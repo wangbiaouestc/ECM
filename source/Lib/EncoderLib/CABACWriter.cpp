@@ -146,7 +146,38 @@ void CABACWriter::end_of_slice()
   m_BinEncoder.finish       ();
 }
 
+#if ERICSSON_BIF && BIF_CTU_SIG
+void CABACWriter::bif(const Slice& slice, const BifParams& bifParams)
+{
+  for (int i = 0; i < bifParams.numBlocks; ++i)
+  {
+    bif(slice, bifParams, i);
+  }
+}
 
+void CABACWriter::bif(const Slice& slice, const BifParams& bifParams, unsigned ctuRsAddr)
+{
+  const PPS& pps = *slice.getPPS();
+  if (!pps.getUseBIF())
+  {
+    return;
+  }
+
+  if (ctuRsAddr == 0)
+  {
+    m_BinEncoder.encodeBinEP(bifParams.allCtuOn);
+    if (bifParams.allCtuOn == 0)
+    {
+      m_BinEncoder.encodeBinEP(bifParams.frmOn);
+    }
+  }
+  if (bifParams.allCtuOn == 0 && bifParams.frmOn)
+  {
+    int i = ctuRsAddr;
+    m_BinEncoder.encodeBin(bifParams.ctuOn[i], Ctx::BifCtrlFlags());
+  }
+}
+#endif
 
 
 //================================================================================

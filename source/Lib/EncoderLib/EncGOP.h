@@ -60,6 +60,9 @@
 #include "Analyze.h"
 #include "RateCtrl.h"
 #include <vector>
+#if ERICSSON_BIF
+#include "BilateralFilter.h"
+#endif
 #include "EncHRD.h"
 
 #if JVET_O0756_CALCULATE_HDRMETRICS
@@ -137,6 +140,9 @@ private:
   PicList*                m_pcListPic;
 
   HLSWriter*              m_HLSWriter;
+#if ERICSSON_BIF
+  BilateralFilter         m_cBilateralFilter;
+#endif
   LoopFilter*             m_pcLoopFilter;
 
   SEIWriter               m_seiWriter;

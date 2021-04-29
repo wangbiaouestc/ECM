@@ -46,6 +46,9 @@
 #include "CommonLib/Unit.h"
 #include "CommonLib/UnitPartitioner.h"
 #include "CommonLib/IbcHashMap.h"
+#if ERICSSON_BIF
+#include "CommonLib/BilateralFilter.h"
+#endif
 #include "CommonLib/LoopFilter.h"
 
 #include "DecoderLib/DecCu.h"
@@ -255,6 +258,9 @@ public:
 
   EncModeCtrl* getModeCtrl  () { return m_modeCtrl; }
 
+#if ERICSSON_BIF
+  BilateralFilter *m_bilateralFilter = new BilateralFilter();
+#endif
 
   void   setMergeBestSATDCost(double cost) { m_mergeBestSATDCost = cost; }
   double getMergeBestSATDCost()            { return m_mergeBestSATDCost; }

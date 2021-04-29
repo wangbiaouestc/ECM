@@ -411,7 +411,12 @@ protected:
   int       m_maxNumAddHypRefFrames;                          ///< max. number of ref frames for additional inter hypotheseis
   int       m_addHypTries;                                    ///< max. number of tries for additional inter hypotheseis
 #endif
-
+#if ERICSSON_BIF
+  bool      m_BIF;                                            ///< bilateral filter
+  unsigned  m_BIFStrength;                                    /// Bilateral filter strength
+  int       m_BIFQPOffset;                                    /// Bilateral QP offset
+#endif
+  
   // ADD_NEW_TOOL : (encoder app) add tool enabling flags and associated parameters here
   bool      m_virtualBoundariesEnabledFlag;
   bool      m_virtualBoundariesPresentFlag;

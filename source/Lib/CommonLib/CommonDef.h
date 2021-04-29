@@ -124,6 +124,13 @@ static const int AFFINE_ME_LIST_SIZE =                             4;
 static const int AFFINE_ME_LIST_SIZE_LD =                          3;
 static const double AFFINE_ME_LIST_MVP_TH =                        1.0;
 
+#if ERICSSON_BIF || BIF_POST_FILTER
+// In reality only one sample is padded, but previously two samples were padded,
+// so the filtering happens in a copied area that has room for two padded
+// samples on either side.
+static const int32_t NUMBER_PADDED_SAMPLES = 2;
+#endif
+
 // ====================================================================================================================
 // Common constants
 // ====================================================================================================================

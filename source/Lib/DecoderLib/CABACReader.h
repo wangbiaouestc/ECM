@@ -68,6 +68,11 @@ public:
   // sao (clause 7.3.8.3)
   void        sao                       ( CodingStructure&              cs,     unsigned        ctuRsAddr );
 
+#if ERICSSON_BIF && BIF_CTU_SIG
+  void        bif                      (CodingStructure&              cs);
+  void        bif                      (CodingStructure&              cs, unsigned ctuRsAddr);
+#endif
+  
   void        readAlfCtuFilterIndex(CodingStructure&              cs, unsigned        ctuRsAddr);
 
   void ccAlfFilterControlIdc(CodingStructure &cs, const ComponentID compID, const int curIdx, uint8_t *filterControlIdc,

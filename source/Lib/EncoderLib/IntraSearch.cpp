@@ -43,6 +43,9 @@
 #include "CommonLib/Rom.h"
 #include "CommonLib/Picture.h"
 #include "CommonLib/UnitTools.h"
+#if ERICSSON_BIF
+#include "CommonLib/BilateralFilter.h"
+#endif
 
 #include "CommonLib/dtrace_next.h"
 #include "CommonLib/dtrace_buffer.h"
@@ -57,6 +60,9 @@ IntraSearch::IntraSearch()
   , m_pFullCS       (nullptr)
   , m_pBestCS       (nullptr)
   , m_pcEncCfg      (nullptr)
+#if ERICSSON_BIF
+  , m_bilateralFilter(nullptr)
+#endif
   , m_pcTrQuant     (nullptr)
   , m_pcRdCost      (nullptr)
   , m_pcReshape     (nullptr)
@@ -210,6 +216,9 @@ IntraSearch::~IntraSearch()
 }
 
 void IntraSearch::init( EncCfg*        pcEncCfg,
+#if ERICSSON_BIF
+                       BilateralFilter* bilateralFilter,
+#endif
                         TrQuant*       pcTrQuant,
                         RdCost*        pcRdCost,
                         CABACWriter*   CABACEstimator,
@@ -223,6 +232,9 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
 {
   CHECK(m_isInitialized, "Already initialized");
   m_pcEncCfg                     = pcEncCfg;
+#if ERICSSON_BIF
+  m_bilateralFilter              = bilateralFilter;
+#endif
   m_pcTrQuant                    = pcTrQuant;
   m_pcRdCost                     = pcRdCost;
   m_CABACEstimator               = CABACEstimator;
@@ -3185,6 +3197,9 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
 
   const CompArea      &area                 = tu.blocks[compID];
   const SPS           &sps                  = *cs.sps;
+#if ERICSSON_BIF && BIF_RDO_COST
+  const PPS           &pps                  = *cs.pps;
+#endif
 
   const ChannelType    chType               = toChannelType(compID);
   const int            bitDepth             = sps.getBitDepth(chType);
@@ -3478,7 +3493,82 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
   }
 #endif
 
+#if ERICSSON_BIF && BIF_RDO_COST
+  CompArea      tmpArea1(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
+  PelBuf tmpRecLuma;
+  if(isLuma(compID))
+  {
+    tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
+    tmpRecLuma.copyFrom(piReco);
+  }
+  
+  //===== update distortion =====
+#if WCG_EXT
+  
+  if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs()
+      && slice.getLmcsEnabledFlag() && (m_pcReshape->getCTUFlag() || (isChroma(compID) && m_pcEncCfg->getReshapeIntraCMD()))))
+  {
+    
+    const CPelBuf orgLuma = cs.getOrgBuf( cs.area.blocks[COMPONENT_Y] );
+    if (compID == COMPONENT_Y)
+    {
+      if(!(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
+      {
+        tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
+      }
 
+      if (pps.getUseBIF() /*&& (uiAbsSum > 0)*/ && isLuma(compID) && (tu.cu->qp > 17) && (128 > std::max(tu.lumaSize().width, tu.lumaSize().height)))
+      {
+        CompArea compArea = tu.blocks[compID];
+        PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+        if(!(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
+        {
+          m_bilateralFilter->bilateralFilterRDOversionLarge(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, true, m_pcReshape->getInvLUT());
+        }
+        else
+        {
+          std::vector<Pel> dummy_invLUT;
+          m_bilateralFilter->bilateralFilterRDOversionLarge(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, false, dummy_invLUT);
+        }
+      }
+      
+      ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
+    }
+    else
+    {
+      ruiDist += m_pcRdCost->getDistPart(piOrg, piReco, bitDepth, compID, DF_SSE_WTD, &orgLuma);
+      if( jointCbCr )
+      {
+        ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+      }
+    }
+  }
+  else
+#endif
+  {
+    if(isLuma(compID))
+    {
+      if (pps.getUseBIF() /*&& (uiAbsSum > 0)*/ && isLuma(compID) && (tu.cu->qp > 17) && (128 > std::max(tu.lumaSize().width, tu.lumaSize().height)))
+      {
+        CompArea compArea = tu.blocks[compID];
+        PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+        std::vector<Pel>        my_invLUT;
+        m_bilateralFilter->bilateralFilterRDOversionLarge(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, false, my_invLUT);
+      }
+      
+      ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecLuma, bitDepth, compID, DF_SSE );
+    }
+    else
+    {
+      ruiDist += m_pcRdCost->getDistPart( piOrg, piReco, bitDepth, compID, DF_SSE );
+      if( jointCbCr )
+      {
+        ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
+      }
+    }
+  }
+
+#else
   //===== update distortion =====
 #if WCG_EXT
   if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs()
@@ -3510,6 +3600,7 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
     }
   }
+#endif
 }
 
 void IntraSearch::xIntraCodingACTTUBlock(TransformUnit &tu, const ComponentID &compID, Distortion& ruiDist, std::vector<TrMode>* trModes, const bool loadTr)

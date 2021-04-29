@@ -453,6 +453,14 @@ void HLSWriter::codePPS( const PPS* pcPPS )
     }
   }
   }
+#if ERICSSON_BIF
+  WRITE_FLAG(pcPPS->getUseBIF() ? 1 : 0, "bilateral_filter_flag" );
+  if(pcPPS->getUseBIF())
+  {
+    WRITE_CODE( pcPPS->getBIFStrength(), 2,                               "bilateral_filter_strength");
+    WRITE_SVLC( pcPPS->getBIFQPOffset(),                                  "bilateral_filter_qp_offset");
+  }
+#endif
 #if !JVET_S0132_HLS_REORDER
   WRITE_FLAG( pcPPS->getUseWP() ? 1 : 0,  "weighted_pred_flag" );   // Use of Weighting Prediction (P_SLICE)
   WRITE_FLAG( pcPPS->getWPBiPred() ? 1 : 0, "weighted_bipred_flag" );  // Use of Weighting Bi-Prediction (B_SLICE)
@@ -2317,6 +2325,7 @@ void HLSWriter::codePictureHeader( PicHeader* picHeader, bool writeRbspTrailingB
   {
     if (pps->getSaoInfoInPhFlag())
     {
+      // This does not need to be run even if BIF=1.
       WRITE_FLAG(picHeader->getSaoEnabledFlag(CHANNEL_TYPE_LUMA), "ph_sao_luma_enabled_flag");
       if (sps->getChromaFormatIdc() != CHROMA_400)
       {

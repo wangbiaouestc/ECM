@@ -788,6 +788,11 @@ void EncApp::xInitLibCfg()
 
   m_cEncLib.setUseWrapAround                                     ( m_wrapAround );
   m_cEncLib.setWrapAroundOffset                                  ( m_wrapAroundOffset );
+#if ERICSSON_BIF
+  m_cEncLib.setUseBIF                                            ( m_BIF );
+  m_cEncLib.setBIFStrength                                       ( m_BIFStrength );
+  m_cEncLib.setBIFQPOffset                                       ( m_BIFQPOffset );
+#endif
 
   // ADD_NEW_TOOL : (encoder app) add setting of tool enabling flags and associated parameters here
   m_cEncLib.setVirtualBoundariesEnabledFlag                      ( m_virtualBoundariesEnabledFlag );

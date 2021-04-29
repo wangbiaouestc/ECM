@@ -48,6 +48,9 @@
 #include "CommonLib/Unit.h"
 #include "CommonLib/UnitPartitioner.h"
 #include "CommonLib/RdCost.h"
+#if ERICSSON_BIF
+#include "CommonLib/BilateralFilter.h"
+#endif
 
 #include "CommonLib/AffineGradientSearch.h"
 #include "CommonLib/IbcHashMap.h"
@@ -297,6 +300,9 @@ protected:
   EncCfg*         m_pcEncCfg;
 
   // interface to classes
+#if ERICSSON_BIF
+  BilateralFilter* m_bilateralFilter;
+#endif
   TrQuant*        m_pcTrQuant;
   EncReshape*     m_pcReshape;
 
@@ -373,6 +379,9 @@ public:
   virtual ~InterSearch();
 
   void init                         ( EncCfg*        pcEncCfg,
+#if ERICSSON_BIF
+                                     BilateralFilter* bilateralFilter,
+#endif
                                       TrQuant*       pcTrQuant,
                                       int            iSearchRange,
                                       int            bipredSearchRange,

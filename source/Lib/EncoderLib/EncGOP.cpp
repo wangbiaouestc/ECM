@@ -178,6 +178,9 @@ void  EncGOP::create()
 {
   m_bLongtermTestPictureHasBeenCoded = 0;
   m_bLongtermTestPictureHasBeenCoded2 = 0;
+#if ERICSSON_BIF
+  m_cBilateralFilter.create();
+#endif
 }
 
 void  EncGOP::destroy()
@@ -202,6 +205,9 @@ void  EncGOP::destroy()
     delete m_picOrig;
     m_picOrig = NULL;
   }
+#if ERICSSON_BIF
+  m_cBilateralFilter.destroy();
+#endif
 }
 
 void EncGOP::init ( EncLib* pcEncLib )
@@ -1941,6 +1947,26 @@ void EncGOP::xPicInitLMCS(Picture *pic, PicHeader *picHeader, Slice *slice)
   }
 }
 
+
+#if ERICSSON_BIF && BIF_CABAC_ESTIMATION
+class BIFCabacEstImp : public BIFCabacEst
+{
+  CABACWriter* CABACEstimator;
+public:
+  BIFCabacEstImp(CABACWriter* _CABACEstimator) : CABACEstimator(_CABACEstimator) {};
+  virtual ~BIFCabacEstImp() {};
+
+  virtual uint64_t getBits(const Slice& slice, const BifParams& htdfParams)
+  {
+    CABACEstimator->initCtxModels(slice);
+    CABACEstimator->resetBits();
+    CABACEstimator->bif(slice, htdfParams);
+    return CABACEstimator->getEstFracBits();
+  }
+};
+#endif
+
+
 // ====================================================================================================================
 // Public member functions
 // ====================================================================================================================
@@ -2756,7 +2782,13 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
     }
 #endif
 #endif
+#if ERICSSON_BIF
+    // BIF happens in SAO code so this needs to be done
+    // even if SAO=0 if BIF=1.
+    if (pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF() )
+#else
     if (pcSlice->getSPS()->getSAOEnabledFlag())
+#endif
     {
       pcPic->resizeSAO( numberOfCtusInFrame, 0 );
       pcPic->resizeSAO( numberOfCtusInFrame, 1 );
@@ -3024,6 +3056,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
       // SAO parameter estimation using non-deblocked pixels for CTU bottom and right boundary areas
       if( pcSlice->getSPS()->getSAOEnabledFlag() && m_pcCfg->getSaoCtuBoundary() )
       {
+        // This is fine to skip even if SAO=0 and BIF=1.
         m_pcSAO->getPreDBFStatistics( cs );
       }
 
@@ -3067,17 +3100,33 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
       CS::setRefinedMotionField(cs);
 #endif
 
+#if ERICSSON_BIF
+      // We need to do this step if at least one of BIF or SAO are enabled.
+      if( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF())
+#else
       if( pcSlice->getSPS()->getSAOEnabledFlag() )
+#endif
       {
         bool sliceEnabled[MAX_NUM_COMPONENT];
         m_pcSAO->initCABACEstimator( m_pcEncLib->getCABACEncoder(), m_pcEncLib->getCtxCache(), pcSlice );
-
+#if ERICSSON_BIF && BIF_CABAC_ESTIMATION
+        BIFCabacEstImp est(m_pcEncLib->getCABACEncoder()->getCABACEstimator(cs.slice->getSPS()));
+#endif
+        
         m_pcSAO->SAOProcess( cs, sliceEnabled, pcSlice->getLambdas(),
 #if ENABLE_QPA
                              (m_pcCfg->getUsePerceptQPA() && !m_pcCfg->getUseRateCtrl() && pcSlice->getPPS()->getUseDQP() ? m_pcEncLib->getRdCost (PARL_PARAM0 (0))->getChromaWeight() : 0.0),
 #endif
-                             m_pcCfg->getTestSAODisableAtPictureLevel(), m_pcCfg->getSaoEncodingRate(), m_pcCfg->getSaoEncodingRateChroma(), m_pcCfg->getSaoCtuBoundary(), m_pcCfg->getSaoGreedyMergeEnc() );
+                             m_pcCfg->getTestSAODisableAtPictureLevel(), m_pcCfg->getSaoEncodingRate(), m_pcCfg->getSaoEncodingRateChroma(), m_pcCfg->getSaoCtuBoundary(), m_pcCfg->getSaoGreedyMergeEnc()
+#if ERICSSON_BIF && BIF_CABAC_ESTIMATION
+                              , &est
+#endif
+                            );
         //assign SAO slice header
+#if ERICSSON_BIF
+        if( pcSlice->getSPS()->getSAOEnabledFlag() )
+        {
+#endif
         for (int s = 0; s < uiNumSliceSegments; s++)
         {
 
@@ -3095,6 +3144,9 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
         }
 
         }
+#if ERICSSON_BIF
+      }
+#endif
       }
 
       if( pcSlice->getSPS()->getALFEnabledFlag() )
@@ -3174,6 +3226,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 #endif
       if( pcSlice->getSPS()->getSAOEnabledFlag() )
       {
+        // This does not need to be run even if BIF=1.
         m_pcSAO->disabledRate( *pcPic->cs, pcPic->getSAO(1), m_pcCfg->getSaoEncodingRate(), m_pcCfg->getSaoEncodingRateChroma());
       }
       if (pcSlice->getSPS()->getALFEnabledFlag() && (pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Y) || pcSlice->getTileGroupCcAlfCbEnabledFlag() || pcSlice->getTileGroupCcAlfCrEnabledFlag()))

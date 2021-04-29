@@ -805,6 +805,13 @@ protected:
 #endif
 
   bool        m_alf;                                          ///< Adaptive Loop Filter
+
+#if ERICSSON_BIF
+  bool        m_BIF;
+  int         m_BIFStrength;
+  int         m_BIFQPOffset;
+#endif
+  
   bool        m_ccalf;
   int         m_ccalfQpThreshold;
 
@@ -1276,6 +1283,14 @@ public:
   bool      getUseWrapAround                ()         const { return m_wrapAround; }
   void      setWrapAroundOffset             ( unsigned u )   { m_wrapAroundOffset = u; }
   unsigned  getWrapAroundOffset             ()         const { return m_wrapAroundOffset; }
+#if ERICSSON_BIF
+  void      setUseBIF                       ( bool b )       { m_BIF = b; }
+  bool      getUseBIF                       ()         const { return m_BIF; }
+  void      setBIFStrength                  ( int val )       { m_BIFStrength = val; }
+  int       getBIFStrength                  ()         const { return m_BIFStrength; }
+  void      setBIFQPOffset                  ( int val )       { m_BIFQPOffset = val; }
+  int       getBIFQPOffset                  ()         const { return m_BIFQPOffset; }
+#endif
 #if MULTI_HYP_PRED
   void      setNumMHPCandsToTest(int i) { m_numMHPCandsToTest = i; }
   int       getNumMHPCandsToTest() { return m_numMHPCandsToTest; }

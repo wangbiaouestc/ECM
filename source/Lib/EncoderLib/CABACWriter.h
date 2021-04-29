@@ -80,6 +80,10 @@ public:
   void        sao                       ( const Slice&                  slice,    unsigned          ctuRsAddr );
   void        sao_block_pars            ( const SAOBlkParam&            saoPars,  const BitDepths&  bitDepths,  bool* sliceEnabled, bool leftMergeAvail, bool aboveMergeAvail, bool onlyEstMergeInfo );
   void        sao_offset_pars           ( const SAOOffset&              ctbPars,  ComponentID       compID,     bool sliceEnabled,  int bitDepth );
+#if ERICSSON_BIF && BIF_CTU_SIG
+  void        bif                      (const Slice&                   slice, const BifParams& BifParams);
+  void        bif                      (const Slice& slice, const BifParams& BifParams, unsigned ctuRsAddr);
+#endif
   // coding (quad)tree (clause 7.3.8.4)
   void        coding_tree               ( const CodingStructure&        cs,       Partitioner&      pm,         CUCtx& cuCtx, Partitioner* pPartitionerChroma = nullptr, CUCtx* pCuCtxChroma = nullptr);
   void        split_cu_mode             ( const PartSplit               split,    const CodingStructure& cs,    Partitioner& pm );

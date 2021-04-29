@@ -1461,6 +1461,18 @@ const CtxSet ContextSetCfg::SaoTypeIdx = ContextSetCfg::addCtxSet
 	{ 4 }
 });
 
+#if ERICSSON_BIF && BIF_CTU_SIG
+const CtxSet ContextSetCfg::BifCtrlFlags = ContextSetCfg::addCtxSet
+({
+  { 39 },
+  { 39 },
+  { 39 },
+  { DWS },
+  { DWS },
+  { DWS }
+});
+#endif
+
 const CtxSet ContextSetCfg::LFNSTIdx = ContextSetCfg::addCtxSet
 ({
 #if EXTENDED_LFNST
@@ -2436,6 +2448,16 @@ const CtxSet ContextSetCfg::SaoTypeIdx = ContextSetCfg::addCtxSet
   {  13, },
   {   4, },
 });
+
+#if ERICSSON_BIF && BIF_CTU_SIG
+const CtxSet ContextSetCfg::BifCtrlFlags = ContextSetCfg::addCtxSet
+({
+  { 39, },
+  { 39, },
+  { 39, },
+  { DWS, },
+});
+#endif
 
 const CtxSet ContextSetCfg::LFNSTIdx = ContextSetCfg::addCtxSet
 ({

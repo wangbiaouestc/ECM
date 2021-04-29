@@ -45,6 +45,9 @@
 #include "CommonLib/UnitTools.h"
 #include "CommonLib/dtrace_next.h"
 #include "CommonLib/dtrace_buffer.h"
+#if ERICSSON_BIF
+#include "CommonLib/BilateralFilter.h"
+#endif
 #include "CommonLib/MCTS.h"
 
 #include "EncModeCtrl.h"
@@ -89,6 +92,9 @@ InterSearch::InterSearch()
   , m_pSplitCS                    (nullptr)
   , m_pFullCS                     (nullptr)
   , m_pcEncCfg                    (nullptr)
+#if ERICSSON_BIF
+, m_bilateralFilter             (nullptr)
+#endif
   , m_pcTrQuant                   (nullptr)
   , m_pcReshape                   (nullptr)
   , m_iSearchRange                (0)
@@ -207,6 +213,9 @@ InterSearch::~InterSearch()
 }
 
 void InterSearch::init( EncCfg*        pcEncCfg,
+#if ERICSSON_BIF
+                      BilateralFilter* bilateralFilter,
+#endif
                         TrQuant*       pcTrQuant,
                         int            iSearchRange,
                         int            bipredSearchRange,
@@ -229,6 +238,9 @@ void InterSearch::init( EncCfg*        pcEncCfg,
   }
   m_defaultCachedBvs.currCnt = 0;
   m_pcEncCfg                     = pcEncCfg;
+#if ERICSSON_BIF
+  m_bilateralFilter              = bilateralFilter;
+#endif
   m_pcTrQuant                    = pcTrQuant;
   m_iSearchRange                 = iSearchRange;
   m_bipredSearchRange            = bipredSearchRange;
@@ -7672,7 +7684,29 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
               resiBuf.scaleSignal(tu.getChromaAdj(), 0, tu.cu->cs->slice->clpRng(compID));
             }
 
+#if ERICSSON_BIF && BIF_RDO_COST
+            // getCbf() is going to be 1 since currAbsSum > 0 here, according to the if-statement a couple of lines up.
+            bool isInter = (cu.predMode == MODE_INTER) ? true : false;
+            if (cs.pps->getUseBIF() && isLuma(compID) && (tu.cu->qp > 17) && (128 > std::max(tu.lumaSize().width, tu.lumaSize().height)) && ((isInter == false) || (32 > std::min(tu.lumaSize().width, tu.lumaSize().height))))
+            {
+              CompArea tmpArea1(COMPONENT_Y, tu.chromaFormat, Position(0, 0), Size(resiBuf.width, resiBuf.height));
+              PelBuf tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
+              tmpRecLuma.copyFrom(resiBuf);
+              
+              const CPelBuf predBuf = csFull->getPredBuf(compArea);
+              PelBuf recIPredBuf = csFull->slice->getPic()->getRecoBuf(compArea);
+              std::vector<Pel>        my_invLUT;
+              m_bilateralFilter->bilateralFilterRDOversionLarge(tmpRecLuma, predBuf, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, false, false, my_invLUT);
+
+              currCompDist = m_pcRdCost->getDistPart(orgResiBuf, tmpRecLuma, channelBitDepth, compID, DF_SSE);
+            }
+            else
+            {
+              currCompDist = m_pcRdCost->getDistPart(orgResiBuf, resiBuf, channelBitDepth, compID, DF_SSE);
+            }
+#else
             currCompDist = m_pcRdCost->getDistPart(orgResiBuf, resiBuf, channelBitDepth, compID, DF_SSE);
+#endif
 
 #if WCG_EXT
             currCompCost = m_pcRdCost->calcRdCost(currCompFracBits, currCompDist, false);
@@ -8634,7 +8668,75 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
       continue;
     CPelBuf reco = cs.getRecoBuf (compID);
     CPelBuf org  = cs.getOrgBuf  (compID);
-
+#if ERICSSON_BIF && BIF_RDO_COST
+    const CompArea &areaY = cu.Y();
+    CompArea      tmpArea1(COMPONENT_Y, areaY.chromaFormat, Position(0, 0), areaY.size());
+    PelBuf tmpRecLuma;
+    if(isLuma(compID))
+    {
+      tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
+      tmpRecLuma.copyFrom(reco);
+      if(m_pcEncCfg->getLmcs() && (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() ) && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
+      {
+        tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
+      }
+      
+      if(cs.pps->getUseBIF() && isLuma(compID) && (cu.qp > 17))
+      {
+        for (auto &currTU : CU::traverseTUs(cu))
+        {
+          Position tuPosInCu = currTU.lumaPos() - cu.lumaPos();
+          PelBuf tmpSubBuf = tmpRecLuma.subBuf(tuPosInCu, currTU.lumaSize());
+          
+          
+          bool isInter = (cu.predMode == MODE_INTER) ? true : false;
+          if ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+          {
+            CompArea compArea = currTU.blocks[compID];
+            PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+            
+            // Only reshape surrounding samples if reshaping is on
+            if(m_pcEncCfg->getLmcs() && (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() ) && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
+            {
+              m_bilateralFilter->bilateralFilterRDOversionLarge(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, true, m_pcReshape->getInvLUT());
+            }
+            else
+            {
+              std::vector<Pel> dummy_invLUT;
+              m_bilateralFilter->bilateralFilterRDOversionLarge(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, false, dummy_invLUT);
+            }
+          }
+        }
+      }
+    }
+#if WCG_EXT
+    if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs() && (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())))
+    {
+      const CPelBuf orgLuma = cs.getOrgBuf( cs.area.blocks[COMPONENT_Y] );
+      if (compID == COMPONENT_Y )
+      {
+        //        if(!(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
+        //        {
+        //          tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
+        //        }
+        finalDistortion += m_pcRdCost->getDistPart(org, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
+      }
+      else
+        finalDistortion += m_pcRdCost->getDistPart(org, reco, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
+    }
+    else
+#endif
+    {
+      if (compID == COMPONENT_Y )
+      {
+        finalDistortion += m_pcRdCost->getDistPart( org, tmpRecLuma, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE );
+      }
+      else
+      {
+        finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE );
+      }
+    }
+#else
 #if WCG_EXT
     if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs() && (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())))
     {
@@ -8657,6 +8759,7 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
     {
       finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE );
     }
+#endif
   }
 
   cs.dist     = finalDistortion;

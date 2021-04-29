@@ -41,6 +41,9 @@
 #include "CommonDef.h"
 #include "Unit.h"
 #include "Reshape.h"
+#if ERICSSON_BIF || BIF_POST_FILTER
+#include "BilateralFilter.h"
+#endif
 //! \ingroup CommonLib
 //! \{
 
@@ -65,12 +68,19 @@ class SampleAdaptiveOffset
 public:
   SampleAdaptiveOffset();
   virtual ~SampleAdaptiveOffset();
+#if BIF_POST_FILTER
+  void BIFPostFilter( CodingStructure& cs, SAOBlkParam* saoBlkParams );
+  PelUnitBuf getBIFPostFilteredBuf()                                 { return m_tempBuf; }
+#endif
   void SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkParams
                    );
   void create( int picWidth, int picHeight, ChromaFormat format, uint32_t maxCUWidth, uint32_t maxCUHeight, uint32_t maxCUDepth, uint32_t lumaBitShift, uint32_t chromaBitShift );
   void destroy();
   static int getMaxOffsetQVal(const int channelBitDepth) { return (1<<(std::min<int>(channelBitDepth,MAX_SAO_TRUNCATED_BITDEPTH)-5))-1; } //Table 9-32, inclusive
   void setReshaper(Reshape * p) { m_pcReshape = p; }
+#if ERICSSON_BIF || BIF_POST_FILTER
+  BilateralFilter m_bilateralFilter;
+#endif
 protected:
   void deriveLoopFilterBoundaryAvailibility(CodingStructure& cs, const Position &pos,
     bool& isLeftAvail,
@@ -87,10 +97,21 @@ protected:
                   , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
                   , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
     );
+#if ERICSSON_BIF
+  void offsetBlockBIFonly(const int channelBitDepth, const ClpRng& clpRng, int typeIdx, int* offset, const Pel* srcBlk, Pel* resBlk, int srcStride, int resStride,  int width, int height
+                          , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail, CodingStructure &cs, const UnitArea &area);
+  void offsetBlockNoClip(const int channelBitDepth, const ClpRng& clpRng, int typeIdx, int* offset
+                         , const Pel* srcBlk, Pel* resBlk, int srcStride, int resStride,  int width, int height
+                         , bool isLeftAvail,  bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail);
+#endif
   void invertQuantOffsets(ComponentID compIdx, int typeIdc, int typeAuxInfo, int* dstOffsets, int* srcOffsets);
   void reconstructBlkSAOParam(SAOBlkParam& recParam, SAOBlkParam* mergeList[NUM_SAO_MERGE_TYPES]);
   int  getMergeList(CodingStructure& cs, int ctuRsAddr, SAOBlkParam* blkParams, SAOBlkParam* mergeList[NUM_SAO_MERGE_TYPES]);
   void offsetCTU(const UnitArea& area, const CPelUnitBuf& src, PelUnitBuf& res, SAOBlkParam& saoblkParam, CodingStructure& cs);
+#if ERICSSON_BIF
+  void offsetCTUnoClip( const UnitArea& area, const CPelUnitBuf& src, PelUnitBuf& res, SAOBlkParam& saoblkParam, CodingStructure& cs);
+  void offsetCTUonlySAO(const UnitArea& area, const CPelUnitBuf& src, PelUnitBuf& res, SAOBlkParam& saoblkParam, CodingStructure& cs);
+#endif
   void xReconstructBlkSAOParams(CodingStructure& cs, SAOBlkParam* saoBlkParams);
   bool isCrossedByVirtualBoundaries(const int xPos, const int yPos, const int width, const int height, int& numHorVirBndry, int& numVerVirBndry, int horVirBndryPos[], int verVirBndryPos[], const PicHeader* picHeader);
   inline bool isProcessDisabled(int xPos, int yPos, int numVerVirBndry, int numHorVirBndry, int verVirBndryPos[], int horVirBndryPos[])

@@ -801,6 +801,16 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
     pcPPS->setSliceChromaQpFlag(0);
     pcPPS->clearChromaQpOffsetList();
   }
+  
+#if ERICSSON_BIF
+  READ_FLAG( uiCode, "bilateral_filter_flag" );                        pcPPS->setUseBIF(uiCode != 0) ;
+  if(pcPPS->getUseBIF())
+  {
+    READ_CODE( 2, uiCode, "bilateral_filter_strength" );               pcPPS->setBIFStrength( uiCode);
+    READ_SVLC( iCode, "bilateral_filter_qp_offset" );                  pcPPS->setBIFQPOffset( iCode);
+  }
+#endif
+  
 #if !JVET_S0132_HLS_REORDER
   READ_FLAG( uiCode, "weighted_pred_flag" );          // Use of Weighting Prediction (P_SLICE)
   pcPPS->setUseWP( uiCode==1 );

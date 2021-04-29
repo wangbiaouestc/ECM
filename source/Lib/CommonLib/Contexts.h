@@ -291,6 +291,9 @@ public:
   static const CtxSet   MVPIdx;
   static const CtxSet   SaoMergeFlag;
   static const CtxSet   SaoTypeIdx;
+#if ERICSSON_BIF && BIF_CTU_SIG
+  static const CtxSet   BifCtrlFlags;
+#endif
   static const CtxSet   TransformSkipFlag;
   static const CtxSet   MTSIdx;
   static const CtxSet   LFNSTIdx;

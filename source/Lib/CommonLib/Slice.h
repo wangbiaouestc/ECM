@@ -2229,6 +2229,11 @@ private:
   bool             m_wrapAroundEnabledFlag;               //< reference wrap around enabled or not
   unsigned         m_picWidthMinusWrapAroundOffset;          // <pic_width_in_minCbSizeY - wraparound_offset_in_minCbSizeY
   unsigned         m_wrapAroundOffset;                    //< reference wrap around offset in luma samples
+#if ERICSSON_BIF
+  bool             m_BIF;
+  int              m_BIFStrength;
+  int              m_BIFQPOffset;
+#endif
 
 public:
   PreCalcValues   *pcv;
@@ -2424,6 +2429,14 @@ public:
 
   void                   setCabacInitPresentFlag( bool flag )                             { m_cabacInitPresentFlag = flag;                }
   bool                   getCabacInitPresentFlag() const                                  { return m_cabacInitPresentFlag;                }
+#if ERICSSON_BIF
+  void                   setUseBIF( bool b)                                               { m_BIF = b;                                    }
+  bool                   getUseBIF() const                                                { return m_BIF;                                 }
+  void                   setBIFStrength( int val)                                         { m_BIFStrength = val;                          }
+  int                    getBIFStrength() const                                           { return m_BIFStrength;                         }
+  void                   setBIFQPOffset( int val)                                         { m_BIFQPOffset = val;                          }
+  int                    getBIFQPOffset() const                                           { return m_BIFQPOffset;                         }
+#endif
   void                   setDeblockingFilterControlPresentFlag( bool val )                { m_deblockingFilterControlPresentFlag = val;   }
   bool                   getDeblockingFilterControlPresentFlag() const                    { return m_deblockingFilterControlPresentFlag;  }
   void                   setDeblockingFilterOverrideEnabledFlag( bool val )               { m_deblockingFilterOverrideEnabledFlag = val;  }

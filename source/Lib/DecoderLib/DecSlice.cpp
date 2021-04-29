@@ -237,6 +237,12 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
     {
       break;
     }
+#if ERICSSON_BIF && BIF_CTU_SIG
+    if (ctuRsAddr == 0)
+    {
+      cabacReader.bif(cs);
+    }
+#endif
     cabacReader.coding_tree_unit( cs, ctuArea, pic->m_prevQP, ctuRsAddr );
 
     m_pcCuDecoder->decompressCtu( cs, ctuArea );

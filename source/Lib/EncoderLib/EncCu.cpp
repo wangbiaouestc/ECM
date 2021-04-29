@@ -209,6 +209,11 @@ void EncCu::destroy()
 {
   unsigned numWidths  = gp_sizeIdxInfo->numWidths();
   unsigned numHeights = gp_sizeIdxInfo->numHeights();
+
+#if ERICSSON_BIF
+  delete m_bilateralFilter;
+#endif
+
 #if ENABLE_OBMC
   m_tempWoOBMCBuffer.destroy();
 #endif
@@ -5778,10 +5783,7 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
           pu.bdmvrRefine = true;
           m_pcInterSearch->setBdmvrSubPuMvBuf(m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[(uiMergeCand << 1) + 1]);
         }
-        else
-        {
-          PU::spanMotionInfo(pu, mergeCtx);
-        }
+        PU::spanMotionInfo(pu, mergeCtx, m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[( uiMergeCand << 1 ) + 1]);
 #else
         PU::spanMotionInfo(pu, mergeCtx);
 #endif
@@ -5793,13 +5795,6 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
 
         m_pcInterSearch->motionCompensation(pu, acMergeRealBuffer[uiMergeCand], REF_PIC_LIST_X, true, true);
 
-#if MULTI_PASS_DMVR
-        if( pu.bdmvrRefine )
-        {
-          ::memcpy( m_mvBufEncBDOF4TM[uiMergeCand], m_pcInterSearch->getBdofSubPuMvOffset(), sizeof( Mv ) * BDOF_SUBPU_MAX_NUM );
-          PU::spanMotionInfo( pu, mergeCtx, m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[( uiMergeCand << 1 ) + 1], m_mvBufEncBDOF4TM[uiMergeCand] );
-        }
-#endif
         distParam.cur = acMergeRealBuffer[uiMergeCand].Y();
         Distortion uiSad = distParam.distFunc(distParam);
         m_CABACEstimator->getCtx() = ctxStart;
@@ -5879,10 +5874,7 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
 #endif
       }
 #if MULTI_PASS_DMVR
-      if (!pu.bdmvrRefine)
-      {
-        PU::spanMotionInfo(pu, mergeCtx);
-      }
+      PU::spanMotionInfo(pu, mergeCtx, m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[( uiMergeCand << 1 ) + 1]);
 #else
       PU::spanMotionInfo(pu, mergeCtx);
 #endif
@@ -5890,12 +5882,6 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
       if( mrgTempBufSet )
       {
         tempCS->getPredBuf().copyFrom(acMergeRealBuffer[uiMergeCand]);
-#if MULTI_PASS_DMVR
-        if( pu.bdmvrRefine )
-        {
-          PU::spanMotionInfo( pu, mergeCtx, m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[( uiMergeCand << 1 ) + 1], m_mvBufEncBDOF4TM[uiMergeCand] );
-        }
-#endif
       }
       else
       {
@@ -5904,13 +5890,6 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
         m_pcInterSearch->m_storeBeforeLIC = false;
 #endif
         m_pcInterSearch->motionCompensation( pu );
-#if MULTI_PASS_DMVR
-        if( pu.bdmvrRefine )
-        {
-          ::memcpy( m_mvBufEncBDOF4TM[uiMergeCand], m_pcInterSearch->getBdofSubPuMvOffset(), sizeof( Mv ) * BDOF_SUBPU_MAX_NUM );
-          PU::spanMotionInfo( pu, mergeCtx, m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[( uiMergeCand << 1 ) + 1], m_mvBufEncBDOF4TM[uiMergeCand] );
-        }
-#endif
       }
 
       xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, uiNoResidualPass, uiNoResidualPass == 0 ? &candHasNoResidual[uiMrgHADIdx] : NULL );
@@ -6835,7 +6814,33 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
         }
       }
     }
-
+    
+#if ERICSSON_BIF
+    // Bilateral:
+    // The CU itself, the above area and the area to the left have been copied into
+    //     PelStorage&          picDbBuf = m_pcLoopFilter->getDbEncPicYuvBuffer();
+    //  It is now possible to insert the code for bilateral filtering here.
+    
+    if(cs.pps->getUseBIF())
+    {
+      for (auto &currTU : CU::traverseTUs(*cu))
+      {
+        bool isInter = (cu->predMode == MODE_INTER) ? true : false;
+        if ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)))
+        {
+          if ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)))
+          {
+            CompArea &compArea = currTU.block(COMPONENT_Y);
+            PelBuf    recBuf = picDbBuf.getBuf(compArea);
+            PelBuf recIPredBuf = recBuf;
+            std::vector<Pel>        my_invLUT;
+            m_bilateralFilter->bilateralFilterRDOversionLarge(recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(COMPONENT_Y), currTU, true, false, my_invLUT);
+          }
+        }
+      }
+    }
+#endif
+    
     //deblock
     if ( leftEdgeAvai )
     {
@@ -7417,6 +7422,70 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
       CPelBuf reco = tempCS->getRecoBuf( compID );
       CPelBuf org  = tempCS->getOrgBuf ( compID );
 
+      
+#if ERICSSON_BIF && BIF_RDO_COST
+        const CompArea &area = cu.blocks[COMPONENT_Y];
+        CompArea    tmpArea(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
+        PelBuf tmpRecLuma = m_tmpStorageLCU->getBuf(tmpArea);
+        if(isLuma(compID))
+        {
+          tmpRecLuma.copyFrom(reco);
+
+          if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (
+            m_pcEncCfg->getLmcs() && (tempCS->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())))
+          {
+            tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
+          }
+        }
+        if(tempCS->pps->getUseBIF() && isLuma(compID) && (cu.qp > 17))
+        {
+          for (auto &currTU : CU::traverseTUs(cu))
+          {
+            Position tuPosInCu = currTU.lumaPos() - cu.lumaPos();
+            PelBuf tmpSubBuf = tmpRecLuma.subBuf(tuPosInCu, currTU.lumaSize());
+
+            bool isInter = (cu.predMode == MODE_INTRA) ? false : true;
+            
+            if ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+            {
+              CompArea compArea = currTU.blocks[compID];
+              PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
+              // Do we need to use clipArea?
+              
+              // Only reshape surrounding samples if reshaping is on
+               if(m_pcEncCfg->getLmcs() && (tempCS->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() ) && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
+               {
+                 m_bilateralFilter->bilateralFilterRDOversionLarge(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, true, m_pcReshape->getInvLUT());
+               }
+               else
+               {
+                 std::vector<Pel> dummy_invLUT;
+                 m_bilateralFilter->bilateralFilterRDOversionLarge(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, false, dummy_invLUT);
+               }
+            }
+          }
+        }
+
+#if WCG_EXT
+        if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (
+          m_pcEncCfg->getLmcs() && (tempCS->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())))
+        {
+          const CPelBuf orgLuma = tempCS->getOrgBuf(tempCS->area.blocks[COMPONENT_Y]);
+          if (compID == COMPONENT_Y && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
+          {
+            finalDistortion += m_pcRdCost->getDistPart(org, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
+          }
+          else
+          {
+            finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE_WTD, &orgLuma );
+          }
+        }
+        else
+#endif
+        {
+          finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE );
+        }
+#else
 #if WCG_EXT
       if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs() && (tempCS->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())))
       {
@@ -7436,7 +7505,10 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
       }
       else
 #endif
-      finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE );
+      {
+        finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE );
+      }
+#endif
     }
     }
 

@@ -3347,6 +3347,11 @@ PPS::PPS()
 , m_wrapAroundEnabledFlag            (false)
 , m_picWidthMinusWrapAroundOffset    (0)
 , m_wrapAroundOffset                 (0)
+#if ERICSSON_BIF
+, m_BIF                              (false)
+, m_BIFStrength                      (1)
+, m_BIFQPOffset                      (0)
+#endif
 , pcv                                (NULL)
 {
   m_ChromaQpAdjTableIncludingNullEntry[0].u.comp.CbOffset = 0; // Array includes entry [0] for the null offset used when cu_chroma_qp_offset_flag=0. This is initialised here and never subsequently changed.

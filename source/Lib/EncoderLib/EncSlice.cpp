@@ -1931,6 +1931,13 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
       resetBcwCodingOrder(false, cs);
     }
 
+#if ERICSSON_BIF && BIF_CTU_SIG
+    if (ctuRsAddr == 0)
+    {
+      BifParams& bifParam = cs.picture->getBifParam();
+      m_CABACWriter->bif(*pcSlice, bifParam);
+    }
+#endif
     m_CABACWriter->coding_tree_unit( cs, ctuArea, pcPic->m_prevQP, ctuRsAddr );
 
     // store probabilities of first CTU in line into buffer

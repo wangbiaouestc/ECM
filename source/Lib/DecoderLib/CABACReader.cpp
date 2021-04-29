@@ -341,13 +341,27 @@ void CABACReader::sao( CodingStructure& cs, unsigned ctuRsAddr )
 {
   const SPS&   sps   = *cs.sps;
 
+#if ERICSSON_BIF
+  // If neither BIF nor SAO is enabled, we can return.
+  if(!(cs.pps->getUseBIF() || cs.sps->getSAOEnabledFlag()))
+  {
+    return;
+  }
+  // At least one is enabled, it is safe to assume we can do getSAO().
+  SAOBlkParam&      sao_ctu_pars            = cs.picture->getSAO()[ctuRsAddr];
+#endif
+  
   if( !sps.getSAOEnabledFlag() )
   {
     return;
   }
 
   const Slice& slice                        = *cs.slice;
+#if ERICSSON_BIF
+  // The getSAO() function call has been moved up.
+#else
   SAOBlkParam&      sao_ctu_pars            = cs.picture->getSAO()[ctuRsAddr];
+#endif
   bool              slice_sao_luma_flag     = ( slice.getSaoEnabledFlag( CHANNEL_TYPE_LUMA ) );
   bool              slice_sao_chroma_flag   = ( slice.getSaoEnabledFlag( CHANNEL_TYPE_CHROMA ) && sps.getChromaFormatIdc() != CHROMA_400 );
   sao_ctu_pars[ COMPONENT_Y  ].modeIdc      = SAO_MODE_OFF;
@@ -479,6 +493,74 @@ void CABACReader::sao( CodingStructure& cs, unsigned ctuRsAddr )
     sao_pars.offset[ SAO_CLASS_EO_FULL_PEAK   ] = -offset[3];
   }
 }
+
+#if ERICSSON_BIF && BIF_CTU_SIG
+void CABACReader::bif(CodingStructure& cs)
+{
+  int width = cs.picture->lwidth();
+  int height = cs.picture->lheight();
+
+  int block_width = cs.pcv->maxCUWidth;
+  int block_height = cs.pcv->maxCUHeight;
+
+  int width_in_blocks = width / block_width + (width % block_width != 0);
+  int height_in_blocks = height / block_height + (height % block_height != 0);
+
+  for (int i = 0; i < width_in_blocks * height_in_blocks; i++)
+  {
+    bif(cs, i);
+  }
+}
+
+void CABACReader::bif(CodingStructure& cs, unsigned ctuRsAddr)
+{
+//  const SPS&   sps = *cs.sps;
+  const PPS&   pps = *cs.pps;
+
+  if (!pps.getUseBIF())
+  {
+    return;
+  }
+
+  BifParams& bifParams = cs.picture->getBifParam();
+
+  if (ctuRsAddr == 0)
+  {
+    int width = cs.picture->lwidth();
+    int height = cs.picture->lheight();
+    int block_width = cs.pcv->maxCUWidth;
+    int block_height = cs.pcv->maxCUHeight;
+
+    int width_in_blocks = width / block_width + (width % block_width != 0);
+    int height_in_blocks = height / block_height + (height % block_height != 0);
+    bifParams.numBlocks = width_in_blocks * height_in_blocks;
+    bifParams.ctuOn.resize(bifParams.numBlocks);
+    std::fill(bifParams.ctuOn.begin(), bifParams.ctuOn.end(), 0);
+  }
+  if (ctuRsAddr == 0)
+  {
+    bifParams.allCtuOn = m_BinDecoder.decodeBinEP();
+    if (bifParams.allCtuOn == 0)
+      bifParams.frmOn = m_BinDecoder.decodeBinEP();
+  }
+  int i = ctuRsAddr;
+  if (bifParams.allCtuOn)
+  {
+    bifParams.ctuOn[i] = 1;
+  }
+  else
+  {
+    if (bifParams.frmOn)
+    {
+      bifParams.ctuOn[i] = m_BinDecoder.decodeBin(Ctx::BifCtrlFlags());
+    }
+    else
+    {
+      bifParams.ctuOn[i] = 0;
+    }
+  }
+}
+#endif
 
 //================================================================================
 //  clause 7.3.8.4

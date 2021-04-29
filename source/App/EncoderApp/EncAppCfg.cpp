@@ -1044,7 +1044,12 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("AdditionalInterHypRefFrames",                     m_maxNumAddHypRefFrames,                              4, "max. number of ref frames for additional inter hypotheseis")
   ("AdditionalInterHypTries",                         m_addHypTries,                                        1, "number of tries for additional inter prediction hypotheseis")
 #endif
-
+#if ERICSSON_BIF
+  ("BIF",                                             m_BIF,                                            false, "bilateral filter   (0: off, 1:on)  [default: off]")
+  ("BIFStrength",                                     m_BIFStrength,                                       1u, "bilateral filter strength  (0: half, 1: full, 2: double)  [default: full]")
+  ("BIFQPOffset",                                     m_BIFQPOffset,                                        0, "bilateral filter QP offset (0: no offset)  [default: 0]")
+#endif
+  
   // ADD_NEW_TOOL : (encoder app) add parsing parameters here
   ( "VirtualBoundariesPresentInSPSFlag",              m_virtualBoundariesPresentFlag,                    true, "Virtual Boundary position information is signalled in SPS or PH (1:SPS, 0:PH)  [default: on]" )
   ("NumVerVirtualBoundaries",                         m_numVerVirtualBoundaries,                           0u, "Number of vertical virtual boundaries (0-3, inclusive)")
@@ -4301,6 +4306,11 @@ void EncAppCfg::xPrintParameter()
   {
     msg( VERBOSE, "WrapAroundOffset:%d ", m_wrapAroundOffset );
   }
+#if ERICSSON_BIF
+  msg( VERBOSE, "BIF:%d ", m_BIF);
+  msg( VERBOSE, "BIFStrength:%d ", m_BIFStrength);
+  msg( VERBOSE, "BIFQPOffset:%d ", m_BIFQPOffset);
+#endif
   // ADD_NEW_TOOL (add some output indicating the usage of tools)
   msg( VERBOSE, "VirtualBoundariesEnabledFlag:%d ", m_virtualBoundariesEnabledFlag );
   msg( VERBOSE, "VirtualBoundariesPresentInSPSFlag:%d ", m_virtualBoundariesPresentFlag );

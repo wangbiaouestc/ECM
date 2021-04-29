@@ -62,6 +62,9 @@ enum PictureType
   PIC_ORIGINAL_INPUT,
   PIC_TRUE_ORIGINAL_INPUT,
   PIC_FILTERED_ORIGINAL_INPUT,
+#if BIF_POST_FILTER
+  PIC_POST_FILTER,
+#endif
   NUM_PIC_TYPES
 };
 extern XUCache g_globalUnitCache;
@@ -238,6 +241,10 @@ private:
   PelStorage m_resi;
   PelStorage m_reco;
   PelStorage m_orgr;
+#if BIF_POST_FILTER
+  PelStorage m_post;
+#endif
+
 
   TCoeff *m_coeffs [ MAX_NUM_COMPONENT ];
 #if SIGN_PREDICTION
@@ -293,6 +300,14 @@ public:
   const CPelUnitBuf   getRecoBuf(const UnitArea &unit) const;
          PelUnitBuf&  getRecoBufRef() { return m_reco; }
 
+#if BIF_POST_FILTER
+         PelBuf       getPostBuf(const CompArea &blk);
+  const CPelBuf       getPostBuf(const CompArea &blk) const;
+         PelUnitBuf   getPostBuf(const UnitArea &unit);
+  const CPelUnitBuf   getPostBuf(const UnitArea &unit) const;
+         PelUnitBuf&  getPostBufRef() { return m_reco; }
+#endif
+  
          PelBuf       getOrgResiBuf(const CompArea &blk);
   const CPelBuf       getOrgResiBuf(const CompArea &blk) const;
          PelUnitBuf   getOrgResiBuf(const UnitArea &unit);
@@ -335,6 +350,14 @@ public:
   const CPelBuf       getRecoBuf(const ComponentID compID)   const { return m_reco.get(compID); }
          PelUnitBuf   getRecoBuf()                                 { return m_reco; }
   const CPelUnitBuf   getRecoBuf()                           const { return m_reco; }
+
+#if BIF_POST_FILTER
+  // post buffer
+         PelBuf       getPostBuf(const ComponentID compID)         { return m_post.get(compID); }
+  const CPelBuf       getPostBuf(const ComponentID compID)   const { return m_post.get(compID); }
+         PelUnitBuf   getPostBuf()                                 { return m_post; }
+  const CPelUnitBuf   getPostBuf()                           const { return m_post; }
+#endif
 
 private:
 

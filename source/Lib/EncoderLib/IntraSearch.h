@@ -47,6 +47,9 @@
 #include "CommonLib/TrQuant.h"
 #include "CommonLib/Unit.h"
 #include "CommonLib/RdCost.h"
+#if ERICSSON_BIF
+#include "CommonLib/BilateralFilter.h"
+#endif
 #include "EncReshape.h"
 
 //! \ingroup EncoderLib
@@ -382,6 +385,9 @@ protected:
   EncCfg*         m_pcEncCfg;
 
   // interface to classes
+#if ERICSSON_BIF
+  BilateralFilter* m_bilateralFilter;
+#endif
   TrQuant*        m_pcTrQuant;
   RdCost*         m_pcRdCost;
   EncReshape*     m_pcReshape;
@@ -409,6 +415,9 @@ public:
   ~IntraSearch();
 
   void init                       ( EncCfg*        pcEncCfg,
+#if ERICSSON_BIF
+                                   BilateralFilter* bilateralFilter,
+#endif
                                     TrQuant*       pcTrQuant,
                                     RdCost*        pcRdCost,
                                     CABACWriter*   CABACEstimator,

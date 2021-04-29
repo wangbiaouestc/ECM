@@ -192,7 +192,13 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 }
                 else
                 {
+#if ERICSSON_BIF
+                // Since the per-CTU BIF parameter is stored in SAO, we need to
+                // do this copy even if SAO=0, if BIF=1.
+                if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseBIF() )
+#else
                 if ( pic->cs->sps->getSAOEnabledFlag() )
+#endif
                 {
                   pcEncPic->copySAO( *pic, 0 );
                 }
@@ -233,7 +239,13 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 }
 
                 pcDecLib->executeLoopFilters();
+#if ERICSSON_BIF
+                // Since the per-CTU BIF parameter is stored in SAO, we need to
+                // do this copy even if SAO=0, if BIF=1.
+                if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseBIF() )
+#else
                 if ( pic->cs->sps->getSAOEnabledFlag() )
+#endif
                 {
                   pcEncPic->copySAO( *pic, 1 );
                 }
@@ -491,6 +503,9 @@ void DecLib::create()
 {
   m_apcSlicePilot = new Slice;
   m_uiSliceSegmentIdx = 0;
+#if ERICSSON_BIF && BIF_IN_LOOP
+  m_cBilateralFilter.create();
+#endif
 }
 
 void DecLib::destroy()
@@ -505,6 +520,9 @@ void DecLib::destroy()
   }
 
   m_cSliceDecoder.destroy();
+#if ERICSSON_BIF && BIF_IN_LOOP
+  m_cBilateralFilter.destroy();
+#endif
 }
 
 void DecLib::init(
@@ -659,11 +677,16 @@ void DecLib::executeLoopFilters()
 #if !MULTI_PASS_DMVR
   CS::setRefinedMotionField(cs);
 #endif
+
+#if ERICSSON_BIF
+  if( cs.sps->getSAOEnabledFlag() || cs.pps->getUseBIF())
+#else
   if( cs.sps->getSAOEnabledFlag() )
+#endif
   {
     m_cSAO.SAOProcess( cs, cs.picture->getSAO() );
   }
-
+    
   if( cs.sps->getALFEnabledFlag() )
   {
     m_cALF.getCcAlfFilterParam() = cs.slice->m_ccAlfFilterParam;
@@ -673,6 +696,12 @@ void DecLib::executeLoopFilters()
     m_cALF.ALFProcess(cs);
   }
 
+#if BIF_POST_FILTER
+  m_cSAO.BIFPostFilter( cs, cs.picture->getSAO() );
+#endif
+  
+  // Use residual buffer to store post-filtered image
+  
   for (int i = 0; i < cs.pps->getNumSubPics() && m_targetSubPicIdx; i++)
   {
     // keep target subpic samples untouched, for other subpics mask their output sample value to 0

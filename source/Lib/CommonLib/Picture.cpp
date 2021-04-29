@@ -39,7 +39,9 @@
 #include "SEI.h"
 #include "ChromaFormat.h"
 #include "CommonLib/InterpolationFilter.h"
-
+#if ERICSSON_BIF && BIF_CTU_SIG
+BifParams Picture::m_BifParams;
+#endif
 
 #if ENABLE_SPLIT_PARALLELISM
 
@@ -213,6 +215,11 @@ void Picture::create( const ChromaFormat &_chromaFormat, const Size &size, const
   M_BUFS( 0, PIC_RECONSTRUCTION ).create( _chromaFormat, a, _maxCUSize, margin, MEMORY_ALIGN_DEF_SIZE );
   M_BUFS( 0, PIC_RECON_WRAP ).create( _chromaFormat, a, _maxCUSize, margin, MEMORY_ALIGN_DEF_SIZE );
 
+#if BIF_POST_FILTER
+  M_BUFS( 0, PIC_POST_FILTER ).create( _chromaFormat, a, _maxCUSize, _margin, MEMORY_ALIGN_DEF_SIZE );
+#endif
+
+  
   if( !_decoder )
   {
     M_BUFS( 0, PIC_ORIGINAL ).    create( _chromaFormat, a );
@@ -356,6 +363,14 @@ const CPelUnitBuf Picture::getPredBuf(const UnitArea &unit) const { return getBu
 const CPelBuf     Picture::getResiBuf(const CompArea &blk)  const { return getBuf(blk,  PIC_RESIDUAL); }
        PelUnitBuf Picture::getResiBuf(const UnitArea &unit)       { return getBuf(unit, PIC_RESIDUAL); }
 const CPelUnitBuf Picture::getResiBuf(const UnitArea &unit) const { return getBuf(unit, PIC_RESIDUAL); }
+#if BIF_POST_FILTER
+       PelBuf     Picture::getPostBuf(const CompArea &blk)        { return getBuf(blk,  PIC_POST_FILTER); }
+const CPelBuf     Picture::getPostBuf(const CompArea &blk)  const { return getBuf(blk,  PIC_POST_FILTER); }
+       PelUnitBuf Picture::getPostBuf(const UnitArea &unit)       { return getBuf(unit, PIC_POST_FILTER); }
+const CPelUnitBuf Picture::getPostBuf(const UnitArea &unit) const { return getBuf(unit, PIC_POST_FILTER); }
+       PelUnitBuf Picture::getPostBuf()                           { return M_BUFS(scheduler.getSplitPicId(), PIC_POST_FILTER); }
+const CPelUnitBuf Picture::getPostBuf()                     const { return M_BUFS(scheduler.getSplitPicId(), PIC_POST_FILTER); }
+#endif
 
        PelBuf     Picture::getRecoBuf(const ComponentID compID, bool wrap)       { return getBuf(compID,                    wrap ? PIC_RECON_WRAP : PIC_RECONSTRUCTION); }
 const CPelBuf     Picture::getRecoBuf(const ComponentID compID, bool wrap) const { return getBuf(compID,                    wrap ? PIC_RECON_WRAP : PIC_RECONSTRUCTION); }

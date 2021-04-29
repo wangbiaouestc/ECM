@@ -132,6 +132,15 @@ struct Picture : public UnitArea
   const CPelBuf     getResiBuf(const CompArea &blk) const;
          PelUnitBuf getResiBuf(const UnitArea &unit);
   const CPelUnitBuf getResiBuf(const UnitArea &unit) const;
+  
+#if BIF_POST_FILTER
+         PelBuf     getPostBuf(const CompArea &blk);
+  const CPelBuf     getPostBuf(const CompArea &blk) const;
+         PelUnitBuf getPostBuf(const UnitArea &unit);
+  const CPelUnitBuf getPostBuf(const UnitArea &unit) const;
+         PelUnitBuf getPostBuf();
+  const CPelUnitBuf getPostBuf() const;
+#endif
 
          PelBuf     getRecoBuf(const ComponentID compID, bool wrap=false);
   const CPelBuf     getRecoBuf(const ComponentID compID, bool wrap=false) const;
@@ -305,6 +314,16 @@ public:
   void            resizeSAO(unsigned numEntries, int dstid) { m_sao[dstid].resize(numEntries); }
   void            copySAO(const Picture& src, int dstid)    { std::copy(src.m_sao[0].begin(), src.m_sao[0].end(), m_sao[dstid].begin()); }
 
+#if ERICSSON_BIF && BIF_CTU_SIG
+  BifParams&       getBifParam() { return m_BifParams; }
+  void resizeBIF(unsigned numEntries)
+  {
+    m_BifParams.numBlocks = numEntries;
+    m_BifParams.ctuOn.resize(numEntries);
+    std::fill(m_BifParams.ctuOn.begin(), m_BifParams.ctuOn.end(), 0);
+  };
+#endif
+  
 #if ENABLE_QPA
   std::vector<double>     m_uEnerHpCtu;                         ///< CTU-wise L2 or squared L1 norm of high-passed luma input
   std::vector<Pel>        m_iOffsetCtu;                         ///< CTU-wise DC offset (later QP index offset) of luma input
@@ -314,6 +333,9 @@ public:
 #endif
 
   std::vector<SAOBlkParam> m_sao[2];
+#if ERICSSON_BIF && BIF_CTU_SIG
+  static BifParams        m_BifParams;
+#endif
 
   std::vector<uint8_t> m_alfCtuEnableFlag[MAX_NUM_COMPONENT];
   uint8_t* getAlfCtuEnableFlag( int compIdx ) { return m_alfCtuEnableFlag[compIdx].data(); }

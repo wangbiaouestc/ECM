@@ -546,6 +546,226 @@ void SampleAdaptiveOffset::offsetBlock(const int channelBitDepth, const ClpRng& 
   }
 }
 
+#if ERICSSON_BIF
+void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const ClpRng& clpRng, int typeIdx, int* offset
+                                             , const Pel* srcBlk, Pel* resBlk, int srcStride, int resStride,  int width, int height
+                                             , bool isLeftAvail,  bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail)
+{
+  int x,y, startX, startY, endX, endY, edgeType;
+  int firstLineStartX, firstLineEndX, lastLineStartX, lastLineEndX;
+  int8_t signLeft, signRight, signDown;
+  
+  const Pel* srcLine = srcBlk;
+  Pel* resLine = resBlk;
+  
+  switch(typeIdx)
+  {
+    case SAO_TYPE_EO_0:
+    {
+      offset += 2;
+      startX = isLeftAvail ? 0 : 1;
+      endX   = isRightAvail ? width : (width -1);
+      for (y=0; y< height; y++)
+      {
+        signLeft = (int8_t)sgn(srcLine[startX] - srcLine[startX-1]);
+        for (x=startX; x< endX; x++)
+        {
+          signRight = (int8_t)sgn(srcLine[x] - srcLine[x+1]);
+          edgeType =  signRight + signLeft;
+          signLeft  = -signRight;
+          
+          resLine[x] = srcLine[x] + offset[edgeType];
+        }
+        srcLine  += srcStride;
+        resLine += resStride;
+      }
+      
+    }
+      break;
+    case SAO_TYPE_EO_90:
+    {
+      offset += 2;
+      int8_t *signUpLine = &m_signLineBuf1[0];
+      
+      startY = isAboveAvail ? 0 : 1;
+      endY   = isBelowAvail ? height : height-1;
+      if (!isAboveAvail)
+      {
+        srcLine += srcStride;
+        resLine += resStride;
+      }
+      
+      const Pel* srcLineAbove= srcLine- srcStride;
+      for (x=0; x< width; x++)
+      {
+        signUpLine[x] = (int8_t)sgn(srcLine[x] - srcLineAbove[x]);
+      }
+      
+      const Pel* srcLineBelow;
+      for (y=startY; y<endY; y++)
+      {
+        srcLineBelow= srcLine+ srcStride;
+        
+        for (x=0; x< width; x++)
+        {
+          signDown  = (int8_t)sgn(srcLine[x] - srcLineBelow[x]);
+          edgeType = signDown + signUpLine[x];
+          signUpLine[x]= -signDown;
+          
+          resLine[x] = srcLine[x] + offset[edgeType];
+        }
+        srcLine += srcStride;
+        resLine += resStride;
+      }
+      
+    }
+      break;
+    case SAO_TYPE_EO_135:
+    {
+      offset += 2;
+      int8_t *signUpLine, *signDownLine, *signTmpLine;
+      
+      signUpLine  = &m_signLineBuf1[0];
+      signDownLine= &m_signLineBuf2[0];
+      
+      startX = isLeftAvail ? 0 : 1 ;
+      endX   = isRightAvail ? width : (width-1);
+      
+      //prepare 2nd line's upper sign
+      const Pel* srcLineBelow= srcLine+ srcStride;
+      for (x=startX; x< endX+1; x++)
+      {
+        signUpLine[x] = (int8_t)sgn(srcLineBelow[x] - srcLine[x- 1]);
+      }
+      
+      //1st line
+      const Pel* srcLineAbove= srcLine- srcStride;
+      firstLineStartX = isAboveLeftAvail ? 0 : 1;
+      firstLineEndX   = isAboveAvail? endX: 1;
+      for(x= firstLineStartX; x< firstLineEndX; x++)
+      {
+        edgeType  =  sgn(srcLine[x] - srcLineAbove[x- 1]) - signUpLine[x+1];
+        
+        resLine[x] = srcLine[x] + offset[edgeType];
+      }
+      srcLine  += srcStride;
+      resLine  += resStride;
+      
+      
+      //middle lines
+      for (y= 1; y< height-1; y++)
+      {
+        srcLineBelow= srcLine+ srcStride;
+        
+        for (x=startX; x<endX; x++)
+        {
+          signDown =  (int8_t)sgn(srcLine[x] - srcLineBelow[x+ 1]);
+          edgeType =  signDown + signUpLine[x];
+          resLine[x] = srcLine[x] + offset[edgeType];
+          
+          signDownLine[x+1] = -signDown;
+        }
+        signDownLine[startX] = (int8_t)sgn(srcLineBelow[startX] - srcLine[startX-1]);
+        
+        signTmpLine  = signUpLine;
+        signUpLine   = signDownLine;
+        signDownLine = signTmpLine;
+        
+        srcLine += srcStride;
+        resLine += resStride;
+      }
+      
+      //last line
+      srcLineBelow= srcLine+ srcStride;
+      lastLineStartX = isBelowAvail ? startX : (width -1);
+      lastLineEndX   = isBelowRightAvail ? width : (width -1);
+      for(x= lastLineStartX; x< lastLineEndX; x++)
+      {
+        edgeType =  sgn(srcLine[x] - srcLineBelow[x+ 1]) + signUpLine[x];
+        resLine[x] = srcLine[x] + offset[edgeType];
+        
+      }
+    }
+      break;
+    case SAO_TYPE_EO_45:
+    {
+      offset += 2;
+      int8_t *signUpLine = &m_signLineBuf1[1];
+      
+      startX = isLeftAvail ? 0 : 1;
+      endX   = isRightAvail ? width : (width -1);
+      
+      //prepare 2nd line upper sign
+      const Pel* srcLineBelow= srcLine+ srcStride;
+      for (x=startX-1; x< endX; x++)
+      {
+        signUpLine[x] = (int8_t)sgn(srcLineBelow[x] - srcLine[x+1]);
+      }
+      
+      
+      //first line
+      const Pel* srcLineAbove= srcLine- srcStride;
+      firstLineStartX = isAboveAvail ? startX : (width -1 );
+      firstLineEndX   = isAboveRightAvail ? width : (width-1);
+      for(x= firstLineStartX; x< firstLineEndX; x++)
+      {
+        edgeType = sgn(srcLine[x] - srcLineAbove[x+1]) -signUpLine[x-1];
+        resLine[x] = srcLine[x] + offset[edgeType];
+      }
+      srcLine += srcStride;
+      resLine += resStride;
+      
+      //middle lines
+      for (y= 1; y< height-1; y++)
+      {
+        srcLineBelow= srcLine+ srcStride;
+        
+        for(x= startX; x< endX; x++)
+        {
+          signDown =  (int8_t)sgn(srcLine[x] - srcLineBelow[x-1]);
+          edgeType =  signDown + signUpLine[x];
+          resLine[x] = srcLine[x] + offset[edgeType];
+          signUpLine[x-1] = -signDown;
+        }
+        signUpLine[endX-1] = (int8_t)sgn(srcLineBelow[endX-1] - srcLine[endX]);
+        srcLine  += srcStride;
+        resLine += resStride;
+      }
+      
+      //last line
+      srcLineBelow= srcLine+ srcStride;
+      lastLineStartX = isBelowLeftAvail ? 0 : 1;
+      lastLineEndX   = isBelowAvail ? endX : 1;
+      for(x= lastLineStartX; x< lastLineEndX; x++)
+      {
+        edgeType = sgn(srcLine[x] - srcLineBelow[x-1]) + signUpLine[x];
+        resLine[x] = srcLine[x] + offset[edgeType];
+        
+      }
+    }
+      break;
+    case SAO_TYPE_BO:
+    {
+      const int shiftBits = channelBitDepth - NUM_SAO_BO_CLASSES_LOG2;
+      for (y=0; y< height; y++)
+      {
+        for (x=0; x< width; x++)
+        {
+          resLine[x] = srcLine[x] + offset[srcLine[x] >> shiftBits];
+        }
+        srcLine += srcStride;
+        resLine += resStride;
+      }
+    }
+      break;
+    default:
+    {
+      THROW("Not a supported SAO types\n");
+    }
+  }
+}
+#endif
+
 void SampleAdaptiveOffset::offsetCTU( const UnitArea& area, const CPelUnitBuf& src, PelUnitBuf& res, SAOBlkParam& saoblkParam, CodingStructure& cs)
 {
   const uint32_t numberOfComponents = getNumberValidComponents( area.chromaFormat );
@@ -615,15 +835,179 @@ void SampleAdaptiveOffset::offsetCTU( const UnitArea& area, const CPelUnitBuf& s
   } //compIdx
 }
 
+#if ERICSSON_BIF
+void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnitBuf& src, PelUnitBuf& res, SAOBlkParam& saoblkParam, CodingStructure& cs)
+{
+  const uint32_t numberOfComponents = getNumberValidComponents( area.chromaFormat );
+  bool bAllOff=true;
+  for( uint32_t compIdx = 0; compIdx < numberOfComponents; compIdx++)
+  {
+    if (saoblkParam[compIdx].modeIdc != SAO_MODE_OFF)
+    {
+      bAllOff=false;
+    }
+  }
+  if (bAllOff)
+  {
+    return;
+  }
+  
+  bool isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail;
+  
+  //block boundary availability
+  deriveLoopFilterBoundaryAvailibility(cs, area.Y(), isLeftAvail,isRightAvail,isAboveAvail,isBelowAvail,isAboveLeftAvail,isAboveRightAvail,isBelowLeftAvail,isBelowRightAvail);
+  
+  const size_t lineBufferSize = area.Y().width + 1;
+  if (m_signLineBuf1.size() < lineBufferSize)
+  {
+    m_signLineBuf1.resize(lineBufferSize);
+    m_signLineBuf2.resize(lineBufferSize);
+  }
+  
+  int numHorVirBndry = 0, numVerVirBndry = 0;
+  int horVirBndryPos[] = { -1,-1,-1 };
+  int verVirBndryPos[] = { -1,-1,-1 };
+  int horVirBndryPosComp[] = { -1,-1,-1 };
+  int verVirBndryPosComp[] = { -1,-1,-1 };
+  bool isCtuCrossedByVirtualBoundaries = isCrossedByVirtualBoundaries(area.Y().x, area.Y().y, area.Y().width, area.Y().height, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos, cs.picHeader);
+  for(int compIdx = 0; compIdx < numberOfComponents; compIdx++)
+  {
+    const ComponentID compID = ComponentID(compIdx);
+    const CompArea& compArea = area.block(compID);
+    SAOOffset& ctbOffset     = saoblkParam[compIdx];
+    
+    if(ctbOffset.modeIdc != SAO_MODE_OFF)
+    {
+      int  srcStride    = src.get(compID).stride;
+      const Pel* srcBlk = src.get(compID).bufAt(compArea);
+      int  resStride    = res.get(compID).stride;
+      Pel* resBlk       = res.get(compID).bufAt(compArea);
+      for (int i = 0; i < numHorVirBndry; i++)
+      {
+        horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
+      }
+      for (int i = 0; i < numVerVirBndry; i++)
+      {
+        verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
+      }
+      
+      if(compID == COMPONENT_Y)
+      {
+        // If it is luma we should not clip, since we will clip
+        // after BIF has been added.
+
+        offsetBlockNoClip( cs.sps->getBitDepth(toChannelType(compID)),
+                    cs.slice->clpRng(compID),
+                    ctbOffset.typeIdc, ctbOffset.offset
+                    , srcBlk, resBlk, srcStride, resStride, compArea.width, compArea.height
+                    , isLeftAvail, isRightAvail
+                    , isAboveAvail, isBelowAvail
+                    , isAboveLeftAvail, isAboveRightAvail
+                    , isBelowLeftAvail, isBelowRightAvail
+   //                 , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+                    );
+        }
+      else
+      {
+        // If it is chroma we should clip as normal, since
+        // chroma is not bilaterally filtered.
+        offsetBlock( cs.sps->getBitDepth(toChannelType(compID)),
+                    cs.slice->clpRng(compID),
+                    ctbOffset.typeIdc, ctbOffset.offset
+                    , srcBlk, resBlk, srcStride, resStride, compArea.width, compArea.height
+                    , isLeftAvail, isRightAvail
+                    , isAboveAvail, isBelowAvail
+                    , isAboveLeftAvail, isAboveRightAvail
+                    , isBelowLeftAvail, isBelowRightAvail
+                    , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+                    );
+
+      }
+      
+    }
+  } //compIdx
+}
+#endif
+
+#if BIF_POST_FILTER
+void SampleAdaptiveOffset::BIFPostFilter( CodingStructure& cs, SAOBlkParam* saoBlkParams
+                                      )
+{
+  // We use the temporary buffer used by SAO and BIF for
+  // the post-filter data.
+  
+  // First copy the finished image into the temporary buffer.
+  const PreCalcValues& pcv = *cs.pcv;
+  PelUnitBuf rec = cs.getRecoBuf();
+  PelUnitBuf post = cs.getPostBuf();
+  post.copyFrom( rec );
+
+  // Now do bilateral filtering on the m_tempBuf buffer:
+  int ctuRsAddr = 0;
+  for( uint32_t yPos = 0; yPos < pcv.lumaHeight; yPos += pcv.maxCUHeight )
+  {
+    for( uint32_t xPos = 0; xPos < pcv.lumaWidth; xPos += pcv.maxCUWidth )
+    {
+      const uint32_t width  = (xPos + pcv.maxCUWidth  > pcv.lumaWidth)  ? (pcv.lumaWidth - xPos)  : pcv.maxCUWidth;
+      const uint32_t height = (yPos + pcv.maxCUHeight > pcv.lumaHeight) ? (pcv.lumaHeight - yPos) : pcv.maxCUHeight;
+      const UnitArea area( cs.area.chromaFormat, Area(xPos , yPos, width, height) );
+      
+      // We are using BIF, so we run SAO without clipping
+      // However, if 'SAO=0', bAllDisabled=true and we should not run offsetCTUnoClip.
+      
+      // And now we traverse the CTU to do BIF
+      for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
+      {
+        for (auto &currTU : CU::traverseTUs(currCU))
+        {
+          
+          bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+          if ( ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+          {
+            m_bilateralFilter.bilateralFilterLargeSIMD(rec, post, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+          }
+          else
+          {
+            // We don't need to clip if SAO was not performed on luma.
+            m_bilateralFilter.clipNotBilaterallyFilteredBlocks(rec, post, cs.slice->clpRng(COMPONENT_Y), currTU);
+          }
+        }
+      }
+
+      ctuRsAddr++;
+    }
+  }
+}
+#endif
+
 void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkParams
                                       )
 {
   CHECK(!saoBlkParams, "No parameters present");
 
+#if ERICSSON_BIF
+  // In code without BIF, SAOProcess would not be run if 'SAO=0'.
+  // However, in the BIF-enabled code, we still might go here if 'SAO=0' and 'BIF=1'.
+  // Hence we must check getSAOEnabledFlag() for some of the function calls.
+  if( cs.sps->getSAOEnabledFlag() )
+  {
+    xReconstructBlkSAOParams(cs, saoBlkParams);
+  }
+#else
   xReconstructBlkSAOParams(cs, saoBlkParams);
+#endif
 
   const uint32_t numberOfComponents = getNumberValidComponents(cs.area.chromaFormat);
   bool bAllDisabled = true;
+#if ERICSSON_BIF
+  // If 'SAO=0' we would not normally get here. However, now we might get
+  // here if 'SAO=0' and 'BIF=1'. Hence we should only run this if
+  // getSAOEnabledFlag() is true. Note that if getSAOEnabledFlag() is false,
+  // we will not run the code and bAllDisabled will stay true, which will
+  // give the correct behavior.
+  if( cs.sps->getSAOEnabledFlag() )
+  {
+#endif
   for (uint32_t compIdx = 0; compIdx < numberOfComponents; compIdx++)
   {
     if (m_picSAOEnabled[compIdx])
@@ -631,9 +1015,22 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
       bAllDisabled = false;
     }
   }
+#if ERICSSON_BIF
+  }
+#endif
   if (bAllDisabled)
   {
+#if ERICSSON_BIF
+    // Even if we are not doing SAO we might still need to do BIF
+    // so we cannot return even if SAO is never used.
+    if(!cs.pps->getUseBIF())
+    {
+      // However, if we are not doing BIF it is safe to return.
+      return;
+    }
+#else
     return;
+#endif
   }
 
   const PreCalcValues& pcv = *cs.pcv;
@@ -648,8 +1045,58 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
       const uint32_t width  = (xPos + pcv.maxCUWidth  > pcv.lumaWidth)  ? (pcv.lumaWidth - xPos)  : pcv.maxCUWidth;
       const uint32_t height = (yPos + pcv.maxCUHeight > pcv.lumaHeight) ? (pcv.lumaHeight - yPos) : pcv.maxCUHeight;
       const UnitArea area( cs.area.chromaFormat, Area(xPos , yPos, width, height) );
-
+#if ERICSSON_BIF
+      if(cs.pps->getUseBIF())
+      {
+        // We are using BIF, so we run SAO without clipping
+        // However, if 'SAO=0', bAllDisabled=true and we should not run offsetCTUnoClip.
+        if( !bAllDisabled )
+          offsetCTUnoClip( area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs);
+        
+        // We don't need to clip if SAO was not performed on luma.
+        SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
+        SAOOffset& myCtbOffset     = mySAOblkParam[0];
+        
+#if BIF_CTU_SIG
+        BifParams& bifParams = cs.picture->getBifParam();
+#endif
+        
+        bool clipLumaIfNoBilat = false;
+        if(!bAllDisabled && myCtbOffset.modeIdc != SAO_MODE_OFF)
+          clipLumaIfNoBilat = true;
+        
+        // And now we traverse the CTU to do BIF
+        for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
+        {
+          for (auto &currTU : CU::traverseTUs(currCU))
+          {
+            
+            bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+#if BIF_CTU_SIG
+            if ( bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+#else
+            if ( mySAOblkParam.BIF && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+#endif
+            {
+              m_bilateralFilter.bilateralFilterLargeSIMD(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+            }
+            else
+            {
+              // We don't need to clip if SAO was not performed on luma.
+              if(clipLumaIfNoBilat)
+                m_bilateralFilter.clipNotBilaterallyFilteredBlocks(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Y), currTU);
+            }
+          }
+        }
+      }
+      else
+      {
+        // BIF is not used, use old SAO code
+        offsetCTU( area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs);
+      }
+#else
       offsetCTU( area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs);
+#endif
       ctuRsAddr++;
     }
   }

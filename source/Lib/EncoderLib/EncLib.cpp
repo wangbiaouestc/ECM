@@ -111,6 +111,9 @@ void EncLib::create( const int layerId )
   m_cCuEncoder      = new EncCu              [m_numCuEncStacks];
   m_cInterSearch    = new InterSearch        [m_numCuEncStacks];
   m_cIntraSearch    = new IntraSearch        [m_numCuEncStacks];
+#if ERICSSON_BIF
+  m_bilateralFilter = new BilateralFilter    [m_numCuEncStacks];
+#endif
   m_cTrQuant        = new TrQuant            [m_numCuEncStacks];
   m_CABACEncoder    = new CABACEncoder       [m_numCuEncStacks];
   m_cRdCost         = new RdCost             [m_numCuEncStacks];
@@ -119,9 +122,16 @@ void EncLib::create( const int layerId )
   for( int jId = 0; jId < m_numCuEncStacks; jId++ )
   {
     m_cCuEncoder[jId].         create( this );
+#if ERICSSON_BIF
+    m_bilateralFilter[jId].    create();
+#endif
+
   }
 #else
   m_cCuEncoder.         create( this );
+#if ERICSSON_BIF
+  m_bilateralFilter.    create();
+#endif
 #endif
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
   m_cInterSearch.cacheAssign( &m_cacheModel );
@@ -158,7 +168,11 @@ void EncLib::create( const int layerId )
   {
     m_cEncALF.create(this, m_iSourceWidth, m_iSourceHeight, m_chromaFormatIDC, m_maxCUWidth, m_maxCUHeight, floorLog2(m_maxCUWidth) - m_log2MinCUSize, m_bitDepth, m_inputBitDepth);
   }
+#if ERICSSON_BIF
+  if (m_bUseSAO || m_BIF)
+#else
   if (m_bUseSAO)
+#endif
   {
     const uint32_t widthInCtus = (m_iSourceWidth + m_maxCUWidth - 1) / m_maxCUWidth;
     const uint32_t heightInCtus = (m_iSourceHeight + m_maxCUHeight - 1) / m_maxCUHeight;
@@ -202,16 +216,25 @@ void EncLib::destroy ()
   {
     m_cInterSearch[jId].   destroy();
     m_cIntraSearch[jId].   destroy();
+#if ERICSSON_BIF
+    m_bilateralFilter[jId].destroy();
+#endif
   }
 #else
   m_cInterSearch.       destroy();
   m_cIntraSearch.       destroy();
+#if ERICSSON_BIF
+  m_bilateralFilter.    destroy();
+#endif
 #endif
 
 #if ENABLE_SPLIT_PARALLELISM
   delete[] m_cCuEncoder;
   delete[] m_cInterSearch;
   delete[] m_cIntraSearch;
+#if ERICSSON_BIF
+  delete[] m_bilateralFilter;
+#endif
   delete[] m_cTrQuant;
   delete[] m_CABACEncoder;
   delete[] m_cRdCost;
@@ -413,6 +436,9 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     // initialize encoder search class
     CABACWriter* cabacEstimator = m_CABACEncoder[jId].getCABACEstimator( &sps0 );
     m_cIntraSearch[jId].init( this,
+#if ERICSSON_BIF
+                             &m_bilateralFilter[jId],
+#endif
                               &m_cTrQuant[jId],
                               &m_cRdCost[jId],
                               cabacEstimator,
@@ -421,6 +447,9 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
                             , sps0.getBitDepth(CHANNEL_TYPE_LUMA)
     );
     m_cInterSearch[jId].init( this,
+#if ERICSSON_BIF
+                             &m_bilateralFilter[jId],
+#endif
                               &m_cTrQuant[jId],
                               m_iSearchRange,
                               m_bipredSearchRange,
@@ -450,6 +479,9 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
   // initialize encoder search class
   CABACWriter* cabacEstimator = m_CABACEncoder.getCABACEstimator(&sps0);
   m_cIntraSearch.init( this,
+#if ERICSSON_BIF
+                       &m_bilateralFilter,
+#endif
                        &m_cTrQuant,
                        &m_cRdCost,
                        cabacEstimator,
@@ -458,6 +490,9 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
                      , sps0.getBitDepth(CHANNEL_TYPE_LUMA)
   );
   m_cInterSearch.init( this,
+#if ERICSSON_BIF
+                       &m_bilateralFilter,
+#endif
                        &m_cTrQuant,
                        m_iSearchRange,
                        m_bipredSearchRange,
@@ -1845,6 +1880,12 @@ void EncLib::xInitPPS(PPS &pps, const SPS &sps)
   pps.setUseWP( m_useWeightedPred );
   pps.setWPBiPred( m_useWeightedBiPred );
   pps.setOutputFlagPresentFlag( false );
+
+#if ERICSSON_BIF
+  pps.setUseBIF                ( m_BIF );
+  pps.setBIFStrength           ( m_BIFStrength );
+  pps.setBIFQPOffset           ( m_BIFQPOffset );
+#endif
 
   if ( getDeblockingFilterMetric() )
   {

@@ -54,6 +54,9 @@
 #include "CommonLib/SEI.h"
 #include "CommonLib/Unit.h"
 #include "CommonLib/Reshape.h"
+#if ERICSSON_BIF && BIF_IN_LOOP
+#include "BilateralFilter.h"
+#endif
 
 class InputNALUnit;
 
@@ -97,6 +100,9 @@ private:
 
   SEIMessages             m_SEIs; ///< List of SEI messages that have been received before the first slice and between slices, excluding prefix SEIs...
 
+#if ERICSSON_BIF && BIF_IN_LOOP
+  BilateralFilter         m_cBilateralFilter;
+#endif
 
   // functional classes
   IntraPrediction         m_cIntraPred;
@@ -214,6 +220,10 @@ public:
   );
   bool  decode(InputNALUnit& nalu, int& iSkipFrame, int& iPOCLastDisplay, int iTargetOlsIdx);
   void  deletePicBuffer();
+  
+#if BIF_POST_FILTER
+  PelUnitBuf getPostFilteredBuf()                                 { return m_cSAO.getBIFPostFilteredBuf(); }
+#endif
 
   void  executeLoopFilters();
 #if JVET_R0270

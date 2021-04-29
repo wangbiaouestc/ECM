@@ -1,4 +1,4 @@
-﻿/* The copyright in this software is being made available under the BSD
+/* The copyright in this software is being made available under the BSD
  * License, included below. This software may be subject to other third party
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
@@ -49,6 +49,15 @@
 #include <cstring>
 #include <assert.h>
 #include <cassert>
+
+// Run test with the following config file parameters:
+//
+// BIF : 1
+// BIFStrength : 1
+// BIFQPOffset : -1
+//
+#define ALLOW_BILATERAL_FILTER                           1 // Allow for bilateral filtering (use BIF=1, BIFStrength=1, BIFQPOffset=1 in cfg file).
+
 
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
@@ -158,6 +167,45 @@
 
 
 // clang-format off
+#define ERICSSON_POST_FILTER                              0 // Run the decoder on the anchor binaries to get the post-filtered .yuv files. Not tested.
+
+#if ALLOW_BILATERAL_FILTER
+#define ERICSSON_BIF                                      1
+#else
+#define ERICSSON_BIF                                      0
+#endif
+
+#if ERICSSON_POST_FILTER
+#define BIF_POST_FILTER                                   1 // post-filter
+#else
+#define BIF_POST_FILTER                                   0 // post-filter
+#endif
+
+#define BIF_OLD_CODE                                      0 // Old code that can be removed.
+
+#if ERICSSON_BIF
+#define BIF_IN_LOOP                                       1
+#define BIF_CTU_SIG                                       1
+#define BIF_CTU_RDO                                       1
+#define BIF_CABAC_ESTIMATION                              1
+#define BIF_SAO_INTERACTION                               1
+#if ALLOW_BILATERAL_FILTER
+#define BIF_RDO_COST                                      1
+#else
+#define BIF_RDO_COST                                      0
+#endif
+#endif
+
+#if ERICSSON_BIF || BIF_POST_FILTER
+#define BIF_SIMD                                          1
+#define BIF_ROUND_ADD                                     32
+#define BIF_ROUND_SHIFT                                   6
+#define BIF_EXTEND_PADDED_SAMPLES                         1
+#endif
+
+
+
+
 //########### place macros to be removed in next cycle below this line ###############
 #define JVET_S0058_GCI                                    1 // no_mtt_constraint_flag and no_weightedpred_constraint_flag
 
@@ -1131,6 +1179,16 @@ private:
 
 };
 
+#if ERICSSON_BIF && BIF_CTU_SIG
+class BifParams
+{
+public:
+  int frmOn;                // slice_bif_enabled_flag
+  int allCtuOn;             // slice_bif_all_ctb_enabled_flag
+  int numBlocks;
+  std::vector<int> ctuOn;   // bif_ctb_flag[][]
+};
+#endif
 
 
 struct BitDepths

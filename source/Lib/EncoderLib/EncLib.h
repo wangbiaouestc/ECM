@@ -42,6 +42,9 @@
 #include "CommonLib/TrQuant.h"
 #include "CommonLib/LoopFilter.h"
 #include "CommonLib/NAL.h"
+#if ERICSSON_BIF
+#include "CommonLib/BilateralFilter.h"
+#endif
 
 #include "Utilities/VideoIOYuv.h"
 
@@ -88,8 +91,14 @@ private:
 #endif
   // coding tool
 #if ENABLE_SPLIT_PARALLELISM
+#if ERICSSON_BIF
+  BilateralFilter          *m_bilateralFilter;
+#endif
   TrQuant                  *m_cTrQuant;                           ///< transform & quantization class
 #else
+#if ERICSSON_BIF
+  BilateralFilter           m_bilateralFilter;
+#endif
   TrQuant                   m_cTrQuant;                           ///< transform & quantization class
 #endif
   LoopFilter                m_cLoopFilter;                        ///< deblocking filter class
@@ -196,11 +205,17 @@ public:
   InterSearch*            getInterSearch        ( int jId = 0 ) { return  &m_cInterSearch[jId];    }
   IntraSearch*            getIntraSearch        ( int jId = 0 ) { return  &m_cIntraSearch[jId];    }
 
+#if ERICSSON_BIF
+  BilateralFilter*        getBilateralFilter    ( int jId = 0 ) { return  &m_bilateralFilter[jId]; }
+#endif
   TrQuant*                getTrQuant            ( int jId = 0 ) { return  &m_cTrQuant[jId];        }
 #else
   InterSearch*            getInterSearch        ()              { return  &m_cInterSearch;         }
   IntraSearch*            getIntraSearch        ()              { return  &m_cIntraSearch;         }
 
+#if ERICSSON_BIF
+  BilateralFilter*        getBilateralFilter    ()              { return  &m_bilateralFilter;      }
+#endif
   TrQuant*                getTrQuant            ()              { return  &m_cTrQuant;             }
 #endif
   LoopFilter*             getLoopFilter         ()              { return  &m_cLoopFilter;          }
