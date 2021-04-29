@@ -239,7 +239,7 @@ typedef       int             DistType;
 #endif
 
 
-
+#define JVET_V0056                                        1 // JVET-V0056: MCTF changes
 
 //########### place macros to be removed in next cycle below this line ###############
 #define JVET_S0058_GCI                                    1 // no_mtt_constraint_flag and no_weightedpred_constraint_flag
