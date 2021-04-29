@@ -2260,6 +2260,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if ENABLE_DIMD
   READ_FLAG(uiCode, "sps_dimd_enabled_flag");                           pcSPS->setUseDimd(uiCode != 0);
 #endif
+#if IDCC_TPM_JEM
+  READ_FLAG(uiCode, "sps_intraTMP_enabled_flag");                   pcSPS->setUseIntraTMP( uiCode != 0 );
+  if(pcSPS->getUseIntraTMP())
+  {
+    READ_UVLC(uiCode, "sps_log2_intra_tmp_max_size");                 pcSPS->setIntraTMPMaxSize(1 << uiCode);
+  }
+#endif
   if( pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
     READ_FLAG( uiCode, "sps_cclm_enabled_flag" );                   pcSPS->setUseLMChroma( uiCode != 0 );

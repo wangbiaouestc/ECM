@@ -70,6 +70,9 @@ namespace CU
   bool isSameSubPic                   (const CodingUnit &cu, const CodingUnit &cu2);
   bool isLastSubCUOfCtu               (const CodingUnit &cu);
   uint32_t getCtuAddr                     (const CodingUnit &cu);
+#if IDCC_TPM_JEM
+  Position getCtuXYAddr(const CodingUnit& cu);
+#endif
   int  predictQP                      (const CodingUnit& cu, const int prevQP );
 
   uint32_t getNumPUs                      (const CodingUnit& cu);
@@ -138,6 +141,9 @@ namespace PU
   int  getIntraMPMs(const PredictionUnit &pu, unsigned *mpm, const ChannelType &channelType = CHANNEL_TYPE_LUMA);
 #endif
   bool          isMIP                 (const PredictionUnit &pu, const ChannelType &chType = CHANNEL_TYPE_LUMA);
+#if IDCC_TPM_JEM
+  bool          isTmp(const PredictionUnit& pu, const ChannelType& chType = CHANNEL_TYPE_LUMA);
+#endif
   bool          isDMChromaMIP         (const PredictionUnit &pu);
   uint32_t      getIntraDirLuma       (const PredictionUnit &pu);
   void getIntraChromaCandModes(const PredictionUnit &pu, unsigned modeList[NUM_CHROMA_MODE]);
@@ -268,6 +274,9 @@ uint32_t getCtuAddr        (const Position& pos, const PreCalcValues &pcv);
 int  getNumModesMip   (const Size& block);
 int getMipSizeId      (const Size& block);
 bool allowLfnstWithMip(const Size& block);
+#if IDCC_TPM_JEM
+bool allowLfnstWithTpm();
+#endif
 
 template<typename T, size_t N>
 uint32_t updateCandList(T uiMode, double uiCost, static_vector<T, N>& candModeList, static_vector<double, N>& candCostList

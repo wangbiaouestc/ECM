@@ -679,6 +679,9 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
   if(   sps.getSpsRangeExtension().getIntraSmoothingDisabledFlag()
     || !isLuma( chType )
     || useISP
+#if IDCC_TPM_JEM
+	  || PU::isTmp(pu, chType)
+#endif
     || PU::isMIP( pu, chType )
     || m_ipaParam.multiRefIndex
     || DC_IDX == dirMode
@@ -1384,7 +1387,53 @@ void IntraPrediction::initIntraPatternChTypeISP(const CodingUnit& cu, const Comp
   }
 }
 
+#if IDCC_TPM_JEM
+bool IntraPrediction::isRefTemplateAvailable(CodingUnit& cu, CompArea& area)
+{
+	const ChannelType      chType = toChannelType(area.compID);
+	const CodingStructure& cs = *cu.cs;
+	const SPS& sps = *cs.sps;
+	const PreCalcValues& pcv = *cs.pcv;
 
+
+	const int  tuWidth = area.width;
+	const int  tuHeight = area.height;
+	const int  predSize = m_topRefLength;
+	const int  predHSize = m_leftRefLength;
+	//const int predStride = predSize;
+
+
+	const int  unitWidth = pcv.minCUWidth >> getComponentScaleX(area.compID, sps.getChromaFormatIdc());
+	const int  unitHeight = pcv.minCUHeight >> getComponentScaleY(area.compID, sps.getChromaFormatIdc());
+
+	const int  totalAboveUnits = (predSize + (unitWidth - 1)) / unitWidth;
+	const int  totalLeftUnits = (predHSize + (unitHeight - 1)) / unitHeight;
+	const int  totalUnits = totalAboveUnits + totalLeftUnits + 1; //+1 for top-left
+	const int  numAboveUnits = std::max<int>(tuWidth / unitWidth, 1);
+	const int  numLeftUnits = std::max<int>(tuHeight / unitHeight, 1);
+	const int  numAboveRightUnits = totalAboveUnits - numAboveUnits;
+	const int  numLeftBelowUnits = totalLeftUnits - numLeftUnits;
+
+	if (numAboveUnits <= 0 || numLeftUnits <= 0 || numAboveRightUnits <= 0 || numLeftBelowUnits <= 0)
+		return false;
+
+	// ----- Step 1: analyze neighborhood -----
+	const Position posLT = area;
+	//const Position posRT = area.topRight();
+	//const Position posLB = area.bottomLeft();
+
+	bool  neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1];
+	//int   numIntraNeighbor = 0;
+
+	memset(neighborFlags, 0, totalUnits);
+
+	//bool retVal = 1;
+
+	return isAboveLeftAvailable(cu, chType, posLT) && isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)) && isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1));
+
+	//return retVal;
+}
+#endif
 void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu )
 {
   const ChannelType      chType = toChannelType( area.compID );

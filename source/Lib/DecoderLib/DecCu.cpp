@@ -307,7 +307,19 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   }
   else
   {
+#if IDCC_TPM_JEM
+	  if (PU::isTmp(pu, chType))
+	  {
+		  int foundCandiNum;
+		  m_pcTrQuant->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
+		  m_pcTrQuant->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
+		  m_pcTrQuant->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+		  assert(foundCandiNum >= 1);
+	  }
+	  else if (PU::isMIP(pu, chType))
+#else
     if( PU::isMIP( pu, chType ) )
+#endif
     {
       m_pcIntraPred->initIntraMip( pu, area );
       m_pcIntraPred->predIntraMip( compID, piPred, pu );
@@ -500,7 +512,19 @@ void DecCu::xIntraRecACTBlk(TransformUnit& tu)
 
     PelBuf piPred = cs.getPredBuf(area);
     m_pcIntraPred->initIntraPatternChType(*tu.cu, area);
+#if IDCC_TPM_JEM
+	if (PU::isTmp(pu, chType))
+	{
+		int foundCandiNum;
+		const unsigned int           uiStride = cs.picture->getRecoBuf(COMPONENT_Y).stride;
+		m_pcTrQuant->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
+		m_pcTrQuant->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
+		m_pcTrQuant->generateTMPrediction(piPred.buf, uiStride, pu.lwidth(), pu.lheight(), foundCandiNum);
+	}
+	else if (PU::isMIP(pu, chType))
+#else
     if (PU::isMIP(pu, chType))
+#endif
     {
       m_pcIntraPred->initIntraMip(pu, area);
       m_pcIntraPred->predIntraMip(compID, piPred, pu);

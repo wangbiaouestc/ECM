@@ -2008,6 +2008,9 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               m_modeCtrl->setISPMode(cu.ispMode);
               m_modeCtrl->setISPLfnstIdx(cu.lfnstIdx);
               m_modeCtrl->setMIPFlagISPPass(cu.mipFlag);
+#if IDCC_TPM_JEM
+			  m_modeCtrl->setTPMFlagISPPass(cu.TmpFlag);
+#endif
               m_modeCtrl->setBestISPIntraModeRelCU(cu.ispMode ? PU::getFinalIntraMode(*cu.firstPU, CHANNEL_TYPE_LUMA) : UINT8_MAX);
               m_modeCtrl->setBestDCT2NonISPCostRelCU(m_modeCtrl->getMtsFirstPassNoIspCost());
             }
@@ -3878,6 +3881,9 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
   cu.mmvdSkip = false;
   cu.skip = false;
   cu.mipFlag = false;
+#if IDCC_TPM_JEM
+  cu.TmpFlag = false;
+#endif
   cu.bdpcmMode = 0;
 
   PredictionUnit &pu = tempCS->addPU(cu, pm.chType);
@@ -4103,6 +4109,9 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
       cu.mmvdSkip = false;
       cu.skip = false;
       cu.mipFlag = false;
+#if IDCC_TPM_JEM
+	  cu.TmpFlag = false;
+#endif
       cu.bdpcmMode = 0;
       PredictionUnit &pu = tempCS->addPU(cu, pm.chType);
       pu.mergeFlag = true;
@@ -4799,6 +4808,9 @@ void EncCu::xCheckSATDCostGeoMerge(CodingStructure *&tempCS, CodingUnit &cu, Pre
   cu.mmvdSkip = false;
   cu.skip = false;
   cu.mipFlag = false;
+#if IDCC_TPM_JEM
+  cu.TmpFlag = false;
+#endif
   cu.bdpcmMode = 0;
   pu.mergeFlag = true;
   pu.regularMergeFlag = false;
@@ -5783,7 +5795,10 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
           pu.bdmvrRefine = true;
           m_pcInterSearch->setBdmvrSubPuMvBuf(m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[(uiMergeCand << 1) + 1]);
         }
-        PU::spanMotionInfo(pu, mergeCtx, m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[( uiMergeCand << 1 ) + 1]);
+        else
+        {
+          PU::spanMotionInfo(pu, mergeCtx);
+        }
 #else
         PU::spanMotionInfo(pu, mergeCtx);
 #endif
@@ -5795,6 +5810,13 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
 
         m_pcInterSearch->motionCompensation(pu, acMergeRealBuffer[uiMergeCand], REF_PIC_LIST_X, true, true);
 
+#if MULTI_PASS_DMVR
+        if( pu.bdmvrRefine )
+        {
+          ::memcpy( m_mvBufEncBDOF4TM[uiMergeCand], m_pcInterSearch->getBdofSubPuMvOffset(), sizeof( Mv ) * BDOF_SUBPU_MAX_NUM );
+          PU::spanMotionInfo( pu, mergeCtx, m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[( uiMergeCand << 1 ) + 1], m_mvBufEncBDOF4TM[uiMergeCand] );
+        }
+#endif
         distParam.cur = acMergeRealBuffer[uiMergeCand].Y();
         Distortion uiSad = distParam.distFunc(distParam);
         m_CABACEstimator->getCtx() = ctxStart;
@@ -5874,7 +5896,10 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
 #endif
       }
 #if MULTI_PASS_DMVR
-      PU::spanMotionInfo(pu, mergeCtx, m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[( uiMergeCand << 1 ) + 1]);
+      if (!pu.bdmvrRefine)
+      {
+        PU::spanMotionInfo(pu, mergeCtx);
+      }
 #else
       PU::spanMotionInfo(pu, mergeCtx);
 #endif
@@ -5882,6 +5907,12 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
       if( mrgTempBufSet )
       {
         tempCS->getPredBuf().copyFrom(acMergeRealBuffer[uiMergeCand]);
+#if MULTI_PASS_DMVR
+        if( pu.bdmvrRefine )
+        {
+          PU::spanMotionInfo( pu, mergeCtx, m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[( uiMergeCand << 1 ) + 1], m_mvBufEncBDOF4TM[uiMergeCand] );
+        }
+#endif
       }
       else
       {
@@ -5890,6 +5921,13 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
         m_pcInterSearch->m_storeBeforeLIC = false;
 #endif
         m_pcInterSearch->motionCompensation( pu );
+#if MULTI_PASS_DMVR
+        if( pu.bdmvrRefine )
+        {
+          ::memcpy( m_mvBufEncBDOF4TM[uiMergeCand], m_pcInterSearch->getBdofSubPuMvOffset(), sizeof( Mv ) * BDOF_SUBPU_MAX_NUM );
+          PU::spanMotionInfo( pu, mergeCtx, m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[( uiMergeCand << 1 ) + 1], m_mvBufEncBDOF4TM[uiMergeCand] );
+        }
+#endif
       }
 
       xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, uiNoResidualPass, uiNoResidualPass == 0 ? &candHasNoResidual[uiMrgHADIdx] : NULL );

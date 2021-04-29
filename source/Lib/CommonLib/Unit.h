@@ -334,6 +334,9 @@ struct CodingUnit : public UnitArea
   uint8_t         BcwIdx;
   int8_t          refIdxBi[2];
   bool           mipFlag;
+#if IDCC_TPM_JEM
+  bool			 TmpFlag;
+#endif
 #if INTER_LIC
   bool           LICFlag;
 #endif

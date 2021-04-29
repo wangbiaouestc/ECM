@@ -144,6 +144,9 @@ protected:
 
   void xPredIntraBDPCM            ( const CPelBuf &pSrc, PelBuf &pDst, const uint32_t dirMode, const ClpRng& clpRng );
   Pel  xGetPredValDc              ( const CPelBuf &pSrc, const Size &dstSize );
+#if IDCC_TPM_JEM
+  bool isRefTemplateAvailable(CodingUnit& cu, CompArea& area);
+#endif
 
   void xFillReferenceSamples      ( const CPelBuf &recoBuf,      Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu );
   void xFilterReferenceSamples(const Pel *refBufUnfiltered, Pel *refBufFiltered, const CompArea &area, const SPS &sps,

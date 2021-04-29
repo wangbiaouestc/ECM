@@ -116,6 +116,9 @@ public:
   void        adaptive_color_transform(const CodingUnit&             cu);
   void        sbt_mode                  ( const CodingUnit&             cu );
   void        end_of_ctu                ( const CodingUnit&             cu,       CUCtx&            cuCtx );
+#if IDCC_TPM_JEM
+  void        Tmp_Flag(const CodingUnit& cu);
+#endif
   void        mip_flag                  ( const CodingUnit&             cu );
   void        mip_pred_modes            ( const CodingUnit&             cu );
   void        mip_pred_mode             ( const PredictionUnit&         pu );

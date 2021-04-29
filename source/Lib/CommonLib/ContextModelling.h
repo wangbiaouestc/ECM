@@ -611,6 +611,9 @@ unsigned CtxAffineFlag( const CodingUnit& cu );
 unsigned CtxPredModeFlag( const CodingUnit& cu );
 unsigned CtxIBCFlag(const CodingUnit& cu);
 unsigned CtxMipFlag   ( const CodingUnit& cu );
+#if IDCC_TPM_JEM
+unsigned CtxTmpFlag(const CodingUnit& cu);
+#endif
 unsigned CtxPltCopyFlag( const unsigned prevRunType, const unsigned dist );
 #if ENABLE_DIMD
 unsigned CtxDIMDFlag(const CodingUnit& cu);

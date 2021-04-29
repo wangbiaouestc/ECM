@@ -394,6 +394,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
   const TempCtx ctxStart          ( m_CtxCache, m_CABACEstimator->getCtx() );
   const TempCtx ctxStartMipFlag    ( m_CtxCache, SubCtx( Ctx::MipFlag,          m_CABACEstimator->getCtx() ) );
+#if IDCC_TPM_JEM
+  const TempCtx ctxStartTpmFlag(m_CtxCache, SubCtx(Ctx::TmpFlag, m_CABACEstimator->getCtx()));
+#endif
   const TempCtx ctxStartIspMode    ( m_CtxCache, SubCtx( Ctx::ISPMode,          m_CABACEstimator->getCtx() ) );
 #if SECONDARY_MPM
   const TempCtx ctxStartMPMIdxFlag(m_CtxCache, SubCtx(Ctx::IntraLumaMPMIdx, m_CABACEstimator->getCtx()));
@@ -491,6 +494,10 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
     const bool mipAllowed = sps.getUseMIP() && isLuma(partitioner.chType) && ((cu.lfnstIdx == 0) || allowLfnstWithMip(cu.firstPU->lumaSize()));
     const bool testMip = mipAllowed && !(cu.lwidth() > (8 * cu.lheight()) || cu.lheight() > (8 * cu.lwidth()));
     const bool supportedMipBlkSize = pu.lwidth() <= MIP_MAX_WIDTH && pu.lheight() <= MIP_MAX_HEIGHT;
+#if IDCC_TPM_JEM
+	const bool tpmAllowed = sps.getUseIntraTMP() && isLuma(partitioner.chType) && ((cu.lfnstIdx == 0) || allowLfnstWithTpm());
+	const bool testTpm = tpmAllowed && (cu.lwidth() <= sps.getIntraTMPMaxSize() && cu.lheight() <= sps.getIntraTMPMaxSize());
+#endif
 
     static_vector<ModeInfo, FAST_UDI_MAX_RDMODE_NUM> uiRdModeList;
 
@@ -566,10 +573,19 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                                    ? std::max(numModesForFullRD, floorLog2(std::min(pu.lwidth(), pu.lheight())) - 1)
                                    : numModesForFullRD;
           }
+#if IDCC_TPM_JEM
+		  if (testTpm)
+			  numModesForFullRD += 1; // testing tpm
+		  const int numHadCand = (testMip ? 2 : 1) * 3 + testTpm;
+#else
           const int numHadCand = (testMip ? 2 : 1) * 3;
+#endif
 
           //*** Derive (regular) candidates using Hadamard
           cu.mipFlag = false;
+#if IDCC_TPM_JEM
+		  cu.TmpFlag = false;
+#endif
 
           //===== init pattern for luma prediction =====
           initIntraPatternChType(cu, pu.Y(), true);
@@ -600,6 +616,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               minSadHad += std::min(distParamSad.distFunc(distParamSad) * 2, distParamHad.distFunc(distParamHad));
 
               // NB xFracModeBitsIntra will not affect the mode for chroma that may have already been pre-estimated.
+#if IDCC_TPM_JEM
+			  m_CABACEstimator->getCtx() = SubCtx(Ctx::TmpFlag, ctxStartTpmFlag);
+#endif
               m_CABACEstimator->getCtx() = SubCtx( Ctx::MipFlag, ctxStartMipFlag );
               m_CABACEstimator->getCtx() = SubCtx( Ctx::ISPMode, ctxStartIspMode );
 #if SECONDARY_MPM
@@ -674,6 +693,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
                     // NB xFracModeBitsIntra will not affect the mode for chroma that may have already been
                     // pre-estimated.
+#if IDCC_TPM_JEM
+					m_CABACEstimator->getCtx() = SubCtx(Ctx::TmpFlag, ctxStartTpmFlag);
+#endif
                     m_CABACEstimator->getCtx() = SubCtx(Ctx::MipFlag, ctxStartMipFlag);
                     m_CABACEstimator->getCtx() = SubCtx(Ctx::ISPMode, ctxStartIspMode);
 #if SECONDARY_MPM
@@ -739,6 +761,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                     std::min(distParamSad.distFunc(distParamSad) * 2, distParamHad.distFunc(distParamHad));
 
                   // NB xFracModeBitsIntra will not affect the mode for chroma that may have already been pre-estimated.
+#if IDCC_TPM_JEM
+				  m_CABACEstimator->getCtx() = SubCtx(Ctx::TmpFlag, ctxStartTpmFlag);
+#endif
                   m_CABACEstimator->getCtx() = SubCtx(Ctx::MipFlag, ctxStartMipFlag);
                   m_CABACEstimator->getCtx() = SubCtx(Ctx::ISPMode, ctxStartIspMode);
 #if SECONDARY_MPM
@@ -781,6 +806,48 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               m_dSavedHadListLFNST.resize(3);
               LFNSTSaveFlag = false;
             }
+#if IDCC_TPM_JEM
+			// derive TPM candidate using hadamard
+			if (testTpm)
+			{
+				cu.TmpFlag = true;
+				cu.mipFlag = false;
+				pu.multiRefIdx = 0;
+
+
+
+				int foundCandiNum = 0;
+				bool bsuccessfull = 0;
+				CodingUnit cu_cpy = cu;
+
+				if (isRefTemplateAvailable(cu_cpy, cu_cpy.blocks[COMPONENT_Y]))
+				{
+					m_pcTrQuant->getTargetTemplate(&cu_cpy, pu.lwidth(), pu.lheight());
+					m_pcTrQuant->candidateSearchIntra(&cu_cpy, pu.lwidth(), pu.lheight());
+					bsuccessfull = m_pcTrQuant->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+				}
+				if (bsuccessfull && foundCandiNum >= 1)
+				{
+					
+					Distortion minSadHad =
+						std::min(distParamSad.distFunc(distParamSad) * 2, distParamHad.distFunc(distParamHad));
+
+					m_CABACEstimator->getCtx() = SubCtx(Ctx::TmpFlag, ctxStartTpmFlag);
+
+					uint64_t fracModeBits = xFracModeBitsIntra(pu, 0, CHANNEL_TYPE_LUMA);
+
+					double cost = double(minSadHad) + double(fracModeBits) * sqrtLambdaForFirstPass;
+					DTRACE(g_trace_ctx, D_INTRA_COST, "IntraTPM: %u, %llu, %f (%d)\n", minSadHad, fracModeBits, cost,
+						0);
+
+					updateCandList(ModeInfo(0, 0, 0, NOT_INTRA_SUBPARTITIONS, 0, 1), cost, uiRdModeList,
+						CandCostList, numModesForFullRD);
+					updateCandList(ModeInfo(0, 0, 0, NOT_INTRA_SUBPARTITIONS, 0, 1),
+						0.8 * double(minSadHad), uiHadModeList, CandHadList, numHadCand);
+				}
+				
+			}
+#endif
             //*** Derive MIP candidates using Hadamard
             if (testMip && !supportedMipBlkSize)
             {
@@ -799,6 +866,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
             }
             else if (testMip)
             {
+#if IDCC_TPM_JEM
+				cu.TmpFlag = 0;
+#endif
               cu.mipFlag     = true;
               pu.multiRefIdx = 0;
 
@@ -1025,6 +1095,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
           cs.interHad = 0;
 
           //===== reset context models =====
+#if IDCC_TPM_JEM
+		  m_CABACEstimator->getCtx() = SubCtx(Ctx::TmpFlag, ctxStartTpmFlag);
+#endif
           m_CABACEstimator->getCtx() = SubCtx(Ctx::MipFlag, ctxStartMipFlag);
           m_CABACEstimator->getCtx() = SubCtx(Ctx::ISPMode, ctxStartIspMode);
 #if SECONDARY_MPM
@@ -1129,6 +1202,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         cu.dimd = true;
       }
 #endif
+#if IDCC_TPM_JEM
+	  cu.TmpFlag = uiOrgMode.tpmFlg;
+#endif
       cu.mipFlag                     = uiOrgMode.mipFlg;
       pu.mipTransposedFlag           = uiOrgMode.mipTrFlg;
       cu.ispMode                     = uiOrgMode.ispMod;
@@ -1140,6 +1216,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       CHECK(cu.ispMode && cu.mipFlag, "Error: combination of ISP and MIP not supported");
       CHECK(cu.ispMode && pu.multiRefIdx, "Error: combination of ISP and MRL not supported");
       CHECK(cu.ispMode&& cu.colorTransform, "Error: combination of ISP and ACT not supported");
+#if IDCC_TPM_JEM
+	  CHECK(cu.mipFlag&& cu.TmpFlag, "Error: combination of MIP and TPM not supported");
+	  CHECK(cu.TmpFlag&& cu.ispMode, "Error: combination of TPM and ISP not supported");
+	  CHECK(cu.TmpFlag&& pu.multiRefIdx, "Error: combination of TPM and MRL not supported");
+#endif
 
       pu.intraDir[CHANNEL_TYPE_CHROMA] = cu.colorTransform ? DM_CHROMA_IDX : pu.intraDir[CHANNEL_TYPE_CHROMA];
 
@@ -1180,10 +1261,17 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
             uiBestPUMode.ispMod, mtsCheckRangeFlag, mtsFirstCheckId, mtsLastCheckId, moreProbMTSIdxFirst);
         }
       }
-
+#if IDCC_TPM_JEM
+	  if (!cu.ispMode && !cu.mtsFlag && !cu.lfnstIdx && !cu.bdpcmMode && !pu.multiRefIdx && !cu.mipFlag && !cu.TmpFlag && testISP)
+#else
       if (!cu.ispMode && !cu.mtsFlag && !cu.lfnstIdx && !cu.bdpcmMode && !pu.multiRefIdx && !cu.mipFlag && testISP)
+#endif
       {
+#if IDCC_TPM_JEM
+		  m_regIntraRDListWithCosts.push_back(ModeInfoWithCost(cu.mipFlag, pu.mipTransposedFlag, pu.multiRefIdx, cu.ispMode, uiOrgMode.modeId, cu.TmpFlag, csTemp->cost));
+#else
         m_regIntraRDListWithCosts.push_back( ModeInfoWithCost( cu.mipFlag, pu.mipTransposedFlag, pu.multiRefIdx, cu.ispMode, uiOrgMode.modeId, csTemp->cost ) );
+#endif
       }
 
       if( cu.ispMode && !csTemp->cus[0]->firstTU->cbf[COMPONENT_Y] )
@@ -1198,10 +1286,15 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       {
         m_modeCostStore[lfnstIdx][mode] = tmpValidReturn ? csTemp->cost : (MAX_DOUBLE / 2.0); //(MAX_DOUBLE / 2.0) ??
       }
-
+#if IDCC_TPM_JEM
+	  DTRACE(g_trace_ctx, D_INTRA_COST, "IntraCost T [x=%d,y=%d,w=%d,h=%d] %f (%d,%d,%d,%d,%d,%d,%d) \n", cu.blocks[0].x,
+		  cu.blocks[0].y, (int)width, (int)height, csTemp->cost, uiOrgMode.modeId, uiOrgMode.ispMod,
+		  pu.multiRefIdx, cu.TmpFlag, cu.mipFlag, cu.lfnstIdx, cu.mtsFlag);
+#else
       DTRACE(g_trace_ctx, D_INTRA_COST, "IntraCost T [x=%d,y=%d,w=%d,h=%d] %f (%d,%d,%d,%d,%d,%d) \n", cu.blocks[0].x,
              cu.blocks[0].y, (int) width, (int) height, csTemp->cost, uiOrgMode.modeId, uiOrgMode.ispMod,
              pu.multiRefIdx, cu.mipFlag, cu.lfnstIdx, cu.mtsFlag);
+#endif
 
       if( tmpValidReturn )
       {
@@ -1298,6 +1391,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
     if( validReturn )
     {
       //=== update PU data ====
+#if IDCC_TPM_JEM
+		cu.TmpFlag = uiBestPUMode.tpmFlg;
+#endif
       cu.mipFlag = uiBestPUMode.mipFlg;
       pu.mipTransposedFlag             = uiBestPUMode.mipTrFlg;
       pu.multiRefIdx = uiBestPUMode.mRefId;
@@ -3252,7 +3348,19 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       }
       else
       {
+#if IDCC_TPM_JEM
+		  if (PU::isTmp(pu, chType))
+		  {
+			  int foundCandiNum;
+			  m_pcTrQuant->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
+			  m_pcTrQuant->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
+			  m_pcTrQuant->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+			  assert(foundCandiNum >= 1);
+		  }
+		  else if (PU::isMIP(pu, chType))
+#else
         if( PU::isMIP( pu, chType ) )
+#endif
         {
           initIntraMip( pu, area );
           predIntraMip( compID, piPred, pu );
@@ -4474,7 +4582,20 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
       PelBuf         piResi = resiBuf.bufs[compID];
 
       initIntraPatternChType(*tu.cu, area);
+#if IDCC_TPM_JEM
+	  if (PU::isTmp(pu, chType))
+	  {
+		  int foundCandiNum;
+		  m_pcTrQuant->getTargetTemplate(pu.cu, pu.lwidth(), pu.lheight());
+		  m_pcTrQuant->candidateSearchIntra(pu.cu, pu.lwidth(), pu.lheight());
+		  m_pcTrQuant->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+		  assert(foundCandiNum >= 1);
+
+	  }
+	  else if (PU::isMIP(pu, chType))
+#else
       if (PU::isMIP(pu, chType))
+#endif
       {
         initIntraMip(pu, area);
         predIntraMip(compID, piPred, pu);

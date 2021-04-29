@@ -788,6 +788,10 @@ void EncApp::xInitLibCfg()
 
   m_cEncLib.setUseWrapAround                                     ( m_wrapAround );
   m_cEncLib.setWrapAroundOffset                                  ( m_wrapAroundOffset );
+#if IDCC_TPM_JEM
+  m_cEncLib.setUseIntraTMP(m_IntraTMP);
+  m_cEncLib.setIntraTMPMaxSize(m_IntraTMP_MaxSize);
+#endif
 #if ERICSSON_BIF
   m_cEncLib.setUseBIF                                            ( m_BIF );
   m_cEncLib.setBIFStrength                                       ( m_BIFStrength );

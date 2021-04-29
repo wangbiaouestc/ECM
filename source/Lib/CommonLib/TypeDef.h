@@ -1,4 +1,4 @@
-/* The copyright in this software is being made available under the BSD
+﻿/* The copyright in this software is being made available under the BSD
  * License, included below. This software may be subject to other third party
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
@@ -49,6 +49,41 @@
 #include <cstring>
 #include <assert.h>
 #include <cassert>
+
+#define IDCC_TPM_JEM									  1 // template matching prediction as implemented in JEM-7.2
+#if IDCC_TPM_JEM
+
+#define IDCC_TMP_SIMD									1
+//#define IDCC_TMP_MaxSize								64
+#define IDCC_SignleSearchRegion							0 // single region starting from current position up-left on
+
+#define IDCC_FixedComparisonPerPixel					1
+#if IDCC_FixedComparisonPerPixel
+#define IDCC_SearchRangeMultFactor						5
+#endif
+
+#if !IDCC_SignleSearchRegion
+#define IDCC_TMP_Within_CTU								1
+#endif
+#if !IDCC_FixedComparisonPerPixel
+#define IDCC_SEARCHRANGEINTRA							 70 // should be larger than IDCC_TMP_MaxSize + IDCC_TemplateSize
+#endif
+#if IDCC_TMP_SIMD
+#define IDCC_TemplateSize								4 // must be multiple of 4 for SIMD
+#else
+#define IDCC_TemplateSize								4
+#endif
+#define IDCC_TMP_ImplicitMTS							1
+
+#define IDCC_TMP_MaxSize_Depth							6 // should be log2(IDCC_TMP_MaxSize): keep as 6 to avoid any error
+
+#define VCEG_AZ08_USE_SSD_DISTANCE                        0  ///< (default 0) If defined, use SSD distance.
+#define VCEG_AZ08_USE_SAD_DISTANCE                        1  ///< (default 1) If defined, use SAD distance.
+
+#if VCEG_AZ08_USE_SSD_DISTANCE || VCEG_AZ08_USE_SAD_DISTANCE
+typedef       int             DistType;
+#endif
+#endif
 
 // Run test with the following config file parameters:
 //

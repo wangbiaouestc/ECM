@@ -1044,12 +1044,15 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("AdditionalInterHypRefFrames",                     m_maxNumAddHypRefFrames,                              4, "max. number of ref frames for additional inter hypotheseis")
   ("AdditionalInterHypTries",                         m_addHypTries,                                        1, "number of tries for additional inter prediction hypotheseis")
 #endif
+#if IDCC_TPM_JEM
+  ("IntraTMP",                                        m_IntraTMP,                                        false, "intra Template Matching (0: off, 1:on)  [default: on]")
+  ("IntraTMPMaxSize",                                 m_IntraTMP_MaxSize,                                 64u, "intra Template Matching max CU size  [default: 64]")
+#endif
 #if ERICSSON_BIF
-  ("BIF",                                             m_BIF,                                            false, "bilateral filter   (0: off, 1:on)  [default: off]")
+  ("BIF",                                             m_BIF,                                            true, "bilateral filter   (0: off, 1:on)  [default: on]")
   ("BIFStrength",                                     m_BIFStrength,                                       1u, "bilateral filter strength  (0: half, 1: full, 2: double)  [default: full]")
   ("BIFQPOffset",                                     m_BIFQPOffset,                                        0, "bilateral filter QP offset (0: no offset)  [default: 0]")
 #endif
-  
   // ADD_NEW_TOOL : (encoder app) add parsing parameters here
   ( "VirtualBoundariesPresentInSPSFlag",              m_virtualBoundariesPresentFlag,                    true, "Virtual Boundary position information is signalled in SPS or PH (1:SPS, 0:PH)  [default: on]" )
   ("NumVerVirtualBoundaries",                         m_numVerVirtualBoundaries,                           0u, "Number of vertical virtual boundaries (0-3, inclusive)")
@@ -4173,6 +4176,17 @@ void EncAppCfg::xPrintParameter()
     }
 #endif
   }
+#if IDCC_TPM_JEM
+  msg(DETAILS, "Intra TMP: %d\n", m_IntraTMP);
+  msg(DETAILS, "Max CU size of TMP: %d\n", m_IntraTMP_MaxSize);
+#if IDCC_FixedComparisonPerPixel
+  msg(DETAILS, "dynamic search range with fixed comparison per pixel: \n");
+  msg(DETAILS, "	searchRangeWidth = %d*Width \n", IDCC_SearchRangeMultFactor);
+  msg(DETAILS, "	searchRangeHeight = %d*Heigh \n", IDCC_SearchRangeMultFactor);
+#else
+  msg(DETAILS, "search range: %d\n", IDCC_SEARCHRANGEINTRA);
+#endif
+#endif
 
   msg( DETAILS, "Max Num Merge Candidates               : %d\n", m_maxNumMergeCand );
   msg( DETAILS, "Max Num Affine Merge Candidates        : %d\n", m_maxNumAffineMergeCand );
@@ -4306,6 +4320,10 @@ void EncAppCfg::xPrintParameter()
   {
     msg( VERBOSE, "WrapAroundOffset:%d ", m_wrapAroundOffset );
   }
+#if IDCC_TPM_JEM
+  msg( VERBOSE, "IntraTMP:%d ", m_IntraTMP);
+  msg( VERBOSE, "IntraTMP_MaxSize:%d ", m_IntraTMP_MaxSize);
+#endif
 #if ERICSSON_BIF
   msg( VERBOSE, "BIF:%d ", m_BIF);
   msg( VERBOSE, "BIFStrength:%d ", m_BIFStrength);

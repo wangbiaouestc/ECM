@@ -411,6 +411,10 @@ protected:
   int       m_maxNumAddHypRefFrames;                          ///< max. number of ref frames for additional inter hypotheseis
   int       m_addHypTries;                                    ///< max. number of tries for additional inter hypotheseis
 #endif
+#if IDCC_TPM_JEM
+  bool      m_IntraTMP;                                       ///< intra Template Matching 
+  unsigned  m_IntraTMP_MaxSize;                               ///< max CU size for which intra TMP is allowed
+#endif
 #if ERICSSON_BIF
   bool      m_BIF;                                            ///< bilateral filter
   unsigned  m_BIFStrength;                                    /// Bilateral filter strength

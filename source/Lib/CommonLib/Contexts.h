@@ -245,6 +245,9 @@ public:
   static const CtxSet   CclmModeIdx;
   static const CtxSet   IntraChromaPredMode;
   static const CtxSet   MipFlag;
+#if IDCC_TPM_JEM
+  static const CtxSet   TmpFlag;
+#endif
 #if MMLM
   static const CtxSet   MMLMFlag;
 #endif

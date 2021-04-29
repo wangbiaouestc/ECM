@@ -477,6 +477,14 @@ static const int ALF_VB_POS_ABOVE_CTUROW_CHMA = 2;
 #if W0038_DB_OPT
 static const int MAX_ENCODER_DEBLOCKING_QUALITY_LAYERS =           8 ;
 #endif
+#if IDCC_TPM_JEM && !IDCC_FixedComparisonPerPixel
+static const int SEARCHRANGEINTRA = IDCC_SEARCHRANGEINTRA; ///< Intra search range (-SEARCHRANGE,+SEARCHRANGE)
+#endif
+
+#if IDCC_TPM_JEM
+static const int USE_MORE_BLOCKSIZE_DEPTH_MAX = IDCC_TMP_MaxSize_Depth - 1;
+static const int INIT_THRESHOULD_SHIFTBITS = 2;  ///< (default 2) Early skip threshold for checking distance.
+#endif
 
 #if SHARP_LUMA_DELTA_QP
 static const uint32_t LUMA_LEVEL_TO_DQP_LUT_MAXSIZE =                1024; ///< max LUT size for QP offset based on luma

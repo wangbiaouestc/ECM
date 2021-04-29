@@ -221,17 +221,30 @@ private:
     int      mRefId; // PU::multiRefIdx
     uint8_t  ispMod; // CU::ispMode
     uint32_t modeId; // PU::intraDir[CHANNEL_TYPE_LUMA]
-
+#if IDCC_TPM_JEM
+	bool     tpmFlg; // CU::TmpFlag
+#endif
+#if IDCC_TPM_JEM
+	ModeInfo() : mipFlg(false), mipTrFlg(false), mRefId(0), ispMod(NOT_INTRA_SUBPARTITIONS), modeId(0), tpmFlg(0) {}
+	ModeInfo(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode, const bool tpmf = 0) : mipFlg(mipf), mipTrFlg(miptf), mRefId(mrid), ispMod(ispm), modeId(mode), tpmFlg(tpmf) {}
+	bool operator==(const ModeInfo cmp) const { return (mipFlg == cmp.mipFlg && mipTrFlg == cmp.mipTrFlg && mRefId == cmp.mRefId && ispMod == cmp.ispMod && modeId == cmp.modeId && tpmFlg == cmp.tpmFlg); }
+#else
     ModeInfo() : mipFlg(false), mipTrFlg(false), mRefId(0), ispMod(NOT_INTRA_SUBPARTITIONS), modeId(0) {}
     ModeInfo(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode) : mipFlg(mipf), mipTrFlg(miptf), mRefId(mrid), ispMod(ispm), modeId(mode) {}
     bool operator==(const ModeInfo cmp) const { return (mipFlg == cmp.mipFlg && mipTrFlg == cmp.mipTrFlg && mRefId == cmp.mRefId && ispMod == cmp.ispMod && modeId == cmp.modeId); }
+#endif
   };
   struct ModeInfoWithCost : public ModeInfo
   {
     double rdCost;
     ModeInfoWithCost() : ModeInfo(), rdCost(MAX_DOUBLE) {}
+#if IDCC_TPM_JEM
+	ModeInfoWithCost(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode, const bool tpmf, double cost) : ModeInfo(mipf, miptf, mrid, ispm, mode, tpmf), rdCost(cost) {}
+	bool operator==(const ModeInfoWithCost cmp) const { return (mipFlg == cmp.mipFlg && mipTrFlg == cmp.mipTrFlg && mRefId == cmp.mRefId && ispMod == cmp.ispMod && modeId == cmp.modeId && tpmFlg == cmp.tpmFlg && rdCost == cmp.rdCost); }
+#else
     ModeInfoWithCost(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode, double cost) : ModeInfo(mipf, miptf, mrid, ispm, mode), rdCost(cost) {}
     bool operator==(const ModeInfoWithCost cmp) const { return (mipFlg == cmp.mipFlg && mipTrFlg == cmp.mipTrFlg && mRefId == cmp.mRefId && ispMod == cmp.ispMod && modeId == cmp.modeId && rdCost == cmp.rdCost); }
+#endif
     static bool compareModeInfoWithCost(ModeInfoWithCost a, ModeInfoWithCost b) { return a.rdCost < b.rdCost; }
   };
 

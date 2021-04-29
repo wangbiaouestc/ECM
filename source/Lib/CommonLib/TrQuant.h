@@ -55,6 +55,51 @@
 typedef void FwdTrans(const TCoeff*, TCoeff*, int, int, int, int);
 typedef void InvTrans(const TCoeff*, TCoeff*, int, int, int, int, const TCoeff, const TCoeff);
 
+
+
+#if IDCC_TPM_JEM
+
+
+#define MAX_1DTRANS_LEN         (1 << (((USE_MORE_BLOCKSIZE_DEPTH_MAX) + 1) << 1)) ///< 4x4 = 16, 8x8 = 64, 16x16=256, 32x32 = 1024
+extern unsigned int g_uiDepth2Width[5];
+extern unsigned int g_uiDepth2MaxCandiNum[5];
+
+class TempLibFast
+{
+public:
+	int m_pX;    //offset X
+	int m_pY;    //offset Y
+	int m_pXInteger;    //offset X for integer pixel search
+	int m_pYInteger;    //offset Y for integer pixel search
+	DistType m_pDiffInteger;
+	int getXInteger() { return m_pXInteger; }
+	int getYInteger() { return m_pYInteger; }
+	DistType getDiffInteger() { return m_pDiffInteger; }
+	short m_pIdInteger; //frame id
+	short getIdInteger() { return m_pIdInteger; }
+	DistType m_pDiff; //mse
+	short m_pId; //frame id
+	
+
+	TempLibFast();
+	~TempLibFast();
+	//void init();
+	int getX() { return m_pX; }
+	int getY() { return m_pY; }
+	DistType getDiff() { return m_pDiff; }
+	short getId() { return m_pId; }
+	/*void initDiff(unsigned int uiPatchSize, int bitDepth);
+	void initDiff(unsigned int uiPatchSize, int bitDepth, int iCandiNumber);*/
+	void initTemplateDiff(unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int bitDepth);
+	int m_diffMax;
+	int getDiffMax() { return m_diffMax; }
+};
+
+
+typedef short TrainDataType;
+#endif
+
+
 // ====================================================================================================================
 // Class definition
 // ====================================================================================================================
@@ -86,6 +131,19 @@ public:
 #else
   void fwdLfnstNxN( int* src, int* dst, const uint32_t mode, const uint32_t index, const uint32_t size, int zeroOutSize );
   void invLfnstNxN( int* src, int* dst, const uint32_t mode, const uint32_t index, const uint32_t size, int zeroOutSize );
+#endif
+#if IDCC_TPM_JEM
+  DistType calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, DistType iMax);
+  Pel** getTargetPatch(unsigned int uiDepth) { return m_pppTarPatch[uiDepth]; }
+  Pel* getRefPicUsed() { return m_refPicUsed; }
+  void setRefPicUsed(Pel* ref) { m_refPicUsed = ref; }
+  unsigned int getStride() { return m_uiPicStride; }
+  void setStride(unsigned int uiPicStride) { m_uiPicStride = uiPicStride; }
+
+  void searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId);
+  void candidateSearchIntra(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight);
+  bool generateTMPrediction(Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int& foundCandiNum);
+  void getTargetTemplate(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight);
 #endif
 
   uint32_t getLFNSTIntraMode( int wideAngPredMode );
@@ -141,6 +199,15 @@ public:
 
 protected:
   TCoeff   m_tempCoeff[MAX_TB_SIZEY * MAX_TB_SIZEY];
+#if IDCC_TPM_JEM
+  int m_uiPartLibSize;
+  TempLibFast m_tempLibFast;
+  Pel* m_refPicUsed;
+  Picture* m_refPicBuf;
+  unsigned int m_uiPicStride;
+  unsigned int m_uiVaildCandiNum;
+  Pel*** m_pppTarPatch;
+#endif
 #if SIGN_PREDICTION
   Pel      m_tempSignPredResid[SIGN_PRED_MAX_BS * SIGN_PRED_MAX_BS * 2]{0};
   Pel      m_signPredTemplate[SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE*SIGN_PRED_MAX_BS*2];

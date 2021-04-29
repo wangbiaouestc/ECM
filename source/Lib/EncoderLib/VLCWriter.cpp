@@ -132,6 +132,7 @@ void VLCWriter::xWriteUvlc     ( uint32_t uiCode )
   uint32_t uiLength = 1;
   uint32_t uiTemp = ++uiCode;
 
+  if(!uiTemp){std::cout << "integer overflow: uiCode=" << uiCode << std::endl;}
   CHECK( !uiTemp, "Integer overflow" );
 
   while( 1 != uiTemp )
@@ -1383,6 +1384,14 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if ENABLE_DIMD
   WRITE_FLAG( pcSPS->getUseDimd() ? 1 : 0,                                             "sps_dimd_enabled_flag");
 #endif
+#if IDCC_TPM_JEM
+  WRITE_FLAG( pcSPS->getUseIntraTMP() ? 1 : 0,                                         "sps_intraTMP_enabled_flag");
+  if(pcSPS->getUseIntraTMP())
+  {
+    WRITE_UVLC(floorLog2(pcSPS->getIntraTMPMaxSize()), "sps_log2_intra_tmp_max_size");
+  }
+#endif
+
   if( pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
     WRITE_FLAG( pcSPS->getUseLMChroma() ? 1 : 0,                                      "sps_cclm_enabled_flag");

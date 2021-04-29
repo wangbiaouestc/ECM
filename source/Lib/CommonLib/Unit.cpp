@@ -303,6 +303,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   smvdMode        = other.smvdMode;
   ispMode           = other.ispMode;
   mipFlag           = other.mipFlag;
+#if IDCC_TPM_JEM
+  TmpFlag = other.TmpFlag;
+#endif
 #if INTER_LIC
   LICFlag           = other.LICFlag;
 #endif
@@ -384,6 +387,9 @@ void CodingUnit::initData()
   smvdMode        = 0;
   ispMode           = 0;
   mipFlag           = false;
+#if IDCC_TPM_JEM
+  TmpFlag = false;
+#endif
 #if INTER_LIC
   LICFlag = false;
 #endif

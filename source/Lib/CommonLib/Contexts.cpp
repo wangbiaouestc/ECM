@@ -1000,6 +1000,17 @@ const CtxSet ContextSetCfg::MipFlag = ContextSetCfg::addCtxSet
 	{ 9,  9,  8,  6 },
 	{ 10, 10,  9,  6 }
 });
+#if IDCC_TPM_JEM
+const CtxSet ContextSetCfg::TmpFlag = ContextSetCfg::addCtxSet
+({
+  {  CNU,  CNU,  CNU,  CNU, },
+  {  CNU,  CNU,  CNU,  CNU, },
+  {  CNU,  CNU,  CNU,  CNU, },
+  {   DWS,  DWS,   DWS,   DWS, },
+  {   DWS,  DWS,   DWS,   DWS, },
+  {   DWS,  DWS,   DWS,   DWS, },
+	});
+#endif
 
 #if MMLM
 const CtxSet ContextSetCfg::MMLMFlag = ContextSetCfg::addCtxSet
@@ -2078,6 +2089,16 @@ const CtxSet ContextSetCfg::MipFlag = ContextSetCfg::addCtxSet
   {  33,  49,  50,  25, },
   {   9,  10,   9,   6, },
 });
+#if IDCC_TPM_JEM
+const CtxSet ContextSetCfg::TmpFlag = ContextSetCfg::addCtxSet
+({
+  {  CNU,  CNU,  CNU,  CNU, },
+  {  CNU,  CNU,  CNU,  CNU, },
+  {  CNU,  CNU,  CNU,  CNU, },
+  {   DWS,  DWS,   DWS,   DWS, },
+	});
+#endif
+
 
 #if MMLM
 const CtxSet ContextSetCfg::MMLMFlag = ContextSetCfg::addCtxSet

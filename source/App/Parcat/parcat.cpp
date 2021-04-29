@@ -52,9 +52,8 @@ class ParcatHLSyntaxReader : public VLCReader
     bool parsePictureHeaderInSliceHeaderFlag ( ParameterSetManager *parameterSetManager );
 };
 
-bool ParcatHLSyntaxReader::parsePictureHeaderInSliceHeaderFlag(ParameterSetManager *parameterSetManager) {
-
-
+bool ParcatHLSyntaxReader::parsePictureHeaderInSliceHeaderFlag(ParameterSetManager *parameterSetManager)
+{
   uint32_t  uiCode;
   READ_FLAG(uiCode, "picture_header_in_slice_header_flag");
   return (uiCode==1);
@@ -172,7 +171,7 @@ const char * NALU_TYPE[] =
     "NAL_UNIT_CODED_SLICE_GDR",
     "NAL_UNIT_RESERVED_IRAP_VCL11",
     "NAL_UNIT_RESERVED_IRAP_VCL12",
-    "NAL_UNIT_DPS",
+    "NAL_UNIT_DCI",
     "NAL_UNIT_VPS",
     "NAL_UNIT_SPS",
     "NAL_UNIT_PPS",
@@ -195,8 +194,8 @@ const char * NALU_TYPE[] =
 
 int calc_poc(int iPOClsb, int prevTid0POC, int getBitsForPOC, int nalu_type)
 {
-  int iPrevPOC = prevTid0POC;
-  int iMaxPOClsb = 1<< getBitsForPOC;
+  int iPrevPOC    = prevTid0POC;
+  int iMaxPOClsb  = 1<< getBitsForPOC;
   int iPrevPOClsb = iPrevPOC & (iMaxPOClsb - 1);
   int iPrevPOCmsb = iPrevPOC-iPrevPOClsb;
   int iPOCmsb;
@@ -218,9 +217,9 @@ int calc_poc(int iPOClsb, int prevTid0POC, int getBitsForPOC, int nalu_type)
 
 std::vector<uint8_t> filter_segment(const std::vector<uint8_t> & v, int idx, int * poc_base, int * last_idr_poc)
 {
-  const uint8_t * p = v.data();
+  const uint8_t * p   = v.data();
   const uint8_t * buf = v.data();
-  int sz = (int) v.size();
+  int sz  = (int) v.size();
   int nal_start, nal_end;
   int off = 0;
   int cnt = 0;
@@ -229,9 +228,9 @@ std::vector<uint8_t> filter_segment(const std::vector<uint8_t> & v, int idx, int
   std::vector<uint8_t> out;
   out.reserve(v.size());
 
-  int bits_for_poc = 8;
+  int  bits_for_poc  = 8;
   bool skip_next_sei = false;
-  bool change_poc = false;
+  bool change_poc    = false;
   bool first_idr_slice_after_ph_nal = false;
 
   while(find_nal_unit(p, sz, &nal_start, &nal_end) > 0)
@@ -252,7 +251,7 @@ std::vector<uint8_t> filter_segment(const std::vector<uint8_t> & v, int idx, int
 #if ENABLE_TRACING
     printf ("NALU Type: %d (%s)\n", nalu_type, NALU_TYPE[nalu_type]);
 #endif
-    int poc = -1;
+    int poc     = -1;
     int poc_lsb = -1;
     int new_poc = -1;
 
@@ -307,28 +306,41 @@ std::vector<uint8_t> filter_segment(const std::vector<uint8_t> & v, int idx, int
         // beginning of picture header parsing
         parcatHLSReader.parsePictureHeaderUpToPoc(&parameterSetManager);
         int num_bits_up_to_poc_lsb = parcatHLSReader.getBitstream()->getNumBitsRead();
-        int offset = num_bits_up_to_poc_lsb;
+        int num_emul_prev_code_before_poc = 0;
+        for (int i=0; i<parcatHLSReader.getBitstream()->numEmulationPreventionBytesRead(); i++)
+        {
+          if (8*parcatHLSReader.getBitstream()->getEmulationPreventionByteLocation(i) <= num_bits_up_to_poc_lsb)
+            num_emul_prev_code_before_poc++;
+        }
+        int offset = num_bits_up_to_poc_lsb + (num_emul_prev_code_before_poc << 3);
 
         int byte_offset = offset / 8;
-        int hi_bits = offset % 8;
-        uint16_t data = (nalu[byte_offset] << 8) | nalu[byte_offset + 1];
-        int low_bits = 16 - hi_bits - bits_for_poc;
+        int hi_bits     = offset % 8;
+        uint16_t data   = (nalu[byte_offset] << 8) | nalu[byte_offset + 1];
+        int low_bits    = 16 - hi_bits - bits_for_poc;
         poc_lsb = (data >> low_bits) & 0xff;
-        poc = poc_lsb; //calc_poc(poc_lsb, 0, bits_for_poc, nalu_type);
+        poc     = poc_lsb; //calc_poc(poc_lsb, 0, bits_for_poc, nalu_type);
 
         new_poc = poc + *poc_base;
         // int picOrderCntLSB = (pcSlice->getPOC()-pcSlice->getLastIDR()+(1<<pcSlice->getSPS()->getBitsForPOC())) & ((1<<pcSlice->getSPS()->getBitsForPOC())-1);
         unsigned picOrderCntLSB = (new_poc - *last_idr_poc + (1 << bits_for_poc)) & ((1 << bits_for_poc) - 1);
 
         int low = data & ((1 << low_bits) - 1);
-        int hi = data >> (16 - hi_bits);
-        data = (hi << (16 - hi_bits)) | (picOrderCntLSB << low_bits) | low;
+        int hi  = data >> (16 - hi_bits);
+        data    = (hi << (16 - hi_bits)) | (picOrderCntLSB << low_bits) | low;
 
         nalu[byte_offset] = data >> 8;
         nalu[byte_offset + 1] = data & 0xff;
 
 #if ENABLE_TRACING
-        std::cout << "Changed poc " << poc << " to " << new_poc << std::endl;
+        std::cout << "Changed poc " << poc << " to " << new_poc << " at offset " << offset << " bits";
+        if (num_emul_prev_code_before_poc)
+        {
+          std::cout << " with " << num_emul_prev_code_before_poc << " emulation prevention code at byte pos ";
+          for (int i=0; i<num_emul_prev_code_before_poc; i++)
+            std::cout << parcatHLSReader.getBitstream()->getEmulationPreventionByteLocation(i) << " ";
+        }
+        std::cout << std::endl;
 #endif
         ++cnt;
         change_poc = false;
@@ -340,7 +352,8 @@ std::vector<uint8_t> filter_segment(const std::vector<uint8_t> & v, int idx, int
       skip_next_sei = true;
       idr_found = true;
     }
-    if ((idx > 1 && (nalu_type == NAL_UNIT_CODED_SLICE_IDR_W_RADL || nalu_type == NAL_UNIT_CODED_SLICE_IDR_N_LP)) || ((idx > 1 && !idr_found) && (nalu_type == NAL_UNIT_DCI || nalu_type == NAL_UNIT_VPS || nalu_type == NAL_UNIT_SPS || nalu_type == NAL_UNIT_PPS || nalu_type == NAL_UNIT_PREFIX_APS || nalu_type == NAL_UNIT_SUFFIX_APS || nalu_type == NAL_UNIT_PH || nalu_type == NAL_UNIT_ACCESS_UNIT_DELIMITER))
+    if ((idx > 1 && (nalu_type == NAL_UNIT_CODED_SLICE_IDR_W_RADL || nalu_type == NAL_UNIT_CODED_SLICE_IDR_N_LP))
+      || ((idx > 1 && !idr_found) && (nalu_type == NAL_UNIT_DCI || nalu_type == NAL_UNIT_VPS || nalu_type == NAL_UNIT_SPS || nalu_type == NAL_UNIT_PPS || nalu_type == NAL_UNIT_PREFIX_APS || nalu_type == NAL_UNIT_SUFFIX_APS || nalu_type == NAL_UNIT_PH || nalu_type == NAL_UNIT_ACCESS_UNIT_DELIMITER))
       || (nalu_type == NAL_UNIT_SUFFIX_SEI && skip_next_sei))
     {
     }
@@ -355,8 +368,7 @@ std::vector<uint8_t> filter_segment(const std::vector<uint8_t> & v, int idx, int
       skip_next_sei = false;
     }
 
-
-    p += (nal_end - nal_start);
+    p  += (nal_end - nal_start);
     sz -= nal_end;
   }
 
@@ -408,12 +420,12 @@ int main(int argc, char * argv[])
   }
 
   FILE * fdo = fopen(argv[argc - 1], "wb");
-  if (fdo==NULL)
+  if (fdo == NULL)
   {
     fprintf(stderr, "Error: could not open output file: %s", argv[argc - 1]);
     exit(1);
   }
-  int poc_base = 0;
+  int poc_base     = 0;
   int last_idr_poc = 0;
 
   initROM();

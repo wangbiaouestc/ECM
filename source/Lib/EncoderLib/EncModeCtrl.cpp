@@ -2209,6 +2209,9 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
             int bit4 = cuECtx.ispLfnstIdx == 2;
             int bit5 = cuECtx.mipFlag;
             int bit6 = cuECtx.bestCostIsp < cuECtx.bestNonDCT2Cost * 0.95;
+#if IDCC_TPM_JEM
+			int bit7 = cuECtx.TmpFlag;
+#endif
             int val =
               (bit0) |
               (bit1 << 1) |
@@ -2217,6 +2220,9 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
               (bit4 << 4) |
               (bit5 << 5) |
               (bit6 << 6) |
+#if IDCC_TPM_JEM
+			  (bit7 << 7) |
+#endif
               ( cuECtx.bestPredModeDCT2 << 9 );
             relatedCU.ispPredModeVal     = val;
             relatedCU.bestDCT2NonISPCost = cuECtx.bestDCT2NonISPCost;

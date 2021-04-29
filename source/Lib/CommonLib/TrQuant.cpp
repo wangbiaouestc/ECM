@@ -55,6 +55,16 @@
 #include "CommonLib/CodingStatistics.h"
 #endif
 
+#if IDCC_TMP_SIMD
+#include "CommonDefX86.h"
+#endif
+
+#if IDCC_TPM_JEM
+
+unsigned int g_uiDepth2Width[5] = { 4, 8, 16, 32, 64 };
+#endif
+
+
 struct coeffGroupRDStats
 {
   int    iNNZbeforePos0;
@@ -187,6 +197,9 @@ TrQuant::TrQuant() : m_quant( nullptr )
     m_fwdICT[-2]  = fwdTransformCbCr<-2>;
     m_fwdICT[ 3]  = fwdTransformCbCr< 3>;
     m_fwdICT[-3]  = fwdTransformCbCr<-3>;
+#if IDCC_TPM_JEM
+	m_pppTarPatch = NULL;
+#endif
   }
 }
 
@@ -197,6 +210,33 @@ TrQuant::~TrQuant()
     delete m_quant;
     m_quant = nullptr;
   }
+#if IDCC_TPM_JEM
+#endif
+
+#if IDCC_TPM_JEM
+  if (m_pppTarPatch != NULL)
+  {
+	  for (unsigned int uiDepth = 0; uiDepth < USE_MORE_BLOCKSIZE_DEPTH_MAX; uiDepth++)
+	  {
+		  unsigned int blkSize = g_uiDepth2Width[uiDepth];
+
+		  unsigned int patchSize = blkSize + IDCC_TemplateSize;
+		  for (unsigned int uiRow = 0; uiRow < patchSize; uiRow++)
+		  {
+			  if (m_pppTarPatch[uiDepth][uiRow] != NULL)
+			  {
+				  delete[]m_pppTarPatch[uiDepth][uiRow]; m_pppTarPatch[uiDepth][uiRow] = NULL;
+			  }
+		  }
+		  if (m_pppTarPatch[uiDepth] != NULL)
+		  {
+			  delete[]m_pppTarPatch[uiDepth]; m_pppTarPatch[uiDepth] = NULL;
+		  }
+	  }
+	  delete[] m_pppTarPatch;
+	  m_pppTarPatch = NULL;
+  }
+#endif
 }
 
 #if ENABLE_SPLIT_PARALLELISM
@@ -233,6 +273,27 @@ void TrQuant::init( const Quant* otherQuant,
   {
     m_quant->init( uiMaxTrSize, bUseRDOQ, bUseRDOQTS, useSelectiveRDOQ );
   }
+
+
+#if IDCC_TPM_JEM
+  unsigned int blkSize;
+  
+  if (m_pppTarPatch == NULL)
+  {
+	  m_pppTarPatch = new Pel * *[USE_MORE_BLOCKSIZE_DEPTH_MAX];
+	  for (unsigned int uiDepth = 0; uiDepth < USE_MORE_BLOCKSIZE_DEPTH_MAX; uiDepth++)
+	  {
+		  blkSize = g_uiDepth2Width[uiDepth];
+
+		  unsigned int patchSize = blkSize + IDCC_TemplateSize;
+		  m_pppTarPatch[uiDepth] = new Pel * [patchSize];
+		  for (unsigned int uiRow = 0; uiRow < patchSize; uiRow++)
+		  {
+			  m_pppTarPatch[uiDepth][uiRow] = new Pel[patchSize];
+		  }
+	  }
+}
+#endif
 
 #if TU_256
   fastFwdTrans =
@@ -374,6 +435,581 @@ void TrQuant::invLfnstNxN( int* src, int* dst, const uint32_t mode, const uint32
   }
 }
 
+#if IDCC_TPM_JEM
+void insertNode(DistType diff, int& iXOffset, int& iYOffset, DistType& pDiff, int& pX, int& pY, short& pId, unsigned int& setId)
+{
+	pDiff = diff;
+	pX = iXOffset;
+	pY = iYOffset;
+	pId = setId;
+}
+#if IDCC_TPM_JEM
+#if IDCC_FixedComparisonPerPixel
+void clipMvIntraConstraint(CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX)
+#else
+void clipMvIntraConstraint(CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, int iRange, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX)
+#endif
+{
+#if IDCC_FixedComparisonPerPixel
+	int SearchRange_Height, SearchRange_Width;
+	
+	SearchRange_Width = IDCC_SearchRangeMultFactor * uiBlkWidth;
+	SearchRange_Height = IDCC_SearchRangeMultFactor * uiBlkHeight;
+#else
+	int SearchRange_Width = IDCC_SEARCHRANGEINTRA;
+	int SearchRange_Height = IDCC_SEARCHRANGEINTRA;
+#endif
+	int  iMvShift = 0;
+	int iTemplateSize = uiTemplateSize;
+	int iBlkWidth = uiBlkWidth;
+	int iBlkHeight = uiBlkHeight;
+	if (regionId == 0) //above outside LCU
+	{
+		iHorMax = std::min((iCurrX + SearchRange_Width) << iMvShift, (int)((pcCU->cs->sps->getMaxPicWidthInLumaSamples() - iBlkWidth) << iMvShift));
+		iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - SearchRange_Width) << iMvShift);
+
+		iVerMax = (iCurrY - iBlkHeight - offsetLCUY) << iMvShift;
+		iVerMin = std::max(((iTemplateSize) << iMvShift), ((iCurrY - SearchRange_Height) << iMvShift));
+
+		iHorMin = iHorMin - iCurrX;
+		iHorMax = iHorMax - iCurrX;
+		iVerMax = iVerMax - iCurrY;
+		iVerMin = iVerMin - iCurrY;
+	}
+	else if (regionId == 1) //left outside LCU
+	{
+		iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
+		iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - SearchRange_Width) << iMvShift);
+
+		iVerMin = std::max((iTemplateSize) << iMvShift, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift);
+		iVerMax = (iCurrY) << iMvShift;
+
+		iHorMin = iHorMin - iCurrX;
+		iHorMax = iHorMax - iCurrX;
+		iVerMax = iVerMax - iCurrY;
+		iVerMin = iVerMin - iCurrY;
+	}
+	else if (regionId == 2) //left outside LCU (can reach the bottom row of LCU)
+	{
+		iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - SearchRange_Width) << iMvShift);
+		iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
+		iVerMin = (iCurrY + 1) << iMvShift;
+		iVerMax = std::min(pcCU->cs->sps->getMaxPicHeightInLumaSamples() - iBlkHeight, (iCurrY - offsetLCUY + pcCU->cs->sps->getCTUSize() - iBlkHeight) << iMvShift);
+
+		iHorMin = iHorMin - iCurrX;
+		iHorMax = iHorMax - iCurrX;
+		iVerMax = iVerMax - iCurrY;
+		iVerMin = iVerMin - iCurrY;
+	}
+}
+#endif
+#endif
+
+#if IDCC_TPM_JEM
+TempLibFast::TempLibFast()
+{
+}
+
+TempLibFast::~TempLibFast()
+{
+}
+#endif
+
+#if IDCC_TPM_JEM
+void TempLibFast::initTemplateDiff(unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int bitDepth)
+{
+#if VCEG_AZ08_USE_SAD_DISTANCE
+	DistType maxValue = ((1 << bitDepth) >> (INIT_THRESHOULD_SHIFTBITS)) * (uiPatchHeight * uiPatchWidth - uiBlkHeight * uiBlkWidth);
+#endif
+#if VCEG_AZ08_USE_SSD_DISTANCE
+	DistType maxValue = ((1 << bitDepth) >> (INIT_THRESHOULD_SHIFTBITS)) * ((1 << bitDepth) >> (INIT_THRESHOULD_SHIFTBITS)) * (uiPatchSize * uiPatchSize - uiBlkSize * uiBlkSize);
+#endif
+	m_diffMax = maxValue;
+	{
+		m_pDiff = maxValue;
+	}
+}
+
+void TrQuant::getTargetTemplate(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight)
+{
+	const ComponentID compID = COMPONENT_Y;
+	unsigned int uiPatchWidth = uiBlkWidth + IDCC_TemplateSize;
+	unsigned int uiPatchHeight = uiBlkHeight + IDCC_TemplateSize;
+	unsigned int uiTarDepth = floorLog2(std::max(uiBlkHeight, uiBlkWidth)) - 2;
+	Pel** tarPatch = m_pppTarPatch[uiTarDepth];
+	CompArea area = pcCU->blocks[compID];
+	Pel* pCurrStart = pcCU->cs->picture->getRecoBuf(area).buf;
+	unsigned int  uiPicStride = pcCU->cs->picture->getRecoBuf(compID).stride;
+	unsigned int uiY, uiX;
+
+
+
+	//fill template
+	//up-left & up 
+	Pel* tarTemp;
+	Pel* pCurrTemp = pCurrStart - IDCC_TemplateSize * uiPicStride - IDCC_TemplateSize;
+	for (uiY = 0; uiY < IDCC_TemplateSize; uiY++)
+	{
+		tarTemp = tarPatch[uiY]; 
+		for (uiX = 0; uiX < uiPatchWidth; uiX++)
+		{
+			tarTemp[uiX] = pCurrTemp[uiX];
+		}
+		pCurrTemp += uiPicStride;
+	}
+	//left
+	for (uiY = IDCC_TemplateSize; uiY < uiPatchHeight; uiY++)
+	{
+		tarTemp = tarPatch[uiY];
+		for (uiX = 0; uiX < IDCC_TemplateSize; uiX++)
+		{
+			tarTemp[uiX] = pCurrTemp[uiX];
+		}
+		pCurrTemp += uiPicStride;
+	}
+}
+
+void TrQuant::candidateSearchIntra(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight)
+{
+	const ComponentID compID = COMPONENT_Y;
+	const int channelBitDepth = pcCU->cs->sps->getBitDepth(toChannelType(compID));
+	unsigned int uiPatchWidth = uiBlkWidth + IDCC_TemplateSize;
+	unsigned int uiPatchHeight = uiBlkHeight + IDCC_TemplateSize;
+	unsigned int uiTarDepth = floorLog2(std::max(uiBlkWidth, uiBlkHeight)) - 2;
+	Pel** tarPatch = getTargetPatch(uiTarDepth);
+	//Initialize the library for saving the best candidates
+	m_tempLibFast.initTemplateDiff(uiPatchWidth, uiPatchHeight, uiBlkWidth, uiBlkHeight, channelBitDepth);
+	short setId = 0; //record the reference picture.
+	searchCandidateFromOnePicIntra(pcCU, tarPatch, uiPatchWidth, uiPatchHeight, setId);
+	//count collected candidate number
+	DistType pDiff = m_tempLibFast.getDiff();
+	DistType maxDiff = m_tempLibFast.getDiffMax();
+	
+
+	if (pDiff < maxDiff)
+		m_uiVaildCandiNum = 1;
+	else
+		m_uiVaildCandiNum = 0;
+}
+
+void  TrQuant::searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId)
+{
+	const ComponentID compID = COMPONENT_Y;
+	unsigned int uiBlkWidth = uiPatchWidth - IDCC_TemplateSize;
+	unsigned int uiBlkHeight = uiPatchHeight - IDCC_TemplateSize;
+
+	int pX = m_tempLibFast.getX();
+	int pY = m_tempLibFast.getY();
+	DistType pDiff = m_tempLibFast.getDiff();
+	short pId = m_tempLibFast.getId();
+	CompArea area = pcCU->blocks[compID];
+	int  refStride = pcCU->cs->picture->getRecoBuf(compID).stride;
+	
+	Pel* ref = pcCU->cs->picture->getRecoBuf(area).buf;
+	
+	setRefPicUsed(ref); //facilitate the access of each candidate point 
+	
+	setStride(refStride);
+#if !IDCC_FixedComparisonPerPixel
+	int     iSrchRng = SEARCHRANGEINTRA;
+#endif
+
+	
+	Mv cTmpMvPred;
+	cTmpMvPred.setZero();
+
+	unsigned int uiCUPelY = area.pos().y;
+	unsigned int uiCUPelX = area.pos().x;
+	int blkX = 0;
+	int blkY = 0;
+	int iCurrY = uiCUPelY + blkY;
+	int iCurrX = uiCUPelX + blkX;
+
+	Position  ctuRsAddr = CU::getCtuXYAddr(*pcCU);
+	int offsetLCUY = iCurrY - ctuRsAddr.y;
+	int offsetLCUX = iCurrX - ctuRsAddr.x;
+
+
+	int iYOffset, iXOffset;
+	DistType diff;
+	Pel* refCurr;
+
+#if IDCC_SignleSearchRegion
+	int mvYMins;
+	int mvYMaxs;
+	int mvXMins;
+	int mvXMaxs;
+#else
+#define REGION_NUM 3
+	int mvYMins[REGION_NUM];
+	int mvYMaxs[REGION_NUM];
+	int mvXMins[REGION_NUM];
+	int mvXMaxs[REGION_NUM];
+	int regionNum = REGION_NUM;
+	int regionId = 0;
+#endif
+
+#if IDCC_TMP_Within_CTU && !IDCC_SignleSearchRegion
+	//1. check the near pixels within LCU
+	//above pixels in LCU
+	int iTemplateSize = IDCC_TemplateSize;
+	int iBlkWidth = uiBlkWidth;
+	int iBlkHeight = uiBlkHeight;
+	regionId = 0;
+	int iMvShift = 0;
+	
+
+	int iVerMin = std::max(((iTemplateSize) << iMvShift), (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift);
+	int iVerMax = (iCurrY - iBlkHeight) << iMvShift; 
+	int iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - offsetLCUX - iBlkWidth + 1) << iMvShift);
+	int iHorMax = (iCurrX - iBlkWidth);
+
+	mvXMins[regionId] = iHorMin - iCurrX;
+	mvXMaxs[regionId] = iHorMax - iCurrX;
+	mvYMins[regionId] = iVerMin - iCurrY;
+	mvYMaxs[regionId] = iVerMax - iCurrY;
+
+
+
+	//check within CTU pixels
+	for (regionId = 0; regionId < 1; regionId++)
+	{
+		int mvYMin = mvYMins[regionId];
+		int mvYMax = mvYMaxs[regionId];
+		int mvXMin = mvXMins[regionId];
+		int mvXMax = mvXMaxs[regionId];
+		if (mvYMax < mvYMin || mvXMax < mvXMin)
+		{
+			continue;
+		}
+		for (iYOffset = mvYMax; iYOffset >= mvYMin; iYOffset--)
+		{
+			for (iXOffset = mvXMax; iXOffset >= mvXMin; iXOffset--)
+			{
+				refCurr = ref + iYOffset * refStride + iXOffset;
+				diff = calcTemplateDiff(refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, pDiff);
+				if (diff < (pDiff))
+				{
+					insertNode(diff, iXOffset, iYOffset, pDiff, pX, pY, pId, setId); 
+				}
+        if (pDiff == 0)
+        {
+          regionId++;
+        }
+			}
+		}
+	}
+#endif
+#if IDCC_SignleSearchRegion
+
+#if IDCC_FixedComparisonPerPixel
+	int SearchRange_Height, SearchRange_Width;
+	// No. of comparison per pixel is:
+	// (searchRange_width - Width - TempSize_width + 1)  *( searchRange_height - Height - TempSize + 1) / Width / Height
+	// to have a constant comparison per pixel:
+	// (searchRange_width - Width - TempSize_width + 1)/Width must be const  = CC
+	// (searchRange_height - Height - TempSize + 1)/ Height must be constant = CC
+
+	//searchRange_width  = CC*Width + Width + TempSize_width - 1;
+	//searchRange_height  = CC*Height + Height + TempSize_height - 1;
+
+
+	SearchRange_Width = IDCC_SearchRangeMultFactor * uiBlkWidth + uiBlkWidth + iTempSize - 1;
+	SearchRange_Height = IDCC_SearchRangeMultFactor * uiBlkHeight + uiBlkHeight + iTempSize - 1;
+#endif
+	int iTempSize = uiTempSize;
+
+	//int  iMvShift = 0;
+	int iBlkWidth = uiBlkWidth;
+	int iBlkHeight = uiBlkHeight;
+
+#if IDCC_FixedComparisonPerPixel
+	mvYMins = std::max(iTempSize, iCurrY - SearchRange_Height);
+#else
+	mvYMins = std::max(iTempSize, (iCurrY - iSrchRng));
+#endif
+	mvYMaxs = iCurrY - iBlkHeight;
+#if IDCC_FixedComparisonPerPixel
+	mvXMins = std::max(iTempSize, (iCurrX - SearchRange_Width));
+#else
+	mvXMins = std::max(iTempSize, (iCurrX - iSrchRng));
+#endif
+	mvXMaxs = (iCurrX - iBlkWidth);
+
+	mvXMins = mvXMins - iCurrX;
+	mvXMaxs = mvXMaxs - iCurrX;
+	mvYMaxs = mvYMaxs - iCurrY;
+	mvYMins = mvYMins - iCurrY;
+#endif
+
+#if !IDCC_SignleSearchRegion
+	//2. check the pixels outside CTU
+	for (regionId = 0; regionId < regionNum; regionId++)
+	{// this function fills in the range the template matching for pixels outside the current CTU
+#if IDCC_FixedComparisonPerPixel
+		clipMvIntraConstraint(pcCU, regionId, mvXMins[regionId], mvXMaxs[regionId], mvYMins[regionId], mvYMaxs[regionId], IDCC_TemplateSize, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX);
+#else
+		clipMvIntraConstraint(pcCU, regionId, mvXMins[regionId], mvXMaxs[regionId], mvYMins[regionId], mvYMaxs[regionId], iSrchRng, uiTempSize, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX);
+#endif
+	}
+#endif
+#if !IDCC_SignleSearchRegion
+	for (regionId = 0; regionId < regionNum; regionId++)
+#endif
+	{
+#if IDCC_SignleSearchRegion
+		int mvYMin = mvYMins;
+		int mvYMax = mvYMaxs;
+		int mvXMin = mvXMins;
+		int mvXMax = mvXMaxs;
+#else
+		int mvYMin = mvYMins[regionId];
+		int mvYMax = mvYMaxs[regionId];
+		int mvXMin = mvXMins[regionId];
+		int mvXMax = mvXMaxs[regionId];
+#endif
+		if ( mvYMax < mvYMin || mvXMax < mvXMin )
+		{
+#if IDCC_SignleSearchRegion
+			return;
+#else
+			continue;
+#endif
+		}
+		for (iYOffset = mvYMax; iYOffset >= mvYMin; iYOffset--)
+		{
+			for (iXOffset = mvXMax; iXOffset >= mvXMin; iXOffset--)
+			{
+				refCurr = ref + iYOffset * refStride + iXOffset;
+				diff = calcTemplateDiff(refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, pDiff);
+				if (diff < (pDiff))
+				{
+					insertNode(diff, iXOffset, iYOffset, pDiff, pX, pY, pId, setId);
+				}
+        if (pDiff == 0)
+        {
+          regionId = regionNum;
+        }
+			}
+		}
+	}
+	m_tempLibFast.m_pX = pX;
+	m_tempLibFast.m_pY = pY;
+	m_tempLibFast.m_pDiff = pDiff;
+	m_tempLibFast.m_pId = pId;
+}
+bool TrQuant::generateTMPrediction(Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int& foundCandiNum)
+{
+	bool bSucceedFlag = true;
+	unsigned int uiPatchWidth = uiBlkWidth + IDCC_TemplateSize;
+	unsigned int uiPatchHeight = uiBlkHeight + IDCC_TemplateSize;
+
+	foundCandiNum = m_uiVaildCandiNum;
+	if (foundCandiNum < 1)
+	{
+		return false;
+	}
+
+	int pX = m_tempLibFast.getX();
+	int pY = m_tempLibFast.getY();
+	Pel* ref;
+	int picStride = getStride();
+	int iOffsetY, iOffsetX;
+	Pel* refTarget;
+	unsigned int uiHeight = uiPatchHeight - IDCC_TemplateSize;
+	unsigned int uiWidth = uiPatchWidth - IDCC_TemplateSize;
+
+	//the data center: we use the prediction block as the center now.
+	//collect the candidates
+	ref = getRefPicUsed();
+	{
+		iOffsetY = pY;
+		iOffsetX = pX;
+		refTarget = ref + iOffsetY * picStride + iOffsetX;
+		for (unsigned int uiY = 0; uiY < uiHeight; uiY++)
+		{
+			for (unsigned int uiX = 0; uiX < uiWidth; uiX++)
+			{
+				piPred[uiX] = refTarget[uiX];
+			}
+			refTarget += picStride;
+			piPred += uiStride;
+		}
+	}
+	return bSucceedFlag;
+}
+
+DistType TrQuant::calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, DistType iMax)
+{
+#if IDCC_TMP_SIMD
+	DistType iDiffSum = 0;
+	int iY;
+	Pel* refPatchRow = ref - IDCC_TemplateSize * uiStride - IDCC_TemplateSize;
+	Pel* tarPatchRow;
+
+	uint32_t uiSum;
+	// horizontal difference
+	for (iY = 0; iY < IDCC_TemplateSize; iY++)
+	{
+		tarPatchRow = tarPatch[iY];
+		const short* pSrc1 = (const short*)tarPatchRow;
+		const short* pSrc2 = (const short*)refPatchRow;
+
+		// SIMD difference
+		//int  iRows = uiPatchHeight;
+		int  iCols = uiPatchWidth;
+		if ((iCols & 7) == 0)
+		{
+			// Do with step of 8
+			__m128i vzero = _mm_setzero_si128();
+			__m128i vsum32 = vzero;
+			//for (int iY = 0; iY < iRows; iY += iSubStep)
+			{
+				__m128i vsum16 = vzero;
+				for (int iX = 0; iX < iCols; iX += 8)
+				{
+					__m128i vsrc1 = _mm_loadu_si128((const __m128i*)(&pSrc1[iX]));
+					__m128i vsrc2 = _mm_lddqu_si128((const __m128i*)(&pSrc2[iX]));
+					vsum16 = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+				}
+				__m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+				vsum32 = _mm_add_epi32(vsum32, vsumtemp);
+				//pSrc1 += iStrideSrc1;
+				//pSrc2 += iStrideSrc2;
+			}
+			vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+			vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+			uiSum = _mm_cvtsi128_si32(vsum32);
+		}
+		else
+		{
+			// Do with step of 4
+			__m128i vzero = _mm_setzero_si128();
+			__m128i vsum32 = vzero;
+			//for (int iY = 0; iY < iRows; iY += iSubStep)
+			{
+				__m128i vsum16 = vzero;
+				for (int iX = 0; iX < iCols; iX += 4)
+				{
+					__m128i vsrc1 = _mm_loadl_epi64((const __m128i*) & pSrc1[iX]);
+					__m128i vsrc2 = _mm_loadl_epi64((const __m128i*) & pSrc2[iX]);
+					vsum16 = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+				}
+				__m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+				vsum32 = _mm_add_epi32(vsum32, vsumtemp);
+				//pSrc1 += iStrideSrc1;
+				//pSrc2 += iStrideSrc2;
+			}
+			vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+			vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+			uiSum = _mm_cvtsi128_si32(vsum32);
+		}
+		iDiffSum += uiSum;
+
+		if (iDiffSum > iMax) //for speeding up
+		{
+			return iDiffSum;
+		}
+		// update location
+		refPatchRow += uiStride;
+	}
+
+	// vertical difference
+	int  iCols = IDCC_TemplateSize;
+	for (iY = IDCC_TemplateSize; iY < uiPatchHeight; iY++)
+	{
+		tarPatchRow = tarPatch[iY];
+		const short* pSrc1 = (const short*)tarPatchRow;
+		const short* pSrc2 = (const short*)refPatchRow ;
+
+		// SIMD difference
+
+		// Do with step of 4
+		__m128i vzero = _mm_setzero_si128();
+		__m128i vsum32 = vzero;
+		//for (int iY = 0; iY < iRows; iY += iSubStep)
+		{
+			__m128i vsum16 = vzero;
+			for (int iX = 0; iX < iCols; iX += 4)
+			{
+				__m128i vsrc1 = _mm_loadl_epi64((const __m128i*) & pSrc1[iX]);
+				__m128i vsrc2 = _mm_loadl_epi64((const __m128i*) & pSrc2[iX]);
+				vsum16 = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+			}
+			__m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+			vsum32 = _mm_add_epi32(vsum32, vsumtemp);
+			//pSrc1 += iStrideSrc1;
+			//pSrc2 += iStrideSrc2;
+		}
+		vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+		vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+		uiSum = _mm_cvtsi128_si32(vsum32);
+
+		iDiffSum += uiSum;
+
+		if (iDiffSum > iMax) //for speeding up
+		{
+			return iDiffSum;
+		}
+		// update location
+		refPatchRow += uiStride;
+	}
+	
+	return iDiffSum;
+	
+#else
+	int iY, iX;
+#if VCEG_AZ08_USE_SSD_DISTANCE
+	int iDiff;
+#endif
+	DistType iDiffSum = 0;
+	Pel* refPatchRow = ref - IDCC_TemplateSize * uiStride - IDCC_TemplateSize;
+	Pel* tarPatchRow;
+	for (iY = 0; iY < IDCC_TemplateSize; iY++)
+	{
+		tarPatchRow = tarPatch[iY];
+		for (iX = 0; iX < uiPatchWidth; iX++)
+		{
+#if VCEG_AZ08_USE_SAD_DISTANCE
+			iDiffSum += abs(refPatchRow[iX] - tarPatchRow[iX]);
+#endif
+#if VCEG_AZ08_USE_SSD_DISTANCE
+			iDiff = refPatchRow[iX] - tarPatchRow[iX];
+			iDiffSum += iDiff * iDiff;
+#endif
+		}
+		if (iDiffSum > iMax) //for speeding up
+		{
+			return iDiffSum;
+		}
+		refPatchRow += uiStride;
+	}
+	for (iY = IDCC_TemplateSize; iY < uiPatchHeight; iY++)
+	{
+		tarPatchRow = tarPatch[iY];
+		for (iX = 0; iX < uiTempSize; iX++)
+		{
+#if VCEG_AZ08_USE_SAD_DISTANCE
+			iDiffSum += abs(refPatchRow[iX] - tarPatchRow[iX]);
+#endif
+#if VCEG_AZ08_USE_SSD_DISTANCE
+			iDiff = refPatchRow[iX] - tarPatchRow[iX];
+			iDiffSum += iDiff * iDiff;
+#endif
+		}
+		if (iDiffSum > iMax) //for speeding up
+		{
+			return iDiffSum;
+		}
+		refPatchRow += uiStride;
+	}
+	return iDiffSum;
+#endif
+}
+#endif
+
+
+
 uint32_t TrQuant::getLFNSTIntraMode( int wideAngPredMode )
 {
   uint32_t intraMode;
@@ -427,6 +1063,12 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
     {
       intraMode = PLANAR_IDX;
     }
+#if IDCC_TPM_JEM
+	if (PU::isTmp(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
+	{
+		intraMode = PLANAR_IDX;
+  }
+#endif
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
 
 #if EXTENDED_LFNST
@@ -567,6 +1209,12 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
     {
       intraMode = PLANAR_IDX;
     }
+#if IDCC_TPM_JEM
+	if (PU::isTmp(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
+	{
+		intraMode = PLANAR_IDX;
+  }
+#endif
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
 
 #if EXTENDED_LFNST
@@ -787,7 +1435,11 @@ std::vector<int> TrQuant::selectICTCandidates( const TransformUnit &tu, CompStor
 void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &trTypeHor, int &trTypeVer)
 {
   const bool isExplicitMTS = (CU::isIntra(*tu.cu) ? tu.cs->sps->getUseIntraMTS() : tu.cs->sps->getUseInterMTS() && CU::isInter(*tu.cu)) && isLuma(compID);
+#if IDCC_TPM_JEM && !IDCC_TMP_ImplicitMTS
+  const bool isImplicitMTS = CU::isIntra(*tu.cu) && tu.cs->sps->getUseImplicitMTS() && isLuma(compID) && tu.cu->lfnstIdx == 0 && tu.cu->mipFlag == 0 && tu.cu->TmpFlag == 0;
+#else
   const bool isImplicitMTS = CU::isIntra(*tu.cu) && tu.cs->sps->getUseImplicitMTS() && isLuma(compID) && tu.cu->lfnstIdx == 0 && tu.cu->mipFlag == 0;
+#endif
   const bool isISP = CU::isIntra(*tu.cu) && tu.cu->ispMode && isLuma(compID);
   const bool isSBT = CU::isInter(*tu.cu) && tu.cu->sbtInfo && isLuma(compID);
 
@@ -804,7 +1456,11 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
     return;
   }
 
+#if IDCC_TMP_ImplicitMTS
+  if (isImplicitMTS || isISP || tu.cu->TmpFlag)
+#else
   if (isImplicitMTS || isISP)
+#endif
   {
     int  width = tu.blocks[compID].width;
     int  height = tu.blocks[compID].height;

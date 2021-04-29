@@ -1200,7 +1200,15 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
     cu.firstPU->intraDir[0] = cu.bdpcmMode == 2? VER_IDX : HOR_IDX;
     return;
   }
-
+#if IDCC_TPM_JEM
+  int TMP_MaxSize=cu.cs->sps->getIntraTMPMaxSize();
+  if (cu.lwidth() <= TMP_MaxSize && cu.lheight() <= TMP_MaxSize)
+  {
+	  Tmp_Flag(cu);
+	  if (cu.TmpFlag)
+		  return;
+  }
+#endif
   mip_flag(cu);
   if (cu.mipFlag)
   {
@@ -1381,6 +1389,17 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
 {
 
   if( pu.cu->bdpcmMode ) return;
+#if IDCC_TPM_JEM
+  // check if sufficient search range is available
+  //bool bCheck = pu.cu->
+  int TMP_MaxSize=pu.cu->cs->sps->getIntraTMPMaxSize();
+  if (pu.cu->lwidth() <= TMP_MaxSize && pu.cu->lheight() <= TMP_MaxSize)
+  {
+	  Tmp_Flag(*pu.cu);
+	  if (pu.cu->TmpFlag)
+		  return;
+  }
+#endif
   mip_flag(*pu.cu);
   if (pu.cu->mipFlag)
   {
@@ -3569,7 +3588,11 @@ void CABACWriter::residual_lfnst_mode( const CodingUnit& cu, CUCtx& cuCtx )
   int chIdx = cu.isSepTree() && cu.chType == CHANNEL_TYPE_CHROMA ? 1 : 0;
 #endif
   if( ( cu.ispMode && !CU::canUseLfnstWithISP( cu, cu.chType ) ) ||
+#if IDCC_TPM_JEM
+  (cu.cs->sps->getUseLFNST() && CU::isIntra(cu) && ((cu.mipFlag && !allowLfnstWithMip(cu.firstPU->lumaSize())) || (cu.TmpFlag && !allowLfnstWithTpm()))) ||
+#else
       (cu.cs->sps->getUseLFNST() && CU::isIntra(cu) && cu.mipFlag && !allowLfnstWithMip(cu.firstPU->lumaSize())) ||
+#endif
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     (CS::isDualITree(*cu.cs) && cu.chType == CHANNEL_TYPE_CHROMA && std::min(cu.blocks[1].width, cu.blocks[1].height) < 4)
 #else
@@ -4194,6 +4217,25 @@ void CABACWriter::code_unary_fixed( unsigned symbol, unsigned ctxId, unsigned un
     m_BinEncoder.encodeBinsEP( symbol - unary_max - 1, fixed );
   }
 }
+
+#if IDCC_TPM_JEM
+void CABACWriter::Tmp_Flag(const CodingUnit& cu)
+{
+	if (!cu.Y().valid())
+	{
+		return;
+	}
+
+  if( !cu.cs->sps->getUseIntraTMP() )
+  {
+    return;
+  }
+
+	unsigned ctxId = DeriveCtx::CtxTmpFlag(cu);
+	m_BinEncoder.encodeBin(cu.TmpFlag, Ctx::TmpFlag(ctxId));
+	DTRACE(g_trace_ctx, D_SYNTAX, "Tmp_Flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.TmpFlag ? 1 : 0);
+}
+#endif
 
 void CABACWriter::mip_flag( const CodingUnit& cu )
 {
