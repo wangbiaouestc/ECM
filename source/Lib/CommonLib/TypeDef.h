@@ -151,6 +151,7 @@ typedef       int             DistType;
 #define INTRA_6TAP                                        1 // 6TapCubic + 6 TapGaussian + left side 4 tap weak filtering for intra.
 #define SECONDARY_MPM                                     1 // Primary MPM and Secondary MPM: Add neighbouring modes into MPMs from positions AR, BL, AL, derived modes
 #define ENABLE_DIMD                                       1 // Decoder side intra mode derivation
+#define JVET_V0087_DIMD_NO_ISP                            ENABLE_DIMD // disallow combination of DIMD and ISP
 
 // Inter
 #define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode

@@ -3563,7 +3563,11 @@ void CABACWriter::mts_idx( const CodingUnit& cu, CUCtx* cuCtx )
 
 void CABACWriter::isp_mode( const CodingUnit& cu )
 {
-  if( !CU::isIntra( cu ) || !isLuma( cu.chType ) || cu.firstPU->multiRefIdx || !cu.cs->sps->getUseISP() || cu.bdpcmMode || !CU::canUseISP( cu, getFirstComponentOfChannel( cu.chType ) ) || cu.colorTransform )
+  if( !CU::isIntra( cu ) || !isLuma( cu.chType ) || cu.firstPU->multiRefIdx || !cu.cs->sps->getUseISP() || cu.bdpcmMode || !CU::canUseISP( cu, getFirstComponentOfChannel( cu.chType ) ) || cu.colorTransform 
+#if  ENABLE_DIMD && JVET_V0087_DIMD_NO_ISP
+    || cu.dimd
+#endif
+    )
   {
     CHECK( cu.ispMode != NOT_INTRA_SUBPARTITIONS, "cu.ispMode != 0" );
     return;
