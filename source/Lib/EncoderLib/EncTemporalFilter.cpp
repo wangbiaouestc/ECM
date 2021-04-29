@@ -43,7 +43,7 @@
 // Constructor / destructor / initialization / destroy
 // ====================================================================================================================
 
-#if JVET_U0056
+#if JVET_V0056
 const int EncTemporalFilter::m_range = 4;
 #else
 const int EncTemporalFilter::m_range = 2;
@@ -73,7 +73,7 @@ const int EncTemporalFilter::m_interpolationFilter[16][8] =
   {   0,   0,  -2,   4,  64,  -3,   1,   0 }    //15-->-->
 };
 
-#if JVET_U0056
+#if JVET_V0056
 const double EncTemporalFilter::m_refStrengths[3][4] =
 { // abs(POC offset)
   //  1,    2     3     4
@@ -373,7 +373,7 @@ int EncTemporalFilter::motionErrorLuma(const PelStorage &orig,
 void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const PelStorage &orig, const PelStorage &buffer, const int blockSize,
   const Array2D<MotionVector> *previous, const int factor, const bool doubleRes) const
 {
-#if JVET_U0056
+#if JVET_V0056
   int range = doubleRes ? 0 : 5;
 #else
   int range = 5;
@@ -383,7 +383,7 @@ void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const P
   const int origWidth  = orig.Y().width;
   const int origHeight = orig.Y().height;
 
-#if JVET_U0056
+#if JVET_V0056
   for (int blockY = 0; blockY + blockSize <= origHeight; blockY += stepSize)
   {
     for (int blockX = 0; blockX + blockSize <= origWidth; blockX += stepSize)
@@ -401,14 +401,14 @@ void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const P
       }
       else
       {
-#if JVET_U0056
+#if JVET_V0056
         for (int py = -1; py <= 1; py++)
 #else
         for (int py = -2; py <= 2; py++)
 #endif
         {
           int testy = blockY / (2 * blockSize) + py;
-#if JVET_U0056
+#if JVET_V0056
           for (int px = -1; px <= 1; px++)
 #else
           for (int px = -2; px <= 2; px++)
@@ -426,7 +426,7 @@ void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const P
             }
           }
         }
-#if JVET_U0056
+#if JVET_V0056
         int error = motionErrorLuma(orig, buffer, blockX, blockY, 0, 0, blockSize, best.error);
         if (error < best.error)
         {
@@ -477,7 +477,7 @@ void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const P
         }
       }
 
-#if JVET_U0056
+#if JVET_V0056
       if (blockY > 0)
       {
         MotionVector aboveMV = mvs.get(blockX / stepSize, (blockY - stepSize) / stepSize);
@@ -632,7 +632,7 @@ void EncTemporalFilter::applyMotion(const Array2D<MotionVector> &mvs, const PelS
 }
 
 void EncTemporalFilter::bilateralFilter(const PelStorage &orgPic,
-#if JVET_U0056
+#if JVET_V0056
   std::deque<TemporalFilterSourcePicInfo> &srcFrameInfo,
 #else
   const std::deque<TemporalFilterSourcePicInfo> &srcFrameInfo,
@@ -674,7 +674,7 @@ void EncTemporalFilter::bilateralFilter(const PelStorage &orgPic,
     const double weightScaling = overallStrength * (isChroma(compID) ? m_chromaFactor : 0.4);
     const Pel maxSampleValue   = (1 << m_internalBitDepth[toChannelType(compID)]) - 1;
     const double bitDepthDiffWeighting = 1024.0 / (maxSampleValue + 1);
-#if JVET_U0056
+#if JVET_V0056
     const int lumaBlockSize = 8;
     const int csx = getComponentScaleX(compID, m_chromaFormatIDC);
     const int csy = getComponentScaleY(compID, m_chromaFormatIDC);
@@ -691,7 +691,7 @@ void EncTemporalFilter::bilateralFilter(const PelStorage &orgPic,
         const int orgVal = (int) *srcPel;
         double temporalWeightSum = 1.0;
         double newVal = (double) orgVal;
-#if JVET_U0056
+#if JVET_V0056
         if ((y % blockSizeY == 0) && (x % blockSizeX == 0))
         {
           for (int i = 0; i < numRefs; i++)
@@ -728,7 +728,7 @@ void EncTemporalFilter::bilateralFilter(const PelStorage &orgPic,
 #endif
         for (int i = 0; i < numRefs; i++)
         {
-#if JVET_U0056
+#if JVET_V0056
           const int error = srcFrameInfo[i].mvs.get(x / blockSizeX, y / blockSizeY).error;
           const int noise = srcFrameInfo[i].mvs.get(x / blockSizeX, y / blockSizeY).noise;
 #endif
@@ -737,7 +737,7 @@ void EncTemporalFilter::bilateralFilter(const PelStorage &orgPic,
           double diff = (double)(refVal - orgVal);
           diff *= bitDepthDiffWeighting;
           double diffSq = diff * diff;
-#if JVET_U0056
+#if JVET_V0056
           const int index = std::min(3, std::abs(srcFrameInfo[i].origOffset) - 1);
           double ww = 1, sw = 1;
           ww *= (noise < 25) ? 1.0 : 0.6;

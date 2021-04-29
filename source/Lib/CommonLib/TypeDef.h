@@ -54,7 +54,7 @@
 
 //########### place macros to be removed in next cycle below this line ###############
 
-#define JVET_U0056                                        1 // MCTF changes as presented in JVET-V0056
+#define JVET_V0056                                        1 // MCTF changes as presented in JVET-V0056
 
 #define JVET_S0096_RPL_CONSTRAINT                         1// JVET-S0096 aspect 1: When pps_rpl_info_in_ph_flag is equal to 1 and ph_inter_slice_allowed_flag is equal to 1, the value of num_ref_entries[ 0 ][ RplsIdx[ 0 ] ] shall be greater than 0.
 #define JVET_S0078_NOOUTPUTPRIORPICFLAG                   0 // JVET-S0078: Handling of NoOutputOfPriorPicsFlag in output process
