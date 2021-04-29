@@ -271,6 +271,50 @@ Distortion RdCost::xGetSSE_NxN_SIMD( const DistParam &rcDtParam )
 #endif
     }
 #if DIST_SSE_ENABLE
+    else if( iWidth > 32 && (iWidth & 15) == 0 )
+    {
+      if( iRows > 16 && (iRows & 15) )
+      {
+        uiRet = RdCost::xGetSSE( rcDtParam );
+      }
+      else
+      {
+        __m128i vzero = _mm_setzero_si128();
+
+        int num = 1;
+        int rows = iRows;
+
+        if( iRows > 16 )
+        {
+          num = iRows / 16;
+          rows = 16;
+        }
+
+        for( int i = 0; i < num; i++ )
+        {
+          __m128i Sum = _mm_setzero_si128();
+
+          for( int iY = 0; iY < rows; iY++ )
+          {
+            for( int iX = 0; iX < iWidth; iX += 8 )
+            {
+              __m128i Src1 = (sizeof( Torg ) > 1) ? (_mm_loadu_si128( (const __m128i*)(&pSrc1[iX]) )) : (_mm_unpacklo_epi8( _mm_loadl_epi64( (const __m128i*)(&pSrc1[iX]) ), vzero ));
+              __m128i Src2 = (sizeof( Tcur ) > 1) ? (_mm_lddqu_si128( (const __m128i*)(&pSrc2[iX]) )) : (_mm_unpacklo_epi8( _mm_loadl_epi64( (const __m128i*)(&pSrc2[iX]) ), vzero ));
+
+              __m128i Diff = _mm_sub_epi16( Src1, Src2 );
+              __m128i Res = _mm_madd_epi16( Diff, Diff );
+              Sum = _mm_add_epi32( Sum, Res );
+            }
+            pSrc1 += iStrideSrc1;
+            pSrc2 += iStrideSrc2;
+          }
+          Sum = _mm_add_epi32( Sum, _mm_shuffle_epi32( Sum, 0x4e ) );   // 01001110
+          Sum = _mm_add_epi32( Sum, _mm_shuffle_epi32( Sum, 0xb1 ) );   // 10110001
+          uiRet += _mm_cvtsi128_si32( Sum );
+        }
+        uiRet >>= uiShift;
+      }
+    }
     else if ((iWidth & 7) == 0)
 #else
     else
