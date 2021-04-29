@@ -3832,7 +3832,11 @@ void CABACReader::mts_idx( CodingUnit& cu, CUCtx& cuCtx )
 
 void CABACReader::isp_mode( CodingUnit& cu )
 {
-  if( !CU::isIntra( cu ) || !isLuma( cu.chType ) || cu.firstPU->multiRefIdx || !cu.cs->sps->getUseISP() || cu.bdpcmMode || !CU::canUseISP( cu, getFirstComponentOfChannel( cu.chType ) ) || cu.colorTransform )
+  if( !CU::isIntra( cu ) || !isLuma( cu.chType ) || cu.firstPU->multiRefIdx || !cu.cs->sps->getUseISP() || cu.bdpcmMode || !CU::canUseISP( cu, getFirstComponentOfChannel( cu.chType ) ) || cu.colorTransform 
+#if ENABLE_DIMD && JVET_V0087_DIMD_NO_ISP
+      || cu.dimd
+#endif
+    )
   {
     cu.ispMode = NOT_INTRA_SUBPARTITIONS;
     return;

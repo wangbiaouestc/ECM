@@ -311,7 +311,13 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     xPredIntraPlanar( srcBuf, planarBuffer );
 
     const bool applyPdpc = m_ipaParam.applyPDPC;
+#if JVET_V0087_DIMD_NO_ISP   // this is pure cleanup to make code easier to read. It generates identical resut to the else part
+    PredictionUnit pu2 = pu;
+    pu2.intraDir[0] = pu.cu->dimdBlendMode[0];
+    initPredIntraParams(pu2, pu.Y(), *(pu.cs->sps));
 
+    xPredIntraAng(srcBuf, predAng, channelType, clpRng);
+#else
     const bool   useISP = NOT_INTRA_SUBPARTITIONS != pu.cu->ispMode && isLuma( CHANNEL_TYPE_LUMA );//ok
     const Size   cuSize = Size( pu.cu->blocks[compId].width, pu.cu->blocks[compId].height ); //ok
     const Size   puSize = Size( piPred.width, piPred.height );
@@ -390,6 +396,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     }
 
     xPredIntraAng( srcBuf, predAng, channelType, clpRng );
+#endif
     m_ipaParam.applyPDPC = applyPdpc;
 
     // do blending

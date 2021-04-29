@@ -1036,6 +1036,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         cu.dimd = false;
         ModeInfo m = ModeInfo( false, false, 0, NOT_INTRA_SUBPARTITIONS, DIMD_IDX );
         uiRdModeList.push_back(m);
+#if !JVET_V0087_DIMD_NO_ISP
         if (testISP)
         {
           m.ispMod = HOR_INTRA_SUBPARTITIONS;
@@ -1043,6 +1044,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
           m.ispMod = VER_INTRA_SUBPARTITIONS;
           m_ispCandListVer.push_back(m);
         }
+#endif
       }
 #else
       CHECK(numModesForFullRD != uiRdModeList.size(), "Inconsistent state!");
@@ -1221,7 +1223,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 	  CHECK(cu.TmpFlag&& cu.ispMode, "Error: combination of TPM and ISP not supported");
 	  CHECK(cu.TmpFlag&& pu.multiRefIdx, "Error: combination of TPM and MRL not supported");
 #endif
-
+#if ENABLE_DIMD && JVET_V0087_DIMD_NO_ISP
+      CHECK(cu.ispMode && cu.dimd, "Error: combination of ISP and DIMD not supported");
+#endif
       pu.intraDir[CHANNEL_TYPE_CHROMA] = cu.colorTransform ? DM_CHROMA_IDX : pu.intraDir[CHANNEL_TYPE_CHROMA];
 
       // set context models
@@ -6109,14 +6113,14 @@ void IntraSearch::xGetNextISPMode(ModeInfo& modeInfo, const ModeInfo* lastMode, 
     const int thresholdSplit1ForAllLFNSTs = maxNumSubPartitions - 1;
 
     int mode1 = ispTestedModes.getTestedIntraMode((ISPType)nextISPcandSplitType, 0);
-#if ENABLE_DIMD
+#if ENABLE_DIMD && !JVET_V0087_DIMD_NO_ISP
     mode1 = ( mode1 == DC_IDX || mode1 == DIMD_IDX ) ? -1 : mode1;
 #else
     mode1 = mode1 == DC_IDX ? -1 : mode1;
 #endif
     int numSubPartsBestMode1 = mode1 != -1 ? ispTestedModes.getNumCompletedSubParts((ISPType)nextISPcandSplitType, mode1) : -1;
     int mode2 = ispTestedModes.getTestedIntraMode((ISPType)nextISPcandSplitType, 1);
-#if ENABLE_DIMD
+#if ENABLE_DIMD && !JVET_V0087_DIMD_NO_ISP
     mode2 = ( mode2 == DC_IDX || mode2 == DIMD_IDX ) ? -1 : mode2;
 #else
     mode2 = mode2 == DC_IDX ? -1 : mode2;
@@ -6216,7 +6220,7 @@ void IntraSearch::xGetNextISPMode(ModeInfo& modeInfo, const ModeInfo* lastMode, 
 
     // we look for a reference mode that has already been tested within the window and decide to test the new one according to the reference mode costs
     if (
-#if ENABLE_DIMD
+#if ENABLE_DIMD && !JVET_V0087_DIMD_NO_ISP
       candidate.modeId != DIMD_IDX &&
 #endif
       maxNumSubPartitions > 2 && (curIspLfnstIdx > 0 || (candidate.modeId >= DC_IDX && ispTestedModes.numTestedModes[nextISPcandSplitType - 1] >= 2)))
@@ -6432,7 +6436,7 @@ bool IntraSearch::xSortISPCandList(double bestCostSoFar, double bestNonISPCost, 
       break;
     }
     if (
-#if ENABLE_DIMD
+#if ENABLE_DIMD && !JVET_V0087_DIMD_NO_ISP
       origHadList.at(k).modeId == DIMD_IDX ||
 #endif
 	!modeIsInList[origHadList.at(k).modeId])
@@ -6480,7 +6484,7 @@ void IntraSearch::xSortISPCandListLFNST()
       double bestCost  = candList[1].modeId > DC_IDX ? ispTestedModesRef.getRDCost(ispMode, bestModeId) : MAX_DOUBLE;
       for (int i = 0; i < candList.size(); i++)
       {
-#if ENABLE_DIMD
+#if ENABLE_DIMD && !JVET_V0087_DIMD_NO_ISP
         if( candList[i].modeId == DIMD_IDX )
         {
           continue;
