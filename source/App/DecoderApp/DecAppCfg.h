@@ -85,6 +85,10 @@ protected:
 
   int          m_upscaledOutput;                     ////< Output upscaled (2), decoded but in full resolution buffer (1) or decoded cropped (0, default) picture for RPR.
   int           m_targetSubPicIdx;                    ///< Specify which subpicture shall be write to output, using subpicture index
+
+#if DUMP_BEFORE_INLOOP
+  bool          m_dumpBeforeInloop;
+#endif
 public:
   DecAppCfg();
   virtual ~DecAppCfg();

@@ -48,12 +48,68 @@
 // ====================================================================================================================
 // Type definition
 // ====================================================================================================================
+#if MULTI_HYP_PRED 
+struct MultiHypPredictionData
+{
+  int8_t   imv;
+#if INTER_LIC
+  bool     LICFlag;
+#endif
+  bool     isMrg;
+  int8_t   mrgIdx;
+  int8_t   refList;
+  int      mvpIdx;
+  int8_t   refIdx;
+  int8_t   weightIdx;
+  Mv       mv;
+  Mv       mvd;
+};
+
+typedef static_vector<MultiHypPredictionData, MULTI_HYP_PRED_MAX_CANDS> MultiHypVec;
+#endif
 
 /// parameters for AMVP
 struct AMVPInfo
 {
-  Mv       mvCand[ AMVP_MAX_NUM_CANDS_MEM ];  ///< array of motion vector predictor candidates
+#if TM_AMVP
+  Mv       mvCand[REGULAR_AMVP_MAX_NUM_CANDS + 1];  ///< array of motion vector predictor candidates
+#else
+  Mv       mvCand[AMVP_MAX_NUM_CANDS_MEM];  ///< array of motion vector predictor candidates
+#endif
   unsigned numCand;                       ///< number of motion vector predictor candidates
+#if TM_AMVP
+  unsigned maxStorageSize;
+  unsigned maxSimilarityThreshold;
+
+  AMVPInfo() : numCand(0), maxStorageSize(AMVP_MAX_NUM_CANDS), maxSimilarityThreshold(0) {}
+
+  bool xCheckSimilarMotion(const int mvpIdx)
+  {
+    if (maxSimilarityThreshold == 1)
+    {
+      for (uint32_t ui = 0; ui < mvpIdx; ui++)
+      {
+        if (mvCand[ui] == mvCand[mvpIdx])
+        {
+          return true;
+        }
+      }
+    }
+    else if (maxSimilarityThreshold > 1)
+    {
+      for (uint32_t ui = 0; ui < mvpIdx; ui++)
+      {
+        Mv mvDiff = mvCand[ui] - mvCand[mvpIdx];
+        if (mvDiff.getAbsHor() < maxSimilarityThreshold && mvDiff.getAbsVer() < maxSimilarityThreshold)
+        {
+          return true;
+        }
+      }
+    }
+   
+    return false;
+  }
+#endif
 };
 
 struct AffineAMVPInfo
@@ -72,7 +128,7 @@ struct AffineAMVPInfo
 struct MvField
 {
   Mv    mv;
-  int16_t refIdx;
+  int8_t refIdx;
 
   MvField()                                    :            refIdx( NOT_VALID ) {}
   MvField( Mv const & cMv, const int iRefIdx ) : mv( cMv ), refIdx(   iRefIdx ) {}
@@ -106,12 +162,24 @@ struct MotionInfo
   bool     useAltHpelIf;
   uint16_t   sliceIdx;
   Mv      mv     [ NUM_REF_PIC_LIST_01 ];
-  int16_t   refIdx [ NUM_REF_PIC_LIST_01 ];
+  int8_t   refIdx [ NUM_REF_PIC_LIST_01 ];
   uint8_t         BcwIdx;
+#if INTER_LIC
+  bool     usesLIC;
+#endif
+#if MULTI_HYP_PRED  
+  MultiHypVec addHypData;
+#endif
   Mv      bv;
+#if INTER_LIC
+  MotionInfo() : isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, BcwIdx(0), usesLIC(false) { }
+  // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this constructor for anything else
+  MotionInfo(int i) : isInter(i != 0), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, BcwIdx(0), usesLIC(false) { CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
+#else
   MotionInfo() : isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, BcwIdx(0) { }
   // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this constructor for anything else
   MotionInfo(int i) : isInter(i != 0), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, BcwIdx(0) { CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
+#endif
 
   bool operator==( const MotionInfo& mi ) const
   {

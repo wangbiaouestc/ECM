@@ -58,7 +58,15 @@ enum EncTestModeType
   ETM_HASH_INTER,
   ETM_MERGE_SKIP,
   ETM_INTER_ME,
+#if !MERGE_ENC_OPT
   ETM_AFFINE,
+#endif
+#if AFFINE_MMVD && !MERGE_ENC_OPT
+  ETM_AF_MMVD,
+#endif
+#if TM_MRG && !MERGE_ENC_OPT
+  ETM_MERGE_TM,
+#endif
   ETM_MERGE_GEO,
   ETM_INTRA,
   ETM_PALETTE,
@@ -74,6 +82,9 @@ enum EncTestModeType
   ETM_TRIGGER_IMV_LIST,
   ETM_IBC,    // ibc mode
   ETM_IBC_MERGE, // ibc merge mode
+#if MULTI_HYP_PRED
+  ETM_INTER_MULTIHYP,
+#endif
   ETM_INVALID
 };
 
@@ -83,6 +94,9 @@ enum EncTestModeOpts
   ETO_FORCE_MERGE =  1<<0,                // bit   0    (indicates forced merge)
   ETO_IMV_SHIFT   =     1,                // bits  1-3  (imv parameter starts at bit 1)
   ETO_IMV         =  7<<ETO_IMV_SHIFT,    // bits  1-3  (imv parameter uses 3 bits)
+#if INTER_LIC
+  ETO_LIC         = 1 << 4,               // bit   4    (local illumination compensation)
+#endif
   ETO_DUMMY       =  1<<5,                // bit   5    (dummy)
   ETO_INVALID     = 0xffffffff            // bits 0-31  (invalid option)
 };
@@ -137,9 +151,20 @@ inline bool isModeInter( const EncTestMode& encTestmode ) // perhaps remove
 {
   return (   encTestmode.type == ETM_INTER_ME
           || encTestmode.type == ETM_MERGE_SKIP
+#if !MERGE_ENC_OPT
           || encTestmode.type == ETM_AFFINE
+#endif
+#if AFFINE_MMVD && !MERGE_ENC_OPT
+          || encTestmode.type == ETM_AF_MMVD
+#endif
+#if TM_MRG && !MERGE_ENC_OPT
+          || encTestmode.type == ETM_MERGE_TM
+#endif
           || encTestmode.type == ETM_MERGE_GEO
           || encTestmode.type == ETM_HASH_INTER
+#if MULTI_HYP_PRED
+          || encTestmode.type == ETM_INTER_MULTIHYP
+#endif
          );
 }
 
@@ -431,6 +456,9 @@ struct CodedCUInfo
   bool validMv[NUM_REF_PIC_LIST_01][MAX_STORED_CU_INFO_REFS];
   Mv   saveMv [NUM_REF_PIC_LIST_01][MAX_STORED_CU_INFO_REFS];
 
+#if MULTI_HYP_PRED
+  uint8_t numAddHyp;
+#endif
   uint8_t BcwIdx;
   char    selectColorSpaceOption;  // 0 - test both two color spaces; 1 - only test the first color spaces; 2 - only test the second color spaces
   uint16_t ispPredModeVal;
@@ -499,7 +527,10 @@ struct BestEncodingInfo
 {
   CodingUnit     cu;
   PredictionUnit pu;
-#if REUSE_CU_RESULTS_WITH_MULTIPLE_TUS
+#if CONVERT_NUM_TU_SPLITS_TO_CFG
+  std::vector<TransformUnit> tus;
+  size_t         numTus;
+#elif REUSE_CU_RESULTS_WITH_MULTIPLE_TUS
   TransformUnit  tus[MAX_NUM_TUS];
   size_t         numTus;
 #else
@@ -522,6 +553,9 @@ private:
   const Slice        *m_slice_bencinf;
   BestEncodingInfo ***m_bestEncInfo[MAX_CU_SIZE >> MIN_CU_LOG2][MAX_CU_SIZE >> MIN_CU_LOG2];
   TCoeff             *m_pCoeff;
+#if SIGN_PREDICTION
+  TCoeff             *m_pCoeffSign;
+#endif
   Pel                *m_pPcmBuf;
   bool               *m_runType;
   CodingStructure     m_dummyCS;
@@ -529,10 +563,17 @@ private:
 #if ENABLE_SPLIT_PARALLELISM
   int64_t m_currTemporalId;
 #endif
+#if CONVERT_NUM_TU_SPLITS_TO_CFG
+  int                 m_maxNumTUs;
+#endif
 
 protected:
 
+#if CONVERT_NUM_TU_SPLITS_TO_CFG
+  void create   ( const ChromaFormat chFmt, const int maxNumTUs );
+#else
   void create   ( const ChromaFormat chFmt );
+#endif
   void destroy  ();
 
   bool setFromCs( const CodingStructure& cs, const Partitioner& partitioner );

@@ -38,6 +38,7 @@
 #ifndef __TRQUANT__
 #define __TRQUANT__
 
+#include <array>
 #include "CommonDef.h"
 #include "Unit.h"
 #include "ChromaFormat.h"
@@ -119,25 +120,55 @@ public:
   DepQuant* getQuant() { return m_quant; }
   void   lambdaAdjustColorTrans(bool forward) { m_quant->lambdaAdjustColorTrans(forward); }
   void   resetStore() { m_quant->resetStore(); }
+#if SIGN_PREDICTION
+  void predCoeffSigns( TransformUnit &tu, const ComponentID compID, const bool reshapeChroma );
+#endif
 
 #if ENABLE_SPLIT_PARALLELISM
   void    copyState( const TrQuant& other );
 #endif
 
+#if SIGN_PREDICTION
+  enum SIGN_PRED_TYPE
+  {
+      SIGN_PRED_BYPASS   = 0,
+      SIGN_PRED_POSITIVE = 1,
+      SIGN_PRED_NEGATIVE = 2,
+      SIGN_PRED_HIDDEN   = 3,
+  };
+  uint32_t m_aiSignPredCost[1 << SIGN_PRED_MAX_NUM];
+#endif
+
 protected:
   TCoeff   m_tempCoeff[MAX_TB_SIZEY * MAX_TB_SIZEY];
+#if SIGN_PREDICTION
+  Pel      m_tempSignPredResid[SIGN_PRED_MAX_BS * SIGN_PRED_MAX_BS * 2]{0};
+  Pel      m_signPredTemplate[SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE*SIGN_PRED_MAX_BS*2];
+#endif
 
 private:
   DepQuant *m_quant;          //!< Quantizer
   TCoeff    m_mtsCoeffs[NUM_TRAFO_MODES_MTS][MAX_TB_SIZEY * MAX_TB_SIZEY];
+#if EXTENDED_LFNST
+  TCoeff   m_tempInMatrix [ 64 ];
+  TCoeff   m_tempOutMatrix[ 64 ];
+#else
   TCoeff   m_tempInMatrix [ 48 ];
   TCoeff   m_tempOutMatrix[ 48 ];
+#endif
   static const int maxAbsIctMode = 3;
   void                      (*m_invICTMem[1+2*maxAbsIctMode])(PelBuf&,PelBuf&);
   std::pair<int64_t,int64_t>(*m_fwdICTMem[1+2*maxAbsIctMode])(const PelBuf&,const PelBuf&,PelBuf&,PelBuf&);
   void                      (**m_invICT)(PelBuf&,PelBuf&);
   std::pair<int64_t,int64_t>(**m_fwdICT)(const PelBuf&,const PelBuf&,PelBuf&,PelBuf&);
 
+  std::array<std::array<FwdTrans*, g_numTransformMatrixSizes>, NUM_TRANS_TYPE> fastFwdTrans;
+  std::array<std::array<InvTrans*, g_numTransformMatrixSizes>, NUM_TRANS_TYPE> fastInvTrans;
+
+#if TRANSFORM_SIMD_OPT
+  static std::array<std::array<const TMatrixCoeff*, g_numTransformMatrixSizes>, NUM_TRANS_TYPE> m_forwardTransformKernels;
+  static std::array<std::array<const TMatrixCoeff*, g_numTransformMatrixSizes>, NUM_TRANS_TYPE> m_inverseTransformKernels;
+#endif
 
   // forward Transform
   void xT               (const TransformUnit &tu, const ComponentID &compID, const CPelBuf &resi, CoeffBuf &dstCoeff, const int width, const int height);
@@ -170,6 +201,28 @@ private:
                  const CoeffBuf       &coeffs,
                        double*        diagRatio,
                        double*        horVerRatio );
+
+#if ENABLE_SIMD_SIGN_PREDICTION
+  uint32_t( *m_computeSAD ) ( const Pel* ref, const Pel* cur, const int size );
+  static inline uint32_t xComputeSAD( const Pel* ref, const Pel* cur, const int size );
+#endif
+
+#if TRANSFORM_SIMD_OPT
+  template <TransType transType, int transSize>
+  static void fastForwardTransform_SIMD( const TCoeff *block, TCoeff *coeff, int shift, int line, int iSkipLine, int iSkipLine2 );
+
+  template <TransType transType, int transSize>
+  static void fastInverseTransform_SIMD( const TCoeff *coeff, TCoeff *block, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum );
+#endif
+
+#if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT
+#ifdef TARGET_SIMD_X86
+  void    initTrQuantX86();
+  template <X86_VEXT vext>
+  void    _initTrQuantX86();
+#endif
+#endif
+
 };// END CLASS DEFINITION TrQuant
 
 //! \}

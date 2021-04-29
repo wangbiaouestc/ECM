@@ -430,7 +430,11 @@ namespace DQIntern
     inline const BinFracBits *sigSbbFracBits() const { return m_sigSbbFracBits; }
     inline const BinFracBits *sigFlagBits(unsigned stateId) const
     {
+#if TCQ_8STATES
+			return m_sigFracBits[(stateId & 1) ? 1 + ((stateId & 3) >> 1) : 0];
+#else
       return m_sigFracBits[std::max(((int) stateId) - 1, 0)];
+#endif
     }
     inline const CoeffFracBits *gtxFracBits(unsigned stateId) const { return m_gtxFracBits; }
     inline int32_t              lastOffset(unsigned scanIdx) const
@@ -627,8 +631,13 @@ namespace DQIntern
   {
   public:
     Quantizer() {}
+#if TCQ_8STATES
+    void  dequantBlock         ( const TransformUnit& tu, const ComponentID compID, const QpParam& cQP, CoeffBuf& recCoeff, bool enableScalingLists, int* piDequantCoef, const uint64_t stateTransTab ) const;
+#else
     void  dequantBlock         ( const TransformUnit& tu, const ComponentID compID, const QpParam& cQP, CoeffBuf& recCoeff, bool enableScalingLists, int* piDequantCoef ) const;
-    void  initQuantBlock       ( const TransformUnit& tu, const ComponentID compID, const QpParam& cQP, const double lambda, int gValue );
+#endif
+
+		void  initQuantBlock       ( const TransformUnit& tu, const ComponentID compID, const QpParam& cQP, const double lambda, int gValue );
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
     inline void   preQuantCoeff( const TCoeff absCoeff, PQData *pqData, TCoeff quanCoeff ) const;
 #else
@@ -710,8 +719,12 @@ namespace DQIntern
     m_DistOrgFact               = (int64_t)( nomDistFactor * double(int64_t(1)<<(m_DistShift+1       )) + .5 );
   }
 
+#if TCQ_8STATES
+  void Quantizer::dequantBlock( const TransformUnit& tu, const ComponentID compID, const QpParam& cQP, CoeffBuf& recCoeff, bool enableScalingLists, int* piDequantCoef, const uint64_t stateTransTab ) const
+#else
   void Quantizer::dequantBlock( const TransformUnit& tu, const ComponentID compID, const QpParam& cQP, CoeffBuf& recCoeff, bool enableScalingLists, int* piDequantCoef) const
-  {
+#endif
+	{
 
     //----- set basic parameters -----
     const CompArea&     area      = tu.blocks[ compID ];
@@ -769,12 +782,20 @@ namespace DQIntern
         {
           invQScale <<= -shift;
         }
+#if TCQ_8STATES
+        Intermediate_Int  qIdx      = ( level << 1 ) + ( level > 0 ? -(state&1) : (state&1) );
+#else
         Intermediate_Int  qIdx      = ( level << 1 ) + ( level > 0 ? -(state>>1) : (state>>1) );
-        int64_t  nomTCoeff          = ((int64_t)qIdx * (int64_t)invQScale + add) >> ((shift < 0) ? 0 : shift);
+#endif
+				int64_t  nomTCoeff          = ((int64_t)qIdx * (int64_t)invQScale + add) >> ((shift < 0) ? 0 : shift);
         tCoeff[rasterPos]           = (TCoeff)Clip3<int64_t>(minTCoeff, maxTCoeff, nomTCoeff);
       }
+#if TCQ_8STATES
+      state = int( ( stateTransTab >> ((state<<3)+((level&1)<<2)) ) & 15 );
+#else
       state = ( 32040 >> ((state<<2)+((level&1)<<1)) ) & 3;   // the 16-bit value "32040" represent the state transition table
-    }
+#endif
+		}
   }
 
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
@@ -826,7 +847,11 @@ namespace DQIntern
   class CommonCtx
   {
   public:
+#if TCQ_8STATES
+    CommonCtx() : m_currSbbCtx( m_allSbbCtx ), m_prevSbbCtx( m_currSbbCtx + 8 ) {}
+#else
     CommonCtx() : m_currSbbCtx( m_allSbbCtx ), m_prevSbbCtx( m_currSbbCtx + 4 ) {}
+#endif
 
     inline void swap() { std::swap(m_currSbbCtx, m_prevSbbCtx); }
 
@@ -837,7 +862,11 @@ namespace DQIntern
       const int numSbb    = tuPars.m_numSbb;
       const int chunkSize = numSbb + tuPars.m_numCoeff;
       uint8_t*  nextMem   = m_memory;
+#if TCQ_8STATES
+      for( int k = 0; k < 16; k++, nextMem += chunkSize )
+#else
       for( int k = 0; k < 8; k++, nextMem += chunkSize )
+#endif
       {
         m_allSbbCtx[k].sbbFlags = nextMem;
         m_allSbbCtx[k].levels   = nextMem + numSbb;
@@ -849,10 +878,18 @@ namespace DQIntern
   private:
     const NbInfoOut*            m_nbInfo;
     BinFracBits                 m_sbbFlagBits[2];
+#if TCQ_8STATES
+    SbbCtx                      m_allSbbCtx  [16];
+#else
     SbbCtx                      m_allSbbCtx  [8];
+#endif
     SbbCtx*                     m_currSbbCtx;
     SbbCtx*                     m_prevSbbCtx;
+#if TCQ_8STATES
+    uint8_t                     m_memory[ 16 * ( MAX_TB_SIZEY * MAX_TB_SIZEY + MLS_GRP_NUM ) ];
+#else
     uint8_t                     m_memory[ 8 * ( MAX_TB_SIZEY * MAX_TB_SIZEY + MLS_GRP_NUM ) ];
+#endif
   };
 
 #define RICEMAX 32
@@ -872,11 +909,21 @@ namespace DQIntern
 
     template<uint8_t numIPos>
     inline void updateState(const ScanInfo &scanInfo, const State *prevStates, const Decision &decision);
+#if TCQ_8STATES
+    inline void updateStateEOS(const ScanInfo &scanInfo, const State *prevStates, const State *skipStates,
+                               const Decision &decision, int skipOffset );
+#else
     inline void updateStateEOS(const ScanInfo &scanInfo, const State *prevStates, const State *skipStates,
                                const Decision &decision);
+#endif
 
+#if TCQ_8STATES
+    inline void init( int effectiveWidth, int effectiveHeight )
+#else
     inline void init()
+#endif
     {
+      ::memset(m_absLevelsAndCtxInit, 0, sizeof(m_absLevelsAndCtxInit));
       m_rdCost        = std::numeric_limits<int64_t>::max()>>1;
       m_numSigSbb     = 0;
       m_remRegBins    = 4;  // just large enough for last scan pos
@@ -885,85 +932,106 @@ namespace DQIntern
       m_coeffFracBits = m_gtxFracBitsArray[ 0 ];
       m_goRicePar     = 0;
       m_goRiceZero    = 0;
+#if TCQ_8STATES
+      effWidth        = effectiveWidth;
+      effHeight       = effectiveHeight;
+#endif
     }
+
     void checkRdCosts( const ScanPosType spt, const PQData& pqDataA, const PQData& pqDataB, Decision& decisionA, Decision& decisionB ) const
     {
       const int32_t*  goRiceTab = g_goRiceBits[m_goRicePar];
       int64_t         rdCostA   = m_rdCost + pqDataA.deltaDist;
       int64_t         rdCostB   = m_rdCost + pqDataB.deltaDist;
       int64_t         rdCostZ   = m_rdCost;
-        if( m_remRegBins >= 4 )
+
+      const TCoeff absLevelA = pqDataA.absLevel;
+      const TCoeff absLevelB = pqDataB.absLevel;
+      const int32_t* bits    = m_coeffFracBits.bits;
+
+      if( m_remRegBins >= 4 )
+      {
+        if( absLevelA < 4 )
         {
-          if( pqDataA.absLevel < 4 )
-            rdCostA += m_coeffFracBits.bits[ pqDataA.absLevel ];
-          else
-          {
-#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
-            const TCoeff value = ( pqDataA.absLevel - 4 ) >> 1;
-#else
-            const unsigned value = ( pqDataA.absLevel - 4 ) >> 1;
-#endif
-            rdCostA += m_coeffFracBits.bits[ pqDataA.absLevel - ( value << 1 ) ] + goRiceTab[ value < RICEMAX ? value : RICEMAX - 1 ];
-          }
-          if( pqDataB.absLevel < 4 )
-            rdCostB += m_coeffFracBits.bits[ pqDataB.absLevel ];
-          else
-          {
-#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
-            const TCoeff value = ( pqDataB.absLevel - 4 ) >> 1;
-#else
-            const unsigned value = ( pqDataB.absLevel - 4 ) >> 1;
-#endif
-            rdCostB += m_coeffFracBits.bits[ pqDataB.absLevel - ( value << 1 ) ] + goRiceTab[ value < RICEMAX ? value : RICEMAX - 1 ];
-          }
-          if( spt == SCAN_ISCSBB )
-          {
-            rdCostA += m_sigFracBits.intBits[ 1 ];
-            rdCostB += m_sigFracBits.intBits[ 1 ];
-            rdCostZ += m_sigFracBits.intBits[ 0 ];
-          }
-          else if( spt == SCAN_SOCSBB )
-          {
-            rdCostA += m_sbbFracBits.intBits[ 1 ] + m_sigFracBits.intBits[ 1 ];
-            rdCostB += m_sbbFracBits.intBits[ 1 ] + m_sigFracBits.intBits[ 1 ];
-            rdCostZ += m_sbbFracBits.intBits[ 1 ] + m_sigFracBits.intBits[ 0 ];
-          }
-          else if( m_numSigSbb )
-          {
-            rdCostA += m_sigFracBits.intBits[ 1 ];
-            rdCostB += m_sigFracBits.intBits[ 1 ];
-            rdCostZ += m_sigFracBits.intBits[ 0 ];
-          }
-          else
-          {
-            rdCostZ = decisionA.rdCost;
-          }
+          rdCostA += bits[absLevelA];
         }
         else
         {
-          rdCostA += ( 1 << SCALE_BITS ) + goRiceTab[ pqDataA.absLevel <= m_goRiceZero ? pqDataA.absLevel - 1 : ( pqDataA.absLevel < RICEMAX ? pqDataA.absLevel : RICEMAX - 1 ) ];
-          rdCostB += ( 1 << SCALE_BITS ) + goRiceTab[ pqDataB.absLevel <= m_goRiceZero ? pqDataB.absLevel - 1 : ( pqDataB.absLevel < RICEMAX ? pqDataB.absLevel : RICEMAX - 1 ) ];
-          rdCostZ += goRiceTab[ m_goRiceZero ];
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
+          const TCoeff value = ( absLevelA - 4 ) >> 1;
+#else
+          const int value = ( absLevelA - 4 ) >> 1;
+#endif
+          rdCostA += bits[absLevelA - ( value << 1 )] + goRiceTab[value < RICEMAX ? value : RICEMAX - 1];
         }
-        if( rdCostA < decisionA.rdCost )
+
+        if( absLevelB < 4 )
         {
-          decisionA.rdCost = rdCostA;
-          decisionA.absLevel = pqDataA.absLevel;
-          decisionA.prevId = m_stateId;
+          rdCostB += bits[absLevelB];
         }
-        if( rdCostZ < decisionA.rdCost )
+        else
         {
-          decisionA.rdCost = rdCostZ;
-          decisionA.absLevel = 0;
-          decisionA.prevId = m_stateId;
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
+          const TCoeff value = ( absLevelB - 4 ) >> 1;
+#else
+          const int value = ( absLevelB - 4 ) >> 1;
+#endif
+          rdCostB += bits[absLevelB - ( value << 1 )] + goRiceTab[value < RICEMAX ? value : RICEMAX - 1];
         }
-        if( rdCostB < decisionB.rdCost )
+
+        const int sigBit1 = m_sigFracBits.intBits[1];
+
+        if( spt == SCAN_ISCSBB )
         {
-          decisionB.rdCost = rdCostB;
-          decisionB.absLevel = pqDataB.absLevel;
-          decisionB.prevId = m_stateId;
+          rdCostA += sigBit1;
+          rdCostB += sigBit1;
+          rdCostZ += m_sigFracBits.intBits[0];
+        }
+        else if( spt == SCAN_SOCSBB )
+        {
+          const int sbbBit1 = m_sbbFracBits.intBits[1];
+
+          rdCostA += sbbBit1 + sigBit1;
+          rdCostB += sbbBit1 + sigBit1;
+          rdCostZ += sbbBit1 + m_sigFracBits.intBits[0];
+        }
+        else if( m_numSigSbb )
+        {
+          rdCostA += sigBit1;
+          rdCostB += sigBit1;
+          rdCostZ += m_sigFracBits.intBits[0];
+        }
+        else
+        {
+          rdCostZ = decisionA.rdCost;
         }
       }
+      else
+      {
+        rdCostA += ( 1 << SCALE_BITS ) + goRiceTab[absLevelA <= m_goRiceZero ? absLevelA - 1 : ( absLevelA < RICEMAX ? absLevelA : RICEMAX - 1 )];
+        rdCostB += ( 1 << SCALE_BITS ) + goRiceTab[absLevelB <= m_goRiceZero ? absLevelB - 1 : ( absLevelB < RICEMAX ? absLevelB : RICEMAX - 1 )];
+        rdCostZ += goRiceTab[m_goRiceZero];
+      }
+
+      if( rdCostA < decisionA.rdCost )
+      {
+        decisionA.rdCost = rdCostA;
+        decisionA.absLevel = absLevelA;
+        decisionA.prevId = m_stateId;
+      }
+      if( rdCostZ < decisionA.rdCost )
+      {
+        decisionA.rdCost = rdCostZ;
+        decisionA.absLevel = 0;
+        decisionA.prevId = m_stateId;
+      }
+      if( rdCostB < decisionB.rdCost )
+      {
+        decisionB.rdCost = rdCostB;
+        decisionB.absLevel = absLevelB;
+        decisionB.prevId = m_stateId;
+      }
+    }
 
     inline void checkRdCostStart(int32_t lastOffset, const PQData &pqData, Decision &decision) const
     {
@@ -989,24 +1057,41 @@ namespace DQIntern
       }
     }
 
+#if TCQ_8STATES
+		inline void checkRdCostSkipSbb(Decision &decision, int skipOffset) const
+#else
     inline void checkRdCostSkipSbb(Decision &decision) const
+#endif
     {
       int64_t rdCost = m_rdCost + m_sbbFracBits.intBits[0];
       if( rdCost < decision.rdCost )
       {
         decision.rdCost   = rdCost;
         decision.absLevel = 0;
+#if TCQ_8STATES
+        decision.prevId   = skipOffset + m_stateId;
+#else
         decision.prevId   = 4+m_stateId;
+#endif
       }
     }
-
+#if !TU_256 || EXTENDED_LFNST
+#if TCQ_8STATES
+    inline void checkRdCostSkipSbbZeroOut(Decision &decision, int skipOffset) const
+#else
     inline void checkRdCostSkipSbbZeroOut(Decision &decision) const
+#endif
     {
       int64_t rdCost = m_rdCost + m_sbbFracBits.intBits[0];
       decision.rdCost = rdCost;
       decision.absLevel = 0;
+#if TCQ_8STATES
+      decision.prevId = skipOffset + m_stateId;
+#else
       decision.prevId = 4 + m_stateId;
+#endif
     }
+#endif
 
   private:
     int64_t                   m_rdCost;
@@ -1201,17 +1286,30 @@ namespace DQIntern
     }
   }
 
+#if TCQ_8STATES
+  inline void State::updateStateEOS(const ScanInfo &scanInfo, const State *prevStates, const State *skipStates,
+                                    const Decision &decision, int skipOffset )
+#else
   inline void State::updateStateEOS(const ScanInfo &scanInfo, const State *prevStates, const State *skipStates,
                                     const Decision &decision)
+#endif
   {
     m_rdCost = decision.rdCost;
     if( decision.prevId > -2 )
     {
       const State* prvState = 0;
+#if TCQ_8STATES
+      if( decision.prevId  >= skipOffset )
+#else
       if( decision.prevId  >= 4 )
+#endif
       {
         CHECK( decision.absLevel != 0, "cannot happen" );
+#if TCQ_8STATES
+        prvState    = skipStates + ( decision.prevId - skipOffset );
+#else
         prvState    = skipStates + ( decision.prevId - 4 );
+#endif
         m_numSigSbb = 0;
         ::memset( m_absLevelsAndCtxInit, 0, 16*sizeof(uint8_t) );
       }
@@ -1312,7 +1410,8 @@ namespace DQIntern
       }
     }
     ::memset( currState.m_absLevelsAndCtxInit,     0,               16*sizeof(uint8_t) );
-    ::memcpy( currState.m_absLevelsAndCtxInit + 8, templateCtxInit, 16*sizeof(uint16_t) );
+    ::memcpy( currState.m_absLevelsAndCtxInit + 8, templateCtxInit, scanInfo.sbbSize * sizeof( uint16_t ) );
+    ::memset( currState.m_absLevelsAndCtxInit + 8 + scanInfo.sbbSize, 0, ( 16 - scanInfo.sbbSize )*sizeof(uint16_t) );
   }
 
 
@@ -1331,23 +1430,59 @@ namespace DQIntern
     void    dequant ( const TransformUnit& tu, CoeffBuf& recCoeff, const ComponentID compID, const QpParam& cQP, bool enableScalingLists, int* quantCoeff );
 
   private:
+#if TU_256 && !EXTENDED_LFNST
+#if TCQ_8STATES
+		template<int numStates>
+#endif
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
+    void    xDecideAndUpdate  ( const TCoeff absCoeff, const ScanInfo& scanInfo, TCoeff quantCoeff);
+#else
+    void    xDecideAndUpdate  ( const TCoeff absCoeff, const ScanInfo& scanInfo, int quantCoeff);
+#endif    
+#if TCQ_8STATES
+		template<int numStates>
+#endif
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
+    void    xDecide           ( const ScanPosType spt, const TCoeff absCoeff, const int lastOffset, Decision* decisions, TCoeff quantCoeff );
+#else
+    void    xDecide           ( const ScanPosType spt, const TCoeff absCoeff, const int lastOffset, Decision* decisions, int quantCoeff );
+#endif    
+#else
+#if TCQ_8STATES
+		template<int numStates>
+#endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
     void    xDecideAndUpdate  ( const TCoeff absCoeff, const ScanInfo& scanInfo, bool zeroOut, TCoeff quantCoeff);
-    void    xDecide           ( const ScanPosType spt, const TCoeff absCoeff, const int lastOffset, Decision* decisions, bool zeroOut, TCoeff quantCoeff );
 #else
     void    xDecideAndUpdate  ( const TCoeff absCoeff, const ScanInfo& scanInfo, bool zeroOut, int quantCoeff);
-    void    xDecide           ( const ScanPosType spt, const TCoeff absCoeff, const int lastOffset, Decision* decisions, bool zeroOut, int quantCoeff );
+#endif    
+#if TCQ_8STATES
+		template<int numStates>
+#endif
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
+    void    xDecide           ( const ScanPosType spt, const TCoeff absCoeff, const int lastOffset, Decision* decisions, bool zeroOut, TCoeff quantCoeff );
+#else
+		void    xDecide           ( const ScanPosType spt, const TCoeff absCoeff, const int lastOffset, Decision* decisions, bool zeroOut, int quantCoeff );
+#endif
 #endif
 
   private:
     CommonCtx   m_commonCtx;
+#if TCQ_8STATES
+    State       m_allStates[ 24 ];
+#else
     State       m_allStates[ 12 ];
+#endif
     State*      m_currStates;
     State*      m_prevStates;
     State*      m_skipStates;
     State       m_startState;
     Quantizer   m_quant;
+#if TCQ_8STATES
+    Decision    m_trellis[ MAX_TB_SIZEY * MAX_TB_SIZEY * 16 ];
+#else
     Decision    m_trellis[ MAX_TB_SIZEY * MAX_TB_SIZEY ][ 8 ];
+#endif
   };
 
 
@@ -1355,89 +1490,318 @@ namespace DQIntern
   DepQuant::DepQuant()
     : RateEstimator ()
     , m_commonCtx   ()
+#if TCQ_8STATES
+    , m_allStates   {TINIT(0),TINIT(1),TINIT(2),TINIT(3),TINIT(4),TINIT(5),TINIT(6),TINIT(7),
+                     TINIT(0),TINIT(1),TINIT(2),TINIT(3),TINIT(4),TINIT(5),TINIT(6),TINIT(7),
+                     TINIT(0),TINIT(1),TINIT(2),TINIT(3),TINIT(4),TINIT(5),TINIT(6),TINIT(7)}
+#else
     , m_allStates   {TINIT(0),TINIT(1),TINIT(2),TINIT(3),TINIT(0),TINIT(1),TINIT(2),TINIT(3),TINIT(0),TINIT(1),TINIT(2),TINIT(3)}
-    , m_currStates  (  m_allStates      )
+#endif
+		, m_currStates  (  m_allStates      )
+#if TCQ_8STATES
+    , m_prevStates  (  m_currStates + 8 )
+    , m_skipStates  (  m_prevStates + 8 )
+#else
     , m_prevStates  (  m_currStates + 4 )
     , m_skipStates  (  m_prevStates + 4 )
+#endif
     , m_startState  TINIT(0)
   {}
 #undef TINIT
 
-
   void DepQuant::dequant( const TransformUnit& tu,  CoeffBuf& recCoeff, const ComponentID compID, const QpParam& cQP, bool enableScalingLists, int* piDequantCoef )
   {
+#if TCQ_8STATES
+    m_quant.dequantBlock( tu, compID, cQP, recCoeff, enableScalingLists, piDequantCoef, g_stateTransTab[ tu.cs->slice->getDepQuantEnabledIdc() ] );
+#else
     m_quant.dequantBlock( tu, compID, cQP, recCoeff, enableScalingLists, piDequantCoef );
+#endif
   }
 
 
 #define DINIT(l,p) {std::numeric_limits<int64_t>::max()>>2,l,p}
+#if TCQ_8STATES
+  static const Decision startDec[2][16] = {
+    {
+      DINIT(-1,-2),DINIT(-1,-2),DINIT(-1,-2),DINIT(-1,-2),DINIT( 0, 4),DINIT( 0, 5),DINIT( 0, 6),DINIT( 0, 7),
+      DINIT( 0, 0),DINIT( 0, 0),DINIT( 0, 0),DINIT( 0, 0),DINIT( 0, 0),DINIT( 0, 0),DINIT( 0, 0),DINIT( 0, 0)
+    },{
+      DINIT(-1,-2),DINIT(-1,-2),DINIT(-1,-2),DINIT(-1,-2),DINIT(-1,-2),DINIT(-1,-2),DINIT(-1,-2),DINIT(-1,-2),
+      DINIT( 0, 8),DINIT( 0, 9),DINIT( 0,10),DINIT( 0,11),DINIT( 0,12),DINIT( 0,13),DINIT( 0,14),DINIT( 0,15)
+    }};
+#else
   static const Decision startDec[8] = {DINIT(-1,-2),DINIT(-1,-2),DINIT(-1,-2),DINIT(-1,-2),DINIT(0,4),DINIT(0,5),DINIT(0,6),DINIT(0,7)};
+#endif
 #undef  DINIT
 
-
+#if TCQ_8STATES 
+  template<int numStates>
+#endif
+#if TU_256 && !EXTENDED_LFNST
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
+  void DepQuant::xDecide( const ScanPosType spt, const TCoeff absCoeff, const int lastOffset, Decision* decisions, TCoeff quanCoeff)
+#else
+  void DepQuant::xDecide( const ScanPosType spt, const TCoeff absCoeff, const int lastOffset, Decision* decisions, int quanCoeff)
+#endif  
+#else
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
   void DepQuant::xDecide( const ScanPosType spt, const TCoeff absCoeff, const int lastOffset, Decision* decisions, bool zeroOut, TCoeff quanCoeff)
 #else
   void DepQuant::xDecide( const ScanPosType spt, const TCoeff absCoeff, const int lastOffset, Decision* decisions, bool zeroOut, int quanCoeff)
+#endif  
 #endif
   {
+#if TCQ_8STATES
+    ::memcpy( decisions, startDec[numStates>>3], (numStates<<1)*sizeof(Decision) );
+#else
     ::memcpy( decisions, startDec, 8*sizeof(Decision) );
-
+#endif
+#if !TU_256 || EXTENDED_LFNST
     if( zeroOut )
     {
       if( spt==SCAN_EOCSBB )
       {
-        m_skipStates[0].checkRdCostSkipSbbZeroOut( decisions[0] );
-        m_skipStates[1].checkRdCostSkipSbbZeroOut( decisions[1] );
-        m_skipStates[2].checkRdCostSkipSbbZeroOut( decisions[2] );
-        m_skipStates[3].checkRdCostSkipSbbZeroOut( decisions[3] );
+#if TCQ_8STATES
+        m_skipStates[0].checkRdCostSkipSbbZeroOut( decisions[0], numStates );
+        m_skipStates[1].checkRdCostSkipSbbZeroOut( decisions[1], numStates );
+        m_skipStates[2].checkRdCostSkipSbbZeroOut( decisions[2], numStates );
+        m_skipStates[3].checkRdCostSkipSbbZeroOut( decisions[3], numStates );
+        m_skipStates[4].checkRdCostSkipSbbZeroOut( decisions[4], numStates );
+        m_skipStates[5].checkRdCostSkipSbbZeroOut( decisions[5], numStates );
+        m_skipStates[6].checkRdCostSkipSbbZeroOut( decisions[6], numStates );
+        m_skipStates[7].checkRdCostSkipSbbZeroOut( decisions[7], numStates );
+#else
+        m_skipStates[0].checkRdCostSkipSbbZeroOut(decisions[0]);
+        m_skipStates[1].checkRdCostSkipSbbZeroOut(decisions[1]);
+        m_skipStates[2].checkRdCostSkipSbbZeroOut(decisions[2]);
+        m_skipStates[3].checkRdCostSkipSbbZeroOut(decisions[3]);
+#endif
       }
       return;
     }
+#endif
 
     PQData  pqData[4];
     m_quant.preQuantCoeff( absCoeff, pqData, quanCoeff );
+#if TCQ_8STATES
+    if( numStates > 4 )
+    {
+      m_prevStates[0].checkRdCosts( spt, pqData[0], pqData[2], decisions[0], decisions[2]);
+      m_prevStates[1].checkRdCosts( spt, pqData[3], pqData[1], decisions[5], decisions[7]);
+      m_prevStates[2].checkRdCosts( spt, pqData[0], pqData[2], decisions[1], decisions[3]);
+      m_prevStates[3].checkRdCosts( spt, pqData[3], pqData[1], decisions[6], decisions[4]);
+      m_prevStates[4].checkRdCosts( spt, pqData[0], pqData[2], decisions[2], decisions[0]);
+      m_prevStates[5].checkRdCosts( spt, pqData[3], pqData[1], decisions[4], decisions[6]);
+      m_prevStates[6].checkRdCosts( spt, pqData[0], pqData[2], decisions[3], decisions[1]);
+      m_prevStates[7].checkRdCosts( spt, pqData[3], pqData[1], decisions[7], decisions[5]);
+    }
+    else
+    {
+      m_prevStates[0].checkRdCosts( spt, pqData[0], pqData[2], decisions[0], decisions[1]);
+      m_prevStates[1].checkRdCosts( spt, pqData[3], pqData[1], decisions[2], decisions[3]);
+      m_prevStates[2].checkRdCosts( spt, pqData[0], pqData[2], decisions[1], decisions[0]);
+      m_prevStates[3].checkRdCosts( spt, pqData[3], pqData[1], decisions[3], decisions[2]);
+    }
+#else
     m_prevStates[0].checkRdCosts( spt, pqData[0], pqData[2], decisions[0], decisions[2]);
     m_prevStates[1].checkRdCosts( spt, pqData[0], pqData[2], decisions[2], decisions[0]);
     m_prevStates[2].checkRdCosts( spt, pqData[3], pqData[1], decisions[1], decisions[3]);
     m_prevStates[3].checkRdCosts( spt, pqData[3], pqData[1], decisions[3], decisions[1]);
+#endif
     if( spt==SCAN_EOCSBB )
     {
+#if TCQ_8STATES
+      m_skipStates[0].checkRdCostSkipSbb( decisions[0], numStates );
+      m_skipStates[1].checkRdCostSkipSbb( decisions[1], numStates );
+      m_skipStates[2].checkRdCostSkipSbb( decisions[2], numStates );
+      m_skipStates[3].checkRdCostSkipSbb( decisions[3], numStates );
+      m_skipStates[4].checkRdCostSkipSbb( decisions[4], numStates );
+      m_skipStates[5].checkRdCostSkipSbb( decisions[5], numStates );
+      m_skipStates[6].checkRdCostSkipSbb( decisions[6], numStates );
+      m_skipStates[7].checkRdCostSkipSbb( decisions[7], numStates );
+#else
         m_skipStates[0].checkRdCostSkipSbb( decisions[0] );
         m_skipStates[1].checkRdCostSkipSbb( decisions[1] );
         m_skipStates[2].checkRdCostSkipSbb( decisions[2] );
         m_skipStates[3].checkRdCostSkipSbb( decisions[3] );
+#endif
     }
-
+#if TCQ_8STATES
+    if( numStates > 4 )
+    {
+      m_startState.checkRdCostStart( lastOffset, pqData[0], decisions[0] );
+      m_startState.checkRdCostStart( lastOffset, pqData[2], decisions[2] );
+    }
+    else
+    {
+      m_startState.checkRdCostStart( lastOffset, pqData[0], decisions[0] );
+      m_startState.checkRdCostStart( lastOffset, pqData[2], decisions[1] );
+    }
+#else
     m_startState.checkRdCostStart( lastOffset, pqData[0], decisions[0] );
     m_startState.checkRdCostStart( lastOffset, pqData[2], decisions[2] );
+#endif
   }
 
+#if TCQ_8STATES
+	template<int numStates>
+#endif
+#if TU_256 && !EXTENDED_LFNST
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
+  void DepQuant::xDecideAndUpdate( const TCoeff absCoeff, const ScanInfo& scanInfo, TCoeff quantCoeff )
+#else
+  void DepQuant::xDecideAndUpdate( const TCoeff absCoeff, const ScanInfo& scanInfo, int quantCoeff )
+#endif
+#else
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
   void DepQuant::xDecideAndUpdate( const TCoeff absCoeff, const ScanInfo& scanInfo, bool zeroOut, TCoeff quantCoeff )
 #else
   void DepQuant::xDecideAndUpdate( const TCoeff absCoeff, const ScanInfo& scanInfo, bool zeroOut, int quantCoeff )
+#endif  
 #endif
   {
+#if TCQ_8STATES
+    Decision* decisions = m_trellis + scanInfo.scanIdx * (numStates<<1);
+#else
     Decision* decisions = m_trellis[ scanInfo.scanIdx ];
+#endif
 
     std::swap( m_prevStates, m_currStates );
-
+#if TU_256 && !EXTENDED_LFNST
+#if TCQ_8STATES
+    xDecide<numStates>( scanInfo.spt, absCoeff, lastOffset(scanInfo.scanIdx), decisions, quantCoeff );
+#else
+    xDecide( scanInfo.spt, absCoeff, lastOffset(scanInfo.scanIdx), decisions, quantCoeff );
+#endif
+#else
+#if TCQ_8STATES
+		xDecide<numStates>(scanInfo.spt, absCoeff, lastOffset(scanInfo.scanIdx), decisions, zeroOut, quantCoeff);
+#else
     xDecide( scanInfo.spt, absCoeff, lastOffset(scanInfo.scanIdx), decisions, zeroOut, quantCoeff );
-
+#endif
+#endif
     if( scanInfo.scanIdx )
     {
       if( scanInfo.eosbb )
       {
         m_commonCtx.swap();
+#if TCQ_8STATES
+        m_currStates[0].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[0], numStates );
+        m_currStates[1].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[1], numStates );
+        m_currStates[2].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[2], numStates );
+        m_currStates[3].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[3], numStates );
+
+        if( numStates > 4 )
+        {
+          m_currStates[4].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[4], numStates );
+          m_currStates[5].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[5], numStates );
+          m_currStates[6].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[6], numStates );
+          m_currStates[7].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[7], numStates );
+        }
+
+        ::memcpy(decisions + numStates, decisions, numStates * sizeof(Decision));
+#else
         m_currStates[0].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[0] );
         m_currStates[1].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[1] );
         m_currStates[2].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[2] );
         m_currStates[3].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[3] );
         ::memcpy( decisions+4, decisions, 4*sizeof(Decision) );
+#endif
       }
+#if TU_256 && !EXTENDED_LFNST
+      else
+#else
       else if( !zeroOut )
+#endif
       {
+#if TCQ_8STATES
+        switch( scanInfo.nextNbInfoSbb.num )
+        {
+        case 0:
+          m_currStates[0].updateState<0>( scanInfo, m_prevStates, decisions[0] );
+          m_currStates[1].updateState<0>( scanInfo, m_prevStates, decisions[1] );
+          m_currStates[2].updateState<0>( scanInfo, m_prevStates, decisions[2] );
+          m_currStates[3].updateState<0>( scanInfo, m_prevStates, decisions[3] );
+
+          if( numStates > 4 )
+          {
+            m_currStates[4].updateState<0>( scanInfo, m_prevStates, decisions[4] );
+            m_currStates[5].updateState<0>( scanInfo, m_prevStates, decisions[5] );
+            m_currStates[6].updateState<0>( scanInfo, m_prevStates, decisions[6] );
+            m_currStates[7].updateState<0>( scanInfo, m_prevStates, decisions[7] );
+          }
+          break;
+        case 1:
+          m_currStates[0].updateState<1>( scanInfo, m_prevStates, decisions[0] );
+          m_currStates[1].updateState<1>( scanInfo, m_prevStates, decisions[1] );
+          m_currStates[2].updateState<1>( scanInfo, m_prevStates, decisions[2] );
+          m_currStates[3].updateState<1>( scanInfo, m_prevStates, decisions[3] );
+
+          if( numStates > 4 )
+          {
+            m_currStates[4].updateState<1>( scanInfo, m_prevStates, decisions[4] );
+            m_currStates[5].updateState<1>( scanInfo, m_prevStates, decisions[5] );
+            m_currStates[6].updateState<1>( scanInfo, m_prevStates, decisions[6] );
+            m_currStates[7].updateState<1>( scanInfo, m_prevStates, decisions[7] );
+          }
+          break;
+        case 2:
+          m_currStates[0].updateState<2>( scanInfo, m_prevStates, decisions[0] );
+          m_currStates[1].updateState<2>( scanInfo, m_prevStates, decisions[1] );
+          m_currStates[2].updateState<2>( scanInfo, m_prevStates, decisions[2] );
+          m_currStates[3].updateState<2>( scanInfo, m_prevStates, decisions[3] );
+
+          if( numStates > 4 )
+          {
+            m_currStates[4].updateState<2>( scanInfo, m_prevStates, decisions[4] );
+            m_currStates[5].updateState<2>( scanInfo, m_prevStates, decisions[5] );
+            m_currStates[6].updateState<2>( scanInfo, m_prevStates, decisions[6] );
+            m_currStates[7].updateState<2>( scanInfo, m_prevStates, decisions[7] );
+          }
+          break;
+        case 3:
+          m_currStates[0].updateState<3>( scanInfo, m_prevStates, decisions[0] );
+          m_currStates[1].updateState<3>( scanInfo, m_prevStates, decisions[1] );
+          m_currStates[2].updateState<3>( scanInfo, m_prevStates, decisions[2] );
+          m_currStates[3].updateState<3>( scanInfo, m_prevStates, decisions[3] );
+
+          if( numStates > 4 )
+          {
+            m_currStates[4].updateState<3>( scanInfo, m_prevStates, decisions[4] );
+            m_currStates[5].updateState<3>( scanInfo, m_prevStates, decisions[5] );
+            m_currStates[6].updateState<3>( scanInfo, m_prevStates, decisions[6] );
+            m_currStates[7].updateState<3>( scanInfo, m_prevStates, decisions[7] );
+          }
+          break;
+        case 4:
+          m_currStates[0].updateState<4>( scanInfo, m_prevStates, decisions[0] );
+          m_currStates[1].updateState<4>( scanInfo, m_prevStates, decisions[1] );
+          m_currStates[2].updateState<4>( scanInfo, m_prevStates, decisions[2] );
+          m_currStates[3].updateState<4>( scanInfo, m_prevStates, decisions[3] );
+
+          if( numStates > 4 )
+          {
+            m_currStates[4].updateState<4>( scanInfo, m_prevStates, decisions[4] );
+            m_currStates[5].updateState<4>( scanInfo, m_prevStates, decisions[5] );
+            m_currStates[6].updateState<4>( scanInfo, m_prevStates, decisions[6] );
+            m_currStates[7].updateState<4>( scanInfo, m_prevStates, decisions[7] );
+          }
+          break;
+        default:
+          m_currStates[0].updateState<5>( scanInfo, m_prevStates, decisions[0] );
+          m_currStates[1].updateState<5>( scanInfo, m_prevStates, decisions[1] );
+          m_currStates[2].updateState<5>( scanInfo, m_prevStates, decisions[2] );
+          m_currStates[3].updateState<5>( scanInfo, m_prevStates, decisions[3] );
+
+          if( numStates > 4 )
+          {
+            m_currStates[4].updateState<5>( scanInfo, m_prevStates, decisions[4] );
+            m_currStates[5].updateState<5>( scanInfo, m_prevStates, decisions[5] );
+            m_currStates[6].updateState<5>( scanInfo, m_prevStates, decisions[6] );
+            m_currStates[7].updateState<5>( scanInfo, m_prevStates, decisions[7] );
+          }
+        }
+#else
         switch( scanInfo.nextNbInfoSbb.num )
         {
         case 0:
@@ -1476,6 +1840,7 @@ namespace DQIntern
           m_currStates[2].updateState<5>( scanInfo, m_prevStates, decisions[2] );
           m_currStates[3].updateState<5>( scanInfo, m_prevStates, decisions[3] );
         }
+#endif
       }
 
       if( scanInfo.spt == SCAN_SOCSBB )
@@ -1489,8 +1854,29 @@ namespace DQIntern
   void DepQuant::quant( TransformUnit& tu, const CCoeffBuf& srcCoeff, const ComponentID compID, const QpParam& cQP, const double lambda, const Ctx& ctx, TCoeff& absSum, bool enableScalingLists, int* quantCoeff )
   {
     CHECKD( tu.cs->sps->getSpsRangeExtension().getExtendedPrecisionProcessingFlag(), "ext precision is not supported" );
+#if SIGN_PREDICTION
+    CoeffBuf signBuff = tu.getCoeffSigns(compID);
+    uint32_t uiWidth  = tu.blocks[compID].width;
+    uint32_t uiHeight = tu.blocks[compID].height;
+
+    if ( tu.cs->sps->getNumPredSigns() > 0  && uiHeight >= 4 && uiWidth >= 4)
+    {
+      TCoeff *coeff = signBuff.buf;
+      for (uint32_t y = 0; y < SIGN_PRED_FREQ_RANGE; y++)
+      {
+        coeff[0] = TrQuant::SIGN_PRED_BYPASS;
+        coeff[1] = TrQuant::SIGN_PRED_BYPASS;
+        coeff[2] = TrQuant::SIGN_PRED_BYPASS;
+        coeff[3] = TrQuant::SIGN_PRED_BYPASS;
+        coeff += signBuff.stride;
+      }
+    }
+#endif
 
     //===== reset / pre-init =====
+#if TCQ_8STATES
+    const int numStates = 2 << tu.cs->slice->getDepQuantEnabledIdc();
+#endif
     const TUParameters& tuPars  = *g_Rom.getTUPars( tu.blocks[compID], compID );
     m_quant.initQuantBlock    ( tu, compID, cQP, lambda );
     TCoeff*       qCoeff      = tu.getCoeffs( compID ).buf;
@@ -1503,6 +1889,7 @@ namespace DQIntern
     const uint32_t  width    = area.width;
     const uint32_t  height   = area.height;
     const uint32_t  lfnstIdx = tu.cu->lfnstIdx;
+
     //===== scaling matrix ====
     //const int         qpDQ = cQP.Qp + 1;
     //const int         qpPer = qpDQ / 6;
@@ -1510,21 +1897,41 @@ namespace DQIntern
 
     //TCoeff thresTmp = thres;
     bool zeroOut = false;
-    bool zeroOutforThres = false;
-    int effWidth = tuPars.m_width, effHeight = tuPars.m_height;
-    if( ( tu.mtsIdx[compID] > MTS_SKIP || (tu.cs->sps->getUseMTS() && tu.cu->sbtInfo != 0 && tuPars.m_height <= 32 && tuPars.m_width <= 32)) && compID == COMPONENT_Y)
+#if EXTENDED_LFNST || !TU_256
+    int effWidth = tuPars.m_width, effHeight = tuPars.m_height; 
+#endif
+#if !TU_256
+    if( ( tu.mtsIdx[compID] > MTS_SKIP || (tu.cs->sps->getUseMTS() && tu.cu->sbtInfo != 0 && tuPars.m_height <= 32 && tuPars.m_width <= 32)) && compID == COMPONENT_Y )
     {
       effHeight = (tuPars.m_height == 32) ? 16 : tuPars.m_height;
       effWidth = (tuPars.m_width == 32) ? 16 : tuPars.m_width;
       zeroOut = (effHeight < tuPars.m_height || effWidth < tuPars.m_width);
     }
+#endif
+#if EXTENDED_LFNST
+    int lfnst_threshold = 0;
+    if (lfnstIdx > 0 && tu.mtsIdx[compID] != MTS_SKIP && width >= 4 && height >= 4)
+    {
+      const bool whge3 = width >= 8 && height >= 8;
+      lfnst_threshold = whge3 ? 8 : 4;
+      zeroOut = true;
+      effWidth = lfnst_threshold;
+      effHeight = lfnst_threshold;
+    }
+#endif
+    bool zeroOutforThres = zeroOut;
+#if !TU_256
     zeroOutforThres = zeroOut || (32 < tuPars.m_height || 32 < tuPars.m_width);
+#endif
+
     //===== find first test position =====
     int firstTestPos = numCoeff - 1;
+#if !EXTENDED_LFNST
     if (lfnstIdx > 0 && tu.mtsIdx[compID] != MTS_SKIP && width >= 4 && height >= 4)
     {
       firstTestPos = ( ( width == 4 && height == 4 ) || ( width == 8 && height == 8 ) )  ? 7 : 15 ;
     }
+#endif
     const TCoeff defaultQuantisationCoefficient = (TCoeff)m_quant.getQScale();
     const TCoeff thres = m_quant.getLastThreshold();
     for( ; firstTestPos >= 0; firstTestPos-- )
@@ -1532,6 +1939,13 @@ namespace DQIntern
       if (zeroOutforThres && (tuPars.m_scanId2BlkPos[firstTestPos].x >= ((tuPars.m_width == 32 && zeroOut) ? 16 : 32)
                            || tuPars.m_scanId2BlkPos[firstTestPos].y >= ((tuPars.m_height == 32 && zeroOut) ? 16 : 32)))
         continue;
+
+#if EXTENDED_LFNST
+      if( lfnst_threshold > 0 && ( tuPars.m_scanId2BlkPos[firstTestPos].x >= lfnst_threshold || tuPars.m_scanId2BlkPos[firstTestPos].y >= lfnst_threshold ) )
+      {
+        continue;
+      }
+#endif
       TCoeff thresTmp = (enableScalingLists) ? TCoeff(thres / (4 * quantCoeff[tuPars.m_scanId2BlkPos[firstTestPos].idx]))
                                              : TCoeff(thres / (4 * defaultQuantisationCoefficient));
 
@@ -1548,15 +1962,33 @@ namespace DQIntern
     //===== real init =====
     RateEstimator::initCtx( tuPars, tu, compID, ctx.getFracBitsAcess() );
     m_commonCtx.reset( tuPars, *this );
+#if !TCQ_8STATES 
     for( int k = 0; k < 12; k++ )
     {
       m_allStates[k].init();
     }
     m_startState.init();
-
-
+#endif
+#if TU_256
+    int effectWidth  = width;
+    int effectHeight = height;
+#else
     int effectWidth = std::min(32, effWidth);
     int effectHeight = std::min(32, effHeight);
+#endif
+#if EXTENDED_LFNST
+    effectWidth  = ( lfnst_threshold > 0 ) ? lfnst_threshold : effectWidth;
+    effectHeight = ( lfnst_threshold > 0 ) ? lfnst_threshold : effectHeight;
+#endif
+#if TCQ_8STATES
+    for( int k = 0; k < numStates; k++ )
+    {
+      m_allStates[k   ].init( effectWidth, effectHeight );
+      m_allStates[k+8 ].init( effectWidth, effectHeight );
+      m_allStates[k+16].init( effectWidth, effectHeight );
+    }
+    m_startState.init( effectWidth, effectHeight );
+#else
     for (int k = 0; k < 12; k++)
     {
       m_allStates[k].effWidth = effectWidth;
@@ -1564,26 +1996,66 @@ namespace DQIntern
     }
     m_startState.effWidth = effectWidth;
     m_startState.effHeight = effectHeight;
-
-    //===== populate trellis =====
+#endif
+    //===== populate trellis ===== // 
+#if TCQ_8STATES
+#if TU_256 && !EXTENDED_LFNST
+		void (DepQuant::*fdecide)(const TCoeff, const ScanInfo&, int) = (numStates>4 ? &DepQuant::xDecideAndUpdate<8> : &DepQuant::xDecideAndUpdate<4>);
+#else
+    void (DepQuant::*fdecide)(const TCoeff,const ScanInfo&,bool,int) = ( numStates>4 ? &DepQuant::xDecideAndUpdate<8> : &DepQuant::xDecideAndUpdate<4> );
+#endif
+#endif
     for( int scanIdx = firstTestPos; scanIdx >= 0; scanIdx-- )
     {
       const ScanInfo& scanInfo = tuPars.m_scanInfo[ scanIdx ];
+
       if (enableScalingLists)
       {
         m_quant.initQuantBlock(tu, compID, cQP, lambda, quantCoeff[scanInfo.rasterPos]);
+#if TU_256 && !EXTENDED_LFNST
+#if TCQ_8STATES
+				(this->*fdecide)(abs(tCoeff[scanInfo.rasterPos]), scanInfo, quantCoeff[scanInfo.rasterPos]);
+#else
+        xDecideAndUpdate( abs( tCoeff[scanInfo.rasterPos]), scanInfo, quantCoeff[scanInfo.rasterPos] );
+#endif
+#else
+#if TCQ_8STATES
+        (this->*fdecide)( abs( tCoeff[scanInfo.rasterPos]), scanInfo, (zeroOut && (scanInfo.posX >= effWidth || scanInfo.posY >= effHeight)), quantCoeff[scanInfo.rasterPos] );
+#else
         xDecideAndUpdate( abs( tCoeff[scanInfo.rasterPos]), scanInfo, (zeroOut && (scanInfo.posX >= effWidth || scanInfo.posY >= effHeight)), quantCoeff[scanInfo.rasterPos] );
+#endif
+#endif
       }
       else
+#if TU_256 && !EXTENDED_LFNST
+#if TCQ_8STATES
+        (this->*fdecide)( abs( tCoeff[scanInfo.rasterPos]), scanInfo, defaultQuantisationCoefficient );
+#else
+        xDecideAndUpdate( abs( tCoeff[scanInfo.rasterPos]), scanInfo, defaultQuantisationCoefficient );
+#endif
+#else
+#if TCQ_8STATES
+        (this->*fdecide)( abs( tCoeff[scanInfo.rasterPos]), scanInfo, (zeroOut && (scanInfo.posX >= effWidth || scanInfo.posY >= effHeight)), defaultQuantisationCoefficient );
+#else
         xDecideAndUpdate( abs( tCoeff[scanInfo.rasterPos]), scanInfo, (zeroOut && (scanInfo.posX >= effWidth || scanInfo.posY >= effHeight)), defaultQuantisationCoefficient );
+#endif
+#endif
     }
 
     //===== find best path =====
     Decision  decision    = { std::numeric_limits<int64_t>::max(), -1, -2 };
     int64_t   minPathCost =  0;
+#if TCQ_8STATES
+    for( int8_t stateId = 0; stateId < numStates; stateId++ )
+#else
     for( int8_t stateId = 0; stateId < 4; stateId++ )
+#endif
     {
+#if TCQ_8STATES
+      int64_t pathCost = m_trellis[stateId].rdCost;
+#else
       int64_t pathCost = m_trellis[0][stateId].rdCost;
+#endif
       if( pathCost < minPathCost )
       {
         decision.prevId = stateId;
@@ -1593,9 +2065,17 @@ namespace DQIntern
 
     //===== backward scanning =====
     int scanIdx = 0;
+#if TCQ_8STATES
+    for( const Decision* trellisStage = m_trellis; decision.prevId >= 0; scanIdx++, trellisStage += (numStates<<1) )
+#else
     for( ; decision.prevId >= 0; scanIdx++ )
+#endif
     {
+#if TCQ_8STATES
+      decision          = trellisStage[ decision.prevId ];
+#else
       decision          = m_trellis[ scanIdx ][ decision.prevId ];
+#endif
       int32_t blkpos    = tuPars.m_scanId2BlkPos[scanIdx].idx;
       qCoeff[ blkpos ]  = ( tCoeff[ blkpos ] < 0 ? -decision.absLevel : decision.absLevel );
       absSum           += decision.absLevel;
@@ -1627,7 +2107,12 @@ DepQuant::~DepQuant()
 void DepQuant::quant( TransformUnit &tu, const ComponentID &compID, const CCoeffBuf &pSrc, TCoeff &uiAbsSum, const QpParam &cQP, const Ctx& ctx )
 {
   const bool useRegularResidualCoding = tu.cu->slice->getTSResidualCodingDisabledFlag() || tu.mtsIdx[compID] != MTS_SKIP;
+
+#if TCQ_8STATES
+  if( tu.cs->slice->getDepQuantEnabledIdc() && useRegularResidualCoding )
+#else
   if( tu.cs->slice->getDepQuantEnabledFlag() && useRegularResidualCoding )
+#endif
   {
     //===== scaling matrix ====
     const int         qpDQ            = cQP.Qp(tu.mtsIdx[compID] == MTS_SKIP) + 1;
@@ -1642,7 +2127,11 @@ void DepQuant::quant( TransformUnit &tu, const ComponentID &compID, const CCoeff
     const uint32_t    log2TrHeight    = floorLog2(height);
 
     const bool        disableSMForLFNST = tu.cs->slice->getExplicitScalingListUsed() ? tu.cs->slice->getSPS()->getDisableScalingMatrixForLfnstBlks() : false;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     const bool        isLfnstApplied = tu.cu->lfnstIdx > 0 && (tu.cu->isSepTree() ? true : isLuma(compID));
+#else
+    const bool        isLfnstApplied = tu.cu->lfnstIdx > 0 && (CS::isDualITree(*tu.cs) ? true : isLuma(compID));
+#endif
     const bool        disableSMForACT = tu.cs->slice->getSPS()->getScalingMatrixForAlternativeColourSpaceDisabledFlag() && (tu.cs->slice->getSPS()->getScalingMatrixDesignatedColourSpaceFlag() == tu.cu->colorTransform);
     const bool        enableScalingLists = getUseScalingList(width, height, (tu.mtsIdx[compID] == MTS_SKIP), isLfnstApplied, disableSMForLFNST, disableSMForACT);
     static_cast<DQIntern::DepQuant*>(p)->quant( tu, pSrc, compID, cQP, Quant::m_dLambda, ctx, uiAbsSum, enableScalingLists, Quant::getQuantCoeff(scalingListType, qpRem, log2TrWidth, log2TrHeight) );
@@ -1653,10 +2142,62 @@ void DepQuant::quant( TransformUnit &tu, const ComponentID &compID, const CCoeff
   }
 }
 
+#if SIGN_PREDICTION
+uint32_t DepQuant::getPredictedSigns( TransformUnit& tu, const ComponentID compID, std::vector<Position> &predSignsXY )
+{
+  uint32_t numPredSigns = 0;
+  bool bUseSignPred = TU::getUseSignPred( tu, compID );
+
+  if( bUseSignPred )
+  {
+    const int32_t  maxNumPredSigns = tu.cs->sps->getNumPredSigns();
+    CoeffBuf bufQCoeffs = tu.getCoeffs( compID );
+    CoeffBuf bufSigns = tu.getCoeffSigns( compID );
+    TCoeff *coeff = bufQCoeffs.buf;
+    TCoeff *signs = bufSigns.buf;
+
+    for( uint32_t uiY = 0; uiY < SIGN_PRED_FREQ_RANGE; uiY++ )
+    {
+      for( uint32_t uiX = 0; uiX < SIGN_PRED_FREQ_RANGE; uiX++ )
+      {
+        uint32_t uiLevel = abs( coeff[uiX] );
+
+        if( uiLevel )
+        {
+          if( signs[uiX] != TrQuant::SIGN_PRED_HIDDEN )
+          {
+            predSignsXY.push_back( Position( uiX, uiY ) );
+
+            if( ++numPredSigns >= maxNumPredSigns )
+            {
+              break;
+            }
+
+          }
+        }
+      }
+      if( numPredSigns == maxNumPredSigns )
+      {
+        break;
+      }
+
+      coeff += bufQCoeffs.stride;
+      signs += bufSigns.stride;
+    }
+  }
+  return numPredSigns;
+}
+#endif
+
 void DepQuant::dequant( const TransformUnit &tu, CoeffBuf &dstCoeff, const ComponentID &compID, const QpParam &cQP )
 {
   const bool useRegularResidualCoding = tu.cu->slice->getTSResidualCodingDisabledFlag() || tu.mtsIdx[compID] != MTS_SKIP;
+
+#if TCQ_8STATES
+  if( tu.cs->slice->getDepQuantEnabledIdc() && useRegularResidualCoding )
+#else
   if( tu.cs->slice->getDepQuantEnabledFlag() && useRegularResidualCoding )
+#endif
   {
     const int         qpDQ            = cQP.Qp(tu.mtsIdx[compID] == MTS_SKIP) + 1;
     const int         qpPer           = qpDQ / 6;
@@ -1670,7 +2211,11 @@ void DepQuant::dequant( const TransformUnit &tu, CoeffBuf &dstCoeff, const Compo
     const uint32_t    log2TrHeight = floorLog2(height);
 
     const bool disableSMForLFNST = tu.cs->slice->getExplicitScalingListUsed() ? tu.cs->slice->getSPS()->getDisableScalingMatrixForLfnstBlks() : false;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     const bool isLfnstApplied = tu.cu->lfnstIdx > 0 && (tu.cu->isSepTree() ? true : isLuma(compID));
+#else
+    const bool isLfnstApplied = tu.cu->lfnstIdx > 0 && (CS::isDualITree(*tu.cs) ? true : isLuma(compID));
+#endif
     const bool disableSMForACT = tu.cs->slice->getSPS()->getScalingMatrixForAlternativeColourSpaceDisabledFlag() && (tu.cs->slice->getSPS()->getScalingMatrixDesignatedColourSpaceFlag() == tu.cu->colorTransform);
     const bool enableScalingLists = getUseScalingList(width, height, (tu.mtsIdx[compID] == MTS_SKIP), isLfnstApplied, disableSMForLFNST, disableSMForACT);
     static_cast<DQIntern::DepQuant*>(p)->dequant( tu, dstCoeff, compID, cQP, enableScalingLists, Quant::getDequantCoeff(scalingListType, qpRem, log2TrWidth, log2TrHeight) );

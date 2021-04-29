@@ -103,23 +103,17 @@ public:
 
   const Mv& operator += (const Mv& _rcMv)
   {
-    {
-      Mv rcMv = _rcMv;
+    hor += _rcMv.hor;
+    ver += _rcMv.ver;
 
-      hor += rcMv.hor;
-      ver += rcMv.ver;
-    }
     return  *this;
   }
 
   const Mv& operator-= (const Mv& _rcMv)
   {
-    {
-      Mv rcMv = _rcMv;
+    hor -= _rcMv.hor;
+    ver -= _rcMv.ver;
 
-      hor -= rcMv.hor;
-      ver -= rcMv.ver;
-    }
     return  *this;
   }
 

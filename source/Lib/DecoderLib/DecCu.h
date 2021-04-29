@@ -81,7 +81,9 @@ protected:
   void xReconInter        ( CodingUnit&      cu );
   void xDecodeInterTexture( CodingUnit&      cu );
   void xReconIntraQT      ( CodingUnit&      cu );
+#if !REMOVE_PCM
   void xFillPCMBuffer     ( CodingUnit&      cu );
+#endif
 
   void xIntraRecBlk       ( TransformUnit&   tu, const ComponentID compID );
   void xIntraRecACTBlk(TransformUnit&   tu);
@@ -95,8 +97,12 @@ private:
   IntraPrediction*  m_pcIntraPred;
   InterPrediction*  m_pcInterPred;
 
+  PelStorage        m_ciipBuffer;
 
   MotionInfo        m_SubPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#if MULTI_PASS_DMVR
+  Mv                m_mvBufBDMVR[2][MAX_NUM_SUBCU_DMVR];
+#endif
 
   MergeCtx          m_geoMrgCtx;
 };

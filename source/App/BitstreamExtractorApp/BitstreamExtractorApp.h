@@ -107,6 +107,10 @@ protected:
   std::vector<int>      m_updatedVPSList;
   std::vector<int>      m_updatedSPSList;
   std::vector<int>      m_updatedPPSList;
+
+#if EMBEDDED_APS
+  std::vector<int> m_accessUnitApsNals;
+#endif
 };
 
 #endif // __BITSTREAMEXTRACTORAPP__

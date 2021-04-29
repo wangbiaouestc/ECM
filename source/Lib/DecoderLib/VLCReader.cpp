@@ -808,6 +808,10 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
   pcPPS->setWPBiPred( uiCode==1 );
 #endif
   READ_FLAG( uiCode, "deblocking_filter_control_present_flag" );       pcPPS->setDeblockingFilterControlPresentFlag( uiCode ? true : false );
+#if DB_PARAM_TID
+  pcPPS->setDeblockingFilterBetaOffsetDiv2(std::vector<int>(5, 0));
+  pcPPS->setDeblockingFilterTcOffsetDiv2(std::vector<int>(5, 0));
+#endif
   if(pcPPS->getDeblockingFilterControlPresentFlag())
   {
     READ_FLAG( uiCode, "deblocking_filter_override_enabled_flag" );    pcPPS->setDeblockingFilterOverrideEnabledFlag( uiCode ? true : false );
@@ -823,6 +827,26 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
     }
     if(!pcPPS->getPPSDeblockingFilterDisabledFlag())
     {
+#if DB_PARAM_TID
+      std::vector<int> val;
+      READ_CODE(3, uiCode, "pps_beta_offset_div2_num_minus1");
+      val.resize(uiCode + 1);
+      for (int i = 0; i < val.size(); i++)
+      {
+        READ_SVLC(iCode, "pps_beta_offset_div2");                    val[i] = iCode;
+        CHECK(iCode < -12 || iCode > 12, "Invalid deblocking filter configuration");
+      }
+      pcPPS->setDeblockingFilterBetaOffsetDiv2( val );
+
+      READ_CODE(3, uiCode, "pps_tc_offset_div2_num_minus1");
+      val.resize(uiCode + 1);
+      for (int i = 0; i < val.size(); i++)
+      {
+        READ_SVLC(iCode, "pps_tc_offset_div2");                     val[i] = iCode;
+        CHECK(iCode < -12 || iCode > 12, "Invalid deblocking filter configuration");
+      }
+      pcPPS->setDeblockingFilterTcOffsetDiv2(val);
+#else
       READ_SVLC( iCode, "pps_beta_offset_div2" );                    pcPPS->setDeblockingFilterBetaOffsetDiv2( iCode );
       CHECK(  pcPPS->getDeblockingFilterBetaOffsetDiv2() < -12 ||
               pcPPS->getDeblockingFilterBetaOffsetDiv2() > 12, "Invalid deblocking filter configuration" );
@@ -856,6 +880,7 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
         pcPPS->setDeblockingFilterCrBetaOffsetDiv2 ( pcPPS->getDeblockingFilterBetaOffsetDiv2() );
         pcPPS->setDeblockingFilterCrTcOffsetDiv2   ( pcPPS->getDeblockingFilterTcOffsetDiv2()   );
       }
+#endif
     }
   }
   else
@@ -917,7 +942,11 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
   xReadRbspTrailingBits();
 }
 
+#if EMBEDDED_APS
+void HLSyntaxReader::parseAPS(APS* aps, const bool readRbspTrailingBits)
+#else
 void HLSyntaxReader::parseAPS( APS* aps )
+#endif
 {
 #if ENABLE_TRACING
   xTraceAPSHeader();
@@ -965,6 +994,10 @@ void HLSyntaxReader::parseAPS( APS* aps )
       READ_FLAG(code, "aps_extension_data_flag");
     }
   }
+
+#if EMBEDDED_APS
+  if (readRbspTrailingBits)
+#endif
   xReadRbspTrailingBits();
 }
 
@@ -978,7 +1011,7 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
   READ_FLAG(code, "alf_luma_new_filter");
   param.newFilterFlag[CHANNEL_TYPE_LUMA] = code;
 
-  #if JVET_R0433
+#if JVET_R0433
   if (aps->chromaPresentFlag)
   {
 #endif
@@ -1026,8 +1059,48 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
 
   if (param.newFilterFlag[CHANNEL_TYPE_LUMA])
   {
+#if ALF_IMPROVEMENT
+    if (MAX_NUM_ALF_ALTERNATIVES_LUMA > 1)
+      READ_UVLC(code, "alf_luma_num_alts_minus1");
+    else
+      code = 0;
+    param.numAlternativesLuma = code + 1;
+    READ_FLAG(code, "alf_luma_ext");
+    param.filterType[CHANNEL_TYPE_LUMA] = code ? ALF_FILTER_9_EXT : ALF_FILTER_EXT;
+    for (int altIdx = 0; altIdx < param.numAlternativesLuma; ++altIdx)
+    {
+      READ_FLAG(code, "alf_luma_clip");
+      param.nonLinearFlag[CHANNEL_TYPE_LUMA][altIdx] = code ? true : false;
+      READ_UVLC(code, "alf_luma_num_filters_signalled_minus1");
+      param.numLumaFilters[altIdx] = code + 1;
+      if (param.numLumaFilters[altIdx] > 1)
+      {
+        const int length = ceilLog2(param.numLumaFilters[altIdx]);
+        for (int i = 0; i < MAX_NUM_ALF_CLASSES; i++)
+        {
+          READ_CODE(length, code, "alf_luma_coeff_delta_idx");
+          param.filterCoeffDeltaIdx[altIdx][i] = code;
+        }
+      }
+      else
+      {
+        memset(param.filterCoeffDeltaIdx[altIdx], 0, MAX_NUM_ALF_CLASSES * sizeof(short));
+      }
+      AlfFilterShape alfShape(param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_5 ? 5 : (param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_9_EXT ? size_ALF_FILTER_9_EXT : ((param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_7 ? 7 : (param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_EXT ? size_ALF_FILTER_EXT : 9)))));
+      int bestK[2] = { 0 };
+      for(int orderIdx = 0; orderIdx < alfShape.numOrder; orderIdx++)
+      {
+        READ_CODE(2, code, "alf_luma_coeff_exp_golomb_order");
+        bestK[orderIdx] = code;
+      }
+      bestK[1] += ALF_ORDER;
+      bestK[0] += alfShape.offset0;
+      alfFilter(param, false, altIdx, bestK[0], bestK[1]);
+    }
+#else
     READ_FLAG(code, "alf_luma_clip");
     param.nonLinearFlag[CHANNEL_TYPE_LUMA] = code ? true : false;
+
     READ_UVLC(code, "alf_luma_num_filters_signalled_minus1");
     param.numLumaFilters = code + 1;
     if (param.numLumaFilters > 1)
@@ -1044,11 +1117,16 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
       memset(param.filterCoeffDeltaIdx, 0, sizeof(param.filterCoeffDeltaIdx));
     }
     alfFilter( param, false, 0 );
+#endif
   }
   if (param.newFilterFlag[CHANNEL_TYPE_CHROMA])
   {
+#if !ALF_IMPROVEMENT
     READ_FLAG(code, "alf_nonlinear_enable_flag_chroma");
     param.nonLinearFlag[CHANNEL_TYPE_CHROMA] = code ? true : false;
+#else
+    param.filterType[CHANNEL_TYPE_CHROMA] = ALF_FILTER_9;
+#endif
 
     if( MAX_NUM_ALF_ALTERNATIVES_CHROMA > 1 )
       READ_UVLC( code, "alf_chroma_num_alts_minus1" );
@@ -1059,7 +1137,22 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
 
     for( int altIdx=0; altIdx < param.numAlternativesChroma; ++altIdx )
     {
+#if ALF_IMPROVEMENT
+      READ_FLAG(code, "alf_nonlinear_enable_flag_chroma");
+      param.nonLinearFlag[CHANNEL_TYPE_CHROMA][altIdx] = code ? true : false;
+      AlfFilterShape alfShape(param.filterType[CHANNEL_TYPE_CHROMA] == ALF_FILTER_5 ? 5 : (param.filterType[CHANNEL_TYPE_CHROMA] == ALF_FILTER_9_EXT ? size_ALF_FILTER_9_EXT : ((param.filterType[CHANNEL_TYPE_CHROMA] == ALF_FILTER_7 ? 7 : (param.filterType[CHANNEL_TYPE_CHROMA] == ALF_FILTER_EXT ? size_ALF_FILTER_EXT : 9)))));
+      int bestK[2] = { 0 };
+      for (int orderIdx = 0; orderIdx < alfShape.numOrder; orderIdx++)
+      {
+        READ_CODE(2, code, "alf_chroma_coeff_exp_golomb_order");
+        bestK[orderIdx] = code;
+      }
+      bestK[1] += ALF_ORDER;
+      bestK[0] += alfShape.offset0;
+      alfFilter( param, true, altIdx, bestK[0], bestK[1] );
+#else
       alfFilter( param, true, altIdx );
+#endif
     }
   }
 
@@ -1433,7 +1526,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 
   READ_CODE(2, uiCode, "sps_log2_ctu_size_minus5");
   pcSPS->setCTUSize(1 << (uiCode + 5));
+#if CTU_256
+  CHECK( uiCode > 3, "sps_log2_ctu_size_minus5 must be less than or equal to 3" );
+#else
   CHECK(uiCode > 2, "sps_log2_ctu_size_minus5 must be less than or equal to 2");
+#endif
   unsigned ctbLog2SizeY = uiCode + 5;
   pcSPS->setMaxCUWidth(pcSPS->getCTUSize());
   pcSPS->setMaxCUHeight(pcSPS->getCTUSize());
@@ -1507,7 +1604,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 
 #if !JVET_S0186_SPS_CLEANUP
   READ_CODE(2, uiCode, "sps_log2_ctu_size_minus5");              pcSPS->setCTUSize(1 << (uiCode + 5));
+#if CTU_256
+  CHECK( uiCode > 3, "sps_log2_ctu_size_minus5 must be less than or equal to 3" );
+#else
   CHECK(uiCode > 2, "sps_log2_ctu_size_minus5 must be less than or equal to 2");
+#endif
   unsigned ctbLog2SizeY = uiCode + 5;
   pcSPS->setMaxCUWidth(pcSPS->getCTUSize());
   pcSPS->setMaxCUHeight(pcSPS->getCTUSize());
@@ -1765,7 +1866,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   READ_UVLC(uiCode, "sps_log2_diff_min_qt_min_cb_intra_slice_luma");
   unsigned minQtLog2SizeIntraY = uiCode + pcSPS->getLog2MinCodingBlockSize();
   minQT[0] = 1 << minQtLog2SizeIntraY;
+
+#if TU_256
+  CHECK( minQT[0] > MAX_CU_SIZE, "The value of sps_log2_diff_min_qt_min_cb_intra_slice_luma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinCbLog2Size" );
+#else
   CHECK(minQT[0] > 64, "The value of sps_log2_diff_min_qt_min_cb_intra_slice_luma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinCbLog2Size");
+#endif
   CHECK(minQT[0] > (1<<ctbLog2SizeY), "The value of sps_log2_diff_min_qt_min_cb_intra_slice_luma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinCbLog2Size");
   READ_UVLC(uiCode, "sps_max_mtt_hierarchy_depth_intra_slice_luma");     maxBTD[0] = uiCode;
   CHECK(uiCode > 2 * (ctbLog2SizeY - log2MinCUSize), "sps_max_mtt_hierarchy_depth_intra_slice_luma shall be in the range 0 to 2*(ctbLog2SizeY - log2MinCUSize)");
@@ -1777,7 +1883,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     CHECK(uiCode > ctbLog2SizeY - minQtLog2SizeIntraY, "The value of sps_log2_diff_max_bt_min_qt_intra_slice_luma shall be in the range of 0 to CtbLog2SizeY - MinQtLog2SizeIntraY");
     READ_UVLC(uiCode, "sps_log2_diff_max_tt_min_qt_intra_slice_luma");     maxTTSize[0] <<= uiCode;
     CHECK(uiCode > ctbLog2SizeY - minQtLog2SizeIntraY, "The value of sps_log2_diff_max_tt_min_qt_intra_slice_luma shall be in the range of 0 to CtbLog2SizeY - MinQtLog2SizeIntraY");
+
+#if TU_256
+    CHECK( maxTTSize[0] > MAX_CU_SIZE, "The value of sps_log2_diff_max_tt_min_qt_intra_slice_luma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraY" );
+#else
     CHECK(maxTTSize[0] > 64, "The value of sps_log2_diff_max_tt_min_qt_intra_slice_luma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraY");
+#endif
   }
 #if JVET_S0132_HLS_REORDER
   if( pcSPS->getChromaFormatIdc() != CHROMA_400 )
@@ -1815,7 +1926,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     CHECK(uiCode > ctbLog2SizeY - minQtLog2SizeInterY, "The value of sps_log2_diff_max_bt_min_qt_inter_slice shall be in the range of 0 to CtbLog2SizeY - MinQtLog2SizeInterY");
     READ_UVLC(uiCode, "sps_log2_diff_max_tt_min_qt_inter_slice");     maxTTSize[1] <<= uiCode;
     CHECK(uiCode > ctbLog2SizeY - minQtLog2SizeInterY, "The value of sps_log2_diff_max_tt_min_qt_inter_slice shall be in the range of 0 to CtbLog2SizeY - MinQtLog2SizeInterY");
+#if TU_256
+    CHECK( maxTTSize[1] > MAX_CU_SIZE, "The value of sps_log2_diff_max_tt_min_qt_inter_slice shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeInterY" );
+#else
     CHECK(maxTTSize[1] > 64, "The value of sps_log2_diff_max_tt_min_qt_inter_slice shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeInterY");
+#endif
   }
 #if !JVET_S0132_HLS_REORDER
   if (pcSPS->getUseDualITree())
@@ -1828,8 +1943,14 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     {
       READ_UVLC(uiCode, "sps_log2_diff_max_bt_min_qt_intra_slice_chroma");       maxBTSize[2] <<= uiCode;
       READ_UVLC(uiCode, "sps_log2_diff_max_tt_min_qt_intra_slice_chroma");       maxTTSize[2] <<= uiCode;
+
+#if TU_256
+      CHECK( maxTTSize[2] > MAX_CU_SIZE, "The value of sps_log2_diff_max_tt_min_qt_intra_slice_chroma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraChroma" );
+      CHECK( maxBTSize[2] > MAX_CU_SIZE, "The value of sps_log2_diff_max_bt_min_qt_intra_slice_chroma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraChroma" );
+#else
       CHECK(maxTTSize[2] > 64, "The value of sps_log2_diff_max_tt_min_qt_intra_slice_chroma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraChroma");
       CHECK(maxBTSize[2] > 64, "The value of sps_log2_diff_max_bt_min_qt_intra_slice_chroma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraChroma");
+#endif
     }
 }
 #endif
@@ -1839,8 +1960,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   pcSPS->setMaxBTSize(maxBTSize[1], maxBTSize[0], maxBTSize[2]);
   pcSPS->setMaxTTSize(maxTTSize[1], maxTTSize[0], maxTTSize[2]);
 
-  if (pcSPS->getCTUSize() > 32) {
+  if (pcSPS->getCTUSize() > 32)
+  {
+#if TU_256
+    READ_UVLC( uiCode, "sps_log2_max_luma_transform_size_minus5" );        pcSPS->setLog2MaxTbSize( uiCode + 5 );
+#else
     READ_FLAG(uiCode, "sps_max_luma_transform_size_64_flag");        pcSPS->setLog2MaxTbSize((uiCode ? 1 : 0) + 5);
+#endif
   }
   else
   {
@@ -1914,6 +2040,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     pcSPS->setCCALFEnabledFlag(false);
   }
 
+#if SIGN_PREDICTION
+  READ_CODE(4, uiCode, "num_predicted_coef_signs");
+  pcSPS->setNumPredSigns(uiCode);
+#endif
+
 #if JVET_S0074_SPS_REORDER
   READ_FLAG(uiCode, "sps_lmcs_enable_flag");                   pcSPS->setUseLmcs(uiCode == 1);
 #else
@@ -1983,7 +2114,10 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     for (uint32_t ii = 0; ii < numberOfRPL; ii++)
       copyRefPicList(pcSPS, rplListSource->getReferencePictureList(ii), rplListDest->getReferencePictureList(ii));
   }
-  
+
+#if INTER_LIC
+  READ_FLAG( uiCode, "sps_lic_enabled_flag" );                      pcSPS->setLicEnabledFlag( uiCode );
+#endif
 
   READ_FLAG(uiCode, "sps_ref_wraparound_enabled_flag");                  pcSPS->setWrapAroundEnabledFlag( uiCode ? true : false );
 
@@ -2035,11 +2169,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   {
     pcSPS->setFpelMmvdEnabledFlag( false );
   }
-
   READ_UVLC(uiCode, "six_minus_max_num_merge_cand");
   CHECK(MRG_MAX_NUM_CANDS <= uiCode, "Incorrrect max number of merge candidates!");
   pcSPS->setMaxNumMergeCand(MRG_MAX_NUM_CANDS - uiCode);
   READ_FLAG(uiCode, "sps_sbt_enabled_flag");                        pcSPS->setUseSBT                 ( uiCode != 0 );
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+  READ_FLAG( uiCode,    "sps_dmvd_enabled_flag" );                      pcSPS->setUseDMVDMode( uiCode != 0 );
+#endif
   READ_FLAG( uiCode,    "sps_affine_enabled_flag" );                            pcSPS->setUseAffine              ( uiCode != 0 );
   if ( pcSPS->getUseAffine() )
   {
@@ -2050,6 +2186,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     CHECK(AFFINE_MRG_MAX_NUM_CANDS < uiCode, "The value of five_minus_max_num_subblock_merge_cand shall be in the range of 0 to 5 - sps_sbtmvp_enabled_flag");
     pcSPS->setMaxNumAffineMergeCand(AFFINE_MRG_MAX_NUM_CANDS - uiCode);
     READ_FLAG( uiCode,  "sps_affine_type_flag" );                       pcSPS->setUseAffineType          ( uiCode != 0 );
+#if AFFINE_MMVD
+    READ_FLAG( uiCode, "sps_affine_mmvd_enabled_flag" );                pcSPS->setUseAffineMmvdMode      ( uiCode != 0 );
+#endif
     if( pcSPS->getAMVREnabledFlag())
     {
       READ_FLAG( uiCode, "sps_affine_amvr_enabled_flag" );            pcSPS->setAffineAmvrEnabledFlag  ( uiCode != 0 );
@@ -2065,7 +2204,6 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   }
 
   READ_FLAG( uiCode,    "sps_bcw_enabled_flag" );                   pcSPS->setUseBcw( uiCode != 0 );
-
   READ_FLAG( uiCode,     "sps_ciip_enabled_flag" );                           pcSPS->setUseCiip             ( uiCode != 0 );
   if (pcSPS->getMaxNumMergeCand() >= 2)
   {
@@ -2091,6 +2229,15 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     pcSPS->setUseGeo(0);
     pcSPS->setMaxNumGeoCand(0);
   }
+#if MULTI_HYP_PRED
+  READ_FLAG(uiCode, "inter_multi_hyp_enable_flag");                  pcSPS->setMaxNumAddHyps(uiCode);
+  if (pcSPS->getUseInterMultiHyp())
+  {
+    READ_UVLC(uiCode, "max_num_add_hyps_minus1");                pcSPS->setMaxNumAddHyps(uiCode + 1);
+    READ_UVLC(uiCode, "num_add_hyp_weights_minus1");             pcSPS->setNumAddHypWeights(uiCode + 1);
+    READ_UVLC(uiCode, "max_num_add_hyp_ref_frames_minus1");      pcSPS->setMaxNumAddHypRefFrames(uiCode + 1);
+  }
+#endif
 
   READ_UVLC(uiCode, "log2_parallel_merge_level_minus2");
   CHECK(uiCode + 2 > ctbLog2SizeY, "The value of log2_parallel_merge_level_minus2 shall be in the range of 0 to ctbLog2SizeY - 2");
@@ -2100,6 +2247,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   READ_FLAG(uiCode, "sps_isp_enabled_flag");                        pcSPS->setUseISP( uiCode != 0 );
   READ_FLAG(uiCode, "sps_mrl_enabled_flag");                        pcSPS->setUseMRL( uiCode != 0 );
   READ_FLAG(uiCode, "sps_mip_enabled_flag");                        pcSPS->setUseMIP( uiCode != 0 );
+#if ENABLE_DIMD
+  READ_FLAG(uiCode, "sps_dimd_enabled_flag");                           pcSPS->setUseDimd(uiCode != 0);
+#endif
   if( pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
     READ_FLAG( uiCode, "sps_cclm_enabled_flag" );                   pcSPS->setUseLMChroma( uiCode != 0 );
@@ -2175,6 +2325,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
       pcSPS->setLadfIntervalLowerBound(uiCode + pcSPS->getLadfIntervalLowerBound(k - 1) + 1, k);
     }
   }
+#endif
+#if ENABLE_OBMC
+  READ_FLAG(uiCode, "sps_obmc_flag");                              pcSPS->setUseOBMC(uiCode != 0);
 #endif
   READ_FLAG(uiCode, "sps_explicit_scaling_list_enabled_flag");                 pcSPS->setScalingListFlag(uiCode);
 #if JVET_S0050_GCI
@@ -2729,7 +2882,11 @@ void HLSyntaxReader::parseVPS(VPS* pcVPS)
   xReadRbspTrailingBits();
 }
 
+#if EMBEDDED_APS
+void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManager *parameterSetManager, const bool readRbspTrailingBits, const int temporalId, const int layerId, std::vector<int>& accessUnitApsNals )
+#else
 void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManager *parameterSetManager, bool readRbspTrailingBits )
+#endif
 {
   uint32_t  uiCode;
   int       iCode;
@@ -2810,6 +2967,27 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
     }
   }
 
+#if EMBEDDED_APS
+  READ_FLAG(uiCode, "aps_in_ph_flag");
+  if (uiCode)
+  {
+    READ_UVLC(uiCode, "ph_num_aps");
+
+    for (int i = 0; i <= uiCode; i++)
+    {
+      APS* aps = new APS();
+      parseAPS(aps, false);
+      aps->setTemporalId(temporalId);
+      aps->setLayerId(layerId);
+      aps->setHasPrefixNalUnitType(true);
+      parameterSetManager->checkAuApsContent(aps, accessUnitApsNals);
+
+      // aps will be deleted if it was already stored (and did not changed),
+      // thus, storing it must be last action.
+      parameterSetManager->storeAPS(aps, m_pcBitstream->getFifo());
+    }
+  }
+#endif
 
   // alf enable flags and aps IDs
   picHeader->setCcAlfEnabledFlag(COMPONENT_Cb, false);
@@ -2825,6 +3003,10 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
       int alfCrEnabledFlag = 0;
       if (uiCode)
       {
+#if ALF_IMPROVEMENT
+        READ_FLAG(uiCode, "ph_alf_fixed_filter_set_idx");
+        picHeader->setAlfFixedFilterSetIdx(uiCode);
+#endif
         READ_CODE(3, uiCode, "ph_num_alf_aps_ids_luma");
         int numAps = uiCode;
         picHeader->setNumAlfAps(numAps);
@@ -3189,7 +3371,13 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
       READ_UVLC(uiCode, "ph_log2_diff_min_qt_min_cb_intra_slice_luma");
       unsigned minQtLog2SizeIntraY = uiCode + sps->getLog2MinCodingBlockSize();
       minQT[0] = 1 << minQtLog2SizeIntraY;
+
+#if TU_256
+      CHECK( minQT[0] > MAX_CU_SIZE, "The value of ph_log2_diff_min_qt_min_cb_intra_slice_luma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinCbLog2Size" );
+#else
       CHECK(minQT[0] > 64, "The value of ph_log2_diff_min_qt_min_cb_intra_slice_luma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinCbLog2Size");
+#endif
+
       READ_UVLC(uiCode, "ph_max_mtt_hierarchy_depth_intra_slice_luma");         maxBTD[0] = uiCode;
 
       maxTTSize[0] = maxBTSize[0] = minQT[0];
@@ -3199,21 +3387,35 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
         CHECK(uiCode > ctbLog2SizeY - minQtLog2SizeIntraY, "The value of ph_log2_diff_max_bt_min_qt_intra_slice_luma shall be in the range of 0 to CtbLog2SizeY - MinQtLog2SizeIntraY");
         READ_UVLC(uiCode, "ph_log2_diff_max_tt_min_qt_intra_slice_luma");       maxTTSize[0] <<= uiCode;
         CHECK(uiCode > ctbLog2SizeY - minQtLog2SizeIntraY, "The value of ph_log2_diff_max_tt_min_qt_intra_slice_luma shall be in the range of 0 to CtbLog2SizeY - MinQtLog2SizeIntraY");
+
+#if TU_256
+        CHECK( maxTTSize[0] > MAX_CU_SIZE, "The value of ph_log2_diff_max_tt_min_qt_intra_slice_luma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraY" );
+#else
         CHECK(maxTTSize[0] > 64, "The value of ph_log2_diff_max_tt_min_qt_intra_slice_luma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraY");
+#endif
       }
 
       if (sps->getUseDualITree())
       {
         READ_UVLC(uiCode, "ph_log2_diff_min_qt_min_cb_intra_slice_chroma");     minQT[2] = 1 << (uiCode + sps->getLog2MinCodingBlockSize());
+#if TU_256
+        CHECK( minQT[2] > MAX_CU_SIZE, "The value of ph_log2_diff_min_qt_min_cb_intra_slice_chroma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinCbLog2Size" );
+#else
         CHECK(minQT[2] > 64, "The value of ph_log2_diff_min_qt_min_cb_intra_slice_chroma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinCbLog2Size");
+#endif
         READ_UVLC(uiCode, "ph_max_mtt_hierarchy_depth_intra_slice_chroma");     maxBTD[2] = uiCode;
         maxTTSize[2] = maxBTSize[2] = minQT[2];
         if (maxBTD[2] != 0)
         {
           READ_UVLC(uiCode, "ph_log2_diff_max_bt_min_qt_intra_slice_chroma");   maxBTSize[2] <<= uiCode;
           READ_UVLC(uiCode, "ph_log2_diff_max_tt_min_qt_intra_slice_chroma");   maxTTSize[2] <<= uiCode;
+#if TU_256
+          CHECK( maxBTSize[2] > MAX_CU_SIZE, "The value of ph_log2_diff_max_bt_min_qt_intra_slice_chroma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraChroma" );
+          CHECK( maxTTSize[2] > MAX_CU_SIZE, "The value of ph_log2_diff_max_tt_min_qt_intra_slice_chroma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraChroma" );
+#else
           CHECK(maxBTSize[2] > 64, "The value of ph_log2_diff_max_bt_min_qt_intra_slice_chroma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraChroma");
           CHECK(maxTTSize[2] > 64, "The value of ph_log2_diff_max_tt_min_qt_intra_slice_chroma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraChroma");
+#endif
         }
       }
     }
@@ -3555,12 +3757,22 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
     else
     {
       picHeader->setDeblockingFilterDisable       ( pps->getPPSDeblockingFilterDisabledFlag() );
+#if DB_PARAM_TID
+      picHeader->setDeblockingFilterBetaOffsetDiv2( pps->getDeblockingFilterBetaOffsetDiv2()[0] );
+      picHeader->setDeblockingFilterTcOffsetDiv2  ( pps->getDeblockingFilterTcOffsetDiv2()[0] );
+
+      picHeader->setDeblockingFilterCbBetaOffsetDiv2(pps->getDeblockingFilterBetaOffsetDiv2()[0]);
+      picHeader->setDeblockingFilterCbTcOffsetDiv2(pps->getDeblockingFilterTcOffsetDiv2()[0]);
+      picHeader->setDeblockingFilterCrBetaOffsetDiv2(pps->getDeblockingFilterBetaOffsetDiv2()[0]);
+      picHeader->setDeblockingFilterCrTcOffsetDiv2(pps->getDeblockingFilterTcOffsetDiv2()[0]);
+#else
       picHeader->setDeblockingFilterBetaOffsetDiv2( pps->getDeblockingFilterBetaOffsetDiv2() );
       picHeader->setDeblockingFilterTcOffsetDiv2  ( pps->getDeblockingFilterTcOffsetDiv2() );
       picHeader->setDeblockingFilterCbBetaOffsetDiv2( pps->getDeblockingFilterCbBetaOffsetDiv2() );
       picHeader->setDeblockingFilterCbTcOffsetDiv2  ( pps->getDeblockingFilterCbTcOffsetDiv2() );
       picHeader->setDeblockingFilterCrBetaOffsetDiv2( pps->getDeblockingFilterCrBetaOffsetDiv2() );
       picHeader->setDeblockingFilterCrTcOffsetDiv2  ( pps->getDeblockingFilterCrTcOffsetDiv2() );
+#endif
     }
   }
   else
@@ -3661,7 +3873,12 @@ void  HLSyntaxReader::checkAlfNaluTidAndPicTid(Slice* pcSlice, PicHeader* picHea
     }
   }
 }
-void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, ParameterSetManager *parameterSetManager, const int prevTid0POC, const int prevPicPOC)
+
+#if EMBEDDED_APS
+void HLSyntaxReader::parseSliceHeader(Slice* pcSlice, PicHeader* picHeader, ParameterSetManager *parameterSetManager, const int prevTid0POC, const int prevPicPOC, const int layerId, std::vector<int>& accessUnitApsNals)
+#else
+void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, ParameterSetManager *parameterSetManager, const int prevTid0POC, const int prevPicPOC )
+#endif
 {
   uint32_t  uiCode;
   int   iCode;
@@ -3675,7 +3892,11 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
   pcSlice->setPictureHeaderInSliceHeader(uiCode);
   if (uiCode)
   {
+#if EMBEDDED_APS
+    parsePictureHeader( picHeader, parameterSetManager, false, pcSlice->getTLayer(), layerId, accessUnitApsNals );
+#else
     parsePictureHeader(picHeader, parameterSetManager, false);
+#endif
     picHeader->setValid();
   }
   CHECK(picHeader==0, "Invalid Picture Header");
@@ -3874,6 +4095,10 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
 
     if (uiCode)
     {
+#if ALF_IMPROVEMENT 
+      READ_FLAG(uiCode, "slice_alf_fixed_filter_set_idx");
+      pcSlice->setTileGroupAlfFixedFilterSetIdx(uiCode);
+#endif
       READ_CODE(3, uiCode, "slice_num_alf_aps_ids_luma");
       int numAps = uiCode;
       pcSlice->setTileGroupNumAps(numAps);
@@ -4327,6 +4552,13 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
         }
       }
     }
+#if INTER_LIC
+    if (sps->getLicEnabledFlag() && !pcSlice->isIntra())
+    {
+      READ_FLAG(uiCode, "slice_lic_enable_flag");
+      pcSlice->setUseLIC(uiCode != 0);
+    }
+#endif  
 
     int qpDelta = 0;
     if (pps->getQpDeltaInfoInPhFlag())
@@ -4473,6 +4705,20 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
     }
 
   // dependent quantization
+#if TCQ_8STATES
+  if( sps->getDepQuantEnabledFlag() )
+  {
+    READ_CODE( 2, uiCode, "slice_dep_quant_enabled_idc" );
+    pcSlice->setDepQuantEnabledIdc( uiCode );
+  }
+  else
+  {
+    pcSlice->setDepQuantEnabledIdc( 0 );
+  }
+
+  // sign data hiding
+  if( sps->getSignDataHidingEnabledFlag() && !pcSlice->getDepQuantEnabledIdc() )
+#else
   if( sps->getDepQuantEnabledFlag() )
   {
     READ_FLAG(uiCode, "slice_dep_quant_enabled_flag");
@@ -4485,6 +4731,7 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
 
   // sign data hiding
   if( sps->getSignDataHidingEnabledFlag() && !pcSlice->getDepQuantEnabledFlag() )
+#endif
   {
     READ_FLAG( uiCode, "slice_sign_data_hiding_enabled_flag" );
     pcSlice->setSignDataHidingEnabledFlag( uiCode != 0 );
@@ -4495,7 +4742,11 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
   }
 
   // signal TS residual coding disabled flag
+#if TCQ_8STATES
+  if( sps->getTransformSkipEnabledFlag() && !pcSlice->getDepQuantEnabledIdc() && !pcSlice->getSignDataHidingEnabledFlag() )
+#else
   if (sps->getTransformSkipEnabledFlag() && !pcSlice->getDepQuantEnabledFlag() && !pcSlice->getSignDataHidingEnabledFlag())
+#endif
   {
     READ_FLAG(uiCode, "slice_ts_residual_coding_disabled_flag");
     pcSlice->setTSResidualCodingDisabledFlag( uiCode != 0 );
@@ -4511,6 +4762,25 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
 
   }
 
+#if MULTI_HYP_PRED
+  if (sps->getUseInterMultiHyp() && pcSlice->isInterB())
+  {
+    READ_FLAG(uiCode, "num_ref_idx_addhyp_override_flag");
+    if (uiCode)
+    {
+      READ_UVLC(uiCode, "num_ref_idx_addhyp_active");
+      pcSlice->setNumMultiHypRefPics(uiCode);
+    }
+    else
+    {
+      pcSlice->setNumMultiHypRefPics(sps->getMaxNumAddHypRefFrames());
+    }
+  }
+  else
+  {
+    pcSlice->setNumMultiHypRefPics(0);
+  }
+#endif
   if(pps->getSliceHeaderExtensionPresentFlag())
   {
     READ_UVLC(uiCode,"slice_segment_header_extension_length");
@@ -4717,7 +4987,9 @@ void HLSyntaxReader::parseConstraintInfo(ConstraintInfo *cinfo)
     READ_FLAG(symbol, "gci_no_mrl_constraint_flag");                     cinfo->setNoMrlConstraintFlag(symbol > 0 ? true : false);
     READ_FLAG(symbol, "gci_no_mip_constraint_flag");                     cinfo->setNoMipConstraintFlag(symbol > 0 ? true : false);
     READ_FLAG(symbol, "gci_no_cclm_constraint_flag");                    cinfo->setNoCclmConstraintFlag(symbol > 0 ? true : false);
-
+#if ENABLE_DIMD
+    READ_FLAG(symbol, "gci_no_dimd_constraint_flag");                    cinfo->setNoDimdConstraintFlag(symbol > 0 ? true : false);
+#endif
     /* inter */
     READ_FLAG(symbol, "gci_no_ref_pic_resampling_constraint_flag");      cinfo->setNoRprConstraintFlag(symbol > 0 ? true : false);
     READ_FLAG(symbol, "gci_no_res_change_in_clvs_constraint_flag");      cinfo->setNoResChangeInClvsConstraintFlag(symbol > 0 ? true : false);
@@ -4735,7 +5007,9 @@ void HLSyntaxReader::parseConstraintInfo(ConstraintInfo *cinfo)
     READ_FLAG(symbol, "gci_no_bcw_constraint_flag");                     cinfo->setNoBcwConstraintFlag(symbol > 0 ? true : false);
     READ_FLAG(symbol, "gci_no_ciip_constraint_flag");                    cinfo->setNoCiipConstraintFlag(symbol > 0 ? true : false);
     READ_FLAG(symbol, "gci_no_gpm_constraint_flag");                     cinfo->setNoGeoConstraintFlag(symbol > 0 ? true : false);
-
+#if ENABLE_OBMC
+    READ_FLAG(symbol, "gci_no_obmc_constraint_flag");                    cinfo->setNoObmcConstraintFlag(symbol > 0 ? true : false);
+#endif
     /* transform, quantization, residual */
     READ_FLAG(symbol, "gci_no_luma_transform_size_64_constraint_flag");  cinfo->setNoLumaTransformSize64ConstraintFlag(symbol > 0 ? true : false);
     READ_FLAG(symbol, "gci_no_transform_skip_constraint_flag");          cinfo->setNoTransformSkipConstraintFlag(symbol > 0 ? true : false);
@@ -4921,7 +5195,7 @@ void HLSyntaxReader::parseConstraintInfo(ConstraintInfo *cinfo)
       CHECK(symbol == 0, "When intra_only_constraint_flag is equal to 1, the value of no_smvd_constraint_flag shall be equal to 1");
     }
 #endif
-    READ_FLAG(symbol, "no_prof_constraint_flag");                    cinfo->setNoProfConstraintFlag(symbol > 0 ? true : false);
+  READ_FLAG(symbol,  "no_prof_constraint_flag");                    cinfo->setNoProfConstraintFlag(symbol > 0 ? true : false);
 #if !JVET_S0050_GCI
     if (cinfo->getIntraOnlyConstraintFlag() == 1)
     {
@@ -5566,13 +5840,60 @@ bool HLSyntaxReader::xMoreRbspData()
   return (cnt>0);
 }
 
+#if ALF_IMPROVEMENT
+int HLSyntaxReader::alfGolombDecode(const int k, const bool signed_val)
+{
+  int numLeadingBits = -1;
+  uint32_t b = 0;
+  for (; !b; numLeadingBits++)
+  {
+#if RExt__DECODER_DEBUG_BIT_STATISTICS
+    xReadFlag(b, "");
+#else
+    READ_FLAG(b, "alf_coeff_abs_prefix");
+#endif
+  }
 
+  int symbol = ((1 << numLeadingBits) - 1) << k;
+  if (numLeadingBits + k > 0)
+  {
+    uint32_t bins;
+    READ_CODE(numLeadingBits + k, bins, "alf_coeff_abs_suffix");
+    symbol += bins;
+  }
+
+  if (signed_val && symbol != 0)
+  {
+#if RExt__DECODER_DEBUG_BIT_STATISTICS
+    xReadFlag(b, "");
+#else
+    READ_FLAG(b, "alf_coeff_sign");
+#endif
+    symbol = (b) ? -symbol : symbol;
+  }
+  return symbol;
+}
+
+void HLSyntaxReader::alfFilter( AlfParam& alfParam, const bool isChroma, const int altIdx, int order0, int order1 )
+#else
 void HLSyntaxReader::alfFilter( AlfParam& alfParam, const bool isChroma, const int altIdx )
+#endif
 {
   uint32_t code;
 
   // derive maxGolombIdx
-  AlfFilterShape alfShape( isChroma ? 5 : 7 );
+#if ALF_IMPROVEMENT
+  AlfFilterType alfFilterType = isChroma ? alfParam.filterType[CHANNEL_TYPE_CHROMA] : alfParam.filterType[CHANNEL_TYPE_LUMA];
+  AlfFilterShape alfShape(alfFilterType == ALF_FILTER_5 ? 5 : ( alfFilterType == ALF_FILTER_9_EXT ? size_ALF_FILTER_9_EXT : ((alfFilterType == ALF_FILTER_7 ? 7 : (alfFilterType == ALF_FILTER_EXT ? size_ALF_FILTER_EXT :9 )))));
+  const int numFilters = isChroma ? 1 : alfParam.numLumaFilters[altIdx];
+  short* coeff = isChroma ? alfParam.chromaCoeff[altIdx] : alfParam.lumaCoeff[altIdx];
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+  Pel*   clipp = isChroma ? alfParam.chromaClipp[altIdx] : alfParam.lumaClipp[altIdx];
+#else
+  short* clipp = isChroma ? alfParam.chromaClipp[altIdx] : alfParam.lumaClipp[altIdx];
+#endif
+#else
+  AlfFilterShape alfShape(isChroma ? 5 : 7);
   const int numFilters = isChroma ? 1 : alfParam.numLumaFilters;
   short* coeff = isChroma ? alfParam.chromaCoeff[altIdx] : alfParam.lumaCoeff;
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
@@ -5580,12 +5901,32 @@ void HLSyntaxReader::alfFilter( AlfParam& alfParam, const bool isChroma, const i
 #else
   short* clipp = isChroma ? alfParam.chromaClipp[altIdx] : alfParam.lumaClipp;
 #endif
+#endif
 
-
+#if ALF_IMPROVEMENT
+  int offset = isChroma ? MAX_NUM_ALF_CHROMA_COEFF : MAX_NUM_ALF_LUMA_COEFF ;
   // Filter coefficients
   for( int ind = 0; ind < numFilters; ++ind )
   {
-
+    for( int i = 0; i < alfShape.numCoeff - 1; i++ )
+    {
+      if (i < alfShape.indexSecOrder)
+      {
+        coeff[ind * offset + i] = alfGolombDecode(order0);
+      }
+      else
+      {
+        coeff[ind * offset + i] = alfGolombDecode(order1);
+      }
+      CHECK( isChroma &&
+             ( coeff[ind * offset + i] > 127 || coeff[ind * offset + i] < -128 )
+             , "AlfCoeffC shall be in the range of -128 to 127, inclusive" );
+    }
+  }
+#else
+  // Filter coefficients
+  for( int ind = 0; ind < numFilters; ++ind )
+  {
     for( int i = 0; i < alfShape.numCoeff - 1; i++ )
     {
       READ_UVLC( code, isChroma ? "alf_chroma_coeff_abs" : "alf_luma_coeff_abs" );
@@ -5600,19 +5941,26 @@ void HLSyntaxReader::alfFilter( AlfParam& alfParam, const bool isChroma, const i
              , "AlfCoeffC shall be in the range of -128 to 127, inclusive" );
     }
   }
+#endif
 
   // Clipping values coding
+#if ALF_IMPROVEMENT
+  if ( alfParam.nonLinearFlag[isChroma][altIdx] )
+#else
   if ( alfParam.nonLinearFlag[isChroma] )
+#endif
   {
-
     // Filter coefficients
     for( int ind = 0; ind < numFilters; ++ind )
     {
-
       for( int i = 0; i < alfShape.numCoeff - 1; i++ )
       {
         READ_CODE(2, code, isChroma ? "alf_chroma_clip_idx" : "alf_luma_clip_idx");
+#if ALF_IMPROVEMENT
+        clipp[ind * offset + i] = code;
+#else
         clipp[ind * MAX_NUM_ALF_LUMA_COEFF + i] = code;
+#endif
       }
     }
   }
@@ -5620,7 +5968,11 @@ void HLSyntaxReader::alfFilter( AlfParam& alfParam, const bool isChroma, const i
   {
     for( int ind = 0; ind < numFilters; ++ind )
     {
+#if ALF_IMPROVEMENT
+      std::fill_n( clipp + ind * offset, alfShape.numCoeff, 0 );
+#else
       std::fill_n( clipp + ind * MAX_NUM_ALF_LUMA_COEFF, alfShape.numCoeff, 0 );
+#endif
     }
   }
 }

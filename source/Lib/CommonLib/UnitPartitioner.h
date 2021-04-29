@@ -94,8 +94,9 @@ struct PartLevel
   bool         canQtSplit;
   bool         qgEnable;
   bool         qgChromaEnable;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   int          modeType;
-
+#endif
   PartLevel();
   PartLevel( const PartSplit _split, const Partitioning&  _parts );
   PartLevel( const PartSplit _split,       Partitioning&& _parts );
@@ -124,9 +125,10 @@ public:
 
   unsigned currImplicitBtDepth;
   ChannelType chType;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   TreeType treeType;
   ModeType modeType;
-
+#endif
   virtual ~Partitioner                    () { }
 
   const PartLevel& currPartLevel          () const { return m_partStack.back(); }
@@ -137,8 +139,9 @@ public:
   const bool currQgChromaEnable           () const { return currPartLevel().qgChromaEnable; }
 
   SplitSeries getSplitSeries              () const;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   ModeTypeSeries getModeTypeSeries        () const;
-
+#endif
   virtual void initCtu                    ( const UnitArea& ctuArea, const ChannelType _chType, const Slice& slice )    = 0;
   virtual void splitCurrArea              ( const PartSplit split, const CodingStructure &cs )                          = 0;
   virtual void exitCurrSplit              ()                                                                            = 0;
@@ -154,10 +157,14 @@ public:
   virtual bool canSplit                   ( const PartSplit split,                          const CodingStructure &cs ) = 0;
   virtual bool isSplitImplicit            ( const PartSplit split,                          const CodingStructure &cs ) = 0;
   virtual PartSplit getImplicitSplit      (                                                 const CodingStructure &cs ) = 0;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   bool isSepTree                          ( const CodingStructure &cs );
+#endif
   bool isLocalSepTree                     ( const CodingStructure &cs );
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS  
   bool isConsInter                        () { return modeType == MODE_TYPE_INTER; }
   bool isConsIntra                        () { return modeType == MODE_TYPE_INTRA; }
+#endif
 };
 
 class AdaptiveDepthPartitioner : public Partitioner
@@ -198,8 +205,10 @@ public:
 #if _DEBUG
     m_currArea   = _initialState.currArea();
 #endif
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     treeType     = _initialState.treeType;
     modeType     = _initialState.modeType;
+#endif
   }
 
   void initCtu               (const UnitArea& ctuArea, const ChannelType chType, const Slice& slice) {}; // not needed

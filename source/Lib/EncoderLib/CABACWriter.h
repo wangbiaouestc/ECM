@@ -83,8 +83,9 @@ public:
   // coding (quad)tree (clause 7.3.8.4)
   void        coding_tree               ( const CodingStructure&        cs,       Partitioner&      pm,         CUCtx& cuCtx, Partitioner* pPartitionerChroma = nullptr, CUCtx* pCuCtxChroma = nullptr);
   void        split_cu_mode             ( const PartSplit               split,    const CodingStructure& cs,    Partitioner& pm );
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   void        mode_constraint           ( const PartSplit               split,    const CodingStructure& cs,    Partitioner& pm,    const ModeType modeType );
-
+#endif
   // coding unit (clause 7.3.8.5)
   void        coding_unit               ( const CodingUnit&             cu,       Partitioner&      pm,         CUCtx& cuCtx );
   void        cu_skip_flag              ( const CodingUnit&             cu );
@@ -92,11 +93,17 @@ public:
   void        bdpcm_mode                ( const CodingUnit&             cu,       const ComponentID compID );
 
   void        cu_pred_data              ( const CodingUnit&             cu );
+#if ENABLE_OBMC
+  void        obmc_flag                 (const CodingUnit&              cu);
+#endif
   void        cu_bcw_flag               ( const CodingUnit&             cu );
   void        extend_ref_line           (const PredictionUnit&          pu );
   void        extend_ref_line           (const CodingUnit&              cu );
   void        intra_luma_pred_modes     ( const CodingUnit&             cu );
   void        intra_luma_pred_mode      ( const PredictionUnit&         pu );
+#if ENABLE_DIMD
+  void        cu_dimd_flag              ( const CodingUnit&             cu );
+#endif
   void        intra_chroma_pred_modes   ( const CodingUnit&             cu );
   void        intra_chroma_lmc_mode     ( const PredictionUnit&         pu );
   void        intra_chroma_pred_mode    ( const PredictionUnit&         pu );
@@ -119,6 +126,12 @@ public:
   void        subblock_merge_flag       ( const CodingUnit&             cu );
   void        merge_idx                 ( const PredictionUnit&         pu );
   void        mmvd_merge_idx(const PredictionUnit&         pu);
+#if AFFINE_MMVD
+  void        affine_mmvd_data          ( const PredictionUnit&         pu );
+#endif
+#if TM_MRG
+  void        tm_merge_flag             ( const PredictionUnit&         pu);
+#endif
   void        imv_mode                  ( const CodingUnit&             cu );
   void        affine_amvr_mode          ( const CodingUnit&             cu );
   void        inter_pred_idc            ( const PredictionUnit&         pu );
@@ -128,6 +141,10 @@ public:
   void        Ciip_flag              ( const PredictionUnit&         pu );
   void        smvd_mode              ( const PredictionUnit&         pu );
 
+#if MULTI_HYP_PRED
+  void        ref_idx_mh(const int                     numRef, const int         refIdx);
+  void        mh_pred_data(const PredictionUnit&         pu);
+#endif
 
   // transform tree (clause 7.3.8.8)
   void        transform_tree            ( const CodingStructure&        cs,       Partitioner&      pm,     CUCtx& cuCtx,                         const PartSplit ispType = TU_NO_ISP, const int subTuIdx = -1 );
@@ -147,8 +164,15 @@ public:
   void        residual_lfnst_mode       ( const CodingUnit&             cu,       CUCtx&            cuCtx );
   void        isp_mode                  ( const CodingUnit&             cu );
   void        last_sig_coeff            ( CoeffCodingContext&           cctx,     const TransformUnit& tu, ComponentID       compID );
-  void        residual_coding_subblock  ( CoeffCodingContext&           cctx,     const TCoeff*     coeff, const int stateTransTable, int& state );
-  void        residual_codingTS         ( const TransformUnit&          tu,       ComponentID       compID );
+#if TCQ_8STATES
+  void        residual_coding_subblock  ( CoeffCodingContext&           cctx,     const TCoeff*     coeff, const uint64_t stateTransTable, int& state );
+#else
+	void        residual_coding_subblock  ( CoeffCodingContext&           cctx,     const TCoeff*     coeff, const int stateTransTable, int& state );
+#endif
+#if SIGN_PREDICTION
+  void        codePredictedSigns ( TransformUnit &tu, ComponentID compID);
+#endif
+	void        residual_codingTS         ( const TransformUnit&          tu,       ComponentID       compID );
   void        residual_coding_subblockTS( CoeffCodingContext&           cctx,     const TCoeff*     coeff  );
   void        joint_cb_cr               ( const TransformUnit&          tu,       const int cbfMask );
 
@@ -160,9 +184,17 @@ public:
 
   void        codeAlfCtuAlternatives     ( CodingStructure& cs, ChannelType channel, AlfParam* alfParam);
   void        codeAlfCtuAlternatives     ( CodingStructure& cs, ComponentID compID, AlfParam* alfParam);
-  void        codeAlfCtuAlternative      ( CodingStructure& cs, uint32_t ctuRsAddr, const int compIdx, const AlfParam* alfParam = NULL );
+  void        codeAlfCtuAlternative      ( CodingStructure& cs, uint32_t ctuRsAddr, const int compIdx, const AlfParam* alfParam = NULL 
+#if ALF_IMPROVEMENT
+    , int numAltLuma = -1
+#endif
+  );
   void codeCcAlfFilterControlIdc(uint8_t idcVal, CodingStructure &cs, const ComponentID compID, const int curIdx,
                                  const uint8_t *filterControlIdc, Position lumaPos, const int filterCount);
+
+#if INTER_LIC
+  void        cu_lic_flag               ( const CodingUnit& cu );
+#endif
 
 private:
   void        unary_max_symbol          ( unsigned symbol, unsigned ctxId0, unsigned ctxIdN, unsigned maxSymbol );

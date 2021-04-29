@@ -97,6 +97,24 @@ inline void dtraceModeCost(CodingStructure &cs, double lambda)
     intraModeC = 68;
   int imvVal = 0;
   imvVal = cs.cus[0]->imv;
+#if INTER_LIC
+  DTRACE( g_trace_ctx, D_MODE_COST, "ModeCost: %6lld %3d @(%4d,%4d) [%2dx%2d] %d (qp%d,pm%d,skip%d,mrg%d,lic%d,fruc%d,obmc%d,ic%d,imv%d,affn%d,%d,%d) tempCS = %lld (%d,%d)\n",
+          DTRACE_GET_COUNTER(g_trace_ctx, D_MODE_COST),
+          cs.slice->getPOC(),
+          cs.area.Y().x, cs.area.Y().y,
+          cs.area.Y().width, cs.area.Y().height,
+          cs.cus[0]->qtDepth,
+          cs.cus[0]->qp,
+          cs.cus[0]->predMode,
+          cs.cus[0]->skip,
+          cs.pus[0]->mergeFlag,
+          cs.cus[0]->LICFlag,
+          0, 0,
+          imvVal,
+          0, 0,
+          intraModeL, intraModeC,
+          tempCost, tempBits, tempDist);
+#else
   DTRACE( g_trace_ctx, D_MODE_COST, "ModeCost: %6lld %3d @(%4d,%4d) [%2dx%2d] %d (qp%d,pm%d,skip%d,mrg%d,fruc%d,obmc%d,ic%d,imv%d,affn%d,%d,%d) tempCS = %lld (%d,%d)\n",
     DTRACE_GET_COUNTER( g_trace_ctx, D_MODE_COST ),
     cs.slice->getPOC(),
@@ -112,6 +130,7 @@ inline void dtraceModeCost(CodingStructure &cs, double lambda)
     0, 0,
           intraModeL, intraModeC,
           tempCost, tempBits, tempDist );
+#endif
 }
 
 inline void dtraceBestMode(CodingStructure *&tempCS, CodingStructure *&bestCS, double lambda)

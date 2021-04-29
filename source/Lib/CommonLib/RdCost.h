@@ -93,6 +93,9 @@ public:
   int                   subShift;
   int                   cShiftX;
   int                   cShiftY;
+#if TM_AMVP || TM_MRG
+  int                   tmWeightIdx;
+#endif
   DistParam() :
   org(), cur(),
   mask( nullptr ),
@@ -101,6 +104,9 @@ public:
   maskStride2(0),
   step( 1 ), bitDepth( 0 ), useMR( false ), applyWeight( false ), isBiPred( false ), wpCur( nullptr ), compID( MAX_NUM_COMPONENT ), maximumDistortionForEarlyExit( std::numeric_limits<Distortion>::max() ), subShift( 0 )
   , cShiftX(-1), cShiftY(-1)
+#if TM_AMVP || TM_MRG
+  , tmWeightIdx(-1)
+#endif
   { }
 };
 
@@ -180,6 +186,9 @@ public:
   void           setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &cur, int bitDepth, ComponentID compID, bool useHadamard = false );
   void           setDistParam( DistParam &rcDP, const Pel* pOrg, const Pel* piRefY, int iOrgStride, int iRefStride, int bitDepth, ComponentID compID, int width, int height, int subShiftMode = 0, int step = 1, bool useHadamard = false, bool bioApplied = false );
   void           setDistParam( DistParam &rcDP, const CPelBuf &org, const Pel* piRefY, int iRefStride, const Pel* mask, int iMaskStride, int stepX, int iMaskStride2, int bitDepth,  ComponentID compID);
+#if TM_AMVP || TM_MRG
+  void           setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &cur, int bitDepth, bool TrueA_FalseL, int wIdx, int subShift, ComponentID compID );
+#endif
 
   double         getMotionLambda          ( )  { return m_dLambdaMotionSAD; }
   void           selectMotionLambda       ( )  { m_motionLambda = getMotionLambda( ); }
@@ -392,6 +401,11 @@ private:
   static Distortion xCalcHADs4x8      ( const Pel *piOrg, const Pel *piCur, int iStrideOrg, int iStrideCur );
   static Distortion xCalcHADs8x4      ( const Pel *piOrg, const Pel *piCur, int iStrideOrg, int iStrideCur );
 
+#if TM_AMVP || TM_MRG
+  template < int tplSize, bool TrueA_FalseL, bool MR >
+  static Distortion xGetTMErrorFull   ( const DistParam& rcDtParam );
+#endif
+
 #ifdef TARGET_SIMD_X86
   template<X86_VEXT vext>
   static Distortion xGetSSE_SIMD    ( const DistParam& pcDtParam );
@@ -407,6 +421,15 @@ private:
 
   template<X86_VEXT vext>
   static Distortion xGetHADs_SIMD   ( const DistParam& pcDtParam );
+
+#if INTER_LIC || (TM_AMVP || TM_MRG)
+  template< X86_VEXT vext >
+  static Distortion xGetMRSAD_SIMD(const DistParam &rcDtParam);
+#endif
+#if TM_AMVP || TM_MRG
+  template < X86_VEXT vext, int tplSize, bool TrueA_FalseL, bool MR >
+  static Distortion xGetTMErrorFull_SIMD(const DistParam& rcDtParam);
+#endif
 
   template< X86_VEXT vext >
   static Distortion xGetSADwMask_SIMD( const DistParam& pcDtParam );

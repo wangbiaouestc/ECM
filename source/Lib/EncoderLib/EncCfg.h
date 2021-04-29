@@ -229,6 +229,12 @@ protected:
   bool      m_noAffineMotionConstraintFlag;
   bool      m_noBcwConstraintFlag;
   bool      m_noIbcConstraintFlag;
+#if ENABLE_DIMD
+  bool      m_noDimdConstraintFlag;
+#endif
+#if ENABLE_OBMC
+  bool      m_noObmcConstraintFlag;
+#endif
   bool      m_noCiipConstraintFlag;
   bool      m_noGeoConstraintFlag;
   bool      m_noLadfConstraintFlag;
@@ -356,6 +362,12 @@ protected:
   bool      m_sbTmvpEnableFlag;
   bool      m_Affine;
   bool      m_AffineType;
+#if AFFINE_MMVD
+  bool      m_AffineMmvdMode;
+#endif
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+  bool      m_DMVDMode;
+#endif
   bool      m_PROF;
   bool      m_BIO;
 
@@ -369,7 +381,12 @@ protected:
   int       m_LadfQpOffset[MAX_LADF_INTERVALS];
   int       m_LadfIntervalLowerBound[MAX_LADF_INTERVALS];
 #endif
-
+#if ENABLE_DIMD
+  bool      m_dimd;
+#endif
+#if ENABLE_OBMC
+  bool      m_OBMC;
+#endif
   bool      m_ciip;
   bool      m_Geo;
   bool      m_allowDisFracMMVD;
@@ -393,6 +410,13 @@ protected:
 
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;
+#if MULTI_HYP_PRED
+  int       m_numMHPCandsToTest;
+  int       m_maxNumAddHyps;
+  int       m_numAddHypWeights;
+  int       m_maxNumAddHypRefFrames;
+  int       m_addHypTries;
+#endif
 
   // ADD_NEW_TOOL : (encoder lib) add tool enabling flags and associated parameters here
   bool      m_virtualBoundariesEnabledFlag;
@@ -409,6 +433,9 @@ protected:
   bool      m_encDbOpt;
   bool      m_useFastLCTU;
   bool      m_useFastMrg;
+#if MERGE_ENC_OPT
+  uint32_t  m_numFullRDMrg;
+#endif
   bool      m_usePbIntraFast;
   bool      m_useAMaxBT;
   bool      m_e0023FastEnc;
@@ -419,14 +446,22 @@ protected:
   bool      m_MRL;
   bool      m_MIP;
   bool      m_useFastMIP;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   int       m_fastLocalDualTreeMode;
+#endif
   uint32_t  m_log2MaxTbSize;
 
   //====== Loop/Deblock Filter ========
   bool      m_bLoopFilterDisable;
   bool      m_loopFilterOffsetInPPS;
+#if  DB_PARAM_TID
+  std::vector<int> m_loopFilterBetaOffsetDiv2;
+  std::vector<int> m_loopFilterTcOffsetDiv2;
+#else
   int       m_loopFilterBetaOffsetDiv2;
   int       m_loopFilterTcOffsetDiv2;
+#endif
+
   int       m_loopFilterCbBetaOffsetDiv2;
   int       m_loopFilterCbTcOffsetDiv2;
   int       m_loopFilterCrBetaOffsetDiv2;
@@ -698,7 +733,12 @@ protected:
   int       m_PPSCollocatedFromL0Idc;
   uint32_t  m_PPSSixMinusMaxNumMergeCandPlus1;
   uint32_t  m_PPSMaxNumMergeCandMinusMaxNumGeoCandPlus1;
+
+#if TCQ_8STATES
+	int       m_DepQuantEnabledIdc;
+#else
   bool      m_DepQuantEnabledFlag;
+#endif
   bool      m_SignDataHidingEnabledFlag;
   bool      m_RCEnableRateControl;
   int       m_RCTargetBitrate;
@@ -767,6 +807,12 @@ protected:
   bool        m_alf;                                          ///< Adaptive Loop Filter
   bool        m_ccalf;
   int         m_ccalfQpThreshold;
+
+#if INTER_LIC
+  unsigned    m_lic;
+  bool        m_fastPicLevelLIC;
+#endif
+
 #if JVET_O0756_CALCULATE_HDRMETRICS
   double                       m_whitePointDeltaE[hdrtoolslib::NB_REF_WHITE];
   double                       m_maxSampleValue;
@@ -791,6 +837,15 @@ protected:
   int         m_upscaledOutput;
   int         m_numRefLayers[MAX_VPS_LAYERS];
   bool        m_avoidIntraInDepLayer;
+#if SIGN_PREDICTION
+  int m_numPredSign;
+#endif
+#if DUMP_BEFORE_INLOOP
+  bool        m_dumpBeforeInloop;
+#endif
+#if CONVERT_NUM_TU_SPLITS_TO_CFG
+  int         m_maxNumTUs;
+#endif
 
 public:
   EncCfg()
@@ -906,6 +961,14 @@ public:
   void      setNoBcwConstraintFlag(bool val) { m_noBcwConstraintFlag = val; }
   bool      getNoIbcConstraintFlag() const { return m_noIbcConstraintFlag; }
   void      setNoIbcConstraintFlag(bool val) { m_noIbcConstraintFlag = val; }
+#if ENABLE_DIMD
+  bool      getNoDimdConstraintFlag() const { return m_noDimdConstraintFlag; }
+  void      setNoDimdConstraintFlag(bool val) { m_noDimdConstraintFlag = val; }
+#endif
+#if ENABLE_OBMC
+  bool      getNoObmcConstraintFlag() const { return m_noObmcConstraintFlag; }
+  void      setNoObmcConstraintFlag(bool bVal) { m_noObmcConstraintFlag = bVal; }
+#endif
   bool      getNoCiipConstraintFlag() const { return m_noCiipConstraintFlag; }
   void      setNoCiipConstraintFlag(bool val) { m_noCiipConstraintFlag = val; }
   bool      getNoGeoConstraintFlag() const { return m_noGeoConstraintFlag; }
@@ -1108,11 +1171,22 @@ public:
   bool      getAffine                       ()         const { return m_Affine; }
   void      setAffineType( bool b )                          { m_AffineType = b; }
   bool      getAffineType()                            const { return m_AffineType; }
+#if AFFINE_MMVD
+  void      setAffineMmvdMode               ( bool b )       { m_AffineMmvdMode = b; }
+  bool      getAffineMmvdMode               ()         const { return m_AffineMmvdMode; }
+#endif
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+  void      setUseDMVDMode                  (bool b)         { m_DMVDMode = b; }
+  bool      getUseDMVDMode                  ()         const { return m_DMVDMode; }
+#endif
   void      setPROF                         (bool b)         { m_PROF = b; }
   bool      getPROF                         ()         const { return m_PROF; }
   void      setBIO(bool b)                                   { m_BIO = b; }
   bool      getBIO()                                   const { return m_BIO; }
-
+#if ENABLE_OBMC
+  void      setUseOBMC                      ( bool n )       { m_OBMC = n; }
+  bool      getUseOBMC                      ()         const { return m_OBMC; }
+#endif
   void      setMTSIntraMaxCand              ( unsigned u )   { m_MTSIntraMaxCand = u; }
   unsigned  getMTSIntraMaxCand              ()         const { return m_MTSIntraMaxCand; }
   void      setMTSInterMaxCand              ( unsigned u )   { m_MTSInterMaxCand = u; }
@@ -1149,7 +1223,14 @@ public:
   int       getLadfIntervalLowerBound       ( int idx ) const { return m_LadfIntervalLowerBound[ idx ]; }
 
 #endif
-
+#if ENABLE_DIMD
+  void      setUseDimd                   ( bool b )       { m_dimd = b; }
+  bool      getUseDimd                   ()         const { return m_dimd; }
+#endif
+#if ENABLE_OBMC
+  void      setUseObmc                   ( bool b )       { m_OBMC = b; }
+  bool      getUseObmc                   ()         const { return m_OBMC; }
+#endif
   void      setUseCiip                   ( bool b )       { m_ciip = b; }
   bool      getUseCiip                   ()         const { return m_ciip; }
   void      setUseGeo                       ( bool b )       { m_Geo = b; }
@@ -1195,6 +1276,18 @@ public:
   bool      getUseWrapAround                ()         const { return m_wrapAround; }
   void      setWrapAroundOffset             ( unsigned u )   { m_wrapAroundOffset = u; }
   unsigned  getWrapAroundOffset             ()         const { return m_wrapAroundOffset; }
+#if MULTI_HYP_PRED
+  void      setNumMHPCandsToTest(int i) { m_numMHPCandsToTest = i; }
+  int       getNumMHPCandsToTest() { return m_numMHPCandsToTest; }
+  void      setMaxNumAddHyps(int i) { m_maxNumAddHyps = i; }
+  int       getMaxNumAddHyps()         const { return m_maxNumAddHyps; }
+  void      setMaxNumAddHypWeights(int i) { m_numAddHypWeights = i; }
+  int       getMaxNumAddHypWeights()         const { return m_numAddHypWeights; }
+  void      setMaxNumAddHypRefFrames(int i) { m_maxNumAddHypRefFrames = i; }
+  int       getMaxNumAddHypRefFrames()         const { return m_maxNumAddHypRefFrames; }
+  void      setAddHypTries(int i) { m_addHypTries = i; }
+  int       getAddHypTries()         const { return m_addHypTries; }
+#endif
 
   // ADD_NEW_TOOL : (encoder lib) add access functions here
   void      setVirtualBoundariesEnabledFlag( bool b ) { m_virtualBoundariesEnabledFlag = b; }
@@ -1234,6 +1327,10 @@ public:
   bool      getUseFastLCTU                  () const         { return m_useFastLCTU; }
   void      setUseFastMerge                 ( bool  n )      { m_useFastMrg = n; }
   bool      getUseFastMerge                 () const         { return m_useFastMrg; }
+#if MERGE_ENC_OPT
+  void      setNumFullRDMerge                 (uint32_t  n )      { m_numFullRDMrg = n; }
+  uint32_t  getNumFullRDMerge                 () const         { return m_numFullRDMrg; }
+#endif
   void      setUsePbIntraFast               ( bool  n )      { m_usePbIntraFast = n; }
   bool      getUsePbIntraFast               () const         { return m_usePbIntraFast; }
   void      setUseAMaxBT                    ( bool  n )      { m_useAMaxBT = n; }
@@ -1255,16 +1352,23 @@ public:
   bool      getUseMIP                       () const         { return m_MIP; }
   void      setUseFastMIP                   ( bool b )       { m_useFastMIP = b; }
   bool      getUseFastMIP                   () const         { return m_useFastMIP; }
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   void     setFastLocalDualTreeMode         ( int i )        { m_fastLocalDualTreeMode = i; }
   int      getFastLocalDualTreeMode         () const         { return m_fastLocalDualTreeMode; }
-
+#endif
   void      setLog2MaxTbSize                ( uint32_t  u )   { m_log2MaxTbSize = u; }
 
   //====== Loop/Deblock Filter ========
   void      setLoopFilterDisable            ( bool  b )      { m_bLoopFilterDisable       = b; }
   void      setLoopFilterOffsetInPPS        ( bool  b )      { m_loopFilterOffsetInPPS      = b; }
+#if DB_PARAM_TID
+  void      setLoopFilterBetaOffset         ( std::vector<int> i )      { m_loopFilterBetaOffsetDiv2  = i; }
+  void      setLoopFilterTcOffset           ( std::vector<int> i )      { m_loopFilterTcOffsetDiv2    = i; }
+#else
   void      setLoopFilterBetaOffset         ( int   i )      { m_loopFilterBetaOffsetDiv2  = i; }
   void      setLoopFilterTcOffset           ( int   i )      { m_loopFilterTcOffsetDiv2    = i; }
+#endif
+
   void      setLoopFilterCbBetaOffset       ( int   i )      { m_loopFilterCbBetaOffsetDiv2  = i; }
   void      setLoopFilterCbTcOffset         ( int   i )      { m_loopFilterCbTcOffsetDiv2    = i; }
   void      setLoopFilterCrBetaOffset       ( int   i )      { m_loopFilterCrBetaOffsetDiv2  = i; }
@@ -1377,8 +1481,14 @@ public:
   //==== Loop/Deblock Filter ========
   bool      getLoopFilterDisable            ()      { return  m_bLoopFilterDisable;       }
   bool      getLoopFilterOffsetInPPS        ()      { return m_loopFilterOffsetInPPS; }
+#if  DB_PARAM_TID
+  std::vector<int>       getLoopFilterBetaOffset()  { return m_loopFilterBetaOffsetDiv2; }
+  std::vector<int>       getLoopFilterTcOffset()    { return m_loopFilterTcOffsetDiv2; }
+#else
   int       getLoopFilterBetaOffset         ()      { return m_loopFilterBetaOffsetDiv2; }
   int       getLoopFilterTcOffset           ()      { return m_loopFilterTcOffsetDiv2; }
+#endif
+
   int       getLoopFilterCbBetaOffset       ()      { return m_loopFilterCbBetaOffsetDiv2; }
   int       getLoopFilterCbTcOffset         ()      { return m_loopFilterCbTcOffsetDiv2;   }
   int       getLoopFilterCrBetaOffset       ()      { return m_loopFilterCrBetaOffsetDiv2; }
@@ -1815,8 +1925,13 @@ public:
   int          getTMVPModeId ()                                      { return m_TMVPModeId; }
   WeightedPredictionMethod getWeightedPredictionMethod() const       { return m_weightedPredictionMethod; }
   void         setWeightedPredictionMethod( WeightedPredictionMethod m ) { m_weightedPredictionMethod = m; }
-  void         setDepQuantEnabledFlag( bool b )                      { m_DepQuantEnabledFlag = b;    }
+#if TCQ_8STATES
+  void         setDepQuantEnabledIdc( int i )                        { m_DepQuantEnabledIdc = i;    }
+  int          getDepQuantEnabledIdc()                               { return m_DepQuantEnabledIdc; }
+#else
+	void         setDepQuantEnabledFlag( bool b )                      { m_DepQuantEnabledFlag = b;    }
   bool         getDepQuantEnabledFlag()                              { return m_DepQuantEnabledFlag; }
+#endif
   void         setSignDataHidingEnabledFlag( bool b )                { m_SignDataHidingEnabledFlag = b;    }
   bool         getSignDataHidingEnabledFlag()                        { return m_SignDataHidingEnabledFlag; }
   bool         getUseRateCtrl         () const                       { return m_RCEnableRateControl;   }
@@ -1988,6 +2103,14 @@ public:
   bool         getUseCCALF()                                    const { return m_ccalf; }
   void         setCCALFQpThreshold( int b )                           { m_ccalfQpThreshold = b; }
   int          getCCALFQpThreshold()                            const { return m_ccalfQpThreshold; }
+
+#if INTER_LIC
+  void         setUseLIC( bool u )                                    { m_lic = u; }
+  bool         getUseLIC()                                      const { return m_lic; }
+  void         setFastPicLevelLIC( bool b )                           { m_fastPicLevelLIC = b; }
+  bool         getFastPicLevelLIC()                             const { return m_fastPicLevelLIC; }
+#endif
+
 #if JVET_O0756_CALCULATE_HDRMETRICS
   void        setWhitePointDeltaE( uint32_t index, double value )     { m_whitePointDeltaE[ index ] = value; }
   double      getWhitePointDeltaE( uint32_t index )             const { return m_whitePointDeltaE[ index ]; }
@@ -2033,6 +2156,20 @@ public:
 
   const CfgVPSParameters& getVPSParameters() const                                  { return m_cfgVPSParameters; }
   void                    setVPSParameters(const CfgVPSParameters& cfg)             { m_cfgVPSParameters = cfg; }
+
+#if SIGN_PREDICTION
+  void        setNumPredSigns( int num )                              { m_numPredSign = num;}
+  int         getNumPredSigns( )                                      { return m_numPredSign;}
+#endif
+
+#if DUMP_BEFORE_INLOOP
+  void         setDumpBeforeInloop( bool b )                         { m_dumpBeforeInloop = b; }
+  bool         getDumpBeforeInloop()                           const { return m_dumpBeforeInloop; }
+#endif
+#if CONVERT_NUM_TU_SPLITS_TO_CFG
+  void         setMaxNumTUs( int num )                               { m_maxNumTUs = num;  }
+  int          getMaxNumTUs()                                  const { return m_maxNumTUs; }
+#endif
 };
 
 //! \}

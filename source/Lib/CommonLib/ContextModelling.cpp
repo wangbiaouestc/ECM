@@ -83,7 +83,11 @@ CoeffCodingContext::CoeffCodingContext( const TransformUnit& tu, ComponentID com
   , m_sigGroupCtxId             (-1)
   , m_tmplCpSum1                (-1)
   , m_tmplCpDiag                (-1)
+#if TCQ_8STATES
+  , m_sigFlagCtxSet             { Ctx::SigFlag[m_chType], Ctx::SigFlag[m_chType+2], Ctx::SigFlag[m_chType], Ctx::SigFlag[m_chType+4] }
+#else
   , m_sigFlagCtxSet             { Ctx::SigFlag[m_chType], Ctx::SigFlag[m_chType+2], Ctx::SigFlag[m_chType+4] }
+#endif
   , m_parFlagCtxSet             ( Ctx::ParFlag[m_chType] )
   , m_gtxFlagCtxSet             { Ctx::GtxFlag[m_chType], Ctx::GtxFlag[m_chType+2] }
   , m_sigGroupCtxIdTS           (-1)
@@ -94,6 +98,9 @@ CoeffCodingContext::CoeffCodingContext( const TransformUnit& tu, ComponentID com
   , m_tsSignFlagCtxSet          (Ctx::TsResidualSign)
   , m_sigCoeffGroupFlag         ()
   , m_bdpcm                     (bdpcm)
+#if SIGN_PREDICTION
+  , m_bSignPredQualified        (TU::getDelayedSignCoding(tu, component))
+#endif
 {
   // LOGTODO
   unsigned log2sizeX = m_log2BlockWidth;
@@ -105,9 +112,13 @@ CoeffCodingContext::CoeffCodingContext( const TransformUnit& tu, ComponentID com
   }
   else
   {
+#if TU_256
+    static const int prefix_ctx[]   = { 0, 0, 0, 3, 6, 10, 15, 21, 28 };
+#else
     static const int prefix_ctx[8]  = { 0, 0, 0, 3, 6, 10, 15, 21 };
+#endif
     const_cast<int&>(m_lastOffsetX) = prefix_ctx[ log2sizeX ];
-    const_cast<int&>(m_lastOffsetY) = prefix_ctx[ log2sizeY ];;
+    const_cast<int&>(m_lastOffsetY) = prefix_ctx[ log2sizeY ];
     const_cast<int&>(m_lastShiftX)  = (log2sizeX + 1) >> 2;
     const_cast<int&>(m_lastShiftY)  = (log2sizeY + 1) >> 2;
   }
@@ -135,7 +146,7 @@ void CoeffCodingContext::initSubblock( int SubsetId, bool sigGroupFlag )
   m_sigGroupCtxIdTS   = Ctx::TsSigCoeffGroup( sigLeft  + sigAbove );
 }
 
-
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
 unsigned DeriveCtx::CtxModeConsFlag( const CodingStructure& cs, Partitioner& partitioner )
 {
   assert( partitioner.chType == CHANNEL_TYPE_LUMA );
@@ -149,7 +160,7 @@ unsigned DeriveCtx::CtxModeConsFlag( const CodingStructure& cs, Partitioner& par
   unsigned ctxId = ((cuAbove && cuAbove->predMode == MODE_INTRA) || (cuLeft && cuLeft->predMode == MODE_INTRA)) ? 1 : 0;
   return ctxId;
 }
-
+#endif
 
 void DeriveCtx::CtxSplit( const CodingStructure& cs, Partitioner& partitioner, unsigned& ctxSpl, unsigned& ctxQt, unsigned& ctxHv, unsigned& ctxHorBt, unsigned& ctxVerBt, bool* _canSplit /*= nullptr */ )
 {
@@ -291,7 +302,11 @@ unsigned DeriveCtx::CtxQtCbf( const ComponentID compID, const bool prevCbf, cons
 
 unsigned DeriveCtx::CtxInterDir( const PredictionUnit& pu )
 {
+#if CTU_256
+  return ( MAX_CU_DEPTH - ( ( floorLog2( pu.lumaSize().width ) + floorLog2( pu.lumaSize().height ) + 1 ) >> 1 ) );
+#else
   return ( 7 - ((floorLog2(pu.lumaSize().width) + floorLog2(pu.lumaSize().height) + 1) >> 1) );
+#endif
 }
 
 unsigned DeriveCtx::CtxAffineFlag( const CodingUnit& cu )
@@ -323,7 +338,24 @@ unsigned DeriveCtx::CtxSkipFlag( const CodingUnit& cu )
   return ctxId;
 }
 
+#if ENABLE_DIMD 
+unsigned DeriveCtx::CtxDIMDFlag(const CodingUnit& cu)
+{
+  const CodingStructure *cs = cu.cs;
+  unsigned ctxId = 0;
 
+  // Get BCBP of left PU
+  const CodingUnit *cuLeft = cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+  ctxId = (cuLeft && cuLeft->dimd) ? 1 : 0;
+
+  // Get BCBP of above PU
+  const CodingUnit *cuAbove = cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+  ctxId += (cuAbove && cuAbove->dimd) ? 1 : 0;
+
+  // return ctxId;
+  return 0;
+}
+#endif
 
 unsigned DeriveCtx::CtxPredModeFlag( const CodingUnit& cu )
 {
@@ -334,7 +366,6 @@ unsigned DeriveCtx::CtxPredModeFlag( const CodingUnit& cu )
 
   return ctxId;
 }
-
 unsigned DeriveCtx::CtxIBCFlag(const CodingUnit& cu)
 {
   const CodingStructure *cs = cu.cs;
@@ -348,37 +379,221 @@ unsigned DeriveCtx::CtxIBCFlag(const CodingUnit& cu)
   return ctxId;
 }
 
+#if TM_MRG
+void MergeCtx::copyRegularMergeCand(int dstCandIdx, MergeCtx& srcCtx, int srcCandIdx)
+{
+  if (this == (&srcCtx) && dstCandIdx == srcCandIdx)
+  {
+    return;
+  }
+
+  mvFieldNeighbours[ dstCandIdx << 1     ] = srcCtx.mvFieldNeighbours[ srcCandIdx << 1     ];
+  mvFieldNeighbours[(dstCandIdx << 1) + 1] = srcCtx.mvFieldNeighbours[(srcCandIdx << 1) + 1];
+  BcwIdx            [dstCandIdx] = srcCtx.BcwIdx            [srcCandIdx];
+#if INTER_LIC
+  LICFlags          [dstCandIdx] = srcCtx.LICFlags          [srcCandIdx];
+#endif
+  interDirNeighbours[dstCandIdx] = srcCtx.interDirNeighbours[srcCandIdx];
+  useAltHpelIf      [dstCandIdx] = srcCtx.useAltHpelIf      [srcCandIdx];
+#if MULTI_HYP_PRED
+  addHypNeighbours  [dstCandIdx] = srcCtx.addHypNeighbours  [srcCandIdx];
+#endif
+}
+
+void MergeCtx::convertRegularMergeCandToBi(int candIdx)
+{
+  if( interDirNeighbours[candIdx] < 3
+#if INTER_LIC
+      && !LICFlags[candIdx]
+#endif
+    )
+  {
+    MvField& mvfL0 = mvFieldNeighbours[ candIdx << 1     ];
+    MvField& mvfL1 = mvFieldNeighbours[(candIdx << 1) + 1];
+
+    if (mvfL0.refIdx >= 0 && mvfL1.refIdx < 0)
+    {
+      mvfL1.mv = Mv() - mvfL0.mv;
+      mvfL1.refIdx = 0;
+    }
+    else if (mvfL1.refIdx >= 0 && mvfL0.refIdx < 0)
+    {
+      mvfL0.mv = Mv() - mvfL1.mv;
+      mvfL0.refIdx = 0;
+    }
+    else
+    {
+      CHECK(true, "Invalid merge candidate");
+    }
+
+    interDirNeighbours[candIdx] = 3;
+    BcwIdx            [candIdx] = BCW_DEFAULT;
+  } 
+}
+#endif
+
 void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 {
   CHECK( candIdx >= numValidMergeCand, "Merge candidate does not exist" );
+
   pu.regularMergeFlag        = !(pu.ciipFlag || pu.cu->geoFlag);
   pu.mergeFlag               = true;
   pu.mmvdMergeFlag = false;
   pu.interDir                = interDirNeighbours[candIdx];
   pu.cu->imv = (!pu.cu->geoFlag && useAltHpelIf[candIdx]) ? IMV_HPEL : 0;
   pu.mergeIdx                = candIdx;
-  pu.mergeType               = mrgTypeNeighbours[candIdx];
+  pu.mergeType               = CU::isIBC( *pu.cu ) ? MRG_TYPE_IBC : MRG_TYPE_DEFAULT_N;
   pu.mv     [REF_PIC_LIST_0] = mvFieldNeighbours[(candIdx << 1) + 0].mv;
   pu.mv     [REF_PIC_LIST_1] = mvFieldNeighbours[(candIdx << 1) + 1].mv;
-  pu.mvd    [REF_PIC_LIST_0] = Mv();
-  pu.mvd    [REF_PIC_LIST_1] = Mv();
-  pu.refIdx [REF_PIC_LIST_0] = mvFieldNeighbours[( candIdx << 1 ) + 0].refIdx;
-  pu.refIdx [REF_PIC_LIST_1] = mvFieldNeighbours[( candIdx << 1 ) + 1].refIdx;
-  pu.mvpIdx [REF_PIC_LIST_0] = NOT_VALID;
-  pu.mvpIdx [REF_PIC_LIST_1] = NOT_VALID;
-  pu.mvpNum [REF_PIC_LIST_0] = NOT_VALID;
-  pu.mvpNum [REF_PIC_LIST_1] = NOT_VALID;
+#if MULTI_PASS_DMVR
+  pu.bdmvrRefine = false;
+#endif
+  pu.refIdx[REF_PIC_LIST_0] = mvFieldNeighbours[(candIdx << 1) + 0].refIdx;
+  pu.refIdx[REF_PIC_LIST_1] = mvFieldNeighbours[(candIdx << 1) + 1].refIdx;
+
   if (CU::isIBC(*pu.cu))
   {
     pu.bv = pu.mv[REF_PIC_LIST_0];
     pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT); // used for only integer resolution
     pu.cu->imv = pu.cu->imv == IMV_HPEL ? 0 : pu.cu->imv;
+#if MULTI_HYP_PRED
+    pu.addHypData.clear();
+    pu.numMergedAddHyps = 0;
+#endif
   }
   pu.cu->BcwIdx = ( interDirNeighbours[candIdx] == 3 ) ? BcwIdx[candIdx] : BCW_DEFAULT;
+#if MULTI_HYP_PRED
+  if (pu.ciipFlag
+#if TM_MRG
+    || pu.tmMergeFlag
+#endif
+    )
+  {
+    pu.addHypData.clear();
+    pu.numMergedAddHyps = 0;
+  }
+#if MULTI_HYP_PRED
+  else if (pu.Y().area() <= MULTI_HYP_PRED_RESTRICT_BLOCK_SIZE || std::min(pu.Y().width, pu.Y().height) < MULTI_HYP_PRED_RESTRICT_MIN_WH)
+  {
+    pu.addHypData.clear();
+    pu.numMergedAddHyps = 0;
+  }
+#endif
+  else
+  {
+    pu.addHypData = addHypNeighbours[candIdx];
+    pu.numMergedAddHyps = int(addHypNeighbours[candIdx].size());
+  }
+#endif
 
+#if !INTER_RM_SIZE_CONSTRAINTS  
   PU::restrictBiPredMergeCandsOne(pu);
+#endif
   pu.mmvdEncOptMode = 0;
+
+#if INTER_LIC
+  pu.cu->LICFlag = pu.cs->slice->getUseLIC() ? LICFlags[candIdx] : false;
+  if (pu.interDir == 3)
+  {
+    CHECK(pu.cu->LICFlag, "LIC is not used with bi-prediction in merge");
+  }
+#endif
 }
+
+#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR
+bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh) const
+{
+  if (mvFieldNeighbours[(mergeCandIndex << 1)].refIdx < 0 && mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx < 0)
+  {
+    return true;
+  }
+
+  if (mvdSimilarityThresh > 1)
+  {
+    for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
+    {
+      if (interDirNeighbours[ui] == interDirNeighbours[mergeCandIndex])
+      {
+        if (interDirNeighbours[ui] == 3)
+        {
+          if (mvFieldNeighbours[(ui << 1)    ].refIdx == mvFieldNeighbours[(mergeCandIndex << 1)    ].refIdx &&
+              mvFieldNeighbours[(ui << 1) + 1].refIdx == mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx )
+          {
+            Mv mvDiffL0 = mvFieldNeighbours[(ui << 1)    ].mv - mvFieldNeighbours[(mergeCandIndex << 1)    ].mv;
+            Mv mvDiffL1 = mvFieldNeighbours[(ui << 1) + 1].mv - mvFieldNeighbours[(mergeCandIndex << 1) + 1].mv;
+
+            if (mvDiffL0.getAbsHor() < mvdSimilarityThresh && mvDiffL0.getAbsVer() < mvdSimilarityThresh
+             && mvDiffL1.getAbsHor() < mvdSimilarityThresh && mvDiffL1.getAbsVer() < mvdSimilarityThresh)
+            {
+              return true;
+            }
+          }
+        }
+        else if (interDirNeighbours[ui] == 1)
+        {
+          if (mvFieldNeighbours[(ui << 1)].refIdx == mvFieldNeighbours[(mergeCandIndex << 1)].refIdx )
+          {
+            Mv mvDiff = mvFieldNeighbours[(ui << 1)].mv - mvFieldNeighbours[(mergeCandIndex << 1)].mv;
+            if (mvDiff.getAbsHor() < mvdSimilarityThresh && mvDiff.getAbsVer() < mvdSimilarityThresh)
+            {
+              return true;
+            }
+          }
+        }
+        else if (interDirNeighbours[ui] == 2)
+        {
+          if (mvFieldNeighbours[(ui << 1) + 1].refIdx == mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx )
+          {
+            Mv mvDiff = mvFieldNeighbours[(ui << 1) + 1].mv - mvFieldNeighbours[(mergeCandIndex << 1) + 1].mv;
+            if (mvDiff.getAbsHor() < mvdSimilarityThresh && mvDiff.getAbsVer() < mvdSimilarityThresh)
+            {
+              return true;
+            }
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
+  {
+    if (interDirNeighbours[ui] == interDirNeighbours[mergeCandIndex])
+    {
+      if (interDirNeighbours[ui] == 3)
+      {
+        if (mvFieldNeighbours[(ui << 1)    ].refIdx == mvFieldNeighbours[(mergeCandIndex << 1)    ].refIdx &&
+            mvFieldNeighbours[(ui << 1) + 1].refIdx == mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx &&
+            mvFieldNeighbours[(ui << 1)    ].mv     == mvFieldNeighbours[(mergeCandIndex << 1)    ].mv     &&
+            mvFieldNeighbours[(ui << 1) + 1].mv     == mvFieldNeighbours[(mergeCandIndex << 1) + 1].mv)
+        {
+          return true;
+        }
+      }
+      else if (interDirNeighbours[ui] == 1)
+      {
+        if (mvFieldNeighbours[(ui << 1)].refIdx == mvFieldNeighbours[(mergeCandIndex << 1)].refIdx &&
+            mvFieldNeighbours[(ui << 1)].mv     == mvFieldNeighbours[(mergeCandIndex << 1)].mv)
+        {
+          return true;
+        }
+      }
+      else if (interDirNeighbours[ui] == 2)
+      {
+        if (mvFieldNeighbours[(ui << 1) + 1].refIdx == mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx &&
+            mvFieldNeighbours[(ui << 1) + 1].mv     == mvFieldNeighbours[(mergeCandIndex << 1) + 1].mv)
+        {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+#endif
+
 void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
 {
   const Slice &slice = *pu.cs->slice;
@@ -532,6 +747,9 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
   pu.regularMergeFlag = true;
   pu.mergeIdx = candIdx;
   pu.mergeType = MRG_TYPE_DEFAULT_N;
+#if MULTI_PASS_DMVR
+  pu.bdmvrRefine             = false;
+#endif
   pu.mvd[REF_PIC_LIST_0] = Mv();
   pu.mvd[REF_PIC_LIST_1] = Mv();
   pu.mvpIdx[REF_PIC_LIST_0] = NOT_VALID;
@@ -539,7 +757,9 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
   pu.mvpNum[REF_PIC_LIST_0] = NOT_VALID;
   pu.mvpNum[REF_PIC_LIST_1] = NOT_VALID;
   pu.cu->imv = mmvdUseAltHpelIf[fPosBaseIdx] ? IMV_HPEL : 0;
-
+#if INTER_LIC
+  pu.cu->LICFlag = LICFlags[fPosBaseIdx];
+#endif
   pu.cu->BcwIdx = (interDirNeighbours[fPosBaseIdx] == 3) ? BcwIdx[fPosBaseIdx] : BCW_DEFAULT;
 
   for (int refList = 0; refList < 2; refList++)
@@ -550,6 +770,10 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
     }
   }
 
+#if MULTI_HYP_PRED
+  pu.addHypData.clear();
+  pu.numMergedAddHyps = 0;
+#endif
 
   PU::restrictBiPredMergeCandsOne(pu);
 }

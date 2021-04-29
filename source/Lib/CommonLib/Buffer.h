@@ -70,6 +70,14 @@ struct PelBufferOps
   void(*addBIOAvg4)    (const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel*gradY1, int gradStride, int width, int height, int tmpx, int tmpy, int shift, int offset, const ClpRng& clpRng);
   void(*bioGradFilter) (Pel* pSrc, int srcStride, int width, int height, int gradStride, Pel* gradX, Pel* gradY, const int bitDepth);
   void(*calcBIOPar)    (const Pel* srcY0Temp, const Pel* srcY1Temp, const Pel* gradX0, const Pel* gradX1, const Pel* gradY0, const Pel* gradY1, int* dotProductTemp1, int* dotProductTemp2, int* dotProductTemp3, int* dotProductTemp5, int* dotProductTemp6, const int src0Stride, const int src1Stride, const int gradStride, const int widthG, const int heightG, const int bitDepth);
+#if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
+  void(*calcBIOParameter)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGY_GX, Pel* dI);
+  void(*calAbsSum)          (const Pel* diff, int stride, int width, int height, int* absDiff);
+  void(*calcBIOParamSum5)   (Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGY_GX, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX);
+  void(*calcBIOParamSum4)   (Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGY_GX, int width, int height, const int widthG, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX);
+  void(*addBIOAvgN)         (const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel *gradY1, int gradStride, int width, int height, int* tmpx, int* tmpy, int shift, int offset, const ClpRng& clpRng);
+  void(*calcBIOClippedVxVy) (int* sumDIX_pixel_32bit, int* sumAbsGX_pixel_32bit, int* sumDIY_pixel_32bit, int* sumAbsGY_pixel_32bit, int* sumSignGY_GX_pixel_32bit, const int limit, const int bioSubblockSize, int* tmpx_pixel_32bit, int* tmpy_pixel_32bit);
+#endif
   void(*calcBIOSums)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int xu, int yu, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX);
   void(*calcBlkGradient)(int sx, int sy, int    *arraysGx2, int     *arraysGxGy, int     *arraysGxdI, int     *arraysGy2, int     *arraysGydI, int     &sGx2, int     &sGy2, int     &sGxGy, int     &sGxdI, int     &sGydI, int width, int height, int unitSize);
   void(*copyBuffer)(Pel *src, int srcStride, Pel *dst, int dstStride, int width, int height);
@@ -83,12 +91,18 @@ struct PelBufferOps
   void (*profGradFilter) (Pel* pSrc, int srcStride, int width, int height, int gradStride, Pel* gradX, Pel* gradY, const int bitDepth);
   void (*applyPROF)      (Pel* dst, int dstStride, const Pel* src, int srcStride, int width, int height, const Pel* gradX, const Pel* gradY, int gradStride, const int* dMvX, const int* dMvY, int dMvStride, const bool& bi, int shiftNum, Pel offset, const ClpRng& clpRng);
   void (*roundIntVector) (int* v, int size, unsigned int nShift, const int dmvLimit);
+#if TM_AMVP || TM_MRG
+  int64_t (*getSumOfDifference) ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int rowSubShift, int bitDepth );
+#endif
 };
 
 extern PelBufferOps g_pelBufOP;
 
 void paddingCore(Pel *ptr, int stride, int width, int height, int padSize);
 void copyBufferCore(Pel *src, int srcStride, Pel *Dst, int dstStride, int width, int height);
+#if TM_AMVP || TM_MRG
+int64_t getSumOfDifferenceCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int rowSubShift, int bitDepth);
+#endif
 
 template<typename T>
 struct AreaBuf : public Size
@@ -114,6 +128,9 @@ struct AreaBuf : public Size
 
   void reconstruct          ( const AreaBuf<const T> &pred, const AreaBuf<const T> &resi, const ClpRng& clpRng);
   void copyClip             ( const AreaBuf<const T> &src, const ClpRng& clpRng);
+#if MULTI_HYP_PRED
+  void addHypothesisAndClip(const AreaBuf<const T> &other, const int weight, const ClpRng& clpRng);
+#endif
 
   void subtract             ( const AreaBuf<const T> &other );
   void extendSingleBorderPel();
@@ -125,10 +142,13 @@ struct AreaBuf : public Size
   void addAvg               ( const AreaBuf<const T> &other1, const AreaBuf<const T> &other2, const ClpRng& clpRng );
   void removeHighFreq       ( const AreaBuf<T>& other, const bool bClip, const ClpRng& clpRng);
   void updateHistogram      ( std::vector<int32_t>& hist ) const;
+#if INTER_LIC
+  void subtractHistogram    (std::vector<int32_t>& hist) const;
+#endif
 
   T    meanDiff             ( const AreaBuf<const T> &other ) const;
   void subtract             ( const T val );
-
+  void subtract             ( const AreaBuf<const T> &buffer1, const AreaBuf<const T> &buffer2 );
   void linearTransform      ( const int scale, const int shift, const int offset, bool bClip, const ClpRng& clpRng );
 
   void transposedFrom       ( const AreaBuf<const T> &other );
@@ -136,6 +156,10 @@ struct AreaBuf : public Size
   void toLast               ( const ClpRng& clpRng );
 
   void rspSignal            ( std::vector<Pel>& pLUT );
+  void rspSignal            ( const AreaBuf<const Pel>& other, std::vector<Pel>& pLUT );
+  void rspSignal            ( const AreaBuf<Pel> &toReshape, std::vector<Pel>& pLUT );
+  void rspSignalAllAndSubtract ( const AreaBuf<Pel> &buffer1, const AreaBuf<Pel> &buffer2, std::vector<Pel>& pLUT );
+  void rspSignalAndSubtract ( const AreaBuf<Pel> &buffer1, const AreaBuf<Pel> &buffer2, std::vector<Pel>& pLUT );
   void scaleSignal          ( const int scale, const bool dir , const ClpRng& clpRng);
   T    computeAvg           ( ) const;
 
@@ -345,6 +369,10 @@ void AreaBuf<T>::copyFrom( const AreaBuf<const T> &other )
   }
 }
 
+#if MULTI_HYP_PRED
+template<>
+void AreaBuf<Pel>::addHypothesisAndClip(const AreaBuf<const Pel> &other, const int weight, const ClpRng& clpRng);
+#endif
 
 template<typename T>
 void AreaBuf<T>::subtract( const AreaBuf<const T> &other )
@@ -367,6 +395,30 @@ void AreaBuf<T>::subtract( const AreaBuf<const T> &other )
 #undef SUBS_INC
 }
 
+template<typename T>
+void AreaBuf<T>::subtract( const AreaBuf<const T> &buffer1, const AreaBuf<const T> &buffer2 )
+{
+  CHECK( width != buffer1.width, "Incompatible size in buffer1" );
+  CHECK( height != buffer1.height, "Incompatible size in buffer1" );
+  CHECK( width != buffer2.width, "Incompatible size in buffer2" );
+  CHECK( height != buffer2.height, "Incompatible size in buffer2" );
+
+  T* dest = buf;
+  const T* buf1 = buffer1.buf;
+  const T* buf2 = buffer2.buf;
+
+#define SUBS_INC          \
+  dest +=         stride; \
+  buf1 += buffer1.stride; \
+  buf2 += buffer2.stride; \
+
+#define SUBS_OP( ADDR ) dest[ADDR] = buf1[ADDR] - buf2[ADDR]
+
+  SIZE_AWARE_PER_EL_OP( SUBS_OP, SUBS_INC );
+
+#undef SUBS_OP
+#undef SUBS_INC
+}
 
 template<typename T>
 void AreaBuf<T>::copyClip( const AreaBuf<const T> &src, const ClpRng& clpRng )
@@ -541,6 +593,21 @@ void AreaBuf<T>::updateHistogram( std::vector<int32_t>& hist ) const
     }
   }
 }
+
+#if INTER_LIC
+template<typename T>
+void AreaBuf<T>::subtractHistogram(std::vector<int32_t>& hist) const
+{
+  const T* data = buf;
+  for (std::size_t y = 0; y < height; y++, data += stride)
+  {
+    for (std::size_t x = 0; x < width; x++)
+    {
+      hist[data[x]]--;
+    }
+  }
+}
+#endif
 
 template<typename T>
 void AreaBuf<T>::extendBorderPel(unsigned marginX, unsigned marginY)
@@ -782,6 +849,9 @@ struct UnitBuf
   void roundToOutputBitdepth(const UnitBuf<const T> &src, const ClpRngs& clpRngs);
   void reconstruct          ( const UnitBuf<const T> &pred, const UnitBuf<const T> &resi, const ClpRngs& clpRngs );
   void copyClip             ( const UnitBuf<const T> &src, const ClpRngs& clpRngs, const bool lumaOnly = false, const bool chromaOnly = false );
+#if MULTI_HYP_PRED
+  void addHypothesisAndClip(const UnitBuf<const T> &other, const int weight, const ClpRngs& clpRngs, const bool lumaOnly = false);
+#endif
   void subtract             ( const UnitBuf<const T> &other );
   void addWeightedAvg       ( const UnitBuf<const T> &other1, const UnitBuf<const T> &other2, const ClpRngs& clpRngs, const uint8_t bcwIdx = BCW_DEFAULT, const bool chromaOnly = false, const bool lumaOnly = false);
   void addAvg               ( const UnitBuf<const T> &other1, const UnitBuf<const T> &other2, const ClpRngs& clpRngs, const bool chromaOnly = false, const bool lumaOnly = false);
@@ -827,6 +897,18 @@ void UnitBuf<T>::copyFrom(const UnitBuf<const T> &other, const bool lumaOnly, co
   }
 }
 
+#if MULTI_HYP_PRED
+template<typename T>
+void UnitBuf<T>::addHypothesisAndClip(const UnitBuf<const T> &other, const int weight, const ClpRngs& clpRngs, const bool lumaOnly)
+{
+  CHECK(chromaFormat != other.chromaFormat, "Incompatible formats");
+
+  for (unsigned i = 0; i < (lumaOnly ? 1 : bufs.size()); i++)
+  {
+    bufs[i].addHypothesisAndClip(other.bufs[i], weight, clpRngs.comp[i]);
+  }
+}
+#endif
 
 
 template<typename T>

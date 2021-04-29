@@ -49,6 +49,9 @@
 #include "HRD.h"
 #include <unordered_map>
 #include "AlfParameters.h"
+#if MULTI_HYP_PRED
+#include "MotionInfo.h"
+#endif
 
 //! \ingroup CommonLib
 //! \{
@@ -313,6 +316,12 @@ class ConstraintInfo
   bool              m_noAffineMotionConstraintFlag;
   bool              m_noBcwConstraintFlag;
   bool              m_noIbcConstraintFlag;
+#if ENABLE_DIMD
+  bool              m_noDimdConstraintFlag;
+#endif
+#if ENABLE_OBMC
+  bool              m_noObmcConstraintFlag;
+#endif
   bool              m_noCiipConstraintFlag;
   bool              m_noGeoConstraintFlag;
   bool              m_noLadfConstraintFlag;
@@ -422,6 +431,12 @@ public:
     , m_noAffineMotionConstraintFlag(false)
     , m_noBcwConstraintFlag      (false)
     , m_noIbcConstraintFlag      (false)
+#if ENABLE_DIMD
+    , m_noDimdConstraintFlag     (false)
+#endif
+#if ENABLE_OBMC
+    , m_noObmcConstraintFlag     (false)
+#endif
     , m_noCiipConstraintFlag  (false)
     , m_noGeoConstraintFlag      (false)
     , m_noLadfConstraintFlag     (false)
@@ -596,6 +611,14 @@ public:
   void          setNoBcwConstraintFlag(bool bVal) { m_noBcwConstraintFlag = bVal; }
   bool          getNoIbcConstraintFlag() const { return m_noIbcConstraintFlag; }
   void          setNoIbcConstraintFlag(bool bVal) { m_noIbcConstraintFlag = bVal; }
+#if ENABLE_DIMD
+  bool          getNoDimdConstraintFlag() const { return m_noDimdConstraintFlag; }
+  void          setNoDimdConstraintFlag(bool bVal) { m_noDimdConstraintFlag = bVal; }
+#endif
+#if ENABLE_OBMC
+  bool          getNoObmcConstraintFlag() const { return m_noObmcConstraintFlag; }
+  void          setNoObmcConstraintFlag(bool bVal) { m_noObmcConstraintFlag = bVal; }
+#endif
   bool          getNoCiipConstraintFlag() const { return m_noCiipConstraintFlag; }
   void          setNoCiipConstraintFlag(bool bVal) { m_noCiipConstraintFlag = bVal; }
   bool          getNoGeoConstraintFlag() const { return m_noGeoConstraintFlag; }
@@ -1474,6 +1497,12 @@ private:
   bool              m_affineAmvrEnabledFlag;
   bool              m_DMVR;
   bool              m_MMVD;
+#if AFFINE_MMVD
+  bool              m_AffineMmvdMode;
+#endif
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+  bool              m_DMVDMode;
+#endif
   bool              m_SBT;
   bool              m_ISP;
   ChromaFormat      m_chromaFormatIdc;
@@ -1619,13 +1648,29 @@ private:
   bool              m_AffineType;
   bool              m_PROF;
   bool              m_bcw;                        //
+#if ENABLE_DIMD
+  bool              m_dimd;
+#endif
+#if ENABLE_OBMC
+  bool              m_OBMC;
+#endif
   bool              m_ciip;
   bool              m_Geo;
+#if INTER_LIC
+  bool              m_licEnabledFlag;
+#endif
+
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
   bool              m_LadfEnabled;
   int               m_LadfNumIntervals;
   int               m_LadfQpOffset[MAX_LADF_INTERVALS];
   int               m_LadfIntervalLowerBound[MAX_LADF_INTERVALS];
+#endif
+#if MULTI_HYP_PRED
+  bool              m_InterMultiHyp;              // multi hypothesis inter prediction
+  int               m_maxNumAddHyps;
+  int               m_numAddHypWeights;
+  int               m_maxNumAddHypRefFrames;
 #endif
   bool              m_MRL;
   bool              m_MIP;
@@ -1647,7 +1692,11 @@ private:
   bool              m_scalingMatrixAlternativeColourSpaceDisabledFlag;
   bool              m_scalingMatrixDesignatedColourSpaceFlag;
 
-  bool m_disableScalingMatrixForLfnstBlks; 
+  bool              m_disableScalingMatrixForLfnstBlks; 
+
+#if SIGN_PREDICTION
+  int               m_numPredSign;
+#endif
 
 public:
 
@@ -1781,6 +1830,10 @@ public:
   bool                    getIDRRefParamListPresent()                             const { return m_idrRefParamList; }
   void                    setUseDualITree(bool b) { m_dualITree = b; }
   bool                    getUseDualITree()                                      const { return m_dualITree; }
+#if SIGN_PREDICTION
+  void                    setNumPredSigns(int num) { m_numPredSign = num; }
+  int                     getNumPredSigns()                                      const { return m_numPredSign; }
+#endif
 
   void                    setMaxCUWidth( uint32_t u )                                                         { m_uiMaxCUWidth = u;                                                  }
   uint32_t                    getMaxCUWidth() const                                                           { return  m_uiMaxCUWidth;                                              }
@@ -1870,6 +1923,14 @@ void                    setCCALFEnabledFlag( bool b )                           
   void                    setUseDMVR(bool b)                                                              { m_DMVR = b;    }
   bool                    getUseMMVD()const                                                               { return m_MMVD; }
   void                    setUseMMVD(bool b)                                                              { m_MMVD = b;    }
+#if AFFINE_MMVD
+  void                    setUseAffineMmvdMode(bool b)                                                    { m_AffineMmvdMode = b; }
+  bool                    getUseAffineMmvdMode() const                                                    { return m_AffineMmvdMode; }
+#endif
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+  void                    setUseDMVDMode(bool b)                                                          { m_DMVDMode = b; }
+  bool                    getUseDMVDMode() const                                                          { return m_DMVDMode; }
+#endif
   bool                    getBdofControlPresentFlag()const                                                { return m_BdofControlPresentFlag; }
   void                    setBdofControlPresentFlag(bool b)                                               { m_BdofControlPresentFlag = b;    }
 
@@ -1912,12 +1973,15 @@ void                    setCCALFEnabledFlag( bool b )                           
   void                    setMaxLatencyIncreasePlus1( uint32_t ui , uint32_t tlayer)                      { m_uiMaxLatencyIncreasePlus1[tlayer] = ui;                            }
   uint32_t                getMaxNumMergeCand() const { return m_maxNumMergeCand; }
   void                    setMaxNumMergeCand(uint32_t u) { m_maxNumMergeCand = u; }
+#if TM_MRG
+  uint32_t                getMaxNumTMMergeCand() const { return std::min((uint32_t)TM_MRG_MAX_NUM_CANDS, m_maxNumMergeCand); }
+#endif
   uint32_t                getMaxNumAffineMergeCand() const { return m_maxNumAffineMergeCand; }
   void                    setMaxNumAffineMergeCand(uint32_t u) { m_maxNumAffineMergeCand = u; }
   uint32_t                getMaxNumIBCMergeCand() const { return m_maxNumIBCMergeCand; }
   void                    setMaxNumIBCMergeCand(uint32_t u) { m_maxNumIBCMergeCand = u; }
-  uint32_t                getMaxNumGeoCand() const { return m_maxNumGeoCand; }
-  void                    setMaxNumGeoCand(uint32_t u) { m_maxNumGeoCand = u; }
+  uint32_t                getMaxNumGeoCand() const                                                        { CHECK( m_maxNumGeoCand >= GEO_MAX_NUM_UNI_CANDS, "Number of GEO candidates exceed GEO_MAX_NUM_CANDS" ); return m_maxNumGeoCand; }
+  void                    setMaxNumGeoCand(uint32_t u)                                                    { CHECK( m_maxNumGeoCand >= GEO_MAX_NUM_UNI_CANDS, "Number of GEO candidates exceed GEO_MAX_NUM_CANDS" ); m_maxNumGeoCand = u; }
   void                    setAffineAmvrEnabledFlag( bool val )                                            { m_affineAmvrEnabledFlag = val;                                       }
   bool                    getAffineAmvrEnabledFlag() const                                                { return m_affineAmvrEnabledFlag;                                      }
   bool                    getGeneralHrdParametersPresentFlag() const { return m_generalHrdParametersPresentFlag; }
@@ -1996,11 +2060,31 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setLadfIntervalLowerBound( int value, int idx )                         { m_LadfIntervalLowerBound[ idx ] = value; }
   int       getLadfIntervalLowerBound( int idx )                          const     { return m_LadfIntervalLowerBound[ idx ]; }
 #endif
-
+#if MULTI_HYP_PRED
+  bool      getUseInterMultiHyp()                                      const { return m_InterMultiHyp; }
+  int       getMaxNumAddHyps()                                      const { return m_maxNumAddHyps; }
+  void      setMaxNumAddHyps(int i) { m_maxNumAddHyps = i; m_InterMultiHyp = (m_maxNumAddHyps != 0); }
+  void      setNumAddHypWeights(int i) { m_numAddHypWeights = i; }
+  int       getNumAddHypWeights()                                      const { return m_numAddHypWeights; }
+  void      setMaxNumAddHypRefFrames(int i) { m_maxNumAddHypRefFrames = i; }
+  int       getMaxNumAddHypRefFrames()                                    const { return m_maxNumAddHypRefFrames; }
+#endif
+#if ENABLE_DIMD
+  void      setUseDimd         ( bool b )                                        { m_dimd = b; }
+  bool      getUseDimd         ()                                      const     { return m_dimd; }
+#endif
+#if ENABLE_OBMC
+  void      setUseOBMC         ( bool b )                                        { m_OBMC = b; }
+  bool      getUseOBMC         ()                                      const     { return m_OBMC; }
+#endif
   void      setUseCiip         ( bool b )                                        { m_ciip = b; }
   bool      getUseCiip         ()                                      const     { return m_ciip; }
   void      setUseGeo             ( bool b )                                        { m_Geo = b; }
   bool      getUseGeo             ()                                      const     { return m_Geo; }
+#if INTER_LIC
+  void      setLicEnabledFlag     ( bool b )                                        { m_licEnabledFlag = b; }
+  bool      getLicEnabledFlag     ()                                     const      { return m_licEnabledFlag; }
+#endif
   void      setUseMRL             ( bool b )                                        { m_MRL = b; }
   bool      getUseMRL             ()                                      const     { return m_MRL; }
   void      setUseMIP             ( bool b )                                        { m_MIP = b; }
@@ -2079,7 +2163,11 @@ private:
   std::vector<uint16_t> m_subPicId;                     //!< sub-picture ID for each sub-picture in the sequence
   bool             m_noPicPartitionFlag;                //!< no picture partitioning flag - single slice, single tile
   uint8_t          m_log2CtuSize;                       //!< log2 of the CTU size - required to match corresponding value in SPS
+#if CTU_256
+  uint16_t         m_ctuSize;                           //!< CTU size
+#else
   uint8_t          m_ctuSize;                           //!< CTU size
+#endif
   uint32_t         m_picWidthInCtu;                     //!< picture width in units of CTUs
   uint32_t         m_picHeightInCtu;                    //!< picture height in units of CTUs
   uint32_t         m_numExpTileCols;                    //!< number of explicitly specified tile columns
@@ -2111,8 +2199,13 @@ private:
   bool             m_deblockingFilterControlPresentFlag;
   bool             m_deblockingFilterOverrideEnabledFlag;
   bool             m_ppsDeblockingFilterDisabledFlag;
+#if DB_PARAM_TID
+  std::vector<int> m_deblockingFilterBetaOffsetDiv2;    //< beta offset for deblocking filter
+  std::vector<int> m_deblockingFilterTcOffsetDiv2;      //< tc offset for deblocking filter
+#else
   int              m_deblockingFilterBetaOffsetDiv2;    //< beta offset for deblocking filter
   int              m_deblockingFilterTcOffsetDiv2;      //< tc offset for deblocking filter
+#endif
   int              m_deblockingFilterCbBetaOffsetDiv2;    //< beta offset for Cb deblocking filter
   int              m_deblockingFilterCbTcOffsetDiv2;      //< tc offset for Cb deblocking filter
   int              m_deblockingFilterCrBetaOffsetDiv2;    //< beta offset for Cr deblocking filter
@@ -2253,7 +2346,11 @@ public:
                                                                                             m_picWidthInCtu = (m_picWidthInLumaSamples  + m_ctuSize - 1) / m_ctuSize;
                                                                                             m_picHeightInCtu = (m_picHeightInLumaSamples  + m_ctuSize - 1) / m_ctuSize; }
   uint8_t                getLog2CtuSize( ) const                                          { return  m_log2CtuSize;                        }
+#if CTU_256
+  uint16_t               getCtuSize( ) const                                              { return  m_ctuSize;                            }
+#else
   uint8_t                getCtuSize( ) const                                              { return  m_ctuSize;                            }
+#endif
   uint32_t               getPicWidthInCtu( ) const                                        { return  m_picWidthInCtu;                      }
   uint32_t               getPicHeightInCtu( ) const                                       { return  m_picHeightInCtu;                     }
   void                   setNumExpTileColumns( uint32_t u )                               { m_numExpTileCols = u;                         }
@@ -2333,10 +2430,18 @@ public:
   bool                   getDeblockingFilterOverrideEnabledFlag() const                   { return m_deblockingFilterOverrideEnabledFlag; }
   void                   setPPSDeblockingFilterDisabledFlag(bool val)                     { m_ppsDeblockingFilterDisabledFlag = val;      } //!< set offset for deblocking filter disabled
   bool                   getPPSDeblockingFilterDisabledFlag() const                       { return m_ppsDeblockingFilterDisabledFlag;     } //!< get offset for deblocking filter disabled
+#if DB_PARAM_TID
+  void                   setDeblockingFilterBetaOffsetDiv2(std::vector<int> val)          { m_deblockingFilterBetaOffsetDiv2 = val;       } //!< set beta offset for deblocking filter
+  std::vector<int>       getDeblockingFilterBetaOffsetDiv2() const                        { return m_deblockingFilterBetaOffsetDiv2;      } //!< get beta offset for deblocking filter
+  void                   setDeblockingFilterTcOffsetDiv2(std::vector<int> val)            { m_deblockingFilterTcOffsetDiv2 = val;         } //!< set tc offset for deblocking filter
+  std::vector<int>       getDeblockingFilterTcOffsetDiv2() const                          { return m_deblockingFilterTcOffsetDiv2;        } //!< get tc offset for deblocking filter
+#else
   void                   setDeblockingFilterBetaOffsetDiv2(int val)                       { m_deblockingFilterBetaOffsetDiv2 = val;       } //!< set beta offset for deblocking filter
   int                    getDeblockingFilterBetaOffsetDiv2() const                        { return m_deblockingFilterBetaOffsetDiv2;      } //!< get beta offset for deblocking filter
   void                   setDeblockingFilterTcOffsetDiv2(int val)                         { m_deblockingFilterTcOffsetDiv2 = val;         } //!< set tc offset for deblocking filter
   int                    getDeblockingFilterTcOffsetDiv2() const                          { return m_deblockingFilterTcOffsetDiv2;        } //!< get tc offset for deblocking filter
+#endif
+
   void                   setDeblockingFilterCbBetaOffsetDiv2(int val)                     { m_deblockingFilterCbBetaOffsetDiv2 = val;     } //!< set beta offset for Cb deblocking filter
   int                    getDeblockingFilterCbBetaOffsetDiv2() const                      { return m_deblockingFilterCbBetaOffsetDiv2;    } //!< get beta offset for Cb deblocking filter
   void                   setDeblockingFilterCbTcOffsetDiv2(int val)                       { m_deblockingFilterCbTcOffsetDiv2 = val;       } //!< set tc offset for Cb deblocking filter
@@ -2515,6 +2620,9 @@ private:
   bool                        m_jointCbCrSignFlag;                                      //!< joint Cb/Cr residual sign flag
   int                         m_qpDelta;                                                //!< value of Qp delta
   bool                        m_saoEnabledFlag[MAX_NUM_CHANNEL_TYPE];                   //!< sao enabled flags for each channel
+#if ALF_IMPROVEMENT
+  int                         m_alfFixedFilterSetIdx;
+#endif
   bool                        m_alfEnabledFlag[MAX_NUM_COMPONENT];                      //!< alf enabled flags for each component
   int                         m_numAlfAps;                                              //!< number of alf aps active for the picture
   std::vector<int>            m_alfApsId;                                               //!< list of alf aps for the picture
@@ -2642,6 +2750,10 @@ public:
   int                         getQpDelta() const                                        { return m_qpDelta;                                                                            }
   void                        setSaoEnabledFlag(ChannelType chType, bool b)             { m_saoEnabledFlag[chType] = b;                                                                }
   bool                        getSaoEnabledFlag(ChannelType chType) const               { return m_saoEnabledFlag[chType];                                                             }
+#if ALF_IMPROVEMENT
+  void                        setAlfFixedFilterSetIdx(int i)                            { m_alfFixedFilterSetIdx = i;                                                                  }
+  int                         getAlfFixedFilterSetIdx() const                           { return m_alfFixedFilterSetIdx;                                                               }
+#endif
   void                        setAlfEnabledFlag(ComponentID compId, bool b)             { m_alfEnabledFlag[compId] = b;                                                                }
   bool                        getAlfEnabledFlag(ComponentID compId) const               { return m_alfEnabledFlag[compId];                                                             }
   void                        setNumAlfAps(int i)                                       { m_numAlfAps = i;                                                                             }
@@ -2791,7 +2903,11 @@ private:
   int                        m_deblockingFilterCbTcOffsetDiv2;    //< tc offset for deblocking filter
   int                        m_deblockingFilterCrBetaOffsetDiv2;  //< beta offset for deblocking filter
   int                        m_deblockingFilterCrTcOffsetDiv2;    //< tc offset for deblocking filter
+#if TCQ_8STATES
+  int                        m_depQuantEnabledIdc;               //!< dependent quantization enabled idc
+#else
   bool                       m_depQuantEnabledFlag;               //!< dependent quantization enabled flag
+#endif
   bool                       m_signDataHidingEnabledFlag;         //!< sign data hiding enabled flag
   bool                       m_tsResidualCodingDisabledFlag;
   int                        m_list1IdxToList0Idx[MAX_NUM_REF];
@@ -2826,6 +2942,9 @@ private:
 
   uint32_t                   m_colRefIdx;
   double                     m_lambdas[MAX_NUM_COMPONENT];
+#if INTER_LIC
+  bool                       m_UseLIC;
+#endif 
 
   bool                       m_abEqualRef  [NUM_REF_PIC_LIST_01][MAX_NUM_REF][MAX_NUM_REF];
   uint32_t                   m_uiTLayer;
@@ -2858,6 +2977,9 @@ private:
   double                     m_dProcessingTime;
 
   int                        m_rpPicOrderCntVal;
+#if ALF_IMPROVEMENT                               
+  int                        m_tileGroupAlfFixedFilterSetIdx;
+#endif
   APS*                       m_alfApss[ALF_CTB_MAX_NUM_APS];
   bool                       m_tileGroupAlfEnabledFlag[MAX_NUM_COMPONENT];
   int                        m_tileGroupNumAps;
@@ -2869,6 +2991,17 @@ private:
   int                        m_tileGroupCcAlfCrApsId;
   bool                       m_disableSATDForRd;
   bool                       m_isLossless;
+
+#if MULTI_HYP_PRED
+  int                        m_numMultiHypRefPics = 0;
+
+  struct RefListAndRefIdx
+  {
+    RefPicList refList;
+    int8_t     refIdx;
+  };
+  std::vector<RefListAndRefIdx> m_multiHypRefPics;
+#endif
 public:
                               Slice();
   virtual                     ~Slice();
@@ -2988,8 +3121,13 @@ public:
   void                        setDeblockingFilterCbTcOffsetDiv2( int i )             { m_deblockingFilterCbTcOffsetDiv2 = i;                           }
   void                        setDeblockingFilterCrBetaOffsetDiv2( int i )           { m_deblockingFilterCrBetaOffsetDiv2 = i;                         }
   void                        setDeblockingFilterCrTcOffsetDiv2( int i )             { m_deblockingFilterCrTcOffsetDiv2 = i;                           }
+#if TCQ_8STATES
+  void                        setDepQuantEnabledIdc( int b )                        { m_depQuantEnabledIdc = b;                                                                   }
+  int                         getDepQuantEnabledIdc() const                         { return m_depQuantEnabledIdc;                                                                }  
+#else
   void                        setDepQuantEnabledFlag( bool b )                       { m_depQuantEnabledFlag = b;                                                                   }
   bool                        getDepQuantEnabledFlag() const                         { return m_depQuantEnabledFlag;                                                                }  
+#endif
   void                        setSignDataHidingEnabledFlag( bool b )                 { m_signDataHidingEnabledFlag = b;                                                             }
   bool                        getSignDataHidingEnabledFlag() const                   { return m_signDataHidingEnabledFlag;                                                          }  
   void                        setTSResidualCodingDisabledFlag(bool b) { m_tsResidualCodingDisabledFlag = b; }
@@ -3001,6 +3139,12 @@ public:
 
   void                        constructRefPicList(PicList& rcListPic);
   void                        setRefPOCList();
+#if MULTI_HYP_PRED
+  void                        setMultiHypRefPicList();
+  const std::vector<RefListAndRefIdx> &getMultiHypRefPicList() const { return m_multiHypRefPics; }
+  void                        setNumMultiHypRefPics(int i) { m_numMultiHypRefPics = i; }
+  int                         getNumMultiHypRefPics() const { return m_numMultiHypRefPics; }
+#endif
 
   void                        setColFromL0Flag( bool colFromL0 )                     { m_colFromL0Flag = colFromL0;                                  }
   void                        setColRefIdx( uint32_t refIdx)                             { m_colRefIdx = refIdx;                                         }
@@ -3143,6 +3287,11 @@ public:
   void resetProcessingTime()       { m_dProcessingTime = m_iProcessingStartTime = 0; }
   double getProcessingTime() const { return m_dProcessingTime; }
 
+
+#if ALF_IMPROVEMENT  
+  int                         getTileGroupAlfFixedFilterSetIdx() const { return m_tileGroupAlfFixedFilterSetIdx; }
+  void                        setTileGroupAlfFixedFilterSetIdx(int i) { m_tileGroupAlfFixedFilterSetIdx = i; }
+#endif
   void                        resetTileGroupAlfEnabledFlag() { memset(m_tileGroupAlfEnabledFlag, 0, sizeof(m_tileGroupAlfEnabledFlag)); }
   bool                        getTileGroupAlfEnabledFlag(ComponentID compId) const { return m_tileGroupAlfEnabledFlag[compId]; }
   void                        setTileGroupAlfEnabledFlag(ComponentID compId, bool b) { m_tileGroupAlfEnabledFlag[compId] = b; }
@@ -3188,6 +3337,12 @@ public:
 
   CcAlfFilterParam            m_ccAlfFilterParam;
   uint8_t*                    m_ccAlfFilterControl[2];
+
+#if INTER_LIC
+  bool                        getUseLIC()                                   const { return m_UseLIC; }
+  void                        setUseLIC(bool b) { m_UseLIC = b; }
+  void                        setUseLICOnPicLevel(bool fastPicDecision);
+#endif
 
 protected:
   Picture*              xGetRefPic( PicList& rcListPic, int poc, const int layerId );

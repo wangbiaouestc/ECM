@@ -399,7 +399,14 @@ void EncApp::xInitLibCfg()
 
     m_cEncLib.setNoGeoConstraintFlag(m_noGeoConstraintFlag);
     CHECK(m_noGeoConstraintFlag && m_Geo, "GEO shall be deactivated when m_noGeoConstraintFlag is equal to 1");
-
+#if ENABLE_DIMD
+    m_cEncLib.setNoDimdConstraintFlag(m_noDimdConstraintFlag);
+    CHECK(m_noDimdConstraintFlag && m_dimd, "DIMD shall be deactivated when m_noDimdConstraintFlag is equal to 1");
+#endif
+#if ENABLE_OBMC
+    m_cEncLib.setNoObmcConstraintFlag(m_noObmcConstraintFlag);
+    CHECK(m_noObmcConstraintFlag && m_OBMC, "OBMC shall be deactivated when m_noObmcConstraintFlag is equal to 1");
+#endif
     m_cEncLib.setNoLadfConstraintFlag(m_noLadfConstraintFlag);
     CHECK(m_noLadfConstraintFlag && m_LadfEnabed, "LADF shall be deactivated when m_bNoLadfConstraintFlag is equal to 1");
 
@@ -418,7 +425,11 @@ void EncApp::xInitLibCfg()
     CHECK(m_noJointCbCrConstraintFlag && m_JointCbCrMode, "JCCR shall be deactivated when m_noJointCbCrConstraintFlag is equal to 1");
 
     m_cEncLib.setNoDepQuantConstraintFlag(m_noDepQuantConstraintFlag);
+#if TCQ_8STATES
+    CHECK( m_noDepQuantConstraintFlag && m_depQuantEnabledIdc, "DQ shall be deactivated when m_bNoDepQuantConstraintFlag is equal to 1" );
+#else
     CHECK(m_noDepQuantConstraintFlag && m_depQuantEnabledFlag, "DQ shall be deactivated when m_bNoDepQuantConstraintFlag is equal to 1");
+#endif
 
     m_cEncLib.setNoSignDataHidingConstraintFlag(m_noSignDataHidingConstraintFlag);
     CHECK(m_noSignDataHidingConstraintFlag && m_signDataHidingEnabledFlag, "SDH shall be deactivated when m_bNoSignDataHidingConstraintFlag is equal to 1");
@@ -520,6 +531,12 @@ void EncApp::xInitLibCfg()
     m_cEncLib.setNoIbcConstraintFlag(false);
     m_cEncLib.setNoCiipConstraintFlag(false);
     m_cEncLib.setNoGeoConstraintFlag(false);
+#if ENABLE_DIMD
+    m_cEncLib.setNoDimdConstraintFlag(false);
+#endif
+#if ENABLE_OBMC
+    m_cEncLib.setNoObmcConstraintFlag(false);
+#endif
     m_cEncLib.setNoLadfConstraintFlag(false);
     m_cEncLib.setNoTransformSkipConstraintFlag(false);
     m_cEncLib.setNoBDPCMConstraintFlag(false);
@@ -696,11 +713,20 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setMaxBTSizes                                        ( m_uiMaxBT );
   m_cEncLib.setMaxTTSizes                                        ( m_uiMaxTT );
   m_cEncLib.setDualITree                                         ( m_dualTree );
+#if SIGN_PREDICTION
+  m_cEncLib.setNumPredSigns                                       ( m_numPredSign );
+#endif
   m_cEncLib.setLFNST                                             ( m_LFNST );
   m_cEncLib.setUseFastLFNST                                      ( m_useFastLFNST );
   m_cEncLib.setSbTmvpEnabledFlag(m_sbTmvpEnableFlag);
   m_cEncLib.setAffine                                            ( m_Affine );
   m_cEncLib.setAffineType                                        ( m_AffineType );
+#if AFFINE_MMVD
+  m_cEncLib.setAffineMmvdMode                                    ( m_AffineMmvdMode );
+#endif
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+  m_cEncLib.setUseDMVDMode                                       ( m_DMVDMode );
+#endif
   m_cEncLib.setPROF                                              ( m_PROF );
   m_cEncLib.setBIO                                               (m_BIO);
   m_cEncLib.setUseLMChroma                                       ( m_LMChroma );
@@ -717,6 +743,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setUseSMVD                                           ( m_SMVD );
   m_cEncLib.setUseBcw                                            ( m_bcw );
   m_cEncLib.setUseBcwFast                                        ( m_BcwFast );
+#if ENABLE_OBMC
+  m_cEncLib.setUseOBMC                                           ( m_OBMC );
+#endif
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
   m_cEncLib.setUseLadf                                           ( m_LadfEnabed );
   if ( m_LadfEnabed )
@@ -729,7 +758,13 @@ void EncApp::xInitLibCfg()
     }
   }
 #endif
-  m_cEncLib.setUseCiip                                        ( m_ciip );
+#if ENABLE_DIMD
+  m_cEncLib.setUseDimd                                           ( m_dimd );
+#endif
+#if ENABLE_OBMC
+  m_cEncLib.setUseObmc                                           ( m_OBMC );
+#endif
+  m_cEncLib.setUseCiip                                           ( m_ciip );
   m_cEncLib.setUseGeo                                            ( m_Geo );
   m_cEncLib.setUseHashME                                         ( m_HashME );
 
@@ -783,6 +818,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setUseCbfFastMode                                    ( m_bUseCbfFastMode  );
   m_cEncLib.setUseEarlySkipDetection                             ( m_useEarlySkipDetection );
   m_cEncLib.setUseFastMerge                                      ( m_useFastMrg );
+#if MERGE_ENC_OPT
+  m_cEncLib.setNumFullRDMerge                                    ( m_numFullRDMrg );
+#endif
   m_cEncLib.setUsePbIntraFast                                    ( m_usePbIntraFast );
   m_cEncLib.setUseAMaxBT                                         ( m_useAMaxBT );
   m_cEncLib.setUseE0023FastEnc                                   ( m_e0023FastEnc );
@@ -793,7 +831,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setUseMRL                                            ( m_MRL );
   m_cEncLib.setUseMIP                                            ( m_MIP );
   m_cEncLib.setUseFastMIP                                        ( m_useFastMIP );
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   m_cEncLib.setFastLocalDualTreeMode                             ( m_fastLocalDualTreeMode );
+#endif
   m_cEncLib.setUseReconBasedCrossCPredictionEstimate             ( m_reconBasedCrossCPredictionEstimate );
   m_cEncLib.setUseTransformSkip                                  ( m_useTransformSkip      );
   m_cEncLib.setUseTransformSkipFast                              ( m_useTransformSkipFast  );
@@ -1008,18 +1048,30 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setSliceLevelWp                                      ( m_sliceLevelWp );
   m_cEncLib.setSliceLevelDeltaQp                                 ( m_sliceLevelDeltaQp );
   m_cEncLib.setSliceLevelAlf                                     ( m_sliceLevelAlf  );
+#if MULTI_HYP_PRED
+  m_cEncLib.setNumMHPCandsToTest(m_numMHPCandsToTest);
+  m_cEncLib.setMaxNumAddHyps(m_maxNumAddHyps);
+  m_cEncLib.setMaxNumAddHypWeights(m_numAddHypWeights);
+  m_cEncLib.setMaxNumAddHypRefFrames(m_maxNumAddHypRefFrames);
+  m_cEncLib.setAddHypTries(m_addHypTries);
+#endif
   m_cEncLib.setUseScalingListId                                  ( m_useScalingListId  );
   m_cEncLib.setScalingListFileName                               ( m_scalingListFileName );
   m_cEncLib.setDisableScalingMatrixForLfnstBlks                  ( m_disableScalingMatrixForLfnstBlks);
   if ( m_cEncLib.getUseColorTrans() && m_cEncLib.getUseScalingListId() )
   {
     m_cEncLib.setDisableScalingMatrixForAlternativeColourSpace(m_disableScalingMatrixForAlternativeColourSpace);
+    if( m_cEncLib.getDisableScalingMatrixForAlternativeColourSpace() )
+    {
+      m_cEncLib.setScalingMatrixDesignatedColourSpace( m_scalingMatrixDesignatedColourSpace );
+    }
   }
-  if ( m_cEncLib.getDisableScalingMatrixForAlternativeColourSpace() )
-  {
-    m_cEncLib.setScalingMatrixDesignatedColourSpace(m_scalingMatrixDesignatedColourSpace);
-  }
+
+#if TCQ_8STATES
+  m_cEncLib.setDepQuantEnabledIdc                                ( m_depQuantEnabledIdc );
+#else
   m_cEncLib.setDepQuantEnabledFlag                               ( m_depQuantEnabledFlag);
+#endif
   m_cEncLib.setSignDataHidingEnabledFlag                         ( m_signDataHidingEnabledFlag);
   m_cEncLib.setUseRateCtrl                                       ( m_RCEnableRateControl );
   m_cEncLib.setTargetBitrate                                     ( m_RCTargetBitrate );
@@ -1084,6 +1136,16 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setReshapeIntraCMD                                   ( m_intraCMD );
   m_cEncLib.setReshapeCW                                         ( m_reshapeCW );
   m_cEncLib.setReshapeCSoffset                                   ( m_CSoffset );
+#if INTER_LIC
+  m_cEncLib.setUseLIC                                            ( m_lic );
+  m_cEncLib.setFastPicLevelLIC                                   ( m_lic ? m_fastPicLevelLIC : false );
+#endif
+#if DUMP_BEFORE_INLOOP
+  m_cEncLib.setDumpBeforeInloop                                  ( m_dumpBeforeInloop );
+#endif
+#if CONVERT_NUM_TU_SPLITS_TO_CFG
+  m_cEncLib.setMaxNumTUs                                         ( m_maxNumTUs );
+#endif
 
 #if JVET_O0756_CALCULATE_HDRMETRICS
   for (int i=0; i<hdrtoolslib::NB_REF_WHITE; i++)
@@ -1152,6 +1214,9 @@ void EncApp::xCreateLib( std::list<PelUnitBuf*>& recBufList, const int layerId )
 
   // create the encoder
   m_cEncLib.create( layerId );
+#if DUMP_BEFORE_INLOOP
+  m_cEncLib.m_reconFileName = m_reconFileName;
+#endif
 
   // create the output buffer
   for( int i = 0; i < (m_iGOPSize + 1 + (m_isField ? 1 : 0)); i++ )
@@ -1188,6 +1253,12 @@ void EncApp::createLib( const int layerIdx )
   m_trueOrgPic = new PelStorage;
   m_orgPic->create( unitArea );
   m_trueOrgPic->create( unitArea );
+
+  if( m_gopBasedTemporalFilterEnabled )
+  {
+    m_filteredOrgPic = new PelStorage;
+    m_filteredOrgPic->create( unitArea );
+  }
 
   if( !m_bitstream.is_open() )
   {
@@ -1245,6 +1316,13 @@ void EncApp::destroyLib()
   m_trueOrgPic->destroy();
   delete m_trueOrgPic;
   delete m_orgPic;
+
+  if( m_gopBasedTemporalFilterEnabled )
+  {
+    m_filteredOrgPic->destroy();
+    delete m_filteredOrgPic;
+  }
+
 #if EXTENSION_360_VIDEO
   delete m_ext360;
 #endif
@@ -1275,6 +1353,7 @@ bool EncApp::encodePrep( bool& eos )
   if( m_gopBasedTemporalFilterEnabled )
   {
     m_temporalFilter.filter( m_orgPic, m_iFrameRcvd );
+    m_filteredOrgPic->copyFrom( *m_orgPic );
   }
 
   // increase number of received frames
@@ -1296,11 +1375,11 @@ bool EncApp::encodePrep( bool& eos )
   // call encoding function for one frame
   if( m_isField )
   {
-    keepDoing = m_cEncLib.encodePrep( eos, m_flush ? 0 : m_orgPic, m_flush ? 0 : m_trueOrgPic, snrCSC, m_recBufList, m_numEncoded, m_isTopFieldFirst );
+    keepDoing = m_cEncLib.encodePrep( eos, m_flush ? 0 : m_orgPic, m_flush ? 0 : m_trueOrgPic, m_flush ? 0 : m_filteredOrgPic, snrCSC, m_recBufList, m_numEncoded, m_isTopFieldFirst );
   }
   else
   {
-    keepDoing = m_cEncLib.encodePrep( eos, m_flush ? 0 : m_orgPic, m_flush ? 0 : m_trueOrgPic, snrCSC, m_recBufList, m_numEncoded );
+    keepDoing = m_cEncLib.encodePrep( eos, m_flush ? 0 : m_orgPic, m_flush ? 0 : m_trueOrgPic, m_flush ? 0 : m_filteredOrgPic, snrCSC, m_recBufList, m_numEncoded );
   }
 
   return keepDoing;

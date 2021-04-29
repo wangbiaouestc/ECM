@@ -69,6 +69,7 @@ inter3 = _mm_add_epi64(inter1, inter3);                                         
 inter3 = _mm_add_epi64(inter0, inter3);                                                                        \
 }
 
+#if !AFFINE_ENC_OPT
 template<X86_VEXT vext>
 static void simdHorizontalSobelFilter( Pel *const pPred, const int predStride, int *const pDerivate, const int derivateBufStride, const int width, const int height )
 {
@@ -194,20 +195,29 @@ static void simdVerticalSobelFilter( Pel *const pPred, const int predStride, int
   memcpy( pDerivate, pDerivate + derivateBufStride, width * sizeof( pDerivate[0] ) );
   memcpy( pDerivate + (height - 1) * derivateBufStride, pDerivate + (height - 2) * derivateBufStride, width * sizeof( pDerivate[0] ) );
 }
+#endif
 
 template<X86_VEXT vext>
+#if AFFINE_ENC_OPT
+static void simdEqualCoeffComputer(Pel *pResidue, int residueStride, Pel **ppDerivate, int derivateBufStride, int64_t(*pEqualCoeff)[7], int width, int height, bool b6Param, int shift)
+#else
 static void simdEqualCoeffComputer( Pel *pResidue, int residueStride, int **ppDerivate, int derivateBufStride, int64_t( *pEqualCoeff )[7], int width, int height, bool b6Param )
+#endif
 {
+#if !AFFINE_ENC_OPT
   __m128i mmFour;
+#endif
   __m128i mmTmp[4];
   __m128i mmIntermediate[4];
   __m128i mmIndxK, mmIndxJ;
   __m128i mmResidue[2];
   __m128i mmC[12];
 
+#if !AFFINE_ENC_OPT
   // Add directly to indexes to get new index
   mmFour = _mm_set1_epi32(4);
   mmIndxJ = _mm_set1_epi32(-2);
+#endif
 
 
   int n = b6Param ? 6 : 4;
@@ -217,9 +227,13 @@ static void simdEqualCoeffComputer( Pel *pResidue, int residueStride, int **ppDe
 
   for ( int j = 0; j < height; j += 2 )
   {
+#if AFFINE_ENC_OPT
+    mmIndxJ = _mm_set1_epi32(j);
+#else
     if (!(j & 3))
       mmIndxJ = _mm_add_epi32(mmIndxJ, mmFour);
     mmIndxK = _mm_set1_epi32(-2);
+#endif
     idx1 += (derivateBufStride << 1);
     idx2 += (derivateBufStride << 1);
 
@@ -227,21 +241,35 @@ static void simdEqualCoeffComputer( Pel *pResidue, int residueStride, int **ppDe
     {
       idx1 += 4;
       idx2 += 4;
+#if AFFINE_ENC_OPT
+      mmIndxK = _mm_set1_epi32(k);
+#else
       mmIndxK = _mm_add_epi32( mmIndxK, mmFour );
+#endif
 
       if ( b6Param )
       {
         // mmC[0-5] for iC[0-5] of 1st row of pixels
+#if AFFINE_ENC_OPT
+        mmC[0] = _mm_cvtepi16_epi32(_mm_loadl_epi64((const __m128i*)&ppDerivate[0][idx1]));
+        mmC[2] = _mm_cvtepi16_epi32(_mm_loadl_epi64((const __m128i*)&ppDerivate[1][idx1]));
+#else
         mmC[0] = _mm_loadu_si128( (const __m128i*)&ppDerivate[0][idx1] );
         mmC[2] = _mm_loadu_si128( (const __m128i*)&ppDerivate[1][idx1] );
+#endif
         mmC[1] = _mm_mullo_epi32( mmIndxK, mmC[0] );
         mmC[3] = _mm_mullo_epi32( mmIndxK, mmC[2] );
         mmC[4] = _mm_mullo_epi32(mmIndxJ, mmC[0]);
         mmC[5] = _mm_mullo_epi32(mmIndxJ, mmC[2]);
 
         // mmC[6-11] for iC[0-5] of 2nd row of pixels
+#if AFFINE_ENC_OPT
+        mmC[6] = _mm_cvtepi16_epi32(_mm_loadl_epi64((const __m128i*)&ppDerivate[0][idx2]));
+        mmC[8] = _mm_cvtepi16_epi32(_mm_loadl_epi64((const __m128i*)&ppDerivate[1][idx2]));
+#else
         mmC[6] = _mm_loadu_si128( (const __m128i*)&ppDerivate[0][idx2] );
         mmC[8] = _mm_loadu_si128( (const __m128i*)&ppDerivate[1][idx2] );
+#endif
         mmC[7] = _mm_mullo_epi32( mmIndxK, mmC[6] );
         mmC[9] = _mm_mullo_epi32( mmIndxK, mmC[8] );
         mmC[10] = _mm_mullo_epi32(mmIndxJ, mmC[6]);
@@ -250,8 +278,13 @@ static void simdEqualCoeffComputer( Pel *pResidue, int residueStride, int **ppDe
       else
       {
         // mmC[0-3] for iC[0-3] of 1st row of pixels
+#if AFFINE_ENC_OPT
+        mmC[0] = _mm_cvtepi16_epi32(_mm_loadl_epi64((const __m128i*)&ppDerivate[0][idx1]));
+        mmC[2] = _mm_cvtepi16_epi32(_mm_loadl_epi64((const __m128i*)&ppDerivate[1][idx1]));
+#else
         mmC[0] = _mm_loadu_si128( (const __m128i*)&ppDerivate[0][idx1] );
         mmC[2] = _mm_loadu_si128( (const __m128i*)&ppDerivate[1][idx1] );
+#endif
         mmC[1] = _mm_mullo_epi32( mmIndxK, mmC[0] );
         mmC[3] = _mm_mullo_epi32(mmIndxJ, mmC[0]);
         mmTmp[0] = _mm_mullo_epi32(mmIndxJ, mmC[2]);
@@ -260,8 +293,13 @@ static void simdEqualCoeffComputer( Pel *pResidue, int residueStride, int **ppDe
         mmC[3] = _mm_sub_epi32( mmC[3], mmTmp[1] );
 
         // mmC[4-7] for iC[0-3] of 1st row of pixels
+#if AFFINE_ENC_OPT
+        mmC[4] = _mm_cvtepi16_epi32(_mm_loadl_epi64((const __m128i*)&ppDerivate[0][idx2]));
+        mmC[6] = _mm_cvtepi16_epi32(_mm_loadl_epi64((const __m128i*)&ppDerivate[1][idx2]));
+#else
         mmC[4] = _mm_loadu_si128( (const __m128i*)&ppDerivate[0][idx2] );
         mmC[6] = _mm_loadu_si128( (const __m128i*)&ppDerivate[1][idx2] );
+#endif
         mmC[5] = _mm_mullo_epi32( mmIndxK, mmC[4] );
         mmC[7] = _mm_mullo_epi32(mmIndxJ, mmC[4]);
         mmTmp[2] = _mm_mullo_epi32(mmIndxJ, mmC[6]);
@@ -275,8 +313,13 @@ static void simdEqualCoeffComputer( Pel *pResidue, int residueStride, int **ppDe
       mmResidue[1] = _mm_loadl_epi64( (const __m128i*)&pResidue[idx2] );
       mmResidue[0] = _mm_cvtepi16_epi32( mmResidue[0] );
       mmResidue[1] = _mm_cvtepi16_epi32( mmResidue[1] );
+#if AFFINE_ENC_OPT
+      mmResidue[0] = _mm_srai_epi32(mmResidue[0], shift);
+      mmResidue[1] = _mm_srai_epi32(mmResidue[1], shift);
+#else
       mmResidue[0] = _mm_slli_epi32( mmResidue[0], 3 );
       mmResidue[1] = _mm_slli_epi32( mmResidue[1], 3 );
+#endif
 
       // Calculation of coefficient matrix
       for ( int col = 0; col < n; col++ )
@@ -311,8 +354,10 @@ static void simdEqualCoeffComputer( Pel *pResidue, int residueStride, int **ppDe
 template <X86_VEXT vext>
 void AffineGradientSearch::_initAffineGradientSearchX86()
 {
+#if !AFFINE_ENC_OPT
   m_HorizontalSobelFilter = simdHorizontalSobelFilter<vext>;
   m_VerticalSobelFilter = simdVerticalSobelFilter<vext>;
+#endif
   m_EqualCoeffComputer = simdEqualCoeffComputer<vext>;
 }
 

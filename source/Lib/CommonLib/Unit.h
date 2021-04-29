@@ -156,7 +156,7 @@ struct CompArea : public Area
 
   const bool operator!=(const CompArea &other) const { return !(operator==(other)); }
 
-#if REUSE_CU_RESULTS_WITH_MULTIPLE_TUS
+#if REUSE_CU_RESULTS_WITH_MULTIPLE_TUS || CONVERT_NUM_TU_SPLITS_TO_CFG
   void     resizeTo          (const Size& newSize)          { Size::resizeTo(newSize); }
 #endif
   void     repositionTo      (const Position& newPos)       { Position::repositionTo(newPos); }
@@ -220,7 +220,7 @@ struct UnitArea
     return true;
   }
 
-#if REUSE_CU_RESULTS_WITH_MULTIPLE_TUS
+#if REUSE_CU_RESULTS_WITH_MULTIPLE_TUS || CONVERT_NUM_TU_SPLITS_TO_CFG
   void resizeTo    (const UnitArea& unit);
 #endif
   void repositionTo(const UnitArea& unit);
@@ -301,26 +301,42 @@ struct CodingUnit : public UnitArea
   int8_t          chromaQpAdj;
   int8_t          qp;
   SplitSeries    splitSeries;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   TreeType       treeType;
   ModeType       modeType;
   ModeTypeSeries modeTypeSeries;
+#endif
   bool           skip;
   bool           mmvdSkip;
   bool           affine;
-  int            affineType;
+  int8_t         affineType;
   bool           colorTransform;
   bool           geoFlag;
-  int            bdpcmMode;
-  int            bdpcmModeChroma;
+  int8_t         bdpcmMode;
+  int8_t         bdpcmModeChroma;
   uint8_t          imv;
   bool           rootCbf;
   uint8_t        sbtInfo;
   uint32_t           tileIdx;
+#if ENABLE_DIMD
+  bool           dimd;
+  bool           dimd_is_blend;
+  int8_t         dimdMode;
+  int8_t         dimdBlendMode[2]; // max number of blend modes (the main mode is not counter) --> incoherent with dimdRelWeight
+  int8_t         dimdRelWeight[3]; // max number of predictions to blend
+#endif
+#if ENABLE_OBMC
+  bool           obmcFlag;
+  bool           isobmcMC;
+#endif
   uint8_t         mtsFlag;
-  uint32_t        lfnstIdx;
+  uint8_t        lfnstIdx;
   uint8_t         BcwIdx;
-  int             refIdxBi[2];
+  int8_t          refIdxBi[2];
   bool           mipFlag;
+#if INTER_LIC
+  bool           LICFlag;
+#endif
 
   // needed for fast imv mode decisions
   int8_t          imvNumCand;
@@ -361,11 +377,17 @@ struct CodingUnit : public UnitArea
   void              setSbtPos( uint8_t pos ) { CHECK( pos >= 4, "sbt_pos wrong" ); sbtInfo = ( pos << 4 ) + ( sbtInfo & 0xcf ); }
   uint8_t           getSbtTuSplit() const;
   const uint8_t     checkAllowedSbt() const;
+#if !CCLM_LATENCY_RESTRICTION_RMV
   const bool        checkCCLMAllowed() const;
+#endif
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   const bool        isSepTree() const;
+
   const bool        isLocalSepTree() const;
+
   const bool        isConsInter() const { return modeType == MODE_TYPE_INTER; }
   const bool        isConsIntra() const { return modeType == MODE_TYPE_INTRA; }
+#endif
 };
 
 // ---------------------------------------------------------------------------
@@ -374,9 +396,21 @@ struct CodingUnit : public UnitArea
 
 struct IntraPredictionData
 {
-  uint32_t  intraDir[MAX_NUM_CHANNEL_TYPE];
+#if ENABLE_DIMD
+  bool      parseLumaMode = false;
+  int8_t    candId = -1;
+  bool      parseChromaMode = false;
+  bool      mpmFlag = false;
+  int8_t    ipred_idx = -1;
+  bool      secondMpmFlag = false;
+#endif
+#if SECONDARY_MPM
+  uint8_t intraMPM[NUM_MOST_PROBABLE_MODES];
+  uint8_t intraNonMPM[NUM_NON_MPM_MODES];
+#endif
+  uint8_t  intraDir[MAX_NUM_CHANNEL_TYPE];
   bool      mipTransposedFlag;
-  int       multiRefIdx;
+  int8_t    multiRefIdx;
 };
 
 struct InterPredictionData
@@ -388,23 +422,43 @@ struct InterPredictionData
   uint8_t     geoMergeIdx0;
   uint8_t     geoMergeIdx1;
   bool           mmvdMergeFlag;
-  uint32_t       mmvdMergeIdx;
+  uint8_t       mmvdMergeIdx;
+#if AFFINE_MMVD
+  bool        afMmvdFlag;
+  uint8_t     afMmvdBaseIdx; // base vector's merge index at the affine merge list, excluding sbTmvp
+  uint8_t     afMmvdStep;
+  uint8_t     afMmvdDir;
+#endif
+#if TM_MRG
+  bool        tmMergeFlag;
+#endif
   uint8_t     interDir;
   uint8_t     mvpIdx  [NUM_REF_PIC_LIST_01];
   uint8_t     mvpNum  [NUM_REF_PIC_LIST_01];
   Mv        mvd     [NUM_REF_PIC_LIST_01];
   Mv        mv      [NUM_REF_PIC_LIST_01];
-  int16_t     refIdx  [NUM_REF_PIC_LIST_01];
+#if MULTI_PASS_DMVR
+  bool      bdmvrRefine;
+#else
+  Mv        mvdL0SubPu[MAX_NUM_SUBCU_DMVR];
+#endif
+  int8_t     refIdx  [NUM_REF_PIC_LIST_01];
   MergeType mergeType;
   bool      mvRefine;
-  Mv        mvdL0SubPu[MAX_NUM_SUBCU_DMVR];
   Mv        mvdAffi [NUM_REF_PIC_LIST_01][3];
   Mv        mvAffi[NUM_REF_PIC_LIST_01][3];
   bool      ciipFlag;
+#if CIIP_PDPC
+  bool      ciipPDPC;
+#endif
 
   Mv        bv;                             // block vector for IBC
   Mv        bvd;                            // block vector difference for IBC
   uint8_t   mmvdEncOptMode;                  // 0: no action 1: skip chroma MC for MMVD candidate pre-selection 2: skip chroma MC and BIO for MMVD candidate pre-selection
+#if MULTI_HYP_PRED
+  MultiHypVec addHypData;
+  int8_t      numMergedAddHyps;
+#endif
 };
 
 struct PredictionUnit : public UnitArea, public IntraPredictionData, public InterPredictionData
@@ -414,7 +468,11 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
   ChannelType      chType;
 
   // constructors
+#if MULTI_PASS_DMVR
+  PredictionUnit(): chType( CH_L ) { initData(); }
+#else
   PredictionUnit(): chType( CH_L ) { }
+#endif
   PredictionUnit(const UnitArea &unit);
   PredictionUnit(const ChromaFormat _chromaFormat, const Area &area);
 
@@ -468,7 +526,19 @@ struct TransformUnit : public UnitArea
   unsigned       idx;
   TransformUnit *next;
   TransformUnit *prev;
+#if REMOVE_PCM
+#if SIGN_PREDICTION
+  void init(TCoeff **coeffs, TCoeff **signs, Pel **pltIdx, bool **runType);
+#else
+  void init(TCoeff **coeffs, Pel **pltIdx, bool **runType);
+#endif
+#else
+#if SIGN_PREDICTION
+  void init(TCoeff **coeffs, TCoeff **signs, Pel **pcmbuf, bool **runType);
+#else
   void init(TCoeff **coeffs, Pel **pcmbuf, bool **runType);
+#endif
+#endif
 
   TransformUnit& operator=(const TransformUnit& other);
   void copyComponentFrom  (const TransformUnit& other, const ComponentID compID);
@@ -477,8 +547,14 @@ struct TransformUnit : public UnitArea
 
          CoeffBuf getCoeffs(const ComponentID id);
   const CCoeffBuf getCoeffs(const ComponentID id) const;
+#if SIGN_PREDICTION
+         CoeffBuf getCoeffSigns(const ComponentID id);
+  const CCoeffBuf getCoeffSigns(const ComponentID id) const;
+#endif
+#if !REMOVE_PCM
          PelBuf   getPcmbuf(const ComponentID id);
   const CPelBuf   getPcmbuf(const ComponentID id) const;
+#endif
         int       getChromaAdj( )                 const;
         void      setChromaAdj(int i);
          PelBuf   getcurPLTIdx(const ComponentID id);
@@ -497,7 +573,14 @@ struct TransformUnit : public UnitArea
 #endif
 private:
   TCoeff *m_coeffs[ MAX_NUM_TBLOCKS ];
+#if SIGN_PREDICTION
+  TCoeff *m_coeff_signs[ MAX_NUM_TBLOCKS ];
+#endif
+#if REMOVE_PCM
+  Pel    *m_pltIdx[MAX_NUM_TBLOCKS - 1];
+#else
   Pel    *m_pcmbuf[ MAX_NUM_TBLOCKS ];
+#endif
   bool   *m_runType[ MAX_NUM_TBLOCKS - 1 ];
 };
 
@@ -569,5 +652,18 @@ typedef UnitTraverser<const CodingUnit>     cCUTraverser;
 typedef UnitTraverser<const PredictionUnit> cPUTraverser;
 typedef UnitTraverser<const TransformUnit>  cTUTraverser;
 
+#if MULTI_HYP_PRED
+struct MEResult
+{
+  CodingUnit cu;
+  PredictionUnit pu;
+  uint32_t bits;
+  Distortion cost;
+  PelUnitBuf* predBuf;
+  int8_t predBufIdx;
+  MEResult() { predBuf = nullptr; predBufIdx = -1; }
+};
+typedef std::vector<MEResult> MEResultVec;
+#endif
 #endif
 

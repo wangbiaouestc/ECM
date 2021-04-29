@@ -1,4 +1,4 @@
-/* The copyright in this software is being made available under the BSD
+﻿/* The copyright in this software is being made available under the BSD
  * License, included below. This software may be subject to other third party
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
@@ -49,6 +49,113 @@
 #include <cstring>
 #include <assert.h>
 #include <cassert>
+
+#define BASE_ENCODER                                      1
+#define BASE_NORMATIVE                                    1
+#define TOOLS                                             1
+
+#if BASE_ENCODER
+// Lossy encoder speedups
+#define AFFINE_ENC_OPT                                    1 // Affine encoder optimization
+#define AMVR_ENC_OPT                                      1 // Encoder optimization for AMVR
+#define MERGE_ENC_OPT                                     1 // Encoder optimization for merge modes. Regular merge, subblock based merge, CIIP and MMVD share the same full RD pool
+#define ALF_SAO_TRUE_ORG                                  1 // using true original samples for SAO and ALF optimization
+
+#define REMOVE_PCM                                        1 // Remove PCM related code for memory reduction and speedup
+
+// SIMD optimizations
+#define MCIF_SIMD_NEW                                     1
+#define DIST_SSE_ENABLE                                   1
+#define TRANSFORM_SIMD_OPT                                1 // SIMD optimization for transform
+#endif
+
+#if BASE_NORMATIVE
+// Partition
+#define CTU_256                                           1 // Add CTU 256
+#if CTU_256
+#define TU_256                                            1 // Add TU 256, removed MTS zero out
+#endif
+#define REMOVE_VPDU                                       1 // Remove VPDU restriction on BT/TT splitting
+#if TU_256
+#define LMCS_CHROMA_CALC_CU                               1 // Derive chroma LMCS parameter based on neighbor CUs. Needed by VPDU removal and 128x128 transform.
+#endif
+
+//-- intra
+#define INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS             1 // Enable 2xN and Nx2 block by removing SCIPU constraints
+#define CCLM_LATENCY_RESTRICTION_RMV                      1 // remove the latency between luma and chroma restriction of CCLM
+#define LMS_LINEAR_MODEL                                  1 // LMS for parameters derivation of CCLM and MMLM mode, Remove constraint in derivation of neighbouring samples
+
+//-- inter
+#define CIIP_RM_BLOCK_SIZE_CONSTRAINTS                    1 // Remove the 64x64 restriction and enable 8x4/4x8 block for CIIP
+#define BDOF_RM_CONSTRAINTS                               1
+#define INTER_RM_SIZE_CONSTRAINTS                         1 // Remove size constraints for inter block
+#define AFFINE_RM_CONSTRAINTS_AND_OPT                     1 // Remove affine constraints and optimization
+
+// Loop filters
+#define DB_PARAM_TID                                      1 // adjust DB parameters based on temporal ID
+
+#define CONVERT_NUM_TU_SPLITS_TO_CFG                      1 // Convert number of TU splits to config parameter to lower memory
+#define DUMP_BEFORE_INLOOP                                1 // Dump reconstructed YUV before inloop filters, controlled by config parameter
+#endif
+
+
+/// Tools
+#if TOOLS
+// Intra
+#define MMLM                                              1 // Add three MMLM modes
+#define GRAD_PDPC                                         1 // gradient PDPC extension for angular-intra modes for luma.
+#define INTRA_6TAP                                        1 // 6TapCubic + 6 TapGaussian + left side 4 tap weak filtering for intra.
+#define SECONDARY_MPM                                     1 // Primary MPM and Secondary MPM: Add neighbouring modes into MPMs from positions AR, BL, AL, derived modes
+#define ENABLE_DIMD                                       1 // Decoder side intra mode derivation
+
+// Inter
+#define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
+#define SAMPLE_BASED_BDOF                                 1 // Sample based BDOF
+#define MULTI_PASS_DMVR                                   1 // Multi-pass DMVR
+#define AFFINE_MMVD                                       1 // Add MMVD to affine merge mode
+#define INTER_LIC                                         1 // Add LIC to non-subblock inter
+#define NON_ADJACENT_MRG_CAND                             1 // Add non-adjacent merge candidates
+#define MULTI_HYP_PRED                                    1 // Multiple hypothesis prediction
+#define IF_12TAP                                          1 // 12-tap IF
+#define TM_AMVP                                           1 // Add template  matching to non-subblock inter to refine regular AMVP candidates
+#define TM_MRG                                            1 // Add template  matching to non-subblock inter to refine regular merge candidates
+#define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
+
+// Transform and coefficient coding
+#define TCQ_8STATES                                       1
+#define EXTENDED_LFNST                                    1 // Extended LFNST
+#define SIGN_PREDICTION                                   1 // transform coefficients sign prediction
+
+// Entropy Coding
+#define EC_HIGH_PRECISION                                 1 // CABAC high precision
+#define SLICE_TYPE_WIN_SIZE                               1 // Context window initialization based on slice type
+
+// Loop filters
+#define ALF_IMPROVEMENT                                   1 // ALF improvement
+#define EMBEDDED_APS                                      1 // Embed APS into picture header
+
+// SIMD optimizations
+#if IF_12TAP
+#define IF_12TAP_SIMD                                     1 // enable SIMD for 12-tap filter
+#ifdef IF_12TAP_SIMD
+#define SIMD_4x4_12                                       1 //enable 4x4-block combined passes for 12-tap filters
+#endif
+#endif
+#if SIGN_PREDICTION
+#define ENABLE_SIMD_SIGN_PREDICTION                       1
+#endif
+
+#endif // tools
+
+
+
+
+
+
+
+
+
+
 
 // clang-format off
 //########### place macros to be removed in next cycle below this line ###############
@@ -157,7 +264,7 @@
 
 #define JVET_S0138_GCI_PTL                                1 // JVET-S_Notes_d9: move frame_only_constraint_flag and single_layer_constraint_flag into PTL for easy access
 
-#define JVET_S0113_S0195_GCI                              1 // JVET-S0113: no_rectangular_slice_constraint_flag to constrain pps_rect_slice_flag 
+#define JVET_S0113_S0195_GCI                              1 // JVET-S0113: no_rectangular_slice_constraint_flag to constrain pps_rect_slice_flag
                                                             //             one_slice_per_subpicture_constraint_flag to constrain pps_single_slice_per_subpic_flag
                                                             // JVET-S0195: replace one_subpic_per_pic_constraint_flag with no_subpic_info_constraint_flag and its semantics
                                                             //             add no_idr_rpl_constraint_flag
@@ -194,8 +301,11 @@ typedef std::pair<int, int>  TrCost;
 
 #define REUSE_CU_RESULTS                                  1
 #if REUSE_CU_RESULTS
+#if !CONVERT_NUM_TU_SPLITS_TO_CFG
 #define REUSE_CU_RESULTS_WITH_MULTIPLE_TUS                1
 #endif
+#endif
+// clang-format on
 
 #ifndef JVET_J0090_MEMORY_BANDWITH_MEASURE
 #define JVET_J0090_MEMORY_BANDWITH_MEASURE                0
@@ -388,8 +498,9 @@ typedef       uint32_t            Intermediate_UInt; ///< used as intermediate v
 #endif
 
 typedef       uint64_t          SplitSeries;       ///< used to encoded the splits that caused a particular CU size
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
 typedef       uint64_t          ModeTypeSeries;    ///< used to encoded the ModeType at different split depth
-
+#endif
 typedef       uint64_t        Distortion;        ///< distortion measurement
 
 // ====================================================================================================================
@@ -497,7 +608,7 @@ enum ChannelType
   CHANNEL_TYPE_CHROMA  = 1,
   MAX_NUM_CHANNEL_TYPE = 2
 };
-
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
 enum TreeType
 {
   TREE_D = 0, //default tree status (for single-tree slice, TREE_D means joint tree; for dual-tree I slice, TREE_D means TREE_L for luma and TREE_C for chroma)
@@ -511,7 +622,7 @@ enum ModeType
   MODE_TYPE_INTER = 1, //can try inter
   MODE_TYPE_INTRA = 2, //can try intra, ibc, palette
 };
-
+#endif
 #define CH_L CHANNEL_TYPE_LUMA
 #define CH_C CHANNEL_TYPE_CHROMA
 
@@ -658,7 +769,16 @@ enum DFunc
   DF_SAD_INTERMEDIATE_BITDEPTH = 63,
 
   DF_SAD_WITH_MASK   = 64,
+#if TM_AMVP || TM_MRG
+  DF_TM_A_WSAD_FULL_NBIT,
+  DF_TM_L_WSAD_FULL_NBIT,
+  DF_TM_A_WMRSAD_FULL_NBIT,
+  DF_TM_L_WMRSAD_FULL_NBIT,
+
+  DF_TOTAL_FUNCTIONS
+#else
   DF_TOTAL_FUNCTIONS = 65
+#endif
 };
 
 /// motion vector predictor direction used in AMVP
@@ -1437,6 +1557,7 @@ struct XUCache
 };
 
 #define SIGN(x) ( (x) >= 0 ? 1 : -1 )
+
 
 //! \}
 

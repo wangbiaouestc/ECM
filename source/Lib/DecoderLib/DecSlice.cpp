@@ -78,7 +78,6 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
   const SPS*     sps          = slice->getSPS();
   Picture*       pic          = slice->getPic();
   CABACReader&   cabacReader  = *m_CABACDecoder->getCABACReader( 0 );
-
   // setup coding structure
   CodingStructure& cs = *pic->cs;
   cs.slice            = slice;

@@ -127,14 +127,28 @@ public:
   void  codeVUI                 ( const VUI *pcVUI, const SPS* pcSPS );
   void  codeSPS                 ( const SPS* pcSPS );
   void  codePPS                 ( const PPS* pcPPS );
+#if EMBEDDED_APS
+  void  codeAPS                 ( APS* pcAPS, const bool writeRbspTrailingBits );
+#else
   void  codeAPS                 ( APS* pcAPS );
+#endif
   void  codeAlfAps              ( APS* pcAPS );
   void  codeLmcsAps             ( APS* pcAPS );
   void  codeScalingListAps      ( APS* pcAPS );
   void  codeVPS                 ( const VPS* pcVPS );
   void  codeDCI                 ( const DCI* dci );
+
+#if EMBEDDED_APS
+  void  codePictureHeader       ( PicHeader* picHeader, const bool writeRbspTrailingBits, std::vector<APS>& aps );
+#else
   void  codePictureHeader       ( PicHeader* picHeader, bool writeRbspTrailingBits );
+#endif
+
+#if EMBEDDED_APS
+  void  codeSliceHeader         ( std::vector<APS>& aps, Slice* pcSlice );
+#else
   void  codeSliceHeader         ( Slice* pcSlice );
+#endif
   void  codeConstraintInfo      ( const ConstraintInfo* cinfo );
   void  codeProfileTierLevel    ( const ProfileTierLevel* ptl, bool profileTierPresentFlag, int maxNumSubLayersMinus1 );
   void  codeOlsHrdParameters(const GeneralHrdParams * generalHrd, const OlsHrdParams *olsHrd , const uint32_t firstSubLayer, const uint32_t maxNumSubLayersMinus1);
@@ -146,7 +160,12 @@ public:
 #else
   void  codeScalingList         ( const ScalingList &scalingList );
 #endif
+#if ALF_IMPROVEMENT
+  void alfFilter( const AlfParam& alfParam, const bool isChroma, const int altIdx, int order0, int order1 );
+  void alfGolombEncode(const int coeff, const int k, const bool signed_coeff = true);
+#else
   void alfFilter( const AlfParam& alfParam, const bool isChroma, const int altIdx );
+#endif
   void dpb_parameters(int maxSubLayersMinus1, bool subLayerInfoFlag, const SPS *pcSPS);
 private:
 };

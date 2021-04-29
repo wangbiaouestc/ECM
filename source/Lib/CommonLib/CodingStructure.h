@@ -54,12 +54,14 @@ enum PictureType
   PIC_RECONSTRUCTION = 0,
   PIC_ORIGINAL,
   PIC_TRUE_ORIGINAL,
+  PIC_FILTERED_ORIGINAL,
   PIC_PREDICTION,
   PIC_RESIDUAL,
   PIC_ORG_RESI,
   PIC_RECON_WRAP,
   PIC_ORIGINAL_INPUT,
   PIC_TRUE_ORIGINAL_INPUT,
+  PIC_FILTERED_ORIGINAL_INPUT,
   NUM_PIC_TYPES
 };
 extern XUCache g_globalUnitCache;
@@ -123,7 +125,9 @@ public:
   const TransformUnit  *getTU(const Position &pos, const ChannelType _chType, const int subTuIdx = -1) const;
 
   CodingUnit     *getCU(const Position &pos, const ChannelType _chType);
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   CodingUnit     *getLumaCU( const Position &pos );
+#endif  
   PredictionUnit *getPU(const Position &pos, const ChannelType _chType);
   TransformUnit  *getTU(const Position &pos, const ChannelType _chType, const int subTuIdx = -1);
 
@@ -165,9 +169,10 @@ public:
   uint64_t      fracBits;
   Distortion  dist;
   Distortion  interHad;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   TreeType    treeType; //because partitioner can not go deep to tu and cu coding (e.g., addCU()), need another variable for indicating treeType
   ModeType    modeType;
-
+#endif
   void initStructData  (const int &QP = MAX_INT, const bool &skipMotBuf = false);
   void initSubStructure(      CodingStructure& cs, const ChannelType chType, const UnitArea &subArea, const bool &isTuEnc);
 
@@ -178,6 +183,7 @@ public:
   void clearTUs();
   void clearPUs();
   void clearCUs();
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   const int signalModeCons( const PartSplit split, Partitioner &partitioner, const ModeType modeTypeParent ) const;
   void clearCuPuTuIdxMap  ( const UnitArea &_area, uint32_t numCu, uint32_t numPu, uint32_t numTu, uint32_t* pOffset );
   void getNumCuPuTuOffset ( uint32_t* pArray )
@@ -185,7 +191,10 @@ public:
     pArray[0] = m_numCUs;     pArray[1] = m_numPUs;     pArray[2] = m_numTUs;
     pArray[3] = m_offsets[0]; pArray[4] = m_offsets[1]; pArray[5] = m_offsets[2];
   }
-
+#endif
+#if MULTI_HYP_PRED
+  MEResultVec m_MEResults;
+#endif
 
 private:
   void createInternals(const UnitArea& _unit, const bool isTopLayer, const bool isPLTused);
@@ -231,7 +240,14 @@ private:
   PelStorage m_orgr;
 
   TCoeff *m_coeffs [ MAX_NUM_COMPONENT ];
+#if SIGN_PREDICTION
+  TCoeff *m_coeff_signs [ MAX_NUM_COMPONENT ];
+#endif
+#if REMOVE_PCM
+  Pel    *m_pltIdx[MAX_NUM_CHANNEL_TYPE];
+#else
   Pel    *m_pcmbuf [ MAX_NUM_COMPONENT ];
+#endif
   bool   *m_runType[ MAX_NUM_CHANNEL_TYPE ];
   int     m_offsets[ MAX_NUM_COMPONENT ];
 
@@ -291,7 +307,10 @@ public:
   const CPelBuf       getOrgBuf(const ComponentID &compID) const;
          PelUnitBuf   getOrgBuf();
   const CPelUnitBuf   getOrgBuf() const;
-
+#if ALF_SAO_TRUE_ORG
+         PelUnitBuf   getTrueOrgBuf();
+  const CPelUnitBuf   getTrueOrgBuf() const;
+#endif
 
   // pred buffer
          PelBuf       getPredBuf(const ComponentID &compID)       { return m_pred.get(compID); }

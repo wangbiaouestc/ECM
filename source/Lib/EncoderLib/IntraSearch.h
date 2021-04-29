@@ -205,12 +205,12 @@ private:
   CodingStructure ***m_pBestCS;
 
   CodingStructure **m_pSaveCS;
-
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   bool            m_saveCuCostInSCIPU;
   uint8_t         m_numCuInSCIPU;
   Area            m_cuAreaInSCIPU[NUM_INTER_CU_INFO_SAVE];
   double          m_cuCostInSCIPU[NUM_INTER_CU_INFO_SAVE];
-
+#endif
   struct ModeInfo
   {
     bool     mipFlg; // CU::mipFlag
@@ -363,6 +363,12 @@ private:
   int                                                m_numSavedRdModeFirstColorSpace[4 * NUM_LFNST_NUM_PER_SET * 2];
   int                                                m_savedRdModeIdx;
 
+#if SECONDARY_MPM
+  uint8_t m_mpmList[NUM_MOST_PROBABLE_MODES];
+  uint8_t m_nonMPMList[NUM_NON_MPM_MODES];
+  int m_mpmListSize;
+#endif
+
   static_vector<ModeInfo, FAST_UDI_MAX_RDMODE_NUM> m_uiSavedRdModeListLFNST;
   static_vector<ModeInfo, FAST_UDI_MAX_RDMODE_NUM> m_uiSavedHadModeListLFNST;
   uint32_t                                         m_uiSavedNumRdModesLFNST;
@@ -421,14 +427,14 @@ public:
   CodingStructure  **getSaveCSBuf () { return m_pSaveCS; }
 
   void setModeCtrl                ( EncModeCtrl *modeCtrl ) { m_modeCtrl = modeCtrl; }
-
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   bool getSaveCuCostInSCIPU       ()               { return m_saveCuCostInSCIPU; }
   void setSaveCuCostInSCIPU       ( bool b )       { m_saveCuCostInSCIPU = b;  }
   void setNumCuInSCIPU            ( uint8_t i )    { m_numCuInSCIPU = i; }
   void saveCuAreaCostInSCIPU      ( Area area, double cost );
   void initCuAreaCostInSCIPU      ();
   double findInterCUCost          ( CodingUnit &cu );
-
+#endif
 public:
   bool estIntraPredLumaQT(CodingUnit &cu, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE, bool mtsCheckRangeFlag = false, int mtsFirstCheckId = 0, int mtsLastCheckId = 0, bool moreProbMTSIdxFirst = false, CodingStructure* bestCS = NULL);
   void estIntraPredChromaQT       ( CodingUnit &cu, Partitioner& pm, const double maxCostAllowed = MAX_DOUBLE );
@@ -439,6 +445,12 @@ public:
   void sortRdModeListFirstColorSpace(ModeInfo mode, double cost, char bdpcmMode, ModeInfo* rdModeList, double* rdCostList, char* bdpcmModeList, int& candNum);
   void invalidateBestRdModeFirstColorSpace();
   void setSavedRdModeIdx(int idx) { m_savedRdModeIdx = idx; }
+
+#if SECONDARY_MPM
+  uint8_t* getMPMList()           { return m_mpmList; }
+  uint8_t* getNonMPMList()        { return m_nonMPMList; }
+  int& getMpmListSize()           { return m_mpmListSize; }
+#endif
 
 protected:
 

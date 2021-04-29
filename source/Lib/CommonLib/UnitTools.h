@@ -49,7 +49,9 @@ namespace CS
   uint64_t getEstBits                   ( const CodingStructure &cs );
   UnitArea getArea                    ( const CodingStructure &cs, const UnitArea &area, const ChannelType chType );
   bool   isDualITree                  ( const CodingStructure &cs );
+#if !MULTI_PASS_DMVR
   void   setRefinedMotionField(CodingStructure &cs);
+#endif
 }
 
 
@@ -76,8 +78,9 @@ namespace CU
   void saveMotionInHMVP               (const CodingUnit& cu, const bool isToBeDone );
 
   PartSplit getSplitAtDepth           (const CodingUnit& cu, const unsigned depth);
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   ModeType  getModeTypeAtDepth        (const CodingUnit& cu, const unsigned depth);
-
+#endif
   uint32_t getNumNonZeroCoeffNonTsCorner8x8( const CodingUnit& cu, const bool lumaFlag = true, const bool chromaFlag = true );
   bool  isPredRegDiffFromTB(const CodingUnit& cu, const ComponentID compID);
   bool  isFirstTBInPredReg(const CodingUnit& cu, const ComponentID compID, const CompArea &area);
@@ -89,7 +92,9 @@ namespace CU
   uint8_t deriveBcwIdx                (uint8_t bcwLO, uint8_t bcwL1);
   bool bdpcmAllowed                   (const CodingUnit& cu, const ComponentID compID);
   bool isMTSAllowed                   (const CodingUnit& cu, const ComponentID compID);
-
+#if INTER_LIC
+  bool isLICFlagPresent               (const CodingUnit& cu);
+#endif
 
   bool      divideTuInRows            ( const CodingUnit &cu );
   PartSplit getISPType                ( const CodingUnit &cu,                         const ComponentID compID );
@@ -127,15 +132,27 @@ namespace CU
 namespace PU
 {
   int  getLMSymbolList(const PredictionUnit &pu, int *modeList);
+#if SECONDARY_MPM
+  int getIntraMPMs(const PredictionUnit &pu, uint8_t *mpm, uint8_t* non_mpm, const ChannelType &channelType = CHANNEL_TYPE_LUMA);
+#else
   int  getIntraMPMs(const PredictionUnit &pu, unsigned *mpm, const ChannelType &channelType = CHANNEL_TYPE_LUMA);
+#endif
   bool          isMIP                 (const PredictionUnit &pu, const ChannelType &chType = CHANNEL_TYPE_LUMA);
   bool          isDMChromaMIP         (const PredictionUnit &pu);
   uint32_t      getIntraDirLuma       (const PredictionUnit &pu);
-  void getIntraChromaCandModes        (const PredictionUnit &pu, unsigned modeList[NUM_CHROMA_MODE]);
+  void getIntraChromaCandModes(const PredictionUnit &pu, unsigned modeList[NUM_CHROMA_MODE]);
+
   const PredictionUnit &getCoLocatedLumaPU(const PredictionUnit &pu);
   uint32_t getFinalIntraMode              (const PredictionUnit &pu, const ChannelType &chType);
   uint32_t getCoLocatedIntraLumaMode      (const PredictionUnit &pu);
-  int  getWideAngle                   ( const TransformUnit &tu, const uint32_t dirMode, const ComponentID compID );
+  int      getWideAngle                   ( const TransformUnit &tu, const uint32_t dirMode, const ComponentID compID );
+#if MULTI_PASS_DMVR
+  uint32_t getBDMVRMvdThreshold       (const PredictionUnit &pu);
+#endif
+#if TM_MRG
+  uint32_t getTMMvdThreshold          (const PredictionUnit &pu);
+  int      reorderInterMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, int numCand, uint32_t mvdSimilarityThresh );
+#endif
   void getInterMergeCandidates        (const PredictionUnit &pu, MergeCtx& mrgCtx,
     int mmvdList,
     const int& mrgCandIdx = -1 );
@@ -144,7 +161,11 @@ namespace PU
   int getDistScaleFactor(const int &currPOC, const int &currRefPOC, const int &colPOC, const int &colRefPOC);
   bool isDiffMER                      (const Position &pos1, const Position &pos2, const unsigned plevel);
   bool getColocatedMVP                (const PredictionUnit &pu, const RefPicList &eRefPicList, const Position &pos, Mv& rcMv, const int &refIdx, bool sbFlag);
-  void fillMvpCand                    (      PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AMVPInfo &amvpInfo );
+  void fillMvpCand                    (      PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AMVPInfo &amvpInfo 
+#if TM_AMVP
+                                     , InterPrediction* interPred = nullptr
+#endif
+  );
   void fillIBCMvpCand                 (PredictionUnit &pu, AMVPInfo &amvpInfo);
   void fillAffineMvpCand              (      PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AffineAMVPInfo &affiAMVPInfo);
   bool addMVPCandUnscaled             (const PredictionUnit &pu, const RefPicList &eRefPicList, const int &iRefIdx, const Position &pos, const MvpDir &eDir, AMVPInfo &amvpInfo);
@@ -153,30 +174,69 @@ namespace PU
     , const bool isAvailableA1, const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
     , const bool ibcFlag
     , const bool isGt4x4
+#if TM_MRG
+    , const uint32_t mvdSimilarityThresh = 1
+#endif
   );
   void addAMVPHMVPCand                (const PredictionUnit &pu, const RefPicList eRefPicList, const int currRefPOC, AMVPInfo &info);
   bool addAffineMVPCandUnscaled       ( const PredictionUnit &pu, const RefPicList &refPicList, const int &refIdx, const Position &pos, const MvpDir &dir, AffineAMVPInfo &affiAmvpInfo );
   bool isBipredRestriction            (const PredictionUnit &pu);
+#if MULTI_PASS_DMVR
+  void spanMotionInfo                 (      PredictionUnit &pu, const MergeCtx &mrgCtx = MergeCtx(), Mv* bdmvrSubPuMv0 = nullptr, Mv* bdmvrSubPuMv1 = nullptr, Mv* bdofSubPuMvOffset = nullptr );
+#else
   void spanMotionInfo                 (      PredictionUnit &pu, const MergeCtx &mrgCtx = MergeCtx() );
+#endif
   void applyImv                       (      PredictionUnit &pu, MergeCtx &mrgCtx, InterPrediction *interPred = NULL );
   void getAffineControlPointCand(const PredictionUnit &pu, MotionInfo mi[4], bool isAvailable[4], int verIdx[4], int8_t bcwIdx, int modelIdx, int verNum, AffineMergeCtx& affMrgCtx);
-  void getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx, const int mrgCandIdx = -1 );
+  void getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx, 
+#if AFFINE_MMVD
+                           int mrgCandIdx = -1, bool isAfMmvd = false
+#else
+                           const int mrgCandIdx = -1
+#endif
+  );
+#if AFFINE_MMVD
+  void    getAfMmvdMvf                (const PredictionUnit &pu, const AffineMergeCtx& affineMergeCtx, MvField mvfMmvd[2][3], const uint16_t afMmvdBaseIdx, const uint16_t offsetStep, const uint16_t offsetDir);
+  int32_t getAfMmvdEstBits            (const PredictionUnit &pu);
+  uint8_t getMergeIdxFromAfMmvdBaseIdx(AffineMergeCtx& affMrgCtx, uint16_t afMmvdBaseIdx);
+#endif
   void setAllAffineMvField            (      PredictionUnit &pu, MvField *mvField, RefPicList eRefList );
   void setAllAffineMv                 (      PredictionUnit &pu, Mv affLT, Mv affRT, Mv affLB, RefPicList eRefList, bool clipCPMVs = false );
   bool getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx &mrgCtx, bool& LICFlag, const int count, int mmvdList);
   bool getInterMergeSubPuRecurCand(const PredictionUnit &pu, MergeCtx &mrgCtx, const int count);
   bool isBiPredFromDifferentDirEqDistPoc(const PredictionUnit &pu);
   void restrictBiPredMergeCandsOne    (PredictionUnit &pu);
-
+#if ENABLE_OBMC
+  unsigned int getSameNeigMotion(PredictionUnit &pu, MotionInfo& mi, Position off, int  iDir, int& iLength, int iMaxLength);
+  bool identicalMvOBMC(MotionInfo curMI, MotionInfo neighMI, bool bLD);
+  bool getNeighborMotion(PredictionUnit &pu, MotionInfo& mi, Position off, Size unitSize, int iDir);
+#endif
   bool isLMCMode                      (                          unsigned mode);
+#if MMLM
+  bool isMultiModeLM(unsigned mode);
+#endif
   bool isLMCModeEnabled               (const PredictionUnit &pu, unsigned mode);
   bool isChromaIntraModeCrossCheckMode(const PredictionUnit &pu);
+
   void getGeoMergeCandidates          (const PredictionUnit &pu, MergeCtx &GeoMrgCtx);
   void spanGeoMotionInfo              (      PredictionUnit &pu, MergeCtx &GeoMrgCtx, const uint8_t splitDir, const uint8_t candIdx0, const uint8_t candIdx1);
   bool isAddNeighborMv  (const Mv& currMv, Mv* neighborMvs, int numNeighborMv);
   void getIbcMVPsEncOnly(PredictionUnit &pu, Mv* mvPred, int& nbPred);
   bool getDerivedBV(PredictionUnit &pu, const Mv& currentMv, Mv& derivedMv);
   bool checkDMVRCondition(const PredictionUnit& pu);
+#if MULTI_PASS_DMVR
+  bool checkBDMVRCondition(const PredictionUnit& pu);
+#endif
+
+#if INTER_LIC
+  void spanLICFlags(PredictionUnit &pu, const bool LICFlag);
+#endif
+#if MULTI_HYP_PRED
+  Mv   getMultiHypMVP(PredictionUnit &pu, const MultiHypPredictionData &mhData);
+  AMVPInfo getMultiHypMVPCands(PredictionUnit &pu, const MultiHypPredictionData &mhData);
+  AMVPInfo getMultiHypMVPCandsMerge(PredictionUnit &pu, const RefPicList eRefPicList, const int refIdx);
+  AMVPInfo getMultiHypMVPCandsAMVP(PredictionUnit &pu, const RefPicList eRefPicList, const int refIdx);
+#endif
 
 }
 
@@ -195,6 +255,13 @@ namespace TU
   TransformUnit* getPrevTU          ( const TransformUnit &tu, const ComponentID compID );
   bool           getPrevTuCbfAtDepth( const TransformUnit &tu, const ComponentID compID, const int trDepth );
   int            getICTMode         ( const TransformUnit &tu, int jointCbCr = -1 );
+#if SIGN_PREDICTION
+  bool getDelayedSignCoding(const TransformUnit &tu, const ComponentID compID);
+  bool getUseSignPred(const TransformUnit &tu, const ComponentID compID);
+  void predBorderResi(const Position blkPos, const CPelBuf &recoBuf, const CPelBuf &predBuf, const ComponentID compID,
+                      const uint32_t uiWidth,    const uint32_t uiHeight,   Pel *predResiBorder,   const Pel defaultPel);
+  Position posSignHidingFirstCG(const TransformUnit &tu, ComponentID compID);
+#endif
 }
 
 uint32_t getCtuAddr        (const Position& pos, const PreCalcValues &pcv);

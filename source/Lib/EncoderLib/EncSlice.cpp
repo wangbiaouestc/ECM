@@ -117,7 +117,11 @@ EncSlice::setUpLambda( Slice* slice, const double dLambda, int iQP)
     int chromaQPOffset       = slice->getPPS()->getQpOffset( compID ) + slice->getSliceChromaQpDelta( compID );
     int qpc = slice->getSPS()->getMappedChromaQpValue(compID, iQP) + chromaQPOffset;
     double tmpWeight         = pow( 2.0, ( iQP - qpc ) / 3.0 );  // takes into account of the chroma qp mapping and chroma qp Offset
-    if (slice->getDepQuantEnabledFlag())
+#if TCQ_8STATES
+    if( slice->getDepQuantEnabledIdc() )
+#else
+    if( slice->getDepQuantEnabledFlag() )
+#endif
     {
       tmpWeight *= ( m_pcCfg->getGOPSize() >= 8 ? pow( 2.0, 0.1/3.0 ) : pow( 2.0, 0.2/3.0 ) );  // increase chroma weight for dependent quantization (in order to reduce bit rate shift from chroma to luma)
     }
@@ -343,22 +347,41 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
 
   if( m_pcCfg->getCostMode() != COST_LOSSLESS_CODING )
   {
+#if TCQ_8STATES
+    rpcSlice->setDepQuantEnabledIdc( m_pcCfg->getDepQuantEnabledIdc() );
+#else    
     rpcSlice->setDepQuantEnabledFlag( m_pcCfg->getDepQuantEnabledFlag() );
+#endif
+
     rpcSlice->setSignDataHidingEnabledFlag( m_pcCfg->getSignDataHidingEnabledFlag() );
     rpcSlice->setTSResidualCodingDisabledFlag( false );
 
+#if TCQ_8STATES
+    CHECK( (m_pcCfg->getDepQuantEnabledIdc() || m_pcCfg->getSignDataHidingEnabledFlag() ) 
+           && rpcSlice->getTSResidualCodingDisabledFlag() , "TSRC cannot be bypassed if either DQ or SDH are enabled at slice level.");
+#else
     CHECK( (m_pcCfg->getDepQuantEnabledFlag() || m_pcCfg->getSignDataHidingEnabledFlag() ) 
            && rpcSlice->getTSResidualCodingDisabledFlag() , "TSRC cannot be bypassed if either DQ or SDH are enabled at slice level.");
+#endif           
   }
   else
   {
+#if TCQ_8STATES
+    rpcSlice->setDepQuantEnabledIdc(0); //should be disabled for lossless
+#else     
     rpcSlice->setDepQuantEnabledFlag( false ); //should be disabled for lossless
+#endif
+
     rpcSlice->setSignDataHidingEnabledFlag( false ); //should be disabled for lossless
     if( m_pcCfg->getTSRCdisableLL() )
     {
       rpcSlice->setTSResidualCodingDisabledFlag( true );
     }
   }
+
+#if INTER_LIC
+  rpcSlice->setUseLIC(false);
+#endif
 
 #if SHARP_LUMA_DELTA_QP
   pcPic->fieldPic = isField;
@@ -637,10 +660,34 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
   {
     rpcSlice->setDeblockingFilterOverrideFlag( rpcSlice->getPPS()->getDeblockingFilterOverrideEnabledFlag() );
     rpcSlice->setDeblockingFilterDisable( rpcSlice->getPPS()->getPPSDeblockingFilterDisabledFlag() );
+#if DB_PARAM_TID
+    const PPS* pcPPS = rpcSlice->getPPS();
+    int betaIdx = Clip3(0, (int)pcPPS->getDeblockingFilterBetaOffsetDiv2().size() - 1, (int)rpcSlice->getTLayer() + (rpcSlice->isIntra() ? 0 : 1));
+    int tcIdx = Clip3(0, (int)pcPPS->getDeblockingFilterTcOffsetDiv2().size() - 1, (int)rpcSlice->getTLayer() + (rpcSlice->isIntra() ? 0 : 1));
+#endif
     if ( !rpcSlice->getDeblockingFilterDisable())
     {
       if ( rpcSlice->getDeblockingFilterOverrideFlag() && eSliceType!=I_SLICE)
       {
+#if DB_PARAM_TID
+        rpcSlice->setDeblockingFilterBetaOffsetDiv2( m_pcCfg->getGOPEntry(iGOPid).m_betaOffsetDiv2 + m_pcCfg->getLoopFilterBetaOffset()[betaIdx]  );
+        rpcSlice->setDeblockingFilterTcOffsetDiv2( m_pcCfg->getGOPEntry(iGOPid).m_tcOffsetDiv2 + m_pcCfg->getLoopFilterTcOffset()[tcIdx] );
+
+        if( rpcSlice->getPPS()->getPPSChromaToolFlag() )
+        {
+          rpcSlice->setDeblockingFilterCbBetaOffsetDiv2(m_pcCfg->getGOPEntry(iGOPid).m_CbBetaOffsetDiv2 + m_pcCfg->getLoopFilterBetaOffset()[betaIdx]);
+          rpcSlice->setDeblockingFilterCbTcOffsetDiv2(m_pcCfg->getGOPEntry(iGOPid).m_CbTcOffsetDiv2 + m_pcCfg->getLoopFilterTcOffset()[tcIdx]);
+          rpcSlice->setDeblockingFilterCrBetaOffsetDiv2(m_pcCfg->getGOPEntry(iGOPid).m_CrBetaOffsetDiv2 + m_pcCfg->getLoopFilterBetaOffset()[betaIdx]);
+          rpcSlice->setDeblockingFilterCrTcOffsetDiv2(m_pcCfg->getGOPEntry(iGOPid).m_CrTcOffsetDiv2 + m_pcCfg->getLoopFilterTcOffset()[tcIdx]);
+        }
+        else
+        {
+          rpcSlice->setDeblockingFilterCbBetaOffsetDiv2(m_pcCfg->getGOPEntry(iGOPid).m_CbBetaOffsetDiv2 );
+          rpcSlice->setDeblockingFilterCbTcOffsetDiv2(m_pcCfg->getGOPEntry(iGOPid).m_CbTcOffsetDiv2 );
+          rpcSlice->setDeblockingFilterCrBetaOffsetDiv2(m_pcCfg->getGOPEntry(iGOPid).m_CrBetaOffsetDiv2 );
+          rpcSlice->setDeblockingFilterCrTcOffsetDiv2(m_pcCfg->getGOPEntry(iGOPid).m_CrTcOffsetDiv2 );
+        }
+#else
         rpcSlice->setDeblockingFilterBetaOffsetDiv2( m_pcCfg->getGOPEntry(iGOPid).m_betaOffsetDiv2 + m_pcCfg->getLoopFilterBetaOffset()  );
         rpcSlice->setDeblockingFilterTcOffsetDiv2( m_pcCfg->getGOPEntry(iGOPid).m_tcOffsetDiv2 + m_pcCfg->getLoopFilterTcOffset() );
         if( rpcSlice->getPPS()->getPPSChromaToolFlag() )
@@ -657,15 +704,25 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
           rpcSlice->setDeblockingFilterCrBetaOffsetDiv2( rpcSlice->getDeblockingFilterBetaOffsetDiv2() );
           rpcSlice->setDeblockingFilterCrTcOffsetDiv2( rpcSlice->getDeblockingFilterTcOffsetDiv2() );
         }
+#endif
       }
       else
       {
+#if DB_PARAM_TID
+        rpcSlice->setDeblockingFilterBetaOffsetDiv2(m_pcCfg->getLoopFilterBetaOffset()[betaIdx]);
+        rpcSlice->setDeblockingFilterTcOffsetDiv2(m_pcCfg->getLoopFilterTcOffset()[tcIdx]);
+        rpcSlice->setDeblockingFilterCbBetaOffsetDiv2(m_pcCfg->getLoopFilterBetaOffset()[betaIdx]);
+        rpcSlice->setDeblockingFilterCbTcOffsetDiv2(m_pcCfg->getLoopFilterTcOffset()[tcIdx]);
+        rpcSlice->setDeblockingFilterCrBetaOffsetDiv2(m_pcCfg->getLoopFilterBetaOffset()[betaIdx]);
+        rpcSlice->setDeblockingFilterCrTcOffsetDiv2(m_pcCfg->getLoopFilterTcOffset()[tcIdx]);
+#else
         rpcSlice->setDeblockingFilterBetaOffsetDiv2( m_pcCfg->getLoopFilterBetaOffset() );
         rpcSlice->setDeblockingFilterTcOffsetDiv2( m_pcCfg->getLoopFilterTcOffset() );
         rpcSlice->setDeblockingFilterCbBetaOffsetDiv2( m_pcCfg->getLoopFilterCbBetaOffset() );
         rpcSlice->setDeblockingFilterCbTcOffsetDiv2( m_pcCfg->getLoopFilterCbTcOffset() );
         rpcSlice->setDeblockingFilterCrBetaOffsetDiv2( m_pcCfg->getLoopFilterCrBetaOffset() );
         rpcSlice->setDeblockingFilterCrTcOffsetDiv2( m_pcCfg->getLoopFilterCrTcOffset() );
+#endif
       }
     }
   }
@@ -690,7 +747,7 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
 
   rpcSlice->setDisableSATDForRD(false);
 
-  if( ( m_pcCfg->getIBCHashSearch() && m_pcCfg->getIBCMode() ) || m_pcCfg->getAllowDisFracMMVD() )
+  if( ( m_pcCfg->getIBCHashSearch() && m_pcCfg->getIBCMode() ) || ( eSliceType != I_SLICE && m_pcCfg->getAllowDisFracMMVD() ) )
   {
     m_pcCuEncoder->getIbcHashMap().destroy();
     m_pcCuEncoder->getIbcHashMap().init( pcPic->cs->pps->getPicWidthInLumaSamples(), pcPic->cs->pps->getPicHeightInLumaSamples() );
@@ -776,7 +833,11 @@ double EncSlice::calculateLambda( const Slice*     slice,
   double dLambda = initializeLambda (slice, GOPid, int (refQP + 0.5), dQP);
   iQP = Clip3 (-slice->getSPS()->getQpBDOffset (CHANNEL_TYPE_LUMA), MAX_QP, int (dQP + 0.5));
 
-  if (slice->getDepQuantEnabledFlag())
+#if TCQ_8STATES
+	if (slice->getDepQuantEnabledIdc())
+#else
+  if( slice->getDepQuantEnabledFlag() )
+#endif
   {
     dLambda *= pow( 2.0, 0.25/3.0 ); // slight lambda adjustment for dependent quantization (due to different slope of quantizer)
   }
@@ -1330,7 +1391,9 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
     xCheckWPEnable( pcSlice );
   }
 
-
+#if INTER_LIC
+  pcSlice->setUseLICOnPicLevel(m_pcCfg->getFastPicLevelLIC());
+#endif
 
     pcPic->m_prevQP[0] = pcPic->m_prevQP[1] = pcSlice->getSliceQp();
 
@@ -1388,6 +1451,12 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
   m_pcInterSearch->resetAffineMVList();
   m_pcInterSearch->resetUniMvList();
   ::memset(g_isReusedUniMVsFilled, 0, sizeof(g_isReusedUniMVsFilled));
+#if INTER_LIC
+  if (pcSlice->getUseLIC())
+  {
+    ::memset(g_isReusedUniMVsFilledLIC, 0, sizeof(g_isReusedUniMVsFilledLIC));
+  }
+#endif
   encodeCtus( pcPic, bCompressEntireSlice, bFastDeltaQP, m_pcLib );
   if (checkPLTRatio) m_pcLib->checkPltStats( pcPic );
 }
@@ -1507,8 +1576,9 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
   currQP[0] = currQP[1] = pcSlice->getSliceQp();
 
     prevQP[0] = prevQP[1] = pcSlice->getSliceQp();
-  if ( pcSlice->getSPS()->getFpelMmvdEnabledFlag() ||
-      (pcSlice->getSPS()->getIBCFlag() && m_pcCuEncoder->getEncCfg()->getIBCHashSearch()))
+
+
+  if( ( !pcSlice->isIntra() && pcSlice->getSPS()->getFpelMmvdEnabledFlag() ) || ( pcSlice->getSPS()->getIBCFlag() && m_pcCuEncoder->getEncCfg()->getIBCHashSearch() ) )
   {
     m_pcCuEncoder->getIbcHashMap().rebuildPicHashMap(cs.picture->getTrueOrigBuf());
     if (m_pcCfg->getIntraPeriod() != -1)
@@ -1895,7 +1965,6 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
       uiSubStrm++;
     }
   } // CTU-loop
-
 
   if(pcSlice->getPPS()->getCabacInitPresentFlag())
   {

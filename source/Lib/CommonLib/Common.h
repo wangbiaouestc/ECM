@@ -72,7 +72,7 @@ struct Size
   bool operator!=(const Size &other)      const { return (width != other.width) || (height != other.height); }
   bool operator==(const Size &other)      const { return (width == other.width) && (height == other.height); }
   uint32_t area()                             const { return (uint32_t) width * (uint32_t) height; }
-#if REUSE_CU_RESULTS_WITH_MULTIPLE_TUS
+#if REUSE_CU_RESULTS_WITH_MULTIPLE_TUS || CONVERT_NUM_TU_SPLITS_TO_CFG
   void resizeTo(const Size newSize)             { width = newSize.width; height = newSize.height; }
 #endif
 };

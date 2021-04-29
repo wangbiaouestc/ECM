@@ -51,8 +51,10 @@ Reshape::Reshape()
 , m_recReshaped (false)
 , m_reshape (true)
 , m_chromaScale (1 << CSCALE_FP_PREC)
+#if !LMCS_CHROMA_CALC_CU
 , m_vpduX (-1)
 , m_vpduY (-1)
+#endif
 {
 }
 
@@ -108,6 +110,9 @@ int  Reshape::calculateChromaAdjVpduNei(TransformUnit &tu, const CompArea &areaY
   CodingStructure &cs = *tu.cs;
   int xPos = areaY.lumaPos().x;
   int yPos = areaY.lumaPos().y;
+#if LMCS_CHROMA_CALC_CU
+  int numNeighborAbove = areaY.width, numNeighborLeft = areaY.height;
+#else
   int ctuSize = cs.sps->getCTUSize();
   int numNeighbor = std::min(64, ctuSize);
   int numNeighborLog = floorLog2(numNeighbor);
@@ -127,11 +132,30 @@ int  Reshape::calculateChromaAdjVpduNei(TransformUnit &tu, const CompArea &areaY
     return getChromaScale();
   }
   else
+#endif
   {
+#if !LMCS_CHROMA_CALC_CU
     setVPDULoc(xPos, yPos);
+#endif
     Position topLeft(xPos, yPos);
     CodingUnit *topLeftLuma;
     const CodingUnit *cuAbove, *cuLeft;
+#if LMCS_CHROMA_CALC_CU
+    if (CS::isDualITree(cs) && cs.slice->getSliceType() == I_SLICE)
+    {
+      topLeftLuma = tu.cs->picture->cs->getCU(topLeft, CHANNEL_TYPE_LUMA);
+      cuAbove = cs.picture->cs->getCURestricted(topLeft.offset(0, -1), *topLeftLuma, CHANNEL_TYPE_LUMA);
+      cuLeft  = cs.picture->cs->getCURestricted(topLeft.offset(-1, 0), *topLeftLuma, CHANNEL_TYPE_LUMA);
+    }
+    else
+    {
+      topLeftLuma = cs.getCU(topLeft, CHANNEL_TYPE_LUMA);
+      cuAbove = cs.getCURestricted(topLeft.offset(0, -1), *topLeftLuma, CHANNEL_TYPE_LUMA);
+      cuLeft  = cs.getCURestricted(topLeft.offset(-1, 0), *topLeftLuma, CHANNEL_TYPE_LUMA);
+    }
+
+    CompArea lumaArea = CompArea(COMPONENT_Y, tu.chromaFormat, topLeft, areaY, true);
+#else
     if (CS::isDualITree(cs) && cs.slice->getSliceType() == I_SLICE)
     {
       topLeftLuma = tu.cs->picture->cs->getCU(topLeft, CHANNEL_TYPE_LUMA);
@@ -149,6 +173,7 @@ int  Reshape::calculateChromaAdjVpduNei(TransformUnit &tu, const CompArea &areaY
     yPos = topLeftLuma->lumaPos().y;
 
     CompArea lumaArea = CompArea(COMPONENT_Y, tu.chromaFormat, topLeftLuma->lumaPos(), topLeftLuma->lumaSize(), true);
+#endif
     PelBuf piRecoY = cs.picture->getRecoBuf(lumaArea);
     int strideY = piRecoY.stride;
     int chromaScale = (1 << CSCALE_FP_PREC);
@@ -162,7 +187,11 @@ int  Reshape::calculateChromaAdjVpduNei(TransformUnit &tu, const CompArea &areaY
     int pelnum = 0;
     if (cuLeft != nullptr)
     {
+#if LMCS_CHROMA_CALC_CU
+      for (int i = 0; i < numNeighborLeft; i++)
+#else
       for (int i = 0; i < numNeighbor; i++)
+#endif
       {
         int k = (yPos + i) >= picH ? (picH - yPos - 1) : i;
         recLuma += recSrc0[-1 + k * strideY];
@@ -171,13 +200,23 @@ int  Reshape::calculateChromaAdjVpduNei(TransformUnit &tu, const CompArea &areaY
     }
     if (cuAbove != nullptr)
     {
+#if LMCS_CHROMA_CALC_CU
+      for (int i = 0; i < numNeighborAbove; i++)
+#else
       for (int i = 0; i < numNeighbor; i++)
+#endif
       {
         int k = (xPos + i) >= picW ? (picW - xPos - 1) : i;
         recLuma += recSrc0[-strideY + k];
         pelnum++;
       }
     }
+#if LMCS_CHROMA_CALC_CU
+    if (pelnum)
+    {
+      lumaValue = ClipPel((recLuma + (pelnum>>1)) / pelnum, tu.cs->slice->clpRng(COMPONENT_Y));
+    }
+#else
     if (pelnum == numNeighbor)
     {
       lumaValue = (recLuma + (1 << (numNeighborLog - 1))) >> numNeighborLog;
@@ -186,13 +225,16 @@ int  Reshape::calculateChromaAdjVpduNei(TransformUnit &tu, const CompArea &areaY
     {
       lumaValue = (recLuma + (1 << numNeighborLog)) >> (numNeighborLog + 1);
     }
+#endif
     else
     {
       CHECK(pelnum != 0, "");
       lumaValue = valueDC;
     }
     chromaScale = calculateChromaAdj(lumaValue);
+#if !LMCS_CHROMA_CALC_CU
     setChromaScale(chromaScale);
+#endif
     return(chromaScale);
   }
 }

@@ -44,8 +44,13 @@
 #include <vector>
 
 static constexpr int     PROB_BITS   = 15;   // Nominal number of bits to represent probabilities
+#if EC_HIGH_PRECISION
+static constexpr int     PROB_BITS_0 = 15;   // Number of bits to represent 1st estimate
+static constexpr int     PROB_BITS_1 = 15;   // Number of bits to represent 2nd estimate
+#else
 static constexpr int     PROB_BITS_0 = 10;   // Number of bits to represent 1st estimate
 static constexpr int     PROB_BITS_1 = 14;   // Number of bits to represent 2nd estimate
+#endif
 static constexpr int     MASK_0      = ~(~0u << PROB_BITS_0) << (PROB_BITS - PROB_BITS_0);
 static constexpr int     MASK_1      = ~(~0u << PROB_BITS_1) << (PROB_BITS - PROB_BITS_1);
 static constexpr uint8_t DWS         = 8;   // 0x47 Default window sizes
@@ -66,11 +71,13 @@ enum BPMType
 class ProbModelTables
 {
 protected:
+#if EC_HIGH_PRECISION
+	static const BinFracBits m_binFracBits[512];
+#else
   static const BinFracBits m_binFracBits[256];
+#endif
   static const uint8_t      m_RenormTable_32  [ 32];          // Std         MP   MPI
 };
-
-
 
 class BinProbModelBase : public ProbModelTables
 {
@@ -80,9 +87,6 @@ public:
   static uint32_t estFracBitsEP ()                    { return  (       1 << SCALE_BITS ); }
   static uint32_t estFracBitsEP ( unsigned numBins )  { return  ( numBins << SCALE_BITS ); }
 };
-
-
-
 
 class BinProbModel_Std : public BinProbModelBase
 {
@@ -124,8 +128,24 @@ public:
   }
   uint32_t        estFracBits(unsigned bin) const { return getFracBitsArray().intBits[bin]; }
   static uint32_t estFracBitsTrm(unsigned bin) { return (bin ? 0x3bfbb : 0x0010c); }
+#if EC_HIGH_PRECISION
+	BinFracBits     getFracBitsArray() const { return m_binFracBits[state_est()]; }
+#else
   BinFracBits     getFracBitsArray() const { return m_binFracBits[state()]; }
+#endif
 public:
+#if EC_HIGH_PRECISION
+	uint16_t state_est() const { return (m_state[0] + m_state[1]) >> 7; }
+	uint16_t state() const { return (m_state[0] + m_state[1]) >> 1; }
+	uint8_t mps() const { return state() >> 14; }
+	uint8_t getLPS(unsigned range) const
+	{
+		uint16_t q = state();
+		if (q & 0x4000)
+			q = q ^ 0x7fff;
+		return ((range * (q >> 6)) >> 9) + 1;
+	}
+#else
   uint8_t state() const { return (m_state[0] + m_state[1]) >> 8; }
   uint8_t mps() const { return state() >> 7; }
   uint8_t getLPS(unsigned range) const
@@ -135,6 +155,7 @@ public:
       q = q ^ 0xff;
     return ((q >> 2) * (range >> 5) >> 1) + 4;
   }
+#endif
   static uint8_t  getRenormBitsLPS  ( unsigned LPS )                    { return    m_RenormTable_32  [LPS>>3]; }
   static uint8_t  getRenormBitsRange( unsigned range )                  { return    1; }
   uint16_t getState() const { return m_state[0] + m_state[1]; }
@@ -146,16 +167,18 @@ public:
 public:
   uint64_t estFracExcessBits(const BinProbModel_Std &r) const
   {
+#if EC_HIGH_PRECISION
+		int n = 2 * state_est() + 1;
+		return ((1024 - n) * r.estFracBits(0) + n * r.estFracBits(1) + 512) >> 10;
+#else
     int n = 2 * state() + 1;
     return ((512 - n) * r.estFracBits(0) + n * r.estFracBits(1) + 256) >> 9;
+#endif
   }
 private:
   uint16_t m_state[2];
   uint8_t  m_rate;
 };
-
-
-
 
 
 
@@ -198,19 +221,33 @@ public:
   static const CtxSet   SplitQtFlag;
   static const CtxSet   SplitHvFlag;
   static const CtxSet   Split12Flag;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   static const CtxSet   ModeConsFlag;
+#endif
   static const CtxSet   SkipFlag;
   static const CtxSet   MergeFlag;
   static const CtxSet   RegularMergeFlag;
   static const CtxSet   MergeIdx;
+#if TM_MRG
+  static const CtxSet   TmMergeIdx;
+#endif
   static const CtxSet   PredMode;
   static const CtxSet   MultiRefLineIdx;
   static const CtxSet   IntraLumaMpmFlag;
+#if SECONDARY_MPM
+  static const CtxSet   IntraLumaSecondMpmFlag;
+#endif
   static const CtxSet   IntraLumaPlanarFlag;
+#if SECONDARY_MPM
+  static const CtxSet   IntraLumaMPMIdx;
+#endif
   static const CtxSet   CclmModeFlag;
   static const CtxSet   CclmModeIdx;
   static const CtxSet   IntraChromaPredMode;
   static const CtxSet   MipFlag;
+#if MMLM
+  static const CtxSet   MMLMFlag;
+#endif
   static const CtxSet   DeltaQP;
   static const CtxSet   InterDir;
   static const CtxSet   RefPic;
@@ -221,7 +258,20 @@ public:
   static const CtxSet   AffineFlag;
   static const CtxSet   AffineType;
   static const CtxSet   AffMergeIdx;
+#if AFFINE_MMVD
+  static const CtxSet   AfMmvdFlag;
+  static const CtxSet   AfMmvdIdx;
+  static const CtxSet   AfMmvdOffsetStep;
+#endif
+#if TM_MRG
+  static const CtxSet   TMMergeFlag;
+#endif
   static const CtxSet   Mvd;
+#if MULTI_HYP_PRED
+  static const CtxSet   MultiHypothesisFlag;
+  static const CtxSet   MHRefPic;
+  static const CtxSet   MHWeight;
+#endif
   static const CtxSet   BDPCMMode;
   static const CtxSet   QtRootCbf;
   static const CtxSet   ACTFlag;
@@ -256,6 +306,12 @@ public:
   static const CtxSet   ChromaQpAdjFlag;
   static const CtxSet   ChromaQpAdjIdc;
   static const CtxSet   ImvFlag;
+#if ENABLE_DIMD
+  static const CtxSet   DimdFlag;
+#endif
+#if ENABLE_OBMC
+  static const CtxSet   ObmcFlag;
+#endif 
   static const CtxSet   BcwIdx;
   static const CtxSet   ctbAlfFlag;
   static const CtxSet   ctbAlfAlternative;
@@ -266,6 +322,12 @@ public:
   static const CtxSet   IBCFlag;
   static const CtxSet   ISPMode;
   static const CtxSet   JointCbCrFlag;
+#if INTER_LIC
+  static const CtxSet   LICFlag;
+#endif
+#if SIGN_PREDICTION
+  static const CtxSet   signPred[2];
+#endif
   static const unsigned NumberOfContexts;
 
   // combined sets for less complex copying

@@ -145,11 +145,22 @@ static const int MAX_NUM_REF =                                     16; ///< max.
 static const int MAX_QP =                                          63;
 static const int NOT_VALID =                                       -1;
 
-
+#if TM_AMVP
+static const int REGULAR_AMVP_MAX_NUM_CANDS =                       5; ///< AMVP: advanced motion vector prediction - max number of final candidate for regular inter mode
+#endif
 static const int AMVP_MAX_NUM_CANDS =                               2; ///< AMVP: advanced motion vector prediction - max number of final candidates
 static const int AMVP_MAX_NUM_CANDS_MEM =                           3; ///< AMVP: advanced motion vector prediction - max number of candidates
+#if INTER_RM_SIZE_CONSTRAINTS
+static const int AMVP_DECIMATION_FACTOR =                           1;
+#else
 static const int AMVP_DECIMATION_FACTOR =                           2;
+#endif
+#if NON_ADJACENT_MRG_CAND
+static const int MRG_MAX_NUM_CANDS =                                15; ///< MERGE
+static const int LAST_MERGE_IDX_CABAC =                              5;
+#else
 static const int MRG_MAX_NUM_CANDS =                                6; ///< MERGE
+#endif
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFINE MERGE
 static const int IBC_MRG_MAX_NUM_CANDS =                            6; ///< IBC MERGE
 
@@ -158,7 +169,11 @@ static const int MAX_TLAYER =                                       7; ///< Expl
 static const int ADAPT_SR_SCALE =                                   1; ///< division factor for adaptive search range
 
 static const int MIN_TB_LOG2_SIZEY = 2;
-static const int MAX_TB_LOG2_SIZEY = 6;
+#if TU_256
+static const int MAX_TB_LOG2_SIZEY =                                8;
+#else
+static const int MAX_TB_LOG2_SIZEY =                                6;
+#endif
 
 static const int MIN_TB_SIZEY = 1 << MIN_TB_LOG2_SIZEY;
 static const int MAX_TB_SIZEY = 1 << MAX_TB_LOG2_SIZEY;
@@ -177,14 +192,28 @@ static const int MAX_VPS_OLS_MODE_IDC =                             2;
 static const int MAXIMUM_INTRA_FILTERED_WIDTH =                    16;
 static const int MAXIMUM_INTRA_FILTERED_HEIGHT =                   16;
 
+#if TU_256
+static const int MAX_INTRA_SIZE =                                  128;
+static const int MIP_MAX_WIDTH =                                   MAX_INTRA_SIZE;
+static const int MIP_MAX_HEIGHT =                                  MAX_INTRA_SIZE;
+#else
 static const int MIP_MAX_WIDTH =                                   MAX_TB_SIZEY;
 static const int MIP_MAX_HEIGHT =                                  MAX_TB_SIZEY;
+#endif
 
 static const int MAX_NUM_ALF_ALTERNATIVES_CHROMA =                  8;
 static const int MAX_NUM_ALF_CLASSES         =                     25;
+#if ALF_IMPROVEMENT
+static const int MAX_NUM_ALF_ALTERNATIVES_LUMA = 4;
+static const int EXT_LENGTH = 2;
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH;
+static const int MAX_NUM_ALF_CHROMA_COEFF    =                     21;
+static const int MAX_ALF_FILTER_LENGTH       =                      9;
+#else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     13;
 static const int MAX_NUM_ALF_CHROMA_COEFF    =                      7;
 static const int MAX_ALF_FILTER_LENGTH       =                      7;
+#endif
 static const int MAX_NUM_ALF_COEFF           =                     MAX_ALF_FILTER_LENGTH * MAX_ALF_FILTER_LENGTH / 2 + 1;
 static const int MAX_ALF_PADDING_SIZE        =                      4;
 #define MAX_NUM_CC_ALF_FILTERS                                      4
@@ -194,11 +223,18 @@ static constexpr int CCALF_BITS_PER_COEFF_LEVEL     =               3;
 
 static const int ALF_FIXED_FILTER_NUM        =                     64;
 static const int ALF_CTB_MAX_NUM_APS         =                      8;
+#if ALF_IMPROVEMENT
+static const int ALF_ORDER                   =                      4;
+static const int NUM_FIXED_FILTER_SETS       =                      2;
+#else 
 static const int NUM_FIXED_FILTER_SETS       =                     16;
 static const int NUM_TOTAL_FILTER_SETS       =                     NUM_FIXED_FILTER_SETS + ALF_CTB_MAX_NUM_APS;
+#endif
 
 
+#if !BDOF_RM_CONSTRAINTS
 static const int MAX_BDOF_APPLICATION_REGION =                     16;
+#endif
 
 static const int MAX_CPB_CNT =                                     32; ///< Upper bound of (cpb_cnt_minus1 + 1)
 static const int MAX_NUM_LAYER_IDS =                               64;
@@ -242,7 +278,11 @@ static const int MULTI_REF_LINE_IDX[4] =               { 0, 1, 2, 0 };
 static const int PRED_REG_MIN_WIDTH =                               4;  // Minimum prediction region width for ISP subblocks
 
 static const int NUM_LUMA_MODE =                                   67; ///< Planar + DC + 65 directional mode (4*16 + 1)
+#if MMLM
+static const int NUM_LMC_MODE = 1 + 2 + 3; ///< LMC + MDLM_T + MDLM_L + MMLM + MMLM_L + MMLM_T
+#else
 static const int NUM_LMC_MODE =                                    1 + 2; ///< LMC + MDLM_T + MDLM_L
+#endif
 static const int NUM_INTRA_MODE = (NUM_LUMA_MODE + NUM_LMC_MODE);
 
 static const int NUM_EXT_LUMA_MODE =                               28;
@@ -256,17 +296,41 @@ static const int VER_IDX =                    (3 * (NUM_DIR - 1) + 2); ///< inde
 static const int VDIA_IDX =                   (4 * (NUM_DIR - 1) + 2); ///< index for intra VDIAGONAL  mode
 static const int BDPCM_IDX =                  (5 * (NUM_DIR - 1) + 2); ///< index for intra VDIAGONAL  mode
 static const int NOMODE_IDX =                               MAX_UCHAR; ///< indicating uninitialized elements
-
 static const int NUM_CHROMA_MODE = (5 + NUM_LMC_MODE); ///< total number of chroma modes
 static const int LM_CHROMA_IDX = NUM_LUMA_MODE; ///< chroma mode index for derived from LM mode
+#if ENABLE_DIMD
+static const int DIMD_IDX =                                        99; ///< index for intra DIMD mode
+#endif
+#if MMLM
+static const int MMLM_CHROMA_IDX = LM_CHROMA_IDX + 1; ///< MDLM_L
+static const int MDLM_L_IDX = LM_CHROMA_IDX + 2; ///< MDLM_L
+static const int MMLM_L_IDX = LM_CHROMA_IDX + 3; ///< MDLM_T
+static const int MDLM_T_IDX = LM_CHROMA_IDX + 4; ///< MDLM_L
+static const int MMLM_T_IDX = LM_CHROMA_IDX + 5; ///< MDLM_T
+#else
 static const int MDLM_L_IDX =                          LM_CHROMA_IDX + 1; ///< MDLM_L
 static const int MDLM_T_IDX =                          LM_CHROMA_IDX + 2; ///< MDLM_T
+#endif
 static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE; ///< chroma mode index for derived from luma intra mode
 
 static const uint32_t  NUM_TRAFO_MODES_MTS =                            6; ///< Max Intra CU size applying EMT, supported values: 8, 16, 32, 64, 128
+#if TU_256
+static const uint32_t  MTS_INTRA_MAX_CU_SIZE =                         256; ///< Max Intra CU size applying EMT, supported values: 8, 16, 32, 64, 128
+static const uint32_t  MTS_INTER_MAX_CU_SIZE =                         256; ///< Max Inter CU size applying EMT, supported values: 8, 16, 32, 64, 128
+#else
 static const uint32_t  MTS_INTRA_MAX_CU_SIZE =                         32; ///< Max Intra CU size applying EMT, supported values: 8, 16, 32, 64, 128
 static const uint32_t  MTS_INTER_MAX_CU_SIZE =                         32; ///< Max Inter CU size applying EMT, supported values: 8, 16, 32, 64, 128
+#endif
+#if SECONDARY_MPM
+static const int NUM_PRIMARY_MOST_PROBABLE_MODES = 6;
+static const int NUM_SECONDARY_MOST_PROBABLE_MODES = 16;
+static const int NUM_MOST_PROBABLE_MODES = NUM_PRIMARY_MOST_PROBABLE_MODES + NUM_SECONDARY_MOST_PROBABLE_MODES;
+#if SECONDARY_MPM
+static const int NUM_NON_MPM_MODES = NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES;
+#endif
+#else
 static const int NUM_MOST_PROBABLE_MODES = 6;
+#endif
 static const int LM_SYMBOL_NUM = (1 + NUM_LMC_MODE);
 
 static const int MAX_NUM_MIP_MODE =                                32; ///< maximum number of MIP pred. modes
@@ -277,7 +341,11 @@ static const int MAX_LFNST_COEF_NUM =                              16;
 static const int LFNST_LAST_SIG_LUMA =                              1;
 static const int LFNST_LAST_SIG_CHROMA =                            1;
 
+#if EXTENDED_LFNST
+static const int NUM_LFNST_NUM_PER_SET =                            4;
+#else
 static const int NUM_LFNST_NUM_PER_SET =                            3;
+#endif
 
 static const int LOG2_MAX_NUM_COLUMNS_MINUS1 =                      7;
 static const int LOG2_MAX_NUM_ROWS_MINUS1 =                         7;
@@ -311,16 +379,25 @@ static const int RExt__PREDICTION_WEIGHTING_ANALYSIS_DC_PRECISION = 0; ///< Addi
 
 static const int MAX_TIMECODE_SEI_SETS =                            3; ///< Maximum number of time sets
 
+#if CTU_256
+static const int MAX_CU_DEPTH =                                     8; ///< log2(CTUSize)
+#else
 static const int MAX_CU_DEPTH =                                     7; ///< log2(CTUSize)
+#endif
 static const int MAX_CU_SIZE =                        1<<MAX_CU_DEPTH;
 static const int MIN_CU_LOG2 =                                      2;
 static const int MIN_PU_SIZE =                                      4;
 static const int MAX_NUM_PARTS_IN_CTU =                         ( ( MAX_CU_SIZE * MAX_CU_SIZE ) >> ( MIN_CU_LOG2 << 1 ) );
+#if !CONVERT_NUM_TU_SPLITS_TO_CFG
 static const int MAX_NUM_TUS =                                     16; ///< Maximum number of TUs within one CU. When max TB size is 32x32, up to 16 TUs within one CU (128x128) is supported
+#endif
 static const int MAX_LOG2_DIFF_CU_TR_SIZE =                         3;
 static const int MAX_CU_TILING_PARTITIONS = 1 << ( MAX_LOG2_DIFF_CU_TR_SIZE << 1 );
-
+#if TU_256
+static const int JVET_C0024_ZERO_OUT_TH =                          256;
+#else
 static const int JVET_C0024_ZERO_OUT_TH =                          32;
+#endif
 
 static const int MAX_NUM_PART_IDXS_IN_CTU_WIDTH = MAX_CU_SIZE/MIN_PU_SIZE; ///< maximum number of partition indices across the width of a CTU (or height of a CTU)
 static const int SCALING_LIST_REM_NUM =                             6;
@@ -341,7 +418,11 @@ static const int SCALING_LIST_BITS =                                8; ///< bit 
 static const int LOG2_SCALING_LIST_NEUTRAL_VALUE =                  4; ///< log2 of the value that, when used in a scaling list, has no effect on quantisation
 static const int SCALING_LIST_DC =                                 16; ///< default DC value
 
+#if TU_256
+static const int LAST_SIGNIFICANT_GROUPS =                         16;
+#else
 static const int LAST_SIGNIFICANT_GROUPS =                         14;
+#endif
 
 static const int AFFINE_MIN_BLOCK_SIZE =                            4; ///< Minimum affine MC block size
 
@@ -349,13 +430,26 @@ static const int MMVD_REFINE_STEP =                                 8; ///< max 
 static const int MMVD_MAX_REFINE_NUM =                              (MMVD_REFINE_STEP * 4); ///< max number of candidate from a base candidate
 static const int MMVD_BASE_MV_NUM =                                 2; ///< max number of base candidate
 static const int MMVD_ADD_NUM =                                     (MMVD_MAX_REFINE_NUM * MMVD_BASE_MV_NUM);///< total number of mmvd candidate
+#if MERGE_ENC_OPT
+static const int MMVD_MRG_MAX_RD_NUM =                              20;
+#else
 static const int MMVD_MRG_MAX_RD_NUM =                              MRG_MAX_NUM_CANDS;
+#endif
 static const int MMVD_MRG_MAX_RD_BUF_NUM =                          (MMVD_MRG_MAX_RD_NUM + 1);///< increase buffer size by 1
 
 static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_LUMA =      28;
 static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA =    28;
 
+#if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
+static const int BDOF_SUBPU_DIM_LOG2          =                     3;
+static const int BDOF_SUBPU_DIM               =                     (1 << BDOF_SUBPU_DIM_LOG2);
+static const int BDOF_SUBPU_MAX_NUM           =                     ((MAX_CU_SIZE * MAX_CU_SIZE) >> (BDOF_SUBPU_DIM_LOG2 << 1));
+static const int BDOF_SUBPU_STRIDE            =                     (MAX_CU_SIZE >> BDOF_SUBPU_DIM_LOG2);
+static const int BDOF_SUBPU_SIZE              =                     (1 << (BDOF_SUBPU_DIM_LOG2 << 1));
+static const int BIO_EXTEND_SIZE              =                     3;
+#else
 static const int BIO_EXTEND_SIZE              =                     1;
+#endif
 static const int BIO_TEMP_BUFFER_SIZE         =                     (MAX_CU_SIZE + 2 * BIO_EXTEND_SIZE) * (MAX_CU_SIZE + 2 * BIO_EXTEND_SIZE);
 
 static const int PROF_BORDER_EXT_W            =                     1;
@@ -363,7 +457,11 @@ static const int PROF_BORDER_EXT_H            =                     1;
 static const int BCW_NUM =                                          5; ///< the number of weight options
 static const int BCW_DEFAULT =                                      ((uint8_t)(BCW_NUM >> 1)); ///< Default weighting index representing for w=0.5
 static const int BCW_SIZE_CONSTRAINT =                            256; ///< disabling Bcw if cu size is smaller than 256
+#if NON_ADJACENT_MRG_CAND
+static const int MAX_NUM_HMVP_CANDS =                              5; ///< maximum number of HMVP candidates to be stored and used in merge list
+#else
 static const int MAX_NUM_HMVP_CANDS =                              (MRG_MAX_NUM_CANDS-1); ///< maximum number of HMVP candidates to be stored and used in merge list
+#endif
 static const int MAX_NUM_HMVP_AVMPCANDS =                          4; ///< maximum number of HMVP candidates to be used in AMVP list
 
 static const int ALF_VB_POS_ABOVE_CTUROW_LUMA = 4;
@@ -381,7 +479,11 @@ static const int DMVR_SUBCU_WIDTH = 16;
 static const int DMVR_SUBCU_HEIGHT = 16;
 static const int DMVR_SUBCU_WIDTH_LOG2 = 4;
 static const int DMVR_SUBCU_HEIGHT_LOG2 = 4;
+static const int DMVR_SUBPU_STRIDE = (MAX_CU_SIZE >> DMVR_SUBCU_WIDTH_LOG2);
 static const int MAX_NUM_SUBCU_DMVR = ((MAX_CU_SIZE * MAX_CU_SIZE) >> (DMVR_SUBCU_WIDTH_LOG2 + DMVR_SUBCU_HEIGHT_LOG2));
+#if MULTI_PASS_DMVR
+static const int MAX_NUM_SUBCU_DMVR_LOG2 = MAX_CU_DEPTH + MAX_CU_DEPTH - DMVR_SUBCU_WIDTH_LOG2 - DMVR_SUBCU_HEIGHT_LOG2;
+#endif
 static const int DMVR_NUM_ITERATION = 2;
 
 //QTBT high level parameters
@@ -402,20 +504,70 @@ static const int    PICTURE_DISTANCE_TH =                           1;
 static const int    FAST_SKIP_DEPTH =                               2;
 
 static const double PBINTRA_RATIO     =                             1.1;
+#if !MERGE_ENC_OPT
 static const int    NUM_MRG_SATD_CAND =                             4;
+#endif
 static const double MRG_FAST_RATIO    =                             1.25;
 static const int    NUM_AFF_MRG_SATD_CAND =                         2;
+#if AFFINE_MMVD
+static const int    AF_MMVD_BASE_NUM =                              1;
+static const int    AF_MMVD_STEP_NUM =                              5; // number of distance offset
+static const int    AF_MMVD_OFFSET_DIR =                            4; // 00: (+, 0); 01: (-, 0); 10: (0, +); 11 (0, -);
+static const int    AF_MMVD_MAX_REFINE_NUM = AF_MMVD_STEP_NUM * AF_MMVD_OFFSET_DIR; ///< max number of candidate from a base candidate
+static const int    AF_MMVD_NUM = AF_MMVD_BASE_NUM * AF_MMVD_MAX_REFINE_NUM;        ///< total number of affine mmvd candidate
+#if !MERGE_ENC_OPT
+static const int    NUM_AF_MMVD_SATD_CAND = std::min((int)1, MRG_MAX_NUM_CANDS);
+#endif
+#endif
+#if INTER_LIC
+static const int    LIC_MIN_CU_PIXELS =                            32; ///< smallest CU size (in terms of number of luma samples) of LIC
+static const double LIC_AMVP_SKIP_TH  =                           1.2; ///< Given a IMV mode, LIC is not tested if RD cost of non-LIC IMV AMVP mode is 1.2x worse than the current best RD cost
+#endif
+#if TM_AMVP || TM_MRG
+static const int    TM_TPL_SIZE =                                   4; ///< template size for template matching
+static const int    TM_SEARCH_RANGE =                               8; ///< search range (in pixel) of TM refinement
+static const int    TM_MIN_CU_SIZE_FOR_ALT_WEIGHTED_COST =          8; ///< minimal CU size (both width and height) to use alternative weight to compute template matching cost
+static const int    TM_MAX_NUM_OF_ITERATIONS =                    375; ///< maximum number of refinement loops for entire CU in template mode
+static const int    TM_LOG2_BASE_WEIGHT =                           5; ///< base weight of weighted template matching in log2 scale
+static const int    TM_DISTANCE_WEIGHTS[][4] = { { 0, 1, 2, 3 }, { 1, 2, 3, 3 } }; ///< far to near
+static const int    TM_SPATIAL_WEIGHTS [][4] = { { 2, 2, 2, 2 }, { 0, 1, 1, 2 } }; ///< "left to right for above template" or "top to bottom for left template"
+#if TM_MRG
+static const int    TM_MRG_MAX_NUM_CANDS =                          4; ///< maximum number of TM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
+#if MERGE_ENC_OPT
+static const int    TM_MAX_NUM_SATD_CAND = std::min((int)2, TM_MRG_MAX_NUM_CANDS);
+#else
+static const int    TM_MAX_NUM_SATD_CAND = std::min((int)4, TM_MRG_MAX_NUM_CANDS);
+#endif
+#endif
+#endif
+#if MULTI_PASS_DMVR
+static const int    BDMVR_INTME_RANGE =                             8; ///< Bilateral matching search range (n represents for -n pel to n pel, inclusive)
+static const int    BDMVR_INTME_STRIDE = (BDMVR_INTME_RANGE << 1) + 1; ///< Bilateral matching search stride
+static const int    BDMVR_INTME_AREA   = BDMVR_INTME_STRIDE * BDMVR_INTME_STRIDE; ///< Bilateral matching search area
+static const int    BDMVR_INTME_CENTER = BDMVR_INTME_STRIDE * BDMVR_INTME_RANGE + BDMVR_INTME_RANGE; ///< Bilateral matching search area center
+static const int    BDMVR_SIMD_IF_FACTOR =                          8; ///< Specify the pixel alignment factor for SIMD IF. (Usually this factor is 8)
+static const int    BDMVR_INTME_MAX_NUM_SEARCH_ITERATION =         26; ///< for entire CU in bilateral mode, maximum number of refinement loops
+#endif
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+static const int    DECODER_SIDE_MV_WEIGHT =                        4; ///< lambda for decoder-side derived MVs
+#endif
 
 static const double AMAXBT_TH32 =                                  15.0;
 static const double AMAXBT_TH64 =                                  30.0;
+#if CTU_256
+static const double AMAXBT_TH128 =                                 60.0;
+#endif
 
 // need to know for static memory allocation
 static const int MAX_DELTA_QP   =                                   7;      ///< maximum supported delta QP value
 static const int MAX_TESTED_QPs =   ( 1 + 1 + ( MAX_DELTA_QP << 1 ) );      ///< dqp=0 +- max_delta_qp + lossless mode
 
 static const int COM16_C806_TRANS_PREC =                            0;
-
+#if IF_12TAP
+#define NTAPS_LUMA(x)                           ( (x) == 0 ? 12 : 8 )  // 12-tap filter for index 0. 8-tap fitler for other indices.
+#else
 static const int NTAPS_LUMA               =                         8; ///< Number of taps for luma
+#endif
 static const int NTAPS_CHROMA             =                         4; ///< Number of taps for chroma
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
 static const int MAX_LADF_INTERVALS       =                         5; /// max number of luma adaptive deblocking filter qp offset intervals
@@ -423,8 +575,17 @@ static const int MAX_LADF_INTERVALS       =                         5; /// max n
 
 static const int NTAPS_BILINEAR           =                         2; ///< Number of taps for bilinear filter
 
+#if INTER_RM_SIZE_CONSTRAINTS
+static const int ATMVP_SUB_BLOCK_SIZE =                             2; ///< sub-block size for ATMVP
+#else
 static const int ATMVP_SUB_BLOCK_SIZE =                             3; ///< sub-block size for ATMVP
+#endif
+
+#if NON_ADJACENT_MRG_CAND
+static const int GEO_MAX_NUM_UNI_CANDS =                            15;
+#else
 static const int GEO_MAX_NUM_UNI_CANDS =                            6;
+#endif
 static const int GEO_MAX_NUM_CANDS = GEO_MAX_NUM_UNI_CANDS * (GEO_MAX_NUM_UNI_CANDS - 1);
 static const int GEO_MIN_CU_LOG2 =                                  3;
 static const int GEO_MAX_CU_LOG2 =                                  6;
@@ -440,15 +601,23 @@ static const int GEO_MV_MASK_SIZE =         GEO_WEIGHT_MASK_SIZE >> 2;
 static const int GEO_MAX_TRY_WEIGHTED_SAD = 60;
 static const int GEO_MAX_TRY_WEIGHTED_SATD = 8;
 
+#if ENABLE_OBMC
+static const int defaultWeight[2][4] = { {27, 16, 6, 0}, {27, 0, 0, 0} };
+#endif
+
+#if TU_256
+static const int SBT_MAX_SIZE =                          MAX_TB_SIZEY; ///< maximum CU size for using SBT
+#else
 static const int SBT_MAX_SIZE =                                    64; ///< maximum CU size for using SBT
+#endif
 static const int SBT_NUM_SL =                                      10; ///< maximum number of historical PU decision saved for a CU
 static const int SBT_NUM_RDO =                                      2; ///< maximum number of SBT mode tried for a PU
-
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
 static const int NUM_INTER_CU_INFO_SAVE =                           8; ///< maximum number of inter cu information saved for fast algorithm
 static const int LDT_MODE_TYPE_INHERIT =                            0; ///< No need to signal mode_constraint_flag, and the modeType of the region is inherited from its parent node
 static const int LDT_MODE_TYPE_INFER =                              1; ///< No need to signal mode_constraint_flag, and the modeType of the region is inferred as MODE_TYPE_INTRA
 static const int LDT_MODE_TYPE_SIGNAL =                             2; ///< Need to signal mode_constraint_flag, and the modeType of the region is determined by the flag
-
+#endif
 static const int IBC_MAX_CAND_SIZE = 16; // max block size for ibc search
 static const int IBC_NUM_CANDIDATES = 64; ///< Maximum number of candidates to store/test
 static const int CHROMA_REFINEMENT_CANDIDATES = 8; /// 8 candidates BV to choose from
@@ -495,6 +664,29 @@ static const int SCALE_RATIO_BITS =                              14;
 static const int MAX_SCALING_RATIO =                              2;  // max downsampling ratio for RPR
 static const std::pair<int, int> SCALE_1X = std::pair<int, int>( 1 << SCALE_RATIO_BITS, 1 << SCALE_RATIO_BITS );  // scale ratio 1x
 static const int DELTA_QP_ACT[4] =                  { -5, 1, 3, 1 };
+
+#if SIGN_PREDICTION
+static const int SIGN_PRED_MAX_NUM      = 8;
+static const int SIGN_PRED_MAX_BS       = 128; ///< not configurable
+static const int SIGN_PRED_MAX_BS_INTRA = 32;
+static const int SIGN_PRED_MAX_BS_INTER = 128;
+static const int SIGN_PRED_FREQ_RANGE   = 4; ///< not configurable
+static const int SIGN_PRED_SHIFT        = 8; ///< not configurable
+static const int SIGN_PRED_OFFSET       = 1 << ( SIGN_PRED_SHIFT - 1 ); ///< not configurable
+#endif
+#if MULTI_HYP_PRED
+static const auto MULTI_HYP_PRED_MAX_CANDS = 4;
+static const auto MULTI_HYP_PRED_NUM_WEIGHTS = 2;
+static const auto MULTI_HYP_PRED_WEIGHT_BITS = 3;
+static const auto MULTI_HYP_PRED_SEARCH_RANGE = 16;
+#endif
+#if NON_ADJACENT_MRG_CAND || TM_AMVP
+static const auto NADISTANCE_LEVEL =                             4;
+#endif
+#if MULTI_HYP_PRED
+static const auto MULTI_HYP_PRED_RESTRICT_BLOCK_SIZE =          64; // disable multi-hyp for all blocks <= this number
+static const auto MULTI_HYP_PRED_RESTRICT_MIN_WH =               8;
+#endif
 
 // ====================================================================================================================
 // Macro functions
@@ -692,6 +884,24 @@ static inline int ceilLog2(uint32_t x)
   return (x==0) ? -1 : floorLog2(x - 1) + 1;
 }
 
+#if INTER_LIC
+static inline int getMSB(unsigned x)
+{
+  int msb = 0, bits = (sizeof(int) << 3), y = 1;
+  while (x > 1u)
+  {
+    bits >>= 1;
+    y = x >> bits;
+    if (y)
+    {
+      x = y;
+      msb += bits;
+    }
+}
+  msb += y;
+  return msb;
+}
+#endif
 
 //CASE-BREAK for breakpoints
 #if defined ( _MSC_VER ) && defined ( _DEBUG )
@@ -722,6 +932,16 @@ static const uint32_t CCALF_CANDS_COEFF_NR = 8;
 static const int CCALF_SMALL_TAB[CCALF_CANDS_COEFF_NR] = { 0, 1, 2, 4, 8, 16, 32, 64 };
 
 //! \}
+#if ALF_IMPROVEMENT
+static const int NUM_FIXED_FILTERS       = 512;
+static const int ALF_CLASSIFIER_FL       = 5;
+static const int NUM_CLASSIFIER          = 2;
+static const int NUM_SETS_FIXED_FILTERS  = 8;
+static const int NUM_DIR_FIX             = 7;
+static const int NUM_ACT_FIX             = 16;
+static const int NUM_CLASSES_FIX         = ((NUM_DIR_FIX*(NUM_DIR_FIX + 1))*NUM_ACT_FIX);
+static const int MAX_FILTER_LENGTH_FIXED = 13;
+static const int FIX_FILTER_NUM_COEFF    = 42;
+#endif
 
 #endif // end of #ifndef  __COMMONDEF__
-

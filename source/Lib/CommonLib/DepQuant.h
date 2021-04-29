@@ -55,6 +55,9 @@ public:
 
   virtual void quant  ( TransformUnit &tu, const ComponentID &compID, const CCoeffBuf &pSrc, TCoeff &uiAbsSum, const QpParam &cQP, const Ctx& ctx );
   virtual void dequant( const TransformUnit &tu, CoeffBuf &dstCoeff, const ComponentID &compID, const QpParam &cQP );
+#if SIGN_PREDICTION
+  static uint32_t getPredictedSigns( TransformUnit& tu, const ComponentID compID, std::vector<Position> &predSignsXY );
+#endif
 
 private:
   void* p;

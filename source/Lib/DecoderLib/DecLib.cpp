@@ -207,6 +207,9 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                   pcEncPic->resizeAlfCtbFilterIndex(pic->cs->pcv->sizeInCtus);
                   memcpy( pcEncPic->getAlfCtbFilterIndex(), pic->getAlfCtbFilterIndex(), sizeof(short)*pic->cs->pcv->sizeInCtus );
 
+#if ALF_IMPROVEMENT
+                  std::copy(pic->getAlfCtuAlternative(COMPONENT_Y).begin(), pic->getAlfCtuAlternative(COMPONENT_Y).end(), pcEncPic->getAlfCtuAlternative(COMPONENT_Y).begin());
+#endif
                   std::copy( pic->getAlfCtuAlternative(COMPONENT_Cb).begin(), pic->getAlfCtuAlternative(COMPONENT_Cb).end(), pcEncPic->getAlfCtuAlternative(COMPONENT_Cb).begin() );
                   std::copy( pic->getAlfCtuAlternative(COMPONENT_Cr).begin(), pic->getAlfCtuAlternative(COMPONENT_Cr).end(), pcEncPic->getAlfCtuAlternative(COMPONENT_Cr).begin() );
 
@@ -216,6 +219,9 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                     pcEncPic->slices[i]->setAlfAPSs(pic->slices[i]->getTileGroupApsIdLuma());
                     pcEncPic->slices[i]->setAlfAPSs(pic->slices[i]->getAlfAPSs());
                     pcEncPic->slices[i]->setTileGroupApsIdChroma(pic->slices[i]->getTileGroupApsIdChroma());
+#if ALF_IMPROVEMENT 
+                    pcEncPic->slices[i]->setTileGroupAlfFixedFilterSetIdx(pic->slices[i]->getTileGroupAlfFixedFilterSetIdx());
+#endif
                     pcEncPic->slices[i]->setTileGroupAlfEnabledFlag(COMPONENT_Y,  pic->slices[i]->getTileGroupAlfEnabledFlag(COMPONENT_Y));
                     pcEncPic->slices[i]->setTileGroupAlfEnabledFlag(COMPONENT_Cb, pic->slices[i]->getTileGroupAlfEnabledFlag(COMPONENT_Cb));
                     pcEncPic->slices[i]->setTileGroupAlfEnabledFlag(COMPONENT_Cr, pic->slices[i]->getTileGroupAlfEnabledFlag(COMPONENT_Cr));
@@ -635,8 +641,24 @@ void DecLib::executeLoopFilters()
       m_cSAO.setReshaper(&m_cReshaper);
   }
   // deblocking filter
+#if DB_PARAM_TID
+  const PPS* pcPPS = cs.slice->getPPS();
+  if( !cs.slice->getDeblockingFilterOverrideFlag() )
+  {
+    int betaIdx = Clip3(0, (int)pcPPS->getDeblockingFilterBetaOffsetDiv2().size()-1, (int)cs.slice->getTLayer() + (cs.slice->isIntra() ? 0 : 1));
+    int tcIdx = Clip3(0, (int)pcPPS->getDeblockingFilterTcOffsetDiv2().size() - 1, (int)cs.slice->getTLayer() + (cs.slice->isIntra() ? 0 : 1));
+    cs.slice->setDeblockingFilterBetaOffsetDiv2(pcPPS->getDeblockingFilterBetaOffsetDiv2()[betaIdx]);
+    cs.slice->setDeblockingFilterTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx]);
+    cs.slice->setDeblockingFilterCbBetaOffsetDiv2(pcPPS->getDeblockingFilterBetaOffsetDiv2()[betaIdx]);
+    cs.slice->setDeblockingFilterCbTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx]);
+    cs.slice->setDeblockingFilterCrBetaOffsetDiv2(pcPPS->getDeblockingFilterBetaOffsetDiv2()[betaIdx]);
+    cs.slice->setDeblockingFilterCrTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx]);
+  }
+#endif
   m_cLoopFilter.loopFilterPic( cs );
+#if !MULTI_PASS_DMVR
   CS::setRefinedMotionField(cs);
+#endif
   if( cs.sps->getSAOEnabledFlag() )
   {
     m_cSAO.SAOProcess( cs, cs.picture->getSAO() );
@@ -662,16 +684,12 @@ void DecLib::executeLoopFilters()
       uint32_t right = SubPicNoUse.getSubPicRight();
       uint32_t top   = SubPicNoUse.getSubPicTop();
       uint32_t bottom= SubPicNoUse.getSubPicBottom();
-      for (uint32_t row = top; row <= bottom; row++)
-      {
-        for (uint32_t col = left; col <= right; col++)
-        {
-          cs.getRecoBuf().Y().at(col, row) = 0;
-          // for test only, hard coding using 4:2:0 chroma format
-          cs.getRecoBuf().Cb().at(col>>1, row>>1) = 0;
-          cs.getRecoBuf().Cr().at(col>>1, row>>1) = 0;
-        }
-      }
+      PelBuf bufY = cs.getRecoBuf().Y().subBuf(left, top, right - left + 1, bottom - top + 1);
+      PelBuf bufCb = cs.getRecoBuf().Cb().subBuf(left >> 1, top >> 1, (right >> 1) - (left >>1) + 1, (bottom>>1) - (top>>1) + 1);
+      PelBuf bufCr = cs.getRecoBuf().Cr().subBuf(left >> 1, top >> 1, (right >> 1) - (left >> 1) + 1, (bottom >> 1) - (top >> 1) + 1);
+      bufY.fill(0);
+      bufCb.fill(0);
+      bufCr.fill(0);
     }
   }
 
@@ -1597,7 +1615,11 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
                    log2SaoOffsetScaleLuma, log2SaoOffsetScaleChroma );
     m_cLoopFilter.create(maxDepth);
     m_cIntraPred.init( sps->getChromaFormatIdc(), sps->getBitDepth( CHANNEL_TYPE_LUMA ) );
+#if INTER_LIC || (TM_AMVP || TM_MRG)
+    m_cInterPred.init( &m_cRdCost, sps->getChromaFormatIdc(), sps->getMaxCUHeight(), &m_cReshaper);
+#else
     m_cInterPred.init( &m_cRdCost, sps->getChromaFormatIdc(), sps->getMaxCUHeight() );
+#endif
     if (sps->getUseLmcs())
     {
       m_cReshaper.createDec(sps->getBitDepth(CHANNEL_TYPE_LUMA));
@@ -2029,7 +2051,13 @@ void DecLib::xParsePrefixSEImessages()
 void DecLib::xDecodePicHeader( InputNALUnit& nalu )
 {
   m_HLSReader.setBitstream( &nalu.getBitstream() );
+
+#if EMBEDDED_APS
+  m_HLSReader.parsePictureHeader( &m_picHeader, &m_parameterSetManager, true, nalu.m_temporalId, nalu.m_nuhLayerId, m_accessUnitApsNals );
+#else
   m_HLSReader.parsePictureHeader( &m_picHeader, &m_parameterSetManager, true );
+#endif
+
   m_picHeader.setValid();
 }
 
@@ -2076,7 +2104,12 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
 
   m_HLSReader.setBitstream( &nalu.getBitstream() );
   m_apcSlicePilot->m_ccAlfFilterParam = m_cALF.getCcAlfFilterParam();
+
+#if EMBEDDED_APS
+  m_HLSReader.parseSliceHeader( m_apcSlicePilot, &m_picHeader, &m_parameterSetManager, m_prevTid0POC, m_prevPicPOC, nalu.m_nuhLayerId, m_accessUnitApsNals );
+#else
   m_HLSReader.parseSliceHeader( m_apcSlicePilot, &m_picHeader, &m_parameterSetManager, m_prevTid0POC, m_prevPicPOC );
+#endif
 
   if (m_picHeader.getGdrOrIrapPicFlag() && m_bFirstSliceInPicture)
   {
@@ -2661,6 +2694,9 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
 
     //---------------
     pcSlice->setRefPOCList();
+#if MULTI_HYP_PRED 
+    CHECK(pcSlice->getMultiHypRefPicList().size() != pcSlice->getNumMultiHypRefPics(), "error with number of multi-hyp ref pics");
+#endif
 
     NalUnitInfo naluInfo;
     naluInfo.m_nalUnitType = nalu.m_nalUnitType;
@@ -2795,7 +2831,9 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
         m_cReshaper.setRecReshaped(false);
       }
     }
+#if !LMCS_CHROMA_CALC_CU
     m_cReshaper.setVPDULoc(-1, -1);
+#endif
   }
   else
   {
@@ -2920,7 +2958,11 @@ void DecLib::xDecodeAPS(InputNALUnit& nalu)
 {
   APS* aps = new APS();
   m_HLSReader.setBitstream(&nalu.getBitstream());
-  m_HLSReader.parseAPS(aps);
+#if EMBEDDED_APS
+  m_HLSReader.parseAPS( aps, true );
+#else
+  m_HLSReader.parseAPS( aps );
+#endif
   aps->setTemporalId(nalu.m_temporalId);
   aps->setLayerId( nalu.m_nuhLayerId );
   aps->setHasPrefixNalUnitType( nalu.m_nalUnitType == NAL_UNIT_PREFIX_APS );

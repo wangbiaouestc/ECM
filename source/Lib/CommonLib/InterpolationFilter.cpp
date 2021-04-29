@@ -54,8 +54,30 @@ CacheModel* InterpolationFilter::m_cacheModel;
 // ====================================================================================================================
 // Tables
 // ====================================================================================================================
+#if IF_12TAP
+const TFilterCoeff InterpolationFilter::m_lumaFilter4x4[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8] =
+#else
 const TFilterCoeff InterpolationFilter::m_lumaFilter4x4[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_LUMA] =
+#endif
 {
+#if IF_12TAP
+  {  0, 0,   0, 64 * 4,  0,   0,  0,  0 },
+  {  0, 1 * 4,  -3 * 4, 63 * 4,  4 * 4,  -2 * 4,  1 * 4,  0 },
+  {  0, 1 * 4,  -5 * 4, 62 * 4,  8 * 4,  -3 * 4,  1 * 4,  0 },
+  {  0, 2 * 4,  -8 * 4, 60 * 4, 13 * 4,  -4 * 4,  1 * 4,  0 },
+  {  0, 3 * 4, -10 * 4, 58 * 4, 17 * 4,  -5 * 4,  1 * 4,  0 }, //1/4
+  {  0, 3 * 4, -11 * 4, 52 * 4, 26 * 4,  -8 * 4,  2 * 4,  0 },
+  {  0, 2 * 4,  -9 * 4, 47 * 4, 31 * 4, -10 * 4,  3 * 4,  0 },
+  {  0, 3 * 4, -11 * 4, 45 * 4, 34 * 4, -10 * 4,  3 * 4,  0 },
+  {  0, 3 * 4, -11 * 4, 40 * 4, 40 * 4, -11 * 4,  3 * 4,  0 }, //1/2
+  {  0, 3 * 4, -10 * 4, 34 * 4, 45 * 4, -11 * 4,  3 * 4,  0 },
+  {  0, 3 * 4, -10 * 4, 31 * 4, 47 * 4,  -9 * 4,  2 * 4,  0 },
+  {  0, 2 * 4,  -8 * 4, 26 * 4, 52 * 4, -11 * 4,  3 * 4,  0 },
+  {  0, 1 * 4,  -5 * 4, 17 * 4, 58 * 4, -10 * 4,  3 * 4,  0 }, //3/4
+  {  0, 1 * 4,  -4 * 4, 13 * 4, 60 * 4,  -8 * 4,  2 * 4,  0 },
+  {  0, 1 * 4,  -3 * 4,  8 * 4, 62 * 4,  -5 * 4,  1 * 4,  0 },
+  {  0, 1 * 4,  -2 * 4,  4 * 4, 63 * 4,  -3 * 4,  1 * 4,  0 }
+#else
   {  0, 0,   0, 64,  0,   0,  0,  0 },
   {  0, 1,  -3, 63,  4,  -2,  1,  0 },
   {  0, 1,  -5, 62,  8,  -3,  1,  0 },
@@ -72,8 +94,53 @@ const TFilterCoeff InterpolationFilter::m_lumaFilter4x4[LUMA_INTERPOLATION_FILTE
   {  0, 1,  -4, 13, 60,  -8,  2,  0 },
   {  0, 1,  -3,  8, 62,  -5,  1,  0 },
   {  0, 1,  -2,  4, 63,  -3,  1,  0 }
+#endif
 };
-
+#if IF_12TAP
+// from higher cut-off freq to lower cut-off freq.
+const TFilterCoeff InterpolationFilter::m_lumaFilter12[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12] =
+{
+    { 0,     0,     0,     0,     0,   256,     0,     0,     0,     0,     0,     0, },
+    {-1,     2,    -3,     6,   -14,   254,    16,    -7,     4,    -2,     1,     0, },
+    {-1,     3,    -7,    12,   -26,   249,    35,   -15,     8,    -4,     2,     0, },
+    {-2,     5,    -9,    17,   -36,   241,    54,   -22,    12,    -6,     3,    -1, },
+    {-2,     5,   -11,    21,   -43,   230,    75,   -29,    15,    -8,     4,    -1, },
+    {-2,     6,   -13,    24,   -48,   216,    97,   -36,    19,   -10,     4,    -1, },
+    {-2,     7,   -14,    25,   -51,   200,   119,   -42,    22,   -12,     5,    -1, },
+    {-2,     7,   -14,    26,   -51,   181,   140,   -46,    24,   -13,     6,    -2, },
+    {-2,     6,   -13,    25,   -50,   162,   162,   -50,    25,   -13,     6,    -2, },
+    {-2,     6,   -13,    24,   -46,   140,   181,   -51,    26,   -14,     7,    -2, },
+    {-1,     5,   -12,    22,   -42,   119,   200,   -51,    25,   -14,     7,    -2, },
+    {-1,     4,   -10,    19,   -36,    97,   216,   -48,    24,   -13,     6,    -2, },
+    {-1,     4,    -8,    15,   -29,    75,   230,   -43,    21,   -11,     5,    -2, },
+    {-1,     3,    -6,    12,   -22,    54,   241,   -36,    17,    -9,     5,    -2, },
+    { 0,     2,    -4,     8,   -15,    35,   249,   -26,    12,    -7,     3,    -1, },
+    { 0,     1,    -2,     4,    -7,    16,   254,   -14,     6,    -3,     2,    -1, },
+#if SIMD_4x4_12
+    {  0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0  }  // dummy line for SIMD reading of 2 chunks for 12-tap filter not to address wrong memory //kolya
+#endif
+};
+// This is used for affine
+const TFilterCoeff InterpolationFilter::m_lumaFilter[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8] =
+{
+  {      0,     0,       0, 64 * 4,      0,       0,      0,      0 },
+  {      0, 1 * 4,  -3 * 4, 63 * 4,  4 * 4,  -2 * 4,  1 * 4,      0 },
+  { -1 * 4, 2 * 4,  -5 * 4, 62 * 4,  8 * 4,  -3 * 4,  1 * 4,      0 },
+  { -1 * 4, 3 * 4,  -8 * 4, 60 * 4, 13 * 4,  -4 * 4,  1 * 4,      0 },
+  { -1 * 4, 4 * 4, -10 * 4, 58 * 4, 17 * 4,  -5 * 4,  1 * 4,      0 },
+  { -1 * 4, 4 * 4, -11 * 4, 52 * 4, 26 * 4,  -8 * 4,  3 * 4, -1 * 4 },
+  { -1 * 4, 3 * 4,  -9 * 4, 47 * 4, 31 * 4, -10 * 4,  4 * 4, -1 * 4 },
+  { -1 * 4, 4 * 4, -11 * 4, 45 * 4, 34 * 4, -10 * 4,  4 * 4, -1 * 4 },
+  { -1 * 4, 4 * 4, -11 * 4, 40 * 4, 40 * 4, -11 * 4,  4 * 4, -1 * 4 },
+  { -1 * 4, 4 * 4, -10 * 4, 34 * 4, 45 * 4, -11 * 4,  4 * 4, -1 * 4 },
+  { -1 * 4, 4 * 4, -10 * 4, 31 * 4, 47 * 4,  -9 * 4,  3 * 4, -1 * 4 },
+  { -1 * 4, 3 * 4,  -8 * 4, 26 * 4, 52 * 4, -11 * 4,  4 * 4, -1 * 4 },
+  {      0, 1 * 4,  -5 * 4, 17 * 4, 58 * 4, -10 * 4,  4 * 4, -1 * 4 },
+  {      0, 1 * 4,  -4 * 4, 13 * 4, 60 * 4,  -8 * 4,  3 * 4, -1 * 4 },
+  {      0, 1 * 4,  -3 * 4,  8 * 4, 62 * 4,  -5 * 4,  2 * 4, -1 * 4 },
+  {      0, 1 * 4,  -2 * 4,  4 * 4, 63 * 4,  -3 * 4,  1 * 4,      0 }
+};
+#else
 const TFilterCoeff InterpolationFilter::m_lumaFilter[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_LUMA] =
 {
   {  0, 0,   0, 64,  0,   0,  0,  0 },
@@ -93,10 +160,32 @@ const TFilterCoeff InterpolationFilter::m_lumaFilter[LUMA_INTERPOLATION_FILTER_S
   {  0, 1,  -3,  8, 62,  -5,  2, -1 },
   {  0, 1,  -2,  4, 63,  -3,  1,  0 }
 };
-
+#endif
 // 1.5x
+#if IF_12TAP
+const TFilterCoeff InterpolationFilter::m_lumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8] =
+#else
 const TFilterCoeff InterpolationFilter::m_lumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_LUMA] =
+#endif
 {
+#if IF_12TAP
+  { -1 * 4, -5 * 4, 17 * 4, 42 * 4, 17 * 4, -5 * 4, -1 * 4,      0 },
+  {      0, -5 * 4, 15 * 4, 41 * 4, 19 * 4, -5 * 4, -1 * 4,      0 },
+  {      0, -5 * 4, 13 * 4, 40 * 4, 21 * 4, -4 * 4, -1 * 4,      0 },
+  {      0, -5 * 4, 11 * 4, 39 * 4, 24 * 4, -4 * 4, -2 * 4,  1 * 4 },
+  {      0, -5 * 4,  9 * 4, 38 * 4, 26 * 4, -3 * 4, -2 * 4,  1 * 4 },
+  {      0, -5 * 4,  7 * 4, 38 * 4, 28 * 4, -2 * 4, -3 * 4,  1 * 4 },
+  {  1 * 4, -5 * 4,  5 * 4, 36 * 4, 30 * 4, -1 * 4, -3 * 4,  1 * 4 },
+  {  1 * 4, -4 * 4,  3 * 4, 35 * 4, 32 * 4,      0, -4 * 4,  1 * 4 },
+  {  1 * 4, -4 * 4,  2 * 4, 33 * 4, 33 * 4,  2 * 4, -4 * 4,  1 * 4 },
+  {  1 * 4, -4 * 4,      0, 32 * 4, 35 * 4,  3 * 4, -4 * 4,  1 * 4 },
+  {  1 * 4, -3 * 4, -1 * 4, 30 * 4, 36 * 4,  5 * 4, -5 * 4,  1 * 4 },
+  {  1 * 4, -3 * 4, -2 * 4, 28 * 4, 38 * 4,  7 * 4, -5 * 4,      0 },
+  {  1 * 4, -2 * 4, -3 * 4, 26 * 4, 38 * 4,  9 * 4, -5 * 4,      0 },
+  {  1 * 4, -2 * 4, -4 * 4, 24 * 4, 39 * 4, 11 * 4, -5 * 4,      0 },
+  {      0, -1 * 4, -4 * 4, 21 * 4, 40 * 4, 13 * 4, -5 * 4,      0 },
+  {      0, -1 * 4, -5 * 4, 19 * 4, 41 * 4, 15 * 4, -5 * 4,      0 }
+#else
   { -1, -5, 17, 42, 17, -5, -1,  0 },
   {  0, -5, 15, 41, 19, -5, -1,  0 },
   {  0, -5, 13, 40, 21, -4, -1,  0 },
@@ -113,11 +202,34 @@ const TFilterCoeff InterpolationFilter::m_lumaFilterRPR1[LUMA_INTERPOLATION_FILT
   {  1, -2, -4, 24, 39, 11, -5,  0 },
   {  0, -1, -4, 21, 40, 13, -5,  0 },
   {  0, -1, -5, 19, 41, 15, -5,  0 }
+#endif
 };
 
 // 2x
+#if IF_12TAP
+const TFilterCoeff InterpolationFilter::m_lumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8] =
+#else
 const TFilterCoeff InterpolationFilter::m_lumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_LUMA] =
+#endif
 {
+#if IF_12TAP
+  { -4 * 4,  2 * 4, 20 * 4, 28 * 4, 20 * 4,  2 * 4, -4 * 4,      0 },
+  { -4 * 4,      0, 19 * 4, 29 * 4, 21 * 4,  5 * 4, -4 * 4, -2 * 4 },
+  { -4 * 4, -1 * 4, 18 * 4, 29 * 4, 22 * 4,  6 * 4, -4 * 4, -2 * 4 },
+  { -4 * 4, -1 * 4, 16 * 4, 29 * 4, 23 * 4,  7 * 4, -4 * 4, -2 * 4 },
+  { -4 * 4, -1 * 4, 16 * 4, 28 * 4, 24 * 4,  7 * 4, -4 * 4, -2 * 4 },
+  { -4 * 4, -1 * 4, 14 * 4, 28 * 4, 25 * 4,  8 * 4, -4 * 4, -2 * 4 },
+  { -3 * 4, -3 * 4, 14 * 4, 27 * 4, 26 * 4,  9 * 4, -3 * 4, -3 * 4 },
+  { -3 * 4, -1 * 4, 12 * 4, 28 * 4, 25 * 4, 10 * 4, -4 * 4, -3 * 4 },
+  { -3 * 4, -3 * 4, 11 * 4, 27 * 4, 27 * 4, 11 * 4, -3 * 4, -3 * 4 },
+  { -3 * 4, -4 * 4, 10 * 4, 25 * 4, 28 * 4, 12 * 4, -1 * 4, -3 * 4 },
+  { -3 * 4, -3 * 4,  9 * 4, 26 * 4, 27 * 4, 14 * 4, -3 * 4, -3 * 4 },
+  { -2 * 4, -4 * 4,  8 * 4, 25 * 4, 28 * 4, 14 * 4, -1 * 4, -4 * 4 },
+  { -2 * 4, -4 * 4,  7 * 4, 24 * 4, 28 * 4, 16 * 4, -1 * 4, -4 * 4 },
+  { -2 * 4, -4 * 4,  7 * 4, 23 * 4, 29 * 4, 16 * 4, -1 * 4, -4 * 4 },
+  { -2 * 4, -4 * 4,  6 * 4, 22 * 4, 29 * 4, 18 * 4, -1 * 4, -4 * 4 },
+  { -2 * 4, -4 * 4,  5 * 4, 21 * 4, 29 * 4, 19 * 4,      0, -4 * 4 }
+#else
   { -4,  2, 20, 28, 20,  2, -4,  0 },
   { -4,  0, 19, 29, 21,  5, -4, -2 },
   { -4, -1, 18, 29, 22,  6, -4, -2 },
@@ -134,11 +246,34 @@ const TFilterCoeff InterpolationFilter::m_lumaFilterRPR2[LUMA_INTERPOLATION_FILT
   { -2, -4,  7, 23, 29, 16, -1, -4 },
   { -2, -4,  6, 22, 29, 18, -1, -4 },
   { -2, -4,  5, 21, 29, 19,  0, -4 }
+#endif
 };
 
 // 1.5x
+#if IF_12TAP
+const TFilterCoeff InterpolationFilter::m_affineLumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8] =
+#else
 const TFilterCoeff InterpolationFilter::m_affineLumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_LUMA] =
+#endif
 {
+#if IF_12TAP
+  {  0, -6 * 4, 17 * 4, 42 * 4, 17 * 4, -5 * 4, -1 * 4,  0 },
+  {  0, -5 * 4, 15 * 4, 41 * 4, 19 * 4, -5 * 4, -1 * 4,  0 },
+  {  0, -5 * 4, 13 * 4, 40 * 4, 21 * 4, -4 * 4, -1 * 4,  0 },
+  {  0, -5 * 4, 11 * 4, 39 * 4, 24 * 4, -4 * 4, -1 * 4,  0 },
+  {  0, -5 * 4,  9 * 4, 38 * 4, 26 * 4, -3 * 4, -1 * 4,  0 },
+  {  0, -5 * 4,  7 * 4, 38 * 4, 28 * 4, -2 * 4, -2 * 4,  0 },
+  {  0, -4 * 4,  5 * 4, 36 * 4, 30 * 4, -1 * 4, -2 * 4,  0 },
+  {  0, -3 * 4,  3 * 4, 35 * 4, 32 * 4,      0, -3 * 4,  0 },
+  {  0, -3 * 4,  2 * 4, 33 * 4, 33 * 4,  2 * 4, -3 * 4,  0 },
+  {  0, -3 * 4,      0, 32 * 4, 35 * 4,  3 * 4, -3 * 4,  0 },
+  {  0, -2 * 4, -1 * 4, 30 * 4, 36 * 4,  5 * 4, -4 * 4,  0 },
+  {  0, -2 * 4, -2 * 4, 28 * 4, 38 * 4,  7 * 4, -5 * 4,  0 },
+  {  0, -1 * 4, -3 * 4, 26 * 4, 38 * 4,  9 * 4, -5 * 4,  0 },
+  {  0, -1 * 4, -4 * 4, 24 * 4, 39 * 4, 11 * 4, -5 * 4,  0 },
+  {  0, -1 * 4, -4 * 4, 21 * 4, 40 * 4, 13 * 4, -5 * 4,  0 },
+  {  0, -1 * 4, -5 * 4, 19 * 4, 41 * 4, 15 * 4, -5 * 4,  0 }
+#else
   {  0, -6, 17, 42, 17, -5, -1,  0 },
   {  0, -5, 15, 41, 19, -5, -1,  0 },
   {  0, -5, 13, 40, 21, -4, -1,  0 },
@@ -155,11 +290,34 @@ const TFilterCoeff InterpolationFilter::m_affineLumaFilterRPR1[LUMA_INTERPOLATIO
   {  0, -1, -4, 24, 39, 11, -5,  0 },
   {  0, -1, -4, 21, 40, 13, -5,  0 },
   {  0, -1, -5, 19, 41, 15, -5,  0 }
+#endif
 };
 
 // 2x
+#if IF_12TAP
+const TFilterCoeff InterpolationFilter::m_affineLumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8] =
+#else
 const TFilterCoeff InterpolationFilter::m_affineLumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_LUMA] =
+#endif
 {
+#if IF_12TAP
+  {  0, -2 * 4, 20 * 4, 28 * 4, 20 * 4,  2 * 4, -4 * 4,  0 },
+  {  0, -4 * 4, 19 * 4, 29 * 4, 21 * 4,  5 * 4, -6 * 4,  0 },
+  {  0, -5 * 4, 18 * 4, 29 * 4, 22 * 4,  6 * 4, -6 * 4,  0 },
+  {  0, -5 * 4, 16 * 4, 29 * 4, 23 * 4,  7 * 4, -6 * 4,  0 },
+  {  0, -5 * 4, 16 * 4, 28 * 4, 24 * 4,  7 * 4, -6 * 4,  0 },
+  {  0, -5 * 4, 14 * 4, 28 * 4, 25 * 4,  8 * 4, -6 * 4,  0 },
+  {  0, -6 * 4, 14 * 4, 27 * 4, 26 * 4,  9 * 4, -6 * 4,  0 },
+  {  0, -4 * 4, 12 * 4, 28 * 4, 25 * 4, 10 * 4, -7 * 4,  0 },
+  {  0, -6 * 4, 11 * 4, 27 * 4, 27 * 4, 11 * 4, -6 * 4,  0 },
+  {  0, -7 * 4, 10 * 4, 25 * 4, 28 * 4, 12 * 4, -4 * 4,  0 },
+  {  0, -6 * 4,  9 * 4, 26 * 4, 27 * 4, 14 * 4, -6 * 4,  0 },
+  {  0, -6 * 4,  8 * 4, 25 * 4, 28 * 4, 14 * 4, -5 * 4,  0 },
+  {  0, -6 * 4,  7 * 4, 24 * 4, 28 * 4, 16 * 4, -5 * 4,  0 },
+  {  0, -6 * 4,  7 * 4, 23 * 4, 29 * 4, 16 * 4, -5 * 4,  0 },
+  {  0, -6 * 4,  6 * 4, 22 * 4, 29 * 4, 18 * 4, -5 * 4,  0 },
+  {  0, -6 * 4,  5 * 4, 21 * 4, 29 * 4, 19 * 4, -4 * 4,  0 }
+#else
   {  0, -2, 20, 28, 20,  2, -4,  0 },
   {  0, -4, 19, 29, 21,  5, -6,  0 },
   {  0, -5, 18, 29, 22,  6, -6,  0 },
@@ -176,9 +334,52 @@ const TFilterCoeff InterpolationFilter::m_affineLumaFilterRPR2[LUMA_INTERPOLATIO
   {  0, -6,  7, 23, 29, 16, -5,  0 },
   {  0, -6,  6, 22, 29, 18, -5,  0 },
   {  0, -6,  5, 21, 29, 19, -4,  0 }
+#endif
 };
 
-const TFilterCoeff InterpolationFilter::m_lumaAltHpelIFilter[NTAPS_LUMA] = {  0, 3, 9, 20, 20, 9, 3, 0 };
+#if IF_12TAP
+const TFilterCoeff InterpolationFilter::m_lumaAltHpelIFilter[8] = { 0 * 4, 3 * 4, 9 * 4, 20 * 4, 20 * 4, 9 * 4, 3 * 4, 0 * 4 };
+#else
+const TFilterCoeff InterpolationFilter::m_lumaAltHpelIFilter[NTAPS_LUMA] = { 0, 3, 9, 20, 20, 9, 3, 0 };
+#endif
+
+#if IF_12TAP
+const TFilterCoeff InterpolationFilter::m_chromaFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
+{
+{  0 * 4, 64 * 4,  0 * 4,  0 * 4 },
+{ -1 * 4, 63 * 4,  2 * 4,  0 * 4 },
+{ -2 * 4, 62 * 4,  4 * 4,  0 * 4 },
+{ -2 * 4, 60 * 4,  7 * 4, -1 * 4 },
+{ -2 * 4, 58 * 4, 10 * 4, -2 * 4 },
+{ -3 * 4, 57 * 4, 12 * 4, -2 * 4 },
+{ -4 * 4, 56 * 4, 14 * 4, -2 * 4 },
+{ -4 * 4, 55 * 4, 15 * 4, -2 * 4 },
+{ -4 * 4, 54 * 4, 16 * 4, -2 * 4 },
+{ -5 * 4, 53 * 4, 18 * 4, -2 * 4 },
+{ -6 * 4, 52 * 4, 20 * 4, -2 * 4 },
+{ -6 * 4, 49 * 4, 24 * 4, -3 * 4 },
+{ -6 * 4, 46 * 4, 28 * 4, -4 * 4 },
+{ -5 * 4, 44 * 4, 29 * 4, -4 * 4 },
+{ -4 * 4, 42 * 4, 30 * 4, -4 * 4 },
+{ -4 * 4, 39 * 4, 33 * 4, -4 * 4 },
+{ -4 * 4, 36 * 4, 36 * 4, -4 * 4 },
+{ -4 * 4, 33 * 4, 39 * 4, -4 * 4 },
+{ -4 * 4, 30 * 4, 42 * 4, -4 * 4 },
+{ -4 * 4, 29 * 4, 44 * 4, -5 * 4 },
+{ -4 * 4, 28 * 4, 46 * 4, -6 * 4 },
+{ -3 * 4, 24 * 4, 49 * 4, -6 * 4 },
+{ -2 * 4, 20 * 4, 52 * 4, -6 * 4 },
+{ -2 * 4, 18 * 4, 53 * 4, -5 * 4 },
+{ -2 * 4, 16 * 4, 54 * 4, -4 * 4 },
+{ -2 * 4, 15 * 4, 55 * 4, -4 * 4 },
+{ -2 * 4, 14 * 4, 56 * 4, -4 * 4 },
+{ -2 * 4, 12 * 4, 57 * 4, -3 * 4 },
+{ -2 * 4, 10 * 4, 58 * 4, -2 * 4 },
+{ -1 * 4,  7 * 4, 60 * 4, -2 * 4 },
+{  0 * 4,  4 * 4, 62 * 4, -2 * 4 },
+{  0 * 4,  2 * 4, 63 * 4, -1 * 4 },
+};
+#else
 const TFilterCoeff InterpolationFilter::m_chromaFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
 {
   {  0, 64,  0,  0 },
@@ -214,10 +415,120 @@ const TFilterCoeff InterpolationFilter::m_chromaFilter[CHROMA_INTERPOLATION_FILT
   {  0,  4, 62, -2 },
   {  0,  2, 63, -1 },
 };
+#endif
+
+#if INTRA_6TAP
+const TFilterCoeff InterpolationFilter::m_weak4TapFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
+{
+  {  0, 64,  0,  0},
+  { -1, 64,  1,  0},
+  { -3, 65,  3, -1},
+  { -3, 63,  5, -1},
+  { -4, 63,  6, -1},
+  { -5, 62,  9, -2},
+  { -5, 60, 11, -2},
+  { -5, 58, 13, -2},
+  { -6, 57, 16, -3},
+  { -6, 55, 18, -3},
+  { -7, 54, 21, -4},
+  { -7, 52, 23, -4},
+  { -6, 48, 26, -4},
+  { -7, 47, 29, -5},
+  { -6, 43, 32, -5},
+  { -6, 41, 34, -5},
+  { -5, 37, 37, -5},
+  { -5, 34, 41, -6},
+  { -5, 32, 43, -6},
+  { -5, 29, 47, -7},
+  { -4, 26, 48, -6},
+  { -4, 23, 52, -7},
+  { -4, 21, 54, -7},
+  { -3, 18, 55, -6},
+  { -3, 16, 57, -6},
+  { -2, 13, 58, -5},
+  { -2, 11, 60, -5},
+  { -2,  9, 62, -5},
+  { -1,  6, 63, -4},
+  { -1,  5, 63, -3},
+  { -1,  3, 65, -3},
+  {  0,  1, 64, -1},
+};
+
+
+const TFilterCoeff InterpolationFilter::m_lumaIntraFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][6] =
+{
+  {   0,   0, 256,   0,   0,   0 },  //  0/32 position
+  {   0,  -4, 253,   9,  -2,   0 },  //  1/32 position
+  {   1,  -7, 249,  17,  -4,   0 },  //  2/32 position
+  {   1, -10, 245,  25,  -6,   1 },  //  3/32 position
+  {   1, -13, 241,  34,  -8,   1 },  //  4/32 position
+  {   2, -16, 235,  44, -10,   1 },  //  5/32 position
+  {   2, -18, 229,  53, -12,   2 },  //  6/32 position
+  {   2, -20, 223,  63, -14,   2 },  //  7/32 position
+  {   2, -22, 217,  72, -15,   2 },  //  8/32 position
+  {   3, -23, 209,  82, -17,   2 },  //  9/32 position
+  {   3, -24, 202,  92, -19,   2 },  // 10/32 position
+  {   3, -25, 194, 101, -20,   3 },  // 11/32 position
+  {   3, -25, 185, 111, -21,   3 },  // 12/32 position
+  {   3, -26, 178, 121, -23,   3 },  // 13/32 position
+  {   3, -25, 168, 131, -24,   3 },  // 14/32 position
+  {   3, -25, 159, 141, -25,   3 },  // 15/32 position
+  {   3, -25, 150, 150, -25,   3 },  // half-pel position
+  {   3, -25, 141, 159, -25,   3 },  //  17/32 position
+  {   3, -24, 131, 168, -25,   3 },  //  18/32 position
+  {   3, -23, 121, 178, -26,   3 },  //  19/32 position
+  {   3, -21, 111, 185, -25,   3 },  //  20/32 position
+  {   3, -20, 101, 194, -25,   3 },  //  21/32 position
+  {   2, -19,  92, 202, -24,   3 },  //  22/32 position
+  {   2, -17,  82, 209, -23,   3 },  //  23/32 position
+  {   2, -15,  72, 217, -22,   2 },  //  24/32 position
+  {   2, -14,  63, 223, -20,   2 },  //  25/32 position
+  {   2, -12,  53, 229, -18,   2 },  //  26/32 position
+  {   1, -10,  44, 235, -16,   2 },  // 27/32 position
+  {   1,  -8,  34, 241, -13,   1 },  // 28/32 position
+  {   1,  -6,  25, 245, -10,   1 },  // 29/32 position
+  {   0,  -4,  17, 249,  -7,   1 },  // 30/32 position
+  {   0, - 2,   9, 253,  -4,   0 },  // 31/32 position
+};
+#endif
 
 //1.5x
 const TFilterCoeff InterpolationFilter::m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
 {
+#if IF_12TAP
+  { 12 * 4, 40 * 4, 12 * 4,      0 },
+  { 11 * 4, 40 * 4, 13 * 4,      0 },
+  { 10 * 4, 40 * 4, 15 * 4, -1 * 4 },
+  {  9 * 4, 40 * 4, 16 * 4, -1 * 4 },
+  {  8 * 4, 40 * 4, 17 * 4, -1 * 4 },
+  {  8 * 4, 39 * 4, 18 * 4, -1 * 4 },
+  {  7 * 4, 39 * 4, 19 * 4, -1 * 4 },
+  {  6 * 4, 38 * 4, 21 * 4, -1 * 4 },
+  {  5 * 4, 38 * 4, 22 * 4, -1 * 4 },
+  {  4 * 4, 38 * 4, 23 * 4, -1 * 4 },
+  {  4 * 4, 37 * 4, 24 * 4, -1 * 4 },
+  {  3 * 4, 36 * 4, 25 * 4,      0 },
+  {  3 * 4, 35 * 4, 26 * 4,      0 },
+  {  2 * 4, 34 * 4, 28 * 4,      0 },
+  {  2 * 4, 33 * 4, 29 * 4,      0 },
+  {  1 * 4, 33 * 4, 30 * 4,      0 },
+  {  1 * 4, 31 * 4, 31 * 4,  1 * 4 },
+  {      0, 30 * 4, 33 * 4,  1 * 4 },
+  {      0, 29 * 4, 33 * 4,  2 * 4 },
+  {      0, 28 * 4, 34 * 4,  2 * 4 },
+  {      0, 26 * 4, 35 * 4,  3 * 4 },
+  {      0, 25 * 4, 36 * 4,  3 * 4 },
+  { -1 * 4, 24 * 4, 37 * 4,  4 * 4 },
+  { -1 * 4, 23 * 4, 38 * 4,  4 * 4 },
+  { -1 * 4, 22 * 4, 38 * 4,  5 * 4 },
+  { -1 * 4, 21 * 4, 38 * 4,  6 * 4 },
+  { -1 * 4, 19 * 4, 39 * 4,  7 * 4 },
+  { -1 * 4, 18 * 4, 39 * 4,  8 * 4 },
+  { -1 * 4, 17 * 4, 40 * 4,  8 * 4 },
+  { -1 * 4, 16 * 4, 40 * 4,  9 * 4 },
+  { -1 * 4, 15 * 4, 40 * 4, 10 * 4 },
+  {      0, 13 * 4, 40 * 4, 11 * 4 },
+#else
   { 12, 40, 12,  0 },
   { 11, 40, 13,  0 },
   { 10, 40, 15, -1 },
@@ -250,11 +561,46 @@ const TFilterCoeff InterpolationFilter::m_chromaFilterRPR1[CHROMA_INTERPOLATION_
   { -1, 16, 40,  9 },
   { -1, 15, 40, 10 },
   {  0, 13, 40, 11 },
+#endif
 };
 
 //2x
 const TFilterCoeff InterpolationFilter::m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
 {
+#if IF_12TAP
+  { 17 * 4, 30 * 4, 17 * 4,      0 },
+  { 17 * 4, 30 * 4, 18 * 4, -1 * 4 },
+  { 16 * 4, 30 * 4, 18 * 4,      0 },
+  { 16 * 4, 30 * 4, 18 * 4,      0 },
+  { 15 * 4, 30 * 4, 18 * 4,  1 * 4 },
+  { 14 * 4, 30 * 4, 18 * 4,  2 * 4 },
+  { 13 * 4, 29 * 4, 19 * 4,  3 * 4 },
+  { 13 * 4, 29 * 4, 19 * 4,  3 * 4 },
+  { 12 * 4, 29 * 4, 20 * 4,  3 * 4 },
+  { 11 * 4, 28 * 4, 21 * 4,  4 * 4 },
+  { 10 * 4, 28 * 4, 22 * 4,  4 * 4 },
+  { 10 * 4, 27 * 4, 22 * 4,  5 * 4 },
+  {  9 * 4, 27 * 4, 23 * 4,  5 * 4 },
+  {  9 * 4, 26 * 4, 24 * 4,  5 * 4 },
+  {  8 * 4, 26 * 4, 24 * 4,  6 * 4 },
+  {  7 * 4, 26 * 4, 25 * 4,  6 * 4 },
+  {  7 * 4, 25 * 4, 25 * 4,  7 * 4 },
+  {  6 * 4, 25 * 4, 26 * 4,  7 * 4 },
+  {  6 * 4, 24 * 4, 26 * 4,  8 * 4 },
+  {  5 * 4, 24 * 4, 26 * 4,  9 * 4 },
+  {  5 * 4, 23 * 4, 27 * 4,  9 * 4 },
+  {  5 * 4, 22 * 4, 27 * 4, 10 * 4 },
+  {  4 * 4, 22 * 4, 28 * 4, 10 * 4 },
+  {  4 * 4, 21 * 4, 28 * 4, 11 * 4 },
+  {  3 * 4, 20 * 4, 29 * 4, 12 * 4 },
+  {  3 * 4, 19 * 4, 29 * 4, 13 * 4 },
+  {  3 * 4, 19 * 4, 29 * 4, 13 * 4 },
+  {  2 * 4, 18 * 4, 30 * 4, 14 * 4 },
+  {  1 * 4, 18 * 4, 30 * 4, 15 * 4 },
+  {      0, 18 * 4, 30 * 4, 16 * 4 },
+  {      0, 18 * 4, 30 * 4, 16 * 4 },
+  { -1 * 4, 18 * 4, 30 * 4, 17 * 4 }
+#else
   { 17, 30, 17,  0 },
   { 17, 30, 18, -1 },
   { 16, 30, 18,  0 },
@@ -287,10 +633,29 @@ const TFilterCoeff InterpolationFilter::m_chromaFilterRPR2[CHROMA_INTERPOLATION_
   {  0, 18, 30, 16 },
   {  0, 18, 30, 16 },
   { -1, 18, 30, 17 }
+#endif
 };
 
 const TFilterCoeff InterpolationFilter::m_bilinearFilter[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_BILINEAR] =
 {
+#if IF_12TAP
+  { 64 * 4,  0 * 4, },
+  { 60 * 4,  4 * 4, },
+  { 56 * 4,  8 * 4, },
+  { 52 * 4, 12 * 4, },
+  { 48 * 4, 16 * 4, },
+  { 44 * 4, 20 * 4, },
+  { 40 * 4, 24 * 4, },
+  { 36 * 4, 28 * 4, },
+  { 32 * 4, 32 * 4, },
+  { 28 * 4, 36 * 4, },
+  { 24 * 4, 40 * 4, },
+  { 20 * 4, 44 * 4, },
+  { 16 * 4, 48 * 4, },
+  { 12 * 4, 52 * 4, },
+  {  8 * 4, 56 * 4, },
+  {  4 * 4, 60 * 4, },
+#else
   { 64,  0, },
   { 60,  4, },
   { 56,  8, },
@@ -307,6 +672,7 @@ const TFilterCoeff InterpolationFilter::m_bilinearFilter[LUMA_INTERPOLATION_FILT
   { 12, 52, },
   { 8, 56, },
   { 4, 60, },
+#endif
 };
 
 const TFilterCoeff InterpolationFilter::m_bilinearFilterPrec4[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_BILINEAR] =
@@ -334,6 +700,50 @@ const TFilterCoeff InterpolationFilter::m_bilinearFilterPrec4[LUMA_INTERPOLATION
 
 InterpolationFilter::InterpolationFilter()
 {
+#if IF_12TAP
+#if !QC_SIF_SIMD
+  m_filterHor[0][0][0] = filter<12, false, false, false>;
+  m_filterHor[0][0][1] = filter<12, false, false, true>;
+  m_filterHor[0][1][0] = filter<12, false, true, false>;
+  m_filterHor[0][1][1] = filter<12, false, true, true>;
+
+  m_filterHor[1][0][0] = filter<8, false, false, false>;
+  m_filterHor[1][0][1] = filter<8, false, false, true>;
+  m_filterHor[1][1][0] = filter<8, false, true, false>;
+  m_filterHor[1][1][1] = filter<8, false, true, true>;
+
+  m_filterHor[2][0][0] = filter<4, false, false, false>;
+  m_filterHor[2][0][1] = filter<4, false, false, true>;
+  m_filterHor[2][1][0] = filter<4, false, true, false>;
+  m_filterHor[2][1][1] = filter<4, false, true, true>;
+
+  m_filterHor[3][0][0] = filter<2, false, false, false>;
+  m_filterHor[3][0][1] = filter<2, false, false, true>;
+  m_filterHor[3][1][0] = filter<2, false, true, false>;
+  m_filterHor[3][1][1] = filter<2, false, true, true>;
+
+  m_filterVer[0][0][0] = filter<12, true, false, false>;
+  m_filterVer[0][0][1] = filter<12, true, false, true>;
+  m_filterVer[0][1][0] = filter<12, true, true, false>;
+  m_filterVer[0][1][1] = filter<12, true, true, true>;
+
+  m_filterVer[1][0][0] = filter<8, true, false, false>;
+  m_filterVer[1][0][1] = filter<8, true, false, true>;
+  m_filterVer[1][1][0] = filter<8, true, true, false>;
+  m_filterVer[1][1][1] = filter<8, true, true, true>;
+
+  m_filterVer[2][0][0] = filter<4, true, false, false>;
+  m_filterVer[2][0][1] = filter<4, true, false, true>;
+  m_filterVer[2][1][0] = filter<4, true, true, false>;
+  m_filterVer[2][1][1] = filter<4, true, true, true>;
+
+  m_filterVer[3][0][0] = filter<2, true, false, false>;
+  m_filterVer[3][0][1] = filter<2, true, false, true>;
+  m_filterVer[3][1][0] = filter<2, true, true, false>;
+  m_filterVer[3][1][1] = filter<2, true, true, true>;
+#endif
+#else
+#if !QC_SIF_SIMD
   m_filterHor[0][0][0] = filter<8, false, false, false>;
   m_filterHor[0][0][1] = filter<8, false, false, true>;
   m_filterHor[0][1][0] = filter<8, false, true, false>;
@@ -363,13 +773,15 @@ InterpolationFilter::InterpolationFilter()
   m_filterVer[2][0][1] = filter<2, true, false, true>;
   m_filterVer[2][1][0] = filter<2, true, true, false>;
   m_filterVer[2][1][1] = filter<2, true, true, true>;
-
+#endif
+#endif
   m_filterCopy[0][0]   = filterCopy<false, false>;
   m_filterCopy[0][1]   = filterCopy<false, true>;
   m_filterCopy[1][0]   = filterCopy<true, false>;
   m_filterCopy[1][1]   = filterCopy<true, true>;
-
+#if !QC_SIF_SIMD
   m_weightedGeoBlk = xWeightedGeoBlk;
+#endif
 }
 
 
@@ -401,13 +813,11 @@ void InterpolationFilter::filterCopy( const ClpRng& clpRng, const Pel *src, int 
 
   if ( isFirst == isLast )
   {
+    int lineSize = sizeof(Pel) * width;
+
     for (row = 0; row < height; row++)
     {
-      for (col = 0; col < width; col++)
-      {
-        dst[col] = src[col];
-        JVET_J0090_CACHE_ACCESS( &src[col], __FILE__, __LINE__ );
-      }
+      ::memcpy(dst, src, lineSize);
 
       src += srcStride;
       dst += dstStride;
@@ -525,6 +935,37 @@ void InterpolationFilter::filterCopy( const ClpRng& clpRng, const Pel *src, int 
   }
 }
 
+#if SIMD_4x4_12
+void InterpolationFilter::filter4x4( const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int xFrac, int yFrac, bool isLast)
+{
+  const TFilterCoeff* coeffH =  m_lumaFilter12[xFrac];
+  const TFilterCoeff* coeffV =  m_lumaFilter12[yFrac];
+
+  src = src - 5 - 5*srcStride; //for 12-tap filter
+
+  const int headRoom   = std::max<int>( 2, ( IF_INTERNAL_PREC - clpRng.bd ) );
+  int shiftH   = IF_FILTER_PREC - headRoom;
+  int offsetH  = -IF_INTERNAL_OFFS << shiftH;
+  int shiftV = IF_FILTER_PREC;
+  int offsetV = 0;
+
+  int ibdimin = INT16_MIN; //for 16-bit
+  int ibdimax = INT16_MAX;
+
+  if( isLast ) //todo: check for template
+  {
+    shiftV += headRoom;
+    offsetV  = (1 << ( shiftV - 1 )) + (IF_INTERNAL_OFFS << IF_FILTER_PREC);
+    ibdimin = clpRng.min;
+    ibdimax = clpRng.max;
+  }
+  if( !isLast )
+    m_filter4x4[0]( src, srcStride, dst, dstStride, shiftH, offsetH, shiftV, offsetV, coeffH, coeffV, ibdimin, ibdimax );
+  else
+    m_filter4x4[1]( src, srcStride, dst, dstStride, shiftH, offsetH, shiftV, offsetV, coeffH, coeffV, ibdimin, ibdimax );
+}
+#endif
+
 /**
  * \brief Apply FIR filter to a block of samples
  *
@@ -553,7 +994,13 @@ template<int N, bool isVertical, bool isFirst, bool isLast>
 void InterpolationFilter::filter(const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, TFilterCoeff const *coeff, bool biMCForDMVR)
 {
   int row, col;
-
+#if IF_12TAP
+  Pel c[N];
+  for( int i = 0; i < N; i++ )
+  {
+    c[i] = coeff[i];
+  }
+#else
   Pel c[8];
   c[0] = coeff[0];
   c[1] = coeff[1];
@@ -572,7 +1019,7 @@ void InterpolationFilter::filter(const ClpRng& clpRng, Pel const *src, int srcSt
     c[6] = coeff[6];
     c[7] = coeff[7];
   }
-
+#endif
   int cStride = ( isVertical ) ? srcStride : 1;
   src -= ( N/2 - 1 ) * cStride;
 
@@ -636,14 +1083,45 @@ void InterpolationFilter::filter(const ClpRng& clpRng, Pel const *src, int srcSt
         JVET_J0090_CACHE_ACCESS( &src[ col + 4 * cStride], __FILE__, __LINE__ );
         JVET_J0090_CACHE_ACCESS( &src[ col + 5 * cStride], __FILE__, __LINE__ );
       }
-      if ( N == 8 )
+#if IF_12TAP
+      if (N >= 8)
+#else
+      if (N == 8)
+#endif
       {
         sum += src[ col + 6 * cStride] * c[6];
         sum += src[ col + 7 * cStride] * c[7];
         JVET_J0090_CACHE_ACCESS( &src[ col + 6 * cStride], __FILE__, __LINE__ );
         JVET_J0090_CACHE_ACCESS( &src[ col + 7 * cStride], __FILE__, __LINE__ );
       }
+#if IF_12TAP
+      if (N >= 10)
+      {
+        sum += src[col + 8 * cStride] * c[8];
+        sum += src[col + 9 * cStride] * c[9];
+        JVET_J0090_CACHE_ACCESS(&src[col + 8 * cStride], __FILE__, __LINE__);
+        JVET_J0090_CACHE_ACCESS(&src[col + 9 * cStride], __FILE__, __LINE__);
+      }
+      if (N >= 12)
+      {
+        sum += src[col + 10 * cStride] * c[10];
+        sum += src[col + 11 * cStride] * c[11];
+        JVET_J0090_CACHE_ACCESS(&src[col + 10 * cStride], __FILE__, __LINE__);
+        JVET_J0090_CACHE_ACCESS(&src[col + 11 * cStride], __FILE__, __LINE__);
+      }
 
+      if (N == 16)
+      {
+        sum += src[col + 12 * cStride] * c[12];
+        sum += src[col + 13 * cStride] * c[13];
+        sum += src[col + 14 * cStride] * c[14];
+        sum += src[col + 15 * cStride] * c[15];
+        JVET_J0090_CACHE_ACCESS(&src[col + 12 * cStride], __FILE__, __LINE__);
+        JVET_J0090_CACHE_ACCESS(&src[col + 13 * cStride], __FILE__, __LINE__);
+        JVET_J0090_CACHE_ACCESS(&src[col + 14 * cStride], __FILE__, __LINE__);
+        JVET_J0090_CACHE_ACCESS(&src[col + 15 * cStride], __FILE__, __LINE__);
+      }
+#endif
       Pel val = ( sum + offset ) >> shift;
       if ( isLast )
       {
@@ -675,6 +1153,24 @@ template<int N>
 void InterpolationFilter::filterHor(const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, bool isLast, TFilterCoeff const *coeff, bool biMCForDMVR)
 {
 //#if ENABLE_SIMD_OPT_MCIF
+#if IF_12TAP
+  if (N == 12)
+  {
+    m_filterHor[0][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 8)
+  {
+    m_filterHor[1][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 4)
+  {
+    m_filterHor[2][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 2)
+  {
+    m_filterHor[3][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+#else
   if( N == 8 )
   {
     m_filterHor[0][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
@@ -687,6 +1183,7 @@ void InterpolationFilter::filterHor(const ClpRng& clpRng, Pel const *src, int sr
   {
     m_filterHor[2][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
   }
+#endif
   else
   {
     THROW( "Invalid tap number" );
@@ -712,6 +1209,24 @@ template<int N>
 void InterpolationFilter::filterVer(const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, bool isFirst, bool isLast, TFilterCoeff const *coeff, bool biMCForDMVR)
 {
 //#if ENABLE_SIMD_OPT_MCIF
+#if IF_12TAP
+  if (N == 12)
+  {
+    m_filterVer[0][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 8)
+  {
+    m_filterVer[1][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 4)
+  {
+    m_filterVer[2][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 2)
+  {
+    m_filterVer[3][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+#else
   if( N == 8 )
   {
     m_filterVer[0][isFirst][isLast]( clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
@@ -724,7 +1239,9 @@ void InterpolationFilter::filterVer(const ClpRng& clpRng, Pel const *src, int sr
   {
     m_filterVer[2][isFirst][isLast]( clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
   }
-  else{
+#endif
+  else
+  {
     THROW( "Invalid tap number" );
   }
 }
@@ -756,10 +1273,61 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
   }
   else if( isLuma( compID ) )
   {
+#if IF_12TAP
+    CHECK(frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction");
+    if (nFilterIdx == 1)
+    {
+#if TM_AMVP || TM_MRG
+      filterHor<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, (biMCForDMVR ? m_bilinearFilterPrec4 : m_bilinearFilter)[frac], biMCForDMVR );
+#else
+      filterHor<NTAPS_BILINEAR>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_bilinearFilterPrec4[frac], biMCForDMVR);
+#endif
+    }
+    else if (nFilterIdx == 2)
+    {
+      filterHor<8>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilter4x4[frac], biMCForDMVR);
+    }
+    else if (nFilterIdx == 3)
+    {
+      filterHor<8>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilterRPR1[frac], biMCForDMVR);
+    }
+    else if (nFilterIdx == 4)
+    {
+      filterHor<8>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilterRPR2[frac], biMCForDMVR);
+    }
+
+    else if (nFilterIdx == 5)
+    {
+      filterHor<8>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_affineLumaFilterRPR1[frac], biMCForDMVR);
+    }
+    else if (nFilterIdx == 6)
+    {
+      filterHor<8>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_affineLumaFilterRPR2[frac], biMCForDMVR);
+    }
+
+    else if (frac == 8 && useAltHpelIf)
+    {
+      filterHor<8>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaAltHpelIFilter, biMCForDMVR);
+    }
+#if !AFFINE_RM_CONSTRAINTS_AND_OPT
+    else if ((width == 4 && height == 4) || (width == 4 && height == (4 + NTAPS_LUMA(0) - 1)))
+    {
+      filterHor<NTAPS_LUMA(0)>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilter12[frac], biMCForDMVR);
+    }
+#endif
+    else
+    {
+      filterHor<NTAPS_LUMA(0)>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilter12[frac], biMCForDMVR );
+    }
+#else
     CHECK( frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction" );
     if( nFilterIdx == 1 )
     {
+#if TM_AMVP || TM_MRG
+      filterHor<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, (biMCForDMVR ? m_bilinearFilterPrec4 : m_bilinearFilter)[frac], biMCForDMVR );
+#else
       filterHor<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_bilinearFilterPrec4[frac], biMCForDMVR );
+#endif
     }
     else if( nFilterIdx == 2 )
     {
@@ -785,14 +1353,17 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
     {
       filterHor<NTAPS_LUMA>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaAltHpelIFilter, biMCForDMVR );
     }
+#if !AFFINE_RM_CONSTRAINTS_AND_OPT
     else if( ( width == 4 && height == 4 ) || ( width == 4 && height == ( 4 + NTAPS_LUMA - 1 ) ) )
     {
       filterHor<NTAPS_LUMA>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilter4x4[frac], biMCForDMVR );
     }
+#endif
     else
     {
       filterHor<NTAPS_LUMA>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilter[frac], biMCForDMVR );
     }
+#endif
   }
   else
   {
@@ -838,10 +1409,59 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
   }
   else if( isLuma( compID ) )
   {
+#if IF_12TAP
+    CHECK(frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction");
+    if (nFilterIdx == 1)
+    {
+#if TM_AMVP || TM_MRG
+      filterVer<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, (biMCForDMVR ? m_bilinearFilterPrec4 : m_bilinearFilter)[frac], biMCForDMVR );
+#else
+      filterVer<NTAPS_BILINEAR>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_bilinearFilterPrec4[frac], biMCForDMVR);
+#endif
+    }
+    else if (nFilterIdx == 2)
+    {
+      filterVer<8>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilter4x4[frac], biMCForDMVR);
+    }
+    else if (nFilterIdx == 3)
+    {
+      filterVer<8>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilterRPR1[frac], biMCForDMVR);
+    }
+    else if (nFilterIdx == 4)
+    {
+      filterVer<8>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilterRPR2[frac], biMCForDMVR);
+    }
+    else if (nFilterIdx == 5)
+    {
+      filterVer<8>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_affineLumaFilterRPR1[frac], biMCForDMVR);
+    }
+    else if (nFilterIdx == 6)
+    {
+      filterVer<8>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_affineLumaFilterRPR2[frac], biMCForDMVR);
+    }
+    else if (frac == 8 && useAltHpelIf)
+    {
+      filterVer<8>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaAltHpelIFilter, biMCForDMVR);
+    }
+#if !AFFINE_RM_CONSTRAINTS_AND_OPT
+    else if (width == 4 && height == 4)
+    {
+      filterVer<NTAPS_LUMA(0)>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilter12[frac], biMCForDMVR);
+    }
+#endif
+    else
+    {
+      filterVer<NTAPS_LUMA(0)>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilter12[frac], biMCForDMVR );
+    }
+#else
     CHECK( frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction" );
     if( nFilterIdx == 1 )
     {
+#if TM_AMVP || TM_MRG
+      filterVer<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, (biMCForDMVR ? m_bilinearFilterPrec4 : m_bilinearFilter)[frac], biMCForDMVR );
+#else
       filterVer<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_bilinearFilterPrec4[frac], biMCForDMVR );
+#endif
     }
     else if( nFilterIdx == 2 )
     {
@@ -867,14 +1487,17 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
     {
       filterVer<NTAPS_LUMA>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaAltHpelIFilter, biMCForDMVR );
     }
+#if !AFFINE_RM_CONSTRAINTS_AND_OPT
     else if( width == 4 && height == 4 )
     {
       filterVer<NTAPS_LUMA>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilter4x4[frac], biMCForDMVR );
     }
+#endif
     else
     {
       filterVer<NTAPS_LUMA>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilter[frac], biMCForDMVR );
     }
+#endif
   }
   else
   {

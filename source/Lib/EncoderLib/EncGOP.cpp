@@ -355,12 +355,20 @@ int EncGOP::xWritePPS( AccessUnit &accessUnit, const PPS *pps, const int layerId
 int EncGOP::xWriteAPS( AccessUnit &accessUnit, APS *aps, const int layerId, const bool isPrefixNUT )
 {
   OutputNALUnit nalu( isPrefixNUT ? NAL_UNIT_PREFIX_APS : NAL_UNIT_SUFFIX_APS );
+  aps->setLayerId( layerId );
+#if EMBEDDED_APS 
+  m_aps.push_back( *aps );
+  return 0;
+#endif
   m_HLSWriter->setBitstream(&nalu.m_Bitstream);
   nalu.m_nuhLayerId = layerId;
   nalu.m_temporalId = aps->getTemporalId();
-  aps->setLayerId( layerId );
   CHECK( nalu.m_temporalId < accessUnit.temporalId, "TemporalId shall be greater than or equal to the TemporalId of the layer access unit containing the NAL unit" );
-  m_HLSWriter->codeAPS(aps);
+#if EMBEDDED_APS
+  m_HLSWriter->codeAPS( aps, true );
+#else
+  m_HLSWriter->codeAPS( aps );
+#endif
   accessUnit.push_back(new NALUnitEBSP(nalu));
   return (int)(accessUnit.back()->m_nalUnitData.str().size()) * 8;
 }
@@ -403,7 +411,12 @@ int EncGOP::xWritePicHeader( AccessUnit &accessUnit, PicHeader *picHeader )
   m_HLSWriter->setBitstream( &nalu.m_Bitstream );
   nalu.m_temporalId = accessUnit.temporalId;
   nalu.m_nuhLayerId = m_pcEncLib->getLayerId();
+
+#if EMBEDDED_APS
+  m_HLSWriter->codePictureHeader( picHeader, true, m_aps );
+#else
   m_HLSWriter->codePictureHeader( picHeader, true );
+#endif
   accessUnit.push_back(new NALUnitEBSP(nalu));
   return (int)(accessUnit.back()->m_nalUnitData.str().size()) * 8;
 }
@@ -2355,10 +2368,21 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
           {
             newMaxBtSize = 64;
           }
+#if CTU_256
+          else if( dBlkSize < AMAXBT_TH128 )
+          {
+            newMaxBtSize = 128;
+          }
+          else
+          {
+            newMaxBtSize = 256;
+          }
+#else
           else
           {
             newMaxBtSize = 128;
           }
+#endif
           newMaxBtSize = Clip3(picHeader->getMinQTSize(pcSlice->getSliceType()), pcPic->cs->sps->getCTUSize(), newMaxBtSize);
           picHeader->setMaxBTSize(1, newMaxBtSize);
 
@@ -2473,7 +2497,13 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 
 
     //-------------------------------------------------------------
+#if MULTI_HYP_PRED  
+    pcSlice->setNumMultiHypRefPics(pcSlice->getSPS()->getMaxNumAddHypRefFrames());
+#endif
     pcSlice->setRefPOCList();
+#if MULTI_HYP_PRED  
+    pcSlice->setNumMultiHypRefPics((int)pcSlice->getMultiHypRefPicList().size());
+#endif
 
 
     pcSlice->setList1IdxToList0Idx();
@@ -2509,11 +2539,13 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
     {
       int colRefIdxL0 = -1, colRefIdxL1 = -1;
 
+      const bool isResamplingPossible = pcSlice->getSPS()->getRprEnabledFlag();
+
       for( int refIdx = 0; refIdx < pcSlice->getNumRefIdx( REF_PIC_LIST_0 ); refIdx++ )
       {
         CHECK( pcSlice->getRefPic( REF_PIC_LIST_0, refIdx )->unscaledPic == nullptr, "unscaledPic is not set for L0 reference picture" );
 
-        if( pcSlice->getRefPic( REF_PIC_LIST_0, refIdx )->isRefScaled( pcSlice->getPPS() ) == false )
+        if( !isResamplingPossible || !pcSlice->getRefPic( REF_PIC_LIST_0, refIdx )->isRefScaled( pcSlice->getPPS() ) )
         {
           colRefIdxL0 = refIdx;
           break;
@@ -2526,7 +2558,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
         {
           CHECK( pcSlice->getRefPic( REF_PIC_LIST_1, refIdx )->unscaledPic == nullptr, "unscaledPic is not set for L1 reference picture" );
 
-          if( pcSlice->getRefPic( REF_PIC_LIST_1, refIdx )->isRefScaled( pcSlice->getPPS() ) == false )
+          if( !isResamplingPossible || !pcSlice->getRefPic( REF_PIC_LIST_1, refIdx )->isRefScaled( pcSlice->getPPS() ) )
           {
             colRefIdxL1 = refIdx;
             break;
@@ -2827,7 +2859,15 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
           if (pcSlice->getSliceType() == I_SLICE)
           {
             //reshape original signal
-            pcPic->getOrigBuf().copyFrom(pcPic->getTrueOrigBuf());
+            if( m_pcCfg->getGopBasedTemporalFilterEnabled() )
+            {
+              pcPic->getOrigBuf().copyFrom( pcPic->getFilteredOrigBuf() );
+            }
+            else
+            {
+              pcPic->getOrigBuf().copyFrom( pcPic->getTrueOrigBuf() );
+            }
+
             if (pcSlice->getLmcsEnabledFlag())
             {
               pcPic->getOrigBuf(COMPONENT_Y).rspSignal(m_pcReshaper->getFwdLUT());
@@ -2885,6 +2925,57 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 
       duData.clear();
 
+#if DUMP_BEFORE_INLOOP
+      if( m_pcEncLib->getDumpBeforeInloop() )
+      {
+        static VideoIOYuv ioBeforeInLoop;
+
+        if( pcPic )
+        {
+          if( !ioBeforeInLoop.isOpen() )
+          {
+            std::string reconFileName = m_pcEncLib->m_reconFileName;
+            size_t pos = reconFileName.find_last_of( '.' );
+            if( pos != string::npos )
+            {
+              reconFileName.insert( pos, "beforeInloop" );
+            }
+            else
+            {
+              reconFileName.append( "beforeInloop" );
+            }
+            const BitDepths &bitDepths = pcPic->cs->sps->getBitDepths();
+
+            ioBeforeInLoop.open( reconFileName, true, bitDepths.recon, bitDepths.recon, bitDepths.recon );
+          }
+
+          const Window &conf = pcPic->getConformanceWindow();
+          const SPS* sps = pcPic->cs->sps;
+          ChromaFormat chromaFormatIDC = sps->getChromaFormatIdc();
+
+          InputColourSpaceConversion outputColourSpaceConvert = IPCOLOURSPACE_UNCHANGED;
+          bool packedYUVMode = false;
+          bool clipOutputVideoToRec709Range = false;
+
+          if( m_pcCfg->getUpscaledOutput() )
+          {
+            ioBeforeInLoop.writeUpscaledPicture( *sps, *pcPic->cs->pps, pcPic->getRecoBuf(), outputColourSpaceConvert, packedYUVMode, m_pcCfg->getUpscaledOutput(), NUM_CHROMA_FORMAT, clipOutputVideoToRec709Range );
+          }
+          else
+          {
+            ioBeforeInLoop.write( pcPic->getRecoBuf().get( COMPONENT_Y ).width, pcPic->getRecoBuf().get( COMPONENT_Y ).height, pcPic->getRecoBuf(),
+              outputColourSpaceConvert,
+              packedYUVMode,
+              conf.getWindowLeftOffset() * SPS::getWinUnitX( chromaFormatIDC ),
+              conf.getWindowRightOffset() * SPS::getWinUnitX( chromaFormatIDC ),
+              conf.getWindowTopOffset() * SPS::getWinUnitY( chromaFormatIDC ),
+              conf.getWindowBottomOffset() * SPS::getWinUnitY( chromaFormatIDC ),
+              NUM_CHROMA_FORMAT, clipOutputVideoToRec709Range );
+          }
+        }
+      }
+#endif
+
       CodingStructure& cs = *pcPic->cs;
       pcSlice = pcPic->slices[0];
 
@@ -2910,22 +3001,16 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
           }
         }
         m_pcReshaper->setRecReshaped(false);
-        pcPic->getOrigBuf().copyFrom(pcPic->getTrueOrigBuf());
-      }
 
-      // create SAO object based on the picture size
-      if( pcSlice->getSPS()->getSAOEnabledFlag() )
-      {
-        const uint32_t widthInCtus = ( picWidth + maxCUWidth - 1 ) / maxCUWidth;
-        const uint32_t heightInCtus = ( picHeight + maxCUHeight - 1 ) / maxCUHeight;
-        const uint32_t numCtuInFrame = widthInCtus * heightInCtus;
-        const uint32_t  log2SaoOffsetScaleLuma   = (uint32_t) std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA  ) - MAX_SAO_TRUNCATED_BITDEPTH);
-        const uint32_t  log2SaoOffsetScaleChroma = (uint32_t) std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - MAX_SAO_TRUNCATED_BITDEPTH);
+        if( m_pcCfg->getGopBasedTemporalFilterEnabled() )
+        {
+          pcPic->getOrigBuf().copyFrom( pcPic->getFilteredOrigBuf() );
+        }
+        else
+        {
+          pcPic->getOrigBuf().copyFrom( pcPic->getTrueOrigBuf() );
+        }
 
-        m_pcSAO->create( picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, log2SaoOffsetScaleLuma, log2SaoOffsetScaleChroma );
-        m_pcSAO->destroyEncData();
-        m_pcSAO->createEncData( m_pcCfg->getSaoCtuBoundary(), numCtuInFrame );
-        m_pcSAO->setReshaper( m_pcReshaper );
       }
 
       if( pcSlice->getSPS()->getScalingListFlag() && m_pcCfg->getUseScalingListId() == SCALING_LIST_FILE_READ )
@@ -2958,6 +3043,13 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
         }
   #endif
       }
+#if DB_PARAM_TID
+      else
+      {
+        applyDeblockingFilterParameterSelection( pcPic, pcSlice, uiNumSliceSegments, iGOPid );
+      }
+#endif
+
       if (m_pcCfg->getCostMode() == COST_LOSSLESS_CODING) 
       {
         for (int s = 0; s < uiNumSliceSegments; s++)
@@ -2968,9 +3060,12 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
           }
         }
       }
+
       m_pcLoopFilter->loopFilterPic( cs );
 
+#if !MULTI_PASS_DMVR
       CS::setRefinedMotionField(cs);
+#endif
 
       if( pcSlice->getSPS()->getSAOEnabledFlag() )
       {
@@ -3004,9 +3099,6 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 
       if( pcSlice->getSPS()->getALFEnabledFlag() )
       {
-        m_pcALF->destroy();
-        m_pcALF->create( m_pcCfg, picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, m_pcCfg->getBitDepth(), m_pcCfg->getInputBitDepth() );
-
         for (int s = 0; s < uiNumSliceSegments; s++)
         {
           pcPic->slices[s]->setTileGroupAlfEnabledFlag(COMPONENT_Y, false);
@@ -3040,6 +3132,9 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
           }
           if (pcPic->slices[s]->getTileGroupAlfEnabledFlag(COMPONENT_Y))
           {
+#if ALF_IMPROVEMENT
+            pcPic->slices[s]->setTileGroupAlfFixedFilterSetIdx(cs.slice->getTileGroupAlfFixedFilterSetIdx());
+#endif
             pcPic->slices[s]->setTileGroupNumAps(cs.slice->getTileGroupNumAps());
             pcPic->slices[s]->setAlfAPSs(cs.slice->getTileGroupApsIdLuma());
           }
@@ -3179,6 +3274,10 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
       pcSlice = pcPic->slices[0];
 
       /////////////////////////////////////////////////////////////////////////////////////////////////// File writing
+
+#if EMBEDDED_APS
+      m_aps.clear();
+#endif
 
       // write various parameter sets
       bool writePS = m_bSeqFirst || (m_pcCfg->getReWriteParamSets() && (pcSlice->isIRAP()));
@@ -3378,6 +3477,9 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
             picHeader->setAlfEnabledFlag(COMPONENT_Y,  pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Y ) );
             picHeader->setAlfEnabledFlag(COMPONENT_Cb, pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Cb) );
             picHeader->setAlfEnabledFlag(COMPONENT_Cr, pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Cr) );
+#if ALF_IMPROVEMENT
+            picHeader->setAlfFixedFilterSetIdx(pcSlice->getTileGroupAlfFixedFilterSetIdx());
+#endif
             picHeader->setNumAlfAps(pcSlice->getTileGroupNumAps());
             picHeader->setAlfAPSs(pcSlice->getTileGroupApsIdLuma());
             picHeader->setAlfApsIdChroma(pcSlice->getTileGroupApsIdChroma());
@@ -3425,7 +3527,15 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 
 
         tmpBitsBeforeWriting = m_HLSWriter->getNumberOfWrittenBits();
+        pcSlice->m_ccAlfFilterParam      = m_pcALF->getCcAlfFilterParam();
+        pcSlice->m_ccAlfFilterControl[0] = m_pcALF->getCcAlfControlIdc(COMPONENT_Cb);
+        pcSlice->m_ccAlfFilterControl[1] = m_pcALF->getCcAlfControlIdc(COMPONENT_Cr);
+
+#if EMBEDDED_APS
+        m_HLSWriter->codeSliceHeader( m_aps, pcSlice );
+#else
         m_HLSWriter->codeSliceHeader( pcSlice );
+#endif
         actualHeadBits += ( m_HLSWriter->getNumberOfWrittenBits() - tmpBitsBeforeWriting );
 
         pcSlice->setFinalized(true);
@@ -4220,7 +4330,7 @@ void EncGOP::xCalculateAddPSNR(Picture* pcPic, PelUnitBuf cPicD, const AccessUni
 
   if (m_pcEncLib->isResChangeInClvsEnabled())
   {
-    const CPelBuf& upscaledOrg = sps.getUseLmcs() ? pcPic->M_BUFS( 0, PIC_TRUE_ORIGINAL_INPUT).get( COMPONENT_Y ) : pcPic->M_BUFS( 0, PIC_ORIGINAL_INPUT).get( COMPONENT_Y );
+    const CPelBuf& upscaledOrg = ( sps.getUseLmcs() || m_pcCfg->getGopBasedTemporalFilterEnabled() ) ? pcPic->M_BUFS( 0, PIC_TRUE_ORIGINAL_INPUT ).get( COMPONENT_Y ) : pcPic->M_BUFS( 0, PIC_ORIGINAL_INPUT ).get( COMPONENT_Y );
     upscaledRec.create( pic.chromaFormat, Area( Position(), upscaledOrg ) );
 
     int xScale, yScale;
@@ -4281,7 +4391,7 @@ void EncGOP::xCalculateAddPSNR(Picture* pcPic, PelUnitBuf cPicD, const AccessUni
 
     if (m_pcEncLib->isResChangeInClvsEnabled())
     {
-      const CPelBuf& upscaledOrg = sps.getUseLmcs() ? pcPic->M_BUFS( 0, PIC_TRUE_ORIGINAL_INPUT ).get( compID ) : pcPic->M_BUFS( 0, PIC_ORIGINAL_INPUT ).get( compID );
+      const CPelBuf& upscaledOrg = ( sps.getUseLmcs() || m_pcCfg->getGopBasedTemporalFilterEnabled() ) ? pcPic->M_BUFS( 0, PIC_TRUE_ORIGINAL_INPUT ).get( compID ) : pcPic->M_BUFS( 0, PIC_ORIGINAL_INPUT ).get( compID );
 
       const uint32_t upscaledWidth = upscaledOrg.width - ( m_pcEncLib->getPad( 0 ) >> ::getComponentScaleX( compID, format ) );
       const uint32_t upscaledHeight = upscaledOrg.height - ( m_pcEncLib->getPad( 1 ) >> ( !!bPicIsField + ::getComponentScaleY( compID, format ) ) );
@@ -5221,15 +5331,49 @@ void EncGOP::applyDeblockingFilterMetric( Picture* pcPic, uint32_t uiNumSlices )
       const PPS* pcPPS = pcSlice->getPPS();
       pcLocalSlice->setDeblockingFilterOverrideFlag  ( false);
       pcLocalSlice->setDeblockingFilterDisable       ( pcPPS->getPPSDeblockingFilterDisabledFlag() );
+#if DB_PARAM_TID
+      int betaIdx = Clip3(0, (int)pcPPS->getDeblockingFilterBetaOffsetDiv2().size() - 1, (int)pcLocalSlice->getTLayer() + (pcLocalSlice->isIntra() ? 0 : 1));
+      int tcIdx = Clip3(0, (int)pcPPS->getDeblockingFilterTcOffsetDiv2().size() - 1, (int)pcLocalSlice->getTLayer() + (pcLocalSlice->isIntra() ? 0 : 1));
+      pcLocalSlice->setDeblockingFilterBetaOffsetDiv2( pcPPS->getDeblockingFilterBetaOffsetDiv2()[betaIdx] );
+      pcLocalSlice->setDeblockingFilterTcOffsetDiv2  ( pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx]   );
+
+      pcLocalSlice->setDeblockingFilterCbBetaOffsetDiv2(pcPPS->getDeblockingFilterBetaOffsetDiv2()[betaIdx]);
+      pcLocalSlice->setDeblockingFilterCbTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx]);
+      pcLocalSlice->setDeblockingFilterCrBetaOffsetDiv2(pcPPS->getDeblockingFilterBetaOffsetDiv2()[betaIdx]);
+      pcLocalSlice->setDeblockingFilterCrTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx]);
+#else
       pcLocalSlice->setDeblockingFilterBetaOffsetDiv2( pcPPS->getDeblockingFilterBetaOffsetDiv2() );
       pcLocalSlice->setDeblockingFilterTcOffsetDiv2  ( pcPPS->getDeblockingFilterTcOffsetDiv2()   );
       pcLocalSlice->setDeblockingFilterCbBetaOffsetDiv2 ( pcPPS->getDeblockingFilterCbBetaOffsetDiv2() );
       pcLocalSlice->setDeblockingFilterCbTcOffsetDiv2   ( pcPPS->getDeblockingFilterCbTcOffsetDiv2() );
       pcLocalSlice->setDeblockingFilterCrBetaOffsetDiv2 ( pcPPS->getDeblockingFilterCrBetaOffsetDiv2() );
       pcLocalSlice->setDeblockingFilterCrTcOffsetDiv2   ( pcPPS->getDeblockingFilterCrTcOffsetDiv2() );
+#endif
     }
   }
 }
+
+#if DB_PARAM_TID
+void EncGOP::applyDeblockingFilterParameterSelection( Picture* pcPic, Slice* pcSlice, const uint32_t numSlices, const int gopID )
+{
+  const PPS* pcPPS = pcPic->slices[0]->getPPS();
+  for (int i = 0; i<numSlices; i++)
+  {
+    Slice*      pcSlice = pcPic->slices[i];
+    pcSlice->setDeblockingFilterOverrideFlag(false);
+    pcSlice->setDeblockingFilterDisable(pcPPS->getPPSDeblockingFilterDisabledFlag());
+    int betaIdx = Clip3(0, (int)pcPPS->getDeblockingFilterBetaOffsetDiv2().size() - 1, (int)pcSlice->getTLayer() + (pcSlice->isIntra() ? 0 : 1));
+    int tcIdx = Clip3(0, (int)pcPPS->getDeblockingFilterTcOffsetDiv2().size() - 1, (int)pcSlice->getTLayer() + (pcSlice->isIntra() ? 0 : 1));
+    pcSlice->setDeblockingFilterBetaOffsetDiv2(pcPPS->getDeblockingFilterBetaOffsetDiv2()[betaIdx]);
+    pcSlice->setDeblockingFilterTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx]);
+
+    pcSlice->setDeblockingFilterCbBetaOffsetDiv2(pcPPS->getDeblockingFilterBetaOffsetDiv2()[betaIdx]);
+    pcSlice->setDeblockingFilterCbTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx]);
+    pcSlice->setDeblockingFilterCrBetaOffsetDiv2(pcPPS->getDeblockingFilterBetaOffsetDiv2()[betaIdx]);
+    pcSlice->setDeblockingFilterCrTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx]);
+  }
+}
+#endif
 
 #if W0038_DB_OPT
 void EncGOP::applyDeblockingFilterParameterSelection( Picture* pcPic, const uint32_t numSlices, const int gopID )
@@ -5332,6 +5476,10 @@ void EncGOP::applyDeblockingFilterParameterSelection( Picture* pcPic, const uint
   reco.copyFrom( *m_pcDeblockingTempPicYuv );
 
   const PPS* pcPPS = pcPic->slices[0]->getPPS();
+#if DB_PARAM_TID
+  int betaIdx = Clip3(0, (int)pcPPS->getDeblockingFilterBetaOffsetDiv2().size() - 1, (int)pcPic->slices[0]->getTLayer() + (pcPic->slices[0]->isIntra() ? 0 : 1));
+  int tcIdx = Clip3(0, (int)pcPPS->getDeblockingFilterTcOffsetDiv2().size() - 1, (int)pcPic->slices[0]->getTLayer()) + (pcPic->slices[0]->isIntra() ? 0 : 1);
+#endif
   if(bDBFilterDisabledBest)
   {
     for (int i=0; i<numSlices; i++)
@@ -5341,19 +5489,32 @@ void EncGOP::applyDeblockingFilterParameterSelection( Picture* pcPic, const uint
       pcSlice->setDeblockingFilterDisable     ( true);
     }
   }
+#if DB_PARAM_TID
+  else if (betaOffsetDiv2Best == pcPPS->getDeblockingFilterBetaOffsetDiv2()[betaIdx] && tcOffsetDiv2Best == pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx])
+#else
   else if(betaOffsetDiv2Best == pcPPS->getDeblockingFilterBetaOffsetDiv2() &&  tcOffsetDiv2Best == pcPPS->getDeblockingFilterTcOffsetDiv2())
+#endif
   {
     for (int i=0; i<numSlices; i++)
     {
       Slice*      pcSlice = pcPic->slices[i];
       pcSlice->setDeblockingFilterOverrideFlag   ( false);
       pcSlice->setDeblockingFilterDisable        ( pcPPS->getPPSDeblockingFilterDisabledFlag() );
+#if DB_PARAM_TID
+      pcSlice->setDeblockingFilterBetaOffsetDiv2(pcPPS->getDeblockingFilterBetaOffsetDiv2()[betaIdx]);
+      pcSlice->setDeblockingFilterTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx]);
+      pcSlice->setDeblockingFilterCbBetaOffsetDiv2(pcPPS->getDeblockingFilterBetaOffsetDiv2()[betaIdx]);
+      pcSlice->setDeblockingFilterCbTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx]);
+      pcSlice->setDeblockingFilterCrBetaOffsetDiv2(pcPPS->getDeblockingFilterBetaOffsetDiv2()[betaIdx]);
+      pcSlice->setDeblockingFilterCrTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx]);
+#else
       pcSlice->setDeblockingFilterBetaOffsetDiv2 ( pcPPS->getDeblockingFilterBetaOffsetDiv2() );
       pcSlice->setDeblockingFilterTcOffsetDiv2   ( pcPPS->getDeblockingFilterTcOffsetDiv2()   );
-      pcSlice->setDeblockingFilterCbBetaOffsetDiv2 ( pcPPS->getDeblockingFilterBetaOffsetDiv2() );
-      pcSlice->setDeblockingFilterCbTcOffsetDiv2   ( pcPPS->getDeblockingFilterTcOffsetDiv2()   );
-      pcSlice->setDeblockingFilterCrBetaOffsetDiv2 ( pcPPS->getDeblockingFilterBetaOffsetDiv2() );
-      pcSlice->setDeblockingFilterCrTcOffsetDiv2   ( pcPPS->getDeblockingFilterTcOffsetDiv2()   );
+      pcSlice->setDeblockingFilterCbBetaOffsetDiv2(pcPPS->getDeblockingFilterBetaOffsetDiv2());
+      pcSlice->setDeblockingFilterCbTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2());
+      pcSlice->setDeblockingFilterCrBetaOffsetDiv2(pcPPS->getDeblockingFilterBetaOffsetDiv2());
+      pcSlice->setDeblockingFilterCrTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2());
+#endif
     }
   }
   else

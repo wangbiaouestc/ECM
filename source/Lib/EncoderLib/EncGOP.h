@@ -329,11 +329,18 @@ protected:
   int xWritePicHeader( AccessUnit &accessUnit, PicHeader *picHeader );
 
   void applyDeblockingFilterMetric( Picture* pcPic, uint32_t uiNumSlices );
+#if DB_PARAM_TID
+  void applyDeblockingFilterParameterSelection( Picture* pcPic, Slice* pcSlice, const uint32_t numSlices, const int gopID );
+#endif
 #if W0038_DB_OPT
   void applyDeblockingFilterParameterSelection( Picture* pcPic, const uint32_t numSlices, const int gopID );
 #endif
   void xCreateExplicitReferencePictureSetFromReference( Slice* slice, PicList& rcListPic, const ReferencePictureList *rpl0, const ReferencePictureList *rpl1 );
   bool xCheckMaxTidILRefPics(Picture* refPic, bool currentPicIsIRAP);
+
+#if EMBEDDED_APS
+  std::vector<APS> m_aps;
+#endif
 };// END CLASS DEFINITION EncGOP
 
 //! \}

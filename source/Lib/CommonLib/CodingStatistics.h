@@ -119,6 +119,10 @@ enum CodingStatisticsType
   STATS__CABAC_BITS__PLT_MODE,
   STATS__CABAC_BITS__ACT,
   STATS__CABAC_BITS__CROSS_COMPONENT_ALF_BLOCK_LEVEL_IDC,
+
+#if INTER_LIC
+  STATS__CABAC_BITS__LIC_FLAG,
+#endif
   STATS__TOOL_TOTAL_FRAME,// This is a special case and is not included in the report.
   STATS__TOOL_AFF,
   STATS__TOOL_EMT,
@@ -213,6 +217,10 @@ static inline const char* getName(CodingStatisticsType name)
     "CABAC_BITS__PLT_MODE",
     "CABAC_BITS__ACT",
     "CABAC_BITS__CROSS_COMPONENT_ALF_BLOCK_LEVEL_IDC",
+
+#if INTER_LIC
+  "CABAC_BITS__LIC_FLAG",
+#endif
     "TOOL_FRAME",
     "TOOL_AFFINE",
     "TOOL_EMT",

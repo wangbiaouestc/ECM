@@ -69,15 +69,18 @@ void MatrixIntraPrediction::prepareInputForPred(const CPelBuf &pSrc, const Area 
 
   // Step 2: Get the input data (left and top reference samples)
   m_refSamplesTop.resize(block.width);
+
+  const Pel *src = pSrc.buf + 1;
   for (int x = 0; x < block.width; x++)
   {
-    m_refSamplesTop[x] = pSrc.at(x + 1, 0);
+    m_refSamplesTop[x] = src[x];
   }
 
   m_refSamplesLeft.resize(block.height);
+  src = pSrc.buf + 1 + pSrc.stride;
   for (int y = 0; y < block.height; y++)
   {
-    m_refSamplesLeft[y] = pSrc.at(y + 1, 1);
+    m_refSamplesLeft[y] = src[y];
   }
 
   // Step 3: Compute the reduced boundary via Haar-downsampling (input for the prediction)

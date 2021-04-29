@@ -76,20 +76,27 @@ public:
   // coding (quad)tree (clause 7.3.8.4)
   void        coding_tree               ( CodingStructure&              cs,     Partitioner&    pm,       CUCtx& cuCtx, Partitioner* pPartitionerChroma = nullptr, CUCtx* pCuCtxChroma = nullptr);
   PartSplit   split_cu_mode             ( CodingStructure&              cs,     Partitioner&    pm );
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS  
   ModeType    mode_constraint           ( CodingStructure&              cs,     Partitioner&    pm,       const PartSplit splitMode );
-
+#endif
   // coding unit (clause 7.3.8.5)
   void        coding_unit               ( CodingUnit&                   cu,     Partitioner&    pm,       CUCtx& cuCtx );
   void        cu_skip_flag              ( CodingUnit&                   cu );
   void        pred_mode                 ( CodingUnit&                   cu );
   void        bdpcm_mode                ( CodingUnit&                   cu,     const ComponentID compID );
   void        cu_pred_data              ( CodingUnit&                   cu );
+#if ENABLE_OBMC
+  void        obmc_flag                 ( CodingUnit&                   cu );
+#endif
   void        cu_bcw_flag               ( CodingUnit&                   cu );
   void        extend_ref_line           (CodingUnit&                     cu);
   void        intra_luma_pred_modes     ( CodingUnit&                   cu );
   void        intra_chroma_pred_modes   ( CodingUnit&                   cu );
   bool        intra_chroma_lmc_mode     ( PredictionUnit&               pu );
   void        intra_chroma_pred_mode    ( PredictionUnit&               pu );
+#if ENABLE_DIMD
+  void        cu_dimd_flag              (CodingUnit&                   cu);
+ #endif
   void        cu_residual               ( CodingUnit&                   cu,     Partitioner&    pm,       CUCtx& cuCtx );
   void        rqt_root_cbf              ( CodingUnit&                   cu );
   void        adaptive_color_transform(CodingUnit&             cu);
@@ -108,6 +115,12 @@ public:
   void        subblock_merge_flag       ( CodingUnit&                   cu );
   void        merge_idx                 ( PredictionUnit&               pu );
   void        mmvd_merge_idx(PredictionUnit&               pu);
+#if AFFINE_MMVD
+  void        affine_mmvd_data          ( PredictionUnit&               pu );
+#endif
+#if TM_MRG
+  void        tm_merge_flag             ( PredictionUnit&               pu );
+#endif
   void        imv_mode                  ( CodingUnit&                   cu,     MergeCtx&       mrgCtx );
   void        affine_amvr_mode          ( CodingUnit&                   cu,     MergeCtx&       mrgCtx );
   void        inter_pred_idc            ( PredictionUnit&               pu );
@@ -115,6 +128,10 @@ public:
   void        mvp_flag                  ( PredictionUnit&               pu,     RefPicList      eRefList );
   void        Ciip_flag              ( PredictionUnit&               pu );
   void        smvd_mode              ( PredictionUnit&               pu );
+#if MULTI_HYP_PRED
+  int         ref_idx_mh(const int                     numRef);
+  void        mh_pred_data(PredictionUnit&               pu);
+#endif
 
 
   // transform tree (clause 7.3.8.8)
@@ -136,8 +153,23 @@ public:
   void        residual_lfnst_mode       ( CodingUnit&                   cu,     CUCtx&          cuCtx  );
   void        isp_mode                  ( CodingUnit&                   cu );
   int         last_sig_coeff            ( CoeffCodingContext&           cctx,   TransformUnit& tu, ComponentID   compID );
-  void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff, const int stateTransTable, int& state );
-  void        residual_codingTS         ( TransformUnit&                tu,     ComponentID     compID );
+#if TCQ_8STATES
+#if SIGN_PREDICTION
+  void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff,   TCoeff*         sign, const uint64_t stateTransTable, int& state );
+#else
+  void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff, const uint64_t stateTransTable, int& state );
+#endif
+#else
+#if SIGN_PREDICTION
+	void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff,   TCoeff*         sign, const int stateTransTable, int& state );
+#else
+	void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff, const int stateTransTable, int& state );
+#endif
+#endif
+#if SIGN_PREDICTION
+  void        parsePredictedSigns ( TransformUnit &tu, ComponentID compID);
+#endif
+	void        residual_codingTS         ( TransformUnit&                tu,     ComponentID     compID );
   void        residual_coding_subblockTS( CoeffCodingContext&           cctx,   TCoeff*         coeff  );
   void        joint_cb_cr               ( TransformUnit&                tu,     const int cbfMask );
 
@@ -154,6 +186,9 @@ private:
   void        xDecodePLTPredIndicator   ( CodingUnit& cu,           uint32_t maxPLTSize,   ComponentID compBegin );
   void        xAdjustPLTIndex           ( CodingUnit& cu,           Pel curLevel,          uint32_t idx, PelBuf& paletteIdx, PLTtypeBuf& paletteRunType, int maxSymbol, ComponentID compBegin );
 public:
+#if INTER_LIC
+  void        cu_lic_flag               ( CodingUnit& cu );
+#endif
 private:
   BinDecoderBase& m_BinDecoder;
   InputBitstream* m_Bitstream;

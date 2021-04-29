@@ -264,7 +264,9 @@ public:
   /// encode several number of pictures until end-of-sequence
   bool encodePrep( bool bEos,
                PelStorage* pcPicYuvOrg,
-               PelStorage* pcPicYuvTrueOrg, const InputColourSpaceConversion snrCSC, // used for SNR calculations. Picture in original colour space.
+               PelStorage* pcPicYuvTrueOrg,
+               PelStorage* pcPicYuvFilteredOrg,
+               const InputColourSpaceConversion snrCSC, // used for SNR calculations. Picture in original colour space.
                std::list<PelUnitBuf*>& rcListPicYuvRecOut,
                int& iNumEncoded );
 
@@ -274,7 +276,9 @@ public:
 
   bool encodePrep( bool bEos,
                PelStorage* pcPicYuvOrg,
-               PelStorage* pcPicYuvTrueOrg, const InputColourSpaceConversion snrCSC, // used for SNR calculations. Picture in original colour space.
+               PelStorage* pcPicYuvTrueOrg,
+               PelStorage* pcPicYuvFilteredOrg,
+               const InputColourSpaceConversion snrCSC, // used for SNR calculations. Picture in original colour space.
                std::list<PelUnitBuf*>& rcListPicYuvRecOut,
                int& iNumEncoded, bool isTff );
 
@@ -287,6 +291,10 @@ public:
 
   int getLayerId() const { return m_layerId; }
   VPS* getVPS()          { return m_vps;     }
+
+#if DUMP_BEFORE_INLOOP
+  std::string m_reconFileName;
+#endif
 };
 
 //! \}

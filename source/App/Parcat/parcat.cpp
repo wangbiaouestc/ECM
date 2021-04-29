@@ -48,8 +48,8 @@
 class ParcatHLSyntaxReader : public VLCReader
 {
   public:
-    void  parsePictureHeaderUpToPoc ( ParameterSetManager *parameterSetManager );
-    bool  parsePictureHeaderInSliceHeaderFlag ( ParameterSetManager *parameterSetManager );
+    void parsePictureHeaderUpToPoc ( ParameterSetManager *parameterSetManager );
+    bool parsePictureHeaderInSliceHeaderFlag ( ParameterSetManager *parameterSetManager );
 };
 
 bool ParcatHLSyntaxReader::parsePictureHeaderInSliceHeaderFlag(ParameterSetManager *parameterSetManager) {

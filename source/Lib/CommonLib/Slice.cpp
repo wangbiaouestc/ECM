@@ -42,6 +42,9 @@
 #include "dtrace_next.h"
 
 #include "UnitTools.h"
+#if MULTI_HYP_PRED
+#include <set>
+#endif
 
 //! \ingroup CommonLib
 //! \{
@@ -78,7 +81,11 @@ Slice::Slice()
 , m_deblockingFilterCbTcOffsetDiv2  ( 0 )
 , m_deblockingFilterCrBetaOffsetDiv2( 0 )
 , m_deblockingFilterCrTcOffsetDiv2  ( 0 )
+#if TCQ_8STATES
+, m_depQuantEnabledIdc             ( 0 )
+#else
 , m_depQuantEnabledFlag             ( false )
+#endif
 , m_signDataHidingEnabledFlag       ( false )
 , m_tsResidualCodingDisabledFlag  ( false )
 , m_pendingRasInit                ( false )
@@ -92,6 +99,9 @@ Slice::Slice()
 , m_pcPicHeader                   ( NULL )
 , m_colFromL0Flag                 ( true )
 , m_colRefIdx                     ( 0 )
+#if INTER_LIC
+, m_UseLIC                        ( false )
+#endif
 , m_uiTLayer                      ( 0 )
 , m_bTLayerSwitchingFlag          ( false )
 , m_independentSliceIdx           ( 0 )
@@ -258,6 +268,9 @@ void Slice::inheritFromPicHeader( PicHeader *picHeader, const PPS *pps, const SP
   setTileGroupAlfEnabledFlag(COMPONENT_Y,  picHeader->getAlfEnabledFlag(COMPONENT_Y));
   setTileGroupAlfEnabledFlag(COMPONENT_Cb, picHeader->getAlfEnabledFlag(COMPONENT_Cb));
   setTileGroupAlfEnabledFlag(COMPONENT_Cr, picHeader->getAlfEnabledFlag(COMPONENT_Cr));
+#if ALF_IMPROVEMENT
+  setTileGroupAlfFixedFilterSetIdx(picHeader->getAlfFixedFilterSetIdx());
+#endif
   setTileGroupNumAps(picHeader->getNumAlfAps());
   setAlfAPSs(picHeader->getAlfAPSs());
   setTileGroupApsIdChroma(picHeader->getAlfApsIdChroma());
@@ -446,7 +459,10 @@ void Slice::setRefPOCList       ()
       m_aiRefPOCList[iDir][iNumRefIdx] = m_apcRefPicList[iDir][iNumRefIdx]->getPOC();
     }
   }
-
+#if MULTI_HYP_PRED
+  if (getSPS()->getUseInterMultiHyp())
+    setMultiHypRefPicList();
+#endif
 }
 
 void Slice::setList1IdxToList0Idx()
@@ -560,6 +576,38 @@ void Slice::constructRefPicList(PicList& rcListPic)
     m_bIsUsedAsLongTerm[REF_PIC_LIST_1][ii] = pcRefPic->longTerm;
   }
 }
+#if MULTI_HYP_PRED
+void Slice::setMultiHypRefPicList()
+{
+  m_multiHypRefPics.clear();
+  if (getNumMultiHypRefPics() == 0)
+    return;
+  std::set<int> usedRefPOCs;
+
+  const int iNumRefIdx[2] = { getNumRefIdx(REF_PIC_LIST_0), getNumRefIdx(REF_PIC_LIST_1) };
+  for (int i = 0; i < std::max(iNumRefIdx[0], iNumRefIdx[1]); ++i)
+  {
+    for (int iRefPicList = 0; iRefPicList < 2; ++iRefPicList)
+    {
+      if (i < iNumRefIdx[iRefPicList])
+      {
+        const RefPicList eRefPicList = RefPicList(iRefPicList);
+        const int iRefPOC = getRefPOC(eRefPicList, i);
+        if (usedRefPOCs.count(iRefPOC) == 0)
+        {
+          RefListAndRefIdx entry;
+          entry.refList = eRefPicList;
+          entry.refIdx = i;
+          m_multiHypRefPics.push_back(entry);
+          if (m_multiHypRefPics.size() == getNumMultiHypRefPics())
+            return;
+          usedRefPOCs.insert(iRefPOC);
+        }
+      }
+    }
+  }
+}
+#endif
 
 void Slice::initEqualRef()
 {
@@ -1076,7 +1124,11 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
   m_deblockingFilterCbTcOffsetDiv2    = pSrc->m_deblockingFilterCbTcOffsetDiv2;
   m_deblockingFilterCrBetaOffsetDiv2  = pSrc->m_deblockingFilterCrBetaOffsetDiv2;
   m_deblockingFilterCrTcOffsetDiv2    = pSrc->m_deblockingFilterCrTcOffsetDiv2;
+#if TCQ_8STATES
+  m_depQuantEnabledIdc                = pSrc->m_depQuantEnabledIdc;
+#else
   m_depQuantEnabledFlag               = pSrc->m_depQuantEnabledFlag;
+#endif
   m_signDataHidingEnabledFlag         = pSrc->m_signDataHidingEnabledFlag;
   m_tsResidualCodingDisabledFlag      = pSrc->m_tsResidualCodingDisabledFlag;
 
@@ -1151,6 +1203,10 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
 
   m_pendingRasInit                = pSrc->m_pendingRasInit;
 
+#if INTER_LIC
+  m_UseLIC                        = pSrc->m_UseLIC;
+#endif
+
   for ( uint32_t e=0 ; e<NUM_REF_PIC_LIST_01 ; e++ )
   {
     for ( uint32_t n=0 ; n<MAX_NUM_REF ; n++ )
@@ -1166,6 +1222,9 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
 
   m_cabacInitFlag                 = pSrc->m_cabacInitFlag;
   memcpy(m_alfApss, pSrc->m_alfApss, sizeof(m_alfApss)); // this might be quite unsafe
+#if ALF_IMPROVEMENT
+  m_tileGroupAlfFixedFilterSetIdx          = pSrc->m_tileGroupAlfFixedFilterSetIdx;
+#endif
   memcpy( m_tileGroupAlfEnabledFlag, pSrc->m_tileGroupAlfEnabledFlag, sizeof(m_tileGroupAlfEnabledFlag));
   m_tileGroupNumAps               = pSrc->m_tileGroupNumAps;
   m_tileGroupLumaApsId            = pSrc->m_tileGroupLumaApsId;
@@ -1188,6 +1247,10 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
   m_tileGroupCcAlfCrEnabledFlag             = pSrc->m_tileGroupCcAlfCrEnabledFlag;
   m_tileGroupCcAlfCbApsId                   = pSrc->m_tileGroupCcAlfCbApsId;
   m_tileGroupCcAlfCrApsId                   = pSrc->m_tileGroupCcAlfCrApsId;
+#if MULTI_HYP_PRED
+  m_multiHypRefPics = pSrc->m_multiHypRefPics;
+  m_numMultiHypRefPics = pSrc->m_numMultiHypRefPics;
+#endif
 }
 
 
@@ -2956,6 +3019,12 @@ SPS::SPS()
 , m_affineAmvrEnabledFlag     ( false )
 , m_DMVR                      ( false )
 , m_MMVD                      ( false )
+#if AFFINE_MMVD
+ , m_AffineMmvdMode           ( false )
+#endif
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+ , m_DMVDMode                 ( false )
+#endif
 , m_SBT                       ( false )
 , m_ISP                       ( false )
 , m_chromaFormatIdc           (CHROMA_420)
@@ -3041,13 +3110,28 @@ SPS::SPS()
 , m_Affine                    ( false )
 , m_AffineType                ( false )
 , m_PROF                      ( false )
-, m_ciip                   ( false )
+#if ENABLE_DIMD
+, m_dimd                      ( false )
+#endif
+#if ENABLE_OBMC
+, m_OBMC                      ( false )
+#endif
+, m_ciip                      ( false )
 , m_Geo                       ( false )
+#if INTER_LIC
+, m_licEnabledFlag            ( false )
+#endif
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
 , m_LadfEnabled               ( false )
 , m_LadfNumIntervals          ( 0 )
 , m_LadfQpOffset              { 0 }
 , m_LadfIntervalLowerBound    { 0 }
+#endif
+#if MULTI_HYP_PRED
+, m_InterMultiHyp(false)
+, m_maxNumAddHyps(0)
+, m_numAddHypWeights(0)
+, m_maxNumAddHypRefFrames(0)
 #endif
 , m_MRL                       ( false )
 , m_MIP                       ( false )
@@ -4439,6 +4523,8 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
 
   freeScaledRefPicList( scaledRefPic );
 
+  const bool isResamplingPossible = sps->getRprEnabledFlag();
+
   for( int refList = 0; refList < NUM_REF_PIC_LIST_01; refList++ )
   {
     if( refList == 1 && m_eSliceType != B_SLICE )
@@ -4451,13 +4537,20 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
       // if rescaling is needed, otherwise just reuse the original picture pointer; it is needed for motion field, otherwise motion field requires a copy as well
       // reference resampling for the whole picture is not applied at decoder
 
-      int xScale, yScale;
-      CU::getRprScaling( sps, pps, m_apcRefPicList[refList][rIdx], xScale, yScale );
-      m_scalingRatio[refList][rIdx] = std::pair<int, int>( xScale, yScale );
+      if( isResamplingPossible )
+      {
+        int xScale, yScale;
+        CU::getRprScaling( sps, pps, m_apcRefPicList[refList][rIdx], xScale, yScale );
+        m_scalingRatio[refList][rIdx] = std::pair<int, int>( xScale, yScale );
+      }
+      else
+      {
+        m_scalingRatio[refList][rIdx] = SCALE_1X;
+      }
 
       CHECK( m_apcRefPicList[refList][rIdx]->unscaledPic == nullptr, "unscaledPic is not properly set" );
 
-      if( m_apcRefPicList[refList][rIdx]->isRefScaled( pps ) == false )
+      if( !isResamplingPossible || !m_apcRefPicList[refList][rIdx]->isRefScaled( pps ) )
       {
         refPicIsSameRes = true;
       }
@@ -4663,6 +4756,12 @@ bool             operator == (const ConstraintInfo& op1, const ConstraintInfo& o
   if( op1.m_noAffineMotionConstraintFlag                 != op2.m_noAffineMotionConstraintFlag                   ) return false;
   if( op1.m_noBcwConstraintFlag                          != op2.m_noBcwConstraintFlag                            ) return false;
   if( op1.m_noIbcConstraintFlag                          != op2.m_noIbcConstraintFlag                            ) return false;
+#if ENABLE_DIMD
+  if( op1.m_noDimdConstraintFlag                         != op2.m_noDimdConstraintFlag                           ) return false;
+#endif
+#if ENABLE_OBMC
+  if( op1.m_noObmcConstraintFlag                         != op2.m_noObmcConstraintFlag                           ) return false;
+#endif
   if( op1.m_noCiipConstraintFlag                         != op2.m_noCiipConstraintFlag                           ) return false;
   if( op1.m_noLadfConstraintFlag                         != op2.m_noLadfConstraintFlag                           ) return false;
   if( op1.m_noTransformSkipConstraintFlag                != op2.m_noTransformSkipConstraintFlag                  ) return false;
@@ -4782,5 +4881,54 @@ void xTraceSliceHeader()
 void xTraceAccessUnitDelimiter()
 {
   DTRACE( g_trace_ctx, D_HEADER, "=========== Access Unit Delimiter ===========\n" );
+}
+#endif
+
+#if INTER_LIC
+void Slice::setUseLICOnPicLevel( bool fastMode )
+{
+  m_UseLIC = getSPS()->getLicEnabledFlag() && !isIntra();
+
+  if (!fastMode || !m_UseLIC)
+  {
+    return;
+  }
+  m_UseLIC = false;
+
+  //----- get negated histogram of current picture -----
+  int32_t               numValues = 1 << getSPS()->getBitDepth( CHANNEL_TYPE_LUMA );
+  std::vector<int32_t>  negCurrHist( numValues, 0 );
+  int32_t               numSamples = m_pcPic->getOrigBuf().Y().width * m_pcPic->getOrigBuf().Y().height;
+  getPic()->getOrigBuf().Y().subtractHistogram( negCurrHist );
+
+  //----- get SAD threshold -----
+  double  sampleThres = 0.06;
+  int32_t sadThreshold = int32_t(sampleThres * double(numSamples));
+
+  //----- check delta histograms -----
+  std::vector<int32_t> deltaHist;
+
+  for (int dir = 0; dir < (isInterB() ? 2 : 1) && !m_UseLIC; dir++)
+  {
+    RefPicList  eList = RefPicList(dir);
+    int         numRef = getNumRefIdx(eList);
+
+    for (int refIdx = 0; refIdx < numRef && !m_UseLIC; refIdx++)
+    {
+      // get delta histogram
+      deltaHist = negCurrHist;
+      getRefPic(eList, refIdx)->getOrigBuf().Y().updateHistogram(deltaHist);
+
+      // get SAD of delta histogram
+      int32_t sadHist = 0;
+      for (std::size_t k = 0; k < numValues; k++)
+      {
+        sadHist += abs(deltaHist[k]);
+      }
+
+      // check
+      m_UseLIC = sadHist > sadThreshold;
+    }
+  }
 }
 #endif

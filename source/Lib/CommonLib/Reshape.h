@@ -70,8 +70,10 @@ protected:
   int                     m_lumaBD;
   int                     m_reshapeLUTSize;
   int                     m_chromaScale;
+#if !LMCS_CHROMA_CALC_CU
   int                     m_vpduX;
   int                     m_vpduY;
+#endif
 public:
   Reshape();
 #if ENABLE_SPLIT_PARALLELISM
@@ -101,8 +103,10 @@ public:
   bool getReshapeFlag() { return m_reshape; }
   void setReshapeFlag(bool b) { m_reshape = b; }
   int  calculateChromaAdjVpduNei(TransformUnit &tu, const CompArea &areaY);
+#if !LMCS_CHROMA_CALC_CU
   void setVPDULoc(int x, int y) { m_vpduX = x, m_vpduY = y; }
   bool isVPDUprocessed(int x, int y) { return ((x == m_vpduX) && (y == m_vpduY)); }
+#endif
   void setChromaScale (int chromaScale) { m_chromaScale = chromaScale; }
   int  getChromaScale() { return m_chromaScale; }
 };// END CLASS DEFINITION Reshape

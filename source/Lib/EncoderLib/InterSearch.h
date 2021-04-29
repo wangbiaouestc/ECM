@@ -95,6 +95,153 @@ typedef struct
   bool affine6ParaAvail;
 } EncAffineMotion;
 
+#if MERGE_ENC_OPT
+struct ModeInfo
+{
+  uint32_t mergeCand;
+  bool     isRegularMerge;
+  bool     isMMVD;
+  bool     isCIIP;
+#if CIIP_PDPC
+  bool     isCiipPDPC;
+#endif
+  bool     isAffine;
+#if AFFINE_MMVD
+  bool     isAffineMmvd;
+#endif
+#if TM_MRG
+  bool     isTMMrg;
+#endif
+  bool     isGeo;
+  uint8_t     geoSplitDir;
+  uint8_t     geoMergeIdx0;
+  uint8_t     geoMergeIdx1;
+#if ENABLE_OBMC
+  bool      isOBMC;
+#endif
+  ModeInfo() : mergeCand(0), isRegularMerge(false), isMMVD(false)
+    , isCIIP(false)
+#if CIIP_PDPC
+    , isCiipPDPC(false)
+#endif
+    , isAffine(false)
+#if AFFINE_MMVD
+    , isAffineMmvd(false)
+#endif
+#if TM_MRG
+    , isTMMrg(false)
+#endif
+    , isGeo(false), geoSplitDir(0), geoMergeIdx0(0), geoMergeIdx1(0)
+#if ENABLE_OBMC
+    , isOBMC(false)
+#endif
+  {}
+  ModeInfo(const uint32_t mergeCand, const bool isRegularMerge, const bool isMMVD, const bool isCIIP
+#if CIIP_PDPC
+    , const bool isCiipPDPC
+#endif
+    , const bool isAffine
+#if ENABLE_OBMC
+    , const bool isOBMC = false
+#endif
+#if AFFINE_MMVD
+    , const bool isAffineMmvd = false
+#endif
+#if TM_MRG
+    , const bool isTMMrg = false
+#endif
+  ) :
+    mergeCand(mergeCand), isRegularMerge(isRegularMerge), isMMVD(isMMVD), isCIIP(isCIIP)
+#if CIIP_PDPC
+    , isCiipPDPC(isCiipPDPC)
+#endif
+    , isAffine(isAffine)
+#if AFFINE_MMVD
+    , isAffineMmvd(isAffineMmvd)
+#endif
+#if TM_MRG
+    , isTMMrg(isTMMrg)
+#endif
+    , isGeo(false), geoSplitDir(0), geoMergeIdx0(0), geoMergeIdx1(0)
+#if ENABLE_OBMC
+    , isOBMC(false)
+#endif
+  {}
+  ModeInfo(const CodingUnit cu, const PredictionUnit pu)
+  {
+#if AFFINE_MMVD
+    mergeCand = pu.afMmvdFlag ? pu.afMmvdBaseIdx * AF_MMVD_MAX_REFINE_NUM + pu.afMmvdStep * AF_MMVD_OFFSET_DIR + pu.afMmvdDir : pu.mergeIdx;
+#else
+    mergeCand = pu.mergeIdx;
+#endif
+    isRegularMerge = pu.regularMergeFlag;
+    isMMVD = pu.mmvdMergeFlag || cu.mmvdSkip;
+    isCIIP = pu.ciipFlag;
+#if CIIP_PDPC
+    isCiipPDPC = pu.ciipPDPC;
+#endif
+    isAffine = cu.affine;
+#if AFFINE_MMVD
+    isAffineMmvd = pu.afMmvdFlag;
+#endif
+#if TM_MRG
+    isTMMrg = pu.tmMergeFlag;
+#endif
+    isGeo = cu.geoFlag;
+    geoSplitDir = pu.geoSplitDir;
+    geoMergeIdx0 = pu.geoMergeIdx0;
+    geoMergeIdx1 = pu.geoMergeIdx1;
+#if ENABLE_OBMC
+    isOBMC = cu.obmcFlag;
+#endif
+  }
+};
+#endif
+
+#if INTER_LIC
+class EncFastLICCtrl
+{
+  double m_amvpRdBeforeLIC[NUM_IMV_MODES];
+
+public:
+  EncFastLICCtrl() { init(); }
+
+  void init()
+  {
+    m_amvpRdBeforeLIC[IMV_OFF ] = std::numeric_limits<double>::max();
+    m_amvpRdBeforeLIC[IMV_FPEL] = std::numeric_limits<double>::max();
+    m_amvpRdBeforeLIC[IMV_4PEL] = std::numeric_limits<double>::max();
+    m_amvpRdBeforeLIC[IMV_HPEL] = std::numeric_limits<double>::max();
+  }
+
+  bool skipRDCheckForLIC( bool isLIC
+                         , int imv, double curBestRd
+                         , uint32_t cuNumPel
+  )
+  {
+    bool skipLIC = false;
+    if (isLIC)
+    {
+      skipLIC |= skipLicBasedOnBestAmvpRDBeforeLIC(imv, curBestRd);
+      skipLIC |= (cuNumPel < LIC_MIN_CU_PIXELS);
+    }
+    return skipLIC;
+  }
+
+public:
+  void setBestAmvpRDBeforeLIC(const CodingUnit& cu, double curCuRdCost)
+  {
+    m_amvpRdBeforeLIC[cu.imv] = !cu.firstPU->mergeFlag && cu.predMode != MODE_IBC && !cu.LICFlag ? std::min(curCuRdCost, m_amvpRdBeforeLIC[cu.imv]) : m_amvpRdBeforeLIC[cu.imv];
+  }
+private:
+  bool skipLicBasedOnBestAmvpRDBeforeLIC(uint8_t curCuimvIdx, double curBestRdCost)
+  {
+    return m_amvpRdBeforeLIC[curCuimvIdx] != std::numeric_limits<double>::max()
+        && m_amvpRdBeforeLIC[curCuimvIdx] > curBestRdCost * LIC_AMVP_SKIP_TH;
+  }
+};
+#endif
+
 /// encoder search class
 class InterSearch : public InterPrediction, AffineGradientSearch
 {
@@ -105,7 +252,19 @@ private:
   PelStorage      m_tmpStorageLCU;
   PelStorage      m_tmpAffiStorage;
   Pel*            m_tmpAffiError;
+#if AFFINE_ENC_OPT
+  Pel*            m_tmpAffiDeri[2];
+#else
   int*            m_tmpAffiDeri[2];
+#endif
+
+#if MULTI_HYP_PRED
+  MergeCtx        m_geoMrgCtx;
+  bool            m_mhpMrgTempBufSet;
+  PelUnitBuf      m_mhpMrgTempBuf[GEO_MAX_NUM_UNI_CANDS];
+  PelUnitBuf      m_mhpTempBuf[GEO_MAX_TRY_WEIGHTED_SAD];
+  int             m_mhpTempBufCounter;
+#endif
 
   CodingStructure ****m_pSplitCS;
   CodingStructure ****m_pFullCS;
@@ -125,6 +284,11 @@ private:
   int             m_uniMvListIdx;
   int             m_uniMvListSize;
   int             m_uniMvListMaxSize;
+#if INTER_LIC
+  BlkUniMvInfo*   m_uniMvListLIC;
+  int             m_uniMvListIdxLIC;
+  int             m_uniMvListSizeLIC;
+#endif
   Distortion      m_hevcCost;
   EncAffineMotion m_affineMotion;
   PatentBvCand    m_defaultCachedBvs;
@@ -173,7 +337,38 @@ protected:
   uint8_t         m_histBestMtsIdx;                     // historical best MTS idx  for PU of certain SSE values
   bool            m_clipMvInSubPic;
 
+#if INTER_LIC
 public:
+  EncFastLICCtrl  m_fastLicCtrl;
+#endif
+
+public:
+#if MULTI_HYP_PRED
+  void             initMHPTmpBuffer(PelStorage* mergeTmpBuffer, int maxNumMergeCandidates,
+    PelStorage* mhpTmpBuffer, int maxNumStoredMhpCandidates,
+    const UnitArea localUnitArea)
+  {
+    m_mhpMrgTempBufSet = false;
+    for (uint8_t mergeCand = 0; mergeCand < maxNumMergeCandidates; mergeCand++)
+    {
+      m_mhpMrgTempBuf[mergeCand] = mergeTmpBuffer[mergeCand].getBuf(localUnitArea);
+    }
+    for (uint8_t i = 0; i < maxNumStoredMhpCandidates; i++)
+    {
+      m_mhpTempBuf[i] = mhpTmpBuffer[i].getBuf(localUnitArea);
+    }
+    m_mhpTempBufCounter = 0;
+  }
+  void             setGeoTmpBuffer()
+  {
+    m_mhpMrgTempBufSet = true;
+  }
+  void             setGeoTmpBuffer(MergeCtx geoMrgCtx)
+  {
+    m_mhpMrgTempBufSet = true;
+    m_geoMrgCtx = geoMrgCtx;
+  }
+#endif
   InterSearch();
   virtual ~InterSearch();
 
@@ -242,7 +437,30 @@ public:
       m_affMVListSize = std::min(m_affMVListSize + 1, m_affMVListMaxSize);
     }
   }
-  void resetUniMvList() { m_uniMvListIdx = 0; m_uniMvListSize = 0; }
+#if INTER_LIC
+  void swapUniMvBuffer() // simply swap the MvInfo buffer in order to not over-change the functions ME, insertUniMvCands, savePrevUniMvInfo and addUniMvInfo.
+  {
+    BlkUniMvInfo*   tempMvInfo;
+    int             tempInt;
+
+    tempMvInfo     = m_uniMvList;
+    m_uniMvList    = m_uniMvListLIC;
+    m_uniMvListLIC = tempMvInfo;
+
+    tempInt           = m_uniMvListIdx;
+    m_uniMvListIdx    = m_uniMvListIdxLIC;
+    m_uniMvListIdxLIC = tempInt;
+
+    tempInt            = m_uniMvListSize;
+    m_uniMvListSize    = m_uniMvListSizeLIC;
+    m_uniMvListSizeLIC = tempInt;
+  }
+#endif
+  void resetUniMvList() { m_uniMvListIdx = 0; m_uniMvListSize = 0; 
+#if INTER_LIC
+                          m_uniMvListIdxLIC = 0; m_uniMvListSizeLIC = 0; 
+#endif
+  }
   void insertUniMvCands(CompArea blkArea, Mv cMvTemp[2][33])
   {
     BlkUniMvInfo* curMvInfo = m_uniMvList + m_uniMvListIdx;
@@ -315,7 +533,7 @@ public:
     }
   }
   void resetSavedAffineMotion();
-  void storeAffineMotion( Mv acAffineMv[2][3], int16_t affineRefIdx[2], EAffineModel affineType, int bcwIdx );
+  void storeAffineMotion( Mv acAffineMv[2][3], int8_t affineRefIdx[2], EAffineModel affineType, int bcwIdx );
   bool searchBv(PredictionUnit& pu, int xPos, int yPos, int width, int height, int picWidth, int picHeight, int xBv, int yBv, int ctuSize);
   void setClipMvInSubPic(bool flag) { m_clipMvInSubPic = flag; }
 protected:
@@ -387,6 +605,10 @@ public:
   bool xRectHashInterEstimation(PredictionUnit& pu, RefPicList& bestRefPicList, int& bestRefIndex, Mv& bestMv, Mv& bestMvd, int& bestMVPIndex, bool& isPerfectMatch);
   void selectRectangleMatchesInter(const MapIterator& itBegin, int count, std::list<BlockHash>& listBlockHash, const BlockHash& currBlockHash, int width, int height, int idxNonSimple, unsigned int* &hashValues, int baseNum, int picWidth, int picHeight, bool isHorizontal, uint16_t* curHashPic);
   void selectMatchesInter(const MapIterator& itBegin, int count, std::list<BlockHash>& vecBlockHash, const BlockHash& currBlockHash);
+#if MULTI_HYP_PRED
+  void predInterSearchAdditionalHypothesis(PredictionUnit& pu, const MEResult& x, MEResultVec& out);
+  inline static unsigned getAdditionalHypothesisInitialBits(const MultiHypPredictionData& mhData, const int iNumWeights, const int iNumMHRefPics);
+#endif
 protected:
 
   // -------------------------------------------------------------------------------------------------------------------
@@ -446,6 +668,9 @@ protected:
                                     Distortion&           ruiCost,
                                     const AMVPInfo&       amvpInfo,
                                     bool                  bBi = false
+#if MULTI_HYP_PRED
+                                  , const int             weight = 0
+#endif
                                   );
 
   void xTZSearch                  ( const PredictionUnit& pu,
@@ -507,7 +732,7 @@ protected:
                                     const Mv&             rcMvInt,
                                     Mv&                   rcMvHalf,
                                     Mv&                   rcMvQter,
-                                    Distortion&           ruiCost
+                                    Distortion&           ruiCost                             
                                   );
 
   void xPredAffineInterSearch     ( PredictionUnit&       pu,
@@ -584,7 +809,7 @@ public:
 protected:
 
   void xExtDIFUpSamplingH(CPelBuf* pcPattern, bool useAltHpelIf);
-  void xExtDIFUpSamplingQ         ( CPelBuf* pcPatternKey, Mv halfPelRef );
+  void xExtDIFUpSamplingQ         ( CPelBuf* pcPatternKey, Mv halfPelRef);
   uint32_t xDetermineBestMvp      ( PredictionUnit& pu, Mv acMvTemp[3], int& mvpIdx, const AffineAMVPInfo& aamvpi );
   // -------------------------------------------------------------------------------------------------------------------
   // compute symbol bits

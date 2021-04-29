@@ -184,6 +184,12 @@ protected:
   bool      m_noAffineMotionConstraintFlag;
   bool      m_noBcwConstraintFlag;
   bool      m_noIbcConstraintFlag;
+#if ENABLE_DIMD
+  bool      m_noDimdConstraintFlag;
+#endif
+#if ENABLE_OBMC
+  bool      m_noObmcConstraintFlag;
+#endif
   bool      m_noCiipConstraintFlag;
   bool      m_noGeoConstraintFlag;
   bool      m_noLadfConstraintFlag;
@@ -341,6 +347,12 @@ protected:
   bool      m_sbTmvpEnableFlag;
   bool      m_Affine;
   bool      m_AffineType;
+#if AFFINE_MMVD
+  bool      m_AffineMmvdMode;
+#endif
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+  bool      m_DMVDMode;
+#endif
   bool      m_PROF;
   bool      m_BIO;
   int       m_LMChroma;
@@ -362,7 +374,12 @@ protected:
   std::vector<int> m_LadfQpOffset;
   int       m_LadfIntervalLowerBound[MAX_LADF_INTERVALS];
 #endif
-
+#if ENABLE_DIMD
+  bool      m_dimd;
+#endif
+#if ENABLE_OBMC
+  bool      m_OBMC;
+#endif
   bool      m_ciip;
   bool      m_Geo;
   bool      m_HashME;
@@ -387,6 +404,13 @@ protected:
 
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;
+#if MULTI_HYP_PRED
+  int       m_numMHPCandsToTest;
+  int       m_maxNumAddHyps;                                  ///< max. number of additional inter hypotheseis
+  int       m_numAddHypWeights;                               ///< number of weights for additional inter hypotheseis
+  int       m_maxNumAddHypRefFrames;                          ///< max. number of ref frames for additional inter hypotheseis
+  int       m_addHypTries;                                    ///< max. number of tries for additional inter hypotheseis
+#endif
 
   // ADD_NEW_TOOL : (encoder app) add tool enabling flags and associated parameters here
   bool      m_virtualBoundariesEnabledFlag;
@@ -412,6 +436,9 @@ protected:
   bool      m_usePbIntraFast;
   bool      m_useAMaxBT;
   bool      m_useFastMrg;
+#if MERGE_ENC_OPT
+  uint32_t  m_numFullRDMrg;
+#endif
   bool      m_e0023FastEnc;
   bool      m_contentBasedFastQtbt;
   bool      m_useNonLinearAlfLuma;
@@ -420,8 +447,9 @@ protected:
   bool      m_MRL;
   bool      m_MIP;
   bool      m_useFastMIP;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   int       m_fastLocalDualTreeMode;
-
+#endif
 
   int       m_numSplitThreads;
   bool      m_forceSplitSequential;
@@ -453,8 +481,14 @@ protected:
   // coding tools (loop filter)
   bool      m_bLoopFilterDisable;                             ///< flag for using deblocking filter
   bool      m_loopFilterOffsetInPPS;                         ///< offset for deblocking filter in 0 = slice header, 1 = PPS
+#if DB_PARAM_TID
+  std::vector<int> m_loopFilterBetaOffsetDiv2;                     ///< beta offset for deblocking filter
+  std::vector<int> m_loopFilterTcOffsetDiv2;                       ///< tc offset for deblocking filter
+#else
   int       m_loopFilterBetaOffsetDiv2;                     ///< beta offset for deblocking filter
   int       m_loopFilterTcOffsetDiv2;                       ///< tc offset for deblocking filter
+#endif
+
   int       m_loopFilterCbBetaOffsetDiv2;                     ///< beta offset for Cb deblocking filter
   int       m_loopFilterCbTcOffsetDiv2;                       ///< tc offset for Cb deblocking filter
   int       m_loopFilterCrBetaOffsetDiv2;                     ///< beta offset for Cr deblocking filter
@@ -662,7 +696,12 @@ protected:
   bool      m_sliceLevelDeltaQp;                                  ///< code delta in slice headers rather than picture header
 
   int       m_TMVPModeId;
+
+#if TCQ_8STATES
+	int       m_depQuantEnabledIdc;
+#else
   bool      m_depQuantEnabledFlag;
+#endif
   bool      m_signDataHidingEnabledFlag;
   bool      m_RCEnableRateControl;                ///< enable rate control or not
   int       m_RCTargetBitrate;                    ///< target bitrate when rate control is enabled
@@ -732,6 +771,12 @@ protected:
 #if JVET_Q0114_ASPECT5_GCI_FLAG
   bool        m_rprEnabledFlag;
 #endif
+
+#if INTER_LIC
+  bool        m_lic;
+  bool        m_fastPicLevelLIC;
+#endif
+
   double      m_scalingRatioHor;
   double      m_scalingRatioVer;
   bool        m_resChangeInClvsEnabled;
@@ -790,6 +835,16 @@ protected:
   int         m_cropOffsetRight;
   int         m_cropOffsetBottom;
   bool        m_calculateHdrMetrics;
+#endif
+
+#if SIGN_PREDICTION
+  int m_numPredSign;
+#endif
+#if DUMP_BEFORE_INLOOP
+  bool        m_dumpBeforeInloop;
+#endif
+#if CONVERT_NUM_TU_SPLITS_TO_CFG
+  int         m_maxNumTUs;
 #endif
 
   // internal member functions

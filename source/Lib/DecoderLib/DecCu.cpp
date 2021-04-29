@@ -66,6 +66,7 @@ DecCu::DecCu()
 
 DecCu::~DecCu()
 {
+  m_ciipBuffer.destroy();
 }
 
 void DecCu::init( TrQuant* pcTrQuant, IntraPrediction* pcIntra, InterPrediction* pcInter)
@@ -73,6 +74,8 @@ void DecCu::init( TrQuant* pcTrQuant, IntraPrediction* pcIntra, InterPrediction*
   m_pcTrQuant       = pcTrQuant;
   m_pcIntraPred     = pcIntra;
   m_pcInterPred     = pcInter;
+  m_ciipBuffer.destroy();
+  m_ciipBuffer.create(CHROMA_420, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)); // TODO: support other color format
 }
 void DecCu::initDecCuReshaper  (Reshape* pcReshape, ChromaFormat chromaFormatIDC)
 {
@@ -116,6 +119,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 
     for( auto &currCU : cs.traverseCUs( CS::getArea( cs, ctuArea, chType ), chType ) )
     {
+#if !REMOVE_VPDU
       if(currCU.Y().valid())
       {
         const int vSize = cs.slice->getSPS()->getMaxCUHeight() > 64 ? 64 : cs.slice->getSPS()->getMaxCUHeight();
@@ -130,6 +134,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
           }
         }
       }
+#endif
       if (currCU.predMode != MODE_INTRA && currCU.predMode != MODE_PLT && currCU.Y().valid())
       {
         xDeriveCUMV(currCU);
@@ -148,6 +153,71 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         break;
       case MODE_PLT:
       case MODE_INTRA:
+#if ENABLE_DIMD
+        if (currCU.dimd)
+        {
+          PredictionUnit *pu = currCU.firstPU;
+          const CompArea &area = currCU.Y();
+          IntraPrediction::deriveDimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+          pu->intraDir[0] = currCU.dimdMode;
+        }
+        else if (currCU.firstPU->parseLumaMode)
+        {
+          const CompArea &area = currCU.Y();
+          IntraPrediction::deriveDimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+        }
+
+        //redo prediction dir derivation
+        if (currCU.firstPU->parseLumaMode)
+        {
+#if SECONDARY_MPM
+          uint8_t* mpm_pred = currCU.firstPU->intraMPM;  // mpm_idx / rem_intra_luma_pred_mode
+          uint8_t* non_mpm_pred = currCU.firstPU->intraNonMPM;
+          PU::getIntraMPMs( *currCU.firstPU, mpm_pred, non_mpm_pred );
+#else
+          unsigned int mpm_pred[NUM_MOST_PROBABLE_MODES];  // mpm_idx / rem_intra_luma_pred_mode
+          PU::getIntraMPMs(*currCU.firstPU, mpm_pred);
+#endif
+          if (currCU.firstPU->mpmFlag)
+          {
+            currCU.firstPU->intraDir[0] = mpm_pred[currCU.firstPU->ipred_idx];
+          }
+          else
+          {
+#if SECONDARY_MPM
+            if (currCU.firstPU->secondMpmFlag)
+            {
+              currCU.firstPU->intraDir[0] = mpm_pred[currCU.firstPU->ipred_idx];
+            }
+            else
+            {
+              currCU.firstPU->intraDir[0] = non_mpm_pred[currCU.firstPU->ipred_idx];
+            }
+#else
+            //postponed sorting of MPMs (only in remaining branch)
+            std::sort(mpm_pred, mpm_pred + NUM_MOST_PROBABLE_MODES);
+            unsigned ipred_mode = currCU.firstPU->ipred_idx;
+
+            for (uint32_t i = 0; i < NUM_MOST_PROBABLE_MODES; i++)
+            {
+              ipred_mode += (ipred_mode >= mpm_pred[i]);
+            }
+            currCU.firstPU->intraDir[0] = ipred_mode;
+#endif
+          }
+        }
+        if (currCU.firstPU->parseChromaMode)
+        {
+          unsigned chromaCandModes[NUM_CHROMA_MODE];
+          PU::getIntraChromaCandModes(*currCU.firstPU, chromaCandModes);
+
+          CHECK(currCU.firstPU->candId >= NUM_CHROMA_MODE, "Chroma prediction mode index out of bounds");
+          CHECK(PU::isLMCMode(chromaCandModes[currCU.firstPU->candId]), "The intra dir cannot be LM_CHROMA for this path");
+          CHECK(chromaCandModes[currCU.firstPU->candId] == DM_CHROMA_IDX, "The intra dir cannot be DM_CHROMA for this path");
+
+          currCU.firstPU->intraDir[1] = chromaCandModes[currCU.firstPU->candId];
+        }
+#endif
         xReconIntraQT( currCU );
         break;
       default:
@@ -178,19 +248,36 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 
         CodingStructure &cs = *tu.cs;
   const CompArea &area      = tu.blocks[compID];
+#if SIGN_PREDICTION
+  const bool  isJCCR = tu.jointCbCr && isChroma(compID);
+  const CompArea &areaCr      = tu.blocks[isJCCR ? COMPONENT_Cr : compID];
+  PelBuf piPredCr;
+  if(isJCCR)
+  {
+    piPredCr = cs.getPredBuf( tu.blocks[COMPONENT_Cr] );
+  }
+#endif
 
   const ChannelType chType  = toChannelType( compID );
 
         PelBuf piPred       = cs.getPredBuf( area );
 
   const PredictionUnit &pu  = *tu.cs->getPU( area.pos(), chType );
-  const uint32_t uiChFinalMode  = PU::getFinalIntraMode( pu, chType );
+#if ENABLE_DIMD
+  uint32_t uiChFinalMode = PU::getFinalIntraMode(pu, chType);
+#else
+  const uint32_t uiChFinalMode = PU::getFinalIntraMode(pu, chType);
+#endif
   PelBuf pReco              = cs.getRecoBuf(area);
 
   //===== init availability pattern =====
   bool predRegDiffFromTB = CU::isPredRegDiffFromTB(*tu.cu, compID);
   bool firstTBInPredReg = CU::isFirstTBInPredReg(*tu.cu, compID, area);
   CompArea areaPredReg(COMPONENT_Y, tu.chromaFormat, area);
+#if SIGN_PREDICTION
+  if( !isJCCR || compID != COMPONENT_Cr )
+  {
+#endif
   if (tu.cu->ispMode && isLuma(compID))
   {
     if (predRegDiffFromTB)
@@ -239,20 +326,59 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
         m_pcIntraPred->predIntraAng(compID, piPred, pu);
     }
   }
+#if SIGN_PREDICTION
+  if(isJCCR && compID == COMPONENT_Cb)
+  {
+    m_pcIntraPred->initIntraPatternChType(*tu.cu, areaCr);
+    if( PU::isLMCMode( uiChFinalMode ) )
+    {
+      const PredictionUnit& pu = *tu.cu->firstPU;
+      m_pcIntraPred->xGetLumaRecPixels( pu, areaCr );
+      m_pcIntraPred->predIntraChromaLM( COMPONENT_Cr, piPredCr, pu, areaCr, uiChFinalMode );
+    }
+    else
+    {
+      if( PU::isMIP( pu, chType ) )
+      {
+        m_pcIntraPred->initIntraMip( pu, area );
+        m_pcIntraPred->predIntraMip( COMPONENT_Cr, piPredCr, pu );
+      }
+      else
+      {
+        m_pcIntraPred->predIntraAng(COMPONENT_Cr, piPredCr, pu);
+      }
+    }
+  }
+  }
+#endif
   const Slice           &slice = *cs.slice;
   bool flag = slice.getLmcsEnabledFlag() && (slice.isIntra() || (!slice.isIntra() && m_pcReshape->getCTUFlag()));
   if (flag && slice.getPicHeader()->getLmcsChromaResidualScaleFlag() && (compID != COMPONENT_Y) && (tu.cbf[COMPONENT_Cb] || tu.cbf[COMPONENT_Cr]))
   {
+#if LMCS_CHROMA_CALC_CU
+    const Area area = tu.cu->Y().valid() ? tu.cu->Y() : Area(recalcPosition(tu.chromaFormat, tu.chType, CHANNEL_TYPE_LUMA, tu.cu->blocks[tu.chType].pos()), recalcSize(tu.chromaFormat, tu.chType, CHANNEL_TYPE_LUMA, tu.cu->blocks[tu.chType].size()));
+#else
     const Area area = tu.Y().valid() ? tu.Y() : Area(recalcPosition(tu.chromaFormat, tu.chType, CHANNEL_TYPE_LUMA, tu.blocks[tu.chType].pos()), recalcSize(tu.chromaFormat, tu.chType, CHANNEL_TYPE_LUMA, tu.blocks[tu.chType].size()));
+#endif
     const CompArea &areaY = CompArea(COMPONENT_Y, tu.chromaFormat, area);
     int adj = m_pcReshape->calculateChromaAdjVpduNei(tu, areaY);
     tu.setChromaAdj(adj);
   }
+#if SIGN_PREDICTION
+  flag = flag && (tu.blocks[compID].width*tu.blocks[compID].height > 4);
+#endif
   //===== inverse transform =====
   PelBuf piResi = cs.getResiBuf( area );
 
   const QpParam cQP( tu, compID );
 
+#if SIGN_PREDICTION
+  bool bJccrWithCr = tu.jointCbCr && !(tu.jointCbCr >> 1);
+  bool bIsJccr     = tu.jointCbCr && isChroma(compID);
+  ComponentID signPredCompID = bIsJccr ? (bJccrWithCr ? COMPONENT_Cr : COMPONENT_Cb): compID;
+  bool reshapeChroma = flag && (TU::getCbf(tu, signPredCompID) || tu.jointCbCr) && isChroma(signPredCompID) && slice.getPicHeader()->getLmcsChromaResidualScaleFlag();
+  m_pcTrQuant->predCoeffSigns(tu, compID, reshapeChroma);
+#endif
   if( tu.jointCbCr && isChroma(compID) )
   {
     if( compID == COMPONENT_Cb )
@@ -281,7 +407,9 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   }
 
   //===== reconstruction =====
+#if !SIGN_PREDICTION
   flag = flag && (tu.blocks[compID].width*tu.blocks[compID].height > 4);
+#endif
   if (flag && (TU::getCbf(tu, compID) || tu.jointCbCr) && isChroma(compID) && slice.getPicHeader()->getLmcsChromaResidualScaleFlag())
   {
     piResi.scaleSignal(tu.getChromaAdj(), 0, tu.cu->cs->slice->clpRng(compID));
@@ -325,8 +453,10 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
     }
 #endif
   }
-#if REUSE_CU_RESULTS
+#if REUSE_CU_RESULTS || SIGN_PREDICTION
+#if !SIGN_PREDICTION
   if( cs.pcv->isEncoder )
+#endif
   {
     cs.picture->getRecoBuf( area ).copyFrom( pReco );
     cs.picture->getPredBuf(area).copyFrom(piPred);
@@ -352,7 +482,11 @@ void DecCu::xIntraRecACTBlk(TransformUnit& tu)
   if (flag && slice.getPicHeader()->getLmcsChromaResidualScaleFlag() && (tu.cbf[COMPONENT_Cb] || tu.cbf[COMPONENT_Cr]))
 #endif
   {
+#if LMCS_CHROMA_CALC_CU
+    const Area      area = tu.cu->Y().valid() ? tu.cu->Y() : Area(recalcPosition(tu.chromaFormat, tu.chType, CHANNEL_TYPE_LUMA, tu.cu->blocks[tu.chType].pos()), recalcSize(tu.chromaFormat, tu.chType, CHANNEL_TYPE_LUMA, tu.cu->blocks[tu.chType].size()));
+#else
     const Area      area = tu.Y().valid() ? tu.Y() : Area(recalcPosition(tu.chromaFormat, tu.chType, CHANNEL_TYPE_LUMA, tu.blocks[tu.chType].pos()), recalcSize(tu.chromaFormat, tu.chType, CHANNEL_TYPE_LUMA, tu.blocks[tu.chType].size()));
+#endif
     const CompArea &areaY = CompArea(COMPONENT_Y, tu.chromaFormat, area);
     int            adj = m_pcReshape->calculateChromaAdjVpduNei(tu, areaY);
     tu.setChromaAdj(adj);
@@ -410,7 +544,7 @@ void DecCu::xIntraRecACTBlk(TransformUnit& tu)
       }
     }
 
-#if !JVET_S0234_ACT_CRS_FIX 
+#if !JVET_S0234_ACT_CRS_FIX
     flag = flag && (tu.blocks[compID].width*tu.blocks[compID].height > 4);
     if (flag && (TU::getCbf(tu, compID) || tu.jointCbCr) && isChroma(compID) && slice.getPicHeader()->getLmcsChromaResidualScaleFlag())
     {
@@ -467,7 +601,11 @@ void DecCu::xReconIntraQT( CodingUnit &cu )
 
   if (CU::isPLT(cu))
   {
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+    if (CS::isDualITree(*cu.cs))
+#else
     if (cu.isSepTree())
+#endif
     {
       if (cu.chType == CHANNEL_TYPE_LUMA)
       {
@@ -639,6 +777,7 @@ void DecCu::xIntraRecACTQT(CodingUnit &cu)
   }
 }
 
+#if !REMOVE_PCM
 /** Function for filling the PCM buffer of a CU using its reconstructed sample array
 * \param pCU   pointer to current CU
 * \param depth CU Depth
@@ -658,6 +797,7 @@ void DecCu::xFillPCMBuffer(CodingUnit &cu)
     }
   }
 }
+#endif
 
 #include "CommonLib/dtrace_buffer.h"
 
@@ -670,23 +810,30 @@ void DecCu::xReconInter(CodingUnit &cu)
   }
   else
   {
-  m_pcIntraPred->geneIntrainterPred(cu);
+    m_pcIntraPred->geneIntrainterPred(cu, m_ciipBuffer);
 
-  // inter prediction
-  CHECK(CU::isIBC(cu) && cu.firstPU->ciipFlag, "IBC and Ciip cannot be used together");
-  CHECK(CU::isIBC(cu) && cu.affine, "IBC and Affine cannot be used together");
-  CHECK(CU::isIBC(cu) && cu.geoFlag, "IBC and geo cannot be used together");
-  CHECK(CU::isIBC(cu) && cu.firstPU->mmvdMergeFlag, "IBC and MMVD cannot be used together");
-  const bool luma = cu.Y().valid();
-  const bool chroma = isChromaEnabled(cu.chromaFormat) && cu.Cb().valid();
-  if (luma && (chroma || !isChromaEnabled(cu.chromaFormat)))
-  {
-    m_pcInterPred->motionCompensation(cu);
-  }
-  else
-  {
-    m_pcInterPred->motionCompensation(cu, REF_PIC_LIST_0, luma, chroma);
-  }
+    // inter prediction
+    CHECK(CU::isIBC(cu) && cu.firstPU->ciipFlag, "IBC and Ciip cannot be used together");
+    CHECK(CU::isIBC(cu) && cu.affine, "IBC and Affine cannot be used together");
+    CHECK(CU::isIBC(cu) && cu.geoFlag, "IBC and geo cannot be used together");
+    CHECK(CU::isIBC(cu) && cu.firstPU->mmvdMergeFlag, "IBC and MMVD cannot be used together");
+    const bool luma = cu.Y().valid();
+    const bool chroma = isChromaEnabled(cu.chromaFormat) && cu.Cb().valid();
+    if (luma && (chroma || !isChromaEnabled(cu.chromaFormat)))
+    {
+      m_pcInterPred->motionCompensation(cu);
+    }
+    else
+    {
+      m_pcInterPred->motionCompensation(cu, REF_PIC_LIST_0, luma, chroma);
+    }
+
+#if MULTI_PASS_DMVR
+    if( cu.firstPU->bdmvrRefine )
+    {
+      PU::spanMotionInfo( *cu.firstPU, MergeCtx(), m_mvBufBDMVR[0], m_mvBufBDMVR[1], m_pcInterPred->getBdofSubPuMvOffset() );
+    }
+#endif
   }
   if (cu.Y().valid())
   {
@@ -696,18 +843,32 @@ void DecCu::xReconInter(CodingUnit &cu)
 
   if (cu.firstPU->ciipFlag)
   {
-    if (cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+    const UnitArea localUnitArea( cu.cs->area.chromaFormat, Area( 0, 0, cu.Y().width, cu.Y().height ) );
+
+    if( cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() )
     {
-      cu.cs->getPredBuf(*cu.firstPU).Y().rspSignal(m_pcReshape->getFwdLUT());
+      m_pcIntraPred->geneWeightedPred<true>( COMPONENT_Y, cu.cs->getPredBuf( *cu.firstPU ).Y(), *cu.firstPU, cu.cs->getPredBuf( *cu.firstPU ).Y(), m_ciipBuffer.getBuf( localUnitArea.Y() ), m_pcReshape->getFwdLUT().data() );
     }
-    m_pcIntraPred->geneWeightedPred(COMPONENT_Y, cu.cs->getPredBuf(*cu.firstPU).Y(), *cu.firstPU, m_pcIntraPred->getPredictorPtr2(COMPONENT_Y, 0));
-    if (isChromaEnabled(cu.chromaFormat) && cu.chromaSize().width > 2)
+    else
     {
-      m_pcIntraPred->geneWeightedPred(COMPONENT_Cb, cu.cs->getPredBuf(*cu.firstPU).Cb(), *cu.firstPU, m_pcIntraPred->getPredictorPtr2(COMPONENT_Cb, 0));
-      m_pcIntraPred->geneWeightedPred(COMPONENT_Cr, cu.cs->getPredBuf(*cu.firstPU).Cr(), *cu.firstPU, m_pcIntraPred->getPredictorPtr2(COMPONENT_Cr, 0));
+      m_pcIntraPred->geneWeightedPred<false>( COMPONENT_Y, cu.cs->getPredBuf( *cu.firstPU ).Y(), *cu.firstPU, cu.cs->getPredBuf( *cu.firstPU ).Y(), m_ciipBuffer.getBuf( localUnitArea.Y() ) );
+    }
+
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+    if( isChromaEnabled( cu.chromaFormat ) )
+#else
+    if( isChromaEnabled( cu.chromaFormat ) && cu.chromaSize().width > 2 )
+#endif
+    {
+      m_pcIntraPred->geneWeightedPred<false>( COMPONENT_Cb, cu.cs->getPredBuf( *cu.firstPU ).Cb(), *cu.firstPU, cu.cs->getPredBuf( *cu.firstPU ).Cb(), m_ciipBuffer.getBuf( localUnitArea.Cb() ) );
+      m_pcIntraPred->geneWeightedPred<false>( COMPONENT_Cr, cu.cs->getPredBuf( *cu.firstPU ).Cr(), *cu.firstPU, cu.cs->getPredBuf( *cu.firstPU ).Cr(), m_ciipBuffer.getBuf( localUnitArea.Cr() ) );
     }
   }
-
+#if ENABLE_OBMC
+  cu.isobmcMC = true;
+  m_pcInterPred->subBlockOBMC(*cu.firstPU);
+  cu.isobmcMC = false;
+#endif
   DTRACE    ( g_trace_ctx, D_TMP, "pred " );
   DTRACE_CRC( g_trace_ctx, D_TMP, *cu.cs, cu.cs->getPredBuf( cu ), &cu.Y() );
 
@@ -717,6 +878,7 @@ void DecCu::xReconInter(CodingUnit &cu)
   // clip for only non-zero cbf case
   CodingStructure &cs = *cu.cs;
 
+#if !SIGN_PREDICTION
   if (cu.rootCbf)
   {
 #if !JVET_S0234_ACT_CRS_FIX
@@ -766,6 +928,7 @@ void DecCu::xReconInter(CodingUnit &cu)
       cs.getRecoBuf(cu).get(COMPONENT_Y).rspSignal(m_pcReshape->getFwdLUT());
     }
   }
+#endif
 
   DTRACE    ( g_trace_ctx, D_TMP, "reco " );
   DTRACE_CRC( g_trace_ctx, D_TMP, *cu.cs, cu.cs->getRecoBuf( cu ), &cu.Y() );
@@ -785,6 +948,24 @@ void DecCu::xDecodeInterTU( TransformUnit & currTU, const ComponentID compID )
   PelBuf resiBuf  = cs.getResiBuf(area);
 
   QpParam cQP(currTU, compID);
+
+#if SIGN_PREDICTION
+  bool bJccrWithCr = currTU.jointCbCr && !(currTU.jointCbCr >> 1);
+  bool bIsJccr     = currTU.jointCbCr && isChroma(compID);
+  ComponentID signPredCompID = bIsJccr ? (bJccrWithCr ? COMPONENT_Cr : COMPONENT_Cb): compID;
+
+  bool reshapeChroma = currTU.cs->slice->getPicHeader()->getLmcsEnabledFlag() && isChroma(signPredCompID) && (TU::getCbf(currTU, signPredCompID) || currTU.jointCbCr) && currTU.cs->slice->getPicHeader()->getLmcsChromaResidualScaleFlag() && currTU.blocks[signPredCompID].width * currTU.blocks[signPredCompID].height > 4;
+  if (currTU.cs->slice->getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma(compID) && !currTU.cu->firstPU->ciipFlag && !CU::isIBC(*currTU.cu))
+  {
+    cs.picture->getRecoBuf(currTU.blocks[COMPONENT_Y]).copyFrom(cs.getPredBuf(currTU.blocks[COMPONENT_Y]));
+    cs.getPredBuf(currTU.blocks[COMPONENT_Y]).rspSignal(m_pcReshape->getFwdLUT());
+  }
+  m_pcTrQuant->predCoeffSigns(currTU, compID, reshapeChroma);
+  if (currTU.cs->slice->getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma(compID) && !currTU.cu->firstPU->ciipFlag && !CU::isIBC(*currTU.cu))
+  {
+    cs.getPredBuf(currTU.blocks[COMPONENT_Y]).copyFrom(cs.picture->getRecoBuf(currTU.blocks[COMPONENT_Y]));
+  }
+#endif
 
   if( currTU.jointCbCr && isChroma(compID) )
   {
@@ -824,12 +1005,53 @@ void DecCu::xDecodeInterTU( TransformUnit & currTU, const ComponentID compID )
   {
     resiBuf.scaleSignal(currTU.getChromaAdj(), 0, currTU.cu->cs->slice->clpRng(compID));
   }
+
+#if SIGN_PREDICTION
+  int firstComponent = compID;
+  int lastComponent  = compID;
+
+  if( currTU.jointCbCr && isChroma(compID) )
+  {
+    if( compID == COMPONENT_Cb )
+    {
+      firstComponent = MAX_INT;
+    }
+    else
+    {
+      firstComponent -= 1;
+    }
+  }
+  for( auto i = firstComponent; i <= lastComponent; ++i)
+  {
+    ComponentID currCompID = (ComponentID) i;
+    PelBuf compResiBuf = cs.getResiBuf(currTU.blocks[currCompID]);
+
+    if( cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma( currCompID ) && !currTU.cu->firstPU->ciipFlag && !CU::isIBC( *currTU.cu ) )
+    {
+      PelBuf picRecoBuff = currTU.cs->picture->getRecoBuf( currTU.blocks[currCompID] );
+      picRecoBuff.rspSignal( cs.getPredBuf( currTU.blocks[currCompID] ), m_pcReshape->getFwdLUT() );
+      currTU.cs->getRecoBuf( currTU.blocks[currCompID] ).reconstruct( picRecoBuff, compResiBuf, currTU.cu->cs->slice->clpRng( currCompID ) );
+    }
+    else
+    {
+      currTU.cs->getRecoBuf( currTU.blocks[currCompID] ).reconstruct( cs.getPredBuf( currTU.blocks[currCompID] ), compResiBuf, currTU.cu->cs->slice->clpRng( currCompID ) );
+    }
+  }
+#endif
 }
 
 void DecCu::xDecodeInterTexture(CodingUnit &cu)
 {
   if( !cu.rootCbf )
   {
+#if SIGN_PREDICTION
+    CodingStructure &cs = *cu.cs;
+    cs.getRecoBuf(cu).copyClip(cs.getPredBuf(cu), cs.slice->clpRngs());
+    if (cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !CU::isIBC(cu))
+    {
+      cs.getRecoBuf(cu).get(COMPONENT_Y).rspSignal(m_pcReshape->getFwdLUT());
+    }
+#endif
     return;
   }
 
@@ -865,21 +1087,40 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
   else
   {
 #endif
+#if SIGN_PREDICTION
+  for ( auto& currTU : CU::traverseTUs( cu ) )
+  {
+    for(uint32_t ch = 0; ch < uiNumVaildComp; ch++)
+    {
+      const ComponentID compID = ComponentID(ch);
+#else
   for (uint32_t ch = 0; ch < uiNumVaildComp; ch++)
   {
     const ComponentID compID = ComponentID(ch);
 
     for( auto& currTU : CU::traverseTUs( cu ) )
     {
+#endif
       CodingStructure  &cs = *cu.cs;
       const Slice &slice = *cs.slice;
       if (slice.getLmcsEnabledFlag() && slice.getPicHeader()->getLmcsChromaResidualScaleFlag() && (compID == COMPONENT_Y) && (currTU.cbf[COMPONENT_Cb] || currTU.cbf[COMPONENT_Cr]))
       {
+#if LMCS_CHROMA_CALC_CU
+        const CompArea &areaY = cu.blocks[COMPONENT_Y];
+#else
         const CompArea &areaY = currTU.blocks[COMPONENT_Y];
+#endif
         int adj = m_pcReshape->calculateChromaAdjVpduNei(currTU, areaY);
         currTU.setChromaAdj(adj);
     }
       xDecodeInterTU( currTU, compID );
+#if SIGN_PREDICTION
+      if(cs.pcv->isEncoder && cs.sps->getNumPredSigns() > 0)
+      {
+        PelBuf picRecoBuff = currTU.cs->picture->getRecoBuf( currTU.blocks[compID] );
+        picRecoBuff.copyFrom(currTU.cs->getRecoBuf( currTU.blocks[compID] ));
+      }
+#endif
     }
   }
 #if JVET_S0234_ACT_CRS_FIX
@@ -903,6 +1144,20 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 
     if( pu.mergeFlag )
     {
+#if MULTI_HYP_PRED
+#if REUSE_CU_RESULTS
+      CHECK(!cu.cs->pcv->isEncoder && cu.skip && !pu.addHypData.empty(), "Dec: additional hypotheseis signalled in SKIP mode");
+      CHECK(cu.skip && pu.addHypData.size() != pu.numMergedAddHyps, "additional hypotheseis signalled in SKIP mode");
+      // save signalled add hyp data, to put it at the end after merging
+      MultiHypVec addHypData = { std::begin(pu.addHypData) + pu.numMergedAddHyps, std::end(pu.addHypData) };
+#else
+      CHECK(cu.skip && !pu.addHypData.empty(), "additional hypotheseis signalled in SKIP mode");
+      // save signalled add hyp data, to put it at the end after merging
+      auto addHypData = std::move(pu.addHypData);
+#endif
+      pu.addHypData.clear();
+      pu.numMergedAddHyps = 0;
+#endif
       if (pu.mmvdMergeFlag || pu.cu->mmvdSkip)
       {
         CHECK(pu.ciipFlag == true, "invalid Ciip");
@@ -939,10 +1194,24 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             mrgCtx.subPuMvpMiBuf = MotionBuf( m_SubPuMiBuf, bufSize );
             affineMergeCtx.mrgCtx = &mrgCtx;
           }
+#if AFFINE_MMVD
+          PU::getAffineMergeCand(pu, affineMergeCtx, (pu.afMmvdFlag ? pu.afMmvdBaseIdx : pu.mergeIdx), pu.afMmvdFlag);
+
+          if (pu.afMmvdFlag)
+          {
+            pu.mergeIdx = PU::getMergeIdxFromAfMmvdBaseIdx(affineMergeCtx, pu.afMmvdBaseIdx);
+            CHECK(pu.mergeIdx >= pu.cu->slice->getPicHeader()->getMaxNumAffineMergeCand(), "Affine MMVD mode doesn't have a valid base candidate!");
+            PU::getAfMmvdMvf(pu, affineMergeCtx, affineMergeCtx.mvFieldNeighbours + (pu.mergeIdx << 1), pu.mergeIdx, pu.afMmvdStep, pu.afMmvdDir);
+          }
+#else
           PU::getAffineMergeCand( pu, affineMergeCtx, pu.mergeIdx );
+#endif
           pu.interDir = affineMergeCtx.interDirNeighbours[pu.mergeIdx];
           pu.cu->affineType = affineMergeCtx.affineType[pu.mergeIdx];
           pu.cu->BcwIdx = affineMergeCtx.BcwIdx[pu.mergeIdx];
+#if INTER_LIC
+          pu.cu->LICFlag = affineMergeCtx.LICFlags[pu.mergeIdx];
+#endif
           pu.mergeType = affineMergeCtx.mergeType[pu.mergeIdx];
           if ( pu.mergeType == MRG_TYPE_SUBPU_ATMVP )
           {
@@ -959,7 +1228,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               pu.mvpIdx[i] = 0;
               pu.mvpNum[i] = 0;
               pu.mvd[i]    = Mv();
-              PU::setAllAffineMvField( pu, mvField, RefPicList( i ) );
+              pu.refIdx[i] = mvField[0].refIdx;
+              pu.mvAffi[i][0] = mvField[0].mv;
+              pu.mvAffi[i][1] = mvField[1].mv;
+              pu.mvAffi[i][2] = mvField[2].mv;
             }
           }
         }
@@ -972,12 +1244,67 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           else
             PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.mergeIdx);
           mrgCtx.setMergeInfo( pu, pu.mergeIdx );
+#if TM_MRG && !MULTI_PASS_DMVR
+          if (pu.tmMergeFlag)
+          {
+            m_pcInterPred->deriveTMMv(pu);
+          }
+#endif
+#if MULTI_PASS_DMVR
+          if (PU::checkBDMVRCondition(pu))
+          {
+            m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
+            pu.bdmvrRefine = true;
 
+            CHECK(mrgCtx.numValidMergeCand <= 0, "this is not possible");
+
+#if TM_MRG
+            if( !pu.tmMergeFlag && mrgCtx.xCheckSimilarMotion( pu.mergeIdx, PU::getBDMVRMvdThreshold( pu ) ) )
+#else
+            if( mrgCtx.xCheckSimilarMotion( pu.mergeIdx, PU::getBDMVRMvdThreshold( pu ) ) )
+#endif
+            {
+              // span motion to subPU
+              for (int subPuIdx = 0; subPuIdx < MAX_NUM_SUBCU_DMVR; subPuIdx++)
+              {
+                m_mvBufBDMVR[0][subPuIdx] = pu.mv[0];
+                m_mvBufBDMVR[1][subPuIdx] = pu.mv[1];
+              }
+            }
+            else
+            {
+              pu.bdmvrRefine = m_pcInterPred->processBDMVR( pu );
+            }
+          }
+#if TM_MRG
+          else
+          {
+            if (pu.tmMergeFlag)
+            {
+              m_pcInterPred->deriveTMMv(pu);
+            }
+          }
+#endif
+#endif
+#if MULTI_HYP_PRED
+          CHECK(pu.Y().area() <= MULTI_HYP_PRED_RESTRICT_BLOCK_SIZE && !pu.addHypData.empty(), "There are add hyps in small block")
+#endif
+#if MULTI_PASS_DMVR
+          if( !pu.bdmvrRefine )
+          {
+            PU::spanMotionInfo( pu, mrgCtx );
+          }
+#else
           PU::spanMotionInfo( pu, mrgCtx );
+#endif
         }
         }
       }
       }
+#if MULTI_HYP_PRED
+      // put saved additional hypotheseis to the end
+      pu.addHypData.insert(pu.addHypData.end(), std::make_move_iterator(addHypData.begin()), std::make_move_iterator(addHypData.end()));
+#endif
     }
     else
     {
@@ -1027,7 +1354,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                 mvLB = affineAMVPInfo.mvCandLB[mvp_idx] + pu.mvdAffi[eRefList][2];
                 mvLB += pu.mvdAffi[eRefList][0];
               }
-              PU::setAllAffineMv(pu, mvLT, mvRT, mvLB, eRefList, true);
+
+              pu.mvAffi[eRefList][0] = mvLT;
+              pu.mvAffi[eRefList][1] = mvRT;
+              pu.mvAffi[eRefList][2] = mvLB;
             }
           }
         }
@@ -1058,7 +1388,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             if ((pu.cs->slice->getNumRefIdx(eRefList) > 0 || (eRefList == REF_PIC_LIST_0 && CU::isIBC(*pu.cu))) && (pu.interDir & (1 << uiRefListIdx)))
             {
               AMVPInfo amvpInfo;
-              PU::fillMvpCand(pu, eRefList, pu.refIdx[eRefList], amvpInfo);
+              PU::fillMvpCand(pu, eRefList, pu.refIdx[eRefList], amvpInfo
+#if TM_AMVP
+                            , m_pcInterPred
+#endif
+              );
               pu.mvpNum [eRefList] = amvpInfo.numCand;
               if (!cu.cs->pcv->isEncoder)
               {
@@ -1090,6 +1424,47 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
       int yPred = pu.mv[0].getVer() >> MV_FRACTIONAL_BITS_INTERNAL;
       CHECK(!m_pcInterPred->isLumaBvValid(lcuWidth, cuPelX, cuPelY, roiWidth, roiHeight, xPred, yPred), "invalid block vector for IBC detected.");
     }
+#if MULTI_HYP_PRED
+    {
+      bool derivedMrgList = false;
+#if REUSE_CU_RESULTS
+      if (!cu.cs->pcv->isEncoder)
+#endif
+      for (int i = pu.numMergedAddHyps; i < int(pu.addHypData.size()); ++i)
+      {
+        auto &mhData = pu.addHypData[i];
+#if INTER_LIC
+        mhData.LICFlag = pu.cu->LICFlag;
+#endif
+        mhData.imv = pu.cu->imv;
+        if (mhData.isMrg)
+        {
+          if (!derivedMrgList)
+          {
+            PU::getGeoMergeCandidates(pu, m_geoMrgCtx);
+            derivedMrgList = true;
+          }
+          int refList = m_geoMrgCtx.interDirNeighbours[mhData.mrgIdx] - 1; CHECK(refList != 0 && refList != 1, "");
+          mhData.refIdx = m_geoMrgCtx.mvFieldNeighbours[(mhData.mrgIdx << 1) + refList].refIdx;
+          mhData.mv = m_geoMrgCtx.mvFieldNeighbours[(mhData.mrgIdx << 1) + refList].mv;
+          mhData.refList = refList;
+          mhData.imv = m_geoMrgCtx.useAltHpelIf[mhData.mrgIdx] ? IMV_HPEL : 0;
+          continue;
+        }
+        if (pu.cu->affine)
+        {
+          mhData.mvd.changeAffinePrecAmvr2Internal(pu.cu->imv);
+        }
+        else
+        {
+          mhData.mvd.changeTransPrecAmvr2Internal(pu.cu->imv);
+        }
+        const Mv mvp = PU::getMultiHypMVP(pu, mhData);
+        mhData.mv = mvp + mhData.mvd;
+        mhData.mv.mvCliptoStorageBitDepth();
+      }
+    }
+#endif
   }
 }
 //! \}

@@ -213,6 +213,12 @@ void RdCost::init()
   m_afpDistortFunc[DF_SAD_INTERMEDIATE_BITDEPTH] = RdCost::xGetSAD;
 
   m_afpDistortFunc[DF_SAD_WITH_MASK] = RdCost::xGetSADwMask;
+#if TM_AMVP || TM_MRG
+  m_afpDistortFunc[DF_TM_A_WSAD_FULL_NBIT  ] = RdCost::xGetTMErrorFull<TM_TPL_SIZE, true,  false>;
+  m_afpDistortFunc[DF_TM_L_WSAD_FULL_NBIT  ] = RdCost::xGetTMErrorFull<TM_TPL_SIZE, false, false>;
+  m_afpDistortFunc[DF_TM_A_WMRSAD_FULL_NBIT] = RdCost::xGetTMErrorFull<TM_TPL_SIZE, true,  true>;
+  m_afpDistortFunc[DF_TM_L_WMRSAD_FULL_NBIT] = RdCost::xGetTMErrorFull<TM_TPL_SIZE, false, true>;
+#endif
 
 #if ENABLE_SIMD_OPT_DIST
 #ifdef TARGET_SIMD_X86
@@ -282,7 +288,11 @@ void RdCost::setDistParam( DistParam &rcDP, const CPelBuf &org, const Pel* piRef
     }
     else if( isPowerOf2( org.width ) )
     {
+#if CTU_256
+      rcDP.distFunc = m_afpDistortFunc[ DF_SAD + DFOffset + std::min<int>( 7, floorLog2( org.width ) ) ];
+#else
       rcDP.distFunc = m_afpDistortFunc[ DF_SAD + DFOffset + floorLog2( org.width ) ];
+#endif
     }
     else
     {
@@ -291,7 +301,11 @@ void RdCost::setDistParam( DistParam &rcDP, const CPelBuf &org, const Pel* piRef
   }
   else if( isPowerOf2( org.width ) )
   {
+#if CTU_256
+    rcDP.distFunc = m_afpDistortFunc[ DF_HAD + DFOffset + std::min<int>( 7, floorLog2( org.width ) ) ];
+#else
     rcDP.distFunc = m_afpDistortFunc[ DF_HAD + DFOffset + floorLog2( org.width ) ];
+#endif
   }
   else
   {
@@ -363,7 +377,11 @@ void RdCost::setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &c
     }
     else if( isPowerOf2( org.width) )
     {
+#if CTU_256
+      rcDP.distFunc = m_afpDistortFunc[ DF_SAD + DFOffset + std::min<int>( 7, floorLog2( org.width ) ) ];
+#else
       rcDP.distFunc = m_afpDistortFunc[ DF_SAD + DFOffset + floorLog2( org.width ) ];
+#endif
     }
     else
     {
@@ -372,7 +390,11 @@ void RdCost::setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &c
   }
   else
   {
+#if CTU_256
+    rcDP.distFunc = m_afpDistortFunc[ DF_HAD + DFOffset + std::min<int>( 7, floorLog2( org.width ) ) ];
+#else
     rcDP.distFunc = m_afpDistortFunc[ DF_HAD + DFOffset + floorLog2( org.width ) ];
+#endif
   }
 
   rcDP.maximumDistortionForEarlyExit = std::numeric_limits<Distortion>::max();
@@ -416,9 +438,37 @@ void RdCost::setDistParam( DistParam &rcDP, const Pel* pOrg, const Pel* piRefY, 
   }
   else
   {
+#if CTU_256
+    rcDP.distFunc = m_afpDistortFunc[ DF_SAD + std::min<int>( 7, floorLog2( width ) ) ];
+#else
     rcDP.distFunc = m_afpDistortFunc[ DF_SAD + floorLog2( width ) ];
+#endif
   }
 }
+
+#if TM_AMVP || TM_MRG
+void RdCost::setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &cur, int bitDepth, bool TrueA_FalseL, int wIdx, int subShift, ComponentID compID )
+{
+  rcDP.org          = org;
+  rcDP.cur          = cur;
+  rcDP.step         = 1;
+  rcDP.subShift     = subShift;
+  rcDP.bitDepth     = bitDepth;
+  rcDP.compID       = compID;
+  rcDP.tmWeightIdx  = wIdx;
+
+  if (TrueA_FalseL)
+  {
+    rcDP.distFunc = m_afpDistortFunc[ rcDP.useMR ? DF_TM_A_WMRSAD_FULL_NBIT : DF_TM_A_WSAD_FULL_NBIT ];
+  }
+  else
+  {
+    rcDP.distFunc = m_afpDistortFunc[ rcDP.useMR ? DF_TM_L_WMRSAD_FULL_NBIT : DF_TM_L_WSAD_FULL_NBIT ];
+  }
+
+  rcDP.maximumDistortionForEarlyExit = std::numeric_limits<Distortion>::max();
+}
+#endif
 
 #if WCG_EXT
 Distortion RdCost::getDistPart( const CPelBuf &org, const CPelBuf &cur, int bitDepth, const ComponentID compID, DFunc eDFunc, const CPelBuf *orgLuma )
@@ -452,7 +502,11 @@ Distortion RdCost::getDistPart( const CPelBuf &org, const CPelBuf &cur, int bitD
 
   if( isPowerOf2( org.width ) )
   {
+#if CTU_256
+    cDtParam.distFunc = m_afpDistortFunc[eDFunc + std::min<int>( 7, floorLog2( org.width ) )];
+#else
     cDtParam.distFunc = m_afpDistortFunc[eDFunc + floorLog2(org.width)];
+#endif
   }
   else
   {
@@ -3554,4 +3608,94 @@ Distortion RdCost::xGetSADwMask( const DistParam& rcDtParam )
   sum <<= subShift;
   return (sum >> distortionShift );
 }
+
+#if TM_AMVP || TM_MRG
+template <int tplSize, bool TrueA_FalseL, bool MR>
+Distortion RdCost::xGetTMErrorFull( const DistParam& rcDtParam )
+{
+  const CPelBuf& curTplBuf = rcDtParam.org;
+  const CPelBuf& refTplBuf = rcDtParam.cur;
+
+  // get delta mean value
+  const int64_t deltaSum = !MR ? 0 : g_pelBufOP.getSumOfDifference(curTplBuf.buf, curTplBuf.stride, refTplBuf.buf, refTplBuf.stride, curTplBuf.width, curTplBuf.height, rcDtParam.subShift, rcDtParam.bitDepth);
+  if (MR && deltaSum == 0)
+  {
+    return xGetTMErrorFull<tplSize, TrueA_FalseL, false>(rcDtParam);
+  }
+
+  // weight configuration
+  const int* tplWeightD = TM_DISTANCE_WEIGHTS[rcDtParam.tmWeightIdx]; // uiWeight
+  const int* tplWeightS = TM_SPATIAL_WEIGHTS [rcDtParam.tmWeightIdx]; // uiWeight2
+
+  // compute matching cost
+#define X_GET_TM_TEMP_MATCH_ERROR_LOOPER_FOR_ABOVE_TPL(OP)           \
+  for (uint32_t j = 0; j < iRows; j += iSubStep)                     \
+  {                                                                  \
+    Distortion rowSum = 0;                                           \
+    for (uint32_t m = 0, n = 0; m < iCols; m += (iCols >> 2), n++)   \
+    {                                                                \
+      Distortion subblkSum = 0;                                      \
+      for (uint32_t i = m; i < m + (iCols >> 2); i++)                \
+      {                                                              \
+        subblkSum += OP(i, deltaMean);                        /* partSum += OP( i, deltaMean ) << (tplWeightD[j] + tplWeightS[n]); */ \
+      }                                                              \
+      rowSum += (subblkSum << tplWeightS[n] );                       \
+    }                                                                \
+    partSum += (rowSum << tplWeightD[j]);                            \
+    piCur += iStrideCur;                                             \
+    piRef += iStrideRef;                                             \
+  }                                                                  \
+
+#define X_GET_TM_TEMP_MATCH_ERROR_LOOPER_FOR__LEFT_TPL(OP)           \
+  for (uint32_t m = 0, n = 0; m < iRows; m += (iRows >> 2), n++)     \
+  {                                                                  \
+    Distortion multiRowsSum = 0;                                     \
+    for (uint32_t j = m; j < m + (iRows >> 2); j += iSubStep)        \
+    {                                                                \
+      for (uint32_t i = 0; i < iCols; i++)                           \
+      {                                                              \
+        multiRowsSum += (OP(i, deltaMean) << tplWeightD[i]);  /* partSum += OP( i, deltaMean ) << (tplWeightD[i] + tplWeightS[n]); */ \
+      }                                                              \
+      piCur += iStrideCur;                                           \
+      piRef += iStrideRef;                                           \
+    }                                                                \
+    partSum += (multiRowsSum << tplWeightS[n]);                      \
+  }                                                                  \
+
+#define X_GET_TM_ERR___SAD_OP(ADDR, DELTA_MEAN) abs(piCur[ADDR] - piRef[ADDR]               )
+#define X_GET_TM_ERR_MRSAD_OP(ADDR, DELTA_MEAN) abs(piCur[ADDR] - piRef[ADDR] - (DELTA_MEAN))
+
+  const Pel* piCur      = curTplBuf.buf;
+  const Pel* piRef      = refTplBuf.buf;
+  const int  iRows      = (int)curTplBuf.height;
+  const int  iCols      = (int)curTplBuf.width;
+  const int  iSubShift  = rcDtParam.subShift;
+  const int  iSubStep   = (1 << iSubShift);
+  const int  iStrideCur = curTplBuf.stride << iSubShift;
+  const int  iStrideRef = refTplBuf.stride << iSubShift;
+
+  Distortion partSum = 0;
+  const int deltaMean = !MR ? 0 : int(deltaSum / (int64_t)curTplBuf.area());
+  if (MR)
+  {
+    if (TrueA_FalseL) { X_GET_TM_TEMP_MATCH_ERROR_LOOPER_FOR_ABOVE_TPL(X_GET_TM_ERR_MRSAD_OP); }
+    else              { X_GET_TM_TEMP_MATCH_ERROR_LOOPER_FOR__LEFT_TPL(X_GET_TM_ERR_MRSAD_OP); }
+  }
+  else
+  {
+    if (TrueA_FalseL) { X_GET_TM_TEMP_MATCH_ERROR_LOOPER_FOR_ABOVE_TPL(X_GET_TM_ERR___SAD_OP); }
+    else              { X_GET_TM_TEMP_MATCH_ERROR_LOOPER_FOR__LEFT_TPL(X_GET_TM_ERR___SAD_OP); }
+  }
+
+#undef X_GET_TM_TEMP_MATCH_ERROR_LOOPER_FOR_ABOVE_TPL
+#undef X_GET_TM_TEMP_MATCH_ERROR_LOOPER_FOR__LEFT_TPL
+#undef X_GET_TM_ERR___SAD_OP
+#undef X_GET_TM_ERR_MRSAD_OP
+
+  partSum >>= TM_LOG2_BASE_WEIGHT;
+  partSum <<= rcDtParam.subShift;
+  partSum >>= (rcDtParam.bitDepth > 8 ? rcDtParam.bitDepth - 8 : 0);
+  return partSum;
+}
+#endif
 //! \}

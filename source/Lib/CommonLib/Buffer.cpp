@@ -69,6 +69,27 @@ void applyPROFCore(Pel* dst, int dstStride, const Pel* src, int srcStride, int w
   }
 }
 
+#if TM_AMVP || TM_MRG
+int64_t getSumOfDifferenceCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int rowSubShift, int bitDepth)
+{
+  height     >>= rowSubShift;
+  src0Stride <<= rowSubShift;
+  src1Stride <<= rowSubShift;
+
+  int64_t sum = 0;
+#define GET_SUM_DIFF_CORE_OP( ADDR ) sum += ( src0[ADDR] - src1[ADDR] )
+#define GET_SUM_DIFF_CORE_INC    \
+  src0 += src0Stride;            \
+  src1 += src1Stride;            \
+
+  SIZE_AWARE_PER_EL_OP(GET_SUM_DIFF_CORE_OP, GET_SUM_DIFF_CORE_INC);
+
+#undef GET_SUM_DIFF_CORE_OP
+#undef GET_SUM_DIFF_CORE_INC
+
+  return sum;
+}
+#endif
 
 template< typename T >
 void addAvgCore( const T* src1, int src1Stride, const T* src2, int src2Stride, T* dest, int dstStride, int width, int height, int rshift, int offset, const ClpRng& clpRng )
@@ -126,6 +147,199 @@ void addBIOAvgCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Str
   }
 }
 
+#if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
+void calcBIOParameterCore(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGY_GX, Pel* dI)
+{
+  width -= 2;
+  height -= 2;
+  const int bioParamOffset = widthG + 1;
+  srcY0Tmp += src0Stride + 1;
+  srcY1Tmp += src1Stride + 1;
+  gradX0 += bioParamOffset;  gradX1 += bioParamOffset;
+  gradY0 += bioParamOffset;  gradY1 += bioParamOffset;
+  absGX  += bioParamOffset;  absGY  += bioParamOffset;
+  dIX    += bioParamOffset;  dIY    += bioParamOffset;
+  signGY_GX += bioParamOffset;
+  int shift4 = 4;
+  int shift5 = 1;
+  if (dI)
+  {
+    dI += bioParamOffset;
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        int tmpGX = (gradX0[x] + gradX1[x]) >> shift5;
+        int tmpGY = (gradY0[x] + gradY1[x]) >> shift5;
+        int tmpDI = (int)((srcY1Tmp[x] >> shift4) - (srcY0Tmp[x] >> shift4));
+        dI[x] = tmpDI;
+        absGX[x] = (tmpGX < 0 ? -tmpGX : tmpGX);
+        absGY[x] = (tmpGY < 0 ? -tmpGY : tmpGY);
+        dIX[x] = (tmpGX < 0 ? -tmpDI : (tmpGX == 0 ? 0 : tmpDI));
+        dIY[x] = (tmpGY < 0 ? -tmpDI : (tmpGY == 0 ? 0 : tmpDI));
+        signGY_GX[x] = (tmpGY < 0 ? -tmpGX : (tmpGY == 0 ? 0 : tmpGX));
+      }
+      srcY0Tmp += src0Stride;
+      srcY1Tmp += src1Stride;
+      gradX0 += widthG;
+      gradX1 += widthG;
+      gradY0 += widthG;
+      gradY1 += widthG;
+      absGX += widthG;
+      absGY += widthG;
+      dI += widthG;
+      dIX += widthG;
+      dIY += widthG;
+      signGY_GX += widthG;
+    }
+
+    return;
+  }
+
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      int tmpGX = (gradX0[x] + gradX1[x]) >> shift5;
+      int tmpGY = (gradY0[x] + gradY1[x]) >> shift5;
+      int tmpDI = (int)((srcY1Tmp[x] >> shift4) - (srcY0Tmp[x] >> shift4));
+      absGX[x] = (tmpGX < 0 ? -tmpGX : tmpGX);
+      absGY[x] = (tmpGY < 0 ? -tmpGY : tmpGY);
+      dIX[x] = (tmpGX < 0 ? -tmpDI : (tmpGX == 0 ? 0 : tmpDI));
+      dIY[x] = (tmpGY < 0 ? -tmpDI : (tmpGY == 0 ? 0 : tmpDI));
+      signGY_GX[x] = (tmpGY < 0 ? -tmpGX : (tmpGY == 0 ? 0 : tmpGX));
+    }
+    srcY0Tmp += src0Stride;
+    srcY1Tmp += src1Stride;
+    gradX0 += widthG;
+    gradX1 += widthG;
+    gradY0 += widthG;
+    gradY1 += widthG;
+    absGX += widthG;
+    absGY += widthG;
+    dIX += widthG;
+    dIY += widthG;
+    signGY_GX += widthG;
+  }
+}
+
+void calcBIOParamSum5Core(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGY_GX, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX)
+{
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      const int pixel_idx = y * width + x;
+      sumAbsGX[pixel_idx] = 0;
+      sumAbsGY[pixel_idx] = 0;
+      sumDIX[pixel_idx] = 0;
+      sumDIY[pixel_idx] = 0;
+      sumSignGY_GX[pixel_idx] = 0;
+      for (int yy = 0; yy < 5; yy++)
+      {
+        for (int xx = 0; xx < 5; xx++)
+        {
+          sumAbsGX[pixel_idx] += absGX[xx];
+          sumAbsGY[pixel_idx] += absGY[xx];
+          sumDIX[pixel_idx] += dIX[xx];
+          sumDIY[pixel_idx] += dIY[xx];
+          sumSignGY_GX[pixel_idx] += signGY_GX[xx];
+        }
+        absGX += widthG;
+        absGY += widthG;
+        dIX += widthG;
+        dIY += widthG;
+        signGY_GX += widthG;
+      }
+      sumDIX[pixel_idx] <<= 2;
+      sumDIY[pixel_idx] <<= 2;
+      absGX += (1 - 5 * widthG);
+      absGY += (1 - 5 * widthG);
+      dIX += (1 - 5 * widthG);
+      dIY += (1 - 5 * widthG);
+      signGY_GX += (1 - 5 * widthG);
+    }
+    absGX += (widthG - width);
+    absGY += (widthG - width);
+    dIX += (widthG - width);
+    dIY += (widthG - width);
+    signGY_GX += (widthG - width);
+  }
+}
+
+void calcBIOParamSum4Core(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGY_GX, int width, int height, const int widthG, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX)
+{
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      *sumAbsGX += absGX[x];
+      *sumAbsGY += absGY[x];
+      *sumDIX += dIX[x];
+      *sumDIY += dIY[x];
+      *sumSignGY_GX += signGY_GX[x];
+    }
+    absGX += widthG;
+    absGY += widthG;
+    dIX += widthG;
+    dIY += widthG;
+    signGY_GX += widthG;
+  }
+}
+
+void calcBIOClippedVxVyCore(int* sumDIX_pixel_32bit, int* sumAbsGX_pixel_32bit, int* sumDIY_pixel_32bit, int* sumAbsGY_pixel_32bit, int* sumSignGY_GX_pixel_32bit, const int limit, const int bioSubblockSize, int* tmpx_pixel_32bit, int* tmpy_pixel_32bit)
+{
+  for (int idx = 0; idx < bioSubblockSize; idx++)
+  {
+    *tmpx_pixel_32bit = Clip3(-limit, limit, (*sumDIX_pixel_32bit) >> (*sumAbsGX_pixel_32bit));
+    int tmpData = ((*sumSignGY_GX_pixel_32bit) * (*tmpx_pixel_32bit)) >> 1;
+    *tmpy_pixel_32bit = Clip3(-limit, limit, (((*sumDIY_pixel_32bit) - tmpData) >> (*sumAbsGY_pixel_32bit)));
+    sumDIX_pixel_32bit++;
+    sumAbsGX_pixel_32bit++;
+    sumDIY_pixel_32bit++;
+    sumAbsGY_pixel_32bit++;
+    sumSignGY_GX_pixel_32bit++;
+    tmpx_pixel_32bit++;
+    tmpy_pixel_32bit++;
+  }
+}
+
+void addBIOAvgNCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel *gradY1, int gradStride, int width, int height, int* tmpx, int* tmpy, int shift, int offset, const ClpRng& clpRng)
+{
+  int b = 0;
+
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      b = (int)tmpx[x] * (gradX0[x] - gradX1[x]) + (int)tmpy[x] * (gradY0[x] - gradY1[x]);
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+      dst[x] = ClipPel(rightShift((src0[x] + src1[x] + b + offset), shift), clpRng);
+#else
+      dst[x] = ClipPel((int16_t)rightShift((src0[x] + src1[x] + b + offset), shift), clpRng);
+#endif
+    }
+    tmpx += width;    tmpy += width;
+    dst += dstStride;       src0 += src0Stride;     src1 += src1Stride;
+    gradX0 += gradStride; gradX1 += gradStride; gradY0 += gradStride; gradY1 += gradStride;
+  }
+  return;
+}
+
+void calAbsSumCore(const Pel* diff, int stride, int width, int height, int* absSum)
+{
+  *absSum = 0;
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      *absSum += ::abs(diff[x]);
+    }
+    diff += stride;
+  }
+}
+#endif
+
 template<bool PAD = true>
 void gradFilterCore(Pel* pSrc, int srcStride, int width, int height, int gradStride, Pel* gradX, Pel* gradY, const int bitDepth)
 {
@@ -134,9 +348,15 @@ void gradFilterCore(Pel* pSrc, int srcStride, int width, int height, int gradStr
   Pel* gradYTmp = gradY + gradStride + 1;
   int  shift1 = 6;
 
+#if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
+  for (int y = 0; y < (height - 2); y++)
+  {
+    for (int x = 0; x < (width - 2); x++)
+#else
   for (int y = 0; y < (height - 2 * BIO_EXTEND_SIZE); y++)
   {
     for (int x = 0; x < (width - 2 * BIO_EXTEND_SIZE); x++)
+#endif
     {
       gradYTmp[x] = ( srcTmp[x + srcStride] >> shift1 ) - ( srcTmp[x - srcStride] >> shift1 );
       gradXTmp[x] = ( srcTmp[x + 1] >> shift1 ) - ( srcTmp[x - 1] >> shift1 );
@@ -146,6 +366,7 @@ void gradFilterCore(Pel* pSrc, int srcStride, int width, int height, int gradStr
     srcTmp += srcStride;
   }
 
+#if !MULTI_PASS_DMVR && !SAMPLE_BASED_BDOF
   if (PAD)
   {
   gradXTmp = gradX + gradStride + 1;
@@ -168,6 +389,7 @@ void gradFilterCore(Pel* pSrc, int srcStride, int width, int height, int gradStr
   ::memcpy(gradYTmp - gradStride, gradYTmp, sizeof(Pel)*(width));
   ::memcpy(gradYTmp + (height - 2 * BIO_EXTEND_SIZE)*gradStride, gradYTmp + (height - 2 * BIO_EXTEND_SIZE - 1)*gradStride, sizeof(Pel)*(width));
   }
+#endif
 }
 
 void calcBIOSumsCore(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int xu, int yu, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX)
@@ -309,7 +531,17 @@ PelBufferOps::PelBufferOps()
   linTf8 = linTfCore<Pel>;
 
   addBIOAvg4      = addBIOAvgCore;
+#if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
+  calcBIOParameter   = calcBIOParameterCore;
+  calcBIOParamSum5   = calcBIOParamSum5Core;
+  calcBIOParamSum4   = calcBIOParamSum4Core;
+  calcBIOClippedVxVy = calcBIOClippedVxVyCore;
+  addBIOAvgN         = addBIOAvgNCore;
+  calAbsSum          = calAbsSumCore;
+  bioGradFilter      = gradFilterCore <false>;
+#else
   bioGradFilter   = gradFilterCore;
+#endif
   calcBIOSums = calcBIOSumsCore;
 
   copyBuffer = copyBufferCore;
@@ -324,6 +556,9 @@ PelBufferOps::PelBufferOps()
   profGradFilter = gradFilterCore <false>;
   applyPROF      = applyPROFCore;
   roundIntVector = nullptr;
+#if TM_AMVP || TM_MRG
+  getSumOfDifference = getSumOfDifferenceCore;
+#endif
 }
 
 PelBufferOps g_pelBufOP = PelBufferOps();
@@ -362,6 +597,31 @@ void paddingCore(Pel *ptr, int stride, int width, int height, int padSize)
     memcpy(ptrTemp2 + (i * stride), (ptrTemp2), numBytes);
   }
 }
+
+#if MULTI_HYP_PRED
+template<>
+void AreaBuf<Pel>::addHypothesisAndClip(const AreaBuf<const Pel> &other, const int weight, const ClpRng& clpRng)
+{
+  CHECK(width != other.width, "Incompatible size");
+  CHECK(height != other.height, "Incompatible size");
+
+  Pel* dest = buf;
+  const Pel* src = other.buf;
+  const int counterweight = (1 << MULTI_HYP_PRED_WEIGHT_BITS) - weight;
+  const int add = 1 << (MULTI_HYP_PRED_WEIGHT_BITS - 1);
+
+#define ADD_HYP_OP( ADDR ) dest[ADDR] = ClipPel( ( counterweight*dest[ADDR] + weight*src[ADDR] + add ) >> MULTI_HYP_PRED_WEIGHT_BITS, clpRng )
+#define ADD_HYP_INC     \
+    dest += stride; \
+    src += other.stride;
+
+  SIZE_AWARE_PER_EL_OP(ADD_HYP_OP, ADD_HYP_INC);
+
+#undef ADD_HYP_OP
+#undef ADD_HYP_INC
+}
+#endif
+
 template<>
 void AreaBuf<Pel>::addWeightedAvg(const AreaBuf<const Pel> &other1, const AreaBuf<const Pel> &other2, const ClpRng& clpRng, const int8_t bcwIdx)
 {
@@ -410,6 +670,96 @@ void AreaBuf<Pel>::rspSignal(std::vector<Pel>& pLUT)
       dst += stride;
       src += stride;
     }
+}
+
+template<>
+void AreaBuf<Pel>::rspSignal(const AreaBuf<const Pel>& other, std::vector<Pel>& pLUT)
+{
+  CHECK( width != other.width, "Incompatible size" );
+  CHECK( height != other.height, "Incompatible size" );
+
+  Pel* dst = buf;
+  const Pel* src = other.buf;
+  for (unsigned y = 0; y < height; y++)
+  {
+    for (unsigned x = 0; x < width; x++)
+    {
+      dst[x] = pLUT[src[x]];
+    }
+    dst += stride;
+    src += other.stride;
+  }
+}
+
+template<>
+void AreaBuf<Pel>::rspSignal( const AreaBuf<Pel> &toReshape, std::vector<Pel>& pLUT )
+{
+  CHECK( width != toReshape.width, "Incompatible size" );
+  CHECK( height != toReshape.height, "Incompatible size" );
+
+  Pel* dst = buf;
+  Pel* src = toReshape.buf;
+  const int srcStride = toReshape.stride;
+
+  for( unsigned y = 0; y < height; y++ )
+  {
+    for( unsigned x = 0; x < width; x++ )
+    {
+      dst[x] = pLUT[src[x]];
+    }
+    dst += stride;
+    src += srcStride;
+  }
+}
+
+template<>
+void AreaBuf<Pel>::rspSignalAllAndSubtract( const AreaBuf<Pel> &buffer1, const AreaBuf<Pel> &buffer2, std::vector<Pel>& pLUT )
+{
+  CHECK( width != buffer1.width, "Incompatible size in buffer1" );
+  CHECK( height != buffer1.height, "Incompatible size in buffer1" );
+  CHECK( width != buffer2.width, "Incompatible size in buffer2" );
+  CHECK( height != buffer2.height, "Incompatible size in buffer2" );
+
+  Pel* dest = buf;
+  const Pel* buf1 = buffer1.buf;
+  const Pel* buf2 = buffer2.buf;
+
+#define SUBS_INC           \
+  dest +=          stride; \
+  buf1 +=  buffer1.stride; \
+  buf2 +=  buffer2.stride; \
+
+#define SUBS_OP( ADDR ) dest[ADDR] = pLUT[buf1[ADDR]] - pLUT[buf2[ADDR]]
+
+  SIZE_AWARE_PER_EL_OP( SUBS_OP, SUBS_INC );
+
+#undef SUBS_OP
+#undef SUBS_INC
+}
+
+template<>
+void AreaBuf<Pel>::rspSignalAndSubtract( const AreaBuf<Pel> &buffer1, const AreaBuf<Pel> &buffer2, std::vector<Pel>& pLUT )
+{
+  CHECK( width != buffer1.width, "Incompatible size in buffer1" );
+  CHECK( height != buffer1.height, "Incompatible size in buffer1" );
+  CHECK( width != buffer2.width, "Incompatible size in buffer2" );
+  CHECK( height != buffer2.height, "Incompatible size in buffer2" );
+
+  Pel* dest = buf;
+  const Pel* buf1 = buffer1.buf;
+  const Pel* buf2 = buffer2.buf;
+
+#define SUBS_INC           \
+  dest +=          stride; \
+  buf1 +=  buffer1.stride; \
+  buf2 +=  buffer2.stride; \
+
+#define SUBS_OP( ADDR ) dest[ADDR] = pLUT[buf1[ADDR]] - buf2[ADDR]
+
+  SIZE_AWARE_PER_EL_OP( SUBS_OP, SUBS_INC );
+
+#undef SUBS_OP
+#undef SUBS_INC
 }
 
 template<>

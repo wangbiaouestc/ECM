@@ -595,6 +595,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   string inputPathPrefix;
   ExtendedProfileName extendedProfile;
 
+#if DB_PARAM_TID
+  SMultiValueInput<int>  cfg_loopFilterTcOffsetDiv2  (-12, 12, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<int>  cfg_loopFilterBetaOffsetDiv2(-12, 12, 0, std::numeric_limits<uint32_t>::max());
+#endif
+
   // Multi-value input fields:                                // minval, maxval (incl), min_entries, max_entries (incl) [, default values, number of default values]
   SMultiValueInput<uint32_t>  cfgTileColumnWidth              (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
   SMultiValueInput<uint32_t>  cfgTileRowHeight                (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
@@ -733,6 +738,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("ReconFile,o",                                     m_reconFileName,                             string(""), "Reconstructed YUV output file name")
   ("SourceWidth,-wdt",                                m_iSourceWidth,                                       0, "Source picture width")
   ("SourceHeight,-hgt",                               m_iSourceHeight,                                      0, "Source picture height")
+#if SIGN_PREDICTION
+  ("NumSignPred",                                     m_numPredSign,                                        8, "Number of predicted transform coefficient signs")
+#endif
   ("InputBitDepth",                                   m_inputBitDepth[CHANNEL_TYPE_LUMA],                   8, "Bit-depth of input file")
   ("OutputBitDepth",                                  m_outputBitDepth[CHANNEL_TYPE_LUMA],                  0, "Bit-depth of output file (default:InternalBitDepth)")
   ("MSBExtendedBitDepth",                             m_MSBExtendedBitDepth[CHANNEL_TYPE_LUMA],             0, "bit depth of luma component after addition of MSBs of value 0 (used for synthesising High Dynamic Range source material). (default:InputBitDepth)")
@@ -877,6 +885,12 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("NoBcwConstraintFlag",                             m_noBcwConstraintFlag,                           false, "Indicate that BCW is deactivated")
   ("NoCiipConstraintFlag",                            m_noCiipConstraintFlag,                          false, "Indicate that CIIP is deactivated")
   ("NoGpmConstraintFlag",                             m_noGeoConstraintFlag,                            false, "Indicate that GPM is deactivated")
+#if ENABLE_DIMD
+  ("NoDimdConstraintFlag",                             m_noDimdConstraintFlag,                            false, "Indicate that DIMD is deactivated")
+#endif
+#if ENABLE_OBMC
+  ("NoObmcConstraintFlag",                             m_noObmcConstraintFlag,                            false, "Indicate that OBMC is deactivated")
+#endif
   ("NoTransformSkipConstraintFlag",                   m_noTransformSkipConstraintFlag,                  false, "Indicate that Transform Skip is deactivated")
 #if JVET_S0066_GCI
   ("NoLumaTransformSize64ConstraintFlag",             m_noLumaTransformSize64ConstraintFlag,            false, "Indicate that Luma Transform Size 64 is deactivated")
@@ -953,6 +967,12 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MMVD",                                            m_MMVD,                                            true, "Enable Merge mode with Motion Vector Difference (0:off, 1:on)  [default: 1]")
   ("Affine",                                          m_Affine,                                         false, "Enable affine prediction (0:off, 1:on)  [default: off]")
   ("AffineType",                                      m_AffineType,                                      true,  "Enable affine type prediction (0:off, 1:on)  [default: on]" )
+#if AFFINE_MMVD
+  ("AffineMMVD",                                      m_AffineMmvdMode,                                  true, "Affine MMVD mode (0:off, 1:on)  [default: on]" )
+#endif
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+  ("DMVD",                                            m_DMVDMode,                                        true, "DMVD mode (0:off, 1:on)  [default: on]" )
+#endif
   ("PROF",                                            m_PROF,                                           false, "Enable Prediction refinement with optical flow for affine mode (0:off, 1:on)  [default: off]")
   ("BIO",                                             m_BIO,                                            false, "Enable bi-directional optical flow")
   ("IMV",                                             m_ImvMode,                                            1, "Adaptive MV precision Mode (IMV)\n"
@@ -989,6 +1009,12 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("LadfQpOffset",                                    cfg_LadfQpOffset,                      cfg_LadfQpOffset, "LADF QP offset")
   ("LadfIntervalLowerBound",                          cfg_LadfIntervalLowerBound,  cfg_LadfIntervalLowerBound, "LADF lower bound for 2nd lowest interval")
 #endif
+#if ENABLE_DIMD
+  ( "DIMD",                                           m_dimd,                                            true, "Enable decoder side intra mode derivation\n" )
+#endif
+#if ENABLE_OBMC
+  ("OBMC",                                            m_OBMC,                                           true, "Overlapping Block Motion Compensation")
+#endif
   ("CIIP",                                            m_ciip,                                           false, "Enable CIIP mode")
   ("Geo",                                             m_Geo,                                            false, "Enable geometric partitioning mode (0:off, 1:on)")
   ("HashME",                                          m_HashME,                                         false, "Enable hash motion estimation (0:off, 1:on)")
@@ -1011,6 +1037,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 
   ("WrapAround",                                      m_wrapAround,                                     false, "Enable horizontal wrap-around motion compensation for inter prediction (0:off, 1:on)  [default: off]")
   ("WrapAroundOffset",                                m_wrapAroundOffset,                                  0u, "Offset in luma samples used for computing the horizontal wrap-around position")
+#if MULTI_HYP_PRED
+  ("NumMHPCandToTest",                                m_numMHPCandsToTest,                                  2, "number of MHP candidates to test at encoder")
+  ("AdditionalInterHyps",                             m_maxNumAddHyps,                                      2, "number of additional inter prediction hypotheseis")
+  ("AdditionalInterHypWeights",                       m_numAddHypWeights,    MULTI_HYP_PRED_NUM_WEIGHTS, "number of weights for additional inter hypotheseis")
+  ("AdditionalInterHypRefFrames",                     m_maxNumAddHypRefFrames,                              4, "max. number of ref frames for additional inter hypotheseis")
+  ("AdditionalInterHypTries",                         m_addHypTries,                                        1, "number of tries for additional inter prediction hypotheseis")
+#endif
 
   // ADD_NEW_TOOL : (encoder app) add parsing parameters here
   ( "VirtualBoundariesPresentInSPSFlag",              m_virtualBoundariesPresentFlag,                    true, "Virtual Boundary position information is signalled in SPS or PH (1:SPS, 0:PH)  [default: on]" )
@@ -1030,6 +1063,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("IntraCMD",                                        m_intraCMD,                                          0u, "IntraChroma MD: 0: none, 1:fixed to default wPSNR weight")
   ("LCTUFast",                                        m_useFastLCTU,                                    false, "Fast methods for large CTU")
   ("FastMrg",                                         m_useFastMrg,                                     false, "Fast methods for inter merge")
+#if MERGE_ENC_OPT
+  ("NumFullRDMrg", m_numFullRDMrg, 4u, "number of full RD for inter merge")
+#endif
   ("PBIntraFast",                                     m_usePbIntraFast,                                 false, "Fast assertion if the intra mode is probable")
   ("AMaxBT",                                          m_useAMaxBT,                                      false, "Adaptive maximal BT-size")
   ("E0023FastEnc",                                    m_e0023FastEnc,                                    true, "Fast encoding setting for QTBT (proposal E0023)")
@@ -1041,7 +1077,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MRL",                                             m_MRL,                                            false,  "Enable MRL (multiple reference line intra prediction)")
   ("MIP",                                             m_MIP,                                             true,  "Enable MIP (matrix-based intra prediction)")
   ("FastMIP",                                         m_useFastMIP,                                     false,  "Fast encoder search for MIP (matrix-based intra prediction)")
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   ("FastLocalDualTreeMode",                           m_fastLocalDualTreeMode,                              0,  "Fast intra pass coding for local dual-tree in intra coding region, 0: off, 1: use threshold, 2: one intra mode only")
+#endif
   // Unit definition parameters
   ("MaxCUWidth",                                      m_uiMaxCUWidth,                                     64u)
   ("MaxCUHeight",                                     m_uiMaxCUHeight,                                    64u)
@@ -1049,7 +1087,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MaxCUSize,s",                                     m_uiMaxCUWidth,                                     64u, "Maximum CU size")
   ("MaxCUSize,s",                                     m_uiMaxCUHeight,                                    64u, "Maximum CU size")
 
+#if TU_256
+  ("Log2MaxTbSize",                                   m_log2MaxTbSize,                                      7, "Maximum transform block size in logarithm base 2 (Default: 7)")
+#else
   ("Log2MaxTbSize",                                   m_log2MaxTbSize,                                      6, "Maximum transform block size in logarithm base 2 (Default: 6)")
+#endif
 
   // Coding structure paramters
   ("IntraPeriod,-ip",                                 m_iIntraPeriod,                                      -1, "Intra period in frames, (-1: only first frame)")
@@ -1151,8 +1193,14 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   // Deblocking filter parameters
   ("LoopFilterDisable",                               m_bLoopFilterDisable,                             false)
   ("LoopFilterOffsetInPPS",                           m_loopFilterOffsetInPPS,                           true)
+#if DB_PARAM_TID
+  ("LoopFilterBetaOffset_div2",                       cfg_loopFilterBetaOffsetDiv2,                     cfg_loopFilterBetaOffsetDiv2)
+  ("LoopFilterTcOffset_div2",                         cfg_loopFilterTcOffsetDiv2,                       cfg_loopFilterTcOffsetDiv2)
+#else
   ("LoopFilterBetaOffset_div2",                       m_loopFilterBetaOffsetDiv2,                           0)
   ("LoopFilterTcOffset_div2",                         m_loopFilterTcOffsetDiv2,                             0)
+#endif
+
   ("LoopFilterCbBetaOffset_div2",                     m_loopFilterCbBetaOffsetDiv2,                         0)
   ("LoopFilterCbTcOffset_div2",                       m_loopFilterCbTcOffsetDiv2,                           0)
   ("LoopFilterCrBetaOffset_div2",                     m_loopFilterCrBetaOffsetDiv2,                         0)
@@ -1208,11 +1256,24 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("DisableScalingMatrixForLFNST",                    m_disableScalingMatrixForLfnstBlks,                true, "Disable scaling matrices, when enabled, for LFNST-coded blocks")
   ("DisableScalingMatrixForAlternativeColourSpace",   m_disableScalingMatrixForAlternativeColourSpace,  false, "Disable scaling matrices when the colour space is not equal to the designated colour space of scaling matrix")
   ("ScalingMatrixDesignatedColourSpace",              m_scalingMatrixDesignatedColourSpace,              true, "Indicates if the designated colour space of scaling matrices is equal to the original colour space")
+
+#if TCQ_8STATES
+  ("DepQuant",                                        m_depQuantEnabledIdc,                                           2 )
+#else
   ("DepQuant",                                        m_depQuantEnabledFlag,                                          true, "Enable  dependent quantization (Default: 1)" )
+#endif
   ("SignHideFlag,-SBH",                               m_signDataHidingEnabledFlag,                                    false,  "Enable sign hiding" )
+#if NON_ADJACENT_MRG_CAND
+  ("MaxNumMergeCand",                                 m_maxNumMergeCand,                                  10u, "Maximum number of merge candidates")
+#else
   ("MaxNumMergeCand",                                 m_maxNumMergeCand,                                   5u, "Maximum number of merge candidates")
+#endif
   ("MaxNumAffineMergeCand",                           m_maxNumAffineMergeCand,                             5u, "Maximum number of affine merge candidates")
+#if NON_ADJACENT_MRG_CAND
+  ("MaxNumGeoCand",                                   m_maxNumGeoCand,                                     10u, "Maximum number of geometric partitioning mode candidates")
+#else
   ("MaxNumGeoCand",                                   m_maxNumGeoCand,                                     5u, "Maximum number of geometric partitioning mode candidates")
+#endif
   ("MaxNumIBCMergeCand",                              m_maxNumIBCMergeCand,                                6u, "Maximum number of IBC merge candidates")
     /* Misc. */
   ("SEIDecodedPictureHash,-dph",                      tmpDecodedPictureHashSEIMappedType,                   0, "Control generation of decode picture hash SEI messages\n"
@@ -1458,6 +1519,10 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_Q0114_ASPECT5_GCI_FLAG
   ( "RPR",                                            m_rprEnabledFlag,                          true, "Reference Sample Resolution" )
 #endif
+#if INTER_LIC
+  ("LIC",                                             m_lic,                                     true, "Local illumination compensation [LIC] (0:disabled, 1:enabled)  [default: 1]")
+  ("FastPicLevelLIC",                                 m_fastPicLevelLIC,                         true, "Fast picture level LIC decision (0:disabled, 1:enabled)  [default: 1]")
+#endif
   ( "ScalingRatioHor",                                m_scalingRatioHor,                          1.0, "Scaling ratio in hor direction" )
   ( "ScalingRatioVer",                                m_scalingRatioVer,                          1.0, "Scaling ratio in ver direction" )
   ( "FractionNumFrames",                              m_fractionOfFrames,                         1.0, "Encode a fraction of the specified in FramesToBeEncoded frames" )
@@ -1481,6 +1546,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ( "NumPTLsInVPS",                                   m_numPtlsInVps,                               1, "Number of profile_tier_level structures in VPS" )
   ( "AvoidIntraInDepLayers",                          m_avoidIntraInDepLayer,                    true, "Replaces I pictures in dependent layers with B pictures" )
   ( "MaxTidILRefPicsPlus1",                           m_cfgVPSParameters.m_maxTidILRefPicsPlus1,   -1, "Maximum temporal ID for inter-layer reference pictures plus 1, 0 for IRAP only" )
+  
+#if DUMP_BEFORE_INLOOP
+  ( "DumpBeforeInloop",                               m_dumpBeforeInloop,                       false, "Dump YUV before inloop filters" )
+#endif
+#if CONVERT_NUM_TU_SPLITS_TO_CFG
+  ( "MaxNumTUs",                                      m_maxNumTUs,                                  1, "Maximum number of TUs within one CU. When max TB size is 32x32, up to 16 TUs within one CU (128x128) is supported" )
+#endif
     ;
 
   opts.addOptions()
@@ -2568,6 +2640,19 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 
   m_uiMaxCUWidth = m_uiMaxCUHeight = m_uiCTUSize;
 
+#if DB_PARAM_TID
+  m_loopFilterBetaOffsetDiv2.resize(cfg_loopFilterBetaOffsetDiv2.values.size());
+  for (int i = 0; i < m_loopFilterBetaOffsetDiv2.size(); i++)
+  {
+    m_loopFilterBetaOffsetDiv2[i] = cfg_loopFilterBetaOffsetDiv2.values[i];
+  }
+  m_loopFilterTcOffsetDiv2.resize(cfg_loopFilterTcOffsetDiv2.values.size());
+  for (int i = 0; i < m_loopFilterTcOffsetDiv2.size(); i++)
+  {
+    m_loopFilterTcOffsetDiv2[i] = cfg_loopFilterTcOffsetDiv2.values[i];
+  }
+#endif
+
   // check validity of input parameters
   if( xCheckParameter() )
   {
@@ -2680,8 +2765,13 @@ bool EncAppCfg::xCheckParameter()
   bool check_failed = false; /* abort if there is a fatal configuration problem */
 #define xConfirmPara(a,b) check_failed |= confirmPara(a,b)
 
+#if TCQ_8STATES
+  xConfirmPara( m_depQuantEnabledIdc<0 || m_depQuantEnabledIdc>2, "DepQuant must be equal to 0, 1, or 2" );
 
+  if( m_depQuantEnabledIdc )
+#else
   if( m_depQuantEnabledFlag )
+#endif
   {
     xConfirmPara( !m_useRDOQ || !m_useRDOQTS, "RDOQ and RDOQTS must be equal to 1 if dependent quantization is enabled" );
     xConfirmPara( m_signDataHidingEnabledFlag, "SignHideFlag must be equal to 0 if dependent quantization is enabled" );
@@ -2694,6 +2784,15 @@ bool EncAppCfg::xCheckParameter()
     xConfirmPara(m_wrapAroundOffset > m_iSourceWidth, "Wrap-around offset must not be greater than the source picture width");
     xConfirmPara( m_wrapAroundOffset % minCUSize != 0, "Wrap-around offset must be an integer multiple of the specified minimum CU size" );
   }
+#if MULTI_HYP_PRED
+  xConfirmPara(m_maxNumAddHyps < 0, "number of additional hypotheseis shall not be negative");
+  xConfirmPara(m_addHypTries < 0, "number of tries for additional hypotheseis shall not be negative");
+  xConfirmPara(m_maxNumAddHyps && m_addHypTries == 0, "number of tries for additional hypotheseis is zero");
+  xConfirmPara(m_maxNumAddHyps > MULTI_HYP_PRED_MAX_CANDS, "number of additional hypotheseis exceeds the maximal limit");
+  xConfirmPara(m_numAddHypWeights < 1, "number of weights for additional hypotheseis must be at least one");
+  xConfirmPara(m_numAddHypWeights > MULTI_HYP_PRED_NUM_WEIGHTS, "number of weights for additional hypotheseis exceeds the maximal limit");
+  xConfirmPara(m_maxNumAddHypRefFrames < 1, "number of ref frames for additional hypotheseis must be at least one");
+#endif
 
 #if ENABLE_SPLIT_PARALLELISM
   xConfirmPara( m_numSplitThreads < 1, "Number of used threads cannot be smaller than 1" );
@@ -2830,8 +2929,20 @@ bool EncAppCfg::xCheckParameter()
 #else
   xConfirmPara( m_DeblockingFilterMetric && (m_bLoopFilterDisable || m_loopFilterOffsetInPPS), "If DeblockingFilterMetric is true then both LoopFilterDisable and LoopFilterOffsetInPPS must be 0");
 #endif
+
+#if DB_PARAM_TID
+  for (int i = 0; i < m_loopFilterBetaOffsetDiv2.size(); i++)
+  {
+    xConfirmPara(m_loopFilterBetaOffsetDiv2[i] < -12 || m_loopFilterBetaOffsetDiv2[i] > 12, "Loop Filter Beta Offset div. 2 exceeds supported range (-12 to 12");
+  }
+  for (int i = 0; i < m_loopFilterTcOffsetDiv2.size(); i++)
+  {
+    xConfirmPara(m_loopFilterTcOffsetDiv2[i] < -12 || m_loopFilterTcOffsetDiv2[i] > 12, "Loop Filter Tc Offset div. 2 exceeds supported range (-12 to 12)");
+  }
+#else
   xConfirmPara( m_loopFilterBetaOffsetDiv2 < -12 || m_loopFilterBetaOffsetDiv2 > 12,          "Loop Filter Beta Offset div. 2 exceeds supported range (-12 to 12" );
   xConfirmPara( m_loopFilterTcOffsetDiv2 < -12 || m_loopFilterTcOffsetDiv2 > 12,              "Loop Filter Tc Offset div. 2 exceeds supported range (-12 to 12)" );
+#endif
   xConfirmPara( m_loopFilterCbBetaOffsetDiv2 < -12 || m_loopFilterCbBetaOffsetDiv2 > 12,      "Loop Filter Beta Offset div. 2 exceeds supported range (-12 to 12" );
   xConfirmPara( m_loopFilterCbTcOffsetDiv2 < -12 || m_loopFilterCbTcOffsetDiv2 > 12,          "Loop Filter Tc Offset div. 2 exceeds supported range (-12 to 12)" );
   xConfirmPara( m_loopFilterCrBetaOffsetDiv2 < -12 || m_loopFilterCrBetaOffsetDiv2 > 12,      "Loop Filter Beta Offset div. 2 exceeds supported range (-12 to 12" );
@@ -2926,12 +3037,23 @@ bool EncAppCfg::xCheckParameter()
   xConfirmPara( m_uiMaxCUWidth > MAX_CU_SIZE,                                               "MaxCUWith exceeds predefined MAX_CU_SIZE limit");
 
   const int minCuSize = 1 << m_log2MinCuSize;
+#if JVET_R0347_MTT_SIZE_CONSTRAIN
+#if TU_256
+  xConfirmPara( m_uiMinQT[0] > MAX_CU_SIZE,                                                 "Min Luma QT size in I slices should be smaller than or equal to MAX_CU_SIZE");
+  xConfirmPara( m_uiMinQT[1] > MAX_CU_SIZE,                                                 "Min Luma QT size in non-I slices should be smaller than or equal to MAX_CU_SIZE");
+  xConfirmPara( m_uiMaxBT[2] > MAX_CU_SIZE,                                                 "Maximum BT size for chroma block in I slice should be smaller than or equal to MAX_CU_SIZE");
+  xConfirmPara( m_uiMaxTT[0] > MAX_CU_SIZE,                                                 "Maximum TT size for luma block in I slice should be smaller than or equal to MAX_CU_SIZE");
+  xConfirmPara( m_uiMaxTT[1] > MAX_CU_SIZE,                                                 "Maximum TT size for luma block in non-I slice should be smaller than or equal to MAX_CU_SIZE");
+  xConfirmPara( m_uiMaxTT[2] > MAX_CU_SIZE,                                                 "Maximum TT size for chroma block in I slice should be smaller than or equal to MAX_CU_SIZE");
+#else
   xConfirmPara( m_uiMinQT[0] > 64,                                                          "Min Luma QT size in I slices should be smaller than or equal to 64");
   xConfirmPara( m_uiMinQT[1] > 64,                                                          "Min Luma QT size in non-I slices should be smaller than or equal to 64");
   xConfirmPara( m_uiMaxBT[2] > 64,                                                          "Maximum BT size for chroma block in I slice should be smaller than or equal to 64");
   xConfirmPara( m_uiMaxTT[0] > 64,                                                          "Maximum TT size for luma block in I slice should be smaller than or equal to 64");
   xConfirmPara( m_uiMaxTT[1] > 64,                                                          "Maximum TT size for luma block in non-I slice should be smaller than or equal to 64");
   xConfirmPara( m_uiMaxTT[2] > 64,                                                          "Maximum TT size for chroma block in I slice should be smaller than or equal to 64");
+#endif
+#endif
   xConfirmPara( m_uiMinQT[0] < minCuSize,                                                   "Min Luma QT size in I slices should be larger than or equal to minCuSize");
   xConfirmPara( m_uiMinQT[1] < minCuSize,                                                   "Min Luma QT size in non-I slices should be larger than or equal to minCuSize");
   xConfirmPara((m_iSourceWidth % minCuSize ) || (m_iSourceHeight % minCuSize),              "Picture width or height is not a multiple of minCuSize");
@@ -2940,8 +3062,13 @@ bool EncAppCfg::xCheckParameter()
   xConfirmPara( (m_uiMinQT[2] << (int)getChannelTypeScaleX(CHANNEL_TYPE_CHROMA, m_chromaFormatIDC)) > std::min(64, (int)m_uiCTUSize),
                                                                                             "Min Chroma QT size in I slices should be smaller than or equal to CTB size or CB size after implicit split of CTB");
   xConfirmPara( m_uiCTUSize < 32,                                                           "CTUSize must be greater than or equal to 32");
+#if CTU_256
+  xConfirmPara( m_uiCTUSize > 256,                                                          "CTUSize must be less than or equal to 256");
+  xConfirmPara( m_uiCTUSize != 32 && m_uiCTUSize != 64 && m_uiCTUSize != 128 && m_uiCTUSize != 256,   "CTUSize must be a power of 2 (32, 64, 128, 256)");
+#else
   xConfirmPara( m_uiCTUSize > 128,                                                          "CTUSize must be less than or equal to 128");
   xConfirmPara( m_uiCTUSize != 32 && m_uiCTUSize != 64 && m_uiCTUSize != 128,               "CTUSize must be a power of 2 (32, 64, or 128)");
+#endif
   xConfirmPara( m_uiMaxCUWidth < 16,                                                        "Maximum partition width size should be larger than or equal to 16");
   xConfirmPara( m_uiMaxCUHeight < 16,                                                       "Maximum partition height size should be larger than or equal to 16");
   xConfirmPara( m_uiMaxBT[0] < m_uiMinQT[0],                                                "Maximum BT size for luma block in I slice should be larger than minimum QT size");
@@ -2975,7 +3102,14 @@ bool EncAppCfg::xCheckParameter()
     xConfirmPara(m_uiMaxBT[1] != m_uiMinQT[1], "MaxBTNonISlice shall be equal to MinQTNonISlice when MaxMTTHierarchyDepth is 0.");
     xConfirmPara(m_uiMaxTT[1] != m_uiMinQT[1], "MaxTTNonISlice shall be equal to MinQTNonISlice when MaxMTTHierarchyDepth is 0.");
   }
+#if TU_256
+  xConfirmPara( m_log2MaxTbSize > 8, "Log2MaxTbSize must be 8 or smaller." );
+#else
   xConfirmPara( m_log2MaxTbSize > 6, "Log2MaxTbSize must be 6 or smaller." );
+#endif
+#if CONVERT_NUM_TU_SPLITS_TO_CFG
+  xConfirmPara( m_maxNumTUs < 1 || m_maxNumTUs > 16, "Maximum number of TUs shall be greater or equal to 1 and less than or equal to 16" );
+#endif
   xConfirmPara( m_log2MaxTbSize < 5,  "Log2MaxTbSize must be 5 or greater." );
   xConfirmPara( m_maxNumMergeCand < 1,  "MaxNumMergeCand must be 1 or greater.");
   xConfirmPara( m_maxNumMergeCand > MRG_MAX_NUM_CANDS, "MaxNumMergeCand must be no more than MRG_MAX_NUM_CANDS." );
@@ -2989,10 +3123,20 @@ bool EncAppCfg::xCheckParameter()
   xConfirmPara( m_maxNumAffineMergeCand > AFFINE_MRG_MAX_NUM_CANDS, "MaxNumAffineMergeCand must be no more than AFFINE_MRG_MAX_NUM_CANDS." );
   if ( m_Affine == 0 )
   {
+#if AFFINE_MMVD
+    xConfirmPara(m_AffineMmvdMode, "Affine MMVD can't be enabled if Affine is disabled.");
+#endif
     m_maxNumAffineMergeCand = m_sbTmvpEnableFlag ? 1 : 0;
     if (m_PROF) msg(WARNING, "PROF is forcefully disabled when Affine is off \n");
     m_PROF = false;
   }
+#if MULTI_PASS_DMVR
+  if (m_DMVR && m_DMVDMode)
+  {
+    msg(WARNING, "DMVR is forcefully disabled since it has been disabled by the macro MULTI_PASS_DMVR. \n");
+    m_DMVR = false;
+  }
+#endif
 
   xConfirmPara( m_MTS < 0 || m_MTS > 3, "MTS must be greater than 0 smaller than 4" );
   xConfirmPara( m_MTSIntraMaxCand < 0 || m_MTSIntraMaxCand > 5, "m_MTSIntraMaxCand must be greater than 0 and smaller than 6" );
@@ -3097,12 +3241,23 @@ bool EncAppCfg::xCheckParameter()
   {
     for(int i=0; i<m_iGOPSize; i++)
     {
+#if DB_PARAM_TID
+      int betaIdx = Clip3(0, (int)m_loopFilterBetaOffsetDiv2.size() - 1, (int)m_GOPList[i].m_temporalId);
+      int tcIdx = Clip3(0, (int)m_loopFilterTcOffsetDiv2.size() - 1, (int)m_GOPList[i].m_temporalId);
+      xConfirmPara((m_GOPList[i].m_betaOffsetDiv2 + m_loopFilterBetaOffsetDiv2[betaIdx]) < -12 || (m_GOPList[i].m_betaOffsetDiv2 + m_loopFilterBetaOffsetDiv2[betaIdx]) > 12, "Loop Filter Beta Offset div. 2 for one of the GOP entries exceeds supported range (-12 to 12)");
+      xConfirmPara((m_GOPList[i].m_tcOffsetDiv2 + m_loopFilterTcOffsetDiv2[tcIdx]) < -12 || (m_GOPList[i].m_tcOffsetDiv2 + m_loopFilterTcOffsetDiv2[tcIdx]) > 12, "Loop Filter Tc Offset div. 2 for one of the GOP entries exceeds supported range (-12 to 12)");
+      xConfirmPara((m_GOPList[i].m_CbBetaOffsetDiv2 + m_loopFilterBetaOffsetDiv2[betaIdx]) < -12 || (m_GOPList[i].m_CbBetaOffsetDiv2 + m_loopFilterBetaOffsetDiv2[betaIdx]) > 12, "Loop Filter Beta Offset div. 2 for one of the GOP entries exceeds supported range (-12 to 12)");
+      xConfirmPara((m_GOPList[i].m_CbTcOffsetDiv2 + m_loopFilterTcOffsetDiv2[tcIdx]) < -12 || (m_GOPList[i].m_CbTcOffsetDiv2 + m_loopFilterTcOffsetDiv2[tcIdx]) > 12, "Loop Filter Tc Offset div. 2 for one of the GOP entries exceeds supported range (-12 to 12)");
+      xConfirmPara((m_GOPList[i].m_CrBetaOffsetDiv2 + m_loopFilterBetaOffsetDiv2[betaIdx]) < -12 || (m_GOPList[i].m_CrBetaOffsetDiv2 + m_loopFilterBetaOffsetDiv2[betaIdx]) > 12, "Loop Filter Beta Offset div. 2 for one of the GOP entries exceeds supported range (-12 to 12)");
+      xConfirmPara((m_GOPList[i].m_CrTcOffsetDiv2 + m_loopFilterTcOffsetDiv2[tcIdx]) < -12 || (m_GOPList[i].m_CrTcOffsetDiv2 + m_loopFilterTcOffsetDiv2[tcIdx]) > 12, "Loop Filter Tc Offset div. 2 for one of the GOP entries exceeds supported range (-12 to 12)");
+#else
       xConfirmPara( (m_GOPList[i].m_betaOffsetDiv2 + m_loopFilterBetaOffsetDiv2) < -12 || (m_GOPList[i].m_betaOffsetDiv2 + m_loopFilterBetaOffsetDiv2) > 12, "Loop Filter Beta Offset div. 2 for one of the GOP entries exceeds supported range (-12 to 12)" );
       xConfirmPara( (m_GOPList[i].m_tcOffsetDiv2 + m_loopFilterTcOffsetDiv2) < -12 || (m_GOPList[i].m_tcOffsetDiv2 + m_loopFilterTcOffsetDiv2) > 12, "Loop Filter Tc Offset div. 2 for one of the GOP entries exceeds supported range (-12 to 12)" );
       xConfirmPara( (m_GOPList[i].m_CbBetaOffsetDiv2 + m_loopFilterCbBetaOffsetDiv2) < -12 || (m_GOPList[i].m_CbBetaOffsetDiv2 + m_loopFilterCbBetaOffsetDiv2) > 12, "Loop Filter Beta Offset div. 2 for one of the GOP entries exceeds supported range (-12 to 12)" );
       xConfirmPara( (m_GOPList[i].m_CbTcOffsetDiv2 + m_loopFilterCbTcOffsetDiv2) < -12 || (m_GOPList[i].m_CbTcOffsetDiv2 + m_loopFilterCbTcOffsetDiv2) > 12, "Loop Filter Tc Offset div. 2 for one of the GOP entries exceeds supported range (-12 to 12)" );
       xConfirmPara( (m_GOPList[i].m_CrBetaOffsetDiv2 + m_loopFilterCrBetaOffsetDiv2) < -12 || (m_GOPList[i].m_CrBetaOffsetDiv2 + m_loopFilterCrBetaOffsetDiv2) > 12, "Loop Filter Beta Offset div. 2 for one of the GOP entries exceeds supported range (-12 to 12)" );
       xConfirmPara( (m_GOPList[i].m_CrTcOffsetDiv2 + m_loopFilterCrTcOffsetDiv2) < -12 || (m_GOPList[i].m_CrTcOffsetDiv2 + m_loopFilterCrTcOffsetDiv2) > 12, "Loop Filter Tc Offset div. 2 for one of the GOP entries exceeds supported range (-12 to 12)" );
+#endif
     }
   }
 
@@ -3122,9 +3277,9 @@ bool EncAppCfg::xCheckParameter()
 
   xConfirmPara( m_maxSublayers < 1 || m_maxSublayers > 7, "MaxSublayers must be in range [1..7]" );
 
-
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   xConfirmPara( m_fastLocalDualTreeMode < 0 || m_fastLocalDualTreeMode > 2, "FastLocalDualTreeMode must be in range [0..2]" );
-
+#endif
   int extraRPLs = 0;
   //start looping through frames in coding order until we can verify that the GOP structure is correct.
   while (!verifiedGOP && !errorGOP)
@@ -3731,6 +3886,21 @@ bool EncAppCfg::xCheckParameter()
 
   xConfirmPara( m_sariAspectRatioIdc < 0 || m_sariAspectRatioIdc > 255, "SEISARISampleAspectRatioIdc must be in the range of 0 to 255");
 
+#if SIGN_PREDICTION
+  xConfirmPara(m_numPredSign < 0 || m_numPredSign > SIGN_PRED_MAX_NUM, "Number of predicted coefficient signs must be positive value and no larger than SIGN_PRED_MAX_NUM");
+#if TCQ_8STATES
+  if ( m_numPredSign > 0 && !m_depQuantEnabledIdc )
+#else
+  if( m_numPredSign > 0 && !m_depQuantEnabledFlag )
+#endif
+  {
+    msg( WARNING, "*********************************************************************************\n");
+    msg( WARNING, "** ERROR: At this moment Sign Prediction is not supported when DepQuant is off **\n");
+    msg( WARNING, "**        Please set NumSignPred to 0                                          **\n");
+    msg( WARNING, "*********************************************************************************\n");
+    exit(1);
+  }
+#endif
   if ( m_RCEnableRateControl )
   {
     if ( m_RCForceIntraQP )
@@ -4006,6 +4176,13 @@ void EncAppCfg::xPrintParameter()
   msg( DETAILS, "\n");
 
   msg( VERBOSE, "TOOL CFG: ");
+#if CTU_256
+  msg( VERBOSE, "CTU:%d ", m_uiCTUSize );
+  msg( VERBOSE, "MaxTU:%d ", 1 << m_log2MaxTbSize );
+#endif
+#if SIGN_PREDICTION
+  msg( VERBOSE, "SignPred:%d ", m_numPredSign                   );
+#endif
   msg( VERBOSE, "IBD:%d ", ((m_internalBitDepth[CHANNEL_TYPE_LUMA] > m_MSBExtendedBitDepth[CHANNEL_TYPE_LUMA]) || (m_internalBitDepth[CHANNEL_TYPE_CHROMA] > m_MSBExtendedBitDepth[CHANNEL_TYPE_CHROMA])));
   msg( VERBOSE, "HAD:%d ", m_bUseHADME                          );
   msg( VERBOSE, "RDQ:%d ", m_useRDOQ                            );
@@ -4042,18 +4219,26 @@ void EncAppCfg::xPrintParameter()
   msg( VERBOSE, " WaveFrontSynchro:%d WaveFrontSubstreams:%d", m_entropyCodingSyncEnabledFlag?1:0, iWaveFrontSubstreams);
   msg( VERBOSE, " ScalingList:%d ", m_useScalingListId );
   msg( VERBOSE, "TMVPMode:%d ", m_TMVPModeId );
-  msg( VERBOSE, " DQ:%d ", m_depQuantEnabledFlag);
+#if TCQ_8STATES
+  msg( VERBOSE, " DQ:%d ", m_depQuantEnabledIdc);
+#else
+	msg( VERBOSE, " DQ:%d ", m_depQuantEnabledFlag);
+#endif
   msg( VERBOSE, " SignBitHidingFlag:%d ", m_signDataHidingEnabledFlag);
   msg( VERBOSE, "RecalQP:%d ", m_recalculateQPAccordingToLambda ? 1 : 0 );
 
   {
     msg( VERBOSE, "\nTOOL CFG: " );
+    msg( VERBOSE, "GOP:%d ", m_iGOPSize );
     msg( VERBOSE, "LFNST:%d ", m_LFNST );
     msg( VERBOSE, "MMVD:%d ", m_MMVD);
     msg( VERBOSE, "Affine:%d ", m_Affine );
     if ( m_Affine )
     {
       msg( VERBOSE, "AffineType:%d ", m_AffineType );
+#if AFFINE_MMVD
+      msg( VERBOSE, "AffineMMVD:%d ", m_AffineMmvdMode );
+#endif
     }
     msg(VERBOSE, "PROF:%d ", m_PROF);
     msg(VERBOSE, "SbTMVP:%d ", m_sbTmvpEnableFlag);
@@ -4073,8 +4258,23 @@ void EncAppCfg::xPrintParameter()
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
     msg( VERBOSE, "LADF:%d ", m_LadfEnabed );
 #endif
+#if ENABLE_DIMD
+    msg(VERBOSE, "DIMD:%d ", m_dimd);
+#endif
+#if ENABLE_OBMC
+    msg(VERBOSE, "OBMC:%d ", m_OBMC);
+#endif
     msg(VERBOSE, "CIIP:%d ", m_ciip);
     msg( VERBOSE, "Geo:%d ", m_Geo );
+#if MULTI_HYP_PRED
+    msg(VERBOSE, "AdditionalInterHyps:%d ", m_maxNumAddHyps);
+    if (m_maxNumAddHyps)
+    {
+      msg(VERBOSE, "(%d weight%s,", m_numAddHypWeights, m_numAddHypWeights > 1 ? "s" : "");
+      msg(VERBOSE, "%d ref frame%s,", m_maxNumAddHypRefFrames, m_maxNumAddHypRefFrames > 1 ? "s" : "");
+      msg(VERBOSE, "%d %s) ", m_addHypTries, m_addHypTries == 1 ? "try" : "tries");
+    }
+#endif
     m_allowDisFracMMVD = m_MMVD ? m_allowDisFracMMVD : false;
     if ( m_MMVD )
       msg(VERBOSE, "AllowDisFracMMVD:%d ", m_allowDisFracMMVD);
@@ -4082,8 +4282,14 @@ void EncAppCfg::xPrintParameter()
     m_AffineAmvrEncOpt = m_AffineAmvr ? m_AffineAmvrEncOpt : false;
     msg( VERBOSE, "AffineAmvrEncOpt:%d ", m_AffineAmvrEncOpt );
     msg(VERBOSE, "DMVR:%d ", m_DMVR);
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+    msg(VERBOSE, "DMVD:%d ", m_DMVDMode);
+#endif
     msg(VERBOSE, "MmvdDisNum:%d ", m_MmvdDisNum);
     msg(VERBOSE, "JointCbCr:%d ", m_JointCbCrMode);
+#if ENABLE_OBMC
+    msg(VERBOSE, "OBMC:%d ", m_OBMC);
+#endif
   }
   m_useColorTrans = (m_chromaFormatIDC == CHROMA_444) ? m_useColorTrans : 0u;
   msg(VERBOSE, "ACT:%d ", m_useColorTrans);
@@ -4123,10 +4329,23 @@ void EncAppCfg::xPrintParameter()
     }
     msg(VERBOSE, "MRL:%d ", m_MRL);
     msg(VERBOSE, "MIP:%d ", m_MIP);
+#if INTER_LIC
+    msg(VERBOSE, "LIC:%d ", m_lic);
+    if (m_lic)
+    {
+      msg(VERBOSE, "FastPicLevelLIC:%d ", m_fastPicLevelLIC);
+    }
+#endif
     msg(VERBOSE, "EncDbOpt:%d ", m_encDbOpt);
   msg( VERBOSE, "\nFAST TOOL CFG: " );
+#if CONVERT_NUM_TU_SPLITS_TO_CFG
+  msg( VERBOSE, "MaxNumTUs:%d ", m_maxNumTUs );
+#endif
   msg( VERBOSE, "LCTUFast:%d ", m_useFastLCTU );
   msg( VERBOSE, "FastMrg:%d ", m_useFastMrg );
+#if MERGE_ENC_OPT
+  msg(VERBOSE, "NumFullRDMrg:%d ", m_numFullRDMrg);
+#endif
   msg( VERBOSE, "PBIntraFast:%d ", m_usePbIntraFast );
   if( m_ImvMode ) msg( VERBOSE, "IMV4PelFast:%d ", m_Imv4PelFast );
   if( m_MTS ) msg( VERBOSE, "MTSMaxCand: %1d(intra) %1d(inter) ", m_MTSIntraMaxCand, m_MTSInterMaxCand );
@@ -4139,8 +4358,9 @@ void EncAppCfg::xPrintParameter()
   msg( VERBOSE, "UseNonLinearAlfChroma:%d ", m_useNonLinearAlfChroma );
   msg( VERBOSE, "MaxNumAlfAlternativesChroma:%d ", m_maxNumAlfAlternativesChroma );
   if( m_MIP ) msg(VERBOSE, "FastMIP:%d ", m_useFastMIP);
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   msg( VERBOSE, "FastLocalDualTree:%d ", m_fastLocalDualTreeMode );
-
+#endif
   msg( VERBOSE, "NumSplitThreads:%d ", m_numSplitThreads );
   if( m_numSplitThreads > 1 )
   {

@@ -65,21 +65,32 @@ static const uint32_t MAX_INTRA_FILTER_DEPTHS=8;
 
 class IntraPrediction
 {
+#if MMLM
+public:
+  bool m_encPreRDRun;
+#endif
 protected:
   Pel      m_refBuffer[MAX_NUM_COMPONENT][NUM_PRED_BUF][(MAX_CU_SIZE * 2 + 1 + MAX_REF_LINE_IDX) * 2];
   uint32_t m_refBufferStride[MAX_NUM_COMPONENT];
 
 private:
 
+#if !MERGE_ENC_OPT
   Pel* m_yuvExt2[MAX_NUM_COMPONENT][4];
   int  m_yuvExtSize2;
+#endif
 
   static const uint8_t m_aucIntraFilter[MAX_INTRA_FILTER_DEPTHS];
-
+#if LMS_LINEAR_MODEL
+  unsigned m_auShiftLM[32]; // Table for substituting division operation by multiplication
+#endif
   struct IntraPredParam //parameters of Intra Prediction
   {
     bool refFilterFlag;
     bool applyPDPC;
+#if GRAD_PDPC
+    bool useGradPDPC;
+#endif
     bool isModeVer;
     int  multiRefIndex;
     int  intraPredAngle;
@@ -91,6 +102,9 @@ private:
     IntraPredParam()
       : refFilterFlag(false)
       , applyPDPC(false)
+#if GRAD_PDPC
+      , useGradPDPC(false)
+#endif
       , isModeVer(false)
       , multiRefIndex(-1)
       , intraPredAngle(std::numeric_limits<int>::max())
@@ -117,6 +131,8 @@ protected:
   int m_leftRefLength;
   ScanElement* m_scanOrder;
   bool         m_bestScanRotationMode;
+  std::vector<PelStorage>   m_tempBuffer;
+
   // prediction
   void xPredIntraPlanar           ( const CPelBuf &pSrc, PelBuf &pDst );
   void xPredIntraDc               ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const bool enableBoundaryFilter = true );
@@ -138,14 +154,39 @@ protected:
   void setReferenceArrayLengths   ( const CompArea &area );
 
   void destroy                    ();
-
+#if LMS_LINEAR_MODEL
+  void xPadMdlmTemplateSample(Pel*pSrc, Pel*pCur, int cWidth, int cHeight, int existSampNum, int targetSampNum);
+#if MMLM
+  void xGetLMParameters_LMS(const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, int& a, int& b, int& iShift, int &a2, int &b2, int &iShift2, int &yThres);
+#else
+  void xGetLMParameters_LMS(const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, int& a, int& b, int& iShift);
+#endif
+#else
+#if MMLM
+  void xGetLMParameters(const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, int& a, int& b, int& iShift, int &a2, int &b2, int &iShift2, int &yThres);
+#else
   void xGetLMParameters(const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, int& a, int& b, int& iShift);
+#endif
+#endif
+#if LMS_LINEAR_MODEL && MMLM
+  struct MMLM_parameter
+  {
+    int a;
+    int b;
+    int shift;
+  };
+  int xCalcLMParametersGeneralized(int x, int y, int xx, int xy, int count, int bitDepth, int &a, int &b, int &iShift);
+  int xLMSampleClassifiedTraining(int count, int mean, int meanC, int LumaSamples[], int ChrmSamples[], int bitDepth, MMLM_parameter parameters[]);
+#endif
+
 public:
   IntraPrediction();
   virtual ~IntraPrediction();
 
   void init                       (ChromaFormat chromaFormatIDC, const unsigned bitDepthY);
-
+#if ENABLE_DIMD
+  static void deriveDimdMode      (const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu);
+#endif
   // Angular Intra
   void predIntraAng               ( const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
   Pel *getPredictorPtr(const ComponentID compId)
@@ -164,13 +205,19 @@ public:
   void initIntraMip               (const PredictionUnit &pu, const CompArea &area);
   void predIntraMip               (const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
 
+  template<bool lmcs>
+  void geneWeightedPred           ( const ComponentID compId, PelBuf& pred, const PredictionUnit &pu, const PelBuf& interPred, const PelBuf& intraPred, const Pel* pLUT = nullptr );
+  void geneIntrainterPred         (const CodingUnit &cu, PelStorage& pred);
+  void reorderPLT                 (CodingStructure& cs, Partitioner& partitioner, ComponentID compBegin, uint32_t numComp);
+#if !MERGE_ENC_OPT
   void geneWeightedPred           (const ComponentID compId, PelBuf &pred, const PredictionUnit &pu, Pel *srcBuf);
   Pel* getPredictorPtr2           (const ComponentID compID, uint32_t idx) { return m_yuvExt2[compID][idx]; }
   void switchBuffer               (const PredictionUnit &pu, ComponentID compID, PelBuf srcBuff, Pel *dst);
-  void geneIntrainterPred         (const CodingUnit &cu);
-  void reorderPLT                 (CodingStructure& cs, Partitioner& partitioner, ComponentID compBegin, uint32_t numComp);
+#endif
 };
-
+#if ENABLE_DIMD
+int  buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int* piHistogram, int direction, int bw, int bh);
+#endif
 //! \}
 
 #endif // __INTRAPREDICTION__

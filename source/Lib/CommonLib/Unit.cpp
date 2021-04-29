@@ -189,7 +189,7 @@ bool UnitArea::contains( const UnitArea& other, const ChannelType chType ) const
   return any && ret;
 }
 
-#if REUSE_CU_RESULTS_WITH_MULTIPLE_TUS
+#if REUSE_CU_RESULTS_WITH_MULTIPLE_TUS || CONVERT_NUM_TU_SPLITS_TO_CFG
 void UnitArea::resizeTo( const UnitArea& unitArea )
 {
   for( uint32_t i = 0; i < blocks.size(); i++ )
@@ -276,6 +276,24 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   mtsFlag           = other.mtsFlag;
   lfnstIdx          = other.lfnstIdx;
   tileIdx           = other.tileIdx;
+#if ENABLE_DIMD
+  dimd = other.dimd;
+  dimd_is_blend = other.dimd_is_blend;
+  dimdMode = other.dimdMode;
+  for( int i = 0; i < 2; i++ )
+  {
+    dimdBlendMode[i] = other.dimdBlendMode[i];
+  }
+
+  for( int i = 0; i < 3; i++ )
+  {
+    dimdRelWeight[i] = other.dimdRelWeight[i];
+  }
+#endif
+#if ENABLE_OBMC
+  obmcFlag          = other.obmcFlag;
+  isobmcMC          = other.isobmcMC;
+#endif
   imv               = other.imv;
   imvNumCand        = other.imvNumCand;
   BcwIdx            = other.BcwIdx;
@@ -285,6 +303,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   smvdMode        = other.smvdMode;
   ispMode           = other.ispMode;
   mipFlag           = other.mipFlag;
+#if INTER_LIC
+  LICFlag           = other.LICFlag;
+#endif
 
   for (int idx = 0; idx < MAX_NUM_CHANNEL_TYPE; idx++)
   {
@@ -306,10 +327,11 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
       memcpy(curPLT[idx], other.curPLT[idx], MAXPLTSIZE * sizeof(Pel));
     }
   }
-
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   treeType          = other.treeType;
   modeType          = other.modeType;
   modeTypeSeries    = other.modeTypeSeries;
+#endif
   return *this;
 }
 
@@ -336,6 +358,24 @@ void CodingUnit::initData()
   mtsFlag           = 0;
   lfnstIdx          = 0;
   tileIdx           = 0;
+#if ENABLE_DIMD
+  dimd = false;
+  dimd_is_blend = false;
+  dimdMode = -1;
+  for( int i = 0; i < 2; i++ )
+  {
+    dimdBlendMode[i] = -1;
+  }
+
+  for( int i = 0; i < 3; i++ )
+  {
+    dimdRelWeight[i] = -1;
+  }
+#endif
+#if ENABLE_OBMC
+  obmcFlag          = true;
+  isobmcMC          = false;
+#endif
   imv               = 0;
   imvNumCand        = 0;
   BcwIdx            = BCW_DEFAULT;
@@ -344,6 +384,9 @@ void CodingUnit::initData()
   smvdMode        = 0;
   ispMode           = 0;
   mipFlag           = false;
+#if INTER_LIC
+  LICFlag = false;
+#endif
 
   for (int idx = 0; idx < MAX_NUM_CHANNEL_TYPE; idx++)
   {
@@ -359,12 +402,13 @@ void CodingUnit::initData()
   {
     memset(curPLT[idx], 0, MAXPLTSIZE * sizeof(Pel));
   }
-
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   treeType          = TREE_D;
   modeType          = MODE_TYPE_ALL;
   modeTypeSeries    = 0;
+#endif
 }
-
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
 const bool CodingUnit::isSepTree() const
 {
   return treeType != TREE_D || CS::isDualITree( *cs );
@@ -374,12 +418,16 @@ const bool CodingUnit::isLocalSepTree() const
 {
   return treeType != TREE_D && !CS::isDualITree(*cs);
 }
-
+#endif
+#if !CCLM_LATENCY_RESTRICTION_RMV
 const bool CodingUnit::checkCCLMAllowed() const
 {
   bool allowCCLM = false;
-
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+  if( chType != CHANNEL_TYPE_CHROMA ) //single tree I slice or non-I slice
+#else
   if( !CS::isDualITree( *cs ) ) //single tree I slice or non-I slice (Note: judging chType is no longer equivalent to checking dual-tree I slice since the local dual-tree is introduced)
+#endif
   {
     allowCCLM = true;
   }
@@ -389,7 +437,11 @@ const bool CodingUnit::checkCCLMAllowed() const
   }
   else //dual tree, CTU size 64 or 128
   {
+#if TU_256
+    int depthFor64x64Node = 0;
+#else
     int depthFor64x64Node = slice->getSPS()->getCTUSize() == 128 ? 1 : 0;
+#endif
     const PartSplit cuSplitTypeDepth1 = CU::getSplitAtDepth( *this, depthFor64x64Node );
     const PartSplit cuSplitTypeDepth2 = CU::getSplitAtDepth( *this, depthFor64x64Node + 1 );
 
@@ -398,7 +450,11 @@ const bool CodingUnit::checkCCLMAllowed() const
     {
       if( chromaFormat == CHROMA_420 )
       {
+#if TU_256
+        CHECK( !( blocks[COMPONENT_Cb].width <= 32 && blocks[COMPONENT_Cb].height <= 32 ), "chroma cu size shall be <= 16x16 for YUV420 format" );
+#else
         CHECK( !(blocks[COMPONENT_Cb].width <= 16 && blocks[COMPONENT_Cb].height <= 16), "chroma cu size shall be <= 16x16 for YUV420 format" );
+#endif
       }
       allowCCLM = true;
     }
@@ -407,7 +463,11 @@ const bool CodingUnit::checkCCLMAllowed() const
     {
       if( chromaFormat == CHROMA_420 )
       {
+#if TU_256
+        CHECK( !( blocks[COMPONENT_Cb].width >= 32 && blocks[COMPONENT_Cb].height >= 32 ), "chroma cu size shall be 64x64 for YUV420 format" );
+#else
         CHECK( !(blocks[COMPONENT_Cb].width == 32 && blocks[COMPONENT_Cb].height == 32), "chroma cu size shall be 32x32 for YUV420 format" );
+#endif
       }
       allowCCLM = true;
     }
@@ -416,7 +476,11 @@ const bool CodingUnit::checkCCLMAllowed() const
     {
       if( chromaFormat == CHROMA_420 )
       {
+#if TU_256
+        CHECK( !( blocks[COMPONENT_Cb].width >= 32 && blocks[COMPONENT_Cb].height >= 16 ), "chroma cu size shall be 64x32 for YUV420 format" );
+#else
         CHECK( !(blocks[COMPONENT_Cb].width == 32 && blocks[COMPONENT_Cb].height == 16), "chroma cu size shall be 32x16 for YUV420 format" );
+#endif
       }
       allowCCLM = true;
     }
@@ -428,7 +492,11 @@ const bool CodingUnit::checkCCLMAllowed() const
       const Position lumaRefPos( chromaPos().x << getComponentScaleX( COMPONENT_Cb, chromaFormat ), chromaPos().y << getComponentScaleY( COMPONENT_Cb, chromaFormat ) );
       const CodingUnit* colLumaCu = cs->picture->cs->getCU( lumaRefPos, CHANNEL_TYPE_LUMA );
 
+#if TU_256
+      if( colLumaCu->lwidth() < MAX_TB_SIZEY || colLumaCu->lheight() < MAX_TB_SIZEY ) //further split at CTU luma node
+#else
       if( colLumaCu->lwidth() < 64 || colLumaCu->lheight() < 64 ) //further split at 64x64 luma node
+#endif
       {
         const PartSplit cuSplitTypeDepth1Luma = CU::getSplitAtDepth( *colLumaCu, depthFor64x64Node );
         CHECK( !(cuSplitTypeDepth1Luma >= CU_QUAD_SPLIT && cuSplitTypeDepth1Luma <= CU_TRIV_SPLIT), "split mode shall be BT, TT or QT" );
@@ -437,7 +505,11 @@ const bool CodingUnit::checkCCLMAllowed() const
           allowCCLM = false;
         }
       }
+#if TU_256
+      else if( colLumaCu->lwidth() == MAX_TB_SIZEY && colLumaCu->lheight() == MAX_TB_SIZEY && colLumaCu->ispMode ) //not split at CTU luma node and use ISP mode
+#else
       else if( colLumaCu->lwidth() == 64 && colLumaCu->lheight() == 64 && colLumaCu->ispMode ) //not split at 64x64 luma node and use ISP mode
+#endif
       {
         allowCCLM = false;
       }
@@ -446,7 +518,7 @@ const bool CodingUnit::checkCCLMAllowed() const
 
   return allowCCLM;
 }
-
+#endif
 const uint8_t CodingUnit::checkAllowedSbt() const
 {
   if( !slice->getSPS()->getUseSBT() )
@@ -520,11 +592,22 @@ PredictionUnit::PredictionUnit(const ChromaFormat _chromaFormat, const Area &_ar
 void PredictionUnit::initData()
 {
   // intra data - need this default initialization for PCM
+#if SECONDARY_MPM
+  ::memset(intraMPM, 0, sizeof(intraMPM));
+  ::memset(intraNonMPM, 0, sizeof(intraNonMPM));
+#endif
+
   intraDir[0] = DC_IDX;
   intraDir[1] = PLANAR_IDX;
   mipTransposedFlag = false;
   multiRefIdx = 0;
-
+#if ENABLE_DIMD
+  parseLumaMode = false;
+  candId = -1;
+  parseChromaMode = false;
+  mpmFlag = false;
+  ipred_idx = -1;
+#endif
   // inter data
   mergeFlag   = false;
   regularMergeFlag = false;
@@ -533,16 +616,27 @@ void PredictionUnit::initData()
   geoMergeIdx0 = MAX_UCHAR;
   geoMergeIdx1 = MAX_UCHAR;
   mmvdMergeFlag = false;
-  mmvdMergeIdx = MAX_UINT;
+  mmvdMergeIdx = MAX_UCHAR;
+#if AFFINE_MMVD
+  afMmvdFlag    = false;
+  afMmvdBaseIdx = UINT8_MAX;
+  afMmvdStep    = UINT8_MAX;
+  afMmvdDir     = UINT8_MAX;
+#endif
+#if TM_MRG
+  tmMergeFlag = false;
+#endif
   interDir    = MAX_UCHAR;
   mergeType   = MRG_TYPE_DEFAULT_N;
   bv.setZero();
   bvd.setZero();
   mvRefine = false;
-  for (uint32_t i = 0; i < MAX_NUM_SUBCU_DMVR; i++)
-  {
-    mvdL0SubPu[i].setZero();
-  }
+#if MULTI_PASS_DMVR
+  bdmvrRefine = false;
+#else
+  ::memset(mvdL0SubPu, 0, sizeof(mvdL0SubPu));
+#endif
+
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
   {
     mvpIdx[i] = MAX_UCHAR;
@@ -560,18 +654,36 @@ void PredictionUnit::initData()
     }
   }
   ciipFlag = false;
+#if CIIP_PDPC
+  ciipPDPC = false;
+#endif
   mmvdEncOptMode = 0;
+#if MULTI_HYP_PRED
+  addHypData.clear();
+  numMergedAddHyps = 0;
+#endif
 }
 
 PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 {
+#if SECONDARY_MPM
+  ::memcpy(intraMPM, predData.intraMPM, sizeof(intraMPM));
+  ::memcpy(intraNonMPM, predData.intraNonMPM, sizeof(intraNonMPM));
+#endif
+
   for (uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++)
   {
     intraDir[i] = predData.intraDir[i];
   }
   mipTransposedFlag = predData.mipTransposedFlag;
   multiRefIdx = predData.multiRefIdx;
-
+#if ENABLE_DIMD
+  parseLumaMode = predData.parseLumaMode;
+  candId = predData.candId;
+  parseChromaMode = predData.parseChromaMode;
+  mpmFlag = predData.mpmFlag;
+  ipred_idx = predData.ipred_idx;
+#endif
   return *this;
 }
 
@@ -585,15 +697,26 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   geoMergeIdx1 = predData.geoMergeIdx1;
   mmvdMergeFlag = predData.mmvdMergeFlag;
   mmvdMergeIdx = predData.mmvdMergeIdx;
+#if AFFINE_MMVD
+  afMmvdFlag    = predData.afMmvdFlag;
+  afMmvdBaseIdx = predData.afMmvdBaseIdx;
+  afMmvdStep    = predData.afMmvdStep;
+  afMmvdDir     = predData.afMmvdDir;
+#endif
+#if TM_MRG
+  tmMergeFlag = predData.tmMergeFlag;
+#endif
   interDir    = predData.interDir;
   mergeType   = predData.mergeType;
   bv          = predData.bv;
   bvd         = predData.bvd;
   mvRefine = predData.mvRefine;
-  for (uint32_t i = 0; i < MAX_NUM_SUBCU_DMVR; i++)
-  {
-    mvdL0SubPu[i] = predData.mvdL0SubPu[i];
-  }
+#if MULTI_PASS_DMVR
+  bdmvrRefine = predData.bdmvrRefine;
+#else
+  ::memcpy(mvdL0SubPu, predData.mvdL0SubPu, sizeof(mvdL0SubPu));
+#endif
+
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
   {
     mvpIdx[i]   = predData.mvpIdx[i];
@@ -611,11 +734,23 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
     }
   }
   ciipFlag = predData.ciipFlag;
+#if CIIP_PDPC
+  ciipPDPC = predData.ciipPDPC;
+#endif
+#if MULTI_HYP_PRED
+  addHypData = predData.addHypData;
+  numMergedAddHyps = predData.numMergedAddHyps;
+#endif
   return *this;
 }
 
 PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 {
+#if SECONDARY_MPM
+  ::memcpy(intraMPM, other.intraMPM, sizeof(intraMPM));
+  ::memcpy(intraNonMPM, other.intraNonMPM, sizeof(intraNonMPM));
+#endif
+
   for( uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++ )
   {
     intraDir[ i ] = other.intraDir[ i ];
@@ -626,20 +761,38 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   mergeFlag   = other.mergeFlag;
   regularMergeFlag = other.regularMergeFlag;
   mergeIdx    = other.mergeIdx;
+#if ENABLE_DIMD
+  parseLumaMode = other.parseLumaMode;
+  candId = other.candId;
+  parseChromaMode = other.parseChromaMode;
+  mpmFlag = other.mpmFlag;
+  ipred_idx = other.ipred_idx;
+#endif
   geoSplitDir  = other.geoSplitDir;
   geoMergeIdx0 = other.geoMergeIdx0;
   geoMergeIdx1 = other.geoMergeIdx1;
   mmvdMergeFlag = other.mmvdMergeFlag;
   mmvdMergeIdx = other.mmvdMergeIdx;
+#if AFFINE_MMVD
+  afMmvdFlag    = other.afMmvdFlag;
+  afMmvdBaseIdx = other.afMmvdBaseIdx;
+  afMmvdStep    = other.afMmvdStep;
+  afMmvdDir     = other.afMmvdDir;
+#endif
+#if TM_MRG
+  tmMergeFlag = other.tmMergeFlag;
+#endif
   interDir    = other.interDir;
   mergeType   = other.mergeType;
   bv          = other.bv;
   bvd         = other.bvd;
   mvRefine = other.mvRefine;
-  for (uint32_t i = 0; i < MAX_NUM_SUBCU_DMVR; i++)
-  {
-    mvdL0SubPu[i] = other.mvdL0SubPu[i];
-  }
+#if MULTI_PASS_DMVR
+  bdmvrRefine = other.bdmvrRefine;
+#else
+  ::memcpy(mvdL0SubPu, other.mvdL0SubPu, sizeof(mvdL0SubPu));
+#endif
+
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
   {
     mvpIdx[i]   = other.mvpIdx[i];
@@ -657,6 +810,13 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
     }
   }
   ciipFlag = other.ciipFlag;
+#if CIIP_PDPC
+  ciipPDPC = other.ciipPDPC;
+#endif
+#if MULTI_HYP_PRED
+  addHypData = other.addHypData;
+  numMergedAddHyps = other.numMergedAddHyps;
+#endif
   return *this;
 }
 
@@ -669,6 +829,10 @@ PredictionUnit& PredictionUnit::operator=( const MotionInfo& mi )
     refIdx[i] = mi.refIdx[i];
     mv    [i] = mi.mv[i];
   }
+#if MULTI_HYP_PRED
+  addHypData.clear();
+  numMergedAddHyps = 0;
+#endif
 
   return *this;
 }
@@ -704,11 +868,19 @@ TransformUnit::TransformUnit(const UnitArea& unit) : UnitArea(unit), cu(nullptr)
   for( unsigned i = 0; i < MAX_NUM_TBLOCKS; i++ )
   {
     m_coeffs[i] = nullptr;
+#if SIGN_PREDICTION
+    m_coeff_signs[i] = nullptr;
+#endif
+#if !REMOVE_PCM
     m_pcmbuf[i] = nullptr;
+#endif
   }
 
   for (unsigned i = 0; i < MAX_NUM_TBLOCKS - 1; i++)
   {
+#if REMOVE_PCM
+    m_pltIdx[i] = nullptr;
+#endif
     m_runType[i] = nullptr;
   }
 
@@ -720,11 +892,19 @@ TransformUnit::TransformUnit(const ChromaFormat _chromaFormat, const Area &_area
   for( unsigned i = 0; i < MAX_NUM_TBLOCKS; i++ )
   {
     m_coeffs[i] = nullptr;
+#if SIGN_PREDICTION
+    m_coeff_signs[i] = nullptr;
+#endif
+#if !REMOVE_PCM
     m_pcmbuf[i] = nullptr;
+#endif
   }
 
   for (unsigned i = 0; i < MAX_NUM_TBLOCKS - 1; i++)
   {
+#if REMOVE_PCM
+    m_pltIdx[i] = nullptr;
+#endif
     m_runType[i] = nullptr;
   }
 
@@ -743,19 +923,39 @@ void TransformUnit::initData()
   jointCbCr          = 0;
   m_chromaResScaleInv = 0;
 }
+#if REMOVE_PCM
+#if SIGN_PREDICTION
+void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, Pel **pltIdx, bool **runType)
+#else
+void TransformUnit::init(TCoeff **coeffs, Pel **pltIdx, bool **runType)
+#endif
+#else
+#if SIGN_PREDICTION
+void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, Pel **pcmbuf, bool **runType)
+#else
 void TransformUnit::init(TCoeff **coeffs, Pel **pcmbuf, bool **runType)
+#endif
+#endif
 {
   uint32_t numBlocks = getNumberValidTBlocks(*cs->pcv);
 
   for (uint32_t i = 0; i < numBlocks; i++)
   {
     m_coeffs[i] = coeffs[i];
+#if SIGN_PREDICTION
+    m_coeff_signs[i] = signs[i];
+#endif
+#if !REMOVE_PCM
     m_pcmbuf[i] = pcmbuf[i];
+#endif
   }
 
   // numBlocks is either 1 for 4:0:0, or 3 otherwise. It would perhaps be better to loop over getNumberValidChannels(*cs->pcv.chrFormat) for m_runType.
   for (uint32_t i = 0; i < std::max<uint32_t>(2, numBlocks)-1; i++)
   {
+#if REMOVE_PCM
+    m_pltIdx[i] = pltIdx[i];
+#endif
     m_runType[i] = runType[i];
   }
 }
@@ -772,9 +972,17 @@ TransformUnit& TransformUnit::operator=(const TransformUnit& other)
     uint32_t area = blocks[i].area();
 
     if (m_coeffs[i] && other.m_coeffs[i] && m_coeffs[i] != other.m_coeffs[i]) memcpy(m_coeffs[i], other.m_coeffs[i], sizeof(TCoeff) * area);
+#if SIGN_PREDICTION
+    if (m_coeff_signs[i] && other.m_coeff_signs[i] && m_coeff_signs[i] != other.m_coeff_signs[i]) memcpy(m_coeff_signs[i], other.m_coeff_signs[i], sizeof(TCoeff) * area);
+#endif
+#if !REMOVE_PCM
     if (m_pcmbuf[i] && other.m_pcmbuf[i] && m_pcmbuf[i] != other.m_pcmbuf[i]) memcpy(m_pcmbuf[i], other.m_pcmbuf[i], sizeof(Pel   ) * area);
+#endif
     if (cu->slice->getSPS()->getPLTMode() && i < 2)
     {
+#if REMOVE_PCM
+      if (m_pltIdx[i] && other.m_pltIdx[i] && m_pltIdx[i] != other.m_pltIdx[i]) memcpy(m_pltIdx[i], other.m_pltIdx[i], sizeof(Pel) * area);
+#endif
       if (m_runType[i]   && other.m_runType[i]   && m_runType[i]   != other.m_runType[i]  ) memcpy(m_runType[i],   other.m_runType[i],   sizeof(bool) * area);
     }
     cbf[i]           = other.cbf[i];
@@ -795,9 +1003,17 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
   uint32_t area = blocks[i].area();
 
   if (m_coeffs[i] && other.m_coeffs[i] && m_coeffs[i] != other.m_coeffs[i]) memcpy(m_coeffs[i], other.m_coeffs[i], sizeof(TCoeff) * area);
+#if SIGN_PREDICTION
+  if (m_coeff_signs[i] && other.m_coeff_signs[i] && m_coeff_signs[i] != other.m_coeff_signs[i]) memcpy(m_coeff_signs[i], other.m_coeff_signs[i], sizeof(TCoeff) * area);
+#endif
+#if !REMOVE_PCM
   if (m_pcmbuf[i] && other.m_pcmbuf[i] && m_pcmbuf[i] != other.m_pcmbuf[i]) memcpy(m_pcmbuf[i], other.m_pcmbuf[i], sizeof(Pel   ) * area);
+#endif
   if ((i == COMPONENT_Y || i == COMPONENT_Cb))
   {
+#if REMOVE_PCM
+    if (m_pltIdx[i] && other.m_pltIdx[i] && m_pltIdx[i] != other.m_pltIdx[i]) memcpy(m_pltIdx[i], other.m_pltIdx[i], sizeof(Pel) * area);
+#endif
     if (m_runType[i] && other.m_runType[i] && m_runType[i] != other.m_runType[i])   memcpy(m_runType[i], other.m_runType[i], sizeof(bool) * area);
   }
 
@@ -811,11 +1027,21 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
        CoeffBuf TransformUnit::getCoeffs(const ComponentID id)       { return  CoeffBuf(m_coeffs[id], blocks[id]); }
 const CCoeffBuf TransformUnit::getCoeffs(const ComponentID id) const { return CCoeffBuf(m_coeffs[id], blocks[id]); }
 
+#if SIGN_PREDICTION
+       CoeffBuf TransformUnit::getCoeffSigns(const ComponentID id)       { return  CoeffBuf(m_coeff_signs[id], blocks[id]); }
+const CCoeffBuf TransformUnit::getCoeffSigns(const ComponentID id) const { return CCoeffBuf(m_coeff_signs[id], blocks[id]); }
+#endif
+
+#if REMOVE_PCM
+       PelBuf       TransformUnit::getcurPLTIdx(const ComponentID id)         { return        PelBuf(m_pltIdx[id], blocks[id]); }
+const CPelBuf       TransformUnit::getcurPLTIdx(const ComponentID id)   const { return       CPelBuf(m_pltIdx[id], blocks[id]); }
+#else
        PelBuf   TransformUnit::getPcmbuf(const ComponentID id)       { return  PelBuf  (m_pcmbuf[id], blocks[id]); }
 const CPelBuf   TransformUnit::getPcmbuf(const ComponentID id) const { return CPelBuf  (m_pcmbuf[id], blocks[id]); }
 
        PelBuf       TransformUnit::getcurPLTIdx(const ComponentID id)         { return        PelBuf(m_pcmbuf[id], blocks[id]); }
 const CPelBuf       TransformUnit::getcurPLTIdx(const ComponentID id)   const { return       CPelBuf(m_pcmbuf[id], blocks[id]); }
+#endif
 
        PLTtypeBuf   TransformUnit::getrunType  (const ComponentID id)         { return   PLTtypeBuf(m_runType[id], blocks[id]); }
 const CPLTtypeBuf   TransformUnit::getrunType  (const ComponentID id)   const { return  CPLTtypeBuf(m_runType[id], blocks[id]); }
@@ -823,7 +1049,11 @@ const CPLTtypeBuf   TransformUnit::getrunType  (const ComponentID id)   const { 
        PLTescapeBuf TransformUnit::getescapeValue(const ComponentID id)       { return  PLTescapeBuf(m_coeffs[id], blocks[id]); }
 const CPLTescapeBuf TransformUnit::getescapeValue(const ComponentID id) const { return CPLTescapeBuf(m_coeffs[id], blocks[id]); }
 
+#if REMOVE_PCM
+      Pel*          TransformUnit::getPLTIndex   (const ComponentID id)       { return  m_pltIdx[id];    }
+#else
       Pel*          TransformUnit::getPLTIndex   (const ComponentID id)       { return  m_pcmbuf[id];    }
+#endif
       bool*         TransformUnit::getRunTypes   (const ComponentID id)       { return  m_runType[id];   }
 
 void TransformUnit::checkTuNoResidual( unsigned idx )
@@ -845,11 +1075,13 @@ int TransformUnit::getTbAreaAfterCoefZeroOut(ComponentID compID) const
   int tbZeroOutWidth = blocks[compID].width;
   int tbZeroOutHeight = blocks[compID].height;
 
+#if !TU_256
   if ( cs->sps->getUseMTS() && cu->sbtInfo != 0 && blocks[compID].width <= 32 && blocks[compID].height <= 32 && compID == COMPONENT_Y )
   {
     tbZeroOutWidth = (blocks[compID].width == 32) ? 16 : tbZeroOutWidth;
     tbZeroOutHeight = (blocks[compID].height == 32) ? 16 : tbZeroOutHeight;
   }
+#endif
   tbZeroOutWidth = std::min<int>(JVET_C0024_ZERO_OUT_TH, tbZeroOutWidth);
   tbZeroOutHeight = std::min<int>(JVET_C0024_ZERO_OUT_TH, tbZeroOutHeight);
   tbArea = tbZeroOutWidth * tbZeroOutHeight;

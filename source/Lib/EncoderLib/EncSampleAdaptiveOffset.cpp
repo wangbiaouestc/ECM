@@ -213,7 +213,11 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
 #endif
                                           const bool bTestSAODisableAtPictureLevel, const double saoEncodingRate, const double saoEncodingRateChroma, const bool isPreDBFSamplesUsed, bool isGreedyMergeEncoding )
 {
+#if ALF_SAO_TRUE_ORG
+  PelUnitBuf org = cs.getTrueOrgBuf();
+#else
   PelUnitBuf org = cs.getOrgBuf();
+#endif
   PelUnitBuf res = cs.getRecoBuf();
   PelUnitBuf src = m_tempBuf;
   memcpy(m_lambda, lambdas, sizeof(m_lambda));
@@ -251,7 +255,11 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
 
 void EncSampleAdaptiveOffset::getPreDBFStatistics(CodingStructure& cs)
 {
+#if ALF_SAO_TRUE_ORG
+  PelUnitBuf org = cs.getTrueOrgBuf();
+#else
   PelUnitBuf org = cs.getOrgBuf();
+#endif
   PelUnitBuf rec = cs.getRecoBuf();
   getStatistics(m_preDBFstatData, org, rec, cs, true);
 }

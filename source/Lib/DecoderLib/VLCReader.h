@@ -160,7 +160,11 @@ public:
   void  parseDCI            ( DCI* dci );
   void  parseSPS            ( SPS* pcSPS );
   void  parsePPS            ( PPS* pcPPS );
+#if EMBEDDED_APS
+  void  parseAPS            ( APS* aps, const bool readRbspTrailingBits );
+#else
   void  parseAPS            ( APS* pcAPS );
+#endif
   void  parseAlfAps         ( APS* pcAPS );
   void  parseLmcsAps        ( APS* pcAPS );
   void  parseScalingListAps ( APS* pcAPS );
@@ -169,9 +173,21 @@ public:
   void  parseProfileTierLevel(ProfileTierLevel *ptl, bool profileTierPresentFlag, int maxNumSubLayersMinus1);
   void  parseOlsHrdParameters(GeneralHrdParams* generalHrd, OlsHrdParams *olsHrd, uint32_t firstSubLayer, uint32_t tempLevelHigh);
   void parseGeneralHrdParameters(GeneralHrdParams *generalHrd);
+
+#if EMBEDDED_APS
+  void  parsePictureHeader  ( PicHeader* picHeader, ParameterSetManager *parameterSetManager, const bool readRbspTrailingBits, const int temporalId, const int layerId, std::vector<int>& accessUnitApsNals );
+#else
   void  parsePictureHeader  ( PicHeader* picHeader, ParameterSetManager *parameterSetManager, bool readRbspTrailingBits );
+#endif
+
   void  checkAlfNaluTidAndPicTid(Slice* pcSlice, PicHeader* picHeader, ParameterSetManager *parameterSetManager);
+
+#if EMBEDDED_APS
+  void  parseSliceHeader    ( Slice* pcSlice, PicHeader* picHeader, ParameterSetManager *parameterSetManager, const int prevTid0POC, const int prevPicPOC, const int layerId, std::vector<int>& accessUnitApsNals );
+#else
   void  parseSliceHeader    ( Slice* pcSlice, PicHeader* picHeader, ParameterSetManager *parameterSetManager, const int prevTid0POC, const int prevPicPOC );
+#endif
+
   void  getSlicePoc ( Slice* pcSlice, PicHeader* picHeader, ParameterSetManager *parameterSetManager, const int prevTid0POC );
   void  parseTerminatingBit ( uint32_t& ruiBit );
   void  parseRemainingBytes ( bool noTrailingBytesExpected );
@@ -185,7 +201,12 @@ public:
 #endif
   void  decodeScalingList   ( ScalingList *scalingList, uint32_t scalingListId, bool isPredictor);
   void parseReshaper        ( SliceReshapeInfo& sliceReshaperInfo, const SPS* pcSPS, const bool isIntra );
+#if ALF_IMPROVEMENT
+  int  alfGolombDecode( const int k, const bool signed_val = true );
+  void alfFilter( AlfParam& alfParam, const bool isChroma, const int altIdx, int order0, int order1 );
+#else
   void alfFilter( AlfParam& alfParam, const bool isChroma, const int altIdx );
+#endif
   void ccAlfFilter( Slice *pcSlice );
   void dpb_parameters(int maxSubLayersMinus1, bool subLayerInfoFlag, SPS *pcSPS);
   void parseExtraPHBitsStruct( SPS *sps, int numBytes );

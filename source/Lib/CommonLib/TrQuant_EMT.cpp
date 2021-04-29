@@ -962,7 +962,27 @@ void fastInverseDCT2_B64(const TCoeff *src, TCoeff *dst, int shift, int line, in
   memset(dst, 0, uiTrSize*iSkipLine * sizeof(TCoeff));
 }
 
+#if TU_256
+void fastForwardDCT2_B128(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2)
+{
+  _fastForwardMM< 128 >(src, dst, shift, line, iSkipLine, iSkipLine2, g_trCoreDCT2P128[TRANSFORM_FORWARD][0]);
+}
 
+void fastInverseDCT2_B128(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum)
+{
+  _fastInverseMM< 128 >(src, dst, shift, line, iSkipLine, iSkipLine2, outputMinimum, outputMaximum, g_trCoreDCT2P128[TRANSFORM_INVERSE][0]);
+}
+
+void fastForwardDCT2_B256( const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2 )
+{
+  _fastForwardMM< 256 >( src, dst, shift, line, iSkipLine, iSkipLine2, g_trCoreDCT2P256[0] );
+}
+
+void fastInverseDCT2_B256( const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum )
+{
+  _fastInverseMM< 256 >( src, dst, shift, line, iSkipLine, iSkipLine2, outputMinimum, outputMaximum, g_trCoreDCT2P256[0] );
+}
+#endif
 
 // ********************************** DST-VII **********************************
 void fastForwardDST7_B4(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2)
@@ -1427,6 +1447,37 @@ void fastInverseDST7_B32(const TCoeff *src, TCoeff *dst, int shift, int line, in
 #endif
 }
 
+#if TU_256
+void fastForwardDST7_B64(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2)
+{
+  _fastForwardMM< 64 >( src, dst, shift, line, iSkipLine, iSkipLine2, g_trCoreDST7P64[TRANSFORM_FORWARD][0] );
+}
+
+void fastInverseDST7_B64(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum)
+{
+  _fastInverseMM< 64 >( src, dst, shift, line, iSkipLine, iSkipLine2, outputMinimum, outputMaximum, g_trCoreDST7P64[TRANSFORM_INVERSE][0] );
+}
+
+void fastForwardDST7_B128(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2)
+{
+  _fastForwardMM< 128 >(src, dst, shift, line, iSkipLine, iSkipLine2, g_trCoreDST7P128[TRANSFORM_FORWARD][0]);
+}
+
+void fastInverseDST7_B128(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum)
+{
+  _fastInverseMM< 128 >(src, dst, shift, line, iSkipLine, iSkipLine2, outputMinimum, outputMaximum, g_trCoreDST7P128[TRANSFORM_INVERSE][0]);
+}
+
+void fastForwardDST7_B256( const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2 )
+{
+  _fastForwardMM< 256 >( src, dst, shift, line, iSkipLine, iSkipLine2, g_trCoreDST7P256[0] );
+}
+
+void fastInverseDST7_B256( const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum )
+{
+  _fastInverseMM< 256 >( src, dst, shift, line, iSkipLine, iSkipLine2, outputMinimum, outputMaximum, g_trCoreDST7P256[0] );
+}
+#endif
 
 // ********************************** DCT-VIII **********************************
 void fastForwardDCT8_B4(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2)
@@ -1892,3 +1943,34 @@ void fastInverseDCT8_B32(const TCoeff *src, TCoeff *dst, int shift, int line, in
 #endif
 }
 
+#if TU_256
+void fastForwardDCT8_B64(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2)
+{
+  _fastForwardMM< 64 >( src, dst, shift, line, iSkipLine, iSkipLine2, g_trCoreDCT8P64[TRANSFORM_FORWARD][0] );
+}
+
+void fastInverseDCT8_B64(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum)
+{
+  _fastInverseMM< 64 >( src, dst, shift, line, iSkipLine, iSkipLine2, outputMinimum, outputMaximum, g_trCoreDCT8P64[TRANSFORM_INVERSE][0] );
+}
+
+void fastForwardDCT8_B128(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2)
+{
+  _fastForwardMM< 128 >(src, dst, shift, line, iSkipLine, iSkipLine2, g_trCoreDCT8P128[TRANSFORM_FORWARD][0]);
+}
+
+void fastInverseDCT8_B128(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum)
+{
+  _fastInverseMM< 128 >(src, dst, shift, line, iSkipLine, iSkipLine2, outputMinimum, outputMaximum, g_trCoreDCT8P128[TRANSFORM_INVERSE][0]);
+}
+
+void fastForwardDCT8_B256( const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2 )
+{
+  _fastForwardMM< 256 >( src, dst, shift, line, iSkipLine, iSkipLine2, g_trCoreDCT8P256[0] );
+}
+
+void fastInverseDCT8_B256( const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum )
+{
+  _fastInverseMM< 256 >( src, dst, shift, line, iSkipLine, iSkipLine2, outputMinimum, outputMaximum, g_trCoreDCT8P256[0] );
+}
+#endif

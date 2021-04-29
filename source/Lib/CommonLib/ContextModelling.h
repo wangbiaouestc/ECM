@@ -52,6 +52,9 @@ struct CoeffCodingContext
 {
 public:
   CoeffCodingContext( const TransformUnit& tu, ComponentID component, bool signHide, bool bdpcm = false );
+#if SIGN_PREDICTION
+  int  getPredSignsQualified() { return m_bSignPredQualified;}
+#endif
 public:
   void  initSubblock     ( int SubsetId, bool sigGroupFlag = false );
 public:
@@ -157,7 +160,11 @@ public:
 
     m_tmplCpDiag = diag;
     m_tmplCpSum1 = sumAbs - numPos;
+#if TCQ_8STATES
+		return m_sigFlagCtxSet[state & 3](ctxOfs);
+#else
     return m_sigFlagCtxSet[std::max( 0, state-1 )]( ctxOfs );
+#endif
   }
 
   uint8_t ctxOffsetAbs()
@@ -480,7 +487,11 @@ private:
   int                       m_tmplCpSum1;
 #endif
   int                       m_tmplCpDiag;
+#if TCQ_8STATES
+	CtxSet                    m_sigFlagCtxSet[4];
+#else
   CtxSet                    m_sigFlagCtxSet[3];
+#endif
   CtxSet                    m_parFlagCtxSet;
   CtxSet                    m_gtxFlagCtxSet[2];
   unsigned                  m_sigGroupCtxIdTS;
@@ -492,6 +503,9 @@ private:
   int                       m_remainingContextBins;
   std::bitset<MLS_GRP_NUM>  m_sigCoeffGroupFlag;
   const bool                m_bdpcm;
+#if SIGN_PREDICTION
+  int                       m_bSignPredQualified;
+#endif
 };
 
 
@@ -532,13 +546,18 @@ public:
 class MergeCtx
 {
 public:
-  MergeCtx() : numValidMergeCand( 0 ), hasMergedCandList( false ) { for( unsigned i = 0; i < MRG_MAX_NUM_CANDS; i++ ) mrgTypeNeighbours[i] = MRG_TYPE_DEFAULT_N; }
+  MergeCtx() : numValidMergeCand( 0 ), hasMergedCandList( false ) { }
   ~MergeCtx() {}
 public:
   MvField       mvFieldNeighbours [ MRG_MAX_NUM_CANDS << 1 ]; // double length for mv of both lists
   uint8_t       BcwIdx            [ MRG_MAX_NUM_CANDS      ];
+#if INTER_LIC
+  bool          LICFlags          [ MRG_MAX_NUM_CANDS      ];
+#endif
   unsigned char interDirNeighbours[ MRG_MAX_NUM_CANDS      ];
-  MergeType     mrgTypeNeighbours [ MRG_MAX_NUM_CANDS      ];
+#if MULTI_HYP_PRED
+  MultiHypVec   addHypNeighbours[MRG_MAX_NUM_CANDS];
+#endif
   int           numValidMergeCand;
   bool          hasMergedCandList;
 
@@ -549,6 +568,13 @@ public:
   bool          mmvdUseAltHpelIf  [ MMVD_BASE_MV_NUM ];
   bool          useAltHpelIf      [ MRG_MAX_NUM_CANDS ];
   void setMergeInfo( PredictionUnit& pu, int candIdx );
+#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR
+  bool xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
+#endif
+#if TM_MRG
+  void copyRegularMergeCand( int dstCandIdx, MergeCtx& srcCtx, int srcCandIdx );
+  void convertRegularMergeCandToBi(int candIdx);
+#endif
 };
 
 class AffineMergeCtx
@@ -560,6 +586,9 @@ public:
   MvField       mvFieldNeighbours[AFFINE_MRG_MAX_NUM_CANDS << 1][3]; // double length for mv of both lists
   unsigned char interDirNeighbours[AFFINE_MRG_MAX_NUM_CANDS];
   EAffineModel  affineType[AFFINE_MRG_MAX_NUM_CANDS];
+#if INTER_LIC
+  bool          LICFlags[AFFINE_MRG_MAX_NUM_CANDS];
+#endif
   uint8_t       BcwIdx[AFFINE_MRG_MAX_NUM_CANDS];
   int           numValidMergeCand;
   int           maxNumMergeCand;
@@ -572,7 +601,9 @@ public:
 namespace DeriveCtx
 {
 void     CtxSplit     ( const CodingStructure& cs, Partitioner& partitioner, unsigned& ctxSpl, unsigned& ctxQt, unsigned& ctxHv, unsigned& ctxHorBt, unsigned& ctxVerBt, bool* canSplit = nullptr );
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
 unsigned CtxModeConsFlag( const CodingStructure& cs, Partitioner& partitioner );
+#endif
 unsigned CtxQtCbf     ( const ComponentID compID, const bool prevCbf = false, const int ispIdx = 0 );
 unsigned CtxInterDir  ( const PredictionUnit& pu );
 unsigned CtxSkipFlag  ( const CodingUnit& cu );
@@ -581,6 +612,9 @@ unsigned CtxPredModeFlag( const CodingUnit& cu );
 unsigned CtxIBCFlag(const CodingUnit& cu);
 unsigned CtxMipFlag   ( const CodingUnit& cu );
 unsigned CtxPltCopyFlag( const unsigned prevRunType, const unsigned dist );
+#if ENABLE_DIMD
+unsigned CtxDIMDFlag(const CodingUnit& cu);
+#endif
 }
 
 #endif // __CONTEXTMODELLING__

@@ -75,12 +75,20 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
   for( uint32_t i = 0; i < MAX_NUM_COMPONENT; i++ )
   {
     m_coeffs[ i ] = nullptr;
+#if SIGN_PREDICTION
+    m_coeff_signs[ i ] = nullptr;
+#endif
+#if !REMOVE_PCM
     m_pcmbuf[ i ] = nullptr;
+#endif
     m_offsets[ i ] = 0;
   }
 
   for (uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++)
   {
+#if REMOVE_PCM
+    m_pltIdx[i] = nullptr;
+#endif
     m_runType[i] = nullptr;
   }
 
@@ -94,8 +102,10 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
 
   m_motionBuf     = nullptr;
   features.resize( NUM_ENC_FEATURES );
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   treeType = TREE_D;
   modeType = MODE_TYPE_ALL;
+#endif
   tmpColorSpaceIntraCost[0] = MAX_DOUBLE;
   tmpColorSpaceIntraCost[1] = MAX_DOUBLE;
   firstColorSpaceTestOnly = false;
@@ -197,7 +207,7 @@ void CodingStructure::setDecomp(const UnitArea &_area, const bool _isCoded /*= t
     }
   }
 }
-
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
 const int CodingStructure::signalModeCons( const PartSplit split, Partitioner &partitioner, const ModeType modeTypeParent ) const
 {
   if (CS::isDualITree(*this) || modeTypeParent != MODE_TYPE_ALL || partitioner.currArea().chromaFormat == CHROMA_444 || partitioner.currArea().chromaFormat == CHROMA_400 )
@@ -214,11 +224,12 @@ const int CodingStructure::signalModeCons( const PartSplit split, Partitioner &p
     minLumaArea = minLumaArea >> 1;
   }
   int minChromaBlock = minLumaArea >> (getChannelTypeScaleX(CHANNEL_TYPE_CHROMA, partitioner.currArea().chromaFormat) + getChannelTypeScaleY(CHANNEL_TYPE_CHROMA, partitioner.currArea().chromaFormat));
+
   bool is2xNChroma = (partitioner.currArea().chromaSize().width == 4 && split == CU_VERT_SPLIT) || (partitioner.currArea().chromaSize().width == 8 && split == CU_TRIV_SPLIT);
   return minChromaBlock >= 16 && !is2xNChroma ? LDT_MODE_TYPE_INHERIT : ((minLumaArea < 32) || slice->isIntra()) ? LDT_MODE_TYPE_INFER : LDT_MODE_TYPE_SIGNAL;
 }
 
-void CodingStructure::clearCuPuTuIdxMap( const UnitArea &_area, uint32_t numCu, uint32_t numPu, uint32_t numTu, uint32_t* pOffset )
+void CodingStructure::clearCuPuTuIdxMap(const UnitArea &_area, uint32_t numCu, uint32_t numPu, uint32_t numTu, uint32_t* pOffset )
 {
   UnitArea clippedArea = clipArea( _area, *picture );
   uint32_t numCh = ::getNumberValidChannels( _area.chromaFormat );
@@ -283,19 +294,24 @@ CodingUnit* CodingStructure::getLumaCU( const Position &pos )
     return nullptr;
   }
 }
-
+#endif
 CodingUnit* CodingStructure::getCU( const Position &pos, const ChannelType effChType )
 {
   const CompArea &_blk = area.blocks[effChType];
-
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+  if (!_blk.contains(pos))
+#else
   if( !_blk.contains( pos ) || (treeType == TREE_C && effChType == CHANNEL_TYPE_LUMA) )
+#endif
   {
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     //keep this check, which is helpful to identify bugs
     if( treeType == TREE_C && effChType == CHANNEL_TYPE_LUMA )
     {
       CHECK( parent == nullptr, "parent shall be valid; consider using function getLumaCU()" );
       CHECK( parent->treeType != TREE_D, "wrong parent treeType " );
     }
+#endif
     if (parent)
     {
       return parent->getCU(pos, effChType);
@@ -323,14 +339,19 @@ CodingUnit* CodingStructure::getCU( const Position &pos, const ChannelType effCh
 const CodingUnit* CodingStructure::getCU( const Position &pos, const ChannelType effChType ) const
 {
   const CompArea &_blk = area.blocks[effChType];
-
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+  if (!_blk.contains(pos))
+#else
   if( !_blk.contains( pos ) || (treeType == TREE_C && effChType == CHANNEL_TYPE_LUMA) )
+#endif
   {
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     if( treeType == TREE_C && effChType == CHANNEL_TYPE_LUMA )
     {
       CHECK( parent == nullptr, "parent shall be valid; consider using function getLumaCU()" );
       CHECK( parent->treeType != TREE_D, "wrong parent treeType" );
     }
+#endif
     if (parent)
     {
       return parent->getCU(pos, effChType);
@@ -453,8 +474,10 @@ TransformUnit* CodingStructure::getTU( const Position &pos, const ChannelType ef
             while( !tus[idx - 1 + extraIdx]->blocks[getFirstComponentOfChannel( effChType )].contains( pos ) )
             {
               extraIdx++;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
               CHECK( tus[idx - 1 + extraIdx]->cu->treeType == TREE_C, "tu searched by position points to a chroma tree CU" );
               CHECK( extraIdx > 3, "extraIdx > 3" );
+#endif
             }
           }
         }
@@ -508,8 +531,10 @@ const TransformUnit * CodingStructure::getTU( const Position &pos, const Channel
             while ( !tus[idx - 1 + extraIdx]->blocks[getFirstComponentOfChannel( effChType )].contains(pos) )
             {
               extraIdx++;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
               CHECK( tus[idx - 1 + extraIdx]->cu->treeType == TREE_C, "tu searched by position points to a chroma tree CU" );
               CHECK( extraIdx > 3, "extraIdx > 3" );
+#endif
             }
           }
         }
@@ -541,9 +566,10 @@ CodingUnit& CodingStructure::addCU( const UnitArea &unit, const ChannelType chTy
   cu->firstTU   = nullptr;
   cu->lastTU    = nullptr;
   cu->chType    = chType;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   cu->treeType = treeType;
   cu->modeType = modeType;
-
+#endif
   CodingUnit *prevCU = m_numCUs > 0 ? cus.back() : nullptr;
 
   if( prevCU )
@@ -690,7 +716,14 @@ TransformUnit& CodingStructure::addTU( const UnitArea &unit, const ChannelType c
   tu->idx  = idx;
 
   TCoeff *coeffs[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+#if SIGN_PREDICTION
+  TCoeff *signs[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+#endif
+#if REMOVE_PCM
+  Pel    *pltIdx[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+#else
   Pel    *pcmbuf[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+#endif
   bool   *runType[5]   = { nullptr, nullptr, nullptr, nullptr, nullptr };
 
   uint32_t numCh = ::getNumberValidComponents( area.chromaFormat );
@@ -727,10 +760,21 @@ TransformUnit& CodingStructure::addTU( const UnitArea &unit, const ChannelType c
     }
 
     coeffs[i] = m_coeffs[i] + m_offsets[i];
+#if SIGN_PREDICTION
+    signs[i]  = m_coeff_signs[i] + m_offsets[i];
+#endif
+#if !REMOVE_PCM
     pcmbuf[i] = m_pcmbuf[i] + m_offsets[i];
+#endif
 
     if (i < MAX_NUM_CHANNEL_TYPE)
     {
+#if REMOVE_PCM
+      if (m_pltIdx[i] != nullptr)
+      {
+        pltIdx[i] = m_pltIdx[i] + m_offsets[i];
+      }
+#endif
       if (m_runType[i] != nullptr)
       {
         runType[i] = m_runType[i] + m_offsets[i];
@@ -740,7 +784,19 @@ TransformUnit& CodingStructure::addTU( const UnitArea &unit, const ChannelType c
     unsigned areaSize = tu->blocks[i].area();
     m_offsets[i] += areaSize;
   }
+#if REMOVE_PCM
+#if SIGN_PREDICTION
+  tu->init(coeffs, signs, pltIdx, runType);
+#else
+  tu->init(coeffs, pltIdx, runType);
+#endif
+#else
+#if SIGN_PREDICTION
+  tu->init(coeffs, signs, pcmbuf, runType);
+#else
   tu->init(coeffs, pcmbuf, runType);
+#endif
+#endif
 
   return *tu;
 }
@@ -770,7 +826,9 @@ void CodingStructure::addEmptyTUs( Partitioner &partitioner )
       if( tu.blocks[compID].valid() )
       {
         tu.getCoeffs( ComponentID( compID ) ).fill( 0 );
+#if !REMOVE_PCM
         tu.getPcmbuf( ComponentID( compID ) ).fill( 0 );
+#endif
       }
     }
     tu.depth = trDepth;
@@ -781,6 +839,7 @@ CUTraverser CodingStructure::traverseCUs( const UnitArea& unit, const ChannelTyp
 {
   CodingUnit* firstCU = getCU( isLuma( effChType ) ? unit.lumaPos() : unit.chromaPos(), effChType );
   CodingUnit* lastCU = firstCU;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   if( !CS::isDualITree( *this ) ) //for a more generalized separate tree
   {
     bool bContinue = true;
@@ -814,11 +873,13 @@ CUTraverser CodingStructure::traverseCUs( const UnitArea& unit, const ChannelTyp
   }
   else
   {
+#endif
     do
     {
     } while (lastCU && (lastCU = lastCU->next) && unit.contains(*lastCU));
-  }
-
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+}
+#endif
   return CUTraverser( firstCU, lastCU );
 }
 
@@ -1112,7 +1173,12 @@ void CodingStructure::createCoeffs(const bool isPLTused)
     unsigned _area = area.blocks[i].area();
 
     m_coeffs[i] = _area > 0 ? ( TCoeff* ) xMalloc( TCoeff, _area ) : nullptr;
+#if SIGN_PREDICTION
+    m_coeff_signs[i] = _area > 0 ? ( TCoeff* ) xMalloc( TCoeff, _area ) : nullptr;
+#endif
+#if !REMOVE_PCM
     m_pcmbuf[i] = _area > 0 ? ( Pel*    ) xMalloc( Pel,    _area ) : nullptr;
+#endif
   }
 
   if (isPLTused)
@@ -1121,6 +1187,9 @@ void CodingStructure::createCoeffs(const bool isPLTused)
     {
       unsigned _area = area.blocks[i].area();
 
+#if REMOVE_PCM
+      m_pltIdx[i] = _area > 0 ? (Pel*)xMalloc(Pel, _area) : nullptr;
+#endif
       m_runType[i] = _area > 0 ? (bool*)xMalloc(bool, _area) : nullptr;
     }
   }
@@ -1135,15 +1204,31 @@ void CodingStructure::destroyCoeffs()
       xFree(m_coeffs[i]);
       m_coeffs[i] = nullptr;
     }
+#if SIGN_PREDICTION
+    if( m_coeff_signs[i] )
+    { 
+      xFree( m_coeff_signs[i] );
+      m_coeff_signs[i] = nullptr;
+    }
+#endif
+#if !REMOVE_PCM
     if (m_pcmbuf[i])
     {
       xFree(m_pcmbuf[i]);
       m_pcmbuf[i] = nullptr;
     }
+#endif
   }
 
   for (uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++)
   {
+#if REMOVE_PCM
+    if (m_pltIdx[i])
+    {
+      xFree(m_pltIdx[i]);
+      m_pltIdx[i] = nullptr;
+    }
+#endif
     if (m_runType[i])
     {
       xFree(m_runType[i]);
@@ -1195,10 +1280,10 @@ void CodingStructure::initSubStructure( CodingStructure& subStruct, const Channe
   subStruct.motionLut = motionLut;
 
   subStruct.prevPLT = prevPLT;
-
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   subStruct.treeType  = treeType;
   subStruct.modeType  = modeType;
-
+#endif
   subStruct.initStructData( currQP[_chType] );
 
   if( isTuEnc )
@@ -1287,7 +1372,11 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
     {
       // add an analogue CU into own CU store
       const UnitArea &cuPatch = *pcu;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
       CodingUnit &cu = addCU( cuPatch, pcu->chType );
+#else
+      CodingUnit &cu = addCU(cuPatch, chType);
+#endif
 
       // copy the CU info from subPatch
       cu = *pcu;
@@ -1305,8 +1394,11 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
     {
       // add an analogue PU into own PU store
       const UnitArea &puPatch = *ppu;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
       PredictionUnit &pu = addPU( puPatch, ppu->chType );
-
+#else
+      PredictionUnit &pu = addPU(puPatch, chType);
+#endif
       // copy the PU info from subPatch
       pu = *ppu;
     }
@@ -1316,8 +1408,11 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
   {
     // add an analogue TU into own TU store
     const UnitArea &tuPatch = *ptu;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     TransformUnit &tu = addTU( tuPatch, ptu->chType );
-
+#else
+    TransformUnit &tu = addTU(tuPatch, chType);
+#endif
     // copy the TU info from subPatch
     tu = *ptu;
   }
@@ -1449,6 +1544,9 @@ void CodingStructure::initStructData( const int &QP, const bool &skipMotBuf )
   costDbOffset = 0;
   useDbCost = false;
   interHad = std::numeric_limits<Distortion>::max();
+#if MULTI_HYP_PRED
+  m_MEResults.clear();
+#endif
 }
 
 
@@ -1586,6 +1684,10 @@ const CPelUnitBuf CodingStructure::getOrgBuf(const UnitArea &unit)     const { r
 const CPelBuf     CodingStructure::getOrgBuf(const ComponentID &compID)const { return picture->getBuf(area.blocks[compID], PIC_ORIGINAL); }
        PelUnitBuf CodingStructure::getOrgBuf()                               { return picture->getBuf(area, PIC_ORIGINAL); }
 const CPelUnitBuf CodingStructure::getOrgBuf()                         const { return picture->getBuf(area, PIC_ORIGINAL); }
+#if ALF_SAO_TRUE_ORG
+       PelUnitBuf CodingStructure::getTrueOrgBuf()                           { return picture->getBuf(area, PIC_TRUE_ORIGINAL); }
+const CPelUnitBuf CodingStructure::getTrueOrgBuf()                     const { return picture->getBuf(area, PIC_TRUE_ORIGINAL); }
+#endif
 
 PelBuf CodingStructure::getBuf( const CompArea &blk, const PictureType &type )
 {

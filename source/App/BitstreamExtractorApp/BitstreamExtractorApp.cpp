@@ -100,7 +100,11 @@ void BitstreamExtractorApp::xPrintSubPicInfo (PPS *pps)
 void BitstreamExtractorApp::xReadPicHeader(InputNALUnit &nalu)
 {
   m_hlSynaxReader.setBitstream(&nalu.getBitstream());
+#if EMBEDDED_APS
+  m_hlSynaxReader.parsePictureHeader( &m_picHeader, &m_parameterSetManager, true, nalu.m_temporalId, nalu.m_nuhLayerId, m_accessUnitApsNals );
+#else
   m_hlSynaxReader.parsePictureHeader(&m_picHeader, &m_parameterSetManager, true);
+#endif
   m_picHeader.setValid();
 }
 
@@ -115,7 +119,11 @@ Slice BitstreamExtractorApp::xParseSliceHeader(InputNALUnit &nalu)
   slice.setNalUnitLayerId(nalu.m_nuhLayerId);
   slice.setTLayer(nalu.m_temporalId);
 
+#if EMBEDDED_APS
+  m_hlSynaxReader.parseSliceHeader( &slice, &m_picHeader, &m_parameterSetManager, m_prevTid0Poc, m_prevPicPOC, nalu.m_nuhLayerId, m_accessUnitApsNals );
+#else
   m_hlSynaxReader.parseSliceHeader(&slice, &m_picHeader, &m_parameterSetManager, m_prevTid0Poc, m_prevPicPOC);
+#endif
   
   return slice;
 }
@@ -691,7 +699,11 @@ uint32_t BitstreamExtractorApp::decode()
       {
         APS* aps = new APS();
         m_hlSynaxReader.setBitstream( &nalu.getBitstream() );
+#if EMBEDDED_APS
+        m_hlSynaxReader.parseAPS( aps, true );
+#else
         m_hlSynaxReader.parseAPS( aps );
+#endif
         msg (VERBOSE, "APS Info: APS ID = %d Type = %d Layer = %d\n", aps->getAPSId(), aps->getAPSType(), nalu.m_nuhLayerId);
         int apsId = aps->getAPSId();
         int apsType = aps->getAPSType();

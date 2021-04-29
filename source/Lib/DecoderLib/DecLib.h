@@ -278,6 +278,10 @@ public:
   bool  isNewPicture( std::ifstream *bitstreamFile, class InputByteStream *bytestream );
   bool  isNewAccessUnit( bool newPicture, std::ifstream *bitstreamFile, class InputByteStream *bytestream );
 
+#if DUMP_BEFORE_INLOOP
+  Picture* getPicture() { return m_pcPic; }
+#endif
+
 protected:
   void  xUpdateRasInit(Slice* slice);
 

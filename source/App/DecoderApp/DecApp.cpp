@@ -240,6 +240,52 @@ uint32_t DecApp::decode()
     {
       if (!loopFiltered[nalu.m_nuhLayerId] || bitstreamFile)
       {
+#if DUMP_BEFORE_INLOOP
+        if( m_dumpBeforeInloop )
+        {
+          static VideoIOYuv ioBeforeInLoop;
+          Picture* pcPic = m_cDecLib.getPicture();
+
+          if( pcPic )
+          {
+            if( !ioBeforeInLoop.isOpen() )
+            {
+              std::string reconFileName = m_reconFileName;
+              size_t pos = reconFileName.find_last_of( '.' );
+              if( pos != string::npos )
+              {
+                reconFileName.insert( pos, "beforeInloop" );
+              }
+              else
+              {
+                reconFileName.append( "beforeInloop" );
+              }
+              const BitDepths &bitDepths = pcPic->cs->sps->getBitDepths();
+
+              ioBeforeInLoop.open( reconFileName, true, bitDepths.recon, bitDepths.recon, bitDepths.recon );
+            }
+
+            const Window &conf = pcPic->getConformanceWindow();
+            const SPS* sps = pcPic->cs->sps;
+            ChromaFormat chromaFormatIDC = sps->getChromaFormatIdc();
+            if( m_upscaledOutput )
+            {
+              ioBeforeInLoop.writeUpscaledPicture( *sps, *pcPic->cs->pps, pcPic->getRecoBuf(), m_outputColourSpaceConvert, m_packedYUVMode, m_upscaledOutput, NUM_CHROMA_FORMAT, m_bClipOutputVideoToRec709Range );
+            }
+            else
+            {
+              ioBeforeInLoop.write( pcPic->getRecoBuf().get( COMPONENT_Y ).width, pcPic->getRecoBuf().get( COMPONENT_Y ).height, pcPic->getRecoBuf(),
+                m_outputColourSpaceConvert,
+                m_packedYUVMode,
+                conf.getWindowLeftOffset() * SPS::getWinUnitX( chromaFormatIDC ),
+                conf.getWindowRightOffset() * SPS::getWinUnitX( chromaFormatIDC ),
+                conf.getWindowTopOffset() * SPS::getWinUnitY( chromaFormatIDC ),
+                conf.getWindowBottomOffset() * SPS::getWinUnitY( chromaFormatIDC ),
+                NUM_CHROMA_FORMAT, m_bClipOutputVideoToRec709Range );
+            }
+          }
+        }
+#endif
         m_cDecLib.executeLoopFilters();
 #if JVET_R0270
         m_cDecLib.finishPicture(poc, pcListPic, INFO, m_newCLVS[nalu.m_nuhLayerId]);

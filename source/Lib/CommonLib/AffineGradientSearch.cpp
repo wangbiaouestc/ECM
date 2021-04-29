@@ -52,8 +52,10 @@
 
 AffineGradientSearch::AffineGradientSearch()
 {
+#if !AFFINE_ENC_OPT
   m_HorizontalSobelFilter = xHorizontalSobelFilter;
   m_VerticalSobelFilter = xVerticalSobelFilter;
+#endif
   m_EqualCoeffComputer = xEqualCoeffComputer;
 
 #if ENABLE_SIMD_OPT_AFFINE_ME
@@ -63,6 +65,7 @@ AffineGradientSearch::AffineGradientSearch()
 #endif
 }
 
+#if !AFFINE_ENC_OPT
 void AffineGradientSearch::xHorizontalSobelFilter( Pel *const pPred, const int predStride, int *const pDerivate, const int derivateBufStride, const int width, const int height )
 {
   for ( int j = 1; j < height - 1; j++ )
@@ -128,20 +131,33 @@ void AffineGradientSearch::xVerticalSobelFilter( Pel *const pPred, const int pre
     pDerivate[j * derivateBufStride + width - 1] = pDerivate[j * derivateBufStride + width - 2];
   }
 }
+#endif
 
+#if AFFINE_ENC_OPT
+void AffineGradientSearch::xEqualCoeffComputer(Pel *pResidue, int residueStride, Pel **ppDerivate, int derivateBufStride, int64_t(*pEqualCoeff)[7], int width, int height, bool b6Param, int shift)
+#else
 void AffineGradientSearch::xEqualCoeffComputer( Pel *pResidue, int residueStride, int **ppDerivate, int derivateBufStride, int64_t( *pEqualCoeff )[7], int width, int height, bool b6Param )
+#endif
 {
   int affineParamNum = b6Param ? 6 : 4;
 
   for ( int j = 0; j != height; j++ )
   {
+#if AFFINE_ENC_OPT
+    int cy = j;
+#else
     int cy = ((j >> 2) << 2) + 2;
+#endif
     for ( int k = 0; k != width; k++ )
     {
       int iC[6];
 
       int idx = j * derivateBufStride + k;
+#if AFFINE_ENC_OPT
+      int cx = k;
+#else
       int cx = ((k >> 2) << 2) + 2;
+#endif
       if ( !b6Param )
       {
         iC[0] = ppDerivate[0][idx];
@@ -164,7 +180,11 @@ void AffineGradientSearch::xEqualCoeffComputer( Pel *pResidue, int residueStride
         {
           pEqualCoeff[col + 1][row] += (int64_t)iC[col] * iC[row];
         }
+#if AFFINE_ENC_OPT
+        pEqualCoeff[col + 1][affineParamNum] += (((int64_t)iC[col] * pResidue[idx]) >> shift);
+#else
         pEqualCoeff[col + 1][affineParamNum] += ((int64_t)iC[col] * pResidue[idx]) << 3;
+#endif
       }
     }
   }
