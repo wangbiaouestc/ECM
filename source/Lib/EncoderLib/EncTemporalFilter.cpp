@@ -383,7 +383,7 @@ void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const P
   const int origWidth  = orig.Y().width;
   const int origHeight = orig.Y().height;
 
-#if JVET_U0056_BUGFIX
+#if JVET_U0056
   for (int blockY = 0; blockY + blockSize <= origHeight; blockY += stepSize)
   {
     for (int blockX = 0; blockX + blockSize <= origWidth; blockX += stepSize)
