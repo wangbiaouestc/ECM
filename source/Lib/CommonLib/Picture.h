@@ -133,15 +133,6 @@ struct Picture : public UnitArea
          PelUnitBuf getResiBuf(const UnitArea &unit);
   const CPelUnitBuf getResiBuf(const UnitArea &unit) const;
   
-#if BIF_POST_FILTER
-         PelBuf     getPostBuf(const CompArea &blk);
-  const CPelBuf     getPostBuf(const CompArea &blk) const;
-         PelUnitBuf getPostBuf(const UnitArea &unit);
-  const CPelUnitBuf getPostBuf(const UnitArea &unit) const;
-         PelUnitBuf getPostBuf();
-  const CPelUnitBuf getPostBuf() const;
-#endif
-
          PelBuf     getRecoBuf(const ComponentID compID, bool wrap=false);
   const CPelBuf     getRecoBuf(const ComponentID compID, bool wrap=false) const;
          PelBuf     getRecoBuf(const CompArea &blk, bool wrap=false);
@@ -314,7 +305,7 @@ public:
   void            resizeSAO(unsigned numEntries, int dstid) { m_sao[dstid].resize(numEntries); }
   void            copySAO(const Picture& src, int dstid)    { std::copy(src.m_sao[0].begin(), src.m_sao[0].end(), m_sao[dstid].begin()); }
 
-#if ERICSSON_BIF && BIF_CTU_SIG
+#if JVET_V0094_BILATERAL_FILTER
   BifParams&       getBifParam() { return m_BifParams; }
   void resizeBIF(unsigned numEntries)
   {
@@ -333,7 +324,7 @@ public:
 #endif
 
   std::vector<SAOBlkParam> m_sao[2];
-#if ERICSSON_BIF && BIF_CTU_SIG
+#if JVET_V0094_BILATERAL_FILTER
   static BifParams        m_BifParams;
 #endif
 

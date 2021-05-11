@@ -146,7 +146,7 @@ void CABACWriter::end_of_slice()
   m_BinEncoder.finish       ();
 }
 
-#if ERICSSON_BIF && BIF_CTU_SIG
+#if JVET_V0094_BILATERAL_FILTER
 void CABACWriter::bif(const Slice& slice, const BifParams& bifParams)
 {
   for (int i = 0; i < bifParams.numBlocks; ++i)

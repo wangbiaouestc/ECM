@@ -178,7 +178,7 @@ void  EncGOP::create()
 {
   m_bLongtermTestPictureHasBeenCoded = 0;
   m_bLongtermTestPictureHasBeenCoded2 = 0;
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   m_cBilateralFilter.create();
 #endif
 }
@@ -205,7 +205,7 @@ void  EncGOP::destroy()
     delete m_picOrig;
     m_picOrig = NULL;
   }
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   m_cBilateralFilter.destroy();
 #endif
 }
@@ -1948,7 +1948,7 @@ void EncGOP::xPicInitLMCS(Picture *pic, PicHeader *picHeader, Slice *slice)
 }
 
 
-#if ERICSSON_BIF && BIF_CABAC_ESTIMATION
+#if JVET_V0094_BILATERAL_FILTER
 class BIFCabacEstImp : public BIFCabacEst
 {
   CABACWriter* CABACEstimator;
@@ -2782,7 +2782,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
     }
 #endif
 #endif
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
     // BIF happens in SAO code so this needs to be done
     // even if SAO=0 if BIF=1.
     if (pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF() )
@@ -3100,7 +3100,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
       CS::setRefinedMotionField(cs);
 #endif
 
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
       // We need to do this step if at least one of BIF or SAO are enabled.
       if( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF())
 #else
@@ -3109,7 +3109,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
       {
         bool sliceEnabled[MAX_NUM_COMPONENT];
         m_pcSAO->initCABACEstimator( m_pcEncLib->getCABACEncoder(), m_pcEncLib->getCtxCache(), pcSlice );
-#if ERICSSON_BIF && BIF_CABAC_ESTIMATION
+#if JVET_V0094_BILATERAL_FILTER
         BIFCabacEstImp est(m_pcEncLib->getCABACEncoder()->getCABACEstimator(cs.slice->getSPS()));
 #endif
         
@@ -3118,12 +3118,12 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
                              (m_pcCfg->getUsePerceptQPA() && !m_pcCfg->getUseRateCtrl() && pcSlice->getPPS()->getUseDQP() ? m_pcEncLib->getRdCost (PARL_PARAM0 (0))->getChromaWeight() : 0.0),
 #endif
                              m_pcCfg->getTestSAODisableAtPictureLevel(), m_pcCfg->getSaoEncodingRate(), m_pcCfg->getSaoEncodingRateChroma(), m_pcCfg->getSaoCtuBoundary(), m_pcCfg->getSaoGreedyMergeEnc()
-#if ERICSSON_BIF && BIF_CABAC_ESTIMATION
+#if JVET_V0094_BILATERAL_FILTER
                               , &est
 #endif
                             );
         //assign SAO slice header
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
         if( pcSlice->getSPS()->getSAOEnabledFlag() )
         {
 #endif
@@ -3144,7 +3144,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
         }
 
         }
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
       }
 #endif
       }

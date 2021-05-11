@@ -68,7 +68,7 @@ public:
   // sao (clause 7.3.8.3)
   void        sao                       ( CodingStructure&              cs,     unsigned        ctuRsAddr );
 
-#if ERICSSON_BIF && BIF_CTU_SIG
+#if JVET_V0094_BILATERAL_FILTER
   void        bif                      (CodingStructure&              cs);
   void        bif                      (CodingStructure&              cs, unsigned ctuRsAddr);
 #endif

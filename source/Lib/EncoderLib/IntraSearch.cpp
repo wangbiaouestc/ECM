@@ -43,7 +43,7 @@
 #include "CommonLib/Rom.h"
 #include "CommonLib/Picture.h"
 #include "CommonLib/UnitTools.h"
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
 #include "CommonLib/BilateralFilter.h"
 #endif
 
@@ -60,7 +60,7 @@ IntraSearch::IntraSearch()
   , m_pFullCS       (nullptr)
   , m_pBestCS       (nullptr)
   , m_pcEncCfg      (nullptr)
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   , m_bilateralFilter(nullptr)
 #endif
   , m_pcTrQuant     (nullptr)
@@ -216,7 +216,7 @@ IntraSearch::~IntraSearch()
 }
 
 void IntraSearch::init( EncCfg*        pcEncCfg,
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
                        BilateralFilter* bilateralFilter,
 #endif
                         TrQuant*       pcTrQuant,
@@ -232,7 +232,7 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
 {
   CHECK(m_isInitialized, "Already initialized");
   m_pcEncCfg                     = pcEncCfg;
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   m_bilateralFilter              = bilateralFilter;
 #endif
   m_pcTrQuant                    = pcTrQuant;
@@ -3297,7 +3297,7 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
 
   const CompArea      &area                 = tu.blocks[compID];
   const SPS           &sps                  = *cs.sps;
-#if ERICSSON_BIF && BIF_RDO_COST
+#if JVET_V0094_BILATERAL_FILTER
   const PPS           &pps                  = *cs.pps;
 #endif
 
@@ -3605,7 +3605,7 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
   }
 #endif
 
-#if ERICSSON_BIF && BIF_RDO_COST
+#if JVET_V0094_BILATERAL_FILTER
   CompArea      tmpArea1(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
   PelBuf tmpRecLuma;
   if(isLuma(compID))
@@ -3635,12 +3635,12 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
         PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
         if(!(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
         {
-          m_bilateralFilter->bilateralFilterRDOversionLarge(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, true, m_pcReshape->getInvLUT());
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, true, m_pcReshape->getInvLUT());
         }
         else
         {
           std::vector<Pel> dummy_invLUT;
-          m_bilateralFilter->bilateralFilterRDOversionLarge(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, false, dummy_invLUT);
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, false, dummy_invLUT);
         }
       }
       
@@ -3665,7 +3665,7 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
         CompArea compArea = tu.blocks[compID];
         PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
         std::vector<Pel>        my_invLUT;
-        m_bilateralFilter->bilateralFilterRDOversionLarge(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, false, my_invLUT);
+        m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, false, my_invLUT);
       }
       
       ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecLuma, bitDepth, compID, DF_SSE );

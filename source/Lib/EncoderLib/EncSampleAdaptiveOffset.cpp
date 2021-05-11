@@ -41,7 +41,7 @@
 #include "CommonLib/dtrace_codingstruct.h"
 #include "CommonLib/dtrace_buffer.h"
 #include "CommonLib/CodingStructure.h"
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
 #include "CommonLib/BilateralFilter.h"
 #endif
 
@@ -215,26 +215,26 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
                                           const double lambdaChromaWeight,
 #endif
                                           const bool bTestSAODisableAtPictureLevel, const double saoEncodingRate, const double saoEncodingRateChroma, const bool isPreDBFSamplesUsed, bool isGreedyMergeEncoding
-#if ERICSSON_BIF && BIF_CABAC_ESTIMATION
+#if JVET_V0094_BILATERAL_FILTER
                                           ,BIFCabacEst* BifCABACEstimator
 #endif
                                          )
 {
-#if ALF_SAO_TRUE_ORG && !ERICSSON_BIF
+#if ALF_SAO_TRUE_ORG && !JVET_V0094_BILATERAL_FILTER
   PelUnitBuf org = cs.getTrueOrgBuf();
 #else
   PelUnitBuf org = cs.getOrgBuf();
 #endif
   PelUnitBuf res = cs.getRecoBuf();
   PelUnitBuf src = m_tempBuf;
-#if !ERICSSON_BIF
+#if !JVET_V0094_BILATERAL_FILTER
   // Moved until after the bilateral filter has been initialized
   memcpy(m_lambda, lambdas, sizeof(m_lambda));
 #endif
 
   src.copyFrom(res);
 
-#if ERICSSON_BIF && BIF_CTU_SIG
+#if JVET_V0094_BILATERAL_FILTER
   const PreCalcValues& pcv = *cs.pcv;
   BifParams& bifParams = cs.picture->getBifParam();
   int width = cs.picture->lwidth();
@@ -265,7 +265,7 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   //int CtuIdx = 0;
 #endif
   
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   BilateralFilter bilateralFilter;
   
   // Special case when SAO = 0 and BIF = 1.
@@ -274,11 +274,7 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   if(!cs.sps->getSAOEnabledFlag() && cs.pps->getUseBIF())
   {
     bilateralFilter.create();
-    bilateralFilter.bilateralFilterPicRDOperCTU(cs, src
-#if BIF_CABAC_ESTIMATION
-                                          , BifCABACEstimator
-#endif
-                                                ); // Filters from src to res
+    bilateralFilter.bilateralFilterPicRDOperCTU(cs, src, BifCABACEstimator); // Filters from src to res
     bilateralFilter.destroy();
     return;
   }
@@ -286,32 +282,18 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
 #endif
   
   //collect statistics
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   //apply BILAT to res
   if(cs.pps->getUseBIF())
   {
     bilateralFilter.create();
-    bilateralFilter.bilateralFilterPicRDOperCTU(cs, src
-#if BIF_CABAC_ESTIMATION
-                                          , BifCABACEstimator
-#endif
-                                                ); // Filters from src to res
-    getStatistics(m_statData, org,
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
-                  src, res,
-#else
-                  res,
-#endif
-                  cs);
+    bilateralFilter.bilateralFilterPicRDOperCTU(cs, src, BifCABACEstimator); // Filters from src to res
+    getStatistics(m_statData, org, src, res, cs);
     bilateralFilter.destroy();
   }
   else
   {
-    getStatistics(m_statData, org, src,
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
-                  src,
-#endif
-                  cs);
+    getStatistics(m_statData, org, src, src, cs);
   }
 #else
   getStatistics(m_statData, org, src, cs);
@@ -322,7 +304,7 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
     addPreDBFStatistics(m_statData);
   }
   
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   //undo BILAT on res
   if(cs.pps->getUseBIF())
     res.copyFrom(src);
@@ -359,7 +341,7 @@ void EncSampleAdaptiveOffset::getPreDBFStatistics(CodingStructure& cs)
 #endif
   PelUnitBuf rec = cs.getRecoBuf();
   getStatistics(m_preDBFstatData, org,
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
                 rec, rec,
 #else
                 rec,
@@ -384,7 +366,7 @@ void EncSampleAdaptiveOffset::addPreDBFStatistics(std::vector<SAOStatData**>& bl
 }
 
 void EncSampleAdaptiveOffset::getStatistics(std::vector<SAOStatData**>& blkStats, PelUnitBuf& orgYuv, PelUnitBuf& srcYuv,
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
                                             PelUnitBuf& bifYuv,
 #endif
                                             CodingStructure& cs, bool isCalculatePreDeblockSamples)
@@ -437,7 +419,7 @@ void EncSampleAdaptiveOffset::getStatistics(std::vector<SAOStatData**>& blkStats
         int  orgStride  = orgYuv.get(compID).stride;
         Pel* orgBlk     = orgYuv.get(compID).bufAt( compArea );
 
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
         int  bifStride  = bifYuv.get(compID).stride;
         Pel* bifBlk     = bifYuv.get(compID).bufAt( compArea );
 #endif
@@ -453,7 +435,7 @@ void EncSampleAdaptiveOffset::getStatistics(std::vector<SAOStatData**>& blkStats
 
         getBlkStats(compID, cs.sps->getBitDepth(toChannelType(compID)), blkStats[ctuRsAddr][compID]
                   , srcBlk, orgBlk,
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
                     bifBlk, bifStride,
 #endif
                     srcStride, orgStride, compArea.width, compArea.height
@@ -915,7 +897,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 {
   const PreCalcValues& pcv = *cs.pcv;
   bool allBlksDisabled = true;
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   if(cs.sps->getSAOEnabledFlag())
   {
     // If SAO is enabled, we should investigate the components.
@@ -929,11 +911,11 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
       allBlksDisabled = false;
     }
   }
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   }
 #endif
 
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   BilateralFilter bilateralFilter;
   bilateralFilter.create();
 #endif
@@ -986,10 +968,10 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
       if(allBlksDisabled)
       {
         codedParams[ctuRsAddr].reset();
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
         // In the combined filter, we cannot continue here, even if SAO is
         // turned off for all blocks, since we need to perform the bilateral
-        // filter later on (see next ERICSSON_BIF).
+        // filter later on (see next JVET_V0094_BILATERAL_FILTER).
         if(!cs.pps->getUseBIF())
         {
           // Unless we are not using BIF. Then it is safe to continue.
@@ -1181,7 +1163,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
       }
       else
       {
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
         if(cs.pps->getUseBIF())
         {
           offsetCTUnoClip(area, srcYuv, resYuv, reconParams[ctuRsAddr], cs);
@@ -1192,11 +1174,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           // We don't need to clip if SAO was not performed on luma.
           SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
           SAOOffset& myCtbOffset     = mySAOblkParam[0];
-
-#if BIF_CTU_SIG
           BifParams& bifParams = cs.picture->getBifParam();
-#endif
-
           
           bool clipLumaIfNoBilat = false;
           if(myCtbOffset.modeIdc != SAO_MODE_OFF)
@@ -1208,13 +1186,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
             {
               
               bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-#if BIF_CTU_SIG
               if ( bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
-#else
-              if ( mySAOblkParam.BIF && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
-#endif
               {
-                bilateralFilter.bilateralFilterLargeSIMD(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+                bilateralFilter.bilateralFilterDiamond5x5(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
               }
               else
               {
@@ -1245,7 +1219,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 
 #endif
   //reconstruct
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   if (isGreedymergeEncoding || (cs.pps->getUseBIF() &&allBlksDisabled) )
 #else
   if (isGreedymergeEncoding)
@@ -1261,7 +1235,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 
         const UnitArea area(pcv.chrFormat, Area(xPos, yPos, width, height));
         
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
         if(cs.pps->getUseBIF())
         {
           // Sorry for not using nice copy method and using ugly code instead:
@@ -1277,7 +1251,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
         }
 #endif
 
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
         if(cs.pps->getUseBIF())
         {
           offsetCTUnoClip(area, srcYuv, resYuv, reconParams[ctuRsAddr], cs);
@@ -1289,10 +1263,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           // We don't need to clip if SAO was not performed on luma.
           SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
           SAOOffset& myCtbOffset     = mySAOblkParam[0];
-          
-#if BIF_CTU_SIG
           BifParams& bifParams = cs.picture->getBifParam();
-#endif
           
           bool clipLumaIfNoBilat = false;
           if(myCtbOffset.modeIdc != SAO_MODE_OFF)
@@ -1305,9 +1276,8 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               
               bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
               if ( bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
-//              if ( ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17) && 1) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
               {
-                bilateralFilter.bilateralFilterLargeSIMD(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+                bilateralFilter.bilateralFilterDiamond5x5(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
               }
               else
               {
@@ -1330,7 +1300,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
       }
     }
     //delete memory
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
     if (!(cs.pps->getUseBIF()) ||  !allBlksDisabled)
     {
 #endif
@@ -1343,7 +1313,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
       delete[] groupBlkStat[i];
     }
     groupBlkStat.clear();
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
     }
 #endif
   }
@@ -1363,7 +1333,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 
   EncSampleAdaptiveOffset::disabledRate( cs, reconParams, saoEncodingRate, saoEncodingRateChroma );
   
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   bilateralFilter.destroy();
 #endif
 }
@@ -1404,7 +1374,7 @@ void EncSampleAdaptiveOffset::disabledRate( CodingStructure& cs, SAOBlkParam* re
 
 void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int channelBitDepth, SAOStatData* statsDataTypes
                         , Pel* srcBlk, Pel* orgBlk,
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
                           Pel* bifBlk, int bifStride,
 #endif
                                           int srcStride, int orgStride, int width, int height
@@ -1417,7 +1387,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
   int8_t signLeft, signRight, signDown;
   int64_t *diff, *count;
   Pel *srcLine, *orgLine;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
   Pel *bifLine;
 #endif
   int* skipLinesR = m_skipLinesR[compIdx];
@@ -1430,7 +1400,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
 
     srcLine = srcBlk;
     orgLine = orgBlk;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
     bifLine = bifBlk;
 #endif
     diff    = statsData.diff;
@@ -1462,7 +1432,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
             edgeType  =  signRight + signLeft;
             signLeft  = -signRight;
 
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
             diff [edgeType] += (orgLine[x] - bifLine[x]);
 #else
             diff [edgeType] += (orgLine[x] - srcLine[x]);
@@ -1471,7 +1441,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
           }
           srcLine  += srcStride;
           orgLine  += orgStride;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
           bifLine  += bifStride;
 #endif
         }
@@ -1496,7 +1466,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
                 edgeType  =  signRight + signLeft;
                 signLeft  = -signRight;
 
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
                 diff [edgeType] += (orgLine[x] - bifLine[x]);
 #else
                 diff [edgeType] += (orgLine[x] - srcLine[x]);
@@ -1505,7 +1475,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
               }
               srcLine  += srcStride;
               orgLine  += orgStride;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
               bifLine  += bifStride;
 #endif
             }
@@ -1531,7 +1501,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
         {
           srcLine += srcStride;
           orgLine += orgStride;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
           bifLine += bifStride;
 #endif
         }
@@ -1558,7 +1528,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
             edgeType  = signDown + signUpLine[x];
             signUpLine[x]= -signDown;
 
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
             diff [edgeType] += (orgLine[x] - bifLine[x]);
 #else
             diff [edgeType] += (orgLine[x] - srcLine[x]);
@@ -1568,7 +1538,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
           }
           srcLine += srcStride;
           orgLine += orgStride;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
           bifLine += bifStride;
 #endif
         }
@@ -1591,7 +1561,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
                   continue;
                 }
                 edgeType = sgn(srcLine[x] - srcLineBelow[x]) + sgn(srcLine[x] - srcLineAbove[x]);
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
                 diff [edgeType] += (orgLine[x] - bifLine[x]);
 #else
                 diff [edgeType] += (orgLine[x] - srcLine[x]);
@@ -1600,7 +1570,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
               }
               srcLine  += srcStride;
               orgLine  += orgStride;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
               bifLine  += bifStride;
 #endif
             }
@@ -1645,7 +1615,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
             continue;
           }
           edgeType = sgn(srcLine[x] - srcLineAbove[x-1]) - signUpLine[x+1];
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
           diff [edgeType] += (orgLine[x] - bifLine[x]);
 #else
           diff [edgeType] += (orgLine[x] - srcLine[x]);
@@ -1654,7 +1624,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
         }
         srcLine  += srcStride;
         orgLine  += orgStride;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
         bifLine  += bifStride;
 #endif
         //middle lines
@@ -1671,7 +1641,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
               continue;
             }
             edgeType = signDown + signUpLine[x];
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
             diff [edgeType] += (orgLine[x] - bifLine[x]);
 #else
             diff [edgeType] += (orgLine[x] - srcLine[x]);
@@ -1688,7 +1658,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
 
           srcLine += srcStride;
           orgLine += orgStride;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
           bifLine += bifStride;
 #endif
         }
@@ -1711,7 +1681,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
                   continue;
                 }
                 edgeType = sgn(srcLine[x] - srcLineBelow[x+1]) + sgn(srcLine[x] - srcLineAbove[x-1]);
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
                 diff [edgeType] += (orgLine[x] - bifLine[x]);
 #else
                 diff [edgeType] += (orgLine[x] - srcLine[x]);
@@ -1720,7 +1690,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
               }
               srcLine  += srcStride;
               orgLine  += orgStride;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
               bifLine  += bifStride;
 #endif
             }
@@ -1765,7 +1735,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
             continue;
           }
           edgeType = sgn(srcLine[x] - srcLineAbove[x+1]) - signUpLine[x-1];
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
           diff [edgeType] += (orgLine[x] - bifLine[x]);
 #else
           diff [edgeType] += (orgLine[x] - srcLine[x]);
@@ -1775,7 +1745,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
 
         srcLine += srcStride;
         orgLine += orgStride;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
         bifLine += bifStride;
 #endif
         //middle lines
@@ -1792,7 +1762,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
               continue;
             }
             edgeType = signDown + signUpLine[x];
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
             diff [edgeType] += (orgLine[x] - bifLine[x]);
 #else
             diff [edgeType] += (orgLine[x] - srcLine[x]);
@@ -1804,7 +1774,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
           signUpLine[endX-1] = (int8_t)sgn(srcLineBelow[endX-1] - srcLine[endX]);
           srcLine  += srcStride;
           orgLine  += orgStride;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
           bifLine  += bifStride;
 #endif
         }
@@ -1827,7 +1797,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
                   continue;
                 }
                 edgeType = sgn(srcLine[x] - srcLineBelow[x-1]) + sgn(srcLine[x] - srcLineAbove[x+1]);
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
                 diff [edgeType] += (orgLine[x] - bifLine[x]);
 #else
                 diff [edgeType] += (orgLine[x] - srcLine[x]);
@@ -1836,7 +1806,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
               }
               srcLine  += srcStride;
               orgLine  += orgStride;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
               bifLine  += bifStride;
 #endif
             }
@@ -1860,7 +1830,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
           {
 
             int bandIdx= srcLine[x] >> shiftBits;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
             diff [bandIdx] += (orgLine[x] - bifLine[x]);
 #else
             diff [bandIdx] += (orgLine[x] - srcLine[x]);
@@ -1869,7 +1839,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
           }
           srcLine += srcStride;
           orgLine += orgStride;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
           bifLine += bifStride;
 #endif
         }
@@ -1885,7 +1855,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
               for (x=startX; x< endX; x++)
               {
                 int bandIdx= srcLine[x] >> shiftBits;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
                 diff [bandIdx] += (orgLine[x] - bifLine[x]);
 #else
                 diff [bandIdx] += (orgLine[x] - srcLine[x]);
@@ -1894,7 +1864,7 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
               }
               srcLine  += srcStride;
               orgLine  += orgStride;
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
               bifLine  += bifStride;
 #endif
             }

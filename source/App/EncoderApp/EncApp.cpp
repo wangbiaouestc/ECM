@@ -792,7 +792,7 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setUseIntraTMP(m_IntraTMP);
   m_cEncLib.setIntraTMPMaxSize(m_IntraTMP_MaxSize);
 #endif
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   m_cEncLib.setUseBIF                                            ( m_BIF );
   m_cEncLib.setBIFStrength                                       ( m_BIFStrength );
   m_cEncLib.setBIFQPOffset                                       ( m_BIFQPOffset );

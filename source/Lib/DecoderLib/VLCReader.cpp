@@ -802,7 +802,7 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
     pcPPS->clearChromaQpOffsetList();
   }
   
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   READ_FLAG( uiCode, "bilateral_filter_flag" );                        pcPPS->setUseBIF(uiCode != 0) ;
   if(pcPPS->getUseBIF())
   {

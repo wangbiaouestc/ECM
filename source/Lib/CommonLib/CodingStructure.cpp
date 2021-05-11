@@ -120,9 +120,6 @@ void CodingStructure::destroy()
   m_resi.destroy();
   m_reco.destroy();
   m_orgr.destroy();
-#if BIF_POST_FILTER
-  m_post.destroy();
-#endif
 
   destroyCoeffs();
 
@@ -1154,16 +1151,6 @@ void CodingStructure::rebindPicBufs()
   {
     m_resi.destroy();
   }
-#if BIF_POST_FILTER
-  if (!picture->M_BUFS( 0, PIC_POST_FILTER ).bufs.empty())
-  {
-    m_post.createFromBuf(picture->M_BUFS(0, PIC_POST_FILTER));
-  }
-  else
-  {
-    m_post.destroy();
-  }
-#endif
   if( pcv->isEncoder )
   {
     if (!picture->M_BUFS(0, PIC_RESIDUAL).bufs.empty())
@@ -1682,12 +1669,7 @@ const CPelUnitBuf CodingStructure::getResiBuf(const UnitArea &unit)    const { r
 const CPelBuf     CodingStructure::getRecoBuf(const CompArea &blk)     const { return getBuf(blk,  PIC_RECONSTRUCTION); }
        PelUnitBuf CodingStructure::getRecoBuf(const UnitArea &unit)          { return getBuf(unit, PIC_RECONSTRUCTION); }
 const CPelUnitBuf CodingStructure::getRecoBuf(const UnitArea &unit)    const { return getBuf(unit, PIC_RECONSTRUCTION); }
-#if BIF_POST_FILTER
-       PelBuf     CodingStructure::getPostBuf(const CompArea &blk)           { return getBuf(blk,  PIC_POST_FILTER); }
-const CPelBuf     CodingStructure::getPostBuf(const CompArea &blk)     const { return getBuf(blk,  PIC_POST_FILTER); }
-       PelUnitBuf CodingStructure::getPostBuf(const UnitArea &unit)          { return getBuf(unit, PIC_POST_FILTER); }
-const CPelUnitBuf CodingStructure::getPostBuf(const UnitArea &unit)    const { return getBuf(unit, PIC_POST_FILTER); }
-#endif
+
        PelBuf     CodingStructure::getOrgResiBuf(const CompArea &blk)        { return getBuf(blk,  PIC_ORG_RESI); }
 const CPelBuf     CodingStructure::getOrgResiBuf(const CompArea &blk)  const { return getBuf(blk,  PIC_ORG_RESI); }
        PelUnitBuf CodingStructure::getOrgResiBuf(const UnitArea &unit)       { return getBuf(unit, PIC_ORG_RESI); }
@@ -1721,12 +1703,7 @@ PelBuf CodingStructure::getBuf( const CompArea &blk, const PictureType &type )
 
   const ComponentID compID = blk.compID;
   
-#if BIF_POST_FILTER
-  PelStorage* buf = type == PIC_PREDICTION ? &m_pred : ( type == PIC_RESIDUAL ? &m_resi : ( type == PIC_RECONSTRUCTION ? &m_reco : ( type == PIC_ORG_RESI ? &m_orgr : ( type == PIC_POST_FILTER ? &m_post : nullptr ) ) ) );
-#else
   PelStorage* buf = type == PIC_PREDICTION ? &m_pred : ( type == PIC_RESIDUAL ? &m_resi : ( type == PIC_RECONSTRUCTION ? &m_reco : ( type == PIC_ORG_RESI ? &m_orgr : nullptr ) ) );
-#endif
-
 
   CHECK( !buf, "Unknown buffer requested" );
 
@@ -1760,11 +1737,7 @@ const CPelBuf CodingStructure::getBuf( const CompArea &blk, const PictureType &t
 
   const ComponentID compID = blk.compID;
 
-#if BIF_POST_FILTER
-  const PelStorage* buf = type == PIC_PREDICTION ? &m_pred : ( type == PIC_RESIDUAL ? &m_resi : ( type == PIC_RECONSTRUCTION ? &m_reco : ( type == PIC_ORG_RESI ? &m_orgr : ( type == PIC_POST_FILTER ? &m_post : nullptr ) ) ) );
-#else
   const PelStorage* buf = type == PIC_PREDICTION ? &m_pred : ( type == PIC_RESIDUAL ? &m_resi : ( type == PIC_RECONSTRUCTION ? &m_reco : ( type == PIC_ORG_RESI ? &m_orgr : nullptr ) ) );
-#endif
 
   CHECK( !buf, "Unknown buffer requested" );
 

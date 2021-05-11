@@ -124,11 +124,10 @@ static const int AFFINE_ME_LIST_SIZE =                             4;
 static const int AFFINE_ME_LIST_SIZE_LD =                          3;
 static const double AFFINE_ME_LIST_MVP_TH =                        1.0;
 
-#if ERICSSON_BIF || BIF_POST_FILTER
-// In reality only one sample is padded, but previously two samples were padded,
-// so the filtering happens in a copied area that has room for two padded
-// samples on either side.
-static const int32_t NUMBER_PADDED_SAMPLES = 2;
+#if JVET_V0094_BILATERAL_FILTER
+static const int32_t NUMBER_PADDED_SAMPLES =  2;
+static const int32_t BIF_ROUND_ADD =         32;
+static const int32_t BIF_ROUND_SHIFT =        6;
 #endif
 
 // ====================================================================================================================

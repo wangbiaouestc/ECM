@@ -94,7 +94,7 @@ public:
                    const double lambdaChromaWeight,
 #endif
                    const bool bTestSAODisableAtPictureLevel, const double saoEncodingRate, const double saoEncodingRateChroma, const bool isPreDBFSamplesUsed, bool isGreedyMergeEncoding
-#if ERICSSON_BIF && BIF_CABAC_ESTIMATION
+#if JVET_V0094_BILATERAL_FILTER
                                           ,BIFCabacEst* BifCABACEstimator
 #endif
                   );
@@ -105,7 +105,7 @@ private: //methods
 
   void deriveLoopFilterBoundaryAvailibility(CodingStructure& cs, const Position &pos, bool& isLeftAvail, bool& isAboveAvail, bool& isAboveLeftAvail) const;
   void getStatistics(std::vector<SAOStatData**>& blkStats, PelUnitBuf& orgYuv, PelUnitBuf& srcYuv,
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
                      PelUnitBuf& bifYuv,
 #endif
                      CodingStructure& cs, bool isCalculatePreDeblockSamples = false);
@@ -116,7 +116,7 @@ private: //methods
 #endif
                         const double saoEncodingRate, const double saoEncodingRateChroma, const bool isGreedymergeEncoding );
   void getBlkStats(const ComponentID compIdx, const int channelBitDepth, SAOStatData* statsDataTypes, Pel* srcBlk, Pel* orgBlk,
-#if ERICSSON_BIF && BIF_SAO_INTERACTION
+#if JVET_V0094_BILATERAL_FILTER
                    Pel* bifBlk, int bifStride,
 #endif
                    int srcStride, int orgStride, int width, int height, bool isLeftAvail,  bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isCalculatePreDeblockSamples

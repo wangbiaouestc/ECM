@@ -210,7 +210,7 @@ void EncCu::destroy()
   unsigned numWidths  = gp_sizeIdxInfo->numWidths();
   unsigned numHeights = gp_sizeIdxInfo->numHeights();
 
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   delete m_bilateralFilter;
 #endif
 
@@ -6853,7 +6853,7 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
       }
     }
     
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
     // Bilateral:
     // The CU itself, the above area and the area to the left have been copied into
     //     PelStorage&          picDbBuf = m_pcLoopFilter->getDbEncPicYuvBuffer();
@@ -6872,7 +6872,7 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
             PelBuf    recBuf = picDbBuf.getBuf(compArea);
             PelBuf recIPredBuf = recBuf;
             std::vector<Pel>        my_invLUT;
-            m_bilateralFilter->bilateralFilterRDOversionLarge(recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(COMPONENT_Y), currTU, true, false, my_invLUT);
+            m_bilateralFilter->bilateralFilterRDOdiamond5x5(recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(COMPONENT_Y), currTU, true, false, my_invLUT);
           }
         }
       }
@@ -7461,7 +7461,7 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
       CPelBuf org  = tempCS->getOrgBuf ( compID );
 
       
-#if ERICSSON_BIF && BIF_RDO_COST
+#if JVET_V0094_BILATERAL_FILTER
         const CompArea &area = cu.blocks[COMPONENT_Y];
         CompArea    tmpArea(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
         PelBuf tmpRecLuma = m_tmpStorageLCU->getBuf(tmpArea);
@@ -7493,12 +7493,12 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
               // Only reshape surrounding samples if reshaping is on
                if(m_pcEncCfg->getLmcs() && (tempCS->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() ) && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
                {
-                 m_bilateralFilter->bilateralFilterRDOversionLarge(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, true, m_pcReshape->getInvLUT());
+                 m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, true, m_pcReshape->getInvLUT());
                }
                else
                {
                  std::vector<Pel> dummy_invLUT;
-                 m_bilateralFilter->bilateralFilterRDOversionLarge(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, false, dummy_invLUT);
+                 m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, false, dummy_invLUT);
                }
             }
           }
