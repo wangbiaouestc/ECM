@@ -349,6 +349,9 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
           }
 
           pcDecLib->updateAssociatedIRAP();
+          pcDecLib->updatePrevGDRInSameLayer();
+          pcDecLib->updatePrevIRAPAndGDRSubpic();
+
           // LMCS APS will be assigned later in LMCS initialization step
           pcEncPic->cs->picHeader->setLmcsAPS( nullptr );
           if( bitstreamFile )
