@@ -546,7 +546,7 @@ void SampleAdaptiveOffset::offsetBlock(const int channelBitDepth, const ClpRng& 
   }
 }
 
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
 void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const ClpRng& clpRng, int typeIdx, int* offset
                                              , const Pel* srcBlk, Pel* resBlk, int srcStride, int resStride,  int width, int height
                                              , bool isLeftAvail,  bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail)
@@ -835,7 +835,7 @@ void SampleAdaptiveOffset::offsetCTU( const UnitArea& area, const CPelUnitBuf& s
   } //compIdx
 }
 
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
 void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnitBuf& src, PelUnitBuf& res, SAOBlkParam& saoblkParam, CodingStructure& cs)
 {
   const uint32_t numberOfComponents = getNumberValidComponents( area.chromaFormat );
@@ -929,63 +929,12 @@ void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnit
 }
 #endif
 
-#if BIF_POST_FILTER
-void SampleAdaptiveOffset::BIFPostFilter( CodingStructure& cs, SAOBlkParam* saoBlkParams
-                                      )
-{
-  // We use the temporary buffer used by SAO and BIF for
-  // the post-filter data.
-  
-  // First copy the finished image into the temporary buffer.
-  const PreCalcValues& pcv = *cs.pcv;
-  PelUnitBuf rec = cs.getRecoBuf();
-  PelUnitBuf post = cs.getPostBuf();
-  post.copyFrom( rec );
-
-  // Now do bilateral filtering on the m_tempBuf buffer:
-  int ctuRsAddr = 0;
-  for( uint32_t yPos = 0; yPos < pcv.lumaHeight; yPos += pcv.maxCUHeight )
-  {
-    for( uint32_t xPos = 0; xPos < pcv.lumaWidth; xPos += pcv.maxCUWidth )
-    {
-      const uint32_t width  = (xPos + pcv.maxCUWidth  > pcv.lumaWidth)  ? (pcv.lumaWidth - xPos)  : pcv.maxCUWidth;
-      const uint32_t height = (yPos + pcv.maxCUHeight > pcv.lumaHeight) ? (pcv.lumaHeight - yPos) : pcv.maxCUHeight;
-      const UnitArea area( cs.area.chromaFormat, Area(xPos , yPos, width, height) );
-      
-      // We are using BIF, so we run SAO without clipping
-      // However, if 'SAO=0', bAllDisabled=true and we should not run offsetCTUnoClip.
-      
-      // And now we traverse the CTU to do BIF
-      for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
-      {
-        for (auto &currTU : CU::traverseTUs(currCU))
-        {
-          
-          bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-          if ( ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
-          {
-            m_bilateralFilter.bilateralFilterLargeSIMD(rec, post, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
-          }
-          else
-          {
-            // We don't need to clip if SAO was not performed on luma.
-            m_bilateralFilter.clipNotBilaterallyFilteredBlocks(rec, post, cs.slice->clpRng(COMPONENT_Y), currTU);
-          }
-        }
-      }
-
-      ctuRsAddr++;
-    }
-  }
-}
-#endif
-
 void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkParams
                                       )
 {
   CHECK(!saoBlkParams, "No parameters present");
 
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   // In code without BIF, SAOProcess would not be run if 'SAO=0'.
   // However, in the BIF-enabled code, we still might go here if 'SAO=0' and 'BIF=1'.
   // Hence we must check getSAOEnabledFlag() for some of the function calls.
@@ -999,7 +948,7 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
 
   const uint32_t numberOfComponents = getNumberValidComponents(cs.area.chromaFormat);
   bool bAllDisabled = true;
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   // If 'SAO=0' we would not normally get here. However, now we might get
   // here if 'SAO=0' and 'BIF=1'. Hence we should only run this if
   // getSAOEnabledFlag() is true. Note that if getSAOEnabledFlag() is false,
@@ -1015,12 +964,12 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
       bAllDisabled = false;
     }
   }
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   }
 #endif
   if (bAllDisabled)
   {
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
     // Even if we are not doing SAO we might still need to do BIF
     // so we cannot return even if SAO is never used.
     if(!cs.pps->getUseBIF())
@@ -1045,7 +994,7 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
       const uint32_t width  = (xPos + pcv.maxCUWidth  > pcv.lumaWidth)  ? (pcv.lumaWidth - xPos)  : pcv.maxCUWidth;
       const uint32_t height = (yPos + pcv.maxCUHeight > pcv.lumaHeight) ? (pcv.lumaHeight - yPos) : pcv.maxCUHeight;
       const UnitArea area( cs.area.chromaFormat, Area(xPos , yPos, width, height) );
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
       if(cs.pps->getUseBIF())
       {
         // We are using BIF, so we run SAO without clipping
@@ -1056,10 +1005,7 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
         // We don't need to clip if SAO was not performed on luma.
         SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
         SAOOffset& myCtbOffset     = mySAOblkParam[0];
-        
-#if BIF_CTU_SIG
         BifParams& bifParams = cs.picture->getBifParam();
-#endif
         
         bool clipLumaIfNoBilat = false;
         if(!bAllDisabled && myCtbOffset.modeIdc != SAO_MODE_OFF)
@@ -1072,13 +1018,9 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
           {
             
             bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-#if BIF_CTU_SIG
             if ( bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
-#else
-            if ( mySAOblkParam.BIF && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
-#endif
             {
-              m_bilateralFilter.bilateralFilterLargeSIMD(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+              m_bilateralFilter.bilateralFilterDiamond5x5(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
             }
             else
             {

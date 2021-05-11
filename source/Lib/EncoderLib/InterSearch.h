@@ -48,7 +48,7 @@
 #include "CommonLib/Unit.h"
 #include "CommonLib/UnitPartitioner.h"
 #include "CommonLib/RdCost.h"
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
 #include "CommonLib/BilateralFilter.h"
 #endif
 
@@ -300,7 +300,7 @@ protected:
   EncCfg*         m_pcEncCfg;
 
   // interface to classes
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   BilateralFilter* m_bilateralFilter;
 #endif
   TrQuant*        m_pcTrQuant;
@@ -379,7 +379,7 @@ public:
   virtual ~InterSearch();
 
   void init                         ( EncCfg*        pcEncCfg,
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
                                      BilateralFilter* bilateralFilter,
 #endif
                                       TrQuant*       pcTrQuant,

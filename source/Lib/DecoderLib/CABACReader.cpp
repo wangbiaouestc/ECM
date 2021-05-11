@@ -341,7 +341,7 @@ void CABACReader::sao( CodingStructure& cs, unsigned ctuRsAddr )
 {
   const SPS&   sps   = *cs.sps;
 
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   // If neither BIF nor SAO is enabled, we can return.
   if(!(cs.pps->getUseBIF() || cs.sps->getSAOEnabledFlag()))
   {
@@ -357,7 +357,7 @@ void CABACReader::sao( CodingStructure& cs, unsigned ctuRsAddr )
   }
 
   const Slice& slice                        = *cs.slice;
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   // The getSAO() function call has been moved up.
 #else
   SAOBlkParam&      sao_ctu_pars            = cs.picture->getSAO()[ctuRsAddr];
@@ -494,7 +494,7 @@ void CABACReader::sao( CodingStructure& cs, unsigned ctuRsAddr )
   }
 }
 
-#if ERICSSON_BIF && BIF_CTU_SIG
+#if JVET_V0094_BILATERAL_FILTER
 void CABACReader::bif(CodingStructure& cs)
 {
   int width = cs.picture->lwidth();

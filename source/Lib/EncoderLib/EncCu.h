@@ -46,7 +46,7 @@
 #include "CommonLib/Unit.h"
 #include "CommonLib/UnitPartitioner.h"
 #include "CommonLib/IbcHashMap.h"
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
 #include "CommonLib/BilateralFilter.h"
 #endif
 #include "CommonLib/LoopFilter.h"
@@ -258,7 +258,7 @@ public:
 
   EncModeCtrl* getModeCtrl  () { return m_modeCtrl; }
 
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   BilateralFilter *m_bilateralFilter = new BilateralFilter();
 #endif
 

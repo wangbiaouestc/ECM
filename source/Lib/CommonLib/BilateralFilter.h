@@ -35,7 +35,7 @@
 
 #include "CommonDef.h"
 
-#if ERICSSON_BIF || BIF_POST_FILTER
+#if JVET_V0094_BILATERAL_FILTER
 
 #include "Unit.h"
 #include "Buffer.h"
@@ -43,14 +43,12 @@
 #include <smmintrin.h>
 #include <immintrin.h>
 
-#if BIF_CABAC_ESTIMATION
 class BIFCabacEst
 {
 public:
   virtual ~BIFCabacEst() {};
   virtual uint64_t getBits(const Slice& slice, const BifParams& htdfParams) = 0;
 };
-#endif
 
 class BilateralFilter
 {
@@ -66,21 +64,8 @@ private:
   // = 2313 128-bit words which has been rounded up to 2320 above. 
   short *tempblockFiltered = &tempblockFilteredTemp[-2];
 
-  void blockBilateralFilterRDOversionSIMD(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int32_t length, int32_t isInterBlock, int32_t qp, int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, bool useReco, int bfac, int bif_round_add, int bif_round_shift);
-  void blockBilateralFilterRDOversionLargeSIMD(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int32_t length, int32_t isInterBlock, int32_t qp, int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, bool useReco, int bfac, int bif_round_add, int bif_round_shift);
-  void blockBilateralFilterRDOversionSlow(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int32_t length, int32_t isInterBlock, int32_t qp, int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, bool useReco, int bfac, int bif_round_add, int bif_round_shift);
-  void blockBilateralFilterSIMD(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int32_t length, int32_t isInterBlock, int32_t qp, int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift);
-  void blockBilateralFilterLargerSIMD(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int32_t length, int32_t isInterBlock, int32_t qp, int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift);
-  void blockBilateralFilterSlow(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int32_t length, int32_t isInterBlock, int32_t qp, int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift);
-
-  void simdFilterRDOversion(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int32_t length, int32_t isInterBlock,
-                  int32_t qp, int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int bfac, int bif_round_add, int bif_round_shift);
-  void simdFilter(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int32_t length, int32_t isInterBlock,
-                  int32_t qp, int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift);
-  void simdFilterRDOversionLarge(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int32_t length, int32_t isInterBlock,
-                  int32_t qp, int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int bfac, int bif_round_add, int bif_round_shift);
-  void simdFilterLarge(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int32_t length, int32_t isInterBlock,
-                  int32_t qp, int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift);
+  void blockBilateralFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO);
+  void simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO);
 
   char *LUTrowPtr;
   
@@ -120,21 +105,11 @@ public:
   void create();
   void destroy();
 
-  void bilateralFilterRDOversionSIMD(PelBuf& resiBuf, const CPelBuf& predBuf, PelBuf& recoBuf, int32_t qp, const CPelBuf& recIPredBuf, const ClpRng& clpRng, TransformUnit & currTU, bool useReco, bool doReshape, std::vector<Pel>& pLUT);
+  void bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBuf& predBuf, PelBuf& recoBuf, int32_t qp, const CPelBuf& recIPredBuf, const ClpRng& clpRng, TransformUnit & currTU, bool useReco, bool doReshape, std::vector<Pel>& pLUT);
   
-  void bilateralFilterRDOversionLarge(PelBuf& resiBuf, const CPelBuf& predBuf, PelBuf& recoBuf, int32_t qp, const CPelBuf& recIPredBuf, const ClpRng& clpRng, TransformUnit & currTU, bool useReco, bool doReshape, std::vector<Pel>& pLUT);
+  void bilateralFilterPicRDOperCTU(CodingStructure& cs, PelUnitBuf& src,BIFCabacEst* BifCABACEstimator);
   
-  void bilateralFilterPic(CodingStructure& cs, PelUnitBuf& src);
-#if BIF_CTU_RDO
-  void bilateralFilterPicRDOperCTU(CodingStructure& cs, PelUnitBuf& src
-#if BIF_CABAC_ESTIMATION
-                                   ,BIFCabacEst* BifCABACEstimator
-#endif
-                                   );
-#endif
-  
-  void bilateralFilterSIMD(const CPelUnitBuf& src, PelUnitBuf& res, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU);
-  void bilateralFilterLargeSIMD(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU);
+  void bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU);
   void clipNotBilaterallyFilteredBlocks(const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU);
 
 };

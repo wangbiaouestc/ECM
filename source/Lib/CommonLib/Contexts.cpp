@@ -1472,7 +1472,7 @@ const CtxSet ContextSetCfg::SaoTypeIdx = ContextSetCfg::addCtxSet
 	{ 4 }
 });
 
-#if ERICSSON_BIF && BIF_CTU_SIG
+#if JVET_V0094_BILATERAL_FILTER
 const CtxSet ContextSetCfg::BifCtrlFlags = ContextSetCfg::addCtxSet
 ({
   { 39 },
@@ -2470,7 +2470,7 @@ const CtxSet ContextSetCfg::SaoTypeIdx = ContextSetCfg::addCtxSet
   {   4, },
 });
 
-#if ERICSSON_BIF && BIF_CTU_SIG
+#if JVET_V0094_BILATERAL_FILTER
 const CtxSet ContextSetCfg::BifCtrlFlags = ContextSetCfg::addCtxSet
 ({
   { 39, },

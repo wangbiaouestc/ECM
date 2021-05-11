@@ -237,7 +237,7 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
     {
       break;
     }
-#if ERICSSON_BIF && BIF_CTU_SIG
+#if JVET_V0094_BILATERAL_FILTER
     if (ctuRsAddr == 0)
     {
       cabacReader.bif(cs);

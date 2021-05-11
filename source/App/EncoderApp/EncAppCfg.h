@@ -415,7 +415,7 @@ protected:
   bool      m_IntraTMP;                                       ///< intra Template Matching 
   unsigned  m_IntraTMP_MaxSize;                               ///< max CU size for which intra TMP is allowed
 #endif
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   bool      m_BIF;                                            ///< bilateral filter
   unsigned  m_BIFStrength;                                    /// Bilateral filter strength
   int       m_BIFQPOffset;                                    /// Bilateral QP offset

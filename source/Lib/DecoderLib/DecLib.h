@@ -54,7 +54,7 @@
 #include "CommonLib/SEI.h"
 #include "CommonLib/Unit.h"
 #include "CommonLib/Reshape.h"
-#if ERICSSON_BIF && BIF_IN_LOOP
+#if JVET_V0094_BILATERAL_FILTER
 #include "BilateralFilter.h"
 #endif
 
@@ -100,7 +100,7 @@ private:
 
   SEIMessages             m_SEIs; ///< List of SEI messages that have been received before the first slice and between slices, excluding prefix SEIs...
 
-#if ERICSSON_BIF && BIF_IN_LOOP
+#if JVET_V0094_BILATERAL_FILTER
   BilateralFilter         m_cBilateralFilter;
 #endif
 
@@ -220,11 +220,6 @@ public:
   );
   bool  decode(InputNALUnit& nalu, int& iSkipFrame, int& iPOCLastDisplay, int iTargetOlsIdx);
   void  deletePicBuffer();
-  
-#if BIF_POST_FILTER
-  PelUnitBuf getPostFilteredBuf()                                 { return m_cSAO.getBIFPostFilteredBuf(); }
-#endif
-
   void  executeLoopFilters();
 #if JVET_R0270
   void finishPicture(int &poc, PicList *&rpcListPic, MsgLevel msgl = INFO, bool associatedWithNewClvs = false);

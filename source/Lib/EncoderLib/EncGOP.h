@@ -60,7 +60,7 @@
 #include "Analyze.h"
 #include "RateCtrl.h"
 #include <vector>
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
 #include "BilateralFilter.h"
 #endif
 #include "EncHRD.h"
@@ -140,7 +140,7 @@ private:
   PicList*                m_pcListPic;
 
   HLSWriter*              m_HLSWriter;
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   BilateralFilter         m_cBilateralFilter;
 #endif
   LoopFilter*             m_pcLoopFilter;

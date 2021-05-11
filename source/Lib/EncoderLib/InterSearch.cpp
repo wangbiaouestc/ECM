@@ -45,7 +45,7 @@
 #include "CommonLib/UnitTools.h"
 #include "CommonLib/dtrace_next.h"
 #include "CommonLib/dtrace_buffer.h"
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
 #include "CommonLib/BilateralFilter.h"
 #endif
 #include "CommonLib/MCTS.h"
@@ -92,7 +92,7 @@ InterSearch::InterSearch()
   , m_pSplitCS                    (nullptr)
   , m_pFullCS                     (nullptr)
   , m_pcEncCfg                    (nullptr)
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
 , m_bilateralFilter             (nullptr)
 #endif
   , m_pcTrQuant                   (nullptr)
@@ -213,7 +213,7 @@ InterSearch::~InterSearch()
 }
 
 void InterSearch::init( EncCfg*        pcEncCfg,
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
                       BilateralFilter* bilateralFilter,
 #endif
                         TrQuant*       pcTrQuant,
@@ -238,7 +238,7 @@ void InterSearch::init( EncCfg*        pcEncCfg,
   }
   m_defaultCachedBvs.currCnt = 0;
   m_pcEncCfg                     = pcEncCfg;
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   m_bilateralFilter              = bilateralFilter;
 #endif
   m_pcTrQuant                    = pcTrQuant;
@@ -7684,7 +7684,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
               resiBuf.scaleSignal(tu.getChromaAdj(), 0, tu.cu->cs->slice->clpRng(compID));
             }
 
-#if ERICSSON_BIF && BIF_RDO_COST
+#if JVET_V0094_BILATERAL_FILTER
             // getCbf() is going to be 1 since currAbsSum > 0 here, according to the if-statement a couple of lines up.
             bool isInter = (cu.predMode == MODE_INTER) ? true : false;
             if (cs.pps->getUseBIF() && isLuma(compID) && (tu.cu->qp > 17) && (128 > std::max(tu.lumaSize().width, tu.lumaSize().height)) && ((isInter == false) || (32 > std::min(tu.lumaSize().width, tu.lumaSize().height))))
@@ -7696,7 +7696,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
               const CPelBuf predBuf = csFull->getPredBuf(compArea);
               PelBuf recIPredBuf = csFull->slice->getPic()->getRecoBuf(compArea);
               std::vector<Pel>        my_invLUT;
-              m_bilateralFilter->bilateralFilterRDOversionLarge(tmpRecLuma, predBuf, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, false, false, my_invLUT);
+              m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, predBuf, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, false, false, my_invLUT);
 
               currCompDist = m_pcRdCost->getDistPart(orgResiBuf, tmpRecLuma, channelBitDepth, compID, DF_SSE);
             }
@@ -8668,7 +8668,7 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
       continue;
     CPelBuf reco = cs.getRecoBuf (compID);
     CPelBuf org  = cs.getOrgBuf  (compID);
-#if ERICSSON_BIF && BIF_RDO_COST
+#if JVET_V0094_BILATERAL_FILTER
     const CompArea &areaY = cu.Y();
     CompArea      tmpArea1(COMPONENT_Y, areaY.chromaFormat, Position(0, 0), areaY.size());
     PelBuf tmpRecLuma;
@@ -8698,12 +8698,12 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
             // Only reshape surrounding samples if reshaping is on
             if(m_pcEncCfg->getLmcs() && (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() ) && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
             {
-              m_bilateralFilter->bilateralFilterRDOversionLarge(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, true, m_pcReshape->getInvLUT());
+              m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, true, m_pcReshape->getInvLUT());
             }
             else
             {
               std::vector<Pel> dummy_invLUT;
-              m_bilateralFilter->bilateralFilterRDOversionLarge(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, false, dummy_invLUT);
+              m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, false, dummy_invLUT);
             }
           }
         }

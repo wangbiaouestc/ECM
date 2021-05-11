@@ -1931,7 +1931,7 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
       resetBcwCodingOrder(false, cs);
     }
 
-#if ERICSSON_BIF && BIF_CTU_SIG
+#if JVET_V0094_BILATERAL_FILTER
     if (ctuRsAddr == 0)
     {
       BifParams& bifParam = cs.picture->getBifParam();

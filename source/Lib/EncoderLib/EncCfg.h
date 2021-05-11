@@ -810,7 +810,7 @@ protected:
   bool      m_IntraTMP;                                       ///< intra Template Matching 
   unsigned  m_IntraTMP_MaxSize;                               ///< max CU size for which intra TMP is allowed
 #endif
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   bool        m_BIF;
   int         m_BIFStrength;
   int         m_BIFQPOffset;
@@ -1293,7 +1293,7 @@ public:
   void      setIntraTMPMaxSize(unsigned n) { m_IntraTMP_MaxSize = n; }
   unsigned  getIntraTMPMaxSize() { return m_IntraTMP_MaxSize; }
 #endif
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   void      setUseBIF                       ( bool b )       { m_BIF = b; }
   bool      getUseBIF                       ()         const { return m_BIF; }
   void      setBIFStrength                  ( int val )       { m_BIFStrength = val; }

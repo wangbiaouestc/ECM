@@ -294,7 +294,7 @@ public:
   static const CtxSet   MVPIdx;
   static const CtxSet   SaoMergeFlag;
   static const CtxSet   SaoTypeIdx;
-#if ERICSSON_BIF && BIF_CTU_SIG
+#if JVET_V0094_BILATERAL_FILTER
   static const CtxSet   BifCtrlFlags;
 #endif
   static const CtxSet   TransformSkipFlag;

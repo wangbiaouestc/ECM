@@ -80,7 +80,7 @@ public:
   void        sao                       ( const Slice&                  slice,    unsigned          ctuRsAddr );
   void        sao_block_pars            ( const SAOBlkParam&            saoPars,  const BitDepths&  bitDepths,  bool* sliceEnabled, bool leftMergeAvail, bool aboveMergeAvail, bool onlyEstMergeInfo );
   void        sao_offset_pars           ( const SAOOffset&              ctbPars,  ComponentID       compID,     bool sliceEnabled,  int bitDepth );
-#if ERICSSON_BIF && BIF_CTU_SIG
+#if JVET_V0094_BILATERAL_FILTER
   void        bif                      (const Slice&                   slice, const BifParams& BifParams);
   void        bif                      (const Slice& slice, const BifParams& BifParams, unsigned ctuRsAddr);
 #endif

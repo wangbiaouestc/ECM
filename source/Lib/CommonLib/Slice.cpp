@@ -3351,7 +3351,7 @@ PPS::PPS()
 , m_wrapAroundEnabledFlag            (false)
 , m_picWidthMinusWrapAroundOffset    (0)
 , m_wrapAroundOffset                 (0)
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
 , m_BIF                              (false)
 , m_BIFStrength                      (1)
 , m_BIFQPOffset                      (0)

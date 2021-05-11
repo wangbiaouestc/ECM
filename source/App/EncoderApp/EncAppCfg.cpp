@@ -1048,7 +1048,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("IntraTMP",                                        m_IntraTMP,                                        false, "intra Template Matching (0: off, 1:on)  [default: on]")
   ("IntraTMPMaxSize",                                 m_IntraTMP_MaxSize,                                 64u, "intra Template Matching max CU size  [default: 64]")
 #endif
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   ("BIF",                                             m_BIF,                                            true, "bilateral filter   (0: off, 1:on)  [default: on]")
   ("BIFStrength",                                     m_BIFStrength,                                       1u, "bilateral filter strength  (0: half, 1: full, 2: double)  [default: full]")
   ("BIFQPOffset",                                     m_BIFQPOffset,                                        0, "bilateral filter QP offset (0: no offset)  [default: 0]")
@@ -4324,7 +4324,7 @@ void EncAppCfg::xPrintParameter()
   msg( VERBOSE, "IntraTMP:%d ", m_IntraTMP);
   msg( VERBOSE, "IntraTMP_MaxSize:%d ", m_IntraTMP_MaxSize);
 #endif
-#if ERICSSON_BIF
+#if JVET_V0094_BILATERAL_FILTER
   msg( VERBOSE, "BIF:%d ", m_BIF);
   msg( VERBOSE, "BIFStrength:%d ", m_BIFStrength);
   msg( VERBOSE, "BIFQPOffset:%d ", m_BIFQPOffset);
