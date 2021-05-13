@@ -4179,13 +4179,9 @@ void EncAppCfg::xPrintParameter()
 #if IDCC_TPM_JEM
   msg(DETAILS, "Intra TMP: %d\n", m_IntraTMP);
   msg(DETAILS, "Max CU size of TMP: %d\n", m_IntraTMP_MaxSize);
-#if IDCC_FixedComparisonPerPixel
   msg(DETAILS, "dynamic search range with fixed comparison per pixel: \n");
   msg(DETAILS, "	searchRangeWidth = %d*Width \n", IDCC_SearchRangeMultFactor);
   msg(DETAILS, "	searchRangeHeight = %d*Heigh \n", IDCC_SearchRangeMultFactor);
-#else
-  msg(DETAILS, "search range: %d\n", IDCC_SEARCHRANGEINTRA);
-#endif
 #endif
 
   msg( DETAILS, "Max Num Merge Candidates               : %d\n", m_maxNumMergeCand );

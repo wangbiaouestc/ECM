@@ -50,40 +50,6 @@
 #include <assert.h>
 #include <cassert>
 
-#define IDCC_TPM_JEM									  1 // template matching prediction as implemented in JEM-7.2
-#if IDCC_TPM_JEM
-
-#define IDCC_TMP_SIMD									1
-//#define IDCC_TMP_MaxSize								64
-#define IDCC_SignleSearchRegion							0 // single region starting from current position up-left on
-
-#define IDCC_FixedComparisonPerPixel					1
-#if IDCC_FixedComparisonPerPixel
-#define IDCC_SearchRangeMultFactor						5
-#endif
-
-#if !IDCC_SignleSearchRegion
-#define IDCC_TMP_Within_CTU								1
-#endif
-#if !IDCC_FixedComparisonPerPixel
-#define IDCC_SEARCHRANGEINTRA							 70 // should be larger than IDCC_TMP_MaxSize + IDCC_TemplateSize
-#endif
-#if IDCC_TMP_SIMD
-#define IDCC_TemplateSize								4 // must be multiple of 4 for SIMD
-#else
-#define IDCC_TemplateSize								4
-#endif
-#define IDCC_TMP_ImplicitMTS							1
-
-#define IDCC_TMP_MaxSize_Depth							6 // should be log2(IDCC_TMP_MaxSize): keep as 6 to avoid any error
-
-#define VCEG_AZ08_USE_SSD_DISTANCE                        0  ///< (default 0) If defined, use SSD distance.
-#define VCEG_AZ08_USE_SAD_DISTANCE                        1  ///< (default 1) If defined, use SAD distance.
-
-#if VCEG_AZ08_USE_SSD_DISTANCE || VCEG_AZ08_USE_SAD_DISTANCE
-typedef       int             DistType;
-#endif
-#endif
 
 
 #define BASE_ENCODER                                      1
@@ -120,6 +86,25 @@ typedef       int             DistType;
 #define INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS             1 // Enable 2xN and Nx2 block by removing SCIPU constraints
 #define CCLM_LATENCY_RESTRICTION_RMV                      1 // remove the latency between luma and chroma restriction of CCLM
 #define LMS_LINEAR_MODEL                                  1 // LMS for parameters derivation of CCLM and MMLM mode, Remove constraint in derivation of neighbouring samples
+#define IDCC_TPM_JEM									  1 // template matching prediction as implemented in JEM-7.2
+
+#if IDCC_TPM_JEM
+
+#define IDCC_TMP_SIMD									1
+
+#define IDCC_SearchRangeMultFactor						5
+
+#if IDCC_TMP_SIMD
+#define IDCC_TemplateSize								4 // must be multiple of 4 for SIMD
+#else
+#define IDCC_TemplateSize								4
+#endif
+
+#define IDCC_TMP_MaxSize_Depth							6 // should be log2(IDCC_TMP_MaxSize): keep as 6 to avoid any error
+
+typedef       int             DistType;
+#endif
+
 
 //-- inter
 #define CIIP_RM_BLOCK_SIZE_CONSTRAINTS                    1 // Remove the 64x64 restriction and enable 8x4/4x8 block for CIIP

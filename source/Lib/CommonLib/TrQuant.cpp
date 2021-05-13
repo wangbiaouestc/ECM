@@ -444,21 +444,12 @@ void insertNode(DistType diff, int& iXOffset, int& iYOffset, DistType& pDiff, in
 	pId = setId;
 }
 #if IDCC_TPM_JEM
-#if IDCC_FixedComparisonPerPixel
 void clipMvIntraConstraint(CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX)
-#else
-void clipMvIntraConstraint(CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, int iRange, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX)
-#endif
 {
-#if IDCC_FixedComparisonPerPixel
 	int SearchRange_Height, SearchRange_Width;
 	
 	SearchRange_Width = IDCC_SearchRangeMultFactor * uiBlkWidth;
 	SearchRange_Height = IDCC_SearchRangeMultFactor * uiBlkHeight;
-#else
-	int SearchRange_Width = IDCC_SEARCHRANGEINTRA;
-	int SearchRange_Height = IDCC_SEARCHRANGEINTRA;
-#endif
 	int  iMvShift = 0;
 	int iTemplateSize = uiTemplateSize;
 	int iBlkWidth = uiBlkWidth;
@@ -518,12 +509,7 @@ TempLibFast::~TempLibFast()
 #if IDCC_TPM_JEM
 void TempLibFast::initTemplateDiff(unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int bitDepth)
 {
-#if VCEG_AZ08_USE_SAD_DISTANCE
 	DistType maxValue = ((1 << bitDepth) >> (INIT_THRESHOULD_SHIFTBITS)) * (uiPatchHeight * uiPatchWidth - uiBlkHeight * uiBlkWidth);
-#endif
-#if VCEG_AZ08_USE_SSD_DISTANCE
-	DistType maxValue = ((1 << bitDepth) >> (INIT_THRESHOULD_SHIFTBITS)) * ((1 << bitDepth) >> (INIT_THRESHOULD_SHIFTBITS)) * (uiPatchSize * uiPatchSize - uiBlkSize * uiBlkSize);
-#endif
 	m_diffMax = maxValue;
 	{
 		m_pDiff = maxValue;
@@ -610,9 +596,6 @@ void  TrQuant::searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel** tarPatch, 
 	setRefPicUsed(ref); //facilitate the access of each candidate point 
 	
 	setStride(refStride);
-#if !IDCC_FixedComparisonPerPixel
-	int     iSrchRng = SEARCHRANGEINTRA;
-#endif
 
 	
 	Mv cTmpMvPred;
@@ -634,12 +617,7 @@ void  TrQuant::searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel** tarPatch, 
 	DistType diff;
 	Pel* refCurr;
 
-#if IDCC_SignleSearchRegion
-	int mvYMins;
-	int mvYMaxs;
-	int mvXMins;
-	int mvXMaxs;
-#else
+
 #define REGION_NUM 3
 	int mvYMins[REGION_NUM];
 	int mvYMaxs[REGION_NUM];
@@ -647,9 +625,8 @@ void  TrQuant::searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel** tarPatch, 
 	int mvXMaxs[REGION_NUM];
 	int regionNum = REGION_NUM;
 	int regionId = 0;
-#endif
 
-#if IDCC_TMP_Within_CTU && !IDCC_SignleSearchRegion
+
 	//1. check the near pixels within LCU
 	//above pixels in LCU
 	int iTemplateSize = IDCC_TemplateSize;
@@ -699,82 +676,21 @@ void  TrQuant::searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel** tarPatch, 
 			}
 		}
 	}
-#endif
-#if IDCC_SignleSearchRegion
 
-#if IDCC_FixedComparisonPerPixel
-	int SearchRange_Height, SearchRange_Width;
-	// No. of comparison per pixel is:
-	// (searchRange_width - Width - TempSize_width + 1)  *( searchRange_height - Height - TempSize + 1) / Width / Height
-	// to have a constant comparison per pixel:
-	// (searchRange_width - Width - TempSize_width + 1)/Width must be const  = CC
-	// (searchRange_height - Height - TempSize + 1)/ Height must be constant = CC
-
-	//searchRange_width  = CC*Width + Width + TempSize_width - 1;
-	//searchRange_height  = CC*Height + Height + TempSize_height - 1;
-
-
-	SearchRange_Width = IDCC_SearchRangeMultFactor * uiBlkWidth + uiBlkWidth + iTempSize - 1;
-	SearchRange_Height = IDCC_SearchRangeMultFactor * uiBlkHeight + uiBlkHeight + iTempSize - 1;
-#endif
-	int iTempSize = uiTempSize;
-
-	//int  iMvShift = 0;
-	int iBlkWidth = uiBlkWidth;
-	int iBlkHeight = uiBlkHeight;
-
-#if IDCC_FixedComparisonPerPixel
-	mvYMins = std::max(iTempSize, iCurrY - SearchRange_Height);
-#else
-	mvYMins = std::max(iTempSize, (iCurrY - iSrchRng));
-#endif
-	mvYMaxs = iCurrY - iBlkHeight;
-#if IDCC_FixedComparisonPerPixel
-	mvXMins = std::max(iTempSize, (iCurrX - SearchRange_Width));
-#else
-	mvXMins = std::max(iTempSize, (iCurrX - iSrchRng));
-#endif
-	mvXMaxs = (iCurrX - iBlkWidth);
-
-	mvXMins = mvXMins - iCurrX;
-	mvXMaxs = mvXMaxs - iCurrX;
-	mvYMaxs = mvYMaxs - iCurrY;
-	mvYMins = mvYMins - iCurrY;
-#endif
-
-#if !IDCC_SignleSearchRegion
 	//2. check the pixels outside CTU
 	for (regionId = 0; regionId < regionNum; regionId++)
 	{// this function fills in the range the template matching for pixels outside the current CTU
-#if IDCC_FixedComparisonPerPixel
 		clipMvIntraConstraint(pcCU, regionId, mvXMins[regionId], mvXMaxs[regionId], mvYMins[regionId], mvYMaxs[regionId], IDCC_TemplateSize, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX);
-#else
-		clipMvIntraConstraint(pcCU, regionId, mvXMins[regionId], mvXMaxs[regionId], mvYMins[regionId], mvYMaxs[regionId], iSrchRng, uiTempSize, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX);
-#endif
 	}
-#endif
-#if !IDCC_SignleSearchRegion
 	for (regionId = 0; regionId < regionNum; regionId++)
-#endif
 	{
-#if IDCC_SignleSearchRegion
-		int mvYMin = mvYMins;
-		int mvYMax = mvYMaxs;
-		int mvXMin = mvXMins;
-		int mvXMax = mvXMaxs;
-#else
 		int mvYMin = mvYMins[regionId];
 		int mvYMax = mvYMaxs[regionId];
 		int mvXMin = mvXMins[regionId];
 		int mvXMax = mvXMaxs[regionId];
-#endif
 		if ( mvYMax < mvYMin || mvXMax < mvXMin )
 		{
-#if IDCC_SignleSearchRegion
-			return;
-#else
 			continue;
-#endif
 		}
 		for (iYOffset = mvYMax; iYOffset >= mvYMin; iYOffset--)
 		{
@@ -841,7 +757,6 @@ bool TrQuant::generateTMPrediction(Pel* piPred, unsigned int uiStride, unsigned 
 
 DistType TrQuant::calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, DistType iMax)
 {
-#if IDCC_TMP_SIMD
 	DistType iDiffSum = 0;
 	int iY;
 	Pel* refPatchRow = ref - IDCC_TemplateSize * uiStride - IDCC_TemplateSize;
@@ -957,54 +872,6 @@ DistType TrQuant::calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel** tarPat
 	
 	return iDiffSum;
 	
-#else
-	int iY, iX;
-#if VCEG_AZ08_USE_SSD_DISTANCE
-	int iDiff;
-#endif
-	DistType iDiffSum = 0;
-	Pel* refPatchRow = ref - IDCC_TemplateSize * uiStride - IDCC_TemplateSize;
-	Pel* tarPatchRow;
-	for (iY = 0; iY < IDCC_TemplateSize; iY++)
-	{
-		tarPatchRow = tarPatch[iY];
-		for (iX = 0; iX < uiPatchWidth; iX++)
-		{
-#if VCEG_AZ08_USE_SAD_DISTANCE
-			iDiffSum += abs(refPatchRow[iX] - tarPatchRow[iX]);
-#endif
-#if VCEG_AZ08_USE_SSD_DISTANCE
-			iDiff = refPatchRow[iX] - tarPatchRow[iX];
-			iDiffSum += iDiff * iDiff;
-#endif
-		}
-		if (iDiffSum > iMax) //for speeding up
-		{
-			return iDiffSum;
-		}
-		refPatchRow += uiStride;
-	}
-	for (iY = IDCC_TemplateSize; iY < uiPatchHeight; iY++)
-	{
-		tarPatchRow = tarPatch[iY];
-		for (iX = 0; iX < uiTempSize; iX++)
-		{
-#if VCEG_AZ08_USE_SAD_DISTANCE
-			iDiffSum += abs(refPatchRow[iX] - tarPatchRow[iX]);
-#endif
-#if VCEG_AZ08_USE_SSD_DISTANCE
-			iDiff = refPatchRow[iX] - tarPatchRow[iX];
-			iDiffSum += iDiff * iDiff;
-#endif
-		}
-		if (iDiffSum > iMax) //for speeding up
-		{
-			return iDiffSum;
-		}
-		refPatchRow += uiStride;
-	}
-	return iDiffSum;
-#endif
 }
 #endif
 
@@ -1435,11 +1302,7 @@ std::vector<int> TrQuant::selectICTCandidates( const TransformUnit &tu, CompStor
 void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &trTypeHor, int &trTypeVer)
 {
   const bool isExplicitMTS = (CU::isIntra(*tu.cu) ? tu.cs->sps->getUseIntraMTS() : tu.cs->sps->getUseInterMTS() && CU::isInter(*tu.cu)) && isLuma(compID);
-#if IDCC_TPM_JEM && !IDCC_TMP_ImplicitMTS
-  const bool isImplicitMTS = CU::isIntra(*tu.cu) && tu.cs->sps->getUseImplicitMTS() && isLuma(compID) && tu.cu->lfnstIdx == 0 && tu.cu->mipFlag == 0 && tu.cu->TmpFlag == 0;
-#else
   const bool isImplicitMTS = CU::isIntra(*tu.cu) && tu.cs->sps->getUseImplicitMTS() && isLuma(compID) && tu.cu->lfnstIdx == 0 && tu.cu->mipFlag == 0;
-#endif
   const bool isISP = CU::isIntra(*tu.cu) && tu.cu->ispMode && isLuma(compID);
   const bool isSBT = CU::isInter(*tu.cu) && tu.cu->sbtInfo && isLuma(compID);
 
@@ -1456,7 +1319,7 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
     return;
   }
 
-#if IDCC_TMP_ImplicitMTS
+#if IDCC_TPM_JEM
   if (isImplicitMTS || isISP || tu.cu->TmpFlag)
 #else
   if (isImplicitMTS || isISP)
