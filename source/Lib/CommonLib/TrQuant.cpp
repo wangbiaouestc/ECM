@@ -324,7 +324,7 @@ void TrQuant::init( const Quant* otherQuant,
 #if ENABLE_SIMD_SIGN_PREDICTION
   m_computeSAD = xComputeSAD;
 #endif
-#if INTRA_TEMPLATE_MATCHING
+#if JVET_V0130_INTRA_TMP
   m_calcTemplateDiff = calcTemplateDiff;
 #endif
 

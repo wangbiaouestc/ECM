@@ -4176,7 +4176,7 @@ void EncAppCfg::xPrintParameter()
     }
 #endif
   }
-#if INTRA_TEMPLATE_MATCHING
+#if JVET_V0130_INTRA_TMP
   msg(DETAILS, "Intra TMP: %d\n", m_intraTMP);
   msg(DETAILS, "Max CU size of TMP: %d\n", m_intraTmpMaxSize);
   msg(DETAILS, "dynamic search range with fixed comparison per pixel: \n");
@@ -4316,7 +4316,7 @@ void EncAppCfg::xPrintParameter()
   {
     msg( VERBOSE, "WrapAroundOffset:%d ", m_wrapAroundOffset );
   }
-#if INTRA_TEMPLATE_MATCHING
+#if JVET_V0130_INTRA_TMP
   msg( VERBOSE, "IntraTMP:%d ", m_intraTMP);
   msg( VERBOSE, "IntraTmpMaxSize:%d ", m_intraTmpMaxSize);
 #endif
