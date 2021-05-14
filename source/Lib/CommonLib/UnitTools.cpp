@@ -961,7 +961,7 @@ bool PU::isDMChromaMIP(const PredictionUnit &pu)
 
 uint32_t PU::getIntraDirLuma( const PredictionUnit &pu )
 {
-#if INTRA_TEMPLATE_MATCHING
+#if JVET_V0130_INTRA_TMP
 	if (isMIP(pu) || isTmp(pu))
 #else
   if (isMIP(pu))
