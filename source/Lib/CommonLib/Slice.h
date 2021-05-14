@@ -1651,9 +1651,9 @@ private:
 #if ENABLE_DIMD
   bool              m_dimd;
 #endif
-#if IDCC_TPM_JEM
-  bool              m_IntraTMP;                                       ///< intra Template Matching 
-  unsigned          m_IntraTMP_MaxSize;                               ///< max CU size for which intra TMP is allowed
+#if JVET_V0130_INTRA_TMP
+  bool              m_intraTMP;                                       ///< intra Template Matching 
+  unsigned          m_intraTmpMaxSize;                               ///< max CU size for which intra TMP is allowed
 #endif
 #if ENABLE_OBMC
   bool              m_OBMC;
@@ -2077,11 +2077,11 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setUseDimd         ( bool b )                                        { m_dimd = b; }
   bool      getUseDimd         ()                                      const     { return m_dimd; }
 #endif
-#if IDCC_TPM_JEM
-  void      setUseIntraTMP(bool b) { m_IntraTMP = b; }
-  bool      getUseIntraTMP() const { return m_IntraTMP; }
-  void      setIntraTMPMaxSize(unsigned n) { m_IntraTMP_MaxSize = n; }
-  unsigned  getIntraTMPMaxSize() const { return m_IntraTMP_MaxSize; }
+#if JVET_V0130_INTRA_TMP
+  void      setUseIntraTMP     (bool b)                                          { m_intraTMP = b; }
+  bool      getUseIntraTMP     ()                                      const     { return m_intraTMP; }
+  void      setIntraTMPMaxSize (unsigned n)                                      { m_intraTmpMaxSize = n; }
+  unsigned  getIntraTMPMaxSize ()                                      const     { return m_intraTmpMaxSize; }
 #endif
 #if ENABLE_OBMC
   void      setUseOBMC         ( bool b )                                        { m_OBMC = b; }

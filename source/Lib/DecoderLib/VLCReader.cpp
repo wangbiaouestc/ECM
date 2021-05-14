@@ -2260,7 +2260,7 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if ENABLE_DIMD
   READ_FLAG(uiCode, "sps_dimd_enabled_flag");                           pcSPS->setUseDimd(uiCode != 0);
 #endif
-#if IDCC_TPM_JEM
+#if JVET_V0130_INTRA_TMP
   READ_FLAG(uiCode, "sps_intraTMP_enabled_flag");                   pcSPS->setUseIntraTMP( uiCode != 0 );
   if(pcSPS->getUseIntraTMP())
   {

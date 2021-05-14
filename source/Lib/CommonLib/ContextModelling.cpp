@@ -778,17 +778,17 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
   PU::restrictBiPredMergeCandsOne(pu);
 }
 
-#if IDCC_TPM_JEM
+#if JVET_V0130_INTRA_TMP
 unsigned DeriveCtx::CtxTmpFlag(const CodingUnit& cu)
 {
 	const CodingStructure* cs = cu.cs;
 	unsigned ctxId = 0;
 
 	const CodingUnit* cuLeft = cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
-	ctxId = (cuLeft && cuLeft->TmpFlag) ? 1 : 0;
+	ctxId = (cuLeft && cuLeft->tmpFlag) ? 1 : 0;
 
 	const CodingUnit* cuAbove = cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
-	ctxId += (cuAbove && cuAbove->TmpFlag) ? 1 : 0;
+	ctxId += (cuAbove && cuAbove->tmpFlag) ? 1 : 0;
 
 	ctxId = (cu.lwidth() > 2 * cu.lheight() || cu.lheight() > 2 * cu.lwidth()) ? 3 : ctxId;
 

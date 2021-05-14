@@ -307,7 +307,7 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   }
   else
   {
-#if IDCC_TPM_JEM
+#if JVET_V0130_INTRA_TMP
 	  if (PU::isTmp(pu, chType))
 	  {
 		  int foundCandiNum;
@@ -512,11 +512,11 @@ void DecCu::xIntraRecACTBlk(TransformUnit& tu)
 
     PelBuf piPred = cs.getPredBuf(area);
     m_pcIntraPred->initIntraPatternChType(*tu.cu, area);
-#if IDCC_TPM_JEM
+#if JVET_V0130_INTRA_TMP
 	if (PU::isTmp(pu, chType))
 	{
 		int foundCandiNum;
-		const unsigned int           uiStride = cs.picture->getRecoBuf(COMPONENT_Y).stride;
+		const unsigned int uiStride = cs.picture->getRecoBuf(COMPONENT_Y).stride;
 		m_pcTrQuant->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
 		m_pcTrQuant->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
 		m_pcTrQuant->generateTMPrediction(piPred.buf, uiStride, pu.lwidth(), pu.lheight(), foundCandiNum);

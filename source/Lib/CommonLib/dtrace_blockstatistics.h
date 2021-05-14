@@ -78,7 +78,7 @@ enum class BlockStatistic {
   Chroma_IntraMode,
   MultiRefIdx,
   MIPFlag,
-#if IDCC_TPM_JEM
+#if JVET_V0130_INTRA_TMP
   TmpFlag,
 #endif
   ISPMode,
@@ -173,7 +173,7 @@ static const std::map<BlockStatistic, std::tuple<std::string, BlockStatisticType
   { BlockStatistic::JointCbCr,              std::tuple<std::string, BlockStatisticType, std::string>{"JointCbCr",                   BlockStatisticType::Flag,                   ""}},
 
   { BlockStatistic::MIPFlag,                std::tuple<std::string, BlockStatisticType, std::string>{"MIPFlag",                     BlockStatisticType::Flag,                   ""}},
-#if IDCC_TPM_JEM
+#if JVET_V0130_INTRA_TMP
   { BlockStatistic::TmpFlag,                std::tuple<std::string, BlockStatisticType, std::string>{"TmpFlag",                     BlockStatisticType::Flag,                   ""}},
 #endif
   { BlockStatistic::ISPMode,                std::tuple<std::string, BlockStatisticType, std::string>{"ISPMode",                     BlockStatisticType::Integer,                "[0, " + std::to_string(NUM_INTRA_SUBPARTITIONS_MODES) + "]"}},

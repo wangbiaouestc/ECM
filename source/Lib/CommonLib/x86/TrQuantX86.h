@@ -410,7 +410,129 @@ uint32_t computeSAD_SIMD( const Pel* ref, const Pel* cur, const int size )
 }
 #endif
 
-#if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT
+#if ENABLE_SIMD_TMP
+template< X86_VEXT vext >
+int calcTemplateDiffSIMD( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax )
+{
+  int iDiffSum = 0;
+  int iY;
+  Pel* refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride - TMP_TEMPLATE_SIZE;
+  Pel* tarPatchRow;
+  uint32_t uiSum;
+
+  // horizontal difference
+  for( iY = 0; iY < TMP_TEMPLATE_SIZE; iY++ )
+  {
+    tarPatchRow = tarPatch[iY];
+    const short* pSrc1 = ( const short* ) tarPatchRow;
+    const short* pSrc2 = ( const short* ) refPatchRow;
+
+    // SIMD difference
+    //int  iRows = uiPatchHeight;
+    int  iCols = uiPatchWidth;
+    if( (iCols & 7) == 0 )
+    {
+      // Do with step of 8
+      __m128i vzero = _mm_setzero_si128();
+      __m128i vsum32 = vzero;
+      //for (int iY = 0; iY < iRows; iY += iSubStep)
+      {
+        __m128i vsum16 = vzero;
+        for( int iX = 0; iX < iCols; iX += 8 )
+        {
+          __m128i vsrc1 = _mm_loadu_si128( (const __m128i*)(&pSrc1[iX]) );
+          __m128i vsrc2 = _mm_lddqu_si128( (const __m128i*)(&pSrc2[iX]) );
+          vsum16 = _mm_add_epi16( vsum16, _mm_abs_epi16( _mm_sub_epi16( vsrc1, vsrc2 ) ) );
+        }
+        __m128i vsumtemp = _mm_add_epi32( _mm_unpacklo_epi16( vsum16, vzero ), _mm_unpackhi_epi16( vsum16, vzero ) );
+        vsum32 = _mm_add_epi32( vsum32, vsumtemp );
+        //pSrc1 += iStrideSrc1;
+        //pSrc2 += iStrideSrc2;
+      }
+      vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
+      vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
+      uiSum = _mm_cvtsi128_si32( vsum32 );
+    }
+    else
+    {
+      // Do with step of 4
+      __m128i vzero = _mm_setzero_si128();
+      __m128i vsum32 = vzero;
+      //for (int iY = 0; iY < iRows; iY += iSubStep)
+      {
+        __m128i vsum16 = vzero;
+        for( int iX = 0; iX < iCols; iX += 4 )
+        {
+          __m128i vsrc1 = _mm_loadl_epi64( (const __m128i*) & pSrc1[iX] );
+          __m128i vsrc2 = _mm_loadl_epi64( (const __m128i*) & pSrc2[iX] );
+          vsum16 = _mm_add_epi16( vsum16, _mm_abs_epi16( _mm_sub_epi16( vsrc1, vsrc2 ) ) );
+        }
+        __m128i vsumtemp = _mm_add_epi32( _mm_unpacklo_epi16( vsum16, vzero ), _mm_unpackhi_epi16( vsum16, vzero ) );
+        vsum32 = _mm_add_epi32( vsum32, vsumtemp );
+        //pSrc1 += iStrideSrc1;
+        //pSrc2 += iStrideSrc2;
+      }
+      vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
+      vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
+      uiSum = _mm_cvtsi128_si32( vsum32 );
+    }
+    iDiffSum += uiSum;
+
+    if( iDiffSum > iMax ) //for speeding up
+    {
+      return iDiffSum;
+    }
+    // update location
+    refPatchRow += uiStride;
+  }
+
+  // vertical difference
+  int  iCols = TMP_TEMPLATE_SIZE;
+
+  for( iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++ )
+  {
+    tarPatchRow = tarPatch[iY];
+    const short* pSrc1 = ( const short* ) tarPatchRow;
+    const short* pSrc2 = ( const short* ) refPatchRow;
+
+    // SIMD difference
+
+    // Do with step of 4
+    __m128i vzero = _mm_setzero_si128();
+    __m128i vsum32 = vzero;
+    //for (int iY = 0; iY < iRows; iY += iSubStep)
+    {
+      __m128i vsum16 = vzero;
+      for( int iX = 0; iX < iCols; iX += 4 )
+      {
+        __m128i vsrc1 = _mm_loadl_epi64( (const __m128i*) & pSrc1[iX] );
+        __m128i vsrc2 = _mm_loadl_epi64( (const __m128i*) & pSrc2[iX] );
+        vsum16 = _mm_add_epi16( vsum16, _mm_abs_epi16( _mm_sub_epi16( vsrc1, vsrc2 ) ) );
+      }
+      __m128i vsumtemp = _mm_add_epi32( _mm_unpacklo_epi16( vsum16, vzero ), _mm_unpackhi_epi16( vsum16, vzero ) );
+      vsum32 = _mm_add_epi32( vsum32, vsumtemp );
+      //pSrc1 += iStrideSrc1;
+      //pSrc2 += iStrideSrc2;
+    }
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
+    uiSum = _mm_cvtsi128_si32( vsum32 );
+
+    iDiffSum += uiSum;
+
+    if( iDiffSum > iMax ) //for speeding up
+    {
+      return iDiffSum;
+    }
+    // update location
+    refPatchRow += uiStride;
+  }
+
+  return iDiffSum;
+}
+#endif
+
+#if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT || ENABLE_SIMD_TMP
 template <X86_VEXT vext>
 void TrQuant::_initTrQuantX86()
 {
@@ -544,6 +666,10 @@ void TrQuant::_initTrQuantX86()
   fastInvTrans[2][4] = fastInverseTransform_SIMD<DST7, 32>;
   fastInvTrans[2][5] = fastInverseTransform_SIMD<DST7, 64>;
 #endif
+#endif
+
+#if ENABLE_SIMD_TMP
+  m_calcTemplateDiff = calcTemplateDiffSIMD<vext>;
 #endif
 }
 

@@ -884,8 +884,8 @@ void writeAllData(const CodingStructure& cs, const UnitArea& ctuArea)
           if(chType == CHANNEL_TYPE_LUMA)
           {
             DTRACE_BLOCK_SCALAR(g_trace_ctx, D_BLOCK_STATISTICS_ALL, cu, GetBlockStatisticName(BlockStatistic::MIPFlag), cu.mipFlag);
-#if IDCC_TPM_JEM
-			DTRACE_BLOCK_SCALAR(g_trace_ctx, D_BLOCK_STATISTICS_ALL, cu, GetBlockStatisticName(BlockStatistic::TmpFlag), cu.TmpFlag);
+#if JVET_V0130_INTRA_TMP
+            DTRACE_BLOCK_SCALAR(g_trace_ctx, D_BLOCK_STATISTICS_ALL, cu, GetBlockStatisticName(BlockStatistic::TmpFlag), cu.tmpFlag);
 #endif
             DTRACE_BLOCK_SCALAR(g_trace_ctx, D_BLOCK_STATISTICS_ALL, cu, GetBlockStatisticName(BlockStatistic::ISPMode), cu.ispMode);
           }

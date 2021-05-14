@@ -686,7 +686,7 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
   if(   sps.getSpsRangeExtension().getIntraSmoothingDisabledFlag()
     || !isLuma( chType )
     || useISP
-#if IDCC_TPM_JEM
+#if JVET_V0130_INTRA_TMP
 	  || PU::isTmp(pu, chType)
 #endif
     || PU::isMIP( pu, chType )
@@ -1394,7 +1394,7 @@ void IntraPrediction::initIntraPatternChTypeISP(const CodingUnit& cu, const Comp
   }
 }
 
-#if IDCC_TPM_JEM
+#if JVET_V0130_INTRA_TMP
 bool IntraPrediction::isRefTemplateAvailable(CodingUnit& cu, CompArea& area)
 {
 	const ChannelType      chType = toChannelType(area.compID);
@@ -1402,13 +1402,11 @@ bool IntraPrediction::isRefTemplateAvailable(CodingUnit& cu, CompArea& area)
 	const SPS& sps = *cs.sps;
 	const PreCalcValues& pcv = *cs.pcv;
 
-
 	const int  tuWidth = area.width;
 	const int  tuHeight = area.height;
 	const int  predSize = m_topRefLength;
 	const int  predHSize = m_leftRefLength;
 	//const int predStride = predSize;
-
 
 	const int  unitWidth = pcv.minCUWidth >> getComponentScaleX(area.compID, sps.getChromaFormatIdc());
 	const int  unitHeight = pcv.minCUHeight >> getComponentScaleY(area.compID, sps.getChromaFormatIdc());
@@ -1421,8 +1419,10 @@ bool IntraPrediction::isRefTemplateAvailable(CodingUnit& cu, CompArea& area)
 	const int  numAboveRightUnits = totalAboveUnits - numAboveUnits;
 	const int  numLeftBelowUnits = totalLeftUnits - numLeftUnits;
 
-	if (numAboveUnits <= 0 || numLeftUnits <= 0 || numAboveRightUnits <= 0 || numLeftBelowUnits <= 0)
-		return false;
+  if( numAboveUnits <= 0 || numLeftUnits <= 0 || numAboveRightUnits <= 0 || numLeftBelowUnits <= 0 )
+  {
+    return false;
+  }
 
 	// ----- Step 1: analyze neighborhood -----
 	const Position posLT = area;

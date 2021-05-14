@@ -788,9 +788,9 @@ void EncApp::xInitLibCfg()
 
   m_cEncLib.setUseWrapAround                                     ( m_wrapAround );
   m_cEncLib.setWrapAroundOffset                                  ( m_wrapAroundOffset );
-#if IDCC_TPM_JEM
-  m_cEncLib.setUseIntraTMP(m_IntraTMP);
-  m_cEncLib.setIntraTMPMaxSize(m_IntraTMP_MaxSize);
+#if JVET_V0130_INTRA_TMP
+  m_cEncLib.setUseIntraTMP                                       ( m_intraTMP );
+  m_cEncLib.setIntraTMPMaxSize                                   ( m_intraTmpMaxSize );
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   m_cEncLib.setUseBIF                                            ( m_BIF );

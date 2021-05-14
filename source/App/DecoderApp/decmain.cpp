@@ -54,7 +54,7 @@ int main(int argc, char* argv[])
 
   // print information
   fprintf( stdout, "\n" );
-  fprintf( stdout, "VVCSoftware: VTM Decoder Version %s ", VTM_VERSION );
+  fprintf( stdout, "VVCSoftware: ECM Decoder Version %s (VTM-%s) ", ECM_VERSION, VTM_VERSION );
   fprintf( stdout, NVM_ONOS );
   fprintf( stdout, NVM_COMPILEDBY );
   fprintf( stdout, NVM_BITS );

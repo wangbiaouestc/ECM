@@ -1384,11 +1384,11 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if ENABLE_DIMD
   WRITE_FLAG( pcSPS->getUseDimd() ? 1 : 0,                                             "sps_dimd_enabled_flag");
 #endif
-#if IDCC_TPM_JEM
+#if JVET_V0130_INTRA_TMP
   WRITE_FLAG( pcSPS->getUseIntraTMP() ? 1 : 0,                                         "sps_intraTMP_enabled_flag");
   if(pcSPS->getUseIntraTMP())
   {
-    WRITE_UVLC(floorLog2(pcSPS->getIntraTMPMaxSize()), "sps_log2_intra_tmp_max_size");
+    WRITE_UVLC(floorLog2(pcSPS->getIntraTMPMaxSize()),                                 "sps_log2_intra_tmp_max_size");
   }
 #endif
 
