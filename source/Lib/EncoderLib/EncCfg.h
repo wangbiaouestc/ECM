@@ -806,9 +806,9 @@ protected:
 
   bool        m_alf;                                          ///< Adaptive Loop Filter
 
-#if IDCC_TPM_JEM
-  bool      m_IntraTMP;                                       ///< intra Template Matching 
-  unsigned  m_IntraTMP_MaxSize;                               ///< max CU size for which intra TMP is allowed
+#if JVET_V0130_INTRA_TMP
+  bool        m_intraTMP;                                       ///< intra Template Matching 
+  unsigned    m_intraTmpMaxSize;                               ///< max CU size for which intra TMP is allowed
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   bool        m_BIF;
@@ -1287,11 +1287,11 @@ public:
   bool      getUseWrapAround                ()         const { return m_wrapAround; }
   void      setWrapAroundOffset             ( unsigned u )   { m_wrapAroundOffset = u; }
   unsigned  getWrapAroundOffset             ()         const { return m_wrapAroundOffset; }
-#if IDCC_TPM_JEM
-  void      setUseIntraTMP(bool b) { m_IntraTMP = b; }
-  bool      getUseIntraTMP() { return m_IntraTMP; }
-  void      setIntraTMPMaxSize(unsigned n) { m_IntraTMP_MaxSize = n; }
-  unsigned  getIntraTMPMaxSize() { return m_IntraTMP_MaxSize; }
+#if JVET_V0130_INTRA_TMP
+  void      setUseIntraTMP                  (bool b)         { m_intraTMP = b; }
+  bool      getUseIntraTMP()                           const { return m_intraTMP; }
+  void      setIntraTMPMaxSize              (unsigned n)     { m_intraTmpMaxSize = n; }
+  unsigned  getIntraTMPMaxSize()                       const { return m_intraTmpMaxSize; }
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   void      setUseBIF                       ( bool b )       { m_BIF = b; }

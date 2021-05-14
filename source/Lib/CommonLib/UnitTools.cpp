@@ -333,7 +333,7 @@ uint32_t CU::getCtuAddr( const CodingUnit &cu )
 {
   return getCtuAddr( cu.blocks[cu.chType].lumaPos(), *cu.cs->pcv );
 }
-#if IDCC_TPM_JEM
+#if JVET_V0130_INTRA_TMP
 Position CU::getCtuXYAddr(const CodingUnit& cu)
 {
 	return Position((cu.blocks[cu.chType].lumaPos().x >> cu.cs->pcv->maxCUWidthLog2) << cu.cs->pcv->maxCUWidthLog2, (cu.blocks[cu.chType].lumaPos().y >> cu.cs->pcv->maxCUHeightLog2) << cu.cs->pcv->maxCUHeightLog2);
@@ -944,10 +944,10 @@ bool PU::isMIP(const PredictionUnit &pu, const ChannelType &chType)
     return isDMChromaMIP(pu) && (pu.intraDir[CHANNEL_TYPE_CHROMA] == DM_CHROMA_IDX);
   }
 }
-#if IDCC_TPM_JEM
+#if JVET_V0130_INTRA_TMP
 bool PU::isTmp(const PredictionUnit& pu, const ChannelType& chType)
 {
-	return (chType == CHANNEL_TYPE_LUMA && pu.cu->TmpFlag);
+	return (chType == CHANNEL_TYPE_LUMA && pu.cu->tmpFlag);
 }
 #endif
 bool PU::isDMChromaMIP(const PredictionUnit &pu)
@@ -961,7 +961,7 @@ bool PU::isDMChromaMIP(const PredictionUnit &pu)
 
 uint32_t PU::getIntraDirLuma( const PredictionUnit &pu )
 {
-#if IDCC_TPM_JEM
+#if INTRA_TEMPLATE_MATCHING
 	if (isMIP(pu) || isTmp(pu))
 #else
   if (isMIP(pu))
@@ -4984,8 +4984,8 @@ bool CU::isMTSAllowed(const CodingUnit &cu, const ComponentID compID)
   mtsAllowed &= cuWidth <= maxSize && cuHeight <= maxSize;
   mtsAllowed &= !cu.ispMode;
   mtsAllowed &= !cu.sbtInfo;
-#if IDCC_TMP_ImplicitMTS
-  mtsAllowed &= !cu.TmpFlag;
+#if JVET_V0130_INTRA_TMP
+  mtsAllowed &= !cu.tmpFlag;
 #endif
   mtsAllowed &= !(cu.bdpcmMode && cuWidth <= tsMaxSize && cuHeight <= tsMaxSize);
   return mtsAllowed;
@@ -5321,8 +5321,8 @@ bool allowLfnstWithMip(const Size& block)
   }
   return false;
 }
-#if IDCC_TPM_JEM
-bool allowLfnstWithTpm()
+#if JVET_V0130_INTRA_TMP
+bool allowLfnstWithTmp()
 {
 	return true;
 }

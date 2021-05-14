@@ -1,4 +1,4 @@
-/* The copyright in this software is being made available under the BSD
+﻿/* The copyright in this software is being made available under the BSD
  * License, included below. This software may be subject to other third party
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
@@ -86,25 +86,6 @@
 #define INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS             1 // Enable 2xN and Nx2 block by removing SCIPU constraints
 #define CCLM_LATENCY_RESTRICTION_RMV                      1 // remove the latency between luma and chroma restriction of CCLM
 #define LMS_LINEAR_MODEL                                  1 // LMS for parameters derivation of CCLM and MMLM mode, Remove constraint in derivation of neighbouring samples
-#define IDCC_TPM_JEM									  1 // template matching prediction as implemented in JEM-7.2
-
-#if IDCC_TPM_JEM
-
-#define IDCC_TMP_SIMD									1
-
-#define IDCC_SearchRangeMultFactor						5
-
-#if IDCC_TMP_SIMD
-#define IDCC_TemplateSize								4 // must be multiple of 4 for SIMD
-#else
-#define IDCC_TemplateSize								4
-#endif
-
-#define IDCC_TMP_MaxSize_Depth							6 // should be log2(IDCC_TMP_MaxSize): keep as 6 to avoid any error
-
-typedef       int             DistType;
-#endif
-
 
 //-- inter
 #define CIIP_RM_BLOCK_SIZE_CONSTRAINTS                    1 // Remove the 64x64 restriction and enable 8x4/4x8 block for CIIP
@@ -129,6 +110,7 @@ typedef       int             DistType;
 #define SECONDARY_MPM                                     1 // Primary MPM and Secondary MPM: Add neighbouring modes into MPMs from positions AR, BL, AL, derived modes
 #define ENABLE_DIMD                                       1 // Decoder side intra mode derivation
 #define JVET_V0087_DIMD_NO_ISP                            ENABLE_DIMD // disallow combination of DIMD and ISP
+#define JVET_V0130_INTRA_TMP                              1 // JVET-V0130: template matching prediction
 
 // Inter
 #define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
@@ -166,6 +148,12 @@ typedef       int             DistType;
 #endif
 #if SIGN_PREDICTION
 #define ENABLE_SIMD_SIGN_PREDICTION                       1
+#endif
+#if JVET_V0130_INTRA_TMP
+#define ENABLE_SIMD_TMP									                  1
+#endif
+#if JVET_V0094_BILATERAL_FILTER
+#define ENABLE_SIMD_BILATERAL_FILTER                      1
 #endif
 
 #endif // tools

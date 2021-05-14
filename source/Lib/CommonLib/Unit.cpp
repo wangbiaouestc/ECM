@@ -303,8 +303,8 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   smvdMode        = other.smvdMode;
   ispMode           = other.ispMode;
   mipFlag           = other.mipFlag;
-#if IDCC_TPM_JEM
-  TmpFlag = other.TmpFlag;
+#if JVET_V0130_INTRA_TMP
+  tmpFlag           = other.tmpFlag;
 #endif
 #if INTER_LIC
   LICFlag           = other.LICFlag;
@@ -387,8 +387,8 @@ void CodingUnit::initData()
   smvdMode        = 0;
   ispMode           = 0;
   mipFlag           = false;
-#if IDCC_TPM_JEM
-  TmpFlag = false;
+#if JVET_V0130_INTRA_TMP
+  tmpFlag = false;
 #endif
 #if INTER_LIC
   LICFlag = false;

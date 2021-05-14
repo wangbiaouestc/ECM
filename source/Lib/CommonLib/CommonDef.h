@@ -477,11 +477,6 @@ static const int ALF_VB_POS_ABOVE_CTUROW_CHMA = 2;
 static const int MAX_ENCODER_DEBLOCKING_QUALITY_LAYERS =           8 ;
 #endif
 
-#if IDCC_TPM_JEM
-static const int USE_MORE_BLOCKSIZE_DEPTH_MAX = IDCC_TMP_MaxSize_Depth - 1;
-static const int INIT_THRESHOULD_SHIFTBITS = 2;  ///< (default 2) Early skip threshold for checking distance.
-#endif
-
 #if SHARP_LUMA_DELTA_QP
 static const uint32_t LUMA_LEVEL_TO_DQP_LUT_MAXSIZE =                1024; ///< max LUT size for QP offset based on luma
 
@@ -953,6 +948,14 @@ static const int NUM_ACT_FIX             = 16;
 static const int NUM_CLASSES_FIX         = ((NUM_DIR_FIX*(NUM_DIR_FIX + 1))*NUM_ACT_FIX);
 static const int MAX_FILTER_LENGTH_FIXED = 13;
 static const int FIX_FILTER_NUM_COEFF    = 42;
+#endif
+
+#if JVET_V0130_INTRA_TMP
+static const int TMP_TEMPLATE_SIZE =            4; // must be multiple of 4 for SIMD
+static const int TMP_MAXSIZE_DEPTH =            6; // should be log2(TMP_TEMPLATE_SIZE): keep as 6 to avoid any error
+static const int USE_MORE_BLOCKSIZE_DEPTH_MAX = TMP_MAXSIZE_DEPTH - 1;
+static const int INIT_THRESHOULD_SHIFTBITS =    2;  ///< (default 2) Early skip threshold for checking distance.
+static const int TMP_SEARCH_RANGE_MULT_FACTOR = 5;
 #endif
 
 #endif // end of #ifndef  __COMMONDEF__

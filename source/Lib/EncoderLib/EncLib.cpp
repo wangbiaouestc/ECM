@@ -1429,9 +1429,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setNumAddHypWeights(m_numAddHypWeights);
   sps.setMaxNumAddHypRefFrames(m_maxNumAddHypRefFrames);
 #endif
-#if IDCC_TPM_JEM
-  sps.setUseIntraTMP(m_IntraTMP);
-  sps.setIntraTMPMaxSize(m_IntraTMP_MaxSize);
+#if JVET_V0130_INTRA_TMP
+  sps.setUseIntraTMP(m_intraTMP);
+  sps.setIntraTMPMaxSize(m_intraTmpMaxSize);
 #endif
   // ADD_NEW_TOOL : (encoder lib) set tool enabling flags and associated parameters here
   sps.setUseISP                             ( m_ISP );

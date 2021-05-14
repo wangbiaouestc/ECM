@@ -1044,9 +1044,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("AdditionalInterHypRefFrames",                     m_maxNumAddHypRefFrames,                              4, "max. number of ref frames for additional inter hypotheseis")
   ("AdditionalInterHypTries",                         m_addHypTries,                                        1, "number of tries for additional inter prediction hypotheseis")
 #endif
-#if IDCC_TPM_JEM
-  ("IntraTMP",                                        m_IntraTMP,                                        false, "intra Template Matching (0: off, 1:on)  [default: on]")
-  ("IntraTMPMaxSize",                                 m_IntraTMP_MaxSize,                                 64u, "intra Template Matching max CU size  [default: 64]")
+#if JVET_V0130_INTRA_TMP
+  ("IntraTMP",                                        m_intraTMP,                                       false, "intra Template Matching (0: off, 1:on)  [default: on]")
+  ("IntraTMPMaxSize",                                 m_intraTmpMaxSize,                                  64u, "intra Template Matching max CU size  [default: 64]")
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   ("BIF",                                             m_BIF,                                            true, "bilateral filter   (0: off, 1:on)  [default: on]")
@@ -4176,12 +4176,12 @@ void EncAppCfg::xPrintParameter()
     }
 #endif
   }
-#if IDCC_TPM_JEM
-  msg(DETAILS, "Intra TMP: %d\n", m_IntraTMP);
-  msg(DETAILS, "Max CU size of TMP: %d\n", m_IntraTMP_MaxSize);
+#if INTRA_TEMPLATE_MATCHING
+  msg(DETAILS, "Intra TMP: %d\n", m_intraTMP);
+  msg(DETAILS, "Max CU size of TMP: %d\n", m_intraTmpMaxSize);
   msg(DETAILS, "dynamic search range with fixed comparison per pixel: \n");
-  msg(DETAILS, "	searchRangeWidth = %d*Width \n", IDCC_SearchRangeMultFactor);
-  msg(DETAILS, "	searchRangeHeight = %d*Heigh \n", IDCC_SearchRangeMultFactor);
+  msg(DETAILS, "	searchRangeWidth = %d*Width \n", TMP_SEARCH_RANGE_MULT_FACTOR );
+  msg(DETAILS, "	searchRangeHeight = %d*Heigh \n", TMP_SEARCH_RANGE_MULT_FACTOR );
 #endif
 
   msg( DETAILS, "Max Num Merge Candidates               : %d\n", m_maxNumMergeCand );
@@ -4316,9 +4316,9 @@ void EncAppCfg::xPrintParameter()
   {
     msg( VERBOSE, "WrapAroundOffset:%d ", m_wrapAroundOffset );
   }
-#if IDCC_TPM_JEM
-  msg( VERBOSE, "IntraTMP:%d ", m_IntraTMP);
-  msg( VERBOSE, "IntraTMP_MaxSize:%d ", m_IntraTMP_MaxSize);
+#if INTRA_TEMPLATE_MATCHING
+  msg( VERBOSE, "IntraTMP:%d ", m_intraTMP);
+  msg( VERBOSE, "IntraTmpMaxSize:%d ", m_intraTmpMaxSize);
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   msg( VERBOSE, "BIF:%d ", m_BIF);

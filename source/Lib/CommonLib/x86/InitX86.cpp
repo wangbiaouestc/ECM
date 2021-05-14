@@ -50,8 +50,11 @@
 
 #include "CommonLib/IbcHashMap.h"
 
-#if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT
+#if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT || ENABLE_SIMD_TMP
 #include "CommonLib/TrQuant.h"
+#endif
+#if ENABLE_SIMD_BILATERAL_FILTER
+#include "CommonLib/BilateralFilter.h"
 #endif
 
 #ifdef TARGET_SIMD_X86
@@ -190,7 +193,7 @@ void IbcHashMap::initIbcHashMapX86()
 }
 #endif
 
-#if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT
+#if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT || ENABLE_SIMD_TMP
 void TrQuant::initTrQuantX86()
 {
   auto vext = read_x86_extension_flags();
@@ -206,6 +209,29 @@ void TrQuant::initTrQuantX86()
   case SSE42:
   case SSE41:
     _initTrQuantX86<SSE41>();
+    break;
+  default:
+    break;
+  }
+}
+#endif
+
+#if ENABLE_SIMD_BILATERAL_FILTER
+void BilateralFilter::initBilateralFilterX86()
+{
+  auto vext = read_x86_extension_flags();
+  switch( vext )
+  {
+  case AVX512:
+  case AVX2:
+    _initBilateralFilterX86<AVX2>();
+    break;
+  case AVX:
+    _initBilateralFilterX86<AVX>();
+    break;
+  case SSE42:
+  case SSE41:
+    _initBilateralFilterX86<SSE41>();
     break;
   default:
     break;

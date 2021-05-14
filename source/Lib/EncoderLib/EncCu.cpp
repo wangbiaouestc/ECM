@@ -2008,8 +2008,8 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               m_modeCtrl->setISPMode(cu.ispMode);
               m_modeCtrl->setISPLfnstIdx(cu.lfnstIdx);
               m_modeCtrl->setMIPFlagISPPass(cu.mipFlag);
-#if IDCC_TPM_JEM
-			  m_modeCtrl->setTPMFlagISPPass(cu.TmpFlag);
+#if JVET_V0130_INTRA_TMP
+			        m_modeCtrl->setTPMFlagISPPass(cu.tmpFlag);
 #endif
               m_modeCtrl->setBestISPIntraModeRelCU(cu.ispMode ? PU::getFinalIntraMode(*cu.firstPU, CHANNEL_TYPE_LUMA) : UINT8_MAX);
               m_modeCtrl->setBestDCT2NonISPCostRelCU(m_modeCtrl->getMtsFirstPassNoIspCost());
@@ -3881,8 +3881,8 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
   cu.mmvdSkip = false;
   cu.skip = false;
   cu.mipFlag = false;
-#if IDCC_TPM_JEM
-  cu.TmpFlag = false;
+#if JVET_V0130_INTRA_TMP
+  cu.tmpFlag = false;
 #endif
   cu.bdpcmMode = 0;
 
@@ -4109,8 +4109,8 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
       cu.mmvdSkip = false;
       cu.skip = false;
       cu.mipFlag = false;
-#if IDCC_TPM_JEM
-	  cu.TmpFlag = false;
+#if JVET_V0130_INTRA_TMP
+	    cu.tmpFlag = false;
 #endif
       cu.bdpcmMode = 0;
       PredictionUnit &pu = tempCS->addPU(cu, pm.chType);
@@ -4808,8 +4808,8 @@ void EncCu::xCheckSATDCostGeoMerge(CodingStructure *&tempCS, CodingUnit &cu, Pre
   cu.mmvdSkip = false;
   cu.skip = false;
   cu.mipFlag = false;
-#if IDCC_TPM_JEM
-  cu.TmpFlag = false;
+#if JVET_V0130_INTRA_TMP
+  cu.tmpFlag = false;
 #endif
   cu.bdpcmMode = 0;
   pu.mergeFlag = true;
@@ -7677,8 +7677,6 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
   std::stable_sort(mhResults.begin(), mhResults.end(), RDCostComp);
 
   // actual testing with "true" RD costs
-  if (std::min((int)mhResults.size(), m_pcEncCfg->getAddHypTries()) > 1)
-    printf("nbTries=%d\n", std::min((int)mhResults.size(), m_pcEncCfg->getAddHypTries()));
   for (int i = 0; i < std::min((int)mhResults.size(), m_pcEncCfg->getAddHypTries()); ++i)
   {
     tempCS->initStructData(encTestMode.qp);

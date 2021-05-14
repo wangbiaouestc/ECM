@@ -238,8 +238,8 @@ struct ComprCUCtx
                     ( MAX_DOUBLE )
     , bestISPIntraMode
                     ( UINT8_MAX )
-#if IDCC_TPM_JEM
-	  , TmpFlag(false)
+#if JVET_V0130_INTRA_TMP
+	  , tmpFlag       (false)
 #endif
     , mipFlag       ( false )
     , ispMode       ( NOT_INTRA_SUBPARTITIONS )
@@ -286,8 +286,8 @@ struct ComprCUCtx
   double                            bestDCT2NonISPCost;
   double                            bestNonDCT2Cost;
   uint8_t                           bestISPIntraMode;
-#if IDCC_TPM_JEM
-  bool								TmpFlag;
+#if JVET_V0130_INTRA_TMP
+  bool							              	tmpFlag;
 #endif
   bool                              mipFlag;
   uint8_t                           ispMode;
@@ -396,8 +396,8 @@ public:
   void   setBestNonDCT2Cost           ( double val )            { m_ComprCUCtxList.back().bestNonDCT2Cost = val; }
   uint8_t getBestISPIntraModeRelCU    ()                  const { return m_ComprCUCtxList.back().bestISPIntraMode; }
   void   setBestISPIntraModeRelCU     ( uint8_t val )           { m_ComprCUCtxList.back().bestISPIntraMode = val; }
-#if IDCC_TPM_JEM
-  void   setTPMFlagISPPass(bool val) { m_ComprCUCtxList.back().TmpFlag = val; }
+#if JVET_V0130_INTRA_TMP
+  void   setTPMFlagISPPass            (bool val)                { m_ComprCUCtxList.back().tmpFlag = val; }
 #endif
   void   setMIPFlagISPPass            ( bool val )              { m_ComprCUCtxList.back().mipFlag = val; }
   void   setISPMode                   ( uint8_t val )           { m_ComprCUCtxList.back().ispMode = val; }

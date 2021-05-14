@@ -3113,9 +3113,9 @@ SPS::SPS()
 #if ENABLE_DIMD
 , m_dimd                      ( false )
 #endif
-#if IDCC_TPM_JEM
-, m_IntraTMP                  ( false )
-, m_IntraTMP_MaxSize          ( 64 )                             
+#if JVET_V0130_INTRA_TMP
+, m_intraTMP                  ( false )
+, m_intraTmpMaxSize           ( 64 )                             
 #endif
 #if ENABLE_OBMC
 , m_OBMC                      ( false )

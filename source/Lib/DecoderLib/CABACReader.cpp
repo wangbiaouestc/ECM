@@ -1606,16 +1606,20 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
     cu.firstPU->intraDir[0] = cu.bdpcmMode == 2? VER_IDX : HOR_IDX;
     return;
   }
-#if IDCC_TPM_JEM
+#if JVET_V0130_INTRA_TMP
   int TMP_MaxSize=cu.cs->sps->getIntraTMPMaxSize();
   if (cu.lwidth() <= TMP_MaxSize && cu.lheight() <= TMP_MaxSize)
   {
-	  Tmp_Flag(cu);
-	  if (cu.TmpFlag)
-		  return;
+	  tmp_flag(cu);
+    if( cu.tmpFlag )
+    {
+      return;
+    }
   }
   else
-	  cu.TmpFlag = 0;
+  {
+    cu.tmpFlag = 0;
+  }
 #endif
   mip_flag(cu);
   if (cu.mipFlag)
@@ -3862,10 +3866,10 @@ void CABACReader::residual_lfnst_mode( CodingUnit& cu,  CUCtx& cuCtx  )
   int chIdx = cu.isSepTree() && cu.chType == CHANNEL_TYPE_CHROMA ? 1 : 0;
 #endif
   if ((cu.ispMode && !CU::canUseLfnstWithISP(cu, cu.chType))
-#if IDCC_TPM_JEM
-   || (cu.cs->sps->getUseLFNST() && CU::isIntra(cu) && ((cu.mipFlag && !allowLfnstWithMip(cu.firstPU->lumaSize())) || (cu.TmpFlag && !allowLfnstWithTpm())))
+#if JVET_V0130_INTRA_TMP
+    || (cu.cs->sps->getUseLFNST() && CU::isIntra(cu) && ((cu.mipFlag && !allowLfnstWithMip(cu.firstPU->lumaSize())) || (cu.tmpFlag && !allowLfnstWithTmp())))
 #else
-      || (cu.cs->sps->getUseLFNST() && CU::isIntra(cu) && cu.mipFlag && !allowLfnstWithMip(cu.firstPU->lumaSize()))
+    || (cu.cs->sps->getUseLFNST() && CU::isIntra(cu) && cu.mipFlag && !allowLfnstWithMip(cu.firstPU->lumaSize()))
 #endif
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     || (CS::isDualITree(*cu.cs) && cu.chType == CHANNEL_TYPE_CHROMA && std::min(cu.blocks[1].width, cu.blocks[1].height) < 4)
@@ -4506,8 +4510,8 @@ unsigned CABACReader::code_unary_fixed( unsigned ctxId, unsigned unary_max, unsi
   }
   return idx;
 }
-#if IDCC_TPM_JEM
-void CABACReader::Tmp_Flag(CodingUnit& cu)
+#if JVET_V0130_INTRA_TMP
+void CABACReader::tmp_flag(CodingUnit& cu)
 {
 	RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__OTHER);
 
@@ -4518,13 +4522,13 @@ void CABACReader::Tmp_Flag(CodingUnit& cu)
 
   if( !cu.cs->sps->getUseIntraTMP() )
   {
-    cu.TmpFlag = false;
+    cu.tmpFlag = false;
     return;
   }
 
 	unsigned ctxId = DeriveCtx::CtxTmpFlag(cu);
-	cu.TmpFlag = m_BinDecoder.decodeBin(Ctx::TmpFlag(ctxId));
-	DTRACE(g_trace_ctx, D_SYNTAX, "Tmp_Flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.TmpFlag ? 1 : 0);
+	cu.tmpFlag = m_BinDecoder.decodeBin(Ctx::TmpFlag(ctxId));
+	DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpFlag ? 1 : 0);
 }
 #endif
 void CABACReader::mip_flag( CodingUnit& cu )
