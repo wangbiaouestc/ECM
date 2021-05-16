@@ -381,8 +381,14 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
   uint32_t   uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t   uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
   
-  memset(tempblock, 0, uiWidthExt*uiHeightExt * sizeof(short));
-  tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES)* uiWidthExt + NUMBER_PADDED_SAMPLES;
+  int iWidthExtSIMD = uiWidthExt;
+  if( uiWidth < 8 )
+  {
+    iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
+  }
+  
+  memset(tempblock, 0, iWidthExtSIMD*uiHeightExt * sizeof(short));
+  tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES)* iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
   
   //// Clip and move block to temporary block
   if (useReco)
@@ -391,7 +397,7 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
     {
       std::memcpy(tempBlockPtr, piReco, uiWidth * sizeof(Pel));
       piReco += uiRecStride;
-      tempBlockPtr += uiWidthExt;
+      tempBlockPtr += iWidthExtSIMD;
     }
     piReco = piRecoTemp;
   }
@@ -406,7 +412,7 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
       piPred += uiPredStride;
       piResi += uiStrideRes;
       piReco += uiRecStride;
-      tempBlockPtr += uiWidthExt;
+      tempBlockPtr += iWidthExtSIMD;
     }
   }
   
@@ -423,13 +429,13 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
   // if they pass the test.
   for (int yy = 1; yy< uiHeightExt -1 ; yy++)
   {
-    tempblock[yy*uiWidthExt + 1] = tempblock[yy*uiWidthExt + 2];
-    tempblock[yy*uiWidthExt + uiWidthExt - 2] = tempblock[yy*uiWidthExt + uiWidthExt - 3];
+    tempblock[yy*iWidthExtSIMD + 1] = tempblock[yy*iWidthExtSIMD + 2];
+    tempblock[yy*iWidthExtSIMD + uiWidthExt - 2] = tempblock[yy*iWidthExtSIMD + uiWidthExt - 3];
   }
   for (int xx = 1; xx< uiWidthExt - 1; xx++)
   {
-    tempblock[1 * uiWidthExt + xx] = tempblock[2 * uiWidthExt + xx];
-    tempblock[(uiHeightExt - 2)*uiWidthExt + xx] = tempblock[(uiHeightExt - 3)*uiWidthExt + xx];
+    tempblock[1 * iWidthExtSIMD + xx] = tempblock[2 * iWidthExtSIMD + xx];
+    tempblock[(uiHeightExt - 2)*iWidthExtSIMD + xx] = tempblock[(uiHeightExt - 3)*iWidthExtSIMD + xx];
   }
   
   bool subTuVer = currTU.lx() > currTU.cu->lx() ? true : false;
@@ -450,11 +456,11 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
     if (topAvailable && leftAvailable)
     {
       // top left pixels
-      tempblock[uiWidthExt + 1] = *(piRecIPred - (uiRecIPredStride)-1);
+      tempblock[iWidthExtSIMD + 1] = *(piRecIPred - (uiRecIPredStride)-1);
       // Reshape copied pixels if necessary.
       if(doReshape)
       {
-        tempblock[uiWidthExt + 1] = pLUT[tempblock[uiWidthExt + 1]];
+        tempblock[iWidthExtSIMD + 1] = pLUT[tempblock[iWidthExtSIMD + 1]];
       }
     }
     
@@ -464,12 +470,12 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
       for (int blockx = 0; blockx < area.width; blockx += 1)
       {
         // copy 4 pixels one line above block from block to blockx + 3
-        std::copy(piRecIPred - (uiRecIPredStride)+blockx, piRecIPred - (uiRecIPredStride)+blockx + 1, tempblock + 2 + uiWidthExt + blockx);
+        std::copy(piRecIPred - (uiRecIPredStride)+blockx, piRecIPred - (uiRecIPredStride)+blockx + 1, tempblock + 2 + iWidthExtSIMD + blockx);
         if( doReshape )
         {
           for( int xx = 0; xx < 1; xx++ )
           {
-            tempblock[2 + uiWidthExt + blockx + xx] = pLUT[tempblock[2 + uiWidthExt + blockx + xx]];
+            tempblock[2 + iWidthExtSIMD + blockx + xx] = pLUT[tempblock[2 + iWidthExtSIMD + blockx + xx]];
           }
         }
       }
@@ -482,12 +488,12 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
       const unsigned earlierStride = earlierHalfBuf.stride;
       const Pel *earlierPel = earlierHalfBuf.buf + (currTU.prev->lheight() - 1)*earlierStride;
       
-      std::copy(earlierPel, earlierPel + area.width, tempblock + 2 + uiWidthExt);
+      std::copy(earlierPel, earlierPel + area.width, tempblock + 2 + iWidthExtSIMD);
       if( doReshape )
       {
         for( int xx = 0; xx < area.width; xx++ )
         {
-          tempblock[2 + uiWidthExt + xx] = pLUT[tempblock[2 + uiWidthExt + xx]];
+          tempblock[2 + iWidthExtSIMD + xx] = pLUT[tempblock[2 + iWidthExtSIMD + xx]];
         }
       }
 
@@ -506,10 +512,10 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
     {
       for (int blocky = 0; blocky < area.height; blocky += 1)
       {
-        tempblock[(uiWidthExt << 1) + (blocky + 0) * uiWidthExt + 1] = *(piRecIPred + (blocky + 0)*uiRecIPredStride - 1); // 1 pel out
+        tempblock[(iWidthExtSIMD << 1) + (blocky + 0) * iWidthExtSIMD + 1] = *(piRecIPred + (blocky + 0)*uiRecIPredStride - 1); // 1 pel out
         if(doReshape)
         {
-          tempblock[(uiWidthExt << 1) + (blocky + 0) * uiWidthExt + 1] = pLUT[tempblock[(uiWidthExt << 1) + (blocky + 0) * uiWidthExt + 1]];
+          tempblock[(iWidthExtSIMD << 1) + (blocky + 0) * iWidthExtSIMD + 1] = pLUT[tempblock[(iWidthExtSIMD << 1) + (blocky + 0) * iWidthExtSIMD + 1]];
         }
       }
     }
@@ -523,13 +529,13 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
       
       for (int yy = 0; yy < currTU.lheight(); yy++)
       {
-        tempblock[(uiWidthExt << 1) + yy * uiWidthExt + 1] = *(earlierPel + yy*earlierStride + 0);
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = *(earlierPel + yy*earlierStride + 0);
       }
       if(doReshape)
       {
         for (int yy = 0; yy < currTU.lheight(); yy++)
         {
-          tempblock[(uiWidthExt << 1) + yy * uiWidthExt + 1] = pLUT[tempblock[(uiWidthExt << 1) + yy * uiWidthExt + 1]];
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = pLUT[tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1]];
         }
       }
     }
@@ -538,13 +544,13 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
   // Sloppy copying of outer layer
   for(int yy = 0; yy < uiHeight+2; yy++)
   {
-    tempblock[uiWidthExt + yy*uiWidthExt] = tempblock[uiWidthExt + yy*uiWidthExt + 1];
-    tempblock[(uiWidthExt<<1) - 1 + yy*uiWidthExt] = tempblock[(uiWidthExt<<1) - 2 + yy*uiWidthExt];
+    tempblock[iWidthExtSIMD + yy*iWidthExtSIMD] = tempblock[iWidthExtSIMD + yy*iWidthExtSIMD + 1];
+    tempblock[iWidthExtSIMD + uiWidthExt - 1 + yy*iWidthExtSIMD] = tempblock[iWidthExtSIMD + uiWidthExt - 2 + yy*iWidthExtSIMD];
   }
-  std::copy(tempblock  + uiWidthExt, tempblock + uiWidthExt + uiWidthExt, tempblock);
-  std::copy(tempblock  + uiWidthExt*(uiHeightExt-2), tempblock  + uiWidthExt*(uiHeightExt-2) + uiWidthExt, tempblock + uiWidthExt*(uiHeightExt-1));
+  std::copy(tempblock + iWidthExtSIMD, tempblock + iWidthExtSIMD + uiWidthExt, tempblock);
+  std::copy(tempblock  + iWidthExtSIMD*(uiHeightExt-2), tempblock  + iWidthExtSIMD*(uiHeightExt-2) + uiWidthExt, tempblock + iWidthExtSIMD*(uiHeightExt-1));
 
-  m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, piReco, uiRecStride, uiWidth + 4, bfac, bif_round_add, bif_round_shift, true, LUTrowPtr );
+  m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, piReco, uiRecStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, true, LUTrowPtr );
 
   if (!useReco)
   {

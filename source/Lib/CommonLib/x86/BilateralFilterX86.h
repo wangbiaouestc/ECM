@@ -47,7 +47,8 @@
 template<X86_VEXT vext>
 void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr )
 {
-  if( uiWidth < 4 || ( uiWidth < 8 && isRDO ) )
+  //if( uiWidth < 4 || ( uiWidth < 8 && isRDO ) )
+  if( uiWidth < 4 )
   {
     return blockBilateralFilterDiamond5x5(uiWidth, uiHeight, block, blkFilt, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, isRDO, LUTrowPtr );
   }
