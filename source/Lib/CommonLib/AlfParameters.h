@@ -71,6 +71,11 @@ struct AlfFilterShape
     : filterLength( size ),
     numCoeff( size * size / 4 + 1 ),
     filterSize( size * size / 2 + 1 )
+#if ALF_IMPROVEMENT
+    , numOrder( 0 )
+    , indexSecOrder( 0 )
+    , offset0( 0 )
+#endif
   {
     if( size == 5 )
     {
