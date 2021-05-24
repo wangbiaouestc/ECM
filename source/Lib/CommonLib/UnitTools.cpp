@@ -2545,6 +2545,7 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
 {
   CodingStructure &cs = *pu.cs;
 #if TM_AMVP
+  interPred = pu.cu->cs->sps->getUseDMVDMode() ? interPred : nullptr;
   if (cs.pcv->isEncoder && interPred != nullptr && interPred->readTplAmvpBuffer(amvpInfo, *pu.cu, eRefPicList, refIdx))
   {
     return;
