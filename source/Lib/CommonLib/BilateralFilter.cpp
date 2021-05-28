@@ -496,16 +496,6 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
           tempblock[2 + iWidthExtSIMD + xx] = pLUT[tempblock[2 + iWidthExtSIMD + xx]];
         }
       }
-
-      std::copy(earlierPel - earlierStride, earlierPel - earlierStride + area.width, tempblock + 2);
-
-      if( doReshape )
-      {
-        for( int xx = 0; xx < area.width; xx++ )
-        {
-          tempblock[2 + xx] = pLUT[tempblock[2 + xx]];
-        }
-      }
     }
     // left column
     if (leftAvailable)
