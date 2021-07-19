@@ -161,6 +161,18 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
           IntraPrediction::deriveDimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
           pu->intraDir[0] = currCU.dimdMode;
         }
+#if JVET_W0123_TIMD_FUSION
+        else if (currCU.timd)
+        {
+          PredictionUnit *pu = currCU.firstPU;
+          const CompArea &area = currCU.Y();
+#if SECONDARY_MPM
+          IntraPrediction::deriveDimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+#endif
+          currCU.timdMode = m_pcIntraPred->deriveTimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+          pu->intraDir[0] = currCU.timdMode;
+        }
+#endif
         else if (currCU.firstPU->parseLumaMode)
         {
           const CompArea &area = currCU.Y();
@@ -217,6 +229,67 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 
           currCU.firstPU->intraDir[1] = chromaCandModes[currCU.firstPU->candId];
         }
+#else
+#if JVET_W0123_TIMD_FUSION
+        if (currCU.timd)
+        {
+          PredictionUnit *pu = currCU.firstPU;
+          const CompArea &area = currCU.Y();
+          currCU.timdMode = m_pcIntraPred->deriveTimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+          pu->intraDir[0] = currCU.timdMode;
+        }
+
+        //redo prediction dir derivation
+        if (currCU.firstPU->parseLumaMode)
+        {
+#if SECONDARY_MPM
+          uint8_t* mpm_pred = currCU.firstPU->intraMPM;  // mpm_idx / rem_intra_luma_pred_mode
+          uint8_t* non_mpm_pred = currCU.firstPU->intraNonMPM;
+          PU::getIntraMPMs( *currCU.firstPU, mpm_pred, non_mpm_pred );
+#else
+          unsigned int mpm_pred[NUM_MOST_PROBABLE_MODES];  // mpm_idx / rem_intra_luma_pred_mode
+          PU::getIntraMPMs(*currCU.firstPU, mpm_pred);
+#endif
+          if (currCU.firstPU->mpmFlag)
+          {
+            currCU.firstPU->intraDir[0] = mpm_pred[currCU.firstPU->ipred_idx];
+          }
+          else
+          {
+#if SECONDARY_MPM
+            if (currCU.firstPU->secondMpmFlag)
+            {
+              currCU.firstPU->intraDir[0] = mpm_pred[currCU.firstPU->ipred_idx];
+            }
+            else
+            {
+              currCU.firstPU->intraDir[0] = non_mpm_pred[currCU.firstPU->ipred_idx];
+            }
+#else
+            //postponed sorting of MPMs (only in remaining branch)
+            std::sort(mpm_pred, mpm_pred + NUM_MOST_PROBABLE_MODES);
+            unsigned ipred_mode = currCU.firstPU->ipred_idx;
+
+            for (uint32_t i = 0; i < NUM_MOST_PROBABLE_MODES; i++)
+            {
+              ipred_mode += (ipred_mode >= mpm_pred[i]);
+            }
+            currCU.firstPU->intraDir[0] = ipred_mode;
+#endif
+          }
+        }
+        if (currCU.firstPU->parseChromaMode)
+        {
+          unsigned chromaCandModes[NUM_CHROMA_MODE];
+          PU::getIntraChromaCandModes(*currCU.firstPU, chromaCandModes);
+
+          CHECK(currCU.firstPU->candId >= NUM_CHROMA_MODE, "Chroma prediction mode index out of bounds");
+          CHECK(PU::isLMCMode(chromaCandModes[currCU.firstPU->candId]), "The intra dir cannot be LM_CHROMA for this path");
+          CHECK(chromaCandModes[currCU.firstPU->candId] == DM_CHROMA_IDX, "The intra dir cannot be DM_CHROMA for this path");
+
+          currCU.firstPU->intraDir[1] = chromaCandModes[currCU.firstPU->candId];
+        }
+#endif
 #endif
         xReconIntraQT( currCU );
         break;
@@ -670,6 +743,12 @@ void DecCu::xReconIntraQT( CodingUnit &cu )
     }
   }
   }
+#if JVET_W0123_TIMD_FUSION
+  if (cu.blocks[CHANNEL_TYPE_LUMA].valid())
+  {
+    PU::spanIpmInfoIntra(*cu.firstPU);
+  }
+#endif
 }
 
 void DecCu::xReconPLT(CodingUnit &cu, ComponentID compBegin, uint32_t numComp)

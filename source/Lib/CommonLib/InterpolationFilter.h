@@ -75,6 +75,9 @@ public:
 #if INTRA_6TAP
   static const TFilterCoeff m_lumaIntraFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][6]; ///< Chroma filter 6 taps
   static const TFilterCoeff m_weak4TapFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Weak filter 4 taps
+#if JVET_W0123_TIMD_FUSION
+  static const TFilterCoeff m_lumaIntraFilterExt[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS << 1][6]; ///< Chroma filter 6 taps
+#endif
 #endif
   static const TFilterCoeff m_lumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8]; ///< Luma filter taps 1.5x
   static const TFilterCoeff m_lumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8]; ///< Luma filter taps 2x
@@ -101,6 +104,10 @@ private:
   static const TFilterCoeff m_affineLumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_LUMA]; ///< Luma filter taps 2x
 private:
   static const TFilterCoeff m_lumaAltHpelIFilter[NTAPS_LUMA]; ///< Luma filter taps
+#endif
+#if JVET_W0123_TIMD_FUSION
+  static const TFilterCoeff g_aiExtIntraCubicFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS<<1][NTAPS_CHROMA]; ///< Chroma filter taps
+  static const TFilterCoeff g_aiExtIntraGaussFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS<<1][NTAPS_CHROMA]; ///< Chroma filter taps
 #endif
   static const TFilterCoeff m_bilinearFilter[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_BILINEAR]; ///< bilinear filter taps
   static const TFilterCoeff m_bilinearFilterPrec4[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_BILINEAR]; ///< bilinear filter taps
@@ -157,8 +164,15 @@ public:
 #if INTRA_6TAP
   static TFilterCoeff const * const getIntraLumaFilterTable(const int deltaFract) { return m_lumaIntraFilter[deltaFract]; };
   static TFilterCoeff const * const getWeak4TapFilterTable(const int deltaFract) { return m_weak4TapFilter[deltaFract]; };
+#if JVET_W0123_TIMD_FUSION
+  static TFilterCoeff const * const getIntraLumaFilterTableExt(const int deltaFract) { return m_lumaIntraFilterExt[deltaFract]; };
+#endif
 #endif
   static TFilterCoeff const * const getChromaFilterTable(const int deltaFract) { return m_chromaFilter[deltaFract]; };
+#if JVET_W0123_TIMD_FUSION
+  static TFilterCoeff const * const getExtIntraCubicFilter(const int deltaFract) { return g_aiExtIntraCubicFilter[deltaFract]; };
+  static TFilterCoeff const * const getExtIntraGaussFilter(const int deltaFract) { return g_aiExtIntraGaussFilter[deltaFract]; };
+#endif
 };
 
 //! \}

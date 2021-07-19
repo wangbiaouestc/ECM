@@ -403,6 +403,10 @@ void EncApp::xInitLibCfg()
     m_cEncLib.setNoDimdConstraintFlag(m_noDimdConstraintFlag);
     CHECK(m_noDimdConstraintFlag && m_dimd, "DIMD shall be deactivated when m_noDimdConstraintFlag is equal to 1");
 #endif
+#if JVET_W0123_TIMD_FUSION
+    m_cEncLib.setNoTimdConstraintFlag(m_noTimdConstraintFlag);
+    CHECK(m_noTimdConstraintFlag && m_timd, "TIMD shall be deactivated when m_noTimdConstraintFlag is equal to 1");
+#endif
 #if ENABLE_OBMC
     m_cEncLib.setNoObmcConstraintFlag(m_noObmcConstraintFlag);
     CHECK(m_noObmcConstraintFlag && m_OBMC, "OBMC shall be deactivated when m_noObmcConstraintFlag is equal to 1");
@@ -533,6 +537,9 @@ void EncApp::xInitLibCfg()
     m_cEncLib.setNoGeoConstraintFlag(false);
 #if ENABLE_DIMD
     m_cEncLib.setNoDimdConstraintFlag(false);
+#endif
+#if JVET_W0123_TIMD_FUSION
+    m_cEncLib.setNoTimdConstraintFlag(false);
 #endif
 #if ENABLE_OBMC
     m_cEncLib.setNoObmcConstraintFlag(false);
@@ -760,6 +767,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if ENABLE_DIMD
   m_cEncLib.setUseDimd                                           ( m_dimd );
+#endif
+#if JVET_W0123_TIMD_FUSION
+  m_cEncLib.setUseTimd                                           ( m_timd );
 #endif
 #if ENABLE_OBMC
   m_cEncLib.setUseObmc                                           ( m_OBMC );

@@ -909,12 +909,21 @@ const CtxSet ContextSetCfg::PredMode = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::MultiRefLineIdx = ContextSetCfg::addCtxSet
 ({
+#if JVET_W0123_TIMD_FUSION
+  { 25, 59, 25, 59 },
+  { 25, 58, 25, 58 },
+  { 25, 60, 25, 60 },
+  { 6,  5,  6,  5 },
+  { 6,  5,  6,  5 },
+  { 6,  8,  6,  8 }
+#else
 	{ 25, 59 },
 	{ 25, 58 },
 	{ 25, 60 },
 	{ 6,  5 },
 	{ 6,  5 },
 	{ 6,  8 }
+#endif
 });
 
 const CtxSet ContextSetCfg::IntraLumaMpmFlag = ContextSetCfg::addCtxSet
@@ -1575,12 +1584,21 @@ const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::ISPMode = ContextSetCfg::addCtxSet
 ({
+#if JVET_W0123_TIMD_FUSION
+  { 33, 43, 33 },
+  { 33, 43, 33 },
+  { 33, 43, 33 },
+  { 9,  2,  9 },
+  { 9,  3,  9 },
+  { 9,  2,  9 }
+#else
 	{ 33, 43 },
 	{ 33, 43 },
 	{ 33, 43 },
 	{ 9,  2 },
 	{ 9,  3 },
 	{ 9,  2 }
+#endif
 });
 
 const CtxSet ContextSetCfg::SbtFlag = ContextSetCfg::addCtxSet
@@ -1642,6 +1660,18 @@ const CtxSet ContextSetCfg::DimdFlag = ContextSetCfg::addCtxSet
 	{ 5,  1,  1 },
 	{ 5,  1,  1 },
 	{ 2,  1,  1 }
+});
+#endif
+
+#if JVET_W0123_TIMD_FUSION
+const CtxSet ContextSetCfg::TimdFlag = ContextSetCfg::addCtxSet
+({
+  { 48, 56, 56 },
+  { 41, 49, 49 },
+  { 33, 49, 49 },
+  { 5,  1,  1 },
+  { 5,  1,  1 },
+  { 2,  1,  1 }
 });
 #endif
 
@@ -2016,10 +2046,17 @@ const CtxSet ContextSetCfg::PredMode = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::MultiRefLineIdx = ContextSetCfg::addCtxSet
 ({
+#if JVET_W0123_TIMD_FUSION
+  {  25,  59,  25,  59, },
+  {  25,  58,  25,  58, },
+  {  25,  60,  25,  60, },
+  {   5,   8,  5,   8, },
+#else
   {  25,  59, },
   {  25,  58, },
   {  25,  60, },
   {   5,   8, },
+#endif
 });
 
 const CtxSet ContextSetCfg::IntraLumaMpmFlag = ContextSetCfg::addCtxSet
@@ -2553,10 +2590,17 @@ const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::ISPMode = ContextSetCfg::addCtxSet
 ({
+#if JVET_W0123_TIMD_FUSION
+  {  33,  43,  33, },
+  {  33,  36,  33, },
+  {  33,  43,  33, },
+  {   9,   2,   9, },
+#else
   {  33,  43, },
   {  33,  36, },
   {  33,  43, },
   {   9,   2, },
+#endif
 });
 
 const CtxSet ContextSetCfg::SbtFlag = ContextSetCfg::addCtxSet
@@ -2607,6 +2651,17 @@ const CtxSet ContextSetCfg::DimdFlag = ContextSetCfg::addCtxSet
   {  5,  1,  1 }
   });
 #endif
+
+#if JVET_W0123_TIMD_FUSION
+const CtxSet ContextSetCfg::TimdFlag = ContextSetCfg::addCtxSet
+({
+  { 48, 56, 56 },
+  { 41, 49, 49 },
+  { 33, 49, 49 },
+  {  5,  1,  1 }
+});
+#endif
+
 #if ENABLE_OBMC
 const CtxSet ContextSetCfg::ObmcFlag = ContextSetCfg::addCtxSet
 ({

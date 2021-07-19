@@ -1288,6 +1288,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if ENABLE_DIMD
   cinfo->setNoDimdConstraintFlag(m_noDimdConstraintFlag);
 #endif
+#if JVET_W0123_TIMD_FUSION
+  cinfo->setNoTimdConstraintFlag(m_noTimdConstraintFlag);
+#endif
 #if ENABLE_OBMC
   cinfo->setNoObmcConstraintFlag(m_noObmcConstraintFlag);
 #endif
@@ -1407,6 +1410,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if ENABLE_DIMD
   sps.setUseDimd            ( m_dimd );
+#endif
+#if JVET_W0123_TIMD_FUSION
+  sps.setUseTimd            ( m_timd );
 #endif
 #if ENABLE_OBMC
   sps.setUseOBMC            ( m_OBMC );

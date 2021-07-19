@@ -108,6 +108,9 @@ public:
 #if ENABLE_DIMD
   void        cu_dimd_flag              ( const CodingUnit&             cu );
 #endif
+#if JVET_W0123_TIMD_FUSION
+  void        cu_timd_flag              ( const CodingUnit&             cu );
+#endif
   void        intra_chroma_pred_modes   ( const CodingUnit&             cu );
   void        intra_chroma_lmc_mode     ( const PredictionUnit&         pu );
   void        intra_chroma_pred_mode    ( const PredictionUnit&         pu );

@@ -2267,6 +2267,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     READ_UVLC(uiCode, "sps_log2_intra_tmp_max_size");                 pcSPS->setIntraTMPMaxSize(1 << uiCode);
   }
 #endif
+#if JVET_W0123_TIMD_FUSION
+  READ_FLAG(uiCode, "sps_timd_enabled_flag");                        pcSPS->setUseTimd( uiCode != 0 );
+#endif
   if( pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
     READ_FLAG( uiCode, "sps_cclm_enabled_flag" );                   pcSPS->setUseLMChroma( uiCode != 0 );
@@ -5006,6 +5009,9 @@ void HLSyntaxReader::parseConstraintInfo(ConstraintInfo *cinfo)
     READ_FLAG(symbol, "gci_no_cclm_constraint_flag");                    cinfo->setNoCclmConstraintFlag(symbol > 0 ? true : false);
 #if ENABLE_DIMD
     READ_FLAG(symbol, "gci_no_dimd_constraint_flag");                    cinfo->setNoDimdConstraintFlag(symbol > 0 ? true : false);
+#endif
+#if JVET_W0123_TIMD_FUSION
+    READ_FLAG(symbol, "gci_no_timd_constraint_flag");                    cinfo->setNoTimdConstraintFlag(symbol > 0 ? true : false);
 #endif
     /* inter */
     READ_FLAG(symbol, "gci_no_ref_pic_resampling_constraint_flag");      cinfo->setNoRprConstraintFlag(symbol > 0 ? true : false);

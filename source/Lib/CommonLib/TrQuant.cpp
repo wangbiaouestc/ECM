@@ -831,7 +831,11 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
     const ScanElement * scan = whge3 ? g_coefTopLeftDiagScan8x8[ gp_sizeIdxInfo->idxFrom( width ) ] : g_scanOrder[ SCAN_GROUPED_4x4 ][ SCAN_DIAG ][ gp_sizeIdxInfo->idxFrom( width ) ][ gp_sizeIdxInfo->idxFrom( height ) ];
     uint32_t intraMode = PU::getFinalIntraMode( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) );
 
+#if JVET_W0123_TIMD_FUSION
+    if( compID != COMPONENT_Y && PU::isLMCMode( tu.cs->getPU( area.pos(), toChannelType( compID ) )->intraDir[ toChannelType( compID ) ] ) )
+#else
     if( PU::isLMCMode( tu.cs->getPU( area.pos(), toChannelType( compID ) )->intraDir[ toChannelType( compID ) ] ) )
+#endif
     {
       intraMode = PU::getCoLocatedIntraLumaMode( *tu.cs->getPU( area.pos(), toChannelType( compID ) ) );
     }
@@ -843,6 +847,12 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
     if( PU::isTmp( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
     {
       intraMode = PLANAR_IDX;
+    }
+#endif
+#if JVET_W0123_TIMD_FUSION
+    if (tu.cu->timd && compID == COMPONENT_Y)
+    {
+      intraMode = MAP131TO67(intraMode);
     }
 #endif
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
@@ -977,7 +987,11 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
     const ScanElement * scan = whge3 ? g_coefTopLeftDiagScan8x8[ gp_sizeIdxInfo->idxFrom( width ) ] : g_scanOrder[ SCAN_GROUPED_4x4 ][ SCAN_DIAG ][ gp_sizeIdxInfo->idxFrom( width ) ][ gp_sizeIdxInfo->idxFrom( height ) ];
     uint32_t intraMode = PU::getFinalIntraMode( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) );
 
+#if JVET_W0123_TIMD_FUSION
+    if( compID != COMPONENT_Y && PU::isLMCMode( tu.cs->getPU( area.pos(), toChannelType( compID ) )->intraDir[ toChannelType( compID ) ] ) )
+#else
     if( PU::isLMCMode( tu.cs->getPU( area.pos(), toChannelType( compID ) )->intraDir[ toChannelType( compID ) ] ) )
+#endif
     {
       intraMode = PU::getCoLocatedIntraLumaMode( *tu.cs->getPU( area.pos(), toChannelType( compID ) ) );
     }
@@ -989,6 +1003,12 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
     if( PU::isTmp( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
     {
       intraMode = PLANAR_IDX;
+    }
+#endif
+#if JVET_W0123_TIMD_FUSION
+    if (tu.cu->timd && compID == COMPONENT_Y)
+    {
+      intraMode = MAP131TO67(intraMode);
     }
 #endif
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );

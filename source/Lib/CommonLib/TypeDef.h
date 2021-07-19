@@ -112,6 +112,8 @@
 #define JVET_V0087_DIMD_NO_ISP                            ENABLE_DIMD // disallow combination of DIMD and ISP
 #define JVET_V0130_INTRA_TMP                              1 // JVET-V0130: template matching prediction
 
+#define JVET_W0123_TIMD_FUSION                            1 // Template based intra mode derivation and fusion
+
 // Inter
 #define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
 #define SAMPLE_BASED_BDOF                                 1 // Sample based BDOF
@@ -564,6 +566,16 @@ enum ISPType
   NUM_INTRA_SUBPARTITIONS_MODES = 3,
   INTRA_SUBPARTITIONS_RESERVED  = 4
 };
+
+#if JVET_W0123_TIMD_FUSION
+enum TEMPLATE_TYPE
+{
+  NO_NEIGHBOR         = 0,
+  LEFT_NEIGHBOR       = 1,
+  ABOVE_NEIGHBOR      = 2,
+  LEFT_ABOVE_NEIGHBOR = 3
+};
+#endif
 
 enum SbtIdx
 {

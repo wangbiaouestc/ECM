@@ -618,6 +618,9 @@ unsigned CtxPltCopyFlag( const unsigned prevRunType, const unsigned dist );
 #if ENABLE_DIMD
 unsigned CtxDIMDFlag(const CodingUnit& cu);
 #endif
+#if JVET_W0123_TIMD_FUSION
+unsigned CtxTimdFlag( const CodingUnit& cu );
+#endif
 }
 
 #endif // __CONTEXTMODELLING__

@@ -252,6 +252,9 @@ private:
   int     m_offsets[ MAX_NUM_COMPONENT ];
 
   MotionInfo *m_motionBuf;
+#if JVET_W0123_TIMD_FUSION
+  uint8_t *m_ipmBuf;
+#endif
 
 public:
   CodingStructure *bestParent;
@@ -271,6 +274,19 @@ public:
 
   MotionInfo& getMotionInfo( const Position& pos );
   const MotionInfo& getMotionInfo( const Position& pos ) const;
+
+#if JVET_W0123_TIMD_FUSION
+  IpmBuf getIpmBuf( const     Area& _area );
+  IpmBuf getIpmBuf( const UnitArea& _area ) { return getIpmBuf( _area.Y() ); }
+  IpmBuf getIpmBuf()                        { return getIpmBuf(  area.Y() ); }
+
+  const CIpmBuf getIpmBuf( const     Area& _area ) const;
+  const CIpmBuf getIpmBuf( const UnitArea& _area ) const { return getIpmBuf( _area.Y() ); }
+  const CIpmBuf getIpmBuf()                        const { return getIpmBuf(  area.Y() ); }
+
+  uint8_t& getIpmInfo( const Position& pos );
+  const uint8_t& getIpmInfo( const Position& pos ) const;
+#endif
 
 
 public:

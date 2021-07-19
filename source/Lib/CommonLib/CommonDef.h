@@ -300,12 +300,26 @@ static const int HOR_IDX =                    (1 * (NUM_DIR - 1) + 2); ///< inde
 static const int DIA_IDX =                    (2 * (NUM_DIR - 1) + 2); ///< index for intra DIAGONAL   mode
 static const int VER_IDX =                    (3 * (NUM_DIR - 1) + 2); ///< index for intra VERTICAL   mode
 static const int VDIA_IDX =                   (4 * (NUM_DIR - 1) + 2); ///< index for intra VDIAGONAL  mode
+#if JVET_W0123_TIMD_FUSION
+static const int BDPCM_IDX =                                      162;
+#else
 static const int BDPCM_IDX =                  (5 * (NUM_DIR - 1) + 2); ///< index for intra VDIAGONAL  mode
+#endif
 static const int NOMODE_IDX =                               MAX_UCHAR; ///< indicating uninitialized elements
 static const int NUM_CHROMA_MODE = (5 + NUM_LMC_MODE); ///< total number of chroma modes
 static const int LM_CHROMA_IDX = NUM_LUMA_MODE; ///< chroma mode index for derived from LM mode
 #if ENABLE_DIMD
 static const int DIMD_IDX =                                        99; ///< index for intra DIMD mode
+#endif
+#if JVET_W0123_TIMD_FUSION
+static const int TIMD_IDX =                                       199; ///< index for intra TIMD mode
+static const int DIMD_MAX_TEMP_SIZE =                               4;
+static const int EXT_HOR_IDX =                                     34;
+static const int EXT_DIA_IDX =                                     66;
+static const int EXT_VER_IDX =                                     98;
+static const int EXT_VDIA_IDX =                                   130;
+#define MAP131TO67( mode )                 (mode<2?mode:((mode>>1)+1))
+#define MAP67TO131( mode )                 (mode<2?mode:((mode<<1)-2))
 #endif
 #if MMLM
 static const int MMLM_CHROMA_IDX = LM_CHROMA_IDX + 1; ///< MDLM_L

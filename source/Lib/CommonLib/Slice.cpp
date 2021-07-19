@@ -3113,6 +3113,9 @@ SPS::SPS()
 #if ENABLE_DIMD
 , m_dimd                      ( false )
 #endif
+#if JVET_W0123_TIMD_FUSION
+, m_timd                      ( false )
+#endif
 #if JVET_V0130_INTRA_TMP
 , m_intraTMP                  ( false )
 , m_intraTmpMaxSize           ( 64 )                             
@@ -4767,6 +4770,9 @@ bool             operator == (const ConstraintInfo& op1, const ConstraintInfo& o
   if( op1.m_noIbcConstraintFlag                          != op2.m_noIbcConstraintFlag                            ) return false;
 #if ENABLE_DIMD
   if( op1.m_noDimdConstraintFlag                         != op2.m_noDimdConstraintFlag                           ) return false;
+#endif
+#if JVET_W0123_TIMD_FUSION
+  if( op1.m_noTimdConstraintFlag                         != op2.m_noTimdConstraintFlag                           ) return false;
 #endif
 #if ENABLE_OBMC
   if( op1.m_noObmcConstraintFlag                         != op2.m_noObmcConstraintFlag                           ) return false;

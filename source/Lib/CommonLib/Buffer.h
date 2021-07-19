@@ -190,6 +190,10 @@ typedef AreaBuf<const TCoeff> CCoeffBuf;
 
 typedef AreaBuf<      MotionInfo>  MotionBuf;
 typedef AreaBuf<const MotionInfo> CMotionBuf;
+#if JVET_W0123_TIMD_FUSION
+typedef AreaBuf<      uint8_t> IpmBuf;
+typedef AreaBuf<const uint8_t> CIpmBuf;
+#endif
 
 typedef AreaBuf<      TCoeff>  PLTescapeBuf;
 typedef AreaBuf<const TCoeff> CPLTescapeBuf;

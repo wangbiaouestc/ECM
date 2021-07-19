@@ -1140,10 +1140,18 @@ void CABACWriter::extend_ref_line(const PredictionUnit& pu)
   int multiRefIdx = pu.multiRefIdx;
   if (MRL_NUM_REF_LINES > 1)
   {
+#if JVET_W0123_TIMD_FUSION
+    m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[0], cu.timd ? Ctx::MultiRefLineIdx(2) : Ctx::MultiRefLineIdx(0));
+#else
     m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[0], Ctx::MultiRefLineIdx(0));
+#endif
     if (MRL_NUM_REF_LINES > 2 && multiRefIdx != MULTI_REF_LINE_IDX[0])
     {
+#if JVET_W0123_TIMD_FUSION
+      m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[1], cu.timd ? Ctx::MultiRefLineIdx(3) : Ctx::MultiRefLineIdx(1));
+#else
       m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[1], Ctx::MultiRefLineIdx(1));
+#endif
     }
   }
 }
@@ -1177,10 +1185,18 @@ void CABACWriter::extend_ref_line(const CodingUnit& cu)
     int multiRefIdx = pu->multiRefIdx;
     if (MRL_NUM_REF_LINES > 1)
     {
+#if JVET_W0123_TIMD_FUSION
+      m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[0], cu.timd ? Ctx::MultiRefLineIdx(2) : Ctx::MultiRefLineIdx(0));
+#else
       m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[0], Ctx::MultiRefLineIdx(0));
+#endif
       if (MRL_NUM_REF_LINES > 2 && multiRefIdx != MULTI_REF_LINE_IDX[0])
       {
+#if JVET_W0123_TIMD_FUSION
+        m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[1], cu.timd ? Ctx::MultiRefLineIdx(3) : Ctx::MultiRefLineIdx(1));
+#else
         m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[1], Ctx::MultiRefLineIdx(1));
+#endif
       }
 
     }
@@ -1217,11 +1233,20 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
     mip_pred_modes(cu);
     return;
   }
+#if JVET_W0123_TIMD_FUSION
+  cu_timd_flag(cu);
+#endif
   extend_ref_line( cu );
 
   isp_mode( cu );
 #if ENABLE_DIMD
   if (cu.dimd)
+  {
+    return;
+  }
+#endif
+#if JVET_W0123_TIMD_FUSION
+  if (cu.timd)
   {
     return;
   }
@@ -1410,10 +1435,19 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
     mip_pred_mode(pu);
     return;
   }
+#if JVET_W0123_TIMD_FUSION
+  cu_timd_flag(*pu.cu);
+#endif
   extend_ref_line( pu );
   isp_mode( *pu.cu );
 #if ENABLE_DIMD
   if (pu.cu->dimd)
+  {
+    return;
+  }
+#endif
+#if JVET_W0123_TIMD_FUSION
+  if (pu.cu->timd)
   {
     return;
   }
@@ -1539,6 +1573,33 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
     }
   }
 }
+
+#if JVET_W0123_TIMD_FUSION
+void CABACWriter::cu_timd_flag( const CodingUnit& cu )
+{
+  if (!cu.cs->sps->getUseTimd())
+  {
+    return;
+  }
+  if (cu.lwidth() * cu.lheight() > 1024 && cu.slice->getSliceType() == I_SLICE)
+  {
+    return;
+  }
+#if ENABLE_DIMD
+  if (cu.dimd)
+  {
+    return;
+  }
+#endif
+  if (!cu.Y().valid() || cu.predMode != MODE_INTRA || !isLuma(cu.chType))
+  {
+    return;
+  }
+
+  unsigned ctxId = DeriveCtx::CtxTimdFlag(cu);
+  m_BinEncoder.encodeBin(cu.timd, Ctx::TimdFlag(ctxId));
+}
+#endif
 
 #if ENABLE_DIMD
 void CABACWriter::cu_dimd_flag(const CodingUnit& cu)
@@ -3578,11 +3639,19 @@ void CABACWriter::isp_mode( const CodingUnit& cu )
   }
   if ( cu.ispMode == NOT_INTRA_SUBPARTITIONS )
   {
+#if JVET_W0123_TIMD_FUSION
+    m_BinEncoder.encodeBin( 0, cu.timd ? Ctx::ISPMode( 2 ) : Ctx::ISPMode( 0 ) );
+#else
     m_BinEncoder.encodeBin( 0, Ctx::ISPMode( 0 ) );
+#endif
   }
   else
   {
+#if JVET_W0123_TIMD_FUSION
+    m_BinEncoder.encodeBin( 1, cu.timd ? Ctx::ISPMode( 2 ) : Ctx::ISPMode( 0 ) );
+#else
     m_BinEncoder.encodeBin( 1, Ctx::ISPMode( 0 ) );
+#endif
     m_BinEncoder.encodeBin( cu.ispMode - 1, Ctx::ISPMode( 1 ) );
   }
   DTRACE( g_trace_ctx, D_SYNTAX, "intra_subPartitions() etype=%d pos=(%d,%d) ispIdx=%d\n", cu.chType, cu.blocks[cu.chType].x, cu.blocks[cu.chType].y, (int)cu.ispMode );
@@ -3611,6 +3680,12 @@ void CABACWriter::residual_lfnst_mode( const CodingUnit& cu, CUCtx& cuCtx )
   {
     return;
   }
+#if JVET_W0123_TIMD_FUSION
+  if (cu.timd && (cu.ispMode || cu.firstPU->multiRefIdx))
+  {
+    return;
+  }
+#endif
 
   if( cu.cs->sps->getUseLFNST() && CU::isIntra( cu ) )
   {

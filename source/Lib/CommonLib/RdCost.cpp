@@ -446,6 +446,64 @@ void RdCost::setDistParam( DistParam &rcDP, const Pel* pOrg, const Pel* piRefY, 
   }
 }
 
+#if JVET_W0123_TIMD_FUSION
+void RdCost::setTimdDistParam( DistParam &rcDP, const Pel* pOrg, const Pel* piRefY, int iOrgStride, int iRefStride, int bitDepth, ComponentID compID, int width, int height, int subShiftMode, int step, bool useHadamard )
+{
+  rcDP.bitDepth   = bitDepth;
+  rcDP.compID     = compID;
+
+  rcDP.org.buf    = pOrg;
+  rcDP.org.stride = iOrgStride;
+  rcDP.org.width  = width;
+  rcDP.org.height = height;
+
+  rcDP.cur.buf    = piRefY;
+  rcDP.cur.stride = iRefStride;
+  rcDP.cur.width  = width;
+  rcDP.cur.height = height;
+  rcDP.subShift = subShiftMode;
+  rcDP.step       = step;
+  rcDP.maximumDistortionForEarlyExit = std::numeric_limits<Distortion>::max();
+
+  const int DFOffset = ( rcDP.useMR ? DF_MRSAD - DF_SAD : 0 );
+  if( !useHadamard )
+  {
+    if( width == 12 )
+    {
+      rcDP.distFunc = m_afpDistortFunc[ DF_SAD12 + DFOffset ];
+    }
+    else if( width == 24 )
+    {
+      rcDP.distFunc = m_afpDistortFunc[ DF_SAD24 + DFOffset ];
+    }
+    else if( width == 48 )
+    {
+      rcDP.distFunc = m_afpDistortFunc[ DF_SAD48 + DFOffset ];
+    }
+    else if( isPowerOf2( width) )
+    {
+#if CTU_256
+      rcDP.distFunc = m_afpDistortFunc[ DF_SAD + DFOffset + std::min<int>( 7, floorLog2( width ) ) ];
+#else
+      rcDP.distFunc = m_afpDistortFunc[ DF_SAD + DFOffset + floorLog2( width ) ];
+#endif
+    }
+    else
+    {
+      rcDP.distFunc = m_afpDistortFunc[ DF_SAD + DFOffset ];
+    }
+  }
+  else
+  {
+#if CTU_256
+    rcDP.distFunc = m_afpDistortFunc[ DF_HAD + DFOffset + std::min<int>( 7, floorLog2( width ) ) ];
+#else
+    rcDP.distFunc = m_afpDistortFunc[ DF_HAD + DFOffset + floorLog2( width ) ];
+#endif
+  }
+}
+#endif
+
 #if TM_AMVP || TM_MRG
 void RdCost::setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &cur, int bitDepth, bool TrueA_FalseL, int wIdx, int subShift, ComponentID compID )
 {

@@ -187,6 +187,9 @@ protected:
 #if ENABLE_DIMD
   bool      m_noDimdConstraintFlag;
 #endif
+#if JVET_W0123_TIMD_FUSION
+  bool      m_noTimdConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool      m_noObmcConstraintFlag;
 #endif
@@ -376,6 +379,9 @@ protected:
 #endif
 #if ENABLE_DIMD
   bool      m_dimd;
+#endif
+#if JVET_W0123_TIMD_FUSION
+  bool      m_timd;
 #endif
 #if ENABLE_OBMC
   bool      m_OBMC;

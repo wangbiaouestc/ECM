@@ -43,6 +43,9 @@
 #include "Unit.h"
 #include "Buffer.h"
 #include "Picture.h"
+#if JVET_W0123_TIMD_FUSION
+#include "RdCost.h"
+#endif
 
 #include "MatrixIntraPrediction.h"
 
@@ -81,6 +84,10 @@ private:
 #endif
 
   static const uint8_t m_aucIntraFilter[MAX_INTRA_FILTER_DEPTHS];
+#if JVET_W0123_TIMD_FUSION
+  static const uint8_t m_aucIntraFilterExt[MAX_INTRA_FILTER_DEPTHS];
+  RdCost* m_timdSatdCost;
+#endif
 #if LMS_LINEAR_MODEL
   unsigned m_auShiftLM[32]; // Table for substituting division operation by multiplication
 #endif
@@ -136,11 +143,18 @@ protected:
   // prediction
   void xPredIntraPlanar           ( const CPelBuf &pSrc, PelBuf &pDst );
   void xPredIntraDc               ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const bool enableBoundaryFilter = true );
+#if JVET_W0123_TIMD_FUSION
+  void xPredIntraAng              ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng, const bool bExtIntraDir);
+#else
   void xPredIntraAng              ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng);
+#endif
 
   void initPredIntraParams        ( const PredictionUnit & pu,  const CompArea compArea, const SPS& sps );
 
   static bool isIntegerSlope(const int absAng) { return (0 == (absAng & 0x1F)); }
+#if JVET_W0123_TIMD_FUSION
+  static bool isIntegerSlopeExt(const int absAng) { return (0 == (absAng & 0x3F)); }
+#endif
 
   void xPredIntraBDPCM            ( const CPelBuf &pSrc, PelBuf &pDst, const uint32_t dirMode, const ClpRng& clpRng );
   Pel  xGetPredValDc              ( const CPelBuf &pSrc, const Size &dstSize );
@@ -154,6 +168,9 @@ protected:
   );
 
   static int getModifiedWideAngle         ( int width, int height, int predMode );
+#if JVET_W0123_TIMD_FUSION
+  static int getWideAngleExt      ( int width, int height, int predMode );
+#endif
   void setReferenceArrayLengths   ( const CompArea &area );
 
   void destroy                    ();
@@ -189,6 +206,24 @@ public:
   void init                       (ChromaFormat chromaFormatIDC, const unsigned bitDepthY);
 #if ENABLE_DIMD
   static void deriveDimdMode      (const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu);
+#endif
+#if JVET_W0123_TIMD_FUSION
+  void xIntraPredTimdHorVerPdpc   (Pel* pDsty,const int dstStride, Pel* refSide, const int width, const int height, int xOffset, int yOffset, int scale, const Pel* refMain, const ClpRng& clpRng);
+  void xPredTimdIntraPlanar       (const CPelBuf &pSrc, Pel* pDst, int iDstStride, int width, int height, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight);
+  void xPredTimdIntraDc           ( const PredictionUnit &pu, const CPelBuf &pSrc, Pel* pDst, int iDstStride, int iWidth, int iHeight, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight);
+  void xPredTimdIntraAng          ( const CPelBuf &pSrc, const ClpRng& clpRng, Pel* pTrueDst, int iDstStride, int iWidth, int iHeight, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight, uint32_t dirMode);
+  void xIntraPredTimdAngLuma(Pel* pDstBuf, const ptrdiff_t dstStride, Pel* refMain, int width, int height, int deltaPos, int intraPredAngle, const ClpRng& clpRng, int xOffset, int yOffset);
+  void xIntraPredTimdPlanarDcPdpc (const CPelBuf &pSrc, Pel* pDst, int iDstStride, int width, int height, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight);
+  void xIntraPredTimdAngPdpc(Pel* pDsty,const int dstStride,Pel* refSide,const int width,const int height, int xOffset, int yOffset, int scale, int invAngle);
+  void xFillTimdReferenceSamples  ( const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu, int iTemplateWidth, int iTemplateHeight );
+  Pel  xGetPredTimdValDc          ( const CPelBuf &pSrc, const Size &dstSize, TEMPLATE_TYPE eTempType, int iTempHeight, int iTempWidth );
+  void initPredTimdIntraParams    (const PredictionUnit & pu, const CompArea area, int dirMode);
+  void predTimdIntraAng           ( const ComponentID compId, const PredictionUnit &pu, uint32_t uiDirMode, Pel* pPred, uint32_t uiStride, uint32_t iWidth, uint32_t iHeight, TEMPLATE_TYPE eTempType, int32_t iTemplateWidth, int32_t iTemplateHeight);
+  int deriveTimdMode       ( const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu );
+  void initTimdIntraPatternLuma   (const CodingUnit &cu, const CompArea &area, int iTemplateWidth, int iTemplateHeight, uint32_t uiRefWidth, uint32_t uiRefHeight);
+#if GRAD_PDPC
+  void xIntraPredTimdAngGradPdpc  (Pel* pDsty, const int dstStride, Pel* refMain, Pel* refSide, const int width, const int height, int xOffset, int yOffset, int scale, int deltaPos, int intraPredAngle, const ClpRng& clpRng);
+#endif
 #endif
   // Angular Intra
   void predIntraAng               ( const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);

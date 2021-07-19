@@ -888,6 +888,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if ENABLE_DIMD
   ("NoDimdConstraintFlag",                             m_noDimdConstraintFlag,                            false, "Indicate that DIMD is deactivated")
 #endif
+#if JVET_W0123_TIMD_FUSION
+  ("NoTimdConstraintFlag",                             m_noTimdConstraintFlag,                          false, "Indicate that TIMD is deactivated")
+#endif
 #if ENABLE_OBMC
   ("NoObmcConstraintFlag",                             m_noObmcConstraintFlag,                            false, "Indicate that OBMC is deactivated")
 #endif
@@ -1011,6 +1014,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if ENABLE_DIMD
   ( "DIMD",                                           m_dimd,                                            true, "Enable decoder side intra mode derivation\n" )
+#endif
+#if JVET_W0123_TIMD_FUSION
+  ( "TIMD",                                           m_timd,                                            true,  "Enable template based intra mode derivation\n" )
 #endif
 #if ENABLE_OBMC
   ("OBMC",                                            m_OBMC,                                           true, "Overlapping Block Motion Compensation")
@@ -4275,6 +4281,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if ENABLE_DIMD
     msg(VERBOSE, "DIMD:%d ", m_dimd);
+#endif
+#if JVET_W0123_TIMD_FUSION
+    msg(VERBOSE, "TIMD:%d ", m_timd);
 #endif
 #if ENABLE_OBMC
     msg(VERBOSE, "OBMC:%d ", m_OBMC);

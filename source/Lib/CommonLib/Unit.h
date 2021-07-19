@@ -325,6 +325,13 @@ struct CodingUnit : public UnitArea
   int8_t         dimdBlendMode[2]; // max number of blend modes (the main mode is not counter) --> incoherent with dimdRelWeight
   int8_t         dimdRelWeight[3]; // max number of predictions to blend
 #endif
+#if JVET_W0123_TIMD_FUSION
+  bool           timd;
+  int            timdMode;
+  int timdModeSecondary;
+  bool timdIsBlended;
+  int8_t timdFusionWeight[2];
+#endif
 #if ENABLE_OBMC
   bool           obmcFlag;
   bool           isobmcMC;
@@ -399,7 +406,7 @@ struct CodingUnit : public UnitArea
 
 struct IntraPredictionData
 {
-#if ENABLE_DIMD
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   bool      parseLumaMode = false;
   int8_t    candId = -1;
   bool      parseChromaMode = false;
@@ -495,6 +502,13 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
   const MotionInfo& getMotionInfo( const Position& pos ) const;
   MotionBuf         getMotionBuf();
   CMotionBuf        getMotionBuf() const;
+
+#if JVET_W0123_TIMD_FUSION
+  const uint8_t& getIpmInfo() const;
+  const uint8_t& getIpmInfo( const Position& pos ) const;
+  IpmBuf         getIpmBuf();
+  CIpmBuf        getIpmBuf() const;
+#endif
 
 #if ENABLE_SPLIT_PARALLELISM
 
