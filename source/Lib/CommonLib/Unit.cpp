@@ -290,6 +290,14 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
     dimdRelWeight[i] = other.dimdRelWeight[i];
   }
 #endif
+#if JVET_W0123_TIMD_FUSION
+  timd              = other.timd;
+  timdMode          = other.timdMode;
+  timdModeSecondary = other.timdModeSecondary;
+  timdIsBlended     = other.timdIsBlended;
+  timdFusionWeight[0] = other.timdFusionWeight[0];
+  timdFusionWeight[1] = other.timdFusionWeight[1];
+#endif
 #if ENABLE_OBMC
   obmcFlag          = other.obmcFlag;
   isobmcMC          = other.isobmcMC;
@@ -374,6 +382,14 @@ void CodingUnit::initData()
   {
     dimdRelWeight[i] = -1;
   }
+#endif
+#if JVET_W0123_TIMD_FUSION
+  timd              = false;
+  timdMode          = -1;
+  timdModeSecondary = -1;
+  timdIsBlended     = false;
+  timdFusionWeight[0] = -1;
+  timdFusionWeight[1] = -1;
 #endif
 #if ENABLE_OBMC
   obmcFlag          = true;
@@ -607,7 +623,7 @@ void PredictionUnit::initData()
   intraDir[1] = PLANAR_IDX;
   mipTransposedFlag = false;
   multiRefIdx = 0;
-#if ENABLE_DIMD
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   parseLumaMode = false;
   candId = -1;
   parseChromaMode = false;
@@ -683,7 +699,7 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   }
   mipTransposedFlag = predData.mipTransposedFlag;
   multiRefIdx = predData.multiRefIdx;
-#if ENABLE_DIMD
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   parseLumaMode = predData.parseLumaMode;
   candId = predData.candId;
   parseChromaMode = predData.parseChromaMode;
@@ -767,7 +783,7 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   mergeFlag   = other.mergeFlag;
   regularMergeFlag = other.regularMergeFlag;
   mergeIdx    = other.mergeIdx;
-#if ENABLE_DIMD
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   parseLumaMode = other.parseLumaMode;
   candId = other.candId;
   parseChromaMode = other.parseChromaMode;
@@ -863,6 +879,29 @@ CMotionBuf PredictionUnit::getMotionBuf() const
 {
   return cs->getMotionBuf( *this );
 }
+
+#if JVET_W0123_TIMD_FUSION
+const uint8_t& PredictionUnit::getIpmInfo() const
+{
+  return cs->getIpmInfo( lumaPos() );
+}
+
+const uint8_t& PredictionUnit::getIpmInfo( const Position& pos ) const
+{
+  CHECKD( !Y().contains( pos ), "Trying to access motion info outsied of PU" );
+  return cs->getIpmInfo( pos );
+}
+
+IpmBuf PredictionUnit::getIpmBuf()
+{
+  return cs->getIpmBuf( *this );
+}
+
+CIpmBuf PredictionUnit::getIpmBuf() const
+{
+  return cs->getIpmBuf( *this );
+}
+#endif
 
 
 // ---------------------------------------------------------------------------

@@ -1816,6 +1816,12 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   double maxCostAllowedForChroma = MAX_DOUBLE;
   const  CodingUnit *bestCU      = bestCS->getCU( partitioner.chType );
   Distortion interHad = m_modeCtrl->getInterHad();
+#if JVET_W0123_TIMD_FUSION
+  int timdMode = 0;
+  int timdModeSecondary = 0;
+  bool timdIsBlended = false;
+  int  timdFusionWeight[2] = { 0 };
+#endif
 
 
   double dct2Cost                =   MAX_DOUBLE;
@@ -1923,6 +1929,9 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   }
 #endif
 
+#if JVET_W0123_TIMD_FUSION
+  bool timdDerived = false;
+#endif
   for( int trGrpIdx = 0; trGrpIdx < grpNumMax; trGrpIdx++ )
   {
     const uint8_t startMtsFlag = trGrpIdx > 0;
@@ -1979,6 +1988,35 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
           cu.colorTransform = adaptiveColorTrans;
 
           CU::addPUs( cu );
+#if JVET_W0123_TIMD_FUSION
+          cu.timd = false;
+          if (isLuma(partitioner.chType) && cu.slice->getSPS()->getUseTimd())
+          {
+            if (cu.lwidth() * cu.lheight() > 1024 && cu.slice->getSliceType() == I_SLICE)
+            {
+              timdDerived = true;
+            }
+            if (!timdDerived)
+            {
+              const CompArea &area = cu.Y();
+              cu.timdMode = m_pcIntraSearch->deriveTimdMode(bestCS->picture->getRecoBuf(area), area, cu);
+              timdMode = cu.timdMode;
+              timdDerived = true;
+              timdModeSecondary = cu.timdModeSecondary;
+              timdIsBlended     = cu.timdIsBlended;
+              timdFusionWeight[0] = cu.timdFusionWeight[0];
+              timdFusionWeight[1] = cu.timdFusionWeight[1];
+            }
+            else
+            {
+              cu.timdMode = timdMode;
+              cu.timdModeSecondary = timdModeSecondary;
+              cu.timdIsBlended     = timdIsBlended;
+              cu.timdFusionWeight[0] = timdFusionWeight[0];
+              cu.timdFusionWeight[1] = timdFusionWeight[1];
+            }
+          }
+#endif
 
           tempCS->interHad    = interHad;
 
@@ -2003,7 +2041,14 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             {
               continue;
             }
+#if JVET_W0123_TIMD_FUSION
+            PU::spanIpmInfoIntra(*cu.firstPU);
+#endif
+#if JVET_W0123_TIMD_FUSION
+            if (m_pcEncCfg->getUseFastISP() && validCandRet && !mtsFlag && !lfnstIdx && !cu.colorTransform && !cu.timd)
+#else
             if (m_pcEncCfg->getUseFastISP() && validCandRet && !mtsFlag && !lfnstIdx && !cu.colorTransform)
+#endif
             {
               m_modeCtrl->setISPMode(cu.ispMode);
               m_modeCtrl->setISPLfnstIdx(cu.lfnstIdx);

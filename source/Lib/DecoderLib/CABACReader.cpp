@@ -1582,10 +1582,18 @@ void CABACReader::extend_ref_line(CodingUnit& cu)
 
     if (MRL_NUM_REF_LINES > 1)
     {
+#if JVET_W0123_TIMD_FUSION
+      multiRefIdx = m_BinDecoder.decodeBin(cu.timd ? Ctx::MultiRefLineIdx(2) : Ctx::MultiRefLineIdx(0)) == 1 ? MULTI_REF_LINE_IDX[1] : MULTI_REF_LINE_IDX[0];
+#else
       multiRefIdx = m_BinDecoder.decodeBin(Ctx::MultiRefLineIdx(0)) == 1 ? MULTI_REF_LINE_IDX[1] : MULTI_REF_LINE_IDX[0];
+#endif
       if (MRL_NUM_REF_LINES > 2 && multiRefIdx != MULTI_REF_LINE_IDX[0])
       {
+#if JVET_W0123_TIMD_FUSION
+        multiRefIdx = m_BinDecoder.decodeBin(cu.timd ? Ctx::MultiRefLineIdx(3) : Ctx::MultiRefLineIdx(1)) == 1 ? MULTI_REF_LINE_IDX[2] : MULTI_REF_LINE_IDX[1];
+#else
         multiRefIdx = m_BinDecoder.decodeBin(Ctx::MultiRefLineIdx(1)) == 1 ? MULTI_REF_LINE_IDX[2] : MULTI_REF_LINE_IDX[1];
+#endif
       }
 
     }
@@ -1627,10 +1635,19 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
     mip_pred_modes(cu);
     return;
   }
+#if JVET_W0123_TIMD_FUSION
+  cu_timd_flag(cu);
+#endif
   extend_ref_line( cu );
   isp_mode( cu );
 #if ENABLE_DIMD
   if (cu.dimd)
+  {
+    return;
+  }
+#endif
+#if JVET_W0123_TIMD_FUSION
+  if (cu.timd)
   {
     return;
   }
@@ -1669,7 +1686,7 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
 #else
     PU::getIntraMPMs(*pu, mpm_pred);
 #endif
-#if ENABLE_DIMD
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
     pu->parseLumaMode = true;
     pu->mpmFlag = mpmFlag[k];
 #endif
@@ -1711,7 +1728,7 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
           ipred_idx += m_BinDecoder.decodeBinEP();
         }
       }
-#if ENABLE_DIMD
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
       pu->ipred_idx = ipred_idx;
 #endif
       pu->intraDir[0] = mpm_pred[ipred_idx];
@@ -1724,7 +1741,7 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
 #if SECONDARY_MPM
         if (m_BinDecoder.decodeBin(Ctx::IntraLumaSecondMpmFlag()))
         {
-#if ENABLE_DIMD
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
           int idx = m_BinDecoder.decodeBinsEP(4) + NUM_PRIMARY_MOST_PROBABLE_MODES;
           ipred_mode = mpm_pred[idx];
           pu->secondMpmFlag = true;
@@ -1736,7 +1753,7 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
         else
         {
           xReadTruncBinCode(ipred_mode, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES);
-#if ENABLE_DIMD
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
           pu->secondMpmFlag = false;
           pu->ipred_idx = ipred_mode;
 #endif
@@ -1744,7 +1761,7 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
         }
 #else
         xReadTruncBinCode(ipred_mode, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES);
-#if ENABLE_DIMD
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
         pu->ipred_idx = ipred_mode;
 #endif
 #endif
@@ -1779,6 +1796,38 @@ void CABACReader::cu_dimd_flag(CodingUnit& cu)
   cu.dimd = m_BinDecoder.decodeBin(Ctx::DimdFlag(ctxId));
 }
 #endif
+
+#if JVET_W0123_TIMD_FUSION
+void CABACReader::cu_timd_flag( CodingUnit& cu )
+{
+  if (!cu.cs->sps->getUseTimd())
+  {
+    cu.timd = false;
+    return;
+  }
+  if (cu.lwidth() * cu.lheight() > 1024 && cu.slice->getSliceType() == I_SLICE)
+  {
+    cu.timd = false;
+    return;
+  }
+#if ENABLE_DIMD
+  if (cu.dimd)
+  {
+    cu.timd = false;
+    return;
+  }
+#endif
+  if (!cu.Y().valid() || cu.predMode != MODE_INTRA || !isLuma(cu.chType))
+  {
+    cu.timd = false;
+    return;
+  }
+
+  unsigned ctxId = DeriveCtx::CtxTimdFlag( cu );
+  cu.timd = m_BinDecoder.decodeBin( Ctx::TimdFlag(ctxId) );
+}
+#endif
+
 void CABACReader::intra_chroma_pred_modes( CodingUnit& cu )
 {
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -1875,7 +1924,7 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
     pu.intraDir[1] = DM_CHROMA_IDX;
     return;
   }
-#if ENABLE_DIMD
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   pu.parseChromaMode = true;
 #endif
   unsigned candId = m_BinDecoder.decodeBinsEP(2);
@@ -1888,7 +1937,7 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
   CHECK(chromaCandModes[candId] == DM_CHROMA_IDX, "The intra dir cannot be DM_CHROMA for this path");
 
   pu.intraDir[1] = chromaCandModes[candId];
-#if ENABLE_DIMD
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   pu.candId = candId;
 #endif
 }
@@ -3848,7 +3897,11 @@ void CABACReader::isp_mode( CodingUnit& cu )
 
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__ISP_MODE_FLAG);
 
+#if JVET_W0123_TIMD_FUSION
+  int symbol = m_BinDecoder.decodeBin(cu.timd ? Ctx::ISPMode(2) : Ctx::ISPMode(0));
+#else
   int symbol = m_BinDecoder.decodeBin(Ctx::ISPMode(0));
+#endif
 
   if( symbol )
   {
@@ -3881,6 +3934,13 @@ void CABACReader::residual_lfnst_mode( CodingUnit& cu,  CUCtx& cuCtx  )
   {
     return;
   }
+#if JVET_W0123_TIMD_FUSION
+  if (cu.timd && (cu.ispMode || cu.firstPU->multiRefIdx))
+  {
+    cu.lfnstIdx = 0;
+    return;
+  }
+#endif
 
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__LFNST );
 

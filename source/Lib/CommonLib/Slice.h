@@ -319,6 +319,9 @@ class ConstraintInfo
 #if ENABLE_DIMD
   bool              m_noDimdConstraintFlag;
 #endif
+#if JVET_W0123_TIMD_FUSION
+  bool              m_noTimdConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool              m_noObmcConstraintFlag;
 #endif
@@ -433,6 +436,9 @@ public:
     , m_noIbcConstraintFlag      (false)
 #if ENABLE_DIMD
     , m_noDimdConstraintFlag     (false)
+#endif
+#if JVET_W0123_TIMD_FUSION
+    , m_noTimdConstraintFlag     (false)
 #endif
 #if ENABLE_OBMC
     , m_noObmcConstraintFlag     (false)
@@ -614,6 +620,10 @@ public:
 #if ENABLE_DIMD
   bool          getNoDimdConstraintFlag() const { return m_noDimdConstraintFlag; }
   void          setNoDimdConstraintFlag(bool bVal) { m_noDimdConstraintFlag = bVal; }
+#endif
+#if JVET_W0123_TIMD_FUSION
+  bool          getNoTimdConstraintFlag() const { return m_noTimdConstraintFlag; }
+  void          setNoTimdConstraintFlag(bool bVal) { m_noTimdConstraintFlag = bVal; }
 #endif
 #if ENABLE_OBMC
   bool          getNoObmcConstraintFlag() const { return m_noObmcConstraintFlag; }
@@ -1651,6 +1661,9 @@ private:
 #if ENABLE_DIMD
   bool              m_dimd;
 #endif
+#if JVET_W0123_TIMD_FUSION
+  bool              m_timd;
+#endif
 #if JVET_V0130_INTRA_TMP
   bool              m_intraTMP;                                       ///< intra Template Matching 
   unsigned          m_intraTmpMaxSize;                               ///< max CU size for which intra TMP is allowed
@@ -2082,6 +2095,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   bool      getUseIntraTMP     ()                                      const     { return m_intraTMP; }
   void      setIntraTMPMaxSize (unsigned n)                                      { m_intraTmpMaxSize = n; }
   unsigned  getIntraTMPMaxSize ()                                      const     { return m_intraTmpMaxSize; }
+#endif
+#if JVET_W0123_TIMD_FUSION
+  void      setUseTimd         ( bool b )                                        { m_timd = b; }
+  bool      getUseTimd         ()                                      const     { return m_timd; }
 #endif
 #if ENABLE_OBMC
   void      setUseOBMC         ( bool b )                                        { m_OBMC = b; }

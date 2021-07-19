@@ -232,6 +232,9 @@ protected:
 #if ENABLE_DIMD
   bool      m_noDimdConstraintFlag;
 #endif
+#if JVET_W0123_TIMD_FUSION
+  bool      m_noTimdConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool      m_noObmcConstraintFlag;
 #endif
@@ -383,6 +386,9 @@ protected:
 #endif
 #if ENABLE_DIMD
   bool      m_dimd;
+#endif
+#if JVET_W0123_TIMD_FUSION
+  bool      m_timd;
 #endif
 #if ENABLE_OBMC
   bool      m_OBMC;
@@ -976,6 +982,10 @@ public:
   bool      getNoDimdConstraintFlag() const { return m_noDimdConstraintFlag; }
   void      setNoDimdConstraintFlag(bool val) { m_noDimdConstraintFlag = val; }
 #endif
+#if JVET_W0123_TIMD_FUSION
+  bool      getNoTimdConstraintFlag() const { return m_noTimdConstraintFlag; }
+  void      setNoTimdConstraintFlag(bool val) { m_noTimdConstraintFlag = val; }
+#endif
 #if ENABLE_OBMC
   bool      getNoObmcConstraintFlag() const { return m_noObmcConstraintFlag; }
   void      setNoObmcConstraintFlag(bool bVal) { m_noObmcConstraintFlag = bVal; }
@@ -1237,6 +1247,10 @@ public:
 #if ENABLE_DIMD
   void      setUseDimd                   ( bool b )       { m_dimd = b; }
   bool      getUseDimd                   ()         const { return m_dimd; }
+#endif
+#if JVET_W0123_TIMD_FUSION
+  void      setUseTimd                   ( bool b )       { m_timd = b; }
+  bool      getUseTimd                   () const         { return m_timd; }
 #endif
 #if ENABLE_OBMC
   void      setUseObmc                   ( bool b )       { m_OBMC = b; }

@@ -96,6 +96,9 @@ public:
   void        cu_bcw_flag               ( CodingUnit&                   cu );
   void        extend_ref_line           (CodingUnit&                     cu);
   void        intra_luma_pred_modes     ( CodingUnit&                   cu );
+#if JVET_W0123_TIMD_FUSION
+  void        cu_timd_flag              ( CodingUnit&                   cu );
+#endif
   void        intra_chroma_pred_modes   ( CodingUnit&                   cu );
   bool        intra_chroma_lmc_mode     ( PredictionUnit&               pu );
   void        intra_chroma_pred_mode    ( PredictionUnit&               pu );

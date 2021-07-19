@@ -101,6 +101,9 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
   }
 
   m_motionBuf     = nullptr;
+#if JVET_W0123_TIMD_FUSION
+  m_ipmBuf        = nullptr;
+#endif
   features.resize( NUM_ENC_FEATURES );
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   treeType = TREE_D;
@@ -140,6 +143,10 @@ void CodingStructure::destroy()
 
   delete[] m_motionBuf;
   m_motionBuf = nullptr;
+#if JVET_W0123_TIMD_FUSION
+  delete[] m_ipmBuf;
+  m_ipmBuf = nullptr;
+#endif
 
 
   m_tuCache.cache( tus );
@@ -1007,6 +1014,9 @@ void CodingStructure::createInternals(const UnitArea& _unit, const bool isTopLay
 
   unsigned _lumaAreaScaled = g_miScaling.scale( area.lumaSize() ).area();
   m_motionBuf       = new MotionInfo[_lumaAreaScaled];
+#if JVET_W0123_TIMD_FUSION
+  m_ipmBuf          = new uint8_t[_lumaAreaScaled];
+#endif
   initStructData();
 }
 
@@ -1345,6 +1355,14 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
 
     motionLut = subStruct.motionLut;
   }
+#if JVET_W0123_TIMD_FUSION
+  if (!subStruct.m_isTuEnc && chType != CHANNEL_TYPE_CHROMA)
+  {
+    IpmBuf ownIB  = getIpmBuf          ( clippedArea );
+    CIpmBuf subIB = subStruct.getIpmBuf( clippedArea );
+    ownIB.copyFrom( subIB );
+  }
+#endif
   prevPLT = subStruct.prevPLT;
 
 
@@ -1469,6 +1487,11 @@ void CodingStructure::copyStructure( const CodingStructure& other, const Channel
 
     motionLut = other.motionLut;
   }
+#if JVET_W0123_TIMD_FUSION
+  IpmBuf  ownIB = getIpmBuf();
+  CIpmBuf subIB = other.getIpmBuf();
+  ownIB.copyFrom( subIB );
+#endif
   prevPLT = other.prevPLT;
 
   if( copyTUs )
@@ -1536,6 +1559,9 @@ void CodingStructure::initStructData( const int &QP, const bool &skipMotBuf )
   {
     getMotionBuf().memset(0);
   }
+#if JVET_W0123_TIMD_FUSION
+  getIpmBuf().memset(0);
+#endif
 
   fracBits = 0;
   dist     = 0;
@@ -1652,6 +1678,56 @@ const MotionInfo& CodingStructure::getMotionInfo( const Position& pos ) const
 
   return *( m_motionBuf + miPos.y * stride + miPos.x );
 }
+
+#if JVET_W0123_TIMD_FUSION
+IpmBuf CodingStructure::getIpmBuf( const Area& _area )
+{
+  const CompArea& _luma = area.Y();
+
+  CHECKD( !_luma.contains( _area ), "Trying to access motion information outside of this coding structure" );
+
+  const Area miArea   = g_miScaling.scale( _area );
+  const Area selfArea = g_miScaling.scale( _luma );
+
+  return IpmBuf( m_ipmBuf + rsAddr( miArea.pos(), selfArea.pos(), selfArea.width ), selfArea.width, miArea.size() );
+}
+
+const CIpmBuf CodingStructure::getIpmBuf( const Area& _area ) const
+{
+  const CompArea& _luma = area.Y();
+
+  CHECKD( !_luma.contains( _area ), "Trying to access motion information outside of this coding structure" );
+
+  const Area miArea   = g_miScaling.scale( _area );
+  const Area selfArea = g_miScaling.scale( _luma );
+
+  return IpmBuf( m_ipmBuf + rsAddr( miArea.pos(), selfArea.pos(), selfArea.width ), selfArea.width, miArea.size() );
+}
+
+uint8_t& CodingStructure::getIpmInfo( const Position& pos )
+{
+  CHECKD( !area.Y().contains( pos ), "Trying to access motion information outside of this coding structure" );
+
+  //return getIpmBuf().at( g_miScaling.scale( pos - area.lumaPos() ) );
+  // bypass the intra prediction mode buf calling and get the value directly
+  const unsigned stride = g_miScaling.scaleHor( area.lumaSize().width );
+  const Position miPos  = g_miScaling.scale( pos - area.lumaPos() );
+
+  return *( m_ipmBuf + miPos.y * stride + miPos.x );
+}
+
+const uint8_t& CodingStructure::getIpmInfo( const Position& pos ) const
+{
+  CHECKD( !area.Y().contains( pos ), "Trying to access motion information outside of this coding structure" );
+
+  //return getIpmBuf().at( g_miScaling.scale( pos - area.lumaPos() ) );
+  // bypass the intra prediction mode buf calling and get the value directly
+  const unsigned stride = g_miScaling.scaleHor( area.lumaSize().width );
+  const Position miPos  = g_miScaling.scale( pos - area.lumaPos() );
+
+  return *( m_ipmBuf + miPos.y * stride + miPos.x );
+}
+#endif
 
 
 // data accessors
