@@ -52,9 +52,12 @@
 
 
 
+
+
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
+
 
 #if BASE_ENCODER
 // Lossy encoder speedups
@@ -132,6 +135,8 @@
 #define EXTENDED_LFNST                                    1 // Extended LFNST
 #define SIGN_PREDICTION                                   1 // transform coefficients sign prediction
 
+#define JVET_W0103_INTRA_MTS                              1 // JVET W0103: Extended Intra MTS
+
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision
 #define SLICE_TYPE_WIN_SIZE                               1 // Context window initialization based on slice type
@@ -157,7 +162,6 @@
 #if JVET_V0094_BILATERAL_FILTER
 #define ENABLE_SIMD_BILATERAL_FILTER                      1
 #endif
-
 #endif // tools
 
 
@@ -541,11 +545,23 @@ enum QuantFlags
 //EMT transform tags
 enum TransType
 {
+#if JVET_W0103_INTRA_MTS
+  DCT2 = 0,
+  DCT8 = 1,
+  DST7 = 2,
+  DCT5 = 3,
+  DST4 = 4,
+  DST1 = 5,
+  IDTR = 6,
+  NUM_TRANS_TYPE = 7,
+  DCT2_EMT = 8
+#else
   DCT2 = 0,
   DCT8 = 1,
   DST7 = 2,
   NUM_TRANS_TYPE = 3,
   DCT2_EMT = 4
+#endif
 };
 
 enum MTSIdx

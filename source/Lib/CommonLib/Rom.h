@@ -166,7 +166,21 @@ extern TMatrixCoeff g_trCoreDCT2P256[256][256];
 extern TMatrixCoeff g_trCoreDCT8P256[256][256];
 extern TMatrixCoeff g_trCoreDST7P256[256][256];
 #endif
+#if JVET_W0103_INTRA_MTS
+extern TMatrixCoeff g_aiTr2[NUM_TRANS_TYPE][2][2];
+extern TMatrixCoeff g_aiTr4[NUM_TRANS_TYPE][4][4];
+extern TMatrixCoeff g_aiTr8[NUM_TRANS_TYPE][8][8];
+extern TMatrixCoeff g_aiTr16[NUM_TRANS_TYPE][16][16];
+extern TMatrixCoeff g_aiTr32[NUM_TRANS_TYPE][32][32];
+extern TMatrixCoeff g_aiTr64[NUM_TRANS_TYPE][64][64];
+extern TMatrixCoeff g_aiTr128[NUM_TRANS_TYPE][128][128];
+extern TMatrixCoeff g_aiTr256[NUM_TRANS_TYPE][256][256];
 
+extern const uint8_t g_aucIpmToTrSet[16][36];
+extern const uint8_t g_aucTrSet[80][4];
+extern const int8_t  g_aiIdLut[3][3];
+extern const uint8_t g_aucTrIdxToTr[25][2];
+#endif
 #if EXTENDED_LFNST
 extern const     int8_t   g_lfnst8x8[ 35 ][ 3 ][ 64 ][ 64 ];
 extern const     int8_t   g_lfnst4x4[ 35 ][ 3 ][ 16 ][ 16 ];

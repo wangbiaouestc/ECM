@@ -3858,11 +3858,21 @@ void CABACReader::mts_idx( CodingUnit& cu, CUCtx& cuCtx )
       cuCtx.mtsLastScanPos && cu.lfnstIdx == 0 && mtsIdx != MTS_SKIP)
   {
     RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2( STATS__CABAC_BITS__MTS_FLAGS, tu.blocks[COMPONENT_Y], COMPONENT_Y );
+#if JVET_W0103_INTRA_MTS
+    int ctxIdx = (cu.mipFlag) ? 3 : 0;
+#else
     int ctxIdx = 0;
+#endif
     int symbol = m_BinDecoder.decodeBin( Ctx::MTSIdx(ctxIdx));
 
     if( symbol )
     {
+#if JVET_W0103_INTRA_MTS
+      int bins[2];
+      bins[0] = m_BinDecoder.decodeBin(Ctx::MTSIdx(1));
+      bins[1] = m_BinDecoder.decodeBin(Ctx::MTSIdx(2));
+      mtsIdx = MTS_DST7_DST7 + (bins[0] << 1) + bins[1];
+#else
       ctxIdx = 1;
       mtsIdx = MTS_DST7_DST7; // mtsIdx = 2 -- 4
       for( int i = 0; i < 3; i++, ctxIdx++ )
@@ -3875,6 +3885,7 @@ void CABACReader::mts_idx( CodingUnit& cu, CUCtx& cuCtx )
           break;
         }
       }
+#endif
     }
   }
 

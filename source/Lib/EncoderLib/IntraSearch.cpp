@@ -380,6 +380,45 @@ double IntraSearch::findInterCUCost( CodingUnit &cu )
   return COST_UNKNOWN;
 }
 #endif
+#if JVET_W0103_INTRA_MTS
+bool IntraSearch::testISPforCurrCU(const CodingUnit &cu)
+{
+  CodingStructure       &cs = *cu.cs;
+  auto &pu = *cu.firstPU;
+  const CompArea &area = pu.Y();
+  PelBuf piOrg = cs.getOrgBuf(area);
+
+  Pel* pOrg = piOrg.buf;
+  int uiWidth = area.width;
+  int uiHeight = area.height;
+  int iStride = piOrg.stride;
+  int Gsum = 0;
+  int nPix = (uiWidth - 2) * (uiHeight - 2);
+  for (int y = 1; y < (uiHeight - 1); y++)
+  {
+    for (int x = 1; x < (uiWidth - 1); x++)
+    {
+      const Pel *p = pOrg + y * iStride + x;
+
+      int iDy = p[-iStride - 1] + 2 * p[-1] + p[iStride - 1] - p[-iStride + 1] - 2 * p[+1] - p[iStride + 1];
+      int iDx = p[iStride - 1] + 2 * p[iStride] + p[iStride + 1] - p[-iStride - 1] - 2 * p[-iStride] - p[-iStride + 1];
+
+      if (iDy == 0 && iDx == 0)
+        continue;
+
+      int iAmp = (int)(abs(iDx) + abs(iDy));
+      Gsum += iAmp;
+    }
+  }
+  Gsum = (Gsum + (nPix >> 1)) / nPix;
+
+  bool testISP = true;
+  CHECK(m_numModesISPRDO != -1, "m_numModesISPRDO!=-1");
+
+  m_numModesISPRDO = (Gsum < 50 && uiWidth >= 16 && uiHeight >= 16) ? 1 : 2;
+  return testISP;
+}
+#endif
 bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, const double bestCostSoFar, bool mtsCheckRangeFlag, int mtsFirstCheckId, int mtsLastCheckId, bool moreProbMTSIdxFirst, CodingStructure* bestCS)
 {
   CodingStructure       &cs            = *cu.cs;
@@ -441,6 +480,18 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
     mtsUsageFlag = 0;
   }
 
+#if JVET_W0103_INTRA_MTS
+  if (!cu.mtsFlag && !cu.lfnstIdx)
+  {
+    m_globalBestCostStore = MAX_DOUBLE;
+    m_globalBestCostValid = false;
+    if (bestCS->getCU(partitioner.chType) != NULL && bestCS->getCU(partitioner.chType)->predMode != MODE_INTRA && bestCostSoFar != MAX_DOUBLE)
+    {
+      m_globalBestCostStore = bestCostSoFar;
+      m_globalBestCostValid = true;
+    }
+  }
+#endif
   const bool colorTransformIsEnabled = sps.getUseColorTrans() && !CS::isDualITree(cs);
   const bool isFirstColorSpace       = colorTransformIsEnabled && ((m_pcEncCfg->getRGBFormatFlag() && cu.colorTransform) || (!m_pcEncCfg->getRGBFormatFlag() && !cu.colorTransform));
   const bool isSecondColorSpace      = colorTransformIsEnabled && ((m_pcEncCfg->getRGBFormatFlag() && !cu.colorTransform) || (!m_pcEncCfg->getRGBFormatFlag() && cu.colorTransform));
@@ -449,7 +500,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
   bool ispCanBeUsed   = sps.getUseISP() && cu.mtsFlag == 0 && cu.lfnstIdx == 0 && CU::canUseISP(width, height, cu.cs->sps->getMaxTbSize());
   bool saveDataForISP = ispCanBeUsed && (!colorTransformIsEnabled || isFirstColorSpace);
   bool testISP        = ispCanBeUsed && (!colorTransformIsEnabled || !cu.colorTransform);
-
+#if JVET_W0103_INTRA_MTS 
+  if (testISP && m_pcEncCfg->getUseFastISP())
+  {
+    m_numModesISPRDO = -1;
+    testISP &= testISPforCurrCU(cu);
+  }
+#endif
   if ( saveDataForISP )
   {
     //reset the intra modes lists variables
@@ -1016,7 +1073,25 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         if ((m_pcEncCfg->getUseFastLFNST() || !cu.slice->isIntra()) && m_bestModeCostValid[lfnstIdx])
         {
           numModesForFullRD = 0;
+#if JVET_W0103_INTRA_MTS
+          double thresholdSkipMode = 1.0 + ((cu.lfnstIdx > 0) ? 0.1 : 0.8) * (1.4 / sqrt((double)(width * height)));
+          std::vector<std::pair<ModeInfo, double>> ModeInfoWithDCT2Cost(m_savedNumRdModes[0]);
+          for (int i = 0; i < m_savedNumRdModes[0]; i++)
+          {
+            ModeInfoWithDCT2Cost[i] = { m_savedRdModeList[0][i], m_modeCostStore[0][i] };
+          }
+          std::stable_sort(ModeInfoWithDCT2Cost.begin(), ModeInfoWithDCT2Cost.end(), [](const std::pair<ModeInfo, double> & l, const std::pair<ModeInfo, double> & r) {return l.second < r.second; });
 
+          // **Reorder the modes** and Skip checking the modes with much larger R-D cost than the best mode
+          for (int i = 0; i < m_savedNumRdModes[0]; i++)
+          {
+            if (ModeInfoWithDCT2Cost[i].second <= thresholdSkipMode * ModeInfoWithDCT2Cost[0].second)
+            {
+              uiRdModeList.push_back(ModeInfoWithDCT2Cost[i].first);
+              numModesForFullRD++;
+            }
+          }
+#else
           double thresholdSkipMode = 1.0 + ((cu.lfnstIdx > 0) ? 0.1 : 1.0) * (1.4 / sqrt((double) (width * height)));
 
           // Skip checking the modes with much larger R-D cost than the best mode
@@ -1028,6 +1103,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               numModesForFullRD++;
             }
           }
+#endif
         }
         else   // this is necessary because we skip the candidates list calculation, since it was already obtained for
                // the DCT-II. Now we load it
@@ -1060,7 +1136,6 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       CHECK(numModesForFullRD != uiRdModeList.size(), "Inconsistent state!");
 #endif
       // after this point, don't use numModesForFullRD
-
       // PBINTRA fast
       if (m_pcEncCfg->getUsePbIntraFast() && !cs.slice->isIntra() && uiRdModeList.size() < numModesAvailable
           && !cs.slice->getDisableSATDForRD() && (mtsUsageFlag != 2 || lfnstIdx > 0))
@@ -1270,6 +1345,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #endif
 #if JVET_V0130_INTRA_TMP
       cu.tmpFlag = uiOrgMode.tmpFlag;
+#if JVET_W0103_INTRA_MTS
+      if (cu.tmpFlag && cu.mtsFlag) continue;
+#endif
 #endif
       cu.mipFlag                     = uiOrgMode.mipFlg;
       pu.mipTransposedFlag           = uiOrgMode.mipTrFlg;
@@ -1426,6 +1504,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
             sortRdModeListFirstColorSpace(uiOrgMode, csTemp->cost, cu.bdpcmMode, m_savedRdModeFirstColorSpace[m_savedRdModeIdx], m_savedRdCostFirstColorSpace[m_savedRdModeIdx], m_savedBDPCMModeFirstColorSpace[m_savedRdModeIdx], m_numSavedRdModeFirstColorSpace[m_savedRdModeIdx]);
           }
         }
+
         // check r-d cost
         if( csTemp->cost < csBest->cost )
         {
@@ -1444,6 +1523,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
             m_bestModeCostStore[ lfnstIdx ] = csBest->cost; //cs.cost;
             m_bestModeCostValid[ lfnstIdx ] = true;
           }
+#if JVET_W0103_INTRA_MTS
+          if (sps.getUseLFNST() && m_globalBestCostStore > csBest->cost)
+          {
+            m_globalBestCostStore = csBest->cost;
+            m_globalBestCostValid = true;
+          }
+#endif
           if( csBest->cost < bestCurrentCost )
           {
             bestCurrentCost = csBest->cost;
@@ -3411,7 +3497,98 @@ uint64_t IntraSearch::xGetIntraFracBitsQTChroma(TransformUnit& currTU, const Com
   uint64_t fracBits = m_CABACEstimator->getEstFracBits();
   return fracBits;
 }
+#if JVET_W0103_INTRA_MTS
+void IntraSearch::xSelectAMTForFullRD(TransformUnit &tu)
+{
+  if (!tu.blocks[COMPONENT_Y].valid())
+  {
+    return;
+  }
 
+  if (!tu.cu->mtsFlag)
+  {
+    return;
+  }
+
+  CodingStructure &cs = *tu.cs;
+  m_pcRdCost->setChromaFormat(cs.sps->getChromaFormatIdc());
+
+  const CompArea      &area = tu.blocks[COMPONENT_Y];
+
+  const ChannelType    chType = toChannelType(COMPONENT_Y);
+
+
+  PelBuf         piOrg = cs.getOrgBuf(area);
+  PelBuf         piPred = cs.getPredBuf(area);
+  PelBuf         piResi = cs.getResiBuf(area);
+
+
+  const PredictionUnit &pu = *cs.getPU(area.pos(), chType);
+
+  //===== init availability pattern =====
+
+  PelBuf sharedPredTS(m_pSharedPredTransformSkip[COMPONENT_Y], area);
+  initIntraPatternChType(*tu.cu, area);
+
+  //===== get prediction signal =====
+  if (PU::isMIP(pu, chType))
+  {
+    initIntraMip(pu, area);
+    predIntraMip(COMPONENT_Y, piPred, pu);
+  }
+  else
+  {
+    predIntraAng(COMPONENT_Y, piPred, pu);
+  }
+
+
+  // save prediction
+  sharedPredTS.copyFrom(piPred);
+
+  const Slice           &slice = *cs.slice;
+  //===== get residual signal =====
+  piResi.copyFrom(piOrg);
+  if (slice.getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+  {
+    piResi.rspSignal(m_pcReshape->getFwdLUT());
+    piResi.subtract(piPred);
+  }
+  else
+  {
+    piResi.subtract(piPred);
+  }
+  // do transform and calculate Coeff AbsSum for all MTS candidates
+  std::vector<std::pair<int, uint64_t>> CoeffAbsSum(4);
+
+  for (int i = 0; i < 4; i++)
+  {
+    tu.mtsIdx[0] = i + MTS_DST7_DST7;
+    uint64_t AbsSum = m_pcTrQuant->transformNxN(tu);
+    CoeffAbsSum[i] = { i, AbsSum };
+  }
+  std::stable_sort(CoeffAbsSum.begin(), CoeffAbsSum.end(), [](const std::pair<int, uint64_t> & l, const std::pair<int, uint64_t> & r) {return l.second < r.second; });
+
+  for (int i = 0; i < 4; i++)
+  {
+    m_TestAMTForFullRD[i] = CoeffAbsSum[i].first;
+  }
+  m_numCandAMTForFullRD = 4;
+
+  if (m_pcEncCfg->getUseFastLFNST())
+  {
+    double skipThreshold = 1.0 + 1.0 / sqrt((double)(area.width*area.height));
+    skipThreshold = std::max(skipThreshold, 1.03);
+    for (int i = 1; i < m_numCandAMTForFullRD; i++)
+    {
+      if (CoeffAbsSum[i].second > skipThreshold * CoeffAbsSum[0].second)
+      {
+        m_numCandAMTForFullRD = i;
+        break;
+      }
+    }
+  }
+}
+#endif
 void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &compID, Distortion& ruiDist, const int &default0Save1Load2, uint32_t* numSig, std::vector<TrMode>* trModes, const bool loadTr)
 {
   if (!tu.blocks[compID].valid())
@@ -3532,7 +3709,11 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
 
   const Slice           &slice = *cs.slice;
   bool flag = slice.getLmcsEnabledFlag() && (slice.isIntra() || (!slice.isIntra() && m_pcReshape->getCTUFlag()));
+#if JVET_W0103_INTRA_MTS
+  if (!tu.cu->mtsFlag && isLuma(compID))
+#else
   if (isLuma(compID))
+#endif
   {
     //===== get residual signal =====
     piResi.copyFrom( piOrg  );
@@ -4254,13 +4435,21 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
     bool    cbfBestMode      = false;
     bool    cbfBestModeValid = false;
     bool    cbfDCT2  = true;
-
+#if JVET_W0103_INTRA_MTS
+    if (sps.getUseLFNST() && cu.mtsFlag) xSelectAMTForFullRD(tu);
+#endif
     double bestDCT2cost = MAX_DOUBLE;
     double threshold = m_pcEncCfg->getUseFastISP() && !cu.ispMode && ispIsCurrentWinner && nNumTransformCands > 1 ? 1 + 1.4 / sqrt( cu.lwidth() * cu.lheight() ) : 1;
     for( int modeId = firstCheckId; modeId <= ( sps.getUseLFNST() ? lastCheckId : ( nNumTransformCands - 1 ) ); modeId++ )
     {
       uint8_t transformIndex = modeId;
-
+#if JVET_W0103_INTRA_MTS
+      if (sps.getUseLFNST() && cu.mtsFlag)
+      {
+        if (modeId >= m_numCandAMTForFullRD) continue;
+        transformIndex = m_TestAMTForFullRD[modeId];
+      }
+#endif
       if( sps.getUseLFNST() )
       {
         if( ( transformIndex < lastCheckId ) || ( ( transformIndex == lastCheckId ) && !checkTransformSkip ) ) //we avoid this if the mode is transformSkip
@@ -4370,6 +4559,12 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
             }
           }
         }
+#if JVET_W0103_INTRA_MTS
+        else if (cu.mtsFlag)
+        {
+          xIntraCodingTUBlock(tu, COMPONENT_Y, singleDistTmpLuma, 2, &numSig, nullptr, true);
+        }
+#endif
         else
         {
           xIntraCodingTUBlock( tu, COMPONENT_Y, singleDistTmpLuma, default0Save1Load2, &numSig );
@@ -4443,7 +4638,21 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
       {
         bestDCT2cost = singleCostTmp;
       }
-
+#if JVET_W0103_INTRA_MTS
+      if (sps.getUseLFNST() && cu.mtsFlag)
+      {
+        if (singleCostTmp != MAX_DOUBLE)
+        {
+          const CompArea&       area = tu.blocks[COMPONENT_Y];
+          double skipThreshold = 1.0 + 1.0 / sqrt((double)(area.width*area.height));
+          skipThreshold = std::max(skipThreshold, !m_pcEncCfg->getUseFastLFNST()? 1.06: 1.03);
+          if (singleCostTmp > skipThreshold * m_globalBestCostStore)
+          {
+            m_numCandAMTForFullRD = modeId + 1;
+          }
+        }
+      }
+#endif
       if (singleCostTmp < dSingleCost)
       {
         dSingleCost       = singleCostTmp;
@@ -6512,13 +6721,18 @@ bool IntraSearch::xSortISPCandList(double bestCostSoFar, double bestNonISPCost, 
       ModeInfo(refMode.mipFlg, refMode.mipTrFlg, refMode.mRefId, refMode.ispMod, bestISPModeInRelCU));
     modeIsInList[bestISPModeInRelCU] = true;
   }
-
   // Planar
+#if JVET_W0103_INTRA_MTS
+  // push planar later when FastISP is on.
+  if (!m_pcEncCfg->getUseFastISP() && !modeIsInList[mode1])
+#else
   if (!modeIsInList[mode1])
+#endif
   {
     destListPtr->push_back(ModeInfo(refMode.mipFlg, refMode.mipTrFlg, refMode.mRefId, refMode.ispMod, mode1));
     modeIsInList[mode1] = true;
   }
+
   // Best angle in regular intra
   if (mode2 != -1 && !modeIsInList[mode2])
   {
@@ -6543,7 +6757,14 @@ bool IntraSearch::xSortISPCandList(double bestCostSoFar, double bestNonISPCost, 
       }
     }
   }
-
+#if JVET_W0103_INTRA_MTS
+  // Planar (after angular modes when FastISP is on)
+  if (!modeIsInList[mode1])
+  {
+    destListPtr->push_back(ModeInfo(refMode.mipFlg, refMode.mipTrFlg, refMode.mRefId, refMode.ispMod, mode1));
+    modeIsInList[mode1] = true;
+  }
+#endif
   // DC is added after the angles from regular intra
   if (dcModeIndex != -1 && !modeIsInList[DC_IDX])
   {
@@ -6555,6 +6776,12 @@ bool IntraSearch::xSortISPCandList(double bestCostSoFar, double bestNonISPCost, 
   for (int j = 0; j < NUM_LFNST_NUM_PER_SET; j++)
   {
     m_ispTestedModes[j].numOrigModesToTest = (int)destListPtr->size();
+#if JVET_W0103_INTRA_MTS
+    if (m_pcEncCfg->getUseFastISP() && m_numModesISPRDO != -1 && destListPtr->size() > m_numModesISPRDO)
+    {
+      m_ispTestedModes[j].numOrigModesToTest = m_numModesISPRDO;
+    }
+#endif
   }
   const int addedModesFromHadList = 3;
   int       newModesAdded = 0;

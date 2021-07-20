@@ -1832,6 +1832,9 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   bool   trGrpCheck        [ 4 ] = { true, true, true, true };
   int    startMTSIdx       [ 4 ] = { 0, 1, 2, 3 };
   int    endMTSIdx         [ 4 ] = { 0, 1, 2, 3 };
+#if JVET_W0103_INTRA_MTS
+  endMTSIdx[0] = 3; //put all MTS candidates in "Grp 0"
+#endif
   double trGrpStopThreshold[ 3 ] = { 1.001, 1.001, 1.001 };
   int    bestMtsFlag             =   0;
   int    bestLfnstIdx            =   0;
@@ -1857,8 +1860,11 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   bool       skipOtherLfnst      = false;
   int        startLfnstIdx       = 0;
   int        endLfnstIdx         = sps.getUseLFNST() ? maxLfnstIdx : 0;
-
+#if JVET_W0103_INTRA_MTS
+  int grpNumMax = 1;
+#else
   int grpNumMax = sps.getUseLFNST() ? m_pcEncCfg->getMTSIntraMaxCand() : 1;
+#endif
   m_modeCtrl->setISPWasTested(false);
   m_pcIntraSearch->invalidateBestModeCost();
   if (sps.getUseColorTrans() && !CS::isDualITree(*tempCS))
@@ -2222,7 +2228,6 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
           xCalDebCost( *tempCS, partitioner );
           tempCS->useDbCost = m_pcEncCfg->getUseEncDbOpt();
 
-
 #if WCG_EXT
           DTRACE_MODE_COST( *tempCS, m_pcRdCost->getLambda( true ) );
 #else
@@ -2237,6 +2242,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               bestCS->tmpColorSpaceIntraCost[colorSpaceIdx] = tempCS->cost;
             }
           }
+         
           if( !sps.getUseLFNST() )
           {
             xCheckBestMode( tempCS, bestCS, partitioner, encTestMode );
@@ -2249,6 +2255,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               bestSelFlag  [ trGrpIdx ] = true;
               bestMtsFlag               = mtsFlag;
               bestLfnstIdx              = lfnstIdx;
+
               if( bestCS->cus.size() == 1 )
               {
                 CodingUnit &cu = *bestCS->cus.front();
@@ -2261,7 +2268,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
                 }
               }
             }
-
+            
             //we decide to skip the non-DCT-II transforms and LFNST according to the ISP results
             if ((endMtsFlag > 0 || endLfnstIdx > 0) && (cu.ispMode || (bestCS && bestCS->cus[0]->ispMode)) && tempCS->slice->isIntra() && m_pcEncCfg->getUseFastISP())
             {
@@ -2269,7 +2276,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               double bestIspCost       = m_modeCtrl->getIspCost();
               CHECKD( bestCostDct2NoIsp <= bestIspCost, "wrong cost!" );
               double threshold = 1.4;
-
+              
               double lfnstThreshold = 1.01 * threshold;
               if( m_modeCtrl->getStopNonDCT2Transforms() || bestCostDct2NoIsp > bestIspCost*lfnstThreshold )
               {
@@ -2294,6 +2301,16 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
                 break;
               }
             }
+#if JVET_W0103_INTRA_MTS
+            if (lfnstIdx && m_modeCtrl->getMtsFirstPassNoIspCost() != MAX_DOUBLE && isLuma(partitioner.chType))
+            {
+              double threshold = 1.5;
+              if (m_modeCtrl->getMtsFirstPassNoIspCost() > threshold * bestCS->cost)
+              {
+                endLfnstIdx = lfnstIdx;
+              }
+            }
+#endif
           }
 
         } //for emtCuFlag

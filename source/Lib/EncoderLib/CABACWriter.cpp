@@ -3604,12 +3604,22 @@ void CABACWriter::mts_idx( const CodingUnit& cu, CUCtx* cuCtx )
       cuCtx->mtsLastScanPos && cu.lfnstIdx == 0 && mtsIdx != MTS_SKIP)
   {
     int symbol = mtsIdx != MTS_DCT2_DCT2 ? 1 : 0;
+#if JVET_W0103_INTRA_MTS
+    int ctxIdx = (cu.mipFlag) ? 3 : 0;
+#else
     int ctxIdx = 0;
+#endif
 
     m_BinEncoder.encodeBin( symbol, Ctx::MTSIdx(ctxIdx));
 
     if( symbol )
     {
+#if JVET_W0103_INTRA_MTS
+      int TrIdx = (tu.mtsIdx[COMPONENT_Y] - MTS_DST7_DST7);
+      CHECK(TrIdx < 0 || TrIdx >= 4, "TrIdx outside range");
+      m_BinEncoder.encodeBin(TrIdx >> 1, Ctx::MTSIdx(1));
+      m_BinEncoder.encodeBin(TrIdx & 1, Ctx::MTSIdx(2));
+#else
       ctxIdx = 1;
       for( int i = 0; i < 3; i++, ctxIdx++ )
       {
@@ -3621,6 +3631,7 @@ void CABACWriter::mts_idx( const CodingUnit& cu, CUCtx* cuCtx )
           break;
         }
       }
+#endif
     }
   }
   DTRACE( g_trace_ctx, D_SYNTAX, "mts_idx() etype=%d pos=(%d,%d) mtsIdx=%d\n", COMPONENT_Y, tu.cu->lx(), tu.cu->ly(), mtsIdx);
