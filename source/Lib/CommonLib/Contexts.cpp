@@ -1571,7 +1571,17 @@ const CtxSet ContextSetCfg::TransformSkipFlag = ContextSetCfg::addCtxSet
 	{ 1,  5 },
 	{ 2,  5 }
 });
-
+#if JVET_W0103_INTRA_MTS
+const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
+({
+  { 45, 35, 20, 45, },
+  { 38, 35, 35, 38, },
+  { 37, 28, 28, 37, },
+  { 8,  10, 10, 8,  },
+  { 8,  10, 10, 8,  },
+  { 9,  10, 10, 8,  }
+  });
+#else
 const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
 ({
 	{ 37, 25, 34, 40 },
@@ -1581,7 +1591,7 @@ const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
 	{ 9,  0, 10,  8 },
 	{ 9,  1,  9,  0 }
 });
-
+#endif
 const CtxSet ContextSetCfg::ISPMode = ContextSetCfg::addCtxSet
 ({
 #if JVET_W0123_TIMD_FUSION
@@ -2579,7 +2589,15 @@ const CtxSet ContextSetCfg::TransformSkipFlag = ContextSetCfg::addCtxSet
   {  25,   9, },
   {   1,   1, },
 });
-
+#if JVET_W0103_INTRA_MTS
+const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
+({
+  { 45, 35, 20, 45, },
+  { 38, 35, 35, 38, },
+  { 37, 28, 28, 37, },
+  { 8,   9,  9, 8,  },
+  });
+#else
 const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
 ({
   {  45,  25,  27,   0, },
@@ -2587,7 +2605,7 @@ const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
   {  29,   0,  28,   0, },
   {   8,   0,   9,   0, },
 });
-
+#endif
 const CtxSet ContextSetCfg::ISPMode = ContextSetCfg::addCtxSet
 ({
 #if JVET_W0123_TIMD_FUSION

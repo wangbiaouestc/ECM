@@ -547,6 +547,12 @@ void TrQuant::_initTrQuantX86()
     { g_trCoreDCT2P2[TRANSFORM_FORWARD][0], g_trCoreDCT2P4[TRANSFORM_FORWARD][0], g_trCoreDCT2P8[TRANSFORM_FORWARD][0], g_trCoreDCT2P16[TRANSFORM_FORWARD][0], g_trCoreDCT2P32[TRANSFORM_FORWARD][0], g_trCoreDCT2P64[TRANSFORM_FORWARD][0], g_trCoreDCT2P128[TRANSFORM_FORWARD][0], g_trCoreDCT2P256[0] },
     { nullptr,                              g_trCoreDCT8P4[TRANSFORM_FORWARD][0], g_trCoreDCT8P8[TRANSFORM_FORWARD][0], g_trCoreDCT8P16[TRANSFORM_FORWARD][0], g_trCoreDCT8P32[TRANSFORM_FORWARD][0], g_trCoreDCT8P64[TRANSFORM_FORWARD][0], g_trCoreDCT8P128[TRANSFORM_FORWARD][0], g_trCoreDCT8P256[0] },
     { nullptr,                              g_trCoreDST7P4[TRANSFORM_FORWARD][0], g_trCoreDST7P8[TRANSFORM_FORWARD][0], g_trCoreDST7P16[TRANSFORM_FORWARD][0], g_trCoreDST7P32[TRANSFORM_FORWARD][0], g_trCoreDST7P64[TRANSFORM_FORWARD][0], g_trCoreDST7P128[TRANSFORM_FORWARD][0], g_trCoreDST7P256[0] },
+#if JVET_W0103_INTRA_MTS
+    { nullptr,                              g_aiTr4[DCT5][0], g_aiTr8[DCT5][0], g_aiTr16[DCT5][0], g_aiTr32[DCT5][0], g_aiTr64[DCT5][0], g_aiTr128[DCT5][0], g_aiTr256[DCT5][0] },
+    { nullptr,                              g_aiTr4[DST4][0], g_aiTr8[DST4][0], g_aiTr16[DST4][0], g_aiTr32[DST4][0], g_aiTr64[DST4][0], g_aiTr128[DST4][0], g_aiTr256[DST4][0] },
+    { nullptr,                              g_aiTr4[DST1][0], g_aiTr8[DST1][0], g_aiTr16[DST1][0], g_aiTr32[DST1][0], g_aiTr64[DST1][0], g_aiTr128[DST1][0], g_aiTr256[DST1][0] },
+    { nullptr,                              g_aiTr4[IDTR][0], g_aiTr8[IDTR][0], g_aiTr16[IDTR][0], g_aiTr32[IDTR][0], g_aiTr64[IDTR][0], g_aiTr128[IDTR][0], g_aiTr256[IDTR][0] },
+#endif
   } };
 
   m_inverseTransformKernels =
@@ -554,6 +560,12 @@ void TrQuant::_initTrQuantX86()
     { g_trCoreDCT2P2[TRANSFORM_INVERSE][0], g_trCoreDCT2P4[TRANSFORM_INVERSE][0], g_trCoreDCT2P8[TRANSFORM_INVERSE][0], g_trCoreDCT2P16[TRANSFORM_INVERSE][0], g_trCoreDCT2P32[TRANSFORM_INVERSE][0], g_trCoreDCT2P64[TRANSFORM_INVERSE][0], g_trCoreDCT2P128[TRANSFORM_INVERSE][0], g_trCoreDCT2P256[0] },
     { nullptr,                              g_trCoreDCT8P4[TRANSFORM_INVERSE][0], g_trCoreDCT8P8[TRANSFORM_INVERSE][0], g_trCoreDCT8P16[TRANSFORM_INVERSE][0], g_trCoreDCT8P32[TRANSFORM_INVERSE][0], g_trCoreDCT8P64[TRANSFORM_INVERSE][0], g_trCoreDCT8P128[TRANSFORM_INVERSE][0], g_trCoreDCT8P256[0] },
     { nullptr,                              g_trCoreDST7P4[TRANSFORM_INVERSE][0], g_trCoreDST7P8[TRANSFORM_INVERSE][0], g_trCoreDST7P16[TRANSFORM_INVERSE][0], g_trCoreDST7P32[TRANSFORM_INVERSE][0], g_trCoreDST7P64[TRANSFORM_INVERSE][0], g_trCoreDST7P128[TRANSFORM_INVERSE][0], g_trCoreDST7P256[0] },
+#if JVET_W0103_INTRA_MTS
+    { nullptr,                              g_aiTr4[DCT5][0], g_aiTr8[DCT5][0], g_aiTr16[DCT5][0], g_aiTr32[DCT5][0], g_aiTr64[DCT5][0], g_aiTr128[DCT5][0], g_aiTr256[DCT5][0] },
+    { nullptr,                              g_aiTr4[DST4][0], g_aiTr8[DST4][0], g_aiTr16[DST4][0], g_aiTr32[DST4][0], g_aiTr64[DST4][0], g_aiTr128[DST4][0], g_aiTr256[DST4][0] },
+    { nullptr,                              g_aiTr4[DST1][0], g_aiTr8[DST1][0], g_aiTr16[DST1][0], g_aiTr32[DST1][0], g_aiTr64[DST1][0], g_aiTr128[DST1][0], g_aiTr256[DST1][0] },
+    { nullptr,                              g_aiTr4[IDTR][0], g_aiTr8[IDTR][0], g_aiTr16[IDTR][0], g_aiTr32[IDTR][0], g_aiTr64[IDTR][0], g_aiTr128[IDTR][0], g_aiTr256[IDTR][0] },
+#endif
   } };
   
   fastFwdTrans[0][0] = fastForwardTransform_SIMD<DCT2, 2>;
@@ -583,6 +595,44 @@ void TrQuant::_initTrQuantX86()
   fastFwdTrans[2][6] = fastForwardTransform_SIMD<DST7, 128>;
   fastFwdTrans[2][7] = fastForwardTransform_SIMD<DST7, 256>;
 
+#if JVET_W0103_INTRA_MTS
+  fastFwdTrans[3][0] = nullptr;
+  fastFwdTrans[3][1] = fastForwardTransform_SIMD<DCT5, 4>;
+  fastFwdTrans[3][2] = fastForwardTransform_SIMD<DCT5, 8>;
+  fastFwdTrans[3][3] = fastForwardTransform_SIMD<DCT5, 16>;
+  fastFwdTrans[3][4] = fastForwardTransform_SIMD<DCT5, 32>;
+  fastFwdTrans[3][5] = fastForwardTransform_SIMD<DCT5, 64>;
+  fastFwdTrans[3][6] = fastForwardTransform_SIMD<DCT5, 128>;
+  fastFwdTrans[3][7] = fastForwardTransform_SIMD<DCT5, 256>;
+
+  fastFwdTrans[4][0] = nullptr;
+  fastFwdTrans[4][1] = fastForwardTransform_SIMD<DST4, 4>;
+  fastFwdTrans[4][2] = fastForwardTransform_SIMD<DST4, 8>;
+  fastFwdTrans[4][3] = fastForwardTransform_SIMD<DST4, 16>;
+  fastFwdTrans[4][4] = fastForwardTransform_SIMD<DST4, 32>;
+  fastFwdTrans[4][5] = fastForwardTransform_SIMD<DST4, 64>;
+  fastFwdTrans[4][6] = fastForwardTransform_SIMD<DST4, 128>;
+  fastFwdTrans[4][7] = fastForwardTransform_SIMD<DST4, 256>;
+
+  fastFwdTrans[5][0] = nullptr;
+  fastFwdTrans[5][1] = fastForwardTransform_SIMD<DST1, 4>;
+  fastFwdTrans[5][2] = fastForwardTransform_SIMD<DST1, 8>;
+  fastFwdTrans[5][3] = fastForwardTransform_SIMD<DST1, 16>;
+  fastFwdTrans[5][4] = fastForwardTransform_SIMD<DST1, 32>;
+  fastFwdTrans[5][5] = fastForwardTransform_SIMD<DST1, 64>;
+  fastFwdTrans[5][6] = fastForwardTransform_SIMD<DST1, 128>;
+  fastFwdTrans[5][7] = fastForwardTransform_SIMD<DST1, 256>;
+
+  fastFwdTrans[6][0] = nullptr;
+  fastFwdTrans[6][1] = fastForwardTransform_SIMD<IDTR, 4>;
+  fastFwdTrans[6][2] = fastForwardTransform_SIMD<IDTR, 8>;
+  fastFwdTrans[6][3] = fastForwardTransform_SIMD<IDTR, 16>;
+  fastFwdTrans[6][4] = fastForwardTransform_SIMD<IDTR, 32>;
+  fastFwdTrans[6][5] = fastForwardTransform_SIMD<IDTR, 64>;
+  fastFwdTrans[6][6] = fastForwardTransform_SIMD<IDTR, 128>;
+  fastFwdTrans[6][7] = fastForwardTransform_SIMD<IDTR, 256>;
+#endif
+
   fastInvTrans[0][0] = fastInverseTransform_SIMD<DCT2, 2>;
   fastInvTrans[0][1] = fastInverseTransform_SIMD<DCT2, 4>;
   fastInvTrans[0][2] = fastInverseTransform_SIMD<DCT2, 8>;
@@ -609,6 +659,44 @@ void TrQuant::_initTrQuantX86()
   fastInvTrans[2][5] = fastInverseTransform_SIMD<DST7, 64>;
   fastInvTrans[2][6] = fastInverseTransform_SIMD<DST7, 128>;
   fastInvTrans[2][7] = fastInverseTransform_SIMD<DST7, 256>;
+
+#if JVET_W0103_INTRA_MTS
+  fastInvTrans[3][0] = nullptr;
+  fastInvTrans[3][1] = fastInverseTransform_SIMD<DCT5, 4>;
+  fastInvTrans[3][2] = fastInverseTransform_SIMD<DCT5, 8>;
+  fastInvTrans[3][3] = fastInverseTransform_SIMD<DCT5, 16>;
+  fastInvTrans[3][4] = fastInverseTransform_SIMD<DCT5, 32>;
+  fastInvTrans[3][5] = fastInverseTransform_SIMD<DCT5, 64>;
+  fastInvTrans[3][6] = fastInverseTransform_SIMD<DCT5, 128>;
+  fastInvTrans[3][7] = fastInverseTransform_SIMD<DCT5, 256>;
+
+  fastInvTrans[4][0] = nullptr;
+  fastInvTrans[4][1] = fastInverseTransform_SIMD<DST4, 4>;
+  fastInvTrans[4][2] = fastInverseTransform_SIMD<DST4, 8>;
+  fastInvTrans[4][3] = fastInverseTransform_SIMD<DST4, 16>;
+  fastInvTrans[4][4] = fastInverseTransform_SIMD<DST4, 32>;
+  fastInvTrans[4][5] = fastInverseTransform_SIMD<DST4, 64>;
+  fastInvTrans[4][6] = fastInverseTransform_SIMD<DST4, 128>;
+  fastInvTrans[4][7] = fastInverseTransform_SIMD<DST4, 256>;
+
+  fastInvTrans[5][0] = nullptr;
+  fastInvTrans[5][1] = fastInverseTransform_SIMD<DST1, 4>;
+  fastInvTrans[5][2] = fastInverseTransform_SIMD<DST1, 8>;
+  fastInvTrans[5][3] = fastInverseTransform_SIMD<DST1, 16>;
+  fastInvTrans[5][4] = fastInverseTransform_SIMD<DST1, 32>;
+  fastInvTrans[5][5] = fastInverseTransform_SIMD<DST1, 64>;
+  fastInvTrans[5][6] = fastInverseTransform_SIMD<DST1, 128>;
+  fastInvTrans[5][7] = fastInverseTransform_SIMD<DST1, 256>;
+
+  fastInvTrans[6][0] = nullptr;
+  fastInvTrans[6][1] = fastInverseTransform_SIMD<IDTR, 4>;
+  fastInvTrans[6][2] = fastInverseTransform_SIMD<IDTR, 8>;
+  fastInvTrans[6][3] = fastInverseTransform_SIMD<IDTR, 16>;
+  fastInvTrans[6][4] = fastInverseTransform_SIMD<IDTR, 32>;
+  fastInvTrans[6][5] = fastInverseTransform_SIMD<IDTR, 64>;
+  fastInvTrans[6][6] = fastInverseTransform_SIMD<IDTR, 128>;
+  fastInvTrans[6][7] = fastInverseTransform_SIMD<IDTR, 256>;
+#endif
 #else
   m_forwardTransformKernels =
   { {

@@ -297,6 +297,12 @@ void TrQuant::init( const Quant* otherQuant,
     { fastForwardDCT2_B2, fastForwardDCT2_B4, fastForwardDCT2_B8, fastForwardDCT2_B16, fastForwardDCT2_B32, fastForwardDCT2_B64, fastForwardDCT2_B128, fastForwardDCT2_B256 },
     { nullptr,            fastForwardDCT8_B4, fastForwardDCT8_B8, fastForwardDCT8_B16, fastForwardDCT8_B32, fastForwardDCT8_B64, fastForwardDCT8_B128, fastForwardDCT8_B256 },
     { nullptr,            fastForwardDST7_B4, fastForwardDST7_B8, fastForwardDST7_B16, fastForwardDST7_B32, fastForwardDST7_B64, fastForwardDST7_B128, fastForwardDST7_B256 },
+#if JVET_W0103_INTRA_MTS
+    { nullptr,            fastForwardDCT5_B4, fastForwardDCT5_B8, fastForwardDCT5_B16, fastForwardDCT5_B32, fastForwardDCT5_B64, fastForwardDCT5_B128, fastForwardDCT5_B256 },
+    { nullptr,            fastForwardDST4_B4, fastForwardDST4_B8, fastForwardDST4_B16, fastForwardDST4_B32, fastForwardDST4_B64, fastForwardDST4_B128, fastForwardDST4_B256 },
+    { nullptr,            fastForwardDST1_B4, fastForwardDST1_B8, fastForwardDST1_B16, fastForwardDST1_B32, fastForwardDST1_B64, fastForwardDST1_B128, fastForwardDST1_B256 },
+    { nullptr,            fastForwardIDTR_B4, fastForwardIDTR_B8, fastForwardIDTR_B16, fastForwardIDTR_B32, fastForwardIDTR_B64, fastForwardIDTR_B128, fastForwardIDTR_B256 },
+#endif
   } };
 
   fastInvTrans =
@@ -304,6 +310,12 @@ void TrQuant::init( const Quant* otherQuant,
     { fastInverseDCT2_B2, fastInverseDCT2_B4, fastInverseDCT2_B8, fastInverseDCT2_B16, fastInverseDCT2_B32, fastInverseDCT2_B64, fastInverseDCT2_B128, fastInverseDCT2_B256 },
     { nullptr,            fastInverseDCT8_B4, fastInverseDCT8_B8, fastInverseDCT8_B16, fastInverseDCT8_B32, fastInverseDCT8_B64, fastInverseDCT8_B128, fastInverseDCT8_B256 },
     { nullptr,            fastInverseDST7_B4, fastInverseDST7_B8, fastInverseDST7_B16, fastInverseDST7_B32, fastInverseDST7_B64, fastInverseDST7_B128, fastInverseDST7_B256 },
+#if JVET_W0103_INTRA_MTS
+    { nullptr,            fastInverseDCT5_B4, fastInverseDCT5_B8, fastInverseDCT5_B16, fastInverseDCT5_B32, fastInverseDCT5_B64, fastInverseDCT5_B128, fastInverseDCT5_B256 },
+    { nullptr,            fastInverseDST4_B4, fastInverseDST4_B8, fastInverseDST4_B16, fastInverseDST4_B32, fastInverseDST4_B64, fastInverseDST4_B128, fastInverseDST4_B256 },
+    { nullptr,            fastInverseDST1_B4, fastInverseDST1_B8, fastInverseDST1_B16, fastInverseDST1_B32, fastInverseDST1_B64, fastInverseDST1_B128, fastInverseDST1_B256 },
+    { nullptr,            fastInverseIDTR_B4, fastInverseIDTR_B8, fastInverseIDTR_B16, fastInverseIDTR_B32, fastInverseIDTR_B64, fastInverseIDTR_B128, fastInverseIDTR_B256 },
+#endif
   } };
 #else
   fastFwdTrans =
@@ -311,6 +323,12 @@ void TrQuant::init( const Quant* otherQuant,
     { fastForwardDCT2_B2, fastForwardDCT2_B4, fastForwardDCT2_B8, fastForwardDCT2_B16, fastForwardDCT2_B32, fastForwardDCT2_B64 },
     { nullptr,            fastForwardDCT8_B4, fastForwardDCT8_B8, fastForwardDCT8_B16, fastForwardDCT8_B32, nullptr },
     { nullptr,            fastForwardDST7_B4, fastForwardDST7_B8, fastForwardDST7_B16, fastForwardDST7_B32, nullptr },
+#if JVET_W0103_INTRA_MTS
+    { nullptr,            fastForwardDCT5_B4, fastForwardDCT5_B8, fastForwardDCT5_B16, fastForwardDCT5_B32, nullptr },
+    { nullptr,            fastForwardDST4_B4, fastForwardDST4_B8, fastForwardDST4_B16, fastForwardDST4_B32, nullptr },
+    { nullptr,            fastForwardDST1_B4, fastForwardDST1_B8, fastForwardDST1_B16, fastForwardDST1_B32, nullptr },
+    { nullptr,            fastForwardIDTR_B4, fastForwardIDTR_B8, fastForwardIDTR_B16, fastForwardIDTR_B32, nullptr },
+#endif
   } };
 
   fastInvTrans =
@@ -318,6 +336,12 @@ void TrQuant::init( const Quant* otherQuant,
     { fastInverseDCT2_B2, fastInverseDCT2_B4, fastInverseDCT2_B8, fastInverseDCT2_B16, fastInverseDCT2_B32, fastInverseDCT2_B64 },
     { nullptr,            fastInverseDCT8_B4, fastInverseDCT8_B8, fastInverseDCT8_B16, fastInverseDCT8_B32, nullptr },
     { nullptr,            fastInverseDST7_B4, fastInverseDST7_B8, fastInverseDST7_B16, fastInverseDST7_B32, nullptr },
+#if JVET_W0103_INTRA_MTS
+    { nullptr,            fastInverseDCT5_B4, fastInverseDCT5_B8, fastInverseDCT5_B16, fastInverseDCT5_B32, nullptr },
+    { nullptr,            fastInverseDST4_B4, fastInverseDST4_B8, fastInverseDST4_B16, fastInverseDST4_B32, nullptr },
+    { nullptr,            fastInverseDST1_B4, fastInverseDST1_B8, fastInverseDST1_B16, fastInverseDST1_B32, nullptr },
+    { nullptr,            fastInverseIDTR_B4, fastInverseIDTR_B8, fastInverseIDTR_B16, fastInverseIDTR_B32, nullptr },
+#endif
   } };
 #endif
 
@@ -1323,6 +1347,64 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
 
   if (isExplicitMTS)
   {
+#if JVET_W0103_INTRA_MTS
+    if (tu.mtsIdx[compID] > MTS_SKIP && CU::isIntra(*tu.cu))
+    {
+      CHECK(compID != COMPONENT_Y, " MTS activated for chroma");
+      uint32_t width = tu.blocks[compID].width;
+      uint32_t height = tu.blocks[compID].height;
+      int TrIdx = (tu.mtsIdx[compID] - MTS_DST7_DST7);
+      CHECK(width < 4 || height < 4, "width < 4 || height < 4 for MTS");
+      uint8_t nSzIdxW = std::min(3, (floorLog2(width) - 2));
+      uint8_t nSzIdxH = std::min(3, (floorLog2(height) - 2));
+      const CompArea& area = tu.blocks[compID];
+      int predMode = PU::getFinalIntraMode(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID));
+#if JVET_W0123_TIMD_FUSION
+      if (tu.cu->timd && compID == COMPONENT_Y)
+      {
+        predMode = MAP131TO67(predMode);
+      }
+#endif
+      int ucMode;
+      int nMdIdx;
+      bool isTrTransposed = false;
+      if (tu.cu->mipFlag) //MIP is treated as planar.
+      {
+        ucMode = 0;
+        nMdIdx = 35;
+        isTrTransposed = (tu.cs->getPU(area.pos(), toChannelType(compID)))->mipTransposedFlag;
+      }
+      else
+      {
+        ucMode = predMode; //"ucMode" is the signaled Mode.
+        predMode = PU::getWideAngle(tu, (uint32_t)predMode, compID);
+        CHECK(predMode < -(NUM_EXT_LUMA_MODE >> 1) && predMode >= NUM_LUMA_MODE + (NUM_EXT_LUMA_MODE >> 1), "luma mode out of range");
+        predMode = (predMode < 0) ? 2 : (predMode >= NUM_LUMA_MODE) ? 66 : predMode;
+        nMdIdx = predMode > DIA_IDX ? (NUM_LUMA_MODE + 1 - predMode) : predMode;
+        isTrTransposed = (predMode > DIA_IDX) ? true : false;
+      }
+      uint8_t nSzIdx = isTrTransposed ? (nSzIdxH * 4 + nSzIdxW) : (nSzIdxW * 4 + nSzIdxH);
+      CHECK(nSzIdx >= 16, "nSzIdx >= 16");
+      CHECK(nMdIdx >= 36, "nMdIdx >= 36");
+      uint8_t nTrSet = g_aucIpmToTrSet[nSzIdx][nMdIdx];
+      CHECK(nTrSet >= 80, "nTrSet >= 80");
+      trTypeVer = g_aucTrIdxToTr[g_aucTrSet[nTrSet][TrIdx]][predMode > DIA_IDX ? 1 : 0];
+      trTypeHor = g_aucTrIdxToTr[g_aucTrSet[nTrSet][TrIdx]][predMode > DIA_IDX ? 0 : 1];
+      predMode = ucMode; //to Check IDTR criteria, signaled mode should be used to check the difference
+      if (TrIdx == 3 && width <= 16 && height <= 16)
+      {
+        if (abs(predMode - HOR_IDX) <= g_aiIdLut[floorLog2(width) - 2][floorLog2(height) - 2])
+        {
+          trTypeVer = IDTR;
+        }
+        if (abs(predMode - VER_IDX) <= g_aiIdLut[floorLog2(width) - 2][floorLog2(height) - 2])
+        {
+          trTypeHor = IDTR;
+        }
+      }
+    }
+    else
+#endif
     if (tu.mtsIdx[compID] > MTS_SKIP)
     {
       int indHor = (tu.mtsIdx[compID] - MTS_DST7_DST7) & 1;
@@ -1621,7 +1703,35 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
     itC++;
   }
 }
+#if JVET_W0103_INTRA_MTS
+// does transform for MTS candidates and return absSum of unquant Coeffs.
+uint64_t TrQuant::transformNxN(TransformUnit& tu)
+{
+  CHECK(!tu.cu->mtsFlag, "mtsFlag should be on for selection");
+  CodingStructure &cs = *tu.cs;
+  const CompArea &rect = tu.blocks[COMPONENT_Y];
+  const uint32_t uiWidth = rect.width;
+  const uint32_t uiHeight = rect.height;
 
+  const CPelBuf resiBuf = cs.getResiBuf(rect);
+  CoeffBuf tempCoeff(m_mtsCoeffs[tu.mtsIdx[0]], rect);
+  xT(tu, COMPONENT_Y, resiBuf, tempCoeff, uiWidth, uiHeight);
+
+
+  const TCoeff *dstCoeffBuf = tempCoeff.buf;
+  const int  dstCoeffStride = tempCoeff.stride;
+  uint64_t coeffAbsSum = 0;
+
+  for (int y = 0; y < uiHeight; y++)
+  {
+    for (int x = 0; x < uiWidth; x++)
+    {
+      coeffAbsSum += abs(dstCoeffBuf[(y * dstCoeffStride) + x]);
+    }
+  }
+  return coeffAbsSum;
+}
+#endif
 void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const QpParam& cQP, TCoeff& uiAbsSum, const Ctx& ctx, const bool loadTr )
 {
         CodingStructure &cs = *tu.cs;
@@ -1803,7 +1913,11 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   PelBuf     bufResiTemplateReshape(predResiTemplateReshape, uiWidth + uiHeight - 1, 1);
   int trHor, trVer;
   getTrTypes(tu, residCompID, trHor, trVer);
+#if JVET_W0103_INTRA_MTS
+  int actualTrIdx = trHor * NUM_TRANS_TYPE + trVer;
+#else
   int actualTrIdx = trHor * 3 + trVer;
+#endif
   int log2Width = floorLog2(uiWidth);
   int log2Height = floorLog2(uiHeight);
   if(!g_resiBorderTemplate[log2Width-2][log2Height-2][actualTrIdx])
