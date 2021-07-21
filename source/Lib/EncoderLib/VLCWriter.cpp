@@ -2265,6 +2265,12 @@ void HLSWriter::codePictureHeader( PicHeader* picHeader, bool writeRbspTrailingB
     {
       picHeader->setDisFracMMVD(false);
     }
+#if JVET_W0097_GPM_MMVD_TM
+    if (sps->getUseGeo() && (!pps->getRplInfoInPhFlag() || picHeader->getRPL(1)->getNumRefEntries() > 0))
+    {
+      WRITE_FLAG(picHeader->getGPMMMVDTableFlag(), "ph_gpm_ext_mmvd_flag");
+    }
+#endif
 #if JVET_R0324_REORDER
     // mvd L1 zero flag
     if (!pps->getRplInfoInPhFlag() || picHeader->getRPL(1)->getNumRefEntries() > 0)

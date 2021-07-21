@@ -142,6 +142,19 @@ public:
 #if TM_MRG
   void        tm_merge_flag             ( const PredictionUnit&         pu);
 #endif
+#if JVET_W0097_GPM_MMVD_TM
+  void        geo_mmvd_idx(const PredictionUnit&         pu, RefPicList eRefPicList);
+  void        geo_merge_idx(const PredictionUnit&         pu);
+  void        geo_merge_idx1(const PredictionUnit&         pu);
+
+  uint64_t    geo_mode_est(const TempCtx& ctxStart, const int geoMode);
+  uint64_t    geo_mergeIdx_est(const TempCtx& ctxStart, const int candIdx, const int maxNumGeoCand);
+  uint64_t    geo_mmvdFlag_est(const TempCtx& ctxStart, const int flag);
+  uint64_t    geo_mmvdIdx_est(const TempCtx& ctxStart, const int mmvdIdx, const bool extMMVD);
+#if TM_MRG
+  uint64_t    geo_tmFlag_est(const TempCtx& ctxStart, const int flag);
+#endif
+#endif
   void        imv_mode                  ( const CodingUnit&             cu );
   void        affine_amvr_mode          ( const CodingUnit&             cu );
   void        inter_pred_idc            ( const PredictionUnit&         pu );

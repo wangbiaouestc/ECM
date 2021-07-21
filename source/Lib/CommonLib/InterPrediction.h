@@ -280,7 +280,11 @@ public:
 #if ENABLE_OBMC
   void    subBlockOBMC(PredictionUnit  &pu, PelUnitBuf *pDst = nullptr);
 #endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  void    motionCompensationGeo(CodingUnit &cu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1);
+#else
   void    motionCompensationGeo(CodingUnit &cu, MergeCtx &GeoMrgCtx);
+#endif
   void    weightedGeoBlk(PredictionUnit &pu, const uint8_t splitDir, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
   void xPrefetch(PredictionUnit& pu, PelUnitBuf &pcPad, RefPicList refId, bool forLuma);
   void xPad(PredictionUnit& pu, PelUnitBuf &pcPad, RefPicList refId);

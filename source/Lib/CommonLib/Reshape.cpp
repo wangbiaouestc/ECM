@@ -90,7 +90,6 @@ void  Reshape::destroy()
 }
 
 
-
 /** compute chroma residuce scale for TU
 * \param average luma pred of TU
 * \return chroma residue scale

@@ -257,6 +257,10 @@ public:
   static const CtxSet   MmvdFlag;
   static const CtxSet   MmvdMergeIdx;
   static const CtxSet   MmvdStepMvpIdx;
+#if JVET_W0097_GPM_MMVD_TM
+  static const CtxSet   GeoMmvdFlag;
+  static const CtxSet   GeoMmvdStepMvpIdx;
+#endif
   static const CtxSet   SubblockMergeFlag;
   static const CtxSet   AffineFlag;
   static const CtxSet   AffineType;

@@ -2655,6 +2655,57 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
   {
     if( pu.cu->geoFlag )
     {
+#if JVET_W0097_GPM_MMVD_TM
+      m_BinEncoder.encodeBin(pu.geoMMVDFlag0, Ctx::GeoMmvdFlag());
+      if (pu.geoMMVDFlag0)
+      {
+        geo_mmvd_idx(pu, REF_PIC_LIST_0);
+      }
+      m_BinEncoder.encodeBin(pu.geoMMVDFlag1, Ctx::GeoMmvdFlag());
+      if (pu.geoMMVDFlag1)
+      {
+        geo_mmvd_idx(pu, REF_PIC_LIST_1);
+      }
+
+#if TM_MRG
+      if (!pu.geoMMVDFlag0 && !pu.geoMMVDFlag1)
+      {
+        tm_merge_flag(pu);
+        if (pu.tmMergeFlag)
+        {
+          CHECK(!pu.geoTmFlag0 || !pu.geoTmFlag1, "both must be true");
+          CHECK(pu.geoMergeIdx0 == pu.geoMergeIdx1, "Incorrect geoMergeIdx0 and geoMergeIdx1");
+          geo_merge_idx(pu);
+        }
+        else
+        {
+
+          CHECK(pu.geoTmFlag0 || pu.geoTmFlag1, "both must be false");
+          geo_merge_idx(pu);
+        }
+      }
+#else
+      if (!pu.geoMMVDFlag0 && !pu.geoMMVDFlag1)
+      {
+        geo_merge_idx(pu);
+      }
+#endif
+      else if (pu.geoMMVDFlag0 && pu.geoMMVDFlag1)
+      {
+        if (pu.geoMMVDIdx0 == pu.geoMMVDIdx1)
+        {
+          geo_merge_idx(pu);
+        }
+        else
+        {
+          geo_merge_idx1(pu);
+        }
+      }
+      else
+      {
+        geo_merge_idx1(pu);
+      }
+#else
       uint8_t splitDir = pu.geoSplitDir;
       uint8_t candIdx0 = pu.geoMergeIdx0;
       uint8_t candIdx1 = pu.geoMergeIdx1;
@@ -2681,7 +2732,7 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
           unary_max_eqprob(candIdx1 - 1, numCandminus2 - 1);
         }
       }
-
+#endif
       return;
     }
     int numCandminus1;
@@ -2788,6 +2839,176 @@ void CABACWriter::mmvd_merge_idx(const PredictionUnit& pu)
   DTRACE(g_trace_ctx, D_SYNTAX, "pos() pos=%d\n", var2);
   DTRACE(g_trace_ctx, D_SYNTAX, "mmvd_merge_idx() mmvd_merge_idx=%d\n", pu.mmvdMergeIdx);
 }
+#if JVET_W0097_GPM_MMVD_TM
+void CABACWriter::geo_mmvd_idx(const PredictionUnit& pu, RefPicList eRefPicList)
+{
+  int geoMMVDIdx = (eRefPicList == REF_PIC_LIST_0) ? pu.geoMMVDIdx0 : pu.geoMMVDIdx1;
+  bool extMMVD = pu.cs->picHeader->getGPMMMVDTableFlag();
+  CHECK(geoMMVDIdx >= (extMMVD ? GPM_EXT_MMVD_MAX_REFINE_NUM : GPM_MMVD_MAX_REFINE_NUM), "invalid GPM MMVD index exist");
+
+  int step = (extMMVD ? (geoMMVDIdx >> 3) : (geoMMVDIdx >> 2));
+  int direction = (extMMVD ? (geoMMVDIdx - (step << 3)) : (geoMMVDIdx - (step << 2)));
+
+  int mmvdStepToIdx[GPM_EXT_MMVD_REFINE_STEP] = { 5, 0, 1, 2, 3, 4, 6, 7, 8 };
+  step = mmvdStepToIdx[step];
+
+  int numCandminus1_step = (extMMVD ? GPM_EXT_MMVD_REFINE_STEP : GPM_MMVD_REFINE_STEP) - 1;
+  if (numCandminus1_step > 0)
+  {
+    if (step == 0)
+    {
+      m_BinEncoder.encodeBin(0, Ctx::GeoMmvdStepMvpIdx());
+    }
+    else
+    {
+      m_BinEncoder.encodeBin(1, Ctx::GeoMmvdStepMvpIdx());
+      for (unsigned idx = 1; idx < numCandminus1_step; idx++)
+      {
+        m_BinEncoder.encodeBinEP(step == idx ? 0 : 1);
+        if (step == idx)
+        {
+          break;
+        }
+      }
+    }
+  }
+
+  int maxMMVDDir = (extMMVD ? GPM_EXT_MMVD_REFINE_DIRECTION : GPM_MMVD_REFINE_DIRECTION);
+  m_BinEncoder.encodeBinsEP(direction, maxMMVDDir > 4 ? 3 : 2);
+}
+
+void CABACWriter::geo_merge_idx(const PredictionUnit& pu)
+{
+  uint8_t splitDir = pu.geoSplitDir;
+  uint8_t candIdx0 = pu.geoMergeIdx0;
+  uint8_t candIdx1 = pu.geoMergeIdx1;
+
+  xWriteTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
+  candIdx1 -= candIdx1 < candIdx0 ? 0 : 1;
+  const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
+
+  int numCandminus2 = maxNumGeoCand - 2;
+  m_BinEncoder.encodeBin(candIdx0 == 0 ? 0 : 1, Ctx::MergeIdx());
+  if (candIdx0 > 0)
+  {
+    unary_max_eqprob(candIdx0 - 1, numCandminus2);
+  }
+  if (numCandminus2 > 0)
+  {
+    m_BinEncoder.encodeBin(candIdx1 == 0 ? 0 : 1, Ctx::MergeIdx());
+    if (candIdx1 > 0)
+    {
+      unary_max_eqprob(candIdx1 - 1, numCandminus2 - 1);
+    }
+  }
+}
+
+void CABACWriter::geo_merge_idx1(const PredictionUnit& pu)
+{
+  uint8_t splitDir = pu.geoSplitDir;
+  uint8_t candIdx0 = pu.geoMergeIdx0;
+  uint8_t candIdx1 = pu.geoMergeIdx1;
+
+  xWriteTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
+  const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
+
+  int numCandminus2 = maxNumGeoCand - 2;
+  m_BinEncoder.encodeBin(candIdx0 == 0 ? 0 : 1, Ctx::MergeIdx());
+  if (candIdx0 > 0)
+  {
+    unary_max_eqprob(candIdx0 - 1, numCandminus2);
+  }
+  m_BinEncoder.encodeBin(candIdx1 == 0 ? 0 : 1, Ctx::MergeIdx());
+  if (candIdx1 > 0)
+  {
+    unary_max_eqprob(candIdx1 - 1, numCandminus2);
+  }
+}
+
+uint64_t CABACWriter::geo_mode_est(const TempCtx& ctxStart, const int geoMode)
+{
+  getCtx() = ctxStart;
+  resetBits();
+
+  xWriteTruncBinCode(geoMode, GEO_NUM_PARTITION_MODE);
+
+  return getEstFracBits();
+}
+
+uint64_t CABACWriter::geo_mergeIdx_est(const TempCtx& ctxStart, const int candIdx, const int maxNumGeoCand)
+{
+  getCtx() = ctxStart;
+  resetBits();
+
+  int numCandminus2 = maxNumGeoCand - 2;
+  m_BinEncoder.encodeBin(candIdx == 0 ? 0 : 1, Ctx::MergeIdx());
+  if (candIdx > 0)
+  {
+    unary_max_eqprob(candIdx - 1, numCandminus2);
+  }
+
+  return getEstFracBits();
+}
+
+uint64_t CABACWriter::geo_mmvdFlag_est(const TempCtx& ctxStart, const int flag)
+{
+  getCtx() = ctxStart;
+  resetBits();
+
+  m_BinEncoder.encodeBin(flag, Ctx::GeoMmvdFlag());
+
+  return getEstFracBits();
+}
+
+#if TM_MRG
+uint64_t CABACWriter::geo_tmFlag_est(const TempCtx& ctxStart, const int flag)
+{
+  getCtx() = ctxStart;
+  resetBits();
+
+  m_BinEncoder.encodeBin(flag, Ctx::TMMergeFlag());
+
+  return getEstFracBits();
+}
+#endif
+
+uint64_t CABACWriter::geo_mmvdIdx_est(const TempCtx& ctxStart, const int geoMMVDIdx, const bool extMMVD)
+{
+  getCtx() = ctxStart;
+  resetBits();
+
+  CHECK(geoMMVDIdx >= (extMMVD ? GPM_EXT_MMVD_MAX_REFINE_NUM : GPM_MMVD_MAX_REFINE_NUM), "invalid GPM MMVD index exist");
+  int step = (extMMVD ? (geoMMVDIdx >> 3) : (geoMMVDIdx >> 2));
+  int direction = (extMMVD ? (geoMMVDIdx - (step << 3)) : (geoMMVDIdx - (step << 2)));
+
+  int mmvdStepToIdx[GPM_EXT_MMVD_REFINE_STEP] = { 5, 0, 1, 2, 3, 4, 6, 7, 8 };
+  step = mmvdStepToIdx[step];
+
+  int numCandminus1_step = (extMMVD ? GPM_EXT_MMVD_REFINE_STEP : GPM_MMVD_REFINE_STEP) - 1;
+  if (numCandminus1_step > 0)
+  {
+    if (step == 0)
+    {
+      m_BinEncoder.encodeBin(0, Ctx::GeoMmvdStepMvpIdx());
+    }
+    else
+    {
+      m_BinEncoder.encodeBin(1, Ctx::GeoMmvdStepMvpIdx());
+      for (unsigned idx = 1; idx < numCandminus1_step; idx++)
+      {
+        m_BinEncoder.encodeBinEP(step == idx ? 0 : 1);
+        if (step == idx)
+        {
+          break;
+        }
+      }
+    }
+  }
+  int maxMMVDDir = (extMMVD ? GPM_EXT_MMVD_REFINE_DIRECTION : GPM_MMVD_REFINE_DIRECTION);
+  m_BinEncoder.encodeBinsEP(direction, maxMMVDDir > 4 ? 3 : 2);
+  return getEstFracBits();
+}
+#endif
 void CABACWriter::inter_pred_idc( const PredictionUnit& pu )
 {
   if( !pu.cs->slice->isInterB() )

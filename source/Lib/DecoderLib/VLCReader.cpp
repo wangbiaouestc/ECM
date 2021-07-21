@@ -3576,6 +3576,18 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
       picHeader->setDisFracMMVD(false);
     }
 
+#if JVET_W0097_GPM_MMVD_TM
+    if (sps->getUseGeo() && (!pps->getRplInfoInPhFlag() || picHeader->getRPL(1)->getNumRefEntries() > 0))
+    {
+      READ_FLAG(uiCode, "ph_gpm_ext_mmvd_flag");
+      picHeader->setGPMMMVDTableFlag(uiCode);
+    }
+    else
+    {
+      picHeader->setGPMMMVDTableFlag(false);
+    }
+#endif
+
 #if JVET_R0324_REORDER
     // mvd L1 zero flag
     if (!pps->getRplInfoInPhFlag() || picHeader->getRPL(1)->getNumRefEntries() > 0)

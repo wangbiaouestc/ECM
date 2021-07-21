@@ -1251,6 +1251,9 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
   cuECtx.set( DO_TRIV_SPLIT,        1 );
   cuECtx.set( BEST_IMV_COST,        MAX_DOUBLE * .5 );
   cuECtx.set( BEST_NO_IMV_COST,     MAX_DOUBLE * .5 );
+#if JVET_W0097_GPM_MMVD_TM
+  cuECtx.set( BEST_GPM_COST,        MAX_DOUBLE * .5);
+#endif
   cuECtx.set( QT_BEFORE_BT,         qtBeforeBt );
   cuECtx.set( DID_QUAD_SPLIT,       false );
   cuECtx.set( IS_BEST_NOSPLIT_SKIP, false );
@@ -1892,6 +1895,12 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
     {
       return false;
     }
+#if JVET_W0097_GPM_MMVD_TM
+    if (encTestmode.type == ETM_MERGE_GEO && relatedCU.skipGPM)
+    {
+      return false;
+    }
+#endif
     return true;
   }
   else if( isModeSplit( encTestmode ) )
@@ -2131,6 +2140,27 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
       // assume the non-split modes are done and set the marks for the best found mode
       if( bestCS && bestCU )
       {
+#if JVET_W0097_GPM_MMVD_TM
+        if (!slice.isIntra())
+        {
+          double gpmCost = cuECtx.get<double>(BEST_GPM_COST);
+          if (gpmCost != (MAX_DOUBLE * .5))
+          {
+            if (gpmCost > (bestCS->cost * 1.2))
+            {
+              relatedCU.skipGPM = true;
+            }
+            else if (gpmCost > bestCS->cost && bestCU->skip)
+            {
+              relatedCU.skipGPM = true;
+            }
+            else if (gpmCost > bestCS->cost && (!cuECtx.bestTU->cbf[0] && !cuECtx.bestTU->cbf[1] && !cuECtx.bestTU->cbf[2]))
+            {
+              relatedCU.skipGPM = true;
+            }
+          }
+        }
+#endif
         if( CU::isInter( *bestCU ) )
         {
           relatedCU.isInter   = true;
@@ -2321,7 +2351,15 @@ bool EncModeCtrlMTnoRQT::useModeResult( const EncTestMode& encTestmode, CodingSt
       }
     }
   }
-
+#if JVET_W0097_GPM_MMVD_TM
+  if (encTestmode.type == ETM_MERGE_GEO)
+  {
+    if (tempCS->cost < cuECtx.get<double>(BEST_GPM_COST))
+    {
+      cuECtx.set(BEST_GPM_COST, tempCS->cost);
+    }
+  }
+#endif
   if( encTestmode.type == ETM_SPLIT_QT )
   {
     int maxQtD = 0;

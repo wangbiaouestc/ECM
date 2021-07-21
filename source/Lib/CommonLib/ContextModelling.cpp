@@ -513,7 +513,7 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 #endif
 }
 
-#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR
+#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM
 bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh) const
 {
   if (mvFieldNeighbours[(mergeCandIndex << 1)].refIdx < 0 && mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx < 0)
@@ -606,7 +606,117 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
   return false;
 }
 #endif
+#if JVET_W0097_GPM_MMVD_TM
+void MergeCtx::setGeoMmvdMergeInfo(PredictionUnit& pu, int mergeIdx, int mmvdIdx)
+{
+  bool extMMVD = pu.cs->picHeader->getGPMMMVDTableFlag();
+  CHECK(mergeIdx >= numValidMergeCand, "Merge candidate does not exist");
+  CHECK(mmvdIdx >= (extMMVD ? GPM_EXT_MMVD_MAX_REFINE_NUM : GPM_MMVD_MAX_REFINE_NUM), "GPM MMVD index is invalid");
+  CHECK(!pu.cu->geoFlag || CU::isIBC(*pu.cu), "incorrect GPM setting")
 
+    pu.regularMergeFlag = !(pu.ciipFlag || pu.cu->geoFlag);
+  pu.mergeFlag = true;
+  pu.mmvdMergeFlag = false;
+  pu.interDir = interDirNeighbours[mergeIdx];
+  pu.cu->imv = 0;
+  pu.mergeIdx = mergeIdx;
+  pu.mergeType = MRG_TYPE_DEFAULT_N;
+#if MULTI_PASS_DMVR
+  pu.bdmvrRefine = false;
+#endif
+
+  const int mvShift = MV_FRACTIONAL_BITS_DIFF;
+  const int refMvdCands[8] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 16 << mvShift , 32 << mvShift,  64 << mvShift , 128 << mvShift };
+  const int refExtMvdCands[9] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 12 << mvShift , 16 << mvShift, 24 << mvShift, 32 << mvShift, 64 << mvShift };
+  int fPosStep = (extMMVD ? (mmvdIdx >> 3) : (mmvdIdx >> 2));
+  int fPosPosition = (extMMVD ? (mmvdIdx - (fPosStep << 3)) : (mmvdIdx - (fPosStep << 2)));
+  int offset = (extMMVD ? refExtMvdCands[fPosStep] : refMvdCands[fPosStep]);
+  Mv  mvOffset;
+
+  if (fPosPosition == 0)
+  {
+    mvOffset = Mv(offset, 0);
+  }
+  else if (fPosPosition == 1)
+  {
+    mvOffset = Mv(-offset, 0);
+  }
+  else if (fPosPosition == 2)
+  {
+    mvOffset = Mv(0, offset);
+  }
+  else if (fPosPosition == 3)
+  {
+    mvOffset = Mv(0, -offset);
+  }
+  else if (fPosPosition == 4)
+  {
+    mvOffset = Mv(offset, offset);
+  }
+  else if (fPosPosition == 5)
+  {
+    mvOffset = Mv(offset, -offset);
+  }
+  else if (fPosPosition == 6)
+  {
+    mvOffset = Mv(-offset, offset);
+  }
+  else if (fPosPosition == 7)
+  {
+    mvOffset = Mv(-offset, -offset);
+  }
+
+  pu.refIdx[REF_PIC_LIST_0] = mvFieldNeighbours[(mergeIdx << 1) + 0].refIdx;
+  pu.refIdx[REF_PIC_LIST_1] = mvFieldNeighbours[(mergeIdx << 1) + 1].refIdx;
+  if (pu.refIdx[REF_PIC_LIST_0] >= 0)
+  {
+    pu.mv[REF_PIC_LIST_0] = mvFieldNeighbours[(mergeIdx << 1) + 0].mv + mvOffset;
+  }
+  else
+  {
+    pu.mv[REF_PIC_LIST_0] = Mv();
+  }
+
+  if (pu.refIdx[REF_PIC_LIST_1] >= 0)
+  {
+    pu.mv[REF_PIC_LIST_1] = mvFieldNeighbours[(mergeIdx << 1) + 1].mv + mvOffset;
+  }
+  else
+  {
+    pu.mv[REF_PIC_LIST_1] = Mv();
+  }
+  pu.mvd[REF_PIC_LIST_0] = Mv();
+  pu.mvd[REF_PIC_LIST_1] = Mv();
+  pu.mvpIdx[REF_PIC_LIST_0] = NOT_VALID;
+  pu.mvpIdx[REF_PIC_LIST_1] = NOT_VALID;
+  pu.mvpNum[REF_PIC_LIST_0] = NOT_VALID;
+  pu.mvpNum[REF_PIC_LIST_1] = NOT_VALID;
+  pu.cu->BcwIdx = (interDirNeighbours[mergeIdx] == 3) ? BcwIdx[mergeIdx] : BCW_DEFAULT;
+
+#if MULTI_HYP_PRED
+  pu.addHypData.clear();
+  pu.numMergedAddHyps = 0;
+#endif
+
+#if !INTER_RM_SIZE_CONSTRAINTS
+  PU::restrictBiPredMergeCandsOne(pu);
+#endif
+  pu.mmvdEncOptMode = 0;
+
+#if INTER_LIC
+  pu.cu->LICFlag = pu.cs->slice->getUseLIC() ? LICFlags[mergeIdx] : false;
+  if (pu.interDir == 3)
+  {
+    CHECK(pu.cu->LICFlag, "LIC is not used with bi-prediction in merge");
+  }
+#endif
+}
+void MergeCtx::copyMergeCtx(MergeCtx & orgMergeCtx)
+{
+  memcpy(interDirNeighbours, orgMergeCtx.interDirNeighbours, MRG_MAX_NUM_CANDS * sizeof(unsigned char));
+  memcpy(mvFieldNeighbours, orgMergeCtx.mvFieldNeighbours, (MRG_MAX_NUM_CANDS << 1) * sizeof(MvField));
+}
+#endif
 void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
 {
   const Slice &slice = *pu.cs->slice;

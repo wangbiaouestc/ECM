@@ -3414,6 +3414,9 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
       {
         PU::getGeoMergeCandidates(fakePredData, m_geoMrgCtx);
       }
+#if JVET_W0097_GPM_MMVD_TM
+      maxNumMergeCandidates = min((int)maxNumMergeCandidates, m_geoMrgCtx.numValidMergeCand);
+#endif
       const auto savedAffine = pu.cu->affine;
       const auto savedIMV = pu.cu->imv;
       for (int i = 0; i < maxNumMergeCandidates; i++)
@@ -3443,6 +3446,12 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
       }
       setGeoTmpBuffer();
     }
+#if JVET_W0097_GPM_MMVD_TM
+    else
+    {
+      maxNumMergeCandidates = min((int)maxNumMergeCandidates, m_geoMrgCtx.numValidMergeCand);
+    }
+#endif
     for (int i = 0; i < maxNumMergeCandidates; i++)
     {
       int refList = m_geoMrgCtx.interDirNeighbours[i] - 1; CHECK(refList != 0 && refList != 1, "");

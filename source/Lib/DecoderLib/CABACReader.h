@@ -132,6 +132,11 @@ public:
 #if TM_MRG
   void        tm_merge_flag             ( PredictionUnit&               pu );
 #endif
+#if JVET_W0097_GPM_MMVD_TM
+  void        geo_mmvd_idx(PredictionUnit&          pu, RefPicList eRefPicList);
+  void        geo_merge_idx(PredictionUnit&          pu);
+  void        geo_merge_idx1(PredictionUnit&          pu);
+#endif
   void        imv_mode                  ( CodingUnit&                   cu,     MergeCtx&       mrgCtx );
   void        affine_amvr_mode          ( CodingUnit&                   cu,     MergeCtx&       mrgCtx );
   void        inter_pred_idc            ( PredictionUnit&               pu );

@@ -2958,6 +2958,58 @@ void CABACReader::merge_idx( PredictionUnit& pu )
     if (pu.cu->geoFlag)
     {
       RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__GEO_INDEX);
+#if JVET_W0097_GPM_MMVD_TM
+      pu.geoMMVDFlag0 = m_BinDecoder.decodeBin(Ctx::GeoMmvdFlag());
+      if (pu.geoMMVDFlag0)
+      {
+        geo_mmvd_idx(pu, REF_PIC_LIST_0);
+      }
+
+      pu.geoMMVDFlag1 = m_BinDecoder.decodeBin(Ctx::GeoMmvdFlag());
+      if (pu.geoMMVDFlag1)
+      {
+        geo_mmvd_idx(pu, REF_PIC_LIST_1);
+      }
+
+#if TM_MRG
+      if (!pu.geoMMVDFlag0 && !pu.geoMMVDFlag1)
+      {
+        tm_merge_flag(pu);
+        if (pu.tmMergeFlag)
+        {
+          pu.geoTmFlag0 = true;
+          pu.geoTmFlag1 = true;
+          geo_merge_idx(pu);
+        }
+        else
+        {
+          pu.geoTmFlag0 = false;
+          pu.geoTmFlag1 = false;
+          geo_merge_idx(pu);
+        }
+      }
+#else
+      if (!pu.geoMMVDFlag0 && !pu.geoMMVDFlag1)
+      {
+        geo_merge_idx(pu);
+      }
+#endif
+      else if (pu.geoMMVDFlag0 && pu.geoMMVDFlag1)
+      {
+        if (pu.geoMMVDIdx0 == pu.geoMMVDIdx1)
+        {
+          geo_merge_idx(pu);
+        }
+        else
+        {
+          geo_merge_idx1(pu);
+        }
+      }
+      else
+      {
+        geo_merge_idx1(pu);
+      }
+#else
       uint32_t splitDir = 0;
       xReadTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
       pu.geoSplitDir          = splitDir;
@@ -2985,6 +3037,7 @@ void CABACReader::merge_idx( PredictionUnit& pu )
       DTRACE(g_trace_ctx, D_SYNTAX, "merge_idx() geo_split_dir=%d\n", splitDir);
       DTRACE(g_trace_ctx, D_SYNTAX, "merge_idx() geo_idx0=%d\n", mergeCand0);
       DTRACE(g_trace_ctx, D_SYNTAX, "merge_idx() geo_idx1=%d\n", mergeCand1);
+#endif
       return;
     }
 
@@ -3038,7 +3091,94 @@ void CABACReader::merge_idx( PredictionUnit& pu )
   DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() merge_idx=%d\n", pu.mergeIdx );
   }
 }
+#if JVET_W0097_GPM_MMVD_TM
+void CABACReader::geo_mmvd_idx(PredictionUnit& pu, RefPicList eRefPicList)
+{
+  bool extMMVD = pu.cs->picHeader->getGPMMMVDTableFlag();
+  int numCandminus1_step = (extMMVD ? GPM_EXT_MMVD_REFINE_STEP : GPM_MMVD_REFINE_STEP) - 1;
+  int step = 0;
+  if (m_BinDecoder.decodeBin(Ctx::GeoMmvdStepMvpIdx()))
+  {
+    step++;
+    for (; step < numCandminus1_step; step++)
+    {
+      if (!m_BinDecoder.decodeBinEP())
+      {
+        break;
+      }
+    }
+  }
 
+  int idxToMMVDStep[GPM_EXT_MMVD_REFINE_STEP] = { 1, 2, 3, 4, 5, 0, 6, 7, 8 };
+  step = idxToMMVDStep[step];
+
+  int direction = 0;
+  int maxMMVDDir = (extMMVD ? GPM_EXT_MMVD_REFINE_DIRECTION : GPM_MMVD_REFINE_DIRECTION);
+  direction = m_BinDecoder.decodeBinsEP(maxMMVDDir > 4 ? 3 : 2);
+  int mvpIdx = (step * maxMMVDDir + direction);
+  if (eRefPicList == REF_PIC_LIST_0)
+  {
+    pu.geoMMVDIdx0 = mvpIdx;
+  }
+  else
+  {
+    pu.geoMMVDIdx1 = mvpIdx;
+  }
+}
+
+
+void CABACReader::geo_merge_idx(PredictionUnit& pu)
+{
+  uint32_t splitDir = 0;
+  xReadTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
+  pu.geoSplitDir = splitDir;
+  const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
+  CHECK(maxNumGeoCand < 2, "Incorrect max number of geo candidates");
+  CHECK(pu.cu->lheight() > 64 || pu.cu->lwidth() > 64, "Incorrect block size of geo flag");
+  int numCandminus2 = maxNumGeoCand - 2;
+  pu.mergeIdx = 0;
+  int mergeCand0 = 0;
+  int mergeCand1 = 0;
+  if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
+  {
+    mergeCand0 += unary_max_eqprob(numCandminus2) + 1;
+  }
+  if (numCandminus2 > 0)
+  {
+    if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
+    {
+      mergeCand1 += unary_max_eqprob(numCandminus2 - 1) + 1;
+    }
+  }
+  mergeCand1 += mergeCand1 >= mergeCand0 ? 1 : 0;
+  pu.geoMergeIdx0 = mergeCand0;
+  pu.geoMergeIdx1 = mergeCand1;
+}
+
+void CABACReader::geo_merge_idx1(PredictionUnit& pu)
+{
+  uint32_t splitDir = 0;
+  xReadTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
+  pu.geoSplitDir = splitDir;
+  const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
+  CHECK(maxNumGeoCand < 2, "Incorrect max number of geo candidates");
+  CHECK(pu.cu->lheight() > 64 || pu.cu->lwidth() > 64, "Incorrect block size of geo flag");
+  int numCandminus2 = maxNumGeoCand - 2;
+  pu.mergeIdx = 0;
+  int mergeCand0 = 0;
+  int mergeCand1 = 0;
+  if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
+  {
+    mergeCand0 += unary_max_eqprob(numCandminus2) + 1;
+  }
+  if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
+  {
+    mergeCand1 += unary_max_eqprob(numCandminus2) + 1;
+  }
+  pu.geoMergeIdx0 = mergeCand0;
+  pu.geoMergeIdx1 = mergeCand1;
+}
+#endif
 void CABACReader::mmvd_merge_idx(PredictionUnit& pu)
 {
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__MERGE_INDEX);

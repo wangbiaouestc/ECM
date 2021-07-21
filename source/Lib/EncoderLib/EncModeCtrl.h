@@ -462,6 +462,14 @@ struct CodedCUInfo
   bool isSkip;
   bool isMMVDSkip;
   bool isIBC;
+#if JVET_W0097_GPM_MMVD_TM
+  bool    skipGPM;
+  char    isGPMTested;
+  int     geoDirCandList[GEO_MAX_TRY_WEIGHTED_SATD];
+  int     numGeoDirCand;
+  int     geoMrgIdx0List[GEO_MAX_TRY_WEIGHTED_SATD];
+  int     geoMrgIdx1List[GEO_MAX_TRY_WEIGHTED_SATD];
+#endif
   bool validMv[NUM_REF_PIC_LIST_01][MAX_STORED_CU_INFO_REFS];
   Mv   saveMv [NUM_REF_PIC_LIST_01][MAX_STORED_CU_INFO_REFS];
 
@@ -512,7 +520,9 @@ public:
 protected:
   void touch    ( const UnitArea& area );
 #endif
-
+#if JVET_W0097_GPM_MMVD_TM
+public:
+#endif
   CodedCUInfo& getBlkInfo( const UnitArea& area );
 
 public:
@@ -609,13 +619,38 @@ public:
 // EncModeCtrlMTnoRQT - allows and controls modes introduced by QTBT (inkl. multi-type-tree)
 //                    - only 2Nx2N, no RQT, additional binary/triary CU splits
 //////////////////////////////////////////////////////////////////////////
-
+#if JVET_W0097_GPM_MMVD_TM
+enum ExtraFeatures
+{
+  DID_HORZ_SPLIT = 0,
+  DID_VERT_SPLIT,
+  DID_QUAD_SPLIT,
+  BEST_HORZ_SPLIT_COST,
+  BEST_VERT_SPLIT_COST,
+  BEST_TRIH_SPLIT_COST,
+  BEST_TRIV_SPLIT_COST,
+  DO_TRIH_SPLIT,
+  DO_TRIV_SPLIT,
+  BEST_NON_SPLIT_COST,
+  BEST_NO_IMV_COST,
+  BEST_IMV_COST,
+  BEST_GPM_COST,
+  QT_BEFORE_BT,
+  IS_BEST_NOSPLIT_SKIP,
+  MAX_QT_SUB_DEPTH,
+#if REUSE_CU_RESULTS
+  IS_REUSING_CU,
+#endif
+  NUM_EXTRA_FEATURES
+};
+#endif
 class EncModeCtrlMTnoRQT : public EncModeCtrl, public CacheBlkInfoCtrl
 #if REUSE_CU_RESULTS
   , public BestEncInfoCache
 #endif
   , public SaveLoadEncInfoSbt
 {
+#if !JVET_W0097_GPM_MMVD_TM
   enum ExtraFeatures
   {
     DID_HORZ_SPLIT = 0,
@@ -638,7 +673,7 @@ class EncModeCtrlMTnoRQT : public EncModeCtrl, public CacheBlkInfoCtrl
 #endif
     NUM_EXTRA_FEATURES
   };
-
+#endif
   unsigned m_skipThreshold;
 
 public:

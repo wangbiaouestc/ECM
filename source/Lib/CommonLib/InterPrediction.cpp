@@ -626,10 +626,21 @@ void InterPrediction::xSubPuBio(PredictionUnit& pu, PelUnitBuf& predBuf, const R
       int dx = secStep;
       int dy = fstStep;
 
+#if !JVET_W0097_GPM_MMVD_TM
       const MotionInfo &curMi = pu.getMotionInfo(Position{ x, y });
+#endif
 
       subPu.UnitArea::operator=(UnitArea(pu.chromaFormat, Area(x, y, dx, dy)));
+#if JVET_W0097_GPM_MMVD_TM
+      subPu.interDir = pu.interDir;
+      for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
+      {
+        subPu.refIdx[i] = pu.refIdx[i];
+        subPu.mv[i] = pu.mv[i];
+      }
+#else
       subPu = curMi;
+#endif
       PelUnitBuf subPredBuf = predBuf.subBuf(UnitAreaRelative(pu, subPu));
 
       if (yuvDstTmp)
@@ -2810,7 +2821,11 @@ void InterPrediction::xWeightedAverage(
   {
     if( pu.cu->geoFlag )
     {
+#if JVET_W0097_GPM_MMVD_TM
+      pcYuvDst.copyFrom(pcYuvSrc0, lumaOnly, chromaOnly);
+#else
       pcYuvDst.copyFrom( pcYuvSrc0 );
+#endif
     }
     else
     {
@@ -2825,7 +2840,11 @@ void InterPrediction::xWeightedAverage(
   {
     if( pu.cu->geoFlag )
     {
+#if JVET_W0097_GPM_MMVD_TM
+      pcYuvDst.copyFrom(pcYuvSrc1, lumaOnly, chromaOnly);
+#else
       pcYuvDst.copyFrom( pcYuvSrc1 );
+#endif
     }
     else
     {
@@ -3489,18 +3508,45 @@ int InterPrediction::rightShiftMSB(int numer, int denom)
   return numer >> floorLog2(denom);
 }
 
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+void InterPrediction::motionCompensationGeo(CodingUnit &cu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1)
+#else
 void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx )
+#endif
 {
   const uint8_t splitDir = cu.firstPU->geoSplitDir;
   const uint8_t candIdx0 = cu.firstPU->geoMergeIdx0;
   const uint8_t candIdx1 = cu.firstPU->geoMergeIdx1;
+#if JVET_W0097_GPM_MMVD_TM
+  const bool    geoMMVDFlag0 = cu.firstPU->geoMMVDFlag0;
+  const uint8_t geoMMVDIdx0 = cu.firstPU->geoMMVDIdx0;
+  const bool    geoMMVDFlag1 = cu.firstPU->geoMMVDFlag1;
+  const uint8_t geoMMVDIdx1 = cu.firstPU->geoMMVDIdx1;
+#if TM_MRG
+  const bool    geoTmFlag0 = cu.firstPU->geoTmFlag0;
+  const bool    geoTmFlag1 = cu.firstPU->geoTmFlag1;
+#endif
+#endif
   for( auto &pu : CU::traversePUs( cu ) )
   {
     const UnitArea localUnitArea( cu.cs->area.chromaFormat, Area( 0, 0, pu.lwidth(), pu.lheight() ) );
     PelUnitBuf tmpGeoBuf0 = m_geoPartBuf[0].getBuf( localUnitArea );
     PelUnitBuf tmpGeoBuf1 = m_geoPartBuf[1].getBuf( localUnitArea );
     PelUnitBuf predBuf    = cu.cs->getPredBuf( pu );
-
+#if JVET_W0097_GPM_MMVD_TM
+#if TM_MRG
+    if (geoTmFlag0)
+    {
+      geoTmMrgCtx0.setMergeInfo(pu, candIdx0);
+    }
+    else
+#endif
+    if (geoMMVDFlag0)
+    {
+      geoMrgCtx.setGeoMmvdMergeInfo(pu, candIdx0, geoMMVDIdx0);
+    }
+    else
+#endif
     geoMrgCtx.setMergeInfo( pu, candIdx0 );
 
     motionCompensation(pu, tmpGeoBuf0, REF_PIC_LIST_X, true, isChromaEnabled(pu.chromaFormat)); // TODO: check 4:0:0 interaction with weighted prediction.
@@ -3508,7 +3554,20 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
     {
       printf( "DECODER_GEO_PU: pu motion vector across tile boundaries (%d,%d,%d,%d)\n", pu.lx(), pu.ly(), pu.lwidth(), pu.lheight() );
     }
-
+#if JVET_W0097_GPM_MMVD_TM
+#if TM_MRG
+    if (geoTmFlag1)
+    {
+      geoTmMrgCtx1.setMergeInfo(pu, candIdx1);
+    }
+    else
+#endif
+    if (geoMMVDFlag1)
+    {
+      geoMrgCtx.setGeoMmvdMergeInfo(pu, candIdx1, geoMMVDIdx1);
+    }
+    else
+#endif
     geoMrgCtx.setMergeInfo( pu, candIdx1 );
 
     motionCompensation(pu, tmpGeoBuf1, REF_PIC_LIST_X, true, isChromaEnabled(pu.chromaFormat)); // TODO: check 4:0:0 interaction with weighted prediction.
@@ -4937,7 +4996,26 @@ bool TplMatchingCtrl::xFillCurTemplate(Pel* tpl)
   const CPelBuf           recBuf  = currPic.getRecoBuf(m_cu.cs->picture->blocks[m_compID]);
         std::vector<Pel>& invLUT  = m_interRes.m_pcReshape->getInvLUT();
   const bool              useLUT  = isLuma(m_compID) && m_cu.cs->picHeader->getLmcsEnabledFlag() && m_interRes.m_pcReshape->getCTUFlag();
-
+#if JVET_W0097_GPM_MMVD_TM & TM_MRG
+  if (m_cu.geoFlag)
+  {
+    CHECK(m_pu.geoTmType == GEO_TM_OFF, "invalid geo template type value");
+    if (m_pu.geoTmType == GEO_TM_SHAPE_A)
+    {
+      if (TrueA_FalseL == 0)
+      {
+        return false;
+      }
+    }
+    if (m_pu.geoTmType == GEO_TM_SHAPE_L)
+    {
+      if (TrueA_FalseL == 1)
+      {
+        return false;
+      }
+    }
+  }
+#endif
   const Size dstSize = (TrueA_FalseL ? Size(m_pu.lwidth(), tplSize) : Size(tplSize, m_pu.lheight()));
   for (int h = 0; h < (int)dstSize.height; h++)
   {

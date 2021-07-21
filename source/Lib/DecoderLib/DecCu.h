@@ -105,6 +105,9 @@ private:
 #endif
 
   MergeCtx          m_geoMrgCtx;
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  MergeCtx          m_geoTmMrgCtx0, m_geoTmMrgCtx1;
+#endif
 };
 
 //! \}

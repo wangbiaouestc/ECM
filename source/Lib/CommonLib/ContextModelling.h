@@ -568,12 +568,16 @@ public:
   bool          mmvdUseAltHpelIf  [ MMVD_BASE_MV_NUM ];
   bool          useAltHpelIf      [ MRG_MAX_NUM_CANDS ];
   void setMergeInfo( PredictionUnit& pu, int candIdx );
-#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR
+#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM
   bool xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
 #if TM_MRG
   void copyRegularMergeCand( int dstCandIdx, MergeCtx& srcCtx, int srcCandIdx );
   void convertRegularMergeCandToBi(int candIdx);
+#endif
+#if JVET_W0097_GPM_MMVD_TM
+  void setGeoMmvdMergeInfo(PredictionUnit& pu, int mergeIdx, int mmvdIdx);
+  void copyMergeCtx(MergeCtx &orgMergeCtx);
 #endif
 };
 

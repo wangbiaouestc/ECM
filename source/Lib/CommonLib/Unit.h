@@ -431,6 +431,17 @@ struct InterPredictionData
   uint8_t     geoSplitDir;
   uint8_t     geoMergeIdx0;
   uint8_t     geoMergeIdx1;
+#if JVET_W0097_GPM_MMVD_TM
+  bool        geoMMVDFlag0;
+  uint8_t     geoMMVDIdx0;
+  bool        geoMMVDFlag1;
+  uint8_t     geoMMVDIdx1;
+#if TM_MRG
+  bool        geoTmFlag0;
+  bool        geoTmFlag1;
+  uint8_t     geoTmType;
+#endif
+#endif
   bool           mmvdMergeFlag;
   uint8_t       mmvdMergeIdx;
 #if AFFINE_MMVD
@@ -527,7 +538,6 @@ struct TransformUnit : public UnitArea
   CodingStructure *cs;
   ChannelType      chType;
   int              m_chromaResScaleInv;
-
   uint8_t        depth;
   uint8_t        mtsIdx     [ MAX_NUM_TBLOCKS ];
   bool           noResidual;

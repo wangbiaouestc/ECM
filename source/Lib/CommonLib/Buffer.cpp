@@ -90,7 +90,71 @@ int64_t getSumOfDifferenceCore(const Pel* src0, int src0Stride, const Pel* src1,
   return sum;
 }
 #endif
+#if JVET_W0097_GPM_MMVD_TM
+void roundBDCore(const Pel* srcp, const int srcStride, Pel* dest, const int destStride, int width, int height, const ClpRng& clpRng)
+{
+  const int32_t clipbd = clpRng.bd;
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+  const int32_t shiftDefault = IF_INTERNAL_FRAC_BITS(clipbd);
+#else
+  const int32_t shiftDefault = std::max<int>(2, (IF_INTERNAL_PREC - clipbd));
+#endif
+  const int32_t offsetDefault = (1 << (shiftDefault - 1)) + IF_INTERNAL_OFFS;
 
+  if (width == 1)
+  {
+    THROW("Blocks of width = 1 not supported");
+  }
+  else
+  {
+#define RND_OP( ADDR ) dest[ADDR] = ClipPel( rightShift( srcp[ADDR] + offsetDefault, shiftDefault), clpRng )
+#define RND_INC        \
+    srcp += srcStride;  \
+    dest += destStride; \
+
+    SIZE_AWARE_PER_EL_OP(RND_OP, RND_INC);
+
+#undef RND_OP
+#undef RND_INC
+  }
+}
+
+void weightedAvgCore(const Pel* src0, const unsigned src0Stride, const Pel* src1, const unsigned src1Stride, Pel* dest, const unsigned destStride, const int8_t w0, const int8_t w1, int width, int height, const ClpRng& clpRng)
+{
+  const int8_t log2WeightBase = g_BcwLog2WeightBase;
+  const int clipbd = clpRng.bd;
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+  const int shiftNum = IF_INTERNAL_FRAC_BITS(clipbd) + log2WeightBase;
+#else
+  const int shiftNum = std::max<int>(2, (IF_INTERNAL_PREC - clipbd)) + log2WeightBase;
+#endif
+  const int offset = (1 << (shiftNum - 1)) + (IF_INTERNAL_OFFS << log2WeightBase);
+
+#define ADD_AVG_OP( ADDR ) dest[ADDR] = ClipPel( rightShift( ( src0[ADDR]*w0 + src1[ADDR]*w1 + offset ), shiftNum ), clpRng )
+#define ADD_AVG_INC     \
+    src0 += src0Stride; \
+    src1 += src1Stride; \
+    dest += destStride; \
+
+  SIZE_AWARE_PER_EL_OP(ADD_AVG_OP, ADD_AVG_INC);
+
+#undef ADD_AVG_OP
+#undef ADD_AVG_INC
+}
+
+void copyClipCore(const Pel* srcp, const unsigned srcStride, Pel* dest, const unsigned destStride, int width, int height, const ClpRng& clpRng)
+{
+#define RECO_OP( ADDR ) dest[ADDR] = ClipPel( srcp[ADDR], clpRng )
+#define RECO_INC        \
+  srcp += srcStride;  \
+  dest += destStride; \
+
+  SIZE_AWARE_PER_EL_OP(RECO_OP, RECO_INC);
+
+#undef RECO_OP
+#undef RECO_INC
+}
+#endif
 template< typename T >
 void addAvgCore( const T* src1, int src1Stride, const T* src2, int src2Stride, T* dest, int dstStride, int width, int height, int rshift, int offset, const ClpRng& clpRng )
 {
@@ -521,6 +585,11 @@ void linTfCore( const T* src, int srcStride, Pel *dst, int dstStride, int width,
 
 PelBufferOps::PelBufferOps()
 {
+#if JVET_W0097_GPM_MMVD_TM
+  roundBD = roundBDCore;
+  weightedAvg = weightedAvgCore;
+  copyClip = copyClipCore;
+#endif
   addAvg4 = addAvgCore<Pel>;
   addAvg8 = addAvgCore<Pel>;
 
@@ -625,6 +694,19 @@ void AreaBuf<Pel>::addHypothesisAndClip(const AreaBuf<const Pel> &other, const i
 template<>
 void AreaBuf<Pel>::addWeightedAvg(const AreaBuf<const Pel> &other1, const AreaBuf<const Pel> &other2, const ClpRng& clpRng, const int8_t bcwIdx)
 {
+#if JVET_W0097_GPM_MMVD_TM
+  const int8_t w0 = getBcwWeight(bcwIdx, REF_PIC_LIST_0);
+  const int8_t w1 = getBcwWeight(bcwIdx, REF_PIC_LIST_1);
+
+  const Pel*            src0 = other1.buf;
+  const Pel*            src1 = other2.buf;
+  Pel*                 dest = buf;
+  const unsigned src0Stride = other1.stride;
+  const unsigned src1Stride = other2.stride;
+  const unsigned destStride = stride;
+
+  g_pelBufOP.weightedAvg(src0, src0Stride, src1, src1Stride, dest, destStride, w0, w1, width, height, clpRng);
+#else
   const int8_t w0 = getBcwWeight(bcwIdx, REF_PIC_LIST_0);
   const int8_t w1 = getBcwWeight(bcwIdx, REF_PIC_LIST_1);
   const int8_t log2WeightBase = g_BcwLog2WeightBase;
@@ -654,6 +736,7 @@ void AreaBuf<Pel>::addWeightedAvg(const AreaBuf<const Pel> &other1, const AreaBu
 
 #undef ADD_AVG_OP
 #undef ADD_AVG_INC
+#endif
 }
 
 template<>
@@ -919,6 +1002,9 @@ void AreaBuf<Pel>::copyClip( const AreaBuf<const Pel> &src, const ClpRng& clpRng
   }
   else
   {
+#if JVET_W0097_GPM_MMVD_TM
+    g_pelBufOP.copyClip(srcp, srcStride, dest, destStride, width, height, clpRng);
+#else
 #define RECO_OP( ADDR ) dest[ADDR] = ClipPel( srcp[ADDR], clpRng )
 #define RECO_INC        \
     srcp += srcStride;  \
@@ -928,6 +1014,7 @@ void AreaBuf<Pel>::copyClip( const AreaBuf<const Pel> &src, const ClpRng& clpRng
 
 #undef RECO_OP
 #undef RECO_INC
+#endif
   }
 }
 
@@ -938,7 +1025,7 @@ void AreaBuf<Pel>::roundToOutputBitdepth( const AreaBuf<const Pel> &src, const C
         Pel* dest =     buf;
   const unsigned srcStride  = src.stride;
   const unsigned destStride = stride;
-
+#if !JVET_W0097_GPM_MMVD_TM
   const int32_t clipbd            = clpRng.bd;
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
   const int32_t shiftDefault      = IF_INTERNAL_FRAC_BITS(clipbd);
@@ -946,13 +1033,16 @@ void AreaBuf<Pel>::roundToOutputBitdepth( const AreaBuf<const Pel> &src, const C
   const int32_t shiftDefault      = std::max<int>(2, (IF_INTERNAL_PREC - clipbd));
 #endif
   const int32_t offsetDefault     = (1<<(shiftDefault-1)) + IF_INTERNAL_OFFS;
-
+#endif
   if( width == 1 )
   {
     THROW( "Blocks of width = 1 not supported" );
   }
   else
   {
+#if JVET_W0097_GPM_MMVD_TM
+    g_pelBufOP.roundBD(srcp, srcStride, dest, destStride, width, height, clpRng);
+#else
 #define RND_OP( ADDR ) dest[ADDR] = ClipPel( rightShift( srcp[ADDR] + offsetDefault, shiftDefault), clpRng )
 #define RND_INC        \
     srcp += srcStride;  \
@@ -962,6 +1052,7 @@ void AreaBuf<Pel>::roundToOutputBitdepth( const AreaBuf<const Pel> &src, const C
 
 #undef RND_OP
 #undef RND_INC
+#endif
   }
 }
 

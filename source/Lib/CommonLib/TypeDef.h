@@ -129,6 +129,7 @@
 #define TM_AMVP                                           1 // Add template  matching to non-subblock inter to refine regular AMVP candidates
 #define TM_MRG                                            1 // Add template  matching to non-subblock inter to refine regular merge candidates
 #define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
+#define JVET_W0097_GPM_MMVD_TM                            1 // JVET-W0097: GPM-MMVD and GPM-TM
 
 // Transform and coefficient coding
 #define TCQ_8STATES                                       1
@@ -731,7 +732,16 @@ enum RefPicList
 
 #define L0 REF_PIC_LIST_0
 #define L1 REF_PIC_LIST_1
-
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+enum GeoTmMvCand
+{
+  GEO_TM_OFF = 0,
+  GEO_TM_SHAPE_AL,
+  GEO_TM_SHAPE_A,
+  GEO_TM_SHAPE_L,
+  GEO_NUM_TM_MV_CAND
+};
+#endif
 /// distortion function index
 enum DFunc
 {

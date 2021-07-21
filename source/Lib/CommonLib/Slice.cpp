@@ -2819,6 +2819,9 @@ PicHeader::PicHeader()
 , m_disDmvrFlag                                   ( 0 )
 , m_disProfFlag                                   ( 0 )
 , m_jointCbCrSignFlag                             ( 0 )
+#if JVET_W0097_GPM_MMVD_TM
+, m_gpmMMVDTableFlag                              (false)
+#endif
 , m_qpDelta                                       ( 0 )
 , m_numAlfAps                                     ( 0 )
 , m_alfApsId                                      ( 0 )
@@ -2911,6 +2914,9 @@ void PicHeader::initPicHeader()
   m_disDmvrFlag                                   = 0;
   m_disProfFlag                                   = 0;
   m_jointCbCrSignFlag                             = 0;
+#if JVET_W0097_GPM_MMVD_TM
+  m_gpmMMVDTableFlag                              = 0;
+#endif
   m_qpDelta                                       = 0;
   m_numAlfAps                                     = 0;
   m_alfChromaApsId                                = 0;
