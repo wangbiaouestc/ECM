@@ -358,6 +358,9 @@ protected:
 #endif
   bool      m_PROF;
   bool      m_BIO;
+#if ARMC_TM
+  bool      m_AML;
+#endif
   int       m_LMChroma;
   bool      m_horCollocatedChromaFlag;
   bool      m_verCollocatedChromaFlag;

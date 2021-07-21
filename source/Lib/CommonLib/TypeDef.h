@@ -50,7 +50,7 @@
 #include <assert.h>
 #include <cassert>
 
-
+#define ARMC_TM                                           1 //Adaptive reordering of merge candidates with template matching
 
 
 

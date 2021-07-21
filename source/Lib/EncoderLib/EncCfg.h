@@ -373,6 +373,9 @@ protected:
 #endif
   bool      m_PROF;
   bool      m_BIO;
+#if ARMC_TM
+  bool      m_AML;
+#endif
 
   bool      m_SMVD;
   bool      m_compositeRefEnabled;        //composite reference
@@ -1204,6 +1207,10 @@ public:
   bool      getPROF                         ()         const { return m_PROF; }
   void      setBIO(bool b)                                   { m_BIO = b; }
   bool      getBIO()                                   const { return m_BIO; }
+#if ARMC_TM
+  void      setAML(bool b)                                   { m_AML = b; }
+  bool      getAML()                                   const { return m_AML; }
+#endif
 #if ENABLE_OBMC
   void      setUseOBMC                      ( bool n )       { m_OBMC = n; }
   bool      getUseOBMC                      ()         const { return m_OBMC; }

@@ -578,6 +578,12 @@ static const double AMAXBT_TH64 =                                  30.0;
 static const double AMAXBT_TH128 =                                 60.0;
 #endif
 
+#if ARMC_TM
+static const int AML_MERGE_TEMPLATE_SIZE =                         1;
+static const int ADAPTIVE_SUB_GROUP_SIZE =                         5;
+static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE =                  3;
+#endif
+
 // need to know for static memory allocation
 static const int MAX_DELTA_QP   =                                   7;      ///< maximum supported delta QP value
 static const int MAX_TESTED_QPs =   ( 1 + 1 + ( MAX_DELTA_QP << 1 ) );      ///< dqp=0 +- max_delta_qp + lossless mode

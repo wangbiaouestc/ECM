@@ -1298,7 +1298,12 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             affineMergeCtx.mrgCtx = &mrgCtx;
           }
 #if AFFINE_MMVD
+#if ARMC_TM
+          int affMrgIdx = pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE + 1)*ADAPTIVE_AFFINE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumAffineMergeCand()) || (pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE * ADAPTIVE_AFFINE_SUB_GROUP_SIZE + ADAPTIVE_AFFINE_SUB_GROUP_SIZE - 1 : pu.mergeIdx;
+          PU::getAffineMergeCand(pu, affineMergeCtx, (pu.afMmvdFlag ? pu.afMmvdBaseIdx : affMrgIdx), pu.afMmvdFlag);
+#else
           PU::getAffineMergeCand(pu, affineMergeCtx, (pu.afMmvdFlag ? pu.afMmvdBaseIdx : pu.mergeIdx), pu.afMmvdFlag);
+#endif
 
           if (pu.afMmvdFlag)
           {
@@ -1306,8 +1311,26 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             CHECK(pu.mergeIdx >= pu.cu->slice->getPicHeader()->getMaxNumAffineMergeCand(), "Affine MMVD mode doesn't have a valid base candidate!");
             PU::getAfMmvdMvf(pu, affineMergeCtx, affineMergeCtx.mvFieldNeighbours + (pu.mergeIdx << 1), pu.mergeIdx, pu.afMmvdStep, pu.afMmvdDir);
           }
+#if ARMC_TM
+          else
+          {
+            if (pu.cs->sps->getUseAML())
+            {
+              m_pcInterPred->adjustAffineMergeCandidates(pu, affineMergeCtx, pu.mergeIdx);
+            }
+          }
+#endif
+#else
+#if ARMC_TM
+          int affMrgIdx = pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE + 1)*ADAPTIVE_AFFINE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumAffineMergeCand()) || (pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE * ADAPTIVE_AFFINE_SUB_GROUP_SIZE + ADAPTIVE_AFFINE_SUB_GROUP_SIZE - 1 : pu.mergeIdx;
+          PU::getAffineMergeCand(pu, affineMergeCtx, affMrgIdx);
+          if (pu.cs->sps->getUseAML())
+          {
+            m_pcInterPred->adjustAffineMergeCandidates(pu, affineMergeCtx, pu.mergeIdx);
+          }
 #else
           PU::getAffineMergeCand( pu, affineMergeCtx, pu.mergeIdx );
+#endif
 #endif
           pu.interDir = affineMergeCtx.interDirNeighbours[pu.mergeIdx];
           pu.cu->affineType = affineMergeCtx.affineType[pu.mergeIdx];
@@ -1345,7 +1368,19 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           if (CU::isIBC(*pu.cu))
             PU::getIBCMergeCandidates(pu, mrgCtx, pu.mergeIdx);
           else
+#if ARMC_TM
+            if (pu.cs->sps->getUseAML())
+            {
+              PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumMergeCand()) || (pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : pu.mergeIdx);
+              m_pcInterPred->adjustInterMergeCandidates(pu, mrgCtx, pu.mergeIdx);
+            }
+            else
+            {
+              PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.mergeIdx);
+            }
+#else
             PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.mergeIdx);
+#endif
           mrgCtx.setMergeInfo( pu, pu.mergeIdx );
 #if TM_MRG && !MULTI_PASS_DMVR
           if (pu.tmMergeFlag)

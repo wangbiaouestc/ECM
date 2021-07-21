@@ -1643,7 +1643,7 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
                    log2SaoOffsetScaleLuma, log2SaoOffsetScaleChroma );
     m_cLoopFilter.create(maxDepth);
     m_cIntraPred.init( sps->getChromaFormatIdc(), sps->getBitDepth( CHANNEL_TYPE_LUMA ) );
-#if INTER_LIC || (TM_AMVP || TM_MRG)
+#if INTER_LIC || (TM_AMVP || TM_MRG) || ARMC_TM
     m_cInterPred.init( &m_cRdCost, sps->getChromaFormatIdc(), sps->getMaxCUHeight(), &m_cReshaper);
 #else
     m_cInterPred.init( &m_cRdCost, sps->getChromaFormatIdc(), sps->getMaxCUHeight() );
