@@ -4831,4 +4831,8 @@ uint8_t g_geoTmShape[2][GEO_NUM_ANGLES] = {
                                             GEO_TM_SHAPE_L,  0,               0,               GEO_TM_SHAPE_L,
                                             GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, 0, } };
 #endif
+#if JVET_W0066_CCSAO
+const int8_t g_ccSaoCandPosX[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y] = { {-1,  0,  1, -1,  0,  1, -1,  0,  1} };
+const int8_t g_ccSaoCandPosY[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y] = { {-1, -1, -1,  0,  0,  0,  1,  1,  1} };
+#endif
 //! \}

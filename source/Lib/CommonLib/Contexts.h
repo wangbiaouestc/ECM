@@ -301,6 +301,9 @@ public:
 #if JVET_V0094_BILATERAL_FILTER
   static const CtxSet   BifCtrlFlags;
 #endif
+#if JVET_W0066_CCSAO
+  static const CtxSet   CcSaoControlIdc;
+#endif
   static const CtxSet   TransformSkipFlag;
   static const CtxSet   MTSIdx;
   static const CtxSet   LFNSTIdx;

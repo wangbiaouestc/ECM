@@ -203,6 +203,18 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                   pcEncPic->copySAO( *pic, 0 );
                 }
 
+#if JVET_W0066_CCSAO
+                if ( pic->cs->sps->getCCSAOEnabledFlag() )
+                {
+                  for (int i = 0; i < pic->slices.size(); i++)
+                  {
+                    pcEncPic->slices[i]->setCcSaoEnabledFlag(COMPONENT_Y,  pic->slices[i]->getCcSaoEnabledFlag(COMPONENT_Y));
+                    pcEncPic->slices[i]->setCcSaoEnabledFlag(COMPONENT_Cb, pic->slices[i]->getCcSaoEnabledFlag(COMPONENT_Cb));
+                    pcEncPic->slices[i]->setCcSaoEnabledFlag(COMPONENT_Cr, pic->slices[i]->getCcSaoEnabledFlag(COMPONENT_Cr));
+                  }
+                }
+#endif
+
                 if( pic->cs->sps->getALFEnabledFlag() )
                 {
                   std::copy(pic->getAlfCtbFilterIndexVec().begin(), pic->getAlfCtbFilterIndexVec().end(), pcEncPic->getAlfCtbFilterIndexVec().begin());
@@ -681,6 +693,13 @@ void DecLib::executeLoopFilters()
   CS::setRefinedMotionField(cs);
 #endif
 
+#if JVET_W0066_CCSAO
+  if (cs.sps->getCCSAOEnabledFlag())
+  {
+    m_cSAO.getCcSaoBuf().copyFrom( cs.getRecoBuf() );
+  }
+#endif
+
 #if JVET_V0094_BILATERAL_FILTER
   if( cs.sps->getSAOEnabledFlag() || cs.pps->getUseBIF())
 #else
@@ -690,6 +709,15 @@ void DecLib::executeLoopFilters()
     m_cSAO.SAOProcess( cs, cs.picture->getSAO() );
   }
     
+#if JVET_W0066_CCSAO
+  if (cs.sps->getCCSAOEnabledFlag())
+  {
+    m_cSAO.getCcSaoComParam() = cs.slice->m_ccSaoComParam;
+    m_cSAO.CCSAOProcess( cs );
+  }
+  m_cSAO.jointClipSaoBifCcSao( cs );
+#endif
+
   if( cs.sps->getALFEnabledFlag() )
   {
     m_cALF.getCcAlfFilterParam() = cs.slice->m_ccAlfFilterParam;
@@ -1641,6 +1669,11 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
                    sps->getMaxCUWidth(), sps->getMaxCUHeight(),
                    maxDepth,
                    log2SaoOffsetScaleLuma, log2SaoOffsetScaleChroma );
+#if JVET_W0066_CCSAO
+    pSlice->m_ccSaoControl[COMPONENT_Y ] = m_cSAO.getCcSaoControlIdc(COMPONENT_Y);
+    pSlice->m_ccSaoControl[COMPONENT_Cb] = m_cSAO.getCcSaoControlIdc(COMPONENT_Cb);
+    pSlice->m_ccSaoControl[COMPONENT_Cr] = m_cSAO.getCcSaoControlIdc(COMPONENT_Cr);
+#endif
     m_cLoopFilter.create(maxDepth);
     m_cIntraPred.init( sps->getChromaFormatIdc(), sps->getBitDepth( CHANNEL_TYPE_LUMA ) );
 #if INTER_LIC || (TM_AMVP || TM_MRG) || ARMC_TM
@@ -2131,6 +2164,9 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
   }
 
   m_HLSReader.setBitstream( &nalu.getBitstream() );
+#if JVET_W0066_CCSAO
+  m_apcSlicePilot->m_ccSaoComParam = m_cSAO.getCcSaoComParam();
+#endif
   m_apcSlicePilot->m_ccAlfFilterParam = m_cALF.getCcAlfFilterParam();
 
 #if EMBEDDED_APS

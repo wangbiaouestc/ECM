@@ -56,6 +56,25 @@
 
 #define SAOCtx(c) SubCtx( Ctx::Sao, c )
 
+#if JVET_W0066_CCSAO
+#include <algorithm>
+
+struct SetIdxCount
+{
+  uint8_t  setIdx;
+  uint16_t count;
+};
+
+struct CtbCost
+{
+  int16_t pos;
+  double  cost;
+};
+
+bool compareSetIdxCount(SetIdxCount a, SetIdxCount b) { return a.count > b.count; }
+
+bool compareCtbCost(CtbCost a, CtbCost b) { return a.cost < b.cost; }
+#endif
 
 //! rounding with IBDI
 inline double xRoundIbdi2(int bitDepth, double x)
@@ -175,6 +194,28 @@ void EncSampleAdaptiveOffset::createEncData(bool isPreDBFSamplesUsed, uint32_t n
       }
     }
   }
+
+#if JVET_W0066_CCSAO
+  if (m_createdEnc)
+  {
+    return;
+  }
+  m_createdEnc = true;
+
+  for (int i = 0; i < MAX_CCSAO_SET_NUM; i++)
+  {
+    m_ccSaoStatData[i] = new CcSaoStatData[m_numCTUsInPic];
+  }
+
+  m_bestCcSaoControl = new uint8_t[m_numCTUsInPic];
+  m_tempCcSaoControl = new uint8_t[m_numCTUsInPic];
+  m_initCcSaoControl = new uint8_t[m_numCTUsInPic];
+
+  for (int i = 0; i < MAX_CCSAO_SET_NUM; i++)
+  {
+    m_trainingDistortion[i] = new int64_t[m_numCTUsInPic];
+  }
+#endif
 }
 
 void EncSampleAdaptiveOffset::destroyEncData()
@@ -199,6 +240,28 @@ void EncSampleAdaptiveOffset::destroyEncData()
     delete[] m_preDBFstatData[i];
   }
   m_preDBFstatData.clear();
+
+#if JVET_W0066_CCSAO
+  if (!m_createdEnc)
+  {
+    return;
+  }
+  m_createdEnc = false;
+
+  for (int i = 0; i < MAX_CCSAO_SET_NUM; i++)
+  {
+    if (m_ccSaoStatData[i]) { delete[] m_ccSaoStatData[i]; m_ccSaoStatData[i] = nullptr; }
+  }
+
+  if (m_bestCcSaoControl) { delete[] m_bestCcSaoControl; m_bestCcSaoControl = nullptr; }
+  if (m_tempCcSaoControl) { delete[] m_tempCcSaoControl; m_tempCcSaoControl = nullptr; }
+  if (m_initCcSaoControl) { delete[] m_initCcSaoControl; m_initCcSaoControl = nullptr; }
+
+  for (int i = 0; i < MAX_CCSAO_SET_NUM; i++)
+  {
+    if (m_trainingDistortion[i]) { delete[] m_trainingDistortion[i]; m_trainingDistortion[i] = nullptr; }
+  }
+#endif
 }
 
 void EncSampleAdaptiveOffset::initCABACEstimator( CABACEncoder* cabacEncoder, CtxCache* ctxCache, Slice* pcSlice )
@@ -1163,6 +1226,27 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
       }
       else
       {
+#if JVET_W0066_CCSAO
+      offsetCTUnoClip(area, srcYuv, resYuv, reconParams[ctuRsAddr], cs);
+#if JVET_V0094_BILATERAL_FILTER
+      if (cs.pps->getUseBIF())
+      {
+        BifParams& bifParams = cs.picture->getBifParam();
+        for (auto& currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
+        {
+          for (auto& currTU : CU::traverseTUs(currCU))
+          {
+
+            bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+            if (bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+            {
+              bilateralFilter.bilateralFilterDiamond5x5NoClip(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+            }
+          }
+        }
+      }
+#endif
+#else
 #if JVET_V0094_BILATERAL_FILTER
         if(cs.pps->getUseBIF())
         {
@@ -1207,6 +1291,8 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #else
       offsetCTU(area, srcYuv, resYuv, reconParams[ctuRsAddr], cs);
 #endif
+#endif
+
       }
 
       ctuRsAddr++;
@@ -1251,6 +1337,27 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
         }
 #endif
 
+#if JVET_W0066_CCSAO
+        offsetCTUnoClip(area, srcYuv, resYuv, reconParams[ctuRsAddr], cs);
+#if JVET_V0094_BILATERAL_FILTER
+        if (cs.pps->getUseBIF())
+        {
+          BifParams& bifParams = cs.picture->getBifParam();
+          for (auto& currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
+          {
+            for (auto& currTU : CU::traverseTUs(currCU))
+            {
+
+              bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+              if (bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+              {
+                bilateralFilter.bilateralFilterDiamond5x5NoClip(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+              }
+            }
+          }
+        }
+#endif
+#else
 #if JVET_V0094_BILATERAL_FILTER
         if(cs.pps->getUseBIF())
         {
@@ -1295,6 +1402,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
         }
 #else
         offsetCTU(area, srcYuv, resYuv, reconParams[ctuRsAddr], cs);
+#endif
 #endif
         ctuRsAddr++;
       }
@@ -1880,6 +1988,720 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
     }
   }
 }
+
+#if JVET_W0066_CCSAO
+void EncSampleAdaptiveOffset::CCSAOProcess(CodingStructure& cs, const double* lambdas, const int intraPeriod)
+{
+  PelUnitBuf orgYuv = cs.getOrgBuf(); 
+  PelUnitBuf dstYuv = cs.getRecoBuf();
+  PelUnitBuf srcYuv = m_ccSaoBuf.getBuf( cs.area );
+  srcYuv.extendBorderPel( MAX_CCSAO_FILTER_LENGTH >> 1 );
+  m_intraPeriod = intraPeriod;
+
+  setupCcSaoLambdas(cs, lambdas);
+
+  if (cs.slice->getSPS()->getCCSAOEnabledFlag())
+  {
+    const TempCtx ctxStartCcSao(m_CtxCache, SubCtx(Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx()));
+    m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc, ctxStartCcSao); deriveCcSao(cs, COMPONENT_Y,  orgYuv, srcYuv, dstYuv);
+    m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc, ctxStartCcSao); deriveCcSao(cs, COMPONENT_Cb, orgYuv, srcYuv, dstYuv);
+    m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc, ctxStartCcSao); deriveCcSao(cs, COMPONENT_Cr, orgYuv, srcYuv, dstYuv);
+    applyCcSao(cs, *cs.pcv, srcYuv, dstYuv);
+  }
+}
+
+void EncSampleAdaptiveOffset::setupCcSaoLambdas(CodingStructure& cs, const double* lambdas)
+{
+  m_lambda[COMPONENT_Y ] = m_picWidth * m_picHeight <= 416 * 240 
+                         ? lambdas[COMPONENT_Y ] * 4.0 
+                         : lambdas[COMPONENT_Y ];
+  m_lambda[COMPONENT_Cb] = lambdas[COMPONENT_Cb];
+  m_lambda[COMPONENT_Cr] = lambdas[COMPONENT_Cr];
+}
+
+void EncSampleAdaptiveOffset::deriveCcSao(CodingStructure& cs, const ComponentID compID, const CPelUnitBuf& orgYuv, const CPelUnitBuf& srcYuv, const CPelUnitBuf& dstYuv)
+{
+  double bestCost = 0;
+  double tempCost = 0;
+  double bestCostS[MAX_CCSAO_SET_NUM + 1] = { 0 };
+
+  double bestCostG[17] = { 0 };
+  int    classNumG[17] = { 0 };
+  int    stageNum = m_intraPeriod == 1 ? MAX_CCSAO_CLASS_NUM / 4 : MAX_CCSAO_CLASS_NUM / 16;
+  for (int stage = 1; stage <= stageNum; stage++)
+    classNumG[stage] = stage * (MAX_CCSAO_CLASS_NUM / stageNum);
+
+  m_bestCcSaoParam.reset();
+  memset(m_bestCcSaoControl, 0, sizeof(uint8_t) * m_numCTUsInPic);
+
+  for (int setNum = 1; setNum <= MAX_CCSAO_SET_NUM; setNum++)
+  {
+    if (setNum > 1)
+    {
+      getCcSaoStatistics(cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatData, m_bestCcSaoParam);
+    }
+    setupInitCcSaoParam(cs, compID, setNum, m_trainingDistortion, m_ccSaoStatData, m_ccSaoStatFrame,
+                        m_initCcSaoParam, m_bestCcSaoParam, m_initCcSaoControl, m_bestCcSaoControl);
+
+    for (int stage = 1; stage <= stageNum; stage++)
+    {
+      for (int bandNumY = 1; bandNumY <= MAX_CCSAO_BAND_NUM_Y; bandNumY++)
+      for (int bandNumU = 1; bandNumU <= MAX_CCSAO_BAND_NUM_U; bandNumU++)
+      for (int bandNumV = 1; bandNumV <= MAX_CCSAO_BAND_NUM_V; bandNumV++)
+      for (int candPosY = 0; candPosY <  MAX_CCSAO_CAND_POS_Y && bandNumY > 1; candPosY++)
+      {
+        if (bandNumY < bandNumU || bandNumY < bandNumV)
+          continue;
+
+        int classNum = bandNumY * bandNumU * bandNumV;
+        if (classNum > MAX_CCSAO_CLASS_NUM)
+          continue;
+
+        if (classNum <= classNumG[stage - 1] || classNum > classNumG[stage])
+          continue;
+
+        setupTempCcSaoParam(cs, compID, setNum, candPosY, bandNumY, bandNumU, bandNumV, m_tempCcSaoParam, m_initCcSaoParam, m_tempCcSaoControl, m_initCcSaoControl);
+        getCcSaoStatistics(cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatData, m_tempCcSaoParam);
+        deriveCcSaoRDO(cs, compID, m_trainingDistortion, m_ccSaoStatData, m_ccSaoStatFrame,
+                       m_bestCcSaoParam, m_tempCcSaoParam, m_bestCcSaoControl, m_tempCcSaoControl, bestCost, tempCost);
+      }
+
+      bestCostG[stage] = bestCost;
+      if (bestCostG[stage] >= bestCostG[stage - 1])
+        break;
+    }
+
+    bestCostS[setNum] = bestCost;
+    if (bestCostS[setNum] >= bestCostS[setNum - 1])
+      break;
+  }
+
+  bool oneBlockFiltered = false;
+  for (int ctbIdx = 0; m_bestCcSaoParam.setNum > 0 && ctbIdx < m_numCTUsInPic; ctbIdx++)
+  {
+    if (m_bestCcSaoControl[ctbIdx])
+    {
+      oneBlockFiltered = true;
+      break;
+    }
+  }
+  
+  m_ccSaoComParam.reset(compID);
+  memset(m_ccSaoControl[compID], 0, sizeof(uint8_t) * m_numCTUsInPic);
+
+  m_ccSaoComParam.enabled[compID] = oneBlockFiltered;
+  if (oneBlockFiltered)
+  {
+    CcSaoEncParam storedBestCcSaoParam = m_bestCcSaoParam;
+    memcpy(m_tempCcSaoControl, m_bestCcSaoControl, sizeof(uint8_t) * m_numCTUsInPic);
+
+    int setNum = 0;
+    for (int setIdx = 0; setIdx < MAX_CCSAO_SET_NUM; setIdx++)
+    {
+      uint8_t setIdc = m_bestCcSaoParam.mapIdxToIdc[setIdx];
+      if (m_bestCcSaoParam.setEnabled[setIdx])
+      {
+        for (int ctbIdx = 0; ctbIdx < m_numCTUsInPic; ctbIdx++)
+        {
+          if (m_tempCcSaoControl[ctbIdx] == (setIdx + 1) )
+          {
+            m_bestCcSaoControl[ctbIdx] = setIdc;
+          }
+        }
+        m_bestCcSaoParam.candPos[setIdc - 1][COMPONENT_Y ] = storedBestCcSaoParam.candPos[setIdx][COMPONENT_Y ];
+        m_bestCcSaoParam.bandNum[setIdc - 1][COMPONENT_Y ] = storedBestCcSaoParam.bandNum[setIdx][COMPONENT_Y ];
+        m_bestCcSaoParam.bandNum[setIdc - 1][COMPONENT_Cb] = storedBestCcSaoParam.bandNum[setIdx][COMPONENT_Cb];
+        m_bestCcSaoParam.bandNum[setIdc - 1][COMPONENT_Cr] = storedBestCcSaoParam.bandNum[setIdx][COMPONENT_Cr];
+        memcpy(m_bestCcSaoParam.offset[setIdc - 1], storedBestCcSaoParam.offset[setIdx], sizeof(storedBestCcSaoParam.offset[setIdx]));
+        setNum++;
+      }
+      m_bestCcSaoParam.setEnabled[setIdx] = setIdx < m_bestCcSaoParam.setNum ? true : false;
+    }
+    CHECK(setNum != m_bestCcSaoParam.setNum, "Number of sets enabled != setNum");
+
+    m_ccSaoComParam.setNum [compID] = m_bestCcSaoParam.setNum;
+
+    for ( int setIdx = 0; setIdx < m_bestCcSaoParam.setNum; setIdx++ )
+    {
+      m_ccSaoComParam.setEnabled[compID][setIdx]               = m_bestCcSaoParam.setEnabled[setIdx];
+      m_ccSaoComParam.candPos   [compID][setIdx][COMPONENT_Y ] = m_bestCcSaoParam.candPos   [setIdx][COMPONENT_Y ];
+      m_ccSaoComParam.bandNum   [compID][setIdx][COMPONENT_Y ] = m_bestCcSaoParam.bandNum   [setIdx][COMPONENT_Y ];
+      m_ccSaoComParam.bandNum   [compID][setIdx][COMPONENT_Cb] = m_bestCcSaoParam.bandNum   [setIdx][COMPONENT_Cb];
+      m_ccSaoComParam.bandNum   [compID][setIdx][COMPONENT_Cr] = m_bestCcSaoParam.bandNum   [setIdx][COMPONENT_Cr];
+      memcpy(m_ccSaoComParam.offset[compID][setIdx], m_bestCcSaoParam.offset[setIdx], sizeof(m_bestCcSaoParam.offset[setIdx]));
+    }
+    memcpy(m_ccSaoControl[compID], m_bestCcSaoControl, sizeof(uint8_t) * m_numCTUsInPic);
+  }
+}
+
+void EncSampleAdaptiveOffset::setupInitCcSaoParam(CodingStructure& cs, const ComponentID compID, const int setNum, int64_t* trainingDistortion[MAX_CCSAO_SET_NUM]
+                                                , CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], CcSaoStatData frameStats[MAX_CCSAO_SET_NUM]
+                                                , CcSaoEncParam& initCcSaoParam, CcSaoEncParam& bestCcSaoParam
+                                                , uint8_t* initCcSaoControl, uint8_t* bestCcSaoControl)
+{
+  initCcSaoParam.reset();
+  memset(initCcSaoControl, 0, sizeof(uint8_t) * m_numCTUsInPic);
+
+  if (setNum == 1)
+  {
+    std::fill_n(initCcSaoControl, m_numCTUsInPic, 1);
+    return;
+  }
+
+  for (int setIdx = 0; setIdx < MAX_CCSAO_SET_NUM; setIdx++)
+  {
+    if (bestCcSaoParam.setEnabled[setIdx])
+    {
+      getCcSaoFrameStats(compID, setIdx, bestCcSaoControl, blkStats, frameStats);
+      getCcSaoDistortion(compID, setIdx, blkStats, bestCcSaoParam.offset, trainingDistortion);
+    }
+  }
+
+  initCcSaoParam = bestCcSaoParam;
+
+  int ctbCntOn = 0;
+  CtbCost *ctbCost = new CtbCost[m_numCTUsInPic];
+
+  for (int ctbIdx = 0; ctbIdx < m_numCTUsInPic; ctbIdx++)
+  {
+    int64_t dist = 0;
+
+    if (bestCcSaoControl[ctbIdx])
+    {
+      int setIdx = bestCcSaoControl[ctbIdx] - 1;
+      dist = trainingDistortion[setIdx][ctbIdx];
+      ctbCntOn++;
+    }
+
+    ctbCost[ctbIdx].pos = ctbIdx;
+    ctbCost[ctbIdx].cost = (double)dist;
+  }
+
+  std::stable_sort(ctbCost, ctbCost + m_numCTUsInPic, compareCtbCost);
+
+  for (int ctbIdx = 0; ctbIdx < m_numCTUsInPic; ctbIdx++)
+  {
+    int ctbPos = ctbCost[ctbIdx].pos;
+    if (ctbIdx < ctbCntOn)
+    {
+      if (ctbIdx * 2 > ctbCntOn)
+      {
+        initCcSaoControl[ctbPos] = setNum;
+      }
+      else
+      {
+        initCcSaoControl[ctbPos] = bestCcSaoControl[ctbPos];
+      }
+    }
+    else
+    {
+      initCcSaoControl[ctbPos] = 0;
+    }
+  }
+  
+  delete[] ctbCost;
+  ctbCost = nullptr;
+}
+
+void EncSampleAdaptiveOffset::setupTempCcSaoParam(CodingStructure& cs, const ComponentID compID, const int setNum
+                                                , const int candPosY, const int bandNumY, const int bandNumU, const int bandNumV
+                                                , CcSaoEncParam& tempCcSaoParam, CcSaoEncParam& initCcSaoParam
+                                                , uint8_t* tempCcSaoControl, uint8_t* initCcSaoControl)
+{
+  tempCcSaoParam.reset();
+  memset(tempCcSaoControl, 0, sizeof(uint8_t) * m_numCTUsInPic);
+
+  tempCcSaoParam = initCcSaoParam;;
+  memcpy(tempCcSaoControl, initCcSaoControl, sizeof(uint8_t) * m_numCTUsInPic);
+
+  tempCcSaoParam.setNum = setNum;
+  tempCcSaoParam.setEnabled[setNum - 1] = true;
+  tempCcSaoParam.candPos   [setNum - 1][COMPONENT_Y ] = candPosY;
+  tempCcSaoParam.bandNum   [setNum - 1][COMPONENT_Y ] = bandNumY;
+  tempCcSaoParam.bandNum   [setNum - 1][COMPONENT_Cb] = bandNumU;
+  tempCcSaoParam.bandNum   [setNum - 1][COMPONENT_Cr] = bandNumV;
+
+  for (int setIdx = 0; setIdx <= setNum; setIdx++)
+  {
+    tempCcSaoParam.mapIdxToIdc[setIdx] = setIdx < setNum ? setIdx + 1 : 0;
+  }
+}
+
+void EncSampleAdaptiveOffset::getCcSaoStatistics(CodingStructure& cs, const ComponentID compID
+                                               , const CPelUnitBuf& orgYuv, const CPelUnitBuf& srcYuv, const CPelUnitBuf& dstYuv
+                                               , CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], const CcSaoEncParam& ccSaoParam)
+{
+  bool isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail;
+
+  const PreCalcValues& pcv = *cs.pcv;
+
+  int ctuRsAddr = 0;
+  for( uint32_t yPos = 0; yPos < pcv.lumaHeight; yPos += pcv.maxCUHeight )
+  {
+    for( uint32_t xPos = 0; xPos < pcv.lumaWidth; xPos += pcv.maxCUWidth )
+    {
+      const uint32_t width  = (xPos + pcv.maxCUWidth  > pcv.lumaWidth)  ? (pcv.lumaWidth - xPos)  : pcv.maxCUWidth;
+      const uint32_t height = (yPos + pcv.maxCUHeight > pcv.lumaHeight) ? (pcv.lumaHeight - yPos) : pcv.maxCUHeight;
+      const UnitArea area( cs.area.chromaFormat, Area(xPos , yPos, width, height) );
+
+      deriveLoopFilterBoundaryAvailibility(cs, area.Y(), isLeftAvail, isAboveAvail, isAboveLeftAvail );
+
+      //NOTE: The number of skipped lines during gathering CTU statistics depends on the slice boundary availabilities.
+      //For simplicity, here only picture boundaries are considered.
+
+      isRightAvail      = (xPos + pcv.maxCUWidth  < pcv.lumaWidth );
+      isBelowAvail      = (yPos + pcv.maxCUHeight < pcv.lumaHeight);
+      isAboveRightAvail = ((yPos > 0) && (isRightAvail));
+
+      for (int setIdx = 0; setIdx < MAX_CCSAO_SET_NUM; setIdx++)
+      {
+        blkStats[setIdx][ctuRsAddr].reset();
+        if (!ccSaoParam.setEnabled[setIdx])
+          continue;
+
+        const CompArea   &compArea   = area.block(compID);
+        const int         srcStrideY = srcYuv.get(COMPONENT_Y ).stride;
+        const int         srcStrideU = srcYuv.get(COMPONENT_Cb).stride;
+        const int         srcStrideV = srcYuv.get(COMPONENT_Cr).stride;
+        const int         dstStride  = dstYuv.get(compID      ).stride;
+        const int         orgStride  = orgYuv.get(compID      ).stride;
+        const Pel        *srcBlkY    = srcYuv.get(COMPONENT_Y ).bufAt(area.block(COMPONENT_Y ));
+        const Pel        *srcBlkU    = srcYuv.get(COMPONENT_Cb).bufAt(area.block(COMPONENT_Cb));
+        const Pel        *srcBlkV    = srcYuv.get(COMPONENT_Cr).bufAt(area.block(COMPONENT_Cr));
+        const Pel        *dstBlk     = dstYuv.get(compID      ).bufAt(compArea);
+        const Pel        *orgBlk     = orgYuv.get(compID      ).bufAt(compArea);
+
+        const uint16_t    candPosY   = ccSaoParam.candPos[setIdx][COMPONENT_Y ];
+        const uint16_t    bandNumY   = ccSaoParam.bandNum[setIdx][COMPONENT_Y ];
+        const uint16_t    bandNumU   = ccSaoParam.bandNum[setIdx][COMPONENT_Cb];
+        const uint16_t    bandNumV   = ccSaoParam.bandNum[setIdx][COMPONENT_Cr];
+
+        getCcSaoBlkStats(compID, cs.area.chromaFormat, cs.sps->getBitDepth(toChannelType(compID))
+                       , setIdx, blkStats, ctuRsAddr
+                       , candPosY, bandNumY, bandNumU, bandNumV
+                       , srcBlkY, srcBlkU, srcBlkV, orgBlk, dstBlk
+                       , srcStrideY, srcStrideU, srcStrideV, orgStride, dstStride, compArea.width, compArea.height
+                       , isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail
+                       );
+      }
+      ctuRsAddr++;
+    }
+  }
+}
+
+void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth
+                                             , const int setIdx, CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], const int ctuRsAddr
+                                             , const uint16_t candPosY
+                                             , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
+                                             , const Pel* srcY, const Pel* srcU, const Pel* srcV, const Pel* org, const Pel* dst
+                                             , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int orgStride, const int dstStride
+                                             , const int width, const int height
+                                             , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail
+                                             )
+{
+  const int candPosYX = g_ccSaoCandPosX[COMPONENT_Y][candPosY];
+  const int candPosYY = g_ccSaoCandPosY[COMPONENT_Y][candPosY];
+
+  switch(compID)
+  {
+  case COMPONENT_Y:
+    {
+      for (int y = 0; y < height; y++)
+      {
+        for (int x = 0; x < width; x++)
+        {
+          const Pel *colY = srcY +  x  + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> 1);
+          const Pel *colV = srcV + (x >> 1);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV
+                             + bandU * bandNumV
+                             + bandV;
+          const int classIdx = bandIdx;
+
+          blkStats[setIdx][ctuRsAddr].diff [classIdx] += org[x] - dst[x];
+          blkStats[setIdx][ctuRsAddr].count[classIdx]++;
+        }
+
+        srcY += srcStrideY;
+        srcU += srcStrideU * (y & 0x1);
+        srcV += srcStrideV * (y & 0x1);
+        org  += orgStride;
+        dst  += dstStride;
+      }
+    }
+    break;
+  case COMPONENT_Cb:
+  case COMPONENT_Cr:
+    {
+      for (int y = 0; y < height; y++)
+      {
+        for (int x = 0; x < width; x++)
+        {
+          const Pel *colY = srcY + (x << 1) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV
+                             + bandU * bandNumV
+                             + bandV;
+          const int classIdx = bandIdx;
+
+          blkStats[setIdx][ctuRsAddr].diff [classIdx] += org[x] - dst[x];
+          blkStats[setIdx][ctuRsAddr].count[classIdx]++;
+        }
+
+        srcY += srcStrideY << 1;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        org  += orgStride;
+        dst  += dstStride;
+      }
+    }
+    break;
+  default:
+    {
+      THROW("Not a supported CCSAO compID\n");
+    }
+  }
+}
+
+void EncSampleAdaptiveOffset::getCcSaoFrameStats(const ComponentID compID, const int setIdx, const uint8_t* ccSaoControl
+                                               , CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], CcSaoStatData frameStats[MAX_CCSAO_SET_NUM])
+{
+  frameStats[setIdx].reset();
+  int setIdc = setIdx + 1;
+
+  for (int ctbIdx = 0; ctbIdx < m_numCTUsInPic; ctbIdx++)
+  {
+    if (ccSaoControl[ctbIdx] == setIdc)
+    {
+      frameStats[setIdx] += blkStats[setIdx][ctbIdx];
+    }
+  }
+}
+
+inline int EncSampleAdaptiveOffset::estCcSaoIterOffset(const double lambda, const int offsetInput, const int64_t count, const int64_t diffSum, const int shift, const int bitIncrease, int64_t& bestDist, double& bestCost, const int offsetTh)
+{
+  int iterOffset, tempOffset;
+  int64_t tempDist, tempRate;
+  double tempCost, tempMinCost;
+  int offsetOutput = 0;
+  iterOffset = offsetInput;
+  // Assuming sending quantized value 0 results in zero offset and sending the value zero needs 1 bit. entropy coder can be used to measure the exact rate here.
+  tempMinCost = lambda;
+  while (iterOffset != 0)
+  {
+    // Calculate the bits required for signaling the offset
+    tempRate = lengthUvlc(abs(iterOffset)) + (iterOffset == 0 ? 0 : 1);
+
+    // Do the dequantization before distortion calculation
+    tempOffset = iterOffset << bitIncrease;
+    tempDist = estSaoDist(count, tempOffset, diffSum, shift);
+    tempCost = ((double)tempDist + lambda * (double)tempRate);
+    if (tempCost < tempMinCost)
+    {
+      tempMinCost = tempCost;
+      offsetOutput = iterOffset;
+      bestDist = tempDist;
+      bestCost = tempCost;
+    }
+    iterOffset = (iterOffset > 0) ? (iterOffset - 1) : (iterOffset + 1);
+  }
+  return offsetOutput;
+}
+
+void EncSampleAdaptiveOffset::deriveCcSaoOffsets(const ComponentID compID, const int bitDepth, const int setIdx
+                                               , CcSaoStatData frameStats[MAX_CCSAO_SET_NUM]
+                                               , short offset[MAX_CCSAO_SET_NUM][MAX_CCSAO_CLASS_NUM])
+{
+  int quantOffsets[MAX_CCSAO_CLASS_NUM] = { 0 };
+
+  for(int k = 0; k < MAX_CCSAO_CLASS_NUM; k++)
+  {
+    if(frameStats[setIdx].count[k] == 0)
+      continue;
+
+    quantOffsets[k] =
+      (int) xRoundIbdi(bitDepth, (double)(frameStats[setIdx].diff [k] << DISTORTION_PRECISION_ADJUSTMENT(bitDepth))
+                               / (double)(frameStats[setIdx].count[k]));
+    quantOffsets[k] = Clip3(-MAX_CCSAO_OFFSET_THR, MAX_CCSAO_OFFSET_THR, quantOffsets[k]);
+  }
+
+  int64_t dist[MAX_CCSAO_CLASS_NUM] = { 0 };
+  double  cost[MAX_CCSAO_CLASS_NUM] = { 0 };
+  for (int k = 0; k < MAX_CCSAO_CLASS_NUM; k++)
+  {
+    cost[k] = m_lambda[compID];
+    if (quantOffsets[k] != 0)
+    {
+      quantOffsets[k] = estCcSaoIterOffset(m_lambda[compID], quantOffsets[k], frameStats[setIdx].count[k], frameStats[setIdx].diff[k], 0, 0, dist[k], cost[k], MAX_CCSAO_OFFSET_THR);
+    }
+  }
+
+  for (int k = 0; k < MAX_CCSAO_CLASS_NUM; k++)
+  {
+    CHECK(quantOffsets[k] < -MAX_CCSAO_OFFSET_THR || quantOffsets[k] > MAX_CCSAO_OFFSET_THR, "Exceeded valid range for CCSAO offset");
+    offset[setIdx][k] = quantOffsets[k];
+  }
+}
+
+void EncSampleAdaptiveOffset::getCcSaoDistortion(const ComponentID compID, const int setIdx, CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM]
+                                               , short offset[MAX_CCSAO_SET_NUM][MAX_CCSAO_CLASS_NUM]
+                                               , int64_t* trainingDistortion[MAX_CCSAO_SET_NUM])
+{
+  ::memset(trainingDistortion[setIdx], 0, sizeof(int64_t) * m_numCTUsInPic);
+
+  for (int ctbIdx = 0; ctbIdx < m_numCTUsInPic; ctbIdx++)
+  {
+    for (int k = 0; k < MAX_CCSAO_CLASS_NUM; k++)
+    {
+      trainingDistortion[setIdx][ctbIdx]
+        += estSaoDist(blkStats[setIdx][ctbIdx].count[k], offset[setIdx][k], blkStats[setIdx][ctbIdx].diff[k], 0);
+    }
+  }
+}
+
+void EncSampleAdaptiveOffset::determineCcSaoControlIdc(CodingStructure& cs, const ComponentID compID 
+                                                     , const int ctuWidthC, const int ctuHeightC, const int picWidthC, const int picHeightC
+                                                     , CcSaoEncParam& ccSaoParam, uint8_t* ccSaoControl
+                                                     , int64_t* trainingDistorsion[MAX_CCSAO_SET_NUM]
+                                                     , int64_t& curTotalDist, double& curTotalRate)
+{
+  bool setEnabled[MAX_CCSAO_SET_NUM];
+  std::fill_n(setEnabled, MAX_CCSAO_SET_NUM, false);
+
+  SetIdxCount setIdxCount[MAX_CCSAO_SET_NUM];
+  for (int i = 0; i < MAX_CCSAO_SET_NUM; i++)
+  {
+    setIdxCount[i].setIdx = i;
+    setIdxCount[i].count  = 0;
+  }
+
+  double prevRate = curTotalRate;
+
+  TempCtx ctxInitial(m_CtxCache);
+  TempCtx ctxBest(m_CtxCache);
+  TempCtx ctxStart(m_CtxCache);
+  ctxInitial = SubCtx(Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx());
+  ctxBest    = SubCtx(Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx());
+
+  int ctbIdx = 0;
+  for (int yCtb = 0; yCtb < picHeightC; yCtb += ctuHeightC)
+  {
+    for (int xCtb = 0; xCtb < picWidthC; xCtb += ctuWidthC)
+    {
+      int64_t  bestDist   = MAX_INT;
+      double   bestRate   = MAX_DOUBLE;
+      double   bestCost   = MAX_DOUBLE;
+      uint8_t  bestSetIdc = 0;
+      uint8_t  bestSetIdx = 0;
+
+      m_CABACEstimator->getCtx() = ctxBest;
+      ctxStart                   = SubCtx(Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx());
+
+      for (int setIdx = 0; setIdx <= MAX_CCSAO_SET_NUM; setIdx++)
+      {
+        if (setIdx < MAX_CCSAO_SET_NUM && !ccSaoParam.setEnabled[setIdx])
+          continue;
+
+        uint8_t setIdc = ccSaoParam.mapIdxToIdc[setIdx];
+        m_CABACEstimator->getCtx() = ctxStart;
+        m_CABACEstimator->resetBits();
+        const Position lumaPos = Position({ xCtb << getComponentScaleX(compID, cs.pcv->chrFormat),
+                                            yCtb << getComponentScaleY(compID, cs.pcv->chrFormat) });
+        m_CABACEstimator->codeCcSaoControlIdc(setIdc, cs, compID, ctbIdx, ccSaoControl, lumaPos, ccSaoParam.setNum);
+        
+        int64_t dist = setIdx == MAX_CCSAO_SET_NUM ? 0 : trainingDistorsion[setIdx][ctbIdx];
+        double  rate = FRAC_BITS_SCALE * m_CABACEstimator->getEstFracBits();
+        double  cost = rate * m_lambda[compID] + dist;
+
+        if (cost < bestCost)
+        {
+          bestCost   = cost;
+          bestRate   = rate;
+          bestDist   = dist;
+          bestSetIdc = setIdc;
+          bestSetIdx = setIdx;
+          ctxBest = SubCtx(Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx());
+          ccSaoControl[ctbIdx] = setIdx == MAX_CCSAO_SET_NUM ? 0 : setIdx + 1;
+        }
+      }
+      if (bestSetIdc != 0)
+      {
+        setEnabled [bestSetIdx] = true;
+        setIdxCount[bestSetIdx].count++;
+      }
+      curTotalRate += bestRate;
+      curTotalDist += bestDist;
+      ctbIdx++;
+    }
+  }
+
+  std::copy_n(setEnabled, MAX_CCSAO_SET_NUM, ccSaoParam.setEnabled);
+
+  std::stable_sort(setIdxCount, setIdxCount + MAX_CCSAO_SET_NUM, compareSetIdxCount);
+
+  int setIdc = 1;
+  ccSaoParam.setNum = 0;
+  for (SetIdxCount &s : setIdxCount)
+  {
+    int setIdx = s.setIdx;
+    if (ccSaoParam.setEnabled[setIdx])
+    {
+      ccSaoParam.mapIdxToIdc[setIdx] = setIdc;
+      ccSaoParam.setNum++;
+      setIdc++;
+    }
+  }
+
+  curTotalRate = prevRate;
+  m_CABACEstimator->getCtx() = ctxInitial;
+  m_CABACEstimator->resetBits();
+  ctbIdx = 0;
+  for (int yCtb = 0; yCtb < picHeightC; yCtb += ctuHeightC)
+  {
+    for (int xCtb = 0; xCtb < picWidthC; xCtb += ctuWidthC)
+    {
+      const int setIdxPlus1 = ccSaoControl[ctbIdx];
+      const Position lumaPos = Position({ xCtb << getComponentScaleX(compID, cs.pcv->chrFormat), 
+                                          yCtb << getComponentScaleY(compID, cs.pcv->chrFormat) });
+
+      m_CABACEstimator->codeCcSaoControlIdc(setIdxPlus1 == 0 ? 0 : ccSaoParam.mapIdxToIdc[setIdxPlus1 - 1],
+                                            cs, compID, ctbIdx, ccSaoControl, lumaPos, ccSaoParam.setNum);
+      ctbIdx++;
+    }
+  }
+  curTotalRate += FRAC_BITS_SCALE*m_CABACEstimator->getEstFracBits();
+
+  // restore for next iteration
+  m_CABACEstimator->getCtx() = ctxInitial;
+}
+
+int EncSampleAdaptiveOffset::lengthUvlc(int uiCode)
+{
+  int uiLength = 1;
+  int uiTemp = ++uiCode;
+
+  CHECK(!uiTemp, "Integer overflow");
+
+  while (1 != uiTemp)
+  {
+    uiTemp >>= 1;
+    uiLength += 2;
+  }
+  // Take care of cases where uiLength > 32
+  return (uiLength >> 1) + ((uiLength + 1) >> 1);
+}
+
+int EncSampleAdaptiveOffset::getCcSaoParamRate(const ComponentID compID, const CcSaoEncParam& ccSaoParam)
+{
+  int bits = 0;
+
+  if (ccSaoParam.setNum > 0 )
+  {
+    bits += lengthUvlc(ccSaoParam.setNum - 1);
+
+    int signaledSetNum = 0;
+    for (int setIdx = 0; setIdx < MAX_CCSAO_SET_NUM; setIdx++)
+    {
+      if (ccSaoParam.setEnabled[setIdx])
+      {
+        bits += MAX_CCSAO_CAND_POS_Y_BITS;
+        bits += MAX_CCSAO_BAND_NUM_Y_BITS;
+        bits += MAX_CCSAO_BAND_NUM_U_BITS;
+        bits += MAX_CCSAO_BAND_NUM_V_BITS;
+
+        int classNum = ccSaoParam.bandNum[setIdx][COMPONENT_Y ]
+                     * ccSaoParam.bandNum[setIdx][COMPONENT_Cb]
+                     * ccSaoParam.bandNum[setIdx][COMPONENT_Cr];
+        for (int i = 0; i < classNum; i++)
+        {
+          bits += lengthUvlc(abs(ccSaoParam.offset[setIdx][i])) + (ccSaoParam.offset[setIdx][i] == 0 ? 0 : 1);
+        }
+        signaledSetNum++;
+      }
+    }
+    CHECK(signaledSetNum != ccSaoParam.setNum, "Number of sets signaled not the same as indicated");
+  }
+  return bits;
+}
+
+void EncSampleAdaptiveOffset::deriveCcSaoRDO(CodingStructure& cs, const ComponentID compID, int64_t* trainingDistortion[MAX_CCSAO_SET_NUM]
+                                           , CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], CcSaoStatData frameStats[MAX_CCSAO_SET_NUM]
+                                           , CcSaoEncParam& bestCcSaoParam, CcSaoEncParam& tempCcSaoParam
+                                           , uint8_t* bestCcSaoControl, uint8_t* tempCcSaoControl
+                                           , double& bestCost, double& tempCost)
+{
+  const int scaleX          = getComponentScaleX(compID, cs.pcv->chrFormat);
+  const int scaleY          = getComponentScaleY(compID, cs.pcv->chrFormat);
+  const int ctuWidthC       = cs.pcv->maxCUWidth  >> scaleX;
+  const int ctuHeightC      = cs.pcv->maxCUHeight >> scaleY;
+  const int picWidthC       = cs.pcv->lumaWidth   >> scaleX;
+  const int picHeightC      = cs.pcv->lumaHeight  >> scaleY;
+  const int maxTrainingIter = 15;
+
+  const TempCtx ctxStartCcSaoControlFlag  ( m_CtxCache, SubCtx( Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx() ) );
+
+  int    trainingIter = 0;
+  bool   keepTraining = true;
+  bool   improved = false;
+  double prevCost = MAX_DOUBLE;
+  while (keepTraining)
+  {
+    improved = false;
+
+    for (int setIdx = 0; setIdx < MAX_CCSAO_SET_NUM; setIdx++)
+    {
+      if (tempCcSaoParam.setEnabled[setIdx])
+      {
+        getCcSaoFrameStats(compID, setIdx, tempCcSaoControl, blkStats, frameStats);
+        deriveCcSaoOffsets(compID, cs.sps->getBitDepth(toChannelType(compID)), setIdx, frameStats, tempCcSaoParam.offset);
+        getCcSaoDistortion(compID, setIdx, blkStats, tempCcSaoParam.offset, trainingDistortion);
+      }
+    }
+
+    m_CABACEstimator->getCtx() = ctxStartCcSaoControlFlag;
+
+    int64_t curTotalDist = 0;
+    double  curTotalRate = 0;
+    determineCcSaoControlIdc(cs, compID, ctuWidthC, ctuHeightC, picWidthC, picHeightC,
+                             tempCcSaoParam, tempCcSaoControl, trainingDistortion,
+                             curTotalDist, curTotalRate);
+
+    if (tempCcSaoParam.setNum > 0)
+    {
+      curTotalRate += getCcSaoParamRate(compID, tempCcSaoParam);
+      tempCost = curTotalRate * m_lambda[compID] + curTotalDist;
+
+      if (tempCost < prevCost)
+      {
+        prevCost = tempCost;
+        improved = true;
+      }
+
+      if (tempCost < bestCost)
+      {
+        bestCost = tempCost;
+        bestCcSaoParam = tempCcSaoParam;
+        memcpy(bestCcSaoControl, tempCcSaoControl, sizeof(uint8_t) * m_numCTUsInPic);
+      }
+    }
+
+    trainingIter++;
+    if (!improved || trainingIter > maxTrainingIter)
+    {
+      keepTraining = false;
+    }
+  }
+}
+#endif
 
 void EncSampleAdaptiveOffset::deriveLoopFilterBoundaryAvailibility(CodingStructure& cs, const Position &pos, bool& isLeftAvail, bool& isAboveAvail, bool& isAboveLeftAvail) const
 {

@@ -77,6 +77,13 @@ public:
 #if JVET_V0094_BILATERAL_FILTER
   BilateralFilter m_bilateralFilter;
 #endif
+#if JVET_W0066_CCSAO
+  void CCSAOProcess(CodingStructure& cs);
+  CcSaoComParam& getCcSaoComParam() { return m_ccSaoComParam; }
+  uint8_t* getCcSaoControlIdc(const ComponentID compID) { return m_ccSaoControl[compID]; }
+  PelStorage& getCcSaoBuf() { return m_ccSaoBuf; }
+  void jointClipSaoBifCcSao(CodingStructure& cs);
+#endif
 protected:
   void deriveLoopFilterBoundaryAvailibility(CodingStructure& cs, const Position &pos,
     bool& isLeftAvail,
@@ -106,6 +113,9 @@ protected:
   void offsetCTU(const UnitArea& area, const CPelUnitBuf& src, PelUnitBuf& res, SAOBlkParam& saoblkParam, CodingStructure& cs);
 #if JVET_V0094_BILATERAL_FILTER
   void offsetCTUnoClip( const UnitArea& area, const CPelUnitBuf& src, PelUnitBuf& res, SAOBlkParam& saoblkParam, CodingStructure& cs);
+#if JVET_W0066_CCSAO
+  void clipCTU(CodingStructure& cs, PelUnitBuf& dstYuv, const UnitArea& area, const ComponentID compID);
+#endif
   void offsetCTUonlySAO(const UnitArea& area, const CPelUnitBuf& src, PelUnitBuf& res, SAOBlkParam& saoblkParam, CodingStructure& cs);
 #endif
   void xReconstructBlkSAOParams(CodingStructure& cs, SAOBlkParam* saoBlkParams);
@@ -132,6 +142,29 @@ protected:
     return bDisabledFlag;
   }
   Reshape* m_pcReshape;
+#if JVET_W0066_CCSAO
+  void applyCcSao(CodingStructure &cs, const PreCalcValues& pcv, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv);
+  void offsetCTUCcSao(CodingStructure& cs, const UnitArea& area, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv, const int ctuRsAddr);
+  void offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitArea& area, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv, const int ctuRsAddr);
+  void offsetBlockCcSao(const ComponentID compID, const int bitDepth, const ClpRng& clpRng
+                      , const uint16_t candPosY
+                      , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
+                      , const short* offset
+                      , const Pel* srcY, const Pel* srcU, const Pel* srcV, Pel* dst
+                      , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride
+                      , const int width, const int height
+                      , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
+                       );
+  void offsetBlockCcSaoNoClip(const ComponentID compID, const int bitDepth, const ClpRng& clpRng
+                            , const uint16_t candPosY
+                            , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
+                            , const short* offset
+                            , const Pel* srcY, const Pel* srcU, const Pel* srcV, Pel* dst
+                            , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride
+                            , const int width, const int height
+                            , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
+                             );
+#endif
 protected:
   uint32_t m_offsetStepLog2[MAX_NUM_COMPONENT]; //offset step
   PelStorage m_tempBuf;
@@ -139,6 +172,20 @@ protected:
 
   std::vector<int8_t> m_signLineBuf1;
   std::vector<int8_t> m_signLineBuf2;
+#if JVET_W0066_CCSAO
+  bool                m_created = false;
+  PelStorage          m_ccSaoBuf;
+  int                 m_picWidth;
+  int                 m_picHeight;
+  int                 m_maxCUWidth;
+  int                 m_maxCUHeight;
+  int                 m_numCTUsInWidth;
+  int                 m_numCTUsInHeight;
+  int                 m_numCTUsInPic;
+
+  CcSaoComParam       m_ccSaoComParam;
+  uint8_t*            m_ccSaoControl[MAX_NUM_COMPONENT];
+#endif
 private:
   bool m_picSAOEnabled[MAX_NUM_COMPONENT];
 };

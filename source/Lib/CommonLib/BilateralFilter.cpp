@@ -51,6 +51,7 @@
 BilateralFilter::BilateralFilter()
 {
   m_bilateralFilterDiamond5x5 = blockBilateralFilterDiamond5x5;
+  m_bilateralFilterDiamond5x5NoClip = blockBilateralFilterDiamond5x5NoClip;
 
 #if ENABLE_SIMD_BILATERAL_FILTER
 #ifdef TARGET_SIMD_X86
@@ -117,6 +118,241 @@ const char* BilateralFilter::getFilterLutParameters( const int size, const PredM
   return m_wBIF[sqp - 17];
 }
 
+#if JVET_W0066_CCSAO
+void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr)
+{
+  int pad = 2;
+
+  int padwidth = iWidthExtSIMD;
+  int downbuffer[64];
+  int downleftbuffer[65];
+  int downrightbuffer[2][65];
+  int Shift, sg0, v0, idx, w0;
+  Shift = sizeof(int) * 8 - 1;
+  downbuffer[0] = 0;
+
+  for (int x = 0; x < uiWidth; x++)
+  {
+    int pixel = block[(-1 + pad) * padwidth + x + pad];
+    int below = block[(-1 + pad + 1) * padwidth + x + pad];
+    int diff = below - pixel;
+    sg0 = diff >> Shift;
+    v0 = (diff + sg0) ^ sg0;
+    v0 = (v0 + 4) >> 3;
+    idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
+    w0 = LUTrowPtr[idx];
+    int mod = (w0 + sg0) ^ sg0;
+    downbuffer[x] = mod;
+
+    int belowright = block[(-1 + pad + 1) * padwidth + x + pad + 1];
+    diff = belowright - pixel;
+    sg0 = diff >> Shift;
+    v0 = (diff + sg0) ^ sg0;
+    v0 = (v0 + 4) >> 3;
+    idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
+    w0 = LUTrowPtr[idx] >> 1;
+    mod = (w0 + sg0) ^ sg0;
+    downrightbuffer[1][x + 1] = mod;
+
+    int belowleft = block[(-1 + pad + 1) * padwidth + x + pad - 1];
+    diff = belowleft - pixel;
+    sg0 = diff >> Shift;
+    v0 = (diff + sg0) ^ sg0;
+    v0 = (v0 + 4) >> 3;
+    idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
+    w0 = LUTrowPtr[idx] >> 1;
+    mod = (w0 + sg0) ^ sg0;
+    downleftbuffer[x] = mod;
+  }
+  int width = uiWidth;
+  for (int y = 0; y < uiHeight; y++)
+  {
+    int diff;
+
+    int16_t* rowStart = &block[(y + pad) * padwidth + pad];
+
+    int pixel = rowStart[-1];
+
+    int right = rowStart[0];
+    diff = right - pixel;
+    sg0 = diff >> Shift;
+    v0 = (diff + sg0) ^ sg0;
+    v0 = (v0 + 4) >> 3;
+    idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
+    w0 = LUTrowPtr[idx];
+    int mod = (w0 + sg0) ^ sg0;
+    int rightmod = mod;
+
+    pixel = rowStart[-padwidth - 1];
+    int belowright = right;
+    diff = belowright - pixel;
+    sg0 = diff >> Shift;
+    v0 = (diff + sg0) ^ sg0;
+    v0 = (v0 + 4) >> 3;
+    idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
+    w0 = LUTrowPtr[idx] >> 1;
+    mod = (w0 + sg0) ^ sg0;
+    downrightbuffer[(y + 1) % 2][0] = mod;
+
+    pixel = rowStart[-padwidth + width];
+    int belowleft = rowStart[width - 1];
+    diff = belowleft - pixel;
+    sg0 = diff >> Shift;
+    v0 = (diff + sg0) ^ sg0;
+    v0 = (v0 + 4) >> 3;
+    idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
+    w0 = LUTrowPtr[idx] >> 1;
+    mod = (w0 + sg0) ^ sg0;
+    downleftbuffer[width] = mod;
+
+    for (int x = 0; x < uiWidth; x++)
+    {
+      pixel = rowStart[x];
+      int modsum = 0;
+
+      int abovemod = -downbuffer[x];
+      modsum += abovemod;
+
+      int leftmod = -rightmod;
+      modsum += leftmod;
+
+      right = rowStart[x + 1];
+      diff = right - pixel;
+      sg0 = diff >> Shift;
+      v0 = (diff + sg0) ^ sg0;
+      v0 = (v0 + 4) >> 3;
+      idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
+      w0 = LUTrowPtr[idx];
+      mod = (w0 + sg0) ^ sg0;
+
+      modsum += mod;
+      rightmod = mod;
+
+      int below = rowStart[x + padwidth];
+      diff = below - pixel;
+      sg0 = diff >> Shift;
+      v0 = (diff + sg0) ^ sg0;
+      v0 = (v0 + 4) >> 3;
+      idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
+      w0 = LUTrowPtr[idx];
+      mod = (w0 + sg0) ^ sg0;
+      modsum += mod;
+      downbuffer[x] = mod;
+
+      int aboverightmod = -downleftbuffer[x + 1];
+      // modsum += ((int16_t)((uint16_t)((aboverightmod) >> 1)));
+      modsum += aboverightmod;
+
+      int aboveleftmod = -downrightbuffer[(y + 1) % 2][x];
+      // modsum += ((int16_t)((uint16_t)((aboveleftmod) >> 1)));
+      modsum += aboveleftmod;
+
+      int belowleft = rowStart[x + padwidth - 1];
+      diff = belowleft - pixel;
+      sg0 = diff >> Shift;
+      v0 = (diff + sg0) ^ sg0;
+      v0 = (v0 + 4) >> 3;
+      idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
+      w0 = LUTrowPtr[idx] >> 1;
+      mod = (w0 + sg0) ^ sg0;
+      // modsum += ((int16_t)((uint16_t)((mod) >> 1)));
+      modsum += mod;
+      downleftbuffer[x] = mod;
+
+      int belowright = rowStart[x + padwidth + 1];
+      diff = belowright - pixel;
+      sg0 = diff >> Shift;
+      v0 = (diff + sg0) ^ sg0;
+      v0 = (v0 + 4) >> 3;
+      idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
+      w0 = LUTrowPtr[idx] >> 1;
+      mod = (w0 + sg0) ^ sg0;
+      //modsum += ((int16_t)((uint16_t)((mod) >> 1)));
+      modsum += mod;
+      downrightbuffer[y % 2][x + 1] = mod;
+
+      // For samples two pixels out, we do not reuse previously calculated
+      // values even though that is possible. Doing so would likely increase
+      // speed when SIMD is turned off.
+
+      int above = rowStart[x - 2 * padwidth];
+      diff = above - pixel;
+      sg0 = diff >> Shift;
+      v0 = (diff + sg0) ^ sg0;
+      v0 = (v0 + 4) >> 3;
+      idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
+      w0 = LUTrowPtr[idx] >> 1;
+      mod = (w0 + sg0) ^ sg0;
+      modsum += mod;
+
+      below = rowStart[x + 2 * padwidth];
+      diff = below - pixel;
+      sg0 = diff >> Shift;
+      v0 = (diff + sg0) ^ sg0;
+      v0 = (v0 + 4) >> 3;
+      idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
+      w0 = LUTrowPtr[idx] >> 1;
+      mod = (w0 + sg0) ^ sg0;
+      modsum += mod;
+
+      int left = rowStart[x - 2];
+      diff = left - pixel;
+      sg0 = diff >> Shift;
+      v0 = (diff + sg0) ^ sg0;
+      v0 = (v0 + 4) >> 3;
+      idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
+      w0 = LUTrowPtr[idx] >> 1;
+      mod = (w0 + sg0) ^ sg0;
+      modsum += mod;
+
+      right = rowStart[x + 2];
+      diff = right - pixel;
+      sg0 = diff >> Shift;
+      v0 = (diff + sg0) ^ sg0;
+      v0 = (v0 + 4) >> 3;
+      idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
+      w0 = LUTrowPtr[idx] >> 1;
+      mod = (w0 + sg0) ^ sg0;
+      modsum += mod;
+
+      blkFilt[(y + pad) * (padwidth + 4) + x + pad] = ((int16_t)((uint16_t)((modsum * bfac + bif_round_add) >> bif_round_shift)));
+    }
+  }
+
+  // Copy back
+  Pel* tempBlockPtr = (short*)blkFilt + (((padwidth + 4) << 1) + 2);
+  int tempBlockStride = padwidth + 4;
+  if (isRDO)
+  {
+    Pel* srcBlockPtr = (short*)block + (((padwidth) << 1) + 2);
+    int srcBlockStride = padwidth;
+    for (uint32_t yy = 0; yy < uiHeight; yy++)
+    {
+      for (uint32_t xx = 0; xx < uiWidth; xx++)
+      {
+        recPtr[xx] = ClipPel(srcBlockPtr[xx] + tempBlockPtr[xx], clpRng);
+      }
+      recPtr += recStride;
+      tempBlockPtr += tempBlockStride;
+      srcBlockPtr += srcBlockStride;
+    }
+  }
+  else
+  {
+    for (uint32_t yy = 0; yy < uiHeight; yy++)
+    {
+      for (uint32_t xx = 0; xx < uiWidth; xx++)
+      {
+        // new result = old result (which is SAO-treated already) + diff due to bilateral filtering
+        //recPtr[xx] = ClipPel<int>(recPtr[xx] + tempBlockPtr[xx], clpRng);
+        recPtr[xx] = recPtr[xx] + tempBlockPtr[xx]; // clipping is done jointly for SAO/BIF/CCSAO
+      }
+      recPtr += recStride;
+      tempBlockPtr += tempBlockStride;
+    }
+  }
+}
+#endif
 void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr )
 {
   int pad = 2;
@@ -558,6 +794,234 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
     }
   }
 }
+
+#if JVET_W0066_CCSAO
+void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit& currTU)
+{
+  CompArea& compArea = currTU.block(COMPONENT_Y);
+
+  const unsigned uiWidth = compArea.width;
+  const unsigned uiHeight = compArea.height;
+
+  bool topAltAvailable;
+  bool leftAltAvailable;
+
+  int srcStride = src.get(COMPONENT_Y).stride;
+  const Pel* srcPtr = src.get(COMPONENT_Y).bufAt(compArea);
+  const Pel* srcPtrTemp = srcPtr;
+
+  int recStride = rec.get(COMPONENT_Y).stride;
+  Pel* recPtr = rec.get(COMPONENT_Y).bufAt(compArea);
+
+  int bfac = 1;
+  const char* LUTrowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac);
+
+  int bif_round_add = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
+  int bif_round_shift = (BIF_ROUND_SHIFT)-(currTU.cs->pps->getBIFStrength());
+
+  const CompArea& myArea = currTU.blocks[COMPONENT_Y];
+  topAltAvailable = myArea.y - 2 >= 0;
+  leftAltAvailable = myArea.x - 2 >= 0;
+  bool bottomAltAvailable = myArea.y + myArea.height + 1 < currTU.cu->slice->getSPS()->getMaxPicHeightInLumaSamples();
+  bool rightAltAvailable = myArea.x + myArea.width + 1 < currTU.cu->slice->getSPS()->getMaxPicWidthInLumaSamples();
+
+  uint32_t   uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
+  uint32_t   uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
+
+  int iWidthExtSIMD = uiWidthExt;
+  if (uiWidth < 8)
+  {
+    iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
+  }
+
+  Pel* tempBlockPtr;
+
+  bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
+
+  memset(tempblock, 0, iWidthExtSIMD * uiHeightExt * sizeof(short));
+
+  if (allAvail)
+  {
+    // set pointer two rows up and two pixels to the left from the start of the block
+    tempBlockPtr = tempblock;
+
+    // same with image data
+    srcPtr = srcPtr - 2 * srcStride - 2;
+
+    //// Move block to temporary block
+
+    // Check if the block a the top block of a CTU.
+    bool isCTUboundary = myArea.y % currTU.cs->slice->getSPS()->getCTUSize() == 0;
+    if (isCTUboundary)
+    {
+      // The samples two lines up are out of bounds. (One line above the CTU is OK, since SAO uses that line.)
+      // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
+      // Therefore, copy samples from one line up instead of from two lines up by updating srcPtr *before* copy.
+      srcPtr += srcStride;
+      std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+    }
+    else
+    {
+      std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      srcPtr += srcStride;
+    }
+    tempBlockPtr += iWidthExtSIMD;
+    // Copy samples that are not out of bounds.
+    for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
+    {
+      std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      srcPtr += srcStride;
+      tempBlockPtr += iWidthExtSIMD;
+    }
+    // Check if the block is a bottom block of a CTU.
+    isCTUboundary = (myArea.y + uiHeight) % currTU.cs->slice->getSPS()->getCTUSize() == 0;
+    if (isCTUboundary)
+    {
+      // The samples two lines down are out of bounds. (One line below the CTU is OK, since SAO uses that line.)
+      // Hence the bottom line of tempblock is unavailable if the block at the bottom of a CTU.
+      // Therefore, copy samples from the second to last line instead of the last line by subtracting srcPtr before copy.
+      srcPtr -= srcStride;
+      std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+    }
+    else
+    {
+      std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+    }
+    return m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+  }
+  else
+  {
+    tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES)*iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+
+    //// Move block to temporary block
+    for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
+    {
+      std::memcpy(tempBlockPtr, srcPtr, uiWidth * sizeof(Pel));
+      srcPtr += srcStride;
+      tempBlockPtr += iWidthExtSIMD;
+    }
+    srcPtr = srcPtrTemp;
+
+    if (topAltAvailable)
+    {
+      std::copy(srcPtr - 2 * srcStride, srcPtr - 2 * srcStride + uiWidth, tempblock + 2);
+      std::copy(srcPtr - srcStride, srcPtr - srcStride + uiWidth, tempblock + iWidthExtSIMD + 2);
+    }
+    if (bottomAltAvailable)
+    {
+      std::copy(srcPtr + (uiHeight + 1) * srcStride, srcPtr + (uiHeight + 1) * srcStride + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+      std::copy(srcPtr + uiHeight * srcStride, srcPtr + uiHeight * srcStride + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+    }
+    if (leftAltAvailable)
+    {
+      for (int yy = 0; yy < uiHeight; yy++)
+      {
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = *(srcPtr + yy * srcStride - 2);
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = *(srcPtr + yy * srcStride - 1);
+      }
+    }
+    if (rightAltAvailable)
+    {
+      for (int yy = 0; yy < uiHeight; yy++)
+      {
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride + 1);
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride);
+      }
+    }
+
+    // if not all available, copy from inside tempbuffer
+    if (!topAltAvailable)
+    {
+      std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + 2);
+      std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + iWidthExtSIMD + 2);
+    }
+    if (!bottomAltAvailable)
+    {
+      std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+      std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+    }
+    if (!leftAltAvailable)
+    {
+      for (int yy = 0; yy < uiHeight; yy++)
+      {
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+      }
+    }
+    if (!rightAltAvailable)
+    {
+      for (int yy = 0; yy < uiHeight; yy++)
+      {
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+      }
+    }
+
+    // All sides are available, easy to just copy corners also.
+    if (topAltAvailable && leftAltAvailable)
+    {
+      tempblock[0] = *(srcPtr - 2 * srcStride - 2);                                               // a     top left corner
+      tempblock[1] = *(srcPtr - 2 * srcStride - 1);                                               // b     a b|x x
+      tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride - 2);                                   // c     c d|x x
+      tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride - 1);                                   // d     -------
+    }
+    else
+    {
+      tempblock[0] = tempblock[iWidthExtSIMD * 2 + 2];                                            // extend top left
+      tempblock[1] = tempblock[iWidthExtSIMD * 2 + 2];                                            // extend top left
+      tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD * 2 + 2];                            // extend top left
+      tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD * 2 + 2];                            // extend top left
+    }
+
+    if (topAltAvailable && rightAltAvailable)
+    {
+      tempblock[iWidthExtSIMD - 2] = *(srcPtr - 2 * srcStride + uiWidth);                         // a
+      tempblock[iWidthExtSIMD - 1] = *(srcPtr - 2 * srcStride + uiWidth + 1);                     // b
+      tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);                // c
+      tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);            // d
+    }
+    else
+    {
+      tempblock[iWidthExtSIMD - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];               // extend top right
+      tempblock[iWidthExtSIMD - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];               // extend top right
+      tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];  // extend top right
+      tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];  // extend top right
+    }
+
+    if (bottomAltAvailable && leftAltAvailable)
+    {
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = *(srcPtr + uiHeight * srcStride - 2);          // a
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = *(srcPtr + uiHeight * srcStride - 1);          // b
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = *(srcPtr + (uiHeight + 1) * srcStride - 2);    // c
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = *(srcPtr + (uiHeight + 1) * srcStride - 1);    // d
+    }
+    else
+    {
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];  // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];  // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];  // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];  // bot avail: mirror left/right
+    }
+
+    if (bottomAltAvailable && rightAltAvailable)
+    {
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = *(srcPtr + uiHeight * srcStride + uiWidth);                // a
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = *(srcPtr + uiHeight * srcStride + uiWidth + 1);            // b
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth);          // c
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth + 1);      // d
+    }
+    else
+    {
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+    }
+  }
+
+  m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+}
+#endif
 
 void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU)
 {

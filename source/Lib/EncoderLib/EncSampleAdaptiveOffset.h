@@ -79,6 +79,69 @@ struct SAOStatData //data structure for SAO statistics
   }
 };
 
+#if JVET_W0066_CCSAO
+struct CcSaoStatData
+{
+  int64_t  diff [MAX_CCSAO_CLASS_NUM];
+  uint32_t count[MAX_CCSAO_CLASS_NUM];
+
+  CcSaoStatData(){}
+  ~CcSaoStatData(){}
+  void reset()
+  {
+    ::memset(diff,  0, sizeof(int64_t)  * MAX_CCSAO_CLASS_NUM);
+    ::memset(count, 0, sizeof(uint32_t) * MAX_CCSAO_CLASS_NUM);
+  }
+  const CcSaoStatData& operator=(const CcSaoStatData& src)
+  {
+    ::memcpy(diff,  src.diff,  sizeof(int64_t)  * MAX_CCSAO_CLASS_NUM);
+    ::memcpy(count, src.count, sizeof(uint32_t) * MAX_CCSAO_CLASS_NUM);
+    return *this;
+  }
+  const CcSaoStatData& operator+= (const CcSaoStatData& src)
+  {
+    for(int i = 0; i < MAX_CCSAO_CLASS_NUM; i++)
+    {
+      diff [i] += src.diff [i];
+      count[i] += src.count[i];
+    }
+    return *this;
+  }
+};
+
+struct CcSaoEncParam
+{
+  uint8_t  setNum;
+  bool     setEnabled [MAX_CCSAO_SET_NUM];
+  uint16_t candPos    [MAX_CCSAO_SET_NUM][MAX_NUM_LUMA_COMP];
+  uint16_t bandNum    [MAX_CCSAO_SET_NUM][MAX_NUM_COMPONENT];
+  short    offset     [MAX_CCSAO_SET_NUM][MAX_CCSAO_CLASS_NUM];
+  uint8_t  mapIdxToIdc[MAX_CCSAO_SET_NUM + 1];
+
+  CcSaoEncParam() {}
+  ~CcSaoEncParam() {}
+  void reset()
+  {
+    setNum = 0;
+    ::memset(setEnabled,  false, sizeof(setEnabled));
+    ::memset(candPos,         0, sizeof(candPos));
+    ::memset(bandNum,         0, sizeof(bandNum));
+    ::memset(offset,          0, sizeof(offset));
+    ::memset(mapIdxToIdc,     0, sizeof(mapIdxToIdc));
+  }
+  const CcSaoEncParam& operator= (const CcSaoEncParam& src)
+  {
+    setNum = src.setNum;
+    ::memcpy(setEnabled,  src.setEnabled,  sizeof(setEnabled));
+    ::memcpy(candPos,     src.candPos,     sizeof(candPos));
+    ::memcpy(bandNum,     src.bandNum,     sizeof(bandNum));
+    ::memcpy(offset,      src.offset,      sizeof(offset));
+    ::memcpy(mapIdxToIdc, src.mapIdxToIdc, sizeof(mapIdxToIdc));
+    return *this;
+  }
+};
+#endif
+
 class EncSampleAdaptiveOffset : public SampleAdaptiveOffset
 {
 public:
@@ -98,7 +161,9 @@ public:
                                           ,BIFCabacEst* BifCABACEstimator
 #endif
                   );
-
+#if JVET_W0066_CCSAO
+  void CCSAOProcess(CodingStructure& cs, const double* lambdas, const int intraPeriod);
+#endif
   void disabledRate( CodingStructure& cs, SAOBlkParam* reconParams, const double saoEncodingRate, const double saoEncodingRateChroma );
   void getPreDBFStatistics(CodingStructure& cs);
 private: //methods
@@ -129,6 +194,46 @@ private: //methods
   inline int64_t estSaoDist(int64_t count, int64_t offset, int64_t diffSum, int shift);
   inline int estIterOffset(int typeIdx, double lambda, int offsetInput, int64_t count, int64_t diffSum, int shift, int bitIncrease, int64_t& bestDist, double& bestCost, int offsetTh );
   void addPreDBFStatistics(std::vector<SAOStatData**>& blkStats);
+#if JVET_W0066_CCSAO
+  void setupCcSaoLambdas(CodingStructure& cs, const double* lambdas);
+  void deriveCcSao(CodingStructure& cs, const ComponentID compID, const CPelUnitBuf& orgYuv, const CPelUnitBuf& srcYuv, const CPelUnitBuf& dstYuv);
+  void setupInitCcSaoParam(CodingStructure& cs, const ComponentID compID, const int setNum, int64_t* trainingDistortion[MAX_CCSAO_SET_NUM]
+                         , CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], CcSaoStatData frameStats[MAX_CCSAO_SET_NUM]
+                         , CcSaoEncParam& initCcSaoParam, CcSaoEncParam& bestCcSaoParam
+                         , uint8_t* initCcSaoControl, uint8_t* bestCcSaoControl);
+  void setupTempCcSaoParam(CodingStructure& cs, const ComponentID compID, const int setNum
+                         , const int candPosY, const int bandNumY, const int bandNumU, const int bandNumV
+                         , CcSaoEncParam& tempCcSaoParam, CcSaoEncParam& initCcSaoParam
+                         , uint8_t* tempCcSaoControl, uint8_t* initCcSaoControl);
+  void getCcSaoStatistics(CodingStructure& cs, const ComponentID compID, const CPelUnitBuf& orgYuv, const CPelUnitBuf& srcYuv, const CPelUnitBuf& dstYuv
+                        , CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], const CcSaoEncParam& ccSaoParam);
+  void getCcSaoBlkStats(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth
+                      , const int setIdx, CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], const int ctuRsAddr
+                      , const uint16_t candPosY
+                      , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
+                      , const Pel* srcY, const Pel* srcU, const Pel* srcV, const Pel* org, const Pel* dst
+                      , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int orgStride, const int dstStride, const int width, const int height
+                      , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail);
+  void getCcSaoFrameStats(const ComponentID compID, const int setIdx, const uint8_t* ccSaoControl
+                        , CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], CcSaoStatData frameStats[MAX_CCSAO_SET_NUM]);
+  void deriveCcSaoOffsets(const ComponentID compID, const int bitDepth, const int setIdx
+                        , CcSaoStatData frameStats[MAX_CCSAO_SET_NUM]
+                        , short offset[MAX_CCSAO_SET_NUM][MAX_CCSAO_CLASS_NUM]);
+  inline int estCcSaoIterOffset(const double lambda, const int offsetInput, const int64_t count, const int64_t diffSum, const int shift, const int bitIncrease, int64_t& bestDist, double& bestCost, const int offsetTh);
+  void getCcSaoDistortion(const ComponentID compID, const int setIdx, CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM]
+                        , short offset[MAX_CCSAO_SET_NUM][MAX_CCSAO_CLASS_NUM], int64_t* trainingDistortion[MAX_CCSAO_SET_NUM]);
+  void deriveCcSaoRDO(CodingStructure& cs, const ComponentID compID, int64_t* trainingDistortion[MAX_CCSAO_SET_NUM]
+                    , CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], CcSaoStatData frameStats[MAX_CCSAO_SET_NUM]
+                    , CcSaoEncParam& bestCcSaoParam, CcSaoEncParam& tempCcSaoParam
+                    , uint8_t* bestCcSaoControl, uint8_t* tempCcSaoControl
+                    , double& bestCost, double& tempCost);
+  void determineCcSaoControlIdc(CodingStructure& cs, const ComponentID compID, 
+                                const int ctuWidthC, const int ctuHeightC, const int picWidthC, const int picHeightC,
+                                CcSaoEncParam& ccSaoParam, uint8_t* ccSaoControl, int64_t* trainingDistorsion[MAX_CCSAO_SET_NUM],
+                                int64_t& curTotalDist, double& curTotalRate);
+  int  getCcSaoParamRate(const ComponentID compID, const CcSaoEncParam& ccSaoParam);
+  int  lengthUvlc(int uiCode);
+#endif
 private: //members
   //for RDO
   CABACWriter*           m_CABACEstimator;
@@ -141,6 +246,20 @@ private: //members
   double                 m_saoDisabledRate[MAX_NUM_COMPONENT][MAX_TLAYER];
   int                    m_skipLinesR[MAX_NUM_COMPONENT][NUM_SAO_NEW_TYPES];
   int                    m_skipLinesB[MAX_NUM_COMPONENT][NUM_SAO_NEW_TYPES];
+
+#if JVET_W0066_CCSAO
+  bool                   m_createdEnc = false;
+  int                    m_intraPeriod;
+  CcSaoStatData*         m_ccSaoStatData [MAX_CCSAO_SET_NUM];
+  CcSaoStatData          m_ccSaoStatFrame[MAX_CCSAO_SET_NUM];
+  CcSaoEncParam          m_bestCcSaoParam;
+  CcSaoEncParam          m_tempCcSaoParam;
+  CcSaoEncParam          m_initCcSaoParam;
+  uint8_t*               m_bestCcSaoControl;
+  uint8_t*               m_tempCcSaoControl;
+  uint8_t*               m_initCcSaoControl;
+  int64_t*               m_trainingDistortion[MAX_CCSAO_SET_NUM];
+#endif
 };
 
 

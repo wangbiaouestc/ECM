@@ -198,6 +198,26 @@ void CABACWriter::coding_tree_unit( CodingStructure& cs, const UnitArea& area, i
     sao( *cs.slice, ctuRsAddr );
   }
 
+#if JVET_W0066_CCSAO
+  if ( !skipSao )
+  {
+    for ( int compIdx = 0; compIdx < getNumberValidComponents( cs.pcv->chrFormat ); compIdx++ )
+    {
+      if (cs.slice->m_ccSaoComParam.enabled[compIdx])
+      {
+        const int setNum = cs.slice->m_ccSaoComParam.setNum[compIdx];
+
+        const int      ry = ctuRsAddr / cs.pcv->widthInCtus;
+        const int      rx = ctuRsAddr % cs.pcv->widthInCtus;
+        const Position lumaPos(rx * cs.pcv->maxCUWidth, ry * cs.pcv->maxCUHeight);
+
+        codeCcSaoControlIdc(cs.slice->m_ccSaoControl[compIdx][ctuRsAddr], cs, ComponentID(compIdx),
+                            ctuRsAddr, cs.slice->m_ccSaoControl[compIdx], lumaPos, setNum);
+      }
+    }
+  }
+#endif
+
   if (!skipAlf)
   {
     for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
@@ -427,7 +447,49 @@ void CABACWriter::sao_offset_pars( const SAOOffset& ctbPars, ComponentID compID,
   }
 }
 
+#if JVET_W0066_CCSAO
+void CABACWriter::codeCcSaoControlIdc(uint8_t idcVal, CodingStructure &cs, const ComponentID compID,
+                                      const int curIdx, const uint8_t *controlIdc, Position lumaPos,
+                                      const int setNum)
+{
+  CHECK(idcVal > setNum, "Set index is too large");
 
+  const uint32_t curSliceIdx    = cs.slice->getIndependentSliceIdx();
+  const uint32_t curTileIdx     = cs.pps->getTileIdx( lumaPos );
+  Position       leftLumaPos    = lumaPos.offset(-(int)cs.pcv->maxCUWidth, 0);
+  Position       aboveLumaPos   = lumaPos.offset(0, -(int)cs.pcv->maxCUWidth);
+  bool           leftAvail      = cs.getCURestricted( leftLumaPos,  lumaPos, curSliceIdx, curTileIdx, CH_L ) ? true : false;
+  bool           aboveAvail     = cs.getCURestricted( aboveLumaPos, lumaPos, curSliceIdx, curTileIdx, CH_L ) ? true : false;
+  int            ctxt           = 0;
+
+  if (leftAvail)
+  {
+    ctxt += ( controlIdc[curIdx - 1]) ? 1 : 0;
+  }
+  if (aboveAvail)
+  {
+    ctxt += (controlIdc[curIdx - cs.pcv->widthInCtus]) ? 1 : 0;
+  }
+  ctxt += ( compID == COMPONENT_Y  ) ? 0 
+        : ( compID == COMPONENT_Cb ) ? 3 : 6;
+
+  m_BinEncoder.encodeBin( ( idcVal == 0 ) ? 0 : 1, Ctx::CcSaoControlIdc( ctxt ) ); // ON/OFF flag is context coded
+  if ( idcVal > 0 )
+  {
+    int val = (idcVal - 1);
+    while ( val )
+    {
+      m_BinEncoder.encodeBinEP( 1 );
+      val--;
+    }
+    if ( idcVal < setNum )
+    {
+      m_BinEncoder.encodeBinEP( 0 );
+    }
+  }
+  DTRACE( g_trace_ctx, D_SYNTAX, "ccSaoControlIdc() compID=%d pos=(%d,%d) ctxt=%d, setNum=%d, idcVal=%d\n", compID, lumaPos.x, lumaPos.y, ctxt, setNum, idcVal );
+}
+#endif
 
 //================================================================================
 //  clause 7.3.8.4

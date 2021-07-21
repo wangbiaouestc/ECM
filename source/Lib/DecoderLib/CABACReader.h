@@ -73,6 +73,10 @@ public:
   void        bif                      (CodingStructure&              cs, unsigned ctuRsAddr);
 #endif
   
+#if JVET_W0066_CCSAO
+  void        ccSaoControlIdc           ( CodingStructure &cs, const ComponentID compID, const int curIdx, uint8_t *controlIdc, Position lumaPos, int setNum );
+#endif
+  
   void        readAlfCtuFilterIndex(CodingStructure&              cs, unsigned        ctuRsAddr);
 
   void ccAlfFilterControlIdc(CodingStructure &cs, const ComponentID compID, const int curIdx, uint8_t *filterControlIdc,

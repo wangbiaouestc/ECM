@@ -1233,6 +1233,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   }
 
   WRITE_FLAG( pcSPS->getSAOEnabledFlag(),                                            "sps_sao_enabled_flag");
+#if JVET_W0066_CCSAO
+  WRITE_FLAG( pcSPS->getCCSAOEnabledFlag(),                                          "sps_ccsao_enabled_flag" );
+#endif
   WRITE_FLAG( pcSPS->getALFEnabledFlag(),                                            "sps_alf_enabled_flag" );
   if (pcSPS->getALFEnabledFlag() && pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
@@ -2365,7 +2368,29 @@ void HLSWriter::codePictureHeader( PicHeader* picHeader, bool writeRbspTrailingB
     picHeader->setSaoEnabledFlag(CHANNEL_TYPE_CHROMA, false);
   }
 
-
+#if JVET_W0066_CCSAO
+  if(sps->getCCSAOEnabledFlag())
+  {
+    if (pps->getSaoInfoInPhFlag())
+    {
+      WRITE_FLAG(picHeader->getCcSaoEnabledFlag(COMPONENT_Y),  "ph_cc_sao_y_enabled_flag");
+      WRITE_FLAG(picHeader->getCcSaoEnabledFlag(COMPONENT_Cb), "ph_cc_sao_cb_enabled_flag");
+      WRITE_FLAG(picHeader->getCcSaoEnabledFlag(COMPONENT_Cr), "ph_cc_sao_cr_enabled_flag");
+    }
+    else
+    {
+      picHeader->setCcSaoEnabledFlag(COMPONENT_Y,  true);
+      picHeader->setCcSaoEnabledFlag(COMPONENT_Cb, true);
+      picHeader->setCcSaoEnabledFlag(COMPONENT_Cr, true);
+    }
+  }
+  else
+  {
+    picHeader->setCcSaoEnabledFlag(COMPONENT_Y,  false);
+    picHeader->setCcSaoEnabledFlag(COMPONENT_Cb, false);
+    picHeader->setCcSaoEnabledFlag(COMPONENT_Cr, false);
+  }
+#endif
 
   // deblocking filter controls
   if (pps->getDeblockingFilterControlPresentFlag())
@@ -2822,6 +2847,9 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
       }
     }
 
+#if JVET_W0066_CCSAO
+    codeCcSao(pcSlice, picHeader, pcSlice->getSPS(), pcSlice->m_ccSaoComParam);
+#endif
 
     if (pcSlice->getPPS()->getDeblockingFilterControlPresentFlag())
     {
@@ -3033,6 +3061,9 @@ void  HLSWriter::codeConstraintInfo  ( const ConstraintInfo* cinfo )
 
     /* loop filter */
     WRITE_FLAG(cinfo->getNoSaoConstraintFlag() ? 1 : 0, "gci_no_sao_constraint_flag");
+#if JVET_W0066_CCSAO
+    WRITE_FLAG(cinfo->getNoCCSaoConstraintFlag() ? 1 : 0, "gci_no_ccsao_constraint_flag");
+#endif
     WRITE_FLAG(cinfo->getNoAlfConstraintFlag() ? 1 : 0, "gci_no_alf_constraint_flag");
     WRITE_FLAG(cinfo->getNoCCAlfConstraintFlag() ? 1 : 0, "gci_no_ccalf_constraint_flag");
     WRITE_FLAG(cinfo->getNoLmcsConstraintFlag() ? 1 : 0, "gci_no_lmcs_constraint_flag");
@@ -3565,6 +3596,65 @@ bool HLSWriter::xFindMatchingLTRP(Slice* pcSlice, uint32_t *ltrpsIndex, int ltrp
   }
   return false;
 }
+
+#if JVET_W0066_CCSAO
+void HLSWriter::codeCcSao(Slice* pcSlice, PicHeader* picHeader, const SPS* sps, const CcSaoComParam& ccSaoParam)
+{
+  if (pcSlice->getSPS()->getCCSAOEnabledFlag())
+  {
+    WRITE_FLAG(ccSaoParam.enabled[COMPONENT_Y ] ? 1 : 0, "slice_ccsao_y_enabled_flag");
+    WRITE_FLAG(ccSaoParam.enabled[COMPONENT_Cb] ? 1 : 0, "slice_ccsao_cb_enabled_flag");
+    WRITE_FLAG(ccSaoParam.enabled[COMPONENT_Cr] ? 1 : 0, "slice_ccsao_cr_enabled_flag");
+
+    for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
+    {
+      if (ccSaoParam.enabled[compIdx])
+      {
+        CHECK(ccSaoParam.setNum[compIdx] == 0 
+           || ccSaoParam.setNum[compIdx] >  MAX_CCSAO_SET_NUM, "CCSAO setNum out of range");
+        WRITE_UVLC(ccSaoParam.setNum[compIdx] - 1, "ccsao_set_num");
+
+        for (int setIdx = 0; setIdx < ccSaoParam.setNum[compIdx]; setIdx++)
+        {
+          CHECK(ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y ] >= MAX_CCSAO_CAND_POS_Y, "CCSAO candPosY out of range");
+          CHECK(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ] == 0 
+             || ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ] >  MAX_CCSAO_BAND_NUM_Y, "CCSAO bandNumY out of range");
+          CHECK(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] == 0 
+             || ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] >  MAX_CCSAO_BAND_NUM_U, "CCSAO bandNumU out of range");
+          CHECK(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] == 0
+             || ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] >  MAX_CCSAO_BAND_NUM_V, "CCSAO bandNumV out of range");
+
+          WRITE_CODE(ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y ],     MAX_CCSAO_CAND_POS_Y_BITS, "ccsao_cand_pos_y");
+          WRITE_CODE(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ] - 1, MAX_CCSAO_BAND_NUM_Y_BITS, "ccsao_band_num_y");
+          WRITE_CODE(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] - 1, MAX_CCSAO_BAND_NUM_U_BITS, "ccsao_band_num_u");
+          WRITE_CODE(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] - 1, MAX_CCSAO_BAND_NUM_V_BITS, "ccsao_band_num_v");
+
+          const short *offset   = ccSaoParam.offset [compIdx][setIdx];
+          const int    classNum = ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ]
+                                * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb]
+                                * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr];
+          for (int i = 0; i < classNum; i++)
+          {
+            CHECK((offset[i] > MAX_CCSAO_OFFSET_THR || offset[i] < -MAX_CCSAO_OFFSET_THR), "CCSAO offset out of range");
+            WRITE_UVLC(abs(offset[i]), "ccsao_offset_abs");
+            if (abs(offset[i]) != 0)
+            {
+              WRITE_FLAG((offset[i] < 0) ? 1 : 0, "ccsao_offset_sign");
+            }
+          }
+
+          DTRACE(g_trace_ctx, D_SYNTAX, "offset setIdx %d: ", setIdx);
+          for (int i = 0; i < classNum; i++)
+          {
+            DTRACE(g_trace_ctx, D_SYNTAX, "%d ", offset[i]);
+          }
+          DTRACE(g_trace_ctx, D_SYNTAX, "\n");
+        }
+      }
+    }
+  }
+}
+#endif
 
 #if ALF_IMPROVEMENT
 void HLSWriter::alfGolombEncode(int coeff, int k, const bool signed_coeff)

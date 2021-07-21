@@ -146,6 +146,7 @@
 #define ALF_IMPROVEMENT                                   1 // ALF improvement
 #define EMBEDDED_APS                                      1 // Embed APS into picture header
 #define JVET_V0094_BILATERAL_FILTER                       1 // Bilateral filter
+#define JVET_W0066_CCSAO                                  1 // JVET-W0066: Cross-component sample adaptive offset
 
 // SIMD optimizations
 #if IF_12TAP
@@ -671,6 +672,9 @@ enum ModeType
 enum ComponentID
 {
   COMPONENT_Y         = 0,
+#if JVET_W0066_CCSAO
+  MAX_NUM_LUMA_COMP   = 1,
+#endif
   COMPONENT_Cb        = 1,
   COMPONENT_Cr        = 2,
   MAX_NUM_COMPONENT   = 3,

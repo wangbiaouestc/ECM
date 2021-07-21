@@ -84,6 +84,10 @@ public:
   void        bif                      (const Slice&                   slice, const BifParams& BifParams);
   void        bif                      (const Slice& slice, const BifParams& BifParams, unsigned ctuRsAddr);
 #endif
+#if JVET_W0066_CCSAO
+  void        codeCcSaoControlIdc       ( uint8_t idcVal, CodingStructure &cs, const ComponentID compID, const int curIdx,
+                                          const uint8_t *controlIdc, Position lumaPos, const int setNum );
+#endif
   // coding (quad)tree (clause 7.3.8.4)
   void        coding_tree               ( const CodingStructure&        cs,       Partitioner&      pm,         CUCtx& cuCtx, Partitioner* pPartitionerChroma = nullptr, CUCtx* pCuCtxChroma = nullptr);
   void        split_cu_mode             ( const PartSplit               split,    const CodingStructure& cs,    Partitioner& pm );

@@ -346,6 +346,11 @@ void EncApp::xInitLibCfg()
     m_cEncLib.setNoSaoConstraintFlag(m_noSaoConstraintFlag);
     CHECK(m_noSaoConstraintFlag && m_bUseSAO, "SAO shall be deactivated when m_bNoSaoConstraintFlag is equal to 1");
 
+#if JVET_W0066_CCSAO
+    m_cEncLib.setNoCCSaoConstraintFlag(m_noCCSaoConstraintFlag);
+    CHECK(m_noCCSaoConstraintFlag && m_CCSAO, "CCSAO shall be deactivated when m_noCCSaoConstraintFlag is equal to 1");
+#endif
+
     m_cEncLib.setNoAlfConstraintFlag(m_noAlfConstraintFlag);
     CHECK(m_noAlfConstraintFlag && m_alf, "ALF shall be deactivated when m_bNoAlfConstraintFlag is equal to 1");
 
@@ -516,6 +521,9 @@ void EncApp::xInitLibCfg()
     m_cEncLib.setNoQtbttDualTreeIntraConstraintFlag(false);
     m_cEncLib.setNoPartitionConstraintsOverrideConstraintFlag(false);
     m_cEncLib.setNoSaoConstraintFlag(false);
+#if JVET_W0066_CCSAO
+    m_cEncLib.setNoCCSaoConstraintFlag(false);
+#endif
     m_cEncLib.setNoAlfConstraintFlag(false);
     m_cEncLib.setNoCCAlfConstraintFlag(false);
 #if JVET_S0058_GCI
@@ -919,6 +927,9 @@ void EncApp::xInitLibCfg()
   //====== Sub-picture and Slices ========
   m_cEncLib.setSingleSlicePerSubPicFlagFlag                      ( m_singleSlicePerSubPicFlag );
   m_cEncLib.setUseSAO                                            ( m_bUseSAO );
+#if JVET_W0066_CCSAO
+  m_cEncLib.setUseCCSAO                                          ( m_CCSAO );
+#endif
   m_cEncLib.setTestSAODisableAtPictureLevel                      ( m_bTestSAODisableAtPictureLevel );
   m_cEncLib.setSaoEncodingRate                                   ( m_saoEncodingRate );
   m_cEncLib.setSaoEncodingRateChroma                             ( m_saoEncodingRateChroma );

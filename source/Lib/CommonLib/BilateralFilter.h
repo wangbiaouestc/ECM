@@ -65,7 +65,13 @@ private:
   short *tempblockFiltered = &tempblockFilteredTemp[-2];
 
   void (*m_bilateralFilterDiamond5x5)( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr);
+#if JVET_W0066_CCSAO
+  void (*m_bilateralFilterDiamond5x5NoClip)(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr);
+#endif
   static void blockBilateralFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr );
+#if JVET_W0066_CCSAO
+  static void blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr);
+#endif
   
   char m_wBIF[26][16] = {
   {  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, },
@@ -108,6 +114,9 @@ public:
   void bilateralFilterPicRDOperCTU(CodingStructure& cs, PelUnitBuf& src,BIFCabacEst* BifCABACEstimator);
   
   void bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU);
+#if JVET_W0066_CCSAO
+  void bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit& currTU);
+#endif
   void clipNotBilaterallyFilteredBlocks(const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU);
 
   const char* getFilterLutParameters( const int size, const PredMode predMode, const int qp, int& bfac );
@@ -116,6 +125,10 @@ public:
 #ifdef TARGET_SIMD_X86
   template<X86_VEXT vext>
   static void simdFilterDiamond5x5( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr );
+#if JVET_W0066_CCSAO
+  template<X86_VEXT vext>
+  static void simdFilterDiamond5x5NoClip(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr);
+#endif
 
   void    initBilateralFilterX86();
   template <X86_VEXT vext>

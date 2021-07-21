@@ -207,6 +207,21 @@ static const int MIP_MAX_WIDTH =                                   MAX_TB_SIZEY;
 static const int MIP_MAX_HEIGHT =                                  MAX_TB_SIZEY;
 #endif
 
+#if JVET_W0066_CCSAO
+#define          MAX_CCSAO_SET_NUM                                  4
+static const int MAX_CCSAO_CAND_POS_Y        =                      9;
+static const int MAX_CCSAO_CAND_POS_Y_BITS   =                      4;
+static const int MAX_CCSAO_BAND_NUM_Y        =                     16;
+static const int MAX_CCSAO_BAND_NUM_Y_BITS   =                      4;
+static const int MAX_CCSAO_BAND_NUM_U        =                      4;
+static const int MAX_CCSAO_BAND_NUM_U_BITS   =                      2;
+static const int MAX_CCSAO_BAND_NUM_V        =                      4;
+static const int MAX_CCSAO_BAND_NUM_V_BITS   =                      2;
+static const int MAX_CCSAO_CLASS_NUM         =                     64;
+static const int MAX_CCSAO_OFFSET_THR        =                     15;
+static const int MAX_CCSAO_FILTER_LENGTH     =                      3;
+#endif
+
 static const int MAX_NUM_ALF_ALTERNATIVES_CHROMA =                  8;
 static const int MAX_NUM_ALF_CLASSES         =                     25;
 #if ALF_IMPROVEMENT
