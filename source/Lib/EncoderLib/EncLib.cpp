@@ -1370,6 +1370,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setSbTMVPEnabledFlag(m_sbTmvpEnableFlag);
   sps.setAMVREnabledFlag                ( m_ImvMode != IMV_OFF );
   sps.setBDOFEnabledFlag                    ( m_BIO );
+#if ARMC_TM
+  sps.setUseAML                             ( m_AML );
+#endif
   sps.setMaxNumMergeCand(getMaxNumMergeCand());
   sps.setMaxNumAffineMergeCand(getMaxNumAffineMergeCand());
   sps.setMaxNumIBCMergeCand(getMaxNumIBCMergeCand());

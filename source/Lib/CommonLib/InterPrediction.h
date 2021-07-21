@@ -51,7 +51,7 @@
 #include "ContextModelling.h"
 // forward declaration
 class Mv;
-#if INTER_LIC || (TM_AMVP || TM_MRG)
+#if INTER_LIC || (TM_AMVP || TM_MRG) || ARMC_TM
 class Reshape;
 #endif
 
@@ -70,7 +70,7 @@ public:
   PelUnitBuf        m_predictionBeforeLIC;
   bool              m_storeBeforeLIC;
 #endif
-#if INTER_LIC || (TM_AMVP || TM_MRG) // note: already refactor
+#if INTER_LIC || (TM_AMVP || TM_MRG) || ARMC_TM // note: already refactor
   Reshape*          m_pcReshape;
 #endif
 
@@ -216,6 +216,13 @@ protected:
                                  , bool bilinearMC = false
                                  , Pel *srcPadBuf = NULL
                                  , int32_t srcPadStride = 0
+#if ARMC_TM
+                                 , bool AML = false
+#if INTER_LIC
+                                 , bool doLic = false
+                                 , Mv   mvCurr = Mv(0, 0)
+#endif
+#endif
                                  );
 
   void xAddBIOAvg4              (const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel*gradY1, int gradStride, int width, int height, int tmpx, int tmpy, int shift, int offset, const ClpRng& clpRng);
@@ -226,6 +233,14 @@ protected:
   void xWeightedAverage         ( const bool isBdofMvRefine, const int bdofBlockOffset, const PredictionUnit& pu, const CPelUnitBuf& pcYuvSrc0, const CPelUnitBuf& pcYuvSrc1, PelUnitBuf& pcYuvDst, const BitDepths& clipBitDepths, const ClpRngs& clpRngs, const bool& bioApplied, const bool lumaOnly = false, const bool chromaOnly = false, PelUnitBuf* yuvDstTmp = NULL );
 #else
   void xWeightedAverage         ( const PredictionUnit& pu, const CPelUnitBuf& pcYuvSrc0, const CPelUnitBuf& pcYuvSrc1, PelUnitBuf& pcYuvDst, const BitDepths& clipBitDepths, const ClpRngs& clpRngs, const bool& bioApplied, const bool lumaOnly = false, const bool chromaOnly = false, PelUnitBuf* yuvDstTmp = NULL );
+#endif
+#if ARMC_TM
+#if !INTER_LIC
+  template <bool TrueA_FalseL>
+  void xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl);
+#endif
+  void xWeightedAverageY(const PredictionUnit& pu, const CPelUnitBuf& pcYuvSrc0, const CPelUnitBuf& pcYuvSrc1, PelUnitBuf& pcYuvDst, const BitDepths& clipBitDepths, const ClpRngs& clpRngs);
+  void xPredAffineTpl(const PredictionUnit &pu, const RefPicList &eRefPicList, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate);
 #endif
 #if AFFINE_ENC_OPT
   void xPredAffineBlk           ( const ComponentID& compID, const PredictionUnit& pu, const Picture* refPic, const Mv* _mv, PelUnitBuf& dstPic, const bool& bi, const ClpRng& clpRng, const bool genChromaMv = false, const std::pair<int, int> scalingRatio = SCALE_1X, const bool calGradient = false);
@@ -248,6 +263,13 @@ protected:
 
 
   MotionInfo      m_SubPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#if ARMC_TM
+  Pel*   m_acYuvCurAMLTemplate[2][MAX_NUM_COMPONENT];   //0: top, 1: left
+  bool   m_bAMLTemplateAvailabe[2];
+  Pel*   m_acYuvRefAboveTemplate[2][MAX_NUM_COMPONENT];   //0: list0, 1: list1
+  Pel*   m_acYuvRefLeftTemplate[2][MAX_NUM_COMPONENT];   //0: list0, 1: list1
+  Pel*   m_acYuvRefAMLTemplate[2][MAX_NUM_COMPONENT];   //0: top, 1: left
+#endif
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
   CacheModel      *m_cacheModel;
 #endif
@@ -260,7 +282,7 @@ public:
   InterPrediction();
   virtual ~InterPrediction();
 
-#if INTER_LIC || (TM_AMVP || TM_MRG)
+#if INTER_LIC || (TM_AMVP || TM_MRG) || ARMC_TM
   void    init                (RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape);
 #else
   void    init                (RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize);
@@ -302,6 +324,19 @@ public:
 #endif
 #if !AFFINE_RM_CONSTRAINTS_AND_OPT
   static bool isSubblockVectorSpreadOverLimit( int a, int b, int c, int d, int predType );
+#endif
+#if ARMC_TM
+  void    adjustInterMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, int mrgCandIdx = -1);
+  bool    xAMLGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWidth, int nCurBlkHeight);
+  bool    xAMLIsTopTempAvailable(PredictionUnit& pu);
+  bool    xAMLIsLeftTempAvailable(PredictionUnit& pu);
+  void    updateCandList(uint32_t uiCand, Distortion uiCost, uint32_t uiMrgCandNum, uint32_t* RdCandList, Distortion* CandCostList);
+  void    updateCandInfo(MergeCtx& mrgCtx, uint32_t(*RdCandList)[MRG_MAX_NUM_CANDS], int mrgCandIdx = -1);
+  void    getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft);
+  void    adjustAffineMergeCandidates(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, int mrgCandIdx = -1);
+  void    updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, uint32_t(*RdCandList)[AFFINE_MRG_MAX_NUM_CANDS], int mrgCandIdx = -1);
+  void    xGetSublkAMLTemplate(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate);
+  void    getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft);
 #endif
 #if INTER_LIC
   void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset);

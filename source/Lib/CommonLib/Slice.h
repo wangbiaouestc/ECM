@@ -1691,6 +1691,9 @@ private:
 #endif
   bool              m_MRL;
   bool              m_MIP;
+#if ARMC_TM
+  bool              m_AML;
+#endif
   ChromaQpMappingTable m_chromaQpMappingTable;
   bool m_GDREnabledFlag;
   bool              m_SubLayerCbpParametersPresentFlag;
@@ -2117,6 +2120,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setUseMIP             ( bool b )                                        { m_MIP = b; }
   bool      getUseMIP             ()                                      const     { return m_MIP; }
 
+#if ARMC_TM
+  void      setUseAML             ( bool b )                                        { m_AML = b; }
+  bool      getUseAML             ()                                      const     { return m_AML; }
+#endif
   bool      getUseWP              ()                                      const     { return m_useWeightPred; }
   bool      getUseWPBiPred        ()                                      const     { return m_useWeightedBiPred; }
   void      setUseWP              ( bool b )                                        { m_useWeightPred = b; }

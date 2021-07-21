@@ -736,6 +736,9 @@ void EncApp::xInitLibCfg()
 #endif
   m_cEncLib.setPROF                                              ( m_PROF );
   m_cEncLib.setBIO                                               (m_BIO);
+#if ARMC_TM
+  m_cEncLib.setAML                                               ( m_AML );
+#endif
   m_cEncLib.setUseLMChroma                                       ( m_LMChroma );
   m_cEncLib.setHorCollocatedChromaFlag                           ( m_horCollocatedChromaFlag );
   m_cEncLib.setVerCollocatedChromaFlag                           ( m_verCollocatedChromaFlag );

@@ -3148,6 +3148,9 @@ SPS::SPS()
 #endif
 , m_MRL                       ( false )
 , m_MIP                       ( false )
+#if ARMC_TM
+, m_AML                       ( false )
+#endif
 , m_GDREnabledFlag            ( true )
 , m_SubLayerCbpParametersPresentFlag ( true )
 , m_rprEnabledFlag            ( false )
