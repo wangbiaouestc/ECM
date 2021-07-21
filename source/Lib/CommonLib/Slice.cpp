@@ -153,6 +153,10 @@ Slice::Slice()
   {
     m_saoEnabledFlag[ch] = false;
   }
+#if JVET_W0066_CCSAO
+  m_ccSaoComParam.reset();
+  resetCcSaoEnabledFlag();
+#endif
 
   memset(m_alfApss, 0, sizeof(m_alfApss));
   m_ccAlfFilterParam.reset();
@@ -209,6 +213,10 @@ void Slice::initSlice()
   m_useLTforDRAP         = false;
   m_isDRAP               = false;
   m_latestDRAPPOC        = MAX_INT;
+#if JVET_W0066_CCSAO
+  m_ccSaoComParam.reset();
+  resetCcSaoEnabledFlag();
+#endif
   resetTileGroupAlfEnabledFlag();
   m_ccAlfFilterParam.reset();
   m_tileGroupCcAlfCbEnabledFlag = 0;
@@ -264,6 +272,14 @@ void Slice::inheritFromPicHeader( PicHeader *picHeader, const PPS *pps, const SP
 
   setSaoEnabledFlag(CHANNEL_TYPE_LUMA,     picHeader->getSaoEnabledFlag(CHANNEL_TYPE_LUMA));
   setSaoEnabledFlag(CHANNEL_TYPE_CHROMA,   picHeader->getSaoEnabledFlag(CHANNEL_TYPE_CHROMA));
+#if JVET_W0066_CCSAO
+  setCcSaoEnabledFlag(COMPONENT_Y,  picHeader->getCcSaoEnabledFlag(COMPONENT_Y));
+  setCcSaoEnabledFlag(COMPONENT_Cb, picHeader->getCcSaoEnabledFlag(COMPONENT_Cb));
+  setCcSaoEnabledFlag(COMPONENT_Cr, picHeader->getCcSaoEnabledFlag(COMPONENT_Cr));
+  m_ccSaoComParam.enabled[COMPONENT_Y ] = picHeader->getCcSaoEnabledFlag(COMPONENT_Y);
+  m_ccSaoComParam.enabled[COMPONENT_Cb] = picHeader->getCcSaoEnabledFlag(COMPONENT_Cb);
+  m_ccSaoComParam.enabled[COMPONENT_Cr] = picHeader->getCcSaoEnabledFlag(COMPONENT_Cr);
+#endif
 
   setTileGroupAlfEnabledFlag(COMPONENT_Y,  picHeader->getAlfEnabledFlag(COMPONENT_Y));
   setTileGroupAlfEnabledFlag(COMPONENT_Cb, picHeader->getAlfEnabledFlag(COMPONENT_Cb));
@@ -1219,6 +1235,15 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
   {
     m_saoEnabledFlag[ch] = pSrc->m_saoEnabledFlag[ch];
   }
+#if JVET_W0066_CCSAO
+  m_ccSaoComParam                  = pSrc->m_ccSaoComParam;
+  m_ccSaoControl    [COMPONENT_Y ] = pSrc->m_ccSaoControl    [COMPONENT_Y ];
+  m_ccSaoControl    [COMPONENT_Cb] = pSrc->m_ccSaoControl    [COMPONENT_Cb];
+  m_ccSaoControl    [COMPONENT_Cr] = pSrc->m_ccSaoControl    [COMPONENT_Cr];
+  m_ccSaoEnabledFlag[COMPONENT_Y ] = pSrc->m_ccSaoEnabledFlag[COMPONENT_Y ];
+  m_ccSaoEnabledFlag[COMPONENT_Cb] = pSrc->m_ccSaoEnabledFlag[COMPONENT_Cb];
+  m_ccSaoEnabledFlag[COMPONENT_Cr] = pSrc->m_ccSaoEnabledFlag[COMPONENT_Cr];
+#endif
 
   m_cabacInitFlag                 = pSrc->m_cabacInitFlag;
   memcpy(m_alfApss, pSrc->m_alfApss, sizeof(m_alfApss)); // this might be quite unsafe
@@ -4760,6 +4785,9 @@ bool             operator == (const ConstraintInfo& op1, const ConstraintInfo& o
   if( op1.m_noQtbttDualTreeIntraConstraintFlag           != op2.m_noQtbttDualTreeIntraConstraintFlag             ) return false;
   if( op1.m_noPartitionConstraintsOverrideConstraintFlag != op2.m_noPartitionConstraintsOverrideConstraintFlag   ) return false;
   if( op1.m_noSaoConstraintFlag                          != op2.m_noSaoConstraintFlag                            ) return false;
+#if JVET_W0066_CCSAO
+  if( op1.m_noCCSaoConstraintFlag                        != op2.m_noCCSaoConstraintFlag                          ) return false;
+#endif
   if( op1.m_noAlfConstraintFlag                          != op2.m_noAlfConstraintFlag                            ) return false;
   if( op1.m_noCCAlfConstraintFlag                        != op2.m_noCCAlfConstraintFlag                          ) return false;
 #if JVET_S0058_GCI

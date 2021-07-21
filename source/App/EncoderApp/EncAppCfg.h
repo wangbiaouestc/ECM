@@ -167,6 +167,9 @@ protected:
 #endif
   bool      m_noPartitionConstraintsOverrideConstraintFlag;
   bool      m_noSaoConstraintFlag;
+#if JVET_W0066_CCSAO
+  bool      m_noCCSaoConstraintFlag;
+#endif
   bool      m_noAlfConstraintFlag;
   bool      m_noCCAlfConstraintFlag;
 #if JVET_S0058_GCI
@@ -490,6 +493,9 @@ protected:
 
   // coding tool (SAO)
   bool      m_bUseSAO;
+#if JVET_W0066_CCSAO
+  bool      m_CCSAO;
+#endif
   bool      m_bTestSAODisableAtPictureLevel;
   double    m_saoEncodingRate;                                ///< When >0 SAO early picture termination is enabled for luma and chroma
   double    m_saoEncodingRateChroma;                          ///< The SAO early picture termination rate to use for chroma (when m_SaoEncodingRate is >0). If <=0, use results for luma.

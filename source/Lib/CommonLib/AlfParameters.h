@@ -424,6 +424,50 @@ struct CcAlfFilterParam
     return *this;
   }
 };
+
+#if JVET_W0066_CCSAO
+struct CcSaoComParam
+{
+  bool     enabled   [MAX_NUM_COMPONENT];
+  uint8_t  setNum    [MAX_NUM_COMPONENT];
+  bool     setEnabled[MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM];
+  uint16_t candPos   [MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM][MAX_NUM_LUMA_COMP];
+  uint16_t bandNum   [MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM][MAX_NUM_COMPONENT];
+  short    offset    [MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM][MAX_CCSAO_CLASS_NUM];
+  CcSaoComParam()
+  {
+    reset();
+  }
+  void reset()
+  {
+    std::memset( enabled,    false, sizeof( enabled    ) );
+    std::memset( setNum,         0, sizeof( setNum     ) );
+    std::memset( setEnabled, false, sizeof( setEnabled ) );
+    std::memset( candPos,        0, sizeof( candPos    ) );
+    std::memset( bandNum,        0, sizeof( bandNum    ) );
+    std::memset( offset,         0, sizeof( offset     ) );
+  }
+  void reset(ComponentID compID)
+  {
+    enabled[compID] = false;
+    setNum [compID] = 0;
+    std::memset( setEnabled[compID], false, sizeof( setEnabled[compID]) );
+    std::memset( candPos   [compID],     0, sizeof( candPos   [compID]) );
+    std::memset( bandNum   [compID],     0, sizeof( bandNum   [compID]) );
+    std::memset( offset    [compID],     0, sizeof( offset    [compID]) );
+  }
+  const CcSaoComParam& operator = ( const CcSaoComParam& src )
+  {
+    std::memcpy( enabled,    src.enabled,    sizeof( enabled    ) );
+    std::memcpy( setNum,     src.setNum,     sizeof( setNum     ) );
+    std::memcpy( setEnabled, src.setEnabled, sizeof( setEnabled ) );
+    std::memcpy( candPos,    src.candPos,    sizeof( candPos    ) );
+    std::memcpy( bandNum,    src.bandNum,    sizeof( bandNum    ) );
+    std::memcpy( offset,     src.offset,     sizeof( offset     ) );
+    return *this;
+  }
+};
+#endif
 //! \}
 
 #endif  // end of #ifndef  __ALFPARAMETERS__

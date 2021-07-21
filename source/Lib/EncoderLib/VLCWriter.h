@@ -160,6 +160,9 @@ public:
 #else
   void  codeScalingList         ( const ScalingList &scalingList );
 #endif
+#if JVET_W0066_CCSAO
+  void codeCcSao                ( Slice* pcSlice, PicHeader* picHeader, const SPS* sps, const CcSaoComParam& ccSaoParam );
+#endif
 #if ALF_IMPROVEMENT
   void alfFilter( const AlfParam& alfParam, const bool isChroma, const int altIdx, int order0, int order1 );
   void alfGolombEncode(const int coeff, const int k, const bool signed_coeff = true);

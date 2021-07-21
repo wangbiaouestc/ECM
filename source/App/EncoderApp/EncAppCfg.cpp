@@ -914,6 +914,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("NoSignDataHidingConstraintFlag",                  m_noSignDataHidingConstraintFlag,                false, "Indicate that SDH is deactivated")
   ("NoQpDeltaConstraintFlag",                         m_noQpDeltaConstraintFlag,                       false, "Indicate that QPdelta is deactivated")
   ("NoSaoConstraintFlag",                             m_noSaoConstraintFlag,                           false, "Indicate that SAO is deactivated")
+#if JVET_W0066_CCSAO
+  ("NoCCSaoConstraintFlag",                           m_noCCSaoConstraintFlag,                         false, "Indicate that CCSAO is deactivated")
+#endif
   ("NoAlfConstraintFlag",                             m_noAlfConstraintFlag,                           false, "Indicate that ALF is deactivated")
   ("NoCCAlfConstraintFlag",                           m_noCCAlfConstraintFlag,                          false, "Indicate that CCALF is deactivated")
   ("NoLmcsConstraintFlag",                            m_noLmcsConstraintFlag,                           false, "Indicate that LMCS is deactivated")
@@ -1240,6 +1243,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("GolombRiceParameterAdaptation",                   m_persistentRiceAdaptationEnabledFlag,            false, "Enable the adaptation of the Golomb-Rice parameter over the course of each slice")
   ("AlignCABACBeforeBypass",                          m_cabacBypassAlignmentEnabledFlag,                false, "Align the CABAC engine to a defined fraction of a bit prior to coding bypass data. Must be 1 in high bit rate profile, 0 otherwise")
   ("SAO",                                             m_bUseSAO,                                         true, "Enable Sample Adaptive Offset")
+#if JVET_W0066_CCSAO
+  ("CCSAO",                                           m_CCSAO,                                           true, "Cross-component Sample Adaptive Offset" )
+#endif
   ("TestSAODisableAtPictureLevel",                    m_bTestSAODisableAtPictureLevel,                  false, "Enables the testing of disabling SAO at the picture level after having analysed all blocks")
   ("SaoEncodingRate",                                 m_saoEncodingRate,                                 0.75, "When >0 SAO early picture termination is enabled for luma and chroma")
   ("SaoEncodingRateChroma",                           m_saoEncodingRateChroma,                            0.5, "The SAO early picture termination rate to use for chroma (when m_SaoEncodingRate is >0). If <=0, use results for luma")
@@ -4233,6 +4239,9 @@ void EncAppCfg::xPrintParameter()
   msg( VERBOSE, "Slices: %d ", m_numSlicesInPic);
   msg( VERBOSE, "MCTS:%d ", m_MCTSEncConstraint );
   msg( VERBOSE, "SAO:%d ", (m_bUseSAO)?(1):(0));
+#if JVET_W0066_CCSAO
+  msg( VERBOSE, "CCSAO:%d ", m_CCSAO ? 1 : 0 );
+#endif
   msg( VERBOSE, "ALF:%d ", m_alf ? 1 : 0 );
   msg( VERBOSE, "CCALF:%d ", m_ccalf ? 1 : 0 );
 

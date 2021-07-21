@@ -169,9 +169,17 @@ void EncLib::create( const int layerId )
     m_cEncALF.create(this, m_iSourceWidth, m_iSourceHeight, m_chromaFormatIDC, m_maxCUWidth, m_maxCUHeight, floorLog2(m_maxCUWidth) - m_log2MinCUSize, m_bitDepth, m_inputBitDepth);
   }
 #if JVET_V0094_BILATERAL_FILTER
+#if JVET_W0066_CCSAO
+  if (m_bUseSAO || m_BIF || m_CCSAO)
+#else
   if (m_bUseSAO || m_BIF)
+#endif
+#else
+#if JVET_W0066_CCSAO
+  if (m_bUseSAO || m_CCSAO)
 #else
   if (m_bUseSAO)
+#endif
 #endif
   {
     const uint32_t widthInCtus = (m_iSourceWidth + m_maxCUWidth - 1) / m_maxCUWidth;
@@ -1268,6 +1276,9 @@ void EncLib::xInitSPS( SPS& sps )
   cinfo->setNoQtbttDualTreeIntraConstraintFlag(m_noQtbttDualTreeIntraConstraintFlag);
   cinfo->setNoPartitionConstraintsOverrideConstraintFlag(m_noPartitionConstraintsOverrideConstraintFlag);
   cinfo->setNoSaoConstraintFlag(m_noSaoConstraintFlag);
+#if JVET_W0066_CCSAO
+  cinfo->setNoCCSaoConstraintFlag(m_noCCSaoConstraintFlag);
+#endif
   cinfo->setNoAlfConstraintFlag(m_noAlfConstraintFlag);
   cinfo->setNoCCAlfConstraintFlag(m_noCCAlfConstraintFlag);
 #if JVET_S0058_GCI
@@ -1474,6 +1485,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseWPBiPred( m_useWeightedBiPred );
 
   sps.setSAOEnabledFlag( m_bUseSAO );
+#if JVET_W0066_CCSAO
+  sps.setCCSAOEnabledFlag( m_CCSAO );
+#endif
   sps.setJointCbCrEnabledFlag( m_JointCbCrMode );
   sps.setMaxTLayers( m_maxTempLayer );
   sps.setTemporalIdNestingFlag( ( m_maxTempLayer == 1 ) ? true : false );

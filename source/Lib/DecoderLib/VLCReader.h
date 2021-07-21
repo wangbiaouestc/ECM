@@ -201,6 +201,9 @@ public:
 #endif
   void  decodeScalingList   ( ScalingList *scalingList, uint32_t scalingListId, bool isPredictor);
   void parseReshaper        ( SliceReshapeInfo& sliceReshaperInfo, const SPS* pcSPS, const bool isIntra );
+#if JVET_W0066_CCSAO
+  void parseCcSao           ( Slice* pcSlice, PicHeader* picHeader, const SPS* sps, CcSaoComParam& ccSaoParam );
+#endif
 #if ALF_IMPROVEMENT
   int  alfGolombDecode( const int k, const bool signed_val = true );
   void alfFilter( AlfParam& alfParam, const bool isChroma, const int altIdx, int order0, int order1 );

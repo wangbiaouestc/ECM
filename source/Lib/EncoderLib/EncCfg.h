@@ -212,6 +212,9 @@ protected:
 #endif
   bool      m_noPartitionConstraintsOverrideConstraintFlag;
   bool      m_noSaoConstraintFlag;
+#if JVET_W0066_CCSAO
+  bool      m_noCCSaoConstraintFlag;
+#endif
   bool      m_noAlfConstraintFlag;
   bool      m_noCCAlfConstraintFlag;
 #if JVET_S0058_GCI
@@ -481,6 +484,9 @@ protected:
   bool      m_DeblockingFilterMetric;
 #endif
   bool      m_bUseSAO;
+#if JVET_W0066_CCSAO
+  bool      m_CCSAO;
+#endif
   bool      m_bTestSAODisableAtPictureLevel;
   double    m_saoEncodingRate;       // When non-0 SAO early picture termination is enabled for luma and chroma
   double    m_saoEncodingRateChroma; // The SAO early picture termination rate to use for chroma (when m_SaoEncodingRate is >0). If <=0, use results for luma.
@@ -949,6 +955,10 @@ public:
   void      setNoPartitionConstraintsOverrideConstraintFlag(bool val) { m_noPartitionConstraintsOverrideConstraintFlag = val; }
   bool      getNoSaoConstraintFlag() const { return m_noSaoConstraintFlag; }
   void      setNoSaoConstraintFlag(bool val) { m_noSaoConstraintFlag = val; }
+#if JVET_W0066_CCSAO
+  bool      getNoCCSaoConstraintFlag() const { return m_noCCSaoConstraintFlag; }
+  void      setNoCCSaoConstraintFlag(bool val) { m_noCCSaoConstraintFlag = val; }
+#endif
   bool      getNoAlfConstraintFlag() const { return m_noAlfConstraintFlag; }
   void      setNoAlfConstraintFlag(bool val) { m_noAlfConstraintFlag = val; }
   bool      getNoCCAlfConstraintFlag() const { return m_noCCAlfConstraintFlag; }
@@ -1670,6 +1680,10 @@ public:
   bool      getSingleSlicePerSubPicFlagFlag( )                       { return m_singleSlicePerSubPicFlag;    }
   void      setUseSAO                  (bool bVal)                   { m_bUseSAO = bVal; }
   bool      getUseSAO                  ()                            { return m_bUseSAO; }
+#if JVET_W0066_CCSAO
+  void      setUseCCSAO( bool b )                                    { m_CCSAO = b; }
+  bool      getUseCCSAO()                                      const { return m_CCSAO; }
+#endif
   void  setTestSAODisableAtPictureLevel (bool bVal)                  { m_bTestSAODisableAtPictureLevel = bVal; }
   bool  getTestSAODisableAtPictureLevel ( ) const                    { return m_bTestSAODisableAtPictureLevel; }
 

@@ -145,6 +145,24 @@ void CABACReader::coding_tree_unit( CodingStructure& cs, const UnitArea& area, i
 #endif
 
   sao( cs, ctuRsAddr );
+#if JVET_W0066_CCSAO
+  if (cs.sps->getCCSAOEnabledFlag())
+  {
+    for ( int compIdx = 0; compIdx < getNumberValidComponents( cs.pcv->chrFormat ); compIdx++ )
+    {
+      if (cs.slice->m_ccSaoComParam.enabled[compIdx])
+      {
+        const int setNum = cs.slice->m_ccSaoComParam.setNum[compIdx];
+
+        const int      ry = ctuRsAddr / cs.pcv->widthInCtus;
+        const int      rx = ctuRsAddr % cs.pcv->widthInCtus;
+        const Position lumaPos(rx * cs.pcv->maxCUWidth, ry * cs.pcv->maxCUHeight);
+
+        ccSaoControlIdc(cs, ComponentID(compIdx), ctuRsAddr, cs.slice->m_ccSaoControl[compIdx], lumaPos, setNum);
+      }
+    }
+  }
+#endif
   if (cs.sps->getALFEnabledFlag() && (cs.slice->getTileGroupAlfEnabledFlag(COMPONENT_Y)))
   {
     const PreCalcValues& pcv = *cs.pcv;
@@ -559,6 +577,46 @@ void CABACReader::bif(CodingStructure& cs, unsigned ctuRsAddr)
       bifParams.ctuOn[i] = 0;
     }
   }
+}
+#endif
+
+#if JVET_W0066_CCSAO
+void CABACReader::ccSaoControlIdc(CodingStructure &cs, const ComponentID compID, const int curIdx,
+                                  uint8_t *controlIdc, Position lumaPos, int setNum)
+{
+  //RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__CROSS_COMPONENT_SAO_BLOCK_LEVEL_IDC );
+
+  Position       leftLumaPos    = lumaPos.offset(-(int)cs.pcv->maxCUWidth, 0);
+  Position       aboveLumaPos   = lumaPos.offset(0, -(int)cs.pcv->maxCUWidth);
+  const uint32_t curSliceIdx    = cs.slice->getIndependentSliceIdx();
+  const uint32_t curTileIdx     = cs.pps->getTileIdx( lumaPos );
+  bool           leftAvail      = cs.getCURestricted( leftLumaPos,  lumaPos, curSliceIdx, curTileIdx, CH_L ) ? true : false;
+  bool           aboveAvail     = cs.getCURestricted( aboveLumaPos, lumaPos, curSliceIdx, curTileIdx, CH_L ) ? true : false;
+  int            ctxt           = 0;
+
+  if (leftAvail)
+  {
+    ctxt += ( controlIdc[curIdx - 1] ) ? 1 : 0;
+  }
+  if (aboveAvail)
+  {
+    ctxt += ( controlIdc[curIdx - cs.pcv->widthInCtus] ) ? 1 : 0;
+  }
+  ctxt += ( compID == COMPONENT_Y  ) ? 0 
+        : ( compID == COMPONENT_Cb ) ? 3 : 6;
+
+  int idcVal  = m_BinDecoder.decodeBin( Ctx::CcSaoControlIdc( ctxt ) );
+  if ( idcVal )
+  {
+    while ( ( idcVal != setNum ) && m_BinDecoder.decodeBinEP() )
+    {
+      idcVal++;
+    }
+  }
+  controlIdc[curIdx] = idcVal;
+
+  DTRACE(g_trace_ctx, D_SYNTAX, "ccSaoControlIdc() compID=%d pos=(%d,%d) ctxt=%d, setNum=%d, idcVal=%d\n",
+         compID, lumaPos.x, lumaPos.y, ctxt, setNum, idcVal);
 }
 #endif
 

@@ -299,6 +299,9 @@ class ConstraintInfo
 #endif
   bool              m_noPartitionConstraintsOverrideConstraintFlag;
   bool              m_noSaoConstraintFlag;
+#if JVET_W0066_CCSAO
+  bool              m_noCCSaoConstraintFlag;
+#endif
   bool              m_noAlfConstraintFlag;
   bool              m_noCCAlfConstraintFlag;
 #if JVET_S0058_GCI
@@ -417,6 +420,9 @@ public:
 #endif
     , m_noPartitionConstraintsOverrideConstraintFlag(false)
     , m_noSaoConstraintFlag      (false)
+#if JVET_W0066_CCSAO
+    , m_noCCSaoConstraintFlag      (false)
+#endif
     , m_noAlfConstraintFlag      (false)
     , m_noCCAlfConstraintFlag      (false)
 #if JVET_S0058_GCI
@@ -583,6 +589,10 @@ public:
   void          setNoPartitionConstraintsOverrideConstraintFlag(bool bVal) { m_noPartitionConstraintsOverrideConstraintFlag = bVal; }
   bool          getNoSaoConstraintFlag() const { return m_noSaoConstraintFlag; }
   void          setNoSaoConstraintFlag(bool bVal) { m_noSaoConstraintFlag = bVal; }
+#if JVET_W0066_CCSAO
+  bool          getNoCCSaoConstraintFlag() const { return m_noCCSaoConstraintFlag; }
+  void          setNoCCSaoConstraintFlag(bool val) { m_noCCSaoConstraintFlag = val; }
+#endif
   bool          getNoAlfConstraintFlag() const { return m_noAlfConstraintFlag; }
   void          setNoAlfConstraintFlag(bool bVal) { m_noAlfConstraintFlag = bVal; }
   bool          getNoCCAlfConstraintFlag() const { return m_noCCAlfConstraintFlag; }
@@ -1604,6 +1614,9 @@ private:
   bool              m_useWeightedBiPred;                 //!< Use of Weighting Bi-Prediction (B_SLICE)
 
   bool              m_saoEnabledFlag;
+#if JVET_W0066_CCSAO
+  bool              m_ccSaoEnabledFlag;
+#endif
 
   bool              m_bTemporalIdNestingFlag; // temporal_id_nesting_flag
 
@@ -1923,6 +1936,10 @@ public:
 
   void                    setSAOEnabledFlag(bool bVal)                                                    { m_saoEnabledFlag = bVal;                                                    }
   bool                    getSAOEnabledFlag() const                                                       { return m_saoEnabledFlag;                                                    }
+#if JVET_W0066_CCSAO
+  bool                    getCCSAOEnabledFlag() const                                                     { return m_ccSaoEnabledFlag; }
+  void                    setCCSAOEnabledFlag( bool b )                                                   { m_ccSaoEnabledFlag = b;    }
+#endif
 
   bool                    getALFEnabledFlag() const                                                       { return m_alfEnabledFlag; }
   void                    setALFEnabledFlag( bool b )                                                     { m_alfEnabledFlag = b; }
@@ -2670,6 +2687,9 @@ private:
 #endif
   int                         m_qpDelta;                                                //!< value of Qp delta
   bool                        m_saoEnabledFlag[MAX_NUM_CHANNEL_TYPE];                   //!< sao enabled flags for each channel
+#if JVET_W0066_CCSAO
+  bool                        m_ccSaoEnabledFlag[MAX_NUM_COMPONENT];
+#endif
 #if ALF_IMPROVEMENT
   int                         m_alfFixedFilterSetIdx;
 #endif
@@ -2804,6 +2824,10 @@ public:
   int                         getQpDelta() const                                        { return m_qpDelta;                                                                            }
   void                        setSaoEnabledFlag(ChannelType chType, bool b)             { m_saoEnabledFlag[chType] = b;                                                                }
   bool                        getSaoEnabledFlag(ChannelType chType) const               { return m_saoEnabledFlag[chType];                                                             }
+#if JVET_W0066_CCSAO
+  void                        setCcSaoEnabledFlag(ComponentID compId, bool b)           { m_ccSaoEnabledFlag[compId] = b;                                                              }
+  bool                        getCcSaoEnabledFlag(ComponentID compId) const             { return m_ccSaoEnabledFlag[compId];                                                           }
+#endif
 #if ALF_IMPROVEMENT
   void                        setAlfFixedFilterSetIdx(int i)                            { m_alfFixedFilterSetIdx = i;                                                                  }
   int                         getAlfFixedFilterSetIdx() const                           { return m_alfFixedFilterSetIdx;                                                               }
@@ -2916,6 +2940,9 @@ class Slice
 private:
   //  Bitstream writing
   bool                       m_saoEnabledFlag[MAX_NUM_CHANNEL_TYPE];
+#if JVET_W0066_CCSAO
+  bool                       m_ccSaoEnabledFlag[MAX_NUM_COMPONENT];
+#endif
   int                        m_iPOC;
   int                        m_iLastIDR;
   int                        m_prevGDRInSameLayerPOC;  //< the previous GDR in the same layer
@@ -3078,6 +3105,11 @@ public:
   APS**                       getAlfAPSs()                                           { return m_alfApss;                                             }
   void                        setSaoEnabledFlag(ChannelType chType, bool s)          {m_saoEnabledFlag[chType] =s;                                   }
   bool                        getSaoEnabledFlag(ChannelType chType) const            { return m_saoEnabledFlag[chType];                              }
+#if JVET_W0066_CCSAO
+  void                        resetCcSaoEnabledFlag()                                { memset(m_ccSaoEnabledFlag, 0, sizeof(m_ccSaoEnabledFlag));    }
+  void                        setCcSaoEnabledFlag(ComponentID compID, bool b)        { m_ccSaoEnabledFlag[compID] = b;                               }
+  bool                        getCcSaoEnabledFlag(ComponentID compID)                { return m_ccSaoEnabledFlag[compID];                            }
+#endif
   void                        setRPL0(const ReferencePictureList *pcRPL)             { m_pRPL0 = pcRPL;                                             }
   void                        setRPL1(const ReferencePictureList *pcRPL)             { m_pRPL1 = pcRPL;                                             }
   const ReferencePictureList* getRPL0()                                              { return m_pRPL0;                                              }
@@ -3389,6 +3421,10 @@ public:
   bool                        isLastSliceInSubpic();
 #endif
 
+#if JVET_W0066_CCSAO
+  CcSaoComParam               m_ccSaoComParam;
+  uint8_t*                    m_ccSaoControl[MAX_NUM_COMPONENT];
+#endif
   CcAlfFilterParam            m_ccAlfFilterParam;
   uint8_t*                    m_ccAlfFilterControl[2];
 

@@ -3100,6 +3100,13 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
       CS::setRefinedMotionField(cs);
 #endif
 
+#if JVET_W0066_CCSAO
+      if ( cs.sps->getCCSAOEnabledFlag() )
+      {
+        m_pcSAO->getCcSaoBuf().copyFrom( cs.getRecoBuf() );
+      }
+#endif
+
 #if JVET_V0094_BILATERAL_FILTER
       // We need to do this step if at least one of BIF or SAO are enabled.
       if( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF())
@@ -3148,6 +3155,24 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
       }
 #endif
       }
+
+#if JVET_W0066_CCSAO
+      if ( pcSlice->getSPS()->getCCSAOEnabledFlag() )
+      {
+        m_pcSAO->initCABACEstimator( m_pcEncLib->getCABACEncoder(), m_pcEncLib->getCtxCache(), pcSlice );
+        m_pcSAO->CCSAOProcess( cs, pcSlice->getLambdas(), m_pcCfg->getIntraPeriod() );
+
+        //assign CCSAO slice header
+        for (int s = 0; s < uiNumSliceSegments; s++)
+        {
+          pcPic->slices[s]->m_ccSaoComParam              = m_pcSAO->getCcSaoComParam();
+          pcPic->slices[s]->m_ccSaoControl[COMPONENT_Y]  = m_pcSAO->getCcSaoControlIdc(COMPONENT_Y);
+          pcPic->slices[s]->m_ccSaoControl[COMPONENT_Cb] = m_pcSAO->getCcSaoControlIdc(COMPONENT_Cb);
+          pcPic->slices[s]->m_ccSaoControl[COMPONENT_Cr] = m_pcSAO->getCcSaoControlIdc(COMPONENT_Cr);
+        }
+      }
+      m_pcSAO->jointClipSaoBifCcSao( cs );
+#endif
 
       if( pcSlice->getSPS()->getALFEnabledFlag() )
       {
@@ -3522,6 +3547,11 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
           {
             picHeader->setSaoEnabledFlag(CHANNEL_TYPE_LUMA,   pcSlice->getSaoEnabledFlag(CHANNEL_TYPE_LUMA  ));
             picHeader->setSaoEnabledFlag(CHANNEL_TYPE_CHROMA, pcSlice->getSaoEnabledFlag(CHANNEL_TYPE_CHROMA));
+#if JVET_W0066_CCSAO
+            picHeader->setCcSaoEnabledFlag(COMPONENT_Y,  pcSlice->getCcSaoEnabledFlag(COMPONENT_Y));
+            picHeader->setCcSaoEnabledFlag(COMPONENT_Cb, pcSlice->getCcSaoEnabledFlag(COMPONENT_Cb));
+            picHeader->setCcSaoEnabledFlag(COMPONENT_Cr, pcSlice->getCcSaoEnabledFlag(COMPONENT_Cr));
+#endif
           }
 
           // code ALF parameters in picture header or slice headers

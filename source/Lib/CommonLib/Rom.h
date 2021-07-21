@@ -324,5 +324,9 @@ extern uint8_t g_geoTmShape[2][GEO_NUM_ANGLES];
 #if MULTI_HYP_PRED
 extern const int g_addHypWeight[MULTI_HYP_PRED_NUM_WEIGHTS];
 #endif
+#if JVET_W0066_CCSAO
+extern const int8_t g_ccSaoCandPosX[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y];
+extern const int8_t g_ccSaoCandPosY[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y];
+#endif
 #endif  //__TCOMROM__
 
