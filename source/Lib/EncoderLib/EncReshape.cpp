@@ -104,7 +104,6 @@ void  EncReshape::createEnc(int picWidth, int picHeight, uint32_t maxCUWidth, ui
   {
     m_chromaAdjHelpLUT.resize(PIC_CODE_CW_BINS, 1<<CSCALE_FP_PREC);
   }
-
   m_sliceReshapeInfo.setUseSliceReshaper(true);
   m_sliceReshapeInfo.setSliceReshapeChromaAdj(true);
   m_sliceReshapeInfo.setSliceReshapeModelPresentFlag(true);

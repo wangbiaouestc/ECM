@@ -4540,4 +4540,23 @@ int8_t    g_angle2mirror[GEO_NUM_ANGLES] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
 const int g_addHypWeight[MULTI_HYP_PRED_NUM_WEIGHTS] = { 2, -1 };
 static_assert(g_BcwLog2WeightBase == MULTI_HYP_PRED_WEIGHT_BITS, "number of bits for gbi and multi-hyp weights do not match");
 #endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+uint8_t g_geoTmShape[2][GEO_NUM_ANGLES] = {
+                                          { GEO_TM_SHAPE_A,  0,               GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,
+                                            GEO_TM_SHAPE_A,  GEO_TM_SHAPE_AL, 0,               0,
+                                            GEO_TM_SHAPE_AL, 0,               0,               GEO_TM_SHAPE_AL,
+                                            GEO_TM_SHAPE_AL, GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,  0,
+                                            GEO_TM_SHAPE_A,  0,               GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,
+                                            GEO_TM_SHAPE_A,  GEO_TM_SHAPE_AL, 0,               0,
+                                            GEO_TM_SHAPE_AL, 0,               0,               GEO_TM_SHAPE_AL,
+                                            GEO_TM_SHAPE_AL, GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,  0, },
+                                          { GEO_TM_SHAPE_AL, 0,               GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL,
+                                            GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,  0,               0,
+                                            GEO_TM_SHAPE_L,  0,               0,               GEO_TM_SHAPE_L,
+                                            GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, 0,
+                                            GEO_TM_SHAPE_AL, 0,               GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL,
+                                            GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,  0,               0,
+                                            GEO_TM_SHAPE_L,  0,               0,               GEO_TM_SHAPE_L,
+                                            GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, 0, } };
+#endif
 //! \}

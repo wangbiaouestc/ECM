@@ -637,6 +637,16 @@ void PredictionUnit::initData()
   geoSplitDir  = MAX_UCHAR;
   geoMergeIdx0 = MAX_UCHAR;
   geoMergeIdx1 = MAX_UCHAR;
+#if JVET_W0097_GPM_MMVD_TM
+  geoMMVDFlag0 = false;
+  geoMMVDIdx0 = MAX_UCHAR;
+  geoMMVDFlag1 = false;
+  geoMMVDIdx1 = MAX_UCHAR;
+#if TM_MRG
+  geoTmFlag0 = false;
+  geoTmFlag1 = false;
+#endif
+#endif
   mmvdMergeFlag = false;
   mmvdMergeIdx = MAX_UCHAR;
 #if AFFINE_MMVD
@@ -717,6 +727,16 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   geoSplitDir  = predData.geoSplitDir;
   geoMergeIdx0 = predData.geoMergeIdx0;
   geoMergeIdx1 = predData.geoMergeIdx1;
+#if JVET_W0097_GPM_MMVD_TM
+  geoMMVDFlag0 = predData.geoMMVDFlag0;
+  geoMMVDIdx0 = predData.geoMMVDIdx0;
+  geoMMVDFlag1 = predData.geoMMVDFlag1;
+  geoMMVDIdx1 = predData.geoMMVDIdx1;
+#if TM_MRG
+  geoTmFlag0 = predData.geoTmFlag0;
+  geoTmFlag1 = predData.geoTmFlag1;
+#endif
+#endif
   mmvdMergeFlag = predData.mmvdMergeFlag;
   mmvdMergeIdx = predData.mmvdMergeIdx;
 #if AFFINE_MMVD
@@ -793,6 +813,16 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   geoSplitDir  = other.geoSplitDir;
   geoMergeIdx0 = other.geoMergeIdx0;
   geoMergeIdx1 = other.geoMergeIdx1;
+#if JVET_W0097_GPM_MMVD_TM
+  geoMMVDFlag0 = other.geoMMVDFlag0;
+  geoMMVDIdx0 = other.geoMMVDIdx0;
+  geoMMVDFlag1 = other.geoMMVDFlag1;
+  geoMMVDIdx1 = other.geoMMVDIdx1;
+#if TM_MRG
+  geoTmFlag0 = other.geoTmFlag0;
+  geoTmFlag1 = other.geoTmFlag1;
+#endif
+#endif
   mmvdMergeFlag = other.mmvdMergeFlag;
   mmvdMergeIdx = other.mmvdMergeIdx;
 #if AFFINE_MMVD

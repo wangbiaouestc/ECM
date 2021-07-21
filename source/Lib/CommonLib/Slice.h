@@ -2658,6 +2658,9 @@ private:
   bool                        m_disDmvrFlag;                                            //!< picture level DMVR disable flag
   bool                        m_disProfFlag;                                            //!< picture level PROF disable flag
   bool                        m_jointCbCrSignFlag;                                      //!< joint Cb/Cr residual sign flag
+#if JVET_W0097_GPM_MMVD_TM
+  bool                        m_gpmMMVDTableFlag;
+#endif
   int                         m_qpDelta;                                                //!< value of Qp delta
   bool                        m_saoEnabledFlag[MAX_NUM_CHANNEL_TYPE];                   //!< sao enabled flags for each channel
 #if ALF_IMPROVEMENT
@@ -2786,6 +2789,10 @@ public:
   bool                        getDisProfFlag() const                                    { return m_disProfFlag;                                                                        }
   void                        setJointCbCrSignFlag( bool b )                            { m_jointCbCrSignFlag = b;                                                                     }
   bool                        getJointCbCrSignFlag() const                              { return m_jointCbCrSignFlag;                                                                  }
+#if JVET_W0097_GPM_MMVD_TM
+  void                        setGPMMMVDTableFlag(bool b)                               { m_gpmMMVDTableFlag = b;                                                                      }
+  bool                        getGPMMMVDTableFlag() const                               { return m_gpmMMVDTableFlag;                                                                   }
+#endif
   void                        setQpDelta(int b)                                         { m_qpDelta = b;                                                                               }
   int                         getQpDelta() const                                        { return m_qpDelta;                                                                            }
   void                        setSaoEnabledFlag(ChannelType chType, bool b)             { m_saoEnabledFlag[chType] = b;                                                                }

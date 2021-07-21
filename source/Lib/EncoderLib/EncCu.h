@@ -148,7 +148,61 @@ public:
   }
   int numGeoTemplatesInitialized;
 };
+#if JVET_W0097_GPM_MMVD_TM
+struct SingleGeoMMVDMergeEntry
+{
+  int mergeIdx;
+  int mmvdIdx;   // 0 - mmvd OFF; 1 - mmvdIdx = 0; 2 - mmvdIdx = 1; 3 - mmvdIdx = 2; ...
+  double cost;
+  SingleGeoMMVDMergeEntry() : mergeIdx(0), mmvdIdx(0), cost(MAX_DOUBLE) {};
+  SingleGeoMMVDMergeEntry(int _mergeIdx, int _mmvdIdx, double _cost) : mergeIdx(_mergeIdx), mmvdIdx(_mmvdIdx), cost(_cost) {};
+};
 
+class FastGeoMMVDCostList
+{
+public:
+  FastGeoMMVDCostList()
+  {
+    for (int partIdx = 0; partIdx < 2; partIdx++)
+    {
+      singleDistList[partIdx] = new SingleGeoMMVDMergeEntry**[GEO_NUM_PARTITION_MODE];
+      for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
+      {
+        singleDistList[partIdx][splitDir] = new SingleGeoMMVDMergeEntry*[MRG_MAX_NUM_CANDS];
+        for (int candIdx = 0; candIdx < MRG_MAX_NUM_CANDS; candIdx++)
+        {
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+          singleDistList[partIdx][splitDir][candIdx] = new SingleGeoMMVDMergeEntry[GPM_EXT_MMVD_MAX_REFINE_NUM + 2];
+#else
+          singleDistList[partIdx][splitDir][candIdx] = new SingleGeoMMVDMergeEntry[GPM_EXT_MMVD_MAX_REFINE_NUM + 1];
+#endif
+        }
+      }
+    }
+  }
+  ~FastGeoMMVDCostList()
+  {
+    for (int partIdx = 0; partIdx < 2; partIdx++)
+    {
+      for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
+      {
+        for (int candIdx = 0; candIdx < MRG_MAX_NUM_CANDS; candIdx++)
+        {
+          delete[] singleDistList[partIdx][splitDir][candIdx];
+        }
+        delete[] singleDistList[partIdx][splitDir];
+      }
+      delete[] singleDistList[partIdx];
+      singleDistList[partIdx] = nullptr;
+    }
+  }
+  SingleGeoMMVDMergeEntry*** singleDistList[2];
+  void insert(int geoIdx, int partIdx, int mergeIdx, int mmvdIdx, double cost)
+  {
+    singleDistList[partIdx][geoIdx][mergeIdx][mmvdIdx] = SingleGeoMMVDMergeEntry(mergeIdx, mmvdIdx, cost);
+  }
+};
+#endif
 class EncCu
   : DecCu
 {
@@ -212,6 +266,20 @@ private:
 
   PelStorage            m_acGeoWeightedBuffer[GEO_MAX_TRY_WEIGHTED_SAD]; // to store weighted prediction pixels
   FastGeoCostList       m_GeoCostList;
+#if JVET_W0097_GPM_MMVD_TM
+  PelStorage            m_acGeoMMVDBuffer[MRG_MAX_NUM_CANDS][GPM_EXT_MMVD_MAX_REFINE_NUM];
+  PelStorage            m_acGeoMMVDTmpBuffer[MRG_MAX_NUM_CANDS][GPM_EXT_MMVD_MAX_REFINE_NUM];
+  FastGeoMMVDCostList   m_GeoMMVDCostList;
+  bool fastGpmMmvdSearch;
+  bool fastGpmMmvdRelatedCU;
+  bool includeMoreMMVDCandFirstPass;
+  int  maxNumGPMDirFirstPass;
+  int  numCandPerPar;
+#if TM_MRG
+  PelStorage            m_acGeoMergeTmpBuffer[GEO_TM_MAX_NUM_CANDS];
+  PelStorage            m_acGeoSADTmpBuffer[GEO_TM_MAX_NUM_CANDS];
+#endif
+#endif
   double                m_AFFBestSATDCost;
   double                m_mergeBestSATDCost;
   MotionInfo            m_SubPuMiBuf      [( MAX_CU_SIZE * MAX_CU_SIZE ) >> ( MIN_CU_LOG2 << 1 )];
@@ -240,6 +308,10 @@ private:
                               const bool updateRdCostLambda );
 #endif
   double                m_sbtCostSave[2];
+#if JVET_W0097_GPM_MMVD_TM
+  MergeCtx              m_mergeCand;
+  bool                  m_mergeCandAvail;
+#endif
 public:
   /// copy parameters from encoder class
   void  init                ( EncLib* pcEncLib, const SPS& sps PARL_PARAM( const int jId = 0 ) );
@@ -333,9 +405,11 @@ protected:
 #endif
                               );
 #endif
+#if !JVET_W0097_GPM_MMVD_TM
   void xCheckSATDCostGeoMerge 
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx geoMergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
                                 , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);
+#endif
 #else
   void xCheckRDCostAffineMerge2Nx2N
                               ( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode );
@@ -360,7 +434,11 @@ protected:
 #if ENABLE_OBMC 
   void xCheckRDCostInterWoOBMC(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode);
 #endif
+#if JVET_W0097_GPM_MMVD_TM
+  void xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode, bool isSecondPass = false);
+#else
   void xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode);
+#endif
   void xEncodeInterResidual(   CodingStructure *&tempCS
                              , CodingStructure *&bestCS
                              , Partitioner &partitioner

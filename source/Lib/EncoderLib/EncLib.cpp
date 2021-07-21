@@ -2133,6 +2133,30 @@ void EncLib::xInitPicHeader(PicHeader &picHeader, const SPS &sps, const PPS &pps
   picHeader.setDisBdofFlag(false);
   picHeader.setDisDmvrFlag(false);
   picHeader.setDisProfFlag(false);
+#if JVET_W0097_GPM_MMVD_TM
+  if (sps.getUseGeo())
+  {
+#if TOOLS
+    if (getIntraPeriod() > 0)
+    {
+      if ((getSourceWidth() * getSourceHeight()) > (1920 * 1080))
+      {
+        picHeader.setGPMMMVDTableFlag(false);
+      }
+      else
+      {
+        picHeader.setGPMMMVDTableFlag(true);
+      }
+    }
+    else
+    {
+      picHeader.setGPMMMVDTableFlag(true);
+    }
+#else
+  picHeader.setGPMMMVDTableFlag(false);
+#endif
+  }
+#endif
 }
 
 void EncLib::xInitAPS(APS &aps)

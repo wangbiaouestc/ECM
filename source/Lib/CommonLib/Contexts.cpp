@@ -853,6 +853,28 @@ const CtxSet ContextSetCfg::MmvdStepMvpIdx = ContextSetCfg::addCtxSet
 	{ 0 }
 });
 
+#if JVET_W0097_GPM_MMVD_TM
+const CtxSet ContextSetCfg::GeoMmvdFlag = ContextSetCfg::addCtxSet
+({
+  { 25 },
+  { 33 },
+  { 35 },
+  { 5 },
+  { 4 },
+  { 4 }
+  });
+
+const CtxSet ContextSetCfg::GeoMmvdStepMvpIdx = ContextSetCfg::addCtxSet
+({
+  { 59 },
+  { 60 },
+  { 35 },
+  { 0 },
+  { 0 },
+  { 0 }
+  });
+#endif
+
 #if AFFINE_MMVD
 const CtxSet ContextSetCfg::AfMmvdFlag = ContextSetCfg::addCtxSet
 ({
@@ -2001,6 +2023,24 @@ const CtxSet ContextSetCfg::MmvdStepMvpIdx = ContextSetCfg::addCtxSet
   { CNU, },
   {   0, },
 });
+
+#if JVET_W0097_GPM_MMVD_TM
+const CtxSet ContextSetCfg::GeoMmvdFlag = ContextSetCfg::addCtxSet
+({
+  {  25, },
+  {  26, },
+  { CNU, },
+  {   4, },
+  });
+
+const CtxSet ContextSetCfg::GeoMmvdStepMvpIdx = ContextSetCfg::addCtxSet
+({
+  {  59, },
+  {  60, },
+  { CNU, },
+  {   0, },
+  });
+#endif
 
 #if AFFINE_MMVD
 const CtxSet ContextSetCfg::AfMmvdFlag = ContextSetCfg::addCtxSet

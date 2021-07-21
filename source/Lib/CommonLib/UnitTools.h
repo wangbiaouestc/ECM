@@ -155,7 +155,7 @@ namespace PU
   uint32_t getFinalIntraMode              (const PredictionUnit &pu, const ChannelType &chType);
   uint32_t getCoLocatedIntraLumaMode      (const PredictionUnit &pu);
   int      getWideAngle                   ( const TransformUnit &tu, const uint32_t dirMode, const ComponentID compID );
-#if MULTI_PASS_DMVR
+#if MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM
   uint32_t getBDMVRMvdThreshold       (const PredictionUnit &pu);
 #endif
 #if TM_MRG
@@ -236,8 +236,23 @@ namespace PU
   bool isLMCModeEnabled               (const PredictionUnit &pu, unsigned mode);
   bool isChromaIntraModeCrossCheckMode(const PredictionUnit &pu);
 
+#if JVET_W0097_GPM_MMVD_TM
+#if TM_MRG
+  void getGeoMergeCandidates(PredictionUnit &pu, MergeCtx &GeoMrgCtx, MergeCtx* mergeCtx = NULL);
+#else
+  void getGeoMergeCandidates(const PredictionUnit &pu, MergeCtx &GeoMrgCtx, MergeCtx* mergeCtx = NULL);
+#endif
+#else
   void getGeoMergeCandidates          (const PredictionUnit &pu, MergeCtx &GeoMrgCtx);
+#endif
   void spanGeoMotionInfo              (      PredictionUnit &pu, MergeCtx &GeoMrgCtx, const uint8_t splitDir, const uint8_t candIdx0, const uint8_t candIdx1);
+#if JVET_W0097_GPM_MMVD_TM
+#if TM_MRG
+  void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1);
+#else
+  void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &GeoMrgCtx, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool mmvdFlag1, const uint8_t mmvdIdx1);
+#endif
+#endif
   bool isAddNeighborMv  (const Mv& currMv, Mv* neighborMvs, int numNeighborMv);
   void getIbcMVPsEncOnly(PredictionUnit &pu, Mv* mvPred, int& nbPred);
   bool getDerivedBV(PredictionUnit &pu, const Mv& currentMv, Mv& derivedMv);
@@ -337,5 +352,128 @@ uint32_t updateCandList(T uiMode, double uiCost, static_vector<T, N>& candModeLi
   }
   return 0;
 }
+#if JVET_W0097_GPM_MMVD_TM
+template<size_t N>
+void orderCandList(uint8_t uiMode, bool bNonMMVDListCand, int splitDir, double uiCost, static_vector<uint8_t, N>& candModeList, static_vector<bool, N>& isNonMMVDListIdx, static_vector<int, N>&  candSplitDirList, static_vector<double, N>& candCostList, size_t uiFastCandNum = N)
+{
+  CHECK(std::min(uiFastCandNum, candModeList.size()) != std::min(uiFastCandNum, candCostList.size()), "Sizes do not match!");
+  CHECK(uiFastCandNum > candModeList.capacity(), "The vector is to small to hold all the candidates!");
 
+  size_t i;
+  size_t shift = 0;
+  size_t currSize = std::min(uiFastCandNum, candCostList.size());
+
+  while (shift < uiFastCandNum && shift < currSize && uiCost < candCostList[currSize - 1 - shift])
+  {
+    shift++;
+  }
+
+  if (candModeList.size() >= uiFastCandNum && shift != 0)
+  {
+    for (i = 1; i < shift; i++)
+    {
+      candModeList[currSize - i] = candModeList[currSize - 1 - i];
+      isNonMMVDListIdx[currSize - i] = isNonMMVDListIdx[currSize - 1 - i];
+      candSplitDirList[currSize - i] = candSplitDirList[currSize - 1 - i];
+      candCostList[currSize - i] = candCostList[currSize - 1 - i];
+    }
+    candModeList[currSize - shift] = uiMode;
+    isNonMMVDListIdx[currSize - shift] = bNonMMVDListCand;
+    candSplitDirList[currSize - shift] = splitDir;
+    candCostList[currSize - shift] = uiCost;
+    return;
+  }
+  else if (currSize < uiFastCandNum)
+  {
+    candModeList.insert(candModeList.end() - shift, uiMode);
+    isNonMMVDListIdx.insert(isNonMMVDListIdx.end() - shift, bNonMMVDListCand);
+    candSplitDirList.insert(candSplitDirList.end() - shift, splitDir);
+    candCostList.insert(candCostList.end() - shift, uiCost);
+    return;
+  }
+  return;
+}
+
+template<size_t N>
+uint32_t updateGeoMMVDCandList(double uiCost, int splitDir, int mergeCand0, int mergeCand1, int mmvdCand0, int mmvdCand1,
+  static_vector<double, N>& candCostList, static_vector<int, N>& geoSplitDirList, static_vector<int, N>& geoMergeCand0, static_vector<int, N>& geoMergeCand1, static_vector<int, N>& geoMmvdCand0, static_vector<int, N>& geoMmvdCand1,
+  size_t uiFastCandNum)
+{
+  CHECK(std::min(uiFastCandNum, geoSplitDirList.size()) != std::min(uiFastCandNum, candCostList.size()), "Sizes do not match!");
+  CHECK(uiFastCandNum > candCostList.capacity(), "The vector is to small to hold all the candidates!");
+
+  size_t i;
+  size_t shift = 0;
+  size_t currSize = std::min(uiFastCandNum, candCostList.size());
+
+  while (shift < uiFastCandNum && shift < currSize && uiCost < candCostList[currSize - 1 - shift])
+  {
+    shift++;
+  }
+
+  if (candCostList.size() >= uiFastCandNum && shift != 0)
+  {
+    for (i = 1; i < shift; i++)
+    {
+      geoSplitDirList[currSize - i] = geoSplitDirList[currSize - 1 - i];
+      geoMergeCand0[currSize - i] = geoMergeCand0[currSize - 1 - i];
+      geoMergeCand1[currSize - i] = geoMergeCand1[currSize - 1 - i];
+      geoMmvdCand0[currSize - i] = geoMmvdCand0[currSize - 1 - i];
+      geoMmvdCand1[currSize - i] = geoMmvdCand1[currSize - 1 - i];
+      candCostList[currSize - i] = candCostList[currSize - 1 - i];
+    }
+    geoSplitDirList[currSize - shift] = splitDir;
+    geoMergeCand0[currSize - shift] = mergeCand0;
+    geoMergeCand1[currSize - shift] = mergeCand1;
+    geoMmvdCand0[currSize - shift] = mmvdCand0;
+    geoMmvdCand1[currSize - shift] = mmvdCand1;
+    candCostList[currSize - shift] = uiCost;
+    return 1;
+  }
+  else if (currSize < uiFastCandNum)
+  {
+    geoSplitDirList.insert(geoSplitDirList.end() - shift, splitDir);
+    geoMergeCand0.insert(geoMergeCand0.end() - shift, mergeCand0);
+    geoMergeCand1.insert(geoMergeCand1.end() - shift, mergeCand1);
+    geoMmvdCand0.insert(geoMmvdCand0.end() - shift, mmvdCand0);
+    geoMmvdCand1.insert(geoMmvdCand1.end() - shift, mmvdCand1);
+    candCostList.insert(candCostList.end() - shift, uiCost);
+    return 1;
+  }
+  return 0;
+}
+
+template<size_t N>
+void sortCandList(double uiCost, int mergeCand, int mmvdCand, static_vector<double, N>& candCostList, static_vector<int, N>& mergeCandList, static_vector<int, N>& mmvdCandList, int fastCandNum)
+{
+  size_t i;
+  size_t shift = 0;
+  size_t currSize = candCostList.size();
+  CHECK(currSize > fastCandNum, "list overflow!");
+
+  while (shift < currSize && uiCost < candCostList[currSize - 1 - shift])
+  {
+    shift++;
+  }
+
+  if (currSize == fastCandNum && shift != 0)
+  {
+    for (i = 1; i < shift; i++)
+    {
+      mergeCandList[currSize - i] = mergeCandList[currSize - 1 - i];
+      mmvdCandList[currSize - i] = mmvdCandList[currSize - 1 - i];
+      candCostList[currSize - i] = candCostList[currSize - 1 - i];
+    }
+    mergeCandList[currSize - shift] = mergeCand;
+    mmvdCandList[currSize - shift] = mmvdCand;
+    candCostList[currSize - shift] = uiCost;
+  }
+  else if (currSize < fastCandNum)
+  {
+    mergeCandList.insert(mergeCandList.end() - shift, mergeCand);
+    mmvdCandList.insert(mmvdCandList.end() - shift, mmvdCand);
+    candCostList.insert(candCostList.end() - shift, uiCost);
+  }
+}
+#endif
 #endif

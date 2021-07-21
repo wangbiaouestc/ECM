@@ -304,6 +304,9 @@ extern int16_t   g_weightOffset       [GEO_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE][
 extern int8_t    g_angle2mask         [GEO_NUM_ANGLES];
 extern int8_t    g_Dis[GEO_NUM_ANGLES];
 extern int8_t    g_angle2mirror[GEO_NUM_ANGLES];
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+extern uint8_t g_geoTmShape[2][GEO_NUM_ANGLES];
+#endif
 #if MULTI_HYP_PRED
 extern const int g_addHypWeight[MULTI_HYP_PRED_NUM_WEIGHTS];
 #endif

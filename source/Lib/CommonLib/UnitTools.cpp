@@ -1441,7 +1441,7 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
   mrgCtx.numValidMergeCand = cnt;
 }
 
-#if MULTI_PASS_DMVR
+#if MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM
 uint32_t PU::getBDMVRMvdThreshold(const PredictionUnit &pu)
 {
   uint32_t numPixels = pu.lwidth() * pu.lheight();
@@ -4777,7 +4777,15 @@ void PU::restrictBiPredMergeCandsOne(PredictionUnit &pu)
   }
 }
 
+#if JVET_W0097_GPM_MMVD_TM
+#if TM_MRG
+void PU::getGeoMergeCandidates(PredictionUnit &pu, MergeCtx& geoMrgCtx, MergeCtx* mergeCtx)
+#else
+void PU::getGeoMergeCandidates(const PredictionUnit &pu, MergeCtx& geoMrgCtx, MergeCtx* mergeCtx)
+#endif
+#else
 void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
+#endif
 {
   MergeCtx tmpMergeCtx;
 
@@ -4797,9 +4805,26 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
     geoMrgCtx.LICFlags[i] = false;
 #endif
   }
-
+#if JVET_W0097_GPM_MMVD_TM
+  if (mergeCtx == NULL)
+  {
+#if TM_MRG
+    const bool tmMergeFlag = pu.tmMergeFlag;
+    pu.tmMergeFlag = false;
+#endif
+#endif
   PU::getInterMergeCandidates(pu, tmpMergeCtx, 0);
-
+#if JVET_W0097_GPM_MMVD_TM
+#if TM_MRG
+  pu.tmMergeFlag = tmMergeFlag;
+#endif
+  }
+  else
+  {
+    memcpy(tmpMergeCtx.interDirNeighbours, mergeCtx->interDirNeighbours, maxNumMergeCand * sizeof(unsigned char));
+    memcpy(tmpMergeCtx.mvFieldNeighbours, mergeCtx->mvFieldNeighbours, (maxNumMergeCand << 1) * sizeof(MvField));
+  }
+#endif
   for (int32_t i = 0; i < maxNumMergeCand; i++)
   {
     int parity = i & 1;
@@ -4810,6 +4835,12 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
       geoMrgCtx.mvFieldNeighbours[(geoMrgCtx.numValidMergeCand << 1) + parity].mv = tmpMergeCtx.mvFieldNeighbours[(i << 1) + parity].mv;
       geoMrgCtx.mvFieldNeighbours[(geoMrgCtx.numValidMergeCand << 1) + !parity].refIdx = -1;
       geoMrgCtx.mvFieldNeighbours[(geoMrgCtx.numValidMergeCand << 1) + parity].refIdx = tmpMergeCtx.mvFieldNeighbours[(i << 1) + parity].refIdx;
+#if JVET_W0097_GPM_MMVD_TM
+      if (geoMrgCtx.xCheckSimilarMotion(geoMrgCtx.numValidMergeCand, PU::getBDMVRMvdThreshold(pu)))
+      {
+        continue;
+      }
+#endif
       geoMrgCtx.numValidMergeCand++;
       if (geoMrgCtx.numValidMergeCand == GEO_MAX_NUM_UNI_CANDS)
       {
@@ -4825,6 +4856,12 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
       geoMrgCtx.mvFieldNeighbours[(geoMrgCtx.numValidMergeCand << 1) + parity].mv = Mv(0, 0);
       geoMrgCtx.mvFieldNeighbours[(geoMrgCtx.numValidMergeCand << 1) + !parity].refIdx = tmpMergeCtx.mvFieldNeighbours[(i << 1) + !parity].refIdx;
       geoMrgCtx.mvFieldNeighbours[(geoMrgCtx.numValidMergeCand << 1) + parity].refIdx = -1;
+#if JVET_W0097_GPM_MMVD_TM
+      if (geoMrgCtx.xCheckSimilarMotion(geoMrgCtx.numValidMergeCand, PU::getBDMVRMvdThreshold(pu)))
+      {
+        continue;
+      }
+#endif
       geoMrgCtx.numValidMergeCand++;
       if (geoMrgCtx.numValidMergeCand == GEO_MAX_NUM_UNI_CANDS)
       {
@@ -4832,6 +4869,148 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
       }
     }
   }
+#if JVET_W0097_GPM_MMVD_TM
+  // add more parity based geo candidates, in an opposite parity rule
+  if (geoMrgCtx.numValidMergeCand < pu.cs->sps->getMaxNumGeoCand())
+  {
+    for (int32_t i = 0; i < maxNumMergeCand; i++)
+    {
+      int parity = i & 1;
+      if (tmpMergeCtx.interDirNeighbours[i] == 3)
+      {
+        geoMrgCtx.interDirNeighbours[geoMrgCtx.numValidMergeCand] = 2 - parity;
+        geoMrgCtx.mvFieldNeighbours[(geoMrgCtx.numValidMergeCand << 1) + !parity].mv = tmpMergeCtx.mvFieldNeighbours[(i << 1) + !parity].mv;
+        geoMrgCtx.mvFieldNeighbours[(geoMrgCtx.numValidMergeCand << 1) + parity].mv = Mv(0, 0);
+        geoMrgCtx.mvFieldNeighbours[(geoMrgCtx.numValidMergeCand << 1) + !parity].refIdx = tmpMergeCtx.mvFieldNeighbours[(i << 1) + !parity].refIdx;
+        geoMrgCtx.mvFieldNeighbours[(geoMrgCtx.numValidMergeCand << 1) + parity].refIdx = -1;
+        if (geoMrgCtx.xCheckSimilarMotion(geoMrgCtx.numValidMergeCand, PU::getBDMVRMvdThreshold(pu)))
+        {
+          continue;
+        }
+        geoMrgCtx.numValidMergeCand++;
+        if (geoMrgCtx.numValidMergeCand == pu.cs->sps->getMaxNumGeoCand())
+        {
+          return;
+        }
+      }
+    }
+  }
+
+  // add at most two average based geo candidates
+  if (geoMrgCtx.numValidMergeCand < pu.cs->sps->getMaxNumGeoCand())
+  {
+    // add one L0 cand by averaging the first two available L0 candidates
+    int cnt = 0;
+    int firstAvailRefIdx = -1;
+    Mv  avgMv;
+    avgMv.setZero();
+    for (int i = 0; i < geoMrgCtx.numValidMergeCand; i++)
+    {
+      if (cnt == 2)
+      {
+        break;
+      }
+      if (geoMrgCtx.interDirNeighbours[i] == 1)
+      {
+        avgMv += geoMrgCtx.mvFieldNeighbours[i * 2].mv;
+        if (firstAvailRefIdx == -1)
+        {
+          firstAvailRefIdx = geoMrgCtx.mvFieldNeighbours[i * 2].refIdx;
+        }
+        cnt++;
+      }
+    }
+    if (cnt == 2)
+    {
+      roundAffineMv(avgMv.hor, avgMv.ver, 1);
+      geoMrgCtx.interDirNeighbours[geoMrgCtx.numValidMergeCand] = 1;
+      geoMrgCtx.mvFieldNeighbours[geoMrgCtx.numValidMergeCand * 2].setMvField(avgMv, firstAvailRefIdx);
+      geoMrgCtx.mvFieldNeighbours[geoMrgCtx.numValidMergeCand * 2 + 1].setMvField(Mv(0, 0), NOT_VALID);
+
+      if (!geoMrgCtx.xCheckSimilarMotion(geoMrgCtx.numValidMergeCand, PU::getBDMVRMvdThreshold(pu)))
+      {
+        geoMrgCtx.numValidMergeCand++;
+      }
+      if (geoMrgCtx.numValidMergeCand == pu.cs->sps->getMaxNumGeoCand())
+      {
+        return;
+      }
+    }
+
+    // add one L1 cand by averaging the first two available L1 candidates
+    cnt = 0;
+    firstAvailRefIdx = -1;
+    avgMv.setZero();
+    for (int i = 0; i < geoMrgCtx.numValidMergeCand; i++)
+    {
+      if (cnt == 2)
+      {
+        break;
+      }
+      if (geoMrgCtx.interDirNeighbours[i] == 2)
+      {
+        avgMv += geoMrgCtx.mvFieldNeighbours[i * 2 + 1].mv;
+        if (firstAvailRefIdx == -1)
+        {
+          firstAvailRefIdx = geoMrgCtx.mvFieldNeighbours[i * 2 + 1].refIdx;
+        }
+        cnt++;
+      }
+    }
+    if (cnt == 2)
+    {
+      roundAffineMv(avgMv.hor, avgMv.ver, 1);
+      geoMrgCtx.interDirNeighbours[geoMrgCtx.numValidMergeCand] = 2;
+      geoMrgCtx.mvFieldNeighbours[geoMrgCtx.numValidMergeCand * 2 + 1].setMvField(avgMv, firstAvailRefIdx);
+      geoMrgCtx.mvFieldNeighbours[geoMrgCtx.numValidMergeCand * 2].setMvField(Mv(0, 0), NOT_VALID);
+      if (!geoMrgCtx.xCheckSimilarMotion(geoMrgCtx.numValidMergeCand, PU::getBDMVRMvdThreshold(pu)))
+      {
+        geoMrgCtx.numValidMergeCand++;
+      }
+      if (geoMrgCtx.numValidMergeCand == pu.cs->sps->getMaxNumGeoCand())
+      {
+        return;
+      }
+    }
+  }
+  if (geoMrgCtx.numValidMergeCand < pu.cs->sps->getMaxNumGeoCand())
+  {
+    const Slice &slice = *pu.cs->slice;
+    int         iNumRefIdx = std::min(slice.getNumRefIdx(REF_PIC_LIST_0), slice.getNumRefIdx(REF_PIC_LIST_1));
+
+    int r = 0;
+    int refcnt = 0;
+
+    for (int32_t i = geoMrgCtx.numValidMergeCand; i < pu.cs->sps->getMaxNumGeoCand(); i++)
+    {
+      int parity = i & 1;
+      if (0x01 + parity)
+      {
+        geoMrgCtx.interDirNeighbours[geoMrgCtx.numValidMergeCand] = 1 + parity;
+        geoMrgCtx.mvFieldNeighbours[(geoMrgCtx.numValidMergeCand << 1) + !parity].mv = Mv(0, 0);
+        geoMrgCtx.mvFieldNeighbours[(geoMrgCtx.numValidMergeCand << 1) + parity].mv = Mv(0, 0);
+        geoMrgCtx.mvFieldNeighbours[(geoMrgCtx.numValidMergeCand << 1) + !parity].refIdx = -1;
+        geoMrgCtx.mvFieldNeighbours[(geoMrgCtx.numValidMergeCand << 1) + parity].refIdx = r;
+
+        if (refcnt == iNumRefIdx - 1)
+        {
+          r = 0;
+        }
+        else
+        {
+          ++r;
+          ++refcnt;
+        }
+
+        geoMrgCtx.numValidMergeCand++;
+        if (geoMrgCtx.numValidMergeCand == pu.cs->sps->getMaxNumGeoCand())
+        {
+          return;
+        }
+      }
+    }
+  }
+#endif
 }
 
 void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8_t splitDir, const uint8_t candIdx0, const uint8_t candIdx1)
@@ -4949,6 +5128,441 @@ void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8
   spanIpmInfoInter(pu, mb, ib);
 #endif
 }
+
+#if JVET_W0097_GPM_MMVD_TM
+#if TM_MRG
+void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1)
+{
+  pu.geoSplitDir = splitDir;
+  pu.geoMergeIdx0 = mergeIdx0;
+  pu.geoMergeIdx1 = mergeIdx1;
+  pu.geoTmFlag0 = tmFlag0;
+  pu.geoMMVDFlag0 = mmvdFlag0;
+  pu.geoMMVDIdx0 = mmvdIdx0;
+  pu.geoTmFlag1 = tmFlag1;
+  pu.geoMMVDFlag1 = mmvdFlag1;
+  pu.geoMMVDIdx1 = mmvdIdx1;
+
+  MergeCtx *mergeCtx0 = (tmFlag0 ? &geoTmMrgCtx0 : &geoMrgCtx);
+  MergeCtx *mergeCtx1 = (tmFlag1 ? &geoTmMrgCtx1 : &geoMrgCtx);
+
+  const int mvShift = MV_FRACTIONAL_BITS_DIFF;
+  const bool extMMVD = pu.cs->picHeader->getGPMMMVDTableFlag();
+  const int MmvdCands[8] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 16 << mvShift , 32 << mvShift,  64 << mvShift , 128 << mvShift };
+  const int ExtMmvdCands[9] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 12 << mvShift , 16 << mvShift, 24 << mvShift, 32 << mvShift, 64 << mvShift };
+  const int* refMvdCands = (extMMVD ? ExtMmvdCands : MmvdCands);
+  Mv mvOffset0[2], mvOffset1[2], deltaMv;
+
+  if (mmvdFlag0)
+  {
+    int fPosStep = (extMMVD ? (mmvdIdx0 >> 3) : (mmvdIdx0 >> 2));
+    int fPosPosition = (extMMVD ? (mmvdIdx0 - (fPosStep << 3)) : (mmvdIdx0 - (fPosStep << 2)));
+
+    if (fPosPosition == 0)
+    {
+      deltaMv = Mv(refMvdCands[fPosStep], 0);
+    }
+    else if (fPosPosition == 1)
+    {
+      deltaMv = Mv(-refMvdCands[fPosStep], 0);
+    }
+    else if (fPosPosition == 2)
+    {
+      deltaMv = Mv(0, refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 3)
+    {
+      deltaMv = Mv(0, -refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 4)
+    {
+      deltaMv = Mv(refMvdCands[fPosStep], refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 5)
+    {
+      deltaMv = Mv(refMvdCands[fPosStep], -refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 6)
+    {
+      deltaMv = Mv(-refMvdCands[fPosStep], refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 7)
+    {
+      deltaMv = Mv(-refMvdCands[fPosStep], -refMvdCands[fPosStep]);
+    }
+
+    if (mergeCtx0->interDirNeighbours[mergeIdx0] == 1)
+    {
+      mvOffset0[0] = deltaMv;
+    }
+    else
+    {
+      mvOffset0[1] = deltaMv;
+    }
+  }
+
+  if (mmvdFlag1)
+  {
+    int fPosStep = (extMMVD ? (mmvdIdx1 >> 3) : (mmvdIdx1 >> 2));
+    int fPosPosition = (extMMVD ? (mmvdIdx1 - (fPosStep << 3)) : (mmvdIdx1 - (fPosStep << 2)));
+
+    if (fPosPosition == 0)
+    {
+      deltaMv = Mv(refMvdCands[fPosStep], 0);
+    }
+    else if (fPosPosition == 1)
+    {
+      deltaMv = Mv(-refMvdCands[fPosStep], 0);
+    }
+    else if (fPosPosition == 2)
+    {
+      deltaMv = Mv(0, refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 3)
+    {
+      deltaMv = Mv(0, -refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 4)
+    {
+      deltaMv = Mv(refMvdCands[fPosStep], refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 5)
+    {
+      deltaMv = Mv(refMvdCands[fPosStep], -refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 6)
+    {
+      deltaMv = Mv(-refMvdCands[fPosStep], refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 7)
+    {
+      deltaMv = Mv(-refMvdCands[fPosStep], -refMvdCands[fPosStep]);
+    }
+
+    if (mergeCtx1->interDirNeighbours[mergeIdx1] == 1)
+    {
+      mvOffset1[0] = deltaMv;
+    }
+    else
+    {
+      mvOffset1[1] = deltaMv;
+    }
+  }
+
+  MotionBuf mb = pu.getMotionBuf();
+
+  MotionInfo biMv;
+  biMv.isInter = true;
+  biMv.sliceIdx = pu.cs->slice->getIndependentSliceIdx();
+
+  if (mergeCtx0->interDirNeighbours[mergeIdx0] == 1 && mergeCtx1->interDirNeighbours[mergeIdx1] == 2)
+  {
+    biMv.interDir = 3;
+    biMv.mv[0] = mergeCtx0->mvFieldNeighbours[mergeIdx0 << 1].mv + mvOffset0[0];
+    biMv.mv[1] = mergeCtx1->mvFieldNeighbours[(mergeIdx1 << 1) + 1].mv + mvOffset1[1];
+    biMv.refIdx[0] = mergeCtx0->mvFieldNeighbours[mergeIdx0 << 1].refIdx;
+    biMv.refIdx[1] = mergeCtx1->mvFieldNeighbours[(mergeIdx1 << 1) + 1].refIdx;
+  }
+  else if (mergeCtx0->interDirNeighbours[mergeIdx0] == 2 && mergeCtx1->interDirNeighbours[mergeIdx1] == 1)
+  {
+    biMv.interDir = 3;
+    biMv.mv[0] = mergeCtx1->mvFieldNeighbours[mergeIdx1 << 1].mv + mvOffset1[0];
+    biMv.mv[1] = mergeCtx0->mvFieldNeighbours[(mergeIdx0 << 1) + 1].mv + mvOffset0[1];
+    biMv.refIdx[0] = mergeCtx1->mvFieldNeighbours[mergeIdx1 << 1].refIdx;
+    biMv.refIdx[1] = mergeCtx0->mvFieldNeighbours[(mergeIdx0 << 1) + 1].refIdx;
+  }
+  else if (mergeCtx0->interDirNeighbours[mergeIdx0] == 1 && mergeCtx1->interDirNeighbours[mergeIdx1] == 1)
+  {
+    biMv.interDir = 1;
+    biMv.mv[0] = mergeCtx1->mvFieldNeighbours[mergeIdx1 << 1].mv + mvOffset1[0];
+    biMv.mv[1] = Mv(0, 0);
+    biMv.refIdx[0] = mergeCtx1->mvFieldNeighbours[mergeIdx1 << 1].refIdx;
+    biMv.refIdx[1] = -1;
+  }
+  else if (mergeCtx0->interDirNeighbours[mergeIdx0] == 2 && mergeCtx1->interDirNeighbours[mergeIdx1] == 2)
+  {
+    biMv.interDir = 2;
+    biMv.mv[0] = Mv(0, 0);
+    biMv.mv[1] = mergeCtx1->mvFieldNeighbours[(mergeIdx1 << 1) + 1].mv + mvOffset1[1];
+    biMv.refIdx[0] = -1;
+    biMv.refIdx[1] = mergeCtx1->mvFieldNeighbours[(mergeIdx1 << 1) + 1].refIdx;
+  }
+
+  int16_t angle = g_GeoParams[splitDir][0];
+  int tpmMask = 0;
+  int lookUpY = 0, motionIdx = 0;
+  bool isFlip = angle >= 13 && angle <= 27;
+  int distanceIdx = g_GeoParams[splitDir][1];
+  int distanceX = angle;
+  int distanceY = (distanceX + (GEO_NUM_ANGLES >> 2)) % GEO_NUM_ANGLES;
+  int offsetX = (-(int)pu.lwidth()) >> 1;
+  int offsetY = (-(int)pu.lheight()) >> 1;
+  if (distanceIdx > 0)
+  {
+    if (angle % 16 == 8 || (angle % 16 != 0 && pu.lheight() >= pu.lwidth()))
+    {
+      offsetY += angle < 16 ? ((distanceIdx * pu.lheight()) >> 3) : -(int)((distanceIdx * pu.lheight()) >> 3);
+    }
+    else
+    {
+      offsetX += angle < 16 ? ((distanceIdx * pu.lwidth()) >> 3) : -(int)((distanceIdx * pu.lwidth()) >> 3);
+    }
+  }
+  for (int y = 0; y < mb.height; y++)
+  {
+    lookUpY = (((4 * y + offsetY) << 1) + 5) * g_Dis[distanceY];
+    for (int x = 0; x < mb.width; x++)
+    {
+      motionIdx = (((4 * x + offsetX) << 1) + 5) * g_Dis[distanceX] + lookUpY;
+      tpmMask = abs(motionIdx) < 32 ? 2 : (motionIdx <= 0 ? (1 - isFlip) : isFlip);
+      if (tpmMask == 2)
+      {
+        mb.at(x, y).isInter = true;
+        mb.at(x, y).interDir = biMv.interDir;
+        mb.at(x, y).refIdx[0] = biMv.refIdx[0];
+        mb.at(x, y).refIdx[1] = biMv.refIdx[1];
+        mb.at(x, y).mv[0] = biMv.mv[0];
+        mb.at(x, y).mv[1] = biMv.mv[1];
+        mb.at(x, y).sliceIdx = biMv.sliceIdx;
+      }
+      else if (tpmMask == 0)
+      {
+        mb.at(x, y).isInter = true;
+        mb.at(x, y).interDir = mergeCtx0->interDirNeighbours[mergeIdx0];
+        mb.at(x, y).refIdx[0] = mergeCtx0->mvFieldNeighbours[mergeIdx0 << 1].refIdx;
+        mb.at(x, y).refIdx[1] = mergeCtx0->mvFieldNeighbours[(mergeIdx0 << 1) + 1].refIdx;
+        mb.at(x, y).mv[0] = mergeCtx0->mvFieldNeighbours[mergeIdx0 << 1].mv + mvOffset0[0];
+        mb.at(x, y).mv[1] = mergeCtx0->mvFieldNeighbours[(mergeIdx0 << 1) + 1].mv + mvOffset0[1];
+        mb.at(x, y).sliceIdx = biMv.sliceIdx;
+      }
+      else
+      {
+        mb.at(x, y).isInter = true;
+        mb.at(x, y).interDir = mergeCtx1->interDirNeighbours[mergeIdx1];
+        mb.at(x, y).refIdx[0] = mergeCtx1->mvFieldNeighbours[mergeIdx1 << 1].refIdx;
+        mb.at(x, y).refIdx[1] = mergeCtx1->mvFieldNeighbours[(mergeIdx1 << 1) + 1].refIdx;
+        mb.at(x, y).mv[0] = mergeCtx1->mvFieldNeighbours[mergeIdx1 << 1].mv + mvOffset1[0];
+        mb.at(x, y).mv[1] = mergeCtx1->mvFieldNeighbours[(mergeIdx1 << 1) + 1].mv + mvOffset1[1];
+        mb.at(x, y).sliceIdx = biMv.sliceIdx;
+      }
+    }
+  }
+}
+#else
+void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool mmvdFlag1, const uint8_t mmvdIdx1)
+{
+  pu.geoSplitDir = splitDir;
+  pu.geoMergeIdx0 = mergeIdx0;
+  pu.geoMergeIdx1 = mergeIdx1;
+  pu.geoMMVDFlag0 = mmvdFlag0;
+  pu.geoMMVDIdx0 = mmvdIdx0;
+  pu.geoMMVDFlag1 = mmvdFlag1;
+  pu.geoMMVDIdx1 = mmvdIdx1;
+
+  const int mvShift = MV_FRACTIONAL_BITS_DIFF;
+  const bool extMMVD = pu.cs->picHeader->getGPMMMVDTableFlag();
+  const int MmvdCands[8] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 16 << mvShift , 32 << mvShift,  64 << mvShift , 128 << mvShift };
+  const int ExtMmvdCands[9] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 12 << mvShift , 16 << mvShift, 24 << mvShift, 32 << mvShift, 64 << mvShift };
+  const int* refMvdCands = (extMMVD ? ExtMmvdCands : MmvdCands);
+  Mv mvOffset0[2], mvOffset1[2], deltaMv;
+
+  if (mmvdFlag0)
+  {
+    int fPosStep = (extMMVD ? (mmvdIdx0 >> 3) : (mmvdIdx0 >> 2));
+    int fPosPosition = (extMMVD ? (mmvdIdx0 - (fPosStep << 3)) : (mmvdIdx0 - (fPosStep << 2)));
+
+    if (fPosPosition == 0)
+    {
+      deltaMv = Mv(refMvdCands[fPosStep], 0);
+    }
+    else if (fPosPosition == 1)
+    {
+      deltaMv = Mv(-refMvdCands[fPosStep], 0);
+    }
+    else if (fPosPosition == 2)
+    {
+      deltaMv = Mv(0, refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 3)
+    {
+      deltaMv = Mv(0, -refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 4)
+    {
+      deltaMv = Mv(refMvdCands[fPosStep], refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 5)
+    {
+      deltaMv = Mv(refMvdCands[fPosStep], -refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 6)
+    {
+      deltaMv = Mv(-refMvdCands[fPosStep], refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 7)
+    {
+      deltaMv = Mv(-refMvdCands[fPosStep], -refMvdCands[fPosStep]);
+    }
+
+    if (geoMrgCtx.interDirNeighbours[mergeIdx0] == 1)
+    {
+      mvOffset0[0] = deltaMv;
+    }
+    else
+    {
+      mvOffset0[1] = deltaMv;
+    }
+  }
+
+  if (mmvdFlag1)
+  {
+    int fPosStep = (extMMVD ? (mmvdIdx1 >> 3) : (mmvdIdx1 >> 2));
+    int fPosPosition = (extMMVD ? (mmvdIdx1 - (fPosStep << 3)) : (mmvdIdx1 - (fPosStep << 2)));
+
+    if (fPosPosition == 0)
+    {
+      deltaMv = Mv(refMvdCands[fPosStep], 0);
+    }
+    else if (fPosPosition == 1)
+    {
+      deltaMv = Mv(-refMvdCands[fPosStep], 0);
+    }
+    else if (fPosPosition == 2)
+    {
+      deltaMv = Mv(0, refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 3)
+    {
+      deltaMv = Mv(0, -refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 4)
+    {
+      deltaMv = Mv(refMvdCands[fPosStep], refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 5)
+    {
+      deltaMv = Mv(refMvdCands[fPosStep], -refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 6)
+    {
+      deltaMv = Mv(-refMvdCands[fPosStep], refMvdCands[fPosStep]);
+    }
+    else if (fPosPosition == 7)
+    {
+      deltaMv = Mv(-refMvdCands[fPosStep], -refMvdCands[fPosStep]);
+    }
+
+    if (geoMrgCtx.interDirNeighbours[mergeIdx1] == 1)
+    {
+      mvOffset1[0] = deltaMv;
+    }
+    else
+    {
+      mvOffset1[1] = deltaMv;
+    }
+  }
+
+  MotionBuf mb = pu.getMotionBuf();
+
+  MotionInfo biMv;
+  biMv.isInter = true;
+  biMv.sliceIdx = pu.cs->slice->getIndependentSliceIdx();
+
+  if (geoMrgCtx.interDirNeighbours[mergeIdx0] == 1 && geoMrgCtx.interDirNeighbours[mergeIdx1] == 2)
+  {
+    biMv.interDir = 3;
+    biMv.mv[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx0 << 1].mv + mvOffset0[0];
+    biMv.mv[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1].mv + mvOffset1[1];
+    biMv.refIdx[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx0 << 1].refIdx;
+    biMv.refIdx[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1].refIdx;
+  }
+  else if (geoMrgCtx.interDirNeighbours[mergeIdx0] == 2 && geoMrgCtx.interDirNeighbours[mergeIdx1] == 1)
+  {
+    biMv.interDir = 3;
+    biMv.mv[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx1 << 1].mv + mvOffset1[0];
+    biMv.mv[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx0 << 1) + 1].mv + mvOffset0[1];
+    biMv.refIdx[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx1 << 1].refIdx;
+    biMv.refIdx[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx0 << 1) + 1].refIdx;
+  }
+  else if (geoMrgCtx.interDirNeighbours[mergeIdx0] == 1 && geoMrgCtx.interDirNeighbours[mergeIdx1] == 1)
+  {
+    biMv.interDir = 1;
+    biMv.mv[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx1 << 1].mv + mvOffset1[0];
+    biMv.mv[1] = Mv(0, 0);
+    biMv.refIdx[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx1 << 1].refIdx;
+    biMv.refIdx[1] = -1;
+  }
+  else if (geoMrgCtx.interDirNeighbours[mergeIdx0] == 2 && geoMrgCtx.interDirNeighbours[mergeIdx1] == 2)
+  {
+    biMv.interDir = 2;
+    biMv.mv[0] = Mv(0, 0);
+    biMv.mv[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1].mv + mvOffset1[1];
+    biMv.refIdx[0] = -1;
+    biMv.refIdx[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1].refIdx;
+  }
+
+  int16_t angle = g_GeoParams[splitDir][0];
+  int tpmMask = 0;
+  int lookUpY = 0, motionIdx = 0;
+  bool isFlip = angle >= 13 && angle <= 27;
+  int distanceIdx = g_GeoParams[splitDir][1];
+  int distanceX = angle;
+  int distanceY = (distanceX + (GEO_NUM_ANGLES >> 2)) % GEO_NUM_ANGLES;
+  int offsetX = (-(int)pu.lwidth()) >> 1;
+  int offsetY = (-(int)pu.lheight()) >> 1;
+  if (distanceIdx > 0)
+  {
+    if (angle % 16 == 8 || (angle % 16 != 0 && pu.lheight() >= pu.lwidth()))
+    {
+      offsetY += angle < 16 ? ((distanceIdx * pu.lheight()) >> 3) : -(int)((distanceIdx * pu.lheight()) >> 3);
+    }
+    else
+    {
+      offsetX += angle < 16 ? ((distanceIdx * pu.lwidth()) >> 3) : -(int)((distanceIdx * pu.lwidth()) >> 3);
+    }
+  }
+  for (int y = 0; y < mb.height; y++)
+  {
+    lookUpY = (((4 * y + offsetY) << 1) + 5) * g_Dis[distanceY];
+    for (int x = 0; x < mb.width; x++)
+    {
+      motionIdx = (((4 * x + offsetX) << 1) + 5) * g_Dis[distanceX] + lookUpY;
+      tpmMask = abs(motionIdx) < 32 ? 2 : (motionIdx <= 0 ? (1 - isFlip) : isFlip);
+      if (tpmMask == 2)
+      {
+        mb.at(x, y).isInter = true;
+        mb.at(x, y).interDir = biMv.interDir;
+        mb.at(x, y).refIdx[0] = biMv.refIdx[0];
+        mb.at(x, y).refIdx[1] = biMv.refIdx[1];
+        mb.at(x, y).mv[0] = biMv.mv[0];
+        mb.at(x, y).mv[1] = biMv.mv[1];
+        mb.at(x, y).sliceIdx = biMv.sliceIdx;
+      }
+      else if (tpmMask == 0)
+      {
+        mb.at(x, y).isInter = true;
+        mb.at(x, y).interDir = geoMrgCtx.interDirNeighbours[mergeIdx0];
+        mb.at(x, y).refIdx[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx0 << 1].refIdx;
+        mb.at(x, y).refIdx[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx0 << 1) + 1].refIdx;
+        mb.at(x, y).mv[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx0 << 1].mv + mvOffset0[0];
+        mb.at(x, y).mv[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx0 << 1) + 1].mv + mvOffset0[1];
+        mb.at(x, y).sliceIdx = biMv.sliceIdx;
+      }
+      else
+      {
+        mb.at(x, y).isInter = true;
+        mb.at(x, y).interDir = geoMrgCtx.interDirNeighbours[mergeIdx1];
+        mb.at(x, y).refIdx[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx1 << 1].refIdx;
+        mb.at(x, y).refIdx[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1].refIdx;
+        mb.at(x, y).mv[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx1 << 1].mv + mvOffset1[0];
+        mb.at(x, y).mv[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1].mv + mvOffset1[1];
+        mb.at(x, y).sliceIdx = biMv.sliceIdx;
+      }
+    }
+  }
+}
+#endif
+#endif
 
 bool CU::hasSubCUNonZeroMVd( const CodingUnit& cu )
 {

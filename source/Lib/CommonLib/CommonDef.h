@@ -456,7 +456,14 @@ static const int MMVD_MRG_MAX_RD_NUM =                              20;
 static const int MMVD_MRG_MAX_RD_NUM =                              MRG_MAX_NUM_CANDS;
 #endif
 static const int MMVD_MRG_MAX_RD_BUF_NUM =                          (MMVD_MRG_MAX_RD_NUM + 1);///< increase buffer size by 1
-
+#if JVET_W0097_GPM_MMVD_TM
+static const int GPM_MMVD_REFINE_STEP = 8;
+static const int GPM_MMVD_REFINE_DIRECTION = 4;
+static const int GPM_MMVD_MAX_REFINE_NUM = (GPM_MMVD_REFINE_STEP * GPM_MMVD_REFINE_DIRECTION);
+static const int GPM_EXT_MMVD_REFINE_STEP = 9;
+static const int GPM_EXT_MMVD_REFINE_DIRECTION = 8;
+static const int GPM_EXT_MMVD_MAX_REFINE_NUM = (GPM_EXT_MMVD_REFINE_STEP * GPM_EXT_MMVD_REFINE_DIRECTION);
+#endif
 static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_LUMA =      28;
 static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA =    28;
 
@@ -618,7 +625,14 @@ static const int GEO_NUM_DISTANCES =                                4;
 static const int GEO_NUM_PRESTORED_MASK =                           6;
 static const int GEO_WEIGHT_MASK_SIZE = 3 * (GEO_MAX_CU_SIZE >> 3) * 2 + GEO_MAX_CU_SIZE;
 static const int GEO_MV_MASK_SIZE =         GEO_WEIGHT_MASK_SIZE >> 2;
+#if JVET_W0097_GPM_MMVD_TM
+static const int GEO_MAX_TRY_WEIGHTED_SAD = 70;
+#if TM_MRG
+static const int GEO_TM_MAX_NUM_CANDS = GEO_MAX_NUM_UNI_CANDS * (GEO_NUM_TM_MV_CAND - 1);
+#endif
+#else
 static const int GEO_MAX_TRY_WEIGHTED_SAD = 60;
+#endif
 static const int GEO_MAX_TRY_WEIGHTED_SATD = 8;
 
 #if ENABLE_OBMC

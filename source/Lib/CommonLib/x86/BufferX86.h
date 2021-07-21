@@ -47,6 +47,209 @@
 
 #if ENABLE_SIMD_OPT_BUFFER
 #ifdef TARGET_SIMD_X86
+#if JVET_W0097_GPM_MMVD_TM
+template< X86_VEXT vext >
+void roundBD_SSE(const Pel* srcp, const int srcStride, Pel* dest, const int destStride, int width, int height, const ClpRng& clpRng)
+{
+  const int32_t clipbd = clpRng.bd;
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+  const int32_t shiftDefault = IF_INTERNAL_FRAC_BITS(clipbd);
+#else
+  const int32_t shiftDefault = std::max<int>(2, (IF_INTERNAL_PREC - clipbd));
+#endif
+  const int32_t offsetDefault = (1 << (shiftDefault - 1)) + IF_INTERNAL_OFFS;
+
+#if USE_AVX2
+  if (vext >= AVX2 && (width & 0x0f) == 0)
+  {
+    __m256i voffset = _mm256_set1_epi16((short)offsetDefault);
+    __m256i vibdmin = _mm256_set1_epi16((short)clpRng.min);
+    __m256i vibdmax = _mm256_set1_epi16((short)clpRng.max);
+    __m256i vsrc;
+    for (int row = 0; row < height; row++)
+    {
+      for (int col = 0; col < width; col += 16)
+      {
+        vsrc = _mm256_lddqu_si256((__m256i *)&srcp[col]);
+        vsrc = _mm256_adds_epi16(vsrc, voffset);
+        vsrc = _mm256_srai_epi16(vsrc, shiftDefault);
+        vsrc = _mm256_min_epi16(vibdmax, _mm256_max_epi16(vibdmin, vsrc));
+        _mm256_storeu_si256((__m256i *)&dest[col], vsrc);
+      }
+      srcp += srcStride;
+      dest += destStride;
+    }
+  }
+  else
+  {
+#endif
+    __m128i voffset = _mm_set1_epi16((short)offsetDefault);
+    __m128i vibdmin = _mm_set1_epi16((short)clpRng.min);
+    __m128i vibdmax = _mm_set1_epi16((short)clpRng.max);
+    __m128i vsrc;
+    for (int row = 0; row < height; row++)
+    {
+      int col = 0;
+      for (; col < ((width >> 3) << 3); col += 8)
+      {
+        vsrc = _mm_lddqu_si128((__m128i *)&srcp[col]);
+        vsrc = _mm_adds_epi16(vsrc, voffset);
+        vsrc = _mm_srai_epi16(vsrc, shiftDefault);
+        vsrc = _mm_min_epi16(vibdmax, _mm_max_epi16(vibdmin, vsrc));
+        _mm_storeu_si128((__m128i *)&dest[col], vsrc);
+      }
+      for (; col < ((width >> 2) << 2); col += 4)
+      {
+        vsrc = _mm_loadl_epi64((__m128i *)&srcp[col]);
+        vsrc = _mm_adds_epi16(vsrc, voffset);
+        vsrc = _mm_srai_epi16(vsrc, shiftDefault);
+        vsrc = _mm_min_epi16(vibdmax, _mm_max_epi16(vibdmin, vsrc));
+        _mm_storel_epi64((__m128i *)&dest[col], vsrc);
+      }
+      for (; col < width; col++)
+      {
+        dest[col] = ClipPel(rightShift(srcp[col] + offsetDefault, shiftDefault), clpRng);
+      }
+      srcp += srcStride;
+      dest += destStride;
+    }
+#if USE_AVX2
+  }
+#endif
+}
+
+template< X86_VEXT vext >
+void weightedAvg_SSE(const Pel* src0, const unsigned src0Stride, const Pel* src1, const unsigned src1Stride, Pel* dest, const unsigned destStride, const int8_t w0, const int8_t w1, int width, int height, const ClpRng& clpRng)
+{
+  const int8_t log2WeightBase = g_BcwLog2WeightBase;
+  const int    clipbd = clpRng.bd;
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+  const int shiftNum = IF_INTERNAL_FRAC_BITS(clipbd) + log2WeightBase;
+#else
+  const int shiftNum = std::max<int>(2, (IF_INTERNAL_PREC - clipbd)) + log2WeightBase;
+#endif
+  const int offset = (1 << (shiftNum - 1)) + (IF_INTERNAL_OFFS << log2WeightBase);
+
+#if USE_AVX2
+  if ((vext >= AVX2) && (width & 0x7) == 0)
+  {
+    __m256i mw = _mm256_unpacklo_epi16(_mm256_set1_epi16(w0), _mm256_set1_epi16(w1));
+    __m256i voffset = _mm256_set1_epi32(offset);
+    __m256i vibdmin = _mm256_set1_epi16((short)clpRng.min);
+    __m256i vibdmax = _mm256_set1_epi16((short)clpRng.max);
+    __m256i msrc0, msrc1, msum0, msum1;
+
+    for (int row = 0; row < height; row++)
+    {
+      for (int col = 0; col < width; col += 8)
+      {
+        msrc0 = _mm256_castsi128_si256(_mm_lddqu_si128((__m128i*)(&src0[col])));
+        msrc1 = _mm256_castsi128_si256(_mm_lddqu_si128((__m128i*)(&src1[col])));
+        msum0 = _mm256_unpacklo_epi16(msrc0, msrc1);
+        msum1 = _mm256_unpackhi_epi16(msrc0, msrc1);
+        msum0 = _mm256_madd_epi16(msum0, mw);
+        msum1 = _mm256_madd_epi16(msum1, mw);
+        msum0 = _mm256_add_epi32(msum0, voffset);
+        msum1 = _mm256_add_epi32(msum1, voffset);
+        msum0 = _mm256_srai_epi32(msum0, shiftNum);
+        msum1 = _mm256_srai_epi32(msum1, shiftNum);
+        msum0 = _mm256_packs_epi32(msum0, msum1);
+        msum0 = _mm256_min_epi16(vibdmax, _mm256_max_epi16(vibdmin, msum0));
+        _mm_storeu_si128((__m128i *)&dest[col], _mm256_castsi256_si128(msum0));
+      }
+      src0 += src0Stride;
+      src1 += src1Stride;
+      dest += destStride;
+    }
+  }
+  else
+  {
+#endif
+    __m128i mw = _mm_unpacklo_epi16(_mm_set1_epi16(w0), _mm_set1_epi16(w1));
+    __m128i voffset = _mm_set1_epi32(offset);
+    __m128i vibdmin = _mm_set1_epi16((short)clpRng.min);
+    __m128i vibdmax = _mm_set1_epi16((short)clpRng.max);
+
+    for (int row = 0; row < height; row++)
+    {
+      int col = 0;
+      for (; col < ((width >> 2) << 2); col += 4)
+      {
+        __m128i msrc = _mm_unpacklo_epi16(_mm_loadl_epi64((__m128i *)&src0[col]), _mm_loadl_epi64((__m128i *)&src1[col]));
+        msrc = _mm_madd_epi16(msrc, mw);
+        msrc = _mm_add_epi32(msrc, voffset);
+        msrc = _mm_srai_epi32(msrc, shiftNum);
+        msrc = _mm_packs_epi32(msrc, msrc);
+        msrc = _mm_min_epi16(vibdmax, _mm_max_epi16(vibdmin, msrc));
+        _mm_storel_epi64((__m128i *)&dest[col], msrc);
+      }
+      for (; col < width; col++)
+      {
+        dest[col] = ClipPel(rightShift(src0[col] * w0 + src1[col] * w1 + offset, shiftNum), clpRng);
+      }
+      src0 += src0Stride;
+      src1 += src1Stride;
+      dest += destStride;
+    }
+#if USE_AVX2
+  }
+#endif
+}
+
+template< X86_VEXT vext >
+void copyClip_SSE(const Pel* srcp, const unsigned srcStride, Pel* dest, const unsigned destStride, int width, int height, const ClpRng& clpRng)
+{
+#if USE_AVX2
+  if (vext >= AVX2 && (width & 0x0f) == 0)
+  {
+    __m256i vibdmin = _mm256_set1_epi16((short)clpRng.min);
+    __m256i vibdmax = _mm256_set1_epi16((short)clpRng.max);
+    __m256i vsrc;
+    for (int row = 0; row < height; row++)
+    {
+      for (int col = 0; col < width; col += 16)
+      {
+        vsrc = _mm256_lddqu_si256((__m256i *)&srcp[col]);
+        vsrc = _mm256_min_epi16(vibdmax, _mm256_max_epi16(vibdmin, vsrc));
+        _mm256_storeu_si256((__m256i *)&dest[col], vsrc);
+      }
+      srcp += srcStride;
+      dest += destStride;
+    }
+  }
+  else
+  {
+#endif
+    __m128i vibdmin = _mm_set1_epi16((short)clpRng.min);
+    __m128i vibdmax = _mm_set1_epi16((short)clpRng.max);
+    __m128i vsrc;
+    for (int row = 0; row < height; row++)
+    {
+      int col = 0;
+      for (; col < ((width >> 3) << 3); col += 8)
+      {
+        vsrc = _mm_lddqu_si128((__m128i *)&srcp[col]);
+        vsrc = _mm_min_epi16(vibdmax, _mm_max_epi16(vibdmin, vsrc));
+        _mm_storeu_si128((__m128i *)&dest[col], vsrc);
+      }
+      for (; col < ((width >> 2) << 2); col += 4)
+      {
+        vsrc = _mm_loadl_epi64((__m128i *)&srcp[col]);
+        vsrc = _mm_min_epi16(vibdmax, _mm_max_epi16(vibdmin, vsrc));
+        _mm_storel_epi64((__m128i *)&dest[col], vsrc);
+      }
+      for (; col < width; col++)
+      {
+        dest[col] = ClipPel(srcp[col], clpRng);
+      }
+      srcp += srcStride;
+      dest += destStride;
+    }
+#if USE_AVX2
+  }
+#endif
+}
+#endif
 
 template< X86_VEXT vext, int W >
 void addAvg_SSE( const int16_t* src0, int src0Stride, const int16_t* src1, int src1Stride, int16_t *dst, int dstStride, int width, int height, int shift, int offset, const ClpRng& clpRng )
@@ -1767,6 +1970,11 @@ int64_t getSumOfDifference_SSE(const Pel* src0, int src0Stride, const Pel* src1,
 template<X86_VEXT vext>
 void PelBufferOps::_initPelBufOpsX86()
 {
+#if JVET_W0097_GPM_MMVD_TM
+  roundBD = roundBD_SSE<vext>;
+  weightedAvg = weightedAvg_SSE<vext>;
+  copyClip = copyClip_SSE<vext>;
+#endif
   addAvg8 = addAvg_SSE<vext, 8>;
   addAvg4 = addAvg_SSE<vext, 4>;
 
