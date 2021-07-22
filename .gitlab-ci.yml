@@ -11,7 +11,7 @@ stages:
          - master
          - merge_requests
       variables:
-         - $CI_PROJECT_URL == 'https://vcgit.hhi.fraunhofer.de/jvet/VVCSoftware_VTM'
+         - $CI_PROJECT_URL == 'https://vcgit.hhi.fraunhofer.de/ecm/ECM'
          - $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'master'
 
 .build_template_linux:
