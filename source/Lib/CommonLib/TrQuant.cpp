@@ -365,11 +365,16 @@ void TrQuant::fwdLfnstNxN( TCoeff* src, TCoeff* dst, const uint32_t mode, const 
 void TrQuant::fwdLfnstNxN( int* src, int* dst, const uint32_t mode, const uint32_t index, const uint32_t size, int zeroOutSize )
 #endif
 {
+#if JVET_W0119_LFNST_EXTENSION
+  const int8_t* trMat  = ( size > 8 ) ? g_lfnst16x16[ mode ][ index ][ 0 ] : ( ( size > 4 ) ? g_lfnst8x8[ mode ][ index ][ 0 ] : g_lfnst4x4[ mode ][ index ][ 0 ] );
+  const int     trSize = ( size > 8 ) ? L16W_ZO : ( ( size > 4 ) ? L8W_ZO : 16 );
+#else
   const int8_t* trMat  = ( size > 4 ) ? g_lfnst8x8[ mode ][ index ][ 0 ] : g_lfnst4x4[ mode ][ index ][ 0 ];
 #if EXTENDED_LFNST
   const int     trSize = ( size > 4 ) ? 64 : 16;
 #else
   const int     trSize = ( size > 4 ) ? 48 : 16;
+#endif
 #endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
   TCoeff           coef;
@@ -378,7 +383,7 @@ void TrQuant::fwdLfnstNxN( int* src, int* dst, const uint32_t mode, const uint32
   int           coef;
   int*          out    = dst;
 #endif  
-#if EXTENDED_LFNST
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
   assert( index < 4 );
 #else
   assert( index < 3 );
@@ -415,11 +420,16 @@ void TrQuant::invLfnstNxN( int* src, int* dst, const uint32_t mode, const uint32
   const TCoeff    outputMinimum         = -( 1 << maxLog2TrDynamicRange );
   const TCoeff    outputMaximum         =  ( 1 << maxLog2TrDynamicRange ) - 1;
 
+#if JVET_W0119_LFNST_EXTENSION
+  const int8_t*   trMat  = ( size > 8 ) ? g_lfnst16x16[ mode ][ index ][ 0 ] : ( ( size > 4 ) ? g_lfnst8x8[ mode ][ index ][ 0 ] : g_lfnst4x4[ mode ][ index ][ 0 ] );
+  const int       trSize = ( size > 8 ) ? L16W_ZO : ( ( size > 4 ) ? L8W_ZO : 16 );
+#else
   const int8_t*   trMat                 =  ( size > 4 ) ? g_lfnst8x8[ mode ][ index ][ 0 ] : g_lfnst4x4[ mode ][ index ][ 0 ];
 #if EXTENDED_LFNST
   const int       trSize                =  ( size > 4 ) ? 64 : 16;
 #else
   const int       trSize                =  ( size > 4 ) ? 48 : 16;
+#endif
 #endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
   TCoeff          resi;
@@ -429,7 +439,7 @@ void TrQuant::invLfnstNxN( int* src, int* dst, const uint32_t mode, const uint32
   int*            out                   =  dst;
 #endif  
 
-#if EXTENDED_LFNST
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
   assert( index < 4 );
 #else
   assert( index < 3 );
@@ -851,8 +861,16 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
   if (lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (CS::isDualITree(*tu.cs) ? true : isLuma(compID)))
 #endif
   {
+#if JVET_W0119_LFNST_EXTENSION
+    const bool whge4         = PU::getUseLFNST16( width, height );
+    const bool whge3         = PU::getUseLFNST8 ( width, height );
+    int widthIdx             = gp_sizeIdxInfo->idxFrom(  width );
+    int heightIdx            = gp_sizeIdxInfo->idxFrom( height );
+    const ScanElement * scan = whge4 ? g_coefTopLeftDiagScan16x16[ widthIdx ] : ( whge3 ? g_coefTopLeftDiagScan8x8[ widthIdx ] : g_scanOrder[ SCAN_GROUPED_4x4 ][ SCAN_DIAG ][ widthIdx ][ heightIdx ] );
+#else
     const bool whge3 = width >= 8 && height >= 8;
     const ScanElement * scan = whge3 ? g_coefTopLeftDiagScan8x8[ gp_sizeIdxInfo->idxFrom( width ) ] : g_scanOrder[ SCAN_GROUPED_4x4 ][ SCAN_DIAG ][ gp_sizeIdxInfo->idxFrom( width ) ][ gp_sizeIdxInfo->idxFrom( height ) ];
+#endif
     uint32_t intraMode = PU::getFinalIntraMode( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) );
 
 #if JVET_W0123_TIMD_FUSION
@@ -881,7 +899,7 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
 #endif
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
 
-#if EXTENDED_LFNST
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
     if (lfnstIdx < 4)
 #else
     if( lfnstIdx < 3 )
@@ -892,8 +910,12 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
       CodingStatistics::IncrementStatisticTool( CodingStatisticsClassType { STATS__TOOL_LFNST, width, height, compID } );
 #endif
       bool          transposeFlag   = getTransposeFlag( intraMode );
+#if JVET_W0119_LFNST_EXTENSION
+      const int     sbSize          = whge4 ? 16 : ( whge3 ? 8 : 4 );
+#else
       const int     sbSize          = whge3 ? 8 : 4;
-#if !EXTENDED_LFNST
+#endif
+#if !EXTENDED_LFNST && !JVET_W0119_LFNST_EXTENSION
       bool          tu4x4Flag       = ( width == 4 && height == 4 );
       bool          tu8x8Flag       = ( width == 8 && height == 8 );
 #endif
@@ -905,16 +927,29 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
       TCoeff *dst = lfnstTemp;
 
       const ScanElement *scanPtr = scan;
+#if JVET_W0119_LFNST_EXTENSION
+      int numLfnstCoeff = whge4 ? L16H : ( whge3 ? L8H : 16 );
+      for( y = 0; y < numLfnstCoeff; y++ )
+#else
 #if EXTENDED_LFNST
       const int nSamples = sbSize * sbSize;
       for( y = 0; y < nSamples; y++ )
 #else
       for (y = 0; y < 16; y++)
 #endif
+#endif
       {
         *dst++ = coeffTemp[ scanPtr->idx ];
         scanPtr++;
       }
+#if JVET_W0119_LFNST_EXTENSION
+      int zeroOutSize = PU::getLFNSTMatrixDim( width, height );
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+      invLfnstNxN( m_tempInMatrix, m_tempOutMatrix, g_lfnstLut[ intraMode ], lfnstIdx - 1, sbSize, zeroOutSize, maxLog2TrDynamicRange );
+#else
+      invLfnstNxN( m_tempInMatrix, m_tempOutMatrix, g_lfnstLut[ intraMode ], lfnstIdx - 1, sbSize, zeroOutSize );
+#endif
+#else
 #if EXTENDED_LFNST
       const int trSize = whge3 ? 64 : 16;
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
@@ -928,6 +963,7 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
 #else
       invLfnstNxN( m_tempInMatrix, m_tempOutMatrix, g_lfnstLut[ intraMode ], lfnstIdx - 1, sbSize, ( tu4x4Flag || tu8x8Flag ) ? 8 : 16 );
 #endif          
+#endif
 #endif
           lfnstTemp = m_tempOutMatrix; // inverse spectral rearrangement
 
@@ -945,11 +981,15 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
             coeffTemp += width;
           }
         }
+#if JVET_W0119_LFNST_EXTENSION
+        else if( sbSize == 8 )
+#else
         else   // ( sbSize == 8 )
+#endif
         {
           for (y = 0; y < 8; y++)
           {
-#if EXTENDED_LFNST
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
             coeffTemp[0] = lfnstTemp[0];
             coeffTemp[1] = lfnstTemp[8];
             coeffTemp[2] = lfnstTemp[16];
@@ -975,13 +1015,50 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
             coeffTemp += width;
           }
         }
+#if JVET_W0119_LFNST_EXTENSION
+        else // (sbSize == 16)
+        {
+          for( y = 0; y < 12; y++ )
+          {
+            coeffTemp[ 0 ] = lfnstTemp[  0 ];  coeffTemp[ 1 ] = lfnstTemp[ 12 ];
+            coeffTemp[ 2 ] = lfnstTemp[ 24 ];  coeffTemp[ 3 ] = lfnstTemp[ 36 ];
+
+            if( y < 8 )
+            {
+              coeffTemp[ 4 ] = lfnstTemp[ 48 ];  coeffTemp[ 5 ] = lfnstTemp[ 56 ];
+              coeffTemp[ 6 ] = lfnstTemp[ 64 ];  coeffTemp[ 7 ] = lfnstTemp[ 72 ];
+            }
+
+            if( y < 4 )
+            {
+              coeffTemp[  8 ] = lfnstTemp[ 80 ];  coeffTemp[  9 ] = lfnstTemp[ 84 ];
+              coeffTemp[ 10 ] = lfnstTemp[ 88 ];  coeffTemp[ 11 ] = lfnstTemp[ 92 ];
+            }
+            lfnstTemp++;
+            coeffTemp += width;
+          }
+        }
+#endif
       }
       else
       {
-
+#if JVET_W0119_LFNST_EXTENSION
+        if( sbSize == 16 )
+        {
+          for( y = 0; y < 12; y++ )
+          {
+            uint32_t uiStride = ( y < 4 ) ? 12 : ( ( y < 8 ) ? 8 : 4 );
+            ::memcpy( coeffTemp, lfnstTemp, uiStride * sizeof( TCoeff ) );
+            lfnstTemp += uiStride;
+            coeffTemp += width;
+          }
+        }
+        else
+        {
+#endif
         for (y = 0; y < sbSize; y++)
         {
-#if EXTENDED_LFNST
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
           uint32_t uiStride = sbSize;
 #else
           uint32_t uiStride = (y < 4) ? sbSize : 4;
@@ -990,6 +1067,9 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
           lfnstTemp += uiStride;
           coeffTemp += width;
         }
+#if JVET_W0119_LFNST_EXTENSION
+        }
+#endif
       }
     }
   }
@@ -1007,8 +1087,16 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
   if (lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (CS::isDualITree(*tu.cs) ? true : isLuma(compID)))
 #endif
   {
+#if JVET_W0119_LFNST_EXTENSION
+    const bool whge4         = PU::getUseLFNST16( width, height );  // width >= 16 && height >= 16;
+    const bool whge3         = PU::getUseLFNST8( width, height );
+    int widthIdx             = gp_sizeIdxInfo->idxFrom( width );
+    int heightIdx            = gp_sizeIdxInfo->idxFrom( height );
+    const ScanElement * scan = whge4 ? g_coefTopLeftDiagScan16x16[ widthIdx ] : ( whge3 ? g_coefTopLeftDiagScan8x8[ widthIdx ] : g_scanOrder[ SCAN_GROUPED_4x4 ][ SCAN_DIAG ][ widthIdx ][ heightIdx ] );
+#else
     const bool whge3 = width >= 8 && height >= 8;
     const ScanElement * scan = whge3 ? g_coefTopLeftDiagScan8x8[ gp_sizeIdxInfo->idxFrom( width ) ] : g_scanOrder[ SCAN_GROUPED_4x4 ][ SCAN_DIAG ][ gp_sizeIdxInfo->idxFrom( width ) ][ gp_sizeIdxInfo->idxFrom( height ) ];
+#endif
     uint32_t intraMode = PU::getFinalIntraMode( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) );
 
 #if JVET_W0123_TIMD_FUSION
@@ -1037,7 +1125,7 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
 #endif
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
 
-#if EXTENDED_LFNST
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
     if ( lfnstIdx < 4 )
 #else
     if( lfnstIdx < 3 )
@@ -1046,8 +1134,12 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
       intraMode = getLFNSTIntraMode( PU::getWideAngle( tu, intraMode, compID ) );
 
       bool            transposeFlag   = getTransposeFlag( intraMode );
+#if JVET_W0119_LFNST_EXTENSION
+      const int       sbSize          = whge4 ? 16 : ( whge3 ? 8 : 4 );
+#else
       const int       sbSize          = whge3 ? 8 : 4;
-#if !EXTENDED_LFNST
+#endif
+#if !EXTENDED_LFNST && !JVET_W0119_LFNST_EXTENSION
       bool            tu4x4Flag       = ( width == 4 && height == 4 );
       bool            tu8x8Flag       = ( width == 8 && height == 8 );
 #endif
@@ -1073,11 +1165,15 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
             coeffTemp += width;
           }
         }
+#if JVET_W0119_LFNST_EXTENSION
+        else if( sbSize == 8 )
+#else
         else   // ( sbSize == 8 )
+#endif
         {
           for (y = 0; y < 8; y++)
           {
-#if EXTENDED_LFNST
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
             lfnstTemp[  0 ] = coeffTemp[ 0 ];
             lfnstTemp[  8 ] = coeffTemp[ 1 ];
             lfnstTemp[ 16 ] = coeffTemp[ 2 ];
@@ -1103,12 +1199,50 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
             coeffTemp += width;
           }
         }
+#if JVET_W0119_LFNST_EXTENSION
+        else // (sbSize == 16)
+        {
+          for( y = 0; y < 12; y++ )
+          {
+            lfnstTemp[  0 ] = coeffTemp[ 0 ]; lfnstTemp[ 12 ] = coeffTemp[ 1 ];
+            lfnstTemp[ 24 ] = coeffTemp[ 2 ]; lfnstTemp[ 36 ] = coeffTemp[ 3 ];
+
+            if( y < 8 )
+            {
+              lfnstTemp[ 48 ] = coeffTemp[ 4 ];  lfnstTemp[ 56 ] = coeffTemp[ 5 ];
+              lfnstTemp[ 64 ] = coeffTemp[ 6 ];  lfnstTemp[ 72 ] = coeffTemp[ 7 ];
+            }
+
+            if( y < 4 )
+            {
+              lfnstTemp[ 80 ] = coeffTemp[  8 ];  lfnstTemp[ 84 ] = coeffTemp[  9 ];
+              lfnstTemp[ 88 ] = coeffTemp[ 10 ];  lfnstTemp[ 92 ] = coeffTemp[ 11 ];
+            }
+            lfnstTemp++;
+            coeffTemp += width;
+          }
+        }
+#endif
       }
       else
       {
+#if JVET_W0119_LFNST_EXTENSION
+        if( sbSize == 16 )
+        {
+          for( y = 0; y < 16; y++ )
+          {
+            uint32_t uiStride = ( y < 4 ) ? 12 : ( ( y < 8 ) ? 8 : 4 );
+            ::memcpy( lfnstTemp, coeffTemp, uiStride * sizeof( TCoeff ) );
+            lfnstTemp += uiStride;
+            coeffTemp += width;
+          }
+        }
+        else
+        {
+#endif
         for( y = 0; y < sbSize; y++ )
         {
-#if EXTENDED_LFNST
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
           uint32_t uiStride = sbSize;
 #else
           uint32_t uiStride = ( y < 4 ) ? sbSize : 4;
@@ -1117,23 +1251,36 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
           lfnstTemp += uiStride;
           coeffTemp += width;
         }
+#if JVET_W0119_LFNST_EXTENSION
+        }
+#endif
       }
 
+#if JVET_W0119_LFNST_EXTENSION
+      int zeroOutSize = PU::getLFNSTMatrixDim( width, height );
+
+      fwdLfnstNxN( m_tempInMatrix, m_tempOutMatrix, g_lfnstLut[ intraMode ], lfnstIdx - 1, sbSize, zeroOutSize );
+#else
 #if EXTENDED_LFNST
       const int trSize = whge3 ? 64 : 16;
       fwdLfnstNxN( m_tempInMatrix, m_tempOutMatrix, g_lfnstLut[ intraMode ], lfnstIdx - 1, sbSize, trSize );
 #else
       fwdLfnstNxN( m_tempInMatrix, m_tempOutMatrix, g_lfnstLut[ intraMode ], lfnstIdx - 1, sbSize, ( tu4x4Flag || tu8x8Flag ) ? 8 : 16 );
 #endif
+#endif
       lfnstTemp = m_tempOutMatrix; // forward spectral rearrangement
       coeffTemp = tempCoeff;
           
       const ScanElement *scanPtr = scan;
 
+#if JVET_W0119_LFNST_EXTENSION
+      int lfnstCoeffNum = ( sbSize > 8 ) ? L16W_ZO : ( ( sbSize > 4 ) ? L8W_ZO : 16 );
+#else
 #if EXTENDED_LFNST
       int lfnstCoeffNum = sbSize * sbSize;
 #else
       int lfnstCoeffNum = ( sbSize == 4 ) ? sbSize * sbSize : 48;
+#endif
 #endif
 
       for (y = 0; y < lfnstCoeffNum; y++)
@@ -1451,6 +1598,13 @@ void TrQuant::xT( const TransformUnit &tu, const ComponentID &compID, const CPel
       skipWidth  = width  - 4;
       skipHeight = height - 4;
     }
+#if JVET_W0119_LFNST_EXTENSION
+    else if( width >= 16 && height >= 16 )
+    {
+      skipWidth  = width  - 16;
+      skipHeight = height - 16;
+    }
+#endif
     else if( (width >= 8 && height >= 8) )
     {
       skipWidth  = width  - 8;
@@ -1546,6 +1700,13 @@ void TrQuant::xIT( const TransformUnit &tu, const ComponentID &compID, const CCo
       skipWidth  = width  - 4;
       skipHeight = height - 4;
     }
+#if JVET_W0119_LFNST_EXTENSION
+    else if( ( width >= 16 && height >= 16 ) )
+    {
+      skipWidth  = width  - 16;
+      skipHeight = height - 16;
+    }
+#endif
     else if( (width >= 8 && height >= 8) )
     {
       skipWidth  = width  - 8;

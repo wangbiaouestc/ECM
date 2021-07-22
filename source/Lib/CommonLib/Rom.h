@@ -75,7 +75,12 @@ struct ScanElement
 extern       uint32_t   g_log2SbbSize[MAX_CU_DEPTH + 1][MAX_CU_DEPTH + 1][2];
 extern ScanElement
   *g_scanOrder[SCAN_NUMBER_OF_GROUP_TYPES][SCAN_NUMBER_OF_TYPES][MAX_CU_SIZE / 2 + 1][MAX_CU_SIZE / 2 + 1];
+#if JVET_W0119_LFNST_EXTENSION
+extern       ScanElement   g_coefTopLeftDiagScan8x8  [ MAX_CU_DEPTH + 1 ][  64 ];
+extern       ScanElement   g_coefTopLeftDiagScan16x16[ MAX_CU_DEPTH + 1 ][ 256 ];
+#else
 extern       ScanElement   g_coefTopLeftDiagScan8x8[ MAX_CU_SIZE / 2 + 1 ][ 64 ];
+#endif
 
 extern const int g_quantScales   [2/*0=4^n blocks, 1=2*4^n blocks*/][SCALING_LIST_REM_NUM];          // Q(QP%6)
 extern const int g_invQuantScales[2/*0=4^n blocks, 1=2*4^n blocks*/][SCALING_LIST_REM_NUM];          // IQ(QP%6)
@@ -181,6 +186,11 @@ extern const uint8_t g_aucTrSet[80][4];
 extern const int8_t  g_aiIdLut[3][3];
 extern const uint8_t g_aucTrIdxToTr[25][2];
 #endif
+#if JVET_W0119_LFNST_EXTENSION
+extern const     int8_t   g_lfnst16x16[ 35 ][ 3 ][ L16H ][ L16W ];
+extern const     int8_t   g_lfnst8x8  [ 35 ][ 3 ][  L8H ][  L8W ];
+extern const     int8_t   g_lfnst4x4  [ 35 ][ 3 ][   16 ][   16 ];
+#else
 #if EXTENDED_LFNST
 extern const     int8_t   g_lfnst8x8[ 35 ][ 3 ][ 64 ][ 64 ];
 extern const     int8_t   g_lfnst4x4[ 35 ][ 3 ][ 16 ][ 16 ];
@@ -188,8 +198,9 @@ extern const     int8_t   g_lfnst4x4[ 35 ][ 3 ][ 16 ][ 16 ];
 extern const     int8_t   g_lfnst8x8[ 4 ][ 2 ][ 16 ][ 48 ];
 extern const     int8_t   g_lfnst4x4[ 4 ][ 2 ][ 16 ][ 16 ];
 #endif
+#endif
 
-#if EXTENDED_LFNST
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
 extern const     uint8_t  g_lfnstLut[ 95 ];
 #else
 extern const     uint8_t  g_lfnstLut[ NUM_INTRA_MODE + NUM_EXT_LUMA_MODE - 1 ];

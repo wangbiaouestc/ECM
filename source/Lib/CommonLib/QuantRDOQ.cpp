@@ -677,10 +677,16 @@ void QuantRDOQ::xRateDistOptQuant(TransformUnit &tu, const ComponentID &compID, 
     cctx.initSubblock( subSetId );
 
     uint32_t maxNonZeroPosInCG = iCGSizeM1;
-#if !EXTENDED_LFNST
+#if !EXTENDED_LFNST && !JVET_W0119_LFNST_EXTENSION
     if( lfnstIdx > 0 && ( ( uiWidth == 4 && uiHeight == 4 ) || ( uiWidth == 8 && uiHeight == 8 && cctx.cgPosX() == 0 && cctx.cgPosY() == 0 ) ) )
     {
       maxNonZeroPosInCG = 7;
+    }
+#endif
+#if JVET_W0119_LFNST_EXTENSION
+    if( lfnstIdx > 0 && ( uiWidth == 8 && uiHeight == 8 && cctx.cgPosX() == 0 && cctx.cgPosY() == 0 ) )
+    {
+      maxNonZeroPosInCG = 15;
     }
 #endif
     memset( &rdStats, 0, sizeof (coeffGroupRDStats));
@@ -984,10 +990,16 @@ void QuantRDOQ::xRateDistOptQuant(TransformUnit &tu, const ComponentID &compID, 
     if (cctx.isSigGroup( iCGScanPos ) )
     {
       uint32_t maxNonZeroPosInCG = iCGSizeM1;
-#if !EXTENDED_LFNST
+#if !EXTENDED_LFNST && !JVET_W0119_LFNST_EXTENSION
       if( lfnstIdx > 0 && ( ( uiWidth == 4 && uiHeight == 4 ) || ( uiWidth == 8 && uiHeight == 8 && cctx.cgPosX() == 0 && cctx.cgPosY() == 0 ) ) )
       {
         maxNonZeroPosInCG = 7;
+      }
+#endif
+#if JVET_W0119_LFNST_EXTENSION
+      if( lfnstIdx > 0 && ( uiWidth == 8 && uiHeight == 8 && cctx.cgPosX() == 0 && cctx.cgPosY() == 0 ) )
+      {
+        maxNonZeroPosInCG = 15;
       }
 #endif
       for( int iScanPosinCG = maxNonZeroPosInCG; iScanPosinCG >= 0; iScanPosinCG-- )

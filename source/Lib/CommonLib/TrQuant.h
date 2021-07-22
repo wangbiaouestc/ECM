@@ -217,12 +217,17 @@ protected:
 private:
   DepQuant *m_quant;          //!< Quantizer
   TCoeff    m_mtsCoeffs[NUM_TRAFO_MODES_MTS][MAX_TB_SIZEY * MAX_TB_SIZEY];
+#if JVET_W0119_LFNST_EXTENSION
+  TCoeff   m_tempInMatrix [ L16W_ZO ];
+  TCoeff   m_tempOutMatrix[ L16W_ZO ];
+#else
 #if EXTENDED_LFNST
   TCoeff   m_tempInMatrix [ 64 ];
   TCoeff   m_tempOutMatrix[ 64 ];
 #else
   TCoeff   m_tempInMatrix [ 48 ];
   TCoeff   m_tempOutMatrix[ 48 ];
+#endif
 #endif
   static const int maxAbsIctMode = 3;
   void                      (*m_invICTMem[1+2*maxAbsIctMode])(PelBuf&,PelBuf&);

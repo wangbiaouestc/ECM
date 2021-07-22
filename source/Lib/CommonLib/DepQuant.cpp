@@ -1929,7 +1929,11 @@ namespace DQIntern
 #if !EXTENDED_LFNST
     if (lfnstIdx > 0 && tu.mtsIdx[compID] != MTS_SKIP && width >= 4 && height >= 4)
     {
+#if JVET_W0119_LFNST_EXTENSION
+      firstTestPos = PU::getLFNSTMatrixDim( width, height ) - 1;
+#else
       firstTestPos = ( ( width == 4 && height == 4 ) || ( width == 8 && height == 8 ) )  ? 7 : 15 ;
+#endif
     }
 #endif
     const TCoeff defaultQuantisationCoefficient = (TCoeff)m_quant.getQScale();
