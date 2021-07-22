@@ -4228,6 +4228,21 @@ void initROM()
       g_coefTopLeftDiagScan8x8[ blockWidthIdx ][ i ].x   = g_auiXYDiagScan8x8[ i ][ 0 ];
       g_coefTopLeftDiagScan8x8[ blockWidthIdx ][ i ].y   = g_auiXYDiagScan8x8[ i ][ 1 ];
     }
+#if JVET_W0119_LFNST_EXTENSION
+    for( int blky = 0; blky <= 1; blky++ )
+    {
+      for( int blkx = 0; blkx <= 1; blkx++ )
+      {
+        for( int i = 0; i < 64; i++ )
+        {
+          int i4 = blky * 128 + blkx * 64 + i;
+          g_coefTopLeftDiagScan16x16[ blockWidthIdx ][ i4 ].idx = g_auiXYDiagScan8x8[ i ][ 0 ] + g_auiXYDiagScan8x8[ i ][ 1 ] * blockWidth + blkx * 8 + blky * 8 * blockWidth;
+          g_coefTopLeftDiagScan16x16[ blockWidthIdx ][ i4 ].x   = g_auiXYDiagScan8x8[ i ][ 0 ];
+          g_coefTopLeftDiagScan16x16[ blockWidthIdx ][ i4 ].y   = g_auiXYDiagScan8x8[ i ][ 1 ];
+        }
+      }
+    }
+#endif
   }
 
   initGeoTemplate();
@@ -4506,7 +4521,12 @@ UnitScale g_miScaling( MIN_CU_LOG2, MIN_CU_LOG2 );
 
 // scanning order table
 ScanElement *g_scanOrder[SCAN_NUMBER_OF_GROUP_TYPES][SCAN_NUMBER_OF_TYPES][MAX_CU_SIZE / 2 + 1][MAX_CU_SIZE / 2 + 1];
+#if JVET_W0119_LFNST_EXTENSION
+ScanElement  g_coefTopLeftDiagScan8x8  [ MAX_CU_DEPTH + 1 ][  64 ];
+ScanElement  g_coefTopLeftDiagScan16x16[ MAX_CU_DEPTH + 1 ][ 256 ];
+#else
 ScanElement  g_coefTopLeftDiagScan8x8[ MAX_CU_SIZE / 2 + 1 ][ 64 ];
+#endif
 
 #if TU_256
 // starting position of the coefficient in a group

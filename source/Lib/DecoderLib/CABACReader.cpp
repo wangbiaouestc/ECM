@@ -3946,7 +3946,11 @@ void CABACReader::residual_coding( TransformUnit& tu, ComponentID compID, CUCtx&
 #if !EXTENDED_LFNST
   if (tu.mtsIdx[compID] != MTS_SKIP && tu.blocks[compID].height >= 4 && tu.blocks[compID].width >= 4 )
   {
+#if JVET_W0119_LFNST_EXTENSION
+    const int maxLfnstPos = PU::getLFNSTMatrixDim( tu.blocks[ compID ].width, tu.blocks[ compID ].height ) - 1;
+#else
     const int maxLfnstPos = ((tu.blocks[compID].height == 4 && tu.blocks[compID].width == 4) || (tu.blocks[compID].height == 8 && tu.blocks[compID].width == 8)) ? 7 : 15;
+#endif
     cuCtx.violatesLfnstConstrained[ toChannelType(compID) ] |= cctx.scanPosLast() > maxLfnstPos;
   }
 #endif
@@ -4195,7 +4199,7 @@ void CABACReader::residual_lfnst_mode( CodingUnit& cu,  CUCtx& cuCtx  )
   if (cu.isSepTree()) cctx++;
 #endif
 
-#if EXTENDED_LFNST
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
   uint32_t firstBit = m_BinDecoder.decodeBin(Ctx::LFNSTIdx(cctx));
   cctx = 2 + firstBit;
   uint32_t secondBit = m_BinDecoder.decodeBin(Ctx::LFNSTIdx(cctx));
