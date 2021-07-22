@@ -1907,7 +1907,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   int    bestMtsFlag             =   0;
   int    bestLfnstIdx            =   0;
 
-#if EXTENDED_LFNST
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   const int  maxLfnstIdx         = (CS::isDualITree(*tempCS) && partitioner.chType == CHANNEL_TYPE_CHROMA && (partitioner.currArea().lwidth() < 8 || partitioner.currArea().lheight() < 8))
                                    || (partitioner.currArea().lwidth() > sps.getMaxTbSize() || partitioner.currArea().lheight() > sps.getMaxTbSize()) ? 0 : 3;

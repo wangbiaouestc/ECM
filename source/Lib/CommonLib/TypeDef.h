@@ -133,7 +133,12 @@
 
 // Transform and coefficient coding
 #define TCQ_8STATES                                       1
+#define JVET_W0119_LFNST_EXTENSION                        1
+#if JVET_W0119_LFNST_EXTENSION
+#define EXTENDED_LFNST                                    0
+#else
 #define EXTENDED_LFNST                                    1 // Extended LFNST
+#endif
 #define SIGN_PREDICTION                                   1 // transform coefficients sign prediction
 
 #define JVET_W0103_INTRA_MTS                              1 // JVET W0103: Extended Intra MTS

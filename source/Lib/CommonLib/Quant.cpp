@@ -1008,7 +1008,11 @@ void Quant::quant(TransformUnit &tu, const ComponentID &compID, const CCoeffBuf 
     const int qBits8 = iQBits - 8;
 
     const uint32_t lfnstIdx = tu.cu->lfnstIdx;
+#if JVET_W0119_LFNST_EXTENSION
+    const int maxNumberOfCoeffs = lfnstIdx > 0 ? PU::getLFNSTMatrixDim( uiWidth, uiHeight ) : piQCoef.area();
+#else
     const int maxNumberOfCoeffs = lfnstIdx > 0 ? ((( uiWidth == 4 && uiHeight == 4 ) || ( uiWidth == 8 && uiHeight == 8) ) ? 8 : 16) : piQCoef.area();
+#endif
     memset( piQCoef.buf, 0, sizeof(TCoeff) * piQCoef.area() );
 
     const ScanElement* scan = g_scanOrder[SCAN_GROUPED_4x4][SCAN_DIAG][gp_sizeIdxInfo->idxFrom(uiWidth)][gp_sizeIdxInfo->idxFrom(uiHeight)];

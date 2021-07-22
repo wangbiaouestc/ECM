@@ -1527,7 +1527,7 @@ const CtxSet ContextSetCfg::CcSaoControlIdc = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::LFNSTIdx = ContextSetCfg::addCtxSet
 ({
-#if EXTENDED_LFNST
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
 	{ 58, 37, 42, 35 },
 	{ 43, 45, 42, 35 },
 	{ 28, 43, 42, 27 },
@@ -2589,7 +2589,7 @@ const CtxSet ContextSetCfg::CcSaoControlIdc = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::LFNSTIdx = ContextSetCfg::addCtxSet
 ({
-#if EXTENDED_LFNST
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
   { 58, 37, 42, 35 },
   { 43, 45, 42, 35 },
   { 28, 43, 42, 27 },

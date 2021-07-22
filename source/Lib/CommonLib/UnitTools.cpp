@@ -539,6 +539,31 @@ bool CU::canUseLfnstWithISP( const CodingUnit& cu, const ChannelType chType )
   return CU::canUseLfnstWithISP( cu.blocks[chType == CHANNEL_TYPE_LUMA ? 0 : 1], (ISPType)cu.ispMode );
 }
 
+#if JVET_W0119_LFNST_EXTENSION
+Size CU::getLfnstSize( const CodingUnit& cu, const ChannelType chType )
+{
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+  int chIdx = CS::isDualITree( *cu.cs ) && cu.chType == CHANNEL_TYPE_CHROMA ? 1 : 0;
+#else
+  int chIdx = cu.isSepTree() && cu.chType == CHANNEL_TYPE_CHROMA ? 1 : 0;
+#endif
+  Size lfnstSize;
+  if( cu.ispMode )
+  {
+    CHECK( !isLuma( chType ), "Wrong ISP mode!" );
+    const CompArea& cuArea = cu.blocks[ 0 ];
+    lfnstSize = ( cu.ispMode == HOR_INTRA_SUBPARTITIONS ) ? Size( cuArea.width, CU::getISPSplitDim( cuArea.width, cuArea.height, TU_1D_HORZ_SPLIT ) ) :
+                Size( CU::getISPSplitDim( cuArea.width, cuArea.height, TU_1D_VERT_SPLIT ), cuArea.height );
+  }
+  else
+  {
+    lfnstSize.width  = cu.blocks[ chIdx ].lumaSize().width;
+    lfnstSize.height = cu.blocks[ chIdx ].lumaSize().height;
+  }
+  return lfnstSize;
+}
+#endif
+
 uint32_t CU::getISPSplitDim( const int width, const int height, const PartSplit ispType )
 {
   bool divideTuInRows = ispType == TU_1D_HORZ_SPLIT;
@@ -1263,6 +1288,35 @@ int PU::getWideAngle( const TransformUnit &tu, const uint32_t dirMode, const Com
 
   return predMode;
 }
+
+#if JVET_W0119_LFNST_EXTENSION
+int PU::getLFNSTMatrixDim( int width, int height )
+{
+  int dimension = ( width == 8 && height == 8 ) ? 16 : ( ( ( width >= 8 ) && ( height >= 8 ) ) ? 32 : 16 );
+
+  if( ( width >= 16 ) && ( height >= 16 ) )
+  {
+    dimension = L16H;
+  }
+
+  return dimension;
+}
+
+bool PU::getUseLFNST8( int width, int height )
+{
+  return ( width >= 8 ) && ( height >= 8 );
+}
+
+bool PU::getUseLFNST16( int width, int height )
+{
+  return ( width >= 16 ) && ( height >= 16 );
+}
+
+uint8_t PU::getLFNSTIdx( int intraMode, int mtsMode )
+{
+  return g_lfnstLut[ intraMode ];
+}
+#endif
 
 bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int &mrgCandIdx,
                           const uint32_t maxNumMergeCandMin1, int &cnt, const bool isAvailableA1,

@@ -348,6 +348,17 @@ static const int MDLM_T_IDX =                          LM_CHROMA_IDX + 2; ///< M
 #endif
 static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE; ///< chroma mode index for derived from luma intra mode
 
+#if JVET_W0119_LFNST_EXTENSION
+static const uint32_t  L16W_ZO           = 96;
+static const uint32_t  L16W              = 96;
+static const uint32_t  L16H              = 32;
+static const uint32_t  L16H_ZO           = 32;
+static const uint32_t  L8W               = 64;
+static const uint32_t  L8W_ZO            = 64;
+static const uint32_t  L8H               = 32;
+static const uint32_t  L8H_ZO            = 32;
+#endif
+
 static const uint32_t  NUM_TRAFO_MODES_MTS =                            6; ///< Max Intra CU size applying EMT, supported values: 8, 16, 32, 64, 128
 #if TU_256
 static const uint32_t  MTS_INTRA_MAX_CU_SIZE =                         256; ///< Max Intra CU size applying EMT, supported values: 8, 16, 32, 64, 128
@@ -376,7 +387,7 @@ static const int MAX_LFNST_COEF_NUM =                              16;
 static const int LFNST_LAST_SIG_LUMA =                              1;
 static const int LFNST_LAST_SIG_CHROMA =                            1;
 
-#if EXTENDED_LFNST
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
 static const int NUM_LFNST_NUM_PER_SET =                            4;
 #else
 static const int NUM_LFNST_NUM_PER_SET =                            3;

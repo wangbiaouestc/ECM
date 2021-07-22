@@ -107,6 +107,9 @@ namespace CU
   bool      canUseISP                 ( const int width, const int height, const int maxTrSize = MAX_TB_SIZEY );
   bool      canUseLfnstWithISP        ( const CompArea& cuArea, const ISPType ispSplitType );
   bool      canUseLfnstWithISP        ( const CodingUnit& cu, const ChannelType chType );
+#if JVET_W0119_LFNST_EXTENSION
+  Size      getLfnstSize              ( const CodingUnit& cu, const ChannelType chType );
+#endif
   uint32_t  getISPSplitDim            ( const int width, const int height, const PartSplit ispType );
   bool      allLumaCBFsAreZero        ( const CodingUnit& cu );
 #if JVET_W0123_TIMD_FUSION
@@ -153,6 +156,12 @@ namespace PU
 
   const PredictionUnit &getCoLocatedLumaPU(const PredictionUnit &pu);
   uint32_t getFinalIntraMode              (const PredictionUnit &pu, const ChannelType &chType);
+#if JVET_W0119_LFNST_EXTENSION
+  int      getLFNSTMatrixDim          ( int width, int height );
+  bool     getUseLFNST8               ( int width, int height );
+  uint8_t  getLFNSTIdx                ( int intraMode, int mtsMode = 0 );
+  bool     getUseLFNST16              ( int width, int height );
+#endif
   uint32_t getCoLocatedIntraLumaMode      (const PredictionUnit &pu);
   int      getWideAngle                   ( const TransformUnit &tu, const uint32_t dirMode, const ComponentID compID );
 #if MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM
