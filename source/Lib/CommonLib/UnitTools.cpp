@@ -4457,6 +4457,10 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
           subPuIdx++;
           MotionBuf mb = pu.cs->getMotionBuf(Area(pu.lx() + xStart, pu.ly() + yStart, dx, dy));
           mb.fill(mi);
+#if JVET_W0123_TIMD_FUSION
+          IpmBuf ib2 = pu.cs->getIpmBuf(Area(pu.lx() + xStart, pu.ly() + yStart, dx, dy));
+          spanIpmInfoInter(pu, mb, ib2);
+#endif
         }
         subPuIdx += bioSubPuIdxStrideIncr;
       }
@@ -4631,8 +4635,8 @@ void PU::spanIpmInfoInter( PredictionUnit &pu, MotionBuf &mb, IpmBuf &ib)
   Picture* pRefPic0;
   Picture* pRefPic1;
   uint8_t* ii = ib.buf;
-  int ibH = pu.Y().height >> MIN_CU_LOG2;
-  int ibW = pu.Y().width >> MIN_CU_LOG2;
+  int ibH = mb.height;
+  int ibW = mb.width;
   for (int y = 0; y < ibH; y++)
   {
     for (int x = 0; x < ibW; x++)
