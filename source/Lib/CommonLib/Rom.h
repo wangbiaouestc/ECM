@@ -109,7 +109,11 @@ extern int8_t          g_aucPrevLog2[MAX_CU_SIZE + 1];
 // Scanning order & context mapping table
 // ====================================================================================================================
 
+#if TU_256
+extern const uint32_t   g_uiGroupIdx[];
+#else
 extern const uint32_t   g_uiGroupIdx[ MAX_TB_SIZEY ];
+#endif
 extern const uint32_t   g_uiMinInGroup[ LAST_SIGNIFICANT_GROUPS ];
 extern const uint32_t   g_auiGoRiceParsCoeff     [ 32 ];
 inline uint32_t g_auiGoRicePosCoeff0(int st, uint32_t ricePar)
