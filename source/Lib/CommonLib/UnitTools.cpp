@@ -4457,13 +4457,13 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
           subPuIdx++;
           MotionBuf mb = pu.cs->getMotionBuf(Area(pu.lx() + xStart, pu.ly() + yStart, dx, dy));
           mb.fill(mi);
-#if JVET_W0123_TIMD_FUSION
-          IpmBuf ib2 = pu.cs->getIpmBuf(Area(pu.lx() + xStart, pu.ly() + yStart, dx, dy));
-          spanIpmInfoInter(pu, mb, ib2);
-#endif
         }
         subPuIdx += bioSubPuIdxStrideIncr;
       }
+#if JVET_W0123_TIMD_FUSION
+      MotionBuf mb = pu.getMotionBuf();
+      spanIpmInfoInter(pu, mb, ib);
+#endif
       return;
     }
     MotionBuf mb = pu.getMotionBuf();
