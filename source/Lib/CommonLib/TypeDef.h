@@ -50,9 +50,6 @@
 #include <assert.h>
 #include <cassert>
 
-#define ARMC_TM                                           1 //Adaptive reordering of merge candidates with template matching
-
-
 
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
@@ -126,10 +123,13 @@
 #define NON_ADJACENT_MRG_CAND                             1 // Add non-adjacent merge candidates
 #define MULTI_HYP_PRED                                    1 // Multiple hypothesis prediction
 #define IF_12TAP                                          1 // 12-tap IF
+#define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
+
+// Inter template matching tools
 #define TM_AMVP                                           1 // Add template  matching to non-subblock inter to refine regular AMVP candidates
 #define TM_MRG                                            1 // Add template  matching to non-subblock inter to refine regular merge candidates
-#define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
 #define JVET_W0097_GPM_MMVD_TM                            1 // JVET-W0097: GPM-MMVD and GPM-TM
+#define ARMC_TM                                           1 // JVET-W0090: Adaptive reordering of merge candidates with template matching
 
 // Transform and coefficient coding
 #define TCQ_8STATES                                       1
