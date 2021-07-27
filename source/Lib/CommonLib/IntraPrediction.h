@@ -158,7 +158,7 @@ protected:
 
   void xPredIntraBDPCM            ( const CPelBuf &pSrc, PelBuf &pDst, const uint32_t dirMode, const ClpRng& clpRng );
   Pel  xGetPredValDc              ( const CPelBuf &pSrc, const Size &dstSize );
-#if JVET_V0130_INTRA_TMP
+#if JVET_V0130_INTRA_TMP && !JVET_W0069_TMP_BOUNDARY
   bool isRefTemplateAvailable(CodingUnit& cu, CompArea& area);
 #endif
 
@@ -202,6 +202,10 @@ protected:
 public:
   IntraPrediction();
   virtual ~IntraPrediction();
+
+#if JVET_W0069_TMP_BOUNDARY
+  RefTemplateType GetRefTemplateType(CodingUnit& cu, CompArea& area);
+#endif
 
   void init                       (ChromaFormat chromaFormatIDC, const unsigned bitDepthY);
 #if ENABLE_DIMD

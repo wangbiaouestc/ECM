@@ -542,7 +542,11 @@ void TempLibFast::initTemplateDiff(unsigned int uiPatchWidth, unsigned int uiPat
 	}
 }
 
+#if JVET_W0069_TMP_BOUNDARY
+void TrQuant::getTargetTemplate(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType TempType)
+#else
 void TrQuant::getTargetTemplate(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight)
+#endif
 {
 	const ComponentID compID = COMPONENT_Y;
 	unsigned int uiPatchWidth = uiBlkWidth + TMP_TEMPLATE_SIZE;
@@ -557,6 +561,10 @@ void TrQuant::getTargetTemplate(CodingUnit* pcCU, unsigned int uiBlkWidth, unsig
 	//fill template
 	//up-left & up 
 	Pel* tarTemp;
+#if JVET_W0069_TMP_BOUNDARY
+	if (TempType == L_Shape_Template)
+	{
+#endif
 	Pel* pCurrTemp = pCurrStart - TMP_TEMPLATE_SIZE * uiPicStride - TMP_TEMPLATE_SIZE;
 	for (uiY = 0; uiY < TMP_TEMPLATE_SIZE; uiY++)
 	{
@@ -577,9 +585,42 @@ void TrQuant::getTargetTemplate(CodingUnit* pcCU, unsigned int uiBlkWidth, unsig
 		}
 		pCurrTemp += uiPicStride;
 	}
+#if JVET_W0069_TMP_BOUNDARY
+	}
+  else if (TempType == Up_Template)
+  {
+    Pel* pCurrTemp = pCurrStart - TMP_TEMPLATE_SIZE * uiPicStride;
+    for (uiY = 0; uiY < TMP_TEMPLATE_SIZE; uiY++)
+    {
+      tarTemp = tarPatch[uiY];
+      for (uiX = 0; uiX < uiBlkWidth; uiX++)
+      {
+        tarTemp[uiX] = pCurrTemp[uiX];
+      }
+      pCurrTemp += uiPicStride;
+    }
+  }
+	else if (TempType == Left_Template)
+	{
+		Pel* pCurrTemp = pCurrStart - TMP_TEMPLATE_SIZE;
+		for (uiY = TMP_TEMPLATE_SIZE; uiY < uiPatchHeight; uiY++)
+		{
+			tarTemp = tarPatch[uiY];
+			for (uiX = 0; uiX < TMP_TEMPLATE_SIZE; uiX++)
+			{
+				tarTemp[uiX] = pCurrTemp[uiX];
+			}
+			pCurrTemp += uiPicStride;
+		}
+	}
+#endif
 }
 
+#if JVET_W0069_TMP_BOUNDARY
+void TrQuant::candidateSearchIntra(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType TempType)
+#else
 void TrQuant::candidateSearchIntra(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight)
+#endif
 {
 	const ComponentID compID = COMPONENT_Y;
 	const int channelBitDepth = pcCU->cs->sps->getBitDepth(toChannelType(compID));
@@ -590,7 +631,11 @@ void TrQuant::candidateSearchIntra(CodingUnit* pcCU, unsigned int uiBlkWidth, un
 	//Initialize the library for saving the best candidates
 	m_tempLibFast.initTemplateDiff(uiPatchWidth, uiPatchHeight, uiBlkWidth, uiBlkHeight, channelBitDepth);
 	short setId = 0; //record the reference picture.
+#if JVET_W0069_TMP_BOUNDARY
+	searchCandidateFromOnePicIntra(pcCU, tarPatch, uiPatchWidth, uiPatchHeight, setId, TempType);
+#else
 	searchCandidateFromOnePicIntra(pcCU, tarPatch, uiPatchWidth, uiPatchHeight, setId);
+#endif
 	//count collected candidate number
 	int pDiff = m_tempLibFast.getDiff();
 	int maxDiff = m_tempLibFast.getDiffMax();
@@ -606,7 +651,11 @@ void TrQuant::candidateSearchIntra(CodingUnit* pcCU, unsigned int uiBlkWidth, un
   }
 }
 
+#if JVET_W0069_TMP_BOUNDARY
+void  TrQuant::searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId, RefTemplateType TempType)
+#else
 void  TrQuant::searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId)
+#endif
 {
 	const ComponentID compID = COMPONENT_Y;
 	unsigned int uiBlkWidth = uiPatchWidth - TMP_TEMPLATE_SIZE;
@@ -685,7 +734,11 @@ void  TrQuant::searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel** tarPatch, 
 			for (iXOffset = mvXMax; iXOffset >= mvXMin; iXOffset--)
 			{
 				refCurr = ref + iYOffset * refStride + iXOffset;
+#if JVET_W0069_TMP_BOUNDARY
+				diff = m_calcTemplateDiff(refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, pDiff, TempType);
+#else
 				diff = m_calcTemplateDiff(refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, pDiff);
+#endif
 				if (diff < (pDiff))
 				{
 					insertNode(diff, iXOffset, iYOffset, pDiff, pX, pY, pId, setId); 
@@ -719,7 +772,11 @@ void  TrQuant::searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel** tarPatch, 
 			for (iXOffset = mvXMax; iXOffset >= mvXMin; iXOffset--)
 			{
 				refCurr = ref + iYOffset * refStride + iXOffset;
+#if JVET_W0069_TMP_BOUNDARY
+				diff = m_calcTemplateDiff(refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, pDiff, TempType);
+#else
 				diff = m_calcTemplateDiff(refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, pDiff);
+#endif
 
 				if (diff < (pDiff))
 				{
@@ -780,12 +837,48 @@ bool TrQuant::generateTMPrediction(Pel* piPred, unsigned int uiStride, unsigned 
 	return bSucceedFlag;
 }
 
+#if JVET_W0069_TMP_BOUNDARY
+bool TrQuant::generateTM_DC_Prediction(Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val)
+{
+  bool bSucceedFlag = true;
+  {
+    for (unsigned int uiY = 0; uiY < uiBlkHeight; uiY++)
+    {
+      for (unsigned int uiX = 0; uiX < uiBlkWidth; uiX++)
+      {
+        piPred[uiX] = DC_Val;
+      }
+      piPred += uiStride;
+    }
+  }
+	return bSucceedFlag;
+}
+#endif
+
+#if JVET_W0069_TMP_BOUNDARY
+int TrQuant::calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType TempType)
+#else
 int TrQuant::calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax)
+#endif
 {
   int iDiffSum = 0;
+#if JVET_W0069_TMP_BOUNDARY
+  Pel* refPatchRow;
+  if (TempType == L_Shape_Template)
+	  refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride - TMP_TEMPLATE_SIZE;
+  else if (TempType == Left_Template)
+	  refPatchRow = ref - TMP_TEMPLATE_SIZE;
+  else if (TempType == Up_Template)
+	  refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride;
+#else
   Pel* refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride - TMP_TEMPLATE_SIZE;
+#endif
   Pel* tarPatchRow;
 
+#if JVET_W0069_TMP_BOUNDARY
+  if (TempType == L_Shape_Template)
+  {
+#endif
   // horizontal difference
   for( int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++ )
   {
@@ -815,6 +908,43 @@ int TrQuant::calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel** tarPatch, u
     }
     refPatchRow += uiStride;
   }
+#if JVET_W0069_TMP_BOUNDARY
+	}
+  else if (TempType == Up_Template)
+  {
+    // top  template difference
+    for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
+    {
+      tarPatchRow = tarPatch[iY];
+      for (int iX = 0; iX < uiPatchWidth - TMP_TEMPLATE_SIZE; iX++)
+      {
+        iDiffSum += abs(refPatchRow[iX] - tarPatchRow[iX]);
+      }
+      if (iDiffSum > iMax) //for speeding up
+      {
+        return iDiffSum;
+      }
+      refPatchRow += uiStride;
+    }
+  }
+  else if (TempType == Left_Template)
+  {
+	  // left template difference
+	  for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)
+	  {
+		  tarPatchRow = tarPatch[iY];
+		  for (int iX = 0; iX < TMP_TEMPLATE_SIZE; iX++)
+		  {
+			  iDiffSum += abs(refPatchRow[iX] - tarPatchRow[iX]);
+		  }
+		  if (iDiffSum > iMax) //for speeding up
+		  {
+			  return iDiffSum;
+		  }
+		  refPatchRow += uiStride;
+	  }
+  }
+#endif
 
   return iDiffSum;
 }
