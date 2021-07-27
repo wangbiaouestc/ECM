@@ -3173,7 +3173,7 @@ SPS::SPS()
 #endif
 , m_MRL                       ( false )
 , m_MIP                       ( false )
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
 , m_AML                       ( false )
 #endif
 , m_GDREnabledFlag            ( true )

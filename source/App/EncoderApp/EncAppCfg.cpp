@@ -981,7 +981,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
   ("PROF",                                            m_PROF,                                           false, "Enable Prediction refinement with optical flow for affine mode (0:off, 1:on)  [default: off]")
   ("BIO",                                             m_BIO,                                            false, "Enable bi-directional optical flow")
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   ("AML",                                             m_AML,                                             true, "Enable adaptive merge list")
 #endif
   ("IMV",                                             m_ImvMode,                                            1, "Adaptive MV precision Mode (IMV)\n"
@@ -4278,7 +4278,7 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "DualITree:%d ", m_dualTree );
     msg( VERBOSE, "IMV:%d ", m_ImvMode );
     msg( VERBOSE, "BIO:%d ", m_BIO );
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
     msg( VERBOSE, "AML:%d ", m_AML );
 #endif
     msg( VERBOSE, "LMChroma:%d ", m_LMChroma );

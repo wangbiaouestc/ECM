@@ -1352,7 +1352,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             affineMergeCtx.mrgCtx = &mrgCtx;
           }
 #if AFFINE_MMVD
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
           int affMrgIdx = pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE + 1)*ADAPTIVE_AFFINE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumAffineMergeCand()) || (pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE * ADAPTIVE_AFFINE_SUB_GROUP_SIZE + ADAPTIVE_AFFINE_SUB_GROUP_SIZE - 1 : pu.mergeIdx;
           PU::getAffineMergeCand(pu, affineMergeCtx, (pu.afMmvdFlag ? pu.afMmvdBaseIdx : affMrgIdx), pu.afMmvdFlag);
 #else
@@ -1365,7 +1365,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             CHECK(pu.mergeIdx >= pu.cu->slice->getPicHeader()->getMaxNumAffineMergeCand(), "Affine MMVD mode doesn't have a valid base candidate!");
             PU::getAfMmvdMvf(pu, affineMergeCtx, affineMergeCtx.mvFieldNeighbours + (pu.mergeIdx << 1), pu.mergeIdx, pu.afMmvdStep, pu.afMmvdDir);
           }
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
           else
           {
             if (pu.cs->sps->getUseAML())
@@ -1375,7 +1375,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           }
 #endif
 #else
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
           int affMrgIdx = pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE + 1)*ADAPTIVE_AFFINE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumAffineMergeCand()) || (pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE * ADAPTIVE_AFFINE_SUB_GROUP_SIZE + ADAPTIVE_AFFINE_SUB_GROUP_SIZE - 1 : pu.mergeIdx;
           PU::getAffineMergeCand(pu, affineMergeCtx, affMrgIdx);
           if (pu.cs->sps->getUseAML())
@@ -1422,7 +1422,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           if (CU::isIBC(*pu.cu))
             PU::getIBCMergeCandidates(pu, mrgCtx, pu.mergeIdx);
           else
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
             if (pu.cs->sps->getUseAML())
             {
               PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumMergeCand()) || (pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : pu.mergeIdx);

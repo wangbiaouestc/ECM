@@ -1310,7 +1310,7 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 
   WRITE_FLAG( pcSPS->getAMVREnabledFlag() ? 1 : 0,                                   "sps_amvr_enabled_flag" );
 
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   WRITE_FLAG( pcSPS->getUseAML() ? 1 : 0,                                             "sps_aml_enabled_flag" );
 #endif
   WRITE_FLAG( pcSPS->getBDOFEnabledFlag() ? 1 : 0,                                   "sps_bdof_enabled_flag" );

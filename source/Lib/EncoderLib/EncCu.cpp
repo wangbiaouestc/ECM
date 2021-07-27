@@ -2776,7 +2776,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
   tempCS->initStructData( encTestMode.qp );
 
   MergeCtx mergeCtx;
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   MergeCtx mergeCtxtmp;
 #endif
   const SPS &sps = *tempCS->sps;
@@ -2786,7 +2786,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     && !(bestCS->area.lumaSize().width < 8 || bestCS->area.lumaSize().height < 8);
 
   AffineMergeCtx affineMergeCtx;
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   AffineMergeCtx affineMergeCtxTmp;
 #endif
   MergeCtx mrgCtx;
@@ -2842,7 +2842,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     m_mergeCandAvail = true;
 #endif
     PU::getInterMMVDMergeCandidates(pu, mergeCtx);
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
     mergeCtxtmp = mergeCtx;
     if (sps.getUseAML())
     {
@@ -2855,7 +2855,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       cu.firstPU = &pu;
       pu.tmMergeFlag = true;
       PU::getInterMergeCandidates(pu, tmMrgCtx, 0);
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
       if (sps.getUseAML())
       {
         m_pcInterSearch->adjustInterMergeCandidates(pu, tmMrgCtx);
@@ -2908,7 +2908,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       pu.regularMergeFlag = false;
       cu.affine = true;
       PU::getAffineMergeCand(pu, affineMergeCtx);
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
       affineMergeCtxTmp = affineMergeCtx;
       if (sps.getUseAML())
       {
@@ -3417,7 +3417,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       if ( pu.cs->sps->getUseMMVD() )
       {
 #if MERGE_ENC_OPT
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
         xCheckSATDCostMmvdMerge(tempCS, cu, pu, mergeCtxtmp, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart);
 #else
         xCheckSATDCostMmvdMerge(tempCS, cu, pu, mergeCtx, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart);
@@ -3432,7 +3432,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
           int refineStep = (mmvdMergeCand - (baseIdx * MMVD_MAX_REFINE_NUM)) / 4;
           if (refineStep >= m_pcEncCfg->getMmvdDisNum())
             continue;
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
           mergeCtxtmp.setMmvdMergeCandiInfo(pu, mmvdMergeCand);
 #else
           mergeCtx.setMmvdMergeCandiInfo(pu, mmvdMergeCand);
@@ -3499,7 +3499,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if AFFINE_MMVD
       if (affineMmvdAvail)
       {
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
         xCheckSATDCostAffineMmvdMerge(tempCS, cu, pu, affineMergeCtxTmp, mrgCtx, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart);
 #else
         xCheckSATDCostAffineMmvdMerge(tempCS, cu, pu, affineMergeCtx, mrgCtx, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart);
@@ -3654,7 +3654,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       {
         cu.mmvdSkip = true;
         pu.regularMergeFlag = true;
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
         mergeCtxtmp.setMmvdMergeCandiInfo(pu, uiMergeCand);
 #else
         mergeCtx.setMmvdMergeCandiInfo(pu, uiMergeCand);
@@ -3681,7 +3681,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         pu.afMmvdDir      = (uint8_t)dirIdx;
         pu.afMmvdStep     = (uint8_t)stepIdx;
         pu.mergeIdx       = (uint8_t)(baseIdx + afMmvdBaseIdxToMergeIdxOffset);
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
         pu.mergeType = affineMergeCtxTmp.mergeType[pu.mergeIdx];
 #if INTER_LIC
         pu.cu->LICFlag = affineMergeCtxTmp.LICFlags[pu.mergeIdx];
@@ -6469,7 +6469,7 @@ void EncCu::xCheckRDCostAffineMerge2Nx2N( CodingStructure *&tempCS, CodingStruct
     pu.cs = tempCS;
     pu.regularMergeFlag = false;
     PU::getAffineMergeCand( pu, affineMergeCtx );
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
     if (sps.getUseAML())
     {
       m_pcInterSearch->adjustAffineMergeCandidates(pu, affineMergeCtx);
@@ -7126,7 +7126,7 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
 
     pu.tmMergeFlag = true;
     PU::getInterMergeCandidates(pu, mergeCtx, 0);
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
     if (sps.getUseAML())
     {
       m_pcInterSearch->adjustInterMergeCandidates(pu, mergeCtx);
