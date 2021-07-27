@@ -1773,7 +1773,11 @@ void IntraPrediction::initIntraPatternChTypeISP(const CodingUnit& cu, const Comp
 }
 
 #if JVET_V0130_INTRA_TMP
+#if JVET_W0069_TMP_BOUNDARY
+RefTemplateType IntraPrediction::GetRefTemplateType(CodingUnit& cu, CompArea& area)
+#else
 bool IntraPrediction::isRefTemplateAvailable(CodingUnit& cu, CompArea& area)
+#endif
 {
 	const ChannelType      chType = toChannelType(area.compID);
 	const CodingStructure& cs = *cu.cs;
@@ -1799,7 +1803,11 @@ bool IntraPrediction::isRefTemplateAvailable(CodingUnit& cu, CompArea& area)
 
   if( numAboveUnits <= 0 || numLeftUnits <= 0 || numAboveRightUnits <= 0 || numLeftBelowUnits <= 0 )
   {
+#if JVET_W0069_TMP_BOUNDARY
+	  return No_Template;
+#else
     return false;
+#endif
   }
 
 	// ----- Step 1: analyze neighborhood -----
@@ -1814,7 +1822,19 @@ bool IntraPrediction::isRefTemplateAvailable(CodingUnit& cu, CompArea& area)
 
 	//bool retVal = 1;
 
+#if JVET_W0069_TMP_BOUNDARY
+	if (isAboveLeftAvailable(cu, chType, posLT) && isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)) && isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1)))
+		return L_Shape_Template;
+	else if (isAboveLeftAvailable(cu, chType, posLT))
+		return Left_Template;
+	else if (isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)))
+		return Up_Template;
+	else
+		return No_Template;
+	CHECK(1, "un defined template type");
+#else
 	return isAboveLeftAvailable(cu, chType, posLT) && isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)) && isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1));
+#endif
 
 	//return retVal;
 }

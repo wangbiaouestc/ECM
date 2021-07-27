@@ -130,18 +130,35 @@ public:
   void invLfnstNxN( int* src, int* dst, const uint32_t mode, const uint32_t index, const uint32_t size, int zeroOutSize );
 #endif
 #if JVET_V0130_INTRA_TMP
+#if JVET_W0069_TMP_BOUNDARY
+  int (*m_calcTemplateDiff)(Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType TempType);
+  static int calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType TempType);
+#else
   int ( *m_calcTemplateDiff )(Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax);
   static int calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax);
+#endif
   Pel** getTargetPatch(unsigned int uiDepth)       { return m_pppTarPatch[uiDepth]; }
   Pel* getRefPicUsed()                             { return m_refPicUsed; }
   void setRefPicUsed(Pel* ref)                     { m_refPicUsed = ref; }
   unsigned int getStride()                         { return m_uiPicStride; }
   void         setStride(unsigned int uiPicStride) { m_uiPicStride = uiPicStride; }
 
+#if JVET_W0069_TMP_BOUNDARY
+  void searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId, RefTemplateType TempType);
+  void candidateSearchIntra(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType TempType);
+#else
   void searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId);
   void candidateSearchIntra(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight);
+#endif
   bool generateTMPrediction(Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int& foundCandiNum);
+#if JVET_W0069_TMP_BOUNDARY
+  bool generateTM_DC_Prediction(Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val);
+#endif
+#if JVET_W0069_TMP_BOUNDARY
+  void getTargetTemplate(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType TempType);
+#else
   void getTargetTemplate(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight);
+#endif
 #endif
 
   uint32_t getLFNSTIntraMode( int wideAngPredMode );

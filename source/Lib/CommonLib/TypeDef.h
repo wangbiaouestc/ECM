@@ -111,6 +111,7 @@
 #define ENABLE_DIMD                                       1 // Decoder side intra mode derivation
 #define JVET_V0087_DIMD_NO_ISP                            ENABLE_DIMD // disallow combination of DIMD and ISP
 #define JVET_V0130_INTRA_TMP                              1 // JVET-V0130: template matching prediction
+#define JVET_W0069_TMP_BOUNDARY								  1
 
 #define JVET_W0123_TIMD_FUSION                            1 // Template based intra mode derivation and fusion
 
@@ -656,6 +657,15 @@ enum ChannelType
   CHANNEL_TYPE_CHROMA  = 1,
   MAX_NUM_CHANNEL_TYPE = 2
 };
+#if JVET_W0069_TMP_BOUNDARY
+enum RefTemplateType
+{
+  L_Shape_Template = 1,
+  Left_Template = 2,
+  Up_Template = 3,
+  No_Template = 4,
+};
+#endif
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
 enum TreeType
 {
