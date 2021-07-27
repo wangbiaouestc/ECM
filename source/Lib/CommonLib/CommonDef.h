@@ -285,7 +285,11 @@ static const int MAX_TILE_ROWS =                                   22;  ///< Max
 static const int MAX_TILES =            MAX_TILE_COLS * MAX_TILE_ROWS;  ///< Maximum number of tiles
 #endif
 static const int MAX_SLICES =                                     600;  ///< Maximum number of slices per picture
+#if TU_256
+static const int MLS_GRP_NUM =       MAX_TB_SIZEY * MAX_TB_SIZEY >> 4;  ///< Max number of coefficient groups
+#else
 static const int MLS_GRP_NUM =                                   1024; ///< Max number of coefficient groups, max(16, 256)
+#endif
 
 static const int MLS_CG_SIZE =                                      4; ///< Coefficient group size of 4x4; = MLS_CG_LOG2_WIDTH + MLS_CG_LOG2_HEIGHT
 
