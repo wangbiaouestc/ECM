@@ -361,7 +361,7 @@ protected:
 #endif
   bool      m_PROF;
   bool      m_BIO;
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   bool      m_AML;
 #endif
   int       m_LMChroma;

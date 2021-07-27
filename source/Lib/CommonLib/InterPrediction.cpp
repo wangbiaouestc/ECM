@@ -44,7 +44,7 @@
 #include <memory.h>
 #include <algorithm>
 
-#if INTER_LIC || (TM_AMVP || TM_MRG) || ARMC_TM
+#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM
 #include "Reshape.h"
 #endif
 
@@ -181,7 +181,7 @@ InterPrediction::InterPrediction()
   CHECK(mvSearchIdx_bilMrg != (2 * BDMVR_INTME_RANGE + 1) * (2 * BDMVR_INTME_RANGE + 1),
       "this is wrong, mvSearchIdx_bilMrg != (2 * BDMVR_INTME_RANGE + 1) * (2 * BDMVR_INTME_RANGE + 1)");
 #endif
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   for (uint32_t ch = 0; ch < MAX_NUM_COMPONENT; ch++)
   {
     for (uint32_t tmplt = 0; tmplt < 2; tmplt++)
@@ -288,7 +288,7 @@ void InterPrediction::destroy()
 #if MULTI_HYP_PRED
   m_additionalHypothesisStorage.destroy();
 #endif
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   for (uint32_t ch = 0; ch < MAX_NUM_COMPONENT; ch++)
   {
     for (uint32_t tmplt = 0; tmplt < 2; tmplt++)
@@ -306,14 +306,14 @@ void InterPrediction::destroy()
 #endif
 }
 
-#if INTER_LIC || (TM_AMVP || TM_MRG) || ARMC_TM
+#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM
 void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape )
 #else
 void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize )
 #endif
 {
   m_pcRdCost = pcRdCost;
-#if INTER_LIC || (TM_AMVP || TM_MRG) || ARMC_TM
+#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM
   m_pcReshape = reshape;
 #endif
 
@@ -439,7 +439,7 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
     m_pcLICRecAboveTemplate = (Pel*)xMalloc(Pel, MAX_CU_SIZE);
   }
 #endif
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   for (uint32_t ch = 0; ch < MAX_NUM_COMPONENT; ch++)
   {
     for (uint32_t tmplt = 0; tmplt < 2; tmplt++)
@@ -1513,7 +1513,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
                                      , bool bilinearMC
                                      , Pel *srcPadBuf
                                      , int32_t srcPadStride
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
                                      , bool AML
 #if INTER_LIC
                                      , bool doLic
@@ -1522,7 +1522,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
 #endif
                                     )
 {
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   int                 nFilterIdx = AML ? 0 : 0;
   if (bilinearMC)
   {
@@ -1636,7 +1636,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
 
     if( yFrac == 0 )
     {
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
       m_if.filterHor( compID, (Pel*)refBuf.buf, refBuf.stride, dstBuf.buf, dstBuf.stride, backupWidth, backupHeight, xFrac, rndRes, chFmt, clpRng, nFilterIdx, bilinearMC, useAltHpelIf );
 #else
       m_if.filterHor( compID, ( Pel* ) refBuf.buf, refBuf.stride, dstBuf.buf, dstBuf.stride, backupWidth, backupHeight, xFrac, rndRes, chFmt, clpRng, bilinearMC, bilinearMC, useAltHpelIf);
@@ -1644,7 +1644,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
     }
     else if( xFrac == 0 )
     {
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
       m_if.filterVer( compID, (Pel*)refBuf.buf, refBuf.stride, dstBuf.buf, dstBuf.stride, backupWidth, backupHeight, yFrac, true, rndRes, chFmt, clpRng, nFilterIdx, bilinearMC, useAltHpelIf );
 #else
       m_if.filterVer( compID, ( Pel* ) refBuf.buf, refBuf.stride, dstBuf.buf, dstBuf.stride, backupWidth, backupHeight, yFrac, true, rndRes, chFmt, clpRng, bilinearMC, bilinearMC, useAltHpelIf);
@@ -1680,7 +1680,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
 #else
         int vFilterSize = isLuma( compID ) ? NTAPS_LUMA : NTAPS_CHROMA;
 #endif
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
         if (isLuma(compID) && nFilterIdx == 1)
 #else
         if (bilinearMC)
@@ -1688,7 +1688,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
         {
           vFilterSize = NTAPS_BILINEAR;
         }
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
         m_if.filterHor(compID, (Pel*)refBuf.buf - ((vFilterSize >> 1) - 1) * refBuf.stride, refBuf.stride, tmpBuf.buf, tmpBuf.stride, backupWidth, backupHeight + vFilterSize - 1, xFrac, false, chFmt, clpRng, nFilterIdx, bilinearMC, useAltHpelIf);
         JVET_J0090_SET_CACHE_ENABLE(false);
         m_if.filterVer(compID, (Pel*)tmpBuf.buf + ((vFilterSize >> 1) - 1) * tmpBuf.stride, tmpBuf.stride, dstBuf.buf, dstBuf.stride, backupWidth, backupHeight, yFrac, false, rndRes, chFmt, clpRng, nFilterIdx, bilinearMC, useAltHpelIf);
@@ -1760,7 +1760,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
       m_predictionBeforeLIC.bufs[compID].copyFrom( dstBuf );
     }
 
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
     if (pu.cu->LICFlag && (!pu.ciipFlag || doLic))
 #else
     if( pu.cu->LICFlag && !pu.ciipFlag )
@@ -1769,10 +1769,10 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
       CHECK( pu.cu->geoFlag, "Geometric mode is not used with LIC" );
       CHECK( CU::isIBC( *pu.cu ), "IBC mode is not used with LIC" );
       CHECK( pu.interDir == 3, "Bi-prediction is not used with LIC" );
-#if !ARMC_TM
+#if !JVET_W0090_ARMC_TM
       CHECK( pu.ciipFlag, "CIIP mode is not used with LIC" );
 #endif
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
       if (AML)
       {
         xLocalIlluComp(pu, compID, *refPic, mvCurr, bi, dstBuf);
@@ -2942,7 +2942,7 @@ void InterPrediction::xWeightedAverage(
   }
 }
 
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
 #if !INTER_LIC
 template <bool TrueA_FalseL>
 void InterPrediction::xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl)
@@ -4534,7 +4534,7 @@ void InterPrediction::cacheAssign( CacheModel *cache )
 }
 #endif
 
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
 void  InterPrediction::adjustInterMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, int mrgCandIdx)
 {
   uint32_t RdCandList[MRG_MAX_NUM_CANDS][MRG_MAX_NUM_CANDS];

@@ -51,7 +51,7 @@
 #include "ContextModelling.h"
 // forward declaration
 class Mv;
-#if INTER_LIC || (TM_AMVP || TM_MRG) || ARMC_TM
+#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM
 class Reshape;
 #endif
 
@@ -70,7 +70,7 @@ public:
   PelUnitBuf        m_predictionBeforeLIC;
   bool              m_storeBeforeLIC;
 #endif
-#if INTER_LIC || (TM_AMVP || TM_MRG) || ARMC_TM // note: already refactor
+#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM // note: already refactor
   Reshape*          m_pcReshape;
 #endif
 
@@ -216,7 +216,7 @@ protected:
                                  , bool bilinearMC = false
                                  , Pel *srcPadBuf = NULL
                                  , int32_t srcPadStride = 0
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
                                  , bool AML = false
 #if INTER_LIC
                                  , bool doLic = false
@@ -234,7 +234,7 @@ protected:
 #else
   void xWeightedAverage         ( const PredictionUnit& pu, const CPelUnitBuf& pcYuvSrc0, const CPelUnitBuf& pcYuvSrc1, PelUnitBuf& pcYuvDst, const BitDepths& clipBitDepths, const ClpRngs& clpRngs, const bool& bioApplied, const bool lumaOnly = false, const bool chromaOnly = false, PelUnitBuf* yuvDstTmp = NULL );
 #endif
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
 #if !INTER_LIC
   template <bool TrueA_FalseL>
   void xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl);
@@ -263,7 +263,7 @@ protected:
 
 
   MotionInfo      m_SubPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   Pel*   m_acYuvCurAMLTemplate[2][MAX_NUM_COMPONENT];   //0: top, 1: left
   bool   m_bAMLTemplateAvailabe[2];
   Pel*   m_acYuvRefAboveTemplate[2][MAX_NUM_COMPONENT];   //0: list0, 1: list1
@@ -282,7 +282,7 @@ public:
   InterPrediction();
   virtual ~InterPrediction();
 
-#if INTER_LIC || (TM_AMVP || TM_MRG) || ARMC_TM
+#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM
   void    init                (RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape);
 #else
   void    init                (RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize);
@@ -325,7 +325,7 @@ public:
 #if !AFFINE_RM_CONSTRAINTS_AND_OPT
   static bool isSubblockVectorSpreadOverLimit( int a, int b, int c, int d, int predType );
 #endif
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   void    adjustInterMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, int mrgCandIdx = -1);
   bool    xAMLGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWidth, int nCurBlkHeight);
   bool    xAMLIsTopTempAvailable(PredictionUnit& pu);

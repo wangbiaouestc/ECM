@@ -275,7 +275,7 @@ void InterSearch::init( EncCfg*        pcEncCfg,
   }
 
   const ChromaFormat cform = pcEncCfg->getChromaFormatIdc();
-#if INTER_LIC || (TM_AMVP || TM_MRG) || ARMC_TM
+#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM
   InterPrediction::init( pcRdCost, cform, maxCUHeight, m_pcReshape );
 #else 
   InterPrediction::init( pcRdCost, cform, maxCUHeight );

@@ -996,7 +996,7 @@ void AreaBuf<Pel>::copyClip( const AreaBuf<const Pel> &src, const ClpRng& clpRng
   const unsigned srcStride  = src.stride;
   const unsigned destStride = stride;
 
-#if !ARMC_TM
+#if !JVET_W0090_ARMC_TM
   if( width == 1 )
   {
     THROW( "Blocks of width = 1 not supported" );
@@ -1101,22 +1101,17 @@ void AreaBuf<Pel>::linearTransform( const int scale, const int shift, const int 
   const Pel* src = buf;
         Pel* dst = buf;
 
-#if ARMC_TM
-#if ENABLE_SIMD_OPT_BUFFER && defined(TARGET_SIMD_X86)
-        if ((width & 7) == 0)
-        {
-          g_pelBufOP.linTf8(src, stride, dst, stride, width, height, scale, shift, offset, clpRng, bClip);
-        }
-        else if ((width & 3) == 0)
-        {
-          g_pelBufOP.linTf4(src, stride, dst, stride, width, height, scale, shift, offset, clpRng, bClip);
-        }
-#endif
+#if JVET_W0090_ARMC_TM
+  if (width == 0)
+  {
+    THROW("Blocks of width = 0 not supported");
+  }
 #else
   if( width == 1 )
   {
     THROW( "Blocks of width = 1 not supported" );
   }
+#endif
 #if ENABLE_SIMD_OPT_BUFFER && defined(TARGET_SIMD_X86)
   else if( ( width & 7 ) == 0 )
   {
@@ -1126,7 +1121,6 @@ void AreaBuf<Pel>::linearTransform( const int scale, const int shift, const int 
   {
     g_pelBufOP.linTf4( src, stride, dst, stride, width, height, scale, shift, offset, clpRng, bClip );
   }
-#endif
 #endif
   else
   {

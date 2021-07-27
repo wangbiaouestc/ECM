@@ -744,7 +744,7 @@ void EncApp::xInitLibCfg()
 #endif
   m_cEncLib.setPROF                                              ( m_PROF );
   m_cEncLib.setBIO                                               (m_BIO);
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   m_cEncLib.setAML                                               ( m_AML );
 #endif
   m_cEncLib.setUseLMChroma                                       ( m_LMChroma );

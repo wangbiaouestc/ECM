@@ -1704,7 +1704,7 @@ private:
 #endif
   bool              m_MRL;
   bool              m_MIP;
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   bool              m_AML;
 #endif
   ChromaQpMappingTable m_chromaQpMappingTable;
@@ -2137,7 +2137,7 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setUseMIP             ( bool b )                                        { m_MIP = b; }
   bool      getUseMIP             ()                                      const     { return m_MIP; }
 
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   void      setUseAML             ( bool b )                                        { m_AML = b; }
   bool      getUseAML             ()                                      const     { return m_AML; }
 #endif

@@ -129,7 +129,7 @@
 #define TM_AMVP                                           1 // Add template  matching to non-subblock inter to refine regular AMVP candidates
 #define TM_MRG                                            1 // Add template  matching to non-subblock inter to refine regular merge candidates
 #define JVET_W0097_GPM_MMVD_TM                            1 // JVET-W0097: GPM-MMVD and GPM-TM
-#define ARMC_TM                                           1 // JVET-W0090: Adaptive reordering of merge candidates with template matching
+#define JVET_W0090_ARMC_TM                                1 // JVET-W0090: Adaptive reordering of merge candidates with template matching
 
 // Transform and coefficient coding
 #define TCQ_8STATES                                       1

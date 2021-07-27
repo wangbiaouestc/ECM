@@ -611,7 +611,7 @@ static const double AMAXBT_TH64 =                                  30.0;
 static const double AMAXBT_TH128 =                                 60.0;
 #endif
 
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
 static const int AML_MERGE_TEMPLATE_SIZE =                         1;
 static const int ADAPTIVE_SUB_GROUP_SIZE =                         5;
 static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE =                  3;

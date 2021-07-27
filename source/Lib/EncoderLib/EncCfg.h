@@ -376,7 +376,7 @@ protected:
 #endif
   bool      m_PROF;
   bool      m_BIO;
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   bool      m_AML;
 #endif
 
@@ -1217,7 +1217,7 @@ public:
   bool      getPROF                         ()         const { return m_PROF; }
   void      setBIO(bool b)                                   { m_BIO = b; }
   bool      getBIO()                                   const { return m_BIO; }
-#if ARMC_TM
+#if JVET_W0090_ARMC_TM
   void      setAML(bool b)                                   { m_AML = b; }
   bool      getAML()                                   const { return m_AML; }
 #endif
