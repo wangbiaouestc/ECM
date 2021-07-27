@@ -109,11 +109,10 @@
 #define INTRA_6TAP                                        1 // 6TapCubic + 6 TapGaussian + left side 4 tap weak filtering for intra.
 #define SECONDARY_MPM                                     1 // Primary MPM and Secondary MPM: Add neighbouring modes into MPMs from positions AR, BL, AL, derived modes
 #define ENABLE_DIMD                                       1 // Decoder side intra mode derivation
-#define JVET_V0087_DIMD_NO_ISP                            ENABLE_DIMD // disallow combination of DIMD and ISP
+#define JVET_V0087_DIMD_NO_ISP                  ENABLE_DIMD // JVET-V0087: disallow combination of DIMD and ISP
 #define JVET_V0130_INTRA_TMP                              1 // JVET-V0130: template matching prediction
-#define JVET_W0069_TMP_BOUNDARY								  1
-
-#define JVET_W0123_TIMD_FUSION                            1 // Template based intra mode derivation and fusion
+#define JVET_W0069_TMP_BOUNDARY								            1 // JVET-W0069: boundary handling for TMP
+#define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
 
 // Inter
 #define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
@@ -660,10 +659,10 @@ enum ChannelType
 #if JVET_W0069_TMP_BOUNDARY
 enum RefTemplateType
 {
-  L_Shape_Template = 1,
-  Left_Template = 2,
-  Up_Template = 3,
-  No_Template = 4,
+  L_SHAPE_TEMPLATE = 1,
+  LEFT_TEMPLATE    = 2,
+  ABOVE_TEMPLATE   = 3,
+  NO_TEMPLATE      = 4
 };
 #endif
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS

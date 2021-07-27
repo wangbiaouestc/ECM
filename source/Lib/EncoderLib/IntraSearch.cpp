@@ -892,16 +892,16 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               CodingUnit cu_cpy = cu;
 
 #if JVET_W0069_TMP_BOUNDARY
-			  RefTemplateType TemplateType = GetRefTemplateType(cu_cpy, cu_cpy.blocks[COMPONENT_Y]);
-			  if (TemplateType != No_Template)
+              RefTemplateType TemplateType = GetRefTemplateType( cu_cpy, cu_cpy.blocks[COMPONENT_Y] );
+              if( TemplateType != NO_TEMPLATE )
 #else
               if( isRefTemplateAvailable( cu_cpy, cu_cpy.blocks[COMPONENT_Y] ) )
 #endif
               {
 #if JVET_W0069_TMP_BOUNDARY
-				  m_pcTrQuant->getTargetTemplate(&cu_cpy, pu.lwidth(), pu.lheight(), TemplateType);
-				  m_pcTrQuant->candidateSearchIntra(&cu_cpy, pu.lwidth(), pu.lheight(), TemplateType);
-				  bsuccessfull = m_pcTrQuant->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+                m_pcTrQuant->getTargetTemplate( &cu_cpy, pu.lwidth(), pu.lheight(), TemplateType );
+                m_pcTrQuant->candidateSearchIntra( &cu_cpy, pu.lwidth(), pu.lheight(), TemplateType );
+                bsuccessfull = m_pcTrQuant->generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
 #else
                 m_pcTrQuant->getTargetTemplate( &cu_cpy, pu.lwidth(), pu.lheight() );
                 m_pcTrQuant->candidateSearchIntra( &cu_cpy, pu.lwidth(), pu.lheight() );
@@ -909,11 +909,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #endif
               }
 #if JVET_W0069_TMP_BOUNDARY
-			  else
-			  {
-				  foundCandiNum = 1;
-				  bsuccessfull = m_pcTrQuant->generateTM_DC_Prediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (cu_cpy.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1));
-			  }
+              else
+              {
+                foundCandiNum = 1;
+                bsuccessfull = m_pcTrQuant->generateTM_DC_Prediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (cu_cpy.cs->sps->getBitDepth( CHANNEL_TYPE_LUMA ) - 1) );
+              }
 #endif
               if( bsuccessfull && foundCandiNum >= 1 )
               {
@@ -3679,18 +3679,18 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
         {
           int foundCandiNum;
 #if JVET_W0069_TMP_BOUNDARY
-		  RefTemplateType TempType = GetRefTemplateType(*(tu.cu), tu.cu->blocks[COMPONENT_Y]);
-		  if (TempType != No_Template)
-		  {
-			  m_pcTrQuant->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight(), TempType);
-			  m_pcTrQuant->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight(), TempType);
-			  m_pcTrQuant->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
-		  }
-		  else
-		  {
-			  foundCandiNum = 1;
-			  m_pcTrQuant->generateTM_DC_Prediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1));
-		  }
+          RefTemplateType TempType = GetRefTemplateType( *(tu.cu), tu.cu->blocks[COMPONENT_Y] );
+          if( TempType != NO_TEMPLATE )
+          {
+            m_pcTrQuant->getTargetTemplate( tu.cu, pu.lwidth(), pu.lheight(), TempType );
+            m_pcTrQuant->candidateSearchIntra( tu.cu, pu.lwidth(), pu.lheight(), TempType );
+            m_pcTrQuant->generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
+          }
+          else
+          {
+            foundCandiNum = 1;
+            m_pcTrQuant->generateTM_DC_Prediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth( CHANNEL_TYPE_LUMA ) - 1) );
+          }
 #else
           m_pcTrQuant->getTargetTemplate( tu.cu, pu.lwidth(), pu.lheight() );
           m_pcTrQuant->candidateSearchIntra( tu.cu, pu.lwidth(), pu.lheight() );

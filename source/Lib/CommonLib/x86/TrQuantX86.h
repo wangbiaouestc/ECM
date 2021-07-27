@@ -422,12 +422,18 @@ int calcTemplateDiffSIMD( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsig
   int iY;
 #if JVET_W0069_TMP_BOUNDARY
   Pel* refPatchRow;
-  if (TempType == L_Shape_Template)
+  if( TempType == L_SHAPE_TEMPLATE )
+  {
     refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride - TMP_TEMPLATE_SIZE;
-  else if (TempType == Left_Template)
+  }
+  else if( TempType == LEFT_TEMPLATE )
+  {
     refPatchRow = ref - TMP_TEMPLATE_SIZE;
-  else if (TempType == Up_Template)
+  }
+  else if( TempType == ABOVE_TEMPLATE )
+  {
     refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride;
+  }
 #else
   Pel* refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride - TMP_TEMPLATE_SIZE;
 #endif
@@ -436,7 +442,7 @@ int calcTemplateDiffSIMD( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsig
 
   // horizontal difference
 #if JVET_W0069_TMP_BOUNDARY
-  if (TempType == L_Shape_Template)
+  if (TempType == L_SHAPE_TEMPLATE)
   {
 #endif
   for( iY = 0; iY < TMP_TEMPLATE_SIZE; iY++ )
@@ -547,7 +553,7 @@ int calcTemplateDiffSIMD( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsig
   }
 #if JVET_W0069_TMP_BOUNDARY
   }
-  else if (TempType == Up_Template)
+  else if (TempType == ABOVE_TEMPLATE)
   {
   // horizontal difference
   for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
@@ -617,7 +623,7 @@ int calcTemplateDiffSIMD( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsig
 
   
   }
-  else if (TempType == Left_Template)
+  else if (TempType == LEFT_TEMPLATE)
   {
 
   // vertical difference

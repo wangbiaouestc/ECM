@@ -562,7 +562,7 @@ void TrQuant::getTargetTemplate(CodingUnit* pcCU, unsigned int uiBlkWidth, unsig
 	//up-left & up 
 	Pel* tarTemp;
 #if JVET_W0069_TMP_BOUNDARY
-	if (TempType == L_Shape_Template)
+	if (TempType == L_SHAPE_TEMPLATE)
 	{
 #endif
 	Pel* pCurrTemp = pCurrStart - TMP_TEMPLATE_SIZE * uiPicStride - TMP_TEMPLATE_SIZE;
@@ -587,7 +587,7 @@ void TrQuant::getTargetTemplate(CodingUnit* pcCU, unsigned int uiBlkWidth, unsig
 	}
 #if JVET_W0069_TMP_BOUNDARY
 	}
-  else if (TempType == Up_Template)
+  else if (TempType == ABOVE_TEMPLATE)
   {
     Pel* pCurrTemp = pCurrStart - TMP_TEMPLATE_SIZE * uiPicStride;
     for (uiY = 0; uiY < TMP_TEMPLATE_SIZE; uiY++)
@@ -600,7 +600,7 @@ void TrQuant::getTargetTemplate(CodingUnit* pcCU, unsigned int uiBlkWidth, unsig
       pCurrTemp += uiPicStride;
     }
   }
-	else if (TempType == Left_Template)
+	else if (TempType == LEFT_TEMPLATE)
 	{
 		Pel* pCurrTemp = pCurrStart - TMP_TEMPLATE_SIZE;
 		for (uiY = TMP_TEMPLATE_SIZE; uiY < uiPatchHeight; uiY++)
@@ -686,7 +686,6 @@ void  TrQuant::searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel** tarPatch, 
 	Position  ctuRsAddr = CU::getCtuXYAddr(*pcCU);
 	int offsetLCUY = iCurrY - ctuRsAddr.y;
 	int offsetLCUX = iCurrX - ctuRsAddr.x;
-
 
 	int iYOffset, iXOffset;
 	int diff;
@@ -864,19 +863,25 @@ int TrQuant::calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel** tarPatch, u
   int iDiffSum = 0;
 #if JVET_W0069_TMP_BOUNDARY
   Pel* refPatchRow;
-  if (TempType == L_Shape_Template)
-	  refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride - TMP_TEMPLATE_SIZE;
-  else if (TempType == Left_Template)
-	  refPatchRow = ref - TMP_TEMPLATE_SIZE;
-  else if (TempType == Up_Template)
-	  refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride;
+  if( TempType == L_SHAPE_TEMPLATE )
+  {
+    refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride - TMP_TEMPLATE_SIZE;
+  }
+  else if( TempType == LEFT_TEMPLATE )
+  {
+    refPatchRow = ref - TMP_TEMPLATE_SIZE;
+  }
+  else if( TempType == ABOVE_TEMPLATE )
+  {
+    refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride;
+  }
 #else
   Pel* refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride - TMP_TEMPLATE_SIZE;
 #endif
   Pel* tarPatchRow;
 
 #if JVET_W0069_TMP_BOUNDARY
-  if (TempType == L_Shape_Template)
+  if( TempType == L_SHAPE_TEMPLATE )
   {
 #endif
   // horizontal difference
@@ -910,7 +915,7 @@ int TrQuant::calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel** tarPatch, u
   }
 #if JVET_W0069_TMP_BOUNDARY
 	}
-  else if (TempType == Up_Template)
+  else if (TempType == ABOVE_TEMPLATE)
   {
     // top  template difference
     for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
@@ -927,7 +932,7 @@ int TrQuant::calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel** tarPatch, u
       refPatchRow += uiStride;
     }
   }
-  else if (TempType == Left_Template)
+  else if (TempType == LEFT_TEMPLATE)
   {
 	  // left template difference
 	  for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)

@@ -386,7 +386,7 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 		  int foundCandiNum;
 #if JVET_W0069_TMP_BOUNDARY
 		  RefTemplateType TempType = m_pcIntraPred->GetRefTemplateType(*(tu.cu), tu.cu->blocks[COMPONENT_Y]);
-		  if (TempType != No_Template)
+		  if (TempType != NO_TEMPLATE)
 		  {
 			  m_pcTrQuant->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight(), TempType);
 			  m_pcTrQuant->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight(), TempType);

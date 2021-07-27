@@ -1804,7 +1804,7 @@ bool IntraPrediction::isRefTemplateAvailable(CodingUnit& cu, CompArea& area)
   if( numAboveUnits <= 0 || numLeftUnits <= 0 || numAboveRightUnits <= 0 || numLeftBelowUnits <= 0 )
   {
 #if JVET_W0069_TMP_BOUNDARY
-	  return No_Template;
+	  return NO_TEMPLATE;
 #else
     return false;
 #endif
@@ -1824,13 +1824,13 @@ bool IntraPrediction::isRefTemplateAvailable(CodingUnit& cu, CompArea& area)
 
 #if JVET_W0069_TMP_BOUNDARY
 	if (isAboveLeftAvailable(cu, chType, posLT) && isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)) && isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1)))
-		return L_Shape_Template;
+		return L_SHAPE_TEMPLATE;
 	else if (isAboveLeftAvailable(cu, chType, posLT))
-		return Left_Template;
+		return LEFT_TEMPLATE;
 	else if (isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)))
-		return Up_Template;
+		return ABOVE_TEMPLATE;
 	else
-		return No_Template;
+		return NO_TEMPLATE;
 	CHECK(1, "un defined template type");
 #else
 	return isAboveLeftAvailable(cu, chType, posLT) && isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)) && isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1));
