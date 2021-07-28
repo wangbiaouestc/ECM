@@ -51,7 +51,9 @@
 BilateralFilter::BilateralFilter()
 {
   m_bilateralFilterDiamond5x5 = blockBilateralFilterDiamond5x5;
+#if JVET_W0066_CCSAO
   m_bilateralFilterDiamond5x5NoClip = blockBilateralFilterDiamond5x5NoClip;
+#endif
 
 #if ENABLE_SIMD_BILATERAL_FILTER
 #ifdef TARGET_SIMD_X86
