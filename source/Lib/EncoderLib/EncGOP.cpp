@@ -3219,7 +3219,10 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
           {
             pcPic->slices[s]->setTileGroupNumAps(0);
           }
-          pcPic->slices[s]->setAlfAPSs(cs.slice->getAlfAPSs());
+          if( s < uiNumSliceSegments - 1 )
+          {
+            pcPic->slices[s]->setAlfAPSs(cs.slice->getAlfAPSs());
+          }
           pcPic->slices[s]->setTileGroupApsIdChroma(cs.slice->getTileGroupApsIdChroma());
           pcPic->slices[s]->setTileGroupCcAlfCbApsId(cs.slice->getTileGroupCcAlfCbApsId());
           pcPic->slices[s]->setTileGroupCcAlfCrApsId(cs.slice->getTileGroupCcAlfCrApsId());
