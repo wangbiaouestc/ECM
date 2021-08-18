@@ -1359,7 +1359,11 @@ void BilateralFilter::bilateralFilterPicRDOperCTU(CodingStructure& cs, PelUnitBu
          
           if ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
           {
+#if JVET_W0066_CCSAO
+            bilateralFilterDiamond5x5NoClip(src, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+#else
             bilateralFilterDiamond5x5(src, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+#endif
           }
         }
       }
