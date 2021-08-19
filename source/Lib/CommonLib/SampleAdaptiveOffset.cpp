@@ -1063,17 +1063,20 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
       if (!bAllDisabled)
         offsetCTUnoClip(area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs);
 
-      BifParams& bifParams = cs.picture->getBifParam();
-
-      // And now we traverse the CTU to do BIF
-      for (auto& currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
+      if (cs.pps->getUseBIF())
       {
-        for (auto& currTU : CU::traverseTUs(currCU))
+        BifParams& bifParams = cs.picture->getBifParam();
+
+        // And now we traverse the CTU to do BIF
+        for (auto& currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
         {
-          bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-          if (bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+          for (auto& currTU : CU::traverseTUs(currCU))
           {
-            m_bilateralFilter.bilateralFilterDiamond5x5NoClip(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+            bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+            if (bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+            {
+              m_bilateralFilter.bilateralFilterDiamond5x5NoClip(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+            }
           }
         }
       }
@@ -1198,13 +1201,23 @@ void SampleAdaptiveOffset::jointClipSaoBifCcSao(CodingStructure& cs)
       const uint32_t height = (yPos + pcv.maxCUHeight > pcv.lumaHeight) ? (pcv.lumaHeight - yPos) : pcv.maxCUHeight;
       const UnitArea area(cs.area.chromaFormat, Area(xPos, yPos, width, height));
       const uint32_t numberOfComponents = getNumberValidComponents(area.chromaFormat);
-      SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
 
       for (int compIdx = 0; compIdx < numberOfComponents; compIdx++)
       {
-        const int setIdc = m_ccSaoControl[compIdx][ctuRsAddr];
-        SAOOffset& myCtbOffset = mySAOblkParam[compIdx];
-        if ((m_ccSaoComParam.enabled[compIdx] && setIdc != 0) || (myCtbOffset.modeIdc != SAO_MODE_OFF))
+        bool saoOn = false;
+        bool ccsaoOn = false;
+        if (cs.sps->getSAOEnabledFlag())
+        {
+          SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
+          SAOOffset& myCtbOffset = mySAOblkParam[compIdx];
+          saoOn = myCtbOffset.modeIdc != SAO_MODE_OFF;
+        }
+        if (cs.sps->getCCSAOEnabledFlag())
+        {
+          const int setIdc = m_ccSaoControl[compIdx][ctuRsAddr];
+          ccsaoOn = m_ccSaoComParam.enabled[compIdx] && setIdc != 0;
+        }
+        if (ccsaoOn || saoOn)
         {
           // We definitely need to clip if either SAO or CCSAO is on for the given component of the CTU                  
           clipCTU(cs, dstYuv, area, ComponentID(compIdx));
