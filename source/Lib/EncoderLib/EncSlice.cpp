@@ -1736,7 +1736,9 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       resetBcwCodingOrder(false, cs);
       m_pcInterSearch->initWeightIdxBits();
     }
+#if !JVET_V0094_BILATERAL_FILTER
     if (pcSlice->getSPS()->getUseLmcs())
+#endif
     {
       m_pcCuEncoder->setDecCuReshaperInEncCU(m_pcLib->getReshaper(), pcSlice->getSPS()->getChromaFormatIdc());
 

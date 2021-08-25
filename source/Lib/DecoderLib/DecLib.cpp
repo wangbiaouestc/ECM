@@ -1721,7 +1721,9 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
 
     // Recursive structure
     m_cCuDecoder.init( &m_cTrQuant, &m_cIntraPred, &m_cInterPred );
+#if !JVET_V0094_BILATERAL_FILTER
     if (sps->getUseLmcs())
+#endif
     {
       m_cCuDecoder.initDecCuReshaper(&m_cReshaper, sps->getChromaFormatIdc());
     }
