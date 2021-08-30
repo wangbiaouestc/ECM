@@ -1260,7 +1260,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       }
     }
 #if JVET_W0123_TIMD_FUSION
-    if (isTimdValid && sps.getUseISP() && CU::canUseISP(width, height, cu.cs->sps->getMaxTbSize()) && lfnstIdx == 0)
+    if (isTimdValid && sps.getUseISP() && CU::canUseISP(width, height, cu.cs->sps->getMaxTbSize()) && lfnstIdx == 0 && !cu.mtsFlag)
     {
       uiRdModeList.push_back( ModeInfo( false, false, 0, HOR_INTRA_SUBPARTITIONS, TIMD_IDX ) );
       uiRdModeList.push_back( ModeInfo( false, false, 0, VER_INTRA_SUBPARTITIONS, TIMD_IDX ) );
