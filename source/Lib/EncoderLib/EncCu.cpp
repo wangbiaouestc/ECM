@@ -306,7 +306,7 @@ void EncCu::destroy()
     {
       for (unsigned h = 0; h < numHeights; h++)
       {
-        if ((w == h) && gp_sizeIdxInfo->isCuSize(gp_sizeIdxInfo->sizeFrom(w)) && gp_sizeIdxInfo->isCuSize(gp_sizeIdxInfo->sizeFrom(h)))
+        if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( w ) ) && gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( h ) ) )
         {
           m_pTempCUWoOBMC[w][h]->destroy();
           delete m_pTempCUWoOBMC[w][h];

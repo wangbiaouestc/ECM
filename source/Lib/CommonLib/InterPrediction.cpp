@@ -260,6 +260,7 @@ void InterPrediction::destroy()
 #if ENABLE_OBMC
   m_tmpObmcBufL0.destroy();
   m_tmpObmcBufT0.destroy();
+  m_tmpSubObmcBuf.destroy();
 #endif
   xFree(m_cYuvPredTempDMVRL0);
   m_cYuvPredTempDMVRL0 = nullptr;
@@ -400,6 +401,10 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
 #if ENABLE_OBMC
     m_tmpObmcBufL0.create(UnitArea(chromaFormatIDC, Area(0, 0, 4, MAX_CU_SIZE)));
     m_tmpObmcBufT0.create(UnitArea(chromaFormatIDC, Area(0, 0, MAX_CU_SIZE, 4)));
+    m_tmpSubObmcBuf.create(UnitArea(chromaFormatIDC, Area(0, 0, 20, 4)));
+    m_tmpSubObmcBuf.bufs[0].memset(0);
+    m_tmpSubObmcBuf.bufs[1].memset(0);
+    m_tmpSubObmcBuf.bufs[2].memset(0);
 #endif
   }
 
@@ -3476,6 +3481,14 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
     return;
   }
 
+  PelUnitBuf pcYuvTmpPred = m_tmpSubObmcBuf;
+
+  PelUnitBuf cTmp1 = pcYuvTmpPred.subBuf(UnitArea(pu.chromaFormat, Area(0, 0, uiMinCUW, uiMinCUW)));
+  PelUnitBuf cTmp2 = pcYuvTmpPred.subBuf(UnitArea(pu.chromaFormat, Area(4, 0, uiMinCUW, uiMinCUW)));
+  PelUnitBuf cTmp3 = pcYuvTmpPred.subBuf(UnitArea(pu.chromaFormat, Area(8, 0, uiMinCUW, uiMinCUW)));
+  PelUnitBuf cTmp4 = pcYuvTmpPred.subBuf(UnitArea(pu.chromaFormat, Area(12, 0, uiMinCUW, uiMinCUW)));
+  PelUnitBuf zero  = pcYuvTmpPred.subBuf(UnitArea(pu.chromaFormat, Area(16, 0, uiMinCUW, uiMinCUW)));
+
   for (int iSubX = 0; iSubX < uiWidthInBlock; iSubX += 1)
   {
     for (int iSubY = 0; iSubY < uiHeightInBlock; iSubY += 1)
@@ -3486,11 +3499,6 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
       subPu.UnitArea::operator=(UnitArea(pu.chromaFormat, Area(orgPuArea.lumaPos().offset(iSubX * uiMinCUW, iSubY * uiMinCUW), Size{ uiMinCUW, uiMinCUW })));
       const UnitArea predArea = UnitAreaRelative(orgPuArea, subPu);
       PelUnitBuf     cPred = pcYuvPred.subBuf(predArea);
-
-      PelUnitBuf cTmp1 = pcYuvTmpPredT0.subBuf(UnitArea(pu.chromaFormat, Area(0, 0, uiMinCUW, uiMinCUW)));
-      PelUnitBuf cTmp2 = pcYuvTmpPredT0.subBuf(UnitArea(pu.chromaFormat, Area(4, 0, uiMinCUW, uiMinCUW)));
-      PelUnitBuf cTmp3 = pcYuvTmpPredT0.subBuf(UnitArea(pu.chromaFormat, Area(8, 0, uiMinCUW, uiMinCUW)));
-      PelUnitBuf cTmp4 = pcYuvTmpPredT0.subBuf(UnitArea(pu.chromaFormat, Area(12, 0, uiMinCUW, uiMinCUW)));
 
       bool isAboveAvail = false, isLeftAvail = false, isBelowAvail = false, isRightAvail = false;
 
@@ -3542,7 +3550,7 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
       {
         for( int compID = 0; compID < MAX_NUM_COMPONENT; compID++ )
         {
-          xSubblockOBMCBlending( ComponentID( compID ), subPu, cPred, cTmp1, cTmp2, cTmp3, cTmp4, isAboveAvail, isLeftAvail, isBelowAvail, isRightAvail, true );
+          xSubblockOBMCBlending( ComponentID( compID ), subPu, cPred, isAboveAvail ? cTmp1: zero, isLeftAvail ? cTmp2: zero, isBelowAvail ? cTmp3: zero, isRightAvail ? cTmp4: zero, isAboveAvail, isLeftAvail, isBelowAvail, isRightAvail, true );
         }
       }
     }
@@ -3679,12 +3687,12 @@ void InterPrediction::xSubblockOBMCBlending(const ComponentID eComp, PredictionU
   const int strideDst = pcYuvPredDst.bufs[eComp].stride;
   const int strideSrc = pcYuvPredSrc1.bufs[eComp].stride;
 
-  unsigned int isLuma = (eComp == COMPONENT_Y) ? 0 : 1;
+  unsigned int isChroma = !isLuma( eComp );
   unsigned int aboveWeight[4], leftWeight[4], belowWeight[4], rightWeight[4];
 
   if( isAboveAvail )
   {
-    memcpy( aboveWeight, defaultWeight[isLuma], sizeof( aboveWeight ) );
+    memcpy( aboveWeight, defaultWeight[isChroma], sizeof( aboveWeight ) );
   }
   else
   {
@@ -3693,7 +3701,7 @@ void InterPrediction::xSubblockOBMCBlending(const ComponentID eComp, PredictionU
 
   if( isLeftAvail )
   {
-    memcpy( leftWeight, defaultWeight[isLuma], sizeof( leftWeight ) );
+    memcpy( leftWeight, defaultWeight[isChroma], sizeof( leftWeight ) );
   }
   else
   {
@@ -3702,7 +3710,7 @@ void InterPrediction::xSubblockOBMCBlending(const ComponentID eComp, PredictionU
 
   if( isBelowAvail )
   {
-    memcpy( belowWeight, defaultWeight[isLuma], sizeof( belowWeight ) );
+    memcpy( belowWeight, defaultWeight[isChroma], sizeof( belowWeight ) );
   }
   else
   {
@@ -3711,7 +3719,7 @@ void InterPrediction::xSubblockOBMCBlending(const ComponentID eComp, PredictionU
 
   if( isRightAvail )
   {
-    memcpy( rightWeight, defaultWeight[isLuma], sizeof( rightWeight ) );
+    memcpy( rightWeight, defaultWeight[isChroma], sizeof( rightWeight ) );
   }
   else
   {
@@ -3728,14 +3736,13 @@ void InterPrediction::xSubblockOBMCBlending(const ComponentID eComp, PredictionU
   Pel* pSrc3 = pOrgSrc3;
   Pel* pSrc4 = pOrgSrc4;
 
-  switch (eComp)
+  if( isLuma( eComp ) )
   {
-  case COMPONENT_Y:
-    for (int j = 0; j < iHeight; j++)
+    for( int j = 0; j < iHeight; j++ )
     {
       unsigned int idx_h = iHeight - 1 - j;
 
-      for (int i = 0; i < iWidth; i++)
+      for( int i = 0; i < iWidth; i++ )
       {
         unsigned int idx_w = iWidth - 1 - i;
 
@@ -3756,9 +3763,9 @@ void InterPrediction::xSubblockOBMCBlending(const ComponentID eComp, PredictionU
       pSrc3 += strideSrc;
       pSrc4 += strideSrc;
     }
-    break;
-
-  default:
+  }
+  else
+  {
     pDst[0] = ((sumWeight - aboveWeight[0] - leftWeight[0]) * pDst[0] + aboveWeight[0] * pSrc1[0] + leftWeight[0] * pSrc2[0] + add) >> shift;
     pDst[1] = ((sumWeight - aboveWeight[0] - rightWeight[0]) * pDst[1] + aboveWeight[0] * pSrc1[1] + rightWeight[0] * pSrc4[1] + add) >> shift;
 

@@ -202,6 +202,7 @@ protected:
 #if ENABLE_OBMC
   PelStorage           m_tmpObmcBufL0;
   PelStorage           m_tmpObmcBufT0;
+  PelStorage           m_tmpSubObmcBuf;
 #endif
 #if MULTI_PASS_DMVR
   void xPredInterBiBDMVR        ( PredictionUnit &pu, PelUnitBuf &pcYuvPred, const bool luma, const bool chroma, PelUnitBuf *yuvPredTmp = NULL );

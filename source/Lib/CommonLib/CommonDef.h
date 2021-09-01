@@ -672,7 +672,7 @@ static const int GEO_MAX_TRY_WEIGHTED_SAD = 60;
 static const int GEO_MAX_TRY_WEIGHTED_SATD = 8;
 
 #if ENABLE_OBMC
-static const int defaultWeight[2][4] = { {27, 16, 6, 0}, {27, 0, 0, 0} };
+static const unsigned int defaultWeight[2][4] = { {27, 16, 6, 0}, {27, 0, 0, 0} };
 #endif
 
 #if TU_256
