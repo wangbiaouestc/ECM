@@ -591,7 +591,7 @@ void SampleAdaptiveOffset::offsetBlock(const int channelBitDepth, const ClpRng& 
   }
 }
 
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_W0066_CCSAO
 void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const ClpRng& clpRng, int typeIdx, int* offset
                                              , const Pel* srcBlk, Pel* resBlk, int srcStride, int resStride,  int width, int height
                                              , bool isLeftAvail,  bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail)
@@ -880,7 +880,7 @@ void SampleAdaptiveOffset::offsetCTU( const UnitArea& area, const CPelUnitBuf& s
   } //compIdx
 }
 
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_W0066_CCSAO
 void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnitBuf& src, PelUnitBuf& res, SAOBlkParam& saoblkParam, CodingStructure& cs)
 {
   const uint32_t numberOfComponents = getNumberValidComponents( area.chromaFormat );
@@ -1060,9 +1060,12 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
 
 #if JVET_W0066_CCSAO
       // Always do non-clipped version for SAO/BIF, the clipping is done jointly after CCSAO is also applied
-      if (!bAllDisabled)
-        offsetCTUnoClip(area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs);
+      if( !bAllDisabled )
+      {
+        offsetCTUnoClip( area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs );
+      }
 
+#if JVET_V0094_BILATERAL_FILTER
       if (cs.pps->getUseBIF())
       {
         BifParams& bifParams = cs.picture->getBifParam();
@@ -1080,6 +1083,7 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
           }
         }
       }
+#endif
 #else
 #if JVET_V0094_BILATERAL_FILTER
       if(cs.pps->getUseBIF())
@@ -1185,8 +1189,17 @@ void SampleAdaptiveOffset::applyCcSao(CodingStructure &cs, const PreCalcValues& 
 
 void SampleAdaptiveOffset::jointClipSaoBifCcSao(CodingStructure& cs)
 {
-  if (!cs.sps->getSAOEnabledFlag() && !cs.pps->getUseBIF() && !cs.sps->getCCSAOEnabledFlag())
+#if JVET_V0094_BILATERAL_FILTER
+  if( !cs.sps->getSAOEnabledFlag() && !cs.pps->getUseBIF() && !cs.sps->getCCSAOEnabledFlag() )
+  {
     return;
+  }
+#else
+  if( !cs.sps->getSAOEnabledFlag() && !cs.sps->getCCSAOEnabledFlag() )
+  {
+    return;
+  }
+#endif
 
   const PreCalcValues& pcv = *cs.pcv;
   PelUnitBuf dstYuv = cs.getRecoBuf();
@@ -1222,6 +1235,7 @@ void SampleAdaptiveOffset::jointClipSaoBifCcSao(CodingStructure& cs)
           // We definitely need to clip if either SAO or CCSAO is on for the given component of the CTU                  
           clipCTU(cs, dstYuv, area, ComponentID(compIdx));
         }
+#if JVET_V0094_BILATERAL_FILTER
         else
         {
           // When BIF is on, the luma component might need to be clipped
@@ -1246,6 +1260,7 @@ void SampleAdaptiveOffset::jointClipSaoBifCcSao(CodingStructure& cs)
             }
           }
         }
+#endif
       }
       ctuRsAddr++;
     }
