@@ -1102,11 +1102,7 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
     // left extend by 1
     for (int k = -(sizeSide + 1); k <= -1; k++)
     {
-#if JVET_W0123_TIMD_FUSION
-      int frac32precision = bExtIntraDir ? ((-k * absInvAngle + 16) >> 5) : ((-k * absInvAngle + 8) >> 4);
-#else
       int frac32precision = (-k * absInvAngle + 8) >> 4;
-#endif
       int intpel = frac32precision >> 5;
       int fracpel = frac32precision & 31;
       //std::cout << " fracPel: " << fracpel << std::endl;
