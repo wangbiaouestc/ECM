@@ -156,7 +156,7 @@
 // SIMD optimizations
 #if IF_12TAP
 #define IF_12TAP_SIMD                                     1 // enable SIMD for 12-tap filter
-#ifdef IF_12TAP_SIMD
+#if IF_12TAP_SIMD
 #define SIMD_4x4_12                                       1 //enable 4x4-block combined passes for 12-tap filters
 #endif
 #endif
