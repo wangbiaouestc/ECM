@@ -108,6 +108,9 @@ public:
   void ALFProcess(CodingStructure& cs);
   void create( const int picWidth, const int picHeight, const ChromaFormat format, const int maxCUWidth, const int maxCUHeight, const int maxCUDepth, const int inputBitDepth[MAX_NUM_CHANNEL_TYPE] );
   void destroy();
+#if RPR_ENABLE
+  Size  getAlfSize() { return Size(m_tempBuf.get(COMPONENT_Y).width, m_tempBuf.get(COMPONENT_Y).height); }
+#endif
 
 
 #if ALF_IMPROVEMENT

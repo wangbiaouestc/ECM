@@ -824,8 +824,15 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
   const CompArea& myArea = currTU.blocks[COMPONENT_Y];
   topAltAvailable = myArea.y - 2 >= 0;
   leftAltAvailable = myArea.x - 2 >= 0;
+#if RPR_ENABLE
+  int curPicWidth         = currTU.cu->cs->pcv->lumaWidth;
+  int curPicHeight        = currTU.cu->cs->pcv->lumaHeight;
+  bool bottomAltAvailable = myArea.y + myArea.height + 1 < curPicHeight;
+  bool rightAltAvailable  = myArea.x + myArea.width  + 1 < curPicWidth;
+#else
   bool bottomAltAvailable = myArea.y + myArea.height + 1 < currTU.cu->slice->getSPS()->getMaxPicHeightInLumaSamples();
   bool rightAltAvailable = myArea.x + myArea.width + 1 < currTU.cu->slice->getSPS()->getMaxPicWidthInLumaSamples();
+#endif
 
   uint32_t   uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t   uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
@@ -1051,9 +1058,16 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
   const CompArea &myArea = currTU.blocks[COMPONENT_Y];
   topAltAvailable = myArea.y - 2 >= 0;
   leftAltAvailable = myArea.x - 2 >= 0;
+#if RPR_ENABLE
+  int curPicWidth         = currTU.cu->cs->pcv->lumaWidth;
+  int curPicHeight        = currTU.cu->cs->pcv->lumaHeight;
+  bool bottomAltAvailable = myArea.y + myArea.height + 1 < curPicHeight;
+  bool rightAltAvailable  = myArea.x + myArea.width  + 1 < curPicWidth;
+#else
   bool bottomAltAvailable = myArea.y + myArea.height + 1 < currTU.cu->slice->getSPS()->getMaxPicHeightInLumaSamples();
   bool rightAltAvailable = myArea.x + myArea.width + 1 < currTU.cu->slice->getSPS()->getMaxPicWidthInLumaSamples();
-  
+#endif
+
   uint32_t   uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t   uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
   

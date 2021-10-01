@@ -77,6 +77,9 @@ public:
 #if JVET_V0094_BILATERAL_FILTER
   BilateralFilter m_bilateralFilter;
 #endif
+#if RPR_ENABLE
+  Size  getSaoSize() { return Size(m_tempBuf.get(COMPONENT_Y).width, m_tempBuf.get(COMPONENT_Y).height); }
+#endif
 #if JVET_W0066_CCSAO
   void CCSAOProcess(CodingStructure& cs);
   CcSaoComParam& getCcSaoComParam() { return m_ccSaoComParam; }

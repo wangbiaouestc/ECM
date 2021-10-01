@@ -3618,6 +3618,11 @@ void InterSearch::xEstimateMvPredAMVP( PredictionUnit& pu, PelUnitBuf& origBuf, 
 #endif
     );
   }
+#if INTER_LIC && RPR_ENABLE
+  // xPredInterBlk may call PU::checkRprLicCondition()
+  pu.refIdx[eRefPicList]      = iRefIdx;
+  pu.refIdx[1 - eRefPicList]  = NOT_VALID;
+#endif
 
   // initialize Mvp index & Mvp
   iBestIdx = 0;
@@ -3812,6 +3817,11 @@ Distortion InterSearch::xGetAffineTemplateCost( PredictionUnit& pu, PelUnitBuf& 
   Distortion uiCost = std::numeric_limits<Distortion>::max();
 
   const Picture* picRef = pu.cu->slice->getRefPic( eRefPicList, iRefIdx );
+#if INTER_LIC && RPR_ENABLE
+  // xPredAffineBlk may call PU::checkRprLicCondition()
+  pu.refIdx[eRefPicList]    = iRefIdx;
+  pu.refIdx[1-eRefPicList]  = NOT_VALID;
+#endif
 
   // prediction pattern
   const bool bi = pu.cu->slice->testWeightPred() && pu.cu->slice->getSliceType()==P_SLICE

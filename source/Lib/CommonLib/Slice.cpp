@@ -4950,8 +4950,14 @@ void Slice::setUseLICOnPicLevel( bool fastMode )
   //----- get negated histogram of current picture -----
   int32_t               numValues = 1 << getSPS()->getBitDepth( CHANNEL_TYPE_LUMA );
   std::vector<int32_t>  negCurrHist( numValues, 0 );
+#if RPR_ENABLE
+  const Picture* curPic = m_pcPic->unscaledPic;
+  int32_t               numSamples = curPic->getOrigBuf().Y().width * curPic->getOrigBuf().Y().height;
+  curPic->getOrigBuf().Y().subtractHistogram(negCurrHist);
+#else
   int32_t               numSamples = m_pcPic->getOrigBuf().Y().width * m_pcPic->getOrigBuf().Y().height;
   getPic()->getOrigBuf().Y().subtractHistogram( negCurrHist );
+#endif
 
   //----- get SAD threshold -----
   double  sampleThres = 0.06;
@@ -4969,7 +4975,13 @@ void Slice::setUseLICOnPicLevel( bool fastMode )
     {
       // get delta histogram
       deltaHist = negCurrHist;
+
+#if RPR_ENABLE
+      const Picture* refPic = getRefPic(eList, refIdx)->unscaledPic;
+      refPic->getOrigBuf().Y().updateHistogram(deltaHist);
+#else
       getRefPic(eList, refIdx)->getOrigBuf().Y().updateHistogram(deltaHist);
+#endif
 
       // get SAD of delta histogram
       int32_t sadHist = 0;

@@ -1655,9 +1655,23 @@ const CMotionBuf CodingStructure::getMotionBuf( const Area& _area ) const
   return MotionBuf( m_motionBuf + rsAddr( miArea.pos(), selfArea.pos(), selfArea.width ), selfArea.width, miArea.size() );
 }
 
+#if JVET_W0123_TIMD_FUSION && RPR_ENABLE
+bool  CodingStructure::picContain( const Position _pos ) 
+{
+  const Picture* pic = picture->unscaledPic;
+  const int width   = pic->getPicWidthInLumaSamples();
+  const int height  = pic->getPicHeightInLumaSamples();
+  return (_pos.x >= 0) && (_pos.x < width) && (_pos.y >= 0) && (_pos.y < height);
+}
+#endif
+
 MotionInfo& CodingStructure::getMotionInfo( const Position& pos )
 {
+#if JVET_W0123_TIMD_FUSION && RPR_ENABLE
+  CHECKD( !picContain( pos ), "Trying to access motion information outside of this coding structure");
+#else
   CHECKD( !area.Y().contains( pos ), "Trying to access motion information outside of this coding structure" );
+#endif
 
   //return getMotionBuf().at( g_miScaling.scale( pos - area.lumaPos() ) );
   // bypass the motion buf calling and get the value directly
@@ -1706,7 +1720,11 @@ const CIpmBuf CodingStructure::getIpmBuf( const Area& _area ) const
 
 uint8_t& CodingStructure::getIpmInfo( const Position& pos )
 {
+#if RPR_ENABLE
+  CHECKD( !picContain( pos ), "Trying to access motion information outside of this coding structure");
+#else
   CHECKD( !area.Y().contains( pos ), "Trying to access motion information outside of this coding structure" );
+#endif
 
   //return getIpmBuf().at( g_miScaling.scale( pos - area.lumaPos() ) );
   // bypass the intra prediction mode buf calling and get the value directly

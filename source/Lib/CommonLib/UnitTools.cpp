@@ -2325,6 +2325,27 @@ bool PU::checkBDMVRCondition(const PredictionUnit& pu)
 }
 #endif
 
+#if INTER_LIC && RPR_ENABLE
+bool PU::checkRprLicCondition( const PredictionUnit & pu )
+{
+  if ( pu.cs->sps->getLicEnabledFlag() )
+  {
+    if (pu.refIdx[0] >= 0 && pu.refIdx[1] >= 0) return false;
+
+    bool  bLicEnabled = true;
+    int iRefIdx             = (pu.refIdx[0] >= 0) ? pu.refIdx[0] : pu.refIdx[1];
+    RefPicList  eRefPicList = (pu.refIdx[0] >= 0) ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+
+    const bool isResamplingPossible = pu.cs->sps->getRprEnabledFlag();
+    if ( isResamplingPossible && pu.cu->slice->getRefPic(eRefPicList, iRefIdx)->isRefScaled(pu.cs->pps) )
+      bLicEnabled = false;
+    return bLicEnabled;
+  }
+  else
+    return false;
+}
+#endif
+
 static int xGetDistScaleFactor(const int &iCurrPOC, const int &iCurrRefPOC, const int &iColPOC, const int &iColRefPOC)
 {
   int iDiffPocD = iColPOC - iColRefPOC;
@@ -4617,6 +4638,48 @@ void PU::spanIpmInfoIntra( PredictionUnit &pu)
   ib.fill(ipm);
 }
 
+#if RPR_ENABLE
+void  scalePositionInRef( PredictionUnit& pu, const PPS& pps, RefPicList refList, int refIdx, Position& PosY )
+{
+  const Picture* refPic = pu.cu->slice->getRefPic( refList, refIdx )->unscaledPic;
+  const bool scaled = refPic->isRefScaled( &pps );
+  if (scaled)
+  {
+    const SPS* sps = pu.cu->cs->sps;
+    ChromaFormat chFmt = sps->getChromaFormatIdc();
+
+    const std::pair<int, int> scalingRatio = pu.cu->slice->getScalingRatio( refList, refIdx );
+
+    int64_t x0Int;
+    int64_t y0Int;
+
+    int posX = PosY.x;
+    int posY = PosY.y;
+
+    const int posShift = SCALE_RATIO_BITS - 4;
+
+    int shiftHor = MV_FRACTIONAL_BITS_INTERNAL ;
+    int shiftVer = MV_FRACTIONAL_BITS_INTERNAL ;
+    int offX = 1 << (posShift - shiftHor - 1);
+    int offY = 1 << (posShift - shiftVer - 1);
+
+    x0Int = (posX << (4)) * (int64_t)scalingRatio.first ;
+    x0Int = SIGN(x0Int) * ((llabs(x0Int) + ((long long)1 << 7)) >> 8) + ((refPic->getScalingWindow().getWindowLeftOffset() * SPS::getWinUnitX(chFmt)) << (posShift));
+
+    y0Int = (posY << (4)) * (int64_t)scalingRatio.second ;
+    y0Int = SIGN(y0Int) * ((llabs(y0Int) + ((long long)1 << 7)) >> 8) + ((refPic->getScalingWindow().getWindowTopOffset() * SPS::getWinUnitY(chFmt)) << (posShift));
+
+    int xInt0 = ((int32_t)x0Int + offX) >> posShift;
+    int yInt0 = ((int32_t)y0Int + offY) >> posShift;
+
+    PosY.x = std::min( std::max(xInt0, 0), (int)refPic->unscaledPic->getPicWidthInLumaSamples()  - 1 );
+    PosY.y = std::min( std::max(yInt0, 0), (int)refPic->unscaledPic->getPicHeightInLumaSamples() - 1 );
+  }
+  //else
+  //  clipColPos( PosY.x, PosY.y, pu );
+}
+#endif
+
 void PU::spanIpmInfoInter( PredictionUnit &pu, MotionBuf &mb, IpmBuf &ib)
 {
   const unsigned scale = 4 * std::max<int>(1, 4 * AMVP_DECIMATION_FACTOR / 4);
@@ -4632,8 +4695,13 @@ void PU::spanIpmInfoInter( PredictionUnit &pu, MotionBuf &mb, IpmBuf &ib)
   Position PosY1;
   Mv cMv0;
   Mv cMv1;
+#if RPR_ENABLE
+  const Picture* pRefPic0;
+  const Picture* pRefPic1;
+#else
   Picture* pRefPic0;
   Picture* pRefPic1;
+#endif
   uint8_t* ii = ib.buf;
   int ibH = mb.height;
   int ibW = mb.width;
@@ -4667,31 +4735,52 @@ void PU::spanIpmInfoInter( PredictionUnit &pu, MotionBuf &mb, IpmBuf &ib)
           PosY.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv.getHor();
           PosY.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv.getVer();
           clipColPos(PosY.x, PosY.y, pu);
+#if RPR_ENABLE
+          scalePositionInRef( pu, *pu.cs->pps, refList, refIdx, PosY );
+          PosY.x = (PosY.x & mask);
+          PosY.y = (PosY.y & mask);
+          ipm = pu.cu->slice->getRefPic(refList, refIdx)->unscaledPic->cs->getIpmInfo(PosY);
+#else
           PosY.x = (PosY.x & mask);
           PosY.y = (PosY.y & mask);
           ipm = pu.cu->slice->getRefPic(refList, refIdx)->cs->getIpmInfo(PosY);
+#endif
         }
       }
       else
       {
+#if RPR_ENABLE
+        pRefPic0 = pu.cu->slice->getRefPic(REF_PIC_LIST_0, tempMi.refIdx[0])->unscaledPic;
+#else
         pRefPic0 = pu.cu->slice->getRefPic(REF_PIC_LIST_0, tempMi.refIdx[0]);
+#endif
         cMv0 = tempMi.mv[0];
         cMv0.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
         PosY0.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv0.getHor();
         PosY0.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv0.getVer();
         clipColPos(PosY0.x, PosY0.y, pu);
+#if RPR_ENABLE
+        scalePositionInRef( pu, *pu.cs->pps, REF_PIC_LIST_0, tempMi.refIdx[0], PosY0 );
+#endif
         PosY0.x = (PosY0.x & mask);
         PosY0.y = (PosY0.y & mask);
         mi0 = pRefPic0->cs->getMotionInfo(PosY0);
         int ipm0 = pRefPic0->cs->getIpmInfo(PosY0);
         int pocDiff0 = abs(pRefPic0->getPOC() - pu.cu->slice->getPOC());
 
+#if RPR_ENABLE
+        pRefPic1 = pu.cu->slice->getRefPic(REF_PIC_LIST_1, tempMi.refIdx[1])->unscaledPic;
+#else
         pRefPic1 = pu.cu->slice->getRefPic(REF_PIC_LIST_1, tempMi.refIdx[1]);
+#endif
         cMv1 = tempMi.mv[1];
         cMv1.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
         PosY1.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv1.getHor();
         PosY1.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv1.getVer();
         clipColPos(PosY1.x, PosY1.y, pu);
+#if RPR_ENABLE
+        scalePositionInRef( pu, *pu.cs->pps, REF_PIC_LIST_1, tempMi.refIdx[1], PosY1 );
+#endif
         PosY1.x = (PosY1.x & mask);
         PosY1.y = (PosY1.y & mask);
         mi1 = pRefPic1->cs->getMotionInfo(PosY1);

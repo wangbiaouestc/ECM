@@ -140,10 +140,12 @@ void SampleAdaptiveOffset::create( int picWidth, int picHeight, ChromaFormat for
   m_numberOfComponents = getNumberValidComponents(format);
 
 #if JVET_W0066_CCSAO
+  #if !RPR_ENABLE
   if (m_created)
   {
     return;
   }
+  #endif
   m_created = true;
 
   m_ccSaoBuf.destroy();
@@ -171,10 +173,12 @@ void SampleAdaptiveOffset::destroy()
   m_tempBuf.destroy();
 
 #if JVET_W0066_CCSAO
+  #if !RPR_ENABLE
   if (!m_created)
   {
     return;
   }
+  #endif
   m_created = false;
 
   m_ccSaoBuf.destroy();
