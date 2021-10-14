@@ -352,6 +352,9 @@ int EncGOP::xWritePPS( AccessUnit &accessUnit, const PPS *pps, const int layerId
   OutputNALUnit nalu(NAL_UNIT_PPS);
   m_HLSWriter->setBitstream( &nalu.m_Bitstream );
   nalu.m_nuhLayerId = layerId;
+#if RPR_ENABLE
+  nalu.m_temporalId = accessUnit.temporalId;
+#endif
   CHECK( nalu.m_temporalId < accessUnit.temporalId, "TemporalId shall be greater than or equal to the TemporalId of the layer access unit containing the NAL unit" );
   m_HLSWriter->codePPS( pps );
   accessUnit.push_back(new NALUnitEBSP(nalu));
@@ -3045,6 +3048,26 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 
       }
 
+#if RPR_ENABLE
+      // create SAO object based on the picture size
+      if ( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF() )
+      {
+        Size saoSize = m_pcSAO->getSaoSize();
+        if ( saoSize.width != picWidth || saoSize.height != picHeight ) {
+          const uint32_t widthInCtus = (picWidth + maxCUWidth - 1) / maxCUWidth;
+          const uint32_t heightInCtus = (picHeight + maxCUHeight - 1) / maxCUHeight;
+          const uint32_t numCtuInFrame = widthInCtus * heightInCtus;
+          const uint32_t  log2SaoOffsetScaleLuma = (uint32_t)std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - MAX_SAO_TRUNCATED_BITDEPTH);
+          const uint32_t  log2SaoOffsetScaleChroma = (uint32_t)std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - MAX_SAO_TRUNCATED_BITDEPTH);
+
+          m_pcSAO->create(picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, log2SaoOffsetScaleLuma, log2SaoOffsetScaleChroma);
+          m_pcSAO->destroyEncData();
+          m_pcSAO->createEncData(m_pcCfg->getSaoCtuBoundary(), numCtuInFrame);
+          m_pcSAO->setReshaper(m_pcReshaper);
+        }
+      }
+#endif
+
       if( pcSlice->getSPS()->getScalingListFlag() && m_pcCfg->getUseScalingListId() == SCALING_LIST_FILE_READ )
       {
         picHeader->setExplicitScalingListEnabledFlag(true);
@@ -3172,6 +3195,18 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
         }
       }
       m_pcSAO->jointClipSaoBifCcSao( cs );
+#endif
+
+#if RPR_ENABLE
+      // create ALF object based on the picture size
+      if ( pcSlice->getSPS()->getALFEnabledFlag() )
+      {
+        Size alfSize = m_pcALF->getAlfSize();
+        if ( alfSize.width != picWidth || alfSize.height != picHeight ) {
+          m_pcALF->destroy();
+          m_pcALF->create( m_pcCfg, picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, m_pcCfg->getBitDepth(), m_pcCfg->getInputBitDepth() );
+        }
+      }
 #endif
 
       if( pcSlice->getSPS()->getALFEnabledFlag() )

@@ -275,6 +275,10 @@ public:
   MotionInfo& getMotionInfo( const Position& pos );
   const MotionInfo& getMotionInfo( const Position& pos ) const;
 
+#if JVET_W0123_TIMD_FUSION && RPR_ENABLE
+  bool  picContain( const Position _pos );
+#endif
+
 #if JVET_W0123_TIMD_FUSION
   IpmBuf getIpmBuf( const     Area& _area );
   IpmBuf getIpmBuf( const UnitArea& _area ) { return getIpmBuf( _area.Y() ); }

@@ -710,11 +710,22 @@ bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* cPicYu
     }
 #endif
 
+#if RPR_ENABLE
+#else
     if( m_resChangeInClvsEnabled && m_intraPeriod == -1 )
+#endif
     {
       const int poc = m_iPOCLast + ( m_compositeRefEnabled ? 2 : 1 );
 
+#if RPR_ENABLE
+      ppsID = 0;
+      bool  bApplyRpr = false;
+      bApplyRpr |= (m_switchPocPeriod < 0);                                   // RPR applied for all pictures
+      bApplyRpr |= (m_switchPocPeriod > 0) && (poc / m_switchPocPeriod % 2);  // RPR applied for periods RA or LDB
+      if( bApplyRpr )
+#else
       if( poc / m_switchPocPeriod % 2 )
+#endif
       {
         ppsID = ENC_PPS_ID_RPR;
       }

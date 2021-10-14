@@ -1621,6 +1621,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
     m_framesToBeEncoded = int( m_framesToBeEncoded * m_fractionOfFrames );
   }
 
+#if RPR_ENABLE
+  if ( m_switchPocPeriod >= 0 )
+#endif
   if (m_resChangeInClvsEnabled && !m_switchPocPeriod)
   {
     m_switchPocPeriod = m_iFrameRate / 2 / m_iGOPSize * m_iGOPSize;

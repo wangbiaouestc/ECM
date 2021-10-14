@@ -50,6 +50,8 @@
 #include <assert.h>
 #include <cassert>
 
+#define RPR_ENABLE                                        1
+
 
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1

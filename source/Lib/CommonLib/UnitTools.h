@@ -269,6 +269,9 @@ namespace PU
 #if MULTI_PASS_DMVR
   bool checkBDMVRCondition(const PredictionUnit& pu);
 #endif
+#if INTER_LIC && RPR_ENABLE
+  bool checkRprLicCondition(const PredictionUnit& pu);
+#endif
 
 #if INTER_LIC
   void spanLICFlags(PredictionUnit &pu, const bool LICFlag);

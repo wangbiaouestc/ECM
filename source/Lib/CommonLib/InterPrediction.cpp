@@ -1760,6 +1760,11 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
     }
 
 #if INTER_LIC
+#if RPR_ENABLE
+  }
+  PelBuf& dstBuf = dstPic.bufs[compID];
+#endif
+
     if( m_storeBeforeLIC )
     {
       m_predictionBeforeLIC.bufs[compID].copyFrom( dstBuf );
@@ -1777,6 +1782,10 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
 #if !JVET_W0090_ARMC_TM
       CHECK( pu.ciipFlag, "CIIP mode is not used with LIC" );
 #endif
+#if RPR_ENABLE
+      if (PU::checkRprLicCondition(pu))
+      {
+#endif
 #if JVET_W0090_ARMC_TM
       if (AML)
       {
@@ -1785,9 +1794,14 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
       else
 #endif
       xLocalIlluComp( pu, compID, *refPic, _mv, bi, dstBuf );
-    }
+#if RPR_ENABLE
+      }
 #endif
+    }
+#if !RPR_ENABLE
   }
+#endif
+#endif
 }
 
 #if !AFFINE_RM_CONSTRAINTS_AND_OPT
@@ -2467,6 +2481,9 @@ void InterPrediction::xPredAffineBlk(const ComponentID &compID, const Prediction
   }
 
   if (pu.cu->LICFlag)
+#if RPR_ENABLE
+  if ( PU::checkRprLicCondition(pu) )
+#endif
   {
     PelBuf &dstBuf = dstPic.bufs[compID];
     int LICshift = 0, scale = 0, offset = 0;
@@ -4796,13 +4813,26 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
 
       clipMv(mvTop, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
 
-#if INTER_LIC
+#if RPR_ENABLE
+      const Picture* picRef = pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0])->unscaledPic;
+      const std::pair<int, int>& scalingRatio = pu.cu->slice->getScalingRatio(REF_PIC_LIST_0, pu.refIdx[0]);
+  #if INTER_LIC
+      xPredInterBlk(COMPONENT_Y, pu, picRef, mvTop, pcBufPredRefTop,
+        false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true, true,
+        mvCurr);
+  #else
+      xPredInterBlk(COMPONENT_Y, pu, picRef, mvTop, pcBufPredRefTop,
+        false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true);
+  #endif
+#else
+  #if INTER_LIC
       xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0]), mvTop, pcBufPredRefTop,
                     false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true, true,
                     mvCurr);
-#else
+  #else
       xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0]), mvTop, pcBufPredRefTop,
                     false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true);
+  #endif
 #endif
     }
     if (m_bAMLTemplateAvailabe[1])
@@ -4812,13 +4842,26 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
 
       clipMv(mvLeft, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
 
-#if INTER_LIC
+#if RPR_ENABLE
+      const Picture* picRef = pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0])->unscaledPic;
+      const std::pair<int, int>& scalingRatio = pu.cu->slice->getScalingRatio(REF_PIC_LIST_0, pu.refIdx[0]);
+  #if INTER_LIC
+      xPredInterBlk(COMPONENT_Y, pu, picRef, mvLeft, pcBufPredRefLeft,
+                    false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true, true,
+                    mvCurr);
+  #else
+      xPredInterBlk(COMPONENT_Y, pu, picRef, mvLeft, pcBufPredRefLeft,
+                    false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true);
+  #endif
+#else
+  #if INTER_LIC
       xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0]), mvLeft, pcBufPredRefLeft,
                     false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true, true,
                     mvCurr);
-#else
+  #else
       xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0]), mvLeft, pcBufPredRefLeft,
                     false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true);
+  #endif
 #endif
     }
   }
@@ -4853,24 +4896,50 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
 
         if (pu.refIdx[0] >= 0 && pu.refIdx[1] >= 0)
         {
-#if INTER_LIC
+#if RPR_ENABLE
+          const Picture* picRef = pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->unscaledPic;
+          const std::pair<int, int>& scalingRatio = pu.cu->slice->getScalingRatio(eRefPicList, pu.refIdx[refList]);
+  #if INTER_LIC
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvTop, pcMbBuf, true,
+                        pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true, true,
+                        mvCurr);
+  #else
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvTop, pcMbBuf, true,
+                        pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true);
+  #endif
+#else
+  #if INTER_LIC
           xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvTop, pcMbBuf, true,
                         pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true, true,
                         mvCurr);
-#else
+  #else
           xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvTop, pcMbBuf, true,
                         pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true);
+  #endif
 #endif
         }
         else
         {
-#if INTER_LIC
+#if RPR_ENABLE
+          const Picture* picRef = pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->unscaledPic;
+          const std::pair<int, int>& scalingRatio = pu.cu->slice->getScalingRatio(eRefPicList, pu.refIdx[refList]);
+  #if INTER_LIC
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvTop, pcMbBuf,
+                        false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true,
+                        true, mvCurr);
+  #else
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvTop, pcMbBuf,
+                        false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true);
+  #endif
+#else
+  #if INTER_LIC
           xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvTop, pcMbBuf,
                         false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true,
                         true, mvCurr);
-#else
+  #else
           xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvTop, pcMbBuf,
                         false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true);
+  #endif
 #endif
         }
       }
@@ -4886,24 +4955,50 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
 
         if (pu.refIdx[0] >= 0 && pu.refIdx[1] >= 0)
         {
-#if INTER_LIC
+#if RPR_ENABLE
+          const Picture* picRef = pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->unscaledPic;
+          const std::pair<int, int>& scalingRatio = pu.cu->slice->getScalingRatio(eRefPicList, pu.refIdx[refList]);
+  #if INTER_LIC
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvLeft, pcMbBuf,
+                        true, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true,
+                        true, mvCurr);
+  #else
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvLeft, pcMbBuf,
+                        true, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true);
+  #endif
+#else
+  #if INTER_LIC
           xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvLeft, pcMbBuf,
                         true, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true,
                         true, mvCurr);
-#else
+  #else
           xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvLeft, pcMbBuf,
                         true, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true);
+  #endif
 #endif
         }
         else
         {
-#if INTER_LIC
+#if RPR_ENABLE
+          const Picture* picRef = pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->unscaledPic;
+          const std::pair<int, int>& scalingRatio = pu.cu->slice->getScalingRatio(eRefPicList, pu.refIdx[refList]);
+  #if INTER_LIC
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvLeft, pcMbBuf,
+                        false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true,
+                        true, mvCurr);
+  #else
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvLeft, pcMbBuf,
+                        false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true);
+  #endif
+#else
+  #if INTER_LIC
           xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvLeft, pcMbBuf,
                         false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true,
                         true, mvCurr);
-#else
+  #else
           xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvLeft, pcMbBuf,
                         false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true);
+  #endif
 #endif
         }
       }
@@ -5000,6 +5095,17 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
       PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
       PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
 
+#if RPR_ENABLE
+      bool bRefIsRescaled = false;
+      for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
+      {
+        const RefPicList eRefPicList = refList ? REF_PIC_LIST_1 : REF_PIC_LIST_0;
+        bRefIsRescaled |= (pu.refIdx[refList] >= 0) ? pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->isRefScaled(pu.cs->pps) : false;
+      }
+      if ( !bRefIsRescaled )
+      {
+#endif
+
       getAffAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
 
       if (m_bAMLTemplateAvailabe[0])
@@ -5015,6 +5121,10 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
 
         uiCost += cDistParam.distFunc(cDistParam);
       }
+
+#if RPR_ENABLE
+      }
+#endif
     }
     updateCandList(uiMergeCand, uiCost, ADAPTIVE_AFFINE_SUB_GROUP_SIZE, RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE], candCostList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE]);
   }
@@ -5484,21 +5594,26 @@ bool InterPrediction::xPredInterBlkRPR( const std::pair<int, int>& scalingRatio,
 
     const int extSize = isLuma( compID ) ? 1 : 2;
 #if IF_12TAP
-    int vFilterSize = isLuma(compID) ? NTAPS_LUMA(1) : NTAPS_CHROMA;
+  #if RPR_ENABLE
+    const int iTap = 0;
+  #else
+    const int iTap = 1;
+  #endif
+    int vFilterSize = isLuma(compID) ? NTAPS_LUMA(iTap) : NTAPS_CHROMA;
 #else
     int vFilterSize = isLuma( compID ) ? NTAPS_LUMA : NTAPS_CHROMA;
 #endif
 
     int yInt0 = ( (int32_t)y0Int + offY ) >> posShift;
 #if IF_12TAP
-    yInt0 = std::min(std::max(-(NTAPS_LUMA(1) / 2), yInt0), (refPicHeight >> ::getComponentScaleY(compID, chFmt)) + (NTAPS_LUMA(1) / 2));
+    yInt0 = std::min(std::max(-(NTAPS_LUMA(iTap) / 2), yInt0), (refPicHeight >> ::getComponentScaleY(compID, chFmt)) + (NTAPS_LUMA(iTap) / 2));
 #else
     yInt0 = std::min( std::max( -(NTAPS_LUMA / 2), yInt0 ), ( refPicHeight >> ::getComponentScaleY( compID, chFmt ) ) + (NTAPS_LUMA / 2) );
 #endif
 
     int xInt0 = ( (int32_t)x0Int + offX ) >> posShift;
 #if IF_12TAP
-    xInt0 = std::min(std::max(-(NTAPS_LUMA(1) / 2), xInt0), (refPicWidth >> ::getComponentScaleX(compID, chFmt)) + (NTAPS_LUMA(1) / 2));
+    xInt0 = std::min(std::max(-(NTAPS_LUMA(iTap) / 2), xInt0), (refPicWidth >> ::getComponentScaleX(compID, chFmt)) + (NTAPS_LUMA(iTap) / 2));
 #else
     xInt0 = std::min( std::max( -(NTAPS_LUMA / 2), xInt0 ), ( refPicWidth >> ::getComponentScaleX( compID, chFmt ) ) + (NTAPS_LUMA / 2) );
 #endif
@@ -5517,7 +5632,7 @@ bool InterPrediction::xPredInterBlkRPR( const std::pair<int, int>& scalingRatio,
       int posX = (int32_t)x0Int + col * stepX;
       xInt = ( posX + offX ) >> posShift;
 #if IF_12TAP
-      xInt = std::min(std::max(-(NTAPS_LUMA(1) / 2), xInt), (refPicWidth >> ::getComponentScaleX(compID, chFmt)) + (NTAPS_LUMA(1) / 2));
+      xInt = std::min(std::max(-(NTAPS_LUMA(iTap) / 2), xInt), (refPicWidth >> ::getComponentScaleX(compID, chFmt)) + (NTAPS_LUMA(iTap) / 2));
 #else
       xInt = std::min( std::max( -(NTAPS_LUMA / 2), xInt ), ( refPicWidth >> ::getComponentScaleX( compID, chFmt ) ) + (NTAPS_LUMA / 2) );
 #endif
@@ -5537,7 +5652,7 @@ bool InterPrediction::xPredInterBlkRPR( const std::pair<int, int>& scalingRatio,
       int posY = (int32_t)y0Int + row * stepY;
       yInt = ( posY + offY ) >> posShift;
 #if IF_12TAP
-      yInt = std::min(std::max(-(NTAPS_LUMA(1) / 2), yInt), (refPicHeight >> ::getComponentScaleY(compID, chFmt)) + (NTAPS_LUMA(1) / 2));
+      yInt = std::min(std::max(-(NTAPS_LUMA(iTap) / 2), yInt), (refPicHeight >> ::getComponentScaleY(compID, chFmt)) + (NTAPS_LUMA(iTap) / 2));
 #else
       yInt = std::min( std::max( -(NTAPS_LUMA / 2), yInt ), ( refPicHeight >> ::getComponentScaleY( compID, chFmt ) ) + (NTAPS_LUMA / 2) );
 #endif
