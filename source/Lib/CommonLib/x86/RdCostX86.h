@@ -365,33 +365,16 @@ Distortion RdCost::xGetSSE_NxN_SIMD(const DistParam &rcDtParam)
   const int   iStrideSrc2 = rcDtParam.cur.stride;
 
   const uint32_t uiShift = DISTORTION_PRECISION_ADJUSTMENT(rcDtParam.bitDepth) << 1;
-#if DIST_SSE_ENABLE
   Distortion uiRet = 0;
-#else
-  unsigned int uiRet = 0;
-#endif
 
   if (4 == iCols)
   {
     __m128i Sum = _mm_setzero_si128();
-#if DIST_SSE_ENABLE
     __m128i vzero = _mm_setzero_si128();
-#endif
     for (int iY = 0; iY < iRows; iY++)
     {
-#if DIST_SSE_ENABLE
-      __m128i Src1 = (sizeof(Torg) > 1) ? (_mm_loadl_epi64((const __m128i *) pSrc1))
-                                        : (_mm_unpacklo_epi8(_mm_cvtsi32_si128(*(const int *) pSrc1), vzero));
-      __m128i Src2 = (sizeof(Tcur) > 1) ? (_mm_loadl_epi64((const __m128i *) pSrc2))
-                                        : (_mm_unpacklo_epi8(_mm_cvtsi32_si128(*(const int *) pSrc2), vzero));
-#else
-      __m128i Src1 = (sizeof(Torg) > 1)
-                       ? (_mm_loadl_epi64((const __m128i *) pSrc1))
-                       : (_mm_unpacklo_epi8(_mm_cvtsi32_si128(*(const int *) pSrc1), _mm_setzero_si128()));
-      __m128i Src2 = (sizeof(Tcur) > 1)
-                       ? (_mm_loadl_epi64((const __m128i *) pSrc2))
-                       : (_mm_unpacklo_epi8(_mm_cvtsi32_si128(*(const int *) pSrc2), _mm_setzero_si128()));
-#endif
+      __m128i Src1 = (sizeof(Torg) > 1) ? (_mm_loadl_epi64((const __m128i *) pSrc1)) : (_mm_unpacklo_epi8(_mm_cvtsi32_si128(*(const int *) pSrc1), vzero));
+      __m128i Src2 = (sizeof(Tcur) > 1) ? (_mm_loadl_epi64((const __m128i *) pSrc2)) : (_mm_unpacklo_epi8(_mm_cvtsi32_si128(*(const int *) pSrc2), vzero));
       pSrc1 += iStrideSrc1;
       pSrc2 += iStrideSrc2;
       __m128i Diff = _mm_sub_epi16(Src1, Src2);
@@ -403,32 +386,17 @@ Distortion RdCost::xGetSSE_NxN_SIMD(const DistParam &rcDtParam)
   }
   else
   {
-#if DIST_SSE_ENABLE
     if (vext >= AVX2 && ((iCols & 15) == 0))
-#else
-    if (vext >= AVX2 && iWidth >= 16)
-#endif
     {
 #ifdef USE_AVX2
-#if DIST_SSE_ENABLE
       __m256i Sum   = _mm256_setzero_si256();
       __m256i vzero = _mm256_setzero_si256();
       for (int iY = 0; iY < iRows; iY++)
       {
         for (int iX = 0; iX < iCols; iX += 16)
         {
-          __m256i Src1 =
-            (sizeof(Torg) > 1)
-              ? (_mm256_lddqu_si256((__m256i *) (&pSrc1[iX])))
-              : (_mm256_unpacklo_epi8(
-                _mm256_permute4x64_epi64(_mm256_castsi128_si256(_mm_lddqu_si128((__m128i *) (&pSrc1[iX]))), 0xD8),
-                vzero));
-          __m256i Src2 =
-            (sizeof(Tcur) > 1)
-              ? (_mm256_lddqu_si256((__m256i *) (&pSrc2[iX])))
-              : (_mm256_unpacklo_epi8(
-                _mm256_permute4x64_epi64(_mm256_castsi128_si256(_mm_lddqu_si128((__m128i *) (&pSrc2[iX]))), 0xD8),
-                vzero));
+          __m256i Src1 = (sizeof(Torg) > 1) ? (_mm256_lddqu_si256((__m256i *)(&pSrc1[iX]))) : (_mm256_unpacklo_epi8(_mm256_permute4x64_epi64(_mm256_castsi128_si256(_mm_lddqu_si128((__m128i *) (&pSrc1[iX]))), 0xD8), vzero));
+          __m256i Src2 = (sizeof(Tcur) > 1) ? (_mm256_lddqu_si256((__m256i *)(&pSrc2[iX]))) : (_mm256_unpacklo_epi8(_mm256_permute4x64_epi64(_mm256_castsi128_si256(_mm_lddqu_si128((__m128i *) (&pSrc2[iX]))), 0xD8), vzero));
           __m256i Diff = _mm256_sub_epi16(Src1, Src2);
           __m256i Res  = _mm256_madd_epi16(Diff, Diff);
           Sum          = _mm256_add_epi32(Sum, Res);
@@ -441,40 +409,8 @@ Distortion RdCost::xGetSSE_NxN_SIMD(const DistParam &rcDtParam)
       Sum   = _mm256_add_epi64(Sum, _mm256_permute4x64_epi64(Sum, 14));
       Sum   = _mm256_add_epi64(Sum, _mm256_permute4x64_epi64(Sum, 1));
       uiRet = _mm_cvtsi128_si64(_mm256_castsi256_si128(Sum)) >> uiShift;
-#else
-      __m256i Sum = _mm256_setzero_si256();
-      for (int iY = 0; iY < iRows; iY++)
-      {
-        for (int iX = 0; iX < iWidth; iX += 16)
-        {
-          __m256i Src1 =
-            (sizeof(Torg) > 1)
-              ? (_mm256_lddqu_si256((__m256i *) (&pSrc1[iX])))
-              : (_mm256_unpacklo_epi8(
-                _mm256_permute4x64_epi64(_mm256_castsi128_si256(_mm_lddqu_si128((__m128i *) (&pSrc1[iX]))), 0xD8),
-                _mm256_setzero_si256()));
-          __m256i Src2 =
-            (sizeof(Tcur) > 1)
-              ? (_mm256_lddqu_si256((__m256i *) (&pSrc2[iX])))
-              : (_mm256_unpacklo_epi8(
-                _mm256_permute4x64_epi64(_mm256_castsi128_si256(_mm_lddqu_si128((__m128i *) (&pSrc2[iX]))), 0xD8),
-                _mm256_setzero_si256()));
-          __m256i Diff = _mm256_sub_epi16(Src1, Src2);
-          __m256i Res  = _mm256_madd_epi16(Diff, Diff);
-          Sum          = _mm256_add_epi32(Sum, Res);
-        }
-        pSrc1 += iStrideSrc1;
-        pSrc2 += iStrideSrc2;
-      }
-      Sum   = _mm256_hadd_epi32(Sum, Sum);
-      Sum   = _mm256_hadd_epi32(Sum, Sum);
-      uiRet = (_mm_cvtsi128_si32(_mm256_castsi256_si128(Sum))
-               + _mm_cvtsi128_si32(_mm256_castsi256_si128(_mm256_permute2x128_si256(Sum, Sum, 0x11))))
-              >> uiShift;
-#endif
 #endif
     }
-#if DIST_SSE_ENABLE
     else if (iCols > 32 && (iCols & 15) == 0)
     {
       if (iRows > 16 && (iRows & 15))
@@ -502,12 +438,8 @@ Distortion RdCost::xGetSSE_NxN_SIMD(const DistParam &rcDtParam)
           {
             for (int iX = 0; iX < iCols; iX += 8)
             {
-              __m128i Src1 = (sizeof(Torg) > 1)
-                               ? (_mm_loadu_si128((const __m128i *) (&pSrc1[iX])))
-                               : (_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *) (&pSrc1[iX])), vzero));
-              __m128i Src2 = (sizeof(Tcur) > 1)
-                               ? (_mm_lddqu_si128((const __m128i *) (&pSrc2[iX])))
-                               : (_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *) (&pSrc2[iX])), vzero));
+              __m128i Src1 = (sizeof(Torg) > 1)  ? (_mm_loadu_si128((const __m128i *) (&pSrc1[iX]))) : (_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *) (&pSrc1[iX])), vzero));
+              __m128i Src2 = (sizeof(Tcur) > 1)  ? (_mm_lddqu_si128((const __m128i *) (&pSrc2[iX]))) : (_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *) (&pSrc2[iX])), vzero));
 
               __m128i Diff = _mm_sub_epi16(Src1, Src2);
               __m128i Res  = _mm_madd_epi16(Diff, Diff);
@@ -524,33 +456,15 @@ Distortion RdCost::xGetSSE_NxN_SIMD(const DistParam &rcDtParam)
       }
     }
     else if ((iCols & 7) == 0)
-#else
-    else
-#endif
     {
       __m128i Sum = _mm_setzero_si128();
-#if DIST_SSE_ENABLE
       __m128i vzero = _mm_setzero_si128();
-#endif
       for (int iY = 0; iY < iRows; iY++)
       {
         for (int iX = 0; iX < iCols; iX += 8)
         {
-#if DIST_SSE_ENABLE
-          __m128i Src1 = (sizeof(Torg) > 1)
-                           ? (_mm_loadu_si128((const __m128i *) (&pSrc1[iX])))
-                           : (_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *) (&pSrc1[iX])), vzero));
-          __m128i Src2 = (sizeof(Tcur) > 1)
-                           ? (_mm_lddqu_si128((const __m128i *) (&pSrc2[iX])))
-                           : (_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *) (&pSrc2[iX])), vzero));
-#else
-          __m128i Src1 = (sizeof(Torg) > 1)
-                           ? (_mm_loadu_si128((const __m128i *) (&pSrc1[iX])))
-                           : (_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *) (&pSrc1[iX])), _mm_setzero_si128()));
-          __m128i Src2 = (sizeof(Tcur) > 1)
-                           ? (_mm_lddqu_si128((const __m128i *) (&pSrc2[iX])))
-                           : (_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *) (&pSrc2[iX])), _mm_setzero_si128()));
-#endif
+          __m128i Src1 = (sizeof(Torg) > 1) ? (_mm_loadu_si128((const __m128i *) (&pSrc1[iX]))) : (_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *) (&pSrc1[iX])), vzero));
+          __m128i Src2 = (sizeof(Tcur) > 1) ? (_mm_lddqu_si128((const __m128i *) (&pSrc2[iX]))) : (_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *) (&pSrc2[iX])), vzero));
           __m128i Diff = _mm_sub_epi16(Src1, Src2);
           __m128i Res  = _mm_madd_epi16(Diff, Diff);
           Sum          = _mm_add_epi32(Sum, Res);
