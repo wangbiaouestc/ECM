@@ -225,7 +225,7 @@ protected:
                                  , Pel *srcPadBuf = NULL
                                  , int32_t srcPadStride = 0
 #if JVET_W0090_ARMC_TM
-                                 , bool AML = false
+                                 , bool isAML = false
 #if INTER_LIC
                                  , bool doLic = false
                                  , Mv   mvCurr = Mv(0, 0)

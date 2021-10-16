@@ -3202,7 +3202,8 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
       if ( pcSlice->getSPS()->getALFEnabledFlag() )
       {
         Size alfSize = m_pcALF->getAlfSize();
-        if ( alfSize.width != picWidth || alfSize.height != picHeight ) {
+        if ( alfSize.width != picWidth || alfSize.height != picHeight )
+        {
           m_pcALF->destroy();
           m_pcALF->create( m_pcCfg, picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, m_pcCfg->getBitDepth(), m_pcCfg->getInputBitDepth() );
         }

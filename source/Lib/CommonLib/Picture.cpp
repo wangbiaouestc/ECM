@@ -748,10 +748,9 @@ void Picture::sampleRateConv( const std::pair<int, int> scalingRatio, const std:
     filterVer = &DownsamplingFilterSRC[verFilter][0][0];
   }
 #if IF_12TAP
-  #if RPR_ENABLE
-  #else
-  CHECK(true, "Called at un-handled point");
-  #endif
+#if !RPR_ENABLE
+  CHECK( true, "Called at un-handled point" );
+#endif
   const int filterLength = downsampling ? 12 : (useLumaFilter ? NTAPS_LUMA(1) : NTAPS_CHROMA);
 #else
   const int filterLength = downsampling ? 12 : (useLumaFilter ? NTAPS_LUMA : NTAPS_CHROMA);
