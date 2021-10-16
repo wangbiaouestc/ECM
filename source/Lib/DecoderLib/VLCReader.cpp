@@ -2192,6 +2192,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   READ_FLAG( uiCode,    "sps_dmvd_enabled_flag" );                      pcSPS->setUseDMVDMode( uiCode != 0 );
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  READ_UVLC(uiCode, "six_minus_max_num_bm_merge_cand");
+  CHECK(BM_MRG_MAX_NUM_CANDS < uiCode, "Incorrrect max number of BM merge candidates!");
+  pcSPS->setMaxNumBMMergeCand(BM_MRG_MAX_NUM_CANDS - uiCode);
+#endif
   READ_FLAG( uiCode,    "sps_affine_enabled_flag" );                            pcSPS->setUseAffine              ( uiCode != 0 );
   if ( pcSPS->getUseAffine() )
   {

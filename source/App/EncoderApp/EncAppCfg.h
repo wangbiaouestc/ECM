@@ -708,6 +708,9 @@ protected:
 
   uint32_t      m_log2ParallelMergeLevel;                         ///< Parallel merge estimation region
   uint32_t      m_maxNumMergeCand;                                ///< Max number of merge candidates
+#if JVET_X0049_ADAPT_DMVR
+  uint32_t      m_maxNumBMMergeCand;                                ///< Max number of BM merge candidates
+#endif
   uint32_t      m_maxNumAffineMergeCand;                          ///< Max number of affine merge candidates
   uint32_t      m_maxNumGeoCand;
   uint32_t      m_maxNumIBCMergeCand;                             ///< Max number of IBC merge candidates

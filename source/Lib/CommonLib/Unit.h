@@ -453,6 +453,10 @@ struct InterPredictionData
 #if TM_MRG
   bool        tmMergeFlag;
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  uint8_t     bmMergeFlag;
+  uint8_t     bmDir;
+#endif
   uint8_t     interDir;
   uint8_t     mvpIdx  [NUM_REF_PIC_LIST_01];
   uint8_t     mvpNum  [NUM_REF_PIC_LIST_01];

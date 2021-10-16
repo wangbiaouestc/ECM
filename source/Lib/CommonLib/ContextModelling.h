@@ -559,6 +559,9 @@ public:
   MultiHypVec   addHypNeighbours[MRG_MAX_NUM_CANDS];
 #endif
   int           numValidMergeCand;
+#if JVET_X0049_ADAPT_DMVR
+  int           numCandToTestEnc;
+#endif
   bool          hasMergedCandList;
 
   MotionBuf     subPuMvpMiBuf;
@@ -612,6 +615,9 @@ unsigned CtxQtCbf     ( const ComponentID compID, const bool prevCbf = false, co
 unsigned CtxInterDir  ( const PredictionUnit& pu );
 unsigned CtxSkipFlag  ( const CodingUnit& cu );
 unsigned CtxAffineFlag( const CodingUnit& cu );
+#if JVET_X0049_ADAPT_DMVR
+unsigned CtxBMMrgFlag(const CodingUnit& cu);
+#endif
 unsigned CtxPredModeFlag( const CodingUnit& cu );
 unsigned CtxIBCFlag(const CodingUnit& cu);
 unsigned CtxMipFlag   ( const CodingUnit& cu );

@@ -604,6 +604,12 @@ static const int    BDMVR_INTME_AREA   = BDMVR_INTME_STRIDE * BDMVR_INTME_STRIDE
 static const int    BDMVR_INTME_CENTER = BDMVR_INTME_STRIDE * BDMVR_INTME_RANGE + BDMVR_INTME_RANGE; ///< Bilateral matching search area center
 static const int    BDMVR_SIMD_IF_FACTOR =                          8; ///< Specify the pixel alignment factor for SIMD IF. (Usually this factor is 8)
 static const int    BDMVR_INTME_MAX_NUM_SEARCH_ITERATION =         26; ///< for entire CU in bilateral mode, maximum number of refinement loops
+#if JVET_X0049_ADAPT_DMVR
+static const int    BDMVR_BUF_STRIDE = MAX_CU_SIZE + (BDMVR_INTME_RANGE << 1) + (BDMVR_SIMD_IF_FACTOR - 2);
+static const int    BDMVR_CENTER_POSITION = BDMVR_INTME_RANGE * BDMVR_BUF_STRIDE + BDMVR_INTME_RANGE;
+static const int    BM_MRG_MAX_NUM_CANDS = 6; ///< maximum number of BM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
+static const int    BM_MRG_SUB_PU_INT_MAX_SRCH_ROUND = 3;
+#endif
 #endif
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
 static const int    DECODER_SIDE_MV_WEIGHT =                        4; ///< lambda for decoder-side derived MVs

@@ -1719,6 +1719,9 @@ private:
   bool              m_ppsValidFlag[64];
   Size              m_scalingWindowSizeInPPS[64];
   uint32_t          m_maxNumMergeCand;
+#if JVET_X0049_ADAPT_DMVR
+  uint32_t          m_maxNumBMMergeCand;
+#endif
   uint32_t          m_maxNumAffineMergeCand;
   uint32_t          m_maxNumIBCMergeCand;
   uint32_t          m_maxNumGeoCand;
@@ -2012,6 +2015,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   void                    setMaxNumMergeCand(uint32_t u) { m_maxNumMergeCand = u; }
 #if TM_MRG
   uint32_t                getMaxNumTMMergeCand() const { return std::min((uint32_t)TM_MRG_MAX_NUM_CANDS, m_maxNumMergeCand); }
+#endif
+#if JVET_X0049_ADAPT_DMVR
+  void                    setMaxNumBMMergeCand(uint32_t u) { m_maxNumBMMergeCand = u; }
+  uint32_t                getMaxNumBMMergeCand() const { return m_maxNumBMMergeCand; }
 #endif
   uint32_t                getMaxNumAffineMergeCand() const { return m_maxNumAffineMergeCand; }
   void                    setMaxNumAffineMergeCand(uint32_t u) { m_maxNumAffineMergeCand = u; }

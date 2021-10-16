@@ -3181,6 +3181,9 @@ SPS::SPS()
 , m_rprEnabledFlag            ( false )
 , m_resChangeInClvsEnabledFlag ( false )
 , m_maxNumMergeCand(MRG_MAX_NUM_CANDS)
+#if JVET_X0049_ADAPT_DMVR
+, m_maxNumBMMergeCand(BM_MRG_MAX_NUM_CANDS)
+#endif
 , m_maxNumAffineMergeCand(AFFINE_MRG_MAX_NUM_CANDS)
 , m_maxNumIBCMergeCand(IBC_MRG_MAX_NUM_CANDS)
 , m_maxNumGeoCand(0)

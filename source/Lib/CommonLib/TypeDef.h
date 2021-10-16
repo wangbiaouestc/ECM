@@ -127,6 +127,9 @@
 #define IF_12TAP                                          1 // 12-tap IF
 #define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
 
+#define JVET_X0049_ADAPT_DMVR                             1 // JVET-X0049: Adaptive DMVR
+#define JVET_X0056_DMVD_EARLY_TERMINATION                 1 // JVET-X0056: Early termination for DMVR and TM
+
 // Inter template matching tools
 #define TM_AMVP                                           1 // Add template  matching to non-subblock inter to refine regular AMVP candidates
 #define TM_MRG                                            1 // Add template  matching to non-subblock inter to refine regular merge candidates

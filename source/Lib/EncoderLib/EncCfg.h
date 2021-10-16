@@ -725,6 +725,9 @@ protected:
   WeightedPredictionMethod m_weightedPredictionMethod;
   uint32_t      m_log2ParallelMergeLevelMinus2;       ///< Parallel merge estimation region
   uint32_t      m_maxNumMergeCand;                    ///< Maximum number of merge candidates
+#if JVET_X0049_ADAPT_DMVR
+  uint32_t      m_maxNumBMMergeCand;                  ///< Maximum number of BM merge candidates
+#endif
   uint32_t      m_maxNumAffineMergeCand;              ///< Maximum number of affine merge candidates
   uint32_t      m_maxNumGeoCand;
   uint32_t      m_maxNumIBCMergeCand;                 ///< Max number of IBC merge candidates
@@ -1953,6 +1956,10 @@ public:
   uint32_t     getLog2ParallelMergeLevelMinus2()                     { return m_log2ParallelMergeLevelMinus2; }
   void         setMaxNumMergeCand                ( uint32_t u )          { m_maxNumMergeCand = u;      }
   uint32_t         getMaxNumMergeCand                ()                  { return m_maxNumMergeCand;   }
+#if JVET_X0049_ADAPT_DMVR
+  void         setMaxNumBMMergeCand              ( uint32_t u )          { m_maxNumBMMergeCand = u;      }
+  uint32_t         getMaxNumBMMergeCand              ()                  { return m_maxNumBMMergeCand;   }
+#endif
   void         setMaxNumAffineMergeCand          ( uint32_t u )      { m_maxNumAffineMergeCand = u;    }
   uint32_t     getMaxNumAffineMergeCand          ()                  { return m_maxNumAffineMergeCand; }
   void         setMaxNumGeoCand                  ( uint32_t u )      { m_maxNumGeoCand = u;    }

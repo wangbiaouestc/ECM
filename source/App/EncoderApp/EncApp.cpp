@@ -888,6 +888,9 @@ void EncApp::xInitLibCfg()
   }
 
   m_cEncLib.setMaxNumMergeCand                                   ( m_maxNumMergeCand );
+#if JVET_X0049_ADAPT_DMVR
+  m_cEncLib.setMaxNumBMMergeCand                                 ( m_maxNumBMMergeCand );
+#endif
   m_cEncLib.setMaxNumAffineMergeCand                             ( m_maxNumAffineMergeCand );
   m_cEncLib.setMaxNumGeoCand                                     ( m_maxNumGeoCand );
   m_cEncLib.setMaxNumIBCMergeCand                                ( m_maxNumIBCMergeCand );

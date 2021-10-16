@@ -2846,6 +2846,26 @@ void CABACReader::tm_merge_flag(PredictionUnit& pu)
 }
 #endif
 
+#if JVET_X0049_ADAPT_DMVR
+void CABACReader::bm_merge_flag(PredictionUnit& pu)
+{
+  pu.bmDir = 0;
+  pu.bmMergeFlag = false;
+  if (!PU::isBMMergeFlagCoded(pu))
+  {
+    return;
+  }
+
+  unsigned ctxId = DeriveCtx::CtxBMMrgFlag(*pu.cu);
+  pu.bmMergeFlag = (m_BinDecoder.decodeBin(Ctx::BMMergeFlag(ctxId)));
+  if (pu.bmMergeFlag)
+  {
+    pu.bmDir = 1 << m_BinDecoder.decodeBin(Ctx::BMMergeFlag(3));
+  }
+  DTRACE(g_trace_ctx, D_SYNTAX, "bm_merge_flag() bmMergeFlag=%d, bmDir = %d\n", pu.bmMergeFlag ? 1 : 0, pu.bmDir);
+}
+#endif
+
 void CABACReader::merge_flag( PredictionUnit& pu )
 {
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__MERGE_FLAG );
@@ -2917,9 +2937,26 @@ void CABACReader::merge_data( PredictionUnit& pu )
 #if TM_MRG
       tm_merge_flag(pu);
 #endif
+#if JVET_X0049_ADAPT_DMVR
+#if TM_MRG
+      if (pu.tmMergeFlag)
+#endif
+      {
+        bm_merge_flag(pu);
+#if TM_MRG
+        if (pu.bmMergeFlag)
+        {
+          pu.tmMergeFlag = false;
+        }
+#endif
+      }
+#endif
       if (cu.cs->slice->getSPS()->getUseMMVD()
 #if TM_MRG
         && !pu.tmMergeFlag
+#endif
+#if JVET_X0049_ADAPT_DMVR
+        && !pu.bmMergeFlag
 #endif
         )
       {
@@ -2940,6 +2977,9 @@ void CABACReader::merge_data( PredictionUnit& pu )
       pu.cu->mmvdSkip = false;
 #if TM_MRG
       pu.tmMergeFlag = false;
+#endif
+#if JVET_X0049_ADAPT_DMVR
+      pu.bmMergeFlag = false;
 #endif
       if (geoAvailable && ciipAvailable)
       {
@@ -3109,6 +3149,12 @@ void CABACReader::merge_idx( PredictionUnit& pu )
     numCandminus1 = int(pu.cs->sps->getMaxNumTMMergeCand()) - 1;
   }
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  else if (pu.bmMergeFlag)
+  {
+    numCandminus1 = int(pu.cs->sps->getMaxNumBMMergeCand()) - 1;
+  }
+#endif
   if( numCandminus1 > 0 )
   {
 #if TM_MRG
@@ -3147,6 +3193,12 @@ void CABACReader::merge_idx( PredictionUnit& pu )
 #endif
   }
   DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() merge_idx=%d\n", pu.mergeIdx );
+#if JVET_X0049_ADAPT_DMVR
+  if (pu.bmMergeFlag && pu.bmDir == 2)
+  {
+    pu.mergeIdx += BM_MRG_MAX_NUM_CANDS;
+  }
+#endif
   }
 }
 #if JVET_W0097_GPM_MMVD_TM
@@ -3444,6 +3496,12 @@ void CABACReader::mh_pred_data(PredictionUnit& pu)
   }
 #if TM_MRG
   if (pu.tmMergeFlag)
+  {
+    return;
+  }
+#endif
+#if JVET_X0049_ADAPT_DMVR
+  if (pu.bmMergeFlag)
   {
     return;
   }
