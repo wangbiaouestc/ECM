@@ -1437,6 +1437,25 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           if (CU::isIBC(*pu.cu))
             PU::getIBCMergeCandidates(pu, mrgCtx, pu.mergeIdx);
           else
+#if JVET_X0049_ADAPT_DMVR
+            if (pu.bmMergeFlag)
+            {
+              uint8_t mergeIdx = pu.bmDir == 2 ? pu.mergeIdx - BM_MRG_MAX_NUM_CANDS : pu.mergeIdx;
+#if JVET_W0090_ARMC_TM
+              if (pu.cs->sps->getUseAML())
+              {
+                PU::getInterBMCandidates(pu, mrgCtx, pu.cs->sps->getUseAML() && (((mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumBMMergeCand()) || (mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : mergeIdx);
+                uint8_t bmDir = pu.bmDir;
+                pu.bmDir = 0;
+                m_pcInterPred->adjustInterMergeCandidates(pu, mrgCtx, mergeIdx);
+                pu.bmDir = bmDir;
+              }
+              else
+#endif
+              PU::getInterBMCandidates(pu, mrgCtx, mergeIdx);
+            }
+            else
+#endif
 #if JVET_W0090_ARMC_TM
             if (pu.cs->sps->getUseAML())
             {
@@ -1465,10 +1484,18 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 
             CHECK(mrgCtx.numValidMergeCand <= 0, "this is not possible");
 
+#if JVET_X0049_ADAPT_DMVR
+#if TM_MRG
+            if (!pu.tmMergeFlag && !pu.bmMergeFlag && mrgCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu)))
+#else
+            if (!pu.bmMergeFlag && mrgCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu)))
+#endif
+#else
 #if TM_MRG
             if( !pu.tmMergeFlag && mrgCtx.xCheckSimilarMotion( pu.mergeIdx, PU::getBDMVRMvdThreshold( pu ) ) )
 #else
             if( mrgCtx.xCheckSimilarMotion( pu.mergeIdx, PU::getBDMVRMvdThreshold( pu ) ) )
+#endif
 #endif
             {
               // span motion to subPU

@@ -115,6 +115,10 @@ struct ModeInfo
 #if TM_MRG
   bool     isTMMrg;
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  bool     isBMMrg;
+  uint8_t  bmDir;
+#endif
   bool     isGeo;
   uint8_t     geoSplitDir;
   uint8_t     geoMergeIdx0;
@@ -134,7 +138,11 @@ struct ModeInfo
 #if TM_MRG
     , isTMMrg(false)
 #endif
-    , isGeo(false), geoSplitDir(0), geoMergeIdx0(0), geoMergeIdx1(0)
+#if JVET_X0049_ADAPT_DMVR
+    , isBMMrg(false)
+    , bmDir(0)
+#endif
+  , isGeo(false), geoSplitDir(0), geoMergeIdx0(0), geoMergeIdx1(0)
 #if ENABLE_OBMC
     , isOBMC(false)
 #endif
@@ -189,6 +197,10 @@ struct ModeInfo
 #endif
 #if TM_MRG
     isTMMrg = pu.tmMergeFlag;
+#endif
+#if JVET_X0049_ADAPT_DMVR
+    isBMMrg = pu.bmMergeFlag;
+    bmDir = pu.bmDir;
 #endif
     isGeo = cu.geoFlag;
     geoSplitDir = pu.geoSplitDir;

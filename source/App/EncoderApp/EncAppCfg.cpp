@@ -1291,6 +1291,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #else
   ("MaxNumMergeCand",                                 m_maxNumMergeCand,                                   5u, "Maximum number of merge candidates")
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  ("MaxNumBMMergeCand",                               m_maxNumBMMergeCand,                                 4u, "Maximum number of BM merge candidates")
+#endif
   ("MaxNumAffineMergeCand",                           m_maxNumAffineMergeCand,                             5u, "Maximum number of affine merge candidates")
 #if NON_ADJACENT_MRG_CAND
   ("MaxNumGeoCand",                                   m_maxNumGeoCand,                                     10u, "Maximum number of geometric partitioning mode candidates")
@@ -3139,6 +3142,9 @@ bool EncAppCfg::xCheckParameter()
   xConfirmPara( m_log2MaxTbSize < 5,  "Log2MaxTbSize must be 5 or greater." );
   xConfirmPara( m_maxNumMergeCand < 1,  "MaxNumMergeCand must be 1 or greater.");
   xConfirmPara( m_maxNumMergeCand > MRG_MAX_NUM_CANDS, "MaxNumMergeCand must be no more than MRG_MAX_NUM_CANDS." );
+#if JVET_X0049_ADAPT_DMVR
+  xConfirmPara( m_maxNumBMMergeCand > BM_MRG_MAX_NUM_CANDS, "MaxNumBMMergeCand must be no more than BM_MRG_MAX_NUM_CANDS." );
+#endif
   xConfirmPara( m_maxNumGeoCand > GEO_MAX_NUM_UNI_CANDS, "MaxNumGeoCand must be no more than GEO_MAX_NUM_UNI_CANDS." );
   xConfirmPara( m_maxNumGeoCand > m_maxNumMergeCand, "MaxNumGeoCand must be no more than MaxNumMergeCand." );
   xConfirmPara( 0 < m_maxNumGeoCand && m_maxNumGeoCand < 2, "MaxNumGeoCand must be no less than 2 unless MaxNumGeoCand is 0." );
@@ -4203,6 +4209,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 
   msg( DETAILS, "Max Num Merge Candidates               : %d\n", m_maxNumMergeCand );
+#if JVET_X0049_ADAPT_DMVR
+  msg( DETAILS, "Max Num BM Merge Candidates            : %d\n", m_maxNumBMMergeCand );
+#endif
   msg( DETAILS, "Max Num Affine Merge Candidates        : %d\n", m_maxNumAffineMergeCand );
   msg( DETAILS, "Max Num Geo Merge Candidates           : %d\n", m_maxNumGeoCand );
   msg( DETAILS, "Max Num IBC Merge Candidates           : %d\n", m_maxNumIBCMergeCand );

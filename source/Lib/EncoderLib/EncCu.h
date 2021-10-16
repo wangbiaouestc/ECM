@@ -290,6 +290,10 @@ private:
 #endif
   Mv                    m_mvBufEncBDOF[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
   Mv                    m_mvBufEncBDOF4TM[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
+#if JVET_X0049_ADAPT_DMVR
+  Mv                    m_mvBufBDMVR4BM[(BM_MRG_MAX_NUM_CANDS << 1)<<1][MAX_NUM_SUBCU_DMVR];
+  Mv                    m_mvBufEncBDOF4BM[BM_MRG_MAX_NUM_CANDS<<1][BDOF_SUBPU_MAX_NUM];
+#endif
 #endif
 
   int                   m_ctuIbcSearchRangeX;
@@ -382,6 +386,15 @@ protected:
                                 , bool* applyBDMVR
 #endif
                               );
+#if JVET_X0049_ADAPT_DMVR
+  void xCheckSATDCostBMMerge
+                              ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
+                                , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart
+#if MULTI_PASS_DMVR
+                                , bool* applyBDMVR
+#endif
+                              );
+#endif
   void xCheckSATDCostCiipMerge 
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx mergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer, PelUnitBuf  acMergeTmpBuffer[MRG_MAX_NUM_CANDS]
                                 , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);

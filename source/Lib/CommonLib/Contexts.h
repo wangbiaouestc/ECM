@@ -231,6 +231,9 @@ public:
 #if TM_MRG
   static const CtxSet   TmMergeIdx;
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  static const CtxSet   BMMergeFlag;
+#endif
   static const CtxSet   PredMode;
   static const CtxSet   MultiRefLineIdx;
   static const CtxSet   IntraLumaMpmFlag;

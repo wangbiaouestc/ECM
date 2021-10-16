@@ -230,6 +230,20 @@ namespace PU
   void setAllAffineMvField            (      PredictionUnit &pu, MvField *mvField, RefPicList eRefList );
   void setAllAffineMv                 (      PredictionUnit &pu, Mv affLT, Mv affRT, Mv affLB, RefPicList eRefList, bool clipCPMVs = false );
   bool getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx &mrgCtx, bool& LICFlag, const int count, int mmvdList);
+#if JVET_X0049_ADAPT_DMVR
+  bool isBMMergeFlagCoded(const PredictionUnit& pu);
+  bool isBiPredFromDifferentDirEqDistPoc(const PredictionUnit& pu, int refIdx0, int refIdx1);
+  bool addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx& mrgCtx, const int& mrgCandIdx, const uint32_t maxNumMergeCandMin1, int &cnt
+    , const bool isAvailableA1, const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
+    , const bool ibcFlag
+    , const bool isGt4x4
+#if TM_MRG
+    , const uint32_t mvdSimilarityThresh = 1
+#endif
+  );
+  void getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
+    const int& mrgCandIdx = -1);
+#endif
   bool getInterMergeSubPuRecurCand(const PredictionUnit &pu, MergeCtx &mrgCtx, const int count);
   bool isBiPredFromDifferentDirEqDistPoc(const PredictionUnit &pu);
   void restrictBiPredMergeCandsOne    (PredictionUnit &pu);

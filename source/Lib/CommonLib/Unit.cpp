@@ -658,6 +658,10 @@ void PredictionUnit::initData()
 #if TM_MRG
   tmMergeFlag = false;
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  bmMergeFlag = false;
+  bmDir = 0;
+#endif
   interDir    = MAX_UCHAR;
   mergeType   = MRG_TYPE_DEFAULT_N;
   bv.setZero();
@@ -748,6 +752,10 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 #if TM_MRG
   tmMergeFlag = predData.tmMergeFlag;
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  bmMergeFlag = predData.bmMergeFlag;
+  bmDir = predData.bmDir;
+#endif
   interDir    = predData.interDir;
   mergeType   = predData.mergeType;
   bv          = predData.bv;
@@ -833,6 +841,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
 #if TM_MRG
   tmMergeFlag = other.tmMergeFlag;
+#endif
+#if JVET_X0049_ADAPT_DMVR
+  bmMergeFlag = other.bmMergeFlag;
+  bmDir = other.bmDir;
 #endif
   interDir    = other.interDir;
   mergeType   = other.mergeType;

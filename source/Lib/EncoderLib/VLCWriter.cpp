@@ -1334,6 +1334,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   WRITE_FLAG( pcSPS->getUseDMVDMode() ? 1 : 0,                                                 "sps_dmvd_enabled_flag" );
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  WRITE_UVLC(BM_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumBMMergeCand(), "six_minus_max_num_merge_cand");
+#endif
   WRITE_FLAG( pcSPS->getUseAffine() ? 1 : 0,                                                   "sps_affine_enabled_flag" );
   if ( pcSPS->getUseAffine() )
   {

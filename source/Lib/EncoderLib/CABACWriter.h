@@ -126,6 +126,9 @@ public:
 #if JVET_V0130_INTRA_TMP
   void        tmp_flag                  ( const CodingUnit& cu );
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  void        bm_merge_flag             ( const PredictionUnit&         pu);
+#endif
   void        mip_flag                  ( const CodingUnit&             cu );
   void        mip_pred_modes            ( const CodingUnit&             cu );
   void        mip_pred_mode             ( const PredictionUnit&         pu );

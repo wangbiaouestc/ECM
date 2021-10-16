@@ -1104,6 +1104,18 @@ const CtxSet ContextSetCfg::SubblockMergeFlag = ContextSetCfg::addCtxSet
 	{ 4,  4,  4 }
 });
 
+#if JVET_X0049_ADAPT_DMVR
+const CtxSet ContextSetCfg::BMMergeFlag = ContextSetCfg::addCtxSet
+({
+  { 25, CNU, CNU, CNU },
+  { 26, CNU, CNU, CNU },
+  { 35, CNU, CNU, CNU },
+  { 4, 4, 4, 4 },
+  { 4, 4, 4, 4 },
+  { 4, 4, 4, 4 }
+});
+#endif
+
 const CtxSet ContextSetCfg::AffineFlag = ContextSetCfg::addCtxSet
 ({
 	{ 34, 27,  6 },
@@ -2246,6 +2258,15 @@ const CtxSet ContextSetCfg::SubblockMergeFlag = ContextSetCfg::addCtxSet
   {   4,   4,   4, },
 });
 
+#if JVET_X0049_ADAPT_DMVR
+const CtxSet ContextSetCfg::BMMergeFlag = ContextSetCfg::addCtxSet
+({
+  { 25, CNU, CNU, CNU },
+  { 26, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU },
+  { 4, 4, 4, 4 },
+});
+#endif
 const CtxSet ContextSetCfg::AffineFlag = ContextSetCfg::addCtxSet
 ({
   {  19,  13,   6, },

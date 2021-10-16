@@ -2521,9 +2521,33 @@ void CABACWriter::tm_merge_flag(const PredictionUnit& pu)
     return;
   }
 
+#if JVET_X0049_ADAPT_DMVR
+  m_BinEncoder.encodeBin(pu.tmMergeFlag || pu.bmMergeFlag, Ctx::TMMergeFlag());
+#else
   m_BinEncoder.encodeBin(pu.tmMergeFlag, Ctx::TMMergeFlag());
+#endif
 
   DTRACE(g_trace_ctx, D_SYNTAX, "tm_merge_flag() tmMergeFlag=%d\n", pu.tmMergeFlag ? 1 : 0);
+}
+#endif
+
+#if JVET_X0049_ADAPT_DMVR
+void CABACWriter::bm_merge_flag(const PredictionUnit& pu)
+{
+  if (!PU::isBMMergeFlagCoded(pu))
+  {
+    return;
+  }
+
+  unsigned ctxId = DeriveCtx::CtxBMMrgFlag(*pu.cu);
+  m_BinEncoder.encodeBin(pu.bmMergeFlag, Ctx::BMMergeFlag(ctxId));
+  if (pu.bmMergeFlag)
+  {
+    CHECK(pu.bmDir != 1 && pu.bmDir != 2, "pu.bmDir != 1 && pu.bmDir != 2");
+    m_BinEncoder.encodeBin(pu.bmDir >> 1, Ctx::BMMergeFlag(3));
+  }
+
+  DTRACE(g_trace_ctx, D_SYNTAX, "bm_merge_flag() bmMergeFlag=%d, bmDir = %d\n", pu.bmMergeFlag ? 1 : 0, pu.bmDir);
 }
 #endif
 
@@ -2578,9 +2602,20 @@ void CABACWriter::merge_data(const PredictionUnit& pu)
 #if TM_MRG
     tm_merge_flag(pu);
 #endif
+#if JVET_X0049_ADAPT_DMVR 
+#if TM_MRG
+    if ((pu.tmMergeFlag || pu.bmMergeFlag))
+#endif
+    {
+       bm_merge_flag(pu);
+    }
+#endif
     if (pu.cs->sps->getUseMMVD()
 #if TM_MRG
       && !pu.tmMergeFlag
+#endif
+#if JVET_X0049_ADAPT_DMVR
+      && !pu.bmMergeFlag
 #endif
       )
     {
@@ -2798,11 +2833,24 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
       return;
     }
     int numCandminus1;
+#if JVET_X0049_ADAPT_DMVR
+    uint8_t mergeIdx = pu.mergeIdx;
+#endif
     if (pu.cu->predMode == MODE_IBC)
       numCandminus1 = int(pu.cs->sps->getMaxNumIBCMergeCand()) - 1;
 #if TM_MRG
     else if (pu.tmMergeFlag)
       numCandminus1 = int(pu.cs->sps->getMaxNumTMMergeCand()) - 1;
+#endif
+#if JVET_X0049_ADAPT_DMVR
+    else if (pu.bmMergeFlag)
+    {
+      numCandminus1 = int(pu.cs->sps->getMaxNumBMMergeCand()) - 1;
+      if (pu.bmDir == 2)
+      {
+        mergeIdx -= BM_MRG_MAX_NUM_CANDS;
+      }
+    }
 #endif
     else
       numCandminus1 = int(pu.cs->sps->getMaxNumMergeCand()) - 1;
@@ -2815,7 +2863,11 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
     unsigned int uiUnaryIdx = 0;
     for (; uiUnaryIdx < numCandminus1; ++uiUnaryIdx)
     {
+#if JVET_X0049_ADAPT_DMVR
+      unsigned int uiSymbol = mergeIdx == uiUnaryIdx ? 0 : 1;
+#else
       unsigned int uiSymbol = pu.mergeIdx == uiUnaryIdx ? 0 : 1;
+#endif
 #if TM_MRG
       m_BinEncoder.encodeBin(uiSymbol, mrgIdxCtxSet((uiUnaryIdx > LAST_MERGE_IDX_CABAC - 1 ? LAST_MERGE_IDX_CABAC - 1 : uiUnaryIdx)));
 #else
@@ -2827,7 +2879,11 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
       }
     }
 #else
-    if( pu.mergeIdx == 0 )
+#if JVET_X0049_ADAPT_DMVR
+    if (mergeIdx == 0)
+#else
+    if (pu.mergeIdx == 0)
+#endif
     {
 #if TM_MRG
       m_BinEncoder.encodeBin( 0, mrgIdxCtxSet() );
@@ -2846,8 +2902,13 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
 #endif
       for( unsigned idx = 1; idx < numCandminus1; idx++ )
       {
+#if JVET_X0049_ADAPT_DMVR
+        m_BinEncoder.encodeBinEP(mergeIdx == idx ? 0 : 1);
+        if (mergeIdx == idx)
+#else
           m_BinEncoder.encodeBinEP( pu.mergeIdx == idx ? 0 : 1 );
         if( pu.mergeIdx == idx )
+#endif
         {
           break;
         }
@@ -2855,7 +2916,11 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
     }
 #endif
   }
+#if JVET_X0049_ADAPT_DMVR
+  DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() merge_idx=%d\n", mergeIdx );
+#else
   DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() merge_idx=%d\n", pu.mergeIdx );
+#endif
   }
 }
 
@@ -3168,6 +3233,13 @@ void CABACWriter::mh_pred_data(const PredictionUnit& pu)
   }
 #if TM_MRG
   if (pu.tmMergeFlag)
+  {
+    CHECK(!pu.addHypData.empty(), "Multi Hyp: !pu.addHypData.empty()");
+    return;
+  }
+#endif
+#if JVET_X0049_ADAPT_DMVR
+  if (pu.bmMergeFlag)
   {
     CHECK(!pu.addHypData.empty(), "Multi Hyp: !pu.addHypData.empty()");
     return;

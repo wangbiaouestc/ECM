@@ -3407,6 +3407,9 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
 #if TM_MRG
       fakePredData.tmMergeFlag = false;
 #endif
+#if JVET_X0049_ADAPT_DMVR
+      fakePredData.bmMergeFlag = false;
+#endif
 #if MULTI_PASS_DMVR
       fakePredData.bdmvrRefine = false;
 #endif

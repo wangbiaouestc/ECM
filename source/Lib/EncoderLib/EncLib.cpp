@@ -1396,6 +1396,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseAML                             ( m_AML );
 #endif
   sps.setMaxNumMergeCand(getMaxNumMergeCand());
+#if JVET_X0049_ADAPT_DMVR
+  sps.setMaxNumBMMergeCand(getMaxNumBMMergeCand());
+#endif
   sps.setMaxNumAffineMergeCand(getMaxNumAffineMergeCand());
   sps.setMaxNumIBCMergeCand(getMaxNumIBCMergeCand());
   sps.setMaxNumGeoCand(getMaxNumGeoCand());
