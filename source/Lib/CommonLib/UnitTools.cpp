@@ -2971,19 +2971,27 @@ bool PU::checkRprLicCondition( const PredictionUnit & pu )
 {
   if ( pu.cs->sps->getLicEnabledFlag() )
   {
-    if (pu.refIdx[0] >= 0 && pu.refIdx[1] >= 0) return false;
+    if( pu.refIdx[0] >= 0 && pu.refIdx[1] >= 0 )
+    {
+      return false;
+    }
 
     bool  bLicEnabled = true;
     int iRefIdx             = (pu.refIdx[0] >= 0) ? pu.refIdx[0] : pu.refIdx[1];
     RefPicList  eRefPicList = (pu.refIdx[0] >= 0) ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
 
     const bool isResamplingPossible = pu.cs->sps->getRprEnabledFlag();
-    if ( isResamplingPossible && pu.cu->slice->getRefPic(eRefPicList, iRefIdx)->isRefScaled(pu.cs->pps) )
+    if( isResamplingPossible && pu.cu->slice->getRefPic( eRefPicList, iRefIdx )->isRefScaled( pu.cs->pps ) )
+    {
       bLicEnabled = false;
+    }
+
     return bLicEnabled;
   }
   else
+  {
     return false;
+  }
 }
 #endif
 

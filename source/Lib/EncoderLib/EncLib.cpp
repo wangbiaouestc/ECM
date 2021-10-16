@@ -710,8 +710,7 @@ bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* cPicYu
     }
 #endif
 
-#if RPR_ENABLE
-#else
+#if !RPR_ENABLE
     if( m_resChangeInClvsEnabled && m_intraPeriod == -1 )
 #endif
     {

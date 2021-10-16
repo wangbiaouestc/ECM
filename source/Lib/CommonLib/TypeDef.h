@@ -50,13 +50,12 @@
 #include <assert.h>
 #include <cassert>
 
-#define RPR_ENABLE                                        1
-
-
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
 
+
+#define RPR_ENABLE                                        1 // JVET-X0121: Fixes for RRP
 
 #if BASE_ENCODER
 // Lossy encoder speedups

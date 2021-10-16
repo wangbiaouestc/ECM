@@ -459,6 +459,7 @@ Distortion RdCost::xGetSSE_NxN_SIMD(const DistParam &rcDtParam)
     {
       __m128i Sum = _mm_setzero_si128();
       __m128i vzero = _mm_setzero_si128();
+
       for (int iY = 0; iY < iRows; iY++)
       {
         for (int iX = 0; iX < iCols; iX += 8)
