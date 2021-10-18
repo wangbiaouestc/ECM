@@ -2578,7 +2578,7 @@ void RdCost::_initRdCostX86()
   m_afpDistortFunc[DF_SSE16] = xGetSSE_NxN_SIMD<16, vext>;
   m_afpDistortFunc[DF_SSE32] = xGetSSE_NxN_SIMD<32, vext>;
   m_afpDistortFunc[DF_SSE64] = xGetSSE_NxN_SIMD<64, vext>;
-#if DIST_SSE_ENABLE && CTU_256
+#if DIST_SSE_ENABLE && CTU_256 && 0
   m_afpDistortFunc[DF_SSE16N] = xGetSSE_NxN_SIMD<vext>;
 #else
   m_afpDistortFunc[DF_SSE16N] = xGetSSE_NxN_SIMD<128, vext>;
