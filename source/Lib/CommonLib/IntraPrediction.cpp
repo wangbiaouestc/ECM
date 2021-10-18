@@ -3419,7 +3419,7 @@ int IntraPrediction::deriveTimdMode( const CPelBuf &recoBuf, const CompArea &are
       }
     }
 
-    if ((uiSecondaryCost - uiBestCost) < uiBestCost)
+    if (uiSecondaryCost < 2*uiBestCost)
   {
     cu.timdMode         = iBestMode;
     cu.timdIsBlended    = true;
