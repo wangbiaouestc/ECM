@@ -5790,7 +5790,9 @@ void EncCu::xCheckSATDCostRegularMerge(CodingStructure *&tempCS, CodingUnit &cu,
 #if MULTI_HYP_PRED
     if (testMHP && pu.addHypData.size() < tempCS->sps->getMaxNumAddHyps())
     {
+#if MULTI_PASS_DMVR
       CHECK(pu.bdmvrRefine && !applyBDMVR[uiMergeCand], "");
+#endif
       uint32_t uiBitsCand = uiMergeCand + 1 + 1 + 1; // one bit for merge flag,  one bit for subblock_merge_flag, and one bit for regualr_merge_flag
       MEResult mergeResult;
       mergeResult.cu = cu;
@@ -6135,6 +6137,14 @@ void EncCu::xCheckSATDCostTMMerge(       CodingStructure*& tempCS,
     {
       pu.bdmvrRefine = true;
       m_pcInterSearch->setBdmvrSubPuMvBuf(m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[(uiMergeCand << 1) + 1]);
+    }
+#if !BDOF_RM_CONSTRAINTS
+    else
+#endif
+#endif
+#if !BDOF_RM_CONSTRAINTS
+    {
+      PU::spanMotionInfo(pu, mrgCtx);
     }
 #endif
 
