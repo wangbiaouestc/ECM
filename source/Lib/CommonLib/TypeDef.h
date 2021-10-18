@@ -117,6 +117,7 @@
 
 // Inter
 #define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
+#define JVET_X0090_CIIP_FIX                               1 // JVET-X0090: combination of CIIP, OBMC and LMCS
 #define SAMPLE_BASED_BDOF                                 1 // Sample based BDOF
 #define MULTI_PASS_DMVR                                   1 // Multi-pass DMVR
 #define AFFINE_MMVD                                       1 // Add MMVD to affine merge mode

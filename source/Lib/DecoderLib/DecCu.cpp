@@ -972,7 +972,11 @@ void DecCu::xReconInter(CodingUnit &cu)
   if (cu.firstPU->ciipFlag)
   {
     const UnitArea localUnitArea( cu.cs->area.chromaFormat, Area( 0, 0, cu.Y().width, cu.Y().height ) );
-
+#if ENABLE_OBMC && JVET_X0090_CIIP_FIX
+    cu.isobmcMC = true;
+    m_pcInterPred->subBlockOBMC(*cu.firstPU);
+    cu.isobmcMC = false;
+#endif
     if( cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() )
     {
       m_pcIntraPred->geneWeightedPred<true>( COMPONENT_Y, cu.cs->getPredBuf( *cu.firstPU ).Y(), *cu.firstPU, cu.cs->getPredBuf( *cu.firstPU ).Y(), m_ciipBuffer.getBuf( localUnitArea.Y() ), m_pcReshape->getFwdLUT().data() );
@@ -994,7 +998,14 @@ void DecCu::xReconInter(CodingUnit &cu)
   }
 #if ENABLE_OBMC
   cu.isobmcMC = true;
+#if JVET_X0090_CIIP_FIX
+  if (!cu.firstPU->ciipFlag)
+  {
+    m_pcInterPred->subBlockOBMC(*cu.firstPU);
+  }
+#else
   m_pcInterPred->subBlockOBMC(*cu.firstPU);
+#endif
   cu.isobmcMC = false;
 #endif
   DTRACE    ( g_trace_ctx, D_TMP, "pred " );
