@@ -35,21 +35,30 @@
 
 #include "CommonDef.h"
 
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
 
 #include "Unit.h"
 #include "Buffer.h"
 #include <tmmintrin.h>
 #include <smmintrin.h>
 #include <immintrin.h>
-
+#if JVET_V0094_BILATERAL_FILTER
 class BIFCabacEst
 {
 public:
   virtual ~BIFCabacEst() {};
   virtual uint64_t getBits(const Slice& slice, const BifParams& htdfParams) = 0;
 };
-
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+class CBIFCabacEst
+{
+public:
+    virtual ~CBIFCabacEst() {};
+    virtual uint64_t getBits_Cb(const Slice& slice, const CBifParams& htdfParams) = 0;
+    virtual uint64_t getBits_Cr(const Slice& slice, const CBifParams& htdfParams) = 0;
+};
+#endif
 class BilateralFilter
 {
 private:
@@ -72,7 +81,7 @@ private:
 #if JVET_W0066_CCSAO
   static void blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr);
 #endif
-  
+#if JVET_V0094_BILATERAL_FILTER
   char m_wBIF[26][16] = {
   {  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, },
   {  0,   1,   1,   1,   1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, },
@@ -101,14 +110,44 @@ private:
   {  0,  16,  23,  32,  36,  40,  43,  43,  44,  42,  39,  26,  21,  17,  15,  -3, },
   {  0,  17,  23,  33,  37,  41,  44,  44,  45,  44,  42,  27,  22,  17,  15,  -3, },
   };
-  
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  char m_wBIF_chroma[26][16] = {
+  {   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, },
+  {   0,   1,   1,   1,   1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, },
+  {   0,   2,   2,   2,   1,   1,   0,   1,   0,   0,   0,   0,   0,   0,   0,   0, },
+  {   0,   2,   2,   2,   2,   1,   1,   1,   1,   1,   1,   1,   0,   1,   1,   -1, },
+  {   0,   2,   2,   2,   2,   2,   1,   2,   1,   1,   1,   1,   0,   1,   1,   -1, },
+  {   0,   3,   3,   3,   2,   2,   1,   2,   1,   1,   1,   1,   0,   1,   1,   -1, },
+  {   0,   4,   4,   4,   3,   2,   2,   2,   2,   2,   2,   1,   0,   1,   1,   -1, },
+  {   0,   5,   5,   5,   4,   2,   2,   2,   2,   2,   2,   1,   1,   1,   1,   -1, },
+  {   0,   5,   6,   6,   4,   3,   2,   2,   2,   2,   2,   2,   1,   2,   2,   -2, },
+  {   0,   5,   8,   8,   5,   3,   3,   3,   3,   2,   2,   2,   2,   2,   2,   -2, },
+  {   0,   6,   9,   9,   5,   4,   4,   3,   4,   3,   3,   2,   2,   2,   2,   -2, },
+  {   0,   6,   9,  10,   8,   6,   6,   5,   5,   5,   4,   2,   2,   2,   2,   -2, },
+  {   0,   6,  10,  11,  10,   9,   9,   6,   6,   5,   5,   4,   4,   3,   3,   -2, },
+  {   0,   7,  11,  12,  12,  12,  11,   9,   7,   7,   6,   5,   5,   4,   5,   -2, },
+  {   0,   7,  12,  13,  15,  15,  13,  10,   9,   8,   8,   6,   6,   5,   5,   -2, },
+  {   0,   7,  12,  15,  17,  17,  16,  12,   9,   9,   9,   7,   7,   5,   6,   -2, },
+  {   0,   8,  13,  16,  19,  20,  19,  16,  14,  13,  12,   9,   9,   7,   7,   -2, },
+  {   0,   8,  14,  18,  20,  22,  22,  20,  18,  17,  14,  11,  10,   9,   9,   -2, },
+  {   0,   9,  15,  19,  23,  23,  25,  23,  23,  20,  17,  13,  12,  10,   9,   -2, },
+  {   0,   9,  16,  20,  24,  26,  28,  27,  27,  24,  20,  15,  13,  12,  11,   -2, },
+  {   0,   9,  16,  22,  26,  28,  31,  31,  31,  28,  23,  17,  15,  13,  12,   -2, },
+  {   0,  10,  16,  23,  27,  29,  32,  32,  32,  30,  25,  18,  16,  13,  12,   -2, },
+  {   0,  11,  17,  23,  27,  30,  33,  33,  33,  30,  27,  19,  16,  13,  12,   -2, },
+  {   0,  12,  17,  24,  27,  30,  33,  33,  34,  32,  29,  20,  16,  13,  12,   -2, },
+  {   0,  12,  18,  25,  28,  31,  34,  34,  34,  33,  30,  20,  16,  13,  12,   -2, },
+  {   0,  13,  18,  26,  29,  32,  34,  34,  35,  34,  33,  21,  17,  13,  12,   -2, },
+  };
+#endif
 public:
   BilateralFilter();
   ~BilateralFilter();
 
   void create();
   void destroy();
-
+#if JVET_V0094_BILATERAL_FILTER
   void bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBuf& predBuf, PelBuf& recoBuf, int32_t qp, const CPelBuf& recIPredBuf, const ClpRng& clpRng, TransformUnit & currTU, bool useReco, bool doReshape, std::vector<Pel>& pLUT);
   
   void bilateralFilterPicRDOperCTU(CodingStructure& cs, PelUnitBuf& src,BIFCabacEst* BifCABACEstimator);
@@ -117,11 +156,28 @@ public:
 #if JVET_W0066_CCSAO
   void bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit& currTU);
 #endif
+#endif
   void clipNotBilaterallyFilteredBlocks(const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU);
-
+#if JVET_V0094_BILATERAL_FILTER
   const char* getFilterLutParameters( const int size, const PredMode predMode, const int qp, int& bfac );
+#endif
 
-#if ENABLE_SIMD_BILATERAL_FILTER
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  void bilateralFilterRDOdiamond5x5_chroma(PelBuf& resiBuf, const CPelBuf& predBuf, PelBuf& recoBuf, int32_t qp, const CPelBuf& recIPredBuf, const ClpRng& clpRng, TransformUnit & currTU, bool useReco, bool isCb);
+
+  void bilateralFilterPicRDOperCTU_chroma(CodingStructure& cs, PelUnitBuf& src, CBIFCabacEst* CBifCABACEstimator, bool isCb);
+
+  void bilateralFilterDiamond5x5_chroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb);
+
+  void clipNotBilaterallyFilteredBlocks_chroma(const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU, bool isCb);
+
+#if JVET_W0066_CCSAO
+    void bilateralFilterDiamond5x5NoClip_chroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb);
+#endif
+    const char* getFilterLutParameters_chroma( const int size, const PredMode predMode, const int qp, int& bfac, int width_for_strength, int height_for_strength, bool isLumaValid);
+#endif
+
+#if ENABLE_SIMD_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER_ENABLE_SIMD
 #ifdef TARGET_SIMD_X86
   template<X86_VEXT vext>
   static void simdFilterDiamond5x5( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr );

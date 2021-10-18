@@ -595,7 +595,7 @@ void SampleAdaptiveOffset::offsetBlock(const int channelBitDepth, const ClpRng& 
   }
 }
 
-#if JVET_V0094_BILATERAL_FILTER || JVET_W0066_CCSAO
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER || JVET_W0066_CCSAO
 void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const ClpRng& clpRng, int typeIdx, int* offset
                                              , const Pel* srcBlk, Pel* resBlk, int srcStride, int resStride,  int width, int height
                                              , bool isLeftAvail,  bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail)
@@ -884,7 +884,7 @@ void SampleAdaptiveOffset::offsetCTU( const UnitArea& area, const CPelUnitBuf& s
   } //compIdx
 }
 
-#if JVET_V0094_BILATERAL_FILTER || JVET_W0066_CCSAO
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER || JVET_W0066_CCSAO
 void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnitBuf& src, PelUnitBuf& res, SAOBlkParam& saoblkParam, CodingStructure& cs)
 {
   const uint32_t numberOfComponents = getNumberValidComponents( area.chromaFormat );
@@ -943,7 +943,7 @@ void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnit
         verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
       }
 #endif
-#if JVET_W0066_CCSAO    
+#if JVET_W0066_CCSAO
       // Do not clip the final output for both luma and chroma. Clipping is done jontly for SAO/BIF/CCSAO.
       
 	    offsetBlockNoClip(cs.sps->getBitDepth(toChannelType(compID)),
@@ -957,7 +957,11 @@ void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnit
 		  //                 , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
 	    );    
 #else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+      if(isLuma(compID) || isChroma(compID))
+#else
       if(compID == COMPONENT_Y)
+#endif
       {
         // If it is luma we should not clip, since we will clip
         // after BIF has been added.
@@ -996,12 +1000,11 @@ void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnit
 }
 #endif
 
-void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkParams
-                                      )
+void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkParams )
 {
   CHECK(!saoBlkParams, "No parameters present");
 
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   // In code without BIF, SAOProcess would not be run if 'SAO=0'.
   // However, in the BIF-enabled code, we still might go here if 'SAO=0' and 'BIF=1'.
   // Hence we must check getSAOEnabledFlag() for some of the function calls.
@@ -1015,7 +1018,7 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
 
   const uint32_t numberOfComponents = getNumberValidComponents(cs.area.chromaFormat);
   bool bAllDisabled = true;
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   // If 'SAO=0' we would not normally get here. However, now we might get
   // here if 'SAO=0' and 'BIF=1'. Hence we should only run this if
   // getSAOEnabledFlag() is true. Note that if getSAOEnabledFlag() is false,
@@ -1031,21 +1034,32 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
       bAllDisabled = false;
     }
   }
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   }
 #endif
   if (bAllDisabled)
   {
 #if JVET_V0094_BILATERAL_FILTER
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+    if(!cs.pps->getUseBIF() && !cs.pps->getUseCBIF())
+#else
     // Even if we are not doing SAO we might still need to do BIF
     // so we cannot return even if SAO is never used.
     if(!cs.pps->getUseBIF())
+#endif
     {
       // However, if we are not doing BIF it is safe to return.
       return;
     }
 #else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+    if(!cs.pps->getUseCBIF())
+    {
+        return;
+    }
+#else
     return;
+#endif
 #endif
   }
 
@@ -1068,7 +1082,6 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
       {
         offsetCTUnoClip( area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs );
       }
-
 #if JVET_V0094_BILATERAL_FILTER
       if (cs.pps->getUseBIF())
       {
@@ -1088,9 +1101,66 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
         }
       }
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+      if(cs.pps->getUseCBIF())
+      {
+        bool TU_VALID = false;
+        bool TU_CBF = false;
+        bool isDualTree = CS::isDualITree(cs);
+        ChannelType CType = isDualTree ? CH_C : CH_L;
+        bool BIF_chroma = false;
+        CBifParams& CBifParams = cs.picture->getCBifParam();
+
+        // And now we traverse the CTU to do BIF
+        for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CType), CType))
+        {
+            bool chroma_valid = currCU.Cb().valid() && currCU.Cr().valid();
+            if(!chroma_valid)
+            {
+                continue;
+            }
+            for (auto &currTU : CU::traverseTUs(currCU))
+            {
+                bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+
+                for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
+                {
+                    BIF_chroma = false;
+                    bool isCb = compIdx == COMPONENT_Cb ? true : false;
+                    ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+                    bool CTU_ON = isCb ? CBifParams.ctuOn_Cb[ctuRsAddr] : CBifParams.ctuOn_Cr[ctuRsAddr];
+
+                    if(!isDualTree)
+                    {
+                        TU_VALID = currTU.blocks[compIdx].valid();
+                        TU_CBF = false;//if CHROMA TU is not vaild, CBF must be zero
+                        if(TU_VALID)
+                        {
+                            TU_CBF = TU::getCbf(currTU, compID);
+                        }
+                        BIF_chroma = (CTU_ON && ((TU_CBF || isInter == false) && (currTU.cu->qp > 17)) && (TU_VALID));
+                    }
+                    else
+                    {
+                        TU_CBF = TU::getCbf(currTU, compID);
+                        BIF_chroma = (CTU_ON && (( TU_CBF || isInter == false) && (currTU.cu->qp > 17)));
+                    }
+                    if(BIF_chroma)
+                    {
+                        m_bilateralFilter.bilateralFilterDiamond5x5NoClip_chroma(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb);
+                    }
+                }
+            }
+        }
+    }
+#endif
 #else
 #if JVET_V0094_BILATERAL_FILTER
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+      if(cs.pps->getUseBIF() || cs.pps->getUseCBIF())
+#else
       if(cs.pps->getUseBIF())
+#endif
       {
         // We are using BIF, so we run SAO without clipping
         // However, if 'SAO=0', bAllDisabled=true and we should not run offsetCTUnoClip.
@@ -1105,6 +1175,22 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
         bool clipLumaIfNoBilat = false;
         if(!bAllDisabled && myCtbOffset.modeIdc != SAO_MODE_OFF)
           clipLumaIfNoBilat = true;
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+        SAOOffset& myCtbOffset_Cb     = mySAOblkParam[1];
+        SAOOffset& myCtbOffset_Cr     = mySAOblkParam[2];
+        CBifParams& CBifParams = cs.picture->getCBifParam();
+
+        bool clipChromaIfNoBilat_Cb = false;
+        bool clipChromaIfNoBilat_Cr = false;
+
+        if(!bAllDisabled && myCtbOffset_Cb.modeIdc != SAO_MODE_OFF)
+            clipChromaIfNoBilat_Cb = true;
+        if(!bAllDisabled && myCtbOffset_Cr.modeIdc != SAO_MODE_OFF)
+            clipChromaIfNoBilat_Cr = true;
+
+        if(cs.pps->getUseBIF())
+        {
+#endif
         
         // And now we traverse the CTU to do BIF
         for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
@@ -1125,6 +1211,102 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
             }
           }
         }
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+        } // BIF LUMA is disabled
+        else
+        {
+            for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
+            {
+                for (auto &currTU : CU::traverseTUs(currCU))
+                {
+                    if(clipLumaIfNoBilat)
+                    {
+                        m_bilateralFilter.clipNotBilaterallyFilteredBlocks(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Y), currTU);
+                    }
+                }
+            }
+        }
+        if(cs.pps->getUseCBIF())
+        {
+            bool TU_VALID = false;
+            bool TU_CBF = false;
+            bool isDualTree = CS::isDualITree(cs);
+            ChannelType CType = isDualTree ? CH_C : CH_L;
+            bool BIF_chroma = false;
+            // And now we traverse the CTU to do BIF
+            for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CType), CType))
+            {
+                bool chroma_valid = currCU.Cb().valid() && currCU.Cr().valid();
+                if(!chroma_valid)
+                {
+                    continue;
+                }
+                for (auto &currTU : CU::traverseTUs(currCU))
+                {
+                    bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+                    for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
+                    {
+                        bool isCb = compIdx == COMPONENT_Cb ? true : false;
+                        ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+                        bool CTU_ON = isCb ? CBifParams.ctuOn_Cb[ctuRsAddr] : CBifParams.ctuOn_Cr[ctuRsAddr];
+
+                        BIF_chroma = false;
+                        if(!isDualTree)
+                        {
+                            TU_VALID =  currTU.blocks[compIdx].valid();
+                            TU_CBF = false;//if CHROMA TU is not vaild, CBF must be zero
+                            if(TU_VALID)
+                            {
+                                TU_CBF =TU::getCbf(currTU, compID);
+                            }
+                            BIF_chroma = (CTU_ON && ((TU_CBF || isInter == false) && (currTU.cu->qp > 17)) && (TU_VALID));
+                        }
+                        else
+                        {
+                            TU_CBF = TU::getCbf(currTU, compID);
+                            BIF_chroma = (CTU_ON && ((TU_CBF || isInter == false) && (currTU.cu->qp > 17)));
+                        }
+
+                        if(BIF_chroma)
+                        {
+                            m_bilateralFilter.bilateralFilterDiamond5x5_chroma(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb);
+                        }
+                        else
+                        {
+                            bool use_clip = isCb ? clipChromaIfNoBilat_Cb : clipChromaIfNoBilat_Cr;
+                            if(use_clip && currTU.blocks[compIdx].valid())
+                                m_bilateralFilter.clipNotBilaterallyFilteredBlocks_chroma(m_tempBuf, rec, cs.slice->clpRng(compID), currTU, isCb);
+                        }
+                    }
+                }
+            }
+        }// BIF chroma is disabled
+        else
+        {
+            bool isDualTree = CS::isDualITree(cs);
+            ChannelType CType = isDualTree ? CH_C : CH_L;
+
+            for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CType), CType))
+            {
+                bool chroma_valid = currCU.Cb().valid() && currCU.Cr().valid();
+                if(!chroma_valid)
+                {
+                    continue;
+                }
+                for (auto &currTU : CU::traverseTUs(currCU))
+                {
+                    if(clipChromaIfNoBilat_Cb && currTU.blocks[COMPONENT_Cb].valid())
+                    {
+                        m_bilateralFilter.clipNotBilaterallyFilteredBlocks_chroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cb), currTU, true);
+                    }
+                    if(clipChromaIfNoBilat_Cr && currTU.blocks[COMPONENT_Cr].valid())
+                    {
+                        m_bilateralFilter.clipNotBilaterallyFilteredBlocks_chroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cr), currTU, false);
+                    }
+                  }
+              }
+          }
+#endif
       }
       else
       {
@@ -1132,7 +1314,131 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
         offsetCTU( area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs);
       }
 #else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+        if( !bAllDisabled )
+        {
+            offsetCTUnoClip( area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs);
+        }
+
+        SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
+        SAOOffset& myCtbOffset     = mySAOblkParam[0];
+
+        bool clipLumaIfNoBilat = false;
+        if(!bAllDisabled && myCtbOffset.modeIdc != SAO_MODE_OFF)
+        {
+            clipLumaIfNoBilat = true;
+        }
+
+        SAOOffset& myCtbOffset_Cb     = mySAOblkParam[1];
+        SAOOffset& myCtbOffset_Cr     = mySAOblkParam[2];
+        CBifParams& CBifParams = cs.picture->getCBifParam();
+
+        bool clipChromaIfNoBilat_Cb = false;
+        bool clipChromaIfNoBilat_Cr = false;
+
+        if(!bAllDisabled && myCtbOffset_Cb.modeIdc != SAO_MODE_OFF)
+        {
+            clipChromaIfNoBilat_Cb = true;
+        }
+        if(!bAllDisabled && myCtbOffset_Cr.modeIdc != SAO_MODE_OFF)
+        {
+            clipChromaIfNoBilat_Cr = true;
+        }
+
+        for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
+        {
+            for (auto &currTU : CU::traverseTUs(currCU))
+            {
+                if(clipLumaIfNoBilat)
+                {
+                    m_bilateralFilter.clipNotBilaterallyFilteredBlocks(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Y), currTU);
+                }
+            }
+        }
+
+        if(cs.pps->getUseCBIF())
+        {
+            bool TU_VALID = false;
+            bool TU_CBF = false;
+            bool isDualTree = CS::isDualITree(cs);
+            ChannelType CType = isDualTree ? CH_C : CH_L;
+            bool BIF_chroma = false;
+            // And now we traverse the CTU to do BIF
+            for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CType), CType))
+            {
+                bool chroma_valid = currCU.Cb().valid() && currCU.Cr().valid();
+                if(!chroma_valid)
+                {
+                    continue;
+                }
+                for (auto &currTU : CU::traverseTUs(currCU))
+                {
+                    bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+                    for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
+                    {
+                        bool isCb = compIdx == COMPONENT_Cb ? true : false;
+                        ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+                        bool CTU_ON = isCb ? CBifParams.ctuOn_Cb[ctuRsAddr] : CBifParams.ctuOn_Cr[ctuRsAddr];
+
+                        BIF_chroma = false;
+                        if(!isDualTree)
+                        {
+                            TU_VALID = currTU.blocks[compIdx].valid();
+                            TU_CBF = false;//if CHROMA TU is not vaild, CBF must be zero
+                            if(TU_VALID)
+                            {
+                                TU_CBF = TU::getCbf(currTU, compID);
+                            }
+                            BIF_chroma = (CTU_ON && ((TU_CBF || isInter == false) && (currTU.cu->qp > 17)) && (TU_VALID));
+                        }
+                        else
+                        {
+                            TU_CBF = TU::getCbf(currTU, compID);
+                            BIF_chroma = (CTU_ON && ((TU_CBF || isInter == false) && (currTU.cu->qp > 17)));
+                        }
+                        if(BIF_chroma)
+                        {
+                            m_bilateralFilter.bilateralFilterDiamond5x5_chroma(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb);
+                        }
+                        else
+                        {
+                            bool use_clip = isCb ? clipChromaIfNoBilat_Cb : clipChromaIfNoBilat_Cr;
+                            if(use_clip && currTU.blocks[compIdx].valid())
+                            {
+                                m_bilateralFilter.clipNotBilaterallyFilteredBlocks_chroma(m_tempBuf, rec, cs.slice->clpRng(compID), currTU, true);
+                            }
+                        }
+                    }
+                }
+            }
+        }// BIF chroma off
+        else
+        {
+            bool isDualTree = CS::isDualITree(cs);
+            ChannelType CType = isDualTree ? CH_C : CH_L;
+            for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CType), CType))
+            {
+                bool chroma_valid = currCU.Cb().valid() && currCU.Cr().valid();
+                if(!chroma_valid)
+                {
+                    continue;
+                }
+                for (auto &currTU : CU::traverseTUs(currCU))
+                {
+                    if(clipChromaIfNoBilat_Cb && currTU.blocks[COMPONENT_Cb].valid())
+                    {
+                        m_bilateralFilter.clipNotBilaterallyFilteredBlocks_chroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cb), currTU, true);
+                    }
+                    if(clipChromaIfNoBilat_Cr && currTU.blocks[COMPONENT_Cr].valid())
+                    {
+                        m_bilateralFilter.clipNotBilaterallyFilteredBlocks_chroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cr), currTU, false);
+                    }
+                }
+            }
+        }
+#else
       offsetCTU( area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs);
+#endif
 #endif
 #endif
       ctuRsAddr++;
@@ -1194,16 +1500,21 @@ void SampleAdaptiveOffset::applyCcSao(CodingStructure &cs, const PreCalcValues& 
 void SampleAdaptiveOffset::jointClipSaoBifCcSao(CodingStructure& cs)
 {
 #if JVET_V0094_BILATERAL_FILTER
-  if( !cs.sps->getSAOEnabledFlag() && !cs.pps->getUseBIF() && !cs.sps->getCCSAOEnabledFlag() )
-  {
-    return;
-  }
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if (!cs.sps->getSAOEnabledFlag() && !cs.pps->getUseBIF() && !cs.pps->getUseCBIF() && !cs.sps->getCCSAOEnabledFlag())
 #else
-  if( !cs.sps->getSAOEnabledFlag() && !cs.sps->getCCSAOEnabledFlag() )
+  if (!cs.sps->getSAOEnabledFlag() && !cs.pps->getUseBIF() && !cs.sps->getCCSAOEnabledFlag())
+#endif
+#else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if (!cs.sps->getSAOEnabledFlag() && !cs.sps->getCCSAOEnabledFlag() && !cs.pps->getUseCBIF())
+#else
+  if (!cs.sps->getSAOEnabledFlag() && !cs.sps->getCCSAOEnabledFlag())
+#endif
+#endif
   {
     return;
   }
-#endif
 
   const PreCalcValues& pcv = *cs.pcv;
   PelUnitBuf dstYuv = cs.getRecoBuf();
@@ -1263,6 +1574,60 @@ void SampleAdaptiveOffset::jointClipSaoBifCcSao(CodingStructure& cs)
               }
             }
           }
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+          if(cs.pps->getUseCBIF())
+          {
+            if(compIdx == COMPONENT_Cb || compIdx == COMPONENT_Cr)
+            {
+                CBifParams& CBifParams = cs.picture->getCBifParam();
+                bool isCb = compIdx == COMPONENT_Cb ? true : false;
+                ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+
+                bool TU_VALID = false;
+                bool TU_CBF = false;
+                bool CTU_ON = false;
+                bool isDualTree = CS::isDualITree(cs);
+                ChannelType CType = isDualTree ? CH_C : CH_L;
+                bool BIF_chroma = false;
+                for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CType), CType))
+                {
+                    bool chroma_valid = currCU.Cb().valid() && currCU.Cr().valid();
+                    if(!chroma_valid)
+                    {
+                        continue;
+                    }
+
+                    for (auto &currTU : CU::traverseTUs(currCU))
+                    {
+                        bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+                        //Cb or Cr
+                        BIF_chroma = false;
+                        CTU_ON = isCb ? CBifParams.ctuOn_Cb[ctuRsAddr] : CBifParams.ctuOn_Cr[ctuRsAddr];
+
+                        if(!isDualTree)
+                        {
+                            TU_VALID = currTU.blocks[compIdx].valid();
+                            TU_CBF = false;//if CHROMA TU is not vaild, CBF must be zero
+                            if(TU_VALID)
+                            {
+                                TU_CBF = TU::getCbf(currTU, compID);
+                            }
+                            BIF_chroma = (CTU_ON && ((TU_CBF || isInter == false) && (currTU.cu->qp > 17)) && (TU_VALID));
+                        }
+                        else
+                        {
+                            TU_CBF = TU::getCbf(currTU, compID);
+                            BIF_chroma = (CTU_ON && ((TU_CBF || isInter == false) && (currTU.cu->qp > 17)));
+                        }
+                        if(BIF_chroma)
+                        {
+                            m_bilateralFilter.clipNotBilaterallyFilteredBlocks_chroma(m_tempBuf, dstYuv, cs.slice->clpRng(compID) , currTU, isCb);
+                        }
+                    }
+                }
+            }
+          }
+#endif
         }
 #endif
       }

@@ -314,7 +314,17 @@ public:
     std::fill(m_BifParams.ctuOn.begin(), m_BifParams.ctuOn.end(), 0);
   };
 #endif
-  
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  CBifParams&       getCBifParam() { return m_CBifParams; }
+  void resizeBIF_Chroma(unsigned numEntries)
+  {
+    m_CBifParams.numBlocks = numEntries;
+    m_CBifParams.ctuOn_Cb.resize(numEntries);
+    m_CBifParams.ctuOn_Cr.resize(numEntries);
+    std::fill(m_CBifParams.ctuOn_Cb.begin(), m_CBifParams.ctuOn_Cb.end(), 0);
+    std::fill(m_CBifParams.ctuOn_Cr.begin(), m_CBifParams.ctuOn_Cr.end(), 0);
+  }
+#endif
 #if ENABLE_QPA
   std::vector<double>     m_uEnerHpCtu;                         ///< CTU-wise L2 or squared L1 norm of high-passed luma input
   std::vector<Pel>        m_iOffsetCtu;                         ///< CTU-wise DC offset (later QP index offset) of luma input
@@ -327,7 +337,9 @@ public:
 #if JVET_V0094_BILATERAL_FILTER
   static BifParams        m_BifParams;
 #endif
-
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  static CBifParams       m_CBifParams;
+#endif
   std::vector<uint8_t> m_alfCtuEnableFlag[MAX_NUM_COMPONENT];
   uint8_t* getAlfCtuEnableFlag( int compIdx ) { return m_alfCtuEnableFlag[compIdx].data(); }
   std::vector<uint8_t>* getAlfCtuEnableFlag() { return m_alfCtuEnableFlag; }

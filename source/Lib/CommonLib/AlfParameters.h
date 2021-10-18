@@ -195,9 +195,15 @@ struct AlfFilterShape
     else if( size == size_CC_ALF )
     {
       size = 4;
+#if JVET_X0071_LONGER_CCALF
+      filterLength = MAX_NUM_CC_ALF_CHROMA_COEFF;
+      numCoeff = MAX_NUM_CC_ALF_CHROMA_COEFF;
+      filterSize = MAX_NUM_CC_ALF_CHROMA_COEFF;
+#else
       filterLength = 8;
       numCoeff = 8;
       filterSize = 8;
+#endif
       filterType   = CC_ALF;
     }
     else
@@ -224,6 +230,9 @@ struct AlfParam
 {
   bool                         enabledFlag[MAX_NUM_COMPONENT];                          // alf_slice_enable_flag, alf_chroma_idc
 #if ALF_IMPROVEMENT
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+  char                         lumaClassifierIdx[MAX_NUM_ALF_ALTERNATIVES_LUMA];
+#endif
   AlfFilterType                filterType[MAX_NUM_CHANNEL_TYPE];
   bool                         nonLinearFlag[MAX_NUM_CHANNEL_TYPE][32]; // alf_[luma/chroma]_clip_flag
   int                          numAlternativesLuma;
@@ -267,6 +276,9 @@ struct AlfParam
   {
     std::memset( enabledFlag, false, sizeof( enabledFlag ) );
     std::memset( nonLinearFlag, false, sizeof( nonLinearFlag ) );
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+    std::memset( lumaClassifierIdx, 0, sizeof( lumaClassifierIdx ) );
+#endif
     std::memset( lumaCoeff, 0, sizeof( lumaCoeff ) );
     std::memset( lumaClipp, 0, sizeof( lumaClipp ) );
     numAlternativesChroma = 1;
@@ -292,6 +304,9 @@ struct AlfParam
   {
     std::memcpy( enabledFlag, src.enabledFlag, sizeof( enabledFlag ) );
     std::memcpy( nonLinearFlag, src.nonLinearFlag, sizeof( nonLinearFlag ) );
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+    std::memcpy( lumaClassifierIdx, src.lumaClassifierIdx, sizeof( lumaClassifierIdx ) );
+#endif
     std::memcpy( lumaCoeff, src.lumaCoeff, sizeof( lumaCoeff ) );
     std::memcpy( lumaClipp, src.lumaClipp, sizeof( lumaClipp ) );
     numAlternativesChroma = src.numAlternativesChroma;
@@ -327,6 +342,12 @@ struct AlfParam
     {
       return false;
     }
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+    if( memcmp( lumaClassifierIdx, other.lumaClassifierIdx, sizeof( lumaClassifierIdx ) ) )
+    {
+      return false;
+    }
+#endif
 #endif
     if( memcmp( lumaCoeff, other.lumaCoeff, sizeof( lumaCoeff ) ) )
     {

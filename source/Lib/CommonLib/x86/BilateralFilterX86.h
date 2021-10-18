@@ -43,7 +43,7 @@
 #include <x86intrin.h>
 #endif
 
-#if ENABLE_SIMD_BILATERAL_FILTER
+#if ENABLE_SIMD_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER_ENABLE_SIMD
 #if JVET_W0066_CCSAO
 template<X86_VEXT vext>
 void BilateralFilter::simdFilterDiamond5x5NoClip(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr)

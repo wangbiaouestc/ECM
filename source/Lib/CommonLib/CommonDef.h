@@ -124,7 +124,7 @@ static const int AFFINE_ME_LIST_SIZE =                             4;
 static const int AFFINE_ME_LIST_SIZE_LD =                          3;
 static const double AFFINE_ME_LIST_MVP_TH =                        1.0;
 
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
 static const int32_t NUMBER_PADDED_SAMPLES =  2;
 static const int32_t BIF_ROUND_ADD =         32;
 static const int32_t BIF_ROUND_SHIFT =        6;
@@ -237,8 +237,13 @@ static const int MAX_ALF_FILTER_LENGTH       =                      7;
 #endif
 static const int MAX_NUM_ALF_COEFF           =                     MAX_ALF_FILTER_LENGTH * MAX_ALF_FILTER_LENGTH / 2 + 1;
 static const int MAX_ALF_PADDING_SIZE        =                      4;
+#if JVET_X0071_LONGER_CCALF
+#define MAX_NUM_CC_ALF_FILTERS                                      16
+static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               25;
+#else
 #define MAX_NUM_CC_ALF_FILTERS                                      4
 static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               8;
+#endif
 static constexpr int CCALF_DYNAMIC_RANGE            =               6;
 static constexpr int CCALF_BITS_PER_COEFF_LEVEL     =               3;
 
@@ -247,6 +252,11 @@ static const int ALF_CTB_MAX_NUM_APS         =                      8;
 #if ALF_IMPROVEMENT
 static const int ALF_ORDER                   =                      4;
 static const int NUM_FIXED_FILTER_SETS       =                      2;
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+static const int ALF_NUM_CLASSIFIER          =                      2;
+static const int ALF_CLASSES_NEW             =                     25;
+static const int ALF_NUM_CLASSES_CLASSIFIER[ALF_NUM_CLASSIFIER] = { MAX_NUM_ALF_CLASSES,  ALF_CLASSES_NEW };
+#endif
 #else 
 static const int NUM_FIXED_FILTER_SETS       =                     16;
 static const int NUM_TOTAL_FILTER_SETS       =                     NUM_FIXED_FILTER_SETS + ALF_CTB_MAX_NUM_APS;

@@ -42,7 +42,7 @@
 #include "CommonLib/TrQuant.h"
 #include "CommonLib/LoopFilter.h"
 #include "CommonLib/NAL.h"
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
 #include "CommonLib/BilateralFilter.h"
 #endif
 
@@ -91,12 +91,12 @@ private:
 #endif
   // coding tool
 #if ENABLE_SPLIT_PARALLELISM
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   BilateralFilter          *m_bilateralFilter;
 #endif
   TrQuant                  *m_cTrQuant;                           ///< transform & quantization class
 #else
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   BilateralFilter           m_bilateralFilter;
 #endif
   TrQuant                   m_cTrQuant;                           ///< transform & quantization class
@@ -205,7 +205,7 @@ public:
   InterSearch*            getInterSearch        ( int jId = 0 ) { return  &m_cInterSearch[jId];    }
   IntraSearch*            getIntraSearch        ( int jId = 0 ) { return  &m_cIntraSearch[jId];    }
 
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   BilateralFilter*        getBilateralFilter    ( int jId = 0 ) { return  &m_bilateralFilter[jId]; }
 #endif
   TrQuant*                getTrQuant            ( int jId = 0 ) { return  &m_cTrQuant[jId];        }
@@ -213,7 +213,7 @@ public:
   InterSearch*            getInterSearch        ()              { return  &m_cInterSearch;         }
   IntraSearch*            getIntraSearch        ()              { return  &m_cIntraSearch;         }
 
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   BilateralFilter*        getBilateralFilter    ()              { return  &m_bilateralFilter;      }
 #endif
   TrQuant*                getTrQuant            ()              { return  &m_cTrQuant;             }

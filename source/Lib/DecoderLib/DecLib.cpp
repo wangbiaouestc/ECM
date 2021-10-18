@@ -193,11 +193,19 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 else
                 {
 #if JVET_V0094_BILATERAL_FILTER
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+                if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseBIF() || pic->cs->pps->getUseCBIF())
+#else
                 // Since the per-CTU BIF parameter is stored in SAO, we need to
                 // do this copy even if SAO=0, if BIF=1.
                 if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseBIF() )
+#endif
+#else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+                if ( pic->cs->sps->getSAOEnabledFlag()  || pic->cs->pps->getUseCBIF())
 #else
                 if ( pic->cs->sps->getSAOEnabledFlag() )
+#endif
 #endif
                 {
                   pcEncPic->copySAO( *pic, 0 );
@@ -252,11 +260,19 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
 
                 pcDecLib->executeLoopFilters();
 #if JVET_V0094_BILATERAL_FILTER
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+                if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseBIF() || pic->cs->pps->getUseCBIF())
+#else
                 // Since the per-CTU BIF parameter is stored in SAO, we need to
                 // do this copy even if SAO=0, if BIF=1.
                 if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseBIF() )
+#endif
+#else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+                if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseCBIF())
 #else
                 if ( pic->cs->sps->getSAOEnabledFlag() )
+#endif
 #endif
                 {
                   pcEncPic->copySAO( *pic, 1 );
@@ -518,7 +534,7 @@ void DecLib::create()
 {
   m_apcSlicePilot = new Slice;
   m_uiSliceSegmentIdx = 0;
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   m_cBilateralFilter.create();
 #endif
 }
@@ -535,7 +551,7 @@ void DecLib::destroy()
   }
 
   m_cSliceDecoder.destroy();
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   m_cBilateralFilter.destroy();
 #endif
 }
@@ -701,9 +717,17 @@ void DecLib::executeLoopFilters()
 #endif
 
 #if JVET_V0094_BILATERAL_FILTER
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if( cs.sps->getSAOEnabledFlag() || cs.pps->getUseBIF() || cs.pps->getUseCBIF())
+#else
   if( cs.sps->getSAOEnabledFlag() || cs.pps->getUseBIF())
+#endif
+#else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if( cs.sps->getSAOEnabledFlag() || cs.pps->getUseCBIF())
 #else
   if( cs.sps->getSAOEnabledFlag() )
+#endif
 #endif
   {
     m_cSAO.SAOProcess( cs, cs.picture->getSAO() );
