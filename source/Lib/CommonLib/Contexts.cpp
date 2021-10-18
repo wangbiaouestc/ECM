@@ -1184,9 +1184,9 @@ const CtxSet ContextSetCfg::MultiHypothesisFlag = ContextSetCfg::addCtxSet
   { 3, 26, CNU, },
   { 3, 26, CNU, },
   { 35, 35, CNU, },
-  { 1,  4, CNU, },
-  { 1,  4, CNU, },
-  { 4,  4, CNU, }
+  { 1,  4, DWS, },
+  { 1,  4, DWS, },
+  { 4,  4, DWS, }
 });
 
 const CtxSet ContextSetCfg::MHRefPic = ContextSetCfg::addCtxSet
@@ -1533,6 +1533,8 @@ const CtxSet ContextSetCfg::CcSaoControlIdc = ContextSetCfg::addCtxSet
   { CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, },
   { CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, },
   { CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, },
+  { DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, },
+  { DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, },
   { DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, },
 });
 #endif
