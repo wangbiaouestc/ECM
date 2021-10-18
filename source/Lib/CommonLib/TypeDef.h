@@ -55,8 +55,6 @@
 #define TOOLS                                             1
 
 
-#define RPR_ENABLE                                        1 // JVET-X0121: Fixes for RRP
-
 #if BASE_ENCODER
 // Lossy encoder speedups
 #define AFFINE_ENC_OPT                                    1 // Affine encoder optimization
@@ -67,8 +65,8 @@
 #define REMOVE_PCM                                        1 // Remove PCM related code for memory reduction and speedup
 
 // SIMD optimizations
-#define MCIF_SIMD_NEW                                     1
-#define DIST_SSE_ENABLE                                   1
+#define MCIF_SIMD_NEW                                     1 // SIMD for interpolation
+#define DIST_SSE_ENABLE                                   1 // Enable SIMD for SSE
 #define TRANSFORM_SIMD_OPT                                1 // SIMD optimization for transform
 #endif
 
@@ -131,10 +129,13 @@
 #define JVET_X0056_DMVD_EARLY_TERMINATION                 1 // JVET-X0056: Early termination for DMVR and TM
 
 // Inter template matching tools
-#define TM_AMVP                                           1 // Add template  matching to non-subblock inter to refine regular AMVP candidates
-#define TM_MRG                                            1 // Add template  matching to non-subblock inter to refine regular merge candidates
-#define JVET_W0097_GPM_MMVD_TM                            1 // JVET-W0097: GPM-MMVD and GPM-TM
+#define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
+#if ENABLE_INTER_TEMPLATE_MATCHING
+#define TM_AMVP                                           1 // Add template matching to non-subblock inter to refine regular AMVP candidates
+#define TM_MRG                                            1 // Add template matching to non-subblock inter to refine regular merge candidates
 #define JVET_W0090_ARMC_TM                                1 // JVET-W0090: Adaptive reordering of merge candidates with template matching
+#endif
+#define JVET_W0097_GPM_MMVD_TM                            1 // JVET-W0097: GPM-MMVD and GPM-TM, GPM-TM part is controlled by TM_MRG
 
 // Transform and coefficient coding
 #define TCQ_8STATES                                       1
@@ -156,10 +157,10 @@
 #define ALF_IMPROVEMENT                                   1 // ALF improvement
 #define EMBEDDED_APS                                      1 // Embed APS into picture header
 #define JVET_V0094_BILATERAL_FILTER                       1 // Bilateral filter
+#define JVET_X0071_CHROMA_BILATERAL_FILTER                1 // JVET-X0071/JVET-X0067: Chroma bilateral filter
 #define JVET_W0066_CCSAO                                  1 // JVET-W0066: Cross-component sample adaptive offset
 #define JVET_X0071_LONGER_CCALF                           1 // JVET-X0071/JVET-X0045: Longer filter for CCALF
 #define JVET_X0071_ALF_BAND_CLASSIFIER                    1 // JVET-X0071/JVET-X0070: Alternative band classifier for ALF
-#define JVET_X0071_CHROMA_BILATERAL_FILTER                1 // JVET-X0071/JVET-X0067: Chroma bilateral filter
 
 // SIMD optimizations
 #if IF_12TAP
@@ -182,6 +183,8 @@
 #endif
 #endif // tools
 
+// Software extensions
+#define RPR_ENABLE                                        1 // JVET-X0121: Fixes for RRP
 
 
 
