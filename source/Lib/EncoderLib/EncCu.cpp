@@ -3918,6 +3918,40 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #else
           uint32_t bufIdx = 0;
 #endif
+#if JVET_X0090_CIIP_FIX
+          m_pcInterSearch->motionCompensation(pu);
+#if ENABLE_OBMC
+          cu.isobmcMC = true;
+          cu.obmcFlag = true;
+          m_pcInterSearch->subBlockOBMC(pu);
+          cu.isobmcMC = false;
+#endif
+          if (cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+          {
+            m_pcIntraSearch->geneWeightedPred<true>(COMPONENT_Y, tempCS->getPredBuf(pu).Y(), pu, tempCS->getPredBuf(pu).Y(), m_ciipBuffer[bufIdx].getBuf(localUnitArea.Y()), m_pcReshape->getFwdLUT().data());
+          }
+          else
+          {
+            m_pcIntraSearch->geneWeightedPred<false>(COMPONENT_Y, tempCS->getPredBuf(pu).Y(), pu, tempCS->getPredBuf(pu).Y(), m_ciipBuffer[bufIdx].getBuf(localUnitArea.Y()));
+          }
+
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+          if (isChromaEnabled(pu.chromaFormat))
+#else
+          if (isChromaEnabled(pu.chromaFormat) && pu.chromaSize().width > 2)
+#endif
+          {
+            m_pcIntraSearch->geneWeightedPred<false>(COMPONENT_Cb, tempCS->getPredBuf(pu).Cb(), pu, tempCS->getPredBuf(pu).Cb(), m_ciipBuffer[bufIdx].getBuf(localUnitArea.Cb()));
+            m_pcIntraSearch->geneWeightedPred<false>(COMPONENT_Cr, tempCS->getPredBuf(pu).Cr(), pu, tempCS->getPredBuf(pu).Cr(), m_ciipBuffer[bufIdx].getBuf(localUnitArea.Cr()));
+          }
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+          else if (isChromaEnabled(pu.chromaFormat))
+          {
+            tempCS->getPredBuf().Cb().copyFrom(tempCS->getPredBuf(pu).Cb());
+            tempCS->getPredBuf().Cr().copyFrom(tempCS->getPredBuf(pu).Cr());
+          }
+#endif
+#else
           // Luma CIIP was already done in SATD check stage and stored
           tempCS->getPredBuf().Y().copyFrom( acMergeTempBuffer[uiMrgHADIdx]->Y() );
 
@@ -3936,6 +3970,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             tempCS->getPredBuf().Cb().copyFrom(acMergeTmpBuffer[uiMergeCand].Cb());
             tempCS->getPredBuf().Cr().copyFrom(acMergeTmpBuffer[uiMergeCand].Cr());
           }
+#endif
 #endif
         }
         else
@@ -4078,7 +4113,14 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if ENABLE_OBMC
       cu.isobmcMC = true;
       cu.obmcFlag = true;
+#if JVET_X0090_CIIP_FIX
+      if (!pu.ciipFlag)
+      {
+        m_pcInterSearch->subBlockOBMC(pu);
+      }
+#else
       m_pcInterSearch->subBlockOBMC( pu );
+#endif
       cu.isobmcMC = false;
 #endif
 
