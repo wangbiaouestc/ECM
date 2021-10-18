@@ -3396,6 +3396,11 @@ PPS::PPS()
 , m_BIFStrength                      (1)
 , m_BIFQPOffset                      (0)
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+, m_CBIF                              (false)
+, m_CBIFStrength                      (1)
+, m_CBIFQPOffset                      (0)
+#endif
 , pcv                                (NULL)
 {
   m_ChromaQpAdjTableIncludingNullEntry[0].u.comp.CbOffset = 0; // Array includes entry [0] for the null offset used when cu_chroma_qp_offset_flag=0. This is initialised here and never subsequently changed.

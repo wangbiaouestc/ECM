@@ -178,7 +178,69 @@ void CABACWriter::bif(const Slice& slice, const BifParams& bifParams, unsigned c
   }
 }
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+void CABACWriter::Cbif_Cb(const Slice& slice, const CBifParams& CBifParams)
+{
+    for (int i = 0; i < CBifParams.numBlocks; ++i)
+    {
+        Cbif_Cb(slice, CBifParams, i);
+    }
+}
 
+void CABACWriter::Cbif_Cb(const Slice& slice, const CBifParams& CBifParams, unsigned ctuRsAddr)
+{
+    const PPS& pps = *slice.getPPS();
+    if (!pps.getUseCBIF())
+    {
+        return;
+    }
+
+    if (ctuRsAddr == 0)
+    {
+        m_BinEncoder.encodeBinEP(CBifParams.allCtuOn_Cb);
+        if (CBifParams.allCtuOn_Cb == 0)
+        {
+            m_BinEncoder.encodeBinEP(CBifParams.frmOn_Cb);
+        }
+    }
+    if (CBifParams.allCtuOn_Cb == 0 && CBifParams.frmOn_Cb)
+    {
+        int i = ctuRsAddr;
+        m_BinEncoder.encodeBin(CBifParams.ctuOn_Cb[i], Ctx::CBifCtrlFlags_Cb());
+    }
+}
+
+void CABACWriter::Cbif_Cr(const Slice& slice, const CBifParams& CBifParams)
+{
+    for (int i = 0; i < CBifParams.numBlocks; ++i)
+    {
+        Cbif_Cr(slice, CBifParams, i);
+    }
+}
+
+void CABACWriter::Cbif_Cr(const Slice& slice, const CBifParams& CBifParams, unsigned ctuRsAddr)
+{
+    const PPS& pps = *slice.getPPS();
+    if (!pps.getUseCBIF())
+    {
+        return;
+    }
+
+    if (ctuRsAddr == 0)
+    {
+        m_BinEncoder.encodeBinEP(CBifParams.allCtuOn_Cr);
+        if (CBifParams.allCtuOn_Cr == 0)
+        {
+            m_BinEncoder.encodeBinEP(CBifParams.frmOn_Cr);
+        }
+    }
+    if (CBifParams.allCtuOn_Cr == 0 && CBifParams.frmOn_Cr)
+    {
+        int i = ctuRsAddr;
+        m_BinEncoder.encodeBin(CBifParams.ctuOn_Cr[i], Ctx::CBifCtrlFlags_Cr());
+    }
+}
+#endif
 
 //================================================================================
 //  clause 7.3.8.2
@@ -4616,6 +4678,54 @@ void CABACWriter::codeAlfCtuEnableFlag( CodingStructure& cs, uint32_t ctuRsAddr,
   }
 }
 
+
+#if JVET_X0071_LONGER_CCALF
+void CABACWriter::codeCcAlfFilterControlIdc(uint8_t idcVal, CodingStructure &cs, const ComponentID compID,
+  const int curIdx, const uint8_t *filterControlIdc, Position lumaPos,
+  const int filterCount)
+{
+  CHECK(idcVal > filterCount, "Filter index is too large");
+
+  const uint32_t curSliceIdx = cs.slice->getIndependentSliceIdx();
+  const uint32_t curTileIdx = cs.pps->getTileIdx(lumaPos);
+  Position       leftLumaPos = lumaPos.offset(-(int)cs.pcv->maxCUWidth, 0);
+  Position       aboveLumaPos = lumaPos.offset(0, -(int)cs.pcv->maxCUWidth);
+  bool           leftAvail = cs.getCURestricted(leftLumaPos, lumaPos, curSliceIdx, curTileIdx, CH_L) ? true : false;
+  bool           aboveAvail = cs.getCURestricted(aboveLumaPos, lumaPos, curSliceIdx, curTileIdx, CH_L) ? true : false;
+  int            ctxt = 0;
+
+  if (leftAvail)
+  {
+    ctxt += (filterControlIdc[curIdx - 1] != 1) ? 1 : 0;
+  }
+  if (aboveAvail)
+  {
+    ctxt += (filterControlIdc[curIdx - cs.pcv->widthInCtus] != 1) ? 1 : 0;
+  }
+  ctxt += (compID == COMPONENT_Cr) ? 3 : 0;
+
+  int       pos0 = 1;
+  unsigned  mappedIdc = (idcVal == 0 ? pos0 : idcVal <= pos0 ? idcVal - 1 : idcVal);
+
+  m_BinEncoder.encodeBin((mappedIdc == 0) ? 0 : 1, Ctx::CcAlfFilterControlFlag(ctxt)); // ON/OFF flag is context coded
+  if (mappedIdc > 0)
+  {
+    int val = (mappedIdc - 1);
+    while (val)
+    {
+      m_BinEncoder.encodeBinEP(1);
+      val--;
+    }
+    if (mappedIdc < filterCount)
+    {
+      m_BinEncoder.encodeBinEP(0);
+    }
+  }
+  DTRACE(g_trace_ctx, D_SYNTAX, "ccAlfFilterControlIdc() compID=%d pos=(%d,%d) ctxt=%d, filterCount=%d, idcVal=%d\n", compID, lumaPos.x, lumaPos.y, ctxt, filterCount, idcVal);
+}
+
+#else
+
 void CABACWriter::codeCcAlfFilterControlIdc(uint8_t idcVal, CodingStructure &cs, const ComponentID compID,
                                             const int curIdx, const uint8_t *filterControlIdc, Position lumaPos,
                                             const int filterCount)
@@ -4656,6 +4766,10 @@ void CABACWriter::codeCcAlfFilterControlIdc(uint8_t idcVal, CodingStructure &cs,
   }
   DTRACE( g_trace_ctx, D_SYNTAX, "ccAlfFilterControlIdc() compID=%d pos=(%d,%d) ctxt=%d, filterCount=%d, idcVal=%d\n", compID, lumaPos.x, lumaPos.y, ctxt, filterCount, idcVal );
 }
+
+#endif
+
+
 
 void CABACWriter::code_unary_fixed( unsigned symbol, unsigned ctxId, unsigned unary_max, unsigned fixed )
 {

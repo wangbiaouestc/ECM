@@ -810,6 +810,14 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
     READ_SVLC( iCode, "bilateral_filter_qp_offset" );                  pcPPS->setBIFQPOffset( iCode);
   }
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  READ_FLAG( uiCode, "chroma bilateral_filter_flag" );             pcPPS->setUseCBIF(uiCode != 0) ;
+  if(pcPPS->getUseCBIF())
+  {
+    READ_CODE( 2, uiCode, "chroma bilateral_filter_strength" );    pcPPS->setCBIFStrength( uiCode);
+    READ_SVLC( iCode, "chroma bilateral_filter_qp_offset" );       pcPPS->setCBIFQPOffset( iCode);
+  }
+#endif
   
 #if !JVET_S0132_HLS_REORDER
   READ_FLAG( uiCode, "weighted_pred_flag" );          // Use of Weighting Prediction (P_SLICE)
@@ -1079,6 +1087,10 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
     param.filterType[CHANNEL_TYPE_LUMA] = code ? ALF_FILTER_9_EXT : ALF_FILTER_EXT;
     for (int altIdx = 0; altIdx < param.numAlternativesLuma; ++altIdx)
     {
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+      READ_FLAG(code, "alf_luma_classifier");
+      param.lumaClassifierIdx[altIdx] = code;
+#endif
       READ_FLAG(code, "alf_luma_clip");
       param.nonLinearFlag[CHANNEL_TYPE_LUMA][altIdx] = code ? true : false;
       READ_UVLC(code, "alf_luma_num_filters_signalled_minus1");
@@ -1086,7 +1098,11 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
       if (param.numLumaFilters[altIdx] > 1)
       {
         const int length = ceilLog2(param.numLumaFilters[altIdx]);
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+        for (int i = 0; i < ALF_NUM_CLASSES_CLASSIFIER[(int)param.lumaClassifierIdx[altIdx]]; i++)
+#else
         for (int i = 0; i < MAX_NUM_ALF_CLASSES; i++)
+#endif
         {
           READ_CODE(length, code, "alf_luma_coeff_delta_idx");
           param.filterCoeffDeltaIdx[altIdx][i] = code;
@@ -1188,7 +1204,7 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
         short *coeff = ccAlfParam.ccAlfCoeff[ccIdx][filterIdx];
         // Filter coefficients
         for (int i = 0; i < alfShape.numCoeff - 1; i++)
-        {
+        {          
           READ_CODE(CCALF_BITS_PER_COEFF_LEVEL, code,
                     ccIdx == 0 ? "alf_cc_cb_mapped_coeff_abs" : "alf_cc_cr_mapped_coeff_abs");
           if (code == 0)
@@ -4144,6 +4160,7 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
   {
     READ_FLAG(uiCode, "slice_alf_enabled_flag");
     pcSlice->setTileGroupAlfEnabledFlag(COMPONENT_Y, uiCode);
+
     int alfCbEnabledFlag = 0;
     int alfCrEnabledFlag = 0;
 
@@ -4199,6 +4216,7 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
     {
       READ_FLAG(uiCode, "slice_cc_alf_cb_enabled_flag");
       pcSlice->setTileGroupCcAlfCbEnabledFlag(uiCode);
+
       filterParam.ccAlfFilterEnabled[COMPONENT_Cb - 1] = (uiCode == 1) ? true : false;
       pcSlice->setTileGroupCcAlfCbApsId(-1);
       if (filterParam.ccAlfFilterEnabled[COMPONENT_Cb - 1])

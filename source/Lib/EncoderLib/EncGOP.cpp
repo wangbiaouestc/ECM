@@ -178,7 +178,7 @@ void  EncGOP::create()
 {
   m_bLongtermTestPictureHasBeenCoded = 0;
   m_bLongtermTestPictureHasBeenCoded2 = 0;
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   m_cBilateralFilter.create();
 #endif
 }
@@ -205,7 +205,7 @@ void  EncGOP::destroy()
     delete m_picOrig;
     m_picOrig = NULL;
   }
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   m_cBilateralFilter.destroy();
 #endif
 }
@@ -1968,7 +1968,31 @@ public:
   }
 };
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+class CBIFCabacEstImp : public CBIFCabacEst
+{
+    CABACWriter* CABACEstimator;
+public:
+    CBIFCabacEstImp(CABACWriter* _CABACEstimator) : CABACEstimator(_CABACEstimator) {};
+    virtual ~CBIFCabacEstImp() {};
 
+    virtual uint64_t getBits_Cb(const Slice& slice, const CBifParams& htdfParams)
+    {
+        CABACEstimator->initCtxModels(slice);
+        CABACEstimator->resetBits();
+        CABACEstimator->Cbif_Cb(slice, htdfParams);
+        return CABACEstimator->getEstFracBits();
+    }
+
+    virtual uint64_t getBits_Cr(const Slice& slice, const CBifParams& htdfParams)
+    {
+        CABACEstimator->initCtxModels(slice);
+        CABACEstimator->resetBits();
+        CABACEstimator->Cbif_Cr(slice, htdfParams);
+        return CABACEstimator->getEstFracBits();
+    }
+};
+#endif
 
 // ====================================================================================================================
 // Public member functions
@@ -2786,11 +2810,19 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 #endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+    if (pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF() || pcSlice->getPPS()->getUseCBIF())
+#else
     // BIF happens in SAO code so this needs to be done
     // even if SAO=0 if BIF=1.
     if (pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF() )
+#endif
+#else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+    if (pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseCBIF())
 #else
     if (pcSlice->getSPS()->getSAOEnabledFlag())
+#endif
 #endif
     {
       pcPic->resizeSAO( numberOfCtusInFrame, 0 );
@@ -3131,16 +3163,27 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 #endif
 
 #if JVET_V0094_BILATERAL_FILTER
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+      if( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF() || pcSlice->getPPS()->getUseCBIF())
+#else
       // We need to do this step if at least one of BIF or SAO are enabled.
       if( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF())
+#endif
+#else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+      if( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseCBIF())
 #else
       if( pcSlice->getSPS()->getSAOEnabledFlag() )
+#endif
 #endif
       {
         bool sliceEnabled[MAX_NUM_COMPONENT];
         m_pcSAO->initCABACEstimator( m_pcEncLib->getCABACEncoder(), m_pcEncLib->getCtxCache(), pcSlice );
 #if JVET_V0094_BILATERAL_FILTER
         BIFCabacEstImp est(m_pcEncLib->getCABACEncoder()->getCABACEstimator(cs.slice->getSPS()));
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+        CBIFCabacEstImp CBIF_est(m_pcEncLib->getCABACEncoder()->getCABACEstimator(cs.slice->getSPS()));
 #endif
         
         m_pcSAO->SAOProcess( cs, sliceEnabled, pcSlice->getLambdas(),
@@ -3151,9 +3194,12 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 #if JVET_V0094_BILATERAL_FILTER
                               , &est
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+                              , &CBIF_est
+#endif
                             );
         //assign SAO slice header
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
         if( pcSlice->getSPS()->getSAOEnabledFlag() )
         {
 #endif
@@ -3174,7 +3220,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
         }
 
         }
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
       }
 #endif
       }

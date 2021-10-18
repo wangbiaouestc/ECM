@@ -1940,6 +1940,14 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
       m_CABACWriter->bif(*pcSlice, bifParam);
     }
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+    if(ctuRsAddr == 0)
+    {
+        CBifParams& CBifParam = cs.picture->getCBifParam();
+        m_CABACWriter->Cbif_Cb(*pcSlice, CBifParam);
+        m_CABACWriter->Cbif_Cr(*pcSlice, CBifParam);
+    }
+#endif
     m_CABACWriter->coding_tree_unit( cs, ctuArea, pcPic->m_prevQP, ctuRsAddr );
 
     // store probabilities of first CTU in line into buffer

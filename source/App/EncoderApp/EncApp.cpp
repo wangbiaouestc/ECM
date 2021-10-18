@@ -818,6 +818,11 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setBIFStrength                                       ( m_BIFStrength );
   m_cEncLib.setBIFQPOffset                                       ( m_BIFQPOffset );
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  m_cEncLib.setUseCBIF                                            ( m_CBIF );
+  m_cEncLib.setCBIFStrength                                       ( m_CBIFStrength );
+  m_cEncLib.setCBIFQPOffset                                       ( m_CBIFQPOffset );
+#endif
 
   // ADD_NEW_TOOL : (encoder app) add setting of tool enabling flags and associated parameters here
   m_cEncLib.setVirtualBoundariesEnabledFlag                      ( m_virtualBoundariesEnabledFlag );

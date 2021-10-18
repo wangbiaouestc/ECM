@@ -1,4 +1,4 @@
-﻿/* The copyright in this software is being made available under the BSD
+/* The copyright in this software is being made available under the BSD
  * License, included below. This software may be subject to other third party
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
@@ -157,6 +157,9 @@
 #define EMBEDDED_APS                                      1 // Embed APS into picture header
 #define JVET_V0094_BILATERAL_FILTER                       1 // Bilateral filter
 #define JVET_W0066_CCSAO                                  1 // JVET-W0066: Cross-component sample adaptive offset
+#define JVET_X0071_LONGER_CCALF                           1 // JVET-X0071/JVET-X0045: Longer filter for CCALF
+#define JVET_X0071_ALF_BAND_CLASSIFIER                    1 // JVET-X0071/JVET-X0070: Alternative band classifier for ALF
+#define JVET_X0071_CHROMA_BILATERAL_FILTER                1 // JVET-X0071/JVET-X0067: Chroma bilateral filter
 
 // SIMD optimizations
 #if IF_12TAP
@@ -173,6 +176,9 @@
 #endif
 #if JVET_V0094_BILATERAL_FILTER
 #define ENABLE_SIMD_BILATERAL_FILTER                      1
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+#define JVET_X0071_CHROMA_BILATERAL_FILTER_ENABLE_SIMD    1
 #endif
 #endif // tools
 
@@ -1213,6 +1219,19 @@ public:
   int allCtuOn;             // slice_bif_all_ctb_enabled_flag
   int numBlocks;
   std::vector<int> ctuOn;   // bif_ctb_flag[][]
+};
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+class CBifParams
+{
+public:
+    int frmOn_Cb;                // slice_bif_enabled_flag for chroma
+    int frmOn_Cr;                // slice_bif_enabled_flag for chroma
+    int allCtuOn_Cb;             // slice_bif_all_ctb_enabled_flag for chroma
+    int allCtuOn_Cr;             // slice_bif_all_ctb_enabled_flag for chroma
+    int numBlocks;
+    std::vector<int> ctuOn_Cb;   // bif_ctb_flag[][] for chroma
+    std::vector<int> ctuOn_Cr;   // bif_ctb_flag[][] for chroma
 };
 #endif
 

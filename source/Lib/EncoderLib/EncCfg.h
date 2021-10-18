@@ -833,6 +833,11 @@ protected:
   int         m_BIFStrength;
   int         m_BIFQPOffset;
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  bool        m_CBIF;
+  int         m_CBIFStrength;
+  int         m_CBIFQPOffset;
+#endif
   
   bool        m_ccalf;
   int         m_ccalfQpThreshold;
@@ -1334,6 +1339,14 @@ public:
   int       getBIFStrength                  ()         const { return m_BIFStrength; }
   void      setBIFQPOffset                  ( int val )       { m_BIFQPOffset = val; }
   int       getBIFQPOffset                  ()         const { return m_BIFQPOffset; }
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  void      setUseCBIF                       ( bool b )       { m_CBIF = b; }
+  bool      getUseCBIF                       ()         const { return m_CBIF; }
+  void      setCBIFStrength                  ( int val )       { m_CBIFStrength = val; }
+  int       getCBIFStrength                  ()         const { return m_CBIFStrength; }
+  void      setCBIFQPOffset                  ( int val )       { m_CBIFQPOffset = val; }
+  int       getCBIFQPOffset                  ()         const { return m_CBIFQPOffset; }
 #endif
 #if MULTI_HYP_PRED
   void      setNumMHPCandsToTest(int i) { m_numMHPCandsToTest = i; }

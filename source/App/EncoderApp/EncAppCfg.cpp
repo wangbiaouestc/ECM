@@ -1065,6 +1065,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("BIFStrength",                                     m_BIFStrength,                                       1u, "bilateral filter strength  (0: half, 1: full, 2: double)  [default: full]")
   ("BIFQPOffset",                                     m_BIFQPOffset,                                        0, "bilateral filter QP offset (0: no offset)  [default: 0]")
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  ("CBIF",                                             m_CBIF,                                            true, "chroma bilateral filter   (0: off, 1:on)  [default: on]")
+  ("CBIFStrength",                                     m_CBIFStrength,                                       1u, "chroma bilateral filter strength  (0: half, 1: full, 2: double)  [default: full]")
+  ("CBIFQPOffset",                                     m_CBIFQPOffset,                                        0, "chroma bilateral filter QP offset (0: no offset)  [default: 0]")
+#endif
   // ADD_NEW_TOOL : (encoder app) add parsing parameters here
   ( "VirtualBoundariesPresentInSPSFlag",              m_virtualBoundariesPresentFlag,                    true, "Virtual Boundary position information is signalled in SPS or PH (1:SPS, 0:PH)  [default: on]" )
   ("NumVerVirtualBoundaries",                         m_numVerVirtualBoundaries,                           0u, "Number of vertical virtual boundaries (0-3, inclusive)")
@@ -4361,6 +4366,11 @@ void EncAppCfg::xPrintParameter()
   msg( VERBOSE, "BIF:%d ", m_BIF);
   msg( VERBOSE, "BIFStrength:%d ", m_BIFStrength);
   msg( VERBOSE, "BIFQPOffset:%d ", m_BIFQPOffset);
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  msg( VERBOSE, "CBIF:%d ", m_CBIF);
+  msg( VERBOSE, "CBIFStrength:%d ", m_CBIFStrength);
+  msg( VERBOSE, "CBIFQPOffset:%d ", m_CBIFQPOffset);
 #endif
   // ADD_NEW_TOOL (add some output indicating the usage of tools)
   msg( VERBOSE, "VirtualBoundariesEnabledFlag:%d ", m_virtualBoundariesEnabledFlag );

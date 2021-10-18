@@ -160,6 +160,9 @@ public:
 #if JVET_V0094_BILATERAL_FILTER
                                           ,BIFCabacEst* BifCABACEstimator
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+                                          ,CBIFCabacEst* CBifCABACEstimator
+#endif
                   );
 #if JVET_W0066_CCSAO
   void CCSAOProcess(CodingStructure& cs, const double* lambdas, const int intraPeriod);
@@ -170,7 +173,7 @@ private: //methods
 
   void deriveLoopFilterBoundaryAvailibility(CodingStructure& cs, const Position &pos, bool& isLeftAvail, bool& isAboveAvail, bool& isAboveLeftAvail) const;
   void getStatistics(std::vector<SAOStatData**>& blkStats, PelUnitBuf& orgYuv, PelUnitBuf& srcYuv,
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
                      PelUnitBuf& bifYuv,
 #endif
                      CodingStructure& cs, bool isCalculatePreDeblockSamples = false);
@@ -181,7 +184,7 @@ private: //methods
 #endif
                         const double saoEncodingRate, const double saoEncodingRateChroma, const bool isGreedymergeEncoding );
   void getBlkStats(const ComponentID compIdx, const int channelBitDepth, SAOStatData* statsDataTypes, Pel* srcBlk, Pel* orgBlk,
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
                    Pel* bifBlk, int bifStride,
 #endif
                    int srcStride, int orgStride, int width, int height, bool isLeftAvail,  bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isCalculatePreDeblockSamples

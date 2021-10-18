@@ -1526,6 +1526,26 @@ const CtxSet ContextSetCfg::BifCtrlFlags = ContextSetCfg::addCtxSet
   { DWS }
 });
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+const CtxSet ContextSetCfg::CBifCtrlFlags_Cb = ContextSetCfg::addCtxSet
+({
+  { 39 },
+  { 39 },
+  { 39 },
+  { DWS },
+  { DWS },
+  { DWS }
+});
+const CtxSet ContextSetCfg::CBifCtrlFlags_Cr = ContextSetCfg::addCtxSet
+({
+  { 39 },
+  { 39 },
+  { 39 },
+  { DWS },
+  { DWS },
+  { DWS }
+});
+#endif
 
 #if JVET_W0066_CCSAO
 const CtxSet ContextSetCfg::CcSaoControlIdc = ContextSetCfg::addCtxSet
@@ -2597,6 +2617,22 @@ const CtxSet ContextSetCfg::BifCtrlFlags = ContextSetCfg::addCtxSet
   { 39, },
   { 39, },
   { DWS, },
+});
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+const CtxSet ContextSetCfg::CBifCtrlFlags_Cb = ContextSetCfg::addCtxSet
+({
+    { 39, },
+    { 39, },
+    { 39, },
+    { DWS, },
+});
+const CtxSet ContextSetCfg::CBifCtrlFlags_Cr = ContextSetCfg::addCtxSet
+({
+    { 39, },
+    { 39, },
+    { 39, },
+    { DWS, },
 });
 #endif
 

@@ -42,6 +42,9 @@
 #if JVET_V0094_BILATERAL_FILTER
 BifParams Picture::m_BifParams;
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+CBifParams Picture::m_CBifParams;
+#endif
 
 #if ENABLE_SPLIT_PARALLELISM
 

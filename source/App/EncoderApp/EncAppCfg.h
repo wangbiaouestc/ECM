@@ -432,6 +432,11 @@ protected:
   unsigned  m_BIFStrength;                                    /// Bilateral filter strength
   int       m_BIFQPOffset;                                    /// Bilateral QP offset
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  bool      m_CBIF;
+  unsigned  m_CBIFStrength;
+  int       m_CBIFQPOffset;
+#endif
   
   // ADD_NEW_TOOL : (encoder app) add tool enabling flags and associated parameters here
   bool      m_virtualBoundariesEnabledFlag;

@@ -111,7 +111,7 @@ void EncLib::create( const int layerId )
   m_cCuEncoder      = new EncCu              [m_numCuEncStacks];
   m_cInterSearch    = new InterSearch        [m_numCuEncStacks];
   m_cIntraSearch    = new IntraSearch        [m_numCuEncStacks];
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   m_bilateralFilter = new BilateralFilter    [m_numCuEncStacks];
 #endif
   m_cTrQuant        = new TrQuant            [m_numCuEncStacks];
@@ -122,14 +122,14 @@ void EncLib::create( const int layerId )
   for( int jId = 0; jId < m_numCuEncStacks; jId++ )
   {
     m_cCuEncoder[jId].         create( this );
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
     m_bilateralFilter[jId].    create();
 #endif
 
   }
 #else
   m_cCuEncoder.         create( this );
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   m_bilateralFilter.    create();
 #endif
 #endif
@@ -170,15 +170,31 @@ void EncLib::create( const int layerId )
   }
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_W0066_CCSAO
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if (m_bUseSAO || m_BIF || m_CCSAO || m_CBIF)
+#else
   if (m_bUseSAO || m_BIF || m_CCSAO)
+#endif
+#else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if (m_bUseSAO || m_BIF || m_CBIF)
 #else
   if (m_bUseSAO || m_BIF)
 #endif
+#endif
 #else
 #if JVET_W0066_CCSAO
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if (m_bUseSAO || m_CCSAO || m_CBIF)
+#else
   if (m_bUseSAO || m_CCSAO)
+#endif
+#else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if (m_bUseSAO || m_CBIF)
 #else
   if (m_bUseSAO)
+#endif
 #endif
 #endif
   {
@@ -224,14 +240,14 @@ void EncLib::destroy ()
   {
     m_cInterSearch[jId].   destroy();
     m_cIntraSearch[jId].   destroy();
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
     m_bilateralFilter[jId].destroy();
 #endif
   }
 #else
   m_cInterSearch.       destroy();
   m_cIntraSearch.       destroy();
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   m_bilateralFilter.    destroy();
 #endif
 #endif
@@ -240,7 +256,7 @@ void EncLib::destroy ()
   delete[] m_cCuEncoder;
   delete[] m_cInterSearch;
   delete[] m_cIntraSearch;
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   delete[] m_bilateralFilter;
 #endif
   delete[] m_cTrQuant;
@@ -444,7 +460,7 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     // initialize encoder search class
     CABACWriter* cabacEstimator = m_CABACEncoder[jId].getCABACEstimator( &sps0 );
     m_cIntraSearch[jId].init( this,
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
                              &m_bilateralFilter[jId],
 #endif
                               &m_cTrQuant[jId],
@@ -455,7 +471,7 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
                             , sps0.getBitDepth(CHANNEL_TYPE_LUMA)
     );
     m_cInterSearch[jId].init( this,
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
                              &m_bilateralFilter[jId],
 #endif
                               &m_cTrQuant[jId],
@@ -487,7 +503,7 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
   // initialize encoder search class
   CABACWriter* cabacEstimator = m_CABACEncoder.getCABACEstimator(&sps0);
   m_cIntraSearch.init( this,
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
                        &m_bilateralFilter,
 #endif
                        &m_cTrQuant,
@@ -498,7 +514,7 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
                      , sps0.getBitDepth(CHANNEL_TYPE_LUMA)
   );
   m_cInterSearch.init( this,
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
                        &m_bilateralFilter,
 #endif
                        &m_cTrQuant,
@@ -1925,6 +1941,11 @@ void EncLib::xInitPPS(PPS &pps, const SPS &sps)
   pps.setUseBIF                ( m_BIF );
   pps.setBIFStrength           ( m_BIFStrength );
   pps.setBIFQPOffset           ( m_BIFQPOffset );
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  pps.setUseCBIF                ( m_CBIF );
+  pps.setCBIFStrength           ( m_CBIFStrength );
+  pps.setCBIFQPOffset           ( m_CBIFQPOffset );
 #endif
 
   if ( getDeblockingFilterMetric() )

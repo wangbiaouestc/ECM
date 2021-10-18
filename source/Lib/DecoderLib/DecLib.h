@@ -54,7 +54,7 @@
 #include "CommonLib/SEI.h"
 #include "CommonLib/Unit.h"
 #include "CommonLib/Reshape.h"
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
 #include "BilateralFilter.h"
 #endif
 
@@ -100,7 +100,7 @@ private:
 
   SEIMessages             m_SEIs; ///< List of SEI messages that have been received before the first slice and between slices, excluding prefix SEIs...
 
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   BilateralFilter         m_cBilateralFilter;
 #endif
 

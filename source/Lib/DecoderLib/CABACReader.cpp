@@ -327,11 +327,19 @@ void CABACReader::ccAlfFilterControlIdc(CodingStructure &cs, const ComponentID c
 
   if (leftAvail)
   {
+#if JVET_X0071_LONGER_CCALF
+    ctxt += (filterControlIdc[curIdx - 1] != 1) ? 1 : 0;
+#else
     ctxt += ( filterControlIdc[curIdx - 1] ) ? 1 : 0;
+#endif
   }
   if (aboveAvail)
   {
+#if JVET_X0071_LONGER_CCALF
+    ctxt += (filterControlIdc[curIdx - cs.pcv->widthInCtus] != 1) ? 1 : 0;
+#else
     ctxt += ( filterControlIdc[curIdx - cs.pcv->widthInCtus] ) ? 1 : 0;
+#endif
   }
   ctxt += ( compID == COMPONENT_Cr ) ? 3 : 0;
 
@@ -343,6 +351,12 @@ void CABACReader::ccAlfFilterControlIdc(CodingStructure &cs, const ComponentID c
       idcVal++;
     }
   }
+
+#if JVET_X0071_LONGER_CCALF
+  int pos0 = 1;
+  idcVal = (idcVal == pos0 ? 0 : idcVal < pos0 ? idcVal + 1 : idcVal);
+#endif
+
   filterControlIdc[curIdx] = idcVal;
 
   DTRACE(g_trace_ctx, D_SYNTAX, "ccAlfFilterControlIdc() compID=%d pos=(%d,%d) ctxt=%d, filterCount=%d, idcVal=%d\n",
@@ -360,13 +374,25 @@ void CABACReader::sao( CodingStructure& cs, unsigned ctuRsAddr )
   const SPS&   sps   = *cs.sps;
 
 #if JVET_V0094_BILATERAL_FILTER
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if(!(cs.pps->getUseBIF() || cs.sps->getSAOEnabledFlag() || !(cs.pps->getUseCBIF())))
+#else
   // If neither BIF nor SAO is enabled, we can return.
   if(!(cs.pps->getUseBIF() || cs.sps->getSAOEnabledFlag()))
+#endif
   {
     return;
   }
   // At least one is enabled, it is safe to assume we can do getSAO().
   SAOBlkParam&      sao_ctu_pars            = cs.picture->getSAO()[ctuRsAddr];
+#else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if(!(cs.pps->getUseCBIF() || cs.sps->getSAOEnabledFlag()))
+  {
+        return;
+  }
+    SAOBlkParam&      sao_ctu_pars            = cs.picture->getSAO()[ctuRsAddr];
+#endif
 #endif
   
   if( !sps.getSAOEnabledFlag() )
@@ -375,7 +401,7 @@ void CABACReader::sao( CodingStructure& cs, unsigned ctuRsAddr )
   }
 
   const Slice& slice                        = *cs.slice;
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   // The getSAO() function call has been moved up.
 #else
   SAOBlkParam&      sao_ctu_pars            = cs.picture->getSAO()[ctuRsAddr];
@@ -577,6 +603,139 @@ void CABACReader::bif(CodingStructure& cs, unsigned ctuRsAddr)
       bifParams.ctuOn[i] = 0;
     }
   }
+}
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+void CABACReader::Cbif_Cb(CodingStructure& cs)
+{
+    int width = cs.picture->lwidth();
+    int height = cs.picture->lheight();
+
+    int block_width = cs.pcv->maxCUWidth;
+    int block_height = cs.pcv->maxCUHeight;
+
+    int width_in_blocks = width / block_width + (width % block_width != 0);
+    int height_in_blocks = height / block_height + (height % block_height != 0);
+
+    for (int i = 0; i < width_in_blocks * height_in_blocks; i++)
+    {
+        Cbif_Cb(cs, i);
+    }
+}
+
+void CABACReader::Cbif_Cb(CodingStructure& cs, unsigned ctuRsAddr)
+{
+    const PPS&   pps = *cs.pps;
+
+    if (!pps.getUseCBIF())
+    {
+        return;
+    }
+
+    CBifParams& CBifParams = cs.picture->getCBifParam();
+
+    if (ctuRsAddr == 0)
+    {
+        int width = cs.picture->lwidth();
+        int height = cs.picture->lheight();
+        int block_width = cs.pcv->maxCUWidth;
+        int block_height = cs.pcv->maxCUHeight;
+
+        int width_in_blocks = width / block_width + (width % block_width != 0);
+        int height_in_blocks = height / block_height + (height % block_height != 0);
+        int num_blocks = width_in_blocks * height_in_blocks;
+        CBifParams.numBlocks = num_blocks;
+        CBifParams.ctuOn_Cb.resize(num_blocks);
+        std::fill(CBifParams.ctuOn_Cb.begin(), CBifParams.ctuOn_Cb.end(), 0);
+    }
+    if (ctuRsAddr == 0)
+    {
+        CBifParams.allCtuOn_Cb = m_BinDecoder.decodeBinEP();
+        if (CBifParams.allCtuOn_Cb == 0)
+            CBifParams.frmOn_Cb = m_BinDecoder.decodeBinEP();
+    }
+    int i = ctuRsAddr;
+    if (CBifParams.allCtuOn_Cb)
+    {
+        CBifParams.ctuOn_Cb[i] = 1;
+    }
+    else
+    {
+        if (CBifParams.frmOn_Cb)
+        {
+            CBifParams.ctuOn_Cb[i] = m_BinDecoder.decodeBin(Ctx::CBifCtrlFlags_Cb());
+        }
+        else
+        {
+            CBifParams.ctuOn_Cb[i] = 0;
+        }
+    }
+}
+
+void CABACReader::Cbif_Cr(CodingStructure& cs)
+{
+    int width = cs.picture->lwidth();
+    int height = cs.picture->lheight();
+
+    int block_width = cs.pcv->maxCUWidth;
+    int block_height = cs.pcv->maxCUHeight;
+
+    int width_in_blocks = width / block_width + (width % block_width != 0);
+    int height_in_blocks = height / block_height + (height % block_height != 0);
+
+    for (int i = 0; i < width_in_blocks * height_in_blocks; i++)
+    {
+        Cbif_Cr(cs, i);
+    }
+}
+
+void CABACReader::Cbif_Cr(CodingStructure& cs, unsigned ctuRsAddr)
+{
+    const PPS&   pps = *cs.pps;
+
+    if (!pps.getUseCBIF())
+    {
+        return;
+    }
+
+    CBifParams& CBifParams = cs.picture->getCBifParam();
+
+    if (ctuRsAddr == 0)
+    {
+        int width = cs.picture->lwidth();
+        int height = cs.picture->lheight();
+        int block_width = cs.pcv->maxCUWidth;
+        int block_height = cs.pcv->maxCUHeight;
+
+        int width_in_blocks = width / block_width + (width % block_width != 0);
+        int height_in_blocks = height / block_height + (height % block_height != 0);
+        int num_blocks = width_in_blocks * height_in_blocks;
+        CBifParams.numBlocks = num_blocks;
+        CBifParams.ctuOn_Cr.resize(num_blocks);
+        std::fill(CBifParams.ctuOn_Cr.begin(), CBifParams.ctuOn_Cr.end(), 0);
+    }
+    if (ctuRsAddr == 0)
+    {
+        CBifParams.allCtuOn_Cr = m_BinDecoder.decodeBinEP();
+        if (CBifParams.allCtuOn_Cr == 0)
+            CBifParams.frmOn_Cr = m_BinDecoder.decodeBinEP();
+    }
+    int i = ctuRsAddr;
+    if (CBifParams.allCtuOn_Cr)
+    {
+        CBifParams.ctuOn_Cr[i] = 1;
+    }
+    else
+    {
+        if (CBifParams.frmOn_Cr)
+        {
+            CBifParams.ctuOn_Cr[i] = m_BinDecoder.decodeBin(Ctx::CBifCtrlFlags_Cr());
+        }
+        else
+        {
+            CBifParams.ctuOn_Cr[i] = 0;
+        }
+    }
 }
 #endif
 
