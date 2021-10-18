@@ -3617,9 +3617,9 @@ int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t ui
         int iRatio = static_cast<int>(fRatio_scaled);
         // get ang_idx
         int idx = -1;
-        for( int i = 0; i < 17; i++ )
+        for( int i = 1; i < 17; i++ )
         {
-          if( iRatio < angTable[i] )
+          if( iRatio <= angTable[i] )
           {
             idx = iRatio - angTable[i - 1] < angTable[i] - iRatio ? i - 1 : i;
             break;
