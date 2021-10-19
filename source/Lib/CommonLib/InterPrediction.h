@@ -139,7 +139,7 @@ protected:
                              Mv(-2, 2), Mv(-1, 2), Mv(0, 2), Mv(1, 2), Mv(2, 2) };
   uint64_t m_SADsArray[((2 * DMVR_NUM_ITERATION) + 1) * ((2 * DMVR_NUM_ITERATION) + 1)];
 #if MULTI_PASS_DMVR
-#if JVET_X0049_ADAPT_DMVR
+#if JVET_X0049_BDMVR_SW_OPT
   Mv m_pSearchEnlargeOffset_bilMrg[5][BDMVR_INTME_AREA];
   uint16_t m_pSearchEnlargeOffsetToIdx[5][BDMVR_INTME_AREA];
   uint16_t m_pSearchEnlargeOffsetNum[5];
@@ -378,9 +378,11 @@ private:
 #endif
   void       xBDMVRPreInterpolation    (const PredictionUnit& pu, const Mv (&mvCenter)[2], bool doPreInterpolationFP, bool doPreInterpolationHP);
 
-#if JVET_X0049_ADAPT_DMVR
+#if JVET_X0049_BDMVR_SW_OPT
   Distortion xBDMVRGetMatchingError    (const PredictionUnit& pu, const Mv (&mv)[2], bool useMR, bool useHadmard = false );
+#if JVET_X0049_ADAPT_DMVR
   template <uint8_t dir>
+#endif
 #else
   Distortion xBDMVRGetMatchingError    (const PredictionUnit& pu, const Mv (&mv)[2], bool useMR );
 #endif
@@ -389,7 +391,7 @@ private:
                                       , const Mv(&mvInitial)[2]  // only used for full-pel MVD
                                       , int nDirect              // only used for half-pel MVD
                                         );
-#if JVET_X0049_ADAPT_DMVR
+#if JVET_X0049_BDMVR_SW_OPT
   template <bool adaptRange, bool useHadamard>
   Distortion xBDMVRMvIntPelFullSearch  (Mv&mvOffset, Distortion curBestCost, 
     const Mv(&initialMv)[2], 
@@ -399,10 +401,12 @@ private:
     const Distortion earlyTerminateTh, DistParam &cDistParam, Pel* pelBuffer[2], const int stride);
   template<bool hPel>
   Distortion xBDMVRMvSquareSearch(Mv(&curBestMv)[2], Distortion curBestCost, PredictionUnit& pu, const Mv(&initialMv)[2], int32_t maxSearchRounds, int32_t searchStepShift, bool useMR, bool useHadmard);
+#if JVET_X0049_ADAPT_DMVR
   template <uint8_t dir>
   Distortion xBDMVRMvOneTemplateHPelSquareSearch(Mv(&curBestMv)[2], Distortion curBestCost, PredictionUnit& pu,
     const Mv(&initialMv)[2], int32_t maxSearchRounds, int32_t searchStepShift,
     bool useMR, bool useHadmard);
+#endif
 #else
   Distortion xBDMVRMvIntPelFullSearch  (Mv (&curBestMv)[2], Distortion curBestCost, PredictionUnit& pu, const Mv (&initialMv)[2], int32_t maxSearchRounds, int32_t searchStepShift, bool useMR, const int subPuBufOffset );
   Distortion xBDMVRMvSquareSearch      (Mv(&curBestMv)[2], Distortion curBestCost, PredictionUnit& pu, const Mv(&initialMv)[2], int32_t maxSearchRounds, int32_t searchStepShift, bool useMR, bool useHadmard);

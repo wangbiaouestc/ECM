@@ -125,7 +125,10 @@
 #define IF_12TAP                                          1 // 12-tap IF
 #define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
 
+#define JVET_X0049_BDMVR_SW_OPT                           1 // JVET-X0049: software optimization for BDMVR (lossless)
+#if JVET_X0049_BDMVR_SW_OPT
 #define JVET_X0049_ADAPT_DMVR                             1 // JVET-X0049: Adaptive DMVR
+#endif
 #define JVET_X0056_DMVD_EARLY_TERMINATION                 1 // JVET-X0056: Early termination for DMVR and TM
 
 // Inter template matching tools
