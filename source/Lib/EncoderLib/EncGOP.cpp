@@ -3082,7 +3082,11 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 
 #if RPR_ENABLE
       // create SAO object based on the picture size
-      if ( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF() )
+      if( pcSlice->getSPS()->getSAOEnabledFlag()
+#if JVET_V0094_BILATERAL_FILTER
+          || pcSlice->getPPS()->getUseBIF()
+#endif
+          )
       {
         Size saoSize = m_pcSAO->getSaoSize();
         if ( saoSize.width != picWidth || saoSize.height != picHeight ) {
