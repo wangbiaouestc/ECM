@@ -957,6 +957,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MinQTChromaISliceInChromaSamples",                m_uiMinQT[2],                                        4u, "MinQTChromaISliceInChromaSamples")
   ("MinQTNonISlice",                                  m_uiMinQT[1],                                        8u, "MinQTNonISlice")
   ("MaxMTTHierarchyDepth",                            m_uiMaxMTTHierarchyDepth,                            3u, "MaxMTTHierarchyDepth")
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+  ("MaxMTTHierarchyDepthByTid",                       m_sMaxMTTHierarchyDepthByTid,          string("333333"), "MaxMTTHierarchyDepthByTid")
+#endif
   ("MaxMTTHierarchyDepthI",                           m_uiMaxMTTHierarchyDepthI,                           3u, "MaxMTTHierarchyDepthI")
   ("MaxMTTHierarchyDepthISliceL",                     m_uiMaxMTTHierarchyDepthI,                           3u, "MaxMTTHierarchyDepthISliceL")
   ("MaxMTTHierarchyDepthISliceC",                     m_uiMaxMTTHierarchyDepthIChroma,                     3u, "MaxMTTHierarchyDepthISliceC")
@@ -2688,6 +2691,16 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   }
 #endif
 
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+  CHECK( m_sMaxMTTHierarchyDepthByTid.size() > MAX_TLAYER, "MaxMTTHierarchyDepthByTid is greater than MAX_TLAYER" );
+
+  for( int i = 0; i < m_sMaxMTTHierarchyDepthByTid.size(); i++ )
+  {
+    CHECK( i >= MAX_TLAYER, "Index exceeds MAX_TLAYER" );
+    m_maxMTTHierarchyDepthByTid[i] = std::stoul( m_sMaxMTTHierarchyDepthByTid.substr( i, 1 ) );
+  }
+#endif
+
   // check validity of input parameters
   if( xCheckParameter() )
   {
@@ -3204,6 +3217,19 @@ bool EncAppCfg::xCheckParameter()
   xConfirmPara( m_confWinTop    % SPS::getWinUnitY(m_chromaFormatIDC) != 0, "Top conformance window offset must be an integer multiple of the specified chroma subsampling");
   xConfirmPara( m_confWinBottom % SPS::getWinUnitY(m_chromaFormatIDC) != 0, "Bottom conformance window offset must be an integer multiple of the specified chroma subsampling");
 
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+  int sumMaxMTTHierarchyDepthByTid = 0;
+  for( auto &p : m_maxMTTHierarchyDepthByTid )
+  {
+    sumMaxMTTHierarchyDepthByTid += p;
+  }
+
+  if( sumMaxMTTHierarchyDepthByTid == 0 )
+  {
+    xConfirmPara( m_uiMaxBT[1] != m_uiMinQT[1], "MaxBTNonISlice shall be equal to MinQTNonISlice when MaxMTTHierarchyDepth is 0." );
+    xConfirmPara( m_uiMaxTT[1] != m_uiMinQT[1], "MaxTTNonISlice shall be equal to MinQTNonISlice when MaxMTTHierarchyDepth is 0." );
+  }
+#endif
 
   // max CU width and height should be power of 2
   uint32_t ui = m_uiMaxCUWidth;
@@ -4094,6 +4120,10 @@ void EncAppCfg::xPrintParameter()
     msg( DETAILS, "Profile                                : %s\n", profileToString(m_profile) );
   }
   msg(DETAILS, "CTU size / min CU size                 : %d / %d \n", m_uiMaxCUWidth, 1 << m_log2MinCuSize);
+
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+  msg( DETAILS, "Max MTT Hierarchy Depth in B-slices by temporal ID: %s\n", m_sMaxMTTHierarchyDepthByTid.c_str() );
+#endif
 
   msg(DETAILS, "subpicture info present flag           : %s\n", m_subPicInfoPresentFlag ? "Enabled" : "Disabled");
   if (m_subPicInfoPresentFlag)
