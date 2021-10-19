@@ -487,7 +487,7 @@ void clipMvIntraConstraint(CodingUnit* pcCU, int regionId, int& iHorMin, int& iH
 	int iBlkHeight = uiBlkHeight;
 	if (regionId == 0) //above outside LCU
 	{
-		iHorMax = std::min((iCurrX + searchRangeWidth) << iMvShift, (int)((pcCU->cs->sps->getMaxPicWidthInLumaSamples() - iBlkWidth) << iMvShift));
+    iHorMax = std::min((iCurrX + searchRangeWidth) << iMvShift, (int)((pcCU->cs->pps->getPicWidthInLumaSamples() - iBlkWidth) << iMvShift) );
 		iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift);
 
 		iVerMax = (iCurrY - iBlkHeight - offsetLCUY) << iMvShift;
@@ -516,7 +516,7 @@ void clipMvIntraConstraint(CodingUnit* pcCU, int regionId, int& iHorMin, int& iH
 		iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift);
 		iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
 		iVerMin = (iCurrY + 1) << iMvShift;
-		iVerMax = std::min(pcCU->cs->sps->getMaxPicHeightInLumaSamples() - iBlkHeight, (iCurrY - offsetLCUY + pcCU->cs->sps->getCTUSize() - iBlkHeight) << iMvShift);
+    iVerMax = std::min(pcCU->cs->pps->getPicHeightInLumaSamples() - iBlkHeight, (iCurrY - offsetLCUY + pcCU->cs->sps->getCTUSize() - iBlkHeight) << iMvShift);
 
 		iHorMin = iHorMin - iCurrX;
 		iHorMax = iHorMax - iCurrX;
