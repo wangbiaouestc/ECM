@@ -347,6 +347,9 @@ protected:
   unsigned  m_uiMaxMTTHierarchyDepth;
   unsigned  m_uiMaxMTTHierarchyDepthI;
   unsigned  m_uiMaxMTTHierarchyDepthIChroma;
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+  unsigned  m_maxMTTHierarchyDepthByTid[MAX_TLAYER];
+#endif
   bool      m_dualITree;
   unsigned  m_maxCUWidth;
   unsigned  m_maxCUHeight;
@@ -1132,6 +1135,11 @@ public:
   void      setMaxTTSizes                   ( unsigned* maxTT)   { m_uiMaxTT[0] = maxTT[0]; m_uiMaxTT[1] = maxTT[1]; m_uiMaxTT[2] = maxTT[2]; }
   void      setMaxMTTHierarchyDepth         ( unsigned uiMaxMTTHierarchyDepth, unsigned uiMaxMTTHierarchyDepthI, unsigned uiMaxMTTHierarchyDepthIChroma )
                                                              { m_uiMaxMTTHierarchyDepth = uiMaxMTTHierarchyDepth; m_uiMaxMTTHierarchyDepthI = uiMaxMTTHierarchyDepthI; m_uiMaxMTTHierarchyDepthIChroma = uiMaxMTTHierarchyDepthIChroma; }
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+  void      setMaxMTTHierarchyDepthByTid    ( unsigned* maxMTTHierarchyDepthByTid )   { std::memcpy( m_maxMTTHierarchyDepthByTid, maxMTTHierarchyDepthByTid, sizeof( m_maxMTTHierarchyDepthByTid) );}
+  unsigned  getMaxMTTHierarchyDepthByTid    ( int i ) const                           { CHECK( (i < 0 || i >= MAX_TLAYER), "EncCgf::getMaxMTTHierarchyDepthByTid: abnormal index value" ); return m_maxMTTHierarchyDepthByTid[i]; }
+  unsigned* getMaxMTTHierarchyDepthsByTid   ()                                        { return &m_maxMTTHierarchyDepthByTid[0]; }
+#endif
   unsigned  getMaxMTTHierarchyDepth         ()         const { return m_uiMaxMTTHierarchyDepth; }
   unsigned  getMaxMTTHierarchyDepthI        ()         const { return m_uiMaxMTTHierarchyDepthI; }
   unsigned  getMaxMTTHierarchyDepthIChroma  ()         const { return m_uiMaxMTTHierarchyDepthIChroma; }
