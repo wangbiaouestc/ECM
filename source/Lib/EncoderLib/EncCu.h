@@ -298,6 +298,10 @@ private:
   Mv                    m_mvBufEncBDOF4BM[BM_MRG_MAX_NUM_CANDS<<1][BDOF_SUBPU_MAX_NUM];
 #endif
 #endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  Mv                    m_mvBufEncAmBDMVR[2][MAX_NUM_SUBCU_DMVR];
+  MvField               mvField_amList_enc[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
+#endif
 
   int                   m_ctuIbcSearchRangeX;
   int                   m_ctuIbcSearchRangeY;

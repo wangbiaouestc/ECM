@@ -374,6 +374,10 @@ protected:
 public:
   EncFastLICCtrl  m_fastLicCtrl;
 #endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+public:
+  Distortion      m_amvpOnlyCost;
+#endif
 
 public:
 #if MULTI_HYP_PRED
@@ -617,7 +621,12 @@ public:
 
   void setModeCtrl( EncModeCtrl *modeCtrl ) { m_modeCtrl = modeCtrl;}
 
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  void predInterSearch(CodingUnit& cu, Partitioner& partitioner, bool& amvpMergeModeNotValid,
+      MvField* mvField_amList = nullptr, Mv* mvBufEncAmBDMVR_L0 = nullptr, Mv* mvBufEncAmBDMVR_L1 = nullptr);
+#else
   void predInterSearch(CodingUnit& cu, Partitioner& partitioner );
+#endif
 
   /// set ME search range
   void setAdaptiveSearchRange       ( int iDir, int iRefIdx, int iSearchRange) { CHECK(iDir >= MAX_NUM_REF_LIST_ADAPT_SR || iRefIdx>=int(MAX_IDX_ADAPT_SR), "Invalid index"); m_aaiAdaptSR[iDir][iRefIdx] = iSearchRange; }
@@ -659,6 +668,9 @@ protected:
                                     AMVPInfo&             amvpInfo,
                                     bool                  bFilled = false,
                                     Distortion*           puiDistBiP = NULL
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+                                  , MvField*              mvField_amList = NULL
+#endif
                                   );
 
   void xCheckBestMVP              ( RefPicList  eRefPicList,

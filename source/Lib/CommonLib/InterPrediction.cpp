@@ -7697,6 +7697,12 @@ Distortion InterPrediction::xBDMVRGetMatchingError(const PredictionUnit& pu, con
 
   for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
   {
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+    if (pu.amvpMergeModeFlag[1 - refList])
+    {
+      continue;
+    }
+#endif
     const Picture&   refPic  = *pu.cu->slice->getRefPic((RefPicList)refList, pu.refIdx[refList])->unscaledPic;
     xBDMVRFillBlkPredPelBuffer( pu, refPic, mv[refList] , predBuf[refList], pu.cs->slice->clpRng(COMPONENT_Y) );
   }
@@ -7917,5 +7923,166 @@ void InterPrediction::xAddHypMC(PredictionUnit& pu, PelUnitBuf& predBuf, PelUnit
   pu.cu->imv = savedIMV;
   pu.cu->affine = savedAffine;
   pu.addHypData = savedHypVec;
+}
+#endif
+
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvField_amList, const int decAmvpRefIdx)
+{
+  RefPicList refListMerge = pu.amvpMergeModeFlag[0] ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+  RefPicList refListAmvp = RefPicList(1 - refListMerge);
+  for (int idx = 0; idx < pu.cu->slice->getNumRefIdx(refListAmvp) * AMVP_MAX_NUM_CANDS; idx++)
+  {
+    mvField_amList[idx] = MvField();
+    mvField_amList[MAX_NUM_AMVP_CANDS_MAX_REF + idx] = MvField();
+  }
+  int amvpRefIdxStart = 0;
+  int amvpRefIdxEnd = pu.cu->slice->getNumRefIdx(refListAmvp);
+  int decAmvpMvpIdx = -1;
+  if (decAmvpRefIdx >= 0)
+  {
+    amvpRefIdxStart = decAmvpRefIdx;
+    amvpRefIdxEnd = decAmvpRefIdx + 1;
+    decAmvpMvpIdx = pu.mvpIdx[refListAmvp];
+  }
+  const int curPoc = pu.cu->slice->getPOC();
+  const bool useMR = pu.lumaSize().area() > 64;
+
+  for (int refIdxAmvp = amvpRefIdxStart; refIdxAmvp < amvpRefIdxEnd; refIdxAmvp++)
+  {
+    const int amvpRefPoc = pu.cu->slice->getRefPOC(refListAmvp, refIdxAmvp);
+    bool findValidMergeRefPic = false;
+    for (int refIdxCandMerge = 0; refIdxCandMerge < pu.cu->slice->getNumRefIdx(refListMerge); refIdxCandMerge++)
+    {
+      const int candMergePoc = pu.cu->slice->getRefPOC(refListMerge, refIdxCandMerge);
+      if ((amvpRefPoc - curPoc) * (candMergePoc - curPoc) < 0)
+      {
+        findValidMergeRefPic = true;
+        break;
+      }
+    }
+    if (findValidMergeRefPic == false)
+    {
+      continue;
+    }
+    pu.refIdx[refListAmvp] = refIdxAmvp;
+    AMVPInfo amvpInfo;
+    PU::fillMvpCand( pu, refListAmvp, refIdxAmvp, amvpInfo
+#if TM_AMVP
+                   , this
+#endif
+    );
+    MergeCtx bmMergeCtx;
+    PU::getInterMergeCandidates(pu, bmMergeCtx, 0, AMVP_MERGE_MODE_MERGE_LIST_MAX_CANDS - 1);
+
+    int bestMvpIdxLoopStart = 0;
+    int bestMvpIdxLoopEnd = amvpInfo.numCand;
+    if (decAmvpRefIdx >= 0)
+    {
+      bestMvpIdxLoopStart = decAmvpMvpIdx;
+      bestMvpIdxLoopEnd = bestMvpIdxLoopStart + 1;
+    }
+    for (int bestMvpIdxToTest = bestMvpIdxLoopStart; bestMvpIdxToTest < bestMvpIdxLoopEnd; bestMvpIdxToTest++)
+    {
+      const int mvField_merge_idx = refIdxAmvp * AMVP_MAX_NUM_CANDS + bestMvpIdxToTest;
+      const int mvField_amvp_idx = MAX_NUM_AMVP_CANDS_MAX_REF + mvField_merge_idx;
+      pu.mv[refListAmvp] = amvpInfo.mvCand[bestMvpIdxToTest];
+
+      // BM select merge candidate
+      struct bmCostSort
+      {
+        int mergeIdx;
+        Distortion bmCost;
+      };
+      bmCostSort temp;
+      const auto CostIncSort = [](const bmCostSort &x, const bmCostSort &y) { return x.bmCost < y.bmCost; };
+      std::vector<bmCostSort> input;
+      // here to select the merge cand which has minimum BM cost, at each cand, the cost is derived by  minBMcost(mvpIdx0, mvpIdx1)
+      if (bmMergeCtx.numValidMergeCand > 1)
+      {
+        // pre Fill AMVP prediction blocks
+#if JVET_X0049_BDMVR_SW_OPT
+        Pel* pelBufferAmvp = m_filteredBlock[3][refListAmvp][0] + BDMVR_CENTER_POSITION;
+        const SizeType stride = BDMVR_BUF_STRIDE;
+#else
+        Pel* pelBufferAmvp        = m_filteredBlock[3][refListAmvp][0];
+        const SizeType stride     = pu.lwidth();
+#endif
+        PelUnitBuf predBufAmvp    = PelUnitBuf(pu.chromaFormat, PelBuf(pelBufferAmvp, stride, pu.lwidth(), pu.lheight()));
+        const Picture& refPicAmvp = *pu.cu->slice->getRefPic((RefPicList)refListAmvp, pu.refIdx[refListAmvp])->unscaledPic;
+        xBDMVRFillBlkPredPelBuffer( pu, refPicAmvp, pu.mv[refListAmvp] , predBufAmvp, pu.cs->slice->clpRng(COMPONENT_Y) );
+        Mv mvAmBdmvr[2/*refListId*/];
+        for (int mergeIdx = 0; mergeIdx < bmMergeCtx.numValidMergeCand; mergeIdx++)
+        {
+          pu.refIdx[refListMerge] = bmMergeCtx.mvFieldNeighbours[(mergeIdx << 1) + refListMerge].refIdx;
+          mvAmBdmvr[refListAmvp] = amvpInfo.mvCand[bestMvpIdxToTest];
+          mvAmBdmvr[refListMerge] = bmMergeCtx.mvFieldNeighbours[(mergeIdx << 1) + refListMerge].mv;
+          Distortion tmpBmCost = xBDMVRGetMatchingError(pu, mvAmBdmvr, useMR);
+          temp.mergeIdx = mergeIdx;
+          temp.bmCost = tmpBmCost;
+          input.push_back(temp);
+        }
+        stable_sort(input.begin(), input.end(), CostIncSort);
+      }
+      if (bmMergeCtx.numValidMergeCand == 1)
+      {
+        pu.mv[refListMerge] = bmMergeCtx.mvFieldNeighbours[refListMerge].mv;
+        pu.refIdx[refListMerge] = bmMergeCtx.mvFieldNeighbours[refListMerge].refIdx;
+      }
+      else
+      {
+        pu.mv[refListMerge] = bmMergeCtx.mvFieldNeighbours[(input[0].mergeIdx << 1) + refListMerge].mv;
+        pu.refIdx[refListMerge] = bmMergeCtx.mvFieldNeighbours[(input[0].mergeIdx << 1) + refListMerge].refIdx;
+      }
+      amvpMergeModeMvRefinement(pu, mvField_amList, mvField_merge_idx, mvField_amvp_idx);
+    } // bestMvpIdxLoop
+  }  // refIdxAmvp loop
+}
+void InterPrediction::amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvField_amList, const int mvField_merge_idx, const int mvField_amvp_idx)
+{
+  const RefPicList refListMerge = pu.amvpMergeModeFlag[0] ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+  const RefPicList refListAmvp = RefPicList(1 - refListMerge);
+  const int curPoc = pu.cu->slice->getPOC();
+  const int mergeRefPoc = pu.cu->slice->getRefPOC(refListMerge, pu.refIdx[refListMerge]);
+  const bool useMR = pu.lumaSize().area() > 64;
+  const int amvpRefPoc = pu.cu->slice->getRefPOC(refListAmvp, pu.refIdx[refListAmvp]);
+  if ((mergeRefPoc - curPoc) == (curPoc - amvpRefPoc))
+  {
+    Mv         mvInitial[2];
+    mvInitial[refListAmvp] = pu.mv[refListAmvp];;
+    mvInitial[refListMerge] = pu.mv[refListMerge];
+    Mv         mvFinal[2] = { mvInitial[0], mvInitial[1] };
+    Distortion curBmCost = std::numeric_limits<Distortion>::max();
+#if JVET_X0049_BDMVR_SW_OPT
+    curBmCost = xBDMVRMvSquareSearch<false>(mvFinal, curBmCost, pu, mvInitial,
+        AMVP_MERGE_MODE_REDUCED_MV_REFINE_SEARCH_ROUND, MV_FRACTIONAL_BITS_INTERNAL, useMR, false);
+    curBmCost = xBDMVRMvSquareSearch<true>(mvFinal, curBmCost, pu, mvInitial,
+      2, MV_FRACTIONAL_BITS_INTERNAL - 1, useMR, false);
+#else
+    curBmCost = xBDMVRMvSquareSearch( mvFinal, curBmCost, pu, mvInitial,
+        AMVP_MERGE_MODE_REDUCED_MV_REFINE_SEARCH_ROUND, MV_FRACTIONAL_BITS_INTERNAL, useMR, false );
+    curBmCost = xBDMVRMvSquareSearch( mvFinal, curBmCost, pu, mvInitial,
+        2, MV_FRACTIONAL_BITS_INTERNAL - 1, useMR, false );
+#endif
+    pu.mv[refListMerge] = mvFinal[refListMerge];
+    pu.mv[refListAmvp] = mvFinal[refListAmvp];
+  }
+#if TM_AMVP || TM_MRG
+  else
+  {
+    Distortion tmCost[2];
+    tmCost[refListMerge] = deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), refListMerge, pu.refIdx[refListMerge], 0, pu.mv[refListMerge]);
+    tmCost[refListAmvp] = deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), refListAmvp, pu.refIdx[refListAmvp], 0, pu.mv[refListAmvp]);
+    RefPicList refListToBeRefined = (tmCost[refListMerge] < tmCost[refListAmvp]) ? refListAmvp : refListMerge;
+    MvField    mvfBetterUni(pu.mv[1 - refListToBeRefined], pu.refIdx[1 - refListToBeRefined]);
+    deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), refListToBeRefined, pu.refIdx[refListToBeRefined],
+        AMVP_MERGE_MODE_REDUCED_MV_REFINE_SEARCH_ROUND, pu.mv[refListToBeRefined], &mvfBetterUni);
+  }
+#endif
+  pu.mv[refListAmvp].roundTransPrecInternal2Amvr(pu.cu->imv);
+  mvField_amList[mvField_merge_idx].refIdx = pu.refIdx[refListMerge];
+  mvField_amList[mvField_merge_idx].mv = pu.mv[refListMerge];
+  mvField_amList[mvField_amvp_idx].refIdx = pu.refIdx[refListAmvp];
+  mvField_amList[mvField_amvp_idx].mv = pu.mv[refListAmvp];
 }
 #endif

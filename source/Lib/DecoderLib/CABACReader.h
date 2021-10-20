@@ -161,6 +161,9 @@ public:
   int         ref_idx_mh(const int                     numRef);
   void        mh_pred_data(PredictionUnit&               pu);
 #endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  void        amvpMerge_mode         ( PredictionUnit&               pu );
+#endif
 
 
   // transform tree (clause 7.3.8.8)

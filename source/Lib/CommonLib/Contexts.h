@@ -302,6 +302,9 @@ public:
   static const CtxSet   TsLrg1Flag;
   static const CtxSet   TsResidualSign;
   static const CtxSet   MVPIdx;
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  static const CtxSet   amFlagState;
+#endif
   static const CtxSet   SaoMergeFlag;
   static const CtxSet   SaoTypeIdx;
 #if JVET_V0094_BILATERAL_FILTER

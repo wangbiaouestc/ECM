@@ -181,6 +181,9 @@ public:
   void        ref_idx_mh(const int                     numRef, const int         refIdx);
   void        mh_pred_data(const PredictionUnit&         pu);
 #endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  void        amvpMerge_mode         ( const PredictionUnit&         pu );
+#endif
 
   // transform tree (clause 7.3.8.8)
   void        transform_tree            ( const CodingStructure&        cs,       Partitioner&      pm,     CUCtx& cuCtx,                         const PartSplit ispType = TU_NO_ISP, const int subTuIdx = -1 );
