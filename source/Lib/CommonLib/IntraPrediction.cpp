@@ -3567,9 +3567,23 @@ int IntraPrediction::deriveTimdMode( const CPelBuf &recoBuf, const CompArea &are
     const int blend_sum_weight = 6;
     int       sum_weight       = 1 << blend_sum_weight;
 
+#if JVET_X0149_TIMD_DIMD_LUT
+    int g_gradDivTable[16] = { 0, 7, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0 };
+    uint64_t s0 = uiSecondaryCost;
+    uint64_t s1 = uiBestCost + uiSecondaryCost;
+    int x = floorLog2_uint64(s1);
+    CHECK(x < 0, "floor log2 value should be no negative");
+    int norm_s1 = int(s1 << 4 >> x) & 15;
+    int v = g_gradDivTable[norm_s1] | 8;
+    x += (norm_s1 != 0);
+    int shift = x + 3;
+    int add = (1 << (shift - 1));
+    int iRatio = int((s0 * v * sum_weight + add) >> shift);
+#else
     double dRatio       = 0.0;
     dRatio              = (double) uiSecondaryCost / (double) (uiBestCost + uiSecondaryCost);
     int iRatio          = static_cast<int>(dRatio * sum_weight + 0.5);
+#endif
     cu.timdFusionWeight[0] = iRatio;
     cu.timdFusionWeight[1] = sum_weight - iRatio;
   }
@@ -3693,17 +3707,42 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
     cu.dimdBlendMode[0] = second_mode;
   }
 
+#if JVET_X0149_TIMD_DIMD_LUT
+  int log2BlendWeight = 6;
+  int dimd_planar_weight = 21;
+  int sum_weight = (1 << log2BlendWeight);
+#else
   const int blend_sum_weight = 6;
   int sum_weight = 1 << blend_sum_weight;
+#endif
   if (cu.dimd_is_blend)
   {
+#if JVET_X0149_TIMD_DIMD_LUT
+    int g_gradDivTable[16] = { 0, 7, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0 };
+    sum_weight = sum_weight - dimd_planar_weight;
+    int s0 = first_amp;
+    int s1 = first_amp + second_amp;
+    int x = floorLog2(s1);
+    CHECK(x < 0, "floor log2 value should be no negative");
+    int norm_s1 = (s1 << 4 >> x) & 15;
+    int v = g_gradDivTable[norm_s1] | 8;
+    x += (norm_s1 != 0);
+    int shift = x + 3;
+    int add = (1 << (shift - 1));
+    int iRatio = (s0 * v * sum_weight + add) >> shift;
+#else
     double dRatio = 0.0;
     sum_weight -= static_cast<int>((double)sum_weight / 3); // ~ 1/3 of the weight to be reserved for planar
     dRatio = (double)first_amp / (double)(first_amp + second_amp);
     int iRatio = static_cast<int>(dRatio * sum_weight);
+#endif
     cu.dimdRelWeight[0] = iRatio;
     cu.dimdRelWeight[2] = sum_weight - iRatio;
+#if JVET_X0149_TIMD_DIMD_LUT
+    cu.dimdRelWeight[1] = dimd_planar_weight;
+#else
     cu.dimdRelWeight[1] = (1 << blend_sum_weight) - sum_weight;
+#endif
   }
   else
   {
@@ -3722,6 +3761,9 @@ int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t ui
   int dirs[4] = { -1, 1, -1, 1 };
   int map_x_gr_y_1[2][2] = { { 1, 0 },{ 0, 1 } };
   int map_x_gr_y_0[2][2] = { { 2, 3 },{ 3, 2 } };
+#if JVET_X0149_TIMD_DIMD_LUT
+  int g_gradDivTable[16] = { 0, 7, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0 };
+#endif
 
   for (uint32_t y = 0; y < uiHeight; y += h_step)
   {
@@ -3751,9 +3793,30 @@ int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t ui
         int x_gr_y = absx > absy ? 1 : 0;
         int region = x_gr_y ? map_x_gr_y_1[signy][signx] : map_x_gr_y_0[signy][signx];
         //region = (region == 1 ? 2 : (region == 2 ? 1 : (region == 3 ? 4 : 3)));
+#if JVET_X0149_TIMD_DIMD_LUT
+        int s0 = x_gr_y ? absy : absx;
+        int s1 = x_gr_y ? absx : absy;
+        int x = floorLog2(s1);
+        int norm_s1 = (s1 << 4 >> x) & 15;
+        int v = g_gradDivTable[norm_s1] | 8;
+        x += (norm_s1 != 0);
+        int shift = 13 - x;
+        int iRatio;
+        if (shift < 0)
+        {
+          shift = -shift;
+          int add = (1 << (shift - 1));
+          iRatio = (s0 * v + add) >> shift;
+        }
+        else
+        {
+          iRatio = (s0 * v) << shift;
+        }
+#else
         float fRatio = x_gr_y ? static_cast<float>(absy) / static_cast<float>(absx) : static_cast<float>(absx) / static_cast<float>(absy);
         float fRatio_scaled = fRatio * (1 << 16);
         int iRatio = static_cast<int>(fRatio_scaled);
+#endif
         // get ang_idx
         int idx = -1;
         for( int i = 1; i < 17; i++ )
