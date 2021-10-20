@@ -413,6 +413,11 @@ private:
 #endif
 
   Mv*       m_bdmvrSubPuMvBuf[2];
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+public:
+  void      getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvField_amList, const int decAmvpRefIdx = -1);
+  void      amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvField_amList, const int mvField_merge_idx, const int mvField_amvp_idx);
+#endif
 
 public:
   Mv*       getBdofSubPuMvOffset() {return m_bdofSubPuMvOffset;}

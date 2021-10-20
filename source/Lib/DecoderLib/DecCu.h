@@ -103,6 +103,9 @@ private:
 #if MULTI_PASS_DMVR
   Mv                m_mvBufBDMVR[2][MAX_NUM_SUBCU_DMVR];
 #endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+ MvField            mvField_amList_dec[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
+#endif
 
   MergeCtx          m_geoMrgCtx;
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG

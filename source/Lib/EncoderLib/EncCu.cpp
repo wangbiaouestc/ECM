@@ -8232,6 +8232,17 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 #if ENABLE_OBMC
   double bestOBMCCost = MAX_DOUBLE;
 #endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  int maxBdmvrAmSearchLoop = 3;
+  m_pcInterSearch->m_amvpOnlyCost = std::numeric_limits<Distortion>::max();
+  if ((tempCS->slice->getUseLIC() && (encTestMode.opts & ETO_LIC)) || !tempCS->slice->isInterB() || (tempCS->picHeader->getMvdL1ZeroFlag() == true))
+  {
+    maxBdmvrAmSearchLoop = 1;
+  }
+  for (int bdmvrAmSearchLoop = 0; bdmvrAmSearchLoop < maxBdmvrAmSearchLoop; bdmvrAmSearchLoop++)
+  {
+  bool bdmvrAmMergeNotValid = false;
+#endif
   tempCS->initStructData( encTestMode.qp );
   m_pcInterSearch->setAffineModeSelected(false);
 
@@ -8257,6 +8268,9 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   {
     bcwLoopNum = 1;
   }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  bcwLoopNum = (bdmvrAmSearchLoop > 0) ? 1 : bcwLoopNum;
+#endif
 
   double curBestCost = bestCS->cost;
   double equBcwCost = MAX_DOUBLE;
@@ -8311,7 +8325,37 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 #if INTER_LIC
   if (cu.slice->getUseLIC() && lic) { m_pcInterSearch->swapUniMvBuffer(); }
 #endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  if (bdmvrAmSearchLoop == 0)
+  {
+    cu.firstPU->amvpMergeModeFlag[REF_PIC_LIST_0] = false;
+    cu.firstPU->amvpMergeModeFlag[REF_PIC_LIST_1] = false;
+  }
+  else if (bdmvrAmSearchLoop == 1)
+  {
+    cu.firstPU->amvpMergeModeFlag[REF_PIC_LIST_0] = true;
+    cu.firstPU->amvpMergeModeFlag[REF_PIC_LIST_1] = false;
+  }
+  else
+  {
+    cu.firstPU->amvpMergeModeFlag[REF_PIC_LIST_0] = false;
+    cu.firstPU->amvpMergeModeFlag[REF_PIC_LIST_1] = true;
+  }
+  if (cu.firstPU->amvpMergeModeFlag[0] || cu.firstPU->amvpMergeModeFlag[1])
+  {
+    m_pcInterSearch->predInterSearch( cu, partitioner, bdmvrAmMergeNotValid,
+        mvField_amList_enc, m_mvBufEncAmBDMVR[0], m_mvBufEncAmBDMVR[1] );
+  }
+  else
+  m_pcInterSearch->predInterSearch( cu, partitioner, bdmvrAmMergeNotValid );
+  if ((cu.firstPU->refIdx[REF_PIC_LIST_0] < 0 && cu.firstPU->refIdx[REF_PIC_LIST_1] < 0) || bdmvrAmMergeNotValid)
+  {
+    tempCS->initStructData(encTestMode.qp);
+    continue;
+  }
+#else
   m_pcInterSearch->predInterSearch( cu, partitioner );
+#endif
 #if INTER_LIC
   if (cu.slice->getUseLIC() && lic) { m_pcInterSearch->swapUniMvBuffer(); }
 #endif
@@ -8390,6 +8434,9 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   {
     xCalDebCost( *bestCS, partitioner );
   }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  }
+#endif
 }
 
 
@@ -8397,6 +8444,9 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 
 bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode, double &bestIntPelCost)
 {
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  bool bdmvrAmMergeNotValid = false;
+#endif
 #if ENABLE_OBMC
   double bestOBMCCost = MAX_DOUBLE;
 #endif
@@ -8513,7 +8563,11 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
 #if INTER_LIC
   if (cu.slice->getUseLIC() && lic) { m_pcInterSearch->swapUniMvBuffer(); }
 #endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  m_pcInterSearch->predInterSearch( cu, partitioner, bdmvrAmMergeNotValid );
+#else
   m_pcInterSearch->predInterSearch( cu, partitioner );
+#endif
 #if INTER_LIC
   if (cu.slice->getUseLIC() && lic) { m_pcInterSearch->swapUniMvBuffer(); }
 #endif

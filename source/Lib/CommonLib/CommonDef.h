@@ -169,6 +169,11 @@ static const int MRG_MAX_NUM_CANDS =                                6; ///< MERG
 #endif
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFINE MERGE
 static const int IBC_MRG_MAX_NUM_CANDS =                            6; ///< IBC MERGE
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+static const int MAX_NUM_AMVP_CANDS_MAX_REF =                       MAX_NUM_REF * AMVP_MAX_NUM_CANDS;
+static const int AMVP_MERGE_MODE_MERGE_LIST_MAX_CANDS =             6;
+static const int AMVP_MERGE_MODE_REDUCED_MV_REFINE_SEARCH_ROUND =   8;
+#endif
 
 static const int MAX_TLAYER =                                       7; ///< Explicit temporal layer QP offset - max number of temporal layer
 

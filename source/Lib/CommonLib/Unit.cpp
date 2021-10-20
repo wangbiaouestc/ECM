@@ -675,6 +675,9 @@ void PredictionUnit::initData()
 
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
   {
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+    amvpMergeModeFlag[i] = false;
+#endif
     mvpIdx[i] = MAX_UCHAR;
     mvpNum[i] = MAX_UCHAR;
     refIdx[i] = -1;
@@ -769,6 +772,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
   {
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+    amvpMergeModeFlag[i] = predData.amvpMergeModeFlag[i];
+#endif
     mvpIdx[i]   = predData.mvpIdx[i];
     mvpNum[i]   = predData.mvpNum[i];
     mv[i]       = predData.mv[i];
@@ -859,6 +865,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
   {
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+    amvpMergeModeFlag[i] = other.amvpMergeModeFlag[i];
+#endif
     mvpIdx[i]   = other.mvpIdx[i];
     mvpNum[i]   = other.mvpNum[i];
     mv[i]       = other.mv[i];

@@ -1496,6 +1496,18 @@ const CtxSet ContextSetCfg::MVPIdx = ContextSetCfg::addCtxSet
 	{ 13 }
 });
 
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+const CtxSet ContextSetCfg::amFlagState = ContextSetCfg::addCtxSet
+({
+  {   34 },
+  {   34 },
+  {  CNU },
+  {    4 },
+  {    4 },
+  {  DWS },
+  });
+#endif
+
 const CtxSet ContextSetCfg::SmvdFlag = ContextSetCfg::addCtxSet
 ({
 	{ 28 },

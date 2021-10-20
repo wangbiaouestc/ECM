@@ -192,10 +192,18 @@ namespace PU
     , const bool isAvailableA1, const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
     , const bool ibcFlag
     , const bool isGt4x4
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+    , const PredictionUnit &pu
+    , const int curPoc = 0
+    , const int amvpPoc = 0
+#endif
 #if TM_MRG
     , const uint32_t mvdSimilarityThresh = 1
 #endif
   );
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  bool checkIsValidMergeMvCand        (const CodingStructure &cs, const PredictionUnit &pu, const int curPoc, const int amvpPoc, int8_t mergeRefIdx[ NUM_REF_PIC_LIST_01 ]);
+#endif
   void addAMVPHMVPCand                (const PredictionUnit &pu, const RefPicList eRefPicList, const int currRefPOC, AMVPInfo &info);
   bool addAffineMVPCandUnscaled       ( const PredictionUnit &pu, const RefPicList &refPicList, const int &refIdx, const Position &pos, const MvpDir &dir, AffineAMVPInfo &affiAmvpInfo );
   bool isBipredRestriction            (const PredictionUnit &pu);

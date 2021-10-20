@@ -1620,6 +1620,34 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         }
         else
       {
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+#if REUSE_CU_RESULTS
+        if (!cu.cs->pcv->isEncoder && (pu.amvpMergeModeFlag[REF_PIC_LIST_0] || pu.amvpMergeModeFlag[REF_PIC_LIST_1]))
+#else
+        if (pu.amvpMergeModeFlag[REF_PIC_LIST_0] || pu.amvpMergeModeFlag[REF_PIC_LIST_1])
+#endif
+        {
+          CHECK(pu.interDir != 3, "this is not possible");
+          const RefPicList refListMerge = pu.amvpMergeModeFlag[REF_PIC_LIST_0] ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+          const RefPicList refListAmvp = RefPicList(1 - refListMerge);
+          int orgRefIdxAMVP = pu.refIdx[refListAmvp];
+          int orgInterDir = pu.interDir;
+          int orgMvpIdxL0 = pu.mvpIdx[REF_PIC_LIST_0];
+          int orgMvpIdxL1 = pu.mvpIdx[REF_PIC_LIST_1];
+          Mv orgMvd0 = pu.mvd[0];
+          Mv orgMvd1 = pu.mvd[1];
+          // this part is to derive the merge info
+          m_pcInterPred->getAmvpMergeModeMergeList(pu, mvField_amList_dec, orgRefIdxAMVP);
+          // if there was set PU merge info, restore the AMVP information
+          pu.mvpIdx[REF_PIC_LIST_0] = orgMvpIdxL0;
+          pu.mvpIdx[REF_PIC_LIST_1] = orgMvpIdxL1;
+          pu.interDir = orgInterDir;
+          pu.mergeFlag = false;
+          pu.mvd[0] = orgMvd0;
+          pu.mvd[1] = orgMvd1;
+          pu.refIdx[refListAmvp] = orgRefIdxAMVP;
+        }
+#endif
         if( pu.cu->affine )
         {
           for ( uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++ )
@@ -1690,6 +1718,44 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             if ((pu.cs->slice->getNumRefIdx(eRefList) > 0 || (eRefList == REF_PIC_LIST_0 && CU::isIBC(*pu.cu))) && (pu.interDir & (1 << uiRefListIdx)))
             {
               AMVPInfo amvpInfo;
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+              if (pu.amvpMergeModeFlag[eRefList] == true)
+              {
+#if REUSE_CU_RESULTS
+                if (!cu.cs->pcv->isEncoder)
+                {
+#endif
+                const int mvField_merge_idx = pu.refIdx[1 - eRefList] * AMVP_MAX_NUM_CANDS + pu.mvpIdx[1 - eRefList];
+                pu.mv[eRefList] = mvField_amList_dec[mvField_merge_idx].mv;
+                pu.refIdx[eRefList] = mvField_amList_dec[mvField_merge_idx].refIdx;
+#if REUSE_CU_RESULTS
+                }
+#endif
+              }
+              else
+              {
+
+                if (pu.amvpMergeModeFlag[1 - eRefList] == true)
+                {
+#if TM_AMVP
+                  amvpInfo.numCand = 1;
+#else
+                  amvpInfo.numCand = AMVP_MAX_NUM_CANDS;
+#endif
+#if REUSE_CU_RESULTS
+                  if (cu.cs->pcv->isEncoder)
+                  {
+                    amvpInfo.mvCand[pu.mvpIdx[eRefList]] = pu.mv[eRefList] - pu.mvd[eRefList];
+                  }
+                  else
+#endif
+                  {
+                    const int mvField_amvp_idx = MAX_NUM_AMVP_CANDS_MAX_REF + pu.refIdx[eRefList] * AMVP_MAX_NUM_CANDS + pu.mvpIdx[eRefList];
+                    amvpInfo.mvCand[pu.mvpIdx[eRefList]] = mvField_amList_dec[mvField_amvp_idx].mv;
+                  }
+                }
+                else
+#endif
               PU::fillMvpCand(pu, eRefList, pu.refIdx[eRefList], amvpInfo
 #if TM_AMVP
                             , m_pcInterPred
@@ -1702,9 +1768,28 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               }
               pu.mv[eRefList] = amvpInfo.mvCand[pu.mvpIdx[eRefList]] + pu.mvd[eRefList];
               pu.mv[eRefList].mvCliptoStorageBitDepth();
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+              }
+#endif
             }
           }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+          if ((pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1]) && PU::checkBDMVRCondition(pu))
+          {
+            m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
+            pu.bdmvrRefine = true;
+            // span motion to subPU
+            for (int subPuIdx = 0; subPuIdx < MAX_NUM_SUBCU_DMVR; subPuIdx++)
+            {
+              m_mvBufBDMVR[0][subPuIdx] = pu.mv[0];
+              m_mvBufBDMVR[1][subPuIdx] = pu.mv[1];
+            }
+          }
+#endif
         }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+        if (!pu.bdmvrRefine)
+#endif
         PU::spanMotionInfo( pu, mrgCtx );
       }
     }
