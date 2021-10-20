@@ -275,6 +275,9 @@ public:
 #endif
 #if TM_MRG
   static const CtxSet   TMMergeFlag;
+#if JVET_X0141_CIIP_TIMD_TM
+  static const CtxSet   CiipTMMergeFlag;
+#endif
 #endif
   static const CtxSet   Mvd;
 #if MULTI_HYP_PRED

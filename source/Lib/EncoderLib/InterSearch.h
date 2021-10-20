@@ -108,6 +108,9 @@ struct ModeInfo
 #if CIIP_PDPC
   bool     isCiipPDPC;
 #endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  int      intraMode;
+#endif
   bool     isAffine;
 #if AFFINE_MMVD
   bool     isAffineMmvd;
@@ -131,6 +134,9 @@ struct ModeInfo
 #if CIIP_PDPC
     , isCiipPDPC(false)
 #endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+    , intraMode(0)
+#endif
     , isAffine(false)
 #if AFFINE_MMVD
     , isAffineMmvd(false)
@@ -151,6 +157,9 @@ struct ModeInfo
 #if CIIP_PDPC
     , const bool isCiipPDPC
 #endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+    , const int intraMode
+#endif
     , const bool isAffine
 #if ENABLE_OBMC
     , const bool isOBMC = false
@@ -165,6 +174,9 @@ struct ModeInfo
     mergeCand(mergeCand), isRegularMerge(isRegularMerge), isMMVD(isMMVD), isCIIP(isCIIP)
 #if CIIP_PDPC
     , isCiipPDPC(isCiipPDPC)
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+    , intraMode(intraMode)
 #endif
     , isAffine(isAffine)
 #if AFFINE_MMVD
@@ -190,6 +202,9 @@ struct ModeInfo
     isCIIP = pu.ciipFlag;
 #if CIIP_PDPC
     isCiipPDPC = pu.ciipPDPC;
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+    intraMode = pu.intraDir[0];
 #endif
     isAffine = cu.affine;
 #if AFFINE_MMVD

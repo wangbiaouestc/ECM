@@ -938,6 +938,25 @@ void DecCu::xReconInter(CodingUnit &cu)
   }
   else
   {
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+    if (cu.firstPU->ciipFlag
+#if CIIP_PDPC
+      && !cu.firstPU->ciipPDPC
+#endif
+      )
+    {
+      PredictionUnit *pu = cu.firstPU;
+      const CompArea &area = cu.Y();
+      if (cu.slice->getSPS()->getUseTimd() && (cu.lwidth() * cu.lheight() <= CIIP_MAX_SIZE))
+      {
+#if SECONDARY_MPM && ENABLE_DIMD
+        IntraPrediction::deriveDimdMode(cu.cs->picture->getRecoBuf(area), area, cu);
+#endif
+        cu.timdMode = m_pcIntraPred->deriveTimdMode(cu.cs->picture->getRecoBuf(area), area, cu);
+        pu->intraDir[0] = MAP131TO67(cu.timdMode);
+      }
+    }
+#endif
     m_pcIntraPred->geneIntrainterPred(cu, m_ciipBuffer);
 
     // inter prediction
@@ -1443,6 +1462,44 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         }
           PU::spanMotionInfo( pu, mrgCtx );
         }
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+        else if (pu.ciipFlag && pu.tmMergeFlag)
+        {
+          int storeMrgIdx = pu.mergeIdx;
+          pu.tmMergeFlag = false;
+          PU::getInterMergeCandidates(pu, mrgCtx, 0, CIIP_TM_MRG_MAX_NUM_CANDS - 1);
+          mrgCtx.numValidMergeCand = int(pu.cs->sps->getMaxNumCiipTMMergeCand());
+          pu.tmMergeFlag = true;
+          for (uint32_t uiMergeCand = 0; uiMergeCand < CIIP_TM_MRG_MAX_NUM_CANDS; uiMergeCand++)
+          {
+            mrgCtx.setMergeInfo(pu, uiMergeCand);
+            m_pcInterPred->deriveTMMv(pu);
+            // Store refined motion back to ciipTmMrgCtx
+            mrgCtx.interDirNeighbours[uiMergeCand] = pu.interDir;
+            mrgCtx.BcwIdx[uiMergeCand] = pu.cu->BcwIdx;  // Bcw may change, because bi may be reduced to uni by deriveTMMv(pu)
+            mrgCtx.mvFieldNeighbours[2 * uiMergeCand].setMvField(pu.mv[0], pu.refIdx[0]);
+            mrgCtx.mvFieldNeighbours[2 * uiMergeCand + 1].setMvField(pu.mv[1], pu.refIdx[1]);
+            if (pu.interDir == 1)
+            {
+              mrgCtx.mvFieldNeighbours[2 * uiMergeCand + 1].setMvField(Mv(), NOT_VALID);
+            }
+            if (pu.interDir == 2)
+            {
+              mrgCtx.mvFieldNeighbours[2 * uiMergeCand].setMvField(Mv(), NOT_VALID);
+            }
+          }
+#if JVET_W0090_ARMC_TM
+          if (pu.cs->sps->getUseAML())
+          {
+             m_pcInterPred->adjustInterMergeCandidates(pu, mrgCtx, CIIP_TM_MRG_MAX_NUM_CANDS - 1);
+          }
+#endif
+
+          mrgCtx.setMergeInfo(pu, storeMrgIdx);
+          pu.bdmvrRefine = false;
+          PU::spanMotionInfo(pu, mrgCtx);
+        }
+#endif
         else
         {
           if (CU::isIBC(*pu.cu))

@@ -1461,6 +1461,19 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseOBMC            ( m_OBMC );
 #endif
   sps.setUseCiip            ( m_ciip );
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  if(sps.getUseCiip())
+  {
+   if(getIntraPeriod() < 0)
+   {
+      sps.setUseCiipTmMrg (false);
+   }
+   else
+   {
+      sps.setUseCiipTmMrg (true);
+   }
+  }
+#endif
   sps.setUseGeo                ( m_Geo );
   sps.setUseMMVD               ( m_MMVD );
   sps.setFpelMmvdEnabledFlag   (( m_MMVD ) ? m_allowDisFracMMVD : false);

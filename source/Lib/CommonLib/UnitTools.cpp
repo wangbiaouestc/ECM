@@ -5159,7 +5159,11 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
     {
       mb.fill(mi);
 #if JVET_W0123_TIMD_FUSION
-      if (mi.isIBCmot)
+      if (mi.isIBCmot
+#if JVET_X0141_CIIP_TIMD_TM
+        || pu.ciipFlag
+#endif
+        )
       {
         ib.fill(PLANAR_IDX);
       }

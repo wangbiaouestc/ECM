@@ -1685,6 +1685,9 @@ private:
   bool              m_OBMC;
 #endif
   bool              m_ciip;
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  bool              m_ciipTmMrg;
+#endif
   bool              m_Geo;
 #if INTER_LIC
   bool              m_licEnabledFlag;
@@ -2016,6 +2019,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if TM_MRG
   uint32_t                getMaxNumTMMergeCand() const { return std::min((uint32_t)TM_MRG_MAX_NUM_CANDS, m_maxNumMergeCand); }
 #endif
+
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  uint32_t                getMaxNumCiipTMMergeCand() const { return std::min((uint32_t)CIIP_TM_MRG_MAX_NUM_CANDS, m_maxNumMergeCand); }
+#endif
 #if JVET_X0049_ADAPT_DMVR
   void                    setMaxNumBMMergeCand(uint32_t u) { m_maxNumBMMergeCand = u; }
   uint32_t                getMaxNumBMMergeCand() const { return m_maxNumBMMergeCand; }
@@ -2133,6 +2140,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #endif
   void      setUseCiip         ( bool b )                                        { m_ciip = b; }
   bool      getUseCiip         ()                                      const     { return m_ciip; }
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  void      setUseCiipTmMrg         ( bool b )                                        { m_ciipTmMrg = b; }
+  bool      getUseCiipTmMrg         ()                                      const     { return m_ciipTmMrg; }
+#endif
   void      setUseGeo             ( bool b )                                        { m_Geo = b; }
   bool      getUseGeo             ()                                      const     { return m_Geo; }
 #if INTER_LIC

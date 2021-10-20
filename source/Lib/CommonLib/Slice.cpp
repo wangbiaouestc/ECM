@@ -3155,6 +3155,9 @@ SPS::SPS()
 , m_OBMC                      ( false )
 #endif
 , m_ciip                      ( false )
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+, m_ciipTmMrg                 ( false )
+#endif
 , m_Geo                       ( false )
 #if INTER_LIC
 , m_licEnabledFlag            ( false )

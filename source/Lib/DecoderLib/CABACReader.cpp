@@ -3147,6 +3147,12 @@ void CABACReader::merge_data( PredictionUnit& pu )
       else if (ciipAvailable)
       {
         pu.ciipFlag = true;
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+        if (pu.cs->slice->getSPS()->getUseCiipTmMrg())
+        {
+          pu.tmMergeFlag = (m_BinDecoder.decodeBin(Ctx::CiipTMMergeFlag()));
+        }
+#endif
 #if CIIP_PDPC
         pu.ciipPDPC = ( m_BinDecoder.decodeBin( Ctx::CiipFlag( 1 ) ) );
 #endif
@@ -3305,7 +3311,18 @@ void CABACReader::merge_idx( PredictionUnit& pu )
 #if TM_MRG
   else if (pu.tmMergeFlag)
   {
+#if JVET_X0141_CIIP_TIMD_TM
+    if (pu.ciipFlag)
+    {
+      numCandminus1 = int(pu.cs->sps->getMaxNumCiipTMMergeCand()) - 1;
+    }
+    else
+    {
+      numCandminus1 = int(pu.cs->sps->getMaxNumTMMergeCand()) - 1;
+    }
+#else
     numCandminus1 = int(pu.cs->sps->getMaxNumTMMergeCand()) - 1;
+#endif
   }
 #endif
 #if JVET_X0049_ADAPT_DMVR
@@ -3351,6 +3368,7 @@ void CABACReader::merge_idx( PredictionUnit& pu )
     }
 #endif
   }
+
   DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() merge_idx=%d\n", pu.mergeIdx );
 #if JVET_X0049_ADAPT_DMVR
   if (pu.bmMergeFlag && pu.bmDir == 2)
@@ -3632,8 +3650,21 @@ void CABACReader::Ciip_flag(PredictionUnit& pu)
 #if CIIP_PDPC
   if( pu.ciipFlag )
   {
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+    if (pu.cs->slice->getSPS()->getUseCiipTmMrg())
+    {
+      pu.tmMergeFlag = (m_BinDecoder.decodeBin(Ctx::CiipTMMergeFlag()));
+    }
+#endif
     pu.ciipPDPC = (m_BinDecoder.decodeBin(Ctx::CiipFlag(1)));
   }
+#else
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  if (pu.ciipFlag && pu.cs->slice->getSPS()->getUseCiipTmMrg())
+  {
+    pu.tmMergeFlag = (m_BinDecoder.decodeBin(Ctx::CiipTMMergeFlag()));
+  }
+#endif
 #endif
 }
 
