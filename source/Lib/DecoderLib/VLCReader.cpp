@@ -2247,6 +2247,16 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 
   READ_FLAG( uiCode,    "sps_bcw_enabled_flag" );                   pcSPS->setUseBcw( uiCode != 0 );
   READ_FLAG( uiCode,     "sps_ciip_enabled_flag" );                           pcSPS->setUseCiip             ( uiCode != 0 );
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  if (pcSPS->getUseCiip())
+  {
+    READ_FLAG(uiCode, "sps_ciip_tm_merge_enabled_flag");                           pcSPS->setUseCiipTmMrg(uiCode != 0);
+  }
+  else
+  {
+    pcSPS->setUseCiipTmMrg(false);
+  }
+#endif
   if (pcSPS->getMaxNumMergeCand() >= 2)
   {
     READ_FLAG(uiCode, "sps_gpm_enabled_flag");

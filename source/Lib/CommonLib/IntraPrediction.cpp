@@ -1481,6 +1481,144 @@ void IntraPrediction::geneWeightedPred( const ComponentID compId, PelBuf& pred, 
       wIntra = 2; wMerge = 2;
     }
   }
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  const ChannelType chType = toChannelType(compId);
+  int dirMode = PU::getFinalIntraMode(pu, chType);
+  if (dirMode == PLANAR_IDX || dirMode == DC_IDX || width < 4 || height < 4)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for( int x = 0; x < width; x++ )
+      {
+        if( lmcs )
+        {
+          dstBuf[x] = ( wMerge * pLUT[interPredBuf[x]] + wIntra * intraPredBuf[x] + 2 ) >> 2;
+        }
+        else
+        {
+          dstBuf[x] = ( wMerge * interPredBuf[x] + wIntra * intraPredBuf[x] + 2 ) >> 2;
+        }
+      }
+      dstBuf += dstStride;
+      interPredBuf += interPredStride;
+      intraPredBuf += intraPredStride;
+    }
+  }
+  else if (dirMode < DIA_IDX)
+  {
+    int interval = (width >> 2);
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        if (x < interval)
+        {
+          if (lmcs)
+          {
+            dstBuf[x] = (2 * pLUT[interPredBuf[x]] + 6 * intraPredBuf[x] + 4) >> 3;
+          }
+          else
+          {
+            dstBuf[x] = (2 * interPredBuf[x] + 6 * intraPredBuf[x] + 4) >> 3;
+          }
+        }
+        else if (x >= interval && x < (2 * interval))
+        {
+          if (lmcs)
+          {
+            dstBuf[x] = (3 * pLUT[interPredBuf[x]] + 5 * intraPredBuf[x] + 4) >> 3;
+          }
+          else
+          {
+            dstBuf[x] = (3 * interPredBuf[x] + 5 * intraPredBuf[x] + 4) >> 3;
+          }
+        }
+        else if (x >= (interval * 2) && x < (3 * interval))
+        {
+          if (lmcs)
+          {
+            dstBuf[x] = (5 * pLUT[interPredBuf[x]] + 3 * intraPredBuf[x] + 4) >> 3;
+          }
+          else
+          {
+            dstBuf[x] = (5 * interPredBuf[x] + 3 * intraPredBuf[x] + 4) >> 3;
+          }
+        }
+        else
+        {
+          if (lmcs)
+          {
+            dstBuf[x] = (6 * pLUT[interPredBuf[x]] + 2 * intraPredBuf[x] + 4) >> 3;
+          }
+          else
+          {
+            dstBuf[x] = (6 * interPredBuf[x] + 2 * intraPredBuf[x] + 4) >> 3;
+          }
+        }
+      }
+      dstBuf += dstStride;
+      interPredBuf += interPredStride;
+      intraPredBuf += intraPredStride;
+    }
+  }
+  else
+  {
+    int interval = (height >> 2);
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        if (y < interval)
+        {
+          if (lmcs)
+          {
+            dstBuf[x] = (2 * pLUT[interPredBuf[x]] + 6 * intraPredBuf[x] + 4) >> 3;
+          }
+          else
+          {
+            dstBuf[x] = (2 * interPredBuf[x] + 6 * intraPredBuf[x] + 4) >> 3;
+          }
+        }
+        else if (y >= interval && y < (2 * interval))
+        {
+          if (lmcs)
+          {
+            dstBuf[x] = (3 * pLUT[interPredBuf[x]] + 5 * intraPredBuf[x] + 4) >> 3;
+          }
+          else
+          {
+            dstBuf[x] = (3 * interPredBuf[x] + 5 * intraPredBuf[x] + 4) >> 3;
+          }
+        }
+        else if (y >= (interval * 2) && y < (3 * interval))
+        {
+          if (lmcs)
+          {
+            dstBuf[x] = (5 * pLUT[interPredBuf[x]] + 3 * intraPredBuf[x] + 4) >> 3;
+          }
+          else
+          {
+            dstBuf[x] = (5 * interPredBuf[x] + 3 * intraPredBuf[x] + 4) >> 3;
+          }
+        }
+        else
+        {
+          if (lmcs)
+          {
+            dstBuf[x] = (6 * pLUT[interPredBuf[x]] + 2 * intraPredBuf[x] + 4) >> 3;
+          }
+          else
+          {
+            dstBuf[x] = (6 * interPredBuf[x] + 2 * intraPredBuf[x] + 4) >> 3;
+          }
+        }
+      }
+      dstBuf += dstStride;
+      interPredBuf += interPredStride;
+      intraPredBuf += intraPredStride;
+    }
+  }
+#else
   for (int y = 0; y < height; y++)
   {
     for( int x = 0; x < width; x++ )
@@ -1499,6 +1637,7 @@ void IntraPrediction::geneWeightedPred( const ComponentID compId, PelBuf& pred, 
     interPredBuf += interPredStride;
     intraPredBuf += intraPredStride;
   }
+#endif
 #if CIIP_PDPC
   }
   else

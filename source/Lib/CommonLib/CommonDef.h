@@ -600,6 +600,9 @@ static const int    TM_DISTANCE_WEIGHTS[][4] = { { 0, 1, 2, 3 }, { 1, 2, 3, 3 } 
 static const int    TM_SPATIAL_WEIGHTS [][4] = { { 2, 2, 2, 2 }, { 0, 1, 1, 2 } }; ///< "left to right for above template" or "top to bottom for left template"
 #if TM_MRG
 static const int    TM_MRG_MAX_NUM_CANDS =                          4; ///< maximum number of TM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
+#if JVET_X0141_CIIP_TIMD_TM
+static const int    CIIP_TM_MRG_MAX_NUM_CANDS =                     2; ///< maximum number of CIIP TM merge candidates (note: should be at most equal to CIIP_TM_MRG_MAX_NUM_CANDS)
+#endif
 #if MERGE_ENC_OPT
 static const int    TM_MAX_NUM_SATD_CAND = std::min((int)2, TM_MRG_MAX_NUM_CANDS);
 #else
@@ -689,6 +692,10 @@ static const int GEO_MAX_TRY_WEIGHTED_SATD = 8;
 
 #if ENABLE_OBMC
 static const unsigned int defaultWeight[2][4] = { {27, 16, 6, 0}, {27, 0, 0, 0} };
+#endif
+
+#if JVET_X0141_CIIP_TIMD_TM
+static const int CIIP_MAX_SIZE =                                 1024; ///< maximum CU size for using CIIP TIMD
 #endif
 
 #if TU_256

@@ -2703,8 +2703,21 @@ void CABACWriter::merge_data(const PredictionUnit& pu)
 #if CIIP_PDPC
     if (pu.ciipFlag && !geoAvailable && ciipAvailable)
     {
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+      if (pu.cs->slice->getSPS()->getUseCiipTmMrg())
+      {
+          m_BinEncoder.encodeBin(pu.tmMergeFlag, Ctx::CiipTMMergeFlag());
+      }
+#endif
       m_BinEncoder.encodeBin(pu.ciipPDPC, Ctx::CiipFlag(1));
     }
+#else
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+    if (pu.ciipFlag && !geoAvailable && ciipAvailable && pu.cs->slice->getSPS()->getUseCiipTmMrg())
+    {
+      m_BinEncoder.encodeBin(pu.tmMergeFlag, Ctx::CiipTMMergeFlag());
+    }
+#endif
 #endif
     merge_idx(pu);
   }
@@ -2902,7 +2915,20 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
       numCandminus1 = int(pu.cs->sps->getMaxNumIBCMergeCand()) - 1;
 #if TM_MRG
     else if (pu.tmMergeFlag)
+#if JVET_X0141_CIIP_TIMD_TM
+    {
+      if (pu.ciipFlag)
+      {
+        numCandminus1 = int(pu.cs->sps->getMaxNumCiipTMMergeCand()) - 1;
+      }
+      else
+      {
+        numCandminus1 = int(pu.cs->sps->getMaxNumTMMergeCand()) - 1;
+      }
+    }
+#else
       numCandminus1 = int(pu.cs->sps->getMaxNumTMMergeCand()) - 1;
+#endif
 #endif
 #if JVET_X0049_ADAPT_DMVR
     else if (pu.bmMergeFlag)
@@ -3441,8 +3467,21 @@ void CABACWriter::Ciip_flag(const PredictionUnit& pu)
 #if CIIP_PDPC
   if( pu.ciipFlag )
   {
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+    if (pu.cs->slice->getSPS()->getUseCiipTmMrg())
+    {
+        m_BinEncoder.encodeBin(pu.tmMergeFlag, Ctx::CiipTMMergeFlag());
+    }
+#endif
     m_BinEncoder.encodeBin(pu.ciipPDPC, Ctx::CiipFlag(1));
   }
+#else
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  if (pu.ciipFlag && pu.cs->slice->getSPS()->getUseCiipTmMrg())
+  {
+    m_BinEncoder.encodeBin(pu.tmMergeFlag, Ctx::CiipTMMergeFlag());
+  }
+#endif
 #endif
 }
 
