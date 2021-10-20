@@ -116,6 +116,7 @@
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
 #define JVET_X0149_TIMD_DIMD_LUT                          1 // JVET-X0149: LUT-based derivation of DIMD and TIMD
 #endif
+#define JVET_X0124_TMP_SIGNAL                   ENABLE_DIMD // JVET-X0124: cleanup on signalling of intra template matching
 
 // Inter
 #define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode

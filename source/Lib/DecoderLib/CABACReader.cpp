@@ -5041,6 +5041,14 @@ void CABACReader::tmp_flag(CodingUnit& cu)
 		return;
 	}
 
+#if JVET_X0124_TMP_SIGNAL
+	if (cu.dimd)
+	{
+		cu.tmpFlag = false;
+		return;
+	}
+#endif
+
   if( !cu.cs->sps->getUseIntraTMP() )
   {
     cu.tmpFlag = false;
