@@ -379,6 +379,58 @@ void IntraPrediction::xIntraPredTimdAngLuma(Pel* pDstBuf, const ptrdiff_t dstStr
     deltaPos += intraPredAngle;
   }
 }
+
+#if JVET_X0148_TIMD_PDPC
+void IntraPrediction::xIntraPredPlanarDcPdpc(const CPelBuf &pSrc, Pel* pDst, int iDstStride, int width, int height, bool ciipPDPC)
+{
+  const int iWidth  = width;
+  const int iHeight = height;
+  const int scale  = ((floorLog2(iWidth) - 2 + floorLog2(iHeight) - 2 + 2) >> 2);
+  CHECK(scale < 0 || scale > 31, "PDPC: scale < 0 || scale > 31");
+  const Pel *srcLeft = pSrc.bufAt(1, 1);
+#if CIIP_PDPC
+  if (ciipPDPC)
+  {
+    for (int y = 0; y < iHeight; y++)
+    {
+      const int  wT     = 32 >> std::min(31, ((y << 1) >> scale));
+      const Pel  left    = *srcLeft;
+      const Pel *srcTop = pSrc.buf + 1;
+      for (int x = 0; x < iWidth; x++)
+      {
+        const int wL  = 32 >> std::min(31, ((x << 1) >> scale));
+        const Pel top = *srcTop;
+        pDst[x]        = ((wL * left + wT * top + 32) >> 6);
+
+        srcTop++;
+      }
+      srcLeft++;
+      pDst += iDstStride;
+    }
+  }
+  else
+#endif
+    for (int y = 0; y < iHeight; y++)
+    {
+      const int  wT     = 32 >> std::min(31, ((y << 1) >> scale));
+      const Pel  left   = *srcLeft;
+      const Pel *srcTop = pSrc.buf + 1;
+
+      for (int x = 0; x < iWidth; x++)
+      {
+        const int wL  = 32 >> std::min(31, ((x << 1) >> scale));
+        const Pel top = *srcTop;
+        const Pel val = pDst[x];
+
+        pDst[x] = val + ((wL * (left - val) + wT * (top - val) + 32) >> 6);
+        srcTop++;
+      }
+
+      srcLeft++;
+      pDst += iDstStride;
+    }
+}
+#endif
 #endif
 
 // ====================================================================================================================
@@ -516,6 +568,17 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #endif
     }
 #if CIIP_PDPC
+  }
+#endif
+
+#if JVET_X0148_TIMD_PDPC
+#if CIIP_PDPC
+  if ((m_ipaParam.applyPDPC || pu.ciipPDPC) && (uiDirMode == PLANAR_IDX || uiDirMode == DC_IDX))
+#else
+  if (m_ipaParam.applyPDPC && (uiDirMode == PLANAR_IDX || uiDirMode == DC_IDX))
+#endif
+  {
+    xIntraPredPlanarDcPdpc(srcBuf, piPred.buf, piPred.stride, iWidth, iHeight, pu.ciipPDPC);
   }
 #endif
 
@@ -673,6 +736,16 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     default:          xPredIntraAng(srcBuf, predFusion, channelType, clpRng, bExtIntraDir); break;
     }
 
+#if JVET_X0148_TIMD_PDPC
+#if CIIP_PDPC
+    if ((m_ipaParam.applyPDPC || pu.ciipPDPC) && (pu.cu->timdModeSecondary == PLANAR_IDX || pu.cu->timdModeSecondary == DC_IDX))
+#else
+    if (m_ipaParam.applyPDPC && (pu.cu->timdModeSecondary == PLANAR_IDX || pu.cu->timdModeSecondary == DC_IDX))
+#endif
+    {
+      xIntraPredPlanarDcPdpc(srcBuf, m_tempBuffer[1].getBuf(localUnitArea.Y()).buf, m_tempBuffer[1].getBuf(localUnitArea.Y()).stride, iWidth, iHeight, pu.ciipPDPC);
+    }
+#endif
     m_ipaParam.applyPDPC = applyPdpc;
 
     // do blending
@@ -696,6 +769,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
   }
 #endif
 
+#if !JVET_X0148_TIMD_PDPC
 #if CIIP_PDPC
   if (m_ipaParam.applyPDPC || pu.ciipPDPC)
 #else
@@ -754,6 +828,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       }
     }
   }
+#endif
 }
 
 void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea& chromaArea, int intraDir)
