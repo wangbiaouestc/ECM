@@ -4832,6 +4832,13 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
 		return;
 	}
 
+#if JVET_X0124_TMP_SIGNAL
+	if (cu.dimd)
+	{
+		return;
+	}
+#endif
+
   if( !cu.cs->sps->getUseIntraTMP() )
   {
     return;
