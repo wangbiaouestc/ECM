@@ -113,7 +113,7 @@
 #define JVET_V0130_INTRA_TMP                              1 // JVET-V0130: template matching prediction
 #define JVET_W0069_TMP_BOUNDARY								            1 // JVET-W0069: boundary handling for TMP
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
-#define JVET_X0124_TMP_SIGNAL                             1 // JVET-X0124: cleanup on signalling of intra template matching
+#define JVET_X0124_TMP_SIGNAL                   ENABLE_DIMD // JVET-X0124: cleanup on signalling of intra template matching
 
 // Inter
 #define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
