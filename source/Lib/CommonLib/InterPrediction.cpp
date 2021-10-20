@@ -1707,7 +1707,8 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
           && dmvrWidth == 0                                  //seems to conflict with DMVR, not sure //kolya
         )
         m_if.filter4x4(clpRng,  (Pel*)refBuf.buf, refBuf.stride,  dstBuf.buf, dstBuf.stride, xFrac, yFrac, rndRes);
-      else {
+      else
+      {
 #endif
         PelBuf tmpBuf = dmvrWidth ? PelBuf( m_filteredBlockTmp[0][compID], Size( dmvrWidth, dmvrHeight ) ) : PelBuf( m_filteredBlockTmp[0][compID], pu.blocks[compID] );
         if( dmvrWidth == 0 )
@@ -1799,10 +1800,11 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
       dstBuf.buf = backupDstBufPtr;
       dstBuf.stride = backupDstBufStride;
     }
-
-#if INTER_LIC
 #if RPR_ENABLE
   }
+#endif
+#if INTER_LIC
+#if RPR_ENABLE
   PelBuf& dstBuf = dstPic.bufs[compID];
 #endif
 
@@ -1839,9 +1841,9 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
       }
 #endif
     }
+#endif
 #if !RPR_ENABLE
   }
-#endif
 #endif
 }
 

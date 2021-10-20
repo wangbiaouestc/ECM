@@ -4844,6 +4844,13 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
     return;
   }
 
+#if JVET_X0124_TMP_SIGNAL
+	if (cu.dimd)
+	{
+		return;
+	}
+#endif
+
 	unsigned ctxId = DeriveCtx::CtxTmpFlag(cu);
 	m_BinEncoder.encodeBin(cu.tmpFlag, Ctx::TmpFlag(ctxId));
 	DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpFlag ? 1 : 0);
