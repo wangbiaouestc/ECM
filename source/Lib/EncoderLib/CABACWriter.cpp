@@ -4833,23 +4833,16 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
 	}
 
 #if JVET_X0124_TMP_SIGNAL
-	if (cu.dimd)
-	{
-		return;
-	}
+  if (cu.dimd)
+  {
+    return;
+  }
 #endif
 
   if( !cu.cs->sps->getUseIntraTMP() )
   {
     return;
   }
-
-#if JVET_X0124_TMP_SIGNAL
-	if (cu.dimd)
-	{
-		return;
-	}
-#endif
 
 	unsigned ctxId = DeriveCtx::CtxTmpFlag(cu);
 	m_BinEncoder.encodeBin(cu.tmpFlag, Ctx::TmpFlag(ctxId));
