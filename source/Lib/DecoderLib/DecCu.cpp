@@ -385,22 +385,23 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 	  {
 		  int foundCandiNum;
 #if JVET_W0069_TMP_BOUNDARY
-		  RefTemplateType TempType = m_pcIntraPred->GetRefTemplateType(*(tu.cu), tu.cu->blocks[COMPONENT_Y]);
-		  if (TempType != NO_TEMPLATE)
+		  RefTemplateType tempType = m_pcIntraPred->getRefTemplateType(*(tu.cu), tu.cu->blocks[COMPONENT_Y]);
+
+      if( tempType != NO_TEMPLATE )
 		  {
-			  m_pcTrQuant->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight(), TempType);
-			  m_pcTrQuant->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight(), TempType);
-			  m_pcTrQuant->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+        m_pcIntraPred->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight(), tempType);
+        m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight(), tempType);
+        m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
 		  }
 		  else
 		  {
 			  foundCandiNum = 1;
-			  m_pcTrQuant->generateTM_DC_Prediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1));
+        m_pcIntraPred->generateTmDcPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1));
 		  }
 #else
-		  m_pcTrQuant->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
-		  m_pcTrQuant->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
-		  m_pcTrQuant->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+      m_pcIntraPred->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
+      m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
+      m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
 #endif
 		  assert(foundCandiNum >= 1);
 	  }
@@ -605,9 +606,9 @@ void DecCu::xIntraRecACTBlk(TransformUnit& tu)
 	{
 		int foundCandiNum;
 		const unsigned int uiStride = cs.picture->getRecoBuf(COMPONENT_Y).stride;
-		m_pcTrQuant->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
-		m_pcTrQuant->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
-		m_pcTrQuant->generateTMPrediction(piPred.buf, uiStride, pu.lwidth(), pu.lheight(), foundCandiNum);
+    m_pcIntraPred->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
+    m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
+    m_pcIntraPred->generateTMPrediction(piPred.buf, uiStride, pu.lwidth(), pu.lheight(), foundCandiNum);
 	}
 	else if (PU::isMIP(pu, chType))
 #else

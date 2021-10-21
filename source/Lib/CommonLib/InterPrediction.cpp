@@ -48,6 +48,10 @@
 #include "Reshape.h"
 #endif
 
+#if ENABLE_SIMD_TMP
+#include "CommonDefX86.h"
+#endif
+
 //! \ingroup CommonLib
 //! \{
 

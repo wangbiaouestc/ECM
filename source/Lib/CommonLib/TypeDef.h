@@ -65,6 +65,8 @@
 
 #define REMOVE_PCM                                        1 // Remove PCM related code for memory reduction and speedup
 
+#define JVET_X0049_BDMVR_SW_OPT                           1 // JVET-X0049: software optimization for BDMVR (lossless)
+
 // SIMD optimizations
 #define MCIF_SIMD_NEW                                     1 // SIMD for interpolation
 #define DIST_SSE_ENABLE                                   1 // Enable SIMD for SSE
@@ -109,15 +111,19 @@
 #define INTRA_6TAP                                        1 // 6TapCubic + 6 TapGaussian + left side 4 tap weak filtering for intra.
 #define SECONDARY_MPM                                     1 // Primary MPM and Secondary MPM: Add neighbouring modes into MPMs from positions AR, BL, AL, derived modes
 #define ENABLE_DIMD                                       1 // Decoder side intra mode derivation
-#define JVET_V0087_DIMD_NO_ISP                  ENABLE_DIMD // JVET-V0087: disallow combination of DIMD and ISP
+#if ENABLE_DIMD
+#define JVET_V0087_DIMD_NO_ISP                            1 // JVET-V0087: disallow combination of DIMD and ISP
+#define JVET_X0124_TMP_SIGNAL                             1 // JVET-X0124: cleanup on signalling of intra template matching
+#endif
 #define JVET_V0130_INTRA_TMP                              1 // JVET-V0130: template matching prediction
 #define JVET_W0069_TMP_BOUNDARY								            1 // JVET-W0069: boundary handling for TMP
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
-#define JVET_X0148_TIMD_PDPC         JVET_W0123_TIMD_FUSION // JVET-X0148: PDPC handling for TIMD
+#if JVET_W0123_TIMD_FUSION
+#define JVET_X0148_TIMD_PDPC                              1 // JVET-X0148: PDPC handling for TIMD
+#endif
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
 #define JVET_X0149_TIMD_DIMD_LUT                          1 // JVET-X0149: LUT-based derivation of DIMD and TIMD
 #endif
-#define JVET_X0124_TMP_SIGNAL                   ENABLE_DIMD // JVET-X0124: cleanup on signalling of intra template matching
 
 // Inter
 #define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
@@ -131,13 +137,11 @@
 #define IF_12TAP                                          1 // 12-tap IF
 #define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
 
-#define JVET_X0049_BDMVR_SW_OPT                           1 // JVET-X0049: software optimization for BDMVR (lossless)
 #if JVET_X0049_BDMVR_SW_OPT
 #define JVET_X0049_ADAPT_DMVR                             1 // JVET-X0049: Adaptive DMVR
 #endif
 #define JVET_X0056_DMVD_EARLY_TERMINATION                 1 // JVET-X0056: Early termination for DMVR and TM
-
-#define JVET_X0083_BM_AMVP_MERGE_MODE                     1
+#define JVET_X0083_BM_AMVP_MERGE_MODE                     1 // JVET-X0083: AMVP-merge mode
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
