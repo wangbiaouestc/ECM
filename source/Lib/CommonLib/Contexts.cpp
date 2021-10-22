@@ -917,6 +917,17 @@ const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
 	{ 4 },
 	{ 4 }
 });
+#if JVET_X0141_CIIP_TIMD_TM
+const CtxSet ContextSetCfg::CiipTMMergeFlag = ContextSetCfg::addCtxSet
+({
+  { 25 },
+  { 26 },
+  { 35 },
+  { 4 },
+  { 4 },
+  { 4 }
+  });
+#endif
 #endif
 
 const CtxSet ContextSetCfg::PredMode = ContextSetCfg::addCtxSet
@@ -1104,6 +1115,18 @@ const CtxSet ContextSetCfg::SubblockMergeFlag = ContextSetCfg::addCtxSet
 	{ 4,  4,  4 }
 });
 
+#if JVET_X0049_ADAPT_DMVR
+const CtxSet ContextSetCfg::BMMergeFlag = ContextSetCfg::addCtxSet
+({
+  { 25, CNU, CNU, CNU },
+  { 26, CNU, CNU, CNU },
+  { 35, CNU, CNU, CNU },
+  { 4, 4, 4, 4 },
+  { 4, 4, 4, 4 },
+  { 4, 4, 4, 4 }
+});
+#endif
+
 const CtxSet ContextSetCfg::AffineFlag = ContextSetCfg::addCtxSet
 ({
 	{ 34, 27,  6 },
@@ -1172,9 +1195,9 @@ const CtxSet ContextSetCfg::MultiHypothesisFlag = ContextSetCfg::addCtxSet
   { 3, 26, CNU, },
   { 3, 26, CNU, },
   { 35, 35, CNU, },
-  { 1,  4, CNU, },
-  { 1,  4, CNU, },
-  { 4,  4, CNU, }
+  { 1,  4, DWS, },
+  { 1,  4, DWS, },
+  { 4,  4, DWS, }
 });
 
 const CtxSet ContextSetCfg::MHRefPic = ContextSetCfg::addCtxSet
@@ -1473,6 +1496,18 @@ const CtxSet ContextSetCfg::MVPIdx = ContextSetCfg::addCtxSet
 	{ 13 }
 });
 
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+const CtxSet ContextSetCfg::amFlagState = ContextSetCfg::addCtxSet
+({
+  {   34 },
+  {   34 },
+  {  CNU },
+  {    4 },
+  {    4 },
+  {  DWS },
+  });
+#endif
+
 const CtxSet ContextSetCfg::SmvdFlag = ContextSetCfg::addCtxSet
 ({
 	{ 28 },
@@ -1514,6 +1549,26 @@ const CtxSet ContextSetCfg::BifCtrlFlags = ContextSetCfg::addCtxSet
   { DWS }
 });
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+const CtxSet ContextSetCfg::CBifCtrlFlags_Cb = ContextSetCfg::addCtxSet
+({
+  { 39 },
+  { 39 },
+  { 39 },
+  { DWS },
+  { DWS },
+  { DWS }
+});
+const CtxSet ContextSetCfg::CBifCtrlFlags_Cr = ContextSetCfg::addCtxSet
+({
+  { 39 },
+  { 39 },
+  { 39 },
+  { DWS },
+  { DWS },
+  { DWS }
+});
+#endif
 
 #if JVET_W0066_CCSAO
 const CtxSet ContextSetCfg::CcSaoControlIdc = ContextSetCfg::addCtxSet
@@ -1521,6 +1576,8 @@ const CtxSet ContextSetCfg::CcSaoControlIdc = ContextSetCfg::addCtxSet
   { CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, },
   { CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, },
   { CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, },
+  { DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, },
+  { DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, },
   { DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, },
 });
 #endif
@@ -2094,6 +2151,15 @@ const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
   { CNU, },
   {   4, },
 });
+#if JVET_X0141_CIIP_TIMD_TM
+const CtxSet ContextSetCfg::CiipTMMergeFlag = ContextSetCfg::addCtxSet
+({
+  {  25, },
+  {  26, },
+  { CNU, },
+  {   4, },
+  });
+#endif
 #endif
 
 const CtxSet ContextSetCfg::PredMode = ContextSetCfg::addCtxSet
@@ -2246,6 +2312,15 @@ const CtxSet ContextSetCfg::SubblockMergeFlag = ContextSetCfg::addCtxSet
   {   4,   4,   4, },
 });
 
+#if JVET_X0049_ADAPT_DMVR
+const CtxSet ContextSetCfg::BMMergeFlag = ContextSetCfg::addCtxSet
+({
+  { 25, CNU, CNU, CNU },
+  { 26, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU },
+  { 4, 4, 4, 4 },
+});
+#endif
 const CtxSet ContextSetCfg::AffineFlag = ContextSetCfg::addCtxSet
 ({
   {  19,  13,   6, },
@@ -2574,6 +2649,22 @@ const CtxSet ContextSetCfg::BifCtrlFlags = ContextSetCfg::addCtxSet
   { 39, },
   { 39, },
   { DWS, },
+});
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+const CtxSet ContextSetCfg::CBifCtrlFlags_Cb = ContextSetCfg::addCtxSet
+({
+    { 39, },
+    { 39, },
+    { 39, },
+    { DWS, },
+});
+const CtxSet ContextSetCfg::CBifCtrlFlags_Cr = ContextSetCfg::addCtxSet
+({
+    { 39, },
+    { 39, },
+    { 39, },
+    { DWS, },
 });
 #endif
 

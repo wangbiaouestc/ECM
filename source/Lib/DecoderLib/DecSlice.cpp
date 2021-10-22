@@ -243,6 +243,13 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
       cabacReader.bif(cs);
     }
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+    if (ctuRsAddr == 0)
+    {
+        cabacReader.Cbif_Cb(cs);
+        cabacReader.Cbif_Cr(cs);
+    }
+#endif
     cabacReader.coding_tree_unit( cs, ctuArea, pic->m_prevQP, ctuRsAddr );
 
     m_pcCuDecoder->decompressCtu( cs, ctuArea );

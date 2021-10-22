@@ -1942,7 +1942,11 @@ static void simdCalcClass0(AlfClassifier **classifier, const Area &blkDst, const
 static void simdCalcClass1(AlfClassifier **classifier, const Area &blkDst, const Area &curBlk, int dirWindSize, int classDir, int noDir, int noAct, int bitDepth, int subBlkSize, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS])
 {
   const __m128i shift = _mm_cvtsi32_si128(9 + bitDepth);
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+  const int multTab[] = { 16884, 4221, 1872, 1053, 675, 468 };
+#else
   const int multTab[] = { 5628, 1407, 624, 351, 225, 156 };
+#endif
   const __m128i mult = _mm_set1_epi32(multTab[dirWindSize]);
   const __m128i scale = _mm_set1_epi32(15);
 

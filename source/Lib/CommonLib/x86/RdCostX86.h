@@ -350,6 +350,153 @@ Distortion RdCost::xGetSSE_NxN_SIMD( const DistParam &rcDtParam )
   return uiRet;
 }
 
+#if DIST_SSE_ENABLE && CTU_256
+template<X86_VEXT vext> 
+Distortion RdCost::xGetSSE_NxN_SIMD(const DistParam &rcDtParam)
+{
+  if (rcDtParam.bitDepth > 10 || rcDtParam.applyWeight)
+    return RdCost::xGetSSE(rcDtParam);
+
+  const Torg *pSrc1       = (const Torg *) rcDtParam.org.buf;
+  const Tcur *pSrc2       = (const Tcur *) rcDtParam.cur.buf;
+  int         iCols       = rcDtParam.org.width;
+  int         iRows       = rcDtParam.org.height;
+  const int   iStrideSrc1 = rcDtParam.org.stride;
+  const int   iStrideSrc2 = rcDtParam.cur.stride;
+
+  const uint32_t uiShift = DISTORTION_PRECISION_ADJUSTMENT(rcDtParam.bitDepth) << 1;
+  Distortion uiRet = 0;
+
+  if (4 == iCols)
+  {
+    __m128i Sum = _mm_setzero_si128();
+    __m128i vzero = _mm_setzero_si128();
+    for (int iY = 0; iY < iRows; iY++)
+    {
+      __m128i Src1 = (sizeof(Torg) > 1) ? (_mm_loadl_epi64((const __m128i *) pSrc1)) : (_mm_unpacklo_epi8(_mm_cvtsi32_si128(*(const int *) pSrc1), vzero));
+      __m128i Src2 = (sizeof(Tcur) > 1) ? (_mm_loadl_epi64((const __m128i *) pSrc2)) : (_mm_unpacklo_epi8(_mm_cvtsi32_si128(*(const int *) pSrc2), vzero));
+      pSrc1 += iStrideSrc1;
+      pSrc2 += iStrideSrc2;
+      __m128i Diff = _mm_sub_epi16(Src1, Src2);
+      __m128i Res  = _mm_madd_epi16(Diff, Diff);
+      Sum          = _mm_add_epi32(Sum, Res);
+    }
+    Sum   = _mm_add_epi32(Sum, _mm_shuffle_epi32(Sum, 0xb1));   // 10110001
+    uiRet = _mm_cvtsi128_si32(Sum) >> uiShift;
+  }
+  else
+  {
+    if (vext >= AVX2 && ((iCols & 15) == 0))
+    {
+#ifdef USE_AVX2
+      __m256i vzero = _mm256_setzero_si256();
+
+      int num = 1;
+      int rows = iRows;
+
+      if( iRows > 64 )
+      {
+        num = iRows / 64;
+        rows = 64;
+      }
+
+      for( int i = 0; i < num; i++ )
+      {
+        __m256i Sum = _mm256_setzero_si256();
+
+        for( int iY = 0; iY < rows; iY++ )
+        {
+          for( int iX = 0; iX < iCols; iX += 16 )
+          {
+            __m256i Src1 = (sizeof( Torg ) > 1) ? (_mm256_lddqu_si256( (__m256i *)(&pSrc1[iX]) )) : (_mm256_unpacklo_epi8( _mm256_permute4x64_epi64( _mm256_castsi128_si256( _mm_lddqu_si128( (__m128i *) (&pSrc1[iX]) ) ), 0xD8 ), vzero ));
+            __m256i Src2 = (sizeof( Tcur ) > 1) ? (_mm256_lddqu_si256( (__m256i *)(&pSrc2[iX]) )) : (_mm256_unpacklo_epi8( _mm256_permute4x64_epi64( _mm256_castsi128_si256( _mm_lddqu_si128( (__m128i *) (&pSrc2[iX]) ) ), 0xD8 ), vzero ));
+            __m256i Diff = _mm256_sub_epi16( Src1, Src2 );
+            __m256i Res  = _mm256_madd_epi16( Diff, Diff );
+            Sum          = _mm256_add_epi32( Sum, Res );
+          }
+          pSrc1 += iStrideSrc1;
+          pSrc2 += iStrideSrc2;
+        }
+
+        Sum = _mm256_add_epi64( _mm256_unpacklo_epi32( Sum, vzero ), _mm256_unpackhi_epi32( Sum, vzero ) );
+        Sum = _mm256_add_epi64( Sum, _mm256_permute4x64_epi64( Sum, 14 ) );
+        Sum = _mm256_add_epi64( Sum, _mm256_permute4x64_epi64( Sum, 1 ) );
+        uiRet += _mm_cvtsi128_si64( _mm256_castsi256_si128( Sum ) ) >> uiShift;
+      }
+      uiRet >>= uiShift;
+#endif
+    }
+    else if (iCols > 32 && (iCols & 15) == 0)
+    {
+      if (iRows > 16 && (iRows & 15))
+      {
+        uiRet = RdCost::xGetSSE(rcDtParam);
+      }
+      else
+      {
+        __m128i vzero = _mm_setzero_si128();
+
+        int num  = 1;
+        int rows = iRows;
+
+        if (iRows > 16)
+        {
+          num  = iRows / 16;
+          rows = 16;
+        }
+
+        for (int i = 0; i < num; i++)
+        {
+          __m128i Sum = _mm_setzero_si128();
+
+          for (int iY = 0; iY < rows; iY++)
+          {
+            for (int iX = 0; iX < iCols; iX += 8)
+            {
+              __m128i Src1 = (sizeof(Torg) > 1)  ? (_mm_loadu_si128((const __m128i *) (&pSrc1[iX]))) : (_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *) (&pSrc1[iX])), vzero));
+              __m128i Src2 = (sizeof(Tcur) > 1)  ? (_mm_lddqu_si128((const __m128i *) (&pSrc2[iX]))) : (_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *) (&pSrc2[iX])), vzero));
+
+              __m128i Diff = _mm_sub_epi16(Src1, Src2);
+              __m128i Res  = _mm_madd_epi16(Diff, Diff);
+              Sum          = _mm_add_epi32(Sum, Res);
+            }
+            pSrc1 += iStrideSrc1;
+            pSrc2 += iStrideSrc2;
+          }
+          Sum = _mm_add_epi32(Sum, _mm_shuffle_epi32(Sum, 0x4e));   // 01001110
+          Sum = _mm_add_epi32(Sum, _mm_shuffle_epi32(Sum, 0xb1));   // 10110001
+          uiRet += _mm_cvtsi128_si32(Sum);
+        }
+        uiRet >>= uiShift;
+      }
+    }
+    else if ((iCols & 7) == 0)
+    {
+      __m128i Sum = _mm_setzero_si128();
+      __m128i vzero = _mm_setzero_si128();
+
+      for (int iY = 0; iY < iRows; iY++)
+      {
+        for (int iX = 0; iX < iCols; iX += 8)
+        {
+          __m128i Src1 = (sizeof(Torg) > 1) ? (_mm_loadu_si128((const __m128i *) (&pSrc1[iX]))) : (_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *) (&pSrc1[iX])), vzero));
+          __m128i Src2 = (sizeof(Tcur) > 1) ? (_mm_lddqu_si128((const __m128i *) (&pSrc2[iX]))) : (_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *) (&pSrc2[iX])), vzero));
+          __m128i Diff = _mm_sub_epi16(Src1, Src2);
+          __m128i Res  = _mm_madd_epi16(Diff, Diff);
+          Sum          = _mm_add_epi32(Sum, Res);
+        }
+        pSrc1 += iStrideSrc1;
+        pSrc2 += iStrideSrc2;
+      }
+      Sum   = _mm_add_epi32(Sum, _mm_shuffle_epi32(Sum, 0x4e));   // 01001110
+      Sum   = _mm_add_epi32(Sum, _mm_shuffle_epi32(Sum, 0xb1));   // 10110001
+      uiRet = _mm_cvtsi128_si32(Sum) >> uiShift;
+    }
+  }
+  return uiRet;
+}
+#endif
+
 template< X86_VEXT vext >
 Distortion RdCost::xGetSAD_SIMD( const DistParam &rcDtParam )
 {
@@ -2446,7 +2593,11 @@ void RdCost::_initRdCostX86()
   m_afpDistortFunc[DF_SSE16] = xGetSSE_NxN_SIMD<16, vext>;
   m_afpDistortFunc[DF_SSE32] = xGetSSE_NxN_SIMD<32, vext>;
   m_afpDistortFunc[DF_SSE64] = xGetSSE_NxN_SIMD<64, vext>;
+#if CTU_256
+  m_afpDistortFunc[DF_SSE16N] = xGetSSE_NxN_SIMD<vext>;
+#else
   m_afpDistortFunc[DF_SSE16N] = xGetSSE_NxN_SIMD<128, vext>;
+#endif
 #else
   //m_afpDistortFunc[DF_SSE    ] = xGetSSE_SIMD<Pel, Pel, vext>;
   //m_afpDistortFunc[DF_SSE2   ] = xGetSSE_SIMD<Pel, Pel, vext>;

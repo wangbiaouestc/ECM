@@ -385,22 +385,23 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 	  {
 		  int foundCandiNum;
 #if JVET_W0069_TMP_BOUNDARY
-		  RefTemplateType TempType = m_pcIntraPred->GetRefTemplateType(*(tu.cu), tu.cu->blocks[COMPONENT_Y]);
-		  if (TempType != NO_TEMPLATE)
+		  RefTemplateType tempType = m_pcIntraPred->getRefTemplateType(*(tu.cu), tu.cu->blocks[COMPONENT_Y]);
+
+      if( tempType != NO_TEMPLATE )
 		  {
-			  m_pcTrQuant->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight(), TempType);
-			  m_pcTrQuant->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight(), TempType);
-			  m_pcTrQuant->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+        m_pcIntraPred->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight(), tempType);
+        m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight(), tempType);
+        m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
 		  }
 		  else
 		  {
 			  foundCandiNum = 1;
-			  m_pcTrQuant->generateTM_DC_Prediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1));
+        m_pcIntraPred->generateTmDcPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1));
 		  }
 #else
-		  m_pcTrQuant->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
-		  m_pcTrQuant->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
-		  m_pcTrQuant->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+      m_pcIntraPred->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
+      m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
+      m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
 #endif
 		  assert(foundCandiNum >= 1);
 	  }
@@ -605,9 +606,9 @@ void DecCu::xIntraRecACTBlk(TransformUnit& tu)
 	{
 		int foundCandiNum;
 		const unsigned int uiStride = cs.picture->getRecoBuf(COMPONENT_Y).stride;
-		m_pcTrQuant->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
-		m_pcTrQuant->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
-		m_pcTrQuant->generateTMPrediction(piPred.buf, uiStride, pu.lwidth(), pu.lheight(), foundCandiNum);
+    m_pcIntraPred->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
+    m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
+    m_pcIntraPred->generateTMPrediction(piPred.buf, uiStride, pu.lwidth(), pu.lheight(), foundCandiNum);
 	}
 	else if (PU::isMIP(pu, chType))
 #else
@@ -938,6 +939,25 @@ void DecCu::xReconInter(CodingUnit &cu)
   }
   else
   {
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+    if (cu.firstPU->ciipFlag
+#if CIIP_PDPC
+      && !cu.firstPU->ciipPDPC
+#endif
+      )
+    {
+      PredictionUnit *pu = cu.firstPU;
+      const CompArea &area = cu.Y();
+      if (cu.slice->getSPS()->getUseTimd() && (cu.lwidth() * cu.lheight() <= CIIP_MAX_SIZE))
+      {
+#if SECONDARY_MPM && ENABLE_DIMD
+        IntraPrediction::deriveDimdMode(cu.cs->picture->getRecoBuf(area), area, cu);
+#endif
+        cu.timdMode = m_pcIntraPred->deriveTimdMode(cu.cs->picture->getRecoBuf(area), area, cu);
+        pu->intraDir[0] = MAP131TO67(cu.timdMode);
+      }
+    }
+#endif
     m_pcIntraPred->geneIntrainterPred(cu, m_ciipBuffer);
 
     // inter prediction
@@ -972,7 +992,11 @@ void DecCu::xReconInter(CodingUnit &cu)
   if (cu.firstPU->ciipFlag)
   {
     const UnitArea localUnitArea( cu.cs->area.chromaFormat, Area( 0, 0, cu.Y().width, cu.Y().height ) );
-
+#if ENABLE_OBMC && JVET_X0090_CIIP_FIX
+    cu.isobmcMC = true;
+    m_pcInterPred->subBlockOBMC(*cu.firstPU);
+    cu.isobmcMC = false;
+#endif
     if( cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() )
     {
       m_pcIntraPred->geneWeightedPred<true>( COMPONENT_Y, cu.cs->getPredBuf( *cu.firstPU ).Y(), *cu.firstPU, cu.cs->getPredBuf( *cu.firstPU ).Y(), m_ciipBuffer.getBuf( localUnitArea.Y() ), m_pcReshape->getFwdLUT().data() );
@@ -994,7 +1018,14 @@ void DecCu::xReconInter(CodingUnit &cu)
   }
 #if ENABLE_OBMC
   cu.isobmcMC = true;
+#if JVET_X0090_CIIP_FIX
+  if (!cu.firstPU->ciipFlag)
+  {
+    m_pcInterPred->subBlockOBMC(*cu.firstPU);
+  }
+#else
   m_pcInterPred->subBlockOBMC(*cu.firstPU);
+#endif
   cu.isobmcMC = false;
 #endif
   DTRACE    ( g_trace_ctx, D_TMP, "pred " );
@@ -1432,11 +1463,68 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         }
           PU::spanMotionInfo( pu, mrgCtx );
         }
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+        else if (pu.ciipFlag && pu.tmMergeFlag)
+        {
+          int storeMrgIdx = pu.mergeIdx;
+          pu.tmMergeFlag = false;
+          PU::getInterMergeCandidates(pu, mrgCtx, 0, CIIP_TM_MRG_MAX_NUM_CANDS - 1);
+          mrgCtx.numValidMergeCand = int(pu.cs->sps->getMaxNumCiipTMMergeCand());
+          pu.tmMergeFlag = true;
+          for (uint32_t uiMergeCand = 0; uiMergeCand < CIIP_TM_MRG_MAX_NUM_CANDS; uiMergeCand++)
+          {
+            mrgCtx.setMergeInfo(pu, uiMergeCand);
+            m_pcInterPred->deriveTMMv(pu);
+            // Store refined motion back to ciipTmMrgCtx
+            mrgCtx.interDirNeighbours[uiMergeCand] = pu.interDir;
+            mrgCtx.BcwIdx[uiMergeCand] = pu.cu->BcwIdx;  // Bcw may change, because bi may be reduced to uni by deriveTMMv(pu)
+            mrgCtx.mvFieldNeighbours[2 * uiMergeCand].setMvField(pu.mv[0], pu.refIdx[0]);
+            mrgCtx.mvFieldNeighbours[2 * uiMergeCand + 1].setMvField(pu.mv[1], pu.refIdx[1]);
+            if (pu.interDir == 1)
+            {
+              mrgCtx.mvFieldNeighbours[2 * uiMergeCand + 1].setMvField(Mv(), NOT_VALID);
+            }
+            if (pu.interDir == 2)
+            {
+              mrgCtx.mvFieldNeighbours[2 * uiMergeCand].setMvField(Mv(), NOT_VALID);
+            }
+          }
+#if JVET_W0090_ARMC_TM
+          if (pu.cs->sps->getUseAML())
+          {
+             m_pcInterPred->adjustInterMergeCandidates(pu, mrgCtx, CIIP_TM_MRG_MAX_NUM_CANDS - 1);
+          }
+#endif
+
+          mrgCtx.setMergeInfo(pu, storeMrgIdx);
+          pu.bdmvrRefine = false;
+          PU::spanMotionInfo(pu, mrgCtx);
+        }
+#endif
         else
         {
           if (CU::isIBC(*pu.cu))
             PU::getIBCMergeCandidates(pu, mrgCtx, pu.mergeIdx);
           else
+#if JVET_X0049_ADAPT_DMVR
+            if (pu.bmMergeFlag)
+            {
+              uint8_t mergeIdx = pu.bmDir == 2 ? pu.mergeIdx - BM_MRG_MAX_NUM_CANDS : pu.mergeIdx;
+#if JVET_W0090_ARMC_TM
+              if (pu.cs->sps->getUseAML())
+              {
+                PU::getInterBMCandidates(pu, mrgCtx, pu.cs->sps->getUseAML() && (((mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumBMMergeCand()) || (mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : mergeIdx);
+                uint8_t bmDir = pu.bmDir;
+                pu.bmDir = 0;
+                m_pcInterPred->adjustInterMergeCandidates(pu, mrgCtx, mergeIdx);
+                pu.bmDir = bmDir;
+              }
+              else
+#endif
+              PU::getInterBMCandidates(pu, mrgCtx, mergeIdx);
+            }
+            else
+#endif
 #if JVET_W0090_ARMC_TM
             if (pu.cs->sps->getUseAML())
             {
@@ -1465,10 +1553,18 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 
             CHECK(mrgCtx.numValidMergeCand <= 0, "this is not possible");
 
+#if JVET_X0049_ADAPT_DMVR
+#if TM_MRG
+            if (!pu.tmMergeFlag && !pu.bmMergeFlag && mrgCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu)))
+#else
+            if (!pu.bmMergeFlag && mrgCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu)))
+#endif
+#else
 #if TM_MRG
             if( !pu.tmMergeFlag && mrgCtx.xCheckSimilarMotion( pu.mergeIdx, PU::getBDMVRMvdThreshold( pu ) ) )
 #else
             if( mrgCtx.xCheckSimilarMotion( pu.mergeIdx, PU::getBDMVRMvdThreshold( pu ) ) )
+#endif
 #endif
             {
               // span motion to subPU
@@ -1525,6 +1621,34 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         }
         else
       {
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+#if REUSE_CU_RESULTS
+        if (!cu.cs->pcv->isEncoder && (pu.amvpMergeModeFlag[REF_PIC_LIST_0] || pu.amvpMergeModeFlag[REF_PIC_LIST_1]))
+#else
+        if (pu.amvpMergeModeFlag[REF_PIC_LIST_0] || pu.amvpMergeModeFlag[REF_PIC_LIST_1])
+#endif
+        {
+          CHECK(pu.interDir != 3, "this is not possible");
+          const RefPicList refListMerge = pu.amvpMergeModeFlag[REF_PIC_LIST_0] ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+          const RefPicList refListAmvp = RefPicList(1 - refListMerge);
+          int orgRefIdxAMVP = pu.refIdx[refListAmvp];
+          int orgInterDir = pu.interDir;
+          int orgMvpIdxL0 = pu.mvpIdx[REF_PIC_LIST_0];
+          int orgMvpIdxL1 = pu.mvpIdx[REF_PIC_LIST_1];
+          Mv orgMvd0 = pu.mvd[0];
+          Mv orgMvd1 = pu.mvd[1];
+          // this part is to derive the merge info
+          m_pcInterPred->getAmvpMergeModeMergeList(pu, mvField_amList_dec, orgRefIdxAMVP);
+          // if there was set PU merge info, restore the AMVP information
+          pu.mvpIdx[REF_PIC_LIST_0] = orgMvpIdxL0;
+          pu.mvpIdx[REF_PIC_LIST_1] = orgMvpIdxL1;
+          pu.interDir = orgInterDir;
+          pu.mergeFlag = false;
+          pu.mvd[0] = orgMvd0;
+          pu.mvd[1] = orgMvd1;
+          pu.refIdx[refListAmvp] = orgRefIdxAMVP;
+        }
+#endif
         if( pu.cu->affine )
         {
           for ( uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++ )
@@ -1595,6 +1719,44 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             if ((pu.cs->slice->getNumRefIdx(eRefList) > 0 || (eRefList == REF_PIC_LIST_0 && CU::isIBC(*pu.cu))) && (pu.interDir & (1 << uiRefListIdx)))
             {
               AMVPInfo amvpInfo;
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+              if (pu.amvpMergeModeFlag[eRefList] == true)
+              {
+#if REUSE_CU_RESULTS
+                if (!cu.cs->pcv->isEncoder)
+                {
+#endif
+                const int mvField_merge_idx = pu.refIdx[1 - eRefList] * AMVP_MAX_NUM_CANDS + pu.mvpIdx[1 - eRefList];
+                pu.mv[eRefList] = mvField_amList_dec[mvField_merge_idx].mv;
+                pu.refIdx[eRefList] = mvField_amList_dec[mvField_merge_idx].refIdx;
+#if REUSE_CU_RESULTS
+                }
+#endif
+              }
+              else
+              {
+
+                if (pu.amvpMergeModeFlag[1 - eRefList] == true)
+                {
+#if TM_AMVP
+                  amvpInfo.numCand = 1;
+#else
+                  amvpInfo.numCand = AMVP_MAX_NUM_CANDS;
+#endif
+#if REUSE_CU_RESULTS
+                  if (cu.cs->pcv->isEncoder)
+                  {
+                    amvpInfo.mvCand[pu.mvpIdx[eRefList]] = pu.mv[eRefList] - pu.mvd[eRefList];
+                  }
+                  else
+#endif
+                  {
+                    const int mvField_amvp_idx = MAX_NUM_AMVP_CANDS_MAX_REF + pu.refIdx[eRefList] * AMVP_MAX_NUM_CANDS + pu.mvpIdx[eRefList];
+                    amvpInfo.mvCand[pu.mvpIdx[eRefList]] = mvField_amList_dec[mvField_amvp_idx].mv;
+                  }
+                }
+                else
+#endif
               PU::fillMvpCand(pu, eRefList, pu.refIdx[eRefList], amvpInfo
 #if TM_AMVP
                             , m_pcInterPred
@@ -1607,9 +1769,28 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               }
               pu.mv[eRefList] = amvpInfo.mvCand[pu.mvpIdx[eRefList]] + pu.mvd[eRefList];
               pu.mv[eRefList].mvCliptoStorageBitDepth();
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+              }
+#endif
             }
           }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+          if ((pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1]) && PU::checkBDMVRCondition(pu))
+          {
+            m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
+            pu.bdmvrRefine = true;
+            // span motion to subPU
+            for (int subPuIdx = 0; subPuIdx < MAX_NUM_SUBCU_DMVR; subPuIdx++)
+            {
+              m_mvBufBDMVR[0][subPuIdx] = pu.mv[0];
+              m_mvBufBDMVR[1][subPuIdx] = pu.mv[1];
+            }
+          }
+#endif
         }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+        if (!pu.bdmvrRefine)
+#endif
         PU::spanMotionInfo( pu, mrgCtx );
       }
     }

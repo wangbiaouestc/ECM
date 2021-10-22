@@ -139,9 +139,16 @@ protected:
                              Mv(-2, 2), Mv(-1, 2), Mv(0, 2), Mv(1, 2), Mv(2, 2) };
   uint64_t m_SADsArray[((2 * DMVR_NUM_ITERATION) + 1) * ((2 * DMVR_NUM_ITERATION) + 1)];
 #if MULTI_PASS_DMVR
+#if JVET_X0049_BDMVR_SW_OPT
+  Mv m_pSearchEnlargeOffset_bilMrg[5][BDMVR_INTME_AREA];
+  uint16_t m_pSearchEnlargeOffsetToIdx[5][BDMVR_INTME_AREA];
+  uint16_t m_pSearchEnlargeOffsetNum[5];
+  uint64_t m_SADsEnlargeArray_bilMrg[BDMVR_INTME_AREA];
+#else
   Mv m_pSearchEnlargeOffset_bilMrg[BDMVR_INTME_AREA];
   uint64_t m_SADsEnlargeArray_bilMrg[BDMVR_INTME_AREA];
   int searchPriority_bilMrg[BDMVR_INTME_AREA];
+#endif
   int costShift_1_bilMrg[BDMVR_INTME_AREA];
   int costShift_2_bilMrg[BDMVR_INTME_AREA];
 #endif
@@ -218,7 +225,7 @@ protected:
                                  , Pel *srcPadBuf = NULL
                                  , int32_t srcPadStride = 0
 #if JVET_W0090_ARMC_TM
-                                 , bool AML = false
+                                 , bool isAML = false
 #if INTER_LIC
                                  , bool doLic = false
                                  , Mv   mvCurr = Mv(0, 0)
@@ -366,23 +373,60 @@ public:
 #if MULTI_PASS_DMVR
 private:
   void       xBDMVRFillBlkPredPelBuffer(const PredictionUnit& pu, const Picture& refPic, const Mv &_mv, PelUnitBuf &dstBuf, const ClpRng& clpRng);
+#if JVET_X0049_ADAPT_DMVR
+  template <uint8_t dir>
+#endif
   void       xBDMVRPreInterpolation    (const PredictionUnit& pu, const Mv (&mvCenter)[2], bool doPreInterpolationFP, bool doPreInterpolationHP);
 
+#if JVET_X0049_BDMVR_SW_OPT
+  Distortion xBDMVRGetMatchingError    (const PredictionUnit& pu, const Mv (&mv)[2], bool useMR, bool useHadmard = false );
+#if JVET_X0049_ADAPT_DMVR
+  template <uint8_t dir>
+#endif
+#else
   Distortion xBDMVRGetMatchingError    (const PredictionUnit& pu, const Mv (&mv)[2], bool useMR );
+#endif
   Distortion xBDMVRGetMatchingError    (const PredictionUnit& pu, const Mv (&mv)[2], const int subPuOffset, bool useHadmard, bool useMR
                                       , bool& doPreInterpolation, int32_t searchStepShift, const Mv (&mvCenter)[2]
                                       , const Mv(&mvInitial)[2]  // only used for full-pel MVD
                                       , int nDirect              // only used for half-pel MVD
                                         );
+#if JVET_X0049_BDMVR_SW_OPT
+  template <bool adaptRange, bool useHadamard>
+  Distortion xBDMVRMvIntPelFullSearch  (Mv&mvOffset, Distortion curBestCost, 
+    const Mv(&initialMv)[2], 
+    const int32_t maxSearchRounds, 
+    const int maxHorOffset, const int maxVerOffset, 
+    const bool earlySkip,
+    const Distortion earlyTerminateTh, DistParam &cDistParam, Pel* pelBuffer[2], const int stride);
+  template<bool hPel>
+  Distortion xBDMVRMvSquareSearch(Mv(&curBestMv)[2], Distortion curBestCost, PredictionUnit& pu, const Mv(&initialMv)[2], int32_t maxSearchRounds, int32_t searchStepShift, bool useMR, bool useHadmard);
+#if JVET_X0049_ADAPT_DMVR
+  template <uint8_t dir>
+  Distortion xBDMVRMvOneTemplateHPelSquareSearch(Mv(&curBestMv)[2], Distortion curBestCost, PredictionUnit& pu,
+    const Mv(&initialMv)[2], int32_t maxSearchRounds, int32_t searchStepShift,
+    bool useMR, bool useHadmard);
+#endif
+#else
   Distortion xBDMVRMvIntPelFullSearch  (Mv (&curBestMv)[2], Distortion curBestCost, PredictionUnit& pu, const Mv (&initialMv)[2], int32_t maxSearchRounds, int32_t searchStepShift, bool useMR, const int subPuBufOffset );
-  Distortion xBDMVRMvSquareSearch      (Mv (&curBestMv)[2], Distortion curBestCost, PredictionUnit& pu, const Mv (&initialMv)[2], int32_t maxSearchRounds, int32_t searchStepShift, bool useMR, bool useHadmard);
+  Distortion xBDMVRMvSquareSearch      (Mv(&curBestMv)[2], Distortion curBestCost, PredictionUnit& pu, const Mv(&initialMv)[2], int32_t maxSearchRounds, int32_t searchStepShift, bool useMR, bool useHadmard);
+#endif
 
   Mv*       m_bdmvrSubPuMvBuf[2];
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+public:
+  void      getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvField_amList, const int decAmvpRefIdx = -1);
+  void      amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvField_amList, const int mvField_merge_idx, const int mvField_amvp_idx);
+#endif
 
 public:
   Mv*       getBdofSubPuMvOffset() {return m_bdofSubPuMvOffset;}
   void      setBdmvrSubPuMvBuf(Mv* mvBuf0, Mv* mvBuf1) { m_bdmvrSubPuMvBuf[0] = mvBuf0; m_bdmvrSubPuMvBuf[1] = mvBuf1; }
   bool      processBDMVR              (PredictionUnit& pu);
+#if JVET_X0049_ADAPT_DMVR
+  bool      processBDMVRPU2Dir        (PredictionUnit& pu, bool subPURefine[2], Mv(&finalMvDir)[2]);
+  void      processBDMVRSubPU         (PredictionUnit& pu, bool subPURefine);
+#endif
 #endif
   void xFillIBCBuffer(CodingUnit &cu);
   void resetIBCBuffer(const ChromaFormat chromaFormatIDC, const int ctuSize);
@@ -443,6 +487,9 @@ class TplMatchingCtrl
   PelBuf m_refSrAbove; // pre-filled samples on search area
   PelBuf m_refSrLeft;  // pre-filled samples on search area
 
+#if JVET_X0056_DMVD_EARLY_TERMINATION
+  Distortion m_earlyTerminateTh;
+#endif
 #if MULTI_PASS_DMVR
   Distortion m_tmCostArrayDiamond[9];
   Distortion m_tmCostArrayCross[5];

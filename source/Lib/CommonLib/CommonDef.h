@@ -124,7 +124,7 @@ static const int AFFINE_ME_LIST_SIZE =                             4;
 static const int AFFINE_ME_LIST_SIZE_LD =                          3;
 static const double AFFINE_ME_LIST_MVP_TH =                        1.0;
 
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
 static const int32_t NUMBER_PADDED_SAMPLES =  2;
 static const int32_t BIF_ROUND_ADD =         32;
 static const int32_t BIF_ROUND_SHIFT =        6;
@@ -169,6 +169,11 @@ static const int MRG_MAX_NUM_CANDS =                                6; ///< MERG
 #endif
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFINE MERGE
 static const int IBC_MRG_MAX_NUM_CANDS =                            6; ///< IBC MERGE
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+static const int MAX_NUM_AMVP_CANDS_MAX_REF =                       MAX_NUM_REF * AMVP_MAX_NUM_CANDS;
+static const int AMVP_MERGE_MODE_MERGE_LIST_MAX_CANDS =             6;
+static const int AMVP_MERGE_MODE_REDUCED_MV_REFINE_SEARCH_ROUND =   8;
+#endif
 
 static const int MAX_TLAYER =                                       7; ///< Explicit temporal layer QP offset - max number of temporal layer
 
@@ -237,8 +242,13 @@ static const int MAX_ALF_FILTER_LENGTH       =                      7;
 #endif
 static const int MAX_NUM_ALF_COEFF           =                     MAX_ALF_FILTER_LENGTH * MAX_ALF_FILTER_LENGTH / 2 + 1;
 static const int MAX_ALF_PADDING_SIZE        =                      4;
+#if JVET_X0071_LONGER_CCALF
+#define MAX_NUM_CC_ALF_FILTERS                                      16
+static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               25;
+#else
 #define MAX_NUM_CC_ALF_FILTERS                                      4
 static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               8;
+#endif
 static constexpr int CCALF_DYNAMIC_RANGE            =               6;
 static constexpr int CCALF_BITS_PER_COEFF_LEVEL     =               3;
 
@@ -247,6 +257,11 @@ static const int ALF_CTB_MAX_NUM_APS         =                      8;
 #if ALF_IMPROVEMENT
 static const int ALF_ORDER                   =                      4;
 static const int NUM_FIXED_FILTER_SETS       =                      2;
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+static const int ALF_NUM_CLASSIFIER          =                      2;
+static const int ALF_CLASSES_NEW             =                     25;
+static const int ALF_NUM_CLASSES_CLASSIFIER[ALF_NUM_CLASSIFIER] = { MAX_NUM_ALF_CLASSES,  ALF_CLASSES_NEW };
+#endif
 #else 
 static const int NUM_FIXED_FILTER_SETS       =                     16;
 static const int NUM_TOTAL_FILTER_SETS       =                     NUM_FIXED_FILTER_SETS + ALF_CTB_MAX_NUM_APS;
@@ -590,6 +605,9 @@ static const int    TM_DISTANCE_WEIGHTS[][4] = { { 0, 1, 2, 3 }, { 1, 2, 3, 3 } 
 static const int    TM_SPATIAL_WEIGHTS [][4] = { { 2, 2, 2, 2 }, { 0, 1, 1, 2 } }; ///< "left to right for above template" or "top to bottom for left template"
 #if TM_MRG
 static const int    TM_MRG_MAX_NUM_CANDS =                          4; ///< maximum number of TM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
+#if JVET_X0141_CIIP_TIMD_TM
+static const int    CIIP_TM_MRG_MAX_NUM_CANDS =                     2; ///< maximum number of CIIP TM merge candidates (note: should be at most equal to CIIP_TM_MRG_MAX_NUM_CANDS)
+#endif
 #if MERGE_ENC_OPT
 static const int    TM_MAX_NUM_SATD_CAND = std::min((int)2, TM_MRG_MAX_NUM_CANDS);
 #else
@@ -604,6 +622,12 @@ static const int    BDMVR_INTME_AREA   = BDMVR_INTME_STRIDE * BDMVR_INTME_STRIDE
 static const int    BDMVR_INTME_CENTER = BDMVR_INTME_STRIDE * BDMVR_INTME_RANGE + BDMVR_INTME_RANGE; ///< Bilateral matching search area center
 static const int    BDMVR_SIMD_IF_FACTOR =                          8; ///< Specify the pixel alignment factor for SIMD IF. (Usually this factor is 8)
 static const int    BDMVR_INTME_MAX_NUM_SEARCH_ITERATION =         26; ///< for entire CU in bilateral mode, maximum number of refinement loops
+#if JVET_X0049_BDMVR_SW_OPT
+static const int    BDMVR_BUF_STRIDE = MAX_CU_SIZE + (BDMVR_INTME_RANGE << 1) + (BDMVR_SIMD_IF_FACTOR - 2);
+static const int    BDMVR_CENTER_POSITION = BDMVR_INTME_RANGE * BDMVR_BUF_STRIDE + BDMVR_INTME_RANGE;
+static const int    BM_MRG_MAX_NUM_CANDS = 6; ///< maximum number of BM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
+static const int    BM_MRG_SUB_PU_INT_MAX_SRCH_ROUND = 3;
+#endif
 #endif
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
 static const int    DECODER_SIDE_MV_WEIGHT =                        4; ///< lambda for decoder-side derived MVs
@@ -673,6 +697,10 @@ static const int GEO_MAX_TRY_WEIGHTED_SATD = 8;
 
 #if ENABLE_OBMC
 static const unsigned int defaultWeight[2][4] = { {27, 16, 6, 0}, {27, 0, 0, 0} };
+#endif
+
+#if JVET_X0141_CIIP_TIMD_TM
+static const int CIIP_MAX_SIZE =                                 1024; ///< maximum CU size for using CIIP TIMD
 #endif
 
 #if TU_256
@@ -948,6 +976,49 @@ static inline int floorLog2(uint32_t x)
 #endif
 #endif
 }
+
+#if JVET_X0149_TIMD_DIMD_LUT
+static inline int floorLog2_uint64(uint64_t x)
+{
+  if (x == 0)
+  {
+    // note: ceilLog2() expects -1 as return value
+    return -1;
+  }
+  int result = 0;
+  if (x & 0xffffffff00000000)
+  {
+    x >>= 32;
+    result += 32;
+  }
+  if (x & 0xffff0000)
+  {
+    x >>= 16;
+    result += 16;
+  }
+  if (x & 0xff00)
+  {
+    x >>= 8;
+    result += 8;
+  }
+  if (x & 0xf0)
+  {
+    x >>= 4;
+    result += 4;
+  }
+  if (x & 0xc)
+  {
+    x >>= 2;
+    result += 2;
+  }
+  if (x & 0x2)
+  {
+    x >>= 1;
+    result += 1;
+  }
+  return result;
+}
+#endif
 
 static inline int ceilLog2(uint32_t x)
 {

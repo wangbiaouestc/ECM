@@ -414,6 +414,10 @@ private:
   static Distortion xGetSSE_SIMD    ( const DistParam& pcDtParam );
   template<int iWidth, X86_VEXT vext>
   static Distortion xGetSSE_NxN_SIMD( const DistParam& pcDtParam );
+#if DIST_SSE_ENABLE && CTU_256
+  template<X86_VEXT vext>
+  static Distortion xGetSSE_NxN_SIMD( const DistParam &pcDtParam );
+#endif
 
   template<X86_VEXT vext>
   static Distortion xGetSAD_SIMD    ( const DistParam& pcDtParam );

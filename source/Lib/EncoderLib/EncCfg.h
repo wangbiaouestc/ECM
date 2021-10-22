@@ -347,6 +347,9 @@ protected:
   unsigned  m_uiMaxMTTHierarchyDepth;
   unsigned  m_uiMaxMTTHierarchyDepthI;
   unsigned  m_uiMaxMTTHierarchyDepthIChroma;
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+  unsigned  m_maxMTTHierarchyDepthByTid[MAX_TLAYER];
+#endif
   bool      m_dualITree;
   unsigned  m_maxCUWidth;
   unsigned  m_maxCUHeight;
@@ -725,6 +728,9 @@ protected:
   WeightedPredictionMethod m_weightedPredictionMethod;
   uint32_t      m_log2ParallelMergeLevelMinus2;       ///< Parallel merge estimation region
   uint32_t      m_maxNumMergeCand;                    ///< Maximum number of merge candidates
+#if JVET_X0049_ADAPT_DMVR
+  uint32_t      m_maxNumBMMergeCand;                  ///< Maximum number of BM merge candidates
+#endif
   uint32_t      m_maxNumAffineMergeCand;              ///< Maximum number of affine merge candidates
   uint32_t      m_maxNumGeoCand;
   uint32_t      m_maxNumIBCMergeCand;                 ///< Max number of IBC merge candidates
@@ -829,6 +835,11 @@ protected:
   bool        m_BIF;
   int         m_BIFStrength;
   int         m_BIFQPOffset;
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  bool        m_CBIF;
+  int         m_CBIFStrength;
+  int         m_CBIFQPOffset;
 #endif
   
   bool        m_ccalf;
@@ -1124,6 +1135,11 @@ public:
   void      setMaxTTSizes                   ( unsigned* maxTT)   { m_uiMaxTT[0] = maxTT[0]; m_uiMaxTT[1] = maxTT[1]; m_uiMaxTT[2] = maxTT[2]; }
   void      setMaxMTTHierarchyDepth         ( unsigned uiMaxMTTHierarchyDepth, unsigned uiMaxMTTHierarchyDepthI, unsigned uiMaxMTTHierarchyDepthIChroma )
                                                              { m_uiMaxMTTHierarchyDepth = uiMaxMTTHierarchyDepth; m_uiMaxMTTHierarchyDepthI = uiMaxMTTHierarchyDepthI; m_uiMaxMTTHierarchyDepthIChroma = uiMaxMTTHierarchyDepthIChroma; }
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+  void      setMaxMTTHierarchyDepthByTid    ( unsigned* maxMTTHierarchyDepthByTid )   { std::memcpy( m_maxMTTHierarchyDepthByTid, maxMTTHierarchyDepthByTid, sizeof( m_maxMTTHierarchyDepthByTid) );}
+  unsigned  getMaxMTTHierarchyDepthByTid    ( int i ) const                           { CHECK( (i < 0 || i >= MAX_TLAYER), "EncCgf::getMaxMTTHierarchyDepthByTid: abnormal index value" ); return m_maxMTTHierarchyDepthByTid[i]; }
+  unsigned* getMaxMTTHierarchyDepthsByTid   ()                                        { return &m_maxMTTHierarchyDepthByTid[0]; }
+#endif
   unsigned  getMaxMTTHierarchyDepth         ()         const { return m_uiMaxMTTHierarchyDepth; }
   unsigned  getMaxMTTHierarchyDepthI        ()         const { return m_uiMaxMTTHierarchyDepthI; }
   unsigned  getMaxMTTHierarchyDepthIChroma  ()         const { return m_uiMaxMTTHierarchyDepthIChroma; }
@@ -1331,6 +1347,14 @@ public:
   int       getBIFStrength                  ()         const { return m_BIFStrength; }
   void      setBIFQPOffset                  ( int val )       { m_BIFQPOffset = val; }
   int       getBIFQPOffset                  ()         const { return m_BIFQPOffset; }
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  void      setUseCBIF                       ( bool b )       { m_CBIF = b; }
+  bool      getUseCBIF                       ()         const { return m_CBIF; }
+  void      setCBIFStrength                  ( int val )       { m_CBIFStrength = val; }
+  int       getCBIFStrength                  ()         const { return m_CBIFStrength; }
+  void      setCBIFQPOffset                  ( int val )       { m_CBIFQPOffset = val; }
+  int       getCBIFQPOffset                  ()         const { return m_CBIFQPOffset; }
 #endif
 #if MULTI_HYP_PRED
   void      setNumMHPCandsToTest(int i) { m_numMHPCandsToTest = i; }
@@ -1953,6 +1977,10 @@ public:
   uint32_t     getLog2ParallelMergeLevelMinus2()                     { return m_log2ParallelMergeLevelMinus2; }
   void         setMaxNumMergeCand                ( uint32_t u )          { m_maxNumMergeCand = u;      }
   uint32_t         getMaxNumMergeCand                ()                  { return m_maxNumMergeCand;   }
+#if JVET_X0049_ADAPT_DMVR
+  void         setMaxNumBMMergeCand              ( uint32_t u )          { m_maxNumBMMergeCand = u;      }
+  uint32_t         getMaxNumBMMergeCand              ()                  { return m_maxNumBMMergeCand;   }
+#endif
   void         setMaxNumAffineMergeCand          ( uint32_t u )      { m_maxNumAffineMergeCand = u;    }
   uint32_t     getMaxNumAffineMergeCand          ()                  { return m_maxNumAffineMergeCand; }
   void         setMaxNumGeoCand                  ( uint32_t u )      { m_maxNumGeoCand = u;    }

@@ -957,6 +957,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MinQTChromaISliceInChromaSamples",                m_uiMinQT[2],                                        4u, "MinQTChromaISliceInChromaSamples")
   ("MinQTNonISlice",                                  m_uiMinQT[1],                                        8u, "MinQTNonISlice")
   ("MaxMTTHierarchyDepth",                            m_uiMaxMTTHierarchyDepth,                            3u, "MaxMTTHierarchyDepth")
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+  ("MaxMTTHierarchyDepthByTid",                       m_sMaxMTTHierarchyDepthByTid,          string("333333"), "MaxMTTHierarchyDepthByTid")
+#endif
   ("MaxMTTHierarchyDepthI",                           m_uiMaxMTTHierarchyDepthI,                           3u, "MaxMTTHierarchyDepthI")
   ("MaxMTTHierarchyDepthISliceL",                     m_uiMaxMTTHierarchyDepthI,                           3u, "MaxMTTHierarchyDepthISliceL")
   ("MaxMTTHierarchyDepthISliceC",                     m_uiMaxMTTHierarchyDepthIChroma,                     3u, "MaxMTTHierarchyDepthISliceC")
@@ -1064,6 +1067,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("BIF",                                             m_BIF,                                            true, "bilateral filter   (0: off, 1:on)  [default: on]")
   ("BIFStrength",                                     m_BIFStrength,                                       1u, "bilateral filter strength  (0: half, 1: full, 2: double)  [default: full]")
   ("BIFQPOffset",                                     m_BIFQPOffset,                                        0, "bilateral filter QP offset (0: no offset)  [default: 0]")
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  ("CBIF",                                             m_CBIF,                                            true, "chroma bilateral filter   (0: off, 1:on)  [default: on]")
+  ("CBIFStrength",                                     m_CBIFStrength,                                       1u, "chroma bilateral filter strength  (0: half, 1: full, 2: double)  [default: full]")
+  ("CBIFQPOffset",                                     m_CBIFQPOffset,                                        0, "chroma bilateral filter QP offset (0: no offset)  [default: 0]")
 #endif
   // ADD_NEW_TOOL : (encoder app) add parsing parameters here
   ( "VirtualBoundariesPresentInSPSFlag",              m_virtualBoundariesPresentFlag,                    true, "Virtual Boundary position information is signalled in SPS or PH (1:SPS, 0:PH)  [default: on]" )
@@ -1290,6 +1298,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MaxNumMergeCand",                                 m_maxNumMergeCand,                                  10u, "Maximum number of merge candidates")
 #else
   ("MaxNumMergeCand",                                 m_maxNumMergeCand,                                   5u, "Maximum number of merge candidates")
+#endif
+#if JVET_X0049_ADAPT_DMVR
+  ("MaxNumBMMergeCand",                               m_maxNumBMMergeCand,                                 4u, "Maximum number of BM merge candidates")
 #endif
   ("MaxNumAffineMergeCand",                           m_maxNumAffineMergeCand,                             5u, "Maximum number of affine merge candidates")
 #if NON_ADJACENT_MRG_CAND
@@ -1621,7 +1632,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
     m_framesToBeEncoded = int( m_framesToBeEncoded * m_fractionOfFrames );
   }
 
+#if RPR_ENABLE
+  if( m_resChangeInClvsEnabled && m_switchPocPeriod > 0 )
+#else
   if (m_resChangeInClvsEnabled && !m_switchPocPeriod)
+#endif
   {
     m_switchPocPeriod = m_iFrameRate / 2 / m_iGOPSize * m_iGOPSize;
   }
@@ -2676,6 +2691,16 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   }
 #endif
 
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+  CHECK( m_sMaxMTTHierarchyDepthByTid.size() > MAX_TLAYER, "MaxMTTHierarchyDepthByTid is greater than MAX_TLAYER" );
+
+  for( int i = 0; i < m_sMaxMTTHierarchyDepthByTid.size(); i++ )
+  {
+    CHECK( i >= MAX_TLAYER, "Index exceeds MAX_TLAYER" );
+    m_maxMTTHierarchyDepthByTid[i] = std::stoul( m_sMaxMTTHierarchyDepthByTid.substr( i, 1 ) );
+  }
+#endif
+
   // check validity of input parameters
   if( xCheckParameter() )
   {
@@ -3136,6 +3161,9 @@ bool EncAppCfg::xCheckParameter()
   xConfirmPara( m_log2MaxTbSize < 5,  "Log2MaxTbSize must be 5 or greater." );
   xConfirmPara( m_maxNumMergeCand < 1,  "MaxNumMergeCand must be 1 or greater.");
   xConfirmPara( m_maxNumMergeCand > MRG_MAX_NUM_CANDS, "MaxNumMergeCand must be no more than MRG_MAX_NUM_CANDS." );
+#if JVET_X0049_ADAPT_DMVR
+  xConfirmPara( m_maxNumBMMergeCand > BM_MRG_MAX_NUM_CANDS, "MaxNumBMMergeCand must be no more than BM_MRG_MAX_NUM_CANDS." );
+#endif
   xConfirmPara( m_maxNumGeoCand > GEO_MAX_NUM_UNI_CANDS, "MaxNumGeoCand must be no more than GEO_MAX_NUM_UNI_CANDS." );
   xConfirmPara( m_maxNumGeoCand > m_maxNumMergeCand, "MaxNumGeoCand must be no more than MaxNumMergeCand." );
   xConfirmPara( 0 < m_maxNumGeoCand && m_maxNumGeoCand < 2, "MaxNumGeoCand must be no less than 2 unless MaxNumGeoCand is 0." );
@@ -3189,6 +3217,19 @@ bool EncAppCfg::xCheckParameter()
   xConfirmPara( m_confWinTop    % SPS::getWinUnitY(m_chromaFormatIDC) != 0, "Top conformance window offset must be an integer multiple of the specified chroma subsampling");
   xConfirmPara( m_confWinBottom % SPS::getWinUnitY(m_chromaFormatIDC) != 0, "Bottom conformance window offset must be an integer multiple of the specified chroma subsampling");
 
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+  int sumMaxMTTHierarchyDepthByTid = 0;
+  for( auto &p : m_maxMTTHierarchyDepthByTid )
+  {
+    sumMaxMTTHierarchyDepthByTid += p;
+  }
+
+  if( sumMaxMTTHierarchyDepthByTid == 0 )
+  {
+    xConfirmPara( m_uiMaxBT[1] != m_uiMinQT[1], "MaxBTNonISlice shall be equal to MinQTNonISlice when MaxMTTHierarchyDepth is 0." );
+    xConfirmPara( m_uiMaxTT[1] != m_uiMinQT[1], "MaxTTNonISlice shall be equal to MinQTNonISlice when MaxMTTHierarchyDepth is 0." );
+  }
+#endif
 
   // max CU width and height should be power of 2
   uint32_t ui = m_uiMaxCUWidth;
@@ -4080,6 +4121,10 @@ void EncAppCfg::xPrintParameter()
   }
   msg(DETAILS, "CTU size / min CU size                 : %d / %d \n", m_uiMaxCUWidth, 1 << m_log2MinCuSize);
 
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+  msg( DETAILS, "Max MTT Hierarchy Depth in B-slices by temporal ID: %s\n", m_sMaxMTTHierarchyDepthByTid.c_str() );
+#endif
+
   msg(DETAILS, "subpicture info present flag           : %s\n", m_subPicInfoPresentFlag ? "Enabled" : "Disabled");
   if (m_subPicInfoPresentFlag)
   {
@@ -4200,6 +4245,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 
   msg( DETAILS, "Max Num Merge Candidates               : %d\n", m_maxNumMergeCand );
+#if JVET_X0049_ADAPT_DMVR
+  msg( DETAILS, "Max Num BM Merge Candidates            : %d\n", m_maxNumBMMergeCand );
+#endif
   msg( DETAILS, "Max Num Affine Merge Candidates        : %d\n", m_maxNumAffineMergeCand );
   msg( DETAILS, "Max Num Geo Merge Candidates           : %d\n", m_maxNumGeoCand );
   msg( DETAILS, "Max Num IBC Merge Candidates           : %d\n", m_maxNumIBCMergeCand );
@@ -4348,6 +4396,11 @@ void EncAppCfg::xPrintParameter()
   msg( VERBOSE, "BIF:%d ", m_BIF);
   msg( VERBOSE, "BIFStrength:%d ", m_BIFStrength);
   msg( VERBOSE, "BIFQPOffset:%d ", m_BIFQPOffset);
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  msg( VERBOSE, "CBIF:%d ", m_CBIF);
+  msg( VERBOSE, "CBIFStrength:%d ", m_CBIFStrength);
+  msg( VERBOSE, "CBIFQPOffset:%d ", m_CBIFQPOffset);
 #endif
   // ADD_NEW_TOOL (add some output indicating the usage of tools)
   msg( VERBOSE, "VirtualBoundariesEnabledFlag:%d ", m_virtualBoundariesEnabledFlag );

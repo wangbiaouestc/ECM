@@ -3155,6 +3155,9 @@ SPS::SPS()
 , m_OBMC                      ( false )
 #endif
 , m_ciip                      ( false )
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+, m_ciipTmMrg                 ( false )
+#endif
 , m_Geo                       ( false )
 #if INTER_LIC
 , m_licEnabledFlag            ( false )
@@ -3181,6 +3184,9 @@ SPS::SPS()
 , m_rprEnabledFlag            ( false )
 , m_resChangeInClvsEnabledFlag ( false )
 , m_maxNumMergeCand(MRG_MAX_NUM_CANDS)
+#if JVET_X0049_ADAPT_DMVR
+, m_maxNumBMMergeCand(BM_MRG_MAX_NUM_CANDS)
+#endif
 , m_maxNumAffineMergeCand(AFFINE_MRG_MAX_NUM_CANDS)
 , m_maxNumIBCMergeCand(IBC_MRG_MAX_NUM_CANDS)
 , m_maxNumGeoCand(0)
@@ -3392,6 +3398,11 @@ PPS::PPS()
 , m_BIF                              (false)
 , m_BIFStrength                      (1)
 , m_BIFQPOffset                      (0)
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+, m_CBIF                              (false)
+, m_CBIFStrength                      (1)
+, m_CBIFQPOffset                      (0)
 #endif
 , pcv                                (NULL)
 {
@@ -4950,8 +4961,14 @@ void Slice::setUseLICOnPicLevel( bool fastMode )
   //----- get negated histogram of current picture -----
   int32_t               numValues = 1 << getSPS()->getBitDepth( CHANNEL_TYPE_LUMA );
   std::vector<int32_t>  negCurrHist( numValues, 0 );
+#if RPR_ENABLE
+  const Picture* curPic = m_pcPic->unscaledPic;
+  int32_t               numSamples = curPic->getOrigBuf().Y().width * curPic->getOrigBuf().Y().height;
+  curPic->getOrigBuf().Y().subtractHistogram(negCurrHist);
+#else
   int32_t               numSamples = m_pcPic->getOrigBuf().Y().width * m_pcPic->getOrigBuf().Y().height;
   getPic()->getOrigBuf().Y().subtractHistogram( negCurrHist );
+#endif
 
   //----- get SAD threshold -----
   double  sampleThres = 0.06;
@@ -4969,7 +4986,13 @@ void Slice::setUseLICOnPicLevel( bool fastMode )
     {
       // get delta histogram
       deltaHist = negCurrHist;
+
+#if RPR_ENABLE
+      const Picture* refPic = getRefPic(eList, refIdx)->unscaledPic;
+      refPic->getOrigBuf().Y().updateHistogram(deltaHist);
+#else
       getRefPic(eList, refIdx)->getOrigBuf().Y().updateHistogram(deltaHist);
+#endif
 
       // get SAD of delta histogram
       int32_t sadHist = 0;

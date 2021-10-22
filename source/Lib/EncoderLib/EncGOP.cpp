@@ -178,7 +178,7 @@ void  EncGOP::create()
 {
   m_bLongtermTestPictureHasBeenCoded = 0;
   m_bLongtermTestPictureHasBeenCoded2 = 0;
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   m_cBilateralFilter.create();
 #endif
 }
@@ -205,7 +205,7 @@ void  EncGOP::destroy()
     delete m_picOrig;
     m_picOrig = NULL;
   }
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   m_cBilateralFilter.destroy();
 #endif
 }
@@ -352,6 +352,9 @@ int EncGOP::xWritePPS( AccessUnit &accessUnit, const PPS *pps, const int layerId
   OutputNALUnit nalu(NAL_UNIT_PPS);
   m_HLSWriter->setBitstream( &nalu.m_Bitstream );
   nalu.m_nuhLayerId = layerId;
+#if RPR_ENABLE
+  nalu.m_temporalId = accessUnit.temporalId;
+#endif
   CHECK( nalu.m_temporalId < accessUnit.temporalId, "TemporalId shall be greater than or equal to the TemporalId of the layer access unit containing the NAL unit" );
   m_HLSWriter->codePPS( pps );
   accessUnit.push_back(new NALUnitEBSP(nalu));
@@ -1965,7 +1968,31 @@ public:
   }
 };
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+class CBIFCabacEstImp : public CBIFCabacEst
+{
+    CABACWriter* CABACEstimator;
+public:
+    CBIFCabacEstImp(CABACWriter* _CABACEstimator) : CABACEstimator(_CABACEstimator) {};
+    virtual ~CBIFCabacEstImp() {};
 
+    virtual uint64_t getBits_Cb(const Slice& slice, const CBifParams& htdfParams)
+    {
+        CABACEstimator->initCtxModels(slice);
+        CABACEstimator->resetBits();
+        CABACEstimator->Cbif_Cb(slice, htdfParams);
+        return CABACEstimator->getEstFracBits();
+    }
+
+    virtual uint64_t getBits_Cr(const Slice& slice, const CBifParams& htdfParams)
+    {
+        CABACEstimator->initCtxModels(slice);
+        CABACEstimator->resetBits();
+        CABACEstimator->Cbif_Cr(slice, htdfParams);
+        return CABACEstimator->getEstFracBits();
+    }
+};
+#endif
 
 // ====================================================================================================================
 // Public member functions
@@ -2373,6 +2400,14 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
       {
         int refLayer = pcSlice->getDepth();
         if( refLayer > 9 ) refLayer = 9; // Max layer is 10
+
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+        if( m_pcCfg->getMaxMTTHierarchyDepthByTid( refLayer ) != m_pcCfg->getMaxMTTHierarchyDepth() )
+        {
+          picHeader->setSplitConsOverrideFlag( true );
+          picHeader->setMaxMTTHierarchyDepth( P_SLICE, m_pcCfg->getMaxMTTHierarchyDepthByTid( refLayer ) );
+        }
+#endif
 
         if( m_bInitAMaxBT && pcSlice->getPOC() > m_uiPrevISlicePOC )
         {
@@ -2783,11 +2818,19 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 #endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+    if (pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF() || pcSlice->getPPS()->getUseCBIF())
+#else
     // BIF happens in SAO code so this needs to be done
     // even if SAO=0 if BIF=1.
     if (pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF() )
+#endif
+#else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+    if (pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseCBIF())
 #else
     if (pcSlice->getSPS()->getSAOEnabledFlag())
+#endif
 #endif
     {
       pcPic->resizeSAO( numberOfCtusInFrame, 0 );
@@ -3045,6 +3088,30 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 
       }
 
+#if RPR_ENABLE
+      // create SAO object based on the picture size
+      if( pcSlice->getSPS()->getSAOEnabledFlag()
+#if JVET_V0094_BILATERAL_FILTER
+          || pcSlice->getPPS()->getUseBIF()
+#endif
+          )
+      {
+        Size saoSize = m_pcSAO->getSaoSize();
+        if ( saoSize.width != picWidth || saoSize.height != picHeight ) {
+          const uint32_t widthInCtus = (picWidth + maxCUWidth - 1) / maxCUWidth;
+          const uint32_t heightInCtus = (picHeight + maxCUHeight - 1) / maxCUHeight;
+          const uint32_t numCtuInFrame = widthInCtus * heightInCtus;
+          const uint32_t  log2SaoOffsetScaleLuma = (uint32_t)std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - MAX_SAO_TRUNCATED_BITDEPTH);
+          const uint32_t  log2SaoOffsetScaleChroma = (uint32_t)std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - MAX_SAO_TRUNCATED_BITDEPTH);
+
+          m_pcSAO->create(picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, log2SaoOffsetScaleLuma, log2SaoOffsetScaleChroma);
+          m_pcSAO->destroyEncData();
+          m_pcSAO->createEncData(m_pcCfg->getSaoCtuBoundary(), numCtuInFrame);
+          m_pcSAO->setReshaper(m_pcReshaper);
+        }
+      }
+#endif
+
       if( pcSlice->getSPS()->getScalingListFlag() && m_pcCfg->getUseScalingListId() == SCALING_LIST_FILE_READ )
       {
         picHeader->setExplicitScalingListEnabledFlag(true);
@@ -3108,16 +3175,27 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 #endif
 
 #if JVET_V0094_BILATERAL_FILTER
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+      if( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF() || pcSlice->getPPS()->getUseCBIF())
+#else
       // We need to do this step if at least one of BIF or SAO are enabled.
       if( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF())
+#endif
+#else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+      if( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseCBIF())
 #else
       if( pcSlice->getSPS()->getSAOEnabledFlag() )
+#endif
 #endif
       {
         bool sliceEnabled[MAX_NUM_COMPONENT];
         m_pcSAO->initCABACEstimator( m_pcEncLib->getCABACEncoder(), m_pcEncLib->getCtxCache(), pcSlice );
 #if JVET_V0094_BILATERAL_FILTER
         BIFCabacEstImp est(m_pcEncLib->getCABACEncoder()->getCABACEstimator(cs.slice->getSPS()));
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+        CBIFCabacEstImp CBIF_est(m_pcEncLib->getCABACEncoder()->getCABACEstimator(cs.slice->getSPS()));
 #endif
         
         m_pcSAO->SAOProcess( cs, sliceEnabled, pcSlice->getLambdas(),
@@ -3128,9 +3206,12 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 #if JVET_V0094_BILATERAL_FILTER
                               , &est
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+                              , &CBIF_est
+#endif
                             );
         //assign SAO slice header
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
         if( pcSlice->getSPS()->getSAOEnabledFlag() )
         {
 #endif
@@ -3151,7 +3232,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
         }
 
         }
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
       }
 #endif
       }
@@ -3172,6 +3253,19 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
         }
       }
       m_pcSAO->jointClipSaoBifCcSao( cs );
+#endif
+
+#if RPR_ENABLE
+      // create ALF object based on the picture size
+      if ( pcSlice->getSPS()->getALFEnabledFlag() )
+      {
+        Size alfSize = m_pcALF->getAlfSize();
+        if ( alfSize.width != picWidth || alfSize.height != picHeight )
+        {
+          m_pcALF->destroy();
+          m_pcALF->create( m_pcCfg, picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, m_pcCfg->getBitDepth(), m_pcCfg->getInputBitDepth() );
+        }
+      }
 #endif
 
       if( pcSlice->getSPS()->getALFEnabledFlag() )

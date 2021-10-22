@@ -108,6 +108,9 @@ public:
   void ALFProcess(CodingStructure& cs);
   void create( const int picWidth, const int picHeight, const ChromaFormat format, const int maxCUWidth, const int maxCUHeight, const int maxCUDepth, const int inputBitDepth[MAX_NUM_CHANNEL_TYPE] );
   void destroy();
+#if RPR_ENABLE
+  Size  getAlfSize() { return Size(m_tempBuf.get(COMPONENT_Y).width, m_tempBuf.get(COMPONENT_Y).height); }
+#endif
 
 
 #if ALF_IMPROVEMENT
@@ -117,20 +120,12 @@ public:
   static void calcClass(AlfClassifier **classifier, const Area &blkDst, const Area &cu, int dirWindSize, int classDir, int noDir, int noAct, int bitDepth, int subBlkSize, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS]);
   static void deriveClassificationLaplacianBig(const Area &curBlk, uint32_t **laplacian[NUM_DIRECTIONS]);
   static void deriveClassificationLaplacian(const CPelBuf &srcLuma, const Area &blkDst, const Area &blk, uint32_t **laplacian[NUM_DIRECTIONS]);
-  void deriveClassificationAndFixFilterResultsBlk( 
-    AlfClassifier **classifier,
-    Pel ***fixedFilterResults,
-    const CPelBuf &srcLuma,
-    const Area &blkDst,
-    const Area &blk,
-    const int bits,
-    CodingStructure& cs,
-    const ClpRng &clpRng,
-    const Pel clippingValues[4],
-    int qp, int qpIdx, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX],
-    uint32_t **laplacian[NUM_DIRECTIONS], 
-    const int classifierIdx
-  );
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+  void deriveClassificationAndFixFilterResultsBlk( AlfClassifier ***classifier, Pel ***fixedFilterResults, const CPelBuf &srcLuma, const Area &blkDst, const Area &blk, const int bits, CodingStructure& cs, const ClpRng &clpRng, const Pel clippingValues[4], int qp, int qpIdx, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS], const int classifierIdx, const int multipleClassifierIdx );
+  static void calcClassNew( AlfClassifier **classifier, const Area &blkDst, const Area &cu, const CPelBuf& srcLuma, int subBlkSize, AlfClassifier **classifier0, int classifierIdx, int bitDepth );
+#else
+  void deriveClassificationAndFixFilterResultsBlk( AlfClassifier **classifier, Pel ***fixedFilterResults, const CPelBuf &srcLuma, const Area &blkDst, const Area &blk, const int bits, CodingStructure& cs, const ClpRng &clpRng, const Pel clippingValues[4], int qp, int qpIdx, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS], const int classifierIdx );
+#endif
   template<AlfFilterType filtTypeCcAlf>
   static void filterBlkCcAlf(const PelBuf& dstBuf, const CPelUnitBuf& recSrc, const Area& blkDst, const Area& blkSrc, const ComponentID compId, const int16_t* filterCoeff, const ClpRngs& clpRngs, CodingStructure& cs);
 #else
@@ -138,15 +133,22 @@ public:
     template<AlfFilterType filtTypeCcAlf>
   static void filterBlkCcAlf(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs, int vbCTUHeight, int vbPos);
 #endif
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+  void deriveClassification( AlfClassifier*** classifier, const CPelBuf& srcLuma, const Area& blkDst, const Area& blk, CodingStructure &cs, const int classifierIdx, const int multipleClassifierIdx );
+#else
   void deriveClassification( AlfClassifier** classifier, const CPelBuf& srcLuma, const Area& blkDst, const Area& blk
 #if ALF_IMPROVEMENT
   , CodingStructure &cs, const int classifierIdx
 #endif
   );
+#endif
 
 #if ALF_IMPROVEMENT
   void(*m_calcClass0)(AlfClassifier **classifier, const Area &blkDst, const Area &cu, int dirWindSize, int classDir, int noDir, int noAct, int bitDepth, int subBlkSize, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS]);
   void(*m_calcClass1)(AlfClassifier **classifier, const Area &blkDst, const Area &cu, int dirWindSize, int classDir, int noDir, int noAct, int bitDepth, int subBlkSize, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS]);
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+  void(*m_calcClass2)(AlfClassifier **classifier, const Area &blkDst, const Area &cu, const CPelBuf& srcLuma, int subBlkSize, AlfClassifier **classifier0, int classifierIdx, int bitDepth);
+#endif
   void(*m_deriveClassificationLaplacianBig)(const Area &curBlk, uint32_t **laplacian[NUM_DIRECTIONS]);
   void(*m_deriveClassificationLaplacian)(const CPelBuf &srcLuma, const Area &blkDst, const Area &blk, uint32_t **laplacian[NUM_DIRECTIONS]);
   void(*m_filter13x13Blk)(AlfClassifier **classifier, const CPelBuf &srcLuma, const Area& curBlk, Pel ***fixedFilterResults, int picWidth, const int fixedFiltInd, const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize, const ClpRng &clpRng, const Pel clippingValues[4]);
@@ -232,7 +234,13 @@ protected:
   bool                         m_filterTypeTest[MAX_NUM_CHANNEL_TYPE][ALF_NUM_OF_FILTER_TYPES];
   int                          m_filterTypeToStatIndex[MAX_NUM_CHANNEL_TYPE][ALF_NUM_OF_FILTER_TYPES];
 #endif
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+  AlfClassifier**              m_classifier[ALF_NUM_CLASSIFIER];
+  char                         m_classifierIdxApsLuma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA];
+  char                         m_classifierFinal[MAX_NUM_ALF_ALTERNATIVES_LUMA];
+#else
   AlfClassifier**              m_classifier;
+#endif
 #if ALF_IMPROVEMENT
   int                          m_numLumaAltAps[ALF_CTB_MAX_NUM_APS];
   short                        m_coeffApsLuma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA][MAX_NUM_ALF_LUMA_COEFF * MAX_NUM_ALF_CLASSES];

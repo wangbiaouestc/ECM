@@ -48,7 +48,7 @@
 #include "CommonLib/Unit.h"
 #include "CommonLib/UnitPartitioner.h"
 #include "CommonLib/RdCost.h"
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
 #include "CommonLib/BilateralFilter.h"
 #endif
 
@@ -108,12 +108,19 @@ struct ModeInfo
 #if CIIP_PDPC
   bool     isCiipPDPC;
 #endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  int      intraMode;
+#endif
   bool     isAffine;
 #if AFFINE_MMVD
   bool     isAffineMmvd;
 #endif
 #if TM_MRG
   bool     isTMMrg;
+#endif
+#if JVET_X0049_ADAPT_DMVR
+  bool     isBMMrg;
+  uint8_t  bmDir;
 #endif
   bool     isGeo;
   uint8_t     geoSplitDir;
@@ -127,6 +134,9 @@ struct ModeInfo
 #if CIIP_PDPC
     , isCiipPDPC(false)
 #endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+    , intraMode(0)
+#endif
     , isAffine(false)
 #if AFFINE_MMVD
     , isAffineMmvd(false)
@@ -134,7 +144,11 @@ struct ModeInfo
 #if TM_MRG
     , isTMMrg(false)
 #endif
-    , isGeo(false), geoSplitDir(0), geoMergeIdx0(0), geoMergeIdx1(0)
+#if JVET_X0049_ADAPT_DMVR
+    , isBMMrg(false)
+    , bmDir(0)
+#endif
+  , isGeo(false), geoSplitDir(0), geoMergeIdx0(0), geoMergeIdx1(0)
 #if ENABLE_OBMC
     , isOBMC(false)
 #endif
@@ -142,6 +156,9 @@ struct ModeInfo
   ModeInfo(const uint32_t mergeCand, const bool isRegularMerge, const bool isMMVD, const bool isCIIP
 #if CIIP_PDPC
     , const bool isCiipPDPC
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+    , const int intraMode
 #endif
     , const bool isAffine
 #if ENABLE_OBMC
@@ -157,6 +174,9 @@ struct ModeInfo
     mergeCand(mergeCand), isRegularMerge(isRegularMerge), isMMVD(isMMVD), isCIIP(isCIIP)
 #if CIIP_PDPC
     , isCiipPDPC(isCiipPDPC)
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+    , intraMode(intraMode)
 #endif
     , isAffine(isAffine)
 #if AFFINE_MMVD
@@ -183,12 +203,19 @@ struct ModeInfo
 #if CIIP_PDPC
     isCiipPDPC = pu.ciipPDPC;
 #endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+    intraMode = pu.intraDir[0];
+#endif
     isAffine = cu.affine;
 #if AFFINE_MMVD
     isAffineMmvd = pu.afMmvdFlag;
 #endif
 #if TM_MRG
     isTMMrg = pu.tmMergeFlag;
+#endif
+#if JVET_X0049_ADAPT_DMVR
+    isBMMrg = pu.bmMergeFlag;
+    bmDir = pu.bmDir;
 #endif
     isGeo = cu.geoFlag;
     geoSplitDir = pu.geoSplitDir;
@@ -300,7 +327,7 @@ protected:
   EncCfg*         m_pcEncCfg;
 
   // interface to classes
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   BilateralFilter* m_bilateralFilter;
 #endif
   TrQuant*        m_pcTrQuant;
@@ -347,6 +374,10 @@ protected:
 public:
   EncFastLICCtrl  m_fastLicCtrl;
 #endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+public:
+  Distortion      m_amvpOnlyCost;
+#endif
 
 public:
 #if MULTI_HYP_PRED
@@ -379,7 +410,7 @@ public:
   virtual ~InterSearch();
 
   void init                         ( EncCfg*        pcEncCfg,
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
                                      BilateralFilter* bilateralFilter,
 #endif
                                       TrQuant*       pcTrQuant,
@@ -590,7 +621,12 @@ public:
 
   void setModeCtrl( EncModeCtrl *modeCtrl ) { m_modeCtrl = modeCtrl;}
 
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  void predInterSearch(CodingUnit& cu, Partitioner& partitioner, bool& amvpMergeModeNotValid,
+      MvField* mvField_amList = nullptr, Mv* mvBufEncAmBDMVR_L0 = nullptr, Mv* mvBufEncAmBDMVR_L1 = nullptr);
+#else
   void predInterSearch(CodingUnit& cu, Partitioner& partitioner );
+#endif
 
   /// set ME search range
   void setAdaptiveSearchRange       ( int iDir, int iRefIdx, int iSearchRange) { CHECK(iDir >= MAX_NUM_REF_LIST_ADAPT_SR || iRefIdx>=int(MAX_IDX_ADAPT_SR), "Invalid index"); m_aaiAdaptSR[iDir][iRefIdx] = iSearchRange; }
@@ -632,6 +668,9 @@ protected:
                                     AMVPInfo&             amvpInfo,
                                     bool                  bFilled = false,
                                     Distortion*           puiDistBiP = NULL
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+                                  , MvField*              mvField_amList = NULL
+#endif
                                   );
 
   void xCheckBestMVP              ( RefPicList  eRefPicList,

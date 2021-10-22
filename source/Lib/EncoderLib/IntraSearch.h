@@ -47,7 +47,7 @@
 #include "CommonLib/TrQuant.h"
 #include "CommonLib/Unit.h"
 #include "CommonLib/RdCost.h"
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
 #include "CommonLib/BilateralFilter.h"
 #endif
 #include "EncReshape.h"
@@ -404,7 +404,7 @@ protected:
   EncCfg*         m_pcEncCfg;
 
   // interface to classes
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   BilateralFilter* m_bilateralFilter;
 #endif
   TrQuant*        m_pcTrQuant;
@@ -434,7 +434,7 @@ public:
   ~IntraSearch();
 
   void init                       ( EncCfg*        pcEncCfg,
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
                                    BilateralFilter* bilateralFilter,
 #endif
                                     TrQuant*       pcTrQuant,

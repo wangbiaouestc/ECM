@@ -66,6 +66,43 @@ enum PredBuf
 
 static const uint32_t MAX_INTRA_FILTER_DEPTHS=8;
 
+#if JVET_V0130_INTRA_TMP
+extern unsigned int g_uiDepth2Width[5];
+extern unsigned int g_uiDepth2MaxCandiNum[5];
+
+class TempLibFast
+{
+public:
+  int m_pX;    //offset X
+  int m_pY;    //offset Y
+  int m_pXInteger;    //offset X for integer pixel search
+  int m_pYInteger;    //offset Y for integer pixel search
+  int m_pDiffInteger;
+  int getXInteger() { return m_pXInteger; }
+  int getYInteger() { return m_pYInteger; }
+  int getDiffInteger() { return m_pDiffInteger; }
+  short m_pIdInteger; //frame id
+  short getIdInteger() { return m_pIdInteger; }
+  int m_pDiff; //mse
+  short m_pId; //frame id
+
+  TempLibFast();
+  ~TempLibFast();
+  //void init();
+  int getX() { return m_pX; }
+  int getY() { return m_pY; }
+  int getDiff() { return m_pDiff; }
+  short getId() { return m_pId; }
+  /*void initDiff(unsigned int uiPatchSize, int bitDepth);
+  void initDiff(unsigned int uiPatchSize, int bitDepth, int iCandiNumber);*/
+  void initTemplateDiff( unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int bitDepth );
+  int m_diffMax;
+  int getDiffMax() { return m_diffMax; }
+};
+
+typedef short TrainDataType;
+#endif
+
 class IntraPrediction
 {
 #if MMLM
@@ -140,6 +177,16 @@ protected:
   bool         m_bestScanRotationMode;
   std::vector<PelStorage>   m_tempBuffer;
 
+#if JVET_V0130_INTRA_TMP
+  int          m_uiPartLibSize;
+  TempLibFast  m_tempLibFast;
+  Pel*         m_refPicUsed;
+  Picture*     m_refPicBuf;
+  unsigned int m_uiPicStride;
+  unsigned int m_uiVaildCandiNum;
+  Pel***       m_pppTarPatch;
+#endif
+
   // prediction
   void xPredIntraPlanar           ( const CPelBuf &pSrc, PelBuf &pDst );
   void xPredIntraDc               ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const bool enableBoundaryFilter = true );
@@ -204,7 +251,7 @@ public:
   virtual ~IntraPrediction();
 
 #if JVET_W0069_TMP_BOUNDARY
-  RefTemplateType GetRefTemplateType(CodingUnit& cu, CompArea& area);
+  RefTemplateType getRefTemplateType(CodingUnit& cu, CompArea& area);
 #endif
 
   void init                       (ChromaFormat chromaFormatIDC, const unsigned bitDepthY);
@@ -227,6 +274,9 @@ public:
   void initTimdIntraPatternLuma   (const CodingUnit &cu, const CompArea &area, int iTemplateWidth, int iTemplateHeight, uint32_t uiRefWidth, uint32_t uiRefHeight);
 #if GRAD_PDPC
   void xIntraPredTimdAngGradPdpc  (Pel* pDsty, const int dstStride, Pel* refMain, Pel* refSide, const int width, const int height, int xOffset, int yOffset, int scale, int deltaPos, int intraPredAngle, const ClpRng& clpRng);
+#endif
+#if JVET_X0148_TIMD_PDPC
+  void xIntraPredPlanarDcPdpc     (const CPelBuf &pSrc, Pel *pDst, int iDstStride, int width, int height, bool ciipPDPC);
 #endif
 #endif
   // Angular Intra
@@ -255,6 +305,44 @@ public:
   void geneWeightedPred           (const ComponentID compId, PelBuf &pred, const PredictionUnit &pu, Pel *srcBuf);
   Pel* getPredictorPtr2           (const ComponentID compID, uint32_t idx) { return m_yuvExt2[compID][idx]; }
   void switchBuffer               (const PredictionUnit &pu, ComponentID compID, PelBuf srcBuff, Pel *dst);
+#endif
+
+#if JVET_V0130_INTRA_TMP
+#if JVET_W0069_TMP_BOUNDARY
+  int( *m_calcTemplateDiff )(Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType TempType);
+  static int calcTemplateDiff( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType TempType );
+#else
+  int( *m_calcTemplateDiff )(Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax);
+  static int calcTemplateDiff( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax );
+#endif
+  Pel** getTargetPatch( unsigned int uiDepth ) { return m_pppTarPatch[uiDepth]; }
+  Pel* getRefPicUsed() { return m_refPicUsed; }
+  void setRefPicUsed( Pel* ref ) { m_refPicUsed = ref; }
+  unsigned int getStride() { return m_uiPicStride; }
+  void         setStride( unsigned int uiPicStride ) { m_uiPicStride = uiPicStride; }
+
+#if JVET_W0069_TMP_BOUNDARY
+  void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId, RefTemplateType tempType );
+  void candidateSearchIntra( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType );
+#else
+  void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId );
+  void candidateSearchIntra( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
+#endif
+  bool generateTMPrediction( Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int& foundCandiNum );
+#if JVET_W0069_TMP_BOUNDARY
+  bool generateTmDcPrediction( Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val );
+  void getTargetTemplate( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType );
+#else
+  void getTargetTemplate( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
+#endif
+#endif
+
+#if ENABLE_SIMD_TMP
+#ifdef TARGET_SIMD_X86
+  void    initIntraX86();
+  template <X86_VEXT vext>
+  void    _initIntraX86();
+#endif
 #endif
 };
 #if ENABLE_DIMD

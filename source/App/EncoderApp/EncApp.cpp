@@ -818,6 +818,11 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setBIFStrength                                       ( m_BIFStrength );
   m_cEncLib.setBIFQPOffset                                       ( m_BIFQPOffset );
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  m_cEncLib.setUseCBIF                                            ( m_CBIF );
+  m_cEncLib.setCBIFStrength                                       ( m_CBIFStrength );
+  m_cEncLib.setCBIFQPOffset                                       ( m_CBIFQPOffset );
+#endif
 
   // ADD_NEW_TOOL : (encoder app) add setting of tool enabling flags and associated parameters here
   m_cEncLib.setVirtualBoundariesEnabledFlag                      ( m_virtualBoundariesEnabledFlag );
@@ -888,6 +893,9 @@ void EncApp::xInitLibCfg()
   }
 
   m_cEncLib.setMaxNumMergeCand                                   ( m_maxNumMergeCand );
+#if JVET_X0049_ADAPT_DMVR
+  m_cEncLib.setMaxNumBMMergeCand                                 ( m_maxNumBMMergeCand );
+#endif
   m_cEncLib.setMaxNumAffineMergeCand                             ( m_maxNumAffineMergeCand );
   m_cEncLib.setMaxNumGeoCand                                     ( m_maxNumGeoCand );
   m_cEncLib.setMaxNumIBCMergeCand                                ( m_maxNumIBCMergeCand );
@@ -1204,6 +1212,10 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setNumRefLayers                                       ( m_numRefLayers );
 
   m_cEncLib.setVPSParameters(m_cfgVPSParameters);
+
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+  m_cEncLib.setMaxMTTHierarchyDepthByTid                          ( m_maxMTTHierarchyDepthByTid );
+#endif
 }
 
 void EncApp::xCreateLib( std::list<PelUnitBuf*>& recBufList, const int layerId )

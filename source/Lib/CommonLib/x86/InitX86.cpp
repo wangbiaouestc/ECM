@@ -53,7 +53,7 @@
 #if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT || ENABLE_SIMD_TMP
 #include "CommonLib/TrQuant.h"
 #endif
-#if ENABLE_SIMD_BILATERAL_FILTER
+#if ENABLE_SIMD_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER_ENABLE_SIMD
 #include "CommonLib/BilateralFilter.h"
 #endif
 
@@ -193,7 +193,7 @@ void IbcHashMap::initIbcHashMapX86()
 }
 #endif
 
-#if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT || ENABLE_SIMD_TMP
+#if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT
 void TrQuant::initTrQuantX86()
 {
   auto vext = read_x86_extension_flags();
@@ -216,7 +216,30 @@ void TrQuant::initTrQuantX86()
 }
 #endif
 
-#if ENABLE_SIMD_BILATERAL_FILTER
+#if ENABLE_SIMD_TMP
+void IntraPrediction::initIntraX86()
+{
+  auto vext = read_x86_extension_flags();
+  switch( vext )
+  {
+  case AVX512:
+  case AVX2:
+    _initIntraX86<AVX2>();
+    break;
+  case AVX:
+    _initIntraX86<AVX>();
+    break;
+  case SSE42:
+  case SSE41:
+    _initIntraX86<SSE41>();
+    break;
+  default:
+    break;
+  }
+}
+#endif
+
+#if ENABLE_SIMD_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER_ENABLE_SIMD
 void BilateralFilter::initBilateralFilterX86()
 {
   auto vext = read_x86_extension_flags();

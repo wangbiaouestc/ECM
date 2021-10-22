@@ -43,7 +43,7 @@
 #include "CommonLib/Rom.h"
 #include "CommonLib/Picture.h"
 #include "CommonLib/UnitTools.h"
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
 #include "CommonLib/BilateralFilter.h"
 #endif
 
@@ -60,7 +60,7 @@ IntraSearch::IntraSearch()
   , m_pFullCS       (nullptr)
   , m_pBestCS       (nullptr)
   , m_pcEncCfg      (nullptr)
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   , m_bilateralFilter(nullptr)
 #endif
   , m_pcTrQuant     (nullptr)
@@ -216,7 +216,7 @@ IntraSearch::~IntraSearch()
 }
 
 void IntraSearch::init( EncCfg*        pcEncCfg,
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
                        BilateralFilter* bilateralFilter,
 #endif
                         TrQuant*       pcTrQuant,
@@ -232,7 +232,7 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
 {
   CHECK(m_isInitialized, "Already initialized");
   m_pcEncCfg                     = pcEncCfg;
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   m_bilateralFilter              = bilateralFilter;
 #endif
   m_pcTrQuant                    = pcTrQuant;
@@ -892,27 +892,27 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               CodingUnit cu_cpy = cu;
 
 #if JVET_W0069_TMP_BOUNDARY
-              RefTemplateType TemplateType = GetRefTemplateType( cu_cpy, cu_cpy.blocks[COMPONENT_Y] );
-              if( TemplateType != NO_TEMPLATE )
+              RefTemplateType templateType = getRefTemplateType( cu_cpy, cu_cpy.blocks[COMPONENT_Y] );
+              if( templateType != NO_TEMPLATE )
 #else
               if( isRefTemplateAvailable( cu_cpy, cu_cpy.blocks[COMPONENT_Y] ) )
 #endif
               {
 #if JVET_W0069_TMP_BOUNDARY
-                m_pcTrQuant->getTargetTemplate( &cu_cpy, pu.lwidth(), pu.lheight(), TemplateType );
-                m_pcTrQuant->candidateSearchIntra( &cu_cpy, pu.lwidth(), pu.lheight(), TemplateType );
-                bsuccessfull = m_pcTrQuant->generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
+                getTargetTemplate( &cu_cpy, pu.lwidth(), pu.lheight(), templateType );
+                candidateSearchIntra( &cu_cpy, pu.lwidth(), pu.lheight(), templateType );
+                bsuccessfull = generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
 #else
-                m_pcTrQuant->getTargetTemplate( &cu_cpy, pu.lwidth(), pu.lheight() );
-                m_pcTrQuant->candidateSearchIntra( &cu_cpy, pu.lwidth(), pu.lheight() );
-                bsuccessfull = m_pcTrQuant->generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
+                getTargetTemplate( &cu_cpy, pu.lwidth(), pu.lheight() );
+                candidateSearchIntra( &cu_cpy, pu.lwidth(), pu.lheight() );
+                bsuccessfull = generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
 #endif
               }
 #if JVET_W0069_TMP_BOUNDARY
               else
               {
                 foundCandiNum = 1;
-                bsuccessfull = m_pcTrQuant->generateTM_DC_Prediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (cu_cpy.cs->sps->getBitDepth( CHANNEL_TYPE_LUMA ) - 1) );
+                bsuccessfull = generateTmDcPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (cu_cpy.cs->sps->getBitDepth( CHANNEL_TYPE_LUMA ) - 1) );
               }
 #endif
               if( bsuccessfull && foundCandiNum >= 1 )
@@ -3619,7 +3619,7 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
 
   const CompArea      &area                 = tu.blocks[compID];
   const SPS           &sps                  = *cs.sps;
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   const PPS           &pps                  = *cs.pps;
 #endif
 
@@ -3679,22 +3679,22 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
         {
           int foundCandiNum;
 #if JVET_W0069_TMP_BOUNDARY
-          RefTemplateType TempType = GetRefTemplateType( *(tu.cu), tu.cu->blocks[COMPONENT_Y] );
-          if( TempType != NO_TEMPLATE )
+          RefTemplateType tempType = getRefTemplateType( *(tu.cu), tu.cu->blocks[COMPONENT_Y] );
+          if( tempType != NO_TEMPLATE )
           {
-            m_pcTrQuant->getTargetTemplate( tu.cu, pu.lwidth(), pu.lheight(), TempType );
-            m_pcTrQuant->candidateSearchIntra( tu.cu, pu.lwidth(), pu.lheight(), TempType );
-            m_pcTrQuant->generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
+            getTargetTemplate( tu.cu, pu.lwidth(), pu.lheight(), tempType );
+            candidateSearchIntra( tu.cu, pu.lwidth(), pu.lheight(), tempType );
+            generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
           }
           else
           {
             foundCandiNum = 1;
-            m_pcTrQuant->generateTM_DC_Prediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth( CHANNEL_TYPE_LUMA ) - 1) );
+            generateTmDcPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth( CHANNEL_TYPE_LUMA ) - 1) );
           }
 #else
-          m_pcTrQuant->getTargetTemplate( tu.cu, pu.lwidth(), pu.lheight() );
-          m_pcTrQuant->candidateSearchIntra( tu.cu, pu.lwidth(), pu.lheight() );
-          m_pcTrQuant->generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
+          getTargetTemplate( tu.cu, pu.lwidth(), pu.lheight() );
+          candidateSearchIntra( tu.cu, pu.lwidth(), pu.lheight() );
+          generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
 #endif
           CHECK( foundCandiNum < 1, "" );
         }
@@ -3954,7 +3954,15 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
     tmpRecLuma.copyFrom(piReco);
   }
-  
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  CompArea tmpArea2(compID, area.chromaFormat, Position(0, 0), area.size());
+  PelBuf tmpRecChroma;
+  if(isChroma(compID))
+  {
+    tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea2);
+    tmpRecChroma.copyFrom(piReco);
+  }
+#endif
   //===== update distortion =====
 #if WCG_EXT
   
@@ -3989,10 +3997,32 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     }
     else
     {
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+      if(pps.getUseCBIF() && isChroma(compID) && (tu.cu->qp > 17))
+      {
+        CompArea compArea = tu.blocks[compID];
+        PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+        bool isCb = compID == COMPONENT_Cb ? true : false;
+        m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
+      }
+      ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecChroma, bitDepth, compID, DF_SSE_WTD, &orgLuma);
+#else
       ruiDist += m_pcRdCost->getDistPart(piOrg, piReco, bitDepth, compID, DF_SSE_WTD, &orgLuma);
+#endif
       if( jointCbCr )
       {
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+        if(compID == COMPONENT_Cr)
+        {
+            ruiDist += m_pcRdCost->getDistPart(crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+        }
+        else
+        {
+            ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+        }
+#else
         ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+#endif
       }
     }
   }
@@ -4013,16 +4043,120 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     }
     else
     {
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+      if (pps.getUseCBIF() && isChroma(compID) && (tu.cu->qp > 17))
+      {
+        CompArea compArea = tu.blocks[compID];
+        PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+        bool isCb = compID == COMPONENT_Cb ? true : false;
+        m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
+      }
+      ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecChroma, bitDepth, compID, DF_SSE );
+#else
       ruiDist += m_pcRdCost->getDistPart( piOrg, piReco, bitDepth, compID, DF_SSE );
+#endif
       if( jointCbCr )
       {
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+        if(compID == COMPONENT_Cr)
+        {
+            ruiDist += m_pcRdCost->getDistPart( crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE );
+        }
+        else{
+            ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
+        }
+#else
         ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
+#endif
       }
     }
   }
 
 #else
   //===== update distortion =====
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+    CompArea tmpArea2(compID, area.chromaFormat, Position(0, 0), area.size());
+    PelBuf tmpRecChroma;
+    if(isChroma(compID))
+    {
+        tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea2);
+        tmpRecChroma.copyFrom(piReco);
+    }
+#if WCG_EXT
+    if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs() && slice.getLmcsEnabledFlag() && (m_pcReshape->getCTUFlag() || (isChroma(compID) && m_pcEncCfg->getReshapeIntraCMD()))))
+    {
+        const CPelBuf orgLuma = cs.getOrgBuf( cs.area.blocks[COMPONENT_Y] );
+        if(isLuma(compID))
+        {
+            if (compID == COMPONENT_Y  && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
+            {
+                CompArea      tmpArea1(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
+                PelBuf tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
+                tmpRecLuma.rspSignal( piReco, m_pcReshape->getInvLUT() );
+                ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
+            }
+            else
+            {
+                ruiDist += m_pcRdCost->getDistPart(piOrg, piReco, bitDepth, compID, DF_SSE_WTD, &orgLuma);
+                if( jointCbCr )
+                {
+                    ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+                }
+            }
+        }
+        else
+        {
+            if(pps.getUseCBIF() && isChroma(compID) && (tu.cu->qp > 17))
+            {
+                CompArea compArea = tu.blocks[compID];
+                PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+                bool isCb = compID == COMPONENT_Cb ? true : false;
+                m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
+            }
+            ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecChroma, bitDepth, compID, DF_SSE_WTD, &orgLuma);
+
+            if( jointCbCr )
+            {
+                if(compID == COMPONENT_Cr)
+                {
+                    ruiDist += m_pcRdCost->getDistPart(crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+                }
+                else
+                {
+                    ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+                }
+            }
+        }
+    }
+    else
+#endif
+    {
+        if(isLuma(compID))
+        {
+            ruiDist += m_pcRdCost->getDistPart( piOrg, piReco, bitDepth, compID, DF_SSE );
+        }
+        else{
+            if (pps.getUseCBIF() && isChroma(compID) && (tu.cu->qp > 17))
+            {
+                CompArea compArea = tu.blocks[compID];
+                PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+                bool isCb = compID == COMPONENT_Cb ? true : false;
+                m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
+            }
+            ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecChroma, bitDepth, compID, DF_SSE );
+        }
+        if( jointCbCr )
+        {
+            if(compID == COMPONENT_Cr)
+            {
+                ruiDist += m_pcRdCost->getDistPart( crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE );
+            }
+            else{
+                ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
+            }
+        }
+    }
+#else
 #if WCG_EXT
   if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs()
     && slice.getLmcsEnabledFlag() && (m_pcReshape->getCTUFlag() || (isChroma(compID) && m_pcEncCfg->getReshapeIntraCMD()))))
@@ -4053,6 +4187,7 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
     }
   }
+#endif
 #endif
 }
 
@@ -4959,9 +5094,9 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
       if( PU::isTmp( pu, chType ) )
       {
         int foundCandiNum;
-        m_pcTrQuant->getTargetTemplate( pu.cu, pu.lwidth(), pu.lheight() );
-        m_pcTrQuant->candidateSearchIntra( pu.cu, pu.lwidth(), pu.lheight() );
-        m_pcTrQuant->generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
+        getTargetTemplate( pu.cu, pu.lwidth(), pu.lheight() );
+        candidateSearchIntra( pu.cu, pu.lwidth(), pu.lheight() );
+        generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
         CHECK( foundCandiNum < 1, "" );
 
       }

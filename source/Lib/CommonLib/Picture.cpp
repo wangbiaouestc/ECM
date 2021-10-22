@@ -42,6 +42,9 @@
 #if JVET_V0094_BILATERAL_FILTER
 BifParams Picture::m_BifParams;
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+CBifParams Picture::m_CBifParams;
+#endif
 
 #if ENABLE_SPLIT_PARALLELISM
 
@@ -748,12 +751,18 @@ void Picture::sampleRateConv( const std::pair<int, int> scalingRatio, const std:
     filterVer = &DownsamplingFilterSRC[verFilter][0][0];
   }
 #if IF_12TAP
-  CHECK(true, "Called at un-handled point");
+#if !RPR_ENABLE
+  CHECK( true, "Called at un-handled point" );
+#endif
   const int filterLength = downsampling ? 12 : (useLumaFilter ? NTAPS_LUMA(1) : NTAPS_CHROMA);
 #else
   const int filterLength = downsampling ? 12 : (useLumaFilter ? NTAPS_LUMA : NTAPS_CHROMA);
 #endif
+#if RPR_ENABLE && IF_12TAP
+  const int log2Norm = downsampling ? 14 : 16;
+#else
   const int log2Norm = downsampling ? 14 : 12;
+#endif
 
   int *buf = new int[orgHeight * scaledWidth];
   int maxVal = ( 1 << bitDepth ) - 1;
@@ -796,7 +805,11 @@ void Picture::sampleRateConv( const std::pair<int, int> scalingRatio, const std:
 
     for( int i = 0; i < scaledWidth; i++ )
     {
+#if RPR_ENABLE && IF_12TAP
+      uint64_t sum = 0;
+#else
       int sum = 0;
+#endif
       int* tmp = buf + i;
       const TFilterCoeff* f = filterVer + frac * filterLength;
 
@@ -806,7 +819,13 @@ void Picture::sampleRateConv( const std::pair<int, int> scalingRatio, const std:
         sum += f[k] * tmp[yInt*scaledWidth];
       }
 
+#if RPR_ENABLE && IF_12TAP
+      const uint64_t one = 1;
+      int sumS = (int)((sum + (one << (log2Norm - 1))) >> log2Norm);
+      dst[i] = std::min<int>(std::max(0, sumS), maxVal);
+#else
       dst[i] = std::min<int>( std::max( 0, ( sum + ( 1 << ( log2Norm - 1 ) ) ) >> log2Norm ), maxVal );
+#endif
     }
 
     dst += scaledStride;

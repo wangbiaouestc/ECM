@@ -198,6 +198,9 @@ void EncCu::create( EncCfg* encCfg )
     m_acRealMergeBuffer[ui+MRG_MAX_NUM_CANDS].create(chromaFormat, Area(0, 0, uiMaxWidth, uiMaxHeight));
 #endif
     m_acMergeTmpBuffer[ui].create(chromaFormat, Area(0, 0, uiMaxWidth, uiMaxHeight));
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+    m_acTmMergeTmpBuffer[ui].create(chromaFormat, Area(0, 0, uiMaxWidth, uiMaxHeight));
+#endif
   }
 
   for( unsigned ui = 0; ui < GEO_MAX_TRY_WEIGHTED_SAD; ui++ )
@@ -246,7 +249,7 @@ void EncCu::destroy()
   unsigned numWidths  = gp_sizeIdxInfo->numWidths();
   unsigned numHeights = gp_sizeIdxInfo->numHeights();
 
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   delete m_bilateralFilter;
 #endif
 
@@ -337,6 +340,9 @@ void EncCu::destroy()
     m_acRealMergeBuffer[ui+MRG_MAX_NUM_CANDS].destroy();
 #endif
     m_acMergeTmpBuffer[ui].destroy();
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+    m_acTmMergeTmpBuffer[ui].destroy();
+#endif
   }
 
   for (unsigned ui = 0; ui < GEO_MAX_TRY_WEIGHTED_SAD; ui++)
@@ -994,7 +1000,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     else if( currTestMode.type == ETM_MERGE_SKIP )
     {
       xCheckRDCostMerge2Nx2N( tempCS, bestCS, partitioner, currTestMode );
+
       CodingUnit* cu = bestCS->getCU(partitioner.chType);
+
       if (cu)
       cu->mmvdSkip = cu->skip == false ? false : cu->mmvdSkip;
     }
@@ -2792,6 +2800,15 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
   MergeCtx mrgCtx;
 #if TM_MRG
   MergeCtx tmMrgCtx;
+#if JVET_X0141_CIIP_TIMD_TM
+  MergeCtx ciipTmMrgCtx;
+#endif
+#endif
+
+
+#if JVET_X0049_ADAPT_DMVR
+  MergeCtx bmMrgCtx;
+  bool checkBmMrg = false;
 #endif
 
   if (sps.getSbTMVPEnabledFlag())
@@ -2802,6 +2819,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     affineMergeCtx.mrgCtx = &mrgCtx;
 #if TM_MRG
     tmMrgCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+#if JVET_X0141_CIIP_TIMD_TM
+    ciipTmMrgCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+#endif
 #endif
   }
 #endif
@@ -2810,6 +2830,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
   bool applyBDMVR[MRG_MAX_NUM_CANDS] = { false };
 #if TM_MRG && MERGE_ENC_OPT
   bool applyBDMVR4TM[TM_MRG_MAX_NUM_CANDS] = { false };
+#endif
+#if JVET_X0049_ADAPT_DMVR
+  bool applyBDMVR4BM[(BM_MRG_MAX_NUM_CANDS << 1)<<1] = { false };
 #endif
 #endif
 #if !MULTI_PASS_DMVR
@@ -2837,6 +2860,49 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     PU::getInterMergeCandidates(pu, mergeCtx
       , 0
     );
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+    if (cu.cs->sps->getUseCiipTmMrg())
+    {
+      pu.tmMergeFlag = true;
+      pu.ciipFlag = true;
+      ciipTmMrgCtx = mergeCtx;
+      ciipTmMrgCtx.numValidMergeCand = int(pu.cs->sps->getMaxNumCiipTMMergeCand());
+      memcpy(ciipTmMrgCtx.BcwIdx, mergeCtx.BcwIdx, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(uint8_t));
+      memcpy(ciipTmMrgCtx.interDirNeighbours, mergeCtx.interDirNeighbours, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(unsigned char));
+      memcpy(ciipTmMrgCtx.mvFieldNeighbours, mergeCtx.mvFieldNeighbours, (CIIP_TM_MRG_MAX_NUM_CANDS << 1) * sizeof(MvField));
+      memcpy(ciipTmMrgCtx.useAltHpelIf, mergeCtx.useAltHpelIf, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(bool));
+      memcpy(ciipTmMrgCtx.LICFlags, mergeCtx.LICFlags, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(bool));
+      memcpy(ciipTmMrgCtx.addHypNeighbours, mergeCtx.addHypNeighbours, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(MultiHypVec));
+
+      for (uint32_t uiMergeCand = 0; uiMergeCand < ciipTmMrgCtx.numValidMergeCand; uiMergeCand++)
+      {
+        ciipTmMrgCtx.setMergeInfo(pu, uiMergeCand);
+        m_pcInterSearch->deriveTMMv(pu);
+
+        // Store refined motion back to ciipTmMrgCtx
+        ciipTmMrgCtx.interDirNeighbours[uiMergeCand] = pu.interDir;
+        ciipTmMrgCtx.BcwIdx[uiMergeCand] = pu.cu->BcwIdx;  // Bcw may change, because bi may be reduced to uni by deriveTMMv(pu)
+        ciipTmMrgCtx.mvFieldNeighbours[2 * uiMergeCand].setMvField(pu.mv[0], pu.refIdx[0]);
+        ciipTmMrgCtx.mvFieldNeighbours[2 * uiMergeCand + 1].setMvField(pu.mv[1], pu.refIdx[1]);
+        if (pu.interDir == 1)
+        {
+          ciipTmMrgCtx.mvFieldNeighbours[2 * uiMergeCand + 1].setMvField(Mv(), NOT_VALID);
+        }
+        if (pu.interDir == 2)
+        {
+          ciipTmMrgCtx.mvFieldNeighbours[2 * uiMergeCand].setMvField(Mv(), NOT_VALID);
+        }
+      }
+#if JVET_W0090_ARMC_TM
+      if (sps.getUseAML())
+      {
+        m_pcInterSearch->adjustInterMergeCandidates(pu, ciipTmMrgCtx);
+      }
+#endif
+      pu.tmMergeFlag = false;
+      pu.ciipFlag = false;
+    }
+#endif
 #if JVET_W0097_GPM_MMVD_TM
     m_mergeCand.copyMergeCtx(mergeCtx);
     m_mergeCandAvail = true;
@@ -2952,6 +3018,29 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
           }
         }
       }
+
+#if JVET_X0049_ADAPT_DMVR
+      checkBmMrg = PU::isBMMergeFlagCoded(pu);
+      if (checkBmMrg)
+      {
+        pu.bmMergeFlag = true;
+        PU::getInterBMCandidates(pu, bmMrgCtx);
+#if JVET_W0090_ARMC_TM
+        if (pu.cs->sps->getUseAML())
+        {
+          pu.bmDir = 0;
+          m_pcInterSearch->adjustInterMergeCandidates(pu, bmMrgCtx);
+        }
+#endif
+        if (bmMrgCtx.numValidMergeCand == 0)
+        {
+          checkBmMrg = false;
+        }
+
+        pu.bmMergeFlag = false;
+        pu.bdmvrRefine = false;
+      }
+#endif
     }
 #endif
   }
@@ -2967,6 +3056,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
   PelUnitBuf                                  acMergeBuffer[MRG_MAX_NUM_CANDS];
 #endif
   PelUnitBuf                                  acMergeTmpBuffer[MRG_MAX_NUM_CANDS];
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  PelUnitBuf                                  acTmMergeTmpBuffer[MRG_MAX_NUM_CANDS];
+#endif
   PelUnitBuf                                  acMergeRealBuffer[MMVD_MRG_MAX_RD_BUF_NUM];
   PelUnitBuf *                                acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM];
   PelUnitBuf *                                singleMergeTempBuffer;
@@ -3004,13 +3096,21 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     {
 #if CIIP_PDPC
 #if MERGE_ENC_OPT
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+      RdModeList.push_back(ModeInfo(i, true, false, false, false, 0, false));
+#else
       RdModeList.push_back(ModeInfo(i, true, false, false, false, false));
+#endif
 #else
       RdModeList.push_back(ModeInfo(i, true, false, false, false));
 #endif
 #else
 #if MERGE_ENC_OPT
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+      RdModeList.push_back(ModeInfo(i, true, false, false, 0, false));
+#else
       RdModeList.push_back(ModeInfo(i, true, false, false, false));
+#endif
 #else
       RdModeList.push_back(ModeInfo(i, true, false, false));
 #endif
@@ -3020,9 +3120,17 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     {
 #if MERGE_ENC_OPT
 #if CIIP_PDPC
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+      RdModeList.push_back(ModeInfo(std::min(MMVD_ADD_NUM, i - mergeCtx.numValidMergeCand), false, true, false, false, 0, false));
+#else
       RdModeList.push_back(ModeInfo(std::min(MMVD_ADD_NUM, i - mergeCtx.numValidMergeCand), false, true, false, false, false));
+#endif
+#else
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+      RdModeList.push_back(ModeInfo(std::min(MMVD_ADD_NUM, i - mergeCtx.numValidMergeCand), false, true, false, 0, false));
 #else
       RdModeList.push_back(ModeInfo(std::min(MMVD_ADD_NUM, i - mergeCtx.numValidMergeCand), false, true, false, false));
+#endif
 #endif
 #else
 #if CIIP_PDPC
@@ -3158,6 +3266,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if TM_MRG
       pu.tmMergeFlag = false;
+#endif
+#if JVET_X0049_ADAPT_DMVR
+      pu.bmMergeFlag = false;
 #endif
 #if MULTI_PASS_DMVR
       pu.bdmvrRefine = false;
@@ -3318,6 +3429,12 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       {
 #if MERGE_ENC_OPT
         xCheckSATDCostCiipMerge(tempCS, cu, pu, mergeCtx, acMergeTempBuffer, singleMergeTempBuffer, acMergeTmpBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart);
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+        if (sps.getUseCiipTmMrg())
+        {
+            xCheckSATDCostCiipTmMerge(tempCS, cu, pu, ciipTmMrgCtx, acMergeTempBuffer, singleMergeTempBuffer, acTmMergeTmpBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart);
+        }
+#endif
 #else
         // prepare for Intra bits calculation
         pu.ciipFlag = true;
@@ -3328,6 +3445,21 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         {
           CiipMergeCand[mergeCnt] = RdModeList[mergeCnt].mergeCand;
         }
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+        int intraMode = PLANAR_IDX;
+        if (mergeCtx.numValidMergeCand)
+        {
+          const CompArea &area = cu.Y();
+          if (cu.slice->getSPS()->getUseTimd() && (cu.lwidth() * cu.lheight() <= CIIP_MAX_SIZE))
+          {
+#if SECONDARY_MPM && ENABLE_DIMD
+            IntraPrediction::deriveDimdMode(cu.cs->picture->getRecoBuf(area), area, cu);
+#endif
+            cu.timdMode = m_pcIntraSearch->deriveTimdMode(cu.cs->picture->getRecoBuf(area), area, cu);
+            intraMode = MAP131TO67(cu.timdMode);
+          }
+        }
+#endif
         for (uint32_t mergeCnt = 0; mergeCnt < std::min(std::min(NUM_MRG_SATD_CAND, (const int)mergeCtx.numValidMergeCand), 4); mergeCnt++)
         {
           uint32_t mergeCand = CiipMergeCand[mergeCnt];
@@ -3344,6 +3476,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             pu.ciipPDPC = intraCnt == 1;
 #else
           uint32_t intraCnt = 0;
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+          pu.intraDir[0] = pu.ciipPDPC ? PLANAR_IDX : intraMode;
 #endif
           PelBuf ciipBuff = m_ciipBuffer[intraCnt].getBuf(localUnitArea.Y());
           // generate intrainter Y prediction
@@ -3507,6 +3642,16 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       }
 #endif
 #endif
+#if JVET_X0049_ADAPT_DMVR
+      if (sps.getUseDMVDMode() && checkBmMrg)
+      {
+        xCheckSATDCostBMMerge(tempCS, cu, pu, bmMrgCtx, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart
+#if MULTI_PASS_DMVR
+          , applyBDMVR4BM
+#endif
+        );
+      }
+#endif
       // Try to limit number of candidates using SATD-costs
       for( uint32_t i = 1; i < uiNumMrgSATDCand; i++ )
       {
@@ -3539,6 +3684,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             uint32_t bufIdx = pu.ciipPDPC ? 1 : 0;
 #else
             uint32_t bufIdx = 0;
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+              pu.intraDir[0] = RdModeList[mergeCnt].intraMode;
 #endif
             if (!tag[bufIdx])
             {
@@ -3626,17 +3774,34 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if TM_MRG
       pu.tmMergeFlag      = false;
 #endif
+#if JVET_X0049_ADAPT_DMVR
+      pu.bmMergeFlag      = false;
+      pu.bmDir            = 0;
+#endif
 #if MULTI_PASS_DMVR
       bool isDMVR         = false;
 #endif
 #if ENABLE_OBMC
       pu.ciipFlag = false;
 #endif
+#if JVET_X0141_CIIP_TIMD_TM
+      pu.intraDir[0] = PLANAR_IDX;
+#endif
       if (uiNoResidualPass == 0 && RdModeList[uiMrgHADIdx].isCIIP)
       {
         cu.mmvdSkip = false;
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+        pu.tmMergeFlag = RdModeList[uiMrgHADIdx].isTMMrg;
+#endif
 #if MULTI_HYP_PRED
         pu.ciipFlag = true;
+#if  JVET_X0141_CIIP_TIMD_TM && TM_MRG
+        if (pu.tmMergeFlag)
+        {
+          ciipTmMrgCtx.setMergeInfo(pu, uiMergeCand);
+        }
+        else
+#endif
         mergeCtx.setMergeInfo(pu, uiMergeCand);
 #else
         mergeCtx.setMergeInfo(pu, uiMergeCand);
@@ -3646,7 +3811,11 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         pu.ciipPDPC = RdModeList[uiMrgHADIdx].isCiipPDPC;
 #endif
         pu.regularMergeFlag = false;
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+        pu.intraDir[0] = RdModeList[uiMrgHADIdx].intraMode;
+#else
         pu.intraDir[0] = PLANAR_IDX;
+#endif
         CHECK(pu.intraDir[0]<0 || pu.intraDir[0]>(NUM_LUMA_MODE - 1), "out of intra mode");
         pu.intraDir[1] = DM_CHROMA_IDX;
       }
@@ -3769,11 +3938,18 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         }
       }
 #if TM_MRG && MERGE_ENC_OPT
+#if JVET_X0141_CIIP_TIMD_TM
+      else if (RdModeList[uiMrgHADIdx].isTMMrg && !RdModeList[uiMrgHADIdx].isCIIP)
+#else
       else if (RdModeList[uiMrgHADIdx].isTMMrg)
+#endif
       {
         cu.mmvdSkip         = false;
         pu.regularMergeFlag = true;
         pu.tmMergeFlag      = true;
+#if JVET_X0141_CIIP_TIMD_TM
+        pu.ciipFlag = false;
+#endif
         tmMrgCtx.setMergeInfo(pu, uiMergeCand);
 #if MULTI_PASS_DMVR
         if (applyBDMVR4TM[uiMergeCand])
@@ -3785,12 +3961,32 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
       }
 #endif
+#if JVET_X0049_ADAPT_DMVR
+      else if (RdModeList[uiMrgHADIdx].isBMMrg)
+      {
+        cu.mmvdSkip = false;
+        pu.regularMergeFlag = true;
+        pu.bmMergeFlag = true;
+        pu.bmDir = RdModeList[uiMrgHADIdx].bmDir;
+        bmMrgCtx.setMergeInfo(pu, uiMergeCand);
+        if (applyBDMVR4BM[uiMergeCand])
+        {
+          isDMVR = true;
+          pu.bdmvrRefine = true;
+          m_pcInterSearch->setBdmvrSubPuMvBuf(m_mvBufBDMVR4BM[uiMergeCand << 1], m_mvBufBDMVR4BM[(uiMergeCand << 1) + 1]);
+        }
+      }
+#endif
 #endif
       else
       {
         cu.mmvdSkip = false;
         pu.regularMergeFlag = true;
         mergeCtx.setMergeInfo(pu, uiMergeCand);
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+        pu.ciipFlag = false;
+        pu.tmMergeFlag = false;
+#endif
 #if MULTI_PASS_DMVR
         if (applyBDMVR[uiMergeCand])
         {
@@ -3855,6 +4051,40 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #else
           uint32_t bufIdx = 0;
 #endif
+#if JVET_X0090_CIIP_FIX
+          m_pcInterSearch->motionCompensation(pu);
+#if ENABLE_OBMC
+          cu.isobmcMC = true;
+          cu.obmcFlag = true;
+          m_pcInterSearch->subBlockOBMC(pu);
+          cu.isobmcMC = false;
+#endif
+          if (cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+          {
+            m_pcIntraSearch->geneWeightedPred<true>(COMPONENT_Y, tempCS->getPredBuf(pu).Y(), pu, tempCS->getPredBuf(pu).Y(), m_ciipBuffer[bufIdx].getBuf(localUnitArea.Y()), m_pcReshape->getFwdLUT().data());
+          }
+          else
+          {
+            m_pcIntraSearch->geneWeightedPred<false>(COMPONENT_Y, tempCS->getPredBuf(pu).Y(), pu, tempCS->getPredBuf(pu).Y(), m_ciipBuffer[bufIdx].getBuf(localUnitArea.Y()));
+          }
+
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+          if (isChromaEnabled(pu.chromaFormat))
+#else
+          if (isChromaEnabled(pu.chromaFormat) && pu.chromaSize().width > 2)
+#endif
+          {
+            m_pcIntraSearch->geneWeightedPred<false>(COMPONENT_Cb, tempCS->getPredBuf(pu).Cb(), pu, tempCS->getPredBuf(pu).Cb(), m_ciipBuffer[bufIdx].getBuf(localUnitArea.Cb()));
+            m_pcIntraSearch->geneWeightedPred<false>(COMPONENT_Cr, tempCS->getPredBuf(pu).Cr(), pu, tempCS->getPredBuf(pu).Cr(), m_ciipBuffer[bufIdx].getBuf(localUnitArea.Cr()));
+          }
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+          else if (isChromaEnabled(pu.chromaFormat))
+          {
+            tempCS->getPredBuf().Cb().copyFrom(tempCS->getPredBuf(pu).Cb());
+            tempCS->getPredBuf().Cr().copyFrom(tempCS->getPredBuf(pu).Cr());
+          }
+#endif
+#else
           // Luma CIIP was already done in SATD check stage and stored
           tempCS->getPredBuf().Y().copyFrom( acMergeTempBuffer[uiMrgHADIdx]->Y() );
 
@@ -3864,8 +4094,21 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
           if( isChromaEnabled( pu.chromaFormat ) && pu.chromaSize().width > 2 )
 #endif
           {
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+            if (pu.tmMergeFlag)
+            {
+              m_pcIntraSearch->geneWeightedPred<false>(COMPONENT_Cb, tempCS->getPredBuf(pu).Cb(), pu, acTmMergeTmpBuffer[uiMergeCand].Cb(), m_ciipBuffer[bufIdx].getBuf(localUnitArea.Cb()));
+              m_pcIntraSearch->geneWeightedPred<false>(COMPONENT_Cr, tempCS->getPredBuf(pu).Cr(), pu, acTmMergeTmpBuffer[uiMergeCand].Cr(), m_ciipBuffer[bufIdx].getBuf(localUnitArea.Cr()));
+            }
+            else
+            {
+              m_pcIntraSearch->geneWeightedPred<false>(COMPONENT_Cb, tempCS->getPredBuf(pu).Cb(), pu, acMergeTmpBuffer[uiMergeCand].Cb(), m_ciipBuffer[bufIdx].getBuf(localUnitArea.Cb()));
+              m_pcIntraSearch->geneWeightedPred<false>(COMPONENT_Cr, tempCS->getPredBuf(pu).Cr(), pu, acMergeTmpBuffer[uiMergeCand].Cr(), m_ciipBuffer[bufIdx].getBuf(localUnitArea.Cr()));
+            }
+#else
             m_pcIntraSearch->geneWeightedPred<false>( COMPONENT_Cb, tempCS->getPredBuf( pu ).Cb(), pu, acMergeTmpBuffer[uiMergeCand].Cb(), m_ciipBuffer[bufIdx].getBuf( localUnitArea.Cb() ) );
             m_pcIntraSearch->geneWeightedPred<false>( COMPONENT_Cr, tempCS->getPredBuf( pu ).Cr(), pu, acMergeTmpBuffer[uiMergeCand].Cr(), m_ciipBuffer[bufIdx].getBuf( localUnitArea.Cr() ) );
+#endif
           }
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
           else if (isChromaEnabled(pu.chromaFormat))
@@ -3873,6 +4116,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             tempCS->getPredBuf().Cb().copyFrom(acMergeTmpBuffer[uiMergeCand].Cb());
             tempCS->getPredBuf().Cr().copyFrom(acMergeTmpBuffer[uiMergeCand].Cr());
           }
+#endif
 #endif
         }
         else
@@ -3897,9 +4141,20 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             if (!RdModeList[uiMrgHADIdx].isAffine && !RdModeList[uiMrgHADIdx].isGeo && pu.bdmvrRefine)
             {
 #if TM_MRG
-              if( pu.tmMergeFlag )
+#if JVET_X0141_CIIP_TIMD_TM
+              if (pu.tmMergeFlag && !RdModeList[uiMrgHADIdx].isCIIP)
+#else
+              if ( pu.tmMergeFlag )
+#endif
               {
                 PU::spanMotionInfo( pu, mergeCtx, m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[( uiMergeCand << 1 ) + 1], m_pcInterSearch->getBdofSubPuMvOffset() );
+              }
+              else
+#endif
+#if JVET_X0049_ADAPT_DMVR
+              if( pu.bmMergeFlag ) 
+              {
+                PU::spanMotionInfo( pu, bmMrgCtx, m_mvBufBDMVR4BM[uiMergeCand << 1], m_mvBufBDMVR4BM[( uiMergeCand << 1 ) + 1], m_pcInterSearch->getBdofSubPuMvOffset() );
               }
               else
 #endif
@@ -3950,6 +4205,13 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
               }
               else
 #endif
+#if JVET_X0049_ADAPT_DMVR
+              if( pu.bmMergeFlag )
+              {
+                PU::spanMotionInfo( pu, bmMrgCtx, m_mvBufBDMVR4BM[uiMergeCand << 1], m_mvBufBDMVR4BM[( uiMergeCand << 1 ) + 1], m_mvBufEncBDOF4BM[uiMergeCand] );
+              }
+              else
+#endif
               PU::spanMotionInfo(pu, mergeCtx, m_mvBufBDMVR[uiMergeCand << 1], m_mvBufBDMVR[(uiMergeCand << 1) + 1], m_mvBufEncBDOF[uiMergeCand]);
             }
 #endif
@@ -3971,6 +4233,13 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
           }
           else
 #endif
+#if JVET_X0049_ADAPT_DMVR 
+            if (pu.bmMergeFlag)
+            {
+              PU::spanMotionInfo(pu, bmMrgCtx, m_mvBufBDMVR4BM[uiMergeCand << 1], m_mvBufBDMVR4BM[(uiMergeCand << 1) + 1], m_mvBufEncBDOF4BM[uiMergeCand]);
+            }
+            else
+#endif
             PU::spanMotionInfo(pu, mergeCtx, m_mvBufBDMVR[uiMergeCand << 1], m_mvBufBDMVR[(uiMergeCand << 1) + 1], m_pcInterSearch->getBdofSubPuMvOffset());
         }
 #endif
@@ -3978,6 +4247,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       if (!cu.mmvdSkip && !pu.ciipFlag && uiNoResidualPass != 0 && !cu.affine 
 #if TM_MRG
           && !pu.tmMergeFlag
+#endif
+#if JVET_X0049_ADAPT_DMVR
+        && !pu.bmMergeFlag
 #endif
 #if AFFINE_MMVD && MERGE_ENC_OPT
           && !pu.afMmvdFlag
@@ -3991,7 +4263,14 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if ENABLE_OBMC
       cu.isobmcMC = true;
       cu.obmcFlag = true;
+#if JVET_X0090_CIIP_FIX
+      if (!pu.ciipFlag)
+      {
+        m_pcInterSearch->subBlockOBMC(pu);
+      }
+#else
       m_pcInterSearch->subBlockOBMC( pu );
+#endif
       cu.isobmcMC = false;
 #endif
 
@@ -4135,6 +4414,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
   pu.regularMergeFlag = false;
 #if TM_MRG
   pu.tmMergeFlag = false;
+#endif
+#if JVET_X0049_ADAPT_DMVR
+  pu.bmMergeFlag = false;
 #endif
   CHECK(!m_mergeCandAvail, "merge candidates are not available");
 #if TM_MRG
@@ -5700,7 +5982,9 @@ void EncCu::xCheckSATDCostRegularMerge(CodingStructure *&tempCS, CodingUnit &cu,
 #if MULTI_HYP_PRED
     if (testMHP && pu.addHypData.size() < tempCS->sps->getMaxNumAddHyps())
     {
+#if MULTI_PASS_DMVR
       CHECK(pu.bdmvrRefine && !applyBDMVR[uiMergeCand], "");
+#endif
       uint32_t uiBitsCand = uiMergeCand + 1 + 1 + 1; // one bit for merge flag,  one bit for subblock_merge_flag, and one bit for regualr_merge_flag
       MEResult mergeResult;
       mergeResult.cu = cu;
@@ -5755,6 +6039,22 @@ void EncCu::xCheckSATDCostCiipMerge(CodingStructure *&tempCS, CodingUnit &cu, Pr
   const double sqrtLambdaForFirstPassIntra = m_pcRdCost->getMotionLambda() * FRAC_BITS_SCALE;
   const UnitArea localUnitArea(tempCS->area.chromaFormat, Area(0, 0, tempCS->area.Y().width, tempCS->area.Y().height));
 
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  int intraMode = PLANAR_IDX;
+  if (mergeCtx.numValidMergeCand)
+  {
+    const CompArea &area = cu.Y();
+    if (cu.slice->getSPS()->getUseTimd() && (cu.lwidth() * cu.lheight() <= CIIP_MAX_SIZE))
+    {
+#if SECONDARY_MPM && ENABLE_DIMD
+      IntraPrediction::deriveDimdMode(cu.cs->picture->getRecoBuf(area), area, cu);
+#endif
+      cu.timdMode = m_pcIntraSearch->deriveTimdMode(cu.cs->picture->getRecoBuf(area), area, cu);
+      intraMode = MAP131TO67(cu.timdMode);
+    }
+  }
+#endif
+
   int insertPos = -1;
   for (uint32_t mergeCand = 0; mergeCand < mergeCtx.numValidMergeCand; mergeCand++)
   {
@@ -5774,6 +6074,9 @@ void EncCu::xCheckSATDCostCiipMerge(CodingStructure *&tempCS, CodingUnit &cu, Pr
 #endif
     PelBuf ciipBuff = m_ciipBuffer[intraCnt].getBuf(localUnitArea.Y());
 
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+    pu.intraDir[0] = (intraCnt == 1) ? PLANAR_IDX : intraMode;
+#endif
     // generate intrainter Y prediction
     if (mergeCand == 0)
     {
@@ -5826,6 +6129,126 @@ pu.ciipFlag = false;
 pu.ciipPDPC = false;
 #endif
 }
+
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+void EncCu::xCheckSATDCostCiipTmMerge(CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx mergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer, PelUnitBuf  acTmMergeTmpBuffer[MRG_MAX_NUM_CANDS]
+  , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart)
+{
+#if INTER_LIC
+  cu.LICFlag = false;
+#endif
+  cu.mmvdSkip = false;
+  cu.geoFlag = false;
+  cu.affine = false;
+  //cu.imv = 0;
+
+  pu.ciipFlag = true;
+#if CIIP_PDPC
+  pu.ciipPDPC = false;
+#endif
+  pu.mmvdMergeFlag = false;
+  pu.regularMergeFlag = false;
+  pu.tmMergeFlag = true;
+
+  const double sqrtLambdaForFirstPassIntra = m_pcRdCost->getMotionLambda() * FRAC_BITS_SCALE;
+  const UnitArea localUnitArea(tempCS->area.chromaFormat, Area(0, 0, tempCS->area.Y().width, tempCS->area.Y().height));
+
+  int intraMode = PLANAR_IDX;
+#if JVET_W0123_TIMD_FUSION
+  if (mergeCtx.numValidMergeCand)
+  {
+    const CompArea &area = cu.Y();
+    if (cu.slice->getSPS()->getUseTimd() && (cu.lwidth() * cu.lheight() <= CIIP_MAX_SIZE))
+    {
+#if SECONDARY_MPM && ENABLE_DIMD
+      IntraPrediction::deriveDimdMode(cu.cs->picture->getRecoBuf(area), area, cu);
+#endif
+      cu.timdMode = m_pcIntraSearch->deriveTimdMode(cu.cs->picture->getRecoBuf(area), area, cu);
+      intraMode = MAP131TO67(cu.timdMode);
+    }
+  }
+#endif
+
+  int insertPos = -1;
+  for (uint32_t mergeCand = 0; mergeCand < mergeCtx.numValidMergeCand; mergeCand++)
+  {
+    //acTmMergeTmpBuffer[mergeCand] = m_acTmMergeTmpBuffer[mergeCand].getBuf(localUnitArea);
+    // estimate merge bits
+    mergeCtx.setMergeInfo(pu, mergeCand);
+
+#if MULTI_HYP_PRED
+    pu.addHypData.clear();
+    pu.numMergedAddHyps = 0;
+#endif
+    acTmMergeTmpBuffer[mergeCand] = m_acTmMergeTmpBuffer[mergeCand].getBuf(localUnitArea);
+    m_pcInterSearch->motionCompensation(pu, acTmMergeTmpBuffer[mergeCand]);
+
+    // first round
+    pu.intraDir[0] = PLANAR_IDX;
+#if CIIP_PDPC
+    for (int intraCnt = 0; intraCnt < 2; intraCnt++)
+    {
+      pu.ciipPDPC = intraCnt == 1;
+#else
+    uint32_t intraCnt = 0;
+#endif
+    PelBuf ciipBuff = m_ciipBuffer[intraCnt].getBuf(localUnitArea.Y());
+
+    pu.intraDir[0] = (intraCnt == 1) ? PLANAR_IDX : intraMode;
+    // generate intrainter Y prediction
+    if (mergeCand == 0)
+    {
+      m_pcIntraSearch->initIntraPatternChType(*pu.cu, pu.Y());
+      m_pcIntraSearch->predIntraAng(COMPONENT_Y, ciipBuff, pu);
+    }
+
+    if (pu.cs->picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+    {
+      m_pcIntraSearch->geneWeightedPred<true>(COMPONENT_Y, singleMergeTempBuffer->Y(), pu, acTmMergeTmpBuffer[mergeCand].Y(), ciipBuff, m_pcReshape->getFwdLUT().data());
+    }
+    else
+    {
+      m_pcIntraSearch->geneWeightedPred<false>(COMPONENT_Y, singleMergeTempBuffer->Y(), pu, acTmMergeTmpBuffer[mergeCand].Y(), ciipBuff);
+    }
+
+    // calculate cost
+    if (pu.cs->picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+    {
+      PelBuf tmp = m_acGeoWeightedBuffer->getBuf(localUnitArea.Y());
+      tmp.rspSignal(singleMergeTempBuffer->Y(), m_pcReshape->getInvLUT());
+      distParam.cur = tmp;
+    }
+    else
+    {
+      distParam.cur = singleMergeTempBuffer->Y();
+    }
+
+    Distortion sadValue = distParam.distFunc(distParam);
+    m_CABACEstimator->getCtx() = ctxStart;
+    pu.regularMergeFlag = false;
+    uint64_t fracBits = m_pcInterSearch->xCalcPuMeBits(pu);
+    double cost = (double)sadValue + (double)fracBits * sqrtLambdaForFirstPassIntra; // need to check the cost calculation again???
+    insertPos = -1;
+    updateCandList(ModeInfo(cu, pu), cost, RdModeList, candCostList, uiNumMrgSATDCand, &insertPos);
+    if (insertPos != -1 && insertPos < MMVD_MRG_MAX_RD_NUM)
+    {
+      for (int i = int(RdModeList.size()) - 1; i > insertPos; i--)
+      {
+        swap(acMergeTempBuffer[i - 1], acMergeTempBuffer[i]);
+      }
+      swap(singleMergeTempBuffer, acMergeTempBuffer[insertPos]);
+    }
+#if CIIP_PDPC
+    }
+#endif
+  }
+pu.ciipFlag = false;
+#if CIIP_PDPC
+pu.ciipPDPC = false;
+#endif
+pu.tmMergeFlag = false;
+}
+#endif
 
 void EncCu::xCheckSATDCostMmvdMerge(CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx mergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
   , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart)
@@ -6045,6 +6468,14 @@ void EncCu::xCheckSATDCostTMMerge(       CodingStructure*& tempCS,
     {
       pu.bdmvrRefine = true;
       m_pcInterSearch->setBdmvrSubPuMvBuf(m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[(uiMergeCand << 1) + 1]);
+    }
+#if !BDOF_RM_CONSTRAINTS
+    else
+#endif
+#endif
+#if !BDOF_RM_CONSTRAINTS
+    {
+      PU::spanMotionInfo(pu, mrgCtx);
     }
 #endif
 
@@ -7801,6 +8232,17 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 #if ENABLE_OBMC
   double bestOBMCCost = MAX_DOUBLE;
 #endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  int maxBdmvrAmSearchLoop = 3;
+  m_pcInterSearch->m_amvpOnlyCost = std::numeric_limits<Distortion>::max();
+  if ((tempCS->slice->getUseLIC() && (encTestMode.opts & ETO_LIC)) || !tempCS->slice->isInterB() || (tempCS->picHeader->getMvdL1ZeroFlag() == true))
+  {
+    maxBdmvrAmSearchLoop = 1;
+  }
+  for (int bdmvrAmSearchLoop = 0; bdmvrAmSearchLoop < maxBdmvrAmSearchLoop; bdmvrAmSearchLoop++)
+  {
+  bool bdmvrAmMergeNotValid = false;
+#endif
   tempCS->initStructData( encTestMode.qp );
   m_pcInterSearch->setAffineModeSelected(false);
 
@@ -7826,6 +8268,9 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   {
     bcwLoopNum = 1;
   }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  bcwLoopNum = (bdmvrAmSearchLoop > 0) ? 1 : bcwLoopNum;
+#endif
 
   double curBestCost = bestCS->cost;
   double equBcwCost = MAX_DOUBLE;
@@ -7880,7 +8325,37 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 #if INTER_LIC
   if (cu.slice->getUseLIC() && lic) { m_pcInterSearch->swapUniMvBuffer(); }
 #endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  if (bdmvrAmSearchLoop == 0)
+  {
+    cu.firstPU->amvpMergeModeFlag[REF_PIC_LIST_0] = false;
+    cu.firstPU->amvpMergeModeFlag[REF_PIC_LIST_1] = false;
+  }
+  else if (bdmvrAmSearchLoop == 1)
+  {
+    cu.firstPU->amvpMergeModeFlag[REF_PIC_LIST_0] = true;
+    cu.firstPU->amvpMergeModeFlag[REF_PIC_LIST_1] = false;
+  }
+  else
+  {
+    cu.firstPU->amvpMergeModeFlag[REF_PIC_LIST_0] = false;
+    cu.firstPU->amvpMergeModeFlag[REF_PIC_LIST_1] = true;
+  }
+  if (cu.firstPU->amvpMergeModeFlag[0] || cu.firstPU->amvpMergeModeFlag[1])
+  {
+    m_pcInterSearch->predInterSearch( cu, partitioner, bdmvrAmMergeNotValid,
+        mvField_amList_enc, m_mvBufEncAmBDMVR[0], m_mvBufEncAmBDMVR[1] );
+  }
+  else
+  m_pcInterSearch->predInterSearch( cu, partitioner, bdmvrAmMergeNotValid );
+  if ((cu.firstPU->refIdx[REF_PIC_LIST_0] < 0 && cu.firstPU->refIdx[REF_PIC_LIST_1] < 0) || bdmvrAmMergeNotValid)
+  {
+    tempCS->initStructData(encTestMode.qp);
+    continue;
+  }
+#else
   m_pcInterSearch->predInterSearch( cu, partitioner );
+#endif
 #if INTER_LIC
   if (cu.slice->getUseLIC() && lic) { m_pcInterSearch->swapUniMvBuffer(); }
 #endif
@@ -7959,6 +8434,9 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   {
     xCalDebCost( *bestCS, partitioner );
   }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  }
+#endif
 }
 
 
@@ -7966,6 +8444,9 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 
 bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode, double &bestIntPelCost)
 {
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  bool bdmvrAmMergeNotValid = false;
+#endif
 #if ENABLE_OBMC
   double bestOBMCCost = MAX_DOUBLE;
 #endif
@@ -8082,7 +8563,11 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
 #if INTER_LIC
   if (cu.slice->getUseLIC() && lic) { m_pcInterSearch->swapUniMvBuffer(); }
 #endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  m_pcInterSearch->predInterSearch( cu, partitioner, bdmvrAmMergeNotValid );
+#else
   m_pcInterSearch->predInterSearch( cu, partitioner );
+#endif
 #if INTER_LIC
   if (cu.slice->getUseLIC() && lic) { m_pcInterSearch->swapUniMvBuffer(); }
 #endif
@@ -8334,6 +8819,52 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
           }
         }
       }
+    }
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+    if(cs.pps->getUseCBIF()){
+        bool TU_VALID = false;
+        bool TU_CBF = false;
+        bool isDualTree = CS::isDualITree(cs);
+        bool chroma_valid = cu->Cb().valid() && cu->Cr().valid();
+        bool BIF_chroma = false;
+        for (auto &currTU : CU::traverseTUs(*cu))
+        {
+            bool isInter = (cu->predMode == MODE_INTER) ? true : false;
+
+            for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
+            {
+                bool isCb = compIdx == COMPONENT_Cb ? true : false;
+                ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+
+                BIF_chroma = false;
+                if(!isDualTree && chroma_valid)
+                {
+                    TU_VALID = currTU.blocks[compIdx].valid();
+                    TU_CBF = false;
+                    if(TU_VALID)
+                    {
+                        TU_CBF = TU::getCbf(currTU, compID);
+                    }
+                    BIF_chroma = ((TU_CBF || isInter == false) && (currTU.cu->qp > 17) && (TU_VALID));
+                }
+
+                if(isDualTree && chroma_valid)
+                {
+                    TU_CBF = TU::getCbf(currTU, compID);
+                    BIF_chroma = ((TU_CBF || isInter == false) && (currTU.cu->qp > 17));
+                }
+
+                if (BIF_chroma)
+                {
+                    CompArea &compArea = currTU.block(compID);
+                    PelBuf    recBuf = picDbBuf.getBuf(compArea);
+                    PelBuf recIPredBuf = recBuf;
+
+                    m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, isCb);
+                }
+            }
+        }
     }
 #endif
     
@@ -8961,6 +9492,59 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
             }
           }
         }
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+        const CompArea &area_chroma = cu.blocks[compID];
+        CompArea    tmpArea_chroma(compID, area_chroma.chromaFormat, Position(0, 0), area_chroma.size());
+        PelBuf tmpRecChroma;
+        if(isChroma(compID))
+        {
+            tmpRecChroma = m_tmpStorageLCU->getBuf(tmpArea_chroma);
+            tmpRecChroma.copyFrom(reco);
+        }
+
+        if(tempCS->pps->getUseCBIF() && isChroma(compID) && (cu.qp > 17))
+        {
+            bool TU_VALID = false;
+            bool TU_CBF = false;
+            bool isDualTree = CS::isDualITree(*tempCS);
+            bool chroma_valid = cu.Cb().valid() && cu.Cr().valid();
+            bool BIF_chroma = false;
+
+            for (auto &currTU : CU::traverseTUs(cu))
+            {
+                Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
+                PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
+
+                bool isInter = (cu.predMode == MODE_INTER) ? true : false;
+                bool isCb = compID == COMPONENT_Cb ? true : false;
+                BIF_chroma = false;
+                if(!isDualTree && chroma_valid)
+                {
+                    TU_VALID = currTU.blocks[compID].valid();
+                    TU_CBF = false;//if CHROMA TU is not vaild, CBF must be zero
+
+                    if(TU_VALID)
+                    {
+                        TU_CBF = TU::getCbf(currTU, compID);
+                    }
+                    BIF_chroma = (( TU_CBF || isInter == false) && (currTU.cu->qp > 17) && (TU_VALID));
+
+                }
+
+                if(isDualTree && chroma_valid)
+                {
+                    BIF_chroma = ((TU::getCbf(currTU, compID) || isInter == false) && (currTU.cu->qp > 17));
+                }
+
+                if(BIF_chroma)
+                {
+                    CompArea compArea = currTU.blocks[compID];
+                    PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
+                    m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, isCb);
+                }
+            }
+        }
+#endif
 
 #if WCG_EXT
         if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (
@@ -8973,7 +9557,18 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
           }
           else
           {
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+            if(isChroma(compID) && tempCS->pps->getUseCBIF())
+            {
+                finalDistortion += m_pcRdCost->getDistPart(org, tmpRecChroma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
+            }
+            else
+            {
+                finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE_WTD, &orgLuma );
+            }
+#else
             finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE_WTD, &orgLuma );
+#endif
           }
         }
         else
@@ -8982,6 +9577,56 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
           finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE );
         }
 #else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+        const CompArea &area_chroma = cu.blocks[compID];
+        CompArea    tmpArea_chroma(compID, area_chroma.chromaFormat, Position(0, 0), area_chroma.size());
+        PelBuf tmpRecChroma;
+        if(isChroma(compID))
+        {
+            tmpRecChroma = m_tmpStorageLCU->getBuf(tmpArea_chroma);
+            tmpRecChroma.copyFrom(reco);
+        }
+
+        if(tempCS->pps->getUseCBIF() && isChroma(compID) && (cu.qp > 17))
+        {
+            bool TU_VALID = false;
+            bool TU_CBF = false;
+            bool isDualTree = CS::isDualITree(*tempCS);
+            bool chroma_valid = cu.Cb().valid() && cu.Cr().valid();
+            bool BIF_chroma = false;
+
+            for (auto &currTU : CU::traverseTUs(cu))
+            {
+                Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
+                PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
+
+                bool isInter = (cu.predMode == MODE_INTER) ? true : false;
+                bool isCb = compID == COMPONENT_Cb ? true : false;
+                BIF_chroma = false;
+                if(!isDualTree && chroma_valid)
+                {
+                    TU_VALID = currTU.blocks[compID].valid();
+                    TU_CBF = false;//if CHROMA TU is not vaild, CBF must be zero
+
+                    if(TU_VALID){
+                        TU_CBF = TU::getCbf(currTU, compID);
+                    }
+                    BIF_chroma = (( TU_CBF || isInter == false) && (currTU.cu->qp > 17) && (TU_VALID));
+                }
+
+                if(isDualTree && chroma_valid){
+                    BIF_chroma = ((TU::getCbf(currTU, compID) || isInter == false) && (currTU.cu->qp > 17));
+                }
+
+                if(BIF_chroma)
+                {
+                    CompArea compArea = currTU.blocks[compID];
+                    PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
+                    m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, isCb);
+                }
+            }
+        }
+#endif
 #if WCG_EXT
       if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs() && (tempCS->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())))
       {
@@ -8996,7 +9641,18 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
         }
         else
         {
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+          if(isChroma(compID) && tempCS->pps->getUseCBIF())
+          {
+            finalDistortion += m_pcRdCost->getDistPart(org, tmpRecChroma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
+          }
+          else
+          {
+            finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE_WTD, &orgLuma );
+          }
+#else
           finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE_WTD, &orgLuma );
+#endif
         }
       }
       else
@@ -9154,6 +9810,13 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
       }
       else
 #endif
+#if JVET_X0049_ADAPT_DMVR 
+      if( pu.bmMergeFlag )
+      {
+        m_pcInterSearch->setBdmvrSubPuMvBuf( m_mvBufBDMVR4BM[pu.mergeIdx << 1], m_mvBufBDMVR4BM[( pu.mergeIdx << 1 ) + 1] );
+      }
+      else
+#endif
       m_pcInterSearch->setBdmvrSubPuMvBuf(m_mvBufBDMVR[pu.mergeIdx << 1], m_mvBufBDMVR[(pu.mergeIdx << 1) + 1]);
     }
     else
@@ -9179,6 +9842,13 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
       if( pu.tmMergeFlag )
       {
         PU::spanMotionInfo( pu, mrgCtx, m_mvBufBDMVR4TM[pu.mergeIdx << 1], m_mvBufBDMVR4TM[( pu.mergeIdx << 1 ) + 1], m_pcInterSearch->getBdofSubPuMvOffset() );
+      }
+      else
+#endif
+#if JVET_X0049_ADAPT_DMVR
+      if( pu.bmMergeFlag )
+      {
+        PU::spanMotionInfo( pu, mrgCtx, m_mvBufBDMVR4BM[pu.mergeIdx << 1], m_mvBufBDMVR4BM[( pu.mergeIdx << 1 ) + 1], m_pcInterSearch->getBdofSubPuMvOffset() );
       }
       else
 #endif
@@ -9280,6 +9950,116 @@ void EncCu::xCheckRDCostInterWoOBMC(CodingStructure *&tempCS, CodingStructure *&
   cu->obmcFlag = false;
   //
   xEncodeInterResidual(tempCS, bestCS, partitioner, encTestMode, 0);
+}
+#endif
+
+#if JVET_X0049_ADAPT_DMVR
+void EncCu::xCheckSATDCostBMMerge(CodingStructure*& tempCS,
+  CodingUnit&       cu,
+  PredictionUnit&   pu,
+  MergeCtx&         mrgCtx,
+  PelUnitBuf*       acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM],
+  PelUnitBuf*&      singleMergeTempBuffer,
+  unsigned&         uiNumMrgSATDCand,
+  static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList,
+  static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>    &candCostList,
+  DistParam         distParam,
+  const TempCtx&          ctxStart
+#if MULTI_PASS_DMVR && !ADAPT_DIRECTIONAL_DMVR_SKIP_SUBPU_BDOF_REFINE
+  , bool*             applyBDMVR
+#endif
+)
+{
+  pu.mergeFlag = true;
+  cu.mmvdSkip = false;
+  cu.geoFlag = false;
+  cu.affine = false;
+  cu.imv = IMV_OFF;
+  pu.ciipFlag = false;
+#if CIIP_PDPC
+  pu.ciipPDPC = false;
+#endif
+  pu.mmvdMergeFlag = false;
+  pu.regularMergeFlag = false;
+  pu.bmMergeFlag = true;
+#if TM_MRG
+  pu.tmMergeFlag = false;
+#endif
+  pu.mvRefine = false;
+#if INTER_LIC
+  m_pcInterSearch->m_storeBeforeLIC = false;
+#endif
+  pu.bdmvrRefine = true;
+  mrgCtx.setMergeInfo(pu, 0);
+
+  const double sqrtLambdaForFirstPassIntra = m_pcRdCost->getMotionLambda() * FRAC_BITS_SCALE;
+  int insertPos = -1;
+  const uint32_t maxNumCand = mrgCtx.numCandToTestEnc;
+  bool subPuRefine[2] = { false, false };
+  Mv   finalMvDir[2];
+  for (uint32_t candIdx = 0; candIdx < maxNumCand; candIdx++)
+  {
+    pu.cu->imv = mrgCtx.useAltHpelIf[candIdx] ? IMV_HPEL : 0;
+    pu.cu->BcwIdx = mrgCtx.BcwIdx[candIdx];
+    pu.mv[REF_PIC_LIST_0] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 0].mv;
+    pu.mv[REF_PIC_LIST_1] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].mv;
+    pu.refIdx[REF_PIC_LIST_0] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 0].refIdx;
+    pu.refIdx[REF_PIC_LIST_1] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].refIdx;
+    bool test2nd = m_pcInterSearch->processBDMVRPU2Dir(pu, subPuRefine, finalMvDir);
+    for (pu.bmDir = 1; pu.bmDir <= (test2nd ? 2 : 1); pu.bmDir++)
+    {
+      uint8_t curDir = pu.bmDir - 1;
+      uint8_t refDir = 1 - curDir;
+      uint32_t uiMergeCand = candIdx;
+      if (pu.bmDir == 2)
+      {
+        uiMergeCand = candIdx + BM_MRG_MAX_NUM_CANDS;
+      }
+
+      pu.mergeIdx = uiMergeCand;
+      pu.mv[curDir] = finalMvDir[curDir];
+      pu.mv[refDir] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + refDir].mv;
+      applyBDMVR[uiMergeCand] = true;
+      pu.bdmvrRefine = true;
+      m_pcInterSearch->setBdmvrSubPuMvBuf(m_mvBufBDMVR4BM[uiMergeCand << 1], m_mvBufBDMVR4BM[(uiMergeCand << 1) + 1]);
+      
+      m_pcInterSearch->processBDMVRSubPU(pu, subPuRefine[curDir]);
+
+      m_pcInterSearch->motionCompensation(pu, *singleMergeTempBuffer);
+#if MULTI_PASS_DMVR 
+      ::memcpy(m_mvBufEncBDOF4BM[uiMergeCand], m_pcInterSearch->getBdofSubPuMvOffset(), sizeof(Mv) * BDOF_SUBPU_MAX_NUM);
+#endif
+      distParam.cur = singleMergeTempBuffer->Y();
+      Distortion uiSad = distParam.distFunc(distParam);
+
+      m_CABACEstimator->getCtx() = ctxStart;
+      uint64_t fracBits = m_pcInterSearch->xCalcPuMeBits(pu);
+      double cost = (double)uiSad + (double)fracBits * sqrtLambdaForFirstPassIntra;
+      insertPos = -1;
+      updateCandList(ModeInfo(cu, pu), cost, RdModeList, candCostList, uiNumMrgSATDCand, &insertPos);
+      if (insertPos != -1 && insertPos < MMVD_MRG_MAX_RD_NUM)
+      {
+        for (int i = int(RdModeList.size()) - 1; i > insertPos; i--)
+        {
+          swap(acMergeTempBuffer[i - 1], acMergeTempBuffer[i]);
+        }
+        swap(singleMergeTempBuffer, acMergeTempBuffer[insertPos]);
+      }
+    }
+  }
+  pu.bmDir = 0;
+  pu.bmMergeFlag = false;
+  pu.regularMergeFlag = true;
+#if TM_MRG
+  pu.tmMergeFlag = false;
+#endif
+  cu.affine = false;
+#if AFFINE_MMVD
+  pu.afMmvdFlag = false;
+#endif
+#if MULTI_PASS_DMVR
+  pu.bdmvrRefine = false;
+#endif
 }
 #endif
 //! \}

@@ -1685,6 +1685,9 @@ private:
   bool              m_OBMC;
 #endif
   bool              m_ciip;
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  bool              m_ciipTmMrg;
+#endif
   bool              m_Geo;
 #if INTER_LIC
   bool              m_licEnabledFlag;
@@ -1719,6 +1722,9 @@ private:
   bool              m_ppsValidFlag[64];
   Size              m_scalingWindowSizeInPPS[64];
   uint32_t          m_maxNumMergeCand;
+#if JVET_X0049_ADAPT_DMVR
+  uint32_t          m_maxNumBMMergeCand;
+#endif
   uint32_t          m_maxNumAffineMergeCand;
   uint32_t          m_maxNumIBCMergeCand;
   uint32_t          m_maxNumGeoCand;
@@ -2013,6 +2019,14 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if TM_MRG
   uint32_t                getMaxNumTMMergeCand() const { return std::min((uint32_t)TM_MRG_MAX_NUM_CANDS, m_maxNumMergeCand); }
 #endif
+
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  uint32_t                getMaxNumCiipTMMergeCand() const { return std::min((uint32_t)CIIP_TM_MRG_MAX_NUM_CANDS, m_maxNumMergeCand); }
+#endif
+#if JVET_X0049_ADAPT_DMVR
+  void                    setMaxNumBMMergeCand(uint32_t u) { m_maxNumBMMergeCand = u; }
+  uint32_t                getMaxNumBMMergeCand() const { return m_maxNumBMMergeCand; }
+#endif
   uint32_t                getMaxNumAffineMergeCand() const { return m_maxNumAffineMergeCand; }
   void                    setMaxNumAffineMergeCand(uint32_t u) { m_maxNumAffineMergeCand = u; }
   uint32_t                getMaxNumIBCMergeCand() const { return m_maxNumIBCMergeCand; }
@@ -2126,6 +2140,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #endif
   void      setUseCiip         ( bool b )                                        { m_ciip = b; }
   bool      getUseCiip         ()                                      const     { return m_ciip; }
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  void      setUseCiipTmMrg         ( bool b )                                        { m_ciipTmMrg = b; }
+  bool      getUseCiipTmMrg         ()                                      const     { return m_ciipTmMrg; }
+#endif
   void      setUseGeo             ( bool b )                                        { m_Geo = b; }
   bool      getUseGeo             ()                                      const     { return m_Geo; }
 #if INTER_LIC
@@ -2284,6 +2302,11 @@ private:
   bool             m_BIF;
   int              m_BIFStrength;
   int              m_BIFQPOffset;
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  bool             m_CBIF;
+  int              m_CBIFStrength;
+  int              m_CBIFQPOffset;
 #endif
 
 public:
@@ -2487,6 +2510,14 @@ public:
   int                    getBIFStrength() const                                           { return m_BIFStrength;                         }
   void                   setBIFQPOffset( int val)                                         { m_BIFQPOffset = val;                          }
   int                    getBIFQPOffset() const                                           { return m_BIFQPOffset;                         }
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  void                   setUseCBIF( bool b)                                              { m_CBIF = b;             }
+  bool                   getUseCBIF() const                                               { return m_CBIF;          }
+  void                   setCBIFStrength( int val)                                        { m_CBIFStrength = val;   }
+  int                    getCBIFStrength() const                                          { return m_CBIFStrength;  }
+  void                   setCBIFQPOffset( int val)                                        { m_CBIFQPOffset = val;   }
+  int                    getCBIFQPOffset() const                                          { return m_CBIFQPOffset;  }
 #endif
   void                   setDeblockingFilterControlPresentFlag( bool val )                { m_deblockingFilterControlPresentFlag = val;   }
   bool                   getDeblockingFilterControlPresentFlag() const                    { return m_deblockingFilterControlPresentFlag;  }

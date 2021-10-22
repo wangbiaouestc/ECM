@@ -72,6 +72,12 @@ public:
   void        bif                      (CodingStructure&              cs);
   void        bif                      (CodingStructure&              cs, unsigned ctuRsAddr);
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  void        Cbif_Cb                      (CodingStructure&              cs);
+  void        Cbif_Cb                      (CodingStructure&              cs, unsigned ctuRsAddr);
+  void        Cbif_Cr                      (CodingStructure&              cs);
+  void        Cbif_Cr                      (CodingStructure&              cs, unsigned ctuRsAddr);
+#endif
   
 #if JVET_W0066_CCSAO
   void        ccSaoControlIdc           ( CodingStructure &cs, const ComponentID compID, const int curIdx, uint8_t *controlIdc, Position lumaPos, int setNum );
@@ -117,6 +123,9 @@ public:
 #if JVET_V0130_INTRA_TMP
   void        tmp_flag                  ( CodingUnit&                   cu );
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  void        bm_merge_flag             ( PredictionUnit&               pu );
+#endif
   void        mip_flag                  ( CodingUnit&                   cu );
   void        mip_pred_modes            ( CodingUnit&                   cu );
   void        mip_pred_mode             ( PredictionUnit&               pu );
@@ -151,6 +160,9 @@ public:
 #if MULTI_HYP_PRED
   int         ref_idx_mh(const int                     numRef);
   void        mh_pred_data(PredictionUnit&               pu);
+#endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  void        amvpMerge_mode         ( PredictionUnit&               pu );
 #endif
 
 

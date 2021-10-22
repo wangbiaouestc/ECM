@@ -462,6 +462,14 @@ void HLSWriter::codePPS( const PPS* pcPPS )
     WRITE_SVLC( pcPPS->getBIFQPOffset(),                                  "bilateral_filter_qp_offset");
   }
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  WRITE_FLAG(pcPPS->getUseCBIF() ? 1 : 0, "chroma bilateral_filter_flag" );
+  if(pcPPS->getUseCBIF())
+  {
+    WRITE_CODE( pcPPS->getCBIFStrength(), 2,  "chroma bilateral_filter_strength");
+    WRITE_SVLC( pcPPS->getCBIFQPOffset(),     "chroma bilateral_filter_qp_offset");
+  }
+#endif
 #if !JVET_S0132_HLS_REORDER
   WRITE_FLAG( pcPPS->getUseWP() ? 1 : 0,  "weighted_pred_flag" );   // Use of Weighting Prediction (P_SLICE)
   WRITE_FLAG( pcPPS->getWPBiPred() ? 1 : 0, "weighted_bipred_flag" );  // Use of Weighting Bi-Prediction (B_SLICE)
@@ -617,12 +625,19 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
     WRITE_FLAG( param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_9_EXT ? 1 : 0, "alf_luma_ext" );
     for (int altIdx = 0; altIdx < param.numAlternativesLuma; ++altIdx)
     {
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+      WRITE_FLAG( param.lumaClassifierIdx[altIdx], "alf_luma_classifier" );
+#endif
       WRITE_FLAG( param.nonLinearFlag[CHANNEL_TYPE_LUMA][altIdx], "alf_luma_clip" );
       WRITE_UVLC( param.numLumaFilters[altIdx] - 1, "alf_luma_num_filters_signalled_minus1" );
       if ( param.numLumaFilters[altIdx] > 1 )
       {
         const int length = ceilLog2(param.numLumaFilters[altIdx]);
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+        for( int i = 0; i < ALF_NUM_CLASSES_CLASSIFIER[(int)param.lumaClassifierIdx[altIdx]]; i++ )
+#else
         for( int i = 0; i < MAX_NUM_ALF_CLASSES; i++ )
+#endif
         {
           WRITE_CODE( param.filterCoeffDeltaIdx[altIdx][i], length, "alf_luma_coeff_delta_idx" );
         }
@@ -1334,6 +1349,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   WRITE_FLAG( pcSPS->getUseDMVDMode() ? 1 : 0,                                                 "sps_dmvd_enabled_flag" );
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  WRITE_UVLC(BM_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumBMMergeCand(), "six_minus_max_num_merge_cand");
+#endif
   WRITE_FLAG( pcSPS->getUseAffine() ? 1 : 0,                                                   "sps_affine_enabled_flag" );
   if ( pcSPS->getUseAffine() )
   {
@@ -1356,6 +1374,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   WRITE_FLAG(pcSPS->getUseBcw() ? 1 : 0, "sps_bcw_enabled_flag");
 
   WRITE_FLAG( pcSPS->getUseCiip() ? 1 : 0,                                                  "sps_ciip_enabled_flag" );
+  #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  if (pcSPS->getUseCiip())
+  {
+    WRITE_FLAG(pcSPS->getUseCiipTmMrg() ? 1 : 0, "sps_ciip_tm_merge_enabled_flag");
+  }
+  #endif
   if (pcSPS->getMaxNumMergeCand() >= 2)
   {
     WRITE_FLAG(pcSPS->getUseGeo() ? 1 : 0, "sps_gpm_enabled_flag");

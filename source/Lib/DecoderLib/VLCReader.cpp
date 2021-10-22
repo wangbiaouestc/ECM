@@ -810,6 +810,14 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
     READ_SVLC( iCode, "bilateral_filter_qp_offset" );                  pcPPS->setBIFQPOffset( iCode);
   }
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  READ_FLAG( uiCode, "chroma bilateral_filter_flag" );             pcPPS->setUseCBIF(uiCode != 0) ;
+  if(pcPPS->getUseCBIF())
+  {
+    READ_CODE( 2, uiCode, "chroma bilateral_filter_strength" );    pcPPS->setCBIFStrength( uiCode);
+    READ_SVLC( iCode, "chroma bilateral_filter_qp_offset" );       pcPPS->setCBIFQPOffset( iCode);
+  }
+#endif
   
 #if !JVET_S0132_HLS_REORDER
   READ_FLAG( uiCode, "weighted_pred_flag" );          // Use of Weighting Prediction (P_SLICE)
@@ -1079,6 +1087,10 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
     param.filterType[CHANNEL_TYPE_LUMA] = code ? ALF_FILTER_9_EXT : ALF_FILTER_EXT;
     for (int altIdx = 0; altIdx < param.numAlternativesLuma; ++altIdx)
     {
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+      READ_FLAG(code, "alf_luma_classifier");
+      param.lumaClassifierIdx[altIdx] = code;
+#endif
       READ_FLAG(code, "alf_luma_clip");
       param.nonLinearFlag[CHANNEL_TYPE_LUMA][altIdx] = code ? true : false;
       READ_UVLC(code, "alf_luma_num_filters_signalled_minus1");
@@ -1086,7 +1098,11 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
       if (param.numLumaFilters[altIdx] > 1)
       {
         const int length = ceilLog2(param.numLumaFilters[altIdx]);
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+        for (int i = 0; i < ALF_NUM_CLASSES_CLASSIFIER[(int)param.lumaClassifierIdx[altIdx]]; i++)
+#else
         for (int i = 0; i < MAX_NUM_ALF_CLASSES; i++)
+#endif
         {
           READ_CODE(length, code, "alf_luma_coeff_delta_idx");
           param.filterCoeffDeltaIdx[altIdx][i] = code;
@@ -1188,7 +1204,7 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
         short *coeff = ccAlfParam.ccAlfCoeff[ccIdx][filterIdx];
         // Filter coefficients
         for (int i = 0; i < alfShape.numCoeff - 1; i++)
-        {
+        {          
           READ_CODE(CCALF_BITS_PER_COEFF_LEVEL, code,
                     ccIdx == 0 ? "alf_cc_cb_mapped_coeff_abs" : "alf_cc_cr_mapped_coeff_abs");
           if (code == 0)
@@ -1919,8 +1935,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     {
       READ_UVLC(uiCode, "sps_log2_diff_max_bt_min_qt_intra_slice_chroma");       maxBTSize[2] <<= uiCode;
       READ_UVLC(uiCode, "sps_log2_diff_max_tt_min_qt_intra_slice_chroma");       maxTTSize[2] <<= uiCode;
+#if TU_256
+      CHECK( maxTTSize[2] > MAX_CU_SIZE, "The value of sps_log2_diff_max_tt_min_qt_intra_slice_chroma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraChroma" );
+      CHECK( maxBTSize[2] > MAX_CU_SIZE, "The value of sps_log2_diff_max_bt_min_qt_intra_slice_chroma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraChroma" );
+#else
       CHECK(maxTTSize[2] > 64, "The value of sps_log2_diff_max_tt_min_qt_intra_slice_chroma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraChroma");
       CHECK(maxBTSize[2] > 64, "The value of sps_log2_diff_max_bt_min_qt_intra_slice_chroma shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeIntraChroma");
+#endif
     }
   }
 #endif
@@ -2192,6 +2213,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   READ_FLAG( uiCode,    "sps_dmvd_enabled_flag" );                      pcSPS->setUseDMVDMode( uiCode != 0 );
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  READ_UVLC(uiCode, "six_minus_max_num_bm_merge_cand");
+  CHECK(BM_MRG_MAX_NUM_CANDS < uiCode, "Incorrrect max number of BM merge candidates!");
+  pcSPS->setMaxNumBMMergeCand(BM_MRG_MAX_NUM_CANDS - uiCode);
+#endif
   READ_FLAG( uiCode,    "sps_affine_enabled_flag" );                            pcSPS->setUseAffine              ( uiCode != 0 );
   if ( pcSPS->getUseAffine() )
   {
@@ -2221,6 +2247,16 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 
   READ_FLAG( uiCode,    "sps_bcw_enabled_flag" );                   pcSPS->setUseBcw( uiCode != 0 );
   READ_FLAG( uiCode,     "sps_ciip_enabled_flag" );                           pcSPS->setUseCiip             ( uiCode != 0 );
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  if (pcSPS->getUseCiip())
+  {
+    READ_FLAG(uiCode, "sps_ciip_tm_merge_enabled_flag");                           pcSPS->setUseCiipTmMrg(uiCode != 0);
+  }
+  else
+  {
+    pcSPS->setUseCiipTmMrg(false);
+  }
+#endif
   if (pcSPS->getMaxNumMergeCand() >= 2)
   {
     READ_FLAG(uiCode, "sps_gpm_enabled_flag");
@@ -3477,7 +3513,11 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
       READ_UVLC(uiCode, "ph_log2_diff_min_qt_min_cb_inter_slice");
       unsigned minQtLog2SizeInterY = uiCode + sps->getLog2MinCodingBlockSize();
       minQT[1] = 1 << minQtLog2SizeInterY;
+#if TU_256
+      CHECK( minQT[1] > MAX_CU_SIZE, "The value of ph_log2_diff_min_qt_min_cb_inter_slice shall be in the range of 0 to min(8, CtbLog2SizeY) - MinCbLog2SizeY." );
+#else
       CHECK(minQT[1] > 64, "The value of ph_log2_diff_min_qt_min_cb_inter_slice shall be in the range of 0 to min(6, CtbLog2SizeY) - MinCbLog2SizeY.");
+#endif
       CHECK(minQT[1] > (1<<ctbLog2SizeY), "The value of ph_log2_diff_min_qt_min_cb_inter_slice shall be in the range of 0 to min(6, CtbLog2SizeY) - MinCbLog2SizeY");
       READ_UVLC(uiCode, "ph_max_mtt_hierarchy_depth_inter_slice");              maxBTD[1] = uiCode;
 
@@ -3488,7 +3528,11 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
         CHECK(uiCode > ctbLog2SizeY - minQtLog2SizeInterY, "The value of ph_log2_diff_max_bt_min_qt_inter_slice shall be in the range of 0 to CtbLog2SizeY - MinQtLog2SizeInterY");
         READ_UVLC(uiCode, "ph_log2_diff_max_tt_min_qt_inter_slice");            maxTTSize[1] <<= uiCode;
         CHECK(uiCode > ctbLog2SizeY - minQtLog2SizeInterY, "The value of ph_log2_diff_max_tt_min_qt_inter_slice shall be in the range of 0 to CtbLog2SizeY - MinQtLog2SizeInterY");
+#if TU_256
+        CHECK( maxTTSize[1] > MAX_CU_SIZE, "The value of ph_log2_diff_max_tt_min_qt_inter_slice shall be in the range of 0 to min(8,CtbLog2SizeY) - MinQtLog2SizeInterY." );
+#else
         CHECK(maxTTSize[1] > 64, "The value of ph_log2_diff_max_tt_min_qt_inter_slice shall be in the range of 0 to min(6,CtbLog2SizeY) - MinQtLog2SizeInterY.");
+#endif
       }
     }
     // delta quantization and chrom and chroma offset
@@ -4139,6 +4183,7 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
   {
     READ_FLAG(uiCode, "slice_alf_enabled_flag");
     pcSlice->setTileGroupAlfEnabledFlag(COMPONENT_Y, uiCode);
+
     int alfCbEnabledFlag = 0;
     int alfCrEnabledFlag = 0;
 
@@ -4194,6 +4239,7 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
     {
       READ_FLAG(uiCode, "slice_cc_alf_cb_enabled_flag");
       pcSlice->setTileGroupCcAlfCbEnabledFlag(uiCode);
+
       filterParam.ccAlfFilterEnabled[COMPONENT_Cb - 1] = (uiCode == 1) ? true : false;
       pcSlice->setTileGroupCcAlfCbApsId(-1);
       if (filterParam.ccAlfFilterEnabled[COMPONENT_Cb - 1])

@@ -341,6 +341,10 @@ protected:
   unsigned m_subPicIdLen;
   std::vector<uint16_t> m_subPicId;
   bool      m_SplitConsOverrideEnabledFlag;
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+  std::string m_sMaxMTTHierarchyDepthByTid;
+  unsigned m_maxMTTHierarchyDepthByTid[MAX_TLAYER];
+#endif
   unsigned  m_uiMinQT[3]; // 0: I slice luma; 1: P/B slice; 2: I slice chroma
   unsigned  m_uiMaxMTTHierarchyDepth;
   unsigned  m_uiMaxMTTHierarchyDepthI;
@@ -431,6 +435,11 @@ protected:
   bool      m_BIF;                                            ///< bilateral filter
   unsigned  m_BIFStrength;                                    /// Bilateral filter strength
   int       m_BIFQPOffset;                                    /// Bilateral QP offset
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  bool      m_CBIF;
+  unsigned  m_CBIFStrength;
+  int       m_CBIFQPOffset;
 #endif
   
   // ADD_NEW_TOOL : (encoder app) add tool enabling flags and associated parameters here
@@ -708,6 +717,9 @@ protected:
 
   uint32_t      m_log2ParallelMergeLevel;                         ///< Parallel merge estimation region
   uint32_t      m_maxNumMergeCand;                                ///< Max number of merge candidates
+#if JVET_X0049_ADAPT_DMVR
+  uint32_t      m_maxNumBMMergeCand;                                ///< Max number of BM merge candidates
+#endif
   uint32_t      m_maxNumAffineMergeCand;                          ///< Max number of affine merge candidates
   uint32_t      m_maxNumGeoCand;
   uint32_t      m_maxNumIBCMergeCand;                             ///< Max number of IBC merge candidates

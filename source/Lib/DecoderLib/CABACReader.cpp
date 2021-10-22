@@ -327,11 +327,19 @@ void CABACReader::ccAlfFilterControlIdc(CodingStructure &cs, const ComponentID c
 
   if (leftAvail)
   {
+#if JVET_X0071_LONGER_CCALF
+    ctxt += (filterControlIdc[curIdx - 1] != 1) ? 1 : 0;
+#else
     ctxt += ( filterControlIdc[curIdx - 1] ) ? 1 : 0;
+#endif
   }
   if (aboveAvail)
   {
+#if JVET_X0071_LONGER_CCALF
+    ctxt += (filterControlIdc[curIdx - cs.pcv->widthInCtus] != 1) ? 1 : 0;
+#else
     ctxt += ( filterControlIdc[curIdx - cs.pcv->widthInCtus] ) ? 1 : 0;
+#endif
   }
   ctxt += ( compID == COMPONENT_Cr ) ? 3 : 0;
 
@@ -343,6 +351,12 @@ void CABACReader::ccAlfFilterControlIdc(CodingStructure &cs, const ComponentID c
       idcVal++;
     }
   }
+
+#if JVET_X0071_LONGER_CCALF
+  int pos0 = 1;
+  idcVal = (idcVal == pos0 ? 0 : idcVal < pos0 ? idcVal + 1 : idcVal);
+#endif
+
   filterControlIdc[curIdx] = idcVal;
 
   DTRACE(g_trace_ctx, D_SYNTAX, "ccAlfFilterControlIdc() compID=%d pos=(%d,%d) ctxt=%d, filterCount=%d, idcVal=%d\n",
@@ -360,13 +374,25 @@ void CABACReader::sao( CodingStructure& cs, unsigned ctuRsAddr )
   const SPS&   sps   = *cs.sps;
 
 #if JVET_V0094_BILATERAL_FILTER
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if(!(cs.pps->getUseBIF() || cs.sps->getSAOEnabledFlag() || !(cs.pps->getUseCBIF())))
+#else
   // If neither BIF nor SAO is enabled, we can return.
   if(!(cs.pps->getUseBIF() || cs.sps->getSAOEnabledFlag()))
+#endif
   {
     return;
   }
   // At least one is enabled, it is safe to assume we can do getSAO().
   SAOBlkParam&      sao_ctu_pars            = cs.picture->getSAO()[ctuRsAddr];
+#else
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if(!(cs.pps->getUseCBIF() || cs.sps->getSAOEnabledFlag()))
+  {
+        return;
+  }
+    SAOBlkParam&      sao_ctu_pars            = cs.picture->getSAO()[ctuRsAddr];
+#endif
 #endif
   
   if( !sps.getSAOEnabledFlag() )
@@ -375,7 +401,7 @@ void CABACReader::sao( CodingStructure& cs, unsigned ctuRsAddr )
   }
 
   const Slice& slice                        = *cs.slice;
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   // The getSAO() function call has been moved up.
 #else
   SAOBlkParam&      sao_ctu_pars            = cs.picture->getSAO()[ctuRsAddr];
@@ -577,6 +603,139 @@ void CABACReader::bif(CodingStructure& cs, unsigned ctuRsAddr)
       bifParams.ctuOn[i] = 0;
     }
   }
+}
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+void CABACReader::Cbif_Cb(CodingStructure& cs)
+{
+    int width = cs.picture->lwidth();
+    int height = cs.picture->lheight();
+
+    int block_width = cs.pcv->maxCUWidth;
+    int block_height = cs.pcv->maxCUHeight;
+
+    int width_in_blocks = width / block_width + (width % block_width != 0);
+    int height_in_blocks = height / block_height + (height % block_height != 0);
+
+    for (int i = 0; i < width_in_blocks * height_in_blocks; i++)
+    {
+        Cbif_Cb(cs, i);
+    }
+}
+
+void CABACReader::Cbif_Cb(CodingStructure& cs, unsigned ctuRsAddr)
+{
+    const PPS&   pps = *cs.pps;
+
+    if (!pps.getUseCBIF())
+    {
+        return;
+    }
+
+    CBifParams& CBifParams = cs.picture->getCBifParam();
+
+    if (ctuRsAddr == 0)
+    {
+        int width = cs.picture->lwidth();
+        int height = cs.picture->lheight();
+        int block_width = cs.pcv->maxCUWidth;
+        int block_height = cs.pcv->maxCUHeight;
+
+        int width_in_blocks = width / block_width + (width % block_width != 0);
+        int height_in_blocks = height / block_height + (height % block_height != 0);
+        int num_blocks = width_in_blocks * height_in_blocks;
+        CBifParams.numBlocks = num_blocks;
+        CBifParams.ctuOn_Cb.resize(num_blocks);
+        std::fill(CBifParams.ctuOn_Cb.begin(), CBifParams.ctuOn_Cb.end(), 0);
+    }
+    if (ctuRsAddr == 0)
+    {
+        CBifParams.allCtuOn_Cb = m_BinDecoder.decodeBinEP();
+        if (CBifParams.allCtuOn_Cb == 0)
+            CBifParams.frmOn_Cb = m_BinDecoder.decodeBinEP();
+    }
+    int i = ctuRsAddr;
+    if (CBifParams.allCtuOn_Cb)
+    {
+        CBifParams.ctuOn_Cb[i] = 1;
+    }
+    else
+    {
+        if (CBifParams.frmOn_Cb)
+        {
+            CBifParams.ctuOn_Cb[i] = m_BinDecoder.decodeBin(Ctx::CBifCtrlFlags_Cb());
+        }
+        else
+        {
+            CBifParams.ctuOn_Cb[i] = 0;
+        }
+    }
+}
+
+void CABACReader::Cbif_Cr(CodingStructure& cs)
+{
+    int width = cs.picture->lwidth();
+    int height = cs.picture->lheight();
+
+    int block_width = cs.pcv->maxCUWidth;
+    int block_height = cs.pcv->maxCUHeight;
+
+    int width_in_blocks = width / block_width + (width % block_width != 0);
+    int height_in_blocks = height / block_height + (height % block_height != 0);
+
+    for (int i = 0; i < width_in_blocks * height_in_blocks; i++)
+    {
+        Cbif_Cr(cs, i);
+    }
+}
+
+void CABACReader::Cbif_Cr(CodingStructure& cs, unsigned ctuRsAddr)
+{
+    const PPS&   pps = *cs.pps;
+
+    if (!pps.getUseCBIF())
+    {
+        return;
+    }
+
+    CBifParams& CBifParams = cs.picture->getCBifParam();
+
+    if (ctuRsAddr == 0)
+    {
+        int width = cs.picture->lwidth();
+        int height = cs.picture->lheight();
+        int block_width = cs.pcv->maxCUWidth;
+        int block_height = cs.pcv->maxCUHeight;
+
+        int width_in_blocks = width / block_width + (width % block_width != 0);
+        int height_in_blocks = height / block_height + (height % block_height != 0);
+        int num_blocks = width_in_blocks * height_in_blocks;
+        CBifParams.numBlocks = num_blocks;
+        CBifParams.ctuOn_Cr.resize(num_blocks);
+        std::fill(CBifParams.ctuOn_Cr.begin(), CBifParams.ctuOn_Cr.end(), 0);
+    }
+    if (ctuRsAddr == 0)
+    {
+        CBifParams.allCtuOn_Cr = m_BinDecoder.decodeBinEP();
+        if (CBifParams.allCtuOn_Cr == 0)
+            CBifParams.frmOn_Cr = m_BinDecoder.decodeBinEP();
+    }
+    int i = ctuRsAddr;
+    if (CBifParams.allCtuOn_Cr)
+    {
+        CBifParams.ctuOn_Cr[i] = 1;
+    }
+    else
+    {
+        if (CBifParams.frmOn_Cr)
+        {
+            CBifParams.ctuOn_Cr[i] = m_BinDecoder.decodeBin(Ctx::CBifCtrlFlags_Cr());
+        }
+        else
+        {
+            CBifParams.ctuOn_Cr[i] = 0;
+        }
+    }
 }
 #endif
 
@@ -1219,6 +1378,13 @@ void CABACReader::imv_mode( CodingUnit& cu, MergeCtx& mrgCtx )
     return;
   }
 
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  auto &pu = *cu.firstPU;
+  if (pu.amvpMergeModeFlag[REF_PIC_LIST_0] || pu.amvpMergeModeFlag[REF_PIC_LIST_1])
+  {
+    return;
+  }
+#endif
   bool bNonZeroMvd = CU::hasSubCUNonZeroMVd( cu );
   if( !bNonZeroMvd )
   {
@@ -1514,6 +1680,13 @@ void CABACReader::cu_bcw_flag(CodingUnit& cu)
   {
     return;
   }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  auto &pu = *cu.firstPU;
+  if (pu.amvpMergeModeFlag[REF_PIC_LIST_0] || pu.amvpMergeModeFlag[REF_PIC_LIST_1])
+  {
+    return;
+  }
+#endif
 
   CHECK(!(BCW_NUM > 1 && (BCW_NUM == 2 || (BCW_NUM & 0x01) == 1)), " !( BCW_NUM > 1 && ( BCW_NUM == 2 || ( BCW_NUM & 0x01 ) == 1 ) ) ");
 
@@ -2632,12 +2805,31 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
   }
   else
   {
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+    amvpMerge_mode( pu );
+    if (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1])
+    {
+      pu.cu->affine = 0;
+      pu.cu->smvdMode = 0;
+      CHECK(pu.interDir != 3, "this is not possible");
+      CHECK(CU::isIBC(*pu.cu) != 0, "this is not possible");
+    }
+    else
+    {
+#endif
     inter_pred_idc( pu );
     affine_flag   ( *pu.cu );
     smvd_mode( pu );
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+    }
+#endif
 
     if( pu.interDir != 2 /* PRED_L1 */ )
     {
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+      if (!pu.amvpMergeModeFlag[REF_PIC_LIST_0])
+      {
+#endif
       ref_idx     ( pu, REF_PIC_LIST_0 );
       if( pu.cu->affine )
       {
@@ -2652,6 +2844,9 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
       {
         mvd_coding( pu.mvd[REF_PIC_LIST_0] );
       }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+      }
+#endif
       mvp_flag    ( pu, REF_PIC_LIST_0 );
     }
 
@@ -2659,6 +2854,10 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
     {
       if ( pu.cu->smvdMode != 1 )
       {
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+        if (!pu.amvpMergeModeFlag[REF_PIC_LIST_1])
+        {
+#endif
         ref_idx(pu, REF_PIC_LIST_1);
         if (pu.cu->cs->picHeader->getMvdL1ZeroFlag() && pu.interDir == 3 /* PRED_BI */)
         {
@@ -2680,6 +2879,9 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
         {
           mvd_coding(pu.mvd[REF_PIC_LIST_1]);
         }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+        }
+#endif
       }
       mvp_flag    ( pu, REF_PIC_LIST_1 );
     }
@@ -2846,6 +3048,26 @@ void CABACReader::tm_merge_flag(PredictionUnit& pu)
 }
 #endif
 
+#if JVET_X0049_ADAPT_DMVR
+void CABACReader::bm_merge_flag(PredictionUnit& pu)
+{
+  pu.bmDir = 0;
+  pu.bmMergeFlag = false;
+  if (!PU::isBMMergeFlagCoded(pu))
+  {
+    return;
+  }
+
+  unsigned ctxId = DeriveCtx::CtxBMMrgFlag(*pu.cu);
+  pu.bmMergeFlag = (m_BinDecoder.decodeBin(Ctx::BMMergeFlag(ctxId)));
+  if (pu.bmMergeFlag)
+  {
+    pu.bmDir = 1 << m_BinDecoder.decodeBin(Ctx::BMMergeFlag(3));
+  }
+  DTRACE(g_trace_ctx, D_SYNTAX, "bm_merge_flag() bmMergeFlag=%d, bmDir = %d\n", pu.bmMergeFlag ? 1 : 0, pu.bmDir);
+}
+#endif
+
 void CABACReader::merge_flag( PredictionUnit& pu )
 {
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__MERGE_FLAG );
@@ -2917,9 +3139,26 @@ void CABACReader::merge_data( PredictionUnit& pu )
 #if TM_MRG
       tm_merge_flag(pu);
 #endif
+#if JVET_X0049_ADAPT_DMVR
+#if TM_MRG
+      if (pu.tmMergeFlag)
+#endif
+      {
+        bm_merge_flag(pu);
+#if TM_MRG
+        if (pu.bmMergeFlag)
+        {
+          pu.tmMergeFlag = false;
+        }
+#endif
+      }
+#endif
       if (cu.cs->slice->getSPS()->getUseMMVD()
 #if TM_MRG
         && !pu.tmMergeFlag
+#endif
+#if JVET_X0049_ADAPT_DMVR
+        && !pu.bmMergeFlag
 #endif
         )
       {
@@ -2941,6 +3180,9 @@ void CABACReader::merge_data( PredictionUnit& pu )
 #if TM_MRG
       pu.tmMergeFlag = false;
 #endif
+#if JVET_X0049_ADAPT_DMVR
+      pu.bmMergeFlag = false;
+#endif
       if (geoAvailable && ciipAvailable)
       {
         Ciip_flag(pu);
@@ -2948,6 +3190,12 @@ void CABACReader::merge_data( PredictionUnit& pu )
       else if (ciipAvailable)
       {
         pu.ciipFlag = true;
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+        if (pu.cs->slice->getSPS()->getUseCiipTmMrg())
+        {
+          pu.tmMergeFlag = (m_BinDecoder.decodeBin(Ctx::CiipTMMergeFlag()));
+        }
+#endif
 #if CIIP_PDPC
         pu.ciipPDPC = ( m_BinDecoder.decodeBin( Ctx::CiipFlag( 1 ) ) );
 #endif
@@ -3106,7 +3354,24 @@ void CABACReader::merge_idx( PredictionUnit& pu )
 #if TM_MRG
   else if (pu.tmMergeFlag)
   {
+#if JVET_X0141_CIIP_TIMD_TM
+    if (pu.ciipFlag)
+    {
+      numCandminus1 = int(pu.cs->sps->getMaxNumCiipTMMergeCand()) - 1;
+    }
+    else
+    {
+      numCandminus1 = int(pu.cs->sps->getMaxNumTMMergeCand()) - 1;
+    }
+#else
     numCandminus1 = int(pu.cs->sps->getMaxNumTMMergeCand()) - 1;
+#endif
+  }
+#endif
+#if JVET_X0049_ADAPT_DMVR
+  else if (pu.bmMergeFlag)
+  {
+    numCandminus1 = int(pu.cs->sps->getMaxNumBMMergeCand()) - 1;
   }
 #endif
   if( numCandminus1 > 0 )
@@ -3146,7 +3411,14 @@ void CABACReader::merge_idx( PredictionUnit& pu )
     }
 #endif
   }
+
   DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() merge_idx=%d\n", pu.mergeIdx );
+#if JVET_X0049_ADAPT_DMVR
+  if (pu.bmMergeFlag && pu.bmDir == 2)
+  {
+    pu.mergeIdx += BM_MRG_MAX_NUM_CANDS;
+  }
+#endif
   }
 }
 #if JVET_W0097_GPM_MMVD_TM
@@ -3328,6 +3600,42 @@ void CABACReader::ref_idx( PredictionUnit &pu, RefPicList eRefList )
     pu.refIdx[eRefList] = pu.cs->slice->getSymRefIdx( eRefList );
     return;
   }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  if (pu.amvpMergeModeFlag[1 - eRefList])
+  {
+    const RefPicList refListAmvp = eRefList;
+    const RefPicList refListMerge = RefPicList(1 - eRefList);
+    const int curPoc = pu.cs->slice->getPOC();
+    const int numRefAmvp = pu.cs->slice->getNumRefIdx(refListAmvp);
+    const int numRefMerge = pu.cs->slice->getNumRefIdx(refListMerge);
+    int candidateRefIdxCount = 0;
+    int onlyOneValidRefIdxAmvp = -1;
+    for (int refIdxAmvp = 0; refIdxAmvp < numRefAmvp; refIdxAmvp++)
+    {
+      const int amvpPoc = pu.cs->slice->getRefPOC(refListAmvp, refIdxAmvp);
+      bool validCandidate = false;
+      for (int refIdxMerge = 0; refIdxMerge < numRefMerge; refIdxMerge++)
+      {
+        const int mergePoc = pu.cs->slice->getRefPOC(refListMerge, refIdxMerge);
+        if ((amvpPoc - curPoc) * (mergePoc - curPoc) < 0)
+        {
+          validCandidate = true;
+        }
+      }
+      if (validCandidate)
+      {
+        onlyOneValidRefIdxAmvp = refIdxAmvp;
+        candidateRefIdxCount++;
+      }
+    }
+    CHECK(candidateRefIdxCount == 0, "this is not possible");
+    if (candidateRefIdxCount == 1)
+    {
+      pu.refIdx[eRefList] = onlyOneValidRefIdxAmvp;
+      return;
+    }
+  }
+#endif
 
   int numRef  = pu.cs->slice->getNumRefIdx(eRefList);
 
@@ -3385,6 +3693,12 @@ void CABACReader::mvp_flag( PredictionUnit& pu, RefPicList eRefList )
 {
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__MVP_IDX );
 
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  if (pu.amvpMergeModeFlag[eRefList])
+  {
+    return;
+  }
+#endif
 #if TM_AMVP
   unsigned mvp_idx = !pu.cu->cs->sps->getUseDMVDMode() || pu.cu->affine || CU::isIBC(*pu.cu) ? m_BinDecoder.decodeBin( Ctx::MVPIdx() ) : 0;
 #else
@@ -3421,8 +3735,21 @@ void CABACReader::Ciip_flag(PredictionUnit& pu)
 #if CIIP_PDPC
   if( pu.ciipFlag )
   {
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+    if (pu.cs->slice->getSPS()->getUseCiipTmMrg())
+    {
+      pu.tmMergeFlag = (m_BinDecoder.decodeBin(Ctx::CiipTMMergeFlag()));
+    }
+#endif
     pu.ciipPDPC = (m_BinDecoder.decodeBin(Ctx::CiipFlag(1)));
   }
+#else
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  if (pu.ciipFlag && pu.cs->slice->getSPS()->getUseCiipTmMrg())
+  {
+    pu.tmMergeFlag = (m_BinDecoder.decodeBin(Ctx::CiipTMMergeFlag()));
+  }
+#endif
 #endif
 }
 
@@ -3444,6 +3771,12 @@ void CABACReader::mh_pred_data(PredictionUnit& pu)
   }
 #if TM_MRG
   if (pu.tmMergeFlag)
+  {
+    return;
+  }
+#endif
+#if JVET_X0049_ADAPT_DMVR
+  if (pu.bmMergeFlag)
   {
     return;
   }
@@ -4793,6 +5126,14 @@ void CABACReader::tmp_flag(CodingUnit& cu)
 		return;
 	}
 
+#if JVET_X0124_TMP_SIGNAL
+  if (cu.dimd)
+  {
+    cu.tmpFlag = false;
+    return;
+  }
+#endif
+
   if( !cu.cs->sps->getUseIntraTMP() )
   {
     cu.tmpFlag = false;
@@ -4918,3 +5259,35 @@ void CABACReader::parsePredictedSigns( TransformUnit &tu, ComponentID compID )
 }
 #endif
 
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+void CABACReader::amvpMerge_mode( PredictionUnit& pu )
+{
+  if (PU::isBipredRestriction(pu))
+  {
+    CHECK(1, "this is not possible");
+    return;
+  }
+  unsigned useAmMode = 0;
+  if (!pu.cu->slice->getCheckLDC())
+  {
+    useAmMode = m_BinDecoder.decodeBin(Ctx::amFlagState());
+  }
+  if (useAmMode)
+  {
+    pu.interDir = 3; // implicit BI prediction
+    unsigned mergeDir = 0;
+    if (pu.cu->cs->picHeader->getMvdL1ZeroFlag() == false)
+    {
+      mergeDir = m_BinDecoder.decodeBinEP();
+    }
+    else
+    {
+      // when L1ZeroFlag is true, only L1 can be mergeDir
+      mergeDir = 1;
+    }
+    pu.mvpIdx[mergeDir] = 2;
+    pu.amvpMergeModeFlag[mergeDir] = true;
+    pu.amvpMergeModeFlag[1 - mergeDir] = false;
+  }
+}
+#endif

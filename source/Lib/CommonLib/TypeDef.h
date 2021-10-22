@@ -1,4 +1,4 @@
-﻿/* The copyright in this software is being made available under the BSD
+/* The copyright in this software is being made available under the BSD
  * License, included below. This software may be subject to other third party
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
@@ -50,13 +50,13 @@
 #include <assert.h>
 #include <cassert>
 
-
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
 
 
 #if BASE_ENCODER
+#define JVET_X0144_MAX_MTT_DEPTH_TID                      1 // JVET-X0144: max MTT hierarchy depth set by temporal ID
 // Lossy encoder speedups
 #define AFFINE_ENC_OPT                                    1 // Affine encoder optimization
 #define AMVR_ENC_OPT                                      1 // Encoder optimization for AMVR
@@ -65,9 +65,11 @@
 
 #define REMOVE_PCM                                        1 // Remove PCM related code for memory reduction and speedup
 
+#define JVET_X0049_BDMVR_SW_OPT                           1 // JVET-X0049: software optimization for BDMVR (lossless)
+
 // SIMD optimizations
-#define MCIF_SIMD_NEW                                     1
-#define DIST_SSE_ENABLE                                   1
+#define MCIF_SIMD_NEW                                     1 // SIMD for interpolation
+#define DIST_SSE_ENABLE                                   1 // Enable SIMD for SSE
 #define TRANSFORM_SIMD_OPT                                1 // SIMD optimization for transform
 #endif
 
@@ -109,13 +111,23 @@
 #define INTRA_6TAP                                        1 // 6TapCubic + 6 TapGaussian + left side 4 tap weak filtering for intra.
 #define SECONDARY_MPM                                     1 // Primary MPM and Secondary MPM: Add neighbouring modes into MPMs from positions AR, BL, AL, derived modes
 #define ENABLE_DIMD                                       1 // Decoder side intra mode derivation
-#define JVET_V0087_DIMD_NO_ISP                  ENABLE_DIMD // JVET-V0087: disallow combination of DIMD and ISP
+#if ENABLE_DIMD
+#define JVET_V0087_DIMD_NO_ISP                            1 // JVET-V0087: disallow combination of DIMD and ISP
+#define JVET_X0124_TMP_SIGNAL                             1 // JVET-X0124: cleanup on signalling of intra template matching
+#endif
 #define JVET_V0130_INTRA_TMP                              1 // JVET-V0130: template matching prediction
 #define JVET_W0069_TMP_BOUNDARY								            1 // JVET-W0069: boundary handling for TMP
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
+#if JVET_W0123_TIMD_FUSION
+#define JVET_X0148_TIMD_PDPC                              1 // JVET-X0148: PDPC handling for TIMD
+#endif
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
+#define JVET_X0149_TIMD_DIMD_LUT                          1 // JVET-X0149: LUT-based derivation of DIMD and TIMD
+#endif
 
 // Inter
 #define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
+#define JVET_X0090_CIIP_FIX                               1 // JVET-X0090: combination of CIIP, OBMC and LMCS
 #define SAMPLE_BASED_BDOF                                 1 // Sample based BDOF
 #define MULTI_PASS_DMVR                                   1 // Multi-pass DMVR
 #define AFFINE_MMVD                                       1 // Add MMVD to affine merge mode
@@ -125,11 +137,21 @@
 #define IF_12TAP                                          1 // 12-tap IF
 #define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
 
+#if JVET_X0049_BDMVR_SW_OPT
+#define JVET_X0049_ADAPT_DMVR                             1 // JVET-X0049: Adaptive DMVR
+#endif
+#define JVET_X0056_DMVD_EARLY_TERMINATION                 1 // JVET-X0056: Early termination for DMVR and TM
+#define JVET_X0083_BM_AMVP_MERGE_MODE                     1 // JVET-X0083: AMVP-merge mode
+
 // Inter template matching tools
-#define TM_AMVP                                           1 // Add template  matching to non-subblock inter to refine regular AMVP candidates
-#define TM_MRG                                            1 // Add template  matching to non-subblock inter to refine regular merge candidates
-#define JVET_W0097_GPM_MMVD_TM                            1 // JVET-W0097: GPM-MMVD and GPM-TM
+#define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
+#if ENABLE_INTER_TEMPLATE_MATCHING
+#define TM_AMVP                                           1 // Add template matching to non-subblock inter to refine regular AMVP candidates
+#define TM_MRG                                            1 // Add template matching to non-subblock inter to refine regular merge candidates
 #define JVET_W0090_ARMC_TM                                1 // JVET-W0090: Adaptive reordering of merge candidates with template matching
+#endif
+#define JVET_W0097_GPM_MMVD_TM                            1 // JVET-W0097: GPM-MMVD and GPM-TM, GPM-TM part is controlled by TM_MRG
+#define JVET_X0141_CIIP_TIMD_TM                           1 // JVET-X0141: CIIP with TIMD and TM merge, CIIP-TM part is controlled by TM_MRG, and CIIP-TIMD part is controlled by JVET_W0123_TIMD_FUSION
 
 // Transform and coefficient coding
 #define TCQ_8STATES                                       1
@@ -151,7 +173,10 @@
 #define ALF_IMPROVEMENT                                   1 // ALF improvement
 #define EMBEDDED_APS                                      1 // Embed APS into picture header
 #define JVET_V0094_BILATERAL_FILTER                       1 // Bilateral filter
+#define JVET_X0071_CHROMA_BILATERAL_FILTER                1 // JVET-X0071/JVET-X0067: Chroma bilateral filter
 #define JVET_W0066_CCSAO                                  1 // JVET-W0066: Cross-component sample adaptive offset
+#define JVET_X0071_LONGER_CCALF                           1 // JVET-X0071/JVET-X0045: Longer filter for CCALF
+#define JVET_X0071_ALF_BAND_CLASSIFIER                    1 // JVET-X0071/JVET-X0070: Alternative band classifier for ALF
 
 // SIMD optimizations
 #if IF_12TAP
@@ -169,8 +194,13 @@
 #if JVET_V0094_BILATERAL_FILTER
 #define ENABLE_SIMD_BILATERAL_FILTER                      1
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+#define JVET_X0071_CHROMA_BILATERAL_FILTER_ENABLE_SIMD    1
+#endif
 #endif // tools
 
+// Software extensions
+#define RPR_ENABLE                                        1 // JVET-X0121: Fixes for RRP
 
 
 
@@ -1208,6 +1238,19 @@ public:
   int allCtuOn;             // slice_bif_all_ctb_enabled_flag
   int numBlocks;
   std::vector<int> ctuOn;   // bif_ctb_flag[][]
+};
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+class CBifParams
+{
+public:
+    int frmOn_Cb;                // slice_bif_enabled_flag for chroma
+    int frmOn_Cr;                // slice_bif_enabled_flag for chroma
+    int allCtuOn_Cb;             // slice_bif_all_ctb_enabled_flag for chroma
+    int allCtuOn_Cr;             // slice_bif_all_ctb_enabled_flag for chroma
+    int numBlocks;
+    std::vector<int> ctuOn_Cb;   // bif_ctb_flag[][] for chroma
+    std::vector<int> ctuOn_Cr;   // bif_ctb_flag[][] for chroma
 };
 #endif
 

@@ -309,6 +309,21 @@ unsigned DeriveCtx::CtxInterDir( const PredictionUnit& pu )
 #endif
 }
 
+#if JVET_X0049_ADAPT_DMVR
+unsigned DeriveCtx::CtxBMMrgFlag(const CodingUnit& cu)
+{
+  const CodingStructure *cs = cu.cs;
+  unsigned ctxId = 0;
+
+  const CodingUnit *cuLeft = cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+  ctxId = (cuLeft && (cuLeft->firstPU->bmMergeFlag || (!cuLeft->firstPU->mergeFlag && cuLeft->firstPU->interDir == 3))) ? 1 : 0;
+
+  const CodingUnit *cuAbove = cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+  ctxId += (cuAbove && (cuAbove->firstPU->bmMergeFlag || (!cuAbove->firstPU->mergeFlag && cuAbove->firstPU->interDir == 3))) ? 1 : 0;
+
+  return ctxId;
+}
+#endif
 unsigned DeriveCtx::CtxAffineFlag( const CodingUnit& cu )
 {
   const CodingStructure *cs = cu.cs;
@@ -447,6 +462,13 @@ void MergeCtx::convertRegularMergeCandToBi(int candIdx)
 
 void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 {
+#if JVET_X0049_ADAPT_DMVR
+  pu.mergeIdx = candIdx;
+  if (pu.bmMergeFlag && pu.bmDir == 2)
+  {
+    candIdx -= BM_MRG_MAX_NUM_CANDS;
+  }
+#endif
   CHECK( candIdx >= numValidMergeCand, "Merge candidate does not exist" );
 
   pu.regularMergeFlag        = !(pu.ciipFlag || pu.cu->geoFlag);
@@ -454,7 +476,9 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
   pu.mmvdMergeFlag = false;
   pu.interDir                = interDirNeighbours[candIdx];
   pu.cu->imv = (!pu.cu->geoFlag && useAltHpelIf[candIdx]) ? IMV_HPEL : 0;
+#if !JVET_X0049_ADAPT_DMVR
   pu.mergeIdx                = candIdx;
+#endif
   pu.mergeType               = CU::isIBC( *pu.cu ) ? MRG_TYPE_IBC : MRG_TYPE_DEFAULT_N;
   pu.mv     [REF_PIC_LIST_0] = mvFieldNeighbours[(candIdx << 1) + 0].mv;
   pu.mv     [REF_PIC_LIST_1] = mvFieldNeighbours[(candIdx << 1) + 1].mv;
@@ -479,6 +503,9 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
   if (pu.ciipFlag
 #if TM_MRG
     || pu.tmMergeFlag
+#endif
+#if JVET_X0049_ADAPT_DMVR
+    || pu.bmMergeFlag
 #endif
     )
   {

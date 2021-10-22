@@ -453,6 +453,10 @@ struct InterPredictionData
 #if TM_MRG
   bool        tmMergeFlag;
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  uint8_t     bmMergeFlag;
+  uint8_t     bmDir;
+#endif
   uint8_t     interDir;
   uint8_t     mvpIdx  [NUM_REF_PIC_LIST_01];
   uint8_t     mvpNum  [NUM_REF_PIC_LIST_01];
@@ -462,6 +466,9 @@ struct InterPredictionData
   bool      bdmvrRefine;
 #else
   Mv        mvdL0SubPu[MAX_NUM_SUBCU_DMVR];
+#endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  bool      amvpMergeModeFlag[NUM_REF_PIC_LIST_01];
 #endif
   int8_t     refIdx  [NUM_REF_PIC_LIST_01];
   MergeType mergeType;

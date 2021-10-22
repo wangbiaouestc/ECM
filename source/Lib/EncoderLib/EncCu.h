@@ -46,7 +46,7 @@
 #include "CommonLib/Unit.h"
 #include "CommonLib/UnitPartitioner.h"
 #include "CommonLib/IbcHashMap.h"
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
 #include "CommonLib/BilateralFilter.h"
 #endif
 #include "CommonLib/LoopFilter.h"
@@ -262,6 +262,9 @@ private:
   PelStorage            m_acRealMergeBuffer[MRG_MAX_NUM_CANDS];
 #endif
   PelStorage            m_acMergeTmpBuffer[MRG_MAX_NUM_CANDS];
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  PelStorage            m_acTmMergeTmpBuffer[MRG_MAX_NUM_CANDS];
+#endif
   PelStorage            m_ciipBuffer[2];
 
   PelStorage            m_acGeoWeightedBuffer[GEO_MAX_TRY_WEIGHTED_SAD]; // to store weighted prediction pixels
@@ -290,6 +293,14 @@ private:
 #endif
   Mv                    m_mvBufEncBDOF[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
   Mv                    m_mvBufEncBDOF4TM[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
+#if JVET_X0049_ADAPT_DMVR
+  Mv                    m_mvBufBDMVR4BM[(BM_MRG_MAX_NUM_CANDS << 1)<<1][MAX_NUM_SUBCU_DMVR];
+  Mv                    m_mvBufEncBDOF4BM[BM_MRG_MAX_NUM_CANDS<<1][BDOF_SUBPU_MAX_NUM];
+#endif
+#endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  Mv                    m_mvBufEncAmBDMVR[2][MAX_NUM_SUBCU_DMVR];
+  MvField               mvField_amList_enc[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
 #endif
 
   int                   m_ctuIbcSearchRangeX;
@@ -330,7 +341,7 @@ public:
 
   EncModeCtrl* getModeCtrl  () { return m_modeCtrl; }
 
-#if JVET_V0094_BILATERAL_FILTER
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   BilateralFilter *m_bilateralFilter = new BilateralFilter();
 #endif
 
@@ -382,9 +393,23 @@ protected:
                                 , bool* applyBDMVR
 #endif
                               );
+#if JVET_X0049_ADAPT_DMVR
+  void xCheckSATDCostBMMerge
+                              ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
+                                , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart
+#if MULTI_PASS_DMVR
+                                , bool* applyBDMVR
+#endif
+                              );
+#endif
   void xCheckSATDCostCiipMerge 
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx mergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer, PelUnitBuf  acMergeTmpBuffer[MRG_MAX_NUM_CANDS]
                                 , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  void xCheckSATDCostCiipTmMerge
+                              (CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx mergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer, PelUnitBuf  acTmMergeTmpBuffer[MRG_MAX_NUM_CANDS]
+                                , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);
+#endif
   void xCheckSATDCostMmvdMerge 
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx mergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
                                 , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);

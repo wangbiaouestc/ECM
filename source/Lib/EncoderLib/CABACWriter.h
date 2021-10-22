@@ -84,6 +84,12 @@ public:
   void        bif                      (const Slice&                   slice, const BifParams& BifParams);
   void        bif                      (const Slice& slice, const BifParams& BifParams, unsigned ctuRsAddr);
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  void        Cbif_Cb                      (const Slice&                   slice, const CBifParams& CBifParams);
+  void        Cbif_Cb                      (const Slice& slice, const CBifParams& CBifParams, unsigned ctuRsAddr);
+  void        Cbif_Cr                      (const Slice&                   slice, const CBifParams& CBifParams);
+  void        Cbif_Cr                      (const Slice& slice, const CBifParams& CBifParams, unsigned ctuRsAddr);
+#endif
 #if JVET_W0066_CCSAO
   void        codeCcSaoControlIdc       ( uint8_t idcVal, CodingStructure &cs, const ComponentID compID, const int curIdx,
                                           const uint8_t *controlIdc, Position lumaPos, const int setNum );
@@ -125,6 +131,9 @@ public:
   void        end_of_ctu                ( const CodingUnit&             cu,       CUCtx&            cuCtx );
 #if JVET_V0130_INTRA_TMP
   void        tmp_flag                  ( const CodingUnit& cu );
+#endif
+#if JVET_X0049_ADAPT_DMVR
+  void        bm_merge_flag             ( const PredictionUnit&         pu);
 #endif
   void        mip_flag                  ( const CodingUnit&             cu );
   void        mip_pred_modes            ( const CodingUnit&             cu );
@@ -171,6 +180,9 @@ public:
 #if MULTI_HYP_PRED
   void        ref_idx_mh(const int                     numRef, const int         refIdx);
   void        mh_pred_data(const PredictionUnit&         pu);
+#endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  void        amvpMerge_mode         ( const PredictionUnit&         pu );
 #endif
 
   // transform tree (clause 7.3.8.8)

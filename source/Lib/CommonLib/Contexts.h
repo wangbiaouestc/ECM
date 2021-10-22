@@ -231,6 +231,9 @@ public:
 #if TM_MRG
   static const CtxSet   TmMergeIdx;
 #endif
+#if JVET_X0049_ADAPT_DMVR
+  static const CtxSet   BMMergeFlag;
+#endif
   static const CtxSet   PredMode;
   static const CtxSet   MultiRefLineIdx;
   static const CtxSet   IntraLumaMpmFlag;
@@ -272,6 +275,9 @@ public:
 #endif
 #if TM_MRG
   static const CtxSet   TMMergeFlag;
+#if JVET_X0141_CIIP_TIMD_TM
+  static const CtxSet   CiipTMMergeFlag;
+#endif
 #endif
   static const CtxSet   Mvd;
 #if MULTI_HYP_PRED
@@ -296,10 +302,17 @@ public:
   static const CtxSet   TsLrg1Flag;
   static const CtxSet   TsResidualSign;
   static const CtxSet   MVPIdx;
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  static const CtxSet   amFlagState;
+#endif
   static const CtxSet   SaoMergeFlag;
   static const CtxSet   SaoTypeIdx;
 #if JVET_V0094_BILATERAL_FILTER
   static const CtxSet   BifCtrlFlags;
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  static const CtxSet   CBifCtrlFlags_Cb;
+  static const CtxSet   CBifCtrlFlags_Cr;
 #endif
 #if JVET_W0066_CCSAO
   static const CtxSet   CcSaoControlIdc;
