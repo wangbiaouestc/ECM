@@ -6255,6 +6255,11 @@ void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx
       }
     }
   }
+
+#if JVET_W0123_TIMD_FUSION
+  IpmBuf ib = pu.getIpmBuf();
+  spanIpmInfoInter( pu, mb, ib );
+#endif
 }
 #else
 void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool mmvdFlag1, const uint8_t mmvdIdx1)
@@ -6468,6 +6473,11 @@ void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, const ui
       }
     }
   }
+
+#if JVET_W0123_TIMD_FUSION
+  IpmBuf ib = pu.getIpmBuf();
+  spanIpmInfoInter( pu, mb, ib );
+#endif
 }
 #endif
 #endif
