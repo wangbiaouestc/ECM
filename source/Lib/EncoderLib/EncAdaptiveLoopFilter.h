@@ -311,6 +311,8 @@ private:
 public:
   EncAdaptiveLoopFilter( int& apsIdStart );
   virtual ~EncAdaptiveLoopFilter() {}
+
+  template<bool alfWSSD>
   void  initDistortion(
 #if ALF_IMPROVEMENT
     CodingStructure& cs
