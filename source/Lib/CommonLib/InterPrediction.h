@@ -140,13 +140,13 @@ protected:
   uint64_t m_SADsArray[((2 * DMVR_NUM_ITERATION) + 1) * ((2 * DMVR_NUM_ITERATION) + 1)];
 #if MULTI_PASS_DMVR
 #if JVET_X0049_BDMVR_SW_OPT
-  Mv m_pSearchEnlargeOffset_bilMrg[5][BDMVR_INTME_AREA];
-  uint16_t m_pSearchEnlargeOffsetToIdx[5][BDMVR_INTME_AREA];
-  uint16_t m_pSearchEnlargeOffsetNum[5];
-  uint64_t m_SADsEnlargeArray_bilMrg[BDMVR_INTME_AREA];
+  Mv m_SearchEnlargeOffsetBilMrg[5][BDMVR_INTME_AREA];
+  uint16_t m_SearchEnlargeOffsetToIdx[5][BDMVR_INTME_AREA];
+  uint16_t m_SearchEnlargeOffsetNum[5];
+  uint64_t m_SADsEnlargeArrayBilMrg[BDMVR_INTME_AREA];
 #else
-  Mv m_pSearchEnlargeOffset_bilMrg[BDMVR_INTME_AREA];
-  uint64_t m_SADsEnlargeArray_bilMrg[BDMVR_INTME_AREA];
+  Mv m_SearchEnlargeOffsetBilMrg[BDMVR_INTME_AREA];
+  uint64_t m_SADsEnlargeArrayBilMrg[BDMVR_INTME_AREA];
   int searchPriority_bilMrg[BDMVR_INTME_AREA];
 #endif
   int costShift_1_bilMrg[BDMVR_INTME_AREA];

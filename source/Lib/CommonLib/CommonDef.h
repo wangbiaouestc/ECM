@@ -621,7 +621,8 @@ static const int    BDMVR_INTME_STRIDE = (BDMVR_INTME_RANGE << 1) + 1; ///< Bila
 static const int    BDMVR_INTME_AREA   = BDMVR_INTME_STRIDE * BDMVR_INTME_STRIDE; ///< Bilateral matching search area
 static const int    BDMVR_INTME_CENTER = BDMVR_INTME_STRIDE * BDMVR_INTME_RANGE + BDMVR_INTME_RANGE; ///< Bilateral matching search area center
 static const int    BDMVR_SIMD_IF_FACTOR =                          8; ///< Specify the pixel alignment factor for SIMD IF. (Usually this factor is 8)
-static const int    BDMVR_INTME_MAX_NUM_SEARCH_ITERATION =         26; ///< for entire CU in bilateral mode, maximum number of refinement loops
+static const int    BDMVR_INTME_SQUARE_SEARCH_MAX_NUM_ITERATIONS =  26; ///< maximum number of iterations in BDMVR integer square search at CU level
+static const int    BDMVR_INTME_FULL_SEARCH_MAX_NUM_ITERATIONS   =  5; ///< maximum number of iterations in BDMVR integer full search at CU level (up to 5)
 #if JVET_X0049_BDMVR_SW_OPT
 static const int    BDMVR_BUF_STRIDE = MAX_CU_SIZE + (BDMVR_INTME_RANGE << 1) + (BDMVR_SIMD_IF_FACTOR - 2);
 static const int    BDMVR_CENTER_POSITION = BDMVR_INTME_RANGE * BDMVR_BUF_STRIDE + BDMVR_INTME_RANGE;
