@@ -2694,10 +2694,15 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_X0144_MAX_MTT_DEPTH_TID
   CHECK( m_sMaxMTTHierarchyDepthByTid.size() > MAX_TLAYER, "MaxMTTHierarchyDepthByTid is greater than MAX_TLAYER" );
 
-  for( int i = 0; i < m_sMaxMTTHierarchyDepthByTid.size(); i++ )
+  for( int i = 0; i < (int)m_sMaxMTTHierarchyDepthByTid.size(); i++ )
   {
     CHECK( i >= MAX_TLAYER, "Index exceeds MAX_TLAYER" );
     m_maxMTTHierarchyDepthByTid[i] = std::stoul( m_sMaxMTTHierarchyDepthByTid.substr( i, 1 ) );
+  }
+
+  for( int i = (int)m_sMaxMTTHierarchyDepthByTid.size(); i < MAX_TLAYER; i++ )
+  {
+    m_maxMTTHierarchyDepthByTid[i] = m_uiMaxMTTHierarchyDepth;
   }
 #endif
 
