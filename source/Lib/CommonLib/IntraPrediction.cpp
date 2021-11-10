@@ -3689,7 +3689,8 @@ int IntraPrediction::deriveTimdMode( const CPelBuf &recoBuf, const CompArea &are
       }
     }
 
-    if (uiSecondaryCost < 2*uiBestCost)
+    // if( uiSecondaryCost < 2 * uiBestCost ), 2 * uiBestCost can overflow uint64_t
+    if( uiSecondaryCost < uiBestCost || (uiSecondaryCost - uiBestCost < uiBestCost) )
   {
     cu.timdMode         = iBestMode;
     cu.timdIsBlended    = true;
@@ -3701,7 +3702,8 @@ int IntraPrediction::deriveTimdMode( const CPelBuf &recoBuf, const CompArea &are
 #if JVET_X0149_TIMD_DIMD_LUT
     int g_gradDivTable[16] = { 0, 7, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0 };
     uint64_t s0 = uiSecondaryCost;
-    uint64_t s1 = uiBestCost + uiSecondaryCost;
+    // uiBestCost + uiSecondaryCost can overlow uint64_t
+    uint64_t s1 = (MAX_UINT64 - uiSecondaryCost < uiBestCost) ? MAX_UINT64 : (uiBestCost + uiSecondaryCost);
     int x = floorLog2_uint64(s1);
     CHECK(x < 0, "floor log2 value should be no negative");
     int norm_s1 = int(s1 << 4 >> x) & 15;
@@ -3710,6 +3712,13 @@ int IntraPrediction::deriveTimdMode( const CPelBuf &recoBuf, const CompArea &are
     int shift = x + 3;
     int add = (1 << (shift - 1));
     int iRatio = int((s0 * v * sum_weight + add) >> shift);
+
+    if( iRatio > sum_weight )
+    {
+      iRatio = sum_weight;
+    }
+
+    CHECK( iRatio > sum_weight, "Wrong DIMD ratio" );
 #else
     double dRatio       = 0.0;
     dRatio              = (double) uiSecondaryCost / (double) (uiBestCost + uiSecondaryCost);
@@ -3861,6 +3870,13 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
     int shift = x + 3;
     int add = (1 << (shift - 1));
     int iRatio = (s0 * v * sum_weight + add) >> shift;
+
+    if( iRatio > sum_weight )
+    {
+      iRatio = sum_weight;
+    }
+
+    CHECK( iRatio > sum_weight, "Wrong DIMD ratio" );
 #else
     double dRatio = 0.0;
     sum_weight -= static_cast<int>((double)sum_weight / 3); // ~ 1/3 of the weight to be reserved for planar
@@ -3943,13 +3959,15 @@ int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t ui
         {
           iRatio = (s0 * v) << shift;
         }
+
+        // iRatio after integerization can go beyond 2^16
 #else
         float fRatio = x_gr_y ? static_cast<float>(absy) / static_cast<float>(absx) : static_cast<float>(absx) / static_cast<float>(absy);
         float fRatio_scaled = fRatio * (1 << 16);
         int iRatio = static_cast<int>(fRatio_scaled);
 #endif
         // get ang_idx
-        int idx = -1;
+        int idx = 16;
         for( int i = 1; i < 17; i++ )
         {
           if( iRatio <= angTable[i] )
@@ -3966,6 +3984,10 @@ int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t ui
       {
         iAng_uneven = iDx == 0 ? VER_IDX : HOR_IDX;
       }
+
+      CHECK( iAng_uneven < 0, "Wrong mode in DIMD histogram" );
+      CHECK( iAng_uneven >= NUM_LUMA_MODE, "Wrong mode in DIMD histogram" );
+
       piHistogram[iAng_uneven] += iAmp;
     }
   }
