@@ -1374,15 +1374,6 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       pu.intraDir[CHANNEL_TYPE_LUMA] = uiOrgMode.modeId;
 #if JVET_W0123_TIMD_FUSION
       cu.timd = false;
-      int modeDiff = uiOrgMode.modeId - MAP131TO67(cu.dimdMode);
-      if (isTimdValid && lfnstIdx == 0 && uiOrgMode.ispMod > 0 && modeDiff == 0)
-      {
-        continue;
-      }
-      if (isTimdValid && uiOrgMode.mRefId > 0 && lfnstIdx == 0 && cu.mtsFlag == 0 && modeDiff == 0)
-      {
-        continue;
-      }
       if (mode >= 0 && uiOrgMode.modeId == TIMD_IDX)
       {
         if (cu.ispMode)
