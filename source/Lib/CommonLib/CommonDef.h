@@ -325,7 +325,11 @@ static const int NUM_LMC_MODE =                                    1 + 2; ///< L
 #endif
 static const int NUM_INTRA_MODE = (NUM_LUMA_MODE + NUM_LMC_MODE);
 
+#if TU_256
+static const int NUM_EXT_LUMA_MODE =                               30;
+#else
 static const int NUM_EXT_LUMA_MODE =                               28;
+#endif
 
 static const int NUM_DIR =           (((NUM_LUMA_MODE - 3) >> 2) + 1);
 static const int PLANAR_IDX =                                       0; ///< index for intra PLANAR mode
@@ -368,6 +372,7 @@ static const int MDLM_T_IDX =                          LM_CHROMA_IDX + 2; ///< M
 static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE; ///< chroma mode index for derived from luma intra mode
 
 #if JVET_W0119_LFNST_EXTENSION
+static const int NUM_LFNST_INTRA_MODES   = NUM_LUMA_MODE + NUM_EXT_LUMA_MODE;
 static const uint32_t  L16W_ZO           = 96;
 static const uint32_t  L16W              = 96;
 static const uint32_t  L16H              = 32;
