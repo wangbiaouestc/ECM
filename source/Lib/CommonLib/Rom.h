@@ -205,7 +205,7 @@ extern const     int8_t   g_lfnst4x4[ 4 ][ 2 ][ 16 ][ 16 ];
 #endif
 
 #if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
-extern const     uint8_t  g_lfnstLut[ 95 ];
+extern const     uint8_t  g_lfnstLut[NUM_LFNST_INTRA_MODES];
 #else
 extern const     uint8_t  g_lfnstLut[ NUM_INTRA_MODE + NUM_EXT_LUMA_MODE - 1 ];
 #endif
