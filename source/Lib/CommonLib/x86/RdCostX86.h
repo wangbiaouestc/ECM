@@ -421,7 +421,7 @@ Distortion RdCost::xGetSSE_NxN_SIMD(const DistParam &rcDtParam)
         Sum = _mm256_add_epi64( _mm256_unpacklo_epi32( Sum, vzero ), _mm256_unpackhi_epi32( Sum, vzero ) );
         Sum = _mm256_add_epi64( Sum, _mm256_permute4x64_epi64( Sum, 14 ) );
         Sum = _mm256_add_epi64( Sum, _mm256_permute4x64_epi64( Sum, 1 ) );
-        uiRet += _mm_cvtsi128_si64( _mm256_castsi256_si128( Sum ) ) >> uiShift;
+        uiRet += _mm_cvtsi128_si64( _mm256_castsi256_si128( Sum ) );
       }
       uiRet >>= uiShift;
 #endif

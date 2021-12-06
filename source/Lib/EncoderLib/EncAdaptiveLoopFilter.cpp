@@ -3386,11 +3386,22 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
     }
   }
 
-  initDistortion(
+  if (m_alfWSSD)
+  {
+    initDistortion<true>(
 #if ALF_IMPROVEMENT
-    cs
+      cs
 #endif
-  );
+      );
+  }
+  else
+  {
+    initDistortion<false>(
+#if ALF_IMPROVEMENT
+      cs
+#endif
+      );
+  }
 }
 
 #if ALF_IMPROVEMENT
@@ -3837,6 +3848,8 @@ std::vector<int> EncAdaptiveLoopFilter::getAvaiApsIdsLuma(CodingStructure& cs, i
   CHECK(newApsId >= ALF_CTB_MAX_NUM_APS, "Wrong APS index assignment in getAvaiApsIdsLuma");
   return result;
 }
+
+template<bool alfWSSD>
 void  EncAdaptiveLoopFilter::initDistortion(
 #if ALF_IMPROVEMENT
   CodingStructure& cs
@@ -3896,11 +3909,19 @@ void  EncAdaptiveLoopFilter::initDistortion(
           {
             for (int x = 0; x < width; x++)
             {
-              m_ctbDistortionFixedFilter[classifierIdx][filterSetIdx][ctbIdx] += (org[x] - m_fixFilterResult[fixedFilter][y + yPos][x + xPos]) *  (org[x] - m_fixFilterResult[fixedFilter][y + yPos][x + xPos]);
+              if (alfWSSD)
+              {
+                double weight = m_lumaLevelToWeightPLUT[org[x]];
+                m_ctbDistortionFixedFilter[classifierIdx][filterSetIdx][ctbIdx] += weight * (org[x] - m_fixFilterResult[fixedFilter][y + yPos][x + xPos]) *  (org[x] - m_fixFilterResult[fixedFilter][y + yPos][x + xPos]);
+              }
+              else
+              {
+                m_ctbDistortionFixedFilter[classifierIdx][filterSetIdx][ctbIdx] += (org[x] - m_fixFilterResult[fixedFilter][y + yPos][x + xPos]) *  (org[x] - m_fixFilterResult[fixedFilter][y + yPos][x + xPos]);
+              }
             }
             org += orgStride;
           }
-}
+        }
       }
       ctbIdx++;
     }

@@ -116,7 +116,7 @@
 #define JVET_X0124_TMP_SIGNAL                             1 // JVET-X0124: cleanup on signalling of intra template matching
 #endif
 #define JVET_V0130_INTRA_TMP                              1 // JVET-V0130: template matching prediction
-#define JVET_W0069_TMP_BOUNDARY								            1 // JVET-W0069: boundary handling for TMP
+#define JVET_W0069_TMP_BOUNDARY                           1 // JVET-W0069: boundary handling for TMP
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
 #if JVET_W0123_TIMD_FUSION
 #define JVET_X0148_TIMD_PDPC                              1 // JVET-X0148: PDPC handling for TIMD
@@ -189,7 +189,7 @@
 #define ENABLE_SIMD_SIGN_PREDICTION                       1
 #endif
 #if JVET_V0130_INTRA_TMP
-#define ENABLE_SIMD_TMP									                  1
+#define ENABLE_SIMD_TMP                                   1
 #endif
 #if JVET_V0094_BILATERAL_FILTER
 #define ENABLE_SIMD_BILATERAL_FILTER                      1

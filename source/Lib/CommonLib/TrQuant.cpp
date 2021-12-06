@@ -429,6 +429,10 @@ uint32_t TrQuant::getLFNSTIntraMode( int wideAngPredMode )
     intraMode = ( uint32_t ) wideAngPredMode;
   }
 
+#if JVET_W0119_LFNST_EXTENSION
+  CHECK( intraMode >= NUM_LFNST_INTRA_MODES, "Wrong intra mode for LFNST" );
+#endif
+
   return intraMode;
 }
 
@@ -1117,7 +1121,7 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
       {
         ucMode = predMode; //"ucMode" is the signaled Mode.
         predMode = PU::getWideAngle(tu, (uint32_t)predMode, compID);
-        CHECK(predMode < -(NUM_EXT_LUMA_MODE >> 1) && predMode >= NUM_LUMA_MODE + (NUM_EXT_LUMA_MODE >> 1), "luma mode out of range");
+        CHECK(predMode < -(NUM_EXT_LUMA_MODE >> 1) || predMode >= NUM_LUMA_MODE + (NUM_EXT_LUMA_MODE >> 1), "luma mode out of range");
         predMode = (predMode < 0) ? 2 : (predMode >= NUM_LUMA_MODE) ? 66 : predMode;
         nMdIdx = predMode > DIA_IDX ? (NUM_LUMA_MODE + 1 - predMode) : predMode;
         isTrTransposed = (predMode > DIA_IDX) ? true : false;
