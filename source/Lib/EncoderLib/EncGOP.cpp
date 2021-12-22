@@ -2100,6 +2100,10 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
     picHeader = pcPic->cs->picHeader;
     picHeader->setSPSId( pcPic->cs->pps->getSPSId() );
     picHeader->setPPSId( pcPic->cs->pps->getPPSId() );
+    picHeader->setMinQTSizes(pcPic->cs->sps->getMinQTSizes());
+    picHeader->setMaxMTTHierarchyDepths(pcPic->cs->sps->getMaxMTTHierarchyDepths());
+    picHeader->setMaxBTSizes(pcPic->cs->sps->getMaxBTSizes());
+    picHeader->setMaxTTSizes(pcPic->cs->sps->getMaxTTSizes());
     picHeader->setSplitConsOverrideFlag(false);
     // initial two flags to be false
     picHeader->setPicInterSliceAllowedFlag(false);
