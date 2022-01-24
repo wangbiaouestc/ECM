@@ -595,7 +595,41 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         // this should always be true
         CHECK(!pu.Y().valid(), "PU is not valid");
         bool isFirstLineOfCtu     = (((pu.block(COMPONENT_Y).y) & ((pu.cs->sps)->getMaxCUWidth() - 1)) == 0);
+#if JVET_Y0116_EXTENDED_MRL_LIST
+        int  numOfPassesExtendRef = MRL_NUM_REF_LINES;
+        if (!sps.getUseMRL() || isFirstLineOfCtu) 
+        {
+          numOfPassesExtendRef = 1;
+        }
+        else
+        {
+          bool checkLineOutsideCtu[MRL_NUM_REF_LINES - 1];
+          for (int mrlIdx = 1; mrlIdx < MRL_NUM_REF_LINES; mrlIdx++)
+          {
+            bool isLineOutsideCtu =
+              ((cu.block(COMPONENT_Y).y) % ((cu.cs->sps)->getMaxCUWidth()) <= MULTI_REF_LINE_IDX[mrlIdx]) ? true
+                                                                                                          : false;
+            checkLineOutsideCtu[mrlIdx-1] = isLineOutsideCtu;
+          }
+          if (checkLineOutsideCtu[0]) 
+          {
+            numOfPassesExtendRef = 1;
+          }
+          else
+          {
+            for (int mrlIdx = MRL_NUM_REF_LINES - 2; mrlIdx > 0; mrlIdx--)
+            {
+              if (checkLineOutsideCtu[mrlIdx] && !checkLineOutsideCtu[mrlIdx - 1])
+              {
+                numOfPassesExtendRef = mrlIdx + 1;
+                break;
+              }
+            }
+          }
+        }
+#else
         int  numOfPassesExtendRef = ((!sps.getUseMRL() || isFirstLineOfCtu) ? 1 : MRL_NUM_REF_LINES);
+#endif
         pu.multiRefIdx            = 0;
 
         if (numModesForFullRD != numModesAvailable)
@@ -1238,7 +1272,37 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       if (lfnstIdx == 0 && !cu.mtsFlag)
       {
         bool isFirstLineOfCtu     = (((pu.block(COMPONENT_Y).y) & ((pu.cs->sps)->getMaxCUWidth() - 1)) == 0);
+#if JVET_Y0116_EXTENDED_MRL_LIST
+        int  numOfPassesExtendRef = 3;
+        if (!sps.getUseMRL() || isFirstLineOfCtu) 
+        {
+          numOfPassesExtendRef = 1;
+        }
+        else
+        {
+          bool checkLineOutsideCtu[2];
+          for (int mrlIdx = 1; mrlIdx < 3; mrlIdx++)
+          {
+            bool isLineOutsideCtu =
+              ((cu.block(COMPONENT_Y).y) % ((cu.cs->sps)->getMaxCUWidth()) <= MULTI_REF_LINE_IDX[mrlIdx]) ? true
+                                                                                                          : false;
+            checkLineOutsideCtu[mrlIdx-1] = isLineOutsideCtu;
+          }
+          if (checkLineOutsideCtu[0]) 
+          {
+            numOfPassesExtendRef = 1;
+          }
+          else
+          {
+            if (checkLineOutsideCtu[1] && !checkLineOutsideCtu[0])
+            {
+              numOfPassesExtendRef = 2;
+            }
+          }
+        }
+#else
         int  numOfPassesExtendRef = ((!sps.getUseMRL() || isFirstLineOfCtu) ? 1 : MRL_NUM_REF_LINES);
+#endif
         for (int mRefNum = 1; mRefNum < numOfPassesExtendRef; mRefNum++)
         {
           int multiRefIdx = MULTI_REF_LINE_IDX[mRefNum];

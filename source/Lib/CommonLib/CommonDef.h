@@ -311,9 +311,15 @@ static const int MLS_CG_SIZE =                                      4; ///< Coef
 
 static const int RVM_VCEGAM10_M =                                   4;
 
+#if JVET_Y0116_EXTENDED_MRL_LIST
+static const int MAX_REF_LINE_IDX =                                 13; //highest refLine offset in the list
+static const int MRL_NUM_REF_LINES =                                6; //number of candidates in the array
+static const int MULTI_REF_LINE_IDX[6] =               { 0, 1, 3, 5, 7, 12 };
+#else
 static const int MAX_REF_LINE_IDX =                                 3; //highest refLine offset in the list
 static const int MRL_NUM_REF_LINES =                                3; //number of candidates in the array
 static const int MULTI_REF_LINE_IDX[4] =               { 0, 1, 2, 0 };
+#endif
 
 static const int PRED_REG_MIN_WIDTH =                               4;  // Minimum prediction region width for ISP subblocks
 

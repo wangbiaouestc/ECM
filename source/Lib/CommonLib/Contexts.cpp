@@ -942,6 +942,23 @@ const CtxSet ContextSetCfg::PredMode = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::MultiRefLineIdx = ContextSetCfg::addCtxSet
 ({
+#if JVET_Y0116_EXTENDED_MRL_LIST
+#if JVET_W0123_TIMD_FUSION
+  { 25, 59, 59, 59, 59, 25, 59},
+  { 25, 58, 58, 58, 58, 25, 58},
+  { 25, 60, 60, 60, 60, 25, 60},
+  { 6,  5,  5,  5,  5,  6,  5 },
+  { 6,  5,  5,  5,  5,  6,  5 },
+  { 6,  8,  8,  8,  8,  6,  8 }
+#else
+  { 25, 59, 59, 59, 59},
+  { 25, 58, 58, 58, 58},
+  { 25, 60, 60, 60, 60},
+  { 6,  5,  5,  5,  5 },
+  { 6,  5,  5,  5,  5 },
+  { 6,  8,  8,  8,  8 }
+#endif
+#else
 #if JVET_W0123_TIMD_FUSION
   { 25, 59, 25, 59 },
   { 25, 58, 25, 58 },
@@ -956,6 +973,7 @@ const CtxSet ContextSetCfg::MultiRefLineIdx = ContextSetCfg::addCtxSet
 	{ 6,  5 },
 	{ 6,  5 },
 	{ 6,  8 }
+#endif
 #endif
 });
 
@@ -2172,6 +2190,19 @@ const CtxSet ContextSetCfg::PredMode = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::MultiRefLineIdx = ContextSetCfg::addCtxSet
 ({
+#if JVET_Y0116_EXTENDED_MRL_LIST
+#if JVET_W0123_TIMD_FUSION
+  { 25, 59, 59, 59, 59, 25, 59},
+  { 25, 58, 58, 58, 58, 25, 58},
+  { 25, 60, 60, 60, 60, 25, 60},
+  { 5,  8,  8,  8,  8,  5,  8 },
+#else
+  { 25, 59, 59, 59, 59},
+  { 25, 58, 58, 58, 58},
+  { 25, 60, 60, 60, 60},
+  { 5,  8,  8,  8,  8 },
+#endif
+#else
 #if JVET_W0123_TIMD_FUSION
   {  25,  59,  25,  59, },
   {  25,  58,  25,  58, },
@@ -2182,6 +2213,7 @@ const CtxSet ContextSetCfg::MultiRefLineIdx = ContextSetCfg::addCtxSet
   {  25,  58, },
   {  25,  60, },
   {   5,   8, },
+#endif
 #endif
 });
 

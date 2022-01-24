@@ -125,6 +125,8 @@
 #define JVET_X0149_TIMD_DIMD_LUT                          1 // JVET-X0149: LUT-based derivation of DIMD and TIMD
 #endif
 
+#define JVET_Y0116_EXTENDED_MRL_LIST                      1 // JVET-Y0116: Extended MRL Candidate List
+
 // Inter
 #define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
 #define JVET_X0090_CIIP_FIX                               1 // JVET-X0090: combination of CIIP, OBMC and LMCS
