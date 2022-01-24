@@ -171,13 +171,13 @@ void EncLib::create( const int layerId )
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_W0066_CCSAO
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  if (m_bUseSAO || m_BIF || m_CCSAO || m_CBIF)
+  if (m_bUseSAO || m_BIF || m_CCSAO || m_chromaBIF)
 #else
   if (m_bUseSAO || m_BIF || m_CCSAO)
 #endif
 #else
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  if (m_bUseSAO || m_BIF || m_CBIF)
+  if (m_bUseSAO || m_BIF || m_chromaBIF)
 #else
   if (m_bUseSAO || m_BIF)
 #endif
@@ -185,13 +185,13 @@ void EncLib::create( const int layerId )
 #else
 #if JVET_W0066_CCSAO
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  if (m_bUseSAO || m_CCSAO || m_CBIF)
+  if (m_bUseSAO || m_CCSAO || m_chromaBIF)
 #else
   if (m_bUseSAO || m_CCSAO)
 #endif
 #else
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  if (m_bUseSAO || m_CBIF)
+  if (m_bUseSAO || m_chromaBIF)
 #else
   if (m_bUseSAO)
 #endif
@@ -1956,9 +1956,9 @@ void EncLib::xInitPPS(PPS &pps, const SPS &sps)
   pps.setBIFQPOffset           ( m_BIFQPOffset );
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  pps.setUseCBIF                ( m_CBIF );
-  pps.setCBIFStrength           ( m_CBIFStrength );
-  pps.setCBIFQPOffset           ( m_CBIFQPOffset );
+  pps.setUseChromaBIF          ( m_chromaBIF );
+  pps.setChromaBIFStrength     ( m_chromaBIFStrength );
+  pps.setChromaBIFQPOffset     ( m_chromaBIFQPOffset );
 #endif
 
   if ( getDeblockingFilterMetric() )

@@ -1969,28 +1969,27 @@ public:
 };
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-class CBIFCabacEstImp : public CBIFCabacEst
+class ChromaBIFCabacEstImp : public ChromaBIFCabacEst
 {
-    CABACWriter* CABACEstimator;
+  CABACWriter* CABACEstimator;
 public:
-    CBIFCabacEstImp(CABACWriter* _CABACEstimator) : CABACEstimator(_CABACEstimator) {};
-    virtual ~CBIFCabacEstImp() {};
+  ChromaBIFCabacEstImp(CABACWriter* _CABACEstimator) : CABACEstimator(_CABACEstimator) {};
+  virtual ~ChromaBIFCabacEstImp() {};
 
-    virtual uint64_t getBits_Cb(const Slice& slice, const CBifParams& htdfParams)
-    {
-        CABACEstimator->initCtxModels(slice);
-        CABACEstimator->resetBits();
-        CABACEstimator->Cbif_Cb(slice, htdfParams);
-        return CABACEstimator->getEstFracBits();
-    }
-
-    virtual uint64_t getBits_Cr(const Slice& slice, const CBifParams& htdfParams)
-    {
-        CABACEstimator->initCtxModels(slice);
-        CABACEstimator->resetBits();
-        CABACEstimator->Cbif_Cr(slice, htdfParams);
-        return CABACEstimator->getEstFracBits();
-    }
+  virtual uint64_t getBitsCb(const Slice& slice, const ChromaBifParams& chromaBifParams)
+  {
+    CABACEstimator->initCtxModels(slice);
+    CABACEstimator->resetBits();
+    CABACEstimator->chromaBifCb(slice, chromaBifParams);
+    return CABACEstimator->getEstFracBits();
+  }
+  virtual uint64_t getBitsCr(const Slice& slice, const ChromaBifParams& chromaBifParams)
+  {
+    CABACEstimator->initCtxModels(slice);
+    CABACEstimator->resetBits();
+    CABACEstimator->chromaBifCr(slice, chromaBifParams);
+    return CABACEstimator->getEstFracBits();
+  }
 };
 #endif
 
@@ -2823,7 +2822,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 #endif
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-    if (pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF() || pcSlice->getPPS()->getUseCBIF())
+    if (pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF() || pcSlice->getPPS()->getUseChromaBIF())
 #else
     // BIF happens in SAO code so this needs to be done
     // even if SAO=0 if BIF=1.
@@ -2831,7 +2830,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 #endif
 #else
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-    if (pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseCBIF())
+    if (pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseChromaBIF())
 #else
     if (pcSlice->getSPS()->getSAOEnabledFlag())
 #endif
@@ -3098,6 +3097,9 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 #if JVET_V0094_BILATERAL_FILTER
           || pcSlice->getPPS()->getUseBIF()
 #endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+          || pcSlice->getPPS()->getUseChromaBIF()
+#endif
           )
       {
         Size saoSize = m_pcSAO->getSaoSize();
@@ -3180,14 +3182,14 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-      if( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF() || pcSlice->getPPS()->getUseCBIF())
+      if( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF() || pcSlice->getPPS()->getUseChromaBIF())
 #else
       // We need to do this step if at least one of BIF or SAO are enabled.
       if( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseBIF())
 #endif
 #else
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-      if( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseCBIF())
+      if( pcSlice->getSPS()->getSAOEnabledFlag() || pcSlice->getPPS()->getUseChromaBIF())
 #else
       if( pcSlice->getSPS()->getSAOEnabledFlag() )
 #endif
@@ -3199,7 +3201,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
         BIFCabacEstImp est(m_pcEncLib->getCABACEncoder()->getCABACEstimator(cs.slice->getSPS()));
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-        CBIFCabacEstImp CBIF_est(m_pcEncLib->getCABACEncoder()->getCABACEstimator(cs.slice->getSPS()));
+        ChromaBIFCabacEstImp chromaBifEst(m_pcEncLib->getCABACEncoder()->getCABACEstimator(cs.slice->getSPS()));
 #endif
         
         m_pcSAO->SAOProcess( cs, sliceEnabled, pcSlice->getLambdas(),
@@ -3211,7 +3213,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
                               , &est
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-                              , &CBIF_est
+                              , &chromaBifEst
 #endif
                             );
         //assign SAO slice header

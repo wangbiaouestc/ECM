@@ -1241,16 +1241,16 @@ public:
 };
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-class CBifParams
+class ChromaBifParams
 {
 public:
-    int frmOn_Cb;                // slice_bif_enabled_flag for chroma
-    int frmOn_Cr;                // slice_bif_enabled_flag for chroma
-    int allCtuOn_Cb;             // slice_bif_all_ctb_enabled_flag for chroma
-    int allCtuOn_Cr;             // slice_bif_all_ctb_enabled_flag for chroma
-    int numBlocks;
-    std::vector<int> ctuOn_Cb;   // bif_ctb_flag[][] for chroma
-    std::vector<int> ctuOn_Cr;   // bif_ctb_flag[][] for chroma
+  int frmOnCb;                // slice_bif_enabled_flag for chroma
+  int frmOnCr;                // slice_bif_enabled_flag for chroma
+  int allCtuOnCb;             // slice_bif_all_ctb_enabled_flag for chroma
+  int allCtuOnCr;             // slice_bif_all_ctb_enabled_flag for chroma
+  int numBlocks;
+  std::vector<int> ctuOnCb;   // bif_ctb_flag[][] for chroma
+  std::vector<int> ctuOnCr;   // bif_ctb_flag[][] for chroma
 };
 #endif
 

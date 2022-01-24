@@ -8822,49 +8822,46 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
     }
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-    if(cs.pps->getUseCBIF()){
-        bool TU_VALID = false;
-        bool TU_CBF = false;
-        bool isDualTree = CS::isDualITree(cs);
-        bool chroma_valid = cu->Cb().valid() && cu->Cr().valid();
-        bool BIF_chroma = false;
-        for (auto &currTU : CU::traverseTUs(*cu))
+    if(cs.pps->getUseChromaBIF())
+    {
+      bool tuValid = false;
+      bool tuCBF = false;
+      bool isDualTree = CS::isDualITree(cs);
+      bool chromaValid = cu->Cb().valid() && cu->Cr().valid();
+      bool applyChromaBIF = false;
+      for (auto &currTU : CU::traverseTUs(*cu))
+      {
+        bool isInter = (cu->predMode == MODE_INTER) ? true : false;
+        for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
         {
-            bool isInter = (cu->predMode == MODE_INTER) ? true : false;
-
-            for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
+          bool isCb = compIdx == COMPONENT_Cb ? true : false;
+          ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+          applyChromaBIF = false;
+          if(!isDualTree && chromaValid)
+          {
+            tuValid = currTU.blocks[compIdx].valid();
+            tuCBF = false;
+            if(tuValid)
             {
-                bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-
-                BIF_chroma = false;
-                if(!isDualTree && chroma_valid)
-                {
-                    TU_VALID = currTU.blocks[compIdx].valid();
-                    TU_CBF = false;
-                    if(TU_VALID)
-                    {
-                        TU_CBF = TU::getCbf(currTU, compID);
-                    }
-                    BIF_chroma = ((TU_CBF || isInter == false) && (currTU.cu->qp > 17) && (TU_VALID));
-                }
-
-                if(isDualTree && chroma_valid)
-                {
-                    TU_CBF = TU::getCbf(currTU, compID);
-                    BIF_chroma = ((TU_CBF || isInter == false) && (currTU.cu->qp > 17));
-                }
-
-                if (BIF_chroma)
-                {
-                    CompArea &compArea = currTU.block(compID);
-                    PelBuf    recBuf = picDbBuf.getBuf(compArea);
-                    PelBuf recIPredBuf = recBuf;
-
-                    m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, isCb);
-                }
+              tuCBF = TU::getCbf(currTU, compID);
             }
+            applyChromaBIF = ((tuCBF || isInter == false) && (currTU.cu->qp > 17) && (tuValid));
+          }
+
+          if(isDualTree && chromaValid)
+          {
+            tuCBF = TU::getCbf(currTU, compID);
+            applyChromaBIF = ((tuCBF || isInter == false) && (currTU.cu->qp > 17));
+          }
+          if (applyChromaBIF)
+          {
+            CompArea &compArea = currTU.block(compID);
+            PelBuf    recBuf = picDbBuf.getBuf(compArea);
+            PelBuf recIPredBuf = recBuf;
+            m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, isCb);
+          }
         }
+      }
     }
 #endif
     
@@ -9493,56 +9490,52 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
           }
         }
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-        const CompArea &area_chroma = cu.blocks[compID];
-        CompArea    tmpArea_chroma(compID, area_chroma.chromaFormat, Position(0, 0), area_chroma.size());
+        const CompArea &areaChroma = cu.blocks[compID];
+        CompArea    tmpAreaChroma(compID, areaChroma.chromaFormat, Position(0, 0), areaChroma.size());
         PelBuf tmpRecChroma;
         if(isChroma(compID))
         {
-            tmpRecChroma = m_tmpStorageLCU->getBuf(tmpArea_chroma);
-            tmpRecChroma.copyFrom(reco);
+          tmpRecChroma = m_tmpStorageLCU->getBuf(tmpAreaChroma);
+          tmpRecChroma.copyFrom(reco);
         }
 
-        if(tempCS->pps->getUseCBIF() && isChroma(compID) && (cu.qp > 17))
+        if(tempCS->pps->getUseChromaBIF() && isChroma(compID) && (cu.qp > 17))
         {
-            bool TU_VALID = false;
-            bool TU_CBF = false;
-            bool isDualTree = CS::isDualITree(*tempCS);
-            bool chroma_valid = cu.Cb().valid() && cu.Cr().valid();
-            bool BIF_chroma = false;
-
-            for (auto &currTU : CU::traverseTUs(cu))
+          bool tuValid = false;
+          bool tuCBF = false;
+          bool isDualTree = CS::isDualITree(*tempCS);
+          bool chromaValid = cu.Cb().valid() && cu.Cr().valid();
+          bool applyChromaBIF = false;
+          for (auto &currTU : CU::traverseTUs(cu))
+          {
+            Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
+            PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
+            bool isInter = (cu.predMode == MODE_INTER) ? true : false;
+            bool isCb = compID == COMPONENT_Cb ? true : false;
+            applyChromaBIF = false;
+            if(!isDualTree && chromaValid)
             {
-                Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
-                PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
-
-                bool isInter = (cu.predMode == MODE_INTER) ? true : false;
-                bool isCb = compID == COMPONENT_Cb ? true : false;
-                BIF_chroma = false;
-                if(!isDualTree && chroma_valid)
-                {
-                    TU_VALID = currTU.blocks[compID].valid();
-                    TU_CBF = false;//if CHROMA TU is not vaild, CBF must be zero
-
-                    if(TU_VALID)
-                    {
-                        TU_CBF = TU::getCbf(currTU, compID);
-                    }
-                    BIF_chroma = (( TU_CBF || isInter == false) && (currTU.cu->qp > 17) && (TU_VALID));
-
-                }
-
-                if(isDualTree && chroma_valid)
-                {
-                    BIF_chroma = ((TU::getCbf(currTU, compID) || isInter == false) && (currTU.cu->qp > 17));
-                }
-
-                if(BIF_chroma)
-                {
-                    CompArea compArea = currTU.blocks[compID];
-                    PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
-                    m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, isCb);
-                }
+              tuValid = currTU.blocks[compID].valid();
+              tuCBF = false;//if CHROMA TU is not vaild, CBF must be zero
+              if(tuValid)
+              {
+                tuCBF = TU::getCbf(currTU, compID);
+              }
+              applyChromaBIF = (( tuCBF || isInter == false) && (currTU.cu->qp > 17) && (tuValid));
             }
+
+            if(isDualTree && chromaValid)
+            {
+              applyChromaBIF = ((TU::getCbf(currTU, compID) || isInter == false) && (currTU.cu->qp > 17));
+            }
+
+            if(applyChromaBIF)
+            {
+              CompArea compArea = currTU.blocks[compID];
+              PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
+              m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, isCb);
+            }
+          }
         }
 #endif
 
@@ -9558,13 +9551,13 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
           else
           {
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-            if(isChroma(compID) && tempCS->pps->getUseCBIF())
+            if(isChroma(compID) && tempCS->pps->getUseChromaBIF())
             {
-                finalDistortion += m_pcRdCost->getDistPart(org, tmpRecChroma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
+              finalDistortion += m_pcRdCost->getDistPart(org, tmpRecChroma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
             }
             else
             {
-                finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE_WTD, &orgLuma );
+              finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE_WTD, &orgLuma );
             }
 #else
             finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE_WTD, &orgLuma );
@@ -9578,53 +9571,52 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
         }
 #else
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-        const CompArea &area_chroma = cu.blocks[compID];
-        CompArea    tmpArea_chroma(compID, area_chroma.chromaFormat, Position(0, 0), area_chroma.size());
+        const CompArea &areaChroma = cu.blocks[compID];
+        CompArea    tmpAreaChroma(compID, areaChroma.chromaFormat, Position(0, 0), areaChroma.size());
         PelBuf tmpRecChroma;
         if(isChroma(compID))
         {
-            tmpRecChroma = m_tmpStorageLCU->getBuf(tmpArea_chroma);
-            tmpRecChroma.copyFrom(reco);
+          tmpRecChroma = m_tmpStorageLCU->getBuf(tmpAreaChroma);
+          tmpRecChroma.copyFrom(reco);
         }
 
-        if(tempCS->pps->getUseCBIF() && isChroma(compID) && (cu.qp > 17))
+        if(tempCS->pps->getUseChromaBIF() && isChroma(compID) && (cu.qp > 17))
         {
-            bool TU_VALID = false;
-            bool TU_CBF = false;
-            bool isDualTree = CS::isDualITree(*tempCS);
-            bool chroma_valid = cu.Cb().valid() && cu.Cr().valid();
-            bool BIF_chroma = false;
+          bool tuValid = false;
+          bool tuCBF = false;
+          bool isDualTree = CS::isDualITree(*tempCS);
+          bool chromaValid = cu.Cb().valid() && cu.Cr().valid();
+          bool applyChromaBIF = false;
 
-            for (auto &currTU : CU::traverseTUs(cu))
+          for (auto &currTU : CU::traverseTUs(cu))
+          {
+            Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
+            PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
+
+            bool isInter = (cu.predMode == MODE_INTER) ? true : false;
+            bool isCb = compID == COMPONENT_Cb ? true : false;
+            applyChromaBIF = false;
+            if(!isDualTree && chromaValid)
             {
-                Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
-                PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
-
-                bool isInter = (cu.predMode == MODE_INTER) ? true : false;
-                bool isCb = compID == COMPONENT_Cb ? true : false;
-                BIF_chroma = false;
-                if(!isDualTree && chroma_valid)
-                {
-                    TU_VALID = currTU.blocks[compID].valid();
-                    TU_CBF = false;//if CHROMA TU is not vaild, CBF must be zero
-
-                    if(TU_VALID){
-                        TU_CBF = TU::getCbf(currTU, compID);
-                    }
-                    BIF_chroma = (( TU_CBF || isInter == false) && (currTU.cu->qp > 17) && (TU_VALID));
-                }
-
-                if(isDualTree && chroma_valid){
-                    BIF_chroma = ((TU::getCbf(currTU, compID) || isInter == false) && (currTU.cu->qp > 17));
-                }
-
-                if(BIF_chroma)
-                {
-                    CompArea compArea = currTU.blocks[compID];
-                    PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
-                    m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, isCb);
-                }
+              tuValid = currTU.blocks[compID].valid();
+              tuCBF = false;//if CHROMA TU is not vaild, CBF must be zero
+              if(tuValid)
+              {
+                tuCBF = TU::getCbf(currTU, compID);
+              }
+              applyChromaBIF = ((tuCBF || isInter == false) && (currTU.cu->qp > 17) && (tuValid));
             }
+            if(isDualTree && chromaValid)
+            {
+              applyChromaBIF = ((TU::getCbf(currTU, compID) || isInter == false) && (currTU.cu->qp > 17));
+            }
+            if(applyChromaBIF)
+            {
+              CompArea compArea = currTU.blocks[compID];
+              PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
+              m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, isCb);
+            }
+          }
         }
 #endif
 #if WCG_EXT
@@ -9642,7 +9634,7 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
         else
         {
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-          if(isChroma(compID) && tempCS->pps->getUseCBIF())
+          if(isChroma(compID) && tempCS->pps->getUseChromaBIF())
           {
             finalDistortion += m_pcRdCost->getDistPart(org, tmpRecChroma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
           }

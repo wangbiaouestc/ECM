@@ -3989,12 +3989,12 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     else
     {
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-      if(pps.getUseCBIF() && isChroma(compID) && (tu.cu->qp > 17))
+      if(pps.getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17))
       {
         CompArea compArea = tu.blocks[compID];
         PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
         bool isCb = compID == COMPONENT_Cb ? true : false;
-        m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
+        m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
       }
       ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecChroma, bitDepth, compID, DF_SSE_WTD, &orgLuma);
 #else
@@ -4005,11 +4005,11 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
         if(compID == COMPONENT_Cr)
         {
-            ruiDist += m_pcRdCost->getDistPart(crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+          ruiDist += m_pcRdCost->getDistPart(crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
         }
         else
         {
-            ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+          ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
         }
 #else
         ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
@@ -4035,12 +4035,12 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     else
     {
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-      if (pps.getUseCBIF() && isChroma(compID) && (tu.cu->qp > 17))
+      if (pps.getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17))
       {
         CompArea compArea = tu.blocks[compID];
         PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
         bool isCb = compID == COMPONENT_Cb ? true : false;
-        m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
+        m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
       }
       ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecChroma, bitDepth, compID, DF_SSE );
 #else
@@ -4051,10 +4051,11 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
         if(compID == COMPONENT_Cr)
         {
-            ruiDist += m_pcRdCost->getDistPart( crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE );
+          ruiDist += m_pcRdCost->getDistPart( crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE );
         }
-        else{
-            ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
+        else
+        {
+          ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
         }
 #else
         ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
@@ -4070,82 +4071,83 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     PelBuf tmpRecChroma;
     if(isChroma(compID))
     {
-        tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea2);
-        tmpRecChroma.copyFrom(piReco);
+      tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea2);
+      tmpRecChroma.copyFrom(piReco);
     }
 #if WCG_EXT
     if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs() && slice.getLmcsEnabledFlag() && (m_pcReshape->getCTUFlag() || (isChroma(compID) && m_pcEncCfg->getReshapeIntraCMD()))))
     {
-        const CPelBuf orgLuma = cs.getOrgBuf( cs.area.blocks[COMPONENT_Y] );
-        if(isLuma(compID))
+      const CPelBuf orgLuma = cs.getOrgBuf( cs.area.blocks[COMPONENT_Y] );
+      if(isLuma(compID))
+      {
+        if (compID == COMPONENT_Y  && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
         {
-            if (compID == COMPONENT_Y  && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
-            {
-                CompArea      tmpArea1(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
-                PelBuf tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
-                tmpRecLuma.rspSignal( piReco, m_pcReshape->getInvLUT() );
-                ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
-            }
-            else
-            {
-                ruiDist += m_pcRdCost->getDistPart(piOrg, piReco, bitDepth, compID, DF_SSE_WTD, &orgLuma);
-                if( jointCbCr )
-                {
-                    ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
-                }
-            }
+          CompArea      tmpArea1(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
+          PelBuf tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
+          tmpRecLuma.rspSignal( piReco, m_pcReshape->getInvLUT() );
+          ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
         }
         else
         {
-            if(pps.getUseCBIF() && isChroma(compID) && (tu.cu->qp > 17))
-            {
-                CompArea compArea = tu.blocks[compID];
-                PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
-                bool isCb = compID == COMPONENT_Cb ? true : false;
-                m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
-            }
-            ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecChroma, bitDepth, compID, DF_SSE_WTD, &orgLuma);
-
-            if( jointCbCr )
-            {
-                if(compID == COMPONENT_Cr)
-                {
-                    ruiDist += m_pcRdCost->getDistPart(crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
-                }
-                else
-                {
-                    ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
-                }
-            }
+          ruiDist += m_pcRdCost->getDistPart(piOrg, piReco, bitDepth, compID, DF_SSE_WTD, &orgLuma);
+          if( jointCbCr )
+          {
+            ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+          }
         }
+      }
+      else
+      {
+        if(pps.getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17))
+        {
+          CompArea compArea = tu.blocks[compID];
+          PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+          bool isCb = compID == COMPONENT_Cb ? true : false;
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
+        }
+        ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecChroma, bitDepth, compID, DF_SSE_WTD, &orgLuma);
+        if( jointCbCr )
+        {
+          if(compID == COMPONENT_Cr)
+          {
+            ruiDist += m_pcRdCost->getDistPart(crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+          }
+          else
+          {
+            ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+          }
+        }
+      }
     }
     else
 #endif
     {
-        if(isLuma(compID))
+      if(isLuma(compID))
+      {
+        ruiDist += m_pcRdCost->getDistPart( piOrg, piReco, bitDepth, compID, DF_SSE );
+      }
+      else
+      {
+        if (pps.getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17))
         {
-            ruiDist += m_pcRdCost->getDistPart( piOrg, piReco, bitDepth, compID, DF_SSE );
+          CompArea compArea = tu.blocks[compID];
+          PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+          bool isCb = compID == COMPONENT_Cb ? true : false;
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
         }
-        else{
-            if (pps.getUseCBIF() && isChroma(compID) && (tu.cu->qp > 17))
-            {
-                CompArea compArea = tu.blocks[compID];
-                PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
-                bool isCb = compID == COMPONENT_Cb ? true : false;
-                m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
-            }
-            ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecChroma, bitDepth, compID, DF_SSE );
-        }
-        if( jointCbCr )
+        ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecChroma, bitDepth, compID, DF_SSE );
+      }
+      if( jointCbCr )
+      {
+        if(compID == COMPONENT_Cr)
         {
-            if(compID == COMPONENT_Cr)
-            {
-                ruiDist += m_pcRdCost->getDistPart( crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE );
-            }
-            else{
-                ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
-            }
+          ruiDist += m_pcRdCost->getDistPart( crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE );
         }
+        else
+        {
+          ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
+        }
+      }
     }
 #else
 #if WCG_EXT

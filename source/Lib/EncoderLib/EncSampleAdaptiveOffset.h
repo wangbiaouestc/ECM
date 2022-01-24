@@ -161,7 +161,7 @@ public:
                                           ,BIFCabacEst* BifCABACEstimator
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-                                          ,CBIFCabacEst* CBifCABACEstimator
+                                          ,ChromaBIFCabacEst* ChromaBifCABACEstimator
 #endif
                   );
 #if JVET_W0066_CCSAO

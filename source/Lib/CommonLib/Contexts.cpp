@@ -1550,7 +1550,7 @@ const CtxSet ContextSetCfg::BifCtrlFlags = ContextSetCfg::addCtxSet
 });
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-const CtxSet ContextSetCfg::CBifCtrlFlags_Cb = ContextSetCfg::addCtxSet
+const CtxSet ContextSetCfg::ChromaBifCtrlFlagsCb = ContextSetCfg::addCtxSet
 ({
   { 39 },
   { 39 },
@@ -1559,7 +1559,7 @@ const CtxSet ContextSetCfg::CBifCtrlFlags_Cb = ContextSetCfg::addCtxSet
   { DWS },
   { DWS }
 });
-const CtxSet ContextSetCfg::CBifCtrlFlags_Cr = ContextSetCfg::addCtxSet
+const CtxSet ContextSetCfg::ChromaBifCtrlFlagsCr = ContextSetCfg::addCtxSet
 ({
   { 39 },
   { 39 },
@@ -2652,14 +2652,14 @@ const CtxSet ContextSetCfg::BifCtrlFlags = ContextSetCfg::addCtxSet
 });
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-const CtxSet ContextSetCfg::CBifCtrlFlags_Cb = ContextSetCfg::addCtxSet
+const CtxSet ContextSetCfg::ChromaBifCtrlFlagsCb = ContextSetCfg::addCtxSet
 ({
     { 39, },
     { 39, },
     { 39, },
     { DWS, },
 });
-const CtxSet ContextSetCfg::CBifCtrlFlags_Cr = ContextSetCfg::addCtxSet
+const CtxSet ContextSetCfg::ChromaBifCtrlFlagsCr = ContextSetCfg::addCtxSet
 ({
     { 39, },
     { 39, },

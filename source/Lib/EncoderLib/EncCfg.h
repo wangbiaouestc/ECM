@@ -837,9 +837,9 @@ protected:
   int         m_BIFQPOffset;
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  bool        m_CBIF;
-  int         m_CBIFStrength;
-  int         m_CBIFQPOffset;
+  bool        m_chromaBIF;
+  int         m_chromaBIFStrength;
+  int         m_chromaBIFQPOffset;
 #endif
   
   bool        m_ccalf;
@@ -1349,12 +1349,12 @@ public:
   int       getBIFQPOffset                  ()         const { return m_BIFQPOffset; }
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  void      setUseCBIF                       ( bool b )       { m_CBIF = b; }
-  bool      getUseCBIF                       ()         const { return m_CBIF; }
-  void      setCBIFStrength                  ( int val )       { m_CBIFStrength = val; }
-  int       getCBIFStrength                  ()         const { return m_CBIFStrength; }
-  void      setCBIFQPOffset                  ( int val )       { m_CBIFQPOffset = val; }
-  int       getCBIFQPOffset                  ()         const { return m_CBIFQPOffset; }
+  void      setUseChromaBIF                 ( bool b )       { m_chromaBIF = b; }
+  bool      getUseChromaBIF                 ()         const { return m_chromaBIF; }
+  void      setChromaBIFStrength            ( int val )       { m_chromaBIFStrength = val; }
+  int       getChromaBIFStrength            ()         const { return m_chromaBIFStrength; }
+  void      setChromaBIFQPOffset            ( int val )       { m_chromaBIFQPOffset = val; }
+  int       getChromaBIFQPOffset            ()         const { return m_chromaBIFQPOffset; }
 #endif
 #if MULTI_HYP_PRED
   void      setNumMHPCandsToTest(int i) { m_numMHPCandsToTest = i; }

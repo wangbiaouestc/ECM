@@ -819,9 +819,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setBIFQPOffset                                       ( m_BIFQPOffset );
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  m_cEncLib.setUseCBIF                                            ( m_CBIF );
-  m_cEncLib.setCBIFStrength                                       ( m_CBIFStrength );
-  m_cEncLib.setCBIFQPOffset                                       ( m_CBIFQPOffset );
+  m_cEncLib.setUseChromaBIF                                      ( m_chromaBIF );
+  m_cEncLib.setChromaBIFStrength                                 ( m_chromaBIFStrength );
+  m_cEncLib.setChromaBIFQPOffset                                 ( m_chromaBIFQPOffset );
 #endif
 
   // ADD_NEW_TOOL : (encoder app) add setting of tool enabling flags and associated parameters here

@@ -463,11 +463,11 @@ void HLSWriter::codePPS( const PPS* pcPPS )
   }
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  WRITE_FLAG(pcPPS->getUseCBIF() ? 1 : 0, "chroma bilateral_filter_flag" );
-  if(pcPPS->getUseCBIF())
+  WRITE_FLAG(pcPPS->getUseChromaBIF() ? 1 : 0, "chroma bilateral_filter_flag" );
+  if(pcPPS->getUseChromaBIF())
   {
-    WRITE_CODE( pcPPS->getCBIFStrength(), 2,  "chroma bilateral_filter_strength");
-    WRITE_SVLC( pcPPS->getCBIFQPOffset(),     "chroma bilateral_filter_qp_offset");
+    WRITE_CODE( pcPPS->getChromaBIFStrength(), 2,  "chroma bilateral_filter_strength");
+    WRITE_SVLC( pcPPS->getChromaBIFQPOffset(),     "chroma bilateral_filter_qp_offset");
   }
 #endif
 #if !JVET_S0132_HLS_REORDER

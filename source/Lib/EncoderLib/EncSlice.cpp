@@ -1736,7 +1736,7 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       resetBcwCodingOrder(false, cs);
       m_pcInterSearch->initWeightIdxBits();
     }
-#if !JVET_V0094_BILATERAL_FILTER
+#if !JVET_V0094_BILATERAL_FILTER && !JVET_X0071_CHROMA_BILATERAL_FILTER
     if (pcSlice->getSPS()->getUseLmcs())
 #endif
     {
@@ -1943,9 +1943,9 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
     if(ctuRsAddr == 0)
     {
-        CBifParams& CBifParam = cs.picture->getCBifParam();
-        m_CABACWriter->Cbif_Cb(*pcSlice, CBifParam);
-        m_CABACWriter->Cbif_Cr(*pcSlice, CBifParam);
+        ChromaBifParams& chromaBifParam = cs.picture->getChromaBifParam();
+        m_CABACWriter->chromaBifCb(*pcSlice, chromaBifParam);
+        m_CABACWriter->chromaBifCr(*pcSlice, chromaBifParam);
     }
 #endif
     m_CABACWriter->coding_tree_unit( cs, ctuArea, pcPic->m_prevQP, ctuRsAddr );
