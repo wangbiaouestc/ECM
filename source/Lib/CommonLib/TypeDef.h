@@ -1,4 +1,4 @@
-/* The copyright in this software is being made available under the BSD
+﻿/* The copyright in this software is being made available under the BSD
  * License, included below. This software may be subject to other third party
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
@@ -154,6 +154,7 @@
 #endif
 #define JVET_W0097_GPM_MMVD_TM                            1 // JVET-W0097: GPM-MMVD and GPM-TM, GPM-TM part is controlled by TM_MRG
 #define JVET_X0141_CIIP_TIMD_TM                           1 // JVET-X0141: CIIP with TIMD and TM merge, CIIP-TM part is controlled by TM_MRG, and CIIP-TIMD part is controlled by JVET_W0123_TIMD_FUSION
+#define JVET_Y0134_TMVP_NAMVP_CAND_REORDERING             1 // JVET-Y0134: MV candidate reordering for TMVP and NAMVP types (controlled by JVET_W0090_ARMC_TM), and reference picture selection for TMVP 
 
 // Transform and coefficient coding
 #define TCQ_8STATES                                       1

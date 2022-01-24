@@ -546,6 +546,18 @@ public:
 class MergeCtx
 {
 public:
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  MvField       mvFieldNeighbours[NUM_MERGE_CANDS << 1]; // double length for mv of both lists
+  uint8_t       BcwIdx[NUM_MERGE_CANDS];
+#if INTER_LIC
+  bool          LICFlags[NUM_MERGE_CANDS];
+#endif
+  unsigned char interDirNeighbours[NUM_MERGE_CANDS];
+#if MULTI_HYP_PRED
+  MultiHypVec   addHypNeighbours[NUM_MERGE_CANDS];
+#endif
+  Distortion    candCost[NUM_MERGE_CANDS];
+#else
   MergeCtx() : numValidMergeCand( 0 ), hasMergedCandList( false ) { }
   ~MergeCtx() {}
 public:
@@ -558,6 +570,7 @@ public:
 #if MULTI_HYP_PRED
   MultiHypVec   addHypNeighbours[MRG_MAX_NUM_CANDS];
 #endif
+#endif
   int           numValidMergeCand;
 #if JVET_X0049_ADAPT_DMVR
   int           numCandToTestEnc;
@@ -569,9 +582,13 @@ public:
   MvField mmvdBaseMv[MMVD_BASE_MV_NUM][2];
   void setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx);
   bool          mmvdUseAltHpelIf  [ MMVD_BASE_MV_NUM ];
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  bool          useAltHpelIf      [ NUM_MERGE_CANDS ];
+#else
   bool          useAltHpelIf      [ MRG_MAX_NUM_CANDS ];
+#endif
   void setMergeInfo( PredictionUnit& pu, int candIdx );
-#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM
+#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM)
   bool xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
 #if TM_MRG

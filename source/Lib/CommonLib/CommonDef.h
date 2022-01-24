@@ -161,8 +161,15 @@ static const int AMVP_DECIMATION_FACTOR =                           1;
 #else
 static const int AMVP_DECIMATION_FACTOR =                           2;
 #endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+static const int NUM_MERGE_CANDS =                                 30; ///< for maximum buffer of merging candidates
+static const int NUM_TMVP_CANDS =                                   9; ///< TMVP
+#endif
 #if NON_ADJACENT_MRG_CAND
 static const int MRG_MAX_NUM_CANDS =                                15; ///< MERGE
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+static const int NUM_NON_ADJ_CANDS =                                18; ///< Non-Adj
+#endif
 static const int LAST_MERGE_IDX_CABAC =                              5;
 #else
 static const int MRG_MAX_NUM_CANDS =                                6; ///< MERGE
@@ -615,6 +622,9 @@ static const int    TM_LOG2_BASE_WEIGHT =                           5; ///< base
 static const int    TM_DISTANCE_WEIGHTS[][4] = { { 0, 1, 2, 3 }, { 1, 2, 3, 3 } }; ///< far to near
 static const int    TM_SPATIAL_WEIGHTS [][4] = { { 2, 2, 2, 2 }, { 0, 1, 1, 2 } }; ///< "left to right for above template" or "top to bottom for left template"
 #if TM_MRG
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+static const int    TM_MRG_MAX_NUM_INIT_CANDS =                    10; ///< maximum number of TM merge candidates for ARMC (note: should be at most equal to MRG_MAX_NUM_CANDS)
+#endif
 static const int    TM_MRG_MAX_NUM_CANDS =                          4; ///< maximum number of TM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
 #if JVET_X0141_CIIP_TIMD_TM
 static const int    CIIP_TM_MRG_MAX_NUM_CANDS =                     2; ///< maximum number of CIIP TM merge candidates (note: should be at most equal to CIIP_TM_MRG_MAX_NUM_CANDS)
@@ -625,6 +635,9 @@ static const int    TM_MAX_NUM_SATD_CAND = std::min((int)2, TM_MRG_MAX_NUM_CANDS
 static const int    TM_MAX_NUM_SATD_CAND = std::min((int)4, TM_MRG_MAX_NUM_CANDS);
 #endif
 #endif
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+static const int    BM_MRG_MAX_NUM_INIT_CANDS =                    10; ///< maximum number of BM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
 #endif
 #if MULTI_PASS_DMVR
 static const int    BDMVR_INTME_RANGE =                             8; ///< Bilateral matching search range (n represents for -n pel to n pel, inclusive)
@@ -792,6 +805,9 @@ static const auto MULTI_HYP_PRED_SEARCH_RANGE = 16;
 #endif
 #if NON_ADJACENT_MRG_CAND || TM_AMVP
 static const auto NADISTANCE_LEVEL =                             4;
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+static const auto TMVP_DISTANCE_LEVEL =                          5;
 #endif
 #if MULTI_HYP_PRED
 static const auto MULTI_HYP_PRED_RESTRICT_BLOCK_SIZE =          64; // disable multi-hyp for all blocks <= this number
