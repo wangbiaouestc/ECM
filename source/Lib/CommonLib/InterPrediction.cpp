@@ -1702,7 +1702,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
     }
     else
     {
-#if SIMD_4x4_12
+#if SIMD_4x4_12 && defined(TARGET_SIMD_X86)
       //use 4x4 if possible
       if( compID == COMPONENT_Y
           && backupWidth == 4
@@ -1748,7 +1748,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
         JVET_J0090_SET_CACHE_ENABLE( false );
         m_if.filterVer( compID, ( Pel* ) tmpBuf.buf + ( ( vFilterSize >> 1 ) - 1 ) * tmpBuf.stride, tmpBuf.stride, dstBuf.buf, dstBuf.stride, backupWidth, backupHeight, yFrac, false, rndRes, chFmt, clpRng, bilinearMC, bilinearMC, useAltHpelIf);
 #endif
-#if SIMD_4x4_12
+#if SIMD_4x4_12 && defined(TARGET_SIMD_X86)
       }
 #endif
     }
@@ -2362,7 +2362,7 @@ void InterPrediction::xPredAffineBlk(const ComponentID &compID, const Prediction
         }
         else
         {
-#if SIMD_4x4_12
+#if SIMD_4x4_12 && defined(TARGET_SIMD_X86)
 #if AFFINE_RM_CONSTRAINTS_AND_OPT
           if (compID == COMPONENT_Y && bw == 4 && bh == 4)
 #else
@@ -2377,7 +2377,7 @@ void InterPrediction::xPredAffineBlk(const ComponentID &compID, const Prediction
             m_if.filterVer(compID, tmpBuf.buf + ((vFilterSize >> 1) - 1)*tmpBuf.stride, tmpBuf.stride, dst, dstStride, bw, bh, yFrac, false, isLast, chFmt, clpRng
               , 0, false, false);
             JVET_J0090_SET_CACHE_ENABLE(true);
-#if SIMD_4x4_12
+#if SIMD_4x4_12 && defined(TARGET_SIMD_X86)
           }
 #endif
         }

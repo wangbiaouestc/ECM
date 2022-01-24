@@ -136,7 +136,7 @@ public:
   InterpolationFilter();
   ~InterpolationFilter() {}
 #if IF_12TAP
-#if SIMD_4x4_12
+#if SIMD_4x4_12 && defined(TARGET_SIMD_X86)
   void(*m_filter4x4[2])(const int16_t* src, int srcStride, int16_t *dst, int dstStride, int shiftH, int offsetH, int shiftV, int offsetV, int16_t const *coeffH, int16_t const *coeffV, int ibdimin, int ibdimax); //kolya
 #endif
 

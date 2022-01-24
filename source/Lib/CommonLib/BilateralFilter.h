@@ -39,9 +39,11 @@
 
 #include "Unit.h"
 #include "Buffer.h"
+#ifdef TARGET_SIMD_X86
 #include <tmmintrin.h>
 #include <smmintrin.h>
 #include <immintrin.h>
+#endif
 #if JVET_V0094_BILATERAL_FILTER
 class BIFCabacEst
 {
@@ -62,8 +64,13 @@ public:
 class BilateralFilter
 {
 private:
+#ifdef TARGET_SIMD_X86
   __m128i tempblockSIMD[2320];
   __m128i tempblockFilteredSIMD[2320];
+#else
+  int64_t tempblockSIMD[2 * 2320];
+  int64_t tempblockFilteredSIMD[2 * 2320];
+#endif
   short *tempblock = (short *) tempblockSIMD;
   short *tempblockFilteredTemp = (short *) (&tempblockFilteredSIMD[1]);
   // SIMD method writes to tempblockFiltered + 4 so that address
