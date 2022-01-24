@@ -402,6 +402,7 @@ protected:
   bool      m_allowDisFracMMVD;
   bool      m_AffineAmvr;
   bool      m_AffineAmvrEncOpt;
+  bool      m_AffineAmvp;
   bool      m_DMVR;
   bool      m_MMVD;
   int       m_MmvdDisNum;
