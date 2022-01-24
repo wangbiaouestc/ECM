@@ -503,7 +503,7 @@ DecLib::DecLib()
   , m_dci(NULL)
   , m_apsMapEnc( nullptr )
 {
-#if ENABLE_SIMD_OPT_BUFFER
+#if ENABLE_SIMD_OPT_BUFFER && defined(TARGET_SIMD_X86)
   g_pelBufOP.initPelBufOpsX86();
 #endif
 #if JVET_S0155_EOS_NALU_CHECK

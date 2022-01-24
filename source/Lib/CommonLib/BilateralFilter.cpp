@@ -38,9 +38,11 @@
 #endif
 
 #if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
+#ifdef TARGET_SIMD_X86
 #include <tmmintrin.h>
 #include <smmintrin.h>
 #include <immintrin.h>
+#endif
 #include <stdio.h>
 #include <math.h>
 #include <string.h>

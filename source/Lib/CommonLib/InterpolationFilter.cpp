@@ -1140,7 +1140,7 @@ void InterpolationFilter::filterCopy( const ClpRng& clpRng, const Pel *src, int 
   }
 }
 
-#if SIMD_4x4_12
+#if SIMD_4x4_12 && defined(TARGET_SIMD_X86)
 void InterpolationFilter::filter4x4( const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int xFrac, int yFrac, bool isLast)
 {
   const TFilterCoeff* coeffH =  m_lumaFilter12[xFrac];
