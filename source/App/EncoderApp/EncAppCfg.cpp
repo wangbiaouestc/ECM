@@ -1037,6 +1037,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("AllowDisFracMMVD",                                m_allowDisFracMMVD,                               false, "Disable fractional MVD in MMVD mode adaptively")
   ("AffineAmvr",                                      m_AffineAmvr,                                     false, "Eanble AMVR for affine inter mode")
   ("AffineAmvrEncOpt",                                m_AffineAmvrEncOpt,                               false, "Enable encoder optimization of affine AMVR")
+  ("AffineAmvp",                                      m_AffineAmvp,                                      true, "Enable AMVP for affine inter mode")
   ("DMVR",                                            m_DMVR,                                           false, "Decoder-side Motion Vector Refinement")
   ("MmvdDisNum",                                      m_MmvdDisNum,                                     8,     "Number of MMVD Distance Entries")
   ("ColorTransform",                                  m_useColorTrans,                                  false, "Enable the color transform")
@@ -4373,6 +4374,7 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "AffineAmvr:%d ", m_AffineAmvr );
     m_AffineAmvrEncOpt = m_AffineAmvr ? m_AffineAmvrEncOpt : false;
     msg( VERBOSE, "AffineAmvrEncOpt:%d ", m_AffineAmvrEncOpt );
+    msg(VERBOSE, "AffineAmvp:%d ", m_AffineAmvp);
     msg(VERBOSE, "DMVR:%d ", m_DMVR);
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
     msg(VERBOSE, "DMVD:%d ", m_DMVDMode);

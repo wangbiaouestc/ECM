@@ -408,6 +408,7 @@ protected:
   bool      m_AffineAmvr;
   bool      m_HashME;
   bool      m_AffineAmvrEncOpt;
+  bool      m_AffineAmvp;
   bool      m_DMVR;
   bool      m_MMVD;
   int       m_MmvdDisNum;
@@ -1301,6 +1302,8 @@ public:
   bool      getUseAffineAmvr                ()         const { return m_AffineAmvr; }
   void      setUseAffineAmvrEncOpt          ( bool b )       { m_AffineAmvrEncOpt = b;    }
   bool      getUseAffineAmvrEncOpt          ()         const { return m_AffineAmvrEncOpt; }
+  void      setUseAffineAmvp                ( bool b )       { m_AffineAmvp = b; }
+  bool      getUseAffineAmvp                ()         const { return m_AffineAmvp; }
   void      setDMVR                      ( bool b )       { m_DMVR = b; }
   bool      getDMVR                      ()         const { return m_DMVR; }
   void      setMMVD                         (bool b)         { m_MMVD = b;    }

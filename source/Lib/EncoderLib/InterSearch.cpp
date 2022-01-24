@@ -3316,6 +3316,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     if (cu.Y().width > 8 && cu.Y().height > 8 && cu.slice->getSPS()->getUseAffine()
 #endif
       && checkAffine
+      && m_pcEncCfg->getUseAffineAmvp()
       && (bcwIdx == BCW_DEFAULT || m_affineModeSelected || !m_pcEncCfg->getUseBcwFast())
 #if JVET_X0083_BM_AMVP_MERGE_MODE
       && !amvpMergeModeFlag
