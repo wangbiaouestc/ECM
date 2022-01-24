@@ -375,7 +375,7 @@ void CABACReader::sao( CodingStructure& cs, unsigned ctuRsAddr )
 
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  if(!(cs.pps->getUseBIF() || cs.sps->getSAOEnabledFlag() || !(cs.pps->getUseCBIF())))
+  if(!(cs.pps->getUseBIF() || cs.sps->getSAOEnabledFlag() || cs.pps->getUseChromaBIF()))
 #else
   // If neither BIF nor SAO is enabled, we can return.
   if(!(cs.pps->getUseBIF() || cs.sps->getSAOEnabledFlag()))
@@ -387,7 +387,7 @@ void CABACReader::sao( CodingStructure& cs, unsigned ctuRsAddr )
   SAOBlkParam&      sao_ctu_pars            = cs.picture->getSAO()[ctuRsAddr];
 #else
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  if(!(cs.pps->getUseCBIF() || cs.sps->getSAOEnabledFlag()))
+  if(!(cs.pps->getUseChromaBIF() || cs.sps->getSAOEnabledFlag()))
   {
         return;
   }
@@ -606,136 +606,138 @@ void CABACReader::bif(CodingStructure& cs, unsigned ctuRsAddr)
 }
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-void CABACReader::Cbif_Cb(CodingStructure& cs)
+void CABACReader::chromaBifCb(CodingStructure& cs)
 {
-    int width = cs.picture->lwidth();
-    int height = cs.picture->lheight();
+  int width = cs.picture->lwidth();
+  int height = cs.picture->lheight();
 
-    int block_width = cs.pcv->maxCUWidth;
-    int block_height = cs.pcv->maxCUHeight;
+  int blockWidth = cs.pcv->maxCUWidth;
+  int blockHeight = cs.pcv->maxCUHeight;
 
-    int width_in_blocks = width / block_width + (width % block_width != 0);
-    int height_in_blocks = height / block_height + (height % block_height != 0);
+  int widthInBlocks = width / blockWidth + (width % blockWidth != 0);
+  int heightInBlocks = height / blockHeight + (height % blockHeight != 0);
 
-    for (int i = 0; i < width_in_blocks * height_in_blocks; i++)
-    {
-        Cbif_Cb(cs, i);
-    }
+  for (int i = 0; i < widthInBlocks * heightInBlocks; i++)
+  {
+    chromaBifCb(cs, i);
+  }
 }
 
-void CABACReader::Cbif_Cb(CodingStructure& cs, unsigned ctuRsAddr)
+void CABACReader::chromaBifCb(CodingStructure& cs, unsigned ctuRsAddr)
 {
-    const PPS&   pps = *cs.pps;
+  const PPS&   pps = *cs.pps;
 
-    if (!pps.getUseCBIF())
+  if (!pps.getUseChromaBIF())
+  {
+    return;
+  }
+  ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
+  if (ctuRsAddr == 0)
+  {
+    int width = cs.picture->lwidth();
+    int height = cs.picture->lheight();
+    int blockWidth = cs.pcv->maxCUWidth;
+    int blockHeight = cs.pcv->maxCUHeight;
+
+    int widthInBlocks = width / blockWidth + (width % blockWidth != 0);
+    int heightInBlocks = height / blockHeight + (height % blockHeight != 0);
+    int numBlocks = widthInBlocks * heightInBlocks;
+    chromaBifParams.numBlocks = numBlocks;
+    chromaBifParams.ctuOnCb.resize(numBlocks);
+    std::fill(chromaBifParams.ctuOnCb.begin(), chromaBifParams.ctuOnCb.end(), 0);
+  }
+  if (ctuRsAddr == 0)
+  {
+    chromaBifParams.allCtuOnCb = m_BinDecoder.decodeBinEP();
+    if (chromaBifParams.allCtuOnCb == 0)
     {
-        return;
+      chromaBifParams.frmOnCb = m_BinDecoder.decodeBinEP();
     }
-
-    CBifParams& CBifParams = cs.picture->getCBifParam();
-
-    if (ctuRsAddr == 0)
+  }
+  int i = ctuRsAddr;
+  if (chromaBifParams.allCtuOnCb)
+  {
+    chromaBifParams.ctuOnCb[i] = 1;
+  }
+  else
+  {
+    if (chromaBifParams.frmOnCb)
     {
-        int width = cs.picture->lwidth();
-        int height = cs.picture->lheight();
-        int block_width = cs.pcv->maxCUWidth;
-        int block_height = cs.pcv->maxCUHeight;
-
-        int width_in_blocks = width / block_width + (width % block_width != 0);
-        int height_in_blocks = height / block_height + (height % block_height != 0);
-        int num_blocks = width_in_blocks * height_in_blocks;
-        CBifParams.numBlocks = num_blocks;
-        CBifParams.ctuOn_Cb.resize(num_blocks);
-        std::fill(CBifParams.ctuOn_Cb.begin(), CBifParams.ctuOn_Cb.end(), 0);
-    }
-    if (ctuRsAddr == 0)
-    {
-        CBifParams.allCtuOn_Cb = m_BinDecoder.decodeBinEP();
-        if (CBifParams.allCtuOn_Cb == 0)
-            CBifParams.frmOn_Cb = m_BinDecoder.decodeBinEP();
-    }
-    int i = ctuRsAddr;
-    if (CBifParams.allCtuOn_Cb)
-    {
-        CBifParams.ctuOn_Cb[i] = 1;
+      chromaBifParams.ctuOnCb[i] = m_BinDecoder.decodeBin(Ctx::ChromaBifCtrlFlagsCb());
     }
     else
     {
-        if (CBifParams.frmOn_Cb)
-        {
-            CBifParams.ctuOn_Cb[i] = m_BinDecoder.decodeBin(Ctx::CBifCtrlFlags_Cb());
-        }
-        else
-        {
-            CBifParams.ctuOn_Cb[i] = 0;
-        }
+      chromaBifParams.ctuOnCb[i] = 0;
     }
+  }
 }
 
-void CABACReader::Cbif_Cr(CodingStructure& cs)
+void CABACReader::chromaBifCr(CodingStructure& cs)
 {
+  int width = cs.picture->lwidth();
+  int height = cs.picture->lheight();
+
+  int blockWidth = cs.pcv->maxCUWidth;
+  int blockHeight = cs.pcv->maxCUHeight;
+
+  int widthInBlocks = width / blockWidth + (width % blockWidth != 0);
+  int heightInBlocks = height / blockHeight + (height % blockHeight != 0);
+
+  for (int i = 0; i < widthInBlocks * heightInBlocks; i++)
+  {
+    chromaBifCr(cs, i);
+  }
+}
+
+void CABACReader::chromaBifCr(CodingStructure& cs, unsigned ctuRsAddr)
+{
+  const PPS&   pps = *cs.pps;
+
+  if (!pps.getUseChromaBIF())
+  {
+    return;
+  }
+
+  ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
+
+  if (ctuRsAddr == 0)
+  {
     int width = cs.picture->lwidth();
     int height = cs.picture->lheight();
+    int blockWidth = cs.pcv->maxCUWidth;
+    int blockHeight = cs.pcv->maxCUHeight;
 
-    int block_width = cs.pcv->maxCUWidth;
-    int block_height = cs.pcv->maxCUHeight;
-
-    int width_in_blocks = width / block_width + (width % block_width != 0);
-    int height_in_blocks = height / block_height + (height % block_height != 0);
-
-    for (int i = 0; i < width_in_blocks * height_in_blocks; i++)
+    int widthInBlocks = width / blockWidth + (width % blockWidth != 0);
+    int heightInBlocks = height / blockHeight + (height % blockHeight != 0);
+    int numBlocks = widthInBlocks * heightInBlocks;
+    chromaBifParams.numBlocks = numBlocks;
+    chromaBifParams.ctuOnCr.resize(numBlocks);
+    std::fill(chromaBifParams.ctuOnCr.begin(), chromaBifParams.ctuOnCr.end(), 0);
+  }
+  if (ctuRsAddr == 0)
+  {
+    chromaBifParams.allCtuOnCr = m_BinDecoder.decodeBinEP();
+    if (chromaBifParams.allCtuOnCr == 0)
     {
-        Cbif_Cr(cs, i);
+      chromaBifParams.frmOnCr = m_BinDecoder.decodeBinEP();
     }
-}
-
-void CABACReader::Cbif_Cr(CodingStructure& cs, unsigned ctuRsAddr)
-{
-    const PPS&   pps = *cs.pps;
-
-    if (!pps.getUseCBIF())
+  }
+  int i = ctuRsAddr;
+  if (chromaBifParams.allCtuOnCr)
+  {
+    chromaBifParams.ctuOnCr[i] = 1;
+  }
+  else
+  {
+    if (chromaBifParams.frmOnCr)
     {
-        return;
-    }
-
-    CBifParams& CBifParams = cs.picture->getCBifParam();
-
-    if (ctuRsAddr == 0)
-    {
-        int width = cs.picture->lwidth();
-        int height = cs.picture->lheight();
-        int block_width = cs.pcv->maxCUWidth;
-        int block_height = cs.pcv->maxCUHeight;
-
-        int width_in_blocks = width / block_width + (width % block_width != 0);
-        int height_in_blocks = height / block_height + (height % block_height != 0);
-        int num_blocks = width_in_blocks * height_in_blocks;
-        CBifParams.numBlocks = num_blocks;
-        CBifParams.ctuOn_Cr.resize(num_blocks);
-        std::fill(CBifParams.ctuOn_Cr.begin(), CBifParams.ctuOn_Cr.end(), 0);
-    }
-    if (ctuRsAddr == 0)
-    {
-        CBifParams.allCtuOn_Cr = m_BinDecoder.decodeBinEP();
-        if (CBifParams.allCtuOn_Cr == 0)
-            CBifParams.frmOn_Cr = m_BinDecoder.decodeBinEP();
-    }
-    int i = ctuRsAddr;
-    if (CBifParams.allCtuOn_Cr)
-    {
-        CBifParams.ctuOn_Cr[i] = 1;
+      chromaBifParams.ctuOnCr[i] = m_BinDecoder.decodeBin(Ctx::ChromaBifCtrlFlagsCr());
     }
     else
     {
-        if (CBifParams.frmOn_Cr)
-        {
-            CBifParams.ctuOn_Cr[i] = m_BinDecoder.decodeBin(Ctx::CBifCtrlFlags_Cr());
-        }
-        else
-        {
-            CBifParams.ctuOn_Cr[i] = 0;
-        }
+      chromaBifParams.ctuOnCr[i] = 0;
     }
+  }
 }
 #endif
 

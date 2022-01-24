@@ -437,9 +437,9 @@ protected:
   int       m_BIFQPOffset;                                    /// Bilateral QP offset
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  bool      m_CBIF;
-  unsigned  m_CBIFStrength;
-  int       m_CBIFQPOffset;
+  bool      m_chromaBIF;
+  unsigned  m_chromaBIFStrength;
+  int       m_chromaBIFQPOffset;
 #endif
   
   // ADD_NEW_TOOL : (encoder app) add tool enabling flags and associated parameters here

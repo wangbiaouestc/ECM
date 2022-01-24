@@ -194,7 +194,7 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 {
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-                if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseBIF() || pic->cs->pps->getUseCBIF())
+                if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseBIF() || pic->cs->pps->getUseChromaBIF())
 #else
                 // Since the per-CTU BIF parameter is stored in SAO, we need to
                 // do this copy even if SAO=0, if BIF=1.
@@ -202,7 +202,7 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
 #endif
 #else
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-                if ( pic->cs->sps->getSAOEnabledFlag()  || pic->cs->pps->getUseCBIF())
+                if ( pic->cs->sps->getSAOEnabledFlag()  || pic->cs->pps->getUseChromaBIF())
 #else
                 if ( pic->cs->sps->getSAOEnabledFlag() )
 #endif
@@ -261,7 +261,7 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 pcDecLib->executeLoopFilters();
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-                if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseBIF() || pic->cs->pps->getUseCBIF())
+                if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseBIF() || pic->cs->pps->getUseChromaBIF())
 #else
                 // Since the per-CTU BIF parameter is stored in SAO, we need to
                 // do this copy even if SAO=0, if BIF=1.
@@ -269,7 +269,7 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
 #endif
 #else
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-                if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseCBIF())
+                if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseChromaBIF())
 #else
                 if ( pic->cs->sps->getSAOEnabledFlag() )
 #endif
@@ -718,13 +718,13 @@ void DecLib::executeLoopFilters()
 
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  if( cs.sps->getSAOEnabledFlag() || cs.pps->getUseBIF() || cs.pps->getUseCBIF())
+  if( cs.sps->getSAOEnabledFlag() || cs.pps->getUseBIF() || cs.pps->getUseChromaBIF())
 #else
   if( cs.sps->getSAOEnabledFlag() || cs.pps->getUseBIF())
 #endif
 #else
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  if( cs.sps->getSAOEnabledFlag() || cs.pps->getUseCBIF())
+  if( cs.sps->getSAOEnabledFlag() || cs.pps->getUseChromaBIF())
 #else
   if( cs.sps->getSAOEnabledFlag() )
 #endif
@@ -1745,7 +1745,7 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
 
     // Recursive structure
     m_cCuDecoder.init( &m_cTrQuant, &m_cIntraPred, &m_cInterPred );
-#if !JVET_V0094_BILATERAL_FILTER
+#if !JVET_V0094_BILATERAL_FILTER && !JVET_X0071_CHROMA_BILATERAL_FILTER
     if (sps->getUseLmcs())
 #endif
     {

@@ -51,12 +51,12 @@ public:
 };
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-class CBIFCabacEst
+class ChromaBIFCabacEst
 {
 public:
-    virtual ~CBIFCabacEst() {};
-    virtual uint64_t getBits_Cb(const Slice& slice, const CBifParams& htdfParams) = 0;
-    virtual uint64_t getBits_Cr(const Slice& slice, const CBifParams& htdfParams) = 0;
+    virtual ~ChromaBIFCabacEst() {};
+    virtual uint64_t getBitsCb(const Slice& slice, const ChromaBifParams& htdfParams) = 0;
+    virtual uint64_t getBitsCr(const Slice& slice, const ChromaBifParams& htdfParams) = 0;
 };
 #endif
 class BilateralFilter
@@ -112,7 +112,7 @@ private:
   };
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  char m_wBIF_chroma[26][16] = {
+  char m_wBIFChroma[26][16] = {
   {   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, },
   {   0,   1,   1,   1,   1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, },
   {   0,   2,   2,   2,   1,   1,   0,   1,   0,   0,   0,   0,   0,   0,   0,   0, },
@@ -163,18 +163,18 @@ public:
 #endif
 
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  void bilateralFilterRDOdiamond5x5_chroma(PelBuf& resiBuf, const CPelBuf& predBuf, PelBuf& recoBuf, int32_t qp, const CPelBuf& recIPredBuf, const ClpRng& clpRng, TransformUnit & currTU, bool useReco, bool isCb);
+  void bilateralFilterRDOdiamond5x5Chroma(PelBuf& resiBuf, const CPelBuf& predBuf, PelBuf& recoBuf, int32_t qp, const CPelBuf& recIPredBuf, const ClpRng& clpRng, TransformUnit & currTU, bool useReco, bool isCb);
 
-  void bilateralFilterPicRDOperCTU_chroma(CodingStructure& cs, PelUnitBuf& src, CBIFCabacEst* CBifCABACEstimator, bool isCb);
+  void bilateralFilterPicRDOperCTUChroma(CodingStructure& cs, PelUnitBuf& src, ChromaBIFCabacEst* ChromaBifCABACEstimator, bool isCb);
 
-  void bilateralFilterDiamond5x5_chroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb);
+  void bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb);
 
-  void clipNotBilaterallyFilteredBlocks_chroma(const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU, bool isCb);
+  void clipNotBilaterallyFilteredBlocksChroma(const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU, bool isCb);
 
 #if JVET_W0066_CCSAO
-    void bilateralFilterDiamond5x5NoClip_chroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb);
+    void bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb);
 #endif
-    const char* getFilterLutParameters_chroma( const int size, const PredMode predMode, const int qp, int& bfac, int width_for_strength, int height_for_strength, bool isLumaValid);
+    const char* getFilterLutParametersChroma( const int size, const PredMode predMode, const int qp, int& bfac, int widthForStrength, int heightForStrength, bool isLumaValid);
 #endif
 
 #if ENABLE_SIMD_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER_ENABLE_SIMD

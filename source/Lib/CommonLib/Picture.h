@@ -315,14 +315,14 @@ public:
   };
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  CBifParams&       getCBifParam() { return m_CBifParams; }
-  void resizeBIF_Chroma(unsigned numEntries)
+  ChromaBifParams&       getChromaBifParam() { return m_ChromaBifParams; }
+  void resizeBIFChroma(unsigned numEntries)
   {
-    m_CBifParams.numBlocks = numEntries;
-    m_CBifParams.ctuOn_Cb.resize(numEntries);
-    m_CBifParams.ctuOn_Cr.resize(numEntries);
-    std::fill(m_CBifParams.ctuOn_Cb.begin(), m_CBifParams.ctuOn_Cb.end(), 0);
-    std::fill(m_CBifParams.ctuOn_Cr.begin(), m_CBifParams.ctuOn_Cr.end(), 0);
+    m_ChromaBifParams.numBlocks = numEntries;
+    m_ChromaBifParams.ctuOnCb.resize(numEntries);
+    m_ChromaBifParams.ctuOnCr.resize(numEntries);
+    std::fill(m_ChromaBifParams.ctuOnCb.begin(), m_ChromaBifParams.ctuOnCb.end(), 0);
+    std::fill(m_ChromaBifParams.ctuOnCr.begin(), m_ChromaBifParams.ctuOnCr.end(), 0);
   }
 #endif
 #if ENABLE_QPA
@@ -338,7 +338,7 @@ public:
   static BifParams        m_BifParams;
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  static CBifParams       m_CBifParams;
+  static ChromaBifParams       m_ChromaBifParams;
 #endif
   std::vector<uint8_t> m_alfCtuEnableFlag[MAX_NUM_COMPONENT];
   uint8_t* getAlfCtuEnableFlag( int compIdx ) { return m_alfCtuEnableFlag[compIdx].data(); }

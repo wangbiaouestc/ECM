@@ -85,10 +85,10 @@ public:
   void        bif                      (const Slice& slice, const BifParams& BifParams, unsigned ctuRsAddr);
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  void        Cbif_Cb                      (const Slice&                   slice, const CBifParams& CBifParams);
-  void        Cbif_Cb                      (const Slice& slice, const CBifParams& CBifParams, unsigned ctuRsAddr);
-  void        Cbif_Cr                      (const Slice&                   slice, const CBifParams& CBifParams);
-  void        Cbif_Cr                      (const Slice& slice, const CBifParams& CBifParams, unsigned ctuRsAddr);
+  void        chromaBifCb              (const Slice&                   slice, const ChromaBifParams& chromaBifParams);
+  void        chromaBifCb              (const Slice& slice, const ChromaBifParams& chromaBifParams, unsigned ctuRsAddr);
+  void        chromaBifCr              (const Slice&                   slice, const ChromaBifParams& chromaBifParams);
+  void        chromaBifCr              (const Slice& slice, const ChromaBifParams& chromaBifParams, unsigned ctuRsAddr);
 #endif
 #if JVET_W0066_CCSAO
   void        codeCcSaoControlIdc       ( uint8_t idcVal, CodingStructure &cs, const ComponentID compID, const int curIdx,

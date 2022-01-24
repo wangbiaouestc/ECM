@@ -3400,9 +3400,9 @@ PPS::PPS()
 , m_BIFQPOffset                      (0)
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-, m_CBIF                              (false)
-, m_CBIFStrength                      (1)
-, m_CBIFQPOffset                      (0)
+, m_chromaBIF                        (false)
+, m_chromaBIFStrength                (1)
+, m_chromaBIFQPOffset                (0)
 #endif
 , pcv                                (NULL)
 {

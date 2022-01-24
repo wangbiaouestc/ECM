@@ -811,11 +811,11 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
   }
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  READ_FLAG( uiCode, "chroma bilateral_filter_flag" );             pcPPS->setUseCBIF(uiCode != 0) ;
-  if(pcPPS->getUseCBIF())
+  READ_FLAG( uiCode, "chroma bilateral_filter_flag" );             pcPPS->setUseChromaBIF(uiCode != 0) ;
+  if(pcPPS->getUseChromaBIF())
   {
-    READ_CODE( 2, uiCode, "chroma bilateral_filter_strength" );    pcPPS->setCBIFStrength( uiCode);
-    READ_SVLC( iCode, "chroma bilateral_filter_qp_offset" );       pcPPS->setCBIFQPOffset( iCode);
+    READ_CODE( 2, uiCode, "chroma bilateral_filter_strength" );    pcPPS->setChromaBIFStrength( uiCode);
+    READ_SVLC( iCode, "chroma bilateral_filter_qp_offset" );       pcPPS->setChromaBIFQPOffset( iCode);
   }
 #endif
   

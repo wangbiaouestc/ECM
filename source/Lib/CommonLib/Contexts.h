@@ -311,8 +311,8 @@ public:
   static const CtxSet   BifCtrlFlags;
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  static const CtxSet   CBifCtrlFlags_Cb;
-  static const CtxSet   CBifCtrlFlags_Cr;
+  static const CtxSet   ChromaBifCtrlFlagsCb;
+  static const CtxSet   ChromaBifCtrlFlagsCr;
 #endif
 #if JVET_W0066_CCSAO
   static const CtxSet   CcSaoControlIdc;
