@@ -138,6 +138,75 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
   {
     clipMv = clipMvInPic;
   }
+
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+  if (slice->getPicHeader()->getEnableTMVPFlag())
+  {
+    const Picture* const pColPic = slice->getRefPic(RefPicList(slice->isInterB() ? 1 - slice->getColFromL0Flag() : 0), slice->getColRefIdx());
+    if (pColPic)
+    {
+      const int currPOC = slice->getPOC();
+      const int colPOC = pColPic->getPOC();
+
+      slice->resizeImBuf(pColPic->numSlices);
+      Slice *pColSlice = nullptr;
+      for (int sliceIdx = 0; sliceIdx < pColPic->numSlices; sliceIdx++)
+      {
+        pColSlice = pColPic->slices[sliceIdx];
+        if (pColSlice->isIntra())
+        {
+          continue;
+        }
+
+        for (int colRefPicListIdx = 0; colRefPicListIdx < (pColSlice->isInterB() ? 2 : 1); colRefPicListIdx++)
+        {
+          for (int colRefIdx = 0; colRefIdx < pColSlice->getNumRefIdx(RefPicList(colRefPicListIdx)); colRefIdx++)
+          {
+            const bool bIsColRefLongTerm = pColSlice->getIsUsedAsLongTerm(RefPicList(colRefPicListIdx), colRefIdx);
+            const int colRefPOC = pColSlice->getRefPOC(RefPicList(colRefPicListIdx), colRefIdx);
+
+            for (int curRefPicListIdx = 0; curRefPicListIdx < (slice->isInterB() ? 2 : 1); curRefPicListIdx++)
+            {
+              double bestDistScale = 1000;
+              int targetRefIdx = -1;
+              for (int curRefIdx = 0; curRefIdx < slice->getNumRefIdx(RefPicList(curRefPicListIdx)); curRefIdx++)
+              {
+                const int currRefPOC = slice->getRefPic(RefPicList(curRefPicListIdx), curRefIdx)->getPOC();
+                const bool bIsCurrRefLongTerm = slice->getRefPic(RefPicList(curRefPicListIdx), curRefIdx)->longTerm;
+                if (bIsCurrRefLongTerm != bIsColRefLongTerm)
+                {
+                  continue;
+                }
+                if (bIsCurrRefLongTerm)
+                {
+                  targetRefIdx = curRefIdx;
+                  bestDistScale = 1;
+                  break;
+                }
+                else if (colPOC - colRefPOC == currPOC - currRefPOC)
+                {
+                  targetRefIdx = curRefIdx;
+                  bestDistScale = 1;
+                  break;
+                }
+                else
+                {
+                  if (abs(1.0 - (abs(currPOC - currRefPOC) * 1.0 / abs(colPOC - colRefPOC) * 1.0)) < bestDistScale)
+                  {
+                    bestDistScale = abs(1.0 - (abs(currPOC - currRefPOC) * 1.0 / abs(colPOC - colRefPOC) * 1.0));
+                    targetRefIdx = curRefIdx;
+                  }
+                }
+              } // curRefIdx
+              slice->setImRefIdx(sliceIdx, RefPicList(colRefPicListIdx), RefPicList(curRefPicListIdx), colRefIdx, targetRefIdx);
+            } // curRefPicListIdx
+          }
+        }
+      }
+    }
+  }
+#endif
+
   // for every CTU in the slice segment...
   unsigned subStrmId = 0;
   for( unsigned ctuIdx = 0; ctuIdx < slice->getNumCtuInSlice(); ctuIdx++ )

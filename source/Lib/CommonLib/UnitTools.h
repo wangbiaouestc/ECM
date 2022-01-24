@@ -173,12 +173,25 @@ namespace PU
 #endif
   void getInterMergeCandidates        (const PredictionUnit &pu, MergeCtx& mrgCtx,
     int mmvdList,
-    const int& mrgCandIdx = -1 );
+    const int& mrgCandIdx = -1 
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+    , MergeCtx* mvpMrgCtx1 = NULL
+    , MergeCtx* mvpMrgCtx2 = NULL
+#endif
+  );
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  void getTmvpMergeCand               (const PredictionUnit &pu, MergeCtx& mvpMrgCtx);
+  void getNonAdjacentMergeCand        (const PredictionUnit &pu, MergeCtx& mvpMrgCtx);
+#endif
   void getIBCMergeCandidates          (const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx = -1);
   void getInterMMVDMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx = -1);
   int getDistScaleFactor(const int &currPOC, const int &currRefPOC, const int &colPOC, const int &colRefPOC);
   bool isDiffMER                      (const Position &pos1, const Position &pos2, const unsigned plevel);
-  bool getColocatedMVP                (const PredictionUnit &pu, const RefPicList &eRefPicList, const Position &pos, Mv& rcMv, const int &refIdx, bool sbFlag);
+  bool getColocatedMVP                (const PredictionUnit &pu, const RefPicList &eRefPicList, const Position &pos, Mv& rcMv, const int &refIdx, bool sbFlag
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+    , int* targetRefIdx = nullptr
+#endif
+  );
   void fillMvpCand                    (      PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AMVPInfo &amvpInfo 
 #if TM_AMVP
                                      , InterPrediction* interPred = nullptr
@@ -250,7 +263,16 @@ namespace PU
 #endif
   );
   void getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
-    const int& mrgCandIdx = -1);
+    const int& mrgCandIdx = -1
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+    , MergeCtx* mvpMrgCtx1 = NULL
+    , MergeCtx* mvpMrgCtx2 = NULL
+#endif
+  );
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  void getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mvpMrgCtx);
+  void getNonAdjacentBMCand(const PredictionUnit &pu, MergeCtx& mvpMrgCtx);
+#endif
 #endif
   bool getInterMergeSubPuRecurCand(const PredictionUnit &pu, MergeCtx &mrgCtx, const int count);
   bool isBiPredFromDifferentDirEqDistPoc(const PredictionUnit &pu);

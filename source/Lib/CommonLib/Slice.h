@@ -3053,6 +3053,9 @@ private:
 
 
   uint32_t                   m_colRefIdx;
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+  std::vector<int>           m_implicitRefIdx[NUM_REF_PIC_LIST_01][NUM_REF_PIC_LIST_01][MAX_NUM_REF + 1];
+#endif
   double                     m_lambdas[MAX_NUM_COMPONENT];
 #if INTER_LIC
   bool                       m_UseLIC;
@@ -3204,6 +3207,28 @@ public:
   bool                        getColFromL0Flag() const                               { return m_colFromL0Flag;                                       }
   uint32_t                    getColRefIdx() const                                   { return m_colRefIdx;                                           }
   void                        checkColRefIdx(uint32_t curSliceSegmentIdx, const Picture* pic);
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+  void resizeImBuf(int numSlices)
+  {
+    for (int refIdx = 0; refIdx < MAX_NUM_REF + 1; refIdx++)
+    {
+      m_implicitRefIdx[REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx[REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].begin(), m_implicitRefIdx[REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].end(), -1);
+
+      m_implicitRefIdx[REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx[REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].begin(), m_implicitRefIdx[REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].end(), -1);
+
+      m_implicitRefIdx[REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx[REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].begin(), m_implicitRefIdx[REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].end(), -1);
+
+      m_implicitRefIdx[REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx[REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].begin(), m_implicitRefIdx[REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].end(), -1);
+    }
+  }
+  void                        setImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int col_refIdx, int cur_refIdx) { m_implicitRefIdx[colRefPicList][curRefPicList][col_refIdx][sliceIdx] = cur_refIdx; }
+  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int col_refIdx) { return m_implicitRefIdx[colRefPicList][curRefPicList][col_refIdx][sliceIdx]; }
+  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int col_refIdx) const { return m_implicitRefIdx[colRefPicList][curRefPicList][col_refIdx][sliceIdx]; }
+#endif
   bool                        getIsUsedAsLongTerm(int i, int j) const                { return m_bIsUsedAsLongTerm[i][j];                             }
   void                        setIsUsedAsLongTerm(int i, int j, bool value)          { m_bIsUsedAsLongTerm[i][j] = value;                            }
   bool                        getCheckLDC() const                                    { return m_bCheckLDC;                                           }

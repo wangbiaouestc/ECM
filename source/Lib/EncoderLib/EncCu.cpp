@@ -2857,14 +2857,72 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if TM_MRG
     pu.tmMergeFlag = false;
 #endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+    int nWidth = pu.lumaSize().width;
+    int nHeight = pu.lumaSize().height;
+    bool tplAvail = m_pcInterSearch->xAMLGetCurBlkTemplate(pu, nWidth, nHeight);
+
+    MergeCtx tmvpMergeCandCtx;
+    PU::getTmvpMergeCand(pu, tmvpMergeCandCtx);
+    if (sps.getUseAML())
+    {
+      if (tplAvail)
+      {
+        m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, tmvpMergeCandCtx, 1);
+      }
+      else
+      {
+        tmvpMergeCandCtx.numValidMergeCand = std::min(1, tmvpMergeCandCtx.numValidMergeCand);
+      }
+    }
+    MergeCtx namvpMergeCandCtx;
+    PU::getNonAdjacentMergeCand(pu, namvpMergeCandCtx);
+    if (sps.getUseAML())
+    {
+      if (tplAvail)
+      {
+        m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, namvpMergeCandCtx, 9);
+      }
+      else
+      {
+        namvpMergeCandCtx.numValidMergeCand = std::min(9, namvpMergeCandCtx.numValidMergeCand);
+      }
+    }
+#endif
     PU::getInterMergeCandidates(pu, mergeCtx
       , 0
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+      , -1
+      , &tmvpMergeCandCtx
+      , &namvpMergeCandCtx
+#endif
     );
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+    if (sps.getUseAML())
+    {
+      if (tplAvail)
+      {
+        m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, mergeCtx, pu.cs->sps->getMaxNumMergeCand());
+      }
+    }
+    PU::getInterMergeCandidates(pu, mergeCtxtmp, 0);
+#endif
+
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
     if (cu.cs->sps->getUseCiipTmMrg())
     {
       pu.tmMergeFlag = true;
       pu.ciipFlag = true;
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+      ciipTmMrgCtx = mergeCtxtmp;
+      ciipTmMrgCtx.numValidMergeCand = int(pu.cs->sps->getMaxNumCiipTMMergeCand());
+      memcpy(ciipTmMrgCtx.BcwIdx, mergeCtxtmp.BcwIdx, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(uint8_t));
+      memcpy(ciipTmMrgCtx.interDirNeighbours, mergeCtxtmp.interDirNeighbours, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(unsigned char));
+      memcpy(ciipTmMrgCtx.mvFieldNeighbours, mergeCtxtmp.mvFieldNeighbours, (CIIP_TM_MRG_MAX_NUM_CANDS << 1) * sizeof(MvField));
+      memcpy(ciipTmMrgCtx.useAltHpelIf, mergeCtxtmp.useAltHpelIf, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(bool));
+      memcpy(ciipTmMrgCtx.LICFlags, mergeCtxtmp.LICFlags, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(bool));
+      memcpy(ciipTmMrgCtx.addHypNeighbours, mergeCtxtmp.addHypNeighbours, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(MultiHypVec));
+#else
       ciipTmMrgCtx = mergeCtx;
       ciipTmMrgCtx.numValidMergeCand = int(pu.cs->sps->getMaxNumCiipTMMergeCand());
       memcpy(ciipTmMrgCtx.BcwIdx, mergeCtx.BcwIdx, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(uint8_t));
@@ -2873,6 +2931,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       memcpy(ciipTmMrgCtx.useAltHpelIf, mergeCtx.useAltHpelIf, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(bool));
       memcpy(ciipTmMrgCtx.LICFlags, mergeCtx.LICFlags, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(bool));
       memcpy(ciipTmMrgCtx.addHypNeighbours, mergeCtx.addHypNeighbours, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(MultiHypVec));
+#endif
 
       for (uint32_t uiMergeCand = 0; uiMergeCand < ciipTmMrgCtx.numValidMergeCand; uiMergeCand++)
       {
@@ -2904,9 +2963,16 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     }
 #endif
 #if JVET_W0097_GPM_MMVD_TM
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+    m_mergeCand.copyMergeCtx(mergeCtxtmp);
+#else
     m_mergeCand.copyMergeCtx(mergeCtx);
+#endif
     m_mergeCandAvail = true;
 #endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+    PU::getInterMMVDMergeCandidates(pu, mergeCtxtmp);
+#else
     PU::getInterMMVDMergeCandidates(pu, mergeCtx);
 #if JVET_W0090_ARMC_TM
     mergeCtxtmp = mergeCtx;
@@ -2915,16 +2981,62 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       m_pcInterSearch->adjustInterMergeCandidates(pu, mergeCtx);
     }
 #endif
+#endif
 #if TM_MRG && MERGE_ENC_OPT
     if (cu.cs->sps->getUseDMVDMode())
     {
       cu.firstPU = &pu;
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+      MergeCtx tmvpTmMergeCandCtx;
+      PU::getTmvpMergeCand(pu, tmvpTmMergeCandCtx);
+      if (sps.getUseAML())
+      {
+        if (tplAvail)
+        {
+          m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, tmvpTmMergeCandCtx, 1);
+        }
+        else
+        {
+          tmvpTmMergeCandCtx.numValidMergeCand = std::min(1, tmvpTmMergeCandCtx.numValidMergeCand);
+        }
+      }
+      MergeCtx namvpTmMergeCandCtx;
+      PU::getNonAdjacentMergeCand(pu, namvpTmMergeCandCtx);
+      if (sps.getUseAML())
+      {
+        if (tplAvail)
+        {
+          m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, namvpTmMergeCandCtx, 9);
+        }
+        else
+        {
+          namvpTmMergeCandCtx.numValidMergeCand = std::min(9, namvpTmMergeCandCtx.numValidMergeCand);
+        }
+      }
+#endif
       pu.tmMergeFlag = true;
-      PU::getInterMergeCandidates(pu, tmMrgCtx, 0);
+      PU::getInterMergeCandidates(pu, tmMrgCtx, 0
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+        , -1
+        , &tmvpTmMergeCandCtx
+        , &namvpTmMergeCandCtx
+#endif
+      );
 #if JVET_W0090_ARMC_TM
       if (sps.getUseAML())
       {
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+        if (tplAvail)
+        {
+          m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, tmMrgCtx, pu.cs->sps->getMaxNumTMMergeCand());
+        }
+        if (tmMrgCtx.numValidMergeCand > pu.cs->sps->getMaxNumTMMergeCand())
+        {
+          tmMrgCtx.numValidMergeCand = pu.cs->sps->getMaxNumTMMergeCand();
+        }
+#else
         m_pcInterSearch->adjustInterMergeCandidates(pu, tmMrgCtx);
+#endif
       }
 #endif
 
@@ -3024,12 +3136,59 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       if (checkBmMrg)
       {
         pu.bmMergeFlag = true;
-        PU::getInterBMCandidates(pu, bmMrgCtx);
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+        MergeCtx tmvpMergeCandCtx2;
+        PU::getTmvpBMCand(pu, tmvpMergeCandCtx2);
+        if (sps.getUseAML())
+        {
+          pu.bmDir = 0;
+          if (tplAvail)
+          {
+            m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, tmvpMergeCandCtx2, 1);
+          }
+          else
+          {
+            tmvpMergeCandCtx2.numValidMergeCand = std::min(1, tmvpMergeCandCtx2.numValidMergeCand);
+          }
+        }
+        MergeCtx namvpMergeCandCtx2;
+        PU::getNonAdjacentBMCand(pu, namvpMergeCandCtx2);
+        if (sps.getUseAML())
+        {
+          pu.bmDir = 0;
+          if (tplAvail)
+          {
+            m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, namvpMergeCandCtx2, 3);
+          }
+          else
+          {
+            namvpMergeCandCtx2.numValidMergeCand = std::min(3, namvpMergeCandCtx2.numValidMergeCand);
+          }
+        }
+#endif
+        PU::getInterBMCandidates(pu, bmMrgCtx
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+          , -1
+          , &tmvpMergeCandCtx2
+          , &namvpMergeCandCtx2
+#endif
+        );
 #if JVET_W0090_ARMC_TM
         if (pu.cs->sps->getUseAML())
         {
           pu.bmDir = 0;
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+          if (tplAvail)
+          {
+            m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, bmMrgCtx, pu.cs->sps->getMaxNumBMMergeCand());
+          }
+          if (bmMrgCtx.numValidMergeCand > pu.cs->sps->getMaxNumBMMergeCand())
+          {
+            bmMrgCtx.numValidMergeCand = pu.cs->sps->getMaxNumBMMergeCand();
+          }
+#else
           m_pcInterSearch->adjustInterMergeCandidates(pu, bmMrgCtx);
+#endif
         }
 #endif
         if (bmMrgCtx.numValidMergeCand == 0)
@@ -9986,7 +10145,11 @@ void EncCu::xCheckSATDCostBMMerge(CodingStructure*& tempCS,
 
   const double sqrtLambdaForFirstPassIntra = m_pcRdCost->getMotionLambda() * FRAC_BITS_SCALE;
   int insertPos = -1;
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  const uint32_t maxNumCand = ::min(mrgCtx.numValidMergeCand, mrgCtx.numCandToTestEnc);
+#else
   const uint32_t maxNumCand = mrgCtx.numCandToTestEnc;
+#endif
   bool subPuRefine[2] = { false, false };
   Mv   finalMvDir[2];
   for (uint32_t candIdx = 0; candIdx < maxNumCand; candIdx++)

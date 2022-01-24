@@ -2671,6 +2671,77 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
       {
         picHeader->setEnableTMVPFlag( 0 );
       }
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+      if (picHeader->getEnableTMVPFlag())
+      {
+        const Picture* const pColPic = pcSlice->getRefPic(RefPicList(pcSlice->isInterB() ? 1 - pcSlice->getColFromL0Flag() : 0), pcSlice->getColRefIdx());
+        if (pColPic)
+        {
+          const int currPOC = pcSlice->getPOC();
+          const int colPOC = pColPic->getPOC();
+
+          pcSlice->resizeImBuf(pColPic->numSlices);
+          Slice *pColSlice = nullptr;
+          for (int sliceIdx = 0; sliceIdx < pColPic->numSlices; sliceIdx++)
+          {
+            pColSlice = pColPic->slices[sliceIdx];
+            if (pColSlice->isIntra())
+            {
+              continue;
+            }
+
+            for (int colRefPicListIdx = 0; colRefPicListIdx < (pColSlice->isInterB() ? 2 : 1); colRefPicListIdx++)
+            {
+              for (int colRefIdx = 0; colRefIdx < pColSlice->getNumRefIdx(RefPicList(colRefPicListIdx)); colRefIdx++)
+              {
+                const bool bIsColRefLongTerm = pColSlice->getIsUsedAsLongTerm(RefPicList(colRefPicListIdx), colRefIdx);
+                const int colRefPOC = pColSlice->getRefPOC(RefPicList(colRefPicListIdx), colRefIdx);
+
+                for (int curRefPicListIdx = 0; curRefPicListIdx < (pcSlice->isInterB() ? 2 : 1); curRefPicListIdx++)
+                {
+                  double bestDistScale = 1000;
+                  int targetRefIdx = -1;
+                  for (int curRefIdx = 0; curRefIdx < pcSlice->getNumRefIdx(RefPicList(curRefPicListIdx)); curRefIdx++)
+                  {
+                    const int currRefPOC = pcSlice->getRefPic(RefPicList(curRefPicListIdx), curRefIdx)->getPOC();
+                    const bool bIsCurrRefLongTerm = pcSlice->getRefPic(RefPicList(curRefPicListIdx), curRefIdx)->longTerm;
+                    if (bIsCurrRefLongTerm != bIsColRefLongTerm)
+                    {
+                      continue;
+                    }
+                    if (bIsCurrRefLongTerm)
+                    {
+                      targetRefIdx = curRefIdx;
+                      bestDistScale = 1;
+                      break;
+                    }
+                    else if (colPOC - colRefPOC == currPOC - currRefPOC)
+                    {
+                      targetRefIdx = curRefIdx;
+                      bestDistScale = 1;
+                      break;
+                    }
+                    else
+                    {
+                      //printf("colRefPicListIdx:%d, curRefPicListIdx:%d, colRefIdx:%d, targetRefIdx:%d, curRefIdx:%d\n", colRefPicListIdx, curRefPicListIdx, colRefIdx, targetRefIdx, curRefIdx);
+                      //printf("currPOC:%d, currRefPOC:%d, colPOC:%d, colRefPOC:%d\n", currPOC, currRefPOC, colPOC, colRefPOC);
+                      //printf("bestDistScale:%.2f %.2f\n", bestDistScale, abs(1.0 - (abs(currPOC - currRefPOC) * 1.0 / abs(colPOC - colRefPOC) * 1.0)));
+                      if (abs(1.0 - (abs(currPOC - currRefPOC) * 1.0 / abs(colPOC - colRefPOC) * 1.0)) < bestDistScale)
+                      {
+                        bestDistScale = abs(1.0 - (abs(currPOC - currRefPOC) * 1.0 / abs(colPOC - colRefPOC) * 1.0));
+                        targetRefIdx = curRefIdx;
+                      }
+                    }
+                  } // curRefIdx
+                    //printf("sliceIdx:%d, colRefPicListIdx:%d, curRefPicListIdx:%d, colRefIdx:%d, targetRefIdx:%d\n", sliceIdx, colRefPicListIdx, curRefPicListIdx, colRefIdx, targetRefIdx);
+                  pcSlice->setImRefIdx(sliceIdx, RefPicList(colRefPicListIdx), RefPicList(curRefPicListIdx), colRefIdx, targetRefIdx);
+                } // curRefPicListIdx
+              }
+            }
+          }
+        }
+      }
+#endif
     }
 
     pcSlice->scaleRefPicList( scaledRefPic, pcPic->cs->picHeader, m_pcEncLib->getApss(), picHeader->getLmcsAPS(), picHeader->getScalingListAPS(), false );
