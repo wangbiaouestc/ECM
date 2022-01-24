@@ -147,7 +147,7 @@ InterPrediction::InterPrediction()
   int mvSearchIdx_bilMrg = 0;
 #if JVET_X0049_BDMVR_SW_OPT
   uint16_t currtPrio = 0, currIdx = 0;
-  ::memset(m_pSearchEnlargeOffsetNum, 0, sizeof(m_pSearchEnlargeOffsetNum));
+  ::memset(m_SearchEnlargeOffsetNum, 0, sizeof(m_SearchEnlargeOffsetNum));
 #endif
   for (int y = -BDMVR_INTME_RANGE; y <= BDMVR_INTME_RANGE; y++)
   {
@@ -155,14 +155,14 @@ InterPrediction::InterPrediction()
     {
 #if JVET_X0049_BDMVR_SW_OPT
 #else
-      m_pSearchEnlargeOffset_bilMrg[mvSearchIdx_bilMrg] = Mv(x, y);
+      m_SearchEnlargeOffsetBilMrg[mvSearchIdx_bilMrg] = Mv(x, y);
 #endif
       if ( (abs(x) + abs(y)) == 0 )
       {
 #if JVET_X0049_BDMVR_SW_OPT
         currtPrio = 0;
-        currIdx = m_pSearchEnlargeOffsetNum[currtPrio];
-        m_pSearchEnlargeOffsetToIdx[currtPrio][currIdx] = mvSearchIdx_bilMrg;
+        currIdx = m_SearchEnlargeOffsetNum[currtPrio];
+        m_SearchEnlargeOffsetToIdx[currtPrio][currIdx] = mvSearchIdx_bilMrg;
 #else
         searchPriority_bilMrg[mvSearchIdx_bilMrg] = 0;
 #endif
@@ -173,8 +173,8 @@ InterPrediction::InterPrediction()
       {
 #if JVET_X0049_BDMVR_SW_OPT
         currtPrio = 1;
-        currIdx = m_pSearchEnlargeOffsetNum[currtPrio];
-        m_pSearchEnlargeOffsetToIdx[currtPrio][currIdx] = mvSearchIdx_bilMrg;
+        currIdx = m_SearchEnlargeOffsetNum[currtPrio];
+        m_SearchEnlargeOffsetToIdx[currtPrio][currIdx] = mvSearchIdx_bilMrg;
 #else
         searchPriority_bilMrg[mvSearchIdx_bilMrg] = 1;
 #endif
@@ -185,8 +185,8 @@ InterPrediction::InterPrediction()
       {
 #if JVET_X0049_BDMVR_SW_OPT
         currtPrio = 2;
-        currIdx = m_pSearchEnlargeOffsetNum[currtPrio];
-        m_pSearchEnlargeOffsetToIdx[currtPrio][currIdx] = mvSearchIdx_bilMrg;
+        currIdx = m_SearchEnlargeOffsetNum[currtPrio];
+        m_SearchEnlargeOffsetToIdx[currtPrio][currIdx] = mvSearchIdx_bilMrg;
 #else
         searchPriority_bilMrg[mvSearchIdx_bilMrg] = 2;
 #endif
@@ -197,8 +197,8 @@ InterPrediction::InterPrediction()
       {
 #if JVET_X0049_BDMVR_SW_OPT
         currtPrio = 3;
-        currIdx = m_pSearchEnlargeOffsetNum[currtPrio];
-        m_pSearchEnlargeOffsetToIdx[currtPrio][currIdx] = mvSearchIdx_bilMrg;
+        currIdx = m_SearchEnlargeOffsetNum[currtPrio];
+        m_SearchEnlargeOffsetToIdx[currtPrio][currIdx] = mvSearchIdx_bilMrg;
 #else
         searchPriority_bilMrg[mvSearchIdx_bilMrg] = 3;
 #endif
@@ -209,8 +209,8 @@ InterPrediction::InterPrediction()
       {
 #if JVET_X0049_BDMVR_SW_OPT
         currtPrio = 4;
-        currIdx = m_pSearchEnlargeOffsetNum[currtPrio];
-        m_pSearchEnlargeOffsetToIdx[currtPrio][currIdx] = mvSearchIdx_bilMrg;
+        currIdx = m_SearchEnlargeOffsetNum[currtPrio];
+        m_SearchEnlargeOffsetToIdx[currtPrio][currIdx] = mvSearchIdx_bilMrg;
 #else
         searchPriority_bilMrg[mvSearchIdx_bilMrg] = 4;
 #endif
@@ -218,8 +218,8 @@ InterPrediction::InterPrediction()
         costShift_2_bilMrg[mvSearchIdx_bilMrg++] = 2;
       }
 #if JVET_X0049_BDMVR_SW_OPT
-      m_pSearchEnlargeOffset_bilMrg[currtPrio][currIdx] = Mv(x, y);
-      m_pSearchEnlargeOffsetNum[currtPrio]++;
+      m_SearchEnlargeOffsetBilMrg[currtPrio][currIdx] = Mv(x, y);
+      m_SearchEnlargeOffsetNum[currtPrio]++;
 #endif
     }
   }
@@ -6759,7 +6759,7 @@ void InterPrediction::processBDMVRSubPU(PredictionUnit& pu, bool subPURefine)
   const int adaptiveSearchRangeHor = (dx >> 1) < BDMVR_INTME_RANGE ? (dx >> 1) : BDMVR_INTME_RANGE;
   const int adaptiveSearchRangeVer = (dy >> 1) < BDMVR_INTME_RANGE ? (dy >> 1) : BDMVR_INTME_RANGE;
   const bool adaptRange = (adaptiveSearchRangeHor != BDMVR_INTME_RANGE || adaptiveSearchRangeVer != BDMVR_INTME_RANGE);
-  const int maxSearchRound = std::min(pu.bmMergeFlag ? BM_MRG_SUB_PU_INT_MAX_SRCH_ROUND : BDMVR_INTME_MAX_NUM_SEARCH_ITERATION, 5);
+  const int maxSearchRound = pu.bmMergeFlag ? BM_MRG_SUB_PU_INT_MAX_SRCH_ROUND : BDMVR_INTME_FULL_SEARCH_MAX_NUM_ITERATIONS;
 
   // prepare cDistParam for cost calculation
   DistParam cDistParam;
@@ -6828,7 +6828,7 @@ void InterPrediction::processBDMVRSubPU(PredictionUnit& pu, bool subPURefine)
 
         mvFinal[0] = mvInitial[0] + mvOffset;
         mvFinal[1] = mvInitial[1] - mvOffset;
-        minCost = m_SADsEnlargeArray_bilMrg[bestOffsetIdx];
+        minCost = m_SADsEnlargeArrayBilMrg[bestOffsetIdx];
         Distortion tmpCost = getDecoderSideDerivedMvCost(mvInitial[0], mvFinal[0], BDMVR_INTME_RANGE + 1, DECODER_SIDE_MV_WEIGHT);
         if (minCost >= tmpCost)
         {
@@ -6893,14 +6893,14 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
     else
 #endif
     {
-      minCost = xBDMVRMvSquareSearch<false>( mvFinal_PU, minCost, pu, mvInitial_PU, BDMVR_INTME_MAX_NUM_SEARCH_ITERATION, MV_FRACTIONAL_BITS_INTERNAL,     bUseMR, false );
+      minCost = xBDMVRMvSquareSearch<false>( mvFinal_PU, minCost, pu, mvInitial_PU, BDMVR_INTME_SQUARE_SEARCH_MAX_NUM_ITERATIONS, MV_FRACTIONAL_BITS_INTERNAL,     bUseMR, false );
       if (minCost > 0)
       {
         minCost = xBDMVRMvSquareSearch<true>(mvFinal_PU, minCost, pu, mvInitial_PU, 2, MV_FRACTIONAL_BITS_INTERNAL - 1, bUseMR, false);
       }
     }
 #else
-    minCost = xBDMVRMvSquareSearch( mvFinal_PU, minCost, pu, mvInitial_PU, BDMVR_INTME_MAX_NUM_SEARCH_ITERATION, MV_FRACTIONAL_BITS_INTERNAL,     bUseMR, false );
+    minCost = xBDMVRMvSquareSearch( mvFinal_PU, minCost, pu, mvInitial_PU, BDMVR_INTME_SQUARE_SEARCH_MAX_NUM_ITERATIONS, MV_FRACTIONAL_BITS_INTERNAL,     bUseMR, false );
     minCost = xBDMVRMvSquareSearch( mvFinal_PU, minCost, pu, mvInitial_PU, 2, MV_FRACTIONAL_BITS_INTERNAL - 1,     bUseMR, false );
 #endif
 
@@ -6962,9 +6962,9 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
   const int adaptiveSearchRangeVer = (dy >> 1) < BDMVR_INTME_RANGE ? (dy >> 1) : BDMVR_INTME_RANGE;
   const bool adaptRange = (adaptiveSearchRangeHor != BDMVR_INTME_RANGE || adaptiveSearchRangeVer != BDMVR_INTME_RANGE);
 #if JVET_X0049_ADAPT_DMVR
-  const int maxSearchRound = std::min(pu.bmMergeFlag ? BM_MRG_SUB_PU_INT_MAX_SRCH_ROUND : BDMVR_INTME_MAX_NUM_SEARCH_ITERATION, 5);
+  const int maxSearchRound = pu.bmMergeFlag ? BM_MRG_SUB_PU_INT_MAX_SRCH_ROUND : BDMVR_INTME_FULL_SEARCH_MAX_NUM_ITERATIONS;
 #else
-  const int maxSearchRound = std::min(BDMVR_INTME_MAX_NUM_SEARCH_ITERATION, 5);
+  const int maxSearchRound = BDMVR_INTME_FULL_SEARCH_MAX_NUM_ITERATIONS;
 #endif
 
   // prepare cDistParam for cost calculation
@@ -7048,7 +7048,7 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
 
         mvFinal[0] = mvInitial[0] + mvOffset;
         mvFinal[1] = mvInitial[1] - mvOffset;
-        minCost = m_SADsEnlargeArray_bilMrg[bestOffsetIdx];
+        minCost = m_SADsEnlargeArrayBilMrg[bestOffsetIdx];
         Distortion tmpCost = getDecoderSideDerivedMvCost(mvInitial[0], mvFinal[0], BDMVR_INTME_RANGE + 1, DECODER_SIDE_MV_WEIGHT);
         if (minCost >= tmpCost)
         {
@@ -7071,7 +7071,7 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
       Mv         mvFinal[2] = { pu.mv[0], pu.mv[1] };
       const int subPuBufOffset = 0;  // will do interpolation inside search
 
-      minCost = xBDMVRMvIntPelFullSearch( mvFinal, minCost, subPu, mvInitial, BDMVR_INTME_MAX_NUM_SEARCH_ITERATION, MV_FRACTIONAL_BITS_INTERNAL, bUseMR, subPuBufOffset );
+      minCost = xBDMVRMvIntPelFullSearch( mvFinal, minCost, subPu, mvInitial, BDMVR_INTME_SQUARE_SEARCH_MAX_NUM_ITERATIONS, MV_FRACTIONAL_BITS_INTERNAL, bUseMR, subPuBufOffset );
       minCost = (minCost < dx * dy) ? 0 : std::numeric_limits<Distortion>::max();
       minCost = xBDMVRMvSquareSearch( mvFinal, minCost, subPu, mvInitial, 2, MV_FRACTIONAL_BITS_INTERNAL - 1, false,  true);
 #endif
@@ -7232,7 +7232,7 @@ Distortion InterPrediction::xBDMVRMvIntPelFullSearch(Mv&mvOffset, Distortion cur
   curBestCost = cDistParam.distFunc(cDistParam);
 #endif
 
-  m_SADsEnlargeArray_bilMrg[BDMVR_INTME_CENTER] = curBestCost;
+  m_SADsEnlargeArrayBilMrg[BDMVR_INTME_CENTER] = curBestCost;
   curBestCost = curBestCost - (curBestCost >> 2);  // cost tuning
 
   if (curBestCost < earlyTerminateTh)
@@ -7246,12 +7246,12 @@ Distortion InterPrediction::xBDMVRMvIntPelFullSearch(Mv&mvOffset, Distortion cur
   for (int searchPrio = 1; searchPrio < maxSearchRounds; searchPrio++)
   {
     prevMinCost = curBestCost;
-    for (int currIdx = 0; currIdx < m_pSearchEnlargeOffsetNum[searchPrio]; currIdx++)
+    for (int currIdx = 0; currIdx < m_SearchEnlargeOffsetNum[searchPrio]; currIdx++)
     {
       tmCost = 0;
-      int horOffset = m_pSearchEnlargeOffset_bilMrg[searchPrio][currIdx].getHor();
-      int verOffset = m_pSearchEnlargeOffset_bilMrg[searchPrio][currIdx].getVer();
-      int searchOffsetIdx = m_pSearchEnlargeOffsetToIdx[searchPrio][currIdx];
+      int horOffset = m_SearchEnlargeOffsetBilMrg[searchPrio][currIdx].getHor();
+      int verOffset = m_SearchEnlargeOffsetBilMrg[searchPrio][currIdx].getVer();
+      int searchOffsetIdx = m_SearchEnlargeOffsetToIdx[searchPrio][currIdx];
 
       if (adaptRange)
       {
@@ -7268,20 +7268,20 @@ Distortion InterPrediction::xBDMVRMvIntPelFullSearch(Mv&mvOffset, Distortion cur
 #if FULL_NBIT
       if (useHadamard)
       {
-        m_SADsEnlargeArray_bilMrg[searchOffsetIdx] = cDistParam.distFunc(cDistParam) >> 1;  // magic shift, benefit for early terminate
+        m_SADsEnlargeArrayBilMrg[searchOffsetIdx] = cDistParam.distFunc(cDistParam) >> 1;  // magic shift, benefit for early terminate
       }
       else
       {
         int32_t precisionAdj = cDistParam.bitDepth > 8 ? cDistParam.bitDepth - 8 : 0;
-        m_SADsEnlargeArray_bilMrg[searchOffsetIdx] = cDistParam.distFunc(cDistParam) >> precisionAdj;
+        m_SADsEnlargeArrayBilMrg[searchOffsetIdx] = cDistParam.distFunc(cDistParam) >> precisionAdj;
       }
 #else
-      m_SADsEnlargeArray_bilMrg[searchOffsetIdx] = cDistParam.distFunc(cDistParam);
+      m_SADsEnlargeArrayBilMrg[searchOffsetIdx] = cDistParam.distFunc(cDistParam);
 #endif
 
-      tmCost += m_SADsEnlargeArray_bilMrg[searchOffsetIdx];
-      tmCost += (m_SADsEnlargeArray_bilMrg[searchOffsetIdx] >> costShift_1_bilMrg[searchOffsetIdx]);
-      tmCost += (m_SADsEnlargeArray_bilMrg[searchOffsetIdx] >> costShift_2_bilMrg[searchOffsetIdx]);
+      tmCost += m_SADsEnlargeArrayBilMrg[searchOffsetIdx];
+      tmCost += (m_SADsEnlargeArrayBilMrg[searchOffsetIdx] >> costShift_1_bilMrg[searchOffsetIdx]);
+      tmCost += (m_SADsEnlargeArrayBilMrg[searchOffsetIdx] >> costShift_2_bilMrg[searchOffsetIdx]);
 
       if (tmCost < curBestCost)
       {
@@ -7319,9 +7319,9 @@ Distortion InterPrediction::xBDMVRMvIntPelFullSearch(Mv(&curBestMv)[2], Distorti
 
   for (int i = 0; i < BDMVR_INTME_AREA; i++)
   {
-    m_SADsEnlargeArray_bilMrg[i] = MAX_UINT64;
+    m_SADsEnlargeArrayBilMrg[i] = MAX_UINT64;
   }
-  m_SADsEnlargeArray_bilMrg[BDMVR_INTME_CENTER] = curBestCost;
+  m_SADsEnlargeArrayBilMrg[BDMVR_INTME_CENTER] = curBestCost;
   curBestCost = curBestCost - (curBestCost >> 2);  // cost tuning
   const Distortion earlyTerminateTh = pu.lumaSize().area();
   Distortion tmCost = MAX_UINT64;
@@ -7329,7 +7329,7 @@ Distortion InterPrediction::xBDMVRMvIntPelFullSearch(Mv(&curBestMv)[2], Distorti
   Distortion prevMinCost = MAX_UINT64;
 #endif
 
-  for( int searchPrio = 0 ; searchPrio < 5 ; searchPrio++ )
+  for( int searchPrio = 0 ; searchPrio < BDMVR_INTME_FULL_SEARCH_MAX_NUM_ITERATIONS; searchPrio++ )
   {
     if( curBestCost < earlyTerminateTh )
     {
@@ -7345,22 +7345,22 @@ Distortion InterPrediction::xBDMVRMvIntPelFullSearch(Mv(&curBestMv)[2], Distorti
       if (searchPriority_bilMrg[searchOffsetIdx] != searchPrio)
         continue;
       // adaptive search area base on block dimension
-      if (m_pSearchEnlargeOffset_bilMrg[searchOffsetIdx].getAbsVer() > adaptiveSearchRangeVer)
+      if (m_SearchEnlargeOffsetBilMrg[searchOffsetIdx].getAbsVer() > adaptiveSearchRangeVer)
         continue;
-      if (m_pSearchEnlargeOffset_bilMrg[searchOffsetIdx].getAbsHor() > adaptiveSearchRangeHor)
+      if (m_SearchEnlargeOffsetBilMrg[searchOffsetIdx].getAbsHor() > adaptiveSearchRangeHor)
         continue;
 
-      Mv mvOffset(m_pSearchEnlargeOffset_bilMrg[searchOffsetIdx].getHor() << searchStepShift, m_pSearchEnlargeOffset_bilMrg[searchOffsetIdx].getVer() << searchStepShift);
+      Mv mvOffset(m_SearchEnlargeOffsetBilMrg[searchOffsetIdx].getHor() << searchStepShift, m_SearchEnlargeOffsetBilMrg[searchOffsetIdx].getVer() << searchStepShift);
       Mv mvCand[2] = {initialMv[0] + mvOffset, initialMv[1] - mvOffset};
 
-      if ( m_SADsEnlargeArray_bilMrg[searchOffsetIdx] == MAX_UINT64 )
+      if ( m_SADsEnlargeArrayBilMrg[searchOffsetIdx] == MAX_UINT64 )
       {
-        m_SADsEnlargeArray_bilMrg[searchOffsetIdx] = xBDMVRGetMatchingError( pu, mvCand, subPuBufOffset, useHadamard, useMR,
+        m_SADsEnlargeArrayBilMrg[searchOffsetIdx] = xBDMVRGetMatchingError( pu, mvCand, subPuBufOffset, useHadamard, useMR,
                                                                              doPreInterpolation, searchStepShift, initialMv, initialMv, -1 );
       }
-      tmCost += m_SADsEnlargeArray_bilMrg[searchOffsetIdx];
-      tmCost += (m_SADsEnlargeArray_bilMrg[searchOffsetIdx] >> costShift_1_bilMrg[searchOffsetIdx]);
-      tmCost += (m_SADsEnlargeArray_bilMrg[searchOffsetIdx] >> costShift_2_bilMrg[searchOffsetIdx]);
+      tmCost += m_SADsEnlargeArrayBilMrg[searchOffsetIdx];
+      tmCost += (m_SADsEnlargeArrayBilMrg[searchOffsetIdx] >> costShift_1_bilMrg[searchOffsetIdx]);
+      tmCost += (m_SADsEnlargeArrayBilMrg[searchOffsetIdx] >> costShift_2_bilMrg[searchOffsetIdx]);
 
       if( tmCost < curBestCost )
       {
