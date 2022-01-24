@@ -2125,9 +2125,18 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
   const int  unitWidth          = tuWidth  <= 2 && cu.ispMode && isLuma(area.compID) ? tuWidth  : pcv.minCUWidth  >> (noShift ? 0 : getComponentScaleX(area.compID, sps.getChromaFormatIdc()));
   const int  unitHeight         = tuHeight <= 2 && cu.ispMode && isLuma(area.compID) ? tuHeight : pcv.minCUHeight >> (noShift ? 0 : getComponentScaleY(area.compID, sps.getChromaFormatIdc()));
 
+ #if JVET_Y0116_EXTENDED_MRL_LIST
+  int leftMrlUnitNum  = multiRefIdx / unitHeight;
+  int aboveMrlUnitNum = multiRefIdx / unitWidth;
+#endif
+
   const int  totalAboveUnits    = (predSize + (unitWidth - 1)) / unitWidth;
   const int  totalLeftUnits     = (predHSize + (unitHeight - 1)) / unitHeight;
+#if JVET_Y0116_EXTENDED_MRL_LIST
+  const int  totalUnits         = totalAboveUnits + totalLeftUnits + 1 + leftMrlUnitNum + aboveMrlUnitNum; //+1 for top-left
+#else
   const int  totalUnits         = totalAboveUnits + totalLeftUnits + 1; //+1 for top-left
+#endif
   const int  numAboveUnits      = std::max<int>( tuWidth / unitWidth, 1 );
   const int  numLeftUnits       = std::max<int>( tuHeight / unitHeight, 1 );
   const int  numAboveRightUnits = totalAboveUnits - numAboveUnits;
@@ -2140,17 +2149,33 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
   const Position posRT          = area.topRight();
   const Position posLB          = area.bottomLeft();
 
+#if JVET_Y0116_EXTENDED_MRL_LIST
+  bool  neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + MAX_REF_LINE_IDX + 1];
+#else
   bool  neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1];
+#endif
   int   numIntraNeighbor = 0;
 
   memset( neighborFlags, 0, totalUnits );
 
+#if JVET_Y0116_EXTENDED_MRL_LIST
+  neighborFlags[totalLeftUnits+leftMrlUnitNum] = isAboveLeftAvailable( cu, chType, posLT.offset(-multiRefIdx, -multiRefIdx) );
+  numIntraNeighbor += neighborFlags[totalLeftUnits+leftMrlUnitNum] ? 1 : 0;
+  numIntraNeighbor += isAboveAvailable     ( cu, chType, posLT.offset(-aboveMrlUnitNum*unitWidth, -multiRefIdx), aboveMrlUnitNum,      unitWidth,  (neighborFlags + totalLeftUnits + 1 + leftMrlUnitNum) );
+  numIntraNeighbor += isLeftAvailable      ( cu, chType, posLT.offset(-multiRefIdx, -leftMrlUnitNum*unitHeight), leftMrlUnitNum,       unitHeight, (neighborFlags + totalLeftUnits - 1 + leftMrlUnitNum) );
+  numIntraNeighbor += isAboveAvailable     ( cu, chType, posLT.offset(0, -multiRefIdx), numAboveUnits,      unitWidth,  (neighborFlags + totalLeftUnits + 1 + leftMrlUnitNum + aboveMrlUnitNum) );
+  numIntraNeighbor += isAboveRightAvailable( cu, chType, posRT.offset(0, -multiRefIdx), numAboveRightUnits, unitWidth,  (neighborFlags + totalLeftUnits + 1 + leftMrlUnitNum + aboveMrlUnitNum + numAboveUnits) );
+  numIntraNeighbor += isLeftAvailable      ( cu, chType, posLT.offset(-multiRefIdx, 0), numLeftUnits,       unitHeight, (neighborFlags + totalLeftUnits - 1) );
+  numIntraNeighbor += isBelowLeftAvailable ( cu, chType, posLB.offset(-multiRefIdx, 0), numLeftBelowUnits,  unitHeight, (neighborFlags + totalLeftUnits - 1 - numLeftUnits) );
+
+#else
   neighborFlags[totalLeftUnits] = isAboveLeftAvailable( cu, chType, posLT );
   numIntraNeighbor += neighborFlags[totalLeftUnits] ? 1 : 0;
   numIntraNeighbor += isAboveAvailable     ( cu, chType, posLT, numAboveUnits,      unitWidth,  (neighborFlags + totalLeftUnits + 1) );
   numIntraNeighbor += isAboveRightAvailable( cu, chType, posRT, numAboveRightUnits, unitWidth,  (neighborFlags + totalLeftUnits + 1 + numAboveUnits) );
   numIntraNeighbor += isLeftAvailable      ( cu, chType, posLT, numLeftUnits,       unitHeight, (neighborFlags + totalLeftUnits - 1) );
   numIntraNeighbor += isBelowLeftAvailable ( cu, chType, posLB, numLeftBelowUnits,  unitHeight, (neighborFlags + totalLeftUnits - 1 - numLeftUnits) );
+#endif
 
   // ----- Step 2: fill reference samples (depending on neighborhood) -----
 
@@ -2189,11 +2214,19 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
     // Fill top-left sample(s) if available
     ptrSrc = srcBuf - (1 + multiRefIdx) * srcStride - (1 + multiRefIdx);
     ptrDst = refBufUnfiltered;
+#if JVET_Y0116_EXTENDED_MRL_LIST
+    if (neighborFlags[totalLeftUnits+leftMrlUnitNum])
+#else
     if (neighborFlags[totalLeftUnits])
+#endif
     {
       ptrDst[0] = ptrSrc[0];
       ptrDst[predStride] = ptrSrc[0];
+#if JVET_Y0116_EXTENDED_MRL_LIST
+      for (int i = 1; i <= multiRefIdx-leftMrlUnitNum*unitHeight; i++)
+#else
       for (int i = 1; i <= multiRefIdx; i++)
+#endif
       {
         ptrDst[i] = ptrSrc[i];
         ptrDst[i + predStride] = ptrSrc[i * srcStride];
@@ -2201,9 +2234,18 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
     }
 
     // Fill left & below-left samples if available (downwards)
+#if JVET_Y0116_EXTENDED_MRL_LIST
+    ptrSrc += (1 + multiRefIdx-leftMrlUnitNum*unitHeight) * srcStride;
+    ptrDst += (1 + multiRefIdx-leftMrlUnitNum*unitHeight) + predStride;
+#else
     ptrSrc += (1 + multiRefIdx) * srcStride;
     ptrDst += (1 + multiRefIdx) + predStride;
+#endif
+#if JVET_Y0116_EXTENDED_MRL_LIST
+    for (int unitIdx = totalLeftUnits + leftMrlUnitNum - 1; unitIdx > 0; unitIdx--)
+#else
     for (int unitIdx = totalLeftUnits - 1; unitIdx > 0; unitIdx--)
+#endif
     {
       if (neighborFlags[unitIdx])
       {
@@ -2226,9 +2268,18 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
     }
 
     // Fill above & above-right samples if available (left-to-right)
+#if JVET_Y0116_EXTENDED_MRL_LIST
+    ptrSrc = srcBuf - srcStride * (1 + multiRefIdx ) - aboveMrlUnitNum*unitWidth;
+    ptrDst = refBufUnfiltered + 1 + multiRefIdx - aboveMrlUnitNum*unitWidth;
+#else
     ptrSrc = srcBuf - srcStride * (1 + multiRefIdx);
     ptrDst = refBufUnfiltered + 1 + multiRefIdx;
+#endif
+#if JVET_Y0116_EXTENDED_MRL_LIST
+    for (int unitIdx = totalLeftUnits + leftMrlUnitNum + 1; unitIdx < totalUnits - 1; unitIdx++)
+#else
     for (int unitIdx = totalLeftUnits + 1; unitIdx < totalUnits - 1; unitIdx++)
+#endif
     {
       if (neighborFlags[unitIdx])
       {
@@ -2264,6 +2315,21 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
       // first available sample
       int firstAvailRow = -1;
       int firstAvailCol = 0;
+
+#if JVET_Y0116_EXTENDED_MRL_LIST
+      if (firstAvailUnit < totalLeftUnits + leftMrlUnitNum)
+      {
+        firstAvailRow = (totalLeftUnits + leftMrlUnitNum - firstAvailUnit) * unitHeight + multiRefIdx - leftMrlUnitNum * unitHeight;
+      }
+      else if (firstAvailUnit == totalLeftUnits + leftMrlUnitNum)
+      {
+        firstAvailRow = multiRefIdx - leftMrlUnitNum * unitHeight;
+      }
+      else
+      {
+        firstAvailCol = (firstAvailUnit - totalLeftUnits - leftMrlUnitNum - 1) * unitWidth + 1 + multiRefIdx - aboveMrlUnitNum * unitWidth;
+      }
+#else
       if (firstAvailUnit < totalLeftUnits)
       {
         firstAvailRow = (totalLeftUnits - firstAvailUnit) * unitHeight + multiRefIdx;
@@ -2276,6 +2342,7 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
       {
         firstAvailCol = (firstAvailUnit - totalLeftUnits - 1) * unitWidth + 1 + multiRefIdx;
       }
+#endif
       const Pel firstAvailSample = ptrDst[firstAvailRow < 0 ? firstAvailCol : firstAvailRow + predStride];
 
       // last sample below-left (n.a.)
@@ -2306,6 +2373,20 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
         // last available sample
         int lastAvailRow = -1;
         int lastAvailCol = 0;
+#if JVET_Y0116_EXTENDED_MRL_LIST
+        if (lastAvailUnit < totalLeftUnits + leftMrlUnitNum)
+        {
+          lastAvailRow = (totalLeftUnits + leftMrlUnitNum - lastAvailUnit - 1) * unitHeight + multiRefIdx - leftMrlUnitNum * unitHeight + 1;
+        }
+        else if (lastAvailUnit == totalLeftUnits + leftMrlUnitNum)
+        {
+          lastAvailCol = multiRefIdx- leftMrlUnitNum * unitHeight;
+        }
+        else
+        {
+          lastAvailCol = (lastAvailUnit - totalLeftUnits - leftMrlUnitNum) * unitWidth + multiRefIdx - aboveMrlUnitNum * unitWidth;
+        }
+#else
         if (lastAvailUnit < totalLeftUnits)
         {
           lastAvailRow = (totalLeftUnits - lastAvailUnit - 1) * unitHeight + multiRefIdx + 1;
@@ -2318,9 +2399,38 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
         {
           lastAvailCol = (lastAvailUnit - totalLeftUnits) * unitWidth + multiRefIdx;
         }
+#endif
         const Pel lastAvailSample = ptrDst[lastAvailRow < 0 ? lastAvailCol : lastAvailRow + predStride];
 
         // fill current unit with last available sample
+#if JVET_Y0116_EXTENDED_MRL_LIST
+        if (currUnit < totalLeftUnits + leftMrlUnitNum)
+        {
+          for (int i = lastAvailRow - 1; i >= lastAvailRow - unitHeight; i--)
+          {
+            ptrDst[i + predStride] = lastAvailSample;
+          }
+        }
+        else if (currUnit == totalLeftUnits + leftMrlUnitNum)
+        {
+          for (int i = 0; i < multiRefIdx - leftMrlUnitNum * unitHeight + 1; i++)
+          {
+            ptrDst[i + predStride] = lastAvailSample;
+          }
+          for (int j = 0; j < multiRefIdx - aboveMrlUnitNum * unitWidth + 1; j++)
+          {
+            ptrDst[j] = lastAvailSample;
+          }
+        }
+        else
+        {
+          int numSamplesInUnit = (currUnit == totalUnits - 1) ? ((predSize % unitWidth == 0) ? unitWidth : predSize % unitWidth) : unitWidth;
+          for (int j = lastAvailCol + 1; j <= lastAvailCol + numSamplesInUnit; j++)
+          {
+            ptrDst[j] = lastAvailSample;
+          }
+        }
+#else
         if (currUnit < totalLeftUnits)
         {
           for (int i = lastAvailRow - 1; i >= lastAvailRow - unitHeight; i--)
@@ -2347,6 +2457,7 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
             ptrDst[j] = lastAvailSample;
           }
         }
+#endif
       }
       lastAvailUnit = currUnit;
       currUnit++;

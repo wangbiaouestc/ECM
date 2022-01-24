@@ -1813,6 +1813,40 @@ void CABACReader::extend_ref_line(CodingUnit& cu)
     }
     int multiRefIdx = 0;
 
+#if JVET_Y0116_EXTENDED_MRL_LIST
+    if (MRL_NUM_REF_LINES > 1)
+    {
+#if JVET_W0123_TIMD_FUSION
+      multiRefIdx = m_BinDecoder.decodeBin(cu.timd ? Ctx::MultiRefLineIdx(5) : Ctx::MultiRefLineIdx(0)) == 1 ? MULTI_REF_LINE_IDX[1] : MULTI_REF_LINE_IDX[0];
+#else
+      multiRefIdx = m_BinDecoder.decodeBin(Ctx::MultiRefLineIdx(0)) == 1 ? MULTI_REF_LINE_IDX[1] : MULTI_REF_LINE_IDX[0];
+#endif
+      if (MRL_NUM_REF_LINES > 2 && multiRefIdx != MULTI_REF_LINE_IDX[0])
+      {
+#if JVET_W0123_TIMD_FUSION
+        multiRefIdx = m_BinDecoder.decodeBin(cu.timd ? Ctx::MultiRefLineIdx(6) : Ctx::MultiRefLineIdx(1)) == 1 ? MULTI_REF_LINE_IDX[2] : MULTI_REF_LINE_IDX[1];
+#else
+        multiRefIdx = m_BinDecoder.decodeBin(Ctx::MultiRefLineIdx(1)) == 1 ? MULTI_REF_LINE_IDX[2] : MULTI_REF_LINE_IDX[1];
+#endif
+        if (MRL_NUM_REF_LINES > 3 && multiRefIdx != MULTI_REF_LINE_IDX[1]
+#if JVET_W0123_TIMD_FUSION
+        && !cu.timd
+#endif
+          )
+        {
+          multiRefIdx = m_BinDecoder.decodeBin(Ctx::MultiRefLineIdx(2)) == 1 ? MULTI_REF_LINE_IDX[3] : MULTI_REF_LINE_IDX[2];
+          if (MRL_NUM_REF_LINES > 4 && multiRefIdx != MULTI_REF_LINE_IDX[2])
+          {
+            multiRefIdx = m_BinDecoder.decodeBin(Ctx::MultiRefLineIdx(3)) == 1 ? MULTI_REF_LINE_IDX[4] : MULTI_REF_LINE_IDX[3];
+            if (MRL_NUM_REF_LINES > 5 && multiRefIdx != MULTI_REF_LINE_IDX[3])
+            {
+              multiRefIdx = m_BinDecoder.decodeBin(Ctx::MultiRefLineIdx(4)) == 1 ? MULTI_REF_LINE_IDX[5] : MULTI_REF_LINE_IDX[4];
+            }
+          }
+        }
+      }
+    }
+#else
     if (MRL_NUM_REF_LINES > 1)
     {
 #if JVET_W0123_TIMD_FUSION
@@ -1830,6 +1864,7 @@ void CABACReader::extend_ref_line(CodingUnit& cu)
       }
 
     }
+#endif
     pu->multiRefIdx = multiRefIdx;
     pu = pu->next;
   }

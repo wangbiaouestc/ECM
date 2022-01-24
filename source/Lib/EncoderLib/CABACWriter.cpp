@@ -1267,6 +1267,40 @@ void CABACWriter::extend_ref_line(const PredictionUnit& pu)
     return;
   }
   int multiRefIdx = pu.multiRefIdx;
+#if JVET_Y0116_EXTENDED_MRL_LIST
+  if (MRL_NUM_REF_LINES > 1)
+  {
+#if JVET_W0123_TIMD_FUSION
+    m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[0], cu.timd ? Ctx::MultiRefLineIdx(5) : Ctx::MultiRefLineIdx(0));
+#else
+    m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[0], Ctx::MultiRefLineIdx(0));
+#endif
+    if (MRL_NUM_REF_LINES > 2 && multiRefIdx != MULTI_REF_LINE_IDX[0])
+    {
+#if JVET_W0123_TIMD_FUSION
+      m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[1], cu.timd ? Ctx::MultiRefLineIdx(6) : Ctx::MultiRefLineIdx(1));
+#else
+      m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[1], Ctx::MultiRefLineIdx(1));
+#endif
+      if (MRL_NUM_REF_LINES > 3 && multiRefIdx != MULTI_REF_LINE_IDX[1]
+#if JVET_W0123_TIMD_FUSION
+        && !cu.timd
+#endif
+        )
+      {
+        m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[2], Ctx::MultiRefLineIdx(2));
+        if (MRL_NUM_REF_LINES > 4 && multiRefIdx != MULTI_REF_LINE_IDX[2])
+        {
+          m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[3], Ctx::MultiRefLineIdx(3));
+          if (MRL_NUM_REF_LINES > 5 && multiRefIdx != MULTI_REF_LINE_IDX[3])
+          {
+            m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[4], Ctx::MultiRefLineIdx(4));
+          }
+        }
+      }
+    }
+  }
+#else
   if (MRL_NUM_REF_LINES > 1)
   {
 #if JVET_W0123_TIMD_FUSION
@@ -1283,6 +1317,7 @@ void CABACWriter::extend_ref_line(const PredictionUnit& pu)
 #endif
     }
   }
+#endif
 }
 
 void CABACWriter::extend_ref_line(const CodingUnit& cu)
@@ -1312,6 +1347,40 @@ void CABACWriter::extend_ref_line(const CodingUnit& cu)
       return;
     }
     int multiRefIdx = pu->multiRefIdx;
+#if JVET_Y0116_EXTENDED_MRL_LIST
+    if (MRL_NUM_REF_LINES > 1)
+    {
+#if JVET_W0123_TIMD_FUSION
+      m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[0], cu.timd ? Ctx::MultiRefLineIdx(5) : Ctx::MultiRefLineIdx(0));
+#else
+      m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[0], Ctx::MultiRefLineIdx(0));
+#endif
+      if (MRL_NUM_REF_LINES > 2 && multiRefIdx != MULTI_REF_LINE_IDX[0])
+      {
+#if JVET_W0123_TIMD_FUSION
+        m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[1], cu.timd ? Ctx::MultiRefLineIdx(6) : Ctx::MultiRefLineIdx(1));
+#else
+        m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[1], Ctx::MultiRefLineIdx(1));
+#endif
+        if (MRL_NUM_REF_LINES > 3 && multiRefIdx != MULTI_REF_LINE_IDX[1]
+#if JVET_W0123_TIMD_FUSION
+          && !cu.timd
+#endif
+          )
+        {
+          m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[2], Ctx::MultiRefLineIdx(2));
+          if (MRL_NUM_REF_LINES > 4 && multiRefIdx != MULTI_REF_LINE_IDX[2])
+          {
+            m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[3], Ctx::MultiRefLineIdx(3));
+            if (MRL_NUM_REF_LINES > 5 && multiRefIdx != MULTI_REF_LINE_IDX[3])
+            {
+              m_BinEncoder.encodeBin(multiRefIdx != MULTI_REF_LINE_IDX[4], Ctx::MultiRefLineIdx(4));
+            }
+          }
+        }
+      }
+    }
+#else
     if (MRL_NUM_REF_LINES > 1)
     {
 #if JVET_W0123_TIMD_FUSION
@@ -1329,6 +1398,7 @@ void CABACWriter::extend_ref_line(const CodingUnit& cu)
       }
 
     }
+#endif
     pu = pu->next;
   }
 }
