@@ -4869,4 +4869,9 @@ uint8_t g_geoTmShape[2][GEO_NUM_ANGLES] = {
 const int8_t g_ccSaoCandPosX[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y] = { {-1,  0,  1, -1,  0,  1, -1,  0,  1} };
 const int8_t g_ccSaoCandPosY[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y] = { {-1, -1, -1,  0,  0,  0,  1,  1,  1} };
 #endif
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+const int8_t g_ccSaoEdgeTypeX[CCSAO_EDGE_TYPE][2] = { { -1, 1 }, { 0, 0 }, { -1, 1 }, { 1, -1 } };
+const int8_t g_ccSaoEdgeTypeY[CCSAO_EDGE_TYPE][2] = { { 0, 0 }, { -1, 1 }, { -1, 1 }, { -1, 1 } };
+const short  g_ccSaoQuanValue[CCSAO_QUAN_NUM]      = { 2, 4, 6, 8, 10, 14, 18, 22, 30, 38, 54, 70, 86, 118, 150, 182 };
+#endif
 //! \}

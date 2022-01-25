@@ -3640,6 +3640,51 @@ void HLSWriter::codeCcSao(Slice* pcSlice, PicHeader* picHeader, const SPS* sps, 
 
         for (int setIdx = 0; setIdx < ccSaoParam.setNum[compIdx]; setIdx++)
         {
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+          WRITE_FLAG(ccSaoParam.setType[compIdx][setIdx] ? 1 : 0,
+                     "ccsao_setType"); /* ccsao_setType = 1 means Edge offset, 0 means Band offset */
+          if (ccSaoParam.setType[compIdx][setIdx])
+          {
+            /* Edge offset - do correct checks */
+            CHECK(ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y] >= CCSAO_EDGE_TYPE, "ccsao_cand_pos_y_TYPE");
+            CHECK(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] == 0
+                    || ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] > CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C,
+                  "CCSAO bandNumY out of range");
+            CHECK(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] == 0
+                    || ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] > CCSAO_QUAN_NUM,
+                  "CCSAO bandNum chroma out of range");
+
+            WRITE_CODE(ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y], MAX_CCSAO_CAND_POS_Y_BITS - 2,
+                       "ccsao_cand_pos_y");
+            WRITE_CODE(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] - 1, MAX_CCSAO_BAND_NUM_Y_BITS - 2 + 1,
+                       "ccsao_band_num_y");
+            WRITE_CODE(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] - 1, MAX_CCSAO_BAND_NUM_U_BAND_BITS,
+                       "ccsao_band_num_u");
+          }
+          else
+          {
+            /* Band offset */
+            CHECK(ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y] >= MAX_CCSAO_CAND_POS_Y,
+                  "CCSAO candPosY out of range");
+            CHECK(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] == 0
+                    || ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] > MAX_CCSAO_BAND_NUM_Y,
+                  "CCSAO bandNumY out of range");
+            CHECK(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] == 0
+                    || ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] > MAX_CCSAO_BAND_NUM_U,
+                  "CCSAO bandNumU out of range");
+            CHECK(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] == 0
+                    || ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] > MAX_CCSAO_BAND_NUM_V,
+                  "CCSAO bandNumV out of range");
+
+            WRITE_CODE(ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y], MAX_CCSAO_CAND_POS_Y_BITS, "ccsao_cand_pos_y");
+            WRITE_CODE(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] - 1, MAX_CCSAO_BAND_NUM_Y_BITS,
+                       "ccsao_band_num_y");
+            WRITE_CODE(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] - 1, MAX_CCSAO_BAND_NUM_U_BITS,
+                       "ccsao_band_num_u");
+            WRITE_CODE(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] - 1, MAX_CCSAO_BAND_NUM_V_BITS,
+                       "ccsao_band_num_v");
+          }
+#else
           CHECK(ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y ] >= MAX_CCSAO_CAND_POS_Y, "CCSAO candPosY out of range");
           CHECK(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ] == 0 
              || ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ] >  MAX_CCSAO_BAND_NUM_Y, "CCSAO bandNumY out of range");
@@ -3652,11 +3697,38 @@ void HLSWriter::codeCcSao(Slice* pcSlice, PicHeader* picHeader, const SPS* sps, 
           WRITE_CODE(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ] - 1, MAX_CCSAO_BAND_NUM_Y_BITS, "ccsao_band_num_y");
           WRITE_CODE(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] - 1, MAX_CCSAO_BAND_NUM_U_BITS, "ccsao_band_num_u");
           WRITE_CODE(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] - 1, MAX_CCSAO_BAND_NUM_V_BITS, "ccsao_band_num_v");
-
+#endif
           const short *offset   = ccSaoParam.offset [compIdx][setIdx];
-          const int    classNum = ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ]
-                                * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb]
-                                * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr];
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+          int classNum = ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y]
+                         * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb]
+                         * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr];
+#else
+          const int classNum = ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y]
+                               * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb]
+                               * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr];
+
+#endif
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+          if (ccSaoParam.setType[compIdx][setIdx])
+          {
+            if (ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] <= CCSAO_EDGE_COMPARE_VALUE + CCSAO_EDGE_COMPARE_VALUE)
+            {
+              classNum = (ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y]) * CCSAO_EDGE_NUM;
+            }
+            else if (ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y]
+                     <= CCSAO_EDGE_COMPARE_VALUE + CCSAO_EDGE_COMPARE_VALUE + CCSAO_EDGE_COMPARE_VALUE)
+            {
+              classNum = (ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] - 4) * CCSAO_EDGE_NUM;
+            }
+            else if (ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y]
+                     <= CCSAO_EDGE_COMPARE_VALUE + CCSAO_EDGE_COMPARE_VALUE + CCSAO_EDGE_COMPARE_VALUE
+                          + CCSAO_EDGE_COMPARE_VALUE)
+            {
+              classNum = (ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] - 6) * CCSAO_EDGE_NUM;
+            }
+          }
+#endif
           for (int i = 0; i < classNum; i++)
           {
             CHECK((offset[i] > MAX_CCSAO_OFFSET_THR || offset[i] < -MAX_CCSAO_OFFSET_THR), "CCSAO offset out of range");

@@ -5972,16 +5972,59 @@ void HLSyntaxReader::parseCcSao( Slice* pcSlice, PicHeader* picHeader, const SPS
       for (int setIdx = 0; setIdx < ccSaoParam.setNum[compIdx]; setIdx++)
       {
         ccSaoParam.setEnabled[compIdx][setIdx] = true;
-
-        READ_CODE(MAX_CCSAO_CAND_POS_Y_BITS, uiCode, "ccsao_cand_pos_y"); ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y ] = uiCode;
-        READ_CODE(MAX_CCSAO_BAND_NUM_Y_BITS, uiCode, "ccsao_band_num_y"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ] = uiCode + 1;
-        READ_CODE(MAX_CCSAO_BAND_NUM_U_BITS, uiCode, "ccsao_band_num_u"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] = uiCode + 1;
-        READ_CODE(MAX_CCSAO_BAND_NUM_V_BITS, uiCode, "ccsao_band_num_v"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] = uiCode + 1;
-
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+        READ_FLAG(uiCode, "ccsao_setType");
+        ccSaoParam.setType[compIdx][setIdx] = uiCode;
+        if (ccSaoParam.setType[compIdx][setIdx])
+        {
+          /* Edge offset */
+          READ_CODE(MAX_CCSAO_CAND_POS_Y_BITS - 2, uiCode, "ccsao_cand_pos_y_TYPE");
+          ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y] = uiCode;
+          READ_CODE(MAX_CCSAO_BAND_NUM_Y_BITS - 2 + 1, uiCode, "ccsao_band_num_y");
+          ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] = uiCode + 1;
+          READ_CODE(MAX_CCSAO_BAND_NUM_U_BAND_BITS, uiCode, "ccsao_band_num_c");
+          ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] = uiCode + 1;
+        }
+        else
+        {
+          /* Band offset */
+#endif
+          READ_CODE(MAX_CCSAO_CAND_POS_Y_BITS, uiCode, "ccsao_cand_pos_y");
+          ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y] = uiCode;
+          READ_CODE(MAX_CCSAO_BAND_NUM_Y_BITS, uiCode, "ccsao_band_num_y");
+          ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] = uiCode + 1;
+          READ_CODE(MAX_CCSAO_BAND_NUM_U_BITS, uiCode, "ccsao_band_num_u");
+          ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] = uiCode + 1;
+          READ_CODE(MAX_CCSAO_BAND_NUM_V_BITS, uiCode, "ccsao_band_num_v");
+          ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] = uiCode + 1;
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+        }
+#endif
         short *offset   = ccSaoParam.offset [compIdx][setIdx];
         int    classNum = ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ]
                         * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb]
                         * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr];
+
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+        if (ccSaoParam.setType[compIdx][setIdx])
+        {
+          if (ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] <= CCSAO_EDGE_COMPARE_VALUE + CCSAO_EDGE_COMPARE_VALUE)
+          {
+            classNum = (ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y]) * CCSAO_EDGE_NUM;
+          }
+          else if (ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y]
+                   <= CCSAO_EDGE_COMPARE_VALUE + CCSAO_EDGE_COMPARE_VALUE + CCSAO_EDGE_COMPARE_VALUE)
+          {
+            classNum = (ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] - 4) * CCSAO_EDGE_NUM;
+          }
+          else if (ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y]
+                   <= CCSAO_EDGE_COMPARE_VALUE + CCSAO_EDGE_COMPARE_VALUE + CCSAO_EDGE_COMPARE_VALUE
+                        + CCSAO_EDGE_COMPARE_VALUE)
+          {
+            classNum = (ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] - 6) * CCSAO_EDGE_NUM;
+          }
+        }
+#endif
         for (int i = 0; i < classNum; i++)
         {
           READ_UVLC(uiCode, "ccsao_offset_abs"); offset[i] = uiCode;

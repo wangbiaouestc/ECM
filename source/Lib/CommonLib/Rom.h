@@ -343,5 +343,10 @@ extern const int g_addHypWeight[MULTI_HYP_PRED_NUM_WEIGHTS];
 extern const int8_t g_ccSaoCandPosX[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y];
 extern const int8_t g_ccSaoCandPosY[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y];
 #endif
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+extern const int8_t g_ccSaoEdgeTypeX[CCSAO_EDGE_TYPE][2];
+extern const int8_t g_ccSaoEdgeTypeY[CCSAO_EDGE_TYPE][2];
+extern const short  g_ccSaoQuanValue[CCSAO_QUAN_NUM];
+#endif
 #endif  //__TCOMROM__
 

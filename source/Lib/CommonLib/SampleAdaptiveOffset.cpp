@@ -1678,38 +1678,69 @@ void SampleAdaptiveOffset::offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitA
     if (m_ccSaoComParam.enabled[compIdx])
     {
       const int setIdc = m_ccSaoControl[compIdx][ctuRsAddr];
-
-      if (setIdc != 0)
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+      int setType = m_ccSaoComParam.setType[compIdx][setIdc - 1];
+      if (setType)
       {
-        const ComponentID compID     = ComponentID(compIdx);
-        const CompArea   &compArea   = area.block(compID);
-        const int         srcStrideY = srcYuv.get(COMPONENT_Y ).stride;
-        const int         srcStrideU = srcYuv.get(COMPONENT_Cb).stride;
-        const int         srcStrideV = srcYuv.get(COMPONENT_Cr).stride;
-        const int         dstStride  = dstYuv.get(compID      ).stride;
-        const Pel        *srcBlkY    = srcYuv.get(COMPONENT_Y ).bufAt(area.block(COMPONENT_Y ));
-        const Pel        *srcBlkU    = srcYuv.get(COMPONENT_Cb).bufAt(area.block(COMPONENT_Cb));
-        const Pel        *srcBlkV    = srcYuv.get(COMPONENT_Cr).bufAt(area.block(COMPONENT_Cr));
-              Pel        *dstBlk     = dstYuv.get(compID      ).bufAt(compArea);
-              
-        const uint16_t    candPosY   = m_ccSaoComParam.candPos[compIdx][setIdc - 1][COMPONENT_Y ];
-        const uint16_t    bandNumY   = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Y ];
-        const uint16_t    bandNumU   = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cb];
-        const uint16_t    bandNumV   = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cr];
-        const short      *offset     = m_ccSaoComParam.offset [compIdx][setIdc - 1];
+        /* Edge offset over here */
+        if (setIdc != 0)
+        {
+          const ComponentID compID     = ComponentID(compIdx);
+          const CompArea &  compArea   = area.block(compID);
+          const int         srcStrideY = srcYuv.get(COMPONENT_Y).stride;
+          const int         srcStrideU = srcYuv.get(COMPONENT_Cb).stride;
+          const int         srcStrideV = srcYuv.get(COMPONENT_Cr).stride;
+          const int         dstStride  = dstYuv.get(compID).stride;
+          const Pel *       srcBlkY    = srcYuv.get(COMPONENT_Y).bufAt(area.block(COMPONENT_Y));
+          const Pel *       srcBlkU    = srcYuv.get(COMPONENT_Cb).bufAt(area.block(COMPONENT_Cb));
+          const Pel *       srcBlkV    = srcYuv.get(COMPONENT_Cr).bufAt(area.block(COMPONENT_Cr));
+          Pel *             dstBlk     = dstYuv.get(compID).bufAt(compArea);
 
-        offsetBlockCcSaoNoClip(compID, cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID)
-                             , candPosY, bandNumY, bandNumU, bandNumV
-                             , offset
-                             , srcBlkY, srcBlkU, srcBlkV, dstBlk
-                             , srcStrideY, srcStrideU, srcStrideV, dstStride
-                             , compArea.width, compArea.height
-                             , isLeftAvail, isRightAvail
-                             , isAboveAvail, isBelowAvail
-                             , isAboveLeftAvail, isAboveRightAvail
-                             , isBelowLeftAvail, isBelowRightAvail
-                              );
+          const uint16_t candPosY = m_ccSaoComParam.candPos[compIdx][setIdc - 1][COMPONENT_Y];  /* Edge Type */
+          const uint16_t bandNumY = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Y];  /* Num Bands */
+          const uint16_t bandNumU = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cb]; /* treshold */
+          const uint16_t bandNumV = bandNumU;
+
+          const short *offset = m_ccSaoComParam.offset[compIdx][setIdc - 1];
+
+          offsetBlockCcSaoNoClipEdge(compID, cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID),
+                                     candPosY, bandNumY, bandNumU, bandNumV, offset, srcBlkY, srcBlkU, srcBlkV, dstBlk,
+                                     srcStrideY, srcStrideU, srcStrideV, dstStride, compArea.width, compArea.height,
+                                     isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail,
+                                     isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail);
+        }
       }
+      else
+      {
+#endif
+        if (setIdc != 0)
+        {
+          const ComponentID compID     = ComponentID(compIdx);
+          const CompArea &  compArea   = area.block(compID);
+          const int         srcStrideY = srcYuv.get(COMPONENT_Y).stride;
+          const int         srcStrideU = srcYuv.get(COMPONENT_Cb).stride;
+          const int         srcStrideV = srcYuv.get(COMPONENT_Cr).stride;
+          const int         dstStride  = dstYuv.get(compID).stride;
+          const Pel *       srcBlkY    = srcYuv.get(COMPONENT_Y).bufAt(area.block(COMPONENT_Y));
+          const Pel *       srcBlkU    = srcYuv.get(COMPONENT_Cb).bufAt(area.block(COMPONENT_Cb));
+          const Pel *       srcBlkV    = srcYuv.get(COMPONENT_Cr).bufAt(area.block(COMPONENT_Cr));
+          Pel *             dstBlk     = dstYuv.get(compID).bufAt(compArea);
+
+          const uint16_t candPosY = m_ccSaoComParam.candPos[compIdx][setIdc - 1][COMPONENT_Y];
+          const uint16_t bandNumY = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Y];
+          const uint16_t bandNumU = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cb];
+          const uint16_t bandNumV = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cr];
+          const short *  offset   = m_ccSaoComParam.offset[compIdx][setIdc - 1];
+
+          offsetBlockCcSaoNoClip(compID, cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID), candPosY,
+                                 bandNumY, bandNumU, bandNumV, offset, srcBlkY, srcBlkU, srcBlkV, dstBlk, srcStrideY,
+                                 srcStrideU, srcStrideV, dstStride, compArea.width, compArea.height, isLeftAvail,
+                                 isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail,
+                                 isBelowLeftAvail, isBelowRightAvail);
+        }
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+      }
+#endif
     }
   }
 }
@@ -1773,7 +1804,157 @@ void SampleAdaptiveOffset::offsetCTUCcSao(CodingStructure& cs, const UnitArea& a
     }
   }
 }
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+int calcDiffRange(Pel a, Pel b, int th)
+{
+  int diff      = a - b;
+  int value     = 0;
+  int thred     = g_ccSaoQuanValue[th];
+  int neg_thred = (-1) * thred;
+  if (diff < 0)
+  {
+    if (diff < neg_thred)
+    {
+      value = 0;
+    }
+    else
+    {
+      value = 1;
+    }      
+  }
+  else
+  {
+    if (diff < thred)
+    {
+      value = 2;
+    }
+    else
+    {
+      value = 3;
+    }
+  }
+  return value;
+}
 
+void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
+  const ComponentID compID, const int bitDepth, const ClpRng &clpRng, const uint16_t candPosY, const uint16_t bandNumY,
+  const uint16_t bandNumU, const uint16_t bandNumV, const short *offset, const Pel *srcY, const Pel *srcU,
+  const Pel *srcV, Pel *dst, const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride,
+  const int width, const int height, bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail,
+  bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail)
+{
+  const int candPosYXA = g_ccSaoEdgeTypeX[candPosY][0];
+  const int candPosYYA = g_ccSaoEdgeTypeY[candPosY][0];
+  const int candPosYXB = g_ccSaoEdgeTypeX[candPosY][1];
+  const int candPosYYB = g_ccSaoEdgeTypeY[candPosY][1];
+  int       signa, signb, band;
+  int       th = bandNumU - 1;
+
+  switch (compID)
+  {
+  case COMPONENT_Y:
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        const Pel *colY = srcY + x;
+        const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+        const Pel *colU = srcU + (x >> 1);
+        const Pel *colV = srcV + (x >> 1);
+
+        signa = calcDiffRange(*colY, *colA, th);
+        signb = calcDiffRange(*colY, *colB, th);
+
+        signa = signa * 4 + signb;
+        if (bandNumY <= 4)
+        {
+          band               = (*colY * bandNumY) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else if (bandNumY > 4 && bandNumY <= 6)
+        {
+          int bandc          = bandNumY - 4;
+          band               = (*colU * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else
+        {
+          int bandc          = bandNumY - 6;
+          band               = (*colV * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+      }
+      srcY += srcStrideY;
+      srcU += srcStrideU * (y & 0x1);
+      srcV += srcStrideV * (y & 0x1);
+      dst += dstStride;
+    }
+  }
+  break;
+  case COMPONENT_Cb:
+  case COMPONENT_Cr:
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        const Pel *colY = srcY + (x << 1);
+        const Pel *colA = srcY + (x << 1) + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + (x << 1) + srcStrideY * candPosYYB + candPosYXB;
+        signa           = calcDiffRange(*colY, *colA, th);
+        signb           = calcDiffRange(*colY, *colB, th);
+        signa           = signa * 4 + signb;
+
+        if (bandNumY <= 4)
+        {
+          band               = (*colY * bandNumY) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else if (bandNumY > 4 && bandNumY <= 6)
+        {
+          int        bandc   = bandNumY - 4;
+          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+          band               = (*colC * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else
+        {
+          const Pel *colCT   = (compID == COMPONENT_Cb)
+                                 ? srcV + (x)
+                                 : srcU + (x); /* also use the remaining third component for bandIdx calc.*/
+          int        bandc   = bandNumY - 6;
+          band               = (*colCT * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+      }
+      srcY += srcStrideY << 1;
+      srcU += srcStrideU;
+      srcV += srcStrideV;
+      dst += dstStride;
+    }
+  }
+  break;
+  default:
+  {
+    THROW("Not a supported CCSAO compID\n");
+  }
+  }
+}
+#endif
 void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, const int bitDepth, const ClpRng& clpRng
                                                 , const uint16_t candPosY
                                                 , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
