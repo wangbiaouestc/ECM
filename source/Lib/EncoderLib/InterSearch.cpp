@@ -7736,6 +7736,15 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 
       uint8_t nNumTransformCands = 1 + ( tsAllowed ? 1 : 0 ) + ( mtsAllowed ? 4 : 0 ); // DCT + TS + 4 MTS = 6 tests
       std::vector<TrMode> trModes;
+#if TU_256
+      if(tu.idx != cu.firstTU->idx)
+      {
+        trModes.push_back( TrMode( cu.firstTU->mtsIdx[compID], true ) );
+        nNumTransformCands = 1;
+      }
+      else
+      {
+#endif
       if (m_pcEncCfg->getCostMode() == COST_LOSSLESS_CODING && slice.isLossless())
       {
         nNumTransformCands = 0;
@@ -7773,6 +7782,10 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #endif
         }
       }
+#if TU_256
+      }
+#endif
+
       if (colorTransFlag && (m_pcEncCfg->getCostMode() != COST_LOSSLESS_CODING || !slice.isLossless()))
       {
         m_pcTrQuant->lambdaAdjustColorTrans(true);
@@ -8079,7 +8092,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           }
 
           // evaluate
+#if TU_256
+          if( isFirstMode || ( currCompCost < minCost[compID] ) || ( transformMode == 1 && currCompCost == minCost[compID] ) )
+#else
           if( ( currCompCost < minCost[compID] ) || ( transformMode == 1 && currCompCost == minCost[compID] ) )
+#endif
           {
             // copy component
             if (isFirstMode && ((nonCoeffCost < currCompCost) || (currAbsSum == 0))) // check for forced null
