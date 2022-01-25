@@ -2920,8 +2920,12 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       memcpy(ciipTmMrgCtx.interDirNeighbours, mergeCtxtmp.interDirNeighbours, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(unsigned char));
       memcpy(ciipTmMrgCtx.mvFieldNeighbours, mergeCtxtmp.mvFieldNeighbours, (CIIP_TM_MRG_MAX_NUM_CANDS << 1) * sizeof(MvField));
       memcpy(ciipTmMrgCtx.useAltHpelIf, mergeCtxtmp.useAltHpelIf, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(bool));
+#if INTER_LIC
       memcpy(ciipTmMrgCtx.LICFlags, mergeCtxtmp.LICFlags, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(bool));
+#endif
+#if MULTI_HYP_PRED
       memcpy(ciipTmMrgCtx.addHypNeighbours, mergeCtxtmp.addHypNeighbours, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(MultiHypVec));
+#endif
 #else
       ciipTmMrgCtx = mergeCtx;
       ciipTmMrgCtx.numValidMergeCand = int(pu.cs->sps->getMaxNumCiipTMMergeCand());
@@ -2929,8 +2933,12 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       memcpy(ciipTmMrgCtx.interDirNeighbours, mergeCtx.interDirNeighbours, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(unsigned char));
       memcpy(ciipTmMrgCtx.mvFieldNeighbours, mergeCtx.mvFieldNeighbours, (CIIP_TM_MRG_MAX_NUM_CANDS << 1) * sizeof(MvField));
       memcpy(ciipTmMrgCtx.useAltHpelIf, mergeCtx.useAltHpelIf, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(bool));
+#if INTER_LIC
       memcpy(ciipTmMrgCtx.LICFlags, mergeCtx.LICFlags, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(bool));
+#endif
+#if MULTI_HYP_PRED
       memcpy(ciipTmMrgCtx.addHypNeighbours, mergeCtx.addHypNeighbours, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(MultiHypVec));
+#endif
 #endif
 
       for (uint32_t uiMergeCand = 0; uiMergeCand < ciipTmMrgCtx.numValidMergeCand; uiMergeCand++)
@@ -8394,7 +8402,11 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   int maxBdmvrAmSearchLoop = 3;
   m_pcInterSearch->m_amvpOnlyCost = std::numeric_limits<Distortion>::max();
-  if ((tempCS->slice->getUseLIC() && (encTestMode.opts & ETO_LIC)) || !tempCS->slice->isInterB() || (tempCS->picHeader->getMvdL1ZeroFlag() == true))
+  if (!tempCS->slice->isInterB() || (tempCS->picHeader->getMvdL1ZeroFlag() == true)
+#if INTER_LIC
+      || (tempCS->slice->getUseLIC() && (encTestMode.opts & ETO_LIC))
+#endif
+      )
   {
     maxBdmvrAmSearchLoop = 1;
   }

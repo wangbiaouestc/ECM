@@ -2424,9 +2424,13 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
       }
       mrgCtx.interDirNeighbours [ mrgCtx.numValidMergeCand ] = 3;
       mrgCtx.BcwIdx             [ mrgCtx.numValidMergeCand ] = BCW_DEFAULT;
+#if INTER_LIC
       mrgCtx.LICFlags           [ mrgCtx.numValidMergeCand ] = false;
+#endif
       mrgCtx.useAltHpelIf       [ mrgCtx.numValidMergeCand ] = false;
+#if MULTI_HYP_PRED
       mrgCtx.addHypNeighbours   [ mrgCtx.numValidMergeCand ].clear();
+#endif
       mrgCtx.mvFieldNeighbours  [ mrgCtx.numValidMergeCand << 1].setMvField(Mv(0, 0), mergeRefIdx);
       mrgCtx.mvFieldNeighbours  [(mrgCtx.numValidMergeCand << 1) + 1].setMvField(Mv(0, 0), mergeRefIdx);
       mrgCtx.numValidMergeCand++;
@@ -2548,7 +2552,10 @@ bool PU::addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const i
       int refIdx1 = miNeighbor.refIdx[1];
       if (refIdx0 >= 0 && refIdx1 >= 0 
         && miNeighbor.BcwIdx == BCW_DEFAULT
-        && miNeighbor.addHypData.empty())
+#if MULTI_HYP_PRED
+        && miNeighbor.addHypData.empty()
+#endif
+        )
       {
         if (cs.slice->getRefPic(REF_PIC_LIST_0, refIdx0)->longTerm
           || cs.slice->getRefPic(REF_PIC_LIST_1, refIdx1)->longTerm)
