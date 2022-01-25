@@ -234,6 +234,20 @@ static const int MAX_CCSAO_OFFSET_THR        =                     15;
 static const int MAX_CCSAO_FILTER_LENGTH     =                      3;
 #endif
 
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+static const int N_C                            = 3; /* Num components*/
+static const int Y_C                            = 0; /* Y luma */
+static const int U_C                            = 1; /* Cb Chroma */
+static const int V_C                            = 2; /* Cr Chroma */
+static const int CCSAO_EDGE_NUM                 = 16;
+static const int CCSAO_EDGE_COMPARE_VALUE       = 2;
+static const int CCSAO_EDGE_TYPE                = 4;
+static const int CCSAO_QUAN_NUM                 = 16;
+static const int CCSAO_EDGE_BAND_NUM_Y          = 4;
+static const int CCSAO_EDGE_BAND_NUM_C          = 4;
+static const int MAX_CCSAO_BAND_NUM_U_BAND_BITS = 4;
+#endif
+
 static const int MAX_NUM_ALF_ALTERNATIVES_CHROMA =                  8;
 static const int MAX_NUM_ALF_CLASSES         =                     25;
 #if ALF_IMPROVEMENT

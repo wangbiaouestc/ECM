@@ -147,6 +147,16 @@ protected:
 #if JVET_W0066_CCSAO
   void applyCcSao(CodingStructure &cs, const PreCalcValues& pcv, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv);
   void offsetCTUCcSao(CodingStructure& cs, const UnitArea& area, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv, const int ctuRsAddr);
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+  void offsetBlockCcSaoNoClipEdge(const ComponentID compID, const int bitDepth, const ClpRng &clpRng,
+                                  const uint16_t candPosY, const uint16_t bandNumY, const uint16_t bandNumU,
+                                  const uint16_t bandNumV, const short *offset, const Pel *srcY, const Pel *srcU,
+                                  const Pel *srcV, Pel *dst, const int srcStrideY, const int srcStrideU,
+                                  const int srcStrideV, const int dstStride, const int width, const int height,
+                                  bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail,
+                                  bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail,
+                                  bool isBelowRightAvail);
+#endif
   void offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitArea& area, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv, const int ctuRsAddr);
   void offsetBlockCcSao(const ComponentID compID, const int bitDepth, const ClpRng& clpRng
                       , const uint16_t candPosY
