@@ -2859,7 +2859,9 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
             {
               PelUnitBuf predBufTmp = m_tmpPredStorage[1 - iRefList].getBuf( UnitAreaRelative(cu, pu) );
               motionCompensation( pu, predBufTmp, RefPicList(1 - iRefList) );
+#if MULTI_HYP_PRED
               CHECK(pu.addHypData.empty() == false, "this is not possible");
+#endif
               xMotionEstimation ( pu, origBuf, eRefPicList, cMvPredBi[iRefList][iRefIdxTemp], iRefIdxTemp, cMvTemp[iRefList][iRefIdxTemp], aaiMvpIdxBi[iRefList][iRefIdxTemp], uiBitsTemp, uiCostTemp, amvp[eRefPicList], true );
             }
             else
