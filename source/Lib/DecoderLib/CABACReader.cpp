@@ -4461,7 +4461,14 @@ void CABACReader::mts_idx( CodingUnit& cu, CUCtx& cuCtx )
     }
   }
 
+#if TU_256
+  for( auto &tmpTu : CU::traverseTUs( cu ) )
+  {
+    tmpTu.mtsIdx[COMPONENT_Y] = mtsIdx;
+  }
+#else
   tu.mtsIdx[COMPONENT_Y] = mtsIdx;
+#endif
 
   DTRACE(g_trace_ctx, D_SYNTAX, "mts_idx() etype=%d pos=(%d,%d) mtsIdx=%d\n", COMPONENT_Y, tu.cu->lx(), tu.cu->ly(), mtsIdx);
 }
