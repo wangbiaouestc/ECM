@@ -184,6 +184,10 @@ namespace PU
   void getNonAdjacentMergeCand        (const PredictionUnit &pu, MergeCtx& mvpMrgCtx);
 #endif
   void getIBCMergeCandidates          (const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx = -1);
+#if  JVET_Y0058_IBC_LIST_MODIFY
+  bool checkIsIBCCandidateValid       (const PredictionUnit &pu,const MotionInfo miNeighbor);
+  bool searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int height, int picWidth, int picHeight, int xBv, int yBv, int ctuSize);
+#endif
   void getInterMMVDMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx = -1);
   int getDistScaleFactor(const int &currPOC, const int &currRefPOC, const int &colPOC, const int &colRefPOC);
   bool isDiffMER                      (const Position &pos1, const Position &pos2, const unsigned plevel);
@@ -205,8 +209,10 @@ namespace PU
     , const bool isAvailableA1, const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
     , const bool ibcFlag
     , const bool isGt4x4
-#if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_X0083_BM_AMVP_MERGE_MODE || JVET_Y0058_IBC_LIST_MODIFY
     , const PredictionUnit &pu
+#endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
     , const int curPoc = 0
     , const int amvpPoc = 0
 #endif

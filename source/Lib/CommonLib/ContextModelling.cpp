@@ -540,7 +540,7 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 #endif
 }
 
-#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM)
+#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Y0058_IBC_LIST_MODIFY
 bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh) const
 {
   if (mvFieldNeighbours[(mergeCandIndex << 1)].refIdx < 0 && mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx < 0)
