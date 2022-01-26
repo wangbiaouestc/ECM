@@ -8076,6 +8076,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 
     cu.geoFlag = false;
     PU::getIBCMergeCandidates(pu, mergeCtx);
+#if JVET_Y0058_IBC_LIST_MODIFY
+    m_pcInterSearch->adjustIBCMergeCandidates(pu, mergeCtx);
+#endif
   }
 
   int candHasNoResidual[MRG_MAX_NUM_CANDS];
