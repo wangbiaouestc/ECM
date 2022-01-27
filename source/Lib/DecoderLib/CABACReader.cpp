@@ -2920,6 +2920,12 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
         }
 #endif
       }
+#if JVET_Y0128_NON_CTC
+      else
+      {
+        pu.refIdx[REF_PIC_LIST_1] = pu.cs->slice->getSymRefIdx(REF_PIC_LIST_1);
+      }
+#endif
       mvp_flag    ( pu, REF_PIC_LIST_1 );
     }
   }
@@ -3640,6 +3646,13 @@ void CABACReader::ref_idx( PredictionUnit &pu, RefPicList eRefList )
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   if (pu.amvpMergeModeFlag[1 - eRefList])
   {
+#if JVET_Y0128_NON_CTC
+    if (pu.cs->slice->getAmvpMergeModeOnlyOneValidRefIdx(eRefList) >= 0)
+    {
+      pu.refIdx[eRefList] = pu.cs->slice->getAmvpMergeModeOnlyOneValidRefIdx(eRefList);
+      return;
+    }
+#else
     const RefPicList refListAmvp = eRefList;
     const RefPicList refListMerge = RefPicList(1 - eRefList);
     const int curPoc = pu.cs->slice->getPOC();
@@ -3671,6 +3684,7 @@ void CABACReader::ref_idx( PredictionUnit &pu, RefPicList eRefList )
       pu.refIdx[eRefList] = onlyOneValidRefIdxAmvp;
       return;
     }
+#endif
   }
 #endif
 
@@ -3737,7 +3751,19 @@ void CABACReader::mvp_flag( PredictionUnit& pu, RefPicList eRefList )
   }
 #endif
 #if TM_AMVP
+#if JVET_Y0128_NON_CTC
+  unsigned mvp_idx = 0;
+  if (pu.cu->affine || CU::isIBC(*pu.cu))
+  {
+    mvp_idx = m_BinDecoder.decodeBin( Ctx::MVPIdx() );
+  }
+  else if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
+  {
+    mvp_idx = m_BinDecoder.decodeBin( Ctx::MVPIdx() );
+  }
+#else
   unsigned mvp_idx = !pu.cu->cs->sps->getUseDMVDMode() || pu.cu->affine || CU::isIBC(*pu.cu) ? m_BinDecoder.decodeBin( Ctx::MVPIdx() ) : 0;
+#endif
 #else
   unsigned mvp_idx = m_BinDecoder.decodeBin( Ctx::MVPIdx() );
 #endif
@@ -5312,7 +5338,11 @@ void CABACReader::amvpMerge_mode( PredictionUnit& pu )
     return;
   }
   unsigned useAmMode = 0;
+#if JVET_Y0128_NON_CTC
+  if (pu.cu->slice->getUseAmvpMergeMode() == true)
+#else
   if (!pu.cu->slice->getCheckLDC())
+#endif
   {
     useAmMode = m_BinDecoder.decodeBin(Ctx::amFlagState());
   }

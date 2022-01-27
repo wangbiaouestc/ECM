@@ -8405,7 +8405,11 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   int maxBdmvrAmSearchLoop = 3;
   m_pcInterSearch->m_amvpOnlyCost = std::numeric_limits<Distortion>::max();
+#if JVET_Y0128_NON_CTC
+  if (!tempCS->slice->isInterB() || (tempCS->slice->getUseAmvpMergeMode() == false)
+#else
   if (!tempCS->slice->isInterB() || (tempCS->picHeader->getMvdL1ZeroFlag() == true)
+#endif
 #if INTER_LIC
       || (tempCS->slice->getUseLIC() && (encTestMode.opts & ETO_LIC))
 #endif
@@ -8550,6 +8554,16 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
       isEqualUni = true;
     }
   }
+#if JVET_Y0128_NON_CTC && INTER_LIC
+  if (cu.LICFlag)
+  {
+    if (!PU::checkRprLicCondition(*cu.firstPU)) // To check whether LIC actually performs in MC
+    {
+      cu.LICFlag = false;
+      PU::spanLICFlags(*cu.firstPU, false);
+    }
+  }
+#endif
 #if ENABLE_OBMC //normal inter
   const unsigned wIdx = gp_sizeIdxInfo->idxFrom(partitioner.currArea().lwidth());
   CodingStructure *prevCS = tempCS;
@@ -8776,6 +8790,16 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
       isEqualUni = true;
     }
   }
+#if JVET_Y0128_NON_CTC && INTER_LIC
+  if (cu.LICFlag)
+  {
+    if (!PU::checkRprLicCondition(*cu.firstPU)) // To check whether LIC actually performs in MC
+    {
+      cu.LICFlag = false;
+      PU::spanLICFlags(*cu.firstPU, false);
+    }
+  }
+#endif
 
   if ( !CU::hasSubCUNonZeroMVd( cu ) && !CU::hasSubCUNonZeroAffineMVd( cu ) )
   {

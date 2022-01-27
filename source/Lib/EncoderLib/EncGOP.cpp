@@ -2744,7 +2744,15 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 #endif
     }
 
+#if JVET_Y0128_NON_CTC
+    bool  bDisableTMVP = pcSlice->scaleRefPicList( scaledRefPic, pcPic->cs->picHeader, m_pcEncLib->getApss(), picHeader->getLmcsAPS(), picHeader->getScalingListAPS(), false );
+    if ( picHeader->getEnableTMVPFlag() && bDisableTMVP )
+    {
+      picHeader->setEnableTMVPFlag( 0 );
+    }
+#else
     pcSlice->scaleRefPicList( scaledRefPic, pcPic->cs->picHeader, m_pcEncLib->getApss(), picHeader->getLmcsAPS(), picHeader->getScalingListAPS(), false );
+#endif
 
     // set adaptive search range for non-intra-slices
     if (m_pcCfg->getUseASR() && !pcSlice->isIntra())
@@ -2857,6 +2865,10 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
     {
       pcSlice->setBiDirPred( false, -1, -1 );
     }
+#if JVET_Y0128_NON_CTC
+    pcSlice->checkBMAvailability(pcSlice);
+    pcSlice->checkAmvpMergeModeAvailability(pcSlice);
+#endif
 
     double lambda            = 0.0;
     int actualHeadBits       = 0;

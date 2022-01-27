@@ -1822,7 +1822,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                 if (pu.amvpMergeModeFlag[1 - eRefList] == true)
                 {
 #if TM_AMVP
+#if JVET_Y0128_NON_CTC
+                  amvpInfo.numCand = PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) ? 1 : 2;
+#else
                   amvpInfo.numCand = 1;
+#endif
 #else
                   amvpInfo.numCand = AMVP_MAX_NUM_CANDS;
 #endif

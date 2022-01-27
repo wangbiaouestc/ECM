@@ -3367,6 +3367,12 @@ void CABACWriter::ref_idx( const PredictionUnit& pu, RefPicList eRefList )
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   if (pu.amvpMergeModeFlag[1 - eRefList])
   {
+#if JVET_Y0128_NON_CTC
+    if (pu.cu->slice->getAmvpMergeModeOnlyOneValidRefIdx(eRefList) >= 0)
+    {
+      return;
+    }
+#else
     const RefPicList refListAmvp = eRefList;
     const RefPicList refListMerge = RefPicList(1 - eRefList);
     const int curPoc = pu.cs->slice->getPOC();
@@ -3395,6 +3401,7 @@ void CABACWriter::ref_idx( const PredictionUnit& pu, RefPicList eRefList )
     {
       return;
     }
+#endif
   }
 #endif
 
@@ -3586,7 +3593,20 @@ void CABACWriter::mvp_flag( const PredictionUnit& pu, RefPicList eRefList )
   }
 #endif
 #if TM_AMVP
+#if JVET_Y0128_NON_CTC
+  bool needToCodeMvpIdx = false;
+  if (pu.cu->affine || CU::isIBC(*pu.cu))
+  {
+    needToCodeMvpIdx = true;
+  }
+  else if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
+  {
+    needToCodeMvpIdx = true;
+  }
+  if (needToCodeMvpIdx)
+#else
   if(!pu.cu->cs->sps->getUseDMVDMode() || pu.cu->affine || CU::isIBC(*pu.cu))
+#endif
 #endif
   m_BinEncoder.encodeBin( pu.mvpIdx[eRefList], Ctx::MVPIdx() );
   DTRACE( g_trace_ctx, D_SYNTAX, "mvp_flag() value=%d pos=(%d,%d)\n", pu.mvpIdx[eRefList], pu.lumaPos().x, pu.lumaPos().y );
@@ -5251,7 +5271,11 @@ void CABACWriter::amvpMerge_mode( const PredictionUnit& pu )
   }
   else
   {
+#if JVET_Y0128_NON_CTC
+    if (pu.cu->slice->getUseAmvpMergeMode())
+#else
     if (!pu.cu->slice->getCheckLDC())
+#endif
     {
       m_BinEncoder.encodeBin(0, Ctx::amFlagState());
     }

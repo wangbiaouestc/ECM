@@ -213,15 +213,21 @@ namespace PU
     , const PredictionUnit &pu
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
+#if !JVET_Y0128_NON_CTC
     , const int curPoc = 0
     , const int amvpPoc = 0
+#endif
 #endif
 #if TM_MRG
     , const uint32_t mvdSimilarityThresh = 1
 #endif
   );
 #if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0128_NON_CTC
+  bool checkIsValidMergeMvCand        (const PredictionUnit &pu, int8_t mergeRefIdx[ NUM_REF_PIC_LIST_01 ]);
+#else
   bool checkIsValidMergeMvCand        (const CodingStructure &cs, const PredictionUnit &pu, const int curPoc, const int amvpPoc, int8_t mergeRefIdx[ NUM_REF_PIC_LIST_01 ]);
+#endif
 #endif
   void addAMVPHMVPCand                (const PredictionUnit &pu, const RefPicList eRefPicList, const int currRefPOC, AMVPInfo &info);
   bool addAffineMVPCandUnscaled       ( const PredictionUnit &pu, const RefPicList &refPicList, const int &refIdx, const Position &pos, const MvpDir &dir, AffineAMVPInfo &affiAmvpInfo );
@@ -257,6 +263,9 @@ namespace PU
   void setAllAffineMvField            (      PredictionUnit &pu, MvField *mvField, RefPicList eRefList );
   void setAllAffineMv                 (      PredictionUnit &pu, Mv affLT, Mv affRT, Mv affLB, RefPicList eRefList, bool clipCPMVs = false );
   bool getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx &mrgCtx, bool& LICFlag, const int count, int mmvdList);
+#if JVET_Y0128_NON_CTC
+  bool isBiRefScaled(const CodingStructure& cs, const int refIdx0, const int refIdx1);
+#endif
 #if JVET_X0049_ADAPT_DMVR
   bool isBMMergeFlagCoded(const PredictionUnit& pu);
   bool isBiPredFromDifferentDirEqDistPoc(const PredictionUnit& pu, int refIdx0, int refIdx1);
@@ -321,6 +330,9 @@ namespace PU
 #endif
 #if INTER_LIC && RPR_ENABLE
   bool checkRprLicCondition(const PredictionUnit& pu);
+#endif
+#if JVET_Y0128_NON_CTC
+  bool checkTmEnableCondition(const SPS* sps, const PPS* pps, const Picture* refPic);
 #endif
 
 #if INTER_LIC
