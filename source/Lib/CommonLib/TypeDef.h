@@ -209,6 +209,7 @@
 
 // Software extensions
 #define RPR_ENABLE                                        1 // JVET-X0121: Fixes for RRP
+#define JVET_Y0128_NON_CTC                                1
 
 
 

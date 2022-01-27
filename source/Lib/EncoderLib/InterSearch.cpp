@@ -1,4 +1,4 @@
-/* The copyright in this software is being made available under the BSD
+﻿/* The copyright in this software is being made available under the BSD
  * License, included below. This software may be subject to other third party
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
@@ -2315,7 +2315,11 @@ bool InterSearch::predInterHashSearch(CodingUnit& cu, Partitioner& partitioner, 
     pu.mvpIdx[bestRefPicList] = bestMVPIndex;
 
 #if TM_AMVP
+#if JVET_Y0128_NON_CTC
+    pu.mvpNum[bestRefPicList] = PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(bestRefPicList, bestRefIndex)) ? 1 : 2;
+#else
     pu.mvpNum[bestRefPicList] = 1;
+#endif
 #else
     pu.mvpNum[bestRefPicList] = 2;
 #endif
@@ -2409,6 +2413,15 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
   int candidateRefIdxCount     = 0;
   if (amvpMergeModeFlag)
   {
+#if JVET_Y0128_NON_CTC
+    if (pu.cu->slice->getUseAmvpMergeMode() == false)
+    {
+      m_skipPROF = false;
+      m_encOnly = false;
+      bdmvrAmMergeNotValid = true;
+      return;
+    }
+#endif
     trySmvd = false;
     checkAffine = false;
     refListMerge = pu.amvpMergeModeFlag[0] ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
@@ -2423,6 +2436,15 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
       candidateRefIdxCount++;
     }
   }
+#if JVET_Y0128_NON_CTC
+  if ( amvpMergeModeFlag && !candidateRefIdxCount )
+  {
+    m_skipPROF = false;
+    m_encOnly = false;
+    bdmvrAmMergeNotValid = true;
+    return;
+  }
+#endif
 #endif
   if ( pu.cu->imv == 2 && checkNonAffine && pu.cu->slice->getSPS()->getAffineAmvrEnabledFlag() )
   {
@@ -3218,6 +3240,10 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
       {
         if (uiCostBi > ((m_amvpOnlyCost * 5) >> 2))
         {
+#if JVET_Y0128_NON_CTC
+          m_skipPROF = false;
+          m_encOnly = false;
+#endif
           bdmvrAmMergeNotValid = true;
           return;
         }
@@ -3862,7 +3888,7 @@ void InterSearch::xEstimateMvPredAMVP( PredictionUnit& pu, PelUnitBuf& origBuf, 
       const int mvField_amvp_idx_0 = MAX_NUM_AMVP_CANDS_MAX_REF + iRefIdx * AMVP_MAX_NUM_CANDS;
       pcAMVPInfo->mvCand[0] = mvField_amList[mvField_amvp_idx_0].mv;
       pcAMVPInfo->numCand = 1;
-#if !TM_AMVP
+#if !TM_AMVP || JVET_Y0128_NON_CTC
       const int mvField_amvp_idx_1 = mvField_amvp_idx_0 + 1;
       if (mvField_amList[mvField_amvp_idx_1].refIdx >= 0)
       {
@@ -3881,6 +3907,9 @@ void InterSearch::xEstimateMvPredAMVP( PredictionUnit& pu, PelUnitBuf& origBuf, 
   }
 #if INTER_LIC && RPR_ENABLE
   // xPredInterBlk may call PU::checkRprLicCondition()
+#if JVET_Y0128_NON_CTC
+  pu.interDir = (uint8_t)(eRefPicList + 1);
+#endif
   pu.refIdx[eRefPicList]      = iRefIdx;
   pu.refIdx[1 - eRefPicList]  = NOT_VALID;
 #endif
@@ -4080,6 +4109,9 @@ Distortion InterSearch::xGetAffineTemplateCost( PredictionUnit& pu, PelUnitBuf& 
   const Picture* picRef = pu.cu->slice->getRefPic( eRefPicList, iRefIdx );
 #if INTER_LIC && RPR_ENABLE
   // xPredAffineBlk may call PU::checkRprLicCondition()
+#if JVET_Y0128_NON_CTC
+  pu.interDir = (uint8_t)(eRefPicList + 1);
+#endif
   pu.refIdx[eRefPicList]    = iRefIdx;
   pu.refIdx[1-eRefPicList]  = NOT_VALID;
 #endif

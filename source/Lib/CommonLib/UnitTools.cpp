@@ -1326,8 +1326,10 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
                         , const PredictionUnit &pu
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
+#if !JVET_Y0128_NON_CTC
                         , const int curPoc
                         , const int amvpPoc
+#endif
 #endif
 #if TM_MRG
                         , const uint32_t mvdSimilarityThresh
@@ -1345,7 +1347,11 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
     miNeighbor = lut[num_avai_candInLUT - mrgIdx];
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0128_NON_CTC
+    bool isValidAmMode = checkIsValidMergeMvCand(pu, miNeighbor.refIdx);
+#else
     bool isValidAmMode = checkIsValidMergeMvCand(cs, pu, curPoc, amvpPoc, miNeighbor.refIdx);
+#endif
     if (isValidAmMode &&
         ( mrgIdx > 2 || ((mrgIdx > 1 || !isGt4x4) && ibcFlag)
           || ((!isAvailableA1 || (miLeft != miNeighbor)) && (!isAvailableB1 || (miAbove != miNeighbor))) )
@@ -1945,6 +1951,12 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   mrgCtx.numValidMergeCand = maxNumMergeCand;
   // compute the location of the current PU
 #if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0128_NON_CTC
+  if (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1])
+  {
+    mrgCtx.numValidMergeCand = (mrgCandIdx + 1) > maxNumMergeCand ? maxNumMergeCand : (mrgCandIdx + 1);
+  }
+#else
   const int curPoc = slice.getPOC();
   RefPicList amvpRefList = REF_PIC_LIST_X;
   RefPicList mergeRefList = REF_PIC_LIST_X;
@@ -1956,6 +1968,7 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     amvpPoc = slice.getRefPOC(amvpRefList, pu.refIdx[amvpRefList]);
     mrgCtx.numValidMergeCand = (mrgCandIdx + 1) > maxNumMergeCand ? maxNumMergeCand : (mrgCandIdx + 1);
   }
+#endif
 #endif
 
   int cnt = 0;
@@ -1975,7 +1988,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     miAbove = puAbove->getMotionInfo(posRT.offset(0, -1));
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0128_NON_CTC
+    bool isValidAmMode = checkIsValidMergeMvCand(pu, miAbove.refIdx);
+#else
     bool isValidAmMode = checkIsValidMergeMvCand(cs, pu, curPoc, amvpPoc, miAbove.refIdx);
+#endif
     if (isValidAmMode)
     {
 #endif
@@ -2040,7 +2057,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     miLeft = puLeft->getMotionInfo(posLB.offset(-1, 0));
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0128_NON_CTC
+    bool isValidAmMode = checkIsValidMergeMvCand(pu, miLeft.refIdx);
+#else
     bool isValidAmMode = checkIsValidMergeMvCand(cs, pu, curPoc, amvpPoc, miLeft.refIdx);
+#endif
     if (isValidAmMode && (!isAvailableB1 || (miAbove != miLeft)))
 #else
     if (!isAvailableB1 || (miAbove != miLeft))
@@ -2105,7 +2126,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     miAboveRight = puAboveRight->getMotionInfo( posRT.offset( 1, -1 ) );
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0128_NON_CTC
+    bool isValidAmMode = checkIsValidMergeMvCand(pu, miAboveRight.refIdx);
+#else
     bool isValidAmMode = checkIsValidMergeMvCand(cs, pu, curPoc, amvpPoc, miAboveRight.refIdx);
+#endif
     if (isValidAmMode && (!isAvailableB1 || ( miAbove != miAboveRight )))
 #else
     if( !isAvailableB1 || ( miAbove != miAboveRight ) )
@@ -2171,7 +2196,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     miBelowLeft = puLeftBottom->getMotionInfo( posLB.offset( -1, 1 ) );
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0128_NON_CTC
+    bool isValidAmMode = checkIsValidMergeMvCand(pu, miBelowLeft.refIdx);
+#else
     bool isValidAmMode = checkIsValidMergeMvCand(cs, pu, curPoc, amvpPoc, miBelowLeft.refIdx);
+#endif
     if (isValidAmMode && (!isAvailableA1 || ( miBelowLeft != miLeft )))
 #else
     if( !isAvailableA1 || ( miBelowLeft != miLeft ) )
@@ -2250,7 +2279,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
       miAboveLeft = puAboveLeft->getMotionInfo( posLT.offset( -1, -1 ) );
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0128_NON_CTC
+      bool isValidAmMode = checkIsValidMergeMvCand(pu, miAboveLeft.refIdx);
+#else
       bool isValidAmMode = checkIsValidMergeMvCand(cs, pu, curPoc, amvpPoc, miAboveLeft.refIdx);
+#endif
       if (isValidAmMode && ( !isAvailableA1 || ( miLeft != miAboveLeft ) ) && ( !isAvailableB1 || ( miAbove != miAboveLeft ) ))
 #else
       if( ( !isAvailableA1 || ( miLeft != miAboveLeft ) ) && ( !isAvailableB1 || ( miAbove != miAboveLeft ) ) )
@@ -2377,7 +2410,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
     int8_t tempRefIdx[2] = { mrgCtx.mvFieldNeighbours[2 * uiArrayAddr].refIdx, mrgCtx.mvFieldNeighbours[2 * uiArrayAddr + 1].refIdx };
+#if JVET_Y0128_NON_CTC
+    bool isValidAmMode = checkIsValidMergeMvCand(pu, tempRefIdx);
+#else
     bool isValidAmMode = checkIsValidMergeMvCand(cs, pu, curPoc, amvpPoc, tempRefIdx);
+#endif
     if (isValidAmMode && ( dir != 0 ))
 #else
     if( dir != 0 )
@@ -2499,7 +2536,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0128_NON_CTC
+        bool isValidAmMode = checkIsValidMergeMvCand(pu, miNeighbor.refIdx);
+#else
         bool isValidAmMode = checkIsValidMergeMvCand(cs, pu, curPoc, amvpPoc, miNeighbor.refIdx);
+#endif
         if (isValidAmMode)
         {
 #endif
@@ -2598,8 +2639,10 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
       , pu
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
+#if !JVET_Y0128_NON_CTC
       , curPoc
       , amvpPoc
+#endif
 #endif
 #if TM_MRG
       , mvdSimilarityThresh
@@ -2723,8 +2766,13 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     mrgCtx.numValidMergeCand = uiArrayAddr;
     while ((mrgCtx.numValidMergeCand < targetMaxNumMergeCand) && (mergeRefIdx < iNumRefIdx))
     {
+#if JVET_Y0128_NON_CTC
+      if (pu.cu->slice->getAmvpMergeModeValidCandPair(pu.amvpMergeModeFlag[0] ? mergeRefIdx  : pu.refIdx[0],
+                                                      pu.amvpMergeModeFlag[0] ? pu.refIdx[1] : mergeRefIdx) == false)
+#else
       const int mergePoc = slice.getRefPOC(mergeRefList, mergeRefIdx);
       if ((amvpPoc - curPoc) * (mergePoc - curPoc) > 0)
+#endif
       {
         mergeRefIdx++;
         continue;
@@ -2787,12 +2835,36 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #endif
 }
 
+#if JVET_Y0128_NON_CTC
+bool  PU::isBiRefScaled(const CodingStructure& cs, const int refIdx0, const int refIdx1)
+{
+  const bool isResamplingPossible = cs.sps->getRprEnabledFlag();
+  if (!isResamplingPossible)
+  {
+    return false;
+  }
+
+  const bool ref0IsScaled = refIdx0 < 0 || refIdx0 >= MAX_NUM_REF
+    ? false
+    : isResamplingPossible && cs.slice->getRefPic(REF_PIC_LIST_0, refIdx0)->isRefScaled(cs.pps);
+  const bool ref1IsScaled = refIdx1 < 0 || refIdx1 >= MAX_NUM_REF
+    ? false
+    : isResamplingPossible && cs.slice->getRefPic(REF_PIC_LIST_1, refIdx1)->isRefScaled(cs.pps);
+
+  return (ref0IsScaled || ref1IsScaled);
+}
+#endif
+
 #if JVET_X0049_ADAPT_DMVR
 bool PU::isBMMergeFlagCoded(const PredictionUnit& pu)
 {
 
   if (pu.cs->slice->getSPS()->getUseDMVDMode()
+#if JVET_Y0128_NON_CTC
+    && pu.cs->slice->getUseBM()
+#else
     && !pu.cs->slice->getCheckLDC()
+#endif
     )
   {
     return (pu.cs->sps->getMaxNumBMMergeCand() > 0);
@@ -2809,6 +2881,12 @@ bool PU::isBiPredFromDifferentDirEqDistPoc(const PredictionUnit& pu, int refIdx0
     {
       return false;
     }
+#if JVET_Y0128_NON_CTC
+    if ( PU::isBiRefScaled( *pu.cs, refIdx0, refIdx1 ) )
+    {
+      return false;
+    }
+#endif
     const int poc0 = pu.cu->slice->getRefPOC(REF_PIC_LIST_0, refIdx0);
     const int poc1 = pu.cu->slice->getRefPOC(REF_PIC_LIST_1, refIdx1);
     const int poc = pu.cu->slice->getPOC();
@@ -2881,6 +2959,12 @@ bool PU::addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const i
             isBmCand = true;
           }
         }
+#if JVET_Y0128_NON_CTC
+        if ( isBmCand && PU::isBiRefScaled( cs, refIdx0, refIdx1 ) )
+        {
+          isBmCand = false;
+        }
+#endif
       }
       if (!isBmCand)
       {
@@ -3501,7 +3585,11 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
 
   mrgCtx.numCandToTestEnc = cnt;
 
+#if JVET_Y0128_NON_CTC
+  while(cnt < maxNumMergeCand)
+#else
   if (cnt < maxNumMergeCand)
+#endif
   {
     mrgCtx.interDirNeighbours[cnt] = 3;
     mrgCtx.BcwIdx[cnt] = BCW_DEFAULT;
@@ -3512,10 +3600,17 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
     mrgCtx.addHypNeighbours[cnt].clear();
 #endif
     mrgCtx.useAltHpelIf[cnt] = false;
+#if JVET_Y0128_NON_CTC
+    mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(Mv(0, 0), pu.cs->slice->getBMDefaultRefIdx(0));
+    mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(0, 0), pu.cs->slice->getBMDefaultRefIdx(1));
+#else
     mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(Mv(0, 0), 0);
     mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(0, 0), 0);
+#endif
+#if !JVET_Y0128_NON_CTC
 #if NON_ADJACENT_MRG_CAND || TM_MRG
     if (!mrgCtx.xCheckSimilarMotion(cnt, mvThreshod))
+#endif
 #endif
     {
       if (mrgCandIdx == cnt)
@@ -4365,14 +4460,23 @@ bool PU::checkRprLicCondition( const PredictionUnit & pu )
 {
   if ( pu.cs->sps->getLicEnabledFlag() )
   {
+#if JVET_Y0128_NON_CTC
+    if(pu.interDir != 1 && pu.interDir != 2)
+#else
     if( pu.refIdx[0] >= 0 && pu.refIdx[1] >= 0 )
+#endif
     {
       return false;
     }
 
     bool  bLicEnabled = true;
+#if JVET_Y0128_NON_CTC
+    int iRefIdx             = (pu.interDir == 1) ? pu.refIdx[0] : pu.refIdx[1];
+    RefPicList  eRefPicList = (pu.interDir == 1) ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+#else
     int iRefIdx             = (pu.refIdx[0] >= 0) ? pu.refIdx[0] : pu.refIdx[1];
     RefPicList  eRefPicList = (pu.refIdx[0] >= 0) ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+#endif
 
     const bool isResamplingPossible = pu.cs->sps->getRprEnabledFlag();
     if( isResamplingPossible && pu.cu->slice->getRefPic( eRefPicList, iRefIdx )->isRefScaled( pu.cs->pps ) )
@@ -4383,6 +4487,29 @@ bool PU::checkRprLicCondition( const PredictionUnit & pu )
     return bLicEnabled;
   }
   else
+  {
+    return false;
+  }
+}
+#endif
+
+#if JVET_Y0128_NON_CTC
+bool PU::checkTmEnableCondition(const SPS* sps, const PPS* pps, const Picture* refPic)
+{
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+  if (sps->getUseDMVDMode())
+  {
+    if (sps->getRprEnabledFlag())
+    {
+      return !refPic->isRefScaled(pps);
+    }
+    else
+    {
+      return true;
+    }
+  }
+  else
+#endif
   {
     return false;
   }
@@ -4859,7 +4986,11 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
 {
   CodingStructure &cs = *pu.cs;
 #if TM_AMVP
+#if JVET_Y0128_NON_CTC
+  interPred = PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefPicList, refIdx)) ? interPred : nullptr;
+#else
   interPred = pu.cu->cs->sps->getUseDMVDMode() ? interPred : nullptr;
+#endif
   if (cs.pcv->isEncoder && interPred != nullptr && interPred->readTplAmvpBuffer(amvpInfo, *pu.cu, eRefPicList, refIdx))
   {
     return;
@@ -6144,8 +6275,13 @@ void PU::getAfMmvdMvf(const PredictionUnit& pu, const AffineMergeCtx& affineMerg
   CHECK(affineMergeCtx.mergeType[afMmvdBase] != MRG_TYPE_DEFAULT_N, "AFF_MMVD base candidate type is not regular Affine!");
 
   static const int32_t refMvdCands[AF_MMVD_STEP_NUM] = { 1, 2, 4, 8, 16 };
+#if JVET_Y0128_NON_CTC
+  const int32_t iPicSize = pu.cu->slice->getPic()->lumaSize().area();
+  const int32_t mvShift  = iPicSize < 921600 ? 0 : ( iPicSize < 4096000 ? 2 : MV_FRACTIONAL_BITS_INTERNAL - 1); // 921600 = 1280x720, 4096000 = 2560x1600
+#else
   static const int32_t iPicSize = pu.cu->slice->getPic()->lumaSize().area();
   static const int32_t mvShift  = iPicSize < 921600 ? 0 : ( iPicSize < 4096000 ? 2 : MV_FRACTIONAL_BITS_INTERNAL - 1); // 921600 = 1280x720, 4096000 = 2560x1600
+#endif
   int step = refMvdCands[offsetStep] << mvShift;
   int affineType = affineMergeCtx.affineType[afMmvdBase];
 
@@ -7029,6 +7165,12 @@ bool PU::isBiPredFromDifferentDirEqDistPoc(const PredictionUnit& pu)
     {
       return false;
     }
+#if JVET_Y0128_NON_CTC
+    if ( PU::isBiRefScaled( *pu.cs, pu.refIdx[0], pu.refIdx[1] ) )
+    {
+      return false;
+    }
+#endif
     const int poc0 = pu.cu->slice->getRefPOC(REF_PIC_LIST_0, pu.refIdx[0]);
     const int poc1 = pu.cu->slice->getRefPOC(REF_PIC_LIST_1, pu.refIdx[1]);
     const int poc = pu.cu->slice->getPOC();
@@ -8642,6 +8784,13 @@ bool CU::isLICFlagPresent(const CodingUnit& cu)
     return false;
   }
 
+#if JVET_Y0128_NON_CTC
+  if (!PU::checkRprLicCondition(*cu.firstPU))
+  {
+    return false;
+  }
+#endif
+
   return true;
 }
 
@@ -8797,6 +8946,21 @@ Position TU::posSignHidingFirstCG( const TransformUnit &tu, ComponentID compID )
 #endif
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0128_NON_CTC
+bool PU::checkIsValidMergeMvCand(const PredictionUnit &pu, int8_t mergeRefIdx[ NUM_REF_PIC_LIST_01 ])
+{
+  if (pu.amvpMergeModeFlag[REF_PIC_LIST_0] || pu.amvpMergeModeFlag[REF_PIC_LIST_1])
+  {
+    if (mergeRefIdx[pu.amvpMergeModeFlag[REF_PIC_LIST_0] ? 0 : 1] < 0)
+    {
+      return false;
+    }
+    return pu.cu->slice->getAmvpMergeModeValidCandPair(pu.amvpMergeModeFlag[REF_PIC_LIST_0] ? mergeRefIdx[0] : pu.refIdx[0],
+                                                       pu.amvpMergeModeFlag[REF_PIC_LIST_0] ? pu.refIdx[1]   : mergeRefIdx[1]);
+  }
+  return true;
+}
+#else
 bool PU::checkIsValidMergeMvCand(const CodingStructure &cs, const PredictionUnit &pu, const int curPoc, const int amvpPoc, int8_t mergeRefIdx[ NUM_REF_PIC_LIST_01 ])
 {
   if (pu.amvpMergeModeFlag[REF_PIC_LIST_0])
@@ -8825,4 +8989,5 @@ bool PU::checkIsValidMergeMvCand(const CodingStructure &cs, const PredictionUnit
   }
   return true;
 }
+#endif
 #endif

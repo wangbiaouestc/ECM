@@ -2622,7 +2622,15 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
     CU::checkConformanceILRP(pcSlice);
   }
 
+#if JVET_Y0128_NON_CTC
+  bool  bDisableTMVP = pcSlice->scaleRefPicList( scaledRefPic, m_pcPic->cs->picHeader, m_parameterSetManager.getAPSs(), m_picHeader.getLmcsAPS(), m_picHeader.getScalingListAPS(), true );
+  if ( m_picHeader.getEnableTMVPFlag() && bDisableTMVP )
+  {
+    m_picHeader.setEnableTMVPFlag(0);
+  }
+#else
   pcSlice->scaleRefPicList( scaledRefPic, m_pcPic->cs->picHeader, m_parameterSetManager.getAPSs(), m_picHeader.getLmcsAPS(), m_picHeader.getScalingListAPS(), true );
+#endif
 
 #if !JVET_S0258_SUBPIC_CONSTRAINTS
   // For each value of i in the range of 0 to sps_num_subpics_minus1, inclusive, when the value of SubpicIdVal[ i ] of a current picture is not equal to the value of SubpicIdVal[ i ] of a reference picture,
@@ -2699,6 +2707,10 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
 
       pcSlice->setCheckLDC(bLowDelay);
     }
+#if JVET_Y0128_NON_CTC
+    //---------------
+    pcSlice->setRefPOCList();
+#endif
 
     if (pcSlice->getSPS()->getUseSMVD() && pcSlice->getCheckLDC() == false
       && pcSlice->getPicHeader()->getMvdL1ZeroFlag() == false
@@ -2782,10 +2794,17 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
       pcSlice->setBiDirPred( false, -1, -1 );
     }
 
+#if !JVET_Y0128_NON_CTC
     //---------------
     pcSlice->setRefPOCList();
+#endif
+
 #if MULTI_HYP_PRED 
     CHECK(pcSlice->getMultiHypRefPicList().size() != pcSlice->getNumMultiHypRefPics(), "error with number of multi-hyp ref pics");
+#endif
+#if JVET_Y0128_NON_CTC
+    pcSlice->checkBMAvailability(pcSlice);
+    pcSlice->checkAmvpMergeModeAvailability(pcSlice);
 #endif
 
     NalUnitInfo naluInfo;

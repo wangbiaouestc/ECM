@@ -3030,6 +3030,14 @@ private:
 
   bool                       m_biDirPred;
   int                        m_symRefIdx[2];
+#if JVET_Y0128_NON_CTC
+  bool                       m_useBM;
+  int                        m_bmDefaultRefIdx[2];
+  bool                       m_useAmvpMergeMode;
+  int                        m_amvpMergeModeOnlyOneValidRefIdx[2];
+  bool                       m_amvpMergeModeValidRefIdx[2][MAX_NUM_REF];
+  bool                       m_amvpMergeModeValidCandPair[MAX_NUM_REF][MAX_NUM_REF];
+#endif
 
   //  Data
   int                        m_iSliceQpDelta;
@@ -3295,6 +3303,17 @@ public:
   void                        setBiDirPred( bool b, int refIdx0, int refIdx1 ) { m_biDirPred = b; m_symRefIdx[0] = refIdx0; m_symRefIdx[1] = refIdx1; }
   bool                        getBiDirPred() const { return m_biDirPred; }
   int                         getSymRefIdx( int refList ) const { return m_symRefIdx[refList]; }
+#if JVET_Y0128_NON_CTC
+  void                        checkBMAvailability(Slice* pcSlice);
+  void                        setUseBM( bool b, int refIdx0, int refIdx1 ) { m_useBM = b; m_bmDefaultRefIdx[0] = refIdx0; m_bmDefaultRefIdx[1] = refIdx1; }
+  bool                        getUseBM() const { return m_useBM; }
+  int                         getBMDefaultRefIdx( int refList ) const { return m_bmDefaultRefIdx[refList]; }
+  void                        checkAmvpMergeModeAvailability(Slice* pcSlice);
+  bool                        getUseAmvpMergeMode() const { return m_useAmvpMergeMode; }
+  int                         getAmvpMergeModeOnlyOneValidRefIdx(RefPicList refList) const { return m_amvpMergeModeOnlyOneValidRefIdx[refList]; }
+  bool                        getAmvpMergeModeValidRefIdx(RefPicList refList, int refIdx) { return m_amvpMergeModeValidRefIdx[refList][refIdx]; }
+  bool                        getAmvpMergeModeValidCandPair(int refIdxInRefList0, int refIdxInRefList1) const { return m_amvpMergeModeValidCandPair[refIdxInRefList0][refIdxInRefList1]; }
+#endif
 
   bool                        isIntra() const                                        { return m_eSliceType == I_SLICE;                               }
   bool                        isInterB() const                                       { return m_eSliceType == B_SLICE;                               }
@@ -3466,7 +3485,11 @@ public:
   bool                        getDisableSATDForRD() { return m_disableSATDForRd; }
   void                        setLossless(bool b) { m_isLossless = b; }
   bool                        isLossless() const { return m_isLossless; }
+#if JVET_Y0128_NON_CTC
+  bool                        scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS** apss, APS* lmcsAps, APS* scalingListAps, const bool isDecoder );
+#else
   void                        scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS** apss, APS* lmcsAps, APS* scalingListAps, const bool isDecoder );
+#endif
   void                        freeScaledRefPicList( Picture *scaledRefPic[] );
   bool                        checkRPR();
   const std::pair<int, int>&  getScalingRatio( const RefPicList refPicList, const int refIdx )  const { CHECK( refIdx < 0, "Invalid reference index" ); return m_scalingRatio[refPicList][refIdx]; }

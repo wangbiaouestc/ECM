@@ -4768,6 +4768,16 @@ void  InterPrediction::adjustInterMergeCandidates(PredictionUnit &pu, MergeCtx& 
     PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
     PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
 
+#if JVET_Y0128_NON_CTC
+    bool bRefIsRescaled = false;
+    for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
+    {
+      const RefPicList eRefPicList = refList ? REF_PIC_LIST_1 : REF_PIC_LIST_0;
+      bRefIsRescaled |= (pu.refIdx[refList] >= 0) ? pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->isRefScaled(pu.cs->pps) : false;
+    }
+    if ( !bRefIsRescaled )
+    {
+#endif
     getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
 
     if (m_bAMLTemplateAvailabe[0])
@@ -4783,6 +4793,10 @@ void  InterPrediction::adjustInterMergeCandidates(PredictionUnit &pu, MergeCtx& 
 
       uiCost += cDistParam.distFunc(cDistParam);
     }
+#if JVET_Y0128_NON_CTC
+    }
+#endif
+
     updateCandList(uiMergeCand, uiCost, ADAPTIVE_SUB_GROUP_SIZE, RdCandList[uiMergeCand / ADAPTIVE_SUB_GROUP_SIZE], candCostList[uiMergeCand / ADAPTIVE_SUB_GROUP_SIZE]);
   }
 #if JVET_X0049_ADAPT_DMVR
@@ -6360,6 +6374,12 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
 {
   CHECK(refIdx < 0, "Invalid reference index for TM");
   const CodingUnit& cu   = *pu.cu;
+#if JVET_Y0128_NON_CTC
+  if ( cu.slice->getRefPic(eRefList, refIdx)->isRefScaled( pu.cs->pps ) )
+  {
+    return std::numeric_limits<Distortion>::max();
+  }
+#endif
   const Picture& refPic  = *cu.slice->getRefPic(eRefList, refIdx)->unscaledPic;
   bool doSimilarityCheck = otherMvf == nullptr ? false : cu.slice->getRefPOC((RefPicList)eRefList, refIdx) == cu.slice->getRefPOC((RefPicList)(1 - eRefList), otherMvf->refIdx);
 
@@ -6380,6 +6400,12 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
   }
   else // bi prediction
   {
+#if JVET_Y0128_NON_CTC
+    if ( cu.slice->getRefPic((RefPicList)(1 - eRefList), otherMvf->refIdx)->isRefScaled(pu.cs->pps) )
+    {
+      return std::numeric_limits<Distortion>::max();
+    }
+#endif
     const Picture& otherRefPic = *cu.slice->getRefPic((RefPicList)(1-eRefList), otherMvf->refIdx)->unscaledPic;
     tplCtrl.removeHighFreq<TM_TPL_SIZE>(otherRefPic, otherMvf->mv, getBcwWeight(cu.BcwIdx, eRefList));
     tplCtrl.deriveMvUni<TM_TPL_SIZE>();
@@ -8337,11 +8363,20 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
     amvpRefIdxEnd = decAmvpRefIdx + 1;
     decAmvpMvpIdx = pu.mvpIdx[refListAmvp];
   }
+#if !JVET_Y0128_NON_CTC
   const int curPoc = pu.cu->slice->getPOC();
+#endif
   const bool useMR = pu.lumaSize().area() > 64;
 
   for (int refIdxAmvp = amvpRefIdxStart; refIdxAmvp < amvpRefIdxEnd; refIdxAmvp++)
   {
+#if JVET_Y0128_NON_CTC
+    if (pu.cu->slice->getAmvpMergeModeValidRefIdx(refListAmvp, refIdxAmvp) == false)
+    {
+      continue;
+    }
+    CHECK(pu.cu->slice->getRefPic(refListAmvp, refIdxAmvp)->isRefScaled(pu.cu->cs->pps), "this is not possible");
+#else
     const int amvpRefPoc = pu.cu->slice->getRefPOC(refListAmvp, refIdxAmvp);
     bool findValidMergeRefPic = false;
     for (int refIdxCandMerge = 0; refIdxCandMerge < pu.cu->slice->getNumRefIdx(refListMerge); refIdxCandMerge++)
@@ -8357,6 +8392,7 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
     {
       continue;
     }
+#endif
     pu.refIdx[refListAmvp] = refIdxAmvp;
     AMVPInfo amvpInfo;
     PU::fillMvpCand( pu, refListAmvp, refIdxAmvp, amvpInfo
@@ -8409,6 +8445,9 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
           pu.refIdx[refListMerge] = bmMergeCtx.mvFieldNeighbours[(mergeIdx << 1) + refListMerge].refIdx;
           mvAmBdmvr[refListAmvp] = amvpInfo.mvCand[bestMvpIdxToTest];
           mvAmBdmvr[refListMerge] = bmMergeCtx.mvFieldNeighbours[(mergeIdx << 1) + refListMerge].mv;
+#if JVET_Y0128_NON_CTC
+          CHECK(pu.cu->slice->getRefPic((RefPicList)refListMerge, pu.refIdx[refListMerge])->isRefScaled(pu.cs->pps), "this is not possible");
+#endif
           Distortion tmpBmCost = xBDMVRGetMatchingError(pu, mvAmBdmvr, useMR);
           temp.mergeIdx = mergeIdx;
           temp.bmCost = tmpBmCost;
@@ -8438,6 +8477,10 @@ void InterPrediction::amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvF
   const int mergeRefPoc = pu.cu->slice->getRefPOC(refListMerge, pu.refIdx[refListMerge]);
   const bool useMR = pu.lumaSize().area() > 64;
   const int amvpRefPoc = pu.cu->slice->getRefPOC(refListAmvp, pu.refIdx[refListAmvp]);
+#if JVET_Y0128_NON_CTC
+  CHECK(pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0])->isRefScaled(pu.cs->pps), "this is not possible");
+  CHECK(pu.cu->slice->getRefPic(REF_PIC_LIST_1, pu.refIdx[1])->isRefScaled(pu.cs->pps), "this is not possible");
+#endif
   if ((mergeRefPoc - curPoc) == (curPoc - amvpRefPoc))
   {
     Mv         mvInitial[2];

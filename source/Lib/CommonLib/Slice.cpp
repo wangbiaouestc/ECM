@@ -225,6 +225,162 @@ void Slice::initSlice()
   m_tileGroupCcAlfCrApsId = -1;
 }
 
+#if JVET_Y0128_NON_CTC
+void Slice::checkBMAvailability(Slice* pcSlice)
+{
+  pcSlice->setUseBM(false, -1, -1);
+  if (!pcSlice->getSPS()->getUseDMVDMode()
+    || pcSlice->getCheckLDC()
+    )
+  {
+    return;
+  }
+  const int curPoc = pcSlice->getPOC();
+  for (int refIdxInList0 = 0; refIdxInList0 < pcSlice->getNumRefIdx(REF_PIC_LIST_0); refIdxInList0++)
+  {
+    for (int refIdxInList1 = 0; refIdxInList1 < pcSlice->getNumRefIdx(REF_PIC_LIST_1); refIdxInList1++)
+    {
+      if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->isRefScaled(pcSlice->getPPS()) ||
+        pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->isRefScaled(pcSlice->getPPS()))
+      {
+        continue;
+      }
+      if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->longTerm ||
+        pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->longTerm)
+      {
+        continue;
+      }
+      const WPScalingParam *wp0 = pcSlice->getWpScaling(REF_PIC_LIST_0, refIdxInList0);
+      const WPScalingParam *wp1 = pcSlice->getWpScaling(REF_PIC_LIST_1, refIdxInList1);
+      if (WPScalingParam::isWeighted(wp0) || WPScalingParam::isWeighted(wp1))
+      {
+        continue;
+      }
+
+      const int tmpPoc0 = pcSlice->getRefPOC(REF_PIC_LIST_0, refIdxInList0);
+      const int tmpPoc1 = pcSlice->getRefPOC(REF_PIC_LIST_1, refIdxInList1);
+      if ((tmpPoc0 - curPoc) * (tmpPoc1 - curPoc) < 0
+        && abs(curPoc - tmpPoc0) == abs(curPoc - tmpPoc1))
+      {
+        pcSlice->setUseBM(true, refIdxInList0, refIdxInList1);
+        break;
+      }
+    }
+  }
+}
+
+void Slice::checkAmvpMergeModeAvailability(Slice* pcSlice)
+{
+  m_useAmvpMergeMode = false;
+  m_amvpMergeModeOnlyOneValidRefIdx[0] = -1;
+  m_amvpMergeModeOnlyOneValidRefIdx[1] = -1;
+  for (int refIdxInList0 = 0; refIdxInList0 < pcSlice->getNumRefIdx(REF_PIC_LIST_0); refIdxInList0++)
+  {
+    for (int refIdxInList1 = 0; refIdxInList1 < pcSlice->getNumRefIdx(REF_PIC_LIST_1); refIdxInList1++)
+    {
+      m_amvpMergeModeValidCandPair[refIdxInList0][refIdxInList1] = false;
+    }
+    m_amvpMergeModeValidRefIdx[REF_PIC_LIST_0][refIdxInList0] = false;
+    m_amvpMergeModeValidRefIdx[REF_PIC_LIST_1][refIdxInList0] = false;
+  }
+  if (!pcSlice->getSPS()->getUseDMVDMode()
+    || pcSlice->getCheckLDC()
+    )
+  {
+    return;
+  }
+  const int curPoc = pcSlice->getPOC();
+  // collect slice enabling condition from L0
+  int onlyOneValidRefIdxAmvp = -1;
+  int candidateRefIdxCount = 0;
+  for (int refIdxInList0 = 0; refIdxInList0 < pcSlice->getNumRefIdx(REF_PIC_LIST_0); refIdxInList0++)
+  {
+    bool validCandidate = false;
+    for (int refIdxInList1 = 0; refIdxInList1 < pcSlice->getNumRefIdx(REF_PIC_LIST_1); refIdxInList1++)
+    {
+      if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->isRefScaled(pcSlice->getPPS()) ||
+        pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->isRefScaled(pcSlice->getPPS()))
+      {
+        continue;
+      }
+      if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->longTerm ||
+        pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->longTerm)
+      {
+        continue;
+      }
+      const WPScalingParam *wp0 = pcSlice->getWpScaling(REF_PIC_LIST_0, refIdxInList0);
+      const WPScalingParam *wp1 = pcSlice->getWpScaling(REF_PIC_LIST_1, refIdxInList1);
+      if (WPScalingParam::isWeighted(wp0) || WPScalingParam::isWeighted(wp1))
+      {
+        continue;
+      }
+      const int tmpPoc0 = pcSlice->getRefPOC(REF_PIC_LIST_0, refIdxInList0);
+      const int tmpPoc1 = pcSlice->getRefPOC(REF_PIC_LIST_1, refIdxInList1);
+      if ((tmpPoc0 - curPoc) * (tmpPoc1 - curPoc) < 0)
+      {
+        validCandidate = true;
+        m_amvpMergeModeValidCandPair[refIdxInList0][refIdxInList1] = true;
+      }
+    }
+    if (validCandidate)
+    {
+      m_useAmvpMergeMode = true;
+      m_amvpMergeModeValidRefIdx[REF_PIC_LIST_0][refIdxInList0] = true;
+      onlyOneValidRefIdxAmvp = refIdxInList0;
+      candidateRefIdxCount++;
+    }
+  }
+  if (candidateRefIdxCount == 1)
+  {
+    m_amvpMergeModeOnlyOneValidRefIdx[0] = onlyOneValidRefIdxAmvp;
+  }
+  // collect slice enabling condition from L1
+  onlyOneValidRefIdxAmvp = -1;
+  candidateRefIdxCount = 0;
+  for (int refIdxInList1 = 0; refIdxInList1 < pcSlice->getNumRefIdx(REF_PIC_LIST_1); refIdxInList1++)
+  {
+    bool validCandidate = false;
+    for (int refIdxInList0 = 0; refIdxInList0 < pcSlice->getNumRefIdx(REF_PIC_LIST_0); refIdxInList0++)
+    {
+      if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->isRefScaled(pcSlice->getPPS()) ||
+        pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->isRefScaled(pcSlice->getPPS()))
+      {
+        continue;
+      }
+      if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->longTerm ||
+        pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->longTerm)
+      {
+        continue;
+      }
+      const WPScalingParam *wp0 = pcSlice->getWpScaling(REF_PIC_LIST_0, refIdxInList0);
+      const WPScalingParam *wp1 = pcSlice->getWpScaling(REF_PIC_LIST_1, refIdxInList1);
+      if (WPScalingParam::isWeighted(wp0) || WPScalingParam::isWeighted(wp1))
+      {
+        continue;
+      }
+      const int tmpPoc0 = pcSlice->getRefPOC(REF_PIC_LIST_0, refIdxInList0);
+      const int tmpPoc1 = pcSlice->getRefPOC(REF_PIC_LIST_1, refIdxInList1);
+      if ((tmpPoc0 - curPoc) * (tmpPoc1 - curPoc) < 0)
+      {
+        validCandidate = true;
+        m_amvpMergeModeValidCandPair[refIdxInList0][refIdxInList1] = true;
+      }
+    }
+    if (validCandidate)
+    {
+      m_useAmvpMergeMode = true;
+      m_amvpMergeModeValidRefIdx[REF_PIC_LIST_1][refIdxInList1] = true;
+      onlyOneValidRefIdxAmvp = refIdxInList1;
+      candidateRefIdxCount++;
+    }
+  }
+  if (candidateRefIdxCount == 1)
+  {
+    m_amvpMergeModeOnlyOneValidRefIdx[1] = onlyOneValidRefIdxAmvp;
+  }
+}
+#endif
+
 void Slice::inheritFromPicHeader( PicHeader *picHeader, const PPS *pps, const SPS *sps )
 {
   if (pps->getRplInfoInPhFlag())
@@ -4562,7 +4718,11 @@ uint32_t PreCalcValues::getMinQtSize( const Slice &slice, const ChannelType chTy
   return minQtSize[getValIdx( slice, chType )];
 }
 
+#if JVET_Y0128_NON_CTC
+bool Slice::scaleRefPicList( Picture* scaledRefPic[ ], PicHeader* picHeader, APS** apss, APS* lmcsAps, APS* scalingListAps, const bool isDecoder )
+#else
 void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS** apss, APS* lmcsAps, APS* scalingListAps, const bool isDecoder )
+#endif
 {
   int i;
   const SPS* sps = getSPS();
@@ -4575,7 +4735,11 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
 
   if( m_eSliceType == I_SLICE )
   {
+#if JVET_Y0128_NON_CTC
+    return false;
+#else
     return;
+#endif
   }
 
   freeScaledRefPicList( scaledRefPic );
@@ -4706,10 +4870,14 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
   }
 
   //Make sure that TMVP is disabled when there are no reference pictures with the same resolution
+#if JVET_Y0128_NON_CTC
+  return (!refPicIsSameRes);
+#else
   if(!refPicIsSameRes)
   {
     CHECK(getPicHeader()->getEnableTMVPFlag() != 0, "TMVP cannot be enabled in pictures that have no reference pictures with the same resolution")
   }
+#endif
 }
 
 void Slice::freeScaledRefPicList( Picture *scaledRefPic[] )
