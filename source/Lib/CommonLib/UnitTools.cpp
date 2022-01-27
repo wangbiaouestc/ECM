@@ -2858,7 +2858,9 @@ bool PU::addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const i
       int refIdx0 = miNeighbor.refIdx[0];
       int refIdx1 = miNeighbor.refIdx[1];
       if (refIdx0 >= 0 && refIdx1 >= 0 
+#if !JVET_Y0089_DMVR_BCW
         && miNeighbor.BcwIdx == BCW_DEFAULT
+#endif
 #if MULTI_HYP_PRED
         && miNeighbor.addHypData.empty()
 #endif
@@ -2891,6 +2893,9 @@ bool PU::addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const i
       if (slice.isInterB())
       {
         mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miNeighbor.mv[1], miNeighbor.refIdx[1]);
+#if JVET_Y0089_DMVR_BCW
+        mrgCtx.BcwIdx[cnt] = (mrgCtx.interDirNeighbours[cnt] == 3) ? miNeighbor.BcwIdx : BCW_DEFAULT;
+#endif
       }
 #if NON_ADJACENT_MRG_CAND
       if (mrgCtx.xCheckSimilarMotion(cnt
@@ -2985,6 +2990,9 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
       mrgCtx.useAltHpelIf[cnt] = miAbove.useAltHpelIf;
       mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miAbove.mv[0], miAbove.refIdx[0]);
       mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miAbove.mv[1], miAbove.refIdx[1]);
+#if JVET_Y0089_DMVR_BCW
+      mrgCtx.BcwIdx[cnt] = (mrgCtx.interDirNeighbours[cnt] == 3) ? puAbove->cu->BcwIdx : BCW_DEFAULT;
+#endif
 #if NON_ADJACENT_MRG_CAND || TM_MRG
       if (!mrgCtx.xCheckSimilarMotion(cnt, mvThreshod))
       {
@@ -3028,6 +3036,9 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
         // get Mv from Left
         mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miLeft.mv[0], miLeft.refIdx[0]);
         mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miLeft.mv[1], miLeft.refIdx[1]);
+#if JVET_Y0089_DMVR_BCW
+        mrgCtx.BcwIdx[cnt] = (mrgCtx.interDirNeighbours[cnt] == 3) ? puLeft->cu->BcwIdx : BCW_DEFAULT;
+#endif
 #if NON_ADJACENT_MRG_CAND || TM_MRG
         if (!mrgCtx.xCheckSimilarMotion(cnt, mvThreshod))
         {
@@ -3072,6 +3083,9 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
         mrgCtx.useAltHpelIf[cnt] = miAboveRight.useAltHpelIf;
         mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miAboveRight.mv[0], miAboveRight.refIdx[0]);
         mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miAboveRight.mv[1], miAboveRight.refIdx[1]);
+#if JVET_Y0089_DMVR_BCW
+        mrgCtx.BcwIdx[cnt] = (mrgCtx.interDirNeighbours[cnt] == 3) ? puAboveRight->cu->BcwIdx : BCW_DEFAULT;
+#endif
 
 #if NON_ADJACENT_MRG_CAND || TM_MRG
         if (!mrgCtx.xCheckSimilarMotion(cnt, mvThreshod))
@@ -3116,6 +3130,9 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
         // get Mv from Bottom-Left
         mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miBelowLeft.mv[0], miBelowLeft.refIdx[0]);
         mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miBelowLeft.mv[1], miBelowLeft.refIdx[1]);
+#if JVET_Y0089_DMVR_BCW
+        mrgCtx.BcwIdx[cnt] = (mrgCtx.interDirNeighbours[cnt] == 3) ? puLeftBottom->cu->BcwIdx : BCW_DEFAULT;
+#endif
 
 #if NON_ADJACENT_MRG_CAND || TM_MRG
         if (!mrgCtx.xCheckSimilarMotion(cnt, mvThreshod))
@@ -3163,6 +3180,9 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
         // get Mv from Above-Left
         mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miAboveLeft.mv[0], miAboveLeft.refIdx[0]);
         mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miAboveLeft.mv[1], miAboveLeft.refIdx[1]);
+#if JVET_Y0089_DMVR_BCW
+        mrgCtx.BcwIdx[cnt] = (mrgCtx.interDirNeighbours[cnt] == 3) ? puAboveLeft->cu->BcwIdx : BCW_DEFAULT;
+#endif
 
 #if NON_ADJACENT_MRG_CAND || TM_MRG
         if (!mrgCtx.xCheckSimilarMotion(cnt, mvThreshod))
@@ -3283,6 +3303,9 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
 #if MULTI_HYP_PRED
       mrgCtx.addHypNeighbours[cnt] = mvpMrgCtx1->addHypNeighbours[0];
 #endif
+#if JVET_Y0089_DMVR_BCW
+      mrgCtx.BcwIdx[cnt] = (mrgCtx.interDirNeighbours[cnt] == 3) ? mvpMrgCtx1->BcwIdx[0] : BCW_DEFAULT;
+#endif
 #if NON_ADJACENT_MRG_CAND || TM_MRG
       if (!mrgCtx.xCheckSimilarMotion(cnt, mvThreshod))
 #endif
@@ -3353,6 +3376,9 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
           mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNeighbor.mv[0], miNeighbor.refIdx[0]);
           mrgCtx.useAltHpelIf[cnt] = miNeighbor.useAltHpelIf;
           mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miNeighbor.mv[1], miNeighbor.refIdx[1]);
+#if JVET_Y0089_DMVR_BCW
+          mrgCtx.BcwIdx[cnt] = (mrgCtx.interDirNeighbours[cnt] == 3) ? puNonAdjacent->cu->BcwIdx : BCW_DEFAULT;
+#endif
 
 #if NON_ADJACENT_MRG_CAND || TM_MRG
           if (!mrgCtx.xCheckSimilarMotion(cnt, mvThreshod))
@@ -3379,6 +3405,9 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
       mrgCtx.mvFieldNeighbours[cnt << 1] = mvpMrgCtx2->mvFieldNeighbours[uiNumCand << 1];
       mrgCtx.useAltHpelIf[cnt] = mvpMrgCtx2->useAltHpelIf[uiNumCand];
       mrgCtx.mvFieldNeighbours[(cnt << 1) + 1] = mvpMrgCtx2->mvFieldNeighbours[(uiNumCand << 1) + 1];
+#if JVET_Y0089_DMVR_BCW
+      mrgCtx.BcwIdx[cnt] = (mrgCtx.interDirNeighbours[cnt] == 3) ? mvpMrgCtx2->BcwIdx[uiNumCand] : BCW_DEFAULT;
+#endif
 #if NON_ADJACENT_MRG_CAND || TM_MRG
       if (!mrgCtx.xCheckSimilarMotion(cnt, mvThreshod))
 #endif
@@ -4319,7 +4348,9 @@ bool PU::checkBDMVRCondition(const PredictionUnit& pu)
 #endif
       && !pu.cu->mmvdSkip
       && PU::isBiPredFromDifferentDirEqDistPoc( pu )
+#if !JVET_Y0089_DMVR_BCW
       && ( pu.cu->BcwIdx == BCW_DEFAULT )
+#endif
       && !WPScalingParam::isWeighted( wp0 ) && !WPScalingParam::isWeighted( wp1 ) && !ref0IsScaled && !ref1IsScaled;
   }
   else
@@ -6564,8 +6595,18 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
         for (int xStart = 0; xStart < pu.lwidth(); xStart += dx)
         {
           const int bdmvrSubPuIdx = (yStart >> DMVR_SUBCU_HEIGHT_LOG2) * DMVR_SUBPU_STRIDE + (xStart >> DMVR_SUBCU_WIDTH_LOG2);
-          mi.mv[0] = bdmvrSubPuMv0[bdmvrSubPuIdx] + bdofSubPuMvOffset[subPuIdx];
-          mi.mv[1] = bdmvrSubPuMv1[bdmvrSubPuIdx] - bdofSubPuMvOffset[subPuIdx];
+#if JVET_Y0089_DMVR_BCW
+          if (pu.cu->BcwIdx != BCW_DEFAULT)
+          {
+            mi.mv[0] = bdmvrSubPuMv0[bdmvrSubPuIdx];
+            mi.mv[1] = bdmvrSubPuMv1[bdmvrSubPuIdx];
+          }
+          else
+#endif
+          {
+            mi.mv[0] = bdmvrSubPuMv0[bdmvrSubPuIdx] + bdofSubPuMvOffset[subPuIdx];
+            mi.mv[1] = bdmvrSubPuMv1[bdmvrSubPuIdx] - bdofSubPuMvOffset[subPuIdx];
+          }
 
           subPuIdx++;
           MotionBuf mb = pu.cs->getMotionBuf(Area(pu.lx() + xStart, pu.ly() + yStart, dx, dy));

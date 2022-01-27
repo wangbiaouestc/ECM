@@ -7066,6 +7066,9 @@ bool InterPrediction::processBDMVRPU2Dir(PredictionUnit& pu, bool subPURefine[2]
 {
   const int lumaArea = pu.lumaSize().area();
   bool       bUseMR = lumaArea > 64;
+#if JVET_Y0089_DMVR_BCW
+  bUseMR |= (pu.cu->BcwIdx != BCW_DEFAULT);
+#endif
   subPURefine[0] = subPURefine[1] = true;
 
   Distortion minCost = std::numeric_limits<Distortion>::max();
@@ -7141,6 +7144,9 @@ void InterPrediction::processBDMVRSubPU(PredictionUnit& pu, bool subPURefine)
   DistParam cDistParam;
   cDistParam.applyWeight = false;
   cDistParam.useMR = false;
+#if JVET_Y0089_DMVR_BCW
+  cDistParam.useMR |= (pu.cu->BcwIdx != BCW_DEFAULT);
+#endif
 
   Pel* pelBuffer[2] = { nullptr, nullptr };
   pelBuffer[0] = m_filteredBlock[3][REF_PIC_LIST_0][0] + BDMVR_CENTER_POSITION;
@@ -7245,6 +7251,9 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
   {
     Distortion minCost = std::numeric_limits<Distortion>::max();
     bool       bUseMR = lumaArea > 64;
+#if JVET_Y0089_DMVR_BCW
+    bUseMR    |= (pu.cu->BcwIdx != BCW_DEFAULT);
+#endif
     Mv         mvFinal_PU[2] = { pu.mv[0], pu.mv[1] };
     Mv         mvInitial_PU[2] = { pu.mv[0], pu.mv[1] };
 
@@ -7347,6 +7356,9 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
   DistParam cDistParam;
   cDistParam.applyWeight = false;
   cDistParam.useMR = false;
+#if JVET_Y0089_DMVR_BCW
+  cDistParam.useMR |= (pu.cu->BcwIdx != BCW_DEFAULT);
+#endif
 
   Pel* pelBuffer[2] = { nullptr, nullptr };
   pelBuffer[0] = m_filteredBlock[3][REF_PIC_LIST_0][0] + BDMVR_CENTER_POSITION;
