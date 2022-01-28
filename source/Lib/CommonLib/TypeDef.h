@@ -1,4 +1,4 @@
-﻿/* The copyright in this software is being made available under the BSD
+/* The copyright in this software is being made available under the BSD
  * License, included below. This software may be subject to other third party
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
@@ -49,6 +49,11 @@
 #include <cstring>
 #include <assert.h>
 #include <cassert>
+
+
+
+
+
 
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
@@ -155,6 +160,7 @@
 #define TM_AMVP                                           1 // Add template matching to non-subblock inter to refine regular AMVP candidates
 #define TM_MRG                                            1 // Add template matching to non-subblock inter to refine regular merge candidates
 #define JVET_W0090_ARMC_TM                                1 // JVET-W0090: Adaptive reordering of merge candidates with template matching
+#define JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED            1 // JVET-Y0067: TM based reordering for MMVD and affine MMVD and MVD sign prediction
 #endif
 #define JVET_W0097_GPM_MMVD_TM                            1 // JVET-W0097: GPM-MMVD and GPM-TM, GPM-TM part is controlled by TM_MRG
 #define JVET_X0141_CIIP_TIMD_TM                           1 // JVET-X0141: CIIP with TIMD and TM merge, CIIP-TM part is controlled by TM_MRG, and CIIP-TIMD part is controlled by JVET_W0123_TIMD_FUSION
@@ -882,7 +888,6 @@ enum DFunc
   DF_TM_L_WSAD_FULL_NBIT,
   DF_TM_A_WMRSAD_FULL_NBIT,
   DF_TM_L_WMRSAD_FULL_NBIT,
-
   DF_TOTAL_FUNCTIONS
 #else
   DF_TOTAL_FUNCTIONS = 65

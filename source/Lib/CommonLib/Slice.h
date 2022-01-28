@@ -1523,6 +1523,9 @@ private:
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   bool              m_DMVDMode;
 #endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  bool              m_MVSD;
+#endif
   bool              m_SBT;
   bool              m_ISP;
   ChromaFormat      m_chromaFormatIdc;
@@ -1973,6 +1976,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   void                    setUseDMVDMode(bool b)                                                          { m_DMVDMode = b; }
   bool                    getUseDMVDMode() const                                                          { return m_DMVDMode; }
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void                    setUseMVSD(bool b) { m_MVSD = b; }
+  bool                    getUseMVSD()const                                                               { return m_MVSD; }
 #endif
   bool                    getBdofControlPresentFlag()const                                                { return m_BdofControlPresentFlag; }
   void                    setBdofControlPresentFlag(bool b)                                               { m_BdofControlPresentFlag = b;    }

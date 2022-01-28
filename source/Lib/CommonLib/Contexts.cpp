@@ -845,12 +845,21 @@ const CtxSet ContextSetCfg::MmvdMergeIdx = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::MmvdStepMvpIdx = ContextSetCfg::addCtxSet
 ({
-	{ 59 },
-	{ 60 },
-	{ 35 },
-	{ 0 },
-	{ 0 },
-	{ 0 }
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  { 35, 35, 35, 35, 35},
+  { 35, 35, 35, 35, 35},
+  { 35, 35, 35, 35, 35},
+  { 4,  4,  4,  4,  4 },
+  { 4,  4,  4,  4,  4 },
+  { 4,  4,  4,  4,  4 }
+#else
+  { 59 },
+  { 60 },
+  { 35 },
+  { 0 },
+  { 0 },
+  { 0 }
+#endif
 });
 
 #if JVET_W0097_GPM_MMVD_TM
@@ -898,12 +907,21 @@ const CtxSet ContextSetCfg::AfMmvdIdx = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::AfMmvdOffsetStep = ContextSetCfg::addCtxSet
 ({
-	{ 51 },
-	{ 60 },
-	{ 35 },
-	{ 0 },
-	{ 0 },
-	{ 0 }
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  { 35, 35, 35, 35, 35 },
+  { 35, 35, 35, 35, 35 },
+  { 35, 35, 35, 35, 35 },
+  { 4,  4,  4,  4,  4 },
+  { 4,  4,  4,  4,  4 },
+  { 4,  4,  4,  4,  4 }
+#else
+  { 51 },
+  { 60 },
+  { 35 },
+  { 0 },
+  { 0 },
+  { 0 }
+#endif
 });
 #endif
 
@@ -1206,7 +1224,17 @@ const CtxSet ContextSetCfg::Mvd = ContextSetCfg::addCtxSet
 	{ 9,  6 },
 	{ 9, 10 }
 });
-
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+const CtxSet ContextSetCfg::MvsdIdx = ContextSetCfg::addCtxSet
+({
+  { 34, 34, 34, 34,},
+  { 34, 34, 34, 34,},
+  { 34, 34, 34, 34,},
+  { 13, 13, 13, 13,},
+  { 13, 13, 13, 13,},
+  { 13, 13, 13, 13,}
+});
+#endif
 #if MULTI_HYP_PRED
 const CtxSet ContextSetCfg::MultiHypothesisFlag = ContextSetCfg::addCtxSet
 ({

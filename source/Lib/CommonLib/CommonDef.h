@@ -523,8 +523,24 @@ static const int LAST_SIGNIFICANT_GROUPS =                         14;
 
 static const int AFFINE_MIN_BLOCK_SIZE =                            4; ///< Minimum affine MC block size
 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int MMVD_REFINE_STEP =                                 6; ///< max number of distance step
+#else
 static const int MMVD_REFINE_STEP =                                 8; ///< max number of distance step
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int MMVD_MAX_DIR =                                     16;
+#endif
+
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int MMVD_SIZE_SHIFT =                                   3;
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int MMVD_MAX_REFINE_NUM =                              (MMVD_REFINE_STEP * MMVD_MAX_DIR); ///< max number of candidate from a base candidate
+#else
 static const int MMVD_MAX_REFINE_NUM =                              (MMVD_REFINE_STEP * 4); ///< max number of candidate from a base candidate
+#endif
+
 static const int MMVD_BASE_MV_NUM =                                 2; ///< max number of base candidate
 static const int MMVD_ADD_NUM =                                     (MMVD_MAX_REFINE_NUM * MMVD_BASE_MV_NUM);///< total number of mmvd candidate
 #if MERGE_ENC_OPT
@@ -533,6 +549,9 @@ static const int MMVD_MRG_MAX_RD_NUM =                              20;
 static const int MMVD_MRG_MAX_RD_NUM =                              MRG_MAX_NUM_CANDS;
 #endif
 static const int MMVD_MRG_MAX_RD_BUF_NUM =                          (MMVD_MRG_MAX_RD_NUM + 1);///< increase buffer size by 1
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int LAST_MERGE_MMVD_IDX_CABAC =                              5;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
 static const int GPM_MMVD_REFINE_STEP = 8;
 static const int GPM_MMVD_REFINE_DIRECTION = 4;
@@ -608,6 +627,10 @@ static const int    PICTURE_DISTANCE_TH =                           1;
 static const int    FAST_SKIP_DEPTH =                               2;
 
 static const double PBINTRA_RATIO     =                             1.1;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int THRES_TRANS          =                             16;
+static const int THRES_AFFINE         =                             4;
+#endif
 #if !MERGE_ENC_OPT
 static const int    NUM_MRG_SATD_CAND =                             4;
 #endif
@@ -616,7 +639,14 @@ static const int    NUM_AFF_MRG_SATD_CAND =                         2;
 #if AFFINE_MMVD
 static const int    AF_MMVD_BASE_NUM =                              1;
 static const int    AF_MMVD_STEP_NUM =                              5; // number of distance offset
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int    AF_MMVD_OFFSET_DIR =                            8;
+#else
 static const int    AF_MMVD_OFFSET_DIR =                            4; // 00: (+, 0); 01: (-, 0); 10: (0, +); 11 (0, -);
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int Affine_MMVD_Size_Shift =                           1;
+#endif
 static const int    AF_MMVD_MAX_REFINE_NUM = AF_MMVD_STEP_NUM * AF_MMVD_OFFSET_DIR; ///< max number of candidate from a base candidate
 static const int    AF_MMVD_NUM = AF_MMVD_BASE_NUM * AF_MMVD_MAX_REFINE_NUM;        ///< total number of affine mmvd candidate
 #if !MERGE_ENC_OPT
@@ -687,6 +717,13 @@ static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE =                  3;
 static const int ADAPTIVE_IBC_SUB_GROUP_SIZE =                     6;
 #endif
 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD =   MMVD_MAX_REFINE_NUM;
+#endif
+
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM;
+#endif
 // need to know for static memory allocation
 static const int MAX_DELTA_QP   =                                   7;      ///< maximum supported delta QP value
 static const int MAX_TESTED_QPs =   ( 1 + 1 + ( MAX_DELTA_QP << 1 ) );      ///< dqp=0 +- max_delta_qp + lossless mode

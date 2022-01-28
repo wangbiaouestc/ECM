@@ -39,7 +39,9 @@
 #define __MV__
 
 #include "CommonDef.h"
-
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#include <limits.h>
+#endif
 //! \ingroup CommonLib
 //! \{
 
@@ -262,6 +264,14 @@ public:
     ver = (ver + mvClipPeriod) & (mvClipPeriod - 1);
     ver = (ver >= halMvClipPeriod) ? (ver - mvClipPeriod) : ver;
   }
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  bool isMvsdApplicable() const
+  {
+    return (getAbsHor() + getAbsVer()) >= 1;
+  }
+  
+  Mv getAbsMv() { return Mv(abs(hor), abs(ver)); }
+#endif
 };// END CLASS DEFINITION MV
 
 namespace std

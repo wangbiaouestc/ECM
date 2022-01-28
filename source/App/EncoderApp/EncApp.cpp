@@ -796,6 +796,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setDMVR                                              ( m_DMVR );
   m_cEncLib.setMMVD                                              ( m_MMVD );
   m_cEncLib.setMmvdDisNum                                        (m_MmvdDisNum);
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  m_cEncLib.setUseMVSD                                           (m_MVSD);
+#endif
   m_cEncLib.setRGBFormatFlag(m_rgbFormat);
   m_cEncLib.setUseColorTrans(m_useColorTrans);
   m_cEncLib.setPLTMode                                           ( m_PLTMode );

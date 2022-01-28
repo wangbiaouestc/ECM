@@ -449,6 +449,9 @@ struct InterPredictionData
   uint8_t     afMmvdBaseIdx; // base vector's merge index at the affine merge list, excluding sbTmvp
   uint8_t     afMmvdStep;
   uint8_t     afMmvdDir;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  uint8_t     afMmvdMergeIdx;
+#endif
 #endif
 #if TM_MRG
   bool        tmMergeFlag;
@@ -479,7 +482,9 @@ struct InterPredictionData
 #if CIIP_PDPC
   bool      ciipPDPC;
 #endif
-
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  int       mvsdIdx[NUM_REF_PIC_LIST_01];
+#endif
   Mv        bv;                             // block vector for IBC
   Mv        bvd;                            // block vector difference for IBC
   uint8_t   mmvdEncOptMode;                  // 0: no action 1: skip chroma MC for MMVD candidate pre-selection 2: skip chroma MC and BIO for MMVD candidate pre-selection
@@ -532,6 +537,9 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
 
   int64_t cacheId;
   bool    cacheUsed;
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  bool              isMvsdApplicable() const;
 #endif
 };
 

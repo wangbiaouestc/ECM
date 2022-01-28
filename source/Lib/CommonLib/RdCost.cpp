@@ -145,7 +145,6 @@ void RdCost::init()
   m_afpDistortFunc[DF_SSE32  ] = RdCost::xGetSSE32;
   m_afpDistortFunc[DF_SSE64  ] = RdCost::xGetSSE64;
   m_afpDistortFunc[DF_SSE16N ] = RdCost::xGetSSE16N;
-
   m_afpDistortFunc[DF_SAD    ] = RdCost::xGetSAD;
   m_afpDistortFunc[DF_SAD2   ] = RdCost::xGetSAD;
   m_afpDistortFunc[DF_SAD4   ] = RdCost::xGetSAD4;

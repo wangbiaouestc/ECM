@@ -6300,10 +6300,17 @@ void PU::getAfMmvdMvf(const PredictionUnit& pu, const AffineMergeCtx& affineMerg
     mvfMmvd[1][i].mv = Mv();
   }
 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  const int xDir[] = {1, -1,  0,  0,  1, -1,  1, -1, 2, -2,  2, -2, 1,  1, -1, -1};
+  const int yDir[] = {0,  0,  1, -1,  1, -1, -1,  1, 1,  1, -1, -1, 2, -2,  2, -2};
+  int offsetX = xDir[offsetDir]  * step;
+  int offsetY = yDir[offsetDir] * step;
+#else
   int magY = (offsetDir >> 1) & 0x1;
   int sign = (offsetDir & 0x1) ? -1 : 1;
   int offsetX = (1 - magY) * sign * step;
   int offsetY = (    magY) * sign * step;
+#endif
   Mv offsetMv(offsetX, offsetY);
 
   int numCp = (affineType == AFFINEMODEL_4PARAM) ? 2 : 3;
@@ -6334,10 +6341,15 @@ void PU::getAfMmvdMvf(const PredictionUnit& pu, const AffineMergeCtx& affineMerg
 int32_t PU::getAfMmvdEstBits(const PredictionUnit &pu)
 {
   int baseBits = (AF_MMVD_BASE_NUM == 1 ? 0 : pu.afMmvdBaseIdx + (pu.afMmvdBaseIdx == AF_MMVD_BASE_NUM - 1 ? 0: 1));
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  int stepBits = pu.afMmvdMergeIdx + (pu.afMmvdMergeIdx == AF_MMVD_MAX_REFINE_NUM - 1 ? 0 : 1);
+  return stepBits + baseBits;
+#else
   int stepBits = pu.afMmvdStep + (pu.afMmvdStep == AF_MMVD_STEP_NUM - 1 ? 0 : 1);
   int dirBits  = gp_sizeIdxInfo->idxFrom(AF_MMVD_OFFSET_DIR);
-
+  
   return stepBits + dirBits + baseBits;
+#endif
 }
 #endif
 
@@ -7104,6 +7116,9 @@ void PU::applyImv( PredictionUnit& pu, MergeCtx &mrgCtx, InterPrediction *interP
 {
   if( !pu.mergeFlag )
   {
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    Mv cMvpL0;
+#endif
     if( pu.interDir != 2 /* PRED_L1 */ )
     {
       pu.mvd[0].changeTransPrecAmvr2Internal(pu.cu->imv);
@@ -7121,6 +7136,29 @@ void PU::applyImv( PredictionUnit& pu, MergeCtx &mrgCtx, InterPrediction *interP
       );
       pu.mvpNum[0] = amvpInfo.numCand;
       pu.mvpIdx[0] = mvp_idx;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+      if (!CU::isIBC(*pu.cu))
+      {
+        RefPicList eRefList(REF_PIC_LIST_0);
+        if (pu.isMvsdApplicable() && pu.mvd[eRefList].isMvsdApplicable())
+        {
+          if (pu.cu->smvdMode)
+          {
+            cMvpL0 = amvpInfo.mvCand[pu.mvpIdx[eRefList]];
+          }
+          else
+          {
+            std::vector<Mv> cMvdDerivedVec;
+            interPred->deriveMvdSign(amvpInfo.mvCand[mvp_idx], pu.mvd[eRefList], pu, eRefList, pu.refIdx[eRefList], cMvdDerivedVec);
+            CHECK(pu.mvsdIdx[eRefList] >= cMvdDerivedVec.size(), "");
+            int mvsdIdx = pu.mvsdIdx[eRefList];
+            Mv cMvd = interPred->deriveMVDFromMVSDIdxTrans(mvsdIdx, cMvdDerivedVec);
+            CHECK(cMvd == Mv(0, 0), " zero MVD!");
+            pu.mvd[eRefList] = cMvd;
+          }
+        }
+      }
+#endif
       pu.mv    [0] = amvpInfo.mvCand[mvp_idx] + pu.mvd[0];
       pu.mv[0].mvCliptoStorageBitDepth();
     }
@@ -7140,6 +7178,35 @@ void PU::applyImv( PredictionUnit& pu, MergeCtx &mrgCtx, InterPrediction *interP
       );
       pu.mvpNum[1] = amvpInfo.numCand;
       pu.mvpIdx[1] = mvp_idx;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+      RefPicList eRefList(REF_PIC_LIST_1);
+      if (pu.isMvsdApplicable() && pu.mvd[eRefList].isMvsdApplicable())
+      {
+        if (pu.cu->smvdMode)
+        {
+          std::vector<Mv> cMvdDerivedVec;
+          interPred->deriveMvdSignSMVD(cMvpL0, amvpInfo.mvCand[pu.mvpIdx[1]], pu.mvd[REF_PIC_LIST_0], pu, cMvdDerivedVec);
+          CHECK(pu.mvsdIdx[REF_PIC_LIST_0] >= cMvdDerivedVec.size(), "");
+          int mvsdIdx = pu.mvsdIdx[REF_PIC_LIST_0];
+          Mv cMvd = interPred->deriveMVDFromMVSDIdxTrans(mvsdIdx, cMvdDerivedVec);
+          CHECK(cMvd == Mv(0, 0), " zero MVD for SMVD!");
+          pu.mvd[REF_PIC_LIST_0] = cMvd;
+          pu.mv[REF_PIC_LIST_0] = cMvpL0 + pu.mvd[REF_PIC_LIST_0];
+          pu.mv[REF_PIC_LIST_0].mvCliptoStorageBitDepth();
+          pu.mvd[REF_PIC_LIST_1].set(-pu.mvd[REF_PIC_LIST_0].hor, -pu.mvd[REF_PIC_LIST_0].ver);
+        }
+        else
+        {
+          std::vector<Mv> cMvdDerivedVec;
+          interPred->deriveMvdSign(amvpInfo.mvCand[mvp_idx], pu.mvd[eRefList], pu, eRefList, pu.refIdx[eRefList], cMvdDerivedVec);
+          CHECK(pu.mvsdIdx[eRefList] >= cMvdDerivedVec.size(), "");
+          int mvsdIdx = pu.mvsdIdx[eRefList];
+          Mv cMvd = interPred->deriveMVDFromMVSDIdxTrans(mvsdIdx, cMvdDerivedVec );
+          CHECK(cMvd == Mv(0, 0), " zero MVD!");
+          pu.mvd[eRefList] = cMvd;
+        }
+      }
+#endif
       pu.mv    [1] = amvpInfo.mvCand[mvp_idx] + pu.mvd[1];
       pu.mv[1].mvCliptoStorageBitDepth();
     }
@@ -8283,7 +8350,12 @@ bool CU::isBcwIdxCoded( const CodingUnit &cu )
     CHECK(cu.BcwIdx != BCW_DEFAULT, "Error: cu.BcwIdx != BCW_DEFAULT");
     return false;
   }
-
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  if (cu.skip)
+  {
+    return false;
+  }
+#endif
   if (cu.predMode == MODE_IBC)
   {
     return false;
@@ -8303,13 +8375,17 @@ bool CU::isBcwIdxCoded( const CodingUnit &cu )
   {
     if( cu.firstPU->interDir == 3 )
     {
+#if !JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
       const int refIdx0 = cu.firstPU->refIdx[REF_PIC_LIST_0];
       const int refIdx1 = cu.firstPU->refIdx[REF_PIC_LIST_1];
-
+      
       const WPScalingParam *wp0 = cu.cs->slice->getWpScaling(REF_PIC_LIST_0, refIdx0);
       const WPScalingParam *wp1 = cu.cs->slice->getWpScaling(REF_PIC_LIST_1, refIdx1);
-
+      
       return !(WPScalingParam::isWeighted(wp0) || WPScalingParam::isWeighted(wp1));
+#else
+      return true;
+#endif
     }
   }
 

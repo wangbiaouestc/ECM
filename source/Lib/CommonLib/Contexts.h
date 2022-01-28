@@ -280,6 +280,9 @@ public:
 #endif
 #endif
   static const CtxSet   Mvd;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  static const CtxSet   MvsdIdx;
+#endif
 #if MULTI_HYP_PRED
   static const CtxSet   MultiHypothesisFlag;
   static const CtxSet   MHRefPic;

@@ -1477,6 +1477,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseGeo                ( m_Geo );
   sps.setUseMMVD               ( m_MMVD );
   sps.setFpelMmvdEnabledFlag   (( m_MMVD ) ? m_allowDisFracMMVD : false);
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  sps.setUseMVSD               (m_MVSD);
+#endif
   sps.setBdofControlPresentFlag(m_BIO);
   sps.setDmvrControlPresentFlag(m_DMVR);
   sps.setProfControlPresentFlag(m_PROF);

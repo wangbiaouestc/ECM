@@ -412,6 +412,9 @@ protected:
   bool      m_DMVR;
   bool      m_MMVD;
   int       m_MmvdDisNum;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  bool      m_MVSD;
+#endif
   bool      m_rgbFormat;
   bool      m_useColorTrans;
   unsigned  m_PLTMode;
@@ -1310,6 +1313,10 @@ public:
   bool      getMMVD                         ()         const { return m_MMVD; }
   void      setMmvdDisNum                   ( int b )        { m_MmvdDisNum = b; }
   int       getMmvdDisNum                   ()         const { return m_MmvdDisNum; }
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void      setUseMVSD(bool b) { m_MVSD = b; }
+  bool      getUseMVSD()                               const { return m_MVSD; }
+#endif
   void      setRGBFormatFlag(bool value) { m_rgbFormat = value; }
   bool      getRGBFormatFlag()                         const { return m_rgbFormat; }
   void      setUseColorTrans(bool value) { m_useColorTrans = value; }

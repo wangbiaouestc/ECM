@@ -2206,6 +2206,10 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   {
     pcSPS->setFpelMmvdEnabledFlag( false );
   }
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  READ_FLAG(uiCode, "sps_mvsd_enabled_flag");
+  pcSPS->setUseMVSD(uiCode != 0);
+#endif
   READ_UVLC(uiCode, "six_minus_max_num_merge_cand");
   CHECK(MRG_MAX_NUM_CANDS <= uiCode, "Incorrrect max number of merge candidates!");
   pcSPS->setMaxNumMergeCand(MRG_MAX_NUM_CANDS - uiCode);

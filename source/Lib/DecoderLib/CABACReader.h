@@ -133,6 +133,9 @@ public:
   void        cuPaletteSubblockInfo     ( CodingUnit&                   cu,     ComponentID     compBegin, uint32_t numComp, int subSetId, uint32_t& prevRunPos, unsigned& prevRunType );
   // prediction unit (clause 7.3.8.6)
   void        prediction_unit           ( PredictionUnit&               pu,     MergeCtx&       mrgCtx );
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void        mvsd_data                 ( PredictionUnit&               pu );
+#endif
   void        merge_flag                ( PredictionUnit&               pu );
   void        merge_data                ( PredictionUnit&               pu );
   void        affine_flag               ( CodingUnit&                   cu );
@@ -171,7 +174,15 @@ public:
   bool        cbf_comp                  ( CodingStructure&              cs,     const CompArea& area,     unsigned depth, const bool prevCbf = false, const bool useISP = false );
 
   // mvd coding (clause 7.3.8.9)
-  void        mvd_coding                ( Mv &rMvd );
+  void        mvd_coding                ( Mv &rMvd 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    , bool codeSign = true
+#endif
+  );
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void        mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList);
+  void        mvsdAffineIdxFunc(PredictionUnit &pu, RefPicList eRefList);
+#endif
 
   // transform unit (clause 7.3.8.10)
   void        transform_unit            ( TransformUnit&                tu,     CUCtx&          cuCtx, Partitioner& pm,        const int subTuCounter = -1 );

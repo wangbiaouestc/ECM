@@ -406,6 +406,9 @@ protected:
   bool      m_DMVR;
   bool      m_MMVD;
   int       m_MmvdDisNum;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  bool      m_MVSD;
+#endif
   bool      m_rgbFormat;
   bool      m_useColorTrans;
   unsigned  m_PLTMode;
