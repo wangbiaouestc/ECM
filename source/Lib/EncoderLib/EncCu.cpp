@@ -2787,6 +2787,12 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if JVET_W0090_ARMC_TM
   MergeCtx mergeCtxtmp;
 #endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  uint32_t               mmvdLUT[MMVD_ADD_NUM];
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  uint32_t               affMmvdLUT[AF_MMVD_NUM];
+#endif
   const SPS &sps = *tempCS->sps;
 
 #if MERGE_ENC_OPT
@@ -2989,6 +2995,13 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       m_pcInterSearch->adjustInterMergeCandidates(pu, mergeCtx);
     }
 #endif
+
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    bool flag = pu.mmvdMergeFlag;
+    pu.mmvdMergeFlag = true;
+    m_pcInterSearch->sortInterMergeMMVDCandidates(pu, mergeCtxtmp, mmvdLUT);
+    pu.mmvdMergeFlag = flag;
 #endif
 #if TM_MRG && MERGE_ENC_OPT
     if (cu.cs->sps->getUseDMVDMode())
@@ -3096,6 +3109,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       PU::getAffineMergeCand(pu, affineMergeCtx);
 #if JVET_W0090_ARMC_TM
       affineMergeCtxTmp = affineMergeCtx;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+      m_pcInterSearch->sortAffineMergeCandidates(pu, affineMergeCtxTmp, affMmvdLUT);
+#endif
       if (sps.getUseAML())
       {
         m_pcInterSearch->adjustAffineMergeCandidates(pu, affineMergeCtx);
@@ -3212,7 +3228,11 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
   }
 #if AFFINE_MMVD && MERGE_ENC_OPT
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  int  afMmvdBaseIdxToMergeIdxOffset = (int)PU::getMergeIdxFromAfMmvdBaseIdx(affineMergeCtxTmp, 0);
+#else
   int  afMmvdBaseIdxToMergeIdxOffset = (int)PU::getMergeIdxFromAfMmvdBaseIdx(affineMergeCtx, 0);
+#endif
   int  afMmvdBaseCount = std::min<int>((int)AF_MMVD_BASE_NUM, affineMergeCtx.numValidMergeCand - afMmvdBaseIdxToMergeIdxOffset);
   bool affineMmvdAvail = affineMrgAvail && afMmvdBaseCount >= 1 && sps.getUseAffineMmvdMode();
 #endif
@@ -3720,9 +3740,17 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       {
 #if MERGE_ENC_OPT
 #if JVET_W0090_ARMC_TM
-        xCheckSATDCostMmvdMerge(tempCS, cu, pu, mergeCtxtmp, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart);
+        xCheckSATDCostMmvdMerge(tempCS, cu, pu, mergeCtxtmp, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+                           ,     mmvdLUT
+#endif
+                                );
 #else
-        xCheckSATDCostMmvdMerge(tempCS, cu, pu, mergeCtx, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart);
+        xCheckSATDCostMmvdMerge(tempCS, cu, pu, mergeCtx, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+                           ,     mmvdLUT
+#endif
+                                );
 #endif
 #else
         cu.mmvdSkip = true;
@@ -3802,9 +3830,17 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       if (affineMmvdAvail)
       {
 #if JVET_W0090_ARMC_TM
-        xCheckSATDCostAffineMmvdMerge(tempCS, cu, pu, affineMergeCtxTmp, mrgCtx, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart);
+        xCheckSATDCostAffineMmvdMerge(tempCS, cu, pu, affineMergeCtxTmp, mrgCtx, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+                                          , affMmvdLUT
+#endif
+                                      );
 #else
-        xCheckSATDCostAffineMmvdMerge(tempCS, cu, pu, affineMergeCtx, mrgCtx, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart);
+        xCheckSATDCostAffineMmvdMerge(tempCS, cu, pu, affineMergeCtx, mrgCtx, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, RdModeList, candCostList, distParam, ctxStart
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+                                          , affMmvdLUT
+#endif
+                                      );
 #endif
       }
 #endif
@@ -3991,17 +4027,31 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         cu.mmvdSkip = true;
         pu.regularMergeFlag = true;
 #if JVET_W0090_ARMC_TM
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+        mergeCtxtmp.setMmvdMergeCandiInfo(pu, uiMergeCand, mmvdLUT[uiMergeCand]);
+#else
         mergeCtxtmp.setMmvdMergeCandiInfo(pu, uiMergeCand);
+#endif
+#else
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+        mergeCtx.setMmvdMergeCandiInfo(pu, uiMergeCand, mmvdLUT[uiMergeCand]);
 #else
         mergeCtx.setMmvdMergeCandiInfo(pu, uiMergeCand);
+#endif
 #endif
       }
 #if MERGE_ENC_OPT
 #if AFFINE_MMVD
       else if (RdModeList[uiMrgHADIdx].isAffineMmvd)
       {
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+        int uiMergeCandTemp = affMmvdLUT[uiMergeCand];
+        int baseIdx = (int)uiMergeCandTemp / AF_MMVD_MAX_REFINE_NUM;
+        int stepIdx = (int)uiMergeCandTemp - baseIdx * AF_MMVD_MAX_REFINE_NUM;
+#else
         int baseIdx = (int)uiMergeCand / AF_MMVD_MAX_REFINE_NUM;
         int stepIdx = (int)uiMergeCand - baseIdx * AF_MMVD_MAX_REFINE_NUM;
+#endif
         int dirIdx  = stepIdx % AF_MMVD_OFFSET_DIR;
             stepIdx = stepIdx / AF_MMVD_OFFSET_DIR;
 
@@ -4017,6 +4067,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         pu.afMmvdDir      = (uint8_t)dirIdx;
         pu.afMmvdStep     = (uint8_t)stepIdx;
         pu.mergeIdx       = (uint8_t)(baseIdx + afMmvdBaseIdxToMergeIdxOffset);
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+        pu.afMmvdMergeIdx = uiMergeCand;
+#endif
 #if JVET_W0090_ARMC_TM
         pu.mergeType = affineMergeCtxTmp.mergeType[pu.mergeIdx];
 #if INTER_LIC
@@ -6418,7 +6471,11 @@ pu.tmMergeFlag = false;
 #endif
 
 void EncCu::xCheckSATDCostMmvdMerge(CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx mergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
-  , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart)
+  , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    , uint32_t * mmvdLUT
+#endif
+                                    )
 {
 #if INTER_LIC
   cu.LICFlag = false;
@@ -6444,19 +6501,43 @@ void EncCu::xCheckSATDCostMmvdMerge(CodingStructure *&tempCS, CodingUnit &cu, Pr
 #endif
 
   const int tempNum = (mergeCtx.numValidMergeCand > 1) ? MMVD_ADD_NUM : MMVD_ADD_NUM >> 1;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  for (int mmvdMergeCandtemp = 0; mmvdMergeCandtemp < tempNum; mmvdMergeCandtemp++)
+  {
+    if(mmvdMergeCandtemp - (mmvdMergeCandtemp/MMVD_MAX_REFINE_NUM )* MMVD_MAX_REFINE_NUM  >= (MMVD_MAX_REFINE_NUM >> MMVD_SIZE_SHIFT ))
+    {
+      continue;
+    }
+    int mmvdMergeCand = (mmvdLUT == NULL) ? mmvdMergeCandtemp : mmvdLUT[mmvdMergeCandtemp];
+#else
   for (int mmvdMergeCand = 0; mmvdMergeCand < tempNum; mmvdMergeCand++)
   {
+#endif
     int baseIdx = mmvdMergeCand / MMVD_MAX_REFINE_NUM;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    int refineStep = (mmvdMergeCand - (baseIdx * MMVD_MAX_REFINE_NUM )) / MMVD_MAX_DIR ;
+#else
     int refineStep = (mmvdMergeCand - (baseIdx * MMVD_MAX_REFINE_NUM)) / 4;
+#endif
+#if  !JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
     if( refineStep >= m_pcEncCfg->getMmvdDisNum() )
     {
       continue;
     }
+#endif
 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    mergeCtx.setMmvdMergeCandiInfo(pu, mmvdMergeCandtemp, mmvdMergeCand);
+#else
     mergeCtx.setMmvdMergeCandiInfo(pu, mmvdMergeCand);
+#endif
     pu.mvRefine = true;
     distParam.cur = singleMergeTempBuffer->Y();
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    pu.mmvdEncOptMode = (refineStep > 1 ? 2 : 1);
+#else
     pu.mmvdEncOptMode = (refineStep > 2 ? 2 : 1);
+#endif
     CHECK(!pu.mmvdMergeFlag, "MMVD merge should be set");
     // Don't do chroma MC here
     m_pcInterSearch->motionCompensation(pu, *singleMergeTempBuffer, REF_PIC_LIST_X, true, false);
@@ -6700,6 +6781,9 @@ void EncCu::xCheckSATDCostAffineMmvdMerge(       CodingStructure*& tempCS,
                                                  static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>    &candCostList,
                                                  DistParam         distParam,
                                            const TempCtx&          ctxStart
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+                                          , uint32_t * affMmvdLUT
+#endif
 )
 {
   cu.mmvdSkip         = false;
@@ -6737,8 +6821,18 @@ void EncCu::xCheckSATDCostAffineMmvdMerge(       CodingStructure*& tempCS,
 #endif
   const double sqrtLambdaForFirstPassIntra = m_pcRdCost->getMotionLambda() * FRAC_BITS_SCALE;
   int insertPos = -1;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  for (uint32_t uiMergeCandTemp = 0; uiMergeCandTemp < afMmvdCandCount; uiMergeCandTemp++)
+  {
+    uint32_t uiMergeCand = affMmvdLUT[uiMergeCandTemp];
+    if(uiMergeCandTemp - (uiMergeCandTemp/AF_MMVD_MAX_REFINE_NUM )* AF_MMVD_MAX_REFINE_NUM  >= (AF_MMVD_MAX_REFINE_NUM >> Affine_MMVD_Size_Shift ))
+    {
+      continue;
+    }
+#else
   for (uint32_t uiMergeCand = 0; uiMergeCand < afMmvdCandCount; uiMergeCand++)
   {
+#endif
     int baseIdx = (int)uiMergeCand / AF_MMVD_MAX_REFINE_NUM;
     int stepIdx = (int)uiMergeCand - baseIdx * AF_MMVD_MAX_REFINE_NUM;
     int dirIdx  = stepIdx % AF_MMVD_OFFSET_DIR;
@@ -6751,6 +6845,9 @@ void EncCu::xCheckSATDCostAffineMmvdMerge(       CodingStructure*& tempCS,
       pu.afMmvdDir      = (uint8_t)dirIdx;
       pu.afMmvdStep     = (uint8_t)stepIdx;
       pu.mergeIdx       = (uint8_t)(baseIdx + baseIdxToMergeIdxOffset);
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+      pu.afMmvdMergeIdx = (uint8_t)uiMergeCandTemp;
+#endif
       pu.mergeType      = affineMergeCtx.mergeType         [pu.mergeIdx];
       pu.interDir       = affineMergeCtx.interDirNeighbours[pu.mergeIdx];
       pu.cu->affineType = affineMergeCtx.affineType        [pu.mergeIdx];

@@ -143,6 +143,9 @@ public:
   Pel         writePLTIndex             ( const CodingUnit&             cu,       uint32_t          idx,           PelBuf&  paletteIdx,       PLTtypeBuf&  paletteRunType, int         maxSymbol,   ComponentID compBegin );
   // prediction unit (clause 7.3.8.6)
   void        prediction_unit           ( const PredictionUnit&         pu );
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void        mvsd_data                 ( const PredictionUnit&         pu );
+#endif
   void        merge_flag                ( const PredictionUnit&         pu );
   void        merge_data                ( const PredictionUnit&         pu );
   void        affine_flag               ( const CodingUnit&             cu );
@@ -190,7 +193,15 @@ public:
   void        cbf_comp                  ( const CodingStructure&        cs,       bool              cbf,    const CompArea& area, unsigned depth, const bool prevCbf = false, const bool useISP = false );
 
   // mvd coding (clause 7.3.8.9)
-  void        mvd_coding                ( const Mv &rMvd, int8_t imv );
+  void        mvd_coding                ( const Mv &rMvd, int8_t imv 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    , bool codeSign = true
+#endif
+  );
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList);
+  void mvsdAffineIdxFunc(const PredictionUnit &pu, RefPicList eRefList);
+#endif
   // transform unit (clause 7.3.8.10)
   void        transform_unit            ( const TransformUnit&          tu,       CUCtx&            cuCtx,  Partitioner& pm,       const int subTuCounter = -1 );
   void        cu_qp_delta               ( const CodingUnit&             cu,       int               predQP, const int8_t qp );

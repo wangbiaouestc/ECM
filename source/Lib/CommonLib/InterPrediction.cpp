@@ -1573,7 +1573,11 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
                                     )
 {
 #if JVET_W0090_ARMC_TM
+#if  JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  int filterIdx = isAML && pu.mmvdMergeFlag ? 1 : 0;
+#else
   int filterIdx = 0;
+#endif
   if (bilinearMC)
   {
     filterIdx = 1;
@@ -3015,7 +3019,11 @@ void InterPrediction::xWeightedAverage(
 #if JVET_W0090_ARMC_TM
 #if !INTER_LIC
 template <bool TrueA_FalseL>
-void InterPrediction::xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl)
+void InterPrediction::xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+                                     , bool AML
+#endif
+                                     )
 {
   const int lumaShift = 2 + MV_FRACTIONAL_BITS_DIFF;
   const int horShift = (lumaShift + ::getComponentScaleX(compID, cu.chromaFormat));
@@ -3048,7 +3056,11 @@ void InterPrediction::xGetPredBlkTpl(const CodingUnit& cu, const ComponentID com
     bh = tplSize;
   }
 
-  const int  nFilterIdx = 0;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  int   nFilterIdx =  AML  ? 1 : 0;
+#else
+  const int  nFilterIdx   = 0;
+#endif
   const bool useAltHpelIf = false;
 
   if (yFrac == 0)
@@ -3061,10 +3073,23 @@ void InterPrediction::xGetPredBlkTpl(const CodingUnit& cu, const ComponentID com
   }
   else
   {
+      
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if IF_12TAP
+    int vFilterSize = isLuma(compID) ? NTAPS_LUMA(0) : NTAPS_CHROMA;
+#else
+    int vFilterSize = isLuma(compID) ? NTAPS_LUMA : NTAPS_CHROMA;
+#endif
+    if (isLuma(compID) && nFilterIdx == 1)
+    {
+      vFilterSize = NTAPS_BILINEAR;
+    }
+#else
 #if IF_12TAP
     const int vFilterSize = isLuma(compID) ? NTAPS_LUMA(0) : NTAPS_CHROMA;
 #else
     const int vFilterSize = isLuma(compID) ? NTAPS_LUMA : NTAPS_CHROMA;
+#endif
 #endif
     PelBuf tmpBuf = PelBuf(m_filteredBlockTmp[0][compID], Size(bw, bh + vFilterSize - 1));
 
@@ -3204,7 +3229,11 @@ void InterPrediction::xPredAffineTpl(const PredictionUnit &pu, const RefPicList 
           iMvScaleTmpHor = tmpMv.getHor();
           iMvScaleTmpVer = tmpMv.getVer();
         }
-        xGetSublkAMLTemplate(*pu.cu, COMPONENT_Y, *refPic, Mv(iMvScaleTmpHor, iMvScaleTmpVer), blockWidth, blockHeight, w, h, numTemplate, refLeftTemplate, refAboveTemplate);
+        xGetSublkAMLTemplate(*pu.cu, COMPONENT_Y, *refPic, Mv(iMvScaleTmpHor, iMvScaleTmpVer), blockWidth, blockHeight, w, h, numTemplate, refLeftTemplate, refAboveTemplate
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+                             , pu.afMmvdFlag
+#endif
+                             );
       }
     }
   }
@@ -4606,6 +4635,231 @@ void InterPrediction::cacheAssign( CacheModel *cache )
 }
 #endif
 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+void  InterPrediction::sortInterMergeMMVDCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t * mmvdLUT, uint32_t MMVDIdx)
+{
+  
+  const int tempNum = (const int) (std::min<int>(MMVD_BASE_MV_NUM, mrgCtx.numValidMergeCand) * MMVD_MAX_REFINE_NUM);
+  const int groupSize = std::min<int>(tempNum, ADAPTIVE_SUB_GROUP_SIZE_MMVD);
+#if _WINDOWS
+  Distortion candCostList[MMVD_BASE_MV_NUM* MMVD_MAX_REFINE_NUM];
+#else
+  Distortion candCostList[tempNum] ;
+#endif
+  
+  for (uint32_t i = 0; i < tempNum; i++)
+  {
+    mmvdLUT[i] = i;
+    candCostList[i] = MAX_UINT;
+  }
+  Distortion uiCost;
+  DistParam cDistParam;
+  cDistParam.applyWeight = false;
+  int nWidth = pu.lumaSize().width;
+  int nHeight = pu.lumaSize().height;
+  if (!xAMLGetCurBlkTemplate(pu, nWidth, nHeight))
+  {
+    return;
+  }
+  
+  int startMMVDIdx = 0;
+  int endMMVDIdx = tempNum;
+  if(MMVDIdx != -1)
+  {
+    uint32_t gpId = MMVDIdx/groupSize;
+    startMMVDIdx = gpId * groupSize;
+    endMMVDIdx = (gpId+1) * groupSize;
+  }
+  
+  int shiftEnc = MMVD_SIZE_SHIFT;
+  int encGrpSize = groupSize >> shiftEnc;
+  for (int mmvdMergeCand = startMMVDIdx; mmvdMergeCand < endMMVDIdx; mmvdMergeCand++)
+  {
+    mrgCtx.setMmvdMergeCandiInfo(pu, mmvdMergeCand, mmvdMergeCand);
+    
+    for (int refList = 0; refList < 2; refList++)
+    {
+      if (pu.refIdx[refList] >= 0)
+      {
+        pu.mv[refList].roundToPrecision(MV_PRECISION_QUARTER, MV_PRECISION_INT);
+      }
+    }
+    
+    uiCost = 0;
+    
+    PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+    PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+    PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+    PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+    
+    getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
+    
+    if (m_bAMLTemplateAvailabe[0])
+    {
+      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+      
+      uiCost += cDistParam.distFunc(cDistParam);
+    }
+    
+    if (m_bAMLTemplateAvailabe[1])
+    {
+      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+      
+      uiCost += cDistParam.distFunc(cDistParam);
+    }
+    // update part
+    uint32_t i;
+    uint32_t shift = 0;
+    uint32_t gpIdx = mmvdMergeCand/groupSize;
+    uint32_t endIdx = gpIdx * groupSize + encGrpSize;
+    while (shift < encGrpSize && uiCost < candCostList[endIdx - 1 - shift])
+    {
+      shift++;
+    }
+    if (shift != 0)
+    {
+      for (i = 1; i < shift; i++)
+      {
+        mmvdLUT[endIdx - i] = mmvdLUT[endIdx - 1 - i];
+        candCostList[endIdx - i] = candCostList[endIdx - 1 - i];
+      }
+      mmvdLUT[endIdx - shift] = mmvdMergeCand;
+      candCostList[endIdx - shift] = uiCost;
+    }
+  }
+  
+}
+#endif
+
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeCtx& affMrgCtx, uint32_t * affMmvdLUT, uint32_t afMMVDIdx)
+{
+  const int tempNum = AF_MMVD_NUM;
+  int baseIdxToMergeIdxOffset = (int)PU::getMergeIdxFromAfMmvdBaseIdx(affMrgCtx, 0);
+  int baseCount               = std::min<int>((int)AF_MMVD_BASE_NUM, affMrgCtx.numValidMergeCand - baseIdxToMergeIdxOffset);
+  const int groupSize = std::min<int>(tempNum, ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF);
+  Distortion candCostList[tempNum];
+  for (uint32_t i = 0; i < tempNum; i++)
+  {
+    affMmvdLUT[i] = i;
+    candCostList[i] = MAX_UINT;
+  }
+  
+  if (baseCount < 1)
+  {
+    return;
+  }
+  Distortion uiCost;
+  
+  DistParam cDistParam;
+  cDistParam.applyWeight = false;
+  
+  int nWidth = pu.lumaSize().width;
+  int nHeight = pu.lumaSize().height;
+  
+  if (!xAMLGetCurBlkTemplate(pu, nWidth, nHeight))
+  {
+    return;
+  }
+  
+  int startMMVDIdx = 0;
+  int endMMVDIdx = tempNum;
+  if(afMMVDIdx != -1)
+  {
+    uint32_t gpId = afMMVDIdx/groupSize;
+    startMMVDIdx = gpId * groupSize;
+    endMMVDIdx = (gpId+1) * groupSize;
+  }
+  int shiftEnc = Affine_MMVD_Size_Shift;
+  int encGrpSize = groupSize >> shiftEnc;
+  for (int mmvdMergeCand = startMMVDIdx; mmvdMergeCand < endMMVDIdx; mmvdMergeCand++)
+  {
+    pu.afMmvdMergeIdx = (uint8_t)mmvdMergeCand;
+    
+    int baseIdx = (int)mmvdMergeCand / AF_MMVD_MAX_REFINE_NUM;
+    int stepIdx = (int)mmvdMergeCand - baseIdx * AF_MMVD_MAX_REFINE_NUM;
+    int dirIdx  = stepIdx % AF_MMVD_OFFSET_DIR;
+    stepIdx = stepIdx / AF_MMVD_OFFSET_DIR;
+    
+    pu.cu->affine = true;
+    pu.cu->imv    = IMV_OFF;
+    pu.cu->mmvdSkip         = false;
+    pu.regularMergeFlag = false;
+    pu.mmvdMergeFlag    = false;
+    pu.mergeFlag      = true;
+    pu.afMmvdFlag     = true;
+    pu.afMmvdBaseIdx  = (uint8_t)baseIdx;
+    pu.afMmvdDir      = (uint8_t)dirIdx;
+    pu.afMmvdStep     = (uint8_t)stepIdx;
+    pu.mergeIdx       = (uint8_t)(baseIdxToMergeIdxOffset + baseIdx);
+    pu.mergeType = affMrgCtx.mergeType[pu.mergeIdx];
+    pu.cu->LICFlag = affMrgCtx.LICFlags[pu.mergeIdx];
+    pu.cu->LICFlag = false;
+    pu.interDir = affMrgCtx.interDirNeighbours[pu.mergeIdx];
+    pu.cu->affineType = affMrgCtx.affineType[pu.mergeIdx];
+    pu.cu->BcwIdx = affMrgCtx.BcwIdx[pu.mergeIdx];
+    pu.ciipFlag = false;
+    MvField mvfMmvd[2][3];
+    PU::getAfMmvdMvf(pu, affMrgCtx, mvfMmvd, pu.mergeIdx, pu.afMmvdStep, pu.afMmvdDir);
+    for (int i = 0; i < 2; i++)
+    {
+      if( pu.cs->slice->getNumRefIdx( RefPicList( i ) ) > 0 )
+      {
+        pu.mvpIdx[i] = 0;
+        pu.mvpNum[i] = 0;
+        pu.mvd[i]    = Mv();
+        pu.refIdx[i] = mvfMmvd[i][0].refIdx;
+        pu.mvAffi[i][0] = mvfMmvd[i][0].mv;
+        pu.mvAffi[i][1] = mvfMmvd[i][1].mv;
+        pu.mvAffi[i][2] = mvfMmvd[i][2].mv;
+      }
+    }
+    uiCost = 0;
+    PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+    PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+    PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+    PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+    getAffAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
+    
+    if (m_bAMLTemplateAvailabe[0])
+    {
+      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+      
+      uiCost += cDistParam.distFunc(cDistParam);
+    }
+    
+    if (m_bAMLTemplateAvailabe[1])
+    {
+      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+      
+      uiCost += cDistParam.distFunc(cDistParam);
+    }
+    
+    // update part
+    uint32_t i;
+    uint32_t shift = 0;
+    uint32_t gpIdx = mmvdMergeCand/groupSize;
+    uint32_t endIdx = gpIdx * groupSize + encGrpSize;
+    while (shift < encGrpSize && uiCost < candCostList[endIdx - 1 - shift])
+    {
+      shift++;
+    }
+    
+    if (shift != 0)
+    {
+      for (i = 1; i < shift; i++)
+      {
+        affMmvdLUT[endIdx - i] = affMmvdLUT[endIdx - 1 - i];
+        candCostList[endIdx - i] = candCostList[endIdx - 1 - i];
+      }
+      affMmvdLUT[endIdx - shift] = mmvdMergeCand;
+      candCostList[endIdx - shift] = uiCost;
+    }
+    
+  }
+}
+#endif
+
 #if JVET_W0090_ARMC_TM
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
 void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& mvpMergeCandCtx, int numRetrievedMergeCand, int mrgCandIdx)
@@ -5378,7 +5632,11 @@ void InterPrediction::xGetSublkAMLTemplate(const CodingUnit& cu,
   const int         posH,
   int*              numTemplate,
   Pel*              refLeftTemplate,
-  Pel*              refAboveTemplate)
+  Pel*              refAboveTemplate
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+     , bool afMMVD
+#endif
+                                           )
 {
   const int       bitDepth = cu.cs->sps->getBitDepth(toChannelType(compID));
   const int       precShift = std::max(0, bitDepth - 12);
@@ -5390,7 +5648,11 @@ void InterPrediction::xGetSublkAMLTemplate(const CodingUnit& cu,
   // above
   if (cuAbove && posH == 0)
   {
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    xGetPredBlkTpl<true>(cu, compID, refBuf, mv, posW, posH, sublkWidth, refAboveTemplate, afMMVD);
+#else
     xGetPredBlkTpl<true>(cu, compID, refBuf, mv, posW, posH, sublkWidth, refAboveTemplate);
+#endif
 
     for (int k = posW; k < posW + sublkWidth; k++)
     {
@@ -5404,7 +5666,11 @@ void InterPrediction::xGetSublkAMLTemplate(const CodingUnit& cu,
   // left
   if (cuLeft && posW == 0)
   {
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    xGetPredBlkTpl<false>(cu, compID, refBuf, mv, posW, posH, sublkHeight, refLeftTemplate, afMMVD);
+#else
     xGetPredBlkTpl<false>(cu, compID, refBuf, mv, posW, posH, sublkHeight, refLeftTemplate);
+#endif
 
     for (int k = posH; k < posH + sublkHeight; k++)
     {
@@ -6308,7 +6574,11 @@ void InterPrediction::xGetLICParamGeneral(const CodingUnit& cu,
 }
 
 template <bool TrueA_FalseL>
-void InterPrediction::xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl)
+void InterPrediction::xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+                      , bool AML
+#endif
+                                     )
 {
   const int lumaShift = 2 + MV_FRACTIONAL_BITS_DIFF;
   const int horShift  = (lumaShift + ::getComponentScaleX(compID, cu.chromaFormat));
@@ -6341,7 +6611,11 @@ void InterPrediction::xGetPredBlkTpl(const CodingUnit& cu, const ComponentID com
     bh        = tplSize;
   }
 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  int   nFilterIdx =  AML  ? 1 : 0;
+#else
   const int  nFilterIdx   = 0;
+#endif
   const bool useAltHpelIf = false;
 
   if ( yFrac == 0 )
@@ -6354,10 +6628,22 @@ void InterPrediction::xGetPredBlkTpl(const CodingUnit& cu, const ComponentID com
   }
   else
   {
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if IF_12TAP
+    int vFilterSize = isLuma(compID) ? NTAPS_LUMA(0) : NTAPS_CHROMA;
+#else
+    int vFilterSize = isLuma(compID) ? NTAPS_LUMA : NTAPS_CHROMA;
+#endif
+    if (isLuma(compID) && nFilterIdx == 1)
+    {
+      vFilterSize = NTAPS_BILINEAR;
+    }
+#else
 #if IF_12TAP
     const int vFilterSize = isLuma(compID) ? NTAPS_LUMA(0) : NTAPS_CHROMA;
 #else
     const int vFilterSize = isLuma(compID) ? NTAPS_LUMA : NTAPS_CHROMA;
+#endif
 #endif
     PelBuf tmpBuf = PelBuf(m_filteredBlockTmp[0][compID], Size(bw, bh+vFilterSize-1));
 
@@ -8520,4 +8806,924 @@ void InterPrediction::amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvF
   mvField_amList[mvField_amvp_idx].refIdx = pu.refIdx[refListAmvp];
   mvField_amList[mvField_amvp_idx].mv = pu.mv[refListAmvp];
 }
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void InterPrediction::deriveMvdSign(const Mv& cMvPred, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, RefPicList eRefList, int refIdx, std::vector<Mv>& cMvdDerived)
+  {
+    const static int patternsX[4][2] =
+    {
+      { +1, +1 },
+      { +1, -1 },
+    };
+    
+    const static int patternsY[4][2] =
+    {
+      { +1, +1 },
+      { -1, +1 },
+    };
+    
+    const static int patternsXY[4][2] =
+    {
+      { +1, +1 },
+      { +1, -1 },
+      { -1, +1 },
+      { -1, -1 },
+    };
+    
+    typedef int Int2[2];
+    const Int2* patterns = 0;
+    uint16_t patternsNum = 0;
+    if (cMvdKnownAtDecoder.getHor() == 0)
+    {
+      patterns = patternsX;
+      patternsNum = 2;
+    }
+    else if (cMvdKnownAtDecoder.getVer() == 0)
+    {
+      patterns = patternsY;
+      patternsNum = 2;
+    }
+    else
+    {
+      patterns = patternsXY;
+      patternsNum = 4;
+    }
+    cMvdDerived.resize(patternsNum);
+    for (int n = 0; n < patternsNum; ++n)
+    {
+      auto sign = patterns[n];
+      auto cMv = Mv(sign[0] * cMvdKnownAtDecoder.getHor(), sign[1] * cMvdKnownAtDecoder.getVer());
+      cMvdDerived[n] = cMv;
+    }
+    if (!pu.lumaPos().x && !pu.lumaPos().y)
+    {
+      return;
+    }
+    CHECK(refIdx < 0, "Invalid reference index for FRUC");
+    
+    const Picture& refPic = *pu.cu->slice->getRefPic(eRefList, refIdx)->unscaledPic;
+    InterPredResources interRes(m_pcReshape, m_pcRdCost, m_if, m_filteredBlockTmp[0][COMPONENT_Y]
+                                , m_filteredBlock[3][1][0], m_filteredBlock[3][0][0]
+                                );
+    
+    TplMatchingCtrl tplCtrl(pu, interRes, refPic, true, COMPONENT_Y, true, 0, m_pcCurTplAbove, m_pcCurTplLeft, m_pcRefTplAbove, m_pcRefTplLeft, Mv(0, 0), nullptr, 0);
+    
+    std::vector<std::pair<Mv, Distortion>> aMvCostVec(patternsNum);
+    
+    for (int n = 0; n < patternsNum; ++n)
+    {
+      auto cMvdTest = cMvdDerived[n];
+      Mv cMvTest = cMvPred + cMvdTest;
+      Distortion uiCost = tplCtrl.xGetTempMatchError<TM_TPL_SIZE>(cMvTest);
+      aMvCostVec[n] = { cMvdTest, uiCost };
+    }
+    
+    std::stable_sort(aMvCostVec.begin(), aMvCostVec.end(), [](const std::pair<Mv, Distortion> & l, const std::pair<Mv, Distortion> & r) {return l.second < r.second; });
+    
+    for (int n = 0; n < patternsNum; ++n)
+    {
+      cMvdDerived[n] = aMvCostVec[n].first;
+    }
+  }
+  void InterPrediction::deriveMvdSignSMVD(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, std::vector<Mv>& cMvdDerived)
+  {
+    const static int patternsX[4][2] =
+    {
+      { +1, +1 },
+      { +1, -1 },
+    };
+    
+    const static int patternsY[4][2] =
+    {
+      { +1, +1 },
+      { -1, +1 },
+    };
+    
+    const static int patternsXY[4][2] =
+    {
+      { +1, +1 },
+      { +1, -1 },
+      { -1, +1 },
+      { -1, -1 },
+    };
+    
+    typedef int Int2[2];
+    const Int2* patterns = 0;
+    uint16_t patternsNum = 0;
+    if (cMvdKnownAtDecoder.getHor() == 0)
+    {
+      patterns = patternsX;
+      patternsNum = 2;
+    }
+    else if (cMvdKnownAtDecoder.getVer() == 0)
+    {
+      patterns = patternsY;
+      patternsNum = 2;
+    }
+    else
+    {
+      patterns = patternsXY;
+      patternsNum = 4;
+    }
+    
+    cMvdDerived.resize(patternsNum);
+    for (int n = 0; n < patternsNum; ++n)
+    {
+      auto sign = patterns[n];
+      auto cMv = Mv(sign[0] * cMvdKnownAtDecoder.getHor(), sign[1] * cMvdKnownAtDecoder.getVer());
+      cMvdDerived[n] = cMv;
+    }
+    
+    if (!pu.lumaPos().x && !pu.lumaPos().y)
+    {
+      return;
+    }
+    std::vector<std::pair<Mv, Distortion>> aMvCostVec(patternsNum);
+    InterPredResources interRes(m_pcReshape, m_pcRdCost, m_if, m_filteredBlockTmp[0][COMPONENT_Y]
+                                , m_filteredBlock[3][1][0], m_filteredBlock[3][0][0]
+                                );
+    
+    // For L0
+    int refIdx = pu.cs->slice->getSymRefIdx(REF_PIC_LIST_0);
+    CHECK(refIdx < 0, "Invalid reference index for SMVD L0");
+    const Picture& refPic = *pu.cu->slice->getRefPic(REF_PIC_LIST_0, refIdx)->unscaledPic;
+    
+    TplMatchingCtrl tplCtrl(pu, interRes, refPic, true, COMPONENT_Y, true, 0, m_pcCurTplAbove, m_pcCurTplLeft, m_pcRefTplAbove, m_pcRefTplLeft, Mv(0, 0), nullptr, 0);
+    
+    for (int n = 0; n < patternsNum; ++n)
+    {
+      auto cMvdTest = cMvdDerived[n];
+      Mv cMvTest = cMvPred + cMvdTest;
+      Distortion uiCost = tplCtrl.xGetTempMatchError<TM_TPL_SIZE>(cMvTest);
+      aMvCostVec[n] = { cMvdTest, uiCost };
+    }
+    
+    std::stable_sort(aMvCostVec.begin(), aMvCostVec.end(), [](const std::pair<Mv, Distortion> & l, const std::pair<Mv, Distortion> & r) {return l.second < r.second; });
+    
+    for (int n = 0; n < patternsNum; ++n)
+    {
+      cMvdDerived[n] = aMvCostVec[n].first;
+    }
+  }
+  void InterPrediction::deriveMvdSignAffine(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvPred3, const Mv& cMvdKnownAtDecoder, const Mv& cMvdKnownAtDecoder2, const Mv& cMvdKnownAtDecoder3,
+                                            PredictionUnit& pu, RefPicList eRefList, int refIdx, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3)
+  {
+    int patterns2[2][1] =
+    {
+      { +1 },
+      { -1 },
+    };
+    
+    int patterns4[4][2] =
+    {
+      { +1, +1 },
+      { +1, -1 },
+      { -1, +1 },
+      { -1, -1 },
+    };
+    
+    int patterns8[8][3] =
+    {
+      {+1, +1, +1 },
+      {+1, +1, -1 },
+      {+1, -1, +1 },
+      {+1, -1, -1 },
+      {-1, +1, +1 },
+      {-1, +1, -1 },
+      {-1, -1, +1 },
+      {-1, -1, -1 },
+    };
+    
+    int patterns16[16][4] =
+    {
+      {+1, +1, +1, +1 },
+      {+1, +1, +1, -1 },
+      {+1, +1, -1, +1 },
+      {+1, +1, -1, -1 },
+      {+1, -1, +1, +1 },
+      {+1, -1, +1, -1 },
+      {+1, -1, -1, +1 },
+      {+1, -1, -1, -1 },
+      {-1, +1, +1, +1 },
+      {-1, +1, +1, -1 },
+      {-1, +1, -1, +1 },
+      {-1, +1, -1, -1 },
+      {-1, -1, +1, +1 },
+      {-1, -1, +1, -1 },
+      {-1, -1, -1, +1 },
+      {-1, -1, -1, -1 },
+    };
+    
+    int patterns32[32][5] =
+    {
+      {+1, +1, +1, +1, +1 },
+      {+1, +1, +1, +1, -1 },
+      {+1, +1, +1, -1, +1 },
+      {+1, +1, +1, -1, -1 },
+      {+1, +1, -1, +1, +1 },
+      {+1, +1, -1, +1, -1 },
+      {+1, +1, -1, -1, +1 },
+      {+1, +1, -1, -1, -1 },
+      {+1, -1, +1, +1, +1 },
+      {+1, -1, +1, +1, -1 },
+      {+1, -1, +1, -1, +1 },
+      {+1, -1, +1, -1, -1 },
+      {+1, -1, -1, +1, +1 },
+      {+1, -1, -1, +1, -1 },
+      {+1, -1, -1, -1, +1 },
+      {+1, -1, -1, -1, -1 },
+      {-1, +1, +1, +1, +1 },
+      {-1, +1, +1, +1, -1 },
+      {-1, +1, +1, -1, +1 },
+      {-1, +1, +1, -1, -1 },
+      {-1, +1, -1, +1, +1 },
+      {-1, +1, -1, +1, -1 },
+      {-1, +1, -1, -1, +1 },
+      {-1, +1, -1, -1, -1 },
+      {-1, -1, +1, +1, +1 },
+      {-1, -1, +1, +1, -1 },
+      {-1, -1, +1, -1, +1 },
+      {-1, -1, +1, -1, -1 },
+      {-1, -1, -1, +1, +1 },
+      {-1, -1, -1, +1, -1 },
+      {-1, -1, -1, -1, +1 },
+      {-1, -1, -1, -1, -1 },
+    };
+    
+    int patterns64[64][6] =
+    {
+      {+1, +1, +1, +1, +1, +1 },
+      {+1, +1, +1, +1, +1, -1 },
+      {+1, +1, +1, +1, -1, +1 },
+      {+1, +1, +1, +1, -1, -1 },
+      {+1, +1, +1, -1, +1, +1 },
+      {+1, +1, +1, -1, +1, -1 },
+      {+1, +1, +1, -1, -1, +1 },
+      {+1, +1, +1, -1, -1, -1 },
+      {+1, +1, -1, +1, +1, +1 },
+      {+1, +1, -1, +1, +1, -1 },
+      {+1, +1, -1, +1, -1, +1 },
+      {+1, +1, -1, +1, -1, -1 },
+      {+1, +1, -1, -1, +1, +1 },
+      {+1, +1, -1, -1, +1, -1 },
+      {+1, +1, -1, -1, -1, +1 },
+      {+1, +1, -1, -1, -1, -1 },
+      {+1, -1, +1, +1, +1, +1 },
+      {+1, -1, +1, +1, +1, -1 },
+      {+1, -1, +1, +1, -1, +1 },
+      {+1, -1, +1, +1, -1, -1 },
+      {+1, -1, +1, -1, +1, +1 },
+      {+1, -1, +1, -1, +1, -1 },
+      {+1, -1, +1, -1, -1, +1 },
+      {+1, -1, +1, -1, -1, -1 },
+      {+1, -1, -1, +1, +1, +1 },
+      {+1, -1, -1, +1, +1, -1 },
+      {+1, -1, -1, +1, -1, +1 },
+      {+1, -1, -1, +1, -1, -1 },
+      {+1, -1, -1, -1, +1, +1 },
+      {+1, -1, -1, -1, +1, -1 },
+      {+1, -1, -1, -1, -1, +1 },
+      {+1, -1, -1, -1, -1, -1 },
+      {-1, +1, +1, +1, +1, +1 },
+      {-1, +1, +1, +1, +1, -1 },
+      {-1, +1, +1, +1, -1, +1 },
+      {-1, +1, +1, +1, -1, -1 },
+      {-1, +1, +1, -1, +1, +1 },
+      {-1, +1, +1, -1, +1, -1 },
+      {-1, +1, +1, -1, -1, +1 },
+      {-1, +1, +1, -1, -1, -1 },
+      {-1, +1, -1, +1, +1, +1 },
+      {-1, +1, -1, +1, +1, -1 },
+      {-1, +1, -1, +1, -1, +1 },
+      {-1, +1, -1, +1, -1, -1 },
+      {-1, +1, -1, -1, +1, +1 },
+      {-1, +1, -1, -1, +1, -1 },
+      {-1, +1, -1, -1, -1, +1 },
+      {-1, +1, -1, -1, -1, -1 },
+      {-1, -1, +1, +1, +1, +1 },
+      {-1, -1, +1, +1, +1, -1 },
+      {-1, -1, +1, +1, -1, +1 },
+      {-1, -1, +1, +1, -1, -1 },
+      {-1, -1, +1, -1, +1, +1 },
+      {-1, -1, +1, -1, +1, -1 },
+      {-1, -1, +1, -1, -1, +1 },
+      {-1, -1, +1, -1, -1, -1 },
+      {-1, -1, -1, +1, +1, +1 },
+      {-1, -1, -1, +1, +1, -1 },
+      {-1, -1, -1, +1, -1, +1 },
+      {-1, -1, -1, +1, -1, -1 },
+      {-1, -1, -1, -1, +1, +1 },
+      {-1, -1, -1, -1, +1, -1 },
+      {-1, -1, -1, -1, -1, +1 },
+      {-1, -1, -1, -1, -1, -1 },
+    };
+    std::vector<int> isZeroComp(6, 0);
+    if (cMvdKnownAtDecoder.getHor() == 0)
+    {
+      isZeroComp[0] = 1;
+    }
+    if (cMvdKnownAtDecoder.getVer() == 0)
+    {
+      isZeroComp[1] = 1;
+    }
+    if (cMvdKnownAtDecoder2.getHor() == 0)
+    {
+      isZeroComp[2] = 1;
+    }
+    if (cMvdKnownAtDecoder2.getVer() == 0)
+    {
+      isZeroComp[3] = 1;
+    }
+    if (cMvdKnownAtDecoder3.getHor() == 0)
+    {
+      isZeroComp[4] = 1;
+    }
+    if (cMvdKnownAtDecoder3.getVer() == 0)
+    {
+      isZeroComp[5] = 1;
+    }
+    int nZeroComp = isZeroComp[0] + isZeroComp[1] + isZeroComp[2] + isZeroComp[3] + isZeroComp[4] + isZeroComp[5];
+    CHECK(nZeroComp == 6, "nnZeroComp == 6");
+    
+    uint16_t patternsNum = 0;
+    std::vector<Mv> MvdCand[3];
+    if (nZeroComp == 0)
+    {
+      patternsNum = 64;
+      MvdCand[0].resize(patternsNum);
+      MvdCand[1].resize(patternsNum);
+      MvdCand[2].resize(patternsNum);
+      for (int n = 0; n < patternsNum; ++n)
+      {
+        auto sign = patterns64[n];
+        MvdCand[0][n] = Mv(sign[0] * cMvdKnownAtDecoder.getHor(), sign[1] * cMvdKnownAtDecoder.getVer());
+        MvdCand[1][n] = Mv(sign[2] * cMvdKnownAtDecoder2.getHor(), sign[3] * cMvdKnownAtDecoder2.getVer());
+        MvdCand[2][n] = Mv(sign[4] * cMvdKnownAtDecoder3.getHor(), sign[5] * cMvdKnownAtDecoder3.getVer());
+      }
+    }
+    else if (nZeroComp == 1)
+    {
+      patternsNum = 32;
+      MvdCand[0].resize(patternsNum);
+      MvdCand[1].resize(patternsNum);
+      MvdCand[2].resize(patternsNum);
+      for (int n = 0; n < patternsNum; ++n)
+      {
+        auto signR = patterns32[n];
+        int sign[6];
+        int k = 0;
+        for (int i = 0; i < 6; i++)
+        {
+          if (isZeroComp[i])
+          {
+            sign[i] = +1;
+          }
+          else
+          {
+            sign[i] = signR[k];
+            k++;
+          }
+        }
+        MvdCand[0][n] = Mv(sign[0] * cMvdKnownAtDecoder.getHor(), sign[1] * cMvdKnownAtDecoder.getVer());
+        MvdCand[1][n] = Mv(sign[2] * cMvdKnownAtDecoder2.getHor(), sign[3] * cMvdKnownAtDecoder2.getVer());
+        MvdCand[2][n] = Mv(sign[4] * cMvdKnownAtDecoder3.getHor(), sign[5] * cMvdKnownAtDecoder3.getVer());
+      }
+    }
+    else if (nZeroComp == 2)
+    {
+      patternsNum = 16;
+      MvdCand[0].resize(patternsNum);
+      MvdCand[1].resize(patternsNum);
+      MvdCand[2].resize(patternsNum);
+      for (int n = 0; n < patternsNum; ++n)
+      {
+        auto signR = patterns16[n];
+        int sign[6];
+        int k = 0;
+        for (int i = 0; i < 6; i++)
+        {
+          if (isZeroComp[i])
+          {
+            sign[i] = +1;
+          }
+          else
+          {
+            sign[i] = signR[k];
+            k++;
+          }
+        }
+        MvdCand[0][n] = Mv(sign[0] * cMvdKnownAtDecoder.getHor(), sign[1] * cMvdKnownAtDecoder.getVer());
+        MvdCand[1][n] = Mv(sign[2] * cMvdKnownAtDecoder2.getHor(), sign[3] * cMvdKnownAtDecoder2.getVer());
+        MvdCand[2][n] = Mv(sign[4] * cMvdKnownAtDecoder3.getHor(), sign[5] * cMvdKnownAtDecoder3.getVer());
+      }
+    }
+    else if (nZeroComp == 3)
+    {
+      patternsNum = 8;
+      MvdCand[0].resize(patternsNum);
+      MvdCand[1].resize(patternsNum);
+      MvdCand[2].resize(patternsNum);
+      for (int n = 0; n < patternsNum; ++n)
+      {
+        auto signR = patterns8[n];
+        int sign[6];
+        int k = 0;
+        for (int i = 0; i < 6; i++)
+        {
+          if (isZeroComp[i])
+          {
+            sign[i] = +1;
+          }
+          else
+          {
+            sign[i] = signR[k];
+            k++;
+          }
+        }
+        MvdCand[0][n] = Mv(sign[0] * cMvdKnownAtDecoder.getHor(), sign[1] * cMvdKnownAtDecoder.getVer());
+        MvdCand[1][n] = Mv(sign[2] * cMvdKnownAtDecoder2.getHor(), sign[3] * cMvdKnownAtDecoder2.getVer());
+        MvdCand[2][n] = Mv(sign[4] * cMvdKnownAtDecoder3.getHor(), sign[5] * cMvdKnownAtDecoder3.getVer());
+      }
+    }
+    else if (nZeroComp == 4)
+    {
+      patternsNum = 4;
+      MvdCand[0].resize(patternsNum);
+      MvdCand[1].resize(patternsNum);
+      MvdCand[2].resize(patternsNum);
+      for (int n = 0; n < patternsNum; ++n)
+      {
+        auto signR = patterns4[n];
+        int sign[6];
+        int k = 0;
+        for (int i = 0; i < 6; i++)
+        {
+          if (isZeroComp[i])
+          {
+            sign[i] = +1;
+          }
+          else
+          {
+            sign[i] = signR[k];
+            k++;
+          }
+        }
+        MvdCand[0][n] = Mv(sign[0] * cMvdKnownAtDecoder.getHor(), sign[1] * cMvdKnownAtDecoder.getVer());
+        MvdCand[1][n] = Mv(sign[2] * cMvdKnownAtDecoder2.getHor(), sign[3] * cMvdKnownAtDecoder2.getVer());
+        MvdCand[2][n] = Mv(sign[4] * cMvdKnownAtDecoder3.getHor(), sign[5] * cMvdKnownAtDecoder3.getVer());
+      }
+    }
+    else
+    {
+      patternsNum = 2;
+      MvdCand[0].resize(patternsNum);
+      MvdCand[1].resize(patternsNum);
+      MvdCand[2].resize(patternsNum);
+      for (int n = 0; n < patternsNum; ++n)
+      {
+        auto signR = patterns2[n];
+        int sign[6];
+        int k = 0;
+        for (int i = 0; i < 6; i++)
+        {
+          if (isZeroComp[i])
+          {
+            sign[i] = +1;
+          }
+          else
+          {
+            sign[i] = signR[k];
+            k++;
+          }
+        }
+        MvdCand[0][n] = Mv(sign[0] * cMvdKnownAtDecoder.getHor(), sign[1] * cMvdKnownAtDecoder.getVer());
+        MvdCand[1][n] = Mv(sign[2] * cMvdKnownAtDecoder2.getHor(), sign[3] * cMvdKnownAtDecoder2.getVer());
+        MvdCand[2][n] = Mv(sign[4] * cMvdKnownAtDecoder3.getHor(), sign[5] * cMvdKnownAtDecoder3.getVer());
+      }
+    }
+    
+    cMvdDerived.resize(patternsNum);
+    cMvdDerived2.resize(patternsNum);
+    cMvdDerived3.resize(patternsNum);
+    
+    for (int n = 0; n < patternsNum; ++n)
+    {
+      cMvdDerived[n] = MvdCand[0][n];
+      cMvdDerived2[n] = MvdCand[1][n];
+      cMvdDerived3[n] = MvdCand[2][n];
+    }
+    
+    if (!pu.lumaPos().x && !pu.lumaPos().y)
+    {
+      for (int n = 0; n < patternsNum; ++n)
+      {
+        cMvdDerived[n] = MvdCand[0][n];
+        cMvdDerived2[n] = MvdCand[1][n];
+        cMvdDerived3[n] = MvdCand[2][n];
+      }
+      return;
+    }
+    
+    /////////////////////////////////////////////////////////////////
+    Pel* refLeftTemplate = m_pcLICRefLeftTemplate;
+    Pel* refAboveTemplate = m_pcLICRefAboveTemplate;
+    Pel* recLeftTemplate = m_pcLICRecLeftTemplate;
+    Pel* recAboveTemplate = m_pcLICRecAboveTemplate;
+    int numTemplate[2] = { 0 , 0 }; // 0:Above, 1:Left
+    
+    const int width = pu.Y().width;
+    const int height = pu.Y().height;
+    int blockWidth = AFFINE_MIN_BLOCK_SIZE;
+    int blockHeight = AFFINE_MIN_BLOCK_SIZE;
+    
+    const int iHalfBW = blockWidth >> 1;
+    const int iHalfBH = blockHeight >> 1;
+    
+    const int iBit = MAX_CU_DEPTH;
+    const int shift = iBit - 4 + MV_FRACTIONAL_BITS_INTERNAL;
+    int iDMvHorX, iDMvHorY, iDMvVerX, iDMvVerY;
+    
+    CHECK(refIdx < 0, "Invalid reference index for FRUC");
+    const Picture& refPic = *pu.cu->slice->getRefPic(eRefList, refIdx)->unscaledPic;
+    std::vector<std::pair<int, Distortion>> aMvCostVec(patternsNum);
+    Distortion uiCost = 0;
+    
+    for (int n = 0; n < patternsNum; ++n)
+    {
+      uiCost = 0;
+      //--------------------- (derive CPMVs)----------------------------------------------//
+      Mv mvLT = cMvPred + MvdCand[0][n];
+      Mv mvRT = cMvPred2 + MvdCand[1][n];
+      mvRT += MvdCand[0][n];
+      
+      Mv mvLB;
+      if (pu.cu->affineType == AFFINEMODEL_6PARAM)
+      {
+        mvLB = cMvPred3 + MvdCand[2][n];
+        mvLB += MvdCand[0][n];
+      }
+      //--------------- Calculate dMVs ------------------------------------------//
+      iDMvHorX = (mvRT - mvLT).getHor() << (iBit - floorLog2(width));
+      iDMvHorY = (mvRT - mvLT).getVer() << (iBit - floorLog2(width));
+      if (pu.cu->affineType == AFFINEMODEL_6PARAM)
+      {
+        iDMvVerX = (mvLB - mvLT).getHor() << (iBit - floorLog2(height));
+        iDMvVerY = (mvLB - mvLT).getVer() << (iBit - floorLog2(height));
+      }
+      else
+      {
+        iDMvVerX = -iDMvHorY;
+        iDMvVerY = iDMvHorX;
+      }
+      
+      int iMvScaleHor = mvLT.getHor() << iBit;
+      int iMvScaleVer = mvLT.getVer() << iBit;
+      
+      int mvScaleHorLine = iMvScaleHor + iDMvHorX * iHalfBW + iDMvVerX * iHalfBH;
+      int mvScaleVerLine = iMvScaleVer + iDMvHorY * iHalfBW + iDMvVerY * iHalfBH;
+      
+      int deltaMvHorXBlk = iDMvHorX * blockWidth;
+      int deltaMvHorYBlk = iDMvHorY * blockWidth;
+      
+      // get prediction block by block
+      
+      for (int h = 0; h < height; h += blockHeight)
+      {
+        int mvScaleHorBlk = mvScaleHorLine;
+        int mvScaleVerBlk = mvScaleVerLine;
+        
+        for (int w = 0; w < width; w += blockWidth)
+        {
+          if (w != 0 && h != 0) continue; //applies only on boundary subblocks.
+          int iMvScaleTmpHor, iMvScaleTmpVer;
+          
+          iMvScaleTmpHor = mvScaleHorBlk;
+          iMvScaleTmpVer = mvScaleVerBlk;
+          
+          mvScaleHorBlk += deltaMvHorXBlk;
+          mvScaleVerBlk += deltaMvHorYBlk;
+          
+          roundAffineMv(iMvScaleTmpHor, iMvScaleTmpVer, shift);
+          Mv tmpMv(iMvScaleTmpHor, iMvScaleTmpVer);
+          tmpMv.clipToStorageBitDepth();
+          //clip
+          clipMv(tmpMv, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
+          iMvScaleTmpHor = tmpMv.getHor();
+          iMvScaleTmpVer = tmpMv.getVer();
+          uiCost += xGetSublkTemplateCost(*pu.cu, COMPONENT_Y, refPic, Mv(iMvScaleTmpHor, iMvScaleTmpVer), blockWidth, blockHeight, w, h, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate);
+        }
+      }
+      aMvCostVec[n] = { n, uiCost };
+    }
+    //--------------------------------------------------------------------------------//
+    /////////////////////////////////////////////////////////////////
+    std::stable_sort(aMvCostVec.begin(), aMvCostVec.end(), [](const std::pair<int, Distortion> & l, const std::pair<int, Distortion> & r) {return l.second < r.second; });
+    for (int n = 0; n < patternsNum; ++n)
+    {
+      int index = aMvCostVec[n].first;
+      cMvdDerived[n] = MvdCand[0][index];
+      cMvdDerived2[n] = MvdCand[1][index];
+      cMvdDerived3[n] = MvdCand[2][index];
+    }
+  }
+  
+  Distortion InterPrediction::xGetSublkTemplateCost(const CodingUnit& cu,
+                                                    const ComponentID compID,
+                                                    const Picture&    refPic,
+                                                    const Mv&         mv,
+                                                    const int         sublkWidth,
+                                                    const int         sublkHeight,
+                                                    const int         posW,
+                                                    const int         posH,
+                                                    int*              numTemplate,
+                                                    Pel*              refLeftTemplate,
+                                                    Pel*              refAboveTemplate,
+                                                    Pel*              recLeftTemplate,
+                                                    Pel*              recAboveTemplate)
+  {
+    const int       bitDepth = cu.cs->sps->getBitDepth(toChannelType(compID));
+    const int       precShift = std::max(0, bitDepth - 12);
+    Distortion cost = 0;
+    
+    const Picture&  currPic = *cu.cs->picture;
+    const CodingUnit* const cuAbove = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID));
+    const CodingUnit* const cuLeft = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID));
+    const CPelBuf recBuf = cuAbove || cuLeft ? currPic.getRecoBuf(cu.cs->picture->blocks[compID]) : CPelBuf();
+    const CPelBuf refBuf = cuAbove || cuLeft ? refPic.getRecoBuf(refPic.blocks[compID]) : CPelBuf();
+    
+    std::vector<Pel>& invLUT = m_pcReshape->getInvLUT();
+    
+    // above
+    if (cuAbove && posH == 0)
+    {
+      xGetPredBlkTpl<true>(cu, compID, refBuf, mv, posW, posH, sublkWidth, refAboveTemplate);
+      const Pel*    rec = recBuf.bufAt(cu.blocks[compID].pos().offset(0, -1));
+      for (int k = posW; k < posW + sublkWidth; k++)
+      {
+        int refVal = refAboveTemplate[k];
+        int recVal = rec[k];
+        
+        if (isLuma(compID) && cu.cs->picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+        {
+          recVal = invLUT[recVal];
+        }
+        
+        recVal >>= precShift;
+        refVal >>= precShift;
+        
+        refAboveTemplate[k] = refVal;
+        recAboveTemplate[k] = recVal;
+        numTemplate[0]++;
+        cost += (Distortion)(refVal - recVal) * (refVal - recVal);
+      }
+    }
+    
+    // left
+    if (cuLeft && posW == 0)
+    {
+      xGetPredBlkTpl<false>(cu, compID, refBuf, mv, posW, posH, sublkHeight, refLeftTemplate);
+      const Pel*    rec = recBuf.bufAt(cu.blocks[compID].pos().offset(-1, 0));
+      for (int k = posH; k < posH + sublkHeight; k++)
+      {
+        int refVal = refLeftTemplate[k];
+        int recVal = rec[recBuf.stride * k];
+        
+        if (isLuma(compID) && cu.cs->picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+        {
+          recVal = invLUT[recVal];
+        }
+        
+        recVal >>= precShift;
+        refVal >>= precShift;
+        
+        refLeftTemplate[k] = refVal;
+        recLeftTemplate[k] = recVal;
+        numTemplate[1]++;
+        cost += (Distortion)(refVal - recVal) * (refVal - recVal);
+      }
+    }
+    return cost;
+  }
+  int InterPrediction::deriveMVSDIdxFromMVDAffine(PredictionUnit& pu, RefPicList eRefList, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3)
+  {
+    int mvsdIdx = 0;
+    int shift = 0;
+    int bin = 0;
+    if (pu.mvdAffi[eRefList][0].getHor())
+    {
+      bin = (cMvdDerived[0].getHor() == pu.mvdAffi[eRefList][0].getHor()) ? 0 : 1;
+      mvsdIdx += bin << shift;
+      shift++;
+    }
+    if (pu.mvdAffi[eRefList][0].getVer())
+    {
+      for (int i = 0; i < (int)cMvdDerived.size(); i++)
+      {
+        if (cMvdDerived[i].getHor() == pu.mvdAffi[eRefList][0].getHor())
+        {
+          bin = (cMvdDerived[i].getVer() == pu.mvdAffi[eRefList][0].getVer()) ? 0 : 1;
+          mvsdIdx += bin << shift;
+          shift++;
+          break;
+        }
+      }
+    }
+    if (pu.mvdAffi[eRefList][1].getHor())
+    {
+      for (int i = 0; i < (int)cMvdDerived.size(); i++)
+      {
+        if (cMvdDerived[i] == pu.mvdAffi[eRefList][0])
+        {
+          bin = (cMvdDerived2[i].getHor() == pu.mvdAffi[eRefList][1].getHor()) ? 0 : 1;
+          mvsdIdx += bin << shift;
+          shift++;
+          break;
+        }
+      }
+    }
+    if (pu.mvdAffi[eRefList][1].getVer())
+    {
+      for (int i = 0; i < (int)cMvdDerived.size(); i++)
+      {
+        if (cMvdDerived[i] == pu.mvdAffi[eRefList][0] && cMvdDerived2[i].getHor() == pu.mvdAffi[eRefList][1].getHor())
+        {
+          bin = (cMvdDerived2[i].getVer() == pu.mvdAffi[eRefList][1].getVer()) ? 0 : 1;
+          mvsdIdx += bin << shift;
+          shift++;
+          break;
+        }
+      }
+    }
+    if (pu.cu->affineType == AFFINEMODEL_6PARAM)
+    {
+      if (pu.mvdAffi[eRefList][2].getHor())
+      {
+        for (int i = 0; i < (int)cMvdDerived.size(); i++)
+        {
+          if (cMvdDerived[i] == pu.mvdAffi[eRefList][0] && cMvdDerived2[i] == pu.mvdAffi[eRefList][1])
+          {
+            bin = (cMvdDerived3[i].getHor() == pu.mvdAffi[eRefList][2].getHor()) ? 0 : 1;
+            mvsdIdx += bin << shift;
+            shift++;
+            break;
+          }
+        }
+      }
+      if (pu.mvdAffi[eRefList][2].getVer())
+      {
+        for (int i = 0; i < (int)cMvdDerived.size(); i++)
+        {
+          if (cMvdDerived[i] == pu.mvdAffi[eRefList][0] && cMvdDerived2[i] == pu.mvdAffi[eRefList][1] && cMvdDerived3[i].getHor() == pu.mvdAffi[eRefList][2].getHor())
+          {
+            bin = (cMvdDerived3[i].getVer() == pu.mvdAffi[eRefList][2].getVer()) ? 0 : 1;
+            mvsdIdx += bin << shift;
+            shift++;
+            break;
+          }
+        }
+      }
+    }
+    return mvsdIdx;
+  }
+  
+  void InterPrediction::deriveMVDFromMVSDIdxAffine(PredictionUnit& pu, RefPicList eRefList, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3)
+  {
+    int mvsdIdx = pu.mvsdIdx[eRefList];
+    int bin = 0;
+    
+    if (pu.mvdAffi[eRefList][0].getHor())
+    {
+      bin = mvsdIdx & 1;
+      int val = bin ? -cMvdDerived[0].getHor() : cMvdDerived[0].getHor();
+      pu.mvdAffi[eRefList][0].setHor(val);
+      mvsdIdx >>= 1;
+    }
+    if (pu.mvdAffi[eRefList][0].getVer())
+    {
+      for (int i = 0; i < (int)cMvdDerived.size(); i++)
+      {
+        if (cMvdDerived[i].getHor() == pu.mvdAffi[eRefList][0].getHor())
+        {
+          bin = mvsdIdx & 1;
+          int val = bin ? -cMvdDerived[i].getVer() : cMvdDerived[i].getVer();
+          pu.mvdAffi[eRefList][0].setVer(val);
+          mvsdIdx >>= 1;
+          break;
+        }
+      }
+    }
+    if (pu.mvdAffi[eRefList][1].getHor())
+    {
+      for (int i = 0; i < (int)cMvdDerived.size(); i++)
+      {
+        if (cMvdDerived[i] == pu.mvdAffi[eRefList][0])
+        {
+          bin = mvsdIdx & 1;
+          int val = bin ? -cMvdDerived2[i].getHor() : cMvdDerived2[i].getHor();
+          pu.mvdAffi[eRefList][1].setHor(val);
+          mvsdIdx >>= 1;
+          break;
+        }
+      }
+    }
+    if (pu.mvdAffi[eRefList][1].getVer())
+    {
+      for (int i = 0; i < (int)cMvdDerived.size(); i++)
+      {
+        if (cMvdDerived[i] == pu.mvdAffi[eRefList][0] && cMvdDerived2[i].getHor() == pu.mvdAffi[eRefList][1].getHor())
+        {
+          bin = mvsdIdx & 1;
+          int val = bin ? -cMvdDerived2[i].getVer() : cMvdDerived2[i].getVer();
+          pu.mvdAffi[eRefList][1].setVer(val);
+          mvsdIdx >>= 1;
+          break;
+        }
+      }
+    }
+    if (pu.cu->affineType == AFFINEMODEL_6PARAM)
+    {
+      if (pu.mvdAffi[eRefList][2].getHor())
+      {
+        for (int i = 0; i < (int)cMvdDerived.size(); i++)
+        {
+          if (cMvdDerived[i] == pu.mvdAffi[eRefList][0] && cMvdDerived2[i] == pu.mvdAffi[eRefList][1])
+          {
+            bin = mvsdIdx & 1;
+            int val = bin ? -cMvdDerived3[i].getHor() : cMvdDerived3[i].getHor();
+            pu.mvdAffi[eRefList][2].setHor(val);
+            mvsdIdx >>= 1;
+            break;
+          }
+        }
+      }
+      if (pu.mvdAffi[eRefList][2].getVer())
+      {
+        for (int i = 0; i < (int)cMvdDerived.size(); i++)
+        {
+          if (cMvdDerived[i] == pu.mvdAffi[eRefList][0] && cMvdDerived2[i] == pu.mvdAffi[eRefList][1] && cMvdDerived3[i].getHor() == pu.mvdAffi[eRefList][2].getHor())
+          {
+            bin = mvsdIdx & 1;
+            int val = bin ? -cMvdDerived3[i].getVer() : cMvdDerived3[i].getVer();
+            pu.mvdAffi[eRefList][2].setVer(val);
+            mvsdIdx >>= 1;
+            break;
+          }
+        }
+      }
+    }
+  }
+  int InterPrediction::deriveMVSDIdxFromMVDTrans(Mv cMvd, std::vector<Mv>& cMvdDerived)
+  {
+    int mvsdIdx = 0;
+    int shift = 0;
+    int bin = 0;
+    
+    if (cMvd.getHor())
+    {
+      bin = (cMvdDerived[0].getHor() == cMvd.getHor()) ? 0 : 1;
+      mvsdIdx += bin << shift;
+      shift++;
+    }
+    if (cMvd.getVer())
+    {
+      for (int i = 0; i < (int)cMvdDerived.size(); i++)
+      {
+        if (cMvdDerived[i].getHor() == cMvd.getHor())
+        {
+          bin = (cMvdDerived[i].getVer() == cMvd.getVer()) ? 0 : 1;
+          mvsdIdx += bin << shift;
+          shift++;
+          break;
+        }
+      }
+    }
+    return mvsdIdx;
+  }
+  Mv InterPrediction::deriveMVDFromMVSDIdxTrans(int mvsdIdx, std::vector<Mv>& cMvdDerived)
+  {
+    int bin = 0;
+    Mv cMvd = Mv(0, 0);
+    if (cMvdDerived[0].getHor())
+    {
+      bin = mvsdIdx & 1;
+      int val = bin ? -cMvdDerived[0].getHor() : cMvdDerived[0].getHor();
+      cMvd.setHor(val);
+      mvsdIdx >>= 1;
+    }
+    if (cMvdDerived[0].getVer())
+    {
+      for (int i = 0; i < (int)cMvdDerived.size(); i++)
+      {
+        if (cMvdDerived[i].getHor() == cMvd.getHor())
+        {
+          bin = mvsdIdx & 1;
+          int val = bin ? -cMvdDerived[i].getVer() : cMvdDerived[i].getVer();
+          cMvd.setVer(val);
+          mvsdIdx >>= 1;
+          break;
+        }
+      }
+    }
+    return cMvd;
+  }
 #endif

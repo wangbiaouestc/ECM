@@ -193,7 +193,11 @@ struct ModeInfo
   ModeInfo(const CodingUnit cu, const PredictionUnit pu)
   {
 #if AFFINE_MMVD
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    mergeCand = pu.afMmvdFlag ?  pu.afMmvdMergeIdx : pu.mergeIdx;
+#else
     mergeCand = pu.afMmvdFlag ? pu.afMmvdBaseIdx * AF_MMVD_MAX_REFINE_NUM + pu.afMmvdStep * AF_MMVD_OFFSET_DIR + pu.afMmvdDir : pu.mergeIdx;
+#endif
 #else
     mergeCand = pu.mergeIdx;
 #endif

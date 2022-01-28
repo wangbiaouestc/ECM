@@ -1039,7 +1039,14 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("AffineAmvrEncOpt",                                m_AffineAmvrEncOpt,                               false, "Enable encoder optimization of affine AMVR")
   ("AffineAmvp",                                      m_AffineAmvp,                                      true, "Enable AMVP for affine inter mode")
   ("DMVR",                                            m_DMVR,                                           false, "Decoder-side Motion Vector Refinement")
-  ("MmvdDisNum",                                      m_MmvdDisNum,                                     8,     "Number of MMVD Distance Entries")
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  ("MmvdDisNum",                                      m_MmvdDisNum,                          MMVD_REFINE_STEP, "Number of MMVD Distance Entries")
+#else
+  ("MmvdDisNum",                                      m_MmvdDisNum,                                         8, "Number of MMVD Distance Entries")
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  ("MVSD",                                            m_MVSD,                                            true, "Motion Vector difference Sign Derivation (0:off, 1:on)")
+#endif
   ("ColorTransform",                                  m_useColorTrans,                                  false, "Enable the color transform")
   ("PLT",                                             m_PLTMode,                                           0u, "PLTMode (0x1:enabled, 0x0:disabled)  [default: disabled]")
   ("JointCbCr",                                       m_JointCbCrMode,                                  false, "Enable joint coding of chroma residuals (JointCbCr, 0:off, 1:on)")
@@ -4376,6 +4383,9 @@ void EncAppCfg::xPrintParameter()
     msg(VERBOSE, "DMVD:%d ", m_DMVDMode);
 #endif
     msg(VERBOSE, "MmvdDisNum:%d ", m_MmvdDisNum);
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    msg(VERBOSE, "MVSD:%d ", m_MVSD);
+#endif
     msg(VERBOSE, "JointCbCr:%d ", m_JointCbCrMode);
 #if ENABLE_OBMC
     msg(VERBOSE, "OBMC:%d ", m_OBMC);

@@ -654,6 +654,9 @@ void PredictionUnit::initData()
   afMmvdBaseIdx = UINT8_MAX;
   afMmvdStep    = UINT8_MAX;
   afMmvdDir     = UINT8_MAX;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  afMmvdMergeIdx = UINT8_MAX;
+#endif
 #endif
 #if TM_MRG
   tmMergeFlag = false;
@@ -683,6 +686,9 @@ void PredictionUnit::initData()
     refIdx[i] = -1;
     mv[i]     .setZero();
     mvd[i]    .setZero();
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    mvsdIdx[i] = -1;
+#endif
     for( uint32_t j = 0; j < 3; j++ )
     {
       mvdAffi[i][j].setZero();
@@ -751,6 +757,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   afMmvdBaseIdx = predData.afMmvdBaseIdx;
   afMmvdStep    = predData.afMmvdStep;
   afMmvdDir     = predData.afMmvdDir;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  afMmvdMergeIdx = predData.afMmvdMergeIdx;
+#endif
 #endif
 #if TM_MRG
   tmMergeFlag = predData.tmMergeFlag;
@@ -780,6 +789,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
     mv[i]       = predData.mv[i];
     mvd[i]      = predData.mvd[i];
     refIdx[i]   = predData.refIdx[i];
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    mvsdIdx[i] = predData.mvsdIdx[i];
+#endif
     for( uint32_t j = 0; j < 3; j++ )
     {
       mvdAffi[i][j] = predData.mvdAffi[i][j];
@@ -844,6 +856,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   afMmvdBaseIdx = other.afMmvdBaseIdx;
   afMmvdStep    = other.afMmvdStep;
   afMmvdDir     = other.afMmvdDir;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  afMmvdMergeIdx = other.afMmvdMergeIdx;
+#endif
 #endif
 #if TM_MRG
   tmMergeFlag = other.tmMergeFlag;
@@ -873,6 +888,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
     mv[i]       = other.mv[i];
     mvd[i]      = other.mvd[i];
     refIdx[i]   = other.refIdx[i];
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    mvsdIdx[i] = other.mvsdIdx[i];
+#endif
     for( uint32_t j = 0; j < 3; j++ )
     {
       mvdAffi[i][j] = other.mvdAffi[i][j];
@@ -930,7 +948,21 @@ CMotionBuf PredictionUnit::getMotionBuf() const
 {
   return cs->getMotionBuf( *this );
 }
-
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+bool PredictionUnit::isMvsdApplicable() const
+{
+  
+  if (!cs->sps->getUseMVSD())
+  {
+    return false;
+  }
+  if (cu->firstPU->addHypData.size() - cu->firstPU->numMergedAddHyps > 0)
+  {
+    return false;
+  }
+  return true;
+}
+#endif
 #if JVET_W0123_TIMD_FUSION
 const uint8_t& PredictionUnit::getIpmInfo() const
 {

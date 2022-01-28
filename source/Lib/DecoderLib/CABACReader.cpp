@@ -1666,11 +1666,18 @@ void CABACReader::cu_pred_data( CodingUnit &cu )
 
   imv_mode   ( cu, mrgCtx );
   affine_amvr_mode( cu, mrgCtx );
-
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  for (auto &pu : CU::traversePUs(cu))
+  {
+    mvsd_data(pu);
+  }
+#endif
 #if INTER_LIC
   cu_lic_flag( cu ); // local illumination compensation
 #endif
-  cu_bcw_flag( cu );
+#if !JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  cu_bcw_flag(cu);
+#endif
 #if ENABLE_OBMC
   obmc_flag  ( cu );
 #endif
@@ -2857,6 +2864,9 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
     inter_pred_idc( pu );
     affine_flag   ( *pu.cu );
     smvd_mode( pu );
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    cu_bcw_flag(*pu.cu);
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
     }
 #endif
@@ -2870,16 +2880,32 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
       ref_idx     ( pu, REF_PIC_LIST_0 );
       if( pu.cu->affine )
       {
-        mvd_coding( pu.mvdAffi[REF_PIC_LIST_0][0] );
-        mvd_coding( pu.mvdAffi[REF_PIC_LIST_0][1] );
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+        mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][0],  !pu.isMvsdApplicable());
+#else
+        mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][0]);
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+        mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][1],  !pu.isMvsdApplicable());
+#else
+        mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][1]);
+#endif
         if ( pu.cu->affineType == AFFINEMODEL_6PARAM )
         {
-          mvd_coding( pu.mvdAffi[REF_PIC_LIST_0][2] );
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+          mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][2],  !pu.isMvsdApplicable());
+#else
+          mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][2]);
+#endif
         }
       }
       else
       {
-        mvd_coding( pu.mvd[REF_PIC_LIST_0] );
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+        mvd_coding(pu.mvd[REF_PIC_LIST_0] ,  !pu.isMvsdApplicable());
+#else
+        mvd_coding(pu.mvd[REF_PIC_LIST_0] );
+#endif
       }
 #if JVET_X0083_BM_AMVP_MERGE_MODE
       }
@@ -2905,16 +2931,32 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
         }
         else if (pu.cu->affine)
         {
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+          mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][0],  !pu.isMvsdApplicable());
+#else
           mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][0]);
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+          mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][1],  !pu.isMvsdApplicable());
+#else
           mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][1]);
+#endif
           if (pu.cu->affineType == AFFINEMODEL_6PARAM)
           {
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+            mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][2],  !pu.isMvsdApplicable());
+#else
             mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][2]);
+#endif
           }
         }
         else
         {
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+          mvd_coding(pu.mvd[REF_PIC_LIST_1],  !pu.isMvsdApplicable());
+#else
           mvd_coding(pu.mvd[REF_PIC_LIST_1]);
+#endif
         }
 #if JVET_X0083_BM_AMVP_MERGE_MODE
         }
@@ -2948,7 +2990,42 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
     pu.refIdx[1 - eCurRefList] = pu.cs->slice->getSymRefIdx( 1 - eCurRefList );
   }
 }
-
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+void CABACReader::mvsd_data(PredictionUnit&  pu)
+{
+  CHECK(pu.cu->slice->getSliceType() == I_SLICE && !CU::isIBC(*pu.cu), "cannot be I Slice");
+  if (CU::isIBC(*pu.cu))
+  {
+    return;
+  }
+  if (pu.cu->skip || pu.mergeFlag || CU::isIBC(*pu.cu) || !pu.isMvsdApplicable())
+  {
+    return;
+  }
+  if (pu.interDir != 2 /* PRED_L1 */)
+  {
+    if (pu.cu->affine)
+    {
+      mvsdAffineIdxFunc(pu, REF_PIC_LIST_0);
+    }
+    else
+    {
+      mvsdIdxFunc(pu, REF_PIC_LIST_0);
+    }
+  }
+  if (pu.interDir != 1 /* PRED_L0 */ && pu.cu->smvdMode != 1)
+  {
+    if (pu.cu->affine)
+    {
+      mvsdAffineIdxFunc(pu, REF_PIC_LIST_1);
+    }
+    else
+    {
+      mvsdIdxFunc(pu, REF_PIC_LIST_1);
+    }
+  }
+}
+#endif
 void CABACReader::smvd_mode( PredictionUnit& pu )
 {
   pu.cu->smvdMode = 0;
@@ -3047,6 +3124,24 @@ void CABACReader::affine_mmvd_data(PredictionUnit& pu)
   pu.afMmvdBaseIdx = afMmvdBaseIdx;
   DTRACE(g_trace_ctx, D_SYNTAX, "afMmvd_base_idx() afMmvd_base_idx=%d\n", afMmvdBaseIdx);
 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  unsigned int ricePar = 1;
+  int numCandminus1_step =  (AF_MMVD_MAX_REFINE_NUM >> (ricePar+Affine_MMVD_Size_Shift))  - 1;
+  int temp = (ricePar == 0) ? 0 : m_BinDecoder.decodeBinsEP(ricePar);
+  int uiUnaryIdx = 0;
+  for (; uiUnaryIdx < numCandminus1_step; ++uiUnaryIdx)
+  {
+    if (!m_BinDecoder.decodeBin(Ctx::AfMmvdOffsetStep((uiUnaryIdx > LAST_MERGE_MMVD_IDX_CABAC - 1 ? LAST_MERGE_MMVD_IDX_CABAC - 1 : uiUnaryIdx))))
+    {
+      break;
+    }
+  }
+  uiUnaryIdx <<= ricePar;
+  uiUnaryIdx += temp;
+  pu.afMmvdMergeIdx = uiUnaryIdx;
+  pu.afMmvdStep = 0;
+  pu.afMmvdDir = 0;
+#else
   {
     // Decode Step Value
     uint8_t stepOffset = 0;
@@ -3067,7 +3162,7 @@ void CABACReader::affine_mmvd_data(PredictionUnit& pu)
     }
     pu.afMmvdStep = stepOffset;
     DTRACE(g_trace_ctx, D_SYNTAX, "afMmvd_offsetStep() afMmvd_offSetstep=%d\n", stepOffset);
-
+    
     // Decode offset direction
     uint8_t b0 = 0, b1 = 0;
     b0 = m_BinDecoder.decodeBinEP();
@@ -3076,6 +3171,7 @@ void CABACReader::affine_mmvd_data(PredictionUnit& pu)
     pu.afMmvdDir = offDir;
     DTRACE(g_trace_ctx, D_SYNTAX, "afMmvd_offsetDir() afMmvd_offsetDir=%d\n", offDir);
   }
+#endif
 }
 #endif
 
@@ -3552,6 +3648,36 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu)
   pu.geoMergeIdx1 = mergeCand1;
 }
 #endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+void CABACReader::mmvd_merge_idx(PredictionUnit& pu)
+{
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__MERGE_INDEX);
+  unsigned int uiUnaryIdx = 0;
+  int var0 = 0;
+  if (pu.cs->sps->getMaxNumMergeCand() > 1)
+  {
+    static_assert(MMVD_BASE_MV_NUM == 2, "");
+    var0 = m_BinDecoder.decodeBin(Ctx::MmvdMergeIdx());
+  }
+  DTRACE(g_trace_ctx, D_SYNTAX, "base_mvp_idx() base_mvp_idx=%d\n", var0);
+  unsigned int ricePar = 1;
+  int numCandminus1_step =  (MMVD_MAX_REFINE_NUM >> (ricePar+MMVD_SIZE_SHIFT))  - 1;
+  int temp = 0;
+  temp = m_BinDecoder.decodeBinsEP(ricePar);
+  
+  for (; uiUnaryIdx < numCandminus1_step; ++uiUnaryIdx)
+  {
+    if (!m_BinDecoder.decodeBin(Ctx::MmvdStepMvpIdx((uiUnaryIdx > LAST_MERGE_MMVD_IDX_CABAC - 1 ? LAST_MERGE_MMVD_IDX_CABAC - 1 : uiUnaryIdx))))
+    {
+      break;
+    }
+  }
+  uiUnaryIdx <<= ricePar;
+  uiUnaryIdx += temp;
+  pu.mmvdMergeIdx = var0 * MMVD_MAX_REFINE_NUM  +uiUnaryIdx;
+  DTRACE(g_trace_ctx, D_SYNTAX, "mmvd_merge_idx() mmvd_merge_idx=%d\n", pu.mmvdMergeIdx);
+}
+#else
 void CABACReader::mmvd_merge_idx(PredictionUnit& pu)
 {
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__MERGE_INDEX);
@@ -3599,6 +3725,7 @@ void CABACReader::mmvd_merge_idx(PredictionUnit& pu)
   pu.mmvdMergeIdx = mvpIdx;
   DTRACE(g_trace_ctx, D_SYNTAX, "mmvd_merge_idx() mmvd_merge_idx=%d\n", pu.mmvdMergeIdx);
 }
+#endif
 
 void CABACReader::inter_pred_idc( PredictionUnit& pu )
 {
@@ -4028,7 +4155,11 @@ bool CABACReader::cbf_comp( CodingStructure& cs, const CompArea& area, unsigned 
 //    void  mvd_coding( pu, refList )
 //================================================================================
 
-void CABACReader::mvd_coding( Mv &rMvd )
+void CABACReader::mvd_coding( Mv &rMvd 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  , bool codeSign
+#endif
+)
 {
 #if RExt__DECODER_DEBUG_BIT_STATISTICS
   CodingStatisticsClassType ctype_mvd    ( STATS__CABAC_BITS__MVD );
@@ -4060,6 +4191,9 @@ void CABACReader::mvd_coding( Mv &rMvd )
     {
       horAbs += m_BinDecoder.decodeRemAbsEP(1, 0, MV_BITS - 1);
     }
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    if (codeSign)
+#endif
     if (m_BinDecoder.decodeBinEP())
     {
       horAbs = -horAbs;
@@ -4071,6 +4205,9 @@ void CABACReader::mvd_coding( Mv &rMvd )
     {
       verAbs += m_BinDecoder.decodeRemAbsEP(1, 0, MV_BITS - 1);
     }
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    if (codeSign)
+#endif
     if (m_BinDecoder.decodeBinEP())
     {
       verAbs = -verAbs;
@@ -4079,7 +4216,121 @@ void CABACReader::mvd_coding( Mv &rMvd )
   rMvd = Mv(horAbs, verAbs);
   CHECK(!((horAbs >= MVD_MIN) && (horAbs <= MVD_MAX)) || !((verAbs >= MVD_MIN) && (verAbs <= MVD_MAX)), "Illegal MVD value");
 }
-
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
+{
+  if (!pu.isMvsdApplicable())
+  {
+    return;
+  }
+  
+  if (pu.cu->cs->picHeader->getMvdL1ZeroFlag() && eRefList == REF_PIC_LIST_1 && pu.interDir == 3)
+  {
+    return;
+  }
+  if (pu.cu->smvdMode && eRefList == REF_PIC_LIST_1)
+  {
+    return;
+  }
+  
+  Mv TrMv = pu.mvd[eRefList].getAbsMv();
+  TrMv.changeTransPrecAmvr2Internal(pu.cu->imv);
+  int Thres = THRES_TRANS;
+  
+  int mvsdIdx = 0;
+  int shift = 0;
+  if (pu.mvd[eRefList].getHor())
+  {
+    uint8_t ctxId = (TrMv.getHor() <= Thres) ? 0 : 1;
+    uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
+    mvsdIdx += (bin << shift);
+    shift++;
+  }
+  if (pu.mvd[eRefList].getVer())
+  {
+    uint8_t ctxId = (TrMv.getVer() <= Thres) ? 0 : 1;
+    uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
+    mvsdIdx += (bin << shift);
+    shift++;
+  }
+  pu.mvsdIdx[eRefList] = mvsdIdx;
+}
+void CABACReader::mvsdAffineIdxFunc(PredictionUnit &pu, RefPicList eRefList)
+{
+  if (!pu.cu->affine)
+  {
+    return;
+  }
+  if (!pu.isMvsdApplicable())
+  {
+    return;
+  }
+  
+  if (pu.cu->cs->picHeader->getMvdL1ZeroFlag() && eRefList == REF_PIC_LIST_1 && pu.interDir == 3)
+  {
+    return;
+  }
+  
+  Mv AffMv[3];
+  AffMv[0] = pu.mvdAffi[eRefList][0].getAbsMv();
+  AffMv[1] = pu.mvdAffi[eRefList][1].getAbsMv();
+  AffMv[2] = pu.mvdAffi[eRefList][2].getAbsMv();
+  AffMv[0].changeAffinePrecAmvr2Internal(pu.cu->imv);
+  AffMv[1].changeAffinePrecAmvr2Internal(pu.cu->imv);
+  AffMv[2].changeAffinePrecAmvr2Internal(pu.cu->imv);
+  int Thres = THRES_AFFINE;
+  
+  int mvsdIdx = 0;
+  int shift = 0;
+  
+  if (pu.mvdAffi[eRefList][0].getHor())
+  {
+    uint8_t ctxId = (AffMv[0].getHor() <= Thres) ? 2 : 3;
+    uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
+    mvsdIdx += (bin << shift);
+    shift++;
+  }
+  if (pu.mvdAffi[eRefList][0].getVer())
+  {
+    uint8_t ctxId = (AffMv[0].getVer() <= Thres) ? 2 : 3;
+    uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
+    mvsdIdx += (bin << shift);
+    shift++;
+  }
+  if (pu.mvdAffi[eRefList][1].getHor())
+  {
+    uint8_t ctxId = (AffMv[1].getHor() <= Thres) ? 2 : 3;
+    uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
+    mvsdIdx += (bin << shift);
+    shift++;
+  }
+  if (pu.mvdAffi[eRefList][1].getVer())
+  {
+    uint8_t ctxId = (AffMv[1].getVer() <= Thres) ? 2 : 3;
+    uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
+    mvsdIdx += (bin << shift);
+    shift++;
+  }
+  if (pu.cu->affineType == AFFINEMODEL_6PARAM)
+  {
+    if (pu.mvdAffi[eRefList][2].getHor())
+    {
+      uint8_t ctxId = (AffMv[2].getHor() <= Thres) ? 2 : 3;
+      uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
+      mvsdIdx += (bin << shift);
+      shift++;
+    }
+    if (pu.mvdAffi[eRefList][2].getVer())
+    {
+      uint8_t ctxId = (AffMv[2].getVer() <= Thres) ? 2 : 3;
+      uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
+      mvsdIdx += (bin << shift);
+      shift++;
+    }
+  }
+  pu.mvsdIdx[eRefList] = mvsdIdx;
+}
+#endif
 //================================================================================
 //  clause 7.3.8.10
 //--------------------------------------------------------------------------------

@@ -580,7 +580,11 @@ public:
   MotionBuf     subPuMvpMiBuf;
   MotionBuf     subPuMvpExtMiBuf;
   MvField mmvdBaseMv[MMVD_BASE_MV_NUM][2];
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int candIdxMaped = -1);
+#else
   void setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx);
+#endif
   bool          mmvdUseAltHpelIf  [ MMVD_BASE_MV_NUM ];
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
   bool          useAltHpelIf      [ NUM_MERGE_CANDS ];
