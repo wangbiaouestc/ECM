@@ -300,7 +300,7 @@ private:
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   Mv                    m_mvBufEncAmBDMVR[2][MAX_NUM_SUBCU_DMVR];
-  MvField               mvField_amList_enc[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
+  MvField               m_mvFieldAmListEnc[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
 #endif
 
   int                   m_ctuIbcSearchRangeX;

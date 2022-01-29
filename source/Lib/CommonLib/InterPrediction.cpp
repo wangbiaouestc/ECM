@@ -8631,14 +8631,18 @@ void InterPrediction::xAddHypMC(PredictionUnit& pu, PelUnitBuf& predBuf, PelUnit
 #endif
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
-void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvField_amList, const int decAmvpRefIdx)
+void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvFieldAmListCommon, const int decAmvpRefIdx)
 {
   RefPicList refListMerge = pu.amvpMergeModeFlag[0] ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
   RefPicList refListAmvp = RefPicList(1 - refListMerge);
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+  for (int idx = 0; idx < pu.cu->slice->getNumRefIdx(refListAmvp) * AMVP_MAX_NUM_CANDS_MEM; idx++)
+#else
   for (int idx = 0; idx < pu.cu->slice->getNumRefIdx(refListAmvp) * AMVP_MAX_NUM_CANDS; idx++)
+#endif
   {
-    mvField_amList[idx] = MvField();
-    mvField_amList[MAX_NUM_AMVP_CANDS_MAX_REF + idx] = MvField();
+    mvFieldAmListCommon[idx] = MvField();
+    mvFieldAmListCommon[MAX_NUM_AMVP_CANDS_MAX_REF + idx] = MvField();
   }
   int amvpRefIdxStart = 0;
   int amvpRefIdxEnd = pu.cu->slice->getNumRefIdx(refListAmvp);
@@ -8698,8 +8702,12 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
     }
     for (int bestMvpIdxToTest = bestMvpIdxLoopStart; bestMvpIdxToTest < bestMvpIdxLoopEnd; bestMvpIdxToTest++)
     {
-      const int mvField_merge_idx = refIdxAmvp * AMVP_MAX_NUM_CANDS + bestMvpIdxToTest;
-      const int mvField_amvp_idx = MAX_NUM_AMVP_CANDS_MAX_REF + mvField_merge_idx;
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+      const int mvFieldMergeIdx = refIdxAmvp * AMVP_MAX_NUM_CANDS_MEM + bestMvpIdxToTest;
+#else
+      const int mvFieldMergeIdx = refIdxAmvp * AMVP_MAX_NUM_CANDS + bestMvpIdxToTest;
+#endif
+      const int mvFieldAmvpIdx = MAX_NUM_AMVP_CANDS_MAX_REF + mvFieldMergeIdx;
       pu.mv[refListAmvp] = amvpInfo.mvCand[bestMvpIdxToTest];
 
       // BM select merge candidate
@@ -8741,21 +8749,56 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
         }
         stable_sort(input.begin(), input.end(), CostIncSort);
       }
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+      else
+      {
+        temp.mergeIdx = 0;
+        temp.bmCost = 0;
+        input.push_back(temp);
+      }
+#else
       if (bmMergeCtx.numValidMergeCand == 1)
       {
         pu.mv[refListMerge] = bmMergeCtx.mvFieldNeighbours[refListMerge].mv;
         pu.refIdx[refListMerge] = bmMergeCtx.mvFieldNeighbours[refListMerge].refIdx;
       }
       else
+#endif
       {
         pu.mv[refListMerge] = bmMergeCtx.mvFieldNeighbours[(input[0].mergeIdx << 1) + refListMerge].mv;
         pu.refIdx[refListMerge] = bmMergeCtx.mvFieldNeighbours[(input[0].mergeIdx << 1) + refListMerge].refIdx;
       }
-      amvpMergeModeMvRefinement(pu, mvField_amList, mvField_merge_idx, mvField_amvp_idx);
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+      if (bestMvpIdxToTest == 0 || bestMvpIdxToTest == 2)
+      {
+#endif
+      amvpMergeModeMvRefinement(pu, mvFieldAmListCommon, mvFieldMergeIdx, mvFieldAmvpIdx);
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+      }
+      else if (bmMergeCtx.numValidMergeCand == 1)
+      {
+        mvFieldAmListCommon[mvFieldMergeIdx].refIdx = bmMergeCtx.mvFieldNeighbours[(input[0].mergeIdx << 1) + refListMerge].refIdx;
+        mvFieldAmListCommon[mvFieldMergeIdx].mv = bmMergeCtx.mvFieldNeighbours[(input[0].mergeIdx << 1) + refListMerge].mv;
+        mvFieldAmListCommon[mvFieldAmvpIdx].refIdx = refIdxAmvp;
+        mvFieldAmListCommon[mvFieldAmvpIdx].mv = amvpInfo.mvCand[bestMvpIdxToTest];
+      }
+      else
+      {
+        pu.mv[refListAmvp] = amvpInfo.mvCand[bestMvpIdxToTest];
+        pu.refIdx[refListAmvp] = refIdxAmvp;
+        pu.mv[refListMerge] = bmMergeCtx.mvFieldNeighbours[(input[1].mergeIdx << 1) + refListMerge].mv;
+        pu.refIdx[refListMerge] = bmMergeCtx.mvFieldNeighbours[(input[1].mergeIdx << 1) + refListMerge].refIdx;
+        amvpMergeModeMvRefinement(pu, mvFieldAmListCommon, mvFieldMergeIdx, mvFieldAmvpIdx);
+      }
+      if (bestMvpIdxToTest == 2)
+      {
+        mvFieldAmListCommon[mvFieldAmvpIdx].mv.roundTransPrecInternal2Amvr(pu.cu->imv);
+      }
+#endif
     } // bestMvpIdxLoop
   }  // refIdxAmvp loop
 }
-void InterPrediction::amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvField_amList, const int mvField_merge_idx, const int mvField_amvp_idx)
+void InterPrediction::amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvFieldAmListCommon, const int mvFieldMergeIdx, const int mvFieldAmvpIdx)
 {
   const RefPicList refListMerge = pu.amvpMergeModeFlag[0] ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
   const RefPicList refListAmvp = RefPicList(1 - refListMerge);
@@ -8800,11 +8843,13 @@ void InterPrediction::amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvF
         AMVP_MERGE_MODE_REDUCED_MV_REFINE_SEARCH_ROUND, pu.mv[refListToBeRefined], &mvfBetterUni);
   }
 #endif
+#if !JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
   pu.mv[refListAmvp].roundTransPrecInternal2Amvr(pu.cu->imv);
-  mvField_amList[mvField_merge_idx].refIdx = pu.refIdx[refListMerge];
-  mvField_amList[mvField_merge_idx].mv = pu.mv[refListMerge];
-  mvField_amList[mvField_amvp_idx].refIdx = pu.refIdx[refListAmvp];
-  mvField_amList[mvField_amvp_idx].mv = pu.mv[refListAmvp];
+#endif
+  mvFieldAmListCommon[mvFieldMergeIdx].refIdx = pu.refIdx[refListMerge];
+  mvFieldAmListCommon[mvFieldMergeIdx].mv = pu.mv[refListMerge];
+  mvFieldAmListCommon[mvFieldAmvpIdx].refIdx = pu.refIdx[refListAmvp];
+  mvFieldAmListCommon[mvFieldAmvpIdx].mv = pu.mv[refListAmvp];
 }
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED

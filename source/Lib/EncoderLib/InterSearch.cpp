@@ -2350,7 +2350,7 @@ bool InterSearch::predInterHashSearch(CodingUnit& cu, Partitioner& partitioner, 
 //! search of the best candidate for inter prediction
 #if JVET_X0083_BM_AMVP_MERGE_MODE
 void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner, bool& bdmvrAmMergeNotValid,
-    MvField* mvField_amList, Mv* mvBufEncAmBDMVR_L0, Mv* mvBufEncAmBDMVR_L1)
+    MvField* mvFieldAmListCommon, Mv* mvBufEncAmBDMVR_L0, Mv* mvBufEncAmBDMVR_L1)
 #else
 void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #endif
@@ -2435,10 +2435,16 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     checkAffine = false;
     refListMerge = pu.amvpMergeModeFlag[0] ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
     refListAmvp = RefPicList(1 - refListMerge);
-    getAmvpMergeModeMergeList(pu, mvField_amList);
+    getAmvpMergeModeMergeList(pu, mvFieldAmListCommon);
     for (int iRefIdxTemp = 0; iRefIdxTemp < cs.slice->getNumRefIdx(refListAmvp); iRefIdxTemp++)
     {
-      if (mvField_amList[iRefIdxTemp * AMVP_MAX_NUM_CANDS].refIdx < 0 && mvField_amList[iRefIdxTemp * AMVP_MAX_NUM_CANDS + 1].refIdx < 0)
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+      if (mvFieldAmListCommon[iRefIdxTemp * AMVP_MAX_NUM_CANDS_MEM].refIdx < 0
+          && mvFieldAmListCommon[iRefIdxTemp * AMVP_MAX_NUM_CANDS_MEM + 1].refIdx < 0
+          && mvFieldAmListCommon[iRefIdxTemp * AMVP_MAX_NUM_CANDS_MEM + 2].refIdx < 0)
+#else
+      if (mvFieldAmListCommon[iRefIdxTemp * AMVP_MAX_NUM_CANDS].refIdx < 0 && mvFieldAmListCommon[iRefIdxTemp * AMVP_MAX_NUM_CANDS + 1].refIdx < 0)
+#endif
       {
         continue;
       }
@@ -2492,7 +2498,11 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     Distortion   uiAffineCost = std::numeric_limits<Distortion>::max();
     Distortion   uiCost[2] = { std::numeric_limits<Distortion>::max(), std::numeric_limits<Distortion>::max() };
     Distortion   uiCostBi  =   std::numeric_limits<Distortion>::max();
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+    Distortion   uiCostTemp = std::numeric_limits<Distortion>::max();
+#else
     Distortion   uiCostTemp;
+#endif
 
     uint32_t         uiBits[3];
     uint32_t         uiBitsTemp;
@@ -2802,11 +2812,17 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           Mv selectedBestMv;
           if (amvpMergeModeFlag)
           {
-            if (mvField_amList[iRefIdxTemp * AMVP_MAX_NUM_CANDS].refIdx < 0 && mvField_amList[iRefIdxTemp * AMVP_MAX_NUM_CANDS + 1].refIdx < 0)
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+            if (mvFieldAmListCommon[iRefIdxTemp * AMVP_MAX_NUM_CANDS_MEM].refIdx < 0
+                && mvFieldAmListCommon[iRefIdxTemp * AMVP_MAX_NUM_CANDS_MEM + 1].refIdx < 0
+                && mvFieldAmListCommon[iRefIdxTemp * AMVP_MAX_NUM_CANDS_MEM + 2].refIdx < 0)
+#else
+            if (mvFieldAmListCommon[iRefIdxTemp * AMVP_MAX_NUM_CANDS].refIdx < 0 && mvFieldAmListCommon[iRefIdxTemp * AMVP_MAX_NUM_CANDS + 1].refIdx < 0)
+#endif
             {
               continue;
             }
-            xEstimateMvPredAMVP( pu, origBuf, refListAmvp, iRefIdxTemp, cMvPred[refListAmvp][iRefIdxTemp], amvp[refListAmvp], false, &biPDistTemp, mvField_amList);
+            xEstimateMvPredAMVP( pu, origBuf, refListAmvp, iRefIdxTemp, cMvPred[refListAmvp][iRefIdxTemp], amvp[refListAmvp], false, &biPDistTemp, mvFieldAmListCommon);
             xCopyAMVPInfo( &amvp[refListAmvp], &aacAMVPInfo[refListAmvp][iRefIdxTemp]); // must always be done ( also when AMVP_MODE = AM_NONE )
             numberBestMvpIdxLoop = amvp[eRefPicList].numCand;
           }
@@ -2814,7 +2830,11 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           {
             if (amvpMergeModeFlag)
             {
-              const int mvField_merge_idx = iRefIdxTemp * AMVP_MAX_NUM_CANDS + bestMvpIdxLoop;
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+              const int mvFieldMergeIdx = iRefIdxTemp * AMVP_MAX_NUM_CANDS_MEM + bestMvpIdxLoop;
+#else
+              const int mvFieldMergeIdx = iRefIdxTemp * AMVP_MAX_NUM_CANDS + bestMvpIdxLoop;
+#endif
               aaiMvpIdxBi[iRefList][iRefIdxTemp] = bestMvpIdxLoop;
               unsigned idx1, idx2, idx3, idx4;
               getAreaIdx(cu.Y(), *cu.slice->getPPS()->pcv, idx1, idx2, idx3, idx4);
@@ -2829,8 +2849,8 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
               }
               cMvPredBi[iRefList][iRefIdxTemp] = amvp[eRefPicList].mvCand[bestMvpIdxLoop];
               // set merge dir mv info and MC
-              pu.mv[1 - iRefList] = mvField_amList[mvField_merge_idx].mv;
-              pu.refIdx[1 - iRefList] = mvField_amList[mvField_merge_idx].refIdx;
+              pu.mv[1 - iRefList] = mvFieldAmListCommon[mvFieldMergeIdx].mv;
+              pu.refIdx[1 - iRefList] = mvFieldAmListCommon[mvFieldMergeIdx].refIdx;
             }
 #endif
             if( m_pcEncCfg->getUseBcwFast() && (bcwIdx != BCW_DEFAULT)
@@ -2888,12 +2908,28 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #if JVET_X0083_BM_AMVP_MERGE_MODE
             if (amvpMergeModeFlag)
             {
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+              if (bestMvpIdxLoop < 2)
+              {
+                MvField amvpMvField, mergeMvField;
+                amvpMvField.setMvField(cMvPredBi[iRefList][iRefIdxTemp], iRefIdxTemp);
+                mergeMvField.setMvField(cMvPredBi[iRefList][iRefIdxTemp].getSymmvdMv(cMvPredBi[iRefList][iRefIdxTemp], pu.mv[1 - iRefList]), pu.refIdx[1 - iRefList]);
+                uiCostTemp = xGetSymmetricCost( pu, origBuf, eRefPicList, amvpMvField, mergeMvField, bcwIdx );
+                uiCostTemp += m_pcRdCost->getCost( uiBitsTemp );
+                cMvTemp[iRefList][iRefIdxTemp] = amvpMvField.mv;
+              }
+              else
+              {
+#endif
               PelUnitBuf predBufTmp = m_tmpPredStorage[1 - iRefList].getBuf( UnitAreaRelative(cu, pu) );
               motionCompensation( pu, predBufTmp, RefPicList(1 - iRefList) );
 #if MULTI_HYP_PRED
               CHECK(pu.addHypData.empty() == false, "this is not possible");
 #endif
               xMotionEstimation ( pu, origBuf, eRefPicList, cMvPredBi[iRefList][iRefIdxTemp], iRefIdxTemp, cMvTemp[iRefList][iRefIdxTemp], aaiMvpIdxBi[iRefList][iRefIdxTemp], uiBitsTemp, uiCostTemp, amvp[eRefPicList], true );
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+              }
+#endif
             }
             else
             {
@@ -3263,17 +3299,31 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
         uiLastMode = 2;
         if (pu.amvpMergeModeFlag[1])
         {
-          const int mvField_merge_idx = iRefIdxBi[0] * AMVP_MAX_NUM_CANDS + aaiMvpIdxBi[0][iRefIdxBi[0]];
-          pu.mv[REF_PIC_LIST_1] = mvField_amList[mvField_merge_idx].mv;
-          pu.refIdx[REF_PIC_LIST_1] = mvField_amList[mvField_merge_idx].refIdx;
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+          const int mvFieldMergeIdx = iRefIdxBi[0] * AMVP_MAX_NUM_CANDS_MEM + aaiMvpIdxBi[0][iRefIdxBi[0]];
+#else
+          const int mvFieldMergeIdx = iRefIdxBi[0] * AMVP_MAX_NUM_CANDS + aaiMvpIdxBi[0][iRefIdxBi[0]];
+#endif
+          pu.mv[REF_PIC_LIST_1] = mvFieldAmListCommon[mvFieldMergeIdx].mv;
+          pu.refIdx[REF_PIC_LIST_1] = mvFieldAmListCommon[mvFieldMergeIdx].refIdx;
           pu.mvpIdx[REF_PIC_LIST_1] = 2;
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+          pu.mvd[REF_PIC_LIST_1].setZero();
+#endif
         }
         if (pu.amvpMergeModeFlag[0])
         {
-          const int mvField_merge_idx = iRefIdxBi[1] * AMVP_MAX_NUM_CANDS + aaiMvpIdxBi[1][iRefIdxBi[1]];
-          pu.mv[REF_PIC_LIST_0] = mvField_amList[mvField_merge_idx].mv;
-          pu.refIdx[REF_PIC_LIST_0] = mvField_amList[mvField_merge_idx].refIdx;
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+          const int mvFieldMergeIdx = iRefIdxBi[1] * AMVP_MAX_NUM_CANDS_MEM + aaiMvpIdxBi[1][iRefIdxBi[1]];
+#else
+          const int mvFieldMergeIdx = iRefIdxBi[1] * AMVP_MAX_NUM_CANDS + aaiMvpIdxBi[1][iRefIdxBi[1]];
+#endif
+          pu.mv[REF_PIC_LIST_0] = mvFieldAmListCommon[mvFieldMergeIdx].mv;
+          pu.refIdx[REF_PIC_LIST_0] = mvFieldAmListCommon[mvFieldMergeIdx].refIdx;
           pu.mvpIdx[REF_PIC_LIST_0] = 2;
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+          pu.mvd[REF_PIC_LIST_0].setZero();
+#endif
         }
         pu.interDir = 3;
         if (!pu.amvpMergeModeFlag[0])
@@ -3601,10 +3651,10 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
       {
         AffineAMVPInfo affineAMVPInfo;
         PU::fillAffineMvpCand(pu, eRefPicList, pu.refIdx[uiRefListIdx], affineAMVPInfo);
-        const unsigned mvp_idx = pu.mvpIdx[eRefPicList];
+        const unsigned mvpIdx = pu.mvpIdx[eRefPicList];
 
         std::vector<Mv> cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3;
-        deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvp_idx], affineAMVPInfo.mvCandRT[mvp_idx], affineAMVPInfo.mvCandLB[mvp_idx],
+        deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvpIdx], affineAMVPInfo.mvCandRT[mvpIdx], affineAMVPInfo.mvCandLB[mvpIdx],
           absMvd[0], absMvd[1], absMvd[2], pu, eRefPicList, pu.refIdx[eRefPicList], cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
         int idx = -1;
         idx = deriveMVSDIdxFromMVDAffine(pu, eRefPicList, cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
@@ -3950,7 +4000,7 @@ inline unsigned InterSearch::getAdditionalHypothesisInitialBits(const MultiHypPr
 
 // AMVP
 #if JVET_X0083_BM_AMVP_MERGE_MODE
-void InterSearch::xEstimateMvPredAMVP( PredictionUnit& pu, PelUnitBuf& origBuf, RefPicList eRefPicList, int iRefIdx, Mv& rcMvPred, AMVPInfo& rAMVPInfo, bool bFilled, Distortion* puiDistBiP, MvField* mvField_amList )
+void InterSearch::xEstimateMvPredAMVP( PredictionUnit& pu, PelUnitBuf& origBuf, RefPicList eRefPicList, int iRefIdx, Mv& rcMvPred, AMVPInfo& rAMVPInfo, bool bFilled, Distortion* puiDistBiP, MvField* mvFieldAmListCommon )
 #else
 void InterSearch::xEstimateMvPredAMVP( PredictionUnit& pu, PelUnitBuf& origBuf, RefPicList eRefPicList, int iRefIdx, Mv& rcMvPred, AMVPInfo& rAMVPInfo, bool bFilled, Distortion* puiDistBiP )
 #endif
@@ -3968,15 +4018,28 @@ void InterSearch::xEstimateMvPredAMVP( PredictionUnit& pu, PelUnitBuf& origBuf, 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
     if (pu.amvpMergeModeFlag[1 - eRefPicList] == true)
     {
-      const int mvField_amvp_idx_0 = MAX_NUM_AMVP_CANDS_MAX_REF + iRefIdx * AMVP_MAX_NUM_CANDS;
-      pcAMVPInfo->mvCand[0] = mvField_amList[mvField_amvp_idx_0].mv;
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+      const int mvFieldAmvpIdx0 = MAX_NUM_AMVP_CANDS_MAX_REF + iRefIdx * AMVP_MAX_NUM_CANDS_MEM;
+      CHECK(mvFieldAmListCommon[mvFieldAmvpIdx0].refIdx != iRefIdx, "this is not possible");
+#else
+      const int mvFieldAmvpIdx0 = MAX_NUM_AMVP_CANDS_MAX_REF + iRefIdx * AMVP_MAX_NUM_CANDS;
+#endif
+      pcAMVPInfo->mvCand[0] = mvFieldAmListCommon[mvFieldAmvpIdx0].mv;
       pcAMVPInfo->numCand = 1;
 #if !TM_AMVP || JVET_Y0128_NON_CTC
-      const int mvField_amvp_idx_1 = mvField_amvp_idx_0 + 1;
-      if (mvField_amList[mvField_amvp_idx_1].refIdx >= 0)
+      const int mvFieldAmvpIdx1 = mvFieldAmvpIdx0 + 1;
+      if (mvFieldAmListCommon[mvFieldAmvpIdx1].refIdx >= 0)
       {
-        pcAMVPInfo->mvCand[1] = mvField_amList[mvField_amvp_idx_1].mv;
+        pcAMVPInfo->mvCand[1] = mvFieldAmListCommon[mvFieldAmvpIdx1].mv;
         pcAMVPInfo->numCand = 2;
+      }
+#endif
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+      const int mvFieldAmvpIdx2 = mvFieldAmvpIdx0 + 2;
+      if (mvFieldAmListCommon[mvFieldAmvpIdx2].refIdx >= 0)
+      {
+        pcAMVPInfo->mvCand[2] = mvFieldAmListCommon[mvFieldAmvpIdx2].mv;
+        pcAMVPInfo->numCand = 3;
       }
 #endif
       return;

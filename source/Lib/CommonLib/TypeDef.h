@@ -152,6 +152,7 @@
 #endif
 #define JVET_X0056_DMVD_EARLY_TERMINATION                 1 // JVET-X0056: Early termination for DMVR and TM
 #define JVET_X0083_BM_AMVP_MERGE_MODE                     1 // JVET-X0083: AMVP-merge mode
+#define JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE             (JVET_X0083_BM_AMVP_MERGE_MODE && 1)
 #define JVET_Y0089_DMVR_BCW                               1 // JVET-Y0089: DMVR with BCW enabled
 
 // Inter template matching tools

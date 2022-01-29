@@ -8619,7 +8619,7 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   if (cu.firstPU->amvpMergeModeFlag[0] || cu.firstPU->amvpMergeModeFlag[1])
   {
     m_pcInterSearch->predInterSearch( cu, partitioner, bdmvrAmMergeNotValid,
-        mvField_amList_enc, m_mvBufEncAmBDMVR[0], m_mvBufEncAmBDMVR[1] );
+        m_mvFieldAmListEnc, m_mvBufEncAmBDMVR[0], m_mvBufEncAmBDMVR[1] );
   }
   else
   m_pcInterSearch->predInterSearch( cu, partitioner, bdmvrAmMergeNotValid );

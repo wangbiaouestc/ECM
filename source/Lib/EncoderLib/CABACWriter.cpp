@@ -2487,6 +2487,9 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
 #endif
     if( pu.interDir != 2 /* PRED_L1 */ )
     {
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+      mvp_flag    ( pu, REF_PIC_LIST_0 );
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
       if (!pu.amvpMergeModeFlag[REF_PIC_LIST_0])
       {
@@ -2522,20 +2525,37 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
       else
       {
         Mv mvd = pu.mvd[REF_PIC_LIST_0];
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+        if (pu.amvpMergeModeFlag[REF_PIC_LIST_1] == true && pu.mvpIdx[REF_PIC_LIST_0] < 2)
+        {
+          CHECK(mvd.hor != 0, "this is not possible");
+          CHECK(mvd.ver != 0, "this is not possible");
+        }
+        else
+        {
+#endif
         mvd.changeTransPrecInternal2Amvr(pu.cu->imv);
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
         mvd_coding(mvd, 0, !pu.isMvsdApplicable());
 #else
         mvd_coding(mvd, 0); // already changed to signaling precision
 #endif
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+        }
+#endif
       }
 #if JVET_X0083_BM_AMVP_MERGE_MODE
       }
 #endif
+#if !JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
       mvp_flag    ( pu, REF_PIC_LIST_0 );
+#endif
     }
     if( pu.interDir != 1 /* PRED_L0 */ )
     {
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+      mvp_flag    ( pu, REF_PIC_LIST_1 );
+#endif
       if ( pu.cu->smvdMode != 1 )
       {
 #if JVET_X0083_BM_AMVP_MERGE_MODE
@@ -2575,11 +2595,23 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
         else
         {
           Mv mvd = pu.mvd[REF_PIC_LIST_1];
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+          if (pu.amvpMergeModeFlag[REF_PIC_LIST_0] == true && pu.mvpIdx[REF_PIC_LIST_1] < 2)
+          {
+            CHECK(mvd.hor != 0, "this is not possible");
+            CHECK(mvd.ver != 0, "this is not possible");
+          }
+          else
+          {
+#endif
           mvd.changeTransPrecInternal2Amvr(pu.cu->imv);
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
           mvd_coding(mvd, 0, !pu.isMvsdApplicable());
 #else
           mvd_coding(mvd, 0); // already changed to signaling precision
+#endif
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+          }
 #endif
         }
       }
@@ -2587,7 +2619,9 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
       }
 #endif
       }
+#if !JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
       mvp_flag    ( pu, REF_PIC_LIST_1 );
+#endif
     }
   }
 }
@@ -3721,6 +3755,30 @@ void CABACWriter::mvp_flag( const PredictionUnit& pu, RefPicList eRefList )
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   if (pu.amvpMergeModeFlag[eRefList])
   {
+    return;
+  }
+#endif
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+  if (pu.amvpMergeModeFlag[1 - eRefList] == true)
+  {
+    if (pu.mvpIdx[eRefList] < 2)
+    {
+#if TM_AMVP
+#if JVET_Y0128_NON_CTC
+      if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
+#else
+      if(!pu.cu->cs->sps->getUseDMVDMode() || pu.cu->affine || CU::isIBC(*pu.cu))
+#endif
+#endif
+      {
+        m_BinEncoder.encodeBin( 0, Ctx::MVPIdx() );
+      }
+      m_BinEncoder.encodeBinEP( pu.mvpIdx[eRefList] );
+    }
+    else
+    {
+      m_BinEncoder.encodeBin( 1, Ctx::MVPIdx() );
+    }
     return;
   }
 #endif

@@ -1745,7 +1745,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           Mv orgMvd0 = pu.mvd[0];
           Mv orgMvd1 = pu.mvd[1];
           // this part is to derive the merge info
-          m_pcInterPred->getAmvpMergeModeMergeList(pu, mvField_amList_dec, orgRefIdxAMVP);
+          m_pcInterPred->getAmvpMergeModeMergeList(pu, m_mvFieldAmListDec, orgRefIdxAMVP);
           // if there was set PU merge info, restore the AMVP information
           pu.mvpIdx[REF_PIC_LIST_0] = orgMvpIdxL0;
           pu.mvpIdx[REF_PIC_LIST_1] = orgMvpIdxL1;
@@ -1766,7 +1766,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               AffineAMVPInfo affineAMVPInfo;
               PU::fillAffineMvpCand( pu, eRefList, pu.refIdx[eRefList], affineAMVPInfo );
 
-              const unsigned mvp_idx = pu.mvpIdx[eRefList];
+              const unsigned mvpIdx = pu.mvpIdx[eRefList];
 
               pu.mvpNum[eRefList] = affineAMVPInfo.numCand;
 
@@ -1789,20 +1789,20 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               if ((absMvd[0] != Mv(0, 0) || absMvd[1] != Mv(0, 0) || absMvd[2] != Mv(0, 0)) && pu.isMvsdApplicable())
               {
                 std::vector<Mv> cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3;
-                m_pcInterPred->deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvp_idx], affineAMVPInfo.mvCandRT[mvp_idx], affineAMVPInfo.mvCandLB[mvp_idx],
+                m_pcInterPred->deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvpIdx], affineAMVPInfo.mvCandRT[mvpIdx], affineAMVPInfo.mvCandLB[mvpIdx],
                   absMvd[0], absMvd[1], absMvd[2], pu, eRefList, pu.refIdx[eRefList], cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
                 CHECK(pu.mvsdIdx[eRefList] >= cMvdDerivedVec.size(), "");
                 m_pcInterPred->deriveMVDFromMVSDIdxAffine(pu, eRefList, cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
               }
 #endif
-              Mv mvLT = affineAMVPInfo.mvCandLT[mvp_idx] + pu.mvdAffi[eRefList][0];
-              Mv mvRT = affineAMVPInfo.mvCandRT[mvp_idx] + pu.mvdAffi[eRefList][1];
+              Mv mvLT = affineAMVPInfo.mvCandLT[mvpIdx] + pu.mvdAffi[eRefList][0];
+              Mv mvRT = affineAMVPInfo.mvCandRT[mvpIdx] + pu.mvdAffi[eRefList][1];
               mvRT += pu.mvdAffi[eRefList][0];
 
               Mv mvLB;
               if ( cu.affineType == AFFINEMODEL_6PARAM )
               {
-                mvLB = affineAMVPInfo.mvCandLB[mvp_idx] + pu.mvdAffi[eRefList][2];
+                mvLB = affineAMVPInfo.mvCandLB[mvpIdx] + pu.mvdAffi[eRefList][2];
                 mvLB += pu.mvdAffi[eRefList][0];
               }
 
@@ -1849,9 +1849,13 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                 if (!cu.cs->pcv->isEncoder)
                 {
 #endif
-                const int mvField_merge_idx = pu.refIdx[1 - eRefList] * AMVP_MAX_NUM_CANDS + pu.mvpIdx[1 - eRefList];
-                pu.mv[eRefList] = mvField_amList_dec[mvField_merge_idx].mv;
-                pu.refIdx[eRefList] = mvField_amList_dec[mvField_merge_idx].refIdx;
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+                const int mvFieldMergeIdx = pu.refIdx[1 - eRefList] * AMVP_MAX_NUM_CANDS_MEM + pu.mvpIdx[1 - eRefList];
+#else
+                const int mvFieldMergeIdx = pu.refIdx[1 - eRefList] * AMVP_MAX_NUM_CANDS + pu.mvpIdx[1 - eRefList];
+#endif
+                pu.mv[eRefList] = m_mvFieldAmListDec[mvFieldMergeIdx].mv;
+                pu.refIdx[eRefList] = m_mvFieldAmListDec[mvFieldMergeIdx].refIdx;
 #if REUSE_CU_RESULTS
                 }
 #endif
@@ -1870,6 +1874,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #else
                   amvpInfo.numCand = AMVP_MAX_NUM_CANDS;
 #endif
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+                  amvpInfo.numCand += 1;
+#endif
 #if REUSE_CU_RESULTS
                   if (cu.cs->pcv->isEncoder)
                   {
@@ -1878,8 +1885,12 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                   else
 #endif
                   {
-                    const int mvField_amvp_idx = MAX_NUM_AMVP_CANDS_MAX_REF + pu.refIdx[eRefList] * AMVP_MAX_NUM_CANDS + pu.mvpIdx[eRefList];
-                    amvpInfo.mvCand[pu.mvpIdx[eRefList]] = mvField_amList_dec[mvField_amvp_idx].mv;
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+                    const int mvFieldAmvpIdx = MAX_NUM_AMVP_CANDS_MAX_REF + pu.refIdx[eRefList] * AMVP_MAX_NUM_CANDS_MEM + pu.mvpIdx[eRefList];
+#else
+                    const int mvFieldAmvpIdx = MAX_NUM_AMVP_CANDS_MAX_REF + pu.refIdx[eRefList] * AMVP_MAX_NUM_CANDS + pu.mvpIdx[eRefList];
+#endif
+                    amvpInfo.mvCand[pu.mvpIdx[eRefList]] = m_mvFieldAmListDec[mvFieldAmvpIdx].mv;
                   }
                 }
                 else
