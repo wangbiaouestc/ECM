@@ -627,7 +627,7 @@ public:
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   void predInterSearch(CodingUnit& cu, Partitioner& partitioner, bool& amvpMergeModeNotValid,
-      MvField* mvField_amList = nullptr, Mv* mvBufEncAmBDMVR_L0 = nullptr, Mv* mvBufEncAmBDMVR_L1 = nullptr);
+      MvField* mvFieldAmListCommon = nullptr, Mv* mvBufEncAmBDMVR_L0 = nullptr, Mv* mvBufEncAmBDMVR_L1 = nullptr);
 #else
   void predInterSearch(CodingUnit& cu, Partitioner& partitioner );
 #endif
@@ -673,7 +673,7 @@ protected:
                                     bool                  bFilled = false,
                                     Distortion*           puiDistBiP = NULL
 #if JVET_X0083_BM_AMVP_MERGE_MODE
-                                  , MvField*              mvField_amList = NULL
+                                  , MvField*              mvFieldAmListCommon = NULL
 #endif
                                   );
 

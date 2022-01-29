@@ -2873,6 +2873,9 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
 
     if( pu.interDir != 2 /* PRED_L1 */ )
     {
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+      mvp_flag    ( pu, REF_PIC_LIST_0 );
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
       if (!pu.amvpMergeModeFlag[REF_PIC_LIST_0])
       {
@@ -2901,20 +2904,36 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
       }
       else
       {
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+        if (pu.amvpMergeModeFlag[REF_PIC_LIST_1] == true && pu.mvpIdx[REF_PIC_LIST_0] < 2)
+        {
+          pu.mvd[REF_PIC_LIST_0].setZero();
+        }
+        else
+        {
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
         mvd_coding(pu.mvd[REF_PIC_LIST_0] ,  !pu.isMvsdApplicable());
 #else
         mvd_coding(pu.mvd[REF_PIC_LIST_0] );
 #endif
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+        }
+#endif
       }
 #if JVET_X0083_BM_AMVP_MERGE_MODE
       }
 #endif
+#if !JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
       mvp_flag    ( pu, REF_PIC_LIST_0 );
+#endif
     }
 
     if( pu.interDir != 1 /* PRED_L0 */ )
     {
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+      mvp_flag    ( pu, REF_PIC_LIST_1 );
+#endif
       if ( pu.cu->smvdMode != 1 )
       {
 #if JVET_X0083_BM_AMVP_MERGE_MODE
@@ -2952,10 +2971,21 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
         }
         else
         {
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+          if (pu.amvpMergeModeFlag[REF_PIC_LIST_0] == true && pu.mvpIdx[REF_PIC_LIST_1] < 2)
+          {
+            pu.mvd[REF_PIC_LIST_1].setZero();
+          }
+          else
+          {
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
           mvd_coding(pu.mvd[REF_PIC_LIST_1],  !pu.isMvsdApplicable());
 #else
           mvd_coding(pu.mvd[REF_PIC_LIST_1]);
+#endif
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+          }
 #endif
         }
 #if JVET_X0083_BM_AMVP_MERGE_MODE
@@ -2968,7 +2998,9 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
         pu.refIdx[REF_PIC_LIST_1] = pu.cs->slice->getSymRefIdx(REF_PIC_LIST_1);
       }
 #endif
+#if !JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
       mvp_flag    ( pu, REF_PIC_LIST_1 );
+#endif
     }
   }
 #if MULTI_HYP_PRED
@@ -3877,26 +3909,51 @@ void CABACReader::mvp_flag( PredictionUnit& pu, RefPicList eRefList )
     return;
   }
 #endif
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+  if (pu.amvpMergeModeFlag[1 - eRefList] == true)
+  {
+    unsigned mvpIdx = 0;
 #if TM_AMVP
 #if JVET_Y0128_NON_CTC
-  unsigned mvp_idx = 0;
+    if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
+#else
+    if(!pu.cu->cs->sps->getUseDMVDMode() || pu.cu->affine || CU::isIBC(*pu.cu))
+#endif
+#endif
+    {
+      mvpIdx = m_BinDecoder.decodeBin( Ctx::MVPIdx() );
+    }
+    if (mvpIdx == 0)
+    {
+      pu.mvpIdx [eRefList] = mvpIdx + m_BinDecoder.decodeBinEP();
+    }
+    else
+    {
+      pu.mvpIdx [eRefList] = mvpIdx + 1;
+    }
+    return;
+  }
+#endif
+#if TM_AMVP
+#if JVET_Y0128_NON_CTC
+  unsigned mvpIdx = 0;
   if (pu.cu->affine || CU::isIBC(*pu.cu))
   {
-    mvp_idx = m_BinDecoder.decodeBin( Ctx::MVPIdx() );
+    mvpIdx = m_BinDecoder.decodeBin( Ctx::MVPIdx() );
   }
   else if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
   {
-    mvp_idx = m_BinDecoder.decodeBin( Ctx::MVPIdx() );
+    mvpIdx = m_BinDecoder.decodeBin( Ctx::MVPIdx() );
   }
 #else
-  unsigned mvp_idx = !pu.cu->cs->sps->getUseDMVDMode() || pu.cu->affine || CU::isIBC(*pu.cu) ? m_BinDecoder.decodeBin( Ctx::MVPIdx() ) : 0;
+  unsigned mvpIdx = !pu.cu->cs->sps->getUseDMVDMode() || pu.cu->affine || CU::isIBC(*pu.cu) ? m_BinDecoder.decodeBin( Ctx::MVPIdx() ) : 0;
 #endif
 #else
-  unsigned mvp_idx = m_BinDecoder.decodeBin( Ctx::MVPIdx() );
+  unsigned mvpIdx = m_BinDecoder.decodeBin( Ctx::MVPIdx() );
 #endif
-  DTRACE( g_trace_ctx, D_SYNTAX, "mvp_flag() value=%d pos=(%d,%d)\n", mvp_idx, pu.lumaPos().x, pu.lumaPos().y );
-  pu.mvpIdx [eRefList] = mvp_idx;
-  DTRACE( g_trace_ctx, D_SYNTAX, "mvpIdx(refList:%d)=%d\n", eRefList, mvp_idx );
+  DTRACE( g_trace_ctx, D_SYNTAX, "mvp_flag() value=%d pos=(%d,%d)\n", mvpIdx, pu.lumaPos().x, pu.lumaPos().y );
+  pu.mvpIdx [eRefList] = mvpIdx;
+  DTRACE( g_trace_ctx, D_SYNTAX, "mvpIdx(refList:%d)=%d\n", eRefList, mvpIdx );
 }
 
 void CABACReader::Ciip_flag(PredictionUnit& pu)
