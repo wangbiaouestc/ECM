@@ -72,6 +72,8 @@
 
 #define JVET_X0049_BDMVR_SW_OPT                           1 // JVET-X0049: software optimization for BDMVR (lossless)
 
+#define JVET_Y0152_TT_ENC_SPEEDUP                         1 // TT encoding speedup
+
 // SIMD optimizations
 #define MCIF_SIMD_NEW                                     1 // SIMD for interpolation
 #define DIST_SSE_ENABLE                                   1 // Enable SIMD for SSE

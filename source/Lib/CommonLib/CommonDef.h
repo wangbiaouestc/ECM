@@ -728,6 +728,15 @@ static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD =   MMVD_MAX_REFINE_NUM;
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM;
 #endif
+
+#if JVET_Y0152_TT_ENC_SPEEDUP
+static constexpr int   FAST_METHOD_TT_ENC_SPEEDUP = 0x0001;  ///< Embedding flag, which, if false, de-activates all the following ABT_ENC_SPEEDUP_* modes
+static constexpr int FAST_METHOD_HOR_XOR_VER = 0x0002;
+static constexpr int FAST_METHOD_ENC_SPEEDUP_BT_BASED = 0x0004;
+static constexpr int FAST_METHOD_TT_ENC_SPEEDUP_BSLICE = 0x0008;
+static constexpr int FAST_METHOD_TT_ENC_SPEEDUP_ISLICE = 0x0010;
+#endif
+
 // need to know for static memory allocation
 static const int MAX_DELTA_QP   =                                   7;      ///< maximum supported delta QP value
 static const int MAX_TESTED_QPs =   ( 1 + 1 + ( MAX_DELTA_QP << 1 ) );      ///< dqp=0 +- max_delta_qp + lossless mode

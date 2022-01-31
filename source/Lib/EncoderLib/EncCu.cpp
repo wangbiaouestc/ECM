@@ -790,6 +790,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     tempCS->initSubStructure(*m_pTempCUWoOBMC[wIdx][hIdx], partitioner.chType, partitioner.currArea(), false);
   }
 #endif
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  tempCS->splitRdCostBest = NULL;
+#endif
   m_modeCtrl->initCULevel( partitioner, *tempCS );
   if( partitioner.currQtDepth == 0 && partitioner.currMtDepth == 0 && !tempCS->slice->isIntra() && ( sps.getUseSBT() || sps.getUseInterMTS() ) )
   {
@@ -883,6 +886,11 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   }
 
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  double splitRdCostBest[NUM_PART_SPLIT];
+  std::fill(std::begin(splitRdCostBest), std::end(splitRdCostBest), MAX_DOUBLE);
+#endif
+
   do
   {
     for (int i = compBegin; i < (compBegin + numComp); i++)
@@ -954,6 +962,10 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
           xCheckRDCostInterIMV(tempCS, bestCS, partitioner, currTestMode, bestIntPelCost);
 #endif
           tempCS->bestCS = nullptr;
+#if JVET_Y0152_TT_ENC_SPEEDUP
+          splitRdCostBest[CTU_LEVEL] = bestCS->cost;
+          tempCS->splitRdCostBest = splitRdCostBest;
+#endif
         }
       }
       else
@@ -961,6 +973,10 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
         tempCS->bestCS = bestCS;
         xCheckRDCostInter( tempCS, bestCS, partitioner, currTestMode );
         tempCS->bestCS = nullptr;
+#if JVET_Y0152_TT_ENC_SPEEDUP
+        splitRdCostBest[CTU_LEVEL] = bestCS->cost;
+        tempCS->splitRdCostBest = splitRdCostBest;
+#endif
       }
 #if ENABLE_OBMC
       if (tryObmc && tempCS->cus.size() != 0)//todo
@@ -972,29 +988,49 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     else if (currTestMode.type == ETM_HASH_INTER)
     {
       xCheckRDCostHashInter( tempCS, bestCS, partitioner, currTestMode );
+#if JVET_Y0152_TT_ENC_SPEEDUP
+      splitRdCostBest[CTU_LEVEL] = bestCS->cost;
+      tempCS->splitRdCostBest = splitRdCostBest;
+#endif
     }
 #if !MERGE_ENC_OPT
     else if( currTestMode.type == ETM_AFFINE )
     {
       xCheckRDCostAffineMerge2Nx2N( tempCS, bestCS, partitioner, currTestMode );
+#if JVET_Y0152_TT_ENC_SPEEDUP
+      splitRdCostBest[CTU_LEVEL] = bestCS->cost;
+      tempCS->splitRdCostBest = splitRdCostBest;
+#endif
     }
 #endif
 #if AFFINE_MMVD && !MERGE_ENC_OPT
     else if (currTestMode.type == ETM_AF_MMVD)
     {
       xCheckRDCostAffineMmvd2Nx2N(tempCS, bestCS, partitioner, currTestMode);
+#if JVET_Y0152_TT_ENC_SPEEDUP
+      splitRdCostBest[CTU_LEVEL] = bestCS->cost;
+      tempCS->splitRdCostBest = splitRdCostBest;
+#endif
     }
 #endif
 #if TM_MRG && !MERGE_ENC_OPT
     else if (currTestMode.type == ETM_MERGE_TM)
     {
       xCheckRDCostTMMerge2Nx2N(tempCS, bestCS, partitioner, currTestMode);
+#if JVET_Y0152_TT_ENC_SPEEDUP
+      splitRdCostBest[CTU_LEVEL] = bestCS->cost;
+      tempCS->splitRdCostBest = splitRdCostBest;
+#endif
     }
 #endif
 #if REUSE_CU_RESULTS
     else if( currTestMode.type == ETM_RECO_CACHED )
     {
       xReuseCachedResult( tempCS, bestCS, partitioner );
+#if JVET_Y0152_TT_ENC_SPEEDUP
+      splitRdCostBest[CTU_LEVEL] = bestCS->cost;
+      tempCS->splitRdCostBest = splitRdCostBest;
+#endif
     }
 #endif
     else if( currTestMode.type == ETM_MERGE_SKIP )
@@ -1005,6 +1041,10 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 
       if (cu)
       cu->mmvdSkip = cu->skip == false ? false : cu->mmvdSkip;
+#if JVET_Y0152_TT_ENC_SPEEDUP
+      splitRdCostBest[CTU_LEVEL] = bestCS->cost;
+      tempCS->splitRdCostBest = splitRdCostBest;
+#endif
     }
     else if( currTestMode.type == ETM_MERGE_GEO )
     {
@@ -1022,11 +1062,19 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #else
       xCheckRDCostMergeGeo2Nx2N( tempCS, bestCS, partitioner, currTestMode );
 #endif
+#if JVET_Y0152_TT_ENC_SPEEDUP
+      splitRdCostBest[CTU_LEVEL] = bestCS->cost;
+      tempCS->splitRdCostBest = splitRdCostBest;
+#endif
     }
 #if MULTI_HYP_PRED
     else if (currTestMode.type == ETM_INTER_MULTIHYP)
     {
       xCheckRDCostInterMultiHyp2Nx2N(tempCS, bestCS, partitioner, currTestMode);
+#if JVET_Y0152_TT_ENC_SPEEDUP
+      splitRdCostBest[CTU_LEVEL] = bestCS->cost;
+      tempCS->splitRdCostBest = splitRdCostBest;
+#endif
     }
 #endif
     else if( currTestMode.type == ETM_INTRA )
@@ -1064,18 +1112,34 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       {
         xCheckRDCostIntra(tempCS, bestCS, partitioner, currTestMode, false);
       }
+#if JVET_Y0152_TT_ENC_SPEEDUP
+      splitRdCostBest[CTU_LEVEL] = bestCS->cost;
+      tempCS->splitRdCostBest = splitRdCostBest;
+#endif
     }
     else if (currTestMode.type == ETM_PALETTE)
     {
       xCheckPLT( tempCS, bestCS, partitioner, currTestMode );
+#if JVET_Y0152_TT_ENC_SPEEDUP
+      splitRdCostBest[CTU_LEVEL] = bestCS->cost;
+      tempCS->splitRdCostBest = splitRdCostBest;
+#endif
     }
     else if (currTestMode.type == ETM_IBC)
     {
       xCheckRDCostIBCMode(tempCS, bestCS, partitioner, currTestMode);
+#if JVET_Y0152_TT_ENC_SPEEDUP
+      splitRdCostBest[CTU_LEVEL] = bestCS->cost;
+      tempCS->splitRdCostBest = splitRdCostBest;
+#endif
     }
     else if (currTestMode.type == ETM_IBC_MERGE)
     {
       xCheckRDCostIBCModeMerge2Nx2N(tempCS, bestCS, partitioner, currTestMode);
+#if JVET_Y0152_TT_ENC_SPEEDUP
+      splitRdCostBest[CTU_LEVEL] = bestCS->cost;
+      tempCS->splitRdCostBest = splitRdCostBest;
+#endif
     }
     else if( isModeSplit( currTestMode ) )
     {
@@ -1122,9 +1186,19 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
           }
         }
 
+#if JVET_Y0152_TT_ENC_SPEEDUP
+        xCheckModeSplit(tempCS, bestCS, partitioner, currTestMode, modeTypeParent, skipInterPass, splitRdCostBest);
+        tempCS->splitRdCostBest = splitRdCostBest;
+#else
         xCheckModeSplit( tempCS, bestCS, partitioner, currTestMode, modeTypeParent, skipInterPass );
+#endif
+#else
+#if JVET_Y0152_TT_ENC_SPEEDUP
+      xCheckModeSplit(tempCS, bestCS, partitioner, currTestMode, splitRdCostBest);
+      tempCS->splitRdCostBest = splitRdCostBest;
 #else
       xCheckModeSplit(tempCS, bestCS, partitioner, currTestMode);
+#endif
 #endif
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
         //recover cons modes
@@ -1478,9 +1552,17 @@ void EncCu::copyState( EncCu* other, Partitioner& partitioner, const UnitArea& c
 }
 #endif
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+#if JVET_Y0152_TT_ENC_SPEEDUP
+void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode, double *splitRdCostBest)
+#else
 void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode )
+#endif
+#else
+#if JVET_Y0152_TT_ENC_SPEEDUP
+void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode, const ModeType modeTypeParent, bool &skipInterPass, double *splitRdCostBest)
 #else
 void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode, const ModeType modeTypeParent, bool &skipInterPass )
+#endif
 #endif
 {
   const int qp                = encTestMode.qp;
@@ -1851,6 +1933,9 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
       skipInterPass = true;
     }
   }
+#endif
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  splitRdCostBest[getPartSplit(encTestMode)] = tempCS->cost;
 #endif
   // RD check for sub partitioned coding structure.
   xCheckBestMode( tempCS, bestCS, partitioner, encTestMode );
