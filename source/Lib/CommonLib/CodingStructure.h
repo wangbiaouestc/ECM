@@ -160,11 +160,14 @@ public:
 
   static_vector<double, NUM_ENC_FEATURES> features;
 
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  double     *splitRdCostBest; //[Partition::NUM_PART_SPLIT];
+#endif
   double      cost;
   bool        useDbCost;
   double      costDbOffset;
   double      lumaCost;
-  uint64_t      fracBits;
+  uint64_t    fracBits;
   Distortion  dist;
   Distortion  interHad;
   TreeType    treeType; //because partitioner can not go deep to tu and cu coding (e.g., addCU()), need another variable for indicating treeType
