@@ -272,7 +272,7 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setSwitchPocPeriod                                   ( m_switchPocPeriod );
   m_cEncLib.setUpscaledOutput                                    ( m_upscaledOutput );
   m_cEncLib.setFramesToBeEncoded                                 ( m_framesToBeEncoded );
-
+  m_cEncLib.setValidFrames                                       ( m_firstValidFrame, m_lastValidFrame );
   m_cEncLib.setAvoidIntraInDepLayer                              ( m_avoidIntraInDepLayer );
 
   //====== SPS constraint flags =======
@@ -1207,10 +1207,11 @@ void EncApp::createLib( const int layerIdx )
 
   if( m_gopBasedTemporalFilterEnabled )
   {
-    m_temporalFilter.init( m_FrameSkip, m_inputBitDepth, m_MSBExtendedBitDepth, m_internalBitDepth, m_iSourceWidth, sourceHeight,
-      m_aiPad, m_bClipInputVideoToRec709Range, m_inputFileName, m_chromaFormatIDC,
-      m_inputColourSpaceConvert, m_iQP, m_gopBasedTemporalFilterStrengths,
-      m_gopBasedTemporalFilterFutureReference );
+    m_temporalFilter.init( m_FrameSkip, m_inputBitDepth, m_MSBExtendedBitDepth, m_internalBitDepth, m_iSourceWidth,
+                           sourceHeight, m_aiPad, m_bClipInputVideoToRec709Range, m_inputFileName,
+                           m_chromaFormatIDC, m_inputColourSpaceConvert, m_iQP, m_gopBasedTemporalFilterStrengths,
+                           m_gopBasedTemporalFilterPastRefs, m_gopBasedTemporalFilterFutureRefs, m_firstValidFrame,
+                           m_lastValidFrame );
   }
 }
 
