@@ -129,6 +129,9 @@ protected:
   bool      m_printHexPsnr;
   bool      m_printFrameMSE;
   bool      m_printSequenceMSE;
+#if MSSIM_UNIFORM_METRICS_LOG
+  bool      m_printMSSSIM;
+#endif
   bool      m_cabacZeroWordPaddingEnabled;
   bool      m_bClipInputVideoToRec709Range;
   bool      m_bClipOutputVideoToRec709Range;

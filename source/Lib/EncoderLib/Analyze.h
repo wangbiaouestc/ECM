@@ -70,6 +70,9 @@ private:
   double    m_dFrmRate; //--CFG_KDY
   double    m_MSEyuvframe[MAX_NUM_COMPONENT]; // sum of MSEs
   double    m_upscaledPSNR[MAX_NUM_COMPONENT];
+#if MSSIM_UNIFORM_METRICS_LOG
+  double    m_msssim[MAX_NUM_COMPONENT];
+#endif
 #if EXTENSION_360_VIDEO
   TExt360EncAnalyze m_ext360;
 #endif
@@ -82,10 +85,14 @@ public:
   virtual ~Analyze()  {}
   Analyze() { clear(); }
 
-  void  addResult( double psnr[MAX_NUM_COMPONENT], double bits, const double MSEyuvframe[MAX_NUM_COMPONENT]
-    , const double upscaledPSNR[MAX_NUM_COMPONENT]
-    , bool isEncodeLtRef
-  )
+  void addResult(double psnr[MAX_NUM_COMPONENT], double bits, const double MSEyuvframe[MAX_NUM_COMPONENT],
+                 const double upscaledPSNR[MAX_NUM_COMPONENT]
+#if MSSIM_UNIFORM_METRICS_LOG
+                 ,
+                 const double msssim[MAX_NUM_COMPONENT]
+#endif
+                 ,
+                 bool isEncodeLtRef)
   {
     m_dAddBits  += bits;
     if (isEncodeLtRef)
@@ -95,12 +102,18 @@ public:
       m_dPSNRSum[i] += psnr[i];
       m_MSEyuvframe[i] += MSEyuvframe[i];
       m_upscaledPSNR[i] += upscaledPSNR[i];
+#if MSSIM_UNIFORM_METRICS_LOG
+      m_msssim[i] += msssim[i];
+#endif
     }
 
     m_uiNumPic++;
   }
 #if ENABLE_QPA || JVET_W0134_UNIFORM_METRICS_LOG
   double getWPSNR(const ComponentID compID) const { return m_dPSNRSum[compID] / (double) m_uiNumPic; }
+#if MSSIM_UNIFORM_METRICS_LOG
+  double getMsssim(ComponentID compID) const { return m_msssim[compID]; }
+#endif
 #endif
   double  getPsnr(ComponentID compID) const { return  m_dPSNRSum[compID];  }
 #if JVET_O0756_CALCULATE_HDRMETRICS
@@ -133,6 +146,9 @@ public:
       m_dPSNRSum[i] = 0;
       m_MSEyuvframe[i] = 0;
       m_upscaledPSNR[i] = 0;
+#if MSSIM_UNIFORM_METRICS_LOG
+      m_msssim[i] = 0;
+#endif
     }
     m_uiNumPic = 0;
 #if EXTENSION_360_VIDEO
@@ -189,8 +205,12 @@ public:
 
 #if JVET_W0134_UNIFORM_METRICS_LOG
   void printOut(std::string &header, std::string &metrics, const std::string &delim, ChromaFormat chFmt,
-                bool printMSEBasedSNR, bool printSequenceMSE, bool printHexPsnr, bool printRprPSNR,
-                const BitDepths &bitDepths, bool useWPSNR = false, bool printHdrMetrics = false)
+                bool printMSEBasedSNR, bool printSequenceMSE,
+#if MSSIM_UNIFORM_METRICS_LOG
+                bool printMSSSIM,
+#endif
+                bool printHexPsnr, bool printRprPSNR, const BitDepths &bitDepths, bool useWPSNR = false,
+                bool printHdrMetrics = false)
   {
     std::ostringstream headeross, metricoss;
     // no generic lambda in C++11...
@@ -242,9 +262,11 @@ public:
       {
         const ComponentID compID = ComponentID(componentIndex);
         if (getNumPic() == 0)
+        {
           mseBasedSNR[compID] =
             0 * scale;   // this is the same calculation that will be evaluated for any other statistic when there are
                          // no frames (it should result in NaN). We use it here so all the output is consistent.
+        }
         else
         {
           const uint32_t maxval = /*useWPSNR ? (1 << bitDepths.recon[toChannelType(compID)]) - 1 :*/ 255
@@ -312,6 +334,14 @@ public:
     {
       addFieldL("xDeltaE          ", "%-16" PRIx64 " ", hexValue(getDeltaE() / (double) getNumPic()));
       addFieldL("xPSNRL           ", "%-16" PRIx64 " ", hexValue(getPsnrL() / (double) getNumPic()));
+    }
+#endif
+#if MSSIM_UNIFORM_METRICS_LOG
+    if (printMSSSIM)
+    {
+      addFieldD("Y-MS-SSIM  ", "%-9.7lf  ", getMsssim(COMPONENT_Y) / (double) getNumPic());
+      addFieldD("U-MS-SSIM  ", "%-9.7lf  ", getMsssim(COMPONENT_Cb) / (double) getNumPic(), withchroma);
+      addFieldD("V-MS-SSIM  ", "%-9.7lf  ", getMsssim(COMPONENT_Cr) / (double) getNumPic(), withchroma);
     }
 #endif
     if (printSequenceMSE)
