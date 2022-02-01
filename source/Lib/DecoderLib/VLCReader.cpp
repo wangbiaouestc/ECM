@@ -3631,7 +3631,11 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
     }
 
 #if JVET_W0097_GPM_MMVD_TM
+#if JVET_Y0065_GPM_INTRA
+    if (sps->getUseGeo())
+#else
     if (sps->getUseGeo() && (!pps->getRplInfoInPhFlag() || picHeader->getRPL(1)->getNumRefEntries() > 0))
+#endif
     {
       READ_FLAG(uiCode, "ph_gpm_ext_mmvd_flag");
       picHeader->setGPMMMVDTableFlag(uiCode);

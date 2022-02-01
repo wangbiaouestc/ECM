@@ -146,6 +146,9 @@ namespace PU
 #else
   int  getIntraMPMs(const PredictionUnit &pu, unsigned *mpm, const ChannelType &channelType = CHANNEL_TYPE_LUMA);
 #endif
+#if JVET_Y0065_GPM_INTRA
+  void getGeoIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t splitDir, uint8_t shape );
+#endif
   bool          isMIP                 (const PredictionUnit &pu, const ChannelType &chType = CHANNEL_TYPE_LUMA);
 #if JVET_V0130_INTRA_TMP
   bool          isTmp(const PredictionUnit& pu, const ChannelType& chType = CHANNEL_TYPE_LUMA);
@@ -549,5 +552,23 @@ void sortCandList(double uiCost, int mergeCand, int mmvdCand, static_vector<doub
     candCostList.insert(candCostList.end() - shift, uiCost);
   }
 }
+
+#if JVET_Y0065_GPM_INTRA
+template<size_t N>
+void sortIntraCandList(double uiCost, int mergeCand, static_vector<double, N>& candCostList, static_vector<int, N>& intraCandList)
+{
+  size_t shift = 0;
+  size_t currSize = candCostList.size();
+  CHECK(currSize >= GEO_MAX_NUM_INTRA_CANDS, "list overflow!");
+
+  while (shift < currSize && uiCost < candCostList[currSize - 1 - shift])
+  {
+    shift++;
+  }
+
+  intraCandList.insert(intraCandList.end() - shift, mergeCand);
+  candCostList.insert(candCostList.end() - shift, uiCost);
+}
+#endif
 #endif
 #endif

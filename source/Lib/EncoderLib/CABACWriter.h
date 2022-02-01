@@ -165,6 +165,10 @@ public:
 
   uint64_t    geo_mode_est(const TempCtx& ctxStart, const int geoMode);
   uint64_t    geo_mergeIdx_est(const TempCtx& ctxStart, const int candIdx, const int maxNumGeoCand);
+#if JVET_Y0065_GPM_INTRA
+  uint64_t    geo_intraFlag_est         ( const TempCtx& ctxStart, const int flag);
+  uint64_t    geo_intraIdx_est          ( const TempCtx& ctxStart, const int intraIdx);
+#endif
   uint64_t    geo_mmvdFlag_est(const TempCtx& ctxStart, const int flag);
   uint64_t    geo_mmvdIdx_est(const TempCtx& ctxStart, const int mmvdIdx, const bool extMMVD);
 #if TM_MRG

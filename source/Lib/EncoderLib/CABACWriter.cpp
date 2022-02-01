@@ -2879,8 +2879,13 @@ void CABACWriter::merge_data(const PredictionUnit& pu)
   const bool ciipAvailable = pu.cs->sps->getUseCiip() && !pu.cu->skip && pu.cu->lwidth() < MAX_CU_SIZE && pu.cu->lheight() < MAX_CU_SIZE && pu.cu->lwidth() * pu.cu->lheight() >= 64;
 #endif
 
+#if JVET_Y0065_GPM_INTRA
+  const bool geoAvailable = pu.cu->cs->slice->getSPS()->getUseGeo() && !pu.cu->cs->slice->isIntra() &&
+    pu.cs->sps->getMaxNumGeoCand() > 0
+#else
   const bool geoAvailable = pu.cu->cs->slice->getSPS()->getUseGeo() && pu.cu->cs->slice->isInterB() &&
     pu.cs->sps->getMaxNumGeoCand() > 1
+#endif
                                                                     && pu.cu->lwidth() >= GEO_MIN_CU_SIZE && pu.cu->lheight() >= GEO_MIN_CU_SIZE
                                                                     && pu.cu->lwidth() <= GEO_MAX_CU_SIZE && pu.cu->lheight() <= GEO_MAX_CU_SIZE
                                                                     && pu.cu->lwidth() < 8 * pu.cu->lheight() && pu.cu->lheight() < 8 * pu.cu->lwidth();
@@ -3064,20 +3069,44 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
     if( pu.cu->geoFlag )
     {
 #if JVET_W0097_GPM_MMVD_TM
+#if JVET_Y0065_GPM_INTRA
+      bool isIntra0 = (pu.geoMergeIdx0 >= GEO_MAX_NUM_UNI_CANDS);
+      bool isIntra1 = (pu.geoMergeIdx1 >= GEO_MAX_NUM_UNI_CANDS);
+      bool bUseOnlyOneVector = pu.cs->slice->isInterP() || pu.cs->sps->getMaxNumGeoCand() == 1;
+#endif
       m_BinEncoder.encodeBin(pu.geoMMVDFlag0, Ctx::GeoMmvdFlag());
       if (pu.geoMMVDFlag0)
       {
         geo_mmvd_idx(pu, REF_PIC_LIST_0);
       }
+#if JVET_Y0065_GPM_INTRA
+      else
+      {
+        m_BinEncoder.encodeBin( isIntra0 ? 1 : 0, Ctx::GPMIntraFlag() );
+      }
+
+      if (!bUseOnlyOneVector || isIntra0)
+      {
+#endif
       m_BinEncoder.encodeBin(pu.geoMMVDFlag1, Ctx::GeoMmvdFlag());
       if (pu.geoMMVDFlag1)
       {
         geo_mmvd_idx(pu, REF_PIC_LIST_1);
       }
+#if JVET_Y0065_GPM_INTRA
+      else if (!isIntra0)
+      {
+        m_BinEncoder.encodeBin( isIntra1 ? 1 : 0, Ctx::GPMIntraFlag() );
+      }
+      }
+#endif
 
 #if TM_MRG
       if (!pu.geoMMVDFlag0 && !pu.geoMMVDFlag1)
       {
+#if JVET_Y0065_GPM_INTRA
+        if (!isIntra0 && !isIntra1)
+#endif
         tm_merge_flag(pu);
         if (pu.tmMergeFlag)
         {
@@ -3089,6 +3118,13 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
         {
 
           CHECK(pu.geoTmFlag0 || pu.geoTmFlag1, "both must be false");
+#if JVET_Y0065_GPM_INTRA
+          if (isIntra0 || isIntra1)
+          {
+            geo_merge_idx1(pu);
+          }
+          else
+#endif
           geo_merge_idx(pu);
         }
       }
@@ -3393,21 +3429,45 @@ void CABACWriter::geo_merge_idx1(const PredictionUnit& pu)
   uint8_t splitDir = pu.geoSplitDir;
   uint8_t candIdx0 = pu.geoMergeIdx0;
   uint8_t candIdx1 = pu.geoMergeIdx1;
+#if JVET_Y0065_GPM_INTRA
+  bool isIntra0 = (candIdx0 >= GEO_MAX_NUM_UNI_CANDS);
+  bool isIntra1 = (candIdx1 >= GEO_MAX_NUM_UNI_CANDS);
+#endif
 
   xWriteTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
   const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
 
   int numCandminus2 = maxNumGeoCand - 2;
+#if JVET_Y0065_GPM_INTRA
+  if (isIntra0)
+  {
+    unary_max_eqprob(candIdx0 - GEO_MAX_NUM_UNI_CANDS, GEO_MAX_NUM_INTRA_CANDS-1);
+  }
+  else if (numCandminus2 >= 0)
+  {
+#endif
   m_BinEncoder.encodeBin(candIdx0 == 0 ? 0 : 1, Ctx::MergeIdx());
   if (candIdx0 > 0)
   {
     unary_max_eqprob(candIdx0 - 1, numCandminus2);
   }
+#if JVET_Y0065_GPM_INTRA
+  }
+  if (isIntra1)
+  {
+    unary_max_eqprob(candIdx1 - GEO_MAX_NUM_UNI_CANDS, GEO_MAX_NUM_INTRA_CANDS-1);
+  }
+  else if (numCandminus2 >= 0)
+  {
+#endif
   m_BinEncoder.encodeBin(candIdx1 == 0 ? 0 : 1, Ctx::MergeIdx());
   if (candIdx1 > 0)
   {
     unary_max_eqprob(candIdx1 - 1, numCandminus2);
   }
+#if JVET_Y0065_GPM_INTRA
+  }
+#endif
 }
 
 uint64_t CABACWriter::geo_mode_est(const TempCtx& ctxStart, const int geoMode)
@@ -3426,6 +3486,12 @@ uint64_t CABACWriter::geo_mergeIdx_est(const TempCtx& ctxStart, const int candId
   resetBits();
 
   int numCandminus2 = maxNumGeoCand - 2;
+#if JVET_Y0065_GPM_INTRA
+  if (numCandminus2 < 0)
+  {
+    return 0;
+  }
+#endif
   m_BinEncoder.encodeBin(candIdx == 0 ? 0 : 1, Ctx::MergeIdx());
   if (candIdx > 0)
   {
@@ -3434,6 +3500,28 @@ uint64_t CABACWriter::geo_mergeIdx_est(const TempCtx& ctxStart, const int candId
 
   return getEstFracBits();
 }
+
+#if JVET_Y0065_GPM_INTRA
+uint64_t CABACWriter::geo_intraFlag_est( const TempCtx& ctxStart, const int flag)
+{
+  getCtx() = ctxStart;
+  resetBits();
+
+  m_BinEncoder.encodeBin(flag, Ctx::GPMIntraFlag());
+
+  return getEstFracBits();
+}
+
+uint64_t CABACWriter::geo_intraIdx_est( const TempCtx& ctxStart, const int intraIdx)
+{
+  getCtx() = ctxStart;
+  resetBits();
+
+  unary_max_eqprob(intraIdx, GEO_MAX_NUM_INTRA_CANDS-1);
+
+  return getEstFracBits();
+}
+#endif
 
 uint64_t CABACWriter::geo_mmvdFlag_est(const TempCtx& ctxStart, const int flag)
 {

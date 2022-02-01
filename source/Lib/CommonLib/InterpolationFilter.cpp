@@ -986,6 +986,9 @@ InterpolationFilter::InterpolationFilter()
   m_filterCopy[1][1]   = filterCopy<true, true>;
 #if !QC_SIF_SIMD
   m_weightedGeoBlk = xWeightedGeoBlk;
+#if JVET_Y0065_GPM_INTRA
+  m_weightedGeoBlkRounded = xWeightedGeoBlkRounded;
+#endif
 #endif
 }
 
@@ -1784,6 +1787,61 @@ void InterpolationFilter::xWeightedGeoBlk(const PredictionUnit &pu, const uint32
     weight += stepY;
   }
 }
+
+#if JVET_Y0065_GPM_INTRA
+void InterpolationFilter::weightedGeoBlkRounded(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+{
+  m_weightedGeoBlkRounded(pu, width, height, compIdx, splitDir, predDst, predSrc0, predSrc1);
+}
+
+void InterpolationFilter::xWeightedGeoBlkRounded(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+{
+  Pel*    dst = predDst.get(compIdx).buf;
+  Pel*    src0 = predSrc0.get(compIdx).buf;
+  Pel*    src1 = predSrc1.get(compIdx).buf;
+  int32_t strideDst = predDst.get(compIdx).stride - width;
+  int32_t strideSrc0 = predSrc0.get(compIdx).stride - width;
+  int32_t strideSrc1 = predSrc1.get(compIdx).stride - width;
+
+  const uint32_t scaleX = getComponentScaleX(compIdx, pu.chromaFormat);
+  const uint32_t scaleY = getComponentScaleY(compIdx, pu.chromaFormat);
+
+  int16_t angle = g_GeoParams[splitDir][0];
+  int16_t wIdx = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2;
+  int16_t hIdx = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2;
+  int16_t stepX = 1 << scaleX;
+  int16_t stepY = 0;
+  int16_t* weight = nullptr;
+  if (g_angle2mirror[angle] == 2)
+  {
+    stepY = -(int)((GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth());
+    weight = &g_globalGeoWeights[g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+  }
+  else if (g_angle2mirror[angle] == 1)
+  {
+    stepX = -1 << scaleX;
+    stepY = (GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth();
+    weight = &g_globalGeoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
+  }
+  else
+  {
+    stepY = (GEO_WEIGHT_MASK_SIZE << scaleY) - pu.lwidth();
+    weight = &g_globalGeoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+  }
+  for( int y = 0; y < height; y++ )
+  {
+    for( int x = 0; x < width; x++ )
+    {
+      *dst++ = (*weight*(*src0++) + ((8 - *weight) * (*src1++)) + 4)>>3;
+      weight += stepX;
+    }
+    dst    += strideDst;
+    src0   += strideSrc0;
+    src1   += strideSrc1;
+    weight += stepY;
+  }
+}
+#endif
 
 /**
  * \brief turn on SIMD fuc

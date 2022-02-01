@@ -8127,13 +8127,21 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             if ( sps.getNumPredSigns() > 0)
             {
               bool reshapeChroma = slice.getPicHeader()->getLmcsEnabledFlag() && isChroma(compID) && slice.getPicHeader()->getLmcsChromaResidualScaleFlag() && tu.blocks[compID].width*tu.blocks[compID].height > 4;
+#if JVET_Y0065_GPM_INTRA
+              if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !tu.cu->firstPU->gpmIntraFlag && !CU::isIBC(*tu.cu))
+#else
               if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !CU::isIBC(*tu.cu))
+#endif
               {
                 cs.picture->getRecoBuf(tu.blocks[COMPONENT_Y]).copyFrom(cs.getPredBuf(tu.blocks[COMPONENT_Y]));
                 cs.getPredBuf(tu.blocks[compID]).rspSignal(m_pcReshape->getFwdLUT());
               }
               m_pcTrQuant->predCoeffSigns(tu, compID, reshapeChroma);
+#if JVET_Y0065_GPM_INTRA
+              if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !tu.cu->firstPU->gpmIntraFlag && !CU::isIBC(*tu.cu))
+#else
               if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !CU::isIBC(*tu.cu))
+#endif
               {
                 cs.getPredBuf(tu.blocks[COMPONENT_Y]).copyFrom(cs.picture->getRecoBuf(tu.blocks[COMPONENT_Y]));
               }
@@ -8317,7 +8325,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
       {
         PelBuf picRecoBuff = tu.cs->picture->getRecoBuf( tu.blocks[compID] );
 
+#if JVET_Y0065_GPM_INTRA
+        if( cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma( compID ) && !tu.cu->firstPU->ciipFlag && !tu.cu->firstPU->gpmIntraFlag && !CU::isIBC( *tu.cu ) )
+#else
         if( cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma( compID ) && !tu.cu->firstPU->ciipFlag && !CU::isIBC( *tu.cu ) )
+#endif
         {
           picRecoBuff.rspSignal( cs.getPredBuf( tu.blocks[compID] ), m_pcReshape->getFwdLUT() );
           picRecoBuff.reconstruct( picRecoBuff, csFull->getResiBuf( tu.blocks[compID] ), tu.cu->cs->slice->clpRng( compID ) );
@@ -8615,7 +8627,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           ComponentID comp = (ComponentID) i;
           PelBuf picRecoBuff = tu.cs->picture->getRecoBuf( tu.blocks[comp] );
 
+#if JVET_Y0065_GPM_INTRA
+          if( cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma( comp ) && !tu.cu->firstPU->ciipFlag && !tu.cu->firstPU->gpmIntraFlag && !CU::isIBC( *tu.cu ) )
+#else
           if( cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma( comp ) && !tu.cu->firstPU->ciipFlag && !CU::isIBC( *tu.cu ) )
+#endif
           {
             picRecoBuff.rspSignal( cs.getPredBuf( tu.blocks[comp] ), m_pcReshape->getFwdLUT() );
             picRecoBuff.reconstruct( picRecoBuff, csFull->getResiBuf( tu.blocks[comp] ), tu.cu->cs->slice->clpRng( comp ) );
@@ -8836,7 +8852,11 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
     CHECK( cu.sbtInfo != 0, "sbtInfo shall be 0 if CU has no residual" );
     cs.getResiBuf().fill(0);
 
+#if JVET_Y0065_GPM_INTRA
+    if( m_pcEncCfg->getLmcs() && ( cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() ) && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC( cu ) )
+#else
     if( m_pcEncCfg->getLmcs() && ( cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() ) && !cu.firstPU->ciipFlag && !CU::isIBC( cu ) )
+#endif
     {
       cs.getRecoBuf().Y().rspSignal( cs.getPredBuf().Y(), m_pcReshape->getFwdLUT() );
       cs.getRecoBuf().Cb().copyFrom( cs.getPredBuf().Cb() );
@@ -8903,7 +8923,11 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
   {
     if( cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() )
     {
+#if JVET_Y0065_GPM_INTRA
+      if( !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC( cu ) )
+#else
       if( !cu.firstPU->ciipFlag && !CU::isIBC( cu ) )
+#endif
       {
         cs.getResiBuf( COMPONENT_Y ).rspSignalAllAndSubtract( cs.getOrgBuf( COMPONENT_Y ), cs.getPredBuf( COMPONENT_Y ), m_pcReshape->getFwdLUT() );
       }
@@ -9174,7 +9198,11 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
   {
     if (cu.rootCbf && cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
     {
+#if JVET_Y0065_GPM_INTRA
+      if( !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC( cu ) )
+#else
       if( !cu.firstPU->ciipFlag && !CU::isIBC( cu ) )
+#endif
       {
         const CompArea &areaY = cu.Y();
         CompArea      tmpArea( COMPONENT_Y, areaY.chromaFormat, Position( 0, 0 ), areaY.size() );
@@ -9191,7 +9219,11 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
     else
     {
       cs.getRecoBuf().bufs[0].reconstruct(cs.getPredBuf().bufs[0], cs.getResiBuf().bufs[0], cs.slice->clpRngs().comp[0]);
+#if JVET_Y0065_GPM_INTRA
+      if (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
+#else
       if (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !CU::isIBC(cu))
+#endif
       {
         cs.getRecoBuf().bufs[0].rspSignal(m_pcReshape->getFwdLUT());
       }

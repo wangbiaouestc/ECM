@@ -557,6 +557,12 @@ const uint8_t CodingUnit::checkAllowedSbt() const
   {
     return 0;
   }
+#if JVET_Y0065_GPM_INTRA
+  if (firstPU->gpmIntraFlag)
+  {
+    return 0;
+  }
+#endif
 
   uint8_t sbtAllowed = 0;
   int cuWidth  = lwidth();
@@ -637,6 +643,9 @@ void PredictionUnit::initData()
   geoSplitDir  = MAX_UCHAR;
   geoMergeIdx0 = MAX_UCHAR;
   geoMergeIdx1 = MAX_UCHAR;
+#if JVET_Y0065_GPM_INTRA
+  gpmIntraFlag = false;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
   geoMMVDFlag0 = false;
   geoMMVDIdx0 = MAX_UCHAR;
@@ -740,6 +749,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   geoSplitDir  = predData.geoSplitDir;
   geoMergeIdx0 = predData.geoMergeIdx0;
   geoMergeIdx1 = predData.geoMergeIdx1;
+#if JVET_Y0065_GPM_INTRA
+  gpmIntraFlag = predData.gpmIntraFlag;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
   geoMMVDFlag0 = predData.geoMMVDFlag0;
   geoMMVDIdx0 = predData.geoMMVDIdx0;
@@ -839,6 +851,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   geoSplitDir  = other.geoSplitDir;
   geoMergeIdx0 = other.geoMergeIdx0;
   geoMergeIdx1 = other.geoMergeIdx1;
+#if JVET_Y0065_GPM_INTRA
+  gpmIntraFlag = other.gpmIntraFlag;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
   geoMMVDFlag0 = other.geoMMVDFlag0;
   geoMMVDIdx0 = other.geoMMVDIdx0;

@@ -431,6 +431,9 @@ struct InterPredictionData
   uint8_t     geoSplitDir;
   uint8_t     geoMergeIdx0;
   uint8_t     geoMergeIdx1;
+#if JVET_Y0065_GPM_INTRA
+  bool        gpmIntraFlag;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
   bool        geoMMVDFlag0;
   uint8_t     geoMMVDIdx0;
