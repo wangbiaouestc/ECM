@@ -60,7 +60,15 @@ struct Position
 
   Position operator-( const Position &other )         const { return{ x - other.x, y - other.y }; }
 };
-
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+struct PositionWithLevel
+{
+  PosType x;
+  PosType y;
+  TCoeff level;
+  PositionWithLevel(const PosType _x, const PosType _y, const TCoeff _level) : x(_x), y(_y), level(_level) { }
+};
+#endif
 struct Size
 {
   SizeType width;

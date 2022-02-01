@@ -45,7 +45,9 @@
 #include "Rom.h"
 
 #include <memory.h>
-
+#if INTRA_TRANS_ENC_OPT
+#include <smmintrin.h>
+#endif
 #include "CommonLib/InterpolationFilter.h"
 
 //! \ingroup CommonLib
@@ -238,7 +240,18 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
   {
     buffer.create( chromaFormatIDC, Area( 0, 0, MAX_CU_SIZE, MAX_CU_SIZE ) );
   }
-
+#if ENABLE_DIMD && INTRA_TRANS_ENC_OPT
+  m_dimdBlending = xDimdBlending;
+#ifdef TARGET_SIMD_X86
+  m_dimdBlending = xDimdBlending_SIMD;
+#endif
+#endif
+#if JVET_W0123_TIMD_FUSION && INTRA_TRANS_ENC_OPT
+  m_timdBlending = xTimdBlending;
+#ifdef TARGET_SIMD_X86
+  m_timdBlending = xTimdBlending_SIMD;
+#endif
+#endif
 #if JVET_V0130_INTRA_TMP
   unsigned int blkSize;
 
@@ -748,6 +761,13 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     m_ipaParam.applyPDPC = applyPdpc;
 
     // do blending
+#if INTRA_TRANS_ENC_OPT
+    Pel *pelPred = piPred.buf;
+    Pel *pelPlanar = planarBuffer.buf;
+    Pel *pelPredAng = predAng.buf;
+    int  w0 = pu.cu->dimdRelWeight[0], w1 = pu.cu->dimdRelWeight[1], w2 = pu.cu->dimdRelWeight[2];
+    m_dimdBlending(pelPred, piPred.stride, pelPlanar, planarBuffer.stride, pelPredAng, predAng.stride, w0, w1, w2, width, height);
+#else
     const int log2WeightSum = 6;
     Pel *pelPred = piPred.buf;
     Pel *pelPlanar = planarBuffer.buf;
@@ -768,6 +788,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       pelPlanar += planarBuffer.stride;
       pelPredAng += predAng.stride;
     }
+#endif
   }
 #endif
 
@@ -805,6 +826,12 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     m_ipaParam.applyPDPC = applyPdpc;
 
     // do blending
+#if INTRA_TRANS_ENC_OPT
+    Pel *pelPred = piPred.buf;
+    Pel *pelPredFusion = predFusion.buf;
+    int  w0 = pu.cu->timdFusionWeight[0], w1 = pu.cu->timdFusionWeight[1];
+    m_timdBlending(pelPred, piPred.stride, pelPredFusion, predFusion.stride, w0, w1, width, height);
+#else
     const int log2WeightSum = 6;
     Pel *pelPred = piPred.buf;
     Pel *pelPredFusion = predFusion.buf;
@@ -822,6 +849,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       pelPred += piPred.stride;
       pelPredFusion += predFusion.stride;
     }
+#endif
   }
 #endif
 
@@ -3854,6 +3882,54 @@ int IntraPrediction::deriveTimdMode( const CPelBuf &recoBuf, const CompArea &are
     return PLANAR_IDX;
   }
 }
+#if INTRA_TRANS_ENC_OPT
+void xTimdBlending(Pel *pDst, int strideDst, Pel *pSrc, int strideSrc, int w0, int w1, int width, int height)
+{
+  const int log2WeightSum = 6;
+  Pel *pelPred = pDst;
+  Pel *pelPredFusion = pSrc;
+
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      int blend = pelPred[x] * w0;
+      blend += pelPredFusion[x] * w1;
+      pelPred[x] = (Pel)(blend >> log2WeightSum);
+    }
+
+    pelPred += strideDst;
+    pelPredFusion += strideSrc;
+  }
+}
+#ifdef TARGET_SIMD_X86
+void xTimdBlending_SIMD(Pel *pDst, int strideDst, Pel *pSrc, int strideSrc, int w0, int w1, int width, int height)
+{
+  CHECK((width % 4) != 0, "width should be multiple of 4");
+  __m128i vw0 = _mm_set1_epi32(w0);
+  __m128i vw1 = _mm_set1_epi32(w1);
+  int   shift = 6;
+
+  for (int i = 0; i < height; i++)
+  {
+    for (int j = 0; j < width; j += 4)
+    {
+      __m128i vdst = _mm_cvtepi16_epi32(_mm_loadl_epi64((__m128i*)(pDst + j)));
+      __m128i vsrc = _mm_cvtepi16_epi32(_mm_loadl_epi64((__m128i*)(pSrc + j)));
+
+      vdst = _mm_mullo_epi32(vdst, vw0);
+      vdst = _mm_add_epi32(vdst, _mm_mullo_epi32(vsrc, vw1));
+
+      vdst = _mm_srai_epi32(vdst, shift);
+      vdst = _mm_packs_epi32(vdst, vdst);
+      _mm_storel_epi64((__m128i*)(pDst + j), vdst);
+    }
+    pDst += strideDst;
+    pSrc += strideSrc;
+  }
+}
+#endif
+#endif
 #endif
 #if ENABLE_DIMD
 void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu)
@@ -4104,6 +4180,60 @@ int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t ui
   }
   return 0;
 }
+#if INTRA_TRANS_ENC_OPT
+void xDimdBlending(Pel *pDst, int strideDst, Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int w2, int width, int height)
+{
+  Pel *pelPred = pDst;
+  Pel *pelPlanar = pSrc0;
+  Pel *pelPredAng = pSrc1;
+
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      int blend = pelPred[x] * w0;
+      blend += pelPlanar[x] * w1;
+      blend += pelPredAng[x] * w2;
+      pelPred[x] = (Pel)(blend >> 6);
+    }
+
+    pelPred += strideDst;
+    pelPlanar += strideSrc0;
+    pelPredAng += strideSrc1;
+  }
+}
+#ifdef TARGET_SIMD_X86
+void xDimdBlending_SIMD(Pel *pDst, int strideDst, Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int w2, int width, int height)
+{
+  CHECK((width % 4) != 0, "width should be multiple of 4");
+  __m128i vw0 = _mm_set1_epi32(w0);
+  __m128i vw1 = _mm_set1_epi32(w1);
+  __m128i vw2 = _mm_set1_epi32(w2);
+  int   shift = 6;
+
+  for (int i = 0; i < height; i++)
+  {
+    for (int j = 0; j < width; j += 4)
+    {
+      __m128i vdst = _mm_cvtepi16_epi32(_mm_loadl_epi64((__m128i*)(pDst + j)));
+      __m128i vsrc0 = _mm_cvtepi16_epi32(_mm_loadl_epi64((__m128i*)(pSrc0 + j)));
+      __m128i vsrc1 = _mm_cvtepi16_epi32(_mm_loadl_epi64((__m128i*)(pSrc1 + j)));
+
+      vdst = _mm_mullo_epi32(vdst, vw0);
+      vdst = _mm_add_epi32(vdst, _mm_mullo_epi32(vsrc0, vw1));
+      vdst = _mm_add_epi32(vdst, _mm_mullo_epi32(vsrc1, vw2));
+
+      vdst = _mm_srai_epi32(vdst, shift);
+      vdst = _mm_packs_epi32(vdst, vdst);
+      _mm_storel_epi64((__m128i*)(pDst + j), vdst);
+    }
+    pDst += strideDst;
+    pSrc0 += strideSrc0;
+    pSrc1 += strideSrc1;
+  }
+}
+#endif
+#endif
 #endif
 bool isAboveLeftAvailable(const CodingUnit &cu, const ChannelType &chType, const Position &posLT)
 {

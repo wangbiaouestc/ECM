@@ -9646,7 +9646,11 @@ bool TU::getDelayedSignCoding( const TransformUnit &tu, const ComponentID compID
 
 bool TU::getUseSignPred( const TransformUnit &tu, const ComponentID compID )
 {
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  return TU::getDelayedSignCoding( tu, compID ) && ( !tu.cu->lfnstIdx || !tu.cu->tmpFlag );
+#else
   return TU::getDelayedSignCoding( tu, compID ) && !tu.cu->lfnstIdx;
+#endif
 }
 
 void TU::predBorderResi( const Position blkPos, const CPelBuf &recoBuf, const CPelBuf &predBuf, const ComponentID compID,

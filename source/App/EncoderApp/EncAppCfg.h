@@ -890,6 +890,9 @@ protected:
 
 #if SIGN_PREDICTION
   int m_numPredSign;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  int m_log2SignPredArea;
+#endif
 #endif
 #if DUMP_BEFORE_INLOOP
   bool        m_dumpBeforeInloop;

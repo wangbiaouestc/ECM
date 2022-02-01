@@ -255,6 +255,9 @@ struct ComprCUCtx
 
     extraFeaturesd.reserve( numExtraFeatures );
     extraFeaturesd.resize ( numExtraFeatures, 0.0 );
+#if INTRA_TRANS_ENC_OPT
+    bestLfnstCost[0] = bestLfnstCost[1] = MAX_DOUBLE;
+#endif
   }
 
   unsigned                          minDepth;
@@ -279,6 +282,9 @@ struct ComprCUCtx
   double                            bestCostWithoutSplitFlags;
   double                            bestCostMtsFirstPassNoIsp;
   double                            bestCostIsp;
+#if INTRA_TRANS_ENC_OPT
+  double                            bestLfnstCost[2];
+#endif
   bool                              ispWasTested;
   uint16_t                          bestPredModeDCT2;
   bool                              relatedCuIsValid;
@@ -297,6 +303,9 @@ struct ComprCUCtx
   template<typename T> T    get( int ft )       const { return typeid(T) == typeid(double) ? (T&)extraFeaturesd[ft] : T(extraFeatures[ft]); }
   template<typename T> void set( int ft, T val )      { extraFeatures [ft] = int64_t( val ); }
   void                      set( int ft, double val ) { extraFeaturesd[ft] = val; }
+#if INTRA_TRANS_ENC_OPT
+  bool   isLfnstTested()                        const { return (bestLfnstCost[0] != MAX_DOUBLE && bestLfnstCost[1] != MAX_DOUBLE); }
+#endif
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -382,6 +391,9 @@ public:
   void   setMtsFirstPassNoIspCost     ( double cost )           { m_ComprCUCtxList.back().bestCostMtsFirstPassNoIsp = cost;         }
   double getIspCost                   ()                  const { return m_ComprCUCtxList.back().bestCostIsp; }
   void   setIspCost                   ( double val )            { m_ComprCUCtxList.back().bestCostIsp = val; }
+#if INTRA_TRANS_ENC_OPT
+  void   resetLfnstCost               ()                        { m_ComprCUCtxList.back().bestLfnstCost[0] = m_ComprCUCtxList.back().bestLfnstCost[1] = MAX_DOUBLE; }
+#endif
   bool   getISPWasTested              ()                  const { return m_ComprCUCtxList.back().ispWasTested; }
   void   setISPWasTested              ( bool val )              { m_ComprCUCtxList.back().ispWasTested = val; }
   void   setBestPredModeDCT2          ( uint16_t val )          { m_ComprCUCtxList.back().bestPredModeDCT2 = val; }
@@ -484,7 +496,11 @@ struct CodedCUInfo
   double   bestNonDCT2Cost;
   bool     relatedCuIsValid;
   uint8_t  bestISPIntraMode;
-
+#if INTRA_TRANS_ENC_OPT
+  double   bestCostForLfnst;
+  bool     relatedCuLfnstIsValid;
+  bool     skipLfnstTest;
+#endif
 #if ENABLE_SPLIT_PARALLELISM
 
   uint64_t
@@ -574,6 +590,9 @@ private:
   TCoeff             *m_pCoeff;
 #if SIGN_PREDICTION
   TCoeff             *m_pCoeffSign;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  unsigned           *m_pCoeffSignScanIdx;
+#endif
 #endif
   Pel                *m_pPcmBuf;
   bool               *m_runType;

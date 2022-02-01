@@ -8126,25 +8126,53 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #if SIGN_PREDICTION
             if ( sps.getNumPredSigns() > 0)
             {
-              bool reshapeChroma = slice.getPicHeader()->getLmcsEnabledFlag() && isChroma(compID) && slice.getPicHeader()->getLmcsChromaResidualScaleFlag() && tu.blocks[compID].width*tu.blocks[compID].height > 4;
-#if JVET_Y0065_GPM_INTRA
-              if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !tu.cu->firstPU->gpmIntraFlag && !CU::isIBC(*tu.cu))
-#else
-              if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !CU::isIBC(*tu.cu))
-#endif
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+              bool doSignPrediction = true;
+              if (isLuma(compID) && tu.mtsIdx[COMPONENT_Y] > MTS_SKIP)
               {
-                cs.picture->getRecoBuf(tu.blocks[COMPONENT_Y]).copyFrom(cs.getPredBuf(tu.blocks[COMPONENT_Y]));
-                cs.getPredBuf(tu.blocks[compID]).rspSignal(m_pcReshape->getFwdLUT());
+                bool signHiding = slice.getSignDataHidingEnabledFlag();
+                CoeffCodingContext  cctx(tu, COMPONENT_Y, signHiding);
+                int scanPosLast = -1;
+                TCoeff* coeff = tu.getCoeffs(compID).buf;
+                for (int scanPos = cctx.maxNumCoeff() - 1; scanPos >= 0; scanPos--)
+                {
+                  unsigned blkPos = cctx.blockPos(scanPos);
+                  if (coeff[blkPos])
+                  {
+                    scanPosLast = scanPos;
+                    break;
+                  }
+                }
+                if (scanPosLast < 1)
+                {
+                  doSignPrediction = false;
+                }
               }
-              m_pcTrQuant->predCoeffSigns(tu, compID, reshapeChroma);
-#if JVET_Y0065_GPM_INTRA
-              if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !tu.cu->firstPU->gpmIntraFlag && !CU::isIBC(*tu.cu))
-#else
-              if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !CU::isIBC(*tu.cu))
-#endif
+              if (doSignPrediction)
               {
-                cs.getPredBuf(tu.blocks[COMPONENT_Y]).copyFrom(cs.picture->getRecoBuf(tu.blocks[COMPONENT_Y]));
+#endif
+                bool reshapeChroma = slice.getPicHeader()->getLmcsEnabledFlag() && isChroma(compID) && slice.getPicHeader()->getLmcsChromaResidualScaleFlag() && tu.blocks[compID].width*tu.blocks[compID].height > 4;
+#if JVET_Y0065_GPM_INTRA
+                if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !tu.cu->firstPU->gpmIntraFlag && !CU::isIBC(*tu.cu))
+#else
+			    if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !CU::isIBC(*tu.cu))
+#endif
+                {
+                  cs.picture->getRecoBuf(tu.blocks[COMPONENT_Y]).copyFrom(cs.getPredBuf(tu.blocks[COMPONENT_Y]));
+                  cs.getPredBuf(tu.blocks[compID]).rspSignal(m_pcReshape->getFwdLUT());
+                }
+                m_pcTrQuant->predCoeffSigns(tu, compID, reshapeChroma);
+#if JVET_Y0065_GPM_INTRA
+                if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !tu.cu->firstPU->gpmIntraFlag && !CU::isIBC(*tu.cu))
+#else
+			    if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !CU::isIBC(*tu.cu))
+#endif
+                {
+                  cs.getPredBuf(tu.blocks[COMPONENT_Y]).copyFrom(cs.picture->getRecoBuf(tu.blocks[COMPONENT_Y]));
+                }
+#if JVET_Y0141_SIGN_PRED_IMPROVE
               }
+#endif
             }
 #endif
 

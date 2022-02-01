@@ -1259,6 +1259,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 
 #if SIGN_PREDICTION
   WRITE_CODE(pcSPS->getNumPredSigns(), 4, "num_predicted_coef_signs");
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  if (pcSPS->getNumPredSigns() > 0)
+  {
+    WRITE_CODE(pcSPS->getLog2SignPredArea() - 2,2, "log2_sign_pred_area_minus2");
+  }
+#endif
 #endif
 
 #if JVET_S0074_SPS_REORDER

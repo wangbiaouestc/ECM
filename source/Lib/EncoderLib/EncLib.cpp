@@ -1421,7 +1421,10 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setIDRRefParamListPresent              ( m_idrRefParamList );
   sps.setUseDualITree                        ( m_dualITree );
 #if SIGN_PREDICTION
-  sps.setNumPredSigns                         ( m_numPredSign );
+  sps.setNumPredSigns                        ( m_numPredSign );
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  sps.setLog2SignPredArea                    (m_log2SignPredArea);
+#endif
 #endif
   sps.setUseLFNST                            ( m_LFNST );
   sps.setSbTMVPEnabledFlag(m_sbTmvpEnableFlag);

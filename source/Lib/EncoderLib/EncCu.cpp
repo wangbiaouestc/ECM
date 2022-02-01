@@ -2045,6 +2045,16 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   bool       skipOtherLfnst      = false;
   int        startLfnstIdx       = 0;
   int        endLfnstIdx         = sps.getUseLFNST() ? maxLfnstIdx : 0;
+#if INTRA_TRANS_ENC_OPT
+  if (m_pcEncCfg->getIntraPeriod() == 1)
+  {
+    CodedCUInfo    &relatedCU = ((EncModeCtrlMTnoRQT *)m_modeCtrl)->getBlkInfo(partitioner.currArea());
+    if (isLuma(partitioner.chType) && relatedCU.skipLfnstTest)
+    {
+      endLfnstIdx = startLfnstIdx;
+    }
+  }
+#endif
 #if JVET_W0103_INTRA_MTS
   int grpNumMax = 1;
 #else
@@ -2122,6 +2132,10 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 
 #if JVET_W0123_TIMD_FUSION
   bool timdDerived = false;
+#endif
+#if INTRA_TRANS_ENC_OPT
+  m_pcIntraSearch->m_skipTimdLfnstMtsPass = false;
+  m_modeCtrl->resetLfnstCost();
 #endif
   for( int trGrpIdx = 0; trGrpIdx < grpNumMax; trGrpIdx++ )
   {
@@ -2377,6 +2391,12 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
                                      : (tempCS->area.chromaFormat != CHROMA_400 && std::min( cu.firstTU->blocks[ 1 ].width, cu.firstTU->blocks[ 1 ].height ) < 4) ?
                                             TU::getCbfAtDepth( *cu.firstTU, COMPONENT_Y, 0 )
                                           : cu.rootCbf;
+#if INTRA_TRANS_ENC_OPT
+            if (CS::isDualITree(*tempCS) && (partitioner.chType == CHANNEL_TYPE_LUMA))
+            {
+              CHECK(cbfAtZeroDepth, "such case should be wrapped out during the RD!");
+            }
+#endif
             if( cbfAtZeroDepth )
             {
               tempCS->cost = MAX_DOUBLE;

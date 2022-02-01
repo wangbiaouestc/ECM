@@ -4861,8 +4861,15 @@ void CABACWriter::residual_coding_subblock( CoeffCodingContext& cctx, const TCoe
   const int   minSubPos   = cctx.minSubPos();
   const bool  isLast      = cctx.isLast();
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  const int   cgStartPosX = cctx.cgPosX() << cctx.log2CGWidth();
+  const int   cgStartPosY = cctx.cgPosY() << cctx.log2CGHeight();
+  const bool  isSPArea = (cgStartPosX < SIGN_PRED_FREQ_RANGE) && (cgStartPosY < SIGN_PRED_FREQ_RANGE);
+  const bool  signPredQualified = cctx.getPredSignsQualified() > 0 && isSPArea && cctx.width() >= 4 && cctx.height() >= 4;
+#else
   const bool  isFirst      = !cctx.isNotFirst();
   const bool  signPredQualified = cctx.getPredSignsQualified() > 0 && isFirst && cctx.width() >= 4 && cctx.height() >= 4 ;
+#endif
 #endif
   int         firstSigPos = ( isLast ? cctx.scanPosLast() : cctx.maxSubPos() );
   int         nextSigPos  = firstSigPos;
@@ -5613,6 +5620,21 @@ void CABACWriter::cu_lic_flag(const CodingUnit& cu)
 #endif
 
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+struct signCombInfo
+{
+  uint32_t sign;
+  unsigned idx;
+  bool     isSignPred;
+
+  signCombInfo(const unsigned _sign, const unsigned _idx, const bool _isPred) : sign(_sign), idx(_idx), isSignPred(_isPred) { }
+};
+
+bool compareOrderIdx(signCombInfo cand0, signCombInfo cand1)
+{
+  return (cand0.idx < cand1.idx);
+}
+#endif
 void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
 {
   const CtxSet* ctx = &Ctx::signPred[toChannelType( compID )];
@@ -5623,7 +5645,114 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
   CoeffBuf signBuff = tu.getCoeffSigns( compID );
   TCoeff *coeff = buff.buf;
   TCoeff *signs = signBuff.buf;
-
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  IdxBuf signScanIdxBuff = tu.getCoeffSignsScanIdx(compID);
+  unsigned *signScanIdx = signScanIdxBuff.buf;
+  uint32_t extAreaWidth = std::min(tu.blocks[compID].width, (uint32_t)SIGN_PRED_FREQ_RANGE);
+  uint32_t extAreaHeight = std::min(tu.blocks[compID].height, (uint32_t)SIGN_PRED_FREQ_RANGE);
+  if (!useSignPred)
+  {
+    for (uint32_t y = 0; y < extAreaHeight; y++)
+    {
+      for (uint32_t x = 0; x < extAreaWidth; x++)
+      {
+        TCoeff coef = coeff[x];
+        if (coef)
+        {
+          if (signs[x] != TrQuant::SIGN_PRED_HIDDEN)
+          {
+            m_BinEncoder.encodeBinEP(coef < 0 ? 1 : 0);
+          }
+        }
+      }
+      coeff += buff.stride;
+      signs += signBuff.stride;
+    }
+  }
+  else
+  {
+    std::vector<signCombInfo> signCombList;
+    bool lfnstEnabled = tu.checkLFNSTApplied(compID);
+    std::vector<uint32_t> levelList;
+    const int32_t maxNumPredSigns = lfnstEnabled ? 4 : tu.cs->sps->getNumPredSigns();
+    int numScanPos = 0;
+    uint32_t extAreaSize = (lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea());
+    uint32_t spAreaWidth = std::min(tu.blocks[compID].width, extAreaSize);
+    uint32_t spAreaHeight = std::min(tu.blocks[compID].height, extAreaSize);
+    for (uint32_t y = 0; y < spAreaHeight; y++)
+    {
+      for (uint32_t x = 0; x < spAreaWidth; x++)
+      {
+        TCoeff coef = coeff[x];
+        if (coef)
+        {
+          TCoeff sign = signs[x];
+          if (sign != TrQuant::SIGN_PRED_HIDDEN)
+          {
+            if (sign == TrQuant::SIGN_PRED_BYPASS)
+            {
+              uint32_t curSign = (coef < 0) ? 1 : 0;
+              unsigned scanIdx = signScanIdx[x];
+              signCombInfo signCand(curSign, scanIdx, false);
+              signCombList.push_back(signCand);
+            }
+            else
+            {
+              uint32_t errSignPred = ((coef > 0 && sign == TrQuant::SIGN_PRED_POSITIVE) || (coef < 0 && sign == TrQuant::SIGN_PRED_NEGATIVE)) ? 0 : 1;
+              unsigned scanIdx = signScanIdx[x];
+              signCombInfo signCand(errSignPred, scanIdx, true);
+              signCombList.push_back(signCand);
+            }
+            if (numScanPos < maxNumPredSigns)
+            {
+              levelList.push_back(abs(coef));
+              numScanPos++;
+            }
+          }
+        }
+      }
+      coeff += buff.stride;
+      signs += signBuff.stride;
+      signScanIdx += signScanIdxBuff.stride;
+    }
+    std::sort(signCombList.begin(), signCombList.end(), compareOrderIdx);
+    numScanPos = 0;
+    for (uint32_t idx = 0; idx < signCombList.size(); idx++)
+    {
+      if (signCombList[idx].isSignPred)
+      {
+        uint32_t errSignPred = signCombList[idx].sign;
+        uint32_t level = levelList[numScanPos++];
+        int levOffset = (level < 2) ? 0 : 1;
+        m_BinEncoder.encodeBin(errSignPred, (*ctx)(ctxOffset + levOffset));
+      }
+      else
+      {
+        uint32_t curSign = signCombList[idx].sign;
+        m_BinEncoder.encodeBinEP(curSign);
+      }
+    }
+    if (spAreaWidth != extAreaWidth || spAreaHeight != extAreaHeight)
+    {
+      coeff = buff.buf;
+      for (uint32_t y = 0; y < extAreaHeight; y++)
+      {
+        uint32_t startX = (y < spAreaHeight) ? spAreaWidth : 0;
+        uint32_t endX = extAreaWidth - 1;
+        for (uint32_t x = startX; x <= endX; x++)
+        {
+          TCoeff coef = coeff[x];
+          if (coef)
+          {
+            uint32_t curSign = (coef < 0) ? 1 : 0;
+            m_BinEncoder.encodeBinEP(curSign);
+          }
+        }
+        coeff += buff.stride;
+      }
+    }
+  }
+#else
   for( uint32_t y = 0; y < SIGN_PRED_FREQ_RANGE; y++ )
   {
     for( uint32_t x = 0; x < SIGN_PRED_FREQ_RANGE; x++ )
@@ -5653,6 +5782,7 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
     coeff += buff.stride;
     signs += signBuff.stride;
   }
+#endif
 }
 #endif
 

@@ -736,7 +736,10 @@ void EncApp::xInitLibCfg()
 #endif
   m_cEncLib.setDualITree                                         ( m_dualTree );
 #if SIGN_PREDICTION
-  m_cEncLib.setNumPredSigns                                       ( m_numPredSign );
+  m_cEncLib.setNumPredSigns                                      ( m_numPredSign );
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  m_cEncLib.setLog2SignPredArea                                  (m_log2SignPredArea);
+#endif
 #endif
   m_cEncLib.setLFNST                                             ( m_LFNST );
   m_cEncLib.setUseFastLFNST                                      ( m_useFastLFNST );

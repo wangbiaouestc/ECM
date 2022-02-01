@@ -1966,7 +1966,6 @@ int64_t getSumOfDifference_SSE(const Pel* src0, int src0Stride, const Pel* src1,
   return deltaAvg;
 }
 #endif
-
 template<X86_VEXT vext>
 void PelBufferOps::_initPelBufOpsX86()
 {

@@ -752,6 +752,9 @@ void BestEncInfoCache::destroy()
   delete[] m_pCoeff;
 #if SIGN_PREDICTION
   delete[] m_pCoeffSign;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  delete[] m_pCoeffSignScanIdx;
+#endif
 #endif
   delete[] m_pPcmBuf;
 
@@ -801,6 +804,9 @@ void BestEncInfoCache::init( const Slice &slice )
   m_pCoeff = new TCoeff[numCoeff*m_maxNumTUs];
 #if SIGN_PREDICTION
   m_pCoeffSign = new TCoeff[numCoeff*m_maxNumTUs];
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  m_pCoeffSignScanIdx = new unsigned[numCoeff*m_maxNumTUs];
+#endif
 #endif
   m_pPcmBuf = new Pel[numCoeff*m_maxNumTUs];
   if( slice.getSPS()->getPLTMode() )
@@ -811,6 +817,9 @@ void BestEncInfoCache::init( const Slice &slice )
   m_pCoeff  = new TCoeff[numCoeff*MAX_NUM_TUS];
 #if SIGN_PREDICTION
   m_pCoeffSign = new TCoeff[numCoeff*MAX_NUM_TUS];
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  m_pCoeffSignScanIdx = new unsigned[numCoeff*MAX_NUM_TUS];
+#endif
 #endif
   m_pPcmBuf = new Pel   [numCoeff*MAX_NUM_TUS];
   if (slice.getSPS()->getPLTMode())
@@ -832,6 +841,9 @@ void BestEncInfoCache::init( const Slice &slice )
   TCoeff *coeffPtr = m_pCoeff;
 #if SIGN_PREDICTION
   TCoeff *coeffSignPtr = m_pCoeffSign;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  unsigned *coeffSignScanIdx = m_pCoeffSignScanIdx;
+#endif
 #endif
   Pel    *pcmPtr   = m_pPcmBuf;
   bool   *runTypePtr   = m_runType;
@@ -850,6 +862,9 @@ void BestEncInfoCache::init( const Slice &slice )
             TCoeff *coeff[MAX_NUM_TBLOCKS] = { 0, };
 #if SIGN_PREDICTION
             TCoeff *sign[MAX_NUM_TBLOCKS] = { 0, };
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+            unsigned *sign_scanIdx[MAX_NUM_TBLOCKS] = { 0, };
+#endif
 #endif
             Pel    *pcmbf[MAX_NUM_TBLOCKS] = { 0, };
             bool   *runType[MAX_NUM_TBLOCKS - 1] = { 0, };
@@ -869,6 +884,9 @@ void BestEncInfoCache::init( const Slice &slice )
                 coeff[i] = coeffPtr; coeffPtr += area.blocks[i].area();
 #if SIGN_PREDICTION
                 sign[i] = coeffSignPtr; coeffSignPtr += area.blocks[i].area();
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+                sign_scanIdx[i] = coeffSignScanIdx; coeffSignScanIdx += area.blocks[i].area();
+#endif
 #endif
                 pcmbf[i] = pcmPtr;   pcmPtr += area.blocks[i].area();
                 if (i < 2)
@@ -879,7 +897,11 @@ void BestEncInfoCache::init( const Slice &slice )
 
               tu.cs = &m_dummyCS;
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+              tu.init(coeff, sign, sign_scanIdx, pcmbf, runType);
+#else
               tu.init(coeff, sign, pcmbf, runType);
+#endif
 #else
               tu.init(coeff, pcmbf, runType);
 #endif
@@ -2289,6 +2311,22 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
             relatedCU.bestISPIntraMode   = cuECtx.bestISPIntraMode;
             relatedCU.relatedCuIsValid   = true;
           }
+#if INTRA_TRANS_ENC_OPT
+          if ((m_pcEncCfg->getIntraPeriod() == 1) && isLuma(partitioner.chType) && cuECtx.isLfnstTested() && (!relatedCU.relatedCuLfnstIsValid || bestCS->cost < relatedCU.bestCostForLfnst))
+          {
+            relatedCU.bestCostForLfnst = bestCS->cost;
+            relatedCU.relatedCuLfnstIsValid = true;
+
+            if (cuECtx.bestLfnstCost[1] > (cuECtx.bestLfnstCost[0] * 1.4))
+            {
+              relatedCU.skipLfnstTest = true;
+            }
+            else
+            {
+              relatedCU.skipLfnstTest = false;
+            }
+          }
+#endif
         }
 #if ENABLE_SPLIT_PARALLELISM
 #if REUSE_CU_RESULTS
@@ -2437,6 +2475,22 @@ bool EncModeCtrlMTnoRQT::useModeResult( const EncTestMode& encTestmode, CodingSt
     {
       cuECtx.bestCostMtsFirstPassNoIsp = tempCS->cost;
     }
+#if INTRA_TRANS_ENC_OPT
+    if (cu.lfnstIdx)
+    {
+      if (tempCS->cost < cuECtx.bestLfnstCost[1])
+      {
+        cuECtx.bestLfnstCost[1] = tempCS->cost;
+      }
+    }
+    else
+    {
+      if (tempCS->cost < cuECtx.bestLfnstCost[0])
+      {
+        cuECtx.bestLfnstCost[0] = tempCS->cost;
+      }
+    }
+#endif
   }
 
   if( m_pcEncCfg->getIMV4PelFast() && m_pcEncCfg->getIMV() && encTestmode.type == ETM_INTER_ME )

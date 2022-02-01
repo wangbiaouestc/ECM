@@ -889,7 +889,10 @@ protected:
   int         m_numRefLayers[MAX_VPS_LAYERS];
   bool        m_avoidIntraInDepLayer;
 #if SIGN_PREDICTION
-  int m_numPredSign;
+  int         m_numPredSign;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  int         m_log2SignPredArea;
+#endif
 #endif
 #if DUMP_BEFORE_INLOOP
   bool        m_dumpBeforeInloop;
@@ -2284,8 +2287,11 @@ public:
   void                    setVPSParameters(const CfgVPSParameters& cfg)             { m_cfgVPSParameters = cfg; }
 
 #if SIGN_PREDICTION
-  void        setNumPredSigns( int num )                              { m_numPredSign = num;}
-  int         getNumPredSigns( )                                      { return m_numPredSign;}
+  void        setNumPredSigns( int num )                             { m_numPredSign = num;}
+  int         getNumPredSigns( )                                     { return m_numPredSign;}
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  void        setLog2SignPredArea( int val )                         { m_log2SignPredArea = val; }
+#endif
 #endif
 
 #if DUMP_BEFORE_INLOOP

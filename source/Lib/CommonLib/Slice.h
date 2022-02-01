@@ -1738,6 +1738,9 @@ private:
 
 #if SIGN_PREDICTION
   int               m_numPredSign;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  int               m_log2SignPredArea;
+#endif
 #endif
 
 public:
@@ -1864,17 +1867,22 @@ public:
   unsigned                getMaxTTSize()                                                            const { return m_maxTTSize[1]; }
   unsigned                getMaxTTSizeI()                                                           const { return m_maxTTSize[0]; }
   unsigned                getMaxTTSizeIChroma()                                                     const { return m_maxTTSize[2]; }
-  unsigned*               getMinQTSizes()                                                          const { return (unsigned *)m_minQT;                }
-  unsigned*               getMaxMTTHierarchyDepths()                                               const { return (unsigned *)m_maxMTTHierarchyDepth; }
-  unsigned*               getMaxBTSizes()                                                          const { return (unsigned *)m_maxBTSize;            }
-  unsigned*               getMaxTTSizes()                                                          const { return (unsigned *)m_maxTTSize;            }
-  void                    setIDRRefParamListPresent(bool b)                             { m_idrRefParamList = b; }
-  bool                    getIDRRefParamListPresent()                             const { return m_idrRefParamList; }
-  void                    setUseDualITree(bool b) { m_dualITree = b; }
-  bool                    getUseDualITree()                                      const { return m_dualITree; }
+  unsigned*               getMinQTSizes()                                                           const { return (unsigned *)m_minQT;                }
+  unsigned*               getMaxMTTHierarchyDepths()                                                const { return (unsigned *)m_maxMTTHierarchyDepth; }
+  unsigned*               getMaxBTSizes()                                                           const { return (unsigned *)m_maxBTSize;            }
+  unsigned*               getMaxTTSizes()                                                           const { return (unsigned *)m_maxTTSize;            }
+  void                    setIDRRefParamListPresent(bool b)                                               { m_idrRefParamList = b; }
+  bool                    getIDRRefParamListPresent()                                               const { return m_idrRefParamList; }
+  void                    setUseDualITree(bool b)                                                         { m_dualITree = b; }
+  bool                    getUseDualITree()                                                         const { return m_dualITree; }
 #if SIGN_PREDICTION
-  void                    setNumPredSigns(int num) { m_numPredSign = num; }
-  int                     getNumPredSigns()                                      const { return m_numPredSign; }
+  void                    setNumPredSigns(int num)                                                        { m_numPredSign = num; }
+  int                     getNumPredSigns()                                                         const { return m_numPredSign; }
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  void                    setLog2SignPredArea(int val)                                                    { m_log2SignPredArea = val; }
+  int                     getLog2SignPredArea()                                                     const { return m_log2SignPredArea; }
+  int                     getSignPredArea()                                                         const { return (1 << m_log2SignPredArea); }
+#endif
 #endif
 
   void                    setMaxCUWidth( uint32_t u )                                                         { m_uiMaxCUWidth = u;                                                  }

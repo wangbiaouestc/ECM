@@ -742,6 +742,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("SourceHeight,-hgt",                               m_iSourceHeight,                                      0, "Source picture height")
 #if SIGN_PREDICTION
   ("NumSignPred",                                     m_numPredSign,                                        8, "Number of predicted transform coefficient signs")
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  ("Log2SignPredArea",                                m_log2SignPredArea,                                   2, "log2 of width/height of area for sign prediction")
+#endif
 #endif
   ("InputBitDepth",                                   m_inputBitDepth[CHANNEL_TYPE_LUMA],                   8, "Bit-depth of input file")
   ("OutputBitDepth",                                  m_outputBitDepth[CHANNEL_TYPE_LUMA],                  0, "Bit-depth of output file (default:InternalBitDepth)")
@@ -1798,6 +1801,43 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   {
     EXIT ( "Error: TemporalSubsampleRatio must be greater than 0" );
   }
+
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  if (m_iIntraPeriod == 1)
+  {
+    if (m_iQP > 22 && m_iQP < 37)
+    {
+      m_log2SignPredArea = 3;
+    }
+  }
+  else if (m_iIntraPeriod == -1)
+  {
+    if (m_iSourceHeight >= 1080)
+    {
+      m_log2SignPredArea = (m_iQP >= 32) ? 5 : 3;
+    }
+    else if (m_iSourceHeight >= 720)
+    {
+      m_log2SignPredArea = (m_iQP > 32) ? 5 : 4;
+    }
+    else if (m_iSourceHeight >= 480)
+    {
+      m_log2SignPredArea = 4;
+    }
+    else
+    {
+      m_log2SignPredArea = 3;
+    }
+    if (m_IBCMode)
+    {
+      m_log2SignPredArea = 3;
+    }
+  }
+  else
+  {
+    m_log2SignPredArea = 4;
+  }
+#endif
 
   m_framesToBeEncoded = ( m_framesToBeEncoded + m_temporalSubsampleRatio - 1 ) / m_temporalSubsampleRatio;
   m_adIntraLambdaModifier = cfg_adIntraLambdaModifier.values;
@@ -3994,6 +4034,9 @@ bool EncAppCfg::xCheckParameter()
     msg( WARNING, "*********************************************************************************\n");
     exit(1);
   }
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  xConfirmPara(m_numPredSign > 0 && (m_log2SignPredArea < 2 || m_log2SignPredArea > 5), "log2 of predicted sign area must be in between 2 and 5 inclusively");
+#endif
 #endif
   if ( m_RCEnableRateControl )
   {
@@ -4302,6 +4345,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if SIGN_PREDICTION
   msg( VERBOSE, "SignPred:%d ", m_numPredSign                   );
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  msg(VERBOSE, "Log2SignPredArea:%d ", m_log2SignPredArea);
+#endif
 #endif
   msg( VERBOSE, "IBD:%d ", ((m_internalBitDepth[CHANNEL_TYPE_LUMA] > m_MSBExtendedBitDepth[CHANNEL_TYPE_LUMA]) || (m_internalBitDepth[CHANNEL_TYPE_CHROMA] > m_MSBExtendedBitDepth[CHANNEL_TYPE_CHROMA])));
   msg( VERBOSE, "HAD:%d ", m_bUseHADME                          );
