@@ -234,6 +234,10 @@
 #define JVET_V0056                                        1 // JVET-V0056: MCTF changes
 
 //########### place macros to be removed in next cycle below this line ###############
+#define JVET_W0134_UNIFORM_METRICS_LOG                    1 // change metrics output for easy parsing
+
+
+
 #define JVET_S0058_GCI                                    1 // no_mtt_constraint_flag and no_weightedpred_constraint_flag
 
 #define JVET_R0341_GCI                                    1 // JVET-R0341: on constraint flag for local chroma QP control
