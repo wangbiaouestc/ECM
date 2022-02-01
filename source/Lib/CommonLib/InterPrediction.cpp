@@ -3893,7 +3893,11 @@ int InterPrediction::rightShiftMSB(int numer, int denom)
 }
 
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
+#if JVET_Y0065_GPM_INTRA
+void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT )
+#else
 void InterPrediction::motionCompensationGeo(CodingUnit &cu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1)
+#endif
 #else
 void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx )
 #endif
@@ -3917,6 +3921,27 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
     PelUnitBuf tmpGeoBuf0 = m_geoPartBuf[0].getBuf( localUnitArea );
     PelUnitBuf tmpGeoBuf1 = m_geoPartBuf[1].getBuf( localUnitArea );
     PelUnitBuf predBuf    = cu.cs->getPredBuf( pu );
+#if JVET_Y0065_GPM_INTRA
+    bool isIntra0 = candIdx0 >= GEO_MAX_NUM_UNI_CANDS;
+    bool isIntra1 = candIdx1 >= GEO_MAX_NUM_UNI_CANDS;
+    if (isIntra0)
+    {
+      PU::getGeoIntraMPMs(pu, pu.intraMPM, splitDir, g_geoTmShape[0][g_GeoParams[pu.geoSplitDir][0]]);
+      pu.intraDir[0] = pu.intraMPM[candIdx0 - GEO_MAX_NUM_UNI_CANDS];
+      pcIntraPred->initIntraPatternChType(cu, pu.Y());
+      pcIntraPred->predIntraAng(COMPONENT_Y, tmpGeoBuf0.Y(), pu);
+      if (isChromaEnabled(pu.chromaFormat))
+      {
+        pu.intraDir[1] = pu.intraDir[0];
+        pcIntraPred->initIntraPatternChType(cu, pu.Cb());
+        pcIntraPred->predIntraAng(COMPONENT_Cb, tmpGeoBuf0.Cb(), pu);
+        pcIntraPred->initIntraPatternChType(cu, pu.Cr());
+        pcIntraPred->predIntraAng(COMPONENT_Cr, tmpGeoBuf0.Cr(), pu);
+      }
+    }
+    else
+    {
+#endif
 #if JVET_W0097_GPM_MMVD_TM
 #if TM_MRG
     if (geoTmFlag0)
@@ -3938,6 +3963,41 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
     {
       printf( "DECODER_GEO_PU: pu motion vector across tile boundaries (%d,%d,%d,%d)\n", pu.lx(), pu.ly(), pu.lwidth(), pu.lheight() );
     }
+#if JVET_Y0065_GPM_INTRA
+      if (isIntra1)
+      {
+        tmpGeoBuf0.roundToOutputBitdepth(tmpGeoBuf0, cu.slice->clpRngs());
+#if ENABLE_OBMC
+#if JVET_W0123_TIMD_FUSION
+        PU::spanMotionInfo2(pu);
+#else
+        PU::spanMotionInfo(pu);
+#endif
+        cu.isobmcMC = true;
+        subBlockOBMC(pu, &tmpGeoBuf0);
+        cu.isobmcMC = false;
+#endif
+      }
+    }
+
+    if (isIntra1)
+    {
+      PU::getGeoIntraMPMs(pu, pu.intraMPM+GEO_MAX_NUM_INTRA_CANDS, splitDir, g_geoTmShape[1][g_GeoParams[pu.geoSplitDir][0]]);
+      pu.intraDir[0] = pu.intraMPM[candIdx1 - GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS];
+      pcIntraPred->initIntraPatternChType(cu, pu.Y());
+      pcIntraPred->predIntraAng(COMPONENT_Y, tmpGeoBuf1.Y(), pu);
+      if (isChromaEnabled(pu.chromaFormat))
+      {
+        pu.intraDir[1] = pu.intraDir[0];
+        pcIntraPred->initIntraPatternChType(cu, pu.Cb());
+        pcIntraPred->predIntraAng(COMPONENT_Cb, tmpGeoBuf1.Cb(), pu);
+        pcIntraPred->initIntraPatternChType(cu, pu.Cr());
+        pcIntraPred->predIntraAng(COMPONENT_Cr, tmpGeoBuf1.Cr(), pu);
+      }
+    }
+    else
+    {
+#endif
 #if JVET_W0097_GPM_MMVD_TM
 #if TM_MRG
     if (geoTmFlag1)
@@ -3959,6 +4019,39 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
     {
       printf( "DECODER_GEO_PU: pu motion vector across tile boundaries (%d,%d,%d,%d)\n", pu.lx(), pu.ly(), pu.lwidth(), pu.lheight() );
     }
+#if JVET_Y0065_GPM_INTRA
+      if (isIntra0)
+      {
+        tmpGeoBuf1.roundToOutputBitdepth(tmpGeoBuf1, cu.slice->clpRngs());
+#if ENABLE_OBMC
+#if JVET_W0123_TIMD_FUSION
+        PU::spanMotionInfo2(pu);
+#else
+        PU::spanMotionInfo(pu);
+#endif
+        cu.isobmcMC = true;
+        subBlockOBMC(pu, &tmpGeoBuf1);
+        cu.isobmcMC = false;
+#endif
+      }
+    }
+    if (pu.gpmIntraFlag)
+    {
+      if (reshapeLUT)
+      {
+        if (!isIntra1)
+        {
+          tmpGeoBuf1.Y().rspSignal(*reshapeLUT);
+        }
+        else if (!isIntra0)
+        {
+          tmpGeoBuf0.Y().rspSignal(*reshapeLUT);
+        }
+      }
+      weightedGeoBlkRounded(pu, splitDir, isChromaEnabled(pu.chromaFormat)? MAX_NUM_CHANNEL_TYPE : CHANNEL_TYPE_LUMA, predBuf, tmpGeoBuf0, tmpGeoBuf1);
+    }
+    else
+#endif
     weightedGeoBlk(pu, splitDir, isChromaEnabled(pu.chromaFormat)? MAX_NUM_CHANNEL_TYPE : CHANNEL_TYPE_LUMA, predBuf, tmpGeoBuf0, tmpGeoBuf1);
   }
 }
@@ -3986,6 +4079,32 @@ void InterPrediction::weightedGeoBlk( PredictionUnit &pu, const uint8_t splitDir
     }
   }
 }
+
+#if JVET_Y0065_GPM_INTRA
+void InterPrediction::weightedGeoBlkRounded( PredictionUnit &pu, const uint8_t splitDir, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+{
+  if( channel == CHANNEL_TYPE_LUMA )
+  {
+    m_if.weightedGeoBlkRounded( pu, pu.lumaSize().width, pu.lumaSize().height, COMPONENT_Y, splitDir, predDst, predSrc0, predSrc1 );
+  }
+  else if( channel == CHANNEL_TYPE_CHROMA )
+  {
+    m_if.weightedGeoBlkRounded( pu, pu.chromaSize().width, pu.chromaSize().height, COMPONENT_Cb, splitDir, predDst, predSrc0, predSrc1 );
+    m_if.weightedGeoBlkRounded( pu, pu.chromaSize().width, pu.chromaSize().height, COMPONENT_Cr, splitDir, predDst, predSrc0, predSrc1 );
+  }
+  else
+  {
+    m_if.weightedGeoBlkRounded( pu, pu.lumaSize().width,   pu.lumaSize().height,   COMPONENT_Y,  splitDir, predDst, predSrc0, predSrc1 );
+    if (isChromaEnabled(pu.chromaFormat))
+    {
+      m_if.weightedGeoBlkRounded(pu, pu.chromaSize().width, pu.chromaSize().height, COMPONENT_Cb, splitDir, predDst, predSrc0,
+                          predSrc1);
+      m_if.weightedGeoBlkRounded(pu, pu.chromaSize().width, pu.chromaSize().height, COMPONENT_Cr, splitDir, predDst, predSrc0,
+                          predSrc1);
+    }
+  }
+}
+#endif
 
 void InterPrediction::xPrefetch(PredictionUnit& pu, PelUnitBuf &pcPad, RefPicList refId, bool forLuma)
 {

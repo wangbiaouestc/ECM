@@ -234,6 +234,9 @@ public:
 #if JVET_X0049_ADAPT_DMVR
   static const CtxSet   BMMergeFlag;
 #endif
+#if JVET_Y0065_GPM_INTRA
+  static const CtxSet   GPMIntraFlag;
+#endif
   static const CtxSet   PredMode;
   static const CtxSet   MultiRefLineIdx;
   static const CtxSet   IntraLumaMpmFlag;

@@ -168,8 +168,13 @@ public:
       singleDistList[partIdx] = new SingleGeoMMVDMergeEntry**[GEO_NUM_PARTITION_MODE];
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
       {
+#if JVET_Y0065_GPM_INTRA
+        singleDistList[partIdx][splitDir] = new SingleGeoMMVDMergeEntry*[GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS];
+        for (int candIdx = 0; candIdx < GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS; candIdx++)
+#else
         singleDistList[partIdx][splitDir] = new SingleGeoMMVDMergeEntry*[MRG_MAX_NUM_CANDS];
         for (int candIdx = 0; candIdx < MRG_MAX_NUM_CANDS; candIdx++)
+#endif
         {
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
           singleDistList[partIdx][splitDir][candIdx] = new SingleGeoMMVDMergeEntry[GPM_EXT_MMVD_MAX_REFINE_NUM + 2];
@@ -186,7 +191,11 @@ public:
     {
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
       {
+#if JVET_Y0065_GPM_INTRA
+        for (int candIdx = 0; candIdx < GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS; candIdx++)
+#else
         for (int candIdx = 0; candIdx < MRG_MAX_NUM_CANDS; candIdx++)
+#endif
         {
           delete[] singleDistList[partIdx][splitDir][candIdx];
         }
@@ -255,7 +264,11 @@ private:
   IbcHashMap            m_ibcHashMap;
   EncModeCtrl          *m_modeCtrl;
 
+#if JVET_Y0065_GPM_INTRA
+  PelStorage            m_acMergeBuffer[GEO_NUM_RDO_BUFFER];
+#else
   PelStorage            m_acMergeBuffer[MMVD_MRG_MAX_RD_BUF_NUM];
+#endif
 #if INTER_LIC || MULTI_HYP_PRED
   PelStorage            m_acRealMergeBuffer[MRG_MAX_NUM_CANDS * 2];
 #else
@@ -267,7 +280,11 @@ private:
 #endif
   PelStorage            m_ciipBuffer[2];
 
+#if JVET_Y0065_GPM_INTRA
+  PelStorage            m_acGeoWeightedBuffer[GEO_MAX_TRY_WEIGHTED_SAD+1]; // to store weighted prediction pixles
+#else
   PelStorage            m_acGeoWeightedBuffer[GEO_MAX_TRY_WEIGHTED_SAD]; // to store weighted prediction pixels
+#endif
   FastGeoCostList       m_GeoCostList;
 #if JVET_W0097_GPM_MMVD_TM
   PelStorage            m_acGeoMMVDBuffer[MRG_MAX_NUM_CANDS][GPM_EXT_MMVD_MAX_REFINE_NUM];

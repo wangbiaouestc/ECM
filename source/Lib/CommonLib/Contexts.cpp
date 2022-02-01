@@ -823,6 +823,18 @@ const CtxSet ContextSetCfg::TmMergeIdx = ContextSetCfg::addCtxSet
 });
 #endif
 
+#if JVET_Y0065_GPM_INTRA
+const CtxSet ContextSetCfg::GPMIntraFlag = ContextSetCfg::addCtxSet
+({
+  {  35, },
+  {  35, },
+  {  35, },
+  {   4, },
+  {   4, },
+  {   4, }
+});
+#endif
+
 const CtxSet ContextSetCfg::MmvdFlag = ContextSetCfg::addCtxSet
 ({
 	{ 25 },

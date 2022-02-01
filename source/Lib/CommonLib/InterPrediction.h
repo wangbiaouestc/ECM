@@ -49,6 +49,9 @@
 
 #include "RdCost.h"
 #include "ContextModelling.h"
+#if JVET_Y0065_GPM_INTRA
+#include "IntraPrediction.h"
+#endif
 // forward declaration
 class Mv;
 #if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM
@@ -315,11 +318,18 @@ public:
   void    subBlockOBMC(PredictionUnit  &pu, PelUnitBuf *pDst = nullptr);
 #endif
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
+#if JVET_Y0065_GPM_INTRA
+  void    motionCompensationGeo(CodingUnit &cu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT);
+#else
   void    motionCompensationGeo(CodingUnit &cu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1);
+#endif
 #else
   void    motionCompensationGeo(CodingUnit &cu, MergeCtx &GeoMrgCtx);
 #endif
   void    weightedGeoBlk(PredictionUnit &pu, const uint8_t splitDir, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+#if JVET_Y0065_GPM_INTRA
+  void    weightedGeoBlkRounded( PredictionUnit &pu, const uint8_t splitDir, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+#endif
   void xPrefetch(PredictionUnit& pu, PelUnitBuf &pcPad, RefPicList refId, bool forLuma);
   void xPad(PredictionUnit& pu, PelUnitBuf &pcPad, RefPicList refId);
   void xFinalPaddedMCForDMVR(PredictionUnit& pu, PelUnitBuf &pcYuvSrc0, PelUnitBuf &pcYuvSrc1, PelUnitBuf &pcPad0, PelUnitBuf &pcPad1, const bool bioApplied

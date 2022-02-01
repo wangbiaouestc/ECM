@@ -819,6 +819,16 @@ void writeAllData(const CodingStructure& cs, const UnitArea& ctuArea)
               // first partition
               {
                 PredictionUnit tmpPu = *cu.firstPU;
+#if JVET_Y0065_GPM_INTRA
+                if (candIdx0 >= GEO_MAX_NUM_UNI_CANDS)
+                {
+                  const int intraDir = tmpPu.intraMPM[candIdx0 - GEO_MAX_NUM_UNI_CANDS];
+                  const int geoPartIdx = 0;
+                  DTRACE_POLYGON_SCALAR(g_trace_ctx, D_BLOCK_STATISTICS_ALL, cu.slice->getPOC(), geoPartitions[geoPartIdx], GetBlockStatisticName(BlockStatistic::GPMIntra), intraDir);
+                }
+                else
+                {
+#endif
                 geoMrgCtx.setMergeInfo( tmpPu, candIdx0 );
                 const int geoPartIdx = 0;
                 for (int refIdx = 0; refIdx < 2; refIdx++)
@@ -838,11 +848,24 @@ void writeAllData(const CodingStructure& cs, const UnitArea& ctuArea)
                                           );
                   }
                 }
+#if JVET_Y0065_GPM_INTRA
+                }
+#endif
               }
 
               // second partition
               {
                 PredictionUnit tmpPu = *cu.firstPU;
+#if JVET_Y0065_GPM_INTRA
+                if (candIdx1 >= GEO_MAX_NUM_UNI_CANDS)
+                {
+                  const int intraDir = tmpPu.intraMPM[candIdx1 - GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS];
+                  const int geoPartIdx = 0;
+                  DTRACE_POLYGON_SCALAR(g_trace_ctx, D_BLOCK_STATISTICS_ALL, cu.slice->getPOC(), geoPartitions[geoPartIdx], GetBlockStatisticName(BlockStatistic::GPMIntra), intraDir);
+                }
+                else
+                {
+#endif
                 geoMrgCtx.setMergeInfo( tmpPu, candIdx1 );
                 const int geoPartIdx = 1;
                 {
@@ -864,6 +887,9 @@ void writeAllData(const CodingStructure& cs, const UnitArea& ctuArea)
                     }
                   }
                 }
+#if JVET_Y0065_GPM_INTRA
+                }
+#endif
               }
             }
           }

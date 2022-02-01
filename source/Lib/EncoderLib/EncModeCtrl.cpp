@@ -1515,7 +1515,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
       // add inter modes
       if( m_pcEncCfg->getUseEarlySkipDetection() )
       {
+#if JVET_Y0065_GPM_INTRA
+        if( cs.sps->getUseGeo() && !cs.slice->isIntra() )
+#else
         if( cs.sps->getUseGeo() && cs.slice->isInterB() )
+#endif
         {
           m_ComprCUCtxList.back().testModes.push_back( { ETM_MERGE_GEO, ETO_STANDARD, qp } );
         }
@@ -1543,7 +1547,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
       else
       {
         m_ComprCUCtxList.back().testModes.push_back( { ETM_INTER_ME,    ETO_STANDARD, qp } );
+#if JVET_Y0065_GPM_INTRA
+        if( cs.sps->getUseGeo() && !cs.slice->isIntra() )
+#else
         if( cs.sps->getUseGeo() && cs.slice->isInterB() )
+#endif
         {
           m_ComprCUCtxList.back().testModes.push_back( { ETM_MERGE_GEO, ETO_STANDARD, qp } );
         }

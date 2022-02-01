@@ -1091,6 +1091,256 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
   }
 }
 
+#if JVET_Y0065_GPM_INTRA
+void PU::getGeoIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t splitDir, uint8_t shape )
+{
+  bool includedMode[NUM_INTRA_MODE];
+  memset(includedMode, false, sizeof(includedMode));
+
+  int numValidMPM = 0;
+  mpm[numValidMPM++] = g_geoAngle2IntraAng[g_GeoParams[splitDir][0]];
+  includedMode[mpm[0]] = true;
+
+  CodingUnit* cu = pu.cu;
+#if ENABLE_DIMD
+  if (cu->slice->getSPS()->getUseDimd())
+  {
+    if (cu->dimdMode != -1)
+    {
+      mpm[numValidMPM] = cu->dimdMode;
+      if( !includedMode[mpm[numValidMPM]] )
+      {
+        includedMode[mpm[numValidMPM++]] = true;
+      }
+    }
+  }
+#endif
+#if JVET_W0123_TIMD_FUSION
+  if (cu->slice->getSPS()->getUseTimd() && cu->timdMode != -1)
+  {
+    mpm[numValidMPM] = MAP131TO67(cu->timdMode);
+    if( !includedMode[mpm[numValidMPM]] )
+    {
+      includedMode[mpm[numValidMPM++]] = true;
+      if (numValidMPM == GEO_MAX_NUM_INTRA_CANDS)
+      {
+        return;
+      }
+    }
+  }
+#endif
+  const CompArea &area = pu.block(COMPONENT_Y);
+  const Position posA = area.topRight().offset(0, -1);
+  const Position posAR = area.topRight().offset(1, -1);
+  const Position posL = area.bottomLeft().offset(-1, 0);
+  const Position posBL = area.bottomLeft().offset(-1, 1);
+  const Position posAL = area.topLeft().offset(-1, -1);
+
+  if (shape == GEO_TM_SHAPE_L || shape == GEO_TM_SHAPE_AL)
+  {
+    const PredictionUnit *puLeft = pu.cs->getPURestricted(posL, pu, CHANNEL_TYPE_LUMA);
+    if (puLeft && CU::isIntra(*puLeft->cu))
+    {
+#if JVET_W0123_TIMD_FUSION
+      mpm[numValidMPM] = puLeft->cu->timd ? MAP131TO67(PU::getIntraDirLuma(*puLeft)) : PU::getIntraDirLuma(*puLeft);
+#else
+      mpm[numValidMPM] = PU::getIntraDirLuma(*puLeft);
+#endif
+      if( !includedMode[mpm[numValidMPM]] )
+      {
+        includedMode[mpm[numValidMPM++]] = true;
+        if (numValidMPM == GEO_MAX_NUM_INTRA_CANDS)
+        {
+          return;
+        }
+      }
+    }
+  }
+
+  if (shape == GEO_TM_SHAPE_A || shape == GEO_TM_SHAPE_AL)
+  {
+    const PredictionUnit *puAbove = pu.cs->getPURestricted(posA, pu, CHANNEL_TYPE_LUMA);
+    if (puAbove && CU::isIntra(*puAbove->cu))
+    {
+#if JVET_W0123_TIMD_FUSION
+      mpm[numValidMPM] = puAbove->cu->timd ? MAP131TO67(PU::getIntraDirLuma(*puAbove)) : PU::getIntraDirLuma(*puAbove);
+#else
+      mpm[numValidMPM] = PU::getIntraDirLuma(*puAbove);
+#endif
+      if( !includedMode[mpm[numValidMPM]] )
+      {
+        includedMode[mpm[numValidMPM++]] = true;
+        if (numValidMPM == GEO_MAX_NUM_INTRA_CANDS)
+        {
+          return;
+        }
+      }
+    }
+  }
+
+#if JVET_W0123_TIMD_FUSION
+  if (shape == GEO_TM_SHAPE_L || shape == GEO_TM_SHAPE_AL)
+  {
+    const PredictionUnit *puLeft = pu.cs->getPURestricted(posL, pu, CHANNEL_TYPE_LUMA);
+    if (puLeft && CU::isInter(*puLeft->cu))
+    {
+      mpm[numValidMPM] = puLeft->getIpmInfo(posL);
+      if( !includedMode[mpm[numValidMPM]] )
+      {
+        includedMode[mpm[numValidMPM++]] = true;
+        if (numValidMPM == GEO_MAX_NUM_INTRA_CANDS)
+        {
+          return;
+        }
+      }
+    }
+  }
+
+  if (shape == GEO_TM_SHAPE_A || shape == GEO_TM_SHAPE_AL)
+  {
+    const PredictionUnit *puAbove = pu.cs->getPURestricted(posA, pu, CHANNEL_TYPE_LUMA);
+    if (puAbove && CU::isInter(*puAbove->cu))
+    {
+      mpm[numValidMPM] = puAbove->getIpmInfo(posA);
+      if( !includedMode[mpm[numValidMPM]] )
+      {
+        includedMode[mpm[numValidMPM++]] = true;
+        if (numValidMPM == GEO_MAX_NUM_INTRA_CANDS)
+        {
+          return;
+        }
+      }
+    }
+  }
+#endif
+
+  if (shape == GEO_TM_SHAPE_L || shape == GEO_TM_SHAPE_AL)
+  {
+    const PredictionUnit *puBelowLeft = pu.cs->getPURestricted(posBL, pu, CHANNEL_TYPE_LUMA);
+    if (puBelowLeft && CU::isIntra(*puBelowLeft->cu))
+    {
+#if JVET_W0123_TIMD_FUSION
+      mpm[numValidMPM] = puBelowLeft->cu->timd ? MAP131TO67(PU::getIntraDirLuma(*puBelowLeft)) : PU::getIntraDirLuma(*puBelowLeft);
+#else
+      mpm[numValidMPM] = PU::getIntraDirLuma(*puBelowLeft);
+#endif
+      if( !includedMode[mpm[numValidMPM]] )
+      {
+        includedMode[mpm[numValidMPM++]] = true;
+        if (numValidMPM == GEO_MAX_NUM_INTRA_CANDS)
+        {
+          return;
+        }
+      }
+    }
+  }
+
+  if (shape == GEO_TM_SHAPE_A || shape == GEO_TM_SHAPE_AL)
+  {
+    const PredictionUnit *puAboveRight = pu.cs->getPURestricted(posAR, pu, CHANNEL_TYPE_LUMA);
+    if (puAboveRight && CU::isIntra(*puAboveRight->cu))
+    {
+#if JVET_W0123_TIMD_FUSION
+      mpm[numValidMPM] = puAboveRight->cu->timd ? MAP131TO67(PU::getIntraDirLuma(*puAboveRight)) : PU::getIntraDirLuma(*puAboveRight);
+#else
+      mpm[numValidMPM] = PU::getIntraDirLuma(*puAboveRight);
+#endif
+      if( !includedMode[mpm[numValidMPM]] )
+      {
+        includedMode[mpm[numValidMPM++]] = true;
+        if (numValidMPM == GEO_MAX_NUM_INTRA_CANDS)
+        {
+          return;
+        }
+      }
+    }
+  }
+
+  {
+    const PredictionUnit *puAboveLeft = pu.cs->getPURestricted(posAL, pu, CHANNEL_TYPE_LUMA);
+    if (puAboveLeft && CU::isIntra(*puAboveLeft->cu))
+    {
+#if JVET_W0123_TIMD_FUSION
+      mpm[numValidMPM] = puAboveLeft->cu->timd ? MAP131TO67(PU::getIntraDirLuma(*puAboveLeft)) : PU::getIntraDirLuma(*puAboveLeft);
+#else
+      mpm[numValidMPM] = PU::getIntraDirLuma(*puAboveLeft);
+#endif
+      if( !includedMode[mpm[numValidMPM]] )
+      {
+        includedMode[mpm[numValidMPM++]] = true;
+        if (numValidMPM == GEO_MAX_NUM_INTRA_CANDS)
+        {
+          return;
+        }
+      }
+    }
+  }
+
+#if JVET_W0123_TIMD_FUSION
+  if (shape == GEO_TM_SHAPE_L || shape == GEO_TM_SHAPE_AL)
+  {
+    const PredictionUnit *puBelowLeft = pu.cs->getPURestricted(posBL, pu, CHANNEL_TYPE_LUMA);
+    if (puBelowLeft && CU::isInter(*puBelowLeft->cu))
+    {
+      mpm[numValidMPM] = puBelowLeft->getIpmInfo(posBL);
+      if( !includedMode[mpm[numValidMPM]] )
+      {
+        includedMode[mpm[numValidMPM++]] = true;
+        if (numValidMPM == GEO_MAX_NUM_INTRA_CANDS)
+        {
+          return;
+        }
+      }
+    }
+  }
+
+  if (shape == GEO_TM_SHAPE_A || shape == GEO_TM_SHAPE_AL)
+  {
+    const PredictionUnit *puAboveRight = pu.cs->getPURestricted(posAR, pu, CHANNEL_TYPE_LUMA);
+    if (puAboveRight && CU::isInter(*puAboveRight->cu))
+    {
+      mpm[numValidMPM] = puAboveRight->getIpmInfo(posAR);
+      if( !includedMode[mpm[numValidMPM]] )
+      {
+        includedMode[mpm[numValidMPM++]] = true;
+        if (numValidMPM == GEO_MAX_NUM_INTRA_CANDS)
+        {
+          return;
+        }
+      }
+    }
+  }
+
+  {
+    const PredictionUnit *puAboveLeft = pu.cs->getPURestricted(posAL, pu, CHANNEL_TYPE_LUMA);
+    if (puAboveLeft && CU::isInter(*puAboveLeft->cu))
+    {
+      mpm[numValidMPM] = puAboveLeft->getIpmInfo(posAL);
+      if( !includedMode[mpm[numValidMPM]] )
+      {
+        includedMode[mpm[numValidMPM++]] = true;
+        if (numValidMPM == GEO_MAX_NUM_INTRA_CANDS)
+        {
+          return;
+        }
+      }
+    }
+  }
+#endif
+
+  mpm[numValidMPM] = (mpm[0] > DIA_IDX) ? (mpm[0]-32) : (mpm[0]+32);
+  if( !includedMode[mpm[numValidMPM]] )
+  {
+    includedMode[mpm[numValidMPM++]] = true;
+    if (numValidMPM == GEO_MAX_NUM_INTRA_CANDS)
+    {
+      return;
+    }
+  }
+  mpm[numValidMPM] = PLANAR_IDX;
+}
+#endif
+
 bool PU::isMIP(const PredictionUnit &pu, const ChannelType &chType)
 {
   if (chType == CHANNEL_TYPE_LUMA)
@@ -2006,7 +2256,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   // above
   const PredictionUnit *puAbove = cs.getPURestricted(posRT.offset(0, -1), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+  bool isAvailableB1 = puAbove && isDiffMER(pu.lumaPos(), posRT.offset(0, -1), plevel) && pu.cu != puAbove->cu && CU::isInter(*puAbove->cu) && puAbove->getMotionInfo(posRT.offset(0, -1)).isInter;
+#else
   bool isAvailableB1 = puAbove && isDiffMER(pu.lumaPos(), posRT.offset(0, -1), plevel) && pu.cu != puAbove->cu && CU::isInter(*puAbove->cu);
+#endif
 
   if (isAvailableB1)
   {
@@ -2082,7 +2336,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   //left
   const PredictionUnit* puLeft = cs.getPURestricted(posLB.offset(-1, 0), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+  const bool isAvailableA1 = puLeft && isDiffMER(pu.lumaPos(), posLB.offset(-1, 0), plevel) && pu.cu != puLeft->cu && CU::isInter(*puLeft->cu) && puLeft->getMotionInfo(posLB.offset(-1, 0)).isInter;
+#else
   const bool isAvailableA1 = puLeft && isDiffMER(pu.lumaPos(), posLB.offset(-1, 0), plevel) && pu.cu != puLeft->cu && CU::isInter(*puLeft->cu);
+#endif
 
   if (isAvailableA1)
   {
@@ -2158,7 +2416,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   // above right
   const PredictionUnit *puAboveRight = cs.getPURestricted( posRT.offset( 1, -1 ), pu, pu.chType );
 
+#if JVET_Y0065_GPM_INTRA
+  bool isAvailableB0 = puAboveRight && isDiffMER( pu.lumaPos(), posRT.offset(1, -1), plevel) && CU::isInter( *puAboveRight->cu ) && puAboveRight->getMotionInfo( posRT.offset( 1, -1 ) ).isInter;
+#else
   bool isAvailableB0 = puAboveRight && isDiffMER( pu.lumaPos(), posRT.offset(1, -1), plevel) && CU::isInter( *puAboveRight->cu );
+#endif
 
   if( isAvailableB0 )
   {
@@ -2235,7 +2497,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   //left bottom
   const PredictionUnit *puLeftBottom = cs.getPURestricted( posLB.offset( -1, 1 ), pu, pu.chType );
 
+#if JVET_Y0065_GPM_INTRA
+  bool isAvailableA0 = puLeftBottom && isDiffMER( pu.lumaPos(), posLB.offset(-1, 1), plevel) && CU::isInter( *puLeftBottom->cu ) && puLeftBottom->getMotionInfo( posLB.offset( -1, 1 ) ).isInter;
+#else
   bool isAvailableA0 = puLeftBottom && isDiffMER( pu.lumaPos(), posLB.offset(-1, 1), plevel) && CU::isInter( *puLeftBottom->cu );
+#endif
 
   if( isAvailableA0 )
   {
@@ -2325,7 +2591,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   {
     const PredictionUnit *puAboveLeft = cs.getPURestricted( posLT.offset( -1, -1 ), pu, pu.chType );
 
+#if JVET_Y0065_GPM_INTRA
+    bool isAvailableB2 = puAboveLeft && isDiffMER( pu.lumaPos(), posLT.offset(-1, -1), plevel ) && CU::isInter( *puAboveLeft->cu ) && puAboveLeft->getMotionInfo( posLT.offset( -1, -1 ) ).isInter;
+#else
     bool isAvailableB2 = puAboveLeft && isDiffMER( pu.lumaPos(), posLT.offset(-1, -1), plevel ) && CU::isInter( *puAboveLeft->cu );
+#endif
 
     if( isAvailableB2 )
     {
@@ -2595,7 +2865,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 
       const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+      bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER( pu.lumaPos(), posLT.offset( offsetX, offsetY ) , plevel) && CU::isInter(*puNonAdjacent->cu) && puNonAdjacent->getMotionInfo(posLT.offset(offsetX, offsetY)).isInter;
+#else
       bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER( pu.lumaPos(), posLT.offset( offsetX, offsetY ) , plevel) && CU::isInter(*puNonAdjacent->cu);
+#endif
 
       if (isAvailableNonAdjacent)
       {
@@ -3144,7 +3418,11 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
   // above
   const PredictionUnit *puAbove = cs.getPURestricted(posRT.offset(0, -1), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+  bool isAvailableB1 = puAbove && isDiffMER(pu.lumaPos(), posRT.offset(0, -1), plevel) && pu.cu != puAbove->cu && CU::isInter(*puAbove->cu) && puAbove->getMotionInfo(posRT.offset(0, -1)).isInter;
+#else
   bool isAvailableB1 = puAbove && isDiffMER(pu.lumaPos(), posRT.offset(0, -1), plevel) && pu.cu != puAbove->cu && CU::isInter(*puAbove->cu);
+#endif
 
   if (isAvailableB1)
   {
@@ -3186,7 +3464,11 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
   //left
   const PredictionUnit* puLeft = cs.getPURestricted(posLB.offset(-1, 0), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+  const bool isAvailableA1 = puLeft && isDiffMER(pu.lumaPos(), posLB.offset(-1, 0), plevel) && pu.cu != puLeft->cu && CU::isInter(*puLeft->cu) && puLeft->getMotionInfo(posLB.offset(-1, 0)).isInter;
+#else
   const bool isAvailableA1 = puLeft && isDiffMER(pu.lumaPos(), posLB.offset(-1, 0), plevel) && pu.cu != puLeft->cu && CU::isInter(*puLeft->cu);
+#endif
 
   if (isAvailableA1)
   {
@@ -3234,7 +3516,11 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
   // above right
   const PredictionUnit *puAboveRight = cs.getPURestricted(posRT.offset(1, -1), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+  bool isAvailableB0 = puAboveRight && isDiffMER(pu.lumaPos(), posRT.offset(1, -1), plevel) && CU::isInter(*puAboveRight->cu) && puAboveRight->getMotionInfo(posRT.offset(1, -1)).isInter;
+#else
   bool isAvailableB0 = puAboveRight && isDiffMER(pu.lumaPos(), posRT.offset(1, -1), plevel) && CU::isInter(*puAboveRight->cu);
+#endif
 
   if (isAvailableB0)
   {
@@ -3280,7 +3566,11 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
   //left bottom
   const PredictionUnit *puLeftBottom = cs.getPURestricted(posLB.offset(-1, 1), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+  bool isAvailableA0 = puLeftBottom && isDiffMER(pu.lumaPos(), posLB.offset(-1, 1), plevel) && CU::isInter(*puLeftBottom->cu) && puLeftBottom->getMotionInfo(posLB.offset(-1, 1)).isInter;
+#else
   bool isAvailableA0 = puLeftBottom && isDiffMER(pu.lumaPos(), posLB.offset(-1, 1), plevel) && CU::isInter(*puLeftBottom->cu);
+#endif
 
   if (isAvailableA0)
   {
@@ -3329,7 +3619,11 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
 
   const PredictionUnit *puAboveLeft = cs.getPURestricted(posLT.offset(-1, -1), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+  bool isAvailableB2 = puAboveLeft && isDiffMER(pu.lumaPos(), posLT.offset(-1, -1), plevel) && CU::isInter(*puAboveLeft->cu) && puAboveLeft->getMotionInfo(posLT.offset(-1, -1)).isInter;
+#else
   bool isAvailableB2 = puAboveLeft && isDiffMER(pu.lumaPos(), posLT.offset(-1, -1), plevel) && CU::isInter(*puAboveLeft->cu);
+#endif
 
   if (isAvailableB2)
   {
@@ -3527,7 +3821,11 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
 
       const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+      bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu) && puNonAdjacent->getMotionInfo(posLT.offset(offsetX, offsetY)).isInter;
+#else
       bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu);
+#endif
 
       if (isAvailableNonAdjacent)
       {
@@ -5221,7 +5519,11 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
 
         const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+        bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu) && puNonAdjacent->getMotionInfo(posLT.offset(offsetX, offsetY)).isInter;
+#else
         bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu);
+#endif
 
         if (isAvailableNonAdjacent)
         {
@@ -5713,7 +6015,11 @@ bool PU::addMVPCandUnscaled( const PredictionUnit &pu, const RefPicList &eRefPic
 
   neibPU = cs.getPURestricted( neibPos, pu, pu.chType );
 
+#if JVET_Y0065_GPM_INTRA
+  if( neibPU == NULL || !CU::isInter( *neibPU->cu ) || !neibPU->getMotionInfo( neibPos ).isInter)
+#else
   if( neibPU == NULL || !CU::isInter( *neibPU->cu ) )
+#endif
   {
     return false;
   }
@@ -6077,7 +6383,11 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 
     //left
     const PredictionUnit* puLeft = cs.getPURestricted( posCurLB.offset( -1, 0 ), pu, pu.chType );
+#if JVET_Y0065_GPM_INTRA
+    const bool isAvailableA1 = puLeft && isDiffMER(pu.lumaPos(), posCurLB.offset(-1, 0), plevel) && pu.cu != puLeft->cu && CU::isInter( *puLeft->cu ) && puLeft->getMotionInfo( posCurLB.offset( -1, 0 ) ).isInter;
+#else
     const bool isAvailableA1 = puLeft && isDiffMER(pu.lumaPos(), posCurLB.offset(-1, 0), plevel) && pu.cu != puLeft->cu && CU::isInter( *puLeft->cu );
+#endif
     if ( isAvailableA1 )
     {
 #if INTER_LIC
@@ -6193,7 +6503,11 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
         const Position pos = posLT[i];
         const PredictionUnit* puNeigh = cs.getPURestricted( pos, pu, pu.chType );
 
+#if JVET_Y0065_GPM_INTRA
+        if (puNeigh && CU::isInter(*puNeigh->cu) && puNeigh->getMotionInfo( pos ).isInter && PU::isDiffMER(pu.lumaPos(), pos, plevel))
+#else
         if (puNeigh && CU::isInter(*puNeigh->cu) && PU::isDiffMER(pu.lumaPos(), pos, plevel))
+#endif
         {
           isAvailable[0] = true;
           mi[0] = puNeigh->getMotionInfo( pos );
@@ -6209,7 +6523,11 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
         const Position pos = posRT[i];
         const PredictionUnit* puNeigh = cs.getPURestricted( pos, pu, pu.chType );
 
+#if JVET_Y0065_GPM_INTRA
+        if (puNeigh && CU::isInter(*puNeigh->cu) && puNeigh->getMotionInfo( pos ).isInter && PU::isDiffMER(pu.lumaPos(), pos, plevel))
+#else
         if (puNeigh && CU::isInter(*puNeigh->cu) && PU::isDiffMER(pu.lumaPos(), pos, plevel))
+#endif
         {
           isAvailable[1] = true;
           mi[1] = puNeigh->getMotionInfo( pos );
@@ -6225,7 +6543,11 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
         const Position pos = posLB[i];
         const PredictionUnit* puNeigh = cs.getPURestricted( pos, pu, pu.chType );
 
+#if JVET_Y0065_GPM_INTRA
+        if (puNeigh && CU::isInter(*puNeigh->cu) && puNeigh->getMotionInfo( pos ).isInter && PU::isDiffMER(pu.lumaPos(), pos, plevel))
+#else
         if (puNeigh && CU::isInter(*puNeigh->cu) && PU::isDiffMER(pu.lumaPos(), pos, plevel))
+#endif
         {
           isAvailable[2] = true;
           mi[2] = puNeigh->getMotionInfo( pos );
@@ -7576,14 +7898,22 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
   if (geoMrgCtx.numValidMergeCand < pu.cs->sps->getMaxNumGeoCand())
   {
     const Slice &slice = *pu.cs->slice;
+#if JVET_Y0065_GPM_INTRA
+    int         iNumRefIdx = pu.cs->slice->isInterP() ? slice.getNumRefIdx(REF_PIC_LIST_0) : std::min(slice.getNumRefIdx(REF_PIC_LIST_0), slice.getNumRefIdx(REF_PIC_LIST_1));
+#else
     int         iNumRefIdx = std::min(slice.getNumRefIdx(REF_PIC_LIST_0), slice.getNumRefIdx(REF_PIC_LIST_1));
+#endif
 
     int r = 0;
     int refcnt = 0;
 
     for (int32_t i = geoMrgCtx.numValidMergeCand; i < pu.cs->sps->getMaxNumGeoCand(); i++)
     {
+#if JVET_Y0065_GPM_INTRA
+      int parity = pu.cs->slice->isInterP() ? 0 : (i & 1);
+#else
       int parity = i & 1;
+#endif
       if (0x01 + parity)
       {
         geoMrgCtx.interDirNeighbours[geoMrgCtx.numValidMergeCand] = 1 + parity;
@@ -7623,6 +7953,11 @@ void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8
   IpmBuf ib = pu.getIpmBuf();
 #endif
 
+#if JVET_Y0065_GPM_INTRA
+  bool isIntra0 = candIdx0 >= GEO_MAX_NUM_UNI_CANDS;
+  bool isIntra1 = candIdx1 >= GEO_MAX_NUM_UNI_CANDS;
+  uint32_t sliceIdx = pu.cs->slice->getIndependentSliceIdx();
+#else
   MotionInfo biMv;
   biMv.isInter  = true;
   biMv.sliceIdx = pu.cs->slice->getIndependentSliceIdx();
@@ -7659,6 +7994,7 @@ void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8
     biMv.refIdx[0] = -1;
     biMv.refIdx[1] = geoMrgCtx.mvFieldNeighbours[(candIdx1 << 1) + 1].refIdx;
   }
+#endif
 
   int16_t angle = g_GeoParams[splitDir][0];
   int tpmMask = 0;
@@ -7690,6 +8026,19 @@ void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8
     for (int x = 0; x < mb.width; x++)
     {
       motionIdx = (((4 * x + offsetX) << 1) + 5) * g_Dis[distanceX] + lookUpY;
+#if JVET_Y0065_GPM_INTRA
+      tpmMask = motionIdx <= 0 ? (1 - isFlip) : isFlip;
+      if (tpmMask == 0 && isIntra0)
+      {
+        motionInfo[x].isInter = false;
+        motionInfo[x].interDir = MAX_UCHAR;
+        motionInfo[x].refIdx[0] = -1;
+        motionInfo[x].refIdx[1] = -1;
+        motionInfo[x].mv[0] = Mv();
+        motionInfo[x].mv[1] = Mv();
+        motionInfo[x].sliceIdx = sliceIdx;
+      }
+#else
       tpmMask = abs(motionIdx) < 32 ? 2 : (motionIdx <= 0 ? (1 - isFlip) : isFlip);
       if (tpmMask == 2)
       {
@@ -7701,6 +8050,7 @@ void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8
         motionInfo[x].mv[1] = biMv.mv[1];
         motionInfo[x].sliceIdx = biMv.sliceIdx;
       }
+#endif
       else if (tpmMask == 0)
       {
         motionInfo[x].isInter = true;
@@ -7709,8 +8059,24 @@ void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8
         motionInfo[x].refIdx[1] = geoMrgCtx.mvFieldNeighbours[(candIdx0 << 1) + 1].refIdx;
         motionInfo[x].mv[0] = geoMrgCtx.mvFieldNeighbours[candIdx0 << 1].mv;
         motionInfo[x].mv[1] = geoMrgCtx.mvFieldNeighbours[(candIdx0 << 1) + 1].mv;
+#if JVET_Y0065_GPM_INTRA
+        motionInfo[x].sliceIdx = sliceIdx;
+#else
         motionInfo[x].sliceIdx = biMv.sliceIdx;
+#endif
       }
+#if JVET_Y0065_GPM_INTRA
+      else if (tpmMask == 1 && isIntra1)
+      {
+        motionInfo[x].isInter = false;
+        motionInfo[x].interDir = MAX_UCHAR;
+        motionInfo[x].refIdx[0] = -1;
+        motionInfo[x].refIdx[1] = -1;
+        motionInfo[x].mv[0] = Mv();
+        motionInfo[x].mv[1] = Mv();
+        motionInfo[x].sliceIdx = sliceIdx;
+      }
+#endif
       else
       {
         motionInfo[x].isInter = true;
@@ -7719,12 +8085,127 @@ void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8
         motionInfo[x].refIdx[1] = geoMrgCtx.mvFieldNeighbours[(candIdx1 << 1) + 1].refIdx;
         motionInfo[x].mv[0] = geoMrgCtx.mvFieldNeighbours[candIdx1 << 1].mv;
         motionInfo[x].mv[1] = geoMrgCtx.mvFieldNeighbours[(candIdx1 << 1) + 1].mv;
+#if JVET_Y0065_GPM_INTRA
+        motionInfo[x].sliceIdx = sliceIdx;
+#else
         motionInfo[x].sliceIdx = biMv.sliceIdx;
+#endif
       }
     }
     motionInfo += mb.stride;
   }
 #if JVET_W0123_TIMD_FUSION
+#if JVET_Y0065_GPM_INTRA
+  if (pu.gpmIntraFlag)
+  {
+    const unsigned scale = 4 * std::max<int>(1, 4 * AMVP_DECIMATION_FACTOR / 4);
+    const unsigned mask = ~(scale - 1);
+    uint8_t* ii = ib.buf;
+    int geoIpm[3];
+    geoIpm[0] = isIntra0 ? pu.intraMPM[candIdx0 - GEO_MAX_NUM_UNI_CANDS] : -1;
+    geoIpm[1] = isIntra1 ? pu.intraMPM[candIdx1 - GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS] : -1;
+    geoIpm[2] = (isIntra0 && isIntra1) ? ((candIdx1 < candIdx0) ? geoIpm[1] : geoIpm[0]) : isIntra0 ? geoIpm[0] : geoIpm[1];
+
+    for (int y = 0; y < mb.height; y++)
+    {
+      lookUpY = (((4 * y + offsetY) << 1) + 5) * g_Dis[distanceY];
+      for (int x = 0; x < mb.width; x++)
+      {
+        motionIdx = (((4 * x + offsetX) << 1) + 5) * g_Dis[distanceX] + lookUpY;
+        tpmMask = motionIdx <= 0 ? (1 - isFlip) : isFlip;
+        uint8_t ipm;
+        if (geoIpm[tpmMask] >= 0)
+        {
+          ipm = (uint8_t)geoIpm[tpmMask];
+        }
+        else
+        {
+          MotionInfo tempMi = mb.at(x, y);
+          if (tempMi.interDir != 3)
+          {
+            CHECK( tempMi.interDir != 1 && tempMi.interDir != 2, "Uncorrect interDir" );
+            int list = tempMi.interDir-1;
+            Mv cMv = tempMi.mv[list];
+            int refIdx = tempMi.refIdx[list];
+
+            cMv.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+            Position PosY;
+            PosY.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv.getHor();
+            PosY.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv.getVer();
+            clipColPos(PosY.x, PosY.y, pu);
+            PosY.x = (PosY.x & mask);
+            PosY.y = (PosY.y & mask);
+            ipm = pu.cu->slice->getRefPic(RefPicList(list), refIdx)->cs->getIpmInfo(PosY);
+          }
+          else
+          {
+            Picture* pRefPic0 = pu.cu->slice->getRefPic(REF_PIC_LIST_0, tempMi.refIdx[0]);
+            Mv cMv0 = tempMi.mv[0];
+            cMv0.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+            Position PosY0;
+            PosY0.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv0.getHor();
+            PosY0.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv0.getVer();
+            clipColPos(PosY0.x, PosY0.y, pu);
+            PosY0.x = (PosY0.x & mask);
+            PosY0.y = (PosY0.y & mask);
+            MotionInfo mi0 = pRefPic0->cs->getMotionInfo(PosY0);
+            int ipm0 = pRefPic0->cs->getIpmInfo(PosY0);
+            int pocDiff0 = abs(pRefPic0->getPOC() - pu.cu->slice->getPOC());
+
+            Picture* pRefPic1 = pu.cu->slice->getRefPic(REF_PIC_LIST_1, tempMi.refIdx[1]);
+            Mv cMv1 = tempMi.mv[1];
+            cMv1.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+            Position PosY1;
+            PosY1.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv1.getHor();
+            PosY1.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv1.getVer();
+            clipColPos(PosY1.x, PosY1.y, pu);
+            PosY1.x = (PosY1.x & mask);
+            PosY1.y = (PosY1.y & mask);
+            MotionInfo mi1 = pRefPic1->cs->getMotionInfo(PosY1);
+            int ipm1 = pRefPic1->cs->getIpmInfo(PosY1);
+            int pocDiff1 = abs(pRefPic1->getPOC() - pu.cu->slice->getPOC());
+
+            if (!mi0.isInter && mi1.isInter)
+            {
+              ipm = ipm0;
+            }
+            else if (!mi1.isInter && mi0.isInter)
+            {
+              ipm = ipm1;
+            }
+            else if (ipm0 > DC_IDX && ipm1 <= DC_IDX)
+            {
+              ipm = ipm0;
+            }
+            else if (ipm0 <= DC_IDX && ipm1 > DC_IDX)
+            {
+              ipm = ipm1;
+            }
+            else if (pocDiff0 < pocDiff1)
+            {
+              ipm = ipm0;
+            }
+            else if (pocDiff1 < pocDiff0)
+            {
+              ipm = ipm1;
+            }
+            else if (pRefPic0->m_prevQP[0] > pRefPic1->m_prevQP[0])
+            {
+              ipm = ipm1;
+            }
+            else
+            {
+              ipm = ipm0;
+            }
+          }
+        }
+        ii[x] = ipm;
+      }
+      ii += ib.stride;
+    }
+  }
+  else
+#endif
   spanIpmInfoInter(pu, mb, ib);
 #endif
 }
@@ -7851,6 +8332,11 @@ void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx
 
   MotionBuf mb = pu.getMotionBuf();
 
+#if JVET_Y0065_GPM_INTRA
+  bool isIntra0 = mergeIdx0 >= GEO_MAX_NUM_UNI_CANDS;
+  bool isIntra1 = mergeIdx1 >= GEO_MAX_NUM_UNI_CANDS;
+  uint32_t sliceIdx = pu.cs->slice->getIndependentSliceIdx();
+#else
   MotionInfo biMv;
   biMv.isInter = true;
   biMv.sliceIdx = pu.cs->slice->getIndependentSliceIdx();
@@ -7887,6 +8373,7 @@ void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx
     biMv.refIdx[0] = -1;
     biMv.refIdx[1] = mergeCtx1->mvFieldNeighbours[(mergeIdx1 << 1) + 1].refIdx;
   }
+#endif
 
   int16_t angle = g_GeoParams[splitDir][0];
   int tpmMask = 0;
@@ -7914,6 +8401,19 @@ void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx
     for (int x = 0; x < mb.width; x++)
     {
       motionIdx = (((4 * x + offsetX) << 1) + 5) * g_Dis[distanceX] + lookUpY;
+#if JVET_Y0065_GPM_INTRA
+      tpmMask = motionIdx <= 0 ? (1 - isFlip) : isFlip;
+      if (tpmMask == 0 && isIntra0)
+      {
+        mb.at(x, y).isInter = false;
+        mb.at(x, y).interDir = MAX_UCHAR;
+        mb.at(x, y).refIdx[0] = -1;
+        mb.at(x, y).refIdx[1] = -1;
+        mb.at(x, y).mv[0] = Mv();
+        mb.at(x, y).mv[1] = Mv();
+        mb.at(x, y).sliceIdx = sliceIdx;
+      }
+#else
       tpmMask = abs(motionIdx) < 32 ? 2 : (motionIdx <= 0 ? (1 - isFlip) : isFlip);
       if (tpmMask == 2)
       {
@@ -7925,6 +8425,7 @@ void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx
         mb.at(x, y).mv[1] = biMv.mv[1];
         mb.at(x, y).sliceIdx = biMv.sliceIdx;
       }
+#endif
       else if (tpmMask == 0)
       {
         mb.at(x, y).isInter = true;
@@ -7933,8 +8434,24 @@ void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx
         mb.at(x, y).refIdx[1] = mergeCtx0->mvFieldNeighbours[(mergeIdx0 << 1) + 1].refIdx;
         mb.at(x, y).mv[0] = mergeCtx0->mvFieldNeighbours[mergeIdx0 << 1].mv + mvOffset0[0];
         mb.at(x, y).mv[1] = mergeCtx0->mvFieldNeighbours[(mergeIdx0 << 1) + 1].mv + mvOffset0[1];
+#if JVET_Y0065_GPM_INTRA
+        mb.at(x, y).sliceIdx = sliceIdx;
+#else
         mb.at(x, y).sliceIdx = biMv.sliceIdx;
+#endif
       }
+#if JVET_Y0065_GPM_INTRA
+      else if (tpmMask == 1 && isIntra1)
+      {
+        mb.at(x, y).isInter = false;
+        mb.at(x, y).interDir = MAX_UCHAR;
+        mb.at(x, y).refIdx[0] = -1;
+        mb.at(x, y).refIdx[1] = -1;
+        mb.at(x, y).mv[0] = Mv();
+        mb.at(x, y).mv[1] = Mv();
+        mb.at(x, y).sliceIdx = sliceIdx;
+      }
+#endif
       else
       {
         mb.at(x, y).isInter = true;
@@ -7943,13 +8460,128 @@ void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx
         mb.at(x, y).refIdx[1] = mergeCtx1->mvFieldNeighbours[(mergeIdx1 << 1) + 1].refIdx;
         mb.at(x, y).mv[0] = mergeCtx1->mvFieldNeighbours[mergeIdx1 << 1].mv + mvOffset1[0];
         mb.at(x, y).mv[1] = mergeCtx1->mvFieldNeighbours[(mergeIdx1 << 1) + 1].mv + mvOffset1[1];
+#if JVET_Y0065_GPM_INTRA
+        mb.at(x, y).sliceIdx = sliceIdx;
+#else
         mb.at(x, y).sliceIdx = biMv.sliceIdx;
+#endif
       }
     }
   }
 
 #if JVET_W0123_TIMD_FUSION
   IpmBuf ib = pu.getIpmBuf();
+#if JVET_Y0065_GPM_INTRA
+  if (pu.gpmIntraFlag)
+  {
+    const unsigned scale = 4 * std::max<int>(1, 4 * AMVP_DECIMATION_FACTOR / 4);
+    const unsigned mask = ~(scale - 1);
+    uint8_t* ii = ib.buf;
+    int geoIpm[3];
+    geoIpm[0] = isIntra0 ? pu.intraMPM[mergeIdx0 - GEO_MAX_NUM_UNI_CANDS] : -1;
+    geoIpm[1] = isIntra1 ? pu.intraMPM[mergeIdx1 - GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS] : -1;
+    geoIpm[2] = (isIntra0 && isIntra1) ? ((mergeIdx1 < mergeIdx0) ? geoIpm[1] : geoIpm[0]) : isIntra0 ? geoIpm[0] : geoIpm[1];
+
+    for (int y = 0; y < mb.height; y++)
+    {
+      lookUpY = (((4 * y + offsetY) << 1) + 5) * g_Dis[distanceY];
+      for (int x = 0; x < mb.width; x++)
+      {
+        motionIdx = (((4 * x + offsetX) << 1) + 5) * g_Dis[distanceX] + lookUpY;
+        tpmMask = motionIdx <= 0 ? (1 - isFlip) : isFlip;
+        uint8_t ipm;
+        if (geoIpm[tpmMask] >= 0)
+        {
+          ipm = (uint8_t)geoIpm[tpmMask];
+        }
+        else
+        {
+          MotionInfo tempMi = mb.at(x, y);
+          if (tempMi.interDir != 3)
+          {
+            CHECK( tempMi.interDir != 1 && tempMi.interDir != 2, "Uncorrect interDir" );
+            int list = tempMi.interDir-1;
+            Mv cMv = tempMi.mv[list];
+            int refIdx = tempMi.refIdx[list];
+
+            cMv.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+            Position PosY;
+            PosY.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv.getHor();
+            PosY.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv.getVer();
+            clipColPos(PosY.x, PosY.y, pu);
+            PosY.x = (PosY.x & mask);
+            PosY.y = (PosY.y & mask);
+            ipm = pu.cu->slice->getRefPic(RefPicList(list), refIdx)->cs->getIpmInfo(PosY);
+          }
+          else
+          {
+            Picture* pRefPic0 = pu.cu->slice->getRefPic(REF_PIC_LIST_0, tempMi.refIdx[0]);
+            Mv cMv0 = tempMi.mv[0];
+            cMv0.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+            Position PosY0;
+            PosY0.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv0.getHor();
+            PosY0.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv0.getVer();
+            clipColPos(PosY0.x, PosY0.y, pu);
+            PosY0.x = (PosY0.x & mask);
+            PosY0.y = (PosY0.y & mask);
+            MotionInfo mi0 = pRefPic0->cs->getMotionInfo(PosY0);
+            int ipm0 = pRefPic0->cs->getIpmInfo(PosY0);
+            int pocDiff0 = abs(pRefPic0->getPOC() - pu.cu->slice->getPOC());
+
+            Picture* pRefPic1 = pu.cu->slice->getRefPic(REF_PIC_LIST_1, tempMi.refIdx[1]);
+            Mv cMv1 = tempMi.mv[1];
+            cMv1.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+            Position PosY1;
+            PosY1.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv1.getHor();
+            PosY1.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv1.getVer();
+            clipColPos(PosY1.x, PosY1.y, pu);
+            PosY1.x = (PosY1.x & mask);
+            PosY1.y = (PosY1.y & mask);
+            MotionInfo mi1 = pRefPic1->cs->getMotionInfo(PosY1);
+            int ipm1 = pRefPic1->cs->getIpmInfo(PosY1);
+            int pocDiff1 = abs(pRefPic1->getPOC() - pu.cu->slice->getPOC());
+
+            if (!mi0.isInter && mi1.isInter)
+            {
+              ipm = ipm0;
+            }
+            else if (!mi1.isInter && mi0.isInter)
+            {
+              ipm = ipm1;
+            }
+            else if (ipm0 > DC_IDX && ipm1 <= DC_IDX)
+            {
+              ipm = ipm0;
+            }
+            else if (ipm0 <= DC_IDX && ipm1 > DC_IDX)
+            {
+              ipm = ipm1;
+            }
+            else if (pocDiff0 < pocDiff1)
+            {
+              ipm = ipm0;
+            }
+            else if (pocDiff1 < pocDiff0)
+            {
+              ipm = ipm1;
+            }
+            else if (pRefPic0->m_prevQP[0] > pRefPic1->m_prevQP[0])
+            {
+              ipm = ipm1;
+            }
+            else
+            {
+              ipm = ipm0;
+            }
+          }
+        }
+        ii[x] = ipm;
+      }
+      ii += ib.stride;
+    }
+  }
+  else
+#endif
   spanIpmInfoInter( pu, mb, ib );
 #endif
 }

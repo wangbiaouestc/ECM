@@ -149,6 +149,37 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
       {
       case MODE_INTER:
       case MODE_IBC:
+#if JVET_Y0065_GPM_INTRA
+#if ENABLE_DIMD && JVET_W0123_TIMD_FUSION
+        if ((cs.slice->getSPS()->getUseDimd() || cs.slice->getSPS()->getUseTimd()) && currCU.geoFlag && currCU.firstPU->gpmIntraFlag)
+#elif ENABLE_DIMD
+        if (cs.slice->getSPS()->getUseDimd() && currCU.geoFlag && currCU.firstPU->gpmIntraFlag)
+#elif JVET_W0123_TIMD_FUSION
+        if (cs.slice->getSPS()->getUseTimd() && currCU.geoFlag && currCU.firstPU->gpmIntraFlag)
+#endif
+        {
+          if ((int)(currCU.firstPU->geoMergeIdx0)-GEO_MAX_NUM_UNI_CANDS > 0 || (int)(currCU.firstPU->geoMergeIdx1)-GEO_MAX_NUM_UNI_CANDS > 0) // dimd/timd
+          {
+            const CompArea &area = currCU.Y();
+#if ENABLE_DIMD
+#if JVET_W0123_TIMD_FUSION
+            if (cs.slice->getSPS()->getUseDimd())
+#endif
+            {
+              IntraPrediction::deriveDimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+            }
+#endif
+#if JVET_W0123_TIMD_FUSION
+#if ENABLE_DIMD
+            if (cs.slice->getSPS()->getUseTimd())
+#endif
+            {
+              currCU.timdMode = m_pcIntraPred->deriveTimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+            }
+#endif
+          }
+        }
+#endif
         xReconInter( currCU );
         break;
       case MODE_PLT:
@@ -926,7 +957,11 @@ void DecCu::xReconInter(CodingUnit &cu)
   {
 #if JVET_W0097_GPM_MMVD_TM
 #if TM_MRG
+#if JVET_Y0065_GPM_INTRA
+    m_pcInterPred->motionCompensationGeo( cu, m_geoMrgCtx, m_geoTmMrgCtx0, m_geoTmMrgCtx1, m_pcIntraPred, (cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag()) ? &m_pcReshape->getFwdLUT() : nullptr );
+#else
     m_pcInterPred->motionCompensationGeo(cu, m_geoMrgCtx, m_geoTmMrgCtx0, m_geoTmMrgCtx1);
+#endif
     PU::spanGeoMMVDMotionInfo(*cu.firstPU, m_geoMrgCtx, m_geoTmMrgCtx0, m_geoTmMrgCtx1, cu.firstPU->geoSplitDir, cu.firstPU->geoMergeIdx0, cu.firstPU->geoMergeIdx1, cu.firstPU->geoTmFlag0, cu.firstPU->geoMMVDFlag0, cu.firstPU->geoMMVDIdx0, cu.firstPU->geoTmFlag1, cu.firstPU->geoMMVDFlag1, cu.firstPU->geoMMVDIdx1);
 #else
     m_pcInterPred->motionCompensationGeo(cu, m_geoMrgCtx);
@@ -1019,7 +1054,11 @@ void DecCu::xReconInter(CodingUnit &cu)
 #if ENABLE_OBMC
   cu.isobmcMC = true;
 #if JVET_X0090_CIIP_FIX
+#if JVET_Y0065_GPM_INTRA
+  if (!cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag)
+#else
   if (!cu.firstPU->ciipFlag)
+#endif
   {
     m_pcInterPred->subBlockOBMC(*cu.firstPU);
   }
@@ -1114,13 +1153,21 @@ void DecCu::xDecodeInterTU( TransformUnit & currTU, const ComponentID compID )
   ComponentID signPredCompID = bIsJccr ? (bJccrWithCr ? COMPONENT_Cr : COMPONENT_Cb): compID;
 
   bool reshapeChroma = currTU.cs->slice->getPicHeader()->getLmcsEnabledFlag() && isChroma(signPredCompID) && (TU::getCbf(currTU, signPredCompID) || currTU.jointCbCr) && currTU.cs->slice->getPicHeader()->getLmcsChromaResidualScaleFlag() && currTU.blocks[signPredCompID].width * currTU.blocks[signPredCompID].height > 4;
+#if JVET_Y0065_GPM_INTRA
+  if (currTU.cs->slice->getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma(compID) && !currTU.cu->firstPU->ciipFlag && !currTU.cu->firstPU->gpmIntraFlag && !CU::isIBC(*currTU.cu))
+#else
   if (currTU.cs->slice->getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma(compID) && !currTU.cu->firstPU->ciipFlag && !CU::isIBC(*currTU.cu))
+#endif
   {
     cs.picture->getRecoBuf(currTU.blocks[COMPONENT_Y]).copyFrom(cs.getPredBuf(currTU.blocks[COMPONENT_Y]));
     cs.getPredBuf(currTU.blocks[COMPONENT_Y]).rspSignal(m_pcReshape->getFwdLUT());
   }
   m_pcTrQuant->predCoeffSigns(currTU, compID, reshapeChroma);
+#if JVET_Y0065_GPM_INTRA
+  if (currTU.cs->slice->getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma(compID) && !currTU.cu->firstPU->ciipFlag && !currTU.cu->firstPU->gpmIntraFlag && !CU::isIBC(*currTU.cu))
+#else
   if (currTU.cs->slice->getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma(compID) && !currTU.cu->firstPU->ciipFlag && !CU::isIBC(*currTU.cu))
+#endif
   {
     cs.getPredBuf(currTU.blocks[COMPONENT_Y]).copyFrom(cs.picture->getRecoBuf(currTU.blocks[COMPONENT_Y]));
   }
@@ -1185,7 +1232,11 @@ void DecCu::xDecodeInterTU( TransformUnit & currTU, const ComponentID compID )
     ComponentID currCompID = (ComponentID) i;
     PelBuf compResiBuf = cs.getResiBuf(currTU.blocks[currCompID]);
 
+#if JVET_Y0065_GPM_INTRA
+    if( cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma( currCompID ) && !currTU.cu->firstPU->ciipFlag && !currTU.cu->firstPU->gpmIntraFlag && !CU::isIBC( *currTU.cu ) )
+#else
     if( cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma( currCompID ) && !currTU.cu->firstPU->ciipFlag && !CU::isIBC( *currTU.cu ) )
+#endif
     {
       PelBuf picRecoBuff = currTU.cs->picture->getRecoBuf( currTU.blocks[currCompID] );
       picRecoBuff.rspSignal( cs.getPredBuf( currTU.blocks[currCompID] ), m_pcReshape->getFwdLUT() );
@@ -1206,7 +1257,11 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
 #if SIGN_PREDICTION
     CodingStructure &cs = *cu.cs;
     cs.getRecoBuf(cu).copyClip(cs.getPredBuf(cu), cs.slice->clpRngs());
+#if JVET_Y0065_GPM_INTRA
+    if (cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
+#else
     if (cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !CU::isIBC(cu))
+#endif
     {
       cs.getRecoBuf(cu).get(COMPONENT_Y).rspSignal(m_pcReshape->getFwdLUT());
     }

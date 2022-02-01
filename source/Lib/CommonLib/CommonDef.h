@@ -765,7 +765,14 @@ static const int GEO_MAX_NUM_UNI_CANDS =                            15;
 #else
 static const int GEO_MAX_NUM_UNI_CANDS =                            6;
 #endif
+#if JVET_Y0065_GPM_INTRA
+static const int GEO_MAX_NUM_INTRA_CANDS =                          3;
+static const int GEO_NUM_INTRA_RDO_BUFFER =                         23;
+static const int GEO_NUM_RDO_BUFFER =                               GEO_MAX_NUM_UNI_CANDS + GEO_NUM_INTRA_RDO_BUFFER;
+static const int GEO_MAX_NUM_CANDS = (GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS) * ((GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS) - 1);
+#else
 static const int GEO_MAX_NUM_CANDS = GEO_MAX_NUM_UNI_CANDS * (GEO_MAX_NUM_UNI_CANDS - 1);
+#endif
 static const int GEO_MIN_CU_LOG2 =                                  3;
 static const int GEO_MAX_CU_LOG2 =                                  6;
 static const int GEO_MIN_CU_SIZE =               1 << GEO_MIN_CU_LOG2;

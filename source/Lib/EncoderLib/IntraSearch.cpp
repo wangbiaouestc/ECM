@@ -6437,14 +6437,22 @@ uint64_t IntraSearch::xFracModeBitsIntra(PredictionUnit &pu, const uint32_t &uiM
 {
   uint8_t orgMode = uiMode;
 
+#if JVET_Y0065_GPM_INTRA
+  if (!pu.ciipFlag && !pu.gpmIntraFlag)
+#else
   if (!pu.ciipFlag)
+#endif
   std::swap(orgMode, pu.intraDir[chType]);
 
   m_CABACEstimator->resetBits();
 
   if( isLuma( chType ) )
   {
+#if JVET_Y0065_GPM_INTRA
+    if (!pu.ciipFlag && !pu.gpmIntraFlag)
+#else
     if (!pu.ciipFlag)
+#endif
     {
       m_CABACEstimator->intra_luma_pred_mode(pu);
     }
@@ -6454,7 +6462,11 @@ uint64_t IntraSearch::xFracModeBitsIntra(PredictionUnit &pu, const uint32_t &uiM
     m_CABACEstimator->intra_chroma_pred_mode( pu );
   }
 
+#if JVET_Y0065_GPM_INTRA
+  if ( !pu.ciipFlag && !pu.gpmIntraFlag )
+#else
   if ( !pu.ciipFlag )
+#endif
   std::swap(orgMode, pu.intraDir[chType]);
 
   return m_CABACEstimator->getEstFracBits();
