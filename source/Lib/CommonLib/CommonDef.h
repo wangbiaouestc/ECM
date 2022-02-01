@@ -867,7 +867,11 @@ static const int SIGN_PRED_MAX_NUM      = 8;
 static const int SIGN_PRED_MAX_BS       = 128; ///< not configurable
 static const int SIGN_PRED_MAX_BS_INTRA = 32;
 static const int SIGN_PRED_MAX_BS_INTER = 128;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+static const int SIGN_PRED_FREQ_RANGE   = 32;///< not configurable
+#else
 static const int SIGN_PRED_FREQ_RANGE   = 4; ///< not configurable
+#endif
 static const int SIGN_PRED_SHIFT        = 8; ///< not configurable
 static const int SIGN_PRED_OFFSET       = 1 << ( SIGN_PRED_SHIFT - 1 ); ///< not configurable
 #endif

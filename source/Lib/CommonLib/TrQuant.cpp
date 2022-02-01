@@ -294,8 +294,15 @@ void TrQuant::init( const Quant* otherQuant,
 
 #if ENABLE_SIMD_SIGN_PREDICTION
   m_computeSAD = xComputeSAD;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  m_computeHypSampleInt8 = xComputeHypSampleInt8;
+  m_computeSynSample = xComputeSynSample;
 #endif
-
+#endif
+#if INTRA_TRANS_ENC_OPT
+  m_fwdLfnst = forwardLfnst;
+  m_invLfnst = inverseLfnst;
+#endif
 #if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT
 #ifdef TARGET_SIMD_X86
   initTrQuantX86();
@@ -321,8 +328,10 @@ void TrQuant::fwdLfnstNxN( int* src, int* dst, const uint32_t mode, const uint32
 #endif
 #endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
-  TCoeff           coef;
-  TCoeff*          out    = dst;
+#if !INTRA_TRANS_ENC_OPT 
+  TCoeff        coef;
+#endif
+  TCoeff*       out    = dst;
 #else
   int           coef;
   int*          out    = dst;
@@ -333,6 +342,9 @@ void TrQuant::fwdLfnstNxN( int* src, int* dst, const uint32_t mode, const uint32
   assert( index < 3 );
 #endif
 
+#if INTRA_TRANS_ENC_OPT
+  m_fwdLfnst(src, out, trMat, trSize, zeroOutSize);
+#else
   for( int j = 0; j < zeroOutSize; j++ )
   {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
@@ -349,7 +361,7 @@ void TrQuant::fwdLfnstNxN( int* src, int* dst, const uint32_t mode, const uint32
     *out++ = ( coef + 64 ) >> 7;
     trMat += trSize;
   }
-
+#endif
   ::memset( out, 0, ( trSize - zeroOutSize ) * sizeof( int ) );
 }
 
@@ -376,7 +388,9 @@ void TrQuant::invLfnstNxN( int* src, int* dst, const uint32_t mode, const uint32
 #endif
 #endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if !INTRA_TRANS_ENC_OPT 
   TCoeff          resi;
+#endif
   TCoeff*         out                   =  dst;
 #else
   int             resi;
@@ -388,7 +402,9 @@ void TrQuant::invLfnstNxN( int* src, int* dst, const uint32_t mode, const uint32
 #else
   assert( index < 3 );
 #endif
-
+#if INTRA_TRANS_ENC_OPT 
+  m_invLfnst(src, out, trMat, trSize, zeroOutSize, outputMinimum, outputMaximum);
+#else
   for( int j = 0; j < trSize; j++ )
   {
     resi = 0;
@@ -410,6 +426,7 @@ void TrQuant::invLfnstNxN( int* src, int* dst, const uint32_t mode, const uint32
 #endif
     trMat++;
   }
+#endif
 }
 
 uint32_t TrQuant::getLFNSTIntraMode( int wideAngPredMode )
@@ -1584,6 +1601,44 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     return;
   }
 
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  std::vector<Position> predSignsXY;
+  DepQuant::getPredictedSigns(tu, residCompID, predSignsXY, m_signsBuf, !tu.cs->pcv->isEncoder);
+  int32_t numPredSigns = (int32_t)predSignsXY.size();
+
+  if (!numPredSigns)
+  {
+    return;
+  }
+  auto setCoeffSign = [](CoeffBuf &buff, uint8_t* signBuf, std::vector<Position> &pos) -> void
+  {
+    for (int i = 0; i < pos.size(); ++i)
+    {
+      bool bit_value = signBuf[i];
+      TCoeff &coeff = buff.at(pos[i]);
+      coeff = std::abs(coeff) * (bit_value ? -1 : 1);
+    }
+  };
+  auto extractCoeffSign = [](CoeffBuf &buff, uint8_t* signBuf, std::vector<Position> &pos) -> void
+  {
+    for (int i = 0; i < pos.size(); ++i)
+    {
+      uint32_t coeffSign = buff.at(pos[i]) < 0 ? 1 : 0;
+      signBuf[i] = (uint8_t)coeffSign;
+    }
+  };
+  auto setCoeffSignPositive = [](CoeffBuf &buff, std::vector<Position> &pos) -> void
+  {
+    for (int i = 0; i < pos.size(); ++i)
+    {
+      TCoeff &coeff = buff.at(pos[i]);
+      if (coeff < 0)
+      {
+        coeff = -coeff;
+      }
+    }
+  };
+#else
   auto setCoeffSign = [](CoeffBuf &buff, uint32_t signMask, std::vector<Position> &pos) -> void
   {
     for( int i = 0, j = (int)pos.size() - 1; i < pos.size(); ++i, j-- )
@@ -1602,6 +1657,7 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
       signMask |= coeffSign << j;
     }
   };
+#endif
 
   auto createTemplate = [this,tu](ComponentID comp, uint32_t width, uint32_t height, uint32_t mtsIdx) -> void
   {
@@ -1611,16 +1667,31 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     CoeffBuf coeff(memCoeff, width, height);
     PelBuf   resi(memTmpResid, width, height);
     coeff.fill(0);
-
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    int h = (height > SIGN_PRED_FREQ_RANGE) ? SIGN_PRED_FREQ_RANGE : height;
+    int w = (width > SIGN_PRED_FREQ_RANGE) ? SIGN_PRED_FREQ_RANGE : width;
+    int spArea = tu.cs->sps->getSignPredArea();
+    int signPredWidth = std::min((int)width, spArea);
+    int signPredHeight = std::min((int)height, spArea);
+    int8_t  *pTemplate = (int8_t *)xMalloc(int8_t, (width + height - 1) * h*w);
+    AreaBuf<int8_t> templateBuf(pTemplate, (width + height - 1), h*w);
+#else
     int8_t  *pTemplate = (int8_t *)xMalloc(int8_t, (width + height - 1) * SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE);
     AreaBuf<int8_t> templateBuf(pTemplate, (width + height - 1), SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE);
-
+#endif
     Position prev(0,0);
     int8_t *templ = templateBuf.buf;
-
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    for (int j = 0; j < signPredHeight*signPredWidth; ++j)
+    {
+      Position curr(j%signPredWidth, j / signPredWidth);
+      int idx = curr.y * w + curr.x;
+      templ = templateBuf.buf + templateBuf.stride * idx;
+#else
     for( int j = 0; j < SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE; ++j)
     {
       Position curr(j%SIGN_PRED_FREQ_RANGE, j/SIGN_PRED_FREQ_RANGE);
+#endif
       coeff.at(prev) = 0;
       coeff.at(curr) = 1 << SIGN_PRED_SHIFT;
 
@@ -1640,8 +1711,9 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
       {
         templ[i + height - 1] = (int8_t)pelResi[i];
       }
-
+#if !JVET_Y0141_SIGN_PRED_IMPROVE
       templ += templateBuf.stride;
+#endif
       prev = curr;
     }
 
@@ -1653,7 +1725,51 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     xFree(memTmpResid);
   };
 
-  
+#if JVET_Y0141_SIGN_PRED_IMPROVE  
+  auto createTemplateLFNST = [this, tu](ComponentID comp, uint32_t width, uint32_t height, uint32_t lfnstIdx) -> void
+  {
+    Pel      *memTmpResid = (Pel *)xMalloc(Pel, width*height);
+    CoeffBuf coeff(m_tempCoeff, width, height);
+    PelBuf   resi(memTmpResid, width, height);
+    int signPredHeight = 4;
+    int signPredWidth = 4;
+    int8_t  *pTemplate = (int8_t *)xMalloc(int8_t, (width + height - 1) * signPredHeight*signPredWidth);
+    AreaBuf<int8_t> templateBuf(pTemplate, (width + height - 1), signPredHeight*signPredWidth);
+    int8_t *templ = templateBuf.buf;
+    for (int j = 0; j < signPredHeight*signPredWidth; ++j)
+    {
+      coeff.fill(0);
+      Position curr((j%signPredWidth), (j / signPredWidth));
+      coeff.at(curr) = 1 << SIGN_PRED_SHIFT;
+
+      xInvLfnst(tu, comp);
+      xIT(tu, comp, coeff, resi);
+
+      Pel* pelResi = resi.bufAt(0, height - 1);
+
+      for (uint32_t i = 0; i < height; i++)
+      {
+        templ[i] = (int8_t)(*pelResi);
+        pelResi -= resi.stride;
+      }
+
+      pelResi = resi.buf;
+
+      for (uint32_t i = 0; i < width; i++)
+      {
+        templ[i + height - 1] = (int8_t)pelResi[i];
+      }
+
+      templ += templateBuf.stride;
+    }
+
+    int log2Width = floorLog2(width);
+    int log2Height = floorLog2(height);
+    g_resiBorderTemplateLFNST[log2Width - 2][log2Height - 2][lfnstIdx] = templateBuf.buf;
+
+    xFree(memTmpResid);
+  };
+#endif
 
   const QpParam cQP( tu, residCompID );
   CodingStructure &cs = *tu.cs;
@@ -1668,6 +1784,34 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   const uint32_t     uiHeight = tu.blocks[residCompID].height;
   PelBuf     bufResiTemplate(predResiTemplate, uiWidth + uiHeight - 1, 1);
   PelBuf     bufResiTemplateReshape(predResiTemplateReshape, uiWidth + uiHeight - 1, 1);
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  int log2Width = floorLog2(uiWidth);
+  int log2Height = floorLog2(uiHeight);
+  int actualTrIdx = 0, actualLfnstIdx = 0;
+  bool lfnstEnabled = tu.checkLFNSTApplied(residCompID);
+  if (lfnstEnabled)
+  {
+    actualLfnstIdx = getLfnstIdx(tu, residCompID);
+    if (!g_resiBorderTemplateLFNST[log2Width - 2][log2Height - 2][actualLfnstIdx])
+    {
+      createTemplateLFNST(residCompID, uiWidth, uiHeight, actualLfnstIdx);
+    }
+  }
+  else
+  {
+    int trHor, trVer;
+    getTrTypes(tu, residCompID, trHor, trVer);
+#if JVET_W0103_INTRA_MTS
+    actualTrIdx = trHor * NUM_TRANS_TYPE + trVer;
+#else
+    actualTrIdx = trHor * 3 + trVer;
+#endif
+    if (!g_resiBorderTemplate[log2Width - 2][log2Height - 2][actualTrIdx])
+    {
+      createTemplate(residCompID, uiWidth, uiHeight, actualTrIdx);
+    }
+  }
+#else
   int trHor, trVer;
   getTrTypes(tu, residCompID, trHor, trVer);
 #if JVET_W0103_INTRA_MTS
@@ -1681,9 +1825,19 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   {
     createTemplate(residCompID, uiWidth, uiHeight, actualTrIdx);
   }
-  AreaBuf<const int8_t> templateNormalizedBuf( g_resiBorderTemplate[log2Width-2][log2Height-2][actualTrIdx], uiWidth+uiHeight-1, SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE);
-  PelBuf templateBuf(m_signPredTemplate, uiWidth+uiHeight-1, SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE);
-
+#endif
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  const uint32_t spSize = (lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea());
+  const uint32_t signPredWidth = std::min(uiWidth, spSize);
+  const uint32_t signPredHeight = std::min(uiHeight, spSize);
+  const uint32_t w = std::min(uiWidth, (uint32_t)SIGN_PRED_FREQ_RANGE);
+  const uint32_t h = std::min(uiHeight, (uint32_t)SIGN_PRED_FREQ_RANGE);
+  AreaBuf<const int8_t>   templateNormalizedBuf = (lfnstEnabled ? AreaBuf<const int8_t>() : AreaBuf<const int8_t>(g_resiBorderTemplate[log2Width - 2][log2Height - 2][actualTrIdx], uiWidth + uiHeight - 1, w*h));
+  AreaBuf<const int8_t>   templateLfnstNormalizedBuf = (lfnstEnabled ? AreaBuf<const int8_t>(g_resiBorderTemplateLFNST[log2Width - 2][log2Height - 2][actualLfnstIdx], uiWidth + uiHeight - 1, signPredWidth*signPredHeight) : AreaBuf<const int8_t>());
+  PelBuf templateBuf(m_signPredTemplate, uiWidth + uiHeight - 1, signPredWidth*signPredHeight);
+#else
+  AreaBuf<const int8_t> templateNormalizedBuf(g_resiBorderTemplate[log2Width - 2][log2Height - 2][actualTrIdx], uiWidth + uiHeight - 1, SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE);
+  PelBuf templateBuf(m_signPredTemplate, uiWidth + uiHeight - 1, SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE);
   std::vector<Position> predSignsXY;
   DepQuant::getPredictedSigns( tu, residCompID, predSignsXY );
   int32_t numPredSigns = (int32_t)predSignsXY.size();
@@ -1694,6 +1848,7 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   }
 
   uint32_t bufferSigns;
+#endif
   CoeffBuf bufTmpQuant = CoeffBuf(m_tempCoeff, tu.blocks[residCompID]);
   PelBuf   piResi(m_tempSignPredResid, uiWidth, uiHeight);
   PelBuf   piResiCr(m_tempSignPredResid + uiWidth*uiHeight, uiWidth, uiHeight);
@@ -1701,13 +1856,41 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   CoeffBuf quantedCoeffBuff = tu.getCoeffs(residCompID);
   CoeffBuf bufSigns         = tu.getCoeffSigns(residCompID);
 
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  extractCoeffSign(quantedCoeffBuff, m_signsBuf, predSignsXY);
+  setCoeffSignPositive(quantedCoeffBuff, predSignsXY);
+#else
   extractCoeffSign(quantedCoeffBuff, bufferSigns, predSignsXY);
   setCoeffSign(quantedCoeffBuff, 0, predSignsXY);
+#endif
 
   xDeQuant( tu, bufTmpQuant, residCompID, cQP );
 
-  setCoeffSign(quantedCoeffBuff, bufferSigns, predSignsXY);
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  setCoeffSign(quantedCoeffBuff, m_signsBuf, predSignsXY);
+  TCoeff *tmpQuant = bufTmpQuant.bufAt( 0, 0 );
+  int tmpQuantStride = bufTmpQuant.stride;
+  for( auto xy : predSignsXY )
+  {
+    int pos = xy.y * signPredWidth + xy.x;
+    Pel *templ = templateBuf.bufAt( 0, pos );
+    TCoeff temp = tmpQuant[xy.y * tmpQuantStride + xy.x];
+    CHECK(temp <= 0, "coefficient value should be positive");
 
+    if (lfnstEnabled)
+    {
+      const int8_t *templNorm = templateLfnstNormalizedBuf.bufAt(0, pos);
+      m_computeHypSampleInt8(temp, templNorm, templ, uiWidth, uiHeight);
+    }
+    else
+    {
+      int idx = xy.y * w + xy.x;
+      const int8_t *templNorm = templateNormalizedBuf.bufAt(0, idx);
+      m_computeHypSampleInt8(temp, templNorm, templ, uiWidth, uiHeight);
+    }
+  }
+#else
+  setCoeffSign(quantedCoeffBuff, bufferSigns, predSignsXY);
   TCoeff *tmpQuant = bufTmpQuant.bufAt( 0, 0 );
   int tmpQuantStride = bufTmpQuant.stride;
 
@@ -1731,7 +1914,13 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
       std::memset( templ, 0, sizeof( *templ ) * ( uiWidth + uiHeight - 1 ) );
     }
   }
-
+#endif
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  if (lfnstEnabled)
+  {
+    xInvLfnst(tu, residCompID);
+  }
+#endif
   if( bJccrWithCr )
   {
     xIT( tu, COMPONENT_Cr, bufTmpQuant, piResiCr );
@@ -1755,7 +1944,16 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   }
 
   Pel *resiTemplate = bufResiTemplate.buf + uiHeight - 1;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  memcpy(resiTemplate, pelResi, uiWidth * sizeof(Pel));
 
+  pelResi += resiStride;
+  for (int i = 1; i < uiHeight; i++)
+  {
+    resiTemplate[-i] = pelResi[0];
+    pelResi += resiStride;
+  }
+#else
   for( int i = 1; i < uiWidth; i++ )
   {
     resiTemplate[i] += pelResi[i];
@@ -1766,7 +1964,7 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     resiTemplate[-i] += pelResi[0];
     pelResi += resiStride;
   }
-
+#endif
   int signPrev = 0;
 
   for (uint32_t idx = 0; idx < (1 << numPredSigns); idx++)
@@ -1791,13 +1989,21 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
 
       bool signModifyTo = (signCurr >> uiBit) & 0x1;
       int  predSignIdx = numPredSigns - uiBit - 1;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+      int pos_idx = predSignsXY[predSignIdx].y * signPredWidth + predSignsXY[predSignIdx].x;
+#else
       int pos_idx = predSignsXY[predSignIdx].y * SIGN_PRED_FREQ_RANGE + predSignsXY[predSignIdx].x;
+#endif
       Pel *templ = templateBuf.bufAt(0, pos_idx);
 
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+      m_computeSynSample(templ, bufResiTemplate.buf, uiWidth, uiHeight, signModifyTo);
+#else
       for (uint32_t i = 0; i < uiHeight + uiWidth - 1; i++)
       {
         bufResiTemplate.buf[i] += templ[i] * (signModifyTo ? -2 : 2);
       }
+#endif
     }
 
     if(reshapeChroma)
@@ -1915,6 +2121,123 @@ inline uint32_t TrQuant::xComputeSAD( const Pel* ref, const Pel* cur, const int 
   }
 
   return dist;
+}
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+inline uint32_t TrQuant::xComputeHypSampleInt8(const int dequant, const int8_t* templateNormalizedBuf, Pel* templ, const uint32_t uiWidth, const uint32_t uiHeight)
+{
+  uint32_t energy = 0;
+  for (int j = 0; j < uiWidth + uiHeight - 1; ++j)
+  {
+    templ[j] = (dequant * templateNormalizedBuf[j] + SIGN_PRED_OFFSET) >> SIGN_PRED_SHIFT;
+  }
+
+  return energy;
+}
+inline void TrQuant::xComputeSynSample(const Pel* templ, Pel* resiBuf, const uint32_t uiWidth, const uint32_t uiHeight, const bool signModifyTo)
+{
+  for (uint32_t i = 0; i < uiHeight + uiWidth - 1; i++)
+  {
+    resiBuf[i] += templ[i] * (signModifyTo ? -2 : 2);
+  }
+}
+#endif
+#endif
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
+{
+  const CompArea& area = tu.blocks[compID];
+  const uint32_t  lfnstIdx = tu.cu->lfnstIdx;
+  uint32_t intraMode = PU::getFinalIntraMode(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID));
+#if JVET_W0123_TIMD_FUSION
+  if (compID != COMPONENT_Y && PU::isLMCMode(tu.cs->getPU(area.pos(), toChannelType(compID))->intraDir[toChannelType(compID)]))
+#else
+  if (PU::isLMCMode(tu.cs->getPU(area.pos(), toChannelType(compID))->intraDir[toChannelType(compID)]))
+#endif
+  {
+    intraMode = PU::getCoLocatedIntraLumaMode(*tu.cs->getPU(area.pos(), toChannelType(compID)));
+  }
+  if (PU::isMIP(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
+  {
+    intraMode = PLANAR_IDX;
+  }
+#if JVET_V0130_INTRA_TMP
+  if (PU::isTmp(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
+  {
+    intraMode = PLANAR_IDX;
+  }
+#endif
+#if JVET_W0123_TIMD_FUSION
+  if (tu.cu->timd && compID == COMPONENT_Y)
+  {
+    intraMode = MAP131TO67(intraMode);
+  }
+#endif
+
+  CHECK(intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode");
+#if JVET_W0119_LFNST_EXTENSION || EXTENDED_LFNST
+  CHECK(!(lfnstIdx >= 1 && lfnstIdx <= 3), "invalid lfnst idx");
+#else
+  CHECK((lfnstIdx != 1) && (lfnstIdx != 2), "invalid lfnst idx");
+#endif
+  intraMode = getLFNSTIntraMode(PU::getWideAngle(tu, intraMode, compID));
+  bool transposeFlag = getTransposeFlag(intraMode);
+  int mode = g_lfnstLut[intraMode];
+  int index = lfnstIdx - 1;
+#if JVET_W0119_LFNST_EXTENSION || EXTENDED_LFNST
+  int result = (transposeFlag * 105) + (index * 35) + mode;
+  CHECK(!((result >= 0) && (result <= 209)), "invalid index output");
+#else
+  int result = (transposeFlag << 3) + (index << 2) + mode;
+  CHECK(!((result >= 0) && (result <= 15)), "invalid index output");
+#endif
+
+  return result;
+}
+#endif
+#if INTRA_TRANS_ENC_OPT
+void TrQuant::forwardLfnst(TCoeff* src, TCoeff*& dst, const int8_t*& trMat, const int trSize, const int zeroOutSize)
+{
+  for (int j = 0; j < zeroOutSize; j++)
+  {
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+    TCoeff*          srcPtr = src;
+#else
+    int*          srcPtr = src;
+#endif
+    const int8_t* trMatTmp = trMat;
+    TCoeff coef = 0;
+    for (int i = 0; i < trSize; i++)
+    {
+      coef += *srcPtr++ * *trMatTmp++;
+    }
+    *dst++ = (coef + 64) >> 7;
+    trMat += trSize;
+  }
+}
+
+void TrQuant::inverseLfnst(TCoeff* src, TCoeff*  dst, const int8_t*  trMat, const int trSize, const int zeroOutSize, const TCoeff outputMinimum, const TCoeff outputMaximum)
+{
+  for (int j = 0; j < trSize; j++)
+  {
+    TCoeff resi = 0;
+    const int8_t* trMatTmp = trMat;
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+    TCoeff*       srcPtr = src;
+#else
+    int*          srcPtr = src;
+#endif
+    for (int i = 0; i < zeroOutSize; i++)
+    {
+      resi += *srcPtr++ * *trMatTmp;
+      trMatTmp += trSize;
+    }
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+    *dst++ = Clip3<TCoeff>(outputMinimum, outputMaximum, (resi + 64) >> 7);
+#else
+    *dst++ = Clip3(outputMinimum, outputMaximum, (int)(resi + 64) >> 7);
+#endif
+    trMat++;
+  }
 }
 #endif
 #endif

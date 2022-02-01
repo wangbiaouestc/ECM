@@ -1642,20 +1642,27 @@ const CtxSet ContextSetCfg::CcSaoControlIdc = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::LFNSTIdx = ContextSetCfg::addCtxSet
 ({
-#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
-	{ 58, 37, 42, 35 },
-	{ 43, 45, 42, 35 },
-	{ 28, 43, 42, 27 },
-	{  9,  9,  9, 10 },
-	{  9,  9,  6, 13 },
-	{  9, 10,  9, 10 }
+#if INTRA_TRANS_ENC_OPT
+  { 51, CNU,  50,  35, },
+  { 36, CNU,  43,  35, },
+  { CNU,  51,  43,  42, },
+  { 10, DWS,   8,  13, },
+  { 10, DWS,   6,  13, },
+  { DWS,  10,   9,  10, }
+#elif EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
+  { 58, 37, 42, 35 },
+  { 43, 45, 42, 35 },
+  { 28, 43, 42, 27 },
+  {  9,  9,  9, 10 },
+  {  9,  9,  6, 13 },
+  {  9, 10,  9, 10 }
 #else
-	{ 58, 37, 42 },
-	{ 43, 45, 42 },
-	{ 28, 43, 42 },
-	{  9,  9,  9 },
-	{  9,  9,  6 },
-	{  9, 10,  9 }
+  { 58, 37, 42 },
+  { 43, 45, 42 },
+  { 28, 43, 42 },
+  {  9,  9,  9 },
+  {  9,  9,  6 },
+  {  9, 10,  9 }
 #endif
 });
 
@@ -1718,7 +1725,19 @@ const CtxSet ContextSetCfg::TransformSkipFlag = ContextSetCfg::addCtxSet
 	{ 1,  5 },
 	{ 2,  5 }
 });
+
 #if JVET_W0103_INTRA_MTS
+#if INTRA_TRANS_ENC_OPT
+const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
+({
+  { 38,  42,  27,  45, },
+  { 31,  27,  27,  38, },
+  { 45,  28,  28,  37, },
+  { 8,   8,   9,   8, },
+  { 8,   8,   9,   8, },
+  { 9,   9,  10,   8, }
+});
+#else
 const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
 ({
   { 45, 35, 20, 45, },
@@ -1728,6 +1747,7 @@ const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
   { 8,  10, 10, 8,  },
   { 9,  10, 10, 8,  }
   });
+#endif
 #else
 const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
 ({
@@ -1739,6 +1759,7 @@ const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
 	{ 9,  1,  9,  0 }
 });
 #endif
+
 const CtxSet ContextSetCfg::ISPMode = ContextSetCfg::addCtxSet
 ({
 #if JVET_W0123_TIMD_FUSION
@@ -1811,27 +1832,46 @@ const CtxSet ContextSetCfg::ChromaQpAdjFlag = ContextSetCfg::addCtxSet
 #if ENABLE_DIMD
 const CtxSet ContextSetCfg::DimdFlag = ContextSetCfg::addCtxSet
 ({
-	{ 48, 56, 56 },
-	{ 41, 49, 49 },
-	{ 33, 49, 49 },
-	{ 5,  1,  1 },
-	{ 5,  1,  1 },
-	{ 2,  1,  1 }
-});
-#endif
-
-#if JVET_W0123_TIMD_FUSION
-const CtxSet ContextSetCfg::TimdFlag = ContextSetCfg::addCtxSet
-({
+#if INTRA_TRANS_ENC_OPT
+  { 48, CNU, CNU, },
+  { 48, CNU, CNU, },
+  { 33, CNU, CNU, },
+  { 6, DWS, DWS, },
+  { 6, DWS, DWS, },
+  { 3, DWS, DWS, }
+#else
   { 48, 56, 56 },
   { 41, 49, 49 },
   { 33, 49, 49 },
   { 5,  1,  1 },
   { 5,  1,  1 },
   { 2,  1,  1 }
+#endif
 });
 #endif
 
+
+#if JVET_W0123_TIMD_FUSION
+const CtxSet ContextSetCfg::TimdFlag = ContextSetCfg::addCtxSet
+({
+#if INTRA_TRANS_ENC_OPT
+  { 41,  49,  49, },
+  { 34,  34,  34, },
+  { 34,  42,  50, },
+  { 6,   6,   5, },
+  { 7,   6,   5, },
+  { 6,   5,   2, }
+#else
+  { 48, 56, 56 },
+  { 41, 49, 49 },
+  { 33, 49, 49 },
+  { 5,  1,  1 },
+  { 5,  1,  1 },
+  { 2,  1,  1 }
+#endif
+});
+
+#endif
 #if ENABLE_OBMC 
 const CtxSet ContextSetCfg::ObmcFlag = ContextSetCfg::addCtxSet
 ({
@@ -2015,6 +2055,26 @@ const CtxSet ContextSetCfg::TsResidualSign = ContextSetCfg::addCtxSet
 #if SIGN_PREDICTION
 const CtxSet ContextSetCfg::signPred[2] = 
 {
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  ContextSetCfg::addCtxSet
+  ( {
+    { 34,  34,  19,  26, },
+    { 34,  34,  34,  26, },
+    { 34,  34,  34,  26, },
+    { 13,  13,  13,  10, },
+    { 13,  13,  13,  10, },
+    { 13,  10,  10,  10, }
+    } ),
+  ContextSetCfg::addCtxSet
+  ( {
+    { 34,  34,  19,  26, },
+    { 34,  41,  34,  41, },
+    { 34,  34, CNU, CNU, },
+    { 13,  13,   9,   8, },
+    { 13,  13,  10,  10, },
+    { 13,  13, DWS, DWS, }
+    } )
+#else
   ContextSetCfg::addCtxSet
   ( {
     { 34, 34, 34, 34 },
@@ -2034,8 +2094,10 @@ const CtxSet ContextSetCfg::signPred[2] =
     {  9,  9,  9,  9 },
     {  9,  9,  9,  9 }
     } )
+#endif
 };
 #endif
+
 #else
 const CtxSet ContextSetCfg::SplitFlag = ContextSetCfg::addCtxSet
 ({

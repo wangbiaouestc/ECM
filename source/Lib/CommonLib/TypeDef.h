@@ -179,8 +179,11 @@
 #define EXTENDED_LFNST                                    1 // Extended LFNST
 #endif
 #define SIGN_PREDICTION                                   1 // transform coefficients sign prediction
-
+#if SIGN_PREDICTION
+#define JVET_Y0141_SIGN_PRED_IMPROVE                      1  //JVET-Y0141 test3: sign prediction improvement                          
+#endif
 #define JVET_W0103_INTRA_MTS                              1 // JVET W0103: Extended Intra MTS
+                   
 
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision
@@ -195,6 +198,9 @@
 #define JVET_X0071_LONGER_CCALF                           1 // JVET-X0071/JVET-X0045: Longer filter for CCALF
 #define JVET_X0071_ALF_BAND_CLASSIFIER                    1 // JVET-X0071/JVET-X0070: Alternative band classifier for ALF
 #define JVET_Y0106_CCSAO_EDGE_CLASSIFIER                  1 // JVET-Y0106: Edge based classifier for CCSAO
+
+//encoder optimization
+#define INTRA_TRANS_ENC_OPT                               1 //software optimization introduced by JVET-Y0141,including TIMD/DIMD/MTS/LFNS encoder fast algorithm, SIMD implementation and CM initial value retraining 
 
 // SIMD optimizations
 #if IF_12TAP

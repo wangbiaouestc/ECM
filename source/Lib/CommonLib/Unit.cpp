@@ -1012,7 +1012,10 @@ TransformUnit::TransformUnit(const UnitArea& unit) : UnitArea(unit), cu(nullptr)
   {
     m_coeffs[i] = nullptr;
 #if SIGN_PREDICTION
-    m_coeff_signs[i] = nullptr;
+    m_coeffSigns[i] = nullptr;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    m_coeffSignsIdx[i] = nullptr;
+#endif
 #endif
 #if !REMOVE_PCM
     m_pcmbuf[i] = nullptr;
@@ -1036,7 +1039,10 @@ TransformUnit::TransformUnit(const ChromaFormat _chromaFormat, const Area &_area
   {
     m_coeffs[i] = nullptr;
 #if SIGN_PREDICTION
-    m_coeff_signs[i] = nullptr;
+    m_coeffSigns[i] = nullptr;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    m_coeffSignsIdx[i] = nullptr;
+#endif
 #endif
 #if !REMOVE_PCM
     m_pcmbuf[i] = nullptr;
@@ -1068,13 +1074,21 @@ void TransformUnit::initData()
 }
 #if REMOVE_PCM
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, unsigned **signsScanIdx, Pel **pltIdx, bool **runType)
+#else
 void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, Pel **pltIdx, bool **runType)
+#endif
 #else
 void TransformUnit::init(TCoeff **coeffs, Pel **pltIdx, bool **runType)
 #endif
 #else
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, unsigned **signsScanIdx, Pel **pcmbuf, bool **runType)
+#else
 void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, Pel **pcmbuf, bool **runType)
+#endif
 #else
 void TransformUnit::init(TCoeff **coeffs, Pel **pcmbuf, bool **runType)
 #endif
@@ -1086,7 +1100,10 @@ void TransformUnit::init(TCoeff **coeffs, Pel **pcmbuf, bool **runType)
   {
     m_coeffs[i] = coeffs[i];
 #if SIGN_PREDICTION
-    m_coeff_signs[i] = signs[i];
+    m_coeffSigns[i] = signs[i];
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    m_coeffSignsIdx[i] = signsScanIdx[i];
+#endif
 #endif
 #if !REMOVE_PCM
     m_pcmbuf[i] = pcmbuf[i];
@@ -1116,7 +1133,10 @@ TransformUnit& TransformUnit::operator=(const TransformUnit& other)
 
     if (m_coeffs[i] && other.m_coeffs[i] && m_coeffs[i] != other.m_coeffs[i]) memcpy(m_coeffs[i], other.m_coeffs[i], sizeof(TCoeff) * area);
 #if SIGN_PREDICTION
-    if (m_coeff_signs[i] && other.m_coeff_signs[i] && m_coeff_signs[i] != other.m_coeff_signs[i]) memcpy(m_coeff_signs[i], other.m_coeff_signs[i], sizeof(TCoeff) * area);
+    if (m_coeffSigns[i] && other.m_coeffSigns[i] && m_coeffSigns[i] != other.m_coeffSigns[i]) memcpy(m_coeffSigns[i], other.m_coeffSigns[i], sizeof(TCoeff) * area);
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    if (m_coeffSignsIdx[i] && other.m_coeffSignsIdx[i] && m_coeffSignsIdx[i] != other.m_coeffSignsIdx[i]) memcpy(m_coeffSignsIdx[i], other.m_coeffSignsIdx[i], sizeof(unsigned) * area);
+#endif
 #endif
 #if !REMOVE_PCM
     if (m_pcmbuf[i] && other.m_pcmbuf[i] && m_pcmbuf[i] != other.m_pcmbuf[i]) memcpy(m_pcmbuf[i], other.m_pcmbuf[i], sizeof(Pel   ) * area);
@@ -1147,7 +1167,10 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
 
   if (m_coeffs[i] && other.m_coeffs[i] && m_coeffs[i] != other.m_coeffs[i]) memcpy(m_coeffs[i], other.m_coeffs[i], sizeof(TCoeff) * area);
 #if SIGN_PREDICTION
-  if (m_coeff_signs[i] && other.m_coeff_signs[i] && m_coeff_signs[i] != other.m_coeff_signs[i]) memcpy(m_coeff_signs[i], other.m_coeff_signs[i], sizeof(TCoeff) * area);
+  if (m_coeffSigns[i] && other.m_coeffSigns[i] && m_coeffSigns[i] != other.m_coeffSigns[i]) memcpy(m_coeffSigns[i], other.m_coeffSigns[i], sizeof(TCoeff) * area);
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  if (m_coeffSignsIdx[i] && other.m_coeffSignsIdx[i] && m_coeffSignsIdx[i] != other.m_coeffSignsIdx[i]) memcpy(m_coeffSignsIdx[i], other.m_coeffSignsIdx[i], sizeof(unsigned) * area);
+#endif
 #endif
 #if !REMOVE_PCM
   if (m_pcmbuf[i] && other.m_pcmbuf[i] && m_pcmbuf[i] != other.m_pcmbuf[i]) memcpy(m_pcmbuf[i], other.m_pcmbuf[i], sizeof(Pel   ) * area);
@@ -1171,8 +1194,12 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
 const CCoeffBuf TransformUnit::getCoeffs(const ComponentID id) const { return CCoeffBuf(m_coeffs[id], blocks[id]); }
 
 #if SIGN_PREDICTION
-       CoeffBuf TransformUnit::getCoeffSigns(const ComponentID id)       { return  CoeffBuf(m_coeff_signs[id], blocks[id]); }
-const CCoeffBuf TransformUnit::getCoeffSigns(const ComponentID id) const { return CCoeffBuf(m_coeff_signs[id], blocks[id]); }
+       CoeffBuf TransformUnit::getCoeffSigns(const ComponentID id)       { return  CoeffBuf(m_coeffSigns[id], blocks[id]); }
+const CCoeffBuf TransformUnit::getCoeffSigns(const ComponentID id) const { return CCoeffBuf(m_coeffSigns[id], blocks[id]); }
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+      IdxBuf    TransformUnit::getCoeffSignsScanIdx(const ComponentID id) { return  IdxBuf(m_coeffSignsIdx[id], blocks[id]); }
+const CIdxBuf   TransformUnit::getCoeffSignsScanIdx(const ComponentID id) const { return CIdxBuf(m_coeffSignsIdx[id], blocks[id]); }
+#endif
 #endif
 
 #if REMOVE_PCM
@@ -1230,6 +1257,17 @@ int TransformUnit::getTbAreaAfterCoefZeroOut(ComponentID compID) const
   tbArea = tbZeroOutWidth * tbZeroOutHeight;
   return tbArea;
 }
-
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+bool TransformUnit::checkLFNSTApplied(ComponentID compID)
+{
+  const uint32_t  lfnstIdx = this->cu->lfnstIdx;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+  bool  lfnstApplied = lfnstIdx && this->mtsIdx[compID] != MTS_SKIP && (this->cu->isSepTree() ? true : isLuma(compID));
+#else
+  bool  lfnstApplied = lfnstIdx && this->mtsIdx[compID] != MTS_SKIP && (CS::isDualITree(*this->cs) ? true : isLuma(compID));
+#endif
+  return lfnstApplied;
+}
+#endif
 int          TransformUnit::getChromaAdj()                     const { return m_chromaResScaleInv; }
 void         TransformUnit::setChromaAdj(int i)                      { m_chromaResScaleInv = i;    }

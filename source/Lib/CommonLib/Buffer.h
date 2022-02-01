@@ -189,6 +189,11 @@ struct AreaBuf : public Size
 typedef AreaBuf<      Pel>  PelBuf;
 typedef AreaBuf<const Pel> CPelBuf;
 
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+typedef AreaBuf<      unsigned> IdxBuf;
+typedef AreaBuf<const unsigned> CIdxBuf;
+#endif
+
 typedef AreaBuf<      TCoeff>  CoeffBuf;
 typedef AreaBuf<const TCoeff> CCoeffBuf;
 

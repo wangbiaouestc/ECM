@@ -58,8 +58,18 @@ bool g_mctsDecCheckEnabled = false;
 
 MsgLevel g_verbosity = VERBOSE;
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+#if JVET_W0119_LFNST_EXTENSION || EXTENDED_LFNST
+int8_t * g_resiBorderTemplateLFNST[6][6][210];
+#else
+int8_t * g_resiBorderTemplateLFNST[6][6][16];
+#endif
+int8_t * g_resiBorderTemplate[6][6][NUM_TRANS_TYPE*NUM_TRANS_TYPE];
+#else
 const int8_t * g_resiBorderTemplate[6][6][NUM_TRANS_TYPE*NUM_TRANS_TYPE];
+#endif
 // g_initRomSignPred: Format for each [W][H][Idx] in [0-5][0-5][0-8], 0 => empty, 1 => (W+H-1)*16 template coefficients
+#if !JVET_W0103_INTRA_MTS
 const int8_t g_initRomSignPred[] = {
  1,8, 8, 8, 8, 8, 8, 8, 10, 10, 10, 10, 5, -4, -10, 8, 8, 8, 8, -8, -8, 8, 5, 5, 5, 5, -10, 10, -4, -10, -4, 5, 10, 10, 10, 10, -13, -6, 6, 13, 6, -6, -13, -10, -4, 5, 10,
  -10, -10, 10, -6, -3, 3, 6, -13, 13, -6, 8, -8, -8, 8, 8, 8, 8, 10, -10, -10, 10, 5, -4, -10, 8, -8, -8, 8, -8, -8, 8, 5, -4, -4, 5, -10, 10, -4, -4, 10, -10, 5, 5, 5,
@@ -3621,6 +3631,7 @@ const int8_t g_initRomSignPred[] = {
  9, 8, 7, 6, 5, 4, 2, 1, 0, -1, -2, -3, -4, -6, -7, -8, -9, -10, -11, -11, -12, -13, -14, -14, -15, -15, -15, -16, -16, -16, 0,0,0,0,0,0,0,0,
 };
 #endif
+#endif
 
 const char* nalUnitTypeToString(NalUnitType type)
 {
@@ -4301,6 +4312,10 @@ void initROM()
   }
 #endif
 
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  memset(&g_resiBorderTemplate[0][0][0], 0, sizeof(g_resiBorderTemplate));
+  memset(&g_resiBorderTemplateLFNST[0][0][0], 0, sizeof(g_resiBorderTemplateLFNST));
+#endif
 #if TU_256
   c = 256;
   const double s = sqrt( ( double ) c ) * (64 << COM16_C806_TRANS_PREC);
@@ -4431,6 +4446,34 @@ void destroyROM()
     g_globalGeoWeights   [i] = nullptr;
     g_globalGeoEncSADmask[i] = nullptr;
   }
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  for (int log2Width = 0; log2Width < 6; log2Width++)
+  {
+    for (int log2Height = 0; log2Height < 6; log2Height++)
+    {
+      for (int idx = 0; idx < NUM_TRANS_TYPE*NUM_TRANS_TYPE; idx++)
+      {
+        if (g_resiBorderTemplate[log2Width][log2Height][idx])
+        {
+          xFree(g_resiBorderTemplate[log2Width][log2Height][idx]);
+          g_resiBorderTemplate[log2Width][log2Height][idx] = nullptr;
+        }
+      }
+#if JVET_W0119_LFNST_EXTENSION || EXTENDED_LFNST
+      for (int idx = 0; idx < 210; idx++)
+#else
+      for (int idx = 0; idx < 16; idx++)
+#endif
+      {
+        if (g_resiBorderTemplateLFNST[log2Width][log2Height][idx])
+        {
+          xFree(g_resiBorderTemplateLFNST[log2Width][log2Height][idx]);
+          g_resiBorderTemplateLFNST[log2Width][log2Height][idx] = nullptr;
+        }
+      }
+    }
+  }
+#endif
 }
 
 #if MMLM

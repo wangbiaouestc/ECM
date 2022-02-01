@@ -4759,13 +4759,24 @@ void CABACReader::residual_coding( TransformUnit& tu, ComponentID compID, CUCtx&
   if ( tu.cs->sps->getNumPredSigns() > 0  && uiHeight >= 4 && uiWidth >= 4)
   {
     TCoeff *signs = signBuff.buf;
-
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    uint32_t spArea = tu.cs->sps->getSignPredArea();
+    uint32_t spWidth = std::min(uiWidth, spArea);
+    uint32_t spHeight = std::min(uiHeight, spArea);
+    CHECK(TrQuant::SIGN_PRED_BYPASS, "SIGN_PRED_BYPASS should be equal to 0");
+    for (uint32_t y = 0; y < spHeight; y++)
+#else
     for (uint32_t y = 0; y < SIGN_PRED_FREQ_RANGE; y++)
+#endif
     {
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+      memset(signs, 0, sizeof(TCoeff) * spWidth);
+#else
       signs[0] = TrQuant::SIGN_PRED_BYPASS;
       signs[1] = TrQuant::SIGN_PRED_BYPASS;
       signs[2] = TrQuant::SIGN_PRED_BYPASS;
       signs[3] = TrQuant::SIGN_PRED_BYPASS;
+#endif
       signs += signBuff.stride;
     }
   }
@@ -5116,8 +5127,15 @@ void CABACReader::residual_coding_subblock( CoeffCodingContext& cctx, TCoeff* co
   const int   minSubPos   = cctx.minSubPos();
   const bool  isLast      = cctx.isLast();
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  const int   cgStartPosX = cctx.cgPosX() << cctx.log2CGWidth();
+  const int   cgStartPosY = cctx.cgPosY() << cctx.log2CGHeight();
+  const bool  isSPArea = (cgStartPosX < SIGN_PRED_FREQ_RANGE) && (cgStartPosY < SIGN_PRED_FREQ_RANGE);
+  const bool  signPredQualified = cctx.getPredSignsQualified() > 0 && isSPArea && cctx.width() >= 4 && cctx.height() >= 4;
+#else
   const bool  isFirst      = !cctx.isNotFirst();
   const bool  signPredQualified = cctx.getPredSignsQualified() && isFirst && cctx.width() >= 4 && cctx.height() >= 4 ;
+#endif
 #endif
   int         firstSigPos = ( isLast ? cctx.scanPosLast() : cctx.maxSubPos() );
   int         nextSigPos  = firstSigPos;
@@ -5675,7 +5693,12 @@ void CABACReader::parsePredictedSigns( TransformUnit &tu, ComponentID compID )
   uint32_t bin;
   const CtxSet* ctx = &Ctx::signPred[toChannelType( compID )];
   int ctxOffset = CU::isIntra( *tu.cu ) ? 0 : 2;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  bool lfnstEnabled = tu.checkLFNSTApplied(compID);
+  const int32_t maxNumPredSigns = lfnstEnabled ? 4 : tu.cs->sps->getNumPredSigns();
+#else
   const int32_t maxNumPredSigns = tu.cs->sps->getNumPredSigns();
+#endif
   const bool useSignPred = TU::getUseSignPred( tu, compID );
   int numSignPred = 0;
 
@@ -5683,10 +5706,23 @@ void CABACReader::parsePredictedSigns( TransformUnit &tu, ComponentID compID )
   CoeffBuf signBuff = tu.getCoeffSigns( compID );
   TCoeff *coeff = buff.buf;
   TCoeff *signs = signBuff.buf;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  uint32_t extAreaWidth = std::min(tu.blocks[compID].width, (uint32_t)SIGN_PRED_FREQ_RANGE);
+  uint32_t extAreaHeight = std::min(tu.blocks[compID].height, (uint32_t)SIGN_PRED_FREQ_RANGE);
+  uint32_t extAreaSize = (lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea());
+  uint32_t spAreaWidth = std::min(tu.blocks[compID].width, extAreaSize);
+  uint32_t spAreaHeight = std::min(tu.blocks[compID].height, extAreaSize);
 
-  for( uint32_t y = 0; y < SIGN_PRED_FREQ_RANGE; y++ )
+  for ( uint32_t y = 0; y < spAreaHeight; y++ )
+#else
+  for ( uint32_t y = 0; y < SIGN_PRED_FREQ_RANGE; y++ )
+#endif
   {
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    for ( uint32_t x = 0; x < spAreaWidth; x++ )
+#else
     for( uint32_t x = 0; x < SIGN_PRED_FREQ_RANGE; x++ )
+#endif
     {
       TCoeff coef = coeff[x];
 
@@ -5700,8 +5736,13 @@ void CABACReader::parsePredictedSigns( TransformUnit &tu, ComponentID compID )
           }
           else
           {
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+            int levOffset = (coef < 2) ? 0 : 1;
+            bin = m_BinDecoder.decodeBin((*ctx)(ctxOffset + levOffset));
+#else
             uint32_t ctxId = ( x || y ) ? 1 : 0;
             bin = m_BinDecoder.decodeBin( ( *ctx )( ctxId + ctxOffset ) );
+#endif
             numSignPred++;
           }
 
@@ -5715,6 +5756,30 @@ void CABACReader::parsePredictedSigns( TransformUnit &tu, ComponentID compID )
     coeff += buff.stride;
     signs += signBuff.stride;
   }
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  if ( spAreaWidth != extAreaWidth || spAreaHeight != extAreaHeight )
+  {
+    coeff = buff.buf;
+    for ( uint32_t y = 0; y < extAreaHeight; y++ )
+    {
+      uint32_t startX = (y < spAreaHeight) ? spAreaWidth : 0;
+      uint32_t endX = extAreaWidth - 1;
+      for ( uint32_t x = startX; x <= endX; x++ )
+      {
+        TCoeff coef = coeff[x];
+        if (coef)
+        {
+          bin = m_BinDecoder.decodeBinEP();
+          if (bin)
+          {
+            coeff[x] = -coef;
+          }
+        }
+      }
+      coeff += buff.stride;
+    }
+  }
+#endif
 }
 #endif
 

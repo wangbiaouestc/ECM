@@ -2077,6 +2077,14 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if SIGN_PREDICTION
   READ_CODE(4, uiCode, "num_predicted_coef_signs");
   pcSPS->setNumPredSigns(uiCode);
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  if (pcSPS->getNumPredSigns() > 0)
+  {
+    //READ_UVLC(uiCode, "log2_sign_pred_area_minus2");
+    READ_CODE(2, uiCode, "log2_sign_pred_area_minus2");
+    pcSPS->setLog2SignPredArea(uiCode + 2);
+  }
+#endif
 #endif
 
 #if JVET_S0074_SPS_REORDER

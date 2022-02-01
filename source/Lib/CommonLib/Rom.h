@@ -61,7 +61,16 @@ void         destroyROM();
 
 
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+#if JVET_W0119_LFNST_EXTENSION || EXTENDED_LFNST
+extern       int8_t * g_resiBorderTemplateLFNST[6][6][210];
+#else
+extern       int8_t * g_resiBorderTemplateLFNST[6][6][16];
+#endif
+extern       int8_t * g_resiBorderTemplate[6][6][NUM_TRANS_TYPE*NUM_TRANS_TYPE];
+#else
 extern const int8_t * g_resiBorderTemplate[6][6][NUM_TRANS_TYPE*NUM_TRANS_TYPE];
+#endif
 #endif
 
 // flexible conversion from relative to absolute index
@@ -288,7 +297,9 @@ constexpr uint8_t g_tbMax[257] = { 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 
 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8 };
 
 #if SIGN_PREDICTION
+#if !JVET_W0103_INTRA_MTS
 extern const int8_t    g_initRomSignPred[];
+#endif
 extern const int32_t   g_aucIdxTrCombo[5][5][5][NUM_INTRA_MODE];
 extern const int32_t   g_aucNumTrCombo[5][5];
 #endif

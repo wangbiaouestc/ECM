@@ -573,13 +573,21 @@ struct TransformUnit : public UnitArea
   TransformUnit *prev;
 #if REMOVE_PCM
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  void init(TCoeff **coeffs, TCoeff **signs, unsigned **signsScanIdx, Pel **pltIdx, bool **runType);
+#else
   void init(TCoeff **coeffs, TCoeff **signs, Pel **pltIdx, bool **runType);
+#endif
 #else
   void init(TCoeff **coeffs, Pel **pltIdx, bool **runType);
 #endif
 #else
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  void init(TCoeff **coeffs, TCoeff **signs, unsigned **signsScanIdx, Pel **pcmbuf, bool **runType);
+#else
   void init(TCoeff **coeffs, TCoeff **signs, Pel **pcmbuf, bool **runType);
+#endif
 #else
   void init(TCoeff **coeffs, Pel **pcmbuf, bool **runType);
 #endif
@@ -589,12 +597,18 @@ struct TransformUnit : public UnitArea
   void copyComponentFrom  (const TransformUnit& other, const ComponentID compID);
   void checkTuNoResidual( unsigned idx );
   int  getTbAreaAfterCoefZeroOut(ComponentID compID) const;
-
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  bool checkLFNSTApplied(ComponentID compID);
+#endif
          CoeffBuf getCoeffs(const ComponentID id);
   const CCoeffBuf getCoeffs(const ComponentID id) const;
 #if SIGN_PREDICTION
          CoeffBuf getCoeffSigns(const ComponentID id);
   const CCoeffBuf getCoeffSigns(const ComponentID id) const;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  IdxBuf          getCoeffSignsScanIdx(const ComponentID id);
+  const CIdxBuf   getCoeffSignsScanIdx(const ComponentID id) const;
+#endif
 #endif
 #if !REMOVE_PCM
          PelBuf   getPcmbuf(const ComponentID id);
@@ -619,7 +633,10 @@ struct TransformUnit : public UnitArea
 private:
   TCoeff *m_coeffs[ MAX_NUM_TBLOCKS ];
 #if SIGN_PREDICTION
-  TCoeff *m_coeff_signs[ MAX_NUM_TBLOCKS ];
+  TCoeff *m_coeffSigns[ MAX_NUM_TBLOCKS ];
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  unsigned *m_coeffSignsIdx[MAX_NUM_TBLOCKS];
+#endif
 #endif
 #if REMOVE_PCM
   Pel    *m_pltIdx[MAX_NUM_TBLOCKS - 1];

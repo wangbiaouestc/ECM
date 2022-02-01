@@ -76,7 +76,10 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
   {
     m_coeffs[ i ] = nullptr;
 #if SIGN_PREDICTION
-    m_coeff_signs[ i ] = nullptr;
+    m_coeffSigns[ i ] = nullptr;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    m_coeffSignsIdx[i] = nullptr;
+#endif
 #endif
 #if !REMOVE_PCM
     m_pcmbuf[ i ] = nullptr;
@@ -725,6 +728,9 @@ TransformUnit& CodingStructure::addTU( const UnitArea &unit, const ChannelType c
   TCoeff *coeffs[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 #if SIGN_PREDICTION
   TCoeff *signs[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  unsigned *signsScanIdx[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+#endif
 #endif
 #if REMOVE_PCM
   Pel    *pltIdx[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
@@ -768,7 +774,10 @@ TransformUnit& CodingStructure::addTU( const UnitArea &unit, const ChannelType c
 
     coeffs[i] = m_coeffs[i] + m_offsets[i];
 #if SIGN_PREDICTION
-    signs[i]  = m_coeff_signs[i] + m_offsets[i];
+    signs[i]  = m_coeffSigns[i] + m_offsets[i];
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    signsScanIdx[i] = m_coeffSignsIdx[i] + m_offsets[i];
+#endif
 #endif
 #if !REMOVE_PCM
     pcmbuf[i] = m_pcmbuf[i] + m_offsets[i];
@@ -793,13 +802,21 @@ TransformUnit& CodingStructure::addTU( const UnitArea &unit, const ChannelType c
   }
 #if REMOVE_PCM
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  tu->init(coeffs, signs, signsScanIdx, pltIdx, runType);
+#else
   tu->init(coeffs, signs, pltIdx, runType);
+#endif
 #else
   tu->init(coeffs, pltIdx, runType);
 #endif
 #else
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  tu->init(coeffs, signs, signsScanIdx, pcmbuf, runType);
+#else
   tu->init(coeffs, signs, pcmbuf, runType);
+#endif
 #else
   tu->init(coeffs, pcmbuf, runType);
 #endif
@@ -1184,7 +1201,10 @@ void CodingStructure::createCoeffs(const bool isPLTused)
 
     m_coeffs[i] = _area > 0 ? ( TCoeff* ) xMalloc( TCoeff, _area ) : nullptr;
 #if SIGN_PREDICTION
-    m_coeff_signs[i] = _area > 0 ? ( TCoeff* ) xMalloc( TCoeff, _area ) : nullptr;
+    m_coeffSigns[i] = _area > 0 ? ( TCoeff* ) xMalloc( TCoeff, _area ) : nullptr;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    m_coeffSignsIdx[i] = _area > 0 ? (unsigned*)xMalloc(unsigned, _area) : nullptr;
+#endif
 #endif
 #if !REMOVE_PCM
     m_pcmbuf[i] = _area > 0 ? ( Pel*    ) xMalloc( Pel,    _area ) : nullptr;
@@ -1215,11 +1235,18 @@ void CodingStructure::destroyCoeffs()
       m_coeffs[i] = nullptr;
     }
 #if SIGN_PREDICTION
-    if( m_coeff_signs[i] )
+    if( m_coeffSigns[i] )
     { 
-      xFree( m_coeff_signs[i] );
-      m_coeff_signs[i] = nullptr;
+      xFree( m_coeffSigns[i] );
+      m_coeffSigns[i] = nullptr;
     }
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    if (m_coeffSignsIdx[i])
+    {
+      xFree(m_coeffSignsIdx[i]);
+      m_coeffSignsIdx[i] = nullptr;
+    }
+#endif
 #endif
 #if !REMOVE_PCM
     if (m_pcmbuf[i])

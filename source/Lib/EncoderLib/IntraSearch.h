@@ -429,7 +429,9 @@ protected:
   int             m_prevRunPosRDOQ [2][NUM_TRELLIS_STATE];
   double          m_stateCostRDOQ  [2][NUM_TRELLIS_STATE];
 public:
-
+#if INTRA_TRANS_ENC_OPT
+  bool            m_skipTimdLfnstMtsPass;
+#endif
   IntraSearch();
   ~IntraSearch();
 

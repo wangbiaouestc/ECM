@@ -306,7 +306,12 @@ public:
   Pel* getPredictorPtr2           (const ComponentID compID, uint32_t idx) { return m_yuvExt2[compID][idx]; }
   void switchBuffer               (const PredictionUnit &pu, ComponentID compID, PelBuf srcBuff, Pel *dst);
 #endif
-
+#if ENABLE_DIMD && INTRA_TRANS_ENC_OPT
+  void(*m_dimdBlending)(Pel *pDst, int strideDst, Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int w2, int width, int height);
+#endif
+#if JVET_W0123_TIMD_FUSION && INTRA_TRANS_ENC_OPT
+  void(*m_timdBlending)(Pel *pDst, int strideDst, Pel *pSrc, int strideSrc, int w0, int w1, int width, int height);
+#endif
 #if JVET_V0130_INTRA_TMP
 #if JVET_W0069_TMP_BOUNDARY
   int( *m_calcTemplateDiff )(Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType TempType);
@@ -347,6 +352,18 @@ public:
 };
 #if ENABLE_DIMD
 int  buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int* piHistogram, int direction, int bw, int bh);
+#if INTRA_TRANS_ENC_OPT
+void xDimdBlending(Pel *pDst, int strideDst, Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int w2, int wdith, int height);
+#ifdef TARGET_SIMD_X86
+void xDimdBlending_SIMD(Pel *pDst, int strideDst, Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int w2, int wdith, int height);
+#endif
+#endif
+#endif
+#if JVET_W0123_TIMD_FUSION && INTRA_TRANS_ENC_OPT
+void xTimdBlending(Pel *pDst, int strideDst, Pel *pSrc, int strideSrc, int w0, int w1, int width, int height);
+#ifdef TARGET_SIMD_X86
+void xTimdBlending_SIMD(Pel *pDst, int strideDst, Pel *pSrc, int strideSrc, int w0, int w1, int width, int height);
+#endif
 #endif
 //! \}
 
