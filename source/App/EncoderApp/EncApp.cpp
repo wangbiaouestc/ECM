@@ -240,6 +240,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setPrintFrameMSE                                     ( m_printFrameMSE);
   m_cEncLib.setPrintHexPsnr(m_printHexPsnr);
   m_cEncLib.setPrintSequenceMSE                                  ( m_printSequenceMSE);
+#if MSSIM_UNIFORM_METRICS_LOG
+  m_cEncLib.setPrintMSSSIM                                       ( m_printMSSSIM );
+#endif
   m_cEncLib.setCabacZeroWordPaddingEnabled                       ( m_cabacZeroWordPaddingEnabled );
 
   m_cEncLib.setFrameRate                                         ( m_iFrameRate );

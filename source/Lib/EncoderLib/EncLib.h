@@ -304,6 +304,9 @@ public:
 
   void printSummary(bool isField) {
     m_cGOPEncoder.printOutSummary(m_uiNumAllPicCoded, isField, m_printMSEBasedSequencePSNR, m_printSequenceMSE,
+#if MSSIM_UNIFORM_METRICS_LOG
+                                  m_printMSSSIM,
+#endif
                                   m_printHexPsnr, m_resChangeInClvsEnabled, m_spsMap.getFirstPS()->getBitDepths()
 #if JVET_W0134_UNIFORM_METRICS_LOG
                                                                               ,

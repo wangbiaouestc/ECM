@@ -176,6 +176,9 @@ protected:
   bool      m_printHexPsnr;
   bool      m_printFrameMSE;
   bool      m_printSequenceMSE;
+#if MSSIM_UNIFORM_METRICS_LOG
+  bool      m_printMSSSIM;
+#endif
   bool      m_cabacZeroWordPaddingEnabled;
 
 #if JVET_S0179_CONDITIONAL_SIGNAL_GCI
@@ -1094,6 +1097,10 @@ public:
   bool      getPrintSequenceMSE             ()         const { return m_printSequenceMSE;           }
   void      setPrintSequenceMSE             (bool value)     { m_printSequenceMSE = value;          }
 
+#if MSSIM_UNIFORM_METRICS_LOG
+  bool      getPrintMSSSIM                  ()         const { return m_printMSSSIM;               }
+  void      setPrintMSSSIM                  (bool value)     { m_printMSSSIM = value;              }
+#endif
   bool      getCabacZeroWordPaddingEnabled()           const { return m_cabacZeroWordPaddingEnabled;  }
   void      setCabacZeroWordPaddingEnabled(bool value)       { m_cabacZeroWordPaddingEnabled = value; }
 
