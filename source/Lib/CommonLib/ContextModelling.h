@@ -520,6 +520,9 @@ public:
                            lfnstLastScanPos                              = false;
                            violatesMtsCoeffConstraint                    = false;
                            mtsLastScanPos                                = false;
+#if JVET_Y0142_ADAPT_INTRA_MTS
+                           mtsCoeffAbsSum                                = 0;
+#endif
                          }
   CUCtx(int _qp)       : isDQPCoded(false), isChromaQpAdjCoded(false),
                          qgStart(false),
@@ -530,6 +533,9 @@ public:
                            lfnstLastScanPos                              = false;
                            violatesMtsCoeffConstraint                    = false;
                            mtsLastScanPos                                = false;
+#if JVET_Y0142_ADAPT_INTRA_MTS
+                           mtsCoeffAbsSum                                = 0;
+#endif
                          }
   ~CUCtx() {}
 public:
@@ -541,6 +547,9 @@ public:
   bool      violatesLfnstConstrained[MAX_NUM_CHANNEL_TYPE];
   bool      violatesMtsCoeffConstraint;
   bool      mtsLastScanPos;
+#if JVET_Y0142_ADAPT_INTRA_MTS
+  int64_t   mtsCoeffAbsSum;
+#endif
 };
 
 class MergeCtx

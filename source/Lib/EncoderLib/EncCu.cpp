@@ -2018,7 +2018,11 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   int    startMTSIdx       [ 4 ] = { 0, 1, 2, 3 };
   int    endMTSIdx         [ 4 ] = { 0, 1, 2, 3 };
 #if JVET_W0103_INTRA_MTS
+#if JVET_Y0142_ADAPT_INTRA_MTS
+  endMTSIdx[0] = 5; //put all MTS candidates in "Grp 0"
+#else
   endMTSIdx[0] = 3; //put all MTS candidates in "Grp 0"
+#endif
 #endif
   double trGrpStopThreshold[ 3 ] = { 1.001, 1.001, 1.001 };
   int    bestMtsFlag             =   0;
@@ -2539,6 +2543,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
       }
     }
   } //trGrpIdx
+
   if(!adaptiveColorTrans)
   m_modeCtrl->setBestNonDCT2Cost(bestNonDCT2Cost);
   return foundZeroRootCbf;

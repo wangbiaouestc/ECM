@@ -1976,7 +1976,9 @@ void CABACWriter::cu_residual( const CodingUnit& cu, Partitioner& partitioner, C
   cuCtx.lfnstLastScanPos                              = false;
   cuCtx.violatesMtsCoeffConstraint                    = false;
   cuCtx.mtsLastScanPos                                = false;
-
+#if JVET_Y0142_ADAPT_INTRA_MTS
+  cuCtx.mtsCoeffAbsSum                                = 0;
+#endif
   if( cu.ispMode && isLuma( partitioner.chType ) )
   {
     TUIntraSubPartitioner subTuPartitioner( partitioner );
@@ -4510,6 +4512,7 @@ void CABACWriter::residual_coding( const TransformUnit& tu, ComponentID compID, 
   // determine and set last coeff position and sig group flags
   int                      scanPosLast = -1;
   std::bitset<MLS_GRP_NUM> sigGroupFlags;
+
   for( int scanPos = 0; scanPos < cctx.maxNumCoeff(); scanPos++)
   {
     unsigned blkPos = cctx.blockPos( scanPos );
@@ -4542,6 +4545,21 @@ void CABACWriter::residual_coding( const TransformUnit& tu, ComponentID compID, 
   if (cuCtx && isLuma(compID) && tu.mtsIdx[compID] != MTS_SKIP)
   {
     cuCtx->mtsLastScanPos |= cctx.scanPosLast() >= 1;
+#if JVET_Y0142_ADAPT_INTRA_MTS
+    const int  coeffStride = tu.getCoeffs(compID).stride;
+    const int  uiWidth = tu.getCoeffs(compID).width;
+    const int  uiHeight = tu.getCoeffs(compID).height;
+    uint64_t coeffAbsSum = 0;
+
+    for (int y = 0; y < uiHeight; y++)
+    {
+      for (int x = 0; x < uiWidth; x++)
+      {
+        coeffAbsSum += abs(coeff[(y * coeffStride) + x]);
+      }
+    }
+    cuCtx->mtsCoeffAbsSum = (int64_t)coeffAbsSum;
+#endif
   }
 
 
@@ -4638,7 +4656,11 @@ void CABACWriter::mts_idx( const CodingUnit& cu, CUCtx* cuCtx )
   {
     int symbol = mtsIdx != MTS_DCT2_DCT2 ? 1 : 0;
 #if JVET_W0103_INTRA_MTS
+#if JVET_Y0142_ADAPT_INTRA_MTS
+    int ctxIdx = (cuCtx->mtsCoeffAbsSum > MTS_TH_COEFF[1]) ? 2 : (cuCtx->mtsCoeffAbsSum > MTS_TH_COEFF[0]) ? 1 : 0;
+#else
     int ctxIdx = (cu.mipFlag) ? 3 : 0;
+#endif
 #else
     int ctxIdx = 0;
 #endif
@@ -4648,10 +4670,23 @@ void CABACWriter::mts_idx( const CodingUnit& cu, CUCtx* cuCtx )
     if( symbol )
     {
 #if JVET_W0103_INTRA_MTS
-      int TrIdx = (tu.mtsIdx[COMPONENT_Y] - MTS_DST7_DST7);
-      CHECK(TrIdx < 0 || TrIdx >= 4, "TrIdx outside range");
-      m_BinEncoder.encodeBin(TrIdx >> 1, Ctx::MTSIdx(1));
-      m_BinEncoder.encodeBin(TrIdx & 1, Ctx::MTSIdx(2));
+      int trIdx = (tu.mtsIdx[COMPONENT_Y] - MTS_DST7_DST7);
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      int nCands = MTS_NCANDS[ctxIdx];
+      if (trIdx < 0 || trIdx >= nCands)
+      {
+        //Don't do anything.
+      }
+      else
+      {
+        CHECK(trIdx < 0 || trIdx >= nCands, "trIdx outside range");
+        xWriteTruncBinCode(trIdx, nCands);
+      }
+#else
+      CHECK(trIdx < 0 || trIdx >= 4, "trIdx outside range");
+      m_BinEncoder.encodeBin(trIdx >> 1, Ctx::MTSIdx(1));
+      m_BinEncoder.encodeBin(trIdx & 1, Ctx::MTSIdx(2));
+#endif
 #else
       ctxIdx = 1;
       for( int i = 0; i < 3; i++, ctxIdx++ )

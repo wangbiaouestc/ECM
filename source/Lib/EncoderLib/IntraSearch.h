@@ -199,7 +199,12 @@ private:
   EncModeCtrl    *m_modeCtrl;
   Pel*            m_pSharedPredTransformSkip[MAX_NUM_TBLOCKS];
 #if JVET_W0103_INTRA_MTS
-  int            m_TestAMTForFullRD[4];
+#if JVET_Y0142_ADAPT_INTRA_MTS
+  int            m_testAMTForFullRD[6];
+  bool           m_validMTSReturn;
+#else
+  int            m_testAMTForFullRD[4];
+#endif
   int            m_numCandAMTForFullRD;
 #endif
   XUCache         m_unitCache;
@@ -378,6 +383,11 @@ private:
   double     m_globalBestCostStore;
   bool       m_globalBestCostValid;
   int        m_numModesISPRDO; //full modes for ISP testing.
+#if JVET_Y0142_ADAPT_INTRA_MTS
+  static_vector<ModeInfo, NUM_LUMA_MODE> m_modesForMTS;
+  static_vector<int64_t, NUM_LUMA_MODE> m_modesCoeffAbsSumDCT2;
+  int64_t m_coeffAbsSumDCT2;
+#endif
 #endif
   ModeInfo                                           m_savedRdModeFirstColorSpace[4 * NUM_LFNST_NUM_PER_SET * 2][FAST_UDI_MAX_RDMODE_NUM];
   char                                               m_savedBDPCMModeFirstColorSpace[4 * NUM_LFNST_NUM_PER_SET * 2][FAST_UDI_MAX_RDMODE_NUM];

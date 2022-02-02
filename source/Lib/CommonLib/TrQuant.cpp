@@ -1471,7 +1471,11 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
   const double thrTS = trCosts.begin()->first;
   while( itC != trCosts.end() )
   {
+#if JVET_Y0142_ADAPT_INTRA_MTS
+    const bool testTr = itC->first <= ( trModes->at(itC->second).first == 1 ? thrTS : thr) && numTests <= maxCand;
+#else
     const bool testTr = itC->first <= ( itC->second == 1 ? thrTS : thr ) && numTests <= maxCand;
+#endif
     trModes->at( itC->second ).second = testTr;
     numTests += testTr;
     itC++;

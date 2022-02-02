@@ -2256,7 +2256,9 @@ void CABACReader::cu_residual( CodingUnit& cu, Partitioner &partitioner, CUCtx& 
   cuCtx.lfnstLastScanPos                              = false;
   cuCtx.violatesMtsCoeffConstraint                    = false;
   cuCtx.mtsLastScanPos                                = false;
-
+#if JVET_Y0142_ADAPT_INTRA_MTS
+  cuCtx.mtsCoeffAbsSum                                = 0;
+#endif
   ChromaCbfs chromaCbfs;
   if( cu.ispMode && isLuma( partitioner.chType ) )
   {
@@ -4828,7 +4830,24 @@ void CABACReader::residual_coding( TransformUnit& tu, ComponentID compID, CUCtx&
       }
 #endif
     }
+#if JVET_Y0142_ADAPT_INTRA_MTS
+    if (isLuma(compID) && tu.mtsIdx[compID] != MTS_SKIP)
+    {
+      const int  coeffStride = tu.getCoeffs(compID).stride;
+      const int  uiWidth = tu.getCoeffs(compID).width;
+      const int  uiHeight = tu.getCoeffs(compID).height;
+      uint64_t coeffAbsSum = 0;
 
+      for (int y = 0; y < uiHeight; y++)
+      {
+        for (int x = 0; x < uiWidth; x++)
+        {
+          coeffAbsSum += abs(coeff[(y * coeffStride) + x]);
+        }
+      }
+      cuCtx.mtsCoeffAbsSum = (int64_t)coeffAbsSum;
+    }
+#endif
 }
 
 void CABACReader::ts_flag( TransformUnit& tu, ComponentID compID )
@@ -4857,7 +4876,11 @@ void CABACReader::mts_idx( CodingUnit& cu, CUCtx& cuCtx )
   {
     RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2( STATS__CABAC_BITS__MTS_FLAGS, tu.blocks[COMPONENT_Y], COMPONENT_Y );
 #if JVET_W0103_INTRA_MTS
+#if JVET_Y0142_ADAPT_INTRA_MTS
+    int ctxIdx = (cuCtx.mtsCoeffAbsSum > MTS_TH_COEFF[1]) ? 2 : (cuCtx.mtsCoeffAbsSum > MTS_TH_COEFF[0]) ? 1 : 0;
+#else
     int ctxIdx = (cu.mipFlag) ? 3 : 0;
+#endif
 #else
     int ctxIdx = 0;
 #endif
@@ -4866,10 +4889,24 @@ void CABACReader::mts_idx( CodingUnit& cu, CUCtx& cuCtx )
     if( symbol )
     {
 #if JVET_W0103_INTRA_MTS
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      int nCands = MTS_NCANDS[ctxIdx];
+      uint32_t val;
+      if (nCands > 1)
+      {
+        xReadTruncBinCode(val, nCands);
+      }
+      else
+      {
+        val = 0;
+      }
+      mtsIdx = MTS_DST7_DST7 + val;
+#else
       int bins[2];
       bins[0] = m_BinDecoder.decodeBin(Ctx::MTSIdx(1));
       bins[1] = m_BinDecoder.decodeBin(Ctx::MTSIdx(2));
       mtsIdx = MTS_DST7_DST7 + (bins[0] << 1) + bins[1];
+#endif
 #else
       ctxIdx = 1;
       mtsIdx = MTS_DST7_DST7; // mtsIdx = 2 -- 4
