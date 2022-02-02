@@ -183,7 +183,9 @@
 #define JVET_Y0141_SIGN_PRED_IMPROVE                      1  //JVET-Y0141 test3: sign prediction improvement                          
 #endif
 #define JVET_W0103_INTRA_MTS                              1 // JVET W0103: Extended Intra MTS
-                   
+#if JVET_W0103_INTRA_MTS
+#define JVET_Y0142_ADAPT_INTRA_MTS                        1
+#endif
 
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision

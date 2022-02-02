@@ -1537,7 +1537,6 @@ void EncSlice::setJointCbCrModes( CodingStructure& cs, const Position topLeftLum
   cs.picHeader->setJointCbCrSignFlag( sgnFlag );
 }
 
-
 void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, const bool bFastDeltaQP, EncLib* pEncLib )
 {
   CodingStructure&  cs            = *pcPic->cs;

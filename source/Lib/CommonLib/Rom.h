@@ -195,7 +195,11 @@ extern TMatrixCoeff g_aiTr128[NUM_TRANS_TYPE][128][128];
 extern TMatrixCoeff g_aiTr256[NUM_TRANS_TYPE][256][256];
 
 extern const uint8_t g_aucIpmToTrSet[16][36];
+#if JVET_Y0142_ADAPT_INTRA_MTS
+extern const uint8_t g_aucTrSet[80][6];
+#else
 extern const uint8_t g_aucTrSet[80][4];
+#endif
 extern const int8_t  g_aiIdLut[3][3];
 extern const uint8_t g_aucTrIdxToTr[25][2];
 #endif

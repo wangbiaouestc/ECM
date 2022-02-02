@@ -1727,7 +1727,17 @@ const CtxSet ContextSetCfg::TransformSkipFlag = ContextSetCfg::addCtxSet
 });
 
 #if JVET_W0103_INTRA_MTS
-#if INTRA_TRANS_ENC_OPT
+#if JVET_Y0142_ADAPT_INTRA_MTS
+const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
+({
+  { 43, 38, 46, 38 },
+  { 36, 38, 46, 38 },
+  { 35, 38, 38, 38 },
+  {  8,  9,  9,  8 },
+  { 12,  8,  8,  8 },
+  {  9,  9,  9,  9 }
+});
+#elif INTRA_TRANS_ENC_OPT
 const CtxSet ContextSetCfg::MTSIdx = ContextSetCfg::addCtxSet
 ({
   { 38,  42,  27,  45, },

@@ -414,7 +414,13 @@ static const uint32_t  L8H               = 32;
 static const uint32_t  L8H_ZO            = 32;
 #endif
 
+#if JVET_Y0142_ADAPT_INTRA_MTS
+static const uint32_t  MTS_TH_COEFF[2] =                                { 6, 32};
+static const uint32_t  MTS_NCANDS[3] =                                  { 1, 4, 6};
+static const uint32_t  NUM_TRAFO_MODES_MTS =                            8;
+#else
 static const uint32_t  NUM_TRAFO_MODES_MTS =                            6; ///< Max Intra CU size applying EMT, supported values: 8, 16, 32, 64, 128
+#endif
 #if TU_256
 static const uint32_t  MTS_INTRA_MAX_CU_SIZE =                         256; ///< Max Intra CU size applying EMT, supported values: 8, 16, 32, 64, 128
 static const uint32_t  MTS_INTER_MAX_CU_SIZE =                         256; ///< Max Inter CU size applying EMT, supported values: 8, 16, 32, 64, 128

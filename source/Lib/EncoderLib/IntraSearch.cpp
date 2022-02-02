@@ -493,6 +493,10 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       m_globalBestCostStore = bestCostSoFar;
       m_globalBestCostValid = true;
     }
+#if JVET_Y0142_ADAPT_INTRA_MTS
+    m_modesForMTS.clear();
+    m_modesCoeffAbsSumDCT2.clear();
+#endif
   }
 #endif
   const bool colorTransformIsEnabled = sps.getUseColorTrans() && !CS::isDualITree(cs);
@@ -1264,7 +1268,12 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         }
       }
     }
-
+#if JVET_Y0142_ADAPT_INTRA_MTS
+    if (sps.getUseLFNST() && m_modesForMTS.size() == 0 && cu.mtsFlag)
+    {
+      return false;
+    }
+#endif
     int numNonISPModes = (int)uiRdModeList.size();
 #if JVET_W0123_TIMD_FUSION
     bool isTimdValid = cu.slice->getSPS()->getUseTimd();
@@ -1338,7 +1347,6 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       uiRdModeList.push_back( ModeInfo( false, false, 0, VER_INTRA_SUBPARTITIONS, TIMD_IDX ) );
     }
 #endif
-
     //===== check modes (using r-d costs) =====
     ModeInfo       uiBestPUMode;
     int            bestBDPCMMode = 0;
@@ -1387,6 +1395,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         cu.bdpcmMode = 0;
         uiOrgMode = uiRdModeList[mode];
       }
+
       if (!cu.bdpcmMode && uiRdModeList[mode].ispMod == INTRA_SUBPARTITIONS_RESERVED)
       {
         if (mode == numNonISPModes)   // the list needs to be sorted only once
@@ -1513,7 +1522,26 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       CHECK(cu.ispMode && cu.dimd, "Error: combination of ISP and DIMD not supported");
 #endif
       pu.intraDir[CHANNEL_TYPE_CHROMA] = cu.colorTransform ? DM_CHROMA_IDX : pu.intraDir[CHANNEL_TYPE_CHROMA];
-
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      if (cu.mtsFlag)
+      {
+        int mtsModeIdx = -1;
+        for (int i = 0; i < m_modesForMTS.size(); i++)
+        {
+          if (uiOrgMode == m_modesForMTS[i])
+          {
+            mtsModeIdx = i;
+            break;
+          }
+        }
+        if (mtsModeIdx == -1)
+        {
+          mtsModeIdx = 0;
+        }
+        CHECK(mtsModeIdx == -1, "mtsModeIdx==-1");
+        m_coeffAbsSumDCT2 = (m_modesForMTS.size() == 0) ? 10 : m_modesCoeffAbsSumDCT2[mtsModeIdx];
+      }
+#endif
       // set context models
       m_CABACEstimator->getCtx() = ctxStart;
 
@@ -1565,6 +1593,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
             uiBestPUMode.ispMod, mtsCheckRangeFlag, mtsFirstCheckId, mtsLastCheckId, moreProbMTSIdxFirst);
         }
       }
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      if (!cu.mtsFlag && !lfnstIdx && mode < numNonISPModes && !(cu.timd && pu.multiRefIdx))
+      {
+        m_modesForMTS.push_back(uiOrgMode);
+        m_modesCoeffAbsSumDCT2.push_back(m_coeffAbsSumDCT2);
+      }
+#endif
 #if JVET_V0130_INTRA_TMP
 #if JVET_W0123_TIMD_FUSION
       if (!cu.ispMode && !cu.mtsFlag && !cu.lfnstIdx && !cu.bdpcmMode && !pu.multiRefIdx && !cu.mipFlag && !cu.tmpFlag && testISP && !cu.timd)
@@ -3702,35 +3737,56 @@ void IntraSearch::xSelectAMTForFullRD(TransformUnit &tu)
     piResi.subtract(piPred);
   }
   // do transform and calculate Coeff AbsSum for all MTS candidates
-  std::vector<std::pair<int, uint64_t>> CoeffAbsSum(4);
-
+#if JVET_Y0142_ADAPT_INTRA_MTS
+  int nCands = MTS_NCANDS[2];
+  if (m_coeffAbsSumDCT2 >= 0 && m_coeffAbsSumDCT2 <= MTS_TH_COEFF[0])
+  {
+    nCands = MTS_NCANDS[0];
+  }
+  else if(m_coeffAbsSumDCT2 > MTS_TH_COEFF[0] && m_coeffAbsSumDCT2 <= MTS_TH_COEFF[1])
+  {
+    nCands = MTS_NCANDS[1];
+  }
+  std::vector<std::pair<int, uint64_t>> coeffAbsSum(nCands);
+  for (int i = 0; i < nCands; i++)
+#else
+  std::vector<std::pair<int, uint64_t>> coeffAbsSum(4);
   for (int i = 0; i < 4; i++)
+#endif
   {
     tu.mtsIdx[0] = i + MTS_DST7_DST7;
     uint64_t AbsSum = m_pcTrQuant->transformNxN(tu);
-    CoeffAbsSum[i] = { i, AbsSum };
+    coeffAbsSum[i] = { i, AbsSum };
   }
-  std::stable_sort(CoeffAbsSum.begin(), CoeffAbsSum.end(), [](const std::pair<int, uint64_t> & l, const std::pair<int, uint64_t> & r) {return l.second < r.second; });
-
+  std::stable_sort(coeffAbsSum.begin(), coeffAbsSum.end(), [](const std::pair<int, uint64_t> & l, const std::pair<int, uint64_t> & r) {return l.second < r.second; });
+#if JVET_Y0142_ADAPT_INTRA_MTS
+  for (int i = 0; i < nCands; i++)
+#else
   for (int i = 0; i < 4; i++)
+#endif
   {
-    m_TestAMTForFullRD[i] = CoeffAbsSum[i].first;
+    m_testAMTForFullRD[i] = coeffAbsSum[i].first;
   }
+#if JVET_Y0142_ADAPT_INTRA_MTS
+  m_numCandAMTForFullRD = nCands;
+#else
   m_numCandAMTForFullRD = 4;
-
+#endif
+#if !JVET_Y0142_ADAPT_INTRA_MTS
   if (m_pcEncCfg->getUseFastLFNST())
   {
     double skipThreshold = 1.0 + 1.0 / sqrt((double)(area.width*area.height));
     skipThreshold = std::max(skipThreshold, 1.03);
     for (int i = 1; i < m_numCandAMTForFullRD; i++)
     {
-      if (CoeffAbsSum[i].second > skipThreshold * CoeffAbsSum[0].second)
+      if (coeffAbsSum[i].second > skipThreshold * coeffAbsSum[0].second)
       {
         m_numCandAMTForFullRD = i;
         break;
       }
     }
   }
+#endif
 }
 #endif
 void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &compID, Distortion& ruiDist, const int &default0Save1Load2, uint32_t* numSig, std::vector<TrMode>* trModes, const bool loadTr)
@@ -3936,7 +3992,11 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
   {
     if (trModes)
     {
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      m_pcTrQuant->transformNxN(tu, compID, cQP, trModes, 8);
+#else
       m_pcTrQuant->transformNxN(tu, compID, cQP, trModes, m_pcEncCfg->getMTSIntraMaxCand());
+#endif
       tu.mtsIdx[compID] = trModes->at(0).first;
     }
 
@@ -3954,6 +4014,34 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       ruiDist = MAX_INT;
       return;
     }
+#if JVET_Y0142_ADAPT_INTRA_MTS
+    if (isLuma(compID) && tu.mtsIdx[compID] >= MTS_DST7_DST7)
+    {
+      bool signHiding = cs.slice->getSignDataHidingEnabledFlag();
+      CoeffCodingContext  cctx(tu, compID, signHiding);
+      const TCoeff*       coeff = tu.getCoeffs(compID).buf;
+      int          scanPosLast = -1;
+      uint64_t     coeffAbsSum = 0;
+
+      for (int scanPos = 0; scanPos < cctx.maxNumCoeff(); scanPos++)
+      {
+        unsigned blkPos = cctx.blockPos(scanPos);
+        if (coeff[blkPos])
+        {
+          scanPosLast = scanPos;
+          coeffAbsSum += abs(coeff[blkPos]);
+        }
+      }
+      int nCands = (coeffAbsSum > MTS_TH_COEFF[1]) ? MTS_NCANDS[2] : (coeffAbsSum > MTS_TH_COEFF[0]) ? MTS_NCANDS[1] : MTS_NCANDS[0];
+      bool isInvalid = (scanPosLast <= 0) || ((tu.mtsIdx[COMPONENT_Y] - MTS_DST7_DST7) >= nCands);
+      if (isInvalid)
+      {
+        m_validMTSReturn = false;
+        ruiDist = MAX_INT;
+        return;
+      }
+    }
+#endif
     if ((m_pcEncCfg->getCostMode() == COST_LOSSLESS_CODING && slice.isLossless() && tu.mtsIdx[compID] == 0)
         && 0 == tu.cu->bdpcmMode)
     {
@@ -4709,7 +4797,11 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
     }
     else
     {
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      nNumTransformCands = 1 + (tsAllowed ? 1 : 0) + (mtsAllowed ? 6 : 0); // DCT + TS + 6 MTS = 8 tests
+#else
       nNumTransformCands = 1 + ( tsAllowed ? 1 : 0 ) + ( mtsAllowed ? 4 : 0 ); // DCT + TS + 4 MTS = 6 tests
+#endif
       if (m_pcEncCfg->getCostMode() == COST_LOSSLESS_CODING && slice.isLossless())
       {
         nNumTransformCands = 1;
@@ -4732,7 +4824,11 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
         }
         if (mtsAllowed)
         {
+#if JVET_Y0142_ADAPT_INTRA_MTS
+          for (int i = 2; i < 8; i++)
+#else
           for (int i = 2; i < 6; i++)
+#endif
           {
             trModes.push_back(TrMode(i, true));
           }
@@ -4769,7 +4865,10 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
     bool    cbfBestModeValid = false;
     bool    cbfDCT2  = true;
 #if JVET_W0103_INTRA_MTS
-    if (sps.getUseLFNST() && cu.mtsFlag) xSelectAMTForFullRD(tu);
+    if (sps.getUseLFNST() && cu.mtsFlag)
+    {
+      xSelectAMTForFullRD(tu);
+    }
 #endif
     double bestDCT2cost = MAX_DOUBLE;
     double threshold = m_pcEncCfg->getUseFastISP() && !cu.ispMode && ispIsCurrentWinner && nNumTransformCands > 1 ? 1 + 1.4 / sqrt( cu.lwidth() * cu.lheight() ) : 1;
@@ -4779,9 +4878,15 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
 #if JVET_W0103_INTRA_MTS
       if (sps.getUseLFNST() && cu.mtsFlag)
       {
-        if (modeId >= m_numCandAMTForFullRD) continue;
-        transformIndex = m_TestAMTForFullRD[modeId];
+        if (modeId >= m_numCandAMTForFullRD)
+        {
+          continue;
+        }
+        transformIndex = m_testAMTForFullRD[modeId];
       }
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      m_validMTSReturn = true;
+#endif
 #endif
       if( sps.getUseLFNST() )
       {
@@ -4924,11 +5029,14 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
           xIntraCodingTUBlock( tu, COMPONENT_Y, singleDistTmpLuma, default0Save1Load2, &numSig );
         }
       }
-
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      cuCtx.mtsCoeffAbsSum = 0;
+#endif
       cuCtx.mtsLastScanPos = false;
 #if INTRA_TRANS_ENC_OPT
       cuCtx.lfnstLastScanPos = false;
 #endif
+
       //----- determine rate and r-d cost -----
       if( ( sps.getUseLFNST() ? ( modeId == lastCheckId && modeId != 0 && checkTransformSkip ) : ( trModes[ modeId ].first != 0 ) ) && !TU::getCbfAtDepth( tu, COMPONENT_Y, currDepth ) )
       {
@@ -4951,11 +5059,26 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
         }
         else
         {
+#if JVET_Y0142_ADAPT_INTRA_MTS
+          if (tu.mtsIdx[COMPONENT_Y] > MTS_SKIP && !m_validMTSReturn)
+          {
+            singleTmpFracBits = 0;
+          }
+          else
+          {
+            singleTmpFracBits = xGetIntraFracBitsQT(*csFull, partitioner, true, false, subTuCounter, ispType, &cuCtx);
+          }
+#else
           singleTmpFracBits = xGetIntraFracBitsQT( *csFull, partitioner, true, false, subTuCounter, ispType, &cuCtx );
+#endif
         }
         if (tu.mtsIdx[COMPONENT_Y] > MTS_SKIP)
         {
+#if JVET_Y0142_ADAPT_INTRA_MTS
+          if(!m_validMTSReturn)
+#else
           if (!cuCtx.mtsLastScanPos)
+#endif
           {
             singleCostTmp = MAX_DOUBLE;
           }
@@ -4995,12 +5118,21 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
           const CompArea&       area = tu.blocks[COMPONENT_Y];
           double skipThreshold = 1.0 + 1.0 / sqrt((double)(area.width*area.height));
           skipThreshold = std::max(skipThreshold, !m_pcEncCfg->getUseFastLFNST()? 1.06: 1.03);
+#if JVET_Y0142_ADAPT_INTRA_MTS
+          skipThreshold = (m_coeffAbsSumDCT2 >= MTS_TH_COEFF[1])? std::max(skipThreshold, 1.06) : skipThreshold;
+#endif
           if (singleCostTmp > skipThreshold * m_globalBestCostStore)
           {
             m_numCandAMTForFullRD = modeId + 1;
           }
         }
       }
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      if (tu.mtsIdx[0] == 0 && !cu.ispMode && !cu.lfnstIdx)
+      {
+        m_coeffAbsSumDCT2 = cuCtx.mtsCoeffAbsSum;
+      }
+#endif
 #endif
       if (singleCostTmp < dSingleCost)
       {
@@ -5172,6 +5304,9 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
       cuCtx.lfnstLastScanPos = false;
       cuCtx.violatesMtsCoeffConstraint = false;
       cuCtx.mtsLastScanPos = false;
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      cuCtx.mtsCoeffAbsSum = 0;
+#endif
 
       //----- determine rate and r-d cost -----
       csSplit->fracBits = xGetIntraFracBitsQT( *csSplit, partitioner, true, false, cu.ispMode ? 0 : -1, ispType, &cuCtx );
@@ -5527,7 +5662,13 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
 
         if (tu.mtsIdx[COMPONENT_Y] > MTS_SKIP)
         {
+#if JVET_Y0142_ADAPT_INTRA_MTS
+          int nCands = (cuCtx.mtsCoeffAbsSum > MTS_TH_COEFF[1]) ? MTS_NCANDS[2] : (cuCtx.mtsCoeffAbsSum > MTS_TH_COEFF[0]) ? MTS_NCANDS[1] : MTS_NCANDS[0];
+          bool isInvalid = !cuCtx.mtsLastScanPos || ((tu.mtsIdx[COMPONENT_Y] - MTS_DST7_DST7) >= nCands);
+          if (isInvalid)
+#else
           if (!cuCtx.mtsLastScanPos)
+#endif
           {
             singleCostTmp = MAX_DOUBLE;
           }
