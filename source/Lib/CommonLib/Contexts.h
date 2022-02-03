@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -141,8 +141,10 @@ public:
 	uint8_t getLPS(unsigned range) const
 	{
 		uint16_t q = state();
-		if (q & 0x4000)
-			q = q ^ 0x7fff;
+    if( q & 0x4000 )
+    {
+      q = q ^ 0x7fff;
+    }
 		return ((range * (q >> 6)) >> 9) + 1;
 	}
 #else
