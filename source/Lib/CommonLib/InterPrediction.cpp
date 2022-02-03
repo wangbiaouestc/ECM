@@ -6817,7 +6817,7 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
     mv = tplCtrl.getFinalMv();
 
     int8_t intWeight = getBcwWeight(cu.BcwIdx, eRefList);
-    return (tplCtrl.getMinCost() * intWeight + (g_BcwWeightBase >> 1)) >> g_BcwWeightBase;
+    return (tplCtrl.getMinCost() * intWeight + (g_BcwWeightBase >> 1)) >> g_BcwLog2WeightBase;
   }
 }
 
