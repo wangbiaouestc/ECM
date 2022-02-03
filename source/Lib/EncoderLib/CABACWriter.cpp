@@ -4657,7 +4657,15 @@ void CABACWriter::mts_idx( const CodingUnit& cu, CUCtx* cuCtx )
     int symbol = mtsIdx != MTS_DCT2_DCT2 ? 1 : 0;
 #if JVET_W0103_INTRA_MTS
 #if JVET_Y0142_ADAPT_INTRA_MTS
+#if JVET_Y0159_INTER_MTS
+    int ctxIdx = 0;
+    if (CU::isIntra(cu))
+    {
+      ctxIdx = (cuCtx->mtsCoeffAbsSum > MTS_TH_COEFF[1]) ? 2 : (cuCtx->mtsCoeffAbsSum > MTS_TH_COEFF[0]) ? 1 : 0;
+    }
+#else
     int ctxIdx = (cuCtx->mtsCoeffAbsSum > MTS_TH_COEFF[1]) ? 2 : (cuCtx->mtsCoeffAbsSum > MTS_TH_COEFF[0]) ? 1 : 0;
+#endif
 #else
     int ctxIdx = (cu.mipFlag) ? 3 : 0;
 #endif
@@ -4672,7 +4680,11 @@ void CABACWriter::mts_idx( const CodingUnit& cu, CUCtx* cuCtx )
 #if JVET_W0103_INTRA_MTS
       int trIdx = (tu.mtsIdx[COMPONENT_Y] - MTS_DST7_DST7);
 #if JVET_Y0142_ADAPT_INTRA_MTS
+#if JVET_Y0159_INTER_MTS
+      int nCands = CU::isIntra(cu) ? MTS_NCANDS[ctxIdx] : 4;
+#else
       int nCands = MTS_NCANDS[ctxIdx];
+#endif
       if (trIdx < 0 || trIdx >= nCands)
       {
         //Don't do anything.

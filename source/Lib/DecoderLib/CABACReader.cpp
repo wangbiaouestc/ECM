@@ -4877,7 +4877,15 @@ void CABACReader::mts_idx( CodingUnit& cu, CUCtx& cuCtx )
     RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2( STATS__CABAC_BITS__MTS_FLAGS, tu.blocks[COMPONENT_Y], COMPONENT_Y );
 #if JVET_W0103_INTRA_MTS
 #if JVET_Y0142_ADAPT_INTRA_MTS
+#if JVET_Y0159_INTER_MTS
+    int ctxIdx = 0;
+    if (CU::isIntra(cu))
+    {
+      ctxIdx = (cuCtx.mtsCoeffAbsSum > MTS_TH_COEFF[1]) ? 2 : (cuCtx.mtsCoeffAbsSum > MTS_TH_COEFF[0]) ? 1 : 0;
+    }
+#else
     int ctxIdx = (cuCtx.mtsCoeffAbsSum > MTS_TH_COEFF[1]) ? 2 : (cuCtx.mtsCoeffAbsSum > MTS_TH_COEFF[0]) ? 1 : 0;
+#endif
 #else
     int ctxIdx = (cu.mipFlag) ? 3 : 0;
 #endif
@@ -4890,7 +4898,11 @@ void CABACReader::mts_idx( CodingUnit& cu, CUCtx& cuCtx )
     {
 #if JVET_W0103_INTRA_MTS
 #if JVET_Y0142_ADAPT_INTRA_MTS
+#if JVET_Y0159_INTER_MTS
+      int nCands = CU::isIntra(cu)? MTS_NCANDS[ctxIdx] : 4;
+#else
       int nCands = MTS_NCANDS[ctxIdx];
+#endif
       uint32_t val;
       if (nCands > 1)
       {

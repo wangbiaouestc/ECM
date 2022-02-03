@@ -184,7 +184,10 @@
 #endif
 #define JVET_W0103_INTRA_MTS                              1 // JVET W0103: Extended Intra MTS
 #if JVET_W0103_INTRA_MTS
-#define JVET_Y0142_ADAPT_INTRA_MTS                        1
+#define JVET_Y0142_ADAPT_INTRA_MTS                        1 // JVET Y0142: Adaptive Intra MTS
+#if JVET_Y0142_ADAPT_INTRA_MTS
+#define JVET_Y0159_INTER_MTS                              1 // JVET Y0159: Inter MTS uses fixed 4 candidates
+#endif
 #endif
 
 // Entropy Coding
