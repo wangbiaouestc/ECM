@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -200,12 +200,12 @@ private:
   Pel*            m_pSharedPredTransformSkip[MAX_NUM_TBLOCKS];
 #if JVET_W0103_INTRA_MTS
 #if JVET_Y0142_ADAPT_INTRA_MTS
-  int            m_testAMTForFullRD[6];
-  bool           m_validMTSReturn;
+  int             m_testAMTForFullRD[6];
+  bool            m_validMTSReturn;
 #else
-  int            m_testAMTForFullRD[4];
+  int             m_testAMTForFullRD[4];
 #endif
-  int            m_numCandAMTForFullRD;
+  int             m_numCandAMTForFullRD;
 #endif
   XUCache         m_unitCache;
 

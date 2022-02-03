@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -143,17 +143,17 @@ protected:
   uint64_t m_SADsArray[((2 * DMVR_NUM_ITERATION) + 1) * ((2 * DMVR_NUM_ITERATION) + 1)];
 #if MULTI_PASS_DMVR
 #if JVET_X0049_BDMVR_SW_OPT
-  Mv m_SearchEnlargeOffsetBilMrg[5][BDMVR_INTME_AREA];
-  uint16_t m_SearchEnlargeOffsetToIdx[5][BDMVR_INTME_AREA];
-  uint16_t m_SearchEnlargeOffsetNum[5];
-  uint64_t m_SADsEnlargeArrayBilMrg[BDMVR_INTME_AREA];
+  Mv                   m_searchEnlargeOffsetBilMrg[5][BDMVR_INTME_AREA];
+  uint16_t             m_searchEnlargeOffsetToIdx[5][BDMVR_INTME_AREA];
+  uint16_t             m_searchEnlargeOffsetNum[5];
+  uint64_t             m_sadEnlargeArrayBilMrg[BDMVR_INTME_AREA];
 #else
-  Mv m_SearchEnlargeOffsetBilMrg[BDMVR_INTME_AREA];
-  uint64_t m_SADsEnlargeArrayBilMrg[BDMVR_INTME_AREA];
-  int searchPriority_bilMrg[BDMVR_INTME_AREA];
+  Mv                   m_searchEnlargeOffsetBilMrg[BDMVR_INTME_AREA];
+  uint64_t             m_sadEnlargeArrayBilMrg[BDMVR_INTME_AREA];
+  int                  m_searchPriorityBilMrg[BDMVR_INTME_AREA];
 #endif
-  int costShift_1_bilMrg[BDMVR_INTME_AREA];
-  int costShift_2_bilMrg[BDMVR_INTME_AREA];
+  int                  m_costShiftBilMrg1[BDMVR_INTME_AREA];
+  int                  m_costShiftBilMrg2[BDMVR_INTME_AREA];
 #endif
 
   Pel                  m_gradBuf[2][(AFFINE_MIN_BLOCK_SIZE + 2) * (AFFINE_MIN_BLOCK_SIZE + 2)];

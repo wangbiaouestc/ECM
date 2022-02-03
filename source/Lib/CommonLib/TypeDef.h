@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -182,11 +182,11 @@
 #if SIGN_PREDICTION
 #define JVET_Y0141_SIGN_PRED_IMPROVE                      1  //JVET-Y0141 test3: sign prediction improvement                          
 #endif
-#define JVET_W0103_INTRA_MTS                              1 // JVET W0103: Extended Intra MTS
+#define JVET_W0103_INTRA_MTS                              1 // JVET-W0103: Extended Intra MTS
 #if JVET_W0103_INTRA_MTS
-#define JVET_Y0142_ADAPT_INTRA_MTS                        1 // JVET Y0142: Adaptive Intra MTS
+#define JVET_Y0142_ADAPT_INTRA_MTS                        1 // JVET-Y0142: Adaptive Intra MTS
 #if JVET_Y0142_ADAPT_INTRA_MTS
-#define JVET_Y0159_INTER_MTS                              1 // JVET Y0159: Inter MTS uses fixed 4 candidates
+#define JVET_Y0159_INTER_MTS                              1 // JVET-Y0159: Inter MTS uses fixed 4 candidates
 #endif
 #endif
 
@@ -230,7 +230,7 @@
 
 // Software extensions
 #define RPR_ENABLE                                        1 // JVET-X0121: Fixes for RRP
-#define JVET_Y0128_NON_CTC                                1
+#define JVET_Y0128_NON_CTC                                1 // JVET-Y0128: Fixing issues for RPR enabling and non-CTC configuration in ECM
 
 
 
