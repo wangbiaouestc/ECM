@@ -324,6 +324,9 @@ protected:
   int                   m_lumaLevelToDeltaQPLUT[LUMA_LEVEL_TO_DQP_LUT_MAXSIZE];
   int                   m_lumaQPOffset;
 #endif
+#if JVET_Y0240_BIM
+  std::map<int, int*>  *m_bimQPMap;
+#endif
   bool                  m_fastDeltaQP;
   static_vector<ComprCUCtx, ( MAX_CU_DEPTH << 2 )> m_ComprCUCtxList;
 #if ENABLE_SPLIT_PARALLELISM
@@ -419,6 +422,14 @@ public:
   void setInterSearch                 (InterSearch* pcInterSearch)   { m_pcInterSearch = pcInterSearch; }
   void   setPltEnc                    ( bool b )                { m_doPlt = b; }
   bool   getPltEnc()                                      const { return m_doPlt; }
+#if JVET_Y0240_BIM
+  void   setBIMQPMap                  ( std::map<int, int*> *qpMap ) { m_bimQPMap = qpMap; }
+  int    getBIMOffset                 ( int poc, int ctuId )
+  {
+    auto it = m_bimQPMap->find(poc);
+    return (it == m_bimQPMap->end()) ? 0 : (*m_bimQPMap)[poc][ctuId];
+  }
+#endif
 
 protected:
   void xExtractFeatures ( const EncTestMode encTestmode, CodingStructure& cs );

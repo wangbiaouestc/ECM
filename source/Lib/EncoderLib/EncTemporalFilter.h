@@ -70,6 +70,11 @@ public:
   Array2D() : m_width(0), m_height(0), v() { }
   Array2D(int width, int height, const T& value=T()) : m_width(0), m_height(0), v() { allocate(width, height, value); }
 
+#if JVET_Y0240_BIM
+  int w() const { return m_width;  }
+  int h() const { return m_height; }
+#endif
+
   void allocate(int width, int height, const T& value=T())
   {
     m_width  = width;
@@ -113,7 +118,11 @@ public:
              const int width, const int height, const int *pad, const bool rec709, const std::string &filename,
              const ChromaFormat inputChroma, const InputColourSpaceConversion colorSpaceConv, const int qp,
              const std::map<int, double> &temporalFilterStrengths, const int pastRefs, const int futureRefs,
-             const int firstValidFrame, const int lastValidFrame );
+             const int firstValidFrame, const int lastValidFrame
+#if JVET_Y0240_BIM
+             , const bool bMCTFenabled, std::map<int, int*> *adaptQPmap, const bool bBIMenabled, const int ctuSize
+#endif
+             );
 
   bool filter(PelStorage *orgPic, int frame);
 
@@ -126,6 +135,9 @@ private:
   static const int m_padding;
   static const int m_interpolationFilter[16][8];
   static const double m_refStrengths[2][4];
+#if JVET_Y0240_BIM
+  static const int m_cuTreeThresh[4];
+#endif
 
   // Private member variables
   int m_FrameSkip;
@@ -142,6 +154,13 @@ private:
   bool m_clipInputVideoToRec709Range;
   InputColourSpaceConversion m_inputColourSpaceConvert;
   Area m_area;
+#if JVET_Y0240_BIM
+  bool m_mctfEnabled;
+  bool m_bimEnabled;
+  int m_numCtu;
+  int m_ctuSize;
+  std::map<int, int*> *m_ctuAdaptedQP;
+#endif
 
   int m_pastRefs;
   int m_futureRefs;

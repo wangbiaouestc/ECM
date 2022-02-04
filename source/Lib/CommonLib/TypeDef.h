@@ -61,6 +61,9 @@
 
 
 #if BASE_ENCODER
+
+#define JVET_Y0240_BIM                                    1 // JVET_Y0240: Block Importance Mapping
+
 #define JVET_X0144_MAX_MTT_DEPTH_TID                      1 // JVET-X0144: max MTT hierarchy depth set by temporal ID
 // Lossy encoder speedups
 #define AFFINE_ENC_OPT                                    1 // Affine encoder optimization

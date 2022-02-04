@@ -1218,6 +1218,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("WCGPPSChromaQpScale",                             m_wcgChromaQpControl.chromaQpScale,                 0.0, "WCG PPS Chroma QP Scale")
   ("WCGPPSChromaQpOffset",                            m_wcgChromaQpControl.chromaQpOffset,                0.0, "WCG PPS Chroma QP Offset")
 #endif
+#if JVET_Y0240_BIM
+  ("BIM",                                             m_bimEnabled,                                     false, "Block Importance Mapping QP adaptation depending on estimated propagation of reference samples.")
+#endif
 #if W0038_CQP_ADJ
   ("SliceChromaQPOffsetPeriodicity",                  m_sliceChromaQpOffsetPeriodicity,                    0u, "Used in conjunction with Slice Cb/Cr QpOffsetIntraOrPeriodic. Use 0 (default) to disable periodic nature.")
   ("SliceCbQpOffsetIntraOrPeriodic",                  m_sliceChromaQpOffsetIntraOrPeriodic[0],              0, "Chroma Cb QP Offset at slice level for I slice or for periodic inter slices as defined by SliceChromaQPOffsetPeriodicity. Replaces offset in the GOP table.")
@@ -4143,6 +4146,15 @@ bool EncAppCfg::xCheckParameter()
       msg( WARNING, "Number of frames used for temporal prefilter is different from default.\n" );
     }
   }
+#if JVET_Y0240_BIM
+  if (m_bimEnabled)
+  {
+    xConfirmPara(m_temporalSubsampleRatio != 1, "Block Importance Mapping only support Temporal sub-sample ratio 1");
+    xConfirmPara(
+      m_gopBasedTemporalFilterPastRefs <= 0 && m_gopBasedTemporalFilterFutureRefs <= 0,
+      "Either TemporalFilterPastRefs or TemporalFilterFutureRefs must be larger than 0 when Block Importance Mapping is enabled" );
+  }
+#endif
 #if EXTENSION_360_VIDEO
   check_failed |= m_ext360.verifyParameters();
 #endif
@@ -4575,6 +4587,9 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "RPR:%d ", 0 );
   }
   msg( VERBOSE, "TemporalFilter:%d/%d ", m_gopBasedTemporalFilterPastRefs, m_gopBasedTemporalFilterFutureRefs );
+#if JVET_Y0240_BIM
+  msg(VERBOSE, "BIM:%d ", m_bimEnabled);
+#endif
 #if EXTENSION_360_VIDEO
   m_ext360.outputConfigurationSummary();
 #endif

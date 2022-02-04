@@ -839,6 +839,9 @@ protected:
   int                   m_gopBasedTemporalFilterPastRefs;
   int                   m_gopBasedTemporalFilterFutureRefs;            ///< Enable/disable future frame references in the GOP-based Temporal Filter
   std::map<int, double> m_gopBasedTemporalFilterStrengths;             ///< Filter strength per frame for the GOP-based Temporal Filter
+#if JVET_Y0240_BIM
+  bool                  m_bimEnabled;
+#endif
 
   int         m_maxLayers;
   int         m_targetOlsIdx;
