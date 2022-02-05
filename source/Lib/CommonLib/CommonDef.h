@@ -722,9 +722,9 @@ static const double AMAXBT_TH128 =                                 60.0;
 static const int AML_MERGE_TEMPLATE_SIZE =                         1;
 static const int ADAPTIVE_SUB_GROUP_SIZE =                         5;
 static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE =                  3;
-#endif
 #if JVET_Y0058_IBC_LIST_MODIFY
 static const int ADAPTIVE_IBC_SUB_GROUP_SIZE =                     6;
+#endif
 #endif
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED

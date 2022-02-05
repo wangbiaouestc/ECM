@@ -5933,7 +5933,6 @@ void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
     }
   }
 }
-#endif
 #if JVET_Y0058_IBC_LIST_MODIFY
 void  InterPrediction::adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, int mrgCandIdx)
 {
@@ -6199,6 +6198,7 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
     }
   }
 }
+#endif
 #endif
 void InterPrediction::xFillIBCBuffer(CodingUnit &cu)
 {
