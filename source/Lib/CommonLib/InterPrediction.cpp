@@ -8725,7 +8725,6 @@ void InterPrediction::xAddHypMC(PredictionUnit& pu, PelUnitBuf& predBuf, PelUnit
     // get legacy ref list and ref idx
     const auto &MHRefPics = pu.cs->slice->getMultiHypRefPicList();
     CHECK(mhData.refIdx < 0, "Multi Hyp: mhData.refIdx < 0");
-    CHECK(mhData.refIdx >= MHRefPics.size(), "Multi Hyp: mhData.refIdx >= MHRefPics.size()");
     const int iRefPicList = mhData.isMrg ? mhData.refList : MHRefPics[mhData.refIdx].refList;
     const int iRefIdx = mhData.isMrg ? mhData.refIdx : MHRefPics[mhData.refIdx].refIdx;
 
