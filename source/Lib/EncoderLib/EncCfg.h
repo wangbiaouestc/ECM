@@ -590,6 +590,10 @@ protected:
   bool      m_bFastMEForGenBLowDelayEnabled;
   bool      m_bUseBLambdaForNonKeyLowDelayPictures;
   bool      m_gopBasedTemporalFilterEnabled;
+#if JVET_Y0240_BIM
+  bool      m_bimEnabled;
+  std::map<int, int*> m_adaptQPmap;
+#endif
   bool      m_noPicPartitionFlag;                             ///< no picture partitioning flag (single tile, single slice)
   bool      m_mixedLossyLossless;                             ///< enable mixed lossy/lossless coding
   std::vector<uint16_t> m_sliceLosslessArray;                      ///< Slice lossless array
@@ -1683,6 +1687,13 @@ public:
 
   void      setGopBasedTemporalFilterEnabled( const bool b ) { m_gopBasedTemporalFilterEnabled = b; }
   bool      getGopBasedTemporalFilterEnabled() const         { return m_gopBasedTemporalFilterEnabled; }
+#if JVET_Y0240_BIM
+  void      setBIM                          (bool flag)               { m_bimEnabled = flag; }
+  bool      getBIM                          ()                        { return m_bimEnabled; }
+  void      setAdaptQPmap                   (std::map<int, int*> map) { m_adaptQPmap = map; }
+  int*      getAdaptQPmap                   (int poc)                 { return m_adaptQPmap[poc]; }
+  std::map<int, int*> *getAdaptQPmap        ()                        { return &m_adaptQPmap; }
+#endif
 
 
   bool      getUseReconBasedCrossCPredictionEstimate ()                const { return m_reconBasedCrossCPredictionEstimate;  }

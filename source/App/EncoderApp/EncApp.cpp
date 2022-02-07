@@ -1223,6 +1223,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setCalculateHdrMetrics                               (m_calculateHdrMetrics);
 #endif
   m_cEncLib.setGopBasedTemporalFilterEnabled(m_gopBasedTemporalFilterEnabled);
+#if JVET_Y0240_BIM
+  m_cEncLib.setBIM                                               (m_bimEnabled);
+#endif
   m_cEncLib.setNumRefLayers                                       ( m_numRefLayers );
 
   m_cEncLib.setVPSParameters(m_cfgVPSParameters);
@@ -1313,11 +1316,22 @@ void EncApp::createLib( const int layerIdx )
   m_orgPic->create( unitArea );
   m_trueOrgPic->create( unitArea );
 
-  if( m_gopBasedTemporalFilterEnabled )
+#if JVET_Y0240_BIM
+  if ( m_gopBasedTemporalFilterEnabled || m_bimEnabled )
+#else
+  if ( m_gopBasedTemporalFilterEnabled )
+#endif
   {
     m_filteredOrgPic = new PelStorage;
     m_filteredOrgPic->create( unitArea );
   }
+#if JVET_Y0240_BIM
+  if ( m_cEncLib.getBIM() )
+  {
+    std::map<int, int*> adaptQPmap;
+    m_cEncLib.setAdaptQPmap(adaptQPmap);
+  }
+#endif
 
   if( !m_bitstream.is_open() )
   {
@@ -1340,13 +1354,21 @@ void EncApp::createLib( const int layerIdx )
   m_ext360 = new TExt360AppEncTop( *this, m_cEncLib.getGOPEncoder()->getExt360Data(), *( m_cEncLib.getGOPEncoder() ), *m_orgPic );
 #endif
 
+#if JVET_Y0240_BIM
+  if( m_gopBasedTemporalFilterEnabled || m_bimEnabled )
+#else
   if( m_gopBasedTemporalFilterEnabled )
+#endif
   {
     m_temporalFilter.init( m_FrameSkip, m_inputBitDepth, m_MSBExtendedBitDepth, m_internalBitDepth, m_iSourceWidth,
                            sourceHeight, m_aiPad, m_bClipInputVideoToRec709Range, m_inputFileName,
                            m_chromaFormatIDC, m_inputColourSpaceConvert, m_iQP, m_gopBasedTemporalFilterStrengths,
                            m_gopBasedTemporalFilterPastRefs, m_gopBasedTemporalFilterFutureRefs, m_firstValidFrame,
-                           m_lastValidFrame );
+                           m_lastValidFrame
+#if JVET_Y0240_BIM
+                           , m_gopBasedTemporalFilterEnabled, m_cEncLib.getAdaptQPmap(), m_cEncLib.getBIM(), m_uiCTUSize
+#endif
+                           );
   }
 }
 
@@ -1377,12 +1399,26 @@ void EncApp::destroyLib()
   delete m_trueOrgPic;
   delete m_orgPic;
 
-  if( m_gopBasedTemporalFilterEnabled )
+#if JVET_Y0240_BIM
+  if ( m_gopBasedTemporalFilterEnabled || m_bimEnabled )
+#else
+  if ( m_gopBasedTemporalFilterEnabled )
+#endif
   {
     m_filteredOrgPic->destroy();
     delete m_filteredOrgPic;
   }
-
+#if JVET_Y0240_BIM
+  if ( m_bimEnabled )
+  {
+    auto map = m_cEncLib.getAdaptQPmap();
+    for (auto it = map->begin(); it != map->end(); ++it)
+    {
+      int *p = it->second;
+      delete p;
+    }
+  }
+#endif
 #if EXTENSION_360_VIDEO
   delete m_ext360;
 #endif
@@ -1410,7 +1446,11 @@ bool EncApp::encodePrep( bool& eos )
   m_cVideoIOYuvInputFile.read( *m_orgPic, *m_trueOrgPic, ipCSC, m_aiPad, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range );
 #endif
 
-  if( m_gopBasedTemporalFilterEnabled )
+#if JVET_Y0240_BIM
+  if ( m_gopBasedTemporalFilterEnabled || m_bimEnabled )
+#else
+  if ( m_gopBasedTemporalFilterEnabled )
+#endif
   {
     m_temporalFilter.filter( m_orgPic, m_iFrameRcvd );
     m_filteredOrgPic->copyFrom( *m_orgPic );
