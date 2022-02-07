@@ -917,7 +917,11 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   double splitRdCostBest[NUM_PART_SPLIT];
   std::fill(std::begin(splitRdCostBest), std::end(splitRdCostBest), MAX_DOUBLE);
 #endif
-
+  if( tempCS->slice->getCheckLDC() )
+  {
+    m_bestBcwCost[0] = m_bestBcwCost[1] = std::numeric_limits<double>::max();
+    m_bestBcwIdx[0] = m_bestBcwIdx[1] = -1;
+  }
   do
   {
     for (int i = compBegin; i < (compBegin + numComp); i++)
@@ -9487,21 +9491,11 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   tempCS->initStructData( encTestMode.qp );
   m_pcInterSearch->setAffineModeSelected(false);
 
-#if INTER_LIC
-  bool lic = encTestMode.opts & ETO_LIC;
-  if( tempCS->slice->getCheckLDC() && !lic )
-#else
-  if( tempCS->slice->getCheckLDC() )
-#endif
-  {
-    m_bestBcwCost[0] = m_bestBcwCost[1] = std::numeric_limits<double>::max();
-    m_bestBcwIdx[0] = m_bestBcwIdx[1] = -1;
-  }
-
   m_pcInterSearch->resetBufferedUniMotions();
   int bcwLoopNum = (tempCS->slice->isInterB() ? BCW_NUM : 1);
   bcwLoopNum = (tempCS->sps->getUseBcw() ? bcwLoopNum : 1);
 #if INTER_LIC
+  bool lic = encTestMode.opts & ETO_LIC;
   bcwLoopNum = lic ? 1 : bcwLoopNum;
 #endif
 
