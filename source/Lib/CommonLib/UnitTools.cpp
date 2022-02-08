@@ -9065,7 +9065,6 @@ AMVPInfo PU::getMultiHypMVPCands(PredictionUnit &pu, const MultiHypPredictionDat
   const auto mhRefIdxForAMVPList = mhDataForAMVPList.refIdx;
   const auto &MHRefPics = pu.cs->slice->getMultiHypRefPicList();
   CHECK(MHRefPics.empty(), "Multi Hyp: MHRefPics.empty()");
-  CHECK(mhRefIdxForAMVPList >= MHRefPics.size(), "Multi Hyp: mhRefIdxForAMVPList >= MHRefPics.size()");
   const auto eRefPicList = RefPicList(MHRefPics[mhRefIdxForAMVPList].refList);
   const int iRefIdx = MHRefPics[mhRefIdxForAMVPList].refIdx;
 
