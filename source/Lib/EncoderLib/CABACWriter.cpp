@@ -2489,14 +2489,14 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
 #endif
     if( pu.interDir != 2 /* PRED_L1 */ )
     {
-#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
-      mvp_flag    ( pu, REF_PIC_LIST_0 );
-#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
       if (!pu.amvpMergeModeFlag[REF_PIC_LIST_0])
       {
 #endif
       ref_idx     ( pu, REF_PIC_LIST_0 );
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+      mvp_flag    ( pu, REF_PIC_LIST_0 );
+#endif
       if ( pu.cu->affine )
       {
         Mv mvd = pu.mvdAffi[REF_PIC_LIST_0][0];
@@ -2555,9 +2555,6 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
     }
     if( pu.interDir != 1 /* PRED_L0 */ )
     {
-#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
-      mvp_flag    ( pu, REF_PIC_LIST_1 );
-#endif
       if ( pu.cu->smvdMode != 1 )
       {
 #if JVET_X0083_BM_AMVP_MERGE_MODE
@@ -2565,6 +2562,9 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
       {
 #endif
       ref_idx     ( pu, REF_PIC_LIST_1 );
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+      mvp_flag    ( pu, REF_PIC_LIST_1 );
+#endif
       if( !pu.cs->picHeader->getMvdL1ZeroFlag() || pu.interDir != 3 /* PRED_BI */ )
       {
         if ( pu.cu->affine )
