@@ -45,7 +45,7 @@
 #include "Rom.h"
 
 #include <memory.h>
-#if INTRA_TRANS_ENC_OPT
+#if INTRA_TRANS_ENC_OPT && defined(TARGET_SIMD_X86)
 #include <smmintrin.h>
 #endif
 #include "CommonLib/InterpolationFilter.h"
