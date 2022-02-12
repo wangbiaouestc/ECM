@@ -94,11 +94,11 @@ EncCu::EncCu() : m_GeoModeTest
   }
 #endif
 #if JVET_W0097_GPM_MMVD_TM
-  fastGpmMmvdSearch = false;
-  fastGpmMmvdRelatedCU = false;
-  includeMoreMMVDCandFirstPass = false;
-  maxNumGPMDirFirstPass = 64;
-  numCandPerPar = 5;
+  m_fastGpmMmvdSearch = false;
+  m_fastGpmMmvdRelatedCU = false;
+  m_includeMoreMMVDCandFirstPass = false;
+  m_maxNumGPMDirFirstPass = 64;
+  m_numCandPerPar = 5;
 #endif
 }
 
@@ -234,16 +234,16 @@ void EncCu::create( EncCfg* encCfg )
   }
   int sourceWidth = encCfg->getSourceWidth();
   int sourceHeight = encCfg->getSourceHeight();
-  fastGpmMmvdSearch = (((encCfg->getIntraPeriod() > 0) && ((sourceWidth * sourceHeight) <= (1920 * 1080))) || ((encCfg->getIntraPeriod() < 0) && ((sourceWidth * sourceHeight) >= (1280 * 720)))) && !encCfg->getIBCMode();
+  m_fastGpmMmvdSearch = (((encCfg->getIntraPeriod() > 0) && ((sourceWidth * sourceHeight) <= (1920 * 1080))) || ((encCfg->getIntraPeriod() < 0) && ((sourceWidth * sourceHeight) >= (1280 * 720)))) && !encCfg->getIBCMode();
 #if TM_MRG
-  fastGpmMmvdRelatedCU = ((encCfg->getIntraPeriod() < 0) && ((sourceWidth * sourceHeight) >= (1920 * 1080))) && !encCfg->getIBCMode();
+  m_fastGpmMmvdRelatedCU = ((encCfg->getIntraPeriod() < 0) && ((sourceWidth * sourceHeight) >= (1920 * 1080))) && !encCfg->getIBCMode();
 #else
-  fastGpmMmvdRelatedCU = ((encCfg->getIntraPeriod() < 0) && ((sourceWidth * sourceHeight) >= (1280 * 720))) && !encCfg->getIBCMode();
+  m_fastGpmMmvdRelatedCU = ((encCfg->getIntraPeriod() < 0) && ((sourceWidth * sourceHeight) >= (1280 * 720))) && !encCfg->getIBCMode();
 #endif
 
-  includeMoreMMVDCandFirstPass = ((encCfg->getIntraPeriod() > 0) || ((encCfg->getIntraPeriod() < 0) && fastGpmMmvdSearch));
-  maxNumGPMDirFirstPass = ((encCfg->getIntraPeriod() < 0) ? 50 : (fastGpmMmvdSearch ? 36 : 64));
-  numCandPerPar = (fastGpmMmvdSearch ? 4 : 5);
+  m_includeMoreMMVDCandFirstPass = ((encCfg->getIntraPeriod() > 0) || ((encCfg->getIntraPeriod() < 0) && m_fastGpmMmvdSearch));
+  m_maxNumGPMDirFirstPass = ((encCfg->getIntraPeriod() < 0) ? 50 : (m_fastGpmMmvdSearch ? 36 : 64));
+  m_numCandPerPar = (m_fastGpmMmvdSearch ? 4 : 5);
 #if TM_MRG
   for (uint16_t ui = 0; ui < GEO_TM_MAX_NUM_CANDS; ui++)
   {
@@ -4687,7 +4687,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if JVET_W0097_GPM_MMVD_TM
 void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode, bool isSecondPass)
 {
-  int numSATDCands = ((fastGpmMmvdSearch && isSecondPass) ? 60 : 70);
+  int numSATDCands = (m_fastGpmMmvdSearch && isSecondPass) ? 60 : 70;
 
   tempCS->initStructData(encTestMode.qp);
 #if TM_MRG
@@ -5066,16 +5066,16 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #else
       double tempCost = (double)sadLarge + geoMergeIdxCost[mergeCand] + geoMMVDFlagCost[0];
 #endif
-      m_GeoMMVDCostList.insert(splitDir, 0, mergeCand, 0, tempCost);
-      sortCandList(tempCost, mergeCand, 0, sadCostList0[splitDir], mergeCandList0[splitDir], mmvdCandList0[splitDir], numCandPerPar);
+      m_geoMMVDCostList.insert(splitDir, 0, mergeCand, 0, tempCost);
+      sortCandList(tempCost, mergeCand, 0, sadCostList0[splitDir], mergeCandList0[splitDir], mmvdCandList0[splitDir], m_numCandPerPar);
       sadSmall = sadWholeBlk[mergeCand] - sadLarge;
 #if JVET_Y0065_GPM_INTRA
       tempCost = (double)sadSmall + geoMergeIdxCost[mergeCand] + geoIntraFlag0Cost[0] + geoMMVDFlagCost[0];
 #else
       tempCost = (double)sadSmall + geoMergeIdxCost[mergeCand] + geoMMVDFlagCost[0];
 #endif
-      m_GeoMMVDCostList.insert(splitDir, 1, mergeCand, 0, tempCost);
-      sortCandList(tempCost, mergeCand, 0, sadCostList1[splitDir], mergeCandList1[splitDir], mmvdCandList1[splitDir], numCandPerPar);
+      m_geoMMVDCostList.insert(splitDir, 1, mergeCand, 0, tempCost);
+      sortCandList(tempCost, mergeCand, 0, sadCostList1[splitDir], mergeCandList1[splitDir], mmvdCandList1[splitDir], m_numCandPerPar);
 #if JVET_Y0065_GPM_INTRA
       }
       else
@@ -5085,7 +5085,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
         m_pcRdCost->setDistParam(distParam, tempCS->getOrgBuf().Y(), geoIntraTempBuf[rdobuffer].Y().buf, geoIntraTempBuf[rdobuffer].Y().stride, SADmask, maskStride, stepX, maskStride2, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y);
         sadLarge = distParam.distFunc(distParam);
         tempCost = (double)sadLarge + geoIntraIdxCost[intraIdx] + geoIntraFlag0Cost[1] + geoMMVDFlagCost[0];
-        m_GeoMMVDCostList.insert(splitDir, 0, mergeCand, 0, tempCost);
+        m_geoMMVDCostList.insert(splitDir, 0, mergeCand, 0, tempCost);
         sortIntraCandList(tempCost, mergeCand, intraSadCostList0[splitDir], intraCandList0[splitDir]);
 
         if (geoIntraMPMList[splitDir][0][intraIdx] != geoIntraMPMList[splitDir][1][intraIdx])
@@ -5096,7 +5096,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
         }
         sadSmall = sadIntraWholeBlk[rdobuffer] - sadLarge;
         tempCost = (double)sadSmall + geoIntraIdxCost[intraIdx] + geoIntraFlag0Cost[1] + geoMMVDFlagCost[0];
-        m_GeoMMVDCostList.insert(splitDir, 1, mergeCand, 0, tempCost);
+        m_geoMMVDCostList.insert(splitDir, 1, mergeCand, 0, tempCost);
         sortIntraCandList(tempCost, mergeCand, intraSadCostList1[splitDir], intraCandList1[splitDir]);
       }
 #endif
@@ -5114,13 +5114,13 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
   for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
   {
 #if JVET_Y0065_GPM_INTRA
-    int numCandMerge0 = min(numCandPerPar, (int)mergeCandList0[splitDir].size());
+    int numCandMerge0 = min(m_numCandPerPar, (int)mergeCandList0[splitDir].size());
     int numCandIntra0 = (int)intraCandList0[splitDir].size();
     int numCandPart0 = numCandMerge0 + numCandIntra0;
     for (int candIdx0 = 0; candIdx0 < numCandPart0; candIdx0++)
     {
       int mergeCand0 = candIdx0 < numCandMerge0 ? mergeCandList0[splitDir][candIdx0] : intraCandList0[splitDir][candIdx0-numCandMerge0];
-      int numCandMerge1 = min(numCandPerPar, (int)mergeCandList1[splitDir].size());
+      int numCandMerge1 = min(m_numCandPerPar, (int)mergeCandList1[splitDir].size());
       int numCandIntra1 = candIdx0 < numCandMerge0 ? (int)intraCandList1[splitDir].size() : 0;
       int numCandPart1 = numCandMerge1 + numCandIntra1;
       int candStart1 = (bUseOnlyOneVector && candIdx0 < numCandMerge0) ? numCandMerge1 : 0;
@@ -5128,8 +5128,8 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
       {
         int mergeCand1 = candIdx1 < numCandMerge1 ? mergeCandList1[splitDir][candIdx1] : intraCandList1[splitDir][candIdx1-numCandMerge1];
 #else
-    int numCandPart0 = min(numCandPerPar, (int)mergeCandList0[splitDir].size());
-    int numCandPart1 = min(numCandPerPar, (int)mergeCandList1[splitDir].size());
+    int numCandPart0 = min(m_numCandPerPar, (int)mergeCandList0[splitDir].size());
+    int numCandPart1 = min(m_numCandPerPar, (int)mergeCandList1[splitDir].size());
     for (int candIdx0 = 0; candIdx0 < numCandPart0; candIdx0++)
     {
       for (int candIdx1 = 0; candIdx1 < numCandPart1; candIdx1++)
@@ -5143,7 +5143,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
           continue;
         }
 
-        double tempCost = m_GeoMMVDCostList.singleDistList[0][splitDir][mergeCand0][0].cost + m_GeoMMVDCostList.singleDistList[1][splitDir][mergeCand1][0].cost;
+        double tempCost = m_geoMMVDCostList.singleDistList[0][splitDir][mergeCand0][0].cost + m_geoMMVDCostList.singleDistList[1][splitDir][mergeCand1][0].cost;
         tempCost = tempCost + geoModeCost[splitDir];
 #if TM_MRG
 #if JVET_Y0065_GPM_INTRA
@@ -5245,9 +5245,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
     int intraIdx0 = mergeCand0 - GEO_MAX_NUM_UNI_CANDS;
     int intraIdx1 = mergeCand1 - GEO_MAX_NUM_UNI_CANDS;
     updateCost += (isIntra0 ? geoIntraIdxCost[intraIdx0] : geoMergeIdxCost[mergeCand0]);
-    updateCost += (isIntra1 ? geoIntraIdxCost[intraIdx1] : ((fastGpmMmvdSearch && !isIntra0) ? geoMergeIdxCost[mergeCand1 > mergeCand0 ? (mergeCand1 - 1) : mergeCand1] : geoMergeIdxCost[mergeCand1]));
+    updateCost += (isIntra1 ? geoIntraIdxCost[intraIdx1] : ((m_fastGpmMmvdSearch && !isIntra0) ? geoMergeIdxCost[mergeCand1 > mergeCand0 ? (mergeCand1 - 1) : mergeCand1] : geoMergeIdxCost[mergeCand1]));
 #else
-    double updateCost = geoModeCost[splitDir] + geoMergeIdxCost[mergeCand0] + (fastGpmMmvdSearch ? geoMergeIdxCost[mergeCand1 > mergeCand0 ? (mergeCand1 - 1) : mergeCand1] : geoMergeIdxCost[mergeCand1]) + geoMMVDFlagCost[mmvdFlag0] + geoMMVDFlagCost[mmvdFlag1];
+    double updateCost = geoModeCost[splitDir] + geoMergeIdxCost[mergeCand0] + (m_fastGpmMmvdSearch ? geoMergeIdxCost[mergeCand1 > mergeCand0 ? (mergeCand1 - 1) : mergeCand1] : geoMergeIdxCost[mergeCand1]) + geoMMVDFlagCost[mmvdFlag0] + geoMMVDFlagCost[mmvdFlag1];
 #endif
 #if TM_MRG
 #if JVET_Y0065_GPM_INTRA
@@ -5583,7 +5583,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
       for (int i = 0; i < relatedCU.numGeoDirCand; i++)
       {
         isGPMModeIncludedForMMVD[relatedCU.geoDirCandList[i]] = true;
-        if (fastGpmMmvdRelatedCU)
+        if (m_fastGpmMmvdRelatedCU)
         {
 #if JVET_Y0065_GPM_INTRA
           if (relatedCU.geoMrgIdx0List[i] < GEO_MAX_NUM_UNI_CANDS)
@@ -5595,7 +5595,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
           isBaseMergeCandIncluded[relatedCU.geoMrgIdx1List[i]] = true;
         }
       }
-      if (!fastGpmMmvdRelatedCU)
+      if (!m_fastGpmMmvdRelatedCU)
       {
         std::memset(isBaseMergeCandIncluded, true, GEO_MAX_NUM_UNI_CANDS * sizeof(bool));
       }
@@ -5607,7 +5607,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
       isBaseMergeCandIncluded[mergeCandList0[selGeoModeList[0]][0]] = true;
       isBaseMergeCandIncluded[mergeCandList1[selGeoModeList[0]][0]] = true;
 
-      for (int i = 1; i < maxNumGPMDirFirstPass; i++)
+      for (int i = 1; i < m_maxNumGPMDirFirstPass; i++)
       {
         if (selGeoModeRDList[i] > dirCostThresh)
         {
@@ -5620,14 +5620,14 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
           isBaseMergeCandIncluded[mergeCandList1[selGeoModeList[i]][0]] = true;
         }
       }
-      if (includeMoreMMVDCandFirstPass)
+      if (m_includeMoreMMVDCandFirstPass)
       {
         int num = 0;
         // add more cands from best combo results obtained in weighted blended nonmmvd combo
         num = min((int)geocandCostList.size(), GEO_MAX_TRY_WEIGHTED_SATD);
         for (int i = 0; i < num; i++)
         {
-          if (fastGpmMmvdSearch && (geocandCostList[i] > dirCostThresh))
+          if (m_fastGpmMmvdSearch && (geocandCostList[i] > dirCostThresh))
           {
             break;
           }
@@ -5692,7 +5692,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
         if (simpleGPMMMVDStep)
         {
           int mmvdStep = (extMMVD ? (mmvdCand >> 3) : (mmvdCand >> 2));
-          if (mmvdStep >= 5 && (!fastGpmMmvdSearch || (fastGpmMmvdSearch && !isSecondPass)))
+          if (mmvdStep >= 5 && (!m_fastGpmMmvdSearch || (m_fastGpmMmvdSearch && !isSecondPass)))
           {
             continue;
           }
@@ -5767,7 +5767,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
           if (simpleGPMMMVDStep)
           {
             int mmvdStep = (extMMVD ? (mmvdCand >> 3) : (mmvdCand >> 2));
-            if (mmvdStep >= 5 && (!fastGpmMmvdSearch || (fastGpmMmvdSearch && !isSecondPass)))
+            if (mmvdStep >= 5 && (!m_fastGpmMmvdSearch || (m_fastGpmMmvdSearch && !isSecondPass)))
             {
               continue;
             }
@@ -5779,13 +5779,13 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
           m_pcRdCost->setDistParam(distParam, tempCS->getOrgBuf().Y(), geoMMVDTempBuf[mergeCand][mmvdCand].Y().buf, geoMMVDTempBuf[mergeCand][mmvdCand].Y().stride, SADmask, maskStride, stepX, maskStride2, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y);
           sadLarge = distParam.distFunc(distParam);
           double tempCost = (double)sadLarge + geoMergeIdxCost[mergeCand] + geoMMVDFlagCost[1] + geoMMVDIdxCost[mmvdCand];
-          m_GeoMMVDCostList.insert(splitDir, 0, mergeCand, (mmvdCand + 1), tempCost);
-          sortCandList(tempCost, mergeCand, (mmvdCand + 1), sadCostList0[splitDir], mergeCandList0[splitDir], mmvdCandList0[splitDir], numCandPerPar);
+          m_geoMMVDCostList.insert(splitDir, 0, mergeCand, (mmvdCand + 1), tempCost);
+          sortCandList(tempCost, mergeCand, (mmvdCand + 1), sadCostList0[splitDir], mergeCandList0[splitDir], mmvdCandList0[splitDir], m_numCandPerPar);
 
           sadSmall = sadMMVDWholeBlk[mergeCand][mmvdCand] - sadLarge;
           tempCost = (double)sadSmall + geoMergeIdxCost[mergeCand] + geoMMVDFlagCost[1] + geoMMVDIdxCost[mmvdCand];
-          m_GeoMMVDCostList.insert(splitDir, 1, mergeCand, (mmvdCand + 1), tempCost);
-          sortCandList(tempCost, mergeCand, (mmvdCand + 1), sadCostList1[splitDir], mergeCandList1[splitDir], mmvdCandList1[splitDir], numCandPerPar);
+          m_geoMMVDCostList.insert(splitDir, 1, mergeCand, (mmvdCand + 1), tempCost);
+          sortCandList(tempCost, mergeCand, (mmvdCand + 1), sadCostList1[splitDir], mergeCandList1[splitDir], mmvdCandList1[splitDir], m_numCandPerPar);
         }
       }
     }
@@ -5793,14 +5793,14 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
     for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
     {
 #if JVET_Y0065_GPM_INTRA
-      int numCandMerge0 = min(numCandPerPar, (int)mergeCandList0[splitDir].size());
+      int numCandMerge0 = min(m_numCandPerPar, (int)mergeCandList0[splitDir].size());
       int numCandIntra0 = (int)intraCandList0[splitDir].size();
       int numCandPart0 = numCandMerge0 + numCandIntra0;
       for (int candIdx0 = 0; candIdx0 < numCandPart0; candIdx0++)
       {
         int mergeCand0 = candIdx0 < numCandMerge0 ? mergeCandList0[splitDir][candIdx0] : intraCandList0[splitDir][candIdx0 - numCandMerge0];
         int mmvdCand0 = candIdx0 < numCandMerge0 ? mmvdCandList0[splitDir][candIdx0] : 0;
-        int numCandMerge1 = min(numCandPerPar, (int)mergeCandList1[splitDir].size());
+        int numCandMerge1 = min(m_numCandPerPar, (int)mergeCandList1[splitDir].size());
         int numCandIntra1 = candIdx0 < numCandMerge0 ? (int)intraCandList1[splitDir].size() : 0;
         int numCandPart1 = numCandMerge0 + numCandIntra1;
         int candStart1 = (bUseOnlyOneVector && candIdx0 < numCandMerge0) ? numCandMerge0 : 0;
@@ -5809,8 +5809,8 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
           int mergeCand1 = candIdx1 < numCandMerge1 ? mergeCandList1[splitDir][candIdx1] : intraCandList1[splitDir][candIdx1 - numCandMerge1];
           int mmvdCand1 = candIdx1 < numCandMerge1 ? mmvdCandList1[splitDir][candIdx1] : 0;
 #else
-      int numCandPart0 = min(numCandPerPar, (int)mergeCandList0[splitDir].size());
-      int numCandPart1 = min(numCandPerPar, (int)mergeCandList1[splitDir].size());
+      int numCandPart0 = min(m_numCandPerPar, (int)mergeCandList0[splitDir].size());
+      int numCandPart1 = min(m_numCandPerPar, (int)mergeCandList1[splitDir].size());
       for (int candIdx0 = 0; candIdx0 < numCandPart0; candIdx0++)
       {
         for (int candIdx1 = 0; candIdx1 < numCandPart1; candIdx1++)
@@ -5837,7 +5837,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
             }
           }
 
-          double tempCost = m_GeoMMVDCostList.singleDistList[0][splitDir][mergeCand0][mmvdCand0].cost + m_GeoMMVDCostList.singleDistList[1][splitDir][mergeCand1][mmvdCand1].cost;
+          double tempCost = m_geoMMVDCostList.singleDistList[0][splitDir][mergeCand0][mmvdCand0].cost + m_geoMMVDCostList.singleDistList[1][splitDir][mergeCand1][mmvdCand1].cost;
           tempCost = tempCost + geoModeCost[splitDir];
 #if TM_MRG
 #if JVET_Y0065_GPM_INTRA
@@ -5953,13 +5953,13 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
           m_pcRdCost->setDistParam(distParam, tempCS->getOrgBuf().Y(), geoTmTempBuf[mergeCand0].Y().buf, geoTmTempBuf[mergeCand0].Y().stride, SADmask, maskStride, stepX, maskStride2, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y);
           sadLarge = distParam.distFunc(distParam);
           double tempCost = (double)sadLarge + geoMergeIdxCost[mergeCand] + geoMMVDFlagCost[0];
-          m_GeoMMVDCostList.insert(splitDir, 0, mergeCand, (GPM_EXT_MMVD_MAX_REFINE_NUM + 1), tempCost);
+          m_geoMMVDCostList.insert(splitDir, 0, mergeCand, (GPM_EXT_MMVD_MAX_REFINE_NUM + 1), tempCost);
 
           uint8_t mergeCand1 = mergeCand + (g_geoTmShape[1][g_GeoParams[splitDir][0]] - 1) * GEO_MAX_NUM_UNI_CANDS;
           m_pcRdCost->setDistParam(distParam, tempCS->getOrgBuf().Y(), geoTmTempBuf[mergeCand1].Y().buf, geoTmTempBuf[mergeCand1].Y().stride, SADmask, maskStride, stepX, maskStride2, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y);
           sadSmall = sadTmWholeBlk[mergeCand1] - distParam.distFunc(distParam);
           tempCost = (double)sadSmall + geoMergeIdxCost[mergeCand] + geoMMVDFlagCost[0];
-          m_GeoMMVDCostList.insert(splitDir, 1, mergeCand, (GPM_EXT_MMVD_MAX_REFINE_NUM + 1), tempCost);
+          m_geoMMVDCostList.insert(splitDir, 1, mergeCand, (GPM_EXT_MMVD_MAX_REFINE_NUM + 1), tempCost);
         }
       }
 
@@ -5981,7 +5981,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
             {
               continue;
             }
-            double tempCost = m_GeoMMVDCostList.singleDistList[0][splitDir][mergeCand0][GPM_EXT_MMVD_MAX_REFINE_NUM + 1].cost + m_GeoMMVDCostList.singleDistList[1][splitDir][mergeCand1][GPM_EXT_MMVD_MAX_REFINE_NUM + 1].cost;
+            double tempCost = m_geoMMVDCostList.singleDistList[0][splitDir][mergeCand0][GPM_EXT_MMVD_MAX_REFINE_NUM + 1].cost + m_geoMMVDCostList.singleDistList[1][splitDir][mergeCand1][GPM_EXT_MMVD_MAX_REFINE_NUM + 1].cost;
             tempCost = tempCost + geoModeCost[splitDir] + geoTMFlagCost[1];
             updateGeoMMVDCandList(tempCost, splitDir, mergeCand0, mergeCand1, (GPM_EXT_MMVD_MAX_REFINE_NUM + 1), (GPM_EXT_MMVD_MAX_REFINE_NUM + 1),
               geoSADCostList, geoSplitDirList, geoMergeCand0, geoMergeCand1, geoMmvdCand0, geoMmvdCand1, numSATDCands);
@@ -6180,7 +6180,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
       orderCandList(candidateIdx, false, splitDir, updateCost, geoRdModeList, isNonMMVDListIdx, geoPartitionModeList, geocandCostList, geoNumMrgSATDCand);
     }
 
-    if (fastGpmMmvdRelatedCU)
+    if (m_fastGpmMmvdRelatedCU)
     {
       int cnt = 0;
       for (uint8_t i = 0; i < geoNumMrgSATDCand; i++)

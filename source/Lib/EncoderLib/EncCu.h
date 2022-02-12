@@ -289,12 +289,12 @@ private:
 #if JVET_W0097_GPM_MMVD_TM
   PelStorage            m_acGeoMMVDBuffer[MRG_MAX_NUM_CANDS][GPM_EXT_MMVD_MAX_REFINE_NUM];
   PelStorage            m_acGeoMMVDTmpBuffer[MRG_MAX_NUM_CANDS][GPM_EXT_MMVD_MAX_REFINE_NUM];
-  FastGeoMMVDCostList   m_GeoMMVDCostList;
-  bool fastGpmMmvdSearch;
-  bool fastGpmMmvdRelatedCU;
-  bool includeMoreMMVDCandFirstPass;
-  int  maxNumGPMDirFirstPass;
-  int  numCandPerPar;
+  FastGeoMMVDCostList   m_geoMMVDCostList;
+  bool                  m_fastGpmMmvdSearch;
+  bool                  m_fastGpmMmvdRelatedCU;
+  bool                  m_includeMoreMMVDCandFirstPass;
+  int                   m_maxNumGPMDirFirstPass;
+  int                   m_numCandPerPar;
 #if TM_MRG
   PelStorage            m_acGeoMergeTmpBuffer[GEO_TM_MAX_NUM_CANDS];
   PelStorage            m_acGeoSADTmpBuffer[GEO_TM_MAX_NUM_CANDS];
