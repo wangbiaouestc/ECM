@@ -185,6 +185,10 @@ struct ModeInfo
 #if TM_MRG
     , isTMMrg(isTMMrg)
 #endif
+#if JVET_X0049_ADAPT_DMVR
+    , isBMMrg( false )
+    , bmDir( 0 )
+#endif
     , isGeo(false), geoSplitDir(0), geoMergeIdx0(0), geoMergeIdx1(0)
 #if ENABLE_OBMC
     , isOBMC(false)
