@@ -3899,7 +3899,11 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
 void InterPrediction::motionCompensationGeo(CodingUnit &cu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1)
 #endif
 #else
+#if JVET_Y0065_GPM_INTRA
+void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx, IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT )
+#else
 void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx )
+#endif
 #endif
 {
   const uint8_t splitDir = cu.firstPU->geoSplitDir;

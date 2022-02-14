@@ -7353,7 +7353,7 @@ void PU::spanIpmInfoIntra( PredictionUnit &pu)
 }
 
 #if RPR_ENABLE
-void  scalePositionInRef( PredictionUnit& pu, const PPS& pps, RefPicList refList, int refIdx, Position& PosY )
+void scalePositionInRef( PredictionUnit& pu, const PPS& pps, RefPicList refList, int refIdx, Position& PosY )
 {
   const Picture* refPic = pu.cu->slice->getRefPic( refList, refIdx )->unscaledPic;
   const bool scaled = refPic->isRefScaled( &pps );
@@ -8213,25 +8213,33 @@ void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8
 #if JVET_W0097_GPM_MMVD_TM
 #if TM_MRG
 void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1)
+#else
+void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool mmvdFlag1, const uint8_t mmvdIdx1 )
+#endif
 {
   pu.geoSplitDir = splitDir;
   pu.geoMergeIdx0 = mergeIdx0;
   pu.geoMergeIdx1 = mergeIdx1;
-  pu.geoTmFlag0 = tmFlag0;
   pu.geoMMVDFlag0 = mmvdFlag0;
   pu.geoMMVDIdx0 = mmvdIdx0;
-  pu.geoTmFlag1 = tmFlag1;
   pu.geoMMVDFlag1 = mmvdFlag1;
   pu.geoMMVDIdx1 = mmvdIdx1;
 
+#if TM_MRG
+  pu.geoTmFlag0 = tmFlag0;
+  pu.geoTmFlag1 = tmFlag1;
   MergeCtx *mergeCtx0 = (tmFlag0 ? &geoTmMrgCtx0 : &geoMrgCtx);
   MergeCtx *mergeCtx1 = (tmFlag1 ? &geoTmMrgCtx1 : &geoMrgCtx);
+#else
+  MergeCtx *mergeCtx0 = &geoMrgCtx;
+  MergeCtx *mergeCtx1 = &geoMrgCtx;
+#endif
 
   const int mvShift = MV_FRACTIONAL_BITS_DIFF;
   const bool extMMVD = pu.cs->picHeader->getGPMMMVDTableFlag();
-  const int MmvdCands[8] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 16 << mvShift , 32 << mvShift,  64 << mvShift , 128 << mvShift };
-  const int ExtMmvdCands[9] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 12 << mvShift , 16 << mvShift, 24 << mvShift, 32 << mvShift, 64 << mvShift };
-  const int* refMvdCands = (extMMVD ? ExtMmvdCands : MmvdCands);
+  const int mmvdCands[8] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 16 << mvShift , 32 << mvShift,  64 << mvShift , 128 << mvShift };
+  const int extMmvdCands[9] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 12 << mvShift , 16 << mvShift, 24 << mvShift, 32 << mvShift, 64 << mvShift };
+  const int* refMvdCands = (extMMVD ? extMmvdCands : mmvdCands);
   Mv mvOffset0[2], mvOffset1[2], deltaMv;
 
   if (mmvdFlag0)
@@ -8585,225 +8593,6 @@ void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx
   spanIpmInfoInter( pu, mb, ib );
 #endif
 }
-#else
-void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool mmvdFlag1, const uint8_t mmvdIdx1)
-{
-  pu.geoSplitDir = splitDir;
-  pu.geoMergeIdx0 = mergeIdx0;
-  pu.geoMergeIdx1 = mergeIdx1;
-  pu.geoMMVDFlag0 = mmvdFlag0;
-  pu.geoMMVDIdx0 = mmvdIdx0;
-  pu.geoMMVDFlag1 = mmvdFlag1;
-  pu.geoMMVDIdx1 = mmvdIdx1;
-
-  const int mvShift = MV_FRACTIONAL_BITS_DIFF;
-  const bool extMMVD = pu.cs->picHeader->getGPMMMVDTableFlag();
-  const int MmvdCands[8] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 16 << mvShift , 32 << mvShift,  64 << mvShift , 128 << mvShift };
-  const int ExtMmvdCands[9] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 12 << mvShift , 16 << mvShift, 24 << mvShift, 32 << mvShift, 64 << mvShift };
-  const int* refMvdCands = (extMMVD ? ExtMmvdCands : MmvdCands);
-  Mv mvOffset0[2], mvOffset1[2], deltaMv;
-
-  if (mmvdFlag0)
-  {
-    int fPosStep = (extMMVD ? (mmvdIdx0 >> 3) : (mmvdIdx0 >> 2));
-    int fPosPosition = (extMMVD ? (mmvdIdx0 - (fPosStep << 3)) : (mmvdIdx0 - (fPosStep << 2)));
-
-    if (fPosPosition == 0)
-    {
-      deltaMv = Mv(refMvdCands[fPosStep], 0);
-    }
-    else if (fPosPosition == 1)
-    {
-      deltaMv = Mv(-refMvdCands[fPosStep], 0);
-    }
-    else if (fPosPosition == 2)
-    {
-      deltaMv = Mv(0, refMvdCands[fPosStep]);
-    }
-    else if (fPosPosition == 3)
-    {
-      deltaMv = Mv(0, -refMvdCands[fPosStep]);
-    }
-    else if (fPosPosition == 4)
-    {
-      deltaMv = Mv(refMvdCands[fPosStep], refMvdCands[fPosStep]);
-    }
-    else if (fPosPosition == 5)
-    {
-      deltaMv = Mv(refMvdCands[fPosStep], -refMvdCands[fPosStep]);
-    }
-    else if (fPosPosition == 6)
-    {
-      deltaMv = Mv(-refMvdCands[fPosStep], refMvdCands[fPosStep]);
-    }
-    else if (fPosPosition == 7)
-    {
-      deltaMv = Mv(-refMvdCands[fPosStep], -refMvdCands[fPosStep]);
-    }
-
-    if (geoMrgCtx.interDirNeighbours[mergeIdx0] == 1)
-    {
-      mvOffset0[0] = deltaMv;
-    }
-    else
-    {
-      mvOffset0[1] = deltaMv;
-    }
-  }
-
-  if (mmvdFlag1)
-  {
-    int fPosStep = (extMMVD ? (mmvdIdx1 >> 3) : (mmvdIdx1 >> 2));
-    int fPosPosition = (extMMVD ? (mmvdIdx1 - (fPosStep << 3)) : (mmvdIdx1 - (fPosStep << 2)));
-
-    if (fPosPosition == 0)
-    {
-      deltaMv = Mv(refMvdCands[fPosStep], 0);
-    }
-    else if (fPosPosition == 1)
-    {
-      deltaMv = Mv(-refMvdCands[fPosStep], 0);
-    }
-    else if (fPosPosition == 2)
-    {
-      deltaMv = Mv(0, refMvdCands[fPosStep]);
-    }
-    else if (fPosPosition == 3)
-    {
-      deltaMv = Mv(0, -refMvdCands[fPosStep]);
-    }
-    else if (fPosPosition == 4)
-    {
-      deltaMv = Mv(refMvdCands[fPosStep], refMvdCands[fPosStep]);
-    }
-    else if (fPosPosition == 5)
-    {
-      deltaMv = Mv(refMvdCands[fPosStep], -refMvdCands[fPosStep]);
-    }
-    else if (fPosPosition == 6)
-    {
-      deltaMv = Mv(-refMvdCands[fPosStep], refMvdCands[fPosStep]);
-    }
-    else if (fPosPosition == 7)
-    {
-      deltaMv = Mv(-refMvdCands[fPosStep], -refMvdCands[fPosStep]);
-    }
-
-    if (geoMrgCtx.interDirNeighbours[mergeIdx1] == 1)
-    {
-      mvOffset1[0] = deltaMv;
-    }
-    else
-    {
-      mvOffset1[1] = deltaMv;
-    }
-  }
-
-  MotionBuf mb = pu.getMotionBuf();
-
-  MotionInfo biMv;
-  biMv.isInter = true;
-  biMv.sliceIdx = pu.cs->slice->getIndependentSliceIdx();
-
-  if (geoMrgCtx.interDirNeighbours[mergeIdx0] == 1 && geoMrgCtx.interDirNeighbours[mergeIdx1] == 2)
-  {
-    biMv.interDir = 3;
-    biMv.mv[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx0 << 1].mv + mvOffset0[0];
-    biMv.mv[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1].mv + mvOffset1[1];
-    biMv.refIdx[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx0 << 1].refIdx;
-    biMv.refIdx[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1].refIdx;
-  }
-  else if (geoMrgCtx.interDirNeighbours[mergeIdx0] == 2 && geoMrgCtx.interDirNeighbours[mergeIdx1] == 1)
-  {
-    biMv.interDir = 3;
-    biMv.mv[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx1 << 1].mv + mvOffset1[0];
-    biMv.mv[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx0 << 1) + 1].mv + mvOffset0[1];
-    biMv.refIdx[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx1 << 1].refIdx;
-    biMv.refIdx[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx0 << 1) + 1].refIdx;
-  }
-  else if (geoMrgCtx.interDirNeighbours[mergeIdx0] == 1 && geoMrgCtx.interDirNeighbours[mergeIdx1] == 1)
-  {
-    biMv.interDir = 1;
-    biMv.mv[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx1 << 1].mv + mvOffset1[0];
-    biMv.mv[1] = Mv(0, 0);
-    biMv.refIdx[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx1 << 1].refIdx;
-    biMv.refIdx[1] = -1;
-  }
-  else if (geoMrgCtx.interDirNeighbours[mergeIdx0] == 2 && geoMrgCtx.interDirNeighbours[mergeIdx1] == 2)
-  {
-    biMv.interDir = 2;
-    biMv.mv[0] = Mv(0, 0);
-    biMv.mv[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1].mv + mvOffset1[1];
-    biMv.refIdx[0] = -1;
-    biMv.refIdx[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1].refIdx;
-  }
-
-  int16_t angle = g_GeoParams[splitDir][0];
-  int tpmMask = 0;
-  int lookUpY = 0, motionIdx = 0;
-  bool isFlip = angle >= 13 && angle <= 27;
-  int distanceIdx = g_GeoParams[splitDir][1];
-  int distanceX = angle;
-  int distanceY = (distanceX + (GEO_NUM_ANGLES >> 2)) % GEO_NUM_ANGLES;
-  int offsetX = (-(int)pu.lwidth()) >> 1;
-  int offsetY = (-(int)pu.lheight()) >> 1;
-  if (distanceIdx > 0)
-  {
-    if (angle % 16 == 8 || (angle % 16 != 0 && pu.lheight() >= pu.lwidth()))
-    {
-      offsetY += angle < 16 ? ((distanceIdx * pu.lheight()) >> 3) : -(int)((distanceIdx * pu.lheight()) >> 3);
-    }
-    else
-    {
-      offsetX += angle < 16 ? ((distanceIdx * pu.lwidth()) >> 3) : -(int)((distanceIdx * pu.lwidth()) >> 3);
-    }
-  }
-  for (int y = 0; y < mb.height; y++)
-  {
-    lookUpY = (((4 * y + offsetY) << 1) + 5) * g_Dis[distanceY];
-    for (int x = 0; x < mb.width; x++)
-    {
-      motionIdx = (((4 * x + offsetX) << 1) + 5) * g_Dis[distanceX] + lookUpY;
-      tpmMask = abs(motionIdx) < 32 ? 2 : (motionIdx <= 0 ? (1 - isFlip) : isFlip);
-      if (tpmMask == 2)
-      {
-        mb.at(x, y).isInter = true;
-        mb.at(x, y).interDir = biMv.interDir;
-        mb.at(x, y).refIdx[0] = biMv.refIdx[0];
-        mb.at(x, y).refIdx[1] = biMv.refIdx[1];
-        mb.at(x, y).mv[0] = biMv.mv[0];
-        mb.at(x, y).mv[1] = biMv.mv[1];
-        mb.at(x, y).sliceIdx = biMv.sliceIdx;
-      }
-      else if (tpmMask == 0)
-      {
-        mb.at(x, y).isInter = true;
-        mb.at(x, y).interDir = geoMrgCtx.interDirNeighbours[mergeIdx0];
-        mb.at(x, y).refIdx[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx0 << 1].refIdx;
-        mb.at(x, y).refIdx[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx0 << 1) + 1].refIdx;
-        mb.at(x, y).mv[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx0 << 1].mv + mvOffset0[0];
-        mb.at(x, y).mv[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx0 << 1) + 1].mv + mvOffset0[1];
-        mb.at(x, y).sliceIdx = biMv.sliceIdx;
-      }
-      else
-      {
-        mb.at(x, y).isInter = true;
-        mb.at(x, y).interDir = geoMrgCtx.interDirNeighbours[mergeIdx1];
-        mb.at(x, y).refIdx[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx1 << 1].refIdx;
-        mb.at(x, y).refIdx[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1].refIdx;
-        mb.at(x, y).mv[0] = geoMrgCtx.mvFieldNeighbours[mergeIdx1 << 1].mv + mvOffset1[0];
-        mb.at(x, y).mv[1] = geoMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1].mv + mvOffset1[1];
-        mb.at(x, y).sliceIdx = biMv.sliceIdx;
-      }
-    }
-  }
-
-#if JVET_W0123_TIMD_FUSION
-  IpmBuf ib = pu.getIpmBuf();
-  spanIpmInfoInter( pu, mb, ib );
-#endif
-}
-#endif
 #endif
 
 bool CU::hasSubCUNonZeroMVd( const CodingUnit& cu )

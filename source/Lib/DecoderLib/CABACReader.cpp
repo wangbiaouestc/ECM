@@ -3518,6 +3518,13 @@ void CABACReader::merge_idx( PredictionUnit& pu )
 #else
       if (!pu.geoMMVDFlag0 && !pu.geoMMVDFlag1)
       {
+#if JVET_Y0065_GPM_INTRA
+        if( isIntra0 || isIntra1 )
+        {
+          geo_merge_idx1( pu, isIntra0, isIntra1 );
+        }
+        else
+#endif
         geo_merge_idx(pu);
       }
 #endif
