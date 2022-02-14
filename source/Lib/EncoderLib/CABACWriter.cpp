@@ -3110,6 +3110,12 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
         m_BinEncoder.encodeBin( isIntra1 ? 1 : 0, Ctx::GPMIntraFlag() );
       }
       }
+      else
+      {
+        CHECK( !isIntra1, "isIntra1 shall be true" );
+      }
+
+      CHECK( pu.gpmIntraFlag != (isIntra0 || isIntra1), "gpmIntraFlag shall be equal to (isIntra0 || isIntra1)" );
 #endif
 
 #if TM_MRG
@@ -3142,6 +3148,13 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
 #else
       if (!pu.geoMMVDFlag0 && !pu.geoMMVDFlag1)
       {
+#if JVET_Y0065_GPM_INTRA
+        if( isIntra0 || isIntra1 )
+        {
+          geo_merge_idx1( pu );
+        }
+        else
+#endif
         geo_merge_idx(pu);
       }
 #endif

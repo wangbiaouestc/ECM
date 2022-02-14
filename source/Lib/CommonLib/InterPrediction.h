@@ -324,7 +324,11 @@ public:
   void    motionCompensationGeo(CodingUnit &cu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1);
 #endif
 #else
+#if JVET_Y0065_GPM_INTRA
+  void    motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx, IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT );
+#else
   void    motionCompensationGeo(CodingUnit &cu, MergeCtx &GeoMrgCtx);
+#endif
 #endif
   void    weightedGeoBlk(PredictionUnit &pu, const uint8_t splitDir, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
 #if JVET_Y0065_GPM_INTRA

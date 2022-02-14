@@ -351,7 +351,7 @@ extern int8_t    g_angle2mirror[GEO_NUM_ANGLES];
 #if JVET_Y0065_GPM_INTRA
 extern int8_t    g_geoAngle2IntraAng  [GEO_NUM_ANGLES];
 #endif
-#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+#if (JVET_W0097_GPM_MMVD_TM && TM_MRG) || JVET_Y0065_GPM_INTRA
 extern uint8_t g_geoTmShape[2][GEO_NUM_ANGLES];
 #endif
 #if MULTI_HYP_PRED

@@ -964,11 +964,19 @@ void DecCu::xReconInter(CodingUnit &cu)
 #endif
     PU::spanGeoMMVDMotionInfo(*cu.firstPU, m_geoMrgCtx, m_geoTmMrgCtx0, m_geoTmMrgCtx1, cu.firstPU->geoSplitDir, cu.firstPU->geoMergeIdx0, cu.firstPU->geoMergeIdx1, cu.firstPU->geoTmFlag0, cu.firstPU->geoMMVDFlag0, cu.firstPU->geoMMVDIdx0, cu.firstPU->geoTmFlag1, cu.firstPU->geoMMVDFlag1, cu.firstPU->geoMMVDIdx1);
 #else
+#if JVET_Y0065_GPM_INTRA
+    m_pcInterPred->motionCompensationGeo( cu, m_geoMrgCtx, m_pcIntraPred, (cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag()) ? &m_pcReshape->getFwdLUT() : nullptr );
+#else
     m_pcInterPred->motionCompensationGeo(cu, m_geoMrgCtx);
+#endif
     PU::spanGeoMMVDMotionInfo(*cu.firstPU, m_geoMrgCtx, cu.firstPU->geoSplitDir, cu.firstPU->geoMergeIdx0, cu.firstPU->geoMergeIdx1, cu.firstPU->geoMMVDFlag0, cu.firstPU->geoMMVDIdx0, cu.firstPU->geoMMVDFlag1, cu.firstPU->geoMMVDIdx1);
 #endif
 #else
+#if JVET_Y0065_GPM_INTRA
+    m_pcInterPred->motionCompensationGeo( cu, m_geoMrgCtx, m_pcIntraPred, (cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag()) ? &m_pcReshape->getFwdLUT() : nullptr );
+#else
     m_pcInterPred->motionCompensationGeo( cu, m_geoMrgCtx );
+#endif
     PU::spanGeoMotionInfo( *cu.firstPU, m_geoMrgCtx, cu.firstPU->geoSplitDir, cu.firstPU->geoMergeIdx0, cu.firstPU->geoMergeIdx1 );
 #endif
   }

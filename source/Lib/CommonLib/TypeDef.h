@@ -157,9 +157,11 @@
 #endif
 #define JVET_X0056_DMVD_EARLY_TERMINATION                 1 // JVET-X0056: Early termination for DMVR and TM
 #define JVET_X0083_BM_AMVP_MERGE_MODE                     1 // JVET-X0083: AMVP-merge mode
-#define JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE             (JVET_X0083_BM_AMVP_MERGE_MODE && 1)
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+#define JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE             1 // JVET-Y0129: MVD signalling for AMVP-merge mode
+#endif
 #define JVET_Y0089_DMVR_BCW                               1 // JVET-Y0089: DMVR with BCW enabled
-#define JVET_Y0065_GPM_INTRA                              1 // JVET-Y0065: Intra Prediction for GPM
+#define JVET_Y0065_GPM_INTRA                              1 // JVET-Y0065: Intra prediction for GPM
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
@@ -817,7 +819,7 @@ enum RefPicList
 
 #define L0 REF_PIC_LIST_0
 #define L1 REF_PIC_LIST_1
-#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+#if (JVET_W0097_GPM_MMVD_TM && TM_MRG) || JVET_Y0065_GPM_INTRA
 enum GeoTmMvCand
 {
   GEO_TM_OFF = 0,

@@ -5057,7 +5057,7 @@ int8_t    g_geoAngle2IntraAng[GEO_NUM_ANGLES] = {50, 0, 44, 41, 34, 27, 0, 0, 18
 const int g_addHypWeight[MULTI_HYP_PRED_NUM_WEIGHTS] = { 2, -1 };
 static_assert(g_BcwLog2WeightBase == MULTI_HYP_PRED_WEIGHT_BITS, "number of bits for gbi and multi-hyp weights do not match");
 #endif
-#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+#if (JVET_W0097_GPM_MMVD_TM && TM_MRG) || JVET_Y0065_GPM_INTRA
 uint8_t g_geoTmShape[2][GEO_NUM_ANGLES] = {
                                           { GEO_TM_SHAPE_A,  0,               GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,
                                             GEO_TM_SHAPE_A,  GEO_TM_SHAPE_AL, 0,               0,
