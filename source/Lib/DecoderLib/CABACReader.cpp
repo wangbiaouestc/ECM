@@ -2994,13 +2994,11 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
         }
 #endif
       }
-#if JVET_Y0128_NON_CTC
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
       else
       {
         pu.refIdx[REF_PIC_LIST_1] = pu.cs->slice->getSymRefIdx(REF_PIC_LIST_1);
-#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
         mvp_flag    ( pu, REF_PIC_LIST_1 );
-#endif
       }
 #endif
 #if !JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE

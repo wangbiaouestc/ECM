@@ -2451,7 +2451,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
       candidateRefIdxCount++;
     }
   }
-#if JVET_Y0128_NON_CTC
+#if JVET_Y0128_NON_CTC || JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
   if ( amvpMergeModeFlag && !candidateRefIdxCount )
   {
     m_skipPROF = false;
@@ -3285,7 +3285,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
       {
         if (uiCostBi > ((m_amvpOnlyCost * 5) >> 2))
         {
-#if JVET_Y0128_NON_CTC
+#if JVET_Y0128_NON_CTC || JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
           m_skipPROF = false;
           m_encOnly = false;
 #endif
@@ -4026,7 +4026,7 @@ void InterSearch::xEstimateMvPredAMVP( PredictionUnit& pu, PelUnitBuf& origBuf, 
 #endif
       pcAMVPInfo->mvCand[0] = mvFieldAmListCommon[mvFieldAmvpIdx0].mv;
       pcAMVPInfo->numCand = 1;
-#if !TM_AMVP || JVET_Y0128_NON_CTC
+#if !TM_AMVP || JVET_Y0128_NON_CTC || JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
       const int mvFieldAmvpIdx1 = mvFieldAmvpIdx0 + 1;
       if (mvFieldAmListCommon[mvFieldAmvpIdx1].refIdx >= 0)
       {
