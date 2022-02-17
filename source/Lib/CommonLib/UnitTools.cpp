@@ -2233,7 +2233,9 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   }
 #else
   const int curPoc = slice.getPOC();
+#if !JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
   RefPicList amvpRefList = REF_PIC_LIST_X;
+#endif
   RefPicList mergeRefList = REF_PIC_LIST_X;
   int amvpPoc = -1;
   if (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1])
@@ -2241,6 +2243,17 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     mergeRefList = pu.amvpMergeModeFlag[0] ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
     amvpRefList = RefPicList(1 - mergeRefList);
     amvpPoc = slice.getRefPOC(amvpRefList, pu.refIdx[amvpRefList]);
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+    useAmvpMergeMode = true;
+    if (pu.amvpMergeModeFlag[0] == true)
+    {
+      amvpMergeCtxMergeDir = 1;
+    }
+    else
+    {
+      amvpMergeCtxMergeDir = 2;
+    }
+#endif
     mrgCtx.numValidMergeCand = (mrgCandIdx + 1) > maxNumMergeCand ? maxNumMergeCand : (mrgCandIdx + 1);
   }
 #endif

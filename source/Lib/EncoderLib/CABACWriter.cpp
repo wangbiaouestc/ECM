@@ -2621,13 +2621,11 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
       }
 #endif
       }
-#if JVET_Y0128_NON_CTC
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
       else
       {
         CHECK( pu.refIdx[REF_PIC_LIST_1] != pu.cs->slice->getSymRefIdx(REF_PIC_LIST_1), "Wrong L1 reference index" );
-#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
         mvp_flag    ( pu, REF_PIC_LIST_1 );
-#endif
       }
 #endif
 #if !JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
