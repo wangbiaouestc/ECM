@@ -2966,7 +2966,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 
               if (!(cu.imv != 0 && biPredResult.pu.mvd[0] == Mv(0, 0) && biPredResult.pu.mvd[1] == Mv(0, 0)))
               {
-                cs.m_MEResults.push_back(biPredResult);
+                cs.m_meResults.push_back(biPredResult);
               }
 
             }
@@ -3217,7 +3217,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 
             if (!(cu.imv != 0 && biPredResult.pu.mvd[0] == Mv(0, 0) && biPredResult.pu.mvd[1] == Mv(0, 0)))
             {
-              cs.m_MEResults.push_back(biPredResult);
+              cs.m_meResults.push_back(biPredResult);
             }
 
           }
@@ -6271,7 +6271,7 @@ void InterSearch::xPredAffineInterSearch( PredictionUnit&       pu,
           biPredResult.pu.mvpNum[iRefList] = aaiMvpNum[iRefList][iRefIdxTemp];
           biPredResult.pu.mvpNum[1 - iRefList] = aaiMvpNum[1 - iRefList][iRefIdxBi[1 - iRefList]];
 
-          pu.cs->m_MEResults.push_back(biPredResult);
+          pu.cs->m_meResults.push_back(biPredResult);
         }
 #endif
         if ( uiCostTemp < uiCostBi )

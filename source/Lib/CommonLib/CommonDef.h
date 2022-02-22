@@ -560,15 +560,15 @@ static const int MMVD_MRG_MAX_RD_NUM =                              MRG_MAX_NUM_
 #endif
 static const int MMVD_MRG_MAX_RD_BUF_NUM =                          (MMVD_MRG_MAX_RD_NUM + 1);///< increase buffer size by 1
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-static const int LAST_MERGE_MMVD_IDX_CABAC =                              5;
+static const int LAST_MERGE_MMVD_IDX_CABAC =                        5;
 #endif
 #if JVET_W0097_GPM_MMVD_TM
-static const int GPM_MMVD_REFINE_STEP = 8;
-static const int GPM_MMVD_REFINE_DIRECTION = 4;
-static const int GPM_MMVD_MAX_REFINE_NUM = (GPM_MMVD_REFINE_STEP * GPM_MMVD_REFINE_DIRECTION);
-static const int GPM_EXT_MMVD_REFINE_STEP = 9;
-static const int GPM_EXT_MMVD_REFINE_DIRECTION = 8;
-static const int GPM_EXT_MMVD_MAX_REFINE_NUM = (GPM_EXT_MMVD_REFINE_STEP * GPM_EXT_MMVD_REFINE_DIRECTION);
+static const int GPM_MMVD_REFINE_STEP =                             8;
+static const int GPM_MMVD_REFINE_DIRECTION =                        4;
+static const int GPM_MMVD_MAX_REFINE_NUM =                          (GPM_MMVD_REFINE_STEP * GPM_MMVD_REFINE_DIRECTION);
+static const int GPM_EXT_MMVD_REFINE_STEP =                         9;
+static const int GPM_EXT_MMVD_REFINE_DIRECTION =                    8;
+static const int GPM_EXT_MMVD_MAX_REFINE_NUM =                      (GPM_EXT_MMVD_REFINE_STEP * GPM_EXT_MMVD_REFINE_DIRECTION);
 #endif
 static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_LUMA =      28;
 static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA =    28;
@@ -638,8 +638,8 @@ static const int    FAST_SKIP_DEPTH =                               2;
 
 static const double PBINTRA_RATIO     =                             1.1;
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-static const int THRES_TRANS          =                             16;
-static const int THRES_AFFINE         =                             4;
+static const int    THRES_TRANS =                                  16;
+static const int    THRES_AFFINE =                                  4;
 #endif
 #if !MERGE_ENC_OPT
 static const int    NUM_MRG_SATD_CAND =                             4;
@@ -655,7 +655,7 @@ static const int    AF_MMVD_OFFSET_DIR =                            8;
 static const int    AF_MMVD_OFFSET_DIR =                            4; // 00: (+, 0); 01: (-, 0); 10: (0, +); 11 (0, -);
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-static const int Affine_MMVD_Size_Shift =                           1;
+static const int    AFFINE_MMVD_SIZE_SHIFT =                        1;
 #endif
 static const int    AF_MMVD_MAX_REFINE_NUM = AF_MMVD_STEP_NUM * AF_MMVD_OFFSET_DIR; ///< max number of candidate from a base candidate
 static const int    AF_MMVD_NUM = AF_MMVD_BASE_NUM * AF_MMVD_MAX_REFINE_NUM;        ///< total number of affine mmvd candidate

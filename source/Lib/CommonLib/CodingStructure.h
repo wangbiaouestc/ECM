@@ -196,7 +196,7 @@ public:
   }
 #endif
 #if MULTI_HYP_PRED
-  MEResultVec m_MEResults;
+  MEResultVec m_meResults;
 #endif
 
 private:

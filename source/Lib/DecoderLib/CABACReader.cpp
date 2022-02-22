@@ -1890,8 +1890,8 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
     return;
   }
 #if JVET_V0130_INTRA_TMP
-  int TMP_MaxSize=cu.cs->sps->getIntraTMPMaxSize();
-  if (cu.lwidth() <= TMP_MaxSize && cu.lheight() <= TMP_MaxSize)
+  int tmpMaxSize=cu.cs->sps->getIntraTMPMaxSize();
+  if( cu.lwidth() <= tmpMaxSize && cu.lheight() <= tmpMaxSize )
   {
 	  tmp_flag(cu);
     if( cu.tmpFlag )
@@ -3161,7 +3161,7 @@ void CABACReader::affine_mmvd_data(PredictionUnit& pu)
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   unsigned int ricePar = 1;
-  int numCandminus1_step =  (AF_MMVD_MAX_REFINE_NUM >> (ricePar+Affine_MMVD_Size_Shift))  - 1;
+  int numCandminus1_step =  (AF_MMVD_MAX_REFINE_NUM >> (ricePar + AFFINE_MMVD_SIZE_SHIFT))  - 1;
   int temp = (ricePar == 0) ? 0 : m_BinDecoder.decodeBinsEP(ricePar);
   int uiUnaryIdx = 0;
   for (; uiUnaryIdx < numCandminus1_step; ++uiUnaryIdx)
