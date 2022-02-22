@@ -1598,7 +1598,7 @@ void CodingStructure::initStructData( const int &QP, const bool &skipMotBuf )
   useDbCost = false;
   interHad = std::numeric_limits<Distortion>::max();
 #if MULTI_HYP_PRED
-  m_MEResults.clear();
+  m_meResults.clear();
 #endif
 }
 

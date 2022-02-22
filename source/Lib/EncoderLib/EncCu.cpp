@@ -703,9 +703,9 @@ bool EncCu::xCheckBestMode( CodingStructure *&tempCS, CodingStructure *&bestCS, 
 #if MULTI_HYP_PRED
     if (tempCS->sps->getUseInterMultiHyp() && tempCS->slice->isInterB())
     {
-      m_baseResultsForMH.insert(m_baseResultsForMH.end(), tempCS->m_MEResults.begin(), tempCS->m_MEResults.end());
+      m_baseResultsForMH.insert(m_baseResultsForMH.end(), tempCS->m_meResults.begin(), tempCS->m_meResults.end());
 #if MULTI_HYP_PRED
-      tempCS->m_MEResults.clear(); // avoid duplicate insert
+      tempCS->m_meResults.clear(); // avoid duplicate insert
 #endif
     }
 #endif
@@ -7811,7 +7811,7 @@ void EncCu::xCheckSATDCostAffineMmvdMerge(       CodingStructure*& tempCS,
   for (uint32_t uiMergeCandTemp = 0; uiMergeCandTemp < afMmvdCandCount; uiMergeCandTemp++)
   {
     uint32_t uiMergeCand = affMmvdLUT[uiMergeCandTemp];
-    if(uiMergeCandTemp - (uiMergeCandTemp/AF_MMVD_MAX_REFINE_NUM )* AF_MMVD_MAX_REFINE_NUM  >= (AF_MMVD_MAX_REFINE_NUM >> Affine_MMVD_Size_Shift ))
+    if(uiMergeCandTemp - (uiMergeCandTemp/AF_MMVD_MAX_REFINE_NUM )* AF_MMVD_MAX_REFINE_NUM  >= (AF_MMVD_MAX_REFINE_NUM >> AFFINE_MMVD_SIZE_SHIFT))
     {
       continue;
     }

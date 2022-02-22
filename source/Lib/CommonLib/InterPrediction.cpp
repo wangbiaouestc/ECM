@@ -4893,7 +4893,7 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
     startMMVDIdx = gpId * groupSize;
     endMMVDIdx = (gpId+1) * groupSize;
   }
-  int shiftEnc = Affine_MMVD_Size_Shift;
+  int shiftEnc = AFFINE_MMVD_SIZE_SHIFT;
   int encGrpSize = groupSize >> shiftEnc;
   for (int mmvdMergeCand = startMMVDIdx; mmvdMergeCand < endMMVDIdx; mmvdMergeCand++)
   {

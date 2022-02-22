@@ -1594,7 +1594,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         }
       }
 #if JVET_Y0142_ADAPT_INTRA_MTS
+#if JVET_W0123_TIMD_FUSION
       if (!cu.mtsFlag && !lfnstIdx && mode < numNonISPModes && !(cu.timd && pu.multiRefIdx))
+#else
+      if( !cu.mtsFlag && !lfnstIdx && mode < numNonISPModes && !pu.multiRefIdx )
+#endif
       {
         m_modesForMTS.push_back(uiOrgMode);
         m_modesCoeffAbsSumDCT2.push_back(m_coeffAbsSumDCT2);
@@ -1659,13 +1663,22 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #if INTRA_TRANS_ENC_OPT
         if (setSkipTimdControl && !cu.ispMode)
         {
+#if JVET_W0123_TIMD_FUSION || ENABLE_DIMD
+#if JVET_W0123_TIMD_FUSION && ENABLE_DIMD
           if (!cu.dimd && !cu.timd)
+#elif ENABLE_DIMD
+          if( !cu.dimd )
+#else
+          if( !cu.timd )
+#endif
           {
             if (csTemp->cost < regAngCost)
             {
               regAngCost = csTemp->cost;
             }
           }
+#endif
+#if JVET_W0123_TIMD_FUSION
           if (cu.timd)
           {
             if (csTemp->cost < timdAngCost)
@@ -1673,6 +1686,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               timdAngCost = csTemp->cost;
             }
           }
+#endif
         }
 #endif
         // check r-d cost

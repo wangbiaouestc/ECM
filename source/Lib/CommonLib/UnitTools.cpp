@@ -9448,7 +9448,11 @@ bool TU::getDelayedSignCoding( const TransformUnit &tu, const ComponentID compID
 bool TU::getUseSignPred( const TransformUnit &tu, const ComponentID compID )
 {
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-  return TU::getDelayedSignCoding( tu, compID ) && ( !tu.cu->lfnstIdx || !tu.cu->tmpFlag );
+#if JVET_V0130_INTRA_TMP
+  return TU::getDelayedSignCoding( tu, compID ) && (!tu.cu->lfnstIdx || !tu.cu->tmpFlag);
+#else
+  return TU::getDelayedSignCoding( tu, compID ) && !tu.cu->lfnstIdx;
+#endif
 #else
   return TU::getDelayedSignCoding( tu, compID ) && !tu.cu->lfnstIdx;
 #endif

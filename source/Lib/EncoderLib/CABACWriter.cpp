@@ -1424,8 +1424,8 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
     return;
   }
 #if JVET_V0130_INTRA_TMP
-  int TMP_MaxSize=cu.cs->sps->getIntraTMPMaxSize();
-  if (cu.lwidth() <= TMP_MaxSize && cu.lheight() <= TMP_MaxSize)
+  int tmpMaxSize = cu.cs->sps->getIntraTMPMaxSize();
+  if( cu.lwidth() <= tmpMaxSize && cu.lheight() <= tmpMaxSize )
   {
 	  tmp_flag(cu);
     if( cu.tmpFlag )
@@ -1626,8 +1626,8 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
 #if JVET_V0130_INTRA_TMP
   // check if sufficient search range is available
   //bool bCheck = pu.cu->
-  int TMP_MaxSize=pu.cu->cs->sps->getIntraTMPMaxSize();
-  if (pu.cu->lwidth() <= TMP_MaxSize && pu.cu->lheight() <= TMP_MaxSize)
+  int tmpMaxSize = pu.cu->cs->sps->getIntraTMPMaxSize();
+  if( pu.cu->lwidth() <= tmpMaxSize && pu.cu->lheight() <= tmpMaxSize )
   {
 	  tmp_flag(*pu.cu);
     if( pu.cu->tmpFlag )
@@ -2761,7 +2761,7 @@ void CABACWriter::affine_mmvd_data(const PredictionUnit& pu)
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   uint8_t sym = pu.afMmvdMergeIdx;
   unsigned int ricePar = 1;
-  int numCandminus1_step =  ((AF_MMVD_MAX_REFINE_NUM >> ricePar) >> Affine_MMVD_Size_Shift) - 1;
+  int numCandminus1_step =  ((AF_MMVD_MAX_REFINE_NUM >> ricePar) >> AFFINE_MMVD_SIZE_SHIFT) - 1;
   if(ricePar > 0)
   {
     m_BinEncoder.encodeBinsEP( sym % (1 << ricePar), ricePar);

@@ -547,7 +547,7 @@ public:
 protected:
   void touch    ( const UnitArea& area );
 #endif
-#if JVET_W0097_GPM_MMVD_TM
+#if JVET_W0097_GPM_MMVD_TM || INTRA_TRANS_ENC_OPT
 public:
 #endif
   CodedCUInfo& getBlkInfo( const UnitArea& area );

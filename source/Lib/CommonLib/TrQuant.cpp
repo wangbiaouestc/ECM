@@ -2198,6 +2198,7 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
   return result;
 }
 #endif
+#endif
 #if INTRA_TRANS_ENC_OPT
 void TrQuant::forwardLfnst(TCoeff* src, TCoeff*& dst, const int8_t*& trMat, const int trSize, const int zeroOutSize)
 {
@@ -2243,7 +2244,6 @@ void TrQuant::inverseLfnst(TCoeff* src, TCoeff*  dst, const int8_t*  trMat, cons
     trMat++;
   }
 }
-#endif
 #endif
 
 //! \}

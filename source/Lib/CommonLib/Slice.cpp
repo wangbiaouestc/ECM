@@ -229,8 +229,10 @@ void Slice::initSlice()
 void Slice::checkBMAvailability(Slice* pcSlice)
 {
   pcSlice->setUseBM(false, -1, -1);
-  if (!pcSlice->getSPS()->getUseDMVDMode()
-    || pcSlice->getCheckLDC()
+  if( pcSlice->getCheckLDC()
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+  || !pcSlice->getSPS()->getUseDMVDMode()
+#endif
     )
   {
     return;
@@ -283,9 +285,12 @@ void Slice::checkAmvpMergeModeAvailability(Slice* pcSlice)
     m_amvpMergeModeValidRefIdx[REF_PIC_LIST_0][refIdxInList0] = false;
     m_amvpMergeModeValidRefIdx[REF_PIC_LIST_1][refIdxInList0] = false;
   }
-  if (!pcSlice->getSPS()->getUseDMVDMode()
-    || pcSlice->getCheckLDC()
-    )
+
+  if( pcSlice->getCheckLDC()
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+      || !pcSlice->getSPS()->getUseDMVDMode()
+#endif
+      )
   {
     return;
   }

@@ -138,7 +138,7 @@
 #define JVET_Y0116_EXTENDED_MRL_LIST                      1 // JVET-Y0116: Extended MRL Candidate List
 
 //IBC
-#define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058:Modifications of IBC merge/AMVP list construction
+#define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058:Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
 
 // Inter
 #define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
