@@ -410,13 +410,13 @@ uint32_t computeSAD_SIMD( const Pel* ref, const Pel* cur, const int size )
 }
 #endif
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-static const __m128i vzeros32 = _mm_setzero_si128();
-static const __m128i voffset32 = _mm_set1_epi32(SIGN_PRED_OFFSET);
-static const __m128i vmask32 = _mm_set_epi32(-1, -1, -1, 0);
 
 template< X86_VEXT vext >
 uint32_t computeHypSampleInt8_SIMD(const int dequant, const int8_t* templateNormalizedBuf, Pel* templ, const uint32_t uiWidth, const uint32_t uiHeight)
 {
+  const __m128i vzeros32 = _mm_setzero_si128();
+  const __m128i voffset32 = _mm_set1_epi32(SIGN_PRED_OFFSET);
+  const __m128i vmask32 = _mm_set_epi32(-1, -1, -1, 0);
   __m128i vdequant = _mm_set1_epi32(dequant);
   __m128i vsum = _mm_setzero_si128();
   __m128i vnorm;
@@ -460,13 +460,13 @@ uint32_t computeHypSampleInt8_SIMD(const int dequant, const int8_t* templateNorm
   return 0;
 }
 
-static const __m128i vscale0 = _mm_set1_epi16(-2);
-static const __m128i vscale1 = _mm_set1_epi16(2);
-static const __m128i vmask16 = _mm_set_epi16(-1, -1, -1, -1, -1, -1, -1, 0);
-
 template< X86_VEXT vext >
 void computeSynSample_SIMD(const Pel* templ, Pel* resiBuf, const uint32_t uiWidth, const uint32_t uiHeight, const bool signModifyTo)
 {
+ 
+  const __m128i vscale0 = _mm_set1_epi16(-2);
+  const __m128i vscale1 = _mm_set1_epi16(2);
+  const __m128i vmask16 = _mm_set_epi16(-1, -1, -1, -1, -1, -1, -1, 0);
   __m128i vtemp, vdst;
 
   if (signModifyTo)
@@ -526,12 +526,12 @@ void computeSynSample_SIMD(const Pel* templ, Pel* resiBuf, const uint32_t uiWidt
 }
 #endif
 #if INTRA_TRANS_ENC_OPT 
-static const __m128i vrnd = _mm_set1_epi32(64);
 template< X86_VEXT vext >
 void forwardLfnst_SIMD(TCoeff* src, TCoeff*& dst, const int8_t*& trMat, const int trSize, const int zeroOutSize)
 {
   CHECK((trSize & 0x7) || (zeroOutSize & 0x7), "trSize and zeroOutSize should be multiple of 8");
 
+  const __m128i vrnd = _mm_set1_epi32(64);
   __m128i vmat[4], vcoef[4], vsrc;
 
   int trSize2 = (trSize << 1);
@@ -573,6 +573,7 @@ void inverseLfnst_SIMD(TCoeff* src, TCoeff*  dst, const int8_t*  trMat, const in
 {
   CHECK((trSize & 0x7) || (zeroOutSize & 0x7), "trSize and zeroOutSize should be multiple of 8");
 
+  const __m128i vrnd = _mm_set1_epi32(64);
   __m128i vmat[4], vcoef[4], vsrc;
   __m128i vmin = _mm_set1_epi32(outputMinimum);
   __m128i vmax = _mm_set1_epi32(outputMaximum);
