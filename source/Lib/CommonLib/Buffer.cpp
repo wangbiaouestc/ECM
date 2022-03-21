@@ -1141,6 +1141,12 @@ template<>
 void AreaBuf<Pel>::subtract( const Pel val )
 {
   ClpRng clpRngDummy;
+
+  clpRngDummy.min = 0;
+  clpRngDummy.max = 0;
+  clpRngDummy.bd = 0;
+  clpRngDummy.n = 0;
+
   linearTransform( 1, 0, -val, false, clpRngDummy );
 }
 #endif
