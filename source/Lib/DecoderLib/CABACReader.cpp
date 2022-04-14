@@ -581,6 +581,7 @@ void CABACReader::bif(CodingStructure& cs, unsigned ctuRsAddr)
     bifParams.ctuOn.resize(bifParams.numBlocks);
     std::fill(bifParams.ctuOn.begin(), bifParams.ctuOn.end(), 0);
   }
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET2(STATS__CABAC_BITS__BIF, COMPONENT_Y);
   if (ctuRsAddr == 0)
   {
     bifParams.allCtuOn = m_BinDecoder.decodeBinEP();
@@ -616,6 +617,7 @@ void CABACReader::chromaBifCb(CodingStructure& cs)
 
   int widthInBlocks = width / blockWidth + (width % blockWidth != 0);
   int heightInBlocks = height / blockHeight + (height % blockHeight != 0);
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET2(STATS__CABAC_BITS__BIF, COMPONENT_Cb);
 
   for (int i = 0; i < widthInBlocks * heightInBlocks; i++)
   {
@@ -682,6 +684,7 @@ void CABACReader::chromaBifCr(CodingStructure& cs)
 
   int widthInBlocks = width / blockWidth + (width % blockWidth != 0);
   int heightInBlocks = height / blockHeight + (height % blockHeight != 0);
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET2(STATS__CABAC_BITS__BIF, COMPONENT_Cr);
 
   for (int i = 0; i < widthInBlocks * heightInBlocks; i++)
   {
@@ -766,6 +769,7 @@ void CABACReader::ccSaoControlIdc(CodingStructure &cs, const ComponentID compID,
   ctxt += ( compID == COMPONENT_Y  ) ? 0 
         : ( compID == COMPONENT_Cb ) ? 3 : 6;
 
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET2(STATS__CABAC_BITS__SAO, compID);
   int idcVal  = m_BinDecoder.decodeBin( Ctx::CcSaoControlIdc( ctxt ) );
   if ( idcVal )
   {
@@ -1281,7 +1285,7 @@ void CABACReader::coding_unit( CodingUnit &cu, Partitioner &partitioner, CUCtx& 
 
 void CABACReader::cu_skip_flag( CodingUnit& cu )
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__SKIP_FLAG );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__SKIP_FLAG, cu.lumaSize());
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   if (cu.slice->isIntra() && cu.cs->slice->getSPS()->getIBCFlag())
 #else
@@ -1373,7 +1377,7 @@ void CABACReader::cu_skip_flag( CodingUnit& cu )
 
 void CABACReader::imv_mode( CodingUnit& cu, MergeCtx& mrgCtx )
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__OTHER );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__IMV_FLAG, cu.lumaSize());
 
   if( !cu.cs->sps->getAMVREnabledFlag() )
   {
@@ -1433,7 +1437,7 @@ void CABACReader::imv_mode( CodingUnit& cu, MergeCtx& mrgCtx )
 }
 void CABACReader::affine_amvr_mode( CodingUnit& cu, MergeCtx& mrgCtx )
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__OTHER );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__AFFINE_AMVR, cu.lumaSize());
 
   const SPS* sps = cu.slice->getSPS();
 
@@ -1464,7 +1468,7 @@ void CABACReader::affine_amvr_mode( CodingUnit& cu, MergeCtx& mrgCtx )
 
 void CABACReader::pred_mode( CodingUnit& cu )
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__PRED_MODE );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2(STATS__CABAC_BITS__PRED_MODE, cu.block((!CS::isDualITree(*cu.cs) || isLuma(cu.chType))? COMPONENT_Y: COMPONENT_Cb).lumaSize(), (!CS::isDualITree(*cu.cs) || isLuma(cu.chType)) ? CHANNEL_TYPE_LUMA : CHANNEL_TYPE_CHROMA);
   if (cu.cs->slice->getSPS()->getIBCFlag() && cu.chType != CHANNEL_TYPE_CHROMA)
   {
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -1699,7 +1703,7 @@ void CABACReader::cu_bcw_flag(CodingUnit& cu)
 
   CHECK(!(BCW_NUM > 1 && (BCW_NUM == 2 || (BCW_NUM & 0x01) == 1)), " !( BCW_NUM > 1 && ( BCW_NUM == 2 || ( BCW_NUM & 0x01 ) == 1 ) ) ");
 
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__BCW_IDX);
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__BCW_IDX, cu.lumaSize());
 
   uint32_t idx = 0;
 
@@ -1751,6 +1755,7 @@ void CABACReader::obmc_flag(CodingUnit& cu)
     cu.obmcFlag = true;
     return;
   }
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__OBMC, cu.lumaSize());
 
   cu.obmcFlag = (bool)m_BinDecoder.decodeBin(Ctx::ObmcFlag());
 }
@@ -1799,7 +1804,7 @@ void CABACReader::extend_ref_line(CodingUnit& cu)
     cu.firstPU->multiRefIdx = 0;
     return;
   }
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__MULTI_REF_LINE);
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MULTI_REF_LINE, cu.lumaSize());
 
   const int numBlocks = CU::getNumPUs(cu);
   PredictionUnit* pu = cu.firstPU;
@@ -2066,6 +2071,7 @@ void CABACReader::cu_dimd_flag(CodingUnit& cu)
     cu.dimd = false;
     return;
   }
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2(STATS__CABAC_BITS__INTRA_DIMD, cu.lumaSize(), COMPONENT_Y);
 
   unsigned ctxId = DeriveCtx::CtxDIMDFlag(cu);
   cu.dimd = m_BinDecoder.decodeBin(Ctx::DimdFlag(ctxId));
@@ -2097,6 +2103,7 @@ void CABACReader::cu_timd_flag( CodingUnit& cu )
     cu.timd = false;
     return;
   }
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2(STATS__CABAC_BITS__INTRA_TIMD, cu.lumaSize(), COMPONENT_Y);
 
   unsigned ctxId = DeriveCtx::CtxTimdFlag( cu );
   cu.timd = m_BinDecoder.decodeBin( Ctx::TimdFlag(ctxId) );
@@ -2306,7 +2313,7 @@ void CABACReader::cu_residual( CodingUnit& cu, Partitioner &partitioner, CUCtx& 
 
 void CABACReader::rqt_root_cbf( CodingUnit& cu )
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__QT_ROOT_CBF );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__QT_ROOT_CBF, cu.lumaSize());
 
   cu.rootCbf = ( m_BinDecoder.decodeBin( Ctx::QtRootCbf() ) );
 
@@ -2330,7 +2337,7 @@ void CABACReader::adaptive_color_transform(CodingUnit& cu)
 
   if (CU::isInter(cu) || CU::isIBC(cu) || CU::isIntra(cu))
   {
-    RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__ACT );
+    RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__ACT, cu.lumaSize());
     cu.colorTransform = (m_BinDecoder.decodeBin(Ctx::ACTFlag()));
   }
 }
@@ -2346,7 +2353,7 @@ void CABACReader::sbt_mode( CodingUnit& cu )
   SizeType cuWidth = cu.lwidth();
   SizeType cuHeight = cu.lheight();
 
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__SBT_MODE );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__SBT_MODE, cu.lumaSize());
   //bin - flag
   uint8_t ctxIdx = ( cuWidth * cuHeight <= 256 ) ? 1 : 0;
   bool sbtFlag = m_BinDecoder.decodeBin( Ctx::SbtFlag( ctxIdx ) );
@@ -2410,7 +2417,7 @@ void CABACReader::end_of_ctu( CodingUnit& cu, CUCtx& cuCtx )
 
 void CABACReader::cu_palette_info(CodingUnit& cu, ComponentID compBegin, uint32_t numComp, CUCtx& cuCtx)
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__PLT_MODE );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__PLT_MODE, cu.lumaSize());
 
   const SPS&      sps = *(cu.cs->sps);
   TransformUnit&   tu = *cu.firstTU;
@@ -2839,6 +2846,7 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
     pu.interDir = 1;
     pu.cu->affine = false;
     pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
+    RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MVD, pu.lumaSize());
     mvd_coding(pu.mvd[REF_PIC_LIST_0]);
     if (pu.cs->sps->getMaxNumIBCMergeCand() == 1)
     {
@@ -2885,6 +2893,7 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
 #endif
       if( pu.cu->affine )
       {
+        RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MVD, pu.lumaSize());
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
         mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][0],  !pu.isMvsdApplicable());
 #else
@@ -2906,6 +2915,7 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
       }
       else
       {
+        RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MVD, pu.lumaSize());
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
         if (pu.amvpMergeModeFlag[REF_PIC_LIST_1] == true && pu.mvpIdx[REF_PIC_LIST_0] < 2)
         {
@@ -2952,6 +2962,7 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
         }
         else if (pu.cu->affine)
         {
+          RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MVD, pu.lumaSize());
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
           mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][0],  !pu.isMvsdApplicable());
 #else
@@ -2973,6 +2984,7 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
         }
         else
         {
+          RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MVD, pu.lumaSize());
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
           if (pu.amvpMergeModeFlag[REF_PIC_LIST_0] == true && pu.mvpIdx[REF_PIC_LIST_1] < 2)
           {
@@ -3074,7 +3086,7 @@ void CABACReader::smvd_mode( PredictionUnit& pu )
     return;
   }
 
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__SYMMVD_FLAG );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__SYMMVD_FLAG, pu.lumaSize());
 
   pu.cu->smvdMode = m_BinDecoder.decodeBin( Ctx::SmvdFlag() ) ? 1 : 0;
 
@@ -3087,7 +3099,7 @@ void CABACReader::subblock_merge_flag( CodingUnit& cu )
 
   if ( !cu.cs->slice->isIntra() && (cu.slice->getPicHeader()->getMaxNumAffineMergeCand() > 0) && cu.lumaSize().width >= 8 && cu.lumaSize().height >= 8 )
   {
-    RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__AFFINE_FLAG );
+    RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__AFFINE_FLAG, cu.lumaSize());
 
     unsigned ctxId = DeriveCtx::CtxAffineFlag( cu );
     cu.affine = m_BinDecoder.decodeBin( Ctx::SubblockMergeFlag( ctxId ) );
@@ -3103,7 +3115,7 @@ void CABACReader::affine_flag( CodingUnit& cu )
   if ( !cu.cs->slice->isIntra() && cu.cs->sps->getUseAffine() && cu.lumaSize().width > 8 && cu.lumaSize().height > 8 )
 #endif
   {
-    RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__AFFINE_FLAG );
+    RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__AFFINE_FLAG, cu.lumaSize());
 
     unsigned ctxId = DeriveCtx::CtxAffineFlag( cu );
     cu.affine = m_BinDecoder.decodeBin( Ctx::AffineFlag( ctxId ) );
@@ -3129,6 +3141,7 @@ void CABACReader::affine_mmvd_data(PredictionUnit& pu)
   {
     return;
   }
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__AFFINE_MMVD, pu.lumaSize());
 
   pu.afMmvdFlag = (m_BinDecoder.decodeBin(Ctx::AfMmvdFlag()));
   DTRACE(g_trace_ctx, D_SYNTAX, "affine_mmvd_flag() af_mmvd_merge=%d pos=(%d,%d) size=%dx%d\n", pu.afMmvdFlag ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
@@ -3216,6 +3229,7 @@ void CABACReader::tm_merge_flag(PredictionUnit& pu)
   pu.tmMergeFlag = false;
   if (pu.cs->slice->getSPS()->getUseDMVDMode())
   {
+    RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MERGE_FLAG, pu.lumaSize());
     pu.tmMergeFlag = (m_BinDecoder.decodeBin(Ctx::TMMergeFlag()));
     DTRACE(g_trace_ctx, D_SYNTAX, "tm_merge_flag() tmMergeFlag=%d\n", pu.tmMergeFlag ? 1 : 0);
   }
@@ -3231,6 +3245,7 @@ void CABACReader::bm_merge_flag(PredictionUnit& pu)
   {
     return;
   }
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MERGE_FLAG, pu.lumaSize());
 
   unsigned ctxId = DeriveCtx::CtxBMMrgFlag(*pu.cu);
   pu.bmMergeFlag = (m_BinDecoder.decodeBin(Ctx::BMMergeFlag(ctxId)));
@@ -3244,7 +3259,7 @@ void CABACReader::bm_merge_flag(PredictionUnit& pu)
 
 void CABACReader::merge_flag( PredictionUnit& pu )
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__MERGE_FLAG );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__MERGE_FLAG, pu.lumaSize());
 
   pu.mergeFlag = ( m_BinDecoder.decodeBin( Ctx::MergeFlag() ) );
 
@@ -3280,7 +3295,7 @@ void CABACReader::merge_data( PredictionUnit& pu )
       return;
     }
 
-    RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__MERGE_FLAG );
+    RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__MERGE_FLAG, pu.lumaSize());
 
 #if CIIP_RM_BLOCK_SIZE_CONSTRAINTS
 #if CTU_256
@@ -3341,6 +3356,7 @@ void CABACReader::merge_data( PredictionUnit& pu )
 #endif
         )
       {
+        RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MERGE_FLAG, pu.lumaSize()); 
         cu.firstPU->mmvdMergeFlag = m_BinDecoder.decodeBin(Ctx::MmvdFlag(0));
       }
       else
@@ -3372,10 +3388,12 @@ void CABACReader::merge_data( PredictionUnit& pu )
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
         if (pu.cs->slice->getSPS()->getUseCiipTmMrg())
         {
+          RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MERGE_FLAG, pu.lumaSize()); 
           pu.tmMergeFlag = (m_BinDecoder.decodeBin(Ctx::CiipTMMergeFlag()));
         }
 #endif
 #if CIIP_PDPC
+        RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__INTRA_PDPC_FLAG, pu.lumaSize()); 
         pu.ciipPDPC = ( m_BinDecoder.decodeBin( Ctx::CiipFlag( 1 ) ) );
 #endif
       }
@@ -3407,7 +3425,7 @@ void CABACReader::merge_data( PredictionUnit& pu )
 
 void CABACReader::merge_idx( PredictionUnit& pu )
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__MERGE_INDEX );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MERGE_INDEX, pu.lumaSize());
 
   if ( pu.cu->affine )
   {
@@ -3442,7 +3460,7 @@ void CABACReader::merge_idx( PredictionUnit& pu )
 
     if (pu.cu->geoFlag)
     {
-      RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__GEO_INDEX);
+      RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__GEO_INDEX, pu.lumaSize());
 #if JVET_W0097_GPM_MMVD_TM
 #if JVET_Y0065_GPM_INTRA
       bool isIntra0 = false;
@@ -3694,6 +3712,7 @@ void CABACReader::geo_mmvd_idx(PredictionUnit& pu, RefPicList eRefPicList)
 void CABACReader::geo_merge_idx(PredictionUnit& pu)
 {
   uint32_t splitDir = 0;
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__GEO_INDEX, pu.lumaSize());
   xReadTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
   pu.geoSplitDir = splitDir;
   const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
@@ -3726,6 +3745,7 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu)
 #endif
 {
   uint32_t splitDir = 0;
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__GEO_INDEX, pu.lumaSize());
   xReadTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
   pu.geoSplitDir = splitDir;
   const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
@@ -3774,7 +3794,7 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu)
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 void CABACReader::mmvd_merge_idx(PredictionUnit& pu)
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__MERGE_INDEX);
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MERGE_INDEX, pu.lumaSize());
   unsigned int uiUnaryIdx = 0;
   int var0 = 0;
   if (pu.cs->sps->getMaxNumMergeCand() > 1)
@@ -3803,7 +3823,7 @@ void CABACReader::mmvd_merge_idx(PredictionUnit& pu)
 #else
 void CABACReader::mmvd_merge_idx(PredictionUnit& pu)
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__MERGE_INDEX);
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MERGE_INDEX, pu.lumaSize());
 
   int var0 = 0;
   if (pu.cs->sps->getMaxNumMergeCand() > 1)
@@ -3852,7 +3872,7 @@ void CABACReader::mmvd_merge_idx(PredictionUnit& pu)
 
 void CABACReader::inter_pred_idc( PredictionUnit& pu )
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__INTER_DIR );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__INTER_DIR, pu.lumaSize());
 
   if( pu.cs->slice->isInterP() )
   {
@@ -3886,7 +3906,7 @@ void CABACReader::inter_pred_idc( PredictionUnit& pu )
 
 void CABACReader::ref_idx( PredictionUnit &pu, RefPicList eRefList )
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__REF_FRM_IDX );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__REF_FRM_IDX, pu.lumaSize());
 
   if ( pu.cu->smvdMode )
   {
@@ -3969,7 +3989,6 @@ void CABACReader::ref_idx( PredictionUnit &pu, RefPicList eRefList )
 #if MULTI_HYP_PRED
 int CABACReader::ref_idx_mh(const int numRef)
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__REF_FRM_IDX);
 
   if (numRef <= 1 || !m_BinDecoder.decodeBin(Ctx::MHRefPic()))
   {
@@ -3992,7 +4011,7 @@ int CABACReader::ref_idx_mh(const int numRef)
 
 void CABACReader::mvp_flag( PredictionUnit& pu, RefPicList eRefList )
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__MVP_IDX );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__MVP_IDX, pu.lumaSize());
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   if (pu.amvpMergeModeFlag[eRefList])
@@ -4066,7 +4085,7 @@ void CABACReader::Ciip_flag(PredictionUnit& pu)
     return;
   }
 
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__MH_INTRA_FLAG);
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MH_INTRA_FLAG, pu.lumaSize());
 
   pu.ciipFlag = (m_BinDecoder.decodeBin(Ctx::CiipFlag()));
   DTRACE(g_trace_ctx, D_SYNTAX, "Ciip_flag() Ciip=%d pos=(%d,%d) size=%dx%d\n", pu.ciipFlag ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
@@ -4137,6 +4156,14 @@ void CABACReader::mh_pred_data(PredictionUnit& pu)
     return;
   }
 
+#if RExt__DECODER_DEBUG_BIT_STATISTICS
+  CodingStatisticsClassType ctype_mh(STATS__CABAC_BITS__MH_INTER, pu.lumaSize().width, pu.lumaSize().height);
+  CodingStatisticsClassType ctype_mvpIdx(STATS__CABAC_BITS__MVP_IDX, pu.lumaSize().width, pu.lumaSize().height);
+  CodingStatisticsClassType ctype_mergeIdx(STATS__CABAC_BITS__MERGE_INDEX, pu.lumaSize().width, pu.lumaSize().height);
+  CodingStatisticsClassType ctype_refIdx(STATS__CABAC_BITS__REF_FRM_IDX, pu.lumaSize().width, pu.lumaSize().height);
+  CodingStatisticsClassType ctype_mvd(STATS__CABAC_BITS__MVD, pu.lumaSize().width, pu.lumaSize().height);
+#endif
+  RExt__DECODER_DEBUG_BIT_STATISTICS_SET(ctype_mh);
 
   const int numMHRef = pu.cs->slice->getNumMultiHypRefPics();
   CHECK(numMHRef <= 0, "Multi Hyp: numMHRef <= 0");
@@ -4149,6 +4176,7 @@ void CABACReader::mh_pred_data(PredictionUnit& pu)
       hypIdx++;
     }
     MultiHypPredictionData mhData;
+    RExt__DECODER_DEBUG_BIT_STATISTICS_SET(ctype_mh);
     if (m_BinDecoder.decodeBin(Ctx::MultiHypothesisFlag(2)))
     {
       mhData.isMrg = true;
@@ -4156,6 +4184,7 @@ void CABACReader::mh_pred_data(PredictionUnit& pu)
       CHECK(maxNumGeoCand < 2, "Incorrect max number of geo candidates");
       int numCandminus2 = maxNumGeoCand - 2;
       int mergeCand0 = 0;
+      RExt__DECODER_DEBUG_BIT_STATISTICS_SET(ctype_mergeIdx);
       if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
       {
         mergeCand0 += unary_max_eqprob(numCandminus2) + 1;
@@ -4166,10 +4195,14 @@ void CABACReader::mh_pred_data(PredictionUnit& pu)
       continue;
     }
     mhData.isMrg = false;
+
+    RExt__DECODER_DEBUG_BIT_STATISTICS_SET(ctype_refIdx);
     mhData.refIdx = ref_idx_mh(numMHRef);
     CHECK(mhData.refIdx < 0, "Multi Hyp: mhData.refIdx < 0");
     CHECK(mhData.refIdx >= numMHRef, "Multi Hyp: mhData.refIdx >= numMHRef");
+    RExt__DECODER_DEBUG_BIT_STATISTICS_SET(ctype_mvd);
     mvd_coding(mhData.mvd);
+    RExt__DECODER_DEBUG_BIT_STATISTICS_SET(ctype_mvpIdx);
     mhData.mvpIdx = m_BinDecoder.decodeBin(Ctx::MVPIdx());
     mhData.weightIdx = unary_max_symbol(Ctx::MHWeight(), Ctx::MHWeight(1), pu.cs->sps->getNumAddHypWeights() - 1);
     pu.addHypData.push_back(mhData);
@@ -4309,13 +4342,6 @@ void CABACReader::mvd_coding( Mv &rMvd
 #endif
 )
 {
-#if RExt__DECODER_DEBUG_BIT_STATISTICS
-  CodingStatisticsClassType ctype_mvd    ( STATS__CABAC_BITS__MVD );
-  CodingStatisticsClassType ctype_mvd_ep ( STATS__CABAC_BITS__MVD_EP );
-#endif
-
-  RExt__DECODER_DEBUG_BIT_STATISTICS_SET( ctype_mvd );
-
   // abs_mvd_greater0_flag[ 0 | 1 ]
   int horAbs = (int)m_BinDecoder.decodeBin(Ctx::Mvd());
   int verAbs = (int)m_BinDecoder.decodeBin(Ctx::Mvd());
@@ -4329,8 +4355,6 @@ void CABACReader::mvd_coding( Mv &rMvd
   {
     verAbs += (int)m_BinDecoder.decodeBin(Ctx::Mvd(1));
   }
-
-  RExt__DECODER_DEBUG_BIT_STATISTICS_SET( ctype_mvd_ep );
 
   // abs_mvd_minus2[ 0 | 1 ] and mvd_sign_flag[ 0 | 1 ]
   if (horAbs)
@@ -4384,6 +4408,7 @@ void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
   Mv TrMv = pu.mvd[eRefList].getAbsMv();
   TrMv.changeTransPrecAmvr2Internal(pu.cu->imv);
   int Thres = THRES_TRANS;
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MVS, pu.lumaSize());
   
   int mvsdIdx = 0;
   int shift = 0;
@@ -4430,6 +4455,7 @@ void CABACReader::mvsdAffineIdxFunc(PredictionUnit &pu, RefPicList eRefList)
   
   int mvsdIdx = 0;
   int shift = 0;
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MVS, pu.lumaSize());
   
   if (pu.mvdAffi[eRefList][0].getHor())
   {
@@ -4645,7 +4671,7 @@ void CABACReader::transform_unit( TransformUnit& tu, CUCtx& cuCtx, Partitioner& 
 
 void CABACReader::cu_qp_delta( CodingUnit& cu, int predQP, int8_t& qp )
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__DELTA_QP_EP );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__DELTA_QP_EP, cu.lumaSize());
 
   CHECK( predQP == std::numeric_limits<int>::max(), "Invalid predicted QP" );
   int qpY = predQP;
@@ -4968,7 +4994,7 @@ void CABACReader::isp_mode( CodingUnit& cu )
     return;
   }
 
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__ISP_MODE_FLAG);
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__ISP_MODE_FLAG, cu.lumaSize());
 
 #if JVET_W0123_TIMD_FUSION
   int symbol = m_BinDecoder.decodeBin(cu.timd ? Ctx::ISPMode(2) : Ctx::ISPMode(0));
@@ -4978,7 +5004,6 @@ void CABACReader::isp_mode( CodingUnit& cu )
 
   if( symbol )
   {
-    RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__ISP_SPLIT_FLAG );
     cu.ispMode = 1 + m_BinDecoder.decodeBin( Ctx::ISPMode( 1 ) );
   }
   DTRACE( g_trace_ctx, D_SYNTAX, "intra_subPartitions() etype=%d pos=(%d,%d) ispIdx=%d\n", cu.chType, cu.blocks[cu.chType].x, cu.blocks[cu.chType].y, (int)cu.ispMode );
@@ -5015,7 +5040,6 @@ void CABACReader::residual_lfnst_mode( CodingUnit& cu,  CUCtx& cuCtx  )
   }
 #endif
 
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__LFNST );
 
   if( cu.cs->sps->getUseLFNST() && CU::isIntra( cu ) )
   {
@@ -5059,6 +5083,7 @@ void CABACReader::residual_lfnst_mode( CodingUnit& cu,  CUCtx& cuCtx  )
   if (cu.isSepTree()) cctx++;
 #endif
 
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2(STATS__CABAC_BITS__LFNST, cu.blocks[chIdx].lumaSize(), ChannelType(chIdx));
 #if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
   uint32_t firstBit = m_BinDecoder.decodeBin(Ctx::LFNSTIdx(cctx));
   cctx = 2 + firstBit;
@@ -5653,7 +5678,7 @@ unsigned CABACReader::code_unary_fixed( unsigned ctxId, unsigned unary_max, unsi
 #if JVET_V0130_INTRA_TMP
 void CABACReader::tmp_flag(CodingUnit& cu)
 {
-	RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__OTHER);
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2(STATS__CABAC_BITS__INTRA_TMP_FLAG, cu.lumaSize(), COMPONENT_Y);
 
 	if (!cu.Y().valid())
 	{
@@ -5681,7 +5706,7 @@ void CABACReader::tmp_flag(CodingUnit& cu)
 #endif
 void CABACReader::mip_flag( CodingUnit& cu )
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__OTHER );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2(STATS__CABAC_BITS__INTRA_MIP, cu.lumaSize(), COMPONENT_Y);
 #if ENABLE_DIMD
   if (cu.dimd)
   {
@@ -5707,7 +5732,7 @@ void CABACReader::mip_flag( CodingUnit& cu )
 
 void CABACReader::mip_pred_modes( CodingUnit &cu )
 {
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__OTHER );
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2(STATS__CABAC_BITS__INTRA_MIP, cu.lumaSize(), COMPONENT_Y);
 
   if( !cu.Y().valid() )
   {
@@ -5737,7 +5762,7 @@ void CABACReader::cu_lic_flag( CodingUnit& cu )
 {
   if( CU::isLICFlagPresent( cu ) )
   {
-    RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET( STATS__CABAC_BITS__LIC_FLAG );
+    RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__LIC_FLAG, cu.lumaSize() );
     cu.LICFlag = m_BinDecoder.decodeBin( Ctx::LICFlag( 0 ) );
     DTRACE( g_trace_ctx, D_SYNTAX, "cu_lic_flag() lic_flag=%d\n", cu.LICFlag ? 1 : 0 );
   }
@@ -5758,6 +5783,7 @@ void CABACReader::parsePredictedSigns( TransformUnit &tu, ComponentID compID )
 #endif
   const bool useSignPred = TU::getUseSignPred( tu, compID );
   int numSignPred = 0;
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2(STATS__CABAC_BITS__SIGN_BIT, tu.cu->block(compID).lumaSize(), compID);
 
   CoeffBuf buff = tu.getCoeffs( compID );
   CoeffBuf signBuff = tu.getCoeffSigns( compID );
@@ -5849,6 +5875,7 @@ void CABACReader::amvpMerge_mode( PredictionUnit& pu )
     return;
   }
   unsigned useAmMode = 0;
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__AMVP_MERGE_FLAG, pu.lumaSize());
 #if JVET_Y0128_NON_CTC
   if (pu.cu->slice->getUseAmvpMergeMode() == true)
 #else
