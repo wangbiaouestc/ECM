@@ -1873,6 +1873,7 @@ void CABACReader::extend_ref_line(CodingUnit& cu)
     }
 #endif
     pu->multiRefIdx = multiRefIdx;
+    DTRACE(g_trace_ctx, D_SYNTAX, "extend_ref_line() idx=%d pos=(%d,%d) ref_idx=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->multiRefIdx);
     pu = pu->next;
   }
 }
@@ -2004,6 +2005,7 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
         }
       }
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
+      pu->secondMpmFlag = false;
       pu->ipred_idx = ipred_idx;
 #endif
       pu->intraDir[0] = mpm_pred[ipred_idx];
@@ -2054,7 +2056,11 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
       pu->intraDir[0] = ipred_mode;
     }
 
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
+    DTRACE( g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) predIdx=%d mpm=%d secondmpm=%d \n", k, pu->lumaPos().x, pu->lumaPos().y, pu->ipred_idx, pu->mpmFlag, pu->secondMpmFlag);
+#else
     DTRACE( g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) mode=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->intraDir[0] );
+#endif
     pu = pu->next;
   }
 }
@@ -2069,6 +2075,7 @@ void CABACReader::cu_dimd_flag(CodingUnit& cu)
 
   unsigned ctxId = DeriveCtx::CtxDIMDFlag(cu);
   cu.dimd = m_BinDecoder.decodeBin(Ctx::DimdFlag(ctxId));
+  DTRACE(g_trace_ctx, D_SYNTAX, "cu_dimd_flag() ctx=%d pos=(%d,%d) dimd=%d\n", ctxId, cu.lumaPos().x, cu.lumaPos().y, cu.dimd);
 }
 #endif
 
@@ -2100,6 +2107,7 @@ void CABACReader::cu_timd_flag( CodingUnit& cu )
 
   unsigned ctxId = DeriveCtx::CtxTimdFlag( cu );
   cu.timd = m_BinDecoder.decodeBin( Ctx::TimdFlag(ctxId) );
+  DTRACE(g_trace_ctx, D_SYNTAX, "cu_timd_flag() ctx=%d pos=(%d,%d) timd=%d\n", ctxId, cu.lumaPos().x, cu.lumaPos().y, cu.timd);
 }
 #endif
 
@@ -3217,7 +3225,11 @@ void CABACReader::tm_merge_flag(PredictionUnit& pu)
   if (pu.cs->slice->getSPS()->getUseDMVDMode())
   {
     pu.tmMergeFlag = (m_BinDecoder.decodeBin(Ctx::TMMergeFlag()));
+#if JVET_X0049_ADAPT_DMVR
+    DTRACE(g_trace_ctx, D_SYNTAX, "tm_merge_flag() tmMergeFlag || bmMergeFlag=%d\n", pu.tmMergeFlag);
+#else
     DTRACE(g_trace_ctx, D_SYNTAX, "tm_merge_flag() tmMergeFlag=%d\n", pu.tmMergeFlag ? 1 : 0);
+#endif
   }
 }
 #endif
@@ -3342,6 +3354,7 @@ void CABACReader::merge_data( PredictionUnit& pu )
         )
       {
         cu.firstPU->mmvdMergeFlag = m_BinDecoder.decodeBin(Ctx::MmvdFlag(0));
+        DTRACE(g_trace_ctx, D_SYNTAX, "mmvd_merge_flag() mmvd_merge=%d pos=(%d,%d) size=%dx%d\n", cu.firstPU->mmvdMergeFlag ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
       }
       else
       {
@@ -3782,7 +3795,7 @@ void CABACReader::mmvd_merge_idx(PredictionUnit& pu)
     static_assert(MMVD_BASE_MV_NUM == 2, "");
     var0 = m_BinDecoder.decodeBin(Ctx::MmvdMergeIdx());
   }
-  DTRACE(g_trace_ctx, D_SYNTAX, "base_mvp_idx() base_mvp_idx=%d\n", var0);
+  DTRACE(g_trace_ctx, D_SYNTAX, "mmvd_merge_idx() base_mvp_idx=%d\n", var0);
   unsigned int ricePar = 1;
   int numCandminus1_step =  (MMVD_MAX_REFINE_NUM >> (ricePar+MMVD_SIZE_SHIFT))  - 1;
   int temp = 0;

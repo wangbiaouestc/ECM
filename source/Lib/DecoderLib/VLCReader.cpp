@@ -2478,7 +2478,7 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 
   if (pcSPS->getPtlDpbHrdParamsPresentFlag())
   {
-  READ_FLAG(uiCode, "sps_general_hrd_params_present_flag");        pcSPS->setGeneralHrdParametersPresentFlag(uiCode);
+  READ_FLAG(uiCode, "sps_general_hrd_parameters_present_flag");        pcSPS->setGeneralHrdParametersPresentFlag(uiCode);
   if (pcSPS->getGeneralHrdParametersPresentFlag())
   {
     parseGeneralHrdParameters(pcSPS->getGeneralHrdParameters());
@@ -4822,7 +4822,7 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
 #if TCQ_8STATES
   if( sps->getDepQuantEnabledFlag() )
   {
-    READ_CODE( 2, uiCode, "slice_dep_quant_enabled_idc" );
+    READ_CODE( 2, uiCode, "slice_dep_quant_enabled_flag" );
     pcSlice->setDepQuantEnabledIdc( uiCode );
   }
   else
@@ -5994,7 +5994,7 @@ void HLSyntaxReader::parseCcSao( Slice* pcSlice, PicHeader* picHeader, const SPS
         if (ccSaoParam.setType[compIdx][setIdx])
         {
           /* Edge offset */
-          READ_CODE(MAX_CCSAO_CAND_POS_Y_BITS - 2, uiCode, "ccsao_cand_pos_y_TYPE");
+          READ_CODE(MAX_CCSAO_CAND_POS_Y_BITS - 2, uiCode, "ccsao_cand_pos_y");
           ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y] = uiCode;
           READ_CODE(MAX_CCSAO_BAND_NUM_Y_BITS - 2 + 1, uiCode, "ccsao_band_num_y");
           ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] = uiCode + 1;
@@ -6069,11 +6069,7 @@ int HLSyntaxReader::alfGolombDecode(const int k, const bool signed_val)
   uint32_t b = 0;
   for (; !b; numLeadingBits++)
   {
-#if RExt__DECODER_DEBUG_BIT_STATISTICS
-    xReadFlag(b, "");
-#else
     READ_FLAG(b, "alf_coeff_abs_prefix");
-#endif
   }
 
   int symbol = ((1 << numLeadingBits) - 1) << k;
@@ -6086,11 +6082,7 @@ int HLSyntaxReader::alfGolombDecode(const int k, const bool signed_val)
 
   if (signed_val && symbol != 0)
   {
-#if RExt__DECODER_DEBUG_BIT_STATISTICS
-    xReadFlag(b, "");
-#else
     READ_FLAG(b, "alf_coeff_sign");
-#endif
     symbol = (b) ? -symbol : symbol;
   }
   return symbol;

@@ -494,10 +494,10 @@ void HLSWriter::codePPS( const PPS* pcPPS )
       }
 
       val = pcPPS->getDeblockingFilterTcOffsetDiv2();
-      WRITE_CODE((int)val.size() - 1, 3, "pps_beta_Tc_div2_num_minus1");
+      WRITE_CODE((int)val.size() - 1, 3, "pps_tc_offset_div2_num_minus1");
       for (int i = 0; i < (int)val.size(); i++)
       {
-        WRITE_SVLC((int)val[i], "pps_Tc_offset_div2");
+        WRITE_SVLC((int)val[i], "pps_tc_offset_div2");
       }
 #else
       WRITE_SVLC( pcPPS->getDeblockingFilterBetaOffsetDiv2(),             "pps_beta_offset_div2" );
@@ -1359,7 +1359,7 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   WRITE_FLAG( pcSPS->getUseDMVDMode() ? 1 : 0,                                                 "sps_dmvd_enabled_flag" );
 #endif
 #if JVET_X0049_ADAPT_DMVR
-  WRITE_UVLC(BM_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumBMMergeCand(), "six_minus_max_num_merge_cand");
+  WRITE_UVLC(BM_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumBMMergeCand(), "six_minus_max_num_bm_merge_cand");
 #endif
   WRITE_FLAG( pcSPS->getUseAffine() ? 1 : 0,                                                   "sps_affine_enabled_flag" );
   if ( pcSPS->getUseAffine() )
@@ -1501,7 +1501,7 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 
 
   // KJS: remove scaling lists?
-  WRITE_FLAG( pcSPS->getScalingListFlag() ? 1 : 0,                                   "sps_scaling_list_enabled_flag" );
+  WRITE_FLAG( pcSPS->getScalingListFlag() ? 1 : 0,                                   "sps_explicit_scaling_list_enabled_flag" );
 
   if (pcSPS->getUseLFNST() && pcSPS->getScalingListFlag())
   {
@@ -3672,7 +3672,7 @@ void HLSWriter::codeCcSao(Slice* pcSlice, PicHeader* picHeader, const SPS* sps, 
             WRITE_CODE(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] - 1, MAX_CCSAO_BAND_NUM_Y_BITS - 2 + 1,
                        "ccsao_band_num_y");
             WRITE_CODE(ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] - 1, MAX_CCSAO_BAND_NUM_U_BAND_BITS,
-                       "ccsao_band_num_u");
+                       "ccsao_band_num_c");
           }
           else
           {
