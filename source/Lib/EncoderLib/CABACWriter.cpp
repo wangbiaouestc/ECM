@@ -1407,6 +1407,7 @@ void CABACWriter::extend_ref_line(const CodingUnit& cu)
 
     }
 #endif
+    DTRACE(g_trace_ctx, D_SYNTAX, "extend_ref_line() idx=%d pos=(%d,%d) ref_idx=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->multiRefIdx);
     pu = pu->next;
   }
 }
@@ -1514,6 +1515,10 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
   for( int k = 0; k < numBlocks; k++ )
   {
     const unsigned& mpm_idx = mpm_idxs[k];
+#if ENABLE_TRACING && (ENABLE_DIMD || JVET_W0123_TIMD_FUSION)
+    int pred_idx = -1;
+    bool secondMpmFlag = false;
+#endif
     if( mpm_idx < numMPMs )
     {
       {
@@ -1547,6 +1552,9 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
           m_BinEncoder.encodeBinEP(mpm_idx > 4);
         }
       }
+#if ENABLE_TRACING && (ENABLE_DIMD || JVET_W0123_TIMD_FUSION)
+      pred_idx = mpm_idx;
+#endif
     }
     else
     {
@@ -1578,6 +1586,10 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
         {
           m_BinEncoder.encodeBin(1, Ctx::IntraLumaSecondMpmFlag());
           m_BinEncoder.encodeBinsEP( secondaryMPMIdx, 4);
+#if ENABLE_TRACING && (ENABLE_DIMD || JVET_W0123_TIMD_FUSION)
+          pred_idx = secondaryMPMIdx + NUM_PRIMARY_MOST_PROBABLE_MODES;
+          secondMpmFlag = true;
+#endif
         }
         else
         {
@@ -1595,6 +1607,9 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
           }
 
           xWriteTruncBinCode( nonMPMIdx, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES);  // Remaining mode is truncated binary coded
+#if ENABLE_TRACING && (ENABLE_DIMD || JVET_W0123_TIMD_FUSION)
+          pred_idx = nonMPMIdx;
+#endif
         }
 #else
         std::sort(mpm_pred, mpm_pred + numMPMs);
@@ -1613,7 +1628,11 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
       }
     }
 
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
+    DTRACE(g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) predIdx=%d mpm=%d secondmpm=%d \n", k, pu->lumaPos().x, pu->lumaPos().y, pred_idx, mpm_idx < numMPMs, secondMpmFlag);
+#else
     DTRACE( g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) mode=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->intraDir[0] );
+#endif
     pu = pu->next;
   }
 }
@@ -1805,6 +1824,7 @@ void CABACWriter::cu_timd_flag( const CodingUnit& cu )
 
   unsigned ctxId = DeriveCtx::CtxTimdFlag(cu);
   m_BinEncoder.encodeBin(cu.timd, Ctx::TimdFlag(ctxId));
+  DTRACE(g_trace_ctx, D_SYNTAX, "cu_timd_flag() ctx=%d pos=(%d,%d) timd=%d\n", ctxId, cu.lumaPos().x, cu.lumaPos().y, cu.timd);
 }
 #endif
 
@@ -1817,6 +1837,7 @@ void CABACWriter::cu_dimd_flag(const CodingUnit& cu)
   }
   unsigned ctxId = DeriveCtx::CtxDIMDFlag(cu);
   m_BinEncoder.encodeBin(cu.dimd, Ctx::DimdFlag(ctxId));
+  DTRACE(g_trace_ctx, D_SYNTAX, "cu_dimd_flag() ctx=%d pos=(%d,%d) dimd=%d\n", ctxId, cu.lumaPos().x, cu.lumaPos().y, cu.dimd);
 }
 #endif
 
@@ -2827,7 +2848,11 @@ void CABACWriter::tm_merge_flag(const PredictionUnit& pu)
   m_BinEncoder.encodeBin(pu.tmMergeFlag, Ctx::TMMergeFlag());
 #endif
 
+#if JVET_X0049_ADAPT_DMVR
+  DTRACE(g_trace_ctx, D_SYNTAX, "tm_merge_flag() tmMergeFlag || bmMergeFlag=%d\n", pu.tmMergeFlag || pu.bmMergeFlag);
+#else
   DTRACE(g_trace_ctx, D_SYNTAX, "tm_merge_flag() tmMergeFlag=%d\n", pu.tmMergeFlag ? 1 : 0);
+#endif
 }
 #endif
 
@@ -3319,6 +3344,7 @@ void CABACWriter::mmvd_merge_idx(const PredictionUnit& pu)
     assert(var0 < 2);
     m_BinEncoder.encodeBin(var0, Ctx::MmvdMergeIdx());
   }
+  DTRACE(g_trace_ctx, D_SYNTAX, "mmvd_merge_idx() base_mvp_idx=%d\n", var0);
   unsigned int ricePar = 1;
   int numCandminus1_step =  ((MMVD_MAX_REFINE_NUM >> ricePar) >> MMVD_SIZE_SHIFT) - 1;
   if(ricePar > 0)
@@ -5210,7 +5236,7 @@ void CABACWriter::residual_coding_subblockTS( CoeffCodingContext& cctx, const TC
       {
         unsigned gt2 = (absLevel >= (cutoffVal + 2));
           m_BinEncoder.encodeBin(gt2, cctx.greaterXCtxIdAbsTS(cutoffVal >> 1));
-          DTRACE(g_trace_ctx, D_SYNTAX_RESI, "ts_gt%d_flag() bin=%d ctx=%d sp=%d coeff=%d\n", i, gt2, cctx.greaterXCtxIdAbsTS(cutoffVal >> 1), scanPos, min<int>(absLevel, cutoffVal + 2));
+          DTRACE(g_trace_ctx, D_SYNTAX_RESI, "ts_gt%d_flag() bin=%d ctx=%d sp=%d coeff=%d\n", i, gt2, cctx.greaterXCtxIdAbsTS(cutoffVal >> 1), scanPos, min<int>(absLevel, cutoffVal + 2 + (absLevel&1)));
           cctx.decimateNumCtxBins(1);
       }
       cutoffVal += 2;
