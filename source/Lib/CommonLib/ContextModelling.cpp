@@ -469,7 +469,9 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
     candIdx -= BM_MRG_MAX_NUM_CANDS;
   }
 #endif
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
   CHECK( candIdx >= numValidMergeCand, "Merge candidate does not exist" );
+#endif
 
   pu.regularMergeFlag        = !(pu.ciipFlag || pu.cu->geoFlag);
   pu.mergeFlag               = true;
@@ -541,13 +543,23 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 }
 
 #if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Y0058_IBC_LIST_MODIFY
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh, int compareNum) const
+#else
 bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh) const
+#endif
 {
   if (mvFieldNeighbours[(mergeCandIndex << 1)].refIdx < 0 && mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx < 0)
   {
     return true;
   }
 
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  if (compareNum == -1)
+  {
+    compareNum = mergeCandIndex;
+  }
+#endif
   if (mvdSimilarityThresh > 1)
   {
     for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
@@ -597,7 +609,11 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
     return false;
   }
 
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  for (uint32_t ui = 0; ui < compareNum; ui++)
+#else
   for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
+#endif
   {
     if (interDirNeighbours[ui] == interDirNeighbours[mergeCandIndex])
     {

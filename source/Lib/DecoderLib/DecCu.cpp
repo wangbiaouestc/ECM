@@ -1597,8 +1597,15 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           if (CU::isIBC(*pu.cu))
 #if JVET_Y0058_IBC_LIST_MODIFY && JVET_W0090_ARMC_TM
           {
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+            uint8_t mrgCandIdx = pu.mergeIdx;
+            PU::getIBCMergeCandidates(pu, mrgCtx);
+            m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
+            pu.mergeIdx = mrgCandIdx;
+#else
             PU::getIBCMergeCandidates(pu, mrgCtx, (((pu.mergeIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE + 1)*ADAPTIVE_IBC_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumIBCMergeCand()) || (pu.mergeIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE * ADAPTIVE_IBC_SUB_GROUP_SIZE + ADAPTIVE_IBC_SUB_GROUP_SIZE - 1 : pu.mergeIdx);
             m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, pu.mergeIdx);
+#endif
           }
 #else
             PU::getIBCMergeCandidates(pu, mrgCtx, pu.mergeIdx);

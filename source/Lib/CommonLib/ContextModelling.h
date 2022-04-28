@@ -555,7 +555,7 @@ public:
 class MergeCtx
 {
 public:
-#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+#if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Z0075_IBC_HMVP_ENLARGE
   MvField       mvFieldNeighbours[NUM_MERGE_CANDS << 1]; // double length for mv of both lists
   uint8_t       BcwIdx[NUM_MERGE_CANDS];
 #if INTER_LIC
@@ -595,14 +595,18 @@ public:
   void setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx);
 #endif
   bool          mmvdUseAltHpelIf  [ MMVD_BASE_MV_NUM ];
-#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+#if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Z0075_IBC_HMVP_ENLARGE
   bool          useAltHpelIf      [ NUM_MERGE_CANDS ];
 #else
   bool          useAltHpelIf      [ MRG_MAX_NUM_CANDS ];
 #endif
   void setMergeInfo( PredictionUnit& pu, int candIdx );
 #if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Y0058_IBC_LIST_MODIFY
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  bool xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1, int compareNum = -1) const;
+#else
   bool xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
+#endif
 #endif
 #if TM_MRG
   void copyRegularMergeCand( int dstCandIdx, MergeCtx& srcCtx, int srcCandIdx );
