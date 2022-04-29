@@ -973,7 +973,7 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
   CHECK(blk.y % STEP_Y, "Wrong startHeight in filtering");
   CHECK(blk.x % STEP_X, "Wrong startWidth in filtering");
   CHECK(height % STEP_Y, "Wrong endHeight in filtering");
-  CHECK(width % STEP_X, "Wrong endWidth in filtering");
+  CHECK(width % 4, "Wrong endWidth in filtering");
 
   const Pel *src = srcBuffer.buf + blk.y * srcStride + blk.x;
   Pel *      dst = dstBuffer.buf + blkDst.y * dstStride + blkDst.x;
@@ -1122,7 +1122,14 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
         accumA = _mm_add_epi16(accumA, cur);
         accumA = _mm_min_epi16(mmMax, _mm_max_epi16(accumA, mmMin));
 
-        _mm_storeu_si128((__m128i *) (dst + ii * dstStride + j), accumA);
+        if (j + STEP_X <= width)
+        {
+          _mm_storeu_si128((__m128i *) (dst + ii * dstStride + j), accumA);
+        }
+        else
+        {
+          _mm_storel_epi64((__m128i *) (dst + ii * dstStride + j), accumA);
+        }
       } //for (size_t ii = 0; ii < STEP_Y; ii++)
     } //for (size_t j = 0; j < width; j += STEP_X)
     src += srcStride * STEP_Y;
