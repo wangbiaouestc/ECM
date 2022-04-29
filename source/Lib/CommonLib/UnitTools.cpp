@@ -406,7 +406,20 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
     bool enableHmvp = ((xBr >> log2ParallelMergeLevel) > (pu.cu->Y().x >> log2ParallelMergeLevel)) && ((yBr >> log2ParallelMergeLevel) > (pu.cu->Y().y >> log2ParallelMergeLevel));
     bool enableInsertion = CU::isIBC(cu) || enableHmvp;
     if (enableInsertion)
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+    {
+      if (CU::isIBC(cu))
+      {
+        cu.cs->addMiToLutIBC(cu.cs->motionLut.lutIbc, mi);
+      }
+      else
+      {
+        cu.cs->addMiToLut(cu.cs->motionLut.lut, mi);
+      }
+    }
+#else
     cu.cs->addMiToLut(CU::isIBC(cu) ? cu.cs->motionLut.lutIbc : cu.cs->motionLut.lut, mi);
+#endif
   }
 }
 
@@ -1570,9 +1583,13 @@ uint8_t PU::getLFNSTIdx( int intraMode, int mtsMode )
 
 bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int &mrgCandIdx,
                           const uint32_t maxNumMergeCandMin1, int &cnt, const bool isAvailableA1,
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+                          const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
+#else
                           const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove,
                           const bool ibcFlag, const bool isGt4x4
-#if JVET_X0083_BM_AMVP_MERGE_MODE || JVET_Y0058_IBC_LIST_MODIFY
+#endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE || (JVET_Y0058_IBC_LIST_MODIFY && !JVET_Z0075_IBC_HMVP_ENLARGE)
                         , const PredictionUnit &pu
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
@@ -1589,7 +1606,11 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
   const Slice& slice = *cs.slice;
   MotionInfo miNeighbor;
 
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  auto &lut = cs.motionLut.lut;
+#else
   auto &lut = ibcFlag ? cs.motionLut.lutIbc : cs.motionLut.lut;
+#endif 
   int num_avai_candInLUT = (int)lut.size();
 
   for (int mrgIdx = 1; mrgIdx <= num_avai_candInLUT; mrgIdx++)
@@ -1603,24 +1624,38 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
     bool isValidAmMode = checkIsValidMergeMvCand(cs, pu, curPoc, amvpPoc, miNeighbor.refIdx);
 #endif
     if (isValidAmMode &&
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+        ( mrgIdx > 2
+#else
         ( mrgIdx > 2 || ((mrgIdx > 1 || !isGt4x4) && ibcFlag)
+#endif
           || ((!isAvailableA1 || (miLeft != miNeighbor)) && (!isAvailableB1 || (miAbove != miNeighbor))) )
           )
 #else
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+    if ( mrgIdx > 2
+#else
     if ( mrgIdx > 2 || ((mrgIdx > 1 || !isGt4x4) && ibcFlag)
+#endif
       || ((!isAvailableA1 || (miLeft != miNeighbor)) && (!isAvailableB1 || (miAbove != miNeighbor))) )
 #endif
     {
 #if INTER_LIC
       mrgCtx.LICFlags[cnt] = miNeighbor.usesLIC;
 
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
       if (ibcFlag)
       {
         CHECK(mrgCtx.LICFlags[cnt], "addMergeHMVPCand: LIC is not used with IBC mode")
       }
 #endif
+#endif
       mrgCtx.interDirNeighbours[cnt] = miNeighbor.interDir;
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+      mrgCtx.useAltHpelIf      [cnt] = miNeighbor.useAltHpelIf;
+#else
       mrgCtx.useAltHpelIf      [cnt] = !ibcFlag && miNeighbor.useAltHpelIf;
+#endif
       mrgCtx.BcwIdx            [cnt] = (miNeighbor.interDir == 3) ? miNeighbor.BcwIdx : BCW_DEFAULT;
 
       mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNeighbor.mv[0], miNeighbor.refIdx[0]);
@@ -1649,7 +1684,7 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
         continue;
       }
 #endif
-#if JVET_Y0058_IBC_LIST_MODIFY
+#if JVET_Y0058_IBC_LIST_MODIFY && !JVET_Z0075_IBC_HMVP_ENLARGE
       if (ibcFlag)
       {
         if (!checkIsIBCCandidateValid(pu, miNeighbor))
@@ -1678,10 +1713,88 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
   return false;
 }
 
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+bool PU::addIBCMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int &mrgCandIdx,
+  const uint32_t maxNumMergeCandMin1, int &cnt
+#if JVET_Y0058_IBC_LIST_MODIFY
+  , const PredictionUnit &pu
+#endif
+#if TM_MRG
+  , const uint32_t mvdSimilarityThresh
+#endif
+)
+{
+  const Slice& slice = *cs.slice;
+  MotionInfo miNeighbor;
+
+  auto &lut = cs.motionLut.lutIbc;
+  int num_avai_candInLUT = (int)lut.size();
+  int compareNum = cnt;
+
+  for (int mrgIdx = 1; mrgIdx <= num_avai_candInLUT; mrgIdx++)
+  {
+    miNeighbor = lut[num_avai_candInLUT - mrgIdx];
+
+#if INTER_LIC
+    mrgCtx.LICFlags[cnt] = miNeighbor.usesLIC;
+
+    CHECK(mrgCtx.LICFlags[cnt], "addMergeHMVPCand: LIC is not used with IBC mode")
+#endif
+    mrgCtx.interDirNeighbours[cnt] = miNeighbor.interDir;
+    mrgCtx.useAltHpelIf[cnt] = false;
+    mrgCtx.BcwIdx[cnt] = (miNeighbor.interDir == 3) ? miNeighbor.BcwIdx : BCW_DEFAULT;
+
+    mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNeighbor.mv[0], miNeighbor.refIdx[0]);
+    if (slice.isInterB())
+    {
+      mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miNeighbor.mv[1], miNeighbor.refIdx[1]);
+    }
+#if MULTI_HYP_PRED
+    mrgCtx.addHypNeighbours[cnt] = miNeighbor.addHypData;
+#endif
+
+    if (mrgCtx.xCheckSimilarMotion(cnt
+#if TM_MRG
+      , mvdSimilarityThresh
+#endif
+      , compareNum
+    ))
+    {
+      continue;
+    }
+#if  JVET_Y0058_IBC_LIST_MODIFY
+    if (!checkIsIBCCandidateValid(pu, miNeighbor))
+    {
+      continue;
+    }
+#endif
+    if (mrgCandIdx == cnt)
+    {
+      return true;
+    }
+    cnt++;
+
+    if (cnt == maxNumMergeCandMin1)
+    {
+      break;
+    }
+  }
+
+  if (cnt < maxNumMergeCandMin1)
+  {
+    mrgCtx.useAltHpelIf[cnt] = false;
+  }
+  return false;
+}
+#endif
 void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx)
 {
   const CodingStructure &cs = *pu.cs;
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  const uint32_t maxNumMergeCand = IBC_MRG_MAX_NUM_CANDS_MEM;
+#else
   const uint32_t maxNumMergeCand = pu.cs->sps->getMaxNumIBCMergeCand();
+#endif
   for (uint32_t ui = 0; ui < maxNumMergeCand; ++ui)
   {
     mrgCtx.BcwIdx[ui] = BCW_DEFAULT;
@@ -1694,7 +1807,11 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #endif
   }
 
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  mrgCtx.numValidMergeCand = pu.cs->sps->getMaxNumIBCMergeCand();
+#else 
   mrgCtx.numValidMergeCand = maxNumMergeCand;
+#endif
   // compute the location of the current PU
 
   int cnt = 0;
@@ -1836,7 +1953,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
   }
 
   // above left
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
   if (cnt < 4)
+#endif
   {
     const PredictionUnit *puAboveLeft = cs.getPURestricted(posLT.offset(-1, -1), pu, pu.chType);
     bool isAvailableB2 = puAboveLeft && pu.cu != puAboveLeft->cu && CU::isIBC(*puAboveLeft->cu);
@@ -1870,11 +1989,19 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 
   if (cnt != maxNumMergeCand)
   {
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+    bool bFound = addIBCMergeHMVPCand(cs, mrgCtx, mrgCandIdx, maxNumMergeCand, cnt
+#if JVET_Y0058_IBC_LIST_MODIFY
+      ,pu
+#endif
+     );
+#else
     bool bFound = addMergeHMVPCand(cs, mrgCtx, mrgCandIdx, maxNumMergeCand, cnt, isAvailableA1, miLeft, isAvailableB1,
 #if JVET_X0083_BM_AMVP_MERGE_MODE || JVET_Y0058_IBC_LIST_MODIFY
                                    miAbove, true, isGt4x4, pu);
 #else
                                    miAbove, true, isGt4x4);
+#endif
 #endif
 
     if (bFound)
@@ -1882,6 +2009,12 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
       return;
     }
   }
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  if (cnt == maxNumMergeCand)
+  {
+    return;
+  }
+#endif
 
 #if JVET_Y0058_IBC_LIST_MODIFY
   // pairwise-average candidates
@@ -1934,7 +2067,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
       cnt++;
     }
 
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
   mrgCtx.numValidMergeCand = cnt;
+#endif
 }
 
 #if  JVET_Y0058_IBC_LIST_MODIFY
@@ -2991,12 +3126,16 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   int maxNumMergeCandMin1 = maxNumMergeCand - 1;
   if (cnt != maxNumMergeCandMin1)
   {
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
     bool isGt4x4 = true;
+#endif
     bool bFound = addMergeHMVPCand(cs, mrgCtx, mrgCandIdx, maxNumMergeCandMin1, cnt
       , isAvailableA1, miLeft, isAvailableB1, miAbove
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
       , CU::isIBC(*pu.cu)
       , isGt4x4
-#if JVET_X0083_BM_AMVP_MERGE_MODE || JVET_Y0058_IBC_LIST_MODIFY
+#endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE || (JVET_Y0058_IBC_LIST_MODIFY && !JVET_Z0075_IBC_HMVP_ENLARGE)
       , pu
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
@@ -3273,8 +3412,12 @@ bool PU::isBiPredFromDifferentDirEqDistPoc(const PredictionUnit& pu, int refIdx0
 
 bool PU::addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int &mrgCandIdx,
   const uint32_t maxNumMergeCandMin1, int &cnt, const bool isAvailableA1,
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
+#else
   const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove,
   const bool ibcFlag, const bool isGt4x4
+#endif
 #if TM_MRG
   , const uint32_t mvdSimilarityThresh
 #endif
@@ -3283,23 +3426,33 @@ bool PU::addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const i
   const Slice& slice = *cs.slice;
   MotionInfo miNeighbor;
 
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  auto &lut = cs.motionLut.lut;
+#else
   auto &lut = ibcFlag ? cs.motionLut.lutIbc : cs.motionLut.lut;
+#endif
   int num_avai_candInLUT = (int)lut.size();
 
   for (int mrgIdx = 1; mrgIdx <= num_avai_candInLUT; mrgIdx++)
   {
     miNeighbor = lut[num_avai_candInLUT - mrgIdx];
 
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+    if ( mrgIdx > 2
+#else
     if (mrgIdx > 2 || ((mrgIdx > 1 || !isGt4x4) && ibcFlag)
+#endif
       || ((!isAvailableA1 || (miLeft != miNeighbor)) && (!isAvailableB1 || (miAbove != miNeighbor))))
     {
 #if INTER_LIC
       mrgCtx.LICFlags[cnt] = miNeighbor.usesLIC;
 
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
       if (ibcFlag)
       {
         CHECK(mrgCtx.LICFlags[cnt], "addMergeHMVPCand: LIC is not used with IBC mode")
       }
+#endif
 #endif
 
       bool isBmCand = false;
@@ -3341,7 +3494,11 @@ bool PU::addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const i
         continue;
       }
       mrgCtx.interDirNeighbours[cnt] = miNeighbor.interDir;
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+      mrgCtx.useAltHpelIf      [cnt] = miNeighbor.useAltHpelIf;
+#else
       mrgCtx.useAltHpelIf[cnt] = !ibcFlag && miNeighbor.useAltHpelIf;
+#endif
 
       mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNeighbor.mv[0], miNeighbor.refIdx[0]);
       if (slice.isInterB())
@@ -3905,11 +4062,15 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
 
   if (cnt != maxNumMergeCandMin1)
   {
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
     bool isGt4x4 = true;
+#endif
     bool bFound = addBMMergeHMVPCand(cs, mrgCtx, mrgCandIdx, maxNumMergeCandMin1, cnt
       , isAvailableA1, miLeft, isAvailableB1, miAbove
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
       , CU::isIBC(*pu.cu)
       , isGt4x4
+#endif
 #if TM_MRG
       , mvThreshod
 #endif
@@ -6072,7 +6233,11 @@ void PU::addAMVPHMVPCand(const PredictionUnit &pu, const RefPicList eRefPicList,
   const Slice &slice = *(*pu.cs).slice;
 
   MotionInfo neibMi;
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  auto &lut = pu.cs->motionLut.lut;
+#else
   auto &lut = CU::isIBC(*pu.cu) ? pu.cs->motionLut.lutIbc : pu.cs->motionLut.lut;
+#endif
   int num_avai_candInLUT = (int) lut.size();
   int num_allowedCand = std::min(MAX_NUM_HMVP_AVMPCANDS, num_avai_candInLUT);
   const RefPicList eRefPicList2nd = (eRefPicList == REF_PIC_LIST_0) ? REF_PIC_LIST_1 : REF_PIC_LIST_0;
@@ -6094,7 +6259,11 @@ void PU::addAMVPHMVPCand(const PredictionUnit &pu, const RefPicList eRefPicList,
       const RefPicList eRefPicListIndex = (predictorSource == 0) ? eRefPicList : eRefPicList2nd;
       const int        neibRefIdx = neibMi.refIdx[eRefPicListIndex];
 
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+      if (neibRefIdx >= 0 && ((currRefPOC == slice.getRefPOC(eRefPicListIndex, neibRefIdx))))
+#else
       if (neibRefIdx >= 0 && (CU::isIBC(*pu.cu) || (currRefPOC == slice.getRefPOC(eRefPicListIndex, neibRefIdx))))
+#endif
       {
         Mv pmv = neibMi.mv[eRefPicListIndex];
         pmv.roundTransPrecInternal2Amvr(pu.cu->imv);

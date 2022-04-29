@@ -1062,6 +1062,33 @@ void CodingStructure::addMiToLut(static_vector<MotionInfo, MAX_NUM_HMVP_CANDS> &
   lut.push_back(mi);
 }
 
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+void CodingStructure::addMiToLutIBC(static_vector<MotionInfo, MAX_NUM_HMVP_IBC_CANDS> &lut, const MotionInfo &mi)
+{
+  size_t currCnt = lut.size();
+
+  bool pruned      = false;
+  int  sameCandIdx = 0;
+
+  for (int idx = 0; idx < currCnt; idx++)
+  {
+    if (lut[idx] == mi)
+    {
+      sameCandIdx = idx;
+      pruned      = true;
+      break;
+    }
+  }
+
+  if (pruned || currCnt == lut.capacity())
+  {
+    lut.erase(lut.begin() + sameCandIdx);
+  }
+
+  lut.push_back(mi);
+}
+#endif
+
 void CodingStructure::resetPrevPLT(PLTBuf& prevPLT)
 {
   for (int comp = 0; comp < MAX_NUM_CHANNEL_TYPE; comp++)

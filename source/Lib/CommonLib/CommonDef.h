@@ -164,6 +164,8 @@ static const int AMVP_DECIMATION_FACTOR =                           2;
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
 static const int NUM_MERGE_CANDS =                                 30; ///< for maximum buffer of merging candidates
 static const int NUM_TMVP_CANDS =                                   9; ///< TMVP
+#elif JVET_Z0075_IBC_HMVP_ENLARGE
+static const int NUM_MERGE_CANDS =                                 20;
 #endif
 #if NON_ADJACENT_MRG_CAND
 static const int MRG_MAX_NUM_CANDS =                                15; ///< MERGE
@@ -176,6 +178,9 @@ static const int MRG_MAX_NUM_CANDS =                                6; ///< MERG
 #endif
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFINE MERGE
 static const int IBC_MRG_MAX_NUM_CANDS =                            6; ///< IBC MERGE
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+static const int IBC_MRG_MAX_NUM_CANDS_MEM =                        20; ///< IBC MERGE- max number of candidates 
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
 static const int MAX_NUM_AMVP_CANDS_MAX_REF =                       MAX_NUM_REF * AMVP_MAX_NUM_CANDS_MEM;
@@ -594,6 +599,9 @@ static const int BCW_SIZE_CONSTRAINT =                            256; ///< disa
 static const int MAX_NUM_HMVP_CANDS =                              5; ///< maximum number of HMVP candidates to be stored and used in merge list
 #else
 static const int MAX_NUM_HMVP_CANDS =                              (MRG_MAX_NUM_CANDS-1); ///< maximum number of HMVP candidates to be stored and used in merge list
+#endif
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+static const int MAX_NUM_HMVP_IBC_CANDS =                          25; ///< maximum number of HMVP candidates to be stored and used in IBC merge list
 #endif
 static const int MAX_NUM_HMVP_AVMPCANDS =                          4; ///< maximum number of HMVP candidates to be used in AMVP list
 

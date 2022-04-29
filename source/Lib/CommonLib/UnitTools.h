@@ -210,9 +210,11 @@ namespace PU
   void xInheritedAffineMv             ( const PredictionUnit &pu, const PredictionUnit* puNeighbour, RefPicList eRefPicList, Mv rcMv[3] );
   bool addMergeHMVPCand               (const CodingStructure &cs, MergeCtx& mrgCtx, const int& mrgCandIdx, const uint32_t maxNumMergeCandMin1, int &cnt
     , const bool isAvailableA1, const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
     , const bool ibcFlag
     , const bool isGt4x4
-#if JVET_X0083_BM_AMVP_MERGE_MODE || JVET_Y0058_IBC_LIST_MODIFY
+#endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE || (JVET_Y0058_IBC_LIST_MODIFY && !JVET_Z0075_IBC_HMVP_ENLARGE)
     , const PredictionUnit &pu
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
@@ -231,6 +233,16 @@ namespace PU
 #else
   bool checkIsValidMergeMvCand        (const CodingStructure &cs, const PredictionUnit &pu, const int curPoc, const int amvpPoc, int8_t mergeRefIdx[ NUM_REF_PIC_LIST_01 ]);
 #endif
+#endif
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  bool addIBCMergeHMVPCand               (const CodingStructure &cs, MergeCtx& mrgCtx, const int& mrgCandIdx, const uint32_t maxNumMergeCandMin1, int &cnt
+#if JVET_Y0058_IBC_LIST_MODIFY
+    ,const PredictionUnit &pu
+#endif
+#if TM_MRG
+    , const uint32_t mvdSimilarityThresh = 1
+#endif
+  );
 #endif
   void addAMVPHMVPCand                (const PredictionUnit &pu, const RefPicList eRefPicList, const int currRefPOC, AMVPInfo &info);
   bool addAffineMVPCandUnscaled       ( const PredictionUnit &pu, const RefPicList &refPicList, const int &refIdx, const Position &pos, const MvpDir &dir, AffineAMVPInfo &affiAmvpInfo );
@@ -274,8 +286,10 @@ namespace PU
   bool isBiPredFromDifferentDirEqDistPoc(const PredictionUnit& pu, int refIdx0, int refIdx1);
   bool addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx& mrgCtx, const int& mrgCandIdx, const uint32_t maxNumMergeCandMin1, int &cnt
     , const bool isAvailableA1, const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
     , const bool ibcFlag
     , const bool isGt4x4
+#endif
 #if TM_MRG
     , const uint32_t mvdSimilarityThresh = 1
 #endif

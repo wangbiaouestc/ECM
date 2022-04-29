@@ -6203,6 +6203,119 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
   }
 }
 #endif
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+void  InterPrediction::adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx,uint32_t startPos,uint32_t endPos)
+{
+  uint32_t RdCandList[IBC_MRG_MAX_NUM_CANDS_MEM];
+  Distortion candCostList[IBC_MRG_MAX_NUM_CANDS_MEM];
+
+  for (uint32_t i = 0; i < IBC_MRG_MAX_NUM_CANDS_MEM; i++)
+  {
+    RdCandList[i] = i;
+    candCostList[i] = MAX_UINT;
+  }
+
+  Distortion uiCost;
+
+  DistParam cDistParam;
+  cDistParam.applyWeight = false;
+
+  /*const SPS &sps = *pu.cs->sps;
+  Position puPos = pu.lumaPos();*/
+  int nWidth = pu.lumaSize().width;
+  int nHeight = pu.lumaSize().height;
+
+  if (!xAMLIBCGetCurBlkTemplate(pu, nWidth, nHeight))
+  {
+    return;
+  }
+
+  for (uint32_t uiMergeCand = startPos; uiMergeCand < endPos; ++uiMergeCand)
+  {
+    uiCost = 0;
+
+    mrgCtx.setMergeInfo(pu, uiMergeCand);
+
+    if (pu.bv == Mv(0, 0))
+    {
+      break;
+    }
+
+    PelBuf pcBufPredRefTop = PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE);
+    PelBuf pcBufPredCurTop = PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE);
+    PelBuf pcBufPredRefLeft = PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight);
+    PelBuf pcBufPredCurLeft = PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight);
+
+    getIBCAMLRefTemplate(pu, nWidth, nHeight);
+
+    if (m_bAMLTemplateAvailabe[0])
+    {
+      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop, pcBufPredRefTop, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+
+      uiCost += cDistParam.distFunc(cDistParam);
+    }
+
+    if (m_bAMLTemplateAvailabe[1])
+    {
+      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft, pcBufPredRefLeft, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+
+      uiCost += cDistParam.distFunc(cDistParam);
+    }
+
+    updateCandList(uiMergeCand, uiCost, IBC_MRG_MAX_NUM_CANDS_MEM, RdCandList, candCostList);
+  }
+
+  updateIBCCandInfo(pu, mrgCtx, RdCandList, startPos, endPos);
+}
+void  InterPrediction::updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t* RdCandList,uint32_t startPos,uint32_t endPos)
+{
+  MergeCtx mrgCtxTmp;
+  for (uint32_t ui = 0; ui < IBC_MRG_MAX_NUM_CANDS_MEM; ++ui)
+  {
+    mrgCtxTmp.BcwIdx[ui] = BCW_DEFAULT;
+    mrgCtxTmp.interDirNeighbours[ui] = 0;
+    mrgCtxTmp.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
+    mrgCtxTmp.mvFieldNeighbours[(ui << 1) + 1].refIdx = NOT_VALID;
+    mrgCtxTmp.useAltHpelIf[ui] = false;
+#if INTER_LIC
+    mrgCtxTmp.LICFlags[ui] = false;
+#endif
+  }
+  for (uint32_t uiMergeCand = startPos; uiMergeCand < endPos; ++uiMergeCand)
+  {
+    mrgCtx.setMergeInfo(pu, uiMergeCand);
+    if (pu.bv == Mv(0, 0))
+    {
+      break;
+    }
+    mrgCtxTmp.BcwIdx[uiMergeCand] = mrgCtx.BcwIdx[uiMergeCand];
+    mrgCtxTmp.interDirNeighbours[uiMergeCand] = mrgCtx.interDirNeighbours[uiMergeCand];
+    mrgCtxTmp.mvFieldNeighbours[(uiMergeCand << 1)] = mrgCtx.mvFieldNeighbours[(uiMergeCand << 1)];
+    mrgCtxTmp.mvFieldNeighbours[(uiMergeCand << 1) + 1] = mrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 1];
+    mrgCtxTmp.useAltHpelIf[uiMergeCand] = mrgCtx.useAltHpelIf[uiMergeCand];
+#if INTER_LIC 
+    mrgCtxTmp.LICFlags[uiMergeCand] = mrgCtx.LICFlags[uiMergeCand];
+#endif
+  }
+  //update
+  for (uint32_t uiMergeCand = startPos; uiMergeCand < endPos; ++uiMergeCand)
+  {
+    mrgCtx.setMergeInfo(pu, uiMergeCand);
+    if (pu.bv == Mv(0, 0))
+    {
+      break;
+    }
+    mrgCtx.BcwIdx[uiMergeCand] = mrgCtxTmp.BcwIdx[RdCandList[uiMergeCand -startPos]];
+    mrgCtx.interDirNeighbours[uiMergeCand] = mrgCtxTmp.interDirNeighbours[RdCandList[uiMergeCand -startPos]];
+    mrgCtx.mvFieldNeighbours[(uiMergeCand << 1)] = mrgCtxTmp.mvFieldNeighbours[RdCandList[uiMergeCand -startPos] << 1];
+    mrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 1] = mrgCtxTmp.mvFieldNeighbours[(RdCandList[uiMergeCand -startPos] << 1) + 1];
+    mrgCtx.useAltHpelIf[uiMergeCand] = mrgCtxTmp.useAltHpelIf[RdCandList[uiMergeCand -startPos]];
+#if INTER_LIC
+    mrgCtx.LICFlags[uiMergeCand] = mrgCtxTmp.LICFlags[RdCandList[uiMergeCand -startPos]];
+#endif
+  }
+}
+#endif
 #endif
 void InterPrediction::xFillIBCBuffer(CodingUnit &cu)
 {

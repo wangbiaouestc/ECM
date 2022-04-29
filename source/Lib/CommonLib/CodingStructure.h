@@ -211,6 +211,9 @@ public:
   LutMotionCand motionLut;
 
   void addMiToLut(static_vector<MotionInfo, MAX_NUM_HMVP_CANDS>& lut, const MotionInfo &mi);
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  void addMiToLutIBC(static_vector<MotionInfo, MAX_NUM_HMVP_IBC_CANDS>& lut, const MotionInfo &mi);
+#endif
 
   PLTBuf prevPLT;
   void resetPrevPLT(PLTBuf& prevPLT);
