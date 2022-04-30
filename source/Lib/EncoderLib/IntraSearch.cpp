@@ -1443,6 +1443,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         bool modeDuplicated = (uiOrgMode.modeId == cu.dimdMode);
         if (modeDuplicated)
         {
+          m_modeCostStore[lfnstIdx][mode] = MAX_DOUBLE / 2.0;
           continue;
         }
       }
