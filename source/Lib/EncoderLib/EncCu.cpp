@@ -4086,6 +4086,12 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
           continue;
         }
       }
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+     if (RdModeList[uiMrgHADIdx].isMMVD && (uiMergeCand - (uiMergeCand / MMVD_MAX_REFINE_NUM)* MMVD_MAX_REFINE_NUM >= (MMVD_MAX_REFINE_NUM >> MMVD_SIZE_SHIFT)))
+     {
+	     continue;
+     }
+#endif
 
       if (((uiNoResidualPass != 0) && candHasNoResidual[uiMrgHADIdx])
        || ( (uiNoResidualPass == 0) && bestIsSkip ) )
