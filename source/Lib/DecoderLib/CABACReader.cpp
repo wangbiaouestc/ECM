@@ -2892,10 +2892,16 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
     cu_bcw_flag(*pu.cu);
 #endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    refPairIdx(pu);
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
     }
 #endif
 
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    refIdxLC(pu);
+#endif
     if( pu.interDir != 2 /* PRED_L1 */ )
     {
 #if JVET_X0083_BM_AMVP_MERGE_MODE
@@ -3009,7 +3015,7 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
           {
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-          mvd_coding(pu.mvd[REF_PIC_LIST_1],  !pu.isMvsdApplicable());
+            mvd_coding(pu.mvd[REF_PIC_LIST_1],  !pu.isMvsdApplicable());
 #else
           mvd_coding(pu.mvd[REF_PIC_LIST_1]);
 #endif
@@ -3976,6 +3982,13 @@ void CABACReader::inter_pred_idc( PredictionUnit& pu )
       return;
     }
   }
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  if (pu.cs->sps->getUseARL())
+  {
+    pu.interDir = 1; // temporally set as 1 for enabling refIdxLC()
+    return;
+  }
+#endif
 #if CTU_256
   if( m_BinDecoder.decodeBin( Ctx::InterDir( 7 ) ) )
 #else
@@ -3991,6 +4004,73 @@ void CABACReader::inter_pred_idc( PredictionUnit& pu )
   return;
 }
 
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+void CABACReader::refIdxLC(PredictionUnit& pu)
+{
+  if (!PU::useRefCombList(pu))
+  {
+    return;
+  }
+  int numRefMinus1 = (int)pu.cs->slice->getRefPicCombinedList().size() - 1;
+  int refIdxLC = 0;
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  if (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1])
+  {
+    numRefMinus1 = (int)pu.cs->slice->getRefPicCombinedListAmvpMerge().size() - 1;
+  }
+#endif
+  if (numRefMinus1 > 0)
+  {
+    if (m_BinDecoder.decodeBin(Ctx::RefPicLC(0)))
+    {
+      refIdxLC++;
+      for (; refIdxLC < numRefMinus1; refIdxLC++)
+      {
+        if (!m_BinDecoder.decodeBin(Ctx::RefPicLC(std::min(refIdxLC, 2))))
+        {
+          break;
+        }
+      }
+    }
+  }
+  pu.refIdxLC = refIdxLC;
+  // temporally set interDir and refIdx (has to be done)
+  if (pu.interDir != 3)
+  {
+    pu.interDir = 1;
+  }
+  pu.refIdx[0] = 0;
+}
+
+void CABACReader::refPairIdx(PredictionUnit& pu)
+{
+  if (!PU::useRefPairList(pu))
+  {
+    return;
+  }
+  int numRefMinus1 = (int)pu.cs->slice->getRefPicPairList().size() - 1;
+  int refPairIdx = 0;
+  if (numRefMinus1 > 0)
+  {
+    if (m_BinDecoder.decodeBin(Ctx::RefPicLC(0)))
+    {
+      refPairIdx++;
+      for (; refPairIdx < numRefMinus1; refPairIdx++)
+      {
+        if (!m_BinDecoder.decodeBin(Ctx::RefPicLC(std::min(refPairIdx, 2))))
+        {
+          break;
+        }
+      }
+    }
+  }
+  pu.refPairIdx = refPairIdx;
+  // temporally set refIdx
+  pu.refIdx[0] = 0;
+  pu.refIdx[1] = 0;
+}
+#endif
+
 void CABACReader::ref_idx( PredictionUnit &pu, RefPicList eRefList )
 {
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__REF_FRM_IDX, pu.lumaSize());
@@ -4000,6 +4080,12 @@ void CABACReader::ref_idx( PredictionUnit &pu, RefPicList eRefList )
     pu.refIdx[eRefList] = pu.cs->slice->getSymRefIdx( eRefList );
     return;
   }
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  if (PU::useRefCombList(pu) || PU::useRefPairList(pu))
+  {
+    return;
+  }
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   if (pu.amvpMergeModeFlag[1 - eRefList])
   {
@@ -4066,7 +4152,7 @@ void CABACReader::ref_idx( PredictionUnit &pu, RefPicList eRefList )
   {
     if( numRef <= idx || !m_BinDecoder.decodeBinEP() )
     {
-      pu.refIdx[eRefList] = (signed char)( idx - 1 );
+      pu.refIdx[eRefList] = (signed char)(idx - 1);
       DTRACE( g_trace_ctx, D_SYNTAX, "ref_idx() value=%d pos=(%d,%d)\n", idx-1, pu.lumaPos().x, pu.lumaPos().y );
       return;
     }
@@ -4493,6 +4579,29 @@ void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
   {
     return;
   }
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  if (pu.cs->sps->getUseARL())
+  {
+    if (pu.interDir == 3 && eRefList == REF_PIC_LIST_1 && (pu.mvd[0].getHor() || pu.mvd[0].getVer()))
+    {
+      if (pu.mvd[eRefList].getHor())
+      {
+        if (m_BinDecoder.decodeBinEP())
+        {
+          pu.mvd[eRefList].setHor(-pu.mvd[eRefList].getHor());
+        }
+      }
+      if (pu.mvd[eRefList].getVer())
+      {
+        if (m_BinDecoder.decodeBinEP())
+        {
+          pu.mvd[eRefList].setVer(-pu.mvd[eRefList].getVer());
+        }
+      }
+      return;
+    }
+  }
+#endif
   
   Mv TrMv = pu.mvd[eRefList].getAbsMv();
   TrMv.changeTransPrecAmvr2Internal(pu.cu->imv);
@@ -4532,6 +4641,67 @@ void CABACReader::mvsdAffineIdxFunc(PredictionUnit &pu, RefPicList eRefList)
   {
     return;
   }
+
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  if (pu.cs->sps->getUseARL())
+  {
+    if (pu.interDir == 3 && eRefList == REF_PIC_LIST_1 &&
+      (pu.mvdAffi[0][0].getHor() || pu.mvdAffi[0][0].getVer() ||
+        pu.mvdAffi[0][1].getHor() || pu.mvdAffi[0][1].getVer() ||
+        (pu.cu->affineType == AFFINEMODEL_6PARAM && (pu.mvdAffi[0][2].getHor() || pu.mvdAffi[0][2].getVer()))
+        )
+      )
+    {
+      if (pu.mvdAffi[eRefList][0].getHor())
+      {
+        if (m_BinDecoder.decodeBinEP())
+        {
+          pu.mvdAffi[eRefList][0].setHor(-pu.mvdAffi[eRefList][0].getHor());
+        }
+      }
+      if (pu.mvdAffi[eRefList][0].getVer())
+      {
+        if (m_BinDecoder.decodeBinEP())
+        {
+          pu.mvdAffi[eRefList][0].setVer(-pu.mvdAffi[eRefList][0].getVer());
+        }
+      }
+      if (pu.mvdAffi[eRefList][1].getHor())
+      {
+        if (m_BinDecoder.decodeBinEP())
+        {
+          pu.mvdAffi[eRefList][1].setHor(-pu.mvdAffi[eRefList][1].getHor());
+        }
+      }
+      if (pu.mvdAffi[eRefList][1].getVer())
+      {
+        if (m_BinDecoder.decodeBinEP())
+        {
+          pu.mvdAffi[eRefList][1].setVer(-pu.mvdAffi[eRefList][1].getVer());
+        }
+      }
+
+      if (pu.cu->affineType == AFFINEMODEL_6PARAM)
+      {
+        if (pu.mvdAffi[eRefList][2].getHor())
+        {
+          if (m_BinDecoder.decodeBinEP())
+          {
+            pu.mvdAffi[eRefList][2].setHor(-pu.mvdAffi[eRefList][2].getHor());
+          }
+        }
+        if (pu.mvdAffi[eRefList][2].getVer())
+        {
+          if (m_BinDecoder.decodeBinEP())
+          {
+            pu.mvdAffi[eRefList][2].setVer(-pu.mvdAffi[eRefList][2].getVer());
+          }
+        }
+      }
+      return;
+    }
+  }
+#endif
   
   Mv AffMv[3];
   AffMv[0] = pu.mvdAffi[eRefList][0].getAbsMv();
@@ -5977,6 +6147,13 @@ void CABACReader::amvpMerge_mode( PredictionUnit& pu )
   {
     pu.interDir = 3; // implicit BI prediction
     unsigned mergeDir = 0;
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    if (pu.cs->sps->getUseARL())
+    {
+      mergeDir = 1;
+    }
+    else
+#endif
     if (pu.cu->cs->picHeader->getMvdL1ZeroFlag() == false)
     {
       mergeDir = m_BinDecoder.decodeBinEP();

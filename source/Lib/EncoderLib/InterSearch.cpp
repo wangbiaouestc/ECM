@@ -2316,13 +2316,19 @@ bool InterSearch::predInterHashSearch(CodingUnit& cu, Partitioner& partitioner, 
     pu.mvd[bestRefPicList] = bestMvd;
     pu.mvd[bestRefPicList].changePrecision(MV_PRECISION_QUARTER, MV_PRECISION_INTERNAL);
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-    std::vector<Mv> cMvdDerivedVec;
-    Mv cMvPred = pu.mv[bestRefPicList] - pu.mvd[bestRefPicList];
-    Mv cMvdKnownAtDecoder = Mv(pu.mvd[bestRefPicList].getAbsHor(), pu.mvd[bestRefPicList].getAbsVer());
-    deriveMvdSign(cMvPred, cMvdKnownAtDecoder, pu, bestRefPicList, bestRefIndex, cMvdDerivedVec);
-    int idx = deriveMVSDIdxFromMVDTrans(pu.mvd[bestRefPicList], cMvdDerivedVec);
-    CHECK(idx == -1, "");
-    pu.mvsdIdx[bestRefPicList] = idx;
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    if (!PU::useRefPairList(pu) && !PU::useRefCombList(pu))
+#endif
+    if (pu.isMvsdApplicable())
+    {
+      std::vector<Mv> cMvdDerivedVec;
+      Mv cMvPred = pu.mv[bestRefPicList] - pu.mvd[bestRefPicList];
+      Mv cMvdKnownAtDecoder = Mv(pu.mvd[bestRefPicList].getAbsHor(), pu.mvd[bestRefPicList].getAbsVer());
+      deriveMvdSign(cMvPred, cMvdKnownAtDecoder, pu, bestRefPicList, bestRefIndex, cMvdDerivedVec);
+      int idx = deriveMVSDIdxFromMVDTrans(pu.mvd[bestRefPicList], cMvdDerivedVec);
+      CHECK(idx == -1, "");
+      pu.mvsdIdx[bestRefPicList] = idx;
+    }
 #endif
     pu.refIdx[bestRefPicList] = bestRefIndex;
     pu.mvpIdx[bestRefPicList] = bestMVPIndex;
@@ -2335,6 +2341,16 @@ bool InterSearch::predInterHashSearch(CodingUnit& cu, Partitioner& partitioner, 
 #endif
 #else
     pu.mvpNum[bestRefPicList] = 2;
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    if (PU::useRefCombList(pu))
+    {
+      setUniRefIdxLC(pu);
+    }
+    else if (PU::useRefPairList(pu))
+    {
+      setBiRefPairIdx(pu);
+    }
 #endif
 
     PU::spanMotionInfo(pu);
@@ -2442,6 +2458,13 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     getAmvpMergeModeMergeList(pu, mvFieldAmListCommon);
     for (int iRefIdxTemp = 0; iRefIdxTemp < cs.slice->getNumRefIdx(refListAmvp); iRefIdxTemp++)
     {
+#if REMOVE_DUPLICATE_REF_IN_L1_AMVP_MERGE
+      if (refListAmvp == REF_PIC_LIST_1 && cs.slice->getList1IdxToList0Idx(iRefIdxTemp) >= 0
+        && cs.slice->getAmvpMergeModeValidRefIdx(REF_PIC_LIST_0, cs.slice->getList1IdxToList0Idx(iRefIdxTemp)))
+      {
+        continue;
+      }
+#endif
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
       if (mvFieldAmListCommon[iRefIdxTemp * AMVP_MAX_NUM_CANDS_MEM].refIdx < 0
           && mvFieldAmListCommon[iRefIdxTemp * AMVP_MAX_NUM_CANDS_MEM + 1].refIdx < 0
@@ -2616,6 +2639,12 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
             cMv    [iRefList] = cMvTemp[iRefList][iRefIdxTemp];
             iRefIdx[iRefList] = iRefIdxTemp;
           }
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+          if (cu.cs->sps->getUseARL() && iRefList == 1 && cs.slice->getList1IdxToList0Idx(iRefIdxTemp) >= 0)
+          {
+            uiCostTemp = MAX_UINT;
+          }
+#endif
 
           if ( iRefList == 1 && uiCostTemp < costValidList1 && cs.slice->getList1IdxToList0Idx( iRefIdxTemp ) < 0 )
           {
@@ -2874,6 +2903,18 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
             }
             else
             {
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+              if (cu.cs->sps->getUseARL())
+              {
+                int refIdxTemp[2];
+                refIdxTemp[iRefList] = iRefIdxTemp;
+                refIdxTemp[1 - iRefList] = iRefIdxBi[1 - iRefList];
+                if (pu.cu->slice->getRefPicPairIdx(refIdxTemp[0], refIdxTemp[1]) < 0)
+                {
+                  continue;
+                }
+              }
 #endif
             uiBitsTemp = uiMbBits[2] + uiMotBits[1-iRefList];
             uiBitsTemp += ((cs.slice->getSPS()->getUseBcw() == true) ? getWeightIdxBits(bcwIdx) : 0);
@@ -3639,79 +3680,95 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
   }
 #endif
 #endif
+
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  bool bi = pu.interDir == 3;
-  if (cu.affine)
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  if (cu.imv && !CU::hasSubCUNonZeroMVd(cu) && !CU::hasSubCUNonZeroAffineMVd(cu))
   {
-    for (uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
-    {
-      RefPicList eRefPicList = RefPicList(uiRefListIdx);
-      Mv absMvd[3];
-      absMvd[0] = Mv(pu.mvdAffi[uiRefListIdx][0].getAbsMv());
-      absMvd[1] = Mv(pu.mvdAffi[uiRefListIdx][1].getAbsMv());
-      absMvd[2] = (cu.affineType == AFFINEMODEL_6PARAM) ? Mv(pu.mvdAffi[uiRefListIdx][2].getAbsMv()) : Mv(0, 0);
-      if (pu.cs->slice->getNumRefIdx(eRefPicList) > 0
-        && (pu.interDir & (1 << uiRefListIdx)) && (absMvd[0] != Mv(0, 0) || absMvd[1] != Mv(0, 0) || absMvd[2] != Mv(0, 0)) && pu.isMvsdApplicable())
-      {
-        AffineAMVPInfo affineAMVPInfo;
-        PU::fillAffineMvpCand(pu, eRefPicList, pu.refIdx[uiRefListIdx], affineAMVPInfo);
-        const unsigned mvpIdx = pu.mvpIdx[eRefPicList];
-
-        std::vector<Mv> cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3;
-        deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvpIdx], affineAMVPInfo.mvCandRT[mvpIdx], affineAMVPInfo.mvCandLB[mvpIdx],
-          absMvd[0], absMvd[1], absMvd[2], pu, eRefPicList, pu.refIdx[eRefPicList], cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
-        int idx = -1;
-        idx = deriveMVSDIdxFromMVDAffine(pu, eRefPicList, cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
-        CHECK(idx == -1, "no match for mvsdIdx at Encoder");
-        pu.mvsdIdx[eRefPicList] = idx;
-      }
-    }
+    setWpScalingDistParam(-1, REF_PIC_LIST_X, cu.cs->slice);
+    return;
   }
-  else
+  if(!PU::useRefPairList(pu) && !PU::useRefCombList(pu))
+#endif
+  if (pu.isMvsdApplicable())
   {
-    for (uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
+    bool bi = pu.interDir == 3;
+    if (cu.affine)
     {
-      RefPicList eRefPicList = RefPicList(uiRefListIdx);
-      Mv cMvd = pu.mvd[eRefPicList];
-      if (pu.cs->slice->getNumRefIdx(eRefPicList) > 0
-        && (pu.interDir & (1 << uiRefListIdx))
-        && pu.isMvsdApplicable()
-        && cMvd.isMvsdApplicable()
-        )
+      for (uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
       {
-        auto aMvPred = bi ? cMvPredBi : cMvPred;
-        auto aRefIdx = bi ? iRefIdxBi : iRefIdx;
-        auto aMv = bi ? cMvBi : cMv;
-        Mv cMvPred2 = aMvPred[uiRefListIdx][aRefIdx[uiRefListIdx]];
-        CHECK(cMvd != aMv[uiRefListIdx] - cMvPred2, "");
-        int iRefIdx = pu.refIdx[uiRefListIdx];
-
-        Mv cMvdKnownAtDecoder = Mv(cMvd.getAbsHor(), cMvd.getAbsVer());
-        std::vector<Mv> cMvdDerivedVec;
-        if (cu.smvdMode)
+        RefPicList eRefPicList = RefPicList(uiRefListIdx);
+        Mv absMvd[3];
+        absMvd[0] = Mv(pu.mvdAffi[uiRefListIdx][0].getAbsMv());
+        absMvd[1] = Mv(pu.mvdAffi[uiRefListIdx][1].getAbsMv());
+        absMvd[2] = (cu.affineType == AFFINEMODEL_6PARAM) ? Mv(pu.mvdAffi[uiRefListIdx][2].getAbsMv()) : Mv(0, 0);
+        if (pu.cs->slice->getNumRefIdx(eRefPicList) > 0
+          && (pu.interDir & (1 << uiRefListIdx)) && (absMvd[0] != Mv(0, 0) || absMvd[1] != Mv(0, 0) || absMvd[2] != Mv(0, 0)) && pu.isMvsdApplicable())
         {
-          if (uiRefListIdx == 1)
-          {
-            cMvd = pu.mvd[REF_PIC_LIST_0];
-            CHECK((pu.mvd[REF_PIC_LIST_0].hor != -pu.mvd[REF_PIC_LIST_1].hor) || (pu.mvd[REF_PIC_LIST_0].ver != -pu.mvd[REF_PIC_LIST_1].ver), "not mirrored MVD for SMVD at Enc");
-            CHECK(cs.slice->getSymRefIdx(REF_PIC_LIST_0) != pu.refIdx[REF_PIC_LIST_0], "ref Idx for List 0 does not match for SMVD at Enc");
-            CHECK(cs.slice->getSymRefIdx(REF_PIC_LIST_1) != pu.refIdx[REF_PIC_LIST_1], "ref Idx for List 1 does not match for SMVD at Enc");
+          AffineAMVPInfo affineAMVPInfo;
+          PU::fillAffineMvpCand(pu, eRefPicList, pu.refIdx[uiRefListIdx], affineAMVPInfo);
+          const unsigned mvpIdx = pu.mvpIdx[eRefPicList];
 
-            deriveMvdSignSMVD(aMvPred[0][aRefIdx[0]], aMvPred[1][aRefIdx[1]], cMvdKnownAtDecoder, pu, cMvdDerivedVec);
-            int idx = deriveMVSDIdxFromMVDTrans(cMvd, cMvdDerivedVec);
-            CHECK(idx == -1, "");
-            pu.mvsdIdx[REF_PIC_LIST_0] = idx;
-          }
-        }
-        else
-        {
-          deriveMvdSign(cMvPred2, cMvdKnownAtDecoder, pu, eRefPicList, iRefIdx, cMvdDerivedVec);
-          int idx = deriveMVSDIdxFromMVDTrans(cMvd, cMvdDerivedVec);
-          CHECK(idx == -1, "");
+          std::vector<Mv> cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3;
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+          deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvpIdx], affineAMVPInfo.mvCandRT[mvpIdx], affineAMVPInfo.mvCandLB[mvpIdx],
+            absMvd, pu, eRefPicList, pu.refIdx[eRefPicList], cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
+#else
+          deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvpIdx], affineAMVPInfo.mvCandRT[mvpIdx], affineAMVPInfo.mvCandLB[mvpIdx],
+            absMvd[0], absMvd[1], absMvd[2], pu, eRefPicList, pu.refIdx[eRefPicList], cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
+#endif
+          int idx = -1;
+          idx = deriveMVSDIdxFromMVDAffine(pu, eRefPicList, cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
+          CHECK(idx == -1, "no match for mvsdIdx at Encoder");
           pu.mvsdIdx[eRefPicList] = idx;
         }
       }
-    } //loop end for non-affine
+    }
+    else
+    {
+      for (uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
+      {
+        RefPicList eRefPicList = RefPicList(uiRefListIdx);
+        Mv cMvd = pu.mvd[eRefPicList];
+        if (pu.cs->slice->getNumRefIdx(eRefPicList) > 0
+          && (pu.interDir & (1 << uiRefListIdx))
+          && pu.isMvsdApplicable()
+          && cMvd.isMvsdApplicable()
+          )
+        {
+          auto aMvPred = bi ? cMvPredBi : cMvPred;
+          auto aRefIdx = bi ? iRefIdxBi : iRefIdx;
+          auto aMv = bi ? cMvBi : cMv;
+          Mv cMvPred2 = aMvPred[uiRefListIdx][aRefIdx[uiRefListIdx]];
+          CHECK(cMvd != aMv[uiRefListIdx] - cMvPred2, "");
+          int iRefIdx = pu.refIdx[uiRefListIdx];
+          Mv cMvdKnownAtDecoder = Mv(cMvd.getAbsHor(), cMvd.getAbsVer());
+          std::vector<Mv> cMvdDerivedVec;
+          if (cu.smvdMode)
+          {
+            if (uiRefListIdx == 1)
+            {
+              cMvd = pu.mvd[REF_PIC_LIST_0];
+              CHECK((pu.mvd[REF_PIC_LIST_0].hor != -pu.mvd[REF_PIC_LIST_1].hor) || (pu.mvd[REF_PIC_LIST_0].ver != -pu.mvd[REF_PIC_LIST_1].ver), "not mirrored MVD for SMVD at Enc");
+              CHECK(cs.slice->getSymRefIdx(REF_PIC_LIST_0) != pu.refIdx[REF_PIC_LIST_0], "ref Idx for List 0 does not match for SMVD at Enc");
+              CHECK(cs.slice->getSymRefIdx(REF_PIC_LIST_1) != pu.refIdx[REF_PIC_LIST_1], "ref Idx for List 1 does not match for SMVD at Enc");
+
+              deriveMvdSignSMVD(aMvPred[0][aRefIdx[0]], aMvPred[1][aRefIdx[1]], cMvdKnownAtDecoder, pu, cMvdDerivedVec);
+              int idx = deriveMVSDIdxFromMVDTrans(cMvd, cMvdDerivedVec);
+              CHECK(idx == -1, "");
+              pu.mvsdIdx[REF_PIC_LIST_0] = idx;
+            }
+          }
+          else
+          {
+            deriveMvdSign(cMvPred2, cMvdKnownAtDecoder, pu, eRefPicList, iRefIdx, cMvdDerivedVec);
+            int idx = deriveMVSDIdxFromMVDTrans(cMvd, cMvdDerivedVec);
+            CHECK(idx == -1, "");
+            pu.mvsdIdx[eRefPicList] = idx;
+          }
+        }
+      } //loop end for non-affine
+    }
   }
 #endif
   setWpScalingDistParam( -1, REF_PIC_LIST_X, cu.cs->slice );
@@ -6585,6 +6642,12 @@ void InterSearch::xPredAffineInterSearch( PredictionUnit&       pu,
         ::memcpy( aacMv[iRefList], cMvTemp[iRefList][iRefIdxTemp], sizeof(Mv) * 3 );
         iRefIdx[iRefList] = iRefIdxTemp;
       }
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+      if (pu.cs->sps->getUseARL() && iRefList == 1 && slice.getList1IdxToList0Idx(iRefIdxTemp) >= 0)
+      {
+        uiCostTemp = MAX_UINT;
+      }
+#endif
 
       if ( iRefList == 1 && uiCostTemp < costValidList1 && slice.getList1IdxToList0Idx( iRefIdxTemp ) < 0 )
       {
@@ -6777,6 +6840,18 @@ void InterSearch::xPredAffineInterSearch( PredictionUnit&       pu,
       iRefEnd   = slice.getNumRefIdx(eRefPicList) - 1;
       for ( int iRefIdxTemp = iRefStart; iRefIdxTemp <= iRefEnd; iRefIdxTemp++ )
       {
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+        if (pu.cs->sps->getUseARL())
+        {
+          int refIdxTemp[2];
+          refIdxTemp[iRefList] = iRefIdxTemp;
+          refIdxTemp[1 - iRefList] = iRefIdxBi[1 - iRefList];
+          if (pu.cu->slice->getRefPicPairIdx(refIdxTemp[0], refIdxTemp[1]) < 0)
+          {
+            continue;
+          }
+        }
+#endif
         if ( pu.cu->affineType == AFFINEMODEL_6PARAM && refIdx4Para[iRefList] != iRefIdxTemp )
         {
           continue;

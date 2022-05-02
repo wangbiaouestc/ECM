@@ -2806,6 +2806,14 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
     pcSlice->checkBMAvailability(pcSlice);
     pcSlice->checkAmvpMergeModeAvailability(pcSlice);
 #endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    if (pcSlice->getSPS()->getUseARL())
+    {
+      pcSlice->setList1IdxToList0Idx();
+      pcSlice->generateCombinedList();
+      pcSlice->generateRefPicPairList();
+    }
+#endif
 
     NalUnitInfo naluInfo;
     naluInfo.m_nalUnitType = nalu.m_nalUnitType;

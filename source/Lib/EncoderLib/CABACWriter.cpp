@@ -2512,8 +2512,14 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
     cu_bcw_flag(*pu.cu);
 #endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    refPairIdx(pu);
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
     }
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    refIdxLC(pu);
 #endif
     if( pu.interDir != 2 /* PRED_L1 */ )
     {
@@ -3746,6 +3752,12 @@ void CABACWriter::inter_pred_idc( const PredictionUnit& pu )
       m_BinEncoder.encodeBin( 0, Ctx::InterDir(ctxId) );
     }
   }
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  if (pu.cs->sps->getUseARL())
+  {
+    return;
+  }
+#endif
 #if CTU_256
   m_BinEncoder.encodeBin( ( pu.interDir == 2 ), Ctx::InterDir( 7 ) );
 #else
@@ -3754,6 +3766,73 @@ void CABACWriter::inter_pred_idc( const PredictionUnit& pu )
   DTRACE( g_trace_ctx, D_SYNTAX, "inter_pred_idc() ctx=5 value=%d pos=(%d,%d)\n", pu.interDir, pu.lumaPos().x, pu.lumaPos().y );
 }
 
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+void CABACWriter::refIdxLC(const PredictionUnit& pu)
+{
+  if (!PU::useRefCombList(pu))
+  {
+    return;
+  }
+  int numRefMinus1 = (int)pu.cs->slice->getRefPicCombinedList().size() - 1;
+  int refIdxLC = pu.refIdxLC;
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  if (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1])
+  {
+    numRefMinus1 = (int)pu.cs->slice->getRefPicCombinedListAmvpMerge().size() - 1;
+  }
+#endif
+  if (numRefMinus1 > 0)
+  {
+    if (refIdxLC == 0)
+    {
+      m_BinEncoder.encodeBin(0, Ctx::RefPicLC(0));
+      return;
+    }
+    else
+    {
+      m_BinEncoder.encodeBin(1, Ctx::RefPicLC(0));
+      for (unsigned idx = 1; idx < numRefMinus1; idx++)
+      {
+        m_BinEncoder.encodeBin(refIdxLC == idx ? 0 : 1, Ctx::RefPicLC(std::min((int)idx, 2)));
+        if (refIdxLC == idx)
+        {
+          break;
+        }
+      }
+    }
+  }
+}
+
+void CABACWriter::refPairIdx(const PredictionUnit& pu)
+{
+  if (!PU::useRefPairList(pu))
+  {
+    return;
+  }
+  int numRefMinus1 = (int)pu.cs->slice->getRefPicPairList().size() - 1;
+  int refPairIdx = pu.refPairIdx;
+  if (numRefMinus1 > 0)
+  {
+    if (refPairIdx == 0)
+    {
+      m_BinEncoder.encodeBin(0, Ctx::RefPicLC(0));
+      return;
+    }
+    else
+    {
+      m_BinEncoder.encodeBin(1, Ctx::RefPicLC(0));
+      for (unsigned idx = 1; idx < numRefMinus1; idx++)
+      {
+        m_BinEncoder.encodeBin(refPairIdx == idx ? 0 : 1, Ctx::RefPicLC(std::min((int)idx, 2)));
+        if (refPairIdx == idx)
+        {
+          break;
+        }
+      }
+    }
+  }
+}
+#endif
 
 void CABACWriter::ref_idx( const PredictionUnit& pu, RefPicList eRefList )
 {
@@ -3762,6 +3841,12 @@ void CABACWriter::ref_idx( const PredictionUnit& pu, RefPicList eRefList )
     CHECK( pu.refIdx[eRefList] != pu.cs->slice->getSymRefIdx( eRefList ), "Invalid reference index!\n" );
     return;
   }
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  if (PU::useRefCombList(pu) || PU::useRefPairList(pu))
+  {
+    return;
+  }
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   if (pu.amvpMergeModeFlag[1 - eRefList])
   {
@@ -4259,7 +4344,24 @@ void CABACWriter::mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
   {
     return;
   }
-  
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  if (pu.cs->sps->getUseARL())
+  {
+    if (pu.interDir == 3 && eRefList == REF_PIC_LIST_1 && (pu.mvd[0].getHor() || pu.mvd[0].getVer()))
+    {
+      if (pu.mvd[eRefList].getHor())
+      {
+        m_BinEncoder.encodeBinEP(pu.mvd[eRefList].getHor() < 0);
+      }
+      if (pu.mvd[eRefList].getVer())
+      {
+        m_BinEncoder.encodeBinEP(pu.mvd[eRefList].getVer() < 0);
+      }
+      return;
+    }
+  }
+#endif
+
   Mv TrMv = Mv(pu.mvd[eRefList].getAbsHor(), pu.mvd[eRefList].getAbsVer());
   int Thres = THRES_TRANS;
   
@@ -4304,7 +4406,48 @@ void CABACWriter::mvsdAffineIdxFunc(const PredictionUnit &pu, RefPicList eRefLis
   {
     return;
   }
-  
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  if (pu.cs->sps->getUseARL())
+  {
+    if (pu.interDir == 3 && eRefList == REF_PIC_LIST_1 &&
+      (pu.mvdAffi[0][0].getHor() || pu.mvdAffi[0][0].getVer() ||
+        pu.mvdAffi[0][1].getHor() || pu.mvdAffi[0][1].getVer() ||
+        (pu.cu->affineType == AFFINEMODEL_6PARAM && (pu.mvdAffi[0][2].getHor() || pu.mvdAffi[0][2].getVer()))
+        )
+      )
+    {
+      if (pu.mvdAffi[eRefList][0].getHor())
+      {
+        m_BinEncoder.encodeBinEP(pu.mvdAffi[eRefList][0].getHor() < 0);
+      }
+      if (pu.mvdAffi[eRefList][0].getVer())
+      {
+        m_BinEncoder.encodeBinEP(pu.mvdAffi[eRefList][0].getVer() < 0);
+      }
+      if (pu.mvdAffi[eRefList][1].getHor())
+      {
+        m_BinEncoder.encodeBinEP(pu.mvdAffi[eRefList][1].getHor() < 0);
+      }
+      if (pu.mvdAffi[eRefList][1].getVer())
+      {
+        m_BinEncoder.encodeBinEP(pu.mvdAffi[eRefList][1].getVer() < 0);
+      }
+      if (pu.cu->affineType == AFFINEMODEL_6PARAM)
+      {
+        if (pu.mvdAffi[eRefList][2].getHor())
+        {
+          m_BinEncoder.encodeBinEP(pu.mvdAffi[eRefList][2].getHor() < 0);
+        }
+        if (pu.mvdAffi[eRefList][2].getVer())
+        {
+          m_BinEncoder.encodeBinEP(pu.mvdAffi[eRefList][2].getVer() < 0);
+        }
+      }
+      return;
+    }
+  }
+#endif
+
   Mv AffMv[3];
   AffMv[0] = Mv(pu.mvdAffi[eRefList][0].getAbsHor(), pu.mvdAffi[eRefList][0].getAbsVer());
   AffMv[1] = Mv(pu.mvdAffi[eRefList][1].getAbsHor(), pu.mvdAffi[eRefList][1].getAbsVer());
@@ -5988,6 +6131,13 @@ void CABACWriter::amvpMerge_mode( const PredictionUnit& pu )
   if (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1])
   {
     m_BinEncoder.encodeBin(1, Ctx::amFlagState());
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    if (pu.cs->sps->getUseARL())
+    {
+      // signaled by refIdxLC
+    }
+    else
+#endif
     if (pu.cu->cs->picHeader->getMvdL1ZeroFlag() == false)
     {
       if (pu.amvpMergeModeFlag[REF_PIC_LIST_0])

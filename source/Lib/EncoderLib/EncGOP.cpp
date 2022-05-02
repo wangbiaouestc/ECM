@@ -2870,6 +2870,13 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     pcSlice->checkBMAvailability(pcSlice);
     pcSlice->checkAmvpMergeModeAvailability(pcSlice);
 #endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    if (pcSlice->getSPS()->getUseARL())
+    {
+      pcSlice->generateCombinedList();
+      pcSlice->generateRefPicPairList();
+    }
+#endif
 
     double lambda            = 0.0;
     int actualHeadBits       = 0;

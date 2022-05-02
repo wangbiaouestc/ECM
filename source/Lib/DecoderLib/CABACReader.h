@@ -171,6 +171,10 @@ public:
   void        affine_amvr_mode          ( CodingUnit&                   cu,     MergeCtx&       mrgCtx );
   void        inter_pred_idc            ( PredictionUnit&               pu );
   void        ref_idx                   ( PredictionUnit&               pu,     RefPicList      eRefList );
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  void        refIdxLC                ( PredictionUnit&               pu );
+  void        refPairIdx              ( PredictionUnit&               pu );
+#endif
   void        mvp_flag                  ( PredictionUnit&               pu,     RefPicList      eRefList );
   void        Ciip_flag              ( PredictionUnit&               pu );
   void        smvd_mode              ( PredictionUnit&               pu );

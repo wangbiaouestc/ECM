@@ -1062,6 +1062,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   ("MVSD",                                            m_MVSD,                                            true, "Motion Vector difference Sign Derivation (0:off, 1:on)")
 #endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  ("ARL",                                             m_useARL,                                          true, "Adaptive Reference List (0:off, 1:on)")
+#endif
   ("ColorTransform",                                  m_useColorTrans,                                  false, "Enable the color transform")
   ("PLT",                                             m_PLTMode,                                           0u, "PLTMode (0x1:enabled, 0x0:disabled)  [default: disabled]")
   ("JointCbCr",                                       m_JointCbCrMode,                                  false, "Enable joint coding of chroma residuals (JointCbCr, 0:off, 1:on)")
@@ -4442,6 +4445,12 @@ void EncAppCfg::xPrintParameter()
     msg(VERBOSE, "AffineAmvp:%d ", m_AffineAmvp);
     msg(VERBOSE, "DMVR:%d ", m_DMVR);
     msg(VERBOSE, "MmvdDisNum:%d ", m_MmvdDisNum);
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    msg(VERBOSE, "MVSD:%d ", m_MVSD);
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    msg(VERBOSE, "ARL:%d ", m_useARL);
+#endif
     msg(VERBOSE, "JointCbCr:%d ", m_JointCbCrMode);
   }
   m_useColorTrans = (m_chromaFormatIDC == CHROMA_444) ? m_useColorTrans : 0u;

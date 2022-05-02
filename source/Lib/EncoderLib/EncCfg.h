@@ -428,6 +428,9 @@ protected:
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   bool      m_MVSD;
 #endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  bool      m_useARL;
+#endif
   bool      m_rgbFormat;
   bool      m_useColorTrans;
   unsigned  m_PLTMode;
@@ -1360,6 +1363,10 @@ public:
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   void      setUseMVSD(bool b) { m_MVSD = b; }
   bool      getUseMVSD()                               const { return m_MVSD; }
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  void      setUseARL(bool b) { m_useARL = b; }
+  bool      getUseARL()                               const { return m_useARL; }
 #endif
   void      setRGBFormatFlag(bool value) { m_rgbFormat = value; }
   bool      getRGBFormatFlag()                         const { return m_rgbFormat; }

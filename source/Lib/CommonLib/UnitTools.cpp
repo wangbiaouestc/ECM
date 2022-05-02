@@ -5722,7 +5722,11 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
 #else
   interPred = pu.cu->cs->sps->getUseDMVDMode() ? interPred : nullptr;
 #endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER // AmvpList might be already derived during ref. reordering
+  if (interPred != nullptr && interPred->readTplAmvpBuffer(amvpInfo, *pu.cu, eRefPicList, refIdx))
+#else
   if (cs.pcv->isEncoder && interPred != nullptr && interPred->readTplAmvpBuffer(amvpInfo, *pu.cu, eRefPicList, refIdx))
+#endif
   {
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
     if (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1])
@@ -5987,7 +5991,11 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
   }
 
 #if TM_AMVP
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  if (interPred != nullptr)
+#else
   if (cs.pcv->isEncoder && interPred != nullptr)
+#endif
   {
     interPred->writeTplAmvpBuffer(*pInfo, *pu.cu, eRefPicList, refIdx);
   }
@@ -9935,6 +9943,7 @@ void PU::spanIpmInfoInter( PredictionUnit &pu, MotionBuf &mb, IpmBuf &ib)
 }
 #endif
 
+#if !JVET_Z0054_BLK_REF_PIC_REORDER
 void PU::applyImv( PredictionUnit& pu, MergeCtx &mrgCtx, InterPrediction *interPred )
 {
   if( !pu.mergeFlag )
@@ -10045,6 +10054,7 @@ void PU::applyImv( PredictionUnit& pu, MergeCtx &mrgCtx, InterPrediction *interP
 
   PU::spanMotionInfo( pu, mrgCtx );
 }
+#endif
 
 bool PU::isBiPredFromDifferentDirEqDistPoc(const PredictionUnit& pu)
 {
@@ -10986,6 +10996,58 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
 #endif
   spanIpmInfoInter( pu, mb, ib );
 #endif
+}
+#endif
+
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+bool PU::useRefCombList(const PredictionUnit &pu)
+{
+  if (!pu.cs->sps->getUseARL())
+  {
+    return false;
+  }
+  if (CU::isIBC(*pu.cu))
+  {
+    return false;
+  }
+  if (pu.interDir == 1 || pu.interDir == 2)
+  {
+    return true;
+  }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  if (pu.amvpMergeModeFlag[REF_PIC_LIST_0] || pu.amvpMergeModeFlag[REF_PIC_LIST_1])
+  {
+    return true;
+  }
+#endif
+  return false;
+}
+
+bool PU::useRefPairList(const PredictionUnit &pu)
+{
+  if (!pu.cs->sps->getUseARL())
+  {
+    return false;
+  }
+  if (CU::isIBC(*pu.cu))
+  {
+    return false;
+  }
+  if (pu.interDir != 3 || pu.mergeFlag)
+  {
+    return false;
+  }
+  if (pu.cu->smvdMode)
+  {
+    return false;
+  }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  if (pu.amvpMergeModeFlag[REF_PIC_LIST_0] || pu.amvpMergeModeFlag[REF_PIC_LIST_1])
+  {
+    return false;
+  }
+#endif
+  return true;
 }
 #endif
 

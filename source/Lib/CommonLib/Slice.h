@@ -1529,6 +1529,9 @@ private:
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   bool              m_MVSD;
 #endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  bool              m_useARL;
+#endif
   bool              m_SBT;
   bool              m_ISP;
   ChromaFormat      m_chromaFormatIdc;
@@ -1999,6 +2002,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   void                    setUseMVSD(bool b) { m_MVSD = b; }
   bool                    getUseMVSD()const                                                               { return m_MVSD; }
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  void                    setUseARL(bool b) { m_useARL = b; }
+  bool                    getUseARL()const { return m_useARL; }
 #endif
   bool                    getBdofControlPresentFlag()const                                                { return m_BdofControlPresentFlag; }
   void                    setBdofControlPresentFlag(bool b)                                               { m_BdofControlPresentFlag = b;    }
@@ -3056,6 +3063,16 @@ private:
   bool                       m_tsResidualCodingDisabledFlag;
   int                        m_list1IdxToList0Idx[MAX_NUM_REF];
   int                        m_aiNumRefIdx   [NUM_REF_PIC_LIST_01];    //  for multiple reference of current slice
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  std::vector<RefListAndRefIdx> m_refPicCombinedList;
+  int8_t                     m_iRefIdxOfLC[2][MAX_NUM_REF];
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  std::vector<RefListAndRefIdx> m_refPicCombinedListAmvpMerge;
+  int8_t                     m_iRefIdxOfLCAmvpMerge[2][MAX_NUM_REF];
+#endif
+  std::vector<RefPicPair>    m_refPicPairList;
+  int8_t                     m_iRefPicPairIdx[MAX_NUM_REF][MAX_NUM_REF];
+#endif
   bool                       m_pendingRasInit;
 
   bool                       m_bCheckLDC;
@@ -3150,11 +3167,13 @@ private:
 #if MULTI_HYP_PRED
   int                        m_numMultiHypRefPics = 0;
 
+#if !JVET_Z0054_BLK_REF_PIC_REORDER
   struct RefListAndRefIdx
   {
     RefPicList refList;
     int8_t     refIdx;
   };
+#endif
   std::vector<RefListAndRefIdx> m_multiHypRefPics;
 #endif
 public:
@@ -3321,6 +3340,16 @@ public:
 
   void                        constructRefPicList(PicList& rcListPic);
   void                        setRefPOCList();
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  void                        generateCombinedList();
+  int8_t                      getRefIdxOfLC(RefPicList e, int i) { return m_iRefIdxOfLC[e][i]; }
+  const std::vector<RefListAndRefIdx> &getRefPicCombinedList() const { return m_refPicCombinedList; }
+  int8_t                      getRefIdxOfLCAmvpMerge(RefPicList e, int i) { return m_iRefIdxOfLCAmvpMerge[e][i]; }
+  const std::vector<RefListAndRefIdx> &getRefPicCombinedListAmvpMerge() const { return m_refPicCombinedListAmvpMerge; }
+  void                        generateRefPicPairList();
+  int8_t                      getRefPicPairIdx(int i, int j) { return m_iRefPicPairIdx[i][j]; }
+  const std::vector<RefPicPair> &getRefPicPairList() const { return m_refPicPairList; }
+#endif
 #if MULTI_HYP_PRED
   void                        setMultiHypRefPicList();
   const std::vector<RefListAndRefIdx> &getMultiHypRefPicList() const { return m_multiHypRefPics; }

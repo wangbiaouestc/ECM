@@ -301,7 +301,9 @@ namespace PU
   void spanIpmInfoIntra               (      PredictionUnit &pu );
   void spanIpmInfoInter               (      PredictionUnit &pu, MotionBuf &mb, IpmBuf &ib );
 #endif
+#if !JVET_Z0054_BLK_REF_PIC_REORDER
   void applyImv                       (      PredictionUnit &pu, MergeCtx &mrgCtx, InterPrediction *interPred = NULL );
+#endif
 #if JVET_Z0139_HIST_AFF
   bool getAffineControlPointCand(const PredictionUnit& pu, MotionInfo mi[4], bool isAvailable[4], int verIdx[4], int8_t bcwIdx, int modelIdx, int verNum, AffineMergeCtx& affMrgCtx);
 #else
@@ -420,7 +422,10 @@ namespace PU
   AMVPInfo getMultiHypMVPCandsMerge(PredictionUnit &pu, const RefPicList eRefPicList, const int refIdx);
   AMVPInfo getMultiHypMVPCandsAMVP(PredictionUnit &pu, const RefPicList eRefPicList, const int refIdx);
 #endif
-
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  bool useRefCombList(const PredictionUnit &pu);
+  bool useRefPairList(const PredictionUnit &pu);
+#endif
 }
 
 // TU tools

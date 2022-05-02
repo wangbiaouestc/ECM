@@ -422,6 +422,9 @@ protected:
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   bool      m_MVSD;
 #endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  bool      m_useARL;
+#endif
   bool      m_rgbFormat;
   bool      m_useColorTrans;
   unsigned  m_PLTMode;

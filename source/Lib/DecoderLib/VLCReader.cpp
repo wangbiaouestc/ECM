@@ -2188,6 +2188,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_W0090_ARMC_TM
   READ_FLAG( uiCode, "sps_aml_enabled_flag");                        pcSPS->setUseAML ( uiCode != 0 );
 #endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  READ_FLAG( uiCode, "sps_arl_enabled_flag");                        pcSPS->setUseARL ( uiCode != 0 );
+#endif
   READ_FLAG( uiCode, "sps_bdof_enabled_flag" );                      pcSPS->setBDOFEnabledFlag ( uiCode != 0 );
   if (pcSPS->getBDOFEnabledFlag())
   {

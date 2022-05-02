@@ -1,4 +1,4 @@
-/* The copyright in this software is being made available under the BSD
+﻿/* The copyright in this software is being made available under the BSD
  * License, included below. This software may be subject to other third party
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
@@ -49,10 +49,6 @@
 #include <cstring>
 #include <assert.h>
 #include <cassert>
-
-
-
-
 
 
 #define BASE_ENCODER                                      1
@@ -183,6 +179,7 @@
 #if JVET_W0090_ARMC_TM
 #define JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED            1 // JVET-Y0067: TM based reordering for MMVD and affine MMVD and MVD sign prediction
 #define JVET_Z0102_NO_ARMC_FOR_ZERO_CAND                  1 // JVET-Z0102: No ARMC for the Zero candidates of Regular, TM and BM merge modes
+#define JVET_Z0054_BLK_REF_PIC_REORDER                    1 // JVET-Z0054: Block level TM based reordering of reference pictures
 #endif
 
 // Transform and coefficient coding
@@ -1345,7 +1342,21 @@ struct LFCUParam
   bool topEdge;                          ///< indicates top edge
 };
 
-
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+struct RefListAndRefIdx
+{
+  RefPicList refList;
+  int8_t     refIdx;
+  uint32_t   pocDist;
+  Distortion cost;
+};
+struct RefPicPair
+{
+  int8_t refIdx[2];
+  uint32_t pocDist;
+  Distortion cost;
+};
+#endif
 
 struct PictureHash
 {

@@ -366,6 +366,9 @@ public:
   static const CtxSet   DeltaQP;
   static const CtxSet   InterDir;
   static const CtxSet   RefPic;
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  static const CtxSet   RefPicLC;
+#endif
   static const CtxSet   MmvdFlag;
   static const CtxSet   MmvdMergeIdx;
   static const CtxSet   MmvdStepMvpIdx;

@@ -1400,6 +1400,23 @@ const CtxSet ContextSetCfg::RefPic = ContextSetCfg::addCtxSet
   { 124, 103, },
   });
 
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+const CtxSet ContextSetCfg::RefPicLC = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU },
+  { CNU, CNU, CNU },
+  { CNU, CNU, CNU },
+  { DWS, DWS, DWS },
+  { DWS, DWS, DWS },
+  { DWS, DWS, DWS },
+  { DWE, DWE, DWE },
+  { DWE, DWE, DWE },
+  { DWE, DWE, DWE },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  });
+#endif
+
 const CtxSet ContextSetCfg::SubblockMergeFlag = ContextSetCfg::addCtxSet
 ({
   {  25,  43,  30, },
@@ -3175,6 +3192,18 @@ const CtxSet ContextSetCfg::RefPic = ContextSetCfg::addCtxSet
 	{ 0,  4 },
 	{ 0,  4 }
 });
+
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+const CtxSet ContextSetCfg::RefPicLC = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU },
+  { CNU, CNU, CNU },
+  { CNU, CNU, CNU },
+  { 0, 2, 4 },
+  { 0, 2, 4 },
+  { 0, 2, 4 }
+});
+#endif
 
 const CtxSet ContextSetCfg::SubblockMergeFlag = ContextSetCfg::addCtxSet
 ({
