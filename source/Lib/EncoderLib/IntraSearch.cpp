@@ -1228,6 +1228,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         if (maxSize > 0)
         {
           uiRdModeList.resize(std::min<size_t>(uiRdModeList.size(), maxSize));
+
+          if (sps.getUseLFNST() && mtsUsageFlag == 1)
+          {
+            // Update also the number of stored modes to avoid partial fill of mode storage
+            m_savedNumRdModes[lfnstIdx] = std::min<int32_t>(int32_t(uiRdModeList.size()), m_savedNumRdModes[lfnstIdx]);
+          }
+
           if (bestMipIdx >= 0)
           {
             if (uiRdModeList.size() <= bestMipIdx)
