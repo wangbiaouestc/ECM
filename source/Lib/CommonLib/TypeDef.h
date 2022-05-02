@@ -163,6 +163,7 @@
 #endif
 #define JVET_Y0089_DMVR_BCW                               1 // JVET-Y0089: DMVR with BCW enabled
 #define JVET_Y0065_GPM_INTRA                              1 // JVET-Y0065: Intra prediction for GPM
+#define JVET_Z0083_PARSINGERROR_FIX                       1 // JVET-Z0083: Fix on MHP parsing condition
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction

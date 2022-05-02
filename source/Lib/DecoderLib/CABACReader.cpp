@@ -4151,10 +4151,12 @@ void CABACReader::mh_pred_data(PredictionUnit& pu)
     return;
   }
 #endif
+#if !JVET_Z0083_PARSINGERROR_FIX
   if (!pu.mergeFlag && pu.cu->affine && pu.cu->imv)
   {
     return;
   }
+#endif
   if (!pu.mergeFlag && pu.cu->BcwIdx == BCW_DEFAULT)
   {
     return;
