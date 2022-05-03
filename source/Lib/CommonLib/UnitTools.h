@@ -245,7 +245,44 @@ namespace PU
   );
 #endif
   void addAMVPHMVPCand                (const PredictionUnit &pu, const RefPicList eRefPicList, const int currRefPOC, AMVPInfo &info);
-  bool addAffineMVPCandUnscaled       ( const PredictionUnit &pu, const RefPicList &refPicList, const int &refIdx, const Position &pos, const MvpDir &dir, AffineAMVPInfo &affiAmvpInfo );
+#if JVET_Z0139_HIST_AFF
+  void xGetAffineMvFromLUT(AffineMotionInfo* affHistInfo, int rParameters[4]);
+  bool checkLastAffineMergeCandRedundancy(const PredictionUnit& pu, AffineMergeCtx& affMrgCtx);
+
+  bool addOneAffineMergeHMVPCand(const PredictionUnit& pu, AffineMergeCtx& affMrgCtx, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int affHMVPIdx, const MotionInfo& mvInfo, Position neiPosition, int iGBiIdx, bool bICflag);
+  bool addSpatialAffineMergeHMVPCand(const PredictionUnit& pu, AffineMergeCtx& affMrgCtx, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int affHMVPIdx, const PredictionUnit* neiPUs[], Position neiPositions[], int iNeiNum, const int mrgCandIdx = -1);
+  bool addSpatialAffineAMVPHMVPCand(PredictionUnit& pu, const RefPicList& eRefPicList, const int& refIdx, AffineAMVPInfo& affiAMVPInfo, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int iHMVPlistIdx,
+    int neiIdx[], int iNeiNum, int aiNeibeInherited[], bool bFoundOne);
+  bool addMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrgCtx, const int& mrgCandIdx, int& cnt
+#if TM_MRG
+    ,const uint32_t mvdSimilarityThresh = 1
+#endif
+  );
+  bool addOneMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrgCtx, int& cnt, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int listIdx, const MotionInfo& mvInfo, Position neiPosition
+    , int iGBiIdx
+#if INTER_LIC
+    , bool bICflag
+#endif
+#if TM_MRG
+    , const uint32_t mvdSimilarityThresh = 1
+#endif
+  );
+
+  bool addOneInheritedHMVPAffineMergeCand(const PredictionUnit& pu, AffineMergeCtx& affMrgCtx, static_vector<AffineInheritInfo, MAX_NUM_AFF_INHERIT_HMVP_CANDS>& lutAffInherit, int affHMVPIdx);
+  void xGetAffineMvFromLUT(short affineParameters[4], int rParameters[4]);
+  void deriveAffineParametersFromMVs(const PredictionUnit& pu, const Mv acMvTemp[3], int* affinePara, EAffineModel affModel);
+  void deriveMVsFromAffineParameters(const PredictionUnit& pu, Mv rcMv[3], int* affinePara, const Mv& cBaseMv, const Position& cBasePos);
+  void storeAffParas(int* affinePara);
+  void deriveCenterMVFromAffineParameters(const PredictionUnit& pu, Mv& rcMv, int* affinePara, const Mv& cBaseMv, const Position& cBasePos);
+#endif
+#if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
+  bool checkLastAffineAMVPCandRedundancy(const PredictionUnit& pu, AffineAMVPInfo& affiAMVPInfo);
+#endif
+  bool addAffineMVPCandUnscaled       ( const PredictionUnit &pu, const RefPicList &refPicList, const int &refIdx, const Position &pos, const MvpDir &dir, AffineAMVPInfo &affiAmvpInfo 
+#if JVET_Z0139_HIST_AFF
+    , int aiNeibeInherited[5]
+#endif
+  );
   bool isBipredRestriction            (const PredictionUnit &pu);
 #if MULTI_PASS_DMVR
   void spanMotionInfo                 (      PredictionUnit &pu, const MergeCtx &mrgCtx = MergeCtx(), Mv* bdmvrSubPuMv0 = nullptr, Mv* bdmvrSubPuMv1 = nullptr, Mv* bdofSubPuMvOffset = nullptr );
@@ -262,12 +299,28 @@ namespace PU
   void spanIpmInfoInter               (      PredictionUnit &pu, MotionBuf &mb, IpmBuf &ib );
 #endif
   void applyImv                       (      PredictionUnit &pu, MergeCtx &mrgCtx, InterPrediction *interPred = NULL );
+#if JVET_Z0139_HIST_AFF
+  bool getAffineControlPointCand(const PredictionUnit& pu, MotionInfo mi[4], bool isAvailable[4], int verIdx[4], int8_t bcwIdx, int modelIdx, int verNum, AffineMergeCtx& affMrgCtx);
+#else
   void getAffineControlPointCand(const PredictionUnit &pu, MotionInfo mi[4], bool isAvailable[4], int verIdx[4], int8_t bcwIdx, int modelIdx, int verNum, AffineMergeCtx& affMrgCtx);
+#endif
+#if JVET_Z0139_NA_AFF
+  bool xCPMVSimCheck(const PredictionUnit &pu, AffineMergeCtx &affMrgCtx, Mv curCpmv[2][3], unsigned char curdir, int8_t curRefIdx[2], EAffineModel curType, int bcwIdx, bool LICFlag);
+  int  getMvDiffThresholdByWidthAndHeight(const PredictionUnit &pu, bool width);
+  bool addNonAdjAffineConstructedCPMV(const PredictionUnit &pu, MotionInfo miNew[4], bool isAvaNew[4], Position pos[4], int8_t bcwId, AffineMergeCtx &affMrgCtx, int mrgCandIdx);
+  bool addNonAdjCstAffineMVPCandUnscaled(const PredictionUnit &pu, const RefPicList &refPicList, const int &refIdx, AffineAMVPInfo &affiAmvpInfo);
+  bool addNonAdjCstAffineMVPConstructedCPMV( const PredictionUnit &pu, MotionInfo miNew[3], bool isAvaNew[3], Position pos[3], const RefPicList &refPicList, const int &refIdx, AffineAMVPInfo &affiAmvpInfo);
+  void getNonAdjCstMergeCand(const PredictionUnit &pu, AffineMergeCtx &affMrgCtx, const int mrgCandIdx = -1, bool isInitialized = false);
+  int  getNonAdjAffParaDivFun(int num1, int num2);
+#endif
   void getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx, 
 #if AFFINE_MMVD
                            int mrgCandIdx = -1, bool isAfMmvd = false
 #else
                            const int mrgCandIdx = -1
+#endif
+#if JVET_Z0139_NA_AFF && JVET_W0090_ARMC_TM
+    , bool isZeroCandIdx = false 
 #endif
   );
 #if AFFINE_MMVD

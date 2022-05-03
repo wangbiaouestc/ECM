@@ -1325,7 +1325,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_X0049_ADAPT_DMVR
   ("MaxNumBMMergeCand",                               m_maxNumBMMergeCand,                                 4u, "Maximum number of BM merge candidates")
 #endif
+#if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
+  ("MaxNumAffineMergeCand",                           m_maxNumAffineMergeCand, (uint32_t)AFFINE_MRG_MAX_NUM_CANDS, "Maximum number of affine merge candidates")
+#else
   ("MaxNumAffineMergeCand",                           m_maxNumAffineMergeCand,                             5u, "Maximum number of affine merge candidates")
+#endif
 #if NON_ADJACENT_MRG_CAND
   ("MaxNumGeoCand",                                   m_maxNumGeoCand,                                     10u, "Maximum number of geometric partitioning mode candidates")
 #else

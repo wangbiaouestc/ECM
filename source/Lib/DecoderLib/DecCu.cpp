@@ -1475,10 +1475,19 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if JVET_W0090_ARMC_TM
           int affMrgIdx = pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE + 1)*ADAPTIVE_AFFINE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumAffineMergeCand()) || (pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE * ADAPTIVE_AFFINE_SUB_GROUP_SIZE + ADAPTIVE_AFFINE_SUB_GROUP_SIZE - 1 : pu.mergeIdx;
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Z0139_NA_AFF
+          PU::getAffineMergeCand(pu, affineMergeCtx, (pu.afMmvdFlag ? AF_MMVD_BASE_NUM : affMrgIdx), pu.afMmvdFlag, pu.mergeIdx == 0);
+#else
           PU::getAffineMergeCand(pu, affineMergeCtx, (pu.afMmvdFlag ? AF_MMVD_BASE_NUM : affMrgIdx), pu.afMmvdFlag);
+#endif
+#else
+#if JVET_Z0139_NA_AFF
+          PU::getAffineMergeCand(pu, affineMergeCtx, (pu.afMmvdFlag ? pu.afMmvdBaseIdx : affMrgIdx), pu.afMmvdFlag, pu.mergeIdx == 0);
 #else
           PU::getAffineMergeCand(pu, affineMergeCtx, (pu.afMmvdFlag ? pu.afMmvdBaseIdx : affMrgIdx), pu.afMmvdFlag);
 #endif
+#endif
+
 #else
           PU::getAffineMergeCand(pu, affineMergeCtx, (pu.afMmvdFlag ? pu.afMmvdBaseIdx : pu.mergeIdx), pu.afMmvdFlag);
 #endif
@@ -1506,6 +1515,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           else
           {
             if (pu.cs->sps->getUseAML())
+#if JVET_Z0139_NA_AFF
+            if (affineMergeCtx.numValidMergeCand > 1)
+#endif
             {
               m_pcInterPred->adjustAffineMergeCandidates(pu, affineMergeCtx, pu.mergeIdx);
             }
@@ -1514,7 +1526,12 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #else
 #if JVET_W0090_ARMC_TM
           int affMrgIdx = pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE + 1)*ADAPTIVE_AFFINE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumAffineMergeCand()) || (pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE * ADAPTIVE_AFFINE_SUB_GROUP_SIZE + ADAPTIVE_AFFINE_SUB_GROUP_SIZE - 1 : pu.mergeIdx;
+#if !JVET_Z0139_NA_AFF
           PU::getAffineMergeCand(pu, affineMergeCtx, affMrgIdx);
+#else
+          PU::getAffineMergeCand(pu, affineMergeCtx, affMrgIdx, pu.mergeIdx == 0);
+          if (affineMergeCtx.numValidMergeCand > 1)
+#endif
           if (pu.cs->sps->getUseAML())
           {
             m_pcInterPred->adjustAffineMergeCandidates(pu, affineMergeCtx, pu.mergeIdx);

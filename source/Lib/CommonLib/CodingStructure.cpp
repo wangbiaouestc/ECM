@@ -1062,6 +1062,67 @@ void CodingStructure::addMiToLut(static_vector<MotionInfo, MAX_NUM_HMVP_CANDS> &
   lut.push_back(mi);
 }
 
+#if JVET_Z0139_HIST_AFF
+void CodingStructure::addAffMiToLut(static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutSet, const AffineMotionInfo addMi[2], int refIdx[2])
+{
+  for (int reflist = 0; reflist < 2; reflist++)
+  {
+    if (refIdx[reflist] != -1 && addMi[reflist].oneSetAffineParametersPattern != 0)
+    {
+      int idxInLUT = reflist * MAX_NUM_AFFHMVP_ENTRIES_ONELIST + std::min(refIdx[reflist], MAX_NUM_AFFHMVP_ENTRIES_ONELIST - 1);
+
+      static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>& lut = lutSet[idxInLUT];
+
+
+      size_t currCnt = lut.size();
+
+      bool pruned = false;
+      int  sameCandIdx = 0;
+
+      for (int idx = 0; idx < currCnt; idx++)
+      {
+        if (lut[idx] == addMi[reflist])
+        {
+          sameCandIdx = idx;
+          pruned = true;
+          break;
+        }
+      }
+
+      if (pruned || currCnt == lut.capacity())
+      {
+        lut.erase(lut.begin() + sameCandIdx);
+      }
+
+      lut.push_back(addMi[reflist]);
+    }
+  }
+}
+void CodingStructure::addAffInheritToLut(static_vector<AffineInheritInfo, MAX_NUM_AFF_INHERIT_HMVP_CANDS>& lut, const AffineInheritInfo& mi)
+{
+  size_t currCnt = lut.size();
+
+  bool pruned = false;
+  int  sameCandIdx = 0;
+  for (int idx = 0; idx < currCnt; idx++)
+  {
+    if (lut[idx] == mi)
+    {
+      sameCandIdx = idx;
+      pruned = true;
+      break;
+    }
+  }
+
+  if (pruned || currCnt == lut.capacity())
+  {
+    lut.erase(lut.begin() + sameCandIdx);
+  }
+
+  lut.push_back(mi);
+}
+#endif
+
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 void CodingStructure::addMiToLutIBC(static_vector<MotionInfo, MAX_NUM_HMVP_IBC_CANDS> &lut, const MotionInfo &mi)
 {
