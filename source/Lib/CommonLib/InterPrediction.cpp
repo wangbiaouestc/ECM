@@ -3193,10 +3193,20 @@ void InterPrediction::xPredAffineTpl(const PredictionUnit &pu, const RefPicList 
 #endif
   int iMvScaleTmpHor0 = iMvScaleHor + ((iDMvHorX * blockWidth + iDMvVerX * blockHeight) >> 1);
   int iMvScaleTmpVer0 = iMvScaleVer + ((iDMvHorY * blockWidth + iDMvVerY * blockHeight) >> 1);
+
+#if JVET_Z0139_NA_AFF
+  const CodingUnit *const cuAbove = pu.cu->cs->getCU(pu.cu->blocks[COMPONENT_Y].pos().offset(0, -1), toChannelType(COMPONENT_Y));
+  const CodingUnit *const cuLeft  = pu.cu->cs->getCU(pu.cu->blocks[COMPONENT_Y].pos().offset(-1, 0), toChannelType(COMPONENT_Y));
+
   // get prediction block by block
+  for (int h = 0; (cuLeft && h < cxHeight) || h < 1; h += blockHeight)
+  {
+    for (int w = 0; (cuAbove && w < cxWidth) || w < 1; w += blockWidth)
+#else
   for (int h = 0; h < cxHeight; h += blockHeight)
   {
     for (int w = 0; w < cxWidth; w += blockWidth)
+#endif
     {
       if (w == 0 || h == 0)
       {
@@ -5568,8 +5578,15 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
   }
 }
 
-void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, int mrgCandIdx)
+void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, int mrgCandIdx
+#if JVET_Z0139_NA_AFF
+    , int sortedCandNum
+#endif
+)
 {
+#if JVET_Z0139_NA_AFF
+  const uint32_t maxNumAffineMergeCand = (sortedCandNum > 0) ? sortedCandNum: pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand();
+#endif
   uint32_t RdCandList[AFFINE_MRG_MAX_NUM_CANDS][AFFINE_MRG_MAX_NUM_CANDS];
   Distortion candCostList[AFFINE_MRG_MAX_NUM_CANDS][AFFINE_MRG_MAX_NUM_CANDS];
 
@@ -5621,6 +5638,9 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
 #endif
 
     pu.mergeType = affMrgCtx.mergeType[uiMergeCand];
+#if JVET_Z0139_NA_AFF
+    if (pu.mergeType == MRG_TYPE_DEFAULT_N)
+#else
     if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
     {
       pu.refIdx[0] = affMrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0][0].refIdx;
@@ -5628,6 +5648,7 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
       PU::spanMotionInfo(pu, *affMrgCtx.mrgCtx);
     }
     else
+#endif
     {
       for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
       {
@@ -5674,7 +5695,11 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
       }
 #endif
     }
+#if JVET_Z0139_NA_AFF
+    updateCandList(uiMergeCand, uiCost, maxNumAffineMergeCand, RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE], candCostList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE]);
+#else
     updateCandList(uiMergeCand, uiCost, ADAPTIVE_AFFINE_SUB_GROUP_SIZE, RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE], candCostList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE]);
+#endif
   }
   pu.mergeIdx = mrgCandIdx;    //restore the merge index
   updateAffineCandInfo(pu, affMrgCtx, RdCandList

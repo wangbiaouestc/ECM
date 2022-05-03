@@ -176,7 +176,16 @@ static const int LAST_MERGE_IDX_CABAC =                              5;
 #else
 static const int MRG_MAX_NUM_CANDS =                                6; ///< MERGE
 #endif
+
+#if JVET_Z0139_NA_AFF
+static const int AFF_NON_ADJACENT_DIST    =                          4;
+#endif
+
+#if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
+static const int AFFINE_MRG_MAX_NUM_CANDS =                         15; ///< AFFINE MERGE
+#else
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFINE MERGE
+#endif
 static const int IBC_MRG_MAX_NUM_CANDS =                            6; ///< IBC MERGE
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 static const int IBC_MRG_MAX_NUM_CANDS_MEM =                        20; ///< IBC MERGE- max number of candidates 
@@ -297,6 +306,10 @@ static const int NUM_FIXED_FILTER_SETS       =                     16;
 static const int NUM_TOTAL_FILTER_SETS       =                     NUM_FIXED_FILTER_SETS + ALF_CTB_MAX_NUM_APS;
 #endif
 
+#if JVET_Z0139_HIST_AFF
+static const int MAX_NUM_AFFHMVP_ENTRIES_ONELIST = 5;
+static const int MAX_NUM_AFFHMVP_ENTRIES = MAX_NUM_AFFHMVP_ENTRIES_ONELIST * 2;
+#endif
 
 #if !BDOF_RM_CONSTRAINTS
 static const int MAX_BDOF_APPLICATION_REGION =                     16;
@@ -600,6 +613,12 @@ static const int MAX_NUM_HMVP_CANDS =                              5; ///< maxim
 #else
 static const int MAX_NUM_HMVP_CANDS =                              (MRG_MAX_NUM_CANDS-1); ///< maximum number of HMVP candidates to be stored and used in merge list
 #endif
+#if JVET_Z0139_HIST_AFF
+static const int MAX_NUM_AFF_HMVP_CANDS =                          7; 
+#endif
+#if JVET_Z0139_HIST_AFF
+static const int MAX_NUM_AFF_INHERIT_HMVP_CANDS =                  9; 
+#endif
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 static const int MAX_NUM_HMVP_IBC_CANDS =                          25; ///< maximum number of HMVP candidates to be stored and used in IBC merge list
 #endif
@@ -729,7 +748,11 @@ static const double AMAXBT_TH128 =                                 60.0;
 #if JVET_W0090_ARMC_TM
 static const int AML_MERGE_TEMPLATE_SIZE =                         1;
 static const int ADAPTIVE_SUB_GROUP_SIZE =                         5;
+#if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
+static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE = AFFINE_MRG_MAX_NUM_CANDS;
+#else
 static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE =                  3;
+#endif
 #if JVET_Y0058_IBC_LIST_MODIFY
 static const int ADAPTIVE_IBC_SUB_GROUP_SIZE =                     6;
 #endif
@@ -904,6 +927,11 @@ static const auto TMVP_DISTANCE_LEVEL =                          5;
 #if MULTI_HYP_PRED
 static const auto MULTI_HYP_PRED_RESTRICT_BLOCK_SIZE =          64; // disable multi-hyp for all blocks <= this number
 static const auto MULTI_HYP_PRED_RESTRICT_MIN_WH =               8;
+#endif
+
+#if JVET_Z0139_HIST_AFF
+static const auto AFF_PARA_STORE_BITS          =                  16;
+static const auto AFF_PARA_SHIFT               =                   0;
 #endif
 
 // ====================================================================================================================

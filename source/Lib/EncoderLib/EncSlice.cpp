@@ -1605,6 +1605,14 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     {
       cs.motionLut.lut.resize(0);
       cs.motionLut.lutIbc.resize(0);
+#if JVET_Z0139_HIST_AFF
+        for (int i = 0; i < 2 * MAX_NUM_AFFHMVP_ENTRIES_ONELIST; i++)
+        {
+          cs.motionLut.lutAff[i].resize(0);
+        }
+
+        cs.motionLut.lutAffInherit.resize(0);
+#endif
     }
 
     const SubPic &curSubPic = pcSlice->getPPS()->getSubPicFromPos(pos);

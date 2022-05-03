@@ -286,6 +286,65 @@ public:
     mvpIdx  = m_mvpIdx[bP4][uiRefList][uiRefIdx];
   }
 };
+
+#if JVET_Z0139_HIST_AFF
+struct AffineMotionInfo
+{
+  union
+  {
+    uint64_t oneSetAffineParametersPattern;
+    short oneSetAffineParameters[4];
+  };
+  AffineMotionInfo(uint64_t p) { oneSetAffineParametersPattern = p; };
+  AffineMotionInfo() { oneSetAffineParametersPattern = 0; };
+
+  bool operator == (const AffineMotionInfo& motInfo)
+  {
+    return oneSetAffineParametersPattern == motInfo.oneSetAffineParametersPattern;
+  }
+};
+
+struct AffineInheritInfo
+{
+  Position basePos;
+  MvField  baseMV[2];
+
+  union
+  {
+    uint64_t oneSetAffineParametersPattern0;
+    short oneSetAffineParameters0[4];
+  };
+  union
+  {
+    uint64_t oneSetAffineParametersPattern1;
+    short oneSetAffineParameters1[4];
+  };
+  AffineInheritInfo() { baseMV[0].refIdx = baseMV[1].refIdx = -1; };
+
+  bool operator == (const AffineInheritInfo& motInfo)
+  {
+    if (baseMV[0].refIdx != motInfo.baseMV[0].refIdx)
+    {
+      return false;
+    }
+    if (baseMV[1].refIdx != motInfo.baseMV[1].refIdx)
+    {
+      return false;
+    }
+    if (baseMV[0].refIdx != -1 && oneSetAffineParametersPattern0 != motInfo.oneSetAffineParametersPattern0)
+    {
+      return false;
+    }
+    if (baseMV[1].refIdx != -1 && oneSetAffineParametersPattern1 != motInfo.oneSetAffineParametersPattern1)
+    {
+      return false;
+    }
+    return true;
+  }
+
+};
+#endif
+
 struct LutMotionCand
 {
   static_vector<MotionInfo, MAX_NUM_HMVP_CANDS> lut;
@@ -293,6 +352,11 @@ struct LutMotionCand
   static_vector<MotionInfo, MAX_NUM_HMVP_IBC_CANDS> lutIbc;
 #else
   static_vector<MotionInfo, MAX_NUM_HMVP_CANDS> lutIbc;
+#endif
+
+#if JVET_Z0139_HIST_AFF
+  static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS> lutAff[2 * MAX_NUM_AFFHMVP_ENTRIES_ONELIST];
+  static_vector<AffineInheritInfo, MAX_NUM_AFF_INHERIT_HMVP_CANDS> lutAffInherit;
 #endif
 };
 struct PatentBvCand

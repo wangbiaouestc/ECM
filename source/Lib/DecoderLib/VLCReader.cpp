@@ -2234,9 +2234,15 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   if ( pcSPS->getUseAffine() )
   {
     READ_UVLC(uiCode, "five_minus_max_num_subblock_merge_cand");
+#if JVET_Z0139_HIST_AFF
+    CHECK(
+      uiCode > AFFINE_MRG_MAX_NUM_CANDS - (pcSPS->getSbTMVPEnabledFlag() ? 1 : 0),
+      "The value of five_minus_max_num_subblock_merge_cand shall be in the range of 0 to N - sps_sbtmvp_enabled_flag");
+#else
     CHECK(
       uiCode > 5 - (pcSPS->getSbTMVPEnabledFlag() ? 1 : 0),
       "The value of five_minus_max_num_subblock_merge_cand shall be in the range of 0 to 5 - sps_sbtmvp_enabled_flag");
+#endif
     CHECK(AFFINE_MRG_MAX_NUM_CANDS < uiCode, "The value of five_minus_max_num_subblock_merge_cand shall be in the range of 0 to 5 - sps_sbtmvp_enabled_flag");
     pcSPS->setMaxNumAffineMergeCand(AFFINE_MRG_MAX_NUM_CANDS - uiCode);
     READ_FLAG( uiCode,  "sps_affine_type_flag" );                       pcSPS->setUseAffineType          ( uiCode != 0 );

@@ -523,6 +523,10 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
 
   PredictionUnit *next;
 
+#if JVET_Z0139_HIST_AFF
+  void getAffineMotionInfo(AffineMotionInfo affineMiOut[2], int refIdxOut[2]) const;
+#endif
+
   // for accessing motion information, which can have higher resolution than PUs (should always be used, when accessing neighboring motion information)
   const MotionInfo& getMotionInfo() const;
   const MotionInfo& getMotionInfo( const Position& pos ) const;

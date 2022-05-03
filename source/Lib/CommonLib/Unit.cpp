@@ -943,6 +943,34 @@ PredictionUnit& PredictionUnit::operator=( const MotionInfo& mi )
   return *this;
 }
 
+#if JVET_Z0139_HIST_AFF
+void PredictionUnit::getAffineMotionInfo(AffineMotionInfo affineMiOut[2], int refIdxOut[2]) const
+{
+
+  for (int list = 0; list < 2; list++)
+  {
+    RefPicList eRefList = (list == 0) ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+    refIdxOut[list] = NOT_VALID;
+    affineMiOut[list].oneSetAffineParametersPattern = 0;
+
+    if ((interDir == 1 && list == 1) || (interDir == 2 && list == 0))
+    {
+      continue;
+    }
+    refIdxOut[list] = refIdx[list];
+
+    int affpara[4];
+    PU::deriveAffineParametersFromMVs(*this, mvAffi[eRefList], affpara, (EAffineModel)this->cu->affineType);
+    PU::storeAffParas(affpara);
+
+    affineMiOut[list].oneSetAffineParameters[0] = (short)(affpara[0]);
+    affineMiOut[list].oneSetAffineParameters[1] = (short)(affpara[1]);
+    affineMiOut[list].oneSetAffineParameters[2] = (short)(affpara[2]);
+    affineMiOut[list].oneSetAffineParameters[3] = (short)(affpara[3]);
+  }
+}
+#endif
+
 const MotionInfo& PredictionUnit::getMotionInfo() const
 {
   return cs->getMotionInfo( lumaPos() );

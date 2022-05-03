@@ -294,6 +294,13 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
     {
       cs.motionLut.lut.resize(0);
       cs.motionLut.lutIbc.resize(0);
+#if JVET_Z0139_HIST_AFF   
+      for (int i = 0; i < 2 * MAX_NUM_AFFHMVP_ENTRIES_ONELIST; i++)
+      {
+        cs.motionLut.lutAff[i].resize(0);
+      }
+      cs.motionLut.lutAffInherit.resize(0);
+#endif
       cs.resetIBCBuffer = true;
     }
 
