@@ -2976,6 +2976,130 @@ void xWeightedGeoBlkRounded_SSE(const PredictionUnit &pu, const uint32_t width, 
 }
 #endif
 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+template< X86_VEXT vext, bool trueTFalseL >
+void xWeightedGeoTpl_SSE(const PredictionUnit &pu, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+{
+  const ComponentID compIdx = COMPONENT_Y;
+  if (trueTFalseL == false || (predDst.bufs[compIdx].width & 7) != 0)
+  {
+    InterpolationFilter::xWeightedGeoTpl<trueTFalseL>(pu, splitDir, predDst, predSrc0, predSrc1);
+    return;
+  }
+
+  Pel*    dst  = predDst.get(compIdx).buf;
+  Pel*    src0 = predSrc0.get(compIdx).buf;
+  Pel*    src1 = predSrc1.get(compIdx).buf;
+  int32_t strideDst  = predDst .get(compIdx).stride;
+  int32_t strideSrc0 = predSrc0.get(compIdx).stride;
+  int32_t strideSrc1 = predSrc1.get(compIdx).stride;
+
+  const uint32_t scaleX = getComponentScaleX(compIdx, pu.chromaFormat);
+  const uint32_t scaleY = getComponentScaleY(compIdx, pu.chromaFormat);
+
+  int16_t angle = g_GeoParams[splitDir][0];
+  int16_t wIdx  = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2;
+  int16_t hIdx  = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2;
+  int16_t stepX = 1 << scaleX;
+  int16_t stepY = 0;
+  Pel*   weight = &g_globalGeoWeightsTpl[g_angle2mask[angle]][GEO_TM_ADDED_WEIGHT_MASK_SIZE * GEO_WEIGHT_MASK_SIZE_EXT + GEO_TM_ADDED_WEIGHT_MASK_SIZE];
+  if (g_angle2mirror[angle] == 2)
+  {
+    stepY = -(int)(GEO_WEIGHT_MASK_SIZE_EXT << scaleY);
+    weight += ((GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE_EXT + g_weightOffset[splitDir][hIdx][wIdx][0]);
+    weight += (trueTFalseL ? GEO_WEIGHT_MASK_SIZE_EXT * GEO_MODE_SEL_TM_SIZE : -GEO_MODE_SEL_TM_SIZE ); // Shift to template pos
+  }
+  else if (g_angle2mirror[angle] == 1)
+  {
+    stepX = -1 << scaleX;
+    stepY = (GEO_WEIGHT_MASK_SIZE_EXT << scaleY);
+    weight += (g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE_EXT + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0]));
+    weight -= (trueTFalseL ? GEO_WEIGHT_MASK_SIZE_EXT * GEO_MODE_SEL_TM_SIZE : -GEO_MODE_SEL_TM_SIZE ); // Shift to template pos
+  }
+  else
+  {
+    stepY = (GEO_WEIGHT_MASK_SIZE_EXT << scaleY);
+    weight += (g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE_EXT + g_weightOffset[splitDir][hIdx][wIdx][0]);
+    weight -= (trueTFalseL ? GEO_WEIGHT_MASK_SIZE_EXT * GEO_MODE_SEL_TM_SIZE : GEO_MODE_SEL_TM_SIZE ); // Shift to template pos
+  }
+
+  int  rows = predDst.bufs[compIdx].height;
+  int  cols = predDst.bufs[compIdx].width;
+
+#ifdef USE_AVX2
+  if (vext >= AVX2 && (cols & 15) == 0)
+  {
+    // Do for width that multiple of 16
+    __m256i vzero = _mm256_setzero_si256();
+    __m256i vone  = _mm256_set1_epi16(1);
+    for (int y = 0; y < rows; y++)
+    {
+      for (int x = 0; x < cols; x += 16)
+      {
+        __m256i vsrc0 = _mm256_lddqu_si256( ( __m256i* )( &src0[x] ) );
+        __m256i vsrc1 = _mm256_lddqu_si256( ( __m256i* )( &src1[x] ) );
+        __m256i vmask;
+        if (stepX < 0)
+        {
+          vmask = _mm256_lddqu_si256((__m256i*)((&weight[x]) - (x << 1) - (16 - 1)));
+          const __m256i shuffleMask = _mm256_set_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14, 1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+          vmask = _mm256_shuffle_epi8(vmask, shuffleMask);
+          vmask = _mm256_permute4x64_epi64(vmask, _MM_SHUFFLE(1, 0, 3, 2));
+        }
+        else
+        {
+          vmask = _mm256_lddqu_si256((__m256i*)(&weight[x]));
+        }
+
+        __m256i vtemp16Part0 = _mm256_and_si256( _mm256_sub_epi16( vzero, vmask ), vsrc0 );
+        __m256i vtemp16Part1 = _mm256_and_si256( _mm256_sub_epi16( vmask, vone  ), vsrc1 );
+        _mm256_storeu_si256( ( __m256i* )( &dst[x] ), _mm256_or_si256( vtemp16Part0, vtemp16Part1 ) );
+      }
+
+      src0 += strideSrc0;
+      src1 += strideSrc1;
+      dst  += strideDst;
+      weight += stepY;
+    }
+  }
+  else
+#endif
+  {
+    // Do for width that multiple of 8
+    __m128i vzero = _mm_setzero_si128();
+    __m128i vone  = _mm_set1_epi16(1);
+    for (int y = 0; y < rows; y++)
+    {
+      for (int x = 0; x < cols; x += 8)
+      {
+        __m128i vsrc0 = _mm_lddqu_si128( ( const __m128i* )( &src0[x] ) );
+        __m128i vsrc1 = _mm_lddqu_si128( ( const __m128i* )( &src1[x] ) );
+        __m128i vmask;
+        if (stepX < 0)
+        {
+          vmask = _mm_lddqu_si128((__m128i*)((&weight[x]) - (x << 1) - (8 - 1)));
+          const __m128i shuffleMask = _mm_set_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+          vmask = _mm_shuffle_epi8(vmask, shuffleMask);
+        }
+        else
+        {
+          vmask = _mm_lddqu_si128((const __m128i*)(&weight[x]));
+        }
+
+        __m128i vtemp16Part0 = _mm_and_si128( _mm_sub_epi16( vzero, vmask ), vsrc0 );
+        __m128i vtemp16Part1 = _mm_and_si128( _mm_sub_epi16( vmask, vone  ), vsrc1 );
+        _mm_storeu_si128( ( __m128i* )( &dst[x] ), _mm_or_si128( vtemp16Part0, vtemp16Part1 ) );
+      }
+
+      src0 += strideSrc0;
+      src1 += strideSrc1;
+      dst  += strideDst;
+      weight += stepY;
+    }
+  }
+}
+#endif
+
 template <X86_VEXT vext>
 void InterpolationFilter::_initInterpolationFilterX86()
 {
@@ -3068,6 +3192,9 @@ void InterpolationFilter::_initInterpolationFilterX86()
   m_weightedGeoBlk = xWeightedGeoBlk_SSE<vext>;
 #if JVET_Y0065_GPM_INTRA
   m_weightedGeoBlkRounded = xWeightedGeoBlkRounded_SSE<vext>;
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  m_weightedGeoTplA = xWeightedGeoTpl_SSE<vext, true>;
 #endif
 }
 

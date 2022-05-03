@@ -641,6 +641,9 @@ void PredictionUnit::initData()
   regularMergeFlag = false;
   mergeIdx    = MAX_UCHAR;
   geoSplitDir  = MAX_UCHAR;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  geoSyntaxMode = MAX_UCHAR;
+#endif
   geoMergeIdx0 = MAX_UCHAR;
   geoMergeIdx1 = MAX_UCHAR;
 #if JVET_Y0065_GPM_INTRA
@@ -747,6 +750,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   regularMergeFlag = predData.regularMergeFlag;
   mergeIdx    = predData.mergeIdx;
   geoSplitDir  = predData.geoSplitDir;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  geoSyntaxMode = predData.geoSyntaxMode;
+#endif
   geoMergeIdx0 = predData.geoMergeIdx0;
   geoMergeIdx1 = predData.geoMergeIdx1;
 #if JVET_Y0065_GPM_INTRA
@@ -849,6 +855,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   ipred_idx = other.ipred_idx;
 #endif
   geoSplitDir  = other.geoSplitDir;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  geoSyntaxMode = other.geoSyntaxMode;
+#endif
   geoMergeIdx0 = other.geoMergeIdx0;
   geoMergeIdx1 = other.geoMergeIdx1;
 #if JVET_Y0065_GPM_INTRA

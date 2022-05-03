@@ -429,6 +429,9 @@ struct InterPredictionData
   bool      regularMergeFlag;
   uint8_t     mergeIdx;
   uint8_t     geoSplitDir;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  uint8_t     geoSyntaxMode;
+#endif
   uint8_t     geoMergeIdx0;
   uint8_t     geoMergeIdx1;
 #if JVET_Y0065_GPM_INTRA

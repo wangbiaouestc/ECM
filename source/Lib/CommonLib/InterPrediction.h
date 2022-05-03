@@ -54,7 +54,7 @@
 #endif
 // forward declaration
 class Mv;
-#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM
+#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 class Reshape;
 #endif
 
@@ -77,7 +77,7 @@ public:
   bool isMvOOB(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, bool *mcMaskChroma, bool lumaOnly = false);
   bool isMvOOBSubBlk(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, int mcStride, bool *mcMaskChroma, int mcCStride, bool lumaOnly = false);
 #endif
-#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM // note: already refactor
+#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING // note: already refactor
   Reshape*          m_pcReshape;
 #endif
 
@@ -247,7 +247,7 @@ protected:
                                  , bool bilinearMC = false
                                  , Pel *srcPadBuf = NULL
                                  , int32_t srcPadStride = 0
-#if JVET_W0090_ARMC_TM
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
                                  , bool isAML = false
 #if INTER_LIC
                                  , bool doLic = false
@@ -273,7 +273,7 @@ protected:
   void xWeightedAverage         ( const PredictionUnit& pu, const CPelUnitBuf& pcYuvSrc0, const CPelUnitBuf& pcYuvSrc1, PelUnitBuf& pcYuvDst, const BitDepths& clipBitDepths, const ClpRngs& clpRngs, const bool& bioApplied, const bool lumaOnly = false, const bool chromaOnly = false, PelUnitBuf* yuvDstTmp = NULL );
 #endif
 #endif
-#if JVET_W0090_ARMC_TM
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if !INTER_LIC
   template <bool TrueA_FalseL>
   void xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl
@@ -283,6 +283,8 @@ protected:
                       );
 #endif
   void xWeightedAverageY(const PredictionUnit& pu, const CPelUnitBuf& pcYuvSrc0, const CPelUnitBuf& pcYuvSrc1, PelUnitBuf& pcYuvDst, const BitDepths& clipBitDepths, const ClpRngs& clpRngs);
+#endif
+#if JVET_W0090_ARMC_TM
   void xPredAffineTpl(const PredictionUnit &pu, const RefPicList &eRefPicList, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate);
 #endif
 #if AFFINE_ENC_OPT
@@ -314,13 +316,25 @@ protected:
 
 
   MotionInfo      m_SubPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
-#if JVET_W0090_ARMC_TM
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   Pel*   m_acYuvCurAMLTemplate[2][MAX_NUM_COMPONENT];   //0: top, 1: left
   bool   m_bAMLTemplateAvailabe[2];
   Pel*   m_acYuvRefAboveTemplate[2][MAX_NUM_COMPONENT];   //0: list0, 1: list1
   Pel*   m_acYuvRefLeftTemplate[2][MAX_NUM_COMPONENT];   //0: list0, 1: list1
   Pel*   m_acYuvRefAMLTemplate[2][MAX_NUM_COMPONENT];   //0: top, 1: left
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  Pel*   m_acYuvRefAMLTemplatePart0[2 + 2];   //0: top, 1: left, 2: top, 3: left
+  Pel*   m_acYuvRefAMLTemplatePart1[2 + 2];   //0: top, 1: left, 2: top, 3: left
 #endif
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  bool   m_tplWeightTblInitialized;
+  Pel*   m_tplWeightTblDict[GEO_NUM_CU_SIZE][GEO_NUM_CU_SIZE][GEO_NUM_PARTITION_MODE];
+  Pel    m_tplColWeightTblDict[GEO_NUM_CU_SIZE][GEO_NUM_CU_SIZE][GEO_NUM_PARTITION_MODE][GEO_MAX_CU_SIZE * GEO_MODE_SEL_TM_SIZE];
+  Pel**  m_tplWeightTbl;
+  Pel    (*m_tplColWeightTbl)[GEO_MAX_CU_SIZE * GEO_MODE_SEL_TM_SIZE];
+#endif
+
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
   CacheModel      *m_cacheModel;
 #endif
@@ -333,7 +347,7 @@ public:
   InterPrediction();
   virtual ~InterPrediction();
 
-#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM
+#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void    init                (RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape);
 #else
   void    init                (RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize);
@@ -353,6 +367,59 @@ public:
 #if ENABLE_OBMC
   void    subBlockOBMC(PredictionUnit  &pu, PelUnitBuf *pDst = nullptr);
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void    initTplWeightTable();
+
+  template <bool regular, uint8_t top0Left1TrLeft2 = 0>
+  Pel*    getTplWeightTableCU(int splitDir)
+  {
+    if (regular)
+    {
+      return m_tplWeightTbl[splitDir];
+    }
+    else if (top0Left1TrLeft2 == 2)
+    {
+      return m_tplColWeightTbl[splitDir];
+    }
+    else
+    {
+      int16_t angle = g_GeoParams[splitDir][0];
+      if (g_angle2mirror[angle] == 2)
+      {
+        return m_tplWeightTbl[splitDir] + (top0Left1TrLeft2 == 0 ? GEO_WEIGHT_MASK_SIZE_EXT * GEO_MODE_SEL_TM_SIZE : -GEO_MODE_SEL_TM_SIZE); // Shift to template pos
+      }
+      else if (g_angle2mirror[angle] == 1)
+      {
+        return m_tplWeightTbl[splitDir] - (top0Left1TrLeft2 == 0 ? GEO_WEIGHT_MASK_SIZE_EXT * GEO_MODE_SEL_TM_SIZE : -GEO_MODE_SEL_TM_SIZE); // Shift to template pos;
+      }
+      else
+      {
+        return m_tplWeightTbl[splitDir] - (top0Left1TrLeft2 == 0 ? GEO_WEIGHT_MASK_SIZE_EXT * GEO_MODE_SEL_TM_SIZE : GEO_MODE_SEL_TM_SIZE); // Shift to template pos;
+      }
+    }
+  }
+#endif
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void    deriveGpmSplitMode(PredictionUnit& pu, MergeCtx &geoMrgCtx
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+                           , MergeCtx(&geoTmMrgCtx)[GEO_NUM_TM_MV_CAND]
+#endif
+#if JVET_Y0065_GPM_INTRA
+                           , IntraPrediction* pcIntraPred
+#endif
+  );
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void    motionCompensationGeo(CodingUnit &cu, MergeCtx &geoMrgCtx
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+                              , MergeCtx (&geoTmMrgCtx)[GEO_NUM_TM_MV_CAND]
+#endif
+#if JVET_Y0065_GPM_INTRA
+                              , IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT
+#endif
+  );
+#else
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
 #if JVET_Y0065_GPM_INTRA
   void    motionCompensationGeo(CodingUnit &cu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT);
@@ -366,9 +433,22 @@ public:
   void    motionCompensationGeo(CodingUnit &cu, MergeCtx &GeoMrgCtx);
 #endif
 #endif
+#endif
   void    weightedGeoBlk(PredictionUnit &pu, const uint8_t splitDir, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
 #if JVET_Y0065_GPM_INTRA
   void    weightedGeoBlkRounded( PredictionUnit &pu, const uint8_t splitDir, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  void    getBestGeoTMModeList(PredictionUnit &pu, uint8_t& numValidInList, uint8_t(&modeList)[GEO_NUM_SIG_PARTMODE], Pel* (&pRefTopPart0)[GEO_NUM_TM_MV_CAND], Pel* (&pRefLeftPart0)[GEO_NUM_TM_MV_CAND], Pel* (&pRefTopPart1)[GEO_NUM_TM_MV_CAND], Pel* (&pRefLeftPart1)[GEO_NUM_TM_MV_CAND]);
+#endif
+  void    getBestGeoModeList  (PredictionUnit &pu, uint8_t& numValidInList, uint8_t(&modeList)[GEO_NUM_SIG_PARTMODE], Pel* pRefTopPart0, Pel* pRefLeftPart0, Pel* pRefTopPart1, Pel* pRefLeftPart1
+#if JVET_Y0065_GPM_INTRA
+                             , Pel** pIntraRefTopPart0 = nullptr, Pel** pIntraRefLeftPart0 = nullptr, Pel** pIntraRefTopPart1 = nullptr, Pel** pIntraRefLeftPart1 = nullptr
+#endif
+  );
+  template <bool trueTFalseL>
+  void    weightedGeoTpl(PredictionUnit &pu, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
 #endif
   void xPrefetch(PredictionUnit& pu, PelUnitBuf &pcPad, RefPicList refId, bool forLuma);
   void xPad(PredictionUnit& pu, PelUnitBuf &pcPad, RefPicList refId);
@@ -408,12 +488,20 @@ public:
     
 #if JVET_W0090_ARMC_TM
   void    adjustInterMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, int mrgCandIdx = -1);
+#endif
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   bool    xAMLGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWidth, int nCurBlkHeight);
   bool    xAMLIsTopTempAvailable(PredictionUnit& pu);
   bool    xAMLIsLeftTempAvailable(PredictionUnit& pu);
+#endif
+#if JVET_W0090_ARMC_TM
   void    updateCandList(uint32_t uiCand, Distortion uiCost, uint32_t uiMrgCandNum, uint32_t* RdCandList, Distortion* CandCostList);
   void    updateCandInfo(MergeCtx& mrgCtx, uint32_t(*RdCandList)[MRG_MAX_NUM_CANDS], int mrgCandIdx = -1);
+#endif
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void    getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft);
+#endif
+#if JVET_W0090_ARMC_TM
   void    adjustAffineMergeCandidates(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, int mrgCandIdx = -1
 #if JVET_Z0139_NA_AFF
     , int sortedCandNum = -1
@@ -443,6 +531,43 @@ public:
   void    adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t startPos,uint32_t endPos);
   void    updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t* RdCandList, uint32_t startPos,uint32_t endPos);
 #endif
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  template <uint8_t partIdx, bool useDefaultPelBuffer = true>
+  void    fillPartGPMRefTemplate(PredictionUnit &pu, Pel* bufTop = nullptr, Pel* bufLeft = nullptr)
+  {
+    if (useDefaultPelBuffer)
+    {
+      bufTop  = partIdx == 0 ? m_acYuvRefAMLTemplatePart0[0] : m_acYuvRefAMLTemplatePart1[0];
+      bufLeft = partIdx == 0 ? m_acYuvRefAMLTemplatePart0[1] : m_acYuvRefAMLTemplatePart1[1];
+    }
+    PelUnitBuf pcBufPredRefTop  = (PelUnitBuf(pu.chromaFormat, PelBuf(bufTop,  pu.lwidth(),          GEO_MODE_SEL_TM_SIZE)));
+    PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(bufLeft, GEO_MODE_SEL_TM_SIZE, pu.lheight()        )));
+    getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
+  }
+
+  template <uint8_t partIdx, bool useDefaultPelBuffer = true>
+  void    fillPartGPMRefTemplate(PredictionUnit &pu, MergeCtx& geoMrgCtx, int candIdx, int geoMmvdIdx = -1, Pel* bufTop = nullptr, Pel* bufLeft = nullptr)
+  {
+#if JVET_Y0065_GPM_INTRA
+    if (candIdx >= GEO_MAX_NUM_UNI_CANDS)
+    {
+      return;
+    }
+#endif
+#if JVET_W0097_GPM_MMVD_TM
+    if (geoMmvdIdx >= 0)
+    {
+      geoMrgCtx.setGeoMmvdMergeInfo(pu, candIdx, geoMmvdIdx);
+    }
+    else
+#endif
+    {
+      geoMrgCtx.setMergeInfo(pu, candIdx);
+    }
+    
+    fillPartGPMRefTemplate<partIdx, useDefaultPelBuffer>(pu, bufTop, bufLeft);
+  }
 #endif
 #if INTER_LIC
   void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset);

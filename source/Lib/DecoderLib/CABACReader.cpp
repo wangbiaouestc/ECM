@@ -3581,9 +3581,13 @@ void CABACReader::merge_idx( PredictionUnit& pu )
 #endif
       }
 #else
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+      geoModeIdx(pu);
+#else
       uint32_t splitDir = 0;
       xReadTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
       pu.geoSplitDir          = splitDir;
+#endif
       const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
       CHECK(maxNumGeoCand < 2, "Incorrect max number of geo candidates");
       CHECK(pu.cu->lheight() > 64 || pu.cu->lwidth() > 64, "Incorrect block size of geo flag");
@@ -3605,7 +3609,9 @@ void CABACReader::merge_idx( PredictionUnit& pu )
       mergeCand1 += mergeCand1 >= mergeCand0 ? 1 : 0;
       pu.geoMergeIdx0 = mergeCand0;
       pu.geoMergeIdx1 = mergeCand1;
+#if !JVET_Z0056_GPM_SPLIT_MODE_REORDERING
       DTRACE(g_trace_ctx, D_SYNTAX, "merge_idx() geo_split_dir=%d\n", splitDir);
+#endif
       DTRACE(g_trace_ctx, D_SYNTAX, "merge_idx() geo_idx0=%d\n", mergeCand0);
       DTRACE(g_trace_ctx, D_SYNTAX, "merge_idx() geo_idx1=%d\n", mergeCand1);
 #endif
@@ -3724,10 +3730,14 @@ void CABACReader::geo_mmvd_idx(PredictionUnit& pu, RefPicList eRefPicList)
 
 void CABACReader::geo_merge_idx(PredictionUnit& pu)
 {
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  geoModeIdx(pu);
+#else
   uint32_t splitDir = 0;
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__GEO_INDEX, pu.lumaSize());
   xReadTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
   pu.geoSplitDir = splitDir;
+#endif
   const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
   CHECK(maxNumGeoCand < 2, "Incorrect max number of geo candidates");
   CHECK(pu.cu->lheight() > 64 || pu.cu->lwidth() > 64, "Incorrect block size of geo flag");
@@ -3757,10 +3767,14 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu, bool isIntra0, bool isIntra
 void CABACReader::geo_merge_idx1(PredictionUnit& pu)
 #endif
 {
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  geoModeIdx(pu);
+#else
   uint32_t splitDir = 0;
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__GEO_INDEX, pu.lumaSize());
   xReadTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
   pu.geoSplitDir = splitDir;
+#endif
   const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
 #if JVET_Y0065_GPM_INTRA
   CHECK(maxNumGeoCand < 1, "Incorrect max number of geo candidates");
@@ -3804,6 +3818,59 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu)
   pu.geoMergeIdx1 = mergeCand1;
 }
 #endif
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+void CABACReader::geoModeIdx(PredictionUnit& pu)
+{
+  if (!pu.cs->slice->getSPS()->getUseAltGPMSplitModeCode())
+  {
+    uint32_t geoMode = 0;
+    xReadTruncBinCode(geoMode, GEO_NUM_PARTITION_MODE);
+    pu.geoSplitDir = geoMode;
+    DTRACE(g_trace_ctx, D_SYNTAX, "merge_idx() geo_split_dir=%u\n", geoMode);
+    return;
+  }
+
+  const int maxNumBins    = (GEO_NUM_SIG_PARTMODE / GEO_SPLIT_MODE_RICE_CODE_DIVISOR) - 1;
+  const int maxNumCtxBins = 5;
+        int geoModePrefix = 0;
+  for (int binIdx = 0; binIdx < maxNumBins; ++binIdx, ++geoModePrefix)
+  {
+    if (binIdx < maxNumCtxBins)
+    {
+      if (!m_BinDecoder.decodeBin(Ctx::GeoSubModeIdx(binIdx)))
+      {
+        break;
+      }
+    }
+    else
+    {
+      if (!m_BinDecoder.decodeBinEP())
+      {
+        break;
+      }
+    }
+  }
+
+  if (GEO_SPLIT_MODE_RICE_CODE_DIVISOR > 1)
+  {
+    uint32_t geoModeSuffix = 0;
+    xReadTruncBinCode(geoModeSuffix, GEO_SPLIT_MODE_RICE_CODE_DIVISOR);
+    uint32_t geoMode = ((uint32_t)(geoModePrefix * GEO_SPLIT_MODE_RICE_CODE_DIVISOR)) + geoModeSuffix;
+    pu.geoSyntaxMode = geoMode;
+    pu.geoSplitDir   = geoMode;
+    DTRACE(g_trace_ctx, D_SYNTAX, "merge_idx() geo_split_dir=%d(prefix=%d suffix=%u)\n", geoMode, geoModePrefix, geoModeSuffix);
+  }
+  else
+  {
+    uint32_t geoMode = (uint32_t)geoModePrefix;
+    pu.geoSyntaxMode = geoMode;
+    pu.geoSplitDir   = geoMode;
+    DTRACE(g_trace_ctx, D_SYNTAX, "merge_idx() geo_split_dir=%u\n", geoMode);
+  }
+}
+#endif
+
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 void CABACReader::mmvd_merge_idx(PredictionUnit& pu)
 {

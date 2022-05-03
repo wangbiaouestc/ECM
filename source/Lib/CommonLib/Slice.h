@@ -1523,6 +1523,9 @@ private:
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   bool              m_DMVDMode;
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  bool              m_altGPMSplitModeCode;
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   bool              m_MVSD;
 #endif
@@ -1985,6 +1988,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   void                    setUseDMVDMode(bool b)                                                          { m_DMVDMode = b; }
   bool                    getUseDMVDMode() const                                                          { return m_DMVDMode; }
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void                    setUseAltGPMSplitModeCode(bool b)                                               { m_altGPMSplitModeCode = b; }
+  bool                    getUseAltGPMSplitModeCode() const                                               { return m_altGPMSplitModeCode; }
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   void                    setUseMVSD(bool b) { m_MVSD = b; }

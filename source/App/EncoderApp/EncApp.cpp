@@ -752,6 +752,9 @@ void EncApp::xInitLibCfg()
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   m_cEncLib.setUseDMVDMode                                       ( m_DMVDMode );
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  m_cEncLib.setUseAltGPMSplitModeCode                            ( m_altGPMSplitModeCode );
+#endif
   m_cEncLib.setPROF                                              ( m_PROF );
   m_cEncLib.setBIO                                               (m_BIO);
 #if JVET_W0090_ARMC_TM

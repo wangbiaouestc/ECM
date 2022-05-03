@@ -90,6 +90,72 @@ int64_t getSumOfDifferenceCore(const Pel* src0, int src0Stride, const Pel* src1,
   return sum;
 }
 #endif
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+void getAbsoluteDifferencePerSampleCore(Pel* dst, int dstStride, const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height)
+{
+#define GET_ABS_DIFF_PER_SAMPLE_CORE_OP( ADDR ) dst[ADDR] = std::abs( src0[ADDR] - src1[ADDR] )
+#define GET_ABS_DIFF_PER_SAMPLE_CORE_INC    \
+  src0 += src0Stride;                       \
+  src1 += src1Stride;                       \
+  dst  += dstStride;                        \
+
+  SIZE_AWARE_PER_EL_OP(GET_ABS_DIFF_PER_SAMPLE_CORE_OP, GET_ABS_DIFF_PER_SAMPLE_CORE_INC);
+
+#undef GET_ABS_DIFF_PER_SAMPLE_CORE_OP
+#undef GET_ABS_DIFF_PER_SAMPLE_CORE_INC
+}
+
+template <uint8_t maskType>
+int64_t getMaskedSampleSumCore(Pel* src, int srcStride, int width, int height, int bitDepth, short* weightMask, int maskStepX, int maskStride, int maskStride2)
+{
+  const Pel* mask      = weightMask;
+  const int  cols      = width;
+        int  rows      = height;
+
+  int64_t sum = 0;
+  if (maskType == 1) // 1: Use mask
+  {
+    for (; rows != 0; rows--)
+    {
+      for (int n = 0; n < cols; n++)
+      {
+        sum  += (src[n]) * (*mask);
+        mask += maskStepX;
+      }
+      src  += srcStride;
+      mask += (maskStride + maskStride2);
+    }
+  }
+  else if (maskType == 2 || maskType == 3) // 2: Use binary mask that contains only 0's and 1's, 3: Inverse the input binary mask before use
+  {
+    for (; rows != 0; rows--)
+    {
+      for (int n = 0; n < cols; n++)
+      {
+        sum += (src[n]) & (maskType == 3 ? ((*mask) - 1) : (-(*mask)));
+        mask += maskStepX;
+      }
+      src  += srcStride;
+      mask += (maskStride + maskStride2);
+    }
+  }
+  else // No mask
+  {
+    for (; rows != 0; rows--)
+    {
+      for (int n = 0; n < cols; n++)
+      {
+        sum += src[n];
+      }
+      src  += srcStride;
+    }
+  }
+
+  return sum;
+}
+#endif
+
 #if JVET_W0097_GPM_MMVD_TM
 void roundBDCore(const Pel* srcp, const int srcStride, Pel* dest, const int destStride, int width, int height, const ClpRng& clpRng)
 {
@@ -845,6 +911,13 @@ PelBufferOps::PelBufferOps()
 #if TM_AMVP || TM_MRG
   getSumOfDifference = getSumOfDifferenceCore;
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  getAbsoluteDifferencePerSample = getAbsoluteDifferencePerSampleCore;
+  getSampleSumFunc[0] = getMaskedSampleSumCore<0>;
+  getSampleSumFunc[1] = getMaskedSampleSumCore<1>;
+  getSampleSumFunc[2] = getMaskedSampleSumCore<2>;
+  getSampleSumFunc[3] = getMaskedSampleSumCore<3>;
+#endif
 #if JVET_Z0136_OOB
   isMvOOB = isMvOOBCore;
   isMvOOBSubBlk = isMvOOBSubBlkCore;
@@ -1344,7 +1417,7 @@ void AreaBuf<Pel>::copyClip( const AreaBuf<const Pel> &src, const ClpRng& clpRng
   const unsigned srcStride  = src.stride;
   const unsigned destStride = stride;
 
-#if !JVET_W0090_ARMC_TM
+#if !JVET_W0090_ARMC_TM && !JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   if( width == 1 )
   {
     THROW( "Blocks of width = 1 not supported" );
@@ -1449,7 +1522,7 @@ void AreaBuf<Pel>::linearTransform( const int scale, const int shift, const int 
   const Pel* src = buf;
         Pel* dst = buf;
 
-#if JVET_W0090_ARMC_TM
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   if (width == 0)
   {
     THROW("Blocks of width = 0 not supported");

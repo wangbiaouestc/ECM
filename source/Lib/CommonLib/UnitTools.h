@@ -147,6 +147,9 @@ namespace PU
   int  getIntraMPMs(const PredictionUnit &pu, unsigned *mpm, const ChannelType &channelType = CHANNEL_TYPE_LUMA);
 #endif
 #if JVET_Y0065_GPM_INTRA
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void getGeoIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t splitDir, uint8_t shape, bool doInit, bool doInitAL = true, bool doInitA = true, bool doInitL = true);
+#endif
   void getGeoIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t splitDir, uint8_t shape );
 #endif
   bool          isMIP                 (const PredictionUnit &pu, const ChannelType &chType = CHANNEL_TYPE_LUMA);
@@ -403,6 +406,9 @@ namespace PU
 #endif
 #if JVET_Y0128_NON_CTC
   bool checkTmEnableCondition(const SPS* sps, const PPS* pps, const Picture* refPic);
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  bool checkRprRefExistingInGpm(const PredictionUnit& pu, const MergeCtx& geoMrgCtx0, uint8_t candIdx0, const MergeCtx& geoMrgCtx1, uint8_t candIdx1);
 #endif
 
 #if INTER_LIC

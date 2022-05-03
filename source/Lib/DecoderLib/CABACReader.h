@@ -157,6 +157,9 @@ public:
   void        geo_merge_idx1(PredictionUnit&          pu);
 #endif
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void        geoModeIdx                ( PredictionUnit&          pu );
+#endif
   void        imv_mode                  ( CodingUnit&                   cu,     MergeCtx&       mrgCtx );
   void        affine_amvr_mode          ( CodingUnit&                   cu,     MergeCtx&       mrgCtx );
   void        inter_pred_idc            ( PredictionUnit&               pu );

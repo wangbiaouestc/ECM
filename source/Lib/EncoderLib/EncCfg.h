@@ -387,6 +387,9 @@ protected:
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   bool      m_DMVDMode;
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  bool      m_altGPMSplitModeCode;
+#endif
   bool      m_PROF;
   bool      m_BIO;
 #if JVET_W0090_ARMC_TM
@@ -1265,6 +1268,10 @@ public:
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   void      setUseDMVDMode                  (bool b)         { m_DMVDMode = b; }
   bool      getUseDMVDMode                  ()         const { return m_DMVDMode; }
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void      setUseAltGPMSplitModeCode       (bool b)         { m_altGPMSplitModeCode = b; }
+  bool      getUseAltGPMSplitModeCode       ()         const { return m_altGPMSplitModeCode; }
 #endif
   void      setPROF                         (bool b)         { m_PROF = b; }
   bool      getPROF                         ()         const { return m_PROF; }

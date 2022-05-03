@@ -373,6 +373,9 @@ protected:
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   bool      m_DMVDMode;
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  bool      m_altGPMSplitModeCode;
+#endif
   bool      m_PROF;
   bool      m_BIO;
 #if JVET_W0090_ARMC_TM

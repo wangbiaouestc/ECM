@@ -1448,6 +1448,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   sps.setUseDMVDMode           ( m_DMVDMode );
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  sps.setUseAltGPMSplitModeCode( m_altGPMSplitModeCode );
+#endif
   sps.setUsePROF               ( m_PROF );
   sps.setUseLMChroma           ( m_LMChroma ? true : false );
   sps.setHorCollocatedChromaFlag( m_horCollocatedChromaFlag );

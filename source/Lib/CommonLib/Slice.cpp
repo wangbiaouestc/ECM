@@ -3217,6 +3217,9 @@ SPS::SPS()
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
  , m_DMVDMode                 ( false )
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+, m_altGPMSplitModeCode       ( false )
+#endif
 , m_SBT                       ( false )
 , m_ISP                       ( false )
 , m_chromaFormatIdc           (CHROMA_420)

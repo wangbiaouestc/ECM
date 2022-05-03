@@ -163,7 +163,11 @@ public:
   void        geo_merge_idx(const PredictionUnit&         pu);
   void        geo_merge_idx1(const PredictionUnit&         pu);
 
-  uint64_t    geo_mode_est(const TempCtx& ctxStart, const int geoMode);
+  uint64_t    geo_mode_est(const TempCtx& ctxStart, const int geoMode
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                         , const uint8_t altCodeIdx = 0
+#endif
+  );
   uint64_t    geo_mergeIdx_est(const TempCtx& ctxStart, const int candIdx, const int maxNumGeoCand);
 #if JVET_Y0065_GPM_INTRA
   uint64_t    geo_intraFlag_est         ( const TempCtx& ctxStart, const int flag);
@@ -174,6 +178,10 @@ public:
 #if TM_MRG
   uint64_t    geo_tmFlag_est(const TempCtx& ctxStart, const int flag);
 #endif
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void        geoModeIdx                ( const PredictionUnit&         pu);
+  void        geoModeIdx                ( const uint8_t geoMode, const uint8_t altCodeIdx = 0);
 #endif
   void        imv_mode                  ( const CodingUnit&             cu );
   void        affine_amvr_mode          ( const CodingUnit&             cu );

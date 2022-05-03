@@ -1358,6 +1358,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   WRITE_FLAG( pcSPS->getUseDMVDMode() ? 1 : 0,                                                 "sps_dmvd_enabled_flag" );
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  WRITE_FLAG( pcSPS->getUseAltGPMSplitModeCode() ? 1 : 0,                                      "sps_alt_gpm_code_enabled_flag" );
+#endif
 #if JVET_X0049_ADAPT_DMVR
   WRITE_UVLC(BM_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumBMMergeCand(), "six_minus_max_num_bm_merge_cand");
 #endif
