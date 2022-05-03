@@ -994,6 +994,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   ("DMVD",                                            m_DMVDMode,                                        true, "DMVD mode (0:off, 1:on)  [default: on]" )
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  ("AltGPMSplitModeCode",                             m_altGPMSplitModeCode,                             true, "Enable alternative GPM split mode coding (0:off, 1:on)  [default: on]" )
+#endif
   ("PROF",                                            m_PROF,                                           false, "Enable Prediction refinement with optical flow for affine mode (0:off, 1:on)  [default: off]")
   ("BIO",                                             m_BIO,                                            false, "Enable bi-directional optical flow")
 #if JVET_W0090_ARMC_TM
@@ -4476,6 +4479,9 @@ void EncAppCfg::xPrintParameter()
     msg(VERBOSE, "DMVR:%d ", m_DMVR);
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
     msg(VERBOSE, "DMVD:%d ", m_DMVDMode);
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+    msg(VERBOSE, "AltGPMSplitModeCode:%d ", m_altGPMSplitModeCode);
 #endif
     msg(VERBOSE, "MmvdDisNum:%d ", m_MmvdDisNum);
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED

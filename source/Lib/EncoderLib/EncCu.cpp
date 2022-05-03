@@ -4713,8 +4713,14 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
   tempCS->initStructData(encTestMode.qp);
 #if TM_MRG
   MergeCtx mergeCtx[GEO_NUM_TM_MV_CAND];
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  MergeCtx& mergeCtxRegular = mergeCtx[GEO_TM_OFF];
+#endif
 #else
   MergeCtx mergeCtx;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  MergeCtx& mergeCtxRegular = mergeCtx;
+#endif
 #endif
   const SPS &sps = *tempCS->sps;
   CodedCUInfo& relatedCU = ((EncModeCtrlMTnoRQT *)m_modeCtrl)->getBlkInfo(pm.currArea());
@@ -4739,6 +4745,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
   const TempCtx ctxStart(m_CtxCache, m_CABACEstimator->getCtx());
 
   double geoModeCost[GEO_NUM_PARTITION_MODE], geoMergeIdxCost[MRG_MAX_NUM_CANDS], geoMMVDFlagCost[2], geoMMVDIdxCost[GPM_EXT_MMVD_MAX_REFINE_NUM];
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  double geoSigModeCost[GEO_NUM_SIG_PARTMODE];
+#endif
 #if TM_MRG
   double geoTMFlagCost[2];
 #endif
@@ -4747,6 +4756,13 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
     uint64_t fracBits = m_CABACEstimator->geo_mode_est(ctxStart, idx);
     geoModeCost[idx] = (double)fracBits * sqrtLambdaFracBits;
   }
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  for (int idx = 0; idx < GEO_NUM_SIG_PARTMODE; idx++)
+  {
+    uint64_t fracBits = m_CABACEstimator->geo_mode_est(ctxStart, idx, 1);
+    geoSigModeCost[idx] = (double)fracBits * sqrtLambdaFracBits;
+  }
+#endif
   for (int idx = 0; idx < maxNumMergeCandidates; idx++)
   {
     uint64_t fracBits = m_CABACEstimator->geo_mergeIdx_est(ctxStart, idx, maxNumMergeCandidates);
@@ -4984,7 +5000,11 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
   {
     for (int partIdx = 0; partIdx < 2; partIdx++)
     {
-      PU::getGeoIntraMPMs(pu, geoIntraMPMList[splitDir][partIdx], splitDir, g_geoTmShape[partIdx][g_GeoParams[splitDir][0]]);
+      PU::getGeoIntraMPMs(pu, geoIntraMPMList[splitDir][partIdx], splitDir, g_geoTmShape[partIdx][g_GeoParams[splitDir][0]]
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                        , (splitDir == 0 && partIdx == 0)
+#endif
+      );
       for (int intraIdx = 0; intraIdx < GEO_MAX_NUM_INTRA_CANDS; intraIdx++)
       {
         uint8_t intraPred = geoIntraMPMList[splitDir][partIdx][intraIdx];
@@ -5131,6 +5151,18 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
   static_vector<int, GEO_MAX_TRY_WEIGHTED_SAD> geoMmvdCand0;
   static_vector<int, GEO_MAX_TRY_WEIGHTED_SAD> geoMmvdCand1;
   static_vector<double, GEO_MAX_TRY_WEIGHTED_SAD> geoSADCostList;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  if (sps.getUseAltGPMSplitModeCode())
+  {
+    m_pcInterSearch->initGeoAngleSelection(pu
+#if JVET_Y0065_GPM_INTRA
+                                         , m_pcIntraSearch, geoIntraMPMList
+#endif
+    );
+  }
+  const int tmMmvdBufIdx0 = GPM_EXT_MMVD_MAX_REFINE_NUM + 1;
+  const int tmMmvdBufIdx1 = GPM_EXT_MMVD_MAX_REFINE_NUM + 1;
+#endif
 
   for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
   {
@@ -5164,8 +5196,30 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
           continue;
         }
 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+        int geoSyntaxMode = std::numeric_limits<uint8_t>::max();
+        if(sps.getUseAltGPMSplitModeCode())
+        {
+          m_pcInterSearch->setGeoSplitModeToSyntaxTable(pu, mergeCtxRegular, mergeCand0, mergeCtxRegular, mergeCand1
+#if JVET_Y0065_GPM_INTRA
+                                                      , m_pcIntraSearch
+#endif
+          );
+          geoSyntaxMode = m_pcInterSearch->convertGeoSplitModeToSyntax(splitDir, mergeCand0, mergeCand1);
+          if (geoSyntaxMode == std::numeric_limits<uint8_t>::max())
+          {
+            continue;
+          }
+        }
+#endif
+
         double tempCost = m_geoMMVDCostList.singleDistList[0][splitDir][mergeCand0][0].cost + m_geoMMVDCostList.singleDistList[1][splitDir][mergeCand1][0].cost;
-        tempCost = tempCost + geoModeCost[splitDir];
+        tempCost = tempCost +
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                  (geoSyntaxMode == std::numeric_limits<uint8_t>::max() ? geoModeCost[splitDir] : geoSigModeCost[geoSyntaxMode]);
+#else
+                   geoModeCost[splitDir];
+#endif
 #if TM_MRG
 #if JVET_Y0065_GPM_INTRA
         if (sps.getUseDMVDMode() && mergeCand0 < GEO_MAX_NUM_UNI_CANDS && mergeCand1 < GEO_MAX_NUM_UNI_CANDS)
@@ -5261,6 +5315,27 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
     Distortion sad = distParamSAD2.distFunc(distParamSAD2);
 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+    int geoSyntaxMode = std::numeric_limits<uint8_t>::max();
+    if(sps.getUseAltGPMSplitModeCode())
+    {
+      geoSyntaxMode = m_pcInterSearch->convertGeoSplitModeToSyntax(splitDir, mergeCand0, mergeCand1);
+      CHECK(geoSyntaxMode < 0 || geoSyntaxMode >= GEO_NUM_SIG_PARTMODE, "Invalid GEO split direction!");
+    }
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+    double updateCost = geoMMVDFlagCost[mmvdFlag0] + geoMMVDFlagCost[mmvdFlag1]
+	                    + (geoSyntaxMode == std::numeric_limits<uint8_t>::max() ? geoModeCost[splitDir] : geoSigModeCost[geoSyntaxMode])
+#if JVET_Y0065_GPM_INTRA
+                      + geoIntraFlag0Cost[isIntra0] + geoIntraFlag1Cost[isIntra0][isIntra1]
+					            + (isIntra0 ? geoIntraIdxCost[mergeCand0 - GEO_MAX_NUM_UNI_CANDS] : geoMergeIdxCost[mergeCand0])
+					            + (isIntra1 ? geoIntraIdxCost[mergeCand1 - GEO_MAX_NUM_UNI_CANDS] : ((m_fastGpmMmvdSearch && !isIntra0) ? geoMergeIdxCost[mergeCand1 > mergeCand0 ? (mergeCand1 - 1) : mergeCand1] : geoMergeIdxCost[mergeCand1]))
+#else
+                      + geoMergeIdxCost[mergeCand0]
+					            + (m_fastGpmMmvdSearch ? geoMergeIdxCost[mergeCand1 > mergeCand0 ? (mergeCand1 - 1) : mergeCand1] : geoMergeIdxCost[mergeCand1])
+#endif
+					  ;
+#else
 #if JVET_Y0065_GPM_INTRA
     double updateCost = geoModeCost[splitDir] + geoMMVDFlagCost[mmvdFlag0] + geoIntraFlag0Cost[isIntra0] + geoMMVDFlagCost[mmvdFlag1] + geoIntraFlag1Cost[isIntra0][isIntra1];
     int intraIdx0 = mergeCand0 - GEO_MAX_NUM_UNI_CANDS;
@@ -5269,6 +5344,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
     updateCost += (isIntra1 ? geoIntraIdxCost[intraIdx1] : ((m_fastGpmMmvdSearch && !isIntra0) ? geoMergeIdxCost[mergeCand1 > mergeCand0 ? (mergeCand1 - 1) : mergeCand1] : geoMergeIdxCost[mergeCand1]));
 #else
     double updateCost = geoModeCost[splitDir] + geoMergeIdxCost[mergeCand0] + (m_fastGpmMmvdSearch ? geoMergeIdxCost[mergeCand1 > mergeCand0 ? (mergeCand1 - 1) : mergeCand1] : geoMergeIdxCost[mergeCand1]) + geoMMVDFlagCost[mmvdFlag0] + geoMMVDFlagCost[mmvdFlag1];
+#endif
 #endif
 #if TM_MRG
 #if JVET_Y0065_GPM_INTRA
@@ -5530,6 +5606,14 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if JVET_W0123_TIMD_FUSION
       cu.timdMode = timdMode;
 #endif
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+      if(sps.getUseAltGPMSplitModeCode())
+      {
+        int geoSyntaxMode = m_pcInterSearch->convertGeoSplitModeToSyntax(pu.geoSplitDir, pu.geoMergeIdx0, pu.geoMergeIdx1);
+        CHECK(geoSyntaxMode < 0 || geoSyntaxMode >= GEO_NUM_SIG_PARTMODE, "Invalid GEO split direction!");
+        pu.geoSyntaxMode = (uint8_t)geoSyntaxMode;
+      }
 #endif
 #if TM_MRG
       pu.tmMergeFlag = false;
@@ -5858,8 +5942,30 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
             }
           }
 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+          int geoSyntaxMode = std::numeric_limits<uint8_t>::max();
+          if (sps.getUseAltGPMSplitModeCode())
+          {
+            m_pcInterSearch->setGeoSplitModeToSyntaxTable(pu, mergeCtxRegular, mergeCand0, mergeCtxRegular, mergeCand1
+#if JVET_Y0065_GPM_INTRA
+                                                        , m_pcIntraSearch
+#endif
+                                                        , mmvdCand0 - 1, mmvdCand1 - 1);
+            geoSyntaxMode = m_pcInterSearch->convertGeoSplitModeToSyntax(splitDir, mergeCand0, mergeCand1, mmvdCand0 - 1, mmvdCand1 - 1);
+            if (geoSyntaxMode == std::numeric_limits<uint8_t>::max())
+            {
+              continue;
+            }
+          }
+#endif
+
           double tempCost = m_geoMMVDCostList.singleDistList[0][splitDir][mergeCand0][mmvdCand0].cost + m_geoMMVDCostList.singleDistList[1][splitDir][mergeCand1][mmvdCand1].cost;
-          tempCost = tempCost + geoModeCost[splitDir];
+          tempCost = tempCost 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                   + (geoSyntaxMode == std::numeric_limits<uint8_t>::max() ? geoModeCost[splitDir] : geoSigModeCost[geoSyntaxMode]);
+#else
+                   + geoModeCost[splitDir];
+#endif
 #if TM_MRG
 #if JVET_Y0065_GPM_INTRA
           if (sps.getUseDMVDMode() && mergeCand0 < GEO_MAX_NUM_UNI_CANDS && mergeCand1 < GEO_MAX_NUM_UNI_CANDS)
@@ -6002,8 +6108,28 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
             {
               continue;
             }
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+            int geoSyntaxMode = std::numeric_limits<uint8_t>::max();
+            if(sps.getUseAltGPMSplitModeCode())
+            {
+              m_pcInterSearch->setGeoTMSplitModeToSyntaxTable(pu, mergeCtx, mergeCand0, mergeCand1, tmMmvdBufIdx0 - 1, tmMmvdBufIdx1 - 1);
+              geoSyntaxMode = m_pcInterSearch->convertGeoSplitModeToSyntax(splitDir, mergeCand0, mergeCand1, tmMmvdBufIdx0 - 1, tmMmvdBufIdx1 - 1);
+              if (geoSyntaxMode == std::numeric_limits<uint8_t>::max())
+              {
+                continue;
+              }
+            }
+#endif
+
             double tempCost = m_geoMMVDCostList.singleDistList[0][splitDir][mergeCand0][GPM_EXT_MMVD_MAX_REFINE_NUM + 1].cost + m_geoMMVDCostList.singleDistList[1][splitDir][mergeCand1][GPM_EXT_MMVD_MAX_REFINE_NUM + 1].cost;
-            tempCost = tempCost + geoModeCost[splitDir] + geoTMFlagCost[1];
+            tempCost = tempCost 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                     + (geoSyntaxMode == std::numeric_limits<uint8_t>::max() ? geoModeCost[splitDir] : geoSigModeCost[geoSyntaxMode])
+#else
+                     + geoModeCost[splitDir]
+#endif
+                     + geoTMFlagCost[1];
             updateGeoMMVDCandList(tempCost, splitDir, mergeCand0, mergeCand1, (GPM_EXT_MMVD_MAX_REFINE_NUM + 1), (GPM_EXT_MMVD_MAX_REFINE_NUM + 1),
               geoSADCostList, geoSplitDirList, geoMergeCand0, geoMergeCand1, geoMmvdCand0, geoMmvdCand1, numSATDCands);
           }
@@ -6057,6 +6183,32 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
       if (!mmvdFlag0 && !mmvdFlag1)
       {
         continue;
+      }
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+      int geoSyntaxMode = std::numeric_limits<uint8_t>::max();
+      if (sps.getUseAltGPMSplitModeCode()
+#if JVET_Y0065_GPM_INTRA
+        && mergeCand0 < GEO_MAX_NUM_UNI_CANDS && mergeCand1 < GEO_MAX_NUM_UNI_CANDS
+#endif
+        )
+      {
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+        if (tmFlag0 && tmFlag1)
+        {
+          geoSyntaxMode = m_pcInterSearch->convertGeoSplitModeToSyntax(splitDir, mergeCand0, mergeCand1, tmMmvdBufIdx0 - 1, tmMmvdBufIdx1 - 1);
+          CHECK(geoSyntaxMode < 0 || geoSyntaxMode >= GEO_NUM_SIG_PARTMODE, "Invalid GEO split direction!");
+          CHECK(tmFlag0 != tmFlag1, "tmFlag0 and tmFlag1 have to be identical to each other");
+        }
+        else
+#endif
+        {
+          int  mmvdCandTmp0 = geoMmvdCand0[candidateIdx];
+          int  mmvdCandTmp1 = geoMmvdCand1[candidateIdx];
+          geoSyntaxMode = m_pcInterSearch->convertGeoSplitModeToSyntax(splitDir, mergeCand0, mergeCand1, mmvdCandTmp0 - 1, mmvdCandTmp1 - 1);
+          CHECK(geoSyntaxMode < 0 || geoSyntaxMode >= GEO_NUM_SIG_PARTMODE, "Invalid GEO split direction!");
+          CHECK(!mmvdFlag0 && !mmvdFlag1, "GPM MMVD has to be used at least for one partition");
+        }
       }
 #endif
 
@@ -6178,13 +6330,25 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
       Distortion sad = distParamSAD2.distFunc(distParamSAD2);
 
 #if JVET_Y0065_GPM_INTRA
-      double updateCost = geoModeCost[splitDir] + geoMMVDFlagCost[mmvdFlag0] + geoMMVDFlagCost[mmvdFlag1];
+      double updateCost = 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                          ( geoSyntaxMode == std::numeric_limits<uint8_t>::max() ? geoModeCost[splitDir] : geoSigModeCost[geoSyntaxMode])
+#else
+                          geoModeCost[splitDir] 
+#endif
+                        + geoMMVDFlagCost[mmvdFlag0] + geoMMVDFlagCost[mmvdFlag1];
       updateCost += (mmvdFlag0 ? geoMMVDIdxCost[mmvdCand0] : geoIntraFlag0Cost[isIntra0]);
       updateCost += (isIntra0 ? geoIntraIdxCost[intraIdx0] : geoMergeIdxCost[mergeCand0]);
       updateCost += (mmvdFlag1 ? geoMMVDIdxCost[mmvdCand1] : geoIntraFlag1Cost[isIntra0][isIntra1]);
       updateCost += (isIntra1 ? geoIntraIdxCost[intraIdx1] : geoMergeIdxCost[mergeCand1]);
 #else
-      double updateCost = geoModeCost[splitDir] + geoMergeIdxCost[mergeCand0] + geoMergeIdxCost[mergeCand1] + geoMMVDFlagCost[mmvdFlag0] + geoMMVDFlagCost[mmvdFlag1];
+      double updateCost = 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                          ( geoSyntaxMode == std::numeric_limits<uint8_t>::max(); ? geoModeCost[splitDir] : geoSigModeCost[geoSyntaxMode])
+#else
+                          geoModeCost[splitDir] 
+#endif
+                        + geoMergeIdxCost[mergeCand0] + geoMergeIdxCost[mergeCand1] + geoMMVDFlagCost[mmvdFlag0] + geoMMVDFlagCost[mmvdFlag1];
       if (mmvdFlag0)
       {
         updateCost += geoMMVDIdxCost[mmvdCand0];
@@ -6741,6 +6905,30 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
         pu.geoMMVDFlag1 = (geoMmvdCand1[candidateIdx] > 0);
 #endif
 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+        if(sps.getUseAltGPMSplitModeCode())
+        {
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+          if(pu.tmMergeFlag)
+          {
+            int geoSyntaxMode = m_pcInterSearch->convertGeoSplitModeToSyntax(pu.geoSplitDir, pu.geoMergeIdx0, pu.geoMergeIdx1, tmMmvdBufIdx0 - 1, tmMmvdBufIdx1 - 1);
+            CHECK(geoSyntaxMode < 0 || geoSyntaxMode >= GEO_NUM_SIG_PARTMODE, "Invalid GEO split direction!");
+            CHECK(pu.geoMMVDFlag0 || pu.geoMMVDFlag1, "GPM MMVD should not be used in GPM-TM mode");
+            pu.geoSyntaxMode = (uint8_t)geoSyntaxMode;
+          }
+          else
+#endif
+          {
+            int  mmvdCandTmp0 = geoMmvdCand0[candidateIdx];
+            int  mmvdCandTmp1 = geoMmvdCand1[candidateIdx];
+            int geoSyntaxMode = m_pcInterSearch->convertGeoSplitModeToSyntax(pu.geoSplitDir, pu.geoMergeIdx0, pu.geoMergeIdx1, mmvdCandTmp0 - 1, mmvdCandTmp1 - 1);
+            CHECK(geoSyntaxMode < 0 || geoSyntaxMode >= GEO_NUM_SIG_PARTMODE, "Invalid GEO split direction!");
+            CHECK(!pu.geoMMVDFlag0 && !pu.geoMMVDFlag1, "GPM MMVD has to be used at least for one partition");
+            pu.geoSyntaxMode = (uint8_t)geoSyntaxMode;
+          }
+        }
+#endif
+
         if (pu.geoMMVDFlag0)
         {
           pu.geoMMVDIdx0 = (geoMmvdCand0[candidateIdx] - 1);
@@ -6837,6 +7025,19 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
 
   GeoComboCostList comboList;
   int bitsCandTB = floorLog2(GEO_NUM_PARTITION_MODE);
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  double geoSigModeBits[GEO_NUM_SIG_PARTMODE];
+  if(sps.getUseAltGPMSplitModeCode())
+  {
+    const int maxNumBins = (GEO_NUM_SIG_PARTMODE / GEO_SPLIT_MODE_RICE_CODE_DIVISOR) - 1;
+    for (int idx = 0; idx < GEO_NUM_SIG_PARTMODE; idx++)
+    {
+      int geoModePrefix = idx / GEO_SPLIT_MODE_RICE_CODE_DIVISOR;
+      geoSigModeBits[idx] = geoModePrefix + (geoModePrefix == maxNumBins ? 0 : 1)
+                          + (GEO_SPLIT_MODE_RICE_CODE_DIVISOR > 1 ? floorLog2(GEO_SPLIT_MODE_RICE_CODE_DIVISOR): 0);
+    }
+  }
+#endif
   PelUnitBuf geoBuffer[GEO_MAX_NUM_UNI_CANDS];
   PelUnitBuf geoTempBuf[GEO_MAX_NUM_UNI_CANDS];
   PelUnitBuf geoCombinations[GEO_MAX_TRY_WEIGHTED_SAD];
@@ -6949,18 +7150,51 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
     }
   }
 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  if (sps.getUseAltGPMSplitModeCode())
+  {
+    m_pcInterSearch->initGeoAngleSelection(pu
+#if JVET_Y0065_GPM_INTRA
+                                         , m_pcIntraSearch, geoIntraMPMList
+#endif
+    );
+  }
+#endif
+
   for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
   {
     for (int GeoMotionIdx = 0; GeoMotionIdx < maxNumMergeCandidates * (maxNumMergeCandidates - 1); GeoMotionIdx++)
     {
       unsigned int mergeCand0 = m_GeoModeTest[GeoMotionIdx].m_candIdx0;
       unsigned int mergeCand1 = m_GeoModeTest[GeoMotionIdx].m_candIdx1;
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+      int geoSyntaxMode = std::numeric_limits<uint8_t>::max();
+      if (sps.getUseAltGPMSplitModeCode())
+      {
+        m_pcInterSearch->setGeoSplitModeToSyntaxTable(pu, mergeCtx, mergeCand0, mergeCtx, mergeCand1
+#if JVET_Y0065_GPM_INTRA
+                                                    , m_pcIntraSearch
+#endif
+        );
+        geoSyntaxMode = m_pcInterSearch->convertGeoSplitModeToSyntax(splitDir, mergeCand0, mergeCand1);
+        if (geoSyntaxMode == std::numeric_limits<uint8_t>::max())
+        {
+          continue;
+        }
+      }
+#endif
+
       double tempCost = m_GeoCostList.singleDistList[0][splitDir][mergeCand0].cost + m_GeoCostList.singleDistList[1][splitDir][mergeCand1].cost;
       if( tempCost > bestWholeBlkCost )
       {
         continue;
       }
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+      tempCost = tempCost + (double)(sps.getUseAltGPMSplitModeCode() ? geoSigModeBits[geoSyntaxMode] : bitsCandTB) * sqrtLambdaForFirstPass;
+#else
       tempCost = tempCost + (double)bitsCandTB * sqrtLambdaForFirstPass;
+#endif
       comboList.list.push_back(GeoMergeCombo(splitDir, mergeCand0, mergeCand1, tempCost));
     }
   }
@@ -6996,7 +7230,19 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
     mergeCand1 -= mergeCand1 < mergeCand0 ? 0 : 1;
     mvBits += mergeCand0;
     mvBits += mergeCand1;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+    int geoSyntaxMode = std::numeric_limits<uint8_t>::max();
+    if (sps.getUseAltGPMSplitModeCode())
+    {
+      geoSyntaxMode = m_pcInterSearch->convertGeoSplitModeToSyntax(splitDir, mergeCand0, mergeCand1);
+      CHECK(geoSyntaxMode < 0 || geoSyntaxMode >= GEO_NUM_SIG_PARTMODE, "Invalid GEO split direction!");
+    }
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+    double updateCost = (double)sad + (double)((sps.getUseAltGPMSplitModeCode() ? geoSigModeBits[geoSyntaxMode] : bitsCandTB) + mvBits) * sqrtLambdaForFirstPass;
+#else
     double updateCost = (double)sad + (double)(bitsCandTB + mvBits) * sqrtLambdaForFirstPass;
+#endif
     comboList.list[candidateIdx].cost = updateCost;
     updateCandList(candidateIdx, updateCost, geoRdModeList, geocandCostList, geoNumMrgSATDCand);
   }
@@ -7062,6 +7308,14 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
       pu.geoMergeIdx1 = comboList.list[candidateIdx].mergeIdx1;
       pu.mmvdMergeFlag = false;
       pu.mmvdMergeIdx = MAX_UCHAR;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+      if (sps.getUseAltGPMSplitModeCode())
+      {
+        int geoSyntaxMode = m_pcInterSearch->convertGeoSplitModeToSyntax(pu.geoSplitDir, pu.geoMergeIdx0, pu.geoMergeIdx1);
+        CHECK(geoSyntaxMode < 0 || geoSyntaxMode >= GEO_NUM_SIG_PARTMODE, "Invalid GEO split direction!");
+        pu.geoSyntaxMode = (uint8_t)geoSyntaxMode;
+      }
+#endif
 
       PU::spanGeoMotionInfo(pu, mergeCtx, pu.geoSplitDir, pu.geoMergeIdx0, pu.geoMergeIdx1);
       tempCS->getPredBuf().copyFrom(geoCombinations[candidateIdx]);
@@ -7909,7 +8163,7 @@ void EncCu::xCheckSATDCostAffineMmvdMerge(       CodingStructure*& tempCS,
   pu.afMmvdFlag = false;
 }
 #endif
-#if !JVET_W0097_GPM_MMVD_TM
+#if !JVET_W0097_GPM_MMVD_TM && !JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 void EncCu::xCheckSATDCostGeoMerge(CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx geoMergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
   , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart)
 {

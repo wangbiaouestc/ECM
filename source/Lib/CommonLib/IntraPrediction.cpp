@@ -506,6 +506,192 @@ void IntraPrediction::xIntraPredPlanarDcPdpc(const CPelBuf &pSrc, Pel* pDst, int
 #endif
 #endif
 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING && JVET_Y0065_GPM_INTRA
+template <uint8_t partIdx>
+bool IntraPrediction::xFillIntraGPMRefTemplateAll(PredictionUnit& pu, TEMPLATE_TYPE eTempType, bool readBufferedMPMList, bool doInitMPMList, bool loadIntraRef, std::vector<Pel>* lut, uint8_t candIdx)
+{
+  if (eTempType == NO_NEIGHBOR || candIdx < GEO_MAX_NUM_UNI_CANDS)
+  {
+    return false;
+  }
+
+  doInitMPMList &= !readBufferedMPMList; // No MPM list derivation needed, since MPM list is read from buffer assuming it is already buffered
+  const bool doInitAL = true;
+  const bool doInitA  = partIdx == 0;
+  const bool doInitL  = partIdx == 1;
+
+  uint8_t startIdx = candIdx == std::numeric_limits<uint8_t>::max() ? 0                       : (candIdx - GEO_MAX_NUM_UNI_CANDS);
+  uint8_t endIdx   = candIdx == std::numeric_limits<uint8_t>::max() ? GEO_MAX_NUM_INTRA_CANDS : (startIdx + 1                   );
+  for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
+  {
+    uint8_t* geoIntraMPMList = m_aiGpmIntraMPMLists[splitDir][partIdx];
+    if (!readBufferedMPMList)
+    {
+      PU::getGeoIntraMPMs(pu, geoIntraMPMList, splitDir, g_geoTmShape[partIdx][g_GeoParams[splitDir][0]], doInitMPMList, doInitAL, doInitA, doInitL);
+      doInitMPMList = false; // to prevent duplicating initialization
+    }
+
+    for (uint8_t tmpCandIdx = startIdx; tmpCandIdx < endIdx; ++tmpCandIdx)
+    {
+      uint8_t intraMode = geoIntraMPMList[tmpCandIdx];
+      if (!m_abFilledIntraGPMRefTpl[intraMode])
+      {
+        xFillIntraGPMRefTemplate(pu, eTempType, intraMode, loadIntraRef, m_acYuvRefGPMIntraTemplate[intraMode][0], m_acYuvRefGPMIntraTemplate[intraMode][1], lut);
+        loadIntraRef = false; // to prevent duplicating initialization
+      }      
+    }
+  }
+
+  return true;
+}
+
+bool IntraPrediction::xFillIntraGPMRefTemplate(PredictionUnit& pu, TEMPLATE_TYPE eTempType, uint8_t intraMode, bool loadIntraRef, Pel* bufTop, Pel* bufLeft, std::vector<Pel>* lut)
+{
+  if (eTempType == NO_NEIGHBOR)
+  {
+    return false;
+  }
+  CHECK(intraMode >= NUM_INTRA_MODE, "Invalid intra mode for intra GPM template");
+  m_abFilledIntraGPMRefTpl[intraMode] = true;
+
+  const uint32_t uiPredStride = MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE;
+  static Pel PredLuma[uiPredStride * uiPredStride];
+  
+  int iTempWidth  = GEO_MODE_SEL_TM_SIZE;
+  int iTempHeight = GEO_MODE_SEL_TM_SIZE;
+
+  // Load reference samples
+  if (loadIntraRef)
+  {
+    TEMPLATE_TYPE tplType = (TEMPLATE_TYPE)prefillIntraGPMReferenceSamples(pu, iTempWidth, iTempHeight);
+    CHECK(eTempType != tplType, "Inconsistent template block availability");
+  }
+
+  // Generate intra pred samples
+  int dirMode = intraMode > DC_IDX ? MAP67TO131(intraMode) : intraMode;
+  uint32_t uiRealW = pu.lwidth()  + (eTempType != ABOVE_NEIGHBOR ? iTempWidth  : 0);
+  uint32_t uiRealH = pu.lheight() + (eTempType != LEFT_NEIGHBOR  ? iTempHeight : 0);
+  initPredTimdIntraParams(pu, pu.Y(), dirMode);
+  predTimdIntraAng(COMPONENT_Y, pu, dirMode, PredLuma, uiPredStride, uiRealW, uiRealH, eTempType, (eTempType == ABOVE_NEIGHBOR) ? 0 : iTempWidth, (eTempType == LEFT_NEIGHBOR) ? 0 : iTempHeight);
+
+  // Store intra pred
+  Pel* predSrcAbove = nullptr;
+  Pel* predSrcLeft  = nullptr;
+  if (eTempType == ABOVE_NEIGHBOR)
+  {
+    predSrcAbove = PredLuma;
+  }
+  else if (eTempType == LEFT_NEIGHBOR)
+  {
+    predSrcLeft = PredLuma;
+  }
+  else // Above-left
+  {
+    predSrcAbove = PredLuma + iTempWidth;
+    predSrcLeft  = PredLuma + iTempHeight * uiPredStride;
+  }
+
+  if (predSrcAbove != nullptr)
+  {
+    Pel*   tmpSrc = predSrcAbove;
+    Pel*   tmpDst = &m_acYuvRefGPMIntraTemplate[intraMode][0][0];
+    if (lut == nullptr)
+    {
+      size_t szLine = sizeof(Pel) * pu.lwidth();
+      for (int h = 0; h < iTempHeight; ++h)
+      {
+        memcpy(tmpDst, tmpSrc, szLine);
+        tmpSrc += uiPredStride;
+        tmpDst += pu.lwidth();
+      }
+    }
+    else
+    {
+      for (int h = 0; h < iTempHeight; ++h)
+      {
+        for (int w = 0; w < pu.lwidth(); ++w)
+        {
+          tmpDst[w] = (*lut)[tmpSrc[w]];
+        }
+        tmpSrc += uiPredStride;
+        tmpDst += pu.lwidth();
+      }
+    }
+  }
+
+  if (predSrcLeft != nullptr)
+  {
+    Pel*   tmpSrc = predSrcLeft;
+    Pel*   tmpDst = &m_acYuvRefGPMIntraTemplate[intraMode][1][0];
+    if (lut == nullptr)
+    {
+      for (int h = 0; h < pu.lheight(); ++h)
+      {
+        for (int w = 0; w < iTempWidth; ++w)
+        {
+          tmpDst[w] = tmpSrc[w];
+        }
+        tmpSrc += uiPredStride;
+        tmpDst += iTempWidth;
+      }
+    }
+    else
+    {
+      for (int h = 0; h < pu.lheight(); ++h)
+      {
+        for (int w = 0; w < iTempWidth; ++w)
+        {
+          tmpDst[w] = (*lut)[tmpSrc[w]];
+        }
+        tmpSrc += uiPredStride;
+        tmpDst += iTempWidth;
+      }
+    }
+  }
+
+  return true;
+}
+
+uint8_t IntraPrediction::prefillIntraGPMReferenceSamples(PredictionUnit& pu, int iTempWidth, int iTempHeight)
+{
+  int  iRefX = -1, iRefY = -1;
+  uint32_t uiRefWidth = 0, uiRefHeight = 0;
+  TEMPLATE_TYPE eTempType = CU::deriveTimdRefType(pu.lx(), pu.ly(), pu.lwidth(), pu.lheight(), iTempWidth, iTempHeight, iRefX, iRefY, uiRefWidth, uiRefHeight);
+    
+  m_ipaParam.multiRefIndex = iTempWidth;
+  initTimdIntraPatternLuma(*pu.cu, pu.Y(), (eTempType != ABOVE_NEIGHBOR ? iTempWidth : 0), (eTempType != LEFT_NEIGHBOR ? iTempHeight : 0), uiRefWidth, uiRefHeight);
+
+  return eTempType;
+}
+
+bool IntraPrediction::fillIntraGPMRefTemplateAll(PredictionUnit& pu, bool hasAboveTemplate, bool hasLeftTemplate, bool readBufferedMPMList, bool doInitMPMList, bool loadIntraRef, std::vector<Pel>* lut, uint8_t candIdx0, uint8_t candIdx1)
+{
+  if (candIdx0 < GEO_MAX_NUM_UNI_CANDS && candIdx1 < GEO_MAX_NUM_UNI_CANDS)
+  {
+    return false;
+  }
+
+  TEMPLATE_TYPE templateType = (TEMPLATE_TYPE)((hasAboveTemplate ? ABOVE_NEIGHBOR : 0) + (hasLeftTemplate ? LEFT_NEIGHBOR : 0));
+  if (templateType == NO_NEIGHBOR)
+  {
+    return false;
+  }
+
+  if (candIdx0 >= GEO_MAX_NUM_UNI_CANDS)
+  {
+    xFillIntraGPMRefTemplateAll<0>(pu, templateType, readBufferedMPMList, doInitMPMList, loadIntraRef, lut, candIdx0);
+    doInitMPMList = false; // to prevent duplicating initialization
+    loadIntraRef  = false; // to prevent duplicating initialization
+  }
+  if (candIdx1 >= GEO_MAX_NUM_UNI_CANDS)
+  {
+    xFillIntraGPMRefTemplateAll<1>(pu, templateType, readBufferedMPMList, doInitMPMList, loadIntraRef, lut, candIdx1);
+  }
+
+  return true;
+}
+#endif
+
 // ====================================================================================================================
 // Public member functions
 // ====================================================================================================================

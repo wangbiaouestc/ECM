@@ -2126,6 +2126,193 @@ int64_t getSumOfDifference_SSE(const Pel* src0, int src0Stride, const Pel* src1,
   return deltaAvg;
 }
 #endif
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+template<X86_VEXT vext>
+void getAbsoluteDifferencePerSample_SSE(Pel* dst, int dstStride, const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height)
+{
+  if ((width & 7) != 0)
+  {
+    getAbsoluteDifferencePerSampleCore(dst, dstStride, src0, src0Stride, src1, src1Stride, width, height);
+    return;
+  }
+
+#ifdef USE_AVX2
+  if( vext >= AVX2 && (width & 15 ) == 0 )
+  {
+    // Do for width that multiple of 16
+    for( int y = 0; y < height; y++)
+    {
+      for( int x = 0; x < width; x+=16 )
+      {
+        __m256i vsrc0 = _mm256_lddqu_si256( ( __m256i* )( &src0[x] ) );
+        __m256i vsrc1 = _mm256_lddqu_si256( ( __m256i* )( &src1[x] ) );
+        _mm256_storeu_si256( ( __m256i* )( &dst[x] ), _mm256_abs_epi16( _mm256_sub_epi16( vsrc0, vsrc1 ) ) );
+      }
+      src0 += src0Stride;
+      src1 += src1Stride;
+      dst  += dstStride;
+    }
+  }
+  else
+#endif
+  {
+    // Do with step of 8
+    for( int y = 0; y < height; y++)
+    {
+      for( int x = 0; x < width; x+=8 )
+      {
+        __m128i vsrc0 = _mm_lddqu_si128( ( const __m128i* )( &src0[x] ) );
+        __m128i vsrc1 = _mm_lddqu_si128( ( const __m128i* )( &src1[x] ) );
+        _mm_storeu_si128( ( __m128i* )( &dst[x] ), _mm_abs_epi16( _mm_sub_epi16( vsrc0, vsrc1 ) ) );
+      }
+      src0 += src0Stride;
+      src1 += src1Stride;
+      dst  += dstStride;
+    }
+  }
+}
+
+template <X86_VEXT vext, uint8_t maskType>
+int64_t getMaskedSampleSum_SSE(Pel* src, int srcStride, int width, int height, int bitDepth, short* weightMask, int maskStepX, int maskStride, int maskStride2)
+{
+  if ((width & 7) != 0  || bitDepth > 10)
+  {
+    return getMaskedSampleSumCore<maskType>(src, srcStride, width, height, bitDepth, weightMask, maskStepX, maskStride, maskStride2);
+  }
+
+  int  rows = height;
+  int  cols = width;
+
+  int64_t sum = 0;
+  if( vext >= AVX2 && (cols & 15 ) == 0 )
+  {
+#ifdef USE_AVX2
+    // Do for width that multiple of 16
+    __m256i vzero = _mm256_setzero_si256();
+    __m256i vone  = _mm256_set1_epi16(1);
+    __m256i vsum32 = vzero;
+    if (maskType >= 1 && maskType <= 3)
+    {
+      for( int y = 0; y < rows; y++)
+      {
+        for( int x = 0; x < cols; x+=16 )
+        {
+          __m256i vsrc = _mm256_lddqu_si256( ( __m256i* )( &src[x] ) );
+          __m256i vmask;
+          if (maskStepX == -1)
+          {
+            vmask = _mm256_lddqu_si256((__m256i*)((&weightMask[x]) - (x << 1) - (16 - 1)));
+            const __m256i shuffleMask = _mm256_set_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14, 1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+            vmask = _mm256_shuffle_epi8(vmask, shuffleMask);
+            vmask = _mm256_permute4x64_epi64(vmask, _MM_SHUFFLE(1, 0, 3, 2));
+          }
+          else
+          {
+            vmask = _mm256_lddqu_si256((__m256i*)(&weightMask[x]));
+          }
+
+          if (maskType == 1) // 1: Use mask
+          {
+            vsum32 = _mm256_add_epi32( vsum32, _mm256_madd_epi16( vmask, vsrc ) );
+          }
+          else // 2: Use binary mask that contains only 0's and 1's, 3: Inverse the input binary mask before use
+          {
+            vmask = maskType == 3 ? _mm256_sub_epi16( vmask, vone ) : _mm256_sub_epi16( vzero, vmask );
+            __m256i vtemp16 = _mm256_and_si256( vmask, vsrc );
+            const __m256i shuffleMask = _mm256_set_epi8( 29, 28, 31, 30, 25, 24, 27, 26, 21, 20, 23, 22, 17, 16, 19, 18, 13, 12, 15, 14, 9, 8, 11, 10, 5, 4, 7, 6, 1, 0, 3, 2 );
+            const __m256i bitandMask  = _mm256_set_epi8( 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1 );
+            vsum32 = _mm256_add_epi32( vsum32, _mm256_and_si256( bitandMask, _mm256_add_epi16( vtemp16, _mm256_shuffle_epi8( vtemp16, shuffleMask ) ) ) );
+          }
+        }
+        src += srcStride;
+        weightMask += maskStride;
+      }
+    }
+    else // No mask
+    {
+      for( int y = 0; y < rows; y++)
+      {
+        for( int x = 0; x < cols; x+=16 )
+        {
+          __m256i vtemp16 = _mm256_lddqu_si256( ( __m256i* )( &src[x] ) );
+          const __m256i shuffleMask = _mm256_set_epi8( 29, 28, 31, 30, 25, 24, 27, 26, 21, 20, 23, 22, 17, 16, 19, 18, 13, 12, 15, 14, 9, 8, 11, 10, 5, 4, 7, 6, 1, 0, 3, 2 );
+          const __m256i bitandMask  = _mm256_set_epi8( 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1 );
+          vsum32 = _mm256_add_epi32( vsum32, _mm256_and_si256( bitandMask, _mm256_add_epi16( vtemp16, _mm256_shuffle_epi8( vtemp16, shuffleMask ) ) ) );
+        }
+        src += srcStride;
+      }
+    }
+    vsum32 = _mm256_hadd_epi32( vsum32, vzero );
+    vsum32 = _mm256_hadd_epi32( vsum32, vzero );
+    sum =  _mm_cvtsi128_si32( _mm256_castsi256_si128( vsum32 ) ) + _mm_cvtsi128_si32( _mm256_castsi256_si128( _mm256_permute2x128_si256( vsum32, vsum32, 0x11 ) ) );
+#endif
+  }
+  else
+  {
+    // Do with step of 8
+    __m128i vzero = _mm_setzero_si128();
+    __m128i vone  = _mm_set1_epi16(1);
+    __m128i vsum32 = vzero;
+    if (maskType >= 1 && maskType <= 3)
+    {
+      for( int y = 0; y < rows; y++)
+      {
+        for( int x = 0; x < cols; x+=8 )
+        {
+          __m128i vsrc = _mm_loadu_si128( ( const __m128i* )( &src[x] ) );
+          __m128i vmask;
+          if (maskStepX == -1)
+          {
+            vmask = _mm_lddqu_si128((__m128i*)((&weightMask[x]) - (x << 1) - (8 - 1)));
+            const __m128i shuffleMask = _mm_set_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+            vmask = _mm_shuffle_epi8(vmask, shuffleMask);
+          }
+          else
+          {
+            vmask = _mm_lddqu_si128((const __m128i*)(&weightMask[x]));
+          }
+
+          if (maskType == 1) // 1: Use mask
+          {
+            vsum32 = _mm_add_epi32( vsum32, _mm_madd_epi16( vmask, vsrc ) );
+          }
+          else // 2: Use binary mask that contains only 0's and 1's, 3: Inverse the input binary mask before use
+          {
+            vmask = maskType == 3 ? _mm_sub_epi16( vmask, vone ) : _mm_sub_epi16( vzero, vmask );
+            __m128i vtemp16 = _mm_and_si128( vmask, vsrc );
+            const __m128i shuffleMask = _mm_set_epi8( 13, 12, 15, 14, 9, 8, 11, 10, 5, 4, 7, 6, 1, 0, 3, 2 );
+            const __m128i bitandMask  = _mm_set_epi8( 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1 );
+            vsum32 = _mm_add_epi32( vsum32, _mm_and_si128( bitandMask, _mm_add_epi16( vtemp16, _mm_shuffle_epi8( vtemp16, shuffleMask ) ) ) );
+          }
+        }
+        src += srcStride;
+        weightMask += maskStride;
+      }
+    }
+    else // No mask
+    {
+      for( int y = 0; y < rows; y++)
+      {
+        for( int x = 0; x < cols; x+=8 )
+        {
+          __m128i vtemp16 = _mm_loadu_si128( ( const __m128i* )( &src[x] ) );
+          const __m128i shuffleMask = _mm_set_epi8( 13, 12, 15, 14, 9, 8, 11, 10, 5, 4, 7, 6, 1, 0, 3, 2 );
+          const __m128i bitandMask  = _mm_set_epi8( 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1, 0, 0, -1, -1 );
+          vsum32 = _mm_add_epi32( vsum32, _mm_and_si128( bitandMask, _mm_add_epi16( vtemp16, _mm_shuffle_epi8( vtemp16, shuffleMask ) ) ) );
+        }
+        src += srcStride;
+      }
+    }
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+    sum =  _mm_cvtsi128_si32( vsum32 );
+  }
+
+  return sum;
+}
+#endif
+
 #if JVET_Z0136_OOB
 template<X86_VEXT vext>
 bool isMvOOB_SSE(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, bool *mcMaskChroma, bool lumaOnly, ChromaFormat componentID)
@@ -2347,6 +2534,7 @@ bool isMvOOBSubBlk_SSE(const Mv& rcMv, const struct Position pos, const struct S
   return isOOB;
 }
 #endif
+
 template<X86_VEXT vext>
 void PelBufferOps::_initPelBufOpsX86()
 {
@@ -2392,6 +2580,13 @@ void PelBufferOps::_initPelBufOpsX86()
   roundIntVector = roundIntVector_SIMD<vext>;
 #if TM_AMVP || TM_MRG
   getSumOfDifference = getSumOfDifference_SSE<vext>;
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  getAbsoluteDifferencePerSample = getAbsoluteDifferencePerSample_SSE<vext>;
+  getSampleSumFunc[0] = getMaskedSampleSum_SSE<vext, 0>;
+  getSampleSumFunc[1] = getMaskedSampleSum_SSE<vext, 1>;
+  getSampleSumFunc[2] = getMaskedSampleSum_SSE<vext, 2>;
+  getSampleSumFunc[3] = getMaskedSampleSum_SSE<vext, 3>;
 #endif
 #if JVET_Z0136_OOB
   isMvOOB = isMvOOB_SSE<vext>;

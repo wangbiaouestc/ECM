@@ -129,6 +129,10 @@ InterSearch::InterSearch()
   m_histBestSbt    = MAX_UCHAR;
   m_histBestMtsIdx = MAX_UCHAR;
 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  m_tplWeightTblInitialized = false;
+  initTplWeightTable();
+#endif
 }
 
 
@@ -275,7 +279,7 @@ void InterSearch::init( EncCfg*        pcEncCfg,
   }
 
   const ChromaFormat cform = pcEncCfg->getChromaFormatIdc();
-#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM
+#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   InterPrediction::init( pcRdCost, cform, maxCUHeight, m_pcReshape );
 #else 
   InterPrediction::init( pcRdCost, cform, maxCUHeight );
@@ -3997,6 +4001,579 @@ inline unsigned InterSearch::getAdditionalHypothesisInitialBits(const MultiHypPr
 }
 #endif
 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+void InterSearch::initGeoAngleSelection(PredictionUnit& pu
+#if JVET_Y0065_GPM_INTRA
+                                      , IntraPrediction* pcIntraPred, const uint8_t (&mpm)[GEO_NUM_PARTITION_MODE][2][GEO_MAX_NUM_INTRA_CANDS]
+#endif
+)
+{
+  xAMLGetCurBlkTemplate(pu, pu.lwidth(), pu.lheight());
+  memset(&m_gpmacsSplitModeTmSelAvail[0][0][0], 0, sizeof(m_gpmacsSplitModeTmSelAvail));
+  memset(&m_gpmPartTplCost[0][0][0][0], -1, sizeof(m_gpmPartTplCost));
+
+  int16_t wIdx = floorLog2((uint32_t)pu.lwidth ()) - GEO_MIN_CU_LOG2;
+  int16_t hIdx = floorLog2((uint32_t)pu.lheight()) - GEO_MIN_CU_LOG2;
+  m_tplWeightTbl    = m_tplWeightTblDict   [hIdx][wIdx];
+  m_tplColWeightTbl = m_tplColWeightTblDict[hIdx][wIdx];
+
+#if JVET_Y0065_GPM_INTRA
+  pcIntraPred->clearPrefilledIntraGPMRefTemplate();
+  pcIntraPred->prefillIntraGPMReferenceSamples(pu, GEO_MODE_SEL_TM_SIZE, GEO_MODE_SEL_TM_SIZE);
+  pcIntraPred->setPrefilledIntraGPMMPMModeAll(mpm);
+#endif
+}
+
+void InterSearch::setGeoSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx& mergeCtx0, int mergeCand0, MergeCtx& mergeCtx1, int mergeCand1
+#if JVET_Y0065_GPM_INTRA
+                                             , IntraPrediction* pcIntraPred
+#endif
+                                             , int mmvdCand0, int mmvdCand1)
+{
+#if JVET_Y0065_GPM_INTRA
+  bool isIntra[2];
+  xRemapMrgIndexAndMmvdIdx(mergeCand0, mergeCand1, mmvdCand0, mmvdCand1, isIntra[0], isIntra[1]);
+#endif
+  const int idx0 = mmvdCand0 + 1;
+  const int idx1 = mmvdCand1 + 1;
+
+  if ((m_gpmacsSplitModeTmSelAvail[idx0][idx1][mergeCand0] & ((uint16_t)1 << mergeCand1)) == 0)
+  {
+    uint8_t numValidInList = 0;
+    uint8_t modeList[GEO_NUM_SIG_PARTMODE];
+    selectGeoSplitModes(pu
+#if JVET_Y0065_GPM_INTRA
+                      , pcIntraPred
+#endif
+                      , m_gpmPartTplCost[idx0][mergeCand0]
+                      , m_gpmPartTplCost[idx1][mergeCand1]
+                      , mergeCtx0
+                      , mergeCand0
+#if JVET_Y0065_GPM_INTRA
+                      + (isIntra[0] ? GEO_MAX_NUM_UNI_CANDS : 0)
+#endif
+                      , mergeCtx1
+                      , mergeCand1
+#if JVET_Y0065_GPM_INTRA
+                      + (isIntra[1] ? GEO_MAX_NUM_UNI_CANDS : 0)
+#endif
+                      , numValidInList
+                      , modeList
+#if JVET_W0097_GPM_MMVD_TM
+                      , (mmvdCand0 >= GPM_EXT_MMVD_MAX_REFINE_NUM ? -1 : mmvdCand0)
+                      , (mmvdCand1 >= GPM_EXT_MMVD_MAX_REFINE_NUM ? -1 : mmvdCand1)
+#endif
+    );
+
+    xSetGpmModeToSyntaxModeTable(numValidInList, modeList, m_gpmacsSplitModeTmSel[idx0][idx1][mergeCand0][mergeCand1]);
+    m_gpmacsSplitModeTmSelAvail[idx0][idx1][mergeCand0] |= ((uint16_t)1 << mergeCand1);
+  }
+}
+
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+void InterSearch::setGeoTMSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx(&mergeCtx)[GEO_NUM_TM_MV_CAND], int mergeCand0, int mergeCand1, int mmvdCand0, int mmvdCand1)
+{
+  const int idx0 = mmvdCand0 + 1;
+  const int idx1 = mmvdCand1 + 1;
+
+  if ((m_gpmacsSplitModeTmSelAvail[idx0][idx1][mergeCand0] & ((uint16_t)1 << mergeCand1)) == 0)
+  {
+    uint8_t numValidInList = 0;
+    uint8_t modeList[GEO_NUM_SIG_PARTMODE];
+    selectGeoTMSplitModes(pu
+                        , m_gpmPartTplCost[idx0][mergeCand0]
+                        , m_gpmPartTplCost[idx1][mergeCand1]
+                        , mergeCtx
+                        , mergeCand0
+                        , mergeCand1
+                        , numValidInList
+                        , modeList
+    );
+
+    xSetGpmModeToSyntaxModeTable(numValidInList, modeList, m_gpmacsSplitModeTmSel[idx0][idx1][mergeCand0][mergeCand1]);
+    m_gpmacsSplitModeTmSelAvail[idx0][idx1][mergeCand0] |= ((uint16_t)1 << mergeCand1);
+  }
+}
+#endif
+
+int InterSearch::convertGeoSplitModeToSyntax(int splitDir, int mergeCand0, int mergeCand1, int mmvdCand0, int mmvdCand1)
+{
+#if JVET_Y0065_GPM_INTRA
+  bool isIntra[2];
+  xRemapMrgIndexAndMmvdIdx(mergeCand0, mergeCand1, mmvdCand0, mmvdCand1, isIntra[0], isIntra[1]);
+#endif
+  return m_gpmacsSplitModeTmSel[mmvdCand0 + 1][mmvdCand1 + 1][mergeCand0][mergeCand1][splitDir];
+}
+
+bool InterSearch::selectGeoSplitModes(PredictionUnit &pu,
+#if JVET_Y0065_GPM_INTRA
+                                      IntraPrediction* pcIntraPred,
+#endif
+                                      uint32_t (&gpmTplCostPart0)[2][GEO_NUM_PARTITION_MODE],
+                                      uint32_t (&gpmTplCostPart1)[2][GEO_NUM_PARTITION_MODE],
+                                      MergeCtx& mergeCtx0, int mergeCand0, MergeCtx& mergeCtx1, int mergeCand1, uint8_t& numValidInList, uint8_t (&modeList)[GEO_NUM_SIG_PARTMODE], int mmvdCand0, int mmvdCand1)
+{
+  if (!m_bAMLTemplateAvailabe[0] && !m_bAMLTemplateAvailabe[1])
+  {
+    getBestGeoModeList(pu, numValidInList, modeList, nullptr, nullptr, nullptr, nullptr);
+    return false;
+  }
+
+  if (PU::checkRprRefExistingInGpm(pu, mergeCtx0, mergeCand0, mergeCtx1, mergeCand1))
+  {
+    bool backupTplValid[2] = {m_bAMLTemplateAvailabe[0], m_bAMLTemplateAvailabe[1]};
+    m_bAMLTemplateAvailabe[0] = false;
+    m_bAMLTemplateAvailabe[1] = false;
+    getBestGeoModeList(pu, numValidInList, modeList, nullptr, nullptr, nullptr, nullptr);
+    m_bAMLTemplateAvailabe[0] = backupTplValid[0];
+    m_bAMLTemplateAvailabe[1] = backupTplValid[1];
+    return false;
+  }
+
+  bool fillRefTplPart0 = gpmTplCostPart0[0][0] == std::numeric_limits<uint32_t>::max();
+  bool fillRefTplPart1 = gpmTplCostPart1[1][0] == std::numeric_limits<uint32_t>::max();
+  Pel* pRefTopPart0    = m_acYuvRefAMLTemplatePart0[0];
+  Pel* pRefLeftPart0   = m_acYuvRefAMLTemplatePart0[1];
+  Pel* pRefTopPart1    = m_acYuvRefAMLTemplatePart1[0];
+  Pel* pRefLeftPart1   = m_acYuvRefAMLTemplatePart1[1];
+
+  // First partition
+  if (fillRefTplPart0)
+  {
+    fillPartGPMRefTemplate<0, false>(pu, mergeCtx0, mergeCand0, mmvdCand0, pRefTopPart0, pRefLeftPart0);
+#if JVET_Y0065_GPM_INTRA
+    xCollectIntraGeoPartCost<0>(pu, pcIntraPred, mergeCand0, gpmTplCostPart0[0]);
+#endif
+  }
+
+  // Second
+  if (fillRefTplPart1)
+  {
+    fillPartGPMRefTemplate<1, false>(pu, mergeCtx1, mergeCand1, mmvdCand1, pRefTopPart1, pRefLeftPart1);
+#if JVET_Y0065_GPM_INTRA
+    xCollectIntraGeoPartCost<1>(pu, pcIntraPred, mergeCand1, gpmTplCostPart1[1]);
+#endif
+  }
+
+  // Get mode lists
+  getBestGeoModeListEncoder(pu, numValidInList, modeList, pRefTopPart0, pRefLeftPart0, pRefTopPart1, pRefLeftPart1, gpmTplCostPart0, gpmTplCostPart1);
+  return true;
+}
+
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+bool InterSearch::selectGeoTMSplitModes (PredictionUnit &pu, 
+                                         uint32_t (&gpmTplCostPart0)[2][GEO_NUM_PARTITION_MODE],
+                                         uint32_t (&gpmTplCostPart1)[2][GEO_NUM_PARTITION_MODE],
+                                         MergeCtx (&mergeCtx)[GEO_NUM_TM_MV_CAND], int mergeCand0, int mergeCand1, uint8_t& numValidInList, uint8_t (&modeList)[GEO_NUM_SIG_PARTMODE])
+{
+  if (!m_bAMLTemplateAvailabe[0] && !m_bAMLTemplateAvailabe[1])
+  {
+    getBestGeoModeList(pu, numValidInList, modeList, nullptr, nullptr, nullptr, nullptr);
+    return false;
+  }
+
+  if (PU::checkRprRefExistingInGpm(pu, mergeCtx[GEO_TM_OFF], mergeCand0, mergeCtx[GEO_TM_OFF], mergeCand1))
+  {
+    bool backupTplValid[2] = {m_bAMLTemplateAvailabe[0], m_bAMLTemplateAvailabe[1]};
+    m_bAMLTemplateAvailabe[0] = false;
+    m_bAMLTemplateAvailabe[1] = false;
+    getBestGeoModeList(pu, numValidInList, modeList, nullptr, nullptr, nullptr, nullptr);
+    m_bAMLTemplateAvailabe[0] = backupTplValid[0];
+    m_bAMLTemplateAvailabe[1] = backupTplValid[1];
+    return false;
+  }
+
+  bool fillRefTplPart0  = gpmTplCostPart0[0][0] == std::numeric_limits<uint32_t>::max();
+  bool fillRefTplPart1  = gpmTplCostPart1[1][0] == std::numeric_limits<uint32_t>::max();
+  Pel* pRefTopPart0 [GEO_NUM_TM_MV_CAND] = {nullptr, m_acYuvRefAMLTemplatePart0[0], m_acYuvRefAMLTemplatePart0[2], nullptr                      }; // For mergeCtx[GEO_TM_SHAPE_AL] and mergeCtx[GEO_TM_SHAPE_A]
+  Pel* pRefLeftPart0[GEO_NUM_TM_MV_CAND] = {nullptr, m_acYuvRefAMLTemplatePart0[1], m_acYuvRefAMLTemplatePart0[3], nullptr                      }; // For mergeCtx[GEO_TM_SHAPE_AL] and mergeCtx[GEO_TM_SHAPE_A]
+  Pel* pRefTopPart1 [GEO_NUM_TM_MV_CAND] = {nullptr, m_acYuvRefAMLTemplatePart1[0], nullptr,                       m_acYuvRefAMLTemplatePart1[2]}; // For mergeCtx[GEO_TM_SHAPE_AL] and mergeCtx[GEO_TM_SHAPE_L]
+  Pel* pRefLeftPart1[GEO_NUM_TM_MV_CAND] = {nullptr, m_acYuvRefAMLTemplatePart1[1], nullptr,                       m_acYuvRefAMLTemplatePart1[3]}; // For mergeCtx[GEO_TM_SHAPE_AL] and mergeCtx[GEO_TM_SHAPE_L]
+
+  // First partition
+  if (fillRefTplPart0)
+  {
+    fillPartGPMRefTemplate<0, false>(pu, mergeCtx[GEO_TM_SHAPE_AL], mergeCand0, -1, pRefTopPart0[GEO_TM_SHAPE_AL], pRefLeftPart0[GEO_TM_SHAPE_AL]);
+    fillPartGPMRefTemplate<0, false>(pu, mergeCtx[GEO_TM_SHAPE_A ], mergeCand0, -1, pRefTopPart0[GEO_TM_SHAPE_A ], pRefLeftPart0[GEO_TM_SHAPE_A ]);
+  }
+
+  // Second
+  if (fillRefTplPart1)
+  {
+    fillPartGPMRefTemplate<1, false>(pu, mergeCtx[GEO_TM_SHAPE_AL], mergeCand1, -1, pRefTopPart1[GEO_TM_SHAPE_AL], pRefLeftPart1[GEO_TM_SHAPE_AL]);
+    fillPartGPMRefTemplate<1, false>(pu, mergeCtx[GEO_TM_SHAPE_L ], mergeCand1, -1, pRefTopPart1[GEO_TM_SHAPE_L ], pRefLeftPart1[GEO_TM_SHAPE_L ]);
+  }
+
+  // Get mode lists
+  getBestGeoTMModeListEncoder(pu, numValidInList, modeList, pRefTopPart0, pRefLeftPart0, pRefTopPart1, pRefLeftPart1, gpmTplCostPart0, gpmTplCostPart1);
+  return true;
+}
+#endif
+
+void InterSearch::getBestGeoModeListEncoder(PredictionUnit &pu, uint8_t& numValidInList,
+                                            uint8_t(&modeList)[GEO_NUM_SIG_PARTMODE],
+                                            Pel* pRefTopPart0, Pel* pRefLeftPart0,
+                                            Pel* pRefTopPart1, Pel* pRefLeftPart1,
+                                            uint32_t(&gpmTplCostPart0)[2][GEO_NUM_PARTITION_MODE],
+                                            uint32_t(&gpmTplCostPart1)[2][GEO_NUM_PARTITION_MODE])
+{
+  if (!m_bAMLTemplateAvailabe[0] && !m_bAMLTemplateAvailabe[1])
+  {
+    getBestGeoModeList(pu, numValidInList, modeList, nullptr, nullptr, nullptr, nullptr);
+    return;
+  }
+
+  // Check mode
+  bool filledRefTplPart0 = gpmTplCostPart0[0][0] == std::numeric_limits<uint32_t>::max();
+  bool filledRefTplPart1 = gpmTplCostPart1[1][0] == std::numeric_limits<uint32_t>::max();
+  int bitDepth = pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA);
+
+  if (m_bAMLTemplateAvailabe[0])
+  {
+    SizeType   szPerLine            = pu.lwidth();
+    PelUnitBuf pcBufPredCurTop      = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], szPerLine, GEO_MODE_SEL_TM_SIZE));
+    PelUnitBuf pcBufPredRefTopPart0 = PelUnitBuf(pu.chromaFormat, PelBuf(pRefTopPart0,                szPerLine, GEO_MODE_SEL_TM_SIZE));
+    PelUnitBuf pcBufPredRefTopPart1 = PelUnitBuf(pu.chromaFormat, PelBuf(pRefTopPart1,                szPerLine, GEO_MODE_SEL_TM_SIZE));
+
+    const int maskStride2[3] = { -(int)szPerLine, (int)szPerLine, -(int)szPerLine }; // template length
+    const int maskStride[3] = { GEO_WEIGHT_MASK_SIZE_EXT, GEO_WEIGHT_MASK_SIZE_EXT, -GEO_WEIGHT_MASK_SIZE_EXT }; // mask stride
+    const int stepX[3] = { 1, -1, 1 };
+
+    // Cost of partition 0
+    if(filledRefTplPart0)
+    {
+      GetAbsDiffPerSample(pcBufPredRefTopPart0.Y(), pcBufPredCurTop.Y(), pcBufPredRefTopPart0.Y());
+      uint32_t fullCostPart0 = (uint32_t)GetSampleSum(pcBufPredRefTopPart0.Y(), bitDepth);
+
+      for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
+      {
+        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+        Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
+        uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefTopPart0.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+        gpmTplCostPart0[0][splitDir] = tempDist;
+        gpmTplCostPart0[1][splitDir] = fullCostPart0 - tempDist; // pre-calculated
+      }
+    }
+
+    // Cost of partition 1
+    if(filledRefTplPart1)
+    {
+      GetAbsDiffPerSample(pcBufPredRefTopPart1.Y(), pcBufPredCurTop.Y(), pcBufPredRefTopPart1.Y());
+      uint32_t fullCostPart1 = (uint32_t)GetSampleSum(pcBufPredRefTopPart1.Y(), bitDepth);
+
+      for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
+      {
+        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+        Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
+        uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefTopPart1.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+        gpmTplCostPart1[0][splitDir] = tempDist;  // pre-calculated
+        gpmTplCostPart1[1][splitDir] = fullCostPart1 - tempDist;
+      }
+    }
+  }
+  else
+  {
+    if (filledRefTplPart0)
+    {
+      memset(gpmTplCostPart0[0], 0, sizeof(uint32_t) * GEO_NUM_PARTITION_MODE);
+      memset(gpmTplCostPart0[1], 0, sizeof(uint32_t) * GEO_NUM_PARTITION_MODE);
+    }
+    if (filledRefTplPart1)
+    {
+      memset(gpmTplCostPart1[1], 0, sizeof(uint32_t) * GEO_NUM_PARTITION_MODE);
+      memset(gpmTplCostPart1[0], 0, sizeof(uint32_t) * GEO_NUM_PARTITION_MODE);
+    }
+  }
+
+  if (m_bAMLTemplateAvailabe[1])
+  {
+    SizeType   szPerLine             = pu.lheight();
+    PelUnitBuf pcBufPredCurLeft      = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], szPerLine, GEO_MODE_SEL_TM_SIZE)); // To enable SIMD for cost computation
+    PelUnitBuf pcBufPredRefLeftPart0 = PelUnitBuf(pu.chromaFormat, PelBuf(pRefLeftPart0,               szPerLine, GEO_MODE_SEL_TM_SIZE)); // To enable SIMD for cost computation
+    PelUnitBuf pcBufPredRefLeftPart1 = PelUnitBuf(pu.chromaFormat, PelBuf(pRefLeftPart1,               szPerLine, GEO_MODE_SEL_TM_SIZE)); // To enable SIMD for cost computation
+
+    const int maskStride2[3] = { -(int)szPerLine, -(int)szPerLine, -(int)szPerLine }; // template length
+    const int maskStride[3] = { (int)szPerLine, (int)szPerLine, (int)szPerLine }; // mask stride
+    const int stepX[3] = { 1, 1, 1 };
+
+    // Cost of partition 0
+    if (filledRefTplPart0)
+    {
+      GetAbsDiffPerSample(pcBufPredRefLeftPart0.Y(), pcBufPredCurLeft.Y(), pcBufPredRefLeftPart0.Y());
+      uint32_t fullCostPart0 = (uint32_t)GetSampleSum(pcBufPredRefLeftPart0.Y(), bitDepth);
+
+      for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
+      {
+        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+        Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
+        uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefLeftPart0.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+        gpmTplCostPart0[0][splitDir] += tempDist;
+        gpmTplCostPart0[1][splitDir] += fullCostPart0 - tempDist; // pre-calculated
+      }
+    }
+
+    // Cost of partition 1
+    if (filledRefTplPart1)
+    {
+      GetAbsDiffPerSample(pcBufPredRefLeftPart1.Y(), pcBufPredCurLeft.Y(), pcBufPredRefLeftPart1.Y());
+      uint32_t fullCostPart1 = (uint32_t)GetSampleSum(pcBufPredRefLeftPart1.Y(), bitDepth);
+
+      for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
+      {
+        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+        Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
+        uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefLeftPart1.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+        gpmTplCostPart1[0][splitDir] += tempDist;  // pre-calculated
+        gpmTplCostPart1[1][splitDir] += fullCostPart1 - tempDist;
+      }
+    }
+  }
+
+  // Check split mode cost
+  uint32_t uiCost[GEO_NUM_PARTITION_MODE];
+  for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
+  {
+    uiCost[splitDir] = gpmTplCostPart0[0][splitDir] + gpmTplCostPart1[1][splitDir];
+  }
+
+  // Find best N candidates
+  numValidInList = (uint8_t)getIndexMappingTableToSortedArray1D<uint32_t, GEO_NUM_PARTITION_MODE, uint8_t, GEO_NUM_SIG_PARTMODE>(uiCost, modeList);
+
+}
+
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+void InterSearch::getBestGeoTMModeListEncoder(PredictionUnit &pu, uint8_t& numValidInList,
+                                              uint8_t(&modeList)[GEO_NUM_SIG_PARTMODE],
+                                              Pel* (&pRefTopPart0)[GEO_NUM_TM_MV_CAND], Pel* (&pRefLeftPart0)[GEO_NUM_TM_MV_CAND],
+                                              Pel* (&pRefTopPart1)[GEO_NUM_TM_MV_CAND], Pel* (&pRefLeftPart1)[GEO_NUM_TM_MV_CAND],
+                                              uint32_t(&gpmTplCostPart0)[2][GEO_NUM_PARTITION_MODE],
+                                              uint32_t(&gpmTplCostPart1)[2][GEO_NUM_PARTITION_MODE])
+{
+  if (!m_bAMLTemplateAvailabe[0] && !m_bAMLTemplateAvailabe[1])
+  {
+    getBestGeoModeList(pu, numValidInList, modeList, nullptr, nullptr, nullptr, nullptr);
+    return;
+  }
+
+  // Check mode
+  bool filledRefTplPart0 = gpmTplCostPart0[0][0] == std::numeric_limits<uint32_t>::max();
+  bool filledRefTplPart1 = gpmTplCostPart1[1][0] == std::numeric_limits<uint32_t>::max();
+  int bitDepth = pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA);
+
+  if (m_bAMLTemplateAvailabe[0])
+  {
+    SizeType   szPerLine       = pu.lwidth();
+    PelUnitBuf pcBufPredCurTop = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], szPerLine, GEO_MODE_SEL_TM_SIZE));
+    PelUnitBuf pcBufPredRefTopPart0[GEO_NUM_TM_MV_CAND] = {PelUnitBuf(), 
+                                                           PelUnitBuf(pu.chromaFormat, PelBuf(pRefTopPart0[GEO_TM_SHAPE_AL], szPerLine, GEO_MODE_SEL_TM_SIZE)),
+                                                           PelUnitBuf(pu.chromaFormat, PelBuf(pRefTopPart0[GEO_TM_SHAPE_A ], szPerLine, GEO_MODE_SEL_TM_SIZE)),
+                                                           PelUnitBuf()};
+    PelUnitBuf pcBufPredRefTopPart1[GEO_NUM_TM_MV_CAND] = {PelUnitBuf(),
+                                                           PelUnitBuf(pu.chromaFormat, PelBuf(pRefTopPart1[GEO_TM_SHAPE_AL], szPerLine, GEO_MODE_SEL_TM_SIZE)),
+                                                           PelUnitBuf(),
+                                                           PelUnitBuf(pu.chromaFormat, PelBuf(pRefTopPart1[GEO_TM_SHAPE_L ], szPerLine, GEO_MODE_SEL_TM_SIZE))};
+
+    const int maskStride2[3] = { -(int)szPerLine, (int)szPerLine, -(int)szPerLine }; // template length
+    const int maskStride[3] = { GEO_WEIGHT_MASK_SIZE_EXT, GEO_WEIGHT_MASK_SIZE_EXT, -GEO_WEIGHT_MASK_SIZE_EXT }; // mask stride
+    const int stepX[3] = { 1, -1, 1 };
+
+    // Cost of partition 0
+    if(filledRefTplPart0)
+    {
+      GetAbsDiffPerSample(pcBufPredRefTopPart0[GEO_TM_SHAPE_AL].Y(), pcBufPredCurTop.Y(), pcBufPredRefTopPart0[GEO_TM_SHAPE_AL].Y());
+      GetAbsDiffPerSample(pcBufPredRefTopPart0[GEO_TM_SHAPE_A ].Y(), pcBufPredCurTop.Y(), pcBufPredRefTopPart0[GEO_TM_SHAPE_A ].Y());
+
+      for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
+      {
+        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+        uint8_t shapeIdx  = g_geoTmShape[0][g_GeoParams[splitDir][0]];
+        Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
+        uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefTopPart0[shapeIdx].Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+        gpmTplCostPart0[0][splitDir] = tempDist;
+      }
+    }
+
+    // Cost of partition 1
+    if(filledRefTplPart1)
+    {
+      GetAbsDiffPerSample(pcBufPredRefTopPart1[GEO_TM_SHAPE_AL].Y(), pcBufPredCurTop.Y(), pcBufPredRefTopPart1[GEO_TM_SHAPE_AL].Y());
+      GetAbsDiffPerSample(pcBufPredRefTopPart1[GEO_TM_SHAPE_L ].Y(), pcBufPredCurTop.Y(), pcBufPredRefTopPart1[GEO_TM_SHAPE_L ].Y());
+
+      for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
+      {
+        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+        uint8_t shapeIdx  = g_geoTmShape[1][g_GeoParams[splitDir][0]];
+        Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
+        uint32_t tempDist = (uint32_t)Get01InvMaskedSampleSum(pcBufPredRefTopPart1[shapeIdx].Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+        gpmTplCostPart1[1][splitDir] = tempDist;
+      }
+    }
+  }
+  else
+  {
+    if (filledRefTplPart0)
+    {
+      memset(gpmTplCostPart0[0], 0, sizeof(uint32_t) * GEO_NUM_PARTITION_MODE);
+    }
+    if (filledRefTplPart1)
+    {
+      memset(gpmTplCostPart1[1], 0, sizeof(uint32_t) * GEO_NUM_PARTITION_MODE);
+    }
+  }
+
+  if (m_bAMLTemplateAvailabe[1])
+  {
+    SizeType   szPerLine        = pu.lheight();
+    PelUnitBuf pcBufPredCurLeft = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], szPerLine, GEO_MODE_SEL_TM_SIZE)); // reordered to make it 1 row to enable SIMD
+    PelUnitBuf pcBufPredRefLeftPart0[GEO_NUM_TM_MV_CAND] = {PelUnitBuf(),
+                                                            PelUnitBuf(pu.chromaFormat, PelBuf(pRefLeftPart0[GEO_TM_SHAPE_AL], szPerLine, GEO_MODE_SEL_TM_SIZE)), // To enable SIMD for cost computation
+                                                            PelUnitBuf(pu.chromaFormat, PelBuf(pRefLeftPart0[GEO_TM_SHAPE_A ], szPerLine, GEO_MODE_SEL_TM_SIZE)), // To enable SIMD for cost computation
+                                                            PelUnitBuf()};
+    PelUnitBuf pcBufPredRefLeftPart1[GEO_NUM_TM_MV_CAND] = { PelUnitBuf(),
+                                                            PelUnitBuf(pu.chromaFormat, PelBuf(pRefLeftPart1[GEO_TM_SHAPE_AL], szPerLine, GEO_MODE_SEL_TM_SIZE)), // To enable SIMD for cost computation
+                                                            PelUnitBuf(),
+                                                            PelUnitBuf(pu.chromaFormat, PelBuf(pRefLeftPart1[GEO_TM_SHAPE_L ], szPerLine, GEO_MODE_SEL_TM_SIZE))}; // To enable SIMD for cost computation
+
+    const int maskStride2[3] = { -(int)szPerLine, -(int)szPerLine, -(int)szPerLine }; // template length
+    const int maskStride[3] = { (int)szPerLine, (int)szPerLine, (int)szPerLine }; // mask stride
+    const int stepX[3] = { 1, 1, 1 };
+
+    // Cost of partition 0
+    if (filledRefTplPart0)
+    {
+      GetAbsDiffPerSample(pcBufPredRefLeftPart0[GEO_TM_SHAPE_AL].Y(), pcBufPredCurLeft.Y(), pcBufPredRefLeftPart0[GEO_TM_SHAPE_AL].Y());
+      GetAbsDiffPerSample(pcBufPredRefLeftPart0[GEO_TM_SHAPE_A ].Y(), pcBufPredCurLeft.Y(), pcBufPredRefLeftPart0[GEO_TM_SHAPE_A ].Y());
+
+      for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
+      {
+        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+        uint8_t shapeIdx  = g_geoTmShape[0][g_GeoParams[splitDir][0]];
+        Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
+        uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefLeftPart0[shapeIdx].Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+        gpmTplCostPart0[0][splitDir] += tempDist;
+      }
+    }
+
+    // Cost of partition 1
+    if (filledRefTplPart1)
+    {
+      GetAbsDiffPerSample(pcBufPredRefLeftPart1[GEO_TM_SHAPE_AL].Y(), pcBufPredCurLeft.Y(), pcBufPredRefLeftPart1[GEO_TM_SHAPE_AL].Y());
+      GetAbsDiffPerSample(pcBufPredRefLeftPart1[GEO_TM_SHAPE_L ].Y(), pcBufPredCurLeft.Y(), pcBufPredRefLeftPart1[GEO_TM_SHAPE_L ].Y());
+
+      for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
+      {
+        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+        uint8_t shapeIdx  = g_geoTmShape[1][g_GeoParams[splitDir][0]];
+        Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
+        uint32_t tempDist = (uint32_t)Get01InvMaskedSampleSum(pcBufPredRefLeftPart1[shapeIdx].Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+        gpmTplCostPart1[1][splitDir] += tempDist;
+      }
+    }
+  }
+
+  // Check split mode cost
+  uint32_t uiCost[GEO_NUM_PARTITION_MODE];
+  for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
+  {
+    uiCost[splitDir] = gpmTplCostPart0[0][splitDir] + gpmTplCostPart1[1][splitDir];
+  }
+
+  // Find best N candidates
+  numValidInList = (uint8_t)getIndexMappingTableToSortedArray1D<uint32_t, GEO_NUM_PARTITION_MODE, uint8_t, GEO_NUM_SIG_PARTMODE>(uiCost, modeList);
+
+}
+#endif
+
+#if JVET_Y0065_GPM_INTRA
+template <uint8_t partIdx>
+void InterSearch::xCollectIntraGeoPartCost(PredictionUnit &pu, IntraPrediction* pcIntraPred, int mergeCand, uint32_t(&gpmTplCost)[GEO_NUM_PARTITION_MODE])
+{
+  if ((!m_bAMLTemplateAvailabe[0] && !m_bAMLTemplateAvailabe[1]) || gpmTplCost[0] != std::numeric_limits<uint32_t>::max() || mergeCand < GEO_MAX_NUM_UNI_CANDS)
+  {
+    return;
+  }
+
+  std::vector<Pel>* LUT = m_pcReshape->getSliceReshaperInfo().getUseSliceReshaper() && m_pcReshape->getCTUFlag() ? &m_pcReshape->getInvLUT() : nullptr;
+  pcIntraPred->fillIntraGPMRefTemplateAll(pu, m_bAMLTemplateAvailabe[0], m_bAMLTemplateAvailabe[1], true, false, false, LUT, (partIdx == 0 ? mergeCand : 0), (partIdx == 1 ? mergeCand : 0));
+
+  int  realCandIdx = mergeCand - GEO_MAX_NUM_UNI_CANDS;
+  int  bitDepth    = pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA);
+  Pel* pDiffTop    = partIdx == 0 ? m_acYuvRefAMLTemplatePart0[0] : m_acYuvRefAMLTemplatePart1[0];
+  Pel* pDiffLeft   = partIdx == 0 ? m_acYuvRefAMLTemplatePart0[1] : m_acYuvRefAMLTemplatePart1[1];
+
+  static_vector<int, GEO_NUM_PARTITION_MODE> intraModeToSplitDirAll[NUM_INTRA_MODE];
+  for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
+  {
+    uint8_t intraMode = pcIntraPred->getPrefilledIntraGPMMPMMode(partIdx, splitDir, realCandIdx);
+    intraModeToSplitDirAll[intraMode].push_back(splitDir);
+  }
+
+  if (m_bAMLTemplateAvailabe[0])
+  {
+    SizeType   szPerLine        = pu.lwidth();
+    PelUnitBuf pcBufPredCurTop  = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], szPerLine, GEO_MODE_SEL_TM_SIZE));
+    PelUnitBuf pcBufPredRefTop  = PelUnitBuf(pu.chromaFormat, PelBuf(nullptr,                     szPerLine, GEO_MODE_SEL_TM_SIZE));
+    PelUnitBuf pcBufDiffTop     = PelUnitBuf(pu.chromaFormat, PelBuf(pDiffTop,                    szPerLine, GEO_MODE_SEL_TM_SIZE));
+
+    const int maskStride2[3] = { -(int)szPerLine, (int)szPerLine, -(int)szPerLine }; // template length
+    const int maskStride[3] = { GEO_WEIGHT_MASK_SIZE_EXT, GEO_WEIGHT_MASK_SIZE_EXT, -GEO_WEIGHT_MASK_SIZE_EXT }; // mask stride
+    const int stepX[3] = { 1, -1, 1 };
+
+    for (uint8_t intraMode = 0; intraMode < NUM_INTRA_MODE; ++intraMode)
+    {
+      static_vector<int, GEO_NUM_PARTITION_MODE>& toSplitDir = intraModeToSplitDirAll[intraMode];
+      if (toSplitDir.size() > 0)
+      {
+        pcBufPredRefTop.Y().buf = pcIntraPred->getPrefilledIntraGPMRefTemplate(intraMode, 0);
+        GetAbsDiffPerSample(pcBufDiffTop.Y(), pcBufPredCurTop.Y(), pcBufPredRefTop.Y());
+
+        for (int i = 0; i < toSplitDir.size(); ++i)
+        {
+          int splitDir = toSplitDir[i];
+          int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+          Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
+          gpmTplCost[splitDir] = (uint32_t)GetSampleSumFunc(partIdx + 2, pcBufDiffTop.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+        }
+      }
+    }
+  }
+  else
+  {
+    memset(gpmTplCost, 0, sizeof(gpmTplCost));
+  }
+
+  if (m_bAMLTemplateAvailabe[1])
+  {
+    SizeType   szPerLine        = pu.lheight();
+    PelUnitBuf pcBufPredCurLeft = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], szPerLine, GEO_MODE_SEL_TM_SIZE)); // To enable SIMD for cost computation
+    PelUnitBuf pcBufPredRefLeft = PelUnitBuf(pu.chromaFormat, PelBuf(nullptr,                     szPerLine, GEO_MODE_SEL_TM_SIZE)); // To enable SIMD for cost computation
+    PelUnitBuf pcBufDiffLeft    = PelUnitBuf(pu.chromaFormat, PelBuf(pDiffLeft,                   szPerLine, GEO_MODE_SEL_TM_SIZE)); // To enable SIMD for cost computation
+
+    const int maskStride2[3] = { -(int)szPerLine, -(int)szPerLine, -(int)szPerLine }; // template length
+    const int maskStride[3] = { (int)szPerLine, (int)szPerLine, (int)szPerLine }; // mask stride
+    const int stepX[3] = { 1, 1, 1 };
+
+    for (uint8_t intraMode = 0; intraMode < NUM_INTRA_MODE; ++intraMode)
+    {
+      static_vector<int, GEO_NUM_PARTITION_MODE>& toSplitDir = intraModeToSplitDirAll[intraMode];
+      if (toSplitDir.size() > 0)
+      {
+        pcBufPredRefLeft.Y().buf = pcIntraPred->getPrefilledIntraGPMRefTemplate(intraMode, 1);
+        GetAbsDiffPerSample(pcBufDiffLeft.Y(), pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y());
+
+        for (int i = 0; i < toSplitDir.size(); ++i)
+        {
+          int splitDir = toSplitDir[i];
+          int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+          Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
+          gpmTplCost[splitDir] += (uint32_t)GetSampleSumFunc(partIdx + 2, pcBufDiffLeft.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+        }
+      }
+    }
+  }
+}
+#endif
+#endif
 
 // AMVP
 #if JVET_X0083_BM_AMVP_MERGE_MODE

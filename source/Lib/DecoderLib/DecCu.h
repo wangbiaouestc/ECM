@@ -109,7 +109,11 @@ private:
 
   MergeCtx          m_geoMrgCtx;
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  MergeCtx          m_geoTmMrgCtx[GEO_NUM_TM_MV_CAND];
+#else
   MergeCtx          m_geoTmMrgCtx0, m_geoTmMrgCtx1;
+#endif
 #endif
 };
 

@@ -662,6 +662,102 @@ public:
   void predInterSearchAdditionalHypothesis(PredictionUnit& pu, const MEResult& x, MEResultVec& out);
   inline static unsigned getAdditionalHypothesisInitialBits(const MultiHypPredictionData& mhData, const int iNumWeights, const int iNumMHRefPics);
 #endif
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  // -------------------------------------------------------------------------------------------------------------------
+  // Inter GPM model selection
+  // -------------------------------------------------------------------------------------------------------------------
+protected:
+  uint16_t m_gpmacsSplitModeTmSelAvail [GEO_ENC_MMVD_MAX_REFINE_NUM_ADJ][GEO_ENC_MMVD_MAX_REFINE_NUM_ADJ][GEO_MAX_NUM_UNI_CANDS]; // Note: sizeof(uint16_t) should not be less than GEO_MAX_NUM_UNI_CANDS
+  uint8_t  m_gpmacsSplitModeTmSel      [GEO_ENC_MMVD_MAX_REFINE_NUM_ADJ][GEO_ENC_MMVD_MAX_REFINE_NUM_ADJ][GEO_MAX_NUM_UNI_CANDS][GEO_MAX_NUM_UNI_CANDS][GEO_NUM_PARTITION_MODE];
+  uint32_t m_gpmPartTplCost            [GEO_ENC_MMVD_MAX_REFINE_NUM_ADJ][GEO_MAX_NUM_UNI_CANDS][2][GEO_NUM_PARTITION_MODE]; // [][][0][]: partition 0, [][][1][]: partition 1
+
+public:
+  void initGeoAngleSelection(PredictionUnit& pu
+#if JVET_Y0065_GPM_INTRA
+                           , IntraPrediction* pcIntraPred, const uint8_t (&mpm)[GEO_NUM_PARTITION_MODE][2][GEO_MAX_NUM_INTRA_CANDS]
+#endif
+  );
+  void setGeoSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx& mergeCtx0, int mergeCand0, MergeCtx& mergeCtx1, int mergeCand1
+#if JVET_Y0065_GPM_INTRA
+                                  , IntraPrediction* pcIntraPred
+#endif
+                                  , int mmvdCand0 = -1, int mmvdCand1 = -1); // mmvdCandX = -1: regular, 0~GPM_EXT_MMVD_MAX_REFINE_NUM-1: MMVD, >=GPM_EXT_MMVD_MAX_REFINE_NUM: TM
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  void setGeoTMSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx (&mergeCtx)[GEO_NUM_TM_MV_CAND], int mergeCand0, int mergeCand1, int mmvdCand0 = -1, int mmvdCand1 = -1); // mmvdCandX = -1: regular, 0~GPM_EXT_MMVD_MAX_REFINE_NUM-1: MMVD, >=GPM_EXT_MMVD_MAX_REFINE_NUM: TM
+#endif
+  int  convertGeoSplitModeToSyntax(int splitDir, int mergeCand0, int mergeCand1, int mmvdCand0 = -1, int mmvdCand1 = -1); // mmvdCandX = -1: regular, 0~GPM_EXT_MMVD_MAX_REFINE_NUM-1: MMVD, >=GPM_EXT_MMVD_MAX_REFINE_NUM: TM
+
+protected:
+#if JVET_Y0065_GPM_INTRA
+  inline void xRemapMrgIndexAndMmvdIdx(int& mergeCand0, int& mergeCand1, int& mmvdCand0, int& mmvdCand1, bool &isIntra0, bool &isIntra1)
+  {
+#if JVET_W0097_GPM_MMVD_TM
+    static const int intraMmvdBufIdx = (GPM_EXT_MMVD_MAX_REFINE_NUM + 1) + 1;
+#else
+    static const int intraMmvdBufIdx = 1;
+#endif
+
+    isIntra0 = false;
+    isIntra1 = false;
+
+    if (mergeCand0 >= GEO_MAX_NUM_UNI_CANDS)
+    {
+      isIntra0    = true;
+      mergeCand0 -= GEO_MAX_NUM_UNI_CANDS;
+      mmvdCand0   = intraMmvdBufIdx - 1;
+    }
+
+    if (mergeCand1 >= GEO_MAX_NUM_UNI_CANDS)
+    {
+      isIntra1    = true;
+      mergeCand1 -= GEO_MAX_NUM_UNI_CANDS;
+      mmvdCand1   = intraMmvdBufIdx - 1;
+    }
+  }
+#endif
+
+  inline void xSetGpmModeToSyntaxModeTable(uint8_t numValidInList, uint8_t(&modeListSrc)[GEO_NUM_SIG_PARTMODE], uint8_t(&modeListDst)[GEO_NUM_PARTITION_MODE])
+  {
+    memset(modeListDst, -1, sizeof(modeListDst));
+    for (int i = 0; i < (int)numValidInList; ++i)
+    {
+      modeListDst[modeListSrc[i]] = i;
+    }
+  }
+
+#if JVET_Y0065_GPM_INTRA
+  template <uint8_t partIdx>
+  void xCollectIntraGeoPartCost(PredictionUnit &pu, IntraPrediction* pcIntraPred, int mergeCand, uint32_t(&gpmTplCost)[GEO_NUM_PARTITION_MODE]);
+#endif
+
+  bool selectGeoSplitModes (PredictionUnit &pu, 
+#if JVET_Y0065_GPM_INTRA
+                            IntraPrediction* pcIntraPred,
+#endif
+                            uint32_t (&gpmTplCostPart0)[2][GEO_NUM_PARTITION_MODE],
+                            uint32_t (&gpmTplCostPart1)[2][GEO_NUM_PARTITION_MODE],
+                            MergeCtx& mergeCtx0, int mergeCand0, MergeCtx& mergeCtx1, int mergeCand1, uint8_t& numValidInList, uint8_t (&modeList)[GEO_NUM_SIG_PARTMODE], int mmvdCand0 = -1, int mmvdCand1 = -1);
+  void getBestGeoModeListEncoder (PredictionUnit &pu, uint8_t& numValidInList,
+                                  uint8_t (&modeList)[GEO_NUM_SIG_PARTMODE],
+                                  Pel* pRefTopPart0, Pel* pRefLeftPart0,
+                                  Pel* pRefTopPart1, Pel* pRefLeftPart1,
+                                  uint32_t (&gpmTplCostPart0)[2][GEO_NUM_PARTITION_MODE],
+                                  uint32_t (&gpmTplCostPart1)[2][GEO_NUM_PARTITION_MODE]);
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  bool selectGeoTMSplitModes (PredictionUnit &pu, 
+                              uint32_t (&gpmTplCostPart0)[2][GEO_NUM_PARTITION_MODE],
+                              uint32_t (&gpmTplCostPart1)[2][GEO_NUM_PARTITION_MODE],
+                              MergeCtx (&mergeCtx)[GEO_NUM_TM_MV_CAND], int mergeCand0, int mergeCand1, uint8_t& numValidInList, uint8_t (&modeList)[GEO_NUM_SIG_PARTMODE]);
+  void getBestGeoTMModeListEncoder (PredictionUnit &pu, uint8_t& numValidInList,
+                                    uint8_t (&modeList)[GEO_NUM_SIG_PARTMODE],
+                                    Pel* (&pRefTopPart0)[GEO_NUM_TM_MV_CAND], Pel* (&pRefLeftPart0)[GEO_NUM_TM_MV_CAND],
+                                    Pel* (&pRefTopPart1)[GEO_NUM_TM_MV_CAND], Pel* (&pRefLeftPart1)[GEO_NUM_TM_MV_CAND],
+                                    uint32_t (&gpmTplCostPart0)[2][GEO_NUM_PARTITION_MODE],
+                                    uint32_t (&gpmTplCostPart1)[2][GEO_NUM_PARTITION_MODE]);
+#endif
+#endif
+
 protected:
 
   // -------------------------------------------------------------------------------------------------------------------

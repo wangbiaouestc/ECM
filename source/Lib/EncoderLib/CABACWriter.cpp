@@ -3197,13 +3197,21 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
         geo_merge_idx1(pu);
       }
 #else
+#if !JVET_Z0056_GPM_SPLIT_MODE_REORDERING
       uint8_t splitDir = pu.geoSplitDir;
+#endif
       uint8_t candIdx0 = pu.geoMergeIdx0;
       uint8_t candIdx1 = pu.geoMergeIdx1;
+#if !JVET_Z0056_GPM_SPLIT_MODE_REORDERING
       DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() geo_split_dir=%d\n", splitDir );
+#endif
       DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() geo_idx0=%d\n", candIdx0 );
       DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() geo_idx1=%d\n", candIdx1 );
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+      geoModeIdx(pu);
+#else
       xWriteTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
+#endif
       candIdx1 -= candIdx1 < candIdx0 ? 0 : 1;
       const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
       CHECK(maxNumGeoCand < 2, "Incorrect max number of geo candidates");
@@ -3408,6 +3416,67 @@ void CABACWriter::mmvd_merge_idx(const PredictionUnit& pu)
   DTRACE(g_trace_ctx, D_SYNTAX, "mmvd_merge_idx() mmvd_merge_idx=%d\n", pu.mmvdMergeIdx);
 }
 #endif
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+void CABACWriter::geoModeIdx(const uint8_t geoMode, const uint8_t altCodeIdx)
+{
+  if (altCodeIdx == 0)
+  {
+    xWriteTruncBinCode(geoMode, GEO_NUM_PARTITION_MODE);
+    DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() geo_split_dir=%u\n", geoMode );
+    return;
+  }
+
+  const int maxNumBins    = (GEO_NUM_SIG_PARTMODE / GEO_SPLIT_MODE_RICE_CODE_DIVISOR) - 1;
+  const int maxNumCtxBins = 5;
+        int geoModePrefix = ((int)geoMode) / GEO_SPLIT_MODE_RICE_CODE_DIVISOR;
+
+  for (int binIdx = 0; binIdx < maxNumBins; ++binIdx)
+  {
+    unsigned binVal = (binIdx == geoModePrefix ? 0 : 1);
+    if (binIdx < maxNumCtxBins)
+    {
+      m_BinEncoder.encodeBin(binVal, Ctx::GeoSubModeIdx(binIdx));
+      if (binVal == 0)
+      {
+        break;
+      }
+    }
+    else
+    {
+      m_BinEncoder.encodeBinEP(binVal);
+      if (binVal == 0)
+      {
+        break;
+      }
+    }
+  }
+
+  if (GEO_SPLIT_MODE_RICE_CODE_DIVISOR > 1)
+  {
+    uint8_t geoModeSuffix = geoMode & (uint8_t)(GEO_SPLIT_MODE_RICE_CODE_DIVISOR - 1);
+    xWriteTruncBinCode(geoModeSuffix, GEO_SPLIT_MODE_RICE_CODE_DIVISOR);
+    DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() geo_split_dir=%d(prefix=%d suffix=%u)\n", geoMode, geoModePrefix, geoModeSuffix );
+  }
+  else
+  {
+    DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() geo_split_dir=%d\n", geoMode );
+  }
+}
+
+void CABACWriter::geoModeIdx(const PredictionUnit& pu)
+{
+  if (!pu.cs->slice->getSPS()->getUseAltGPMSplitModeCode())
+  {
+    geoModeIdx(pu.geoSplitDir, 0);
+    return;
+  }
+
+  geoModeIdx(pu.geoSyntaxMode, 1);
+}
+#endif
+
+
 #if JVET_W0097_GPM_MMVD_TM
 void CABACWriter::geo_mmvd_idx(const PredictionUnit& pu, RefPicList eRefPicList)
 {
@@ -3448,11 +3517,17 @@ void CABACWriter::geo_mmvd_idx(const PredictionUnit& pu, RefPicList eRefPicList)
 
 void CABACWriter::geo_merge_idx(const PredictionUnit& pu)
 {
+#if !JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   uint8_t splitDir = pu.geoSplitDir;
+#endif
   uint8_t candIdx0 = pu.geoMergeIdx0;
   uint8_t candIdx1 = pu.geoMergeIdx1;
 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  geoModeIdx(pu);
+#else
   xWriteTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
+#endif
   candIdx1 -= candIdx1 < candIdx0 ? 0 : 1;
   const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
 
@@ -3474,7 +3549,9 @@ void CABACWriter::geo_merge_idx(const PredictionUnit& pu)
 
 void CABACWriter::geo_merge_idx1(const PredictionUnit& pu)
 {
+#if !JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   uint8_t splitDir = pu.geoSplitDir;
+#endif
   uint8_t candIdx0 = pu.geoMergeIdx0;
   uint8_t candIdx1 = pu.geoMergeIdx1;
 #if JVET_Y0065_GPM_INTRA
@@ -3482,7 +3559,11 @@ void CABACWriter::geo_merge_idx1(const PredictionUnit& pu)
   bool isIntra1 = (candIdx1 >= GEO_MAX_NUM_UNI_CANDS);
 #endif
 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  geoModeIdx(pu);
+#else
   xWriteTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
+#endif
   const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
 
   int numCandminus2 = maxNumGeoCand - 2;
@@ -3518,12 +3599,20 @@ void CABACWriter::geo_merge_idx1(const PredictionUnit& pu)
 #endif
 }
 
-uint64_t CABACWriter::geo_mode_est(const TempCtx& ctxStart, const int geoMode)
+uint64_t CABACWriter::geo_mode_est(const TempCtx& ctxStart, const int geoMode
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                                 , const uint8_t altCodeIdx
+#endif
+)
 {
   getCtx() = ctxStart;
   resetBits();
 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  geoModeIdx((uint8_t)geoMode, altCodeIdx);
+#else
   xWriteTruncBinCode(geoMode, GEO_NUM_PARTITION_MODE);
+#endif
 
   return getEstFracBits();
 }

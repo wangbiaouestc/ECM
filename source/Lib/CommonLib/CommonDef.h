@@ -820,7 +820,27 @@ static const int GEO_NUM_ANGLES =                                  32;
 static const int GEO_NUM_DISTANCES =                                4;
 static const int GEO_NUM_PRESTORED_MASK =                           6;
 static const int GEO_WEIGHT_MASK_SIZE = 3 * (GEO_MAX_CU_SIZE >> 3) * 2 + GEO_MAX_CU_SIZE;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if !JVET_W0090_ARMC_TM
+static const int AML_MERGE_TEMPLATE_SIZE =                          1;
+#endif
+static const int GEO_MODE_SEL_TM_SIZE =       AML_MERGE_TEMPLATE_SIZE;
+static const int GEO_TM_ADDED_WEIGHT_MASK_SIZE = GEO_MODE_SEL_TM_SIZE;
+static const int GEO_WEIGHT_MASK_SIZE_EXT = GEO_WEIGHT_MASK_SIZE + GEO_TM_ADDED_WEIGHT_MASK_SIZE * 2;
+static const int GEO_SPLIT_MODE_RICE_CODE_DIVISOR =                 4;
+static const int GEO_MODE_COMPRESSION_RATIO =                       2;
+static const int GEO_NUM_SIG_PARTMODE = GEO_NUM_PARTITION_MODE / GEO_MODE_COMPRESSION_RATIO; ///< max number of splitting modes for signaling
+static const int GEO_ENC_MMVD_MAX_REFINE_NUM_ADJ = 1 // regular merge(1) 
+#if JVET_W0097_GPM_MMVD_TM
+                                                 + GPM_EXT_MMVD_MAX_REFINE_NUM + 1 // mmvd(GPM_EXT_MMVD_MAX_REFINE_NUM) + TM(1)
+#endif
+#if JVET_Y0065_GPM_INTRA
+                                                 + 1 // intra(1)
+#endif
+;
+#else
 static const int GEO_MV_MASK_SIZE =         GEO_WEIGHT_MASK_SIZE >> 2;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
 static const int GEO_MAX_TRY_WEIGHTED_SAD = 70;
 #if TM_MRG
@@ -1189,6 +1209,61 @@ static inline int getMSB(unsigned x)
 }
   msb += y;
   return msb;
+}
+#endif
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+template <typename InputValueType, uint32_t inputValueArraySize, typename OutputIndexType, uint32_t outputIndexArraySize>
+static inline uint32_t getIndexMappingTableToSortedArray1D(InputValueType (&in)[inputValueArraySize], OutputIndexType (&tbl)[outputIndexArraySize])
+{
+  uint32_t numValidInList = 1;
+  InputValueType sortedlist[outputIndexArraySize];
+  sortedlist[0] = in[0];
+  tbl[0] = (OutputIndexType)0;
+
+  for (int inIdx = 1; inIdx < inputValueArraySize; ++inIdx)
+  {
+    // Find insertion index position using binary search
+    int insertIdx = 0;
+    InputValueType* subList = sortedlist;
+    uint32_t subListSize = numValidInList;
+    while (subListSize > 1)
+    {
+      int middleIdx = subListSize >> 1;
+      if (in[inIdx] < subList[middleIdx])
+      {
+        subListSize = middleIdx;
+      }
+      else
+      {
+        subList     += middleIdx;
+        subListSize -= middleIdx;
+        insertIdx   += middleIdx;
+      }
+    }
+    insertIdx += (in[inIdx] < subList[0] ? 0 : 1);
+
+    // Perform insertion at found index position
+    if (insertIdx < outputIndexArraySize)
+    {
+      int startIdx = outputIndexArraySize - 1;
+      if (numValidInList < outputIndexArraySize)
+      {
+        startIdx = numValidInList;
+        ++numValidInList;
+      }
+
+      for (int i = startIdx; i > insertIdx; --i)
+      {
+        sortedlist[i] = sortedlist[i - 1];
+        tbl       [i] = tbl       [i - 1];
+      }
+      sortedlist[insertIdx] = in[inIdx];
+      tbl       [insertIdx] = (OutputIndexType)inIdx;
+    }
+  }
+
+  return numValidInList;
 }
 #endif
 

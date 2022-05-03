@@ -175,6 +175,7 @@
 #define TM_AMVP                                           1 // Add template matching to non-subblock inter to refine regular AMVP candidates
 #define TM_MRG                                            1 // Add template matching to non-subblock inter to refine regular merge candidates
 #define JVET_W0090_ARMC_TM                                1 // JVET-W0090: Adaptive reordering of merge candidates with template matching
+#define JVET_Z0056_GPM_SPLIT_MODE_REORDERING              1 // JVET-Z0056: Template matching based reordering for GPM split modes
 #endif
 #define JVET_W0097_GPM_MMVD_TM                            1 // JVET-W0097: GPM-MMVD and GPM-TM, GPM-TM part is controlled by TM_MRG
 #define JVET_X0141_CIIP_TIMD_TM                           1 // JVET-X0141: CIIP with TIMD and TM merge, CIIP-TM part is controlled by TM_MRG, and CIIP-TIMD part is controlled by JVET_W0123_TIMD_FUSION
@@ -668,7 +669,7 @@ enum ISPType
   INTRA_SUBPARTITIONS_RESERVED  = 4
 };
 
-#if JVET_W0123_TIMD_FUSION
+#if JVET_W0123_TIMD_FUSION || (JVET_Z0056_GPM_SPLIT_MODE_REORDERING && JVET_Y0065_GPM_INTRA)
 enum TEMPLATE_TYPE
 {
   NO_NEIGHBOR         = 0,

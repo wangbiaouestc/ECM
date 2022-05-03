@@ -269,6 +269,9 @@ public:
   static const CtxSet   GeoMmvdFlag;
   static const CtxSet   GeoMmvdStepMvpIdx;
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  static const CtxSet   GeoSubModeIdx;
+#endif
   static const CtxSet   SubblockMergeFlag;
   static const CtxSet   AffineFlag;
   static const CtxSet   AffineType;

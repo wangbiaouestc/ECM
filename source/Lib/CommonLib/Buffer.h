@@ -107,11 +107,23 @@ struct PelBufferOps
 #if TM_AMVP || TM_MRG
   int64_t (*getSumOfDifference) ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int rowSubShift, int bitDepth );
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void (*getAbsoluteDifferencePerSample) ( Pel* dst, int dstStride, const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height );
+  int64_t(*getSampleSumFunc[4]) (Pel* src, int srcStride, int width, int height, int bitDepth, short* weightMask, int maskStepX, int maskStride, int maskStride2);
+#endif
 #if JVET_Z0136_OOB
   bool(*isMvOOB)  (const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, bool *mcMaskChroma, bool lumaOnly, ChromaFormat componentID);
   bool(*isMvOOBSubBlk) (const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, int mcStride, bool *mcMaskChroma, int mcCStride, bool lumaOnly, ChromaFormat componentID);
 #endif
 };
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#define GetAbsDiffPerSample(dstBuf, srcBuf0, srcBuf1)  g_pelBufOP.getAbsoluteDifferencePerSample((dstBuf).buf, (dstBuf).stride, (srcBuf0).buf, (srcBuf0).stride, (srcBuf1).buf, (srcBuf1).stride, (dstBuf).width, (dstBuf).height)
+#define GetSampleSumFunc(fIdx,  srcBuf, bitDepth, mask, maskStepX, maskStride, maskStride2)  g_pelBufOP.getSampleSumFunc[fIdx] ((srcBuf).buf, (srcBuf).stride, (srcBuf).width, (srcBuf.height), (bitDepth), (mask), (maskStepX), (maskStride), (maskStride2))
+#define GetSampleSum(           srcBuf, bitDepth                                          )  GetSampleSumFunc(0, (srcBuf), (bitDepth), nullptr, (        0), (         0), (          0))
+#define GetMaskedSampleSum(     srcBuf, bitDepth, mask, maskStepX, maskStride, maskStride2)  GetSampleSumFunc(1, (srcBuf), (bitDepth),  (mask), (maskStepX), (maskStride), (maskStride2))
+#define Get01MaskedSampleSum(   srcBuf, bitDepth, mask, maskStepX, maskStride, maskStride2)  GetSampleSumFunc(2, (srcBuf), (bitDepth),  (mask), (maskStepX), (maskStride), (maskStride2))
+#define Get01InvMaskedSampleSum(srcBuf, bitDepth, mask, maskStepX, maskStride, maskStride2)  GetSampleSumFunc(3, (srcBuf), (bitDepth),  (mask), (maskStepX), (maskStride), (maskStride2))
+#endif
 
 extern PelBufferOps g_pelBufOP;
 
@@ -119,6 +131,11 @@ void paddingCore(Pel *ptr, int stride, int width, int height, int padSize);
 void copyBufferCore(Pel *src, int srcStride, Pel *Dst, int dstStride, int width, int height);
 #if TM_AMVP || TM_MRG
 int64_t getSumOfDifferenceCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int rowSubShift, int bitDepth);
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+void getAbsoluteDifferencePerSampleCore(Pel* dst, int dstStride, const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height);
+template <uint8_t maskType> // 0: No mask, 1: Use mask, 2: Use binary mask that contains only 0's and 1's, 3: Inverse the input binary mask before use
+int64_t getMaskedSampleSumCore(Pel* src, int srcStride, int width, int height, int bitDepth, short* weightMask, int maskStepX, int maskStride, int maskStride2);
 #endif
 
 template<typename T>

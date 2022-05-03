@@ -2225,6 +2225,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   READ_FLAG( uiCode,    "sps_dmvd_enabled_flag" );                      pcSPS->setUseDMVDMode( uiCode != 0 );
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  READ_FLAG( uiCode,    "sps_alt_gpm_code_enabled_flag" );              pcSPS->setUseAltGPMSplitModeCode( uiCode != 0 );
+#endif
 #if JVET_X0049_ADAPT_DMVR
   READ_UVLC(uiCode, "six_minus_max_num_bm_merge_cand");
   CHECK(BM_MRG_MAX_NUM_CANDS < uiCode, "Incorrrect max number of BM merge candidates!");

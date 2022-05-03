@@ -990,6 +990,10 @@ InterpolationFilter::InterpolationFilter()
   m_weightedGeoBlkRounded = xWeightedGeoBlkRounded;
 #endif
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  m_weightedGeoTplA = xWeightedGeoTpl<true>;
+  m_weightedGeoTplL = xWeightedGeoTpl<false>;
+#endif
 }
 
 
@@ -1485,7 +1489,7 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
     CHECK(frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction");
     if (nFilterIdx == 1)
     {
-#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM
+#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
       filterHor<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, (biMCForDMVR ? m_bilinearFilterPrec4 : m_bilinearFilter)[frac], biMCForDMVR );
 #else
       filterHor<NTAPS_BILINEAR>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_bilinearFilterPrec4[frac], biMCForDMVR);
@@ -1531,7 +1535,7 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
     CHECK( frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction" );
     if( nFilterIdx == 1 )
     {
-#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM
+#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
       filterHor<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, (biMCForDMVR ? m_bilinearFilterPrec4 : m_bilinearFilter)[frac], biMCForDMVR );
 #else
       filterHor<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_bilinearFilterPrec4[frac], biMCForDMVR );
@@ -1621,7 +1625,7 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
     CHECK(frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction");
     if (nFilterIdx == 1)
     {
-#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM
+#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
       filterVer<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, (biMCForDMVR ? m_bilinearFilterPrec4 : m_bilinearFilter)[frac], biMCForDMVR );
 #else
       filterVer<NTAPS_BILINEAR>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_bilinearFilterPrec4[frac], biMCForDMVR);
@@ -1665,7 +1669,7 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
     CHECK( frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction" );
     if( nFilterIdx == 1 )
     {
-#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM
+#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
       filterVer<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, (biMCForDMVR ? m_bilinearFilterPrec4 : m_bilinearFilter)[frac], biMCForDMVR );
 #else
       filterVer<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_bilinearFilterPrec4[frac], biMCForDMVR );
@@ -1725,6 +1729,73 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
     }
   }
 }
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+template <bool trueTFalseL>
+void InterpolationFilter::xWeightedGeoTpl(const PredictionUnit &pu, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+{
+  const ComponentID compIdx = COMPONENT_Y;
+
+  Pel*    dst = predDst.get(compIdx).buf;
+  Pel*    src0 = predSrc0.get(compIdx).buf;
+  Pel*    src1 = predSrc1.get(compIdx).buf;
+  int32_t strideDst  = predDst .get(compIdx).stride;
+  int32_t strideSrc0 = predSrc0.get(compIdx).stride;
+  int32_t strideSrc1 = predSrc1.get(compIdx).stride;
+
+  const uint32_t scaleX = getComponentScaleX(compIdx, pu.chromaFormat);
+  const uint32_t scaleY = getComponentScaleY(compIdx, pu.chromaFormat);
+
+  int16_t angle = g_GeoParams[splitDir][0];
+  int16_t wIdx  = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2;
+  int16_t hIdx  = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2;
+  int16_t stepX = 1 << scaleX;
+  int16_t stepY = 0;
+  Pel*   weight = &g_globalGeoWeightsTpl[g_angle2mask[angle]][GEO_TM_ADDED_WEIGHT_MASK_SIZE * GEO_WEIGHT_MASK_SIZE_EXT + GEO_TM_ADDED_WEIGHT_MASK_SIZE];
+  if (g_angle2mirror[angle] == 2)
+  {
+    stepY = -(int)(GEO_WEIGHT_MASK_SIZE_EXT << scaleY);
+    weight += ((GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE_EXT + g_weightOffset[splitDir][hIdx][wIdx][0]);
+    weight += (trueTFalseL ? GEO_WEIGHT_MASK_SIZE_EXT * GEO_MODE_SEL_TM_SIZE : -GEO_MODE_SEL_TM_SIZE ); // Shift to template pos
+  }
+  else if (g_angle2mirror[angle] == 1)
+  {
+    stepX = -1 << scaleX;
+    stepY = (GEO_WEIGHT_MASK_SIZE_EXT << scaleY);
+    weight += (g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE_EXT + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0]));
+    weight -= (trueTFalseL ? GEO_WEIGHT_MASK_SIZE_EXT * GEO_MODE_SEL_TM_SIZE : -GEO_MODE_SEL_TM_SIZE ); // Shift to template pos
+  }
+  else
+  {
+    stepY = (GEO_WEIGHT_MASK_SIZE_EXT << scaleY);
+    weight += (g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE_EXT + g_weightOffset[splitDir][hIdx][wIdx][0]);
+    weight -= (trueTFalseL ? GEO_WEIGHT_MASK_SIZE_EXT * GEO_MODE_SEL_TM_SIZE : GEO_MODE_SEL_TM_SIZE ); // Shift to template pos
+  }
+
+  if (trueTFalseL)
+  {
+    for (int x = 0; x < predDst.bufs[compIdx].width; x++)
+    {
+      const Pel w = -(*weight);
+      dst[x]  = ((w & src0[x]) | ((~w) & src1[x])); // Same as dst[x] = *weight != 0 ? src0[x] : src0[x]
+      weight += stepX;
+    }
+  }
+  else
+  {
+    for (int y = 0; y < predDst.bufs[compIdx].height; y++)
+    {
+      const Pel w = -(*weight);
+      dst[0] = ((w & src0[0]) | ((~w) & src1[0])); // Same as dst[0] = *weight != 0 ? src0[0] : src0[1]
+
+      dst    += strideDst;
+      src0   += strideSrc0;
+      src1   += strideSrc1;
+      weight += stepY;
+    }
+  }
+}
+#endif
 
 void InterpolationFilter::weightedGeoBlk(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
 {

@@ -1139,14 +1139,81 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
 }
 
 #if JVET_Y0065_GPM_INTRA
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+void PU::getGeoIntraMPMs(const PredictionUnit &pu, uint8_t* mpm, uint8_t splitDir, uint8_t shape, bool doInit, bool doInitAL, bool doInitA, bool doInitL)
+{
+  static uint8_t  partialMPMsAll[GEO_NUM_TM_MV_CAND - 1][GEO_MAX_NUM_INTRA_CANDS]; // [0] for above-left, [1] for above [1] for left
+  if (doInit)
+  {
+    if (doInitAL)
+    {
+      PU::getGeoIntraMPMs(pu, partialMPMsAll[0], GEO_NUM_PARTITION_MODE, GEO_TM_SHAPE_AL);
+    }
+    if (doInitA)
+    {
+      PU::getGeoIntraMPMs(pu, partialMPMsAll[1], GEO_NUM_PARTITION_MODE, GEO_TM_SHAPE_A);
+    }
+    if (doInitL)
+    {
+      PU::getGeoIntraMPMs(pu, partialMPMsAll[2], GEO_NUM_PARTITION_MODE, GEO_TM_SHAPE_L);
+    }
+  }
+
+  const  uint8_t* partialMPMs = partialMPMsAll[shape - 1];
+  uint8_t numValidMPM = 1;
+  mpm[0] = g_geoAngle2IntraAng[g_GeoParams[splitDir][0]];
+  for (int i = 0; i < GEO_MAX_NUM_INTRA_CANDS; ++i)
+  {
+    if (partialMPMs[i] == NOMODE_IDX)
+    {
+      break;
+    }
+
+    if (partialMPMs[i] != mpm[0])
+    {
+      mpm[numValidMPM++] = partialMPMs[i];
+      if (numValidMPM == GEO_MAX_NUM_INTRA_CANDS)
+      {
+        return;
+      }
+    }
+  }
+
+  mpm[numValidMPM] = (mpm[0] > DIA_IDX) ? (mpm[0] - 32) : (mpm[0] + 32);
+  for (int i = 1; i < numValidMPM; ++i)
+  {
+    if (mpm[numValidMPM] == mpm[i])
+    {
+      --numValidMPM;
+      break;
+    }
+  }
+  ++numValidMPM;
+  if (numValidMPM == GEO_MAX_NUM_INTRA_CANDS)
+  {
+    return;
+  }
+
+  mpm[numValidMPM] = PLANAR_IDX;
+}
+#endif
+
 void PU::getGeoIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t splitDir, uint8_t shape )
 {
   bool includedMode[NUM_INTRA_MODE];
   memset(includedMode, false, sizeof(includedMode));
 
   int numValidMPM = 0;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  bool outputFullMPMs = splitDir < GEO_NUM_PARTITION_MODE;
+  if(outputFullMPMs)
+  {
+#endif
   mpm[numValidMPM++] = g_geoAngle2IntraAng[g_GeoParams[splitDir][0]];
   includedMode[mpm[0]] = true;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  }
+#endif
 
   CodingUnit* cu = pu.cu;
 #if ENABLE_DIMD
@@ -1372,6 +1439,17 @@ void PU::getGeoIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t splitD
         }
       }
     }
+  }
+#endif
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  if (!outputFullMPMs)
+  {
+    for (int i = numValidMPM; i < GEO_MAX_NUM_INTRA_CANDS; ++i)
+    {
+      mpm[i] = NOMODE_IDX;
+    }
+    return;
   }
 #endif
 
@@ -5141,6 +5219,31 @@ bool PU::checkTmEnableCondition(const SPS* sps, const PPS* pps, const Picture* r
   {
     return false;
   }
+}
+#endif
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+bool PU::checkRprRefExistingInGpm(const PredictionUnit& pu, const MergeCtx& geoMrgCtx0, uint8_t candIdx0, const MergeCtx& geoMrgCtx1, uint8_t candIdx1)
+{
+  if (pu.cs->sps->getRprEnabledFlag())
+  {
+    auto xCheckUseRprPerPart = [&pu](const MergeCtx& mrgCtx, uint8_t candIdx)
+    {
+#if JVET_Y0065_GPM_INTRA
+      if (candIdx >= GEO_MAX_NUM_UNI_CANDS)
+      {
+        return false;
+      }
+#endif
+      int refList = mrgCtx.interDirNeighbours[candIdx] - 1;
+      int refIdx  = mrgCtx.mvFieldNeighbours[(candIdx << 1) + refList].refIdx;
+      return pu.cu->slice->getRefPic((RefPicList)refList, refIdx)->isRefScaled(pu.cs->pps);
+    };
+
+    return xCheckUseRprPerPart(geoMrgCtx0, candIdx0) || xCheckUseRprPerPart(geoMrgCtx1, candIdx1);
+  }
+
+  return false;
 }
 #endif
 
@@ -11160,6 +11263,7 @@ Mv PU::getMultiHypMVP(PredictionUnit &pu, const MultiHypPredictionData &mhData)
   return mvp;
 }
 #endif
+
 
 bool CU::isBcwIdxCoded( const CodingUnit &cu )
 {

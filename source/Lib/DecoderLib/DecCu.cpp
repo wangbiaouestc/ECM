@@ -955,6 +955,41 @@ void DecCu::xReconInter(CodingUnit &cu)
 {
   if( cu.geoFlag )
   {
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+    m_pcInterPred->motionCompensationGeo( cu, m_geoMrgCtx 
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+                                        , m_geoTmMrgCtx
+#endif
+#if JVET_Y0065_GPM_INTRA
+                                        , m_pcIntraPred, (cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag()) ? &m_pcReshape->getFwdLUT() : nullptr
+#endif
+    );
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+    MergeCtx& m_geoTmMrgCtx0 = m_geoTmMrgCtx[g_geoTmShape[0][g_GeoParams[cu.firstPU->geoSplitDir][0]]];
+    MergeCtx& m_geoTmMrgCtx1 = m_geoTmMrgCtx[g_geoTmShape[1][g_GeoParams[cu.firstPU->geoSplitDir][0]]];
+#endif
+#if JVET_W0097_GPM_MMVD_TM
+    PU::spanGeoMMVDMotionInfo
+#else
+	  PU::spanGeoMotionInfo
+#endif
+                             ( *cu.firstPU, m_geoMrgCtx
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+							                , m_geoTmMrgCtx0, m_geoTmMrgCtx1
+#endif
+							                , cu.firstPU->geoSplitDir, cu.firstPU->geoMergeIdx0, cu.firstPU->geoMergeIdx1
+#if JVET_W0097_GPM_MMVD_TM
+#if TM_MRG
+                              , cu.firstPU->geoTmFlag0
+#endif
+							                , cu.firstPU->geoMMVDFlag0, cu.firstPU->geoMMVDIdx0
+#if TM_MRG							 
+							                , cu.firstPU->geoTmFlag1
+#endif
+							                , cu.firstPU->geoMMVDFlag1, cu.firstPU->geoMMVDIdx1
+#endif
+    );
+#else
 #if JVET_W0097_GPM_MMVD_TM
 #if TM_MRG
 #if JVET_Y0065_GPM_INTRA
@@ -978,6 +1013,7 @@ void DecCu::xReconInter(CodingUnit &cu)
     m_pcInterPred->motionCompensationGeo( cu, m_geoMrgCtx );
 #endif
     PU::spanGeoMotionInfo( *cu.firstPU, m_geoMrgCtx, cu.firstPU->geoSplitDir, cu.firstPU->geoMergeIdx0, cu.firstPU->geoMergeIdx1 );
+#endif
 #endif
   }
   else
@@ -1414,6 +1450,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
           if (pu.geoTmFlag0)
           {
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+            MergeCtx& m_geoTmMrgCtx0 = m_geoTmMrgCtx[GEO_TM_SHAPE_AL];
+#endif
             m_geoTmMrgCtx0.numValidMergeCand = m_geoMrgCtx.numValidMergeCand;
             m_geoTmMrgCtx0.BcwIdx[pu.geoMergeIdx0] = BCW_DEFAULT;
             m_geoTmMrgCtx0.useAltHpelIf[pu.geoMergeIdx0] = false;
@@ -1428,15 +1467,36 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             m_geoTmMrgCtx0.mvFieldNeighbours[(pu.geoMergeIdx0 << 1) + 1].mv = m_geoMrgCtx.mvFieldNeighbours[(pu.geoMergeIdx0 << 1) + 1].mv;
             m_geoTmMrgCtx0.mvFieldNeighbours[(pu.geoMergeIdx0 << 1)].refIdx = m_geoMrgCtx.mvFieldNeighbours[(pu.geoMergeIdx0 << 1)].refIdx;
             m_geoTmMrgCtx0.mvFieldNeighbours[(pu.geoMergeIdx0 << 1) + 1].refIdx = m_geoMrgCtx.mvFieldNeighbours[(pu.geoMergeIdx0 << 1) + 1].refIdx;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+            memcpy(&m_geoTmMrgCtx[GEO_TM_SHAPE_A], &m_geoTmMrgCtx0, sizeof(m_geoTmMrgCtx0));
+#endif
 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+            for (uint8_t tmType = GEO_TM_SHAPE_AL; tmType < GEO_NUM_TM_MV_CAND; ++tmType)
+            {
+              if (tmType == GEO_TM_SHAPE_L || (!pu.cs->slice->getSPS()->getUseAltGPMSplitModeCode() && tmType != g_geoTmShape[0][g_GeoParams[pu.geoSplitDir][0]]))
+              {
+                continue;
+              }
+              m_geoTmMrgCtx[tmType].setMergeInfo(pu, pu.geoMergeIdx0);
+              pu.geoTmType = tmType;
+              m_pcInterPred->deriveTMMv(pu);
+              m_geoTmMrgCtx[tmType].mvFieldNeighbours[(pu.geoMergeIdx0 << 1)    ].mv.set(pu.mv[0].getHor(), pu.mv[0].getVer());
+              m_geoTmMrgCtx[tmType].mvFieldNeighbours[(pu.geoMergeIdx0 << 1) + 1].mv.set(pu.mv[1].getHor(), pu.mv[1].getVer());
+            }
+#else
             m_geoTmMrgCtx0.setMergeInfo(pu, pu.geoMergeIdx0);
             pu.geoTmType = g_geoTmShape[0][g_GeoParams[pu.geoSplitDir][0]];
             m_pcInterPred->deriveTMMv(pu);
             m_geoTmMrgCtx0.mvFieldNeighbours[(pu.geoMergeIdx0 << 1)].mv.set(pu.mv[0].getHor(), pu.mv[0].getVer());
             m_geoTmMrgCtx0.mvFieldNeighbours[(pu.geoMergeIdx0 << 1) + 1].mv.set(pu.mv[1].getHor(), pu.mv[1].getVer());
+#endif
           }
           if (pu.geoTmFlag1)
           {
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+            MergeCtx& m_geoTmMrgCtx1 = m_geoTmMrgCtx[GEO_TM_SHAPE_AL];
+#endif
             m_geoTmMrgCtx1.numValidMergeCand = m_geoMrgCtx.numValidMergeCand;
             m_geoTmMrgCtx1.BcwIdx[pu.geoMergeIdx1] = BCW_DEFAULT;
             m_geoTmMrgCtx1.useAltHpelIf[pu.geoMergeIdx1] = false;
@@ -1451,12 +1511,30 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             m_geoTmMrgCtx1.mvFieldNeighbours[(pu.geoMergeIdx1 << 1) + 1].mv = m_geoMrgCtx.mvFieldNeighbours[(pu.geoMergeIdx1 << 1) + 1].mv;
             m_geoTmMrgCtx1.mvFieldNeighbours[(pu.geoMergeIdx1 << 1)].refIdx = m_geoMrgCtx.mvFieldNeighbours[(pu.geoMergeIdx1 << 1)].refIdx;
             m_geoTmMrgCtx1.mvFieldNeighbours[(pu.geoMergeIdx1 << 1) + 1].refIdx = m_geoMrgCtx.mvFieldNeighbours[(pu.geoMergeIdx1 << 1) + 1].refIdx;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+            memcpy(&m_geoTmMrgCtx[GEO_TM_SHAPE_L], &m_geoTmMrgCtx1, sizeof(m_geoTmMrgCtx1));
+#endif
 
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+            for (uint8_t tmType = GEO_TM_SHAPE_AL; tmType < GEO_NUM_TM_MV_CAND; ++tmType)
+            {
+              if (tmType == GEO_TM_SHAPE_A || (!pu.cs->slice->getSPS()->getUseAltGPMSplitModeCode() && tmType != g_geoTmShape[1][g_GeoParams[pu.geoSplitDir][0]]))
+              {
+                continue;
+              }
+              m_geoTmMrgCtx[tmType].setMergeInfo(pu, pu.geoMergeIdx1);
+              pu.geoTmType = tmType;
+              m_pcInterPred->deriveTMMv(pu);
+              m_geoTmMrgCtx[tmType].mvFieldNeighbours[(pu.geoMergeIdx1 << 1)    ].mv.set(pu.mv[0].getHor(), pu.mv[0].getVer());
+              m_geoTmMrgCtx[tmType].mvFieldNeighbours[(pu.geoMergeIdx1 << 1) + 1].mv.set(pu.mv[1].getHor(), pu.mv[1].getVer());
+            }
+#else
             m_geoTmMrgCtx1.setMergeInfo(pu, pu.geoMergeIdx1);
             pu.geoTmType = g_geoTmShape[1][g_GeoParams[pu.geoSplitDir][0]];
             m_pcInterPred->deriveTMMv(pu);
             m_geoTmMrgCtx1.mvFieldNeighbours[(pu.geoMergeIdx1 << 1)].mv.set(pu.mv[0].getHor(), pu.mv[0].getVer());
             m_geoTmMrgCtx1.mvFieldNeighbours[(pu.geoMergeIdx1 << 1) + 1].mv.set(pu.mv[1].getHor(), pu.mv[1].getVer());
+#endif
           }
 #endif
         }
