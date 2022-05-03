@@ -1301,6 +1301,28 @@ public:
 };
 #endif
 
+struct CclmModel
+{
+  // First model
+  int a        = 0;
+  int b        = 0;
+  int shift    = 0;
+  int midLuma  = 0;
+  
+#if MMLM
+  // Second model
+  int a2       = 0;
+  int b2       = 0;
+  int shift2   = 0;
+  int midLuma2 = 0;
+  int yThres   = 0;
+#endif
+  
+  void setFirstModel (int xa, int xb, int xshift)           { a  = xa; b  = xb; shift  = xshift; }
+#if MMLM
+  void setSecondModel(int xa, int xb, int xshift, int xthr) { a2 = xa; b2 = xb; shift2 = xshift; yThres = xthr; }
+#endif
+};
 
 struct BitDepths
 {

@@ -223,17 +223,9 @@ protected:
   void destroy                    ();
 #if LMS_LINEAR_MODEL
   void xPadMdlmTemplateSample(Pel*pSrc, Pel*pCur, int cWidth, int cHeight, int existSampNum, int targetSampNum);
-#if MMLM
-  void xGetLMParameters_LMS(const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, int& a, int& b, int& iShift, int &a2, int &b2, int &iShift2, int &yThres);
+  void xGetLMParameters_LMS(const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, CclmModel &cclmModel);
 #else
-  void xGetLMParameters_LMS(const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, int& a, int& b, int& iShift);
-#endif
-#else
-#if MMLM
-  void xGetLMParameters(const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, int& a, int& b, int& iShift, int &a2, int &b2, int &iShift2, int &yThres);
-#else
-  void xGetLMParameters(const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, int& a, int& b, int& iShift);
-#endif
+  void xGetLMParameters    (const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, CclmModel &cclmModel);
 #endif
 #if LMS_LINEAR_MODEL && MMLM
   struct MMLM_parameter
@@ -291,7 +283,7 @@ public:
   }
 
   // Cross-component Chroma
-  void predIntraChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea& chromaArea, int intraDir);
+  void predIntraChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea& chromaArea, int intraDir, bool createModel = true, CclmModel *cclmModelStored = nullptr);
   void xGetLumaRecPixels(const PredictionUnit &pu, CompArea chromaArea);
   /// set parameters from CU data for accessing intra data
   void initIntraPatternChType     (const CodingUnit &cu, const CompArea &area, const bool forceRefFilterFlag = false); // use forceRefFilterFlag to get both filtered and unfiltered buffers
