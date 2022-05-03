@@ -287,7 +287,7 @@ void Slice::checkAmvpMergeModeAvailability(Slice* pcSlice)
   }
 
   if( pcSlice->getCheckLDC()
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+#if ( TM_AMVP || TM_MRG || MULTI_PASS_DMVR ) && !JVET_Z0085_AMVPMERGE_DMVD_OFF
       || !pcSlice->getSPS()->getUseDMVDMode()
 #endif
       )
