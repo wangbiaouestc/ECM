@@ -581,7 +581,7 @@ public:
 #endif
 #endif
   int           numValidMergeCand;
-#if JVET_X0049_ADAPT_DMVR
+#if JVET_X0049_ADAPT_DMVR || JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
   int           numCandToTestEnc;
 #endif
   bool          hasMergedCandList;

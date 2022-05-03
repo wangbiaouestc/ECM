@@ -2341,6 +2341,9 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   }
 
   mrgCtx.numValidMergeCand = maxNumMergeCand;
+#if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
+  mrgCtx.numCandToTestEnc = maxNumMergeCand;
+#endif
   // compute the location of the current PU
 #if JVET_X0083_BM_AMVP_MERGE_MODE
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
@@ -3257,6 +3260,9 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 
   uint32_t uiArrayAddr = cnt;
 
+#if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND 
+  mrgCtx.numCandToTestEnc = cnt;
+#endif
   int iNumRefIdx = slice.isInterB() ? std::min(slice.getNumRefIdx(REF_PIC_LIST_0), slice.getNumRefIdx(REF_PIC_LIST_1)) : slice.getNumRefIdx(REF_PIC_LIST_0);
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   if (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1])

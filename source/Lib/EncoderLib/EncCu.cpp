@@ -3052,7 +3052,11 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     {
       if (tplAvail)
       {
+#if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND 
+        m_pcInterSearch->adjustMergeCandidates(pu, mergeCtx, pu.cs->sps->getMaxNumMergeCand());
+#else
         m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, mergeCtx, pu.cs->sps->getMaxNumMergeCand());
+#endif
       }
     }
     PU::getInterMergeCandidates(pu, mergeCtxtmp, 0);
@@ -3192,7 +3196,11 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
         if (tplAvail)
         {
+#if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND 
+          m_pcInterSearch->adjustMergeCandidates(pu, tmMrgCtx, pu.cs->sps->getMaxNumTMMergeCand());
+#else
           m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, tmMrgCtx, pu.cs->sps->getMaxNumTMMergeCand());
+#endif
         }
         if (tmMrgCtx.numValidMergeCand > pu.cs->sps->getMaxNumTMMergeCand())
         {
@@ -3347,7 +3355,11 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
           if (tplAvail)
           {
+#if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND 
+            m_pcInterSearch->adjustMergeCandidates(pu, bmMrgCtx, pu.cs->sps->getMaxNumBMMergeCand());
+#else
             m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, bmMrgCtx, pu.cs->sps->getMaxNumBMMergeCand());
+#endif
           }
           if (bmMrgCtx.numValidMergeCand > pu.cs->sps->getMaxNumBMMergeCand())
           {
