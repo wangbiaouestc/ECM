@@ -156,7 +156,11 @@ void copyClipCore(const Pel* srcp, const unsigned srcStride, Pel* dest, const un
 }
 #endif
 template< typename T >
+#if JVET_Z0136_OOB
+void addAvgCore( const T* src1, int src1Stride, const T* src2, int src2Stride, T* dest, int dstStride, int width, int height, int rshift, int offset, const ClpRng& clpRng, bool *mcMask[2], int mcStride, bool *isOOB)
+#else
 void addAvgCore( const T* src1, int src1Stride, const T* src2, int src2Stride, T* dest, int dstStride, int width, int height, int rshift, int offset, const ClpRng& clpRng )
+#endif
 {
 #define ADD_AVG_CORE_OP( ADDR ) dest[ADDR] = ClipPel( rightShift( ( src1[ADDR] + src2[ADDR] + offset ), rshift ), clpRng )
 #define ADD_AVG_CORE_INC    \
@@ -367,11 +371,78 @@ void calcBIOClippedVxVyCore(int* sumDIX_pixel_32bit, int* sumAbsGX_pixel_32bit, 
     tmpy_pixel_32bit++;
   }
 }
-
+#if JVET_Z0136_OOB
+void addBIOAvgNCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel *gradY1, int gradStride, int width, int height, int* tmpx, int* tmpy, int shift, int offset, const ClpRng& clpRng, bool *mcMask[2], int mcStride, bool *isOOB)
+#else
 void addBIOAvgNCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel *gradY1, int gradStride, int width, int height, int* tmpx, int* tmpy, int shift, int offset, const ClpRng& clpRng)
+#endif
 {
   int b = 0;
-
+#if JVET_Z0136_OOB
+  int offset2 = offset >> 1;
+  int shift2 = shift - 1;
+  bool *pMcMask0 = mcMask[0];
+  bool *pMcMask1 = mcMask[1];
+  if (isOOB[0] || isOOB[1])
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        b = (int)tmpx[x] * (gradX0[x] - gradX1[x]) + (int)tmpy[x] * (gradY0[x] - gradY1[x]);
+        bool oob0 = pMcMask0[x];
+        bool oob1 = pMcMask1[x];
+        if (oob0 && !oob1)
+        {
+          dst[x] = ClipPel(rightShift(src1[x] + offset2, shift2), clpRng);
+        }
+        else if (!oob0 && oob1)
+        {
+          dst[x] = ClipPel(rightShift(src0[x] + offset2, shift2), clpRng);
+        }
+        else
+        {
+          dst[x] = ClipPel(rightShift((src0[x] + src1[x] + b + offset), shift), clpRng);
+        }
+      }
+      pMcMask0 += mcStride;
+      pMcMask1 += mcStride;
+      tmpx += width;
+      tmpy += width;
+      dst += dstStride;
+      src0 += src0Stride;
+      src1 += src1Stride;
+      gradX0 += gradStride;
+      gradX1 += gradStride;
+      gradY0 += gradStride;
+      gradY1 += gradStride;
+    }
+  }
+  else
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        b = (int)tmpx[x] * (gradX0[x] - gradX1[x]) + (int)tmpy[x] * (gradY0[x] - gradY1[x]);
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+        dst[x] = ClipPel(rightShift((src0[x] + src1[x] + b + offset), shift), clpRng);
+#else
+        dst[x] = ClipPel((int16_t)rightShift((src0[x] + src1[x] + b + offset), shift), clpRng);
+#endif
+      }
+      tmpx += width;
+      tmpy += width;
+      dst += dstStride;
+      src0 += src0Stride;
+      src1 += src1Stride;
+      gradX0 += gradStride;
+      gradX1 += gradStride;
+      gradY0 += gradStride;
+      gradY1 += gradStride;
+    }
+  }
+#else
   for (int y = 0; y < height; y++)
   {
     for (int x = 0; x < width; x++)
@@ -387,6 +458,7 @@ void addBIOAvgNCore(const Pel* src0, int src0Stride, const Pel* src1, int src1St
     dst += dstStride;       src0 += src0Stride;     src1 += src1Stride;
     gradX0 += gradStride; gradX1 += gradStride; gradY0 += gradStride; gradY1 += gradStride;
   }
+#endif
   return;
 }
 
@@ -583,6 +655,151 @@ void linTfCore( const T* src, int srcStride, Pel *dst, int dstStride, int width,
 #undef LINTF_CORE_INC
 }
 
+#if JVET_Z0136_OOB
+bool isMvOOBCore(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, bool *mcMaskChroma, bool lumaOnly, ChromaFormat componentID)
+{
+  int chromaScale = getComponentScaleX(COMPONENT_Cb, componentID);
+  const int mvstep = 1 << MV_FRACTIONAL_BITS_INTERNAL;
+  const int mvstepHalf = mvstep >> 1;
+
+  int horMax = (((int)pps->getPicWidthInLumaSamples() - 1) << MV_FRACTIONAL_BITS_INTERNAL) + mvstepHalf;
+  int horMin = -mvstepHalf;
+  int verMax = (((int)pps->getPicHeightInLumaSamples() - 1) << MV_FRACTIONAL_BITS_INTERNAL) + mvstepHalf;
+  int verMin = -mvstepHalf;
+
+  int offsetX = (pos.x << MV_FRACTIONAL_BITS_INTERNAL) + rcMv.getHor();
+  int offsetY = (pos.y << MV_FRACTIONAL_BITS_INTERNAL) + rcMv.getVer();
+  bool isOOB = false;
+  if ((offsetX <= horMin)
+    || ((offsetX + (size.width << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= horMax)
+    || (offsetY <= verMin)
+    || ((offsetY + (size.height << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= verMax))
+  {
+    isOOB = true;
+  }
+  if (isOOB)
+  {
+    int baseOffsetX = offsetX;
+    bool *pMcMask = mcMask;
+
+    for (int y = 0; y < size.height; y++, offsetY += mvstep)
+    {
+      offsetX = baseOffsetX;
+      bool checkY = (offsetY <= verMin) || (offsetY >= verMax);
+      for (int x = 0; x < size.width; x++, offsetX += mvstep)
+      {
+        pMcMask[x] = (offsetX <= horMin) || (offsetX >= horMax) || checkY;
+      }
+      pMcMask += size.width;
+    }
+
+    if (!lumaOnly)
+    {
+      bool *pMcMaskChroma = mcMaskChroma;
+      pMcMask = mcMask;
+      int widthChroma = (size.width) >> chromaScale;
+      int heightChroma = (size.height) >> chromaScale;
+      int widthLuma2 = size.width << chromaScale;
+      for (int y = 0; y < heightChroma; y++)
+      {
+        for (int x = 0; x < widthChroma; x++)
+        {
+          pMcMaskChroma[x] = pMcMask[x << chromaScale];
+        }
+        pMcMaskChroma += widthChroma;
+        pMcMask += widthLuma2;
+      }
+    }
+  }
+  else
+  {
+    bool *pMcMask = mcMask;
+    memset(pMcMask, false, size.width * size.height);
+
+    bool *pMcMaskChroma = mcMaskChroma;
+    int widthChroma = (size.width) >> chromaScale;
+    int heightChroma = (size.height) >> chromaScale;
+    memset(pMcMaskChroma, false, widthChroma * heightChroma);
+  }
+  return isOOB;
+}
+
+bool isMvOOBSubBlkCore(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, int mcStride, bool *mcMaskChroma, int mcCStride, bool lumaOnly, ChromaFormat componentID)
+{
+  int chromaScale = getComponentScaleX(COMPONENT_Cb, componentID);
+  const int mvstep = 1 << MV_FRACTIONAL_BITS_INTERNAL;
+  const int mvstepHalf = mvstep >> 1;
+
+  int horMax = (((int)pps->getPicWidthInLumaSamples() - 1) << MV_FRACTIONAL_BITS_INTERNAL) + mvstepHalf;
+  int horMin = -mvstepHalf;
+  int verMax = (((int)pps->getPicHeightInLumaSamples() - 1) << MV_FRACTIONAL_BITS_INTERNAL) + mvstepHalf;
+  int verMin = -mvstepHalf;
+
+  int offsetX = (pos.x << MV_FRACTIONAL_BITS_INTERNAL) + rcMv.getHor();
+  int offsetY = (pos.y << MV_FRACTIONAL_BITS_INTERNAL) + rcMv.getVer();
+  bool isOOB = false;
+  if ((offsetX <= horMin)
+    || ((offsetX + (size.width << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= horMax)
+    || (offsetY <= verMin)
+    || ((offsetY + (size.height << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= verMax))
+  {
+    isOOB = true;
+  }
+  if (isOOB)
+  {
+    int baseOffsetX = offsetX;
+    bool *pMcMask = mcMask;
+    for (int y = 0; y < size.height; y++, offsetY += mvstep)
+    {
+      offsetX = baseOffsetX;
+      bool checkY = (offsetY <= verMin) || (offsetY >= verMax);;
+      for (int x = 0; x < size.width; x++, offsetX += mvstep)
+      {
+        pMcMask[x] = (offsetX <= horMin) || (offsetX >= horMax) || checkY;
+      }
+      pMcMask += mcStride;
+    }
+
+    if (!lumaOnly)
+    {
+      bool *pMcMaskChroma = mcMaskChroma;
+      pMcMask = mcMask;
+      int widthChroma = (size.width) >> chromaScale;
+      int heightChroma = (size.height) >> chromaScale;
+      int strideLuma2 = mcStride << chromaScale;
+      for (int y = 0; y < heightChroma; y++)
+      {
+        for (int x = 0; x < widthChroma; x++)
+        {
+          pMcMaskChroma[x] = pMcMask[x << chromaScale];
+        }
+        pMcMaskChroma += mcCStride;
+        pMcMask += strideLuma2;
+      }
+    }
+  }
+  else
+  {
+    bool *pMcMask = mcMask;
+    for (int y = 0; y < size.height; y++)
+    {
+      memset(pMcMask, false, size.width);
+      pMcMask += mcStride;
+    }
+
+    bool *pMcMaskChroma = mcMaskChroma;
+    int widthChroma = (size.width) >> chromaScale;
+    int heightChroma = (size.height) >> chromaScale;
+    for (int y = 0; y < heightChroma; y++)
+    {
+      memset(pMcMaskChroma, false, widthChroma);
+      pMcMaskChroma += mcCStride;
+    }
+  }
+  return isOOB;
+}
+#endif
+
 PelBufferOps::PelBufferOps()
 {
 #if JVET_W0097_GPM_MMVD_TM
@@ -627,6 +844,10 @@ PelBufferOps::PelBufferOps()
   roundIntVector = nullptr;
 #if TM_AMVP || TM_MRG
   getSumOfDifference = getSumOfDifferenceCore;
+#endif
+#if JVET_Z0136_OOB
+  isMvOOB = isMvOOBCore;
+  isMvOOBSubBlk = isMvOOBSubBlkCore;
 #endif
 }
 
@@ -692,9 +913,70 @@ void AreaBuf<Pel>::addHypothesisAndClip(const AreaBuf<const Pel> &other, const i
 #endif
 
 template<>
+#if JVET_Z0136_OOB
+void AreaBuf<Pel>::addWeightedAvg(const AreaBuf<const Pel> &other1, const AreaBuf<const Pel> &other2, const ClpRng& clpRng, const int8_t bcwIdx, bool *mcMask[2], int mcStride, bool* isOOB)
+#else
 void AreaBuf<Pel>::addWeightedAvg(const AreaBuf<const Pel> &other1, const AreaBuf<const Pel> &other2, const ClpRng& clpRng, const int8_t bcwIdx)
+#endif
 {
 #if JVET_W0097_GPM_MMVD_TM
+#if JVET_Z0136_OOB
+  int8_t w0 = getBcwWeight(bcwIdx, REF_PIC_LIST_0);
+  int8_t w1 = getBcwWeight(bcwIdx, REF_PIC_LIST_1);
+
+  const int8_t log2WeightBase = g_BcwLog2WeightBase;
+  const Pel* src1 = other1.buf;
+  const Pel* src2 = other2.buf;
+  Pel* dest = buf;
+
+  const unsigned src1Stride = other1.stride;
+  const unsigned src2Stride = other2.stride;
+  const unsigned destStride = stride;
+  const int clipbd = clpRng.bd;
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+  const int shiftNum = IF_INTERNAL_FRAC_BITS(clipbd) + log2WeightBase;
+#else
+  const int shiftNum = std::max<int>(2, (IF_INTERNAL_PREC - clipbd)) + log2WeightBase;
+#endif
+  const int offset = (1 << (shiftNum - 1)) + (IF_INTERNAL_OFFS << log2WeightBase);
+  if (!isOOB[0] && !isOOB[1])
+  {
+    g_pelBufOP.weightedAvg(src1, src1Stride, src2, src2Stride, dest, destStride, w0, w1, width, height, clpRng);
+  }
+  else
+  {
+    int shiftNum2 = IF_INTERNAL_FRAC_BITS(clipbd);
+    const int offset2 = (1 << (shiftNum2 - 1)) + IF_INTERNAL_OFFS;
+    bool *pMcMask0 = mcMask[0];
+    bool *pMcMask1 = mcMask[1];
+
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        bool oob0 = pMcMask0[x];
+        bool oob1 = pMcMask1[x];
+        if (oob0 && !oob1)
+        {
+          dest[x] = ClipPel(rightShift(src2[x] + offset2, shiftNum2), clpRng);
+        }
+        else if (!oob0 && oob1)
+        {
+          dest[x] = ClipPel(rightShift(src1[x] + offset2, shiftNum2), clpRng);
+        }
+        else
+        {
+          dest[x + 0] = ClipPel(rightShift((src1[x] * w0 + src2[x + 0] * w1 + offset), shiftNum), clpRng);
+        }
+      }
+      pMcMask0 += mcStride;
+      pMcMask1 += mcStride;
+      src1 += src1Stride;
+      src2 += src2Stride;
+      dest += destStride;
+    }
+  }
+#else
   const int8_t w0 = getBcwWeight(bcwIdx, REF_PIC_LIST_0);
   const int8_t w1 = getBcwWeight(bcwIdx, REF_PIC_LIST_1);
 
@@ -706,6 +988,7 @@ void AreaBuf<Pel>::addWeightedAvg(const AreaBuf<const Pel> &other1, const AreaBu
   const unsigned destStride = stride;
 
   g_pelBufOP.weightedAvg(src0, src0Stride, src1, src1Stride, dest, destStride, w0, w1, width, height, clpRng);
+#endif
 #else
   const int8_t w0 = getBcwWeight(bcwIdx, REF_PIC_LIST_0);
   const int8_t w1 = getBcwWeight(bcwIdx, REF_PIC_LIST_1);
@@ -897,7 +1180,11 @@ void AreaBuf<Pel>::scaleSignal(const int scale, const bool dir, const ClpRng& cl
 }
 
 template<>
+#if JVET_Z0136_OOB
+void AreaBuf<Pel>::addAvg(const AreaBuf<const Pel> &other1, const AreaBuf<const Pel> &other2, const ClpRng& clpRng, bool *mcMask[2], int mcStride, bool* isOOB)
+#else
 void AreaBuf<Pel>::addAvg( const AreaBuf<const Pel> &other1, const AreaBuf<const Pel> &other2, const ClpRng& clpRng)
+#endif
 {
   const Pel* src0 = other1.buf;
   const Pel* src2 = other2.buf;
@@ -914,6 +1201,66 @@ void AreaBuf<Pel>::addAvg( const AreaBuf<const Pel> &other1, const AreaBuf<const
 #endif
   const int     offset      = (1 << (shiftNum - 1)) + 2 * IF_INTERNAL_OFFS;
 
+#if JVET_Z0136_OOB
+#if ENABLE_SIMD_OPT_BUFFER && defined(TARGET_SIMD_X86)
+  if (mcMask == NULL || (!isOOB[0] && !isOOB[1]))
+  {
+    if ((width & 7) == 0)
+    {
+      g_pelBufOP.addAvg8(src0, src1Stride, src2, src2Stride, dest, destStride, width, height, shiftNum, offset, clpRng, mcMask, mcStride, isOOB);
+    }
+    else if ((width & 3) == 0)
+    {
+      g_pelBufOP.addAvg4(src0, src1Stride, src2, src2Stride, dest, destStride, width, height, shiftNum, offset, clpRng, mcMask, mcStride, isOOB);
+    }
+    else
+#endif
+    {
+#define ADD_AVG_OP( ADDR ) dest[ADDR] = ClipPel( rightShift( ( src0[ADDR] + src2[ADDR] + offset ), shiftNum ), clpRng )
+#define ADD_AVG_INC     \
+    src0 += src1Stride; \
+    src2 += src2Stride; \
+    dest += destStride; \
+
+    SIZE_AWARE_PER_EL_OP(ADD_AVG_OP, ADD_AVG_INC);
+
+#undef ADD_AVG_OP
+#undef ADD_AVG_INC
+    }
+  }
+  else
+  {
+    int shiftNum2 = IF_INTERNAL_FRAC_BITS(clipbd);
+    const int offset2 = (1 << (shiftNum2 - 1)) + IF_INTERNAL_OFFS;
+    bool *pMcMask0 = mcMask[0];
+    bool *pMcMask1 = mcMask[1];
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        bool oob0 = pMcMask0[x];
+        bool oob1 = pMcMask1[x];
+        if (oob0 && !oob1)
+        {
+          dest[x] = ClipPel(rightShift(src2[x] + offset2, shiftNum2), clpRng);
+        }
+        else if (!oob0 && oob1)
+        {
+          dest[x] = ClipPel(rightShift(src0[x] + offset2, shiftNum2), clpRng);
+        }
+        else
+        {
+          dest[x] = ClipPel(rightShift((src0[x] + src2[x] + offset), shiftNum), clpRng);
+        }
+      }
+      pMcMask0 += mcStride;
+      pMcMask1 += mcStride;
+      src0 += src1Stride;
+      src2 += src2Stride;
+      dest += destStride;
+    }
+  }
+#else
 #if ENABLE_SIMD_OPT_BUFFER && defined(TARGET_SIMD_X86)
   if( ( width & 7 ) == 0 )
   {
@@ -937,6 +1284,7 @@ void AreaBuf<Pel>::addAvg( const AreaBuf<const Pel> &other1, const AreaBuf<const
 #undef ADD_AVG_OP
 #undef ADD_AVG_INC
   }
+#endif
 }
 
 template<>

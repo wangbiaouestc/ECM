@@ -164,6 +164,7 @@
 #endif
 #define JVET_Y0089_DMVR_BCW                               1 // JVET-Y0089: DMVR with BCW enabled
 #define JVET_Y0065_GPM_INTRA                              1 // JVET-Y0065: Intra prediction for GPM
+#define JVET_Z0136_OOB                                    1 // JVET-Z0136 test2.2a: enhanced bi-prediction with out-of-boundary prediction samples
 #define JVET_Z0083_PARSINGERROR_FIX                       1 // JVET-Z0083: Fix on MHP parsing condition
 #define JVET_Z0139_HIST_AFF                               1 // JVET-Z0139: Affine HMVP 
 #define JVET_Z0139_NA_AFF                                 1 // JVET-Z0139: Constructed Non-adjacent spatial neighbors for affine mode

@@ -107,6 +107,13 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
 #if JVET_W0123_TIMD_FUSION
   m_ipmBuf        = nullptr;
 #endif
+#if JVET_Z0136_OOB
+  for (uint32_t i = 0; i < 2; i++)
+  {
+    mcMask[i] = nullptr;
+    mcMaskChroma[i] = nullptr;
+  }
+#endif
   features.resize( NUM_ENC_FEATURES );
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   treeType = TREE_D;
@@ -150,7 +157,22 @@ void CodingStructure::destroy()
   delete[] m_ipmBuf;
   m_ipmBuf = nullptr;
 #endif
+#if JVET_Z0136_OOB
+  for (uint32_t i = 0; i < 2; i++)
+  {
+    if (mcMask[i])
+    {
+      xFree(mcMask[i]);
+      mcMask[i] = nullptr;
+    }
 
+    if (mcMaskChroma[i])
+    {
+      xFree(mcMaskChroma[i]);
+      mcMaskChroma[i] = nullptr;
+    }
+  }
+#endif
 
   m_tuCache.cache( tus );
   m_puCache.cache( pus );
@@ -1033,6 +1055,15 @@ void CodingStructure::createInternals(const UnitArea& _unit, const bool isTopLay
   m_motionBuf       = new MotionInfo[_lumaAreaScaled];
 #if JVET_W0123_TIMD_FUSION
   m_ipmBuf          = new uint8_t[_lumaAreaScaled];
+#endif
+#if JVET_Z0136_OOB
+  int extendLumaArea = area.lumaSize().area();
+  for (unsigned i = 0; i < 2; i++)
+  {
+
+    mcMask[i] = (bool*)xMalloc(bool, extendLumaArea);
+    mcMaskChroma[i] = (bool*)xMalloc(bool, extendLumaArea);
+  }
 #endif
   initStructData();
 }
