@@ -1672,7 +1672,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
                 if (tplAvail)
                 {
+#if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND 
+                  m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, pu.cs->sps->getMaxNumBMMergeCand());
+#else
                   m_pcInterPred->adjustMergeCandidatesInOneCandidateGroup(pu, mrgCtx, mergeIdx + 1, mergeIdx);
+#endif
                 }
 #else
                 m_pcInterPred->adjustInterMergeCandidates(pu, mrgCtx, mergeIdx);
@@ -1718,7 +1722,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 
               if (tplAvail)
               {
+#if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
+                m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, pu.tmMergeFlag ? pu.cs->sps->getMaxNumTMMergeCand() : pu.cs->sps->getMaxNumMergeCand());
+#else
                 m_pcInterPred->adjustMergeCandidatesInOneCandidateGroup(pu, mrgCtx, pu.mergeIdx + 1, pu.mergeIdx);
+#endif
               }
 #else
               PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumMergeCand()) || (pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : pu.mergeIdx);
