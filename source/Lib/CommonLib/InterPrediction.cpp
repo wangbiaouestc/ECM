@@ -8983,9 +8983,21 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
 #if JVET_Y0128_NON_CTC
           CHECK(pu.cu->slice->getRefPic((RefPicList)refListMerge, pu.refIdx[refListMerge])->isRefScaled(pu.cs->pps), "this is not possible");
 #endif
-          Distortion tmpBmCost = xBDMVRGetMatchingError(pu, mvAmBdmvr, useMR);
-          temp.mergeIdx = mergeIdx;
-          temp.bmCost = tmpBmCost;
+#if JVET_Z0085_AMVPMERGE_DMVD_OFF
+          if (pu.cu->cs->sps->getUseDMVDMode())
+          {
+#endif
+            Distortion tmpBmCost = xBDMVRGetMatchingError(pu, mvAmBdmvr, useMR);
+            temp.mergeIdx = mergeIdx;
+            temp.bmCost = tmpBmCost;
+#if JVET_Z0085_AMVPMERGE_DMVD_OFF
+          }
+          else
+          {
+            temp.mergeIdx = mergeIdx;
+            temp.bmCost = std::numeric_limits<Distortion>::max();
+          }
+#endif
           input.push_back(temp);
         }
         stable_sort(input.begin(), input.end(), CostIncSort);
@@ -9051,6 +9063,10 @@ void InterPrediction::amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvF
   CHECK(pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0])->isRefScaled(pu.cs->pps), "this is not possible");
   CHECK(pu.cu->slice->getRefPic(REF_PIC_LIST_1, pu.refIdx[1])->isRefScaled(pu.cs->pps), "this is not possible");
 #endif
+#if JVET_Z0085_AMVPMERGE_DMVD_OFF
+  if (pu.cu->cs->sps->getUseDMVDMode())
+  {
+#endif
   if ((mergeRefPoc - curPoc) == (curPoc - amvpRefPoc))
   {
     Mv         mvInitial[2];
@@ -9082,6 +9098,9 @@ void InterPrediction::amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvF
     MvField    mvfBetterUni(pu.mv[1 - refListToBeRefined], pu.refIdx[1 - refListToBeRefined]);
     deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), refListToBeRefined, pu.refIdx[refListToBeRefined],
         AMVP_MERGE_MODE_REDUCED_MV_REFINE_SEARCH_ROUND, pu.mv[refListToBeRefined], &mvfBetterUni);
+    }
+#endif
+#if JVET_Z0085_AMVPMERGE_DMVD_OFF
   }
 #endif
 #if !JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
