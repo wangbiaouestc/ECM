@@ -272,7 +272,10 @@ public:
   double        tmpColorSpaceIntraCost[2];
   bool          firstColorSpaceTestOnly;
   bool resetIBCBuffer;
-
+#if JVET_Z0136_OOB
+  bool          *mcMask[2];
+  bool          *mcMaskChroma[2];
+#endif
   MotionBuf getMotionBuf( const     Area& _area );
   MotionBuf getMotionBuf( const UnitArea& _area ) { return getMotionBuf( _area.Y() ); }
   MotionBuf getMotionBuf()                        { return getMotionBuf(  area.Y() ); }

@@ -73,6 +73,10 @@ public:
   PelUnitBuf        m_predictionBeforeLIC;
   bool              m_storeBeforeLIC;
 #endif
+#if JVET_Z0136_OOB
+  bool isMvOOB(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, bool *mcMaskChroma, bool lumaOnly = false);
+  bool isMvOOBSubBlk(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, int mcStride, bool *mcMaskChroma, int mcCStride, bool lumaOnly = false);
+#endif
 #if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM // note: already refactor
   Reshape*          m_pcReshape;
 #endif
@@ -194,20 +198,36 @@ protected:
                                              const bool &bi, const bool &bioApplied, const bool luma, const bool chroma,
                                              const bool isBdofMvRefine = false);
   void            xPredInterBiSubPuBDOF    ( PredictionUnit &pu, PelUnitBuf &pcYuvPred, const bool luma, const bool chroma );
+#if JVET_Z0136_OOB
+  void            applyBiOptFlow           ( const bool isBdofMvRefine, const int bdofBlockOffset, const PredictionUnit &pu,
+                                             const CPelUnitBuf &yuvSrc0, const CPelUnitBuf &yuvSrc1, const int &refIdx0, const int &refIdx1,
+                                             PelUnitBuf &yuvDst, const BitDepths &clipBitDepths, bool *mcMask[2] = NULL, bool *mcMaskChroma[2] = NULL, bool *isOOB = NULL);
+#else
   void            applyBiOptFlow           ( const bool isBdofMvRefine, const int bdofBlockOffset, const PredictionUnit &pu,
                                              const CPelUnitBuf &yuvSrc0, const CPelUnitBuf &yuvSrc1, const int &refIdx0, const int &refIdx1,
                                              PelUnitBuf &yuvDst, const BitDepths &clipBitDepths );
+#endif
+#else
+#if JVET_Z0136_OOB
+  void            applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf &yuvSrc0, const CPelUnitBuf &yuvSrc1, const int &refIdx0, const int &refIdx1, PelUnitBuf &yuvDst, const BitDepths &clipBitDepths, bool *mcMask[2] = NULL, bool *mcMaskChroma[2] = NULL, bool *isOOB = NULL);
 #else
   void            applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf &yuvSrc0, const CPelUnitBuf &yuvSrc1, const int &refIdx0, const int &refIdx1, PelUnitBuf &yuvDst, const BitDepths &clipBitDepths);
+#endif
   void            xPredInterUni ( const PredictionUnit& pu, const RefPicList& eRefPicList, PelUnitBuf& pcYuvPred, const bool& bi
                                   , const bool& bioApplied
                                   , const bool luma, const bool chroma
   );
 #endif
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
+#if JVET_Z0136_OOB
+  void            subBlockBiOptFlow        ( Pel* dstY, const int dstStride, const Pel* src0, const int src0Stride, const Pel* src1,
+                                             const int src1Stride, int bioParamOffset, const int bioParamStride, int width, int height,
+                                             const ClpRng& clpRng, const int shiftNum, const int offset, const int limit, bool *mcMask[2], int mcStride, bool *isOOB = NULL);
+#else
   void            subBlockBiOptFlow        ( Pel* dstY, const int dstStride, const Pel* src0, const int src0Stride, const Pel* src1,
                                              const int src1Stride, int bioParamOffset, const int bioParamStride, int width, int height,
                                              const ClpRng& clpRng, const int shiftNum, const int offset, const int limit );
+#endif
 #endif
 #if ENABLE_OBMC
   PelStorage           m_tmpObmcBufL0;
@@ -241,9 +261,17 @@ protected:
   void xCalcBIOPar              (const Pel* srcY0Temp, const Pel* srcY1Temp, const Pel* gradX0, const Pel* gradX1, const Pel* gradY0, const Pel* gradY1, int* dotProductTemp1, int* dotProductTemp2, int* dotProductTemp3, int* dotProductTemp5, int* dotProductTemp6, const int src0Stride, const int src1Stride, const int gradStride, const int widthG, const int heightG, int bitDepth);
   void xCalcBlkGradient         (int sx, int sy, int    *arraysGx2, int     *arraysGxGy, int     *arraysGxdI, int     *arraysGy2, int     *arraysGydI, int     &sGx2, int     &sGy2, int     &sGxGy, int     &sGxdI, int     &sGydI, int width, int height, int unitSize);
 #if MULTI_PASS_DMVR
+#if JVET_Z0136_OOB
+  void xWeightedAverage         ( const bool isBdofMvRefine, const int bdofBlockOffset, const PredictionUnit& pu, const CPelUnitBuf& pcYuvSrc0, const CPelUnitBuf& pcYuvSrc1, PelUnitBuf& pcYuvDst, const BitDepths& clipBitDepths, const ClpRngs& clpRngs, const bool& bioApplied, const bool lumaOnly = false, const bool chromaOnly = false, PelUnitBuf* yuvDstTmp = NULL, bool *mcMask[2] = NULL, int mcStride = -1, bool *mcMaskChroma[2] = NULL, int mcCStride = -1, bool *isOOB = NULL );
+#else
   void xWeightedAverage         ( const bool isBdofMvRefine, const int bdofBlockOffset, const PredictionUnit& pu, const CPelUnitBuf& pcYuvSrc0, const CPelUnitBuf& pcYuvSrc1, PelUnitBuf& pcYuvDst, const BitDepths& clipBitDepths, const ClpRngs& clpRngs, const bool& bioApplied, const bool lumaOnly = false, const bool chromaOnly = false, PelUnitBuf* yuvDstTmp = NULL );
+#endif
+#else
+#if JVET_Z0136_OOB
+  void xWeightedAverage         ( const PredictionUnit& pu, const CPelUnitBuf& pcYuvSrc0, const CPelUnitBuf& pcYuvSrc1, PelUnitBuf& pcYuvDst, const BitDepths& clipBitDepths, const ClpRngs& clpRngs, const bool& bioApplied, const bool lumaOnly = false, const bool chromaOnly = false, PelUnitBuf* yuvDstTmp = NULL, bool *mcMask[2] = NULL, int mcStride = -1, bool *mcMaskChroma[2] = NULL, int mcCStride = -1, bool *isOOB = NULL );
 #else
   void xWeightedAverage         ( const PredictionUnit& pu, const CPelUnitBuf& pcYuvSrc0, const CPelUnitBuf& pcYuvSrc1, PelUnitBuf& pcYuvDst, const BitDepths& clipBitDepths, const ClpRngs& clpRngs, const bool& bioApplied, const bool lumaOnly = false, const bool chromaOnly = false, PelUnitBuf* yuvDstTmp = NULL );
+#endif
 #endif
 #if JVET_W0090_ARMC_TM
 #if !INTER_LIC
@@ -258,9 +286,17 @@ protected:
   void xPredAffineTpl(const PredictionUnit &pu, const RefPicList &eRefPicList, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate);
 #endif
 #if AFFINE_ENC_OPT
+#if JVET_Z0136_OOB
+  void xPredAffineBlk           ( const ComponentID& compID, const PredictionUnit& pu, const Picture* refPic, const Mv* _mv, PelUnitBuf& dstPic, const bool& bi, const ClpRng& clpRng, RefPicList eRefPicList, const bool genChromaMv = false, const std::pair<int, int> scalingRatio = SCALE_1X, const bool calGradient = false);
+#else
   void xPredAffineBlk           ( const ComponentID& compID, const PredictionUnit& pu, const Picture* refPic, const Mv* _mv, PelUnitBuf& dstPic, const bool& bi, const ClpRng& clpRng, const bool genChromaMv = false, const std::pair<int, int> scalingRatio = SCALE_1X, const bool calGradient = false);
+#endif
+#else
+#if JVET_Z0136_OOB
+  void xPredAffineBlk           ( const ComponentID& compID, const PredictionUnit& pu, const Picture* refPic, const Mv* _mv, PelUnitBuf& dstPic, const bool& bi, const ClpRng& clpRng, RefPicList eRefPicList, const bool genChromaMv = false, const std::pair<int, int> scalingRatio = SCALE_1X);
 #else
   void xPredAffineBlk           ( const ComponentID& compID, const PredictionUnit& pu, const Picture* refPic, const Mv* _mv, PelUnitBuf& dstPic, const bool& bi, const ClpRng& clpRng, const bool genChromaMv = false, const std::pair<int, int> scalingRatio = SCALE_1X );
+#endif
 #endif
 
   static bool xCheckIdenticalMotion( const PredictionUnit& pu );

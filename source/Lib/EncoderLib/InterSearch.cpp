@@ -4271,7 +4271,11 @@ Distortion InterSearch::xGetAffineTemplateCost( PredictionUnit& pu, PelUnitBuf& 
   Mv mv[3];
   memcpy(mv, acMvCand, sizeof(mv));
   m_iRefListIdx = eRefPicList;
+#if JVET_Z0136_OOB
+  xPredAffineBlk(COMPONENT_Y, pu, picRef, mv, predBuf, bi, pu.cu->slice->clpRng(COMPONENT_Y), eRefPicList);
+#else
   xPredAffineBlk(COMPONENT_Y, pu, picRef, mv, predBuf, bi, pu.cu->slice->clpRng(COMPONENT_Y));
+#endif
   if( bi )
   {
     xWeightedPredictionUni( pu, predBuf, eRefPicList, predBuf, iRefIdx, m_maxCompIDToPred );
@@ -6743,9 +6747,17 @@ void InterSearch::xAffineMotionEstimation( PredictionUnit& pu,
   }
 #if AFFINE_ENC_OPT
   int gStride = width;
+#if JVET_Z0136_OOB
+  xPredAffineBlk(COMPONENT_Y, pu, refPic, acMvTemp, predBuf, false, pu.cs->slice->clpRng(COMPONENT_Y), eRefPicList, false, SCALE_1X, true);
+#else
   xPredAffineBlk(COMPONENT_Y, pu, refPic, acMvTemp, predBuf, false, pu.cs->slice->clpRng(COMPONENT_Y), false, SCALE_1X, true);
+#endif
+#else
+#if JVET_Z0136_OOB
+  xPredAffineBlk( COMPONENT_Y, pu, refPic, acMvTemp, predBuf, false, pu.cs->slice->clpRng(COMPONENT_Y), eRefPicList );
 #else
   xPredAffineBlk( COMPONENT_Y, pu, refPic, acMvTemp, predBuf, false, pu.cs->slice->clpRng( COMPONENT_Y ) );
+#endif
 #endif
 
   // get error
@@ -6966,9 +6978,17 @@ void InterSearch::xAffineMotionEstimation( PredictionUnit& pu,
     }
 
 #if AFFINE_ENC_OPT
+#if JVET_Z0136_OOB
+    xPredAffineBlk(COMPONENT_Y, pu, refPic, acMvTemp, predBuf, false, pu.cu->slice->clpRng(COMPONENT_Y), eRefPicList, false, SCALE_1X, true);
+#else
     xPredAffineBlk( COMPONENT_Y, pu, refPic, acMvTemp, predBuf, false, pu.cu->slice->clpRng( COMPONENT_Y ), false, SCALE_1X, true );
+#endif
+#else
+#if JVET_Z0136_OOB
+    xPredAffineBlk( COMPONENT_Y, pu, refPic, acMvTemp, predBuf, false, pu.cu->slice->clpRng(COMPONENT_Y), eRefPicList  );
 #else
     xPredAffineBlk( COMPONENT_Y, pu, refPic, acMvTemp, predBuf, false, pu.cu->slice->clpRng( COMPONENT_Y ) );
+#endif
 #endif
 
     // get error
@@ -7003,7 +7023,11 @@ void InterSearch::xAffineMotionEstimation( PredictionUnit& pu,
 
   auto checkCPMVRdCost = [&](Mv ctrlPtMv[3])
   {
+#if JVET_Z0136_OOB
+    xPredAffineBlk(COMPONENT_Y, pu, refPic, ctrlPtMv, predBuf, false, pu.cu->slice->clpRng(COMPONENT_Y), eRefPicList);
+#else
     xPredAffineBlk(COMPONENT_Y, pu, refPic, ctrlPtMv, predBuf, false, pu.cu->slice->clpRng(COMPONENT_Y));
+#endif
     // get error
     Distortion costTemp = m_pcRdCost->getDistPart(predBuf.Y(), pBuf->Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, distFunc);
     // get cost with mv
@@ -7093,7 +7117,11 @@ void InterSearch::xAffineMotionEstimation( PredictionUnit& pu,
           {
             acMvTemp[j].set(centerMv[j].getHor() + (testPos[i][0] << mvShift), centerMv[j].getVer() + (testPos[i][1] << mvShift));
             clipMv( acMvTemp[j], pu.cu->lumaPos(), pu.cu->lumaSize(), *pu.cs->sps, *pu.cs->pps );
+#if JVET_Z0136_OOB
+            xPredAffineBlk(COMPONENT_Y, pu, refPic, acMvTemp, predBuf, false, pu.cu->slice->clpRng(COMPONENT_Y), eRefPicList);
+#else
             xPredAffineBlk(COMPONENT_Y, pu, refPic, acMvTemp, predBuf, false, pu.cu->slice->clpRng(COMPONENT_Y));
+#endif
             Distortion costTemp = m_pcRdCost->getDistPart(predBuf.Y(), pBuf->Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, distFunc);
             uint32_t bitsTemp = ruiBits;
             bitsTemp += xCalcAffineMVBits(pu, acMvTemp, acMvPred);

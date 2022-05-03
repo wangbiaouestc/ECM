@@ -4554,7 +4554,11 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
           else if (RdModeList[uiMrgHADIdx].isAffine)
           {
             tempCS->getPredBuf().copyFrom(*acMergeTempBuffer[uiMrgHADIdx], true);
+#if JVET_Z0136_OOB
+            m_pcInterSearch->motionCompensation(pu, REF_PIC_LIST_X, true, true);
+#else
             m_pcInterSearch->motionCompensation(pu, REF_PIC_LIST_X, false, true);
+#endif
           }
 #endif
           else

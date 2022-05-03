@@ -252,8 +252,120 @@ void copyClip_SSE(const Pel* srcp, const unsigned srcStride, Pel* dest, const un
 #endif
 
 template< X86_VEXT vext, int W >
+#if JVET_Z0136_OOB
+void addAvg_SSE( const int16_t* src0, int src0Stride, const int16_t* src1, int src1Stride, int16_t *dst, int dstStride, int width, int height, int shift, int offset, const ClpRng& clpRng, bool *mcMask[2], int mcStride, bool * isOOB)
+#else
 void addAvg_SSE( const int16_t* src0, int src0Stride, const int16_t* src1, int src1Stride, int16_t *dst, int dstStride, int width, int height, int shift, int offset, const ClpRng& clpRng )
+#endif
 {
+#if JVET_Z0136_OOB
+  if (mcMask == NULL || (!isOOB[0] && !isOOB[1]))
+  {
+    if (W == 8)
+    {
+      CHECK(offset & 1, "offset must be even");
+      CHECK(offset < -32768 || offset > 32767, "offset must be a 16-bit value");
+
+      __m128i vibdimin = _mm_set1_epi16(clpRng.min);
+      __m128i vibdimax = _mm_set1_epi16(clpRng.max);
+
+      for (int row = 0; row < height; row++)
+      {
+        for (int col = 0; col < width; col += 8)
+        {
+          __m128i vsrc0 = _mm_loadu_si128((const __m128i *) &src0[col]);
+          __m128i vsrc1 = _mm_loadu_si128((const __m128i *) &src1[col]);
+
+          vsrc0 = _mm_xor_si128(vsrc0, _mm_set1_epi16(0x7fff));
+          vsrc1 = _mm_xor_si128(vsrc1, _mm_set1_epi16(0x7fff));
+          vsrc0 = _mm_avg_epu16(vsrc0, vsrc1);
+          vsrc0 = _mm_xor_si128(vsrc0, _mm_set1_epi16(0x7fff));
+          vsrc0 = _mm_adds_epi16(vsrc0, _mm_set1_epi16(offset >> 1));
+          vsrc0 = _mm_sra_epi16(vsrc0, _mm_cvtsi32_si128(shift - 1));
+          vsrc0 = _mm_max_epi16(vsrc0, vibdimin);
+          vsrc0 = _mm_min_epi16(vsrc0, vibdimax);
+          _mm_storeu_si128((__m128i *) &dst[col], vsrc0);
+        }
+
+        src0 += src0Stride;
+        src1 += src1Stride;
+        dst += dstStride;
+      }
+    }
+    else if (W == 4)
+    {
+      __m128i vzero = _mm_setzero_si128();
+      __m128i voffset = _mm_set1_epi32(offset);
+      __m128i vibdimin = _mm_set1_epi16(clpRng.min);
+      __m128i vibdimax = _mm_set1_epi16(clpRng.max);
+
+      for (int row = 0; row < height; row++)
+      {
+        for (int col = 0; col < width; col += 4)
+        {
+          __m128i vsum = _mm_loadl_epi64((const __m128i *)&src0[col]);
+          __m128i vdst = _mm_loadl_epi64((const __m128i *)&src1[col]);
+          vsum = _mm_cvtepi16_epi32(vsum);
+          vdst = _mm_cvtepi16_epi32(vdst);
+          vsum = _mm_add_epi32(vsum, vdst);
+          vsum = _mm_add_epi32(vsum, voffset);
+          vsum = _mm_srai_epi32(vsum, shift);
+          vsum = _mm_packs_epi32(vsum, vzero);
+
+          vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsum));
+          _mm_storel_epi64((__m128i *)&dst[col], vsum);
+        }
+
+        src0 += src0Stride;
+        src1 += src1Stride;
+        dst += dstStride;
+      }
+    }
+    else
+    {
+      THROW("Unsupported size");
+    }
+  }
+  else
+  {
+    const int     clipbd = clpRng.bd;
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+    const int shiftNum = IF_INTERNAL_FRAC_BITS(clipbd) + 1;
+#else
+    const int     shiftNum = std::max<int>(2, (IF_INTERNAL_PREC - clipbd)) + 1;
+#endif
+    const int     offset = (1 << (shiftNum - 1)) + 2 * IF_INTERNAL_OFFS;
+    int shiftNum2 = IF_INTERNAL_FRAC_BITS(clipbd);
+    const int offset2 = (1 << (shiftNum2 - 1)) + IF_INTERNAL_OFFS;
+    bool *pMcMask0 = mcMask[0];
+    bool *pMcMask1 = mcMask[1];
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        bool oob0 = pMcMask0[x];
+        bool oob1 = pMcMask1[x];
+        if (oob0 && !oob1)
+        {
+          dst[x] = ClipPel(rightShift(src1[x] + offset2, shiftNum2), clpRng);
+        }
+        else if (!oob0 && oob1)
+        {
+          dst[x] = ClipPel(rightShift(src0[x] + offset2, shiftNum2), clpRng);
+        }
+        else
+        {
+          dst[x] = ClipPel(rightShift((src0[x] + src1[x] + offset), shiftNum), clpRng);
+        }
+      }
+      pMcMask0 += mcStride;
+      pMcMask1 += mcStride;
+      src0 += src0Stride;
+      src1 += src1Stride;
+      dst += dstStride;
+    }
+  }
+#else
   if( W == 8 )
   {
     CHECK(offset & 1, "offset must be even");
@@ -318,6 +430,7 @@ void addAvg_SSE( const int16_t* src0, int src0Stride, const int16_t* src1, int s
   {
     THROW( "Unsupported size" );
   }
+#endif
 }
 
 template<X86_VEXT vext>
@@ -913,8 +1026,55 @@ void calcBIOClippedVxVy_SSE(int* sumDIX_pixel_32bit, int* sumAbsGX_pixel_32bit, 
 }
 
 template< X86_VEXT vext >
+#if JVET_Z0136_OOB
+void addBIOAvgN_SSE(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel *gradY1, int gradStride, int width, int height, int* tmpx, int* tmpy, int shift, int offset, const ClpRng& clpRng, bool *mcMask[2], int mcStride, bool * isOOB)
+#else
 void addBIOAvgN_SSE(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel *gradY1, int gradStride, int width, int height, int* tmpx, int* tmpy, int shift, int offset, const ClpRng& clpRng)
+#endif
 {
+#if JVET_Z0136_OOB 
+  if (isOOB[0] || isOOB[1])
+  {
+    int b = 0;
+    int offset2 = offset >> 1;
+    int shift2 = shift - 1;
+    bool *pMcMask0 = mcMask[0];
+    bool *pMcMask1 = mcMask[1];
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        b = (int)tmpx[x] * (gradX0[x] - gradX1[x]) + (int)tmpy[x] * (gradY0[x] - gradY1[x]);
+        bool oob0 = pMcMask0[x];
+        bool oob1 = pMcMask1[x];
+        if (oob0 && !oob1)
+        {
+          dst[x] = ClipPel(rightShift(src1[x] + offset2, shift2), clpRng);
+        }
+        else if (!oob0 && oob1)
+        {
+          dst[x] = ClipPel(rightShift(src0[x] + offset2, shift2), clpRng);
+        }
+        else
+        {
+          dst[x] = ClipPel(rightShift((src0[x] + src1[x] + b + offset), shift), clpRng);
+        }
+      }
+      pMcMask0 += mcStride;
+      pMcMask1 += mcStride;
+      tmpx += width;
+      tmpy += width;
+      dst += dstStride;
+      src0 += src0Stride;
+      src1 += src1Stride;
+      gradX0 += gradStride;
+      gradX1 += gradStride;
+      gradY0 += gradStride;
+      gradY1 += gradStride;
+    }
+    return;
+  }
+#endif
 #ifdef USE_AVX2
   __m128i vibdimin = _mm_set1_epi16(clpRng.min);
   __m128i vibdimax = _mm_set1_epi16(clpRng.max);
@@ -1966,6 +2126,227 @@ int64_t getSumOfDifference_SSE(const Pel* src0, int src0Stride, const Pel* src1,
   return deltaAvg;
 }
 #endif
+#if JVET_Z0136_OOB
+template<X86_VEXT vext>
+bool isMvOOB_SSE(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, bool *mcMaskChroma, bool lumaOnly, ChromaFormat componentID)
+{
+  int chromaScale = getComponentScaleX(COMPONENT_Cb, componentID);
+  const int mvstep = 1 << MV_FRACTIONAL_BITS_INTERNAL;
+  const int mvstepHalf = mvstep >> 1;
+
+  int horMax = (((int)pps->getPicWidthInLumaSamples() - 1) << MV_FRACTIONAL_BITS_INTERNAL) + mvstepHalf;
+  int horMin = -mvstepHalf;
+  int verMax = (((int)pps->getPicHeightInLumaSamples() - 1) << MV_FRACTIONAL_BITS_INTERNAL) + mvstepHalf;
+  int verMin = -mvstepHalf;
+
+  int offsetX = (pos.x << MV_FRACTIONAL_BITS_INTERNAL) + rcMv.getHor();
+  int offsetY = (pos.y << MV_FRACTIONAL_BITS_INTERNAL) + rcMv.getVer();
+  bool isOOB = false;
+  if ((offsetX <= horMin)
+    || ((offsetX + (size.width << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= horMax)
+    || (offsetY <= verMin)
+    || ((offsetY + (size.height << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= verMax))
+  {
+    isOOB = true;
+  }
+  if (isOOB)
+  {
+    int baseOffsetX = offsetX;
+    bool *pMcMask = mcMask;
+    __m128i mmMinusOne = _mm_set1_epi32(-1);
+    __m128i mmOne = _mm_set1_epi32(1);
+    __m128i mmMvStep = _mm_set1_epi32(mvstep);
+    __m128i mmMvStep1 = _mm_set1_epi32(mvstep << 2);
+
+    __m128i mmOffsetX1 = _mm_set_epi32(baseOffsetX + (mvstep << 1) + mvstep, baseOffsetX + (mvstep << 1), baseOffsetX + mvstep, baseOffsetX);
+    __m128i mmOffsetX, mmCheck0, mmCheck1, mmCheck2, mmCheck3, mmCheck;
+    __m128i mmOffsetY = _mm_set1_epi32(offsetY);
+
+    __m128i mmHorMin = _mm_set1_epi32(horMin);
+    __m128i mmHorMax = _mm_set1_epi32(horMax);
+    __m128i mmVerMin = _mm_set1_epi32(verMin);
+    __m128i mmVerMax = _mm_set1_epi32(verMax);
+
+    for (int y = 0; y < size.height; y++)
+    {
+      mmCheck2 = _mm_xor_si128(_mm_cmpgt_epi32(mmOffsetY, mmVerMin), mmMinusOne);
+      mmCheck3 = _mm_xor_si128(_mm_cmplt_epi32(mmOffsetY, mmVerMax), mmMinusOne);
+      mmCheck2 = _mm_or_si128(mmCheck2, mmCheck3);
+
+      mmOffsetX = mmOffsetX1;
+      for (int x = 0; x < size.width; x += 4)
+      {
+        mmCheck0 = _mm_xor_si128(_mm_cmpgt_epi32(mmOffsetX, mmHorMin), mmMinusOne);
+        mmCheck1 = _mm_xor_si128(_mm_cmplt_epi32(mmOffsetX, mmHorMax), mmMinusOne);
+        mmCheck = _mm_or_si128(_mm_or_si128(mmCheck0, mmCheck1), mmCheck2);
+        mmCheck = _mm_add_epi32(_mm_xor_si128(mmCheck, mmMinusOne), mmOne);
+
+        mmCheck = _mm_packs_epi32(mmCheck, mmCheck);
+        mmCheck = _mm_packs_epi16(mmCheck, mmCheck);
+        *(int*)(pMcMask + x) = _mm_cvtsi128_si32(mmCheck);
+
+        mmOffsetX = _mm_add_epi32(mmOffsetX, mmMvStep1);
+      }
+      pMcMask += size.width;
+      mmOffsetY = _mm_add_epi32(mmOffsetY, mmMvStep);
+    }
+
+    if (!lumaOnly)
+    {
+      bool *pMcMaskChroma = mcMaskChroma;
+      pMcMask = mcMask;
+      int widthChroma = (size.width) >> chromaScale;
+      int heightChroma = (size.height) >> chromaScale;
+      int widthLuma2 = size.width << chromaScale;
+      __m128i mmShuffle = _mm_set_epi8(0xf, 0xd, 0xb, 0x9, 0x7, 0x5, 0x3, 0x1, 0xe, 0xc, 0xa, 0x8, 0x6, 0x4, 0x2, 0x0);
+      __m128i mmMaskLuma;
+      int widthChromaMultiple8 = ((widthChroma >> 3) << 3);
+      int stepX = 8, stepX1 = (8 << chromaScale), stepX2 = (1 << chromaScale);
+      for (int y = 0; y < heightChroma; y++)
+      {
+        int x = 0, x1 = 0;
+        for (; x < widthChromaMultiple8; x += stepX, x1 += stepX1)
+        {
+          mmMaskLuma = _mm_lddqu_si128((__m128i const *)(pMcMask + x1));
+          mmMaskLuma = _mm_shuffle_epi8(mmMaskLuma, mmShuffle);
+          _mm_storel_epi64((__m128i *)(pMcMaskChroma + x), mmMaskLuma);
+        }
+        for (; x < widthChroma; x++, x1 += stepX2)
+        {
+          pMcMaskChroma[x] = pMcMask[x1];
+        }
+        pMcMaskChroma += widthChroma;
+        pMcMask += widthLuma2;
+      }
+    }
+  }
+  else
+  {
+    bool *pMcMask = mcMask;
+    memset(pMcMask, false, size.width * size.height);
+
+    bool *pMcMaskChroma = mcMaskChroma;
+    int widthChroma = (size.width) >> chromaScale;
+    int heightChroma = (size.height) >> chromaScale;
+    memset(pMcMaskChroma, false, widthChroma * heightChroma);
+  }
+  return isOOB;
+}
+
+template<X86_VEXT vext>
+bool isMvOOBSubBlk_SSE(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, int mcStride, bool *mcMaskChroma, int mcCStride, bool lumaOnly, ChromaFormat componentID)
+{
+  int chromaScale = getComponentScaleX(COMPONENT_Cb, componentID);
+  const int mvstep = 1 << MV_FRACTIONAL_BITS_INTERNAL;
+  const int mvstepHalf = mvstep >> 1;
+
+  int horMax = (((int)pps->getPicWidthInLumaSamples() - 1) << MV_FRACTIONAL_BITS_INTERNAL) + mvstepHalf;
+  int horMin = -mvstepHalf;
+  int verMax = (((int)pps->getPicHeightInLumaSamples() - 1) << MV_FRACTIONAL_BITS_INTERNAL) + mvstepHalf;
+  int verMin = -mvstepHalf;
+
+  int offsetX = (pos.x << MV_FRACTIONAL_BITS_INTERNAL) + rcMv.getHor();
+  int offsetY = (pos.y << MV_FRACTIONAL_BITS_INTERNAL) + rcMv.getVer();
+  bool isOOB = false;
+  if ((offsetX <= horMin)
+    || ((offsetX + (size.width << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= horMax)
+    || (offsetY <= verMin)
+    || ((offsetY + (size.height << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= verMax))
+  {
+    isOOB = true;
+  }
+  if (isOOB)
+  {
+    int baseOffsetX = offsetX;
+    bool *pMcMask = mcMask;
+    __m128i mmMinusOne = _mm_set1_epi32(-1);
+    __m128i mmOne = _mm_set1_epi32(1);
+    __m128i mmMvStep = _mm_set1_epi32(mvstep);
+    __m128i mmMvStep1 = _mm_set1_epi32(mvstep << 2);
+
+    __m128i mmOffsetX1 = _mm_set_epi32(baseOffsetX + (mvstep << 1) + mvstep, baseOffsetX + (mvstep << 1), baseOffsetX + mvstep, baseOffsetX);
+    __m128i mmOffsetX, mmCheck0, mmCheck1, mmCheck2, mmCheck3, mmCheck;
+    __m128i mmOffsetY = _mm_set1_epi32(offsetY);
+
+    __m128i mmHorMin = _mm_set1_epi32(horMin);
+    __m128i mmHorMax = _mm_set1_epi32(horMax);
+    __m128i mmVerMin = _mm_set1_epi32(verMin);
+    __m128i mmVerMax = _mm_set1_epi32(verMax);
+
+    for (int y = 0; y < size.height; y++)
+    {
+      mmCheck2 = _mm_xor_si128(_mm_cmpgt_epi32(mmOffsetY, mmVerMin), mmMinusOne);
+      mmCheck3 = _mm_xor_si128(_mm_cmplt_epi32(mmOffsetY, mmVerMax), mmMinusOne);
+      mmCheck2 = _mm_or_si128(mmCheck2, mmCheck3);
+
+      mmOffsetX = mmOffsetX1;
+      for (int x = 0; x < size.width; x += 4)
+      {
+        mmCheck0 = _mm_xor_si128(_mm_cmpgt_epi32(mmOffsetX, mmHorMin), mmMinusOne);
+        mmCheck1 = _mm_xor_si128(_mm_cmplt_epi32(mmOffsetX, mmHorMax), mmMinusOne);
+        mmCheck = _mm_or_si128(_mm_or_si128(mmCheck0, mmCheck1), mmCheck2);
+        mmCheck = _mm_add_epi32(_mm_xor_si128(mmCheck, mmMinusOne), mmOne);
+
+        mmCheck = _mm_packs_epi32(mmCheck, mmCheck);
+        mmCheck = _mm_packs_epi16(mmCheck, mmCheck);
+        *(int*)(pMcMask + x) = _mm_cvtsi128_si32(mmCheck);
+
+        mmOffsetX = _mm_add_epi32(mmOffsetX, mmMvStep1);
+      }
+      pMcMask += mcStride;
+      mmOffsetY = _mm_add_epi32(mmOffsetY, mmMvStep);
+    }
+
+    if (!lumaOnly)
+    {
+      bool *pMcMaskChroma = mcMaskChroma;
+      pMcMask = mcMask;
+      int widthChroma = (size.width) >> chromaScale;
+      int heightChroma = (size.height) >> chromaScale;
+      int strideLuma2 = mcStride << chromaScale;
+      __m128i mmShuffle = _mm_set_epi8(0xf, 0xd, 0xb, 0x9, 0x7, 0x5, 0x3, 0x1, 0xe, 0xc, 0xa, 0x8, 0x6, 0x4, 0x2, 0x0);
+      __m128i mmMaskLuma;
+      int widthChromaMultiple8 = ((widthChroma >> 3) << 3);
+      int stepX = 8, stepX1 = (8 << chromaScale), stepX2 = (1 << chromaScale);
+      for (int y = 0; y < heightChroma; y++)
+      {
+        int x = 0, x1 = 0;
+        for (; x < widthChromaMultiple8; x += stepX, x1 += stepX1)
+        {
+          mmMaskLuma = _mm_lddqu_si128((__m128i const *)(pMcMask + x1));
+          mmMaskLuma = _mm_shuffle_epi8(mmMaskLuma, mmShuffle);
+          _mm_storel_epi64((__m128i *)(pMcMaskChroma + x), mmMaskLuma);
+        }
+        for (; x < widthChroma; x++, x1 += stepX2)
+        {
+          pMcMaskChroma[x] = pMcMask[x1];
+        }
+        pMcMaskChroma += mcCStride;
+        pMcMask += strideLuma2;
+      }
+    }
+  }
+  else
+  {
+    bool *pMcMask = mcMask;
+    for (int y = 0; y < size.height; y++)
+    {
+      memset(pMcMask, false, size.width);
+      pMcMask += mcStride;
+    }
+
+    bool *pMcMaskChroma = mcMaskChroma;
+    int widthChroma = (size.width) >> chromaScale;
+    int heightChroma = (size.height) >> chromaScale;
+    for (int y = 0; y < heightChroma; y++)
+    {
+      memset(pMcMaskChroma, false, widthChroma);
+      pMcMaskChroma += mcCStride;
+    }
+  }
+  return isOOB;
+}
+#endif
 template<X86_VEXT vext>
 void PelBufferOps::_initPelBufOpsX86()
 {
@@ -2011,6 +2392,10 @@ void PelBufferOps::_initPelBufOpsX86()
   roundIntVector = roundIntVector_SIMD<vext>;
 #if TM_AMVP || TM_MRG
   getSumOfDifference = getSumOfDifference_SSE<vext>;
+#endif
+#if JVET_Z0136_OOB
+  isMvOOB = isMvOOB_SSE<vext>;
+  isMvOOBSubBlk = isMvOOBSubBlk_SSE<vext>;
 #endif
 }
 
