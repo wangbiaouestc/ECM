@@ -925,7 +925,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #endif
 }
 
-void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea& chromaArea, int intraDir)
+void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea& chromaArea, int intraDir, bool createModel, CclmModel *cclmModelStored)
 {
   int  iLumaStride = 0;
   PelBuf Temp;
@@ -943,21 +943,28 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
     iLumaStride = MAX_CU_SIZE + 1;
     Temp = PelBuf(m_piTemp + iLumaStride + 1, iLumaStride, Size(chromaArea));
   }
-  int a, b, iShift;
-#if MMLM
-  int a2, b2, iShift2, yThres;
+  
+  CclmModel cclmModel;
+
+  if ( createModel )
+  {
 #if LMS_LINEAR_MODEL
-  xGetLMParameters_LMS(pu, compID, chromaArea, a, b, iShift, a2, b2, iShift2, yThres);
+    xGetLMParameters_LMS(pu, compID, chromaArea, cclmModel);
 #else
-  xGetLMParameters(pu, compID, chromaArea, a, b, iShift, a2, b2, iShift2, yThres);
+    xGetLMParameters    (pu, compID, chromaArea, cclmModel);
 #endif
-#else
-#if LMS_LINEAR_MODEL
-  xGetLMParameters_LMS(pu, compID, chromaArea, a, b, iShift);
-#else
-  xGetLMParameters(pu, compID, chromaArea, a, b, iShift);
-#endif
-#endif
+    
+    // Store the created model if storage struct was provided
+    if ( cclmModelStored != nullptr )
+    {
+      *cclmModelStored = cclmModel;
+    }
+  }
+  else
+  {
+    // Use the pre-calculated model
+    cclmModel = *cclmModelStored;
+  }
 
   ////// final prediction
   piPred.copyFrom(Temp);
@@ -974,13 +981,13 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
     {
       for (int j = 0; j < uiCWidth; j++)
       {
-        if (pLuma[j] <= yThres)
+        if (pLuma[j] <= cclmModel.yThres)
         {
-          pPred[j] = (Pel)ClipPel(((a * pLuma[j]) >> iShift) + b, pu.cs->slice->clpRng(compID));
+          pPred[j] = (Pel)ClipPel(((cclmModel.a * pLuma[j]) >> cclmModel.shift) + cclmModel.b, pu.cs->slice->clpRng(compID));
         }
         else
         {
-          pPred[j] = (Pel)ClipPel(((a2 * pLuma[j]) >> iShift2) + b2, pu.cs->slice->clpRng(compID));
+          pPred[j] = (Pel)ClipPel(((cclmModel.a2 * pLuma[j]) >> cclmModel.shift2) + cclmModel.b2, pu.cs->slice->clpRng(compID));
         }
       }
       pPred += uiPredStride;
@@ -989,7 +996,7 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
   }
   else
 #endif
-  piPred.linearTransform(a, iShift, b, true, pu.cs->slice->clpRng(compID));
+  piPred.linearTransform(cclmModel.a, cclmModel.shift, cclmModel.b, true, pu.cs->slice->clpRng(compID));
 }
 
 /** Function for deriving planar intra prediction. This function derives the prediction samples for planar mode (intra coding).
@@ -4637,14 +4644,7 @@ void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chrom
 }
 
 #if !LMS_LINEAR_MODEL
-void IntraPrediction::xGetLMParameters(const PredictionUnit &pu, const ComponentID compID,
-                                              const CompArea &chromaArea,
-#if MMLM
-                                              int &a, int &b, int &iShift,
-                                              int &a2, int &b2, int &iShift2, int &yThres)
-#else
-                                              int &a, int &b, int &iShift)
-#endif
+void IntraPrediction::xGetLMParameters(const PredictionUnit &pu, const ComponentID compID, const CompArea &chromaArea, CclmModel &cclmModel)
 {
   CHECK(compID == COMPONENT_Y, "");
 
@@ -5026,10 +5026,15 @@ void IntraPrediction::xGetLMParameters(const PredictionUnit &pu, const Component
       {
         ax = 0; bx = 1 << (internalBitDepth - 1); iShiftx = 0;
       }
-      if (i == 0) { a = ax; b = bx; iShift = iShiftx; }
-      else { a2 = ax; b2 = bx; iShift2 = iShiftx; }
+      if (i == 0)
+      {
+        cclmModel.setFirstModel ( ax, bx, iShiftx );
+      }
+      else
+      {
+        cclmModel.setSecondModel( ax, bx, iShiftx, yAvg );
+      }
     }
-    yThres = yAvg;
   }
   else
   {
@@ -5051,29 +5056,27 @@ void IntraPrediction::xGetLMParameters(const PredictionUnit &pu, const Component
 
       int y = floorLog2( abs( diffC ) ) + 1;
       int add = 1 << y >> 1;
-      a = (diffC * v + add) >> y;
-      iShift = 3 + x - y;
+      int a = (diffC * v + add) >> y;
+      int b = 0;
+      int iShift = 3 + x - y;
+
       if ( iShift < 1 )
       {
         iShift = 1;
         a = ( (a == 0)? 0: (a < 0)? -15 : 15 );   // a=Sign(a)*15
       }
       b = minLuma[1] - ((a * minLuma[0]) >> iShift);
+
+      cclmModel.setFirstModel ( a, b, iShift );
     }
     else
     {
-      a = 0;
-      b = minLuma[1];
-      iShift = 0;
+      cclmModel.setFirstModel ( 0, minLuma[1], 0 );
     }
   }
   else
   {
-    a = 0;
-
-    b = 1 << (internalBitDepth - 1);
-
-    iShift = 0;
+    cclmModel.setFirstModel ( 0, 1 << (internalBitDepth - 1), 0 );
   }
 #if MMLM
   }
@@ -5499,13 +5502,7 @@ void IntraPrediction::xPadMdlmTemplateSample(Pel*pSrc, Pel*pCur, int cWidth, int
     pTempCur[i] = pCur[i * step];
   }
 }
-void IntraPrediction::xGetLMParameters_LMS(const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea,
-#if MMLM
-  int &a, int &b, int &iShift,
-  int &a2, int &b2, int &iShift2, int &yThres)
-#else
-int &a, int &b, int &iShift)
-#endif
+void IntraPrediction::xGetLMParameters_LMS(const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, CclmModel &cclmModel)
 {
   CHECK(compID == COMPONENT_Y, "");
   const SizeType cWidth = chromaArea.width;
@@ -5683,9 +5680,7 @@ int &a, int &b, int &iShift)
 
     if( !orgNumSample || !existSampNum )
     {
-      a = 0;
-      b = 1 << (uiInternalBitDepth - 1);
-      iShift = 0;
+      cclmModel.setFirstModel( 0, 1 << (uiInternalBitDepth - 1), 0 );
       return;
     }
 
@@ -5762,9 +5757,10 @@ int &a, int &b, int &iShift)
     }
 
     xLMSampleClassifiedTraining(avgCnt, mean, meanC, LumaSamples, ChrmSamples, uiInternalBitDepth, parameters);
-    a = parameters[0].a; b = parameters[0].b; iShift = parameters[0].shift;
-    a2 = parameters[1].a; b2 = parameters[1].b; iShift2 = parameters[1].shift;
-    yThres = mean;
+
+    cclmModel.setFirstModel ( parameters[0].a, parameters[0].b, parameters[0].shift );
+    cclmModel.setSecondModel( parameters[1].a, parameters[1].b, parameters[1].shift, mean );
+
     return;
   }
 #endif
@@ -5773,9 +5769,7 @@ int &a, int &b, int &iShift)
   {
     if ((curChromaMode == MDLM_L_IDX) ? (!leftAvailable) : (!aboveAvailable))
     {
-      a = 0;
-      b = 1 << (uiInternalBitDepth - 1);
-      iShift = 0;
+      cclmModel.setFirstModel( 0, 1 << (uiInternalBitDepth - 1), 0 );
       return;
     }
   }
@@ -5783,9 +5777,7 @@ int &a, int &b, int &iShift)
   {
     if (!leftAvailable && !aboveAvailable)
     {
-      a = 0;
-      b = 1 << (uiInternalBitDepth - 1);
-      iShift = 0;
+      cclmModel.setFirstModel( 0, 1 << (uiInternalBitDepth - 1), 0 );
       return;
     }
   }
@@ -5810,13 +5802,13 @@ int &a, int &b, int &iShift)
   int RErrY = y & ((1 << iCountShift) - 1);
 
   int iB = 7;
-  iShift = 13 - iB;
+  int a      = 0;
+  int b      = 0;
+  int iShift = 13 - iB;
 
   if (iCountShift == 0)
   {
-    a = 0;
-    b = 1 << (uiInternalBitDepth - 1);
-    iShift = 0;
+    cclmModel.setFirstModel( 0, 1 << (uiInternalBitDepth - 1), 0 );
   }
   else
   {
@@ -5879,8 +5871,9 @@ int &a, int &b, int &iShift)
 
     iShift = (iShift + iB) - n;
     a = a >> n;
-
     b = avgY - ((a * avgX) >> iShift);
+
+    cclmModel.setFirstModel( a, b, iShift );
   }
 }
 #endif
