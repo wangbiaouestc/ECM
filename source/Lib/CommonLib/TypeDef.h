@@ -147,6 +147,9 @@
 #define INTER_LIC                                         1 // Add LIC to non-subblock inter
 #define NON_ADJACENT_MRG_CAND                             1 // Add non-adjacent merge candidates
 #define MULTI_HYP_PRED                                    1 // Multiple hypothesis prediction
+#if MULTI_HYP_PRED
+#define JVET_Z0127_SPS_MHP_MAX_MRG_CAND                   1
+#endif
 #define IF_12TAP                                          1 // 12-tap IF
 #define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
 

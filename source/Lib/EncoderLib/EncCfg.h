@@ -757,6 +757,9 @@ protected:
 #endif
   uint32_t      m_maxNumAffineMergeCand;              ///< Maximum number of affine merge candidates
   uint32_t      m_maxNumGeoCand;
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  uint32_t      m_maxNumMHPCand;
+#endif
   uint32_t      m_maxNumIBCMergeCand;                 ///< Max number of IBC merge candidates
   ScalingListMode m_useScalingListId;             ///< Using quantization matrix i.e. 0=off, 1=default, 2=file.
   std::string m_scalingListFileName;              ///< quantization matrix file name
@@ -2055,6 +2058,10 @@ public:
   uint32_t     getMaxNumAffineMergeCand          ()                  { return m_maxNumAffineMergeCand; }
   void         setMaxNumGeoCand                  ( uint32_t u )      { m_maxNumGeoCand = u;    }
   uint32_t     getMaxNumGeoCand                  ()                  { return m_maxNumGeoCand; }
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  void         setMaxNumMHPCand                  ( uint32_t u )      { m_maxNumMHPCand = u;    }
+  uint32_t     getMaxNumMHPCand                  ()                  { return m_maxNumMHPCand; }
+#endif
   void         setMaxNumIBCMergeCand             ( uint32_t u )      { m_maxNumIBCMergeCand = u; }
   uint32_t     getMaxNumIBCMergeCand             ()                  { return m_maxNumIBCMergeCand; }
   void         setUseScalingListId    ( ScalingListMode u )          { m_useScalingListId       = u;   }

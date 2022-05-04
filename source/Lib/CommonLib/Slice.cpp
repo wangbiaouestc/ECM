@@ -3462,6 +3462,9 @@ SPS::SPS()
 , m_maxNumAffineMergeCand(AFFINE_MRG_MAX_NUM_CANDS)
 , m_maxNumIBCMergeCand(IBC_MRG_MAX_NUM_CANDS)
 , m_maxNumGeoCand(0)
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+, m_maxNumMHPCand(0)
+#endif
 , m_scalingMatrixAlternativeColourSpaceDisabledFlag( false )
 , m_scalingMatrixDesignatedColourSpaceFlag( true )
 , m_disableScalingMatrixForLfnstBlks( true)

@@ -746,6 +746,9 @@ protected:
   uint32_t      m_maxNumAffineMergeCand;                          ///< Max number of affine merge candidates
   uint32_t      m_maxNumGeoCand;
   uint32_t      m_maxNumIBCMergeCand;                             ///< Max number of IBC merge candidates
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  uint32_t      m_maxNumMHPCand;
+#endif
 
   bool      m_sliceLevelRpl;                                      ///< code reference picture lists in slice headers rather than picture header
   bool      m_sliceLevelDblk;                                     ///< code deblocking filter parameters in slice headers rather than picture header

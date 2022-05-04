@@ -4359,12 +4359,20 @@ void CABACReader::mh_pred_data(PredictionUnit& pu)
     }
     MultiHypPredictionData mhData;
     RExt__DECODER_DEBUG_BIT_STATISTICS_SET(ctype_mh);
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+    const int maxNumMHPCand = pu.cs->sps->getMaxNumMHPCand();
+    if (maxNumMHPCand > 0 && m_BinDecoder.decodeBin(Ctx::MultiHypothesisFlag(2)))
+    {
+      mhData.isMrg = true;
+      int numCandminus2 = maxNumMHPCand - 2;
+#else
     if (m_BinDecoder.decodeBin(Ctx::MultiHypothesisFlag(2)))
     {
       mhData.isMrg = true;
       const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
       CHECK(maxNumGeoCand < 2, "Incorrect max number of geo candidates");
       int numCandminus2 = maxNumGeoCand - 2;
+#endif
       int mergeCand0 = 0;
       RExt__DECODER_DEBUG_BIT_STATISTICS_SET(ctype_mergeIdx);
       if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
