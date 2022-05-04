@@ -901,6 +901,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setUseBLambdaForNonKeyLowDelayPictures               ( m_bUseBLambdaForNonKeyLowDelayPictures );
   m_cEncLib.setUseISP                                            ( m_ISP );
   m_cEncLib.setUseFastISP                                        ( m_useFastISP );
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  m_cEncLib.setTempCabacInitMode                                 ( m_tempCabacInitMode );
+#endif
 
   // set internal bit-depth and constants
   for (uint32_t channelType = 0; channelType < MAX_NUM_CHANNEL_TYPE; channelType++)

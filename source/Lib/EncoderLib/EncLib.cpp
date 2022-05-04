@@ -1591,6 +1591,10 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setFieldSeqFlag(false);
   sps.setVuiParametersPresentFlag(getVuiParametersPresentFlag());
 
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  sps.setTempCabacInitMode( m_tempCabacInitMode );
+#endif
+
   if (sps.getVuiParametersPresentFlag())
   {
     VUI* pcVUI = sps.getVuiParameters();

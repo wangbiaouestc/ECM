@@ -54,6 +54,10 @@ static constexpr int     PROB_BITS_1 = 14;   // Number of bits to represent 2nd 
 static constexpr int     MASK_0      = ~(~0u << PROB_BITS_0) << (PROB_BITS - PROB_BITS_0);
 static constexpr int     MASK_1      = ~(~0u << PROB_BITS_1) << (PROB_BITS - PROB_BITS_1);
 static constexpr uint8_t DWS         = 8;   // 0x47 Default window sizes
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+static constexpr uint8_t DWE         = 18;  // default weights
+static constexpr uint8_t DWO         = 119; // default window offsets
+#endif
 
 struct BinFracBits
 {
@@ -88,6 +92,10 @@ public:
   static uint32_t estFracBitsEP ( unsigned numBins )  { return  ( numBins << SCALE_BITS ); }
 };
 
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+const uint8_t weightedAdaptRate[5] = { 10, 12, 16, 20, 22 };
+#endif
+
 class BinProbModel_Std : public BinProbModelBase
 {
 public:
@@ -97,10 +105,44 @@ public:
     m_state[0]    = half;
     m_state[1]    = half;
     m_rate        = DWS;
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+    m_weight        = DWE;
+    m_stateUsed[0]  = half;
+    m_stateUsed[1]  = half;
+    m_rateOffset[0] = DWO;
+    m_rateOffset[1] = DWO;
+#endif
+
   }
   ~BinProbModel_Std ()                {}
 public:
   void            init              ( int qp, int initId );
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  void update(unsigned bin)
+  {
+    int rate0 = m_rate >> 4;
+    int rate1 = m_rate & 15;
+
+    auto ws = m_rateOffset[bin];
+    int rateUsed0 = std::max( 2, rate0 + (ws >> 4) - ADJUSTMENT_RANGE );
+    int rateUsed1 = std::max( 2, rate1 + (ws & 15) - ADJUSTMENT_RANGE );
+
+    m_stateUsed[0] = m_state[0] - ((m_state[0] >> rateUsed0) & MASK_0);
+    m_stateUsed[1] = m_state[1] - ((m_state[1] >> rateUsed1) & MASK_1);
+
+    m_state[0] -= (m_state[0] >> rate0) & MASK_0;
+    m_state[1] -= (m_state[1] >> rate1) & MASK_1;
+
+    if (bin)
+    {
+      m_stateUsed[0] += (0x7FFFU >> rateUsed0) & MASK_0;
+      m_stateUsed[1] += (0x7FFFU >> rateUsed1) & MASK_1;
+
+      m_state[0] += (0x7fffu >> rate0) & MASK_0;
+      m_state[1] += (0x7fffu >> rate1) & MASK_1;
+    }
+  }
+#else
   void update(unsigned bin)
   {
     int rate0 = m_rate >> 4;
@@ -114,6 +156,7 @@ public:
       m_state[1] += (0x7fffu >> rate1) & MASK_1;
     }
   }
+#endif
   void setLog2WindowSize(uint8_t log2WindowSize)
   {
     int rate0 = 2 + ((log2WindowSize >> 2) & 3);
@@ -121,6 +164,12 @@ public:
     m_rate    = 16 * rate0 + rate1;
     CHECK(rate1 > 9, "Second window size is too large!");
   }
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  void     setAdaptRateWeight( uint8_t weight ) { m_weight = weight; }
+  uint8_t  getAdaptRateWeight() const           { return m_weight; }
+  void     setAdaptRateOffset(uint8_t rateOffset, bool bin ) { m_rateOffset[bin] = rateOffset;}
+#endif
+
   void estFracBitsUpdate(unsigned bin, uint64_t &b)
   {
     b += estFracBits(bin);
@@ -135,8 +184,46 @@ public:
 #endif
 public:
 #if EC_HIGH_PRECISION
-	uint16_t state_est() const { return (m_state[0] + m_state[1]) >> 7; }
-	uint16_t state() const { return (m_state[0] + m_state[1]) >> 1; }
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  uint16_t        state_est() const
+  {
+    uint8_t  wIdx0 = (m_weight >> 3);
+    uint8_t  wIdx1 = (m_weight & 0x07);
+    uint32_t w0 = weightedAdaptRate[wIdx0];
+    uint32_t w1 = weightedAdaptRate[wIdx1];
+    uint32_t pd;
+    if( (w0 + w1) <= 32 )
+    {
+      pd = (uint32_t( m_stateUsed[0] ) * w0 + uint32_t( m_stateUsed[1] ) * w1) >> 11;
+    }
+    else
+    {
+      pd = (uint32_t( m_stateUsed[0] ) * w0 + uint32_t( m_stateUsed[1] ) * w1) >> 12;
+    }
+    return uint16_t( pd );
+  }
+  uint16_t       state() const
+  {
+    uint8_t  wIdx0 = (m_weight >> 3);
+    uint8_t  wIdx1 = (m_weight & 0x07);
+    uint32_t w0 = weightedAdaptRate[wIdx0];
+    uint32_t w1 = weightedAdaptRate[wIdx1];
+    uint32_t pd;
+    if( (w0 + w1) <= 32 )
+    {
+      pd = (uint32_t( m_stateUsed[0] ) * w0 + uint32_t( m_stateUsed[1] ) * w1) >> 5;
+    }
+    else
+    {
+      pd = (uint32_t( m_stateUsed[0] ) * w0 + uint32_t( m_stateUsed[1] ) * w1) >> 6;
+    }
+    return uint16_t( pd );
+  }
+#else
+  uint16_t state_est() const { return (m_state[0] + m_state[1]) >> 7; }
+  uint16_t state() const { return (m_state[0] + m_state[1]) >> 1; }
+#endif
+
 	uint8_t mps() const { return state() >> 14; }
 	uint8_t getLPS(unsigned range) const
 	{
@@ -160,12 +247,24 @@ public:
 #endif
   static uint8_t  getRenormBitsLPS  ( unsigned LPS )                    { return    m_RenormTable_32  [LPS>>3]; }
   static uint8_t  getRenormBitsRange( unsigned range )                  { return    1; }
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  std::pair<uint16_t, uint16_t> getState() const { return std::pair<uint16_t, uint16_t>(m_state[0], m_state[1]); }
+
+  void setState( std::pair<uint16_t, uint16_t> pState )
+  {
+    m_state[0] = pState.first;
+    m_state[1] = pState.second;
+    m_stateUsed[0] = m_state[0];
+    m_stateUsed[1] = m_state[1];
+  }
+#else
   uint16_t getState() const { return m_state[0] + m_state[1]; }
   void     setState(uint16_t pState)
   {
     m_state[0] = (pState >> 1) & MASK_0;
     m_state[1] = (pState >> 1) & MASK_1;
   }
+#endif
 public:
   uint64_t estFracExcessBits(const BinProbModel_Std &r) const
   {
@@ -180,6 +279,11 @@ public:
 private:
   uint16_t m_state[2];
   uint8_t  m_rate;
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT 
+  uint16_t m_stateUsed[2];
+  uint8_t  m_rateOffset[2];
+  uint8_t  m_weight;
+#endif
 };
 
 
@@ -406,8 +510,15 @@ public:
   void copyFrom   ( const CtxStore<BinProbModel>& src, const CtxSet& ctxSet )  { checkInit(); ::memcpy( m_Ctx+ctxSet.Offset, src.m_Ctx+ctxSet.Offset, sizeof( BinProbModel ) * ctxSet.Size ); }
   void init       ( int qp, int initId );
   void setWinSizes( const std::vector<uint8_t>&   log2WindowSizes );
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  void loadWeights( const std::vector <uint8_t>&  weights );
+  void saveWeights( std::vector<uint8_t>&         weights )  const;
+  void loadPStates( const std::vector<std::pair<uint16_t, uint16_t>>&  probStates );
+  void savePStates( std::vector<std::pair<uint16_t, uint16_t>>&        probStates )  const;
+#else
   void loadPStates( const std::vector<uint16_t>&  probStates );
   void savePStates( std::vector<uint16_t>&        probStates )  const;
+#endif
 
   const BinProbModel& operator[]      ( unsigned  ctxId  )  const { return m_Ctx[ctxId]; }
   BinProbModel&       operator[]      ( unsigned  ctxId  )        { return m_Ctx[ctxId]; }
@@ -484,6 +595,43 @@ public:
     }
   }
 
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  void  loadWeights( const std::vector< uint8_t>& weights )
+  {
+    switch( m_BPMType )
+    {
+    case BPM_Std:   m_CtxStore_Std.loadWeights( weights );  break;
+    default:        break;
+    }
+  }
+
+  void  saveWeights( std::vector<uint8_t>& weights ) const
+  {
+    switch( m_BPMType )
+    {
+    case BPM_Std:   m_CtxStore_Std.saveWeights( weights );  break;
+    default:        break;
+    }
+  }
+
+  void  loadPStates( const std::vector<std::pair<uint16_t, uint16_t>>& probStates )
+  {
+    switch( m_BPMType )
+    {
+    case BPM_Std:   m_CtxStore_Std.loadPStates( probStates );  break;
+    default:        break;
+    }
+  }
+
+  void  savePStates( std::vector<std::pair<uint16_t, uint16_t>>& probStates ) const
+  {
+    switch( m_BPMType )
+    {
+    case BPM_Std:   m_CtxStore_Std.savePStates( probStates );  break;
+    default:        break;
+    }
+  }
+#else
   void  loadPStates( const std::vector<uint16_t>& probStates )
   {
     switch( m_BPMType )
@@ -501,6 +649,7 @@ public:
     default:        break;
     }
   }
+#endif
 
   void  initCtxAndWinSize( unsigned ctxId, const Ctx& ctx, const uint8_t winSize )
   {
@@ -570,6 +719,163 @@ private:
   CtxCache* m_cache;
 };
 
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+class CtxStateBuf
+{
+public:
+  CtxStateBuf() : m_valid( false ) {}
+  ~CtxStateBuf() {}
+  inline void reset() { m_valid = false; }
+  inline bool getIfValid( Ctx &ctx ) const
+  {
+    if( m_valid )
+    {
+      ctx.loadPStates( m_states );
+      ctx.loadWeights( m_weights );
+      return true;
+    }
+    return false;
+  }
+  inline void store( const Ctx &ctx )
+  {
+    ctx.savePStates( m_states );
+    ctx.saveWeights( m_weights );
+    m_valid = true;
+  }
 
+private:
+  std::vector<std::pair<uint16_t, uint16_t>> m_states;
+  bool                 m_valid;
+  std::vector<uint8_t> m_weights;
+};
+
+class CtxStateArray
+{
+public:
+  CtxStateArray() {}
+  ~CtxStateArray() {}
+
+  inline void resetAll()
+  {
+    for( std::size_t k = 0; k < m_data.size(); k++ )
+    {
+      m_data[k].reset();
+    }
+  }
+
+  inline void resize( std::size_t reqSize )
+  {
+    if( m_data.size() < reqSize )
+    {
+      m_data.resize( reqSize );
+    }
+  }
+
+  inline bool getIfValid( Ctx &ctx ) const
+  {
+    if( m_data.size() )
+    {
+      return m_data[0].getIfValid( ctx );
+    }
+    return false;
+  }
+
+  inline void store( const Ctx &ctx )
+  {
+    if( !m_data.size() )
+    {
+      resize( 1 );
+    }
+    m_data[0].store( ctx );
+  }
+
+  inline size_t size() const
+  {    
+    return  m_data.size();
+  }
+
+private:
+  std::vector<CtxStateBuf> m_data;
+};
+
+class CtxStateStore
+{
+public:
+  CtxStateStore() { static_assert((B_SLICE < NUMBER_OF_SLICE_TYPES - 1) && (P_SLICE < NUMBER_OF_SLICE_TYPES - 1), "index out of bound"); }
+  ~CtxStateStore() {}
+
+  void storeCtx( const Slice* slice, const Ctx& ctx )
+  {
+    SliceType t = slice->getSliceType();
+
+    if( t != I_SLICE )
+    {
+      CtxStateArray* ctxStateArray = nullptr;
+      std::pair<int, int> entry( slice->getTLayer(), slice->getSliceQp() );
+
+      if( m_stateBuf[t].find( entry ) != m_stateBuf[t].end() || m_stateBuf[t].size() < TEMP_CABAC_BUFFER_SIZE )
+      {
+        ctxStateArray = &m_stateBuf[t][entry];
+      }
+      else
+      {
+        if( m_stateBuf[t].size() == TEMP_CABAC_BUFFER_SIZE )
+        {         
+          m_stateBuf[t].erase( m_stateBuf[t].begin() );
+        }
+
+        ctxStateArray = &m_stateBuf[t][entry];
+
+        CHECK( m_stateBuf[t].size() > TEMP_CABAC_BUFFER_SIZE, "Wrong buffer size" );
+      }
+
+      ctxStateArray->store( ctx );
+    }
+  }
+
+  bool loadCtx( const Slice* slice, Ctx& ctx )
+  {
+    SliceType t = slice->getSliceType();
+
+    if( t != I_SLICE )
+    {
+      std::pair<int, int> entry( slice->getTLayer(), slice->getSliceQp() );
+
+      if( m_stateBuf[t].find( entry ) != m_stateBuf[t].end() )
+      {
+        const CtxStateArray& ctxStateArray = m_stateBuf[t][entry];
+        return ctxStateArray.getIfValid( ctx );
+      }      
+    }
+    return false;
+  }
+
+  void clearValid()
+  {
+    m_stateBuf[0].clear();
+    m_stateBuf[1].clear();
+  }
+
+private:
+  std::map<std::pair<int, int>, CtxStateArray> m_stateBuf[2];
+};
+
+class CABACDataStore
+{
+public:
+  bool loadCtxStates( const Slice* slice, Ctx& ctx ) { return m_ctxStateStore.loadCtx( slice, ctx ); }
+  void storeCtxStates( const Slice* slice, const Ctx& ctx ) { m_ctxStateStore.storeCtx( slice, ctx ); }
+
+  void updateBufferState( const Slice* slice )
+  {
+    if( slice->getPendingRasInit() )
+    {
+      m_ctxStateStore.clearValid();
+    }
+  }
+private:
+  CtxStateStore       m_ctxStateStore;
+};
+#endif
 
 #endif

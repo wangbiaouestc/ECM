@@ -142,6 +142,10 @@ public:
 
   SliceType getEncCABACTableIdx() const             { return m_encCABACTableIdx;        }
   void    setEncCABACTableIdx (SliceType b)         { m_encCABACTableIdx = b; }
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACDataStore* getCABACDataStore()                  { return m_CABACWriter->m_CABACDataStore; }
+#endif
 private:
   double  xGetQPValueAccordingToLambda ( double lambda );
 };

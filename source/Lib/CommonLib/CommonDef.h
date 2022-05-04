@@ -933,10 +933,10 @@ static const int SIGN_PRED_SHIFT        = 8; ///< not configurable
 static const int SIGN_PRED_OFFSET       = 1 << ( SIGN_PRED_SHIFT - 1 ); ///< not configurable
 #endif
 #if MULTI_HYP_PRED
-static const auto MULTI_HYP_PRED_MAX_CANDS = 4;
-static const auto MULTI_HYP_PRED_NUM_WEIGHTS = 2;
-static const auto MULTI_HYP_PRED_WEIGHT_BITS = 3;
-static const auto MULTI_HYP_PRED_SEARCH_RANGE = 16;
+static const auto MULTI_HYP_PRED_MAX_CANDS =                     4;
+static const auto MULTI_HYP_PRED_NUM_WEIGHTS =                   2;
+static const auto MULTI_HYP_PRED_WEIGHT_BITS =                   3;
+static const auto MULTI_HYP_PRED_SEARCH_RANGE =                 16;
 #endif
 #if NON_ADJACENT_MRG_CAND || TM_AMVP
 static const auto NADISTANCE_LEVEL =                             4;
@@ -950,8 +950,13 @@ static const auto MULTI_HYP_PRED_RESTRICT_MIN_WH =               8;
 #endif
 
 #if JVET_Z0139_HIST_AFF
-static const auto AFF_PARA_STORE_BITS          =                  16;
-static const auto AFF_PARA_SHIFT               =                   0;
+static const auto AFF_PARA_STORE_BITS =                         16;
+static const auto AFF_PARA_SHIFT =                               0;
+#endif
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+static const int TEMP_CABAC_BUFFER_SIZE =                        5;
+static const int ADJUSTMENT_RANGE =                              7;
 #endif
 
 // ====================================================================================================================

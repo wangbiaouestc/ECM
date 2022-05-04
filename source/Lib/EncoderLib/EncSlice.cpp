@@ -1356,6 +1356,9 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
   m_uiPicDist       = 0;
 
   pcSlice->setSliceQpBase( pcSlice->getSliceQp() );
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT 
+  m_CABACEstimator->m_CABACDataStore->updateBufferState( pcSlice );
+#endif
 
   m_CABACEstimator->initCtxModels( *pcSlice );
 
@@ -1415,6 +1418,9 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
     if (applyQPAdaptation (pcPic, pcSlice, *cs.pcv, m_pcCfg->getLumaLevelToDeltaQPMapping().mode == LUMALVL_TO_DQP_NUM_MODES,
                            (m_pcCfg->getBaseQP() >= 38) || (m_pcCfg->getSourceWidth() <= 512 && m_pcCfg->getSourceHeight() <= 320), m_adaptedLumaQP))
     {
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT 
+      m_CABACEstimator->m_CABACDataStore->updateBufferState( pcSlice );
+#endif
       m_CABACEstimator->initCtxModels (*pcSlice);
 #if ENABLE_SPLIT_PARALLELISM
       for (int jId = 1; jId < m_pcLib->getNumCuEncStacks(); jId++)
@@ -1894,6 +1900,10 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
   const uint32_t widthInCtus   = pcv.widthInCtus;
   uint32_t uiSubStrm = 0;
 
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  static Ctx storedCtx;
+#endif
+
   // for every CTU in the slice...
   for( uint32_t ctuIdx = 0; ctuIdx < pcSlice->getNumCtuInSlice(); ctuIdx++ )
   {
@@ -1957,6 +1967,14 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
 #endif
     m_CABACWriter->coding_tree_unit( cs, ctuArea, pcPic->m_prevQP, ctuRsAddr );
 
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+    // store CABAC context to be used in next frames
+    if( storeContexts( pcSlice, ctuXPosInCtus, ctuYPosInCtus ) )
+    {
+      storedCtx = m_CABACWriter->getCtx();
+    }
+#endif
+
     // store probabilities of first CTU in line into buffer
     if( cs.pps->ctuIsTileColBd( ctuXPosInCtus ) && wavefrontsEnabled )
     {
@@ -2000,6 +2018,13 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
   }
   numBinsCoded += m_CABACWriter->getNumBins();
 
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  // store CABAC context to be used in next frames when the last CTU in a picture is processed
+  if( pcSlice->getPPS()->pcv->sizeInCtus - 1 == pcSlice->getCtuAddrInSlice( pcSlice->getNumCtuInSlice() - 1 ) )
+  {
+    m_CABACWriter->m_CABACDataStore->storeCtxStates( pcSlice, storedCtx );
+  }
+#endif
 }
 
 

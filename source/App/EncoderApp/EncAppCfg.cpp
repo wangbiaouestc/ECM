@@ -1617,6 +1617,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
   ( "MaxNumTUs",                                      m_maxNumTUs,                                  1, "Maximum number of TUs within one CU. When max TB size is 32x32, up to 16 TUs within one CU (128x128) is supported" )
 #endif
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  ("TempCabacInit",                                   m_tempCabacInitMode,                          1u, "CABAC context initialization from previous picture (0:off, 1:on)")
+#endif
     ;
 
   opts.addOptions()
@@ -4358,16 +4361,6 @@ void EncAppCfg::xPrintParameter()
   msg( DETAILS, "\n");
 
   msg( VERBOSE, "TOOL CFG: ");
-#if CTU_256
-  msg( VERBOSE, "CTU:%d ", m_uiCTUSize );
-  msg( VERBOSE, "MaxTU:%d ", 1 << m_log2MaxTbSize );
-#endif
-#if SIGN_PREDICTION
-  msg( VERBOSE, "SignPred:%d ", m_numPredSign                   );
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-  msg(VERBOSE, "Log2SignPredArea:%d ", m_log2SignPredArea);
-#endif
-#endif
   msg( VERBOSE, "IBD:%d ", ((m_internalBitDepth[CHANNEL_TYPE_LUMA] > m_MSBExtendedBitDepth[CHANNEL_TYPE_LUMA]) || (m_internalBitDepth[CHANNEL_TYPE_CHROMA] > m_MSBExtendedBitDepth[CHANNEL_TYPE_CHROMA])));
   msg( VERBOSE, "HAD:%d ", m_bUseHADME                          );
   msg( VERBOSE, "RDQ:%d ", m_useRDOQ                            );
@@ -4394,9 +4387,6 @@ void EncAppCfg::xPrintParameter()
   msg( VERBOSE, "Slices: %d ", m_numSlicesInPic);
   msg( VERBOSE, "MCTS:%d ", m_MCTSEncConstraint );
   msg( VERBOSE, "SAO:%d ", (m_bUseSAO)?(1):(0));
-#if JVET_W0066_CCSAO
-  msg( VERBOSE, "CCSAO:%d ", m_CCSAO ? 1 : 0 );
-#endif
   msg( VERBOSE, "ALF:%d ", m_alf ? 1 : 0 );
   msg( VERBOSE, "CCALF:%d ", m_ccalf ? 1 : 0 );
 
@@ -4407,9 +4397,7 @@ void EncAppCfg::xPrintParameter()
   msg( VERBOSE, " WaveFrontSynchro:%d WaveFrontSubstreams:%d", m_entropyCodingSyncEnabledFlag?1:0, iWaveFrontSubstreams);
   msg( VERBOSE, " ScalingList:%d ", m_useScalingListId );
   msg( VERBOSE, "TMVPMode:%d ", m_TMVPModeId );
-#if TCQ_8STATES
-  msg( VERBOSE, " DQ:%d ", m_depQuantEnabledIdc);
-#else
+#if !TCQ_8STATES
 	msg( VERBOSE, " DQ:%d ", m_depQuantEnabledFlag);
 #endif
   msg( VERBOSE, " SignBitHidingFlag:%d ", m_signDataHidingEnabledFlag);
@@ -4424,18 +4412,12 @@ void EncAppCfg::xPrintParameter()
     if ( m_Affine )
     {
       msg( VERBOSE, "AffineType:%d ", m_AffineType );
-#if AFFINE_MMVD
-      msg( VERBOSE, "AffineMMVD:%d ", m_AffineMmvdMode );
-#endif
     }
     msg(VERBOSE, "PROF:%d ", m_PROF);
     msg(VERBOSE, "SbTMVP:%d ", m_sbTmvpEnableFlag);
     msg( VERBOSE, "DualITree:%d ", m_dualTree );
     msg( VERBOSE, "IMV:%d ", m_ImvMode );
     msg( VERBOSE, "BIO:%d ", m_BIO );
-#if JVET_W0090_ARMC_TM
-    msg( VERBOSE, "AML:%d ", m_AML );
-#endif
     msg( VERBOSE, "LMChroma:%d ", m_LMChroma );
     msg( VERBOSE, "HorCollocatedChroma:%d ", m_horCollocatedChromaFlag );
     msg( VERBOSE, "VerCollocatedChroma:%d ", m_verCollocatedChromaFlag );
@@ -4449,26 +4431,8 @@ void EncAppCfg::xPrintParameter()
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
     msg( VERBOSE, "LADF:%d ", m_LadfEnabed );
 #endif
-#if ENABLE_DIMD
-    msg(VERBOSE, "DIMD:%d ", m_dimd);
-#endif
-#if JVET_W0123_TIMD_FUSION
-    msg(VERBOSE, "TIMD:%d ", m_timd);
-#endif
-#if ENABLE_OBMC
-    msg(VERBOSE, "OBMC:%d ", m_OBMC);
-#endif
     msg(VERBOSE, "CIIP:%d ", m_ciip);
     msg( VERBOSE, "Geo:%d ", m_Geo );
-#if MULTI_HYP_PRED
-    msg(VERBOSE, "AdditionalInterHyps:%d ", m_maxNumAddHyps);
-    if (m_maxNumAddHyps)
-    {
-      msg(VERBOSE, "(%d weight%s,", m_numAddHypWeights, m_numAddHypWeights > 1 ? "s" : "");
-      msg(VERBOSE, "%d ref frame%s,", m_maxNumAddHypRefFrames, m_maxNumAddHypRefFrames > 1 ? "s" : "");
-      msg(VERBOSE, "%d %s) ", m_addHypTries, m_addHypTries == 1 ? "try" : "tries");
-    }
-#endif
     m_allowDisFracMMVD = m_MMVD ? m_allowDisFracMMVD : false;
     if ( m_MMVD )
       msg(VERBOSE, "AllowDisFracMMVD:%d ", m_allowDisFracMMVD);
@@ -4477,20 +4441,8 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "AffineAmvrEncOpt:%d ", m_AffineAmvrEncOpt );
     msg(VERBOSE, "AffineAmvp:%d ", m_AffineAmvp);
     msg(VERBOSE, "DMVR:%d ", m_DMVR);
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
-    msg(VERBOSE, "DMVD:%d ", m_DMVDMode);
-#endif
-#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
-    msg(VERBOSE, "AltGPMSplitModeCode:%d ", m_altGPMSplitModeCode);
-#endif
     msg(VERBOSE, "MmvdDisNum:%d ", m_MmvdDisNum);
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-    msg(VERBOSE, "MVSD:%d ", m_MVSD);
-#endif
     msg(VERBOSE, "JointCbCr:%d ", m_JointCbCrMode);
-#if ENABLE_OBMC
-    msg(VERBOSE, "OBMC:%d ", m_OBMC);
-#endif
   }
   m_useColorTrans = (m_chromaFormatIDC == CHROMA_444) ? m_useColorTrans : 0u;
   msg(VERBOSE, "ACT:%d ", m_useColorTrans);
@@ -4502,20 +4454,6 @@ void EncAppCfg::xPrintParameter()
   {
     msg( VERBOSE, "WrapAroundOffset:%d ", m_wrapAroundOffset );
   }
-#if JVET_V0130_INTRA_TMP
-  msg( VERBOSE, "IntraTMP:%d ", m_intraTMP);
-  msg( VERBOSE, "IntraTmpMaxSize:%d ", m_intraTmpMaxSize);
-#endif
-#if JVET_V0094_BILATERAL_FILTER
-  msg( VERBOSE, "BIF:%d ", m_BIF);
-  msg( VERBOSE, "BIFStrength:%d ", m_BIFStrength);
-  msg( VERBOSE, "BIFQPOffset:%d ", m_BIFQPOffset);
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-  msg( VERBOSE, "ChromaBIF:%d ", m_chromaBIF);
-  msg( VERBOSE, "ChromaBIFStrength:%d ", m_chromaBIFStrength);
-  msg( VERBOSE, "ChromaBIFQPOffset:%d ", m_chromaBIFQPOffset);
-#endif
   // ADD_NEW_TOOL (add some output indicating the usage of tools)
   msg( VERBOSE, "VirtualBoundariesEnabledFlag:%d ", m_virtualBoundariesEnabledFlag );
   msg( VERBOSE, "VirtualBoundariesPresentInSPSFlag:%d ", m_virtualBoundariesPresentFlag );
@@ -4544,23 +4482,10 @@ void EncAppCfg::xPrintParameter()
     }
     msg(VERBOSE, "MRL:%d ", m_MRL);
     msg(VERBOSE, "MIP:%d ", m_MIP);
-#if INTER_LIC
-    msg(VERBOSE, "LIC:%d ", m_lic);
-    if (m_lic)
-    {
-      msg(VERBOSE, "FastPicLevelLIC:%d ", m_fastPicLevelLIC);
-    }
-#endif
     msg(VERBOSE, "EncDbOpt:%d ", m_encDbOpt);
   msg( VERBOSE, "\nFAST TOOL CFG: " );
-#if CONVERT_NUM_TU_SPLITS_TO_CFG
-  msg( VERBOSE, "MaxNumTUs:%d ", m_maxNumTUs );
-#endif
   msg( VERBOSE, "LCTUFast:%d ", m_useFastLCTU );
   msg( VERBOSE, "FastMrg:%d ", m_useFastMrg );
-#if MERGE_ENC_OPT
-  msg(VERBOSE, "NumFullRDMrg:%d ", m_numFullRDMrg);
-#endif
   msg( VERBOSE, "PBIntraFast:%d ", m_usePbIntraFast );
   if( m_ImvMode ) msg( VERBOSE, "IMV4PelFast:%d ", m_Imv4PelFast );
   if( m_MTS ) msg( VERBOSE, "MTSMaxCand: %1d(intra) %1d(inter) ", m_MTSIntraMaxCand, m_MTSInterMaxCand );
@@ -4583,10 +4508,6 @@ void EncAppCfg::xPrintParameter()
   }
   msg( VERBOSE, "NumWppThreads:%d+%d ", m_numWppThreads, m_numWppExtraLines );
   msg( VERBOSE, "EnsureWppBitEqual:%d ", m_ensureWppBitEqual );
-#if JVET_Y0152_TT_ENC_SPEEDUP
-  msg( VERBOSE, "TTFastSkip:%d ", m_ttFastSkip);
-  msg( VERBOSE, "TTFastSkipThr:%.3f ", m_ttFastSkipThr);
-#endif
 
   if (m_resChangeInClvsEnabled)
   {
@@ -4597,9 +4518,112 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "RPR:%d ", 0 );
   }
   msg( VERBOSE, "TemporalFilter:%d/%d ", m_gopBasedTemporalFilterPastRefs, m_gopBasedTemporalFilterFutureRefs );
+
+  // ECM tools
+  msg( VERBOSE, "\nECM TOOL CFG: " );
+
+  //intra
+#if ENABLE_DIMD
+  msg( VERBOSE, "DIMD:%d ", m_dimd );
+#endif
+#if JVET_W0123_TIMD_FUSION
+  msg( VERBOSE, "TIMD:%d ", m_timd );
+#endif
+#if JVET_V0130_INTRA_TMP
+  msg( VERBOSE, "IntraTMP:%d ", m_intraTMP );
+  msg( VERBOSE, "IntraTmpMaxSize:%d ", m_intraTmpMaxSize );
+#endif
+
+  //inter
+#if AFFINE_MMVD
+  if( m_Affine )
+  {
+    msg( VERBOSE, "AffineMMVD:%d ", m_AffineMmvdMode );
+  }
+#endif
+#if ENABLE_OBMC
+  msg( VERBOSE, "OBMC:%d ", m_OBMC );
+#endif
+#if MULTI_HYP_PRED
+  msg( VERBOSE, "AdditionalInterHyps:%d ", m_maxNumAddHyps );
+  if( m_maxNumAddHyps )
+  {
+    msg( VERBOSE, "(%d weight%s,", m_numAddHypWeights, m_numAddHypWeights > 1 ? "s" : "" );
+    msg( VERBOSE, "%d ref frame%s,", m_maxNumAddHypRefFrames, m_maxNumAddHypRefFrames > 1 ? "s" : "" );
+    msg( VERBOSE, "%d %s) ", m_addHypTries, m_addHypTries == 1 ? "try" : "tries" );
+  }
+#endif
+#if INTER_LIC
+  msg( VERBOSE, "LIC:%d ", m_lic );
+  if( m_lic )
+  {
+    msg( VERBOSE, "FastPicLevelLIC:%d ", m_fastPicLevelLIC );
+  }
+#endif
+#if JVET_W0090_ARMC_TM
+  msg( VERBOSE, "AML:%d ", m_AML );
+#endif
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+  msg( VERBOSE, "DMVD:%d ", m_DMVDMode );
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  msg( VERBOSE, "MVSD:%d ", m_MVSD );
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+    msg(VERBOSE, "AltGPMSplitModeCode:%d ", m_altGPMSplitModeCode);
+#endif
+
+  // transform and coefficient coding
+#if TCQ_8STATES
+  msg( VERBOSE, "DQ:%d ", m_depQuantEnabledIdc );
+#endif
+#if SIGN_PREDICTION
+  msg( VERBOSE, "SignPred:%d ", m_numPredSign );
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  msg( VERBOSE, "Log2SignPredArea:%d ", m_log2SignPredArea );
+#endif
+#endif
+
+  // in-loop filters
+#if JVET_W0066_CCSAO
+  msg( VERBOSE, "CCSAO:%d ", m_CCSAO ? 1 : 0 );
+#endif
+#if JVET_V0094_BILATERAL_FILTER
+  msg( VERBOSE, "BIF:%d ", m_BIF );
+  msg( VERBOSE, "BIFStrength:%d ", m_BIFStrength );
+  msg( VERBOSE, "BIFQPOffset:%d ", m_BIFQPOffset );
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  msg( VERBOSE, "ChromaBIF:%d ", m_chromaBIF );
+  msg( VERBOSE, "ChromaBIFStrength:%d ", m_chromaBIFStrength );
+  msg( VERBOSE, "ChromaBIFQPOffset:%d ", m_chromaBIFQPOffset );
+#endif
+
+  // entropy coding
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  msg( VERBOSE, "TempCABAC:%d ", m_tempCabacInitMode );
+#endif
+
+  // ECM encoder config
+  msg( VERBOSE, "\nECM ENC CFG: " );
+#if CTU_256
+  msg( VERBOSE, "CTU:%d ", m_uiCTUSize );
+  msg( VERBOSE, "MaxTU:%d ", 1 << m_log2MaxTbSize );
+#endif
+#if CONVERT_NUM_TU_SPLITS_TO_CFG
+  msg( VERBOSE, "MaxNumTUs:%d ", m_maxNumTUs );
+#endif
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  msg( VERBOSE, "TTFastSkip:%d ", m_ttFastSkip );
+  msg( VERBOSE, "TTFastSkipThr:%.3f ", m_ttFastSkipThr );
+#endif
+#if MERGE_ENC_OPT
+  msg( VERBOSE, "NumFullRDMrg:%d ", m_numFullRDMrg );
+#endif
 #if JVET_Y0240_BIM
   msg(VERBOSE, "BIM:%d ", m_bimEnabled);
 #endif
+
 #if EXTENSION_360_VIDEO
   m_ext360.outputConfigurationSummary();
 #endif

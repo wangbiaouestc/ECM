@@ -1746,6 +1746,9 @@ private:
   int               m_log2SignPredArea;
 #endif
 #endif
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  unsigned int      m_tempCabacInitMode;
+#endif
 
 public:
 
@@ -2213,6 +2216,11 @@ void                    setCCALFEnabledFlag( bool b )                           
   bool      getScalingMatrixForAlternativeColourSpaceDisabledFlag()           const { return m_scalingMatrixAlternativeColourSpaceDisabledFlag; }
   void      setScalingMatrixDesignatedColourSpaceFlag(bool b)                       { m_scalingMatrixDesignatedColourSpaceFlag = b; }
   bool      getScalingMatrixDesignatedColourSpaceFlag()                       const { return m_scalingMatrixDesignatedColourSpaceFlag; }
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  void         setTempCabacInitMode( unsigned n )                                { m_tempCabacInitMode = n; }
+  unsigned int getTempCabacInitMode()                                      const { return m_tempCabacInitMode; }
+#endif
 };
 
 

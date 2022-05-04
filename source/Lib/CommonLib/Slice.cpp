@@ -3358,6 +3358,9 @@ SPS::SPS()
 , m_scalingMatrixAlternativeColourSpaceDisabledFlag( false )
 , m_scalingMatrixDesignatedColourSpaceFlag( true )
 , m_disableScalingMatrixForLfnstBlks( true)
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+, m_tempCabacInitMode( 0 )
+#endif
 {
   for(int ch=0; ch<MAX_NUM_CHANNEL_TYPE; ch++)
   {
