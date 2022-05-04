@@ -688,6 +688,10 @@ void PredictionUnit::initData()
   ::memset(mvdL0SubPu, 0, sizeof(mvdL0SubPu));
 #endif
 
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  refIdxLC = -1;
+  refPairIdx = -1;
+#endif
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
   {
 #if JVET_X0083_BM_AMVP_MERGE_MODE
@@ -819,6 +823,10 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
       mvAffi[i][j] = predData.mvAffi[i][j];
     }
   }
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  refIdxLC = predData.refIdxLC;
+  refPairIdx = predData.refPairIdx;
+#endif
   ciipFlag = predData.ciipFlag;
 #if CIIP_PDPC
   ciipPDPC = predData.ciipPDPC;
@@ -924,6 +932,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
       mvAffi[i][j] = other.mvAffi[i][j];
     }
   }
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  refIdxLC = other.refIdxLC;
+  refPairIdx = other.refPairIdx;
+#endif
   ciipFlag = other.ciipFlag;
 #if CIIP_PDPC
   ciipPDPC = other.ciipPDPC;
@@ -1003,7 +1015,6 @@ CMotionBuf PredictionUnit::getMotionBuf() const
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 bool PredictionUnit::isMvsdApplicable() const
 {
-  
   if (!cs->sps->getUseMVSD())
   {
     return false;

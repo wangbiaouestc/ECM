@@ -659,6 +659,113 @@ void Slice::setList1IdxToList0Idx()
   }
 }
 
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+void Slice::generateCombinedList()
+{
+  m_refPicCombinedList.clear();
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  m_refPicCombinedListAmvpMerge.clear();
+#endif
+  for (int8_t iNumCount = 0; iNumCount < m_aiNumRefIdx[REF_PIC_LIST_0] + m_aiNumRefIdx[REF_PIC_LIST_1]; iNumCount++)
+  {
+    m_iRefIdxOfLC[REF_PIC_LIST_0][iNumCount] = -1;
+    m_iRefIdxOfLC[REF_PIC_LIST_1][iNumCount] = -1;
+  }
+
+  for (int8_t iNumRefIdx = 0; iNumRefIdx < std::max(m_aiNumRefIdx[REF_PIC_LIST_0], m_aiNumRefIdx[REF_PIC_LIST_1]); iNumRefIdx++)
+  {
+    if (iNumRefIdx < m_aiNumRefIdx[REF_PIC_LIST_0])
+    {
+      RefListAndRefIdx refListAndRefIdx;
+      refListAndRefIdx.refList = REF_PIC_LIST_0;
+      refListAndRefIdx.refIdx = iNumRefIdx;
+      m_iRefIdxOfLC[REF_PIC_LIST_0][iNumRefIdx] = (int8_t)m_refPicCombinedList.size();
+      m_refPicCombinedList.push_back(refListAndRefIdx);
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+      if (getAmvpMergeModeValidRefIdx(REF_PIC_LIST_0, iNumRefIdx))
+      {
+        m_iRefIdxOfLCAmvpMerge[REF_PIC_LIST_0][iNumRefIdx] = (int8_t)m_refPicCombinedListAmvpMerge.size();
+        m_refPicCombinedListAmvpMerge.push_back(refListAndRefIdx);
+      }
+#endif
+    }
+
+    if (iNumRefIdx < m_aiNumRefIdx[REF_PIC_LIST_1] && m_list1IdxToList0Idx[iNumRefIdx] < 0)
+    {
+      RefListAndRefIdx refListAndRefIdx;
+      refListAndRefIdx.refList = REF_PIC_LIST_1;
+      refListAndRefIdx.refIdx = iNumRefIdx;
+      m_iRefIdxOfLC[REF_PIC_LIST_1][iNumRefIdx] = (int8_t)m_refPicCombinedList.size();
+      m_refPicCombinedList.push_back(refListAndRefIdx);
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+      if (getAmvpMergeModeValidRefIdx(REF_PIC_LIST_1, iNumRefIdx))
+      {
+        m_iRefIdxOfLCAmvpMerge[REF_PIC_LIST_1][iNumRefIdx] = (int8_t)m_refPicCombinedListAmvpMerge.size();
+        m_refPicCombinedListAmvpMerge.push_back(refListAndRefIdx);
+      }
+#endif
+    }
+  }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  for (int8_t iNumRefIdx = 0; iNumRefIdx < m_aiNumRefIdx[REF_PIC_LIST_1]; iNumRefIdx++)
+  {
+    if (m_list1IdxToList0Idx[iNumRefIdx] >= 0)
+    {
+      if (getAmvpMergeModeValidRefIdx(REF_PIC_LIST_1, iNumRefIdx))
+      {
+        RefListAndRefIdx refListAndRefIdx;
+        refListAndRefIdx.refList = REF_PIC_LIST_1;
+        refListAndRefIdx.refIdx = iNumRefIdx;
+        m_iRefIdxOfLCAmvpMerge[REF_PIC_LIST_1][iNumRefIdx] = (int8_t)m_refPicCombinedListAmvpMerge.size();
+        m_refPicCombinedListAmvpMerge.push_back(refListAndRefIdx);
+      }
+    }
+  }
+#endif
+}
+
+void Slice::generateRefPicPairList()
+{
+  m_refPicPairList.clear();
+  for (int8_t refIdx0 = 0; refIdx0 < m_aiNumRefIdx[REF_PIC_LIST_0]; refIdx0++)
+  {
+    for (int8_t refIdx1 = 0; refIdx1 < m_aiNumRefIdx[REF_PIC_LIST_1]; refIdx1++)
+    {
+      bool duplicate = false;
+      for (std::vector<RefPicPair>::iterator it = m_refPicPairList.begin(); it != m_refPicPairList.end(); ++it)
+      {
+        if (getRefPOC(REF_PIC_LIST_1, it->refIdx[1]) == getRefPOC(REF_PIC_LIST_0, refIdx0)
+          && getRefPOC(REF_PIC_LIST_0, it->refIdx[0]) == getRefPOC(REF_PIC_LIST_1, refIdx1))
+        {
+          duplicate = true;
+          break;
+        }
+      }
+      if (!getCheckLDC() && duplicate)
+      {
+        continue;
+      }
+      RefPicPair refPicPair;
+      refPicPair.refIdx[0] = refIdx0;
+      refPicPair.refIdx[1] = refIdx1;
+      m_refPicPairList.push_back(refPicPair);
+    }
+  }
+  for (int8_t i = 0; i < MAX_NUM_REF; i++)
+  {
+    for (int8_t j = 0; j < MAX_NUM_REF; j++)
+    {
+      m_iRefPicPairIdx[i][j] = -1;
+    }
+  }
+  
+  for (int8_t i = 0; i < (int8_t)m_refPicPairList.size(); i++)
+  {
+    m_iRefPicPairIdx[m_refPicPairList[i].refIdx[0]][m_refPicPairList[i].refIdx[1]] = i;
+  }
+}
+#endif
+
 void Slice::constructRefPicList(PicList& rcListPic)
 {
   ::memset(m_bIsUsedAsLongTerm, 0, sizeof(m_bIsUsedAsLongTerm));

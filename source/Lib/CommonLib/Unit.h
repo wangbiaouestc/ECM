@@ -480,6 +480,10 @@ struct InterPredictionData
   bool      amvpMergeModeFlag[NUM_REF_PIC_LIST_01];
 #endif
   int8_t     refIdx  [NUM_REF_PIC_LIST_01];
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  int8_t    refIdxLC;
+  int8_t    refPairIdx;
+#endif
   MergeType mergeType;
   bool      mvRefine;
   Mv        mvdAffi [NUM_REF_PIC_LIST_01][3];

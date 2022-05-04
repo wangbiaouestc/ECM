@@ -821,6 +821,10 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   tempCS->splitRdCostBest = NULL;
 #endif
   m_modeCtrl->initCULevel( partitioner, *tempCS );
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  m_pcInterSearch->setFillCurTplAboveARMC(false);
+  m_pcInterSearch->setFillCurTplLeftARMC(false);
+#endif
   if( partitioner.currQtDepth == 0 && partitioner.currMtDepth == 0 && !tempCS->slice->isIntra() && ( sps.getUseSBT() || sps.getUseInterMTS() ) )
   {
     auto slsSbt = dynamic_cast<SaveLoadEncInfoSbt*>( m_modeCtrl );
@@ -9916,6 +9920,17 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
     }
   }
 #endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  PredictionUnit& pu = *cu.firstPU;
+  if (PU::useRefCombList(pu))
+  {
+    m_pcInterSearch->setUniRefIdxLC(pu);
+  }
+  else if (PU::useRefPairList(pu))
+  {
+    m_pcInterSearch->setBiRefPairIdx(pu);
+  }
+#endif
 #if ENABLE_OBMC //normal inter
   const unsigned wIdx = gp_sizeIdxInfo->idxFrom(partitioner.currArea().lwidth());
   CodingStructure *prevCS = tempCS;
@@ -10171,6 +10186,17 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
       return false;
     }
   }
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  PredictionUnit& pu = *cu.firstPU;
+  if (PU::useRefCombList(pu))
+  {
+    m_pcInterSearch->setUniRefIdxLC(pu);
+  }
+  else if (PU::useRefPairList(pu))
+  {
+    m_pcInterSearch->setBiRefPairIdx(pu);
+  }
+#endif
 #if ENABLE_OBMC //normal inter IMV
   CodingStructure *prevCS = tempCS;
   PelUnitBuf tempWoOBMCBuf = m_tempWoOBMCBuffer.subBuf(UnitAreaRelative(cu, cu));
@@ -11341,6 +11367,16 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
 
     pu = mhResults[i].pu;
     cu = mhResults[i].cu;
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    if (!pu.mergeFlag && PU::useRefCombList(pu))
+    {
+      m_pcInterSearch->setUniRefIdxLC(pu);
+    }
+    else if (PU::useRefPairList(pu))
+    {
+      m_pcInterSearch->setBiRefPairIdx(pu);
+    }
+#endif
 
 #if MULTI_PASS_DMVR
     if (pu.bdmvrRefine)

@@ -353,6 +353,26 @@ public:
   void    init                (RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize);
 #endif
 
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  void     setUniRefIdxLC(PredictionUnit &pu);
+  void     setUniRefListAndIdx(PredictionUnit &pu);
+  void     reorderRefCombList(PredictionUnit &pu, std::vector<RefListAndRefIdx> &refListComb
+    , RefPicList currRefList
+    , std::vector<MotionInfoPred> &miPredList
+  );
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void      deriveMVDCandVecFromMotionInforPred(const PredictionUnit &pu, std::vector<MotionInfoPred> &miPredList, RefPicList eRefPicList, std::vector<Mv> &cMvdDerivedVec);
+  void      deriveAffineMVDCandVecFromMotionInforPred(const PredictionUnit &pu, std::vector<MotionInfoPred> &miPredList, RefPicList eRefPicList, std::vector<Mv> cMvdDerivedVec[3]);
+  void      deriveMVDCandVecFromMotionInforPredGeneral(const PredictionUnit &pu, std::vector<MotionInfoPred> &miPredList, RefPicList eRefPicList, std::vector<Mv> &cMvdDerivedVec);
+  void      deriveAffineMVDCandVecFromMotionInforPredGeneral(const PredictionUnit &pu, std::vector<MotionInfoPred> &miPredList, RefPicList eRefPicList, std::vector<Mv> cMvdDerivedVec[3]);
+#endif
+  void     setBiRefPairIdx(PredictionUnit &pu);
+  void     setBiRefIdx(PredictionUnit &pu);
+  void     reorderRefPairList(PredictionUnit &pu, std::vector<RefPicPair> &refPairList
+    , std::vector<MotionInfoPred> &miPredList
+  );
+#endif
+
   // inter
   void    motionCompensation  (PredictionUnit &pu, PelUnitBuf& predBuf, const RefPicList &eRefPicList = REF_PIC_LIST_X
     , const bool luma = true, const bool chroma = true
@@ -461,11 +481,19 @@ public:
   void xinitMC(PredictionUnit& pu, const ClpRngs &clpRngs);
   void xProcessDMVR(PredictionUnit& pu, PelUnitBuf &pcYuvDst, const ClpRngs &clpRngs, const bool bioApplied );
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  void deriveMVDcand(const PredictionUnit& pu, RefPicList eRefPicList, std::vector<Mv>& cMvdCandList);
+  void deriveMVDcandAffine(const PredictionUnit& pu, RefPicList eRefPicList, std::vector<Mv> cMvdCandList[3]);
+#endif
   void deriveMvdSign(const Mv& cMvPred, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, RefPicList eRefPicList, int iRefIdx, std::vector<Mv>& cMvdDerived);
   int deriveMVSDIdxFromMVDTrans(Mv cMvd, std::vector<Mv>& cMvdDerived);
   Mv deriveMVDFromMVSDIdxTrans(int mvsdIdx, std::vector<Mv>& cMvdDerived);
   void deriveMvdSignSMVD(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, std::vector<Mv>& cMvdDerived);
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  void deriveMvdSignAffine(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvPred3, const Mv cMvdKnownAtDecoder[3],
+#else
   void deriveMvdSignAffine(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvPred3, const Mv& cMvdKnownAtDecoder, const Mv& cMvdKnownAtDecoder2, const Mv& cMvdKnownAtDecoder3,
+#endif
   PredictionUnit& pu, RefPicList eRefList, int refIdx, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3);
   Distortion xGetSublkTemplateCost(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight,
     const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate);
@@ -661,6 +689,16 @@ public:
   bool isLumaBvValid(const int ctuSize, const int xCb, const int yCb, const int width, const int height, const int xBv, const int yBv);
 
   bool xPredInterBlkRPR( const std::pair<int, int>& scalingRatio, const PPS& pps, const CompArea &blk, const Picture* refPic, const Mv& mv, Pel* dst, const int dstStride, const bool bi, const bool wrapRef, const ClpRng& clpRng, const int filterIndex, const bool useAltHpelIf = false);
+
+
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+private:
+  bool m_fillCurTplLeftARMC;
+  bool m_fillCurTplAboveARMC;
+public:
+  void setFillCurTplAboveARMC(bool b) { m_fillCurTplAboveARMC = b; }
+  void setFillCurTplLeftARMC(bool b) { m_fillCurTplLeftARMC = b; }
+#endif
 };
 
 #if TM_AMVP || TM_MRG

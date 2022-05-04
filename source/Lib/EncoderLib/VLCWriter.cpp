@@ -1334,6 +1334,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_W0090_ARMC_TM
   WRITE_FLAG( pcSPS->getUseAML() ? 1 : 0,                                             "sps_aml_enabled_flag" );
 #endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  WRITE_FLAG( pcSPS->getUseARL() ? 1 : 0,                                             "sps_arl_enabled_flag" );
+#endif
   WRITE_FLAG( pcSPS->getBDOFEnabledFlag() ? 1 : 0,                                   "sps_bdof_enabled_flag" );
   if (pcSPS->getBDOFEnabledFlag())
   {

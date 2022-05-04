@@ -212,6 +212,19 @@ struct MotionInfo
   }
 };
 
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+struct MotionInfoPred
+{
+  int8_t     interDir;
+  int8_t     refIdx[2];
+  Mv         mv[2];
+  Mv         mvd[2];
+  Mv         mvAffi[2][3];
+  Mv         mvdAffi[2][3];
+  Distortion cost;
+};
+#endif
+
 class BcwMotionParam
 {
   bool       m_readOnly[2][33];       // 2 RefLists, 33 RefFrams

@@ -195,6 +195,10 @@ public:
   void        affine_amvr_mode          ( const CodingUnit&             cu );
   void        inter_pred_idc            ( const PredictionUnit&         pu );
   void        ref_idx                   ( const PredictionUnit&         pu,       RefPicList        eRefList );
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  void        refIdxLC                ( const PredictionUnit&               pu );
+  void        refPairIdx              ( const PredictionUnit&               pu );
+#endif
   void        mvp_flag                  ( const PredictionUnit&         pu,       RefPicList        eRefList );
 
   void        Ciip_flag              ( const PredictionUnit&         pu );

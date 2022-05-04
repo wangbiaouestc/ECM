@@ -119,6 +119,10 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 
     for( auto &currCU : cs.traverseCUs( CS::getArea( cs, ctuArea, chType ), chType ) )
     {
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+      m_pcInterPred->setFillCurTplAboveARMC(false);
+      m_pcInterPred->setFillCurTplLeftARMC(false);
+#endif
 #if !REMOVE_VPDU
       if(currCU.Y().valid())
       {
@@ -1891,6 +1895,53 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
     }
     else
     {
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+#if REUSE_CU_RESULTS
+      if (!cu.cs->pcv->isEncoder)
+#endif
+      {
+        m_pcInterPred->clearTplAmvpBuffer();
+        if (pu.cu->affine)
+        {
+          for (uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
+          {
+            if (pu.interDir & (1 << uiRefListIdx))
+            {
+              pu.mvdAffi[uiRefListIdx][0].changeAffinePrecAmvr2Internal(pu.cu->imv);
+              pu.mvdAffi[uiRefListIdx][1].changeAffinePrecAmvr2Internal(pu.cu->imv);
+              if (cu.affineType == AFFINEMODEL_6PARAM)
+              {
+                pu.mvdAffi[uiRefListIdx][2].changeAffinePrecAmvr2Internal(pu.cu->imv);
+              }
+            }
+          }
+        }
+        else if (CU::isIBC(*pu.cu) && pu.interDir == 1)
+        {
+          pu.mvd[REF_PIC_LIST_0].changeIbcPrecAmvr2Internal(pu.cu->imv);
+        }
+        else
+        {
+          for (uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
+          {
+            if (pu.interDir & (1 << uiRefListIdx))
+            {
+              pu.mvd[uiRefListIdx].changeTransPrecAmvr2Internal(pu.cu->imv);
+            }
+          }
+        }
+        if (PU::useRefPairList(pu))
+        {
+          m_pcInterPred->setBiRefIdx(pu);
+        }
+        if (PU::useRefCombList(pu))
+        {
+          m_pcInterPred->setUniRefListAndIdx(pu);
+        }
+      }
+#endif
+
+#if !JVET_Z0054_BLK_REF_PIC_REORDER
 #if REUSE_CU_RESULTS
       if ( cu.imv && !pu.cu->affine && !cu.cs->pcv->isEncoder )
 #else
@@ -1900,6 +1951,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           PU::applyImv(pu, mrgCtx, m_pcInterPred);
         }
         else
+#endif
       {
 #if JVET_X0083_BM_AMVP_MERGE_MODE
 #if REUSE_CU_RESULTS
@@ -1929,6 +1981,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           pu.refIdx[refListAmvp] = orgRefIdxAMVP;
         }
 #endif
+
         if( pu.cu->affine )
         {
           for ( uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++ )
@@ -1945,6 +1998,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 
               //    Mv mv[3];
               CHECK( pu.refIdx[eRefList] < 0, "Unexpected negative refIdx." );
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+              if (!pu.cs->sps->getUseARL())
+              {
+#else
               if (!cu.cs->pcv->isEncoder)
               {
                 pu.mvdAffi[eRefList][0].changeAffinePrecAmvr2Internal(pu.cu->imv);
@@ -1954,18 +2011,30 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                   pu.mvdAffi[eRefList][2].changeAffinePrecAmvr2Internal(pu.cu->imv);
                 }
               }
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-              Mv absMvd[3];
-              absMvd[0] = Mv(pu.mvdAffi[eRefList][0].getAbsMv());
-              absMvd[1] = Mv(pu.mvdAffi[eRefList][1].getAbsMv());
-              absMvd[2] = (cu.affineType == AFFINEMODEL_6PARAM) ? Mv(pu.mvdAffi[eRefList][2].getAbsMv()) : Mv(0, 0);
-              if ((absMvd[0] != Mv(0, 0) || absMvd[1] != Mv(0, 0) || absMvd[2] != Mv(0, 0)) && pu.isMvsdApplicable())
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED 
+              if (pu.isMvsdApplicable())
               {
-                std::vector<Mv> cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3;
-                m_pcInterPred->deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvpIdx], affineAMVPInfo.mvCandRT[mvpIdx], affineAMVPInfo.mvCandLB[mvpIdx],
-                  absMvd[0], absMvd[1], absMvd[2], pu, eRefList, pu.refIdx[eRefList], cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
-                CHECK(pu.mvsdIdx[eRefList] >= cMvdDerivedVec.size(), "");
-                m_pcInterPred->deriveMVDFromMVSDIdxAffine(pu, eRefList, cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
+                Mv absMvd[3];
+                absMvd[0] = Mv(pu.mvdAffi[eRefList][0].getAbsMv());
+                absMvd[1] = Mv(pu.mvdAffi[eRefList][1].getAbsMv());
+                absMvd[2] = (cu.affineType == AFFINEMODEL_6PARAM) ? Mv(pu.mvdAffi[eRefList][2].getAbsMv()) : Mv(0, 0);
+                if ((absMvd[0] != Mv(0, 0) || absMvd[1] != Mv(0, 0) || absMvd[2] != Mv(0, 0)) && pu.isMvsdApplicable())
+                {
+                  std::vector<Mv> cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3;
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+                  m_pcInterPred->deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvpIdx], affineAMVPInfo.mvCandRT[mvpIdx], affineAMVPInfo.mvCandLB[mvpIdx],
+                    absMvd, pu, eRefList, pu.refIdx[eRefList], cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
+#else
+                  m_pcInterPred->deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvpIdx], affineAMVPInfo.mvCandRT[mvpIdx], affineAMVPInfo.mvCandLB[mvpIdx],
+                    absMvd[0], absMvd[1], absMvd[2], pu, eRefList, pu.refIdx[eRefList], cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
+#endif
+                  CHECK(pu.mvsdIdx[eRefList] >= cMvdDerivedVec.size(), "");
+                  m_pcInterPred->deriveMVDFromMVSDIdxAffine(pu, eRefList, cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
+                }
+              }
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
               }
 #endif
               Mv mvLT = affineAMVPInfo.mvCandLT[mvpIdx] + pu.mvdAffi[eRefList][0];
@@ -1991,12 +2060,14 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           PU::fillIBCMvpCand(pu, amvpInfo);
           pu.mvpNum[REF_PIC_LIST_0] = amvpInfo.numCand;
           Mv mvd = pu.mvd[REF_PIC_LIST_0];
+#if !JVET_Z0054_BLK_REF_PIC_REORDER
 #if REUSE_CU_RESULTS
           if (!cu.cs->pcv->isEncoder)
 #endif
           {
             mvd.changeIbcPrecAmvr2Internal(pu.cu->imv);
           }
+#endif
           if (pu.cs->sps->getMaxNumIBCMergeCand() == 1)
           {
             CHECK( pu.mvpIdx[REF_PIC_LIST_0], "mvpIdx for IBC mode should be 0" );
@@ -2074,10 +2145,15 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #endif
               );
               pu.mvpNum [eRefList] = amvpInfo.numCand;
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+              if(!PU::useRefCombList(pu) && !PU::useRefPairList(pu))
+              {
+#else
               if (!cu.cs->pcv->isEncoder)
               {
                 pu.mvd[eRefList].changeTransPrecAmvr2Internal(pu.cu->imv);
               }
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
               if (pu.isMvsdApplicable() && pu.mvd[eRefList].isMvsdApplicable())
               {
@@ -2113,6 +2189,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                   CHECK(cMvd == Mv(0, 0), " zero MVD!");
                   pu.mvd[eRefList] = cMvd;
                 }
+              }
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
               }
 #endif
               pu.mv[eRefList] = amvpInfo.mvCand[pu.mvpIdx[eRefList]] + pu.mvd[eRefList];
