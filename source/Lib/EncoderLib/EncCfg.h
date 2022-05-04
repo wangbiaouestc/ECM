@@ -907,6 +907,9 @@ protected:
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
   int         m_maxNumTUs;
 #endif
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  unsigned int m_tempCabacInitMode;
+#endif
 
 public:
   EncCfg()
@@ -2320,6 +2323,10 @@ public:
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
   void         setMaxNumTUs( int num )                               { m_maxNumTUs = num;  }
   int          getMaxNumTUs()                                  const { return m_maxNumTUs; }
+#endif
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  void      setTempCabacInitMode( unsigned n )                        { m_tempCabacInitMode = n; }
+  unsigned  getTempCabacInitMode()                              const { return m_tempCabacInitMode; }
 #endif
 };
 

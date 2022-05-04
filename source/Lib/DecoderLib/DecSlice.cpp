@@ -78,6 +78,10 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
   const SPS*     sps          = slice->getSPS();
   Picture*       pic          = slice->getPic();
   CABACReader&   cabacReader  = *m_CABACDecoder->getCABACReader( 0 );
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  cabacReader.m_CABACDataStore->updateBufferState( slice );
+#endif
+
   // setup coding structure
   CodingStructure& cs = *pic->cs;
   cs.slice            = slice;
@@ -208,6 +212,11 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #endif
 
   // for every CTU in the slice segment...
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  static Ctx storedCtx;
+#endif
+
   unsigned subStrmId = 0;
   for( unsigned ctuIdx = 0; ctuIdx < slice->getNumCtuInSlice(); ctuIdx++ )
   {
@@ -330,6 +339,14 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 
     m_pcCuDecoder->decompressCtu( cs, ctuArea );
 
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+    // store CABAC context to be used in next frames
+    if( storeContexts( slice, ctuXPosInCtus, ctuYPosInCtus ) )
+    {
+      storedCtx = cabacReader.getCtx();
+    }
+#endif
+
     if( ctuXPosInCtus == tileXPosInCtus && wavefrontsEnabled )
     {
       m_entropyCodingSyncContextState = cabacReader.getCtx();
@@ -382,6 +399,14 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
       }
     }
   }
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  // store CABAC context to be used in next frames when the last CTU in a picture is processed
+  if( slice->getPPS()->pcv->sizeInCtus - 1 == slice->getCtuAddrInSlice( slice->getNumCtuInSlice() - 1 ) )
+  {
+    cabacReader.m_CABACDataStore->storeCtxStates( slice, storedCtx );
+  }
+#endif
 
   // deallocate all created substreams, including internal buffers.
   for( auto substr: ppcSubstreams )

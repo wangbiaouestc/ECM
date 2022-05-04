@@ -48,7 +48,14 @@
 class CABACReader
 {
 public:
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACReader( BinDecoderBase& binDecoder, CABACDataStore *cabacDataStore ) : m_BinDecoder( binDecoder ), m_Bitstream( 0 )
+  {
+    m_CABACDataStore = cabacDataStore;
+  }
+#else
   CABACReader(BinDecoderBase& binDecoder) : m_BinDecoder(binDecoder), m_Bitstream(0) {}
+#endif
   virtual ~CABACReader() {}
 
 public:
@@ -239,6 +246,11 @@ public:
 #if INTER_LIC
   void        cu_lic_flag               ( CodingUnit& cu );
 #endif
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACDataStore*         m_CABACDataStore;
+#endif
+
 private:
   BinDecoderBase& m_BinDecoder;
   InputBitstream* m_Bitstream;
@@ -249,10 +261,35 @@ private:
 class CABACDecoder
 {
 public:
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   CABACDecoder()
-    : m_CABACReaderStd  ( m_BinDecoderStd )
+    : m_CABACReaderStd  ( m_BinDecoderStd, nullptr )
     , m_CABACReader     { &m_CABACReaderStd }
+    , m_CABACDataStore  ( nullptr )
+  {
+    m_CABACDataStore = new CABACDataStore;
+
+    m_CABACReaderStd.m_CABACDataStore = m_CABACDataStore;
+
+    for( int i = 0; i < BPM_NUM - 1; i++ )
+    {
+      m_CABACReader[i]->m_CABACDataStore = m_CABACDataStore;
+    }
+  }
+
+  virtual ~CABACDecoder()
+  {
+    if( m_CABACDataStore )
+    {
+      delete m_CABACDataStore;
+    }
+  }
+#else
+  CABACDecoder()
+    : m_CABACReaderStd( m_BinDecoderStd )
+    , m_CABACReader{ &m_CABACReaderStd }
   {}
+#endif
 
   CABACReader*                getCABACReader    ( int           id    )       { return m_CABACReader[id]; }
 
@@ -260,6 +297,10 @@ private:
   BinDecoder_Std          m_BinDecoderStd;
   CABACReader             m_CABACReaderStd;
   CABACReader*            m_CABACReader[BPM_NUM-1];
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACDataStore*         m_CABACDataStore;
+#endif
 };
 
 #endif

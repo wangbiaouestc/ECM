@@ -644,4 +644,8 @@ void sortIntraCandList(double uiCost, int mergeCand, static_vector<double, N>& c
 }
 #endif
 #endif
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+bool storeContexts( const Slice* slice, const int ctuXPosInCtus, const int ctuYPosInCtus );
+#endif
 #endif

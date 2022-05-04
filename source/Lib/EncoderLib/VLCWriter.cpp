@@ -1500,6 +1500,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if ENABLE_OBMC
   WRITE_FLAG(pcSPS->getUseOBMC() ? 1 : 0, "sps_obmc_flag");
 #endif
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  WRITE_FLAG( pcSPS->getTempCabacInitMode() ? 1 : 0, "sps_cabac_temp_init_flag" );
+#endif
   // KJS: reference picture sets to be replaced
 
 

@@ -51,7 +51,15 @@ class EncCu;
 class CABACWriter
 {
 public:
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACWriter( BinEncIf& binEncoder, CABACDataStore* cabacDataStore ) : m_BinEncoder( binEncoder ), m_Bitstream( 0 )
+  {
+    m_TestCtx = m_BinEncoder.getCtx(); m_EncCu = NULL;
+    m_CABACDataStore = cabacDataStore;
+  }
+#else
   CABACWriter(BinEncIf& binEncoder)   : m_BinEncoder(binEncoder), m_Bitstream(0) { m_TestCtx = m_BinEncoder.getCtx(); m_EncCu = NULL; }
+#endif
   virtual ~CABACWriter() {}
 
 public:
@@ -258,6 +266,10 @@ public:
   void        cu_lic_flag               ( const CodingUnit& cu );
 #endif
 
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACDataStore*         m_CABACDataStore;
+#endif
+
 private:
   void        unary_max_symbol          ( unsigned symbol, unsigned ctxId0, unsigned ctxIdN, unsigned maxSymbol );
   void        unary_max_eqprob          ( unsigned symbol,                                   unsigned maxSymbol );
@@ -283,12 +295,41 @@ private:
 class CABACEncoder
 {
 public:
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACEncoder()
+    : m_CABACWriterStd( m_BinEncoderStd, nullptr )
+    , m_CABACEstimatorStd( m_BitEstimatorStd, nullptr )
+    , m_CABACWriter{ &m_CABACWriterStd }
+    , m_CABACEstimator{ &m_CABACEstimatorStd }
+    , m_CABACDataStore( nullptr )
+  {
+    m_CABACDataStore = new CABACDataStore;
+
+    m_CABACWriterStd.m_CABACDataStore = m_CABACDataStore;
+    m_CABACEstimatorStd.m_CABACDataStore = m_CABACDataStore;
+
+    for( int i = 0; i < BPM_NUM - 1; i++ )
+    {
+      m_CABACWriter[i]->m_CABACDataStore = m_CABACDataStore;
+      m_CABACEstimator[i]->m_CABACDataStore = m_CABACDataStore;
+    }
+  }
+
+  virtual ~CABACEncoder()
+  {
+    if( m_CABACDataStore )
+    {
+      delete m_CABACDataStore;
+    }
+  }
+#else
   CABACEncoder()
     : m_CABACWriterStd      ( m_BinEncoderStd )
     , m_CABACEstimatorStd   ( m_BitEstimatorStd )
     , m_CABACWriter         { &m_CABACWriterStd,   }
     , m_CABACEstimator      { &m_CABACEstimatorStd }
   {}
+#endif
 
   CABACWriter*                getCABACWriter          ( const SPS*   sps   )        { return m_CABACWriter   [0]; }
   CABACWriter*                getCABACEstimator       ( const SPS*   sps   )        { return m_CABACEstimator[0]; }
@@ -299,6 +340,10 @@ private:
   CABACWriter         m_CABACEstimatorStd;
   CABACWriter*        m_CABACWriter   [BPM_NUM-1];
   CABACWriter*        m_CABACEstimator[BPM_NUM-1];
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACDataStore*         m_CABACDataStore;
+#endif
 };
 
 //! \}

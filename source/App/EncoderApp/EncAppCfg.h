@@ -458,6 +458,9 @@ protected:
   unsigned  m_chromaBIFStrength;
   int       m_chromaBIFQPOffset;
 #endif
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  unsigned  m_tempCabacInitMode;
+#endif
   
   // ADD_NEW_TOOL : (encoder app) add tool enabling flags and associated parameters here
   bool      m_virtualBoundariesEnabledFlag;

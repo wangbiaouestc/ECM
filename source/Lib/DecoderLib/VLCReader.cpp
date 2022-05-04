@@ -2412,6 +2412,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if ENABLE_OBMC
   READ_FLAG(uiCode, "sps_obmc_flag");                              pcSPS->setUseOBMC(uiCode != 0);
 #endif
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  READ_FLAG( uiCode, "sps_cabac_temp_init_flag" );							pcSPS->setTempCabacInitMode( uiCode != 0 );
+#endif
   READ_FLAG(uiCode, "sps_explicit_scaling_list_enabled_flag");                 pcSPS->setScalingListFlag(uiCode);
 #if JVET_S0050_GCI
   if (pcSPS->getProfileTierLevel()->getConstraintInfo()->getNoExplicitScaleListConstraintFlag())

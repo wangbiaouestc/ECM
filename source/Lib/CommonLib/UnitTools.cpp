@@ -11997,3 +11997,16 @@ bool PU::checkIsValidMergeMvCand(const CodingStructure &cs, const PredictionUnit
 }
 #endif
 #endif
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+bool storeContexts( const Slice* slice, const int ctuXPosInCtus, const int ctuYPosInCtus )
+{
+  if( slice->getSPS()->getTempCabacInitMode() && !slice->isIntra() )
+  {
+    const PreCalcValues&  pcv = *slice->getPPS()->pcv;
+    const int             ctuRsAddr = ctuXPosInCtus + ctuYPosInCtus * pcv.widthInCtus;
+    return ctuRsAddr == pcv.sizeInCtus - 1;
+  }
+  return false;
+}
+#endif

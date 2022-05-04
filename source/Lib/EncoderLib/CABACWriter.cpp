@@ -61,6 +61,13 @@ void CABACWriter::initCtxModels( const Slice& slice )
     sliceType = encCABACTableIdx;
   }
   m_BinEncoder.reset( qp, (int)sliceType );
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  if( slice.getSPS()->getTempCabacInitMode() )
+  {
+    m_CABACDataStore->loadCtxStates( &slice, getCtx() );
+  }
+#endif
 }
 
 
