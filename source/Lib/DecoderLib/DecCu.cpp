@@ -1694,21 +1694,24 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         else
         {
           if (CU::isIBC(*pu.cu))
-#if JVET_Y0058_IBC_LIST_MODIFY && JVET_W0090_ARMC_TM
           {
+#if JVET_Y0058_IBC_LIST_MODIFY && JVET_W0090_ARMC_TM
+            if (pu.cs->sps->getUseAML())
+            {
 #if JVET_Z0075_IBC_HMVP_ENLARGE
-            uint8_t mrgCandIdx = pu.mergeIdx;
-            PU::getIBCMergeCandidates(pu, mrgCtx);
-            m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
-            pu.mergeIdx = mrgCandIdx;
+              uint8_t mrgCandIdx = pu.mergeIdx;
+              PU::getIBCMergeCandidates(pu, mrgCtx);
+              m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
+              pu.mergeIdx = mrgCandIdx;
 #else
-            PU::getIBCMergeCandidates(pu, mrgCtx, (((pu.mergeIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE + 1)*ADAPTIVE_IBC_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumIBCMergeCand()) || (pu.mergeIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE * ADAPTIVE_IBC_SUB_GROUP_SIZE + ADAPTIVE_IBC_SUB_GROUP_SIZE - 1 : pu.mergeIdx);
-            m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, pu.mergeIdx);
+              PU::getIBCMergeCandidates(pu, mrgCtx, (((pu.mergeIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE + 1)*ADAPTIVE_IBC_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumIBCMergeCand()) || (pu.mergeIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE * ADAPTIVE_IBC_SUB_GROUP_SIZE + ADAPTIVE_IBC_SUB_GROUP_SIZE - 1 : pu.mergeIdx);
+              m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, pu.mergeIdx);
 #endif
+            }
+            else
+#endif
+              PU::getIBCMergeCandidates(pu, mrgCtx, pu.mergeIdx);
           }
-#else
-            PU::getIBCMergeCandidates(pu, mrgCtx, pu.mergeIdx);
-#endif
           else
 #if JVET_X0049_ADAPT_DMVR
             if (pu.bmMergeFlag)
@@ -1827,6 +1830,13 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           if (pu.tmMergeFlag)
           {
             m_pcInterPred->deriveTMMv(pu);
+#if JVET_Z0084_IBC_TM && TM_MRG
+            if (CU::isIBC(*pu.cu))
+            {
+              pu.bv = pu.mv[0];
+              pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+            }
+#endif
           }
 #endif
 #if MULTI_PASS_DMVR
@@ -1869,6 +1879,13 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             if (pu.tmMergeFlag)
             {
               m_pcInterPred->deriveTMMv(pu);
+#if JVET_Z0084_IBC_TM && TM_MRG
+              if (CU::isIBC(*pu.cu))
+              {
+                pu.bv = pu.mv[0];
+                pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+              }
+#endif
             }
           }
 #endif
@@ -2057,7 +2074,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         else if (CU::isIBC(*pu.cu) && pu.interDir == 1)
         {
           AMVPInfo amvpInfo;
+#if JVET_Z0084_IBC_TM && TM_AMVP
+          PU::fillIBCMvpCand(pu, amvpInfo, m_pcInterPred);
+#else
           PU::fillIBCMvpCand(pu, amvpInfo);
+#endif
           pu.mvpNum[REF_PIC_LIST_0] = amvpInfo.numCand;
           Mv mvd = pu.mvd[REF_PIC_LIST_0];
 #if !JVET_Z0054_BLK_REF_PIC_REORDER

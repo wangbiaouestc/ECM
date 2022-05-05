@@ -608,6 +608,13 @@ public:
   bool xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
 #endif
+#if JVET_Z0084_IBC_TM
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  bool xCheckSimilarIBCMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1, int compareNum = -1) const;
+#else
+  bool xCheckSimilarIBCMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
+#endif
+#endif
 #if TM_MRG
   void copyRegularMergeCand( int dstCandIdx, MergeCtx& srcCtx, int srcCandIdx );
   void convertRegularMergeCandToBi(int candIdx);

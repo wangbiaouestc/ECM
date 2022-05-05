@@ -6828,6 +6828,13 @@ void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
 #if JVET_Y0058_IBC_LIST_MODIFY
 void  InterPrediction::adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, int mrgCandIdx)
 {
+#if JVET_Z0084_IBC_TM
+  if (mrgCtx.numValidMergeCand <= 1)
+  {
+    return;
+  }
+#endif
+
   uint32_t RdCandList[IBC_MRG_MAX_NUM_CANDS][IBC_MRG_MAX_NUM_CANDS];
   Distortion candCostList[IBC_MRG_MAX_NUM_CANDS][IBC_MRG_MAX_NUM_CANDS];
 
@@ -7094,6 +7101,13 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 void  InterPrediction::adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx,uint32_t startPos,uint32_t endPos)
 {
+#if JVET_Z0084_IBC_TM
+  if (mrgCtx.numValidMergeCand <= 1)
+  {
+    return;
+  }
+#endif
+
   uint32_t RdCandList[IBC_MRG_MAX_NUM_CANDS_MEM];
   Distortion candCostList[IBC_MRG_MAX_NUM_CANDS_MEM];
 
@@ -7784,6 +7798,16 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
 {
   CHECK(refIdx < 0, "Invalid reference index for TM");
   const CodingUnit& cu   = *pu.cu;
+#if JVET_Z0084_IBC_TM
+#if JVET_Y0128_NON_CTC
+  if ( !CU::isIBC(cu) && cu.slice->getRefPic(eRefList, refIdx)->isRefScaled( pu.cs->pps ) )
+  {
+    return std::numeric_limits<Distortion>::max();
+  }
+#endif
+  CHECK(CU::isIBC(cu) && otherMvf != nullptr, "IBC TM for bidir is not allowed.");
+  const Picture& refPic  = CU::isIBC(cu) ? *cu.slice->getPic() : *cu.slice->getRefPic(eRefList, refIdx)->unscaledPic;
+#else
 #if JVET_Y0128_NON_CTC
   if ( cu.slice->getRefPic(eRefList, refIdx)->isRefScaled( pu.cs->pps ) )
   {
@@ -7791,6 +7815,7 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
   }
 #endif
   const Picture& refPic  = *cu.slice->getRefPic(eRefList, refIdx)->unscaledPic;
+#endif
   bool doSimilarityCheck = otherMvf == nullptr ? false : cu.slice->getRefPOC((RefPicList)eRefList, refIdx) == cu.slice->getRefPOC((RefPicList)(1 - eRefList), otherMvf->refIdx);
 
   InterPredResources interRes(m_pcReshape, m_pcRdCost, m_if, m_filteredBlockTmp[0][COMPONENT_Y]
@@ -7910,14 +7935,22 @@ TplMatchingCtrl::TplMatchingCtrl( const PredictionUnit&     pu,
 #endif
 
   // Pre-interpolate samples on search area
+#if JVET_Z0084_IBC_TM
+  m_refSrAbove = tplAvalableAbove && maxSearchRounds > 0 && !CU::isIBC(m_cu) ? PelBuf(interRes.m_preFillBufA, m_curTplAbove.width + 2 * TM_SEARCH_RANGE, m_curTplAbove.height + 2 * TM_SEARCH_RANGE) : PelBuf();
+#else
   m_refSrAbove = tplAvalableAbove && maxSearchRounds > 0 ? PelBuf(interRes.m_preFillBufA, m_curTplAbove.width + 2 * TM_SEARCH_RANGE, m_curTplAbove.height + 2 * TM_SEARCH_RANGE) : PelBuf();
+#endif
   if (m_refSrAbove.buf != nullptr)
   {
     m_refSrAbove = xGetRefTemplate<TM_TPL_SIZE, true, TM_SEARCH_RANGE>(m_pu, m_refPic, mvStart, m_refSrAbove);
     m_refSrAbove = m_refSrAbove.subBuf(Position(TM_SEARCH_RANGE, TM_SEARCH_RANGE), m_curTplAbove);
   }
 
+#if JVET_Z0084_IBC_TM
+  m_refSrLeft  = tplAvalableLeft  && maxSearchRounds > 0 && !CU::isIBC(m_cu) ? PelBuf(interRes.m_preFillBufL, m_curTplLeft .width + 2 * TM_SEARCH_RANGE, m_curTplLeft .height + 2 * TM_SEARCH_RANGE) : PelBuf();
+#else
   m_refSrLeft  = tplAvalableLeft  && maxSearchRounds > 0 ? PelBuf(interRes.m_preFillBufL, m_curTplLeft .width + 2 * TM_SEARCH_RANGE, m_curTplLeft .height + 2 * TM_SEARCH_RANGE) : PelBuf();
+#endif
   if (m_refSrLeft.buf != nullptr)
   {
     m_refSrLeft = xGetRefTemplate<TM_TPL_SIZE, false, TM_SEARCH_RANGE>(m_pu, m_refPic, mvStart, m_refSrLeft);
@@ -7986,6 +8019,26 @@ bool TplMatchingCtrl::xFillCurTemplate(Pel* tpl)
     return true;
   }
 
+#if JVET_Z0084_IBC_TM
+  // Stay in reference region for IBC
+  if( CU::isIBC(m_cu) )
+  {
+    const int cuPelX       = m_pu.lx();
+    const int cuPelY       = m_pu.ly();
+    const int roiWidth     = TrueA_FalseL ? m_pu.lwidth() : tplSize;
+    const int roiHeight    = TrueA_FalseL ? tplSize       : m_pu.lheight();
+    const int picWidth     = m_pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
+    const int picHeight    = m_pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
+    const uint32_t ctuSize = m_pu.cs->slice->getSPS()->getMaxCUWidth();
+    const Mv  tempBv       = TrueA_FalseL ? Mv(0, -tplSize) : Mv(-tplSize, 0);
+
+    if (!PU::searchBv(m_pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, tempBv.getHor(), tempBv.getVer(), ctuSize))
+    {
+      return false;
+    }
+  }
+#endif
+
   const Picture&          currPic = *m_cu.cs->picture;
   const CPelBuf           recBuf  = currPic.getRecoBuf(m_cu.cs->picture->blocks[m_compID]);
         std::vector<Pel>& invLUT  = m_interRes.m_pcReshape->getInvLUT();
@@ -8030,9 +8083,36 @@ bool TplMatchingCtrl::xFillCurTemplate(Pel* tpl)
 template <int tplSize, bool TrueA_FalseL, int sr>
 PelBuf TplMatchingCtrl::xGetRefTemplate(const PredictionUnit& curPu, const Picture& refPic, const Mv& _mv, PelBuf& dstBuf)
 {
+#if JVET_Z0084_IBC_TM
+  // Stay in reference region for IBC
+  if( CU::isIBC(m_cu) )
+  {
+    const int cuPelX       = m_pu.lx();
+    const int cuPelY       = m_pu.ly();
+    const int roiWidth     = TrueA_FalseL ? m_pu.lwidth() : tplSize;
+    const int roiHeight    = TrueA_FalseL ? tplSize       : m_pu.lheight();
+    const int picWidth     = m_pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
+    const int picHeight    = m_pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
+    const uint32_t ctuSize = m_pu.cs->slice->getSPS()->getMaxCUWidth();
+
+    Mv tempBv = _mv;
+    tempBv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+    tempBv += TrueA_FalseL ? Mv(0, -tplSize) : Mv(-tplSize, 0);
+
+    if (!PU::searchBv(m_pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, tempBv.getHor(), tempBv.getVer(), ctuSize))
+    {
+      return PelBuf();
+    }
+  }
+#endif
+
   // read from pre-interpolated buffer
   PelBuf& refSrBuf = TrueA_FalseL ? m_refSrAbove : m_refSrLeft;
+#if JVET_Z0084_IBC_TM
+  if (!CU::isIBC(m_cu) && sr == 0 && refPic.getPOC() == m_refPic.getPOC() && refSrBuf.buf != nullptr)
+#else
   if (sr == 0 && refPic.getPOC() == m_refPic.getPOC() && refSrBuf.buf != nullptr)
+#endif
   {
     Mv mvDiff = _mv - m_mvStart;
     if ((mvDiff.getAbsHor() & ((1 << MV_FRACTIONAL_BITS_INTERNAL) - 1)) == 0 && (mvDiff.getAbsVer() & ((1 << MV_FRACTIONAL_BITS_INTERNAL) - 1)) == 0)
@@ -8049,6 +8129,9 @@ PelBuf TplMatchingCtrl::xGetRefTemplate(const PredictionUnit& curPu, const Pictu
   Position blkPos  = ( TrueA_FalseL ? Position(curPu.lx(), curPu.ly() - tplSize) : Position(curPu.lx() - tplSize, curPu.ly()) );
   Size     blkSize = Size(dstBuf.width, dstBuf.height);
   Mv       mv      = _mv - Mv(sr << MV_FRACTIONAL_BITS_INTERNAL, sr << MV_FRACTIONAL_BITS_INTERNAL);
+#if JVET_Z0084_IBC_TM
+  if( !CU::isIBC(m_cu) )
+#endif
   clipMv( mv, blkPos, blkSize, *m_cu.cs->sps, *m_cu.cs->pps );
 
   const int lumaShift = 2 + MV_FRACTIONAL_BITS_DIFF;
@@ -8123,6 +8206,13 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
     return;
   }
 
+#if JVET_Z0084_IBC_TM
+  // Limit to integer pel search for IBC
+  if( CU::isIBC(m_cu) && (searchStepShift < MV_FRACTIONAL_BITS_INTERNAL) )
+  {
+    return;
+  }
+#endif
   // Search pattern configuration
   static const Mv patternCross  [4] = { Mv(0, 1), Mv(1, 0), Mv(0, -1), Mv(-1, 0) };
   static const Mv patternDiamond[8] = { Mv(0, 2), Mv(1, 1), Mv(2, 0), Mv(1, -1), Mv(0, -2), Mv(-1, -1), Mv(-2, 0), Mv(-1, 1) };
@@ -8161,6 +8251,16 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
     CHECK(true, "Unknown search method for TM");
   }
 
+#if JVET_Z0084_IBC_TM
+  const int cuPelX       = m_pu.lx();
+  const int cuPelY       = m_pu.ly();
+  const int roiWidth     = m_pu.lwidth();
+  const int roiHeight    = m_pu.lheight();
+  const int picWidth     = m_pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
+  const int picHeight    = m_pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
+  const uint32_t ctuSize = m_pu.cs->slice->getSPS()->getMaxCUWidth();
+#endif
+
   // Iterative search
   for (int uiRound = 0; uiRound < maxSearchRounds; uiRound++)
   {
@@ -8176,6 +8276,21 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
       Mv mvOffset = pSearchOffset[nDirect];
       mvOffset  <<= searchStepShift;
       Mv mvCand   = mvCurCenter + mvOffset;
+#if JVET_Z0084_IBC_TM
+      // Stay in reference region for IBC
+      if( CU::isIBC(m_cu) )
+      {
+        Mv tempBv = mvCand;
+        tempBv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+
+        if (!PU::searchBv(m_pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, tempBv.getHor(), tempBv.getVer(), ctuSize)
+          || (m_curTplAbove.buf != nullptr && !PU::searchBv(m_pu, cuPelX, cuPelY, roiWidth, tplSize,   picWidth, picHeight, tempBv.getHor(),         tempBv.getVer()-tplSize, ctuSize))
+          || (m_curTplLeft.buf  != nullptr && !PU::searchBv(m_pu, cuPelX, cuPelY, tplSize,  roiHeight, picWidth, picHeight, tempBv.getHor()-tplSize, tempBv.getVer(),         ctuSize)))
+        {
+          continue;
+        }
+      }
+#endif
       Distortion cost = InterPrediction::getDecoderSideDerivedMvCost(m_mvStart, mvCand, TM_SEARCH_RANGE, DECODER_SIDE_MV_WEIGHT); // MV cost is used just for skipping search
       if (cost >= m_minCost || (m_otherRefListMv != nullptr && *m_otherRefListMv == mvCand))
       {
@@ -8370,6 +8485,12 @@ Distortion TplMatchingCtrl::xGetTempMatchError(const Mv& mv)
 
   // fetch reference template block
   refTplBuf = xGetRefTemplate<tplSize, TrueA_FalseL, 0>(m_pu, m_refPic, mv, refTplBuf);
+#if JVET_Z0084_IBC_TM
+  if (refTplBuf.buf == nullptr)
+  {
+    return std::numeric_limits<Distortion>::max();
+  }
+#endif
 
   // compute matching cost
   Distortion partSum = 0;

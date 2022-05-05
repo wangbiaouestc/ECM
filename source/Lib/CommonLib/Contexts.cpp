@@ -2978,6 +2978,17 @@ const CtxSet ContextSetCfg::AfMmvdOffsetStep = ContextSetCfg::addCtxSet
 #endif
 
 #if TM_MRG
+#if JVET_Z0084_IBC_TM
+const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
+({
+  { 25, 33 },
+  { 26, 25 },
+  { 35, 35 },
+  {  4,  5 },
+  {  4,  5 },
+  {  4,  4 }
+});
+#else
 const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
 ({
 	{ 25 },
@@ -2987,6 +2998,8 @@ const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
 	{ 4 },
 	{ 4 }
 });
+#endif
+
 #if JVET_X0141_CIIP_TIMD_TM
 const CtxSet ContextSetCfg::CiipTMMergeFlag = ContextSetCfg::addCtxSet
 ({
@@ -4336,6 +4349,15 @@ const CtxSet ContextSetCfg::AfMmvdOffsetStep = ContextSetCfg::addCtxSet
 #endif
 
 #if TM_MRG
+#if JVET_Z0084_IBC_TM
+const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
+({
+  {  25,  33 },
+  {  26,  25 },
+  { CNU, CNU },
+  {   4,   5 }
+});
+#else
 const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
 ({
   {  25, },
@@ -4343,6 +4365,8 @@ const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
   { CNU, },
   {   4, },
 });
+#endif
+
 #if JVET_X0141_CIIP_TIMD_TM
 const CtxSet ContextSetCfg::CiipTMMergeFlag = ContextSetCfg::addCtxSet
 ({
