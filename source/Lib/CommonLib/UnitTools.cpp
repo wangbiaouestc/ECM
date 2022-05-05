@@ -1695,11 +1695,9 @@ uint8_t PU::getLFNSTIdx( int intraMode, int mtsMode )
 
 bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int &mrgCandIdx,
                           const uint32_t maxNumMergeCandMin1, int &cnt, const bool isAvailableA1,
-#if JVET_Z0075_IBC_HMVP_ENLARGE
                           const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
-#else
-                          const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove,
-                          const bool ibcFlag, const bool isGt4x4
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
+                        , const bool ibcFlag, const bool isGt4x4
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE || (JVET_Y0058_IBC_LIST_MODIFY && !JVET_Z0075_IBC_HMVP_ENLARGE)
                         , const PredictionUnit &pu
@@ -1710,7 +1708,7 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
                         , const int amvpPoc
 #endif
 #endif
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && !JVET_Z0075_IBC_HMVP_ENLARGE)
                         , const uint32_t mvdSimilarityThresh
 #endif
   )
@@ -1752,15 +1750,9 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
       || ((!isAvailableA1 || (miLeft != miNeighbor)) && (!isAvailableB1 || (miAbove != miNeighbor))) )
 #endif
     {
-#if INTER_LIC
-      mrgCtx.LICFlags[cnt] = miNeighbor.usesLIC;
-
-#if !JVET_Z0075_IBC_HMVP_ENLARGE
-      if (ibcFlag)
+#if JVET_Y0058_IBC_LIST_MODIFY && JVET_Z0084_IBC_TM && !JVET_Z0075_IBC_HMVP_ENLARGE
+      if (!ibcFlag || checkIsIBCCandidateValid(pu, miNeighbor))
       {
-        CHECK(mrgCtx.LICFlags[cnt], "addMergeHMVPCand: LIC is not used with IBC mode")
-      }
-#endif
 #endif
       mrgCtx.interDirNeighbours[cnt] = miNeighbor.interDir;
 #if JVET_Z0075_IBC_HMVP_ENLARGE
@@ -1769,6 +1761,15 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
       mrgCtx.useAltHpelIf      [cnt] = !ibcFlag && miNeighbor.useAltHpelIf;
 #endif
       mrgCtx.BcwIdx            [cnt] = (miNeighbor.interDir == 3) ? miNeighbor.BcwIdx : BCW_DEFAULT;
+#if INTER_LIC
+      mrgCtx.LICFlags          [cnt] = miNeighbor.usesLIC;
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
+      if (ibcFlag)
+      {
+        CHECK(mrgCtx.LICFlags[cnt], "addMergeHMVPCand: LIC is not used with IBC mode")
+      }
+#endif
+#endif
 
       mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNeighbor.mv[0], miNeighbor.refIdx[0]);
       if (slice.isInterB())
@@ -1786,6 +1787,18 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
       }
 #endif
 
+#if JVET_Z0084_IBC_TM && !JVET_Z0075_IBC_HMVP_ENLARGE
+      if (ibcFlag)
+      {
+        if (mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh))
+        {
+          continue;
+        }
+      }
+#if NON_ADJACENT_MRG_CAND
+      else
+#endif
+#endif
 #if NON_ADJACENT_MRG_CAND
       if (mrgCtx.xCheckSimilarMotion(cnt
 #if TM_MRG
@@ -1796,7 +1809,7 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
         continue;
       }
 #endif
-#if JVET_Y0058_IBC_LIST_MODIFY && !JVET_Z0075_IBC_HMVP_ENLARGE
+#if JVET_Y0058_IBC_LIST_MODIFY && !JVET_Z0075_IBC_HMVP_ENLARGE && !JVET_Z0084_IBC_TM
       if (ibcFlag)
       {
         if (!checkIsIBCCandidateValid(pu, miNeighbor))
@@ -1815,6 +1828,9 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
       {
         break;
       }
+#if JVET_Y0058_IBC_LIST_MODIFY && JVET_Z0084_IBC_TM && !JVET_Z0075_IBC_HMVP_ENLARGE
+      }
+#endif
     }
   }
 
@@ -1831,12 +1847,14 @@ bool PU::addIBCMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const 
 #if JVET_Y0058_IBC_LIST_MODIFY
   , const PredictionUnit &pu
 #endif
-#if TM_MRG
+#if TM_MRG || JVET_Z0084_IBC_TM
   , const uint32_t mvdSimilarityThresh
 #endif
 )
 {
+#if !JVET_Z0084_IBC_TM
   const Slice& slice = *cs.slice;
+#endif
   MotionInfo miNeighbor;
 
   auto &lut = cs.motionLut.lutIbc;
@@ -1847,55 +1865,74 @@ bool PU::addIBCMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const 
   {
     miNeighbor = lut[num_avai_candInLUT - mrgIdx];
 
+#if JVET_Y0058_IBC_LIST_MODIFY && JVET_Z0084_IBC_TM
+    if (checkIsIBCCandidateValid(pu, miNeighbor))
+    {
+#endif
+      mrgCtx.interDirNeighbours[cnt] = miNeighbor.interDir;
+#if !JVET_Z0084_IBC_TM
+      mrgCtx.useAltHpelIf      [cnt] = false;
+      mrgCtx.BcwIdx            [cnt] = (miNeighbor.interDir == 3) ? miNeighbor.BcwIdx : BCW_DEFAULT;
 #if INTER_LIC
-    mrgCtx.LICFlags[cnt] = miNeighbor.usesLIC;
-
-    CHECK(mrgCtx.LICFlags[cnt], "addMergeHMVPCand: LIC is not used with IBC mode")
+      mrgCtx.LICFlags          [cnt] = miNeighbor.usesLIC;
+      CHECK(mrgCtx.LICFlags[cnt], "addIBCMergeHMVPCand: LIC is not used with IBC mode")
 #endif
-    mrgCtx.interDirNeighbours[cnt] = miNeighbor.interDir;
-    mrgCtx.useAltHpelIf[cnt] = false;
-    mrgCtx.BcwIdx[cnt] = (miNeighbor.interDir == 3) ? miNeighbor.BcwIdx : BCW_DEFAULT;
+#endif
 
-    mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNeighbor.mv[0], miNeighbor.refIdx[0]);
-    if (slice.isInterB())
-    {
-      mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miNeighbor.mv[1], miNeighbor.refIdx[1]);
-    }
+      mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNeighbor.mv[0], miNeighbor.refIdx[0]);
+#if !JVET_Z0084_IBC_TM
+      if (slice.isInterB())
+      {
+        mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miNeighbor.mv[1], miNeighbor.refIdx[1]);
+      }
 #if MULTI_HYP_PRED
-    mrgCtx.addHypNeighbours[cnt] = miNeighbor.addHypData;
+      mrgCtx.addHypNeighbours[cnt] = miNeighbor.addHypData;
+#endif
 #endif
 
-    if (mrgCtx.xCheckSimilarMotion(cnt
+#if JVET_Z0084_IBC_TM
+      if (mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh, compareNum))
+      {
+        continue;
+      }
+#else
+      if (mrgCtx.xCheckSimilarMotion(cnt
 #if TM_MRG
-      , mvdSimilarityThresh
+        , mvdSimilarityThresh
 #endif
-      , compareNum
-    ))
-    {
-      continue;
-    }
-#if  JVET_Y0058_IBC_LIST_MODIFY
-    if (!checkIsIBCCandidateValid(pu, miNeighbor))
-    {
-      continue;
-    }
+        , compareNum
+      ))
+      {
+        continue;
+      }
 #endif
-    if (mrgCandIdx == cnt)
-    {
-      return true;
-    }
-    cnt++;
+#if JVET_Y0058_IBC_LIST_MODIFY && !JVET_Z0084_IBC_TM
+      if (!checkIsIBCCandidateValid(pu, miNeighbor))
+      {
+        continue;
+      }
+#endif
+      if (mrgCandIdx == cnt)
+      {
+        return true;
+      }
+      cnt++;
 
-    if (cnt == maxNumMergeCandMin1)
-    {
-      break;
+      if (cnt == maxNumMergeCandMin1)
+      {
+        break;
+      }
+#if JVET_Y0058_IBC_LIST_MODIFY && JVET_Z0084_IBC_TM
     }
+#endif
   }
 
+#if !JVET_Z0084_IBC_TM
   if (cnt < maxNumMergeCandMin1)
   {
     mrgCtx.useAltHpelIf[cnt] = false;
   }
+#endif
   return false;
 }
 #endif
@@ -1907,6 +1944,10 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #else
   const uint32_t maxNumMergeCand = pu.cs->sps->getMaxNumIBCMergeCand();
 #endif
+#if JVET_Z0084_IBC_TM
+  const uint32_t mvdSimilarityThresh = pu.tmMergeFlag ? PU::getTMMvdThreshold(pu) : 1;
+#endif
+
   for (uint32_t ui = 0; ui < maxNumMergeCand; ++ui)
   {
     mrgCtx.BcwIdx[ui] = BCW_DEFAULT;
@@ -1957,15 +1998,15 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
       return;
     }
     cnt++;
+
+    // early termination
+    if (cnt == maxNumMergeCand)
+    {
+      return;
+    }
 #if JVET_Y0058_IBC_LIST_MODIFY
     }
 #endif
-  }
-
-  // early termination
-  if (cnt == maxNumMergeCand)
-  {
-    return;
   }
 
   // above
@@ -1985,22 +2026,27 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
       mrgCtx.interDirNeighbours[cnt] = miAbove.interDir;
       // get Mv from Above
       mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miAbove.mv[0], miAbove.refIdx[0]);
-      if (mrgCandIdx == cnt)
-      {
-        return;
-      }
 
-      cnt++;
+#if JVET_Z0084_IBC_TM
+      if( !mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh) )
+#endif
+      {
+        if (mrgCandIdx == cnt)
+        {
+          return;
+        }
+        cnt++;
+
+        // early termination
+        if (cnt == maxNumMergeCand)
+        {
+          return;
+        }
+      }
 #if JVET_Y0058_IBC_LIST_MODIFY
       }
 #endif
     }
-  }
-
-  // early termination
-  if (cnt == maxNumMergeCand)
-  {
-    return;
   }
 
 #if JVET_Y0058_IBC_LIST_MODIFY
@@ -2020,19 +2066,24 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
         // get Mv from Above-right
         mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miAboveRight.mv[0], miAboveRight.refIdx[0]);
 
-        if (mrgCandIdx == cnt)
+#if JVET_Z0084_IBC_TM
+        if( !mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh) )
+#endif
         {
-          return;
-        }
+          if (mrgCandIdx == cnt)
+          {
+            return;
+          }
+          cnt++;
 
-        cnt++;
+          // early termination
+          if (cnt == maxNumMergeCand)
+          {
+            return;
+          }
+        }
       }
     }
-  }
-  // early termination
-  if (cnt == maxNumMergeCand)
-  {
-    return;
   }
 
   //left bottom
@@ -2049,23 +2100,31 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
         // get Inter Dir
         mrgCtx.interDirNeighbours[cnt] = miBelowLeft.interDir;
         mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miBelowLeft.mv[0], miBelowLeft.refIdx[0]);
-        if (mrgCandIdx == cnt)
-        {
-          return;
-        }
 
-        cnt++;
+#if JVET_Z0084_IBC_TM
+        if( !mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh) )
+#endif
+        {
+          if (mrgCandIdx == cnt)
+          {
+            return;
+          }
+          cnt++;
+
+          // early termination
+          if (cnt == maxNumMergeCand)
+          {
+            return;
+          }
+        }
       }
     }
   }
-  // early termination
-  if (cnt == maxNumMergeCand)
-  {
-    return;
-  }
 
   // above left
-#if !JVET_Z0075_IBC_HMVP_ENLARGE
+#if JVET_Z0084_IBC_TM && JVET_Z0075_IBC_HMVP_ENLARGE
+  if ((cnt < 4) && pu.cs->sps->getUseAML() && (mrgCandIdx >= 0)) //Only for AMVP case
+#elif !JVET_Z0075_IBC_HMVP_ENLARGE
   if (cnt < 4)
 #endif
   {
@@ -2082,20 +2141,26 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
           // get Inter Dir
           mrgCtx.interDirNeighbours[cnt] = miAboveLeft.interDir;
           mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miAboveLeft.mv[0], miAboveLeft.refIdx[0]);
-          if (mrgCandIdx == cnt)
-          {
-            return;
-          }
 
-          cnt++;
+#if JVET_Z0084_IBC_TM
+          if( !mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh) )
+#endif
+          {
+            if (mrgCandIdx == cnt)
+            {
+              return;
+            }
+            cnt++;
+
+            // early termination
+            if (cnt == maxNumMergeCand)
+            {
+              return;
+            }
+          }
         }
       }
     }
-  }
-  // early termination
-  if (cnt == maxNumMergeCand)
-  {
-    return;
   }
 #endif
 
@@ -2104,29 +2169,46 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #if JVET_Z0075_IBC_HMVP_ENLARGE
     bool bFound = addIBCMergeHMVPCand(cs, mrgCtx, mrgCandIdx, maxNumMergeCand, cnt
 #if JVET_Y0058_IBC_LIST_MODIFY
-      ,pu
+                                     , pu
 #endif
-     );
+#if JVET_Z0084_IBC_TM
+                                     , mvdSimilarityThresh
+#endif
+                                     );
 #else
-    bool bFound = addMergeHMVPCand(cs, mrgCtx, mrgCandIdx, maxNumMergeCand, cnt, isAvailableA1, miLeft, isAvailableB1,
+    bool bFound = addMergeHMVPCand(cs, mrgCtx, mrgCandIdx, maxNumMergeCand, cnt
+#if JVET_Z0084_IBC_TM
+                                  , isGt4x4 && isAvailableA1, miLeft, isGt4x4 && isAvailableB1, miAbove
+#else
+                                  , isAvailableA1, miLeft, isAvailableB1, miAbove
+#endif
+                                  , true, isGt4x4
 #if JVET_X0083_BM_AMVP_MERGE_MODE || JVET_Y0058_IBC_LIST_MODIFY
-                                   miAbove, true, isGt4x4, pu);
-#else
-                                   miAbove, true, isGt4x4);
+                                  , pu
 #endif
+#if JVET_Z0084_IBC_TM
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+#if !JVET_Y0128_NON_CTC
+                                  , 0, 0
+#endif
+#endif
+                                  , mvdSimilarityThresh
+#endif
+                                  );
 #endif
 
     if (bFound)
     {
       return;
     }
-  }
+
 #if JVET_Z0075_IBC_HMVP_ENLARGE
-  if (cnt == maxNumMergeCand)
-  {
-    return;
-  }
+    if (cnt == maxNumMergeCand)
+    {
+      return;
+    }
 #endif
+  }
 
 #if JVET_Y0058_IBC_LIST_MODIFY
   // pairwise-average candidates
@@ -2150,37 +2232,52 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
     {
       mrgCtx.mvFieldNeighbours[cnt * 2].setMvField(avgMv, MAX_NUM_REF);
       mrgCtx.interDirNeighbours[cnt] = 1;
+#if JVET_Z0084_IBC_TM
+      if( !mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh) )
+#else
       if (!mrgCtx.xCheckSimilarMotion(cnt))
+#endif
       {
         if (mrgCandIdx == cnt)
         {
           return;
         }
         cnt++;
+
+        // early termination
+        if (cnt == maxNumMergeCand)
+        {
+          return;
+        }
       }
     }
-  }
-
-  // early termination
-  if (cnt == maxNumMergeCand)
-  {
-    return;
   }
 #endif
 
-    while (cnt < maxNumMergeCand)
+  while (cnt < maxNumMergeCand)
+  {
+    mrgCtx.interDirNeighbours[cnt] = 1;
+    mrgCtx.mvFieldNeighbours[cnt * 2].setMvField(Mv(0, 0), MAX_NUM_REF);
+    if (mrgCandIdx == cnt)
     {
-      mrgCtx.mvFieldNeighbours[cnt * 2].setMvField(Mv(0, 0), MAX_NUM_REF);
-      mrgCtx.interDirNeighbours[cnt] = 1;
-      if (mrgCandIdx == cnt)
-      {
-        return;
-      }
-      cnt++;
+      return;
     }
+    cnt++;
+  }
 
-#if !JVET_Z0075_IBC_HMVP_ENLARGE
+#if JVET_Z0084_IBC_TM && JVET_Z0075_IBC_HMVP_ENLARGE
+  mrgCtx.numValidMergeCand = std::min((int)pu.cs->sps->getMaxNumIBCMergeCand(), cnt);
+#elif !JVET_Z0075_IBC_HMVP_ENLARGE
   mrgCtx.numValidMergeCand = cnt;
+#endif
+
+#if JVET_Z0084_IBC_TM && JVET_Z0075_IBC_HMVP_ENLARGE
+  // Add a zero motion to be able to stop reordering
+  if (cnt < maxNumMergeCand)
+  {
+    mrgCtx.interDirNeighbours[cnt] = 1;
+    mrgCtx.mvFieldNeighbours[cnt * 2].setMvField(Mv(0, 0), MAX_NUM_REF);
+  }
 #endif
 }
 
@@ -2208,15 +2305,18 @@ bool PU::checkIsIBCCandidateValid(const PredictionUnit& pu, const MotionInfo miN
     return false;
   }
 }
+#endif
+
+#if JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0084_IBC_TM
 bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int height, int picWidth, int picHeight, int xBv, int yBv, int ctuSize)
 {
   const int ctuSizeLog2 = floorLog2(ctuSize);
 
   int refRightX = xPos + xBv + width - 1;
-  int refBottomY = yPos + yBv + height - 1;
+  int refLeftX  = xPos + xBv;
 
-  int refLeftX = xPos + xBv;
-  int refTopY = yPos + yBv;
+  int refBottomY = yPos + yBv + height - 1;
+  int refTopY    = yPos + yBv;
 
   if ((xPos + xBv) < 0)
   {
@@ -2252,7 +2352,11 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
     return false;
   }
 
+#if JVET_Z0084_IBC_TM
+  unsigned curTileIdx = pu.cs->pps->getTileIdx(Position(xPos, yPos));
+#else
   unsigned curTileIdx = pu.cs->pps->getTileIdx(pu.lumaPos());
+#endif
   unsigned refTileIdx = pu.cs->pps->getTileIdx(Position(refLeftX, refTopY));
   if (curTileIdx != refTileIdx)
   {
@@ -2292,7 +2396,11 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
 #endif
     {
       // ref block's collocated block in current CTU
+#if JVET_Z0084_IBC_TM
+      const Position refPosCol(refLeftX + ctuSize,  refTopY);
+#else
       const Position refPosCol = pu.Y().topLeft().offset(xBv + ctuSize, yBv);
+#endif
       int offset64x = (refPosCol.x >> (ctuSizeLog2 - 1)) << (ctuSizeLog2 - 1);
       int offset64y = (refPosCol.y >> (ctuSizeLog2 - 1)) << (ctuSizeLog2 - 1);
       const Position refPosCol64x64 = {offset64x, offset64y};
@@ -2312,8 +2420,13 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
   }
 
   // in the same CTU, or valid area from left CTU. Check if the reference block is already coded
+#if JVET_Z0084_IBC_TM
+  const Position refPosLT(refLeftX,  refTopY);
+  const Position refPosBR(refRightX, refBottomY);
+#else
   const Position refPosLT = pu.Y().topLeft().offset(xBv, yBv);
   const Position refPosBR = pu.Y().bottomRight().offset(xBv, yBv);
+#endif
   const ChannelType      chType = toChannelType(COMPONENT_Y);
   if (!pu.cs->isDecomp(refPosBR, chType))
   {
@@ -3563,11 +3676,9 @@ bool PU::isBiPredFromDifferentDirEqDistPoc(const PredictionUnit& pu, int refIdx0
 
 bool PU::addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int &mrgCandIdx,
   const uint32_t maxNumMergeCandMin1, int &cnt, const bool isAvailableA1,
-#if JVET_Z0075_IBC_HMVP_ENLARGE
   const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
-#else
-  const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove,
-  const bool ibcFlag, const bool isGt4x4
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
+  , const bool ibcFlag, const bool isGt4x4
 #endif
 #if TM_MRG
   , const uint32_t mvdSimilarityThresh
@@ -5679,13 +5790,77 @@ bool PU::getDerivedBV(PredictionUnit &pu, const Mv& currentMv, Mv& derivedMv)
 /**
  * Constructs a list of candidates for IBC AMVP (See specification, section "Derivation process for motion vector predictor candidates")
  */
+#if JVET_Z0084_IBC_TM && TM_AMVP
+void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo, InterPrediction* pcInter)
+#else
 void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
+#endif
 {
   AMVPInfo *pInfo = &amvpInfo;
-
   pInfo->numCand = 0;
 
   MergeCtx mergeCtx;
+#if JVET_Z0084_IBC_TM && TM_AMVP
+  pInfo->maxSimilarityThreshold = (pu.cs->sps->getUseDMVDMode() && pcInter) ? PU::getTMMvdThreshold(pu) : 1;
+
+  pu.tmMergeFlag = true;
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  PU::getIBCMergeCandidates(pu, mergeCtx, pu.cs->sps->getMaxNumIBCMergeCand());
+#else
+  PU::getIBCMergeCandidates(pu, mergeCtx);
+#endif
+  pu.tmMergeFlag = false;
+
+  int candIdx = 0;
+  while ((pInfo->numCand < AMVP_MAX_NUM_CANDS_MEM) && (candIdx < mergeCtx.numValidMergeCand))
+  {
+    pInfo->mvCand[pInfo->numCand] = mergeCtx.mvFieldNeighbours[candIdx << 1].mv;
+    pInfo->mvCand[pInfo->numCand].roundIbcPrecInternal2Amvr(pu.cu->imv);
+    if (!pInfo->xCheckSimilarMotion(pInfo->numCand))
+    {
+      pInfo->numCand++;
+    }
+    candIdx++;
+  }
+
+  if (pu.cs->sps->getUseDMVDMode() && pcInter && pInfo->numCand > 0)
+  {
+    struct AMVPSort
+    {
+      Mv AMVPCand;
+      Distortion cost;
+    };
+    AMVPSort temp;
+    std::vector<AMVPSort> input;
+    const auto CostIncSort = [](const AMVPSort &x, const AMVPSort &y) { return x.cost < y.cost; };
+    Distortion tmCost = std::numeric_limits<Distortion>::max();
+
+    for (int candIdx = 0; candIdx < pInfo->numCand; ++candIdx)
+    {
+      tmCost = pcInter->deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), REF_PIC_LIST_0, MAX_NUM_REF, TM_MAX_NUM_OF_ITERATIONS, pInfo->mvCand[candIdx]);
+      pInfo->mvCand[candIdx].roundIbcPrecInternal2Amvr(pu.cu->imv);
+      temp.AMVPCand = pInfo->mvCand[candIdx];
+      temp.cost     = tmCost;
+      input.push_back(temp);
+    }
+
+    stable_sort(input.begin(), input.end(), CostIncSort);
+    for (int candIdx = 0; candIdx < pInfo->numCand; ++candIdx)
+    {
+      pInfo->mvCand[candIdx] = input.at(candIdx).AMVPCand;
+    }
+  }
+
+  if (pInfo->numCand > AMVP_MAX_NUM_CANDS)
+  {
+    pInfo->numCand = AMVP_MAX_NUM_CANDS;
+  }
+
+  while (pInfo->numCand < AMVP_MAX_NUM_CANDS)
+  {
+    pInfo->mvCand[pInfo->numCand++] = Mv(0, 0);
+  }
+#else
   PU::getIBCMergeCandidates(pu, mergeCtx, AMVP_MAX_NUM_CANDS - 1);
   int candIdx = 0;
   while (pInfo->numCand < AMVP_MAX_NUM_CANDS)
@@ -5699,6 +5874,7 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
   {
     mv.roundIbcPrecInternal2Amvr(pu.cu->imv);
   }
+#endif
 }
 
 
@@ -9953,19 +10129,33 @@ void PU::applyImv( PredictionUnit& pu, MergeCtx &mrgCtx, InterPrediction *interP
 #endif
     if( pu.interDir != 2 /* PRED_L1 */ )
     {
+#if !JVET_Z0084_IBC_TM
       pu.mvd[0].changeTransPrecAmvr2Internal(pu.cu->imv);
+#endif
       unsigned mvpIdx = pu.mvpIdx[0];
       AMVPInfo amvpInfo;
       if (CU::isIBC(*pu.cu))
       {
+#if JVET_Z0084_IBC_TM
+        pu.mvd[0].changeIbcPrecAmvr2Internal(pu.cu->imv);
+#endif
+#if JVET_Z0084_IBC_TM && TM_AMVP
+        PU::fillIBCMvpCand(pu, amvpInfo, interPred);
+#else
         PU::fillIBCMvpCand(pu, amvpInfo);
+#endif
       }
       else
-      PU::fillMvpCand(pu, REF_PIC_LIST_0, pu.refIdx[0], amvpInfo
-#if TM_AMVP
-                    , interPred
+      {
+#if JVET_Z0084_IBC_TM
+        pu.mvd[0].changeTransPrecAmvr2Internal(pu.cu->imv);
 #endif
-      );
+        PU::fillMvpCand(pu, REF_PIC_LIST_0, pu.refIdx[0], amvpInfo
+#if TM_AMVP
+                      , interPred
+#endif
+          );
+      }
       pu.mvpNum[0] = amvpInfo.numCand;
       pu.mvpIdx[0] = mvpIdx;
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED

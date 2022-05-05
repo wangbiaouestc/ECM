@@ -9412,6 +9412,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 
   tempCS->initStructData(encTestMode.qp);
   MergeCtx mergeCtx;
+#if JVET_Z0084_IBC_TM && TM_MRG
+  MergeCtx mergeCtxTm;
+#endif
 
   if (sps.getSbTMVPEnabledFlag())
   {
@@ -9445,8 +9448,38 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
     m_pcInterSearch->adjustIBCMergeCandidates(pu, mergeCtx);
 #endif
 #endif
+
+#if JVET_Z0084_IBC_TM && TM_MRG
+    pu.tmMergeFlag = true;
+    PU::getIBCMergeCandidates(pu, mergeCtxTm);
+#if JVET_Y0058_IBC_LIST_MODIFY && JVET_W0090_ARMC_TM
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+    m_pcInterSearch->adjustIBCMergeCandidates(pu, mergeCtxTm, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
+#else
+    m_pcInterSearch->adjustIBCMergeCandidates(pu, mergeCtxTm);
+#endif
+#endif
+    pu.tmMergeFlag = false;
+#endif
   }
 
+#if JVET_Z0084_IBC_TM && TM_MRG
+  int candHasNoResidual[IBC_MRG_MAX_NUM_CANDS<<1];
+  for (unsigned int ui = 0; ui < IBC_MRG_MAX_NUM_CANDS<<1; ui++)
+  {
+    candHasNoResidual[ui] = 0;
+  }
+
+  bool                                                 bestIsSkip = false;
+  unsigned                                             numMrgSATDCand = mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand;
+  static_vector<unsigned, (IBC_MRG_MAX_NUM_CANDS<<1)>  RdModeList(IBC_MRG_MAX_NUM_CANDS<<1);
+  for (unsigned i = 0; i < IBC_MRG_MAX_NUM_CANDS<<1; i++)
+  {
+    RdModeList[i] = i;
+  }
+
+  static_vector<double, (IBC_MRG_MAX_NUM_CANDS<<1)>  candCostList(IBC_MRG_MAX_NUM_CANDS<<1, MAX_DOUBLE);
+#else
   int candHasNoResidual[MRG_MAX_NUM_CANDS];
   for (unsigned int ui = 0; ui < mergeCtx.numValidMergeCand; ui++)
   {
@@ -9463,6 +9496,7 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 
   //{
     static_vector<double, MRG_MAX_NUM_CANDS>  candCostList(MRG_MAX_NUM_CANDS, MAX_DOUBLE);
+#endif
     // 1. Pass: get SATD-cost for selected candidates and reduce their count
     {
       const double sqrtLambdaForFirstPass = m_pcRdCost->getMotionLambda( );
@@ -9480,13 +9514,14 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if INTER_LIC
       cu.LICFlag = false;
 #endif
-
       cu.geoFlag = false;
-      DistParam distParam;
-      const bool bUseHadamard = !cu.slice->getDisableSATDForRD();
+
       PredictionUnit &pu = tempCS->addPU(cu, partitioner.chType); //tempCS->addPU(cu);
       pu.mmvdMergeFlag = false;
       pu.regularMergeFlag = false;
+
+      DistParam distParam;
+      const bool bUseHadamard = !cu.slice->getDisableSATDForRD();
       Picture* refPic = pu.cu->slice->getPic();
       const CPelBuf refBuf = refPic->getRecoBuf(pu.blocks[COMPONENT_Y]);
       const Pel*        piRefSrch = refBuf.buf;
@@ -9499,35 +9534,53 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
         m_pcRdCost->setDistParam(distParam, tmpLuma, refBuf, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
       }
       else
-      m_pcRdCost->setDistParam(distParam, tempCS->getOrgBuf().Y(), refBuf, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
+        m_pcRdCost->setDistParam(distParam, tempCS->getOrgBuf().Y(), refBuf, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
+
       int refStride = refBuf.stride;
+#if !JVET_Y0058_IBC_LIST_MODIFY || !JVET_Z0084_IBC_TM
       const UnitArea localUnitArea(tempCS->area.chromaFormat, Area(0, 0, tempCS->area.Y().width, tempCS->area.Y().height));
+      const int cuPelX = pu.Y().x;
+      const int cuPelY = pu.Y().y;
+      const int roiWidth  = pu.lwidth();
+      const int roiHeight = pu.lheight();
+      const int picWidth  = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
+      const int picHeight = pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
+      const unsigned int lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
+#endif
+
+#if JVET_Z0084_IBC_TM && TM_MRG
+      int numValidBv = mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand;
+#else
       int numValidBv = mergeCtx.numValidMergeCand;
+#endif
       for (unsigned int mergeCand = 0; mergeCand < mergeCtx.numValidMergeCand; mergeCand++)
       {
         mergeCtx.setMergeInfo(pu, mergeCand); // set bv info in merge mode
-        const int cuPelX = pu.Y().x;
-        const int cuPelY = pu.Y().y;
-        int roiWidth = pu.lwidth();
-        int roiHeight = pu.lheight();
-        const int picWidth = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
-        const int picHeight = pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
-        const unsigned int  lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
+
         int xPred = pu.bv.getHor();
         int yPred = pu.bv.getVer();
-
+#if !JVET_Y0058_IBC_LIST_MODIFY || !JVET_Z0084_IBC_TM  //should have already been checked at merge list construction
+#if JVET_Z0084_IBC_TM
+        if (!PU::searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, xPred, yPred, lcuWidth)) // not valid bv derived
+#else
         if (!m_pcInterSearch->searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, xPred, yPred, lcuWidth)) // not valid bv derived
+#endif
         {
           numValidBv--;
           continue;
         }
+#endif
         PU::spanMotionInfo(pu, mergeCtx);
 
         distParam.cur.buf = piRefSrch + refStride * yPred + xPred;
 
         Distortion sad = distParam.distFunc(distParam);
         unsigned int bitsCand = mergeCand + 1;
+#if JVET_Z0084_IBC_TM
+        if (mergeCand == tempCS->sps->getMaxNumIBCMergeCand() - 1)
+#else
         if (mergeCand == tempCS->sps->getMaxNumMergeCand() - 1)
+#endif
         {
           bitsCand--;
         }
@@ -9536,6 +9589,54 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
         updateCandList(mergeCand, cost, RdModeList, candCostList
          , numMrgSATDCand);
       }
+
+#if JVET_Z0084_IBC_TM && TM_MRG
+    // Add TM refined candidates
+    for (unsigned int mergeCand = 0; mergeCand < mergeCtxTm.numValidMergeCand; mergeCand++)
+    {
+      mergeCtxTm.setMergeInfo(pu, mergeCand); // set bv info in merge mode
+
+      Mv tempBv = pu.bv;
+      pu.tmMergeFlag = true;
+      m_pcInterSearch->deriveTMMv(pu);
+      pu.tmMergeFlag = false;
+
+      pu.bv = pu.mv[0];
+      pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+      // Check if mv has been refined
+      if (pu.bv == tempBv)
+      {
+        numValidBv--;
+        continue;
+      }
+
+      //Store refined result for RDO loop
+      mergeCtxTm.mvFieldNeighbours[mergeCand << 1].mv = pu.mv[0];
+
+      int xPred = pu.bv.getHor();
+      int yPred = pu.bv.getVer();
+#if !JVET_Y0058_IBC_LIST_MODIFY  //should have already been checked at merge list construction and during refinement
+      if (!PU::searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, xPred, yPred, lcuWidth)) // not valid bv derived
+      {
+        numValidBv--;
+        continue;
+      }
+#endif
+      PU::spanMotionInfo(pu, mergeCtxTm);
+
+      distParam.cur.buf = piRefSrch + refStride * yPred + xPred;
+
+      Distortion sad = distParam.distFunc(distParam);
+      unsigned int bitsCand = mergeCand + 1;
+      if (mergeCand == tempCS->sps->getMaxNumIBCMergeCand() - 1)
+      {
+        bitsCand--;
+      }
+      double cost = (double)sad + (double)bitsCand * sqrtLambdaForFirstPass;
+
+      updateCandList(mergeCand+mergeCtx.numValidMergeCand, cost, RdModeList, candCostList, numMrgSATDCand);
+    }
+#endif
 
       // Try to limit number of candidates using SATD-costs
       if (numValidBv)
@@ -9601,8 +9702,21 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
             pu.mmvdMergeFlag = false;
             pu.regularMergeFlag = false;
             cu.geoFlag = false;
-            mergeCtx.setMergeInfo(pu, mergeCand);
-            PU::spanMotionInfo(pu, mergeCtx);
+#if JVET_Z0084_IBC_TM && TM_MRG
+            pu.tmMergeFlag      = false;
+            if (mergeCand >= mergeCtx.numValidMergeCand)
+            {
+              pu.tmMergeFlag    = true;
+              mergeCand        -= mergeCtx.numValidMergeCand;
+              mergeCtxTm.setMergeInfo(pu, mergeCand);
+              PU::spanMotionInfo(pu, mergeCtxTm);
+            }
+            else
+#endif
+            {
+              mergeCtx.setMergeInfo(pu, mergeCand);
+              PU::spanMotionInfo(pu, mergeCtx);
+            }
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
             const bool chroma = !(CS::isDualITree(*tempCS));
 #else

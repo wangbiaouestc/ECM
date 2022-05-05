@@ -3251,7 +3251,11 @@ void CABACReader::tm_merge_flag(PredictionUnit& pu)
   if (pu.cs->slice->getSPS()->getUseDMVDMode())
   {
     RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MERGE_FLAG, pu.lumaSize());
+#if JVET_Z0084_IBC_TM && TM_MRG
+    pu.tmMergeFlag = (m_BinDecoder.decodeBin(Ctx::TMMergeFlag(CU::isIBC(*pu.cu) ? 1 : 0)));
+#else
     pu.tmMergeFlag = (m_BinDecoder.decodeBin(Ctx::TMMergeFlag()));
+#endif
 #if JVET_X0049_ADAPT_DMVR
     DTRACE(g_trace_ctx, D_SYNTAX, "tm_merge_flag() tmMergeFlag || bmMergeFlag=%d\n", pu.tmMergeFlag);
 #else
@@ -3303,6 +3307,9 @@ void CABACReader::merge_data( PredictionUnit& pu )
 {
   if (CU::isIBC(*pu.cu))
   {
+#if JVET_Z0084_IBC_TM && TM_MRG
+    tm_merge_flag(pu);
+#endif
     merge_idx(pu);
     return;
   }

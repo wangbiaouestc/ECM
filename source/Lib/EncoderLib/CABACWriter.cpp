@@ -2855,10 +2855,18 @@ void CABACWriter::tm_merge_flag(const PredictionUnit& pu)
     return;
   }
 
+#if JVET_Z0084_IBC_TM && TM_MRG
+#if JVET_X0049_ADAPT_DMVR
+  m_BinEncoder.encodeBin(pu.tmMergeFlag || pu.bmMergeFlag, Ctx::TMMergeFlag(CU::isIBC(*pu.cu) ? 1 : 0));
+#else
+  m_BinEncoder.encodeBin(pu.tmMergeFlag, Ctx::TMMergeFlag(CU::isIBC(*pu.cu) ? 1 : 0));
+#endif
+#else
 #if JVET_X0049_ADAPT_DMVR
   m_BinEncoder.encodeBin(pu.tmMergeFlag || pu.bmMergeFlag, Ctx::TMMergeFlag());
 #else
   m_BinEncoder.encodeBin(pu.tmMergeFlag, Ctx::TMMergeFlag());
+#endif
 #endif
 
 #if JVET_X0049_ADAPT_DMVR
@@ -2901,6 +2909,9 @@ void CABACWriter::merge_data(const PredictionUnit& pu)
 {
   if (CU::isIBC(*pu.cu))
   {
+#if JVET_Z0084_IBC_TM && TM_MRG
+    tm_merge_flag(pu);
+#endif
     merge_idx(pu);
     return;
   }

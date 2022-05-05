@@ -649,6 +649,52 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
   return false;
 }
 #endif
+#if JVET_Z0084_IBC_TM
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+bool MergeCtx::xCheckSimilarIBCMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh, int compareNum) const
+#else
+bool MergeCtx::xCheckSimilarIBCMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh) const
+#endif
+{
+  if (mvFieldNeighbours[mergeCandIndex << 1].refIdx < 0)
+  {
+    return true;
+  }
+
+  if (mvdSimilarityThresh > 1)
+  {
+    for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
+    {
+      Mv mvDiff = mvFieldNeighbours[ui << 1].mv - mvFieldNeighbours[mergeCandIndex << 1].mv;
+      if (mvDiff.getAbsHor() < mvdSimilarityThresh && mvDiff.getAbsVer() < mvdSimilarityThresh)
+      {
+        return true;
+      }
+    }
+  }
+  else
+  {
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+    if (compareNum == -1)
+    {
+      compareNum = mergeCandIndex;
+    }
+
+    for (uint32_t ui = 0; ui < compareNum; ui++)
+#else
+    for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
+#endif
+    {
+      if (mvFieldNeighbours[ui << 1].mv == mvFieldNeighbours[mergeCandIndex << 1].mv)
+      {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+#endif
 #if JVET_W0097_GPM_MMVD_TM
 void MergeCtx::setGeoMmvdMergeInfo(PredictionUnit& pu, int mergeIdx, int mmvdIdx)
 {

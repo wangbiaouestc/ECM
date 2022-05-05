@@ -582,7 +582,9 @@ public:
   }
   void resetSavedAffineMotion();
   void storeAffineMotion( Mv acAffineMv[2][3], int8_t affineRefIdx[2], EAffineModel affineType, int bcwIdx );
+#if !JVET_Z0084_IBC_TM
   bool searchBv(PredictionUnit& pu, int xPos, int yPos, int width, int height, int picWidth, int picHeight, int xBv, int yBv, int ctuSize);
+#endif
   void setClipMvInSubPic(bool flag) { m_clipMvInSubPic = flag; }
 protected:
 

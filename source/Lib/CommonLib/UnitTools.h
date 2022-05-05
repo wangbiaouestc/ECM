@@ -192,6 +192,8 @@ namespace PU
   void getIBCMergeCandidates          (const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx = -1);
 #if  JVET_Y0058_IBC_LIST_MODIFY
   bool checkIsIBCCandidateValid       (const PredictionUnit &pu,const MotionInfo miNeighbor);
+#endif
+#if JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0084_IBC_TM
   bool searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int height, int picWidth, int picHeight, int xBv, int yBv, int ctuSize);
 #endif
   void getInterMMVDMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx = -1);
@@ -207,7 +209,11 @@ namespace PU
                                      , InterPrediction* interPred = nullptr
 #endif
   );
+#if JVET_Z0084_IBC_TM && TM_AMVP
+  void fillIBCMvpCand                 (      PredictionUnit &pu, AMVPInfo &amvpInfo, InterPrediction* pcInter);
+#else
   void fillIBCMvpCand                 (PredictionUnit &pu, AMVPInfo &amvpInfo);
+#endif
   void fillAffineMvpCand              (      PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AffineAMVPInfo &affiAMVPInfo);
   bool addMVPCandUnscaled             (const PredictionUnit &pu, const RefPicList &eRefPicList, const int &iRefIdx, const Position &pos, const MvpDir &eDir, AMVPInfo &amvpInfo);
   void xInheritedAffineMv             ( const PredictionUnit &pu, const PredictionUnit* puNeighbour, RefPicList eRefPicList, Mv rcMv[3] );
@@ -226,7 +232,7 @@ namespace PU
     , const int amvpPoc = 0
 #endif
 #endif
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && !JVET_Z0075_IBC_HMVP_ENLARGE)
     , const uint32_t mvdSimilarityThresh = 1
 #endif
   );
@@ -240,9 +246,9 @@ namespace PU
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   bool addIBCMergeHMVPCand               (const CodingStructure &cs, MergeCtx& mrgCtx, const int& mrgCandIdx, const uint32_t maxNumMergeCandMin1, int &cnt
 #if JVET_Y0058_IBC_LIST_MODIFY
-    ,const PredictionUnit &pu
+    , const PredictionUnit &pu
 #endif
-#if TM_MRG
+#if TM_MRG || JVET_Z0084_IBC_TM
     , const uint32_t mvdSimilarityThresh = 1
 #endif
   );
