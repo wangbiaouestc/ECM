@@ -226,6 +226,10 @@ public:
     , bool codeSign = true
 #endif
   );
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+  void        bvdCoding                ( const Mv &rMvd, int8_t imv );
+  void        xWriteBvdContext(unsigned uiSymbol, unsigned ctxT, int offset, int param);
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   void mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList);
   void mvsdAffineIdxFunc(const PredictionUnit &pu, RefPicList eRefList);
