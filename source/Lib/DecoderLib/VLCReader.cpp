@@ -2312,6 +2312,10 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     READ_UVLC(uiCode, "max_num_add_hyps_minus1");                pcSPS->setMaxNumAddHyps(uiCode + 1);
     READ_UVLC(uiCode, "num_add_hyp_weights_minus1");             pcSPS->setNumAddHypWeights(uiCode + 1);
     READ_UVLC(uiCode, "max_num_add_hyp_ref_frames_minus1");      pcSPS->setMaxNumAddHypRefFrames(uiCode + 1);
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+    READ_UVLC(uiCode, "max_num_merge_cand_minus_max_num_mhp_cand");
+    pcSPS->setMaxNumMHPCand((uint32_t)(pcSPS->getMaxNumMergeCand() - uiCode));
+#endif
   }
 #endif
 

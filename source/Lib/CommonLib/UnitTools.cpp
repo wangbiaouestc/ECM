@@ -10306,9 +10306,16 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
   MergeCtx tmpMergeCtx;
 
   const uint32_t maxNumMergeCand = pu.cs->sps->getMaxNumMergeCand();
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  const uint32_t maxNumGeoMergeCand = std::max(pu.cs->sps->getMaxNumMHPCand(), pu.cs->sps->getMaxNumGeoCand());
+#endif
   geoMrgCtx.numValidMergeCand = 0;
 
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  for (int32_t i = 0; i < maxNumGeoMergeCand; i++)
+#else
   for (int32_t i = 0; i < GEO_MAX_NUM_UNI_CANDS; i++)
+#endif
   {
     geoMrgCtx.BcwIdx[i] = BCW_DEFAULT;
     geoMrgCtx.interDirNeighbours[i] = 0;
@@ -10358,7 +10365,11 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
       }
 #endif
       geoMrgCtx.numValidMergeCand++;
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+      if (geoMrgCtx.numValidMergeCand == maxNumGeoMergeCand)
+#else
       if (geoMrgCtx.numValidMergeCand == GEO_MAX_NUM_UNI_CANDS)
+#endif
       {
         return;
       }
@@ -10379,7 +10390,11 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
       }
 #endif
       geoMrgCtx.numValidMergeCand++;
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+      if (geoMrgCtx.numValidMergeCand == maxNumGeoMergeCand)
+#else
       if (geoMrgCtx.numValidMergeCand == GEO_MAX_NUM_UNI_CANDS)
+#endif
       {
         return;
       }
@@ -10387,7 +10402,11 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
   }
 #if JVET_W0097_GPM_MMVD_TM
   // add more parity based geo candidates, in an opposite parity rule
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  if (geoMrgCtx.numValidMergeCand < maxNumGeoMergeCand)
+#else
   if (geoMrgCtx.numValidMergeCand < pu.cs->sps->getMaxNumGeoCand())
+#endif
   {
     for (int32_t i = 0; i < maxNumMergeCand; i++)
     {
@@ -10404,7 +10423,11 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
           continue;
         }
         geoMrgCtx.numValidMergeCand++;
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+        if (geoMrgCtx.numValidMergeCand == maxNumGeoMergeCand)
+#else
         if (geoMrgCtx.numValidMergeCand == pu.cs->sps->getMaxNumGeoCand())
+#endif
         {
           return;
         }
@@ -10413,7 +10436,11 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
   }
 
   // add at most two average based geo candidates
-  if (geoMrgCtx.numValidMergeCand < pu.cs->sps->getMaxNumGeoCand())
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  if (geoMrgCtx.numValidMergeCand == maxNumGeoMergeCand)
+#else
+  if (geoMrgCtx.numValidMergeCand == pu.cs->sps->getMaxNumGeoCand())
+#endif
   {
     // add one L0 cand by averaging the first two available L0 candidates
     int cnt = 0;
@@ -10447,7 +10474,11 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
       {
         geoMrgCtx.numValidMergeCand++;
       }
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+      if (geoMrgCtx.numValidMergeCand == maxNumGeoMergeCand)
+#else
       if (geoMrgCtx.numValidMergeCand == pu.cs->sps->getMaxNumGeoCand())
+#endif
       {
         return;
       }
@@ -10483,13 +10514,21 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
       {
         geoMrgCtx.numValidMergeCand++;
       }
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+      if (geoMrgCtx.numValidMergeCand == maxNumGeoMergeCand)
+#else
       if (geoMrgCtx.numValidMergeCand == pu.cs->sps->getMaxNumGeoCand())
+#endif
       {
         return;
       }
     }
   }
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  if (geoMrgCtx.numValidMergeCand < maxNumGeoMergeCand)
+#else
   if (geoMrgCtx.numValidMergeCand < pu.cs->sps->getMaxNumGeoCand())
+#endif
   {
     const Slice &slice = *pu.cs->slice;
 #if JVET_Y0065_GPM_INTRA
@@ -10501,7 +10540,11 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
     int r = 0;
     int refcnt = 0;
 
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+    for (int32_t i = geoMrgCtx.numValidMergeCand; i < maxNumGeoMergeCand; i++)
+#else
     for (int32_t i = geoMrgCtx.numValidMergeCand; i < pu.cs->sps->getMaxNumGeoCand(); i++)
+#endif
     {
 #if JVET_Y0065_GPM_INTRA
       int parity = pu.cs->slice->isInterP() ? 0 : (i & 1);
@@ -10527,7 +10570,11 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
         }
 
         geoMrgCtx.numValidMergeCand++;
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+        if (geoMrgCtx.numValidMergeCand == maxNumGeoMergeCand)
+#else
         if (geoMrgCtx.numValidMergeCand == pu.cs->sps->getMaxNumGeoCand())
+#endif
         {
           return;
         }

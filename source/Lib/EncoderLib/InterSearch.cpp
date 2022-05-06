@@ -3888,9 +3888,16 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
   auto savedLICFlag = pu.cu->LICFlag;
 #endif
   tempMHPredData.isMrg = true;
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  uint8_t maxNumMergeCandidates = pu.cs->sps->getMaxNumMHPCand();
+  CHECK(maxNumMergeCandidates >= GEO_MAX_NUM_UNI_CANDS, "");
+  if (maxNumMergeCandidates > 0)
+  {
+#else
   {
     uint8_t maxNumMergeCandidates = pu.cs->sps->getMaxNumGeoCand();
     CHECK(maxNumMergeCandidates >= GEO_MAX_NUM_UNI_CANDS, "");
+#endif
     DistParam distParam;
     const bool bUseHadamard = !pu.cs->slice->getDisableSATDForRD();
     m_pcRdCost->setDistParam(distParam, origBuf.Y(), tempOrigBuf.Y(), sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);

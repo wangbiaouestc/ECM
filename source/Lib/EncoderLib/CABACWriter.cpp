@@ -4008,6 +4008,21 @@ void CABACWriter::mh_pred_data(const PredictionUnit& pu)
     const MultiHypPredictionData &mhData = pu.addHypData[i];
 
 #if MULTI_HYP_PRED
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+    const int maxNumMHPCand = pu.cs->sps->getMaxNumMHPCand();
+    if (maxNumMHPCand > 0)
+    {
+      m_BinEncoder.encodeBin(mhData.isMrg, Ctx::MultiHypothesisFlag(2));
+    }
+    else
+    {
+      CHECK(mhData.isMrg, "mhData.isMrg is true while maxNumMHPCand is 0")
+    }
+    if (mhData.isMrg)
+    {
+      CHECK(mhData.mrgIdx >= maxNumMHPCand, "Incorrect mhData.mrgIdx");
+      int numCandminus2 = maxNumMHPCand - 2;
+#else
     m_BinEncoder.encodeBin(mhData.isMrg, Ctx::MultiHypothesisFlag(2));
     if (mhData.isMrg)
     {
@@ -4015,6 +4030,7 @@ void CABACWriter::mh_pred_data(const PredictionUnit& pu)
       CHECK(maxNumGeoCand < 2, "Incorrect max number of geo candidates");
       CHECK(mhData.mrgIdx >= maxNumGeoCand, "Incorrect mhData.mrgIdx");
       int numCandminus2 = maxNumGeoCand - 2;
+#endif
       m_BinEncoder.encodeBin(mhData.mrgIdx == 0 ? 0 : 1, Ctx::MergeIdx());
       if (mhData.mrgIdx > 0)
       {

@@ -1440,6 +1440,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setMaxNumAffineMergeCand(getMaxNumAffineMergeCand());
   sps.setMaxNumIBCMergeCand(getMaxNumIBCMergeCand());
   sps.setMaxNumGeoCand(getMaxNumGeoCand());
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  sps.setMaxNumMHPCand(getMaxNumMHPCand());
+#endif
   sps.setUseAffine             ( m_Affine );
   sps.setUseAffineType         ( m_AffineType );
 #if AFFINE_MMVD

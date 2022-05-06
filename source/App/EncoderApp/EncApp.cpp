@@ -922,6 +922,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setMaxNumAffineMergeCand                             ( m_maxNumAffineMergeCand );
   m_cEncLib.setMaxNumGeoCand                                     ( m_maxNumGeoCand );
   m_cEncLib.setMaxNumIBCMergeCand                                ( m_maxNumIBCMergeCand );
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  m_cEncLib.setMaxNumMHPCand                                     ( m_maxNumMHPCand );
+#endif
 
   //====== Weighted Prediction ========
   m_cEncLib.setUseWP                                             ( m_useWeightedPred     );

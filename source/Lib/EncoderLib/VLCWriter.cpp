@@ -1418,6 +1418,10 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     WRITE_UVLC(pcSPS->getMaxNumAddHyps() - 1, "max_num_add_hyps_minus1");
     WRITE_UVLC(pcSPS->getNumAddHypWeights() - 1, "num_add_hyp_weights_minus1");
     WRITE_UVLC(pcSPS->getMaxNumAddHypRefFrames() - 1, "max_num_add_hyp_ref_frames_minus1");
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+    WRITE_UVLC(pcSPS->getMaxNumMergeCand() - pcSPS->getMaxNumMHPCand(),
+      "max_num_merge_cand_minus_max_num_mhp_cand");
+#endif
   }
 #endif
 
