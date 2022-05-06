@@ -1541,6 +1541,23 @@ const CtxSet ContextSetCfg::Mvd = ContextSetCfg::addCtxSet
   { 126,  68, },
   });
 
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+const CtxSet ContextSetCfg::Bvd = ContextSetCfg::addCtxSet
+({
+  { 53,  38,  38,  29,  20,  34,  27,  45,  37,  43,  34,  48  },
+  { 38,  38,  38,  29,  28,  42,  27,  45,  44,  28,  42,  33  },
+  { 38,  38,  38,  29,  28,  42,  27,  45,  44,  28,  42,  33  },
+  {  1,  12,  8,   4,   2,   5,   3,   4,   0,   0,   5,   4   },
+  {  6,  10,  9,   6,   7,   7,   5,   5,   4,   1,   2,   3   },
+  {  6,  10,  9,   6,   7,   7,   5,   5,   4,   1,   2,   3   },
+  { DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE },
+  { DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE },
+  { DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE },
+  { DWO, DWO, DWO, DWO, DWO, DWO, DWO, DWO, DWO, DWO, DWO, DWO },
+  { DWO, DWO, DWO, DWO, DWO, DWO, DWO, DWO, DWO, DWO, DWO, DWO }
+});
+#endif
+
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 const CtxSet ContextSetCfg::MvsdIdx = ContextSetCfg::addCtxSet
 ({
@@ -3301,6 +3318,19 @@ const CtxSet ContextSetCfg::Mvd = ContextSetCfg::addCtxSet
 	{ 9,  6 },
 	{ 9, 10 }
 });
+
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+const CtxSet ContextSetCfg::Bvd = ContextSetCfg::addCtxSet
+({
+  { 53, 38, 38, 29, 20, 34, 27, 45, 37, 43, 34, 48 },
+  { 38, 38, 38, 29, 28, 42, 27, 45, 44, 28, 42, 33 },
+  { 38, 38, 38, 29, 28, 42, 27, 45, 44, 28, 42, 33 },
+  {  1, 12,  8,  4,  2,  5,  3,  4,  0,  0,  5,  4 },
+  {  6, 10,  9,  6,  7,  7,  5,  5,  4,  1,  2,  3 },
+  {  6, 10,  9,  6,  7,  7,  5,  5,  4,  1,  2,  3 }
+});
+#endif
+
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 const CtxSet ContextSetCfg::MvsdIdx = ContextSetCfg::addCtxSet
 ({
@@ -4600,6 +4630,16 @@ const CtxSet ContextSetCfg::Mvd = ContextSetCfg::addCtxSet
   {  14,  45, },
   {   9,   5, },
 });
+
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+const CtxSet ContextSetCfg::Bvd = ContextSetCfg::addCtxSet
+({
+  { 53, 38, 38, 29, 20, 34, 27, 45, 37, 43, 34, 48 },
+  { 38, 38, 38, 29, 28, 42, 27, 45, 44, 28, 42, 33 },
+  { 38, 38, 38, 29, 28, 42, 27, 45, 44, 28, 42, 33 },
+  {  6, 10,  9,  6,  7,  7,  5,  5,  4,  1,  2,  3 }
+});
+#endif
 
 #if MULTI_HYP_PRED
 const CtxSet ContextSetCfg::MultiHypothesisFlag = ContextSetCfg::addCtxSet

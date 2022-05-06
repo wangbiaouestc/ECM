@@ -137,6 +137,7 @@
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058:Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
 #define JVET_Z0075_IBC_HMVP_ENLARGE                       1 // JVET-Z0075:Enlarged HMVP table for IBC
 #define JVET_Z0084_IBC_TM                                 1 // JVET-Z0084: add template matching in IBC modes (controlled by TM_MRG or TM_AMVP)
+#define JVET_Z0131_IBC_BVD_BINARIZATION                   1 // JVET-Z0131: Block Vector Difference Binarization
 
 // Inter
 #define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode

@@ -2491,7 +2491,11 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
     ref_idx(pu, REF_PIC_LIST_0);
     Mv mvd = pu.mvd[REF_PIC_LIST_0];
     mvd.changeIbcPrecInternal2Amvr(pu.cu->imv);
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+    bvdCoding(mvd, 0); // already changed to signaling precision
+#else
     mvd_coding(mvd, 0); // already changed to signaling precision
+#endif
     if (pu.cs->sps->getMaxNumIBCMergeCand() == 1)
     {
       CHECK( pu.mvpIdx[REF_PIC_LIST_0], "mvpIdx for IBC mode should be 0" );
@@ -4356,6 +4360,68 @@ void CABACWriter::mvd_coding( const Mv &rMvd, int8_t imv
     m_BinEncoder.encodeBinEP( (verMvd < 0) );
   }
 }
+
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+void CABACWriter::xWriteBvdContext(unsigned uiSymbol, unsigned ctxT, int offset, int param)
+{
+  unsigned bins    = 0;
+  unsigned numBins = 0;
+  while (uiSymbol >= (unsigned) (1 << param))
+  {
+    bins <<= 1;
+    bins++;
+    numBins++;
+    uiSymbol -= 1 << param;
+    param++;
+  }
+  bins <<= 1;
+  numBins++;
+
+  unsigned temp = 0;
+  unsigned bitCount = 0;
+  for (int i = numBins-1; i >=0 ; i--)
+  {
+    temp = bins>>i;
+    if (bitCount >= ctxT)
+    {
+      m_BinEncoder.encodeBinEP(temp);
+    }
+    else
+    {
+      m_BinEncoder.encodeBin(temp, Ctx::Bvd(offset + bitCount + 1));
+    }
+    bins -= (temp << i);
+    bitCount++;
+  }
+  m_BinEncoder.encodeBinsEP(uiSymbol, param);
+}
+#endif
+
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+void CABACWriter::bvdCoding( const Mv &rMvd, int8_t imv )
+{
+  int       horMvd = rMvd.getHor();
+  int       verMvd = rMvd.getVer();
+
+  unsigned  horAbs  = unsigned( horMvd < 0 ? -horMvd : horMvd );
+  unsigned  verAbs  = unsigned( verMvd < 0 ? -verMvd : verMvd );
+
+  m_BinEncoder.encodeBin( (horAbs > 0), Ctx::Bvd(HOR_BVD_CTX_OFFSET) );
+  m_BinEncoder.encodeBin( (verAbs > 0), Ctx::Bvd(VER_BVD_CTX_OFFSET) );
+
+  if( horAbs > 0 )
+  {
+    xWriteBvdContext(horAbs - 1, NUM_HOR_BVD_CTX, HOR_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER);
+    m_BinEncoder.encodeBinEP( (horMvd < 0) );
+  }
+  if( verAbs > 0 )
+  {
+    xWriteBvdContext(verAbs-1, NUM_VER_BVD_CTX, VER_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER);
+    m_BinEncoder.encodeBinEP( (verMvd < 0) );
+  }
+}
+#endif
+
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 void CABACWriter::mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
 {

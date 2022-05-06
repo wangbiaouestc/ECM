@@ -420,6 +420,15 @@ static const int MDLM_T_IDX =                          LM_CHROMA_IDX + 2; ///< M
 #endif
 static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE; ///< chroma mode index for derived from luma intra mode
 
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+static const int BVD_CODING_GOLOMB_ORDER = 1; 
+static const int NUM_HOR_BVD_CTX         = 5;
+static const int NUM_VER_BVD_CTX         = 5;
+static const int HOR_BVD_CTX_OFFSET      = 0;
+static const int BVD_IBC_MAX_PREFIX      = 16;
+static const int VER_BVD_CTX_OFFSET      = 6;
+#endif
+
 #if JVET_W0119_LFNST_EXTENSION
 static const int NUM_LFNST_INTRA_MODES   = NUM_LUMA_MODE + NUM_EXT_LUMA_MODE;
 static const uint32_t  L16W_ZO           = 96;

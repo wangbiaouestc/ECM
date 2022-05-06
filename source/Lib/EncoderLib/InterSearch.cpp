@@ -86,6 +86,68 @@ static const Mv s_acMvRefineQ[9] =
   Mv(  1,  1 )  // 8
 };
 
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p)
+{
+  const FracBitsAccess& fracBits = m_CABACEstimator->getCtx().getFracBitsAcess();
+
+  p->bitsGt0FlagH[0] = fracBits.getFracBitsArray(Ctx::Bvd(HOR_BVD_CTX_OFFSET)).intBits[0];
+  p->bitsGt0FlagH[1] = fracBits.getFracBitsArray(Ctx::Bvd(HOR_BVD_CTX_OFFSET)).intBits[1];;
+
+  p->bitsGt0FlagV[0] = fracBits.getFracBitsArray(Ctx::Bvd(VER_BVD_CTX_OFFSET)).intBits[0];
+  p->bitsGt0FlagV[1] = fracBits.getFracBitsArray(Ctx::Bvd(VER_BVD_CTX_OFFSET)).intBits[1];
+
+  const int epBitCost = 1 << SCALE_BITS;
+  const int horCtxThre = NUM_HOR_BVD_CTX;
+  const int verCtxThre = NUM_VER_BVD_CTX;
+
+  const int horCtxOs = HOR_BVD_CTX_OFFSET;
+  const int verCtxOs = VER_BVD_CTX_OFFSET;
+
+  uint32_t singleBitH[2];
+  uint32_t singleBitV[2];
+  int bitsX = 0, bitsY = 0;
+
+  for (int i = 0; i < BVD_IBC_MAX_PREFIX; i++)
+  {
+    if (i < horCtxThre)
+    {
+      const BinFracBits fracBitsPar = fracBits.getFracBitsArray(Ctx::Bvd(horCtxOs + i + 1));
+      singleBitH[0] = fracBitsPar.intBits[0];
+      singleBitH[1] = fracBitsPar.intBits[1];
+    }
+    else
+    {
+      singleBitH[0] = epBitCost;
+      singleBitH[1] = epBitCost;
+    }
+    p->bitsH[i] = bitsX + singleBitH[0] + (i+BVD_CODING_GOLOMB_ORDER) * epBitCost;
+    bitsX += singleBitH[1];
+  }
+
+  for (int i = 0; i < BVD_IBC_MAX_PREFIX; i++)
+  {
+    if (i < verCtxThre)
+    {
+      const BinFracBits fracBitsPar = fracBits.getFracBitsArray(Ctx::Bvd(verCtxOs + i + 1));
+      singleBitV[0] = fracBitsPar.intBits[0];
+      singleBitV[1] = fracBitsPar.intBits[1];
+    }
+    else
+    {
+      singleBitV[0] = epBitCost;
+      singleBitV[1] = epBitCost;
+    }
+    p->bitsV[i] = bitsY + singleBitV[0] + (i+BVD_CODING_GOLOMB_ORDER) * epBitCost;
+    bitsY += singleBitV[1];
+  }
+
+  p->bitsIdx[0] = fracBits.getFracBitsArray(Ctx::MVPIdx()).intBits[0];
+  p->bitsIdx[1] = fracBits.getFracBitsArray(Ctx::MVPIdx()).intBits[1];
+  p->bitsImv[0] = fracBits.getFracBitsArray(Ctx::ImvFlag(1)).intBits[0];
+  p->bitsImv[1] = fracBits.getFracBitsArray(Ctx::ImvFlag(1)).intBits[1];
+}
+#endif
 
 InterSearch::InterSearch()
   : m_modeCtrl                    (nullptr)
@@ -1509,6 +1571,10 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
   Mv           cMv;
   Mv           cMvPred;
 
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+  xEstBvdBitCosts(m_pcRdCost->getBvdBitCosts());
+#endif
+
   for (auto &pu : CU::traversePUs(cu))
   {
     m_maxCompIDToPred = MAX_NUM_COMPONENT;
@@ -1567,6 +1633,15 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     }
     /// ibc search
     /////////////////////////////////////////////////////////
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+    m_pcRdCost->setPredictors(cMvPred);
+    m_pcRdCost->setCostScale(0);
+#if JVET_Z0084_IBC_TM
+    m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &pu.cu->imv, &bvpIdxBest, true, &amvpInfo4Pel);
+#else
+    m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &pu.cu->imv, &bvpIdxBest);
+#endif
+#else
     unsigned int bitsBVPBest, bitsBVPTemp;
     bitsBVPBest = MAX_INT;
     m_pcRdCost->setCostScale(0);
@@ -1615,6 +1690,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
       }
 
     }
+#endif
 
     pu.bv = cMv; // bv is always at integer accuracy
     cMv.changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
@@ -1649,7 +1725,12 @@ void InterSearch::xxIBCHashSearch(PredictionUnit& pu, Mv* mvPred, int numMvPred,
   std::vector<Position> candPos;
   if (ibcHashMap.ibcHashMatch(pu.Y(), candPos, *pu.cs, m_pcEncCfg->getIBCHashSearchMaxCand(), m_pcEncCfg->getIBCHashSearchRange4SmallBlk()))
   {
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+    Distortion minCost = MAX_UINT64;
+    m_pcRdCost->setPredictors(mvPred);
+#else
     unsigned int minCost = MAX_UINT;
+#endif
 
     const unsigned int  lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
     const int   cuPelX = pu.Y().x;
@@ -1677,6 +1758,14 @@ void InterSearch::xxIBCHashSearch(PredictionUnit& pu, Mv* mvPred, int numMvPred,
           continue;
         }
 
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+        Distortion cost = m_pcRdCost->getBvCostMultiplePreds(candMv.getHor(), candMv.getVer(), pu.cs->sps->getAMVREnabledFlag());
+        if (cost < minCost)
+        {
+          mv = candMv;
+          minCost = cost;
+        }
+#else
         for (int n = 0; n < numMvPred; n++)
         {
           m_pcRdCost->setPredictor(mvPred[n]);
@@ -1714,6 +1803,7 @@ void InterSearch::xxIBCHashSearch(PredictionUnit& pu, Mv* mvPred, int numMvPred,
           }
 
         }
+#endif
       }
     }
   }

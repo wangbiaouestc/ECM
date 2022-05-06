@@ -591,6 +591,10 @@ protected:
   /// sub-function for motion vector refinement used in fractional-pel accuracy
   Distortion  xPatternRefinement    ( const CPelBuf* pcPatternKey, Mv baseRefMv, int iFrac, Mv& rcMvFrac, bool bAllowUseOfHadamard );
 
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+  void xEstBvdBitCosts(EstBvdBitsStruct *p);
+#endif
+
    typedef struct
    {
      int left;

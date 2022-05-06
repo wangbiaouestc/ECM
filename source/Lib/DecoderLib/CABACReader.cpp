@@ -2862,7 +2862,11 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
     pu.cu->affine = false;
     pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
     RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MVD, pu.lumaSize());
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+    bvdCoding(pu.mvd[REF_PIC_LIST_0]);
+#else
     mvd_coding(pu.mvd[REF_PIC_LIST_0]);
+#endif
     if (pu.cs->sps->getMaxNumIBCMergeCand() == 1)
     {
       pu.mvpIdx[REF_PIC_LIST_0] = 0;
@@ -4578,6 +4582,64 @@ void CABACReader::mvd_coding( Mv &rMvd
   rMvd = Mv(horAbs, verAbs);
   CHECK(!((horAbs >= MVD_MIN) && (horAbs <= MVD_MAX)) || !((verAbs >= MVD_MIN) && (verAbs <= MVD_MAX)), "Illegal MVD value");
 }
+
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+unsigned CABACReader::xReadBvdContext(unsigned ctxT, int offset, int param)
+{
+  unsigned symbol = 0;
+  unsigned bit    = 1;
+  unsigned uiIdx = 0;
+  while( bit )
+  {
+    if (uiIdx >= ctxT)
+    {
+      bit = m_BinDecoder.decodeBinEP();
+    }
+    else
+    {
+      bit = m_BinDecoder.decodeBin(Ctx::Bvd( offset + uiIdx + 1));
+    }
+    uiIdx++;
+    symbol += bit << param++;
+  }
+  if( --param )
+  {
+    bit = m_BinDecoder.decodeBinsEP(param);
+    symbol += bit;
+  }
+  return symbol;
+}
+#endif
+
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+void CABACReader::bvdCoding( Mv &rMvd )
+{
+  int horAbs = (int)m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
+  int verAbs = (int)m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
+
+  if (horAbs)
+  {
+    horAbs += xReadBvdContext(NUM_HOR_BVD_CTX, HOR_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER);
+
+    if (m_BinDecoder.decodeBinEP())
+    {
+      horAbs = -horAbs;
+    }
+  }
+  if (verAbs)
+  {
+    verAbs += xReadBvdContext(NUM_VER_BVD_CTX, VER_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER);
+
+    if (m_BinDecoder.decodeBinEP())
+    {
+      verAbs = -verAbs;
+    }
+  }
+  rMvd = Mv(horAbs, verAbs);
+  CHECK(!((horAbs >= MVD_MIN) && (horAbs <= MVD_MAX)) || !((verAbs >= MVD_MIN) && (verAbs <= MVD_MAX)), "Illegal BVD value");
+}
+#endif
+
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
 {
