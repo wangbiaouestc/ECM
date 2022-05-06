@@ -261,6 +261,9 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
           CHECK(currCU.firstPU->candId >= NUM_CHROMA_MODE, "Chroma prediction mode index out of bounds");
           CHECK(PU::isLMCMode(chromaCandModes[currCU.firstPU->candId]), "The intra dir cannot be LM_CHROMA for this path");
           CHECK(chromaCandModes[currCU.firstPU->candId] == DM_CHROMA_IDX, "The intra dir cannot be DM_CHROMA for this path");
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+          CHECK(chromaCandModes[currCU.firstPU->candId] == DIMD_CHROMA_IDX, "The intra dir cannot be DIMD_CHROMA for this path");
+#endif
 
           currCU.firstPU->intraDir[1] = chromaCandModes[currCU.firstPU->candId];
         }
@@ -372,6 +375,15 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 
   const PredictionUnit &pu  = *tu.cs->getPU( area.pos(), chType );
 #if ENABLE_DIMD
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+  if (pu.intraDir[1] == DIMD_CHROMA_IDX && compID == COMPONENT_Cb)
+  {
+    CompArea areaCb = pu.Cb();
+    CompArea areaCr = pu.Cr();
+    CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, areaCb.lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, areaCb.size()));
+    IntraPrediction::deriveDimdChromaMode(cs.picture->getRecoBuf(lumaArea), cs.picture->getRecoBuf(areaCb), cs.picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, *pu.cu);
+  }
+#endif
   uint32_t uiChFinalMode = PU::getFinalIntraMode(pu, chType);
 #else
   const uint32_t uiChFinalMode = PU::getFinalIntraMode(pu, chType);
@@ -460,6 +472,12 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       }
       else
         m_pcIntraPred->predIntraAng(compID, piPred, pu);
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+      if (compID != COMPONENT_Y && pu.isChromaFusion)
+      {
+        m_pcIntraPred->geneChromaFusionPred(compID, piPred, pu);
+      }
+#endif
     }
   }
 #if SIGN_PREDICTION
@@ -482,6 +500,12 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       else
       {
         m_pcIntraPred->predIntraAng(COMPONENT_Cr, piPredCr, pu);
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+        if (pu.isChromaFusion)
+        {
+          m_pcIntraPred->geneChromaFusionPred(COMPONENT_Cr, piPredCr, pu);
+        }
+#endif
       }
     }
   }

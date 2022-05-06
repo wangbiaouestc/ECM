@@ -322,6 +322,9 @@ struct CodingUnit : public UnitArea
   bool           dimd;
   bool           dimd_is_blend;
   int8_t         dimdMode;
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+  int8_t         dimdChromaMode;
+#endif
   int8_t         dimdBlendMode[2]; // max number of blend modes (the main mode is not counter) --> incoherent with dimdRelWeight
   int8_t         dimdRelWeight[3]; // max number of predictions to blend
 #endif
@@ -419,6 +422,9 @@ struct IntraPredictionData
   uint8_t intraNonMPM[NUM_NON_MPM_MODES];
 #endif
   uint8_t  intraDir[MAX_NUM_CHANNEL_TYPE];
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+  bool      isChromaFusion;
+#endif
   bool      mipTransposedFlag;
   int8_t    multiRefIdx;
 #if JVET_Z0050_CCLM_SLOPE

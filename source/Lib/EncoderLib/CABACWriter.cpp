@@ -2038,8 +2038,29 @@ void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
   m_BinEncoder.encodeBin(isDerivedMode ? 0 : 1, Ctx::IntraChromaPredMode(0));
   if (isDerivedMode)
   {
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+    if (pu.cs->slice->getSliceType() == I_SLICE)
+    {
+      const bool     isFusion = pu.isChromaFusion;
+      m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
+    }
+#endif
     return;
   }
+
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+  if (pu.cu->slice->getSPS()->getUseDimd())
+  {
+    const bool     isDimdChromaMode = intraDir == DIMD_CHROMA_IDX;
+    m_BinEncoder.encodeBin(isDimdChromaMode ? 0 : 1, Ctx::DimdChromaMode());
+    if (isDimdChromaMode)
+    {
+      const bool     isFusion = pu.isChromaFusion;
+      m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
+      return;
+    }
+  }
+#endif
 
   // chroma candidate index
   unsigned chromaCandModes[NUM_CHROMA_MODE];
@@ -2058,6 +2079,13 @@ void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
   CHECK(chromaCandModes[candId] == DM_CHROMA_IDX, "The intra dir cannot be DM_CHROMA for this path");
   {
     m_BinEncoder.encodeBinsEP(candId, 2);
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+    if (pu.cs->slice->getSliceType() == I_SLICE)
+    {
+      const bool     isFusion = pu.isChromaFusion;
+      m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
+    }
+#endif
   }
 }
 

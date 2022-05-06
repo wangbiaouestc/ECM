@@ -280,6 +280,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   dimd = other.dimd;
   dimd_is_blend = other.dimd_is_blend;
   dimdMode = other.dimdMode;
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+  dimdChromaMode = other.dimdChromaMode;
+#endif
   for( int i = 0; i < 2; i++ )
   {
     dimdBlendMode[i] = other.dimdBlendMode[i];
@@ -373,6 +376,9 @@ void CodingUnit::initData()
   dimd = false;
   dimd_is_blend = false;
   dimdMode = -1;
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+  dimdChromaMode   = -1;
+#endif
   for( int i = 0; i < 2; i++ )
   {
     dimdBlendMode[i] = -1;
@@ -627,6 +633,9 @@ void PredictionUnit::initData()
 
   intraDir[0] = DC_IDX;
   intraDir[1] = PLANAR_IDX;
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+  isChromaFusion = false;
+#endif
   mipTransposedFlag = false;
   multiRefIdx = 0;
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
@@ -739,6 +748,9 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   {
     intraDir[i] = predData.intraDir[i];
   }
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+  isChromaFusion = predData.isChromaFusion;
+#endif
   mipTransposedFlag = predData.mipTransposedFlag;
   multiRefIdx = predData.multiRefIdx;
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
@@ -855,6 +867,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   {
     intraDir[ i ] = other.intraDir[ i ];
   }
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+  isChromaFusion = other.isChromaFusion;
+#endif
   mipTransposedFlag = other.mipTransposedFlag;
   multiRefIdx = other.multiRefIdx;
 #if JVET_Z0050_CCLM_SLOPE

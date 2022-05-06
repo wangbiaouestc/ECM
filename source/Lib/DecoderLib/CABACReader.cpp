@@ -2309,12 +2309,46 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
   if (m_BinDecoder.decodeBin(Ctx::IntraChromaPredMode(0)) == 0)
   {
     pu.intraDir[1] = DM_CHROMA_IDX;
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+    if (pu.cs->slice->getSliceType() == I_SLICE)
+    {
+      if (m_BinDecoder.decodeBin(Ctx::ChromaFusionMode()) == 1)
+      {
+        pu.isChromaFusion = true;
+      }
+    }
+#endif
     return;
   }
+
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+  if (pu.cu->slice->getSPS()->getUseDimd())
+  {
+    if (m_BinDecoder.decodeBin(Ctx::DimdChromaMode()) == 0)
+    {
+      pu.intraDir[1] = DIMD_CHROMA_IDX;
+      if (m_BinDecoder.decodeBin(Ctx::ChromaFusionMode()) == 1)
+      {
+        pu.isChromaFusion = true;
+      }
+      return;
+    }
+  }
+#endif
+
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   pu.parseChromaMode = true;
 #endif
   unsigned candId = m_BinDecoder.decodeBinsEP(2);
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+  if (pu.cs->slice->getSliceType() == I_SLICE)
+  {
+    if (m_BinDecoder.decodeBin(Ctx::ChromaFusionMode()) == 1)
+    {
+      pu.isChromaFusion = true;
+    }
+  }
+#endif
 
   unsigned chromaCandModes[NUM_CHROMA_MODE];
   PU::getIntraChromaCandModes(pu, chromaCandModes);
@@ -2322,6 +2356,9 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
   CHECK(candId >= NUM_CHROMA_MODE, "Chroma prediction mode index out of bounds");
   CHECK(PU::isLMCMode(chromaCandModes[candId]), "The intra dir cannot be LM_CHROMA for this path");
   CHECK(chromaCandModes[candId] == DM_CHROMA_IDX, "The intra dir cannot be DM_CHROMA for this path");
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+  CHECK(chromaCandModes[candId] == DIMD_CHROMA_IDX, "The intra dir cannot be DIMD_CHROMA for this path");
+#endif
 
   pu.intraDir[1] = chromaCandModes[candId];
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION

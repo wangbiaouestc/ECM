@@ -1522,11 +1522,21 @@ void PU::getIntraChromaCandModes(const PredictionUnit &pu, unsigned modeList[NUM
   modeList[7] = MMLM_CHROMA_IDX;
   modeList[8] = MMLM_L_IDX;
   modeList[9] = MMLM_T_IDX;
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   modeList[10] = DM_CHROMA_IDX;
+  modeList[11] = DIMD_CHROMA_IDX;
+#else
+  modeList[10] = DM_CHROMA_IDX;
+#endif
 #else
   modeList[5] = MDLM_L_IDX;
   modeList[6] = MDLM_T_IDX;
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   modeList[7] = DM_CHROMA_IDX;
+  modeList[8] = DIMD_CHROMA_IDX;
+#else
+  modeList[7] = DM_CHROMA_IDX;
+#endif
 #endif
 
   // If Direct Mode is MIP, mode cannot be already in the list.
@@ -1622,6 +1632,12 @@ uint32_t PU::getFinalIntraMode( const PredictionUnit &pu, const ChannelType &chT
   {
     uiIntraMode = g_chroma422IntraAngleMappingTable[uiIntraMode];
   }
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+  if (uiIntraMode == DIMD_CHROMA_IDX && !isLuma(chType))
+  {
+    uiIntraMode = pu.cu->dimdChromaMode;
+  }
+#endif
   return uiIntraMode;
 }
 
