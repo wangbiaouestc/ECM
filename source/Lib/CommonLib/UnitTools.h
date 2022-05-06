@@ -432,6 +432,9 @@ namespace PU
   bool useRefCombList(const PredictionUnit &pu);
   bool useRefPairList(const PredictionUnit &pu);
 #endif
+#if JVET_Z0050_CCLM_SLOPE
+  bool hasCclmDeltaFlag(const PredictionUnit &pu, const int mode = -1);
+#endif
 }
 
 // TU tools

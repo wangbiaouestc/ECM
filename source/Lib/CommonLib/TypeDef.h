@@ -1,4 +1,4 @@
-﻿/* The copyright in this software is being made available under the BSD
+/* The copyright in this software is being made available under the BSD
  * License, included below. This software may be subject to other third party
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
@@ -132,6 +132,8 @@
 #endif
 
 #define JVET_Y0116_EXTENDED_MRL_LIST                      1 // JVET-Y0116: Extended MRL Candidate List
+#define JVET_Z0050_CCLM_SLOPE                             1 // JVET-Z0050: CCLM with slope adjustments
+
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058:Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -1326,6 +1328,45 @@ struct CclmModel
   void setSecondModel(int xa, int xb, int xshift, int xthr) { a2 = xa; b2 = xb; shift2 = xshift; yThres = xthr; }
 #endif
 };
+
+#if JVET_Z0050_CCLM_SLOPE
+struct CclmOffsets
+{
+  int8_t cb0 = 0;
+  int8_t cr0 = 0;
+  int8_t cb1 = 0;
+  int8_t cr1 = 0;
+  
+  bool isActive() const                           { return cb0 || cr0 || cb1 || cr1;        }
+  void setAllZero()                               { cb0 = 0;  cr0 = 0;  cb1 = 0;  cr1 = 0;  }
+  void setOffsets(int b0, int r0, int b1, int r1) { cb0 = b0; cr0 = r0; cb1 = b1; cr1 = r1; }
+  void setOffset(ComponentID c, int model, int v)
+  {
+    if ( c == COMPONENT_Cb )
+    {
+      if ( model == 0 )
+      {
+        cb0 = v;
+      }
+      else
+      {
+        cb1 = v;
+      }
+    }
+    else
+    {
+      if ( model == 0 )
+      {
+        cr0 = v;
+      }
+      else
+      {
+        cr1 = v;
+      }
+    }
+  }
+};
+#endif
 
 struct BitDepths
 {

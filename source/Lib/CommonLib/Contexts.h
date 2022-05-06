@@ -475,6 +475,9 @@ public:
 #if SIGN_PREDICTION
   static const CtxSet   signPred[2];
 #endif
+#if JVET_Z0050_CCLM_SLOPE
+  static const CtxSet   CclmDeltaFlags;
+#endif
   static const unsigned NumberOfContexts;
 
   // combined sets for less complex copying

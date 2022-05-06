@@ -2147,6 +2147,91 @@ void CABACReader::intra_chroma_pred_modes( CodingUnit& cu )
   intra_chroma_pred_mode(*pu);
 }
 
+#if JVET_Z0050_CCLM_SLOPE
+void CABACReader::cclmDelta(PredictionUnit& pu, int8_t &delta)
+{
+  if ( delta )
+  {
+    int flag = 1;
+    
+    while (flag && delta < 4)
+    {
+      flag   = m_BinDecoder.decodeBinEP();
+      delta += flag;
+    }
+
+    delta *= m_BinDecoder.decodeBin(Ctx::CclmDeltaFlags(4)) ? -1 : +1;
+  }
+}
+
+void CABACReader::cclmDeltaSlope(PredictionUnit& pu)
+{
+  if ( PU::hasCclmDeltaFlag( pu ) )
+  {
+    bool deltaActive = m_BinDecoder.decodeBin(Ctx::CclmDeltaFlags(0));
+
+    if ( deltaActive )
+    {
+      bool bothActive = m_BinDecoder.decodeBin(Ctx::CclmDeltaFlags(3));
+
+      pu.cclmOffsets.cb0 = bothActive;
+      pu.cclmOffsets.cr0 = bothActive;
+      
+      if ( !bothActive )
+      {
+        pu.cclmOffsets.cb0 = m_BinDecoder.decodeBin(Ctx::CclmDeltaFlags(1));
+
+#if MMLM
+        if ( PU::isMultiModeLM( pu.intraDir[1] ) && !pu.cclmOffsets.cb0 )
+        {
+          pu.cclmOffsets.cr0 = m_BinDecoder.decodeBin(Ctx::CclmDeltaFlags(2));
+        }
+        else
+#endif
+        {
+          pu.cclmOffsets.cr0 = !pu.cclmOffsets.cb0;
+        }
+      }
+
+      cclmDelta( pu, pu.cclmOffsets.cb0 );
+      cclmDelta( pu, pu.cclmOffsets.cr0 );
+    
+#if MMLM
+      // Now the same for the second model (if applicable)
+      if ( PU::isMultiModeLM( pu.intraDir[1] ) )
+      {
+        bool bothActive = m_BinDecoder.decodeBin(Ctx::CclmDeltaFlags(3));
+
+        pu.cclmOffsets.cb1 = bothActive;
+        pu.cclmOffsets.cr1 = bothActive;
+        
+        if ( !bothActive )
+        {
+          pu.cclmOffsets.cb1 = m_BinDecoder.decodeBin(Ctx::CclmDeltaFlags(1));
+
+          if ( pu.cclmOffsets.cb1 )
+          {
+            pu.cclmOffsets.cr1 = 0;
+          }
+          else if ( pu.cclmOffsets.cb0 == 0 && pu.cclmOffsets.cr0 == 0 && pu.cclmOffsets.cb1 == 0 )
+          {
+            pu.cclmOffsets.cr1 = 1;
+          }
+          else
+          {
+            pu.cclmOffsets.cr1 = m_BinDecoder.decodeBin(Ctx::CclmDeltaFlags(2));
+          }
+        }
+
+        cclmDelta( pu, pu.cclmOffsets.cb1 );
+        cclmDelta( pu, pu.cclmOffsets.cr1 );
+      }
+#endif
+    }
+  }
+}
+#endif
+
 bool CABACReader::intra_chroma_lmc_mode(PredictionUnit& pu)
 {
 #if MMLM
@@ -2189,6 +2274,11 @@ bool CABACReader::intra_chroma_lmc_mode(PredictionUnit& pu)
     pu.intraDir[1] = lmModeList[symbol];
 #endif
   }
+  
+#if JVET_Z0050_CCLM_SLOPE
+  cclmDeltaSlope( pu );
+#endif
+
   return true; //it will only enter this function for LMC modes, so always return true ;
 }
 

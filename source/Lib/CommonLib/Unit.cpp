@@ -636,6 +636,9 @@ void PredictionUnit::initData()
   mpmFlag = false;
   ipred_idx = -1;
 #endif
+#if JVET_Z0050_CCLM_SLOPE
+  cclmOffsets = {};
+#endif
   // inter data
   mergeFlag   = false;
   regularMergeFlag = false;
@@ -745,6 +748,9 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   mpmFlag = predData.mpmFlag;
   ipred_idx = predData.ipred_idx;
 #endif
+#if JVET_Z0050_CCLM_SLOPE
+  cclmOffsets = predData.cclmOffsets;
+#endif
   return *this;
 }
 
@@ -851,6 +857,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   }
   mipTransposedFlag = other.mipTransposedFlag;
   multiRefIdx = other.multiRefIdx;
+#if JVET_Z0050_CCLM_SLOPE
+  cclmOffsets = other.cclmOffsets;
+#endif
 
   mergeFlag   = other.mergeFlag;
   regularMergeFlag = other.regularMergeFlag;

@@ -1545,6 +1545,21 @@ void PU::getIntraChromaCandModes(const PredictionUnit &pu, unsigned modeList[NUM
     }
   }
 }
+  
+#if JVET_Z0050_CCLM_SLOPE
+  bool PU::hasCclmDeltaFlag(const PredictionUnit &pu, const int mode)
+{
+  int  chrMode      = mode < 0 ? pu.intraDir[1] : mode;
+#if MMLM
+  bool hasDeltaFlag = chrMode == LM_CHROMA_IDX || chrMode == MMLM_CHROMA_IDX;
+#else
+  bool hasDeltaFlag = chrMode == LM_CHROMA_IDX;
+#endif
+  hasDeltaFlag     &= pu.Cb().width * pu.Cb().height >= 128;
+
+  return hasDeltaFlag;
+}
+#endif
 
 bool PU::isLMCMode(unsigned mode)
 {

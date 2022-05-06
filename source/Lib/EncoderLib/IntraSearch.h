@@ -540,6 +540,9 @@ protected:
   void xFindAlreadyTestedNearbyIntraModes ( int currentLfnstIdx, int currentIntraMode, int* refLfnstIdx, int* leftIntraMode, int* rightIntraMode, ISPType ispOption, int windowSize );
   bool updateISPStatusFromRelCU           ( double bestNonISPCostCurrCu, ModeInfo bestNonISPModeCurrCu, int& bestISPModeInRelCU );
   void xFinishISPModes                    ( );
+#if JVET_Z0050_CCLM_SLOPE
+  void xFindBestCclmDeltaSlopeSATD        ( PredictionUnit &pu, ComponentID compID, int cclmModel, int &deltaBest, int64_t &satdBest );
+#endif
 };// END CLASS DEFINITION EncSearch
 
 //! \}
