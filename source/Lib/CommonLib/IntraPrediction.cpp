@@ -1793,6 +1793,67 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
   }
 }
 
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu)
+{
+  int width = piPred.width;
+  int height = piPred.height;
+  const UnitArea localUnitArea(pu.chromaFormat, Area(0, 0, width, height));
+
+  PelBuf predLmBuffer = m_tempBuffer[0].getBuf(localUnitArea.Y());
+  PredictionUnit pu2 = pu;
+
+#if MMLM
+  pu2.intraDir[1] = MMLM_CHROMA_IDX;
+#else
+  pu2.intraDir[1] = LM_CHROMA_IDX;
+#endif
+
+  const CompArea &area = pu2.blocks[compId];
+
+  xGetLumaRecPixels(pu2, area);
+  predIntraChromaLM(compId, predLmBuffer, pu2, area, pu2.intraDir[1]);
+
+  Pel *pelPred = piPred.buf;
+  Pel *pelLm = predLmBuffer.buf;
+  int  w0 = 2;
+  int  w1 = 2;
+  int  shift = 2;
+
+  if (pu.cs->slice->isIntra())
+  {
+    const Position posBL = pu.Cb().bottomLeft();
+    const Position posTR = pu.Cb().topRight();
+    const PredictionUnit *neigh0 = pu.cs->getPURestricted(posBL.offset(-1, 0), pu, CHANNEL_TYPE_CHROMA);
+    const PredictionUnit *neigh1 = pu.cs->getPURestricted(posTR.offset(0, -1), pu, CHANNEL_TYPE_CHROMA);
+    bool isNeigh0LM = neigh0 && PU::isLMCMode(neigh0->intraDir[1]);
+    bool isNeigh1LM = neigh1 && PU::isLMCMode(neigh1->intraDir[1]);
+
+    if (isNeigh0LM && isNeigh1LM)
+    {
+      w0 = 1; w1 = 3;
+    }
+    else if (!isNeigh0LM && !isNeigh1LM)
+    {
+      w0 = 3; w1 = 1;
+    }
+  }
+
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      int blend = pelPred[x] * w0;
+      blend += pelLm[x] * w1;
+      blend += 2;
+      pelPred[x] = (Pel) (blend >> shift);
+    }
+    pelPred += piPred.stride;
+    pelLm += predLmBuffer.stride;
+  }
+}
+#endif
+
 void IntraPrediction::xPredIntraBDPCM(const CPelBuf &pSrc, PelBuf &pDst, const uint32_t dirMode, const ClpRng& clpRng )
 {
   const int wdt = pDst.width;
@@ -4323,6 +4384,134 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
   }
 
 }
+
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+void IntraPrediction::deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBuf &recoBufCb, const CPelBuf &recoBufCr, const CompArea &areaY, const CompArea &areaCb, const CompArea &areaCr, CodingUnit &cu)
+{
+  if (!cu.slice->getSPS()->getUseDimd())
+  {
+    return;
+  }
+
+  int sigcnt = 0;
+
+  const CodingStructure  &cs = *cu.cs;
+  const SPS             &sps = *cs.sps;
+  const PreCalcValues   &pcv = *cs.pcv;
+
+  const Pel *pRecoY = recoBufY.buf;
+  const uint32_t uiWidthY = areaY.width;
+  const uint32_t uiHeightY = areaY.height;
+  const int iStrideY = recoBufY.stride;
+
+  const Pel *pRecoCb = recoBufCb.buf;
+  const uint32_t uiWidthCb = areaCb.width;
+  const uint32_t uiHeightCb = areaCb.height;
+  const int iStrideCb = recoBufCb.stride;
+
+  const Pel *pRecoCr = recoBufCr.buf;
+  const uint32_t uiWidthCr = areaCr.width;
+  const uint32_t uiHeightCr = areaCr.height;
+  const int iStrideCr = recoBufCr.stride;
+
+  // get the availability of the neighboring chroma samples
+  const int predSize = (uiWidthCb << 1);
+  const int predHSize = (uiHeightCb << 1);
+
+  const bool noShift = pcv.noChroma2x2 && uiWidthCb == 4; // don't shift on the lowest level (chroma not-split)
+  const int  unitWidth = pcv.minCUWidth >> (noShift ? 0 : getComponentScaleX(areaCb.compID, sps.getChromaFormatIdc()));
+  const int  unitHeight = pcv.minCUHeight >> (noShift ? 0 : getComponentScaleY(areaCb.compID, sps.getChromaFormatIdc()));
+
+  const int  totalAboveUnits = (predSize + (unitWidth - 1)) / unitWidth;
+  const int  totalLeftUnits = (predHSize + (unitHeight - 1)) / unitHeight;
+  const int  totalUnits = totalAboveUnits + totalLeftUnits + 1; //+1 for top-left
+  const int  numAboveUnits = std::max<int>(uiWidthCb / unitWidth, 1);
+  const int  numLeftUnits = std::max<int>(uiHeightCb / unitHeight, 1);
+  const int  numAboveRightUnits = totalAboveUnits - numAboveUnits;
+  const int  numLeftBelowUnits = totalLeftUnits - numLeftUnits;
+
+  CHECK(numAboveUnits <= 0 || numLeftUnits <= 0 || numAboveRightUnits <= 0 || numLeftBelowUnits <= 0, "Size not supported");
+
+  const Position posLT = areaCb;
+
+  bool  neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1];
+  memset(neighborFlags, 0, totalUnits);
+
+  Position pos = posLT.offset(0, -2); // get the availability of the third neighboring row
+  int numIntraAbove = isAboveAvailable(cu, CHANNEL_TYPE_CHROMA, pos, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1));
+  pos = posLT.offset(-2, 0); // get the availability of the third neighboring column
+  int numIntraLeft = isLeftAvailable(cu, CHANNEL_TYPE_CHROMA, pos, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1));
+
+  int piHistogram[NUM_LUMA_MODE] = { 0 };
+
+  if (numIntraLeft)
+  {
+    uint32_t uiHeightLeftY = ((numIntraLeft * unitHeight) << getChannelTypeScaleY(CHANNEL_TYPE_CHROMA, sps.getChromaFormatIdc())) - 1 - (!numIntraAbove ? 1 : 0);
+    uint32_t uiHeightLeftC = numIntraLeft * unitHeight - 1 - (!numIntraAbove ? 1 : 0);
+    const Pel *pRecoLeftY = pRecoY - 2 + iStrideY * (!numIntraAbove ? 1 : 0);
+    const Pel *pRecoLeftCb = pRecoCb - 2 + iStrideCb * (!numIntraAbove ? 1 : 0);
+    const Pel *pRecoLeftCr = pRecoCr - 2 + iStrideCr * (!numIntraAbove ? 1 : 0);
+    sigcnt += buildHistogram(pRecoLeftY, iStrideY, uiHeightLeftY, 1, piHistogram, 1, uiWidthY, uiHeightY);
+    sigcnt += buildHistogram(pRecoLeftCb, iStrideCb, uiHeightLeftC, 1, piHistogram, 1, uiWidthCb, uiHeightCb);
+    sigcnt += buildHistogram(pRecoLeftCr, iStrideCr, uiHeightLeftC, 1, piHistogram, 1, uiWidthCr, uiHeightCr);
+  }
+  if (numIntraAbove)
+  {
+    uint32_t uiWidthAboveY = ((numIntraAbove * unitWidth) << getChannelTypeScaleX(CHANNEL_TYPE_CHROMA, sps.getChromaFormatIdc())) - 1 - (!numIntraLeft ? 1 : 0);
+    uint32_t uiWidthAboveC = numIntraAbove * unitWidth - 1 - (!numIntraLeft ? 1 : 0);
+    const Pel *pRecoAboveY = pRecoY - iStrideY * 2 + (!numIntraLeft ? 1 : 0);
+    const Pel *pRecoAboveCb = pRecoCb - iStrideCb * 2 + (!numIntraLeft ? 1 : 0);
+    const Pel *pRecoAboveCr = pRecoCr - iStrideCr * 2 + (!numIntraLeft ? 1 : 0);
+    sigcnt += buildHistogram(pRecoAboveY, iStrideY, 1, uiWidthAboveY, piHistogram, 2, uiWidthY, uiHeightY);
+    sigcnt += buildHistogram(pRecoAboveCb, iStrideCb, 1, uiWidthAboveC, piHistogram, 2, uiWidthCb, uiHeightCb);
+    sigcnt += buildHistogram(pRecoAboveCr, iStrideCr, 1, uiWidthAboveC, piHistogram, 2, uiWidthCr, uiHeightCr);
+  }
+  if (numIntraLeft && numIntraAbove)
+  {
+    const Pel *pRecoAboveLeftY = pRecoY - 2 - iStrideY * 2;
+    const Pel *pRecoAboveLeftCb = pRecoCb - 2 - iStrideCb * 2;
+    const Pel *pRecoAboveLeftCr = pRecoCr - 2 - iStrideCr * 2;
+    sigcnt += buildHistogram(pRecoAboveLeftY, iStrideY, 2, 2, piHistogram, 3, uiWidthY, uiHeightY);
+    sigcnt += buildHistogram(pRecoAboveLeftCb, iStrideCb, 2, 2, piHistogram, 3, uiWidthCb, uiHeightCb);
+    sigcnt += buildHistogram(pRecoAboveLeftCr, iStrideCr, 2, 2, piHistogram, 3, uiWidthCr, uiHeightCr);
+  }
+
+  int firstAmp = 0, secondAmp = 0, curAmp = 0;
+  int firstMode = 0, secondMode = 0, curMode = 0;
+
+  for (int i = 0; i < NUM_LUMA_MODE; i++)
+  {
+    curAmp = piHistogram[i];
+    curMode = i;
+    if (curAmp > firstAmp)
+    {
+      secondAmp = firstAmp;
+      secondMode = firstMode;
+      firstAmp = curAmp;
+      firstMode = curMode;
+    }
+    else
+    {
+      if (curAmp > secondAmp)
+      {
+        secondAmp = curAmp;
+        secondMode = curMode;
+      }
+    }
+  }
+
+  cu.dimdChromaMode = firstMode;
+  int dmMode = PU::getCoLocatedIntraLumaMode(*cu.firstPU);
+  if (dmMode == firstMode)
+  {
+    cu.dimdChromaMode = secondMode;
+    if (firstMode == secondMode)
+    {
+      cu.dimdChromaMode = DC_IDX;
+    }
+  }
+}
+#endif
 
 int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int* piHistogram, int direction, int bw, int bh)
 {

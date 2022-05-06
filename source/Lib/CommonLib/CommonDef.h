@@ -393,7 +393,11 @@ static const int BDPCM_IDX =                                      162;
 static const int BDPCM_IDX =                  (5 * (NUM_DIR - 1) + 2); ///< index for intra VDIAGONAL  mode
 #endif
 static const int NOMODE_IDX =                               MAX_UCHAR; ///< indicating uninitialized elements
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+static const int NUM_CHROMA_MODE = (6 + NUM_LMC_MODE); ///< total number of chroma modes
+#else
 static const int NUM_CHROMA_MODE = (5 + NUM_LMC_MODE); ///< total number of chroma modes
+#endif
 static const int LM_CHROMA_IDX = NUM_LUMA_MODE; ///< chroma mode index for derived from LM mode
 #if ENABLE_DIMD
 static const int DIMD_IDX =                                        99; ///< index for intra DIMD mode
@@ -418,7 +422,12 @@ static const int MMLM_T_IDX = LM_CHROMA_IDX + 5; ///< MDLM_T
 static const int MDLM_L_IDX =                          LM_CHROMA_IDX + 1; ///< MDLM_L
 static const int MDLM_T_IDX =                          LM_CHROMA_IDX + 2; ///< MDLM_T
 #endif
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+static const int DIMD_CHROMA_IDX =                     NUM_INTRA_MODE; ///< chroma mode index for derived by DIMD method
+static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE + 1; ///< chroma mode index for derived from luma intra mode
+#else
 static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE; ///< chroma mode index for derived from luma intra mode
+#endif
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 static const int BVD_CODING_GOLOMB_ORDER = 1; 

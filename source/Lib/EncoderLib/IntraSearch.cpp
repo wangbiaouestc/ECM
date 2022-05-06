@@ -1867,6 +1867,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
     CclmOffsets satdCclmOffsetsBest[NUM_CHROMA_MODE];
     int64_t     satdCclmCosts      [NUM_CHROMA_MODE] = { 0 };
 #endif
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+    bool isChromaFusion = false;
+#endif
 
     //----- init mode list ----
     {
@@ -1875,6 +1878,13 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       //----- check chroma modes -----
       uint32_t chromaCandModes[ NUM_CHROMA_MODE ];
       PU::getIntraChromaCandModes( pu, chromaCandModes );
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+      // derive DIMD chroma mode
+      CompArea areaCb = pu.Cb();
+      CompArea areaCr = pu.Cr();
+      CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, areaCb.lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, areaCb.size()));//needed for correct pos/size (4x4 Tus)
+      IntraPrediction::deriveDimdChromaMode(cs.picture->getRecoBuf(lumaArea), cs.picture->getRecoBuf(areaCb), cs.picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, *pu.cu);
+#endif
 
       // create a temporary CS
       CodingStructure &saveCS = *m_pSaveCS[0];
@@ -1945,11 +1955,19 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         satdSortedCost[i] = 0; // for the mode not pre-select by SATD, do RDO by default, so set the initial value 0.
         satdModeList[i] = 0;
       }
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+      bool modeIsEnable[NUM_INTRA_MODE + 2]; // use intra mode idx to check whether enable
+      for (int i = 0; i < NUM_INTRA_MODE + 2; i++)
+      {
+        modeIsEnable[i] = 1;
+      }
+#else
       bool modeIsEnable[NUM_INTRA_MODE + 1]; // use intra mode idx to check whether enable
       for (int i = 0; i < NUM_INTRA_MODE + 1; i++)
       {
         modeIsEnable[i] = 1;
       }
+#endif
       DistParam distParamSad;
       DistParam distParamSatd;
       pu.intraDir[1] = MDLM_L_IDX; // temporary assigned, just to indicate this is a MDLM mode. for luma down-sampling operation.
@@ -2017,7 +2035,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         {
           continue;
         }
-        if ((mode == LM_CHROMA_IDX) || (mode == PLANAR_IDX) || (mode == DM_CHROMA_IDX)) // only pre-check regular modes and MDLM modes, not including DM ,Planar, and LM
+        if ((mode == LM_CHROMA_IDX) || (mode == PLANAR_IDX) || (mode == DM_CHROMA_IDX)
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+          || (mode == DIMD_CHROMA_IDX)
+#endif
+          ) // only pre-check regular modes and MDLM modes, not including DM, DIMD, Planar, and LM
         {
           continue;
         }
@@ -2106,6 +2128,14 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       Distortion baseDist = cs.dist;
       bool testBDPCM = true;
       testBDPCM = testBDPCM && CU::bdpcmAllowed(cu, COMPONENT_Cb) && cu.ispMode == 0 && cu.mtsFlag == 0 && cu.lfnstIdx == 0;
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+      double dBestNonLmCost = MAX_DOUBLE;
+#if ENABLE_DIMD
+      int bestNonLmMode = (cu.slice->getSPS()->getUseDimd()) ? DIMD_CHROMA_IDX : DM_CHROMA_IDX;
+#else
+      int bestNonLmMode = DM_CHROMA_IDX;
+#endif
+#endif
       for (int32_t uiMode = uiMinMode - (2 * int(testBDPCM)); uiMode < uiMaxMode; uiMode++)
       {
         int chromaIntraMode;
@@ -2128,6 +2158,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           {
             continue;
           }
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+          if (chromaIntraMode == DIMD_CHROMA_IDX && !cu.slice->getSPS()->getUseDimd()) // when DIMD is disable, then DIMD_CHROMA is disable.
+          {
+            continue;
+          }
+#endif
         }
         cs.setDecomp( pu.Cb(), false );
         cs.dist = baseDist;
@@ -2183,7 +2219,85 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           uiBestMode = chromaIntraMode;
           bestBDPCMMode = cu.bdpcmModeChroma;
         }
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+        bool findBestNonLm = !PU::isLMCMode(chromaIntraMode) && !cu.bdpcmModeChroma && pu.cs->slice->isIntra();
+        if (findBestNonLm && dCost < dBestNonLmCost)
+        {
+          bestNonLmMode = chromaIntraMode;
+          dBestNonLmCost = dCost;
+        }
+#endif
       }
+
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+      // RDO for chroma fusion mode
+      for (int32_t uiMode = 0; uiMode < 1; uiMode++)
+      {
+        int chromaIntraMode = bestNonLmMode;
+        if (!pu.cs->slice->isIntra())
+        {
+#if ENABLE_DIMD
+          if (cu.slice->getSPS()->getUseDimd())
+          {
+            chromaIntraMode = DIMD_CHROMA_IDX;
+          }
+          else
+          {
+            break;
+          }
+#else
+          break;
+#endif
+        }
+        pu.isChromaFusion = true;
+        cs.setDecomp(pu.Cb(), false);
+        cs.dist = baseDist;
+        //----- restore context models -----
+        m_CABACEstimator->getCtx() = ctxStart;
+
+        //----- chroma coding -----
+        pu.intraDir[1] = chromaIntraMode;
+        xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType);
+        if (lumaUsesISP && cs.dist == MAX_UINT)
+        {
+          continue;
+        }
+        if (cs.sps->getTransformSkipEnabledFlag())
+        {
+          m_CABACEstimator->getCtx() = ctxStart;
+        }
+        uint64_t fracBits = xGetIntraFracBitsQT(cs, partitioner, false, true, -1, ispType);
+        Distortion uiDist = cs.dist;
+        double    dCost = m_pcRdCost->calcRdCost(fracBits, uiDist - baseDist);
+        if (dCost < dBestCost)
+        {
+          if (lumaUsesISP && dCost < bestCostSoFar)
+          {
+            bestCostSoFar = dCost;
+          }
+          for (uint32_t i = getFirstComponentOfChannel(CHANNEL_TYPE_CHROMA); i < numberValidComponents; i++)
+          {
+            const CompArea &area = pu.blocks[i];
+            saveCS.getRecoBuf(area).copyFrom(cs.getRecoBuf(area));
+            saveCS.getPredBuf(area).copyFrom(cs.getPredBuf(area));
+            saveCS.getResiBuf(area).copyFrom(cs.getResiBuf(area));
+            saveCS.getPredBuf(area).copyFrom(cs.getPredBuf(area));
+            cs.picture->getPredBuf(area).copyFrom(cs.getPredBuf(area));
+            cs.picture->getRecoBuf(area).copyFrom(cs.getRecoBuf(area));
+            for (uint32_t j = 0; j < saveCS.tus.size(); j++)
+            {
+              saveCS.tus[j]->copyComponentFrom(*orgTUs[j], area.compID);
+            }
+          }
+          dBestCost = dCost;
+          uiBestDist = uiDist;
+          uiBestMode = chromaIntraMode;
+          bestBDPCMMode = cu.bdpcmModeChroma;
+          isChromaFusion = pu.isChromaFusion;
+        }
+      }
+      pu.isChromaFusion = false;
+#endif
 
 #if JVET_Z0050_CCLM_SLOPE
 #if MMLM
@@ -2295,6 +2409,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
     cu.bdpcmModeChroma = bestBDPCMMode;
 #if JVET_Z0050_CCLM_SLOPE
     pu.cclmOffsets     = bestCclmOffsets;
+#endif
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+    pu.isChromaFusion = isChromaFusion;
 #endif
   }
 
@@ -4138,6 +4255,12 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
           {
             predIntraAng(compID, piPred, pu);
           }
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+          if (compID != COMPONENT_Y && pu.isChromaFusion)
+          {
+            geneChromaFusionPred(compID, piPred, pu);
+          }
+#endif
         }
       }
 
@@ -6506,6 +6629,13 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     {
       predIntraAng( COMPONENT_Cb, piPredCb, pu);
       predIntraAng( COMPONENT_Cr, piPredCr, pu);
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+      if (pu.isChromaFusion)
+      {
+        geneChromaFusionPred(COMPONENT_Cb, piPredCb, pu);
+        geneChromaFusionPred(COMPONENT_Cr, piPredCr, pu);
+      }
+#endif
     }
 
     // determination of chroma residuals including reshaping and cross-component prediction
