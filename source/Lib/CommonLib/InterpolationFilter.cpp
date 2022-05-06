@@ -344,7 +344,47 @@ const TFilterCoeff InterpolationFilter::m_lumaAltHpelIFilter[NTAPS_LUMA] = { 0, 
 #endif
 
 #if IF_12TAP
+#if JVET_Z0117_CHROMA_IF
 const TFilterCoeff InterpolationFilter::m_chromaFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
+{
+    {0, 0, 256, 0, 0, 0},
+    {1, -6, 256, 7, -2, 0},
+    {2, -11, 253, 15, -4, 1},
+    {3, -16, 251, 23, -6, 1},
+    {4, -21, 248, 33, -10, 2},
+    {5, -25, 244, 42, -12, 2},
+    {7, -30, 239, 53, -17, 4},
+    {7, -32, 234, 62, -19, 4},
+    {8, -35, 227, 73, -22, 5},
+    {9, -38, 220, 84, -26, 7},
+    {10, -40, 213, 95, -29, 7},
+    {10, -41, 204, 106, -31, 8},
+    {10, -42, 196, 117, -34, 9},
+    {10, -41, 187, 127, -35, 8},
+    {11, -42, 177, 138, -38, 10},
+    {10, -41, 168, 148, -39, 10},
+    {10, -40, 158, 158, -40, 10},
+    {10, -39, 148, 168, -41, 10},
+    {10, -38, 138, 177, -42, 11},
+    {8, -35, 127, 187, -41, 10},
+    {9, -34, 117, 196, -42, 10},
+    {8, -31, 106, 204, -41, 10},
+    {7, -29, 95, 213, -40, 10},
+    {7, -26, 84, 220, -38, 9},
+    {5, -22, 73, 227, -35, 8},
+    {4, -19, 62, 234, -32, 7},
+    {4, -17, 53, 239, -30, 7},
+    {2, -12, 42, 244, -25, 5},
+    {2, -10, 33, 248, -21, 4},
+    {1, -6, 23, 251, -16, 3},
+    {1, -4, 15, 253, -11, 2},
+    {0, -2, 7, 256, -6, 1},
+};
+
+const TFilterCoeff InterpolationFilter::m_chromaFilter4[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][4] =
+#else
+const TFilterCoeff InterpolationFilter::m_chromaFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
+#endif
 {
 {  0 * 4, 64 * 4,  0 * 4,  0 * 4 },
 { -1 * 4, 63 * 4,  2 * 4,  0 * 4 },
@@ -917,6 +957,22 @@ InterpolationFilter::InterpolationFilter()
   m_filterHor[1][1][0] = filter<8, false, true, false>;
   m_filterHor[1][1][1] = filter<8, false, true, true>;
 
+#if JVET_Z0117_CHROMA_IF
+  m_filterHor[2][0][0] = filter<6, false, false, false>;
+  m_filterHor[2][0][1] = filter<6, false, false, true>;
+  m_filterHor[2][1][0] = filter<6, false, true, false>;
+  m_filterHor[2][1][1] = filter<6, false, true, true>;
+  
+  m_filterHor[3][0][0] = filter<4, false, false, false>;
+  m_filterHor[3][0][1] = filter<4, false, false, true>;
+  m_filterHor[3][1][0] = filter<4, false, true, false>;
+  m_filterHor[3][1][1] = filter<4, false, true, true>;
+
+  m_filterHor[4][0][0] = filter<2, false, false, false>;
+  m_filterHor[4][0][1] = filter<2, false, false, true>;
+  m_filterHor[4][1][0] = filter<2, false, true, false>;
+  m_filterHor[4][1][1] = filter<2, false, true, true>;
+#else
   m_filterHor[2][0][0] = filter<4, false, false, false>;
   m_filterHor[2][0][1] = filter<4, false, false, true>;
   m_filterHor[2][1][0] = filter<4, false, true, false>;
@@ -926,6 +982,7 @@ InterpolationFilter::InterpolationFilter()
   m_filterHor[3][0][1] = filter<2, false, false, true>;
   m_filterHor[3][1][0] = filter<2, false, true, false>;
   m_filterHor[3][1][1] = filter<2, false, true, true>;
+#endif
 
   m_filterVer[0][0][0] = filter<12, true, false, false>;
   m_filterVer[0][0][1] = filter<12, true, false, true>;
@@ -937,6 +994,22 @@ InterpolationFilter::InterpolationFilter()
   m_filterVer[1][1][0] = filter<8, true, true, false>;
   m_filterVer[1][1][1] = filter<8, true, true, true>;
 
+#if JVET_Z0117_CHROMA_IF
+  m_filterVer[2][0][0] = filter<6, true, false, false>;
+  m_filterVer[2][0][1] = filter<6, true, false, true>;
+  m_filterVer[2][1][0] = filter<6, true, true, false>;
+  m_filterVer[2][1][1] = filter<6, true, true, true>;
+  
+  m_filterVer[3][0][0] = filter<4, true, false, false>;
+  m_filterVer[3][0][1] = filter<4, true, false, true>;
+  m_filterVer[3][1][0] = filter<4, true, true, false>;
+  m_filterVer[3][1][1] = filter<4, true, true, true>;
+
+  m_filterVer[4][0][0] = filter<2, true, false, false>;
+  m_filterVer[4][0][1] = filter<2, true, false, true>;
+  m_filterVer[4][1][0] = filter<2, true, true, false>;
+  m_filterVer[4][1][1] = filter<2, true, true, true>;
+#else
   m_filterVer[2][0][0] = filter<4, true, false, false>;
   m_filterVer[2][0][1] = filter<4, true, false, true>;
   m_filterVer[2][1][0] = filter<4, true, true, false>;
@@ -946,6 +1019,7 @@ InterpolationFilter::InterpolationFilter()
   m_filterVer[3][0][1] = filter<2, true, false, true>;
   m_filterVer[3][1][0] = filter<2, true, true, false>;
   m_filterVer[3][1][1] = filter<2, true, true, true>;
+#endif
 #endif
 #else
 #if !QC_SIF_SIMD
@@ -1374,6 +1448,39 @@ void InterpolationFilter::filterHor(const ClpRng& clpRng, Pel const *src, int sr
   {
     m_filterHor[1][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
   }
+#if JVET_Z0117_CHROMA_IF
+  else if( N == 6 )
+  {
+    m_filterHor[2][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 4)
+  {
+    m_filterHor[3][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 2)
+  {
+    m_filterHor[4][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+#else
+  else if (N == 4)
+  {
+    m_filterHor[2][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 2)
+  {
+    m_filterHor[3][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+#endif
+#else
+  if( N == 8 )
+  {
+    m_filterHor[0][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+#if JVET_Z0117_CHROMA_IF
+  else if( N == 6 )
+  {
+    m_filterHor[1][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
   else if (N == 4)
   {
     m_filterHor[2][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
@@ -1383,10 +1490,6 @@ void InterpolationFilter::filterHor(const ClpRng& clpRng, Pel const *src, int sr
     m_filterHor[3][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
   }
 #else
-  if( N == 8 )
-  {
-    m_filterHor[0][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
-  }
   else if( N == 4 )
   {
     m_filterHor[1][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
@@ -1395,6 +1498,7 @@ void InterpolationFilter::filterHor(const ClpRng& clpRng, Pel const *src, int sr
   {
     m_filterHor[2][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
   }
+#endif
 #endif
   else
   {
@@ -1430,6 +1534,39 @@ void InterpolationFilter::filterVer(const ClpRng& clpRng, Pel const *src, int sr
   {
     m_filterVer[1][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
   }
+#if JVET_Z0117_CHROMA_IF
+  else if (N == 6)
+  {
+    m_filterVer[2][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 4)
+  {
+    m_filterVer[3][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 2)
+  {
+    m_filterVer[4][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+#else
+  else if (N == 4)
+  {
+    m_filterVer[2][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 2)
+  {
+    m_filterVer[3][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+#endif
+#else
+  if( N == 8 )
+  {
+    m_filterVer[0][isFirst][isLast]( clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+#if JVET_Z0117_CHROMA_IF
+  else if (N == 6)
+  {
+    m_filterVer[1][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
   else if (N == 4)
   {
     m_filterVer[2][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
@@ -1439,10 +1576,6 @@ void InterpolationFilter::filterVer(const ClpRng& clpRng, Pel const *src, int sr
     m_filterVer[3][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
   }
 #else
-  if( N == 8 )
-  {
-    m_filterVer[0][isFirst][isLast]( clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
-  }
   else if( N == 4 )
   {
     m_filterVer[1][isFirst][isLast]( clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
@@ -1451,6 +1584,7 @@ void InterpolationFilter::filterVer(const ClpRng& clpRng, Pel const *src, int sr
   {
     m_filterVer[2][isFirst][isLast]( clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
   }
+#endif
 #endif
   else
   {

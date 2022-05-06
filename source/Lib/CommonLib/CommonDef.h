@@ -793,7 +793,11 @@ static const int COM16_C806_TRANS_PREC =                            0;
 #else
 static const int NTAPS_LUMA               =                         8; ///< Number of taps for luma
 #endif
+#if JVET_Z0117_CHROMA_IF
+static const int NTAPS_CHROMA             =                         6; ///< Number of taps for chroma
+#else
 static const int NTAPS_CHROMA             =                         4; ///< Number of taps for chroma
+#endif
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
 static const int MAX_LADF_INTERVALS       =                         5; /// max number of luma adaptive deblocking filter qp offset intervals
 #endif

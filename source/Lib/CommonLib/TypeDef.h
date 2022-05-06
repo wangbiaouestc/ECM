@@ -154,6 +154,7 @@
 #define JVET_Z0127_SPS_MHP_MAX_MRG_CAND                   1
 #endif
 #define IF_12TAP                                          1 // 12-tap IF
+#define JVET_Z0117_CHROMA_IF                              1 //JVET_Z0117: 6-tap interpolation filter for chroma MC
 #define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
 
 #if JVET_X0049_BDMVR_SW_OPT
