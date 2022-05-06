@@ -421,6 +421,9 @@ struct IntraPredictionData
   uint8_t  intraDir[MAX_NUM_CHANNEL_TYPE];
   bool      mipTransposedFlag;
   int8_t    multiRefIdx;
+#if JVET_Z0050_CCLM_SLOPE
+  CclmOffsets cclmOffsets;
+#endif
 };
 
 struct InterPredictionData

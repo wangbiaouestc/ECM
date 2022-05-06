@@ -1275,9 +1275,9 @@ void AreaBuf<Pel>::addAvg( const AreaBuf<const Pel> &other1, const AreaBuf<const
   const int     offset      = (1 << (shiftNum - 1)) + 2 * IF_INTERNAL_OFFS;
 
 #if JVET_Z0136_OOB
-#if ENABLE_SIMD_OPT_BUFFER && defined(TARGET_SIMD_X86)
   if (mcMask == NULL || (!isOOB[0] && !isOOB[1]))
   {
+#if ENABLE_SIMD_OPT_BUFFER && defined(TARGET_SIMD_X86)
     if ((width & 7) == 0)
     {
       g_pelBufOP.addAvg8(src0, src1Stride, src2, src2Stride, dest, destStride, width, height, shiftNum, offset, clpRng, mcMask, mcStride, isOOB);

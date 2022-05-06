@@ -237,6 +237,9 @@ protected:
   int xCalcLMParametersGeneralized(int x, int y, int xx, int xy, int count, int bitDepth, int &a, int &b, int &iShift);
   int xLMSampleClassifiedTraining(int count, int mean, int meanC, int LumaSamples[], int ChrmSamples[], int bitDepth, MMLM_parameter parameters[]);
 #endif
+#if JVET_Z0050_CCLM_SLOPE
+  void xUpdateCclmModel(int &a, int &b, int &iShift, int midLuma, int delta);
+#endif
 
 public:
   IntraPrediction();

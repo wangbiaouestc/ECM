@@ -1868,6 +1868,94 @@ void CABACWriter::intra_chroma_pred_modes( const CodingUnit& cu )
 
   intra_chroma_pred_mode( *pu );
 }
+
+#if JVET_Z0050_CCLM_SLOPE
+void CABACWriter::cclmDelta(const PredictionUnit& pu, int8_t delta)
+{
+  if ( delta )
+  {
+    int deltaAbs = abs( delta );
+    
+    if ( deltaAbs == 1 )
+    {
+      m_BinEncoder.encodeBinsEP( 0, 1 );
+    }
+    else if ( deltaAbs == 2 )
+    {
+      m_BinEncoder.encodeBinsEP( 2, 2 );
+    }
+    else if ( deltaAbs == 3 )
+    {
+      m_BinEncoder.encodeBinsEP( 6, 3 );
+    }
+    else
+    {
+      m_BinEncoder.encodeBinsEP( 7, 3 );
+    }
+
+    m_BinEncoder.encodeBin( delta < 0 ? 1 : 0, Ctx::CclmDeltaFlags(4) );
+  }
+}
+
+void CABACWriter::cclmDeltaSlope(const PredictionUnit& pu)
+{
+  if ( PU::hasCclmDeltaFlag( pu ) )
+  {
+    bool deltaActive = pu.cclmOffsets.isActive();
+
+    m_BinEncoder.encodeBin( deltaActive ? 1 : 0, Ctx::CclmDeltaFlags(0) );
+    
+    if ( deltaActive )
+    {
+      bool bothActive = pu.cclmOffsets.cb0 && pu.cclmOffsets.cr0;
+
+      m_BinEncoder.encodeBin( bothActive ? 1 : 0, Ctx::CclmDeltaFlags(3) );
+
+      if ( !bothActive )
+      {
+        m_BinEncoder.encodeBin( pu.cclmOffsets.cb0 ? 1 : 0, Ctx::CclmDeltaFlags(1) );
+        
+#if MMLM
+        if ( PU::isMultiModeLM( pu.intraDir[1] ) && !pu.cclmOffsets.cb0 )
+        {
+          m_BinEncoder.encodeBin( pu.cclmOffsets.cr0 ? 1 : 0, Ctx::CclmDeltaFlags(2) );
+        }
+#endif
+      }
+
+      cclmDelta( pu, pu.cclmOffsets.cb0 );
+      cclmDelta( pu, pu.cclmOffsets.cr0 );
+    
+#if MMLM
+      // Now the same for the second model (if applicable)
+      if ( PU::isMultiModeLM( pu.intraDir[1] ) )
+      {
+        bool bothActive = pu.cclmOffsets.cb1 && pu.cclmOffsets.cr1;
+        
+        m_BinEncoder.encodeBin( bothActive ? 1 : 0, Ctx::CclmDeltaFlags(3) );
+        
+        if ( !bothActive )
+        {
+          m_BinEncoder.encodeBin( pu.cclmOffsets.cb1 ? 1 : 0, Ctx::CclmDeltaFlags(1) );
+          
+          if ( !pu.cclmOffsets.cb1 )
+          {
+            if ( pu.cclmOffsets.cb0 || pu.cclmOffsets.cr0 || pu.cclmOffsets.cb1 )
+            {
+              m_BinEncoder.encodeBin( pu.cclmOffsets.cr1 ? 1 : 0, Ctx::CclmDeltaFlags(2) );
+            }
+          }
+        }
+
+        cclmDelta( pu, pu.cclmOffsets.cb1 );
+        cclmDelta( pu, pu.cclmOffsets.cr1 );
+      }
+#endif
+    }
+  }
+}
+#endif
+
 void CABACWriter::intra_chroma_lmc_mode(const PredictionUnit& pu)
 {
   const unsigned intraDir = pu.intraDir[1];
@@ -1916,6 +2004,10 @@ void CABACWriter::intra_chroma_lmc_mode(const PredictionUnit& pu)
     m_BinEncoder.encodeBinEP(symbol_minus_1);
 #endif
   }
+
+#if JVET_Z0050_CCLM_SLOPE
+  cclmDeltaSlope( pu );
+#endif
 }
 
 

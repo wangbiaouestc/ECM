@@ -185,6 +185,10 @@ public:
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   void        amvpMerge_mode         ( PredictionUnit&               pu );
 #endif
+#if JVET_Z0050_CCLM_SLOPE
+  void        cclmDelta             ( PredictionUnit&               pu, int8_t &delta );
+  void        cclmDeltaSlope       ( PredictionUnit&               pu );
+#endif
 
 
   // transform tree (clause 7.3.8.8)

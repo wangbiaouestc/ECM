@@ -1111,6 +1111,33 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #endif
 }
 
+#if JVET_Z0050_CCLM_SLOPE
+void IntraPrediction::xUpdateCclmModel(int &a, int &b, int &iShift, int midLuma, int delta)
+{
+  if ( delta )
+  {
+    const int dShift = 3; // For 1/8 sample value adjustment
+    
+    delta = a > 0 ? -delta : delta;
+    
+    // Make final shift at least the size of the precision of the update
+    if ( iShift < dShift )
+    {
+      a    <<= ( dShift - iShift );
+      iShift = dShift;
+    }
+    else if ( iShift > dShift )
+    {
+      // Final shift is larger than the precision of the update: scale the update up to the final precision
+      delta <<= ( iShift - dShift );
+    }
+    
+    a += delta;
+    b -= ( delta * midLuma ) >> iShift;
+  }
+}
+#endif
+
 void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea& chromaArea, int intraDir, bool createModel, CclmModel *cclmModelStored)
 {
   int  iLumaStride = 0;
@@ -1152,6 +1179,13 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
     cclmModel = *cclmModelStored;
   }
 
+#if JVET_Z0050_CCLM_SLOPE
+  xUpdateCclmModel( cclmModel.a,  cclmModel.b,  cclmModel.shift,  cclmModel.midLuma,  compID == COMPONENT_Cb ? pu.cclmOffsets.cb0 : pu.cclmOffsets.cr0 );
+#if MMLM
+  xUpdateCclmModel( cclmModel.a2, cclmModel.b2, cclmModel.shift2, cclmModel.midLuma2, compID == COMPONENT_Cb ? pu.cclmOffsets.cb1 : pu.cclmOffsets.cr1 );
+#endif
+#endif
+  
   ////// final prediction
   piPred.copyFrom(Temp);
 #if MMLM
@@ -5221,6 +5255,11 @@ void IntraPrediction::xGetLMParameters(const PredictionUnit &pu, const Component
         cclmModel.setSecondModel( ax, bx, iShiftx, yAvg );
       }
     }
+
+#if JVET_Z0050_CCLM_SLOPE
+    cclmModel.midLuma  = cntMMLM[0] ? ( maxLuma2[0][0] + minLuma2[0][0] ) >> 1 : 0;
+    cclmModel.midLuma2 = cntMMLM[1] ? ( maxLuma2[1][0] + minLuma2[1][0] ) >> 1 : 0;
+#endif
   }
   else
   {
@@ -5228,6 +5267,10 @@ void IntraPrediction::xGetLMParameters(const PredictionUnit &pu, const Component
   if (leftAvailable || aboveAvailable)
   {
     int diff = maxLuma[0] - minLuma[0];
+#if JVET_Z0050_CCLM_SLOPE
+    cclmModel.midLuma = ( maxLuma[0] + minLuma[0] ) >> 1;
+#endif
+
     if (diff > 0)
     {
       int diffC = maxLuma[1] - minLuma[1];
@@ -5826,6 +5869,11 @@ void IntraPrediction::xGetLMParameters_LMS(const PredictionUnit &pu, const Compo
   }
   int numSteps = minDim;
 
+#if JVET_Z0050_CCLM_SLOPE
+  int sumLuma = 0;
+  int numPels = aboveAvailable && leftAvailable ? 2*numSteps : aboveAvailable || leftAvailable ? numSteps : 0;
+#endif
+
   if (aboveAvailable)
   {
     cntT = numSteps;
@@ -5838,6 +5886,9 @@ void IntraPrediction::xGetLMParameters_LMS(const PredictionUnit &pu, const Compo
 
       pTempBufferSrc[j] = src[idx];
       pTempBufferCur[j] = cur[idx];
+#if JVET_Z0050_CCLM_SLOPE
+      sumLuma          += src[idx];
+#endif
     }
 
   }
@@ -5854,9 +5905,15 @@ void IntraPrediction::xGetLMParameters_LMS(const PredictionUnit &pu, const Compo
 
       pTempBufferSrc[i + cntT] = src[srcStride * idx];
       pTempBufferCur[i + cntT] = cur[idx];
-
+#if JVET_Z0050_CCLM_SLOPE
+      sumLuma                 += src[srcStride * idx];
+#endif
     }
   }
+  
+#if JVET_Z0050_CCLM_SLOPE
+  cclmModel.midLuma = numPels ? ( sumLuma + numPels/2 ) / numPels : 1 << (uiInternalBitDepth - 1);
+#endif
 
   if ((curChromaMode == MDLM_L_IDX) || (curChromaMode == MDLM_T_IDX))
   {
@@ -5946,6 +6003,31 @@ void IntraPrediction::xGetLMParameters_LMS(const PredictionUnit &pu, const Compo
 
     cclmModel.setFirstModel ( parameters[0].a, parameters[0].b, parameters[0].shift );
     cclmModel.setSecondModel( parameters[1].a, parameters[1].b, parameters[1].shift, mean );
+
+#if JVET_Z0050_CCLM_SLOPE
+    // Middle luma values for the two models
+    int sumLuma0 = 0;
+    int sumLuma1 = 0;
+    int numPels0 = 0;
+    int numPels1 = 0;
+
+    for (int i = 0; i < avgCnt; i++)
+    {
+      if ( LumaSamples[i] <= mean )
+      {
+        sumLuma0 += LumaSamples[i];
+        numPels0 += 1;
+      }
+      else
+      {
+        sumLuma1 += LumaSamples[i];
+        numPels1 += 1;
+      }
+    }
+
+    cclmModel.midLuma  = numPels0 ? ( sumLuma0 + numPels0/2 ) / numPels0 : mean;
+    cclmModel.midLuma2 = numPels1 ? ( sumLuma1 + numPels1/2 ) / numPels1 : mean;
+#endif
 
     return;
   }
