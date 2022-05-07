@@ -44,7 +44,7 @@
 #include <memory.h>
 #include <algorithm>
 
-#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
 #include "Reshape.h"
 #endif
 
@@ -256,6 +256,17 @@ InterPrediction::InterPrediction()
   m_tplWeightTblInitialized = false;
 #endif
 #endif
+#if JVET_Z0061_TM_OBMC
+  for (uint32_t ch = 0; ch < MAX_NUM_COMPONENT; ch++)
+  {
+    for (uint32_t tmplt = 0; tmplt < 2; tmplt++)
+    {
+      m_acYuvRefAboveTemplateOBMC[tmplt][ch] = nullptr;
+      m_acYuvRefLeftTemplateOBMC[tmplt][ch]  = nullptr;
+      m_acYuvBlendTemplateOBMC[tmplt][ch]    = nullptr;
+    }
+  }
+#endif
 }
 
 InterPrediction::~InterPrediction()
@@ -377,16 +388,30 @@ void InterPrediction::destroy()
   }
 #endif
 #endif
+#if JVET_Z0061_TM_OBMC
+  for (uint32_t ch = 0; ch < MAX_NUM_COMPONENT; ch++)
+  {
+    for (uint32_t tmplt = 0; tmplt < 2; tmplt++)
+    {
+      xFree(m_acYuvRefAboveTemplateOBMC[tmplt][ch]);
+      xFree(m_acYuvRefLeftTemplateOBMC[tmplt][ch]);
+      xFree(m_acYuvBlendTemplateOBMC[tmplt][ch]);
+      m_acYuvRefAboveTemplateOBMC[tmplt][ch] = nullptr;
+      m_acYuvRefLeftTemplateOBMC[tmplt][ch]  = nullptr;
+      m_acYuvBlendTemplateOBMC[tmplt][ch]    = nullptr;
+    }
+  }
+#endif
 }
 
-#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
 void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape )
 #else
 void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize )
 #endif
 {
   m_pcRdCost = pcRdCost;
-#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
   m_pcReshape = reshape;
 #endif
 
@@ -534,6 +559,17 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
     m_acYuvRefAMLTemplatePart1[tmplt] = (Pel*)xMalloc(Pel, GEO_MAX_CU_SIZE * GEO_MODE_SEL_TM_SIZE);
   }
 #endif
+#endif
+#if JVET_Z0061_TM_OBMC
+  for (uint32_t ch = 0; ch < MAX_NUM_COMPONENT; ch++)
+  {
+    for (uint32_t tmplt = 0; tmplt < 2; tmplt++)
+    {
+      m_acYuvRefAboveTemplateOBMC[tmplt][ch] = (Pel *) xMalloc(Pel, MAX_CU_SIZE * MAX_CU_SIZE);
+      m_acYuvRefLeftTemplateOBMC[tmplt][ch]  = (Pel *) xMalloc(Pel, MAX_CU_SIZE * MAX_CU_SIZE);
+      m_acYuvBlendTemplateOBMC[tmplt][ch]    = (Pel *) xMalloc(Pel, MAX_CU_SIZE * MAX_CU_SIZE);
+    }
+  }
 #endif
 
   if (m_storedMv == nullptr)
@@ -1756,6 +1792,9 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
                                      , Mv   mvCurr
 #endif
 #endif
+#if JVET_Z0061_TM_OBMC
+                                    , bool fastOBMC
+#endif
                                     )
 {
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -1765,6 +1804,12 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
   int filterIdx = 0;
 #endif
   if (bilinearMC)
+  {
+    filterIdx = 1;
+  }
+#endif
+#if JVET_Z0061_TM_OBMC
+  if (fastOBMC)
   {
     filterIdx = 1;
   }
@@ -3952,6 +3997,35 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
         {
           cTmp1 = pcYuvTmpPredL0.subBuf(predArea);
         }
+#if JVET_Z0061_TM_OBMC
+        bool isAbove   = (iBlkBoundary == 0) ? 1 : 0;
+        int  iOBMCmode = selectOBMCmode(pu, subPu, isAbove, iLength, uiMinCUW, curOffset);
+
+        if (iOBMCmode == 1)   // 1: current;
+        {
+          iSub += iLength;
+        }
+        else if (iOBMCmode == 2)   // 2: neighbour;
+        {
+          xSubBlockMotionCompensation(subPu, cTmp1);
+
+          for (int compID = 0; compID < MAX_NUM_COMPONENT; compID++)
+          {
+            xSubblockTMOBMC(ComponentID(compID), subPu, cPred, cTmp1, iBlkBoundary, iOBMCmode);
+          }
+          iSub += iLength;
+        }
+        else   // 3: blend (OBMC) or default 0: best has not been found;
+        {
+          xSubBlockMotionCompensation(subPu, cTmp1);
+
+          for (int compID = 0; compID < MAX_NUM_COMPONENT; compID++)
+          {
+            xSubblockTMOBMC(ComponentID(compID), subPu, cPred, cTmp1, iBlkBoundary, iOBMCmode);
+          }
+          iSub += iLength;
+        }
+#else
         xSubBlockMotionCompensation(subPu, cTmp1);
 
         for (int compID = 0; compID < MAX_NUM_COMPONENT; compID++)
@@ -3960,6 +4034,7 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
         }
 
         iSub += iLength;
+#endif
       }
       else if (iState == 1 || iState == 3)   // consecutive intra neighbors or   skip OBMC based on MV similarity
       {
@@ -7218,6 +7293,563 @@ void  InterPrediction::updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, u
   }
 }
 #endif
+#endif
+#if JVET_Z0061_TM_OBMC
+void InterPrediction::xOBMCWeightedAverageY(const PredictionUnit &pu, const CPelUnitBuf &pcYuvSrc0,
+                                            const CPelUnitBuf &pcYuvSrc1, PelUnitBuf &pcYuvDst,
+                                            const BitDepths &clipBitDepths, const ClpRngs &clpRngs, MotionInfo currMi)
+{
+  const int iRefIdx0 = currMi.refIdx[0];
+  const int iRefIdx1 = currMi.refIdx[1];
+
+  if (iRefIdx0 >= 0 && iRefIdx1 >= 0)
+  {
+    if (pu.cu->BcwIdx != BCW_DEFAULT)
+    {
+      pcYuvDst.addWeightedAvg(pcYuvSrc0, pcYuvSrc1, clpRngs, pu.cu->BcwIdx, false, true);
+    }
+    else
+    {
+      pcYuvDst.addAvg(pcYuvSrc0, pcYuvSrc1, clpRngs, false, true);
+    }
+  }
+  else if (iRefIdx0 >= 0 && iRefIdx1 < 0)
+  {
+    pcYuvDst.copyClip(pcYuvSrc0, clpRngs, true);
+  }
+  else if (iRefIdx0 < 0 && iRefIdx1 >= 0)
+  {
+    pcYuvDst.copyClip(pcYuvSrc1, clpRngs, true);
+  }
+}
+int InterPrediction::selectOBMCmode(PredictionUnit &pu, PredictionUnit &subblockPu, bool isAbove, int iLength,
+                                    uint32_t uiMinCUW, Position off)
+{
+  const Position posSubBlock(pu.lumaPos().offset(off));
+  Position       posNeighborMotion = Position(0, 0);
+  if (isAbove)
+  {
+    posNeighborMotion = posSubBlock.offset(0, -1);
+  }
+  else if (!isAbove)
+  {
+    posNeighborMotion = posSubBlock.offset(-1, 0);
+  }
+  PredictionUnit *tmpPu = nullptr;
+  tmpPu                 = pu.cs->getPU(posNeighborMotion, pu.chType);
+
+  if (!tmpPu)
+  {
+    return 0;
+  }
+
+  MotionInfo neigMi = tmpPu->getMotionInfo(posNeighborMotion);
+  MotionInfo currMi = pu.getMotionInfo(posSubBlock);
+  Distortion candCostList[3];
+  for (uint32_t i = 0; i < 3; i++)
+  {
+    candCostList[i] = MAX_UINT;
+  }
+
+  Distortion uiCost;
+  DistParam  cDistParam;
+  cDistParam.applyWeight = false;
+  int nWidth             = isAbove ? (iLength * uiMinCUW) : uiMinCUW;
+  int nHeight            = isAbove ? uiMinCUW : (iLength * uiMinCUW);
+
+  if (!xAMLGetCurBlkTemplate(subblockPu, nWidth, nHeight))
+  {
+    return 0;
+  }
+
+  // Process above boundary
+  PelUnitBuf pcBufPredCurTop =
+    (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, TM_OBMC_TEMPLATE_SIZE)));
+  PelUnitBuf pcBufPredRefTop0 =
+    (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAboveTemplateOBMC[0][0], nWidth, TM_OBMC_TEMPLATE_SIZE)));
+  PelUnitBuf pcBufPredRefTop1 =
+    (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAboveTemplateOBMC[1][0], nWidth, TM_OBMC_TEMPLATE_SIZE)));
+  PelUnitBuf pcBufBlendDstAbove =
+    (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvBlendTemplateOBMC[0][0], nWidth, TM_OBMC_TEMPLATE_SIZE)));
+
+  if ((isAbove) && (m_bAMLTemplateAvailabe[0]))
+  {
+    // 0: use current mv to do MC for template;
+    getBlkOBMCRefTemplate(subblockPu, pcBufPredRefTop0, isAbove, currMi);
+    uiCost = 0;
+    m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop0.Y(),
+                             subblockPu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+    uiCost          = cDistParam.distFunc(cDistParam);
+    candCostList[0] = uiCost;
+
+    // 1: use neighbour mv to do MC for template;
+    getBlkOBMCRefTemplate(subblockPu, pcBufPredRefTop1, isAbove, neigMi);
+    uiCost = 0;
+    m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop1.Y(),
+                             subblockPu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+    uiCost          = cDistParam.distFunc(cDistParam);
+    candCostList[1] = uiCost;
+
+    // 2: Now calculate the blending template
+    uiCost               = 0;
+    CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAboveTemplateOBMC[0][0], pcBufPredCurTop.Y()));
+    CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAboveTemplateOBMC[1][0], pcBufPredCurTop.Y()));
+
+    for (int i = 0; i < nWidth; i++)
+    {
+      pcBufBlendDstAbove.Y().buf[i] = (26 * srcPred0.Y().buf[i] + 6 * srcPred1.Y().buf[i] + 16) >> 5;
+    }
+
+    m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufBlendDstAbove.Y(),
+                             subblockPu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+    uiCost          = cDistParam.distFunc(cDistParam);
+    candCostList[2] = uiCost;
+
+    int bestOBMCmode = 0;
+    if ((candCostList[0] < candCostList[1]) && (candCostList[0] < candCostList[2]))
+    {
+      bestOBMCmode = 1;
+    }
+    else
+    {
+      candCostList[0] = candCostList[0] << 3;
+      candCostList[1] = candCostList[1] << 3;
+      if ((candCostList[1] + (candCostList[1] >> 2) + (candCostList[1] >> 3)) <= candCostList[0])
+      {
+        bestOBMCmode = 2;
+      }
+      else if (candCostList[0] <= candCostList[1])
+      {
+        bestOBMCmode = 3;
+      }
+      else if (candCostList[1] <= candCostList[0])
+      {
+        bestOBMCmode = 4;
+      }
+    }
+    return bestOBMCmode;
+  }
+
+  // Process left boundary
+  PelUnitBuf pcBufPredCurLeft =
+    (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], TM_OBMC_TEMPLATE_SIZE, nHeight)));
+  PelUnitBuf pcBufPredRefLeft0 =
+    (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplateOBMC[0][0], TM_OBMC_TEMPLATE_SIZE, nHeight)));
+  PelUnitBuf pcBufPredRefLeft1 =
+    (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplateOBMC[1][0], TM_OBMC_TEMPLATE_SIZE, nHeight)));
+  PelUnitBuf pcBufBlendDstLeft =
+    (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvBlendTemplateOBMC[1][0], TM_OBMC_TEMPLATE_SIZE, nHeight)));
+
+  if ((!isAbove) && (m_bAMLTemplateAvailabe[1]))
+  {
+    // 0: use current mv to do MC for template;
+    getBlkOBMCRefTemplate(subblockPu, pcBufPredRefLeft0, isAbove, currMi);
+    uiCost = 0;
+    m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft0.Y(),
+                             subblockPu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+    uiCost          = cDistParam.distFunc(cDistParam);
+    candCostList[0] = uiCost;
+
+    // 1: use neighbour mv to do MC for template;
+    getBlkOBMCRefTemplate(subblockPu, pcBufPredRefLeft1, isAbove, neigMi);
+    uiCost = 0;
+    m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft1.Y(),
+                             subblockPu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+    uiCost          = cDistParam.distFunc(cDistParam);
+    candCostList[1] = uiCost;
+
+    // 2: Now calculate the blending template
+    uiCost               = 0;
+    CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplateOBMC[0][0], pcBufPredCurLeft.Y()));
+    CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplateOBMC[1][0], pcBufPredCurLeft.Y()));
+    int         idx      = 0;
+    for (int i = 0; i < nHeight; i++)
+    {
+      pcBufBlendDstLeft.Y().buf[idx] = (26 * srcPred0.Y().buf[idx] + 6 * srcPred1.Y().buf[idx] + 16) >> 5;
+      idx += pcBufBlendDstLeft.bufs[COMPONENT_Y].stride;
+    }
+    m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufBlendDstLeft.Y(),
+                             subblockPu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+    uiCost          = cDistParam.distFunc(cDistParam);
+    candCostList[2] = uiCost;
+
+    int bestOBMCmode = 0;
+    if ((candCostList[0] < candCostList[1]) && (candCostList[0] < candCostList[2]))
+    {
+      bestOBMCmode = 1;
+    }
+    else
+    {
+      candCostList[0] = candCostList[0] << 3;
+      candCostList[1] = candCostList[1] << 3;
+      if ((candCostList[1] + (candCostList[1] >> 2) + (candCostList[1] >> 3)) <= candCostList[0])
+      {
+        bestOBMCmode = 2;
+      }
+      else if (candCostList[0] <= candCostList[1])
+      {
+        bestOBMCmode = 3;
+      }
+      else if (candCostList[1] <= candCostList[0])
+      {
+        bestOBMCmode = 4;
+      }
+    }
+    return bestOBMCmode;
+  }
+  else
+  {
+    return 0;
+  }
+}
+bool InterPrediction::xCheckIdenticalMotionOBMC(PredictionUnit &pu, MotionInfo tryMi)
+{
+  const Slice &slice = *pu.cs->slice;
+
+  if (slice.isInterB() && !pu.cs->pps->getWPBiPred())
+  {
+    if (tryMi.refIdx[0] >= 0 && tryMi.refIdx[1] >= 0)
+    {
+      int RefPOCL0 = slice.getRefPic(REF_PIC_LIST_0, tryMi.refIdx[0])->getPOC();
+      int RefPOCL1 = slice.getRefPic(REF_PIC_LIST_1, tryMi.refIdx[1])->getPOC();
+
+      if (RefPOCL0 == RefPOCL1)
+      {
+        if (!pu.cu->affine)
+        {
+          if (tryMi.mv[0] == tryMi.mv[1])
+          {
+            return true;
+          }
+        }
+        else
+        {
+          if ((pu.cu->affineType == AFFINEMODEL_4PARAM && (pu.mvAffi[0][0] == pu.mvAffi[1][0])
+               && (pu.mvAffi[0][1] == pu.mvAffi[1][1]))
+              || (pu.cu->affineType == AFFINEMODEL_6PARAM && (pu.mvAffi[0][0] == pu.mvAffi[1][0])
+                  && (pu.mvAffi[0][1] == pu.mvAffi[1][1]) && (pu.mvAffi[0][2] == pu.mvAffi[1][2])))
+          {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitBuf &pcBufPredRef, bool isAbove,
+                                            MotionInfo tryMi)
+{
+  Mv        mvCurr;
+  const int lumaShift = 2 + MV_FRACTIONAL_BITS_DIFF;
+  const int horShift  = (lumaShift + ::getComponentScaleX(COMPONENT_Y, subblockPu.chromaFormat));
+  const int verShift  = (lumaShift + ::getComponentScaleY(COMPONENT_Y, subblockPu.chromaFormat));
+
+  if (xCheckIdenticalMotionOBMC(subblockPu, tryMi))
+  {
+    mvCurr      = tryMi.mv[0];
+    Mv subPelMv = mvCurr;
+    clipMv(mvCurr, subblockPu.lumaPos(), subblockPu.lumaSize(), *subblockPu.cs->sps, *subblockPu.cs->pps);
+    CHECK(tryMi.refIdx[0] < 0, "invalid ref idx");
+
+    if ((isAbove) && (m_bAMLTemplateAvailabe[0]))
+    {
+      Mv mvTop(0, -(TM_OBMC_TEMPLATE_SIZE << verShift));
+      mvTop += subPelMv;
+      clipMv(mvTop, subblockPu.lumaPos(), subblockPu.lumaSize(), *subblockPu.cs->sps, *subblockPu.cs->pps);
+      xPredInterBlk(COMPONENT_Y, subblockPu, subblockPu.cu->slice->getRefPic(REF_PIC_LIST_0, tryMi.refIdx[0]), mvTop,
+                    pcBufPredRef, false, subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false,
+                    NULL, 0, false, false, Mv(0, 0), true);
+    }
+
+    if ((!isAbove) && (m_bAMLTemplateAvailabe[1]))
+    {
+      Mv mvLeft(-(TM_OBMC_TEMPLATE_SIZE << horShift), 0);
+      mvLeft += subPelMv;
+      clipMv(mvLeft, subblockPu.lumaPos(), subblockPu.lumaSize(), *subblockPu.cs->sps, *subblockPu.cs->pps);
+      xPredInterBlk(COMPONENT_Y, subblockPu, subblockPu.cu->slice->getRefPic(REF_PIC_LIST_0, tryMi.refIdx[0]), mvLeft,
+                    pcBufPredRef, false, subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false,
+                    NULL, 0, false, false, Mv(0, 0), true);
+    }
+  }
+  else
+  {
+    for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
+    {
+      if (tryMi.refIdx[refList] < 0)
+      {
+        continue;
+      }
+      RefPicList eRefPicList = (refList ? REF_PIC_LIST_1 : REF_PIC_LIST_0);
+      CHECK(tryMi.refIdx[refList] >= subblockPu.cu->slice->getNumRefIdx(eRefPicList), "Invalid reference index");
+
+      m_iRefListIdx = refList;
+      mvCurr        = tryMi.mv[refList];
+      Mv subPelMv   = mvCurr;
+      clipMv(mvCurr, subblockPu.lumaPos(), subblockPu.lumaSize(), *subblockPu.cs->sps, *subblockPu.cs->pps);
+
+      if ((isAbove) && (m_bAMLTemplateAvailabe[0]))
+      {
+        Mv mvTop(0, -(TM_OBMC_TEMPLATE_SIZE << verShift));
+        mvTop += subPelMv;
+
+        clipMv(mvTop, subblockPu.lumaPos(), subblockPu.lumaSize(), *subblockPu.cs->sps, *subblockPu.cs->pps);
+
+        PelUnitBuf pcMbBuf =
+          PelUnitBuf(subblockPu.chromaFormat, PelBuf(m_acYuvRefAboveTemplate[refList][0], pcBufPredRef.Y()));
+        if (tryMi.refIdx[0] >= 0 && tryMi.refIdx[1] >= 0)
+        {
+          xPredInterBlk(COMPONENT_Y, subblockPu, subblockPu.cu->slice->getRefPic(eRefPicList, tryMi.refIdx[refList]),
+                        mvTop, pcMbBuf, true, subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0,
+                        false, NULL, 0, false, false, Mv(0, 0), true);
+
+          if (refList == 1)
+          {
+            CPelUnitBuf srcPred0 =
+              CPelUnitBuf(subblockPu.chromaFormat, PelBuf(m_acYuvRefAboveTemplate[0][0], pcBufPredRef.Y()));
+            CPelUnitBuf srcPred1 =
+              CPelUnitBuf(subblockPu.chromaFormat, PelBuf(m_acYuvRefAboveTemplate[1][0], pcBufPredRef.Y()));
+            xOBMCWeightedAverageY(subblockPu, srcPred0, srcPred1, pcBufPredRef,
+                                  subblockPu.cu->slice->getSPS()->getBitDepths(), subblockPu.cu->slice->clpRngs(),
+                                  tryMi);
+          }
+        }
+        else
+        {
+          xPredInterBlk(COMPONENT_Y, subblockPu, subblockPu.cu->slice->getRefPic(eRefPicList, tryMi.refIdx[refList]),
+                        mvTop, pcBufPredRef, false, subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X,
+                        0, 0, false, NULL, 0, false, false, Mv(0, 0), true);
+        }
+      }
+      if ((!isAbove) && (m_bAMLTemplateAvailabe[1]))
+      {
+        Mv mvLeft(-(TM_OBMC_TEMPLATE_SIZE << horShift), 0);
+        mvLeft += subPelMv;
+
+        clipMv(mvLeft, subblockPu.lumaPos(), subblockPu.lumaSize(), *subblockPu.cs->sps, *subblockPu.cs->pps);
+
+        PelUnitBuf pcMbBuf =
+          PelUnitBuf(subblockPu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[refList][0], pcBufPredRef.Y()));
+        if (tryMi.refIdx[0] >= 0 && tryMi.refIdx[1] >= 0)
+        {
+          xPredInterBlk(COMPONENT_Y, subblockPu, subblockPu.cu->slice->getRefPic(eRefPicList, tryMi.refIdx[refList]),
+                        mvLeft, pcMbBuf, true, subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0,
+                        false, NULL, 0, false, false, Mv(0, 0), true);
+
+          if (refList == 1)
+          {
+            CPelUnitBuf srcPred0 =
+              CPelUnitBuf(subblockPu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0], pcBufPredRef.Y()));
+            CPelUnitBuf srcPred1 =
+              CPelUnitBuf(subblockPu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0], pcBufPredRef.Y()));
+            xOBMCWeightedAverageY(subblockPu, srcPred0, srcPred1, pcBufPredRef,
+                                  subblockPu.cu->slice->getSPS()->getBitDepths(), subblockPu.cu->slice->clpRngs(),
+                                  tryMi);
+          }
+        }
+        else
+        {
+          xPredInterBlk(COMPONENT_Y, subblockPu, subblockPu.cu->slice->getRefPic(eRefPicList, tryMi.refIdx[refList]),
+                        mvLeft, pcBufPredRef, false, subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X,
+                        0, 0, false, NULL, 0, false, false, Mv(0, 0), true);
+        }
+      }
+    }
+  }
+}
+void InterPrediction::xGetSublkOBMCTemplate(const CodingUnit &cu, const ComponentID compID, const Picture &refPic,
+                                            const Mv &mv, const int sublkWidth, const int sublkHeight, const int posW,
+                                            const int posH, int *numTemplate, Pel *refLeftTemplate,
+                                            Pel *refAboveTemplate)
+{
+  const int bitDepth  = cu.cs->sps->getBitDepth(toChannelType(compID));
+  const int precShift = std::max(0, bitDepth - 12);
+
+  const CodingUnit *const cuAbove = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID));
+  const CodingUnit *const cuLeft  = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID));
+  const CPelBuf           refBuf  = cuAbove || cuLeft ? refPic.getRecoBuf(refPic.blocks[compID]) : CPelBuf();
+
+  // above
+  if (cuAbove && posH == 0)
+  {
+    xGetPredBlkTpl<true>(cu, compID, refBuf, mv, posW, posH, sublkWidth, refAboveTemplate);
+
+    for (int k = posW; k < posW + sublkWidth; k++)
+    {
+      int refVal = refAboveTemplate[k];
+      refVal >>= precShift;
+      refAboveTemplate[k] = refVal;
+      numTemplate[0]++;
+    }
+  }
+
+  // left
+  if (cuLeft && posW == 0)
+  {
+    xGetPredBlkTpl<false>(cu, compID, refBuf, mv, posW, posH, sublkHeight, refLeftTemplate);
+
+    for (int k = posH; k < posH + sublkHeight; k++)
+    {
+      int refVal = refLeftTemplate[k];
+      refVal >>= precShift;
+      refLeftTemplate[k] = refVal;
+      numTemplate[1]++;
+    }
+  }
+}
+
+void InterPrediction::xSubblockOBMCCopy(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst,
+                                        PelUnitBuf &pcYuvPredSrc, int iDir)
+{
+  int iWidth  = pu.blocks[eComp].width;
+  int iHeight = pu.blocks[eComp].height;
+
+  if (iWidth == 0 || iHeight == 0)
+  {
+    return;
+  }
+
+  Pel *     pOrgDst   = pcYuvPredDst.bufs[eComp].buf;
+  Pel *     pOrgSrc   = pcYuvPredSrc.bufs[eComp].buf;
+  const int strideDst = pcYuvPredDst.bufs[eComp].stride;
+  const int strideSrc = pcYuvPredSrc.bufs[eComp].stride;
+
+  if (iDir == 0)   // above
+  {
+    for (int i = 0; i < iWidth; i++)
+    {
+      Pel *pDst = pOrgDst;
+      Pel *pSrc = pOrgSrc;
+      pDst[i]   = pSrc[i];
+    }
+  }
+
+  if (iDir == 1)   // left
+  {
+    Pel *pDst = pOrgDst;
+    Pel *pSrc = pOrgSrc;
+    for (int i = 0; i < iHeight; i++)
+    {
+      pDst[0] = pSrc[0];
+      pDst += strideDst;
+      pSrc += strideSrc;
+    }
+  }
+}
+
+void InterPrediction::xSubblockTMOBMC(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst,
+                                      PelUnitBuf &pcYuvPredSrc, int iDir, int iOBMCmode)
+{
+  int iWidth  = pu.blocks[eComp].width;
+  int iHeight = pu.blocks[eComp].height;
+
+  if (iWidth == 0 || iHeight == 0)
+  {
+    return;
+  }
+
+  Pel *     pOrgDst   = pcYuvPredDst.bufs[eComp].buf;
+  Pel *     pOrgSrc   = pcYuvPredSrc.bufs[eComp].buf;
+  const int strideDst = pcYuvPredDst.bufs[eComp].stride;
+  const int strideSrc = pcYuvPredSrc.bufs[eComp].stride;
+
+  if (iDir == 0)   // above
+  {
+    for (int i = 0; i < iWidth; i++)
+    {
+      Pel *pDst = pOrgDst;
+      Pel *pSrc = pOrgSrc;
+      if (iOBMCmode == 2)   // neighbor is best
+      {
+        pDst[i] = (26 * pDst[i] + 6 * pSrc[i] + 16) >> 5;
+
+        if (eComp == COMPONENT_Y)
+        {
+          pDst += strideDst;
+          pSrc += strideSrc;
+          pDst[i] = (7 * pDst[i] + pSrc[i] + 4) >> 3;
+
+          pDst += strideDst;
+          pSrc += strideSrc;
+          pDst[i] = (15 * pDst[i] + pSrc[i] + 8) >> 4;
+
+          pDst += strideDst;
+          pSrc += strideSrc;
+          pDst[i] = (31 * pDst[i] + pSrc[i] + 16) >> 5;
+        }
+      }
+      else if (iOBMCmode == 4)
+      {
+        pDst[i] = (7 * pDst[i] + pSrc[i] + 4) >> 3;
+
+        if (eComp == COMPONENT_Y)
+        {
+          pDst += strideDst;
+          pSrc += strideSrc;
+          pDst[i] = (15 * pDst[i] + pSrc[i] + 8) >> 4;
+
+          pDst += strideDst;
+          pSrc += strideSrc;
+          pDst[i] = (31 * pDst[i] + pSrc[i] + 16) >> 5;
+        }
+      }
+      else   // blending is best
+      {
+        pDst[i] = (15 * pDst[i] + pSrc[i] + 8) >> 4;
+
+        // luma blend 3 lines
+        if (eComp == COMPONENT_Y)
+        {
+          pDst += strideDst;
+          pSrc += strideSrc;
+          pDst[i] = (31 * pDst[i] + pSrc[i] + 16) >> 5;
+        }
+      }
+    }
+  }
+
+  if (iDir == 1)   // left
+  {
+    Pel *pDst = pOrgDst;
+    Pel *pSrc = pOrgSrc;
+    for (int i = 0; i < iHeight; i++)
+    {
+      if (iOBMCmode == 2)   // neighbor is best
+      {
+        pDst[0] = (26 * pDst[0] + 6 * pSrc[0] + 16) >> 5;
+
+        if (eComp == COMPONENT_Y)
+        {
+          pDst[1] = (7 * pDst[1] + pSrc[1] + 4) >> 3;
+          pDst[2] = (15 * pDst[2] + pSrc[2] + 8) >> 4;
+          pDst[3] = (31 * pDst[3] + pSrc[3] + 16) >> 5;
+        }
+      }
+      else if (iOBMCmode == 4)   // neighbor is best
+      {
+        pDst[0] = (7 * pDst[0] + pSrc[0] + 4) >> 3;
+
+        if (eComp == COMPONENT_Y)
+        {
+          pDst[1] = (15 * pDst[1] + pSrc[1] + 8) >> 4;
+          pDst[2] = (31 * pDst[2] + pSrc[2] + 16) >> 5;
+        }
+      }
+      else   // blending is best
+      {
+        pDst[0] = (15 * pDst[0] + pSrc[0] + 8) >> 4;
+
+        // luma blend 3 lines
+        if (eComp == COMPONENT_Y)
+        {
+          pDst[1] = (31 * pDst[1] + pSrc[1] + 16) >> 5;
+        }
+      }
+      pDst += strideDst;
+      pSrc += strideSrc;
+    }
+  }
+}
 #endif
 void InterPrediction::xFillIBCBuffer(CodingUnit &cu)
 {
