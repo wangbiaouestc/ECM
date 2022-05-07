@@ -776,6 +776,10 @@ static const int ADAPTIVE_IBC_SUB_GROUP_SIZE =                     6;
 #endif
 #endif
 
+#if JVET_Z0061_TM_OBMC
+static const int TM_OBMC_TEMPLATE_SIZE =                           1;
+#endif
+
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD =   MMVD_MAX_REFINE_NUM;
 #endif
