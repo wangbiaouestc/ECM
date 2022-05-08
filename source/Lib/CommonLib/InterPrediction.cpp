@@ -5752,6 +5752,9 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
     pu.ciipFlag = false;
     MvField mvfMmvd[2][3];
     PU::getAfMmvdMvf(pu, affMrgCtx, mvfMmvd, pu.mergeIdx, pu.afMmvdStep, pu.afMmvdDir);
+#if JVET_Z0067_RPR_ENABLE
+    bool  bIsRefScaled = false;
+#endif
     for (int i = 0; i < 2; i++)
     {
       if( pu.cs->slice->getNumRefIdx( RefPicList( i ) ) > 0 )
@@ -5764,8 +5767,22 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
         pu.mvAffi[i][1] = mvfMmvd[i][1].mv;
         pu.mvAffi[i][2] = mvfMmvd[i][2].mv;
       }
+#if JVET_Z0067_RPR_ENABLE
+      if ( !bIsRefScaled && pu.refIdx[i]>=0 && pu.cu->slice->getRefPic(i ? REF_PIC_LIST_1 : REF_PIC_LIST_0, pu.refIdx[i])->isRefScaled(pu.cs->pps) )
+      {
+        bIsRefScaled = true;
+      }
+#endif
     }
     uiCost = 0;
+#if JVET_Z0067_RPR_ENABLE
+    if ( bIsRefScaled )
+    {
+      uiCost = std::numeric_limits<Distortion>::max();
+    }
+    else
+    {
+#endif
     PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
     PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
     PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
@@ -5785,7 +5802,10 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
       
       uiCost += cDistParam.distFunc(cDistParam);
     }
-    
+#if JVET_Z0067_RPR_ENABLE
+    }
+#endif
+
     // update part
     uint32_t i;
     uint32_t shift = 0;
@@ -6781,6 +6801,9 @@ void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
     Pel *            refAboveTemplate = m_acYuvRefAMLTemplate[0][0];
     int              numTemplate[2]   = { 0, 0 };   // 0:Above, 1:Left
     const RefPicList eRefPicList      = REF_PIC_LIST_0;
+#if JVET_Z0067_RPR_ENABLE
+    CHECK(pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[eRefPicList])->isRefScaled(pu.cs->pps), "getAffAMLRefTemplate not supported with ref scaled.");
+#endif
     xPredAffineTpl(pu, eRefPicList, numTemplate, refLeftTemplate, refAboveTemplate);
 #if INTER_LIC
     if (pu.cu->LICFlag)
@@ -6814,6 +6837,9 @@ void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
       }
       RefPicList eRefPicList = (refList ? REF_PIC_LIST_1 : REF_PIC_LIST_0);
       CHECK(pu.refIdx[refList] >= pu.cu->slice->getNumRefIdx(eRefPicList), "Invalid reference index");
+#if JVET_Z0067_RPR_ENABLE
+      CHECK(pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[eRefPicList])->isRefScaled(pu.cs->pps), "getAffAMLRefTemplate not supported with ref scaled.");
+#endif
       Pel *refLeftTemplate  = m_acYuvRefLeftTemplate[refList][0];
       Pel *refAboveTemplate = m_acYuvRefAboveTemplate[refList][0];
       int  numTemplate[2]   = { 0, 0 };   // 0:Above, 1:Left
@@ -8555,6 +8581,12 @@ TplMatchingCtrl::TplMatchingCtrl( const PredictionUnit&     pu,
 , m_maxSearchRounds (maxSearchRounds)
 , m_compID          (compID)
 {
+#if JVET_Z0067_RPR_ENABLE
+  if ( refPic.isRefScaled(pu.cs->pps) )
+  {
+    return;
+  }
+#endif
   // Initialization
   const bool tplAvalableAbove = xFillCurTemplate<TM_TPL_SIZE, true >((fillCurTpl ? curTplAbove : nullptr));
   const bool tplAvalableLeft  = xFillCurTemplate<TM_TPL_SIZE, false>((fillCurTpl ? curTplLeft  : nullptr));
@@ -11002,16 +11034,21 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
       tmpPU.mvAffi[eRefList][1] = mvRT;
       tmpPU.mvAffi[eRefList][2] = mvLB;
 
+#if !JVET_Z0067_RPR_ENABLE
       getAffAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft);
+#endif
 
       uiCost = 0;
       bool bRefIsRescaled = (tmpPU.refIdx[eRefList] >= 0) ? tmpPU.cu->slice->getRefPic(eRefList, tmpPU.refIdx[eRefList])->isRefScaled(pu.cs->pps) : false;
       if (bRefIsRescaled)
       {
-        uiCost = 0;
+        uiCost = std::numeric_limits<Distortion>::max();
       }
       else
       {
+#if JVET_Z0067_RPR_ENABLE
+        getAffAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft);
+#endif
         if (m_bAMLTemplateAvailabe[0])
         {
           m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
@@ -11089,13 +11126,15 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
       getBlkAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft);
 
       uiCost = 0;
+#if !JVET_Z0067_RPR_ENABLE
       bool bRefIsRescaled = (tmpPU.refIdx[eRefList] >= 0) ? tmpPU.cu->slice->getRefPic(eRefList, tmpPU.refIdx[eRefList])->isRefScaled(pu.cs->pps) : false;
       if (bRefIsRescaled)
       {
-        uiCost = 0;
+        uiCost = std::numeric_limits<Distortion>::max();
       }
       else
       {
+#endif
         if (m_bAMLTemplateAvailabe[0])
         {
           m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
@@ -11109,7 +11148,9 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
 
           uiCost += cDistParam.distFunc(cDistParam);
         }
+#if !JVET_Z0067_RPR_ENABLE
       }
+#endif
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
       MotionInfoPred miPred;
@@ -11468,7 +11509,9 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           miPred.mvAffi[refList][2] = tmpPU.mvAffi[refList][2];
 
 #endif
+#if !JVET_Z0067_RPR_ENABLE
       getAffAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft);
+#endif
 
       uiCost = 0;
       bool bRefIsRescaled = false;
@@ -11479,10 +11522,13 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
       }
       if (bRefIsRescaled)
       {
-        uiCost = 0;
+        uiCost = std::numeric_limits<Distortion>::max();
       }
       else
       {
+#if JVET_Z0067_RPR_ENABLE
+        getAffAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft);
+#endif
         if (m_bAMLTemplateAvailabe[0])
         {
           m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
@@ -11571,6 +11617,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
       getBlkAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft);
 
       uiCost = 0;
+#if !JVET_Z0067_RPR_ENABLE
       bool bRefIsRescaled = false;
       for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
       {
@@ -11579,10 +11626,11 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
       }
       if (bRefIsRescaled)
       {
-        uiCost = 0;
+        uiCost = std::numeric_limits<Distortion>::max();
       }
       else
       {
+#endif
         if (m_bAMLTemplateAvailabe[0])
         {
           m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
@@ -11596,7 +11644,9 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
 
           uiCost += cDistParam.distFunc(cDistParam);
         }
-      }
+#if !JVET_Z0067_RPR_ENABLE
+        }
+#endif
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
           miPred.cost = uiCost;
@@ -12090,6 +12140,16 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
 #endif
     std::vector<std::pair<Mv, Distortion>> aMvCostVec(patternsNum);
     
+#if JVET_Z0067_RPR_ENABLE
+    bool  bIsRefScaled = pu.cu->slice->getRefPic(eRefList, refIdx)->isRefScaled( pu.cs->pps );
+    for (int n = 0; n < patternsNum; ++n)
+    {
+      auto cMvdTest = cMvdDerived[n];
+      Mv cMvTest = cMvPred + cMvdTest;
+      Distortion uiCost = bIsRefScaled ? std::numeric_limits<Distortion>::max() : tplCtrl.xGetTempMatchError<TM_TPL_SIZE>(cMvTest);
+      aMvCostVec[n] = { cMvdTest, uiCost };
+    }
+#else
     for (int n = 0; n < patternsNum; ++n)
     {
       auto cMvdTest = cMvdDerived[n];
@@ -12097,7 +12157,8 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
       Distortion uiCost = tplCtrl.xGetTempMatchError<TM_TPL_SIZE>(cMvTest);
       aMvCostVec[n] = { cMvdTest, uiCost };
     }
-    
+#endif
+
     std::stable_sort(aMvCostVec.begin(), aMvCostVec.end(), [](const std::pair<Mv, Distortion> & l, const std::pair<Mv, Distortion> & r) {return l.second < r.second; });
     
     for (int n = 0; n < patternsNum; ++n)
@@ -12233,6 +12294,16 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
     
     TplMatchingCtrl tplCtrl(pu, interRes, refPic, true, COMPONENT_Y, true, 0, m_pcCurTplAbove, m_pcCurTplLeft, m_pcRefTplAbove, m_pcRefTplLeft, Mv(0, 0), nullptr, 0);
     
+#if JVET_Z0067_RPR_ENABLE
+    bool  bIsRefScaled = pu.cu->slice->getRefPic(REF_PIC_LIST_0, refIdx)->isRefScaled(pu.cs->pps);
+    for (int n = 0; n < patternsNum; ++n)
+    {
+      auto cMvdTest = cMvdDerived[n];
+      Mv cMvTest = cMvPred + cMvdTest;
+      Distortion uiCost = bIsRefScaled ? std::numeric_limits<Distortion>::max() : tplCtrl.xGetTempMatchError<TM_TPL_SIZE>(cMvTest);
+      aMvCostVec[n] = { cMvdTest, uiCost };
+    }
+#else
     for (int n = 0; n < patternsNum; ++n)
     {
       auto cMvdTest = cMvdDerived[n];
@@ -12240,7 +12311,8 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
       Distortion uiCost = tplCtrl.xGetTempMatchError<TM_TPL_SIZE>(cMvTest);
       aMvCostVec[n] = { cMvdTest, uiCost };
     }
-    
+#endif 
+
     std::stable_sort(aMvCostVec.begin(), aMvCostVec.end(), [](const std::pair<Mv, Distortion> & l, const std::pair<Mv, Distortion> & r) {return l.second < r.second; });
     
     for (int n = 0; n < patternsNum; ++n)
@@ -12641,6 +12713,18 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
     std::vector<std::pair<int, Distortion>> aMvCostVec(patternsNum);
     Distortion uiCost = 0;
     
+#if JVET_Z0067_RPR_ENABLE
+    bool bIsRefScaled = pu.cu->slice->getRefPic(eRefList, refIdx)->isRefScaled( pu.cs->pps );
+    if ( bIsRefScaled )
+    {
+      for (int n = 0; n < patternsNum; ++n)
+      {
+        aMvCostVec[n] = { n, uiCost };
+      }
+    }
+    else
+    {
+#endif
     for (int n = 0; n < patternsNum; ++n)
     {
       uiCost = 0;
@@ -12708,6 +12792,9 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
       }
       aMvCostVec[n] = { n, uiCost };
     }
+#if JVET_Z0067_RPR_ENABLE
+    }
+#endif
     //--------------------------------------------------------------------------------//
     /////////////////////////////////////////////////////////////////
     std::stable_sort(aMvCostVec.begin(), aMvCostVec.end(), [](const std::pair<int, Distortion> & l, const std::pair<int, Distortion> & r) {return l.second < r.second; });
@@ -12734,6 +12821,9 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
                                                     Pel*              recLeftTemplate,
                                                     Pel*              recAboveTemplate)
   {
+#if JVET_Z0067_RPR_ENABLE
+    CHECK(refPic.isRefScaled(cu.cs->pps), "xGetSublkTemplateCost ref Scaled not supported");
+#endif
     const int       bitDepth = cu.cs->sps->getBitDepth(toChannelType(compID));
     const int       precShift = std::max(0, bitDepth - 12);
     Distortion cost = 0;
