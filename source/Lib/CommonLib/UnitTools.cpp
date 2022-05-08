@@ -10805,32 +10805,53 @@ void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8
             PosY.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv.getHor();
             PosY.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv.getVer();
             clipColPos(PosY.x, PosY.y, pu);
+#if JVET_Z0067_RPR_ENABLE
+            scalePositionInRef(pu, *pu.cs->pps, RefPicList(list), refIdx, PosY);
+            PosY.x = (PosY.x & mask);
+            PosY.y = (PosY.y & mask);
+            ipm = pu.cu->slice->getRefPic(RefPicList(list), refIdx)->unscaledPic->cs->getIpmInfo(PosY);
+#else
             PosY.x = (PosY.x & mask);
             PosY.y = (PosY.y & mask);
             ipm = pu.cu->slice->getRefPic(RefPicList(list), refIdx)->cs->getIpmInfo(PosY);
+#endif
           }
           else
           {
+#if JVET_Z0067_RPR_ENABLE
+            const Picture* pRefPic0 = pu.cu->slice->getRefPic(REF_PIC_LIST_0, tempMi.refIdx[0])->unscaledPic;
+#else
             Picture* pRefPic0 = pu.cu->slice->getRefPic(REF_PIC_LIST_0, tempMi.refIdx[0]);
+#endif
             Mv cMv0 = tempMi.mv[0];
             cMv0.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
             Position PosY0;
             PosY0.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv0.getHor();
             PosY0.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv0.getVer();
             clipColPos(PosY0.x, PosY0.y, pu);
+#if JVET_Z0067_RPR_ENABLE
+            scalePositionInRef(pu, *pu.cs->pps, REF_PIC_LIST_0, tempMi.refIdx[0], PosY0);
+#endif
             PosY0.x = (PosY0.x & mask);
             PosY0.y = (PosY0.y & mask);
             MotionInfo mi0 = pRefPic0->cs->getMotionInfo(PosY0);
             int ipm0 = pRefPic0->cs->getIpmInfo(PosY0);
             int pocDiff0 = abs(pRefPic0->getPOC() - pu.cu->slice->getPOC());
 
+#if JVET_Z0067_RPR_ENABLE
+            const Picture* pRefPic1 = pu.cu->slice->getRefPic(REF_PIC_LIST_1, tempMi.refIdx[1])->unscaledPic;
+#else
             Picture* pRefPic1 = pu.cu->slice->getRefPic(REF_PIC_LIST_1, tempMi.refIdx[1]);
+#endif
             Mv cMv1 = tempMi.mv[1];
             cMv1.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
             Position PosY1;
             PosY1.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv1.getHor();
             PosY1.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv1.getVer();
             clipColPos(PosY1.x, PosY1.y, pu);
+#if JVET_Z0067_RPR_ENABLE
+            scalePositionInRef(pu, *pu.cs->pps, REF_PIC_LIST_1, tempMi.refIdx[1], PosY1);
+#endif
             PosY1.x = (PosY1.x & mask);
             PosY1.y = (PosY1.y & mask);
             MotionInfo mi1 = pRefPic1->cs->getMotionInfo(PosY1);
@@ -11189,32 +11210,53 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
             PosY.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv.getHor();
             PosY.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv.getVer();
             clipColPos(PosY.x, PosY.y, pu);
+#if JVET_Z0067_RPR_ENABLE
+            scalePositionInRef(pu, *pu.cs->pps, RefPicList(list), refIdx, PosY);
+            PosY.x = (PosY.x & mask);
+            PosY.y = (PosY.y & mask);
+            ipm = pu.cu->slice->getRefPic(RefPicList(list), refIdx)->unscaledPic->cs->getIpmInfo(PosY);
+#else
             PosY.x = (PosY.x & mask);
             PosY.y = (PosY.y & mask);
             ipm = pu.cu->slice->getRefPic(RefPicList(list), refIdx)->cs->getIpmInfo(PosY);
+#endif
           }
           else
           {
+#if JVET_Z0067_RPR_ENABLE
+            const Picture* pRefPic0 = pu.cu->slice->getRefPic(REF_PIC_LIST_0, tempMi.refIdx[0])->unscaledPic;
+#else
             Picture* pRefPic0 = pu.cu->slice->getRefPic(REF_PIC_LIST_0, tempMi.refIdx[0]);
+#endif
             Mv cMv0 = tempMi.mv[0];
             cMv0.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
             Position PosY0;
             PosY0.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv0.getHor();
             PosY0.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv0.getVer();
             clipColPos(PosY0.x, PosY0.y, pu);
+#if JVET_Z0067_RPR_ENABLE
+            scalePositionInRef(pu, *pu.cs->pps, REF_PIC_LIST_0, tempMi.refIdx[0], PosY0);
+#endif
             PosY0.x = (PosY0.x & mask);
             PosY0.y = (PosY0.y & mask);
             MotionInfo mi0 = pRefPic0->cs->getMotionInfo(PosY0);
             int ipm0 = pRefPic0->cs->getIpmInfo(PosY0);
             int pocDiff0 = abs(pRefPic0->getPOC() - pu.cu->slice->getPOC());
 
+#if JVET_Z0067_RPR_ENABLE
+            const Picture* pRefPic1 = pu.cu->slice->getRefPic(REF_PIC_LIST_1, tempMi.refIdx[1])->unscaledPic;
+#else
             Picture* pRefPic1 = pu.cu->slice->getRefPic(REF_PIC_LIST_1, tempMi.refIdx[1]);
+#endif
             Mv cMv1 = tempMi.mv[1];
             cMv1.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
             Position PosY1;
             PosY1.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv1.getHor();
             PosY1.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv1.getVer();
             clipColPos(PosY1.x, PosY1.y, pu);
+#if JVET_Z0067_RPR_ENABLE
+            scalePositionInRef(pu, *pu.cs->pps, REF_PIC_LIST_1, tempMi.refIdx[1], PosY1);
+#endif
             PosY1.x = (PosY1.x & mask);
             PosY1.y = (PosY1.y & mask);
             MotionInfo mi1 = pRefPic1->cs->getMotionInfo(PosY1);
