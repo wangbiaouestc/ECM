@@ -836,6 +836,36 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
   bool rightAltAvailable = myArea.x + myArea.width + 1 < currTU.cu->slice->getSPS()->getMaxPicWidthInLumaSamples();
 #endif
 
+#if JVET_Z0118_GDR
+  PicHeader *picHeader = currTU.cs->picHeader;  
+  if (picHeader->getVirtualBoundariesPresentFlag())
+  {
+    for (int i = 0; i < picHeader->getNumHorVirtualBoundaries(); i++)
+    {
+      if ((myArea.y - NUMBER_PADDED_SAMPLES ) <= picHeader->getVirtualBoundariesPosY(i))
+      {
+        topAltAvailable = false;
+      }
+      if ((myArea.y + myArea.height + NUMBER_PADDED_SAMPLES) >= picHeader->getVirtualBoundariesPosY(i))
+      {
+        bottomAltAvailable = false;
+      }
+    }
+    for (int i = 0; i < picHeader->getNumVerVirtualBoundaries(); i++)
+    {
+      if ((myArea.x - NUMBER_PADDED_SAMPLES) <= picHeader->getVirtualBoundariesPosX(i))
+      {
+        leftAltAvailable = false;
+      }
+      if ((myArea.x + myArea.width + NUMBER_PADDED_SAMPLES) >= picHeader->getVirtualBoundariesPosX(i))
+      {
+        rightAltAvailable = false;
+      }
+    }
+  }
+#endif
+
+ 
   uint32_t   uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t   uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
@@ -1068,6 +1098,35 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
 #else
   bool bottomAltAvailable = myArea.y + myArea.height + 1 < currTU.cu->slice->getSPS()->getMaxPicHeightInLumaSamples();
   bool rightAltAvailable = myArea.x + myArea.width + 1 < currTU.cu->slice->getSPS()->getMaxPicWidthInLumaSamples();
+#endif
+
+#if JVET_Z0118_GDR
+  PicHeader *picHeader = currTU.cs->picHeader;
+  if (picHeader->getVirtualBoundariesPresentFlag())
+  {
+    for (int i = 0; i < picHeader->getNumHorVirtualBoundaries(); i++)
+    {
+      if ((myArea.y - NUMBER_PADDED_SAMPLES) <= picHeader->getVirtualBoundariesPosY(i))
+      {
+        topAltAvailable = false;
+      }
+      if ((myArea.y + myArea.height + NUMBER_PADDED_SAMPLES) >= picHeader->getVirtualBoundariesPosY(i))
+      {
+        bottomAltAvailable = false;
+      }
+    }
+    for (int i = 0; i < picHeader->getNumVerVirtualBoundaries(); i++)
+    {
+      if ((myArea.x - NUMBER_PADDED_SAMPLES) <= picHeader->getVirtualBoundariesPosX(i))
+      {
+        leftAltAvailable = false;
+      }
+      if ((myArea.x + myArea.width + NUMBER_PADDED_SAMPLES) >= picHeader->getVirtualBoundariesPosX(i))
+      {
+        rightAltAvailable = false;
+      }
+    }
+  }
 #endif
 
   uint32_t   uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
@@ -1968,6 +2027,56 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
   bool bottomAltAvailable = myArea.y + myArea.height + 1 < picHeightChroma;
   bool rightAltAvailable = myArea.x + myArea.width + 1 < picWidthChroma;
 
+#if JVET_Z0118_GDR
+    {
+      PicHeader *picHeader = currTU.cs->picHeader;
+      int lumaX = -1, lumaY = -1, lumaWidth = -1, lumaHeight = -1;
+
+      if (isCb)
+      {
+        // ChromaFormat nChromaFormat = currTU.cs->slice->getSPS()->getChromaFormatIdc();
+        lumaX = myArea.x << scaleX;
+        lumaY = myArea.y << scaleY;
+        lumaWidth  = myArea.width  << scaleX;
+        lumaHeight = myArea.height << scaleY;
+      }
+      else
+      {
+        lumaX = currTU.lx();
+        lumaY = currTU.ly();
+        lumaWidth = currTU.lwidth();
+        lumaHeight = currTU.lheight();
+      }
+
+      if (picHeader->getVirtualBoundariesPresentFlag())
+      {
+        for (int i = 0; i < picHeader->getNumHorVirtualBoundaries(); i++)
+        {
+          if (lumaY == picHeader->getVirtualBoundariesPosY(i))
+          {
+            topAltAvailable = false;
+          }
+          if ((lumaY + lumaHeight) == picHeader->getVirtualBoundariesPosY(i))
+          {
+            bottomAltAvailable = false;
+          }
+        }
+
+        for (int i = 0; i < picHeader->getNumVerVirtualBoundaries(); i++)
+        {
+          if (lumaX == picHeader->getVirtualBoundariesPosX(i))
+          {
+            leftAltAvailable = false;
+          }
+          if ((lumaX + lumaWidth) == picHeader->getVirtualBoundariesPosX(i))
+          {
+            rightAltAvailable = false;
+          }
+        }
+      }
+    }
+#endif    
+
   bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
 
   //if not 420, then don't use rec for padding
@@ -2218,6 +2327,55 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
 
   bool bottomAltAvailable = myArea.y + myArea.height + 1 < picHeightChroma;
   bool rightAltAvailable = myArea.x + myArea.width + 1 < picWidthChroma;
+
+#if JVET_Z0118_GDR
+    {
+      PicHeader *picHeader = currTU.cs->picHeader;
+      int lumaX = -1, lumaY = -1, lumaWidth = -1, lumaHeight = -1;
+
+      if (isCb)
+      {
+        ChromaFormat nChromaFormat = currTU.cs->slice->getSPS()->getChromaFormatIdc();
+        lumaX = currTU.Cb().x << getComponentScaleX(compID, nChromaFormat);
+        lumaY = currTU.Cb().y << getComponentScaleY(compID, nChromaFormat);
+        lumaWidth = currTU.Cb().width << getComponentScaleX(compID, nChromaFormat);
+        lumaHeight = currTU.Cb().height << getComponentScaleY(compID, nChromaFormat);
+      }
+      else
+      {
+        lumaX = currTU.lx();
+        lumaY = currTU.ly();
+        lumaWidth = currTU.lwidth();
+        lumaHeight = currTU.lheight();
+      }
+
+      if (picHeader->getVirtualBoundariesPresentFlag())
+      {
+        for (int i = 0; i < picHeader->getNumHorVirtualBoundaries(); i++)
+        {
+          if (lumaY == picHeader->getVirtualBoundariesPosY(i))
+          {
+            topAltAvailable = false;
+          }
+          if ((lumaY + lumaHeight) == picHeader->getVirtualBoundariesPosY(i))
+          {
+            bottomAltAvailable = false;
+          }
+        }
+        for (int i = 0; i < picHeader->getNumVerVirtualBoundaries(); i++)
+        {
+          if (lumaX == picHeader->getVirtualBoundariesPosX(i))
+          {
+            leftAltAvailable = false;
+          }
+          if ((lumaX + lumaWidth) == picHeader->getVirtualBoundariesPosX(i))
+          {
+            rightAltAvailable = false;
+          }
+        }
+      }
+    }
+#endif
 
   bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
 

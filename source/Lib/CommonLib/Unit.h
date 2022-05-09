@@ -518,6 +518,10 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
   CodingUnit      *cu;
   CodingStructure *cs;
   ChannelType      chType;
+#if JVET_Z0118_GDR
+  const MotionInfo constMotionIntra = { false };
+  const uint8_t    constIpm = 0;
+#endif
 
   // constructors
 #if MULTI_PASS_DMVR

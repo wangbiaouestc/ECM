@@ -825,6 +825,137 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   m_pcInterSearch->setFillCurTplAboveARMC(false);
   m_pcInterSearch->setFillCurTplLeftARMC(false);
 #endif
+
+#if JVET_Z0118_GDR
+  bool isCuInCleanArea   = false;
+  bool isCuInRefreshArea = false;
+
+  if (m_pcEncCfg->getGdrEnabled())
+  {
+    bool isInGdrInterval = slice.getPicHeader()->getInGdrInterval();
+    bool isRecoveryPocPic = slice.getPicHeader()->getIsGdrRecoveryPocPic();
+    
+    // 1.0 pic in GDR interval
+    if (isInGdrInterval || isRecoveryPocPic)
+    {
+      // 1.1 set intra/inter area     
+      int gdrBegX = tempCS->picHeader->getGdrBegX();
+      int gdrEndX = tempCS->picHeader->getGdrEndX();
+
+      isCuInCleanArea   = tempCS->isClean(tempCS->area.Y(), CHANNEL_TYPE_LUMA);     
+      isCuInRefreshArea = tempCS->withinRefresh(gdrBegX, gdrEndX);
+
+      // 1.2 switch recon based on clean/dirty current area
+      tempCS->setReconBuf((isCuInCleanArea) ? PIC_RECONSTRUCTION_1 : PIC_RECONSTRUCTION_0);
+      tempCS->picture->setCleanDirty(isCuInCleanArea);
+
+      for (int rlist = REF_PIC_LIST_0; rlist < NUM_REF_PIC_LIST_01; rlist++)
+      {
+        int n = slice.getNumRefIdx((RefPicList)rlist);
+        for (int idx = 0; idx < n; idx++)
+        {
+          Picture *refPic = slice.getReferencePicture((RefPicList)rlist, idx);
+          if (refPic)
+          {
+            refPic->setCleanDirty(isCuInCleanArea);
+          }
+        }
+      }
+
+      // Need to keep the begining of intra refresh area when HashME is enabled
+      bool splitCondition = tempCS->isCuCrossVB(gdrEndX);
+      bool forceRefreshIRA = false;
+      if (m_pcEncCfg->getUseHashME())
+      {
+        splitCondition |= tempCS->isCuCrossIRA(gdrBegX);
+        forceRefreshIRA = true;
+      }
+
+
+      if (isCuInRefreshArea)
+      {
+        if (forceRefreshIRA)
+        {
+          m_modeCtrl->forceIntraMode();
+        }
+      }
+
+      if (splitCondition)
+      {
+        // remove every prediction mode (remain split only)
+        m_modeCtrl->forceRemovePredMode();
+
+        const unsigned minQtSize = tempCS->pcv->getMinQtSize(*tempCS->slice, CHANNEL_TYPE_LUMA); // 8
+
+        if (tempCS->area.lheight() <= minQtSize)
+        {
+          m_modeCtrl->forceRemoveTTH();
+        }
+
+        if (tempCS->area.lheight() < minQtSize)
+        {
+          m_modeCtrl->forceRemoveBTH();
+        }
+
+        if (tempCS->area.lwidth() > minQtSize * 2)
+        {
+          m_modeCtrl->forceRemoveBTV();
+          m_modeCtrl->forceRemoveTTV();
+        }
+
+        if (tempCS->area.lwidth() < minQtSize || tempCS->area.lheight() < minQtSize)
+        {
+          m_modeCtrl->forceRemoveQT();
+        }
+
+        if (tempCS->area.lwidth() != tempCS->area.lheight())
+        {
+          m_modeCtrl->forceRemoveQT();
+        }
+
+        if (!m_modeCtrl->anyPredModeLeft())
+        {
+          m_modeCtrl->forceRemoveDontSplit();
+        }
+      }
+    }
+    // 2. pic in non-GDR interval
+    else
+    {
+      tempCS->setReconBuf(PIC_RECONSTRUCTION_0);
+      tempCS->picture->setCleanDirty(false);
+            
+      {
+        // 2.1 setup reference picture for non-GDR
+        for (int rlist = REF_PIC_LIST_0; rlist < NUM_REF_PIC_LIST_01; rlist++)
+        {
+          int n = slice.getNumRefIdx((RefPicList)rlist);
+          for (int idx = 0; idx < n; idx++)
+          {
+            Picture *refPic = slice.getReferencePicture((RefPicList)rlist, idx);
+
+            if (refPic)
+            {
+              bool isRefInGdrInterval  = refPic->cs->picHeader->getInGdrInterval();
+              bool isRefRecoveryPocPic = refPic->cs->picHeader->getIsGdrRecoveryPocPic();
+
+              if (isRefInGdrInterval || isRefRecoveryPocPic)
+              {
+                refPic->setCleanDirty(true);
+              }
+              else
+              {
+                refPic->setCleanDirty(false);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+#endif
+
+
   if( partitioner.currQtDepth == 0 && partitioner.currMtDepth == 0 && !tempCS->slice->isIntra() && ( sps.getUseSBT() || sps.getUseInterMTS() ) )
   {
     auto slsSbt = dynamic_cast<SaveLoadEncInfoSbt*>( m_modeCtrl );
@@ -1257,7 +1388,11 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
         }
       }
 #endif
+#if JVET_Z0118_GDR
+    if (bestCS->cus.size() > 0 && splitmode != bestCS->cus[0]->splitSeries)
+#else
       if (splitmode != bestCS->cus[0]->splitSeries)
+#endif
       {
         splitmode = bestCS->cus[0]->splitSeries;
         const CodingUnit&     cu = *bestCS->cus.front();
@@ -1329,7 +1464,12 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     CU::saveMotionInHMVP( cu, isIbcSmallBlk );
   }
   bestCS->picture->getPredBuf(currCsArea).copyFrom(bestCS->getPredBuf(currCsArea));
-  bestCS->picture->getRecoBuf( currCsArea ).copyFrom( bestCS->getRecoBuf( currCsArea ) );
+#if JVET_Z0118_GDR
+  bestCS->updateReconMotIPM(currCsArea); // xcomrpessCU - need 
+#else
+  bestCS->picture->getRecoBuf(currCsArea).copyFrom(bestCS->getRecoBuf(currCsArea));
+#endif  
+  
   m_modeCtrl->finishCULevel( partitioner );
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   if( m_pcIntraSearch->getSaveCuCostInSCIPU() && bestCS->cus.size() == 1 )
@@ -1741,6 +1881,12 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
         {
           tempCS->motionLut = oldMotionLut;
         }
+#endif
+#if JVET_Z0118_GDR      
+        tempCS->motionLut = oldMotionLut;
+        tempCS->prevPLT = oldPLT;
+        tempCS->releaseIntermediateData();
+        tempCS->prevQP[partitioner.chType] = oldPrevQp;
 #endif
         return;
       }
@@ -2323,12 +2469,20 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             {
               if (!cu.colorTransform)
               {
+#if JVET_Z0118_GDR
+                cu.cs->updateReconMotIPM(cu.Y()); // xcomrpessCU - need 
+#else
                 cu.cs->picture->getRecoBuf(cu.Y()).copyFrom(cu.cs->getRecoBuf(COMPONENT_Y));
+#endif
                 cu.cs->picture->getPredBuf(cu.Y()).copyFrom(cu.cs->getPredBuf(COMPONENT_Y));
               }
               else
               {
+#if JVET_Z0118_GDR
+                cu.cs->updateReconMotIPM(cu); // xcomrpessCU - need 
+#else
                 cu.cs->picture->getRecoBuf(cu).copyFrom(cu.cs->getRecoBuf(cu));
+#endif
                 cu.cs->picture->getPredBuf(cu).copyFrom(cu.cs->getPredBuf(cu));
               }
             }
@@ -11108,6 +11262,10 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
       xDeriveCUMV( cu );
       xReconInter( cu );
     }
+
+#if JVET_Z0118_GDR
+    bestCS->updateReconMotIPM(cu); // cache    
+#endif
 
     Distortion finalDistortion = 0;
     tempCS->useDbCost = m_pcEncCfg->getUseEncDbOpt();

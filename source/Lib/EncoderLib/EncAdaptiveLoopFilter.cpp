@@ -3277,6 +3277,13 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
               for( int shape = 0; shape != m_filterShapes[chType].size(); shape++ )
               {
               const CompArea& compAreaDst = areaDst.block( compID );
+#if JVET_Z0118_GDR
+                if (m_alfCovariance[compIdx][shape] == nullptr)
+                {
+                  continue;
+                }                
+#endif
+
 #if ALF_IMPROVEMENT
               for (int fixedFilterSetIdx = 0; fixedFilterSetIdx < ((m_filterShapes[chType][shape].filterType == ALF_FILTER_EXT || m_filterShapes[chType][shape].filterType == ALF_FILTER_9_EXT) ? 2 : 1); fixedFilterSetIdx++)
               {
@@ -3309,6 +3316,13 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
 
           for( int shape = 0; shape != m_filterShapes[chType].size(); shape++ )
           {
+#if JVET_Z0118_GDR
+            if (m_filterTypeTest[chType][m_filterShapes[chType][shape].filterType] == false)
+            {
+              continue;
+            }
+#endif
+
             const int numClasses = isLuma( compID ) ? MAX_NUM_ALF_CLASSES : 1;
 
             for( int classIdx = 0; classIdx < numClasses; classIdx++ )

@@ -254,9 +254,17 @@
 #endif // tools
 
 // Software extensions
-#define RPR_ENABLE                                        1 // JVET-X0121: Fixes for RPR
+#define RPR_ENABLE                                        1 // JVET-X0121: Fixes for RRP
 #define JVET_Y0128_NON_CTC                                1 // JVET-Y0128: Fixing issues for RPR enabling and non-CTC configuration in ECM
 #define JVET_Z0067_RPR_ENABLE                             1 // JVET_Z0067: Fixes for RPR
+#define JVET_Z0118_GDR                                    1 // JVET_Z0118: GDR for ECM
+
+#if JVET_Z0118_GDR
+#define GDR_LEAK_TEST  1
+#define GDR_ENC_TRACE  0
+#define GDR_DEC_TRACE  0
+#endif // JVET_Z0118_GDR
+
 
 
 

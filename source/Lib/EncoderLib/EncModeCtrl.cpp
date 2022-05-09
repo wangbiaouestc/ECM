@@ -1183,6 +1183,9 @@ static bool interHadActive( const ComprCUCtx& ctx )
 
 void EncModeCtrlMTnoRQT::create( const EncCfg& cfg )
 {
+#if JVET_Z0118_GDR
+  m_encCfg = cfg;
+#endif
   CacheBlkInfoCtrl::create();
 #if REUSE_CU_RESULTS
 #if CONVERT_NUM_TU_SPLITS_TO_CFG

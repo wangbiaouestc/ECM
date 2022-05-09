@@ -598,7 +598,11 @@ void SampleAdaptiveOffset::offsetBlock(const int channelBitDepth, const ClpRng& 
 #if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER || JVET_W0066_CCSAO
 void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const ClpRng& clpRng, int typeIdx, int* offset
                                              , const Pel* srcBlk, Pel* resBlk, int srcStride, int resStride,  int width, int height
-                                             , bool isLeftAvail,  bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail)
+                                             , bool isLeftAvail,  bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
+#if JVET_Z0118_GDR
+                                             , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
+)
 {
   int x,y, startX, startY, endX, endY, edgeType;
   int firstLineStartX, firstLineEndX, lastLineStartX, lastLineEndX;
@@ -620,6 +624,13 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
         for (x=startX; x< endX; x++)
         {
           signRight = (int8_t)sgn(srcLine[x] - srcLine[x+1]);
+#if JVET_Z0118_GDR
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            signLeft = -signRight;
+            continue;
+          }
+#endif
           edgeType =  signRight + signLeft;
           signLeft  = -signRight;
           
@@ -658,6 +669,13 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
         for (x=0; x< width; x++)
         {
           signDown  = (int8_t)sgn(srcLine[x] - srcLineBelow[x]);
+#if JVET_Z0118_GDR
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            signUpLine[x] = -signDown;
+            continue;
+          }
+#endif
           edgeType = signDown + signUpLine[x];
           signUpLine[x]= -signDown;
           
@@ -693,6 +711,12 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
       firstLineEndX   = isAboveAvail? endX: 1;
       for(x= firstLineStartX; x< firstLineEndX; x++)
       {
+#if JVET_Z0118_GDR
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+        {          
+          continue;
+        }
+#endif
         edgeType  =  sgn(srcLine[x] - srcLineAbove[x- 1]) - signUpLine[x+1];
         
         resLine[x] = srcLine[x] + offset[edgeType];
@@ -709,6 +733,13 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
         for (x=startX; x<endX; x++)
         {
           signDown =  (int8_t)sgn(srcLine[x] - srcLineBelow[x+ 1]);
+#if JVET_Z0118_GDR
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            signDownLine[x + 1] = -signDown;
+            continue;
+          }
+#endif
           edgeType =  signDown + signUpLine[x];
           resLine[x] = srcLine[x] + offset[edgeType];
           
@@ -730,6 +761,12 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
       lastLineEndX   = isBelowRightAvail ? width : (width -1);
       for(x= lastLineStartX; x< lastLineEndX; x++)
       {
+#if JVET_Z0118_GDR
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+        {      
+          continue;
+        }
+#endif
         edgeType =  sgn(srcLine[x] - srcLineBelow[x+ 1]) + signUpLine[x];
         resLine[x] = srcLine[x] + offset[edgeType];
         
@@ -758,6 +795,12 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
       firstLineEndX   = isAboveRightAvail ? width : (width-1);
       for(x= firstLineStartX; x< firstLineEndX; x++)
       {
+#if JVET_Z0118_GDR
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+#endif
         edgeType = sgn(srcLine[x] - srcLineAbove[x+1]) -signUpLine[x-1];
         resLine[x] = srcLine[x] + offset[edgeType];
       }
@@ -772,6 +815,13 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
         for(x= startX; x< endX; x++)
         {
           signDown =  (int8_t)sgn(srcLine[x] - srcLineBelow[x-1]);
+#if JVET_Z0118_GDR
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            signUpLine[x - 1] = -signDown;
+            continue;
+          }
+#endif
           edgeType =  signDown + signUpLine[x];
           resLine[x] = srcLine[x] + offset[edgeType];
           signUpLine[x-1] = -signDown;
@@ -787,6 +837,12 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
       lastLineEndX   = isBelowAvail ? endX : 1;
       for(x= lastLineStartX; x< lastLineEndX; x++)
       {
+#if JVET_Z0118_GDR
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+        {          
+          continue;
+        }
+#endif
         edgeType = sgn(srcLine[x] - srcLineBelow[x-1]) + signUpLine[x];
         resLine[x] = srcLine[x] + offset[edgeType];
         
@@ -913,7 +969,7 @@ void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnit
     m_signLineBuf2.resize(lineBufferSize);
   }
   
-#if !JVET_W0066_CCSAO
+#if !JVET_W0066_CCSAO || JVET_Z0118_GDR
   int numHorVirBndry = 0, numVerVirBndry = 0;
   int horVirBndryPos[] = { -1,-1,-1 };
   int verVirBndryPos[] = { -1,-1,-1 };
@@ -933,7 +989,7 @@ void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnit
       const Pel* srcBlk = src.get(compID).bufAt(compArea);
       int  resStride    = res.get(compID).stride;
       Pel* resBlk       = res.get(compID).bufAt(compArea);
-#if !JVET_W0066_CCSAO
+#if !JVET_W0066_CCSAO || JVET_Z0118_GDR
       for (int i = 0; i < numHorVirBndry; i++)
       {
         horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
@@ -954,7 +1010,9 @@ void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnit
 		    , isAboveAvail, isBelowAvail
 		    , isAboveLeftAvail, isAboveRightAvail
 		    , isBelowLeftAvail, isBelowRightAvail
-		  //                 , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#if JVET_Z0118_GDR
+		    , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#endif
 	    );    
 #else
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
@@ -974,7 +1032,9 @@ void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnit
                     , isAboveAvail, isBelowAvail
                     , isAboveLeftAvail, isAboveRightAvail
                     , isBelowLeftAvail, isBelowRightAvail
-   //                 , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#if JVET_Z0118_GDR
+                    , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#endif
                     );
         }
       else
@@ -1673,6 +1733,15 @@ void SampleAdaptiveOffset::offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitA
   bool isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail;
   deriveLoopFilterBoundaryAvailibility(cs, area.Y(), isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail);
 
+#if JVET_Z0118_GDR
+  int numHorVirBndry = 0, numVerVirBndry = 0;
+  int horVirBndryPos[] = { -1,-1,-1 };
+  int verVirBndryPos[] = { -1,-1,-1 };
+  int horVirBndryPosComp[] = { -1,-1,-1 };
+  int verVirBndryPosComp[] = { -1,-1,-1 };
+  bool isCtuCrossedByVirtualBoundaries = isCrossedByVirtualBoundaries(area.Y().x, area.Y().y, area.Y().width, area.Y().height, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos, cs.picHeader);
+#endif
+
   for (int compIdx = 0; compIdx < numberOfComponents; compIdx++)
   {
     if (m_ccSaoComParam.enabled[compIdx])
@@ -1702,12 +1771,27 @@ void SampleAdaptiveOffset::offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitA
           const uint16_t bandNumV = bandNumU;
 
           const short *offset = m_ccSaoComParam.offset[compIdx][setIdc - 1];
+      
+#if JVET_Z0118_GDR
+        for (int i = 0; i < numHorVirBndry; i++)
+        {
+          horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
+        }
+        for (int i = 0; i < numVerVirBndry; i++)
+        {
+          verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
+        }
+#endif
 
           offsetBlockCcSaoNoClipEdge(compID, cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID),
                                      candPosY, bandNumY, bandNumU, bandNumV, offset, srcBlkY, srcBlkU, srcBlkV, dstBlk,
                                      srcStrideY, srcStrideU, srcStrideV, dstStride, compArea.width, compArea.height,
                                      isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail,
-                                     isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail);
+                                     isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail
+#if JVET_Z0118_GDR
+            , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#endif
+          );
         }
       }
       else
@@ -1732,11 +1816,26 @@ void SampleAdaptiveOffset::offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitA
           const uint16_t bandNumV = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cr];
           const short *  offset   = m_ccSaoComParam.offset[compIdx][setIdc - 1];
 
+#if JVET_Z0118_GDR
+        for (int i = 0; i < numHorVirBndry; i++)
+        {
+          horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
+        }
+        for (int i = 0; i < numVerVirBndry; i++)
+        {
+          verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
+        }
+#endif
+      
           offsetBlockCcSaoNoClip(compID, cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID), candPosY,
                                  bandNumY, bandNumU, bandNumV, offset, srcBlkY, srcBlkU, srcBlkV, dstBlk, srcStrideY,
                                  srcStrideU, srcStrideV, dstStride, compArea.width, compArea.height, isLeftAvail,
                                  isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail,
-                                 isBelowLeftAvail, isBelowRightAvail);
+                                 isBelowLeftAvail, isBelowRightAvail
+#if JVET_Z0118_GDR
+                                 , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#endif
+                              );
         }
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
       }
@@ -1764,6 +1863,15 @@ void SampleAdaptiveOffset::offsetCTUCcSao(CodingStructure& cs, const UnitArea& a
   bool isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail;
   deriveLoopFilterBoundaryAvailibility(cs, area.Y(), isLeftAvail,isRightAvail,isAboveAvail,isBelowAvail,isAboveLeftAvail,isAboveRightAvail,isBelowLeftAvail,isBelowRightAvail);
 
+#if JVET_Z0118_GDR
+  int numHorVirBndry = 0, numVerVirBndry = 0;
+  int horVirBndryPos[] = { -1,-1,-1 };
+  int verVirBndryPos[] = { -1,-1,-1 };
+  int horVirBndryPosComp[] = { -1,-1,-1 };
+  int verVirBndryPosComp[] = { -1,-1,-1 };
+  bool isCtuCrossedByVirtualBoundaries = isCrossedByVirtualBoundaries(area.Y().x, area.Y().y, area.Y().width, area.Y().height, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos, cs.picHeader);
+#endif
+
   for(int compIdx = 0; compIdx < numberOfComponents; compIdx++)
   {
     if(m_ccSaoComParam.enabled[compIdx])
@@ -1788,6 +1896,16 @@ void SampleAdaptiveOffset::offsetCTUCcSao(CodingStructure& cs, const UnitArea& a
         const uint16_t    bandNumU   = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cb];
         const uint16_t    bandNumV   = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cr];
         const short      *offset     = m_ccSaoComParam.offset [compIdx][setIdc - 1];
+#if JVET_Z0118_GDR
+        for (int i = 0; i < numHorVirBndry; i++)
+        {
+          horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
+        }
+        for (int i = 0; i < numVerVirBndry; i++)
+        {
+          verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
+        }
+#endif
 
         offsetBlockCcSao( compID, cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID)
                         , candPosY, bandNumY, bandNumU, bandNumV
@@ -1799,6 +1917,9 @@ void SampleAdaptiveOffset::offsetCTUCcSao(CodingStructure& cs, const UnitArea& a
                         , isAboveAvail, isBelowAvail
                         , isAboveLeftAvail, isAboveRightAvail
                         , isBelowLeftAvail, isBelowRightAvail
+#if JVET_Z0118_GDR
+                        , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#endif
                         );
       }
     }
@@ -1841,7 +1962,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
   const uint16_t bandNumU, const uint16_t bandNumV, const short *offset, const Pel *srcY, const Pel *srcU,
   const Pel *srcV, Pel *dst, const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride,
   const int width, const int height, bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail,
-  bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail)
+  bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
+#if JVET_Z0118_GDR
+  ,bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
+)
 {
   const int candPosYXA = g_ccSaoEdgeTypeX[candPosY][0];
   const int candPosYYA = g_ccSaoEdgeTypeY[candPosY][0];
@@ -1866,6 +1991,18 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
 
         signa = calcDiffRange(*colY, *colA, th);
         signb = calcDiffRange(*colY, *colB, th);
+
+#if JVET_Z0118_GDR          
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, x + candPosYXA, y + candPosYYA, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, x + candPosYXB, y + candPosYYB, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+#endif
 
         signa = signa * 4 + signb;
         if (bandNumY <= 4)
@@ -1963,6 +2100,9 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
                                                 , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride
                                                 , const int width, const int height
                                                 , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
+#if JVET_Z0118_GDR
+                                                , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
                                                  )
 {
   const int candPosYX = g_ccSaoCandPosX[COMPONENT_Y][candPosY];
@@ -1989,6 +2129,12 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           //dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_Z0118_GDR          
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, x + candPosYX, y + candPosYY, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+#endif
           dst[x] = dst[x] + offset[classIdx];
         }
 
@@ -2043,6 +2189,9 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
                                           , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride
                                           , const int width, const int height
                                           , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
+#if JVET_Z0118_GDR
+                                          , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
                                            )
 {
   const int candPosYX = g_ccSaoCandPosX[COMPONENT_Y][candPosY];
@@ -2067,6 +2216,13 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
                              + bandU * bandNumV
                              + bandV;
           const int classIdx = bandIdx;
+
+#if JVET_Z0118_GDR          
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, x + candPosYX, y + candPosYY, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+#endif
 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
         }

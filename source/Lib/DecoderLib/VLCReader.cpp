@@ -284,6 +284,9 @@ void FDReader::parseFillerData(InputBitstream* bs, uint32_t &fdSize)
 
 HLSyntaxReader::HLSyntaxReader()
 {
+#if JVET_Z0118_GDR
+  m_lastGdrPoc = -1;
+#endif
 }
 
 HLSyntaxReader::~HLSyntaxReader()
@@ -1070,10 +1073,12 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
     ccAlfParam.newCcAlfFilter[COMPONENT_Cr - 1] = 0;
   }
 #endif
+#if !JVET_Z0118_GDR
   CHECK(param.newFilterFlag[CHANNEL_TYPE_LUMA] == 0 && param.newFilterFlag[CHANNEL_TYPE_CHROMA] == 0
           && ccAlfParam.newCcAlfFilter[COMPONENT_Cb - 1] == 0 && ccAlfParam.newCcAlfFilter[COMPONENT_Cr - 1] == 0,
         "bitstream conformance error: one of alf_luma_filter_signal_flag, alf_chroma_filter_signal_flag, "
         "alf_cross_component_cb_filter_signal_flag, and alf_cross_component_cr_filter_signal_flag shall be nonzero");
+#endif
 
   if (param.newFilterFlag[CHANNEL_TYPE_LUMA])
   {
@@ -4984,6 +4989,51 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
       pcSlice->addSubstreamSize(entryPointOffset [ idx ] );
     }
   }
+#if JVET_Z0118_GDR
+  int curPoc = pcSlice->getPOC();  
+  bool isRecoveryPocPic = false;
+
+  if (picHeader->getGdrPicFlag())
+  {    
+    setLastGdrPoc(curPoc);
+    setLastGdrRecoveryPocCnt(pcSlice->getPicHeader()->getRecoveryPocCnt());
+  }
+
+  int recoveryPocCnt    = getLastGdrRecoveryPocCnt();
+  int recoveryPoc       = getLastGdrPoc() + recoveryPocCnt;
+  isRecoveryPocPic      = (curPoc == recoveryPoc);
+
+  picHeader->setInGdrInterval(false);
+  picHeader->setIsGdrRecoveryPocPic(false);
+
+  if (getLastGdrPoc() > 0)
+  {
+    if ((getLastGdrPoc() <= curPoc) && (curPoc < recoveryPoc))
+    {
+      picHeader->setInGdrInterval(true);
+      picHeader->setIsGdrRecoveryPocPic(false);
+      picHeader->setGdrEndX(picHeader->getVirtualBoundariesPosX(0));
+    }
+  }
+  
+  if (isRecoveryPocPic)
+  {
+    picHeader->setInGdrInterval(false);
+    picHeader->setIsGdrRecoveryPocPic(true);
+    picHeader->setGdrEndX(pps->getPicWidthInLumaSamples());
+  }
+#endif
+
+#if GDR_DEC_TRACE
+  printf("-gdr_pic_flag:%d\n", picHeader->getGdrPicFlag() ? 1 : 0);
+  printf("-recovery_poc_cnt:%d\n", picHeader->getRecoveryPocCnt());
+#if JVET_Z0118_GDR
+  printf("-inGdrInterval:%d\n", picHeader->getInGdrInterval());
+#endif
+
+  printf("-lmcs_enable : %d\n", picHeader->getLmcsEnabledFlag() ? 1 : 0);
+  printf("-lmcs_chroma : %d\n", picHeader->getLmcsChromaResidualScaleFlag() ? 1 : 0);
+#endif
   return;
 }
 

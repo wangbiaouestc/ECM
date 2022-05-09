@@ -190,7 +190,12 @@ protected:
   bool                 m_subPuMC;
 
   int                  m_IBCBufferWidth;
+#if JVET_Z0118_GDR
+  PelStorage           m_IBCBuffer0; // for dirty
+  PelStorage           m_IBCBuffer1; // for clean
+#else
   PelStorage           m_IBCBuffer;
+#endif
   void xIntraBlockCopy          (PredictionUnit &pu, PelUnitBuf &predBuf, const ComponentID compID);
   int             rightShiftMSB(int numer, int    denom);
 #if MULTI_PASS_DMVR
@@ -717,12 +722,18 @@ public:
 #endif
 #endif
   void xFillIBCBuffer(CodingUnit &cu);
+#if JVET_Z0118_GDR  
+  void resetCurIBCBuffer(const ChromaFormat chromaFormatIDC, const Area ctuArea, const int ctuSize, const Pel dirtyPel);  
+#endif
   void resetIBCBuffer(const ChromaFormat chromaFormatIDC, const int ctuSize);
   void resetVPDUforIBC(const ChromaFormat chromaFormatIDC, const int ctuSize, const int vSize, const int xPos, const int yPos);
+
   bool isLumaBvValid(const int ctuSize, const int xCb, const int yCb, const int width, const int height, const int xBv, const int yBv);
 
   bool xPredInterBlkRPR( const std::pair<int, int>& scalingRatio, const PPS& pps, const CompArea &blk, const Picture* refPic, const Mv& mv, Pel* dst, const int dstStride, const bool bi, const bool wrapRef, const ClpRng& clpRng, const int filterIndex, const bool useAltHpelIf = false);
-
+#if JVET_Z0118_GDR
+  void xPadIBCBuffer(const CodingStructure &cs, const UnitArea& ctuArea);
+#endif
 
 #if JVET_Z0054_BLK_REF_PIC_REORDER
 private:

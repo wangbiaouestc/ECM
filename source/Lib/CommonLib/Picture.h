@@ -182,6 +182,11 @@ struct Picture : public UnitArea
                                 const ChromaFormat chromaFormatIDC, const BitDepths& bitDepths, const bool useLumaFilter, const bool downsampling,
                                 const bool horCollocatedChromaFlag, const bool verCollocatedChromaFlag );
 
+#if JVET_Z0118_GDR
+  void setCleanDirty(bool flag) { m_cleanDirtyFlag = flag; if (m_cleanDirtyFlag) cs->setReconBuf(PIC_RECONSTRUCTION_1); else cs->setReconBuf(PIC_RECONSTRUCTION_0); }
+  bool getCleanDirty() const    { return m_cleanDirtyFlag; }  
+#endif
+
 private:
   Window        m_conformanceWindow;
   Window        m_scalingWindow;
@@ -244,6 +249,9 @@ public:
   int m_lossyQP;
   std::vector<bool> m_lossylosslessSliceArray;
   bool interLayerRefPicFlag;
+#if JVET_Z0118_GDR
+  bool m_cleanDirtyFlag;
+#endif
 
 #if !JVET_S0258_SUBPIC_CONSTRAINTS
   std::vector<int> subPicIDs;
@@ -282,6 +290,11 @@ public:
   void         allocateNewSlice();
   Slice        *swapSliceObject(Slice * p, uint32_t i);
   void         clearSliceBuffer();
+
+#if JVET_Z0118_GDR
+  void         initCleanCurPicture();  
+  void         copyCleanCurPicture();
+#endif
 
   MCTSInfo     mctsInfo;
   std::vector<AQpLayer*> aqlayer;

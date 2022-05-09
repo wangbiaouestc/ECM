@@ -1890,6 +1890,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       CodingStructure &saveCS = *m_pSaveCS[0];
       saveCS.pcv      = cs.pcv;
       saveCS.picture  = cs.picture;
+#if JVET_Z0118_GDR
+      saveCS.m_pt = cs.m_pt;
+#endif
       saveCS.area.repositionTo( cs.area );
       saveCS.clearTUs();
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -2206,7 +2209,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #endif
             saveCS.getPredBuf     ( area ).copyFrom( cs.getPredBuf   (area ) );
             cs.picture->getPredBuf( area ).copyFrom( cs.getPredBuf   (area ) );
+#if JVET_Z0118_GDR
+            cs.updateReconMotIPM(area);
+#else
             cs.picture->getRecoBuf( area ).copyFrom( cs.getRecoBuf( area ) );
+#endif
 
             for( uint32_t j = 0; j < saveCS.tus.size(); j++ )
             {
@@ -2395,7 +2402,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         cs.getPredBuf         ( area ).copyFrom( saveCS.getPredBuf( area ) );
         cs.picture->getPredBuf( area ).copyFrom( cs.getPredBuf    ( area ) );
 
+#if JVET_Z0118_GDR
+        cs.updateReconMotIPM(area);
+#else
         cs.picture->getRecoBuf( area ).copyFrom( cs.    getRecoBuf( area ) );
+#endif
 
         for( uint32_t j = 0; j < saveCS.tus.size(); j++ )
         {
@@ -2707,7 +2718,11 @@ void IntraSearch::PLTSearch(CodingStructure &cs, Partitioner& partitioner, Compo
   cs.dist += distortion;
   const CompArea &area = cu.blocks[compBegin];
   cs.setDecomp(area);
+#if JVET_Z0118_GDR
+  cs.updateReconMotIPM(area);
+#else
   cs.picture->getRecoBuf(area).copyFrom(cs.getRecoBuf(area));
+#endif
 }
 void IntraSearch::calcPixelPredRD(CodingStructure& cs, Partitioner& partitioner, Pel* orgBuf, Pel* paPixelValue, Pel* paRecoValue, ComponentID compBegin, uint32_t numComp)
 {
@@ -4995,7 +5010,11 @@ bool IntraSearch::xIntraCodingLumaISP(CodingStructure& cs, Partitioner& partitio
     xIntraCodingTUBlock(tu, COMPONENT_Y, singleDistTmpLuma, 0, &numSig);
 
 #if SIGN_PREDICTION
+#if JVET_Z0118_GDR
+    cs.updateReconMotIPM(partitioner.currArea());
+#else
     cs.picture->getRecoBuf( partitioner.currArea() ).copyFrom( cs.getRecoBuf( partitioner.currArea() ) );
+#endif
 #endif
 
     if (singleDistTmpLuma == MAX_INT)   // all zero CBF skip
@@ -5062,7 +5081,11 @@ bool IntraSearch::xIntraCodingLumaISP(CodingStructure& cs, Partitioner& partitio
     if (cs.cost < bestCostSoFar)
     {
       cs.setDecomp(cu.Y());
+#if JVET_Z0118_GDR
+      cs.updateReconMotIPM(currArea.Y());
+#else
       cs.picture->getRecoBuf(currArea.Y()).copyFrom(cs.getRecoBuf(currArea.Y()));
+#endif
 
       for (auto& ptu : cs.tus)
       {
@@ -5215,6 +5238,9 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
     {
       saveCS.pcv     = cs.pcv;
       saveCS.picture = cs.picture;
+#if JVET_Z0118_GDR
+      saveCS.m_pt = cs.m_pt;
+#endif
       saveCS.area.repositionTo(cs.area);
       saveCS.clearTUs();
       tmpTU = &saveCS.addTU(currArea, partitioner.chType);
@@ -5599,7 +5625,11 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
     {
       bool tmpValidReturnSplit = xRecurIntraCodingLumaQT( *csSplit, partitioner, bestCostSoFar, subTuCounter, ispType, false, mtsCheckRangeFlag, mtsFirstCheckId, mtsLastCheckId );
 #if SIGN_PREDICTION
+#if JVET_Z0118_GDR
+      cs.updateReconMotIPM(partitioner.currArea());
+#else
       cs.picture->getRecoBuf(  partitioner.currArea()  ).copyFrom( cs.getRecoBuf( partitioner.currArea() ) );
+#endif
 #endif
       subTuCounter += subTuCounter != -1 ? 1 : 0;
       if( sps.getUseLFNST() && !tmpValidReturnSplit )
@@ -5683,7 +5713,11 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
     if( !sps.getUseLFNST() || validReturnFull || validReturnSplit )
     {
       // otherwise this would've happened in useSubStructure
+#if JVET_Z0118_GDR
+      cs.updateReconMotIPM(currArea.Y());
+#else
       cs.picture->getRecoBuf(currArea.Y()).copyFrom(cs.getRecoBuf(currArea.Y()));
+#endif
       cs.picture->getPredBuf(currArea.Y()).copyFrom(cs.getPredBuf(currArea.Y()));
 
       if( cu.ispMode && earlySkipISP )
@@ -6460,7 +6494,11 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
       m_CABACEstimator->getCtx() = ctxBest;
     }
     tu.jointCbCr = bestJointCbCr;
+#if JVET_Z0118_GDR
+    csFull->updateReconMotIPM(tu);
+#else
     csFull->picture->getRecoBuf(tu).copyFrom(csFull->getRecoBuf(tu));
+#endif
 
     csFull->dist += bestDistJointCbCr;
     csFull->fracBits += bestBitsJointCbCr;
@@ -6564,6 +6602,9 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     CodingStructure &saveCS = *m_pSaveCS[1];
     saveCS.pcv      = cs.pcv;
     saveCS.picture  = cs.picture;
+#if JVET_Z0118_GDR
+    saveCS.m_pt = cs.m_pt;
+#endif
     saveCS.area.repositionTo( cs.area );
     saveCS.initStructData( MAX_INT, true );
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -6998,8 +7039,17 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
       }
 
       // Copy results to the picture structures
+#if JVET_Z0118_GDR
+      cs.updateReconMotIPM(cbArea);
+#else
       cs.picture->getRecoBuf(cbArea).copyFrom(cs.getRecoBuf(cbArea));
+#endif
+
+#if JVET_Z0118_GDR
+      cs.updateReconMotIPM(crArea);
+#else
       cs.picture->getRecoBuf(crArea).copyFrom(cs.getRecoBuf(crArea));
+#endif
       cs.picture->getPredBuf(cbArea).copyFrom(cs.getPredBuf(cbArea));
       cs.picture->getPredBuf(crArea).copyFrom(cs.getPredBuf(crArea));
 

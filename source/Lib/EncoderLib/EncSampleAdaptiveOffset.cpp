@@ -3131,6 +3131,15 @@ void EncSampleAdaptiveOffset::getCcSaoStatistics(CodingStructure& cs, const Comp
 
       deriveLoopFilterBoundaryAvailibility(cs, area.Y(), isLeftAvail, isAboveAvail, isAboveLeftAvail );
 
+#if JVET_Z0118_GDR
+      int numHorVirBndry = 0, numVerVirBndry = 0;
+      int horVirBndryPos[] = { -1,-1,-1 };
+      int verVirBndryPos[] = { -1,-1,-1 };
+      int horVirBndryPosComp[] = { -1,-1,-1 };
+      int verVirBndryPosComp[] = { -1,-1,-1 };
+      bool isCtuCrossedByVirtualBoundaries = isCrossedByVirtualBoundaries(area.Y().x, area.Y().y, area.Y().width, area.Y().height, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos, cs.picHeader);
+#endif
+
       //NOTE: The number of skipped lines during gathering CTU statistics depends on the slice boundary availabilities.
       //For simplicity, here only picture boundaries are considered.
 
@@ -3161,6 +3170,17 @@ void EncSampleAdaptiveOffset::getCcSaoStatistics(CodingStructure& cs, const Comp
         const Pel        *dstBlk     = dstYuv.get(compID      ).bufAt(compArea);
         const Pel        *orgBlk     = orgYuv.get(compID      ).bufAt(compArea);
 
+#if JVET_Z0118_GDR
+        for (int i = 0; i < numHorVirBndry; i++)
+        {
+          horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
+        }
+        for (int i = 0; i < numVerVirBndry; i++)
+        {
+          verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
+        }
+#endif
+
         const uint16_t    candPosY   = ccSaoParam.candPos[setIdx][COMPONENT_Y ];
         const uint16_t    bandNumY   = ccSaoParam.bandNum[setIdx][COMPONENT_Y ];
         const uint16_t    bandNumU   = ccSaoParam.bandNum[setIdx][COMPONENT_Cb];
@@ -3172,6 +3192,9 @@ void EncSampleAdaptiveOffset::getCcSaoStatistics(CodingStructure& cs, const Comp
                        , srcBlkY, srcBlkU, srcBlkV, orgBlk, dstBlk
                        , srcStrideY, srcStrideU, srcStrideV, orgStride, dstStride, compArea.width, compArea.height
                        , isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail
+#if JVET_Z0118_GDR
+                       , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#endif
                        );
       }
       ctuRsAddr++;
@@ -3219,6 +3242,15 @@ void EncSampleAdaptiveOffset::getCcSaoStatisticsEdgeNew(CodingStructure &cs, con
 
       deriveLoopFilterBoundaryAvailibility(cs, area.Y(), isLeftAvail, isAboveAvail, isAboveLeftAvail);
 
+#if JVET_Z0118_GDR
+      int numHorVirBndry = 0, numVerVirBndry = 0;
+      int horVirBndryPos[] = { -1,-1,-1 };
+      int verVirBndryPos[] = { -1,-1,-1 };
+      int horVirBndryPosComp[] = { -1,-1,-1 };
+      int verVirBndryPosComp[] = { -1,-1,-1 };
+      bool isCtuCrossedByVirtualBoundaries = isCrossedByVirtualBoundaries(area.Y().x, area.Y().y, area.Y().width, area.Y().height, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos, cs.picHeader);
+#endif
+
       // NOTE: The number of skipped lines during gathering CTU statistics depends on the slice boundary availabilities.
       // For simplicity, here only picture boundaries are considered.
 
@@ -3241,6 +3273,17 @@ void EncSampleAdaptiveOffset::getCcSaoStatisticsEdgeNew(CodingStructure &cs, con
         const Pel *       dstBlk     = dstYuv.get(compID).bufAt(compArea);
         const Pel *       orgBlk     = orgYuv.get(compID).bufAt(compArea);
 
+#if JVET_Z0118_GDR
+        for (int i = 0; i < numHorVirBndry; i++)
+        {
+          horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
+        }
+        for (int i = 0; i < numVerVirBndry; i++)
+        {
+          verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
+        }
+#endif
+
         const uint16_t candPosY = 0;
         const uint16_t bandNumC = 0;
         const int      setIdx   = 0;
@@ -3250,7 +3293,11 @@ void EncSampleAdaptiveOffset::getCcSaoStatisticsEdgeNew(CodingStructure &cs, con
                                 m_ccSaoStatDataEdgeNew, ctuRsAddr, candPosY, mode, bandNumC, bandNumC, srcBlkY, srcBlkU,
                                 srcBlkV, orgBlk, dstBlk, srcStrideY, srcStrideU, srcStrideV, orgStride, dstStride,
                                 compArea.width, compArea.height, isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail,
-                                isAboveLeftAvail, isAboveRightAvail);
+                                isAboveLeftAvail, isAboveRightAvail
+#if JVET_Z0118_GDR
+                              , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#endif
+        );
       }
       ctuRsAddr++;
     }
@@ -3344,7 +3391,11 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
   const uint16_t bandNumU, const uint16_t bandNumV, const Pel *srcY, const Pel *srcU, const Pel *srcV, const Pel *org,
   const Pel *dst, const int srcStrideY, const int srcStrideU, const int srcStrideV, const int orgStride,
   const int dstStride, const int width, const int height, bool isLeftAvail, bool isRightAvail, bool isAboveAvail,
-  bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail)
+  bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail
+#if JVET_Z0118_GDR
+  , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
+)
 {
   int signa, signb, band;
 
@@ -3368,6 +3419,18 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
           const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
           const Pel *colU = srcU + (x >> 1);
           const Pel *colV = srcV + (x >> 1);
+
+#if JVET_Z0118_GDR          
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, x + candPosYXA, y + candPosYYA, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, x + candPosYXB, y + candPosYYB, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+#endif
 
           for (int th = 0; th < CCSAO_QUAN_NUM; th++)
           {
@@ -3495,6 +3558,9 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
                                              , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int orgStride, const int dstStride
                                              , const int width, const int height
                                              , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail
+#if JVET_Z0118_GDR
+                                             , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
                                              )
 {
   const int candPosYX = g_ccSaoCandPosX[COMPONENT_Y][candPosY];
@@ -3519,6 +3585,12 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
                              + bandU * bandNumV
                              + bandV;
           const int classIdx = bandIdx;
+#if JVET_Z0118_GDR
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+#endif
 
           blkStats[setIdx][ctuRsAddr].diff [classIdx] += org[x] - dst[x];
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
@@ -3550,6 +3622,13 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
                              + bandU * bandNumV
                              + bandV;
           const int classIdx = bandIdx;
+
+#if JVET_Z0118_GDR
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+#endif
 
           blkStats[setIdx][ctuRsAddr].diff [classIdx] += org[x] - dst[x];
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;

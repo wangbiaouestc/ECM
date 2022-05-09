@@ -1023,6 +1023,17 @@ const MotionInfo& PredictionUnit::getMotionInfo() const
 
 const MotionInfo& PredictionUnit::getMotionInfo( const Position& pos ) const
 {
+#if JVET_Z0118_GDR
+  {
+    bool isSrcClean = cs->isClean(Y().bottomRight(), CHANNEL_TYPE_LUMA);
+    bool isTarClean = cs->isClean(pos, CHANNEL_TYPE_LUMA);
+
+    if (isSrcClean && !isTarClean)
+    {
+      return constMotionIntra;
+    }
+  }
+#endif
   CHECKD( !Y().contains( pos ), "Trying to access motion info outsied of PU" );
   return cs->getMotionInfo( pos );
 }
@@ -1039,6 +1050,7 @@ CMotionBuf PredictionUnit::getMotionBuf() const
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 bool PredictionUnit::isMvsdApplicable() const
 {
+  
   if (!cs->sps->getUseMVSD())
   {
     return false;
@@ -1058,6 +1070,18 @@ const uint8_t& PredictionUnit::getIpmInfo() const
 
 const uint8_t& PredictionUnit::getIpmInfo( const Position& pos ) const
 {
+#if JVET_Z0118_GDR
+  {
+    bool isSrcClean = cs->isClean(Y().bottomRight(), CHANNEL_TYPE_LUMA);
+    bool isTarClean = cs->isClean(pos, CHANNEL_TYPE_LUMA);
+
+    if (isSrcClean && !isTarClean)
+    {
+      return constIpm;    
+    }
+  }
+#endif
+
   CHECKD( !Y().contains( pos ), "Trying to access motion info outsied of PU" );
   return cs->getIpmInfo( pos );
 }

@@ -301,14 +301,32 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 
     if ((cs.slice->getSliceType() != I_SLICE || cs.sps->getIBCFlag()) && ctuXPosInCtus == tileXPosInCtus)
     {
+#if JVET_Z0118_GDR
+      cs.motionLut.lut0.resize(0);
+      cs.motionLut.lut1.resize(0);
+      cs.motionLut.lutIbc0.resize(0);
+      cs.motionLut.lutIbc1.resize(0);
+#else
       cs.motionLut.lut.resize(0);
       cs.motionLut.lutIbc.resize(0);
+#endif // JVET_Z0118_GDR
+
 #if JVET_Z0139_HIST_AFF   
       for (int i = 0; i < 2 * MAX_NUM_AFFHMVP_ENTRIES_ONELIST; i++)
       {
+#if JVET_Z0118_GDR
+        cs.motionLut.lutAff0[i].resize(0);
+        cs.motionLut.lutAff1[i].resize(0);
+#else
         cs.motionLut.lutAff[i].resize(0);
+#endif // JVET_Z0118_GDR
       }
+#if JVET_Z0118_GDR
+      cs.motionLut.lutAffInherit0.resize(0);
+      cs.motionLut.lutAffInherit1.resize(0);
+#else
       cs.motionLut.lutAffInherit.resize(0);
+#endif // JVET_Z0118_GDR
 #endif
       cs.resetIBCBuffer = true;
     }

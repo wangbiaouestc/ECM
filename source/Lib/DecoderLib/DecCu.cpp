@@ -111,6 +111,23 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
     m_pcInterPred->resetIBCBuffer(cs.pcv->chrFormat, cs.slice->getSPS()->getMaxCUHeight());
     cs.resetIBCBuffer = false;
   }
+#if JVET_Z0118_GDR
+  // reset current IBC Buffer only when VB pass through
+  if (cs.isInGdrInvervalOrRecoveryPoc())
+  {
+    int gdrEndX = cs.picHeader->getGdrEndX();
+    if (ctuArea.lx() <= gdrEndX && gdrEndX < ctuArea.lx() + ctuArea.lwidth())
+    {
+      m_pcInterPred->resetCurIBCBuffer(
+        cs.pcv->chrFormat,
+        ctuArea.Y(),
+        cs.slice->getSPS()->getMaxCUHeight(),
+        1 << (cs.sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1)
+      );
+    }
+  }
+#endif
+
   for( int ch = 0; ch < maxNumChannelType; ch++ )
   {
     const ChannelType chType = ChannelType( ch );
@@ -123,6 +140,82 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
       m_pcInterPred->setFillCurTplAboveARMC(false);
       m_pcInterPred->setFillCurTplLeftARMC(false);
 #endif
+#if JVET_Z0118_GDR
+      Slice   *slice = currCU.slice;      
+      Picture *refPic;
+      
+      bool isInGdrInterval  = slice->getPicHeader()->getInGdrInterval();
+      bool isRecoveryPocPic = slice->getPicHeader()->getIsGdrRecoveryPocPic();
+      bool isNorPicture = !(isInGdrInterval || isRecoveryPocPic) && slice->isInterB();
+
+      if (isNorPicture) 
+      {        
+        currCU.cs->setReconBuf(PIC_RECONSTRUCTION_0);
+        currCU.cs->picture->setCleanDirty(false);
+
+        // 1.01 use only dirty reference picture
+        for (int rlist = REF_PIC_LIST_0; rlist < NUM_REF_PIC_LIST_01; rlist++)
+        {
+          int n = slice->getNumRefIdx((RefPicList)rlist);
+          for (int idx = 0; idx < n; idx++)
+          {
+            Picture *refPic = slice->getReferencePicture((RefPicList)rlist, idx);
+            if (refPic)
+            {
+              // when cur picture is normal picture and ref picture is gdr/recovery picture
+              // note: pic.slice.picHeader and pic.cs.picHeader could be different    
+              // bool isGdrPic = refPic->cs->picHeader->getInGdrPeriod();
+              bool isRefInGdrInterval  = refPic->cs->picHeader->getInGdrInterval();
+              bool isRefRecoveryPocPic = refPic->cs->picHeader->getIsGdrRecoveryPocPic();
+
+              if (isRefInGdrInterval || isRefRecoveryPocPic)
+              {
+                refPic->setCleanDirty(true);                                
+              }
+              else 
+              {
+                refPic->setCleanDirty(false);                                
+              }
+            }          
+          }
+        }
+      }
+
+      // 1.02 use clean reference pictures for some CU when gdr starts
+      if (isInGdrInterval || isRecoveryPocPic)
+      {
+        // 1.01 switch recon based on clean/dirty current area
+        bool clean_dirty_flag;
+
+        bool isCuClean = currCU.Y().valid() ? cs.isClean(currCU.Y().topLeft(), CHANNEL_TYPE_LUMA) : cs.isClean(currCU.Cb().topLeft(), CHANNEL_TYPE_CHROMA);
+
+        if (isCuClean) 
+        {
+          clean_dirty_flag = true;
+        }
+        else 
+        {
+          clean_dirty_flag = false;
+        }       
+        
+        currCU.cs->setReconBuf((clean_dirty_flag) ? PIC_RECONSTRUCTION_1 : PIC_RECONSTRUCTION_0);
+        currCU.cs->picture->setCleanDirty(clean_dirty_flag);
+
+        for (int rlist = REF_PIC_LIST_0; rlist < NUM_REF_PIC_LIST_01; rlist++)
+        {
+          int n = slice->getNumRefIdx((RefPicList)rlist);
+          for (int idx = 0; idx < n; idx++)
+          {
+            refPic = slice->getReferencePicture((RefPicList)rlist, idx);            
+            if (refPic)
+            {
+              refPic->setCleanDirty(clean_dirty_flag);              
+            }
+          }
+        }
+      }
+#endif
+
 #if !REMOVE_VPDU
       if(currCU.Y().valid())
       {
@@ -337,6 +430,9 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
       }
 
       m_pcInterPred->xFillIBCBuffer(currCU);
+#if JVET_Z0118_GDR // decompressCtu      
+      cs.updateReconMotIPM(currCU); // decompressCtu : need      
+#endif
 
       DTRACE_BLOCK_REC( cs.picture->getRecoBuf( currCU ), currCU, currCU.predMode );
     }
@@ -618,7 +714,12 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   if( cs.pcv->isEncoder )
 #endif
   {
+#if JVET_Z0118_GDR
+    cs.updateReconMotIPM(area, pReco);
+#else
     cs.picture->getRecoBuf( area ).copyFrom( pReco );
+#endif
+
     cs.picture->getPredBuf(area).copyFrom(piPred);
   }
 #endif
@@ -762,7 +863,12 @@ void DecCu::xIntraRecACTBlk(TransformUnit& tu)
 
     if (cs.pcv->isEncoder)
     {
+#if JVET_Z0118_GDR
+      cs.updateReconMotIPM(area, piReco);
+#else
       cs.picture->getRecoBuf(area).copyFrom(piReco);
+#endif
+
       cs.picture->getPredBuf(area).copyFrom(piPred);
     }
   }
@@ -911,7 +1017,11 @@ void DecCu::xReconPLT(CodingUnit &cu, ComponentID compBegin, uint32_t numComp)
   {
     const CompArea &area = cu.blocks[compID];
     PelBuf picReco = cu.cs->getRecoBuf(area);
+#if JVET_Z0118_GDR
+    cu.cs->updateReconMotIPM(area, picReco);
+#else
     cu.cs->picture->getRecoBuf(area).copyFrom(picReco);
+#endif
     cu.cs->setDecomp(area);
   }
 }
@@ -1231,7 +1341,11 @@ void DecCu::xDecodeInterTU( TransformUnit & currTU, const ComponentID compID )
   if (currTU.cs->slice->getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma(compID) && !currTU.cu->firstPU->ciipFlag && !CU::isIBC(*currTU.cu))
 #endif
   {
+#if JVET_Z0118_GDR
+    cs.updateReconMotIPM(currTU.blocks[COMPONENT_Y], cs.getPredBuf(currTU.blocks[COMPONENT_Y]));
+#else
     cs.picture->getRecoBuf(currTU.blocks[COMPONENT_Y]).copyFrom(cs.getPredBuf(currTU.blocks[COMPONENT_Y]));
+#endif
     cs.getPredBuf(currTU.blocks[COMPONENT_Y]).rspSignal(m_pcReshape->getFwdLUT());
   }
   m_pcTrQuant->predCoeffSigns(currTU, compID, reshapeChroma);
@@ -1311,7 +1425,11 @@ void DecCu::xDecodeInterTU( TransformUnit & currTU, const ComponentID compID )
 #endif
     {
       PelBuf picRecoBuff = currTU.cs->picture->getRecoBuf( currTU.blocks[currCompID] );
+#if JVET_Z0118_GDR
+      currTU.cs->rspSignalPicture(currTU.blocks[currCompID], m_pcReshape->getFwdLUT());
+#else
       picRecoBuff.rspSignal( cs.getPredBuf( currTU.blocks[currCompID] ), m_pcReshape->getFwdLUT() );
+#endif
       currTU.cs->getRecoBuf( currTU.blocks[currCompID] ).reconstruct( picRecoBuff, compResiBuf, currTU.cu->cs->slice->clpRng( currCompID ) );
     }
     else
@@ -1931,7 +2049,18 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
       }
 #if MULTI_HYP_PRED
       // put saved additional hypotheseis to the end
+#if JVET_Z0118_GDR
+      int n = (int) addHypData.capacity();
+      int s = (int) pu.addHypData.size();
+      int e = (int) (addHypData.end() - addHypData.begin());
+
+      if ((s + e) < n)
+      {
+        pu.addHypData.insert(pu.addHypData.end(), std::make_move_iterator(addHypData.begin()), std::make_move_iterator(addHypData.end()));
+      }
+#else
       pu.addHypData.insert(pu.addHypData.end(), std::make_move_iterator(addHypData.begin()), std::make_move_iterator(addHypData.end()));
+#endif
 #endif
     }
     else
@@ -2282,7 +2411,19 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
       const unsigned int  lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
       int xPred = pu.mv[0].getHor() >> MV_FRACTIONAL_BITS_INTERNAL;
       int yPred = pu.mv[0].getVer() >> MV_FRACTIONAL_BITS_INTERNAL;
+#if JVET_Z0118_GDR
+      if (cu.cs->slice->getSPS()->getGDREnabledFlag())
+      {
+        if (cu.cs->isClean(cu))
+          CHECK(!m_pcInterPred->isLumaBvValid(lcuWidth, cuPelX, cuPelY, roiWidth, roiHeight, xPred, yPred), "invalid block vector for IBC detected.");
+      }
+      else 
+      {
+        CHECK(!m_pcInterPred->isLumaBvValid(lcuWidth, cuPelX, cuPelY, roiWidth, roiHeight, xPred, yPred), "invalid block vector for IBC detected.");
+      }
+#else
       CHECK(!m_pcInterPred->isLumaBvValid(lcuWidth, cuPelX, cuPelY, roiWidth, roiHeight, xPred, yPred), "invalid block vector for IBC detected.");
+#endif
     }
 #if MULTI_HYP_PRED
     {

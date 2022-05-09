@@ -390,6 +390,9 @@ void CU::addPUs( CodingUnit& cu )
 void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
 {
   const PredictionUnit& pu = *cu.firstPU;
+#if JVET_Z0118_GDR
+  bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
+#endif
 
 #if JVET_Z0139_HIST_AFF
   if (cu.affine)
@@ -398,11 +401,17 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
     {
       return;
     }
+
     AffineMotionInfo addMi[2];
     int addRefIdx[2];
 
     pu.getAffineMotionInfo(addMi, addRefIdx);
+    
+#if JVET_Z0118_GDR    
+    cu.cs->addAffMiToLut((isClean) ? cu.cs->motionLut.lutAff1 : cu.cs->motionLut.lutAff0, addMi, addRefIdx);
+#else
     cu.cs->addAffMiToLut(cu.cs->motionLut.lutAff, addMi, addRefIdx);
+#endif // JVET_Z0118_GDR
 
     AffineInheritInfo addAffInherit;
     addAffInherit.basePos = cu.lumaPos();
@@ -420,11 +429,15 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
     }
     if (addAffInherit.baseMV[0].refIdx != -1 || addAffInherit.baseMV[1].refIdx != -1)
     {
+#if JVET_Z0118_GDR
+      cu.cs->addAffInheritToLut((isClean) ? cu.cs->motionLut.lutAffInherit1 : cu.cs->motionLut.lutAffInherit0, addAffInherit);
+#else
       cu.cs->addAffInheritToLut(cu.cs->motionLut.lutAffInherit, addAffInherit);
+#endif // JVET_Z0118_GDR
     }
     return;
   }
-#endif
+#endif // JVET_Z0139_HIST_AFF 
   if (!cu.geoFlag && !cu.affine && !isToBeDone)
   {
     MotionInfo mi = pu.getMotionInfo();
@@ -442,6 +455,30 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
     if (enableInsertion)
 #if JVET_Z0075_IBC_HMVP_ENLARGE
     {
+#if JVET_Z0118_GDR      
+      bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
+
+      if (isClean)
+      {
+        if (CU::isIBC(cu))
+        {
+          cu.cs->addMiToLutIBC(cu.cs->motionLut.lutIbc1, mi);
+        }
+        else
+        {
+          cu.cs->addMiToLut(cu.cs->motionLut.lut1, mi);
+        }
+      }
+
+      if (CU::isIBC(cu))
+      {
+        cu.cs->addMiToLutIBC(cu.cs->motionLut.lutIbc0, mi);
+      }
+      else
+      {
+        cu.cs->addMiToLut(cu.cs->motionLut.lut0, mi);
+      }
+#else 
       if (CU::isIBC(cu))
       {
         cu.cs->addMiToLutIBC(cu.cs->motionLut.lutIbc, mi);
@@ -450,10 +487,21 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
       {
         cu.cs->addMiToLut(cu.cs->motionLut.lut, mi);
       }
+#endif // JVET_Z0118_GDR
     }
+#else // JVET_Z0075_IBC_HMVP_ENLARGE
+#if JVET_Z0118_GDR      
+      bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
+
+      if (isClean)
+      {
+        cu.cs->addMiToLut(CU::isIBC(cu) ? cu.cs->motionLut.lutIbc1 : cu.cs->motionLut.lut1, mi);
+      }
+      cu.cs->addMiToLut(CU::isIBC(cu) ? cu.cs->motionLut.lutIbc0 : cu.cs->motionLut.lut0, mi);      
 #else
     cu.cs->addMiToLut(CU::isIBC(cu) ? cu.cs->motionLut.lutIbc : cu.cs->motionLut.lut, mi);
-#endif
+#endif // JVET_Z0118_GDR
+#endif // JVET_Z0075_IBC_HMVP_ENLARGE
   }
 }
 
@@ -1748,10 +1796,24 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
   MotionInfo miNeighbor;
 
 #if JVET_Z0075_IBC_HMVP_ENLARGE
+#if JVET_Z0118_GDR  
+  bool isClean = cs.isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
+#endif // JVET_Z0118_GDR
+
+#if JVET_Z0118_GDR  
+  auto &lut = (isClean) ? cs.motionLut.lut1 : cs.motionLut.lut0;
+#else
   auto &lut = cs.motionLut.lut;
+#endif // JVET_Z0118_GDR
+#else
+
+#if JVET_Z0118_GDR  
+  auto &lut = ibcFlag ? (isClean ? cs.motionLut.lutIbc1 : cs.motionLut.lutIbc0) : (isClean ? cs.motionLut.lut1 : cs.motionLut.lut0);
 #else
   auto &lut = ibcFlag ? cs.motionLut.lutIbc : cs.motionLut.lut;
-#endif 
+#endif // JVET_Z0118_GDR
+
+#endif // JVET_Z0075_IBC_HMVP_ENLARGE
   int num_avai_candInLUT = (int)lut.size();
 
   for (int mrgIdx = 1; mrgIdx <= num_avai_candInLUT; mrgIdx++)
@@ -1887,8 +1949,15 @@ bool PU::addIBCMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const 
   const Slice& slice = *cs.slice;
 #endif
   MotionInfo miNeighbor;
+#if JVET_Z0118_GDR
+  bool isClean = cs.isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
+#endif
 
+#if JVET_Z0118_GDR
+  auto &lut = (isClean) ? cs.motionLut.lutIbc1 : cs.motionLut.lutIbc0;
+#else
   auto &lut = cs.motionLut.lutIbc;
+#endif
   int num_avai_candInLUT = (int)lut.size();
   int compareNum = cnt;
 
@@ -2214,7 +2283,7 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
                                   , isAvailableA1, miLeft, isAvailableB1, miAbove
 #endif
                                   , true, isGt4x4
-#if JVET_X0083_BM_AMVP_MERGE_MODE || JVET_Y0058_IBC_LIST_MODIFY
+#if JVET_X0083_BM_AMVP_MERGE_MODE || JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0118_GDR
                                   , pu
 #endif
 #if JVET_Z0084_IBC_TM
@@ -3394,7 +3463,7 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
       , CU::isIBC(*pu.cu)
       , isGt4x4
 #endif
-#if JVET_X0083_BM_AMVP_MERGE_MODE || (JVET_Y0058_IBC_LIST_MODIFY && !JVET_Z0075_IBC_HMVP_ENLARGE)
+#if JVET_X0083_BM_AMVP_MERGE_MODE || (JVET_Y0058_IBC_LIST_MODIFY && !JVET_Z0075_IBC_HMVP_ENLARGE) || JVET_Z0118_GDR
       , pu
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
@@ -3718,12 +3787,23 @@ bool PU::addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const i
 {
   const Slice& slice = *cs.slice;
   MotionInfo miNeighbor;
+#if JVET_Z0118_GDR  
+  bool isClean = cs.isClean(cs.area.Y().bottomRight(), CHANNEL_TYPE_LUMA);
+#endif // JVET_Z0118_GDR
 
 #if JVET_Z0075_IBC_HMVP_ENLARGE
+#if JVET_Z0118_GDR  
+  auto &lut = (isClean) ? cs.motionLut.lut1 : cs.motionLut.lut0;
+#else
   auto &lut = cs.motionLut.lut;
+#endif // JVET_Z0118_GDR
+#else
+#if JVET_Z0118_GDR  
+  auto &lut = ibcFlag ? (isClean ? cs.motionLut.lutIbc1 : cs.motionLut.lutIbc0) : (isClean ? cs.motionLut.lut1 : cs.motionLut.lut0);
 #else
   auto &lut = ibcFlag ? cs.motionLut.lutIbc : cs.motionLut.lut;
-#endif
+#endif // JVET_Z0118_GDR
+#endif // JVET_Z0075_IBC_HMVP_ENLARGE
   int num_avai_candInLUT = (int)lut.size();
 
   for (int mrgIdx = 1; mrgIdx <= num_avai_candInLUT; mrgIdx++)
@@ -5718,6 +5798,10 @@ void PU::getIbcMVPsEncOnly(PredictionUnit &pu, Mv* mvPred, int& nbPred)
   nbPred = 0;
   Position posLT = pu.Y().topLeft();
 
+#if JVET_Z0118_GDR  
+  bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
+#endif
+
   // above-left
   const PredictionUnit *aboveLeftPU = pu.cs->getPURestricted(posLT.offset(-1, -1), pu, CHANNEL_TYPE_LUMA);
   if (aboveLeftPU && CU::isIBC(*aboveLeftPU->cu))
@@ -5754,10 +5838,19 @@ void PU::getIbcMVPsEncOnly(PredictionUnit &pu, Mv* mvPred, int& nbPred)
     }
   }
 
+#if JVET_Z0118_GDR  
+  size_t numAvaiCandInLUT = isClean ? pu.cs->motionLut.lutIbc1.size() : pu.cs->motionLut.lutIbc0.size();
+#else
   size_t numAvaiCandInLUT = pu.cs->motionLut.lutIbc.size();
+#endif
+
   for (uint32_t cand = 0; cand < numAvaiCandInLUT && nbPred < IBC_NUM_CANDIDATES; cand++)
   {
+#if JVET_Z0118_GDR
+    MotionInfo neibMi = isClean ? pu.cs->motionLut.lutIbc1[cand] : pu.cs->motionLut.lutIbc0[cand];
+#else
     MotionInfo neibMi = pu.cs->motionLut.lutIbc[cand];
+#endif
     if (isAddNeighborMv(neibMi.bv, mvPred, nbPred))
     {
       mvPred[nbPred++] = neibMi.bv;
@@ -6671,6 +6764,10 @@ bool PU::addMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrgCtx
     return false;
   }
 
+#if JVET_Z0118_GDR
+  bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
+#endif
+
   const PredictionUnit* npuGroup1[5];
   const PredictionUnit* npuGroup2[5];
   Position posGroup1[5];
@@ -6734,7 +6831,11 @@ bool PU::addMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrgCtx
       const PredictionUnit* puNei = npuGroup1[i];
       MotionInfo mvInfo = puNei->getMotionInfo(posGroup1[i]);
 
+#if JVET_Z0118_GDR
+      if (addOneMergeHMVPCandFromAffModel(pu, mrgCtx, cnt, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, iAffListIdx, mvInfo, posGroup1[i], mvInfo.interDir == 3 ? puNei->cu->BcwIdx : BCW_DEFAULT
+#else
       if (addOneMergeHMVPCandFromAffModel(pu, mrgCtx, cnt, pu.cs->motionLut.lutAff, iAffListIdx, mvInfo, posGroup1[i], mvInfo.interDir == 3 ? puNei->cu->BcwIdx : BCW_DEFAULT
+#endif
 #if INTER_LIC
         , mvInfo.interDir != 3 ? puNei->cu->LICFlag : false
 #endif
@@ -6783,7 +6884,11 @@ bool PU::addMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrgCtx
       const PredictionUnit* puNei = npuGroup2[i];
       MotionInfo mvInfo = puNei->getMotionInfo(posGroup2[i]);
 
+#if JVET_Z0118_GDR
+      if (addOneMergeHMVPCandFromAffModel(pu, mrgCtx, cnt, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, iAffListIdx, mvInfo, posGroup2[i], mvInfo.interDir == 3 ? puNei->cu->BcwIdx : BCW_DEFAULT
+#else
       if (addOneMergeHMVPCandFromAffModel(pu, mrgCtx, cnt, pu.cs->motionLut.lutAff, iAffListIdx, mvInfo, posGroup2[i], mvInfo.interDir == 3 ? puNei->cu->BcwIdx : BCW_DEFAULT
+#endif
 #if INTER_LIC
         , mvInfo.interDir != 3 ? puNei->cu->LICFlag : false
 #endif
@@ -7244,6 +7349,10 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
     return;
   }
 
+#if JVET_Z0118_GDR
+  bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
+#endif
+
   // insert inherited affine candidates
   Mv outputAffineMv[3];
   Position posLT = pu.Y().topLeft();
@@ -7327,11 +7436,19 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
   {
     if (affiAMVPInfo.numCand < AMVP_MAX_NUM_CANDS && leftAffNeiNum > 0)
     {
+#if JVET_Z0118_GDR
+      addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, 0, leftNeiIdx, leftAffNeiNum, aiNeibeInherited, true);
+#else
       addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, pu.cs->motionLut.lutAff, 0, leftNeiIdx, leftAffNeiNum, aiNeibeInherited, true);
+#endif
     }
     if (affiAMVPInfo.numCand < AMVP_MAX_NUM_CANDS && aboveAffNeiNum > 0)
     {
+#if JVET_Z0118_GDR
+      addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, 0, aboveNeiIdx, aboveAffNeiNum, aiNeibeInherited, true);
+#else
       addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, pu.cs->motionLut.lutAff, 0, aboveNeiIdx, aboveAffNeiNum, aiNeibeInherited, true);
+#endif
     }
   }
 #else
@@ -7430,11 +7547,19 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
   {
     if (affiAMVPInfo.numCand < AMVP_MAX_NUM_CANDS && leftAffNeiNum > 0)
     {
+#if JVET_Z0118_GDR
+      addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, 0, leftNeiIdx, leftAffNeiNum, aiNeibeInherited, true);
+#else
       addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, pu.cs->motionLut.lutAff, 0, leftNeiIdx, leftAffNeiNum, aiNeibeInherited, true);
+#endif
     }
     if (affiAMVPInfo.numCand < AMVP_MAX_NUM_CANDS && aboveAffNeiNum > 0)
     {
+#if JVET_Z0118_GDR
+      addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, 0, aboveNeiIdx, aboveAffNeiNum, aiNeibeInherited, true);
+#else
       addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, pu.cs->motionLut.lutAff, 0, aboveNeiIdx, aboveAffNeiNum, aiNeibeInherited, true);
+#endif
     }
   }
 #endif
@@ -7510,7 +7635,11 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
     {
       for (int affHMVPIdx = 0; affHMVPIdx < MAX_NUM_AFF_HMVP_CANDS; affHMVPIdx++)
       {
+#if JVET_Z0118_GDR
+        addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, affHMVPIdx, neiIdx, 5, aiNeibeInherited, false);
+#else
         addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, pu.cs->motionLut.lutAff, affHMVPIdx, neiIdx, 5, aiNeibeInherited, false);
+#endif
       }
     }
 #endif
@@ -7612,11 +7741,23 @@ void PU::addAMVPHMVPCand(const PredictionUnit &pu, const RefPicList eRefPicList,
   const Slice &slice = *(*pu.cs).slice;
 
   MotionInfo neibMi;
+#if JVET_Z0118_GDR  
+  bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
+#endif // JVET_Z0118_GDR
+
 #if JVET_Z0075_IBC_HMVP_ENLARGE
+#if JVET_Z0118_GDR  
+  auto &lut = (isClean) ? pu.cs->motionLut.lut1 : pu.cs->motionLut.lut0;
+#else
   auto &lut = pu.cs->motionLut.lut;
+#endif // JVET_Z0118_GDR
+#else
+#if JVET_Z0118_GDR  
+  auto &lut = CU::isIBC(*pu.cu) ? (isClean ? pu.cs->motionLut.lutIbc1 : pu.cs->motionLut.lutIbc0) : (isClean ? pu.cs->motionLut.lut1 : pu.cs->motionLut.lut0);
 #else
   auto &lut = CU::isIBC(*pu.cu) ? pu.cs->motionLut.lutIbc : pu.cs->motionLut.lut;
-#endif
+#endif // JVET_Z0118_GDR
+#endif // JVET_Z0075_IBC_HMVP_ENLARGE
   int num_avai_candInLUT = (int) lut.size();
   int num_allowedCand = std::min(MAX_NUM_HMVP_AVMPCANDS, num_avai_candInLUT);
   const RefPicList eRefPicList2nd = (eRefPicList == REF_PIC_LIST_0) ? REF_PIC_LIST_1 : REF_PIC_LIST_0;
@@ -8629,6 +8770,9 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
   const Slice &slice = *pu.cs->slice;
   const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand();
   const unsigned plevel = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
+#if JVET_Z0118_GDR
+  bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
+#endif
 
   for ( int i = 0; i < maxNumAffineMergeCand; i++ )
   {
@@ -9048,12 +9192,20 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 #if JVET_Z0139_HIST_AFF
         if (idx == startIdx)
         {
+#if JVET_Z0118_GDR
+          if (addSpatialAffineMergeHMVPCand(pu, affMrgCtx, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, 0, npuGroup2, posGroup2, numGroup2, mrgCandIdx))
+#else
           if (addSpatialAffineMergeHMVPCand(pu, affMrgCtx, pu.cs->motionLut.lutAff, 0, npuGroup2, posGroup2, numGroup2, mrgCandIdx))
+#endif
           {
             return;
           }
 
+#if JVET_Z0118_GDR
+          if (addOneInheritedHMVPAffineMergeCand(pu, affMrgCtx, (isClean) ? pu.cs->motionLut.lutAffInherit1 : pu.cs->motionLut.lutAffInherit0, 0))
+#else
           if (addOneInheritedHMVPAffineMergeCand(pu, affMrgCtx, pu.cs->motionLut.lutAffInherit, 0))
+#endif
           {
             if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
             {
@@ -9111,7 +9263,11 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
     if (isTmvpAvailable)
     {
       Position posRB = pu.Y().bottomRight().offset(3, 3);
+#if JVET_Z0118_GDR
+      if (addOneAffineMergeHMVPCand(pu, affMrgCtx, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, 0, tmvpInfo, posRB, BCW_DEFAULT, false))
+#else
       if (addOneAffineMergeHMVPCand(pu, affMrgCtx, pu.cs->motionLut.lutAff, 0, tmvpInfo, posRB, BCW_DEFAULT, false))
+#endif
       {
         if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
         {
@@ -9130,14 +9286,22 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 
     for (int iAffListIdx = 1; iAffListIdx < MAX_NUM_AFF_HMVP_CANDS; iAffListIdx++)
     {
+#if JVET_Z0118_GDR
+      if (addSpatialAffineMergeHMVPCand(pu, affMrgCtx, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, iAffListIdx, npuGroup2, posGroup2, numGroup2, mrgCandIdx))
+#else
       if (addSpatialAffineMergeHMVPCand(pu, affMrgCtx, pu.cs->motionLut.lutAff, iAffListIdx, npuGroup2, posGroup2, numGroup2, mrgCandIdx))
+#endif
       {
         return;
       }
       if (isTmvpAvailable)
       {
         Position posRB = pu.Y().bottomRight().offset(3, 3);
+#if JVET_Z0118_GDR
+        if (addOneAffineMergeHMVPCand(pu, affMrgCtx, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, iAffListIdx, tmvpInfo, posRB, BCW_DEFAULT, false))
+#else
         if (addOneAffineMergeHMVPCand(pu, affMrgCtx, pu.cs->motionLut.lutAff, iAffListIdx, tmvpInfo, posRB, BCW_DEFAULT, false))
+#endif
         {
           if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
           {
@@ -9157,7 +9321,11 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 
     for (int iAffListIdx = 1; iAffListIdx < MAX_NUM_AFF_INHERIT_HMVP_CANDS; iAffListIdx++)
     {
+#if JVET_Z0118_GDR
+      if (addOneInheritedHMVPAffineMergeCand(pu, affMrgCtx, (isClean) ? pu.cs->motionLut.lutAffInherit1 : pu.cs->motionLut.lutAffInherit0, iAffListIdx))
+#else
       if (addOneInheritedHMVPAffineMergeCand(pu, affMrgCtx, pu.cs->motionLut.lutAffInherit, iAffListIdx))
+#endif
       {
         if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
         {

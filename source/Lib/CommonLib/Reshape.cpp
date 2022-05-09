@@ -126,7 +126,11 @@ int  Reshape::calculateChromaAdjVpduNei(TransformUnit &tu, const CompArea &areaY
     yPos = yPos / ctuSize * ctuSize;
   }
 
+#if JVET_Z0118_GDR
+  if (isVPDUprocessed(xPos, yPos, (PictureType) tu.cs->picture->getCleanDirty()) && !cs.pcv->isEncoder)
+#else
   if (isVPDUprocessed(xPos, yPos) && !cs.pcv->isEncoder)
+#endif
   {
     return getChromaScale();
   }
@@ -134,7 +138,11 @@ int  Reshape::calculateChromaAdjVpduNei(TransformUnit &tu, const CompArea &areaY
 #endif
   {
 #if !LMCS_CHROMA_CALC_CU
+#if JVET_Z0118_GDR
+    setVPDULoc(xPos, yPos, (PictureType) tu.cs->picture->getCleanDirty());
+#else
     setVPDULoc(xPos, yPos);
+#endif
 #endif
     Position topLeft(xPos, yPos);
     CodingUnit *topLeftLuma;

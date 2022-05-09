@@ -1248,7 +1248,12 @@ void AdaptiveLoopFilter::calcClassNew( AlfClassifier **classifier, const Area &b
 {
   const Pel* src = srcLuma.buf;
   int stride = srcLuma.stride;
+#if JVET_Z0118_GDR // calcClassnew : set yOffset based on curBlk
+  int yOffset = curBlk.pos().y * stride;
+#else
   int yOffset = blkDst.pos().y * stride;
+#endif
+
   const Pel *src0 = &src[yOffset];
   const Pel *src1 = &src[yOffset + stride];
   int stride2 = 2 * stride;
@@ -1256,15 +1261,27 @@ void AdaptiveLoopFilter::calcClassNew( AlfClassifier **classifier, const Area &b
   {
     for (int j = 0; j < blkDst.width; j += subBlkSize)
     {
+#if JVET_Z0118_GDR // calcClassnew : set xOffset based on curBlk
+      int xOffset = curBlk.pos().x + j;
+#else
       int xOffset = blkDst.pos().x + j;
+#endif
+
       const Pel *pY0 = src0 + xOffset;
       const Pel *pY1 = src1 + xOffset;
       int sum = pY0[0] + pY0[1] + pY1[0] + pY1[1];
       int classIdx = (sum * ALF_NUM_CLASSES_CLASSIFIER[classifierIdx]) >> (bitDepth + 2);
+#if JVET_Z0118_GDR // calcClassnew : set clasifier based on dstBlk
+      for (int ii = blkDst.y + i; ii < blkDst.y + i + subBlkSize; ii++)
+      {
+        for (int jj = blkDst.x + j; jj < blkDst.x + j + subBlkSize; jj++)
+        {
+#else
       for (int ii = curBlk.y + i; ii < curBlk.y + i + subBlkSize; ii++)
       {
         for (int jj = curBlk.x + j; jj < curBlk.x + j + subBlkSize; jj++)
         {
+#endif
           classifier[ii][jj] = classIdx << 2;
         }
       }
@@ -1474,11 +1491,17 @@ void AdaptiveLoopFilter::calcClass(AlfClassifier **classifier, const Area &blkDs
 
       static const int transposeTable[8] = { 0, 1, 0, 2, 2, 3, 1, 3 };
       int transposeIdx = transposeTable[mainDirection * 2 + (secondaryDirection >> 1)];
-
+#if JVET_Z0118_GDR // calcClass : set clasifier based on dstBlk
+      for (int ii = blkDst.y + i; ii < blkDst.y + i + subBlkSize; ii++)
+      {
+        for (int jj = blkDst.x + j; jj < blkDst.x + j + subBlkSize; jj++)
+        {
+#else
       for( int ii = curBlk.y + i; ii < curBlk.y + i + subBlkSize; ii++ )
       {
         for( int jj = curBlk.x + j; jj < curBlk.x + j + subBlkSize; jj++ )
         {
+#endif
           classifier[ii][jj] = (actDirInd << 2) + transposeIdx;
         }
       }
@@ -1486,14 +1509,24 @@ void AdaptiveLoopFilter::calcClass(AlfClassifier **classifier, const Area &blkDs
   }
 }
 
+#if JVET_Z0118_GDR // fixedFiltering : add a parameter blk
+void AdaptiveLoopFilter::fixedFiltering(AlfClassifier **classifier, const CPelBuf &srcLuma, const Area& curBlk, const Area& blk, Pel ***fixedFilterResults, int picWidth, const int fixedFiltInd, const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize, const ClpRng &clpRng, const Pel clippingValues[4])
+#else
 void AdaptiveLoopFilter::fixedFiltering( AlfClassifier **classifier, const CPelBuf &srcLuma, const Area& curBlk, Pel ***fixedFilterResults, int picWidth, const int fixedFiltInd, const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize, const ClpRng &clpRng, const Pel clippingValues[4])
+#endif
 {
   const int shift = m_NUM_BITS_FIXED_FILTER - 1;
   const int offset = 1 << (shift - 1);
   const int srcStride = srcLuma.stride;
+
   int posY = curBlk.y;
   int posX = curBlk.x;
+
+#if JVET_Z0118_GDR 
+  const Pel *pImgYPad0 = srcLuma.buf + blk.y * srcStride + blk.x;
+#else
   const Pel *pImgYPad0 = srcLuma.buf + posY * srcStride + posX;
+#endif
   const Pel *pImg0, *pImg1, *pImg2, *pImg3, *pImg4, *pImg5, *pImg6, *pImg7, *pImg8, *pImg9, *pImg10, *pImg11, *pImg12;
   const int clsSizeY = 2;
   const int clsSizeX = 2;
@@ -1751,7 +1784,11 @@ void AdaptiveLoopFilter::deriveClassificationAndFixFilterResultsBlk( AlfClassifi
               m_deriveClassificationLaplacianBig(blkDst, laplacian);
             }
 #if JVET_X0071_ALF_BAND_CLASSIFIER
+#if JVET_Z0118_GDR
+            m_calcClass0(classifier[0], blkDst, blk, usedWindowIdx[dirWindSize], 1, NUM_DIR_FIX, NUM_ACT_FIX, bits, 2, mappingDir, laplacian);
+#else
             m_calcClass0(classifier[0], blkDst, blkDst, usedWindowIdx[dirWindSize], 1, NUM_DIR_FIX, NUM_ACT_FIX, bits, 2, mappingDir, laplacian);
+#endif
 #else
             m_calcClass0(classifier, blkDst, blkDst, usedWindowIdx[dirWindSize], 1, NUM_DIR_FIX, NUM_ACT_FIX, bits, 2, mappingDir, laplacian);
 #endif
@@ -1760,7 +1797,11 @@ void AdaptiveLoopFilter::deriveClassificationAndFixFilterResultsBlk( AlfClassifi
           }
           //fixed filtering
 #if JVET_X0071_ALF_BAND_CLASSIFIER
+#if JVET_Z0118_GDR
+          m_filter13x13Blk(classifier[0], srcLuma, blkDst, blk, fixedFilterResults, m_picWidth, fixedFiltInd, m_classIdnFixedFilter[fixedFiltSetInd][dirWindSize], fixedFiltSetInd, dirWindSize, clpRng, clippingValues);
+#else
           m_filter13x13Blk(classifier[0], srcLuma, blkDst, fixedFilterResults, m_picWidth, fixedFiltInd, m_classIdnFixedFilter[fixedFiltSetInd][dirWindSize], fixedFiltSetInd, dirWindSize, clpRng, clippingValues);
+#endif
 #else
           m_filter13x13Blk(classifier, srcLuma, blkDst, fixedFilterResults, m_picWidth, fixedFiltInd, m_classIdnFixedFilter[fixedFiltSetInd][dirWindSize], fixedFiltSetInd, dirWindSize, clpRng, clippingValues);
 #endif
@@ -1774,13 +1815,21 @@ void AdaptiveLoopFilter::deriveClassificationAndFixFilterResultsBlk( AlfClassifi
 #if JVET_X0071_ALF_BAND_CLASSIFIER
     if( multipleClassifierIdx == ALF_NUM_CLASSIFIER || multipleClassifierIdx == 0 || multipleClassifierIdx == 1 )
     {
+#if JVET_Z0118_GDR
+      m_calcClass1(classifier[0], blkDst, blk, 5, 0, 5, 5, bits, 2, mappingDir, laplacian);
+#else
       m_calcClass1( classifier[0], blkDst, Area(blkDst.pos().x, blkDst.pos().y, blkDst.width, blkDst.height), 5, 0, 5, 5, bits, 2, mappingDir, laplacian );
+#endif
     }
     for( int curClassifierIdx = 1; curClassifierIdx < ALF_NUM_CLASSIFIER; curClassifierIdx++ )
     {
       if( multipleClassifierIdx == ALF_NUM_CLASSIFIER || curClassifierIdx == multipleClassifierIdx )
       {
+#if JVET_Z0118_GDR
+        m_calcClass2(classifier[curClassifierIdx], blkDst, blk, srcLuma, 2, classifier[0], curClassifierIdx, bits);
+#else
         m_calcClass2( classifier[curClassifierIdx], blkDst, Area(blkDst.pos().x, blkDst.pos().y, blkDst.width, blkDst.height), srcLuma, 2, classifier[0], curClassifierIdx, bits);
+#endif
       }
     }
 #else

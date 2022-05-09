@@ -2720,6 +2720,13 @@ private:
 #if !JVET_S0193_NO_OUTPUT_PRIOR_PIC
   bool                        m_noOutputOfPriorPicsFlag;                                //!< no output of prior pictures flag
 #endif
+#if JVET_Z0118_GDR
+  bool                        m_inGdrInterval;
+  bool                        m_gdrRecoveryPocPic;
+  int                         m_lastGdrIntervalPoc;
+  int                         m_gdrBegX;
+  int                         m_gdrEndX;
+#endif  
   uint32_t                    m_recoveryPocCnt;                                         //!< recovery POC count
   bool                        m_noOutputBeforeRecoveryFlag;                             //!< NoOutputBeforeRecoveryFlag
   bool                        m_handleCraAsCvsStartFlag;                                //!< HandleCraAsCvsStartFlag
@@ -2821,6 +2828,16 @@ public:
 #if !JVET_S0193_NO_OUTPUT_PRIOR_PIC
   void                        setNoOutputOfPriorPicsFlag( bool b )                      { m_noOutputOfPriorPicsFlag = b;                                                               }
   bool                        getNoOutputOfPriorPicsFlag() const                        { return m_noOutputOfPriorPicsFlag;                                                            }
+#endif
+#if JVET_Z0118_GDR
+  void                        setInGdrInterval(bool b)                                  { m_inGdrInterval = b;                                                                         }
+  bool                        getInGdrInterval() const                                  { return m_inGdrInterval;                                                                      }  
+  void                        setGdrBegX(int x)                                         { m_gdrBegX = x; }
+  int                         getGdrBegX()                                              { return m_gdrBegX; }
+  void                        setGdrEndX(int x)                                         { m_gdrEndX = x; }
+  int                         getGdrEndX()                                              { return m_gdrEndX; }
+  void                        setIsGdrRecoveryPocPic(bool b)                            { m_gdrRecoveryPocPic = b; }
+  bool                        getIsGdrRecoveryPocPic() const                            { return m_gdrRecoveryPocPic; }
 #endif
   void                        setRecoveryPocCnt( uint32_t u )                           { m_recoveryPocCnt = u;                                                                        }
   uint32_t                    getRecoveryPocCnt() const                                 { return m_recoveryPocCnt;                                                                     }
@@ -3268,6 +3285,9 @@ public:
   Picture*                    getPic()                                               { return m_pcPic;                                               }
   const Picture*              getPic() const                                         { return m_pcPic;                                               }
         Picture*              getRefPic( RefPicList e, int iRefIdx) const            { return m_apcRefPicList[e][iRefIdx];                           }
+#if JVET_Z0118_GDR
+        Picture*              getReferencePicture(RefPicList e, int iRefIdx)         { return m_apcRefPicList[e][iRefIdx];                           }
+#endif
   int                         getRefPOC( RefPicList e, int iRefIdx) const            { return m_aiRefPOCList[e][iRefIdx];                            }
   int                         getDepth() const                                       { return m_iDepth;                                              }
   bool                        getColFromL0Flag() const                               { return m_colFromL0Flag;                                       }
@@ -3386,6 +3406,9 @@ public:
   bool                        isIntra() const                                        { return m_eSliceType == I_SLICE;                               }
   bool                        isInterB() const                                       { return m_eSliceType == B_SLICE;                               }
   bool                        isInterP() const                                       { return m_eSliceType == P_SLICE;                               }
+#if JVET_Z0118_GDR
+  bool                        isInterGDR() const                                     { return (m_eSliceType == B_SLICE && m_eNalUnitType == NAL_UNIT_CODED_SLICE_GDR); }  
+#endif
 
   bool                        getEnableDRAPSEI () const                              { return m_enableDRAPSEI;                                       }
   void                        setEnableDRAPSEI ( bool b )                            { m_enableDRAPSEI = b;                                          }
