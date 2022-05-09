@@ -314,6 +314,9 @@ void EncGOP::init ( EncLib* pcEncLib )
     m_pcTransferFct       = hdrtoolslib::TransferFunction::create(hdrtoolslib::TF_PQ, true, (float) maxSampleValue, 0, 0.0, 1.0, enableTFunctionLUT);
   }
 #endif
+#if JVET_Z0118_GDR
+  m_lastGdrIntervalPoc = -1;
+#endif
 }
 
 int EncGOP::xWriteVPS (AccessUnit &accessUnit, const VPS *vps)
@@ -1892,6 +1895,12 @@ void EncGOP::xPicInitLMCS(Picture *pic, PicHeader *picHeader, Slice *slice)
       else if (m_pcCfg->getReshapeSignalType() == RESHAPE_SIGNAL_SDR || m_pcCfg->getReshapeSignalType() == RESHAPE_SIGNAL_HLG)
       {
         int modIP = pic->getPOC() - pic->getPOC() / m_pcCfg->getReshapeCW().rspFpsToIp * m_pcCfg->getReshapeCW().rspFpsToIp;
+#if JVET_Z0118_GDR
+        if (slice->getSPS()->getGDREnabledFlag() && slice->isInterGDR())
+        {
+          modIP = 0;
+        }
+#endif
         if (m_pcReshaper->getReshapeFlag() && m_pcCfg->getReshapeCW().updateCtrl == 2 && modIP == 0)
         {
           m_pcReshaper->getSliceReshaperInfo().setSliceReshapeModelPresentFlag(true);
@@ -2166,6 +2175,18 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       pcSlice->setSliceType(I_SLICE);
     }
     pcSlice->setTLayer(m_pcCfg->getGOPEntry(iGOPid).m_temporalId);
+#if JVET_Z0118_GDR
+    if (m_pcCfg->getGdrEnabled() && pocCurr >= m_pcCfg->getGdrPocStart() && ((pocCurr - m_pcCfg->getGdrPocStart()) % m_pcCfg->getGdrPeriod() == 0))
+    {
+      pcSlice->setSliceType(B_SLICE);
+    }
+
+    // note : first picture is GDR(I_SLICE)
+    if (m_pcCfg->getGdrEnabled() && pocCurr == 0)
+    {
+      pcSlice->setSliceType(I_SLICE);
+    }
+#endif
 
     // Set the nal unit type
     pcSlice->setNalUnitType(getNalUnitType(pocCurr, m_iLastIDR, isField));
@@ -2746,13 +2767,27 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     }
 
 #if JVET_Y0128_NON_CTC
+#if JVET_Z0118_GDR
+    PicHeader *picHeader = new PicHeader;
+    *picHeader = *pcPic->cs->picHeader;
+    bool  bDisableTMVP = pcSlice->scaleRefPicList( scaledRefPic, picHeader, m_pcEncLib->getApss(), picHeader->getLmcsAPS(), picHeader->getScalingListAPS(), false );
+    picHeader = pcPic->cs->picHeader;
+#else
     bool  bDisableTMVP = pcSlice->scaleRefPicList( scaledRefPic, pcPic->cs->picHeader, m_pcEncLib->getApss(), picHeader->getLmcsAPS(), picHeader->getScalingListAPS(), false );
+#endif
     if ( picHeader->getEnableTMVPFlag() && bDisableTMVP )
     {
       picHeader->setEnableTMVPFlag( 0 );
     }
 #else
+#if JVET_Z0118_GDR
+    PicHeader *picHeader = new PicHeader;
+    *picHeader = *pcPic->cs->picHeader;
+    pcSlice->scaleRefPicList( scaledRefPic, picHeader, m_pcEncLib->getApss(), picHeader->getLmcsAPS(), picHeader->getScalingListAPS(), false );
+    picHeader = pcPic->cs->picHeader;
+#else
     pcSlice->scaleRefPicList( scaledRefPic, pcPic->cs->picHeader, m_pcEncLib->getApss(), picHeader->getLmcsAPS(), picHeader->getScalingListAPS(), false );
+#endif
 #endif
 
     // set adaptive search range for non-intra-slices
@@ -3143,6 +3178,10 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
           }
         }
       }
+#endif
+
+#if JVET_Z0118_GDR
+      pcPic->setCleanDirty(false); 
 #endif
 
       CodingStructure& cs = *pcPic->cs;
@@ -3556,7 +3595,11 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 #endif
 
       // write various parameter sets
+#if JVET_Z0118_GDR // Note : insert SPS/PPS at every GDR picture
+      bool writePS = m_bSeqFirst || (m_pcCfg->getReWriteParamSets() && (pcSlice->isIRAP())) || pcSlice->isInterGDR();
+#else
       bool writePS = m_bSeqFirst || (m_pcCfg->getReWriteParamSets() && (pcSlice->isIRAP()));
+#endif
       if (writePS)
       {
         m_pcEncLib->setParamSetChanged(pcSlice->getSPS()->getSPSId(), pcSlice->getPPS()->getPPSId());
@@ -3592,6 +3635,12 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         ParameterSetMap<APS> *apsMap = m_pcEncLib->getApsMap();
         APS* aps = apsMap->getPS((apsId << NUM_APS_TYPE_LEN) + LMCS_APS);
         bool writeAPS = aps && apsMap->getChangedFlag((apsId << NUM_APS_TYPE_LEN) + LMCS_APS);
+#if JVET_Z0118_GDR // note : insert APS at every GDR picture
+        if (aps && apsId >= 0)
+        {
+          writeAPS |= pcSlice->isInterGDR();
+        }
+#endif
         if (writeAPS)
         {
 #if JVET_R0433
@@ -3599,7 +3648,14 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 #endif
           actualTotalBits += xWriteAPS( accessUnit, aps, m_pcEncLib->getLayerId(), true );
           apsMap->clearChangedFlag((apsId << NUM_APS_TYPE_LEN) + LMCS_APS);
+#if JVET_Z0118_GDR
+          if (!pcSlice->isInterGDR())
+          {
+            CHECK(aps != picHeader->getLmcsAPS(), "Wrong LMCS APS pointer in compressGOP");
+          }
+#else
           CHECK(aps != picHeader->getLmcsAPS(), "Wrong LMCS APS pointer in compressGOP");
+#endif
         }
       }
 
@@ -3610,6 +3666,12 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         ParameterSetMap<APS> *apsMap = m_pcEncLib->getApsMap();
         APS* aps = apsMap->getPS( ( apsId << NUM_APS_TYPE_LEN ) + SCALING_LIST_APS );
         bool writeAPS = aps && apsMap->getChangedFlag( ( apsId << NUM_APS_TYPE_LEN ) + SCALING_LIST_APS );
+#if JVET_Z0118_GDR // note : insert APS at every GDR picture
+        if (aps && apsId >= 0)
+        {
+          writeAPS |= pcSlice->isInterGDR();
+        }
+#endif
         if( writeAPS )
         {
 #if JVET_R0433
@@ -3617,7 +3679,14 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 #endif
           actualTotalBits += xWriteAPS( accessUnit, aps, m_pcEncLib->getLayerId(), true );
           apsMap->clearChangedFlag( ( apsId << NUM_APS_TYPE_LEN ) + SCALING_LIST_APS );
+#if JVET_Z0118_GDR
+          if (!pcSlice->isInterGDR())
+          {
+            CHECK(aps != picHeader->getScalingListAPS(), "Wrong SCALING LIST APS pointer in compressGOP");
+          }
+#else
           CHECK( aps != picHeader->getScalingListAPS(), "Wrong SCALING LIST APS pointer in compressGOP" );
+#endif
         }
       }
 
@@ -3646,7 +3715,12 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
             writeAPS = true;
             aps = apsMap->getPS((pcSlice->getTileGroupCcAlfCrApsId() << NUM_APS_TYPE_LEN) + ALF_APS);
           }
-
+#if JVET_Z0118_GDR // note : insert APS at every GDR picture
+          if (aps && apsId >= 0)
+          {
+            writeAPS |= (pcSlice->isInterGDR());
+          }
+#endif
           if (writeAPS )
           {
 #if JVET_R0433
@@ -3654,7 +3728,14 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 #endif
             actualTotalBits += xWriteAPS( accessUnit, aps, m_pcEncLib->getLayerId(), true );
             apsMap->clearChangedFlag((apsId << NUM_APS_TYPE_LEN) + ALF_APS);
+#if JVET_Z0118_GDR
+            if (!pcSlice->isInterGDR())
+            {
+              CHECK(aps != pcSlice->getAlfAPSs()[apsId] && apsId != pcSlice->getTileGroupCcAlfCbApsId() && apsId != pcSlice->getTileGroupCcAlfCrApsId(), "Wrong APS pointer in compressGOP");
+            }
+#else
             CHECK(aps != pcSlice->getAlfAPSs()[apsId] && apsId != pcSlice->getTileGroupCcAlfCbApsId() && apsId != pcSlice->getTileGroupCcAlfCrApsId(), "Wrong APS pointer in compressGOP");
+#endif
           }
         }
       }
@@ -3911,12 +3992,25 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 #endif
       }
 
+#if JVET_Z0118_GDR
+      pcPic->setCleanDirty(false);
+      pcPic->copyCleanCurPicture();      
+#endif
+
       //-- For time output for each slice
       auto elapsed = std::chrono::steady_clock::now() - beforeTime;
       auto encTime = std::chrono::duration_cast<std::chrono::seconds>( elapsed ).count();
 
+
       std::string digestStr;
+
+#if JVET_Z0118_GDR
+      // note : generate hash sei only for non-gdr pictures
+      bool genHash = !(m_pcCfg->getGdrNoHash() && pcSlice->getPicHeader()->getInGdrInterval());
+      if (m_pcCfg->getDecodedPictureHashSEIType() != HASHTYPE_NONE && genHash)
+#else
       if (m_pcCfg->getDecodedPictureHashSEIType()!=HASHTYPE_NONE)
+#endif
       {
         SEIDecodedPictureHash *decodedPictureHashSei = new SEIDecodedPictureHash();
         PelUnitBuf recoBuf = pcPic->cs->getRecoBuf();
@@ -3958,7 +4052,14 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 
       xWriteTrailingSEIMessages(trailingSeiMessages, accessUnit, pcSlice->getTLayer());
 
+#if JVET_Z0118_GDR
+      if (!(m_pcCfg->getGdrNoHash() && pcSlice->getPicHeader()->getInGdrInterval()))
+      {
+          printHash(m_pcCfg->getDecodedPictureHashSEIType(), digestStr);
+      }
+#else
       printHash(m_pcCfg->getDecodedPictureHashSEIType(), digestStr);
+#endif
 
       if ( m_pcCfg->getUseRateCtrl() )
       {
@@ -5548,6 +5649,18 @@ void EncGOP::xCalculateInterlacedAddPSNR( Picture* pcPicOrgFirstField, Picture* 
  */
 NalUnitType EncGOP::getNalUnitType(int pocCurr, int lastIDR, bool isField)
 {
+#if JVET_Z0118_GDR
+  if (m_pcCfg->getGdrEnabled() && m_pcCfg->getDecodingRefreshType() == 3 && (pocCurr >= m_pcCfg->getGdrPocStart()))
+  {
+    int m = pocCurr - m_pcCfg->getGdrPocStart();
+    int n = m_pcCfg->getGdrPeriod();
+    if (m % n == 0)
+    {
+      return NAL_UNIT_CODED_SLICE_GDR;
+    }
+  }
+#endif
+
   if (pocCurr == 0)
   {
     return NAL_UNIT_CODED_SLICE_IDR_N_LP;
@@ -5589,7 +5702,18 @@ NalUnitType EncGOP::getNalUnitType(int pocCurr, int lastIDR, bool isField)
       return NAL_UNIT_CODED_SLICE_RADL;
     }
   }
+#if JVET_Z0118_GDR
+  if (m_pcCfg->getGdrEnabled() && pocCurr >= m_pcCfg->getGdrPocStart() && ((pocCurr - m_pcCfg->getGdrPocStart()) % m_pcCfg->getGdrPeriod() == 0))
+  {
+    return NAL_UNIT_CODED_SLICE_GDR;
+  }
+  else
+  {
+    return NAL_UNIT_CODED_SLICE_TRAIL;
+  }
+#else
   return NAL_UNIT_CODED_SLICE_TRAIL;
+#endif
 }
 
 void EncGOP::xUpdateRasInit(Slice* slice)

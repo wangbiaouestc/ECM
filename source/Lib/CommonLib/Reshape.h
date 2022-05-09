@@ -73,6 +73,9 @@ protected:
 #if !LMCS_CHROMA_CALC_CU
   int                     m_vpduX;
   int                     m_vpduY;
+#if JVET_Z0118_GDR
+  PictureType             m_pt;
+#endif
 #endif
 public:
   Reshape();
@@ -104,8 +107,13 @@ public:
   void setReshapeFlag(bool b) { m_reshape = b; }
   int  calculateChromaAdjVpduNei(TransformUnit &tu, const CompArea &areaY);
 #if !LMCS_CHROMA_CALC_CU
+#if JVET_Z0118_GDR
+  void setVPDULoc(int x, int y, PictureType pt) { m_vpduX = x, m_vpduY = y; m_pt = pt; }
+  bool isVPDUprocessed(int x, int y, PictureType pt) { return ((x == m_vpduX) && (y == m_vpduY) && (pt == m_pt)); }
+#else
   void setVPDULoc(int x, int y) { m_vpduX = x, m_vpduY = y; }
   bool isVPDUprocessed(int x, int y) { return ((x == m_vpduX) && (y == m_vpduY)); }
+#endif
 #endif
   void setChromaScale (int chromaScale) { m_chromaScale = chromaScale; }
   int  getChromaScale() { return m_chromaScale; }

@@ -76,6 +76,9 @@ private:
   GeneralHrdParams        m_prevGeneralHrdParams;
 
   int                     m_prevGDRInSameLayerPOC[MAX_VPS_LAYERS]; ///< POC number of the latest GDR picture
+#if JVET_Z0118_GDR
+  int                     m_prevGDRInSameLayerRecoveryPOC[MAX_VPS_LAYERS]; ///< Recovery POC number of the latest GDR picture
+#endif
   NalUnitType             m_associatedIRAPType[MAX_VPS_LAYERS]; ///< NAL unit type of the previous IRAP picture
   int                     m_pocCRA[MAX_VPS_LAYERS];            ///< POC number of the previous CRA picture
   int                     m_associatedIRAPDecodingOrderNumber[MAX_VPS_LAYERS]; ///< Decoding order number of the previous IRAP picture
@@ -127,7 +130,11 @@ private:
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
   CacheModel              m_cacheModel;
 #endif
+#if JVET_Z0118_GDR
+  bool isRandomAccessSkipPicture(int& iSkipFrame, int& iPOCLastDisplay, bool mixedNaluInPicFlag, uint32_t layerId);
+#else
   bool isRandomAccessSkipPicture(int& iSkipFrame,  int& iPOCLastDisplay);
+#endif
   Picture*                m_pcPic;
   uint32_t                m_uiSliceSegmentIdx;
   uint32_t                m_prevLayerID;
@@ -141,6 +148,9 @@ private:
   bool                    m_accessUnitEos[MAX_VPS_LAYERS];
   bool                    m_prevSliceSkipped;
   int                     m_skippedPOC;
+#if JVET_Z0118_GDR
+  uint32_t                m_skippedLayerID;
+#endif
   int                     m_lastPOCNoOutputPriorPics;
   bool                    m_isNoOutputPriorPics;
   bool                    m_lastNoOutputBeforeRecoveryFlag[MAX_VPS_LAYERS];    //value of variable NoOutputBeforeRecoveryFlag of the assocated CRA/GDR pic
@@ -204,6 +214,11 @@ public:
 
   DCI*                    m_dci;
   ParameterSetMap<APS>*   m_apsMapEnc;
+#if GDR_LEAK_TEST
+public:
+  int                     m_gdrPocRandomAccess;
+#endif // GDR_LEAK_TEST
+
 public:
   DecLib();
   virtual ~DecLib();
@@ -235,6 +250,9 @@ public:
   void  updateAssociatedIRAP();
   void  updatePrevGDRInSameLayer();
   void  updatePrevIRAPAndGDRSubpic();
+#if JVET_Z0118_GDR
+  bool  getGDRRecoveryPocReached()          { return ( m_pcPic->getPOC() >= m_prevGDRInSameLayerRecoveryPOC[m_pcPic->layerId] ); }
+#endif
 
   bool  getNoOutputPriorPicsFlag () const   { return m_isNoOutputPriorPics; }
   void  setNoOutputPriorPicsFlag (bool val) { m_isNoOutputPriorPics = val; }

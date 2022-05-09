@@ -251,7 +251,11 @@ private: //methods
                             const Pel *dst, const int srcStrideY, const int srcStrideU, const int srcStrideV,
                             const int orgStride, const int dstStride, const int width, const int height,
                             bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail,
-                            bool isAboveLeftAvail, bool isAboveRightAvail);
+                            bool isAboveLeftAvail, bool isAboveRightAvail
+#if JVET_Z0118_GDR
+                          , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
+  );
 
   void getCcSaoBlkStatsEdgeNew(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth,
                                const int setIdx, CcSaoStatData *blkStats[N_C - 1], const int ctuRsAddr,
@@ -260,7 +264,11 @@ private: //methods
                                const Pel *org, const Pel *dst, const int srcStrideY, const int srcStrideU,
                                const int srcStrideV, const int orgStride, const int dstStride, const int width,
                                const int height, bool isLeftAvail, bool isRightAvail, bool isAboveAvail,
-                               bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail);
+                               bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail
+#if JVET_Z0118_GDR
+                             , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
+    );
 #endif
   void getCcSaoBlkStats(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth
                       , const int setIdx, CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], const int ctuRsAddr
@@ -268,7 +276,11 @@ private: //methods
                       , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
                       , const Pel* srcY, const Pel* srcU, const Pel* srcV, const Pel* org, const Pel* dst
                       , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int orgStride, const int dstStride, const int width, const int height
-                      , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail);
+                      , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail
+#if JVET_Z0118_GDR
+                      , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
+  );
   void getCcSaoFrameStats(const ComponentID compID, const int setIdx, const uint8_t* ccSaoControl
                         , CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], CcSaoStatData frameStats[MAX_CCSAO_SET_NUM]
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER

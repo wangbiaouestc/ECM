@@ -8711,6 +8711,9 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
     CodingStructure &saveCS = *m_pSaveCS[0];
     saveCS.pcv     = cs.pcv;
     saveCS.picture = cs.picture;
+#if JVET_Z0118_GDR
+    saveCS.m_pt = cs.m_pt;
+#endif
     saveCS.area.repositionTo(currArea);
     saveCS.clearTUs();
     TransformUnit & bestTU = saveCS.addTU(CS::getArea(cs, currArea, partitioner.chType), partitioner.chType);
@@ -8978,7 +8981,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 			    if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !CU::isIBC(*tu.cu))
 #endif
                 {
+#if JVET_Z0118_GDR
+                  cs.updateReconMotIPM(tu.blocks[COMPONENT_Y], cs.getPredBuf(tu.blocks[COMPONENT_Y]));
+#else
                   cs.picture->getRecoBuf(tu.blocks[COMPONENT_Y]).copyFrom(cs.getPredBuf(tu.blocks[COMPONENT_Y]));
+#endif
                   cs.getPredBuf(tu.blocks[compID]).rspSignal(m_pcReshape->getFwdLUT());
                 }
                 m_pcTrQuant->predCoeffSigns(tu, compID, reshapeChroma);
@@ -9171,6 +9178,14 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #if SIGN_PREDICTION
       if(cs.sps->getNumPredSigns() > 0)
       {
+#if JVET_Z0118_GDR
+#if JVET_Y0065_GPM_INTRA
+        bool lmcsEnable = cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma( compID ) && !tu.cu->firstPU->ciipFlag && !tu.cu->firstPU->gpmIntraFlag && !CU::isIBC( *tu.cu );
+#else
+        bool lmcsEnable = cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma( compID ) && !tu.cu->firstPU->ciipFlag && !CU::isIBC( *tu.cu );
+#endif
+        cs.reconstructPicture(tu.blocks[compID], m_pcReshape->getFwdLUT(), csFull, lmcsEnable);              
+#else // JVET_Z0118_GDR
         PelBuf picRecoBuff = tu.cs->picture->getRecoBuf( tu.blocks[compID] );
 
 #if JVET_Y0065_GPM_INTRA
@@ -9186,9 +9201,10 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         {
           picRecoBuff.reconstruct( cs.getPredBuf( tu.blocks[compID] ), csFull->getResiBuf( tu.blocks[compID] ), tu.cu->cs->slice->clpRng( compID ) );
         }
+      
+#endif // JVET_Z0118_GDR
       }
-#endif
-
+#endif // SIGN_PREDICTION
     } // component loop
 
     if (colorTransFlag)
@@ -9473,6 +9489,14 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         for( auto i = (int)COMPONENT_Cb; i <= (int)COMPONENT_Cr; ++i)
         {
           ComponentID comp = (ComponentID) i;
+#if JVET_Z0118_GDR
+#if JVET_Y0065_GPM_INTRA
+          bool lmcsEnable = cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma( comp ) && !tu.cu->firstPU->ciipFlag && !tu.cu->firstPU->gpmIntraFlag && !CU::isIBC( *tu.cu );
+#else         
+          bool lmcsEnable = cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma( comp ) && !tu.cu->firstPU->ciipFlag && !CU::isIBC( *tu.cu );
+#endif
+          cs.reconstructPicture(tu.blocks[comp], m_pcReshape->getFwdLUT(), csFull, lmcsEnable);          
+#else // JVET_Z0118_GDR
           PelBuf picRecoBuff = tu.cs->picture->getRecoBuf( tu.blocks[comp] );
 
 #if JVET_Y0065_GPM_INTRA
@@ -9488,6 +9512,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           {
             picRecoBuff.reconstruct( cs.getPredBuf( tu.blocks[comp] ), csFull->getResiBuf( tu.blocks[comp] ), tu.cu->cs->slice->clpRng( comp ) );
           }
+#endif // JVET_Z0118_GDR
         }
 
         if ( sps.getNumPredSigns() > 0)
@@ -9800,6 +9825,9 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
   CodingStructure &saveCS = *m_pSaveCS[1];
   saveCS.pcv = cs.pcv;
   saveCS.picture = cs.picture;
+#if JVET_Z0118_GDR
+  saveCS.m_pt = cs.m_pt;
+#endif
   saveCS.area.repositionTo(curUnitArea);
   saveCS.clearCUs();
   saveCS.clearPUs();

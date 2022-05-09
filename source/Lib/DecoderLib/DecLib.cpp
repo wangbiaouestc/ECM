@@ -475,11 +475,19 @@ DecLib::DecLib()
   , m_prevPicPOC(MAX_INT)
   , m_prevTid0POC(0)
   , m_bFirstSliceInPicture(true)
+#if !JVET_Z0118_GDR
   , m_firstSliceInSequence{ true }
+#endif
   , m_firstSliceInBitstream(true)
   , m_isFirstAuInCvs( true )
   , m_prevSliceSkipped(false)
+#if !JVET_Z0118_GDR
   , m_skippedPOC(0)
+#endif
+#if JVET_Z0118_GDR
+  , m_skippedPOC(MAX_INT)
+  , m_skippedLayerID(MAX_INT)
+#endif
   , m_lastPOCNoOutputPriorPics(-1)
   , m_isNoOutputPriorPics(false)
   , m_lastNoOutputBeforeRecoveryFlag{ false }
@@ -510,6 +518,12 @@ DecLib::DecLib()
   memset(m_prevEOS, false, sizeof(m_prevEOS));
 #endif
   memset(m_accessUnitEos, false, sizeof(m_accessUnitEos));
+#if JVET_Z0118_GDR
+  std::fill_n(m_prevGDRInSameLayerPOC, MAX_VPS_LAYERS, -MAX_INT);
+  std::fill_n(m_prevGDRInSameLayerRecoveryPOC, MAX_VPS_LAYERS, -MAX_INT);
+  std::fill_n(m_firstSliceInSequence, MAX_VPS_LAYERS, true);
+  std::fill_n(m_pocCRA, MAX_VPS_LAYERS, -MAX_INT);
+#endif
   for (int i = 0; i < MAX_VPS_LAYERS; i++)
   {
     m_associatedIRAPType[i] = NAL_UNIT_INVALID;
@@ -648,6 +662,13 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
       pcPic->destroy();
       pcPic->create( sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId );
     }
+#if JVET_Z0118_GDR // picHeader should be deleted in case pcPic slot gets reused
+    if (pcPic && pcPic->cs && pcPic->cs->picHeader)
+    {          
+      delete pcPic->cs->picHeader;
+      pcPic->cs->picHeader = nullptr;    
+    }
+#endif
   }
 
   pcPic->setBorderExtension( false );
@@ -664,6 +685,10 @@ void DecLib::executeLoopFilters()
   {
     return; // nothing to deblock
   }
+
+#if JVET_Z0118_GDR
+  m_pcPic->setCleanDirty(false);
+#endif
 
   m_pcPic->cs->slice->startProcessingTimer();
 
@@ -801,6 +826,11 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
   s.pixels = s.count * m_pcPic->Y().width * m_pcPic->Y().height;
 #endif
 
+#if JVET_Z0118_GDR
+ m_pcPic->setCleanDirty(false);
+ m_pcPic->copyCleanCurPicture(); 
+#endif
+
   Slice*  pcSlice = m_pcPic->cs->slice;
   m_prevPicPOC = pcSlice->getPOC();
 
@@ -914,7 +944,9 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
   m_pcPic->destroyTempBuffers();
   m_pcPic->cs->destroyCoeffs();
   m_pcPic->cs->releaseIntermediateData();
+#if !JVET_Z0118_GDR
   m_pcPic->cs->picHeader->initPicHeader();
+#endif
   m_puCounter++;
 }
 
@@ -1001,25 +1033,65 @@ void  DecLib::xCreateUnavailablePicture( const PPS *pps, const int iUnavailableP
 void DecLib::xCreateUnavailablePicture(int iUnavailablePoc, bool longTermFlag, const int layerId, const bool interLayerRefPicFlag)
 #endif
 {
+#if JVET_Z0118_GDR
+  msg(INFO, "Note: Inserting unavailable POC : %d\n", iUnavailablePoc);
+#else
   msg(INFO, "\ninserting unavailable poc : %d\n", iUnavailablePoc);
+#endif
   Picture* cFillPic = xGetNewPicBuffer( *( m_parameterSetManager.getFirstSPS() ), *( m_parameterSetManager.getFirstPPS() ), 0, layerId );
 
+#if JVET_Z0118_GDR
+  cFillPic->cs = new CodingStructure( g_globalUnitCache.cuCache, g_globalUnitCache.puCache, g_globalUnitCache.tuCache );
+  cFillPic->cs->sps = m_parameterSetManager.getFirstSPS();
+  cFillPic->cs->pps = m_parameterSetManager.getFirstPPS();
+  cFillPic->cs->vps = m_parameterSetManager.getVPS(0);
+  cFillPic->cs->create(cFillPic->cs->sps->getChromaFormatIdc(), Area(0, 0, cFillPic->cs->pps->getPicWidthInLumaSamples(), cFillPic->cs->pps->getPicHeightInLumaSamples()), true, (bool)(cFillPic->cs->sps->getPLTMode()));
+  cFillPic->allocateNewSlice();
+#else
   CHECK(!cFillPic->slices.size(), "No slices in picture");
+#endif
 
   cFillPic->slices[0]->initSlice();
 
+#if JVET_Z0118_GDR
+  cFillPic->setDecodingOrderNumber(0);
+  cFillPic->subLayerNonReferencePictureDueToSTSA = false;
+  cFillPic->unscaledPic = cFillPic;
+#endif
+
   uint32_t yFill = 1 << (m_parameterSetManager.getFirstSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - 1);
-  uint32_t cFill = 1 << (m_parameterSetManager.getFirstSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - 1);
+  uint32_t cFill = 1 << (m_parameterSetManager.getFirstSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - 1);  
+
+#if JVET_Z0118_GDR && JVET_Z0118_GDR
+  cFillPic->getBuf(COMPONENT_Y, PIC_RECONSTRUCTION_0).fill(yFill);
+  cFillPic->getBuf(COMPONENT_Cb, PIC_RECONSTRUCTION_0).fill(cFill);
+  cFillPic->getBuf(COMPONENT_Cr, PIC_RECONSTRUCTION_0).fill(cFill);
+
+  cFillPic->getBuf(COMPONENT_Y, PIC_RECONSTRUCTION_1).fill(yFill);
+  cFillPic->getBuf(COMPONENT_Cb, PIC_RECONSTRUCTION_1).fill(cFill);
+  cFillPic->getBuf(COMPONENT_Cr, PIC_RECONSTRUCTION_1).fill(cFill);
+#else
   cFillPic->getRecoBuf().Y().fill(yFill);
   cFillPic->getRecoBuf().Cb().fill(cFill);
   cFillPic->getRecoBuf().Cr().fill(cFill);
+#endif
 
   //  for(int ctuRsAddr=0; ctuRsAddr<cFillPic->getNumberOfCtusInFrame(); ctuRsAddr++)  { cFillPic->getCtu(ctuRsAddr)->initCtu(cFillPic, ctuRsAddr); }
   cFillPic->referenced = true;
   cFillPic->interLayerRefPicFlag = interLayerRefPicFlag;
   cFillPic->longTerm = longTermFlag;
   cFillPic->slices[0]->setPOC(iUnavailablePoc);
+
+#if JVET_Z0118_GDR
+  cFillPic->poc = iUnavailablePoc;
+  if( (cFillPic->slices[0]->getTLayer() == 0) && (cFillPic->slices[0]->getNalUnitType() != NAL_UNIT_CODED_SLICE_RASL) && (cFillPic->slices[0]->getNalUnitType() != NAL_UNIT_CODED_SLICE_RADL) )
+  {
+    m_prevTid0POC = cFillPic->slices[0]->getPOC();
+  }
+#else
   xUpdatePreviousTid0POC(cFillPic->slices[0]);
+#endif
+
   cFillPic->reconstructed = true;
   cFillPic->neededForOutput = false;
 #if JVET_S0124_UNAVAILABLE_REFERENCE
@@ -1067,6 +1139,13 @@ void DecLib::checkLayerIdIncludedInCvss()
     for (auto pic = m_accessUnitPicInfo.begin(); pic != m_accessUnitPicInfo.end(); pic++)
     {
       bool layerIdFind;
+#if JVET_Z0118_GDR
+      if ( m_firstAccessUnitPicInfo.size() == 0 )
+      {
+        msg( NOTICE, "Note: checkIncludedInFirstAu(), m_firstAccessUnitPicInfo.size() is 0.\n");
+        continue;
+      }
+#endif
       for (auto picFirst = m_firstAccessUnitPicInfo.begin(); picFirst != m_firstAccessUnitPicInfo.end(); picFirst++)
       {
         layerIdFind = pic->m_nuhLayerId == picFirst->m_nuhLayerId ? true : false;
@@ -1656,7 +1735,20 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
     m_pcPic = xGetNewPicBuffer( *sps, *pps, m_apcSlicePilot->getTLayer(), layerId );
 
     m_apcSlicePilot->applyReferencePictureListBasedMarking( m_cListPic, m_apcSlicePilot->getRPL0(), m_apcSlicePilot->getRPL1(), layerId, *pps);
+#if JVET_Z0118_GDR
+    PicHeader *picHeader = new PicHeader;
+#if JVET_Z0118_GDR
+    picHeader->initPicHeader();
+#endif
+
+    *picHeader = m_picHeader;
+    m_apcSlicePilot->setPicHeader(picHeader);
+
+    m_pcPic->finalInit(vps, *sps, *pps, picHeader, apss, lmcsAPS, scalinglistAPS);
+#else
     m_pcPic->finalInit( vps, *sps, *pps, &m_picHeader, apss, lmcsAPS, scalinglistAPS );
+#endif
+
     m_pcPic->createTempBuffers( m_pcPic->cs->pps->pcv->maxCUWidth );
     m_pcPic->cs->createCoeffs((bool)m_pcPic->cs->sps->getPLTMode());
 
@@ -1667,6 +1759,9 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
 
     // we now have a real slice:
     Slice *pSlice = m_pcPic->slices[m_uiSliceSegmentIdx];
+#if JVET_Z0118_GDR
+    pSlice->setPicHeader(picHeader);
+#endif
 
     // Update the PPS and SPS pointers with the ones of the picture.
     pps=pSlice->getPPS();
@@ -2210,6 +2305,13 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
 #endif
   }
 
+#if JVET_Z0118_GDR && !JVET_Z0118_GDR_DISPLAY_PARTIAL_GDR
+  if (m_picHeader.getGdrPicFlag() && m_prevGDRInSameLayerPOC[nalu.m_nuhLayerId] == -MAX_INT) // Only care about recovery POC if it is the first coded GDR picture in the layer
+  {
+    m_prevGDRInSameLayerRecoveryPOC[nalu.m_nuhLayerId] = m_apcSlicePilot->getPOC() + m_picHeader.getRecoveryPocCnt();
+  }
+#endif
+
   PPS *pps = m_parameterSetManager.getPPS(m_picHeader.getPPSId());
   CHECK(pps == 0, "No PPS present");
   SPS *sps = m_parameterSetManager.getSPS(pps->getSPSId());
@@ -2322,6 +2424,12 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
         m_picHeader.setNoOutputBeforeRecoveryFlag( m_picHeader.getHandleGdrAsCvsStartFlag() );
       }
     }
+#if JVET_Z0118_GDR
+    else
+    {
+      m_picHeader.setNoOutputBeforeRecoveryFlag( false );
+    }
+#endif
 
     //the inference for NoOutputOfPriorPicsFlag
     if( !m_firstSliceInBitstream && m_picHeader.getNoOutputBeforeRecoveryFlag() )
@@ -2413,10 +2521,17 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
 
   // Skip pictures due to random access
 
+#if JVET_Z0118_GDR
+  if (isRandomAccessSkipPicture(iSkipFrame, iPOCLastDisplay, pps->getMixedNaluTypesInPicFlag(), nalu.m_nuhLayerId))
+#else
   if (isRandomAccessSkipPicture(iSkipFrame, iPOCLastDisplay))
+#endif
   {
     m_prevSliceSkipped = true;
     m_skippedPOC = m_apcSlicePilot->getPOC();
+#if JVET_Z0118_GDR
+    m_skippedLayerID = nalu.m_nuhLayerId;
+#endif
     return false;
   }
   // Skip TFD pictures associated with BLA/BLANT pictures
@@ -2462,7 +2577,11 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
         if (m_apcSlicePilot->getRPL0()->isInterLayerRefPic(refPicIndex) == 0)
         {
 #if JVET_S0124_UNAVAILABLE_REFERENCE
+#if JVET_Z0118_GDR
+          xCreateUnavailablePicture( pps, lostPoc, m_apcSlicePilot->getRPL0()->isRefPicLongterm( refPicIndex ), m_apcSlicePilot->getTLayer(), m_apcSlicePilot->getNalUnitLayerId(), m_apcSlicePilot->getRPL0()->isInterLayerRefPic( refPicIndex ) );
+#else
           xCreateUnavailablePicture( m_apcSlicePilot->getPPS(), lostPoc - 1, m_apcSlicePilot->getRPL0()->isRefPicLongterm( refPicIndex ), m_apcSlicePilot->getPic()->temporalId, m_apcSlicePilot->getPic()->layerId, m_apcSlicePilot->getRPL0()->isInterLayerRefPic( refPicIndex ) );
+#endif
 #else
           xCreateUnavailablePicture(lostPoc - 1, m_apcSlicePilot->getRPL0()->isRefPicLongterm(refPicIndex), m_apcSlicePilot->getPic()->layerId, m_apcSlicePilot->getRPL0()->isInterLayerRefPic(refPicIndex));
 #endif
@@ -2623,13 +2742,23 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
   }
 
 #if JVET_Y0128_NON_CTC
+#if JVET_Z0118_GDR
+  PicHeader *picHeader = nullptr; // picHeader is not necessary for scaledReference picture at decoder but should not share picHeader with non-scaled picture
+  bool  bDisableTMVP = pcSlice->scaleRefPicList( scaledRefPic, picHeader, m_parameterSetManager.getAPSs(), m_picHeader.getLmcsAPS(), m_picHeader.getScalingListAPS(), true );
+#else
   bool  bDisableTMVP = pcSlice->scaleRefPicList( scaledRefPic, m_pcPic->cs->picHeader, m_parameterSetManager.getAPSs(), m_picHeader.getLmcsAPS(), m_picHeader.getScalingListAPS(), true );
+#endif
   if ( m_picHeader.getEnableTMVPFlag() && bDisableTMVP )
   {
     m_picHeader.setEnableTMVPFlag(0);
   }
 #else
+#if JVET_Z0118_GDR
+  PicHeader *picHeader = nullptr; // picHeader is not necessary for scaledReference picture at decoder but should not share picHeader with non-scaled picture
+  pcSlice->scaleRefPicList(scaledRefPic, picHeader, m_parameterSetManager.getAPSs(), m_picHeader.getLmcsAPS(), m_picHeader.getScalingListAPS(), true);
+#else
   pcSlice->scaleRefPicList( scaledRefPic, m_pcPic->cs->picHeader, m_parameterSetManager.getAPSs(), m_picHeader.getLmcsAPS(), m_picHeader.getScalingListAPS(), true );
+#endif
 #endif
 
 #if !JVET_S0258_SUBPIC_CONSTRAINTS
@@ -2949,7 +3078,11 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
       }
     }
 #if !LMCS_CHROMA_CALC_CU
+#if JVET_Z0118_GDR
+    m_cReshaper.setVPDULoc(-1, -1, PIC_RECONSTRUCTION_0);
+#else
     m_cReshaper.setVPDULoc(-1, -1);
+#endif
 #endif
   }
   else
@@ -2957,6 +3090,37 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
     m_cReshaper.setCTUFlag(false);
     m_cReshaper.setRecReshaped(false);
   }
+
+#if GDR_LEAK_TEST
+  if (m_gdrPocRandomAccess == pcSlice->getPOC())
+  {
+    for (int e = 0; e < 2; e++)
+    {
+      for (int ridx = 0; ridx < pcSlice->getNumRefIdx((RefPicList)e); ridx++)
+      {
+        Picture *pic = pcSlice->getRefPic((RefPicList)e, ridx);
+        if (pic)
+        {
+          CodingStructure& cs = *pic->cs;
+          int bdLuma   = cs.slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
+          int bdChroma = cs.slice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA);
+          Pel resetLumaPel   = (1 << (bdLuma - 1));
+          Pel resetChromaPel = (1 << (bdChroma - 1));
+
+          cs.getRecoBuf().Y().fill(resetLumaPel); // for 8-bit sequence
+          cs.getRecoBuf().Cb().fill(resetChromaPel);
+          cs.getRecoBuf().Cr().fill(resetChromaPel);
+
+          cs.getMotionBuf().memset(0);    // clear MV storage
+        }
+      }
+    }
+  }
+#endif // GDR_LEAK_TEST
+  
+#if JVET_Z0118_GDR
+  m_pcPic->initCleanCurPicture();
+#endif
 
   //  Decode a picture
   m_cSliceDecoder.decompressSlice( pcSlice, &( nalu.getBitstream() ), ( m_pcPic->poc == getDebugPOC() ? getDebugCTU() : -1 ) );
@@ -3142,6 +3306,13 @@ bool DecLib::decode(InputNALUnit& nalu, int& iSkipFrame, int& iPOCLastDisplay, i
     case NAL_UNIT_SUFFIX_SEI:
       if (m_pcPic)
       {
+#if JVET_Z0118_GDR
+        if ( m_prevSliceSkipped )
+        {
+          msg( NOTICE, "Note: received suffix SEI but current picture is skipped.\n");
+          return false;
+        }
+#endif
         m_pictureSeiNalus.push_back(new InputNALUnit(nalu));
         m_accessUnitSeiTids.push_back(nalu.m_temporalId);
         const SPS *sps = m_parameterSetManager.getActiveSPS();
@@ -3173,6 +3344,9 @@ bool DecLib::decode(InputNALUnit& nalu, int& iSkipFrame, int& iPOCLastDisplay, i
       m_associatedIRAPType[nalu.m_nuhLayerId] = NAL_UNIT_INVALID;
       m_pocCRA[nalu.m_nuhLayerId] = MAX_INT;
       m_prevGDRInSameLayerPOC[nalu.m_nuhLayerId] = MAX_INT;
+#if JVET_Z0118_GDR      
+      m_prevGDRInSameLayerRecoveryPOC[nalu.m_nuhLayerId] = -MAX_INT;
+#endif
       std::fill_n(m_prevGDRSubpicPOC[nalu.m_nuhLayerId], MAX_NUM_SUB_PICS, MAX_INT);
       memset(m_prevIRAPSubpicPOC[nalu.m_nuhLayerId], 0, sizeof(int)*MAX_NUM_SUB_PICS);
       memset(m_prevIRAPSubpicDecOrderNo[nalu.m_nuhLayerId], 0, sizeof(int)*MAX_NUM_SUB_PICS);
@@ -3235,11 +3409,30 @@ bool DecLib::decode(InputNALUnit& nalu, int& iSkipFrame, int& iPOCLastDisplay, i
  *  equal to or greater than the random access point POC is attempted. For non IDR/CRA/BLA random
  *  access point there is no guarantee that the decoder will not crash.
  */
+#if JVET_Z0118_GDR
+bool DecLib::isRandomAccessSkipPicture( int& iSkipFrame, int& iPOCLastDisplay, bool mixedNaluInPicFlag, uint32_t layerId )
+#else
 bool DecLib::isRandomAccessSkipPicture( int& iSkipFrame, int& iPOCLastDisplay )
+#endif
 {
+#if JVET_Z0118_GDR
+  if( (iSkipFrame > 0) &&
+      (m_apcSlicePilot->getFirstCtuRsAddrInSlice() == 0 && layerId == 0) &&
+      (m_skippedPOC != MAX_INT) && (m_skippedLayerID != MAX_INT))
+  {
+    // When skipFrame count greater than 0, and current frame is not the first frame of sequence, decrement skipFrame count.
+    // If skipFrame count is still greater than 0, the current frame will be skipped.
+    iSkipFrame--;
+  }
+#endif
+
   if (iSkipFrame)
   {
     iSkipFrame--;   // decrement the counter
+#if JVET_Z0118_GDR
+    m_maxDecSubPicIdx = 0;
+    m_maxDecSliceAddrInSubPic = -1;
+#endif
     return true;
   }
   else if ( m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_IDR_W_RADL || m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_IDR_N_LP )
@@ -3248,7 +3441,11 @@ bool DecLib::isRandomAccessSkipPicture( int& iSkipFrame, int& iPOCLastDisplay )
   }
   else if (m_pocRandomAccess == MAX_INT) // start of random access point, m_pocRandomAccess has not been set yet.
   {
+#if JVET_Z0118_GDR
+    if (m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_CRA || m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_GDR )
+#else
     if (m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_CRA )
+#endif
     {
       // set the POC random access since we need to skip the reordered pictures in the case of CRA/CRANT/BLA/BLANT.
       m_pocRandomAccess = m_apcSlicePilot->getPOC();
@@ -3257,9 +3454,19 @@ bool DecLib::isRandomAccessSkipPicture( int& iSkipFrame, int& iPOCLastDisplay )
     {
       if(!m_warningMessageSkipPicture)
       {
+#if JVET_Z0118_GDR
+        msg( WARNING, "Warning: This is not a valid random access point and the data is discarded until the first CRA or GDR picture\n");
+        m_warningMessageSkipPicture = true;
+#else
         msg( WARNING, "\nWarning: this is not a valid random access point and the data is discarded until the first CRA picture");
         m_warningMessageSkipPicture = true;
+#endif
       }
+#if JVET_Z0118_GDR
+      iSkipFrame--;
+      m_maxDecSubPicIdx = 0;
+      m_maxDecSliceAddrInSubPic = -1;
+#endif
       return true;
     }
   }
@@ -3267,6 +3474,11 @@ bool DecLib::isRandomAccessSkipPicture( int& iSkipFrame, int& iPOCLastDisplay )
   else if (m_apcSlicePilot->getPOC() < m_pocRandomAccess && (m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL))
   {
     iPOCLastDisplay++;
+#if JVET_Z0118_GDR
+    iSkipFrame--;
+    m_maxDecSubPicIdx = 0;
+    m_maxDecSliceAddrInSubPic = -1;
+#endif
     return true;
   }
   // if we reach here, then the picture is not skipped.

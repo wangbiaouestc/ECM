@@ -280,7 +280,11 @@ static const int MAX_NUM_ALF_CHROMA_COEFF    =                      7;
 static const int MAX_ALF_FILTER_LENGTH       =                      7;
 #endif
 static const int MAX_NUM_ALF_COEFF           =                     MAX_ALF_FILTER_LENGTH * MAX_ALF_FILTER_LENGTH / 2 + 1;
+#if JVET_Z0118_GDR
+static const int MAX_ALF_PADDING_SIZE        =                      6;
+#else
 static const int MAX_ALF_PADDING_SIZE        =                      4;
+#endif
 #if JVET_X0071_LONGER_CCALF
 #define MAX_NUM_CC_ALF_FILTERS                                      16
 static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               25;

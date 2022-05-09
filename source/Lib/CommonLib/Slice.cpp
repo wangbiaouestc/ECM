@@ -993,11 +993,24 @@ void Slice::checkRPL(const ReferencePictureList* pRPL0, const ReferencePictureLi
   int irapPOC = getAssociatedIRAPPOC();
 
 #if JVET_S0124_UNAVAILABLE_REFERENCE
+#if JVET_Z0118_GDR
+  int numEntries[] = { pRPL0->getNumberOfShorttermPictures() + pRPL0->getNumberOfLongtermPictures() + pRPL0->getNumberOfInterLayerPictures(), pRPL1->getNumberOfShorttermPictures() + pRPL1->getNumberOfLongtermPictures() + pRPL1->getNumberOfInterLayerPictures() };
+#else
   const int numEntries[] = { pRPL0->getNumberOfShorttermPictures() + pRPL0->getNumberOfLongtermPictures() + pRPL0->getNumberOfInterLayerPictures(), pRPL1->getNumberOfShorttermPictures() + pRPL1->getNumberOfLongtermPictures() + pRPL1->getNumberOfInterLayerPictures() };
+#endif
   const int numActiveEntries[] = { getNumRefIdx( REF_PIC_LIST_0 ), getNumRefIdx( REF_PIC_LIST_1 ) };
   const ReferencePictureList* rpl[] = { pRPL0, pRPL1 };
   const bool fieldSeqFlag = getSPS()->getFieldSeqFlag();
   const int layerIdx = m_pcPic->cs->vps == nullptr ? 0 : m_pcPic->cs->vps->getGeneralLayerIdx( m_pcPic->layerId );
+
+#if JVET_Z0118_GDR
+  if ( rcListPic.size() < numEntries[0] || rcListPic.size() < numEntries[1] )
+  {
+    numEntries[0] = 0;
+    numEntries[1] = 0;
+    msg( NOTICE, "Reset numEntriesL0 and numEntriesL1. E.g. receive a CRA after some skipped slices\n");
+  }
+#endif
 
   for( int refPicList = 0; refPicList < 2; refPicList++ )
   {
@@ -1050,7 +1063,11 @@ void Slice::checkRPL(const ReferencePictureList* pRPL0, const ReferencePictureLi
       // Generated reference picture does not have picture header
       const bool isGeneratedRefPic = pcRefPic->slices[0]->getPicHeader() ? false : true;
 
+#if JVET_Z0118_GDR
+      const bool nonReferencePictureFlag = isGeneratedRefPic ? pcRefPic->nonReferencePictureFlag : pcRefPic->slices[0]->getPicHeader()->getNonReferencePictureFlag();
+#else
       const bool nonReferencePictureFlag = isGeneratedRefPic ? pcRefPic->slices[0]->getPicHeader()->getNonReferencePictureFlag() : pcRefPic->nonReferencePictureFlag;
+#endif
       CHECK( pcRefPic == m_pcPic || nonReferencePictureFlag, "The picture referred to by each entry in RefPicList[ 0 ] or RefPicList[ 1 ] shall not be the current picture and shall have ph_non_ref_pic_flag equal to 0" );
 #endif
 
@@ -1647,6 +1664,44 @@ void Slice::checkLeadingPictureRestrictions(PicList& rcListPic, const PPS& pps) 
     }
     const Slice* pcSlice = pcPic->slices[0];
 
+#if JVET_Z0118_GDR
+    if(pcSlice->getPicHeader()) // Generated reference picture does not have picture header
+    {
+      if (pcSlice->getPicHeader()->getPicOutputFlag() == 1 && !this->getNoOutputOfPriorPicsFlag() && pcPic->layerId == this->m_nuhLayerId)
+      {
+        if ((nalUnitType == NAL_UNIT_CODED_SLICE_CRA || nalUnitType == NAL_UNIT_CODED_SLICE_IDR_N_LP || nalUnitType == NAL_UNIT_CODED_SLICE_IDR_W_RADL) && !pps.getMixedNaluTypesInPicFlag())
+        {
+          CHECK(pcPic->poc >= this->getPOC(), "Any picture, with nuh_layer_id equal to a particular value layerId, that precedes an IRAP picture with nuh_layer_id "
+                "equal to layerId in decoding order shall precede the IRAP picture in output order.");
+        }
+      }
+
+      if (pcSlice->getPicHeader()->getPicOutputFlag() == 1 && pcPic->layerId == this->m_nuhLayerId)
+      {
+        if (nalUnitType == NAL_UNIT_CODED_SLICE_RADL)
+        {
+          if (this->getAssociatedIRAPPOC() > pcSlice->getAssociatedIRAPPOC() && !pps.getMixedNaluTypesInPicFlag())
+          {
+            if (this->getAssociatedIRAPPOC() != pcPic->poc)
+            {
+              CHECK(pcPic->poc >= this->getPOC(), "Any picture, with nuh_layer_id equal to a particular value layerId, that precedes an IRAP picture with nuh_layer_id "
+                    "equal to layerId in decoding order shall precede any RADL picture associated with the IRAP picture in output order.");
+            }
+          }
+        }
+      }
+
+      if (pcSlice->getPicHeader()->getPicOutputFlag() == 1 && !this->getPicHeader()->getNoOutputBeforeRecoveryFlag() && pcPic->layerId == this->m_nuhLayerId
+          && nalUnitType != NAL_UNIT_CODED_SLICE_GDR && this->getPicHeader()->getRecoveryPocCnt() != -1)
+      {
+        if (this->getPOC() == this->getPicHeader()->getRecoveryPocCnt() + this->getPrevGDRInSameLayerPOC())
+        {
+          CHECK(pcPic->poc >= this->getPOC(), "Any picture, with nuh_layer_id equal to a particular value layerId, that precedes a recovery point picture with "
+                "nuh_layer_id equal to layerId in decoding order shall precede the recovery point picture in output order.");
+        }
+      }
+    }
+#else // JVET_Z0118_GDR
 #if JVET_S0193_NO_OUTPUT_PRIOR_PIC
     if (pcSlice->getPicHeader()->getPicOutputFlag() == 1 && !this->getNoOutputOfPriorPicsFlag() && pcPic->layerId == this->m_nuhLayerId)
 #else
@@ -1684,6 +1739,7 @@ void Slice::checkLeadingPictureRestrictions(PicList& rcListPic, const PPS& pps) 
               "nuh_layer_id equal to layerId in decoding order shall precede the recovery point picture in output order.");
       }
     }
+#endif // JVET_Z0118_GDR
 
     if ((nalUnitType == NAL_UNIT_CODED_SLICE_RASL || nalUnitType == NAL_UNIT_CODED_SLICE_RADL) && 
       (pcSlice->getNalUnitType() != NAL_UNIT_CODED_SLICE_RASL && pcSlice->getNalUnitType() != NAL_UNIT_CODED_SLICE_RADL) && !pps.getMixedNaluTypesInPicFlag())
@@ -1792,6 +1848,21 @@ void Slice::checkSubpicTypeConstraints(PicList& rcListPic, const ReferencePictur
       bool isBufPicOutput = false;
       int bufSubpicType = NAL_UNIT_INVALID;
       int bufSubpicPrevIRAPSubpicPOC = 0;
+#if JVET_Z0118_GDR
+      if (bufPic->slices[0]->getPicHeader() != NULL) // Generated reference picture does not have picture header
+      {
+        for (int i = 0; i < bufPic->numSlices; i++)
+        {
+          if (bufPic->sliceSubpicIdx[i] == curSubpicIdx)
+          {
+            isBufPicOutput = bufPic->slices[i]->getPicHeader()->getPicOutputFlag();
+            bufSubpicType = bufPic->slices[i]->getNalUnitType();
+            bufSubpicPrevIRAPSubpicPOC = bufPic->slices[i]->getPrevIRAPSubpicPOC();
+            break;
+          }
+        }
+      }
+#else
       for (int i = 0; i < bufPic->numSlices; i++)
       {
         if (bufPic->sliceSubpicIdx[i] == curSubpicIdx)
@@ -1802,6 +1873,7 @@ void Slice::checkSubpicTypeConstraints(PicList& rcListPic, const ReferencePictur
           break;
         }
       }
+#endif
 
 #if JVET_S0193_NO_OUTPUT_PRIOR_PIC
       if ((nalUnitType == NAL_UNIT_CODED_SLICE_CRA || nalUnitType == NAL_UNIT_CODED_SLICE_IDR_N_LP || nalUnitType == NAL_UNIT_CODED_SLICE_IDR_W_RADL) &&
@@ -2375,7 +2447,11 @@ int Slice::checkThatAllRefPicsAreAvailable(PicList& rcListPic, const ReferencePi
     {
       if (printErrors)
       {
+#if JVET_Z0118_GDR
+        msg(ERROR, "Error: Current picture: %d Long-term reference picture with POC = %3d seems to have been removed or not correctly decoded.\n", this->getPOC(), notPresentPoc);
+#else
         msg(ERROR, "\nCurrent picture: %d Long-term reference picture with POC = %3d seems to have been removed or not correctly decoded.", this->getPOC(), notPresentPoc);
+#endif
       }
       return notPresentPoc;
     }
@@ -2414,7 +2490,11 @@ int Slice::checkThatAllRefPicsAreAvailable(PicList& rcListPic, const ReferencePi
     {
       if (printErrors)
       {
+#if JVET_Z0118_GDR
+        msg(ERROR, "Error: Current picture: %d Short-term reference picture with POC = %3d seems to have been removed or not correctly decoded.\n", this->getPOC(), notPresentPoc);
+#else
         msg(ERROR, "\nCurrent picture: %d Short-term reference picture with POC = %3d seems to have been removed or not correctly decoded.", this->getPOC(), notPresentPoc);
+#endif
       }
       return notPresentPoc;
     }
@@ -2493,7 +2573,11 @@ int Slice::checkThatAllRefPicsAreAvailable(PicList& rcListPic, const ReferencePi
     {
       if (printErrors)
       {
+#if JVET_Z0118_GDR
+        msg(ERROR, "Error: Current picture: %d Long-term reference picture with POC = %3d seems to have been removed or not correctly decoded.\n", this->getPOC(), notPresentPoc);
+#else
         msg(ERROR, "\nCurrent picture: %d Long-term reference picture with POC = %3d seems to have been removed or not correctly decoded.", this->getPOC(), notPresentPoc);
+#endif
       }
       *refPicIndex = ii;
       return notPresentPoc;
@@ -2533,7 +2617,11 @@ int Slice::checkThatAllRefPicsAreAvailable(PicList& rcListPic, const ReferencePi
     {
       if (printErrors)
       {
+#if JVET_Z0118_GDR
+        msg(ERROR, "Error: Current picture: %d Short-term reference picture with POC = %3d seems to have been removed or not correctly decoded.\n", this->getPOC(), notPresentPoc);
+#else
         msg(ERROR, "\nCurrent picture: %d Short-term reference picture with POC = %3d seems to have been removed or not correctly decoded.", this->getPOC(), notPresentPoc);
+#endif
       }
       *refPicIndex = ii;
       return notPresentPoc;
