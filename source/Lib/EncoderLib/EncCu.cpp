@@ -9691,7 +9691,7 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
         m_pcRdCost->setDistParam(distParam, tempCS->getOrgBuf().Y(), refBuf, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
 
       int refStride = refBuf.stride;
-#if !JVET_Y0058_IBC_LIST_MODIFY || !JVET_Z0084_IBC_TM
+#if !JVET_Y0058_IBC_LIST_MODIFY
       const UnitArea localUnitArea(tempCS->area.chromaFormat, Area(0, 0, tempCS->area.Y().width, tempCS->area.Y().height));
       const int cuPelX = pu.Y().x;
       const int cuPelY = pu.Y().y;
@@ -9713,17 +9713,19 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 
         int xPred = pu.bv.getHor();
         int yPred = pu.bv.getVer();
-#if !JVET_Y0058_IBC_LIST_MODIFY || !JVET_Z0084_IBC_TM  //should have already been checked at merge list construction
+#if !JVET_Y0058_IBC_LIST_MODIFY  //should have already been checked at merge list construction
 #if JVET_Z0084_IBC_TM
         if (!PU::searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, xPred, yPred, lcuWidth)) // not valid bv derived
 #else
         if (!m_pcInterSearch->searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, xPred, yPred, lcuWidth)) // not valid bv derived
 #endif
+#else
+        if (pu.bv == Mv(0, 0))
+#endif
         {
           numValidBv--;
           continue;
         }
-#endif
         PU::spanMotionInfo(pu, mergeCtx);
 
         distParam.cur.buf = piRefSrch + refStride * yPred + xPred;
@@ -9771,11 +9773,13 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
       int yPred = pu.bv.getVer();
 #if !JVET_Y0058_IBC_LIST_MODIFY  //should have already been checked at merge list construction and during refinement
       if (!PU::searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, xPred, yPred, lcuWidth)) // not valid bv derived
+#else
+      if (pu.bv == Mv(0, 0))
+#endif
       {
         numValidBv--;
         continue;
       }
-#endif
       PU::spanMotionInfo(pu, mergeCtxTm);
 
       distParam.cur.buf = piRefSrch + refStride * yPred + xPred;
