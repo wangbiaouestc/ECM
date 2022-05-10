@@ -2045,7 +2045,11 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
   const uint32_t maxNumMergeCand = pu.cs->sps->getMaxNumIBCMergeCand();
 #endif
 #if JVET_Z0084_IBC_TM
+#if TM_MRG
   const uint32_t mvdSimilarityThresh = pu.tmMergeFlag ? PU::getTMMvdThreshold(pu) : 1;
+#else
+  const uint32_t mvdSimilarityThresh = 1;
+#endif
 #endif
 
   for (uint32_t ui = 0; ui < maxNumMergeCand; ++ui)
@@ -2222,7 +2226,7 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
   }
 
   // above left
-#if JVET_Z0084_IBC_TM && JVET_Z0075_IBC_HMVP_ENLARGE
+#if JVET_Z0084_IBC_TM && JVET_Z0075_IBC_HMVP_ENLARGE && JVET_W0090_ARMC_TM
   if ((cnt < 4) && pu.cs->sps->getUseAML() && (mrgCandIdx >= 0)) //Only for AMVP case
 #elif !JVET_Z0075_IBC_HMVP_ENLARGE
   if (cnt < 4)
