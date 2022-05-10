@@ -244,6 +244,8 @@ uint32_t DecApp::decode()
             bPicSkipped = true;
             m_iSkipFrame++;   // skipFrame count restore, the real decrement occur at the begin of next frame
           }
+#else
+          m_cDecLib.decode(nalu, m_iSkipFrame, m_iPOCLastDisplay, m_targetOlsIdx);
 #endif
 
           if (nalu.m_nalUnitType == NAL_UNIT_VPS)
