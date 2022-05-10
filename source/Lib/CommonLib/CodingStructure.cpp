@@ -70,7 +70,11 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
   , bestParent ( nullptr )
   , tmpColorSpaceCost(MAX_DOUBLE)
   , firstColorSpaceSelected(true)
+#if JVET_Z0153_IBC_EXT_REF
+  , resetIBCBuffer (true)
+#else
   , resetIBCBuffer (false)
+#endif
 {
   for( uint32_t i = 0; i < MAX_NUM_COMPONENT; i++ )
   {

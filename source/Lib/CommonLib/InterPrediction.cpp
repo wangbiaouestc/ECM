@@ -411,7 +411,11 @@ void InterPrediction::destroy()
 }
 
 #if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
+#if JVET_Z0153_IBC_EXT_REF
+void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape, const int picWidth )
+#else
 void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape )
+#endif
 #else
 void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize )
 #endif
@@ -585,6 +589,18 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
   }
 
 #if JVET_Z0118_GDR
+#if JVET_Z0153_IBC_EXT_REF
+  m_IBCBufferWidth = (picWidth + ctuSize - 1) / ctuSize * ctuSize;
+  m_IBCBufferHeight = 3 * ctuSize;
+  if (m_IBCBuffer0.bufs.empty())
+  {    
+    m_IBCBuffer0.create(UnitArea(chromaFormatIDC, Area(0, 0, m_IBCBufferWidth, m_IBCBufferHeight)));
+  }
+  if (m_IBCBuffer1.bufs.empty())
+  {   
+    m_IBCBuffer1.create(UnitArea(chromaFormatIDC, Area(0, 0, m_IBCBufferWidth, m_IBCBufferHeight)));
+  }  
+#else
   m_IBCBufferWidth = g_IBCBufferSize / ctuSize;
 
   if (m_IBCBuffer0.bufs.empty())
@@ -595,11 +611,18 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
   {   
     m_IBCBuffer1.create(UnitArea(chromaFormatIDC, Area(0, 0, m_IBCBufferWidth, ctuSize)));
   }
+#endif
 #else
   if (m_IBCBuffer.bufs.empty())
   {
+#if JVET_Z0153_IBC_EXT_REF
+    m_IBCBufferWidth = (picWidth + ctuSize - 1) / ctuSize * ctuSize;
+    m_IBCBufferHeight = 3 * ctuSize;
+    m_IBCBuffer.create(UnitArea(chromaFormatIDC, Area(0, 0, m_IBCBufferWidth, m_IBCBufferHeight)));
+#else
     m_IBCBufferWidth = g_IBCBufferSize / ctuSize;
     m_IBCBuffer.create(UnitArea(chromaFormatIDC, Area(0, 0, m_IBCBufferWidth, ctuSize)));
+#endif
   }
 #endif
 }
@@ -7922,12 +7945,19 @@ void InterPrediction::xFillIBCBuffer(CodingUnit &cu)
         continue;
       }
 
+#if JVET_Z0153_IBC_EXT_REF
+      const int shiftSampleHor = ::getComponentScaleX(area.compID, cu.chromaFormat);
+      const int shiftSampleVer = ::getComponentScaleY(area.compID, cu.chromaFormat);
+      const int pux = area.x % (m_IBCBufferWidth >> shiftSampleHor);
+      const int puy = area.y % (m_IBCBufferHeight >> shiftSampleVer);
+#else
       const unsigned int lcuWidth = cu.cs->slice->getSPS()->getMaxCUWidth();
       const int shiftSampleHor = ::getComponentScaleX(area.compID, cu.chromaFormat);
       const int shiftSampleVer = ::getComponentScaleY(area.compID, cu.chromaFormat);
       const int ctuSizeLog2Ver = floorLog2(lcuWidth) - shiftSampleVer;
       const int pux = area.x & ((m_IBCBufferWidth >> shiftSampleHor) - 1);
       const int puy = area.y & (( 1 << ctuSizeLog2Ver ) - 1);
+#endif
       const CompArea dstArea = CompArea(area.compID, cu.chromaFormat, Position(pux, puy), Size(area.width, area.height));
       CPelBuf srcBuf = cu.cs->getRecoBuf(area);
 
@@ -7960,10 +7990,15 @@ void InterPrediction::xIntraBlockCopy(PredictionUnit &pu, PelUnitBuf &predBuf, c
   bool useCleanIBCBuffer   = pu.cs->isInGdrInvervalOrRecoveryPoc() && isCleanCu;
 #endif
 
+#if JVET_Z0153_IBC_EXT_REF
+  const int shiftSampleHor = ::getComponentScaleX(compID, pu.chromaFormat);
+  const int shiftSampleVer = ::getComponentScaleY(compID, pu.chromaFormat);
+#else
   const unsigned int lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
   const int shiftSampleHor = ::getComponentScaleX(compID, pu.chromaFormat);
   const int shiftSampleVer = ::getComponentScaleY(compID, pu.chromaFormat);
   const int ctuSizeLog2Ver = floorLog2(lcuWidth) - shiftSampleVer;
+#endif
   pu.bv = pu.mv[REF_PIC_LIST_0];
   pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
   int refx, refy;
@@ -7977,10 +8012,19 @@ void InterPrediction::xIntraBlockCopy(PredictionUnit &pu, PelUnitBuf &predBuf, c
     refx = pu.Cb().x + (pu.bv.hor >> shiftSampleHor);
     refy = pu.Cb().y + (pu.bv.ver >> shiftSampleVer);
   }
+#if JVET_Z0153_IBC_EXT_REF
+  refx = refx % (m_IBCBufferWidth >> shiftSampleHor);
+  refy = refy % (m_IBCBufferHeight >> shiftSampleVer);
+#else
   refx &= ((m_IBCBufferWidth >> shiftSampleHor) - 1);
   refy &= ((1 << ctuSizeLog2Ver) - 1);
+#endif
 
+#if JVET_Z0153_IBC_EXT_REF
+  if (refy + predBuf.bufs[compID].height <= (m_IBCBufferHeight >> shiftSampleVer))
+#else
   if (refx + predBuf.bufs[compID].width <= (m_IBCBufferWidth >> shiftSampleHor))
+#endif
   {
     const CompArea srcArea = CompArea(compID, pu.chromaFormat, Position(refx, refy), Size(predBuf.bufs[compID].width, predBuf.bufs[compID].height));
 #if JVET_Z0118_GDR
@@ -8001,6 +8045,50 @@ void InterPrediction::xIntraBlockCopy(PredictionUnit &pu, PelUnitBuf &predBuf, c
   }
   else
   {//wrap around
+#if JVET_Z0153_IBC_EXT_REF
+#if JVET_Z0118_GDR
+    if (useCleanIBCBuffer)
+    {
+      int height = (m_IBCBufferHeight >> shiftSampleVer) - refy;
+      CompArea srcArea = CompArea(compID, pu.chromaFormat, Position(refx, refy), Size(predBuf.bufs[compID].width, height));
+      CPelBuf srcBuf = m_IBCBuffer1.getBuf(srcArea);
+      PelBuf dstBuf = PelBuf(predBuf.bufs[compID].bufAt(Position(0, 0)), predBuf.bufs[compID].stride, Size(predBuf.bufs[compID].width, height));
+      dstBuf.copyFrom(srcBuf);
+
+      height = refy + predBuf.bufs[compID].height - (m_IBCBufferHeight >> shiftSampleVer);
+      srcArea = CompArea(compID, pu.chromaFormat, Position(refx, 0), Size(predBuf.bufs[compID].width, height));
+      srcBuf = m_IBCBuffer1.getBuf(srcArea);
+      dstBuf = PelBuf(predBuf.bufs[compID].bufAt(Position(0, (m_IBCBufferHeight >> shiftSampleVer) - refy)), predBuf.bufs[compID].stride, Size(predBuf.bufs[compID].width, height));
+      dstBuf.copyFrom(srcBuf);
+    }
+    else
+    {
+      int height = (m_IBCBufferHeight >> shiftSampleVer) - refy;
+      CompArea srcArea = CompArea(compID, pu.chromaFormat, Position(refx, refy), Size(predBuf.bufs[compID].width, height));
+      CPelBuf srcBuf = m_IBCBuffer0.getBuf(srcArea);
+      PelBuf dstBuf = PelBuf(predBuf.bufs[compID].bufAt(Position(0, 0)), predBuf.bufs[compID].stride, Size(predBuf.bufs[compID].width, height));
+      dstBuf.copyFrom(srcBuf);
+
+      height = refy + predBuf.bufs[compID].height - (m_IBCBufferHeight >> shiftSampleVer);
+      srcArea = CompArea(compID, pu.chromaFormat, Position(refx, 0), Size(predBuf.bufs[compID].width, height));
+      srcBuf = m_IBCBuffer0.getBuf(srcArea);
+      dstBuf = PelBuf(predBuf.bufs[compID].bufAt(Position(0, (m_IBCBufferHeight >> shiftSampleVer) - refy)), predBuf.bufs[compID].stride, Size(predBuf.bufs[compID].width, height));
+      dstBuf.copyFrom(srcBuf);
+    }
+#else
+    int height = (m_IBCBufferHeight >> shiftSampleVer) - refy;
+    CompArea srcArea = CompArea(compID, pu.chromaFormat, Position(refx, refy), Size(predBuf.bufs[compID].width, height));
+    CPelBuf srcBuf = m_IBCBuffer.getBuf(srcArea);
+    PelBuf dstBuf = PelBuf(predBuf.bufs[compID].bufAt(Position(0, 0)), predBuf.bufs[compID].stride, Size(predBuf.bufs[compID].width, height));
+    dstBuf.copyFrom(srcBuf);
+
+    height = refy + predBuf.bufs[compID].height - (m_IBCBufferHeight >> shiftSampleVer);
+    srcArea = CompArea(compID, pu.chromaFormat, Position(refx, 0), Size(predBuf.bufs[compID].width, height));
+    srcBuf = m_IBCBuffer.getBuf(srcArea);
+    dstBuf = PelBuf(predBuf.bufs[compID].bufAt(Position(0, (m_IBCBufferHeight >> shiftSampleVer) - refy)), predBuf.bufs[compID].stride, Size(predBuf.bufs[compID].width, height));
+    dstBuf.copyFrom(srcBuf);
+#endif
+#else
     int width = (m_IBCBufferWidth >> shiftSampleHor) - refx;
     CompArea srcArea = CompArea(compID, pu.chromaFormat, Position(refx, refy), Size(width, predBuf.bufs[compID].height));
 
@@ -8040,13 +8128,17 @@ void InterPrediction::xIntraBlockCopy(PredictionUnit &pu, PelUnitBuf &predBuf, c
     dstBuf = PelBuf(predBuf.bufs[compID].bufAt(Position((m_IBCBufferWidth >> shiftSampleHor) - refx, 0)), predBuf.bufs[compID].stride, Size(width, predBuf.bufs[compID].height));
     dstBuf.copyFrom(srcBuf);
 #endif    
+#endif
   }
 }
 
 void InterPrediction::resetIBCBuffer(const ChromaFormat chromaFormatIDC, const int ctuSize)
 {
+#if JVET_Z0153_IBC_EXT_REF
+  const UnitArea area = UnitArea(chromaFormatIDC, Area(0, 0, m_IBCBufferWidth, m_IBCBufferHeight));
+#else
   const UnitArea area = UnitArea(chromaFormatIDC, Area(0, 0, m_IBCBufferWidth, ctuSize));
-
+#endif
 #if JVET_Z0118_GDR  
   m_IBCBuffer0.getBuf(area).fill(-1);  
 #else
@@ -8071,6 +8163,26 @@ void InterPrediction::resetCurIBCBuffer(const ChromaFormat chromaFormatIDC, cons
 
 void InterPrediction::resetVPDUforIBC(const ChromaFormat chromaFormatIDC, const int ctuSize, const int vSize, const int xPos, const int yPos)
 {
+#if JVET_Z0153_IBC_EXT_REF
+  if(xPos == 0)
+  {
+    const UnitArea area = UnitArea(chromaFormatIDC, Area(0, yPos % m_IBCBufferHeight, m_IBCBufferWidth, ctuSize));
+#if JVET_Z0118_GDR
+    m_IBCBuffer0.getBuf(area).fill(-1);
+#else
+    m_IBCBuffer.getBuf(area).fill(-1);
+#endif
+  }
+  if(xPos - 3 * ctuSize >= 0)
+  {
+    const UnitArea area = UnitArea(chromaFormatIDC, Area((xPos - 3 * ctuSize) % m_IBCBufferWidth, (yPos + ctuSize) % m_IBCBufferHeight, ctuSize, ctuSize));
+#if JVET_Z0118_GDR
+    m_IBCBuffer0.getBuf(area).fill(-1);
+#else
+    m_IBCBuffer.getBuf(area).fill(-1);
+#endif
+  }
+#else
   const UnitArea area = UnitArea(chromaFormatIDC, Area(xPos & (m_IBCBufferWidth - 1), yPos & (ctuSize - 1), vSize, vSize));
 
 #if JVET_Z0118_GDR
@@ -8078,29 +8190,55 @@ void InterPrediction::resetVPDUforIBC(const ChromaFormat chromaFormatIDC, const 
 #else
   m_IBCBuffer.getBuf(area).fill(-1);
 #endif
+#endif
 }
 
 bool InterPrediction::isLumaBvValid(const int ctuSize, const int xCb, const int yCb, const int width, const int height, const int xBv, const int yBv)
 {
+#if JVET_Z0153_IBC_EXT_REF
+  int refTLx = xCb + xBv;
+  int refTLy = yCb + yBv;
+#else
   if(((yCb + yBv) & (ctuSize - 1)) + height > ctuSize)
   {
     return false;
   }
   int refTLx = xCb + xBv;
   int refTLy = (yCb + yBv) & (ctuSize - 1);
+#endif
 #if JVET_Z0118_GDR
   PelBuf buf = m_IBCBuffer0.Y();
 #else
   PelBuf buf = m_IBCBuffer.Y();
 #endif
+
   for(int x = 0; x < width; x += 4)
   {
     for(int y = 0; y < height; y += 4)
     {
+#if JVET_Z0153_IBC_EXT_REF
+      if(buf.at((x + refTLx) % m_IBCBufferWidth, (y + refTLy) % m_IBCBufferHeight) == -1)
+      {
+        return false;
+      }
+      if(buf.at((x + 3 + refTLx) % m_IBCBufferWidth, (y + refTLy) % m_IBCBufferHeight) == -1)
+      {
+        return false;
+      }
+      if(buf.at((x + refTLx) % m_IBCBufferWidth, (y + 3 + refTLy) % m_IBCBufferHeight) == -1)
+      {
+        return false;
+      }
+      if(buf.at((x + 3 + refTLx) % m_IBCBufferWidth, (y + 3 + refTLy) % m_IBCBufferHeight) == -1)
+      {
+        return false;
+      }
+#else
       if(buf.at((x + refTLx) & (m_IBCBufferWidth - 1), y + refTLy) == -1) return false;
       if(buf.at((x + 3 + refTLx) & (m_IBCBufferWidth - 1), y + refTLy) == -1) return false;
       if(buf.at((x + refTLx) & (m_IBCBufferWidth - 1), y + 3 + refTLy) == -1) return false;
       if(buf.at((x + 3 + refTLx) & (m_IBCBufferWidth - 1), y + 3 + refTLy) == -1) return false;
+#endif
     }
   }
   return true;

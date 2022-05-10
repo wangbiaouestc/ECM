@@ -294,6 +294,9 @@ void InterSearch::init( EncCfg*        pcEncCfg,
                         CABACWriter*   CABACEstimator,
                         CtxCache*      ctxCache
                       , EncReshape*    pcReshape
+#if JVET_Z0153_IBC_EXT_REF
+                      , const uint32_t curPicWidthY 
+#endif
 )
 {
   CHECK(m_isInitialized, "Already initialized");
@@ -342,7 +345,11 @@ void InterSearch::init( EncCfg*        pcEncCfg,
 
   const ChromaFormat cform = pcEncCfg->getChromaFormatIdc();
 #if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_Z0153_IBC_EXT_REF
+  InterPrediction::init( pcRdCost, cform, maxCUHeight, m_pcReshape, curPicWidthY );
+#else
   InterPrediction::init( pcRdCost, cform, maxCUHeight, m_pcReshape );
+#endif
 #else 
   InterPrediction::init( pcRdCost, cform, maxCUHeight );
 #endif
@@ -1199,6 +1206,21 @@ void InterSearch::xIntraPatternSearch(PredictionUnit& pu, IntTZSearchStruct&  cS
 
     if (pu.lwidth() < 16 && pu.lheight() < 16)
     {
+#if JVET_Z0153_IBC_EXT_REF
+      int verTop = - (int)lcuWidth;
+      int verBottom = std::min((int)(lcuWidth>>2), (int)(lcuWidth - (cuPelY % lcuWidth) - roiHeight));
+      int horLeft = - (int)lcuWidth*2;
+      int horRight = lcuWidth>>2;
+
+      for (int y = std::max(verTop, -cuPelY); y <= verBottom; y += 2)
+      {
+        if ((y == 0) || ((int)(cuPelY + y + roiHeight) >= picHeight))
+        {
+          continue;
+        }        
+        for (int x = std::max(horLeft, -cuPelX); x <= horRight; x++)
+        {
+#else
       for (int y = std::max(srchRngVerTop, -cuPelY); y <= srchRngVerBottom; y += 2)
       {
         if ((y == 0) || ((int)(cuPelY + y + roiHeight) >= picHeight))
@@ -1206,6 +1228,7 @@ void InterSearch::xIntraPatternSearch(PredictionUnit& pu, IntTZSearchStruct&  cS
 
         for (int x = std::max(srchRngHorLeft, -cuPelX); x <= srchRngHorRight; x++)
         {
+#endif
           if ((x == 0) || ((int)(cuPelX + x + roiWidth) >= picWidth))
             continue;
 
@@ -1242,13 +1265,23 @@ void InterSearch::xIntraPatternSearch(PredictionUnit& pu, IntTZSearchStruct&  cS
         goto end;
       }
 
+#if JVET_Z0153_IBC_EXT_REF
+      for (int y = (std::max(verTop, -cuPelY) + 1); y <= verBottom; y += 2)
+      {
+        if ((y == 0) || ((int)(cuPelY + y + roiHeight) >= picHeight))
+        {
+          continue;
+        }
 
+        for (int x = std::max(horLeft, -cuPelX); x <= horRight; x += 2)
+#else
       for (int y = (std::max(srchRngVerTop, -cuPelY) + 1); y <= srchRngVerBottom; y += 2)
       {
         if ((y == 0) || ((int)(cuPelY + y + roiHeight) >= picHeight))
           continue;
 
         for (int x = std::max(srchRngHorLeft, -cuPelX); x <= srchRngHorRight; x += 2)
+#endif
         {
           if ((x == 0) || ((int)(cuPelX + x + roiWidth) >= picWidth))
             continue;
@@ -1300,13 +1333,22 @@ void InterSearch::xIntraPatternSearch(PredictionUnit& pu, IntTZSearchStruct&  cS
 
       tempSadBest = sadBestCand[0];
 
-
+#if JVET_Z0153_IBC_EXT_REF
+      for (int y = (std::max(verTop, -cuPelY) + 1); y <= verBottom; y += 2)
+      {
+        if ((y == 0) || ((int)(cuPelY + y + roiHeight) >= picHeight))
+        {
+          continue;
+        }
+        for (int x = (std::max(horLeft, -cuPelX) + 1); x <= horRight; x += 2)
+#else
       for (int y = (std::max(srchRngVerTop, -cuPelY) + 1); y <= srchRngVerBottom; y += 2)
       {
         if ((y == 0) || ((int)(cuPelY + y + roiHeight) >= picHeight))
           continue;
 
         for (int x = (std::max(srchRngHorLeft, -cuPelX) + 1); x <= srchRngHorRight; x += 2)
+#endif
         {
 
           if ((x == 0) || ((int)(cuPelX + x + roiWidth) >= picWidth))
@@ -1530,6 +1572,14 @@ void InterSearch::xSetIntraSearchRange(PredictionUnit& pu, int iRoiWidth, int iR
   const int cuPelY = pu.Y().y;
 
   const int lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
+#if JVET_Z0153_IBC_EXT_REF
+  const int picWidth = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
+
+  srLeft = -cuPelX;
+  srTop = - 2 * lcuWidth - (cuPelY % lcuWidth);
+  srRight = picWidth - cuPelX - iRoiWidth;
+  srBottom = lcuWidth - (cuPelY % lcuWidth) - iRoiHeight;  
+#else
   const int ctuSizeLog2 = floorLog2(lcuWidth);
   int numLeftCTUs = (1 << ((7 - ctuSizeLog2) << 1)) - ((ctuSizeLog2 < 7) ? 1 : 0);
 
@@ -1538,6 +1588,7 @@ void InterSearch::xSetIntraSearchRange(PredictionUnit& pu, int iRoiWidth, int iR
 
   srRight = lcuWidth - (cuPelX % lcuWidth) - iRoiWidth;
   srBottom = lcuWidth - (cuPelY % lcuWidth) - iRoiHeight;
+#endif
 
   rcMvSrchRngLT.setHor(srLeft);
   rcMvSrchRngLT.setVer(srTop);
@@ -10650,9 +10701,11 @@ bool InterSearch::searchBv(PredictionUnit& pu, int xPos, int yPos, int width, in
     return false;
   }
 
+#if !JVET_Z0153_IBC_EXT_REF
   // Don't search the above CTU row
   if (refTopY >> ctuSizeLog2 < yPos >> ctuSizeLog2)
     return false;
+#endif
 
   // Don't search the below CTU row
   if (refBottomY >> ctuSizeLog2 > yPos >> ctuSizeLog2)
@@ -10682,6 +10735,20 @@ bool InterSearch::searchBv(PredictionUnit& pu, int xPos, int yPos, int width, in
     return false;
   }
 
+#if JVET_Z0153_IBC_EXT_REF
+  if ((refTopY >> ctuSizeLog2) + 2 < (yPos >> ctuSizeLog2))
+  {
+    return false;
+  };
+  if (((refTopY >> ctuSizeLog2) == (yPos >> ctuSizeLog2)) && ((refRightX >> ctuSizeLog2) > (xPos >> ctuSizeLog2)))
+  {
+    return false;
+  }
+  if (((refTopY >> ctuSizeLog2) + 2 == (yPos >> ctuSizeLog2)) && ((refLeftX >> ctuSizeLog2) + 2 < (xPos >> ctuSizeLog2)))
+  {
+    return false;
+  }
+#else
   // in the same CTU line
 #if CTU_256
   int numLeftCTUs = ( 1 << ( ( MAX_CU_DEPTH - ctuSizeLog2 ) << 1 ) ) - ( ( ctuSizeLog2 < MAX_CU_DEPTH ) ? 1 : 0 );
@@ -10712,6 +10779,7 @@ bool InterSearch::searchBv(PredictionUnit& pu, int xPos, int yPos, int width, in
   }
   else
     return false;
+#endif
 
   // in the same CTU, or valid area from left CTU. Check if the reference block is already coded
   const Position refPosLT = pu.Y().topLeft().offset(xBv, yBv);

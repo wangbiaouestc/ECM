@@ -190,6 +190,9 @@ protected:
   bool                 m_subPuMC;
 
   int                  m_IBCBufferWidth;
+#if JVET_Z0153_IBC_EXT_REF
+  int                  m_IBCBufferHeight;
+#endif
 #if JVET_Z0118_GDR
   PelStorage           m_IBCBuffer0; // for dirty
   PelStorage           m_IBCBuffer1; // for clean
@@ -367,7 +370,11 @@ public:
   virtual ~InterPrediction();
 
 #if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
+#if JVET_Z0153_IBC_EXT_REF
+  void    init                (RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape, const int picWidth);
+#else
   void    init                (RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape);
+#endif
 #else
   void    init                (RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize);
 #endif

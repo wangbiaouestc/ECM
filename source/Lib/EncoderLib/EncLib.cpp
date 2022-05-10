@@ -524,6 +524,9 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
                        getUseCompositeRef(),
     m_maxCUWidth, m_maxCUHeight, floorLog2(m_maxCUWidth) - m_log2MinCUSize, &m_cRdCost, cabacEstimator, getCtxCache()
                      , &m_cReshaper
+#if JVET_Z0153_IBC_EXT_REF
+                     , pps0.getPicWidthInLumaSamples()
+#endif
   );
 
   // link temporary buffets from intra search with inter search to avoid unneccessary memory overhead

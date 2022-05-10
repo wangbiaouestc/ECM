@@ -2440,11 +2440,13 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
     return false;
   }
 
+#if !JVET_Z0153_IBC_EXT_REF
   // Don't search the above CTU row
   if (refTopY >> ctuSizeLog2 < yPos >> ctuSizeLog2)
   {
     return false;
   }
+#endif
 
   // Don't search the below CTU row
   if (refBottomY >> ctuSizeLog2 > yPos >> ctuSizeLog2)
@@ -2478,6 +2480,20 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
     return false;
   }
 
+#if JVET_Z0153_IBC_EXT_REF
+  if ((refTopY >> ctuSizeLog2) + 2 < (yPos >> ctuSizeLog2))
+  {
+    return false;
+  }
+  if (((refTopY >> ctuSizeLog2) == (yPos >> ctuSizeLog2)) && ((refRightX >> ctuSizeLog2) > (xPos >> ctuSizeLog2)))
+  {
+    return false;
+  }
+  if (((refTopY >> ctuSizeLog2) + 2 == (yPos >> ctuSizeLog2)) && ((refLeftX >> ctuSizeLog2) + 2 < (xPos >> ctuSizeLog2)))
+  {
+    return false;
+  }
+#else
   // in the same CTU line
 #if CTU_256
   int numLeftCTUs = ( 1 << ( ( MAX_CU_DEPTH - ctuSizeLog2 ) << 1 ) ) - ( ( ctuSizeLog2 < MAX_CU_DEPTH ) ? 1 : 0 );
@@ -2518,6 +2534,7 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
   {
     return false;
   }
+#endif
 
   // in the same CTU, or valid area from left CTU. Check if the reference block is already coded
 #if JVET_Z0084_IBC_TM

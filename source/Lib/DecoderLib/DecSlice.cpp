@@ -328,7 +328,9 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
       cs.motionLut.lutAffInherit.resize(0);
 #endif // JVET_Z0118_GDR
 #endif
+#if !JVET_Z0153_IBC_EXT_REF
       cs.resetIBCBuffer = true;
+#endif
     }
 
     if( !cs.slice->isIntra() )
