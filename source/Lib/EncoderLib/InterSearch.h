@@ -433,6 +433,9 @@ public:
                                       CABACWriter*   CABACEstimator,
                                       CtxCache*      ctxCache
                                      , EncReshape*   m_pcReshape
+#if JVET_Z0153_IBC_EXT_REF
+                                    , const uint32_t curPicWidthY
+#endif
                                     );
 
   void destroy                      ();

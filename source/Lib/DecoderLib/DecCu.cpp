@@ -111,6 +111,13 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
     m_pcInterPred->resetIBCBuffer(cs.pcv->chrFormat, cs.slice->getSPS()->getMaxCUHeight());
     cs.resetIBCBuffer = false;
   }
+#if JVET_Z0153_IBC_EXT_REF
+  else
+  {
+    const int ctuSize = cs.slice->getSPS()->getMaxCUHeight();
+    m_pcInterPred->resetVPDUforIBC(cs.pcv->chrFormat, ctuSize, ctuSize, ctuArea.Y().x, ctuArea.Y().y);
+  }
+#endif
 #if JVET_Z0118_GDR
   // reset current IBC Buffer only when VB pass through
   if (cs.isInGdrInvervalOrRecoveryPoc())
