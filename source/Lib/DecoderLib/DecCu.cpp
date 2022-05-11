@@ -2255,6 +2255,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           }
           pu.mv[REF_PIC_LIST_0] = amvpInfo.mvCand[pu.mvpIdx[REF_PIC_LIST_0]] + mvd;
           pu.mv[REF_PIC_LIST_0].mvCliptoStorageBitDepth();
+#if JVET_Z0160_IBC_ZERO_PADDING
+          pu.bv = pu.mv[0];
+          pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+#endif
         }
         else
         {

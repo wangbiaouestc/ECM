@@ -142,6 +142,7 @@
 #define JVET_Z0084_IBC_TM                                 1 // JVET-Z0084: add template matching in IBC modes (controlled by TM_MRG or TM_AMVP)
 #define JVET_Z0131_IBC_BVD_BINARIZATION                   1 // JVET-Z0131: Block Vector Difference Binarization
 #define JVET_Z0153_IBC_EXT_REF                            1 // JVET-Z0153: extend reference area for IBC
+#define JVET_Z0160_IBC_ZERO_PADDING                       1 // JVET-Z0160: Replacement of zero-padding candidates
 
 // Inter
 #define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
