@@ -2358,6 +2358,104 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
   }
 #endif
 
+#if JVET_Z0160_IBC_ZERO_PADDING
+  int  validIdx = 0;
+  Mv   validBvCand[IBC_MRG_MAX_NUM_CANDS];
+  bool padList = true;
+
+  if (cnt < maxNumMergeCand)
+  {
+    const int ctbSize     = pu.cs->sps->getCTUSize();
+    const int log2CtbSize = floorLog2(ctbSize);
+    const int cbX         = pu.lx() & (ctbSize - 1);
+    const int cbY         = pu.ly() & (ctbSize - 1);
+    const int cbWidth     = pu.lwidth();
+    const int cbHeight    = pu.lheight();
+#if !JVET_Z0153_IBC_EXT_REF
+    const int leftEdge = -ctbSize
+                         * (std::min(pu.Y().x >> log2CtbSize, (1 << ((MAX_CU_DEPTH - log2CtbSize) << 1))
+                                                                - ((log2CtbSize < MAX_CU_DEPTH) ? 1 : 0)));
+    int deltaX = cbX - leftEdge - cbWidth;
+    int deltaY = cbY - cbHeight;
+#else
+    const int deltaX = ctbSize * (pu.lx() >> log2CtbSize) + cbX - cbWidth;
+    const int deltaY = ((pu.ly() >> log2CtbSize) == 0)
+                         ? (cbY - cbHeight)
+                         : ((((pu.ly() >> log2CtbSize) == 1) ? 1 : 2) * ctbSize + cbY - cbHeight);
+#endif
+
+    if (deltaX >= 0 && deltaY >= 0)
+    {
+      validBvCand[0] = Mv(-cbWidth, -cbHeight);
+      validBvCand[1] = Mv(-cbWidth, 0);
+      validBvCand[2] = Mv(0, -cbHeight);
+      validBvCand[3] = Mv(-cbWidth - (deltaX >> 1), -(cbHeight >> 1));
+      validBvCand[4] = Mv(-(cbWidth >> 1), -cbHeight - (deltaY >> 1));
+      validBvCand[5] = Mv(-cbWidth - (deltaX >> 1), -cbHeight - (deltaY >> 1));
+    }
+    else if (deltaY >= 0)
+    {
+      validBvCand[0] = Mv(-cbX, -cbHeight);
+      validBvCand[1] = Mv(0, -cbHeight);
+      validBvCand[2] = Mv(-(cbX >> 1), -cbHeight - (deltaY >> 1));
+      validBvCand[3] = Mv(-cbX, -cbY);
+      validBvCand[4] = Mv(0, -cbY);
+      validBvCand[5] = Mv(cbWidth, -cbHeight - (deltaY >> 1));
+    }
+    else if (deltaX >= 0)
+    {
+      validBvCand[0] = Mv(-cbWidth, -cbY);
+      validBvCand[1] = Mv(-cbWidth, 0);
+      validBvCand[2] = Mv(-cbWidth - (deltaX >> 1), -(cbY >> 1));
+      validBvCand[3] = Mv(-cbX, -cbY);
+      validBvCand[4] = Mv(-cbX, 0);
+      validBvCand[5] = Mv(-cbWidth - (deltaX >> 1), cbHeight);
+    }
+    else
+    {
+      padList = false;
+    }
+  }
+
+  while (cnt < maxNumMergeCand && padList && validIdx < IBC_MRG_MAX_NUM_CANDS)
+  {
+#if !JVET_Z0084_IBC_TM
+    bool duplicateBVP = false;
+#endif
+    Mv mvp = validBvCand[validIdx];
+    mvp.changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+
+#if !JVET_Z0084_IBC_TM
+    for (int i = 0; i < cnt; i++)
+    {
+      if (mvp == mrgCtx.mvFieldNeighbours[i * 2].mv)
+      {
+        duplicateBVP = true;
+        break;
+      }
+    }
+#endif
+    MotionInfo miCand;
+    miCand.mv[0] = mvp;
+    mrgCtx.mvFieldNeighbours[cnt * 2].setMvField(mvp, MAX_NUM_REF);
+    mrgCtx.interDirNeighbours[cnt] = 1;
+
+#if JVET_Z0084_IBC_TM
+    if (!mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh) && checkIsIBCCandidateValid(pu, miCand))
+#else
+    if (!duplicateBVP && checkIsIBCCandidateValid(pu, miCand))
+#endif
+    {
+      if (mrgCandIdx == cnt)
+      {
+        return;
+      }
+      cnt++;
+    }
+    validIdx++;
+  }
+
+#else
   while (cnt < maxNumMergeCand)
   {
     mrgCtx.interDirNeighbours[cnt] = 1;
@@ -2368,6 +2466,7 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
     }
     cnt++;
   }
+#endif
 
 #if JVET_Z0084_IBC_TM && JVET_Z0075_IBC_HMVP_ENLARGE
   mrgCtx.numValidMergeCand = std::min((int)pu.cs->sps->getMaxNumIBCMergeCand(), cnt);
@@ -2375,7 +2474,7 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
   mrgCtx.numValidMergeCand = cnt;
 #endif
 
-#if JVET_Z0084_IBC_TM && JVET_Z0075_IBC_HMVP_ENLARGE
+#if (JVET_Z0160_IBC_ZERO_PADDING || JVET_Z0084_IBC_TM) && JVET_Z0075_IBC_HMVP_ENLARGE
   // Add a zero motion to be able to stop reordering
   if (cnt < maxNumMergeCand)
   {
@@ -10403,6 +10502,10 @@ void PU::applyImv( PredictionUnit& pu, MergeCtx &mrgCtx, InterPrediction *interP
 #endif
       pu.mv    [0] = amvpInfo.mvCand[mvpIdx] + pu.mvd[0];
       pu.mv[0].mvCliptoStorageBitDepth();
+#if JVET_Z0160_IBC_ZERO_PADDING
+      pu.bv = pu.mv[0];
+      pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+#endif
     }
 
     if (pu.interDir != 1 /* PRED_L0 */)
