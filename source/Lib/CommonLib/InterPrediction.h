@@ -327,7 +327,7 @@ protected:
 
 
   MotionInfo      m_SubPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
-#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
   Pel*   m_acYuvCurAMLTemplate[2][MAX_NUM_COMPONENT];   //0: top, 1: left
   bool   m_bAMLTemplateAvailabe[2];
   Pel*   m_acYuvRefAboveTemplate[2][MAX_NUM_COMPONENT];   //0: list0, 1: list1
@@ -339,12 +339,6 @@ protected:
 #endif
 #endif
 #if JVET_Z0061_TM_OBMC
-#if !JVET_W0090_ARMC_TM
-  Pel *m_acYuvCurAMLTemplate[2][MAX_NUM_COMPONENT];   // 0: top, 1: left
-  bool m_bAMLTemplateAvailabe[2];
-  Pel *m_acYuvRefAboveTemplate[2][MAX_NUM_COMPONENT];   // 0: list0, 1: list1
-  Pel *m_acYuvRefLeftTemplate[2][MAX_NUM_COMPONENT];    // 0: list0, 1: list1
-#endif
   Pel *m_acYuvRefAboveTemplateOBMC[2][MAX_NUM_COMPONENT];   // 0: current motion, 1: neighbour motion
   Pel *m_acYuvRefLeftTemplateOBMC[2][MAX_NUM_COMPONENT];    // 0: current motion, 1: neighbour motion
   Pel *m_acYuvBlendTemplateOBMC[2][MAX_NUM_COMPONENT];      // 0: top, 1: left
@@ -543,10 +537,23 @@ public:
 #if JVET_W0090_ARMC_TM
   void    adjustInterMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, int mrgCandIdx = -1);
 #endif
-#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
   bool    xAMLGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWidth, int nCurBlkHeight);
   bool    xAMLIsTopTempAvailable(PredictionUnit& pu);
   bool    xAMLIsLeftTempAvailable(PredictionUnit& pu);
+#endif
+#if JVET_Z0061_TM_OBMC
+  void xOBMCWeightedAverageY(const PredictionUnit &pu, const CPelUnitBuf &pcYuvSrc0, const CPelUnitBuf &pcYuvSrc1,
+                             PelUnitBuf &pcYuvDst, const BitDepths &clipBitDepths, const ClpRngs &clpRngs,
+                             MotionInfo currMi);
+  int  selectOBMCmode(PredictionUnit &curPu, PredictionUnit &neigPu, bool isAbove, int nLength, uint32_t minCUW,
+                      Position curOffset);
+  void getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitBuf &pcBufPredRef, bool isAbove, MotionInfo currMi);
+  bool xCheckIdenticalMotionOBMC(PredictionUnit &pu, MotionInfo tryMi);
+  void xSubblockOBMCCopy(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst,
+                         PelUnitBuf &pcYuvPredSrc, int iDir);
+  void xSubblockTMOBMC(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst, PelUnitBuf &pcYuvPredSrc,
+                       int iDir, int iOBMCmode = 0);
 #endif
 #if JVET_W0090_ARMC_TM
   void    updateCandList(uint32_t uiCand, Distortion uiCost, uint32_t uiMrgCandNum, uint32_t* RdCandList, Distortion* CandCostList);
@@ -568,25 +575,6 @@ public:
 #endif
                                );
   void    getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft);
-#if JVET_Z0061_TM_OBMC
-  void xOBMCWeightedAverageY(const PredictionUnit &pu, const CPelUnitBuf &pcYuvSrc0, const CPelUnitBuf &pcYuvSrc1,
-                             PelUnitBuf &pcYuvDst, const BitDepths &clipBitDepths, const ClpRngs &clpRngs,
-                             MotionInfo currMi);
-  int  selectOBMCmode(PredictionUnit &curPu, PredictionUnit &neigPu, bool isAbove, int nLength, uint32_t minCUW,
-                      Position curOffset);
-#if !JVET_W0090_ARMC_TM
-  bool xAMLGetCurBlkTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight);
-#endif
-  void getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitBuf &pcBufPredRef, bool isAbove, MotionInfo currMi);
-  void xGetSublkOBMCTemplate(const CodingUnit &cu, const ComponentID compID, const Picture &refPic, const Mv &mv,
-                             const int sublkWidth, const int sublkHeight, const int posW, const int posH,
-                             int *numTemplate, Pel *refLeftTemplate, Pel *refAboveTemplate);
-  bool xCheckIdenticalMotionOBMC(PredictionUnit &pu, MotionInfo tryMi);
-  void xSubblockOBMCCopy(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst,
-                         PelUnitBuf &pcYuvPredSrc, int iDir);
-  void xSubblockTMOBMC(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst, PelUnitBuf &pcYuvPredSrc,
-                       int iDir, int iOBMCmode = 0);
-#endif
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
   void adjustMergeCandidates(PredictionUnit& pu, MergeCtx& smvpMergeCandCtx, int numRetrievedMergeCand);
 #endif
