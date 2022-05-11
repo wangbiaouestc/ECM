@@ -782,6 +782,9 @@ static const int ADAPTIVE_IBC_SUB_GROUP_SIZE =                     6;
 
 #if JVET_Z0061_TM_OBMC
 static const int TM_OBMC_TEMPLATE_SIZE =                           1;
+#if (!JVET_W0090_ARMC_TM) && (!JVET_Z0056_GPM_SPLIT_MODE_REORDERING)
+static const int AML_MERGE_TEMPLATE_SIZE =                         1;
+#endif
 #endif
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
