@@ -252,8 +252,9 @@ private: //methods
                             const int orgStride, const int dstStride, const int width, const int height,
                             bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail,
                             bool isAboveLeftAvail, bool isAboveRightAvail
-#if JVET_Z0118_GDR
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                           , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+                          , const int chromaScaleX, const int chromaScaleY 
 #endif
   );
 
@@ -265,8 +266,9 @@ private: //methods
                                const int srcStrideV, const int orgStride, const int dstStride, const int width,
                                const int height, bool isLeftAvail, bool isRightAvail, bool isAboveAvail,
                                bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail
-#if JVET_Z0118_GDR
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                              , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+                             , const int chromaScaleX, const int chromaScaleY 
 #endif
     );
 #endif
@@ -277,8 +279,9 @@ private: //methods
                       , const Pel* srcY, const Pel* srcU, const Pel* srcV, const Pel* org, const Pel* dst
                       , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int orgStride, const int dstStride, const int width, const int height
                       , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail
-#if JVET_Z0118_GDR
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                       , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+                      , const int chromaScaleX, const int chromaScaleY 
 #endif
   );
   void getCcSaoFrameStats(const ComponentID compID, const int setIdx, const uint8_t* ccSaoControl
