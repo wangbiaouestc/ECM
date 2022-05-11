@@ -800,74 +800,600 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
 }
 #endif
 #if JVET_W0066_CCSAO && JVET_V0094_BILATERAL_FILTER
-void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit& currTU)
+void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit& currTU
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  , bool isTUCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+  , bool clipTop, bool clipBottom, bool clipLeft, bool clipRight
+#endif
+)
 {
-  CompArea& compArea = currTU.block(COMPONENT_Y);
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  if (isTUCrossedByVirtualBoundaries)
+  {
+    CompArea &compArea = currTU.block(COMPONENT_Y);
 
-  const unsigned uiWidth = compArea.width;
+    const unsigned width  = compArea.width;
+    const unsigned height = compArea.height;
+
+    const CompArea &myArea       = currTU.blocks[COMPONENT_Y];
+    int             yPos         = myArea.y;
+    int             xPos         = myArea.x;
+    int             yStart       = yPos;
+    int             curPicWidth  = currTU.cu->cs->pcv->lumaWidth;
+    int             curPicHeight = currTU.cu->cs->pcv->lumaHeight;
+
+    for (int i = 0; i <= numHorVirBndry; i++)
+    {
+      const int  yEnd   = i == numHorVirBndry ? yPos + height : horVirBndryPos[i];
+      const int  h      = yEnd - yStart;
+      const bool clipT  = (i == 0 && clipTop) || (i > 0) || (yStart - 2 < 0);
+      const bool clipB  = (i == numHorVirBndry && clipBottom) || (i < numHorVirBndry) || (yEnd + 2 >= curPicHeight);
+      int        xStart = xPos;
+      for (int j = 0; j <= numVerVirBndry; j++)
+      {
+        const int  xEnd  = j == numVerVirBndry ? xPos + width : verVirBndryPos[j];
+        const int  w     = xEnd - xStart;
+        const bool clipL = (j == 0 && clipLeft) || (j > 0) || (xStart - 2 < 0);
+        const bool clipR = (j == numVerVirBndry && clipRight) || (j < numVerVirBndry) || (xEnd + 2 >= curPicWidth);
+
+        const unsigned uiWidth  = w;
+        const unsigned uiHeight = h;
+
+        const Area blkDst(xStart, yStart, uiWidth, uiHeight);        
+        int        srcStride  = src.get(COMPONENT_Y).stride;
+        const Pel *srcPtr     = src.get(COMPONENT_Y).bufAt(blkDst);
+        const Pel *srcPtrTemp = srcPtr;
+
+        int  recStride = rec.get(COMPONENT_Y).stride;
+        Pel *recPtr    = rec.get(COMPONENT_Y).bufAt(blkDst);
+
+        int         bfac      = 1;
+        const char *LUTrowPtr = getFilterLutParameters(std::min(width, height), currTU.cu->predMode,
+                                                       qp + currTU.cs->pps->getBIFQPOffset(), bfac);
+
+        int bif_round_add   = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
+        int bif_round_shift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getBIFStrength());
+
+        bool topAltAvailable  = !clipT;
+        bool leftAltAvailable = !clipL;
+
+        bool bottomAltAvailable = !clipB;
+        bool rightAltAvailable  = !clipR;
+
+        topAltAvailable  = topAltAvailable && (blkDst.y - 2 >= 0);
+        leftAltAvailable = leftAltAvailable && (blkDst.x - 2 >= 0);
+
+        bottomAltAvailable = bottomAltAvailable && (blkDst.y + blkDst.height + 1 < curPicHeight);
+        rightAltAvailable  = rightAltAvailable && (blkDst.x + blkDst.width + 1 < curPicWidth);
+
+        uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
+        uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
+
+        int iWidthExtSIMD = uiWidthExt;
+        if (uiWidth < 8)
+        {
+          iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
+        }
+
+        Pel *tempBlockPtr;
+        bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
+
+        memset(tempblock, 0, iWidthExtSIMD * uiHeightExt * sizeof(short));
+
+        if (allAvail)
+        {
+          // set pointer two rows up and two pixels to the left from the start of the block
+          tempBlockPtr = tempblock;
+
+          // same with image data
+          srcPtr = srcPtr - 2 * srcStride - 2;
+
+          //// Move block to temporary block
+
+          // Check if the block a the top block of a CTU.
+          bool isCTUboundary = blkDst.y % currTU.cs->slice->getSPS()->getCTUSize() == 0;
+          if (isCTUboundary)
+          {
+            // The samples two lines up are out of bounds. (One line above the CTU is OK, since SAO uses that line.)
+            // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
+            // Therefore, copy samples from one line up instead of from two lines up by updating srcPtr *before* copy.
+            srcPtr += srcStride;
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+          }
+          else
+          {
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+            srcPtr += srcStride;
+          }
+          tempBlockPtr += iWidthExtSIMD;
+          // Copy samples that are not out of bounds.
+          for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
+          {
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+            srcPtr += srcStride;
+            tempBlockPtr += iWidthExtSIMD;
+          }
+          // Check if the block is a bottom block of a CTU.
+          isCTUboundary = (blkDst.y + uiHeight) % currTU.cs->slice->getSPS()->getCTUSize() == 0;
+          if (isCTUboundary)
+          {
+            // The samples two lines down are out of bounds. (One line below the CTU is OK, since SAO uses that line.)
+            // Hence the bottom line of tempblock is unavailable if the block at the bottom of a CTU.
+            // Therefore, copy samples from the second to last line instead of the last line by subtracting srcPtr
+            // before copy.
+            srcPtr -= srcStride;
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+          }
+          else
+          {
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+          }
+          m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride,
+                                            iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+        }
+        else
+        {
+          tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+
+          //// Move block to temporary block
+          for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
+          {
+            std::memcpy(tempBlockPtr, srcPtr, uiWidth * sizeof(Pel));
+            srcPtr += srcStride;
+            tempBlockPtr += iWidthExtSIMD;
+          }
+          srcPtr = srcPtrTemp;
+
+          if (topAltAvailable)
+          {
+            std::copy(srcPtr - 2 * srcStride, srcPtr - 2 * srcStride + uiWidth, tempblock + 2);
+            std::copy(srcPtr - srcStride, srcPtr - srcStride + uiWidth, tempblock + iWidthExtSIMD + 2);
+          }
+          if (bottomAltAvailable)
+          {
+            std::copy(srcPtr + (uiHeight + 1) * srcStride, srcPtr + (uiHeight + 1) * srcStride + uiWidth,
+                      tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+            std::copy(srcPtr + uiHeight * srcStride, srcPtr + uiHeight * srcStride + uiWidth,
+                      tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+          }
+          if (leftAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = *(srcPtr + yy * srcStride - 2);
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = *(srcPtr + yy * srcStride - 1);
+            }
+          }
+          if (rightAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] =
+                *(srcPtr + uiWidth + yy * srcStride + 1);
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] =
+                *(srcPtr + uiWidth + yy * srcStride);
+            }
+          }
+
+          // if not all available, copy from inside tempbuffer
+          if (!topAltAvailable)
+          {
+            std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + 2);
+            std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth,
+                      tempblock + iWidthExtSIMD + 2);
+          }
+          if (!bottomAltAvailable)
+          {
+            std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2,
+                      tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth,
+                      tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+            std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2,
+                      tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth,
+                      tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+          }
+          if (!leftAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] =
+                tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] =
+                tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+            }
+          }
+          if (!rightAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] =
+                tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] =
+                tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+            }
+          }
+
+          // All sides are available, easy to just copy corners also.
+          if (topAltAvailable && leftAltAvailable)
+          {
+            tempblock[0]                 = *(srcPtr - 2 * srcStride - 2);   // a     top left corner
+            tempblock[1]                 = *(srcPtr - 2 * srcStride - 1);   // b     a b|x x
+            tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride - 2);       // c     c d|x x
+            tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride - 1);       // d     -------
+          }
+          else
+          {
+            tempblock[0]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+            tempblock[1]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+            tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+            tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+          }
+
+          if (topAltAvailable && rightAltAvailable)
+          {
+            tempblock[iWidthExtSIMD - 2]              = *(srcPtr - 2 * srcStride + uiWidth);       // a
+            tempblock[iWidthExtSIMD - 1]              = *(srcPtr - 2 * srcStride + uiWidth + 1);   // b
+            tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);           // c
+            tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);       // d
+          }
+          else
+          {
+            tempblock[iWidthExtSIMD - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+            tempblock[iWidthExtSIMD - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+            tempblock[iWidthExtSIMD + uiWidthExt - 2] =
+              tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+            tempblock[iWidthExtSIMD + uiWidthExt - 1] =
+              tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+          }
+
+          if (bottomAltAvailable && leftAltAvailable)
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = *(srcPtr + uiHeight * srcStride - 2);         // a
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = *(srcPtr + uiHeight * srcStride - 1);         // b
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = *(srcPtr + (uiHeight + 1) * srcStride - 2);   // c
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = *(srcPtr + (uiHeight + 1) * srcStride - 1);   // d
+          }
+          else
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] =
+              tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] =
+              tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] =
+              tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] =
+              tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+          }
+
+          if (bottomAltAvailable && rightAltAvailable)
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] =
+              *(srcPtr + uiHeight * srcStride + uiWidth);   // a
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] =
+              *(srcPtr + uiHeight * srcStride + uiWidth + 1);   // b
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] =
+              *(srcPtr + (uiHeight + 1) * srcStride + uiWidth);   // c
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] =
+              *(srcPtr + (uiHeight + 1) * srcStride + uiWidth + 1);   // d
+          }
+          else
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] =
+              tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] =
+              tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] =
+              tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] =
+              tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+          }
+          m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride,
+                                            iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+        }
+
+        xStart = xEnd;
+      }
+
+      yStart = yEnd;
+    }
+  }
+  else
+  {
+    CompArea &compArea = currTU.block(COMPONENT_Y);
+
+    const unsigned uiWidth  = compArea.width;
+    const unsigned uiHeight = compArea.height;
+
+    bool topAltAvailable;
+    bool leftAltAvailable;
+
+    int        srcStride  = src.get(COMPONENT_Y).stride;
+    const Pel *srcPtr     = src.get(COMPONENT_Y).bufAt(compArea);
+    const Pel *srcPtrTemp = srcPtr;
+
+    int  recStride = rec.get(COMPONENT_Y).stride;
+    Pel *recPtr    = rec.get(COMPONENT_Y).bufAt(compArea);
+
+    int         bfac      = 1;
+    const char *LUTrowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac);
+
+    int bif_round_add   = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
+    int bif_round_shift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getBIFStrength());
+
+    const CompArea &myArea = currTU.blocks[COMPONENT_Y];
+    topAltAvailable        = myArea.y - 2 >= 0;
+    leftAltAvailable       = myArea.x - 2 >= 0;
+#if RPR_ENABLE
+    int  curPicWidth        = currTU.cu->cs->pcv->lumaWidth;
+    int  curPicHeight       = currTU.cu->cs->pcv->lumaHeight;
+    bool bottomAltAvailable = myArea.y + myArea.height + 1 < curPicHeight;
+    bool rightAltAvailable  = myArea.x + myArea.width + 1 < curPicWidth;
+#else
+    bool bottomAltAvailable = myArea.y + myArea.height + 1 < currTU.cu->slice->getSPS()->getMaxPicHeightInLumaSamples();
+    bool rightAltAvailable  = myArea.x + myArea.width + 1 < currTU.cu->slice->getSPS()->getMaxPicWidthInLumaSamples();
+#endif
+
+    uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
+    uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
+
+    int iWidthExtSIMD = uiWidthExt;
+    if (uiWidth < 8)
+    {
+      iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
+    }
+
+    Pel *tempBlockPtr;
+
+    bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
+
+    memset(tempblock, 0, iWidthExtSIMD * uiHeightExt * sizeof(short));
+
+    if (allAvail)
+    {
+      // set pointer two rows up and two pixels to the left from the start of the block
+      tempBlockPtr = tempblock;
+
+      // same with image data
+      srcPtr = srcPtr - 2 * srcStride - 2;
+
+      //// Move block to temporary block
+
+      // Check if the block a the top block of a CTU.
+      bool isCTUboundary = myArea.y % currTU.cs->slice->getSPS()->getCTUSize() == 0;
+      if (isCTUboundary)
+      {
+        // The samples two lines up are out of bounds. (One line above the CTU is OK, since SAO uses that line.)
+        // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
+        // Therefore, copy samples from one line up instead of from two lines up by updating srcPtr *before* copy.
+        srcPtr += srcStride;
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      }
+      else
+      {
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        srcPtr += srcStride;
+      }
+      tempBlockPtr += iWidthExtSIMD;
+      // Copy samples that are not out of bounds.
+      for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
+      {
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        srcPtr += srcStride;
+        tempBlockPtr += iWidthExtSIMD;
+      }
+      // Check if the block is a bottom block of a CTU.
+      isCTUboundary = (myArea.y + uiHeight) % currTU.cs->slice->getSPS()->getCTUSize() == 0;
+      if (isCTUboundary)
+      {
+        // The samples two lines down are out of bounds. (One line below the CTU is OK, since SAO uses that line.)
+        // Hence the bottom line of tempblock is unavailable if the block at the bottom of a CTU.
+        // Therefore, copy samples from the second to last line instead of the last line by subtracting srcPtr before
+        // copy.
+        srcPtr -= srcStride;
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      }
+      else
+      {
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      }
+      return m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr,
+                                               recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false,
+                                               LUTrowPtr);
+    }
+    else
+    {
+      tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+
+      //// Move block to temporary block
+      for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
+      {
+        std::memcpy(tempBlockPtr, srcPtr, uiWidth * sizeof(Pel));
+        srcPtr += srcStride;
+        tempBlockPtr += iWidthExtSIMD;
+      }
+      srcPtr = srcPtrTemp;
+
+      if (topAltAvailable)
+      {
+        std::copy(srcPtr - 2 * srcStride, srcPtr - 2 * srcStride + uiWidth, tempblock + 2);
+        std::copy(srcPtr - srcStride, srcPtr - srcStride + uiWidth, tempblock + iWidthExtSIMD + 2);
+      }
+      if (bottomAltAvailable)
+      {
+        std::copy(srcPtr + (uiHeight + 1) * srcStride, srcPtr + (uiHeight + 1) * srcStride + uiWidth,
+                  tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+        std::copy(srcPtr + uiHeight * srcStride, srcPtr + uiHeight * srcStride + uiWidth,
+                  tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+      }
+      if (leftAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = *(srcPtr + yy * srcStride - 2);
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = *(srcPtr + yy * srcStride - 1);
+        }
+      }
+      if (rightAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] =
+            *(srcPtr + uiWidth + yy * srcStride + 1);
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride);
+        }
+      }
+
+      // if not all available, copy from inside tempbuffer
+      if (!topAltAvailable)
+      {
+        std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + 2);
+        std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth,
+                  tempblock + iWidthExtSIMD + 2);
+      }
+      if (!bottomAltAvailable)
+      {
+        std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2,
+                  tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth,
+                  tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+        std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2,
+                  tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth,
+                  tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+      }
+      if (!leftAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] =
+            tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] =
+            tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+        }
+      }
+      if (!rightAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] =
+            tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] =
+            tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+        }
+      }
+
+      // All sides are available, easy to just copy corners also.
+      if (topAltAvailable && leftAltAvailable)
+      {
+        tempblock[0]                 = *(srcPtr - 2 * srcStride - 2);   // a     top left corner
+        tempblock[1]                 = *(srcPtr - 2 * srcStride - 1);   // b     a b|x x
+        tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride - 2);       // c     c d|x x
+        tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride - 1);       // d     -------
+      }
+      else
+      {
+        tempblock[0]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+        tempblock[1]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+        tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+        tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+      }
+
+      if (topAltAvailable && rightAltAvailable)
+      {
+        tempblock[iWidthExtSIMD - 2]              = *(srcPtr - 2 * srcStride + uiWidth);       // a
+        tempblock[iWidthExtSIMD - 1]              = *(srcPtr - 2 * srcStride + uiWidth + 1);   // b
+        tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);           // c
+        tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);       // d
+      }
+      else
+      {
+        tempblock[iWidthExtSIMD - 2]              = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+        tempblock[iWidthExtSIMD - 1]              = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+        tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+        tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+      }
+
+      if (bottomAltAvailable && leftAltAvailable)
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = *(srcPtr + uiHeight * srcStride - 2);         // a
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = *(srcPtr + uiHeight * srcStride - 1);         // b
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = *(srcPtr + (uiHeight + 1) * srcStride - 2);   // c
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = *(srcPtr + (uiHeight + 1) * srcStride - 1);   // d
+      }
+      else
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] =
+          tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] =
+          tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] =
+          tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] =
+          tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      }
+
+      if (bottomAltAvailable && rightAltAvailable)
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] =
+          *(srcPtr + uiHeight * srcStride + uiWidth);   // a
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] =
+          *(srcPtr + uiHeight * srcStride + uiWidth + 1);   // b
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] =
+          *(srcPtr + (uiHeight + 1) * srcStride + uiWidth);   // c
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] =
+          *(srcPtr + (uiHeight + 1) * srcStride + uiWidth + 1);   // d
+      }
+      else
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] =
+          tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] =
+          tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] =
+          tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] =
+          tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      }
+    }
+
+    m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride,
+                                      iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+  }
+#else
+  CompArea &compArea = currTU.block(COMPONENT_Y);
+
+  const unsigned uiWidth  = compArea.width;
   const unsigned uiHeight = compArea.height;
 
   bool topAltAvailable;
   bool leftAltAvailable;
 
-  int srcStride = src.get(COMPONENT_Y).stride;
-  const Pel* srcPtr = src.get(COMPONENT_Y).bufAt(compArea);
-  const Pel* srcPtrTemp = srcPtr;
+  int        srcStride  = src.get(COMPONENT_Y).stride;
+  const Pel *srcPtr     = src.get(COMPONENT_Y).bufAt(compArea);
+  const Pel *srcPtrTemp = srcPtr;
 
-  int recStride = rec.get(COMPONENT_Y).stride;
-  Pel* recPtr = rec.get(COMPONENT_Y).bufAt(compArea);
+  int  recStride = rec.get(COMPONENT_Y).stride;
+  Pel *recPtr    = rec.get(COMPONENT_Y).bufAt(compArea);
 
-  int bfac = 1;
-  const char* LUTrowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac);
+  int         bfac      = 1;
+  const char *LUTrowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode,
+                                                 qp + currTU.cs->pps->getBIFQPOffset(), bfac);
 
-  int bif_round_add = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
-  int bif_round_shift = (BIF_ROUND_SHIFT)-(currTU.cs->pps->getBIFStrength());
+  int bif_round_add   = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
+  int bif_round_shift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getBIFStrength());
 
-  const CompArea& myArea = currTU.blocks[COMPONENT_Y];
-  topAltAvailable = myArea.y - 2 >= 0;
-  leftAltAvailable = myArea.x - 2 >= 0;
+  const CompArea &myArea  = currTU.blocks[COMPONENT_Y];
+  topAltAvailable         = myArea.y - 2 >= 0;
+  leftAltAvailable        = myArea.x - 2 >= 0;
 #if RPR_ENABLE
-  int curPicWidth         = currTU.cu->cs->pcv->lumaWidth;
-  int curPicHeight        = currTU.cu->cs->pcv->lumaHeight;
+  int  curPicWidth        = currTU.cu->cs->pcv->lumaWidth;
+  int  curPicHeight       = currTU.cu->cs->pcv->lumaHeight;
   bool bottomAltAvailable = myArea.y + myArea.height + 1 < curPicHeight;
-  bool rightAltAvailable  = myArea.x + myArea.width  + 1 < curPicWidth;
+  bool rightAltAvailable  = myArea.x + myArea.width + 1 < curPicWidth;
 #else
   bool bottomAltAvailable = myArea.y + myArea.height + 1 < currTU.cu->slice->getSPS()->getMaxPicHeightInLumaSamples();
-  bool rightAltAvailable = myArea.x + myArea.width + 1 < currTU.cu->slice->getSPS()->getMaxPicWidthInLumaSamples();
+  bool rightAltAvailable  = myArea.x + myArea.width + 1 < currTU.cu->slice->getSPS()->getMaxPicWidthInLumaSamples();
 #endif
 
-#if JVET_Z0118_GDR
-  PicHeader *picHeader = currTU.cs->picHeader;  
-  if (picHeader->getVirtualBoundariesPresentFlag())
-  {
-    for (int i = 0; i < picHeader->getNumHorVirtualBoundaries(); i++)
-    {
-      if ((myArea.y - NUMBER_PADDED_SAMPLES ) <= picHeader->getVirtualBoundariesPosY(i))
-      {
-        topAltAvailable = false;
-      }
-      if ((myArea.y + myArea.height + NUMBER_PADDED_SAMPLES) >= picHeader->getVirtualBoundariesPosY(i))
-      {
-        bottomAltAvailable = false;
-      }
-    }
-    for (int i = 0; i < picHeader->getNumVerVirtualBoundaries(); i++)
-    {
-      if ((myArea.x - NUMBER_PADDED_SAMPLES) <= picHeader->getVirtualBoundariesPosX(i))
-      {
-        leftAltAvailable = false;
-      }
-      if ((myArea.x + myArea.width + NUMBER_PADDED_SAMPLES) >= picHeader->getVirtualBoundariesPosX(i))
-      {
-        rightAltAvailable = false;
-      }
-    }
-  }
-#endif
-
- 
-  uint32_t   uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
-  uint32_t   uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
+  uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
+  uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
   int iWidthExtSIMD = uiWidthExt;
   if (uiWidth < 8)
@@ -875,7 +1401,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
   }
 
-  Pel* tempBlockPtr;
+  Pel *tempBlockPtr;
 
   bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
 
@@ -932,7 +1458,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
   }
   else
   {
-    tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES)*iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+    tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
 
     //// Move block to temporary block
     for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
@@ -1001,55 +1527,55 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
     // All sides are available, easy to just copy corners also.
     if (topAltAvailable && leftAltAvailable)
     {
-      tempblock[0] = *(srcPtr - 2 * srcStride - 2);                                               // a     top left corner
-      tempblock[1] = *(srcPtr - 2 * srcStride - 1);                                               // b     a b|x x
-      tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride - 2);                                   // c     c d|x x
-      tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride - 1);                                   // d     -------
+      tempblock[0]                 = *(srcPtr - 2 * srcStride - 2);   // a     top left corner
+      tempblock[1]                 = *(srcPtr - 2 * srcStride - 1);   // b     a b|x x
+      tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride - 2);       // c     c d|x x
+      tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride - 1);       // d     -------
     }
     else
     {
-      tempblock[0] = tempblock[iWidthExtSIMD * 2 + 2];                                            // extend top left
-      tempblock[1] = tempblock[iWidthExtSIMD * 2 + 2];                                            // extend top left
-      tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD * 2 + 2];                            // extend top left
-      tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD * 2 + 2];                            // extend top left
+      tempblock[0]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+      tempblock[1]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+      tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+      tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
     }
 
     if (topAltAvailable && rightAltAvailable)
     {
-      tempblock[iWidthExtSIMD - 2] = *(srcPtr - 2 * srcStride + uiWidth);                         // a
-      tempblock[iWidthExtSIMD - 1] = *(srcPtr - 2 * srcStride + uiWidth + 1);                     // b
-      tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);                // c
-      tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);            // d
+      tempblock[iWidthExtSIMD - 2]              = *(srcPtr - 2 * srcStride + uiWidth);       // a
+      tempblock[iWidthExtSIMD - 1]              = *(srcPtr - 2 * srcStride + uiWidth + 1);   // b
+      tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);           // c
+      tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);       // d
     }
     else
     {
-      tempblock[iWidthExtSIMD - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];               // extend top right
-      tempblock[iWidthExtSIMD - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];               // extend top right
-      tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];  // extend top right
-      tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];  // extend top right
+      tempblock[iWidthExtSIMD - 2]              = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+      tempblock[iWidthExtSIMD - 1]              = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+      tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+      tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
     }
 
     if (bottomAltAvailable && leftAltAvailable)
     {
-      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = *(srcPtr + uiHeight * srcStride - 2);          // a
-      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = *(srcPtr + uiHeight * srcStride - 1);          // b
-      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = *(srcPtr + (uiHeight + 1) * srcStride - 2);    // c
-      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = *(srcPtr + (uiHeight + 1) * srcStride - 1);    // d
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = *(srcPtr + uiHeight * srcStride - 2);         // a
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = *(srcPtr + uiHeight * srcStride - 1);         // b
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = *(srcPtr + (uiHeight + 1) * srcStride - 2);   // c
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = *(srcPtr + (uiHeight + 1) * srcStride - 1);   // d
     }
     else
     {
-      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];  // bot avail: mirror left/right
-      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];  // bot avail: mirror left/right
-      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];  // bot avail: mirror left/right
-      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];  // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
     }
 
     if (bottomAltAvailable && rightAltAvailable)
     {
-      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = *(srcPtr + uiHeight * srcStride + uiWidth);                // a
-      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = *(srcPtr + uiHeight * srcStride + uiWidth + 1);            // b
-      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth);          // c
-      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth + 1);      // d
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = *(srcPtr + uiHeight * srcStride + uiWidth);   // a
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = *(srcPtr + uiHeight * srcStride + uiWidth + 1);   // b
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth);   // c
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth + 1);   // d
     }
     else
     {
@@ -1061,102 +1587,583 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
   }
 
   m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+#endif
 }
 #endif
 #if JVET_V0094_BILATERAL_FILTER
-void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU)
-{
-  CompArea &compArea = currTU.block(COMPONENT_Y);
-  
-  const unsigned uiWidth = compArea.width;
-  const unsigned uiHeight = compArea.height;
-  
-  bool topAltAvailable;
-  bool leftAltAvailable;
-  
-  int srcStride = src.get(COMPONENT_Y).stride;
-  const Pel *srcPtr = src.get(COMPONENT_Y).bufAt(compArea);
-  const Pel *srcPtrTemp = srcPtr;
-  
-  int recStride = rec.get(COMPONENT_Y).stride;
-  Pel *recPtr = rec.get(COMPONENT_Y).bufAt(compArea);
-  
-  int bfac = 1;  
-  const char* LUTrowPtr = getFilterLutParameters( std::min( uiWidth, uiHeight ), currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac );
-  
-  int bif_round_add = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
-  int bif_round_shift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getBIFStrength());
-  
-  const CompArea &myArea = currTU.blocks[COMPONENT_Y];
-  topAltAvailable = myArea.y - 2 >= 0;
-  leftAltAvailable = myArea.x - 2 >= 0;
-#if RPR_ENABLE
-  int curPicWidth         = currTU.cu->cs->pcv->lumaWidth;
-  int curPicHeight        = currTU.cu->cs->pcv->lumaHeight;
-  bool bottomAltAvailable = myArea.y + myArea.height + 1 < curPicHeight;
-  bool rightAltAvailable  = myArea.x + myArea.width  + 1 < curPicWidth;
-#else
-  bool bottomAltAvailable = myArea.y + myArea.height + 1 < currTU.cu->slice->getSPS()->getMaxPicHeightInLumaSamples();
-  bool rightAltAvailable = myArea.x + myArea.width + 1 < currTU.cu->slice->getSPS()->getMaxPicWidthInLumaSamples();
+void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  , bool isTUCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+  , bool clipTop, bool clipBottom, bool clipLeft, bool clipRight
 #endif
-
-#if JVET_Z0118_GDR
-  PicHeader *picHeader = currTU.cs->picHeader;
-  if (picHeader->getVirtualBoundariesPresentFlag())
+)
+{
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  if (isTUCrossedByVirtualBoundaries)
   {
-    for (int i = 0; i < picHeader->getNumHorVirtualBoundaries(); i++)
+    CompArea &compArea = currTU.block(COMPONENT_Y);
+
+    const unsigned width  = compArea.width;
+    const unsigned height = compArea.height;
+
+    const CompArea &myArea       = currTU.blocks[COMPONENT_Y];
+    int             yPos         = myArea.y;
+    int             xPos         = myArea.x;
+    int             yStart       = yPos;
+    int             curPicWidth  = currTU.cu->cs->pcv->lumaWidth;
+    int             curPicHeight = currTU.cu->cs->pcv->lumaHeight;
+
+    for (int i = 0; i <= numHorVirBndry; i++)
     {
-      if ((myArea.y - NUMBER_PADDED_SAMPLES) <= picHeader->getVirtualBoundariesPosY(i))
+      const int  yEnd   = i == numHorVirBndry ? yPos + height : horVirBndryPos[i];
+      const int  h      = yEnd - yStart;
+      const bool clipT  = (i == 0 && clipTop) || (i > 0) || (yStart - 2 < 0);
+      const bool clipB  = (i == numHorVirBndry && clipBottom) || (i < numHorVirBndry) || (yEnd + 2 >= curPicHeight);
+      int        xStart = xPos;
+      for (int j = 0; j <= numVerVirBndry; j++)
       {
-        topAltAvailable = false;
+        const int  xEnd  = j == numVerVirBndry ? xPos + width : verVirBndryPos[j];
+        const int  w     = xEnd - xStart;
+        const bool clipL = (j == 0 && clipLeft) || (j > 0) || (xStart - 2 < 0);
+        const bool clipR = (j == numVerVirBndry && clipRight) || (j < numVerVirBndry) || (xEnd + 2 >= curPicWidth);
+
+        const unsigned uiWidth  = w;
+        const unsigned uiHeight = h;
+
+        const Area blkDst(xStart, yStart, uiWidth, uiHeight);        
+        int        srcStride  = src.get(COMPONENT_Y).stride;
+        const Pel *srcPtr     = src.get(COMPONENT_Y).bufAt(blkDst);
+        const Pel *srcPtrTemp = srcPtr;
+
+        int  recStride = rec.get(COMPONENT_Y).stride;
+        Pel *recPtr    = rec.get(COMPONENT_Y).bufAt(blkDst);
+
+        int         bfac      = 1;
+        const char *LUTrowPtr = getFilterLutParameters(std::min(width, height), currTU.cu->predMode,
+                                                       qp + currTU.cs->pps->getBIFQPOffset(), bfac);
+
+        int bif_round_add   = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
+        int bif_round_shift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getBIFStrength());
+
+        bool topAltAvailable  = !clipT;
+        bool leftAltAvailable = !clipL;
+
+        bool bottomAltAvailable = !clipB;
+        bool rightAltAvailable  = !clipR;
+
+        topAltAvailable  = topAltAvailable && (blkDst.y - 2 >= 0);
+        leftAltAvailable = leftAltAvailable && (blkDst.x - 2 >= 0);
+
+        bottomAltAvailable = bottomAltAvailable && (blkDst.y + blkDst.height + 1 < curPicHeight);
+        rightAltAvailable  = rightAltAvailable && (blkDst.x + blkDst.width + 1 < curPicWidth);
+
+        uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
+        uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
+
+        int iWidthExtSIMD = uiWidthExt;
+        if (uiWidth < 8)
+        {
+          iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
+        }
+
+        Pel *tempBlockPtr;
+        bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
+
+        memset(tempblock, 0, iWidthExtSIMD * uiHeightExt * sizeof(short));
+
+        if (allAvail)
+        {
+          // set pointer two rows up and two pixels to the left from the start of the block
+          tempBlockPtr = tempblock;
+
+          // same with image data
+          srcPtr = srcPtr - 2 * srcStride - 2;
+
+          //// Move block to temporary block
+
+          // Check if the block a the top block of a CTU.
+          bool isCTUboundary = blkDst.y % currTU.cs->slice->getSPS()->getCTUSize() == 0;
+          if (isCTUboundary)
+          {
+            // The samples two lines up are out of bounds. (One line above the CTU is OK, since SAO uses that line.)
+            // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
+            // Therefore, copy samples from one line up instead of from two lines up by updating srcPtr *before* copy.
+            srcPtr += srcStride;
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+          }
+          else
+          {
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+            srcPtr += srcStride;
+          }
+          tempBlockPtr += iWidthExtSIMD;
+          // Copy samples that are not out of bounds.
+          for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
+          {
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+            srcPtr += srcStride;
+            tempBlockPtr += iWidthExtSIMD;
+          }
+          // Check if the block is a bottom block of a CTU.
+          isCTUboundary = (blkDst.y + uiHeight) % currTU.cs->slice->getSPS()->getCTUSize() == 0;
+          if (isCTUboundary)
+          {
+            // The samples two lines down are out of bounds. (One line below the CTU is OK, since SAO uses that line.)
+            // Hence the bottom line of tempblock is unavailable if the block at the bottom of a CTU.
+            // Therefore, copy samples from the second to last line instead of the last line by subtracting srcPtr
+            // before copy.
+            srcPtr -= srcStride;
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+          }
+          else
+          {
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+          }
+          m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride,
+                                            iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+        }
+        else
+        {
+          tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+
+          //// Move block to temporary block
+          for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
+          {
+            std::memcpy(tempBlockPtr, srcPtr, uiWidth * sizeof(Pel));
+            srcPtr += srcStride;
+            tempBlockPtr += iWidthExtSIMD;
+          }
+          srcPtr = srcPtrTemp;
+
+          if (topAltAvailable)
+          {
+            std::copy(srcPtr - 2 * srcStride, srcPtr - 2 * srcStride + uiWidth, tempblock + 2);
+            std::copy(srcPtr - srcStride, srcPtr - srcStride + uiWidth, tempblock + iWidthExtSIMD + 2);
+          }
+          if (bottomAltAvailable)
+          {
+            std::copy(srcPtr + (uiHeight + 1) * srcStride, srcPtr + (uiHeight + 1) * srcStride + uiWidth,
+                      tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+            std::copy(srcPtr + uiHeight * srcStride, srcPtr + uiHeight * srcStride + uiWidth,
+                      tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+          }
+          if (leftAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = *(srcPtr + yy * srcStride - 2);
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = *(srcPtr + yy * srcStride - 1);
+            }
+          }
+          if (rightAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride + 1);
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride);
+            }
+          }
+
+          // if not all available, copy from inside tempbuffer
+          if (!topAltAvailable)
+          {
+            std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + 2);
+            std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + iWidthExtSIMD + 2);
+          }
+          if (!bottomAltAvailable)
+          {
+            std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+            std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+          }
+          if (!leftAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+            }
+          }
+          if (!rightAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+            }
+          }
+
+          // All sides are available, easy to just copy corners also.
+          if (topAltAvailable && leftAltAvailable)
+          {
+            tempblock[0]                 = *(srcPtr - 2 * srcStride - 2);   // a     top left corner
+            tempblock[1]                 = *(srcPtr - 2 * srcStride - 1);   // b     a b|x x
+            tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride - 2);       // c     c d|x x
+            tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride - 1);       // d     -------
+          }
+          else
+          {
+            tempblock[0]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+            tempblock[1]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+            tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+            tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+          }
+
+          if (topAltAvailable && rightAltAvailable)
+          {
+            tempblock[iWidthExtSIMD - 2]              = *(srcPtr - 2 * srcStride + uiWidth);       // a
+            tempblock[iWidthExtSIMD - 1]              = *(srcPtr - 2 * srcStride + uiWidth + 1);   // b
+            tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);           // c
+            tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);       // d
+          }
+          else
+          {
+            tempblock[iWidthExtSIMD - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+            tempblock[iWidthExtSIMD - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+            tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+            tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+          }
+
+          if (bottomAltAvailable && leftAltAvailable)
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = *(srcPtr + uiHeight * srcStride - 2);         // a
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = *(srcPtr + uiHeight * srcStride - 1);         // b
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = *(srcPtr + (uiHeight + 1) * srcStride - 2);   // c
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = *(srcPtr + (uiHeight + 1) * srcStride - 1);   // d
+          }
+          else
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+          }
+
+          if (bottomAltAvailable && rightAltAvailable)
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = *(srcPtr + uiHeight * srcStride + uiWidth);   // a
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = *(srcPtr + uiHeight * srcStride + uiWidth + 1);   // b
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth);   // c
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth + 1);   // d
+          }
+          else
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+          }
+          m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride,
+                                            iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+        }
+
+        xStart = xEnd;
       }
-      if ((myArea.y + myArea.height + NUMBER_PADDED_SAMPLES) >= picHeader->getVirtualBoundariesPosY(i))
-      {
-        bottomAltAvailable = false;
-      }
-    }
-    for (int i = 0; i < picHeader->getNumVerVirtualBoundaries(); i++)
-    {
-      if ((myArea.x - NUMBER_PADDED_SAMPLES) <= picHeader->getVirtualBoundariesPosX(i))
-      {
-        leftAltAvailable = false;
-      }
-      if ((myArea.x + myArea.width + NUMBER_PADDED_SAMPLES) >= picHeader->getVirtualBoundariesPosX(i))
-      {
-        rightAltAvailable = false;
-      }
+
+      yStart = yEnd;
     }
   }
+  else
+  {
+    CompArea &compArea = currTU.block(COMPONENT_Y);
+
+    const unsigned uiWidth  = compArea.width;
+    const unsigned uiHeight = compArea.height;
+
+    bool topAltAvailable;
+    bool leftAltAvailable;
+
+    int        srcStride  = src.get(COMPONENT_Y).stride;
+    const Pel *srcPtr     = src.get(COMPONENT_Y).bufAt(compArea);
+    const Pel *srcPtrTemp = srcPtr;
+
+    int  recStride = rec.get(COMPONENT_Y).stride;
+    Pel *recPtr    = rec.get(COMPONENT_Y).bufAt(compArea);
+
+    int         bfac      = 1;
+    const char *LUTrowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac);
+
+    int bif_round_add   = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
+    int bif_round_shift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getBIFStrength());
+
+    const CompArea &myArea = currTU.blocks[COMPONENT_Y];
+    topAltAvailable        = myArea.y - 2 >= 0;
+    leftAltAvailable       = myArea.x - 2 >= 0;
+#if RPR_ENABLE
+    int  curPicWidth        = currTU.cu->cs->pcv->lumaWidth;
+    int  curPicHeight       = currTU.cu->cs->pcv->lumaHeight;
+    bool bottomAltAvailable = myArea.y + myArea.height + 1 < curPicHeight;
+    bool rightAltAvailable  = myArea.x + myArea.width + 1 < curPicWidth;
+#else
+    bool bottomAltAvailable = myArea.y + myArea.height + 1 < currTU.cu->slice->getSPS()->getMaxPicHeightInLumaSamples();
+    bool rightAltAvailable  = myArea.x + myArea.width + 1 < currTU.cu->slice->getSPS()->getMaxPicWidthInLumaSamples();
 #endif
 
-  uint32_t   uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
-  uint32_t   uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
-  
+    uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
+    uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
+
+    int iWidthExtSIMD = uiWidthExt;
+    if (uiWidth < 8)
+    {
+      iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
+    }
+
+    Pel *tempBlockPtr;
+
+    bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
+
+    memset(tempblock, 0, iWidthExtSIMD * uiHeightExt * sizeof(short));
+
+    if (allAvail)
+    {
+      // set pointer two rows up and two pixels to the left from the start of the block
+      tempBlockPtr = tempblock;
+
+      // same with image data
+      srcPtr = srcPtr - 2 * srcStride - 2;
+
+      //// Move block to temporary block
+
+      // Check if the block a the top block of a CTU.
+      bool isCTUboundary = myArea.y % currTU.cs->slice->getSPS()->getCTUSize() == 0;
+      if (isCTUboundary)
+      {
+        // The samples two lines up are out of bounds. (One line above the CTU is OK, since SAO uses that line.)
+        // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
+        // Therefore, copy samples from one line up instead of from two lines up by updating srcPtr *before* copy.
+        srcPtr += srcStride;
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      }
+      else
+      {
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        srcPtr += srcStride;
+      }
+      tempBlockPtr += iWidthExtSIMD;
+      // Copy samples that are not out of bounds.
+      for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
+      {
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        srcPtr += srcStride;
+        tempBlockPtr += iWidthExtSIMD;
+      }
+      // Check if the block is a bottom block of a CTU.
+      isCTUboundary = (myArea.y + uiHeight) % currTU.cs->slice->getSPS()->getCTUSize() == 0;
+      if (isCTUboundary)
+      {
+        // The samples two lines down are out of bounds. (One line below the CTU is OK, since SAO uses that line.)
+        // Hence the bottom line of tempblock is unavailable if the block at the bottom of a CTU.
+        // Therefore, copy samples from the second to last line instead of the last line by subtracting srcPtr before
+        // copy.
+        srcPtr -= srcStride;
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      }
+      else
+      {
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      }
+      return m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false,
+                                               LUTrowPtr);
+    }
+    else
+    {
+      tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+
+      //// Move block to temporary block
+      for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
+      {
+        std::memcpy(tempBlockPtr, srcPtr, uiWidth * sizeof(Pel));
+        srcPtr += srcStride;
+        tempBlockPtr += iWidthExtSIMD;
+      }
+      srcPtr = srcPtrTemp;
+
+      if (topAltAvailable)
+      {
+        std::copy(srcPtr - 2 * srcStride, srcPtr - 2 * srcStride + uiWidth, tempblock + 2);
+        std::copy(srcPtr - srcStride, srcPtr - srcStride + uiWidth, tempblock + iWidthExtSIMD + 2);
+      }
+      if (bottomAltAvailable)
+      {
+        std::copy(srcPtr + (uiHeight + 1) * srcStride, srcPtr + (uiHeight + 1) * srcStride + uiWidth,
+                  tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+        std::copy(srcPtr + uiHeight * srcStride, srcPtr + uiHeight * srcStride + uiWidth,
+                  tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+      }
+      if (leftAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = *(srcPtr + yy * srcStride - 2);
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = *(srcPtr + yy * srcStride - 1);
+        }
+      }
+      if (rightAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] =
+            *(srcPtr + uiWidth + yy * srcStride + 1);
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride);
+        }
+      }
+
+      // if not all available, copy from inside tempbuffer
+      if (!topAltAvailable)
+      {
+        std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + 2);
+        std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth,
+                  tempblock + iWidthExtSIMD + 2);
+      }
+      if (!bottomAltAvailable)
+      {
+        std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+        std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+      }
+      if (!leftAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+        }
+      }
+      if (!rightAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+        }
+      }
+
+      // All sides are available, easy to just copy corners also.
+      if (topAltAvailable && leftAltAvailable)
+      {
+        tempblock[0]                 = *(srcPtr - 2 * srcStride - 2);   // a     top left corner
+        tempblock[1]                 = *(srcPtr - 2 * srcStride - 1);   // b     a b|x x
+        tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride - 2);       // c     c d|x x
+        tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride - 1);       // d     -------
+      }
+      else
+      {
+        tempblock[0]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+        tempblock[1]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+        tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+        tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+      }
+
+      if (topAltAvailable && rightAltAvailable)
+      {
+        tempblock[iWidthExtSIMD - 2]              = *(srcPtr - 2 * srcStride + uiWidth);       // a
+        tempblock[iWidthExtSIMD - 1]              = *(srcPtr - 2 * srcStride + uiWidth + 1);   // b
+        tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);           // c
+        tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);       // d
+      }
+      else
+      {
+        tempblock[iWidthExtSIMD - 2]              = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+        tempblock[iWidthExtSIMD - 1]              = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+        tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+        tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+      }
+
+      if (bottomAltAvailable && leftAltAvailable)
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = *(srcPtr + uiHeight * srcStride - 2);         // a
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = *(srcPtr + uiHeight * srcStride - 1);         // b
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = *(srcPtr + (uiHeight + 1) * srcStride - 2);   // c
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = *(srcPtr + (uiHeight + 1) * srcStride - 1);   // d
+      }
+      else
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      }
+
+      if (bottomAltAvailable && rightAltAvailable)
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = *(srcPtr + uiHeight * srcStride + uiWidth);   // a
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = *(srcPtr + uiHeight * srcStride + uiWidth + 1);   // b
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth);   // c
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth + 1);   // d
+      }
+      else
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      }
+    }
+
+    m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+  }
+#else
+  CompArea &compArea = currTU.block(COMPONENT_Y);
+
+  const unsigned uiWidth  = compArea.width;
+  const unsigned uiHeight = compArea.height;
+
+  bool topAltAvailable;
+  bool leftAltAvailable;
+
+  int        srcStride  = src.get(COMPONENT_Y).stride;
+  const Pel *srcPtr     = src.get(COMPONENT_Y).bufAt(compArea);
+  const Pel *srcPtrTemp = srcPtr;
+
+  int  recStride = rec.get(COMPONENT_Y).stride;
+  Pel *recPtr    = rec.get(COMPONENT_Y).bufAt(compArea);
+
+  int         bfac      = 1;
+  const char *LUTrowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode,
+                                                 qp + currTU.cs->pps->getBIFQPOffset(), bfac);
+
+  int bif_round_add   = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
+  int bif_round_shift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getBIFStrength());
+
+  const CompArea &myArea  = currTU.blocks[COMPONENT_Y];
+  topAltAvailable         = myArea.y - 2 >= 0;
+  leftAltAvailable        = myArea.x - 2 >= 0;
+#if RPR_ENABLE
+  int  curPicWidth        = currTU.cu->cs->pcv->lumaWidth;
+  int  curPicHeight       = currTU.cu->cs->pcv->lumaHeight;
+  bool bottomAltAvailable = myArea.y + myArea.height + 1 < curPicHeight;
+  bool rightAltAvailable  = myArea.x + myArea.width + 1 < curPicWidth;
+#else
+  bool bottomAltAvailable = myArea.y + myArea.height + 1 < currTU.cu->slice->getSPS()->getMaxPicHeightInLumaSamples();
+  bool rightAltAvailable  = myArea.x + myArea.width + 1 < currTU.cu->slice->getSPS()->getMaxPicWidthInLumaSamples();
+#endif
+
+  uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
+  uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
+
   int iWidthExtSIMD = uiWidthExt;
-  if( uiWidth < 8 )
+  if (uiWidth < 8)
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
   }
-  
+
   Pel *tempBlockPtr;
-  
+
   bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
 
-  memset(tempblock, 0, iWidthExtSIMD*uiHeightExt * sizeof(short));
+  memset(tempblock, 0, iWidthExtSIMD * uiHeightExt * sizeof(short));
 
-  if(allAvail)
+  if (allAvail)
   {
     // set pointer two rows up and two pixels to the left from the start of the block
     tempBlockPtr = tempblock;
-    
+
     // same with image data
-    srcPtr = srcPtr - 2*srcStride - 2;
+    srcPtr = srcPtr - 2 * srcStride - 2;
 
     //// Move block to temporary block
 
     // Check if the block a the top block of a CTU.
     bool isCTUboundary = myArea.y % currTU.cs->slice->getSPS()->getCTUSize() == 0;
-    if(isCTUboundary)
+    if (isCTUboundary)
     {
       // The samples two lines up are out of bounds. (One line above the CTU is OK, since SAO uses that line.)
       // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
@@ -1171,7 +2178,7 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
     }
     tempBlockPtr += iWidthExtSIMD;
     // Copy samples that are not out of bounds.
-    for (uint32_t uiY = 1; uiY < uiHeightExt-1; ++uiY)
+    for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
     {
       std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
       srcPtr += srcStride;
@@ -1179,7 +2186,7 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
     }
     // Check if the block is a bottom block of a CTU.
     isCTUboundary = (myArea.y + uiHeight) % currTU.cs->slice->getSPS()->getCTUSize() == 0;
-    if(isCTUboundary)
+    if (isCTUboundary)
     {
       // The samples two lines down are out of bounds. (One line below the CTU is OK, since SAO uses that line.)
       // Hence the bottom line of tempblock is unavailable if the block at the bottom of a CTU.
@@ -1191,11 +2198,11 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
     {
       std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
     }
-    return m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr );
+    return m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
   }
   else
   {
-    tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES)* iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+    tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
 
     //// Move block to temporary block
     for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
@@ -1205,125 +2212,126 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
       tempBlockPtr += iWidthExtSIMD;
     }
     srcPtr = srcPtrTemp;
-    
-    if(topAltAvailable)
+
+    if (topAltAvailable)
     {
-      std::copy(srcPtr - 2*srcStride, srcPtr - 2*srcStride + uiWidth, tempblock + 2);
+      std::copy(srcPtr - 2 * srcStride, srcPtr - 2 * srcStride + uiWidth, tempblock + 2);
       std::copy(srcPtr - srcStride, srcPtr - srcStride + uiWidth, tempblock + iWidthExtSIMD + 2);
     }
-    if(bottomAltAvailable)
+    if (bottomAltAvailable)
     {
-      std::copy(srcPtr + (uiHeight+1)*srcStride, srcPtr +(uiHeight+1)*srcStride + uiWidth, tempblock + (uiHeightExt-1)*iWidthExtSIMD + 2);
-      std::copy(srcPtr + uiHeight*srcStride, srcPtr +uiHeight*srcStride + uiWidth, tempblock + (uiHeightExt-2)*iWidthExtSIMD + 2);
+      std::copy(srcPtr + (uiHeight + 1) * srcStride, srcPtr + (uiHeight + 1) * srcStride + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+      std::copy(srcPtr + uiHeight * srcStride, srcPtr + uiHeight * srcStride + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
     }
-    if(leftAltAvailable)
+    if (leftAltAvailable)
     {
-      for(int yy = 0; yy<uiHeight; yy++)
+      for (int yy = 0; yy < uiHeight; yy++)
       {
-        tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 0] = *(srcPtr + yy*srcStride -2);
-        tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 1] = *(srcPtr + yy*srcStride -1);
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = *(srcPtr + yy * srcStride - 2);
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = *(srcPtr + yy * srcStride - 1);
       }
     }
-    if(rightAltAvailable)
+    if (rightAltAvailable)
     {
-      for(int yy = 0; yy<uiHeight; yy++)
+      for (int yy = 0; yy < uiHeight; yy++)
       {
-        tempblock[(iWidthExtSIMD<<1) + uiWidthExt-1 + yy*iWidthExtSIMD] = *(srcPtr + uiWidth + yy*srcStride + 1);
-        tempblock[(iWidthExtSIMD<<1) + uiWidthExt-2 + yy*iWidthExtSIMD] = *(srcPtr + uiWidth + yy*srcStride);
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride + 1);
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride);
       }
     }
-    
+
     // if not all available, copy from inside tempbuffer
-    if(!topAltAvailable)
+    if (!topAltAvailable)
     {
-      std::copy(tempblock + iWidthExtSIMD*2 + 2, tempblock + iWidthExtSIMD*2 + 2 + uiWidth, tempblock + 2);
-      std::copy(tempblock + iWidthExtSIMD*2 + 2, tempblock + iWidthExtSIMD*2 + 2 + uiWidth, tempblock + iWidthExtSIMD + 2);
+      std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + 2);
+      std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + iWidthExtSIMD + 2);
     }
-    if(!bottomAltAvailable)
+    if (!bottomAltAvailable)
     {
-      std::copy(tempblock + (uiHeightExt-3)*iWidthExtSIMD + 2, tempblock + (uiHeightExt-3)*iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt-2)*iWidthExtSIMD + 2);
-      std::copy(tempblock + (uiHeightExt-3)*iWidthExtSIMD + 2, tempblock + (uiHeightExt-3)*iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt-1)*iWidthExtSIMD + 2);
+      std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+      std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
     }
-    if(!leftAltAvailable)
+    if (!leftAltAvailable)
     {
-      for(int yy = 0; yy<uiHeight; yy++)
+      for (int yy = 0; yy < uiHeight; yy++)
       {
-        tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 0] = tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 2];
-        tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 1] = tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 2];
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
       }
     }
-    if(!rightAltAvailable)
+    if (!rightAltAvailable)
     {
-      for(int yy = 0; yy<uiHeight; yy++)
+      for (int yy = 0; yy < uiHeight; yy++)
       {
-        tempblock[(iWidthExtSIMD<<1) + uiWidthExt-2 + yy*iWidthExtSIMD] = tempblock[(iWidthExtSIMD<<1) + uiWidthExt-2 + yy*iWidthExtSIMD - 1];
-        tempblock[(iWidthExtSIMD<<1) + uiWidthExt-1 + yy*iWidthExtSIMD] = tempblock[(iWidthExtSIMD<<1) + uiWidthExt-2 + yy*iWidthExtSIMD - 1];
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
       }
     }
-    
+
     // All sides are available, easy to just copy corners also.
-    if(topAltAvailable && leftAltAvailable)
+    if (topAltAvailable && leftAltAvailable)
     {
-      tempblock[0] = *(srcPtr - 2*srcStride -2);                                                // a     top left corner
-      tempblock[1] = *(srcPtr - 2*srcStride -1);                                                // b     a b|x x
-      tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride -2);                                  // c     c d|x x
-      tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride -1);                                  // d     -------
+      tempblock[0]                 = *(srcPtr - 2 * srcStride - 2);   // a     top left corner
+      tempblock[1]                 = *(srcPtr - 2 * srcStride - 1);   // b     a b|x x
+      tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride - 2);       // c     c d|x x
+      tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride - 1);       // d     -------
     }
     else
     {
-      tempblock[0] = tempblock[iWidthExtSIMD*2 + 2];                                            // extend top left
-      tempblock[1] = tempblock[iWidthExtSIMD*2 + 2];                                            // extend top left
-      tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD*2 + 2];                            // extend top left
-      tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD*2 + 2];                            // extend top left
+      tempblock[0]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+      tempblock[1]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+      tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+      tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
     }
-    
-    if(topAltAvailable && rightAltAvailable)
+
+    if (topAltAvailable && rightAltAvailable)
     {
-      tempblock[iWidthExtSIMD - 2] = *(srcPtr - 2*srcStride + uiWidth);                         // a
-      tempblock[iWidthExtSIMD - 1] = *(srcPtr - 2*srcStride + uiWidth + 1);                     // b
-      tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);              // c
-      tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);          // d
-    }
-    else
-    {
-      tempblock[iWidthExtSIMD - 2] = tempblock[iWidthExtSIMD*2 + uiWidthExt - 3];               // extend top right
-      tempblock[iWidthExtSIMD - 1] = tempblock[iWidthExtSIMD*2 + uiWidthExt - 3];               // extend top right
-      tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD*2 + uiWidthExt - 3];  // extend top right
-      tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD*2 + uiWidthExt - 3];  // extend top right
-    }
-    
-    if(bottomAltAvailable && leftAltAvailable)
-    {
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + 0] = *(srcPtr + uiHeight*srcStride -2);          // a
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + 1] = *(srcPtr + uiHeight*srcStride -1);          // b
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + 0] = *(srcPtr + (uiHeight+1)*srcStride -2);      // c
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + 1] = *(srcPtr + (uiHeight+1)*srcStride -1);      // d
+      tempblock[iWidthExtSIMD - 2]              = *(srcPtr - 2 * srcStride + uiWidth);       // a
+      tempblock[iWidthExtSIMD - 1]              = *(srcPtr - 2 * srcStride + uiWidth + 1);   // b
+      tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);           // c
+      tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);       // d
     }
     else
     {
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + 0] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + 2];  // bot avail: mirror left/right
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + 1] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + 2];  // bot avail: mirror left/right
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + 0] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + 2];  // bot avail: mirror left/right
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + 1] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + 2];  // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD - 2]              = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+      tempblock[iWidthExtSIMD - 1]              = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+      tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+      tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
     }
-    
-    if(bottomAltAvailable && rightAltAvailable)
+
+    if (bottomAltAvailable && leftAltAvailable)
     {
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + uiWidthExt - 2] = *(srcPtr + uiHeight*srcStride + uiWidth);                // a
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + uiWidthExt - 1] = *(srcPtr + uiHeight*srcStride + uiWidth + 1);            // b
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + uiWidthExt - 2] = *(srcPtr + (uiHeight+1)*srcStride + uiWidth);            // c
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + uiWidthExt - 1] = *(srcPtr + (uiHeight+1)*srcStride + uiWidth + 1);        // d
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = *(srcPtr + uiHeight * srcStride - 2);         // a
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = *(srcPtr + uiHeight * srcStride - 1);         // b
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = *(srcPtr + (uiHeight + 1) * srcStride - 2);   // c
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = *(srcPtr + (uiHeight + 1) * srcStride - 1);   // d
     }
     else
     {
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + uiWidthExt - 2] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + uiWidthExt - 3];
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + uiWidthExt - 1] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + uiWidthExt - 3];
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + uiWidthExt - 2] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + uiWidthExt - 3];
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + uiWidthExt - 1] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+    }
+
+    if (bottomAltAvailable && rightAltAvailable)
+    {
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = *(srcPtr + uiHeight * srcStride + uiWidth);   // a
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = *(srcPtr + uiHeight * srcStride + uiWidth + 1);   // b
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth);   // c
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth + 1);   // d
+    }
+    else
+    {
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
     }
   }
-  
-  m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr );
+
+  m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+#endif
 }
 #endif
 void BilateralFilter::clipNotBilaterallyFilteredBlocks(const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU)
@@ -1396,6 +2404,125 @@ void copyBack(PelBuf &srcBuf, PelBuf &dstBuf)
     dstPtr += dstStride-srcBuf.width;
   }
 }
+
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+bool BilateralFilter::isCrossedByVirtualBoundaries(const CodingStructure &cs, const int xPos, const int yPos,
+                                                   const int width, const int height, bool &clipTop, bool &clipBottom,
+                                                   bool &clipLeft, bool &clipRight, int &numHorVirBndry,
+                                                   int &numVerVirBndry, int horVirBndryPos[], int verVirBndryPos[],
+                                                   bool isEncoderRDO)
+{
+  clipTop                    = false;
+  clipBottom                 = false;
+  clipLeft                   = false;
+  clipRight                  = false;
+  numHorVirBndry             = 0;
+  numVerVirBndry             = 0;
+  const PPS *      pps       = cs.pps;
+  const PicHeader *picHeader = cs.picHeader;
+
+  if (picHeader->getVirtualBoundariesPresentFlag())
+  {
+    for (int i = 0; i < picHeader->getNumHorVirtualBoundaries(); i++)
+    {
+      if (picHeader->getVirtualBoundariesPosY(i) == yPos - 2 || picHeader->getVirtualBoundariesPosY(i) == yPos - 1
+          || picHeader->getVirtualBoundariesPosY(i) == yPos)
+      {
+        clipTop = true;
+      }
+      else if (yPos + height + 2 >= picHeader->getVirtualBoundariesPosY(i))
+      {
+        clipBottom = true;
+      }
+      else if (yPos - 2 < picHeader->getVirtualBoundariesPosY(i)
+               && picHeader->getVirtualBoundariesPosY(i) < yPos + height + 2)
+      {
+        horVirBndryPos[numHorVirBndry++] = picHeader->getVirtualBoundariesPosY(i);
+      }
+    }
+
+    for (int i = 0; i < picHeader->getNumVerVirtualBoundaries(); i++)
+    {
+      if (picHeader->getVirtualBoundariesPosX(i) == xPos - 2 || picHeader->getVirtualBoundariesPosX(i) == xPos - 1
+          || picHeader->getVirtualBoundariesPosX(i) == xPos)
+      {
+        clipLeft = true;
+      }
+      else if (xPos + width + 2 >= picHeader->getVirtualBoundariesPosX(i))
+      {
+        clipRight = true;
+      }
+      else if (xPos - 2 < picHeader->getVirtualBoundariesPosX(i)
+               && picHeader->getVirtualBoundariesPosX(i) < xPos + width + 2)
+      {
+        verVirBndryPos[numVerVirBndry++] = picHeader->getVirtualBoundariesPosX(i);
+      }
+    }
+  }
+  if (!isEncoderRDO)
+  {
+    const Slice &     slice   = *(cs.slice);
+    int               ctuSize = slice.getSPS()->getCTUSize();
+    const Position    currCtuPos(xPos, yPos);
+    const CodingUnit *currCtu                           = cs.getCU(currCtuPos, CHANNEL_TYPE_LUMA);
+    const SubPic &    curSubPic                         = slice.getPPS()->getSubPicFromPos(currCtuPos);
+    bool              loopFilterAcrossSubPicEnabledFlag = curSubPic.getloopFilterAcrossEnabledFlag();
+    // top -> dont need clipping for top of the frame/picture
+    if (yPos >= ctuSize && clipTop == false)
+    {
+      const Position    prevCtuPos(xPos, yPos - ctuSize);
+      const CodingUnit *prevCtu = cs.getCU(prevCtuPos, CHANNEL_TYPE_LUMA);
+      if ((!pps->getLoopFilterAcrossSlicesEnabledFlag() && !CU::isSameSlice(*currCtu, *prevCtu))
+          || (!pps->getLoopFilterAcrossTilesEnabledFlag() && !CU::isSameTile(*currCtu, *prevCtu))
+          || (!loopFilterAcrossSubPicEnabledFlag && !CU::isSameSubPic(*currCtu, *prevCtu)))
+      {
+        clipTop = true;
+      }
+    }
+
+    // bottom -> dont need clipping for bottom of the frame/picture
+    if (yPos + ctuSize < cs.pcv->lumaHeight && clipBottom == false)
+    {
+      const Position    nextCtuPos(xPos, yPos + ctuSize);
+      const CodingUnit *nextCtu = cs.getCU(nextCtuPos, CHANNEL_TYPE_LUMA);
+      if ((!pps->getLoopFilterAcrossSlicesEnabledFlag() && !CU::isSameSlice(*currCtu, *nextCtu))
+          || (!pps->getLoopFilterAcrossTilesEnabledFlag() && !CU::isSameTile(*currCtu, *nextCtu))
+          || (!loopFilterAcrossSubPicEnabledFlag && !CU::isSameSubPic(*currCtu, *nextCtu)))
+      {
+        clipBottom = true;
+      }
+    }
+
+    // left ->  dont need clipping for left of the frame/picture
+    if (xPos >= ctuSize && clipLeft == false)
+    {
+      const Position    prevCtuPos(xPos - ctuSize, yPos);
+      const CodingUnit *prevCtu = cs.getCU(prevCtuPos, CHANNEL_TYPE_LUMA);
+      if ((!pps->getLoopFilterAcrossSlicesEnabledFlag() && !CU::isSameSlice(*currCtu, *prevCtu))
+          || (!pps->getLoopFilterAcrossTilesEnabledFlag() && !CU::isSameTile(*currCtu, *prevCtu))
+          || (!loopFilterAcrossSubPicEnabledFlag && !CU::isSameSubPic(*currCtu, *prevCtu)))
+      {
+        clipLeft = true;
+      }
+    }
+
+    // right -> dont need clipping for right of the frame/picture
+    if (xPos + ctuSize < cs.pcv->lumaWidth && clipRight == false)
+    {
+      const Position    nextCtuPos(xPos + ctuSize, yPos);
+      const CodingUnit *nextCtu = cs.getCU(nextCtuPos, CHANNEL_TYPE_LUMA);
+      if ((!pps->getLoopFilterAcrossSlicesEnabledFlag() && !CU::isSameSlice(*currCtu, *nextCtu))
+          || (!pps->getLoopFilterAcrossTilesEnabledFlag() && !CU::isSameTile(*currCtu, *nextCtu))
+          || (!loopFilterAcrossSubPicEnabledFlag && !CU::isSameSubPic(*currCtu, *nextCtu)))
+      {
+        clipRight = true;
+      }
+    }
+  }
+  return numHorVirBndry > 0 || numVerVirBndry > 0 || clipTop || clipBottom || clipLeft || clipRight;
+}
+#endif
+
 #if JVET_V0094_BILATERAL_FILTER
 void BilateralFilter::bilateralFilterPicRDOperCTU(CodingStructure& cs, PelUnitBuf& src, BIFCabacEst* BifCABACEstimator)
 {
@@ -1434,10 +2561,29 @@ void BilateralFilter::bilateralFilterPicRDOperCTU(CodingStructure& cs, PelUnitBu
          
           if ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
           {
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+            int  numHorVirBndry = 0, numVerVirBndry = 0;
+            int  horVirBndryPos[] = { 0, 0, 0 };
+            int  verVirBndryPos[] = { 0, 0, 0 };
+            bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
+            bool isTUCrossedByVirtualBoundaries = isCrossedByVirtualBoundaries(
+              cs, currTU.Y().x, currTU.Y().y, currTU.lumaSize().width, currTU.lumaSize().height, clipTop, clipBottom,
+              clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
+#endif
 #if JVET_W0066_CCSAO
-            bilateralFilterDiamond5x5NoClip(src, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+            bilateralFilterDiamond5x5NoClip(src, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+              , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
+              , clipTop, clipBottom, clipLeft, clipRight
+#endif
+            );
 #else
-            bilateralFilterDiamond5x5(src, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+            bilateralFilterDiamond5x5(src, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+              , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
+              , clipTop, clipBottom, clipLeft, clipRight
+#endif
+            );
 #endif
           }
         }
@@ -1801,7 +2947,42 @@ void BilateralFilter::bilateralFilterPicRDOperCTUChroma(CodingStructure& cs, Pel
           }
           if(applyChromaBIF)
           {
-            bilateralFilterDiamond5x5Chroma(src, rec, currTU.cu->qp, isCb ? cs.slice->clpRng(COMPONENT_Cb) : cs.slice->clpRng(COMPONENT_Cr), currTU, isCb);
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+            bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
+            int  numHorVirBndry = 0, numVerVirBndry = 0;
+            int  horVirBndryPos[] = { 0, 0, 0 };
+            int  verVirBndryPos[] = { 0, 0, 0 };
+
+            CompArea &myArea                         = (isCb ? currTU.block(COMPONENT_Cb) : currTU.block(COMPONENT_Cr));
+            const int chromaScaleX                   = getComponentScaleX(COMPONENT_Cb, currTU.cu->cs->pcv->chrFormat);
+            const int chromaScaleY                   = getComponentScaleY(COMPONENT_Cb, currTU.cu->cs->pcv->chrFormat);
+            int       yPos                           = myArea.y << chromaScaleX;
+            int       xPos                           = myArea.x << chromaScaleY;
+            bool      isTUCrossedByVirtualBoundaries = isCrossedByVirtualBoundaries(
+              cs, xPos, yPos, myArea.width << chromaScaleX, myArea.height << chromaScaleY, clipTop, clipBottom,
+              clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
+
+#endif
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+            bilateralFilterDiamond5x5NoClipChroma(
+              src, rec, currTU.cu->qp, isCb ? cs.slice->clpRng(COMPONENT_Cb) : cs.slice->clpRng(COMPONENT_Cr), currTU,
+              isCb
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+              ,
+              isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop,
+              clipBottom, clipLeft, clipRight);
+#endif
+#else
+            bilateralFilterDiamond5x5Chroma(src, rec, currTU.cu->qp,
+                                            isCb ? cs.slice->clpRng(COMPONENT_Cb) : cs.slice->clpRng(COMPONENT_Cr),
+                                            currTU, isCb
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                                            ,
+                                            isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos,
+                                            numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight);
+#endif
+            );
+#endif
           }
         }
       }
@@ -1960,9 +3141,568 @@ void BilateralFilter::bilateralFilterPicRDOperCTUChroma(CodingStructure& cs, Pel
 }
 
 #if JVET_W0066_CCSAO
-void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb)
+void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  , bool isTUCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+  , bool clipTop, bool clipBottom, bool clipLeft, bool clipRight
+#endif
+)
 {
-  ComponentID compID = isCb ? COMPONENT_Cb :COMPONENT_Cr;
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  if (isTUCrossedByVirtualBoundaries)
+  {
+    ComponentID     compID       = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+    const CompArea &myArea       = isCb ? currTU.blocks[COMPONENT_Cb] : currTU.blocks[COMPONENT_Cr];
+    const int       chromaScaleX = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
+    const int       chromaScaleY = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
+    const unsigned  width        = myArea.width;
+    const unsigned  height       = myArea.height;
+    int             yPos         = myArea.y;
+    int             xPos         = myArea.x;
+    int             yStart       = yPos;
+    int             curPicWidth  = currTU.cu->cs->pcv->lumaWidth;
+    int             curPicHeight = currTU.cu->cs->pcv->lumaHeight;
+
+    for (int i = 0; i <= numHorVirBndry; i++)
+    {
+      const int  yEnd  = i == numHorVirBndry ? yPos + height : (horVirBndryPos[i] >> chromaScaleY);
+      const int  h     = yEnd - yStart;
+      const bool clipT = (i == 0 && clipTop) || (i > 0) || (yStart - 2 < 0);
+      const bool clipB =
+        (i == numHorVirBndry && clipBottom) || (i < numHorVirBndry) || (yEnd + 2 >= (curPicHeight >> chromaScaleY));
+      int xStart = xPos;
+      for (int j = 0; j <= numVerVirBndry; j++)
+      {
+        const int  xEnd  = j == numVerVirBndry ? xPos + width : (verVirBndryPos[j] >> chromaScaleX);
+        const int  w     = xEnd - xStart;
+        const bool clipL = (j == 0 && clipLeft) || (j > 0) || (xStart - 2 < 0);
+        const bool clipR =
+          (j == numVerVirBndry && clipRight) || (j < numVerVirBndry) || (xEnd + 2 >= (curPicWidth >> chromaScaleX));
+
+        const unsigned uiWidth  = w;
+        const unsigned uiHeight = h;
+
+        const Area blkDst(xStart, yStart, uiWidth, uiHeight);
+        int        srcStride  = src.get(compID).stride;
+        const Pel *srcPtr     = src.get(compID).bufAt(blkDst);
+        const Pel *srcPtrTemp = srcPtr;
+
+        int  recStride = rec.get(compID).stride;
+        Pel *recPtr    = rec.get(compID).bufAt(blkDst);
+
+        int bfac            = 1;
+        int bifRoundAdd     = (BIF_ROUND_ADD) >> (currTU.cs->pps->getChromaBIFStrength());
+        int bifRoundShift   = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getChromaBIFStrength());
+
+        bool topAltAvailable  = !clipT;
+        bool leftAltAvailable = !clipL;
+
+        bool bottomAltAvailable = !clipB;
+        bool rightAltAvailable  = !clipR;
+
+        int widthForStrength    = currTU.blocks[compID].width;
+        int heightForStrength   = currTU.blocks[compID].height;
+
+        if (currTU.blocks[COMPONENT_Y].valid())
+        {
+          widthForStrength    = currTU.blocks[COMPONENT_Y].width;
+          heightForStrength   = currTU.blocks[COMPONENT_Y].height;
+        }
+
+        const char *LUTrowPtr = getFilterLutParametersChroma(
+          std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac,
+          widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid());
+
+        uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
+        uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
+
+        int iWidthExtSIMD = uiWidthExt;
+        if (uiWidth < 8)
+        {
+          iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
+        }
+
+        Pel *tempBlockPtr;
+
+        memset(tempblock, 0, iWidthExtSIMD * uiHeightExt * sizeof(short));
+
+        tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+
+        //// Move block to temporary block
+        for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
+        {
+          std::memcpy(tempBlockPtr, srcPtr, uiWidth * sizeof(Pel));
+          srcPtr += srcStride;
+          tempBlockPtr += iWidthExtSIMD;
+        }
+        srcPtr = srcPtrTemp;
+
+        const CompArea &myArea = isCb ? currTU.blocks[COMPONENT_Cb] : currTU.blocks[COMPONENT_Cr];
+
+        topAltAvailable  = topAltAvailable && (blkDst.y - NUMBER_PADDED_SAMPLES >= 0);
+        leftAltAvailable = leftAltAvailable && (blkDst.x - NUMBER_PADDED_SAMPLES >= 0);
+
+        int      scaleX            = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
+        int      scaleY            = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
+        uint32_t picWidthChroma    = currTU.cu->slice->getPPS()->getPicWidthInLumaSamples() >> scaleX;
+        uint32_t picHeightChroma   = currTU.cu->slice->getPPS()->getPicHeightInLumaSamples() >> scaleY;
+
+        // bool bottomAltAvailable = myArea.y + myArea.height + 1 < chroma_pic_height;
+        // bool rightAltAvailable = myArea.x + myArea.width + 1 < chroma_pic_width;
+
+        bottomAltAvailable = bottomAltAvailable && (blkDst.y + blkDst.height + 1 < picHeightChroma);
+        rightAltAvailable  = rightAltAvailable && (blkDst.x + blkDst.width + 1 < picWidthChroma);
+
+        bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
+
+        // if not 420, then don't use rec for padding
+        if (currTU.cu->chromaFormat != CHROMA_420)
+        {
+          topAltAvailable    = false;
+          bottomAltAvailable = false;
+          leftAltAvailable   = false;
+          rightAltAvailable  = false;
+          allAvail           = false;
+        }
+
+        if (allAvail)
+        {
+          // set pointer two rows up and two pixels to the left from the start of the block
+          tempBlockPtr = tempblock;
+          // same with image data
+          srcPtr = srcPtr - 2 * srcStride - 2;
+          // Move block to temporary block
+          // Check if the block a the top block of a CTU.
+          int      scaleChroma    = getComponentScaleX(compID, currTU.cu->chromaFormat);
+          int      ctuSizeChroma  = currTU.cs->slice->getSPS()->getCTUSize() >> scaleChroma;
+          bool     isCTUboundary  = myArea.y % ctuSizeChroma == 0;
+
+          if (isCTUboundary)
+          {
+            // The samples two lines up are out of bounds. (One line above the CTU is OK, since SAO uses that line.)
+            // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
+            // Therefore, copy samples from one line up instead of from two lines up by updating srcPtr *before* copy.
+            srcPtr += srcStride;
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+          }
+          else
+          {
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+            srcPtr += srcStride;
+          }
+          tempBlockPtr += iWidthExtSIMD;
+          // Copy samples that are not out of bounds.
+          for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
+          {
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+            srcPtr += srcStride;
+            tempBlockPtr += iWidthExtSIMD;
+          }
+          // Check if the block is a bottom block of a CTU.
+          isCTUboundary = (myArea.y + uiHeight) % ctuSizeChroma == 0;
+          if (isCTUboundary)
+          {
+            // The samples two lines down are out of bounds. (One line below the CTU is OK, since SAO uses that line.)
+            // Hence the bottom line of tempblock is unavailable if the block at the bottom of a CTU.
+            // Therefore, copy samples from the second to last line instead of the last line by subtracting srcPtr
+            // before copy.
+            srcPtr -= srcStride;
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+          }
+          else
+          {
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+          }
+        }
+        else
+        {
+          tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+          // Move block to temporary block
+          for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
+          {
+            std::memcpy(tempBlockPtr, srcPtr, uiWidth * sizeof(Pel));
+            srcPtr += srcStride;
+            tempBlockPtr += iWidthExtSIMD;
+          }
+          srcPtr = srcPtrTemp;
+          if (topAltAvailable)
+          {
+            std::copy(srcPtr - 2 * srcStride, srcPtr - 2 * srcStride + uiWidth, tempblock + 2);
+            std::copy(srcPtr - srcStride, srcPtr - srcStride + uiWidth, tempblock + iWidthExtSIMD + 2);
+          }
+          if (bottomAltAvailable)
+          {
+            std::copy(srcPtr + (uiHeight + 1) * srcStride, srcPtr + (uiHeight + 1) * srcStride + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+            std::copy(srcPtr + uiHeight * srcStride, srcPtr + uiHeight * srcStride + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+          }
+          if (leftAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = *(srcPtr + yy * srcStride - 2);
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = *(srcPtr + yy * srcStride - 1);
+            }
+          }
+          if (rightAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride + 1);
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride);
+            }
+          }
+          // if not all available, copy from inside tempbuffer
+          if (!topAltAvailable)
+          {
+            std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + 2);
+            std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + iWidthExtSIMD + 2);
+          }
+          if (!bottomAltAvailable)
+          {
+            std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+            std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+          }
+          if (!leftAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+            }
+          }
+          if (!rightAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+            }
+          }
+          // All sides are available, easy to just copy corners also.
+          if (topAltAvailable && leftAltAvailable)
+          {
+            tempblock[0]                 = *(srcPtr - 2 * srcStride - 2);   // a     top left corner
+            tempblock[1]                 = *(srcPtr - 2 * srcStride - 1);   // b     a b|x x
+            tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride - 2);       // c     c d|x x
+            tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride - 1);       // d     -------
+          }
+          else
+          {
+            tempblock[0]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+            tempblock[1]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+            tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+            tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+          }
+          if (topAltAvailable && rightAltAvailable)
+          {
+            tempblock[iWidthExtSIMD - 2]              = *(srcPtr - 2 * srcStride + uiWidth);       // a
+            tempblock[iWidthExtSIMD - 1]              = *(srcPtr - 2 * srcStride + uiWidth + 1);   // b
+            tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);           // c
+            tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);       // d
+          }
+          else
+          {
+            tempblock[iWidthExtSIMD - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+            tempblock[iWidthExtSIMD - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+            tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+            tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+          }
+          if (bottomAltAvailable && leftAltAvailable)
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = *(srcPtr + uiHeight * srcStride - 2);         // a
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = *(srcPtr + uiHeight * srcStride - 1);         // b
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = *(srcPtr + (uiHeight + 1) * srcStride - 2);   // c
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = *(srcPtr + (uiHeight + 1) * srcStride - 1);   // d
+          }
+          else
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+          }
+          if (bottomAltAvailable && rightAltAvailable)
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = *(srcPtr + uiHeight * srcStride + uiWidth);   // a
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = *(srcPtr + uiHeight * srcStride + uiWidth + 1);   // b
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth);   // c
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth + 1);   // d
+          }
+          else
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+          }
+        }
+
+        m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride,
+                                          iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, LUTrowPtr);
+        xStart = xEnd;
+      }
+
+      yStart = yEnd;
+    }
+  }
+  else
+  {
+    ComponentID compID   = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+    CompArea &  compArea = currTU.block(compID);
+
+    const unsigned uiWidth  = compArea.width;
+    const unsigned uiHeight = compArea.height;
+
+    int        srcStride  = src.get(compID).stride;
+    const Pel *srcPtr     = src.get(compID).bufAt(compArea);
+    const Pel *srcPtrTemp = srcPtr;
+
+    int  recStride = rec.get(compID).stride;
+    Pel *recPtr    = rec.get(compID).bufAt(compArea);
+
+    int bfac            = 1;
+    int bifRoundAdd     = (BIF_ROUND_ADD) >> (currTU.cs->pps->getChromaBIFStrength());
+    int bifRoundShift   = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getChromaBIFStrength());
+
+    int widthForStrength    = currTU.blocks[compID].width;
+    int heightForStrength   = currTU.blocks[compID].height;
+
+    if (currTU.blocks[COMPONENT_Y].valid())
+    {
+      widthForStrength    = currTU.blocks[COMPONENT_Y].width;
+      heightForStrength   = currTU.blocks[COMPONENT_Y].height;
+    }
+
+    const char *LUTrowPtr = getFilterLutParametersChroma(
+      std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac,
+      widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid());
+
+    uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
+    uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
+
+    int iWidthExtSIMD = uiWidthExt;
+    if (uiWidth < 8)
+    {
+      iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
+    }
+
+    Pel *tempBlockPtr;
+
+    memset(tempblock, 0, iWidthExtSIMD * uiHeightExt * sizeof(short));
+
+    tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+
+    //// Move block to temporary block
+    for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
+    {
+      std::memcpy(tempBlockPtr, srcPtr, uiWidth * sizeof(Pel));
+      srcPtr += srcStride;
+      tempBlockPtr += iWidthExtSIMD;
+    }
+    srcPtr = srcPtrTemp;
+
+    const CompArea &myArea = isCb ? currTU.blocks[COMPONENT_Cb] : currTU.blocks[COMPONENT_Cr];
+
+    bool topAltAvailable  = myArea.y - NUMBER_PADDED_SAMPLES >= 0;
+    bool leftAltAvailable = myArea.x - NUMBER_PADDED_SAMPLES >= 0;
+
+    int      scaleX            = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
+    int      scaleY            = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
+    uint32_t picWidthChroma    = currTU.cu->slice->getPPS()->getPicWidthInLumaSamples() >> scaleX;
+    uint32_t picHeightChroma   = currTU.cu->slice->getPPS()->getPicHeightInLumaSamples() >> scaleY;
+
+    bool bottomAltAvailable = myArea.y + myArea.height + 1 < picHeightChroma;
+    bool rightAltAvailable  = myArea.x + myArea.width + 1 < picWidthChroma;
+
+    bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
+
+    // if not 420, then don't use rec for padding
+    if (currTU.cu->chromaFormat != CHROMA_420)
+    {
+      topAltAvailable    = false;
+      bottomAltAvailable = false;
+      leftAltAvailable   = false;
+      rightAltAvailable  = false;
+      allAvail           = false;
+    }
+
+    if (allAvail)
+    {
+      // set pointer two rows up and two pixels to the left from the start of the block
+      tempBlockPtr = tempblock;
+      // same with image data
+      srcPtr = srcPtr - 2 * srcStride - 2;
+      // Move block to temporary block
+      // Check if the block a the top block of a CTU.
+      int      scaleChroma    = getComponentScaleX(compID, currTU.cu->chromaFormat);
+      int      ctuSizeChroma  = currTU.cs->slice->getSPS()->getCTUSize() >> scaleChroma;
+      bool     isCTUboundary  = myArea.y % ctuSizeChroma == 0;
+
+      if (isCTUboundary)
+      {
+        // The samples two lines up are out of bounds. (One line above the CTU is OK, since SAO uses that line.)
+        // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
+        // Therefore, copy samples from one line up instead of from two lines up by updating srcPtr *before* copy.
+        srcPtr += srcStride;
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      }
+      else
+      {
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        srcPtr += srcStride;
+      }
+      tempBlockPtr += iWidthExtSIMD;
+      // Copy samples that are not out of bounds.
+      for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
+      {
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        srcPtr += srcStride;
+        tempBlockPtr += iWidthExtSIMD;
+      }
+      // Check if the block is a bottom block of a CTU.
+      isCTUboundary = (myArea.y + uiHeight) % ctuSizeChroma == 0;
+      if (isCTUboundary)
+      {
+        // The samples two lines down are out of bounds. (One line below the CTU is OK, since SAO uses that line.)
+        // Hence the bottom line of tempblock is unavailable if the block at the bottom of a CTU.
+        // Therefore, copy samples from the second to last line instead of the last line by subtracting srcPtr before
+        // copy.
+        srcPtr -= srcStride;
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      }
+      else
+      {
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      }
+    }
+    else
+    {
+      tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+      // Move block to temporary block
+      for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
+      {
+        std::memcpy(tempBlockPtr, srcPtr, uiWidth * sizeof(Pel));
+        srcPtr += srcStride;
+        tempBlockPtr += iWidthExtSIMD;
+      }
+      srcPtr = srcPtrTemp;
+      if (topAltAvailable)
+      {
+        std::copy(srcPtr - 2 * srcStride, srcPtr - 2 * srcStride + uiWidth, tempblock + 2);
+        std::copy(srcPtr - srcStride, srcPtr - srcStride + uiWidth, tempblock + iWidthExtSIMD + 2);
+      }
+      if (bottomAltAvailable)
+      {
+        std::copy(srcPtr + (uiHeight + 1) * srcStride, srcPtr + (uiHeight + 1) * srcStride + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+        std::copy(srcPtr + uiHeight * srcStride, srcPtr + uiHeight * srcStride + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+      }
+      if (leftAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = *(srcPtr + yy * srcStride - 2);
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = *(srcPtr + yy * srcStride - 1);
+        }
+      }
+      if (rightAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride + 1);
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride);
+        }
+      }
+      // if not all available, copy from inside tempbuffer
+      if (!topAltAvailable)
+      {
+        std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + 2);
+        std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth,
+                  tempblock + iWidthExtSIMD + 2);
+      }
+      if (!bottomAltAvailable)
+      {
+        std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+        std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+      }
+      if (!leftAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+        }
+      }
+      if (!rightAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+        }
+      }
+      // All sides are available, easy to just copy corners also.
+      if (topAltAvailable && leftAltAvailable)
+      {
+        tempblock[0]                 = *(srcPtr - 2 * srcStride - 2);   // a     top left corner
+        tempblock[1]                 = *(srcPtr - 2 * srcStride - 1);   // b     a b|x x
+        tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride - 2);       // c     c d|x x
+        tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride - 1);       // d     -------
+      }
+      else
+      {
+        tempblock[0]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+        tempblock[1]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+        tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+        tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+      }
+      if (topAltAvailable && rightAltAvailable)
+      {
+        tempblock[iWidthExtSIMD - 2]              = *(srcPtr - 2 * srcStride + uiWidth);       // a
+        tempblock[iWidthExtSIMD - 1]              = *(srcPtr - 2 * srcStride + uiWidth + 1);   // b
+        tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);           // c
+        tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);       // d
+      }
+      else
+      {
+        tempblock[iWidthExtSIMD - 2]              = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+        tempblock[iWidthExtSIMD - 1]              = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+        tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+        tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+      }
+      if (bottomAltAvailable && leftAltAvailable)
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = *(srcPtr + uiHeight * srcStride - 2);         // a
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = *(srcPtr + uiHeight * srcStride - 1);         // b
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = *(srcPtr + (uiHeight + 1) * srcStride - 2);   // c
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = *(srcPtr + (uiHeight + 1) * srcStride - 1);   // d
+      }
+      else
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      }
+      if (bottomAltAvailable && rightAltAvailable)
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = *(srcPtr + uiHeight * srcStride + uiWidth);   // a
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = *(srcPtr + uiHeight * srcStride + uiWidth + 1);   // b
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth);   // c
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth + 1);   // d
+      }
+      else
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      }
+    }
+    m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride,
+                                      iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, LUTrowPtr);
+  }
+#else
+  ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
   CompArea &compArea = currTU.block(compID);
 
   const unsigned uiWidth = compArea.width;
@@ -1982,28 +3722,30 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
   int widthForStrength = currTU.blocks[compID].width;
   int heightForStrength = currTU.blocks[compID].height;
 
-  if(currTU.blocks[COMPONENT_Y].valid())
+  if (currTU.blocks[COMPONENT_Y].valid())
   {
     widthForStrength = currTU.blocks[COMPONENT_Y].width;
     heightForStrength = currTU.blocks[COMPONENT_Y].height;
   }
 
-  const char* lutRowPtr = getFilterLutParametersChroma( std::min( uiWidth, uiHeight ), currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac, widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid());
+  const char *lutRowPtr = getFilterLutParametersChroma(
+    std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac,
+    widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid());
 
-  uint32_t  uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
-  uint32_t  uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
+  uint32_t uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
+  uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
   int iWidthExtSIMD = uiWidthExt;
-  if( uiWidth < 8 )
+  if (uiWidth < 8)
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
   }
 
   Pel *tempBlockPtr;
 
-  memset(tempblock, 0, iWidthExtSIMD*uiHeightExt * sizeof(short));
+  memset(tempblock, 0, iWidthExtSIMD * uiHeightExt * sizeof(short));
 
-  tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES)* iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+  tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
 
   // Move block to temporary block
   for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
@@ -2019,68 +3761,18 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
   bool topAltAvailable = myArea.y - NUMBER_PADDED_SAMPLES >= 0;
   bool leftAltAvailable = myArea.x - NUMBER_PADDED_SAMPLES >= 0;
 
-  int scaleX  = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
-  int scaleY  = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
+  int scaleX = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
+  int scaleY = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
   uint32_t picWidthChroma = currTU.cu->slice->getPPS()->getPicWidthInLumaSamples() >> scaleX;
   uint32_t picHeightChroma = currTU.cu->slice->getPPS()->getPicHeightInLumaSamples() >> scaleY;
 
   bool bottomAltAvailable = myArea.y + myArea.height + 1 < picHeightChroma;
   bool rightAltAvailable = myArea.x + myArea.width + 1 < picWidthChroma;
 
-#if JVET_Z0118_GDR
-    {
-      PicHeader *picHeader = currTU.cs->picHeader;
-      int lumaX = -1, lumaY = -1, lumaWidth = -1, lumaHeight = -1;
-
-      if (isCb)
-      {
-        // ChromaFormat nChromaFormat = currTU.cs->slice->getSPS()->getChromaFormatIdc();
-        lumaX = myArea.x << scaleX;
-        lumaY = myArea.y << scaleY;
-        lumaWidth  = myArea.width  << scaleX;
-        lumaHeight = myArea.height << scaleY;
-      }
-      else
-      {
-        lumaX = currTU.lx();
-        lumaY = currTU.ly();
-        lumaWidth = currTU.lwidth();
-        lumaHeight = currTU.lheight();
-      }
-
-      if (picHeader->getVirtualBoundariesPresentFlag())
-      {
-        for (int i = 0; i < picHeader->getNumHorVirtualBoundaries(); i++)
-        {
-          if (lumaY == picHeader->getVirtualBoundariesPosY(i))
-          {
-            topAltAvailable = false;
-          }
-          if ((lumaY + lumaHeight) == picHeader->getVirtualBoundariesPosY(i))
-          {
-            bottomAltAvailable = false;
-          }
-        }
-
-        for (int i = 0; i < picHeader->getNumVerVirtualBoundaries(); i++)
-        {
-          if (lumaX == picHeader->getVirtualBoundariesPosX(i))
-          {
-            leftAltAvailable = false;
-          }
-          if ((lumaX + lumaWidth) == picHeader->getVirtualBoundariesPosX(i))
-          {
-            rightAltAvailable = false;
-          }
-        }
-      }
-    }
-#endif    
-
   bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
 
-  //if not 420, then don't use rec for padding
-  if(currTU.cu->chromaFormat != CHROMA_420)
+  // if not 420, then don't use rec for padding
+  if (currTU.cu->chromaFormat != CHROMA_420)
   {
     topAltAvailable = false;
     bottomAltAvailable = false;
@@ -2089,19 +3781,19 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
     allAvail = false;
   }
 
-  if(allAvail)
+  if (allAvail)
   {
     // set pointer two rows up and two pixels to the left from the start of the block
     tempBlockPtr = tempblock;
     // same with image data
-    srcPtr = srcPtr - 2*srcStride - 2;
+    srcPtr = srcPtr - 2 * srcStride - 2;
     // Move block to temporary block
     // Check if the block a the top block of a CTU.
     int scaleChroma = getComponentScaleX(compID, currTU.cu->chromaFormat);
     int ctuSizeChroma = currTU.cs->slice->getSPS()->getCTUSize() >> scaleChroma;
     bool isCtuBoundary = myArea.y % ctuSizeChroma == 0;
 
-    if(isCtuBoundary)
+    if (isCtuBoundary)
     {
       // The samples two lines up are out of bounds. (One line above the CTU is OK, since SAO uses that line.)
       // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
@@ -2116,7 +3808,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
     }
     tempBlockPtr += iWidthExtSIMD;
     // Copy samples that are not out of bounds.
-    for (uint32_t uiY = 1; uiY < uiHeightExt-1; ++uiY)
+    for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
     {
       std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
       srcPtr += srcStride;
@@ -2124,11 +3816,12 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
     }
     // Check if the block is a bottom block of a CTU.
     isCtuBoundary = (myArea.y + uiHeight) % ctuSizeChroma == 0;
-    if(isCtuBoundary)
+    if (isCtuBoundary)
     {
       // The samples two lines down are out of bounds. (One line below the CTU is OK, since SAO uses that line.)
       // Hence the bottom line of tempblock is unavailable if the block at the bottom of a CTU.
-      // Therefore, copy samples from the second to last line instead of the last line by subtracting srcPtr before copy.
+      // Therefore, copy samples from the second to last line instead of the last line by subtracting srcPtr before
+      // copy.
       srcPtr -= srcStride;
       std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
     }
@@ -2139,7 +3832,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
   }
   else
   {
-    tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES)* iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+    tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
     // Move block to temporary block
     for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
     {
@@ -2148,165 +3841,726 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
       tempBlockPtr += iWidthExtSIMD;
     }
     srcPtr = srcPtrTemp;
-    if(topAltAvailable)
+    if (topAltAvailable)
     {
-      std::copy(srcPtr - 2*srcStride, srcPtr - 2*srcStride + uiWidth, tempblock + 2);
+      std::copy(srcPtr - 2 * srcStride, srcPtr - 2 * srcStride + uiWidth, tempblock + 2);
       std::copy(srcPtr - srcStride, srcPtr - srcStride + uiWidth, tempblock + iWidthExtSIMD + 2);
     }
-    if(bottomAltAvailable)
+    if (bottomAltAvailable)
     {
-      std::copy(srcPtr + (uiHeight+1)*srcStride, srcPtr +(uiHeight+1)*srcStride + uiWidth, tempblock + (uiHeightExt-1)*iWidthExtSIMD + 2);
-      std::copy(srcPtr + uiHeight*srcStride, srcPtr +uiHeight*srcStride + uiWidth, tempblock + (uiHeightExt-2)*iWidthExtSIMD + 2);
+      std::copy(srcPtr + (uiHeight + 1) * srcStride, srcPtr + (uiHeight + 1) * srcStride + uiWidth,
+                tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+      std::copy(srcPtr + uiHeight * srcStride, srcPtr + uiHeight * srcStride + uiWidth,
+                tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
     }
-    if(leftAltAvailable)
+    if (leftAltAvailable)
     {
-      for(int yy = 0; yy<uiHeight; yy++)
+      for (int yy = 0; yy < uiHeight; yy++)
       {
-        tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 0] = *(srcPtr + yy*srcStride -2);
-        tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 1] = *(srcPtr + yy*srcStride -1);
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = *(srcPtr + yy * srcStride - 2);
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = *(srcPtr + yy * srcStride - 1);
       }
     }
-    if(rightAltAvailable)
+    if (rightAltAvailable)
     {
-      for(int yy = 0; yy<uiHeight; yy++)
+      for (int yy = 0; yy < uiHeight; yy++)
       {
-        tempblock[(iWidthExtSIMD<<1) + uiWidthExt-1 + yy*iWidthExtSIMD] = *(srcPtr + uiWidth + yy*srcStride + 1);
-        tempblock[(iWidthExtSIMD<<1) + uiWidthExt-2 + yy*iWidthExtSIMD] = *(srcPtr + uiWidth + yy*srcStride);
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] =
+          *(srcPtr + uiWidth + yy * srcStride + 1);
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride);
       }
     }
     // if not all available, copy from inside tempbuffer
-    if(!topAltAvailable)
+    if (!topAltAvailable)
     {
-      std::copy(tempblock + iWidthExtSIMD*2 + 2, tempblock + iWidthExtSIMD*2 + 2 + uiWidth, tempblock + 2);
-      std::copy(tempblock + iWidthExtSIMD*2 + 2, tempblock + iWidthExtSIMD*2 + 2 + uiWidth, tempblock + iWidthExtSIMD + 2);
+      std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + 2);
+      std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + iWidthExtSIMD + 2);
     }
-    if(!bottomAltAvailable)
+    if (!bottomAltAvailable)
     {
-      std::copy(tempblock + (uiHeightExt-3)*iWidthExtSIMD + 2, tempblock + (uiHeightExt-3)*iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt-2)*iWidthExtSIMD + 2);
-      std::copy(tempblock + (uiHeightExt-3)*iWidthExtSIMD + 2, tempblock + (uiHeightExt-3)*iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt-1)*iWidthExtSIMD + 2);
+      std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+      std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
     }
-    if(!leftAltAvailable)
+    if (!leftAltAvailable)
     {
-      for(int yy = 0; yy<uiHeight; yy++)
+      for (int yy = 0; yy < uiHeight; yy++)
       {
-        tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 0] = tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 2];
-        tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 1] = tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 2];
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
       }
     }
-    if(!rightAltAvailable)
+    if (!rightAltAvailable)
     {
-      for(int yy = 0; yy<uiHeight; yy++)
+      for (int yy = 0; yy < uiHeight; yy++)
       {
-        tempblock[(iWidthExtSIMD<<1) + uiWidthExt-2 + yy*iWidthExtSIMD] = tempblock[(iWidthExtSIMD<<1) + uiWidthExt-2 + yy*iWidthExtSIMD - 1];
-        tempblock[(iWidthExtSIMD<<1) + uiWidthExt-1 + yy*iWidthExtSIMD] = tempblock[(iWidthExtSIMD<<1) + uiWidthExt-2 + yy*iWidthExtSIMD - 1];
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
       }
     }
     // All sides are available, easy to just copy corners also.
-    if(topAltAvailable && leftAltAvailable)
+    if (topAltAvailable && leftAltAvailable)
     {
-      tempblock[0] = *(srcPtr - 2*srcStride -2);                                                // a     top left corner
-      tempblock[1] = *(srcPtr - 2*srcStride -1);                                                // b     a b|x x
-      tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride -2);                                  // c     c d|x x
-      tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride -1);                                  // d     -------
+      tempblock[0] = *(srcPtr - 2 * srcStride - 2);               // a     top left corner
+      tempblock[1] = *(srcPtr - 2 * srcStride - 1);               // b     a b|x x
+      tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride - 2);   // c     c d|x x
+      tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride - 1);   // d     -------
     }
     else
     {
-      tempblock[0] = tempblock[iWidthExtSIMD*2 + 2];                                            // extend top left
-      tempblock[1] = tempblock[iWidthExtSIMD*2 + 2];                                            // extend top left
-      tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD*2 + 2];                            // extend top left
-      tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD*2 + 2];                            // extend top left
+      tempblock[0] = tempblock[iWidthExtSIMD * 2 + 2];                   // extend top left
+      tempblock[1] = tempblock[iWidthExtSIMD * 2 + 2];                   // extend top left
+      tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+      tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
     }
-    if(topAltAvailable && rightAltAvailable)
+    if (topAltAvailable && rightAltAvailable)
     {
-      tempblock[iWidthExtSIMD - 2] = *(srcPtr - 2*srcStride + uiWidth);                         // a
-      tempblock[iWidthExtSIMD - 1] = *(srcPtr - 2*srcStride + uiWidth + 1);                     // b
-      tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);              // c
-      tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);          // d
-    }
-    else
-    {
-      tempblock[iWidthExtSIMD - 2] = tempblock[iWidthExtSIMD*2 + uiWidthExt - 3];               // extend top right
-      tempblock[iWidthExtSIMD - 1] = tempblock[iWidthExtSIMD*2 + uiWidthExt - 3];               // extend top right
-      tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD*2 + uiWidthExt - 3];  // extend top right
-      tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD*2 + uiWidthExt - 3];  // extend top right
-    }
-    if(bottomAltAvailable && leftAltAvailable)
-    {
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + 0] = *(srcPtr + uiHeight*srcStride -2);          // a
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + 1] = *(srcPtr + uiHeight*srcStride -1);          // b
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + 0] = *(srcPtr + (uiHeight+1)*srcStride -2);      // c
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + 1] = *(srcPtr + (uiHeight+1)*srcStride -1);      // d
+      tempblock[iWidthExtSIMD - 2] = *(srcPtr - 2 * srcStride + uiWidth);                // a
+      tempblock[iWidthExtSIMD - 1] = *(srcPtr - 2 * srcStride + uiWidth + 1);            // b
+      tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);       // c
+      tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);   // d
     }
     else
     {
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + 0] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + 2];  // bot avail: mirror left/right
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + 1] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + 2];  // bot avail: mirror left/right
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + 0] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + 2];  // bot avail: mirror left/right
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + 1] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + 2];  // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];                // extend top right
+      tempblock[iWidthExtSIMD - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];                // extend top right
+      tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+      tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
     }
-    if(bottomAltAvailable && rightAltAvailable)
+    if (bottomAltAvailable && leftAltAvailable)
     {
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + uiWidthExt - 2] = *(srcPtr + uiHeight*srcStride + uiWidth);                // a
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + uiWidthExt - 1] = *(srcPtr + uiHeight*srcStride + uiWidth + 1);            // b
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + uiWidthExt - 2] = *(srcPtr + (uiHeight+1)*srcStride + uiWidth);            // c
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + uiWidthExt - 1] = *(srcPtr + (uiHeight+1)*srcStride + uiWidth + 1);        // d
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = *(srcPtr + uiHeight * srcStride - 2);         // a
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = *(srcPtr + uiHeight * srcStride - 1);         // b
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = *(srcPtr + (uiHeight + 1) * srcStride - 2);   // c
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = *(srcPtr + (uiHeight + 1) * srcStride - 1);   // d
     }
     else
     {
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + uiWidthExt - 2] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + uiWidthExt - 3];
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + uiWidthExt - 1] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + uiWidthExt - 3];
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + uiWidthExt - 2] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + uiWidthExt - 3];
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + uiWidthExt - 1] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+    }
+    if (bottomAltAvailable && rightAltAvailable)
+    {
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = *(srcPtr + uiHeight * srcStride + uiWidth);   // a
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = *(srcPtr + uiHeight * srcStride + uiWidth + 1);   // b
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth);   // c
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth + 1);   // d
+    }
+    else
+    {
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
     }
   }
-  m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr );
+  m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride,
+                                    iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr);
+#endif
 }
 #endif //chromaBIF no clip
 
-void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb)
+void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  , bool isTUCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+  , bool clipTop, bool clipBottom, bool clipLeft, bool clipRight
+#endif
+)
 {
-  ComponentID compID = isCb ? COMPONENT_Cb :COMPONENT_Cr;
-  CompArea &compArea = currTU.block(compID);
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  if (isTUCrossedByVirtualBoundaries)
+  {
+    ComponentID     compID       = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+    const CompArea &myArea       = isCb ? currTU.blocks[COMPONENT_Cb] : currTU.blocks[COMPONENT_Cr];
+    const int       chromaScaleX = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
+    const int       chromaScaleY = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
+    const unsigned  width        = myArea.width;
+    const unsigned  height       = myArea.height;
+    int             yPos         = myArea.y;
+    int             xPos         = myArea.x;
+    int             yStart       = yPos;
+    int             curPicWidth  = currTU.cu->cs->pcv->lumaWidth;
+    int             curPicHeight = currTU.cu->cs->pcv->lumaHeight;
 
-  const unsigned uiWidth = compArea.width;
+    for (int i = 0; i <= numHorVirBndry; i++)
+    {
+      const int  yEnd  = i == numHorVirBndry ? yPos + height : (horVirBndryPos[i] >> chromaScaleY);
+      const int  h     = yEnd - yStart;
+      const bool clipT = (i == 0 && clipTop) || (i > 0) || (yStart - 2 < 0);
+      const bool clipB =
+        (i == numHorVirBndry && clipBottom) || (i < numHorVirBndry) || (yEnd + 2 >= (curPicHeight >> chromaScaleY));
+      int xStart = xPos;
+      for (int j = 0; j <= numVerVirBndry; j++)
+      {
+        const int  xEnd  = j == numVerVirBndry ? xPos + width : (verVirBndryPos[j] >> chromaScaleX);
+        const int  w     = xEnd - xStart;
+        const bool clipL = (j == 0 && clipLeft) || (j > 0) || (xStart - 2 < 0);
+        const bool clipR =
+          (j == numVerVirBndry && clipRight) || (j < numVerVirBndry) || (xEnd + 2 >= (curPicWidth >> chromaScaleX));
+
+        const unsigned uiWidth  = w;
+        const unsigned uiHeight = h;
+
+        const Area blkDst(xStart, yStart, uiWidth, uiHeight);
+        int        srcStride  = src.get(compID).stride;
+        const Pel *srcPtr     = src.get(compID).bufAt(blkDst);
+        const Pel *srcPtrTemp = srcPtr;
+
+        int  recStride = rec.get(compID).stride;
+        Pel *recPtr    = rec.get(compID).bufAt(blkDst);
+
+        int bfac            = 1;
+        int bifRoundAdd      = (BIF_ROUND_ADD) >> (currTU.cs->pps->getChromaBIFStrength());
+        int bifRoundShift    = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getChromaBIFStrength());
+
+        bool topAltAvailable  = !clipT;
+        bool leftAltAvailable = !clipL;
+
+        bool bottomAltAvailable = !clipB;
+        bool rightAltAvailable  = !clipR;
+
+        int widthForStrength    = currTU.blocks[compID].width;
+        int heightForStrength   = currTU.blocks[compID].height;
+
+        if (currTU.blocks[COMPONENT_Y].valid())
+        {
+          widthForStrength    = currTU.blocks[COMPONENT_Y].width;
+          heightForStrength   = currTU.blocks[COMPONENT_Y].height;
+        }
+
+        const char *LUTrowPtr = getFilterLutParametersChroma(
+          std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac,
+          widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid());
+
+        uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
+        uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
+
+        int iWidthExtSIMD = uiWidthExt;
+        if (uiWidth < 8)
+        {
+          iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
+        }
+
+        Pel *tempBlockPtr;
+
+        memset(tempblock, 0, iWidthExtSIMD * uiHeightExt * sizeof(short));
+
+        tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+
+        //// Move block to temporary block
+        for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
+        {
+          std::memcpy(tempBlockPtr, srcPtr, uiWidth * sizeof(Pel));
+          srcPtr += srcStride;
+          tempBlockPtr += iWidthExtSIMD;
+        }
+        srcPtr = srcPtrTemp;
+
+        const CompArea &myArea = isCb ? currTU.blocks[COMPONENT_Cb] : currTU.blocks[COMPONENT_Cr];
+
+        topAltAvailable  = topAltAvailable && (blkDst.y - NUMBER_PADDED_SAMPLES >= 0);
+        leftAltAvailable = leftAltAvailable && (blkDst.x - NUMBER_PADDED_SAMPLES >= 0);
+
+        int      scaleX            = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
+        int      scaleY            = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
+        uint32_t picWidthChroma    = currTU.cu->slice->getPPS()->getPicWidthInLumaSamples() >> scaleX;
+        uint32_t picHeightChroma   = currTU.cu->slice->getPPS()->getPicHeightInLumaSamples() >> scaleY;
+
+        bottomAltAvailable = bottomAltAvailable && (blkDst.y + blkDst.height + 1 < picHeightChroma);
+        rightAltAvailable  = rightAltAvailable && (blkDst.x + blkDst.width + 1 < picWidthChroma);
+
+        bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
+
+        // if not 420, then don't use rec for padding
+        if (currTU.cu->chromaFormat != CHROMA_420)
+        {
+          topAltAvailable    = false;
+          bottomAltAvailable = false;
+          leftAltAvailable   = false;
+          rightAltAvailable  = false;
+          allAvail           = false;
+        }
+
+        if (allAvail)
+        {
+          // set pointer two rows up and two pixels to the left from the start of the block
+          tempBlockPtr = tempblock;
+          // same with image data
+          srcPtr = srcPtr - 2 * srcStride - 2;
+          // Move block to temporary block
+          // Check if the block a the top block of a CTU.
+          int      scaleChroma    = getComponentScaleX(compID, currTU.cu->chromaFormat);
+          int      ctuSizeChroma  = currTU.cs->slice->getSPS()->getCTUSize() >> scaleChroma;
+          bool     isCTUboundary  = myArea.y % ctuSizeChroma == 0;
+
+          if (isCTUboundary)
+          {
+            // The samples two lines up are out of bounds. (One line above the CTU is OK, since SAO uses that line.)
+            // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
+            // Therefore, copy samples from one line up instead of from two lines up by updating srcPtr *before* copy.
+            srcPtr += srcStride;
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+          }
+          else
+          {
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+            srcPtr += srcStride;
+          }
+          tempBlockPtr += iWidthExtSIMD;
+          // Copy samples that are not out of bounds.
+          for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
+          {
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+            srcPtr += srcStride;
+            tempBlockPtr += iWidthExtSIMD;
+          }
+          // Check if the block is a bottom block of a CTU.
+          isCTUboundary = (myArea.y + uiHeight) % ctuSizeChroma == 0;
+          if (isCTUboundary)
+          {
+            // The samples two lines down are out of bounds. (One line below the CTU is OK, since SAO uses that line.)
+            // Hence the bottom line of tempblock is unavailable if the block at the bottom of a CTU.
+            // Therefore, copy samples from the second to last line instead of the last line by subtracting srcPtr
+            // before copy.
+            srcPtr -= srcStride;
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+          }
+          else
+          {
+            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+          }
+        }
+        else
+        {
+          tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+          // Move block to temporary block
+          for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
+          {
+            std::memcpy(tempBlockPtr, srcPtr, uiWidth * sizeof(Pel));
+            srcPtr += srcStride;
+            tempBlockPtr += iWidthExtSIMD;
+          }
+          srcPtr = srcPtrTemp;
+          if (topAltAvailable)
+          {
+            std::copy(srcPtr - 2 * srcStride, srcPtr - 2 * srcStride + uiWidth, tempblock + 2);
+            std::copy(srcPtr - srcStride, srcPtr - srcStride + uiWidth, tempblock + iWidthExtSIMD + 2);
+          }
+          if (bottomAltAvailable)
+          {
+            std::copy(srcPtr + (uiHeight + 1) * srcStride, srcPtr + (uiHeight + 1) * srcStride + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+            std::copy(srcPtr + uiHeight * srcStride, srcPtr + uiHeight * srcStride + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+          }
+          if (leftAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = *(srcPtr + yy * srcStride - 2);
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = *(srcPtr + yy * srcStride - 1);
+            }
+          }
+          if (rightAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride + 1);
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride);
+            }
+          }
+          // if not all available, copy from inside tempbuffer
+          if (!topAltAvailable)
+          {
+            std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + 2);
+            std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + iWidthExtSIMD + 2);
+          }
+          if (!bottomAltAvailable)
+          {
+            std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+            std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+          }
+          if (!leftAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+              tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+            }
+          }
+          if (!rightAltAvailable)
+          {
+            for (int yy = 0; yy < uiHeight; yy++)
+            {
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+              tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+            }
+          }
+          // All sides are available, easy to just copy corners also.
+          if (topAltAvailable && leftAltAvailable)
+          {
+            tempblock[0]                 = *(srcPtr - 2 * srcStride - 2);   // a     top left corner
+            tempblock[1]                 = *(srcPtr - 2 * srcStride - 1);   // b     a b|x x
+            tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride - 2);       // c     c d|x x
+            tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride - 1);       // d     -------
+          }
+          else
+          {
+            tempblock[0]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+            tempblock[1]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+            tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+            tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+          }
+          if (topAltAvailable && rightAltAvailable)
+          {
+            tempblock[iWidthExtSIMD - 2]              = *(srcPtr - 2 * srcStride + uiWidth);       // a
+            tempblock[iWidthExtSIMD - 1]              = *(srcPtr - 2 * srcStride + uiWidth + 1);   // b
+            tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);           // c
+            tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);       // d
+          }
+          else
+          {
+            tempblock[iWidthExtSIMD - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+            tempblock[iWidthExtSIMD - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+            tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+            tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+          }
+          if (bottomAltAvailable && leftAltAvailable)
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = *(srcPtr + uiHeight * srcStride - 2);         // a
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = *(srcPtr + uiHeight * srcStride - 1);         // b
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = *(srcPtr + (uiHeight + 1) * srcStride - 2);   // c
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = *(srcPtr + (uiHeight + 1) * srcStride - 1);   // d
+          }
+          else
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+          }
+          if (bottomAltAvailable && rightAltAvailable)
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = *(srcPtr + uiHeight * srcStride + uiWidth);   // a
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = *(srcPtr + uiHeight * srcStride + uiWidth + 1);   // b
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth);   // c
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth + 1);   // d
+          }
+          else
+          {
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+            tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+            tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+          }
+        }
+
+        m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, LUTrowPtr);
+        xStart = xEnd;
+      }
+
+      yStart = yEnd;
+    }
+  }
+  else
+  {
+    ComponentID compID   = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+    CompArea &  compArea = currTU.block(compID);
+
+    const unsigned uiWidth  = compArea.width;
+    const unsigned uiHeight = compArea.height;
+
+    int        srcStride  = src.get(compID).stride;
+    const Pel *srcPtr     = src.get(compID).bufAt(compArea);
+    const Pel *srcPtrTemp = srcPtr;
+
+    int  recStride = rec.get(compID).stride;
+    Pel *recPtr    = rec.get(compID).bufAt(compArea);
+
+    int bfac            = 1;
+    int bifRoundAdd     = (BIF_ROUND_ADD) >> (currTU.cs->pps->getChromaBIFStrength());
+    int bifRoundShift   = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getChromaBIFStrength());
+
+    int widthForStrength    = currTU.blocks[compID].width;
+    int heightForStrength   = currTU.blocks[compID].height;
+
+    if (currTU.blocks[COMPONENT_Y].valid())
+    {
+      widthForStrength    = currTU.blocks[COMPONENT_Y].width;
+      heightForStrength   = currTU.blocks[COMPONENT_Y].height;
+    }
+
+    const char *LUTrowPtr = getFilterLutParametersChroma(
+      std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac,
+      widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid());
+
+    uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
+    uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
+
+    int iWidthExtSIMD = uiWidthExt;
+    if (uiWidth < 8)
+    {
+      iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
+    }
+
+    Pel *tempBlockPtr;
+
+    memset(tempblock, 0, iWidthExtSIMD * uiHeightExt * sizeof(short));
+
+    tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+
+    // Move block to temporary block
+    for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
+    {
+      std::memcpy(tempBlockPtr, srcPtr, uiWidth * sizeof(Pel));
+      srcPtr += srcStride;
+      tempBlockPtr += iWidthExtSIMD;
+    }
+    srcPtr = srcPtrTemp;
+
+    const CompArea &myArea = isCb ? currTU.blocks[COMPONENT_Cb] : currTU.blocks[COMPONENT_Cr];
+
+    bool topAltAvailable  = myArea.y - NUMBER_PADDED_SAMPLES >= 0;
+    bool leftAltAvailable = myArea.x - NUMBER_PADDED_SAMPLES >= 0;
+
+    int      scaleX            = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
+    int      scaleY            = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
+    int      picWidthChroma    = currTU.cu->slice->getPPS()->getPicWidthInLumaSamples() >> scaleX;
+    int      picHeightChroma   = currTU.cu->slice->getPPS()->getPicHeightInLumaSamples() >> scaleY;
+
+    bool bottomAltAvailable = myArea.y + myArea.height + 1 < picHeightChroma;
+    bool rightAltAvailable  = myArea.x + myArea.width + 1 < picWidthChroma;
+
+    bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
+
+    // if not 420, then don't use rec for padding
+    if (currTU.cu->chromaFormat != CHROMA_420)
+    {
+      topAltAvailable    = false;
+      bottomAltAvailable = false;
+      leftAltAvailable   = false;
+      rightAltAvailable  = false;
+      allAvail           = false;
+    }
+
+    if (allAvail)
+    {
+      // set pointer two rows up and two pixels to the left from the start of the block
+      tempBlockPtr = tempblock;
+      // same with image data
+      srcPtr = srcPtr - 2 * srcStride - 2;
+      // Move block to temporary block
+      // Check if the block a the top block of a CTU.
+      int      scaleChroma    = getComponentScaleX(compID, currTU.cu->chromaFormat);
+      int      ctuSizeChroma  = currTU.cs->slice->getSPS()->getCTUSize() >> scaleChroma;
+      bool     isCTUboundary  = myArea.y % ctuSizeChroma == 0;
+
+      if (isCTUboundary)
+      {
+        // The samples two lines up are out of bounds. (One line above the CTU is OK, since SAO uses that line.)
+        // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
+        // Therefore, copy samples from one line up instead of from two lines up by updating srcPtr *before* copy.
+        srcPtr += srcStride;
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      }
+      else
+      {
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        srcPtr += srcStride;
+      }
+      tempBlockPtr += iWidthExtSIMD;
+      // Copy samples that are not out of bounds.
+      for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
+      {
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        srcPtr += srcStride;
+        tempBlockPtr += iWidthExtSIMD;
+      }
+      // Check if the block is a bottom block of a CTU.
+      isCTUboundary = (myArea.y + uiHeight) % ctuSizeChroma == 0;
+      if (isCTUboundary)
+      {
+        // The samples two lines down are out of bounds. (One line below the CTU is OK, since SAO uses that line.)
+        // Hence the bottom line of tempblock is unavailable if the block at the bottom of a CTU.
+        // Therefore, copy samples from the second to last line instead of the last line by subtracting srcPtr before
+        // copy.
+        srcPtr -= srcStride;
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      }
+      else
+      {
+        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      }
+    }
+    else
+    {
+      tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+      // Move block to temporary block
+      for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
+      {
+        std::memcpy(tempBlockPtr, srcPtr, uiWidth * sizeof(Pel));
+        srcPtr += srcStride;
+        tempBlockPtr += iWidthExtSIMD;
+      }
+      srcPtr = srcPtrTemp;
+      if (topAltAvailable)
+      {
+        std::copy(srcPtr - 2 * srcStride, srcPtr - 2 * srcStride + uiWidth, tempblock + 2);
+        std::copy(srcPtr - srcStride, srcPtr - srcStride + uiWidth, tempblock + iWidthExtSIMD + 2);
+      }
+      if (bottomAltAvailable)
+      {
+        std::copy(srcPtr + (uiHeight + 1) * srcStride, srcPtr + (uiHeight + 1) * srcStride + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+        std::copy(srcPtr + uiHeight * srcStride, srcPtr + uiHeight * srcStride + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+      }
+      if (leftAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = *(srcPtr + yy * srcStride - 2);
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = *(srcPtr + yy * srcStride - 1);
+        }
+      }
+      if (rightAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride + 1);
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride);
+        }
+      }
+      // if not all available, copy from inside tempbuffer
+      if (!topAltAvailable)
+      {
+        std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + 2);
+        std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + iWidthExtSIMD + 2);
+      }
+      if (!bottomAltAvailable)
+      {
+        std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+        std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+      }
+      if (!leftAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+          tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+        }
+      }
+      if (!rightAltAvailable)
+      {
+        for (int yy = 0; yy < uiHeight; yy++)
+        {
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+          tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+        }
+      }
+      // All sides are available, easy to just copy corners also.
+      if (topAltAvailable && leftAltAvailable)
+      {
+        tempblock[0]                 = *(srcPtr - 2 * srcStride - 2);   // a     top left corner
+        tempblock[1]                 = *(srcPtr - 2 * srcStride - 1);   // b     a b|x x
+        tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride - 2);       // c     c d|x x
+        tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride - 1);       // d     -------
+      }
+      else
+      {
+        tempblock[0]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+        tempblock[1]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+        tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+        tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+      }
+      if (topAltAvailable && rightAltAvailable)
+      {
+        tempblock[iWidthExtSIMD - 2]              = *(srcPtr - 2 * srcStride + uiWidth);       // a
+        tempblock[iWidthExtSIMD - 1]              = *(srcPtr - 2 * srcStride + uiWidth + 1);   // b
+        tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);           // c
+        tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);       // d
+      }
+      else
+      {
+        tempblock[iWidthExtSIMD - 2]              = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+        tempblock[iWidthExtSIMD - 1]              = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+        tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+        tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+      }
+      if (bottomAltAvailable && leftAltAvailable)
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = *(srcPtr + uiHeight * srcStride - 2);         // a
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = *(srcPtr + uiHeight * srcStride - 1);         // b
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = *(srcPtr + (uiHeight + 1) * srcStride - 2);   // c
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = *(srcPtr + (uiHeight + 1) * srcStride - 1);   // d
+      }
+      else
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      }
+      if (bottomAltAvailable && rightAltAvailable)
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = *(srcPtr + uiHeight * srcStride + uiWidth);   // a
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = *(srcPtr + uiHeight * srcStride + uiWidth + 1);   // b
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth);   // c
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth + 1);   // d
+      }
+      else
+      {
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+        tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+        tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      }
+    }
+    m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride,
+                                      iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, LUTrowPtr);
+  }
+#else
+  ComponentID compID   = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+  CompArea &  compArea = currTU.block(compID);
+
+  const unsigned uiWidth  = compArea.width;
   const unsigned uiHeight = compArea.height;
 
-  int srcStride = src.get(compID).stride;
-  const Pel *srcPtr = src.get(compID).bufAt(compArea);
+  int        srcStride  = src.get(compID).stride;
+  const Pel *srcPtr     = src.get(compID).bufAt(compArea);
   const Pel *srcPtrTemp = srcPtr;
 
-  int recStride = rec.get(compID).stride;
-  Pel *recPtr = rec.get(compID).bufAt(compArea);
+  int  recStride = rec.get(compID).stride;
+  Pel *recPtr    = rec.get(compID).bufAt(compArea);
 
-  int bfac = 1;
-  int bifRoundAdd = (BIF_ROUND_ADD) >> (currTU.cs->pps->getChromaBIFStrength());
+  int bfac          = 1;
+  int bifRoundAdd   = (BIF_ROUND_ADD) >> (currTU.cs->pps->getChromaBIFStrength());
   int bifRoundShift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getChromaBIFStrength());
 
-  int widthForStrength = currTU.blocks[compID].width;
+  int widthForStrength  = currTU.blocks[compID].width;
   int heightForStrength = currTU.blocks[compID].height;
 
-  if(currTU.blocks[COMPONENT_Y].valid())
+  if (currTU.blocks[COMPONENT_Y].valid())
   {
-    widthForStrength = currTU.blocks[COMPONENT_Y].width;
+    widthForStrength  = currTU.blocks[COMPONENT_Y].width;
     heightForStrength = currTU.blocks[COMPONENT_Y].height;
   }
 
-  const char* lutRowPtr = getFilterLutParametersChroma( std::min( uiWidth, uiHeight ), currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac, widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid());
+  const char *lutRowPtr = getFilterLutParametersChroma(
+    std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac,
+    widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid());
 
-  uint32_t uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
+  uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
   int iWidthExtSIMD = uiWidthExt;
-  if( uiWidth < 8 )
+  if (uiWidth < 8)
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
   }
 
   Pel *tempBlockPtr;
 
-  memset(tempblock, 0, iWidthExtSIMD*uiHeightExt * sizeof(short));
+  memset(tempblock, 0, iWidthExtSIMD * uiHeightExt * sizeof(short));
 
-  tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES)* iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+  tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
 
   // Move block to temporary block
   for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
@@ -2316,91 +4570,45 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
     tempBlockPtr += iWidthExtSIMD;
   }
   srcPtr = srcPtrTemp;
+
   const CompArea &myArea = isCb ? currTU.blocks[COMPONENT_Cb] : currTU.blocks[COMPONENT_Cr];
-  bool topAltAvailable = myArea.y - NUMBER_PADDED_SAMPLES >= 0;
+
+  bool topAltAvailable  = myArea.y - NUMBER_PADDED_SAMPLES >= 0;
   bool leftAltAvailable = myArea.x - NUMBER_PADDED_SAMPLES >= 0;
 
-  int scaleX  = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
-  int scaleY  = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
-  int picWidthChroma = currTU.cu->slice->getPPS()->getPicWidthInLumaSamples() >> scaleX;
-  int picHeightChroma = currTU.cu->slice->getPPS()->getPicHeightInLumaSamples() >> scaleY;
+  int      scaleX          = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
+  int      scaleY          = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
+  uint32_t picWidthChroma  = currTU.cu->slice->getPPS()->getPicWidthInLumaSamples() >> scaleX;
+  uint32_t picHeightChroma = currTU.cu->slice->getPPS()->getPicHeightInLumaSamples() >> scaleY;
 
   bool bottomAltAvailable = myArea.y + myArea.height + 1 < picHeightChroma;
-  bool rightAltAvailable = myArea.x + myArea.width + 1 < picWidthChroma;
-
-#if JVET_Z0118_GDR
-    {
-      PicHeader *picHeader = currTU.cs->picHeader;
-      int lumaX = -1, lumaY = -1, lumaWidth = -1, lumaHeight = -1;
-
-      if (isCb)
-      {
-        ChromaFormat nChromaFormat = currTU.cs->slice->getSPS()->getChromaFormatIdc();
-        lumaX = currTU.Cb().x << getComponentScaleX(compID, nChromaFormat);
-        lumaY = currTU.Cb().y << getComponentScaleY(compID, nChromaFormat);
-        lumaWidth = currTU.Cb().width << getComponentScaleX(compID, nChromaFormat);
-        lumaHeight = currTU.Cb().height << getComponentScaleY(compID, nChromaFormat);
-      }
-      else
-      {
-        lumaX = currTU.lx();
-        lumaY = currTU.ly();
-        lumaWidth = currTU.lwidth();
-        lumaHeight = currTU.lheight();
-      }
-
-      if (picHeader->getVirtualBoundariesPresentFlag())
-      {
-        for (int i = 0; i < picHeader->getNumHorVirtualBoundaries(); i++)
-        {
-          if (lumaY == picHeader->getVirtualBoundariesPosY(i))
-          {
-            topAltAvailable = false;
-          }
-          if ((lumaY + lumaHeight) == picHeader->getVirtualBoundariesPosY(i))
-          {
-            bottomAltAvailable = false;
-          }
-        }
-        for (int i = 0; i < picHeader->getNumVerVirtualBoundaries(); i++)
-        {
-          if (lumaX == picHeader->getVirtualBoundariesPosX(i))
-          {
-            leftAltAvailable = false;
-          }
-          if ((lumaX + lumaWidth) == picHeader->getVirtualBoundariesPosX(i))
-          {
-            rightAltAvailable = false;
-          }
-        }
-      }
-    }
-#endif
+  bool rightAltAvailable  = myArea.x + myArea.width + 1 < picWidthChroma;
 
   bool allAvail = topAltAvailable && bottomAltAvailable && leftAltAvailable && rightAltAvailable;
 
-  //if not 420, then don't use rec for padding
-  if(currTU.cu->chromaFormat != CHROMA_420)
+  // if not 420, then don't use rec for padding
+  if (currTU.cu->chromaFormat != CHROMA_420)
   {
-    topAltAvailable = false;
+    topAltAvailable    = false;
     bottomAltAvailable = false;
-    leftAltAvailable = false;
-    rightAltAvailable = false;
-    allAvail = false;
+    leftAltAvailable   = false;
+    rightAltAvailable  = false;
+    allAvail           = false;
   }
-  if(allAvail)
+
+  if (allAvail)
   {
     // set pointer two rows up and two pixels to the left from the start of the block
     tempBlockPtr = tempblock;
     // same with image data
-    srcPtr = srcPtr - 2*srcStride - 2;
+    srcPtr = srcPtr - 2 * srcStride - 2;
     // Move block to temporary block
     // Check if the block a the top block of a CTU.
-    int scaleChroma = getComponentScaleX(compID, currTU.cu->chromaFormat);
-    int ctuSizeChroma = currTU.cs->slice->getSPS()->getCTUSize() >> scaleChroma;
+    int  scaleChroma   = getComponentScaleX(compID, currTU.cu->chromaFormat);
+    int  ctuSizeChroma = currTU.cs->slice->getSPS()->getCTUSize() >> scaleChroma;
     bool isCtuBoundary = myArea.y % ctuSizeChroma == 0;
 
-    if(isCtuBoundary)
+    if (isCtuBoundary)
     {
       // The samples two lines up are out of bounds. (One line above the CTU is OK, since SAO uses that line.)
       // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
@@ -2415,7 +4623,7 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
     }
     tempBlockPtr += iWidthExtSIMD;
     // Copy samples that are not out of bounds.
-    for (uint32_t uiY = 1; uiY < uiHeightExt-1; ++uiY)
+    for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
     {
       std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
       srcPtr += srcStride;
@@ -2423,7 +4631,7 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
     }
     // Check if the block is a bottom block of a CTU.
     isCtuBoundary = (myArea.y + uiHeight) % ctuSizeChroma == 0;
-    if(isCtuBoundary)
+    if (isCtuBoundary)
     {
       // The samples two lines down are out of bounds. (One line below the CTU is OK, since SAO uses that line.)
       // Hence the bottom line of tempblock is unavailable if the block at the bottom of a CTU.
@@ -2438,7 +4646,7 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
   }
   else
   {
-    tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES)* iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+    tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
     // Move block to temporary block
     for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
     {
@@ -2447,118 +4655,119 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
       tempBlockPtr += iWidthExtSIMD;
     }
     srcPtr = srcPtrTemp;
-    if(topAltAvailable)
+    if (topAltAvailable)
     {
-      std::copy(srcPtr - 2*srcStride, srcPtr - 2*srcStride + uiWidth, tempblock + 2);
+      std::copy(srcPtr - 2 * srcStride, srcPtr - 2 * srcStride + uiWidth, tempblock + 2);
       std::copy(srcPtr - srcStride, srcPtr - srcStride + uiWidth, tempblock + iWidthExtSIMD + 2);
     }
-    if(bottomAltAvailable)
+    if (bottomAltAvailable)
     {
-      std::copy(srcPtr + (uiHeight+1)*srcStride, srcPtr +(uiHeight+1)*srcStride + uiWidth, tempblock + (uiHeightExt-1)*iWidthExtSIMD + 2);
-      std::copy(srcPtr + uiHeight*srcStride, srcPtr +uiHeight*srcStride + uiWidth, tempblock + (uiHeightExt-2)*iWidthExtSIMD + 2);
+      std::copy(srcPtr + (uiHeight + 1) * srcStride, srcPtr + (uiHeight + 1) * srcStride + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
+      std::copy(srcPtr + uiHeight * srcStride, srcPtr + uiHeight * srcStride + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
     }
-    if(leftAltAvailable)
+    if (leftAltAvailable)
     {
-      for(int yy = 0; yy<uiHeight; yy++)
+      for (int yy = 0; yy < uiHeight; yy++)
       {
-        tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 0] = *(srcPtr + yy*srcStride -2);
-        tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 1] = *(srcPtr + yy*srcStride -1);
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = *(srcPtr + yy * srcStride - 2);
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = *(srcPtr + yy * srcStride - 1);
       }
     }
-    if(rightAltAvailable)
+    if (rightAltAvailable)
     {
-      for(int yy = 0; yy<uiHeight; yy++)
+      for (int yy = 0; yy < uiHeight; yy++)
       {
-        tempblock[(iWidthExtSIMD<<1) + uiWidthExt-1 + yy*iWidthExtSIMD] = *(srcPtr + uiWidth + yy*srcStride + 1);
-        tempblock[(iWidthExtSIMD<<1) + uiWidthExt-2 + yy*iWidthExtSIMD] = *(srcPtr + uiWidth + yy*srcStride);
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride + 1);
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = *(srcPtr + uiWidth + yy * srcStride);
       }
     }
     // if not all available, copy from inside tempbuffer
-    if(!topAltAvailable)
+    if (!topAltAvailable)
     {
-      std::copy(tempblock + iWidthExtSIMD*2 + 2, tempblock + iWidthExtSIMD*2 + 2 + uiWidth, tempblock + 2);
-      std::copy(tempblock + iWidthExtSIMD*2 + 2, tempblock + iWidthExtSIMD*2 + 2 + uiWidth, tempblock + iWidthExtSIMD + 2);
+      std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + 2);
+      std::copy(tempblock + iWidthExtSIMD * 2 + 2, tempblock + iWidthExtSIMD * 2 + 2 + uiWidth, tempblock + iWidthExtSIMD + 2);
     }
-    if(!bottomAltAvailable)
+    if (!bottomAltAvailable)
     {
-      std::copy(tempblock + (uiHeightExt-3)*iWidthExtSIMD + 2, tempblock + (uiHeightExt-3)*iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt-2)*iWidthExtSIMD + 2);
-      std::copy(tempblock + (uiHeightExt-3)*iWidthExtSIMD + 2, tempblock + (uiHeightExt-3)*iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt-1)*iWidthExtSIMD + 2);
+      std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 2) * iWidthExtSIMD + 2);
+      std::copy(tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2, tempblock + (uiHeightExt - 3) * iWidthExtSIMD + 2 + uiWidth, tempblock + (uiHeightExt - 1) * iWidthExtSIMD + 2);
     }
-    if(!leftAltAvailable)
+    if (!leftAltAvailable)
     {
-      for(int yy = 0; yy<uiHeight; yy++)
+      for (int yy = 0; yy < uiHeight; yy++)
       {
-        tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 0] = tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 2];
-        tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 1] = tempblock[(iWidthExtSIMD<<1) + yy*iWidthExtSIMD + 2];
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 0] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
+        tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 1] = tempblock[(iWidthExtSIMD << 1) + yy * iWidthExtSIMD + 2];
       }
     }
-    if(!rightAltAvailable)
+    if (!rightAltAvailable)
     {
-      for(int yy = 0; yy<uiHeight; yy++)
+      for (int yy = 0; yy < uiHeight; yy++)
       {
-        tempblock[(iWidthExtSIMD<<1) + uiWidthExt-2 + yy*iWidthExtSIMD] = tempblock[(iWidthExtSIMD<<1) + uiWidthExt-2 + yy*iWidthExtSIMD - 1];
-        tempblock[(iWidthExtSIMD<<1) + uiWidthExt-1 + yy*iWidthExtSIMD] = tempblock[(iWidthExtSIMD<<1) + uiWidthExt-2 + yy*iWidthExtSIMD - 1];
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
+        tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 1 + yy * iWidthExtSIMD] = tempblock[(iWidthExtSIMD << 1) + uiWidthExt - 2 + yy * iWidthExtSIMD - 1];
       }
     }
     // All sides are available, easy to just copy corners also.
-    if(topAltAvailable && leftAltAvailable)
+    if (topAltAvailable && leftAltAvailable)
     {
-      tempblock[0] = *(srcPtr - 2*srcStride -2);                                                // a     top left corner
-      tempblock[1] = *(srcPtr - 2*srcStride -1);                                                // b     a b|x x
-      tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride -2);                                  // c     c d|x x
-      tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride -1);                                  // d     -------
+      tempblock[0]                 = *(srcPtr - 2 * srcStride - 2);   // a     top left corner
+      tempblock[1]                 = *(srcPtr - 2 * srcStride - 1);   // b     a b|x x
+      tempblock[iWidthExtSIMD + 0] = *(srcPtr - srcStride - 2);       // c     c d|x x
+      tempblock[iWidthExtSIMD + 1] = *(srcPtr - srcStride - 1);       // d     -------
     }
     else
     {
-      tempblock[0] = tempblock[iWidthExtSIMD*2 + 2];                                            // extend top left
-      tempblock[1] = tempblock[iWidthExtSIMD*2 + 2];                                            // extend top left
-      tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD*2 + 2];                            // extend top left
-      tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD*2 + 2];                            // extend top left
+      tempblock[0]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+      tempblock[1]                 = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+      tempblock[iWidthExtSIMD + 0] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
+      tempblock[iWidthExtSIMD + 1] = tempblock[iWidthExtSIMD * 2 + 2];   // extend top left
     }
-    if(topAltAvailable && rightAltAvailable)
+    if (topAltAvailable && rightAltAvailable)
     {
-      tempblock[iWidthExtSIMD - 2] = *(srcPtr - 2*srcStride + uiWidth);                         // a
-      tempblock[iWidthExtSIMD - 1] = *(srcPtr - 2*srcStride + uiWidth + 1);                     // b
-      tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);              // c
-      tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);          // d
-    }
-    else
-    {
-      tempblock[iWidthExtSIMD - 2] = tempblock[iWidthExtSIMD*2 + uiWidthExt - 3];               // extend top right
-      tempblock[iWidthExtSIMD - 1] = tempblock[iWidthExtSIMD*2 + uiWidthExt - 3];               // extend top right
-      tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD*2 + uiWidthExt - 3];  // extend top right
-      tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD*2 + uiWidthExt - 3];  // extend top right
-    }
-    if(bottomAltAvailable && leftAltAvailable)
-    {
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + 0] = *(srcPtr + uiHeight*srcStride -2);          // a
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + 1] = *(srcPtr + uiHeight*srcStride -1);          // b
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + 0] = *(srcPtr + (uiHeight+1)*srcStride -2);      // c
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + 1] = *(srcPtr + (uiHeight+1)*srcStride -1);      // d
+      tempblock[iWidthExtSIMD - 2]              = *(srcPtr - 2 * srcStride + uiWidth);       // a
+      tempblock[iWidthExtSIMD - 1]              = *(srcPtr - 2 * srcStride + uiWidth + 1);   // b
+      tempblock[iWidthExtSIMD + uiWidthExt - 2] = *(srcPtr - srcStride + uiWidth);           // c
+      tempblock[iWidthExtSIMD + uiWidthExt - 1] = *(srcPtr - srcStride + uiWidth + 1);       // d
     }
     else
     {
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + 0] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + 2];  // bot avail: mirror left/right
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + 1] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + 2];  // bot avail: mirror left/right
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + 0] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + 2];  // bot avail: mirror left/right
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + 1] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + 2];  // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD - 2]              = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+      tempblock[iWidthExtSIMD - 1]              = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+      tempblock[iWidthExtSIMD + uiWidthExt - 2] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
+      tempblock[iWidthExtSIMD + uiWidthExt - 1] = tempblock[iWidthExtSIMD * 2 + uiWidthExt - 3];   // extend top right
     }
-    if(bottomAltAvailable && rightAltAvailable)
+    if (bottomAltAvailable && leftAltAvailable)
     {
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + uiWidthExt - 2] = *(srcPtr + uiHeight*srcStride + uiWidth);                // a
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + uiWidthExt - 1] = *(srcPtr + uiHeight*srcStride + uiWidth + 1);            // b
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + uiWidthExt - 2] = *(srcPtr + (uiHeight+1)*srcStride + uiWidth);            // c
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + uiWidthExt - 1] = *(srcPtr + (uiHeight+1)*srcStride + uiWidth + 1);        // d
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = *(srcPtr + uiHeight * srcStride - 2);         // a
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = *(srcPtr + uiHeight * srcStride - 1);         // b
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = *(srcPtr + (uiHeight + 1) * srcStride - 2);   // c
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = *(srcPtr + (uiHeight + 1) * srcStride - 1);   // d
     }
     else
     {
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + uiWidthExt - 2] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + uiWidthExt - 3];
-      tempblock[iWidthExtSIMD*(uiHeightExt-2) + uiWidthExt - 1] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + uiWidthExt - 3];
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + uiWidthExt - 2] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + uiWidthExt - 3];
-      tempblock[iWidthExtSIMD*(uiHeightExt-1) + uiWidthExt - 1] = tempblock[iWidthExtSIMD*(uiHeightExt-3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 0] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + 2];   // bot avail: mirror left/right
+    }
+    if (bottomAltAvailable && rightAltAvailable)
+    {
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = *(srcPtr + uiHeight * srcStride + uiWidth);   // a
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = *(srcPtr + uiHeight * srcStride + uiWidth + 1);   // b
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth);   // c
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = *(srcPtr + (uiHeight + 1) * srcStride + uiWidth + 1);   // d
+    }
+    else
+    {
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 2) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 2] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
+      tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
     }
   }
-  m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr );
+  m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr);
+#endif
 }
 
 void BilateralFilter::clipNotBilaterallyFilteredBlocksChroma(const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU, bool isCb)

@@ -103,13 +103,13 @@ protected:
                   , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
                   , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
     );
-#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER || JVET_W0066_CCSAO || JVET_Z0118_GDR
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER || JVET_W0066_CCSAO
   void offsetBlockBIFonly(const int channelBitDepth, const ClpRng& clpRng, int typeIdx, int* offset, const Pel* srcBlk, Pel* resBlk, int srcStride, int resStride,  int width, int height
                           , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail, CodingStructure &cs, const UnitArea &area);
   void offsetBlockNoClip(const int channelBitDepth, const ClpRng& clpRng, int typeIdx, int* offset
                          , const Pel* srcBlk, Pel* resBlk, int srcStride, int resStride,  int width, int height
                          , bool isLeftAvail,  bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
-#if JVET_Z0118_GDR
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                          , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
 #endif
   );
@@ -147,30 +147,6 @@ protected:
     }
     return bDisabledFlag;
   }
-#if JVET_Z0118_GDR
-  inline bool isProcessDisabled(int curX, int curY, int xPos, int yPos, int numVerVirBndry, int numHorVirBndry, int verVirBndryPos[], int horVirBndryPos[])
-  {
-    bool bDisabledFlag = false;
-    for (int i = 0; i < numVerVirBndry; i++)
-    {      
-      if ((curX < verVirBndryPos[i] && xPos >= verVirBndryPos[i]) || (curX >= verVirBndryPos[i] && xPos < verVirBndryPos[i]))
-      {
-        bDisabledFlag = true;
-        break;
-      }
-    }
-    for (int i = 0; i < numHorVirBndry; i++)
-    {
-      if ((curY < horVirBndryPos[i] && yPos >= horVirBndryPos[i]) || (curY >= horVirBndryPos[i] && yPos < horVirBndryPos[i]))      
-      {
-        bDisabledFlag = true;
-        break;
-      }
-    }
-    return bDisabledFlag;
-  }
-#endif
-
   Reshape* m_pcReshape;
 #if JVET_W0066_CCSAO
   void applyCcSao(CodingStructure &cs, const PreCalcValues& pcv, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv);
@@ -183,8 +159,9 @@ protected:
                                   const int srcStrideV, const int dstStride, const int width, const int height,
                                   bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail,
                                   bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
-#if JVET_Z0118_GDR
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                                 , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+                                , const int chromaScaleX, const int chromaScaleY 
 #endif
                                   );
 #endif
@@ -197,8 +174,9 @@ protected:
                       , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride
                       , const int width, const int height
                       , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
-#if JVET_Z0118_GDR
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                       , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+                      , const int chromaScaleX, const int chromaScaleY 
 #endif
                        );
   void offsetBlockCcSaoNoClip(const ComponentID compID, const int bitDepth, const ClpRng& clpRng
@@ -209,8 +187,9 @@ protected:
                             , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride
                             , const int width, const int height
                             , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
-#if JVET_Z0118_GDR
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                             , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+                            , const int chromaScaleX, const int chromaScaleY
 #endif
                              );
 #endif

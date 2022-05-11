@@ -229,6 +229,8 @@
 #define JVET_X0071_LONGER_CCALF                           1 // JVET-X0071/JVET-X0045: Longer filter for CCALF
 #define JVET_X0071_ALF_BAND_CLASSIFIER                    1 // JVET-X0071/JVET-X0070: Alternative band classifier for ALF
 #define JVET_Y0106_CCSAO_EDGE_CLASSIFIER                  1 // JVET-Y0106: Edge based classifier for CCSAO
+#define JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY           1 // JVET-Z0105: Enable Virtual Boundary Processing for new In-loop filer tools of ECM
+
 
 //encoder optimization
 #define INTRA_TRANS_ENC_OPT                               1 //software optimization introduced by JVET-Y0141,including TIMD/DIMD/MTS/LFNS encoder fast algorithm, SIMD implementation and CM initial value retraining 
