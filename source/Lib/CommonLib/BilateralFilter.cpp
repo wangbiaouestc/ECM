@@ -2956,8 +2956,8 @@ void BilateralFilter::bilateralFilterPicRDOperCTUChroma(CodingStructure& cs, Pel
             CompArea &myArea                         = (isCb ? currTU.block(COMPONENT_Cb) : currTU.block(COMPONENT_Cr));
             const int chromaScaleX                   = getComponentScaleX(COMPONENT_Cb, currTU.cu->cs->pcv->chrFormat);
             const int chromaScaleY                   = getComponentScaleY(COMPONENT_Cb, currTU.cu->cs->pcv->chrFormat);
-            int       yPos                           = myArea.y << chromaScaleX;
-            int       xPos                           = myArea.x << chromaScaleY;
+            int       yPos                           = myArea.y << chromaScaleY;
+            int       xPos                           = myArea.x << chromaScaleX;
             bool      isTUCrossedByVirtualBoundaries = isCrossedByVirtualBoundaries(
               cs, xPos, yPos, myArea.width << chromaScaleX, myArea.height << chromaScaleY, clipTop, clipBottom,
               clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);

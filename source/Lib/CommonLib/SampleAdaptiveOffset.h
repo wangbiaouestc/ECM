@@ -152,7 +152,7 @@ protected:
   void applyCcSao(CodingStructure &cs, const PreCalcValues& pcv, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv);
   void offsetCTUCcSao(CodingStructure& cs, const UnitArea& area, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv, const int ctuRsAddr);
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-  void offsetBlockCcSaoNoClipEdge(const ComponentID compID, const int bitDepth, const ClpRng &clpRng,
+  void offsetBlockCcSaoNoClipEdge(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng &clpRng,
                                   const uint16_t candPosY, const uint16_t bandNumY, const uint16_t bandNumU,
                                   const uint16_t bandNumV, const short *offset, const Pel *srcY, const Pel *srcU,
                                   const Pel *srcV, Pel *dst, const int srcStrideY, const int srcStrideU,
@@ -161,12 +161,11 @@ protected:
                                   bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                                 , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
-                                , const int chromaScaleX, const int chromaScaleY 
 #endif
                                   );
 #endif
   void offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitArea& area, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv, const int ctuRsAddr);
-  void offsetBlockCcSao(const ComponentID compID, const int bitDepth, const ClpRng& clpRng
+  void offsetBlockCcSao(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng& clpRng
                       , const uint16_t candPosY
                       , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
                       , const short* offset
@@ -176,10 +175,9 @@ protected:
                       , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                       , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
-                      , const int chromaScaleX, const int chromaScaleY 
 #endif
                        );
-  void offsetBlockCcSaoNoClip(const ComponentID compID, const int bitDepth, const ClpRng& clpRng
+  void offsetBlockCcSaoNoClip(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng& clpRng
                             , const uint16_t candPosY
                             , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
                             , const short* offset
@@ -189,7 +187,6 @@ protected:
                             , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                             , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
-                            , const int chromaScaleX, const int chromaScaleY
 #endif
                              );
 #endif
