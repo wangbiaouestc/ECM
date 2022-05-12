@@ -1082,6 +1082,19 @@ const CtxSet ContextSetCfg::AfMmvdOffsetStep = ContextSetCfg::addCtxSet
 #if TM_MRG
 const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_Z0084_IBC_TM
+  {  25,  33 },
+  {  33,  25 },
+  { CNU,  35 },
+  {   5,   5 },
+  {   5,   5 },
+  { DWS,   4 },
+  {  18,  18 },
+  {  18,  18 },
+  { DWE, DWE },
+  { 119, 119 },
+  { 125, 125 },
+#else
   {  25, },
   {  33, },
   { CNU, },
@@ -1093,6 +1106,7 @@ const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
   { DWE, },
   { 119, },
   { 125, },
+#endif
   });
 
 #if JVET_X0141_CIIP_TIMD_TM
