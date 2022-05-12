@@ -10650,7 +10650,7 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
     //     PelStorage&          picDbBuf = m_pcLoopFilter->getDbEncPicYuvBuffer();
     //  It is now possible to insert the code for bilateral filtering here.
     
-    if(cs.pps->getUseBIF())
+    if( cs.pps->getUseBIF() && ( !CS::isDualITree( cs ) || isLuma( partitioner.chType ) ) )
     {
       for (auto &currTU : CU::traverseTUs(*cu))
       {
