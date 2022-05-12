@@ -8863,8 +8863,8 @@ AMVPInfo PU::getMultiHypMVPCandsAMVP(PredictionUnit &pu, const RefPicList eRefPi
 
 AMVPInfo PU::getMultiHypMVPCands(PredictionUnit &pu, const MultiHypPredictionData &mhData)
 {
-  const auto &mhDataForAMVPList = !pu.mergeFlag || pu.addHypData.size() == pu.numMergedAddHyps ? mhData : pu.addHypData[pu.numMergedAddHyps];
-  const auto mhRefIdxForAMVPList = mhDataForAMVPList.refIdx;
+  CHECK(mhData.isMrg, "mhData is merge mode");
+  const auto mhRefIdxForAMVPList = mhData.refIdx;
   const auto &MHRefPics = pu.cs->slice->getMultiHypRefPicList();
   CHECK(MHRefPics.empty(), "Multi Hyp: MHRefPics.empty()");
   const auto eRefPicList = RefPicList(MHRefPics[mhRefIdxForAMVPList].refList);
