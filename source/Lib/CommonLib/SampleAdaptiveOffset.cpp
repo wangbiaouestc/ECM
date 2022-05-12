@@ -1227,8 +1227,8 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
                 CompArea &myArea                         = currTU.block(compID);
                 const int chromaScaleX                   = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
                 const int chromaScaleY                   = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
-                int       yPos                           = myArea.y << chromaScaleX;
-                int       xPos                           = myArea.x << chromaScaleY;
+                int       yPos                           = myArea.y << chromaScaleY;
+                int       xPos                           = myArea.x << chromaScaleX;
                 bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
                   cs, xPos, yPos, myArea.width << chromaScaleX, myArea.height << chromaScaleY, clipTop, clipBottom,
                   clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
@@ -1385,8 +1385,8 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
                   CompArea &myArea                         = currTU.block(compID);
                   const int chromaScaleX                   = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
                   const int chromaScaleY                   = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
-                  int       yPos                           = myArea.y << chromaScaleX;
-                  int       xPos                           = myArea.x << chromaScaleY;
+                  int       yPos                           = myArea.y << chromaScaleY;
+                  int       xPos                           = myArea.x << chromaScaleX;
                   bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
                     cs, xPos, yPos, myArea.width << chromaScaleX, myArea.height << chromaScaleY, clipTop, clipBottom,
                     clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
@@ -1536,8 +1536,8 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
                   CompArea &myArea                         = currTU.block(compID);
                   const int chromaScaleX                   = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
                   const int chromaScaleY                   = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
-                  int       yPos                           = myArea.y << chromaScaleX;
-                  int       xPos                           = myArea.x << chromaScaleY;
+                  int       yPos                           = myArea.y << chromaScaleY;
+                  int       xPos                           = myArea.x << chromaScaleX;
                   bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
                     cs, xPos, yPos, myArea.width << chromaScaleX, myArea.height << chromaScaleY, clipTop, clipBottom,
                     clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
@@ -1870,18 +1870,15 @@ void SampleAdaptiveOffset::offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitA
         {
           verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
         }
-        const int chromaScaleX = getComponentScaleX(compID, cs.pcv->chrFormat);
-        const int chromaScaleY = getComponentScaleY(compID, cs.pcv->chrFormat);
 #endif
 
-          offsetBlockCcSaoNoClipEdge(compID, cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID),
+          offsetBlockCcSaoNoClipEdge(compID, cs.sps->getChromaFormatIdc(), cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID),
                                      candPosY, bandNumY, bandNumU, bandNumV, offset, srcBlkY, srcBlkU, srcBlkV, dstBlk,
                                      srcStrideY, srcStrideU, srcStrideV, dstStride, compArea.width, compArea.height,
                                      isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail,
                                      isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
             , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
-            , chromaScaleX, chromaScaleY
 #endif
           );
         }
@@ -1917,18 +1914,15 @@ void SampleAdaptiveOffset::offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitA
         {
           verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
         }
-        const int chromaScaleX = getComponentScaleX(compID, cs.pcv->chrFormat);
-        const int chromaScaleY = getComponentScaleY(compID, cs.pcv->chrFormat);
 #endif
       
-          offsetBlockCcSaoNoClip(compID, cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID), candPosY,
+          offsetBlockCcSaoNoClip(compID, cs.sps->getChromaFormatIdc(), cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID), candPosY,
                                  bandNumY, bandNumU, bandNumV, offset, srcBlkY, srcBlkU, srcBlkV, dstBlk, srcStrideY,
                                  srcStrideU, srcStrideV, dstStride, compArea.width, compArea.height, isLeftAvail,
                                  isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail,
                                  isBelowLeftAvail, isBelowRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                                  , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
-                                 , chromaScaleX, chromaScaleY
 #endif
                               );
         }
@@ -2000,11 +1994,9 @@ void SampleAdaptiveOffset::offsetCTUCcSao(CodingStructure& cs, const UnitArea& a
         {
           verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
         }
-        const int chromaScaleX = getComponentScaleX(compID, cs.pcv->chrFormat);
-        const int chromaScaleY = getComponentScaleY(compID, cs.pcv->chrFormat);
 #endif
 
-        offsetBlockCcSao( compID, cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID)
+        offsetBlockCcSao( compID, cs.sps->getChromaFormatIdc(), cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID)
                         , candPosY, bandNumY, bandNumU, bandNumV
                         , offset
                         , srcBlkY, srcBlkU, srcBlkV, dstBlk
@@ -2016,7 +2008,6 @@ void SampleAdaptiveOffset::offsetCTUCcSao(CodingStructure& cs, const UnitArea& a
                         , isBelowLeftAvail, isBelowRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                         , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
-                        , chromaScaleX, chromaScaleY
 #endif
                         );
       }
@@ -2056,14 +2047,13 @@ int calcDiffRange(Pel a, Pel b, int th)
 }
 
 void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
-  const ComponentID compID, const int bitDepth, const ClpRng &clpRng, const uint16_t candPosY, const uint16_t bandNumY,
+  const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng &clpRng, const uint16_t candPosY, const uint16_t bandNumY,
   const uint16_t bandNumU, const uint16_t bandNumV, const short *offset, const Pel *srcY, const Pel *srcU,
   const Pel *srcV, Pel *dst, const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride,
   const int width, const int height, bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail,
   bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
   ,bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
-  , const int chromaScaleX, const int chromaScaleY 
 #endif
 )
 {
@@ -2074,6 +2064,10 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
   int       signa, signb, band;
   int       th = bandNumU - 1;
 
+  const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleYM1 = 1 - chromaScaleY;
+
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
   int x, y, startX, startY, endX, endY;
   int firstLineStartX, firstLineEndX, lastLineStartX, lastLineEndX;
@@ -2131,8 +2125,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           }
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
     }
@@ -2145,8 +2139,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       if (!isAboveAvail)
       {
         srcY += srcStrideY;
-        srcU += srcStrideU * (0 & 0x1);
-        srcV += srcStrideV * (0 & 0x1);
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
         dst += dstStride;
       }
       for (y = startY; y < endY; y++)
@@ -2193,8 +2187,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           }
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
     }
@@ -2250,8 +2244,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
         }
       }
       srcY += srcStrideY;
-      srcU += srcStrideU * (0 & 0x1);
-      srcV += srcStrideV * (0 & 0x1);
+      srcU += srcStrideU * chromaScaleYM1;
+      srcV += srcStrideV * chromaScaleYM1;
       dst += dstStride;
 
       // middle lines
@@ -2299,8 +2293,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           }
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
 
@@ -2400,9 +2394,10 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
         }
       }
       srcY += srcStrideY;
-      srcU += srcStrideU * (0 & 0x1);
-      srcV += srcStrideV * (0 & 0x1);
+      srcU += srcStrideU * chromaScaleYM1;
+      srcV += srcStrideV * chromaScaleYM1;
       dst += dstStride;
+
       // middle lines
       for (y = 1; y < height - 1; y++)
       {
@@ -2448,8 +2443,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           }
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
 
@@ -2556,7 +2551,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             dst[x]             = dst[x] + offset[classIdx];
           }
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -2570,7 +2565,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       endY   = isBelowAvail ? height : height - 1;
       if (!isAboveAvail)
       {
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -2619,7 +2614,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             dst[x]             = dst[x] + offset[classIdx];
           }
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -2677,7 +2672,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           dst[x]             = dst[x] + offset[classIdx];
         }
       }
-      srcY += srcStrideY << 1;
+      srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
       srcV += srcStrideV;
       dst += dstStride;
@@ -2727,7 +2722,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             dst[x]             = dst[x] + offset[classIdx];
           }
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -2830,10 +2825,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           dst[x]             = dst[x] + offset[classIdx];
         }
       }
-      srcY += srcStrideY << 1;
+      srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
       srcV += srcStrideV;
       dst += dstStride;
+
       // middle lines
       for (y = 1; y < height - 1; y++)
       {
@@ -2879,7 +2875,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             dst[x]             = dst[x] + offset[classIdx];
           }
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -2985,8 +2981,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
         }
       }
       srcY += srcStrideY;
-      srcU += srcStrideU * (y & 0x1);
-      srcV += srcStrideV * (y & 0x1);
+      srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+      srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
       dst += dstStride;
     }
   }
@@ -3033,7 +3029,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           dst[x]             = dst[x] + offset[classIdx];
         }
       }
-      srcY += srcStrideY << 1;
+      srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
       srcV += srcStrideV;
       dst += dstStride;
@@ -3048,7 +3044,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
 #endif
 }
 #endif
-void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, const int bitDepth, const ClpRng& clpRng
+void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng& clpRng
                                                 , const uint16_t candPosY
                                                 , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
                                                 , const short* offset
@@ -3058,12 +3054,15 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
                                                 , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                                                 , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
-                                                , const int chromaScaleX, const int chromaScaleY 
 #endif
                                                  )
 {
   const int candPosYX = g_ccSaoCandPosX[COMPONENT_Y][candPosY];
   const int candPosYY = g_ccSaoCandPosY[COMPONENT_Y][candPosY];
+
+  const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleYM1 = 1 - chromaScaleY;
 
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
   int x, y, startX, startY, endX, endY;
@@ -3105,8 +3104,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           dst[x] = dst[x] + offset[classIdx];
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (0 & 0x1);
-        srcV += srcStrideV * (0 & 0x1);
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
         dst += dstStride;
 
         // middle lines
@@ -3132,8 +3131,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
             dst[x] = dst[x] + offset[classIdx];
           }
           srcY += srcStrideY;
-          srcU += srcStrideU * (y & 0x1);
-          srcV += srcStrideV * (y & 0x1);
+          srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+          srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
           dst += dstStride;
         }
       }
@@ -3145,8 +3144,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
       if (!isAboveAvail)
       {
         srcY += srcStrideY;
-        srcU += srcStrideU * (0 & 0x1);
-        srcV += srcStrideV * (0 & 0x1);
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
         dst += dstStride;
       }
       for (y = startY; y < endY; y++)
@@ -3172,8 +3171,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
         }
 
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
       break;
@@ -3206,8 +3205,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
       }
 
       srcY += srcStrideY;
-      srcU += srcStrideU * (0 & 0x1);
-      srcV += srcStrideV * (0 & 0x1);
+      srcU += srcStrideU * chromaScaleYM1;
+      srcV += srcStrideV * chromaScaleYM1;
       dst += dstStride;
 
       // middle lines
@@ -3234,8 +3233,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
         }
 
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
       break;
@@ -3267,8 +3266,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           dst[x] = dst[x] + offset[classIdx];
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
       break;
@@ -3294,8 +3293,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           dst[x] = dst[x] + offset[classIdx];
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
       break;
@@ -3327,8 +3326,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           dst[x] = dst[x] + offset[classIdx];
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
       break;
@@ -3360,8 +3359,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           dst[x] = dst[x] + offset[classIdx];
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
 
@@ -3417,8 +3416,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           dst[x] = dst[x] + offset[classIdx];
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
       break;
@@ -3450,10 +3449,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           dst[x] = dst[x] + offset[classIdx];
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
+
       // last line
       lastLineStartX = isBelowAvail ? startX : (width - 1);
       lastLineEndX   = isBelowRightAvail ? width : (width - 1);
@@ -3515,7 +3515,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
           dst[x] = dst[x] + offset[classIdx];
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -3542,7 +3542,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
             // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
             dst[x] = dst[x] + offset[classIdx];
           }
-          srcY += srcStrideY << 1;
+          srcY += srcStrideY << chromaScaleY;
           srcU += srcStrideU;
           srcV += srcStrideV;
           dst += dstStride;
@@ -3556,8 +3556,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
       if (!isAboveAvail)
       {
         srcY += srcStrideY;
-        srcU += srcStrideU * (0 & 0x1);
-        srcV += srcStrideV * (0 & 0x1);
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
         dst += dstStride;
       }
       for (y = startY; y < endY; y++)
@@ -3582,7 +3582,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           dst[x] = dst[x] + offset[classIdx];
         }
 
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -3616,7 +3616,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
         dst[x] = dst[x] + offset[classIdx];
       }
 
-      srcY += srcStrideY << 1;
+      srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
       srcV += srcStrideV;
       dst += dstStride;
@@ -3644,7 +3644,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           dst[x] = dst[x] + offset[classIdx];
         }
 
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -3677,7 +3677,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
           dst[x] = dst[x] + offset[classIdx];
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -3704,7 +3704,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
           dst[x] = dst[x] + offset[classIdx];
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -3737,7 +3737,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
           dst[x] = dst[x] + offset[classIdx];
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -3770,7 +3770,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
           dst[x] = dst[x] + offset[classIdx];
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -3827,7 +3827,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
           dst[x] = dst[x] + offset[classIdx];
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -3860,7 +3860,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
           dst[x] = dst[x] + offset[classIdx];
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -3922,8 +3922,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
       }
 
       srcY += srcStrideY;
-      srcU += srcStrideU * (y & 0x1);
-      srcV += srcStrideV * (y & 0x1);
+      srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+      srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
       dst += dstStride;
     }
   }
@@ -3948,7 +3948,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
         // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
         dst[x] = dst[x] + offset[classIdx];
       }
-      srcY += srcStrideY << 1;
+      srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
       srcV += srcStrideV;
       dst += dstStride;
@@ -3963,7 +3963,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
 #endif
 }
 
-void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int bitDepth, const ClpRng& clpRng
+void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng& clpRng
                                           , const uint16_t candPosY
                                           , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
                                           , const short* offset
@@ -3973,12 +3973,16 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
                                           , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                                           , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
-                                          , const int chromaScaleX, const int chromaScaleY 
 #endif
                                            )
 {
   const int candPosYX = g_ccSaoCandPosX[COMPONENT_Y][candPosY];
   const int candPosYY = g_ccSaoCandPosY[COMPONENT_Y][candPosY];
+
+  const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleYM1 = 1 - chromaScaleY;
+
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
   int x, y, startX, startY, endX, endY;
   int firstLineStartX, firstLineEndX, lastLineStartX, lastLineEndX;
@@ -4017,8 +4021,8 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (0 & 0x1);
-        srcV += srcStrideV * (0 & 0x1);
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
         dst += dstStride;
 
         // middle lines
@@ -4043,8 +4047,8 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
             dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);            
           }
           srcY += srcStrideY;
-          srcU += srcStrideU * (y & 0x1);
-          srcV += srcStrideV * (y & 0x1);
+          srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+          srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
           dst += dstStride;
         }
       }
@@ -4056,8 +4060,8 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
       if (!isAboveAvail)
       {
         srcY += srcStrideY;
-        srcU += srcStrideU * (0 & 0x1);
-        srcV += srcStrideV * (0 & 0x1);
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
         dst += dstStride;
       }
       for (y = startY; y < endY; y++)
@@ -4082,8 +4086,8 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
         }
 
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
       break;
@@ -4115,8 +4119,8 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
       }
 
       srcY += srcStrideY;
-      srcU += srcStrideU * (0 & 0x1);
-      srcV += srcStrideV * (0 & 0x1);
+      srcU += srcStrideU * chromaScaleYM1;
+      srcV += srcStrideV * chromaScaleYM1;
       dst += dstStride;
 
       // middle lines
@@ -4142,8 +4146,8 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
         }
 
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
       break;
@@ -4174,8 +4178,8 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
       break;
@@ -4200,8 +4204,8 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
       break;
@@ -4232,8 +4236,8 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
       break;
@@ -4264,8 +4268,8 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
 
@@ -4319,8 +4323,8 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
       break;
@@ -4351,10 +4355,11 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         dst += dstStride;
       }
+
       // last line
       lastLineStartX = isBelowAvail ? startX : (width - 1);
       lastLineEndX   = isBelowRightAvail ? width : (width - 1);
@@ -4414,7 +4419,7 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -4440,7 +4445,7 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
 
             dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);            
           }
-          srcY += srcStrideY << 1;
+          srcY += srcStrideY << chromaScaleY;
           srcU += srcStrideU;
           srcV += srcStrideV;
           dst += dstStride;
@@ -4454,8 +4459,8 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
       if (!isAboveAvail)
       {
         srcY += srcStrideY;
-        srcU += srcStrideU * (0 & 0x1);
-        srcV += srcStrideV * (0 & 0x1);
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
         dst += dstStride;
       }
       for (y = startY; y < endY; y++)
@@ -4479,7 +4484,7 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
 
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -4512,7 +4517,7 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
         dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);        
       }
 
-      srcY += srcStrideY << 1;
+      srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
       srcV += srcStrideV;
       dst += dstStride;
@@ -4539,7 +4544,7 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
 
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -4571,7 +4576,7 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -4597,7 +4602,7 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -4629,7 +4634,7 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -4661,7 +4666,7 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -4716,7 +4721,7 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
@@ -4748,11 +4753,12 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
 
           dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         dst += dstStride;
       }
+
       // last line
       lastLineStartX = isBelowAvail ? startX : (width - 1);
       lastLineEndX   = isBelowRightAvail ? width : (width - 1);
@@ -4809,8 +4815,8 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
       }
 
       srcY += srcStrideY;
-      srcU += srcStrideU * (y & 0x1);
-      srcV += srcStrideV * (y & 0x1);
+      srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+      srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
       dst += dstStride;
     }
   }
@@ -4835,7 +4841,7 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
         dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
       }
 
-      srcY += srcStrideY << 1;
+      srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
       srcV += srcStrideV;
       dst += dstStride;

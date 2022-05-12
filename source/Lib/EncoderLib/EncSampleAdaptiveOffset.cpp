@@ -1493,8 +1493,8 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                 CompArea &myArea                         = currTU.block(compID);
                 const int chromaScaleX                   = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
                 const int chromaScaleY                   = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
-                int       yPos                           = myArea.y << chromaScaleX;
-                int       xPos                           = myArea.x << chromaScaleY;
+                int       yPos                           = myArea.y << chromaScaleY;
+                int       xPos                           = myArea.x << chromaScaleX;
                 bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
                   cs, xPos, yPos, myArea.width << chromaScaleX, myArea.height << chromaScaleY, clipTop, clipBottom,
                   clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
@@ -1649,8 +1649,8 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     CompArea &myArea           = currTU.block(compID);
                     const int chromaScaleX     = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
                     const int chromaScaleY     = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
-                    int       yPos             = myArea.y << chromaScaleX;
-                    int       xPos             = myArea.x << chromaScaleY;
+                    int       yPos             = myArea.y << chromaScaleY;
+                    int       xPos             = myArea.x << chromaScaleX;
                     bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
                       cs, xPos, yPos, myArea.width << chromaScaleX, myArea.height << chromaScaleY, clipTop, clipBottom,
                       clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
@@ -1794,8 +1794,8 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   CompArea &myArea                         = currTU.block(compID);
                   const int chromaScaleX                   = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
                   const int chromaScaleY                   = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
-                  int       yPos                           = myArea.y << chromaScaleX;
-                  int       xPos                           = myArea.x << chromaScaleY;
+                  int       yPos                           = myArea.y << chromaScaleY;
+                  int       xPos                           = myArea.x << chromaScaleX;
                   bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
                     cs, xPos, yPos, myArea.width << chromaScaleX, myArea.height << chromaScaleY, clipTop, clipBottom,
                     clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
@@ -1993,8 +1993,8 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   CompArea &myArea                         = currTU.block(compID);
                   const int chromaScaleX                   = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
                   const int chromaScaleY                   = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
-                  int       yPos                           = myArea.y << chromaScaleX;
-                  int       xPos                           = myArea.x << chromaScaleY;
+                  int       yPos                           = myArea.y << chromaScaleY;
+                  int       xPos                           = myArea.x << chromaScaleX;
                   bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
                     cs, xPos, yPos, myArea.width << chromaScaleX, myArea.height << chromaScaleY, clipTop, clipBottom,
                     clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
@@ -2141,8 +2141,8 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     CompArea &myArea           = currTU.block(compID);
                     const int chromaScaleX     = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
                     const int chromaScaleY     = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
-                    int       yPos             = myArea.y << chromaScaleX;
-                    int       xPos             = myArea.x << chromaScaleY;
+                    int       yPos             = myArea.y << chromaScaleY;
+                    int       xPos             = myArea.x << chromaScaleX;
                     bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
                       cs, xPos, yPos, myArea.width << chromaScaleX, myArea.height << chromaScaleY, clipTop, clipBottom,
                       clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
@@ -2342,8 +2342,8 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   CompArea &myArea                         = currTU.block(compID);
                   const int chromaScaleX                   = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
                   const int chromaScaleY                   = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
-                  int       yPos                           = myArea.y << chromaScaleX;
-                  int       xPos                           = myArea.x << chromaScaleY;
+                  int       yPos                           = myArea.y << chromaScaleY;
+                  int       xPos                           = myArea.x << chromaScaleX;
                   bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
                     cs, xPos, yPos, myArea.width << chromaScaleX, myArea.height << chromaScaleY, clipTop, clipBottom,
                     clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
@@ -3371,8 +3371,6 @@ void EncSampleAdaptiveOffset::getCcSaoStatistics(CodingStructure& cs, const Comp
         {
           verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
         }
-        const int chromaScaleX = getComponentScaleX(compID, cs.pcv->chrFormat);
-        const int chromaScaleY = getComponentScaleY(compID, cs.pcv->chrFormat);
 #endif
 
         const uint16_t    candPosY   = ccSaoParam.candPos[setIdx][COMPONENT_Y ];
@@ -3388,7 +3386,6 @@ void EncSampleAdaptiveOffset::getCcSaoStatistics(CodingStructure& cs, const Comp
                        , isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                        , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
-                       , chromaScaleX, chromaScaleY
 #endif
                        );
       }
@@ -3477,8 +3474,6 @@ void EncSampleAdaptiveOffset::getCcSaoStatisticsEdgeNew(CodingStructure &cs, con
         {
           verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
         }
-        const int chromaScaleX = getComponentScaleX(compID, cs.pcv->chrFormat);
-        const int chromaScaleY = getComponentScaleY(compID, cs.pcv->chrFormat);
 #endif
 
         const uint16_t candPosY = 0;
@@ -3493,7 +3488,6 @@ void EncSampleAdaptiveOffset::getCcSaoStatisticsEdgeNew(CodingStructure &cs, con
                                 isAboveLeftAvail, isAboveRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                               , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
-                              , chromaScaleX, chromaScaleY
 #endif
         );
       }
@@ -3592,11 +3586,15 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
   bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
   , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
-  , const int chromaScaleX, const int chromaScaleY 
 #endif
 )
 {
   int signa, signb, band;
+
+  const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleYM1 = 1 - chromaScaleY;
+
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
   int        x, y, startX, startY, endX, endY;
   int        firstLineStartX, firstLineEndX;
@@ -3605,8 +3603,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
   const Pel *srcVT = srcV;
   const Pel *orgT  = org;
   const Pel *dstT  = dst;
-  #endif
-#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+
   switch (compID)
   {
   case COMPONENT_Y:
@@ -3679,8 +3676,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             }     // th
           }       // x
           srcY += srcStrideY;
-          srcU += srcStrideU * (y & 0x1);
-          srcV += srcStrideV * (y & 0x1);
+          srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+          srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
           org += orgStride;
           dst += dstStride;
         }   // y
@@ -3693,8 +3690,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
         if (!isAboveAvail)
         {
           srcY += srcStrideY;
-          srcU += srcStrideU * (0 & 0x1);
-          srcV += srcStrideV * (0 & 0x1);
+          srcU += srcStrideU * chromaScaleYM1;
+          srcV += srcStrideV * chromaScaleYM1;
           org += orgStride;
           dst += dstStride;
         }
@@ -3748,8 +3745,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             }     // th
           }       // x
           srcY += srcStrideY;
-          srcU += srcStrideU * (y & 0x1);
-          srcV += srcStrideV * (y & 0x1);
+          srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+          srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
           org += orgStride;
           dst += dstStride;
         }   // y
@@ -3810,8 +3807,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
           }     // th
         }       // x
         srcY += srcStrideY;
-        srcU += srcStrideU * (0 & 0x1);
-        srcV += srcStrideV * (0 & 0x1);
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
         org += orgStride;
         dst += dstStride;
 
@@ -3866,8 +3863,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             }     // th
           }       // x
           srcY += srcStrideY;
-          srcU += srcStrideU * (y & 0x1);
-          srcV += srcStrideV * (y & 0x1);
+          srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+          srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
           org += orgStride;
           dst += dstStride;
         }   // y
@@ -3929,8 +3926,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
           }     // th
         }       // x
         srcY += srcStrideY;
-        srcU += srcStrideU * (0 & 0x1);
-        srcV += srcStrideV * (0 & 0x1);
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
         org += orgStride;
         dst += dstStride;
         // middle lines
@@ -3984,8 +3981,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             }     // th
           }       // x
           srcY += srcStrideY;
-          srcU += srcStrideU * (y & 0x1);
-          srcV += srcStrideV * (y & 0x1);
+          srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+          srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
           org += orgStride;
           dst += dstStride;
         }   // y
@@ -4069,7 +4066,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
               }   // modeY
             }     // th
           }       // x
-          srcY += srcStrideY << 1;
+          srcY += srcStrideY << chromaScaleY;
           srcU += srcStrideU;
           srcV += srcStrideV;
           org += orgStride;
@@ -4083,7 +4080,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
         endY   = isBelowAvail ? height : height - 1;
         if (!isAboveAvail)
         {
-          srcY += srcStrideY << 1;
+          srcY += srcStrideY << chromaScaleY;
           srcU += srcStrideU;
           srcV += srcStrideV;
           org += orgStride;
@@ -4141,7 +4138,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
               }   // mode
             }     // th
           }       // x
-          srcY += srcStrideY << 1;
+          srcY += srcStrideY << chromaScaleY;
           srcU += srcStrideU;
           srcV += srcStrideV;
           org += orgStride;
@@ -4206,7 +4203,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             }   // mode
           }     // th
         }       // x
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         org += orgStride;
@@ -4265,7 +4262,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
               }   // mode
             }     // th
           }       // x
-          srcY += srcStrideY << 1;
+          srcY += srcStrideY << chromaScaleY;
           srcU += srcStrideU;
           srcV += srcStrideV;
           org += orgStride;
@@ -4331,7 +4328,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             }   // mode
           }     // th
         }       // x
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         org += orgStride;
@@ -4389,7 +4386,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
               }   // mode
             }     // th
           }       // x
-          srcY += srcStrideY << 1;
+          srcY += srcStrideY << chromaScaleY;
           srcU += srcStrideU;
           srcV += srcStrideV;
           org += orgStride;
@@ -4466,8 +4463,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
         }       // edge_type
       }         // x
       srcY += srcStrideY;
-      srcU += srcStrideU * (y & 0x1);
-      srcV += srcStrideV * (y & 0x1);
+      srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+      srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
       org += orgStride;
       dst += dstStride;
     }   // y
@@ -4532,7 +4529,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
           }
         }
       }
-      srcY += srcStrideY << 1;
+      srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
       srcV += srcStrideV;
       org += orgStride;
@@ -4558,16 +4555,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
                                              , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                                              , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
-                                             , const int chromaScaleX, const int chromaScaleY 
 #endif
                                              )
 {
   const int candPosYX = g_ccSaoCandPosX[COMPONENT_Y][candPosY];
   const int candPosYY = g_ccSaoCandPosY[COMPONENT_Y][candPosY];
 
+  const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleYM1 = 1 - chromaScaleY;
+
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
   int x, y, startX, startY, endX, endY;
   int firstLineStartX, firstLineEndX;
+
   switch (compID)
   {
   case COMPONENT_Y:
@@ -4581,6 +4582,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
       {
         startX = isLeftAvail ? 0 : 1;
         endX   = width;
+
         // 1st line
         firstLineStartX = isAboveLeftAvail ? 0 : 1;
         firstLineEndX   = isAboveAvail ? endX : 1;
@@ -4604,8 +4606,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (0 & 0x1);
-        srcV += srcStrideV * (0 & 0x1);
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
         org += orgStride;
         dst += dstStride;
 
@@ -4632,8 +4634,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
             blkStats[setIdx][ctuRsAddr].count[classIdx]++;
           }
           srcY += srcStrideY;
-          srcU += srcStrideU * (y & 0x1);
-          srcV += srcStrideV * (y & 0x1);
+          srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+          srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
           org += orgStride;
           dst += dstStride;
         }
@@ -4646,8 +4648,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
       if (!isAboveAvail)
       {
         srcY += srcStrideY;
-        srcU += srcStrideU * (0 & 0x1);
-        srcV += srcStrideV * (0 & 0x1);
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
         org += orgStride;
         dst += dstStride;
       }
@@ -4673,8 +4675,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         org += orgStride;
         dst += dstStride;
       }
@@ -4708,8 +4710,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
       }
 
       srcY += srcStrideY;
-      srcU += srcStrideU * (0 & 0x1);
-      srcV += srcStrideV * (0 & 0x1);
+      srcU += srcStrideU * chromaScaleYM1;
+      srcV += srcStrideV * chromaScaleYM1;
       org += orgStride;
       dst += dstStride;
 
@@ -4736,8 +4738,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         org += orgStride;
         dst += dstStride;
       }
@@ -4770,8 +4772,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         org += orgStride;
         dst += dstStride;
       }
@@ -4798,8 +4800,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         org += orgStride;
         dst += dstStride;
       }
@@ -4832,8 +4834,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         org += orgStride;
         dst += dstStride;
       }
@@ -4866,8 +4868,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         org += orgStride;
         dst += dstStride;
       }
@@ -4900,8 +4902,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         org += orgStride;
         dst += dstStride;
       }
@@ -4934,8 +4936,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
         org += orgStride;
         dst += dstStride;
       }
@@ -4979,7 +4981,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].diff[classIdx] += org[x] - dst[x];
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         org += orgStride;
@@ -5007,7 +5009,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
             blkStats[setIdx][ctuRsAddr].diff[classIdx] += org[x] - dst[x];
             blkStats[setIdx][ctuRsAddr].count[classIdx]++;
           }
-          srcY += srcStrideY << 1;
+          srcY += srcStrideY << chromaScaleY;
           srcU += srcStrideU;
           srcV += srcStrideV;
           org += orgStride;
@@ -5022,8 +5024,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
       if (!isAboveAvail)
       {
         srcY += srcStrideY;
-        srcU += srcStrideU * (0 & 0x1);
-        srcV += srcStrideV * (0 & 0x1);
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
         org += orgStride;
         dst += dstStride;
       }
@@ -5048,7 +5050,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].diff[classIdx] += org[x] - dst[x];
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         org += orgStride;
@@ -5083,7 +5085,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
         blkStats[setIdx][ctuRsAddr].count[classIdx]++;
       }
 
-      srcY += srcStrideY << 1;
+      srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
       srcV += srcStrideV;
       org += orgStride;
@@ -5111,7 +5113,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].diff[classIdx] += org[x] - dst[x];
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         org += orgStride;
@@ -5145,7 +5147,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].diff[classIdx] += org[x] - dst[x];
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         org += orgStride;
@@ -5173,7 +5175,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].diff[classIdx] += org[x] - dst[x];
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         org += orgStride;
@@ -5207,7 +5209,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].diff[classIdx] += org[x] - dst[x];
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         org += orgStride;
@@ -5241,7 +5243,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].diff[classIdx] += org[x] - dst[x];
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         org += orgStride;
@@ -5275,7 +5277,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].diff[classIdx] += org[x] - dst[x];
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         org += orgStride;
@@ -5309,7 +5311,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
           blkStats[setIdx][ctuRsAddr].diff[classIdx] += org[x] - dst[x];
           blkStats[setIdx][ctuRsAddr].count[classIdx]++;
         }
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
         org += orgStride;
@@ -5349,8 +5351,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
       }
 
       srcY += srcStrideY;
-      srcU += srcStrideU * (y & 0x1);
-      srcV += srcStrideV * (y & 0x1);
+      srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+      srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
       org += orgStride;
       dst += dstStride;
     }
@@ -5377,7 +5379,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
         blkStats[setIdx][ctuRsAddr].count[classIdx]++;
       }
 
-      srcY += srcStrideY << 1;
+      srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
       srcV += srcStrideV;
       org += orgStride;
