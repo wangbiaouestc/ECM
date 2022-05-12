@@ -77,7 +77,7 @@ InterPrediction::InterPrediction()
 #if INTER_LIC || (TM_AMVP || TM_MRG) // note: already refactor
   m_pcReshape            ( nullptr ),
 #endif
-#if INTER_LIC
+#if INTER_LIC || JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   m_pcLICRefLeftTemplate ( nullptr ),
   m_pcLICRefAboveTemplate( nullptr ),
   m_pcLICRecLeftTemplate ( nullptr ),
@@ -360,7 +360,7 @@ void InterPrediction::destroy()
   xFree(m_pcRefTplLeft ); m_pcRefTplLeft  = nullptr;
   xFree(m_pcRefTplAbove); m_pcRefTplAbove = nullptr;
 #endif
-#if INTER_LIC
+#if INTER_LIC || JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   xFree(m_pcLICRefLeftTemplate);  m_pcLICRefLeftTemplate  = nullptr;
   xFree(m_pcLICRefAboveTemplate); m_pcLICRefAboveTemplate = nullptr;
   xFree(m_pcLICRecLeftTemplate);  m_pcLICRecLeftTemplate  = nullptr;
@@ -542,7 +542,7 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
     m_pcRefTplAbove = (Pel*)xMalloc(Pel, TM_TPL_SIZE * MAX_CU_SIZE);
   }
 #endif
-#if INTER_LIC
+#if INTER_LIC || JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   if (m_pcLICRefLeftTemplate == nullptr)
   {
     m_pcLICRefLeftTemplate  = (Pel*)xMalloc(Pel, MAX_CU_SIZE);
@@ -5788,8 +5788,10 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
     pu.afMmvdStep     = (uint8_t)stepIdx;
     pu.mergeIdx       = (uint8_t)(baseIdxToMergeIdxOffset + baseIdx);
     pu.mergeType = affMrgCtx.mergeType[pu.mergeIdx];
+#if INTER_LIC
     pu.cu->LICFlag = affMrgCtx.LICFlags[pu.mergeIdx];
     pu.cu->LICFlag = false;
+#endif
     pu.interDir = affMrgCtx.interDirNeighbours[pu.mergeIdx];
     pu.cu->affineType = affMrgCtx.affineType[pu.mergeIdx];
     pu.cu->BcwIdx = affMrgCtx.BcwIdx[pu.mergeIdx];
@@ -12603,17 +12605,20 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
     }
 #endif
   }
+
+  void InterPrediction::deriveMvdSignAffine(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvPred3,
 #if JVET_Z0054_BLK_REF_PIC_REORDER
-  void InterPrediction::deriveMvdSignAffine(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvPred3, const Mv cMvdKnownAtDecoder[3],
-    PredictionUnit& pu, RefPicList eRefList, int refIdx, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3)
+                                            const Mv cMvdKnownAtDecoder[3],
+#else
+                                            const Mv& cMvdKnownAtDecoder, const Mv& cMvdKnownAtDecoder2, const Mv& cMvdKnownAtDecoder3,
+#endif
+                                            PredictionUnit& pu, RefPicList eRefList, int refIdx, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3)
   {
+#if JVET_Z0054_BLK_REF_PIC_REORDER
     std::vector<Mv> MvdCand[3];
     deriveMVDcandAffine(pu, eRefList, MvdCand);
     size_t patternsNum = MvdCand[0].size();
 #else
-  void InterPrediction::deriveMvdSignAffine(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvPred3, const Mv& cMvdKnownAtDecoder, const Mv& cMvdKnownAtDecoder2, const Mv& cMvdKnownAtDecoder3,
-    PredictionUnit& pu, RefPicList eRefList, int refIdx, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3)
-  {
     int patterns2[2][1] =
     {
       { +1 },

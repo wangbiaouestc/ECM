@@ -6638,7 +6638,7 @@ void PU::xGetAffineMvFromLUT(short affineParameters[4], int rParameters[4])
 }
 
 
-// Add afffine candidates from LUT
+// Add affine candidates from LUT
 // return true to early terminate
 
 bool PU::checkLastAffineMergeCandRedundancy(const PredictionUnit& pu, AffineMergeCtx& affMrgCtx)
@@ -6677,10 +6677,12 @@ bool PU::checkLastAffineMergeCandRedundancy(const PredictionUnit& pu, AffineMerg
     {
       continue;
     }
+#if INTER_LIC
     if (affMrgCtx.interDirNeighbours[idx] != 3 && affMrgCtx.LICFlags[idx] != affMrgCtx.LICFlags[lastIdx])
     {
       continue;
     }
+#endif
 
     if ((affMrgCtx.interDirNeighbours[lastIdx] & 1) != 0)
     {
@@ -6881,7 +6883,9 @@ bool PU::addMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrgCtx
           mrgCtx.mvFieldNeighbours[(cnt << 1) + 0].setMvField(Mv(), -1);
           mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), -1);
           mrgCtx.BcwIdx[cnt] = BCW_DEFAULT;
+#if INTER_LIC
           mrgCtx.LICFlags[cnt] = false;
+#endif
           continue;
         }
 #endif
@@ -6933,7 +6937,9 @@ bool PU::addMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrgCtx
           mrgCtx.mvFieldNeighbours[(cnt << 1) + 0].setMvField(Mv(), -1);
           mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), -1);
           mrgCtx.BcwIdx[cnt] = BCW_DEFAULT;
+#if INTER_LIC
           mrgCtx.LICFlags[cnt] = false;
+#endif
           continue;
         }
 #endif
@@ -6973,7 +6979,9 @@ bool PU::addOneMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrg
   int HistParameters[2][4];
   mrgCtx.interDirNeighbours[cnt] = 0;
   mrgCtx.BcwIdx[cnt] = BCW_DEFAULT;
+#if INTER_LIC
   mrgCtx.LICFlags[cnt] = false;
+#endif
   mrgCtx.mvFieldNeighbours[(cnt << 1) + 0].setMvField(Mv(), -1);
   mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), -1);
 
@@ -7017,7 +7025,9 @@ bool PU::addOneMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrg
   if (mrgCtx.interDirNeighbours[cnt] == 0)
   {
     mrgCtx.BcwIdx  [cnt] = BCW_DEFAULT;
+#if INTER_LIC
     mrgCtx.LICFlags[cnt] = false;
+#endif
     mrgCtx.mvFieldNeighbours[(cnt << 1) + 0].setMvField(Mv(), -1);
     mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), -1);
     return false;
@@ -7038,7 +7048,9 @@ bool PU::addOneMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrg
   {
     mrgCtx.interDirNeighbours[cnt] = 0;
     mrgCtx.BcwIdx[cnt] = BCW_DEFAULT;
+#if INTER_LIC
     mrgCtx.LICFlags[cnt] = false;
+#endif
     mrgCtx.mvFieldNeighbours[(cnt << 1) + 0].setMvField(Mv(), -1);
     mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), -1);
     return false;
@@ -7047,7 +7059,11 @@ bool PU::addOneMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrg
   return true;
 }
 
-bool PU::addOneAffineMergeHMVPCand(const PredictionUnit & pu, AffineMergeCtx & affMrgCtx, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int listIdx, const MotionInfo & mvInfo, Position neiPosition, int iGBiIdx, bool bICflag)
+bool PU::addOneAffineMergeHMVPCand(const PredictionUnit & pu, AffineMergeCtx & affMrgCtx, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int listIdx, const MotionInfo & mvInfo, Position neiPosition, int iGBiIdx
+#if INTER_LIC
+                                 ,       bool bICflag
+#endif
+)
 {
   Mv cMv[2][3];
   int aiHistParameters[2][4];
@@ -7198,7 +7214,11 @@ bool PU::addSpatialAffineMergeHMVPCand(const PredictionUnit& pu, AffineMergeCtx&
     {
       continue;
     }
-    if (addOneAffineMergeHMVPCand(pu, affMrgCtx, lutAff, affHMVPIdx, mvInfo, neiPositions[nei], puNei->interDir == 3? puNei->cu->BcwIdx : BCW_DEFAULT, puNei->cu->LICFlag))
+    if (addOneAffineMergeHMVPCand(pu, affMrgCtx, lutAff, affHMVPIdx, mvInfo, neiPositions[nei], puNei->interDir == 3? puNei->cu->BcwIdx : BCW_DEFAULT
+#if INTER_LIC
+                                , puNei->cu->LICFlag
+#endif
+    ))
     {
       if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
       {
@@ -9284,11 +9304,17 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
     if (isTmvpAvailable)
     {
       Position posRB = pu.Y().bottomRight().offset(3, 3);
+      if (addOneAffineMergeHMVPCand(pu, affMrgCtx
 #if JVET_Z0118_GDR
-      if (addOneAffineMergeHMVPCand(pu, affMrgCtx, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, 0, tmvpInfo, posRB, BCW_DEFAULT, false))
+                                 , (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0
 #else
-      if (addOneAffineMergeHMVPCand(pu, affMrgCtx, pu.cs->motionLut.lutAff, 0, tmvpInfo, posRB, BCW_DEFAULT, false))
+                                 , pu.cs->motionLut.lutAff
 #endif
+                                 , 0, tmvpInfo, posRB, BCW_DEFAULT
+#if INTER_LIC
+                                 , false
+#endif
+      ))
       {
         if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
         {
@@ -9318,11 +9344,17 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       if (isTmvpAvailable)
       {
         Position posRB = pu.Y().bottomRight().offset(3, 3);
+        if (addOneAffineMergeHMVPCand(pu, affMrgCtx
 #if JVET_Z0118_GDR
-        if (addOneAffineMergeHMVPCand(pu, affMrgCtx, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, iAffListIdx, tmvpInfo, posRB, BCW_DEFAULT, false))
+                                    , (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0
 #else
-        if (addOneAffineMergeHMVPCand(pu, affMrgCtx, pu.cs->motionLut.lutAff, iAffListIdx, tmvpInfo, posRB, BCW_DEFAULT, false))
+                                    , pu.cs->motionLut.lutAff
 #endif
+                                    , iAffListIdx, tmvpInfo, posRB, BCW_DEFAULT
+#if INTER_LIC
+                                    , false
+#endif
+        ))
         {
           if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
           {

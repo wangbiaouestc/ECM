@@ -258,7 +258,11 @@ namespace PU
   void xGetAffineMvFromLUT(AffineMotionInfo* affHistInfo, int rParameters[4]);
   bool checkLastAffineMergeCandRedundancy(const PredictionUnit& pu, AffineMergeCtx& affMrgCtx);
 
-  bool addOneAffineMergeHMVPCand(const PredictionUnit& pu, AffineMergeCtx& affMrgCtx, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int affHMVPIdx, const MotionInfo& mvInfo, Position neiPosition, int iGBiIdx, bool bICflag);
+  bool addOneAffineMergeHMVPCand(const PredictionUnit& pu, AffineMergeCtx& affMrgCtx, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int affHMVPIdx, const MotionInfo& mvInfo, Position neiPosition, int iGBiIdx
+#if INTER_LIC
+                               ,       bool bICflag
+#endif
+  );
   bool addSpatialAffineMergeHMVPCand(const PredictionUnit& pu, AffineMergeCtx& affMrgCtx, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int affHMVPIdx, const PredictionUnit* neiPUs[], Position neiPositions[], int iNeiNum, const int mrgCandIdx = -1);
   bool addSpatialAffineAMVPHMVPCand(PredictionUnit& pu, const RefPicList& eRefPicList, const int& refIdx, AffineAMVPInfo& affiAMVPInfo, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int iHMVPlistIdx,
     int neiIdx[], int iNeiNum, int aiNeibeInherited[], bool bFoundOne);
