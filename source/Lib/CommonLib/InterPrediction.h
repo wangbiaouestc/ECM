@@ -288,7 +288,7 @@ protected:
 #endif
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if !INTER_LIC
-  template <bool TrueA_FalseL>
+  template <bool trueAfalseL>
   void xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
                       , bool AML = false
@@ -638,7 +638,7 @@ public:
   void xGetSublkTemplate   (const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate);
   void xLocalIlluComp      (const PredictionUnit& pu, const ComponentID compID, const Picture& refPic, const Mv& mv, const bool biPred, PelBuf& dstBuf);
 
-  template <bool TrueA_FalseL>
+  template <bool trueAfalseL>
   void xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
                       , bool AML = false
@@ -828,9 +828,9 @@ public:
   template <int tplSize> void removeHighFreq (const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight);
 
 private:
-  template <int tplSize, bool TrueA_FalseL>         bool       xFillCurTemplate   (Pel* tpl);
-  template <int tplSize, bool TrueA_FalseL, int sr> PelBuf     xGetRefTemplate    (const PredictionUnit& curPu, const Picture& refPic, const Mv& _mv, PelBuf& dstBuf);
-  template <int tplSize, bool TrueA_FalseL>         void       xRemoveHighFreq    (const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight);
+  template <int tplSize, bool trueAfalseL>         bool       xFillCurTemplate   (Pel* tpl);
+  template <int tplSize, bool trueAfalseL, int sr> PelBuf     xGetRefTemplate    (const PredictionUnit& curPu, const Picture& refPic, const Mv& _mv, PelBuf& dstBuf);
+  template <int tplSize, bool trueAfalseL>         void       xRemoveHighFreq    (const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight);
   template <int tplSize, int searchPattern>         void       xRefineMvSearch    (int maxSearchRounds, int searchStepShift);
 #if MULTI_PASS_DMVR
   template <int searchPattern>                      void       xNextTmCostAarray  (int bestDirect);
@@ -842,7 +842,7 @@ private:
 public:
 #endif
   template <int tplSize>                            Distortion xGetTempMatchError (const Mv& mv);
-  template <int tplSize, bool TrueA_FalseL>         Distortion xGetTempMatchError (const Mv& mv);
+  template <int tplSize, bool trueAfalseL>         Distortion xGetTempMatchError (const Mv& mv);
 };
 #endif // TM_AMVP || TM_MRG
 

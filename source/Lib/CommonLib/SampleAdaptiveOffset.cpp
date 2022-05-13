@@ -1878,7 +1878,7 @@ void SampleAdaptiveOffset::offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitA
                                      isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail,
                                      isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-            , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+                                     , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
 #endif
           );
         }
@@ -2091,8 +2091,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             continue;
           }
           const Pel *colY = srcY + x;
-          const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-          const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+          const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
           const Pel *colU = srcU + (x >> chromaScaleX);
           const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -2153,8 +2153,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             continue;
           }
           const Pel *colY = srcY + x;
-          const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-          const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+          const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
           const Pel *colU = srcU + (x >> chromaScaleX);
           const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -2210,8 +2210,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           continue;
         }
         const Pel *colY = srcY + x;
-        const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-        const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+        const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
         const Pel *colU = srcU + (x >> chromaScaleX);
         const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -2259,8 +2259,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             continue;
           }
           const Pel *colY = srcY + x;
-          const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-          const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+          const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
           const Pel *colU = srcU + (x >> chromaScaleX);
           const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -2309,8 +2309,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           continue;
         }
         const Pel *colY = srcY + x;
-        const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-        const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+        const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
         const Pel *colU = srcU + (x >> chromaScaleX);
         const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -2360,8 +2360,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           continue;
         }
         const Pel *colY = srcY + x;
-        const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-        const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+        const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
         const Pel *colU = srcU + (x >> chromaScaleX);
         const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -2409,8 +2409,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             continue;
           }
           const Pel *colY = srcY + x;
-          const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-          const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+          const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
           const Pel *colU = srcU + (x >> chromaScaleX);
           const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -2459,8 +2459,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           continue;
         }
         const Pel *colY = srcY + x;
-        const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-        const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+        const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
         const Pel *colU = srcU + (x >> chromaScaleX);
         const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -2533,7 +2533,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           else if (bandNumY > 4 && bandNumY <= 6)
           {
             int        bandc   = bandNumY - 4;
-            const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+            const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
             band               = (*colC * bandc) >> bitDepth;
             band               = band * CCSAO_EDGE_NUM + signa;
             const int classIdx = band;
@@ -2542,8 +2542,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           else
           {
             const Pel *colCT   = (compID == COMPONENT_Cb)
-                                   ? srcV + (x)
-                                   : srcU + (x); /* also use the remaining third component for bandIdx calc.*/
+                                   ? srcV + x
+                                   : srcU + x; /* also use the remaining third component for bandIdx calc.*/
             int        bandc   = bandNumY - 6;
             band               = (*colCT * bandc) >> bitDepth;
             band               = band * CCSAO_EDGE_NUM + signa;
@@ -2596,7 +2596,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           else if (bandNumY > 4 && bandNumY <= 6)
           {
             int        bandc   = bandNumY - 4;
-            const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+            const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
             band               = (*colC * bandc) >> bitDepth;
             band               = band * CCSAO_EDGE_NUM + signa;
             const int classIdx = band;
@@ -2605,8 +2605,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           else
           {
             const Pel *colCT   = (compID == COMPONENT_Cb)
-                                   ? srcV + (x)
-                                   : srcU + (x); /* also use the remaining third component for bandIdx calc.*/
+                                   ? srcV + x
+                                   : srcU + x; /* also use the remaining third component for bandIdx calc.*/
             int        bandc   = bandNumY - 6;
             band               = (*colCT * bandc) >> bitDepth;
             band               = band * CCSAO_EDGE_NUM + signa;
@@ -2654,7 +2654,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
         else if (bandNumY > 4 && bandNumY <= 6)
         {
           int        bandc   = bandNumY - 4;
-          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
           band               = (*colC * bandc) >> bitDepth;
           band               = band * CCSAO_EDGE_NUM + signa;
           const int classIdx = band;
@@ -2663,8 +2663,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
         else
         {
           const Pel *colCT   = (compID == COMPONENT_Cb)
-                                 ? srcV + (x)
-                                 : srcU + (x); /* also use the remaining third component for bandIdx calc.*/
+                                 ? srcV + x
+                                 : srcU + x; /* also use the remaining third component for bandIdx calc.*/
           int        bandc   = bandNumY - 6;
           band               = (*colCT * bandc) >> bitDepth;
           band               = band * CCSAO_EDGE_NUM + signa;
@@ -2704,7 +2704,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           else if (bandNumY > 4 && bandNumY <= 6)
           {
             int        bandc   = bandNumY - 4;
-            const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+            const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
             band               = (*colC * bandc) >> bitDepth;
             band               = band * CCSAO_EDGE_NUM + signa;
             const int classIdx = band;
@@ -2713,8 +2713,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           else
           {
             const Pel *colCT   = (compID == COMPONENT_Cb)
-                                   ? srcV + (x)
-                                   : srcU + (x); /* also use the remaining third component for bandIdx calc.*/
+                                   ? srcV + x
+                                   : srcU + x; /* also use the remaining third component for bandIdx calc.*/
             int        bandc   = bandNumY - 6;
             band               = (*colCT * bandc) >> bitDepth;
             band               = band * CCSAO_EDGE_NUM + signa;
@@ -2755,7 +2755,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
         else if (bandNumY > 4 && bandNumY <= 6)
         {
           int        bandc   = bandNumY - 4;
-          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
           band               = (*colC * bandc) >> bitDepth;
           band               = band * CCSAO_EDGE_NUM + signa;
           const int classIdx = band;
@@ -2764,8 +2764,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
         else
         {
           const Pel *colCT   = (compID == COMPONENT_Cb)
-                                 ? srcV + (x)
-                                 : srcU + (x); /* also use the remaining third component for bandIdx calc.*/
+                                 ? srcV + x
+                                 : srcU + x; /* also use the remaining third component for bandIdx calc.*/
           int        bandc   = bandNumY - 6;
           band               = (*colCT * bandc) >> bitDepth;
           band               = band * CCSAO_EDGE_NUM + signa;
@@ -2807,7 +2807,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
         else if (bandNumY > 4 && bandNumY <= 6)
         {
           int        bandc   = bandNumY - 4;
-          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
           band               = (*colC * bandc) >> bitDepth;
           band               = band * CCSAO_EDGE_NUM + signa;
           const int classIdx = band;
@@ -2816,8 +2816,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
         else
         {
           const Pel *colCT   = (compID == COMPONENT_Cb)
-                                 ? srcV + (x)
-                                 : srcU + (x); /* also use the remaining third component for bandIdx calc.*/
+                                 ? srcV + x
+                                 : srcU + x; /* also use the remaining third component for bandIdx calc.*/
           int        bandc   = bandNumY - 6;
           band               = (*colCT * bandc) >> bitDepth;
           band               = band * CCSAO_EDGE_NUM + signa;
@@ -2857,7 +2857,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           else if (bandNumY > 4 && bandNumY <= 6)
           {
             int        bandc   = bandNumY - 4;
-            const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+            const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
             band               = (*colC * bandc) >> bitDepth;
             band               = band * CCSAO_EDGE_NUM + signa;
             const int classIdx = band;
@@ -2866,8 +2866,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           else
           {
             const Pel *colCT   = (compID == COMPONENT_Cb)
-                                   ? srcV + (x)
-                                   : srcU + (x); /* also use the remaining third component for bandIdx calc.*/
+                                   ? srcV + x
+                                   : srcU + x; /* also use the remaining third component for bandIdx calc.*/
             int        bandc   = bandNumY - 6;
             band               = (*colCT * bandc) >> bitDepth;
             band               = band * CCSAO_EDGE_NUM + signa;
@@ -2908,7 +2908,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
         else if (bandNumY > 4 && bandNumY <= 6)
         {
           int        bandc   = bandNumY - 4;
-          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
           band               = (*colC * bandc) >> bitDepth;
           band               = band * CCSAO_EDGE_NUM + signa;
           const int classIdx = band;
@@ -2917,8 +2917,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
         else
         {
           const Pel *colCT   = (compID == COMPONENT_Cb)
-                                 ? srcV + (x)
-                                 : srcU + (x); /* also use the remaining third component for bandIdx calc.*/
+                                 ? srcV + x
+                                 : srcU + x; /* also use the remaining third component for bandIdx calc.*/
           int        bandc   = bandNumY - 6;
           band               = (*colCT * bandc) >> bitDepth;
           band               = band * CCSAO_EDGE_NUM + signa;
@@ -2947,8 +2947,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       for (int x = 0; x < width; x++)
       {
         const Pel *colY = srcY + x;
-        const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-        const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+        const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
         const Pel *colU = srcU + (x >> chromaScaleX);
         const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -3011,7 +3011,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
         else if (bandNumY > 4 && bandNumY <= 6)
         {
           int        bandc   = bandNumY - 4;
-          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
           band               = (*colC * bandc) >> bitDepth;
           band               = band * CCSAO_EDGE_NUM + signa;
           const int classIdx = band;
@@ -3020,8 +3020,8 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
         else
         {
           const Pel *colCT   = (compID == COMPONENT_Cb)
-                                 ? srcV + (x)
-                                 : srcU + (x); /* also use the remaining third component for bandIdx calc.*/
+                                 ? srcV + x
+                                 : srcU + x; /* also use the remaining third component for bandIdx calc.*/
           int        bandc   = bandNumY - 6;
           band               = (*colCT * bandc) >> bitDepth;
           band               = band * CCSAO_EDGE_NUM + signa;

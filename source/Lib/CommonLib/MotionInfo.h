@@ -377,7 +377,7 @@ struct LutMotionCand
   static_vector<AffineInheritInfo, MAX_NUM_AFF_INHERIT_HMVP_CANDS> lutAffInherit0;
   static_vector<AffineInheritInfo, MAX_NUM_AFF_INHERIT_HMVP_CANDS> lutAffInherit1;
 #endif
-#else // JVET_Z0118_GDR
+#else
   static_vector<MotionInfo, MAX_NUM_HMVP_CANDS> lut;
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   static_vector<MotionInfo, MAX_NUM_HMVP_IBC_CANDS> lutIbc;
@@ -389,7 +389,7 @@ struct LutMotionCand
   static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS> lutAff[2 * MAX_NUM_AFFHMVP_ENTRIES_ONELIST];
   static_vector<AffineInheritInfo, MAX_NUM_AFF_INHERIT_HMVP_CANDS> lutAffInherit;
 #endif
-#endif // JVET_Z0118_GDR
+#endif
 };
 struct PatentBvCand
 {

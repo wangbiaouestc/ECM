@@ -5118,4 +5118,10 @@ const int8_t g_ccSaoEdgeTypeX[CCSAO_EDGE_TYPE][2] = { { -1, 1 }, { 0, 0 }, { -1,
 const int8_t g_ccSaoEdgeTypeY[CCSAO_EDGE_TYPE][2] = { { 0, 0 }, { -1, 1 }, { -1, 1 }, { -1, 1 } };
 const short  g_ccSaoQuanValue[CCSAO_QUAN_NUM]      = { 2, 4, 6, 8, 10, 14, 18, 22, 30, 38, 54, 70, 86, 118, 150, 182 };
 #endif
+#if JVET_V0130_INTRA_TMP
+unsigned int g_uiDepth2Width[5] = { 4, 8, 16, 32, 64 };
+#endif
+#if JVET_X0149_TIMD_DIMD_LUT
+int g_gradDivTable[16] = { 0, 7, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0 };
+#endif
 //! \}

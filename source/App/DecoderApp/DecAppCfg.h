@@ -87,7 +87,7 @@ protected:
   int           m_targetSubPicIdx;                    ///< Specify which subpicture shall be write to output, using subpicture index
 #if GDR_LEAK_TEST
   int           m_gdrPocRandomAccess;                   ///<
-#endif // GDR_LEAK_TEST
+#endif
 
 #if DUMP_BEFORE_INLOOP
   bool          m_dumpBeforeInloop;

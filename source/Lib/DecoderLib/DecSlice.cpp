@@ -309,7 +309,7 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #else
       cs.motionLut.lut.resize(0);
       cs.motionLut.lutIbc.resize(0);
-#endif // JVET_Z0118_GDR
+#endif
 
 #if JVET_Z0139_HIST_AFF   
       for (int i = 0; i < 2 * MAX_NUM_AFFHMVP_ENTRIES_ONELIST; i++)
@@ -319,14 +319,14 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
         cs.motionLut.lutAff1[i].resize(0);
 #else
         cs.motionLut.lutAff[i].resize(0);
-#endif // JVET_Z0118_GDR
+#endif
       }
 #if JVET_Z0118_GDR
       cs.motionLut.lutAffInherit0.resize(0);
       cs.motionLut.lutAffInherit1.resize(0);
 #else
       cs.motionLut.lutAffInherit.resize(0);
-#endif // JVET_Z0118_GDR
+#endif
 #endif
 #if !JVET_Z0153_IBC_EXT_REF
       cs.resetIBCBuffer = true;

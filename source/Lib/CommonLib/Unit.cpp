@@ -278,7 +278,7 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   tileIdx           = other.tileIdx;
 #if ENABLE_DIMD
   dimd = other.dimd;
-  dimd_is_blend = other.dimd_is_blend;
+  dimdBlending = other.dimdBlending;
   dimdMode = other.dimdMode;
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   dimdChromaMode = other.dimdChromaMode;
@@ -374,7 +374,7 @@ void CodingUnit::initData()
   tileIdx           = 0;
 #if ENABLE_DIMD
   dimd = false;
-  dimd_is_blend = false;
+  dimdBlending = false;
   dimdMode = -1;
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   dimdChromaMode   = -1;

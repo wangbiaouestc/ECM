@@ -305,6 +305,69 @@ int calcTemplateDiffSIMD( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsig
 
   return diffSum;
 }
+#endif
+
+#if ENABLE_DIMD && INTRA_TRANS_ENC_OPT
+template< X86_VEXT vext >
+void dimdBlendingSIMD( Pel *pDst, int strideDst, Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int w2, int width, int height )
+{
+  CHECK( (width % 4) != 0, "width should be multiple of 4" );
+  __m128i vw0 = _mm_set1_epi32( w0 );
+  __m128i vw1 = _mm_set1_epi32( w1 );
+  __m128i vw2 = _mm_set1_epi32( w2 );
+  const int shift = 6;
+
+  for( int i = 0; i < height; i++ )
+  {
+    for( int j = 0; j < width; j += 4 )
+    {
+      __m128i vdst = _mm_cvtepi16_epi32( _mm_loadl_epi64( (__m128i*)(pDst + j) ) );
+      __m128i vsrc0 = _mm_cvtepi16_epi32( _mm_loadl_epi64( (__m128i*)(pSrc0 + j) ) );
+      __m128i vsrc1 = _mm_cvtepi16_epi32( _mm_loadl_epi64( (__m128i*)(pSrc1 + j) ) );
+
+      vdst = _mm_mullo_epi32( vdst, vw0 );
+      vdst = _mm_add_epi32( vdst, _mm_mullo_epi32( vsrc0, vw1 ) );
+      vdst = _mm_add_epi32( vdst, _mm_mullo_epi32( vsrc1, vw2 ) );
+
+      vdst = _mm_srai_epi32( vdst, shift );
+      vdst = _mm_packs_epi32( vdst, vdst );
+      _mm_storel_epi64( (__m128i*)(pDst + j), vdst );
+    }
+    pDst += strideDst;
+    pSrc0 += strideSrc0;
+    pSrc1 += strideSrc1;
+  }
+}
+#endif
+
+#if JVET_W0123_TIMD_FUSION && INTRA_TRANS_ENC_OPT
+template< X86_VEXT vext >
+void timdBlendingSIMD( Pel *pDst, int strideDst, Pel *pSrc, int strideSrc, int w0, int w1, int width, int height )
+{
+  CHECK( (width % 4) != 0, "width should be multiple of 4" );
+  __m128i vw0 = _mm_set1_epi32( w0 );
+  __m128i vw1 = _mm_set1_epi32( w1 );
+  const int shift = 6;
+
+  for( int i = 0; i < height; i++ )
+  {
+    for( int j = 0; j < width; j += 4 )
+    {
+      __m128i vdst = _mm_cvtepi16_epi32( _mm_loadl_epi64( (__m128i*)(pDst + j) ) );
+      __m128i vsrc = _mm_cvtepi16_epi32( _mm_loadl_epi64( (__m128i*)(pSrc + j) ) );
+
+      vdst = _mm_mullo_epi32( vdst, vw0 );
+      vdst = _mm_add_epi32( vdst, _mm_mullo_epi32( vsrc, vw1 ) );
+
+      vdst = _mm_srai_epi32( vdst, shift );
+      vdst = _mm_packs_epi32( vdst, vdst );
+      _mm_storel_epi64( (__m128i*)(pDst + j), vdst );
+    }
+    pDst += strideDst;
+    pSrc += strideSrc;
+  }
+}
+#endif
 
 template <X86_VEXT vext>
 void IntraPrediction::_initIntraX86()
@@ -312,10 +375,15 @@ void IntraPrediction::_initIntraX86()
 #if ENABLE_SIMD_TMP
   m_calcTemplateDiff = calcTemplateDiffSIMD<vext>;
 #endif
+#if ENABLE_DIMD && INTRA_TRANS_ENC_OPT
+  m_dimdBlending = dimdBlendingSIMD<vext>;
+#endif
+#if JVET_W0123_TIMD_FUSION && INTRA_TRANS_ENC_OPT
+  m_timdBlending = timdBlendingSIMD<vext>;
+#endif
 }
 
 template void IntraPrediction::_initIntraX86<SIMDX86>();
-#endif
 
 #endif //#ifdef TARGET_SIMD_X86
 //! \}

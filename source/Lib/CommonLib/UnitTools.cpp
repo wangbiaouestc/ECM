@@ -411,7 +411,7 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
     cu.cs->addAffMiToLut((isClean) ? cu.cs->motionLut.lutAff1 : cu.cs->motionLut.lutAff0, addMi, addRefIdx);
 #else
     cu.cs->addAffMiToLut(cu.cs->motionLut.lutAff, addMi, addRefIdx);
-#endif // JVET_Z0118_GDR
+#endif
 
     AffineInheritInfo addAffInherit;
     addAffInherit.basePos = cu.lumaPos();
@@ -433,11 +433,12 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
       cu.cs->addAffInheritToLut((isClean) ? cu.cs->motionLut.lutAffInherit1 : cu.cs->motionLut.lutAffInherit0, addAffInherit);
 #else
       cu.cs->addAffInheritToLut(cu.cs->motionLut.lutAffInherit, addAffInherit);
-#endif // JVET_Z0118_GDR
+#endif
     }
     return;
   }
-#endif // JVET_Z0139_HIST_AFF 
+#endif
+
   if (!cu.geoFlag && !cu.affine && !isToBeDone)
   {
     MotionInfo mi = pu.getMotionInfo();
@@ -487,9 +488,9 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
       {
         cu.cs->addMiToLut(cu.cs->motionLut.lut, mi);
       }
-#endif // JVET_Z0118_GDR
+#endif
     }
-#else // JVET_Z0075_IBC_HMVP_ENLARGE
+#else
 #if JVET_Z0118_GDR      
       bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
 
@@ -500,8 +501,8 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
       cu.cs->addMiToLut(CU::isIBC(cu) ? cu.cs->motionLut.lutIbc0 : cu.cs->motionLut.lut0, mi);      
 #else
     cu.cs->addMiToLut(CU::isIBC(cu) ? cu.cs->motionLut.lutIbc : cu.cs->motionLut.lut, mi);
-#endif // JVET_Z0118_GDR
-#endif // JVET_Z0075_IBC_HMVP_ENLARGE
+#endif
+#endif
   }
 }
 
@@ -1798,22 +1799,22 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 #if JVET_Z0118_GDR  
   bool isClean = cs.isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
-#endif // JVET_Z0118_GDR
+#endif
 
 #if JVET_Z0118_GDR  
   auto &lut = (isClean) ? cs.motionLut.lut1 : cs.motionLut.lut0;
 #else
   auto &lut = cs.motionLut.lut;
-#endif // JVET_Z0118_GDR
+#endif
 #else
-
 #if JVET_Z0118_GDR  
   auto &lut = ibcFlag ? (isClean ? cs.motionLut.lutIbc1 : cs.motionLut.lutIbc0) : (isClean ? cs.motionLut.lut1 : cs.motionLut.lut0);
 #else
   auto &lut = ibcFlag ? cs.motionLut.lutIbc : cs.motionLut.lut;
-#endif // JVET_Z0118_GDR
+#endif
 
-#endif // JVET_Z0075_IBC_HMVP_ENLARGE
+#endif
+
   int num_avai_candInLUT = (int)lut.size();
 
   for (int mrgIdx = 1; mrgIdx <= num_avai_candInLUT; mrgIdx++)
@@ -3909,21 +3910,22 @@ bool PU::addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const i
   MotionInfo miNeighbor;
 #if JVET_Z0118_GDR  
   bool isClean = cs.isClean(cs.area.Y().bottomRight(), CHANNEL_TYPE_LUMA);
-#endif // JVET_Z0118_GDR
+#endif
 
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 #if JVET_Z0118_GDR  
   auto &lut = (isClean) ? cs.motionLut.lut1 : cs.motionLut.lut0;
 #else
   auto &lut = cs.motionLut.lut;
-#endif // JVET_Z0118_GDR
+#endif
 #else
 #if JVET_Z0118_GDR  
   auto &lut = ibcFlag ? (isClean ? cs.motionLut.lutIbc1 : cs.motionLut.lutIbc0) : (isClean ? cs.motionLut.lut1 : cs.motionLut.lut0);
 #else
   auto &lut = ibcFlag ? cs.motionLut.lutIbc : cs.motionLut.lut;
-#endif // JVET_Z0118_GDR
-#endif // JVET_Z0075_IBC_HMVP_ENLARGE
+#endif
+#endif
+
   int num_avai_candInLUT = (int)lut.size();
 
   for (int mrgIdx = 1; mrgIdx <= num_avai_candInLUT; mrgIdx++)
@@ -7883,21 +7885,22 @@ void PU::addAMVPHMVPCand(const PredictionUnit &pu, const RefPicList eRefPicList,
   MotionInfo neibMi;
 #if JVET_Z0118_GDR  
   bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
-#endif // JVET_Z0118_GDR
+#endif
 
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 #if JVET_Z0118_GDR  
   auto &lut = (isClean) ? pu.cs->motionLut.lut1 : pu.cs->motionLut.lut0;
 #else
   auto &lut = pu.cs->motionLut.lut;
-#endif // JVET_Z0118_GDR
+#endif
 #else
 #if JVET_Z0118_GDR  
   auto &lut = CU::isIBC(*pu.cu) ? (isClean ? pu.cs->motionLut.lutIbc1 : pu.cs->motionLut.lutIbc0) : (isClean ? pu.cs->motionLut.lut1 : pu.cs->motionLut.lut0);
 #else
   auto &lut = CU::isIBC(*pu.cu) ? pu.cs->motionLut.lutIbc : pu.cs->motionLut.lut;
-#endif // JVET_Z0118_GDR
-#endif // JVET_Z0075_IBC_HMVP_ENLARGE
+#endif
+#endif
+
   int num_avai_candInLUT = (int) lut.size();
   int num_allowedCand = std::min(MAX_NUM_HMVP_AVMPCANDS, num_avai_candInLUT);
   const RefPicList eRefPicList2nd = (eRefPicList == REF_PIC_LIST_0) ? REF_PIC_LIST_1 : REF_PIC_LIST_0;

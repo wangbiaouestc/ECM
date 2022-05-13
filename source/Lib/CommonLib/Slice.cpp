@@ -1701,7 +1701,7 @@ void Slice::checkLeadingPictureRestrictions(PicList& rcListPic, const PPS& pps) 
         }
       }
     }
-#else // JVET_Z0118_GDR
+#else
 #if JVET_S0193_NO_OUTPUT_PRIOR_PIC
     if (pcSlice->getPicHeader()->getPicOutputFlag() == 1 && !this->getNoOutputOfPriorPicsFlag() && pcPic->layerId == this->m_nuhLayerId)
 #else
@@ -1739,7 +1739,7 @@ void Slice::checkLeadingPictureRestrictions(PicList& rcListPic, const PPS& pps) 
               "nuh_layer_id equal to layerId in decoding order shall precede the recovery point picture in output order.");
       }
     }
-#endif // JVET_Z0118_GDR
+#endif
 
     if ((nalUnitType == NAL_UNIT_CODED_SLICE_RASL || nalUnitType == NAL_UNIT_CODED_SLICE_RADL) && 
       (pcSlice->getNalUnitType() != NAL_UNIT_CODED_SLICE_RASL && pcSlice->getNalUnitType() != NAL_UNIT_CODED_SLICE_RADL) && !pps.getMixedNaluTypesInPicFlag())

@@ -2425,8 +2425,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if JVET_Z0118_GDR
       if (cu.cs->slice->getSPS()->getGDREnabledFlag())
       {
-        if (cu.cs->isClean(cu))
-          CHECK(!m_pcInterPred->isLumaBvValid(lcuWidth, cuPelX, cuPelY, roiWidth, roiHeight, xPred, yPred), "invalid block vector for IBC detected.");
+        if( cu.cs->isClean( cu ) )
+        {
+          CHECK( !m_pcInterPred->isLumaBvValid( lcuWidth, cuPelX, cuPelY, roiWidth, roiHeight, xPred, yPred ), "invalid block vector for IBC detected." );
+        }
       }
       else 
       {

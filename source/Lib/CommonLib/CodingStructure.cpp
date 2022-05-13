@@ -121,8 +121,8 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
   m_ipmBuf1 = nullptr;  
 #else
   m_ipmBuf = nullptr;
-#endif // JVET_Z0118_GDR
-#endif // JVET_W0123_TIMD_FUSION
+#endif
+#endif
 
 #if JVET_Z0136_OOB
   for (uint32_t i = 0; i < 2; i++)
@@ -202,8 +202,8 @@ void CodingStructure::destroy()
 #else
   delete[] m_ipmBuf;
   m_ipmBuf = nullptr;
-#endif // JVET_Z0118_GDR
-#endif // JVET_W0123_TIMD_FUSION
+#endif
+#endif
 
 #if JVET_Z0136_OOB
   for (uint32_t i = 0; i < 2; i++)

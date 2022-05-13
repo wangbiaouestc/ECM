@@ -9097,8 +9097,8 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
               
               const CPelBuf predBuf = csFull->getPredBuf(compArea);
               PelBuf recIPredBuf = csFull->slice->getPic()->getRecoBuf(compArea);
-              std::vector<Pel>        my_invLUT;
-              m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, predBuf, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, false, false, my_invLUT);
+              std::vector<Pel> invLUT;
+              m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, predBuf, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, false, false, invLUT);
 
               currCompDist = m_pcRdCost->getDistPart(orgResiBuf, tmpRecLuma, channelBitDepth, compID, DF_SSE);
             }
@@ -9547,7 +9547,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           bool lmcsEnable = cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma( comp ) && !tu.cu->firstPU->ciipFlag && !CU::isIBC( *tu.cu );
 #endif
           cs.reconstructPicture(tu.blocks[comp], m_pcReshape->getFwdLUT(), csFull, lmcsEnable);          
-#else // JVET_Z0118_GDR
+#else
           PelBuf picRecoBuff = tu.cs->picture->getRecoBuf( tu.blocks[comp] );
 
 #if JVET_Y0065_GPM_INTRA
@@ -9563,7 +9563,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           {
             picRecoBuff.reconstruct( cs.getPredBuf( tu.blocks[comp] ), csFull->getResiBuf( tu.blocks[comp] ), tu.cu->cs->slice->clpRng( comp ) );
           }
-#endif // JVET_Z0118_GDR
+#endif
         }
 
         if ( sps.getNumPredSigns() > 0)
@@ -10208,8 +10208,8 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
             }
             else
             {
-              std::vector<Pel> dummy_invLUT;
-              m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, false, dummy_invLUT);
+              std::vector<Pel> invLUT;
+              m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, false, invLUT);
             }
           }
         }

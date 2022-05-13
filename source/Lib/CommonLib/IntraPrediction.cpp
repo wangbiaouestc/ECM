@@ -241,16 +241,10 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
     buffer.create( chromaFormatIDC, Area( 0, 0, MAX_CU_SIZE, MAX_CU_SIZE ) );
   }
 #if ENABLE_DIMD && INTRA_TRANS_ENC_OPT
-  m_dimdBlending = xDimdBlending;
-#ifdef TARGET_SIMD_X86
-  m_dimdBlending = xDimdBlending_SIMD;
-#endif
+  m_dimdBlending = dimdBlending;
 #endif
 #if JVET_W0123_TIMD_FUSION && INTRA_TRANS_ENC_OPT
-  m_timdBlending = xTimdBlending;
-#ifdef TARGET_SIMD_X86
-  m_timdBlending = xTimdBlending_SIMD;
-#endif
+  m_timdBlending = timdBlending;
 #endif
 #if JVET_V0130_INTRA_TMP
   unsigned int blkSize;
@@ -845,7 +839,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #endif
 
 #if ENABLE_DIMD
-  if (pu.cu->dimd && pu.cu->dimd_is_blend && isLuma(compID))
+  if (pu.cu->dimd && pu.cu->dimdBlending && isLuma(compID))
   {
     int width = piPred.width;
     int height = piPred.height;
@@ -1162,7 +1156,7 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
   if ( createModel )
   {
 #if LMS_LINEAR_MODEL
-    xGetLMParameters_LMS(pu, compID, chromaArea, cclmModel);
+    xGetLMParametersLMS(pu, compID, chromaArea, cclmModel);
 #else
     xGetLMParameters    (pu, compID, chromaArea, cclmModel);
 #endif
@@ -4181,7 +4175,7 @@ int IntraPrediction::deriveTimdMode( const CPelBuf &recoBuf, const CompArea &are
   }
 }
 #if INTRA_TRANS_ENC_OPT
-void xTimdBlending(Pel *pDst, int strideDst, Pel *pSrc, int strideSrc, int w0, int w1, int width, int height)
+void IntraPrediction::timdBlending(Pel *pDst, int strideDst, Pel *pSrc, int strideSrc, int w0, int w1, int width, int height)
 {
   const int log2WeightSum = 6;
   Pel *pelPred = pDst;
@@ -4200,35 +4194,9 @@ void xTimdBlending(Pel *pDst, int strideDst, Pel *pSrc, int strideSrc, int w0, i
     pelPredFusion += strideSrc;
   }
 }
-#ifdef TARGET_SIMD_X86
-void xTimdBlending_SIMD(Pel *pDst, int strideDst, Pel *pSrc, int strideSrc, int w0, int w1, int width, int height)
-{
-  CHECK((width % 4) != 0, "width should be multiple of 4");
-  __m128i vw0 = _mm_set1_epi32(w0);
-  __m128i vw1 = _mm_set1_epi32(w1);
-  int   shift = 6;
-
-  for (int i = 0; i < height; i++)
-  {
-    for (int j = 0; j < width; j += 4)
-    {
-      __m128i vdst = _mm_cvtepi16_epi32(_mm_loadl_epi64((__m128i*)(pDst + j)));
-      __m128i vsrc = _mm_cvtepi16_epi32(_mm_loadl_epi64((__m128i*)(pSrc + j)));
-
-      vdst = _mm_mullo_epi32(vdst, vw0);
-      vdst = _mm_add_epi32(vdst, _mm_mullo_epi32(vsrc, vw1));
-
-      vdst = _mm_srai_epi32(vdst, shift);
-      vdst = _mm_packs_epi32(vdst, vdst);
-      _mm_storel_epi64((__m128i*)(pDst + j), vdst);
-    }
-    pDst += strideDst;
-    pSrc += strideSrc;
-  }
-}
 #endif
 #endif
-#endif
+
 #if ENABLE_DIMD
 void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu)
 {
@@ -4274,111 +4242,113 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
   int numIntraLeft = isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1));
 
   // ----- Step 2: build histogram of gradients -----
-  int piHistogram_clean[NUM_LUMA_MODE] = { 0 };
+  int histogram[NUM_LUMA_MODE] = { 0 };
   
   if (numIntraLeft)
   {
     uint32_t uiHeightLeft = numIntraLeft * unitHeight - 1 - (!numIntraAbove ? 1 : 0);
     const Pel *pRecoLeft = pReco - 2 + iStride * (!numIntraAbove ? 1 : 0);
-    sigcnt += buildHistogram(pRecoLeft, iStride, uiHeightLeft, 1, piHistogram_clean, 1, uiWidth, uiHeight);
+    sigcnt += buildHistogram(pRecoLeft, iStride, uiHeightLeft, 1, histogram, 1, uiWidth, uiHeight);
   }
 
   if (numIntraAbove)
   {
     uint32_t uiWidthAbove = numIntraAbove * unitWidth - 1 - (!numIntraLeft ? 1 : 0);
     const Pel *pRecoAbove = pReco - iStride * 2 + (!numIntraLeft ? 1 : 0);
-    sigcnt += buildHistogram(pRecoAbove, iStride, 1, uiWidthAbove, piHistogram_clean, 2, uiWidth, uiHeight);
+    sigcnt += buildHistogram(pRecoAbove, iStride, 1, uiWidthAbove, histogram, 2, uiWidth, uiHeight);
   }
 
   if (numIntraLeft && numIntraAbove)
   {
     const Pel *pRecoAboveLeft = pReco - 2 - iStride * 2;
-    sigcnt += buildHistogram(pRecoAboveLeft, iStride, 2, 2, piHistogram_clean, 3, uiWidth, uiHeight);
+    sigcnt += buildHistogram(pRecoAboveLeft, iStride, 2, 2, histogram, 3, uiWidth, uiHeight);
   }
 
-  int first_amp = 0, second_amp = 0, cur_amp = 0;
-  int first_mode = 0, second_mode = 0, cur_mode = 0;
+  int firstAmp = 0, secondAmp = 0, curAmp = 0;
+  int firstMode = 0, secondMode = 0, curMode = 0;
+
   for (int i = 0; i < NUM_LUMA_MODE; i++)
   {
-    cur_amp = piHistogram_clean[i];
-    cur_mode = i;
-    if (cur_amp > first_amp)
+    curAmp = histogram[i];
+    curMode = i;
+    if (curAmp > firstAmp)
     {
-      second_amp = first_amp;
-      second_mode = first_mode;
-      first_amp = cur_amp;
-      first_mode = cur_mode;
+      secondAmp = firstAmp;
+      secondMode = firstMode;
+      firstAmp = curAmp;
+      firstMode = curMode;
     }
     else
     {
-      if (cur_amp > second_amp)
+      if (curAmp > secondAmp)
       {
-        second_amp = cur_amp;
-        second_mode = cur_mode;
+        secondAmp = curAmp;
+        secondMode = curMode;
       }
     }
   }
 
   // ----- Step 3: derive best mode from histogram of gradients -----
-  cu.dimdMode = first_mode;
+  cu.dimdMode = firstMode;
 
-  cu.dimd_is_blend = true;
-  cu.dimd_is_blend &= second_amp > 0;
-  cu.dimd_is_blend &= second_mode > DC_IDX;
-  cu.dimd_is_blend &= first_mode > DC_IDX;
+  cu.dimdBlending = true;
+  cu.dimdBlending &= secondAmp > 0;
+  cu.dimdBlending &= secondMode > DC_IDX;
+  cu.dimdBlending &= firstMode > DC_IDX;
 
-  if( cu.dimd_is_blend )
+  if( cu.dimdBlending )
   {
-    cu.dimdBlendMode[0] = second_mode;
+    cu.dimdBlendMode[0] = secondMode;
   }
 
 #if JVET_X0149_TIMD_DIMD_LUT
-  int log2BlendWeight = 6;
-  int dimd_planar_weight = 21;
-  int sum_weight = (1 << log2BlendWeight);
+  const int log2BlendWeight = 6;
+  const int planarWeight = 21;
+  int sumWeight = 1 << log2BlendWeight;
 #else
-  const int blend_sum_weight = 6;
-  int sum_weight = 1 << blend_sum_weight;
+  const int blendSumWeight = 6;
+  int sumWeight = 1 << blend_sum_weight;
 #endif
-  if (cu.dimd_is_blend)
+  if (cu.dimdBlending)
   {
 #if JVET_X0149_TIMD_DIMD_LUT
-    int g_gradDivTable[16] = { 0, 7, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0 };
-    sum_weight = sum_weight - dimd_planar_weight;
-    int s0 = first_amp;
-    int s1 = first_amp + second_amp;
+    sumWeight = sumWeight - planarWeight;
+    int s0 = firstAmp;
+    int s1 = firstAmp + secondAmp;
     int x = floorLog2(s1);
+
     CHECK(x < 0, "floor log2 value should be no negative");
-    int norm_s1 = (s1 << 4 >> x) & 15;
-    int v = g_gradDivTable[norm_s1] | 8;
-    x += (norm_s1 != 0);
+
+    int norm = (s1 << 4 >> x) & 15;
+    int v = g_gradDivTable[norm] | 8;
+    x += (norm != 0);
     int shift = x + 3;
     int add = (1 << (shift - 1));
-    int iRatio = (s0 * v * sum_weight + add) >> shift;
+    int ratio = (s0 * v * sumWeight + add) >> shift;
 
-    if( iRatio > sum_weight )
+    if( ratio > sumWeight )
     {
-      iRatio = sum_weight;
+      ratio = sumWeight;
     }
 
-    CHECK( iRatio > sum_weight, "Wrong DIMD ratio" );
+    CHECK( ratio > sumWeight, "Wrong DIMD ratio" );
 #else
     double dRatio = 0.0;
-    sum_weight -= static_cast<int>((double)sum_weight / 3); // ~ 1/3 of the weight to be reserved for planar
-    dRatio = (double)first_amp / (double)(first_amp + second_amp);
-    int iRatio = static_cast<int>(dRatio * sum_weight);
+    sum_weight -= static_cast<int>((double)sumWeight / 3); // ~ 1/3 of the weight to be reserved for planar
+    dRatio = (double)firstAmp / (double)(firstAmp + secondAmp);
+    int ratio = static_cast<int>(dRatio * sumWeight);
 #endif
-    cu.dimdRelWeight[0] = iRatio;
-    cu.dimdRelWeight[2] = sum_weight - iRatio;
+    cu.dimdRelWeight[0] = ratio;
+    cu.dimdRelWeight[2] = sumWeight - ratio;
 #if JVET_X0149_TIMD_DIMD_LUT
-    cu.dimdRelWeight[1] = dimd_planar_weight;
+    cu.dimdRelWeight[1] = planarWeight;
 #else
-    cu.dimdRelWeight[1] = (1 << blend_sum_weight) - sum_weight;
+    cu.dimdRelWeight[1] = (1 << blendSumWeight) - sumWeight;
 #endif
   }
   else
   {
-    cu.dimdRelWeight[0] = sum_weight;
+    cu.dimdRelWeight[0] = sumWeight;
     cu.dimdRelWeight[1] = 0;
     cu.dimdRelWeight[2] = 0;
   }
@@ -4513,35 +4483,36 @@ void IntraPrediction::deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBu
 }
 #endif
 
-int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int* piHistogram, int direction, int bw, int bh)
+int IntraPrediction::buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int* piHistogram, int direction, int bw, int bh)
 {
-  int w_step = 1, h_step = 1;
+  const int wStep = 1, hStep = 1;
   int angTable[17] = { 0, 2048, 4096, 6144, 8192, 12288, 16384, 20480, 24576, 28672, 32768, 36864, 40960, 47104, 53248, 59392, 65536 };
   int offsets[4] = { HOR_IDX, HOR_IDX, VER_IDX, VER_IDX };
   int dirs[4] = { -1, 1, -1, 1 };
-  int map_x_gr_y_1[2][2] = { { 1, 0 },{ 0, 1 } };
-  int map_x_gr_y_0[2][2] = { { 2, 3 },{ 3, 2 } };
-#if JVET_X0149_TIMD_DIMD_LUT
-  int g_gradDivTable[16] = { 0, 7, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0 };
-#endif
+  int mapXgrY1[2][2] = { { 1, 0 },{ 0, 1 } };
+  int mapXgrY0[2][2] = { { 2, 3 },{ 3, 2 } };
 
-  for (uint32_t y = 0; y < uiHeight; y += h_step)
+  for (uint32_t y = 0; y < uiHeight; y += hStep)
   {
-    for (uint32_t x = 0; x < uiWidth; x += w_step)
+    for (uint32_t x = 0; x < uiWidth; x += wStep)
     {
-      if ((direction == 3) && x == (uiWidth - 1) && y == (uiHeight - 1))
+      if( (direction == 3) && x == (uiWidth - 1) && y == (uiHeight - 1) )
+      {
         continue;
+      }
 
       const Pel *pRec = pReco + y * iStride + x;
 
       int iDy = pRec[-iStride - 1] + 2 * pRec[-1] + pRec[iStride - 1] - pRec[-iStride + 1] - 2 * pRec[+1] - pRec[iStride + 1];
       int iDx = pRec[iStride - 1] + 2 * pRec[iStride] + pRec[iStride + 1] - pRec[-iStride - 1] - 2 * pRec[-iStride] - pRec[-iStride + 1];
 
-      if (iDy == 0 && iDx == 0)
+      if( iDy == 0 && iDx == 0 )
+      {
         continue;
+      }
 
       int iAmp = (int)(abs(iDx) + abs(iDy));
-      int iAng_uneven = -1;
+      int iAngUneven = -1;
       // for determining region
       if (iDx != 0 && iDy != 0) // pure angles are not concerned
       {
@@ -4550,64 +4521,64 @@ int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t ui
         int signy = iDy < 0 ? 1 : 0;
         int absx = iDx < 0 ? -iDx : iDx;
         int absy = iDy < 0 ? -iDy : iDy;
-        int x_gr_y = absx > absy ? 1 : 0;
-        int region = x_gr_y ? map_x_gr_y_1[signy][signx] : map_x_gr_y_0[signy][signx];
+        int gtY = absx > absy ? 1 : 0;
+        int region = gtY ? mapXgrY1[signy][signx] : mapXgrY0[signy][signx];
         //region = (region == 1 ? 2 : (region == 2 ? 1 : (region == 3 ? 4 : 3)));
 #if JVET_X0149_TIMD_DIMD_LUT
-        int s0 = x_gr_y ? absy : absx;
-        int s1 = x_gr_y ? absx : absy;
+        int s0 = gtY ? absy : absx;
+        int s1 = gtY ? absx : absy;
         int x = floorLog2(s1);
-        int norm_s1 = (s1 << 4 >> x) & 15;
-        int v = g_gradDivTable[norm_s1] | 8;
-        x += (norm_s1 != 0);
+        int norm = (s1 << 4 >> x) & 15;
+        int v = g_gradDivTable[norm] | 8;
+        x += (norm != 0);
         int shift = 13 - x;
-        int iRatio;
+        int ratio;
         if (shift < 0)
         {
           shift = -shift;
           int add = (1 << (shift - 1));
-          iRatio = (s0 * v + add) >> shift;
+          ratio = (s0 * v + add) >> shift;
         }
         else
         {
-          iRatio = (s0 * v) << shift;
+          ratio = (s0 * v) << shift;
         }
 
         // iRatio after integerization can go beyond 2^16
 #else
-        float fRatio = x_gr_y ? static_cast<float>(absy) / static_cast<float>(absx) : static_cast<float>(absx) / static_cast<float>(absy);
-        float fRatio_scaled = fRatio * (1 << 16);
-        int iRatio = static_cast<int>(fRatio_scaled);
+        float fRatio = gtY ? static_cast<float>(absy) / static_cast<float>(absx) : static_cast<float>(absx) / static_cast<float>(absy);
+        float fRatioScaled = fRatio * (1 << 16);
+        int ratio = static_cast<int>(fRatioScaled);
 #endif
         // get ang_idx
         int idx = 16;
         for( int i = 1; i < 17; i++ )
         {
-          if( iRatio <= angTable[i] )
+          if( ratio <= angTable[i] )
           {
-            idx = iRatio - angTable[i - 1] < angTable[i] - iRatio ? i - 1 : i;
+            idx = ratio - angTable[i - 1] < angTable[i] - ratio ? i - 1 : i;
             break;
           }
         }
 
-        iAng_uneven = offsets[region] + dirs[region] * idx;
-        //iAng_uneven = offsets[region - 1] + dirs[region - 1] * idx;
+        iAngUneven = offsets[region] + dirs[region] * idx;
+        //iAngUneven = offsets[region - 1] + dirs[region - 1] * idx;
       }
       else
       {
-        iAng_uneven = iDx == 0 ? VER_IDX : HOR_IDX;
+        iAngUneven = iDx == 0 ? VER_IDX : HOR_IDX;
       }
 
-      CHECK( iAng_uneven < 0, "Wrong mode in DIMD histogram" );
-      CHECK( iAng_uneven >= NUM_LUMA_MODE, "Wrong mode in DIMD histogram" );
+      CHECK( iAngUneven < 0, "Wrong mode in DIMD histogram" );
+      CHECK( iAngUneven >= NUM_LUMA_MODE, "Wrong mode in DIMD histogram" );
 
-      piHistogram[iAng_uneven] += iAmp;
+      piHistogram[iAngUneven] += iAmp;
     }
   }
   return 0;
 }
 #if INTRA_TRANS_ENC_OPT
-void xDimdBlending(Pel *pDst, int strideDst, Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int w2, int width, int height)
+void IntraPrediction::dimdBlending(Pel *pDst, int strideDst, Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int w2, int width, int height)
 {
   Pel *pelPred = pDst;
   Pel *pelPlanar = pSrc0;
@@ -4628,37 +4599,6 @@ void xDimdBlending(Pel *pDst, int strideDst, Pel *pSrc0, int strideSrc0, Pel *pS
     pelPredAng += strideSrc1;
   }
 }
-#ifdef TARGET_SIMD_X86
-void xDimdBlending_SIMD(Pel *pDst, int strideDst, Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int w2, int width, int height)
-{
-  CHECK((width % 4) != 0, "width should be multiple of 4");
-  __m128i vw0 = _mm_set1_epi32(w0);
-  __m128i vw1 = _mm_set1_epi32(w1);
-  __m128i vw2 = _mm_set1_epi32(w2);
-  int   shift = 6;
-
-  for (int i = 0; i < height; i++)
-  {
-    for (int j = 0; j < width; j += 4)
-    {
-      __m128i vdst = _mm_cvtepi16_epi32(_mm_loadl_epi64((__m128i*)(pDst + j)));
-      __m128i vsrc0 = _mm_cvtepi16_epi32(_mm_loadl_epi64((__m128i*)(pSrc0 + j)));
-      __m128i vsrc1 = _mm_cvtepi16_epi32(_mm_loadl_epi64((__m128i*)(pSrc1 + j)));
-
-      vdst = _mm_mullo_epi32(vdst, vw0);
-      vdst = _mm_add_epi32(vdst, _mm_mullo_epi32(vsrc0, vw1));
-      vdst = _mm_add_epi32(vdst, _mm_mullo_epi32(vsrc1, vw2));
-
-      vdst = _mm_srai_epi32(vdst, shift);
-      vdst = _mm_packs_epi32(vdst, vdst);
-      _mm_storel_epi64((__m128i*)(pDst + j), vdst);
-    }
-    pDst += strideDst;
-    pSrc0 += strideSrc0;
-    pSrc1 += strideSrc1;
-  }
-}
-#endif
 #endif
 #endif
 bool isAboveLeftAvailable(const CodingUnit &cu, const ChannelType &chType, const Position &posLT)
@@ -5920,7 +5860,7 @@ void IntraPrediction::xPadMdlmTemplateSample(Pel*pSrc, Pel*pCur, int cWidth, int
     pTempCur[i] = pCur[i * step];
   }
 }
-void IntraPrediction::xGetLMParameters_LMS(const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, CclmModel &cclmModel)
+void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, CclmModel &cclmModel)
 {
   CHECK(compID == COMPONENT_Y, "");
   const SizeType cWidth = chromaArea.width;

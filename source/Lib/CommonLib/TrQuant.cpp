@@ -55,10 +55,6 @@
 #include "CommonLib/CodingStatistics.h"
 #endif
 
-#if JVET_V0130_INTRA_TMP
-unsigned int g_uiDepth2Width[5] = { 4, 8, 16, 32, 64 };
-#endif
-
 struct coeffGroupRDStats
 {
   int    iNNZbeforePos0;

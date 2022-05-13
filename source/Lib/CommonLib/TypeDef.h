@@ -57,21 +57,18 @@
 
 
 #if BASE_ENCODER
-
-#define JVET_Y0240_BIM                                    1 // JVET_Y0240: Block Importance Mapping
-
-#define JVET_X0144_MAX_MTT_DEPTH_TID                      1 // JVET-X0144: max MTT hierarchy depth set by temporal ID
 // Lossy encoder speedups
 #define AFFINE_ENC_OPT                                    1 // Affine encoder optimization
 #define AMVR_ENC_OPT                                      1 // Encoder optimization for AMVR
 #define MERGE_ENC_OPT                                     1 // Encoder optimization for merge modes. Regular merge, subblock based merge, CIIP and MMVD share the same full RD pool
 #define ALF_SAO_TRUE_ORG                                  1 // using true original samples for SAO and ALF optimization
-
 #define REMOVE_PCM                                        1 // Remove PCM related code for memory reduction and speedup
-
-#define JVET_X0049_BDMVR_SW_OPT                           1 // JVET-X0049: software optimization for BDMVR (lossless)
-
 #define JVET_Y0152_TT_ENC_SPEEDUP                         1 // TT encoding speedup
+
+// Software optimization
+#define JVET_X0144_MAX_MTT_DEPTH_TID                      1 // JVET-X0144: max MTT hierarchy depth set by temporal ID
+#define JVET_X0049_BDMVR_SW_OPT                           1 // JVET-X0049: software optimization for BDMVR (lossless)
+#define INTRA_TRANS_ENC_OPT                               1 // JVET-Y0141: Software optimization, including TIMD/DIMD/MTS/LFNS encoder fast algorithm, SIMD implementation and CM initial value retraining 
 
 // SIMD optimizations
 #define MCIF_SIMD_NEW                                     1 // SIMD for interpolation
@@ -102,7 +99,7 @@
 #define AFFINE_RM_CONSTRAINTS_AND_OPT                     1 // Remove affine constraints and optimization
 
 // Loop filters
-#define DB_PARAM_TID                                      1 // adjust DB parameters based on temporal ID
+#define DB_PARAM_TID                                      1 // Adjust DB parameters based on temporal ID
 
 #define CONVERT_NUM_TU_SPLITS_TO_CFG                      1 // Convert number of TU splits to config parameter to lower memory
 #define DUMP_BEFORE_INLOOP                                1 // Dump reconstructed YUV before inloop filters, controlled by config parameter
@@ -113,15 +110,15 @@
 #if TOOLS
 // Intra
 #define MMLM                                              1 // Add three MMLM modes
-#define GRAD_PDPC                                         1 // gradient PDPC extension for angular-intra modes for luma.
+#define GRAD_PDPC                                         1 // Gradient PDPC extension for angular-intra modes for luma.
 #define INTRA_6TAP                                        1 // 6TapCubic + 6 TapGaussian + left side 4 tap weak filtering for intra.
-#define SECONDARY_MPM                                     1 // Primary MPM and Secondary MPM: Add neighbouring modes into MPMs from positions AR, BL, AL, derived modes
+#define SECONDARY_MPM                                     1 // Primary MPM and secondary MPM: Add neighbouring modes into MPMs from positions AR, BL, AL, derived modes
 #define ENABLE_DIMD                                       1 // Decoder side intra mode derivation
 #if ENABLE_DIMD
-#define JVET_V0087_DIMD_NO_ISP                            1 // JVET-V0087: disallow combination of DIMD and ISP
-#define JVET_X0124_TMP_SIGNAL                             1 // JVET-X0124: cleanup on signalling of intra template matching
+#define JVET_V0087_DIMD_NO_ISP                            1 // JVET-V0087: Disallow combination of DIMD and ISP
+#define JVET_X0124_TMP_SIGNAL                             1 // JVET-X0124: Cleanup on signalling of intra template matching
 #endif
-#define JVET_V0130_INTRA_TMP                              1 // JVET-V0130: template matching prediction
+#define JVET_V0130_INTRA_TMP                              1 // JVET-V0130: Template matching prediction
 #define JVET_W0069_TMP_BOUNDARY                           1 // JVET-W0069: boundary handling for TMP
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
 #if JVET_W0123_TIMD_FUSION
@@ -137,15 +134,15 @@
 
 
 //IBC
-#define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058:Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
-#define JVET_Z0075_IBC_HMVP_ENLARGE                       1 // JVET-Z0075:Enlarged HMVP table for IBC
-#define JVET_Z0084_IBC_TM                                 1 // JVET-Z0084: add template matching in IBC modes (controlled by TM_MRG or TM_AMVP)
-#define JVET_Z0131_IBC_BVD_BINARIZATION                   1 // JVET-Z0131: Block Vector Difference Binarization
-#define JVET_Z0153_IBC_EXT_REF                            1 // JVET-Z0153: extend reference area for IBC
+#define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
+#define JVET_Z0075_IBC_HMVP_ENLARGE                       1 // JVET-Z0075: Enlarged HMVP table for IBC
+#define JVET_Z0084_IBC_TM                                 1 // JVET-Z0084: Add template matching in IBC modes (controlled by TM_MRG or TM_AMVP)
+#define JVET_Z0131_IBC_BVD_BINARIZATION                   1 // JVET-Z0131: Block vector difference binarization
+#define JVET_Z0153_IBC_EXT_REF                            1 // JVET-Z0153: Extend reference area for IBC
 #define JVET_Z0160_IBC_ZERO_PADDING                       1 // JVET-Z0160: Replacement of zero-padding candidates
 
 // Inter
-#define CIIP_PDPC                                         1 // apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
+#define CIIP_PDPC                                         1 // Apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
 #define JVET_X0090_CIIP_FIX                               1 // JVET-X0090: combination of CIIP, OBMC and LMCS
 #define SAMPLE_BASED_BDOF                                 1 // Sample based BDOF
 #define MULTI_PASS_DMVR                                   1 // Multi-pass DMVR
@@ -154,10 +151,10 @@
 #define NON_ADJACENT_MRG_CAND                             1 // Add non-adjacent merge candidates
 #define MULTI_HYP_PRED                                    1 // Multiple hypothesis prediction
 #if MULTI_HYP_PRED
-#define JVET_Z0127_SPS_MHP_MAX_MRG_CAND                   1
+#define JVET_Z0127_SPS_MHP_MAX_MRG_CAND                   1 // JVET-Z0127: Signal number of MHP candidates
 #endif
 #define IF_12TAP                                          1 // 12-tap IF
-#define JVET_Z0117_CHROMA_IF                              1 //JVET_Z0117: 6-tap interpolation filter for chroma MC
+#define JVET_Z0117_CHROMA_IF                              1 // JVET-Z0117: 6-tap interpolation filter for chroma MC
 #define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
 
 #if JVET_X0049_BDMVR_SW_OPT
@@ -171,10 +168,10 @@
 #endif
 #define JVET_Y0089_DMVR_BCW                               1 // JVET-Y0089: DMVR with BCW enabled
 #define JVET_Y0065_GPM_INTRA                              1 // JVET-Y0065: Intra prediction for GPM
-#define JVET_Z0136_OOB                                    1 // JVET-Z0136 test2.2a: enhanced bi-prediction with out-of-boundary prediction samples
+#define JVET_Z0136_OOB                                    1 // JVET-Z0136 test2.2a: Enhanced bi-prediction with out-of-boundary prediction samples
 #define JVET_Z0083_PARSINGERROR_FIX                       1 // JVET-Z0083: Fix on MHP parsing condition
 #define JVET_Z0139_HIST_AFF                               1 // JVET-Z0139: Affine HMVP 
-#define JVET_Z0139_NA_AFF                                 1 // JVET-Z0139: Constructed Non-adjacent spatial neighbors for affine mode
+#define JVET_Z0139_NA_AFF                                 1 // JVET-Z0139: Constructed non-adjacent spatial neighbors for affine mode
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
@@ -192,21 +189,21 @@
 #define JVET_Y0134_TMVP_NAMVP_CAND_REORDERING             1 // JVET-Y0134: MV candidate reordering for TMVP and NAMVP types (controlled by JVET_W0090_ARMC_TM), and reference picture selection for TMVP 
 #if JVET_W0090_ARMC_TM
 #define JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED            1 // JVET-Y0067: TM based reordering for MMVD and affine MMVD and MVD sign prediction
-#define JVET_Z0102_NO_ARMC_FOR_ZERO_CAND                  1 // JVET-Z0102: No ARMC for the Zero candidates of Regular, TM and BM merge modes
+#define JVET_Z0102_NO_ARMC_FOR_ZERO_CAND                  1 // JVET-Z0102: No ARMC for the zero candidates of regular, TM and BM merge modes
 #define JVET_Z0054_BLK_REF_PIC_REORDER                    1 // JVET-Z0054: Block level TM based reordering of reference pictures
 #endif
 
 // Transform and coefficient coding
 #define TCQ_8STATES                                       1
-#define JVET_W0119_LFNST_EXTENSION                        1
+#define JVET_W0119_LFNST_EXTENSION                        1 // JVET-W0119: LFNST extension with large kernel
 #if JVET_W0119_LFNST_EXTENSION
 #define EXTENDED_LFNST                                    0
 #else
 #define EXTENDED_LFNST                                    1 // Extended LFNST
 #endif
-#define SIGN_PREDICTION                                   1 // transform coefficients sign prediction
+#define SIGN_PREDICTION                                   1 // Transform coefficients sign prediction
 #if SIGN_PREDICTION
-#define JVET_Y0141_SIGN_PRED_IMPROVE                      1  //JVET-Y0141 test3: sign prediction improvement                          
+#define JVET_Y0141_SIGN_PRED_IMPROVE                      1 // JVET-Y0141 test3: Sign prediction improvement                          
 #endif
 #define JVET_W0103_INTRA_MTS                              1 // JVET-W0103: Extended Intra MTS
 #if JVET_W0103_INTRA_MTS
@@ -230,17 +227,14 @@
 #define JVET_X0071_LONGER_CCALF                           1 // JVET-X0071/JVET-X0045: Longer filter for CCALF
 #define JVET_X0071_ALF_BAND_CLASSIFIER                    1 // JVET-X0071/JVET-X0070: Alternative band classifier for ALF
 #define JVET_Y0106_CCSAO_EDGE_CLASSIFIER                  1 // JVET-Y0106: Edge based classifier for CCSAO
-#define JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY           1 // JVET-Z0105: Enable Virtual Boundary Processing for new In-loop filer tools of ECM
+#define JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY           1 // JVET-Z0105: Enable virtual boundary processing for in-loop filters
 
-
-//encoder optimization
-#define INTRA_TRANS_ENC_OPT                               1 //software optimization introduced by JVET-Y0141,including TIMD/DIMD/MTS/LFNS encoder fast algorithm, SIMD implementation and CM initial value retraining 
 
 // SIMD optimizations
 #if IF_12TAP
-#define IF_12TAP_SIMD                                     1 // enable SIMD for 12-tap filter
+#define IF_12TAP_SIMD                                     1 // Enable SIMD for 12-tap filter
 #if IF_12TAP_SIMD
-#define SIMD_4x4_12                                       1 //enable 4x4-block combined passes for 12-tap filters
+#define SIMD_4x4_12                                       1 // Enable 4x4-block combined passes for 12-tap filters
 #endif
 #endif
 #if SIGN_PREDICTION
@@ -259,16 +253,17 @@
 
 // Software extensions
 #define RPR_ENABLE                                        1 // JVET-X0121: Fixes for RRP
-#define JVET_Y0128_NON_CTC                                1 // JVET-Y0128: Fixing issues for RPR enabling and non-CTC configuration in ECM
-#define JVET_Z0067_RPR_ENABLE                             1 // JVET_Z0067: Fixes for RPR
-#define JVET_Z0118_GDR                                    1 // JVET_Z0118: GDR for ECM
-#define JVET_Z0150_MEMORY_USAGE_PRINT                     1 // JVET-Z0150: print memory usage
+#define JVET_Y0128_NON_CTC                                1 // JVET-Y0128: Fixing issues for RPR enabling and non-CTC configuration
+#define JVET_Y0240_BIM                                    1 // JVET-Y0240: Block importance mapping
+#define JVET_Z0067_RPR_ENABLE                             1 // JVET-Z0067: Fixes for RPR
+#define JVET_Z0150_MEMORY_USAGE_PRINT                     1 // JVET-Z0150: Print memory usage
+#define JVET_Z0118_GDR                                    1 // JVET-Z0118: GDR
 
 #if JVET_Z0118_GDR
-#define GDR_LEAK_TEST  1
-#define GDR_ENC_TRACE  0
-#define GDR_DEC_TRACE  0
-#endif // JVET_Z0118_GDR
+#define GDR_LEAK_TEST                                     1
+#define GDR_ENC_TRACE                                     0
+#define GDR_DEC_TRACE                                     0
+#endif
 
 
 
