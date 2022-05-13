@@ -207,7 +207,7 @@ public:
 #endif
   void           setDistParam( DistParam &rcDP, const CPelBuf &org, const Pel* piRefY, int iRefStride, const Pel* mask01, int iMaskStride, int stepX, int iMaskStride2, int bitDepth,  ComponentID compID);
 #if TM_AMVP || TM_MRG
-  void           setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &cur, int bitDepth, bool TrueA_FalseL, int wIdx, int subShift, ComponentID compID );
+  void           setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &cur, int bitDepth, bool trueAfalseL, int wIdx, int subShift, ComponentID compID );
 #endif
 
   double         getMotionLambda          ( )  { return m_dLambdaMotionSAD; }
@@ -561,7 +561,7 @@ private:
   static Distortion xCalcHADs8x4      ( const Pel *piOrg, const Pel *piCur, int iStrideOrg, int iStrideCur );
 
 #if TM_AMVP || TM_MRG
-  template < int tplSize, bool TrueA_FalseL, bool MR >
+  template < int tplSize, bool trueAfalseL, bool mr >
   static Distortion xGetTMErrorFull   ( const DistParam& rcDtParam );
 #endif
 
@@ -590,7 +590,7 @@ private:
   static Distortion xGetMRSAD_SIMD(const DistParam &rcDtParam);
 #endif
 #if TM_AMVP || TM_MRG
-  template < X86_VEXT vext, int tplSize, bool TrueA_FalseL, bool MR >
+  template < X86_VEXT vext, int tplSize, bool trueAfalseL, bool mr >
   static Distortion xGetTMErrorFull_SIMD(const DistParam& rcDtParam);
 #endif
 

@@ -122,7 +122,7 @@ bool DecAppCfg::parseCfg( int argc, char* argv[] )
   ( "UpscaledOutput",          m_upscaledOutput,                          0,       "Upscaled output for RPR" )
 #if GDR_LEAK_TEST
   ("RandomAccessPos",          m_gdrPocRandomAccess,                    0,         "POC of GDR Random access picture\n" )
-#endif // GDR_LEAK_TEST
+#endif
 #if DUMP_BEFORE_INLOOP
   ( "DumpBeforeInloop",        m_dumpBeforeInloop,                          false, "Dump YUV before inloop filters" )
 #endif

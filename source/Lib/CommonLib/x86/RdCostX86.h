@@ -2864,28 +2864,28 @@ Distortion RdCost::xGetMRSAD_SIMD(const DistParam &rcDtParam)
 #endif
 
 #if TM_AMVP || TM_MRG
-template < X86_VEXT vext, int tplSize, bool TrueA_FalseL, bool MR >
+template < X86_VEXT vext, int tplSize, bool trueAfalseL, bool mr >
 Distortion RdCost::xGetTMErrorFull_SIMD(const DistParam& rcDtParam)
 {
   if ( rcDtParam.org.width < 4
-    || ( TrueA_FalseL && (rcDtParam.org.width & 15) ) // (Above template) multiple of 16
+    || ( trueAfalseL && (rcDtParam.org.width & 15) ) // (Above template) multiple of 16
     || rcDtParam.bitDepth > 10
     || rcDtParam.applyWeight
   )
   {
-    return RdCost::xGetTMErrorFull<tplSize, TrueA_FalseL, MR>(rcDtParam);
+    return RdCost::xGetTMErrorFull<tplSize, trueAfalseL, mr>(rcDtParam);
   }
 
   const CPelBuf& curTplBuf = rcDtParam.org;
   const CPelBuf& refTplBuf = rcDtParam.cur;
 
   // get delta sum value
-  const int64_t deltaSum = !MR ? 0 : g_pelBufOP.getSumOfDifference(curTplBuf.buf, curTplBuf.stride, refTplBuf.buf, refTplBuf.stride, curTplBuf.width, curTplBuf.height, rcDtParam.subShift, rcDtParam.bitDepth);
-  if (MR && deltaSum == 0)
+  const int64_t deltaSum = !mr ? 0 : g_pelBufOP.getSumOfDifference(curTplBuf.buf, curTplBuf.stride, refTplBuf.buf, refTplBuf.stride, curTplBuf.width, curTplBuf.height, rcDtParam.subShift, rcDtParam.bitDepth);
+  if (mr && deltaSum == 0)
   {
-    return xGetTMErrorFull_SIMD<vext, tplSize, TrueA_FalseL, false>(rcDtParam);
+    return xGetTMErrorFull_SIMD<vext, tplSize, trueAfalseL, false>(rcDtParam);
   }
-  const int deltaMean = !MR ? 0 : int(deltaSum / (int64_t)curTplBuf.area());
+  const int deltaMean = !mr ? 0 : int(deltaSum / (int64_t)curTplBuf.area());
 
   // weight configuration
   const int* tplWeightD = TM_DISTANCE_WEIGHTS[rcDtParam.tmWeightIdx]; // uiWeight
@@ -2902,7 +2902,7 @@ Distortion RdCost::xGetTMErrorFull_SIMD(const DistParam& rcDtParam)
 
   // compute matching cost
   Distortion partSum = 0;
-  if (TrueA_FalseL)
+  if (trueAfalseL)
   {
     const int subblkWidth = iCols >> 2;
 
@@ -2910,7 +2910,7 @@ Distortion RdCost::xGetTMErrorFull_SIMD(const DistParam& rcDtParam)
     {
       __m128i vzero  = _mm_setzero_si128();
       __m128i vsum32 = vzero;
-      __m128i delta  = MR ? _mm_set1_epi16(deltaMean) : vzero;
+      __m128i delta  = mr ? _mm_set1_epi16(deltaMean) : vzero;
 
       for (uint32_t j = 0; j < iRows; j += iSubStep)
       {
@@ -2925,7 +2925,7 @@ Distortion RdCost::xGetTMErrorFull_SIMD(const DistParam& rcDtParam)
             {
               __m128i cur = _mm_loadl_epi64((__m128i*)(piCur + i));
               __m128i ref = _mm_loadl_epi64((__m128i*)(piRef + i));
-              vsum16      = MR ? _mm_abs_epi16(_mm_sub_epi16(_mm_sub_epi16(cur, ref), delta)) : _mm_abs_epi16(_mm_sub_epi16(cur, ref));
+              vsum16      = mr ? _mm_abs_epi16(_mm_sub_epi16(_mm_sub_epi16(cur, ref), delta)) : _mm_abs_epi16(_mm_sub_epi16(cur, ref));
             }
 
             vsum32subblk = _mm_add_epi32(vsum32subblk, _mm_unpacklo_epi16(vsum16, vzero));
@@ -2949,7 +2949,7 @@ Distortion RdCost::xGetTMErrorFull_SIMD(const DistParam& rcDtParam)
     {
       __m256i vzero  = _mm256_setzero_si256();
       __m256i vsum32 = vzero;
-      __m256i delta  = MR ? _mm256_set1_epi16(deltaMean) : vzero;
+      __m256i delta  = mr ? _mm256_set1_epi16(deltaMean) : vzero;
 
       for (uint32_t j = 0; j < iRows; j += iSubStep)
       {
@@ -2964,7 +2964,7 @@ Distortion RdCost::xGetTMErrorFull_SIMD(const DistParam& rcDtParam)
             {
               __m256i cur = _mm256_lddqu_si256((__m256i*)(piCur + i));
               __m256i ref = _mm256_lddqu_si256((__m256i*)(piRef + i));
-              vsum16      = MR ? _mm256_abs_epi16(_mm256_sub_epi16(_mm256_sub_epi16(cur, ref), delta)) : _mm256_abs_epi16(_mm256_sub_epi16(cur, ref));
+              vsum16      = mr ? _mm256_abs_epi16(_mm256_sub_epi16(_mm256_sub_epi16(cur, ref), delta)) : _mm256_abs_epi16(_mm256_sub_epi16(cur, ref));
             }
 
             __m256i vsumtemp = _mm256_add_epi32(_mm256_unpacklo_epi16(vsum16, vzero), _mm256_unpackhi_epi16(vsum16, vzero));
@@ -2989,7 +2989,7 @@ Distortion RdCost::xGetTMErrorFull_SIMD(const DistParam& rcDtParam)
     {
       __m128i vzero  = _mm_setzero_si128();
       __m128i vsum32 = vzero;
-      __m128i delta  = MR ? _mm_set1_epi16(deltaMean) : vzero;
+      __m128i delta  = mr ? _mm_set1_epi16(deltaMean) : vzero;
 
       for (uint32_t j = 0; j < iRows; j += iSubStep)
       {
@@ -3004,7 +3004,7 @@ Distortion RdCost::xGetTMErrorFull_SIMD(const DistParam& rcDtParam)
             {
               __m128i cur = _mm_lddqu_si128((__m128i*)(piCur + i));
               __m128i ref = _mm_lddqu_si128((__m128i*)(piRef + i));
-              vsum16      = MR ? _mm_abs_epi16(_mm_sub_epi16(_mm_sub_epi16(cur, ref), delta)) : _mm_abs_epi16(_mm_sub_epi16(cur, ref));
+              vsum16      = mr ? _mm_abs_epi16(_mm_sub_epi16(_mm_sub_epi16(cur, ref), delta)) : _mm_abs_epi16(_mm_sub_epi16(cur, ref));
             }
 
             __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
@@ -3029,7 +3029,7 @@ Distortion RdCost::xGetTMErrorFull_SIMD(const DistParam& rcDtParam)
   {
     __m128i vzero  = _mm_setzero_si128();
     __m128i vsum32 = vzero;
-    __m128i delta  = MR ? _mm_set1_epi16(deltaMean) : vzero;
+    __m128i delta  = mr ? _mm_set1_epi16(deltaMean) : vzero;
 
     for (uint32_t m = 0, n = 0; m < iRows; m += (iRows >> 2), n++)
     {
@@ -3041,7 +3041,7 @@ Distortion RdCost::xGetTMErrorFull_SIMD(const DistParam& rcDtParam)
         {
           __m128i cur = _mm_loadl_epi64((__m128i*)piCur);
           __m128i ref = _mm_loadl_epi64((__m128i*)piRef);
-          __m128i abs = MR ? _mm_abs_epi16(_mm_sub_epi16(_mm_sub_epi16(cur, ref), delta)) : _mm_abs_epi16(_mm_sub_epi16(cur, ref));
+          __m128i abs = mr ? _mm_abs_epi16(_mm_sub_epi16(_mm_sub_epi16(cur, ref), delta)) : _mm_abs_epi16(_mm_sub_epi16(cur, ref));
           vsum16 = _mm_adds_epu16(abs, vsum16);
         }
 

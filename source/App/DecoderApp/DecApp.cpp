@@ -551,7 +551,7 @@ void DecApp::xCreateDecLib()
   m_cDecLib.initScalingList();
 #if GDR_LEAK_TEST
   m_cDecLib.m_gdrPocRandomAccess = this->m_gdrPocRandomAccess;
-#endif // GDR_LEAK_TEST
+#endif
 }
 
 void DecApp::xDestroyDecLib()

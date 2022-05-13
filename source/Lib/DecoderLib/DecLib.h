@@ -217,7 +217,7 @@ public:
 #if GDR_LEAK_TEST
 public:
   int                     m_gdrPocRandomAccess;
-#endif // GDR_LEAK_TEST
+#endif
 
 public:
   DecLib();

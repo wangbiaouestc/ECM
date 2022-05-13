@@ -3120,7 +3120,7 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
       }
     }
   }
-#endif // GDR_LEAK_TEST
+#endif
   
 #if JVET_Z0118_GDR
   m_pcPic->initCleanCurPicture();

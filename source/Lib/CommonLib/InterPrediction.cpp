@@ -3497,7 +3497,7 @@ void InterPrediction::xWeightedAverage(
 
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if !INTER_LIC
-template <bool TrueA_FalseL>
+template <bool trueAfalseL>
 void InterPrediction::xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
                                      , bool AML
@@ -3516,7 +3516,7 @@ void InterPrediction::xGetPredBlkTpl(const CodingUnit& cu, const ComponentID com
   const Pel* ref;
   Pel* dst;
   int refStride, dstStride, bw, bh;
-  if (TrueA_FalseL)
+  if (trueAfalseL)
   {
     ref = refBuf.bufAt(cu.blocks[compID].pos().offset(xInt + posW, yInt + posH - 1));
     dst = predBlkTpl + posW;
@@ -8653,7 +8653,7 @@ void InterPrediction::xGetLICParamGeneral(const CodingUnit& cu,
   offset = Clip3(minOffset, maxOffset, offset);
 }
 
-template <bool TrueA_FalseL>
+template <bool trueAfalseL>
 void InterPrediction::xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
                       , bool AML
@@ -8672,7 +8672,7 @@ void InterPrediction::xGetPredBlkTpl(const CodingUnit& cu, const ComponentID com
   const Pel* ref;
         Pel* dst;
         int refStride, dstStride, bw, bh;
-  if( TrueA_FalseL )
+  if( trueAfalseL )
   {
     ref       = refBuf.bufAt(cu.blocks[compID].pos().offset(xInt + posW, yInt + posH - 1));
     dst       = predBlkTpl + posW;
@@ -8951,10 +8951,10 @@ void TplMatchingCtrl::removeHighFreq(const Picture& otherRefPic, const Mv& other
   xRemoveHighFreq<tplSize, false>(otherRefPic, otherRefMv, curRefBcwWeight);
 }
 
-template <int tplSize, bool TrueA_FalseL>
+template <int tplSize, bool trueAfalseL>
 bool TplMatchingCtrl::xFillCurTemplate(Pel* tpl)
 {
-  const Position          posOffset = TrueA_FalseL ? Position(0, -tplSize) : Position(-tplSize, 0);
+  const Position          posOffset = trueAfalseL ? Position(0, -tplSize) : Position(-tplSize, 0);
   const CodingUnit* const cuNeigh   = m_cu.cs->getCU(m_pu.blocks[m_compID].pos().offset(posOffset), toChannelType(m_compID));
 
   if (cuNeigh == nullptr)
@@ -8973,12 +8973,12 @@ bool TplMatchingCtrl::xFillCurTemplate(Pel* tpl)
   {
     const int cuPelX       = m_pu.lx();
     const int cuPelY       = m_pu.ly();
-    const int roiWidth     = TrueA_FalseL ? m_pu.lwidth() : tplSize;
-    const int roiHeight    = TrueA_FalseL ? tplSize       : m_pu.lheight();
+    const int roiWidth     = trueAfalseL ? m_pu.lwidth() : tplSize;
+    const int roiHeight    = trueAfalseL ? tplSize       : m_pu.lheight();
     const int picWidth     = m_pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
     const int picHeight    = m_pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
     const uint32_t ctuSize = m_pu.cs->slice->getSPS()->getMaxCUWidth();
-    const Mv  tempBv       = TrueA_FalseL ? Mv(0, -tplSize) : Mv(-tplSize, 0);
+    const Mv  tempBv       = trueAfalseL ? Mv(0, -tplSize) : Mv(-tplSize, 0);
 
     if (!PU::searchBv(m_pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, tempBv.getHor(), tempBv.getVer(), ctuSize))
     {
@@ -8997,24 +8997,24 @@ bool TplMatchingCtrl::xFillCurTemplate(Pel* tpl)
     CHECK(m_pu.geoTmType == GEO_TM_OFF, "invalid geo template type value");
     if (m_pu.geoTmType == GEO_TM_SHAPE_A)
     {
-      if (TrueA_FalseL == 0)
+      if (trueAfalseL == 0)
       {
         return false;
       }
     }
     if (m_pu.geoTmType == GEO_TM_SHAPE_L)
     {
-      if (TrueA_FalseL == 1)
+      if (trueAfalseL == 1)
       {
         return false;
       }
     }
   }
 #endif
-  const Size dstSize = (TrueA_FalseL ? Size(m_pu.lwidth(), tplSize) : Size(tplSize, m_pu.lheight()));
+  const Size dstSize = (trueAfalseL ? Size(m_pu.lwidth(), tplSize) : Size(tplSize, m_pu.lheight()));
   for (int h = 0; h < (int)dstSize.height; h++)
   {
-    const Position recPos = TrueA_FalseL ? Position(0, -tplSize + h) : Position(-tplSize, h);
+    const Position recPos = trueAfalseL ? Position(0, -tplSize + h) : Position(-tplSize, h);
     const Pel*     rec    = recBuf.bufAt(m_pu.blocks[m_compID].pos().offset(recPos));
           Pel*     dst    = tpl + h * dstSize.width;
 
@@ -9028,7 +9028,7 @@ bool TplMatchingCtrl::xFillCurTemplate(Pel* tpl)
   return true;
 }
 
-template <int tplSize, bool TrueA_FalseL, int sr>
+template <int tplSize, bool trueAfalseL, int sr>
 PelBuf TplMatchingCtrl::xGetRefTemplate(const PredictionUnit& curPu, const Picture& refPic, const Mv& _mv, PelBuf& dstBuf)
 {
 #if JVET_Z0084_IBC_TM
@@ -9037,15 +9037,15 @@ PelBuf TplMatchingCtrl::xGetRefTemplate(const PredictionUnit& curPu, const Pictu
   {
     const int cuPelX       = m_pu.lx();
     const int cuPelY       = m_pu.ly();
-    const int roiWidth     = TrueA_FalseL ? m_pu.lwidth() : tplSize;
-    const int roiHeight    = TrueA_FalseL ? tplSize       : m_pu.lheight();
+    const int roiWidth     = trueAfalseL ? m_pu.lwidth() : tplSize;
+    const int roiHeight    = trueAfalseL ? tplSize       : m_pu.lheight();
     const int picWidth     = m_pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
     const int picHeight    = m_pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
     const uint32_t ctuSize = m_pu.cs->slice->getSPS()->getMaxCUWidth();
 
     Mv tempBv = _mv;
     tempBv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
-    tempBv += TrueA_FalseL ? Mv(0, -tplSize) : Mv(-tplSize, 0);
+    tempBv += trueAfalseL ? Mv(0, -tplSize) : Mv(-tplSize, 0);
 
     if (!PU::searchBv(m_pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, tempBv.getHor(), tempBv.getVer(), ctuSize))
     {
@@ -9055,7 +9055,7 @@ PelBuf TplMatchingCtrl::xGetRefTemplate(const PredictionUnit& curPu, const Pictu
 #endif
 
   // read from pre-interpolated buffer
-  PelBuf& refSrBuf = TrueA_FalseL ? m_refSrAbove : m_refSrLeft;
+  PelBuf& refSrBuf = trueAfalseL ? m_refSrAbove : m_refSrLeft;
 #if JVET_Z0084_IBC_TM
   if (!CU::isIBC(m_cu) && sr == 0 && refPic.getPOC() == m_refPic.getPOC() && refSrBuf.buf != nullptr)
 #else
@@ -9074,7 +9074,7 @@ PelBuf TplMatchingCtrl::xGetRefTemplate(const PredictionUnit& curPu, const Pictu
   }
 
   // Do interpolation on the fly
-  Position blkPos  = ( TrueA_FalseL ? Position(curPu.lx(), curPu.ly() - tplSize) : Position(curPu.lx() - tplSize, curPu.ly()) );
+  Position blkPos  = ( trueAfalseL ? Position(curPu.lx(), curPu.ly() - tplSize) : Position(curPu.lx() - tplSize, curPu.ly()) );
   Size     blkSize = Size(dstBuf.width, dstBuf.height);
   Mv       mv      = _mv - Mv(sr << MV_FRACTIONAL_BITS_INTERNAL, sr << MV_FRACTIONAL_BITS_INTERNAL);
 #if JVET_Z0084_IBC_TM
@@ -9125,15 +9125,15 @@ PelBuf TplMatchingCtrl::xGetRefTemplate(const PredictionUnit& curPu, const Pictu
   return dstBuf;
 }
 
-template <int tplSize, bool TrueA_FalseL>
+template <int tplSize, bool trueAfalseL>
 void TplMatchingCtrl::xRemoveHighFreq(const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight)
 {
-  PelBuf& curTplBuf = TrueA_FalseL ? m_curTplAbove : m_curTplLeft;
-  PelBuf  refTplBuf = TrueA_FalseL ? m_refTplAbove : m_refTplLeft;
+  PelBuf& curTplBuf = trueAfalseL ? m_curTplAbove : m_curTplLeft;
+  PelBuf  refTplBuf = trueAfalseL ? m_refTplAbove : m_refTplLeft;
 
   if (curTplBuf.buf != nullptr)
   {
-    refTplBuf = xGetRefTemplate<tplSize, TrueA_FalseL, 0>(m_pu, otherRefPic, otherRefMv, refTplBuf);
+    refTplBuf = xGetRefTemplate<tplSize, trueAfalseL, 0>(m_pu, otherRefPic, otherRefMv, refTplBuf);
     if (curRefBcwWeight != g_BcwWeights[BCW_DEFAULT])
     {
       curTplBuf.removeWeightHighFreq(refTplBuf, false, m_cu.slice->clpRng(m_compID), curRefBcwWeight);
@@ -9417,11 +9417,11 @@ Distortion TplMatchingCtrl::xGetTempMatchError(const Mv& mv)
   return sum;
 }
 
-template <int tplSize, bool TrueA_FalseL>
+template <int tplSize, bool trueAfalseL>
 Distortion TplMatchingCtrl::xGetTempMatchError(const Mv& mv)
 {
-  PelBuf& curTplBuf = TrueA_FalseL ? m_curTplAbove : m_curTplLeft;
-  PelBuf  refTplBuf = TrueA_FalseL ? m_refTplAbove : m_refTplLeft;
+  PelBuf& curTplBuf = trueAfalseL ? m_curTplAbove : m_curTplLeft;
+  PelBuf  refTplBuf = trueAfalseL ? m_refTplAbove : m_refTplLeft;
 
   if (curTplBuf.buf == nullptr)
   {
@@ -9432,7 +9432,7 @@ Distortion TplMatchingCtrl::xGetTempMatchError(const Mv& mv)
   const int bitDepth      = m_cu.slice->clpRng(m_compID).bd;
 
   // fetch reference template block
-  refTplBuf = xGetRefTemplate<tplSize, TrueA_FalseL, 0>(m_pu, m_refPic, mv, refTplBuf);
+  refTplBuf = xGetRefTemplate<tplSize, trueAfalseL, 0>(m_pu, m_refPic, mv, refTplBuf);
 #if JVET_Z0084_IBC_TM
   if (refTplBuf.buf == nullptr)
   {
@@ -9450,7 +9450,7 @@ Distortion TplMatchingCtrl::xGetTempMatchError(const Mv& mv)
     cDistParam.useMR = m_cu.LICFlag;
 #endif
     int tmWeightIdx  = (m_pu.lwidth() >= TM_MIN_CU_SIZE_FOR_ALT_WEIGHTED_COST && m_pu.lheight() >= TM_MIN_CU_SIZE_FOR_ALT_WEIGHTED_COST ? 1 : 0);
-    m_interRes.m_pcRdCost->setDistParam( cDistParam, curTplBuf, refTplBuf, bitDepth, TrueA_FalseL, tmWeightIdx, rowSubShift, m_compID );
+    m_interRes.m_pcRdCost->setDistParam( cDistParam, curTplBuf, refTplBuf, bitDepth, trueAfalseL, tmWeightIdx, rowSubShift, m_compID );
     CHECK(TM_TPL_SIZE != 4, "The distortion function of template matching is implemetned currently only for size=4.");
     partSum = cDistParam.distFunc( cDistParam );
   }

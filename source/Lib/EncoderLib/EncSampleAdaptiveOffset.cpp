@@ -3572,8 +3572,8 @@ int calcDiffRangeEnc(Pel a, Pel b, int th)
 int EncSampleAdaptiveOffset::calcEdgeStatIndex(const int ctuRsAddr, const int mode, const int type, const int th)
 {
   int index = 0;
-  index     = (ctuRsAddr * ((CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C) * CCSAO_EDGE_TYPE * CCSAO_QUAN_NUM))
-          + (mode * (CCSAO_EDGE_TYPE * CCSAO_QUAN_NUM)) + (type * CCSAO_QUAN_NUM) + th;
+  index     = ctuRsAddr * (CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C) * CCSAO_EDGE_TYPE * CCSAO_QUAN_NUM
+            + mode * CCSAO_EDGE_TYPE * CCSAO_QUAN_NUM + type * CCSAO_QUAN_NUM + th;
   return index;
 }
 
@@ -3635,8 +3635,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
               continue;
             }
             const Pel *colY = srcY + x;
-            const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-            const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+            const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+            const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
             const Pel *colU = srcU + (x >> chromaScaleX);
             const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -3649,20 +3649,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
 
               for (int modeY = 0; modeY < CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C; modeY++)
               {
-                int band_num = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
+                int bandNum = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
                 if (modeY <= 3)
                 {
-                  band = (*colY * band_num) >> bitDepth;
+                  band = (*colY * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else if (modeY > 3 && modeY <= 5)
                 {
-                  band = (*colU * band_num) >> bitDepth;
+                  band = (*colU * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else
                 {
-                  band = (*colV * (band_num - 2)) >> bitDepth;
+                  band = (*colV * (bandNum - 2)) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
 
@@ -3704,8 +3704,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
               continue;
             }
             const Pel *colY = srcY + x;
-            const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-            const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+            const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+            const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
             const Pel *colU = srcU + (x >> chromaScaleX);
             const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -3718,20 +3718,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
 
               for (int modeY = 0; modeY < CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C; modeY++)
               {
-                int band_num = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
+                int bandNum = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
                 if (modeY <= 3)
                 {
-                  band = (*colY * band_num) >> bitDepth;
+                  band = (*colY * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else if (modeY > 3 && modeY <= 5)
                 {
-                  band = (*colU * band_num) >> bitDepth;
+                  band = (*colU * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else
                 {
-                  band = (*colV * (band_num - 2)) >> bitDepth;
+                  band = (*colV * (bandNum - 2)) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
 
@@ -3766,8 +3766,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             continue;
           }
           const Pel *colY = srcY + x;
-          const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-          const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+          const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
           const Pel *colU = srcU + (x >> chromaScaleX);
           const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -3780,20 +3780,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
 
             for (int modeY = 0; modeY < CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C; modeY++)
             {
-              int band_num = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
+              int bandNum = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
               if (modeY <= 3)
               {
-                band = (*colY * band_num) >> bitDepth;
+                band = (*colY * bandNum) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
               else if (modeY > 3 && modeY <= 5)
               {
-                band = (*colU * band_num) >> bitDepth;
+                band = (*colU * bandNum) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
               else
               {
-                band = (*colV * (band_num - 2)) >> bitDepth;
+                band = (*colV * (bandNum - 2)) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
 
@@ -3822,8 +3822,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
               continue;
             }
             const Pel *colY = srcY + x;
-            const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-            const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+            const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+            const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
             const Pel *colU = srcU + (x >> chromaScaleX);
             const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -3836,20 +3836,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
 
               for (int modeY = 0; modeY < CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C; modeY++)
               {
-                int band_num = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
+                int bandNum = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
                 if (modeY <= 3)
                 {
-                  band = (*colY * band_num) >> bitDepth;
+                  band = (*colY * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else if (modeY > 3 && modeY <= 5)
                 {
-                  band = (*colU * band_num) >> bitDepth;
+                  band = (*colU * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else
                 {
-                  band = (*colV * (band_num - 2)) >> bitDepth;
+                  band = (*colV * (bandNum - 2)) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
 
@@ -3885,8 +3885,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             continue;
           }
           const Pel *colY = srcY + x;
-          const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-          const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+          const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
           const Pel *colU = srcU + (x >> chromaScaleX);
           const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -3899,20 +3899,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
 
             for (int modeY = 0; modeY < CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C; modeY++)
             {
-              int band_num = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
+              int bandNum = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
               if (modeY <= 3)
               {
-                band = (*colY * band_num) >> bitDepth;
+                band = (*colY * bandNum) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
               else if (modeY > 3 && modeY <= 5)
               {
-                band = (*colU * band_num) >> bitDepth;
+                band = (*colU * bandNum) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
               else
               {
-                band = (*colV * (band_num - 2)) >> bitDepth;
+                band = (*colV * (bandNum - 2)) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
 
@@ -3940,8 +3940,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
               continue;
             }
             const Pel *colY = srcY + x;
-            const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-            const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+            const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+            const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
             const Pel *colU = srcU + (x >> chromaScaleX);
             const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -3954,20 +3954,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
 
               for (int modeY = 0; modeY < CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C; modeY++)
               {
-                int band_num = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
+                int bandNum = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
                 if (modeY <= 3)
                 {
-                  band = (*colY * band_num) >> bitDepth;
+                  band = (*colY * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else if (modeY > 3 && modeY <= 5)
                 {
-                  band = (*colU * band_num) >> bitDepth;
+                  band = (*colU * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else
                 {
-                  band = (*colV * (band_num - 2)) >> bitDepth;
+                  band = (*colV * (bandNum - 2)) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
 
@@ -4025,10 +4025,10 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
             const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
 
-            const Pel *colC  = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+            const Pel *colC  = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
             const Pel *colCT = (compID == COMPONENT_Cb)
-                                 ? srcV + (x)
-                                 : srcU + (x); /* also use the remainig third component for bandIdx calc.*/
+                                 ? srcV + x
+                                 : srcU + x; /* also use the remainig third component for bandIdx calc.*/
 
             signa = 0;
             signb = 0;
@@ -4040,20 +4040,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
               signa = signa * 4 + signb;
               for (int modeY = 0; modeY < CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C; modeY++)
               {
-                int band_num = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
+                int bandNum = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
                 if (modeY <= 3)
                 {
-                  band = (*colY * band_num) >> bitDepth;
+                  band = (*colY * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else if (modeY > 3 && modeY <= 5)
                 {
-                  band = (*colC * band_num) >> bitDepth;
+                  band = (*colC * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else
                 {
-                  band = (*colCT * (band_num - 2)) >> bitDepth;
+                  band = (*colCT * (bandNum - 2)) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
 
@@ -4098,10 +4098,10 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
             const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
 
-            const Pel *colC  = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+            const Pel *colC  = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
             const Pel *colCT = (compID == COMPONENT_Cb)
-                                 ? srcV + (x)
-                                 : srcU + (x); /* also use the remainig third component for bandIdx calc.*/
+                                 ? srcV + x
+                                 : srcU + x; /* also use the remainig third component for bandIdx calc.*/
 
             signa = 0;
             signb = 0;
@@ -4112,20 +4112,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
               signa = signa * 4 + signb;
               for (int modeY = 0; modeY < CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C; modeY++)
               {
-                int band_num = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
+                int bandNum = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
                 if (modeY <= 3)
                 {
-                  band = (*colY * band_num) >> bitDepth;
+                  band = (*colY * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else if (modeY > 3 && modeY <= 5)
                 {
-                  band = (*colC * band_num) >> bitDepth;
+                  band = (*colC * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else
                 {
-                  band = (*colCT * (band_num - 2)) >> bitDepth;
+                  band = (*colCT * (bandNum - 2)) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
 
@@ -4163,10 +4163,10 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
           const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
           const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
 
-          const Pel *colC  = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+          const Pel *colC  = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
           const Pel *colCT = (compID == COMPONENT_Cb)
-                               ? srcV + (x)
-                               : srcU + (x); /* also use the remainig third component for bandIdx calc.*/
+                               ? srcV + x
+                               : srcU + x; /* also use the remainig third component for bandIdx calc.*/
 
           signa = 0;
           signb = 0;
@@ -4177,20 +4177,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             signa = signa * 4 + signb;
             for (int modeY = 0; modeY < CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C; modeY++)
             {
-              int band_num = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
+              int bandNum = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
               if (modeY <= 3)
               {
-                band = (*colY * band_num) >> bitDepth;
+                band = (*colY * bandNum) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
               else if (modeY > 3 && modeY <= 5)
               {
-                band = (*colC * band_num) >> bitDepth;
+                band = (*colC * bandNum) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
               else
               {
-                band = (*colCT * (band_num - 2)) >> bitDepth;
+                band = (*colCT * (bandNum - 2)) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
 
@@ -4222,10 +4222,10 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
             const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
 
-            const Pel *colC  = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+            const Pel *colC  = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
             const Pel *colCT = (compID == COMPONENT_Cb)
-                                 ? srcV + (x)
-                                 : srcU + (x); /* also use the remainig third component for bandIdx calc.*/
+                                 ? srcV + x
+                                 : srcU + x; /* also use the remainig third component for bandIdx calc.*/
 
             signa = 0;
             signb = 0;
@@ -4236,20 +4236,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
               signa = signa * 4 + signb;
               for (int modeY = 0; modeY < CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C; modeY++)
               {
-                int band_num = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
+                int bandNum = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
                 if (modeY <= 3)
                 {
-                  band = (*colY * band_num) >> bitDepth;
+                  band = (*colY * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else if (modeY > 3 && modeY <= 5)
                 {
-                  band = (*colC * band_num) >> bitDepth;
+                  band = (*colC * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else
                 {
-                  band = (*colCT * (band_num - 2)) >> bitDepth;
+                  band = (*colCT * (bandNum - 2)) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
 
@@ -4288,10 +4288,10 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
           const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
           const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
 
-          const Pel *colC  = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+          const Pel *colC  = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
           const Pel *colCT = (compID == COMPONENT_Cb)
-                               ? srcV + (x)
-                               : srcU + (x); /* also use the remainig third component for bandIdx calc.*/
+                               ? srcV + x
+                               : srcU + x; /* also use the remainig third component for bandIdx calc.*/
 
           signa = 0;
           signb = 0;
@@ -4302,20 +4302,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             signa = signa * 4 + signb;
             for (int modeY = 0; modeY < CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C; modeY++)
             {
-              int band_num = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
+              int bandNum = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
               if (modeY <= 3)
               {
-                band = (*colY * band_num) >> bitDepth;
+                band = (*colY * bandNum) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
               else if (modeY > 3 && modeY <= 5)
               {
-                band = (*colC * band_num) >> bitDepth;
+                band = (*colC * bandNum) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
               else
               {
-                band = (*colCT * (band_num - 2)) >> bitDepth;
+                band = (*colCT * (bandNum - 2)) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
 
@@ -4346,10 +4346,10 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
             const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
 
-            const Pel *colC  = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+            const Pel *colC  = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
             const Pel *colCT = (compID == COMPONENT_Cb)
-                                 ? srcV + (x)
-                                 : srcU + (x); /* also use the remainig third component for bandIdx calc.*/
+                                 ? srcV + x
+                                 : srcU + x; /* also use the remainig third component for bandIdx calc.*/
 
             signa = 0;
             signb = 0;
@@ -4360,20 +4360,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
               signa = signa * 4 + signb;
               for (int modeY = 0; modeY < CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C; modeY++)
               {
-                int band_num = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
+                int bandNum = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
                 if (modeY <= 3)
                 {
-                  band = (*colY * band_num) >> bitDepth;
+                  band = (*colY * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else if (modeY > 3 && modeY <= 5)
                 {
-                  band = (*colC * band_num) >> bitDepth;
+                  band = (*colC * bandNum) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
                 else
                 {
-                  band = (*colCT * (band_num - 2)) >> bitDepth;
+                  band = (*colCT * (bandNum - 2)) >> bitDepth;
                   band = band * CCSAO_EDGE_NUM + signa;
                 }
 
@@ -4421,8 +4421,8 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
           int candPosYYB = g_ccSaoEdgeTypeY[type][1];
 
           const Pel *colY = srcY + x;
-          const Pel *colA = srcY + (x) + srcStrideY * candPosYYA + candPosYXA;
-          const Pel *colB = srcY + (x) + srcStrideY * candPosYYB + candPosYXB;
+          const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
           const Pel *colU = srcU + (x >> chromaScaleX);
           const Pel *colV = srcV + (x >> chromaScaleX);
 
@@ -4435,20 +4435,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
 
             for (int modeY = 0; modeY < CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C; modeY++)
             {
-              int band_num = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
+              int bandNum = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
               if (modeY <= 3)
               {
-                band = (*colY * band_num) >> bitDepth;
+                band = (*colY * bandNum) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
               else if (modeY > 3 && modeY <= 5)
               {
-                band = (*colU * band_num) >> bitDepth;
+                band = (*colU * bandNum) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
               else
               {
-                band = (*colV * (band_num - 2)) >> bitDepth;
+                band = (*colV * (bandNum - 2)) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
 
@@ -4488,10 +4488,10 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
           const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
           const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
 
-          const Pel *colC  = (compID == COMPONENT_Cb) ? srcU + (x) : srcV + (x);
+          const Pel *colC  = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
           const Pel *colCT = (compID == COMPONENT_Cb)
-                               ? srcV + (x)
-                               : srcU + (x); /* also use the remainig third component for bandIdx calc.*/
+                               ? srcV + x
+                               : srcU + x; /* also use the remainig third component for bandIdx calc.*/
 
           signa = 0;
           signb = 0;
@@ -4502,20 +4502,20 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
             signa = signa * 4 + signb;
             for (int modeY = 0; modeY < CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C; modeY++)
             {
-              int band_num = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
+              int bandNum = (modeY <= 3) ? modeY + 1 : modeY - 4 + 1;
               if (modeY <= 3)
               {
-                band = (*colY * band_num) >> bitDepth;
+                band = (*colY * bandNum) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
               else if (modeY > 3 && modeY <= 5)
               {
-                band = (*colC * band_num) >> bitDepth;
+                band = (*colC * bandNum) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
               else
               {
-                band = (*colCT * (band_num - 2)) >> bitDepth;
+                band = (*colCT * (bandNum - 2)) >> bitDepth;
                 band = band * CCSAO_EDGE_NUM + signa;
               }
 

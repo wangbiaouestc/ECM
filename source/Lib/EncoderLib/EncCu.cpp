@@ -2244,7 +2244,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   }
 #endif
 #if ENABLE_DIMD
-  bool dimd_is_blend = false;
+  bool dimdBlending = false;
   int  dimdMode = 0;
   int  dimdBlendMode[2] = { 0 };
   int  dimdRelWeight[3] = { 0 };
@@ -2266,7 +2266,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
       IntraPrediction::deriveDimdMode(bestCS->picture->getRecoBuf(area), area, cu);
 
       dimdDerived = true;
-      dimd_is_blend = cu.dimd_is_blend;
+      dimdBlending = cu.dimdBlending;
       dimdMode = cu.dimdMode;
       dimdBlendMode[0] = cu.dimdBlendMode[0];
       dimdBlendMode[1] = cu.dimdBlendMode[1];
@@ -2342,7 +2342,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
           cu.dimd = false;
           if( dimdDerived )
           {
-            cu.dimd_is_blend = dimd_is_blend;
+            cu.dimdBlending = dimdBlending;
             cu.dimdMode = dimdMode;
             cu.dimdBlendMode[0] = dimdBlendMode[0];
             cu.dimdBlendMode[1] = dimdBlendMode[1];
@@ -10662,8 +10662,8 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
             CompArea &compArea = currTU.block(COMPONENT_Y);
             PelBuf    recBuf = picDbBuf.getBuf(compArea);
             PelBuf recIPredBuf = recBuf;
-            std::vector<Pel>        my_invLUT;
-            m_bilateralFilter->bilateralFilterRDOdiamond5x5(recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(COMPONENT_Y), currTU, true, false, my_invLUT);
+            std::vector<Pel> invLUT;
+            m_bilateralFilter->bilateralFilterRDOdiamond5x5(recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(COMPONENT_Y), currTU, true, false, invLUT);
           }
         }
       }
@@ -11335,8 +11335,8 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
                }
                else
                {
-                 std::vector<Pel> dummy_invLUT;
-                 m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, false, dummy_invLUT);
+                 std::vector<Pel> invLUT;
+                 m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, false, invLUT);
                }
             }
           }

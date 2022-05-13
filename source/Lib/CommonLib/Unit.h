@@ -320,7 +320,7 @@ struct CodingUnit : public UnitArea
   uint32_t           tileIdx;
 #if ENABLE_DIMD
   bool           dimd;
-  bool           dimd_is_blend;
+  bool           dimdBlending;
   int8_t         dimdMode;
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   int8_t         dimdChromaMode;

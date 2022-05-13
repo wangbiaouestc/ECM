@@ -369,5 +369,11 @@ extern const int8_t g_ccSaoEdgeTypeX[CCSAO_EDGE_TYPE][2];
 extern const int8_t g_ccSaoEdgeTypeY[CCSAO_EDGE_TYPE][2];
 extern const short  g_ccSaoQuanValue[CCSAO_QUAN_NUM];
 #endif
+#if JVET_V0130_INTRA_TMP
+extern unsigned int g_uiDepth2Width[5];
+#endif
+#if JVET_X0149_TIMD_DIMD_LUT
+extern int g_gradDivTable[16];
+#endif
 #endif  //__TCOMROM__
 
