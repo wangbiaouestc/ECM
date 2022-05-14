@@ -454,11 +454,9 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
     bool enableHmvp = ((xBr >> log2ParallelMergeLevel) > (pu.cu->Y().x >> log2ParallelMergeLevel)) && ((yBr >> log2ParallelMergeLevel) > (pu.cu->Y().y >> log2ParallelMergeLevel));
     bool enableInsertion = CU::isIBC(cu) || enableHmvp;
     if (enableInsertion)
-#if JVET_Z0075_IBC_HMVP_ENLARGE
     {
+#if JVET_Z0075_IBC_HMVP_ENLARGE
 #if JVET_Z0118_GDR      
-      bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
-
       if (isClean)
       {
         if (CU::isIBC(cu))
@@ -489,20 +487,18 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
         cu.cs->addMiToLut(cu.cs->motionLut.lut, mi);
       }
 #endif
-    }
 #else
 #if JVET_Z0118_GDR      
-      bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
-
       if (isClean)
       {
         cu.cs->addMiToLut(CU::isIBC(cu) ? cu.cs->motionLut.lutIbc1 : cu.cs->motionLut.lut1, mi);
       }
       cu.cs->addMiToLut(CU::isIBC(cu) ? cu.cs->motionLut.lutIbc0 : cu.cs->motionLut.lut0, mi);      
 #else
-    cu.cs->addMiToLut(CU::isIBC(cu) ? cu.cs->motionLut.lutIbc : cu.cs->motionLut.lut, mi);
+      cu.cs->addMiToLut(CU::isIBC(cu) ? cu.cs->motionLut.lutIbc : cu.cs->motionLut.lut, mi);
 #endif
 #endif
+    }
   }
 }
 

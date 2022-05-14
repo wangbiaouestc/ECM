@@ -118,11 +118,21 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
     m_pcInterPred->resetVPDUforIBC(cs.pcv->chrFormat, ctuSize, ctuSize, ctuArea.Y().x, ctuArea.Y().y);
   }
 #endif
+
 #if JVET_Z0118_GDR
   // reset current IBC Buffer only when VB pass through
   if (cs.isInGdrInvervalOrRecoveryPoc())
   {
+#if JVET_Z0153_IBC_EXT_REF    
+    m_pcInterPred->resetCurIBCBuffer(
+      cs.pcv->chrFormat,
+      ctuArea.Y(),
+      cs.slice->getSPS()->getMaxCUHeight(),        
+      1 << (cs.sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1)
+    );
+#else
     int gdrEndX = cs.picHeader->getGdrEndX();
+
     if (ctuArea.lx() <= gdrEndX && gdrEndX < ctuArea.lx() + ctuArea.lwidth())
     {
       m_pcInterPred->resetCurIBCBuffer(
@@ -132,6 +142,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         1 << (cs.sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1)
       );
     }
+#endif
   }
 #endif
 
@@ -921,15 +932,15 @@ void DecCu::xReconIntraQT( CodingUnit &cu )
   }
   else
   {
-  const uint32_t numChType = ::getNumberValidChannels( cu.chromaFormat );
+    const uint32_t numChType = ::getNumberValidChannels(cu.chromaFormat);
 
-  for( uint32_t chType = CHANNEL_TYPE_LUMA; chType < numChType; chType++ )
-  {
-    if( cu.blocks[chType].valid() )
+    for (uint32_t chType = CHANNEL_TYPE_LUMA; chType < numChType; chType++)
     {
-      xIntraRecQT( cu, ChannelType( chType ) );
+      if (cu.blocks[chType].valid())
+      {
+        xIntraRecQT(cu, ChannelType(chType));
+      }
     }
-  }
   }
 #if JVET_W0123_TIMD_FUSION
   if (cu.blocks[CHANNEL_TYPE_LUMA].valid())
@@ -2425,10 +2436,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if JVET_Z0118_GDR
       if (cu.cs->slice->getSPS()->getGDREnabledFlag())
       {
-        if( cu.cs->isClean( cu ) )
+        if (cu.cs->isClean(cu)) 
         {
-          CHECK( !m_pcInterPred->isLumaBvValid( lcuWidth, cuPelX, cuPelY, roiWidth, roiHeight, xPred, yPred ), "invalid block vector for IBC detected." );
-        }
+          CHECK(!m_pcInterPred->isLumaBvValid(lcuWidth, cuPelX, cuPelY, roiWidth, roiHeight, xPred, yPred), "invalid block vector for IBC detected.");
+	}
       }
       else 
       {
