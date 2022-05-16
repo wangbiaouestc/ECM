@@ -2389,15 +2389,16 @@ void CodingStructure::initStructData( const int &QP, const bool &skipMotBuf )
     currQP[0] = currQP[1] = QP;
   }
 
+#if JVET_Z0118_GDR
+  getMotionBuf(PIC_RECONSTRUCTION_0).memset(0);
+  getMotionBuf(PIC_RECONSTRUCTION_1).memset(0);
+#else
   if (!skipMotBuf && (!parent || ((!slice->isIntra() || slice->getSPS()->getIBCFlag()) && !m_isTuEnc)))
   {
-#if JVET_Z0118_GDR
-    getMotionBuf(PIC_RECONSTRUCTION_0).memset(0);
-    getMotionBuf(PIC_RECONSTRUCTION_1).memset(0);
-#else
     getMotionBuf().memset(0);
-#endif
   }
+#endif
+
 #if JVET_W0123_TIMD_FUSION
 #if JVET_Z0118_GDR
   getIpmBuf(PIC_RECONSTRUCTION_0).memset(0);
