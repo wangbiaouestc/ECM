@@ -458,7 +458,11 @@ const TFilterCoeff InterpolationFilter::m_chromaFilter[CHROMA_INTERPOLATION_FILT
 #endif
 
 #if INTRA_6TAP
+#if JVET_Z0117_CHROMA_IF
+const TFilterCoeff InterpolationFilter::m_weak4TapFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][4] =
+#else
 const TFilterCoeff InterpolationFilter::m_weak4TapFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
+#endif
 {
   {  0, 64,  0,  0},
   { -1, 64,  1,  0},
@@ -603,7 +607,11 @@ const TFilterCoeff InterpolationFilter::m_lumaIntraFilterExt[CHROMA_INTERPOLATIO
 #endif
 
 #if JVET_W0123_TIMD_FUSION
+#if JVET_Z0117_CHROMA_IF
+const TFilterCoeff InterpolationFilter::g_aiExtIntraCubicFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS << 1][4] = {
+#else
 const TFilterCoeff InterpolationFilter::g_aiExtIntraCubicFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS<<1][NTAPS_CHROMA] = {
+#endif
   {   0, 256,   0,   0 },
   {  -1, 254,   4,  -1 },
   {  -3, 252,   8,  -1 },
@@ -669,7 +677,11 @@ const TFilterCoeff InterpolationFilter::g_aiExtIntraCubicFilter[CHROMA_INTERPOLA
   {  -1,   8, 252,  -3},
   {  -1,   4, 254,  -1},
 };
+#if JVET_Z0117_CHROMA_IF
+const TFilterCoeff InterpolationFilter::g_aiExtIntraGaussFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS << 1][4] = {
+#else
 const TFilterCoeff InterpolationFilter::g_aiExtIntraGaussFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS<<1][NTAPS_CHROMA] = {
+#endif
   {  47, 161,  47,   1 },
   {  45, 161,  49,   1 },
   {  43, 161,  51,   1 },
@@ -738,7 +750,11 @@ const TFilterCoeff InterpolationFilter::g_aiExtIntraGaussFilter[CHROMA_INTERPOLA
 #endif
 
 //1.5x
+#if JVET_Z0117_CHROMA_IF
+const TFilterCoeff InterpolationFilter::m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR] =
+#else
 const TFilterCoeff InterpolationFilter::m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
+#endif
 {
 #if IF_12TAP
   { 12 * 4, 40 * 4, 12 * 4,      0 },
@@ -810,7 +826,11 @@ const TFilterCoeff InterpolationFilter::m_chromaFilterRPR1[CHROMA_INTERPOLATION_
 };
 
 //2x
+#if JVET_Z0117_CHROMA_IF
+const TFilterCoeff InterpolationFilter::m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR] =
+#else
 const TFilterCoeff InterpolationFilter::m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
+#endif
 {
 #if IF_12TAP
   { 17 * 4, 30 * 4, 17 * 4,      0 },
@@ -1717,11 +1737,19 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
     CHECK( frac < 0 || csx >= 2 || ( frac << ( 1 - csx ) ) >= CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction" );
     if( nFilterIdx == 3 )
     {
+#if JVET_Z0117_CHROMA_IF
+      filterHor<NTAPS_CHROMA_RPR>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_chromaFilterRPR1[frac << (1 - csx)], biMCForDMVR);
+#else
       filterHor<NTAPS_CHROMA>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_chromaFilterRPR1[frac << ( 1 - csx )], biMCForDMVR );
+#endif
     }
     else if( nFilterIdx == 4 )
     {
+#if JVET_Z0117_CHROMA_IF
+      filterHor<NTAPS_CHROMA_RPR>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_chromaFilterRPR2[frac << (1 - csx)], biMCForDMVR);
+#else
       filterHor<NTAPS_CHROMA>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_chromaFilterRPR2[frac << ( 1 - csx )], biMCForDMVR );
+#endif
     }
     else
     {
@@ -1851,11 +1879,19 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
     CHECK( frac < 0 || csy >= 2 || ( frac << ( 1 - csy ) ) >= CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction" );
     if( nFilterIdx == 3 )
     {
+#if JVET_Z0117_CHROMA_IF
+      filterVer<NTAPS_CHROMA_RPR>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_chromaFilterRPR1[frac << (1 - csy)], biMCForDMVR);
+#else
       filterVer<NTAPS_CHROMA>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_chromaFilterRPR1[frac << ( 1 - csy )], biMCForDMVR );
+#endif
     }
     else if( nFilterIdx == 4 )
     {
+#if JVET_Z0117_CHROMA_IF
+      filterVer<NTAPS_CHROMA_RPR>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_chromaFilterRPR2[frac << (1 - csy)], biMCForDMVR);
+#else
       filterVer<NTAPS_CHROMA>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_chromaFilterRPR2[frac << ( 1 - csy )], biMCForDMVR );
+#endif
     }
     else
     {
