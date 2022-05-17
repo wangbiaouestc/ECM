@@ -7649,6 +7649,21 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
       Mv mvTop(0, -(TM_OBMC_TEMPLATE_SIZE << verShift));
       mvTop += subPelMv;
       clipMv(mvTop, subblockPu.lumaPos(), subblockPu.lumaSize(), *subblockPu.cs->sps, *subblockPu.cs->pps);
+
+#if RPR_ENABLE
+      const Picture *            picRef = subblockPu.cu->slice->getRefPic(REF_PIC_LIST_0, tryMi.refIdx[0])->unscaledPic;
+      const std::pair<int, int> &scalingRatio = subblockPu.cu->slice->getScalingRatio(REF_PIC_LIST_0, tryMi.refIdx[0]);
+      xPredInterBlk(COMPONENT_Y, subblockPu, picRef, mvTop,
+                    pcBufPredRef, false, subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0,
+                    false, NULL, 0
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                    , false
+#if INTER_LIC
+                    , false, Mv(0, 0)
+#endif
+#endif
+                    , true);
+#else
       xPredInterBlk(COMPONENT_Y, subblockPu, subblockPu.cu->slice->getRefPic(REF_PIC_LIST_0, tryMi.refIdx[0]), mvTop,
                     pcBufPredRef, false, subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false,
                     NULL, 0 
@@ -7657,8 +7672,9 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
 #if INTER_LIC        
         , false, Mv(0, 0)
 #endif
-#endif       
-        , true);
+#endif
+                    , true);
+#endif
     }
 
     if ((!isAbove) && (m_bAMLTemplateAvailabe[1]))
@@ -7666,6 +7682,21 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
       Mv mvLeft(-(TM_OBMC_TEMPLATE_SIZE << horShift), 0);
       mvLeft += subPelMv;
       clipMv(mvLeft, subblockPu.lumaPos(), subblockPu.lumaSize(), *subblockPu.cs->sps, *subblockPu.cs->pps);
+#if RPR_ENABLE
+      const Picture *            picRef = subblockPu.cu->slice->getRefPic(REF_PIC_LIST_0, tryMi.refIdx[0])->unscaledPic;
+      const std::pair<int, int> &scalingRatio = subblockPu.cu->slice->getScalingRatio(REF_PIC_LIST_0, tryMi.refIdx[0]);
+      xPredInterBlk(COMPONENT_Y, subblockPu, picRef, mvLeft,
+                    pcBufPredRef, false, subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0,
+                    false,
+                    NULL, 0
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                    , false
+#if INTER_LIC
+                    , false, Mv(0, 0)
+#endif
+#endif
+                    , true);
+#else
       xPredInterBlk(COMPONENT_Y, subblockPu, subblockPu.cu->slice->getRefPic(REF_PIC_LIST_0, tryMi.refIdx[0]), mvLeft,
                     pcBufPredRef, false, subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false,
                     NULL, 0
@@ -7674,8 +7705,9 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
 #if INTER_LIC        
         , false, Mv(0, 0)
 #endif
-#endif        
-        , true);
+#endif
+                    , true);
+#endif
     }
   }
   else
@@ -7706,6 +7738,21 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
                      PelBuf(m_acYuvRefAboveTemplate[refList][0], pcBufPredRef.Y()));
         if (tryMi.refIdx[0] >= 0 && tryMi.refIdx[1] >= 0)
         {
+#if RPR_ENABLE
+          const Picture *picRef = subblockPu.cu->slice->getRefPic(eRefPicList, tryMi.refIdx[refList])->unscaledPic;
+          const std::pair<int, int> &scalingRatio =
+            subblockPu.cu->slice->getScalingRatio(eRefPicList, tryMi.refIdx[refList]);
+          xPredInterBlk(COMPONENT_Y, subblockPu, picRef, mvTop, pcMbBuf, true,
+                        subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0,
+                        false, NULL, 0
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                        , false
+#if INTER_LIC
+                        , false, Mv(0, 0)
+#endif
+#endif
+                        , true);
+#else
           xPredInterBlk(COMPONENT_Y, subblockPu, subblockPu.cu->slice->getRefPic(eRefPicList, tryMi.refIdx[refList]),
                         mvTop, pcMbBuf, true, subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0,
                         false, NULL, 0
@@ -7714,9 +7761,9 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
 #if INTER_LIC             
             , false, Mv(0, 0)
 #endif
-#endif            
-            , true);
-
+#endif
+                        , true);
+#endif
           if (refList == 1)
           {
             CPelUnitBuf srcPred0 =
@@ -7732,6 +7779,21 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
         }
         else
         {
+#if RPR_ENABLE
+          const Picture *picRef = subblockPu.cu->slice->getRefPic(eRefPicList, tryMi.refIdx[refList])->unscaledPic;
+          const std::pair<int, int> &scalingRatio =
+            subblockPu.cu->slice->getScalingRatio(eRefPicList, tryMi.refIdx[refList]);
+          xPredInterBlk(COMPONENT_Y, subblockPu, picRef, mvTop, pcBufPredRef, false,
+                        subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio,
+                        0, 0, false, NULL, 0
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                        , false
+#if INTER_LIC
+                        , false, Mv(0, 0)
+#endif
+#endif
+                        , true);
+#else
           xPredInterBlk(COMPONENT_Y, subblockPu, subblockPu.cu->slice->getRefPic(eRefPicList, tryMi.refIdx[refList]),
                         mvTop, pcBufPredRef, false, subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X,
                         0, 0, false, NULL, 0
@@ -7740,8 +7802,9 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
 #if INTER_LIC             
             , false, Mv(0, 0)
 #endif
-#endif            
-            , true);
+#endif
+                        , true);
+#endif
         }
       }
       if ((!isAbove) && (m_bAMLTemplateAvailabe[1]))
@@ -7756,6 +7819,21 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
                      PelBuf(m_acYuvRefLeftTemplate[refList][0], pcBufPredRef.Y()));
         if (tryMi.refIdx[0] >= 0 && tryMi.refIdx[1] >= 0)
         {
+#if RPR_ENABLE
+          const Picture *picRef = subblockPu.cu->slice->getRefPic(eRefPicList, tryMi.refIdx[refList])->unscaledPic;
+          const std::pair<int, int> &scalingRatio =
+            subblockPu.cu->slice->getScalingRatio(eRefPicList, tryMi.refIdx[refList]);
+          xPredInterBlk(COMPONENT_Y, subblockPu, picRef, mvLeft, pcMbBuf, true,
+                        subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0,
+                        false, NULL, 0
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                        , false
+#if INTER_LIC
+                        , false, Mv(0, 0)
+#endif
+#endif
+                        , true);
+#else
           xPredInterBlk(COMPONENT_Y, subblockPu, subblockPu.cu->slice->getRefPic(eRefPicList, tryMi.refIdx[refList]),
                         mvLeft, pcMbBuf, true, subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0,
                         false, NULL, 0
@@ -7764,9 +7842,9 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
 #if INTER_LIC             
             , false, Mv(0, 0)
 #endif
-#endif            
-            , true);
-
+#endif
+                        , true);
+#endif
           if (refList == 1)
           {
             CPelUnitBuf srcPred0 =
@@ -7782,6 +7860,21 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
         }
         else
         {
+#if RPR_ENABLE
+          const Picture *picRef = subblockPu.cu->slice->getRefPic(eRefPicList, tryMi.refIdx[refList])->unscaledPic;
+          const std::pair<int, int> &scalingRatio =
+            subblockPu.cu->slice->getScalingRatio(eRefPicList, tryMi.refIdx[refList]);
+          xPredInterBlk(COMPONENT_Y, subblockPu, picRef, mvLeft, pcBufPredRef, false,
+                        subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio,
+                        0, 0, false, NULL, 0
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                        , false
+#if INTER_LIC
+                        , false, Mv(0, 0)
+#endif
+#endif
+                        , true);
+#else
           xPredInterBlk(COMPONENT_Y, subblockPu, subblockPu.cu->slice->getRefPic(eRefPicList, tryMi.refIdx[refList]),
                         mvLeft, pcBufPredRef, false, subblockPu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X,
                         0, 0, false, NULL, 0
@@ -7790,8 +7883,9 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
 #if INTER_LIC             
             , false, Mv(0, 0)
 #endif
-#endif            
-            , true);
+#endif
+                        , true);
+#endif
         }
       }
     }
