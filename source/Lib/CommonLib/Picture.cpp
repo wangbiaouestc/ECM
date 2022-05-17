@@ -256,13 +256,6 @@ void Picture::destroy()
     m_hashMap.clearAll();
     if (cs)
     {
-#if JVET_Z0118_GDR
-    if (cs->picHeader)
-    {
-      delete cs->picHeader;
-    }
-    cs->picHeader = nullptr;
-#endif
       cs->destroy();
       delete cs;
       cs = nullptr;
@@ -425,15 +418,31 @@ void Picture::finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHead
   cs->picture = this;
   cs->slice   = nullptr;  // the slices for this picture have not been set at this point. update cs->slice after swapSliceObject()
   cs->pps     = &pps;
-#if JVET_Z0118_GDR
-  setCleanDirty(false);
-#endif
+
   picHeader->setSPSId( sps.getSPSId() );
   picHeader->setPPSId( pps.getPPSId() );
+
 #if JVET_Z0118_GDR
+  setCleanDirty(false);
+
   picHeader->setPic(this);
-#endif
+
+  PicHeader *ph = new PicHeader;
+  ph->initPicHeader();
+  *ph = *picHeader;
+  ph->setPic(this);
+  
+  if (cs->picHeader)
+  {
+    delete cs->picHeader;
+    cs->picHeader = nullptr;
+  }
+
+  cs->picHeader = ph;
+#else
   cs->picHeader = picHeader;
+#endif
+
   memcpy(cs->alfApss, alfApss, sizeof(cs->alfApss));
   cs->lmcsAps = lmcsAps;
   cs->scalinglistAps = scalingListAps;

@@ -1735,18 +1735,11 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
     m_pcPic = xGetNewPicBuffer( *sps, *pps, m_apcSlicePilot->getTLayer(), layerId );
 
     m_apcSlicePilot->applyReferencePictureListBasedMarking( m_cListPic, m_apcSlicePilot->getRPL0(), m_apcSlicePilot->getRPL1(), layerId, *pps);
-#if JVET_Z0118_GDR
-    PicHeader *picHeader = new PicHeader;
-#if JVET_Z0118_GDR
-    picHeader->initPicHeader();
-#endif
 
-    *picHeader = m_picHeader;
-    m_apcSlicePilot->setPicHeader(picHeader);
-
-    m_pcPic->finalInit(vps, *sps, *pps, picHeader, apss, lmcsAPS, scalinglistAPS);
-#else
+    
     m_pcPic->finalInit( vps, *sps, *pps, &m_picHeader, apss, lmcsAPS, scalinglistAPS );
+#if JVET_Z0118_GDR
+    m_apcSlicePilot->setPicHeader(m_pcPic->cs->picHeader);
 #endif
 
     m_pcPic->createTempBuffers( m_pcPic->cs->pps->pcv->maxCUWidth );
@@ -1760,7 +1753,7 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
     // we now have a real slice:
     Slice *pSlice = m_pcPic->slices[m_uiSliceSegmentIdx];
 #if JVET_Z0118_GDR
-    pSlice->setPicHeader(picHeader);
+    pSlice->setPicHeader(m_pcPic->cs->picHeader);
 #endif
 
     // Update the PPS and SPS pointers with the ones of the picture.
