@@ -10558,7 +10558,6 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
 
   if ( calDist )
   {
-    const UnitArea currCsArea = clipArea( CS::getArea( cs, cs.area, partitioner.chType ), *cs.picture );
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     ComponentID compStr = (CS::isDualITree(cs) && !isLuma(partitioner.chType)) ? COMPONENT_Cb : COMPONENT_Y;
     ComponentID compEnd = (CS::isDualITree(cs) && isLuma(partitioner.chType)) ? COMPONENT_Y : COMPONENT_Cr;
@@ -10572,7 +10571,7 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
       const ComponentID compID = ComponentID( comp );
       CPelBuf org = cs.getOrgBuf( compID );
       CPelBuf reco = cs.getRecoBuf( compID );
-      finalDistortion += getDistortionDb( cs, org, reco, compID, currCsArea.block( compID ), false );
+      finalDistortion += getDistortionDb( cs, org, reco, compID, cs.area.block( COMPONENT_Y ), false );
     }
     //updated distortion
     cs.dist = finalDistortion;
@@ -10587,7 +10586,7 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
     ComponentID compStr = ( cu->isSepTree() && !isLuma( partitioner.chType ) ) ? COMPONENT_Cb : COMPONENT_Y;
     ComponentID compEnd = ( cu->isSepTree() &&  isLuma( partitioner.chType ) ) ? COMPONENT_Y : COMPONENT_Cr;
 #endif
-    const UnitArea currCsArea = clipArea( CS::getArea( cs, cs.area, partitioner.chType ), *cs.picture );
+    const UnitArea currCsArea = clipArea( cs.area, *cs.picture );
 
     PelStorage&          picDbBuf = m_pcLoopFilter->getDbEncPicYuvBuffer();
 
@@ -10733,7 +10732,7 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
       ComponentID compId = (ComponentID)compIdx;
       CPelBuf reco = picDbBuf.getBuf( currCsArea.block( compId ) );
       CPelBuf org = cs.getOrgBuf( compId );
-      distCur += getDistortionDb( cs, org, reco, compId, currCsArea.block( compId ), true );
+      distCur += getDistortionDb( cs, org, reco, compId, currCsArea.block( COMPONENT_Y ), true );
     }
 
     //calculate difference between DB_before_SSE and DB_after_SSE for neighbouring CUs
@@ -10747,8 +10746,8 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
         CPelBuf org = cs.picture->getOrigBuf( compArea );
         CPelBuf reco = cs.picture->getRecoBuf( compArea );
         CPelBuf recoDb = picDbBuf.getBuf( compArea );
-        distBeforeDb += getDistortionDb( cs, org, reco,   compId, compArea, false );
-        distAfterDb  += getDistortionDb( cs, org, recoDb, compId, compArea, true  );
+        distBeforeDb += getDistortionDb( cs, org, reco, compId, areaLeft.block( COMPONENT_Y ), false );
+        distAfterDb += getDistortionDb( cs, org, recoDb, compId, areaLeft.block( COMPONENT_Y ), true );
       }
       if ( topEdgeAvai )
       {
@@ -10756,8 +10755,8 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
         CPelBuf org = cs.picture->getOrigBuf( compArea );
         CPelBuf reco = cs.picture->getRecoBuf( compArea );
         CPelBuf recoDb = picDbBuf.getBuf( compArea );
-        distBeforeDb += getDistortionDb( cs, org, reco,   compId, compArea, false );
-        distAfterDb  += getDistortionDb( cs, org, recoDb, compId, compArea, true  );
+        distBeforeDb += getDistortionDb( cs, org, reco, compId, areaTop.block( COMPONENT_Y ), false );
+        distAfterDb += getDistortionDb( cs, org, recoDb, compId, areaTop.block( COMPONENT_Y ), true );
       }
     }
 
@@ -10776,7 +10775,7 @@ Distortion EncCu::getDistortionDb( CodingStructure &cs, CPelBuf org, CPelBuf rec
   Distortion dist = 0;
 #if WCG_EXT
   m_pcRdCost->setChromaFormat(cs.sps->getChromaFormatIdc());
-  CPelBuf orgLuma = cs.picture->getOrigBuf( cs.area.blocks[COMPONENT_Y] );
+  CPelBuf orgLuma = cs.picture->getOrigBuf( compArea );
   if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (
     m_pcEncCfg->getLmcs() && (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())))
   {
