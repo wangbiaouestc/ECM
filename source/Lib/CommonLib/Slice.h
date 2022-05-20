@@ -3090,12 +3090,14 @@ private:
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   std::vector<RefListAndRefIdx> m_refPicCombinedList;
   int8_t                     m_iRefIdxOfLC[2][MAX_NUM_REF];
+  int8_t                     m_numNonScaledRefPic;
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   std::vector<RefListAndRefIdx> m_refPicCombinedListAmvpMerge;
   int8_t                     m_iRefIdxOfLCAmvpMerge[2][MAX_NUM_REF];
 #endif
   std::vector<RefPicPair>    m_refPicPairList;
   int8_t                     m_iRefPicPairIdx[MAX_NUM_REF][MAX_NUM_REF];
+  int8_t                     m_numNonScaledRefPicPair;
 #endif
   bool                       m_pendingRasInit;
 
@@ -3370,11 +3372,13 @@ public:
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   void                        generateCombinedList();
   int8_t                      getRefIdxOfLC(RefPicList e, int i) { return m_iRefIdxOfLC[e][i]; }
+  int8_t                      getNumNonScaledRefPic() { return m_numNonScaledRefPic; }
   const std::vector<RefListAndRefIdx> &getRefPicCombinedList() const { return m_refPicCombinedList; }
   int8_t                      getRefIdxOfLCAmvpMerge(RefPicList e, int i) { return m_iRefIdxOfLCAmvpMerge[e][i]; }
   const std::vector<RefListAndRefIdx> &getRefPicCombinedListAmvpMerge() const { return m_refPicCombinedListAmvpMerge; }
   void                        generateRefPicPairList();
   int8_t                      getRefPicPairIdx(int i, int j) { return m_iRefPicPairIdx[i][j]; }
+  int8_t                      getNumNonScaledRefPicPair() { return m_numNonScaledRefPicPair; }
   const std::vector<RefPicPair> &getRefPicPairList() const { return m_refPicPairList; }
 #endif
 #if MULTI_HYP_PRED

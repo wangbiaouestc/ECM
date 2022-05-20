@@ -672,6 +672,7 @@ void Slice::generateCombinedList()
     m_iRefIdxOfLC[REF_PIC_LIST_1][iNumCount] = -1;
   }
 
+  m_numNonScaledRefPic = 0;
   for (int8_t iNumRefIdx = 0; iNumRefIdx < std::max(m_aiNumRefIdx[REF_PIC_LIST_0], m_aiNumRefIdx[REF_PIC_LIST_1]); iNumRefIdx++)
   {
     if (iNumRefIdx < m_aiNumRefIdx[REF_PIC_LIST_0])
@@ -680,6 +681,15 @@ void Slice::generateCombinedList()
       refListAndRefIdx.refList = REF_PIC_LIST_0;
       refListAndRefIdx.refIdx = iNumRefIdx;
       m_iRefIdxOfLC[REF_PIC_LIST_0][iNumRefIdx] = (int8_t)m_refPicCombinedList.size();
+      if (!m_pcSPS->getRprEnabledFlag() || !getRefPic(refListAndRefIdx.refList, refListAndRefIdx.refIdx)->isRefScaled(m_pcPPS))
+      {
+        refListAndRefIdx.cost = 0;
+        m_numNonScaledRefPic++;
+      }
+      else
+      {
+        refListAndRefIdx.cost = std::numeric_limits<Distortion>::max();
+      }
       m_refPicCombinedList.push_back(refListAndRefIdx);
 #if JVET_X0083_BM_AMVP_MERGE_MODE
       if (getAmvpMergeModeValidRefIdx(REF_PIC_LIST_0, iNumRefIdx))
@@ -696,6 +706,15 @@ void Slice::generateCombinedList()
       refListAndRefIdx.refList = REF_PIC_LIST_1;
       refListAndRefIdx.refIdx = iNumRefIdx;
       m_iRefIdxOfLC[REF_PIC_LIST_1][iNumRefIdx] = (int8_t)m_refPicCombinedList.size();
+      if (!m_pcSPS->getRprEnabledFlag() || !getRefPic(refListAndRefIdx.refList, refListAndRefIdx.refIdx)->isRefScaled(m_pcPPS))
+      {
+        refListAndRefIdx.cost = 0;
+        m_numNonScaledRefPic++;
+      }
+      else
+      {
+        refListAndRefIdx.cost = std::numeric_limits<Distortion>::max();
+      }
       m_refPicCombinedList.push_back(refListAndRefIdx);
 #if JVET_X0083_BM_AMVP_MERGE_MODE
       if (getAmvpMergeModeValidRefIdx(REF_PIC_LIST_1, iNumRefIdx))
@@ -722,6 +741,10 @@ void Slice::generateCombinedList()
     }
   }
 #endif
+  if (m_pcSPS->getRprEnabledFlag())
+  {
+    std::stable_sort(m_refPicCombinedList.begin(), m_refPicCombinedList.end(), [](const RefListAndRefIdx & l, const RefListAndRefIdx & r) {return l.cost < r.cost; });
+  }
 }
 
 void Slice::generateRefPicPairList()
@@ -759,9 +782,23 @@ void Slice::generateRefPicPairList()
     }
   }
   
+  m_numNonScaledRefPicPair = 0;
   for (int8_t i = 0; i < (int8_t)m_refPicPairList.size(); i++)
   {
     m_iRefPicPairIdx[m_refPicPairList[i].refIdx[0]][m_refPicPairList[i].refIdx[1]] = i;
+    if (!m_pcSPS->getRprEnabledFlag() || (!getRefPic(REF_PIC_LIST_0, m_refPicPairList[i].refIdx[0])->isRefScaled(m_pcPPS) && !getRefPic(REF_PIC_LIST_1, m_refPicPairList[i].refIdx[1])->isRefScaled(m_pcPPS)))
+    {
+      m_refPicPairList[i].cost = 0;
+      m_numNonScaledRefPicPair++;
+    }
+    else
+    {
+      m_refPicPairList[i].cost = std::numeric_limits<Distortion>::max();
+    }
+  }
+  if (m_pcSPS->getRprEnabledFlag())
+  {
+    std::stable_sort(m_refPicPairList.begin(), m_refPicPairList.end(), [](const RefPicPair & l, const RefPicPair & r) {return l.cost < r.cost; });
   }
 }
 #endif

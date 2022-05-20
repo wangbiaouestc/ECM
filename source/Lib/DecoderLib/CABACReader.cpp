@@ -4171,6 +4171,7 @@ void CABACReader::refIdxLC(PredictionUnit& pu)
       }
     }
   }
+  DTRACE(g_trace_ctx, D_SYNTAX, "refIdxLC() value=%d pos=(%d,%d)\n", refIdxLC, pu.lumaPos().x, pu.lumaPos().y);
   pu.refIdxLC = refIdxLC;
   // temporally set interDir and refIdx (has to be done)
   if (pu.interDir != 3)
@@ -4202,6 +4203,7 @@ void CABACReader::refPairIdx(PredictionUnit& pu)
       }
     }
   }
+  DTRACE(g_trace_ctx, D_SYNTAX, "refPairIdx() value=%d pos=(%d,%d)\n", refPairIdx, pu.lumaPos().x, pu.lumaPos().y);
   pu.refPairIdx = refPairIdx;
   // temporally set refIdx
   pu.refIdx[0] = 0;
@@ -4362,6 +4364,16 @@ void CABACReader::mvp_flag( PredictionUnit& pu, RefPicList eRefList )
   {
     mvpIdx = m_BinDecoder.decodeBin( Ctx::MVPIdx() );
   }
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  else if (PU::useRefCombList(pu))
+  {
+    mvpIdx = pu.refIdxLC >= pu.cs->slice->getNumNonScaledRefPic() ? m_BinDecoder.decodeBin(Ctx::MVPIdx()) : 0;
+  }
+  else if (PU::useRefPairList(pu))
+  {
+    mvpIdx = pu.refPairIdx >= pu.cs->slice->getNumNonScaledRefPicPair() ? m_BinDecoder.decodeBin(Ctx::MVPIdx()) : 0;
+  }
+#endif
   else if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
   {
     mvpIdx = m_BinDecoder.decodeBin( Ctx::MVPIdx() );

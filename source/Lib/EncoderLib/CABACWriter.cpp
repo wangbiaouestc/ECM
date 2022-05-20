@@ -737,6 +737,10 @@ void CABACWriter::coding_tree(const CodingStructure& cs, Partitioner& partitione
   }
 #endif
   DTRACE_BLOCK_REC_COND( ( !isEncoding() ), cs.picture->getRecoBuf( cu ), cu, cu.predMode );
+  if (CU::isInter(cu))
+  {
+    DTRACE_MOT_FIELD(g_trace_ctx, *cu.firstPU);
+  }
 }
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
 void CABACWriter::mode_constraint( const PartSplit split, const CodingStructure& cs, Partitioner& partitioner, const ModeType modeType )
@@ -3921,6 +3925,7 @@ void CABACWriter::refIdxLC(const PredictionUnit& pu)
     if (refIdxLC == 0)
     {
       m_BinEncoder.encodeBin(0, Ctx::RefPicLC(0));
+      DTRACE(g_trace_ctx, D_SYNTAX, "refIdxLC() value=%d pos=(%d,%d)\n", refIdxLC, pu.lumaPos().x, pu.lumaPos().y);
       return;
     }
     else
@@ -3936,6 +3941,7 @@ void CABACWriter::refIdxLC(const PredictionUnit& pu)
       }
     }
   }
+  DTRACE(g_trace_ctx, D_SYNTAX, "refIdxLC() value=%d pos=(%d,%d)\n", refIdxLC, pu.lumaPos().x, pu.lumaPos().y);
 }
 
 void CABACWriter::refPairIdx(const PredictionUnit& pu)
@@ -3951,6 +3957,7 @@ void CABACWriter::refPairIdx(const PredictionUnit& pu)
     if (refPairIdx == 0)
     {
       m_BinEncoder.encodeBin(0, Ctx::RefPicLC(0));
+      DTRACE(g_trace_ctx, D_SYNTAX, "refPairIdx() value=%d pos=(%d,%d)\n", refPairIdx, pu.lumaPos().x, pu.lumaPos().y);
       return;
     }
     else
@@ -3966,6 +3973,7 @@ void CABACWriter::refPairIdx(const PredictionUnit& pu)
       }
     }
   }
+  DTRACE(g_trace_ctx, D_SYNTAX, "refPairIdx() value=%d pos=(%d,%d)\n", refPairIdx, pu.lumaPos().x, pu.lumaPos().y);
 }
 #endif
 
@@ -4259,6 +4267,16 @@ void CABACWriter::mvp_flag( const PredictionUnit& pu, RefPicList eRefList )
   {
     needToCodeMvpIdx = true;
   }
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  else if (PU::useRefCombList(pu))
+  {
+    needToCodeMvpIdx = pu.refIdxLC >= pu.cs->slice->getNumNonScaledRefPic();
+  }
+  else if (PU::useRefPairList(pu))
+  {
+    needToCodeMvpIdx = pu.refPairIdx >= pu.cs->slice->getNumNonScaledRefPicPair();
+  }
+#endif
   else if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
   {
     needToCodeMvpIdx = true;
