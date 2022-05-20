@@ -453,6 +453,10 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #endif
 
       DTRACE_BLOCK_REC( cs.picture->getRecoBuf( currCU ), currCU, currCU.predMode );
+      if (CU::isInter(currCU))
+      {
+        DTRACE_MOT_FIELD(g_trace_ctx, *currCU.firstPU);
+      }
     }
   }
 #if K0149_BLOCK_STATISTICS

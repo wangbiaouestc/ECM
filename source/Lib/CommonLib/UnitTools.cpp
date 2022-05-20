@@ -11643,7 +11643,7 @@ bool PU::useRefCombList(const PredictionUnit &pu)
   {
     return false;
   }
-  if (pu.interDir == 1 || pu.interDir == 2)
+  if (!pu.mergeFlag && (pu.interDir == 1 || pu.interDir == 2))
   {
     return true;
   }
@@ -12477,6 +12477,16 @@ bool CU::isLICFlagPresent(const CodingUnit& cu)
     return false;
   }
 
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  if (!cu.cs->pcv->isEncoder)
+  {
+    if (PU::useRefCombList(*cu.firstPU))
+    {
+      CHECK(cu.firstPU->refIdxLC < 0, "cu.firstPU->refIdxLC < 0");
+      return (cu.firstPU->refIdxLC >= cu.cs->slice->getNumNonScaledRefPic() ? false : true);
+    }
+  }
+#endif
 #if JVET_Y0128_NON_CTC
   if (!PU::checkRprLicCondition(*cu.firstPU))
   {

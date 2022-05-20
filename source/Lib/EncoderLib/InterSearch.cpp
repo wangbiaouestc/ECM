@@ -2642,13 +2642,6 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     getAmvpMergeModeMergeList(pu, mvFieldAmListCommon);
     for (int iRefIdxTemp = 0; iRefIdxTemp < cs.slice->getNumRefIdx(refListAmvp); iRefIdxTemp++)
     {
-#if REMOVE_DUPLICATE_REF_IN_L1_AMVP_MERGE
-      if (refListAmvp == REF_PIC_LIST_1 && cs.slice->getList1IdxToList0Idx(iRefIdxTemp) >= 0
-        && cs.slice->getAmvpMergeModeValidRefIdx(REF_PIC_LIST_0, cs.slice->getList1IdxToList0Idx(iRefIdxTemp)))
-      {
-        continue;
-      }
-#endif
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
       if (mvFieldAmListCommon[iRefIdxTemp * AMVP_MAX_NUM_CANDS_MEM].refIdx < 0
           && mvFieldAmListCommon[iRefIdxTemp * AMVP_MAX_NUM_CANDS_MEM + 1].refIdx < 0
