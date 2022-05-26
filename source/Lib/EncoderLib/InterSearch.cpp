@@ -9229,7 +9229,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         bool lmcsEnable = cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && isLuma( compID ) && !tu.cu->firstPU->ciipFlag && !CU::isIBC( *tu.cu );
 #endif
         cs.reconstructPicture(tu.blocks[compID], m_pcReshape->getFwdLUT(), csFull, lmcsEnable);              
-#else // JVET_Z0118_GDR
+#else
         PelBuf picRecoBuff = tu.cs->picture->getRecoBuf( tu.blocks[compID] );
 
 #if JVET_Y0065_GPM_INTRA
@@ -9246,9 +9246,9 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           picRecoBuff.reconstruct( cs.getPredBuf( tu.blocks[compID] ), csFull->getResiBuf( tu.blocks[compID] ), tu.cu->cs->slice->clpRng( compID ) );
         }
       
-#endif // JVET_Z0118_GDR
+#endif
       }
-#endif // SIGN_PREDICTION
+#endif
     } // component loop
 
     if (colorTransFlag)

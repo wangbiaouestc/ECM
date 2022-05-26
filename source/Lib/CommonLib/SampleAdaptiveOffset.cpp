@@ -1185,6 +1185,11 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
         bool applyChromaBIF = false;
         ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
 
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+        const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, cs.pcv->chrFormat );
+        const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, cs.pcv->chrFormat );
+#endif
+
         // And now we traverse the CTU to do BIF
         for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, chType), chType))
         {
@@ -1225,8 +1230,6 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
                 int       horVirBndryPos[]               = { 0, 0, 0 };
                 int       verVirBndryPos[]               = { 0, 0, 0 };
                 CompArea &myArea                         = currTU.block(compID);
-                const int chromaScaleX                   = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
-                const int chromaScaleY                   = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
                 int       yPos                           = myArea.y << chromaScaleY;
                 int       xPos                           = myArea.x << chromaScaleX;
                 bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
@@ -4954,6 +4957,6 @@ bool SampleAdaptiveOffset::isCrossedByVirtualBoundaries(const int xPos, const in
       }
     }
   }
-  return numHorVirBndry > 0 || numVerVirBndry > 0 ;
+  return numHorVirBndry > 0 || numVerVirBndry > 0;
 }
 //! \}

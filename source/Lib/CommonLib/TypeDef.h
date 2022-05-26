@@ -260,7 +260,7 @@
 #define JVET_Z0118_GDR                                    1 // JVET-Z0118: GDR
 
 #if JVET_Z0118_GDR
-#define GDR_LEAK_TEST                                     1
+#define GDR_LEAK_TEST                                     0
 #define GDR_ENC_TRACE                                     0
 #define GDR_DEC_TRACE                                     0
 #endif

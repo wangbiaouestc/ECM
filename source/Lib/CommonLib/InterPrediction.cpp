@@ -8083,7 +8083,7 @@ void InterPrediction::xFillIBCBuffer(CodingUnit &cu)
 {
 #if JVET_Z0118_GDR
   bool isCleanCu              = cu.cs->isClean(cu);
-  bool useCleanIBCBuffer      = cu.cs->isInGdrInvervalOrRecoveryPoc() && isCleanCu;
+  bool useCleanIBCBuffer      = cu.cs->isInGdrIntervalOrRecoveryPoc() && isCleanCu;
 #endif
 
   for (auto &currPU : CU::traverseTUs(cu))
@@ -8138,7 +8138,7 @@ void InterPrediction::xIntraBlockCopy(PredictionUnit &pu, PelUnitBuf &predBuf, c
 {
 #if JVET_Z0118_GDR  
   bool isCleanCu           = pu.cs->isClean(pu);
-  bool useCleanIBCBuffer   = pu.cs->isInGdrInvervalOrRecoveryPoc() && isCleanCu;
+  bool useCleanIBCBuffer   = pu.cs->isInGdrIntervalOrRecoveryPoc() && isCleanCu;
 #endif
 
 #if JVET_Z0153_IBC_EXT_REF

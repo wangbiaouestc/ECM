@@ -3217,6 +3217,30 @@ const CtxSet ContextSetCfg::IntraChromaPredMode = ContextSetCfg::addCtxSet
 	{ 5 }
 });
 
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+#if ENABLE_DIMD
+const CtxSet ContextSetCfg::DimdChromaMode = ContextSetCfg::addCtxSet
+( {
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  } );
+#endif
+
+const CtxSet ContextSetCfg::ChromaFusionMode = ContextSetCfg::addCtxSet
+( {
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  } );
+#endif
+
 const CtxSet ContextSetCfg::MipFlag = ContextSetCfg::addCtxSet
 ({
 	{ 56, 57, 50, 33 },

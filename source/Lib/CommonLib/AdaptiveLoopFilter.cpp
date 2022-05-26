@@ -344,6 +344,10 @@ void AdaptiveLoopFilter::applyCcAlfFilter(CodingStructure &cs, ComponentID compI
   int  verVirBndryPos[] = { 0, 0, 0 };
 
   int ctuIdx = 0;
+
+  const int chromaScaleX = getComponentScaleX( compID, m_chromaFormat );
+  const int chromaScaleY = getComponentScaleY( compID, m_chromaFormat );
+
   for( int yPos = 0; yPos < m_picHeight; yPos += m_maxCUHeight )
   {
     for( int xPos = 0; xPos < m_picWidth; xPos += m_maxCUWidth )
@@ -364,8 +368,6 @@ void AdaptiveLoopFilter::applyCcAlfFilter(CodingStructure &cs, ComponentID compI
 
         const int width        = (xPos + m_maxCUWidth > m_picWidth) ? (m_picWidth - xPos) : m_maxCUWidth;
         const int height       = (yPos + m_maxCUHeight > m_picHeight) ? (m_picHeight - yPos) : m_maxCUHeight;
-        const int chromaScaleX = getComponentScaleX(compID, m_chromaFormat);
-        const int chromaScaleY = getComponentScaleY(compID, m_chromaFormat);
 
         int rasterSliceAlfPad = 0;
         if (isCrossedByVirtualBoundaries(cs, xPos, yPos, width, height, clipTop, clipBottom, clipLeft, clipRight,
@@ -1476,9 +1478,12 @@ void AdaptiveLoopFilter::calcClass(AlfClassifier **classifier, const Area &blkDs
       int transposeIdx = transposeTable[mainDirection * 2 + (secondaryDirection >> 1)];
 
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-      for (int ii = blkDst.pos().y + i; ii < blkDst.pos().y + i + subBlkSize; ii++)
+      int posYDst = blkDst.pos().y;
+      int posXDst = blkDst.pos().x;
+
+      for (int ii = posYDst + i; ii < posYDst + i + subBlkSize; ii++)
       {
-        for (int jj = blkDst.pos().x + j; jj < blkDst.pos().x + j + subBlkSize; jj++)
+        for (int jj = posXDst + j; jj < posXDst + j + subBlkSize; jj++)
         {
 #else
       for (int ii = curBlk.y + i; ii < curBlk.y + i + subBlkSize; ii++)

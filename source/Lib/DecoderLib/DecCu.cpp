@@ -121,7 +121,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 
 #if JVET_Z0118_GDR
   // reset current IBC Buffer only when VB pass through
-  if (cs.isInGdrInvervalOrRecoveryPoc())
+  if (cs.isInGdrIntervalOrRecoveryPoc())
   {
 #if JVET_Z0153_IBC_EXT_REF    
     m_pcInterPred->resetCurIBCBuffer(
@@ -203,21 +203,21 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
       if (isInGdrInterval || isRecoveryPocPic)
       {
         // 1.01 switch recon based on clean/dirty current area
-        bool clean_dirty_flag;
+        bool cleanDirtyFlag;
 
         bool isCuClean = currCU.Y().valid() ? cs.isClean(currCU.Y().topLeft(), CHANNEL_TYPE_LUMA) : cs.isClean(currCU.Cb().topLeft(), CHANNEL_TYPE_CHROMA);
 
         if (isCuClean) 
         {
-          clean_dirty_flag = true;
+          cleanDirtyFlag = true;
         }
         else 
         {
-          clean_dirty_flag = false;
+          cleanDirtyFlag = false;
         }       
         
-        currCU.cs->setReconBuf((clean_dirty_flag) ? PIC_RECONSTRUCTION_1 : PIC_RECONSTRUCTION_0);
-        currCU.cs->picture->setCleanDirty(clean_dirty_flag);
+        currCU.cs->setReconBuf(( cleanDirtyFlag ) ? PIC_RECONSTRUCTION_1 : PIC_RECONSTRUCTION_0);
+        currCU.cs->picture->setCleanDirty( cleanDirtyFlag );
 
         for (int rlist = REF_PIC_LIST_0; rlist < NUM_REF_PIC_LIST_01; rlist++)
         {
@@ -227,7 +227,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
             refPic = slice->getReferencePicture((RefPicList)rlist, idx);            
             if (refPic)
             {
-              refPic->setCleanDirty(clean_dirty_flag);              
+              refPic->setCleanDirty( cleanDirtyFlag );
             }
           }
         }
@@ -448,8 +448,8 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
       }
 
       m_pcInterPred->xFillIBCBuffer(currCU);
-#if JVET_Z0118_GDR // decompressCtu      
-      cs.updateReconMotIPM(currCU); // decompressCtu : need      
+#if JVET_Z0118_GDR // decompressCtu
+      cs.updateReconMotIPM( currCU ); // decompressCtu : need
 #endif
 
       DTRACE_BLOCK_REC( cs.picture->getRecoBuf( currCU ), currCU, currCU.predMode );
@@ -2443,7 +2443,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         if (cu.cs->isClean(cu)) 
         {
           CHECK(!m_pcInterPred->isLumaBvValid(lcuWidth, cuPelX, cuPelY, roiWidth, roiHeight, xPred, yPred), "invalid block vector for IBC detected.");
-	}
+        }
       }
       else 
       {

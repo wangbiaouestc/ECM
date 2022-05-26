@@ -1557,7 +1557,7 @@ void Picture::initCleanCurPicture()
 
 void Picture::copyCleanCurPicture()
 {
-  if (cs->isInGdrInvervalOrRecoveryPoc())
+  if (cs->isInGdrIntervalOrRecoveryPoc())
   {
     ChromaFormat chromaFormat = cs->sps->getChromaFormatIdc();
     int gdrEndX = cs->picHeader->getGdrEndX();

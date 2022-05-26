@@ -1453,6 +1453,11 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
         ChannelType chType = isDualTree ? CH_C : CH_L;
         bool applyChromaBIF = false;
 
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+        const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, cs.pcv->chrFormat );
+        const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, cs.pcv->chrFormat );
+#endif
+
         for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, chType), chType))
         {
           bool chromaValid = currCU.Cb().valid() && currCU.Cr().valid();
@@ -1491,8 +1496,6 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                 int       horVirBndryPos[]               = { 0, 0, 0 };
                 int       verVirBndryPos[]               = { 0, 0, 0 };
                 CompArea &myArea                         = currTU.block(compID);
-                const int chromaScaleX                   = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
-                const int chromaScaleY                   = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
                 int       yPos                           = myArea.y << chromaScaleY;
                 int       xPos                           = myArea.x << chromaScaleX;
                 bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
@@ -1950,6 +1953,11 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           bool isDualTree = CS::isDualITree(cs);
           ChannelType chType = isDualTree ? CH_C : CH_L;
           bool applyChromaBIF = false;
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+          const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, cs.pcv->chrFormat );
+          const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, cs.pcv->chrFormat );
+#endif
+
           for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, chType), chType))
           {
             bool chromaValid = currCU.Cb().valid() && currCU.Cr().valid();
@@ -1991,8 +1999,6 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   int       horVirBndryPos[]               = { 0, 0, 0 };
                   int       verVirBndryPos[]               = { 0, 0, 0 };
                   CompArea &myArea                         = currTU.block(compID);
-                  const int chromaScaleX                   = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
-                  const int chromaScaleY                   = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
                   int       yPos                           = myArea.y << chromaScaleY;
                   int       xPos                           = myArea.x << chromaScaleX;
                   bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
@@ -3330,6 +3336,8 @@ void EncSampleAdaptiveOffset::getCcSaoStatistics(CodingStructure& cs, const Comp
       int horVirBndryPosComp[] = { -1,-1,-1 };
       int verVirBndryPosComp[] = { -1,-1,-1 };
       bool isCtuCrossedByVirtualBoundaries = isCrossedByVirtualBoundaries(area.Y().x, area.Y().y, area.Y().width, area.Y().height, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos, cs.picHeader);
+
+
 #endif
 
       //NOTE: The number of skipped lines during gathering CTU statistics depends on the slice boundary availabilities.
