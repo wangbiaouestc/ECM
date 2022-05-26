@@ -1024,6 +1024,7 @@ const MotionInfo& PredictionUnit::getMotionInfo() const
 const MotionInfo& PredictionUnit::getMotionInfo( const Position& pos ) const
 {
 #if JVET_Z0118_GDR
+  if( cs->sps->getGDREnabledFlag() )
   {
     bool isSrcClean = cs->isClean(Y().bottomRight(), CHANNEL_TYPE_LUMA);
     bool isTarClean = cs->isClean(pos, CHANNEL_TYPE_LUMA);
@@ -1050,7 +1051,6 @@ CMotionBuf PredictionUnit::getMotionBuf() const
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 bool PredictionUnit::isMvsdApplicable() const
 {
-  
   if (!cs->sps->getUseMVSD())
   {
     return false;
@@ -1071,6 +1071,7 @@ const uint8_t& PredictionUnit::getIpmInfo() const
 const uint8_t& PredictionUnit::getIpmInfo( const Position& pos ) const
 {
 #if JVET_Z0118_GDR
+  if( cs->sps->getGDREnabledFlag() )
   {
     bool isSrcClean = cs->isClean(Y().bottomRight(), CHANNEL_TYPE_LUMA);
     bool isTarClean = cs->isClean(pos, CHANNEL_TYPE_LUMA);

@@ -377,12 +377,11 @@ uint32_t DecApp::decode()
           Picture *pcPic = *(iterPic++);
           pcPic->neededForOutput = true;
 
-#if !JVET_Z0118_GDR // To disable output pictures in gdr interval
+          // To disable output pictures in gdr interval
           if (pcPic->layerId == nalu.m_nuhLayerId)
           {            
             pcPic->neededForOutput = false;
           }
-#endif
         }
       }
 #endif

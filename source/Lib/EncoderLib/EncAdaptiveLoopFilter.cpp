@@ -4947,23 +4947,24 @@ void EncAdaptiveLoopFilter::alfReconstructor(CodingStructure& cs, const PelUnitB
 #endif
       }
 
+      const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, recBuf.chromaFormat );
+      const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, recBuf.chromaFormat );
+
       for (int compIdx = 1; compIdx < MAX_NUM_COMPONENT; compIdx++)
       {
         ComponentID compID = ComponentID(compIdx);
-        const int chromaScaleX = getComponentScaleX(compID, recBuf.chromaFormat);
-        const int chromaScaleY = getComponentScaleY(compID, recBuf.chromaFormat);
         if (m_ctuEnableFlag[compIdx][ctuIdx])
         {
           Area blk(xPos >> chromaScaleX, yPos >> chromaScaleY, width >> chromaScaleX, height >> chromaScaleY);
-          const int alt_num = m_ctuAlternative[compID][ctuIdx];
+          const int altNum = m_ctuAlternative[compIdx][ctuIdx];
 #if ALF_IMPROVEMENT
 #if JVET_X0071_ALF_BAND_CLASSIFIER
-          alfFiltering( m_classifier[0], recBuf, recExtBuf, blk, blk, compID, m_chromaCoeffFinal[alt_num], m_chromaClippFinal[alt_num], m_clpRngs.comp[compIdx], cs, m_filterTypeApsChroma, nullptr, -1 );
+          alfFiltering( m_classifier[0], recBuf, recExtBuf, blk, blk, compID, m_chromaCoeffFinal[altNum], m_chromaClippFinal[altNum], m_clpRngs.comp[compIdx], cs, m_filterTypeApsChroma, nullptr, -1 );
 #else
-          alfFiltering( m_classifier, recBuf, recExtBuf, blk, blk, compID, m_chromaCoeffFinal[alt_num], m_chromaClippFinal[alt_num], m_clpRngs.comp[compIdx], cs, m_filterTypeApsChroma, nullptr, -1 );
+          alfFiltering( m_classifier, recBuf, recExtBuf, blk, blk, compID, m_chromaCoeffFinal[altNum], m_chromaClippFinal[altNum], m_clpRngs.comp[compIdx], cs, m_filterTypeApsChroma, nullptr, -1 );
 #endif
 #else
-          m_filter5x5Blk( m_classifier, recBuf, recExtBuf, blk, blk, compID, m_chromaCoeffFinal[alt_num], m_chromaClippFinal[alt_num], m_clpRngs.comp[compIdx], cs, m_alfVBChmaCTUHeight, m_alfVBChmaPos );
+          m_filter5x5Blk( m_classifier, recBuf, recExtBuf, blk, blk, compID, m_chromaCoeffFinal[altNum], m_chromaClippFinal[altNum], m_clpRngs.comp[compIdx], cs, m_alfVBChmaCTUHeight, m_alfVBChmaPos );
 #endif
         }
       }

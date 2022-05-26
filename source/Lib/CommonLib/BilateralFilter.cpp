@@ -2548,7 +2548,7 @@ void BilateralFilter::bilateralFilterPicRDOperCTU(CodingStructure& cs, PelUnitBu
       ctuArea = clipArea(ctuArea, *cs.slice->getPic());
       PelBuf piOrg = cs.getOrgBuf(ctuArea).Y();
       PelBuf piSrc = src.subBuf(ctuArea).Y();
-      double MSEnoBIF = getDist(piSrc, piOrg);
+      double mseNoBIF = getDist(piSrc, piOrg);
 
       for (auto &currCU : cs.traverseCUs(CS::getArea(cs, ctuArea, CH_L), CH_L))
       {
@@ -2590,17 +2590,17 @@ void BilateralFilter::bilateralFilterPicRDOperCTU(CodingStructure& cs, PelUnitBu
       }
 
       PelBuf piRec = rec.subBuf(ctuArea).Y();
-      double MSEafterBIF = getDist(piRec, piOrg);
-      frameMSEnoBIF += MSEnoBIF;
-      frameMSEallBIF += MSEafterBIF;
-      if(MSEnoBIF<MSEafterBIF)
+      double mseAfterBIF = getDist(piRec, piOrg);
+      frameMSEnoBIF += mseNoBIF;
+      frameMSEallBIF += mseAfterBIF;
+      if( mseNoBIF < mseAfterBIF )
       {
-        frameMSEswitchBIF += MSEnoBIF;
+        frameMSEswitchBIF += mseNoBIF;
         bifParams.ctuOn[ctuIdx] = 0;
       }
       else
       {
-        frameMSEswitchBIF += MSEafterBIF;
+        frameMSEswitchBIF += mseAfterBIF;
         bifParams.ctuOn[ctuIdx] = 1;
 
       }
@@ -2902,6 +2902,11 @@ void BilateralFilter::bilateralFilterPicRDOperCTUChroma(CodingStructure& cs, Pel
   ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
   int ctuIdx = 0;
 
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, cs.pcv->chrFormat );
+  const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, cs.pcv->chrFormat );
+#endif
+
   for (int y = 0; y < pcv.heightInCtus; y++)
   {
     for (int x = 0; x < pcv.widthInCtus; x++)
@@ -2954,8 +2959,6 @@ void BilateralFilter::bilateralFilterPicRDOperCTUChroma(CodingStructure& cs, Pel
             int  verVirBndryPos[] = { 0, 0, 0 };
 
             CompArea &myArea                         = (isCb ? currTU.block(COMPONENT_Cb) : currTU.block(COMPONENT_Cr));
-            const int chromaScaleX                   = getComponentScaleX(COMPONENT_Cb, currTU.cu->cs->pcv->chrFormat);
-            const int chromaScaleY                   = getComponentScaleY(COMPONENT_Cb, currTU.cu->cs->pcv->chrFormat);
             int       yPos                           = myArea.y << chromaScaleY;
             int       xPos                           = myArea.x << chromaScaleX;
             bool      isTUCrossedByVirtualBoundaries = isCrossedByVirtualBoundaries(
@@ -3141,7 +3144,7 @@ void BilateralFilter::bilateralFilterPicRDOperCTUChroma(CodingStructure& cs, Pel
 }
 
 #if JVET_W0066_CCSAO
-void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb
+void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit& currTU, bool isCb
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
   , bool isTUCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
   , bool clipTop, bool clipBottom, bool clipLeft, bool clipRight
@@ -3149,12 +3152,15 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
 )
 {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  const int      chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, currTU.cu->cs->pcv->chrFormat );
+  const int      chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, currTU.cu->cs->pcv->chrFormat );
+  const uint32_t picWidthChroma = currTU.cu->slice->getPPS()->getPicWidthInLumaSamples() >> chromaScaleX;
+  const uint32_t picHeightChroma = currTU.cu->slice->getPPS()->getPicHeightInLumaSamples() >> chromaScaleY;
+
   if (isTUCrossedByVirtualBoundaries)
   {
     ComponentID     compID       = isCb ? COMPONENT_Cb : COMPONENT_Cr;
     const CompArea &myArea       = isCb ? currTU.blocks[COMPONENT_Cb] : currTU.blocks[COMPONENT_Cr];
-    const int       chromaScaleX = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
-    const int       chromaScaleY = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
     const unsigned  width        = myArea.width;
     const unsigned  height       = myArea.height;
     int             yPos         = myArea.y;
@@ -3168,16 +3174,14 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
       const int  yEnd  = i == numHorVirBndry ? yPos + height : (horVirBndryPos[i] >> chromaScaleY);
       const int  h     = yEnd - yStart;
       const bool clipT = (i == 0 && clipTop) || (i > 0) || (yStart - 2 < 0);
-      const bool clipB =
-        (i == numHorVirBndry && clipBottom) || (i < numHorVirBndry) || (yEnd + 2 >= (curPicHeight >> chromaScaleY));
+      const bool clipB = (i == numHorVirBndry && clipBottom) || (i < numHorVirBndry) || (yEnd + 2 >= (curPicHeight >> chromaScaleY));
       int xStart = xPos;
       for (int j = 0; j <= numVerVirBndry; j++)
       {
         const int  xEnd  = j == numVerVirBndry ? xPos + width : (verVirBndryPos[j] >> chromaScaleX);
         const int  w     = xEnd - xStart;
         const bool clipL = (j == 0 && clipLeft) || (j > 0) || (xStart - 2 < 0);
-        const bool clipR =
-          (j == numVerVirBndry && clipRight) || (j < numVerVirBndry) || (xEnd + 2 >= (curPicWidth >> chromaScaleX));
+        const bool clipR = (j == numVerVirBndry && clipRight) || (j < numVerVirBndry) || (xEnd + 2 >= (curPicWidth >> chromaScaleX));
 
         const unsigned uiWidth  = w;
         const unsigned uiHeight = h;
@@ -3209,9 +3213,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
           heightForStrength   = currTU.blocks[COMPONENT_Y].height;
         }
 
-        const char *LUTrowPtr = getFilterLutParametersChroma(
-          std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac,
-          widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid());
+        const char *LUTrowPtr = getFilterLutParametersChroma( std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac, widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid());
 
         uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
         uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
@@ -3241,15 +3243,6 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
 
         topAltAvailable  = topAltAvailable && (blkDst.y - NUMBER_PADDED_SAMPLES >= 0);
         leftAltAvailable = leftAltAvailable && (blkDst.x - NUMBER_PADDED_SAMPLES >= 0);
-
-        int      scaleX            = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
-        int      scaleY            = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
-        uint32_t picWidthChroma    = currTU.cu->slice->getPPS()->getPicWidthInLumaSamples() >> scaleX;
-        uint32_t picHeightChroma   = currTU.cu->slice->getPPS()->getPicHeightInLumaSamples() >> scaleY;
-
-        // bool bottomAltAvailable = myArea.y + myArea.height + 1 < chroma_pic_height;
-        // bool rightAltAvailable = myArea.x + myArea.width + 1 < chroma_pic_width;
-
         bottomAltAvailable = bottomAltAvailable && (blkDst.y + blkDst.height + 1 < picHeightChroma);
         rightAltAvailable  = rightAltAvailable && (blkDst.x + blkDst.width + 1 < picWidthChroma);
 
@@ -3273,8 +3266,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
           srcPtr = srcPtr - 2 * srcStride - 2;
           // Move block to temporary block
           // Check if the block a the top block of a CTU.
-          int      scaleChroma    = getComponentScaleX(compID, currTU.cu->chromaFormat);
-          int      ctuSizeChroma  = currTU.cs->slice->getSPS()->getCTUSize() >> scaleChroma;
+          int      ctuSizeChroma  = currTU.cs->slice->getSPS()->getCTUSize() >> chromaScaleX;
           bool     isCTUboundary  = myArea.y % ctuSizeChroma == 0;
 
           if (isCTUboundary)
@@ -3505,12 +3497,6 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
 
     bool topAltAvailable  = myArea.y - NUMBER_PADDED_SAMPLES >= 0;
     bool leftAltAvailable = myArea.x - NUMBER_PADDED_SAMPLES >= 0;
-
-    int      scaleX            = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
-    int      scaleY            = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
-    uint32_t picWidthChroma    = currTU.cu->slice->getPPS()->getPicWidthInLumaSamples() >> scaleX;
-    uint32_t picHeightChroma   = currTU.cu->slice->getPPS()->getPicHeightInLumaSamples() >> scaleY;
-
     bool bottomAltAvailable = myArea.y + myArea.height + 1 < picHeightChroma;
     bool rightAltAvailable  = myArea.x + myArea.width + 1 < picWidthChroma;
 
@@ -3534,8 +3520,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
       srcPtr = srcPtr - 2 * srcStride - 2;
       // Move block to temporary block
       // Check if the block a the top block of a CTU.
-      int      scaleChroma    = getComponentScaleX(compID, currTU.cu->chromaFormat);
-      int      ctuSizeChroma  = currTU.cs->slice->getSPS()->getCTUSize() >> scaleChroma;
+      int      ctuSizeChroma  = currTU.cs->slice->getSPS()->getCTUSize() >> chromaScaleX;
       bool     isCTUboundary  = myArea.y % ctuSizeChroma == 0;
 
       if (isCTUboundary)
@@ -3969,6 +3954,11 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
 )
 {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  const int      chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, currTU.cu->cs->pcv->chrFormat );
+  const int      chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, currTU.cu->cs->pcv->chrFormat );
+  const uint32_t picWidthChroma = currTU.cu->slice->getPPS()->getPicWidthInLumaSamples() >> chromaScaleX;
+  const uint32_t picHeightChroma = currTU.cu->slice->getPPS()->getPicHeightInLumaSamples() >> chromaScaleY;
+
   if (isTUCrossedByVirtualBoundaries)
   {
     ComponentID     compID       = isCb ? COMPONENT_Cb : COMPONENT_Cr;
@@ -3988,16 +3978,14 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
       const int  yEnd  = i == numHorVirBndry ? yPos + height : (horVirBndryPos[i] >> chromaScaleY);
       const int  h     = yEnd - yStart;
       const bool clipT = (i == 0 && clipTop) || (i > 0) || (yStart - 2 < 0);
-      const bool clipB =
-        (i == numHorVirBndry && clipBottom) || (i < numHorVirBndry) || (yEnd + 2 >= (curPicHeight >> chromaScaleY));
+      const bool clipB = (i == numHorVirBndry && clipBottom) || (i < numHorVirBndry) || (yEnd + 2 >= (curPicHeight >> chromaScaleY));
       int xStart = xPos;
       for (int j = 0; j <= numVerVirBndry; j++)
       {
         const int  xEnd  = j == numVerVirBndry ? xPos + width : (verVirBndryPos[j] >> chromaScaleX);
         const int  w     = xEnd - xStart;
         const bool clipL = (j == 0 && clipLeft) || (j > 0) || (xStart - 2 < 0);
-        const bool clipR =
-          (j == numVerVirBndry && clipRight) || (j < numVerVirBndry) || (xEnd + 2 >= (curPicWidth >> chromaScaleX));
+        const bool clipR = (j == numVerVirBndry && clipRight) || (j < numVerVirBndry) || (xEnd + 2 >= (curPicWidth >> chromaScaleX));
 
         const unsigned uiWidth  = w;
         const unsigned uiHeight = h;
@@ -4061,12 +4049,6 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
 
         topAltAvailable  = topAltAvailable && (blkDst.y - NUMBER_PADDED_SAMPLES >= 0);
         leftAltAvailable = leftAltAvailable && (blkDst.x - NUMBER_PADDED_SAMPLES >= 0);
-
-        int      scaleX            = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
-        int      scaleY            = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
-        uint32_t picWidthChroma    = currTU.cu->slice->getPPS()->getPicWidthInLumaSamples() >> scaleX;
-        uint32_t picHeightChroma   = currTU.cu->slice->getPPS()->getPicHeightInLumaSamples() >> scaleY;
-
         bottomAltAvailable = bottomAltAvailable && (blkDst.y + blkDst.height + 1 < picHeightChroma);
         rightAltAvailable  = rightAltAvailable && (blkDst.x + blkDst.width + 1 < picWidthChroma);
 
@@ -4090,8 +4072,7 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
           srcPtr = srcPtr - 2 * srcStride - 2;
           // Move block to temporary block
           // Check if the block a the top block of a CTU.
-          int      scaleChroma    = getComponentScaleX(compID, currTU.cu->chromaFormat);
-          int      ctuSizeChroma  = currTU.cs->slice->getSPS()->getCTUSize() >> scaleChroma;
+          int      ctuSizeChroma  = currTU.cs->slice->getSPS()->getCTUSize() >> chromaScaleX;
           bool     isCTUboundary  = myArea.y % ctuSizeChroma == 0;
 
           if (isCTUboundary)
@@ -4321,12 +4302,6 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
 
     bool topAltAvailable  = myArea.y - NUMBER_PADDED_SAMPLES >= 0;
     bool leftAltAvailable = myArea.x - NUMBER_PADDED_SAMPLES >= 0;
-
-    int      scaleX            = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
-    int      scaleY            = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
-    int      picWidthChroma    = currTU.cu->slice->getPPS()->getPicWidthInLumaSamples() >> scaleX;
-    int      picHeightChroma   = currTU.cu->slice->getPPS()->getPicHeightInLumaSamples() >> scaleY;
-
     bool bottomAltAvailable = myArea.y + myArea.height + 1 < picHeightChroma;
     bool rightAltAvailable  = myArea.x + myArea.width + 1 < picWidthChroma;
 
@@ -4349,9 +4324,8 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
       // same with image data
       srcPtr = srcPtr - 2 * srcStride - 2;
       // Move block to temporary block
-      // Check if the block a the top block of a CTU.
-      int      scaleChroma    = getComponentScaleX(compID, currTU.cu->chromaFormat);
-      int      ctuSizeChroma  = currTU.cs->slice->getSPS()->getCTUSize() >> scaleChroma;
+      // Check if the block a the top block of a CTU.      
+      int      ctuSizeChroma  = currTU.cs->slice->getSPS()->getCTUSize() >> chromaScaleX;
       bool     isCTUboundary  = myArea.y % ctuSizeChroma == 0;
 
       if (isCTUboundary)

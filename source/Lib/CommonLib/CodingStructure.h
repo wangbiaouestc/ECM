@@ -120,7 +120,7 @@ public:
 #endif
 
 #if JVET_Z0118_GDR
-  bool isInGdrInvervalOrRecoveryPoc() const;
+  bool isInGdrIntervalOrRecoveryPoc() const;
 
   bool isClean(const ChannelType effChType) const;
   bool isClean(const Position &IntPos, RefPicList e, int refIdx) const;
