@@ -357,6 +357,11 @@ bool CodingStructure::isClean(const ChannelType effChType) const
 
 bool CodingStructure::isClean(const Position &IntPos, RefPicList e, int refIdx) const
 {
+  if (!sps->getGDREnabledFlag())
+  {
+    return false;
+  }
+
   /*
     1. non gdr picture --> false;
     2. gdr picture
@@ -415,6 +420,11 @@ bool CodingStructure::isClean(const Position &IntPos, RefPicList e, int refIdx) 
 
 bool CodingStructure::isClean(const Position &IntPos, const Picture* const refPic) const
 {
+  if (!sps->getGDREnabledFlag())
+  {
+    return false;
+  }
+
   if (!refPic)
   {
     return false;
@@ -465,6 +475,11 @@ bool CodingStructure::isClean(const Position &IntPos, const Picture* const refPi
 
 bool CodingStructure::isClean(const int Intx, const int Inty, const ChannelType effChType) const
 {
+  if (!sps->getGDREnabledFlag())
+  {
+    return false;
+  }
+
   /*
     1. non gdr picture --> false;
     2. gdr picture
@@ -517,6 +532,11 @@ bool CodingStructure::isClean(const Position &IntPos, const ChannelType effChTyp
 
 bool CodingStructure::isClean(const Area &area, const ChannelType effChType) const
 {
+  if (!sps->getGDREnabledFlag())
+  {
+    return false;
+  }
+
   Position pTopLeft  = area.topLeft();
   Position pTopRight = area.topRight();
   Position pBotLeft  = area.bottomLeft();
@@ -532,6 +552,11 @@ bool CodingStructure::isClean(const Area &area, const ChannelType effChType) con
 
 bool CodingStructure::isClean(const CodingUnit &cu) const
 {
+  if (!sps->getGDREnabledFlag())
+  {
+    return false;
+  }
+
   bool ret = cu.Y().valid() ? isClean(cu.Y().bottomRight(), CHANNEL_TYPE_LUMA) : isClean(cu.Cb().bottomRight(), CHANNEL_TYPE_CHROMA);
 
   return ret;
@@ -539,6 +564,11 @@ bool CodingStructure::isClean(const CodingUnit &cu) const
 
 bool CodingStructure::isClean(const PredictionUnit &pu) const
 {
+  if (!sps->getGDREnabledFlag())
+  {
+    return false;
+  }
+
   bool ret = pu.Y().valid() ? isClean(pu.Y().bottomRight(), CHANNEL_TYPE_LUMA) : isClean(pu.Cb().bottomRight(), CHANNEL_TYPE_CHROMA);
 
   return ret;
@@ -546,6 +576,11 @@ bool CodingStructure::isClean(const PredictionUnit &pu) const
 
 bool CodingStructure::isClean(const TransformUnit &tu) const
 {
+  if (!sps->getGDREnabledFlag())
+  {
+    return false;
+  }
+
   bool ret = tu.Y().valid() ? isClean(tu.Y().bottomRight(), CHANNEL_TYPE_LUMA) : isClean(tu.Cb().bottomRight(), CHANNEL_TYPE_CHROMA);
 
   return ret;
@@ -555,16 +590,34 @@ bool CodingStructure::isClean(const TransformUnit &tu) const
 #if JVET_Z0118_GDR
 void CodingStructure::updateReconMotIPM(const UnitArea &uarea) const
 {
+  if (!sps->getGDREnabledFlag())
+  {
+    picture->getRecoBuf(uarea).copyFrom(getRecoBuf(uarea));
+    return;
+  }
+
   updateReconMotIPM(uarea, getRecoBuf(uarea));
 }
 
 void CodingStructure::updateReconMotIPM(const CompArea &carea) const
 {
+  if (!sps->getGDREnabledFlag())
+  {
+    picture->getRecoBuf(carea).copyFrom(getRecoBuf(carea));   
+    return;
+  }  
+
   updateReconMotIPM(carea, getRecoBuf(carea));
 }
 
 void CodingStructure::updateReconMotIPM(const UnitArea &uarea, const CPelUnitBuf &pbuf) const
 {
+  if (!sps->getGDREnabledFlag())
+  {
+    picture->getRecoBuf(uarea).copyFrom(pbuf);
+    return;
+  }
+
   for (int i = 0; i < MAX_NUM_COMPONENT; i++)
   {
     ComponentID compID = (ComponentID)i;
@@ -577,7 +630,13 @@ void CodingStructure::updateReconMotIPM(const UnitArea &uarea, const CPelUnitBuf
 
 void CodingStructure::updateReconMotIPM(const CompArea &carea, const CPelBuf &pbuf) const
 {
-  const ComponentID compID = carea.compID;
+  if (!sps->getGDREnabledFlag())
+  {
+    picture->getRecoBuf(carea).copyFrom(pbuf);
+    return;
+  }
+
+  const ComponentID compID = carea.compID;  
 
   if (!isInGdrIntervalOrRecoveryPoc())
   {

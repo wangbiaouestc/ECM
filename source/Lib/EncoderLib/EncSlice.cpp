@@ -913,7 +913,10 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
     }
 
 #if JVET_Z0118_GDR    
-    pcPic->initCleanCurPicture();
+    if (pcPic->cs->sps->getGDREnabledFlag())
+    {
+      pcPic->initCleanCurPicture();
+    }
 #endif
 
   }
