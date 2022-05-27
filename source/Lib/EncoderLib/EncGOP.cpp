@@ -3994,7 +3994,10 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 
 #if JVET_Z0118_GDR
       pcPic->setCleanDirty(false);
-      pcPic->copyCleanCurPicture();      
+      if (pcPic->cs->sps->getGDREnabledFlag())
+      {
+        pcPic->copyCleanCurPicture();
+      }
 #endif
 
       //-- For time output for each slice

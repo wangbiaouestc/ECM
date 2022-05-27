@@ -828,7 +828,10 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
 
 #if JVET_Z0118_GDR
  m_pcPic->setCleanDirty(false);
- m_pcPic->copyCleanCurPicture(); 
+ if (m_pcPic->cs->sps->getGDREnabledFlag())
+ {
+   m_pcPic->copyCleanCurPicture();
+ }
 #endif
 
   Slice*  pcSlice = m_pcPic->cs->slice;
@@ -3116,7 +3119,10 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
 #endif
   
 #if JVET_Z0118_GDR
-  m_pcPic->initCleanCurPicture();
+  if (m_pcPic->cs->sps->getGDREnabledFlag())
+  {
+    m_pcPic->initCleanCurPicture();
+  }
 #endif
 
   //  Decode a picture

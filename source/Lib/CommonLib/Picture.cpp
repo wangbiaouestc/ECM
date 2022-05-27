@@ -897,7 +897,6 @@ void Picture::rescalePicture( const std::pair<int, int> scalingRatio,
 
 void Picture::saveSubPicBorder(int POC, int subPicX0, int subPicY0, int subPicWidth, int subPicHeight)
 {
-
   // 1.1 set up margin for back up memory allocation
   int xMargin = margin >> getComponentScaleX(COMPONENT_Y, cs->area.chromaFormat);
   int yMargin = margin >> getComponentScaleY(COMPONENT_Y, cs->area.chromaFormat);
@@ -1000,7 +999,6 @@ void Picture::saveSubPicBorder(int POC, int subPicX0, int subPicY0, int subPicWi
 
 void Picture::extendSubPicBorder(int POC, int subPicX0, int subPicY0, int subPicWidth, int subPicHeight)
 {
-
   for (int comp = 0; comp < getNumberValidComponents(cs->area.chromaFormat); comp++)
   {
     ComponentID compID = ComponentID(comp);
@@ -1207,7 +1205,13 @@ void Picture::extendPicBorder( const PPS *pps )
   }
 
 #if JVET_Z0118_GDR
-  for (int pt = (int) PIC_RECONSTRUCTION_0; pt <= (int) PIC_RECONSTRUCTION_1; pt++) 
+  int numPt = PIC_RECONSTRUCTION_0;
+  if (cs->slice->getSPS()->getGDREnabledFlag())
+  {
+    numPt = PIC_RECONSTRUCTION_1;
+  }
+
+  for (int pt = (int) PIC_RECONSTRUCTION_0; pt <= (int) numPt; pt++)
   {
     for (int comp = 0; comp < getNumberValidComponents(cs->area.chromaFormat); comp++)
     {
