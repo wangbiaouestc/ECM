@@ -530,7 +530,7 @@ bool IntraPrediction::xFillIntraGPMRefTemplateAll(PredictionUnit& pu, TEMPLATE_T
       uint8_t intraMode = geoIntraMPMList[tmpCandIdx];
       if (!m_abFilledIntraGPMRefTpl[intraMode])
       {
-        xFillIntraGPMRefTemplate(pu, eTempType, intraMode, loadIntraRef, m_acYuvRefGPMIntraTemplate[intraMode][0], m_acYuvRefGPMIntraTemplate[intraMode][1], lut);
+        xFillIntraGPMRefTemplate(pu, eTempType, intraMode, loadIntraRef, &m_acYuvRefGPMIntraTemplate[intraMode][0][0], &m_acYuvRefGPMIntraTemplate[intraMode][1][0], lut);
         loadIntraRef = false; // to prevent duplicating initialization
       }      
     }
@@ -560,6 +560,12 @@ bool IntraPrediction::xFillIntraGPMRefTemplate(PredictionUnit& pu, TEMPLATE_TYPE
     TEMPLATE_TYPE tplType = (TEMPLATE_TYPE)prefillIntraGPMReferenceSamples(pu, iTempWidth, iTempHeight);
     CHECK(eTempType != tplType, "Inconsistent template block availability");
   }
+  else // Just need setting intra ref parameters, when ref samples have not been swapped out
+  {
+    m_ipaParam.multiRefIndex = iTempWidth;
+    m_topRefLength = (pu.lwidth() + (eTempType != ABOVE_NEIGHBOR ? iTempWidth : 0)) << 1;
+    m_leftRefLength = (pu.lheight() + (eTempType != LEFT_NEIGHBOR ? iTempHeight : 0)) << 1;
+  }
 
   // Generate intra pred samples
   int dirMode = intraMode > DC_IDX ? MAP67TO131(intraMode) : intraMode;
@@ -588,7 +594,7 @@ bool IntraPrediction::xFillIntraGPMRefTemplate(PredictionUnit& pu, TEMPLATE_TYPE
   if (predSrcAbove != nullptr)
   {
     Pel*   tmpSrc = predSrcAbove;
-    Pel*   tmpDst = &m_acYuvRefGPMIntraTemplate[intraMode][0][0];
+    Pel*   tmpDst = bufTop;
     if (lut == nullptr)
     {
       size_t szLine = sizeof(Pel) * pu.lwidth();
@@ -616,7 +622,7 @@ bool IntraPrediction::xFillIntraGPMRefTemplate(PredictionUnit& pu, TEMPLATE_TYPE
   if (predSrcLeft != nullptr)
   {
     Pel*   tmpSrc = predSrcLeft;
-    Pel*   tmpDst = &m_acYuvRefGPMIntraTemplate[intraMode][1][0];
+    Pel*   tmpDst = bufLeft;
     if (lut == nullptr)
     {
       for (int h = 0; h < pu.lheight(); ++h)
