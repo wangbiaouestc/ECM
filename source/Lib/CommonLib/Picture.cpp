@@ -1193,7 +1193,11 @@ void Picture::restoreSubPicBorder(int POC, int subPicX0, int subPicY0, int subPi
   m_bufWrapSubPicBelow.destroy();
 }
 
+#if JVET_Z0118_GDR
+void Picture::extendPicBorder( const SPS *sps, const PPS *pps )
+#else
 void Picture::extendPicBorder( const PPS *pps )
+#endif
 {
   if ( m_bIsBorderExtended )
   {
@@ -1206,7 +1210,7 @@ void Picture::extendPicBorder( const PPS *pps )
 
 #if JVET_Z0118_GDR
   int numPt = PIC_RECONSTRUCTION_0;
-  if (cs->slice->getSPS()->getGDREnabledFlag())
+  if (sps->getGDREnabledFlag())
   {
     numPt = PIC_RECONSTRUCTION_1;
   }

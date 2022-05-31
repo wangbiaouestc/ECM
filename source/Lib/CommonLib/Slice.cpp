@@ -852,7 +852,12 @@ void Slice::constructRefPicList(PicList& rcListPic)
       pcRefPic = xGetLongTermRefPic( rcListPic, ltrpPoc, m_localRPL0.getDeltaPocMSBPresentFlag( ii ), m_pcPic->layerId );
       pcRefPic->longTerm = true;
     }
+
+#if JVET_Z0118_GDR
+    pcRefPic->extendPicBorder( getSPS(), getPPS() );
+#else
     pcRefPic->extendPicBorder( getPPS() );
+#endif
     m_apcRefPicList[REF_PIC_LIST_0][ii] = pcRefPic;
     m_bIsUsedAsLongTerm[REF_PIC_LIST_0][ii] = pcRefPic->longTerm;
   }
@@ -892,7 +897,12 @@ void Slice::constructRefPicList(PicList& rcListPic)
       pcRefPic = xGetLongTermRefPic( rcListPic, ltrpPoc, m_localRPL1.getDeltaPocMSBPresentFlag( ii ), m_pcPic->layerId );
       pcRefPic->longTerm = true;
     }
+
+#if JVET_Z0118_GDR
+    pcRefPic->extendPicBorder( getSPS(), getPPS() );
+#else
     pcRefPic->extendPicBorder( getPPS() );
+#endif
     m_apcRefPicList[REF_PIC_LIST_1][ii] = pcRefPic;
     m_bIsUsedAsLongTerm[REF_PIC_LIST_1][ii] = pcRefPic->longTerm;
   }
@@ -5086,7 +5096,12 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
                                    sps->getChromaFormatIdc(), sps->getBitDepths(), true, downsampling,
                                    sps->getHorCollocatedChromaFlag(), sps->getVerCollocatedChromaFlag() );
           scaledRefPic[j]->unscaledPic = m_apcRefPicList[refList][rIdx];
+
+#if JVET_Z0118_GDR
+          scaledRefPic[j]->extendPicBorder( getSPS(), getPPS() );
+#else
           scaledRefPic[j]->extendPicBorder( getPPS() );
+#endif
 
           m_scaledRefPicList[refList][rIdx] = scaledRefPic[j];
         }
