@@ -590,34 +590,16 @@ bool CodingStructure::isClean(const TransformUnit &tu) const
 #if JVET_Z0118_GDR
 void CodingStructure::updateReconMotIPM(const UnitArea &uarea) const
 {
-  if (!sps->getGDREnabledFlag())
-  {
-    picture->getRecoBuf(uarea).copyFrom(getRecoBuf(uarea));
-    return;
-  }
-
   updateReconMotIPM(uarea, getRecoBuf(uarea));
 }
 
 void CodingStructure::updateReconMotIPM(const CompArea &carea) const
 {
-  if (!sps->getGDREnabledFlag())
-  {
-    picture->getRecoBuf(carea).copyFrom(getRecoBuf(carea));   
-    return;
-  }  
-
   updateReconMotIPM(carea, getRecoBuf(carea));
 }
 
 void CodingStructure::updateReconMotIPM(const UnitArea &uarea, const CPelUnitBuf &pbuf) const
 {
-  if (!sps->getGDREnabledFlag())
-  {
-    picture->getRecoBuf(uarea).copyFrom(pbuf);
-    return;
-  }
-
   for (int i = 0; i < MAX_NUM_COMPONENT; i++)
   {
     ComponentID compID = (ComponentID)i;
@@ -630,12 +612,6 @@ void CodingStructure::updateReconMotIPM(const UnitArea &uarea, const CPelUnitBuf
 
 void CodingStructure::updateReconMotIPM(const CompArea &carea, const CPelBuf &pbuf) const
 {
-  if (!sps->getGDREnabledFlag())
-  {
-    picture->getRecoBuf(carea).copyFrom(pbuf);
-    return;
-  }
-
   const ComponentID compID = carea.compID;  
 
   if (!isInGdrIntervalOrRecoveryPoc())
