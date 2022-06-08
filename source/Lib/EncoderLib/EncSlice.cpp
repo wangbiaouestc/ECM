@@ -912,11 +912,8 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
 #endif
     }
 
-#if JVET_Z0118_GDR    
-    if (pcPic->cs->sps->getGDREnabledFlag())
-    {
-      pcPic->initCleanCurPicture();
-    }
+#if JVET_Z0118_GDR        
+    pcPic->initCleanCurPicture();    
 #endif
 
   }
@@ -1779,28 +1776,37 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     if ((cs.slice->getSliceType() != I_SLICE || cs.sps->getIBCFlag()) && cs.pps->ctuIsTileColBd( ctuXPosInCtus ))
     {
 #if JVET_Z0118_GDR
-      cs.motionLut.lut0.resize(0);
-      cs.motionLut.lut1.resize(0);
+      cs.motionLut.lut0.resize(0);      
       cs.motionLut.lutIbc0.resize(0);
-      cs.motionLut.lutIbc1.resize(0);
+      if (pCfg->getGdrEnabled())
+      {
+        cs.motionLut.lut1.resize(0);
+        cs.motionLut.lutIbc1.resize(0);
+      }
 #else
       cs.motionLut.lut.resize(0);
       cs.motionLut.lutIbc.resize(0);
 #endif
 
 #if JVET_Z0139_HIST_AFF
-        for (int i = 0; i < 2 * MAX_NUM_AFFHMVP_ENTRIES_ONELIST; i++)
-        {
+      for (int i = 0; i < 2 * MAX_NUM_AFFHMVP_ENTRIES_ONELIST; i++)
+      {
 #if JVET_Z0118_GDR
-          cs.motionLut.lutAff0[i].resize(0);
+        cs.motionLut.lutAff0[i].resize(0);
+        if (pCfg->getGdrEnabled())
+        {
           cs.motionLut.lutAff1[i].resize(0);
+        }
 #else
           cs.motionLut.lutAff[i].resize(0);
 #endif
         }
 #if JVET_Z0118_GDR
         cs.motionLut.lutAffInherit0.resize(0);
-        cs.motionLut.lutAffInherit1.resize(0);
+        if (pCfg->getGdrEnabled())
+        {
+          cs.motionLut.lutAffInherit1.resize(0);
+        }
 #else
         cs.motionLut.lutAffInherit.resize(0);
 #endif

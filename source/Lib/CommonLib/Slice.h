@@ -2208,8 +2208,8 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      derivedChromaQPMappingTables()                                          { m_chromaQpMappingTable.derivedChromaQPMappingTables(); }
   const ChromaQpMappingTable& getChromaQpMappingTable()                   const     { return m_chromaQpMappingTable;}
   int       getMappedChromaQpValue(ComponentID compID, int qpVal)         const     { return m_chromaQpMappingTable.getMappedChromaQpValue(compID, qpVal); }
-  void setGDREnabledFlag(bool flag) { m_GDREnabledFlag = flag; }
-  bool getGDREnabledFlag() const { return m_GDREnabledFlag; }
+  void      setGDREnabledFlag(bool flag)                                            { m_GDREnabledFlag = flag; }
+  bool      getGDREnabledFlag() const                                               { return m_GDREnabledFlag; }
   void      setSubLayerParametersPresentFlag(bool flag)                             { m_SubLayerCbpParametersPresentFlag = flag; }
   bool      getSubLayerParametersPresentFlag()                            const     { return m_SubLayerCbpParametersPresentFlag;  }
 

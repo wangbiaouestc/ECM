@@ -7019,6 +7019,7 @@ bool PU::addMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrgCtx
 #endif
       ))
       {
+
 #if JVET_X0083_BM_AMVP_MERGE_MODE
         int8_t candRefIdx[2];
         candRefIdx[0] = mrgCtx.mvFieldNeighbours[(cnt << 1) + 0].refIdx;
