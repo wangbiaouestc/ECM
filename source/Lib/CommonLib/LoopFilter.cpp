@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -767,6 +767,27 @@ unsigned LoopFilter::xGetBoundaryStrengthSingle ( const CodingUnit& cu, const De
     }
   }
 
+#if JVET_Y0065_GPM_INTRA
+  const Position& lumaPosQ  = Position{ localPos.x,  localPos.y };
+  const Position  lumaPosP  = ( edgeDir == EDGE_VER ) ? lumaPosQ.offset( -1, 0 ) : lumaPosQ.offset( 0, -1 );
+  const MotionInfo&     miQ = cuQ.cs->getMotionInfo( lumaPosQ );
+  const MotionInfo&     miP = cuP.cs->getMotionInfo( lumaPosP );
+  if (cuP.firstPU->gpmIntraFlag || cuQ.firstPU->gpmIntraFlag)
+  {
+    if (m_aapucBS[edgeDir][rasterIdx] && (!miQ.isInter || !miP.isInter))
+    {
+      if(chType == CHANNEL_TYPE_LUMA)
+      {
+        return BsSet(2, COMPONENT_Y);
+      }
+      else
+      {
+        return BsSet(2, COMPONENT_Cb) + BsSet(2, COMPONENT_Cr);
+      }
+    }
+  }
+#endif
+
   unsigned tmpBs = 0;
   //-- Set BS for not Intra MB : BS = 2 or 1 or 0
   if(chType == CHANNEL_TYPE_LUMA)
@@ -822,10 +843,12 @@ unsigned LoopFilter::xGetBoundaryStrengthSingle ( const CodingUnit& cu, const De
   {
     return BsSet(1, COMPONENT_Y);
   }
+#if !JVET_Y0065_GPM_INTRA
   const Position& lumaPosQ  = Position{ localPos.x,  localPos.y };
   const Position  lumaPosP  = ( edgeDir == EDGE_VER ) ? lumaPosQ.offset( -1, 0 ) : lumaPosQ.offset( 0, -1 );
   const MotionInfo&     miQ = cuQ.cs->getMotionInfo( lumaPosQ );
   const MotionInfo&     miP = cuP.cs->getMotionInfo( lumaPosP );
+#endif
   const Slice&       sliceP = *cuP.slice;
 
   if (sliceQ.isInterB() || sliceP.isInterB())

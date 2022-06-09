@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -240,6 +240,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setPrintFrameMSE                                     ( m_printFrameMSE);
   m_cEncLib.setPrintHexPsnr(m_printHexPsnr);
   m_cEncLib.setPrintSequenceMSE                                  ( m_printSequenceMSE);
+#if MSSIM_UNIFORM_METRICS_LOG
+  m_cEncLib.setPrintMSSSIM                                       ( m_printMSSSIM );
+#endif
   m_cEncLib.setCabacZeroWordPaddingEnabled                       ( m_cabacZeroWordPaddingEnabled );
 
   m_cEncLib.setFrameRate                                         ( m_iFrameRate );
@@ -256,7 +259,7 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setSwitchPocPeriod                                   ( m_switchPocPeriod );
   m_cEncLib.setUpscaledOutput                                    ( m_upscaledOutput );
   m_cEncLib.setFramesToBeEncoded                                 ( m_framesToBeEncoded );
-
+  m_cEncLib.setValidFrames                                       ( m_firstValidFrame, m_lastValidFrame );
   m_cEncLib.setAvoidIntraInDepLayer                              ( m_avoidIntraInDepLayer );
 
   //====== SPS constraint flags =======
@@ -584,6 +587,13 @@ void EncApp::xInitLibCfg()
 
   //====== Coding Structure ========
   m_cEncLib.setIntraPeriod                                       ( m_iIntraPeriod );
+#if JVET_Z0118_GDR
+  m_cEncLib.setGdrEnabled                                        ( m_gdrEnabled );
+  m_cEncLib.setGdrPeriod                                         ( m_gdrPeriod );
+  m_cEncLib.setGdrPocStart                                       ( m_gdrPocStart );
+  m_cEncLib.setGdrInterval                                       ( m_gdrInterval);
+  m_cEncLib.setGdrNoHash                                         ( m_gdrNoHash );
+#endif
   m_cEncLib.setDecodingRefreshType                               ( m_iDecodingRefreshType );
   m_cEncLib.setGOPSize                                           ( m_iGOPSize );
   m_cEncLib.setDrapPeriod                                        ( m_drapPeriod );
@@ -727,9 +737,16 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setMaxMTTHierarchyDepth                              ( m_uiMaxMTTHierarchyDepth, m_uiMaxMTTHierarchyDepthI, m_uiMaxMTTHierarchyDepthIChroma );
   m_cEncLib.setMaxBTSizes                                        ( m_uiMaxBT );
   m_cEncLib.setMaxTTSizes                                        ( m_uiMaxTT );
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  m_cEncLib.setFastTTskip                                        ( m_ttFastSkip );
+  m_cEncLib.setFastTTskipThr                                     ( m_ttFastSkipThr );
+#endif
   m_cEncLib.setDualITree                                         ( m_dualTree );
 #if SIGN_PREDICTION
-  m_cEncLib.setNumPredSigns                                       ( m_numPredSign );
+  m_cEncLib.setNumPredSigns                                      ( m_numPredSign );
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  m_cEncLib.setLog2SignPredArea                                  (m_log2SignPredArea);
+#endif
 #endif
   m_cEncLib.setLFNST                                             ( m_LFNST );
   m_cEncLib.setUseFastLFNST                                      ( m_useFastLFNST );
@@ -741,6 +758,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   m_cEncLib.setUseDMVDMode                                       ( m_DMVDMode );
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  m_cEncLib.setUseAltGPMSplitModeCode                            ( m_altGPMSplitModeCode );
 #endif
   m_cEncLib.setPROF                                              ( m_PROF );
   m_cEncLib.setBIO                                               (m_BIO);
@@ -792,9 +812,16 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setAllowDisFracMMVD                                  ( m_allowDisFracMMVD );
   m_cEncLib.setUseAffineAmvr                                     ( m_AffineAmvr );
   m_cEncLib.setUseAffineAmvrEncOpt                               ( m_AffineAmvrEncOpt );
+  m_cEncLib.setUseAffineAmvp                                     ( m_AffineAmvp );
   m_cEncLib.setDMVR                                              ( m_DMVR );
   m_cEncLib.setMMVD                                              ( m_MMVD );
   m_cEncLib.setMmvdDisNum                                        (m_MmvdDisNum);
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  m_cEncLib.setUseMVSD                                           (m_MVSD);
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  m_cEncLib.setUseARL                                            (m_useARL);
+#endif
   m_cEncLib.setRGBFormatFlag(m_rgbFormat);
   m_cEncLib.setUseColorTrans(m_useColorTrans);
   m_cEncLib.setPLTMode                                           ( m_PLTMode );
@@ -819,9 +846,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setBIFQPOffset                                       ( m_BIFQPOffset );
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  m_cEncLib.setUseCBIF                                            ( m_CBIF );
-  m_cEncLib.setCBIFStrength                                       ( m_CBIFStrength );
-  m_cEncLib.setCBIFQPOffset                                       ( m_CBIFQPOffset );
+  m_cEncLib.setUseChromaBIF                                      ( m_chromaBIF );
+  m_cEncLib.setChromaBIFStrength                                 ( m_chromaBIFStrength );
+  m_cEncLib.setChromaBIFQPOffset                                 ( m_chromaBIFQPOffset );
 #endif
 
   // ADD_NEW_TOOL : (encoder app) add setting of tool enabling flags and associated parameters here
@@ -884,6 +911,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setUseBLambdaForNonKeyLowDelayPictures               ( m_bUseBLambdaForNonKeyLowDelayPictures );
   m_cEncLib.setUseISP                                            ( m_ISP );
   m_cEncLib.setUseFastISP                                        ( m_useFastISP );
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  m_cEncLib.setTempCabacInitMode                                 ( m_tempCabacInitMode );
+#endif
 
   // set internal bit-depth and constants
   for (uint32_t channelType = 0; channelType < MAX_NUM_CHANNEL_TYPE; channelType++)
@@ -899,6 +929,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setMaxNumAffineMergeCand                             ( m_maxNumAffineMergeCand );
   m_cEncLib.setMaxNumGeoCand                                     ( m_maxNumGeoCand );
   m_cEncLib.setMaxNumIBCMergeCand                                ( m_maxNumIBCMergeCand );
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  m_cEncLib.setMaxNumMHPCand                                     ( m_maxNumMHPCand );
+#endif
 
   //====== Weighted Prediction ========
   m_cEncLib.setUseWP                                             ( m_useWeightedPred     );
@@ -1209,6 +1242,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setCalculateHdrMetrics                               (m_calculateHdrMetrics);
 #endif
   m_cEncLib.setGopBasedTemporalFilterEnabled(m_gopBasedTemporalFilterEnabled);
+#if JVET_Y0240_BIM
+  m_cEncLib.setBIM                                               (m_bimEnabled);
+#endif
   m_cEncLib.setNumRefLayers                                       ( m_numRefLayers );
 
   m_cEncLib.setVPSParameters(m_cfgVPSParameters);
@@ -1299,11 +1335,22 @@ void EncApp::createLib( const int layerIdx )
   m_orgPic->create( unitArea );
   m_trueOrgPic->create( unitArea );
 
-  if( m_gopBasedTemporalFilterEnabled )
+#if JVET_Y0240_BIM
+  if ( m_gopBasedTemporalFilterEnabled || m_bimEnabled )
+#else
+  if ( m_gopBasedTemporalFilterEnabled )
+#endif
   {
     m_filteredOrgPic = new PelStorage;
     m_filteredOrgPic->create( unitArea );
   }
+#if JVET_Y0240_BIM
+  if ( m_cEncLib.getBIM() )
+  {
+    std::map<int, int*> adaptQPmap;
+    m_cEncLib.setAdaptQPmap(adaptQPmap);
+  }
+#endif
 
   if( !m_bitstream.is_open() )
   {
@@ -1326,12 +1373,21 @@ void EncApp::createLib( const int layerIdx )
   m_ext360 = new TExt360AppEncTop( *this, m_cEncLib.getGOPEncoder()->getExt360Data(), *( m_cEncLib.getGOPEncoder() ), *m_orgPic );
 #endif
 
+#if JVET_Y0240_BIM
+  if( m_gopBasedTemporalFilterEnabled || m_bimEnabled )
+#else
   if( m_gopBasedTemporalFilterEnabled )
+#endif
   {
-    m_temporalFilter.init( m_FrameSkip, m_inputBitDepth, m_MSBExtendedBitDepth, m_internalBitDepth, m_iSourceWidth, m_iSourceHeight,
-      m_aiPad, m_bClipInputVideoToRec709Range, m_inputFileName, m_chromaFormatIDC,
-      m_inputColourSpaceConvert, m_iQP, m_gopBasedTemporalFilterStrengths,
-      m_gopBasedTemporalFilterFutureReference );
+    m_temporalFilter.init( m_FrameSkip, m_inputBitDepth, m_MSBExtendedBitDepth, m_internalBitDepth, m_iSourceWidth,
+                           sourceHeight, m_aiPad, m_bClipInputVideoToRec709Range, m_inputFileName,
+                           m_chromaFormatIDC, m_inputColourSpaceConvert, m_iQP, m_gopBasedTemporalFilterStrengths,
+                           m_gopBasedTemporalFilterPastRefs, m_gopBasedTemporalFilterFutureRefs, m_firstValidFrame,
+                           m_lastValidFrame
+#if JVET_Y0240_BIM
+                           , m_gopBasedTemporalFilterEnabled, m_cEncLib.getAdaptQPmap(), m_cEncLib.getBIM(), m_uiCTUSize
+#endif
+                           );
   }
 }
 
@@ -1362,12 +1418,26 @@ void EncApp::destroyLib()
   delete m_trueOrgPic;
   delete m_orgPic;
 
-  if( m_gopBasedTemporalFilterEnabled )
+#if JVET_Y0240_BIM
+  if ( m_gopBasedTemporalFilterEnabled || m_bimEnabled )
+#else
+  if ( m_gopBasedTemporalFilterEnabled )
+#endif
   {
     m_filteredOrgPic->destroy();
     delete m_filteredOrgPic;
   }
-
+#if JVET_Y0240_BIM
+  if ( m_bimEnabled )
+  {
+    auto map = m_cEncLib.getAdaptQPmap();
+    for (auto it = map->begin(); it != map->end(); ++it)
+    {
+      int *p = it->second;
+      delete p;
+    }
+  }
+#endif
 #if EXTENSION_360_VIDEO
   delete m_ext360;
 #endif
@@ -1395,7 +1465,11 @@ bool EncApp::encodePrep( bool& eos )
   m_cVideoIOYuvInputFile.read( *m_orgPic, *m_trueOrgPic, ipCSC, m_aiPad, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range );
 #endif
 
-  if( m_gopBasedTemporalFilterEnabled )
+#if JVET_Y0240_BIM
+  if ( m_gopBasedTemporalFilterEnabled || m_bimEnabled )
+#else
+  if ( m_gopBasedTemporalFilterEnabled )
+#endif
   {
     m_temporalFilter.filter( m_orgPic, m_iFrameRcvd );
     m_filteredOrgPic->copyFrom( *m_orgPic );

@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -67,7 +67,7 @@ bool DecAppCfg::parseCfg( int argc, char* argv[] )
   string sTracingFile;
   bool   bTracingChannelsList = false;
 #endif
-#if ENABLE_SIMD_OPT
+#if ENABLE_SIMD_OPT && defined(TARGET_SIMD_X86)
   std::string ignore;
 #endif
   po::Options opts;
@@ -79,7 +79,7 @@ bool DecAppCfg::parseCfg( int argc, char* argv[] )
 
   ("OplFile,-opl",              m_oplFilename ,                        string(""), "opl-file name without extension for conformance testing\n")
 
-#if ENABLE_SIMD_OPT
+#if ENABLE_SIMD_OPT && defined(TARGET_SIMD_X86)
   ("SIMD",                      ignore,                                string(""), "SIMD extension to use (SCALAR, SSE41, SSE42, AVX, AVX2, AVX512), default: the highest supported extension\n")
 #endif
 
@@ -120,6 +120,9 @@ bool DecAppCfg::parseCfg( int argc, char* argv[] )
   ("MCTSCheck",                m_mctsCheck,                           false,       "If enabled, the decoder checks for violations of mc_exact_sample_value_match_flag in Temporal MCTS ")
   ("targetSubPicIdx",          m_targetSubPicIdx,                     0,           "Specify which subpicture shall be written to output, using subpic index, 0: disabled, subpicIdx=m_targetSubPicIdx-1 \n" )
   ( "UpscaledOutput",          m_upscaledOutput,                          0,       "Upscaled output for RPR" )
+#if GDR_LEAK_TEST
+  ("RandomAccessPos",          m_gdrPocRandomAccess,                    0,         "POC of GDR Random access picture\n" )
+#endif
 #if DUMP_BEFORE_INLOOP
   ( "DumpBeforeInloop",        m_dumpBeforeInloop,                          false, "Dump YUV before inloop filters" )
 #endif

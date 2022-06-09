@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -115,7 +115,15 @@ public:
 
 #if ALF_IMPROVEMENT
   void  copyFixedFilterResults(const PelUnitBuf &recDst, const Area &blkDst, ComponentID COMPONENT_Y, Pel*** fixedFilterResults, const int fixedFilterSetIdx, const int classifierIdx);
-  static void fixedFiltering(AlfClassifier** classifier, const CPelBuf& srcLuma, const Area& cu, Pel*** fixedFilterResults, int picWidth, const int fixedFiltInd, const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize, const ClpRng& clpRng, const Pel clippingValues[4]);
+
+  static void fixedFiltering(AlfClassifier **classifier, const CPelBuf &srcLuma, const Area &cu,
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                             const Area &blkDst,
+#endif
+                             Pel ***fixedFilterResults, int picWidth, const int fixedFiltInd,
+                             const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize,
+                             const ClpRng &clpRng, const Pel clippingValues[4]);
+
   int assignAct(int avg_varPrec, int shift, int noAct);
   static void calcClass(AlfClassifier **classifier, const Area &blkDst, const Area &cu, int dirWindSize, int classDir, int noDir, int noAct, int bitDepth, int subBlkSize, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS]);
   static void deriveClassificationLaplacianBig(const Area &curBlk, uint32_t **laplacian[NUM_DIRECTIONS]);
@@ -151,7 +159,13 @@ public:
 #endif
   void(*m_deriveClassificationLaplacianBig)(const Area &curBlk, uint32_t **laplacian[NUM_DIRECTIONS]);
   void(*m_deriveClassificationLaplacian)(const CPelBuf &srcLuma, const Area &blkDst, const Area &blk, uint32_t **laplacian[NUM_DIRECTIONS]);
-  void(*m_filter13x13Blk)(AlfClassifier **classifier, const CPelBuf &srcLuma, const Area& curBlk, Pel ***fixedFilterResults, int picWidth, const int fixedFiltInd, const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize, const ClpRng &clpRng, const Pel clippingValues[4]);
+  void (*m_filter13x13Blk)(AlfClassifier **classifier, const CPelBuf &srcLuma, const Area &curBlk,
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                           const Area &blkDst,
+#endif
+                           Pel ***fixedFilterResults, int picWidth, const int fixedFiltInd,
+                           const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize,
+                           const ClpRng &clpRng, const Pel clippingValues[4]);
   void(*m_filterCcAlf)(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs);
   template<AlfFilterType filtType>
   static void filterBlk(AlfClassifier **classifier, const PelUnitBuf &recDst, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blk, const ComponentID compId, const short *filterSet,

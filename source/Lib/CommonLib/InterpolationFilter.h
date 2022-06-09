@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -68,22 +68,22 @@ class InterpolationFilter
   static const TFilterCoeff m_lumaFilter4x4[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_LUMA];
 #endif
 public:
+  static const TFilterCoeff m_chromaFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Chroma filter taps
+#if JVET_Z0117_CHROMA_IF
+  static const TFilterCoeff m_chromaFilter4[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][4]; ///< Chroma filter taps
+#endif
+#if JVET_Z0117_CHROMA_IF
+  static const TFilterCoeff m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR]; ///< Chroma filter taps 1.5x
+  static const TFilterCoeff m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR]; ///< Chroma filter taps 2x
+#else
+  static const TFilterCoeff m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Chroma filter taps 1.5x
+  static const TFilterCoeff m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Chroma filter taps 2x
+#endif
 #if IF_12TAP
   static const TFilterCoeff m_lumaFilter12[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12];     ///< Luma filter taps //+1 added by //kolya
   static const TFilterCoeff m_lumaFilter[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8]; ///< Luma filter taps, for affine 
-  static const TFilterCoeff m_chromaFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Chroma filter taps
-#if INTRA_6TAP
-  static const TFilterCoeff m_lumaIntraFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][6]; ///< Chroma filter 6 taps
-  static const TFilterCoeff m_weak4TapFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Weak filter 4 taps
-#if JVET_W0123_TIMD_FUSION
-  static const TFilterCoeff m_lumaIntraFilterExt[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS << 1][6]; ///< Chroma filter 6 taps
-#endif
-#endif
   static const TFilterCoeff m_lumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8]; ///< Luma filter taps 1.5x
   static const TFilterCoeff m_lumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8]; ///< Luma filter taps 2x
-  static const TFilterCoeff m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Chroma filter taps 1.5x
-  static const TFilterCoeff m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Chroma filter taps 2x
-
   static const TFilterCoeff m_affineLumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8]; ///< Luma filter taps 1.5x
   static const TFilterCoeff m_affineLumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8]; ///< Luma filter taps 2x
 
@@ -91,23 +91,33 @@ private:
   static const TFilterCoeff m_lumaAltHpelIFilter[8]; ///< Luma filter taps
 #else
   static const TFilterCoeff m_lumaFilter[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_LUMA]; ///< Luma filter taps
-  static const TFilterCoeff m_chromaFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Chroma filter taps
-#if INTRA_6TAP
-  static const TFilterCoeff m_lumaIntraFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][6]; ///< Chroma filter 6 taps
-  static const TFilterCoeff m_weak4TapFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Weak filter 4 taps
-#endif
   static const TFilterCoeff m_lumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_LUMA]; ///< Luma filter taps 1.5x
   static const TFilterCoeff m_lumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_LUMA]; ///< Luma filter taps 2x
-  static const TFilterCoeff m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Chroma filter taps 1.5x
-  static const TFilterCoeff m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Chroma filter taps 2x
   static const TFilterCoeff m_affineLumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_LUMA]; ///< Luma filter taps 1.5x
   static const TFilterCoeff m_affineLumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_LUMA]; ///< Luma filter taps 2x
+
 private:
   static const TFilterCoeff m_lumaAltHpelIFilter[NTAPS_LUMA]; ///< Luma filter taps
 #endif
+#if INTRA_6TAP
+  static const TFilterCoeff m_lumaIntraFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][6]; ///< Chroma filter 6 taps
+#if JVET_Z0117_CHROMA_IF
+  static const TFilterCoeff m_weak4TapFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][4]; ///< Weak filter 4 taps
+#else
+  static const TFilterCoeff m_weak4TapFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Weak filter 4 taps
+#endif
 #if JVET_W0123_TIMD_FUSION
+  static const TFilterCoeff m_lumaIntraFilterExt[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS << 1][6]; ///< Chroma filter 6 taps
+#endif
+#endif
+#if JVET_W0123_TIMD_FUSION
+#if JVET_Z0117_CHROMA_IF
+  static const TFilterCoeff g_aiExtIntraCubicFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS << 1][4]; ///< Chroma filter taps
+  static const TFilterCoeff g_aiExtIntraGaussFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS << 1][4]; ///< Chroma filter taps
+#else
   static const TFilterCoeff g_aiExtIntraCubicFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS<<1][NTAPS_CHROMA]; ///< Chroma filter taps
   static const TFilterCoeff g_aiExtIntraGaussFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS<<1][NTAPS_CHROMA]; ///< Chroma filter taps
+#endif
 #endif
   static const TFilterCoeff m_bilinearFilter[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_BILINEAR]; ///< bilinear filter taps
   static const TFilterCoeff m_bilinearFilterPrec4[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_BILINEAR]; ///< bilinear filter taps
@@ -128,6 +138,19 @@ public:
 
   static void xWeightedGeoBlk(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
   void weightedGeoBlk(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  template <bool trueTFalseL>
+  static void xWeightedGeoTpl(const PredictionUnit &pu, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+  template <bool trueTFalseL>
+  void weightedGeoTpl (const PredictionUnit &pu, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+  {
+    (trueTFalseL ? m_weightedGeoTplA : m_weightedGeoTplL)(pu, splitDir, predDst, predSrc0, predSrc1);
+  }
+#endif
+#if JVET_Y0065_GPM_INTRA
+  static void xWeightedGeoBlkRounded(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+  void weightedGeoBlkRounded(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+#endif
 protected:
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
   static CacheModel* m_cacheModel;
@@ -136,18 +159,35 @@ public:
   InterpolationFilter();
   ~InterpolationFilter() {}
 #if IF_12TAP
-#if SIMD_4x4_12
+#if SIMD_4x4_12 && defined(TARGET_SIMD_X86)
   void(*m_filter4x4[2])(const int16_t* src, int srcStride, int16_t *dst, int dstStride, int shiftH, int offsetH, int shiftV, int offsetV, int16_t const *coeffH, int16_t const *coeffV, int ibdimin, int ibdimax); //kolya
 #endif
 
+#if JVET_Z0117_CHROMA_IF
+  void(*m_filterHor[5][2][2])(const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, TFilterCoeff const *coeff, bool biMCForDMVR);
+  void(*m_filterVer[5][2][2])(const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, TFilterCoeff const *coeff, bool biMCForDMVR);
+#else
+  void(*m_filterHor[4][2][2])(const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, TFilterCoeff const *coeff, bool biMCForDMVR);
+  void(*m_filterVer[4][2][2])(const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, TFilterCoeff const *coeff, bool biMCForDMVR);
+#endif
+#else
+#if JVET_Z0117_CHROMA_IF
   void(*m_filterHor[4][2][2])(const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, TFilterCoeff const *coeff, bool biMCForDMVR);
   void(*m_filterVer[4][2][2])(const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, TFilterCoeff const *coeff, bool biMCForDMVR);
 #else
   void(*m_filterHor[3][2][2])(const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, TFilterCoeff const *coeff, bool biMCForDMVR);
   void(*m_filterVer[3][2][2])(const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, TFilterCoeff const *coeff, bool biMCForDMVR);
 #endif
+#endif
   void( *m_filterCopy[2][2] )  ( const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, bool biMCForDMVR);
   void( *m_weightedGeoBlk )(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void( *m_weightedGeoTplA )(const PredictionUnit &pu, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+  void( *m_weightedGeoTplL )(const PredictionUnit &pu, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+#endif
+#if JVET_Y0065_GPM_INTRA
+  void( *m_weightedGeoBlkRounded )(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+#endif
 
   void initInterpolationFilter( bool enable );
 #ifdef TARGET_SIMD_X86
@@ -168,7 +208,11 @@ public:
   static TFilterCoeff const * const getIntraLumaFilterTableExt(const int deltaFract) { return m_lumaIntraFilterExt[deltaFract]; };
 #endif
 #endif
+#if JVET_Z0117_CHROMA_IF
+  static TFilterCoeff const * const getChromaFilterTable(const int deltaFract) { return m_chromaFilter4[deltaFract]; };
+#else
   static TFilterCoeff const * const getChromaFilterTable(const int deltaFract) { return m_chromaFilter[deltaFract]; };
+#endif
 #if JVET_W0123_TIMD_FUSION
   static TFilterCoeff const * const getExtIntraCubicFilter(const int deltaFract) { return g_aiExtIntraCubicFilter[deltaFract]; };
   static TFilterCoeff const * const getExtIntraGaussFilter(const int deltaFract) { return g_aiExtIntraGaussFilter[deltaFract]; };

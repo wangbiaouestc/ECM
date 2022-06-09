@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -189,6 +189,9 @@ private:
   bool                    m_bInitAMaxBT;
 
   AUWriterIf*             m_AUWriterIf;
+#if JVET_Z0118_GDR
+  int                     m_lastGdrIntervalPoc;  
+#endif
 
 #if JVET_O0756_CALCULATE_HDRMETRICS
 
@@ -217,10 +220,11 @@ public:
   void  init        ( EncLib* pcEncLib );
 
   void  compressGOP ( int iPOCLast, int iNumPicRcvd, PicList& rcListPic, std::list<PelUnitBuf*>& rcListPicYuvRec,
-                      bool isField, bool isTff, const InputColourSpaceConversion snr_conversion, const bool printFrameMSE
-                    , bool isEncodeLtRef
-                    , const int picIdInGOP
-  );
+                      bool isField, bool isTff, const InputColourSpaceConversion snr_conversion, const bool printFrameMSE,
+#if MSSIM_UNIFORM_METRICS_LOG
+                      const bool printMSSSIM,
+#endif
+                      bool isEncodeLtRef, const int picIdInGOP);
   void  xAttachSliceDataToNalUnit (OutputNALUnit& rNalu, OutputBitstream* pcBitstreamRedirect);
 
 
@@ -241,8 +245,22 @@ public:
   bool      getPrepareLTRef() { return m_isPrepareLTRef; }
   void      setLastLTRefPoc(int iLastLTRefPoc) { m_lastLTRefPoc = iLastLTRefPoc; }
   int       getLastLTRefPoc() const { return m_lastLTRefPoc; }
+#if JVET_Z0118_GDR
+  void      setLastGdrIntervalPoc(int p)  { m_lastGdrIntervalPoc = p; }
+  int       getLastGdrIntervalPoc() const { return m_lastGdrIntervalPoc; }
+#endif
 
-  void  printOutSummary( uint32_t uiNumAllPicCoded, bool isField, const bool printMSEBasedSNR, const bool printSequenceMSE, const bool printHexPsnr, const bool printRprPSNR, const BitDepths &bitDepths );
+  void printOutSummary(uint32_t uiNumAllPicCoded, bool isField, const bool printMSEBasedSNR,
+                       const bool printSequenceMSE,
+#if MSSIM_UNIFORM_METRICS_LOG
+                       const bool printMSSSIM,
+#endif
+                       const bool printHexPsnr, const bool printRprPSNR, const BitDepths &bitDepths
+#if JVET_W0134_UNIFORM_METRICS_LOG
+                       ,
+                       int layerId
+#endif
+  );
 #if W0038_DB_OPT
   uint64_t  preLoopFilterPicAndCalcDist( Picture* pcPic );
 #endif
@@ -280,17 +298,31 @@ protected:
   void copyBuftoFrame       ( Picture* pcPic );
 #endif
 
-  void  xCalculateAddPSNRs(const bool isField, const bool isFieldTopFieldFirst, const int iGOPid, Picture* pcPic, const AccessUnit&accessUnit, PicList &rcListPic, int64_t dEncTime, const InputColourSpaceConversion snr_conversion, const bool printFrameMSE, double* PSNR_Y
-    , bool isEncodeLtRef
-  );
-  void  xCalculateAddPSNR(Picture* pcPic, PelUnitBuf cPicD, const AccessUnit&, double dEncTime, const InputColourSpaceConversion snr_conversion, const bool printFrameMSE, double* PSNR_Y
-    , bool isEncodeLtRef
-  );
+  void xCalculateAddPSNRs(const bool isField, const bool isFieldTopFieldFirst, const int iGOPid, Picture *pcPic,
+                          const AccessUnit &accessUnit, PicList &rcListPic, int64_t dEncTime,
+                          const InputColourSpaceConversion snr_conversion, const bool printFrameMSE,
+#if MSSIM_UNIFORM_METRICS_LOG
+                          const bool printMSSSIM,
+#endif
+                          double *PSNR_Y, bool isEncodeLtRef);
+  void xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUnit &, double dEncTime,
+                         const InputColourSpaceConversion snr_conversion, const bool printFrameMSE,
+#if MSSIM_UNIFORM_METRICS_LOG
+                         const bool printMSSSIM,
+#endif
+                         double *PSNR_Y, bool isEncodeLtRef);
+
   void  xCalculateInterlacedAddPSNR( Picture* pcPicOrgFirstField, Picture* pcPicOrgSecondField,
                                      PelUnitBuf cPicRecFirstField, PelUnitBuf cPicRecSecondField,
-                                     const InputColourSpaceConversion snr_conversion, const bool printFrameMSE, double* PSNR_Y
-                                    , bool isEncodeLtRef
-  );
+                                   const InputColourSpaceConversion snr_conversion, const bool printFrameMSE,
+#if MSSIM_UNIFORM_METRICS_LOG
+                                   const bool printMSSSIM,
+#endif
+                                   double *PSNR_Y, bool isEncodeLtRef);
+#if MSSIM_UNIFORM_METRICS_LOG
+  double xCalculateMSSSIM(const Pel *org, const int orgStride, const Pel *rec, const int recStride, const int width,
+                          const int height, const uint32_t bitDepth);
+#endif
 
   uint64_t xFindDistortionPlane(const CPelBuf& pic0, const CPelBuf& pic1, const uint32_t rshift
 #if ENABLE_QPA

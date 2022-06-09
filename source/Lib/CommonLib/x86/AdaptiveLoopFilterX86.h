@@ -637,6 +637,7 @@ static void simdFilter7x7Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
   CHECK(height % STEP_Y, "Wrong endHeight in filtering");
   CHECK(width % STEP_X, "Wrong endWidth in filtering");
 
+
   const Pel *src = srcBuffer.buf + blk.y * srcStride + blk.x;
   Pel *      dst = dstBuffer.buf + blkDst.y * dstStride + blkDst.x;
 
@@ -973,7 +974,7 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
   CHECK(blk.y % STEP_Y, "Wrong startHeight in filtering");
   CHECK(blk.x % STEP_X, "Wrong startWidth in filtering");
   CHECK(height % STEP_Y, "Wrong endHeight in filtering");
-  CHECK(width % STEP_X, "Wrong endWidth in filtering");
+  CHECK(width % 4, "Wrong endWidth in filtering");
 
   const Pel *src = srcBuffer.buf + blk.y * srcStride + blk.x;
   Pel *      dst = dstBuffer.buf + blkDst.y * dstStride + blkDst.x;
@@ -1122,7 +1123,14 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
         accumA = _mm_add_epi16(accumA, cur);
         accumA = _mm_min_epi16(mmMax, _mm_max_epi16(accumA, mmMin));
 
-        _mm_storeu_si128((__m128i *) (dst + ii * dstStride + j), accumA);
+        if (j + STEP_X <= width)
+        {
+          _mm_storeu_si128((__m128i *) (dst + ii * dstStride + j), accumA);
+        }
+        else
+        {
+          _mm_storel_epi64((__m128i *) (dst + ii * dstStride + j), accumA);
+        }
       } //for (size_t ii = 0; ii < STEP_Y; ii++)
     } //for (size_t j = 0; j < width; j += STEP_X)
     src += srcStride * STEP_Y;
@@ -1379,6 +1387,9 @@ static void simdFilter13x13Blk(
   AlfClassifier **classifier,
   const CPelBuf &srcLuma,
   const Area& curBlk,
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  const Area &blkDst,
+#endif
   Pel ***fixedFilterResults,
   int picWidth,
   const int fixedFiltInd,
@@ -1400,6 +1411,8 @@ static void simdFilter13x13Blk(
   constexpr int STEP_Y = 2;
 
   const Pel *src = srcLuma.buf + curBlk.y * srcStride + curBlk.x;
+
+
   const __m128i mmOffset = _mm_set1_epi32(ROUND);
   const __m128i mmMin = _mm_set1_epi16(clpRng.min);
   const __m128i mmMax = _mm_set1_epi16(clpRng.max);
@@ -1411,7 +1424,12 @@ static void simdFilter13x13Blk(
 
   for (int i = 0; i < height; i += STEP_Y)
   {
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+    const AlfClassifier *pClass = classifier[blkDst.y + i] + blkDst.x;
+#else
     const AlfClassifier *pClass = classifier[curBlk.y + i] + curBlk.x;
+#endif
+
     for (int j = 0; j < width; j += STEP_X)
     {
       __m128i params[21];
@@ -1578,7 +1596,11 @@ static void simdFilter13x13Blk(
         accumA = _mm_add_epi16(accumA, cur);
         accumA = _mm_min_epi16(mmMax, _mm_max_epi16(accumA, mmMin));
 
-        _mm_storeu_si128((__m128i *)(&(fixedFilterResults[fixedFiltInd][curBlk.y + i + ii][curBlk.x + j])), accumA);
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+        _mm_storeu_si128((__m128i *) (&(fixedFilterResults[fixedFiltInd][blkDst.y + i + ii][blkDst.x + j])), accumA);
+#else
+        _mm_storeu_si128((__m128i *) (&(fixedFilterResults[fixedFiltInd][curBlk.y + i + ii][curBlk.x + j])), accumA);
+#endif
       } //for (size_t ii = 0; ii < STEP_Y; ii++)
     }//for (size_t j = 0; j < width; j += STEP_X)
     src += srcStride * STEP_Y;
@@ -1933,8 +1955,14 @@ static void simdCalcClass0(AlfClassifier **classifier, const Area &blkDst, const
       classIdx = _mm_slli_epi16(classIdx, 2);
       classIdx = _mm_add_epi16(classIdx, transposeIdx);
       classIdx = _mm_shuffle_epi8(classIdx, _mm_setr_epi8(0, 1, 0, 1, 4, 5, 4, 5, 8, 9, 8, 9, 12, 13, 12, 13));
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+      _mm_storeu_si128((__m128i *) &classifier[blkDst.pos().y + i][blkDst.pos().x + j], classIdx);
+      _mm_storeu_si128((__m128i *) &classifier[blkDst.pos().y + i + 1][blkDst.pos().x + j], classIdx);
+#else
       _mm_storeu_si128((__m128i *) &classifier[curBlk.pos().y + i][curBlk.pos().x + j], classIdx);
       _mm_storeu_si128((__m128i *) &classifier[curBlk.pos().y + i + 1][curBlk.pos().x + j], classIdx);
+#endif
+
     }//for (int j = 0; j < curBlk.width; j += 8)
   }//for (int i = 0; i < curBlk.height; i += 2)
 }
@@ -2005,8 +2033,13 @@ static void simdCalcClass1(AlfClassifier **classifier, const Area &blkDst, const
       classIdx = _mm_slli_epi16(classIdx, 2);
       classIdx = _mm_add_epi16(classIdx, transposeIdx);
       classIdx = _mm_shuffle_epi8(classIdx, _mm_setr_epi8(0, 1, 0, 1, 4, 5, 4, 5, 8, 9, 8, 9, 12, 13, 12, 13));
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+      _mm_storeu_si128((__m128i *) &classifier[blkDst.pos().y + i][blkDst.pos().x + j], classIdx);
+      _mm_storeu_si128((__m128i *) &classifier[blkDst.pos().y + i + 1][blkDst.pos().x + j], classIdx);
+#else
       _mm_storeu_si128((__m128i *) &classifier[curBlk.pos().y + i][curBlk.pos().x + j], classIdx);
       _mm_storeu_si128((__m128i *) &classifier[curBlk.pos().y + i + 1][curBlk.pos().x + j], classIdx);
+#endif
     }//for (int j = 0; j < curBlk.width; j += 8)
   }//for (int i = 0; i < curBlk.height; i += 2)
 }

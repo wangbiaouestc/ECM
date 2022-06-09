@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -255,6 +255,9 @@ struct ComprCUCtx
 
     extraFeaturesd.reserve( numExtraFeatures );
     extraFeaturesd.resize ( numExtraFeatures, 0.0 );
+#if INTRA_TRANS_ENC_OPT
+    bestLfnstCost[0] = bestLfnstCost[1] = MAX_DOUBLE;
+#endif
   }
 
   unsigned                          minDepth;
@@ -279,6 +282,9 @@ struct ComprCUCtx
   double                            bestCostWithoutSplitFlags;
   double                            bestCostMtsFirstPassNoIsp;
   double                            bestCostIsp;
+#if INTRA_TRANS_ENC_OPT
+  double                            bestLfnstCost[2];
+#endif
   bool                              ispWasTested;
   uint16_t                          bestPredModeDCT2;
   bool                              relatedCuIsValid;
@@ -297,6 +303,9 @@ struct ComprCUCtx
   template<typename T> T    get( int ft )       const { return typeid(T) == typeid(double) ? (T&)extraFeaturesd[ft] : T(extraFeatures[ft]); }
   template<typename T> void set( int ft, T val )      { extraFeatures [ft] = int64_t( val ); }
   void                      set( int ft, double val ) { extraFeaturesd[ft] = val; }
+#if INTRA_TRANS_ENC_OPT
+  bool   isLfnstTested()                        const { return (bestLfnstCost[0] != MAX_DOUBLE && bestLfnstCost[1] != MAX_DOUBLE); }
+#endif
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -314,6 +323,9 @@ protected:
 #if SHARP_LUMA_DELTA_QP
   int                   m_lumaLevelToDeltaQPLUT[LUMA_LEVEL_TO_DQP_LUT_MAXSIZE];
   int                   m_lumaQPOffset;
+#endif
+#if JVET_Y0240_BIM
+  std::map<int, int*>  *m_bimQPMap;
 #endif
   bool                  m_fastDeltaQP;
   static_vector<ComprCUCtx, ( MAX_CU_DEPTH << 2 )> m_ComprCUCtxList;
@@ -382,6 +394,9 @@ public:
   void   setMtsFirstPassNoIspCost     ( double cost )           { m_ComprCUCtxList.back().bestCostMtsFirstPassNoIsp = cost;         }
   double getIspCost                   ()                  const { return m_ComprCUCtxList.back().bestCostIsp; }
   void   setIspCost                   ( double val )            { m_ComprCUCtxList.back().bestCostIsp = val; }
+#if INTRA_TRANS_ENC_OPT
+  void   resetLfnstCost               ()                        { m_ComprCUCtxList.back().bestLfnstCost[0] = m_ComprCUCtxList.back().bestLfnstCost[1] = MAX_DOUBLE; }
+#endif
   bool   getISPWasTested              ()                  const { return m_ComprCUCtxList.back().ispWasTested; }
   void   setISPWasTested              ( bool val )              { m_ComprCUCtxList.back().ispWasTested = val; }
   void   setBestPredModeDCT2          ( uint16_t val )          { m_ComprCUCtxList.back().bestPredModeDCT2 = val; }
@@ -407,6 +422,488 @@ public:
   void setInterSearch                 (InterSearch* pcInterSearch)   { m_pcInterSearch = pcInterSearch; }
   void   setPltEnc                    ( bool b )                { m_doPlt = b; }
   bool   getPltEnc()                                      const { return m_doPlt; }
+#if JVET_Y0240_BIM
+  void   setBIMQPMap                  ( std::map<int, int*> *qpMap ) { m_bimQPMap = qpMap; }
+  int    getBIMOffset                 ( int poc, int ctuId )
+  {
+    auto it = m_bimQPMap->find(poc);
+    return (it == m_bimQPMap->end()) ? 0 : (*m_bimQPMap)[poc][ctuId];
+  }
+#endif
+
+#if JVET_Z0118_GDR
+void forceIntraMode()
+{ 
+  // remove all inter or split to force make intra      
+  int n = (int)m_ComprCUCtxList.back().testModes.size();   
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+
+    if (isModeInter(etm.type))
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;          
+    }
+  }  
+}
+
+void forceIntraNoSplit()
+{
+  // remove all inter or split to force make intra        
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+
+    if (isModeInter(etm.type) || isModeSplit(etm.type)) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }  
+}
+
+// Note: ForceInterMode
+void forceInterMode()
+{    
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+    if (etm.type == ETM_INTRA) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;        
+    }
+  }  
+}
+
+void removeHashInter()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+    if (etm.type == ETM_HASH_INTER) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+
+void removeMergeSkip()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+    if (etm.type == ETM_MERGE_SKIP) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+
+void removeInterME()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+    if (etm.type == ETM_INTER_ME) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+
+#if !MERGE_ENC_OPT
+void removeAffine()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+    if (etm.type == ETM_AFFINE) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+#endif
+
+void removeMergeGeo()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+    if (etm.type == ETM_MERGE_GEO) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+
+void removeIntra()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+    if (etm.type == ETM_INTRA) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+
+void removeBadMode()
+{  
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+
+    if (etm.type == ETM_INTER_ME && ((etm.opts & ETO_IMV) >> ETO_IMV_SHIFT) > 2) 
+    {  
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+      break;
+    }
+  }  
+}
+
+bool anyPredModeLeft()
+{ 
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+
+    if (etm.type == ETM_HASH_INTER ||
+        etm.type == ETM_MERGE_SKIP || 
+        etm.type == ETM_INTER_ME   || 
+#if !MERGE_ENC_OPT
+        etm.type == ETM_AFFINE     || 
+#endif
+        etm.type == ETM_MERGE_GEO  || 
+        etm.type == ETM_INTRA      ||
+        etm.type == ETM_PALETTE    || 
+        etm.type == ETM_IBC        ||
+        etm.type == ETM_IBC_MERGE) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool anyIntraIBCMode()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+
+    if (etm.type == ETM_INTRA || etm.type == ETM_IBC) 
+    {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void forceRemovePredMode()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++)
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+
+    if (
+      etm.type == ETM_HASH_INTER
+      || etm.type == ETM_MERGE_SKIP
+      || etm.type == ETM_INTER_ME
+#if !MERGE_ENC_OPT
+      || etm.type == ETM_AFFINE
+#endif
+#if AFFINE_MMVD && !MERGE_ENC_OPT
+      || etm.type == ETM_AF_MMVD
+#endif
+#if TM_MRG && !MERGE_ENC_OPT
+      || etm.type == ETM_MERGE_TM
+#endif
+      || etm.type == ETM_MERGE_GEO
+      || etm.type == ETM_INTRA
+      || etm.type == ETM_PALETTE
+      || etm.type == ETM_IBC
+      || etm.type == ETM_IBC_MERGE
+#if MULTI_HYP_PRED
+      || etm.type == ETM_INTER_MULTIHYP
+#endif
+      )
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+
+void forceRemoveDontSplit()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+
+    if (etm.type == ETM_POST_DONT_SPLIT) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+
+void forceVerSplitOnly()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];       
+     
+    if (etm.type == ETM_SPLIT_BT_H || etm.type == ETM_SPLIT_TT_H)
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }   
+}
+
+void forceRemoveTTH()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++)
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+
+    if (etm.type == ETM_SPLIT_TT_H)
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+
+void forceRemoveTTV()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+    
+    if (etm.type == ETM_SPLIT_TT_V) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+
+void forceRemoveBTH()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++)
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+
+    if (etm.type == ETM_SPLIT_BT_H)
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+
+void forceRemoveBTV()
+{  
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+
+    if (etm.type == ETM_SPLIT_BT_V) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+
+void forceRemoveQT()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+ 
+    if (etm.type == ETM_SPLIT_QT) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }  
+}
+
+void forceRemoveHT()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+
+    if (etm.type == ETM_SPLIT_BT_H || etm.type == ETM_SPLIT_TT_H) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+
+void forceRemoveQTHT()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+    
+    if (etm.type == ETM_SPLIT_QT || etm.type == ETM_SPLIT_BT_H || etm.type == ETM_SPLIT_TT_H) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+
+void forceRemoveAllSplit()
+{
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+
+    if (etm.type == ETM_SPLIT_QT || etm.type == ETM_SPLIT_BT_H || etm.type == ETM_SPLIT_BT_V || etm.type == ETM_SPLIT_TT_H || etm.type == ETM_SPLIT_TT_V) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;
+    }
+  }
+}
+
+void forceQTonlyMode()
+{
+  // remove all split except QT  
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+
+    if (etm.type != ETM_SPLIT_QT) 
+    {
+      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      j--;
+      n--;        
+    }
+  }    
+}
+
+const char* printType(EncTestModeType type)
+{
+  char *ret;
+
+  switch (type)
+  {
+  case  ETM_HASH_INTER:      ret = strdup("Hash"); break;
+  case  ETM_MERGE_SKIP:      ret = strdup("Mkip"); break;
+  case  ETM_INTER_ME:        ret = strdup("InterMe"); break;
+#if !MERGE_ENC_OPT
+  case  ETM_AFFINE:          ret = strdup("Affi"); break;
+#endif
+#if AFFINE_MMVD && !MERGE_ENC_OPT
+  case  ETM_AF_MMVD:         ret = strdup("AfMMVD"); break;
+#endif
+#if TM_MRG && !MERGE_ENC_OPT
+  case  ETM_MERGE_TM:        ret = strdup("MergeTM"); break;
+#endif
+  case  ETM_MERGE_GEO:       ret = strdup("MergeGeo"); break;
+  case  ETM_INTRA:           ret = strdup("Intra"); break;
+  case  ETM_PALETTE:         ret = strdup("Palet"); break;
+
+  case  ETM_SPLIT_QT:        ret = strdup("QT"); break;
+  case  ETM_SPLIT_BT_H:      ret = strdup("BTH"); break;
+  case  ETM_SPLIT_BT_V:      ret = strdup("BTV"); break;
+  case  ETM_SPLIT_TT_H:      ret = strdup("TTH"); break;
+  case  ETM_SPLIT_TT_V:      ret = strdup("TTV"); break;
+  case  ETM_POST_DONT_SPLIT: ret = strdup("|"); break;
+#if REUSE_CU_RESULTS    
+  case ETM_RECO_CACHED:      ret = strdup("CACHE"); break;
+#endif
+  case ETM_TRIGGER_IMV_LIST: ret = strdup("TrigIMVList"); break;  
+  case ETM_IBC:              ret = strdup("IBC"); break;
+  case ETM_IBC_MERGE:        ret = strdup("IBCMerge"); break;
+#if MULTI_HYP_PRED
+  case ETM_INTER_MULTIHYP:   ret = strdup("MulHyp"); break;
+#endif
+  default:
+    ret = strdup("INVALID");
+  }
+
+  return ret;
+}
+
+void printMode()
+{
+  // remove all inter or split to force make intra          
+  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  printf("-:[");
+  for (int j = 0; j < n; j++) 
+  {
+    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];      
+    printf(" %s", printType(etm.type));      
+  }
+  printf("]\n");   
+}
+#endif
 
 protected:
   void xExtractFeatures ( const EncTestMode encTestmode, CodingStructure& cs );
@@ -484,7 +981,11 @@ struct CodedCUInfo
   double   bestNonDCT2Cost;
   bool     relatedCuIsValid;
   uint8_t  bestISPIntraMode;
-
+#if INTRA_TRANS_ENC_OPT
+  double   bestCostForLfnst;
+  bool     relatedCuLfnstIsValid;
+  bool     skipLfnstTest;
+#endif
 #if ENABLE_SPLIT_PARALLELISM
 
   uint64_t
@@ -520,7 +1021,7 @@ public:
 protected:
   void touch    ( const UnitArea& area );
 #endif
-#if JVET_W0097_GPM_MMVD_TM
+#if JVET_W0097_GPM_MMVD_TM || INTRA_TRANS_ENC_OPT
 public:
 #endif
   CodedCUInfo& getBlkInfo( const UnitArea& area );
@@ -574,6 +1075,9 @@ private:
   TCoeff             *m_pCoeff;
 #if SIGN_PREDICTION
   TCoeff             *m_pCoeffSign;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  unsigned           *m_pCoeffSignScanIdx;
+#endif
 #endif
   Pel                *m_pPcmBuf;
   bool               *m_runType;
@@ -675,6 +1179,9 @@ class EncModeCtrlMTnoRQT : public EncModeCtrl, public CacheBlkInfoCtrl
   };
 #endif
   unsigned m_skipThreshold;
+#if JVET_Z0118_GDR
+  EncCfg m_encCfg;
+#endif
 
 public:
 
@@ -695,6 +1202,9 @@ public:
   virtual bool parallelJobSelector( const EncTestMode& encTestmode, const CodingStructure &cs, Partitioner& partitioner ) const;
 #endif
   virtual bool checkSkipOtherLfnst( const EncTestMode& encTestmode, CodingStructure*& tempCS, Partitioner& partitioner );
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  bool xSkipTreeCandidate(const PartSplit split, const double* splitRdCostBest, const SliceType& sliceType) const;
+#endif
 };
 
 

@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -91,7 +91,9 @@ public:
 
   uint32_t getLFNSTIntraMode( int wideAngPredMode );
   bool     getTransposeFlag ( uint32_t intraMode  );
-
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  int      getLfnstIdx(const TransformUnit &tu, ComponentID compID);
+#endif
 protected:
 
   void xFwdLfnst( const TransformUnit &tu, const ComponentID compID, const bool loadTr = false );
@@ -148,6 +150,9 @@ protected:
 #if SIGN_PREDICTION
   Pel      m_tempSignPredResid[SIGN_PRED_MAX_BS * SIGN_PRED_MAX_BS * 2]{0};
   Pel      m_signPredTemplate[SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE*SIGN_PRED_MAX_BS*2];
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  uint8_t  m_signsBuf[SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE];
+#endif
 #endif
 
 private:
@@ -214,8 +219,20 @@ private:
 #if ENABLE_SIMD_SIGN_PREDICTION
   uint32_t( *m_computeSAD ) ( const Pel* ref, const Pel* cur, const int size );
   static inline uint32_t xComputeSAD( const Pel* ref, const Pel* cur, const int size );
+#if  JVET_Y0141_SIGN_PRED_IMPROVE
+  uint32_t(*m_computeHypSampleInt8) (const int dequant, const int8_t* templateNormalizedBuf, Pel* templ, const uint32_t uiWidth, const uint32_t uiHeight);
+  static inline uint32_t xComputeHypSampleInt8(const int dequant, const int8_t* templateNormalizedBuf, Pel* templ, const uint32_t uiWidth, const uint32_t uiHeight);
+  void(*m_computeSynSample) (const Pel* templ, Pel* resiBuf, const uint32_t uiWidth, const uint32_t uiHeight, const bool signModifyTo);
+  static inline void xComputeSynSample(const Pel* templ, Pel* resiBuf, const uint32_t uiWidth, const uint32_t uiHeight, const bool signModifyTo);
 #endif
+#endif
+#if INTRA_TRANS_ENC_OPT 
+  void(*m_fwdLfnst)  (TCoeff* src, TCoeff*& dst, const int8_t*& trMat, const int trSize, const int zeroOutSize);
+  static void forwardLfnst(TCoeff* src, TCoeff*& dst, const int8_t*& trMat, const int trSize, const int zeroOutSize);
 
+  void(*m_invLfnst)  (TCoeff* src, TCoeff*  dst, const int8_t*  trMat, const int trSize, const int zeroOutSize, const TCoeff outputMinimum, const TCoeff outputMaximum);
+  static void inverseLfnst(TCoeff* src, TCoeff*  dst, const int8_t*  trMat, const int trSize, const int zeroOutSize, const TCoeff outputMinimum, const TCoeff outputMaximum);
+#endif
 #if TRANSFORM_SIMD_OPT
   template <TransType transType, int transSize>
   static void fastForwardTransform_SIMD( const TCoeff *block, TCoeff *coeff, int shift, int line, int iSkipLine, int iSkipLine2 );

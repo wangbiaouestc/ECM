@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -160,11 +160,14 @@ protected:
   //==== File I/O ========
   int       m_iFrameRate;
   int       m_FrameSkip;
-  uint32_t      m_temporalSubsampleRatio;
+  uint32_t  m_temporalSubsampleRatio;
   int       m_iSourceWidth;
   int       m_iSourceHeight;
   Window    m_conformanceWindow;
   int       m_framesToBeEncoded;
+  int       m_firstValidFrame;
+  int       m_lastValidFrame;
+
   double    m_adLambdaModifier[ MAX_TLAYER ];
   std::vector<double> m_adIntraLambdaModifier;
   double    m_dIntraQpFactor;                                 ///< Intra Q Factor. If negative, use a default equation: 0.57*(1.0 - Clip3( 0.0, 0.5, 0.05*(double)(isField ? (GopSize-1)/2 : GopSize-1) ))
@@ -173,6 +176,9 @@ protected:
   bool      m_printHexPsnr;
   bool      m_printFrameMSE;
   bool      m_printSequenceMSE;
+#if MSSIM_UNIFORM_METRICS_LOG
+  bool      m_printMSSSIM;
+#endif
   bool      m_cabacZeroWordPaddingEnabled;
 
 #if JVET_S0179_CONDITIONAL_SIGNAL_GCI
@@ -340,6 +346,13 @@ protected:
   bool                  m_subPicIdMappingInSpsFlag;
   unsigned              m_subPicIdLen;
   std::vector<uint16_t> m_subPicId;
+#if JVET_Z0118_GDR
+  bool      m_gdrEnabled;  
+  unsigned  m_gdrPocStart;
+  unsigned  m_gdrPeriod;
+  int       m_gdrInterval;  
+  bool      m_gdrNoHash;  
+#endif
   bool      m_useSplitConsOverride;
   unsigned  m_uiMinQT[3]; //0: I slice; 1: P/B slice, 2: I slice chroma
   unsigned  m_uiMaxBT[3]; //0: I slice; 1: P/B slice, 2: I slice chroma
@@ -349,6 +362,10 @@ protected:
   unsigned  m_uiMaxMTTHierarchyDepthIChroma;
 #if JVET_X0144_MAX_MTT_DEPTH_TID
   unsigned  m_maxMTTHierarchyDepthByTid[MAX_TLAYER];
+#endif
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  int       m_ttFastSkip;
+  double    m_ttFastSkipThr;
 #endif
   bool      m_dualITree;
   unsigned  m_maxCUWidth;
@@ -376,6 +393,9 @@ protected:
 #endif
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   bool      m_DMVDMode;
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  bool      m_altGPMSplitModeCode;
 #endif
   bool      m_PROF;
   bool      m_BIO;
@@ -408,9 +428,16 @@ protected:
   bool      m_AffineAmvr;
   bool      m_HashME;
   bool      m_AffineAmvrEncOpt;
+  bool      m_AffineAmvp;
   bool      m_DMVR;
   bool      m_MMVD;
   int       m_MmvdDisNum;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  bool      m_MVSD;
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  bool      m_useARL;
+#endif
   bool      m_rgbFormat;
   bool      m_useColorTrans;
   unsigned  m_PLTMode;
@@ -576,6 +603,10 @@ protected:
   bool      m_bFastMEForGenBLowDelayEnabled;
   bool      m_bUseBLambdaForNonKeyLowDelayPictures;
   bool      m_gopBasedTemporalFilterEnabled;
+#if JVET_Y0240_BIM
+  bool      m_bimEnabled;
+  std::map<int, int*> m_adaptQPmap;
+#endif
   bool      m_noPicPartitionFlag;                             ///< no picture partitioning flag (single tile, single slice)
   bool      m_mixedLossyLossless;                             ///< enable mixed lossy/lossless coding
   std::vector<uint16_t> m_sliceLosslessArray;                      ///< Slice lossless array
@@ -733,6 +764,9 @@ protected:
 #endif
   uint32_t      m_maxNumAffineMergeCand;              ///< Maximum number of affine merge candidates
   uint32_t      m_maxNumGeoCand;
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  uint32_t      m_maxNumMHPCand;
+#endif
   uint32_t      m_maxNumIBCMergeCand;                 ///< Max number of IBC merge candidates
   ScalingListMode m_useScalingListId;             ///< Using quantization matrix i.e. 0=off, 1=default, 2=file.
   std::string m_scalingListFileName;              ///< quantization matrix file name
@@ -837,9 +871,9 @@ protected:
   int         m_BIFQPOffset;
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  bool        m_CBIF;
-  int         m_CBIFStrength;
-  int         m_CBIFQPOffset;
+  bool        m_chromaBIF;
+  int         m_chromaBIFStrength;
+  int         m_chromaBIFQPOffset;
 #endif
   
   bool        m_ccalf;
@@ -875,13 +909,19 @@ protected:
   int         m_numRefLayers[MAX_VPS_LAYERS];
   bool        m_avoidIntraInDepLayer;
 #if SIGN_PREDICTION
-  int m_numPredSign;
+  int         m_numPredSign;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  int         m_log2SignPredArea;
+#endif
 #endif
 #if DUMP_BEFORE_INLOOP
   bool        m_dumpBeforeInloop;
 #endif
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
   int         m_maxNumTUs;
+#endif
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  unsigned int m_tempCabacInitMode;
 #endif
 
 public:
@@ -1065,6 +1105,12 @@ public:
 
   void      setFramesToBeEncoded            ( int   i )      { m_framesToBeEncoded = i; }
 
+  void setValidFrames( const int first, const int last )
+  {
+    m_firstValidFrame = first;
+    m_lastValidFrame = last;
+  }
+
   bool      getPrintMSEBasedSequencePSNR    ()         const { return m_printMSEBasedSequencePSNR;  }
   void      setPrintMSEBasedSequencePSNR    (bool value)     { m_printMSEBasedSequencePSNR = value; }
 
@@ -1077,6 +1123,10 @@ public:
   bool      getPrintSequenceMSE             ()         const { return m_printSequenceMSE;           }
   void      setPrintSequenceMSE             (bool value)     { m_printSequenceMSE = value;          }
 
+#if MSSIM_UNIFORM_METRICS_LOG
+  bool      getPrintMSSSIM                  ()         const { return m_printMSSSIM;               }
+  void      setPrintMSSSIM                  (bool value)     { m_printMSSSIM = value;              }
+#endif
   bool      getCabacZeroWordPaddingEnabled()           const { return m_cabacZeroWordPaddingEnabled;  }
   void      setCabacZeroWordPaddingEnabled(bool value)       { m_cabacZeroWordPaddingEnabled = value; }
 
@@ -1133,6 +1183,19 @@ public:
   void      setMinQTSizes                   ( unsigned* minQT)   { m_uiMinQT[0] = minQT[0]; m_uiMinQT[1] = minQT[1]; m_uiMinQT[2] = minQT[2]; }
   void      setMaxBTSizes                   ( unsigned* maxBT)   { m_uiMaxBT[0] = maxBT[0]; m_uiMaxBT[1] = maxBT[1]; m_uiMaxBT[2] = maxBT[2]; }
   void      setMaxTTSizes                   ( unsigned* maxTT)   { m_uiMaxTT[0] = maxTT[0]; m_uiMaxTT[1] = maxTT[1]; m_uiMaxTT[2] = maxTT[2]; }
+#if JVET_Z0118_GDR
+  void      setGdrEnabled(bool b)       { m_gdrEnabled  = b; }
+  void      setGdrPeriod(unsigned u)    { m_gdrPeriod   = u; }
+  void      setGdrPocStart(unsigned u)  { m_gdrPocStart = u; }
+  void      setGdrInterval(int i)       { m_gdrInterval = i; }  
+  void      setGdrNoHash(bool b)        { m_gdrNoHash   = b; }    
+
+  bool      getGdrEnabled()             { return m_gdrEnabled;  }
+  unsigned  getGdrPeriod()              { return m_gdrPeriod;   }
+  unsigned  getGdrPocStart()            { return m_gdrPocStart; }
+  int       getGdrInterval()            { return m_gdrInterval; }  
+  bool      getGdrNoHash()              { return m_gdrNoHash;   }  
+#endif
   void      setMaxMTTHierarchyDepth         ( unsigned uiMaxMTTHierarchyDepth, unsigned uiMaxMTTHierarchyDepthI, unsigned uiMaxMTTHierarchyDepthIChroma )
                                                              { m_uiMaxMTTHierarchyDepth = uiMaxMTTHierarchyDepth; m_uiMaxMTTHierarchyDepthI = uiMaxMTTHierarchyDepthI; m_uiMaxMTTHierarchyDepthIChroma = uiMaxMTTHierarchyDepthIChroma; }
 #if JVET_X0144_MAX_MTT_DEPTH_TID
@@ -1146,6 +1209,12 @@ public:
   int       getCTUSize                      ()         const { return m_CTUSize; }
   void      setUseSplitConsOverride         (bool  n)        { m_useSplitConsOverride = n; }
   bool      getUseSplitConsOverride         ()         const { return m_useSplitConsOverride; }
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  void      setFastTTskip                   ( int val )      { m_ttFastSkip = val; }
+  int       getFastTTskip                   ()         const { return m_ttFastSkip; }
+  void      setFastTTskipThr                ( double val )      { m_ttFastSkipThr = val; }
+  double    getFastTTskipThr                ()         const { return m_ttFastSkipThr; }
+#endif
   void      setDualITree                    ( bool b )       { m_dualITree = b; }
   bool      getDualITree                    ()         const { return m_dualITree; }
   void      setSubPicInfoPresentFlag                        (bool b)                    { m_subPicInfoPresentFlag = b; }
@@ -1229,6 +1298,10 @@ public:
   void      setUseDMVDMode                  (bool b)         { m_DMVDMode = b; }
   bool      getUseDMVDMode                  ()         const { return m_DMVDMode; }
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void      setUseAltGPMSplitModeCode       (bool b)         { m_altGPMSplitModeCode = b; }
+  bool      getUseAltGPMSplitModeCode       ()         const { return m_altGPMSplitModeCode; }
+#endif
   void      setPROF                         (bool b)         { m_PROF = b; }
   bool      getPROF                         ()         const { return m_PROF; }
   void      setBIO(bool b)                                   { m_BIO = b; }
@@ -1277,6 +1350,7 @@ public:
   int       getLadfIntervalLowerBound       ( int idx ) const { return m_LadfIntervalLowerBound[ idx ]; }
 
 #endif
+
 #if ENABLE_DIMD
   void      setUseDimd                   ( bool b )       { m_dimd = b; }
   bool      getUseDimd                   ()         const { return m_dimd; }
@@ -1301,12 +1375,22 @@ public:
   bool      getUseAffineAmvr                ()         const { return m_AffineAmvr; }
   void      setUseAffineAmvrEncOpt          ( bool b )       { m_AffineAmvrEncOpt = b;    }
   bool      getUseAffineAmvrEncOpt          ()         const { return m_AffineAmvrEncOpt; }
+  void      setUseAffineAmvp                ( bool b )       { m_AffineAmvp = b; }
+  bool      getUseAffineAmvp                ()         const { return m_AffineAmvp; }
   void      setDMVR                      ( bool b )       { m_DMVR = b; }
   bool      getDMVR                      ()         const { return m_DMVR; }
   void      setMMVD                         (bool b)         { m_MMVD = b;    }
   bool      getMMVD                         ()         const { return m_MMVD; }
   void      setMmvdDisNum                   ( int b )        { m_MmvdDisNum = b; }
   int       getMmvdDisNum                   ()         const { return m_MmvdDisNum; }
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void      setUseMVSD(bool b) { m_MVSD = b; }
+  bool      getUseMVSD()                               const { return m_MVSD; }
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  void      setUseARL(bool b) { m_useARL = b; }
+  bool      getUseARL()                               const { return m_useARL; }
+#endif
   void      setRGBFormatFlag(bool value) { m_rgbFormat = value; }
   bool      getRGBFormatFlag()                         const { return m_rgbFormat; }
   void      setUseColorTrans(bool value) { m_useColorTrans = value; }
@@ -1349,12 +1433,12 @@ public:
   int       getBIFQPOffset                  ()         const { return m_BIFQPOffset; }
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  void      setUseCBIF                       ( bool b )       { m_CBIF = b; }
-  bool      getUseCBIF                       ()         const { return m_CBIF; }
-  void      setCBIFStrength                  ( int val )       { m_CBIFStrength = val; }
-  int       getCBIFStrength                  ()         const { return m_CBIFStrength; }
-  void      setCBIFQPOffset                  ( int val )       { m_CBIFQPOffset = val; }
-  int       getCBIFQPOffset                  ()         const { return m_CBIFQPOffset; }
+  void      setUseChromaBIF                 ( bool b )       { m_chromaBIF = b; }
+  bool      getUseChromaBIF                 ()         const { return m_chromaBIF; }
+  void      setChromaBIFStrength            ( int val )       { m_chromaBIFStrength = val; }
+  int       getChromaBIFStrength            ()         const { return m_chromaBIFStrength; }
+  void      setChromaBIFQPOffset            ( int val )       { m_chromaBIFQPOffset = val; }
+  int       getChromaBIFQPOffset            ()         const { return m_chromaBIFQPOffset; }
 #endif
 #if MULTI_HYP_PRED
   void      setNumMHPCandsToTest(int i) { m_numMHPCandsToTest = i; }
@@ -1640,8 +1724,17 @@ public:
   bool      getFastUDIUseMPMEnabled         ()      { return m_bFastUDIUseMPMEnabled; }
   bool      getFastMEForGenBLowDelayEnabled ()      { return m_bFastMEForGenBLowDelayEnabled; }
   bool      getUseBLambdaForNonKeyLowDelayPictures () { return m_bUseBLambdaForNonKeyLowDelayPictures; }
-  void  setGopBasedTemporalFilterEnabled(bool flag) { m_gopBasedTemporalFilterEnabled = flag; }
-  bool  getGopBasedTemporalFilterEnabled()          { return m_gopBasedTemporalFilterEnabled; }
+
+  void      setGopBasedTemporalFilterEnabled( const bool b ) { m_gopBasedTemporalFilterEnabled = b; }
+  bool      getGopBasedTemporalFilterEnabled() const         { return m_gopBasedTemporalFilterEnabled; }
+#if JVET_Y0240_BIM
+  void      setBIM                          (bool flag)               { m_bimEnabled = flag; }
+  bool      getBIM                          ()                        { return m_bimEnabled; }
+  void      setAdaptQPmap                   (std::map<int, int*> map) { m_adaptQPmap = map; }
+  int*      getAdaptQPmap                   (int poc)                 { return m_adaptQPmap[poc]; }
+  std::map<int, int*> *getAdaptQPmap        ()                        { return &m_adaptQPmap; }
+#endif
+
 
   bool      getUseReconBasedCrossCPredictionEstimate ()                const { return m_reconBasedCrossCPredictionEstimate;  }
   void      setUseReconBasedCrossCPredictionEstimate (const bool value)      { m_reconBasedCrossCPredictionEstimate = value; }
@@ -1985,6 +2078,10 @@ public:
   uint32_t     getMaxNumAffineMergeCand          ()                  { return m_maxNumAffineMergeCand; }
   void         setMaxNumGeoCand                  ( uint32_t u )      { m_maxNumGeoCand = u;    }
   uint32_t     getMaxNumGeoCand                  ()                  { return m_maxNumGeoCand; }
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  void         setMaxNumMHPCand                  ( uint32_t u )      { m_maxNumMHPCand = u;    }
+  uint32_t     getMaxNumMHPCand                  ()                  { return m_maxNumMHPCand; }
+#endif
   void         setMaxNumIBCMergeCand             ( uint32_t u )      { m_maxNumIBCMergeCand = u; }
   uint32_t     getMaxNumIBCMergeCand             ()                  { return m_maxNumIBCMergeCand; }
   void         setUseScalingListId    ( ScalingListMode u )          { m_useScalingListId       = u;   }
@@ -2246,8 +2343,11 @@ public:
   void                    setVPSParameters(const CfgVPSParameters& cfg)             { m_cfgVPSParameters = cfg; }
 
 #if SIGN_PREDICTION
-  void        setNumPredSigns( int num )                              { m_numPredSign = num;}
-  int         getNumPredSigns( )                                      { return m_numPredSign;}
+  void        setNumPredSigns( int num )                             { m_numPredSign = num;}
+  int         getNumPredSigns( )                                     { return m_numPredSign;}
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  void        setLog2SignPredArea( int val )                         { m_log2SignPredArea = val; }
+#endif
 #endif
 
 #if DUMP_BEFORE_INLOOP
@@ -2257,6 +2357,10 @@ public:
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
   void         setMaxNumTUs( int num )                               { m_maxNumTUs = num;  }
   int          getMaxNumTUs()                                  const { return m_maxNumTUs; }
+#endif
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  void      setTempCabacInitMode( unsigned n )                        { m_tempCabacInitMode = n; }
+  unsigned  getTempCabacInitMode()                              const { return m_tempCabacInitMode; }
 #endif
 };
 

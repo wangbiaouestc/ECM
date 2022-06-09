@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -104,12 +104,16 @@ private:
   Mv                m_mvBufBDMVR[2][MAX_NUM_SUBCU_DMVR];
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
- MvField            mvField_amList_dec[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
+  MvField           m_mvFieldAmListDec[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
 #endif
 
   MergeCtx          m_geoMrgCtx;
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  MergeCtx          m_geoTmMrgCtx[GEO_NUM_TM_MV_CAND];
+#else
   MergeCtx          m_geoTmMrgCtx0, m_geoTmMrgCtx1;
+#endif
 #endif
 };
 

@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1862,12 +1862,24 @@ namespace DQIntern
     if ( tu.cs->sps->getNumPredSigns() > 0  && uiHeight >= 4 && uiWidth >= 4)
     {
       TCoeff *coeff = signBuff.buf;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+      uint32_t spArea = tu.cs->sps->getSignPredArea();
+      uint32_t spWidth = std::min(uiWidth, spArea);
+      uint32_t spHeight = std::min(uiHeight, spArea);
+      CHECK(TrQuant::SIGN_PRED_BYPASS, "SIGN_PRED_BYPASS should be equal to 0");
+      for (uint32_t y = 0; y < spHeight; y++)
+#else
       for (uint32_t y = 0; y < SIGN_PRED_FREQ_RANGE; y++)
+#endif
       {
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+        memset(coeff, 0, sizeof(TCoeff) * spWidth);
+#else
         coeff[0] = TrQuant::SIGN_PRED_BYPASS;
         coeff[1] = TrQuant::SIGN_PRED_BYPASS;
         coeff[2] = TrQuant::SIGN_PRED_BYPASS;
         coeff[3] = TrQuant::SIGN_PRED_BYPASS;
+#endif
         coeff += signBuff.stride;
       }
     }
@@ -2147,9 +2159,118 @@ void DepQuant::quant( TransformUnit &tu, const ComponentID &compID, const CCoeff
 }
 
 #if SIGN_PREDICTION
-uint32_t DepQuant::getPredictedSigns( TransformUnit& tu, const ComponentID compID, std::vector<Position> &predSignsXY )
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+bool compareLevels(PositionWithLevel a, PositionWithLevel b) { return a.level > b.level; }
+uint32_t DepQuant::getPredictedSigns(TransformUnit& tu, const ComponentID compID, std::vector<Position> &predSignsXY, uint8_t* signBuf, bool isDecoder)
 {
   uint32_t numPredSigns = 0;
+  uint32_t numAreaSigns = 0;
+  bool bUseSignPred = TU::getUseSignPred(tu, compID);
+  std::vector<PositionWithLevel> predSignsXYLevel;
+  if (bUseSignPred)
+  {
+    bool lfnstEnabled = tu.checkLFNSTApplied(compID);
+    const int32_t maxNumPredSigns = lfnstEnabled ? 4 : tu.cs->sps->getNumPredSigns();
+    CoeffBuf bufQCoeffs = tu.getCoeffs(compID);
+    CoeffBuf bufSigns = tu.getCoeffSigns(compID);
+    TCoeff *coeff = bufQCoeffs.buf;
+    TCoeff *signs = bufSigns.buf;
+    const CompArea&     area = tu.blocks[compID];
+    const int           numCoeff = area.area();
+    const SizeType      hsId = gp_sizeIdxInfo->idxFrom(area.width);
+    const SizeType      vsId = gp_sizeIdxInfo->idxFrom(area.height);
+    const CoeffScanType scanType = SCAN_DIAG;
+    const ScanElement *scan = g_scanOrder[SCAN_GROUPED_4x4][scanType][hsId][vsId];
+    const uint64_t stateTransTab = g_stateTransTab[tu.cs->slice->getDepQuantEnabledIdc()];
+    int lastScanIdx = -1;
+    for (int scanIdx = numCoeff - 1; scanIdx >= 0; scanIdx--)
+    {
+      if (coeff[scan[scanIdx].idx])
+      {
+        lastScanIdx = scanIdx;
+        break;
+      }
+    }
+    if (lastScanIdx < 0)
+    {
+      return 0;
+    }
+        //----- dequant coefficients ----- 
+    uint32_t extAreaSize = (lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea());
+    uint32_t signPredHeight = (tu.blocks[compID].height > extAreaSize) ? extAreaSize : tu.blocks[compID].height;
+    uint32_t signPredWidth = (tu.blocks[compID].width > extAreaSize) ? extAreaSize : tu.blocks[compID].width;
+    if (isDecoder)
+    {
+      for (uint32_t uiY = 0; uiY < signPredHeight; uiY++)
+      {
+        for (uint32_t uiX = 0; uiX < signPredWidth; uiX++)
+        {
+          int coef = coeff[uiX];
+          if (coef != 0)
+          {
+            if (signs[uiX] != TrQuant::SIGN_PRED_HIDDEN)
+            {
+              uint32_t curSign = ((coef < 0) ? 1 : 0);
+              signBuf[numAreaSigns] = (uint8_t)curSign;
+              numAreaSigns++;
+            }
+          }
+        }
+        coeff += bufQCoeffs.stride;
+        signs += bufSigns.stride;
+      }
+      coeff = bufQCoeffs.buf;
+      signs = bufSigns.buf;
+           
+    }
+    for (int state = 0, scanIdx = lastScanIdx; scanIdx >= 0; scanIdx--)
+    {
+      const unsigned  rasterPos = scan[scanIdx].idx;
+      uint32_t uiX = scan[scanIdx].x;
+      uint32_t uiY = scan[scanIdx].y;
+      const TCoeff&   level = abs(coeff[rasterPos]);
+      if (level && uiY < signPredHeight && uiX < signPredWidth)
+      {
+        if (signs[rasterPos] != TrQuant::SIGN_PRED_HIDDEN)
+        {
+          Intermediate_Int  qIdx = (level << 1) - (state & 1);
+          predSignsXYLevel.push_back(PositionWithLevel(uiX, uiY, qIdx));
+        }
+      }
+      state = int((stateTransTab >> ((state << 3) + ((level & 1) << 2))) & 15);
+    }
+    std::stable_sort(predSignsXYLevel.begin(), predSignsXYLevel.end(), compareLevels);
+
+    IdxBuf bufSignsScanIdx = tu.getCoeffSignsScanIdx(compID);
+
+    if (isDecoder)
+    {
+      CHECK(numAreaSigns != predSignsXYLevel.size(), "sign prediction number error");
+    }
+
+    for (int idx = 0; idx < predSignsXYLevel.size(); idx++)
+    {
+      Position pos = Position(predSignsXYLevel[idx].x, predSignsXYLevel[idx].y);
+      bufSignsScanIdx.at(pos) = idx;
+      if (isDecoder)
+      {
+        TCoeff &quantCoeff = bufQCoeffs.at(pos);
+        quantCoeff = std::abs(quantCoeff) * (signBuf[idx] ? -1 : 1);
+      }
+      if (idx < maxNumPredSigns)
+      {
+        predSignsXY.push_back(pos);
+        numPredSigns++;
+      }
+    }
+    CHECK(numPredSigns > maxNumPredSigns, "");
+  }
+  return numPredSigns;
+}
+#else
+uint32_t DepQuant::getPredictedSigns( TransformUnit& tu, const ComponentID compID, std::vector<Position> &predSignsXY )
+{
+uint32_t numPredSigns = 0;
   bool bUseSignPred = TU::getUseSignPred( tu, compID );
 
   if( bUseSignPred )
@@ -2159,7 +2280,6 @@ uint32_t DepQuant::getPredictedSigns( TransformUnit& tu, const ComponentID compI
     CoeffBuf bufSigns = tu.getCoeffSigns( compID );
     TCoeff *coeff = bufQCoeffs.buf;
     TCoeff *signs = bufSigns.buf;
-
     for( uint32_t uiY = 0; uiY < SIGN_PRED_FREQ_RANGE; uiY++ )
     {
       for( uint32_t uiX = 0; uiX < SIGN_PRED_FREQ_RANGE; uiX++ )
@@ -2191,6 +2311,7 @@ uint32_t DepQuant::getPredictedSigns( TransformUnit& tu, const ComponentID compI
   }
   return numPredSigns;
 }
+#endif
 #endif
 
 void DepQuant::dequant( const TransformUnit &tu, CoeffBuf &dstCoeff, const ComponentID &compID, const QpParam &cQP )

@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2021, ITU/ISO/IEC
+* Copyright (c) 2010-2022, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -52,6 +52,11 @@ struct Picture;
 enum PictureType
 {
   PIC_RECONSTRUCTION = 0,
+#if JVET_Z0118_GDR
+  PIC_RECONSTRUCTION_0 = 0,
+  PIC_RECONSTRUCTION_1 = 1,
+  PIC_RECONSTRUCTION_SAVE = 2,
+#endif
   PIC_ORIGINAL,
   PIC_TRUE_ORIGINAL,
   PIC_FILTERED_ORIGINAL,
@@ -103,6 +108,44 @@ public:
 
   void destroy();
   void releaseIntermediateData();
+#if JVET_Z0118_GDR
+  bool isCuCrossIRA(int begX) const;
+  bool isCuCrossVB(int endX) const;
+  
+  bool containRefresh(int begX, int endX) const;  
+  bool overlapRefresh(int begX, int endX) const;  
+  bool withinRefresh(int begX, int endX) const;  
+  
+  Area findOverlappedArea(const Area &a1, const Area &a2) const;
+#endif
+
+#if JVET_Z0118_GDR
+  bool isInGdrIntervalOrRecoveryPoc() const;
+
+  bool isClean(const ChannelType effChType) const;
+  bool isClean(const Position &IntPos, RefPicList e, int refIdx) const;
+  bool isClean(const Position &IntPos, const Picture* const ref_pic) const;
+  bool isClean(const Position &IntPos, const ChannelType effChType) const;  
+  bool isClean(const int x, const int y, const ChannelType effChType) const;  
+  bool isClean(const Area &area, const ChannelType effChType) const;
+  
+  bool isClean(const CodingUnit &cu) const;
+  bool isClean(const PredictionUnit &pu) const;  
+  bool isClean(const TransformUnit &tu) const;
+#endif
+
+#if JVET_Z0118_GDR
+  void updateReconMotIPM(const UnitArea &uarea) const;
+  void updateReconMotIPM(const CompArea &carea) const;
+  void updateReconMotIPM(const UnitArea &uarea, const CPelUnitBuf &pbuf) const;  
+  void updateReconMotIPM(const CompArea &carea, const CPelBuf &pbuf) const;
+#endif
+
+#if JVET_Z0118_GDR
+  void rspSignalPicture(const UnitArea &uarea, std::vector<Pel>& pLUT, const bool usePred = true) const;
+  void rspSignalPicture(const CompArea &carea, std::vector<Pel>& pLUT, const bool usePred = true) const;
+  void reconstructPicture(const CompArea &carea, std::vector<Pel>& pLUT, CodingStructure *resiCS, bool lmcsEnable) const;
+#endif
 
   void rebindPicBufs();
 
@@ -162,6 +205,9 @@ public:
 
   static_vector<double, NUM_ENC_FEATURES> features;
 
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  double     *splitRdCostBest; //[Partition::NUM_PART_SPLIT];
+#endif
   double      cost;
   bool        useDbCost;
   double      costDbOffset;
@@ -193,7 +239,7 @@ public:
   }
 #endif
 #if MULTI_HYP_PRED
-  MEResultVec m_MEResults;
+  MEResultVec m_meResults;
 #endif
 
 private:
@@ -208,7 +254,14 @@ public:
   LutMotionCand motionLut;
 
   void addMiToLut(static_vector<MotionInfo, MAX_NUM_HMVP_CANDS>& lut, const MotionInfo &mi);
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  void addMiToLutIBC(static_vector<MotionInfo, MAX_NUM_HMVP_IBC_CANDS>& lut, const MotionInfo &mi);
+#endif
 
+#if JVET_Z0139_HIST_AFF
+  void addAffMiToLut(static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutSet, const AffineMotionInfo addMi[2], int refIdx[2]);
+  void addAffInheritToLut(static_vector<AffineInheritInfo, MAX_NUM_AFF_INHERIT_HMVP_CANDS>& lut, const AffineInheritInfo& mi);
+#endif
   PLTBuf prevPLT;
   void resetPrevPLT(PLTBuf& prevPLT);
   void reorderPrevPLT(PLTBuf& prevPLT, uint8_t curPLTSize[MAX_NUM_CHANNEL_TYPE], Pel curPLT[MAX_NUM_COMPONENT][MAXPLTSIZE], bool reuseflag[MAX_NUM_CHANNEL_TYPE][MAXPLTPREDSIZE], uint32_t compBegin, uint32_t numComp, bool jointPLT);
@@ -236,12 +289,24 @@ private:
 
   PelStorage m_pred;
   PelStorage m_resi;
+#if JVET_Z0118_GDR
+public:
+  // PelStorage *m_reco;
+  PictureType m_pt;  
+  PelStorage m_reco0; // for GDR dirty
+  PelStorage m_reco1; // for GDR clean
+private:
+#else
   PelStorage m_reco;
+#endif
   PelStorage m_orgr;
 
   TCoeff *m_coeffs [ MAX_NUM_COMPONENT ];
 #if SIGN_PREDICTION
-  TCoeff *m_coeff_signs [ MAX_NUM_COMPONENT ];
+  TCoeff *m_coeffSigns [ MAX_NUM_COMPONENT ];
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  unsigned *m_coeffSignsIdx[MAX_NUM_COMPONENT];
+#endif
 #endif
 #if REMOVE_PCM
   Pel    *m_pltIdx[MAX_NUM_CHANNEL_TYPE];
@@ -251,9 +316,20 @@ private:
   bool   *m_runType[ MAX_NUM_CHANNEL_TYPE ];
   int     m_offsets[ MAX_NUM_COMPONENT ];
 
+#if JVET_Z0118_GDR
+  MotionInfo *m_motionBuf0;
+  MotionInfo *m_motionBuf1;
+#else
   MotionInfo *m_motionBuf;
+#endif
+
 #if JVET_W0123_TIMD_FUSION
+#if JVET_Z0118_GDR
+  uint8_t *m_ipmBuf0;
+  uint8_t *m_ipmBuf1;
+#else
   uint8_t *m_ipmBuf;
+#endif  
 #endif
 
 public:
@@ -263,7 +339,10 @@ public:
   double        tmpColorSpaceIntraCost[2];
   bool          firstColorSpaceTestOnly;
   bool resetIBCBuffer;
-
+#if JVET_Z0136_OOB
+  bool          *mcMask[2];
+  bool          *mcMaskChroma[2];
+#endif
   MotionBuf getMotionBuf( const     Area& _area );
   MotionBuf getMotionBuf( const UnitArea& _area ) { return getMotionBuf( _area.Y() ); }
   MotionBuf getMotionBuf()                        { return getMotionBuf(  area.Y() ); }
@@ -279,6 +358,19 @@ public:
   bool  picContain( const Position _pos );
 #endif
 
+#if JVET_Z0118_GDR
+  MotionBuf getMotionBuf(const     Area& _area, PictureType pt);
+  MotionBuf getMotionBuf(const UnitArea& _area, PictureType pt) { return getMotionBuf(_area.Y(), pt); }
+  MotionBuf getMotionBuf(PictureType pt) { return getMotionBuf(area.Y(), pt); }
+
+  const CMotionBuf getMotionBuf(const     Area& _area, PictureType pt) const;
+  const CMotionBuf getMotionBuf(const UnitArea& _area, PictureType pt) const { return getMotionBuf(_area.Y(), pt); }
+  const CMotionBuf getMotionBuf(PictureType pt)                        const { return getMotionBuf(area.Y(), pt); }
+
+  MotionInfo& getMotionInfo(const Position& pos, PictureType pt);
+  const MotionInfo& getMotionInfo(const Position& pos, PictureType pt) const;
+#endif
+
 #if JVET_W0123_TIMD_FUSION
   IpmBuf getIpmBuf( const     Area& _area );
   IpmBuf getIpmBuf( const UnitArea& _area ) { return getIpmBuf( _area.Y() ); }
@@ -290,6 +382,19 @@ public:
 
   uint8_t& getIpmInfo( const Position& pos );
   const uint8_t& getIpmInfo( const Position& pos ) const;
+#endif
+
+#if JVET_W0123_TIMD_FUSION && JVET_Z0118_GDR
+  IpmBuf getIpmBuf(const     Area& _area, PictureType pt);
+  IpmBuf getIpmBuf(const UnitArea& _area, PictureType pt) { return getIpmBuf(_area.Y(), pt); }
+  IpmBuf getIpmBuf(PictureType pt) { return getIpmBuf(area.Y(), pt); }
+
+  const CIpmBuf getIpmBuf(const     Area& _area, PictureType pt) const;
+  const CIpmBuf getIpmBuf(const UnitArea& _area, PictureType pt) const { return getIpmBuf(_area.Y(), pt); }
+  const CIpmBuf getIpmBuf(PictureType pt)                        const { return getIpmBuf(area.Y(), pt); }
+
+  uint8_t& getIpmInfo(const Position& pos, PictureType pt);
+  const uint8_t& getIpmInfo(const Position& pos, PictureType pt) const;
 #endif
 
 
@@ -311,7 +416,11 @@ public:
   const CPelBuf       getRecoBuf(const CompArea &blk) const;
          PelUnitBuf   getRecoBuf(const UnitArea &unit);
   const CPelUnitBuf   getRecoBuf(const UnitArea &unit) const;
+#if JVET_Z0118_GDR // getRecoBufRef
+         PelUnitBuf&  getRecoBufRef() { if (m_pt == PIC_RECONSTRUCTION_0) return m_reco0; else return m_reco1; }
+#else
          PelUnitBuf&  getRecoBufRef() { return m_reco; }
+#endif
 
          PelBuf       getOrgResiBuf(const CompArea &blk);
   const CPelBuf       getOrgResiBuf(const CompArea &blk) const;
@@ -351,11 +460,29 @@ public:
   const CPelUnitBuf   getOrgResiBuf()                          const { return m_orgr; }
 
   // reco buffer
+#if JVET_Z0118_GDR
+         PelBuf       getRecoBuf(const ComponentID compID)         { if (m_pt == PIC_RECONSTRUCTION_0) return m_reco0.get(compID); else return m_reco1.get(compID); }
+  const CPelBuf       getRecoBuf(const ComponentID compID)   const { if (m_pt == PIC_RECONSTRUCTION_0) return m_reco0.get(compID); else return m_reco1.get(compID); }
+         PelUnitBuf   getRecoBuf()                                 { if (m_pt == PIC_RECONSTRUCTION_0) return m_reco0; else return m_reco1; }
+  const CPelUnitBuf   getRecoBuf()                           const { if (m_pt == PIC_RECONSTRUCTION_0) return m_reco0; else return m_reco1; }
+#else
          PelBuf       getRecoBuf(const ComponentID compID)         { return m_reco.get(compID); }
   const CPelBuf       getRecoBuf(const ComponentID compID)   const { return m_reco.get(compID); }
          PelUnitBuf   getRecoBuf()                                 { return m_reco; }
   const CPelUnitBuf   getRecoBuf()                           const { return m_reco; }
+#endif
 
+#if JVET_Z0118_GDR // setReconBuf
+  void setReconBuf(const PictureType pt)
+  {
+    m_pt = pt;
+  }
+
+  PictureType checkReconBuf()
+  {
+    return m_pt;
+  }
+#endif
 private:
 
   inline        PelBuf       getBuf(const CompArea &blk,  const PictureType &type);

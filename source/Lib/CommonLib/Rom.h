@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -61,7 +61,16 @@ void         destroyROM();
 
 
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+#if JVET_W0119_LFNST_EXTENSION || EXTENDED_LFNST
+extern       int8_t * g_resiBorderTemplateLFNST[6][6][210];
+#else
+extern       int8_t * g_resiBorderTemplateLFNST[6][6][16];
+#endif
+extern       int8_t * g_resiBorderTemplate[6][6][NUM_TRANS_TYPE*NUM_TRANS_TYPE];
+#else
 extern const int8_t * g_resiBorderTemplate[6][6][NUM_TRANS_TYPE*NUM_TRANS_TYPE];
+#endif
 #endif
 
 // flexible conversion from relative to absolute index
@@ -186,7 +195,11 @@ extern TMatrixCoeff g_aiTr128[NUM_TRANS_TYPE][128][128];
 extern TMatrixCoeff g_aiTr256[NUM_TRANS_TYPE][256][256];
 
 extern const uint8_t g_aucIpmToTrSet[16][36];
+#if JVET_Y0142_ADAPT_INTRA_MTS
+extern const uint8_t g_aucTrSet[80][6];
+#else
 extern const uint8_t g_aucTrSet[80][4];
+#endif
 extern const int8_t  g_aiIdLut[3][3];
 extern const uint8_t g_aucTrIdxToTr[25][2];
 #endif
@@ -288,7 +301,9 @@ constexpr uint8_t g_tbMax[257] = { 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 
 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8 };
 
 #if SIGN_PREDICTION
+#if !JVET_W0103_INTRA_MTS
 extern const int8_t    g_initRomSignPred[];
+#endif
 extern const int32_t   g_aucIdxTrCombo[5][5][5][NUM_INTRA_MODE];
 extern const int32_t   g_aucNumTrCombo[5][5];
 #endif
@@ -324,6 +339,9 @@ const int g_IBCBufferSize = 256 * 128;
 void initGeoTemplate();
 extern int16_t** g_GeoParams;
 extern int16_t*  g_globalGeoWeights   [GEO_NUM_PRESTORED_MASK];
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+extern Pel*      g_globalGeoWeightsTpl[GEO_NUM_PRESTORED_MASK];
+#endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
 extern Pel*      g_globalGeoEncSADmask[GEO_NUM_PRESTORED_MASK];
 #else
@@ -333,7 +351,10 @@ extern int16_t   g_weightOffset       [GEO_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE][
 extern int8_t    g_angle2mask         [GEO_NUM_ANGLES];
 extern int8_t    g_Dis[GEO_NUM_ANGLES];
 extern int8_t    g_angle2mirror[GEO_NUM_ANGLES];
-#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+#if JVET_Y0065_GPM_INTRA
+extern int8_t    g_geoAngle2IntraAng  [GEO_NUM_ANGLES];
+#endif
+#if (JVET_W0097_GPM_MMVD_TM && TM_MRG) || JVET_Y0065_GPM_INTRA
 extern uint8_t g_geoTmShape[2][GEO_NUM_ANGLES];
 #endif
 #if MULTI_HYP_PRED
@@ -342,6 +363,17 @@ extern const int g_addHypWeight[MULTI_HYP_PRED_NUM_WEIGHTS];
 #if JVET_W0066_CCSAO
 extern const int8_t g_ccSaoCandPosX[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y];
 extern const int8_t g_ccSaoCandPosY[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y];
+#endif
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+extern const int8_t g_ccSaoEdgeTypeX[CCSAO_EDGE_TYPE][2];
+extern const int8_t g_ccSaoEdgeTypeY[CCSAO_EDGE_TYPE][2];
+extern const short  g_ccSaoQuanValue[CCSAO_QUAN_NUM];
+#endif
+#if JVET_V0130_INTRA_TMP
+extern unsigned int g_uiDepth2Width[5];
+#endif
+#if JVET_X0149_TIMD_DIMD_LUT
+extern int g_gradDivTable[16];
 #endif
 #endif  //__TCOMROM__
 

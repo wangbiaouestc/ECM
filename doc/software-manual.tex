@@ -2175,6 +2175,11 @@ For Cb component with BT.2020 container use 1.14; for BT.709 material and 1.04 f
 For Cr component with BT.2020 container use 1.79; for BT.709 material and 1.39 for P3 material.
 \\
 
+\Option{BIM} &
+\Default{false} &
+Enable or disable Block Importance Mapping, QP adaptation depending on estimated propagation of reference samples. Depends on future and past reference frames configured for temporal filter.
+\\
+
 \Option{SliceChromaQPOffsetPeriodicity} &
 \Default{0} &
 Defines the periodicity for inter slices that use the slice-level chroma QP offsets, as defined by SliceCbQpOffsetIntraOrPeriodic and SliceCrQpOffsetIntraOrPeriodic. A value of 0 disables the periodicity. It is intended to be used in low-delay configurations where an regular intra period is not defined.

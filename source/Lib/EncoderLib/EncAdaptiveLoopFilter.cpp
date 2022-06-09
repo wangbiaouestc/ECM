@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -3160,7 +3160,11 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
     for( int shape = 0; shape != m_filterShapes[toChannelType( compID )].size(); shape++ )
     {
 #if ALF_IMPROVEMENT
-      if (m_alfCovariance[compIdx][shape] == nullptr)
+      if (m_alfCovariance[compIdx][shape] == nullptr
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+        || m_alfCovariance[compIdx] == nullptr
+#endif
+        )
       {
         continue;
       }
@@ -3273,11 +3277,21 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
               int  orgStride = orgYuv.get(compID).stride;
               Pel* org = orgYuv.get(compID).bufAt(xStart >> ::getComponentScaleX(compID, m_chromaFormat), yStart >> ::getComponentScaleY(compID, m_chromaFormat));
               ChannelType chType = toChannelType( compID );
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+              const int numClasses = isLuma(compID) ? MAX_NUM_ALF_CLASSES : 1;
+#endif
 
               for( int shape = 0; shape != m_filterShapes[chType].size(); shape++ )
               {
               const CompArea& compAreaDst = areaDst.block( compID );
+
 #if ALF_IMPROVEMENT
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                if (m_filterTypeTest[chType][m_filterShapes[chType][shape].filterType] == false)
+                {
+                  continue;
+                }
+#endif
               for (int fixedFilterSetIdx = 0; fixedFilterSetIdx < ((m_filterShapes[chType][shape].filterType == ALF_FILTER_EXT || m_filterShapes[chType][shape].filterType == ALF_FILTER_9_EXT) ? 2 : 1); fixedFilterSetIdx++)
               {
 #if JVET_X0071_ALF_BAND_CLASSIFIER
@@ -3292,6 +3306,23 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
 #else
               getBlkStats( m_alfCovariance[compIdx][shape][ctuRsAddr], m_filterShapes[chType][shape], compIdx ? nullptr : m_classifier, org, orgStride, rec, recStride, compAreaDst, compArea, chType, ((compIdx == 0) ? m_alfVBLumaCTUHeight : m_alfVBChmaCTUHeight), (compIdx == 0) ? m_alfVBLumaPos : m_alfVBChmaPos );
 #endif
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+              for (int classIdx = 0; classIdx < numClasses; classIdx++)
+              {
+#if ALF_IMPROVEMENT
+#if JVET_X0071_ALF_BAND_CLASSIFIER
+                m_alfCovarianceFrame[chType][shape][isLuma(compID) ? classIdx : 0] +=
+                  m_alfCovariance[compIdx][shape][ctuRsAddr][0][0][classIdx];
+#else
+                m_alfCovarianceFrame[chType][shape][isLuma(compID) ? classIdx : 0] +=
+                  m_alfCovariance[compIdx][shape][ctuRsAddr][0][classIdx];
+#endif
+#else
+                m_alfCovarianceFrame[chType][shape][isLuma(compID) ? classIdx : 0] +=
+                  m_alfCovariance[compIdx][shape][ctuRsAddr][classIdx];
+#endif
+              }
+#endif
               }
             }
 
@@ -3300,12 +3331,13 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
 
           yStart = yEnd;
         }
-
+#if !JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
         for( int compIdx = 0; compIdx < numberOfComponents; compIdx++ )
         {
           const ComponentID compID = ComponentID( compIdx );
 
           ChannelType chType = toChannelType( compID );
+
 
           for( int shape = 0; shape != m_filterShapes[chType].size(); shape++ )
           {
@@ -3325,6 +3357,7 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
             }
           }
         }
+#endif
       }
       else
       {
@@ -4914,23 +4947,24 @@ void EncAdaptiveLoopFilter::alfReconstructor(CodingStructure& cs, const PelUnitB
 #endif
       }
 
+      const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, recBuf.chromaFormat );
+      const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, recBuf.chromaFormat );
+
       for (int compIdx = 1; compIdx < MAX_NUM_COMPONENT; compIdx++)
       {
         ComponentID compID = ComponentID(compIdx);
-        const int chromaScaleX = getComponentScaleX(compID, recBuf.chromaFormat);
-        const int chromaScaleY = getComponentScaleY(compID, recBuf.chromaFormat);
         if (m_ctuEnableFlag[compIdx][ctuIdx])
         {
           Area blk(xPos >> chromaScaleX, yPos >> chromaScaleY, width >> chromaScaleX, height >> chromaScaleY);
-          const int alt_num = m_ctuAlternative[compID][ctuIdx];
+          const int altNum = m_ctuAlternative[compIdx][ctuIdx];
 #if ALF_IMPROVEMENT
 #if JVET_X0071_ALF_BAND_CLASSIFIER
-          alfFiltering( m_classifier[0], recBuf, recExtBuf, blk, blk, compID, m_chromaCoeffFinal[alt_num], m_chromaClippFinal[alt_num], m_clpRngs.comp[compIdx], cs, m_filterTypeApsChroma, nullptr, -1 );
+          alfFiltering( m_classifier[0], recBuf, recExtBuf, blk, blk, compID, m_chromaCoeffFinal[altNum], m_chromaClippFinal[altNum], m_clpRngs.comp[compIdx], cs, m_filterTypeApsChroma, nullptr, -1 );
 #else
-          alfFiltering( m_classifier, recBuf, recExtBuf, blk, blk, compID, m_chromaCoeffFinal[alt_num], m_chromaClippFinal[alt_num], m_clpRngs.comp[compIdx], cs, m_filterTypeApsChroma, nullptr, -1 );
+          alfFiltering( m_classifier, recBuf, recExtBuf, blk, blk, compID, m_chromaCoeffFinal[altNum], m_chromaClippFinal[altNum], m_clpRngs.comp[compIdx], cs, m_filterTypeApsChroma, nullptr, -1 );
 #endif
 #else
-          m_filter5x5Blk( m_classifier, recBuf, recExtBuf, blk, blk, compID, m_chromaCoeffFinal[alt_num], m_chromaClippFinal[alt_num], m_clpRngs.comp[compIdx], cs, m_alfVBChmaCTUHeight, m_alfVBChmaPos );
+          m_filter5x5Blk( m_classifier, recBuf, recExtBuf, blk, blk, compID, m_chromaCoeffFinal[altNum], m_chromaClippFinal[altNum], m_clpRngs.comp[compIdx], cs, m_alfVBChmaCTUHeight, m_alfVBChmaPos );
 #endif
         }
       }

@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -452,6 +452,9 @@ struct CcSaoComParam
   bool     enabled   [MAX_NUM_COMPONENT];
   uint8_t  setNum    [MAX_NUM_COMPONENT];
   bool     setEnabled[MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM];
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+  bool setType[MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM];
+#endif
   uint16_t candPos   [MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM][MAX_NUM_LUMA_COMP];
   uint16_t bandNum   [MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM][MAX_NUM_COMPONENT];
   short    offset    [MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM][MAX_CCSAO_CLASS_NUM];
@@ -464,6 +467,9 @@ struct CcSaoComParam
     std::memset( enabled,    false, sizeof( enabled    ) );
     std::memset( setNum,         0, sizeof( setNum     ) );
     std::memset( setEnabled, false, sizeof( setEnabled ) );
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+    std::memset(setType, 0, sizeof(setType));
+#endif
     std::memset( candPos,        0, sizeof( candPos    ) );
     std::memset( bandNum,        0, sizeof( bandNum    ) );
     std::memset( offset,         0, sizeof( offset     ) );
@@ -473,6 +479,9 @@ struct CcSaoComParam
     enabled[compID] = false;
     setNum [compID] = 0;
     std::memset( setEnabled[compID], false, sizeof( setEnabled[compID]) );
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+    std::memset(setType[compID], 0, sizeof(setType[compID]));
+#endif
     std::memset( candPos   [compID],     0, sizeof( candPos   [compID]) );
     std::memset( bandNum   [compID],     0, sizeof( bandNum   [compID]) );
     std::memset( offset    [compID],     0, sizeof( offset    [compID]) );
@@ -482,6 +491,9 @@ struct CcSaoComParam
     std::memcpy( enabled,    src.enabled,    sizeof( enabled    ) );
     std::memcpy( setNum,     src.setNum,     sizeof( setNum     ) );
     std::memcpy( setEnabled, src.setEnabled, sizeof( setEnabled ) );
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+    std::memcpy(setType, src.setType, sizeof(setType));
+#endif
     std::memcpy( candPos,    src.candPos,    sizeof( candPos    ) );
     std::memcpy( bandNum,    src.bandNum,    sizeof( bandNum    ) );
     std::memcpy( offset,     src.offset,     sizeof( offset     ) );

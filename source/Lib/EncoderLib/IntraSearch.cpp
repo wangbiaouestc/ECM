@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -355,6 +355,9 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
       }
     }
   }
+#if INTRA_TRANS_ENC_OPT
+  m_skipTimdLfnstMtsPass = false;
+#endif
 }
 
 
@@ -490,6 +493,10 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       m_globalBestCostStore = bestCostSoFar;
       m_globalBestCostValid = true;
     }
+#if JVET_Y0142_ADAPT_INTRA_MTS
+    m_modesForMTS.clear();
+    m_modesCoeffAbsSumDCT2.clear();
+#endif
   }
 #endif
   const bool colorTransformIsEnabled = sps.getUseColorTrans() && !CS::isDualITree(cs);
@@ -529,6 +536,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
     }
   }
 
+#if INTRA_TRANS_ENC_OPT
+  double regAngCost = MAX_DOUBLE;
+  bool setSkipTimdControl = (m_pcEncCfg->getIntraPeriod() == 1) && !cu.lfnstIdx && !cu.mtsFlag;
+  double timdAngCost = MAX_DOUBLE;
+#endif
   const bool testBDPCM = sps.getBDPCMEnabledFlag() && CU::bdpcmAllowed(cu, ComponentID(partitioner.chType)) && cu.mtsFlag == 0 && cu.lfnstIdx == 0;
   static_vector<ModeInfo, FAST_UDI_MAX_RDMODE_NUM> uiHadModeList;
   static_vector<double, FAST_UDI_MAX_RDMODE_NUM> CandCostList;
@@ -595,7 +607,41 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         // this should always be true
         CHECK(!pu.Y().valid(), "PU is not valid");
         bool isFirstLineOfCtu     = (((pu.block(COMPONENT_Y).y) & ((pu.cs->sps)->getMaxCUWidth() - 1)) == 0);
+#if JVET_Y0116_EXTENDED_MRL_LIST
+        int  numOfPassesExtendRef = MRL_NUM_REF_LINES;
+        if (!sps.getUseMRL() || isFirstLineOfCtu) 
+        {
+          numOfPassesExtendRef = 1;
+        }
+        else
+        {
+          bool checkLineOutsideCtu[MRL_NUM_REF_LINES - 1];
+          for (int mrlIdx = 1; mrlIdx < MRL_NUM_REF_LINES; mrlIdx++)
+          {
+            bool isLineOutsideCtu =
+              ((cu.block(COMPONENT_Y).y) % ((cu.cs->sps)->getMaxCUWidth()) <= MULTI_REF_LINE_IDX[mrlIdx]) ? true
+                                                                                                          : false;
+            checkLineOutsideCtu[mrlIdx-1] = isLineOutsideCtu;
+          }
+          if (checkLineOutsideCtu[0]) 
+          {
+            numOfPassesExtendRef = 1;
+          }
+          else
+          {
+            for (int mrlIdx = MRL_NUM_REF_LINES - 2; mrlIdx > 0; mrlIdx--)
+            {
+              if (checkLineOutsideCtu[mrlIdx] && !checkLineOutsideCtu[mrlIdx - 1])
+              {
+                numOfPassesExtendRef = mrlIdx + 1;
+                break;
+              }
+            }
+          }
+        }
+#else
         int  numOfPassesExtendRef = ((!sps.getUseMRL() || isFirstLineOfCtu) ? 1 : MRL_NUM_REF_LINES);
+#endif
         pu.multiRefIdx            = 0;
 
         if (numModesForFullRD != numModesAvailable)
@@ -1182,6 +1228,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         if (maxSize > 0)
         {
           uiRdModeList.resize(std::min<size_t>(uiRdModeList.size(), maxSize));
+
+          if (sps.getUseLFNST() && mtsUsageFlag == 1)
+          {
+            // Update also the number of stored modes to avoid partial fill of mode storage
+            m_savedNumRdModes[lfnstIdx] = std::min<int32_t>(int32_t(uiRdModeList.size()), m_savedNumRdModes[lfnstIdx]);
+          }
+
           if (bestMipIdx >= 0)
           {
             if (uiRdModeList.size() <= bestMipIdx)
@@ -1222,7 +1275,12 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         }
       }
     }
-
+#if JVET_Y0142_ADAPT_INTRA_MTS
+    if (sps.getUseLFNST() && m_modesForMTS.size() == 0 && cu.mtsFlag)
+    {
+      return false;
+    }
+#endif
     int numNonISPModes = (int)uiRdModeList.size();
 #if JVET_W0123_TIMD_FUSION
     bool isTimdValid = cu.slice->getSPS()->getUseTimd();
@@ -1238,7 +1296,37 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       if (lfnstIdx == 0 && !cu.mtsFlag)
       {
         bool isFirstLineOfCtu     = (((pu.block(COMPONENT_Y).y) & ((pu.cs->sps)->getMaxCUWidth() - 1)) == 0);
+#if JVET_Y0116_EXTENDED_MRL_LIST
+        int  numOfPassesExtendRef = 3;
+        if (!sps.getUseMRL() || isFirstLineOfCtu) 
+        {
+          numOfPassesExtendRef = 1;
+        }
+        else
+        {
+          bool checkLineOutsideCtu[2];
+          for (int mrlIdx = 1; mrlIdx < 3; mrlIdx++)
+          {
+            bool isLineOutsideCtu =
+              ((cu.block(COMPONENT_Y).y) % ((cu.cs->sps)->getMaxCUWidth()) <= MULTI_REF_LINE_IDX[mrlIdx]) ? true
+                                                                                                          : false;
+            checkLineOutsideCtu[mrlIdx-1] = isLineOutsideCtu;
+          }
+          if (checkLineOutsideCtu[0]) 
+          {
+            numOfPassesExtendRef = 1;
+          }
+          else
+          {
+            if (checkLineOutsideCtu[1] && !checkLineOutsideCtu[0])
+            {
+              numOfPassesExtendRef = 2;
+            }
+          }
+        }
+#else
         int  numOfPassesExtendRef = ((!sps.getUseMRL() || isFirstLineOfCtu) ? 1 : MRL_NUM_REF_LINES);
+#endif
         for (int mRefNum = 1; mRefNum < numOfPassesExtendRef; mRefNum++)
         {
           int multiRefIdx = MULTI_REF_LINE_IDX[mRefNum];
@@ -1266,12 +1354,14 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       uiRdModeList.push_back( ModeInfo( false, false, 0, VER_INTRA_SUBPARTITIONS, TIMD_IDX ) );
     }
 #endif
-
     //===== check modes (using r-d costs) =====
     ModeInfo       uiBestPUMode;
     int            bestBDPCMMode = 0;
     double         bestCostNonBDPCM = MAX_DOUBLE;
-
+#if INTRA_TRANS_ENC_OPT
+    double         bestISPCostTested = MAX_DOUBLE;
+    ISPType        bestISPModeTested = NOT_INTRA_SUBPARTITIONS;
+#endif
     CodingStructure *csTemp = m_pTempCS[gp_sizeIdxInfo->idxFrom( cu.lwidth() )][gp_sizeIdxInfo->idxFrom( cu.lheight() )];
     CodingStructure *csBest = m_pBestCS[gp_sizeIdxInfo->idxFrom( cu.lwidth() )][gp_sizeIdxInfo->idxFrom( cu.lheight() )];
 
@@ -1312,6 +1402,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         cu.bdpcmMode = 0;
         uiOrgMode = uiRdModeList[mode];
       }
+
       if (!cu.bdpcmMode && uiRdModeList[mode].ispMod == INTRA_SUBPARTITIONS_RESERVED)
       {
         if (mode == numNonISPModes)   // the list needs to be sorted only once
@@ -1353,6 +1444,17 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         cu.lfnstIdx = m_curIspLfnstIdx;
         uiOrgMode   = uiRdModeList[mode];
       }
+#if ENABLE_DIMD && INTRA_TRANS_ENC_OPT
+      if ((m_pcEncCfg->getIntraPeriod() == 1) && cu.slice->getSPS()->getUseDimd() && mode >= 0 && !cu.dimdBlending && uiOrgMode.ispMod == 0 && uiOrgMode.mRefId == 0 && uiOrgMode.modeId != TIMD_IDX && uiOrgMode.modeId != DIMD_IDX)
+      {
+        bool modeDuplicated = (uiOrgMode.modeId == cu.dimdMode);
+        if (modeDuplicated)
+        {
+          m_modeCostStore[lfnstIdx][mode] = MAX_DOUBLE / 2.0;
+          continue;
+        }
+      }
+#endif	  
 #if ENABLE_DIMD
       cu.dimd = false;
       if( mode >= 0 && uiOrgMode.modeId == DIMD_IDX ) /*to check*/
@@ -1374,25 +1476,32 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       pu.intraDir[CHANNEL_TYPE_LUMA] = uiOrgMode.modeId;
 #if JVET_W0123_TIMD_FUSION
       cu.timd = false;
-      int modeDiff = uiOrgMode.modeId - MAP131TO67(cu.dimdMode);
-      if (isTimdValid && lfnstIdx == 0 && uiOrgMode.ispMod > 0 && modeDiff == 0)
-      {
-        continue;
-      }
-      if (isTimdValid && uiOrgMode.mRefId > 0 && lfnstIdx == 0 && cu.mtsFlag == 0 && modeDiff == 0)
-      {
-        continue;
-      }
       if (mode >= 0 && uiOrgMode.modeId == TIMD_IDX)
       {
         if (cu.ispMode)
         {
           cu.lfnstIdx = lfnstIdx;
+#if INTRA_TRANS_ENC_OPT
+          if ((m_pcEncCfg->getIntraPeriod() == 1) && ((bestISPModeTested == HOR_INTRA_SUBPARTITIONS) || (bestISPModeTested == VER_INTRA_SUBPARTITIONS)))
+          {
+            if (cu.ispMode != bestISPModeTested)
+            {
+              continue;
+            }
+          }
+#endif
           if (cu.ispMode == VER_INTRA_SUBPARTITIONS && uiBestPUMode.ispMod == 0 && !bestTimdMode)
           {
             continue;
           }
         }
+#if INTRA_TRANS_ENC_OPT
+        else if (m_skipTimdLfnstMtsPass)
+        {
+          CHECK(!cu.lfnstIdx && !cu.mtsFlag, "invalid logic");
+          continue;
+        }
+#endif
         uiOrgMode.modeId = cu.timdMode;
         pu.intraDir[CHANNEL_TYPE_LUMA] = uiOrgMode.modeId;
         cu.timd = true;
@@ -1421,7 +1530,26 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       CHECK(cu.ispMode && cu.dimd, "Error: combination of ISP and DIMD not supported");
 #endif
       pu.intraDir[CHANNEL_TYPE_CHROMA] = cu.colorTransform ? DM_CHROMA_IDX : pu.intraDir[CHANNEL_TYPE_CHROMA];
-
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      if (cu.mtsFlag)
+      {
+        int mtsModeIdx = -1;
+        for (int i = 0; i < m_modesForMTS.size(); i++)
+        {
+          if (uiOrgMode == m_modesForMTS[i])
+          {
+            mtsModeIdx = i;
+            break;
+          }
+        }
+        if (mtsModeIdx == -1)
+        {
+          mtsModeIdx = 0;
+        }
+        CHECK(mtsModeIdx == -1, "mtsModeIdx==-1");
+        m_coeffAbsSumDCT2 = (m_modesForMTS.size() == 0) ? 10 : m_modesCoeffAbsSumDCT2[mtsModeIdx];
+      }
+#endif
       // set context models
       m_CABACEstimator->getCtx() = ctxStart;
 
@@ -1452,6 +1580,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         }
 #endif
         csTemp->cost = !tmpValidReturn ? MAX_DOUBLE : csTemp->cost;
+#if INTRA_TRANS_ENC_OPT
+        if (csTemp->cost < bestISPCostTested)
+        {
+          bestISPCostTested = csTemp->cost;
+          bestISPModeTested = (ISPType)cu.ispMode;
+        }
+#endif
       }
       else
       {
@@ -1466,6 +1601,17 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
             uiBestPUMode.ispMod, mtsCheckRangeFlag, mtsFirstCheckId, mtsLastCheckId, moreProbMTSIdxFirst);
         }
       }
+#if JVET_Y0142_ADAPT_INTRA_MTS
+#if JVET_W0123_TIMD_FUSION
+      if (!cu.mtsFlag && !lfnstIdx && mode < numNonISPModes && !(cu.timd && pu.multiRefIdx))
+#else
+      if( !cu.mtsFlag && !lfnstIdx && mode < numNonISPModes && !pu.multiRefIdx )
+#endif
+      {
+        m_modesForMTS.push_back(uiOrgMode);
+        m_modesCoeffAbsSumDCT2.push_back(m_coeffAbsSumDCT2);
+      }
+#endif
 #if JVET_V0130_INTRA_TMP
 #if JVET_W0123_TIMD_FUSION
       if (!cu.ispMode && !cu.mtsFlag && !cu.lfnstIdx && !cu.bdpcmMode && !pu.multiRefIdx && !cu.mipFlag && !cu.tmpFlag && testISP && !cu.timd)
@@ -1522,7 +1668,35 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
             sortRdModeListFirstColorSpace(uiOrgMode, csTemp->cost, cu.bdpcmMode, m_savedRdModeFirstColorSpace[m_savedRdModeIdx], m_savedRdCostFirstColorSpace[m_savedRdModeIdx], m_savedBDPCMModeFirstColorSpace[m_savedRdModeIdx], m_numSavedRdModeFirstColorSpace[m_savedRdModeIdx]);
           }
         }
-
+#if INTRA_TRANS_ENC_OPT
+        if (setSkipTimdControl && !cu.ispMode)
+        {
+#if JVET_W0123_TIMD_FUSION || ENABLE_DIMD
+#if JVET_W0123_TIMD_FUSION && ENABLE_DIMD
+          if (!cu.dimd && !cu.timd)
+#elif ENABLE_DIMD
+          if( !cu.dimd )
+#else
+          if( !cu.timd )
+#endif
+          {
+            if (csTemp->cost < regAngCost)
+            {
+              regAngCost = csTemp->cost;
+            }
+          }
+#endif
+#if JVET_W0123_TIMD_FUSION
+          if (cu.timd)
+          {
+            if (csTemp->cost < timdAngCost)
+            {
+              timdAngCost = csTemp->cost;
+            }
+          }
+#endif
+        }
+#endif
         // check r-d cost
         if( csTemp->cost < csBest->cost )
         {
@@ -1600,6 +1774,15 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       }
 #endif
     } // Mode loop
+#if INTRA_TRANS_ENC_OPT
+    if (setSkipTimdControl && regAngCost != MAX_DOUBLE && timdAngCost != MAX_DOUBLE)
+    {
+      if (regAngCost * 1.3 < timdAngCost)
+      {
+        m_skipTimdLfnstMtsPass = true;
+      }
+    }
+#endif
     cu.ispMode = uiBestPUMode.ispMod;
     cu.lfnstIdx = bestLfnstIdx;
 
@@ -1679,6 +1862,14 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
     Distortion uiBestDist = 0;
     double     dBestCost = MAX_DOUBLE;
     int32_t bestBDPCMMode = 0;
+#if JVET_Z0050_CCLM_SLOPE
+    CclmOffsets bestCclmOffsets = {};
+    CclmOffsets satdCclmOffsetsBest[NUM_CHROMA_MODE];
+    int64_t     satdCclmCosts      [NUM_CHROMA_MODE] = { 0 };
+#endif
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+    bool isChromaFusion = false;
+#endif
 
     //----- init mode list ----
     {
@@ -1687,11 +1878,21 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       //----- check chroma modes -----
       uint32_t chromaCandModes[ NUM_CHROMA_MODE ];
       PU::getIntraChromaCandModes( pu, chromaCandModes );
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+      // derive DIMD chroma mode
+      CompArea areaCb = pu.Cb();
+      CompArea areaCr = pu.Cr();
+      CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, areaCb.lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, areaCb.size()));//needed for correct pos/size (4x4 Tus)
+      IntraPrediction::deriveDimdChromaMode(cs.picture->getRecoBuf(lumaArea), cs.picture->getRecoBuf(areaCb), cs.picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, *pu.cu);
+#endif
 
       // create a temporary CS
       CodingStructure &saveCS = *m_pSaveCS[0];
       saveCS.pcv      = cs.pcv;
       saveCS.picture  = cs.picture;
+#if JVET_Z0118_GDR
+      saveCS.m_pt = cs.m_pt;
+#endif
       saveCS.area.repositionTo( cs.area );
       saveCS.clearTUs();
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -1757,11 +1958,19 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         satdSortedCost[i] = 0; // for the mode not pre-select by SATD, do RDO by default, so set the initial value 0.
         satdModeList[i] = 0;
       }
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+      bool modeIsEnable[NUM_INTRA_MODE + 2]; // use intra mode idx to check whether enable
+      for (int i = 0; i < NUM_INTRA_MODE + 2; i++)
+      {
+        modeIsEnable[i] = 1;
+      }
+#else
       bool modeIsEnable[NUM_INTRA_MODE + 1]; // use intra mode idx to check whether enable
       for (int i = 0; i < NUM_INTRA_MODE + 1; i++)
       {
         modeIsEnable[i] = 1;
       }
+#endif
       DistParam distParamSad;
       DistParam distParamSatd;
       pu.intraDir[1] = MDLM_L_IDX; // temporary assigned, just to indicate this is a MDLM mode. for luma down-sampling operation.
@@ -1769,6 +1978,55 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       initIntraPatternChType(cu, pu.Cb());
       initIntraPatternChType(cu, pu.Cr());
       xGetLumaRecPixels(pu, pu.Cb());
+      
+#if JVET_Z0050_CCLM_SLOPE
+      if ( PU::isLMCModeEnabled( pu, LM_CHROMA_IDX ) && PU::hasCclmDeltaFlag( pu, LM_CHROMA_IDX ) )
+      {
+        // Fill luma reference buffer for the two-sided CCLM
+        pu.intraDir[1] = LM_CHROMA_IDX;
+        xGetLumaRecPixels(pu, pu.Cb());
+
+        for ( int mode = LM_CHROMA_IDX; mode <= MDLM_T_IDX; mode++ )
+        {
+          satdCclmOffsetsBest[mode - LM_CHROMA_IDX].setAllZero();
+          
+          if ( PU::hasCclmDeltaFlag( pu, mode ) )
+          {
+            for ( int comp = COMPONENT_Cb; comp <= COMPONENT_Cr; comp++ )
+            {
+              ComponentID       compID = ComponentID( comp );
+              int            deltaBest = 0;
+              int64_t         satdBest = 0;
+              CclmOffsets& offsetsBest = satdCclmOffsetsBest[mode - LM_CHROMA_IDX];
+              
+              pu.intraDir[1] = mode;
+              pu.cclmOffsets.setAllZero();
+
+              xFindBestCclmDeltaSlopeSATD(pu, compID, 0, deltaBest, satdBest );
+
+              offsetsBest.setOffset(compID, 0, deltaBest);
+
+#if MMLM
+              if ( PU::isMultiModeLM( mode ) )
+              {
+                // Set best found values for the first model to get a matching second model
+                pu.cclmOffsets.setOffsets(offsetsBest.cb0, offsetsBest.cr0, 0, 0);
+
+                xFindBestCclmDeltaSlopeSATD(pu, compID, 1, deltaBest, satdBest );
+
+                offsetsBest.setOffset(compID, 1, deltaBest);
+              }
+#endif
+
+              satdCclmCosts[mode - LM_CHROMA_IDX] += satdBest; // Summing up Cb and Cr cost
+            }
+          }
+        }
+      }
+
+      pu.cclmOffsets.setAllZero();
+#endif
+
 #if MMLM
       m_encPreRDRun = true;
 #endif
@@ -1780,7 +2038,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         {
           continue;
         }
-        if ((mode == LM_CHROMA_IDX) || (mode == PLANAR_IDX) || (mode == DM_CHROMA_IDX)) // only pre-check regular modes and MDLM modes, not including DM ,Planar, and LM
+        if ((mode == LM_CHROMA_IDX) || (mode == PLANAR_IDX) || (mode == DM_CHROMA_IDX)
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+          || (mode == DIMD_CHROMA_IDX)
+#endif
+          ) // only pre-check regular modes and MDLM modes, not including DM, DIMD, Planar, and LM
         {
           continue;
         }
@@ -1869,6 +2131,14 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       Distortion baseDist = cs.dist;
       bool testBDPCM = true;
       testBDPCM = testBDPCM && CU::bdpcmAllowed(cu, COMPONENT_Cb) && cu.ispMode == 0 && cu.mtsFlag == 0 && cu.lfnstIdx == 0;
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+      double dBestNonLmCost = MAX_DOUBLE;
+#if ENABLE_DIMD
+      int bestNonLmMode = (cu.slice->getSPS()->getUseDimd()) ? DIMD_CHROMA_IDX : DM_CHROMA_IDX;
+#else
+      int bestNonLmMode = DM_CHROMA_IDX;
+#endif
+#endif
       for (int32_t uiMode = uiMinMode - (2 * int(testBDPCM)); uiMode < uiMaxMode; uiMode++)
       {
         int chromaIntraMode;
@@ -1891,6 +2161,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           {
             continue;
           }
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+          if (chromaIntraMode == DIMD_CHROMA_IDX && !cu.slice->getSPS()->getUseDimd()) // when DIMD is disable, then DIMD_CHROMA is disable.
+          {
+            continue;
+          }
+#endif
         }
         cs.setDecomp( pu.Cb(), false );
         cs.dist = baseDist;
@@ -1933,7 +2209,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #endif
             saveCS.getPredBuf     ( area ).copyFrom( cs.getPredBuf   (area ) );
             cs.picture->getPredBuf( area ).copyFrom( cs.getPredBuf   (area ) );
+#if JVET_Z0118_GDR
+            cs.updateReconMotIPM(area);
+#else
             cs.picture->getRecoBuf( area ).copyFrom( cs.getRecoBuf( area ) );
+#endif
 
             for( uint32_t j = 0; j < saveCS.tus.size(); j++ )
             {
@@ -1946,7 +2226,169 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           uiBestMode = chromaIntraMode;
           bestBDPCMMode = cu.bdpcmModeChroma;
         }
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+        bool findBestNonLm = !PU::isLMCMode(chromaIntraMode) && !cu.bdpcmModeChroma && pu.cs->slice->isIntra();
+        if (findBestNonLm && dCost < dBestNonLmCost)
+        {
+          bestNonLmMode = chromaIntraMode;
+          dBestNonLmCost = dCost;
+        }
+#endif
       }
+
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+      // RDO for chroma fusion mode
+      for (int32_t uiMode = 0; uiMode < 1; uiMode++)
+      {
+        int chromaIntraMode = bestNonLmMode;
+        if (!pu.cs->slice->isIntra())
+        {
+#if ENABLE_DIMD
+          if (cu.slice->getSPS()->getUseDimd())
+          {
+            chromaIntraMode = DIMD_CHROMA_IDX;
+          }
+          else
+          {
+            break;
+          }
+#else
+          break;
+#endif
+        }
+        pu.isChromaFusion = true;
+        cs.setDecomp(pu.Cb(), false);
+        cs.dist = baseDist;
+        //----- restore context models -----
+        m_CABACEstimator->getCtx() = ctxStart;
+
+        //----- chroma coding -----
+        pu.intraDir[1] = chromaIntraMode;
+        xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType);
+        if (lumaUsesISP && cs.dist == MAX_UINT)
+        {
+          continue;
+        }
+        if (cs.sps->getTransformSkipEnabledFlag())
+        {
+          m_CABACEstimator->getCtx() = ctxStart;
+        }
+        uint64_t fracBits = xGetIntraFracBitsQT(cs, partitioner, false, true, -1, ispType);
+        Distortion uiDist = cs.dist;
+        double    dCost = m_pcRdCost->calcRdCost(fracBits, uiDist - baseDist);
+        if (dCost < dBestCost)
+        {
+          if (lumaUsesISP && dCost < bestCostSoFar)
+          {
+            bestCostSoFar = dCost;
+          }
+          for (uint32_t i = getFirstComponentOfChannel(CHANNEL_TYPE_CHROMA); i < numberValidComponents; i++)
+          {
+            const CompArea &area = pu.blocks[i];
+            saveCS.getRecoBuf(area).copyFrom(cs.getRecoBuf(area));
+            saveCS.getPredBuf(area).copyFrom(cs.getPredBuf(area));
+            saveCS.getResiBuf(area).copyFrom(cs.getResiBuf(area));
+            saveCS.getPredBuf(area).copyFrom(cs.getPredBuf(area));
+            cs.picture->getPredBuf(area).copyFrom(cs.getPredBuf(area));
+            cs.picture->getRecoBuf(area).copyFrom(cs.getRecoBuf(area));
+            for (uint32_t j = 0; j < saveCS.tus.size(); j++)
+            {
+              saveCS.tus[j]->copyComponentFrom(*orgTUs[j], area.compID);
+            }
+          }
+          dBestCost = dCost;
+          uiBestDist = uiDist;
+          uiBestMode = chromaIntraMode;
+          bestBDPCMMode = cu.bdpcmModeChroma;
+          isChromaFusion = pu.isChromaFusion;
+        }
+      }
+      pu.isChromaFusion = false;
+#endif
+
+#if JVET_Z0050_CCLM_SLOPE
+#if MMLM
+      for (int32_t uiMode = 0; uiMode < 2; uiMode++)
+      {
+        int chromaIntraMode = uiMode ? MMLM_CHROMA_IDX : LM_CHROMA_IDX;
+#else
+      for (int32_t uiMode = 0; uiMode < 1; uiMode++)
+      {
+        int chromaIntraMode = LM_CHROMA_IDX;
+#endif
+
+        if ( PU::isLMCModeEnabled( pu, chromaIntraMode ) && PU::hasCclmDeltaFlag( pu, chromaIntraMode ) )
+        {
+          if ( satdCclmOffsetsBest[chromaIntraMode - LM_CHROMA_IDX].isActive() )
+          {
+            pu.intraDir[1] = chromaIntraMode;
+            pu.cclmOffsets = satdCclmOffsetsBest[chromaIntraMode - LM_CHROMA_IDX];
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+            pu.isChromaFusion = false;
+#endif
+
+            // RD search replicated from above
+            cs.setDecomp( pu.Cb(), false );
+            cs.dist = baseDist;
+            //----- restore context models -----
+            m_CABACEstimator->getCtx() = ctxStart;
+
+            xRecurIntraChromaCodingQT( cs, partitioner, bestCostSoFar, ispType );
+            if( lumaUsesISP && cs.dist == MAX_UINT )
+            {
+              continue;
+            }
+
+            if (cs.sps->getTransformSkipEnabledFlag())
+            {
+              m_CABACEstimator->getCtx() = ctxStart;
+            }
+
+            uint64_t fracBits = xGetIntraFracBitsQT( cs, partitioner, false, true, -1, ispType );
+            Distortion uiDist = cs.dist;
+            double    dCost   = m_pcRdCost->calcRdCost( fracBits, uiDist - baseDist );
+
+            //----- compare -----
+            if( dCost < dBestCost )
+            {
+              if( lumaUsesISP && dCost < bestCostSoFar )
+              {
+                bestCostSoFar = dCost;
+              }
+              for( uint32_t i = getFirstComponentOfChannel( CHANNEL_TYPE_CHROMA ); i < numberValidComponents; i++ )
+              {
+                const CompArea &area = pu.blocks[i];
+
+                saveCS.getRecoBuf     ( area ).copyFrom( cs.getRecoBuf   ( area ) );
+#if KEEP_PRED_AND_RESI_SIGNALS
+                saveCS.getPredBuf     ( area ).copyFrom( cs.getPredBuf   ( area ) );
+                saveCS.getResiBuf     ( area ).copyFrom( cs.getResiBuf   ( area ) );
+#endif
+                saveCS.getPredBuf     ( area ).copyFrom( cs.getPredBuf   (area ) );
+                cs.picture->getPredBuf( area ).copyFrom( cs.getPredBuf   (area ) );
+                cs.picture->getRecoBuf( area ).copyFrom( cs.getRecoBuf( area ) );
+
+                for( uint32_t j = 0; j < saveCS.tus.size(); j++ )
+                {
+                  saveCS.tus[j]->copyComponentFrom( *orgTUs[j], area.compID );
+                }
+              }
+
+              dBestCost       = dCost;
+              uiBestDist      = uiDist;
+              uiBestMode      = chromaIntraMode;
+              bestBDPCMMode   = cu.bdpcmModeChroma;
+              bestCclmOffsets = pu.cclmOffsets;
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+              isChromaFusion  = pu.isChromaFusion;
+#endif
+            }
+          }
+        }
+      }
+      
+      pu.cclmOffsets.setAllZero();
+#endif
 
       for( uint32_t i = getFirstComponentOfChannel( CHANNEL_TYPE_CHROMA ); i < numberValidComponents; i++ )
       {
@@ -1960,7 +2402,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         cs.getPredBuf         ( area ).copyFrom( saveCS.getPredBuf( area ) );
         cs.picture->getPredBuf( area ).copyFrom( cs.getPredBuf    ( area ) );
 
+#if JVET_Z0118_GDR
+        cs.updateReconMotIPM(area);
+#else
         cs.picture->getRecoBuf( area ).copyFrom( cs.    getRecoBuf( area ) );
+#endif
 
         for( uint32_t j = 0; j < saveCS.tus.size(); j++ )
         {
@@ -1972,6 +2418,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
     pu.intraDir[1] = uiBestMode;
     cs.dist        = uiBestDist;
     cu.bdpcmModeChroma = bestBDPCMMode;
+#if JVET_Z0050_CCLM_SLOPE
+    pu.cclmOffsets     = bestCclmOffsets;
+#endif
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+    pu.isChromaFusion = isChromaFusion;
+#endif
   }
 
   //----- restore context models -----
@@ -1981,6 +2433,79 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
     cu.ispMode = 0;
   }
 }
+
+#if JVET_Z0050_CCLM_SLOPE
+void IntraSearch::xFindBestCclmDeltaSlopeSATD(PredictionUnit &pu, ComponentID compID, int cclmModel, int &deltaBest, int64_t &sadBest )
+{
+  CclmModel cclmModelStored;
+  CodingStructure& cs = *(pu.cs);
+  CompArea       area = compID == COMPONENT_Cb ? pu.Cb() : pu.Cr();
+  PelBuf       orgBuf = cs.getOrgBuf(area);
+  PelBuf      predBuf = cs.getPredBuf(area);
+  int       maxOffset = 4;
+  int            mode = pu.intraDir[1];
+  bool createNewModel = true;
+
+  DistParam distParamSad;
+  DistParam distParamSatd;
+
+  m_pcRdCost->setDistParam(distParamSad,  orgBuf, predBuf, pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), compID, false);
+  m_pcRdCost->setDistParam(distParamSatd, orgBuf, predBuf, pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), compID, true);
+  
+  distParamSad.applyWeight  = false;
+  distParamSatd.applyWeight = false;
+  
+  sadBest = -1;
+
+  // Search positive offsets
+  for ( int offset = 0; offset <= maxOffset; offset++)
+  {
+    pu.cclmOffsets.setOffset(compID, cclmModel, offset);
+    
+    predIntraChromaLM( compID, predBuf, pu, area, mode, createNewModel, &cclmModelStored );
+    
+    createNewModel  = false; // Need to calculate the base model just once
+    int64_t sad     = distParamSad.distFunc(distParamSad) * 2;
+    int64_t satd    = distParamSatd.distFunc(distParamSatd);
+    int64_t sadThis = std::min(sad, satd);
+    
+    if ( sadBest == -1 || sadThis < sadBest )
+    {
+      sadBest   = sadThis;
+      deltaBest = offset;
+    }
+    else
+    {
+      break;
+    }
+  }
+  
+  // Search negative offsets only if positives didn't help
+  if ( deltaBest == 0 )
+  {
+    for ( int offset = -1; offset >= -maxOffset; offset--)
+    {
+      pu.cclmOffsets.setOffset(compID, cclmModel, offset);
+
+      predIntraChromaLM( compID, predBuf, pu, area, mode, createNewModel, &cclmModelStored );
+      
+      int64_t sad     = distParamSad.distFunc(distParamSad) * 2;
+      int64_t satd    = distParamSatd.distFunc(distParamSatd);
+      int64_t sadThis = std::min(sad, satd);
+      
+      if ( sadThis < sadBest )
+      {
+        sadBest   = sadThis;
+        deltaBest = offset;
+      }
+      else
+      {
+        break;
+      }
+    }
+  }
+}
+#endif
 
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
 void IntraSearch::saveCuAreaCostInSCIPU( Area area, double cost )
@@ -2193,7 +2718,11 @@ void IntraSearch::PLTSearch(CodingStructure &cs, Partitioner& partitioner, Compo
   cs.dist += distortion;
   const CompArea &area = cu.blocks[compBegin];
   cs.setDecomp(area);
+#if JVET_Z0118_GDR
+  cs.updateReconMotIPM(area);
+#else
   cs.picture->getRecoBuf(area).copyFrom(cs.getRecoBuf(area));
+#endif
 }
 void IntraSearch::calcPixelPredRD(CodingStructure& cs, Partitioner& partitioner, Pel* orgBuf, Pel* paPixelValue, Pel* paRecoValue, ComponentID compBegin, uint32_t numComp)
 {
@@ -3576,35 +4105,56 @@ void IntraSearch::xSelectAMTForFullRD(TransformUnit &tu)
     piResi.subtract(piPred);
   }
   // do transform and calculate Coeff AbsSum for all MTS candidates
-  std::vector<std::pair<int, uint64_t>> CoeffAbsSum(4);
-
+#if JVET_Y0142_ADAPT_INTRA_MTS
+  int nCands = MTS_NCANDS[2];
+  if (m_coeffAbsSumDCT2 >= 0 && m_coeffAbsSumDCT2 <= MTS_TH_COEFF[0])
+  {
+    nCands = MTS_NCANDS[0];
+  }
+  else if(m_coeffAbsSumDCT2 > MTS_TH_COEFF[0] && m_coeffAbsSumDCT2 <= MTS_TH_COEFF[1])
+  {
+    nCands = MTS_NCANDS[1];
+  }
+  std::vector<std::pair<int, uint64_t>> coeffAbsSum(nCands);
+  for (int i = 0; i < nCands; i++)
+#else
+  std::vector<std::pair<int, uint64_t>> coeffAbsSum(4);
   for (int i = 0; i < 4; i++)
+#endif
   {
     tu.mtsIdx[0] = i + MTS_DST7_DST7;
     uint64_t AbsSum = m_pcTrQuant->transformNxN(tu);
-    CoeffAbsSum[i] = { i, AbsSum };
+    coeffAbsSum[i] = { i, AbsSum };
   }
-  std::stable_sort(CoeffAbsSum.begin(), CoeffAbsSum.end(), [](const std::pair<int, uint64_t> & l, const std::pair<int, uint64_t> & r) {return l.second < r.second; });
-
+  std::stable_sort(coeffAbsSum.begin(), coeffAbsSum.end(), [](const std::pair<int, uint64_t> & l, const std::pair<int, uint64_t> & r) {return l.second < r.second; });
+#if JVET_Y0142_ADAPT_INTRA_MTS
+  for (int i = 0; i < nCands; i++)
+#else
   for (int i = 0; i < 4; i++)
+#endif
   {
-    m_TestAMTForFullRD[i] = CoeffAbsSum[i].first;
+    m_testAMTForFullRD[i] = coeffAbsSum[i].first;
   }
+#if JVET_Y0142_ADAPT_INTRA_MTS
+  m_numCandAMTForFullRD = nCands;
+#else
   m_numCandAMTForFullRD = 4;
-
+#endif
+#if !JVET_Y0142_ADAPT_INTRA_MTS
   if (m_pcEncCfg->getUseFastLFNST())
   {
     double skipThreshold = 1.0 + 1.0 / sqrt((double)(area.width*area.height));
     skipThreshold = std::max(skipThreshold, 1.03);
     for (int i = 1; i < m_numCandAMTForFullRD; i++)
     {
-      if (CoeffAbsSum[i].second > skipThreshold * CoeffAbsSum[0].second)
+      if (coeffAbsSum[i].second > skipThreshold * coeffAbsSum[0].second)
       {
         m_numCandAMTForFullRD = i;
         break;
       }
     }
   }
+#endif
 }
 #endif
 void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &compID, Distortion& ruiDist, const int &default0Save1Load2, uint32_t* numSig, std::vector<TrMode>* trModes, const bool loadTr)
@@ -3720,6 +4270,12 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
           {
             predIntraAng(compID, piPred, pu);
           }
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+          if (compID != COMPONENT_Y && pu.isChromaFusion)
+          {
+            geneChromaFusionPred(compID, piPred, pu);
+          }
+#endif
         }
       }
 
@@ -3810,7 +4366,11 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
   {
     if (trModes)
     {
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      m_pcTrQuant->transformNxN(tu, compID, cQP, trModes, 8);
+#else
       m_pcTrQuant->transformNxN(tu, compID, cQP, trModes, m_pcEncCfg->getMTSIntraMaxCand());
+#endif
       tu.mtsIdx[compID] = trModes->at(0).first;
     }
 
@@ -3828,6 +4388,34 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       ruiDist = MAX_INT;
       return;
     }
+#if JVET_Y0142_ADAPT_INTRA_MTS
+    if (isLuma(compID) && tu.mtsIdx[compID] >= MTS_DST7_DST7)
+    {
+      bool signHiding = cs.slice->getSignDataHidingEnabledFlag();
+      CoeffCodingContext  cctx(tu, compID, signHiding);
+      const TCoeff*       coeff = tu.getCoeffs(compID).buf;
+      int          scanPosLast = -1;
+      uint64_t     coeffAbsSum = 0;
+
+      for (int scanPos = 0; scanPos < cctx.maxNumCoeff(); scanPos++)
+      {
+        unsigned blkPos = cctx.blockPos(scanPos);
+        if (coeff[blkPos])
+        {
+          scanPosLast = scanPos;
+          coeffAbsSum += abs(coeff[blkPos]);
+        }
+      }
+      int nCands = (coeffAbsSum > MTS_TH_COEFF[1]) ? MTS_NCANDS[2] : (coeffAbsSum > MTS_TH_COEFF[0]) ? MTS_NCANDS[1] : MTS_NCANDS[0];
+      bool isInvalid = (scanPosLast <= 0) || ((tu.mtsIdx[COMPONENT_Y] - MTS_DST7_DST7) >= nCands);
+      if (isInvalid)
+      {
+        m_validMTSReturn = false;
+        ruiDist = MAX_INT;
+        return;
+      }
+    }
+#endif
     if ((m_pcEncCfg->getCostMode() == COST_LOSSLESS_CODING && slice.isLossless() && tu.mtsIdx[compID] == 0)
         && 0 == tu.cu->bdpcmMode)
     {
@@ -3935,142 +4523,177 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       crReco.reconstruct(crPred, crResi, cs.slice->clpRng( COMPONENT_Cr ));
     }
   }
+#if INTRA_TRANS_ENC_OPT 
+  bool doSignPrediction = true;
+  if (isLuma(compID) && ((tu.mtsIdx[COMPONENT_Y] > MTS_SKIP) || (CS::isDualITree(cs) && tu.cu->lfnstIdx && !tu.cu->ispMode)))
+  {
+    bool signHiding = cs.slice->getSignDataHidingEnabledFlag();
+    CoeffCodingContext  cctx(tu, COMPONENT_Y, signHiding);
+    int scanPosLast = -1;
+    TCoeff* coeff = tu.getCoeffs(compID).buf;
+    for (int scanPos = cctx.maxNumCoeff() - 1; scanPos >= 0; scanPos--)
+    {
+      unsigned blkPos = cctx.blockPos(scanPos);
+      if (coeff[blkPos])
+      {
+        scanPosLast = scanPos;
+        break;
+      }
+    }
+    if (scanPosLast < 1)
+    {
+      doSignPrediction = false;
+    }
+  }
+#endif
 #if SIGN_PREDICTION
   if ( sps.getNumPredSigns() > 0)
   {
-    bool bJccrWithCr = tu.jointCbCr && !(tu.jointCbCr >> 1);
-    bool bIsJccr     = tu.jointCbCr && isChroma(compID);
-    ComponentID signPredCompID = bIsJccr ? (bJccrWithCr ? COMPONENT_Cr : COMPONENT_Cb): compID;
-    bool reshapeChroma = flag && (TU::getCbf(tu, signPredCompID) || tu.jointCbCr) && isChroma(signPredCompID) && slice.getPicHeader()->getLmcsChromaResidualScaleFlag();
-    m_pcTrQuant->predCoeffSigns(tu, compID, reshapeChroma);
+#if INTRA_TRANS_ENC_OPT
+    if (doSignPrediction)
+    {
+#endif
+      bool bJccrWithCr = tu.jointCbCr && !(tu.jointCbCr >> 1);
+      bool bIsJccr = tu.jointCbCr && isChroma(compID);
+      ComponentID signPredCompID = bIsJccr ? (bJccrWithCr ? COMPONENT_Cr : COMPONENT_Cb) : compID;
+      bool reshapeChroma = flag && (TU::getCbf(tu, signPredCompID) || tu.jointCbCr) && isChroma(signPredCompID) && slice.getPicHeader()->getLmcsChromaResidualScaleFlag();
+      m_pcTrQuant->predCoeffSigns(tu, compID, reshapeChroma);
+#if INTRA_TRANS_ENC_OPT
+    }
+#endif
   }
 #endif
 
+#if INTRA_TRANS_ENC_OPT 
+  if (doSignPrediction)
+  {
+#endif
 #if JVET_V0094_BILATERAL_FILTER
-  CompArea      tmpArea1(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
-  PelBuf tmpRecLuma;
-  if(isLuma(compID))
-  {
-    tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
-    tmpRecLuma.copyFrom(piReco);
-  }
+    CompArea      tmpArea1(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
+    PelBuf tmpRecLuma;
+    if(isLuma(compID))
+    {
+      tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
+      tmpRecLuma.copyFrom(piReco);
+    }
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  CompArea tmpArea2(compID, area.chromaFormat, Position(0, 0), area.size());
-  PelBuf tmpRecChroma;
-  if(isChroma(compID))
-  {
-    tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea2);
-    tmpRecChroma.copyFrom(piReco);
-  }
+    CompArea tmpArea2(compID, area.chromaFormat, Position(0, 0), area.size());
+    PelBuf tmpRecChroma;
+    if(isChroma(compID))
+    {
+      tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea2);
+      tmpRecChroma.copyFrom(piReco);
+    }
 #endif
   //===== update distortion =====
 #if WCG_EXT
   
-  if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs()
+    if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs()
       && slice.getLmcsEnabledFlag() && (m_pcReshape->getCTUFlag() || (isChroma(compID) && m_pcEncCfg->getReshapeIntraCMD()))))
-  {
-    
-    const CPelBuf orgLuma = cs.getOrgBuf( cs.area.blocks[COMPONENT_Y] );
-    if (compID == COMPONENT_Y)
     {
-      if(!(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
+    
+      const CPelBuf orgLuma = cs.getOrgBuf( cs.area.blocks[COMPONENT_Y] );
+      if (compID == COMPONENT_Y)
       {
-        tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
-      }
-
-      if (pps.getUseBIF() /*&& (uiAbsSum > 0)*/ && isLuma(compID) && (tu.cu->qp > 17) && (128 > std::max(tu.lumaSize().width, tu.lumaSize().height)))
-      {
-        CompArea compArea = tu.blocks[compID];
-        PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
         if(!(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
         {
-          m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, true, m_pcReshape->getInvLUT());
+          tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
         }
-        else
+
+        if (pps.getUseBIF() /*&& (uiAbsSum > 0)*/ && isLuma(compID) && (tu.cu->qp > 17) && (128 > std::max(tu.lumaSize().width, tu.lumaSize().height)))
         {
-          std::vector<Pel> dummy_invLUT;
-          m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, false, dummy_invLUT);
+          CompArea compArea = tu.blocks[compID];
+          PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+          if(!(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
+          {
+            m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, true, m_pcReshape->getInvLUT());
+          }
+          else
+          {
+            std::vector<Pel> invLUT;
+            m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, false, invLUT);
+          }
         }
-      }
       
-      ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
-    }
-    else
-    {
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-      if(pps.getUseCBIF() && isChroma(compID) && (tu.cu->qp > 17))
-      {
-        CompArea compArea = tu.blocks[compID];
-        PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
-        bool isCb = compID == COMPONENT_Cb ? true : false;
-        m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
+        ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
       }
-      ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecChroma, bitDepth, compID, DF_SSE_WTD, &orgLuma);
-#else
-      ruiDist += m_pcRdCost->getDistPart(piOrg, piReco, bitDepth, compID, DF_SSE_WTD, &orgLuma);
-#endif
-      if( jointCbCr )
+      else
       {
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-        if(compID == COMPONENT_Cr)
+        if(pps.getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17))
         {
+          CompArea compArea = tu.blocks[compID];
+          PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+          bool isCb = compID == COMPONENT_Cb ? true : false;
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
+        }
+        ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecChroma, bitDepth, compID, DF_SSE_WTD, &orgLuma);
+#else
+        ruiDist += m_pcRdCost->getDistPart(piOrg, piReco, bitDepth, compID, DF_SSE_WTD, &orgLuma);
+#endif
+        if( jointCbCr )
+        {
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+          if(compID == COMPONENT_Cr)
+          {
             ruiDist += m_pcRdCost->getDistPart(crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
-        }
-        else
-        {
+          }
+          else
+          {
             ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
-        }
+          }
 #else
-        ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+          ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
 #endif
+        }
       }
-    }
-  }
-  else
-#endif
-  {
-    if(isLuma(compID))
-    {
-      if (pps.getUseBIF() /*&& (uiAbsSum > 0)*/ && isLuma(compID) && (tu.cu->qp > 17) && (128 > std::max(tu.lumaSize().width, tu.lumaSize().height)))
-      {
-        CompArea compArea = tu.blocks[compID];
-        PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
-        std::vector<Pel>        my_invLUT;
-        m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, false, my_invLUT);
-      }
-      
-      ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecLuma, bitDepth, compID, DF_SSE );
     }
     else
+#endif
     {
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-      if (pps.getUseCBIF() && isChroma(compID) && (tu.cu->qp > 17))
+      if(isLuma(compID))
       {
-        CompArea compArea = tu.blocks[compID];
-        PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
-        bool isCb = compID == COMPONENT_Cb ? true : false;
-        m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
-      }
-      ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecChroma, bitDepth, compID, DF_SSE );
-#else
-      ruiDist += m_pcRdCost->getDistPart( piOrg, piReco, bitDepth, compID, DF_SSE );
-#endif
-      if( jointCbCr )
-      {
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-        if(compID == COMPONENT_Cr)
+        if (pps.getUseBIF() /*&& (uiAbsSum > 0)*/ && isLuma(compID) && (tu.cu->qp > 17) && (128 > std::max(tu.lumaSize().width, tu.lumaSize().height)))
         {
-            ruiDist += m_pcRdCost->getDistPart( crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE );
+          CompArea compArea = tu.blocks[compID];
+          PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+          std::vector<Pel> invLUT;
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, false, invLUT);
         }
-        else{
-            ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
+      
+        ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecLuma, bitDepth, compID, DF_SSE );
+      }
+      else
+      {
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+        if (pps.getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17))
+        {
+          CompArea compArea = tu.blocks[compID];
+          PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+          bool isCb = compID == COMPONENT_Cb ? true : false;
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
         }
+        ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecChroma, bitDepth, compID, DF_SSE );
 #else
-        ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
+        ruiDist += m_pcRdCost->getDistPart( piOrg, piReco, bitDepth, compID, DF_SSE );
 #endif
+        if( jointCbCr )
+        {
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+          if(compID == COMPONENT_Cr)
+          {
+            ruiDist += m_pcRdCost->getDistPart( crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE );
+          }
+          else
+          {
+            ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
+          }
+#else
+          ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
+#endif
+        }
       }
     }
-  }
 
 #else
   //===== update distortion =====
@@ -4079,115 +4702,119 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     PelBuf tmpRecChroma;
     if(isChroma(compID))
     {
-        tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea2);
-        tmpRecChroma.copyFrom(piReco);
+      tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea2);
+      tmpRecChroma.copyFrom(piReco);
     }
 #if WCG_EXT
     if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs() && slice.getLmcsEnabledFlag() && (m_pcReshape->getCTUFlag() || (isChroma(compID) && m_pcEncCfg->getReshapeIntraCMD()))))
     {
-        const CPelBuf orgLuma = cs.getOrgBuf( cs.area.blocks[COMPONENT_Y] );
-        if(isLuma(compID))
+      const CPelBuf orgLuma = cs.getOrgBuf( cs.area.blocks[COMPONENT_Y] );
+      if(isLuma(compID))
+      {
+        if (compID == COMPONENT_Y  && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
         {
-            if (compID == COMPONENT_Y  && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
-            {
-                CompArea      tmpArea1(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
-                PelBuf tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
-                tmpRecLuma.rspSignal( piReco, m_pcReshape->getInvLUT() );
-                ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
-            }
-            else
-            {
-                ruiDist += m_pcRdCost->getDistPart(piOrg, piReco, bitDepth, compID, DF_SSE_WTD, &orgLuma);
-                if( jointCbCr )
-                {
-                    ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
-                }
-            }
+          CompArea      tmpArea1(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
+          PelBuf tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
+          tmpRecLuma.rspSignal( piReco, m_pcReshape->getInvLUT() );
+          ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
         }
         else
         {
-            if(pps.getUseCBIF() && isChroma(compID) && (tu.cu->qp > 17))
-            {
-                CompArea compArea = tu.blocks[compID];
-                PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
-                bool isCb = compID == COMPONENT_Cb ? true : false;
-                m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
-            }
-            ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecChroma, bitDepth, compID, DF_SSE_WTD, &orgLuma);
-
-            if( jointCbCr )
-            {
-                if(compID == COMPONENT_Cr)
-                {
-                    ruiDist += m_pcRdCost->getDistPart(crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
-                }
-                else
-                {
-                    ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
-                }
-            }
+          ruiDist += m_pcRdCost->getDistPart(piOrg, piReco, bitDepth, compID, DF_SSE_WTD, &orgLuma);
+          if( jointCbCr )
+          {
+            ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+          }
         }
+      }
+      else
+      {
+        if(pps.getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17))
+        {
+          CompArea compArea = tu.blocks[compID];
+          PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+          bool isCb = compID == COMPONENT_Cb ? true : false;
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
+        }
+        ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecChroma, bitDepth, compID, DF_SSE_WTD, &orgLuma);
+        if( jointCbCr )
+        {
+          if(compID == COMPONENT_Cr)
+          {
+            ruiDist += m_pcRdCost->getDistPart(crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+          }
+          else
+          {
+            ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+          }
+        }
+      }
     }
     else
 #endif
     {
-        if(isLuma(compID))
+      if(isLuma(compID))
+      {
+        ruiDist += m_pcRdCost->getDistPart( piOrg, piReco, bitDepth, compID, DF_SSE );
+      }
+      else
+      {
+        if (pps.getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17))
         {
-            ruiDist += m_pcRdCost->getDistPart( piOrg, piReco, bitDepth, compID, DF_SSE );
+          CompArea compArea = tu.blocks[compID];
+          PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+          bool isCb = compID == COMPONENT_Cb ? true : false;
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
         }
-        else{
-            if (pps.getUseCBIF() && isChroma(compID) && (tu.cu->qp > 17))
-            {
-                CompArea compArea = tu.blocks[compID];
-                PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
-                bool isCb = compID == COMPONENT_Cb ? true : false;
-                m_bilateralFilter->bilateralFilterRDOdiamond5x5_chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
-            }
-            ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecChroma, bitDepth, compID, DF_SSE );
-        }
-        if( jointCbCr )
+        ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecChroma, bitDepth, compID, DF_SSE );
+      }
+      if( jointCbCr )
+      {
+        if(compID == COMPONENT_Cr)
         {
-            if(compID == COMPONENT_Cr)
-            {
-                ruiDist += m_pcRdCost->getDistPart( crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE );
-            }
-            else{
-                ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
-            }
+          ruiDist += m_pcRdCost->getDistPart( crOrg, tmpRecChroma, bitDepth, COMPONENT_Cr, DF_SSE );
         }
+        else
+        {
+          ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
+        }
+      }
     }
 #else
 #if WCG_EXT
-  if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs()
-    && slice.getLmcsEnabledFlag() && (m_pcReshape->getCTUFlag() || (isChroma(compID) && m_pcEncCfg->getReshapeIntraCMD()))))
-  {
-    const CPelBuf orgLuma = cs.getOrgBuf( cs.area.blocks[COMPONENT_Y] );
-    if (compID == COMPONENT_Y  && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
+    if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs()
+      && slice.getLmcsEnabledFlag() && (m_pcReshape->getCTUFlag() || (isChroma(compID) && m_pcEncCfg->getReshapeIntraCMD()))))
     {
-      CompArea      tmpArea1(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
-      PelBuf tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
-      tmpRecLuma.rspSignal( piReco, m_pcReshape->getInvLUT() );
-      ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
-    }
-    else
-    {
-      ruiDist += m_pcRdCost->getDistPart(piOrg, piReco, bitDepth, compID, DF_SSE_WTD, &orgLuma);
-      if( jointCbCr )
+      const CPelBuf orgLuma = cs.getOrgBuf( cs.area.blocks[COMPONENT_Y] );
+      if (compID == COMPONENT_Y  && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
       {
-        ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+        CompArea      tmpArea1(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
+        PelBuf tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
+        tmpRecLuma.rspSignal( piReco, m_pcReshape->getInvLUT() );
+        ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
+      }
+      else
+      {
+        ruiDist += m_pcRdCost->getDistPart(piOrg, piReco, bitDepth, compID, DF_SSE_WTD, &orgLuma);
+        if( jointCbCr )
+        {
+          ruiDist += m_pcRdCost->getDistPart(crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE_WTD, &orgLuma);
+        }
       }
     }
-  }
-  else
+    else
 #endif
-  {
-    ruiDist += m_pcRdCost->getDistPart( piOrg, piReco, bitDepth, compID, DF_SSE );
-    if( jointCbCr )
     {
-      ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
+      ruiDist += m_pcRdCost->getDistPart( piOrg, piReco, bitDepth, compID, DF_SSE );
+      if( jointCbCr )
+      {
+        ruiDist += m_pcRdCost->getDistPart( crOrg, crReco, bitDepth, COMPONENT_Cr, DF_SSE );
+      }
     }
-  }
 #endif
+#endif
+#if INTRA_TRANS_ENC_OPT
+  }
 #endif
 }
 
@@ -4383,7 +5010,11 @@ bool IntraSearch::xIntraCodingLumaISP(CodingStructure& cs, Partitioner& partitio
     xIntraCodingTUBlock(tu, COMPONENT_Y, singleDistTmpLuma, 0, &numSig);
 
 #if SIGN_PREDICTION
+#if JVET_Z0118_GDR
+    cs.updateReconMotIPM(partitioner.currArea());
+#else
     cs.picture->getRecoBuf( partitioner.currArea() ).copyFrom( cs.getRecoBuf( partitioner.currArea() ) );
+#endif
 #endif
 
     if (singleDistTmpLuma == MAX_INT)   // all zero CBF skip
@@ -4450,7 +5081,11 @@ bool IntraSearch::xIntraCodingLumaISP(CodingStructure& cs, Partitioner& partitio
     if (cs.cost < bestCostSoFar)
     {
       cs.setDecomp(cu.Y());
+#if JVET_Z0118_GDR
+      cs.updateReconMotIPM(currArea.Y());
+#else
       cs.picture->getRecoBuf(currArea.Y()).copyFrom(cs.getRecoBuf(currArea.Y()));
+#endif
 
       for (auto& ptu : cs.tus)
       {
@@ -4544,7 +5179,11 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
     }
     else
     {
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      nNumTransformCands = 1 + (tsAllowed ? 1 : 0) + (mtsAllowed ? 6 : 0); // DCT + TS + 6 MTS = 8 tests
+#else
       nNumTransformCands = 1 + ( tsAllowed ? 1 : 0 ) + ( mtsAllowed ? 4 : 0 ); // DCT + TS + 4 MTS = 6 tests
+#endif
       if (m_pcEncCfg->getCostMode() == COST_LOSSLESS_CODING && slice.isLossless())
       {
         nNumTransformCands = 1;
@@ -4567,7 +5206,11 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
         }
         if (mtsAllowed)
         {
+#if JVET_Y0142_ADAPT_INTRA_MTS
+          for (int i = 2; i < 8; i++)
+#else
           for (int i = 2; i < 6; i++)
+#endif
           {
             trModes.push_back(TrMode(i, true));
           }
@@ -4595,6 +5238,9 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
     {
       saveCS.pcv     = cs.pcv;
       saveCS.picture = cs.picture;
+#if JVET_Z0118_GDR
+      saveCS.m_pt = cs.m_pt;
+#endif
       saveCS.area.repositionTo(cs.area);
       saveCS.clearTUs();
       tmpTU = &saveCS.addTU(currArea, partitioner.chType);
@@ -4604,7 +5250,10 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
     bool    cbfBestModeValid = false;
     bool    cbfDCT2  = true;
 #if JVET_W0103_INTRA_MTS
-    if (sps.getUseLFNST() && cu.mtsFlag) xSelectAMTForFullRD(tu);
+    if (sps.getUseLFNST() && cu.mtsFlag)
+    {
+      xSelectAMTForFullRD(tu);
+    }
 #endif
     double bestDCT2cost = MAX_DOUBLE;
     double threshold = m_pcEncCfg->getUseFastISP() && !cu.ispMode && ispIsCurrentWinner && nNumTransformCands > 1 ? 1 + 1.4 / sqrt( cu.lwidth() * cu.lheight() ) : 1;
@@ -4614,9 +5263,15 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
 #if JVET_W0103_INTRA_MTS
       if (sps.getUseLFNST() && cu.mtsFlag)
       {
-        if (modeId >= m_numCandAMTForFullRD) continue;
-        transformIndex = m_TestAMTForFullRD[modeId];
+        if (modeId >= m_numCandAMTForFullRD)
+        {
+          continue;
+        }
+        transformIndex = m_testAMTForFullRD[modeId];
       }
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      m_validMTSReturn = true;
+#endif
 #endif
       if( sps.getUseLFNST() )
       {
@@ -4759,8 +5414,14 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
           xIntraCodingTUBlock( tu, COMPONENT_Y, singleDistTmpLuma, default0Save1Load2, &numSig );
         }
       }
-
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      cuCtx.mtsCoeffAbsSum = 0;
+#endif
       cuCtx.mtsLastScanPos = false;
+#if INTRA_TRANS_ENC_OPT
+      cuCtx.lfnstLastScanPos = false;
+#endif
+
       //----- determine rate and r-d cost -----
       if( ( sps.getUseLFNST() ? ( modeId == lastCheckId && modeId != 0 && checkTransformSkip ) : ( trModes[ modeId ].first != 0 ) ) && !TU::getCbfAtDepth( tu, COMPONENT_Y, currDepth ) )
       {
@@ -4783,11 +5444,26 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
         }
         else
         {
+#if JVET_Y0142_ADAPT_INTRA_MTS
+          if (tu.mtsIdx[COMPONENT_Y] > MTS_SKIP && !m_validMTSReturn)
+          {
+            singleTmpFracBits = 0;
+          }
+          else
+          {
+            singleTmpFracBits = xGetIntraFracBitsQT(*csFull, partitioner, true, false, subTuCounter, ispType, &cuCtx);
+          }
+#else
           singleTmpFracBits = xGetIntraFracBitsQT( *csFull, partitioner, true, false, subTuCounter, ispType, &cuCtx );
+#endif
         }
         if (tu.mtsIdx[COMPONENT_Y] > MTS_SKIP)
         {
+#if JVET_Y0142_ADAPT_INTRA_MTS
+          if(!m_validMTSReturn)
+#else
           if (!cuCtx.mtsLastScanPos)
+#endif
           {
             singleCostTmp = MAX_DOUBLE;
           }
@@ -4796,6 +5472,19 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
             singleCostTmp = m_pcRdCost->calcRdCost(singleTmpFracBits, singleDistTmpLuma);
           }
         }
+#if INTRA_TRANS_ENC_OPT
+        else if (CS::isDualITree(cs) && cu.lfnstIdx && !cu.ispMode)
+        {
+          if (!cuCtx.lfnstLastScanPos)
+          {
+            singleCostTmp = MAX_DOUBLE;
+          }
+          else
+          {
+            singleCostTmp = m_pcRdCost->calcRdCost(singleTmpFracBits, singleDistTmpLuma);
+          }
+        }
+#endif
         else
         {
           singleCostTmp = m_pcRdCost->calcRdCost(singleTmpFracBits, singleDistTmpLuma);
@@ -4814,12 +5503,21 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
           const CompArea&       area = tu.blocks[COMPONENT_Y];
           double skipThreshold = 1.0 + 1.0 / sqrt((double)(area.width*area.height));
           skipThreshold = std::max(skipThreshold, !m_pcEncCfg->getUseFastLFNST()? 1.06: 1.03);
+#if JVET_Y0142_ADAPT_INTRA_MTS
+          skipThreshold = (m_coeffAbsSumDCT2 >= MTS_TH_COEFF[1])? std::max(skipThreshold, 1.06) : skipThreshold;
+#endif
           if (singleCostTmp > skipThreshold * m_globalBestCostStore)
           {
             m_numCandAMTForFullRD = modeId + 1;
           }
         }
       }
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      if (tu.mtsIdx[0] == 0 && !cu.ispMode && !cu.lfnstIdx)
+      {
+        m_coeffAbsSumDCT2 = cuCtx.mtsCoeffAbsSum;
+      }
+#endif
 #endif
       if (singleCostTmp < dSingleCost)
       {
@@ -4927,7 +5625,11 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
     {
       bool tmpValidReturnSplit = xRecurIntraCodingLumaQT( *csSplit, partitioner, bestCostSoFar, subTuCounter, ispType, false, mtsCheckRangeFlag, mtsFirstCheckId, mtsLastCheckId );
 #if SIGN_PREDICTION
+#if JVET_Z0118_GDR
+      cs.updateReconMotIPM(partitioner.currArea());
+#else
       cs.picture->getRecoBuf(  partitioner.currArea()  ).copyFrom( cs.getRecoBuf( partitioner.currArea() ) );
+#endif
 #endif
       subTuCounter += subTuCounter != -1 ? 1 : 0;
       if( sps.getUseLFNST() && !tmpValidReturnSplit )
@@ -4991,6 +5693,9 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
       cuCtx.lfnstLastScanPos = false;
       cuCtx.violatesMtsCoeffConstraint = false;
       cuCtx.mtsLastScanPos = false;
+#if JVET_Y0142_ADAPT_INTRA_MTS
+      cuCtx.mtsCoeffAbsSum = 0;
+#endif
 
       //----- determine rate and r-d cost -----
       csSplit->fracBits = xGetIntraFracBitsQT( *csSplit, partitioner, true, false, cu.ispMode ? 0 : -1, ispType, &cuCtx );
@@ -5008,7 +5713,11 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
     if( !sps.getUseLFNST() || validReturnFull || validReturnSplit )
     {
       // otherwise this would've happened in useSubStructure
+#if JVET_Z0118_GDR
+      cs.updateReconMotIPM(currArea.Y());
+#else
       cs.picture->getRecoBuf(currArea.Y()).copyFrom(cs.getRecoBuf(currArea.Y()));
+#endif
       cs.picture->getPredBuf(currArea.Y()).copyFrom(cs.getPredBuf(currArea.Y()));
 
       if( cu.ispMode && earlySkipISP )
@@ -5346,7 +6055,13 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
 
         if (tu.mtsIdx[COMPONENT_Y] > MTS_SKIP)
         {
+#if JVET_Y0142_ADAPT_INTRA_MTS
+          int nCands = (cuCtx.mtsCoeffAbsSum > MTS_TH_COEFF[1]) ? MTS_NCANDS[2] : (cuCtx.mtsCoeffAbsSum > MTS_TH_COEFF[0]) ? MTS_NCANDS[1] : MTS_NCANDS[0];
+          bool isInvalid = !cuCtx.mtsLastScanPos || ((tu.mtsIdx[COMPONENT_Y] - MTS_DST7_DST7) >= nCands);
+          if (isInvalid)
+#else
           if (!cuCtx.mtsLastScanPos)
+#endif
           {
             singleCostTmp = MAX_DOUBLE;
           }
@@ -5779,7 +6494,11 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
       m_CABACEstimator->getCtx() = ctxBest;
     }
     tu.jointCbCr = bestJointCbCr;
+#if JVET_Z0118_GDR
+    csFull->updateReconMotIPM(tu);
+#else
     csFull->picture->getRecoBuf(tu).copyFrom(csFull->getRecoBuf(tu));
+#endif
 
     csFull->dist += bestDistJointCbCr;
     csFull->fracBits += bestBitsJointCbCr;
@@ -5883,6 +6602,9 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     CodingStructure &saveCS = *m_pSaveCS[1];
     saveCS.pcv      = cs.pcv;
     saveCS.picture  = cs.picture;
+#if JVET_Z0118_GDR
+    saveCS.m_pt = cs.m_pt;
+#endif
     saveCS.area.repositionTo( cs.area );
     saveCS.initStructData( MAX_INT, true );
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -5948,6 +6670,13 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     {
       predIntraAng( COMPONENT_Cb, piPredCb, pu);
       predIntraAng( COMPONENT_Cr, piPredCr, pu);
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+      if (pu.isChromaFusion)
+      {
+        geneChromaFusionPred(COMPONENT_Cb, piPredCb, pu);
+        geneChromaFusionPred(COMPONENT_Cr, piPredCr, pu);
+      }
+#endif
     }
 
     // determination of chroma residuals including reshaping and cross-component prediction
@@ -6310,8 +7039,17 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
       }
 
       // Copy results to the picture structures
+#if JVET_Z0118_GDR
+      cs.updateReconMotIPM(cbArea);
+#else
       cs.picture->getRecoBuf(cbArea).copyFrom(cs.getRecoBuf(cbArea));
+#endif
+
+#if JVET_Z0118_GDR
+      cs.updateReconMotIPM(crArea);
+#else
       cs.picture->getRecoBuf(crArea).copyFrom(cs.getRecoBuf(crArea));
+#endif
       cs.picture->getPredBuf(cbArea).copyFrom(cs.getPredBuf(cbArea));
       cs.picture->getPredBuf(crArea).copyFrom(cs.getPredBuf(crArea));
 
@@ -6380,14 +7118,22 @@ uint64_t IntraSearch::xFracModeBitsIntra(PredictionUnit &pu, const uint32_t &uiM
 {
   uint8_t orgMode = uiMode;
 
+#if JVET_Y0065_GPM_INTRA
+  if (!pu.ciipFlag && !pu.gpmIntraFlag)
+#else
   if (!pu.ciipFlag)
+#endif
   std::swap(orgMode, pu.intraDir[chType]);
 
   m_CABACEstimator->resetBits();
 
   if( isLuma( chType ) )
   {
+#if JVET_Y0065_GPM_INTRA
+    if (!pu.ciipFlag && !pu.gpmIntraFlag)
+#else
     if (!pu.ciipFlag)
+#endif
     {
       m_CABACEstimator->intra_luma_pred_mode(pu);
     }
@@ -6397,7 +7143,11 @@ uint64_t IntraSearch::xFracModeBitsIntra(PredictionUnit &pu, const uint32_t &uiM
     m_CABACEstimator->intra_chroma_pred_mode( pu );
   }
 
+#if JVET_Y0065_GPM_INTRA
+  if ( !pu.ciipFlag && !pu.gpmIntraFlag )
+#else
   if ( !pu.ciipFlag )
+#endif
   std::swap(orgMode, pu.intraDir[chType]);
 
   return m_CABACEstimator->getEstFracBits();

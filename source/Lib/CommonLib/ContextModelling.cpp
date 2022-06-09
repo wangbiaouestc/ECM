@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -469,7 +469,9 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
     candIdx -= BM_MRG_MAX_NUM_CANDS;
   }
 #endif
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
   CHECK( candIdx >= numValidMergeCand, "Merge candidate does not exist" );
+#endif
 
   pu.regularMergeFlag        = !(pu.ciipFlag || pu.cu->geoFlag);
   pu.mergeFlag               = true;
@@ -540,14 +542,24 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 #endif
 }
 
-#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM
+#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Y0058_IBC_LIST_MODIFY
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh, int compareNum) const
+#else
 bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh) const
+#endif
 {
   if (mvFieldNeighbours[(mergeCandIndex << 1)].refIdx < 0 && mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx < 0)
   {
     return true;
   }
 
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  if (compareNum == -1)
+  {
+    compareNum = mergeCandIndex;
+  }
+#endif
   if (mvdSimilarityThresh > 1)
   {
     for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
@@ -597,7 +609,11 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
     return false;
   }
 
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  for (uint32_t ui = 0; ui < compareNum; ui++)
+#else
   for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
+#endif
   {
     if (interDirNeighbours[ui] == interDirNeighbours[mergeCandIndex])
     {
@@ -626,6 +642,52 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
         {
           return true;
         }
+      }
+    }
+  }
+
+  return false;
+}
+#endif
+#if JVET_Z0084_IBC_TM
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+bool MergeCtx::xCheckSimilarIBCMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh, int compareNum) const
+#else
+bool MergeCtx::xCheckSimilarIBCMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh) const
+#endif
+{
+  if (mvFieldNeighbours[mergeCandIndex << 1].refIdx < 0)
+  {
+    return true;
+  }
+
+  if (mvdSimilarityThresh > 1)
+  {
+    for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
+    {
+      Mv mvDiff = mvFieldNeighbours[ui << 1].mv - mvFieldNeighbours[mergeCandIndex << 1].mv;
+      if (mvDiff.getAbsHor() < mvdSimilarityThresh && mvDiff.getAbsVer() < mvdSimilarityThresh)
+      {
+        return true;
+      }
+    }
+  }
+  else
+  {
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+    if (compareNum == -1)
+    {
+      compareNum = mergeCandIndex;
+    }
+
+    for (uint32_t ui = 0; ui < compareNum; ui++)
+#else
+    for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
+#endif
+    {
+      if (mvFieldNeighbours[ui << 1].mv == mvFieldNeighbours[mergeCandIndex << 1].mv)
+      {
+        return true;
       }
     }
   }
@@ -744,11 +806,19 @@ void MergeCtx::copyMergeCtx(MergeCtx & orgMergeCtx)
   memcpy(mvFieldNeighbours, orgMergeCtx.mvFieldNeighbours, (MRG_MAX_NUM_CANDS << 1) * sizeof(MvField));
 }
 #endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int candIdxMaped)
+#else
 void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
+#endif
 {
   const Slice &slice = *pu.cs->slice;
   const int mvShift = MV_FRACTIONAL_BITS_DIFF;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  const int refMvdCands[] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 16 << mvShift ,  32 << mvShift };
+#else
   const int refMvdCands[8] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 16 << mvShift , 32 << mvShift,  64 << mvShift , 128 << mvShift };
+#endif
   int fPosGroup = 0;
   int fPosBaseIdx = 0;
   int fPosStep = 0;
@@ -756,13 +826,26 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
   int fPosPosition = 0;
   Mv tempMv[2];
 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  if(candIdxMaped == -1)
+  {
+    candIdxMaped = candIdx;
+  }
+  tempIdx = candIdxMaped;
+#else
   tempIdx = candIdx;
+#endif
   fPosGroup = tempIdx / (MMVD_BASE_MV_NUM * MMVD_MAX_REFINE_NUM);
   tempIdx = tempIdx - fPosGroup * (MMVD_BASE_MV_NUM * MMVD_MAX_REFINE_NUM);
   fPosBaseIdx = tempIdx / MMVD_MAX_REFINE_NUM;
   tempIdx = tempIdx - fPosBaseIdx * (MMVD_MAX_REFINE_NUM);
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  fPosStep = tempIdx / MMVD_MAX_DIR;
+  fPosPosition = tempIdx - fPosStep * MMVD_MAX_DIR;
+#else
   fPosStep = tempIdx / 4;
   fPosPosition = tempIdx - fPosStep * (4);
+#endif
   int offset = refMvdCands[fPosStep];
   if ( pu.cu->slice->getPicHeader()->getDisFracMMVD() )
   {
@@ -771,11 +854,19 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
   const int refList0 = mmvdBaseMv[fPosBaseIdx][0].refIdx;
   const int refList1 = mmvdBaseMv[fPosBaseIdx][1].refIdx;
 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  const int xDir[] = {1, -1,  0,  0,  1, -1,  1, -1, 2, -2,  2, -2, 1,  1, -1, -1};
+  const int yDir[] = {0,  0,  1, -1,  1, -1, -1,  1, 1,  1, -1, -1, 2, -2,  2, -2};
+#endif
+    
   if ((refList0 != -1) && (refList1 != -1))
   {
     const int poc0 = slice.getRefPOC(REF_PIC_LIST_0, refList0);
     const int poc1 = slice.getRefPOC(REF_PIC_LIST_1, refList1);
     const int currPoc = slice.getPOC();
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    tempMv[0] = Mv(xDir[fPosPosition] * offset, yDir[fPosPosition] * offset);
+#else
     if (fPosPosition == 0)
     {
       tempMv[0] = Mv(offset, 0);
@@ -792,6 +883,7 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
     {
       tempMv[0] = Mv(0, -offset);
     }
+#endif
     if ((poc0 - currPoc) == (poc1 - currPoc))
     {
       tempMv[1] = tempMv[0];
@@ -844,6 +936,9 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
   }
   else if (refList0 != -1)
   {
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    tempMv[0] = Mv(xDir[fPosPosition] * offset, yDir[fPosPosition] * offset);
+#else
     if (fPosPosition == 0)
     {
       tempMv[0] = Mv(offset, 0);
@@ -860,6 +955,7 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
     {
       tempMv[0] = Mv(0, -offset);
     }
+#endif
     pu.interDir = 1;
     pu.mv[REF_PIC_LIST_0] = mmvdBaseMv[fPosBaseIdx][0].mv + tempMv[0];
     pu.refIdx[REF_PIC_LIST_0] = refList0;
@@ -868,6 +964,9 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
   }
   else if (refList1 != -1)
   {
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    tempMv[1] = Mv(xDir[fPosPosition] * offset, yDir[fPosPosition] * offset);
+#else
     if (fPosPosition == 0)
     {
       tempMv[1] = Mv(offset, 0);
@@ -884,6 +983,7 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
     {
       tempMv[1] = Mv(0, -offset);
     }
+#endif
     pu.interDir = 2;
     pu.mv[REF_PIC_LIST_0] = Mv(0, 0);
     pu.refIdx[REF_PIC_LIST_0] = -1;

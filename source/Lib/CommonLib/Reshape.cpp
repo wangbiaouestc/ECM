@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2021, ITU/ISO/IEC
+* Copyright (c) 2010-2022, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -126,7 +126,11 @@ int  Reshape::calculateChromaAdjVpduNei(TransformUnit &tu, const CompArea &areaY
     yPos = yPos / ctuSize * ctuSize;
   }
 
+#if JVET_Z0118_GDR
+  if (isVPDUprocessed(xPos, yPos, (PictureType) tu.cs->picture->getCleanDirty()) && !cs.pcv->isEncoder)
+#else
   if (isVPDUprocessed(xPos, yPos) && !cs.pcv->isEncoder)
+#endif
   {
     return getChromaScale();
   }
@@ -134,7 +138,11 @@ int  Reshape::calculateChromaAdjVpduNei(TransformUnit &tu, const CompArea &areaY
 #endif
   {
 #if !LMCS_CHROMA_CALC_CU
+#if JVET_Z0118_GDR
+    setVPDULoc(xPos, yPos, (PictureType) tu.cs->picture->getCleanDirty());
+#else
     setVPDULoc(xPos, yPos);
+#endif
 #endif
     Position topLeft(xPos, yPos);
     CodingUnit *topLeftLuma;

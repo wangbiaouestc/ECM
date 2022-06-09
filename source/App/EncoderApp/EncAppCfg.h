@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -113,10 +113,13 @@ protected:
   int       m_confWinRight;
   int       m_confWinTop;
   int       m_confWinBottom;
+  int       m_firstValidFrame;
+  int       m_lastValidFrame;
   int       m_framesToBeEncoded;                              ///< number of encoded frames
   int       m_aiPad[2];                                       ///< number of padded pixels for width and height
   bool      m_AccessUnitDelimiter;                            ///< add Access Unit Delimiter NAL units
   bool      m_enablePictureHeaderInSliceHeader;               ///< Enable Picture Header in Slice Header
+
   InputColourSpaceConversion m_inputColourSpaceConvert;       ///< colour space conversion to apply to input video
   bool      m_snrInternalColourSpace;                       ///< if true, then no colour space conversion is applied for snr calculation, otherwise inverse of input is applied.
   bool      m_outputInternalColourSpace;                    ///< if true, then no colour space conversion is applied for reconstructed video, otherwise inverse of input is applied.
@@ -126,6 +129,9 @@ protected:
   bool      m_printHexPsnr;
   bool      m_printFrameMSE;
   bool      m_printSequenceMSE;
+#if MSSIM_UNIFORM_METRICS_LOG
+  bool      m_printMSSSIM;
+#endif
   bool      m_cabacZeroWordPaddingEnabled;
   bool      m_bClipInputVideoToRec709Range;
   bool      m_bClipOutputVideoToRec709Range;
@@ -254,6 +260,13 @@ protected:
 #endif
   // coding structure
   int       m_iIntraPeriod;                                   ///< period of I-slice (random access period)
+#if JVET_Z0118_GDR 
+  bool      m_gdrEnabled;
+  int       m_gdrPocStart;
+  int       m_gdrPeriod;
+  int       m_gdrInterval;  
+  bool      m_gdrNoHash;  
+#endif
   int       m_iDecodingRefreshType;                           ///< random access type
   int       m_iGOPSize;                                       ///< GOP size of hierarchical structure
   int       m_drapPeriod;                                     ///< period of dependent RAP pictures
@@ -351,6 +364,10 @@ protected:
   unsigned  m_uiMaxMTTHierarchyDepthIChroma;
   unsigned  m_uiMaxBT[3];
   unsigned  m_uiMaxTT[3];
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  int       m_ttFastSkip;
+  double    m_ttFastSkipThr;
+#endif
   bool      m_dualTree;
   bool      m_LFNST;
   bool      m_useFastLFNST;
@@ -362,6 +379,9 @@ protected:
 #endif
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   bool      m_DMVDMode;
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  bool      m_altGPMSplitModeCode;
 #endif
   bool      m_PROF;
   bool      m_BIO;
@@ -402,9 +422,16 @@ protected:
   bool      m_allowDisFracMMVD;
   bool      m_AffineAmvr;
   bool      m_AffineAmvrEncOpt;
+  bool      m_AffineAmvp;
   bool      m_DMVR;
   bool      m_MMVD;
   int       m_MmvdDisNum;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  bool      m_MVSD;
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  bool      m_useARL;
+#endif
   bool      m_rgbFormat;
   bool      m_useColorTrans;
   unsigned  m_PLTMode;
@@ -437,9 +464,12 @@ protected:
   int       m_BIFQPOffset;                                    /// Bilateral QP offset
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  bool      m_CBIF;
-  unsigned  m_CBIFStrength;
-  int       m_CBIFQPOffset;
+  bool      m_chromaBIF;
+  unsigned  m_chromaBIFStrength;
+  int       m_chromaBIFQPOffset;
+#endif
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  unsigned  m_tempCabacInitMode;
 #endif
   
   // ADD_NEW_TOOL : (encoder app) add tool enabling flags and associated parameters here
@@ -723,6 +753,9 @@ protected:
   uint32_t      m_maxNumAffineMergeCand;                          ///< Max number of affine merge candidates
   uint32_t      m_maxNumGeoCand;
   uint32_t      m_maxNumIBCMergeCand;                             ///< Max number of IBC merge candidates
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  uint32_t      m_maxNumMHPCand;
+#endif
 
   bool      m_sliceLevelRpl;                                      ///< code reference picture lists in slice headers rather than picture header
   bool      m_sliceLevelDblk;                                     ///< code deblocking filter parameters in slice headers rather than picture header
@@ -822,8 +855,12 @@ protected:
   bool        m_avoidIntraInDepLayer;
 
   bool                  m_gopBasedTemporalFilterEnabled;               ///< GOP-based Temporal Filter enable/disable
-  bool                  m_gopBasedTemporalFilterFutureReference;       ///< Enable/disable future frame references in the GOP-based Temporal Filter
+  int                   m_gopBasedTemporalFilterPastRefs;
+  int                   m_gopBasedTemporalFilterFutureRefs;            ///< Enable/disable future frame references in the GOP-based Temporal Filter
   std::map<int, double> m_gopBasedTemporalFilterStrengths;             ///< Filter strength per frame for the GOP-based Temporal Filter
+#if JVET_Y0240_BIM
+  bool                  m_bimEnabled;
+#endif
 
   int         m_maxLayers;
   int         m_targetOlsIdx;
@@ -875,6 +912,9 @@ protected:
 
 #if SIGN_PREDICTION
   int m_numPredSign;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  int m_log2SignPredArea;
+#endif
 #endif
 #if DUMP_BEFORE_INLOOP
   bool        m_dumpBeforeInloop;

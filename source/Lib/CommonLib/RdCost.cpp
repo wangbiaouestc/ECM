@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -145,7 +145,6 @@ void RdCost::init()
   m_afpDistortFunc[DF_SSE32  ] = RdCost::xGetSSE32;
   m_afpDistortFunc[DF_SSE64  ] = RdCost::xGetSSE64;
   m_afpDistortFunc[DF_SSE16N ] = RdCost::xGetSSE16N;
-
   m_afpDistortFunc[DF_SAD    ] = RdCost::xGetSAD;
   m_afpDistortFunc[DF_SAD2   ] = RdCost::xGetSAD;
   m_afpDistortFunc[DF_SAD4   ] = RdCost::xGetSAD4;
@@ -505,7 +504,7 @@ void RdCost::setTimdDistParam( DistParam &rcDP, const Pel* pOrg, const Pel* piRe
 #endif
 
 #if TM_AMVP || TM_MRG
-void RdCost::setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &cur, int bitDepth, bool TrueA_FalseL, int wIdx, int subShift, ComponentID compID )
+void RdCost::setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &cur, int bitDepth, bool trueAfalseL, int wIdx, int subShift, ComponentID compID )
 {
   rcDP.org          = org;
   rcDP.cur          = cur;
@@ -515,7 +514,7 @@ void RdCost::setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &c
   rcDP.compID       = compID;
   rcDP.tmWeightIdx  = wIdx;
 
-  if (TrueA_FalseL)
+  if (trueAfalseL)
   {
     rcDP.distFunc = m_afpDistortFunc[ rcDP.useMR ? DF_TM_A_WMRSAD_FULL_NBIT : DF_TM_A_WSAD_FULL_NBIT ];
   }
@@ -3668,17 +3667,17 @@ Distortion RdCost::xGetSADwMask( const DistParam& rcDtParam )
 }
 
 #if TM_AMVP || TM_MRG
-template <int tplSize, bool TrueA_FalseL, bool MR>
+template <int tplSize, bool trueAfalseL, bool mr>
 Distortion RdCost::xGetTMErrorFull( const DistParam& rcDtParam )
 {
   const CPelBuf& curTplBuf = rcDtParam.org;
   const CPelBuf& refTplBuf = rcDtParam.cur;
 
   // get delta mean value
-  const int64_t deltaSum = !MR ? 0 : g_pelBufOP.getSumOfDifference(curTplBuf.buf, curTplBuf.stride, refTplBuf.buf, refTplBuf.stride, curTplBuf.width, curTplBuf.height, rcDtParam.subShift, rcDtParam.bitDepth);
-  if (MR && deltaSum == 0)
+  const int64_t deltaSum = !mr ? 0 : g_pelBufOP.getSumOfDifference(curTplBuf.buf, curTplBuf.stride, refTplBuf.buf, refTplBuf.stride, curTplBuf.width, curTplBuf.height, rcDtParam.subShift, rcDtParam.bitDepth);
+  if (mr && deltaSum == 0)
   {
-    return xGetTMErrorFull<tplSize, TrueA_FalseL, false>(rcDtParam);
+    return xGetTMErrorFull<tplSize, trueAfalseL, false>(rcDtParam);
   }
 
   // weight configuration
@@ -3733,15 +3732,15 @@ Distortion RdCost::xGetTMErrorFull( const DistParam& rcDtParam )
   const int  iStrideRef = refTplBuf.stride << iSubShift;
 
   Distortion partSum = 0;
-  const int deltaMean = !MR ? 0 : int(deltaSum / (int64_t)curTplBuf.area());
-  if (MR)
+  const int deltaMean = !mr ? 0 : int(deltaSum / (int64_t)curTplBuf.area());
+  if (mr)
   {
-    if (TrueA_FalseL) { X_GET_TM_TEMP_MATCH_ERROR_LOOPER_FOR_ABOVE_TPL(X_GET_TM_ERR_MRSAD_OP); }
+    if (trueAfalseL) { X_GET_TM_TEMP_MATCH_ERROR_LOOPER_FOR_ABOVE_TPL(X_GET_TM_ERR_MRSAD_OP); }
     else              { X_GET_TM_TEMP_MATCH_ERROR_LOOPER_FOR__LEFT_TPL(X_GET_TM_ERR_MRSAD_OP); }
   }
   else
   {
-    if (TrueA_FalseL) { X_GET_TM_TEMP_MATCH_ERROR_LOOPER_FOR_ABOVE_TPL(X_GET_TM_ERR___SAD_OP); }
+    if (trueAfalseL) { X_GET_TM_TEMP_MATCH_ERROR_LOOPER_FOR_ABOVE_TPL(X_GET_TM_ERR___SAD_OP); }
     else              { X_GET_TM_TEMP_MATCH_ERROR_LOOPER_FOR__LEFT_TPL(X_GET_TM_ERR___SAD_OP); }
   }
 

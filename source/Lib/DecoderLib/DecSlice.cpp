@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -78,6 +78,10 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
   const SPS*     sps          = slice->getSPS();
   Picture*       pic          = slice->getPic();
   CABACReader&   cabacReader  = *m_CABACDecoder->getCABACReader( 0 );
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  cabacReader.m_CABACDataStore->updateBufferState( slice );
+#endif
+
   // setup coding structure
   CodingStructure& cs = *pic->cs;
   cs.slice            = slice;
@@ -138,7 +142,81 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
   {
     clipMv = clipMvInPic;
   }
+
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+  if (slice->getPicHeader()->getEnableTMVPFlag())
+  {
+    const Picture* const pColPic = slice->getRefPic(RefPicList(slice->isInterB() ? 1 - slice->getColFromL0Flag() : 0), slice->getColRefIdx());
+    if (pColPic)
+    {
+      const int currPOC = slice->getPOC();
+      const int colPOC = pColPic->getPOC();
+
+      slice->resizeImBuf(pColPic->numSlices);
+      Slice *pColSlice = nullptr;
+      for (int sliceIdx = 0; sliceIdx < pColPic->numSlices; sliceIdx++)
+      {
+        pColSlice = pColPic->slices[sliceIdx];
+        if (pColSlice->isIntra())
+        {
+          continue;
+        }
+
+        for (int colRefPicListIdx = 0; colRefPicListIdx < (pColSlice->isInterB() ? 2 : 1); colRefPicListIdx++)
+        {
+          for (int colRefIdx = 0; colRefIdx < pColSlice->getNumRefIdx(RefPicList(colRefPicListIdx)); colRefIdx++)
+          {
+            const bool bIsColRefLongTerm = pColSlice->getIsUsedAsLongTerm(RefPicList(colRefPicListIdx), colRefIdx);
+            const int colRefPOC = pColSlice->getRefPOC(RefPicList(colRefPicListIdx), colRefIdx);
+
+            for (int curRefPicListIdx = 0; curRefPicListIdx < (slice->isInterB() ? 2 : 1); curRefPicListIdx++)
+            {
+              double bestDistScale = 1000;
+              int targetRefIdx = -1;
+              for (int curRefIdx = 0; curRefIdx < slice->getNumRefIdx(RefPicList(curRefPicListIdx)); curRefIdx++)
+              {
+                const int currRefPOC = slice->getRefPic(RefPicList(curRefPicListIdx), curRefIdx)->getPOC();
+                const bool bIsCurrRefLongTerm = slice->getRefPic(RefPicList(curRefPicListIdx), curRefIdx)->longTerm;
+                if (bIsCurrRefLongTerm != bIsColRefLongTerm)
+                {
+                  continue;
+                }
+                if (bIsCurrRefLongTerm)
+                {
+                  targetRefIdx = curRefIdx;
+                  bestDistScale = 1;
+                  break;
+                }
+                else if (colPOC - colRefPOC == currPOC - currRefPOC)
+                {
+                  targetRefIdx = curRefIdx;
+                  bestDistScale = 1;
+                  break;
+                }
+                else
+                {
+                  if (abs(1.0 - (abs(currPOC - currRefPOC) * 1.0 / abs(colPOC - colRefPOC) * 1.0)) < bestDistScale)
+                  {
+                    bestDistScale = abs(1.0 - (abs(currPOC - currRefPOC) * 1.0 / abs(colPOC - colRefPOC) * 1.0));
+                    targetRefIdx = curRefIdx;
+                  }
+                }
+              } // curRefIdx
+              slice->setImRefIdx(sliceIdx, RefPicList(colRefPicListIdx), RefPicList(curRefPicListIdx), colRefIdx, targetRefIdx);
+            } // curRefPicListIdx
+          }
+        }
+      }
+    }
+  }
+#endif
+
   // for every CTU in the slice segment...
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  static Ctx storedCtx;
+#endif
+
   unsigned subStrmId = 0;
   for( unsigned ctuIdx = 0; ctuIdx < slice->getNumCtuInSlice(); ctuIdx++ )
   {
@@ -223,9 +301,36 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 
     if ((cs.slice->getSliceType() != I_SLICE || cs.sps->getIBCFlag()) && ctuXPosInCtus == tileXPosInCtus)
     {
+#if JVET_Z0118_GDR
+      cs.motionLut.lut0.resize(0);
+      cs.motionLut.lut1.resize(0);
+      cs.motionLut.lutIbc0.resize(0);
+      cs.motionLut.lutIbc1.resize(0);
+#else
       cs.motionLut.lut.resize(0);
       cs.motionLut.lutIbc.resize(0);
+#endif
+
+#if JVET_Z0139_HIST_AFF   
+      for (int i = 0; i < 2 * MAX_NUM_AFFHMVP_ENTRIES_ONELIST; i++)
+      {
+#if JVET_Z0118_GDR
+        cs.motionLut.lutAff0[i].resize(0);
+        cs.motionLut.lutAff1[i].resize(0);
+#else
+        cs.motionLut.lutAff[i].resize(0);
+#endif
+      }
+#if JVET_Z0118_GDR
+      cs.motionLut.lutAffInherit0.resize(0);
+      cs.motionLut.lutAffInherit1.resize(0);
+#else
+      cs.motionLut.lutAffInherit.resize(0);
+#endif
+#endif
+#if !JVET_Z0153_IBC_EXT_REF
       cs.resetIBCBuffer = true;
+#endif
     }
 
     if( !cs.slice->isIntra() )
@@ -246,13 +351,21 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
     if (ctuRsAddr == 0)
     {
-        cabacReader.Cbif_Cb(cs);
-        cabacReader.Cbif_Cr(cs);
+      cabacReader.chromaBifCb(cs);
+      cabacReader.chromaBifCr(cs);
     }
 #endif
     cabacReader.coding_tree_unit( cs, ctuArea, pic->m_prevQP, ctuRsAddr );
 
     m_pcCuDecoder->decompressCtu( cs, ctuArea );
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+    // store CABAC context to be used in next frames
+    if( storeContexts( slice, ctuXPosInCtus, ctuYPosInCtus ) )
+    {
+      storedCtx = cabacReader.getCtx();
+    }
+#endif
 
     if( ctuXPosInCtus == tileXPosInCtus && wavefrontsEnabled )
     {
@@ -306,6 +419,14 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
       }
     }
   }
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  // store CABAC context to be used in next frames when the last CTU in a picture is processed
+  if( slice->getPPS()->pcv->sizeInCtus - 1 == slice->getCtuAddrInSlice( slice->getNumCtuInSlice() - 1 ) )
+  {
+    cabacReader.m_CABACDataStore->storeCtxStates( slice, storedCtx );
+  }
+#endif
 
   // deallocate all created substreams, including internal buffers.
   for( auto substr: ppcSubstreams )

@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -133,6 +133,10 @@ uint32_t DecApp::decode()
 #if JVET_S0155_EOS_NALU_CHECK
   bool isEosPresentInPu = false;
 #endif
+#if JVET_Z0118_GDR
+  bool gdrRecoveryPeriod[MAX_NUM_LAYER_IDS] = { false };
+  bool prevPicSkipped = true;
+#endif
 
   while (!!bitstreamFile)
   {
@@ -206,7 +210,44 @@ uint32_t DecApp::decode()
               bPicSkipped = false;
             }
           }
+
+#if JVET_Z0118_GDR
+          int skipFrameCounter = m_iSkipFrame;
           m_cDecLib.decode(nalu, m_iSkipFrame, m_iPOCLastDisplay, m_targetOlsIdx);
+
+          if ( prevPicSkipped && nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_GDR )
+          {
+            gdrRecoveryPeriod[nalu.m_nuhLayerId] = true;
+          }
+
+          if ( skipFrameCounter == 1 && ( nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_GDR  || nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_CRA ))
+          {
+            skipFrameCounter--;
+          }
+
+          if ( m_iSkipFrame < skipFrameCounter  &&
+              ((nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_TRAIL) || (nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_STSA) || (nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_RASL) || (nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_RADL) || (nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_IDR_W_RADL) || (nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_IDR_N_LP) || (nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_CRA) || (nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_GDR)))
+          {
+            if (m_cDecLib.isSliceNaluFirstInAU(true, nalu))
+            {
+              m_cDecLib.checkSeiInPictureUnit();
+              m_cDecLib.resetPictureSeiNalus();
+              m_cDecLib.checkAPSInPictureUnit();
+              m_cDecLib.resetPictureUnitNals();
+              m_cDecLib.resetAccessUnitSeiTids();
+              m_cDecLib.checkSEIInAccessUnit();
+              m_cDecLib.resetAccessUnitSeiPayLoadTypes();
+              m_cDecLib.resetAccessUnitNals();
+              m_cDecLib.resetAccessUnitApsNals();
+              m_cDecLib.resetAccessUnitPicInfo();
+            }
+            bPicSkipped = true;
+            m_iSkipFrame++;   // skipFrame count restore, the real decrement occur at the begin of next frame
+          }
+#else
+          m_cDecLib.decode(nalu, m_iSkipFrame, m_iPOCLastDisplay, m_targetOlsIdx);
+#endif
+
           if (nalu.m_nalUnitType == NAL_UNIT_VPS)
           {
             m_cDecLib.deriveTargetOutputLayerSet( m_targetOlsIdx );
@@ -220,6 +261,12 @@ uint32_t DecApp::decode()
         }
       }
 #if JVET_S0155_EOS_NALU_CHECK
+#if JVET_Z0118_GDR
+      if( nalu.isSlice() && nalu.m_nalUnitType != NAL_UNIT_CODED_SLICE_RASL)
+      {
+        prevPicSkipped = bPicSkipped;
+      }
+#endif
       // once an EOS NAL unit appears in the current PU, mark the variable isEosPresentInPu as true
       if (nalu.m_nalUnitType == NAL_UNIT_EOS)
       {
@@ -302,6 +349,16 @@ uint32_t DecApp::decode()
       m_cDecLib.updateAssociatedIRAP();
       m_cDecLib.updatePrevGDRInSameLayer();
       m_cDecLib.updatePrevIRAPAndGDRSubpic();
+
+#if JVET_Z0118_GDR
+      if (gdrRecoveryPeriod[nalu.m_nuhLayerId])
+      {
+        if (m_cDecLib.getGDRRecoveryPocReached())
+        {
+          gdrRecoveryPeriod[nalu.m_nuhLayerId] = false;
+        }
+      }
+#endif
     }
     else if ( (bNewPicture || !bitstreamFile || nalu.m_nalUnitType == NAL_UNIT_EOS ) &&
       m_cDecLib.getFirstSliceInSequence(nalu.m_nuhLayerId))
@@ -311,6 +368,24 @@ uint32_t DecApp::decode()
 
     if( pcListPic )
     {
+#if JVET_Z0118_GDR 
+      if ( gdrRecoveryPeriod[nalu.m_nuhLayerId] ) // Suppress YUV and OPL output during GDR recovery
+      {
+        PicList::iterator iterPic = pcListPic->begin();
+        while (iterPic != pcListPic->end())
+        {
+          Picture *pcPic = *(iterPic++);
+          pcPic->neededForOutput = true;
+
+          // To disable output pictures in gdr interval
+          if (pcPic->layerId == nalu.m_nuhLayerId)
+          {            
+            pcPic->neededForOutput = false;
+          }
+        }
+      }
+#endif
+
       if( !m_reconFileName.empty() && !m_cVideoIOYuvReconFile[nalu.m_nuhLayerId].isOpen() )
       {
         const BitDepths &bitDepths=pcListPic->front()->cs->sps->getBitDepths(); // use bit depths of first reconstructed picture.
@@ -473,6 +548,9 @@ void DecApp::xCreateDecLib()
 #endif
   m_cDecLib.m_targetSubPicIdx = this->m_targetSubPicIdx;
   m_cDecLib.initScalingList();
+#if GDR_LEAK_TEST
+  m_cDecLib.m_gdrPocRandomAccess = this->m_gdrPocRandomAccess;
+#endif
 }
 
 void DecApp::xDestroyDecLib()
@@ -525,9 +603,13 @@ void DecApp::xWriteOutput( PicList* pcListPic, uint32_t tId )
   while (iterPic != pcListPic->end())
   {
     Picture* pcPic = *(iterPic);
+#if JVET_Z0118_GDR
+    if(pcPic->neededForOutput && pcPic->getPOC() >= m_iPOCLastDisplay)
+#else
     if(pcPic->neededForOutput && pcPic->getPOC() > m_iPOCLastDisplay)
+#endif
     {
-       numPicsNotYetDisplayed++;
+      numPicsNotYetDisplayed++;
       dpbFullness++;
     }
     else if(pcPic->referenced)
@@ -610,7 +692,11 @@ void DecApp::xWriteOutput( PicList* pcListPic, uint32_t tId )
     {
       pcPic = *(iterPic);
 
+#if JVET_Z0118_GDR
+      if(pcPic->neededForOutput && pcPic->getPOC() >= m_iPOCLastDisplay &&
+#else
       if(pcPic->neededForOutput && pcPic->getPOC() > m_iPOCLastDisplay &&
+#endif
         (numPicsNotYetDisplayed >  numReorderPicsHighestTid || dpbFullness > maxDecPicBufferingHighestTid))
       {
         // write to file

@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -85,6 +85,9 @@ protected:
 
   int          m_upscaledOutput;                     ////< Output upscaled (2), decoded but in full resolution buffer (1) or decoded cropped (0, default) picture for RPR.
   int           m_targetSubPicIdx;                    ///< Specify which subpicture shall be write to output, using subpicture index
+#if GDR_LEAK_TEST
+  int           m_gdrPocRandomAccess;                   ///<
+#endif
 
 #if DUMP_BEFORE_INLOOP
   bool          m_dumpBeforeInloop;

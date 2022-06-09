@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -161,16 +161,41 @@ static const int AMVP_DECIMATION_FACTOR =                           1;
 #else
 static const int AMVP_DECIMATION_FACTOR =                           2;
 #endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+static const int NUM_MERGE_CANDS =                                 30; ///< for maximum buffer of merging candidates
+static const int NUM_TMVP_CANDS =                                   9; ///< TMVP
+#elif JVET_Z0075_IBC_HMVP_ENLARGE
+static const int NUM_MERGE_CANDS =                                 20;
+#endif
 #if NON_ADJACENT_MRG_CAND
 static const int MRG_MAX_NUM_CANDS =                                15; ///< MERGE
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+static const int NUM_NON_ADJ_CANDS =                                18; ///< Non-Adj
+#endif
 static const int LAST_MERGE_IDX_CABAC =                              5;
 #else
 static const int MRG_MAX_NUM_CANDS =                                6; ///< MERGE
 #endif
+
+#if JVET_Z0139_NA_AFF
+static const int AFF_NON_ADJACENT_DIST    =                          4;
+#endif
+
+#if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
+static const int AFFINE_MRG_MAX_NUM_CANDS =                         15; ///< AFFINE MERGE
+#else
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFINE MERGE
+#endif
 static const int IBC_MRG_MAX_NUM_CANDS =                            6; ///< IBC MERGE
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+static const int IBC_MRG_MAX_NUM_CANDS_MEM =                        20; ///< IBC MERGE- max number of candidates 
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+static const int MAX_NUM_AMVP_CANDS_MAX_REF =                       MAX_NUM_REF * AMVP_MAX_NUM_CANDS_MEM;
+#else
 static const int MAX_NUM_AMVP_CANDS_MAX_REF =                       MAX_NUM_REF * AMVP_MAX_NUM_CANDS;
+#endif
 static const int AMVP_MERGE_MODE_MERGE_LIST_MAX_CANDS =             6;
 static const int AMVP_MERGE_MODE_REDUCED_MV_REFINE_SEARCH_ROUND =   8;
 #endif
@@ -227,6 +252,20 @@ static const int MAX_CCSAO_OFFSET_THR        =                     15;
 static const int MAX_CCSAO_FILTER_LENGTH     =                      3;
 #endif
 
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+static const int N_C                            = 3; /* Num components*/
+static const int Y_C                            = 0; /* Y luma */
+static const int U_C                            = 1; /* Cb Chroma */
+static const int V_C                            = 2; /* Cr Chroma */
+static const int CCSAO_EDGE_NUM                 = 16;
+static const int CCSAO_EDGE_COMPARE_VALUE       = 2;
+static const int CCSAO_EDGE_TYPE                = 4;
+static const int CCSAO_QUAN_NUM                 = 16;
+static const int CCSAO_EDGE_BAND_NUM_Y          = 4;
+static const int CCSAO_EDGE_BAND_NUM_C          = 4;
+static const int MAX_CCSAO_BAND_NUM_U_BAND_BITS = 4;
+#endif
+
 static const int MAX_NUM_ALF_ALTERNATIVES_CHROMA =                  8;
 static const int MAX_NUM_ALF_CLASSES         =                     25;
 #if ALF_IMPROVEMENT
@@ -241,7 +280,11 @@ static const int MAX_NUM_ALF_CHROMA_COEFF    =                      7;
 static const int MAX_ALF_FILTER_LENGTH       =                      7;
 #endif
 static const int MAX_NUM_ALF_COEFF           =                     MAX_ALF_FILTER_LENGTH * MAX_ALF_FILTER_LENGTH / 2 + 1;
-static const int MAX_ALF_PADDING_SIZE        =                      4;
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+static const int       MAX_ALF_PADDING_SIZE           =             8;
+#else
+static const int       MAX_ALF_PADDING_SIZE           =             4;
+#endif
 #if JVET_X0071_LONGER_CCALF
 #define MAX_NUM_CC_ALF_FILTERS                                      16
 static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               25;
@@ -267,6 +310,10 @@ static const int NUM_FIXED_FILTER_SETS       =                     16;
 static const int NUM_TOTAL_FILTER_SETS       =                     NUM_FIXED_FILTER_SETS + ALF_CTB_MAX_NUM_APS;
 #endif
 
+#if JVET_Z0139_HIST_AFF
+static const int MAX_NUM_AFFHMVP_ENTRIES_ONELIST = 5;
+static const int MAX_NUM_AFFHMVP_ENTRIES = MAX_NUM_AFFHMVP_ENTRIES_ONELIST * 2;
+#endif
 
 #if !BDOF_RM_CONSTRAINTS
 static const int MAX_BDOF_APPLICATION_REGION =                     16;
@@ -311,9 +358,15 @@ static const int MLS_CG_SIZE =                                      4; ///< Coef
 
 static const int RVM_VCEGAM10_M =                                   4;
 
+#if JVET_Y0116_EXTENDED_MRL_LIST
+static const int MAX_REF_LINE_IDX =                                 13; //highest refLine offset in the list
+static const int MRL_NUM_REF_LINES =                                6; //number of candidates in the array
+static const int MULTI_REF_LINE_IDX[6] =               { 0, 1, 3, 5, 7, 12 };
+#else
 static const int MAX_REF_LINE_IDX =                                 3; //highest refLine offset in the list
 static const int MRL_NUM_REF_LINES =                                3; //number of candidates in the array
 static const int MULTI_REF_LINE_IDX[4] =               { 0, 1, 2, 0 };
+#endif
 
 static const int PRED_REG_MIN_WIDTH =                               4;  // Minimum prediction region width for ISP subblocks
 
@@ -344,7 +397,11 @@ static const int BDPCM_IDX =                                      162;
 static const int BDPCM_IDX =                  (5 * (NUM_DIR - 1) + 2); ///< index for intra VDIAGONAL  mode
 #endif
 static const int NOMODE_IDX =                               MAX_UCHAR; ///< indicating uninitialized elements
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+static const int NUM_CHROMA_MODE = (6 + NUM_LMC_MODE); ///< total number of chroma modes
+#else
 static const int NUM_CHROMA_MODE = (5 + NUM_LMC_MODE); ///< total number of chroma modes
+#endif
 static const int LM_CHROMA_IDX = NUM_LUMA_MODE; ///< chroma mode index for derived from LM mode
 #if ENABLE_DIMD
 static const int DIMD_IDX =                                        99; ///< index for intra DIMD mode
@@ -369,7 +426,21 @@ static const int MMLM_T_IDX = LM_CHROMA_IDX + 5; ///< MDLM_T
 static const int MDLM_L_IDX =                          LM_CHROMA_IDX + 1; ///< MDLM_L
 static const int MDLM_T_IDX =                          LM_CHROMA_IDX + 2; ///< MDLM_T
 #endif
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+static const int DIMD_CHROMA_IDX =                     NUM_INTRA_MODE; ///< chroma mode index for derived by DIMD method
+static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE + 1; ///< chroma mode index for derived from luma intra mode
+#else
 static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE; ///< chroma mode index for derived from luma intra mode
+#endif
+
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+static const int BVD_CODING_GOLOMB_ORDER = 1; 
+static const int NUM_HOR_BVD_CTX         = 5;
+static const int NUM_VER_BVD_CTX         = 5;
+static const int HOR_BVD_CTX_OFFSET      = 0;
+static const int BVD_IBC_MAX_PREFIX      = 16;
+static const int VER_BVD_CTX_OFFSET      = 6;
+#endif
 
 #if JVET_W0119_LFNST_EXTENSION
 static const int NUM_LFNST_INTRA_MODES   = NUM_LUMA_MODE + NUM_EXT_LUMA_MODE;
@@ -383,7 +454,13 @@ static const uint32_t  L8H               = 32;
 static const uint32_t  L8H_ZO            = 32;
 #endif
 
+#if JVET_Y0142_ADAPT_INTRA_MTS
+static const uint32_t  MTS_TH_COEFF[2] =                                { 6, 32};
+static const uint32_t  MTS_NCANDS[3] =                                  { 1, 4, 6};
+static const uint32_t  NUM_TRAFO_MODES_MTS =                            8;
+#else
 static const uint32_t  NUM_TRAFO_MODES_MTS =                            6; ///< Max Intra CU size applying EMT, supported values: 8, 16, 32, 64, 128
+#endif
 #if TU_256
 static const uint32_t  MTS_INTRA_MAX_CU_SIZE =                         256; ///< Max Intra CU size applying EMT, supported values: 8, 16, 32, 64, 128
 static const uint32_t  MTS_INTER_MAX_CU_SIZE =                         256; ///< Max Inter CU size applying EMT, supported values: 8, 16, 32, 64, 128
@@ -496,8 +573,24 @@ static const int LAST_SIGNIFICANT_GROUPS =                         14;
 
 static const int AFFINE_MIN_BLOCK_SIZE =                            4; ///< Minimum affine MC block size
 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int MMVD_REFINE_STEP =                                 6; ///< max number of distance step
+#else
 static const int MMVD_REFINE_STEP =                                 8; ///< max number of distance step
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int MMVD_MAX_DIR =                                     16;
+#endif
+
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int MMVD_SIZE_SHIFT =                                   3;
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int MMVD_MAX_REFINE_NUM =                              (MMVD_REFINE_STEP * MMVD_MAX_DIR); ///< max number of candidate from a base candidate
+#else
 static const int MMVD_MAX_REFINE_NUM =                              (MMVD_REFINE_STEP * 4); ///< max number of candidate from a base candidate
+#endif
+
 static const int MMVD_BASE_MV_NUM =                                 2; ///< max number of base candidate
 static const int MMVD_ADD_NUM =                                     (MMVD_MAX_REFINE_NUM * MMVD_BASE_MV_NUM);///< total number of mmvd candidate
 #if MERGE_ENC_OPT
@@ -506,13 +599,16 @@ static const int MMVD_MRG_MAX_RD_NUM =                              20;
 static const int MMVD_MRG_MAX_RD_NUM =                              MRG_MAX_NUM_CANDS;
 #endif
 static const int MMVD_MRG_MAX_RD_BUF_NUM =                          (MMVD_MRG_MAX_RD_NUM + 1);///< increase buffer size by 1
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int LAST_MERGE_MMVD_IDX_CABAC =                        5;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
-static const int GPM_MMVD_REFINE_STEP = 8;
-static const int GPM_MMVD_REFINE_DIRECTION = 4;
-static const int GPM_MMVD_MAX_REFINE_NUM = (GPM_MMVD_REFINE_STEP * GPM_MMVD_REFINE_DIRECTION);
-static const int GPM_EXT_MMVD_REFINE_STEP = 9;
-static const int GPM_EXT_MMVD_REFINE_DIRECTION = 8;
-static const int GPM_EXT_MMVD_MAX_REFINE_NUM = (GPM_EXT_MMVD_REFINE_STEP * GPM_EXT_MMVD_REFINE_DIRECTION);
+static const int GPM_MMVD_REFINE_STEP =                             8;
+static const int GPM_MMVD_REFINE_DIRECTION =                        4;
+static const int GPM_MMVD_MAX_REFINE_NUM =                          (GPM_MMVD_REFINE_STEP * GPM_MMVD_REFINE_DIRECTION);
+static const int GPM_EXT_MMVD_REFINE_STEP =                         9;
+static const int GPM_EXT_MMVD_REFINE_DIRECTION =                    8;
+static const int GPM_EXT_MMVD_MAX_REFINE_NUM =                      (GPM_EXT_MMVD_REFINE_STEP * GPM_EXT_MMVD_REFINE_DIRECTION);
 #endif
 static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_LUMA =      28;
 static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA =    28;
@@ -538,6 +634,15 @@ static const int BCW_SIZE_CONSTRAINT =                            256; ///< disa
 static const int MAX_NUM_HMVP_CANDS =                              5; ///< maximum number of HMVP candidates to be stored and used in merge list
 #else
 static const int MAX_NUM_HMVP_CANDS =                              (MRG_MAX_NUM_CANDS-1); ///< maximum number of HMVP candidates to be stored and used in merge list
+#endif
+#if JVET_Z0139_HIST_AFF
+static const int MAX_NUM_AFF_HMVP_CANDS =                          7; 
+#endif
+#if JVET_Z0139_HIST_AFF
+static const int MAX_NUM_AFF_INHERIT_HMVP_CANDS =                  9; 
+#endif
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+static const int MAX_NUM_HMVP_IBC_CANDS =                          25; ///< maximum number of HMVP candidates to be stored and used in IBC merge list
 #endif
 static const int MAX_NUM_HMVP_AVMPCANDS =                          4; ///< maximum number of HMVP candidates to be used in AMVP list
 
@@ -581,6 +686,10 @@ static const int    PICTURE_DISTANCE_TH =                           1;
 static const int    FAST_SKIP_DEPTH =                               2;
 
 static const double PBINTRA_RATIO     =                             1.1;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int    THRES_TRANS =                                  16;
+static const int    THRES_AFFINE =                                  4;
+#endif
 #if !MERGE_ENC_OPT
 static const int    NUM_MRG_SATD_CAND =                             4;
 #endif
@@ -589,7 +698,14 @@ static const int    NUM_AFF_MRG_SATD_CAND =                         2;
 #if AFFINE_MMVD
 static const int    AF_MMVD_BASE_NUM =                              1;
 static const int    AF_MMVD_STEP_NUM =                              5; // number of distance offset
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int    AF_MMVD_OFFSET_DIR =                            8;
+#else
 static const int    AF_MMVD_OFFSET_DIR =                            4; // 00: (+, 0); 01: (-, 0); 10: (0, +); 11 (0, -);
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int    AFFINE_MMVD_SIZE_SHIFT =                        1;
+#endif
 static const int    AF_MMVD_MAX_REFINE_NUM = AF_MMVD_STEP_NUM * AF_MMVD_OFFSET_DIR; ///< max number of candidate from a base candidate
 static const int    AF_MMVD_NUM = AF_MMVD_BASE_NUM * AF_MMVD_MAX_REFINE_NUM;        ///< total number of affine mmvd candidate
 #if !MERGE_ENC_OPT
@@ -609,6 +725,9 @@ static const int    TM_LOG2_BASE_WEIGHT =                           5; ///< base
 static const int    TM_DISTANCE_WEIGHTS[][4] = { { 0, 1, 2, 3 }, { 1, 2, 3, 3 } }; ///< far to near
 static const int    TM_SPATIAL_WEIGHTS [][4] = { { 2, 2, 2, 2 }, { 0, 1, 1, 2 } }; ///< "left to right for above template" or "top to bottom for left template"
 #if TM_MRG
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+static const int    TM_MRG_MAX_NUM_INIT_CANDS =                    10; ///< maximum number of TM merge candidates for ARMC (note: should be at most equal to MRG_MAX_NUM_CANDS)
+#endif
 static const int    TM_MRG_MAX_NUM_CANDS =                          4; ///< maximum number of TM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
 #if JVET_X0141_CIIP_TIMD_TM
 static const int    CIIP_TM_MRG_MAX_NUM_CANDS =                     2; ///< maximum number of CIIP TM merge candidates (note: should be at most equal to CIIP_TM_MRG_MAX_NUM_CANDS)
@@ -620,13 +739,17 @@ static const int    TM_MAX_NUM_SATD_CAND = std::min((int)4, TM_MRG_MAX_NUM_CANDS
 #endif
 #endif
 #endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+static const int    BM_MRG_MAX_NUM_INIT_CANDS =                    10; ///< maximum number of BM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
+#endif
 #if MULTI_PASS_DMVR
 static const int    BDMVR_INTME_RANGE =                             8; ///< Bilateral matching search range (n represents for -n pel to n pel, inclusive)
 static const int    BDMVR_INTME_STRIDE = (BDMVR_INTME_RANGE << 1) + 1; ///< Bilateral matching search stride
 static const int    BDMVR_INTME_AREA   = BDMVR_INTME_STRIDE * BDMVR_INTME_STRIDE; ///< Bilateral matching search area
 static const int    BDMVR_INTME_CENTER = BDMVR_INTME_STRIDE * BDMVR_INTME_RANGE + BDMVR_INTME_RANGE; ///< Bilateral matching search area center
 static const int    BDMVR_SIMD_IF_FACTOR =                          8; ///< Specify the pixel alignment factor for SIMD IF. (Usually this factor is 8)
-static const int    BDMVR_INTME_MAX_NUM_SEARCH_ITERATION =         26; ///< for entire CU in bilateral mode, maximum number of refinement loops
+static const int    BDMVR_INTME_SQUARE_SEARCH_MAX_NUM_ITERATIONS =  26; ///< maximum number of iterations in BDMVR integer square search at CU level
+static const int    BDMVR_INTME_FULL_SEARCH_MAX_NUM_ITERATIONS   =  5; ///< maximum number of iterations in BDMVR integer full search at CU level (up to 5)
 #if JVET_X0049_BDMVR_SW_OPT
 static const int    BDMVR_BUF_STRIDE = MAX_CU_SIZE + (BDMVR_INTME_RANGE << 1) + (BDMVR_SIMD_IF_FACTOR - 2);
 static const int    BDMVR_CENTER_POSITION = BDMVR_INTME_RANGE * BDMVR_BUF_STRIDE + BDMVR_INTME_RANGE;
@@ -647,7 +770,37 @@ static const double AMAXBT_TH128 =                                 60.0;
 #if JVET_W0090_ARMC_TM
 static const int AML_MERGE_TEMPLATE_SIZE =                         1;
 static const int ADAPTIVE_SUB_GROUP_SIZE =                         5;
+#if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
+static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE = AFFINE_MRG_MAX_NUM_CANDS;
+#else
 static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE =                  3;
+#endif
+#if JVET_Y0058_IBC_LIST_MODIFY
+static const int ADAPTIVE_IBC_SUB_GROUP_SIZE =                     6;
+#endif
+#endif
+
+#if JVET_Z0061_TM_OBMC
+static const int TM_OBMC_TEMPLATE_SIZE =                           1;
+#if (!JVET_W0090_ARMC_TM) && (!JVET_Z0056_GPM_SPLIT_MODE_REORDERING)
+static const int AML_MERGE_TEMPLATE_SIZE =                         1;
+#endif
+#endif
+
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD =   MMVD_MAX_REFINE_NUM;
+#endif
+
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM;
+#endif
+
+#if JVET_Y0152_TT_ENC_SPEEDUP
+static constexpr int   FAST_METHOD_TT_ENC_SPEEDUP = 0x0001;  ///< Embedding flag, which, if false, de-activates all the following ABT_ENC_SPEEDUP_* modes
+static constexpr int FAST_METHOD_HOR_XOR_VER = 0x0002;
+static constexpr int FAST_METHOD_ENC_SPEEDUP_BT_BASED = 0x0004;
+static constexpr int FAST_METHOD_TT_ENC_SPEEDUP_BSLICE = 0x0008;
+static constexpr int FAST_METHOD_TT_ENC_SPEEDUP_ISLICE = 0x0010;
 #endif
 
 // need to know for static memory allocation
@@ -660,7 +813,12 @@ static const int COM16_C806_TRANS_PREC =                            0;
 #else
 static const int NTAPS_LUMA               =                         8; ///< Number of taps for luma
 #endif
+#if JVET_Z0117_CHROMA_IF
+static const int NTAPS_CHROMA             =                         6; ///< Number of taps for chroma
+static const int NTAPS_CHROMA_RPR         =                         4; ///< Number of taps for chroma RPR
+#else
 static const int NTAPS_CHROMA             =                         4; ///< Number of taps for chroma
+#endif
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
 static const int MAX_LADF_INTERVALS       =                         5; /// max number of luma adaptive deblocking filter qp offset intervals
 #endif
@@ -678,7 +836,14 @@ static const int GEO_MAX_NUM_UNI_CANDS =                            15;
 #else
 static const int GEO_MAX_NUM_UNI_CANDS =                            6;
 #endif
+#if JVET_Y0065_GPM_INTRA
+static const int GEO_MAX_NUM_INTRA_CANDS =                          3;
+static const int GEO_NUM_INTRA_RDO_BUFFER =                         23;
+static const int GEO_NUM_RDO_BUFFER =                               GEO_MAX_NUM_UNI_CANDS + GEO_NUM_INTRA_RDO_BUFFER;
+static const int GEO_MAX_NUM_CANDS = (GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS) * ((GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS) - 1);
+#else
 static const int GEO_MAX_NUM_CANDS = GEO_MAX_NUM_UNI_CANDS * (GEO_MAX_NUM_UNI_CANDS - 1);
+#endif
 static const int GEO_MIN_CU_LOG2 =                                  3;
 static const int GEO_MAX_CU_LOG2 =                                  6;
 static const int GEO_MIN_CU_SIZE =               1 << GEO_MIN_CU_LOG2;
@@ -689,7 +854,27 @@ static const int GEO_NUM_ANGLES =                                  32;
 static const int GEO_NUM_DISTANCES =                                4;
 static const int GEO_NUM_PRESTORED_MASK =                           6;
 static const int GEO_WEIGHT_MASK_SIZE = 3 * (GEO_MAX_CU_SIZE >> 3) * 2 + GEO_MAX_CU_SIZE;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if !JVET_W0090_ARMC_TM
+static const int AML_MERGE_TEMPLATE_SIZE =                          1;
+#endif
+static const int GEO_MODE_SEL_TM_SIZE =       AML_MERGE_TEMPLATE_SIZE;
+static const int GEO_TM_ADDED_WEIGHT_MASK_SIZE = GEO_MODE_SEL_TM_SIZE;
+static const int GEO_WEIGHT_MASK_SIZE_EXT = GEO_WEIGHT_MASK_SIZE + GEO_TM_ADDED_WEIGHT_MASK_SIZE * 2;
+static const int GEO_SPLIT_MODE_RICE_CODE_DIVISOR =                 4;
+static const int GEO_MODE_COMPRESSION_RATIO =                       2;
+static const int GEO_NUM_SIG_PARTMODE = GEO_NUM_PARTITION_MODE / GEO_MODE_COMPRESSION_RATIO; ///< max number of splitting modes for signaling
+static const int GEO_ENC_MMVD_MAX_REFINE_NUM_ADJ = 1 // regular merge(1) 
+#if JVET_W0097_GPM_MMVD_TM
+                                                 + GPM_EXT_MMVD_MAX_REFINE_NUM + 1 // mmvd(GPM_EXT_MMVD_MAX_REFINE_NUM) + TM(1)
+#endif
+#if JVET_Y0065_GPM_INTRA
+                                                 + 1 // intra(1)
+#endif
+;
+#else
 static const int GEO_MV_MASK_SIZE =         GEO_WEIGHT_MASK_SIZE >> 2;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
 static const int GEO_MAX_TRY_WEIGHTED_SAD = 70;
 #if TM_MRG
@@ -773,22 +958,39 @@ static const int SIGN_PRED_MAX_NUM      = 8;
 static const int SIGN_PRED_MAX_BS       = 128; ///< not configurable
 static const int SIGN_PRED_MAX_BS_INTRA = 32;
 static const int SIGN_PRED_MAX_BS_INTER = 128;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+static const int SIGN_PRED_FREQ_RANGE   = 32;///< not configurable
+#else
 static const int SIGN_PRED_FREQ_RANGE   = 4; ///< not configurable
+#endif
 static const int SIGN_PRED_SHIFT        = 8; ///< not configurable
 static const int SIGN_PRED_OFFSET       = 1 << ( SIGN_PRED_SHIFT - 1 ); ///< not configurable
 #endif
 #if MULTI_HYP_PRED
-static const auto MULTI_HYP_PRED_MAX_CANDS = 4;
-static const auto MULTI_HYP_PRED_NUM_WEIGHTS = 2;
-static const auto MULTI_HYP_PRED_WEIGHT_BITS = 3;
-static const auto MULTI_HYP_PRED_SEARCH_RANGE = 16;
+static const auto MULTI_HYP_PRED_MAX_CANDS =                     4;
+static const auto MULTI_HYP_PRED_NUM_WEIGHTS =                   2;
+static const auto MULTI_HYP_PRED_WEIGHT_BITS =                   3;
+static const auto MULTI_HYP_PRED_SEARCH_RANGE =                 16;
 #endif
 #if NON_ADJACENT_MRG_CAND || TM_AMVP
 static const auto NADISTANCE_LEVEL =                             4;
 #endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+static const auto TMVP_DISTANCE_LEVEL =                          5;
+#endif
 #if MULTI_HYP_PRED
 static const auto MULTI_HYP_PRED_RESTRICT_BLOCK_SIZE =          64; // disable multi-hyp for all blocks <= this number
 static const auto MULTI_HYP_PRED_RESTRICT_MIN_WH =               8;
+#endif
+
+#if JVET_Z0139_HIST_AFF
+static const auto AFF_PARA_STORE_BITS =                         16;
+static const auto AFF_PARA_SHIFT =                               0;
+#endif
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+static const int TEMP_CABAC_BUFFER_SIZE =                        5;
+static const int ADJUSTMENT_RANGE =                              7;
 #endif
 
 // ====================================================================================================================
@@ -1046,6 +1248,61 @@ static inline int getMSB(unsigned x)
 }
   msb += y;
   return msb;
+}
+#endif
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+template <typename InputValueType, uint32_t inputValueArraySize, typename OutputIndexType, uint32_t outputIndexArraySize>
+static inline uint32_t getIndexMappingTableToSortedArray1D(InputValueType (&in)[inputValueArraySize], OutputIndexType (&tbl)[outputIndexArraySize])
+{
+  uint32_t numValidInList = 1;
+  InputValueType sortedlist[outputIndexArraySize];
+  sortedlist[0] = in[0];
+  tbl[0] = (OutputIndexType)0;
+
+  for (int inIdx = 1; inIdx < inputValueArraySize; ++inIdx)
+  {
+    // Find insertion index position using binary search
+    int insertIdx = 0;
+    InputValueType* subList = sortedlist;
+    uint32_t subListSize = numValidInList;
+    while (subListSize > 1)
+    {
+      int middleIdx = subListSize >> 1;
+      if (in[inIdx] < subList[middleIdx])
+      {
+        subListSize = middleIdx;
+      }
+      else
+      {
+        subList     += middleIdx;
+        subListSize -= middleIdx;
+        insertIdx   += middleIdx;
+      }
+    }
+    insertIdx += (in[inIdx] < subList[0] ? 0 : 1);
+
+    // Perform insertion at found index position
+    if (insertIdx < outputIndexArraySize)
+    {
+      int startIdx = outputIndexArraySize - 1;
+      if (numValidInList < outputIndexArraySize)
+      {
+        startIdx = numValidInList;
+        ++numValidInList;
+      }
+
+      for (int i = startIdx; i > insertIdx; --i)
+      {
+        sortedlist[i] = sortedlist[i - 1];
+        tbl       [i] = tbl       [i - 1];
+      }
+      sortedlist[insertIdx] = in[inIdx];
+      tbl       [insertIdx] = (OutputIndexType)inIdx;
+    }
+  }
+
+  return numValidInList;
 }
 #endif
 

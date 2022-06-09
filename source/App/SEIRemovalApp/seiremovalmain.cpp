@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
   fprintf( stdout, NVM_ONOS );
   fprintf( stdout, NVM_COMPILEDBY );
   fprintf( stdout, NVM_BITS );
-#if ENABLE_SIMD_OPT
+#if ENABLE_SIMD_OPT && defined(TARGET_SIMD_X86)
   std::string SIMD;
   df::program_options_lite::Options optsSimd;
   optsSimd.addOptions()( "SIMD", SIMD, string( "" ), "" );

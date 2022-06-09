@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2021, ITU/ISO/IEC
+* Copyright (c) 2010-2022, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -278,8 +278,11 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   tileIdx           = other.tileIdx;
 #if ENABLE_DIMD
   dimd = other.dimd;
-  dimd_is_blend = other.dimd_is_blend;
+  dimdBlending = other.dimdBlending;
   dimdMode = other.dimdMode;
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+  dimdChromaMode = other.dimdChromaMode;
+#endif
   for( int i = 0; i < 2; i++ )
   {
     dimdBlendMode[i] = other.dimdBlendMode[i];
@@ -371,8 +374,11 @@ void CodingUnit::initData()
   tileIdx           = 0;
 #if ENABLE_DIMD
   dimd = false;
-  dimd_is_blend = false;
+  dimdBlending = false;
   dimdMode = -1;
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+  dimdChromaMode   = -1;
+#endif
   for( int i = 0; i < 2; i++ )
   {
     dimdBlendMode[i] = -1;
@@ -557,6 +563,12 @@ const uint8_t CodingUnit::checkAllowedSbt() const
   {
     return 0;
   }
+#if JVET_Y0065_GPM_INTRA
+  if (firstPU->gpmIntraFlag)
+  {
+    return 0;
+  }
+#endif
 
   uint8_t sbtAllowed = 0;
   int cuWidth  = lwidth();
@@ -621,6 +633,9 @@ void PredictionUnit::initData()
 
   intraDir[0] = DC_IDX;
   intraDir[1] = PLANAR_IDX;
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+  isChromaFusion = false;
+#endif
   mipTransposedFlag = false;
   multiRefIdx = 0;
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
@@ -630,13 +645,22 @@ void PredictionUnit::initData()
   mpmFlag = false;
   ipred_idx = -1;
 #endif
+#if JVET_Z0050_CCLM_SLOPE
+  cclmOffsets = {};
+#endif
   // inter data
   mergeFlag   = false;
   regularMergeFlag = false;
   mergeIdx    = MAX_UCHAR;
   geoSplitDir  = MAX_UCHAR;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  geoSyntaxMode = MAX_UCHAR;
+#endif
   geoMergeIdx0 = MAX_UCHAR;
   geoMergeIdx1 = MAX_UCHAR;
+#if JVET_Y0065_GPM_INTRA
+  gpmIntraFlag = false;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
   geoMMVDFlag0 = false;
   geoMMVDIdx0 = MAX_UCHAR;
@@ -654,6 +678,9 @@ void PredictionUnit::initData()
   afMmvdBaseIdx = UINT8_MAX;
   afMmvdStep    = UINT8_MAX;
   afMmvdDir     = UINT8_MAX;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  afMmvdMergeIdx = UINT8_MAX;
+#endif
 #endif
 #if TM_MRG
   tmMergeFlag = false;
@@ -673,6 +700,10 @@ void PredictionUnit::initData()
   ::memset(mvdL0SubPu, 0, sizeof(mvdL0SubPu));
 #endif
 
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  refIdxLC = -1;
+  refPairIdx = -1;
+#endif
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
   {
 #if JVET_X0083_BM_AMVP_MERGE_MODE
@@ -683,6 +714,9 @@ void PredictionUnit::initData()
     refIdx[i] = -1;
     mv[i]     .setZero();
     mvd[i]    .setZero();
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    mvsdIdx[i] = -1;
+#endif
     for( uint32_t j = 0; j < 3; j++ )
     {
       mvdAffi[i][j].setZero();
@@ -714,6 +748,9 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   {
     intraDir[i] = predData.intraDir[i];
   }
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+  isChromaFusion = predData.isChromaFusion;
+#endif
   mipTransposedFlag = predData.mipTransposedFlag;
   multiRefIdx = predData.multiRefIdx;
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
@@ -722,6 +759,9 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   parseChromaMode = predData.parseChromaMode;
   mpmFlag = predData.mpmFlag;
   ipred_idx = predData.ipred_idx;
+#endif
+#if JVET_Z0050_CCLM_SLOPE
+  cclmOffsets = predData.cclmOffsets;
 #endif
   return *this;
 }
@@ -732,8 +772,14 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   regularMergeFlag = predData.regularMergeFlag;
   mergeIdx    = predData.mergeIdx;
   geoSplitDir  = predData.geoSplitDir;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  geoSyntaxMode = predData.geoSyntaxMode;
+#endif
   geoMergeIdx0 = predData.geoMergeIdx0;
   geoMergeIdx1 = predData.geoMergeIdx1;
+#if JVET_Y0065_GPM_INTRA
+  gpmIntraFlag = predData.gpmIntraFlag;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
   geoMMVDFlag0 = predData.geoMMVDFlag0;
   geoMMVDIdx0 = predData.geoMMVDIdx0;
@@ -751,6 +797,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   afMmvdBaseIdx = predData.afMmvdBaseIdx;
   afMmvdStep    = predData.afMmvdStep;
   afMmvdDir     = predData.afMmvdDir;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  afMmvdMergeIdx = predData.afMmvdMergeIdx;
+#endif
 #endif
 #if TM_MRG
   tmMergeFlag = predData.tmMergeFlag;
@@ -780,6 +829,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
     mv[i]       = predData.mv[i];
     mvd[i]      = predData.mvd[i];
     refIdx[i]   = predData.refIdx[i];
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    mvsdIdx[i] = predData.mvsdIdx[i];
+#endif
     for( uint32_t j = 0; j < 3; j++ )
     {
       mvdAffi[i][j] = predData.mvdAffi[i][j];
@@ -789,6 +841,10 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
       mvAffi[i][j] = predData.mvAffi[i][j];
     }
   }
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  refIdxLC = predData.refIdxLC;
+  refPairIdx = predData.refPairIdx;
+#endif
   ciipFlag = predData.ciipFlag;
 #if CIIP_PDPC
   ciipPDPC = predData.ciipPDPC;
@@ -811,8 +867,14 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   {
     intraDir[ i ] = other.intraDir[ i ];
   }
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+  isChromaFusion = other.isChromaFusion;
+#endif
   mipTransposedFlag = other.mipTransposedFlag;
   multiRefIdx = other.multiRefIdx;
+#if JVET_Z0050_CCLM_SLOPE
+  cclmOffsets = other.cclmOffsets;
+#endif
 
   mergeFlag   = other.mergeFlag;
   regularMergeFlag = other.regularMergeFlag;
@@ -825,8 +887,14 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   ipred_idx = other.ipred_idx;
 #endif
   geoSplitDir  = other.geoSplitDir;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  geoSyntaxMode = other.geoSyntaxMode;
+#endif
   geoMergeIdx0 = other.geoMergeIdx0;
   geoMergeIdx1 = other.geoMergeIdx1;
+#if JVET_Y0065_GPM_INTRA
+  gpmIntraFlag = other.gpmIntraFlag;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
   geoMMVDFlag0 = other.geoMMVDFlag0;
   geoMMVDIdx0 = other.geoMMVDIdx0;
@@ -844,6 +912,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   afMmvdBaseIdx = other.afMmvdBaseIdx;
   afMmvdStep    = other.afMmvdStep;
   afMmvdDir     = other.afMmvdDir;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  afMmvdMergeIdx = other.afMmvdMergeIdx;
+#endif
 #endif
 #if TM_MRG
   tmMergeFlag = other.tmMergeFlag;
@@ -873,6 +944,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
     mv[i]       = other.mv[i];
     mvd[i]      = other.mvd[i];
     refIdx[i]   = other.refIdx[i];
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    mvsdIdx[i] = other.mvsdIdx[i];
+#endif
     for( uint32_t j = 0; j < 3; j++ )
     {
       mvdAffi[i][j] = other.mvdAffi[i][j];
@@ -882,6 +956,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
       mvAffi[i][j] = other.mvAffi[i][j];
     }
   }
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  refIdxLC = other.refIdxLC;
+  refPairIdx = other.refPairIdx;
+#endif
   ciipFlag = other.ciipFlag;
 #if CIIP_PDPC
   ciipPDPC = other.ciipPDPC;
@@ -910,6 +988,34 @@ PredictionUnit& PredictionUnit::operator=( const MotionInfo& mi )
   return *this;
 }
 
+#if JVET_Z0139_HIST_AFF
+void PredictionUnit::getAffineMotionInfo(AffineMotionInfo affineMiOut[2], int refIdxOut[2]) const
+{
+
+  for (int list = 0; list < 2; list++)
+  {
+    RefPicList eRefList = (list == 0) ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+    refIdxOut[list] = NOT_VALID;
+    affineMiOut[list].oneSetAffineParametersPattern = 0;
+
+    if ((interDir == 1 && list == 1) || (interDir == 2 && list == 0))
+    {
+      continue;
+    }
+    refIdxOut[list] = refIdx[list];
+
+    int affpara[4];
+    PU::deriveAffineParametersFromMVs(*this, mvAffi[eRefList], affpara, (EAffineModel)this->cu->affineType);
+    PU::storeAffParas(affpara);
+
+    affineMiOut[list].oneSetAffineParameters[0] = (short)(affpara[0]);
+    affineMiOut[list].oneSetAffineParameters[1] = (short)(affpara[1]);
+    affineMiOut[list].oneSetAffineParameters[2] = (short)(affpara[2]);
+    affineMiOut[list].oneSetAffineParameters[3] = (short)(affpara[3]);
+  }
+}
+#endif
+
 const MotionInfo& PredictionUnit::getMotionInfo() const
 {
   return cs->getMotionInfo( lumaPos() );
@@ -917,6 +1023,18 @@ const MotionInfo& PredictionUnit::getMotionInfo() const
 
 const MotionInfo& PredictionUnit::getMotionInfo( const Position& pos ) const
 {
+#if JVET_Z0118_GDR
+  if( cs->sps->getGDREnabledFlag() )
+  {
+    bool isSrcClean = cs->isClean(Y().bottomRight(), CHANNEL_TYPE_LUMA);
+    bool isTarClean = cs->isClean(pos, CHANNEL_TYPE_LUMA);
+
+    if (isSrcClean && !isTarClean)
+    {
+      return constMotionIntra;
+    }
+  }
+#endif
   CHECKD( !Y().contains( pos ), "Trying to access motion info outsied of PU" );
   return cs->getMotionInfo( pos );
 }
@@ -930,7 +1048,20 @@ CMotionBuf PredictionUnit::getMotionBuf() const
 {
   return cs->getMotionBuf( *this );
 }
-
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+bool PredictionUnit::isMvsdApplicable() const
+{
+  if (!cs->sps->getUseMVSD())
+  {
+    return false;
+  }
+  if (cu->firstPU->addHypData.size() - cu->firstPU->numMergedAddHyps > 0)
+  {
+    return false;
+  }
+  return true;
+}
+#endif
 #if JVET_W0123_TIMD_FUSION
 const uint8_t& PredictionUnit::getIpmInfo() const
 {
@@ -939,6 +1070,19 @@ const uint8_t& PredictionUnit::getIpmInfo() const
 
 const uint8_t& PredictionUnit::getIpmInfo( const Position& pos ) const
 {
+#if JVET_Z0118_GDR
+  if( cs->sps->getGDREnabledFlag() )
+  {
+    bool isSrcClean = cs->isClean(Y().bottomRight(), CHANNEL_TYPE_LUMA);
+    bool isTarClean = cs->isClean(pos, CHANNEL_TYPE_LUMA);
+
+    if (isSrcClean && !isTarClean)
+    {
+      return constIpm;    
+    }
+  }
+#endif
+
   CHECKD( !Y().contains( pos ), "Trying to access motion info outsied of PU" );
   return cs->getIpmInfo( pos );
 }
@@ -965,7 +1109,10 @@ TransformUnit::TransformUnit(const UnitArea& unit) : UnitArea(unit), cu(nullptr)
   {
     m_coeffs[i] = nullptr;
 #if SIGN_PREDICTION
-    m_coeff_signs[i] = nullptr;
+    m_coeffSigns[i] = nullptr;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    m_coeffSignsIdx[i] = nullptr;
+#endif
 #endif
 #if !REMOVE_PCM
     m_pcmbuf[i] = nullptr;
@@ -989,7 +1136,10 @@ TransformUnit::TransformUnit(const ChromaFormat _chromaFormat, const Area &_area
   {
     m_coeffs[i] = nullptr;
 #if SIGN_PREDICTION
-    m_coeff_signs[i] = nullptr;
+    m_coeffSigns[i] = nullptr;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    m_coeffSignsIdx[i] = nullptr;
+#endif
 #endif
 #if !REMOVE_PCM
     m_pcmbuf[i] = nullptr;
@@ -1021,13 +1171,21 @@ void TransformUnit::initData()
 }
 #if REMOVE_PCM
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, unsigned **signsScanIdx, Pel **pltIdx, bool **runType)
+#else
 void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, Pel **pltIdx, bool **runType)
+#endif
 #else
 void TransformUnit::init(TCoeff **coeffs, Pel **pltIdx, bool **runType)
 #endif
 #else
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, unsigned **signsScanIdx, Pel **pcmbuf, bool **runType)
+#else
 void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, Pel **pcmbuf, bool **runType)
+#endif
 #else
 void TransformUnit::init(TCoeff **coeffs, Pel **pcmbuf, bool **runType)
 #endif
@@ -1039,7 +1197,10 @@ void TransformUnit::init(TCoeff **coeffs, Pel **pcmbuf, bool **runType)
   {
     m_coeffs[i] = coeffs[i];
 #if SIGN_PREDICTION
-    m_coeff_signs[i] = signs[i];
+    m_coeffSigns[i] = signs[i];
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    m_coeffSignsIdx[i] = signsScanIdx[i];
+#endif
 #endif
 #if !REMOVE_PCM
     m_pcmbuf[i] = pcmbuf[i];
@@ -1069,7 +1230,10 @@ TransformUnit& TransformUnit::operator=(const TransformUnit& other)
 
     if (m_coeffs[i] && other.m_coeffs[i] && m_coeffs[i] != other.m_coeffs[i]) memcpy(m_coeffs[i], other.m_coeffs[i], sizeof(TCoeff) * area);
 #if SIGN_PREDICTION
-    if (m_coeff_signs[i] && other.m_coeff_signs[i] && m_coeff_signs[i] != other.m_coeff_signs[i]) memcpy(m_coeff_signs[i], other.m_coeff_signs[i], sizeof(TCoeff) * area);
+    if (m_coeffSigns[i] && other.m_coeffSigns[i] && m_coeffSigns[i] != other.m_coeffSigns[i]) memcpy(m_coeffSigns[i], other.m_coeffSigns[i], sizeof(TCoeff) * area);
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    if (m_coeffSignsIdx[i] && other.m_coeffSignsIdx[i] && m_coeffSignsIdx[i] != other.m_coeffSignsIdx[i]) memcpy(m_coeffSignsIdx[i], other.m_coeffSignsIdx[i], sizeof(unsigned) * area);
+#endif
 #endif
 #if !REMOVE_PCM
     if (m_pcmbuf[i] && other.m_pcmbuf[i] && m_pcmbuf[i] != other.m_pcmbuf[i]) memcpy(m_pcmbuf[i], other.m_pcmbuf[i], sizeof(Pel   ) * area);
@@ -1100,7 +1264,10 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
 
   if (m_coeffs[i] && other.m_coeffs[i] && m_coeffs[i] != other.m_coeffs[i]) memcpy(m_coeffs[i], other.m_coeffs[i], sizeof(TCoeff) * area);
 #if SIGN_PREDICTION
-  if (m_coeff_signs[i] && other.m_coeff_signs[i] && m_coeff_signs[i] != other.m_coeff_signs[i]) memcpy(m_coeff_signs[i], other.m_coeff_signs[i], sizeof(TCoeff) * area);
+  if (m_coeffSigns[i] && other.m_coeffSigns[i] && m_coeffSigns[i] != other.m_coeffSigns[i]) memcpy(m_coeffSigns[i], other.m_coeffSigns[i], sizeof(TCoeff) * area);
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  if (m_coeffSignsIdx[i] && other.m_coeffSignsIdx[i] && m_coeffSignsIdx[i] != other.m_coeffSignsIdx[i]) memcpy(m_coeffSignsIdx[i], other.m_coeffSignsIdx[i], sizeof(unsigned) * area);
+#endif
 #endif
 #if !REMOVE_PCM
   if (m_pcmbuf[i] && other.m_pcmbuf[i] && m_pcmbuf[i] != other.m_pcmbuf[i]) memcpy(m_pcmbuf[i], other.m_pcmbuf[i], sizeof(Pel   ) * area);
@@ -1124,8 +1291,12 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
 const CCoeffBuf TransformUnit::getCoeffs(const ComponentID id) const { return CCoeffBuf(m_coeffs[id], blocks[id]); }
 
 #if SIGN_PREDICTION
-       CoeffBuf TransformUnit::getCoeffSigns(const ComponentID id)       { return  CoeffBuf(m_coeff_signs[id], blocks[id]); }
-const CCoeffBuf TransformUnit::getCoeffSigns(const ComponentID id) const { return CCoeffBuf(m_coeff_signs[id], blocks[id]); }
+       CoeffBuf TransformUnit::getCoeffSigns(const ComponentID id)       { return  CoeffBuf(m_coeffSigns[id], blocks[id]); }
+const CCoeffBuf TransformUnit::getCoeffSigns(const ComponentID id) const { return CCoeffBuf(m_coeffSigns[id], blocks[id]); }
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+      IdxBuf    TransformUnit::getCoeffSignsScanIdx(const ComponentID id) { return  IdxBuf(m_coeffSignsIdx[id], blocks[id]); }
+const CIdxBuf   TransformUnit::getCoeffSignsScanIdx(const ComponentID id) const { return CIdxBuf(m_coeffSignsIdx[id], blocks[id]); }
+#endif
 #endif
 
 #if REMOVE_PCM
@@ -1183,6 +1354,17 @@ int TransformUnit::getTbAreaAfterCoefZeroOut(ComponentID compID) const
   tbArea = tbZeroOutWidth * tbZeroOutHeight;
   return tbArea;
 }
-
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+bool TransformUnit::checkLFNSTApplied(ComponentID compID)
+{
+  const uint32_t  lfnstIdx = this->cu->lfnstIdx;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+  bool  lfnstApplied = lfnstIdx && this->mtsIdx[compID] != MTS_SKIP && (this->cu->isSepTree() ? true : isLuma(compID));
+#else
+  bool  lfnstApplied = lfnstIdx && this->mtsIdx[compID] != MTS_SKIP && (CS::isDualITree(*this->cs) ? true : isLuma(compID));
+#endif
+  return lfnstApplied;
+}
+#endif
 int          TransformUnit::getChromaAdj()                     const { return m_chromaResScaleInv; }
 void         TransformUnit::setChromaAdj(int i)                      { m_chromaResScaleInv = i;    }

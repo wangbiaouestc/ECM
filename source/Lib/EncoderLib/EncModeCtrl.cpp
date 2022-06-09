@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -151,6 +151,14 @@ void EncModeCtrl::xGetMinMaxQP( int& minQP, int& maxQP, const CodingStructure& c
     int deltaQP = m_pcEncCfg->getMaxDeltaQP();
     minQP = Clip3( -sps.getQpBDOffset( CHANNEL_TYPE_LUMA ), MAX_QP, baseQP - deltaQP );
     maxQP = Clip3( -sps.getQpBDOffset( CHANNEL_TYPE_LUMA ), MAX_QP, baseQP + deltaQP );
+#if JVET_Y0240_BIM
+    Position pos = partitioner.currQgPos;
+    const int ctuSize = sps.getCTUSize();
+    const int ctuId = ( pos.y / ctuSize ) * ( ( cs.picture->lwidth() + ctuSize - 1 ) / ctuSize ) + ( pos.x / ctuSize );
+    const int bimOffset = getBIMOffset( m_slice->getPOC(), ctuId );
+    minQP += bimOffset;
+    maxQP += bimOffset;
+#endif
   }
   else if( qgEnableChildren ) // more splits and not the deepest QG level
   {
@@ -752,6 +760,9 @@ void BestEncInfoCache::destroy()
   delete[] m_pCoeff;
 #if SIGN_PREDICTION
   delete[] m_pCoeffSign;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  delete[] m_pCoeffSignScanIdx;
+#endif
 #endif
   delete[] m_pPcmBuf;
 
@@ -801,6 +812,9 @@ void BestEncInfoCache::init( const Slice &slice )
   m_pCoeff = new TCoeff[numCoeff*m_maxNumTUs];
 #if SIGN_PREDICTION
   m_pCoeffSign = new TCoeff[numCoeff*m_maxNumTUs];
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  m_pCoeffSignScanIdx = new unsigned[numCoeff*m_maxNumTUs];
+#endif
 #endif
   m_pPcmBuf = new Pel[numCoeff*m_maxNumTUs];
   if( slice.getSPS()->getPLTMode() )
@@ -811,6 +825,9 @@ void BestEncInfoCache::init( const Slice &slice )
   m_pCoeff  = new TCoeff[numCoeff*MAX_NUM_TUS];
 #if SIGN_PREDICTION
   m_pCoeffSign = new TCoeff[numCoeff*MAX_NUM_TUS];
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  m_pCoeffSignScanIdx = new unsigned[numCoeff*MAX_NUM_TUS];
+#endif
 #endif
   m_pPcmBuf = new Pel   [numCoeff*MAX_NUM_TUS];
   if (slice.getSPS()->getPLTMode())
@@ -832,6 +849,9 @@ void BestEncInfoCache::init( const Slice &slice )
   TCoeff *coeffPtr = m_pCoeff;
 #if SIGN_PREDICTION
   TCoeff *coeffSignPtr = m_pCoeffSign;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  unsigned *coeffSignScanIdx = m_pCoeffSignScanIdx;
+#endif
 #endif
   Pel    *pcmPtr   = m_pPcmBuf;
   bool   *runTypePtr   = m_runType;
@@ -850,6 +870,9 @@ void BestEncInfoCache::init( const Slice &slice )
             TCoeff *coeff[MAX_NUM_TBLOCKS] = { 0, };
 #if SIGN_PREDICTION
             TCoeff *sign[MAX_NUM_TBLOCKS] = { 0, };
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+            unsigned *sign_scanIdx[MAX_NUM_TBLOCKS] = { 0, };
+#endif
 #endif
             Pel    *pcmbf[MAX_NUM_TBLOCKS] = { 0, };
             bool   *runType[MAX_NUM_TBLOCKS - 1] = { 0, };
@@ -869,6 +892,9 @@ void BestEncInfoCache::init( const Slice &slice )
                 coeff[i] = coeffPtr; coeffPtr += area.blocks[i].area();
 #if SIGN_PREDICTION
                 sign[i] = coeffSignPtr; coeffSignPtr += area.blocks[i].area();
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+                sign_scanIdx[i] = coeffSignScanIdx; coeffSignScanIdx += area.blocks[i].area();
+#endif
 #endif
                 pcmbf[i] = pcmPtr;   pcmPtr += area.blocks[i].area();
                 if (i < 2)
@@ -879,7 +905,11 @@ void BestEncInfoCache::init( const Slice &slice )
 
               tu.cs = &m_dummyCS;
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+              tu.init(coeff, sign, sign_scanIdx, pcmbf, runType);
+#else
               tu.init(coeff, sign, pcmbf, runType);
+#endif
 #else
               tu.init(coeff, pcmbf, runType);
 #endif
@@ -1153,6 +1183,9 @@ static bool interHadActive( const ComprCUCtx& ctx )
 
 void EncModeCtrlMTnoRQT::create( const EncCfg& cfg )
 {
+#if JVET_Z0118_GDR
+  m_encCfg = cfg;
+#endif
   CacheBlkInfoCtrl::create();
 #if REUSE_CU_RESULTS
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
@@ -1515,7 +1548,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
       // add inter modes
       if( m_pcEncCfg->getUseEarlySkipDetection() )
       {
+#if JVET_Y0065_GPM_INTRA
+        if( cs.sps->getUseGeo() && !cs.slice->isIntra() )
+#else
         if( cs.sps->getUseGeo() && cs.slice->isInterB() )
+#endif
         {
           m_ComprCUCtxList.back().testModes.push_back( { ETM_MERGE_GEO, ETO_STANDARD, qp } );
         }
@@ -1543,7 +1580,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
       else
       {
         m_ComprCUCtxList.back().testModes.push_back( { ETM_INTER_ME,    ETO_STANDARD, qp } );
+#if JVET_Y0065_GPM_INTRA
+        if( cs.sps->getUseGeo() && !cs.slice->isIntra() )
+#else
         if( cs.sps->getUseGeo() && cs.slice->isInterB() )
+#endif
         {
           m_ComprCUCtxList.back().testModes.push_back( { ETM_MERGE_GEO, ETO_STANDARD, qp } );
         }
@@ -2070,6 +2111,16 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
             return false;
           }
         }
+#if JVET_Y0152_TT_ENC_SPEEDUP
+        if (m_pcEncCfg->getFastTTskip() && split == CU_TRIH_SPLIT)
+        {
+          bool skipTtSplitMode = xSkipTreeCandidate(getPartSplit(encTestmode), cs.splitRdCostBest, m_slice->getSliceType());
+          if (skipTtSplitMode) 
+          {
+            return false;
+          }
+        }
+#endif
         break;
       case CU_VERT_SPLIT:
       case CU_TRIV_SPLIT:
@@ -2081,6 +2132,16 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
             return false;
           }
         }
+#if JVET_Y0152_TT_ENC_SPEEDUP
+        if (m_pcEncCfg->getFastTTskip() && split == CU_TRIV_SPLIT)
+        {
+          bool skipTtSplitMode = xSkipTreeCandidate(getPartSplit(encTestmode), cs.splitRdCostBest, m_slice->getSliceType());
+          if (skipTtSplitMode)
+          {
+            return false;
+          }
+        }
+#endif
         break;
       default:
         break;
@@ -2261,6 +2322,22 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
             relatedCU.bestISPIntraMode   = cuECtx.bestISPIntraMode;
             relatedCU.relatedCuIsValid   = true;
           }
+#if INTRA_TRANS_ENC_OPT
+          if ((m_pcEncCfg->getIntraPeriod() == 1) && isLuma(partitioner.chType) && cuECtx.isLfnstTested() && (!relatedCU.relatedCuLfnstIsValid || bestCS->cost < relatedCU.bestCostForLfnst))
+          {
+            relatedCU.bestCostForLfnst = bestCS->cost;
+            relatedCU.relatedCuLfnstIsValid = true;
+
+            if (cuECtx.bestLfnstCost[1] > (cuECtx.bestLfnstCost[0] * 1.4))
+            {
+              relatedCU.skipLfnstTest = true;
+            }
+            else
+            {
+              relatedCU.skipLfnstTest = false;
+            }
+          }
+#endif
         }
 #if ENABLE_SPLIT_PARALLELISM
 #if REUSE_CU_RESULTS
@@ -2275,6 +2352,85 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
     return false;
   }
 }
+
+#if JVET_Y0152_TT_ENC_SPEEDUP
+bool EncModeCtrlMTnoRQT::xSkipTreeCandidate(const PartSplit split, const double* splitRdCostBest, const SliceType& sliceType) const
+{
+  if (!splitRdCostBest)
+  {
+    return false;
+  }
+  double ttEncSpeedupRate = m_pcEncCfg->getFastTTskipThr();
+  double horXorVerRate = m_pcEncCfg->getFastTTskipThr();
+
+  if (!(m_pcEncCfg->getFastTTskip() & FAST_METHOD_TT_ENC_SPEEDUP_ISLICE))
+  {
+    if (sliceType == I_SLICE)
+    {
+      return false;
+    }
+  }
+
+  if (!(m_pcEncCfg->getFastTTskip() & FAST_METHOD_TT_ENC_SPEEDUP_BSLICE))
+  {
+    if (sliceType == B_SLICE)
+    {
+      return false;
+    }
+  }
+  bool res = false;
+
+  if (split == CU_TRIH_SPLIT)
+  {
+    if (m_pcEncCfg->getFastTTskip() & FAST_METHOD_ENC_SPEEDUP_BT_BASED)
+    {
+      if (splitRdCostBest[CTU_LEVEL] < MAX_DOUBLE && splitRdCostBest[CU_HORZ_SPLIT] < MAX_DOUBLE)
+      {
+        if (splitRdCostBest[CU_HORZ_SPLIT] > ttEncSpeedupRate * splitRdCostBest[CTU_LEVEL])
+        {
+          res = true;
+        }
+      }
+    }
+
+    if (m_pcEncCfg->getFastTTskip() & FAST_METHOD_HOR_XOR_VER)
+    {
+      if (splitRdCostBest[CU_HORZ_SPLIT] < MAX_DOUBLE && splitRdCostBest[CU_VERT_SPLIT] < MAX_DOUBLE)
+      {
+        if (splitRdCostBest[CU_HORZ_SPLIT] > horXorVerRate * splitRdCostBest[CU_VERT_SPLIT])
+        {
+          res = true;
+        }
+      }
+    }
+  }
+  if (split == CU_TRIV_SPLIT)
+  {
+    if (m_pcEncCfg->getFastTTskip() & FAST_METHOD_ENC_SPEEDUP_BT_BASED)
+    {
+      if (splitRdCostBest[CTU_LEVEL] < MAX_DOUBLE && splitRdCostBest[CU_VERT_SPLIT] < MAX_DOUBLE)
+      {
+        if (splitRdCostBest[CU_VERT_SPLIT] > ttEncSpeedupRate * splitRdCostBest[CTU_LEVEL])
+        {
+          res = true;
+        }
+      }
+    }
+
+    if (m_pcEncCfg->getFastTTskip() & FAST_METHOD_HOR_XOR_VER)
+    {
+      if (splitRdCostBest[CU_HORZ_SPLIT] < MAX_DOUBLE && splitRdCostBest[CU_VERT_SPLIT] < MAX_DOUBLE)
+      {
+        if (splitRdCostBest[CU_VERT_SPLIT] > horXorVerRate * splitRdCostBest[CU_HORZ_SPLIT])
+        {
+          res = true;
+        }
+      }
+    }
+  }
+  return res;
+}
+#endif
 
 bool EncModeCtrlMTnoRQT::checkSkipOtherLfnst( const EncTestMode& encTestmode, CodingStructure*& tempCS, Partitioner& partitioner )
 {
@@ -2330,6 +2486,22 @@ bool EncModeCtrlMTnoRQT::useModeResult( const EncTestMode& encTestmode, CodingSt
     {
       cuECtx.bestCostMtsFirstPassNoIsp = tempCS->cost;
     }
+#if INTRA_TRANS_ENC_OPT
+    if (cu.lfnstIdx)
+    {
+      if (tempCS->cost < cuECtx.bestLfnstCost[1])
+      {
+        cuECtx.bestLfnstCost[1] = tempCS->cost;
+      }
+    }
+    else
+    {
+      if (tempCS->cost < cuECtx.bestLfnstCost[0])
+      {
+        cuECtx.bestLfnstCost[0] = tempCS->cost;
+      }
+    }
+#endif
   }
 
   if( m_pcEncCfg->getIMV4PelFast() && m_pcEncCfg->getIMV() && encTestmode.type == ETM_INTER_ME )

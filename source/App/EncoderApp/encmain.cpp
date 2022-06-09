@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -77,6 +77,33 @@ static void printMacroSettings()
   }
 }
 
+#if JVET_Z0150_MEMORY_USAGE_PRINT
+#ifdef __linux
+#include <cstdlib>
+#include <cstdio>
+#include <cstring>
+
+int getProcStatusValue(const char* key)
+{
+  FILE* file = fopen("/proc/self/status", "r");
+  int result = -1;
+  char line[128];
+
+  int len = strlen(key);
+  while (fgets(line, 128, file) != nullptr)
+  {
+    if (strncmp(line, key, len) == 0)
+    {
+      result = atoi(line+len);
+      break;
+    }
+  }
+  fclose(file);
+  return result;
+}
+#endif
+#endif
+
 // ====================================================================================================================
 // Main function
 // ====================================================================================================================
@@ -89,7 +116,7 @@ int main(int argc, char* argv[])
   fprintf( stdout, NVM_ONOS );
   fprintf( stdout, NVM_COMPILEDBY );
   fprintf( stdout, NVM_BITS );
-#if ENABLE_SIMD_OPT
+#if ENABLE_SIMD_OPT && defined(TARGET_SIMD_X86)
   std::string SIMD;
   df::program_options_lite::Options opts;
   opts.addOptions()
@@ -290,6 +317,15 @@ int main(int argc, char* argv[])
       }
     }
   }
+
+#if JVET_Z0150_MEMORY_USAGE_PRINT
+#ifdef __linux
+  int vm = getProcStatusValue("VmPeak:");
+  int rm = getProcStatusValue("VmHWM:");
+  printf("\nMemory Usage: VmPeak= %d KB ( %.1f GiB ),  VmHWM= %d KB ( %.1f GiB )\n", vm, (double)vm/(1024*1024), rm, (double)rm/(1024*1024));
+#endif
+#endif
+
   // ending time
   clock_t endClock = clock();
   auto endTime = std::chrono::steady_clock::now();

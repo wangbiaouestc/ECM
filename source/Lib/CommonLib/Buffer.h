@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -65,8 +65,13 @@ struct PelBufferOps
   void(*weightedAvg)   (const Pel* src0, const unsigned src0Stride, const Pel* src1, const unsigned src1Stride, Pel* dest, const unsigned destStride, const int8_t w0, const int8_t w1, int width, int height, const ClpRng& clpRng);
   void(*copyClip)      (const Pel* srcp, const unsigned srcStride, Pel* dest, const unsigned destStride, int width, int height, const ClpRng& clpRng);
 #endif
+#if JVET_Z0136_OOB
+  void(*addAvg4)       (const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height, int shift, int offset, const ClpRng& clpRng, bool *mcMask[2], int mcStride, bool * isOOB);
+  void(*addAvg8)       (const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height, int shift, int offset, const ClpRng& clpRng, bool *mcMask[2], int mcStride, bool * isOOB);
+#else
   void ( *addAvg4 )       ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,            int shift, int offset, const ClpRng& clpRng );
   void ( *addAvg8 )       ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,            int shift, int offset, const ClpRng& clpRng );
+#endif
   void ( *reco4 )         ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,                                   const ClpRng& clpRng );
   void ( *reco8 )         ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,                                   const ClpRng& clpRng );
   void ( *linTf4 )        ( const Pel* src0, int src0Stride,                                  Pel *dst, int dstStride, int width, int height, int scale, int shift, int offset, const ClpRng& clpRng, bool bClip );
@@ -79,14 +84,18 @@ struct PelBufferOps
   void(*calAbsSum)          (const Pel* diff, int stride, int width, int height, int* absDiff);
   void(*calcBIOParamSum5)   (Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGY_GX, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX);
   void(*calcBIOParamSum4)   (Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGY_GX, int width, int height, const int widthG, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX);
+#if JVET_Z0136_OOB
+  void(*addBIOAvgN)         (const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel *gradY1, int gradStride, int width, int height, int* tmpx, int* tmpy, int shift, int offset, const ClpRng& clpRng, bool *mcMask[2], int mcStride, bool *isOOB);
+#else
   void(*addBIOAvgN)         (const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel *gradY1, int gradStride, int width, int height, int* tmpx, int* tmpy, int shift, int offset, const ClpRng& clpRng);
+#endif
   void(*calcBIOClippedVxVy) (int* sumDIX_pixel_32bit, int* sumAbsGX_pixel_32bit, int* sumDIY_pixel_32bit, int* sumAbsGY_pixel_32bit, int* sumSignGY_GX_pixel_32bit, const int limit, const int bioSubblockSize, int* tmpx_pixel_32bit, int* tmpy_pixel_32bit);
 #endif
   void(*calcBIOSums)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int xu, int yu, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX);
   void(*calcBlkGradient)(int sx, int sy, int    *arraysGx2, int     *arraysGxGy, int     *arraysGxdI, int     *arraysGy2, int     *arraysGydI, int     &sGx2, int     &sGy2, int     &sGxGy, int     &sGxdI, int     &sGydI, int width, int height, int unitSize);
   void(*copyBuffer)(Pel *src, int srcStride, Pel *dst, int dstStride, int width, int height);
   void(*padding)(Pel *dst, int stride, int width, int height, int padSize);
-#if ENABLE_SIMD_OPT_BCW
+#if ENABLE_SIMD_OPT_BCW && defined(TARGET_SIMD_X86)
   void ( *removeWeightHighFreq8)  ( Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int shift, int bcwWeight);
   void ( *removeWeightHighFreq4)  ( Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int shift, int bcwWeight);
   void ( *removeHighFreq8)        ( Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height);
@@ -98,7 +107,23 @@ struct PelBufferOps
 #if TM_AMVP || TM_MRG
   int64_t (*getSumOfDifference) ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int rowSubShift, int bitDepth );
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void (*getAbsoluteDifferencePerSample) ( Pel* dst, int dstStride, const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height );
+  int64_t(*getSampleSumFunc[4]) (Pel* src, int srcStride, int width, int height, int bitDepth, short* weightMask, int maskStepX, int maskStride, int maskStride2);
+#endif
+#if JVET_Z0136_OOB
+  bool(*isMvOOB)  (const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, bool *mcMaskChroma, bool lumaOnly, ChromaFormat componentID);
+  bool(*isMvOOBSubBlk) (const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, int mcStride, bool *mcMaskChroma, int mcCStride, bool lumaOnly, ChromaFormat componentID);
+#endif
 };
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#define GetAbsDiffPerSample(dstBuf, srcBuf0, srcBuf1)  g_pelBufOP.getAbsoluteDifferencePerSample((dstBuf).buf, (dstBuf).stride, (srcBuf0).buf, (srcBuf0).stride, (srcBuf1).buf, (srcBuf1).stride, (dstBuf).width, (dstBuf).height)
+#define GetSampleSumFunc(fIdx,  srcBuf, bitDepth, mask, maskStepX, maskStride, maskStride2)  g_pelBufOP.getSampleSumFunc[fIdx] ((srcBuf).buf, (srcBuf).stride, (srcBuf).width, (srcBuf.height), (bitDepth), (mask), (maskStepX), (maskStride), (maskStride2))
+#define GetSampleSum(           srcBuf, bitDepth                                          )  GetSampleSumFunc(0, (srcBuf), (bitDepth), nullptr, (        0), (         0), (          0))
+#define GetMaskedSampleSum(     srcBuf, bitDepth, mask, maskStepX, maskStride, maskStride2)  GetSampleSumFunc(1, (srcBuf), (bitDepth),  (mask), (maskStepX), (maskStride), (maskStride2))
+#define Get01MaskedSampleSum(   srcBuf, bitDepth, mask, maskStepX, maskStride, maskStride2)  GetSampleSumFunc(2, (srcBuf), (bitDepth),  (mask), (maskStepX), (maskStride), (maskStride2))
+#define Get01InvMaskedSampleSum(srcBuf, bitDepth, mask, maskStepX, maskStride, maskStride2)  GetSampleSumFunc(3, (srcBuf), (bitDepth),  (mask), (maskStepX), (maskStride), (maskStride2))
+#endif
 
 extern PelBufferOps g_pelBufOP;
 
@@ -106,6 +131,11 @@ void paddingCore(Pel *ptr, int stride, int width, int height, int padSize);
 void copyBufferCore(Pel *src, int srcStride, Pel *Dst, int dstStride, int width, int height);
 #if TM_AMVP || TM_MRG
 int64_t getSumOfDifferenceCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int rowSubShift, int bitDepth);
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+void getAbsoluteDifferencePerSampleCore(Pel* dst, int dstStride, const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height);
+template <uint8_t maskType> // 0: No mask, 1: Use mask, 2: Use binary mask that contains only 0's and 1's, 3: Inverse the input binary mask before use
+int64_t getMaskedSampleSumCore(Pel* src, int srcStride, int width, int height, int bitDepth, short* weightMask, int maskStepX, int maskStride, int maskStride2);
 #endif
 
 template<typename T>
@@ -141,9 +171,17 @@ struct AreaBuf : public Size
   void extendBorderPel      (  unsigned margin );
   void extendBorderPel(unsigned marginX, unsigned marginY);
   void padBorderPel         ( unsigned marginX, unsigned marginY, int dir );
+#if JVET_Z0136_OOB
+  void addWeightedAvg(const AreaBuf<const T> &other1, const AreaBuf<const T> &other2, const ClpRng& clpRng, const int8_t bcwIdx, bool *mcMask[2], int mcStride, bool *isOOB);
+#else
   void addWeightedAvg       ( const AreaBuf<const T> &other1, const AreaBuf<const T> &other2, const ClpRng& clpRng, const int8_t bcwIdx);
+#endif
   void removeWeightHighFreq ( const AreaBuf<T>& other, const bool bClip, const ClpRng& clpRng, const int8_t iBcwWeight);
+#if JVET_Z0136_OOB
+  void addAvg               ( const AreaBuf<const T> &other1, const AreaBuf<const T> &other2, const ClpRng& clpRng, bool *mcMask[2], int mcStride, bool* isOOB);
+#else
   void addAvg               ( const AreaBuf<const T> &other1, const AreaBuf<const T> &other2, const ClpRng& clpRng );
+#endif
   void removeHighFreq       ( const AreaBuf<T>& other, const bool bClip, const ClpRng& clpRng);
   void updateHistogram      ( std::vector<int32_t>& hist ) const;
 #if INTER_LIC
@@ -188,6 +226,11 @@ struct AreaBuf : public Size
 
 typedef AreaBuf<      Pel>  PelBuf;
 typedef AreaBuf<const Pel> CPelBuf;
+
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+typedef AreaBuf<      unsigned> IdxBuf;
+typedef AreaBuf<const unsigned> CIdxBuf;
+#endif
 
 typedef AreaBuf<      TCoeff>  CoeffBuf;
 typedef AreaBuf<const TCoeff> CCoeffBuf;
@@ -448,13 +491,21 @@ void AreaBuf<Pel>::reconstruct( const AreaBuf<const Pel> &pred, const AreaBuf<co
 
 
 template<typename T>
+#if JVET_Z0136_OOB
+void AreaBuf<T>::addAvg( const AreaBuf<const T> &other1, const AreaBuf<const T> &other2, const ClpRng& clpRng, bool *mcMask[2], int mcStride, bool* isOOB)
+#else
 void AreaBuf<T>::addAvg( const AreaBuf<const T> &other1, const AreaBuf<const T> &other2, const ClpRng& clpRng )
+#endif
 {
   THROW( "Type not supported" );
 }
 
 template<>
+#if JVET_Z0136_OOB
+void AreaBuf<Pel>::addAvg( const AreaBuf<const Pel> &other1, const AreaBuf<const Pel> &other2, const ClpRng& clpRng, bool *mcMask[2], int mcStride, bool* isOOB);
+#else
 void AreaBuf<Pel>::addAvg( const AreaBuf<const Pel> &other1, const AreaBuf<const Pel> &other2, const ClpRng& clpRng );
+#endif
 
 template<typename T>
 void AreaBuf<T>::linearTransform( const int scale, const int shift, const int offset, bool bClip, const ClpRng& clpRng )
@@ -486,7 +537,7 @@ void AreaBuf<T>::removeWeightHighFreq(const AreaBuf<T>& other, const bool bClip,
   Pel* dst = buf;
   const int  dstStride = stride;
 
-#if ENABLE_SIMD_OPT_BCW
+#if ENABLE_SIMD_OPT_BCW && defined(TARGET_SIMD_X86)
   if(!bClip)
   {
     if(!(width & 7))
@@ -535,7 +586,7 @@ void AreaBuf<T>::removeWeightHighFreq(const AreaBuf<T>& other, const bool bClip,
 #undef REM_HF_INC
 #undef REM_HF_OP
 #undef REM_HF_OP_CLIP
-#if ENABLE_SIMD_OPT_BCW
+#if ENABLE_SIMD_OPT_BCW && defined(TARGET_SIMD_X86)
   }
 #endif
 }
@@ -549,7 +600,7 @@ void AreaBuf<T>::removeHighFreq( const AreaBuf<T>& other, const bool bClip, cons
         T*  dst       = buf;
   const int dstStride = stride;
 
-#if ENABLE_SIMD_OPT_BCW
+#if ENABLE_SIMD_OPT_BCW && defined(TARGET_SIMD_X86)
   if (!bClip)
   {
     if(!(width & 7))
@@ -583,7 +634,7 @@ void AreaBuf<T>::removeHighFreq( const AreaBuf<T>& other, const bool bClip, cons
 #undef REM_HF_OP
 #undef REM_HF_OP_CLIP
 
-#if ENABLE_SIMD_OPT_BCW
+#if ENABLE_SIMD_OPT_BCW && defined(TARGET_SIMD_X86)
   }
 #endif
 }
@@ -861,8 +912,13 @@ struct UnitBuf
   void addHypothesisAndClip(const UnitBuf<const T> &other, const int weight, const ClpRngs& clpRngs, const bool lumaOnly = false);
 #endif
   void subtract             ( const UnitBuf<const T> &other );
+#if JVET_Z0136_OOB
+  void addWeightedAvg       ( const UnitBuf<const T> &other1, const UnitBuf<const T> &other2, const ClpRngs& clpRngs, const uint8_t bcwIdx = BCW_DEFAULT, const bool chromaOnly = false, const bool lumaOnly = false, bool *mcMask[2] = NULL, int mcStride = -1, bool *mcMaskChroma[2] = NULL, int mcCStride = -1, bool *isOOB = NULL);
+  void addAvg               ( const UnitBuf<const T> &other1, const UnitBuf<const T> &other2, const ClpRngs& clpRngs, const bool chromaOnly = false, const bool lumaOnly = false, bool *mcMask[2] = NULL, int mcStride = -1, bool *mcMaskChroma[2] = NULL, int mcCStride = -1, bool *isOOB = NULL);
+#else
   void addWeightedAvg       ( const UnitBuf<const T> &other1, const UnitBuf<const T> &other2, const ClpRngs& clpRngs, const uint8_t bcwIdx = BCW_DEFAULT, const bool chromaOnly = false, const bool lumaOnly = false);
   void addAvg               ( const UnitBuf<const T> &other1, const UnitBuf<const T> &other2, const ClpRngs& clpRngs, const bool chromaOnly = false, const bool lumaOnly = false);
+#endif
   void extendSingleBorderPel();
   void extendBorderPel(unsigned marginX, unsigned marginY);
   void padBorderPel         ( unsigned margin, int dir );
@@ -969,7 +1025,11 @@ void UnitBuf<T>::reconstruct(const UnitBuf<const T> &pred, const UnitBuf<const T
 }
 
 template<typename T>
+#if JVET_Z0136_OOB
+void UnitBuf<T>::addWeightedAvg(const UnitBuf<const T> &other1, const UnitBuf<const T> &other2, const ClpRngs& clpRngs, const uint8_t bcwIdx /* = BCW_DEFAULT */, const bool chromaOnly /* = false */, const bool lumaOnly /* = false */, bool *mcMask[2], int mcStride, bool *mcMaskChroma[2], int mcCStride, bool *isOOB)
+#else
 void UnitBuf<T>::addWeightedAvg(const UnitBuf<const T> &other1, const UnitBuf<const T> &other2, const ClpRngs& clpRngs, const uint8_t bcwIdx /* = BCW_DEFAULT */, const bool chromaOnly /* = false */, const bool lumaOnly /* = false */)
+#endif
 {
   const size_t istart = chromaOnly ? 1 : 0;
   const size_t iend = lumaOnly ? 1 : bufs.size();
@@ -978,12 +1038,20 @@ void UnitBuf<T>::addWeightedAvg(const UnitBuf<const T> &other1, const UnitBuf<co
 
   for(size_t i = istart; i < iend; i++)
   {
+#if JVET_Z0136_OOB
+    bufs[i].addWeightedAvg(other1.bufs[i], other2.bufs[i], clpRngs.comp[i], bcwIdx, i == 0 ? mcMask : mcMaskChroma, i == 0 ? mcStride : mcCStride, isOOB);
+#else
     bufs[i].addWeightedAvg(other1.bufs[i], other2.bufs[i], clpRngs.comp[i], bcwIdx);
+#endif
   }
 }
 
 template<typename T>
+#if JVET_Z0136_OOB
+void UnitBuf<T>::addAvg(const UnitBuf<const T> &other1, const UnitBuf<const T> &other2, const ClpRngs& clpRngs, const bool chromaOnly /* = false */, const bool lumaOnly /* = false */, bool *mcMask[2], int mcStride, bool *mcMaskChroma[2], int mcCStride, bool *isOOB)
+#else
 void UnitBuf<T>::addAvg(const UnitBuf<const T> &other1, const UnitBuf<const T> &other2, const ClpRngs& clpRngs, const bool chromaOnly /* = false */, const bool lumaOnly /* = false */)
+#endif
 {
   const size_t istart = chromaOnly ? 1 : 0;
   const size_t iend   = lumaOnly   ? 1 : bufs.size();
@@ -992,7 +1060,11 @@ void UnitBuf<T>::addAvg(const UnitBuf<const T> &other1, const UnitBuf<const T> &
 
   for( size_t i = istart; i < iend; i++)
   {
+#if JVET_Z0136_OOB
+    bufs[i].addAvg( other1.bufs[i], other2.bufs[i], clpRngs.comp[i], i == 0 ? mcMask : mcMaskChroma, i == 0 ? mcStride : mcCStride, isOOB);
+#else
     bufs[i].addAvg( other1.bufs[i], other2.bufs[i], clpRngs.comp[i]);
+#endif
   }
 }
 

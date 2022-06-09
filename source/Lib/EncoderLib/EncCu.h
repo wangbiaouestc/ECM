@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -91,7 +91,28 @@ struct SmallerThanComboCost
 {
   inline bool operator() (const GeoMergeCombo& first, const GeoMergeCombo& second)
   {
+#if JVET_Z0118_GDR 
+    bool ret = true;
+    
+    ret = (first.cost < second.cost);
+    
+    if (first.cost == second.cost)
+    {
+      ret = first.splitDir < second.splitDir;
+      if (first.splitDir == second.splitDir)
+      {
+        ret = first.mergeIdx0 < second.mergeIdx0;
+        if (first.mergeIdx0 == second.mergeIdx0)
+        {
+          ret = first.mergeIdx1 < second.mergeIdx1;
+        }
+      }
+    }
+
+    return ret;
+#else
       return (first.cost < second.cost);
+#endif
   }
 };
 class GeoComboCostList
@@ -168,8 +189,13 @@ public:
       singleDistList[partIdx] = new SingleGeoMMVDMergeEntry**[GEO_NUM_PARTITION_MODE];
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
       {
+#if JVET_Y0065_GPM_INTRA
+        singleDistList[partIdx][splitDir] = new SingleGeoMMVDMergeEntry*[GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS];
+        for (int candIdx = 0; candIdx < GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS; candIdx++)
+#else
         singleDistList[partIdx][splitDir] = new SingleGeoMMVDMergeEntry*[MRG_MAX_NUM_CANDS];
         for (int candIdx = 0; candIdx < MRG_MAX_NUM_CANDS; candIdx++)
+#endif
         {
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
           singleDistList[partIdx][splitDir][candIdx] = new SingleGeoMMVDMergeEntry[GPM_EXT_MMVD_MAX_REFINE_NUM + 2];
@@ -186,7 +212,11 @@ public:
     {
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
       {
+#if JVET_Y0065_GPM_INTRA
+        for (int candIdx = 0; candIdx < GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS; candIdx++)
+#else
         for (int candIdx = 0; candIdx < MRG_MAX_NUM_CANDS; candIdx++)
+#endif
         {
           delete[] singleDistList[partIdx][splitDir][candIdx];
         }
@@ -255,7 +285,11 @@ private:
   IbcHashMap            m_ibcHashMap;
   EncModeCtrl          *m_modeCtrl;
 
+#if JVET_Y0065_GPM_INTRA
+  PelStorage            m_acMergeBuffer[GEO_NUM_RDO_BUFFER];
+#else
   PelStorage            m_acMergeBuffer[MMVD_MRG_MAX_RD_BUF_NUM];
+#endif
 #if INTER_LIC || MULTI_HYP_PRED
   PelStorage            m_acRealMergeBuffer[MRG_MAX_NUM_CANDS * 2];
 #else
@@ -267,17 +301,21 @@ private:
 #endif
   PelStorage            m_ciipBuffer[2];
 
+#if JVET_Y0065_GPM_INTRA
+  PelStorage            m_acGeoWeightedBuffer[GEO_MAX_TRY_WEIGHTED_SAD+1]; // to store weighted prediction pixles
+#else
   PelStorage            m_acGeoWeightedBuffer[GEO_MAX_TRY_WEIGHTED_SAD]; // to store weighted prediction pixels
+#endif
   FastGeoCostList       m_GeoCostList;
 #if JVET_W0097_GPM_MMVD_TM
   PelStorage            m_acGeoMMVDBuffer[MRG_MAX_NUM_CANDS][GPM_EXT_MMVD_MAX_REFINE_NUM];
   PelStorage            m_acGeoMMVDTmpBuffer[MRG_MAX_NUM_CANDS][GPM_EXT_MMVD_MAX_REFINE_NUM];
-  FastGeoMMVDCostList   m_GeoMMVDCostList;
-  bool fastGpmMmvdSearch;
-  bool fastGpmMmvdRelatedCU;
-  bool includeMoreMMVDCandFirstPass;
-  int  maxNumGPMDirFirstPass;
-  int  numCandPerPar;
+  FastGeoMMVDCostList   m_geoMMVDCostList;
+  bool                  m_fastGpmMmvdSearch;
+  bool                  m_fastGpmMmvdRelatedCU;
+  bool                  m_includeMoreMMVDCandFirstPass;
+  int                   m_maxNumGPMDirFirstPass;
+  int                   m_numCandPerPar;
 #if TM_MRG
   PelStorage            m_acGeoMergeTmpBuffer[GEO_TM_MAX_NUM_CANDS];
   PelStorage            m_acGeoSADTmpBuffer[GEO_TM_MAX_NUM_CANDS];
@@ -300,7 +338,7 @@ private:
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   Mv                    m_mvBufEncAmBDMVR[2][MAX_NUM_SUBCU_DMVR];
-  MvField               mvField_amList_enc[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
+  MvField               m_mvFieldAmListEnc[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
 #endif
 
   int                   m_ctuIbcSearchRangeX;
@@ -369,9 +407,17 @@ protected:
   bool
     xCheckBestMode         ( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestmode );
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  void xCheckModeSplit        ( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode, const ModeType modeTypeParent, bool &skipInterPass, double *splitRdCostBest );
+#else
   void xCheckModeSplit        ( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode, const ModeType modeTypeParent, bool &skipInterPass );
+#endif
+#else
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  void xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode, double *splitRdCostBest);
 #else
   void xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode );
+#endif
 #endif
   bool xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode, bool adaptiveColorTrans);
 
@@ -412,14 +458,22 @@ protected:
 #endif
   void xCheckSATDCostMmvdMerge 
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx mergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
-                                , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);
+                                , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+                               , uint32_t * mmvdLUT = NULL
+#endif
+                               );
   void xCheckSATDCostAffineMerge 
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, AffineMergeCtx affineMergeCtx, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
                                 , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);
 #if AFFINE_MMVD
   void xCheckSATDCostAffineMmvdMerge
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, AffineMergeCtx affineMergeCtx, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
-                                , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);
+                                , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+                                          , uint32_t * affMmvdLUT
+#endif
+                               );
 #endif
 #if TM_MRG
   void xCheckSATDCostTMMerge
@@ -430,7 +484,7 @@ protected:
 #endif
                               );
 #endif
-#if !JVET_W0097_GPM_MMVD_TM
+#if !JVET_W0097_GPM_MMVD_TM && !JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void xCheckSATDCostGeoMerge 
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx geoMergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
                                 , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);

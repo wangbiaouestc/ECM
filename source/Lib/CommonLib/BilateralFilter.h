@@ -39,9 +39,11 @@
 
 #include "Unit.h"
 #include "Buffer.h"
+#ifdef TARGET_SIMD_X86
 #include <tmmintrin.h>
 #include <smmintrin.h>
 #include <immintrin.h>
+#endif
 #if JVET_V0094_BILATERAL_FILTER
 class BIFCabacEst
 {
@@ -51,19 +53,24 @@ public:
 };
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-class CBIFCabacEst
+class ChromaBIFCabacEst
 {
 public:
-    virtual ~CBIFCabacEst() {};
-    virtual uint64_t getBits_Cb(const Slice& slice, const CBifParams& htdfParams) = 0;
-    virtual uint64_t getBits_Cr(const Slice& slice, const CBifParams& htdfParams) = 0;
+    virtual ~ChromaBIFCabacEst() {};
+    virtual uint64_t getBitsCb(const Slice& slice, const ChromaBifParams& htdfParams) = 0;
+    virtual uint64_t getBitsCr(const Slice& slice, const ChromaBifParams& htdfParams) = 0;
 };
 #endif
 class BilateralFilter
 {
 private:
+#ifdef TARGET_SIMD_X86
   __m128i tempblockSIMD[2320];
   __m128i tempblockFilteredSIMD[2320];
+#else
+  int64_t tempblockSIMD[2 * 2320];
+  int64_t tempblockFilteredSIMD[2 * 2320];
+#endif
   short *tempblock = (short *) tempblockSIMD;
   short *tempblockFilteredTemp = (short *) (&tempblockFilteredSIMD[1]);
   // SIMD method writes to tempblockFiltered + 4 so that address
@@ -77,7 +84,7 @@ private:
 #if JVET_W0066_CCSAO
   void (*m_bilateralFilterDiamond5x5NoClip)(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr);
 #endif
-  static void blockBilateralFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr );
+  static void blockBilateralFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr);
 #if JVET_W0066_CCSAO
   static void blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr);
 #endif
@@ -112,7 +119,7 @@ private:
   };
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  char m_wBIF_chroma[26][16] = {
+  char m_wBIFChroma[26][16] = {
   {   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, },
   {   0,   1,   1,   1,   1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, },
   {   0,   2,   2,   2,   1,   1,   0,   1,   0,   0,   0,   0,   0,   0,   0,   0, },
@@ -152,9 +159,19 @@ public:
   
   void bilateralFilterPicRDOperCTU(CodingStructure& cs, PelUnitBuf& src,BIFCabacEst* BifCABACEstimator);
   
-  void bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU);
+  void bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+    , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+    , bool clipTop, bool clipBottom, bool clipLeft, bool clipRight
+#endif
+  );
 #if JVET_W0066_CCSAO
-  void bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit& currTU);
+  void bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit& currTU
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+    , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+    , bool clipTop, bool clipBottom, bool clipLeft, bool clipRight
+#endif
+  );
 #endif
 #endif
   void clipNotBilaterallyFilteredBlocks(const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU);
@@ -163,18 +180,28 @@ public:
 #endif
 
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  void bilateralFilterRDOdiamond5x5_chroma(PelBuf& resiBuf, const CPelBuf& predBuf, PelBuf& recoBuf, int32_t qp, const CPelBuf& recIPredBuf, const ClpRng& clpRng, TransformUnit & currTU, bool useReco, bool isCb);
+  void bilateralFilterRDOdiamond5x5Chroma(PelBuf& resiBuf, const CPelBuf& predBuf, PelBuf& recoBuf, int32_t qp, const CPelBuf& recIPredBuf, const ClpRng& clpRng, TransformUnit & currTU, bool useReco, bool isCb);
 
-  void bilateralFilterPicRDOperCTU_chroma(CodingStructure& cs, PelUnitBuf& src, CBIFCabacEst* CBifCABACEstimator, bool isCb);
+  void bilateralFilterPicRDOperCTUChroma(CodingStructure& cs, PelUnitBuf& src, ChromaBIFCabacEst* ChromaBifCABACEstimator, bool isCb);
 
-  void bilateralFilterDiamond5x5_chroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb);
+  void bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+      , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+      , bool clipTop, bool clipBottom, bool clipLeft, bool clipRight
+#endif
+  );
 
-  void clipNotBilaterallyFilteredBlocks_chroma(const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU, bool isCb);
+  void clipNotBilaterallyFilteredBlocksChroma(const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU, bool isCb);
 
 #if JVET_W0066_CCSAO
-    void bilateralFilterDiamond5x5NoClip_chroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb);
+    void bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+      , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+      , bool clipTop, bool clipBottom, bool clipLeft, bool clipRight
 #endif
-    const char* getFilterLutParameters_chroma( const int size, const PredMode predMode, const int qp, int& bfac, int width_for_strength, int height_for_strength, bool isLumaValid);
+    );
+#endif
+    const char* getFilterLutParametersChroma( const int size, const PredMode predMode, const int qp, int& bfac, int widthForStrength, int heightForStrength, bool isLumaValid);
 #endif
 
 #if ENABLE_SIMD_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER_ENABLE_SIMD
@@ -191,7 +218,12 @@ public:
   void    _initBilateralFilterX86();
 #endif
 #endif
-
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  bool isCrossedByVirtualBoundaries(const CodingStructure &cs, const int xPos, const int yPos, const int width,
+                                    const int height, bool &clipTop, bool &clipBottom, bool &clipLeft, bool &clipRight,
+                                    int &numHorVirBndry, int &numVerVirBndry, int horVirBndryPos[],
+                                    int verVirBndryPos[], bool isEncoderRDO = false);
+#endif
 };
 
 #endif

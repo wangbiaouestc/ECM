@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2021, ITU/ISO/IEC
+* Copyright (c) 2010-2022, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -146,6 +146,11 @@ public:
 
 class HLSyntaxReader : public VLCReader
 {
+#if JVET_Z0118_GDR
+  int m_lastGdrPoc;
+  int m_lastGdrRecoveryPocCnt;
+#endif
+
 public:
   HLSyntaxReader();
   virtual ~HLSyntaxReader();
@@ -155,6 +160,12 @@ protected:
   void  parseRefPicList(SPS* pcSPS, ReferencePictureList* rpl, int rplIdx);
 
 public:
+#if JVET_Z0118_GDR
+  void setLastGdrPoc(int poc) { m_lastGdrPoc = poc;  }
+  int  getLastGdrPoc()        { return m_lastGdrPoc; }
+  void setLastGdrRecoveryPocCnt(int recoveryPocCnt) { m_lastGdrRecoveryPocCnt = recoveryPocCnt; }
+  int  getLastGdrRecoveryPocCnt()                     { return m_lastGdrRecoveryPocCnt; }
+#endif
   void  setBitstream        ( InputBitstream* p )   { m_pcBitstream = p; }
   void  parseVPS            ( VPS* pcVPS );
   void  parseDCI            ( DCI* dci );

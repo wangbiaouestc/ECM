@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -80,6 +80,8 @@ enum ExtendedProfileName   // this is used for determining profile strings, wher
 #endif
   AUTO = -1
 };
+
+constexpr int TF_DEFAULT_REFS = 4;
 
 //! \ingroup EncoderApp
 //! \{
@@ -715,7 +717,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   string sTracingFile;
   bool   bTracingChannelsList = false;
 #endif
-#if ENABLE_SIMD_OPT
+#if ENABLE_SIMD_OPT && defined(TARGET_SIMD_X86)
   std::string ignore;
 #endif
 
@@ -728,7 +730,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("c",    po::parseConfigFile, "configuration file name")
   ("WarnUnknowParameter,w",                           warnUnknowParameter,                                  0, "warn for unknown configuration parameters instead of failing")
   ("isSDR",                                           sdr,                                              false, "compatibility")
-#if ENABLE_SIMD_OPT
+#if ENABLE_SIMD_OPT && defined(TARGET_SIMD_X86)
   ("SIMD",                                            ignore,                                      string(""), "SIMD extension to use (SCALAR, SSE41, SSE42, AVX, AVX2, AVX512), default: the highest supported extension\n")
 #endif
   // File, I/O and source parameters
@@ -740,6 +742,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("SourceHeight,-hgt",                               m_iSourceHeight,                                      0, "Source picture height")
 #if SIGN_PREDICTION
   ("NumSignPred",                                     m_numPredSign,                                        8, "Number of predicted transform coefficient signs")
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  ("Log2SignPredArea",                                m_log2SignPredArea,                                   2, "log2 of width/height of area for sign prediction")
+#endif
 #endif
   ("InputBitDepth",                                   m_inputBitDepth[CHANNEL_TYPE_LUMA],                   8, "Bit-depth of input file")
   ("OutputBitDepth",                                  m_outputBitDepth[CHANNEL_TYPE_LUMA],                  0, "Bit-depth of output file (default:InternalBitDepth)")
@@ -758,6 +763,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("PrintHexPSNR",                                    m_printHexPsnr,                                   false, "0 (default) don't emit hexadecimal PSNR for each frame, 1 = also emit hexadecimal PSNR values")
   ("PrintFrameMSE",                                   m_printFrameMSE,                                  false, "0 (default) emit only bit count and PSNRs for each frame, 1 = also emit MSE values")
   ("PrintSequenceMSE",                                m_printSequenceMSE,                               false, "0 (default) emit only bit rate and PSNRs for the whole sequence, 1 = also emit MSE values")
+#if MSSIM_UNIFORM_METRICS_LOG
+  ("PrintMSSSIM",                                     m_printMSSSIM,                                    false, "0 (default) do not print MS-SSIM scores, 1 = print MS-SSIM scores for each frame and for the whole sequence")
+#endif
   ("CabacZeroWordPaddingEnabled",                     m_cabacZeroWordPaddingEnabled,                     true, "0 do not add conforming cabac-zero-words to bit streams, 1 (default) = add cabac-zero-words as required")
   ("ChromaFormatIDC,-cf",                             tmpChromaFormat,                                      0, "ChromaFormatIDC (400|420|422|444 or set 0 (default) for same as InputChromaFormat)")
   ("ConformanceMode",                                 m_conformanceWindowMode,                              0, "Deprecated alias of ConformanceWindowMode")
@@ -969,6 +977,10 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MaxTTLumaISlice",                                 m_uiMaxTT[0],                                       32u, "MaxTTLumaISlice")
   ("MaxTTChromaISlice",                               m_uiMaxTT[2],                                       32u, "MaxTTChromaISlice")
   ("MaxTTNonISlice",                                  m_uiMaxTT[1],                                       64u, "MaxTTNonISlice")
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  ("TTFastSkip",                                      m_ttFastSkip,                                        31, "fast skip method for TT split partition")
+  ("TTFastSkipThr",                                   m_ttFastSkipThr,                                  1.075, "Threshold value of fast skip method for TT split partition")
+#endif
   ("DualITree",                                       m_dualTree,                                       false, "Use separate QTBT trees for intra slice luma and chroma channel types")
   ( "LFNST",                                          m_LFNST,                                          false, "Enable LFNST (0:off, 1:on)  [default: off]" )
   ( "FastLFNST",                                      m_useFastLFNST,                                   false, "Fast methods for LFNST" )
@@ -981,6 +993,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
   ("DMVD",                                            m_DMVDMode,                                        true, "DMVD mode (0:off, 1:on)  [default: on]" )
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  ("AltGPMSplitModeCode",                             m_altGPMSplitModeCode,                             true, "Enable alternative GPM split mode coding (0:off, 1:on)  [default: on]" )
 #endif
   ("PROF",                                            m_PROF,                                           false, "Enable Prediction refinement with optical flow for affine mode (0:off, 1:on)  [default: off]")
   ("BIO",                                             m_BIO,                                            false, "Enable bi-directional optical flow")
@@ -1037,8 +1052,19 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("AllowDisFracMMVD",                                m_allowDisFracMMVD,                               false, "Disable fractional MVD in MMVD mode adaptively")
   ("AffineAmvr",                                      m_AffineAmvr,                                     false, "Eanble AMVR for affine inter mode")
   ("AffineAmvrEncOpt",                                m_AffineAmvrEncOpt,                               false, "Enable encoder optimization of affine AMVR")
+  ("AffineAmvp",                                      m_AffineAmvp,                                      true, "Enable AMVP for affine inter mode")
   ("DMVR",                                            m_DMVR,                                           false, "Decoder-side Motion Vector Refinement")
-  ("MmvdDisNum",                                      m_MmvdDisNum,                                     8,     "Number of MMVD Distance Entries")
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  ("MmvdDisNum",                                      m_MmvdDisNum,                          MMVD_REFINE_STEP, "Number of MMVD Distance Entries")
+#else
+  ("MmvdDisNum",                                      m_MmvdDisNum,                                         8, "Number of MMVD Distance Entries")
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  ("MVSD",                                            m_MVSD,                                            true, "Motion Vector difference Sign Derivation (0:off, 1:on)")
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  ("ARL",                                             m_useARL,                                          true, "Adaptive Reference List (0:off, 1:on)")
+#endif
   ("ColorTransform",                                  m_useColorTrans,                                  false, "Enable the color transform")
   ("PLT",                                             m_PLTMode,                                           0u, "PLTMode (0x1:enabled, 0x0:disabled)  [default: disabled]")
   ("JointCbCr",                                       m_JointCbCrMode,                                  false, "Enable joint coding of chroma residuals (JointCbCr, 0:off, 1:on)")
@@ -1069,9 +1095,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("BIFQPOffset",                                     m_BIFQPOffset,                                        0, "bilateral filter QP offset (0: no offset)  [default: 0]")
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  ("CBIF",                                             m_CBIF,                                            true, "chroma bilateral filter   (0: off, 1:on)  [default: on]")
-  ("CBIFStrength",                                     m_CBIFStrength,                                       1u, "chroma bilateral filter strength  (0: half, 1: full, 2: double)  [default: full]")
-  ("CBIFQPOffset",                                     m_CBIFQPOffset,                                        0, "chroma bilateral filter QP offset (0: no offset)  [default: 0]")
+  ("ChromaBIF",                                             m_chromaBIF,                                      true, "chroma bilateral filter   (0: off, 1:on)  [default: on]")
+  ("ChromaBIFStrength",                                     m_chromaBIFStrength,                              1u, "chroma bilateral filter strength  (0: half, 1: full, 2: double)  [default: full]")
+  ("ChromaBIFQPOffset",                                     m_chromaBIFQPOffset,                              0, "chroma bilateral filter QP offset (0: no offset)  [default: 0]")
 #endif
   // ADD_NEW_TOOL : (encoder app) add parsing parameters here
   ( "VirtualBoundariesPresentInSPSFlag",              m_virtualBoundariesPresentFlag,                    true, "Virtual Boundary position information is signalled in SPS or PH (1:SPS, 0:PH)  [default: on]" )
@@ -1123,6 +1149,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 
   // Coding structure paramters
   ("IntraPeriod,-ip",                                 m_iIntraPeriod,                                      -1, "Intra period in frames, (-1: only first frame)")
+#if JVET_Z0118_GDR
+  ("GdrEnabled",                                      m_gdrEnabled,                                     false, "GDR enabled")
+  ("GdrPocStart",                                     m_gdrPocStart,                                       -1, "GDR poc start")
+  ("GdrPeriod",                                       m_gdrPeriod,                                         -1, "Number of frames between GDR picture to the next GDR picture")
+  ("GdrInterval",                                     m_gdrInterval,                                       -1, "Number of frames from GDR picture to the recovery point picture")
+  ("GdrNoHash",                                       m_gdrNoHash,                                      false, "Do not generate decode picture hash SEI messages for GDR and recovering pictures")
+#endif
   ("DecodingRefreshType,-dr",                         m_iDecodingRefreshType,                               0, "Intra refresh type (0:none 1:CRA 2:IDR 3:RecPointSEI)")
   ("GOPSize,g",                                       m_iGOPSize,                                           1, "GOP size of temporal structure")
   ("DRAPPeriod",                                      m_drapPeriod,                                         0, "DRAP period in frames (0: disable Dependent RAP indication SEI messages)")
@@ -1197,6 +1230,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("WCGPPSCrQpScale",                                 m_wcgChromaQpControl.chromaCrQpScale,               1.0, "WCG PPS Chroma Cr QP Scale")
   ("WCGPPSChromaQpScale",                             m_wcgChromaQpControl.chromaQpScale,                 0.0, "WCG PPS Chroma QP Scale")
   ("WCGPPSChromaQpOffset",                            m_wcgChromaQpControl.chromaQpOffset,                0.0, "WCG PPS Chroma QP Offset")
+#endif
+#if JVET_Y0240_BIM
+  ("BIM",                                             m_bimEnabled,                                     false, "Block Importance Mapping QP adaptation depending on estimated propagation of reference samples.")
 #endif
 #if W0038_CQP_ADJ
   ("SliceChromaQPOffsetPeriodicity",                  m_sliceChromaQpOffsetPeriodicity,                    0u, "Used in conjunction with Slice Cb/Cr QpOffsetIntraOrPeriodic. Use 0 (default) to disable periodic nature.")
@@ -1302,11 +1338,22 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_X0049_ADAPT_DMVR
   ("MaxNumBMMergeCand",                               m_maxNumBMMergeCand,                                 4u, "Maximum number of BM merge candidates")
 #endif
+#if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
+  ("MaxNumAffineMergeCand",                           m_maxNumAffineMergeCand, (uint32_t)AFFINE_MRG_MAX_NUM_CANDS, "Maximum number of affine merge candidates")
+#else
   ("MaxNumAffineMergeCand",                           m_maxNumAffineMergeCand,                             5u, "Maximum number of affine merge candidates")
+#endif
 #if NON_ADJACENT_MRG_CAND
   ("MaxNumGeoCand",                                   m_maxNumGeoCand,                                     10u, "Maximum number of geometric partitioning mode candidates")
 #else
   ("MaxNumGeoCand",                                   m_maxNumGeoCand,                                     5u, "Maximum number of geometric partitioning mode candidates")
+#endif
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+#if NON_ADJACENT_MRG_CAND
+  ("MaxNumMHPCand",                                   m_maxNumMHPCand,                                     10u, "Maximum number of merge candidates in MHP")
+#else
+  ("MaxNumMHPCand",                                   m_maxNumMHPCand,                                     5u, "Maximum number of merge candidates in MHP")
+#endif
 #endif
   ("MaxNumIBCMergeCand",                              m_maxNumIBCMergeCand,                                6u, "Maximum number of IBC merge candidates")
     /* Misc. */
@@ -1587,11 +1634,17 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
   ( "MaxNumTUs",                                      m_maxNumTUs,                                  1, "Maximum number of TUs within one CU. When max TB size is 32x32, up to 16 TUs within one CU (128x128) is supported" )
 #endif
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  ("TempCabacInit",                                   m_tempCabacInitMode,                          1u, "CABAC context initialization from previous picture (0:off, 1:on)")
+#endif
     ;
 
   opts.addOptions()
-    ("TemporalFilter",                                m_gopBasedTemporalFilterEnabled,          false,            "Enable GOP based temporal filter. Disabled per default")
-    ("TemporalFilterFutureReference",                 m_gopBasedTemporalFilterFutureReference,   true,            "Enable referencing of future frames in the GOP based temporal filter. This is typically disabled for Low Delay configurations.")
+    ("TemporalFilter",                                m_gopBasedTemporalFilterEnabled,                     false, "Enable GOP based temporal filter. Disabled per default")
+    ("TemporalFilterPastRefs",                        m_gopBasedTemporalFilterPastRefs,          TF_DEFAULT_REFS, "Number of past references for temporal prefilter")
+    ("TemporalFilterFutureRefs",                      m_gopBasedTemporalFilterFutureRefs,        TF_DEFAULT_REFS, "Number of future references for temporal prefilter")
+    ("FirstValidFrame",                               m_firstValidFrame,                                       0, "First valid frame")
+    ("LastValidFrame",                                m_lastValidFrame,                                  MAX_INT, "Last valid frame")
     ("TemporalFilterStrengthFrame*",                  m_gopBasedTemporalFilterStrengths, std::map<int, double>(), "Strength for every * frame in GOP based temporal filter, where * is an integer."
                                                                                                                   " E.g. --TemporalFilterStrengthFrame8 0.95 will enable GOP based temporal filter at every 8th frame with strength 0.95");
   // clang-format on
@@ -1632,11 +1685,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
     m_framesToBeEncoded = int( m_framesToBeEncoded * m_fractionOfFrames );
   }
 
-#if RPR_ENABLE
-  if( m_resChangeInClvsEnabled && m_switchPocPeriod > 0 )
-#else
   if (m_resChangeInClvsEnabled && !m_switchPocPeriod)
-#endif
   {
     m_switchPocPeriod = m_iFrameRate / 2 / m_iGOPSize * m_iGOPSize;
   }
@@ -1650,6 +1699,88 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   {
     m_iIntraPeriod = -1;
   }
+
+#if JVET_Z0118_GDR
+  if ( m_gdrEnabled )
+  {
+    m_iDecodingRefreshType = 3;
+    m_intraQPOffset = 0;
+    m_iGOPSize = 1;
+
+    // for ecm 2.0
+    m_bcw = false;
+    m_BcwFast = false;
+    m_Geo = false;
+#if MULTI_HYP_PRED
+    m_maxNumAddHyps = 0;
+#endif
+
+
+    int8_t sliceType = m_GOPList[0].m_sliceType;
+
+    m_GOPList[0].m_POC = 1;    
+    m_GOPList[0].m_QPOffset = 0;
+    m_GOPList[0].m_QPOffsetModelOffset = 0;
+    m_GOPList[0].m_QPOffsetModelScale = 0;
+    m_GOPList[0].m_CbQPoffset = 0;
+    m_GOPList[0].m_CrQPoffset = 0;
+    m_GOPList[0].m_QPFactor = 1.0;
+    m_GOPList[0].m_tcOffsetDiv2 = 0;
+    m_GOPList[0].m_betaOffsetDiv2 = 0;
+    m_GOPList[0].m_CbTcOffsetDiv2 = 0;
+    m_GOPList[0].m_CbBetaOffsetDiv2 = 0;
+    m_GOPList[0].m_CrTcOffsetDiv2 = 0;
+    m_GOPList[0].m_CrBetaOffsetDiv2 = 0;
+    m_GOPList[0].m_temporalId = 0;
+
+    m_GOPList[0].m_numRefPicsActive0 = 2;
+    m_GOPList[0].m_numRefPics0 = 2;
+    m_GOPList[0].m_deltaRefPics0[0] = 1;
+    m_GOPList[0].m_deltaRefPics0[1] = 2;
+
+
+    if (sliceType == 'B')
+    {
+      // for ecm 2.0
+      m_bcw = true;
+      m_BcwFast = true;
+      m_Geo = true;
+#if MULTI_HYP_PRED
+      m_maxNumAddHyps = 2;
+#endif
+
+      m_GOPList[0].m_numRefPicsActive1 = 2;
+      m_GOPList[0].m_numRefPics1 = 2;
+      m_GOPList[0].m_deltaRefPics1[0] = 1;
+      m_GOPList[0].m_deltaRefPics1[1] = 2;
+    }
+
+    m_BIO  = false;
+    m_DMVR = false;
+    m_SMVD = false;
+
+    if (m_gdrPeriod < 0)
+    {
+      m_gdrPeriod = m_iFrameRate + 4;
+    }
+
+    if (m_gdrInterval < 0)
+    {
+      m_gdrInterval = m_iFrameRate;
+    }
+
+    if (m_gdrPocStart < 0)
+    {
+      m_gdrPocStart = m_gdrPeriod;
+    }
+
+    if (m_iIntraPeriod == -1)
+    {
+      m_iFrameRate = (m_iFrameRate == 0) ? 30 : m_iFrameRate;
+      m_iIntraPeriod = m_gdrPeriod;      
+    }
+  }
+#endif
 
   m_bpDeltasGOPStructure = false;
   if(m_iGOPSize == 16)
@@ -1769,10 +1900,56 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   }
   m_inputFileName   = inputPathPrefix + m_inputFileName;
 
+  if( m_firstValidFrame < 0 )
+  {
+    m_firstValidFrame = m_FrameSkip;
+  }
+  if( m_lastValidFrame < 0 )
+  {
+    m_lastValidFrame = m_firstValidFrame + m_framesToBeEncoded - 1;
+  }
+
   if( m_temporalSubsampleRatio < 1)
   {
     EXIT ( "Error: TemporalSubsampleRatio must be greater than 0" );
   }
+
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  if (m_iIntraPeriod == 1)
+  {
+    if (m_iQP > 22 && m_iQP < 37)
+    {
+      m_log2SignPredArea = 3;
+    }
+  }
+  else if (m_iIntraPeriod == -1)
+  {
+    if (m_iSourceHeight >= 1080)
+    {
+      m_log2SignPredArea = (m_iQP >= 32) ? 5 : 3;
+    }
+    else if (m_iSourceHeight >= 720)
+    {
+      m_log2SignPredArea = (m_iQP > 32) ? 5 : 4;
+    }
+    else if (m_iSourceHeight >= 480)
+    {
+      m_log2SignPredArea = 4;
+    }
+    else
+    {
+      m_log2SignPredArea = 3;
+    }
+    if (m_IBCMode)
+    {
+      m_log2SignPredArea = 3;
+    }
+  }
+  else
+  {
+    m_log2SignPredArea = 4;
+  }
+#endif
 
   m_framesToBeEncoded = ( m_framesToBeEncoded + m_temporalSubsampleRatio - 1 ) / m_temporalSubsampleRatio;
   m_adIntraLambdaModifier = cfg_adIntraLambdaModifier.values;
@@ -2401,7 +2578,20 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   }
 #endif
 
+#if JVET_Z0118_GDR
+  if (m_gdrEnabled)
+  {
+    m_virtualBoundariesEnabledFlag = 1;
+    m_virtualBoundariesPresentFlag = 0;
+  }
+  else
+  {
+    m_virtualBoundariesEnabledFlag = 0;
+  }
+#else
   m_virtualBoundariesEnabledFlag = 0;
+#endif
+
   if( m_numVerVirtualBoundaries > 0 || m_numHorVirtualBoundaries > 0 )
     m_virtualBoundariesEnabledFlag = 1;
 
@@ -3172,6 +3362,10 @@ bool EncAppCfg::xCheckParameter()
   xConfirmPara( m_maxNumGeoCand > GEO_MAX_NUM_UNI_CANDS, "MaxNumGeoCand must be no more than GEO_MAX_NUM_UNI_CANDS." );
   xConfirmPara( m_maxNumGeoCand > m_maxNumMergeCand, "MaxNumGeoCand must be no more than MaxNumMergeCand." );
   xConfirmPara( 0 < m_maxNumGeoCand && m_maxNumGeoCand < 2, "MaxNumGeoCand must be no less than 2 unless MaxNumGeoCand is 0." );
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  xConfirmPara( m_maxNumMHPCand > GEO_MAX_NUM_UNI_CANDS, "m_maxNumMHPCand must be no more than GEO_MAX_NUM_UNI_CANDS." );
+  xConfirmPara( m_maxNumMHPCand > m_maxNumMergeCand, "m_maxNumMHPCand must be no more than MaxNumMergeCand." );
+#endif
   xConfirmPara( m_maxNumIBCMergeCand < 1, "MaxNumIBCMergeCand must be 1 or greater." );
   xConfirmPara( m_maxNumIBCMergeCand > IBC_MRG_MAX_NUM_CANDS, "MaxNumIBCMergeCand must be no more than IBC_MRG_MAX_NUM_CANDS." );
   xConfirmPara(m_maxNumAffineMergeCand < (m_sbTmvpEnableFlag ? 1 : 0),
@@ -3969,6 +4163,9 @@ bool EncAppCfg::xCheckParameter()
     msg( WARNING, "*********************************************************************************\n");
     exit(1);
   }
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  xConfirmPara(m_numPredSign > 0 && (m_log2SignPredArea < 2 || m_log2SignPredArea > 5), "log2 of predicted sign area must be in between 2 and 5 inclusively");
+#endif
 #endif
   if ( m_RCEnableRateControl )
   {
@@ -4065,7 +4262,25 @@ bool EncAppCfg::xCheckParameter()
   if (m_gopBasedTemporalFilterEnabled)
   {
     xConfirmPara(m_temporalSubsampleRatio != 1, "GOP Based Temporal Filter only support Temporal sub-sample ratio 1");
+    xConfirmPara(
+      m_gopBasedTemporalFilterPastRefs <= 0 && m_gopBasedTemporalFilterFutureRefs <= 0,
+      "Either TemporalFilterPastRefs or TemporalFilterFutureRefs must be larger than 0 when TemporalFilter is enabled" );
+
+    if( (m_gopBasedTemporalFilterPastRefs != 0 && m_gopBasedTemporalFilterPastRefs != TF_DEFAULT_REFS)
+        || (m_gopBasedTemporalFilterFutureRefs != 0 && m_gopBasedTemporalFilterFutureRefs != TF_DEFAULT_REFS) )
+    {
+      msg( WARNING, "Number of frames used for temporal prefilter is different from default.\n" );
+    }
   }
+#if JVET_Y0240_BIM
+  if (m_bimEnabled)
+  {
+    xConfirmPara(m_temporalSubsampleRatio != 1, "Block Importance Mapping only support Temporal sub-sample ratio 1");
+    xConfirmPara(
+      m_gopBasedTemporalFilterPastRefs <= 0 && m_gopBasedTemporalFilterFutureRefs <= 0,
+      "Either TemporalFilterPastRefs or TemporalFilterFutureRefs must be larger than 0 when Block Importance Mapping is enabled" );
+  }
+#endif
 #if EXTENSION_360_VIDEO
   check_failed |= m_ext360.verifyParameters();
 #endif
@@ -4108,6 +4323,9 @@ void EncAppCfg::xPrintParameter()
   msg( DETAILS, "Hexadecimal PSNR output                : %s\n", ( m_printHexPsnr ? "Enabled" : "Disabled" ) );
   msg( DETAILS, "Sequence MSE output                    : %s\n", ( m_printSequenceMSE ? "Enabled" : "Disabled" ) );
   msg( DETAILS, "Frame MSE output                       : %s\n", ( m_printFrameMSE ? "Enabled" : "Disabled" ) );
+#if MSSIM_UNIFORM_METRICS_LOG
+  msg( DETAILS, "MS-SSIM output                         : %s\n", ( m_printMSSSIM ? "Enabled" : "Disabled") );
+#endif
   msg( DETAILS, "Cabac-zero-word-padding                : %s\n", ( m_cabacZeroWordPaddingEnabled ? "Enabled" : "Disabled" ) );
   if (m_isField)
   {
@@ -4241,6 +4459,16 @@ void EncAppCfg::xPrintParameter()
     }
 #endif
   }
+#if JVET_Z0118_GDR
+  msg(DETAILS, "GDREnabled                             : %d\n", m_gdrEnabled);
+
+  if (m_gdrEnabled)
+  {
+    msg(DETAILS, "GDR Start                              : %d\n", m_gdrPocStart);
+    msg(DETAILS, "GDR Interval                           : %d\n", m_gdrInterval);
+    msg(DETAILS, "GDR Period                             : %d\n", m_gdrPeriod);
+  }
+#endif
 #if JVET_V0130_INTRA_TMP
   msg(DETAILS, "Intra TMP: %d\n", m_intraTMP);
   msg(DETAILS, "Max CU size of TMP: %d\n", m_intraTmpMaxSize);
@@ -4255,17 +4483,13 @@ void EncAppCfg::xPrintParameter()
 #endif
   msg( DETAILS, "Max Num Affine Merge Candidates        : %d\n", m_maxNumAffineMergeCand );
   msg( DETAILS, "Max Num Geo Merge Candidates           : %d\n", m_maxNumGeoCand );
+#if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
+  msg( DETAILS, "Max Num MHP Merge Candidates           : %d\n", m_maxNumMHPCand );
+#endif
   msg( DETAILS, "Max Num IBC Merge Candidates           : %d\n", m_maxNumIBCMergeCand );
   msg( DETAILS, "\n");
 
   msg( VERBOSE, "TOOL CFG: ");
-#if CTU_256
-  msg( VERBOSE, "CTU:%d ", m_uiCTUSize );
-  msg( VERBOSE, "MaxTU:%d ", 1 << m_log2MaxTbSize );
-#endif
-#if SIGN_PREDICTION
-  msg( VERBOSE, "SignPred:%d ", m_numPredSign                   );
-#endif
   msg( VERBOSE, "IBD:%d ", ((m_internalBitDepth[CHANNEL_TYPE_LUMA] > m_MSBExtendedBitDepth[CHANNEL_TYPE_LUMA]) || (m_internalBitDepth[CHANNEL_TYPE_CHROMA] > m_MSBExtendedBitDepth[CHANNEL_TYPE_CHROMA])));
   msg( VERBOSE, "HAD:%d ", m_bUseHADME                          );
   msg( VERBOSE, "RDQ:%d ", m_useRDOQ                            );
@@ -4292,9 +4516,6 @@ void EncAppCfg::xPrintParameter()
   msg( VERBOSE, "Slices: %d ", m_numSlicesInPic);
   msg( VERBOSE, "MCTS:%d ", m_MCTSEncConstraint );
   msg( VERBOSE, "SAO:%d ", (m_bUseSAO)?(1):(0));
-#if JVET_W0066_CCSAO
-  msg( VERBOSE, "CCSAO:%d ", m_CCSAO ? 1 : 0 );
-#endif
   msg( VERBOSE, "ALF:%d ", m_alf ? 1 : 0 );
   msg( VERBOSE, "CCALF:%d ", m_ccalf ? 1 : 0 );
 
@@ -4305,9 +4526,7 @@ void EncAppCfg::xPrintParameter()
   msg( VERBOSE, " WaveFrontSynchro:%d WaveFrontSubstreams:%d", m_entropyCodingSyncEnabledFlag?1:0, iWaveFrontSubstreams);
   msg( VERBOSE, " ScalingList:%d ", m_useScalingListId );
   msg( VERBOSE, "TMVPMode:%d ", m_TMVPModeId );
-#if TCQ_8STATES
-  msg( VERBOSE, " DQ:%d ", m_depQuantEnabledIdc);
-#else
+#if !TCQ_8STATES
 	msg( VERBOSE, " DQ:%d ", m_depQuantEnabledFlag);
 #endif
   msg( VERBOSE, " SignBitHidingFlag:%d ", m_signDataHidingEnabledFlag);
@@ -4322,18 +4541,12 @@ void EncAppCfg::xPrintParameter()
     if ( m_Affine )
     {
       msg( VERBOSE, "AffineType:%d ", m_AffineType );
-#if AFFINE_MMVD
-      msg( VERBOSE, "AffineMMVD:%d ", m_AffineMmvdMode );
-#endif
     }
     msg(VERBOSE, "PROF:%d ", m_PROF);
     msg(VERBOSE, "SbTMVP:%d ", m_sbTmvpEnableFlag);
     msg( VERBOSE, "DualITree:%d ", m_dualTree );
     msg( VERBOSE, "IMV:%d ", m_ImvMode );
     msg( VERBOSE, "BIO:%d ", m_BIO );
-#if JVET_W0090_ARMC_TM
-    msg( VERBOSE, "AML:%d ", m_AML );
-#endif
     msg( VERBOSE, "LMChroma:%d ", m_LMChroma );
     msg( VERBOSE, "HorCollocatedChroma:%d ", m_horCollocatedChromaFlag );
     msg( VERBOSE, "VerCollocatedChroma:%d ", m_verCollocatedChromaFlag );
@@ -4347,41 +4560,24 @@ void EncAppCfg::xPrintParameter()
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
     msg( VERBOSE, "LADF:%d ", m_LadfEnabed );
 #endif
-#if ENABLE_DIMD
-    msg(VERBOSE, "DIMD:%d ", m_dimd);
-#endif
-#if JVET_W0123_TIMD_FUSION
-    msg(VERBOSE, "TIMD:%d ", m_timd);
-#endif
-#if ENABLE_OBMC
-    msg(VERBOSE, "OBMC:%d ", m_OBMC);
-#endif
     msg(VERBOSE, "CIIP:%d ", m_ciip);
     msg( VERBOSE, "Geo:%d ", m_Geo );
-#if MULTI_HYP_PRED
-    msg(VERBOSE, "AdditionalInterHyps:%d ", m_maxNumAddHyps);
-    if (m_maxNumAddHyps)
-    {
-      msg(VERBOSE, "(%d weight%s,", m_numAddHypWeights, m_numAddHypWeights > 1 ? "s" : "");
-      msg(VERBOSE, "%d ref frame%s,", m_maxNumAddHypRefFrames, m_maxNumAddHypRefFrames > 1 ? "s" : "");
-      msg(VERBOSE, "%d %s) ", m_addHypTries, m_addHypTries == 1 ? "try" : "tries");
-    }
-#endif
     m_allowDisFracMMVD = m_MMVD ? m_allowDisFracMMVD : false;
     if ( m_MMVD )
       msg(VERBOSE, "AllowDisFracMMVD:%d ", m_allowDisFracMMVD);
     msg( VERBOSE, "AffineAmvr:%d ", m_AffineAmvr );
     m_AffineAmvrEncOpt = m_AffineAmvr ? m_AffineAmvrEncOpt : false;
     msg( VERBOSE, "AffineAmvrEncOpt:%d ", m_AffineAmvrEncOpt );
+    msg(VERBOSE, "AffineAmvp:%d ", m_AffineAmvp);
     msg(VERBOSE, "DMVR:%d ", m_DMVR);
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
-    msg(VERBOSE, "DMVD:%d ", m_DMVDMode);
-#endif
     msg(VERBOSE, "MmvdDisNum:%d ", m_MmvdDisNum);
-    msg(VERBOSE, "JointCbCr:%d ", m_JointCbCrMode);
-#if ENABLE_OBMC
-    msg(VERBOSE, "OBMC:%d ", m_OBMC);
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    msg(VERBOSE, "MVSD:%d ", m_MVSD);
 #endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    msg(VERBOSE, "ARL:%d ", m_useARL);
+#endif
+    msg(VERBOSE, "JointCbCr:%d ", m_JointCbCrMode);
   }
   m_useColorTrans = (m_chromaFormatIDC == CHROMA_444) ? m_useColorTrans : 0u;
   msg(VERBOSE, "ACT:%d ", m_useColorTrans);
@@ -4393,20 +4589,6 @@ void EncAppCfg::xPrintParameter()
   {
     msg( VERBOSE, "WrapAroundOffset:%d ", m_wrapAroundOffset );
   }
-#if JVET_V0130_INTRA_TMP
-  msg( VERBOSE, "IntraTMP:%d ", m_intraTMP);
-  msg( VERBOSE, "IntraTmpMaxSize:%d ", m_intraTmpMaxSize);
-#endif
-#if JVET_V0094_BILATERAL_FILTER
-  msg( VERBOSE, "BIF:%d ", m_BIF);
-  msg( VERBOSE, "BIFStrength:%d ", m_BIFStrength);
-  msg( VERBOSE, "BIFQPOffset:%d ", m_BIFQPOffset);
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-  msg( VERBOSE, "CBIF:%d ", m_CBIF);
-  msg( VERBOSE, "CBIFStrength:%d ", m_CBIFStrength);
-  msg( VERBOSE, "CBIFQPOffset:%d ", m_CBIFQPOffset);
-#endif
   // ADD_NEW_TOOL (add some output indicating the usage of tools)
   msg( VERBOSE, "VirtualBoundariesEnabledFlag:%d ", m_virtualBoundariesEnabledFlag );
   msg( VERBOSE, "VirtualBoundariesPresentInSPSFlag:%d ", m_virtualBoundariesPresentFlag );
@@ -4435,23 +4617,10 @@ void EncAppCfg::xPrintParameter()
     }
     msg(VERBOSE, "MRL:%d ", m_MRL);
     msg(VERBOSE, "MIP:%d ", m_MIP);
-#if INTER_LIC
-    msg(VERBOSE, "LIC:%d ", m_lic);
-    if (m_lic)
-    {
-      msg(VERBOSE, "FastPicLevelLIC:%d ", m_fastPicLevelLIC);
-    }
-#endif
     msg(VERBOSE, "EncDbOpt:%d ", m_encDbOpt);
   msg( VERBOSE, "\nFAST TOOL CFG: " );
-#if CONVERT_NUM_TU_SPLITS_TO_CFG
-  msg( VERBOSE, "MaxNumTUs:%d ", m_maxNumTUs );
-#endif
   msg( VERBOSE, "LCTUFast:%d ", m_useFastLCTU );
   msg( VERBOSE, "FastMrg:%d ", m_useFastMrg );
-#if MERGE_ENC_OPT
-  msg(VERBOSE, "NumFullRDMrg:%d ", m_numFullRDMrg);
-#endif
   msg( VERBOSE, "PBIntraFast:%d ", m_usePbIntraFast );
   if( m_ImvMode ) msg( VERBOSE, "IMV4PelFast:%d ", m_Imv4PelFast );
   if( m_MTS ) msg( VERBOSE, "MTSMaxCand: %1d(intra) %1d(inter) ", m_MTSIntraMaxCand, m_MTSInterMaxCand );
@@ -4483,7 +4652,113 @@ void EncAppCfg::xPrintParameter()
   {
     msg( VERBOSE, "RPR:%d ", 0 );
   }
-  msg(VERBOSE, "TemporalFilter:%d ", m_gopBasedTemporalFilterEnabled);
+  msg( VERBOSE, "TemporalFilter:%d/%d ", m_gopBasedTemporalFilterPastRefs, m_gopBasedTemporalFilterFutureRefs );
+
+  // ECM tools
+  msg( VERBOSE, "\nECM TOOL CFG: " );
+
+  //intra
+#if ENABLE_DIMD
+  msg( VERBOSE, "DIMD:%d ", m_dimd );
+#endif
+#if JVET_W0123_TIMD_FUSION
+  msg( VERBOSE, "TIMD:%d ", m_timd );
+#endif
+#if JVET_V0130_INTRA_TMP
+  msg( VERBOSE, "IntraTMP:%d ", m_intraTMP );
+  msg( VERBOSE, "IntraTmpMaxSize:%d ", m_intraTmpMaxSize );
+#endif
+
+  //inter
+#if AFFINE_MMVD
+  if( m_Affine )
+  {
+    msg( VERBOSE, "AffineMMVD:%d ", m_AffineMmvdMode );
+  }
+#endif
+#if ENABLE_OBMC
+  msg( VERBOSE, "OBMC:%d ", m_OBMC );
+#endif
+#if MULTI_HYP_PRED
+  msg( VERBOSE, "AdditionalInterHyps:%d ", m_maxNumAddHyps );
+  if( m_maxNumAddHyps )
+  {
+    msg( VERBOSE, "(%d weight%s,", m_numAddHypWeights, m_numAddHypWeights > 1 ? "s" : "" );
+    msg( VERBOSE, "%d ref frame%s,", m_maxNumAddHypRefFrames, m_maxNumAddHypRefFrames > 1 ? "s" : "" );
+    msg( VERBOSE, "%d %s) ", m_addHypTries, m_addHypTries == 1 ? "try" : "tries" );
+  }
+#endif
+#if INTER_LIC
+  msg( VERBOSE, "LIC:%d ", m_lic );
+  if( m_lic )
+  {
+    msg( VERBOSE, "FastPicLevelLIC:%d ", m_fastPicLevelLIC );
+  }
+#endif
+#if JVET_W0090_ARMC_TM
+  msg( VERBOSE, "AML:%d ", m_AML );
+#endif
+#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+  msg( VERBOSE, "DMVD:%d ", m_DMVDMode );
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  msg( VERBOSE, "MVSD:%d ", m_MVSD );
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+    msg(VERBOSE, "AltGPMSplitModeCode:%d ", m_altGPMSplitModeCode);
+#endif
+
+  // transform and coefficient coding
+#if TCQ_8STATES
+  msg( VERBOSE, "DQ:%d ", m_depQuantEnabledIdc );
+#endif
+#if SIGN_PREDICTION
+  msg( VERBOSE, "SignPred:%d ", m_numPredSign );
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  msg( VERBOSE, "Log2SignPredArea:%d ", m_log2SignPredArea );
+#endif
+#endif
+
+  // in-loop filters
+#if JVET_W0066_CCSAO
+  msg( VERBOSE, "CCSAO:%d ", m_CCSAO ? 1 : 0 );
+#endif
+#if JVET_V0094_BILATERAL_FILTER
+  msg( VERBOSE, "BIF:%d ", m_BIF );
+  msg( VERBOSE, "BIFStrength:%d ", m_BIFStrength );
+  msg( VERBOSE, "BIFQPOffset:%d ", m_BIFQPOffset );
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  msg( VERBOSE, "ChromaBIF:%d ", m_chromaBIF );
+  msg( VERBOSE, "ChromaBIFStrength:%d ", m_chromaBIFStrength );
+  msg( VERBOSE, "ChromaBIFQPOffset:%d ", m_chromaBIFQPOffset );
+#endif
+
+  // entropy coding
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  msg( VERBOSE, "TempCABAC:%d ", m_tempCabacInitMode );
+#endif
+
+  // ECM encoder config
+  msg( VERBOSE, "\nECM ENC CFG: " );
+#if CTU_256
+  msg( VERBOSE, "CTU:%d ", m_uiCTUSize );
+  msg( VERBOSE, "MaxTU:%d ", 1 << m_log2MaxTbSize );
+#endif
+#if CONVERT_NUM_TU_SPLITS_TO_CFG
+  msg( VERBOSE, "MaxNumTUs:%d ", m_maxNumTUs );
+#endif
+#if JVET_Y0152_TT_ENC_SPEEDUP
+  msg( VERBOSE, "TTFastSkip:%d ", m_ttFastSkip );
+  msg( VERBOSE, "TTFastSkipThr:%.3f ", m_ttFastSkipThr );
+#endif
+#if MERGE_ENC_OPT
+  msg( VERBOSE, "NumFullRDMrg:%d ", m_numFullRDMrg );
+#endif
+#if JVET_Y0240_BIM
+  msg(VERBOSE, "BIM:%d ", m_bimEnabled);
+#endif
+
 #if EXTENSION_360_VIDEO
   m_ext360.outputConfigurationSummary();
 #endif

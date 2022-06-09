@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,6 +48,20 @@
 
 //! \ingroup CommonLib
 //! \{
+
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+struct EstBvdBitsStruct
+{
+  uint32_t bitsGt0FlagH[2];
+  uint32_t bitsGt0FlagV[2];
+
+  uint32_t bitsH[BVD_IBC_MAX_PREFIX];
+  uint32_t bitsV[BVD_IBC_MAX_PREFIX];
+
+  uint32_t bitsIdx[2];
+  uint32_t bitsImv[2];
+};
+#endif
 
 class DistParam;
 class EncCfg;
@@ -146,6 +160,9 @@ private:
   int                     m_iCostScale;
 
   double                  m_dCost; // for ibc
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+  EstBvdBitsStruct        m_cBvdBitCosts;
+#endif
 public:
   RdCost();
   virtual ~RdCost();
@@ -188,9 +205,9 @@ public:
 #if JVET_W0123_TIMD_FUSION
   void           setTimdDistParam( DistParam &rcDP, const Pel* pOrg, const Pel* piRefY, int iOrgStride, int iRefStride, int bitDepth, ComponentID compID, int width, int height, int subShiftMode = 0, int step = 1, bool useHadamard = false );
 #endif
-  void           setDistParam( DistParam &rcDP, const CPelBuf &org, const Pel* piRefY, int iRefStride, const Pel* mask, int iMaskStride, int stepX, int iMaskStride2, int bitDepth,  ComponentID compID);
+  void           setDistParam( DistParam &rcDP, const CPelBuf &org, const Pel* piRefY, int iRefStride, const Pel* mask01, int iMaskStride, int stepX, int iMaskStride2, int bitDepth,  ComponentID compID);
 #if TM_AMVP || TM_MRG
-  void           setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &cur, int bitDepth, bool TrueA_FalseL, int wIdx, int subShift, ComponentID compID );
+  void           setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &cur, int bitDepth, bool trueAfalseL, int wIdx, int subShift, ComponentID compID );
 #endif
 
   double         getMotionLambda          ( )  { return m_dLambdaMotionSAD; }
@@ -211,7 +228,80 @@ public:
       m_bvPredictors[i] = pcMv[i];
     }
   }
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+  EstBvdBitsStruct*  getBvdBitCosts() 
+  { 
+    return &m_cBvdBitCosts; 
+  }
+#if JVET_Z0084_IBC_TM
+  inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL, bool flag = false, AMVPInfo* amvpInfo4Pel = NULL)
+#else
+  inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL)
+#endif
+  {
+    uint32_t b0 = xGetExpGolombNumberOfBitsIBCH(x - m_bvPredictors[0].getHor()) + xGetExpGolombNumberOfBitsIBCV(y - m_bvPredictors[0].getVer()) + m_cBvdBitCosts.bitsIdx[0];
+    uint32_t b1 = xGetExpGolombNumberOfBitsIBCH(x - m_bvPredictors[1].getHor()) + xGetExpGolombNumberOfBitsIBCV(y - m_bvPredictors[1].getVer()) + m_cBvdBitCosts.bitsIdx[1];
 
+    if (useIMV)
+    {
+      b0 += (x != m_bvPredictors[0].getHor() || y != m_bvPredictors[0].getVer()) ? m_cBvdBitCosts.bitsImv[0] : 0;
+      b1 += (x != m_bvPredictors[1].getHor() || y != m_bvPredictors[1].getVer()) ? m_cBvdBitCosts.bitsImv[0] : 0;
+    }
+    uint32_t bBest = (b1 < b0) ? b1 : b0;
+    int bBestIdx = (b1 < b0) ? 1 : 0;
+    uint8_t bestRes = (useIMV && (x != m_bvPredictors[bBestIdx].getHor() || y != m_bvPredictors[bBestIdx].getVer())) ? 1 : 0;
+    if (bvImvResBest)
+    {
+      *bvImvResBest = bestRes;
+      *bvpIdxBest = bBestIdx;
+    }
+
+    if (bestRes && x % 4 == 0 && y % 4 == 0)
+    {
+      Mv cMv(x >> 2, y >> 2);
+#if JVET_Z0084_IBC_TM
+      Mv tmpBv0;
+      Mv tmpBv1;
+      if (flag) 
+      {
+        tmpBv0 = amvpInfo4Pel->mvCand[0];
+        tmpBv1 = amvpInfo4Pel->mvCand[1];
+        tmpBv0.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_4PEL);
+        tmpBv1.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_4PEL);
+      }
+      else
+      {
+        tmpBv0 = m_bvPredictors[0];
+        tmpBv1 = m_bvPredictors[1];
+        tmpBv0.changePrecision(MV_PRECISION_INT, MV_PRECISION_4PEL);
+        tmpBv1.changePrecision(MV_PRECISION_INT, MV_PRECISION_4PEL);
+      }
+#else
+      Mv tmpBv0 = m_bvPredictors[0];
+      Mv tmpBv1 = m_bvPredictors[1];
+      tmpBv0.changePrecision(MV_PRECISION_INT, MV_PRECISION_4PEL);
+      tmpBv1.changePrecision(MV_PRECISION_INT, MV_PRECISION_4PEL);
+#endif
+
+      uint32_t bQ0 = (cMv == tmpBv0) ? std::numeric_limits<uint32_t>::max() : (xGetExpGolombNumberOfBitsIBCH(cMv.getHor() - tmpBv0.getHor()) + xGetExpGolombNumberOfBitsIBCV(cMv.getVer() - tmpBv0.getVer()) + m_cBvdBitCosts.bitsIdx[0] );
+      uint32_t bQ1 = (cMv == tmpBv1) ? std::numeric_limits<uint32_t>::max() : (xGetExpGolombNumberOfBitsIBCH(cMv.getHor() - tmpBv1.getHor()) + xGetExpGolombNumberOfBitsIBCV(cMv.getVer() - tmpBv1.getVer()) + m_cBvdBitCosts.bitsIdx[1] );
+
+      uint32_t bQBest = (bQ1 < bQ0) ? bQ1 : bQ0;
+      bQBest += (bQBest < std::numeric_limits<uint32_t>::max()) ? m_cBvdBitCosts.bitsImv[1] : 0;
+
+      if (bQBest < bBest)
+      {
+        if (bvImvResBest)
+        {
+          *bvImvResBest = 2;
+          *bvpIdxBest = (bQ1 < bQ0) ? 1 : 0;
+        }
+        bBest = bQBest;
+      }
+    }
+    return Distortion(m_dCost * bBest) >> SCALE_BITS;
+  }
+#else
   inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV)
   {
     return Distortion(m_dCost * getBitsMultiplePreds(x, y, useIMV));
@@ -304,6 +394,7 @@ public:
 
     return length;
   }
+#endif
 
 #if ENABLE_SPLIT_PARALLELISM
   void copyState( const RdCost& other );
@@ -325,6 +416,71 @@ public:
   }
   Distortion     getCostOfVectorWithPredictor( const int x, const int y, const unsigned imvShift )  { return Distortion( m_motionLambda * getBitsOfVectorWithPredictor(x, y, imvShift )); }
   uint32_t           getBitsOfVectorWithPredictor( const int x, const int y, const unsigned imvShift )  { return xGetExpGolombNumberOfBits(((x << m_iCostScale) - m_mvPredictor.getHor())>>imvShift) + xGetExpGolombNumberOfBits(((y << m_iCostScale) - m_mvPredictor.getVer())>>imvShift); }
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+  // for block vector cost
+  uint32_t    xGetExpGolombNumberOfBitsIBCH( int iVal )
+  {
+    CHECKD( iVal == std::numeric_limits<int>::min(), "Wrong value" );
+    
+    unsigned int temp = (iVal <= 0) ? -iVal : iVal;
+    if (!temp) 
+    {
+      return m_cBvdBitCosts.bitsGt0FlagH[0];
+    }
+    else
+    {
+      unsigned int order = BVD_CODING_GOLOMB_ORDER;
+      unsigned int bins = 0;
+      temp -= 1;
+
+      while (temp >= (1<<order))
+      {
+        temp -= (1<<order);
+        order += 1;
+        bins += 1;
+      }
+      CHECKD( bins >= BVD_IBC_MAX_PREFIX, "Prefix is too large" );
+      return m_cBvdBitCosts.bitsGt0FlagH[1]
+             + m_cBvdBitCosts.bitsH[bins] + (1<<SCALE_BITS);
+    }
+  }
+
+  uint32_t    xGetExpGolombNumberOfBitsIBCV( int iVal )
+  {
+    CHECKD( iVal == std::numeric_limits<int>::min(), "Wrong value" );
+    
+    unsigned int temp = (iVal <= 0) ? -iVal : iVal;
+    if (!temp) 
+    {
+      return m_cBvdBitCosts.bitsGt0FlagV[0];
+    }
+    else
+    {
+      unsigned int order = BVD_CODING_GOLOMB_ORDER;
+      unsigned int bins = 0;
+      temp -= 1;
+
+      while (temp >= (1<<order))
+      {
+        temp -= (1<<order);
+        order += 1;
+        bins += 1;
+      }
+      CHECKD( bins >= BVD_IBC_MAX_PREFIX, "Prefix is too large" );
+      return m_cBvdBitCosts.bitsGt0FlagV[1]
+             + m_cBvdBitCosts.bitsV[bins] + (1<<SCALE_BITS);
+    }
+  }
+
+  Distortion     getCostOfVectorWithPredictorIBC( const int x, const int y, const unsigned imvShift )  
+  { 
+    return Distortion( m_motionLambda * getBitsOfVectorWithPredictorIBC(x, y, imvShift )) >> SCALE_BITS; 
+  }
+  uint32_t           getBitsOfVectorWithPredictorIBC( const int x, const int y, const unsigned imvShift )  
+  { 
+    return xGetExpGolombNumberOfBitsIBCH(((x << m_iCostScale) - m_mvPredictor.getHor())>>imvShift) + xGetExpGolombNumberOfBitsIBCV(((y << m_iCostScale) - m_mvPredictor.getVer())>>imvShift); 
+  }
+#endif
 #if WCG_EXT
          void    saveUnadjustedLambda       ();
          void    initLumaLevelToWeightTable ();
@@ -405,7 +561,7 @@ private:
   static Distortion xCalcHADs8x4      ( const Pel *piOrg, const Pel *piCur, int iStrideOrg, int iStrideCur );
 
 #if TM_AMVP || TM_MRG
-  template < int tplSize, bool TrueA_FalseL, bool MR >
+  template < int tplSize, bool trueAfalseL, bool mr >
   static Distortion xGetTMErrorFull   ( const DistParam& rcDtParam );
 #endif
 
@@ -434,7 +590,7 @@ private:
   static Distortion xGetMRSAD_SIMD(const DistParam &rcDtParam);
 #endif
 #if TM_AMVP || TM_MRG
-  template < X86_VEXT vext, int tplSize, bool TrueA_FalseL, bool MR >
+  template < X86_VEXT vext, int tplSize, bool trueAfalseL, bool mr >
   static Distortion xGetTMErrorFull_SIMD(const DistParam& rcDtParam);
 #endif
 

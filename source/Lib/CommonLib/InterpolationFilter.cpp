@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -344,7 +344,47 @@ const TFilterCoeff InterpolationFilter::m_lumaAltHpelIFilter[NTAPS_LUMA] = { 0, 
 #endif
 
 #if IF_12TAP
+#if JVET_Z0117_CHROMA_IF
 const TFilterCoeff InterpolationFilter::m_chromaFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
+{
+    {0, 0, 256, 0, 0, 0},
+    {1, -6, 256, 7, -2, 0},
+    {2, -11, 253, 15, -4, 1},
+    {3, -16, 251, 23, -6, 1},
+    {4, -21, 248, 33, -10, 2},
+    {5, -25, 244, 42, -12, 2},
+    {7, -30, 239, 53, -17, 4},
+    {7, -32, 234, 62, -19, 4},
+    {8, -35, 227, 73, -22, 5},
+    {9, -38, 220, 84, -26, 7},
+    {10, -40, 213, 95, -29, 7},
+    {10, -41, 204, 106, -31, 8},
+    {10, -42, 196, 117, -34, 9},
+    {10, -41, 187, 127, -35, 8},
+    {11, -42, 177, 138, -38, 10},
+    {10, -41, 168, 148, -39, 10},
+    {10, -40, 158, 158, -40, 10},
+    {10, -39, 148, 168, -41, 10},
+    {10, -38, 138, 177, -42, 11},
+    {8, -35, 127, 187, -41, 10},
+    {9, -34, 117, 196, -42, 10},
+    {8, -31, 106, 204, -41, 10},
+    {7, -29, 95, 213, -40, 10},
+    {7, -26, 84, 220, -38, 9},
+    {5, -22, 73, 227, -35, 8},
+    {4, -19, 62, 234, -32, 7},
+    {4, -17, 53, 239, -30, 7},
+    {2, -12, 42, 244, -25, 5},
+    {2, -10, 33, 248, -21, 4},
+    {1, -6, 23, 251, -16, 3},
+    {1, -4, 15, 253, -11, 2},
+    {0, -2, 7, 256, -6, 1},
+};
+
+const TFilterCoeff InterpolationFilter::m_chromaFilter4[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][4] =
+#else
+const TFilterCoeff InterpolationFilter::m_chromaFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
+#endif
 {
 {  0 * 4, 64 * 4,  0 * 4,  0 * 4 },
 { -1 * 4, 63 * 4,  2 * 4,  0 * 4 },
@@ -418,7 +458,11 @@ const TFilterCoeff InterpolationFilter::m_chromaFilter[CHROMA_INTERPOLATION_FILT
 #endif
 
 #if INTRA_6TAP
+#if JVET_Z0117_CHROMA_IF
+const TFilterCoeff InterpolationFilter::m_weak4TapFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][4] =
+#else
 const TFilterCoeff InterpolationFilter::m_weak4TapFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
+#endif
 {
   {  0, 64,  0,  0},
   { -1, 64,  1,  0},
@@ -563,7 +607,11 @@ const TFilterCoeff InterpolationFilter::m_lumaIntraFilterExt[CHROMA_INTERPOLATIO
 #endif
 
 #if JVET_W0123_TIMD_FUSION
+#if JVET_Z0117_CHROMA_IF
+const TFilterCoeff InterpolationFilter::g_aiExtIntraCubicFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS << 1][4] = {
+#else
 const TFilterCoeff InterpolationFilter::g_aiExtIntraCubicFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS<<1][NTAPS_CHROMA] = {
+#endif
   {   0, 256,   0,   0 },
   {  -1, 254,   4,  -1 },
   {  -3, 252,   8,  -1 },
@@ -629,7 +677,11 @@ const TFilterCoeff InterpolationFilter::g_aiExtIntraCubicFilter[CHROMA_INTERPOLA
   {  -1,   8, 252,  -3},
   {  -1,   4, 254,  -1},
 };
+#if JVET_Z0117_CHROMA_IF
+const TFilterCoeff InterpolationFilter::g_aiExtIntraGaussFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS << 1][4] = {
+#else
 const TFilterCoeff InterpolationFilter::g_aiExtIntraGaussFilter[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS<<1][NTAPS_CHROMA] = {
+#endif
   {  47, 161,  47,   1 },
   {  45, 161,  49,   1 },
   {  43, 161,  51,   1 },
@@ -698,7 +750,11 @@ const TFilterCoeff InterpolationFilter::g_aiExtIntraGaussFilter[CHROMA_INTERPOLA
 #endif
 
 //1.5x
+#if JVET_Z0117_CHROMA_IF
+const TFilterCoeff InterpolationFilter::m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR] =
+#else
 const TFilterCoeff InterpolationFilter::m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
+#endif
 {
 #if IF_12TAP
   { 12 * 4, 40 * 4, 12 * 4,      0 },
@@ -770,7 +826,11 @@ const TFilterCoeff InterpolationFilter::m_chromaFilterRPR1[CHROMA_INTERPOLATION_
 };
 
 //2x
+#if JVET_Z0117_CHROMA_IF
+const TFilterCoeff InterpolationFilter::m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR] =
+#else
 const TFilterCoeff InterpolationFilter::m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
+#endif
 {
 #if IF_12TAP
   { 17 * 4, 30 * 4, 17 * 4,      0 },
@@ -917,6 +977,22 @@ InterpolationFilter::InterpolationFilter()
   m_filterHor[1][1][0] = filter<8, false, true, false>;
   m_filterHor[1][1][1] = filter<8, false, true, true>;
 
+#if JVET_Z0117_CHROMA_IF
+  m_filterHor[2][0][0] = filter<6, false, false, false>;
+  m_filterHor[2][0][1] = filter<6, false, false, true>;
+  m_filterHor[2][1][0] = filter<6, false, true, false>;
+  m_filterHor[2][1][1] = filter<6, false, true, true>;
+  
+  m_filterHor[3][0][0] = filter<4, false, false, false>;
+  m_filterHor[3][0][1] = filter<4, false, false, true>;
+  m_filterHor[3][1][0] = filter<4, false, true, false>;
+  m_filterHor[3][1][1] = filter<4, false, true, true>;
+
+  m_filterHor[4][0][0] = filter<2, false, false, false>;
+  m_filterHor[4][0][1] = filter<2, false, false, true>;
+  m_filterHor[4][1][0] = filter<2, false, true, false>;
+  m_filterHor[4][1][1] = filter<2, false, true, true>;
+#else
   m_filterHor[2][0][0] = filter<4, false, false, false>;
   m_filterHor[2][0][1] = filter<4, false, false, true>;
   m_filterHor[2][1][0] = filter<4, false, true, false>;
@@ -926,6 +1002,7 @@ InterpolationFilter::InterpolationFilter()
   m_filterHor[3][0][1] = filter<2, false, false, true>;
   m_filterHor[3][1][0] = filter<2, false, true, false>;
   m_filterHor[3][1][1] = filter<2, false, true, true>;
+#endif
 
   m_filterVer[0][0][0] = filter<12, true, false, false>;
   m_filterVer[0][0][1] = filter<12, true, false, true>;
@@ -937,6 +1014,22 @@ InterpolationFilter::InterpolationFilter()
   m_filterVer[1][1][0] = filter<8, true, true, false>;
   m_filterVer[1][1][1] = filter<8, true, true, true>;
 
+#if JVET_Z0117_CHROMA_IF
+  m_filterVer[2][0][0] = filter<6, true, false, false>;
+  m_filterVer[2][0][1] = filter<6, true, false, true>;
+  m_filterVer[2][1][0] = filter<6, true, true, false>;
+  m_filterVer[2][1][1] = filter<6, true, true, true>;
+  
+  m_filterVer[3][0][0] = filter<4, true, false, false>;
+  m_filterVer[3][0][1] = filter<4, true, false, true>;
+  m_filterVer[3][1][0] = filter<4, true, true, false>;
+  m_filterVer[3][1][1] = filter<4, true, true, true>;
+
+  m_filterVer[4][0][0] = filter<2, true, false, false>;
+  m_filterVer[4][0][1] = filter<2, true, false, true>;
+  m_filterVer[4][1][0] = filter<2, true, true, false>;
+  m_filterVer[4][1][1] = filter<2, true, true, true>;
+#else
   m_filterVer[2][0][0] = filter<4, true, false, false>;
   m_filterVer[2][0][1] = filter<4, true, false, true>;
   m_filterVer[2][1][0] = filter<4, true, true, false>;
@@ -946,6 +1039,7 @@ InterpolationFilter::InterpolationFilter()
   m_filterVer[3][0][1] = filter<2, true, false, true>;
   m_filterVer[3][1][0] = filter<2, true, true, false>;
   m_filterVer[3][1][1] = filter<2, true, true, true>;
+#endif
 #endif
 #else
 #if !QC_SIF_SIMD
@@ -986,6 +1080,13 @@ InterpolationFilter::InterpolationFilter()
   m_filterCopy[1][1]   = filterCopy<true, true>;
 #if !QC_SIF_SIMD
   m_weightedGeoBlk = xWeightedGeoBlk;
+#if JVET_Y0065_GPM_INTRA
+  m_weightedGeoBlkRounded = xWeightedGeoBlkRounded;
+#endif
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  m_weightedGeoTplA = xWeightedGeoTpl<true>;
+  m_weightedGeoTplL = xWeightedGeoTpl<false>;
 #endif
 }
 
@@ -1140,7 +1241,7 @@ void InterpolationFilter::filterCopy( const ClpRng& clpRng, const Pel *src, int 
   }
 }
 
-#if SIMD_4x4_12
+#if SIMD_4x4_12 && defined(TARGET_SIMD_X86)
 void InterpolationFilter::filter4x4( const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int xFrac, int yFrac, bool isLast)
 {
   const TFilterCoeff* coeffH =  m_lumaFilter12[xFrac];
@@ -1367,6 +1468,39 @@ void InterpolationFilter::filterHor(const ClpRng& clpRng, Pel const *src, int sr
   {
     m_filterHor[1][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
   }
+#if JVET_Z0117_CHROMA_IF
+  else if( N == 6 )
+  {
+    m_filterHor[2][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 4)
+  {
+    m_filterHor[3][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 2)
+  {
+    m_filterHor[4][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+#else
+  else if (N == 4)
+  {
+    m_filterHor[2][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 2)
+  {
+    m_filterHor[3][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+#endif
+#else
+  if( N == 8 )
+  {
+    m_filterHor[0][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+#if JVET_Z0117_CHROMA_IF
+  else if( N == 6 )
+  {
+    m_filterHor[1][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
   else if (N == 4)
   {
     m_filterHor[2][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
@@ -1376,10 +1510,6 @@ void InterpolationFilter::filterHor(const ClpRng& clpRng, Pel const *src, int sr
     m_filterHor[3][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
   }
 #else
-  if( N == 8 )
-  {
-    m_filterHor[0][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
-  }
   else if( N == 4 )
   {
     m_filterHor[1][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
@@ -1388,6 +1518,7 @@ void InterpolationFilter::filterHor(const ClpRng& clpRng, Pel const *src, int sr
   {
     m_filterHor[2][1][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
   }
+#endif
 #endif
   else
   {
@@ -1423,6 +1554,39 @@ void InterpolationFilter::filterVer(const ClpRng& clpRng, Pel const *src, int sr
   {
     m_filterVer[1][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
   }
+#if JVET_Z0117_CHROMA_IF
+  else if (N == 6)
+  {
+    m_filterVer[2][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 4)
+  {
+    m_filterVer[3][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 2)
+  {
+    m_filterVer[4][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+#else
+  else if (N == 4)
+  {
+    m_filterVer[2][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+  else if (N == 2)
+  {
+    m_filterVer[3][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+#endif
+#else
+  if( N == 8 )
+  {
+    m_filterVer[0][isFirst][isLast]( clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
+#if JVET_Z0117_CHROMA_IF
+  else if (N == 6)
+  {
+    m_filterVer[1][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
+  }
   else if (N == 4)
   {
     m_filterVer[2][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
@@ -1432,10 +1596,6 @@ void InterpolationFilter::filterVer(const ClpRng& clpRng, Pel const *src, int sr
     m_filterVer[3][isFirst][isLast](clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
   }
 #else
-  if( N == 8 )
-  {
-    m_filterVer[0][isFirst][isLast]( clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
-  }
   else if( N == 4 )
   {
     m_filterVer[1][isFirst][isLast]( clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
@@ -1444,6 +1604,7 @@ void InterpolationFilter::filterVer(const ClpRng& clpRng, Pel const *src, int sr
   {
     m_filterVer[2][isFirst][isLast]( clpRng, src, srcStride, dst, dstStride, width, height, coeff, biMCForDMVR);
   }
+#endif
 #endif
   else
   {
@@ -1482,7 +1643,7 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
     CHECK(frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction");
     if (nFilterIdx == 1)
     {
-#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM
+#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
       filterHor<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, (biMCForDMVR ? m_bilinearFilterPrec4 : m_bilinearFilter)[frac], biMCForDMVR );
 #else
       filterHor<NTAPS_BILINEAR>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_bilinearFilterPrec4[frac], biMCForDMVR);
@@ -1528,7 +1689,7 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
     CHECK( frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction" );
     if( nFilterIdx == 1 )
     {
-#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM
+#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
       filterHor<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, (biMCForDMVR ? m_bilinearFilterPrec4 : m_bilinearFilter)[frac], biMCForDMVR );
 #else
       filterHor<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_bilinearFilterPrec4[frac], biMCForDMVR );
@@ -1576,11 +1737,19 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
     CHECK( frac < 0 || csx >= 2 || ( frac << ( 1 - csx ) ) >= CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction" );
     if( nFilterIdx == 3 )
     {
+#if JVET_Z0117_CHROMA_IF
+      filterHor<NTAPS_CHROMA_RPR>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_chromaFilterRPR1[frac << (1 - csx)], biMCForDMVR);
+#else
       filterHor<NTAPS_CHROMA>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_chromaFilterRPR1[frac << ( 1 - csx )], biMCForDMVR );
+#endif
     }
     else if( nFilterIdx == 4 )
     {
+#if JVET_Z0117_CHROMA_IF
+      filterHor<NTAPS_CHROMA_RPR>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_chromaFilterRPR2[frac << (1 - csx)], biMCForDMVR);
+#else
       filterHor<NTAPS_CHROMA>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_chromaFilterRPR2[frac << ( 1 - csx )], biMCForDMVR );
+#endif
     }
     else
     {
@@ -1618,7 +1787,7 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
     CHECK(frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction");
     if (nFilterIdx == 1)
     {
-#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM
+#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
       filterVer<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, (biMCForDMVR ? m_bilinearFilterPrec4 : m_bilinearFilter)[frac], biMCForDMVR );
 #else
       filterVer<NTAPS_BILINEAR>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_bilinearFilterPrec4[frac], biMCForDMVR);
@@ -1662,7 +1831,7 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
     CHECK( frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction" );
     if( nFilterIdx == 1 )
     {
-#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM
+#if TM_AMVP || TM_MRG || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
       filterVer<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, (biMCForDMVR ? m_bilinearFilterPrec4 : m_bilinearFilter)[frac], biMCForDMVR );
 #else
       filterVer<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_bilinearFilterPrec4[frac], biMCForDMVR );
@@ -1710,11 +1879,19 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
     CHECK( frac < 0 || csy >= 2 || ( frac << ( 1 - csy ) ) >= CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction" );
     if( nFilterIdx == 3 )
     {
+#if JVET_Z0117_CHROMA_IF
+      filterVer<NTAPS_CHROMA_RPR>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_chromaFilterRPR1[frac << (1 - csy)], biMCForDMVR);
+#else
       filterVer<NTAPS_CHROMA>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_chromaFilterRPR1[frac << ( 1 - csy )], biMCForDMVR );
+#endif
     }
     else if( nFilterIdx == 4 )
     {
+#if JVET_Z0117_CHROMA_IF
+      filterVer<NTAPS_CHROMA_RPR>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_chromaFilterRPR2[frac << (1 - csy)], biMCForDMVR);
+#else
       filterVer<NTAPS_CHROMA>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_chromaFilterRPR2[frac << ( 1 - csy )], biMCForDMVR );
+#endif
     }
     else
     {
@@ -1722,6 +1899,73 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
     }
   }
 }
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+template <bool trueTFalseL>
+void InterpolationFilter::xWeightedGeoTpl(const PredictionUnit &pu, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+{
+  const ComponentID compIdx = COMPONENT_Y;
+
+  Pel*    dst = predDst.get(compIdx).buf;
+  Pel*    src0 = predSrc0.get(compIdx).buf;
+  Pel*    src1 = predSrc1.get(compIdx).buf;
+  int32_t strideDst  = predDst .get(compIdx).stride;
+  int32_t strideSrc0 = predSrc0.get(compIdx).stride;
+  int32_t strideSrc1 = predSrc1.get(compIdx).stride;
+
+  const uint32_t scaleX = getComponentScaleX(compIdx, pu.chromaFormat);
+  const uint32_t scaleY = getComponentScaleY(compIdx, pu.chromaFormat);
+
+  int16_t angle = g_GeoParams[splitDir][0];
+  int16_t wIdx  = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2;
+  int16_t hIdx  = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2;
+  int16_t stepX = 1 << scaleX;
+  int16_t stepY = 0;
+  Pel*   weight = &g_globalGeoWeightsTpl[g_angle2mask[angle]][GEO_TM_ADDED_WEIGHT_MASK_SIZE * GEO_WEIGHT_MASK_SIZE_EXT + GEO_TM_ADDED_WEIGHT_MASK_SIZE];
+  if (g_angle2mirror[angle] == 2)
+  {
+    stepY = -(int)(GEO_WEIGHT_MASK_SIZE_EXT << scaleY);
+    weight += ((GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE_EXT + g_weightOffset[splitDir][hIdx][wIdx][0]);
+    weight += (trueTFalseL ? GEO_WEIGHT_MASK_SIZE_EXT * GEO_MODE_SEL_TM_SIZE : -GEO_MODE_SEL_TM_SIZE ); // Shift to template pos
+  }
+  else if (g_angle2mirror[angle] == 1)
+  {
+    stepX = -1 << scaleX;
+    stepY = (GEO_WEIGHT_MASK_SIZE_EXT << scaleY);
+    weight += (g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE_EXT + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0]));
+    weight -= (trueTFalseL ? GEO_WEIGHT_MASK_SIZE_EXT * GEO_MODE_SEL_TM_SIZE : -GEO_MODE_SEL_TM_SIZE ); // Shift to template pos
+  }
+  else
+  {
+    stepY = (GEO_WEIGHT_MASK_SIZE_EXT << scaleY);
+    weight += (g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE_EXT + g_weightOffset[splitDir][hIdx][wIdx][0]);
+    weight -= (trueTFalseL ? GEO_WEIGHT_MASK_SIZE_EXT * GEO_MODE_SEL_TM_SIZE : GEO_MODE_SEL_TM_SIZE ); // Shift to template pos
+  }
+
+  if (trueTFalseL)
+  {
+    for (int x = 0; x < predDst.bufs[compIdx].width; x++)
+    {
+      const Pel w = -(*weight);
+      dst[x]  = ((w & src0[x]) | ((~w) & src1[x])); // Same as dst[x] = *weight != 0 ? src0[x] : src0[x]
+      weight += stepX;
+    }
+  }
+  else
+  {
+    for (int y = 0; y < predDst.bufs[compIdx].height; y++)
+    {
+      const Pel w = -(*weight);
+      dst[0] = ((w & src0[0]) | ((~w) & src1[0])); // Same as dst[0] = *weight != 0 ? src0[0] : src0[1]
+
+      dst    += strideDst;
+      src0   += strideSrc0;
+      src1   += strideSrc1;
+      weight += stepY;
+    }
+  }
+}
+#endif
 
 void InterpolationFilter::weightedGeoBlk(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
 {
@@ -1784,6 +2028,61 @@ void InterpolationFilter::xWeightedGeoBlk(const PredictionUnit &pu, const uint32
     weight += stepY;
   }
 }
+
+#if JVET_Y0065_GPM_INTRA
+void InterpolationFilter::weightedGeoBlkRounded(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+{
+  m_weightedGeoBlkRounded(pu, width, height, compIdx, splitDir, predDst, predSrc0, predSrc1);
+}
+
+void InterpolationFilter::xWeightedGeoBlkRounded(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+{
+  Pel*    dst = predDst.get(compIdx).buf;
+  Pel*    src0 = predSrc0.get(compIdx).buf;
+  Pel*    src1 = predSrc1.get(compIdx).buf;
+  int32_t strideDst = predDst.get(compIdx).stride - width;
+  int32_t strideSrc0 = predSrc0.get(compIdx).stride - width;
+  int32_t strideSrc1 = predSrc1.get(compIdx).stride - width;
+
+  const uint32_t scaleX = getComponentScaleX(compIdx, pu.chromaFormat);
+  const uint32_t scaleY = getComponentScaleY(compIdx, pu.chromaFormat);
+
+  int16_t angle = g_GeoParams[splitDir][0];
+  int16_t wIdx = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2;
+  int16_t hIdx = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2;
+  int16_t stepX = 1 << scaleX;
+  int16_t stepY = 0;
+  int16_t* weight = nullptr;
+  if (g_angle2mirror[angle] == 2)
+  {
+    stepY = -(int)((GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth());
+    weight = &g_globalGeoWeights[g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+  }
+  else if (g_angle2mirror[angle] == 1)
+  {
+    stepX = -1 << scaleX;
+    stepY = (GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth();
+    weight = &g_globalGeoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
+  }
+  else
+  {
+    stepY = (GEO_WEIGHT_MASK_SIZE << scaleY) - pu.lwidth();
+    weight = &g_globalGeoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+  }
+  for( int y = 0; y < height; y++ )
+  {
+    for( int x = 0; x < width; x++ )
+    {
+      *dst++ = (*weight*(*src0++) + ((8 - *weight) * (*src1++)) + 4)>>3;
+      weight += stepX;
+    }
+    dst    += strideDst;
+    src0   += strideSrc0;
+    src1   += strideSrc1;
+    weight += stepY;
+  }
+}
+#endif
 
 /**
  * \brief turn on SIMD fuc

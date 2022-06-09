@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2021, ITU/ISO/IEC
+* Copyright (c) 2010-2022, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -320,8 +320,11 @@ struct CodingUnit : public UnitArea
   uint32_t           tileIdx;
 #if ENABLE_DIMD
   bool           dimd;
-  bool           dimd_is_blend;
+  bool           dimdBlending;
   int8_t         dimdMode;
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+  int8_t         dimdChromaMode;
+#endif
   int8_t         dimdBlendMode[2]; // max number of blend modes (the main mode is not counter) --> incoherent with dimdRelWeight
   int8_t         dimdRelWeight[3]; // max number of predictions to blend
 #endif
@@ -419,8 +422,14 @@ struct IntraPredictionData
   uint8_t intraNonMPM[NUM_NON_MPM_MODES];
 #endif
   uint8_t  intraDir[MAX_NUM_CHANNEL_TYPE];
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+  bool      isChromaFusion;
+#endif
   bool      mipTransposedFlag;
   int8_t    multiRefIdx;
+#if JVET_Z0050_CCLM_SLOPE
+  CclmOffsets cclmOffsets;
+#endif
 };
 
 struct InterPredictionData
@@ -429,8 +438,14 @@ struct InterPredictionData
   bool      regularMergeFlag;
   uint8_t     mergeIdx;
   uint8_t     geoSplitDir;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  uint8_t     geoSyntaxMode;
+#endif
   uint8_t     geoMergeIdx0;
   uint8_t     geoMergeIdx1;
+#if JVET_Y0065_GPM_INTRA
+  bool        gpmIntraFlag;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
   bool        geoMMVDFlag0;
   uint8_t     geoMMVDIdx0;
@@ -449,6 +464,9 @@ struct InterPredictionData
   uint8_t     afMmvdBaseIdx; // base vector's merge index at the affine merge list, excluding sbTmvp
   uint8_t     afMmvdStep;
   uint8_t     afMmvdDir;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  uint8_t     afMmvdMergeIdx;
+#endif
 #endif
 #if TM_MRG
   bool        tmMergeFlag;
@@ -471,6 +489,10 @@ struct InterPredictionData
   bool      amvpMergeModeFlag[NUM_REF_PIC_LIST_01];
 #endif
   int8_t     refIdx  [NUM_REF_PIC_LIST_01];
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  int8_t    refIdxLC;
+  int8_t    refPairIdx;
+#endif
   MergeType mergeType;
   bool      mvRefine;
   Mv        mvdAffi [NUM_REF_PIC_LIST_01][3];
@@ -479,7 +501,9 @@ struct InterPredictionData
 #if CIIP_PDPC
   bool      ciipPDPC;
 #endif
-
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  int       mvsdIdx[NUM_REF_PIC_LIST_01];
+#endif
   Mv        bv;                             // block vector for IBC
   Mv        bvd;                            // block vector difference for IBC
   uint8_t   mmvdEncOptMode;                  // 0: no action 1: skip chroma MC for MMVD candidate pre-selection 2: skip chroma MC and BIO for MMVD candidate pre-selection
@@ -494,6 +518,10 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
   CodingUnit      *cu;
   CodingStructure *cs;
   ChannelType      chType;
+#if JVET_Z0118_GDR
+  const MotionInfo constMotionIntra = { false };
+  const uint8_t    constIpm = 0;
+#endif
 
   // constructors
 #if MULTI_PASS_DMVR
@@ -515,6 +543,10 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
 
   PredictionUnit *next;
 
+#if JVET_Z0139_HIST_AFF
+  void getAffineMotionInfo(AffineMotionInfo affineMiOut[2], int refIdxOut[2]) const;
+#endif
+
   // for accessing motion information, which can have higher resolution than PUs (should always be used, when accessing neighboring motion information)
   const MotionInfo& getMotionInfo() const;
   const MotionInfo& getMotionInfo( const Position& pos ) const;
@@ -532,6 +564,9 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
 
   int64_t cacheId;
   bool    cacheUsed;
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  bool              isMvsdApplicable() const;
 #endif
 };
 
@@ -562,13 +597,21 @@ struct TransformUnit : public UnitArea
   TransformUnit *prev;
 #if REMOVE_PCM
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  void init(TCoeff **coeffs, TCoeff **signs, unsigned **signsScanIdx, Pel **pltIdx, bool **runType);
+#else
   void init(TCoeff **coeffs, TCoeff **signs, Pel **pltIdx, bool **runType);
+#endif
 #else
   void init(TCoeff **coeffs, Pel **pltIdx, bool **runType);
 #endif
 #else
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  void init(TCoeff **coeffs, TCoeff **signs, unsigned **signsScanIdx, Pel **pcmbuf, bool **runType);
+#else
   void init(TCoeff **coeffs, TCoeff **signs, Pel **pcmbuf, bool **runType);
+#endif
 #else
   void init(TCoeff **coeffs, Pel **pcmbuf, bool **runType);
 #endif
@@ -578,12 +621,18 @@ struct TransformUnit : public UnitArea
   void copyComponentFrom  (const TransformUnit& other, const ComponentID compID);
   void checkTuNoResidual( unsigned idx );
   int  getTbAreaAfterCoefZeroOut(ComponentID compID) const;
-
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  bool checkLFNSTApplied(ComponentID compID);
+#endif
          CoeffBuf getCoeffs(const ComponentID id);
   const CCoeffBuf getCoeffs(const ComponentID id) const;
 #if SIGN_PREDICTION
          CoeffBuf getCoeffSigns(const ComponentID id);
   const CCoeffBuf getCoeffSigns(const ComponentID id) const;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  IdxBuf          getCoeffSignsScanIdx(const ComponentID id);
+  const CIdxBuf   getCoeffSignsScanIdx(const ComponentID id) const;
+#endif
 #endif
 #if !REMOVE_PCM
          PelBuf   getPcmbuf(const ComponentID id);
@@ -608,7 +657,10 @@ struct TransformUnit : public UnitArea
 private:
   TCoeff *m_coeffs[ MAX_NUM_TBLOCKS ];
 #if SIGN_PREDICTION
-  TCoeff *m_coeff_signs[ MAX_NUM_TBLOCKS ];
+  TCoeff *m_coeffSigns[ MAX_NUM_TBLOCKS ];
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  unsigned *m_coeffSignsIdx[MAX_NUM_TBLOCKS];
+#endif
 #endif
 #if REMOVE_PCM
   Pel    *m_pltIdx[MAX_NUM_TBLOCKS - 1];

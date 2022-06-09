@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2021, ITU/ISO/IEC
+* Copyright (c) 2010-2022, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -51,7 +51,15 @@ class EncCu;
 class CABACWriter
 {
 public:
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACWriter( BinEncIf& binEncoder, CABACDataStore* cabacDataStore ) : m_BinEncoder( binEncoder ), m_Bitstream( 0 )
+  {
+    m_TestCtx = m_BinEncoder.getCtx(); m_EncCu = NULL;
+    m_CABACDataStore = cabacDataStore;
+  }
+#else
   CABACWriter(BinEncIf& binEncoder)   : m_BinEncoder(binEncoder), m_Bitstream(0) { m_TestCtx = m_BinEncoder.getCtx(); m_EncCu = NULL; }
+#endif
   virtual ~CABACWriter() {}
 
 public:
@@ -85,10 +93,10 @@ public:
   void        bif                      (const Slice& slice, const BifParams& BifParams, unsigned ctuRsAddr);
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  void        Cbif_Cb                      (const Slice&                   slice, const CBifParams& CBifParams);
-  void        Cbif_Cb                      (const Slice& slice, const CBifParams& CBifParams, unsigned ctuRsAddr);
-  void        Cbif_Cr                      (const Slice&                   slice, const CBifParams& CBifParams);
-  void        Cbif_Cr                      (const Slice& slice, const CBifParams& CBifParams, unsigned ctuRsAddr);
+  void        chromaBifCb              (const Slice&                   slice, const ChromaBifParams& chromaBifParams);
+  void        chromaBifCb              (const Slice& slice, const ChromaBifParams& chromaBifParams, unsigned ctuRsAddr);
+  void        chromaBifCr              (const Slice&                   slice, const ChromaBifParams& chromaBifParams);
+  void        chromaBifCr              (const Slice& slice, const ChromaBifParams& chromaBifParams, unsigned ctuRsAddr);
 #endif
 #if JVET_W0066_CCSAO
   void        codeCcSaoControlIdc       ( uint8_t idcVal, CodingStructure &cs, const ComponentID compID, const int curIdx,
@@ -143,6 +151,9 @@ public:
   Pel         writePLTIndex             ( const CodingUnit&             cu,       uint32_t          idx,           PelBuf&  paletteIdx,       PLTtypeBuf&  paletteRunType, int         maxSymbol,   ComponentID compBegin );
   // prediction unit (clause 7.3.8.6)
   void        prediction_unit           ( const PredictionUnit&         pu );
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void        mvsd_data                 ( const PredictionUnit&         pu );
+#endif
   void        merge_flag                ( const PredictionUnit&         pu );
   void        merge_data                ( const PredictionUnit&         pu );
   void        affine_flag               ( const CodingUnit&             cu );
@@ -160,18 +171,34 @@ public:
   void        geo_merge_idx(const PredictionUnit&         pu);
   void        geo_merge_idx1(const PredictionUnit&         pu);
 
-  uint64_t    geo_mode_est(const TempCtx& ctxStart, const int geoMode);
+  uint64_t    geo_mode_est(const TempCtx& ctxStart, const int geoMode
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                         , const uint8_t altCodeIdx = 0
+#endif
+  );
   uint64_t    geo_mergeIdx_est(const TempCtx& ctxStart, const int candIdx, const int maxNumGeoCand);
+#if JVET_Y0065_GPM_INTRA
+  uint64_t    geo_intraFlag_est         ( const TempCtx& ctxStart, const int flag);
+  uint64_t    geo_intraIdx_est          ( const TempCtx& ctxStart, const int intraIdx);
+#endif
   uint64_t    geo_mmvdFlag_est(const TempCtx& ctxStart, const int flag);
   uint64_t    geo_mmvdIdx_est(const TempCtx& ctxStart, const int mmvdIdx, const bool extMMVD);
 #if TM_MRG
   uint64_t    geo_tmFlag_est(const TempCtx& ctxStart, const int flag);
 #endif
 #endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void        geoModeIdx                ( const PredictionUnit&         pu);
+  void        geoModeIdx                ( const uint8_t geoMode, const uint8_t altCodeIdx = 0);
+#endif
   void        imv_mode                  ( const CodingUnit&             cu );
   void        affine_amvr_mode          ( const CodingUnit&             cu );
   void        inter_pred_idc            ( const PredictionUnit&         pu );
   void        ref_idx                   ( const PredictionUnit&         pu,       RefPicList        eRefList );
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  void        refIdxLC                ( const PredictionUnit&               pu );
+  void        refPairIdx              ( const PredictionUnit&               pu );
+#endif
   void        mvp_flag                  ( const PredictionUnit&         pu,       RefPicList        eRefList );
 
   void        Ciip_flag              ( const PredictionUnit&         pu );
@@ -184,13 +211,29 @@ public:
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   void        amvpMerge_mode         ( const PredictionUnit&         pu );
 #endif
+#if JVET_Z0050_CCLM_SLOPE
+  void        cclmDelta             ( const PredictionUnit&         pu, int8_t delta);
+  void        cclmDeltaSlope       ( const PredictionUnit&         pu );
+#endif
 
   // transform tree (clause 7.3.8.8)
   void        transform_tree            ( const CodingStructure&        cs,       Partitioner&      pm,     CUCtx& cuCtx,                         const PartSplit ispType = TU_NO_ISP, const int subTuIdx = -1 );
   void        cbf_comp                  ( const CodingStructure&        cs,       bool              cbf,    const CompArea& area, unsigned depth, const bool prevCbf = false, const bool useISP = false );
 
   // mvd coding (clause 7.3.8.9)
-  void        mvd_coding                ( const Mv &rMvd, int8_t imv );
+  void        mvd_coding                ( const Mv &rMvd, int8_t imv 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    , bool codeSign = true
+#endif
+  );
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+  void        bvdCoding                ( const Mv &rMvd, int8_t imv );
+  void        xWriteBvdContext(unsigned uiSymbol, unsigned ctxT, int offset, int param);
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList);
+  void mvsdAffineIdxFunc(const PredictionUnit &pu, RefPicList eRefList);
+#endif
   // transform unit (clause 7.3.8.10)
   void        transform_unit            ( const TransformUnit&          tu,       CUCtx&            cuCtx,  Partitioner& pm,       const int subTuCounter = -1 );
   void        cu_qp_delta               ( const CodingUnit&             cu,       int               predQP, const int8_t qp );
@@ -235,6 +278,10 @@ public:
   void        cu_lic_flag               ( const CodingUnit& cu );
 #endif
 
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACDataStore*         m_CABACDataStore;
+#endif
+
 private:
   void        unary_max_symbol          ( unsigned symbol, unsigned ctxId0, unsigned ctxIdN, unsigned maxSymbol );
   void        unary_max_eqprob          ( unsigned symbol,                                   unsigned maxSymbol );
@@ -260,12 +307,41 @@ private:
 class CABACEncoder
 {
 public:
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACEncoder()
+    : m_CABACWriterStd( m_BinEncoderStd, nullptr )
+    , m_CABACEstimatorStd( m_BitEstimatorStd, nullptr )
+    , m_CABACWriter{ &m_CABACWriterStd }
+    , m_CABACEstimator{ &m_CABACEstimatorStd }
+    , m_CABACDataStore( nullptr )
+  {
+    m_CABACDataStore = new CABACDataStore;
+
+    m_CABACWriterStd.m_CABACDataStore = m_CABACDataStore;
+    m_CABACEstimatorStd.m_CABACDataStore = m_CABACDataStore;
+
+    for( int i = 0; i < BPM_NUM - 1; i++ )
+    {
+      m_CABACWriter[i]->m_CABACDataStore = m_CABACDataStore;
+      m_CABACEstimator[i]->m_CABACDataStore = m_CABACDataStore;
+    }
+  }
+
+  virtual ~CABACEncoder()
+  {
+    if( m_CABACDataStore )
+    {
+      delete m_CABACDataStore;
+    }
+  }
+#else
   CABACEncoder()
     : m_CABACWriterStd      ( m_BinEncoderStd )
     , m_CABACEstimatorStd   ( m_BitEstimatorStd )
     , m_CABACWriter         { &m_CABACWriterStd,   }
     , m_CABACEstimator      { &m_CABACEstimatorStd }
   {}
+#endif
 
   CABACWriter*                getCABACWriter          ( const SPS*   sps   )        { return m_CABACWriter   [0]; }
   CABACWriter*                getCABACEstimator       ( const SPS*   sps   )        { return m_CABACEstimator[0]; }
@@ -276,6 +352,10 @@ private:
   CABACWriter         m_CABACEstimatorStd;
   CABACWriter*        m_CABACWriter   [BPM_NUM-1];
   CABACWriter*        m_CABACEstimator[BPM_NUM-1];
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACDataStore*         m_CABACDataStore;
+#endif
 };
 
 //! \}

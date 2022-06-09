@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2021, ITU/ISO/IEC
+* Copyright (c) 2010-2022, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -146,6 +146,12 @@ namespace PU
 #else
   int  getIntraMPMs(const PredictionUnit &pu, unsigned *mpm, const ChannelType &channelType = CHANNEL_TYPE_LUMA);
 #endif
+#if JVET_Y0065_GPM_INTRA
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void getGeoIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t splitDir, uint8_t shape, bool doInit, bool doInitAL = true, bool doInitA = true, bool doInitL = true);
+#endif
+  void getGeoIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t splitDir, uint8_t shape );
+#endif
   bool          isMIP                 (const PredictionUnit &pu, const ChannelType &chType = CHANNEL_TYPE_LUMA);
 #if JVET_V0130_INTRA_TMP
   bool          isTmp(const PredictionUnit& pu, const ChannelType& chType = CHANNEL_TYPE_LUMA);
@@ -173,39 +179,123 @@ namespace PU
 #endif
   void getInterMergeCandidates        (const PredictionUnit &pu, MergeCtx& mrgCtx,
     int mmvdList,
-    const int& mrgCandIdx = -1 );
+    const int& mrgCandIdx = -1 
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+    , MergeCtx* mvpMrgCtx1 = NULL
+    , MergeCtx* mvpMrgCtx2 = NULL
+#endif
+  );
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  void getTmvpMergeCand               (const PredictionUnit &pu, MergeCtx& mvpMrgCtx);
+  void getNonAdjacentMergeCand        (const PredictionUnit &pu, MergeCtx& mvpMrgCtx);
+#endif
   void getIBCMergeCandidates          (const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx = -1);
+#if  JVET_Y0058_IBC_LIST_MODIFY
+  bool checkIsIBCCandidateValid       (const PredictionUnit &pu,const MotionInfo miNeighbor);
+#endif
+#if JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0084_IBC_TM
+  bool searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int height, int picWidth, int picHeight, int xBv, int yBv, int ctuSize);
+#endif
   void getInterMMVDMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx = -1);
   int getDistScaleFactor(const int &currPOC, const int &currRefPOC, const int &colPOC, const int &colRefPOC);
   bool isDiffMER                      (const Position &pos1, const Position &pos2, const unsigned plevel);
-  bool getColocatedMVP                (const PredictionUnit &pu, const RefPicList &eRefPicList, const Position &pos, Mv& rcMv, const int &refIdx, bool sbFlag);
+  bool getColocatedMVP                (const PredictionUnit &pu, const RefPicList &eRefPicList, const Position &pos, Mv& rcMv, const int &refIdx, bool sbFlag
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+    , int* targetRefIdx = nullptr
+#endif
+  );
   void fillMvpCand                    (      PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AMVPInfo &amvpInfo 
 #if TM_AMVP
                                      , InterPrediction* interPred = nullptr
 #endif
   );
+#if JVET_Z0084_IBC_TM && TM_AMVP
+  void fillIBCMvpCand                 (      PredictionUnit &pu, AMVPInfo &amvpInfo, InterPrediction* pcInter);
+#else
   void fillIBCMvpCand                 (PredictionUnit &pu, AMVPInfo &amvpInfo);
+#endif
   void fillAffineMvpCand              (      PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AffineAMVPInfo &affiAMVPInfo);
   bool addMVPCandUnscaled             (const PredictionUnit &pu, const RefPicList &eRefPicList, const int &iRefIdx, const Position &pos, const MvpDir &eDir, AMVPInfo &amvpInfo);
   void xInheritedAffineMv             ( const PredictionUnit &pu, const PredictionUnit* puNeighbour, RefPicList eRefPicList, Mv rcMv[3] );
   bool addMergeHMVPCand               (const CodingStructure &cs, MergeCtx& mrgCtx, const int& mrgCandIdx, const uint32_t maxNumMergeCandMin1, int &cnt
     , const bool isAvailableA1, const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
     , const bool ibcFlag
     , const bool isGt4x4
-#if JVET_X0083_BM_AMVP_MERGE_MODE
+#endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE || (JVET_Y0058_IBC_LIST_MODIFY && !JVET_Z0075_IBC_HMVP_ENLARGE)
     , const PredictionUnit &pu
+#endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+#if !JVET_Y0128_NON_CTC
     , const int curPoc = 0
     , const int amvpPoc = 0
+#endif
+#endif
+#if TM_MRG || (JVET_Z0084_IBC_TM && !JVET_Z0075_IBC_HMVP_ENLARGE)
+    , const uint32_t mvdSimilarityThresh = 1
+#endif
+  );
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0128_NON_CTC
+  bool checkIsValidMergeMvCand        (const PredictionUnit &pu, int8_t mergeRefIdx[ NUM_REF_PIC_LIST_01 ]);
+#else
+  bool checkIsValidMergeMvCand        (const CodingStructure &cs, const PredictionUnit &pu, const int curPoc, const int amvpPoc, int8_t mergeRefIdx[ NUM_REF_PIC_LIST_01 ]);
+#endif
+#endif
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+  bool addIBCMergeHMVPCand               (const CodingStructure &cs, MergeCtx& mrgCtx, const int& mrgCandIdx, const uint32_t maxNumMergeCandMin1, int &cnt
+#if JVET_Y0058_IBC_LIST_MODIFY
+    , const PredictionUnit &pu
+#endif
+#if TM_MRG || JVET_Z0084_IBC_TM
+    , const uint32_t mvdSimilarityThresh = 1
+#endif
+  );
+#endif
+  void addAMVPHMVPCand                (const PredictionUnit &pu, const RefPicList eRefPicList, const int currRefPOC, AMVPInfo &info);
+#if JVET_Z0139_HIST_AFF
+  void xGetAffineMvFromLUT(AffineMotionInfo* affHistInfo, int rParameters[4]);
+  bool checkLastAffineMergeCandRedundancy(const PredictionUnit& pu, AffineMergeCtx& affMrgCtx);
+
+  bool addOneAffineMergeHMVPCand(const PredictionUnit& pu, AffineMergeCtx& affMrgCtx, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int affHMVPIdx, const MotionInfo& mvInfo, Position neiPosition, int iGBiIdx
+#if INTER_LIC
+                               ,       bool bICflag
+#endif
+  );
+  bool addSpatialAffineMergeHMVPCand(const PredictionUnit& pu, AffineMergeCtx& affMrgCtx, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int affHMVPIdx, const PredictionUnit* neiPUs[], Position neiPositions[], int iNeiNum, const int mrgCandIdx = -1);
+  bool addSpatialAffineAMVPHMVPCand(PredictionUnit& pu, const RefPicList& eRefPicList, const int& refIdx, AffineAMVPInfo& affiAMVPInfo, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int iHMVPlistIdx,
+    int neiIdx[], int iNeiNum, int aiNeibeInherited[], bool bFoundOne);
+  bool addMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrgCtx, const int& mrgCandIdx, int& cnt
+#if TM_MRG
+    ,const uint32_t mvdSimilarityThresh = 1
+#endif
+  );
+  bool addOneMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrgCtx, int& cnt, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int listIdx, const MotionInfo& mvInfo, Position neiPosition
+    , int iGBiIdx
+#if INTER_LIC
+    , bool bICflag
 #endif
 #if TM_MRG
     , const uint32_t mvdSimilarityThresh = 1
 #endif
   );
-#if JVET_X0083_BM_AMVP_MERGE_MODE
-  bool checkIsValidMergeMvCand        (const CodingStructure &cs, const PredictionUnit &pu, const int curPoc, const int amvpPoc, int8_t mergeRefIdx[ NUM_REF_PIC_LIST_01 ]);
+
+  bool addOneInheritedHMVPAffineMergeCand(const PredictionUnit& pu, AffineMergeCtx& affMrgCtx, static_vector<AffineInheritInfo, MAX_NUM_AFF_INHERIT_HMVP_CANDS>& lutAffInherit, int affHMVPIdx);
+  void xGetAffineMvFromLUT(short affineParameters[4], int rParameters[4]);
+  void deriveAffineParametersFromMVs(const PredictionUnit& pu, const Mv acMvTemp[3], int* affinePara, EAffineModel affModel);
+  void deriveMVsFromAffineParameters(const PredictionUnit& pu, Mv rcMv[3], int* affinePara, const Mv& cBaseMv, const Position& cBasePos);
+  void storeAffParas(int* affinePara);
+  void deriveCenterMVFromAffineParameters(const PredictionUnit& pu, Mv& rcMv, int* affinePara, const Mv& cBaseMv, const Position& cBasePos);
 #endif
-  void addAMVPHMVPCand                (const PredictionUnit &pu, const RefPicList eRefPicList, const int currRefPOC, AMVPInfo &info);
-  bool addAffineMVPCandUnscaled       ( const PredictionUnit &pu, const RefPicList &refPicList, const int &refIdx, const Position &pos, const MvpDir &dir, AffineAMVPInfo &affiAmvpInfo );
+#if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
+  bool checkLastAffineAMVPCandRedundancy(const PredictionUnit& pu, AffineAMVPInfo& affiAMVPInfo);
+#endif
+  bool addAffineMVPCandUnscaled       ( const PredictionUnit &pu, const RefPicList &refPicList, const int &refIdx, const Position &pos, const MvpDir &dir, AffineAMVPInfo &affiAmvpInfo 
+#if JVET_Z0139_HIST_AFF
+    , int aiNeibeInherited[5]
+#endif
+  );
   bool isBipredRestriction            (const PredictionUnit &pu);
 #if MULTI_PASS_DMVR
   void spanMotionInfo                 (      PredictionUnit &pu, const MergeCtx &mrgCtx = MergeCtx(), Mv* bdmvrSubPuMv0 = nullptr, Mv* bdmvrSubPuMv1 = nullptr, Mv* bdofSubPuMvOffset = nullptr );
@@ -221,13 +311,31 @@ namespace PU
   void spanIpmInfoIntra               (      PredictionUnit &pu );
   void spanIpmInfoInter               (      PredictionUnit &pu, MotionBuf &mb, IpmBuf &ib );
 #endif
+#if !JVET_Z0054_BLK_REF_PIC_REORDER
   void applyImv                       (      PredictionUnit &pu, MergeCtx &mrgCtx, InterPrediction *interPred = NULL );
+#endif
+#if JVET_Z0139_HIST_AFF
+  bool getAffineControlPointCand(const PredictionUnit& pu, MotionInfo mi[4], bool isAvailable[4], int verIdx[4], int8_t bcwIdx, int modelIdx, int verNum, AffineMergeCtx& affMrgCtx);
+#else
   void getAffineControlPointCand(const PredictionUnit &pu, MotionInfo mi[4], bool isAvailable[4], int verIdx[4], int8_t bcwIdx, int modelIdx, int verNum, AffineMergeCtx& affMrgCtx);
+#endif
+#if JVET_Z0139_NA_AFF
+  bool xCPMVSimCheck(const PredictionUnit &pu, AffineMergeCtx &affMrgCtx, Mv curCpmv[2][3], unsigned char curdir, int8_t curRefIdx[2], EAffineModel curType, int bcwIdx, bool LICFlag);
+  int  getMvDiffThresholdByWidthAndHeight(const PredictionUnit &pu, bool width);
+  bool addNonAdjAffineConstructedCPMV(const PredictionUnit &pu, MotionInfo miNew[4], bool isAvaNew[4], Position pos[4], int8_t bcwId, AffineMergeCtx &affMrgCtx, int mrgCandIdx);
+  bool addNonAdjCstAffineMVPCandUnscaled(const PredictionUnit &pu, const RefPicList &refPicList, const int &refIdx, AffineAMVPInfo &affiAmvpInfo);
+  bool addNonAdjCstAffineMVPConstructedCPMV( const PredictionUnit &pu, MotionInfo miNew[3], bool isAvaNew[3], Position pos[3], const RefPicList &refPicList, const int &refIdx, AffineAMVPInfo &affiAmvpInfo);
+  void getNonAdjCstMergeCand(const PredictionUnit &pu, AffineMergeCtx &affMrgCtx, const int mrgCandIdx = -1, bool isInitialized = false);
+  int  getNonAdjAffParaDivFun(int num1, int num2);
+#endif
   void getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx, 
 #if AFFINE_MMVD
                            int mrgCandIdx = -1, bool isAfMmvd = false
 #else
                            const int mrgCandIdx = -1
+#endif
+#if JVET_Z0139_NA_AFF && JVET_W0090_ARMC_TM
+    , bool isZeroCandIdx = false 
 #endif
   );
 #if AFFINE_MMVD
@@ -238,19 +346,33 @@ namespace PU
   void setAllAffineMvField            (      PredictionUnit &pu, MvField *mvField, RefPicList eRefList );
   void setAllAffineMv                 (      PredictionUnit &pu, Mv affLT, Mv affRT, Mv affLB, RefPicList eRefList, bool clipCPMVs = false );
   bool getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx &mrgCtx, bool& LICFlag, const int count, int mmvdList);
+#if JVET_Y0128_NON_CTC
+  bool isBiRefScaled(const CodingStructure& cs, const int refIdx0, const int refIdx1);
+#endif
 #if JVET_X0049_ADAPT_DMVR
   bool isBMMergeFlagCoded(const PredictionUnit& pu);
   bool isBiPredFromDifferentDirEqDistPoc(const PredictionUnit& pu, int refIdx0, int refIdx1);
   bool addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx& mrgCtx, const int& mrgCandIdx, const uint32_t maxNumMergeCandMin1, int &cnt
     , const bool isAvailableA1, const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
     , const bool ibcFlag
     , const bool isGt4x4
+#endif
 #if TM_MRG
     , const uint32_t mvdSimilarityThresh = 1
 #endif
   );
   void getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
-    const int& mrgCandIdx = -1);
+    const int& mrgCandIdx = -1
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+    , MergeCtx* mvpMrgCtx1 = NULL
+    , MergeCtx* mvpMrgCtx2 = NULL
+#endif
+  );
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  void getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mvpMrgCtx);
+  void getNonAdjacentBMCand(const PredictionUnit &pu, MergeCtx& mvpMrgCtx);
+#endif
 #endif
   bool getInterMergeSubPuRecurCand(const PredictionUnit &pu, MergeCtx &mrgCtx, const int count);
   bool isBiPredFromDifferentDirEqDistPoc(const PredictionUnit &pu);
@@ -294,6 +416,12 @@ namespace PU
 #if INTER_LIC && RPR_ENABLE
   bool checkRprLicCondition(const PredictionUnit& pu);
 #endif
+#if JVET_Y0128_NON_CTC
+  bool checkTmEnableCondition(const SPS* sps, const PPS* pps, const Picture* refPic);
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  bool checkRprRefExistingInGpm(const PredictionUnit& pu, const MergeCtx& geoMrgCtx0, uint8_t candIdx0, const MergeCtx& geoMrgCtx1, uint8_t candIdx1);
+#endif
 
 #if INTER_LIC
   void spanLICFlags(PredictionUnit &pu, const bool LICFlag);
@@ -304,7 +432,13 @@ namespace PU
   AMVPInfo getMultiHypMVPCandsMerge(PredictionUnit &pu, const RefPicList eRefPicList, const int refIdx);
   AMVPInfo getMultiHypMVPCandsAMVP(PredictionUnit &pu, const RefPicList eRefPicList, const int refIdx);
 #endif
-
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  bool useRefCombList(const PredictionUnit &pu);
+  bool useRefPairList(const PredictionUnit &pu);
+#endif
+#if JVET_Z0050_CCLM_SLOPE
+  bool hasCclmDeltaFlag(const PredictionUnit &pu, const int mode = -1);
+#endif
 }
 
 // TU tools
@@ -509,5 +643,27 @@ void sortCandList(double uiCost, int mergeCand, int mmvdCand, static_vector<doub
     candCostList.insert(candCostList.end() - shift, uiCost);
   }
 }
+
+#if JVET_Y0065_GPM_INTRA
+template<size_t N>
+void sortIntraCandList(double uiCost, int mergeCand, static_vector<double, N>& candCostList, static_vector<int, N>& intraCandList)
+{
+  size_t shift = 0;
+  size_t currSize = candCostList.size();
+  CHECK(currSize >= GEO_MAX_NUM_INTRA_CANDS, "list overflow!");
+
+  while (shift < currSize && uiCost < candCostList[currSize - 1 - shift])
+  {
+    shift++;
+  }
+
+  intraCandList.insert(intraCandList.end() - shift, mergeCand);
+  candCostList.insert(candCostList.end() - shift, uiCost);
+}
+#endif
+#endif
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+bool storeContexts( const Slice* slice, const int ctuXPosInCtus, const int ctuYPosInCtus );
 #endif
 #endif

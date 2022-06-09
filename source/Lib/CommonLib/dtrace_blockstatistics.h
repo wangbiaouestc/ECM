@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -119,6 +119,9 @@ enum class BlockStatistic {
   GeoPartitioning,
   GeoMVL0, //<< currently only uni-prediction enabled
   GeoMVL1, //<< currently only uni-prediction enabled
+#if JVET_Y0065_GPM_INTRA
+  GPMIntra,
+#endif
 
 #if INTER_LIC
   LICFlag,
@@ -215,6 +218,9 @@ static const std::map<BlockStatistic, std::tuple<std::string, BlockStatisticType
   { BlockStatistic::GeoPartitioning,        std::tuple<std::string, BlockStatisticType, std::string>{"GeoPartitioning",             BlockStatisticType::Line,                   ""} },
   { BlockStatistic::GeoMVL0,                std::tuple<std::string, BlockStatisticType, std::string>{"GeoMVL0",                     BlockStatisticType::VectorPolygon,          "Scale: 4"} },
   { BlockStatistic::GeoMVL1,                std::tuple<std::string, BlockStatisticType, std::string>{"GeoMVL1",                     BlockStatisticType::VectorPolygon,          "Scale: 4"} },
+#if JVET_Y0065_GPM_INTRA
+  { BlockStatistic::GPMIntra,               std::tuple<std::string, BlockStatisticType, std::string>{"GPMIntra",                    BlockStatisticType::IntegerPolygon,         "[0, " + std::to_string(NUM_LUMA_MODE) + "]"} },
+#endif
 
 #if INTER_LIC
   { BlockStatistic::LICFlag,                std::tuple<std::string, BlockStatisticType, std::string>{"LICFlag",                     BlockStatisticType::Flag,                   ""}},

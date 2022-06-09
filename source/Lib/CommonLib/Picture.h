@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2021, ITU/ISO/IEC
+* Copyright (c) 2010-2022, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -149,7 +149,11 @@ struct Picture : public UnitArea
          PelUnitBuf getBuf(const UnitArea &unit,     const PictureType &type);
   const CPelUnitBuf getBuf(const UnitArea &unit,     const PictureType &type) const;
 
+#if JVET_Z0118_GDR
+  void extendPicBorder( const SPS *sps, const PPS *pps );
+#else
   void extendPicBorder( const PPS *pps );
+#endif
   void extendWrapBorder( const PPS *pps );
   void finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHeader *picHeader, APS** alfApss, APS* lmcsAps, APS* scalingListAps );
 
@@ -181,6 +185,11 @@ struct Picture : public UnitArea
                                 const PelUnitBuf& afterScaling, const Window& scalingWindowAfter,
                                 const ChromaFormat chromaFormatIDC, const BitDepths& bitDepths, const bool useLumaFilter, const bool downsampling,
                                 const bool horCollocatedChromaFlag, const bool verCollocatedChromaFlag );
+
+#if JVET_Z0118_GDR
+  void setCleanDirty(bool flag) { m_cleanDirtyFlag = flag; if (m_cleanDirtyFlag) cs->setReconBuf(PIC_RECONSTRUCTION_1); else cs->setReconBuf(PIC_RECONSTRUCTION_0); }
+  bool getCleanDirty() const    { return m_cleanDirtyFlag; }  
+#endif
 
 private:
   Window        m_conformanceWindow;
@@ -244,6 +253,9 @@ public:
   int m_lossyQP;
   std::vector<bool> m_lossylosslessSliceArray;
   bool interLayerRefPicFlag;
+#if JVET_Z0118_GDR
+  bool m_cleanDirtyFlag;
+#endif
 
 #if !JVET_S0258_SUBPIC_CONSTRAINTS
   std::vector<int> subPicIDs;
@@ -283,6 +295,11 @@ public:
   Slice        *swapSliceObject(Slice * p, uint32_t i);
   void         clearSliceBuffer();
 
+#if JVET_Z0118_GDR
+  void         initCleanCurPicture();  
+  void         copyCleanCurPicture();
+#endif
+
   MCTSInfo     mctsInfo;
   std::vector<AQpLayer*> aqlayer;
 
@@ -315,14 +332,14 @@ public:
   };
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  CBifParams&       getCBifParam() { return m_CBifParams; }
-  void resizeBIF_Chroma(unsigned numEntries)
+  ChromaBifParams&       getChromaBifParam() { return m_ChromaBifParams; }
+  void resizeBIFChroma(unsigned numEntries)
   {
-    m_CBifParams.numBlocks = numEntries;
-    m_CBifParams.ctuOn_Cb.resize(numEntries);
-    m_CBifParams.ctuOn_Cr.resize(numEntries);
-    std::fill(m_CBifParams.ctuOn_Cb.begin(), m_CBifParams.ctuOn_Cb.end(), 0);
-    std::fill(m_CBifParams.ctuOn_Cr.begin(), m_CBifParams.ctuOn_Cr.end(), 0);
+    m_ChromaBifParams.numBlocks = numEntries;
+    m_ChromaBifParams.ctuOnCb.resize(numEntries);
+    m_ChromaBifParams.ctuOnCr.resize(numEntries);
+    std::fill(m_ChromaBifParams.ctuOnCb.begin(), m_ChromaBifParams.ctuOnCb.end(), 0);
+    std::fill(m_ChromaBifParams.ctuOnCr.begin(), m_ChromaBifParams.ctuOnCr.end(), 0);
   }
 #endif
 #if ENABLE_QPA
@@ -338,7 +355,7 @@ public:
   static BifParams        m_BifParams;
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  static CBifParams       m_CBifParams;
+  static ChromaBifParams       m_ChromaBifParams;
 #endif
   std::vector<uint8_t> m_alfCtuEnableFlag[MAX_NUM_COMPONENT];
   uint8_t* getAlfCtuEnableFlag( int compIdx ) { return m_alfCtuEnableFlag[compIdx].data(); }

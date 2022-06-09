@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2021, ITU/ISO/IEC
+* Copyright (c) 2010-2022, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -48,7 +48,14 @@
 class CABACReader
 {
 public:
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACReader( BinDecoderBase& binDecoder, CABACDataStore *cabacDataStore ) : m_BinDecoder( binDecoder ), m_Bitstream( 0 )
+  {
+    m_CABACDataStore = cabacDataStore;
+  }
+#else
   CABACReader(BinDecoderBase& binDecoder) : m_BinDecoder(binDecoder), m_Bitstream(0) {}
+#endif
   virtual ~CABACReader() {}
 
 public:
@@ -73,10 +80,10 @@ public:
   void        bif                      (CodingStructure&              cs, unsigned ctuRsAddr);
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  void        Cbif_Cb                      (CodingStructure&              cs);
-  void        Cbif_Cb                      (CodingStructure&              cs, unsigned ctuRsAddr);
-  void        Cbif_Cr                      (CodingStructure&              cs);
-  void        Cbif_Cr                      (CodingStructure&              cs, unsigned ctuRsAddr);
+  void        chromaBifCb              (CodingStructure&              cs);
+  void        chromaBifCb              (CodingStructure&              cs, unsigned ctuRsAddr);
+  void        chromaBifCr              (CodingStructure&              cs);
+  void        chromaBifCr              (CodingStructure&              cs, unsigned ctuRsAddr);
 #endif
   
 #if JVET_W0066_CCSAO
@@ -133,6 +140,9 @@ public:
   void        cuPaletteSubblockInfo     ( CodingUnit&                   cu,     ComponentID     compBegin, uint32_t numComp, int subSetId, uint32_t& prevRunPos, unsigned& prevRunType );
   // prediction unit (clause 7.3.8.6)
   void        prediction_unit           ( PredictionUnit&               pu,     MergeCtx&       mrgCtx );
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void        mvsd_data                 ( PredictionUnit&               pu );
+#endif
   void        merge_flag                ( PredictionUnit&               pu );
   void        merge_data                ( PredictionUnit&               pu );
   void        affine_flag               ( CodingUnit&                   cu );
@@ -148,12 +158,23 @@ public:
 #if JVET_W0097_GPM_MMVD_TM
   void        geo_mmvd_idx(PredictionUnit&          pu, RefPicList eRefPicList);
   void        geo_merge_idx(PredictionUnit&          pu);
+#if JVET_Y0065_GPM_INTRA
+  void        geo_merge_idx1            ( PredictionUnit&          pu, bool isIntra0, bool isIntra1);
+#else
   void        geo_merge_idx1(PredictionUnit&          pu);
+#endif
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+  void        geoModeIdx                ( PredictionUnit&          pu );
 #endif
   void        imv_mode                  ( CodingUnit&                   cu,     MergeCtx&       mrgCtx );
   void        affine_amvr_mode          ( CodingUnit&                   cu,     MergeCtx&       mrgCtx );
   void        inter_pred_idc            ( PredictionUnit&               pu );
   void        ref_idx                   ( PredictionUnit&               pu,     RefPicList      eRefList );
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  void        refIdxLC                ( PredictionUnit&               pu );
+  void        refPairIdx              ( PredictionUnit&               pu );
+#endif
   void        mvp_flag                  ( PredictionUnit&               pu,     RefPicList      eRefList );
   void        Ciip_flag              ( PredictionUnit&               pu );
   void        smvd_mode              ( PredictionUnit&               pu );
@@ -164,6 +185,10 @@ public:
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   void        amvpMerge_mode         ( PredictionUnit&               pu );
 #endif
+#if JVET_Z0050_CCLM_SLOPE
+  void        cclmDelta             ( PredictionUnit&               pu, int8_t &delta );
+  void        cclmDeltaSlope       ( PredictionUnit&               pu );
+#endif
 
 
   // transform tree (clause 7.3.8.8)
@@ -171,7 +196,19 @@ public:
   bool        cbf_comp                  ( CodingStructure&              cs,     const CompArea& area,     unsigned depth, const bool prevCbf = false, const bool useISP = false );
 
   // mvd coding (clause 7.3.8.9)
-  void        mvd_coding                ( Mv &rMvd );
+  void        mvd_coding                ( Mv &rMvd 
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    , bool codeSign = true
+#endif
+  );
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+  void        bvdCoding                ( Mv &rMvd );
+  unsigned    xReadBvdContext(unsigned ctxT, int offset, int param);
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void        mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList);
+  void        mvsdAffineIdxFunc(PredictionUnit &pu, RefPicList eRefList);
+#endif
 
   // transform unit (clause 7.3.8.10)
   void        transform_unit            ( TransformUnit&                tu,     CUCtx&          cuCtx, Partitioner& pm,        const int subTuCounter = -1 );
@@ -221,6 +258,11 @@ public:
 #if INTER_LIC
   void        cu_lic_flag               ( CodingUnit& cu );
 #endif
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACDataStore*         m_CABACDataStore;
+#endif
+
 private:
   BinDecoderBase& m_BinDecoder;
   InputBitstream* m_Bitstream;
@@ -231,10 +273,35 @@ private:
 class CABACDecoder
 {
 public:
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   CABACDecoder()
-    : m_CABACReaderStd  ( m_BinDecoderStd )
+    : m_CABACReaderStd  ( m_BinDecoderStd, nullptr )
     , m_CABACReader     { &m_CABACReaderStd }
+    , m_CABACDataStore  ( nullptr )
+  {
+    m_CABACDataStore = new CABACDataStore;
+
+    m_CABACReaderStd.m_CABACDataStore = m_CABACDataStore;
+
+    for( int i = 0; i < BPM_NUM - 1; i++ )
+    {
+      m_CABACReader[i]->m_CABACDataStore = m_CABACDataStore;
+    }
+  }
+
+  virtual ~CABACDecoder()
+  {
+    if( m_CABACDataStore )
+    {
+      delete m_CABACDataStore;
+    }
+  }
+#else
+  CABACDecoder()
+    : m_CABACReaderStd( m_BinDecoderStd )
+    , m_CABACReader{ &m_CABACReaderStd }
   {}
+#endif
 
   CABACReader*                getCABACReader    ( int           id    )       { return m_CABACReader[id]; }
 
@@ -242,6 +309,10 @@ private:
   BinDecoder_Std          m_BinDecoderStd;
   CABACReader             m_CABACReaderStd;
   CABACReader*            m_CABACReader[BPM_NUM-1];
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  CABACDataStore*         m_CABACDataStore;
+#endif
 };
 
 #endif

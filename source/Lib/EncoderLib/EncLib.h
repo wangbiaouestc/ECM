@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -302,7 +302,17 @@ public:
                int& iNumEncoded, bool isTff );
 
 
-  void printSummary(bool isField) { m_cGOPEncoder.printOutSummary(m_uiNumAllPicCoded, isField, m_printMSEBasedSequencePSNR, m_printSequenceMSE, m_printHexPsnr, m_resChangeInClvsEnabled, m_spsMap.getFirstPS()->getBitDepths()); }
+  void printSummary(bool isField) {
+    m_cGOPEncoder.printOutSummary(m_uiNumAllPicCoded, isField, m_printMSEBasedSequencePSNR, m_printSequenceMSE,
+#if MSSIM_UNIFORM_METRICS_LOG
+                                  m_printMSSSIM,
+#endif
+                                  m_printHexPsnr, m_resChangeInClvsEnabled, m_spsMap.getFirstPS()->getBitDepths()
+#if JVET_W0134_UNIFORM_METRICS_LOG
+                                                                              ,
+                                  m_layerId
+#endif
+    ); }
 
   int getLayerId() const { return m_layerId; }
   VPS* getVPS()          { return m_vps;     }

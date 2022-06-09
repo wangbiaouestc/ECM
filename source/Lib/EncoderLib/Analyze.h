@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -70,6 +70,9 @@ private:
   double    m_dFrmRate; //--CFG_KDY
   double    m_MSEyuvframe[MAX_NUM_COMPONENT]; // sum of MSEs
   double    m_upscaledPSNR[MAX_NUM_COMPONENT];
+#if MSSIM_UNIFORM_METRICS_LOG
+  double    m_msssim[MAX_NUM_COMPONENT];
+#endif
 #if EXTENSION_360_VIDEO
   TExt360EncAnalyze m_ext360;
 #endif
@@ -82,10 +85,14 @@ public:
   virtual ~Analyze()  {}
   Analyze() { clear(); }
 
-  void  addResult( double psnr[MAX_NUM_COMPONENT], double bits, const double MSEyuvframe[MAX_NUM_COMPONENT]
-    , const double upscaledPSNR[MAX_NUM_COMPONENT]
-    , bool isEncodeLtRef
-  )
+  void addResult(double psnr[MAX_NUM_COMPONENT], double bits, const double MSEyuvframe[MAX_NUM_COMPONENT],
+                 const double upscaledPSNR[MAX_NUM_COMPONENT]
+#if MSSIM_UNIFORM_METRICS_LOG
+                 ,
+                 const double msssim[MAX_NUM_COMPONENT]
+#endif
+                 ,
+                 bool isEncodeLtRef)
   {
     m_dAddBits  += bits;
     if (isEncodeLtRef)
@@ -95,12 +102,18 @@ public:
       m_dPSNRSum[i] += psnr[i];
       m_MSEyuvframe[i] += MSEyuvframe[i];
       m_upscaledPSNR[i] += upscaledPSNR[i];
+#if MSSIM_UNIFORM_METRICS_LOG
+      m_msssim[i] += msssim[i];
+#endif
     }
 
     m_uiNumPic++;
   }
-#if ENABLE_QPA
-  double  getWPSNR      (const ComponentID compID) const { return m_dPSNRSum[compID] / (double)m_uiNumPic; }
+#if ENABLE_QPA || JVET_W0134_UNIFORM_METRICS_LOG
+  double getWPSNR(const ComponentID compID) const { return m_dPSNRSum[compID] / (double) m_uiNumPic; }
+#if MSSIM_UNIFORM_METRICS_LOG
+  double getMsssim(ComponentID compID) const { return m_msssim[compID]; }
+#endif
 #endif
   double  getPsnr(ComponentID compID) const { return  m_dPSNRSum[compID];  }
 #if JVET_O0756_CALCULATE_HDRMETRICS
@@ -133,6 +146,9 @@ public:
       m_dPSNRSum[i] = 0;
       m_MSEyuvframe[i] = 0;
       m_upscaledPSNR[i] = 0;
+#if MSSIM_UNIFORM_METRICS_LOG
+      m_msssim[i] = 0;
+#endif
     }
     m_uiNumPic = 0;
 #if EXTENSION_360_VIDEO
@@ -186,6 +202,179 @@ public:
     MSEyuv /= double(scale);  // i.e. divide by 6 for 4:2:0, 8 for 4:2:2 etc.
     PSNRyuv = (MSEyuv == 0) ? 999.99 : 10.0 * log10((maxval * maxval) / MSEyuv);
   }
+
+#if JVET_W0134_UNIFORM_METRICS_LOG
+  void printOut(std::string &header, std::string &metrics, const std::string &delim, ChromaFormat chFmt,
+                bool printMSEBasedSNR, bool printSequenceMSE,
+#if MSSIM_UNIFORM_METRICS_LOG
+                bool printMSSSIM,
+#endif
+                bool printHexPsnr, bool printRprPSNR, const BitDepths &bitDepths, bool useWPSNR = false,
+                bool printHdrMetrics = false)
+  {
+    std::ostringstream headeross, metricoss;
+    // no generic lambda in C++11...
+    auto addFieldD = [&](const std::string &header, const char *fmt, double x, bool withchroma = true)
+    {
+      if (!withchroma)
+      {
+        return;
+      }
+      char buffer[512];
+      headeross << header;
+      snprintf(buffer, 512, fmt, x);
+      metricoss << buffer;
+    };
+    auto addFieldL = [&](const std::string &header, const char *fmt, uint64_t x, bool withchroma = true)
+    {
+      if (!withchroma)
+      {
+        return;
+      }
+      char buffer[512];
+      headeross << header;
+      snprintf(buffer, 512, fmt, x);
+      metricoss << buffer;
+    };
+    auto addFieldS = [&](const std::string &header, const char *fmt, const char *s)
+    {
+      char buffer[512];
+      headeross << header;
+      snprintf(buffer, 512, fmt, s);
+      metricoss << buffer;
+    };
+
+    auto hexValue = [](double x)
+    {
+      uint64_t ui;
+      copy(reinterpret_cast<uint8_t *>(&x), reinterpret_cast<uint8_t *>(&x) + sizeof(x),
+           reinterpret_cast<uint8_t *>(&ui));
+      return ui;
+    };
+    //
+    double fps   = m_dFrmRate;   //--CFG_KDY
+    double scale = fps / 1000 / (double) m_uiNumPic;
+
+    double mseBasedSNR[MAX_NUM_COMPONENT];
+    if (printMSEBasedSNR || printRprPSNR)
+    {
+      for (uint32_t componentIndex = 0; componentIndex < MAX_NUM_COMPONENT; componentIndex++)
+      {
+        const ComponentID compID = ComponentID(componentIndex);
+        if (getNumPic() == 0)
+        {
+          mseBasedSNR[compID] =
+            0 * scale;   // this is the same calculation that will be evaluated for any other statistic when there are
+                         // no frames (it should result in NaN). We use it here so all the output is consistent.
+        }
+        else
+        {
+          const uint32_t maxval = /*useWPSNR ? (1 << bitDepths.recon[toChannelType(compID)]) - 1 :*/ 255
+                                  << (bitDepths.recon[toChannelType(compID)] - 8);
+          const double MSE    = m_MSEyuvframe[compID];
+          mseBasedSNR[compID] = (MSE == 0) ? 999.99 : 10.0 * log10((maxval * maxval) / (MSE / (double) getNumPic()));
+        }
+      }
+    }
+
+    addFieldL("\tTotal Frames", "\t%-8d    ", getNumPic());
+    addFieldS(" |  ", " %s ", delim.c_str());
+    addFieldD("Bitrate      ", "%-12.4lf ", getBits() * scale);
+
+    const bool withchroma = (chFmt != CHROMA_400);
+    double     psnrYUV    = MAX_DOUBLE;
+    double     mseYUV     = MAX_DOUBLE;
+    if (withchroma)
+    {
+      calculateCombinedValues(chFmt, psnrYUV, mseYUV, bitDepths);
+    }
+    if (useWPSNR)
+    {
+      addFieldD("Y-WPSNR   ", "%-8.4lf  ", getWPSNR(COMPONENT_Y));
+      addFieldD("U-WPSNR   ", "%-8.4lf  ", getWPSNR(COMPONENT_Cb), withchroma);
+      addFieldD("V-WPSNR   ", "%-8.4lf  ", getWPSNR(COMPONENT_Cr), withchroma);
+      addFieldD("YUV-WPSNR ", "%-8.4lf  ", psnrYUV, withchroma);
+    }
+    else
+    {
+      addFieldD("Y-PSNR   ", "%-8.4lf ", getPsnr(COMPONENT_Y) / (double) getNumPic());
+      addFieldD("U-PSNR   ", "%-8.4lf ", getPsnr(COMPONENT_Cb) / (double) getNumPic(), withchroma);
+      addFieldD("V-PSNR   ", "%-8.4lf ", getPsnr(COMPONENT_Cr) / (double) getNumPic(), withchroma);
+      addFieldD("YUV-PSNR ", "%-8.4lf ", psnrYUV, withchroma);
+    }
+#if JVET_O0756_CALCULATE_HDRMETRICS
+    if (printHdrMetrics && withchroma)
+    {
+      addFieldD("DeltaE   ", "%-8.4lf ", getDeltaE() / (double) getNumPic());
+      addFieldD("PSNRL    ", "%-8.4lf ", getPsnrL() / (double) getNumPic());
+    }
+#endif
+#if EXTENSION_360_VIDEO
+    m_ext360.printInfos(headeross, metricoss, getNumPic());
+#endif
+    if (printHexPsnr)
+    {
+      if (useWPSNR)
+      {
+        addFieldL("xY-WPSNR         ", "%-16" PRIx64 " ", hexValue(getWPSNR(COMPONENT_Y)));
+        addFieldL("xU-WPSNR         ", "%-16" PRIx64 " ", hexValue(getWPSNR(COMPONENT_Cb)), withchroma);
+        addFieldL("xV-WPSNR         ", "%-16" PRIx64 " ", hexValue(getWPSNR(COMPONENT_Cr)), withchroma);
+      }
+      else
+      {
+        addFieldL("xY-PSNR          ", "%-16" PRIx64 " ", hexValue(getPsnr(COMPONENT_Y) / (double) getNumPic()));
+        addFieldL("xU-PSNR          ", "%-16" PRIx64 " ", hexValue(getPsnr(COMPONENT_Cb) / (double) getNumPic()),
+                  withchroma);
+        addFieldL("xV-PSNR          ", "%-16" PRIx64 " ", hexValue(getPsnr(COMPONENT_Cr) / (double) getNumPic()),
+                  withchroma);
+      }
+    }
+#if JVET_O0756_CALCULATE_HDRMETRICS
+    if (printHdrMetrics && printHexPsnr && withchroma)
+    {
+      addFieldL("xDeltaE          ", "%-16" PRIx64 " ", hexValue(getDeltaE() / (double) getNumPic()));
+      addFieldL("xPSNRL           ", "%-16" PRIx64 " ", hexValue(getPsnrL() / (double) getNumPic()));
+    }
+#endif
+#if MSSIM_UNIFORM_METRICS_LOG
+    if (printMSSSIM)
+    {
+      addFieldD("Y-MS-SSIM  ", "%-9.7lf  ", getMsssim(COMPONENT_Y) / (double) getNumPic());
+      addFieldD("U-MS-SSIM  ", "%-9.7lf  ", getMsssim(COMPONENT_Cb) / (double) getNumPic(), withchroma);
+      addFieldD("V-MS-SSIM  ", "%-9.7lf  ", getMsssim(COMPONENT_Cr) / (double) getNumPic(), withchroma);
+    }
+#endif
+    if (printSequenceMSE)
+    {
+      addFieldD("Y-MSE      ", "%-10.4lf ", m_MSEyuvframe[COMPONENT_Y] / (double) getNumPic());
+      addFieldD("U-MSE      ", "%-10.4lf ", m_MSEyuvframe[COMPONENT_Cb] / (double) getNumPic(), withchroma);
+      addFieldD("V-MSE      ", "%-10.4lf ", m_MSEyuvframe[COMPONENT_Cr] / (double) getNumPic(), withchroma);
+      addFieldD("YUV-MSE    ", "%-10.4lf ", mseYUV, withchroma);
+    }
+
+    if (printMSEBasedSNR && !printRprPSNR)
+    {
+      addFieldD("MSE-Y-PSNR   ", "%-8.4lf     ", mseBasedSNR[COMPONENT_Y]);
+      addFieldD("MSE-U-PSNR   ", "%-8.4lf     ", mseBasedSNR[COMPONENT_Cb], withchroma);
+      addFieldD("MSE-V-PSNR   ", "%-8.4lf     ", mseBasedSNR[COMPONENT_Cr], withchroma);
+      addFieldD("MSE-YUV-PSNR ", "%-8.4lf     ", psnrYUV, withchroma);
+    }
+    if (printRprPSNR)
+    {
+      addFieldD("Y-PSNR1  ", "%-8.4lf ", mseBasedSNR[COMPONENT_Y]);
+      addFieldD("U-PSNR1  ", "%-8.4lf ", mseBasedSNR[COMPONENT_Cb], withchroma);
+      addFieldD("V-PSNR1  ", "%-8.4lf ", mseBasedSNR[COMPONENT_Cr], withchroma);
+      addFieldD("Y-PSNR2  ", "%-8.4lf ", m_upscaledPSNR[COMPONENT_Y] / (double) getNumPic());
+      addFieldD("U-PSNR2  ", "%-8.4lf ", m_upscaledPSNR[COMPONENT_Cb] / (double) getNumPic(), withchroma);
+      addFieldD("V-PSNR2  ", "%-8.4lf ", m_upscaledPSNR[COMPONENT_Cr] / (double) getNumPic(), withchroma);
+    }
+    header  = headeross.str();
+    metrics = metricoss.str();
+  }
+
+#endif
+
+#if !JVET_W0134_UNIFORM_METRICS_LOG
 
 #if ENABLE_QPA || WCG_WPSNR
   void    printOut( char cDelim, const ChromaFormat chFmt, const bool printMSEBasedSNR, const bool printSequenceMSE, const bool printHexPsnr, const bool printRprPSNR, const BitDepths &bitDepths, const bool useWPSNR = false
@@ -593,7 +782,7 @@ public:
         break;
     }
   }
-
+#endif
 
   void    printSummary(const ChromaFormat chFmt, const bool printSequenceMSE, const bool printHexPsnr, const BitDepths &bitDepths, const std::string &sFilename)
   {
@@ -648,6 +837,7 @@ public:
 
     fclose(pFile);
   }
+
 };
 
 extern Analyze             m_gcAnalyzeAll;

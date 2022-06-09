@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -598,7 +598,11 @@ void SampleAdaptiveOffset::offsetBlock(const int channelBitDepth, const ClpRng& 
 #if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER || JVET_W0066_CCSAO
 void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const ClpRng& clpRng, int typeIdx, int* offset
                                              , const Pel* srcBlk, Pel* resBlk, int srcStride, int resStride,  int width, int height
-                                             , bool isLeftAvail,  bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail)
+                                             , bool isLeftAvail,  bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                                             , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
+)
 {
   int x,y, startX, startY, endX, endY, edgeType;
   int firstLineStartX, firstLineEndX, lastLineStartX, lastLineEndX;
@@ -620,6 +624,13 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
         for (x=startX; x< endX; x++)
         {
           signRight = (int8_t)sgn(srcLine[x] - srcLine[x+1]);
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            signLeft = -signRight;
+            continue;
+          }
+#endif
           edgeType =  signRight + signLeft;
           signLeft  = -signRight;
           
@@ -658,6 +669,13 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
         for (x=0; x< width; x++)
         {
           signDown  = (int8_t)sgn(srcLine[x] - srcLineBelow[x]);
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            signUpLine[x] = -signDown;
+            continue;
+          }
+#endif
           edgeType = signDown + signUpLine[x];
           signUpLine[x]= -signDown;
           
@@ -693,6 +711,12 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
       firstLineEndX   = isAboveAvail? endX: 1;
       for(x= firstLineStartX; x< firstLineEndX; x++)
       {
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+#endif
         edgeType  =  sgn(srcLine[x] - srcLineAbove[x- 1]) - signUpLine[x+1];
         
         resLine[x] = srcLine[x] + offset[edgeType];
@@ -709,6 +733,13 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
         for (x=startX; x<endX; x++)
         {
           signDown =  (int8_t)sgn(srcLine[x] - srcLineBelow[x+ 1]);
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            signDownLine[x + 1] = -signDown;
+            continue;
+          }
+#endif
           edgeType =  signDown + signUpLine[x];
           resLine[x] = srcLine[x] + offset[edgeType];
           
@@ -730,6 +761,12 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
       lastLineEndX   = isBelowRightAvail ? width : (width -1);
       for(x= lastLineStartX; x< lastLineEndX; x++)
       {
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+#endif
         edgeType =  sgn(srcLine[x] - srcLineBelow[x+ 1]) + signUpLine[x];
         resLine[x] = srcLine[x] + offset[edgeType];
         
@@ -758,6 +795,12 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
       firstLineEndX   = isAboveRightAvail ? width : (width-1);
       for(x= firstLineStartX; x< firstLineEndX; x++)
       {
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+#endif
         edgeType = sgn(srcLine[x] - srcLineAbove[x+1]) -signUpLine[x-1];
         resLine[x] = srcLine[x] + offset[edgeType];
       }
@@ -772,6 +815,13 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
         for(x= startX; x< endX; x++)
         {
           signDown =  (int8_t)sgn(srcLine[x] - srcLineBelow[x-1]);
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            signUpLine[x - 1] = -signDown;
+            continue;
+          }
+#endif
           edgeType =  signDown + signUpLine[x];
           resLine[x] = srcLine[x] + offset[edgeType];
           signUpLine[x-1] = -signDown;
@@ -787,6 +837,12 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
       lastLineEndX   = isBelowAvail ? endX : 1;
       for(x= lastLineStartX; x< lastLineEndX; x++)
       {
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+#endif
         edgeType = sgn(srcLine[x] - srcLineBelow[x-1]) + signUpLine[x];
         resLine[x] = srcLine[x] + offset[edgeType];
         
@@ -913,7 +969,7 @@ void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnit
     m_signLineBuf2.resize(lineBufferSize);
   }
   
-#if !JVET_W0066_CCSAO
+#if !JVET_W0066_CCSAO || JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
   int numHorVirBndry = 0, numVerVirBndry = 0;
   int horVirBndryPos[] = { -1,-1,-1 };
   int verVirBndryPos[] = { -1,-1,-1 };
@@ -933,7 +989,7 @@ void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnit
       const Pel* srcBlk = src.get(compID).bufAt(compArea);
       int  resStride    = res.get(compID).stride;
       Pel* resBlk       = res.get(compID).bufAt(compArea);
-#if !JVET_W0066_CCSAO
+#if !JVET_W0066_CCSAO || JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
       for (int i = 0; i < numHorVirBndry; i++)
       {
         horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
@@ -954,7 +1010,9 @@ void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnit
 		    , isAboveAvail, isBelowAvail
 		    , isAboveLeftAvail, isAboveRightAvail
 		    , isBelowLeftAvail, isBelowRightAvail
-		  //                 , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+		    , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#endif
 	    );    
 #else
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
@@ -974,7 +1032,9 @@ void SampleAdaptiveOffset::offsetCTUnoClip( const UnitArea& area, const CPelUnit
                     , isAboveAvail, isBelowAvail
                     , isAboveLeftAvail, isAboveRightAvail
                     , isBelowLeftAvail, isBelowRightAvail
-   //                 , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                    , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#endif
                     );
         }
       else
@@ -1041,7 +1101,7 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
   {
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-    if(!cs.pps->getUseBIF() && !cs.pps->getUseCBIF())
+    if(!cs.pps->getUseBIF() && !cs.pps->getUseChromaBIF())
 #else
     // Even if we are not doing SAO we might still need to do BIF
     // so we cannot return even if SAO is never used.
@@ -1053,9 +1113,9 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
     }
 #else
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-    if(!cs.pps->getUseCBIF())
+    if(!cs.pps->getUseChromaBIF())
     {
-        return;
+      return;
     }
 #else
     return;
@@ -1095,69 +1155,104 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
             bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
             if (bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
             {
-              m_bilateralFilter.bilateralFilterDiamond5x5NoClip(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+              bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
+              int  numHorVirBndry = 0, numVerVirBndry = 0;
+              int  horVirBndryPos[]               = { 0, 0, 0 };
+              int  verVirBndryPos[]               = { 0, 0, 0 };
+              bool isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
+                cs, currTU.Y().x, currTU.Y().y, currTU.lumaSize().width, currTU.lumaSize().height, clipTop, clipBottom,
+                clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
+#endif
+              m_bilateralFilter.bilateralFilterDiamond5x5NoClip(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
+                , clipTop, clipBottom, clipLeft, clipRight
+#endif
+              );
             }
           }
         }
       }
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-      if(cs.pps->getUseCBIF())
+      if(cs.pps->getUseChromaBIF())
       {
-        bool TU_VALID = false;
-        bool TU_CBF = false;
+        bool tuValid = false;
+        bool tuCBF = false;
         bool isDualTree = CS::isDualITree(cs);
-        ChannelType CType = isDualTree ? CH_C : CH_L;
-        bool BIF_chroma = false;
-        CBifParams& CBifParams = cs.picture->getCBifParam();
+        ChannelType chType = isDualTree ? CH_C : CH_L;
+        bool applyChromaBIF = false;
+        ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
+
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+        const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, cs.pcv->chrFormat );
+        const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, cs.pcv->chrFormat );
+#endif
 
         // And now we traverse the CTU to do BIF
-        for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CType), CType))
+        for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, chType), chType))
         {
-            bool chroma_valid = currCU.Cb().valid() && currCU.Cr().valid();
-            if(!chroma_valid)
+          bool chromaValid = currCU.Cb().valid() && currCU.Cr().valid();
+          if(!chromaValid)
+          {
+            continue;
+          }
+          for (auto &currTU : CU::traverseTUs(currCU))
+          {
+            bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+            for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
             {
-                continue;
-            }
-            for (auto &currTU : CU::traverseTUs(currCU))
-            {
-                bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-
-                for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
+              applyChromaBIF = false;
+              bool isCb = compIdx == COMPONENT_Cb ? true : false;
+              ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+              bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+              if(!isDualTree)
+              {
+                tuValid = currTU.blocks[compIdx].valid();
+                tuCBF = false;//if CHROMA TU is not vaild, CBF must be zero
+                if(tuValid)
                 {
-                    BIF_chroma = false;
-                    bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                    ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                    bool CTU_ON = isCb ? CBifParams.ctuOn_Cb[ctuRsAddr] : CBifParams.ctuOn_Cr[ctuRsAddr];
-
-                    if(!isDualTree)
-                    {
-                        TU_VALID = currTU.blocks[compIdx].valid();
-                        TU_CBF = false;//if CHROMA TU is not vaild, CBF must be zero
-                        if(TU_VALID)
-                        {
-                            TU_CBF = TU::getCbf(currTU, compID);
-                        }
-                        BIF_chroma = (CTU_ON && ((TU_CBF || isInter == false) && (currTU.cu->qp > 17)) && (TU_VALID));
-                    }
-                    else
-                    {
-                        TU_CBF = TU::getCbf(currTU, compID);
-                        BIF_chroma = (CTU_ON && (( TU_CBF || isInter == false) && (currTU.cu->qp > 17)));
-                    }
-                    if(BIF_chroma)
-                    {
-                        m_bilateralFilter.bilateralFilterDiamond5x5NoClip_chroma(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb);
-                    }
+                  tuCBF = TU::getCbf(currTU, compID);
                 }
+                applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)) && (tuValid));
+              }
+              else
+              {
+                tuCBF = TU::getCbf(currTU, compID);
+                applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
+              }
+              if(applyChromaBIF)
+              {
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                bool      clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
+                int       numHorVirBndry = 0, numVerVirBndry = 0;
+                int       horVirBndryPos[]               = { 0, 0, 0 };
+                int       verVirBndryPos[]               = { 0, 0, 0 };
+                CompArea &myArea                         = currTU.block(compID);
+                int       yPos                           = myArea.y << chromaScaleY;
+                int       xPos                           = myArea.x << chromaScaleX;
+                bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
+                  cs, xPos, yPos, myArea.width << chromaScaleX, myArea.height << chromaScaleY, clipTop, clipBottom,
+                  clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
+
+#endif
+                m_bilateralFilter.bilateralFilterDiamond5x5NoClipChroma(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
+                  , clipTop, clipBottom, clipLeft, clipRight
+#endif
+                );
+              }
             }
+          }
         }
-    }
+      }
 #endif
 #else
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-      if(cs.pps->getUseBIF() || cs.pps->getUseCBIF())
+      if(cs.pps->getUseBIF() || cs.pps->getUseChromaBIF())
 #else
       if(cs.pps->getUseBIF())
 #endif
@@ -1176,18 +1271,21 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
         if(!bAllDisabled && myCtbOffset.modeIdc != SAO_MODE_OFF)
           clipLumaIfNoBilat = true;
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-        SAOOffset& myCtbOffset_Cb     = mySAOblkParam[1];
-        SAOOffset& myCtbOffset_Cr     = mySAOblkParam[2];
-        CBifParams& CBifParams = cs.picture->getCBifParam();
+        SAOOffset& myCtbOffsetCb     = mySAOblkParam[1];
+        SAOOffset& myCtbOffsetCr     = mySAOblkParam[2];
+        ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
 
-        bool clipChromaIfNoBilat_Cb = false;
-        bool clipChromaIfNoBilat_Cr = false;
+        bool clipChromaIfNoBilatCb = false;
+        bool clipChromaIfNoBilatCr = false;
 
-        if(!bAllDisabled && myCtbOffset_Cb.modeIdc != SAO_MODE_OFF)
-            clipChromaIfNoBilat_Cb = true;
-        if(!bAllDisabled && myCtbOffset_Cr.modeIdc != SAO_MODE_OFF)
-            clipChromaIfNoBilat_Cr = true;
-
+        if(!bAllDisabled && myCtbOffsetCb.modeIdc != SAO_MODE_OFF)
+        {
+          clipChromaIfNoBilatCb = true;
+        }
+        if(!bAllDisabled && myCtbOffsetCr.modeIdc != SAO_MODE_OFF)
+        {
+          clipChromaIfNoBilatCr = true;
+        }
         if(cs.pps->getUseBIF())
         {
 #endif
@@ -1201,7 +1299,22 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
             bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
             if ( bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
             {
-              m_bilateralFilter.bilateralFilterDiamond5x5(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU);
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+              bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
+              int  numHorVirBndry = 0, numVerVirBndry = 0;
+              int  horVirBndryPos[]               = { 0, 0, 0 };
+              int  verVirBndryPos[]               = { 0, 0, 0 };
+              bool isTUCrossedByVirtualBoundaries = bilateralFilter.isCrossedByVirtualBoundaries(
+                cs, currTU.Y().x, currTU.Y().y, currTU.lumaSize().width, currTU.lumaSize().height, clipTop, clipBottom,
+                clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
+#endif
+
+              m_bilateralFilter.bilateralFilterDiamond5x5(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
+                  , clipTop, clipBottom, clipLeft, clipRight
+#endif
+              );
             }
             else
             {
@@ -1215,97 +1328,117 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
         } // BIF LUMA is disabled
         else
         {
-            for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
+          for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
+          {
+            for (auto &currTU : CU::traverseTUs(currCU))
             {
-                for (auto &currTU : CU::traverseTUs(currCU))
-                {
-                    if(clipLumaIfNoBilat)
-                    {
-                        m_bilateralFilter.clipNotBilaterallyFilteredBlocks(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Y), currTU);
-                    }
-                }
+              if(clipLumaIfNoBilat)
+              {
+                m_bilateralFilter.clipNotBilaterallyFilteredBlocks(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Y), currTU);
+              }
             }
+          }
         }
-        if(cs.pps->getUseCBIF())
+        if(cs.pps->getUseChromaBIF())
         {
-            bool TU_VALID = false;
-            bool TU_CBF = false;
-            bool isDualTree = CS::isDualITree(cs);
-            ChannelType CType = isDualTree ? CH_C : CH_L;
-            bool BIF_chroma = false;
-            // And now we traverse the CTU to do BIF
-            for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CType), CType))
+          bool tuValid = false;
+          bool tuCBF = false;
+          bool isDualTree = CS::isDualITree(cs);
+          ChannelType chType = isDualTree ? CH_C : CH_L;
+          bool applyChromaBIF = false;
+          // And now we traverse the CTU to do BIF
+          for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, chType), chType))
+          {
+            bool chromaValid = currCU.Cb().valid() && currCU.Cr().valid();
+            if(!chromaValid)
             {
-                bool chroma_valid = currCU.Cb().valid() && currCU.Cr().valid();
-                if(!chroma_valid)
-                {
-                    continue;
-                }
-                for (auto &currTU : CU::traverseTUs(currCU))
-                {
-                    bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-                    for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
-                    {
-                        bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                        ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                        bool CTU_ON = isCb ? CBifParams.ctuOn_Cb[ctuRsAddr] : CBifParams.ctuOn_Cr[ctuRsAddr];
-
-                        BIF_chroma = false;
-                        if(!isDualTree)
-                        {
-                            TU_VALID =  currTU.blocks[compIdx].valid();
-                            TU_CBF = false;//if CHROMA TU is not vaild, CBF must be zero
-                            if(TU_VALID)
-                            {
-                                TU_CBF =TU::getCbf(currTU, compID);
-                            }
-                            BIF_chroma = (CTU_ON && ((TU_CBF || isInter == false) && (currTU.cu->qp > 17)) && (TU_VALID));
-                        }
-                        else
-                        {
-                            TU_CBF = TU::getCbf(currTU, compID);
-                            BIF_chroma = (CTU_ON && ((TU_CBF || isInter == false) && (currTU.cu->qp > 17)));
-                        }
-
-                        if(BIF_chroma)
-                        {
-                            m_bilateralFilter.bilateralFilterDiamond5x5_chroma(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb);
-                        }
-                        else
-                        {
-                            bool use_clip = isCb ? clipChromaIfNoBilat_Cb : clipChromaIfNoBilat_Cr;
-                            if(use_clip && currTU.blocks[compIdx].valid())
-                                m_bilateralFilter.clipNotBilaterallyFilteredBlocks_chroma(m_tempBuf, rec, cs.slice->clpRng(compID), currTU, isCb);
-                        }
-                    }
-                }
+              continue;
             }
+            for (auto &currTU : CU::traverseTUs(currCU))
+            {
+              bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+              for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
+              {
+                bool isCb = compIdx == COMPONENT_Cb ? true : false;
+                ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+                bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+                applyChromaBIF = false;
+                if(!isDualTree)
+                {
+                  tuValid = currTU.blocks[compIdx].valid();
+                  tuCBF = false;//if CHROMA TU is not vaild, CBF must be zero
+                  if(tuValid)
+                  {
+                    tuCBF = TU::getCbf(currTU, compID);
+                  }
+                  applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)) && (tuValid));
+                }
+                else
+                {
+                  tuCBF = TU::getCbf(currTU, compID);
+                  applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
+                }
+                if(applyChromaBIF)
+                {
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                  bool      clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
+                  int       numHorVirBndry = 0, numVerVirBndry = 0;
+                  int       horVirBndryPos[]               = { 0, 0, 0 };
+                  int       verVirBndryPos[]               = { 0, 0, 0 };
+                  CompArea &myArea                         = currTU.block(compID);
+                  const int chromaScaleX                   = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
+                  const int chromaScaleY                   = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
+                  int       yPos                           = myArea.y << chromaScaleY;
+                  int       xPos                           = myArea.x << chromaScaleX;
+                  bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
+                    cs, xPos, yPos, myArea.width << chromaScaleX, myArea.height << chromaScaleY, clipTop, clipBottom,
+                    clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
+
+#endif
+                  m_bilateralFilter.bilateralFilterDiamond5x5Chroma(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
+                  , clipTop, clipBottom, clipLeft, clipRight
+#endif
+                  );
+                }
+                else
+                {
+                  bool useClip = isCb ? clipChromaIfNoBilatCb : clipChromaIfNoBilatCr;
+                  if(useClip && currTU.blocks[compIdx].valid())
+                  {
+                    m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(m_tempBuf, rec, cs.slice->clpRng(compID), currTU, isCb);
+                  }
+                }
+              }
+            }
+          }
         }// BIF chroma is disabled
         else
         {
-            bool isDualTree = CS::isDualITree(cs);
-            ChannelType CType = isDualTree ? CH_C : CH_L;
+          bool isDualTree = CS::isDualITree(cs);
+          ChannelType chType = isDualTree ? CH_C : CH_L;
 
-            for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CType), CType))
+          for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, chType), chType))
+          {
+            bool chromaValid = currCU.Cb().valid() && currCU.Cr().valid();
+            if(!chromaValid)
             {
-                bool chroma_valid = currCU.Cb().valid() && currCU.Cr().valid();
-                if(!chroma_valid)
-                {
-                    continue;
-                }
-                for (auto &currTU : CU::traverseTUs(currCU))
-                {
-                    if(clipChromaIfNoBilat_Cb && currTU.blocks[COMPONENT_Cb].valid())
-                    {
-                        m_bilateralFilter.clipNotBilaterallyFilteredBlocks_chroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cb), currTU, true);
-                    }
-                    if(clipChromaIfNoBilat_Cr && currTU.blocks[COMPONENT_Cr].valid())
-                    {
-                        m_bilateralFilter.clipNotBilaterallyFilteredBlocks_chroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cr), currTU, false);
-                    }
-                  }
+              continue;
+            }
+            for (auto &currTU : CU::traverseTUs(currCU))
+            {
+              if(clipChromaIfNoBilatCb && currTU.blocks[COMPONENT_Cb].valid())
+              {
+                m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cb), currTU, true);
               }
+              if(clipChromaIfNoBilatCr && currTU.blocks[COMPONENT_Cr].valid())
+              {
+                m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cr), currTU, false);
+              }
+            }
           }
+        }
 #endif
       }
       else
@@ -1317,7 +1450,7 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
         if( !bAllDisabled )
         {
-            offsetCTUnoClip( area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs);
+          offsetCTUnoClip( area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs);
         }
 
         SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
@@ -1326,115 +1459,135 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
         bool clipLumaIfNoBilat = false;
         if(!bAllDisabled && myCtbOffset.modeIdc != SAO_MODE_OFF)
         {
-            clipLumaIfNoBilat = true;
+          clipLumaIfNoBilat = true;
         }
 
-        SAOOffset& myCtbOffset_Cb     = mySAOblkParam[1];
-        SAOOffset& myCtbOffset_Cr     = mySAOblkParam[2];
-        CBifParams& CBifParams = cs.picture->getCBifParam();
+        SAOOffset& myCtbOffsetCb     = mySAOblkParam[1];
+        SAOOffset& myCtbOffsetCr     = mySAOblkParam[2];
+        ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
 
-        bool clipChromaIfNoBilat_Cb = false;
-        bool clipChromaIfNoBilat_Cr = false;
+        bool clipChromaIfNoBilatCb = false;
+        bool clipChromaIfNoBilatCr = false;
 
-        if(!bAllDisabled && myCtbOffset_Cb.modeIdc != SAO_MODE_OFF)
+        if(!bAllDisabled && myCtbOffsetCb.modeIdc != SAO_MODE_OFF)
         {
-            clipChromaIfNoBilat_Cb = true;
+          clipChromaIfNoBilatCb = true;
         }
-        if(!bAllDisabled && myCtbOffset_Cr.modeIdc != SAO_MODE_OFF)
+        if(!bAllDisabled && myCtbOffsetCr.modeIdc != SAO_MODE_OFF)
         {
-            clipChromaIfNoBilat_Cr = true;
+          clipChromaIfNoBilatCr = true;
         }
 
         for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
         {
-            for (auto &currTU : CU::traverseTUs(currCU))
+          for (auto &currTU : CU::traverseTUs(currCU))
+          {
+            if(clipLumaIfNoBilat)
             {
-                if(clipLumaIfNoBilat)
-                {
-                    m_bilateralFilter.clipNotBilaterallyFilteredBlocks(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Y), currTU);
-                }
+              m_bilateralFilter.clipNotBilaterallyFilteredBlocks(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Y), currTU);
             }
+          }
         }
 
-        if(cs.pps->getUseCBIF())
+        if(cs.pps->getUseChromaBIF())
         {
-            bool TU_VALID = false;
-            bool TU_CBF = false;
-            bool isDualTree = CS::isDualITree(cs);
-            ChannelType CType = isDualTree ? CH_C : CH_L;
-            bool BIF_chroma = false;
-            // And now we traverse the CTU to do BIF
-            for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CType), CType))
+          bool tuValid = false;
+          bool tuCBF = false;
+          bool isDualTree = CS::isDualITree(cs);
+          ChannelType chType = isDualTree ? CH_C : CH_L;
+          bool applyChromaBIF = false;
+          // And now we traverse the CTU to do BIF
+          for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, chType), chType))
+          {
+            bool chromaValid = currCU.Cb().valid() && currCU.Cr().valid();
+            if(!chromaValid)
             {
-                bool chroma_valid = currCU.Cb().valid() && currCU.Cr().valid();
-                if(!chroma_valid)
-                {
-                    continue;
-                }
-                for (auto &currTU : CU::traverseTUs(currCU))
-                {
-                    bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-                    for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
-                    {
-                        bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                        ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                        bool CTU_ON = isCb ? CBifParams.ctuOn_Cb[ctuRsAddr] : CBifParams.ctuOn_Cr[ctuRsAddr];
-
-                        BIF_chroma = false;
-                        if(!isDualTree)
-                        {
-                            TU_VALID = currTU.blocks[compIdx].valid();
-                            TU_CBF = false;//if CHROMA TU is not vaild, CBF must be zero
-                            if(TU_VALID)
-                            {
-                                TU_CBF = TU::getCbf(currTU, compID);
-                            }
-                            BIF_chroma = (CTU_ON && ((TU_CBF || isInter == false) && (currTU.cu->qp > 17)) && (TU_VALID));
-                        }
-                        else
-                        {
-                            TU_CBF = TU::getCbf(currTU, compID);
-                            BIF_chroma = (CTU_ON && ((TU_CBF || isInter == false) && (currTU.cu->qp > 17)));
-                        }
-                        if(BIF_chroma)
-                        {
-                            m_bilateralFilter.bilateralFilterDiamond5x5_chroma(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb);
-                        }
-                        else
-                        {
-                            bool use_clip = isCb ? clipChromaIfNoBilat_Cb : clipChromaIfNoBilat_Cr;
-                            if(use_clip && currTU.blocks[compIdx].valid())
-                            {
-                                m_bilateralFilter.clipNotBilaterallyFilteredBlocks_chroma(m_tempBuf, rec, cs.slice->clpRng(compID), currTU, true);
-                            }
-                        }
-                    }
-                }
+              continue;
             }
+            for (auto &currTU : CU::traverseTUs(currCU))
+            {
+              bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+              for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
+              {
+                bool isCb = compIdx == COMPONENT_Cb ? true : false;
+                ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+                bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+
+                applyChromaBIF = false;
+                if(!isDualTree)
+                {
+                  tuValid = currTU.blocks[compIdx].valid();
+                  tuCBF = false;//if CHROMA TU is not vaild, CBF must be zero
+                  if(tuValid)
+                  {
+                    tuCBF = TU::getCbf(currTU, compID);
+                  }
+                  applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)) && (tuValid));
+                }
+                else
+                {
+                  tuCBF = TU::getCbf(currTU, compID);
+                  applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
+                }
+                if(applyChromaBIF)
+                {
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                  bool      clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
+                  int       numHorVirBndry = 0, numVerVirBndry = 0;
+                  int       horVirBndryPos[]               = { 0, 0, 0 };
+                  int       verVirBndryPos[]               = { 0, 0, 0 };
+                  CompArea &myArea                         = currTU.block(compID);
+                  const int chromaScaleX                   = getComponentScaleX(compID, currTU.cu->cs->pcv->chrFormat);
+                  const int chromaScaleY                   = getComponentScaleY(compID, currTU.cu->cs->pcv->chrFormat);
+                  int       yPos                           = myArea.y << chromaScaleY;
+                  int       xPos                           = myArea.x << chromaScaleX;
+                  bool      isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
+                    cs, xPos, yPos, myArea.width << chromaScaleX, myArea.height << chromaScaleY, clipTop, clipBottom,
+                    clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
+
+#endif
+                  m_bilateralFilter.bilateralFilterDiamond5x5Chroma(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
+                  , clipTop, clipBottom, clipLeft, clipRight
+#endif
+                  );
+                }
+                else
+                {
+                  bool useClip = isCb ? clipChromaIfNoBilatCb : clipChromaIfNoBilatCr;
+                  if(useClip && currTU.blocks[compIdx].valid())
+                  {
+                    m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(m_tempBuf, rec, cs.slice->clpRng(compID), currTU, true);
+                  }
+                }
+              }
+            }
+          }
         }// BIF chroma off
         else
         {
-            bool isDualTree = CS::isDualITree(cs);
-            ChannelType CType = isDualTree ? CH_C : CH_L;
-            for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CType), CType))
+          bool isDualTree = CS::isDualITree(cs);
+          ChannelType chType = isDualTree ? CH_C : CH_L;
+          for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, chType), chType))
+          {
+            bool chromaValid = currCU.Cb().valid() && currCU.Cr().valid();
+            if(!chromaValid)
             {
-                bool chroma_valid = currCU.Cb().valid() && currCU.Cr().valid();
-                if(!chroma_valid)
-                {
-                    continue;
-                }
-                for (auto &currTU : CU::traverseTUs(currCU))
-                {
-                    if(clipChromaIfNoBilat_Cb && currTU.blocks[COMPONENT_Cb].valid())
-                    {
-                        m_bilateralFilter.clipNotBilaterallyFilteredBlocks_chroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cb), currTU, true);
-                    }
-                    if(clipChromaIfNoBilat_Cr && currTU.blocks[COMPONENT_Cr].valid())
-                    {
-                        m_bilateralFilter.clipNotBilaterallyFilteredBlocks_chroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cr), currTU, false);
-                    }
-                }
+              continue;
             }
+            for (auto &currTU : CU::traverseTUs(currCU))
+            {
+              if(clipChromaIfNoBilatCb && currTU.blocks[COMPONENT_Cb].valid())
+              {
+                m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cb), currTU, true);
+              }
+              if(clipChromaIfNoBilatCr && currTU.blocks[COMPONENT_Cr].valid())
+              {
+                m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cr), currTU, false);
+              }
+            }
+          }
         }
 #else
       offsetCTU( area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs);
@@ -1501,13 +1654,13 @@ void SampleAdaptiveOffset::jointClipSaoBifCcSao(CodingStructure& cs)
 {
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  if (!cs.sps->getSAOEnabledFlag() && !cs.pps->getUseBIF() && !cs.pps->getUseCBIF() && !cs.sps->getCCSAOEnabledFlag())
+  if (!cs.sps->getSAOEnabledFlag() && !cs.pps->getUseBIF() && !cs.pps->getUseChromaBIF() && !cs.sps->getCCSAOEnabledFlag())
 #else
   if (!cs.sps->getSAOEnabledFlag() && !cs.pps->getUseBIF() && !cs.sps->getCCSAOEnabledFlag())
 #endif
 #else
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  if (!cs.sps->getSAOEnabledFlag() && !cs.sps->getCCSAOEnabledFlag() && !cs.pps->getUseCBIF())
+  if (!cs.sps->getSAOEnabledFlag() && !cs.sps->getCCSAOEnabledFlag() && !cs.pps->getUseChromaBIF())
 #else
   if (!cs.sps->getSAOEnabledFlag() && !cs.sps->getCCSAOEnabledFlag())
 #endif
@@ -1575,56 +1728,54 @@ void SampleAdaptiveOffset::jointClipSaoBifCcSao(CodingStructure& cs)
             }
           }
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-          if(cs.pps->getUseCBIF())
+          if(cs.pps->getUseChromaBIF())
           {
             if(compIdx == COMPONENT_Cb || compIdx == COMPONENT_Cr)
             {
-                CBifParams& CBifParams = cs.picture->getCBifParam();
-                bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+              ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
+              bool isCb = compIdx == COMPONENT_Cb ? true : false;
+              ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
 
-                bool TU_VALID = false;
-                bool TU_CBF = false;
-                bool CTU_ON = false;
-                bool isDualTree = CS::isDualITree(cs);
-                ChannelType CType = isDualTree ? CH_C : CH_L;
-                bool BIF_chroma = false;
-                for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CType), CType))
+              bool tuValid = false;
+              bool tuCBF = false;
+              bool ctuEnableChromaBIF = false;
+              bool isDualTree = CS::isDualITree(cs);
+              ChannelType chType = isDualTree ? CH_C : CH_L;
+              bool applyChromaBIF = false;
+              for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, chType), chType))
+              {
+                bool chromaValid = currCU.Cb().valid() && currCU.Cr().valid();
+                if(!chromaValid)
                 {
-                    bool chroma_valid = currCU.Cb().valid() && currCU.Cr().valid();
-                    if(!chroma_valid)
-                    {
-                        continue;
-                    }
-
-                    for (auto &currTU : CU::traverseTUs(currCU))
-                    {
-                        bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-                        //Cb or Cr
-                        BIF_chroma = false;
-                        CTU_ON = isCb ? CBifParams.ctuOn_Cb[ctuRsAddr] : CBifParams.ctuOn_Cr[ctuRsAddr];
-
-                        if(!isDualTree)
-                        {
-                            TU_VALID = currTU.blocks[compIdx].valid();
-                            TU_CBF = false;//if CHROMA TU is not vaild, CBF must be zero
-                            if(TU_VALID)
-                            {
-                                TU_CBF = TU::getCbf(currTU, compID);
-                            }
-                            BIF_chroma = (CTU_ON && ((TU_CBF || isInter == false) && (currTU.cu->qp > 17)) && (TU_VALID));
-                        }
-                        else
-                        {
-                            TU_CBF = TU::getCbf(currTU, compID);
-                            BIF_chroma = (CTU_ON && ((TU_CBF || isInter == false) && (currTU.cu->qp > 17)));
-                        }
-                        if(BIF_chroma)
-                        {
-                            m_bilateralFilter.clipNotBilaterallyFilteredBlocks_chroma(m_tempBuf, dstYuv, cs.slice->clpRng(compID) , currTU, isCb);
-                        }
-                    }
+                  continue;
                 }
+                for (auto &currTU : CU::traverseTUs(currCU))
+                {
+                  bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+                  //Cb or Cr
+                  applyChromaBIF = false;
+                  ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+                  if(!isDualTree)
+                  {
+                    tuValid = currTU.blocks[compIdx].valid();
+                    tuCBF = false;//if CHROMA TU is not vaild, CBF must be zero
+                    if(tuValid)
+                    {
+                      tuCBF = TU::getCbf(currTU, compID);
+                    }
+                    applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)) && (tuValid));
+                  }
+                  else
+                  {
+                    tuCBF = TU::getCbf(currTU, compID);
+                    applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
+                  }
+                  if(applyChromaBIF)
+                  {
+                    m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(m_tempBuf, dstYuv, cs.slice->clpRng(compID) , currTU, isCb);
+                  }
+                }
+              }
             }
           }
 #endif
@@ -1674,43 +1825,113 @@ void SampleAdaptiveOffset::offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitA
   bool isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail;
   deriveLoopFilterBoundaryAvailibility(cs, area.Y(), isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail);
 
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  int numHorVirBndry = 0, numVerVirBndry = 0;
+  int horVirBndryPos[] = { -1,-1,-1 };
+  int verVirBndryPos[] = { -1,-1,-1 };
+  int horVirBndryPosComp[] = { -1,-1,-1 };
+  int verVirBndryPosComp[] = { -1,-1,-1 };
+  bool isCtuCrossedByVirtualBoundaries = isCrossedByVirtualBoundaries(area.Y().x, area.Y().y, area.Y().width, area.Y().height, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos, cs.picHeader);
+#endif
+
   for (int compIdx = 0; compIdx < numberOfComponents; compIdx++)
   {
     if (m_ccSaoComParam.enabled[compIdx])
     {
       const int setIdc = m_ccSaoControl[compIdx][ctuRsAddr];
-
-      if (setIdc != 0)
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+      int setType = m_ccSaoComParam.setType[compIdx][setIdc - 1];
+      if (setType)
       {
-        const ComponentID compID     = ComponentID(compIdx);
-        const CompArea   &compArea   = area.block(compID);
-        const int         srcStrideY = srcYuv.get(COMPONENT_Y ).stride;
-        const int         srcStrideU = srcYuv.get(COMPONENT_Cb).stride;
-        const int         srcStrideV = srcYuv.get(COMPONENT_Cr).stride;
-        const int         dstStride  = dstYuv.get(compID      ).stride;
-        const Pel        *srcBlkY    = srcYuv.get(COMPONENT_Y ).bufAt(area.block(COMPONENT_Y ));
-        const Pel        *srcBlkU    = srcYuv.get(COMPONENT_Cb).bufAt(area.block(COMPONENT_Cb));
-        const Pel        *srcBlkV    = srcYuv.get(COMPONENT_Cr).bufAt(area.block(COMPONENT_Cr));
-              Pel        *dstBlk     = dstYuv.get(compID      ).bufAt(compArea);
-              
-        const uint16_t    candPosY   = m_ccSaoComParam.candPos[compIdx][setIdc - 1][COMPONENT_Y ];
-        const uint16_t    bandNumY   = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Y ];
-        const uint16_t    bandNumU   = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cb];
-        const uint16_t    bandNumV   = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cr];
-        const short      *offset     = m_ccSaoComParam.offset [compIdx][setIdc - 1];
+        /* Edge offset over here */
+        if (setIdc != 0)
+        {
+          const ComponentID compID     = ComponentID(compIdx);
+          const CompArea &  compArea   = area.block(compID);
+          const int         srcStrideY = srcYuv.get(COMPONENT_Y).stride;
+          const int         srcStrideU = srcYuv.get(COMPONENT_Cb).stride;
+          const int         srcStrideV = srcYuv.get(COMPONENT_Cr).stride;
+          const int         dstStride  = dstYuv.get(compID).stride;
+          const Pel *       srcBlkY    = srcYuv.get(COMPONENT_Y).bufAt(area.block(COMPONENT_Y));
+          const Pel *       srcBlkU    = srcYuv.get(COMPONENT_Cb).bufAt(area.block(COMPONENT_Cb));
+          const Pel *       srcBlkV    = srcYuv.get(COMPONENT_Cr).bufAt(area.block(COMPONENT_Cr));
+          Pel *             dstBlk     = dstYuv.get(compID).bufAt(compArea);
 
-        offsetBlockCcSaoNoClip(compID, cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID)
-                             , candPosY, bandNumY, bandNumU, bandNumV
-                             , offset
-                             , srcBlkY, srcBlkU, srcBlkV, dstBlk
-                             , srcStrideY, srcStrideU, srcStrideV, dstStride
-                             , compArea.width, compArea.height
-                             , isLeftAvail, isRightAvail
-                             , isAboveAvail, isBelowAvail
-                             , isAboveLeftAvail, isAboveRightAvail
-                             , isBelowLeftAvail, isBelowRightAvail
-                              );
+          const uint16_t candPosY = m_ccSaoComParam.candPos[compIdx][setIdc - 1][COMPONENT_Y];  /* Edge Type */
+          const uint16_t bandNumY = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Y];  /* Num Bands */
+          const uint16_t bandNumU = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cb]; /* treshold */
+          const uint16_t bandNumV = bandNumU;
+
+          const short *offset = m_ccSaoComParam.offset[compIdx][setIdc - 1];
+      
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+        for (int i = 0; i < numHorVirBndry; i++)
+        {
+          horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
+        }
+        for (int i = 0; i < numVerVirBndry; i++)
+        {
+          verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
+        }
+#endif
+
+          offsetBlockCcSaoNoClipEdge(compID, cs.sps->getChromaFormatIdc(), cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID),
+                                     candPosY, bandNumY, bandNumU, bandNumV, offset, srcBlkY, srcBlkU, srcBlkV, dstBlk,
+                                     srcStrideY, srcStrideU, srcStrideV, dstStride, compArea.width, compArea.height,
+                                     isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail,
+                                     isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                                     , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#endif
+          );
+        }
       }
+      else
+      {
+#endif
+        if (setIdc != 0)
+        {
+          const ComponentID compID     = ComponentID(compIdx);
+          const CompArea &  compArea   = area.block(compID);
+          const int         srcStrideY = srcYuv.get(COMPONENT_Y).stride;
+          const int         srcStrideU = srcYuv.get(COMPONENT_Cb).stride;
+          const int         srcStrideV = srcYuv.get(COMPONENT_Cr).stride;
+          const int         dstStride  = dstYuv.get(compID).stride;
+          const Pel *       srcBlkY    = srcYuv.get(COMPONENT_Y).bufAt(area.block(COMPONENT_Y));
+          const Pel *       srcBlkU    = srcYuv.get(COMPONENT_Cb).bufAt(area.block(COMPONENT_Cb));
+          const Pel *       srcBlkV    = srcYuv.get(COMPONENT_Cr).bufAt(area.block(COMPONENT_Cr));
+          Pel *             dstBlk     = dstYuv.get(compID).bufAt(compArea);
+
+          const uint16_t candPosY = m_ccSaoComParam.candPos[compIdx][setIdc - 1][COMPONENT_Y];
+          const uint16_t bandNumY = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Y];
+          const uint16_t bandNumU = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cb];
+          const uint16_t bandNumV = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cr];
+          const short *  offset   = m_ccSaoComParam.offset[compIdx][setIdc - 1];
+
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+        for (int i = 0; i < numHorVirBndry; i++)
+        {
+          horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
+        }
+        for (int i = 0; i < numVerVirBndry; i++)
+        {
+          verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
+        }
+#endif
+      
+          offsetBlockCcSaoNoClip(compID, cs.sps->getChromaFormatIdc(), cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID), candPosY,
+                                 bandNumY, bandNumU, bandNumV, offset, srcBlkY, srcBlkU, srcBlkV, dstBlk, srcStrideY,
+                                 srcStrideU, srcStrideV, dstStride, compArea.width, compArea.height, isLeftAvail,
+                                 isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail,
+                                 isBelowLeftAvail, isBelowRightAvail
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                                 , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#endif
+                              );
+        }
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+      }
+#endif
     }
   }
 }
@@ -1733,6 +1954,15 @@ void SampleAdaptiveOffset::offsetCTUCcSao(CodingStructure& cs, const UnitArea& a
 
   bool isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail;
   deriveLoopFilterBoundaryAvailibility(cs, area.Y(), isLeftAvail,isRightAvail,isAboveAvail,isBelowAvail,isAboveLeftAvail,isAboveRightAvail,isBelowLeftAvail,isBelowRightAvail);
+
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  int numHorVirBndry = 0, numVerVirBndry = 0;
+  int horVirBndryPos[] = { -1,-1,-1 };
+  int verVirBndryPos[] = { -1,-1,-1 };
+  int horVirBndryPosComp[] = { -1,-1,-1 };
+  int verVirBndryPosComp[] = { -1,-1,-1 };
+  bool isCtuCrossedByVirtualBoundaries = isCrossedByVirtualBoundaries(area.Y().x, area.Y().y, area.Y().width, area.Y().height, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos, cs.picHeader);
+#endif
 
   for(int compIdx = 0; compIdx < numberOfComponents; compIdx++)
   {
@@ -1758,8 +1988,18 @@ void SampleAdaptiveOffset::offsetCTUCcSao(CodingStructure& cs, const UnitArea& a
         const uint16_t    bandNumU   = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cb];
         const uint16_t    bandNumV   = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cr];
         const short      *offset     = m_ccSaoComParam.offset [compIdx][setIdc - 1];
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+        for (int i = 0; i < numHorVirBndry; i++)
+        {
+          horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
+        }
+        for (int i = 0; i < numVerVirBndry; i++)
+        {
+          verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
+        }
+#endif
 
-        offsetBlockCcSao( compID, cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID)
+        offsetBlockCcSao( compID, cs.sps->getChromaFormatIdc(), cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID)
                         , candPosY, bandNumY, bandNumU, bandNumV
                         , offset
                         , srcBlkY, srcBlkU, srcBlkV, dstBlk
@@ -1769,13 +2009,1045 @@ void SampleAdaptiveOffset::offsetCTUCcSao(CodingStructure& cs, const UnitArea& a
                         , isAboveAvail, isBelowAvail
                         , isAboveLeftAvail, isAboveRightAvail
                         , isBelowLeftAvail, isBelowRightAvail
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                        , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+#endif
                         );
       }
     }
   }
 }
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+int calcDiffRange(Pel a, Pel b, int th)
+{
+  int diff      = a - b;
+  int value     = 0;
+  int thred     = g_ccSaoQuanValue[th];
+  int neg_thred = (-1) * thred;
+  if (diff < 0)
+  {
+    if (diff < neg_thred)
+    {
+      value = 0;
+    }
+    else
+    {
+      value = 1;
+    }      
+  }
+  else
+  {
+    if (diff < thred)
+    {
+      value = 2;
+    }
+    else
+    {
+      value = 3;
+    }
+  }
+  return value;
+}
 
-void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, const int bitDepth, const ClpRng& clpRng
+void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
+  const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng &clpRng, const uint16_t candPosY, const uint16_t bandNumY,
+  const uint16_t bandNumU, const uint16_t bandNumV, const short *offset, const Pel *srcY, const Pel *srcU,
+  const Pel *srcV, Pel *dst, const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride,
+  const int width, const int height, bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail,
+  bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  ,bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
+)
+{
+  const int candPosYXA = g_ccSaoEdgeTypeX[candPosY][0];
+  const int candPosYYA = g_ccSaoEdgeTypeY[candPosY][0];
+  const int candPosYXB = g_ccSaoEdgeTypeX[candPosY][1];
+  const int candPosYYB = g_ccSaoEdgeTypeY[candPosY][1];
+  int       signa, signb, band;
+  int       th = bandNumU - 1;
+
+  const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleYM1 = 1 - chromaScaleY;
+
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  int x, y, startX, startY, endX, endY;
+  int firstLineStartX, firstLineEndX, lastLineStartX, lastLineEndX;
+  switch (compID)
+  {
+  case COMPONENT_Y:
+  {
+    switch (candPosY)
+    {
+    case SAO_TYPE_EO_0:
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = isRightAvail ? width : (width - 1);
+      for (y = 0; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries
+              && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x;
+          const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          signa = calcDiffRange(*colY, *colA, th);
+          signb = calcDiffRange(*colY, *colB, th);
+
+          signa = signa * 4 + signb;
+          if (bandNumY <= 4)
+          {
+            band               = (*colY * bandNumY) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else if (bandNumY > 4 && bandNumY <= 6)
+          {
+            int bandc          = bandNumY - 4;
+            band               = (*colU * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else
+          {
+            int bandc          = bandNumY - 6;
+            band               = (*colV * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+    }
+    break;
+
+    case SAO_TYPE_EO_90:
+    {
+      startY = isAboveAvail ? 0 : 1;
+      endY   = isBelowAvail ? height : height - 1;
+      if (!isAboveAvail)
+      {
+        srcY += srcStrideY;
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
+        dst += dstStride;
+      }
+      for (y = startY; y < endY; y++)
+      {
+        for (x = 0; x < width; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries
+              && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x;
+          const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          signa = calcDiffRange(*colY, *colA, th);
+          signb = calcDiffRange(*colY, *colB, th);
+
+          signa = signa * 4 + signb;
+          if (bandNumY <= 4)
+          {
+            band               = (*colY * bandNumY) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else if (bandNumY > 4 && bandNumY <= 6)
+          {
+            int bandc          = bandNumY - 4;
+            band               = (*colU * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else
+          {
+            int bandc          = bandNumY - 6;
+            band               = (*colV * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+    }
+    break;
+
+    case SAO_TYPE_EO_135:
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = isRightAvail ? width : (width - 1);
+
+      // 1st line
+      firstLineStartX = isAboveLeftAvail ? 0 : 1;
+      firstLineEndX   = isAboveAvail ? endX : 1;
+      for (x = firstLineStartX; x < firstLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries
+            && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + x;
+        const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+
+        signa = calcDiffRange(*colY, *colA, th);
+        signb = calcDiffRange(*colY, *colB, th);
+
+        signa = signa * 4 + signb;
+        if (bandNumY <= 4)
+        {
+          band               = (*colY * bandNumY) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else if (bandNumY > 4 && bandNumY <= 6)
+        {
+          int bandc          = bandNumY - 4;
+          band               = (*colU * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else
+        {
+          int bandc          = bandNumY - 6;
+          band               = (*colV * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+      }
+      srcY += srcStrideY;
+      srcU += srcStrideU * chromaScaleYM1;
+      srcV += srcStrideV * chromaScaleYM1;
+      dst += dstStride;
+
+      // middle lines
+      for (y = 1; y < height - 1; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries
+              && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x;
+          const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          signa = calcDiffRange(*colY, *colA, th);
+          signb = calcDiffRange(*colY, *colB, th);
+
+          signa = signa * 4 + signb;
+          if (bandNumY <= 4)
+          {
+            band               = (*colY * bandNumY) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else if (bandNumY > 4 && bandNumY <= 6)
+          {
+            int bandc          = bandNumY - 4;
+            band               = (*colU * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else
+          {
+            int bandc          = bandNumY - 6;
+            band               = (*colV * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+
+      // last line
+      lastLineStartX = isBelowAvail ? startX : (width - 1);
+      lastLineEndX   = isBelowRightAvail ? width : (width - 1);
+      for (x = lastLineStartX; x < lastLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries
+            && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + x;
+        const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+
+        signa = calcDiffRange(*colY, *colA, th);
+        signb = calcDiffRange(*colY, *colB, th);
+
+        signa = signa * 4 + signb;
+        if (bandNumY <= 4)
+        {
+          band               = (*colY * bandNumY) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else if (bandNumY > 4 && bandNumY <= 6)
+        {
+          int bandc          = bandNumY - 4;
+          band               = (*colU * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else
+        {
+          int bandc          = bandNumY - 6;
+          band               = (*colV * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+      }
+    }
+    break;
+    case SAO_TYPE_EO_45:
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = isRightAvail ? width : (width - 1);
+
+      // first line
+      firstLineStartX = isAboveAvail ? startX : (width - 1);
+      firstLineEndX   = isAboveRightAvail ? width : (width - 1);
+      for (x = firstLineStartX; x < firstLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries
+            && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + x;
+        const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+
+        signa = calcDiffRange(*colY, *colA, th);
+        signb = calcDiffRange(*colY, *colB, th);
+
+        signa = signa * 4 + signb;
+        if (bandNumY <= 4)
+        {
+          band               = (*colY * bandNumY) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else if (bandNumY > 4 && bandNumY <= 6)
+        {
+          int bandc          = bandNumY - 4;
+          band               = (*colU * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else
+        {
+          int bandc          = bandNumY - 6;
+          band               = (*colV * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+      }
+      srcY += srcStrideY;
+      srcU += srcStrideU * chromaScaleYM1;
+      srcV += srcStrideV * chromaScaleYM1;
+      dst += dstStride;
+
+      // middle lines
+      for (y = 1; y < height - 1; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries
+              && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x;
+          const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          signa = calcDiffRange(*colY, *colA, th);
+          signb = calcDiffRange(*colY, *colB, th);
+
+          signa = signa * 4 + signb;
+          if (bandNumY <= 4)
+          {
+            band               = (*colY * bandNumY) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else if (bandNumY > 4 && bandNumY <= 6)
+          {
+            int bandc          = bandNumY - 4;
+            band               = (*colU * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else
+          {
+            int bandc          = bandNumY - 6;
+            band               = (*colV * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+
+      // last line
+      lastLineStartX = isBelowLeftAvail ? 0 : 1;
+      lastLineEndX   = isBelowAvail ? endX : 1;
+      for (x = lastLineStartX; x < lastLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries
+            && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + x;
+        const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+
+        signa = calcDiffRange(*colY, *colA, th);
+        signb = calcDiffRange(*colY, *colB, th);
+
+        signa = signa * 4 + signb;
+        if (bandNumY <= 4)
+        {
+          band               = (*colY * bandNumY) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else if (bandNumY > 4 && bandNumY <= 6)
+        {
+          int bandc          = bandNumY - 4;
+          band               = (*colU * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else
+        {
+          int bandc          = bandNumY - 6;
+          band               = (*colV * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+      }
+    }
+    break;
+    }
+    break;
+  }
+
+  case COMPONENT_Cb:
+  case COMPONENT_Cr:
+  {
+    switch (candPosY)
+    {
+    case SAO_TYPE_EO_0:
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = isRightAvail ? width : (width - 1);
+      for (y = 0; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries
+              && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX);
+          const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
+          signa           = calcDiffRange(*colY, *colA, th);
+          signb           = calcDiffRange(*colY, *colB, th);
+          signa           = signa * 4 + signb;
+
+          if (bandNumY <= 4)
+          {
+            band               = (*colY * bandNumY) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else if (bandNumY > 4 && bandNumY <= 6)
+          {
+            int        bandc   = bandNumY - 4;
+            const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
+            band               = (*colC * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else
+          {
+            const Pel *colCT   = (compID == COMPONENT_Cb)
+                                   ? srcV + x
+                                   : srcU + x; /* also use the remaining third component for bandIdx calc.*/
+            int        bandc   = bandNumY - 6;
+            band               = (*colCT * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+    }
+    break;
+
+    case SAO_TYPE_EO_90:
+    {
+      startY = isAboveAvail ? 0 : 1;
+      endY   = isBelowAvail ? height : height - 1;
+      if (!isAboveAvail)
+      {
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+      for (y = startY; y < endY; y++)
+      {
+        for (x = 0; x < width; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries
+              && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX);
+          const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
+          signa           = calcDiffRange(*colY, *colA, th);
+          signb           = calcDiffRange(*colY, *colB, th);
+          signa           = signa * 4 + signb;
+
+          if (bandNumY <= 4)
+          {
+            band               = (*colY * bandNumY) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else if (bandNumY > 4 && bandNumY <= 6)
+          {
+            int        bandc   = bandNumY - 4;
+            const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
+            band               = (*colC * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else
+          {
+            const Pel *colCT   = (compID == COMPONENT_Cb)
+                                   ? srcV + x
+                                   : srcU + x; /* also use the remaining third component for bandIdx calc.*/
+            int        bandc   = bandNumY - 6;
+            band               = (*colCT * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+    }
+    break;
+
+    case SAO_TYPE_EO_135:
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = isRightAvail ? width : (width - 1);
+
+      // 1st line
+      firstLineStartX = isAboveLeftAvail ? 0 : 1;
+      firstLineEndX   = isAboveAvail ? endX : 1;
+      for (x = firstLineStartX; x < firstLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries
+            && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + (x << chromaScaleX);
+        const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
+        signa           = calcDiffRange(*colY, *colA, th);
+        signb           = calcDiffRange(*colY, *colB, th);
+        signa           = signa * 4 + signb;
+
+        if (bandNumY <= 4)
+        {
+          band               = (*colY * bandNumY) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else if (bandNumY > 4 && bandNumY <= 6)
+        {
+          int        bandc   = bandNumY - 4;
+          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
+          band               = (*colC * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else
+        {
+          const Pel *colCT   = (compID == COMPONENT_Cb)
+                                 ? srcV + x
+                                 : srcU + x; /* also use the remaining third component for bandIdx calc.*/
+          int        bandc   = bandNumY - 6;
+          band               = (*colCT * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+      }
+      srcY += srcStrideY << chromaScaleY;
+      srcU += srcStrideU;
+      srcV += srcStrideV;
+      dst += dstStride;
+
+      // middle lines
+      for (y = 1; y < height - 1; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries
+              && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX);
+          const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
+          signa           = calcDiffRange(*colY, *colA, th);
+          signb           = calcDiffRange(*colY, *colB, th);
+          signa           = signa * 4 + signb;
+
+          if (bandNumY <= 4)
+          {
+            band               = (*colY * bandNumY) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else if (bandNumY > 4 && bandNumY <= 6)
+          {
+            int        bandc   = bandNumY - 4;
+            const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
+            band               = (*colC * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else
+          {
+            const Pel *colCT   = (compID == COMPONENT_Cb)
+                                   ? srcV + x
+                                   : srcU + x; /* also use the remaining third component for bandIdx calc.*/
+            int        bandc   = bandNumY - 6;
+            band               = (*colCT * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+
+      // last line
+      lastLineStartX = isBelowAvail ? startX : (width - 1);
+      lastLineEndX   = isBelowRightAvail ? width : (width - 1);
+      for (x = lastLineStartX; x < lastLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries
+            && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + (x << chromaScaleX);
+        const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
+        signa           = calcDiffRange(*colY, *colA, th);
+        signb           = calcDiffRange(*colY, *colB, th);
+        signa           = signa * 4 + signb;
+
+        if (bandNumY <= 4)
+        {
+          band               = (*colY * bandNumY) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else if (bandNumY > 4 && bandNumY <= 6)
+        {
+          int        bandc   = bandNumY - 4;
+          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
+          band               = (*colC * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else
+        {
+          const Pel *colCT   = (compID == COMPONENT_Cb)
+                                 ? srcV + x
+                                 : srcU + x; /* also use the remaining third component for bandIdx calc.*/
+          int        bandc   = bandNumY - 6;
+          band               = (*colCT * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+      }
+    }
+    break;
+    case SAO_TYPE_EO_45:
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = isRightAvail ? width : (width - 1);
+
+      // first line
+      firstLineStartX = isAboveAvail ? startX : (width - 1);
+      firstLineEndX   = isAboveRightAvail ? width : (width - 1);
+      for (x = firstLineStartX; x < firstLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries
+            && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + (x << chromaScaleX);
+        const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
+        signa           = calcDiffRange(*colY, *colA, th);
+        signb           = calcDiffRange(*colY, *colB, th);
+        signa           = signa * 4 + signb;
+
+        if (bandNumY <= 4)
+        {
+          band               = (*colY * bandNumY) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else if (bandNumY > 4 && bandNumY <= 6)
+        {
+          int        bandc   = bandNumY - 4;
+          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
+          band               = (*colC * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else
+        {
+          const Pel *colCT   = (compID == COMPONENT_Cb)
+                                 ? srcV + x
+                                 : srcU + x; /* also use the remaining third component for bandIdx calc.*/
+          int        bandc   = bandNumY - 6;
+          band               = (*colCT * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+      }
+      srcY += srcStrideY << chromaScaleY;
+      srcU += srcStrideU;
+      srcV += srcStrideV;
+      dst += dstStride;
+
+      // middle lines
+      for (y = 1; y < height - 1; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries
+              && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX);
+          const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
+          const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
+          signa           = calcDiffRange(*colY, *colA, th);
+          signb           = calcDiffRange(*colY, *colB, th);
+          signa           = signa * 4 + signb;
+
+          if (bandNumY <= 4)
+          {
+            band               = (*colY * bandNumY) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else if (bandNumY > 4 && bandNumY <= 6)
+          {
+            int        bandc   = bandNumY - 4;
+            const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
+            band               = (*colC * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+          else
+          {
+            const Pel *colCT   = (compID == COMPONENT_Cb)
+                                   ? srcV + x
+                                   : srcU + x; /* also use the remaining third component for bandIdx calc.*/
+            int        bandc   = bandNumY - 6;
+            band               = (*colCT * bandc) >> bitDepth;
+            band               = band * CCSAO_EDGE_NUM + signa;
+            const int classIdx = band;
+            dst[x]             = dst[x] + offset[classIdx];
+          }
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+
+      // last line
+      lastLineStartX = isBelowLeftAvail ? 0 : 1;
+      lastLineEndX   = isBelowAvail ? endX : 1;
+      for (x = lastLineStartX; x < lastLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries
+            && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + (x << chromaScaleX);
+        const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
+        signa           = calcDiffRange(*colY, *colA, th);
+        signb           = calcDiffRange(*colY, *colB, th);
+        signa           = signa * 4 + signb;
+
+        if (bandNumY <= 4)
+        {
+          band               = (*colY * bandNumY) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else if (bandNumY > 4 && bandNumY <= 6)
+        {
+          int        bandc   = bandNumY - 4;
+          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
+          band               = (*colC * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else
+        {
+          const Pel *colCT   = (compID == COMPONENT_Cb)
+                                 ? srcV + x
+                                 : srcU + x; /* also use the remaining third component for bandIdx calc.*/
+          int        bandc   = bandNumY - 6;
+          band               = (*colCT * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+      }
+    }
+    break;
+    }
+    break;
+  }
+  default:
+  {
+    THROW("Not a supported CCSAO compID\n");
+  }
+  }
+
+#else
+  switch (compID)
+  {
+  case COMPONENT_Y:
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        const Pel *colY = srcY + x;
+        const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+
+        signa = calcDiffRange(*colY, *colA, th);
+        signb = calcDiffRange(*colY, *colB, th);
+
+        signa = signa * 4 + signb;
+        if (bandNumY <= 4)
+        {
+          band               = (*colY * bandNumY) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else if (bandNumY > 4 && bandNumY <= 6)
+        {
+          int bandc          = bandNumY - 4;
+          band               = (*colU * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else
+        {
+          int bandc          = bandNumY - 6;
+          band               = (*colV * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+      }
+      srcY += srcStrideY;
+      srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+      srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+      dst += dstStride;
+    }
+  }
+  break;
+  case COMPONENT_Cb:
+  case COMPONENT_Cr:
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        const Pel *colY = srcY + (x << chromaScaleX);
+        const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
+        const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
+        signa           = calcDiffRange(*colY, *colA, th);
+        signb           = calcDiffRange(*colY, *colB, th);
+        signa           = signa * 4 + signb;
+
+        if (bandNumY <= 4)
+        {
+          band               = (*colY * bandNumY) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else if (bandNumY > 4 && bandNumY <= 6)
+        {
+          int        bandc   = bandNumY - 4;
+          const Pel *colC    = (compID == COMPONENT_Cb) ? srcU + x : srcV + x;
+          band               = (*colC * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+        else
+        {
+          const Pel *colCT   = (compID == COMPONENT_Cb)
+                                 ? srcV + x
+                                 : srcU + x; /* also use the remaining third component for bandIdx calc.*/
+          int        bandc   = bandNumY - 6;
+          band               = (*colCT * bandc) >> bitDepth;
+          band               = band * CCSAO_EDGE_NUM + signa;
+          const int classIdx = band;
+          dst[x]             = dst[x] + offset[classIdx];
+        }
+      }
+      srcY += srcStrideY << chromaScaleY;
+      srcU += srcStrideU;
+      srcV += srcStrideV;
+      dst += dstStride;
+    }
+  }
+  break;
+  default:
+  {
+    THROW("Not a supported CCSAO compID\n");
+  }
+  }
+#endif
+}
+#endif
+void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng& clpRng
                                                 , const uint16_t candPosY
                                                 , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
                                                 , const short* offset
@@ -1783,79 +3055,918 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
                                                 , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride
                                                 , const int width, const int height
                                                 , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                                                , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
                                                  )
 {
   const int candPosYX = g_ccSaoCandPosX[COMPONENT_Y][candPosY];
   const int candPosYY = g_ccSaoCandPosY[COMPONENT_Y][candPosY];
 
+  const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleYM1 = 1 - chromaScaleY;
+
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  int x, y, startX, startY, endX, endY;
+  int firstLineStartX, firstLineEndX, lastLineStartX, lastLineEndX;
+
   switch (compID)
   {
   case COMPONENT_Y:
+  {
+    switch (candPosY)
     {
-      for (int y = 0; y < height; y++)
+    case 0:   // top left (-1, -1), unlike SAO, CCSAO BO only uses one spatial neighbor sample to derive band
+              // information
+      /* total 9 cases will come up here
+      for (-1,-1) just use the top and middle lines and check for vb */
       {
-        for (int x = 0; x < width; x++)
+        startX = isLeftAvail ? 0 : 1;
+        endX   = width;
+        // 1st line
+        firstLineStartX = isAboveLeftAvail ? 0 : 1;
+        firstLineEndX   = isAboveAvail ? endX : 1;
+        for (x = firstLineStartX; x < firstLineEndX; x++)
         {
-          const Pel* colY = srcY +  x + srcStrideY * candPosYY + candPosYX;
-          const Pel* colU = srcU + (x >> 1);
-          const Pel* colV = srcV + (x >> 1);
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
 
           const int bandY    = (*colY * bandNumY) >> bitDepth;
           const int bandU    = (*colU * bandNumU) >> bitDepth;
           const int bandV    = (*colV * bandNumV) >> bitDepth;
-          const int bandIdx  = bandY * bandNumU * bandNumV
-                             + bandU * bandNumV
-                             + bandV;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
           const int classIdx = bandIdx;
 
-          //dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
+        dst += dstStride;
+
+        // middle lines
+        for (y = 1; y < height; y++)
+        {
+          for (x = startX; x < endX; x++)
+          {
+            if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+            {
+              continue;
+            }
+            const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+            const Pel *colU = srcU + (x >> chromaScaleX);
+            const Pel *colV = srcV + (x >> chromaScaleX);
+
+            const int bandY    = (*colY * bandNumY) >> bitDepth;
+            const int bandU    = (*colU * bandNumU) >> bitDepth;
+            const int bandV    = (*colV * bandNumV) >> bitDepth;
+            const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+            const int classIdx = bandIdx;
+
+            // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+            dst[x] = dst[x] + offset[classIdx];
+          }
+          srcY += srcStrideY;
+          srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+          srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+          dst += dstStride;
+        }
+      }
+      break;
+    case 1: /*(0, -1)  top sample */
+    {
+      startY = isAboveAvail ? 0 : 1;
+      endY   = height;
+      if (!isAboveAvail)
+      {
+        srcY += srcStrideY;
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
+        dst += dstStride;
+      }
+      for (y = startY; y < endY; y++)
+      {
+        for (x = 0; x < width; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
           dst[x] = dst[x] + offset[classIdx];
         }
 
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
-        dst  += dstStride;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
       }
+      break;
     }
-  break;
-  case COMPONENT_Cb:
-  case COMPONENT_Cr:
+    case 2: /*(0, -1)  top right sample */
     {
-      for (int y = 0; y < height; y++)
+      startX = isLeftAvail ? 0 : 1;
+      endX   = width;
+      // first line
+      firstLineStartX = isAboveAvail ? startX : (width - 1);
+      firstLineEndX   = isAboveRightAvail ? width : (width - 1);
+      for (x = firstLineStartX; x < firstLineEndX; x++)
       {
-        for (int x = 0; x < width; x++)
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
         {
-          const Pel* colY = srcY + (x << 1) + srcStrideY * candPosYY + candPosYX;
-          const Pel* colU = srcU +  x;
-          const Pel* colV = srcV +  x;
+          continue;
+        }
+        const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+
+        const int bandY    = (*colY * bandNumY) >> bitDepth;
+        const int bandU    = (*colU * bandNumU) >> bitDepth;
+        const int bandV    = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+        dst[x] = dst[x] + offset[classIdx];
+      }
+
+      srcY += srcStrideY;
+      srcU += srcStrideU * chromaScaleYM1;
+      srcV += srcStrideV * chromaScaleYM1;
+      dst += dstStride;
+
+      // middle lines
+      for (y = 1; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
 
           const int bandY    = (*colY * bandNumY) >> bitDepth;
           const int bandU    = (*colU * bandNumU) >> bitDepth;
           const int bandV    = (*colV * bandNumV) >> bitDepth;
-          const int bandIdx  = bandY * bandNumU * bandNumV
-                             + bandU * bandNumV
-                             + bandV;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
           const int classIdx = bandIdx;
 
-          //dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
           dst[x] = dst[x] + offset[classIdx];
         }
-        srcY += srcStrideY << 1;
+
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+      break;
+    }
+    case 3: /*(-1, 0)  left sample */
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = width;
+
+      for (y = 0; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+      break;
+    }
+    case 4: /*(0, 0)  current sample */
+    {       /* when current sample is choosen there is no more dependency on neighbor samples*/
+
+      for (y = 0; y < height; y++)
+      {
+        for (x = 0; x < width; x++)
+        {
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+      break;
+    }
+    case 5: /*(1, 0)  right sample */
+    {
+      startX = 0;
+      endX   = isRightAvail ? width : (width - 1);
+
+      for (y = 0; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+      break;
+    }
+    case 6: /*(-1, 1)  below left sample */
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = width;
+
+      for (y = 1; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+
+      // last line
+      lastLineStartX = isBelowLeftAvail ? 0 : 1;
+      lastLineEndX   = isBelowAvail ? endX : 1;
+
+      for (x = lastLineStartX; x < lastLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+
+        const int bandY    = (*colY * bandNumY) >> bitDepth;
+        const int bandU    = (*colU * bandNumU) >> bitDepth;
+        const int bandV    = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+        dst[x] = dst[x] + offset[classIdx];
+      }
+      break;
+    }
+    case 7: /*(0, 1)  below sample */
+    {
+      startY = 0;
+      endY   = isBelowAvail ? height : height - 1;
+
+      for (y = startY; y < endY; y++)
+      {
+        for (x = 0; x < width; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+      break;
+    }
+    case 8: /*(1, 1)  below right sample */
+    {
+      startX = 0;
+      endX   = isRightAvail ? width : (width - 1);
+
+      for (y = 0; y < height - 1; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+
+      // last line
+      lastLineStartX = isBelowAvail ? startX : (width - 1);
+      lastLineEndX   = isBelowRightAvail ? width : (width - 1);
+      for (x = lastLineStartX; x < lastLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+
+        const int bandY    = (*colY * bandNumY) >> bitDepth;
+        const int bandU    = (*colU * bandNumU) >> bitDepth;
+        const int bandV    = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+        dst[x] = dst[x] + offset[classIdx];
+      }
+      break;
+    }
+    }
+    break;
+  }
+  case COMPONENT_Cb:
+  case COMPONENT_Cr:
+  {
+    switch (candPosY)
+    {
+    case 0:   // top left (-1, -1), unlike SAO, CCSAO BO only uses one spatial neighbor sample to derive band
+              // information
+      /* total 9 cases will come up here
+      for (-1,-1) just use the top and middle lines and check for vb */
+      {
+        startX = isLeftAvail ? 0 : 1;
+        endX   = width;
+        // 1st line
+        firstLineStartX = isAboveLeftAvail ? 0 : 1;
+        firstLineEndX   = isAboveAvail ? endX : 1;
+        for (x = firstLineStartX; x < firstLineEndX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
-        dst  += dstStride;
+        dst += dstStride;
+
+        // middle lines
+        for (y = 1; y < height; y++)
+        {
+          for (x = startX; x < endX; x++)
+          {
+            if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+            {
+              continue;
+            }
+            const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+            const Pel *colU = srcU + x;
+            const Pel *colV = srcV + x;
+
+            const int bandY    = (*colY * bandNumY) >> bitDepth;
+            const int bandU    = (*colU * bandNumU) >> bitDepth;
+            const int bandV    = (*colV * bandNumV) >> bitDepth;
+            const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+            const int classIdx = bandIdx;
+
+            // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+            dst[x] = dst[x] + offset[classIdx];
+          }
+          srcY += srcStrideY << chromaScaleY;
+          srcU += srcStrideU;
+          srcV += srcStrideV;
+          dst += dstStride;
+        }
+      }
+      break;
+    case 1: /*(0, -1)  top sample */
+    {
+      startY = isAboveAvail ? 0 : 1;
+      endY   = height;
+      if (!isAboveAvail)
+      {
+        srcY += srcStrideY;
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
+        dst += dstStride;
+      }
+      for (y = startY; y < endY; y++)
+      {
+        for (x = 0; x < width; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+      break;
+    }
+    case 2: /*(0, -1)  top right sample */
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = width;
+      // first line
+      firstLineStartX = isAboveAvail ? startX : (width - 1);
+      firstLineEndX   = isAboveRightAvail ? width : (width - 1);
+      for (x = firstLineStartX; x < firstLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + x;
+        const Pel *colV = srcV + x;
+
+        const int bandY    = (*colY * bandNumY) >> bitDepth;
+        const int bandU    = (*colU * bandNumU) >> bitDepth;
+        const int bandV    = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+        dst[x] = dst[x] + offset[classIdx];
+      }
+
+      srcY += srcStrideY << chromaScaleY;
+      srcU += srcStrideU;
+      srcV += srcStrideV;
+      dst += dstStride;
+
+      // middle lines
+      for (y = 1; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+      break;
+    }
+    case 3: /*(-1, 0)  left sample */
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = width;
+
+      for (y = 0; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+      break;
+    }
+    case 4: /*(0, 0)  current sample */
+    {       /* when current sample is choosen there is no more dependency on neighbor samples*/
+
+      for (y = 0; y < height; y++)
+      {
+        for (x = 0; x < width; x++)
+        {
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+      break;
+    }
+    case 5: /*(1, 0)  right sample */
+    {
+      startX = 0;
+      endX   = isRightAvail ? width : (width - 1);
+
+      for (y = 0; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+      break;
+    }
+    case 6: /*(-1, 1)  below left sample */
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = width;
+
+      for (y = 1; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+
+      // last line
+      lastLineStartX = isBelowLeftAvail ? 0 : 1;
+      lastLineEndX   = isBelowAvail ? endX : 1;
+
+      for (x = lastLineStartX; x < lastLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + x;
+        const Pel *colV = srcV + x;
+
+        const int bandY    = (*colY * bandNumY) >> bitDepth;
+        const int bandU    = (*colU * bandNumU) >> bitDepth;
+        const int bandV    = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+        dst[x] = dst[x] + offset[classIdx];
+      }
+      break;
+    }
+    case 7: /*(0, 1)  below sample */
+    {
+      startY = 0;
+      endY   = isBelowAvail ? height : height - 1;
+
+      for (y = startY; y < endY; y++)
+      {
+        for (x = 0; x < width; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+      break;
+    }
+    case 8: /*(1, 1)  below right sample */
+    {
+      startX = 0;
+      endX   = isRightAvail ? width : (width - 1);
+
+      for (y = 0; y < height - 1; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = dst[x] + offset[classIdx];
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+      // last line
+      lastLineStartX = isBelowAvail ? startX : (width - 1);
+      lastLineEndX   = isBelowRightAvail ? width : (width - 1);
+      for (x = lastLineStartX; x < lastLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + x;
+        const Pel *colV = srcV + x;
+
+        const int bandY    = (*colY * bandNumY) >> bitDepth;
+        const int bandU    = (*colU * bandNumU) >> bitDepth;
+        const int bandV    = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+        dst[x] = dst[x] + offset[classIdx];
       }
     }
-  break;
+    break;
+    }
+    break;
+  }
   default:
+  {
+    THROW("Not a supported CCSAO compID\n");
+  }
+  }
+
+#else
+  switch (compID)
+  {
+  case COMPONENT_Y:
+  {
+    for (int y = 0; y < height; y++)
     {
-      THROW("Not a supported CCSAO compID\n");
+      for (int x = 0; x < width; x++)
+      {
+        const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+
+        const int bandY = (*colY * bandNumY) >> bitDepth;
+        const int bandU = (*colU * bandNumU) >> bitDepth;
+        const int bandV = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+        dst[x] = dst[x] + offset[classIdx];
+      }
+
+      srcY += srcStrideY;
+      srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+      srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+      dst += dstStride;
     }
   }
+  break;
+  case COMPONENT_Cb:
+  case COMPONENT_Cr:
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + x;
+        const Pel *colV = srcV + x;
+
+        const int bandY = (*colY * bandNumY) >> bitDepth;
+        const int bandU = (*colU * bandNumU) >> bitDepth;
+        const int bandV = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+        dst[x] = dst[x] + offset[classIdx];
+      }
+      srcY += srcStrideY << chromaScaleY;
+      srcU += srcStrideU;
+      srcV += srcStrideV;
+      dst += dstStride;
+    }
+  }
+  break;
+  default:
+  {
+    THROW("Not a supported CCSAO compID\n");
+  }
+  }
+#endif
 }
 
-void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int bitDepth, const ClpRng& clpRng
+void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng& clpRng
                                           , const uint16_t candPosY
                                           , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
                                           , const short* offset
@@ -1863,75 +3974,889 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const int 
                                           , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride
                                           , const int width, const int height
                                           , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                                          , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
                                            )
 {
   const int candPosYX = g_ccSaoCandPosX[COMPONENT_Y][candPosY];
   const int candPosYY = g_ccSaoCandPosY[COMPONENT_Y][candPosY];
 
-  switch(compID)
+  const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, chromaFormat );
+  const int chromaScaleYM1 = 1 - chromaScaleY;
+
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+  int x, y, startX, startY, endX, endY;
+  int firstLineStartX, firstLineEndX, lastLineStartX, lastLineEndX;
+  switch (compID)
   {
   case COMPONENT_Y:
+  {
+    switch (candPosY)
     {
-      for (int y = 0; y < height; y++)
+    case 0:   // top left (-1, -1), unlike SAO, CCSAO BO only uses one spatial neighbor sample to derive band
+              // information
+      /* total 9 cases will come up here
+      for (-1,-1) just use the top and middle lines and check for vb */
       {
-        for (int x = 0; x < width; x++)
+        startX = isLeftAvail ? 0 : 1;
+        endX   = width;
+        // 1st line
+        firstLineStartX = isAboveLeftAvail ? 0 : 1;
+        firstLineEndX   = isAboveAvail ? endX : 1;
+        for (x = firstLineStartX; x < firstLineEndX; x++)
         {
-          const Pel *colY = srcY +  x  + srcStrideY * candPosYY + candPosYX;
-          const Pel *colU = srcU + (x >> 1);
-          const Pel *colV = srcV + (x >> 1);
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
 
           const int bandY    = (*colY * bandNumY) >> bitDepth;
           const int bandU    = (*colU * bandNumU) >> bitDepth;
           const int bandV    = (*colV * bandNumV) >> bitDepth;
-          const int bandIdx  = bandY * bandNumU * bandNumV
-                             + bandU * bandNumV
-                             + bandV;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
           const int classIdx = bandIdx;
 
-          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
+        dst += dstStride;
+
+        // middle lines
+        for (y = 1; y < height; y++)
+        {
+          for (x = startX; x < endX; x++)
+          {
+            if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+            {
+              continue;
+            }
+            const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+            const Pel *colU = srcU + (x >> chromaScaleX);
+            const Pel *colV = srcV + (x >> chromaScaleX);
+
+            const int bandY    = (*colY * bandNumY) >> bitDepth;
+            const int bandU    = (*colU * bandNumU) >> bitDepth;
+            const int bandV    = (*colV * bandNumV) >> bitDepth;
+            const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+            const int classIdx = bandIdx;
+
+            dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);            
+          }
+          srcY += srcStrideY;
+          srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+          srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+          dst += dstStride;
+        }
+      }
+      break;
+    case 1: /*(0, -1)  top sample */
+    {
+      startY = isAboveAvail ? 0 : 1;
+      endY   = height;
+      if (!isAboveAvail)
+      {
+        srcY += srcStrideY;
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
+        dst += dstStride;
+      }
+      for (y = startY; y < endY; y++)
+      {
+        for (x = 0; x < width; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
 
         srcY += srcStrideY;
-        srcU += srcStrideU * (y & 0x1);
-        srcV += srcStrideV * (y & 0x1);
-        dst  += dstStride;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
       }
+      break;
+    }
+    case 2: /*(0, -1)  top right sample */
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = width;
+      // first line
+      firstLineStartX = isAboveAvail ? startX : (width - 1);
+      firstLineEndX   = isAboveRightAvail ? width : (width - 1);
+      for (x = firstLineStartX; x < firstLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+
+        const int bandY    = (*colY * bandNumY) >> bitDepth;
+        const int bandU    = (*colU * bandNumU) >> bitDepth;
+        const int bandV    = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);        
+      }
+
+      srcY += srcStrideY;
+      srcU += srcStrideU * chromaScaleYM1;
+      srcV += srcStrideV * chromaScaleYM1;
+      dst += dstStride;
+
+      // middle lines
+      for (y = 1; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+      break;
+    }
+    case 3: /*(-1, 0)  left sample */
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = width;
+
+      for (y = 0; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+      break;
+    }
+    case 4: /*(0, 0)  current sample */
+    {       /* when current sample is choosen there is no more dependency on neighbor samples*/
+
+      for (y = 0; y < height; y++)
+      {
+        for (x = 0; x < width; x++)
+        {
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+      break;
+    }
+    case 5: /*(1, 0)  right sample */
+    {
+      startX = 0;
+      endX   = isRightAvail ? width : (width - 1);
+
+      for (y = 0; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+      break;
+    }
+    case 6: /*(-1, 1)  below left sample */
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = width;
+
+      for (y = 1; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+
+      // last line
+      lastLineStartX = isBelowLeftAvail ? 0 : 1;
+      lastLineEndX   = isBelowAvail ? endX : 1;
+
+      for (x = lastLineStartX; x < lastLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+
+        const int bandY    = (*colY * bandNumY) >> bitDepth;
+        const int bandU    = (*colU * bandNumU) >> bitDepth;
+        const int bandV    = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);        
+      }
+      break;
+    }
+    case 7: /*(0, 1)  below sample */
+    {
+      startY = 0;
+      endY   = isBelowAvail ? height : height - 1;
+
+      for (y = startY; y < endY; y++)
+      {
+        for (x = 0; x < width; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+      break;
+    }
+    case 8: /*(1, 1)  below right sample */
+    {
+      startX = 0;
+      endX   = isRightAvail ? width : (width - 1);
+
+      for (y = 0; y < height - 1; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+        srcY += srcStrideY;
+        srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+        srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+        dst += dstStride;
+      }
+
+      // last line
+      lastLineStartX = isBelowAvail ? startX : (width - 1);
+      lastLineEndX   = isBelowRightAvail ? width : (width - 1);
+      for (x = lastLineStartX; x < lastLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+
+        const int bandY    = (*colY * bandNumY) >> bitDepth;
+        const int bandU    = (*colU * bandNumU) >> bitDepth;
+        const int bandV    = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);        
+      }
+      break;
+    }
     }
     break;
+  }
   case COMPONENT_Cb:
   case COMPONENT_Cr:
+  {
+    switch (candPosY)
     {
-      for (int y = 0; y < height; y++)
+    case 0:   // top left (-1, -1), unlike SAO, CCSAO BO only uses one spatial neighbor sample to derive band
+              // information
+      /* total 9 cases will come up here
+      for (-1,-1) just use the top and middle lines and check for vb */
       {
-        for (int x = 0; x < width; x++)
+        startX = isLeftAvail ? 0 : 1;
+        endX   = width;
+        // 1st line
+        firstLineStartX = isAboveLeftAvail ? 0 : 1;
+        firstLineEndX   = isAboveAvail ? endX : 1;
+        for (x = firstLineStartX; x < firstLineEndX; x++)
         {
-          const Pel *colY = srcY + (x << 1) + srcStrideY * candPosYY + candPosYX;
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
           const Pel *colU = srcU + x;
           const Pel *colV = srcV + x;
 
           const int bandY    = (*colY * bandNumY) >> bitDepth;
           const int bandU    = (*colU * bandNumU) >> bitDepth;
           const int bandV    = (*colV * bandNumV) >> bitDepth;
-          const int bandIdx  = bandY * bandNumU * bandNumV
-                             + bandU * bandNumV
-                             + bandV;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
           const int classIdx = bandIdx;
 
-          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
         }
-
-        srcY += srcStrideY << 1;
+        srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
         srcV += srcStrideV;
-        dst  += dstStride;
+        dst += dstStride;
+
+        // middle lines
+        for (y = 1; y < height; y++)
+        {
+          for (x = startX; x < endX; x++)
+          {
+            if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+            {
+              continue;
+            }
+            const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+            const Pel *colU = srcU + x;
+            const Pel *colV = srcV + x;
+
+            const int bandY    = (*colY * bandNumY) >> bitDepth;
+            const int bandU    = (*colU * bandNumU) >> bitDepth;
+            const int bandV    = (*colV * bandNumV) >> bitDepth;
+            const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+            const int classIdx = bandIdx;
+
+            dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);            
+          }
+          srcY += srcStrideY << chromaScaleY;
+          srcU += srcStrideU;
+          srcV += srcStrideV;
+          dst += dstStride;
+        }
+      }
+      break;
+    case 1: /*(0, -1)  top sample */
+    {
+      startY = isAboveAvail ? 0 : 1;
+      endY   = height;
+      if (!isAboveAvail)
+      {
+        srcY += srcStrideY;
+        srcU += srcStrideU * chromaScaleYM1;
+        srcV += srcStrideV * chromaScaleYM1;
+        dst += dstStride;
+      }
+      for (y = startY; y < endY; y++)
+      {
+        for (x = 0; x < width; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+      break;
+    }
+    case 2: /*(0, -1)  top right sample */
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = width;
+      // first line
+      firstLineStartX = isAboveAvail ? startX : (width - 1);
+      firstLineEndX   = isAboveRightAvail ? width : (width - 1);
+      for (x = firstLineStartX; x < firstLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + x;
+        const Pel *colV = srcV + x;
+
+        const int bandY    = (*colY * bandNumY) >> bitDepth;
+        const int bandU    = (*colU * bandNumU) >> bitDepth;
+        const int bandV    = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);        
+      }
+
+      srcY += srcStrideY << chromaScaleY;
+      srcU += srcStrideU;
+      srcV += srcStrideV;
+      dst += dstStride;
+
+      // middle lines
+      for (y = 1; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+      break;
+    }
+    case 3: /*(-1, 0)  left sample */
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = width;
+
+      for (y = 0; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+      break;
+    }
+    case 4: /*(0, 0)  current sample */
+    {       /* when current sample is choosen there is no more dependency on neighbor samples*/
+
+      for (y = 0; y < height; y++)
+      {
+        for (x = 0; x < width; x++)
+        {
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+      break;
+    }
+    case 5: /*(1, 0)  right sample */
+    {
+      startX = 0;
+      endX   = isRightAvail ? width : (width - 1);
+
+      for (y = 0; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+      break;
+    }
+    case 6: /*(-1, 1)  below left sample */
+    {
+      startX = isLeftAvail ? 0 : 1;
+      endX   = width;
+
+      for (y = 1; y < height; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+
+      // last line
+      lastLineStartX = isBelowLeftAvail ? 0 : 1;
+      lastLineEndX   = isBelowAvail ? endX : 1;
+
+      for (x = lastLineStartX; x < lastLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + x;
+        const Pel *colV = srcV + x;
+
+        const int bandY    = (*colY * bandNumY) >> bitDepth;
+        const int bandU    = (*colU * bandNumU) >> bitDepth;
+        const int bandV    = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);        
+      }
+      break;
+    }
+    case 7: /*(0, 1)  below sample */
+    {
+      startY = 0;
+      endY   = isBelowAvail ? height : height - 1;
+
+      for (y = startY; y < endY; y++)
+      {
+        for (x = 0; x < width; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+      break;
+    }
+    case 8: /*(1, 1)  below right sample */
+    {
+      startX = 0;
+      endX   = isRightAvail ? width : (width - 1);
+
+      for (y = 0; y < height - 1; y++)
+      {
+        for (x = startX; x < endX; x++)
+        {
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          {
+            continue;
+          }
+          const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+
+          const int bandY    = (*colY * bandNumY) >> bitDepth;
+          const int bandU    = (*colU * bandNumU) >> bitDepth;
+          const int bandV    = (*colV * bandNumV) >> bitDepth;
+          const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+          const int classIdx = bandIdx;
+
+          dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);          
+        }
+        srcY += srcStrideY << chromaScaleY;
+        srcU += srcStrideU;
+        srcV += srcStrideV;
+        dst += dstStride;
+      }
+
+      // last line
+      lastLineStartX = isBelowAvail ? startX : (width - 1);
+      lastLineEndX   = isBelowRightAvail ? width : (width - 1);
+      for (x = lastLineStartX; x < lastLineEndX; x++)
+      {
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        {
+          continue;
+        }
+        const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + x;
+        const Pel *colV = srcV + x;
+
+        const int bandY    = (*colY * bandNumY) >> bitDepth;
+        const int bandU    = (*colU * bandNumU) >> bitDepth;
+        const int bandV    = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+       
       }
     }
     break;
+    }
+    break;
+  }
   default:
+  {
+    THROW("Not a supported CCSAO compID\n");
+  }
+  }
+
+#else
+  switch (compID)
+  {
+  case COMPONENT_Y:
+  {
+    for (int y = 0; y < height; y++)
     {
-      THROW("Not a supported CCSAO compID\n");
+      for (int x = 0; x < width; x++)
+      {
+        const Pel *colY = srcY + x + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+
+        const int bandY = (*colY * bandNumY) >> bitDepth;
+        const int bandU = (*colU * bandNumU) >> bitDepth;
+        const int bandV = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+      }
+
+      srcY += srcStrideY;
+      srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+      srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+      dst += dstStride;
     }
   }
+  break;
+  case COMPONENT_Cb:
+  case COMPONENT_Cr:
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
+        const Pel *colU = srcU + x;
+        const Pel *colV = srcV + x;
+
+        const int bandY = (*colY * bandNumY) >> bitDepth;
+        const int bandU = (*colU * bandNumU) >> bitDepth;
+        const int bandV = (*colV * bandNumV) >> bitDepth;
+        const int bandIdx = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
+        const int classIdx = bandIdx;
+
+        dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+      }
+
+      srcY += srcStrideY << chromaScaleY;
+      srcU += srcStrideU;
+      srcV += srcStrideV;
+      dst += dstStride;
+    }
+  }
+  break;
+  default:
+  {
+    THROW("Not a supported CCSAO compID\n");
+  }
+  }
+#endif  
 }
 #endif
 
@@ -2032,6 +4957,6 @@ bool SampleAdaptiveOffset::isCrossedByVirtualBoundaries(const int xPos, const in
       }
     }
   }
-  return numHorVirBndry > 0 || numVerVirBndry > 0 ;
+  return numHorVirBndry > 0 || numVerVirBndry > 0;
 }
 //! \}

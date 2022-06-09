@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,6 +42,8 @@
 
 //! \ingroup CommonLib
 //! \{
+
+#ifdef TARGET_SIMD_X86
 
 #include <immintrin.h>
 
@@ -357,6 +359,8 @@ static void _printReg( const R var, const char* varname, uint8_t count = sizeof(
 #else
 #define PREG( var, t, cnt )
 #endif
+
+#endif // TARGET_SIMD_X86
 
 #endif // __COMMONDEFX86__
 

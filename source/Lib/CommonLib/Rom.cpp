@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -58,8 +58,18 @@ bool g_mctsDecCheckEnabled = false;
 
 MsgLevel g_verbosity = VERBOSE;
 #if SIGN_PREDICTION
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+#if JVET_W0119_LFNST_EXTENSION || EXTENDED_LFNST
+int8_t * g_resiBorderTemplateLFNST[6][6][210];
+#else
+int8_t * g_resiBorderTemplateLFNST[6][6][16];
+#endif
+int8_t * g_resiBorderTemplate[6][6][NUM_TRANS_TYPE*NUM_TRANS_TYPE];
+#else
 const int8_t * g_resiBorderTemplate[6][6][NUM_TRANS_TYPE*NUM_TRANS_TYPE];
+#endif
 // g_initRomSignPred: Format for each [W][H][Idx] in [0-5][0-5][0-8], 0 => empty, 1 => (W+H-1)*16 template coefficients
+#if !JVET_W0103_INTRA_MTS
 const int8_t g_initRomSignPred[] = {
  1,8, 8, 8, 8, 8, 8, 8, 10, 10, 10, 10, 5, -4, -10, 8, 8, 8, 8, -8, -8, 8, 5, 5, 5, 5, -10, 10, -4, -10, -4, 5, 10, 10, 10, 10, -13, -6, 6, 13, 6, -6, -13, -10, -4, 5, 10,
  -10, -10, 10, -6, -3, 3, 6, -13, 13, -6, 8, -8, -8, 8, 8, 8, 8, 10, -10, -10, 10, 5, -4, -10, 8, -8, -8, 8, -8, -8, 8, 5, -4, -4, 5, -10, 10, -4, -4, 10, -10, 5, 5, 5,
@@ -3621,6 +3631,7 @@ const int8_t g_initRomSignPred[] = {
  9, 8, 7, 6, 5, 4, 2, 1, 0, -1, -2, -3, -4, -6, -7, -8, -9, -10, -11, -11, -12, -13, -14, -14, -15, -15, -15, -16, -16, -16, 0,0,0,0,0,0,0,0,
 };
 #endif
+#endif
 
 const char* nalUnitTypeToString(NalUnitType type)
 {
@@ -3897,7 +3908,171 @@ const uint8_t g_aucTrIdxToTr[25][2] =
     { DST4, DCT8 },{ DST4, DST7 },{ DST4, DCT5 },{ DST4, DST4 }, {DST4, DST1},
     { DST1, DCT8 },{ DST1, DST7 },{ DST1, DCT5 },{ DST1, DST4 }, {DST1, DST1},
 };
-
+#if JVET_Y0142_ADAPT_INTRA_MTS
+const uint8_t g_aucTrSet[80][6] =
+{
+  //T0:0,  1,  2,  3,  4,  5,
+  { 18, 24, 17, 23, 8, 12},
+  //T1:0,  1,  2,  3,  4,  5,
+  { 18, 3, 7, 22,  0, 16},
+  //T2:0,  1,  2,  3,  4,  5,
+  { 18, 2, 17, 22, 3, 23},
+  //T3:0,  1,  2,  3,  4,  5,
+  { 18, 3, 15, 17, 12, 23},
+  //T4:0,  1,  2,  3,  4,  5,
+  { 18, 12, 3, 19, 10, 13},
+  //T5:0,  1,  2,  3,  4,  5,
+  { 18, 12, 19, 23, 13, 24},
+  //T6:0,  1,  2,  3,  4,  5,
+  { 18, 12, 17, 2, 3, 23},
+  //T7:0,  1,  2,  3,  4,  5,
+  { 18, 2, 17, 22, 12, 23},
+  //T8:0,  1,  2,  3,  4,  5,
+  { 18, 2, 11, 17, 22, 23},
+  //T9:0,  1,  2,  3,  4,  5,
+  { 18, 12, 19, 23, 3, 10},
+  //T10:0,  1,  2,  3,  4, 5,
+  { 16, 12, 13, 24, 7, 8},
+  //T11:0,  1,  2,  3,  4,  5,
+  { 16, 2, 11, 23, 12, 18},
+  //T12:0,  1,  2,  3,  4,  5,
+  { 13, 17, 2, 22, 12, 18},
+  //T13:0,  1,  2,  3,  4,  5,
+  { 17, 11, 2, 21, 12, 18},
+  //T14:0,  1,  2,  3,  4,  5,
+  { 16, 13, 19, 22, 3, 10},
+  //T15:0,  1,  2,  3,  4,  5,
+  { 18, 12, 13, 7, 14, 22},
+  //T16:0,  1,  2,  3,  4,  5,
+  { 16, 12, 11, 1, 18, 22},
+  //T17:0,  1,  2,  3,  4,  5,
+  { 17, 13,  3, 22, 12, 18},
+  //T18:0,  1,  2,  3,  4,  5,
+  {  6, 12,  1, 22, 13, 17},
+  //T19:0,  1,  2,  3,  4,  5,
+  { 16, 12, 13, 15, 2, 23},
+  //T20:0,  1,  2,  3,  4,  5,
+  { 18, 24, 23, 19, 12, 17},
+  //T21:0,  1,  2,  3,  4,  5,
+  { 18, 24, 2,  17,  0, 23},
+  //T22:0,  1,  2,  3,  4,  5,
+  { 17, 3,  4, 22, 2, 13},
+  //T23:0,  1,  2,  3,  4,  5,
+  { 18, 12, 19, 23, 3, 15},
+  //T24:0,  1,  2,  3,  4,  5,
+  { 18, 12, 19, 23, 3, 10},
+  //T25:0,  1,  2,  3,  4,  5,
+  {  6, 12, 18, 24, 13, 19},
+  //T26:0,  1,  2,  3,  4,  5,
+  {  6, 12,  2, 21, 13, 18},
+  //T27:0,  1,  2,  3,  4,  5,
+  { 17, 11,  1, 22, 2, 18},
+  //T28:0,  1,  2,  3,  4,  5,
+  { 16, 17, 3,  11, 12, 23},
+  //T29:0,  1,  2,  3,  4,  5,
+  {  8, 12, 19, 23, 11, 24},
+  //T30:0,  1,  2,  3,  4,  5,
+  { 16, 13, 7, 23, 12, 19},
+  //T31:0,  1,  2,  3,  4,  5,
+  {  6, 12, 1, 11, 18, 22},
+  //T32:0,  1,  2,  3,  4,  5,
+  { 17, 11, 1, 21, 12, 18},
+  //T33:0,  1,  2,  3,  4,  5,
+  {  6, 11, 17, 21, 12, 18},
+  //T34:0,  1,  2,  3,  4,  5,
+  {  8, 11, 14, 17, 12, 22},
+  //T35:0,  1,  2,  3,  4,  5,
+  {  6, 12, 11, 21, 14, 16},
+  //T36:0,  1,  2,  3,  4,  5,
+  {  6, 12, 11,  1, 17, 21},
+  //T37:0,  1,  2,  3,  4,  5,
+  {  6, 12, 11,  2, 17, 21},
+  //T38:0,  1,  2,  3,  4,  5,
+  {  6, 11, 21,  1, 12, 17},
+  //T39:0,  1,  2,  3,  4,  5,
+  {  16, 12, 11, 7, 1, 5},
+  //T40:0,  1,  2,  3,  4,  5,
+  {  8, 12, 19, 24, 11, 17},
+  //T41:0,  1,  2,  3,  4,  5,
+  { 18, 13, 1,  22, 2, 24},
+  //T42:0,  1,  2,  3,  4,  5,
+  {  6, 2, 17, 21, 19, 22},
+  //T43:0,  1,  2,  3,  4,  5,
+  { 16, 12, 11, 19, 8, 15},
+  //T44:0,  1,  2,  3,  4,  5,
+  {  8, 12, 17, 24, 13, 15},
+  //T45:0,  1,  2,  3,  4,  5,
+  {  6, 12, 19, 21, 17, 18},
+  //T46:0,  1,  2,  3,  4,  5,
+  {  6, 12, 13, 21, 2, 18},
+  //T47:0,  1,  2,  3,  4,  5,
+  { 16, 2,  17, 21, 1, 11},
+  //T48:0,  1,  2,  3,  4,  5,
+  {  6, 17, 19, 23, 12, 16},
+  //T49:0,  1,  2,  3,  4,  5,
+  {  6, 12, 14, 17, 8, 22},
+  //T50:0,  1,  2,  3,  4,  5,
+  {  6,  7, 11, 21, 9, 12},
+  //T51:0,  1,  2,  3,  4,  5,
+  { 16, 12, 11,  1, 7, 21},
+  //T52:0,  1,  2,  3,  4,  5,
+  {  6, 12, 11, 1, 17, 21},
+  //T53:0,  1,  2,  3,  4,  5,
+  {  6, 12, 11, 21, 1, 16},
+  //T54:0,  1,  2,  3,  4,  5,
+  {  8,  7,  9, 11, 12, 21},
+  //T55:0,  1,  2,  3,  4,  5,
+  {  6, 12, 7,  11, 14, 21},
+  //T56:0,  1,  2,  3,  4,  5,
+  {  6, 12, 7,  11, 1, 21},
+  //T57:0,  1,  2,  3,  4,  5,
+  { 16, 12, 11, 1, 2, 21},
+  //T58:0,  1,  2,  3,  4,  5,
+  {  6, 11, 17, 21, 1, 12},
+  //T59:0,  1,  2,  3,  4,  5,
+  {  6, 12, 7,  11, 9, 21},
+  //T60:0,  1,  2,  3,  4,  5,
+  { 18, 12, 14, 21, 6, 21},
+  //T61:0,  1,  2,  3,  4,  5,
+  { 16, 11, 1, 22,  2, 17},
+  //T62:0,  1,  2,  3,  4,  5,
+  { 16, 11, 1, 22,  2, 17},
+  //T63:0,  1,  2,  3,  4,  5,
+  { 16, 13, 15, 7, 14, 19},
+  //T64:0,  1,  2,  3,  4,  5,
+  {  8, 12, 1, 19, 16, 23},
+  //T65:0,  1,  2,  3,  4,  5,
+  {  6, 12, 7,  9, 13, 21},
+  //T66:0,  1,  2,  3,  4,  5,
+  {  6, 12, 13, 2,  7, 18},
+  //T67:0,  1,  2,  3,  4,  5,
+  { 16, 12, 1, 21, 11, 17},
+  //T68:0,  1,  2,  3,  4,  5,
+  { 16, 11, 7, 19, 12, 15},
+  //T69:0,  1,  2,  3,  4,  5,
+  {  8, 12, 7, 11, 14, 21},
+  //T70:0,  1,  2,  3,  4,  5,
+  {  6, 12, 7, 11, 8, 9},
+  //T71:0,  1,  2,  3,  4,  5,
+  { 6, 12,  7, 11, 2, 21},
+  //T72:0,  1,  2,  3,  4,  5,
+  {  6, 12, 1, 11, 21, 22},
+  //T73:0,  1,  2,  3,  4,  5,
+  {  6,  7, 11, 16, 9, 12},
+  //T74:0,  1,  2,  3,  4,  5,
+  { 6,  12,  7, 11, 9, 21},
+  //T75:0,  1,  2,  3,  4,  5,
+  { 6, 12,  7, 11, 13, 17},
+  //T76:0,  1,  2,  3,  4,  5,
+  {  6, 12, 11, 21, 2, 7},
+  //T77:0,  1,  2,  3,  4,  5,
+  {  6, 12, 1,  11, 2, 7},
+  //T78:0,  1,  2,  3,  4,  5,
+  { 6,  12, 7, 11, 16, 21},
+  //T79:0,  1,  2,  3,  4,  5,
+  { 6,  12, 7, 11, 9, 16},
+};
+#else
 const uint8_t g_aucTrSet[80][4] =
 {
 //T0:0,  1,  2,  3,
@@ -4061,6 +4236,7 @@ const uint8_t g_aucTrSet[80][4] =
 //T79:0,  1,  2,  3, 
 {  6,  7, 11, 12},
 };
+#endif
 #endif
 // initialize ROM variables
 void initROM()
@@ -4301,6 +4477,10 @@ void initROM()
   }
 #endif
 
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  memset(&g_resiBorderTemplate[0][0][0], 0, sizeof(g_resiBorderTemplate));
+  memset(&g_resiBorderTemplateLFNST[0][0][0], 0, sizeof(g_resiBorderTemplateLFNST));
+#endif
 #if TU_256
   c = 256;
   const double s = sqrt( ( double ) c ) * (64 << COM16_C806_TRANS_PREC);
@@ -4430,7 +4610,39 @@ void destroyROM()
     delete[] g_globalGeoEncSADmask[i];
     g_globalGeoWeights   [i] = nullptr;
     g_globalGeoEncSADmask[i] = nullptr;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+    delete[] g_globalGeoWeightsTpl[i];
+    g_globalGeoWeightsTpl[i] = nullptr;
+#endif
   }
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  for (int log2Width = 0; log2Width < 6; log2Width++)
+  {
+    for (int log2Height = 0; log2Height < 6; log2Height++)
+    {
+      for (int idx = 0; idx < NUM_TRANS_TYPE*NUM_TRANS_TYPE; idx++)
+      {
+        if (g_resiBorderTemplate[log2Width][log2Height][idx])
+        {
+          xFree(g_resiBorderTemplate[log2Width][log2Height][idx]);
+          g_resiBorderTemplate[log2Width][log2Height][idx] = nullptr;
+        }
+      }
+#if JVET_W0119_LFNST_EXTENSION || EXTENDED_LFNST
+      for (int idx = 0; idx < 210; idx++)
+#else
+      for (int idx = 0; idx < 16; idx++)
+#endif
+      {
+        if (g_resiBorderTemplateLFNST[log2Width][log2Height][idx])
+        {
+          xFree(g_resiBorderTemplateLFNST[log2Width][log2Height][idx]);
+          g_resiBorderTemplateLFNST[log2Width][log2Height][idx] = nullptr;
+        }
+      }
+    }
+  }
+#endif
 }
 
 #if MMLM
@@ -4776,6 +4988,9 @@ void initGeoTemplate()
       continue;
     }
     g_globalGeoWeights[g_angle2mask[angleIdx]] = new int16_t[GEO_WEIGHT_MASK_SIZE * GEO_WEIGHT_MASK_SIZE];
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+    g_globalGeoWeightsTpl[g_angle2mask[angleIdx]] = new Pel[GEO_WEIGHT_MASK_SIZE_EXT * GEO_WEIGHT_MASK_SIZE_EXT];
+#endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
     g_globalGeoEncSADmask[g_angle2mask[angleIdx]] = new Pel[GEO_WEIGHT_MASK_SIZE * GEO_WEIGHT_MASK_SIZE];
 #else
@@ -4787,6 +5002,26 @@ void initGeoTemplate()
     int16_t rho = (g_Dis[distanceX] << (GEO_MAX_CU_LOG2+1)) + (g_Dis[distanceY] << (GEO_MAX_CU_LOG2 + 1));
     static const int16_t maskOffset = (2*GEO_MAX_CU_SIZE - GEO_WEIGHT_MASK_SIZE) >> 1;
     int index = 0;
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+    int indexGeoWeight = 0;
+    for( int y = -GEO_TM_ADDED_WEIGHT_MASK_SIZE; y < GEO_WEIGHT_MASK_SIZE + GEO_TM_ADDED_WEIGHT_MASK_SIZE; y++ )
+    {
+      int16_t lookUpY = (((y + maskOffset) << 1) + 1) * g_Dis[distanceY];
+      for( int x = -GEO_TM_ADDED_WEIGHT_MASK_SIZE; x < GEO_WEIGHT_MASK_SIZE + GEO_TM_ADDED_WEIGHT_MASK_SIZE; x++ )
+      {
+        int16_t sx_i = ((x + maskOffset) << 1) + 1;
+        int16_t weightIdx = sx_i * g_Dis[distanceX] + lookUpY - rho;
+        int weightLinearIdx = 32 + weightIdx;
+        g_globalGeoWeightsTpl[g_angle2mask[angleIdx]][index++] = weightIdx > 0 ? 1 : 0;
+        if (x >= 0 && x < GEO_WEIGHT_MASK_SIZE && y >=0 && y < GEO_WEIGHT_MASK_SIZE)
+        {
+          g_globalGeoWeights   [g_angle2mask[angleIdx]][indexGeoWeight] = Clip3(0, 8, (weightLinearIdx + 4) >> 3);
+          g_globalGeoEncSADmask[g_angle2mask[angleIdx]][indexGeoWeight] = weightIdx > 0 ? 1 : 0;
+          ++indexGeoWeight;
+        }
+      }
+    }
+#else
     for( int y = 0; y < GEO_WEIGHT_MASK_SIZE; y++ )
     {
       int16_t lookUpY = (((y + maskOffset) << 1) + 1) * g_Dis[distanceY];
@@ -4799,6 +5034,7 @@ void initGeoTemplate()
         g_globalGeoEncSADmask[g_angle2mask[angleIdx]][index] = weightIdx > 0 ? 1 : 0;
       }
     }
+#endif
   }
 
   for( int hIdx = 0; hIdx < GEO_NUM_CU_SIZE; hIdx++ )
@@ -4829,10 +5065,15 @@ void initGeoTemplate()
       }
     }
   }
+
+
 }
 
 int16_t** g_GeoParams;
 int16_t*  g_globalGeoWeights   [GEO_NUM_PRESTORED_MASK];
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+Pel*      g_globalGeoWeightsTpl[GEO_NUM_PRESTORED_MASK];
+#endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
 Pel*      g_globalGeoEncSADmask[GEO_NUM_PRESTORED_MASK];
 #else
@@ -4842,11 +5083,14 @@ int16_t   g_weightOffset       [GEO_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE][GEO_NUM
 int8_t    g_angle2mask[GEO_NUM_ANGLES] = { 0, -1, 1, 2, 3, 4, -1, -1, 5, -1, -1, 4, 3, 2, 1, -1, 0, -1, 1, 2, 3, 4, -1, -1, 5, -1, -1, 4, 3, 2, 1, -1 };
 int8_t    g_Dis[GEO_NUM_ANGLES] = { 8, 8, 8, 8, 4, 4, 2, 1, 0, -1, -2, -4, -4, -8, -8, -8, -8, -8, -8, -8, -4, -4, -2, -1, 0, 1, 2, 4, 4, 8, 8, 8 };
 int8_t    g_angle2mirror[GEO_NUM_ANGLES] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2 };
+#if JVET_Y0065_GPM_INTRA
+int8_t    g_geoAngle2IntraAng[GEO_NUM_ANGLES] = {50, 0, 44, 41, 34, 27, 0, 0, 18, 0, 0, 9, 66, 59, 56, 0, 50, 0, 44, 41, 34, 27, 0, 0, 18, 0, 0, 9, 66, 59, 56, 0};
+#endif
 #if MULTI_HYP_PRED
 const int g_addHypWeight[MULTI_HYP_PRED_NUM_WEIGHTS] = { 2, -1 };
 static_assert(g_BcwLog2WeightBase == MULTI_HYP_PRED_WEIGHT_BITS, "number of bits for gbi and multi-hyp weights do not match");
 #endif
-#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+#if (JVET_W0097_GPM_MMVD_TM && TM_MRG) || JVET_Y0065_GPM_INTRA
 uint8_t g_geoTmShape[2][GEO_NUM_ANGLES] = {
                                           { GEO_TM_SHAPE_A,  0,               GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,
                                             GEO_TM_SHAPE_A,  GEO_TM_SHAPE_AL, 0,               0,
@@ -4868,5 +5112,16 @@ uint8_t g_geoTmShape[2][GEO_NUM_ANGLES] = {
 #if JVET_W0066_CCSAO
 const int8_t g_ccSaoCandPosX[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y] = { {-1,  0,  1, -1,  0,  1, -1,  0,  1} };
 const int8_t g_ccSaoCandPosY[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y] = { {-1, -1, -1,  0,  0,  0,  1,  1,  1} };
+#endif
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+const int8_t g_ccSaoEdgeTypeX[CCSAO_EDGE_TYPE][2] = { { -1, 1 }, { 0, 0 }, { -1, 1 }, { 1, -1 } };
+const int8_t g_ccSaoEdgeTypeY[CCSAO_EDGE_TYPE][2] = { { 0, 0 }, { -1, 1 }, { -1, 1 }, { -1, 1 } };
+const short  g_ccSaoQuanValue[CCSAO_QUAN_NUM]      = { 2, 4, 6, 8, 10, 14, 18, 22, 30, 38, 54, 70, 86, 118, 150, 182 };
+#endif
+#if JVET_V0130_INTRA_TMP
+unsigned int g_uiDepth2Width[5] = { 4, 8, 16, 32, 64 };
+#endif
+#if JVET_X0149_TIMD_DIMD_LUT
+int g_gradDivTable[16] = { 0, 7, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0 };
 #endif
 //! \}

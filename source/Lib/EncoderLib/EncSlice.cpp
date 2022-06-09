@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2021, ITU/ISO/IEC
+ * Copyright (c) 2010-2022, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -445,10 +445,22 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
       if(m_pcCfg->getDecodingRefreshType() == 3)
       {
         eSliceType = (pocLast == 0 || pocCurr % (m_pcCfg->getIntraPeriod() * multipleFactor) == 0 || m_pcGOPEncoder->getGOPSize() == 0) && (!useIlRef) ? I_SLICE : eSliceType;
+#if JVET_Z0118_GDR
+        if (m_pcCfg->getGdrEnabled() && (pocCurr >= m_pcCfg->getGdrPocStart()) && ((pocCurr - m_pcCfg->getGdrPocStart()) % m_pcCfg->getGdrPeriod() == 0))
+        {
+          eSliceType = B_SLICE;
+        }
+#endif
       }
       else
       {
         eSliceType = (pocLast == 0 || (pocCurr - (isField ? 1 : 0)) % (m_pcCfg->getIntraPeriod() * multipleFactor) == 0 || m_pcGOPEncoder->getGOPSize() == 0) && (!useIlRef) ? I_SLICE : eSliceType;
+#if JVET_Z0118_GDR
+        if (m_pcCfg->getGdrEnabled() && (pocCurr >= m_pcCfg->getGdrPocStart()) && ((pocCurr - m_pcCfg->getGdrPocStart()) % m_pcCfg->getGdrPeriod() == 0))
+        {
+          eSliceType = B_SLICE;
+        }
+#endif
       }
     }
   }
@@ -612,10 +624,22 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
         if(m_pcCfg->getDecodingRefreshType() == 3)
         {
           eSliceType = (pocLast == 0 || pocCurr % (m_pcCfg->getIntraPeriod() * multipleFactor) == 0 || m_pcGOPEncoder->getGOPSize() == 0) && (!useIlRef) ? I_SLICE : eSliceType;
+#if JVET_Z0118_GDR
+          if (m_pcCfg->getGdrEnabled() && (pocCurr >= m_pcCfg->getGdrPocStart()) && ((pocCurr - m_pcCfg->getGdrPocStart()) % m_pcCfg->getGdrPeriod() == 0))
+          {
+            eSliceType = B_SLICE;
+          }
+#endif
         }
         else
         {
           eSliceType = (pocLast == 0 || (pocCurr - (isField ? 1 : 0)) % (m_pcCfg->getIntraPeriod() * multipleFactor) == 0 || m_pcGOPEncoder->getGOPSize() == 0) && (!useIlRef) ? I_SLICE : eSliceType;
+#if JVET_Z0118_GDR
+          if (m_pcCfg->getGdrEnabled() && (pocCurr >= m_pcCfg->getGdrPocStart()) && ((pocCurr - m_pcCfg->getGdrPocStart()) % m_pcCfg->getGdrPeriod() == 0))
+          {
+            eSliceType = B_SLICE;
+          }
+#endif
         }
       }
     }
@@ -752,6 +776,151 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
     m_pcCuEncoder->getIbcHashMap().destroy();
     m_pcCuEncoder->getIbcHashMap().init( pcPic->cs->pps->getPicWidthInLumaSamples(), pcPic->cs->pps->getPicHeightInLumaSamples() );
   }
+#if JVET_Z0118_GDR
+  pcPic->cs->picHeader->setGdrPicFlag(false);
+  pcPic->cs->picHeader->setRecoveryPocCnt(0);
+  pcPic->cs->picHeader->setInGdrInterval(false);  
+  pcPic->cs->picHeader->setIsGdrRecoveryPocPic(false);
+  pcPic->cs->picHeader->setVirtualBoundariesPresentFlag(false);
+
+  if (m_pcCfg->getGdrEnabled())
+  {
+    int gdrPocStart = m_pcCuEncoder->getEncCfg()->getGdrPocStart();
+    int gdrPeriod = m_pcCuEncoder->getEncCfg()->getGdrPeriod();
+    int gdrInterval = m_pcCuEncoder->getEncCfg()->getGdrInterval();
+
+    int picWidth = rpcSlice->getPPS()->getPicWidthInLumaSamples();
+
+    int curPoc = rpcSlice->getPOC();
+    int gdrPoc = (curPoc - gdrPocStart) % gdrPeriod;
+
+    int  offset = (curPoc < gdrPocStart) ? 0 : (((curPoc - gdrPocStart) / gdrPeriod) * gdrPeriod);
+    int  actualGdrStart = gdrPocStart + offset;
+    int  actualGdrInterval = min(gdrInterval, (int)(pcPic->getPicWidthInLumaSamples() / 8));
+    int  recoveryPocCnt = actualGdrInterval - 1;
+    int  recoveryPicPoc = actualGdrStart + recoveryPocCnt;
+
+    bool isInGdrInterval = (curPoc >= actualGdrStart) && (curPoc < recoveryPicPoc);
+    bool isRecoveryPocPic = (curPoc == recoveryPicPoc);
+    bool isOutGdrInterval = !(isInGdrInterval || isRecoveryPocPic);
+    bool isGdrPic = (actualGdrStart == curPoc);
+    
+#if GDR_ENC_TRACE
+    printf("\n");
+    printf("-poc:%d gdrPocStart:%d actualGdrStart:%d actualGdrInterval:%d actualGdrEndPoc:%d isInGdrInterval:%d isRecoveryPocPic:%d\n", rpcSlice->getPOC(), gdrPocStart, actualGdrStart, actualGdrInterval, recoveryPicPoc - 1, isInGdrInterval, isRecoveryPocPic);
+#endif
+    
+    // for none gdr period pictures
+    if ((curPoc < gdrPocStart) || isOutGdrInterval)
+    {
+      pcPic->cs->picHeader->setInGdrInterval(false);
+      pcPic->cs->picHeader->setVirtualBoundariesPresentFlag(false);
+
+      pcPic->cs->picHeader->setNumHorVirtualBoundaries(0);
+      pcPic->cs->picHeader->setNumVerVirtualBoundaries(0);
+
+#if GDR_ENC_TRACE
+      printf("-poc:%d no virtual boundary\n", rpcSlice->getPOC());
+#endif
+    }
+    // for gdr inteval pictures
+    else
+    {
+      int gdrBegX;
+      int gdrEndX;
+      int m1, m2, n1;
+
+      double dd = (picWidth / (double)gdrInterval);
+      int mm = (int)((picWidth / (double)gdrInterval) + 0.49999);
+      m1 = ((mm + 7) >> 3) << 3;
+      m2 = ((mm + 0) >> 3) << 3;
+
+      if (dd > mm && m1 == m2)
+      {
+        m1 = m1 + 8;
+      }
+
+      n1 = (picWidth - m2 * gdrInterval) / 8;
+
+      if (gdrPoc < n1)
+      {
+        gdrBegX = m1 * gdrPoc;
+        gdrEndX = gdrBegX + m1;
+      }
+      else
+      {
+        gdrBegX = m1 * n1 + m2 * (gdrPoc - n1);
+        gdrEndX = gdrBegX + m2;
+        if (picWidth <= gdrBegX)
+        {
+          gdrBegX = picWidth;
+          gdrEndX = picWidth;
+        }
+      }
+
+      pcPic->cs->picHeader->setGdrBegX(gdrBegX);
+      pcPic->cs->picHeader->setGdrEndX(gdrEndX);
+
+      if (isGdrPic)
+      {
+        pcPic->cs->picHeader->setGdrOrIrapPicFlag(true);
+        pcPic->cs->picHeader->setGdrPicFlag(true);
+
+        pcPic->cs->picHeader->setInGdrInterval(true);
+        pcPic->cs->picHeader->setIsGdrRecoveryPocPic(false);
+
+        pcPic->cs->picHeader->setVirtualBoundariesPresentFlag(true);
+        pcPic->cs->picHeader->setNumHorVirtualBoundaries(0);
+        pcPic->cs->picHeader->setNumVerVirtualBoundaries(1);
+        pcPic->cs->picHeader->setVirtualBoundariesPosX(gdrEndX, 0);
+
+        pcPic->cs->picHeader->setRecoveryPocCnt(recoveryPocCnt);
+        m_pcGOPEncoder->setLastGdrIntervalPoc(recoveryPicPoc - 1);
+      }      
+      else if (isInGdrInterval)
+      {
+        pcPic->cs->picHeader->setGdrOrIrapPicFlag(false);
+
+        pcPic->cs->picHeader->setInGdrInterval(true);
+        pcPic->cs->picHeader->setIsGdrRecoveryPocPic(false);
+
+        pcPic->cs->picHeader->setVirtualBoundariesPresentFlag(true);
+        pcPic->cs->picHeader->setNumHorVirtualBoundaries(0);
+        pcPic->cs->picHeader->setNumVerVirtualBoundaries(1);
+        pcPic->cs->picHeader->setVirtualBoundariesPosX(gdrEndX, 0);
+      }
+      else if (isRecoveryPocPic)
+      {
+        pcPic->cs->picHeader->setGdrOrIrapPicFlag(false);
+
+        pcPic->cs->picHeader->setInGdrInterval(false);
+        pcPic->cs->picHeader->setIsGdrRecoveryPocPic(true);
+
+        pcPic->cs->picHeader->setVirtualBoundariesPresentFlag(false);
+        pcPic->cs->picHeader->setNumHorVirtualBoundaries(0);
+        pcPic->cs->picHeader->setNumVerVirtualBoundaries(0);
+#if GDR_ENC_TRACE
+        printf("-poc:%d no virtual boundary\n", rpcSlice->getPOC());
+#endif
+      }
+      
+#if GDR_ENC_TRACE
+      if (isGdrPic || isInGdrInterval)
+      {        
+        printf("-poc:%d beg:%d end:%d\n", rpcSlice->getPOC(), gdrBegX, gdrEndX);
+      }
+#endif
+    }
+
+#if JVET_Z0118_GDR    
+    if (pcPic->cs->sps->getGDREnabledFlag())
+    {
+      pcPic->initCleanCurPicture();
+    }
+#endif
+
+  }
+#endif
 }
 
 double EncSlice::initializeLambda(const Slice* slice, const int GOPid, const int refQP, const double dQP)
@@ -1356,6 +1525,9 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
   m_uiPicDist       = 0;
 
   pcSlice->setSliceQpBase( pcSlice->getSliceQp() );
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT 
+  m_CABACEstimator->m_CABACDataStore->updateBufferState( pcSlice );
+#endif
 
   m_CABACEstimator->initCtxModels( *pcSlice );
 
@@ -1415,6 +1587,9 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
     if (applyQPAdaptation (pcPic, pcSlice, *cs.pcv, m_pcCfg->getLumaLevelToDeltaQPMapping().mode == LUMALVL_TO_DQP_NUM_MODES,
                            (m_pcCfg->getBaseQP() >= 38) || (m_pcCfg->getSourceWidth() <= 512 && m_pcCfg->getSourceHeight() <= 320), m_adaptedLumaQP))
     {
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT 
+      m_CABACEstimator->m_CABACDataStore->updateBufferState( pcSlice );
+#endif
       m_CABACEstimator->initCtxModels (*pcSlice);
 #if ENABLE_SPLIT_PARALLELISM
       for (int jId = 1; jId < m_pcLib->getNumCuEncStacks(); jId++)
@@ -1537,7 +1712,6 @@ void EncSlice::setJointCbCrModes( CodingStructure& cs, const Position topLeftLum
   cs.picHeader->setJointCbCrSignFlag( sgnFlag );
 }
 
-
 void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, const bool bFastDeltaQP, EncLib* pEncLib )
 {
   CodingStructure&  cs            = *pcPic->cs;
@@ -1604,8 +1778,33 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     if( pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU() )
     if ((cs.slice->getSliceType() != I_SLICE || cs.sps->getIBCFlag()) && cs.pps->ctuIsTileColBd( ctuXPosInCtus ))
     {
+#if JVET_Z0118_GDR
+      cs.motionLut.lut0.resize(0);
+      cs.motionLut.lut1.resize(0);
+      cs.motionLut.lutIbc0.resize(0);
+      cs.motionLut.lutIbc1.resize(0);
+#else
       cs.motionLut.lut.resize(0);
       cs.motionLut.lutIbc.resize(0);
+#endif
+
+#if JVET_Z0139_HIST_AFF
+        for (int i = 0; i < 2 * MAX_NUM_AFFHMVP_ENTRIES_ONELIST; i++)
+        {
+#if JVET_Z0118_GDR
+          cs.motionLut.lutAff0[i].resize(0);
+          cs.motionLut.lutAff1[i].resize(0);
+#else
+          cs.motionLut.lutAff[i].resize(0);
+#endif
+        }
+#if JVET_Z0118_GDR
+        cs.motionLut.lutAffInherit0.resize(0);
+        cs.motionLut.lutAffInherit1.resize(0);
+#else
+        cs.motionLut.lutAffInherit.resize(0);
+#endif
+#endif
     }
 
     const SubPic &curSubPic = pcSlice->getPPS()->getSubPicFromPos(pos);
@@ -1736,7 +1935,7 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       resetBcwCodingOrder(false, cs);
       m_pcInterSearch->initWeightIdxBits();
     }
-#if !JVET_V0094_BILATERAL_FILTER
+#if !JVET_V0094_BILATERAL_FILTER && !JVET_X0071_CHROMA_BILATERAL_FILTER
     if (pcSlice->getSPS()->getUseLmcs())
 #endif
     {
@@ -1887,6 +2086,10 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
   const uint32_t widthInCtus   = pcv.widthInCtus;
   uint32_t uiSubStrm = 0;
 
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  static Ctx storedCtx;
+#endif
+
   // for every CTU in the slice...
   for( uint32_t ctuIdx = 0; ctuIdx < pcSlice->getNumCtuInSlice(); ctuIdx++ )
   {
@@ -1943,12 +2146,20 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
     if(ctuRsAddr == 0)
     {
-        CBifParams& CBifParam = cs.picture->getCBifParam();
-        m_CABACWriter->Cbif_Cb(*pcSlice, CBifParam);
-        m_CABACWriter->Cbif_Cr(*pcSlice, CBifParam);
+        ChromaBifParams& chromaBifParam = cs.picture->getChromaBifParam();
+        m_CABACWriter->chromaBifCb(*pcSlice, chromaBifParam);
+        m_CABACWriter->chromaBifCr(*pcSlice, chromaBifParam);
     }
 #endif
     m_CABACWriter->coding_tree_unit( cs, ctuArea, pcPic->m_prevQP, ctuRsAddr );
+
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+    // store CABAC context to be used in next frames
+    if( storeContexts( pcSlice, ctuXPosInCtus, ctuYPosInCtus ) )
+    {
+      storedCtx = m_CABACWriter->getCtx();
+    }
+#endif
 
     // store probabilities of first CTU in line into buffer
     if( cs.pps->ctuIsTileColBd( ctuXPosInCtus ) && wavefrontsEnabled )
@@ -1993,6 +2204,13 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
   }
   numBinsCoded += m_CABACWriter->getNumBins();
 
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  // store CABAC context to be used in next frames when the last CTU in a picture is processed
+  if( pcSlice->getPPS()->pcv->sizeInCtus - 1 == pcSlice->getCtuAddrInSlice( pcSlice->getNumCtuInSlice() - 1 ) )
+  {
+    m_CABACWriter->m_CABACDataStore->storeCtxStates( pcSlice, storedCtx );
+  }
+#endif
 }
 
 
