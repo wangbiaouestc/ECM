@@ -7319,6 +7319,7 @@ bool PU::addSpatialAffineMergeHMVPCand(const PredictionUnit& pu, AffineMergeCtx&
     {
       if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
       {
+        affMrgCtx.numValidMergeCand++;
         return true;
       }
 
@@ -9005,6 +9006,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 #endif
       if ( affMrgCtx.numValidMergeCand == mrgCandIdx )
       {
+        affMrgCtx.numValidMergeCand++;
         return;
       }
 
@@ -9121,6 +9123,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 #endif
       if ( affMrgCtx.numValidMergeCand == mrgCandIdx )
       {
+        affMrgCtx.numValidMergeCand++;
         return;
       }
 
@@ -9307,6 +9310,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
         {
           if (affMrgCtx.numValidMergeCand == mrgCandIdx)
           {
+            affMrgCtx.numValidMergeCand++;
             return;
           }
           affMrgCtx.numValidMergeCand ++;
@@ -9348,6 +9352,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
           {
             if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
             {
+              affMrgCtx.numValidMergeCand++;
               return;
             }
 
@@ -9416,6 +9421,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       {
         if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
         {
+          affMrgCtx.numValidMergeCand++;
           return;
         }
 
@@ -9456,6 +9462,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
         {
           if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
           {
+            affMrgCtx.numValidMergeCand++;
             return;
           }
 
@@ -9480,6 +9487,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       {
         if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
         {
+          affMrgCtx.numValidMergeCand++;
           return;
         }
 
@@ -9564,6 +9572,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       {
         if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
         {
+          affMrgCtx.numValidMergeCand++;
           return;
         }
 
@@ -9600,6 +9609,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
     affMrgCtx.affineType[cnt] = AFFINEMODEL_4PARAM;
     if ( cnt == mrgCandIdx )
     {
+      affMrgCtx.numValidMergeCand++;
       return;
     }
     cnt++;
