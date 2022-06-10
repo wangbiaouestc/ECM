@@ -2350,7 +2350,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               );
               pu.mvpNum [eRefList] = amvpInfo.numCand;
 #if JVET_Z0054_BLK_REF_PIC_REORDER
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+              if( (!PU::useRefCombList(pu) && !PU::useRefPairList(pu)) || (pu.amvpMergeModeFlag[REF_PIC_LIST_0] || pu.amvpMergeModeFlag[REF_PIC_LIST_1]))
+#else
               if(!PU::useRefCombList(pu) && !PU::useRefPairList(pu))
+#endif
               {
 #else
               if (!cu.cs->pcv->isEncoder)
