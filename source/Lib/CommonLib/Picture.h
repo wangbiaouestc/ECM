@@ -99,7 +99,11 @@ struct Picture : public UnitArea
   uint32_t margin;
   Picture();
 
+#if JVET_Z0118_GDR       
+  void create(const bool gdrEnabled, const ChromaFormat &_chromaFormat, const Size &size, const unsigned _maxCUSize, const unsigned _margin, const bool _decoder, const int _layerId, const bool gopBasedTemporalFilterEnabled = false);
+#else
   void create( const ChromaFormat &_chromaFormat, const Size &size, const unsigned _maxCUSize, const unsigned margin, const bool bDecoder, const int layerId, const bool gopBasedTemporalFilterEnabled = false );
+#endif
   void destroy();
 
   void createTempBuffers( const unsigned _maxCUSize );
@@ -149,11 +153,7 @@ struct Picture : public UnitArea
          PelUnitBuf getBuf(const UnitArea &unit,     const PictureType &type);
   const CPelUnitBuf getBuf(const UnitArea &unit,     const PictureType &type) const;
 
-#if JVET_Z0118_GDR
-  void extendPicBorder( const SPS *sps, const PPS *pps );
-#else
   void extendPicBorder( const PPS *pps );
-#endif
   void extendWrapBorder( const PPS *pps );
   void finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHeader *picHeader, APS** alfApss, APS* lmcsAps, APS* scalingListAps );
 

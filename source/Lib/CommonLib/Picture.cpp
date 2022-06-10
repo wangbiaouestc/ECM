@@ -212,19 +212,29 @@ Picture::Picture()
 #endif
 }
 
+#if JVET_Z0118_GDR
+void Picture::create(const bool gdrEnabled, const ChromaFormat &_chromaFormat, const Size &size, const unsigned _maxCUSize, const unsigned _margin, const bool _decoder, const int _layerId, const bool gopBasedTemporalFilterEnabled)
+#else
 void Picture::create( const ChromaFormat &_chromaFormat, const Size &size, const unsigned _maxCUSize, const unsigned _margin, const bool _decoder, const int _layerId, const bool gopBasedTemporalFilterEnabled )
+#endif
 {
   layerId = _layerId;
   UnitArea::operator=( UnitArea( _chromaFormat, Area( Position{ 0, 0 }, size ) ) );
   margin            =  MAX_SCALING_RATIO*_margin;
   const Area a      = Area( Position(), size );
+
 #if JVET_Z0118_GDR
-  M_BUFS( 0, PIC_RECONSTRUCTION_0 ).create( _chromaFormat, a, _maxCUSize, margin, MEMORY_ALIGN_DEF_SIZE );
-  M_BUFS( 0, PIC_RECONSTRUCTION_1 ).create( _chromaFormat, a, _maxCUSize, margin, MEMORY_ALIGN_DEF_SIZE );
+  int numPt = (gdrEnabled) ? 2 : 1;
+  for (int i = 0; i < numPt; i++)
+  {
+    M_BUFS(0, PIC_RECONSTRUCTION_0 + i).create(_chromaFormat, a, _maxCUSize, margin, MEMORY_ALIGN_DEF_SIZE);
+  }  
 #else
   M_BUFS( 0, PIC_RECONSTRUCTION ).create( _chromaFormat, a, _maxCUSize, margin, MEMORY_ALIGN_DEF_SIZE );
-  M_BUFS( 0, PIC_RECON_WRAP ).create( _chromaFormat, a, _maxCUSize, margin, MEMORY_ALIGN_DEF_SIZE );
 #endif
+
+  M_BUFS( 0, PIC_RECON_WRAP ).create( _chromaFormat, a, _maxCUSize, margin, MEMORY_ALIGN_DEF_SIZE );
+
   
   if( !_decoder )
   {
@@ -411,7 +421,12 @@ void Picture::finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHead
   {
     cs = new CodingStructure( g_globalUnitCache.cuCache, g_globalUnitCache.puCache, g_globalUnitCache.tuCache );
     cs->sps = &sps;
+#if JVET_Z0118_GDR
+    cs->create(chromaFormatIDC, Area(0, 0, iWidth, iHeight), true, (bool)sps.getPLTMode(), sps.getGDREnabledFlag());
+#else
     cs->create(chromaFormatIDC, Area(0, 0, iWidth, iHeight), true, (bool)sps.getPLTMode());
+#endif
+
   }
 
   cs->vps = vps;
@@ -1014,8 +1029,10 @@ void Picture::extendSubPicBorder(int POC, int subPicX0, int subPicY0, int subPic
     // 2.3 calculate the width/height of the Subpicture
     int width = subPicWidth >> getComponentScaleX(compID, cs->area.chromaFormat);
     int height = subPicHeight >> getComponentScaleY(compID, cs->area.chromaFormat);
+
 #if JVET_Z0118_GDR
-    for (int i = 0; i < 2; i++)
+    int numPt = (cs->isGdrEnabled()) ? 2 : 1;    
+    for (int i = 0; i < numPt; i++)
     {
       PelBuf s = M_BUFS(0, PIC_RECONSTRUCTION+i).get(compID);
       Pel *src = s.bufAt(left, top);
@@ -1193,11 +1210,7 @@ void Picture::restoreSubPicBorder(int POC, int subPicX0, int subPicY0, int subPi
   m_bufWrapSubPicBelow.destroy();
 }
 
-#if JVET_Z0118_GDR
-void Picture::extendPicBorder( const SPS *sps, const PPS *pps )
-#else
 void Picture::extendPicBorder( const PPS *pps )
-#endif
 {
   if ( m_bIsBorderExtended )
   {
@@ -1209,12 +1222,7 @@ void Picture::extendPicBorder( const PPS *pps )
   }
 
 #if JVET_Z0118_GDR
-  int numPt = PIC_RECONSTRUCTION_0;
-  if (sps->getGDREnabledFlag())
-  {
-    numPt = PIC_RECONSTRUCTION_1;
-  }
-
+  int numPt = (cs->isGdrEnabled()) ? PIC_RECONSTRUCTION_1 : PIC_RECONSTRUCTION_0;  
   for (int pt = (int) PIC_RECONSTRUCTION_0; pt <= (int) numPt; pt++)
   {
     for (int comp = 0; comp < getNumberValidComponents(cs->area.chromaFormat); comp++)
@@ -1370,6 +1378,7 @@ PelBuf Picture::getBuf( const ComponentID compID, const PictureType &type )
     return M_BUFS(scheduler.getSplitPicId(), type).getBuf(compID);
   }
 #endif
+
   return M_BUFS( ( type == PIC_ORIGINAL || type == PIC_TRUE_ORIGINAL || type == PIC_FILTERED_ORIGINAL || type == PIC_ORIGINAL_INPUT || type == PIC_TRUE_ORIGINAL_INPUT || type == PIC_FILTERED_ORIGINAL_INPUT ) ? 0 : scheduler.getSplitPicId(), type ).getBuf( compID );
 }
 
@@ -1381,6 +1390,7 @@ const CPelBuf Picture::getBuf( const ComponentID compID, const PictureType &type
     return M_BUFS(scheduler.getSplitPicId(), type).getBuf(compID);
   }
 #endif
+
   return M_BUFS( ( type == PIC_ORIGINAL || type == PIC_TRUE_ORIGINAL || type == PIC_FILTERED_ORIGINAL || type == PIC_ORIGINAL_INPUT || type == PIC_TRUE_ORIGINAL_INPUT || type == PIC_FILTERED_ORIGINAL_INPUT ) ? 0 : scheduler.getSplitPicId(), type ).getBuf( compID );
 }
 
@@ -1544,6 +1554,11 @@ void Picture::addPictureToHashMapForInter()
 #if JVET_Z0118_GDR
 void Picture::initCleanCurPicture()
 {   
+  if (!cs->isGdrEnabled())
+  {
+    return;
+  }
+
   const int picWidth = getPicWidthInLumaSamples();
   const int picHight = getPicHeightInLumaSamples();
   const int bitDepth = slices[0]->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
@@ -1552,11 +1567,11 @@ void Picture::initCleanCurPicture()
   UnitArea wholePictureArea = UnitArea(chromaFormat, Area(Position(0, 0), Size(picWidth, picHight)));
 
   getBuf(wholePictureArea, PIC_RECONSTRUCTION_0).fill(dirtyPelVal);
-  getBuf(wholePictureArea, PIC_RECONSTRUCTION_1).fill(dirtyPelVal);  
+  getBuf(wholePictureArea, PIC_RECONSTRUCTION_1).fill(dirtyPelVal);
 
   cs->getMotionBuf(wholePictureArea, PIC_RECONSTRUCTION_0).fill(0);
   cs->getMotionBuf(wholePictureArea, PIC_RECONSTRUCTION_1).fill(0);
-
+   
 #if JVET_W0123_TIMD_FUSION
   cs->getIpmBuf(wholePictureArea, PIC_RECONSTRUCTION_0).fill(0);
   cs->getIpmBuf(wholePictureArea, PIC_RECONSTRUCTION_1).fill(0);
@@ -1565,6 +1580,11 @@ void Picture::initCleanCurPicture()
 
 void Picture::copyCleanCurPicture()
 {
+  if (!cs->isGdrEnabled())
+  {
+    return;
+  }
+
   if (cs->isInGdrIntervalOrRecoveryPoc())
   {
     ChromaFormat chromaFormat = cs->sps->getChromaFormatIdc();

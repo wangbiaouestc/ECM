@@ -103,8 +103,14 @@ public:
 
   CodingStructure(CUCache&, PUCache&, TUCache&);
 
+#if JVET_Z0118_GDR
+  bool isGdrEnabled() { return m_gdrEnabled; }       
+  void create(const UnitArea &_unit, const bool isTopLayer, const bool isPLTused, const bool isGdrEnabled = false);
+  void create(const ChromaFormat &_chromaFormat, const Area& _area, const bool isTopLayer, const bool isPLTused, const bool isGdrEnabeld = false);
+#else
   void create(const UnitArea &_unit, const bool isTopLayer, const bool isPLTused);
   void create(const ChromaFormat &_chromaFormat, const Area& _area, const bool isTopLayer, const bool isPLTused);
+#endif
 
   void destroy();
   void releaseIntermediateData();
@@ -262,6 +268,7 @@ public:
   void addAffMiToLut(static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutSet, const AffineMotionInfo addMi[2], int refIdx[2]);
   void addAffInheritToLut(static_vector<AffineInheritInfo, MAX_NUM_AFF_INHERIT_HMVP_CANDS>& lut, const AffineInheritInfo& mi);
 #endif
+
   PLTBuf prevPLT;
   void resetPrevPLT(PLTBuf& prevPLT);
   void reorderPrevPLT(PLTBuf& prevPLT, uint8_t curPLTSize[MAX_NUM_CHANNEL_TYPE], Pel curPLT[MAX_NUM_COMPONENT][MAXPLTSIZE], bool reuseflag[MAX_NUM_CHANNEL_TYPE][MAXPLTPREDSIZE], uint32_t compBegin, uint32_t numComp, bool jointPLT);
@@ -291,11 +298,10 @@ private:
   PelStorage m_resi;
 #if JVET_Z0118_GDR
 public:
-  // PelStorage *m_reco;
   PictureType m_pt;  
+private:
   PelStorage m_reco0; // for GDR dirty
   PelStorage m_reco1; // for GDR clean
-private:
 #else
   PelStorage m_reco;
 #endif
@@ -330,6 +336,10 @@ private:
 #else
   uint8_t *m_ipmBuf;
 #endif  
+#endif
+
+#if JVET_Z0118_GDR
+  bool m_gdrEnabled;
 #endif
 
 public:
@@ -387,7 +397,7 @@ public:
 #if JVET_W0123_TIMD_FUSION && JVET_Z0118_GDR
   IpmBuf getIpmBuf(const     Area& _area, PictureType pt);
   IpmBuf getIpmBuf(const UnitArea& _area, PictureType pt) { return getIpmBuf(_area.Y(), pt); }
-  IpmBuf getIpmBuf(PictureType pt) { return getIpmBuf(area.Y(), pt); }
+  IpmBuf getIpmBuf(PictureType pt)                        { return getIpmBuf(area.Y(), pt); }
 
   const CIpmBuf getIpmBuf(const     Area& _area, PictureType pt) const;
   const CIpmBuf getIpmBuf(const UnitArea& _area, PictureType pt) const { return getIpmBuf(_area.Y(), pt); }
@@ -416,8 +426,8 @@ public:
   const CPelBuf       getRecoBuf(const CompArea &blk) const;
          PelUnitBuf   getRecoBuf(const UnitArea &unit);
   const CPelUnitBuf   getRecoBuf(const UnitArea &unit) const;
-#if JVET_Z0118_GDR // getRecoBufRef
-         PelUnitBuf&  getRecoBufRef() { if (m_pt == PIC_RECONSTRUCTION_0) return m_reco0; else return m_reco1; }
+#if JVET_Z0118_GDR
+         PelUnitBuf&  getRecoBufRef() { return (m_pt == PIC_RECONSTRUCTION_0) ? m_reco0 : m_reco1; }
 #else
          PelUnitBuf&  getRecoBufRef() { return m_reco; }
 #endif
@@ -461,10 +471,10 @@ public:
 
   // reco buffer
 #if JVET_Z0118_GDR
-         PelBuf       getRecoBuf(const ComponentID compID)         { if (m_pt == PIC_RECONSTRUCTION_0) return m_reco0.get(compID); else return m_reco1.get(compID); }
-  const CPelBuf       getRecoBuf(const ComponentID compID)   const { if (m_pt == PIC_RECONSTRUCTION_0) return m_reco0.get(compID); else return m_reco1.get(compID); }
-         PelUnitBuf   getRecoBuf()                                 { if (m_pt == PIC_RECONSTRUCTION_0) return m_reco0; else return m_reco1; }
-  const CPelUnitBuf   getRecoBuf()                           const { if (m_pt == PIC_RECONSTRUCTION_0) return m_reco0; else return m_reco1; }
+        PelBuf        getRecoBuf(const ComponentID compID)         { return (m_pt == PIC_RECONSTRUCTION_0) ? m_reco0.get(compID) : m_reco1.get(compID); }         
+  const CPelBuf       getRecoBuf(const ComponentID compID)   const { return (m_pt == PIC_RECONSTRUCTION_0) ? m_reco0.get(compID) : m_reco1.get(compID); }       
+        PelUnitBuf    getRecoBuf()                                 { return (m_pt == PIC_RECONSTRUCTION_0) ? m_reco0 : m_reco1; }         
+  const CPelUnitBuf   getRecoBuf()                           const { return (m_pt == PIC_RECONSTRUCTION_0) ? m_reco0 : m_reco1; }                
 #else
          PelBuf       getRecoBuf(const ComponentID compID)         { return m_reco.get(compID); }
   const CPelBuf       getRecoBuf(const ComponentID compID)   const { return m_reco.get(compID); }

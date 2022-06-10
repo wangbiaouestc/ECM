@@ -617,7 +617,11 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
   {
     pcPic = new Picture();
 
+#if JVET_Z0118_GDR
+    pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId);
+#else
     pcPic->create( sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId );
+#endif
 
     m_cListPic.push_back( pcPic );
 
@@ -653,14 +657,22 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
 
     m_cListPic.push_back( pcPic );
 
-    pcPic->create( sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId );
+#if JVET_Z0118_GDR
+    pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId );
+#else
+    pcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId);
+#endif
   }
   else
   {
     if( !pcPic->Y().Size::operator==( Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ) ) || pps.pcv->maxCUWidth != sps.getMaxCUWidth() || pps.pcv->maxCUHeight != sps.getMaxCUHeight() || pcPic->layerId != layerId )
     {
       pcPic->destroy();
+#if JVET_Z0118_GDR
+      pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId);
+#else
       pcPic->create( sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId );
+#endif
     }
 #if JVET_Z0118_GDR // picHeader should be deleted in case pcPic slot gets reused
     if (pcPic && pcPic->cs && pcPic->cs->picHeader)
@@ -828,10 +840,7 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
 
 #if JVET_Z0118_GDR
  m_pcPic->setCleanDirty(false);
- if (m_pcPic->cs->sps->getGDREnabledFlag())
- {
-   m_pcPic->copyCleanCurPicture();
- }
+ m_pcPic->copyCleanCurPicture();
 #endif
 
   Slice*  pcSlice = m_pcPic->cs->slice;
@@ -1048,7 +1057,8 @@ void DecLib::xCreateUnavailablePicture(int iUnavailablePoc, bool longTermFlag, c
   cFillPic->cs->sps = m_parameterSetManager.getFirstSPS();
   cFillPic->cs->pps = m_parameterSetManager.getFirstPPS();
   cFillPic->cs->vps = m_parameterSetManager.getVPS(0);
-  cFillPic->cs->create(cFillPic->cs->sps->getChromaFormatIdc(), Area(0, 0, cFillPic->cs->pps->getPicWidthInLumaSamples(), cFillPic->cs->pps->getPicHeightInLumaSamples()), true, (bool)(cFillPic->cs->sps->getPLTMode()));
+  cFillPic->cs->create(cFillPic->cs->sps->getChromaFormatIdc(), Area(0, 0, cFillPic->cs->pps->getPicWidthInLumaSamples(), cFillPic->cs->pps->getPicHeightInLumaSamples()), true, (bool)(cFillPic->cs->sps->getPLTMode()),
+    (m_parameterSetManager.getFirstSPS())->getGDREnabledFlag());
   cFillPic->allocateNewSlice();
 #else
   CHECK(!cFillPic->slices.size(), "No slices in picture");
@@ -3118,11 +3128,8 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
   }
 #endif
   
-#if JVET_Z0118_GDR
-  if (m_pcPic->cs->sps->getGDREnabledFlag())
-  {
+#if JVET_Z0118_GDR 
     m_pcPic->initCleanCurPicture();
-  }
 #endif
 
   //  Decode a picture

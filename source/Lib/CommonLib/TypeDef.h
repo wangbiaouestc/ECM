@@ -257,7 +257,7 @@
 #define JVET_Y0240_BIM                                    1 // JVET-Y0240: Block importance mapping
 #define JVET_Z0067_RPR_ENABLE                             1 // JVET-Z0067: Fixes for RPR
 #define JVET_Z0150_MEMORY_USAGE_PRINT                     1 // JVET-Z0150: Print memory usage
-#define JVET_Z0118_GDR                                    0 // JVET-Z0118: GDR
+#define JVET_Z0118_GDR                                    1 // JVET-Z0118: GDR
 
 #if JVET_Z0118_GDR
 #define GDR_LEAK_TEST                                     0

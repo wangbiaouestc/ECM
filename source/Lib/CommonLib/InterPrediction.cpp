@@ -347,6 +347,7 @@ void InterPrediction::destroy()
     xFree(m_cRefSamplesDMVRL1[ch]);
     m_cRefSamplesDMVRL1[ch] = nullptr;
   }
+
 #if JVET_Z0118_GDR
   m_IBCBuffer0.destroy();
   m_IBCBuffer1.destroy();

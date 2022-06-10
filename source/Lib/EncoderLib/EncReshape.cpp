@@ -443,8 +443,9 @@ void EncReshape::preAnalyzerLMCS(Picture *pcPic, const uint32_t signalType, cons
   m_sliceReshapeInfo.sliceReshaperModelPresentFlag = true;
   m_sliceReshapeInfo.sliceReshaperEnableFlag = true;
   int modIP = pcPic->getPOC() - pcPic->getPOC() / reshapeCW.rspFpsToIp * reshapeCW.rspFpsToIp;
+
 #if JVET_Z0118_GDR
-  if (pcPic->cs->slice->isInterGDR())
+  if (pcPic->cs->isGdrEnabled() && pcPic->cs->slice->isInterGDR())
   {
     modIP = 0;
   }

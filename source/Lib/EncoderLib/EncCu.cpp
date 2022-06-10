@@ -180,7 +180,11 @@ void EncCu::create( EncCfg* encCfg )
         if (gp_sizeIdxInfo->isCuSize(width) && gp_sizeIdxInfo->isCuSize(height))
         {
           m_pTempCUWoOBMC[w][h] = new CodingStructure(m_unitCache.cuCache, m_unitCache.puCache, m_unitCache.tuCache);
+#if JVET_Z0118_GDR
+          m_pTempCUWoOBMC[w][h]->create(chromaFormat, Area(0, 0, width, height), false, false, encCfg->getGdrEnabled());
+#else
           m_pTempCUWoOBMC[w][h]->create(chromaFormat, Area(0, 0, width, height), false, false);
+#endif
           m_pPredBufWoOBMC[w][h].create(UnitArea(chromaFormat, Area(0, 0, width, height)));
         }
       }
@@ -827,11 +831,11 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #endif
 
 #if JVET_Z0118_GDR
-  bool isCuInCleanArea   = false;
-  bool isCuInRefreshArea = false;
-
   if (m_pcEncCfg->getGdrEnabled())
   {
+    bool isCuInCleanArea = false;
+    bool isCuInRefreshArea = false;
+
     bool isInGdrInterval = slice.getPicHeader()->getInGdrInterval();
     bool isRecoveryPocPic = slice.getPicHeader()->getIsGdrRecoveryPocPic();
     
@@ -1876,18 +1880,21 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
         m_CurrCtx--;
         partitioner.exitCurrSplit();
         xCheckBestMode( tempCS, bestCS, partitioner, encTestMode );
+
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
         if( partitioner.chType == CHANNEL_TYPE_LUMA )
         {
           tempCS->motionLut = oldMotionLut;
         }
 #endif
+
 #if JVET_Z0118_GDR      
         tempCS->motionLut = oldMotionLut;
         tempCS->prevPLT = oldPLT;
         tempCS->releaseIntermediateData();
         tempCS->prevQP[partitioner.chType] = oldPrevQp;
-#endif
+#endif        
+
         return;
       }
 

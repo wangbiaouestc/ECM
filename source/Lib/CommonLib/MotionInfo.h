@@ -363,6 +363,7 @@ struct LutMotionCand
 #if JVET_Z0118_GDR
   static_vector<MotionInfo, MAX_NUM_HMVP_CANDS> lut0;
   static_vector<MotionInfo, MAX_NUM_HMVP_CANDS> lut1;
+
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   static_vector<MotionInfo, MAX_NUM_HMVP_IBC_CANDS> lutIbc0;
   static_vector<MotionInfo, MAX_NUM_HMVP_IBC_CANDS> lutIbc1;
@@ -391,6 +392,7 @@ struct LutMotionCand
 #endif
 #endif
 };
+
 struct PatentBvCand
 {
   Mv m_bvCands[IBC_NUM_CANDIDATES];
