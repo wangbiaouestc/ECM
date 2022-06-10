@@ -4367,11 +4367,11 @@ void CABACReader::mvp_flag( PredictionUnit& pu, RefPicList eRefList )
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   else if (PU::useRefCombList(pu))
   {
-    mvpIdx = pu.refIdxLC >= pu.cs->slice->getNumNonScaledRefPic() ? m_BinDecoder.decodeBin(Ctx::MVPIdx()) : 0;
+    mvpIdx = pu.refIdxLC >= pu.cs->slice->getNumNonScaledRefPic() || PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false ? m_BinDecoder.decodeBin(Ctx::MVPIdx()) : 0;
   }
   else if (PU::useRefPairList(pu))
   {
-    mvpIdx = pu.refPairIdx >= pu.cs->slice->getNumNonScaledRefPicPair() ? m_BinDecoder.decodeBin(Ctx::MVPIdx()) : 0;
+    mvpIdx = pu.refPairIdx >= pu.cs->slice->getNumNonScaledRefPicPair() || PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false ? m_BinDecoder.decodeBin(Ctx::MVPIdx()) : 0;
   }
 #endif
   else if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
@@ -4796,7 +4796,7 @@ void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
     return;
   }
 #if JVET_Z0054_BLK_REF_PIC_REORDER
-  if (pu.cs->sps->getUseARL())
+  if (PU::useRefPairList(pu))
   {
     if (pu.interDir == 3 && eRefList == REF_PIC_LIST_1 && (pu.mvd[0].getHor() || pu.mvd[0].getVer()))
     {
@@ -4859,7 +4859,7 @@ void CABACReader::mvsdAffineIdxFunc(PredictionUnit &pu, RefPicList eRefList)
   }
 
 #if JVET_Z0054_BLK_REF_PIC_REORDER
-  if (pu.cs->sps->getUseARL())
+  if (PU::useRefPairList(pu))
   {
     if (pu.interDir == 3 && eRefList == REF_PIC_LIST_1 &&
       (pu.mvdAffi[0][0].getHor() || pu.mvdAffi[0][0].getVer() ||

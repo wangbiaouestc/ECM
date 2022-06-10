@@ -3865,7 +3865,11 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     setWpScalingDistParam(-1, REF_PIC_LIST_X, cu.cs->slice);
     return;
   }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  if ((!PU::useRefCombList(pu) && !PU::useRefPairList(pu)) || (pu.amvpMergeModeFlag[REF_PIC_LIST_0] || pu.amvpMergeModeFlag[REF_PIC_LIST_1]))
+#else
   if(!PU::useRefPairList(pu) && !PU::useRefCombList(pu))
+#endif
 #endif
   if (pu.isMvsdApplicable())
   {

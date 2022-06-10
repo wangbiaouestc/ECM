@@ -4270,11 +4270,11 @@ void CABACWriter::mvp_flag( const PredictionUnit& pu, RefPicList eRefList )
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   else if (PU::useRefCombList(pu))
   {
-    needToCodeMvpIdx = pu.refIdxLC >= pu.cs->slice->getNumNonScaledRefPic();
+    needToCodeMvpIdx = pu.refIdxLC >= pu.cs->slice->getNumNonScaledRefPic() || PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false;
   }
   else if (PU::useRefPairList(pu))
   {
-    needToCodeMvpIdx = pu.refPairIdx >= pu.cs->slice->getNumNonScaledRefPicPair();
+    needToCodeMvpIdx = pu.refPairIdx >= pu.cs->slice->getNumNonScaledRefPicPair() || PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false;
   }
 #endif
   else if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
@@ -4576,7 +4576,7 @@ void CABACWriter::mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
     return;
   }
 #if JVET_Z0054_BLK_REF_PIC_REORDER
-  if (pu.cs->sps->getUseARL())
+  if (PU::useRefPairList(pu))
   {
     if (pu.interDir == 3 && eRefList == REF_PIC_LIST_1 && (pu.mvd[0].getHor() || pu.mvd[0].getVer()))
     {
@@ -4638,7 +4638,7 @@ void CABACWriter::mvsdAffineIdxFunc(const PredictionUnit &pu, RefPicList eRefLis
     return;
   }
 #if JVET_Z0054_BLK_REF_PIC_REORDER
-  if (pu.cs->sps->getUseARL())
+  if (PU::useRefPairList(pu))
   {
     if (pu.interDir == 3 && eRefList == REF_PIC_LIST_1 &&
       (pu.mvdAffi[0][0].getHor() || pu.mvdAffi[0][0].getVer() ||
