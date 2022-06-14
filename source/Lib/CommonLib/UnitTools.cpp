@@ -10800,9 +10800,9 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
 
   // add at most two average based geo candidates
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
-  if (geoMrgCtx.numValidMergeCand == maxNumGeoMergeCand)
+  if (geoMrgCtx.numValidMergeCand < maxNumGeoMergeCand)
 #else
-  if (geoMrgCtx.numValidMergeCand == pu.cs->sps->getMaxNumGeoCand())
+  if (geoMrgCtx.numValidMergeCand < pu.cs->sps->getMaxNumGeoCand())
 #endif
   {
     // add one L0 cand by averaging the first two available L0 candidates
