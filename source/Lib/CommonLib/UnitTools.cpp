@@ -1792,11 +1792,10 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
   const Slice& slice = *cs.slice;
   MotionInfo miNeighbor;
 
-#if JVET_Z0075_IBC_HMVP_ENLARGE
 #if JVET_Z0118_GDR  
   bool isClean = cs.isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
 #endif
-
+#if JVET_Z0075_IBC_HMVP_ENLARGE
 #if JVET_Z0118_GDR  
   auto &lut = (isClean) ? cs.motionLut.lut1 : cs.motionLut.lut0;
 #else
@@ -1808,7 +1807,6 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
 #else
   auto &lut = ibcFlag ? cs.motionLut.lutIbc : cs.motionLut.lut;
 #endif
-
 #endif
 
   int num_avai_candInLUT = (int)lut.size();
