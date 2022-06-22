@@ -9603,22 +9603,28 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
     cu.geoFlag = false;
     PU::getIBCMergeCandidates(pu, mergeCtx);
 #if JVET_Y0058_IBC_LIST_MODIFY && JVET_W0090_ARMC_TM
+    if(pu.cs->sps->getUseAML())
+    {
 #if JVET_Z0075_IBC_HMVP_ENLARGE
-    m_pcInterSearch->adjustIBCMergeCandidates(pu, mergeCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
+      m_pcInterSearch->adjustIBCMergeCandidates(pu, mergeCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
 #else
-    m_pcInterSearch->adjustIBCMergeCandidates(pu, mergeCtx);
+      m_pcInterSearch->adjustIBCMergeCandidates(pu, mergeCtx);
 #endif
+    }
 #endif
 
 #if JVET_Z0084_IBC_TM && TM_MRG
     pu.tmMergeFlag = true;
     PU::getIBCMergeCandidates(pu, mergeCtxTm);
 #if JVET_Y0058_IBC_LIST_MODIFY && JVET_W0090_ARMC_TM
+    if (pu.cs->sps->getUseAML())
+    {
 #if JVET_Z0075_IBC_HMVP_ENLARGE
-    m_pcInterSearch->adjustIBCMergeCandidates(pu, mergeCtxTm, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
+      m_pcInterSearch->adjustIBCMergeCandidates(pu, mergeCtxTm, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
 #else
-    m_pcInterSearch->adjustIBCMergeCandidates(pu, mergeCtxTm);
+      m_pcInterSearch->adjustIBCMergeCandidates(pu, mergeCtxTm);
 #endif
+    }
 #endif
     pu.tmMergeFlag = false;
 #endif
