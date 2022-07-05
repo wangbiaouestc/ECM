@@ -45,6 +45,9 @@
 #include <limits>
 
 #include "Utilities/program_options_lite.h"
+#if Y4M_SUPPORT
+#include "Utilities/VideoIOYuv.h"
+#endif
 #include "CommonLib/Rom.h"
 #include "EncoderLib/RateCtrl.h"
 
@@ -2216,6 +2219,29 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   m_chromaFormatIDC      = ((tmpChromaFormat == 0) ? (m_InputChromaFormatIDC) : (numberToChromaFormat(tmpChromaFormat)));
 #if EXTENSION_360_VIDEO
   m_ext360.processOptions(ext360CfgContext);
+#endif
+
+#if Y4M_SUPPORT
+  if (isY4mFileExt(m_inputFileName))
+  {
+    int          width = 0, height = 0, frameRate = 0, inputBitDepth = 0;
+    ChromaFormat chromaFormat = CHROMA_420;
+    VideoIOYuv   inputFile;
+    inputFile.parseY4mFileHeader(m_inputFileName, width, height, frameRate, inputBitDepth, chromaFormat);
+    if (width != m_iSourceWidth || height != m_iSourceHeight || frameRate != m_iFrameRate
+        || inputBitDepth != m_inputBitDepth[0] || chromaFormat != m_chromaFormatIDC)
+    {
+      msg(WARNING, "\nWarning: Y4M file info is different from input setting. Using the info from Y4M file\n");
+      m_iSourceWidth           = width;
+      m_iSourceHeight          = height;
+      m_iFrameRate             = frameRate;
+      m_inputBitDepth[0]       = inputBitDepth;
+      m_inputBitDepth[1]       = inputBitDepth;
+      m_chromaFormatIDC        = chromaFormat;
+      m_MSBExtendedBitDepth[0] = m_inputBitDepth[0];
+      m_MSBExtendedBitDepth[1] = m_inputBitDepth[1];
+    }
+  }
 #endif
 
   CHECK( !( tmpWeightedPredictionMethod >= 0 && tmpWeightedPredictionMethod <= WP_PER_PICTURE_WITH_HISTOGRAM_AND_PER_COMPONENT_AND_CLIPPING_AND_EXTENSION ), "Error in cfg" );
