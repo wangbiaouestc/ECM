@@ -1244,6 +1244,11 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setGopBasedTemporalFilterEnabled(m_gopBasedTemporalFilterEnabled);
 #if JVET_Y0240_BIM
   m_cEncLib.setBIM                                               (m_bimEnabled);
+  if (m_cEncLib.getBIM())
+  {
+      std::map<int, int*> adaptQPmap;
+      m_cEncLib.setAdaptQPmap(adaptQPmap);
+  }
 #endif
   m_cEncLib.setNumRefLayers                                       ( m_numRefLayers );
 
@@ -1351,13 +1356,6 @@ void EncApp::createLib( const int layerIdx )
     m_filteredOrgPic = new PelStorage;
     m_filteredOrgPic->create( unitArea );
   }
-#if JVET_Y0240_BIM
-  if ( m_cEncLib.getBIM() )
-  {
-    std::map<int, int*> adaptQPmap;
-    m_cEncLib.setAdaptQPmap(adaptQPmap);
-  }
-#endif
 
   if( !m_bitstream.is_open() )
   {
