@@ -12625,7 +12625,7 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
       tmpPU.mvd[0] = *it;
       tmpPU.mv[0] = amvpInfo.mvCand[tmpPU.mvpIdx[0]] + tmpPU.mvd[0];
       tmpPU.mv[0].mvCliptoStorageBitDepth();
-      tmpPU.mv[1] = amvpInfo.mvCand[tmpPU.mvpIdx[1]] - tmpPU.mvd[0];
+      tmpPU.mv[1] = amvpInfo1.mvCand[tmpPU.mvpIdx[1]] - tmpPU.mvd[0];
       tmpPU.mv[1].mvCliptoStorageBitDepth();
       getBlkAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft);
 
