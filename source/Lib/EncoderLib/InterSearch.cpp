@@ -1687,7 +1687,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
     m_pcRdCost->setPredictors(cMvPred);
     m_pcRdCost->setCostScale(0);
-#if JVET_Z0084_IBC_TM
+#if JVET_Z0084_IBC_TM && TM_AMVP
     m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &pu.cu->imv, &bvpIdxBest, true, &amvpInfo4Pel);
 #else
     m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &pu.cu->imv, &bvpIdxBest);
