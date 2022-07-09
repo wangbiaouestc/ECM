@@ -9612,6 +9612,8 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 
 #if JVET_Z0084_IBC_TM && TM_MRG
+    if (pu.cs->sps->getUseDMVDMode() == true)
+    {
     pu.tmMergeFlag = true;
     PU::getIBCMergeCandidates(pu, mergeCtxTm);
 #if JVET_Y0058_IBC_LIST_MODIFY && JVET_W0090_ARMC_TM
@@ -9625,6 +9627,11 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
     }
 #endif
     pu.tmMergeFlag = false;
+    }
+    else
+    {
+      mergeCtxTm.numValidMergeCand = 0;
+    }
 #endif
   }
 
