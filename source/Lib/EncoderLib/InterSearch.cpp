@@ -173,7 +173,11 @@ InterSearch::InterSearch()
   }
   for (int i=0; i<AMVP_MAX_NUM_CANDS+1; i++)
   {
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+    memset (m_auiMVPIdxCost[i], 0, (AMVP_MAX_NUM_CANDS+1+1) * sizeof (uint32_t) );
+#else
     memset (m_auiMVPIdxCost[i], 0, (AMVP_MAX_NUM_CANDS+1) * sizeof (uint32_t) );
+#endif
   }
 
   setWpScalingDistParam( -1, REF_PIC_LIST_X, nullptr );
@@ -342,6 +346,10 @@ void InterSearch::init( EncCfg*        pcEncCfg,
       }
     }
   }
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+  m_auiMVPIdxCost[0][3] = m_auiMVPIdxCost[0][2];
+  m_auiMVPIdxCost[1][3] = m_auiMVPIdxCost[1][2];
+#endif
 
   const ChromaFormat cform = pcEncCfg->getChromaFormatIdc();
 #if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
