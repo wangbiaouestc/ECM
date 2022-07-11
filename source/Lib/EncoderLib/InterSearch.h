@@ -362,7 +362,11 @@ protected:
   Pel            *m_pTempPel;
 
   // AMVP cost computation
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+  uint32_t            m_auiMVPIdxCost               [AMVP_MAX_NUM_CANDS+1][AMVP_MAX_NUM_CANDS+1+1]; //th array bounds
+#else
   uint32_t            m_auiMVPIdxCost               [AMVP_MAX_NUM_CANDS+1][AMVP_MAX_NUM_CANDS+1]; //th array bounds
+#endif
 
   Mv              m_integerMv2Nx2N              [NUM_REF_PIC_LIST_01][MAX_NUM_REF];
 
