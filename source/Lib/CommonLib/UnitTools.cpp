@@ -2674,7 +2674,7 @@ uint32_t PU::getBDMVRMvdThreshold(const PredictionUnit &pu)
 }
 #endif
 
-#if TM_MRG
+#if TM_MRG || TM_AMVP
 uint32_t PU::getTMMvdThreshold(const PredictionUnit &pu)
 {
   uint32_t numPixels = pu.lwidth() * pu.lheight();
@@ -2691,7 +2691,9 @@ uint32_t PU::getTMMvdThreshold(const PredictionUnit &pu)
     return 4 << MV_FRACTIONAL_BITS_INTERNAL;
   }
 }
+#endif
 
+#if TM_MRG
 int PU::reorderInterMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, int numCand, uint32_t mvdSimilarityThresh)
 {
   Slice& slice = *pu.cu->slice;
@@ -4999,7 +5001,9 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
   const CodingStructure &cs = *pu.cs;
   const Slice &slice = *pu.cs->slice;
 
+#if TM_MRG
   const uint32_t mvdSimilarityThresh = 1;
+#endif
   const uint32_t maxNumMergeCand = NUM_TMVP_CANDS;
   for (uint32_t ui = 0; ui < maxNumMergeCand; ++ui)
   {
@@ -5266,7 +5270,9 @@ void PU::getNonAdjacentMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
   const CodingStructure &cs = *pu.cs;
   const Slice &slice = *pu.cs->slice;
 
+#if TM_MRG
   const uint32_t mvdSimilarityThresh = getBDMVRMvdThreshold(pu);
+#endif
   const uint32_t maxNumMergeCand = NUM_NON_ADJ_CANDS;
 
   for (uint32_t ui = 0; ui < maxNumMergeCand; ++ui)
@@ -6043,13 +6049,17 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
 #if JVET_Z0084_IBC_TM && TM_AMVP
   pInfo->maxSimilarityThreshold = (pu.cs->sps->getUseDMVDMode() && pcInter) ? PU::getTMMvdThreshold(pu) : 1;
 
+#if TM_MRG
   pu.tmMergeFlag = true;
+#endif
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   PU::getIBCMergeCandidates(pu, mergeCtx, pu.cs->sps->getMaxNumIBCMergeCand());
 #else
   PU::getIBCMergeCandidates(pu, mergeCtx);
 #endif
+#if TM_MRG
   pu.tmMergeFlag = false;
+#endif
 
   int candIdx = 0;
   while ((pInfo->numCand < AMVP_MAX_NUM_CANDS_MEM) && (candIdx < mergeCtx.numValidMergeCand))
