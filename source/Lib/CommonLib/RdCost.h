@@ -233,7 +233,7 @@ public:
   { 
     return &m_cBvdBitCosts; 
   }
-#if JVET_Z0084_IBC_TM
+#if JVET_Z0084_IBC_TM && TM_AMVP
   inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL, bool flag = false, AMVPInfo* amvpInfo4Pel = NULL)
 #else
   inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL)
@@ -259,7 +259,7 @@ public:
     if (bestRes && x % 4 == 0 && y % 4 == 0)
     {
       Mv cMv(x >> 2, y >> 2);
-#if JVET_Z0084_IBC_TM
+#if JVET_Z0084_IBC_TM && TM_AMVP
       Mv tmpBv0;
       Mv tmpBv1;
       if (flag) 
