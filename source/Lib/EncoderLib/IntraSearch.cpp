@@ -4540,6 +4540,7 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       crReco.reconstruct(crPred, crResi, cs.slice->clpRng( COMPONENT_Cr ));
     }
   }
+#if SIGN_PREDICTION
 #if INTRA_TRANS_ENC_OPT 
   bool doSignPrediction = true;
   if (isLuma(compID) && ((tu.mtsIdx[COMPONENT_Y] > MTS_SKIP) || (CS::isDualITree(cs) && tu.cu->lfnstIdx && !tu.cu->ispMode)))
@@ -4563,7 +4564,7 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     }
   }
 #endif
-#if SIGN_PREDICTION
+
   if ( sps.getNumPredSigns() > 0)
   {
 #if INTRA_TRANS_ENC_OPT
@@ -4579,11 +4580,11 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     }
 #endif
   }
-#endif
 
 #if INTRA_TRANS_ENC_OPT 
   if (doSignPrediction)
   {
+#endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
     CompArea      tmpArea1(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
@@ -4830,7 +4831,7 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     }
 #endif
 #endif
-#if INTRA_TRANS_ENC_OPT
+#if INTRA_TRANS_ENC_OPT && SIGN_PREDICTION
   }
 #endif
 }

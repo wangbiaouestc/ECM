@@ -1307,7 +1307,11 @@ void DecCu::xReconInter(CodingUnit &cu)
         tmpPred.copyFrom(cs.getPredBuf(cu).get(COMPONENT_Y));
       }
 #endif
+#if JVET_Y0065_GPM_INTRA
+      if (!cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
+#else
       if (!cu.firstPU->ciipFlag && !CU::isIBC(cu))
+#endif
         cs.getPredBuf(cu).get(COMPONENT_Y).rspSignal(m_pcReshape->getFwdLUT());
     }
 #if KEEP_PRED_AND_RESI_SIGNALS
@@ -1329,7 +1333,11 @@ void DecCu::xReconInter(CodingUnit &cu)
   else
   {
     cs.getRecoBuf(cu).copyClip(cs.getPredBuf(cu), cs.slice->clpRngs());
+#if JVET_Y0065_GPM_INTRA
+    if (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
+#else
     if (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !CU::isIBC(cu))
+#endif
     {
       cs.getRecoBuf(cu).get(COMPONENT_Y).rspSignal(m_pcReshape->getFwdLUT());
     }

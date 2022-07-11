@@ -2228,7 +2228,7 @@ const CtxSet ContextSetCfg::LFNSTIdx = ContextSetCfg::addCtxSet
   { 28, 43, 42, 27 },
   {  9,  9,  9, 10 },
   {  9,  9,  6, 13 },
-  {  9, 10,  9, 10 }
+  {  9, 10,  9, 10 },
   {DWE, DWE, DWE, DWE},
   {DWE, DWE, DWE, DWE},
   {DWE, DWE, DWE, DWE},
@@ -2240,7 +2240,7 @@ const CtxSet ContextSetCfg::LFNSTIdx = ContextSetCfg::addCtxSet
   { 28, 43, 42 },
   {  9,  9,  9 },
   {  9,  9,  6 },
-  {  9, 10,  9 }
+  {  9, 10,  9 },
   {DWE, DWE, DWE},
   {DWE, DWE, DWE},
   {DWE, DWE, DWE},
