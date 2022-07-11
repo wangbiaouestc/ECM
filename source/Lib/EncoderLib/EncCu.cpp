@@ -4922,10 +4922,13 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
     geoModeCost[idx] = (double)fracBits * sqrtLambdaFracBits;
   }
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
-  for (int idx = 0; idx < GEO_NUM_SIG_PARTMODE; idx++)
+  if (sps.getUseAltGPMSplitModeCode())
   {
-    uint64_t fracBits = m_CABACEstimator->geo_mode_est(ctxStart, idx, 1);
-    geoSigModeCost[idx] = (double)fracBits * sqrtLambdaFracBits;
+    for (int idx = 0; idx < GEO_NUM_SIG_PARTMODE; idx++)
+    {
+      uint64_t fracBits = m_CABACEstimator->geo_mode_est(ctxStart, idx, 1);
+      geoSigModeCost[idx] = (double)fracBits * sqrtLambdaFracBits;
+    }
   }
 #endif
   for (int idx = 0; idx < maxNumMergeCandidates; idx++)
@@ -5325,8 +5328,10 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
     );
   }
+#if TM_MRG
   const int tmMmvdBufIdx0 = GPM_EXT_MMVD_MAX_REFINE_NUM + 1;
   const int tmMmvdBufIdx1 = GPM_EXT_MMVD_MAX_REFINE_NUM + 1;
+#endif
 #endif
 
   for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)

@@ -1976,7 +1976,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               if (tplAvail)
               {
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
-                m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, pu.tmMergeFlag ? pu.cs->sps->getMaxNumTMMergeCand() : pu.cs->sps->getMaxNumMergeCand());
+                m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, 
+#if TM_MRG
+                                                     pu.tmMergeFlag ? pu.cs->sps->getMaxNumTMMergeCand() : 
+#endif
+                                                     pu.cs->sps->getMaxNumMergeCand());
 #else
                 m_pcInterPred->adjustMergeCandidatesInOneCandidateGroup(pu, mrgCtx, pu.mergeIdx + 1, pu.mergeIdx);
 #endif
@@ -2096,7 +2100,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
       if (!cu.cs->pcv->isEncoder)
 #endif
       {
+#if TM_AMVP
         m_pcInterPred->clearTplAmvpBuffer();
+#endif
         if (pu.cu->affine)
         {
           for (uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)

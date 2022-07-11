@@ -173,8 +173,10 @@ namespace PU
 #if MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM
   uint32_t getBDMVRMvdThreshold       (const PredictionUnit &pu);
 #endif
-#if TM_MRG
+#if TM_MRG || TM_AMVP
   uint32_t getTMMvdThreshold          (const PredictionUnit &pu);
+#endif
+#if TM_MRG
   int      reorderInterMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, int numCand, uint32_t mvdSimilarityThresh );
 #endif
   void getInterMergeCandidates        (const PredictionUnit &pu, MergeCtx& mrgCtx,
