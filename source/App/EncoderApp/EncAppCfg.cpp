@@ -741,8 +741,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("InputPathPrefix,-ipp",                            inputPathPrefix,                             string(""), "pathname to prepend to input filename")
   ("BitstreamFile,b",                                 m_bitstreamFileName,                         string(""), "Bitstream output file name")
   ("ReconFile,o",                                     m_reconFileName,                             string(""), "Reconstructed YUV output file name")
+#if JVET_AA0146_WRAP_AROUND_FIX
+  ("SourceWidth,-wdt",                                m_sourceWidth,                                       0, "Source picture width")
+  ("SourceHeight,-hgt",                               m_sourceHeight,                                      0, "Source picture height")
+#else
   ("SourceWidth,-wdt",                                m_iSourceWidth,                                       0, "Source picture width")
   ("SourceHeight,-hgt",                               m_iSourceHeight,                                      0, "Source picture height")
+#endif
 #if SIGN_PREDICTION
   ("NumSignPred",                                     m_numPredSign,                                        8, "Number of predicted transform coefficient signs")
 #if JVET_Y0141_SIGN_PRED_IMPROVE
@@ -773,8 +778,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("ChromaFormatIDC,-cf",                             tmpChromaFormat,                                      0, "ChromaFormatIDC (400|420|422|444 or set 0 (default) for same as InputChromaFormat)")
   ("ConformanceMode",                                 m_conformanceWindowMode,                              0, "Deprecated alias of ConformanceWindowMode")
   ("ConformanceWindowMode",                           m_conformanceWindowMode,                              0, "Window conformance mode (0: no window, 1:automatic padding, 2:padding, 3:conformance")
+#if JVET_AA0146_WRAP_AROUND_FIX
+  ("HorizontalPadding,-pdx",                          m_sourcePadding[0],                                           0, "Horizontal source padding for conformance window mode 2")
+  ("VerticalPadding,-pdy",                            m_sourcePadding[1],                                           0, "Vertical source padding for conformance window mode 2")
+#else
   ("HorizontalPadding,-pdx",                          m_aiPad[0],                                           0, "Horizontal source padding for conformance window mode 2")
   ("VerticalPadding,-pdy",                            m_aiPad[1],                                           0, "Vertical source padding for conformance window mode 2")
+#endif
   ("ConfLeft",                                        m_confWinLeft,                                        0, "Deprecated alias of ConfWinLeft")
   ("ConfRight",                                       m_confWinRight,                                       0, "Deprecated alias of ConfWinRight")
   ("ConfTop",                                         m_confWinTop,                                         0, "Deprecated alias of ConfWinTop")
@@ -1892,8 +1902,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
    * Set any derived parameters
    */
 #if EXTENSION_360_VIDEO
+#if JVET_AA0146_WRAP_AROUND_FIX
+  m_inputFileWidth = m_sourceWidth;
+  m_inputFileHeight = m_sourceHeight;
+#else
   m_inputFileWidth = m_iSourceWidth;
   m_inputFileHeight = m_iSourceHeight;
+#endif
   m_ext360.setMaxCUInfo(m_uiCTUSize, 1 << MIN_CU_LOG2);
 #endif
 
@@ -1927,6 +1942,20 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   }
   else if (m_iIntraPeriod == -1)
   {
+#if JVET_AA0146_WRAP_AROUND_FIX
+    if (m_sourceHeight >= 1080)
+    {
+      m_log2SignPredArea = (m_iQP >= 32) ? 5 : 3;
+    }
+    else if (m_sourceHeight >= 720)
+    {
+      m_log2SignPredArea = (m_iQP > 32) ? 5 : 4;
+    }
+    else if (m_sourceHeight >= 480)
+    {
+      m_log2SignPredArea = 4;
+    }
+#else
     if (m_iSourceHeight >= 1080)
     {
       m_log2SignPredArea = (m_iQP >= 32) ? 5 : 3;
@@ -1939,6 +1968,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
     {
       m_log2SignPredArea = 4;
     }
+#endif
     else
     {
       m_log2SignPredArea = 3;
@@ -1958,10 +1988,17 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   m_adIntraLambdaModifier = cfg_adIntraLambdaModifier.values;
   if(m_isField)
   {
+#if JVET_AA0146_WRAP_AROUND_FIX
+    //Frame height
+    m_iSourceHeightOrg = m_sourceHeight;
+    //Field height
+    m_sourceHeight = m_sourceHeight >> 1;
+#else
     //Frame height
     m_iSourceHeightOrg = m_iSourceHeight;
     //Field height
     m_iSourceHeight = m_iSourceHeight >> 1;
+#endif
     //number of fields to encode
     m_framesToBeEncoded *= 2;
   }
@@ -2009,8 +2046,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
       }
     }
 #if JVET_S0071_SAME_SIZE_SUBPIC_LAYOUT
+#if JVET_AA0146_WRAP_AROUND_FIX
+    uint32_t tmpWidthVal = (m_sourceWidth + m_uiCTUSize - 1) / m_uiCTUSize;
+    uint32_t tmpHeightVal = (m_sourceHeight + m_uiCTUSize - 1) / m_uiCTUSize;
+#else
     uint32_t tmpWidthVal = (m_iSourceWidth + m_uiCTUSize - 1) / m_uiCTUSize;
     uint32_t tmpHeightVal = (m_iSourceHeight + m_uiCTUSize - 1) / m_uiCTUSize;
+#endif
     if (!m_subPicSameSizeFlag)
     {
       for (int i = 0; i < m_numSubPics; i++)
@@ -2029,8 +2071,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #else
     for(int i = 0; i < m_numSubPics; i++)
     {
+#if JVET_AA0146_WRAP_AROUND_FIX
+      CHECK(m_subPicCtuTopLeftX[i] + m_subPicWidth[i] > (m_sourceWidth + m_uiCTUSize - 1) / m_uiCTUSize, "Subpicture must not exceed picture boundary");
+      CHECK(m_subPicCtuTopLeftY[i] + m_subPicHeight[i] > (m_sourceHeight + m_uiCTUSize - 1) / m_uiCTUSize, "Subpicture must not exceed picture boundary");
+#else
       CHECK(m_subPicCtuTopLeftX[i] + m_subPicWidth[i] > (m_iSourceWidth + m_uiCTUSize - 1) / m_uiCTUSize, "Subpicture must not exceed picture boundary");
       CHECK(m_subPicCtuTopLeftY[i] + m_subPicHeight[i] > (m_iSourceHeight + m_uiCTUSize - 1) / m_uiCTUSize, "Subpicture must not exceed picture boundary");
+#endif
     }
 #endif
     // automatically determine subpicture ID lenght in case it is not specified
@@ -2056,10 +2103,18 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_S0221_NUM_VB_CHECK
   if (m_virtualBoundariesPresentFlag)
   {
+#if JVET_AA0146_WRAP_AROUND_FIX
+    if (m_sourceWidth <= 8)
+#else
     if (m_iSourceWidth <= 8)
+#endif
       CHECK(m_numVerVirtualBoundaries != 0, "The number of vertical virtual boundaries shall be 0 when the picture width is less than or equal to 8");
 
+#if JVET_AA0146_WRAP_AROUND_FIX
+    if (m_sourceHeight <= 8)
+#else
     if (m_iSourceHeight <= 8)
+#endif
       CHECK(m_numHorVirtualBoundaries != 0, "The number of horizontal virtual boundaries shall be 0 when the picture height is less than or equal to 8");
   }
 #endif
@@ -2227,6 +2282,22 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
     int          width = 0, height = 0, frameRate = 0, inputBitDepth = 0;
     ChromaFormat chromaFormat = CHROMA_420;
     VideoIOYuv   inputFile;
+#if JVET_AA0146_WRAP_AROUND_FIX
+    inputFile.parseY4mFileHeader(m_inputFileName, width, height, frameRate, inputBitDepth, chromaFormat);
+    if (width != m_sourceWidth || height != m_sourceHeight || frameRate != m_iFrameRate
+        || inputBitDepth != m_inputBitDepth[0] || chromaFormat != m_chromaFormatIDC)
+    {
+      msg(WARNING, "\nWarning: Y4M file info is different from input setting. Using the info from Y4M file\n");
+      m_sourceWidth           = width;
+      m_sourceHeight          = height;
+      m_iFrameRate             = frameRate;
+      m_inputBitDepth[0]       = inputBitDepth;
+      m_inputBitDepth[1]       = inputBitDepth;
+      m_chromaFormatIDC        = chromaFormat;
+      m_MSBExtendedBitDepth[0] = m_inputBitDepth[0];
+      m_MSBExtendedBitDepth[1] = m_inputBitDepth[1];
+    }
+#else
     inputFile.parseY4mFileHeader(m_inputFileName, width, height, frameRate, inputBitDepth, chromaFormat);
     if (width != m_iSourceWidth || height != m_iSourceHeight || frameRate != m_iFrameRate
         || inputBitDepth != m_inputBitDepth[0] || chromaFormat != m_chromaFormatIDC)
@@ -2241,6 +2312,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
       m_MSBExtendedBitDepth[0] = m_inputBitDepth[0];
       m_MSBExtendedBitDepth[1] = m_inputBitDepth[1];
     }
+#endif
   }
 #endif
 
@@ -2336,19 +2408,52 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 
   // Picture width and height must be multiples of 8 and minCuSize
   const int minResolutionMultiple = std::max(8, 1 << m_log2MinCuSize);
+#if JVET_AA0146_WRAP_AROUND_FIX
+  CHECK(((m_sourceWidth% minResolutionMultiple) || (m_sourceHeight % minResolutionMultiple)) && m_conformanceWindowMode != 1, "Picture width or height is not a multiple of 8 or minCuSize, please use ConformanceMode 1!");
+#else
   CHECK(((m_iSourceWidth% minResolutionMultiple) || (m_iSourceHeight % minResolutionMultiple)) && m_conformanceWindowMode != 1, "Picture width or height is not a multiple of 8 or minCuSize, please use ConformanceMode 1!");
+#endif
   switch (m_conformanceWindowMode)
   {
   case 0:
     {
       // no conformance or padding
       m_confWinLeft = m_confWinRight = m_confWinTop = m_confWinBottom = 0;
+#if JVET_AA0146_WRAP_AROUND_FIX
+      m_sourcePadding[1] = m_sourcePadding[0] = 0;
+#else
       m_aiPad[1] = m_aiPad[0] = 0;
+#endif
       break;
     }
   case 1:
     {
       // automatic padding to minimum CU size
+#if JVET_AA0146_WRAP_AROUND_FIX
+      if (m_sourceWidth % minResolutionMultiple)
+      {
+        m_sourcePadding[0] = m_confWinRight  = ((m_sourceWidth / minResolutionMultiple) + 1) * minResolutionMultiple - m_sourceWidth;
+        m_sourceWidth  += m_confWinRight;
+      }
+      if (m_sourceHeight % minResolutionMultiple)
+      {
+        m_sourcePadding[1] = m_confWinBottom = ((m_sourceHeight / minResolutionMultiple) + 1) * minResolutionMultiple - m_sourceHeight;
+        m_sourceHeight += m_confWinBottom;
+        if ( m_isField )
+        {
+          m_iSourceHeightOrg += m_confWinBottom << 1;
+          m_sourcePadding[1] = m_confWinBottom << 1;
+        }
+      }
+      if (m_sourcePadding[0] % SPS::getWinUnitX(m_chromaFormatIDC) != 0)
+      {
+        EXIT( "Error: picture width is not an integer multiple of the specified chroma subsampling");
+      }
+      if (m_sourcePadding[1] % SPS::getWinUnitY(m_chromaFormatIDC) != 0)
+      {
+        EXIT( "Error: picture height is not an integer multiple of the specified chroma subsampling");
+      }
+#else
       if (m_iSourceWidth % minResolutionMultiple)
       {
         m_aiPad[0] = m_confWinRight  = ((m_iSourceWidth / minResolutionMultiple) + 1) * minResolutionMultiple - m_iSourceWidth;
@@ -2372,15 +2477,23 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
       {
         EXIT( "Error: picture height is not an integer multiple of the specified chroma subsampling");
       }
+#endif
       break;
     }
   case 2:
     {
       //padding
+#if JVET_AA0146_WRAP_AROUND_FIX
+      m_sourceWidth  += m_sourcePadding[0];
+      m_sourceHeight += m_sourcePadding[1];
+      m_confWinRight  = m_sourcePadding[0];
+      m_confWinBottom = m_sourcePadding[1];
+#else
       m_iSourceWidth  += m_aiPad[0];
       m_iSourceHeight += m_aiPad[1];
       m_confWinRight  = m_aiPad[0];
       m_confWinBottom = m_aiPad[1];
+#endif
       break;
     }
   case 3:
@@ -2390,11 +2503,19 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
       {
         msg( ERROR, "Warning: Conformance window enabled, but all conformance window parameters set to zero\n");
       }
+#if JVET_AA0146_WRAP_AROUND_FIX
+      if ((m_sourcePadding[1] != 0) || (m_sourcePadding[0]!=0))
+      {
+        msg( ERROR, "Warning: Conformance window enabled, padding parameters will be ignored\n");
+      }
+      m_sourcePadding[1] = m_sourcePadding[0] = 0;
+#else
       if ((m_aiPad[1] != 0) || (m_aiPad[0]!=0))
       {
         msg( ERROR, "Warning: Conformance window enabled, padding parameters will be ignored\n");
       }
       m_aiPad[1] = m_aiPad[0] = 0;
+#endif
       break;
     }
   }
@@ -2404,12 +2525,22 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   {
     for(int i = 0; i < m_numSubPics; i++)
     {
+#if JVET_AA0146_WRAP_AROUND_FIX
+      CHECK( (m_subPicCtuTopLeftX[i] * m_uiCTUSize) >= (m_sourceWidth - m_confWinRight * SPS::getWinUnitX(m_chromaFormatIDC)),
+          "No subpicture can be located completely outside of the conformance cropping window");
+#else
       CHECK( (m_subPicCtuTopLeftX[i] * m_uiCTUSize) >= (m_iSourceWidth - m_confWinRight * SPS::getWinUnitX(m_chromaFormatIDC)),
           "No subpicture can be located completely outside of the conformance cropping window");
+#endif
       CHECK( ((m_subPicCtuTopLeftX[i] + m_subPicWidth[i]) * m_uiCTUSize) <= (m_confWinLeft * SPS::getWinUnitX(m_chromaFormatIDC)),
 	  "No subpicture can be located completely outside of the conformance cropping window" );
+#if JVET_AA0146_WRAP_AROUND_FIX
+      CHECK( (m_subPicCtuTopLeftY[i] * m_uiCTUSize) >= (m_sourceHeight  - m_confWinBottom * SPS::getWinUnitY(m_chromaFormatIDC)),
+          "No subpicture can be located completely outside of the conformance cropping window");
+#else
       CHECK( (m_subPicCtuTopLeftY[i] * m_uiCTUSize) >= (m_iSourceHeight  - m_confWinBottom * SPS::getWinUnitY(m_chromaFormatIDC)),
           "No subpicture can be located completely outside of the conformance cropping window");
+#endif
       CHECK( ((m_subPicCtuTopLeftY[i] + m_subPicHeight[i]) * m_uiCTUSize) <= (m_confWinTop * SPS::getWinUnitY(m_chromaFormatIDC)),
           "No subpicture can be located completely outside of the conformance cropping window");
     }
@@ -2638,7 +2769,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
       }
       for (unsigned i = 0; i < m_numVerVirtualBoundaries; i++)
       {
+#if JVET_AA0146_WRAP_AROUND_FIX
+        CHECK( m_virtualBoundariesPosX[i] == 0 || m_virtualBoundariesPosX[i] >= m_sourceWidth, "The vertical virtual boundary must be within the picture" );
+#else
         CHECK( m_virtualBoundariesPosX[i] == 0 || m_virtualBoundariesPosX[i] >= m_iSourceWidth, "The vertical virtual boundary must be within the picture" );
+#endif
         CHECK( m_virtualBoundariesPosX[i] % 8, "The vertical virtual boundary must be a multiple of 8 luma samples" );
         if (i > 0)
         {
@@ -2652,7 +2787,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
       }
       for (unsigned i = 0; i < m_numHorVirtualBoundaries; i++)
       {
+#if JVET_AA0146_WRAP_AROUND_FIX
+        CHECK( m_virtualBoundariesPosY[i] == 0 || m_virtualBoundariesPosY[i] >= m_sourceHeight, "The horizontal virtual boundary must be within the picture" );
+#else
         CHECK( m_virtualBoundariesPosY[i] == 0 || m_virtualBoundariesPosY[i] >= m_iSourceHeight, "The horizontal virtual boundary must be within the picture" );
+#endif
         CHECK( m_virtualBoundariesPosY[i] % 8, "The horizontal virtual boundary must be a multiple of 8 luma samples" );
         if (i > 0)
         {
@@ -2809,7 +2948,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   }
   m_reshapeCW.binCW.resize(3);
   m_reshapeCW.rspFps = m_iFrameRate;
+#if JVET_AA0146_WRAP_AROUND_FIX
+  m_reshapeCW.rspPicSize = m_sourceWidth*m_sourceHeight;
+#else
   m_reshapeCW.rspPicSize = m_iSourceWidth*m_iSourceHeight;
+#endif
   m_reshapeCW.rspFpsToIp = std::max(16, 16 * (int)(round((double)m_iFrameRate /16.0)));
   m_reshapeCW.rspBaseQP = m_iQP;
   m_reshapeCW.updateCtrl = m_updateCtrl;
@@ -2834,6 +2977,17 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   }
 
 #if ENABLE_QPA_SUB_CTU
+#if JVET_AA0146_WRAP_AROUND_FIX
+#if QP_SWITCHING_FOR_PARALLEL
+  if ((m_iQP < 38) && m_bUsePerceptQPA && !m_bUseAdaptiveQP && (m_sourceWidth <= 2048) && (m_sourceHeight <= 1280)
+#else
+  if (((int)m_fQP < 38) && m_bUsePerceptQPA && !m_bUseAdaptiveQP && (m_sourceWidth <= 2048) && (m_sourceHeight <= 1280)
+#endif
+#if WCG_EXT && ER_CHROMA_QP_WCG_PPS
+     && (!m_wcgChromaQpControl.enabled)
+#endif
+     && ((1 << (m_log2MaxTbSize + 1)) == m_uiCTUSize) && (m_sourceWidth > 512 || m_sourceHeight > 320))
+#else
  #if QP_SWITCHING_FOR_PARALLEL
   if ((m_iQP < 38) && m_bUsePerceptQPA && !m_bUseAdaptiveQP && (m_iSourceWidth <= 2048) && (m_iSourceHeight <= 1280)
  #else
@@ -2843,15 +2997,24 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
       && (!m_wcgChromaQpControl.enabled)
  #endif
       && ((1 << (m_log2MaxTbSize + 1)) == m_uiCTUSize) && (m_iSourceWidth > 512 || m_iSourceHeight > 320))
+#endif
   {
     m_cuQpDeltaSubdiv = 2;
   }
+#else
+#if JVET_AA0146_WRAP_AROUND_FIX
+#if QP_SWITCHING_FOR_PARALLEL
+ if( ( m_iQP < 38 ) && ( m_iGOPSize > 4 ) && m_bUsePerceptQPA && !m_bUseAdaptiveQP && ( m_sourceHeight <= 1280 ) && ( m_sourceWidth <= 2048 ) )
+#else
+ if( ( ( int ) m_fQP < 38 ) && ( m_iGOPSize > 4 ) && m_bUsePerceptQPA && !m_bUseAdaptiveQP && ( m_sourceHeight <= 1280 ) && ( m_sourceWidth <= 2048 ) )
+#endif
 #else
  #if QP_SWITCHING_FOR_PARALLEL
   if( ( m_iQP < 38 ) && ( m_iGOPSize > 4 ) && m_bUsePerceptQPA && !m_bUseAdaptiveQP && ( m_iSourceHeight <= 1280 ) && ( m_iSourceWidth <= 2048 ) )
  #else
   if( ( ( int ) m_fQP < 38 ) && ( m_iGOPSize > 4 ) && m_bUsePerceptQPA && !m_bUseAdaptiveQP && ( m_iSourceHeight <= 1280 ) && ( m_iSourceWidth <= 2048 ) )
  #endif
+#endif
   {
     msg( WARNING, "*************************************************************************\n" );
     msg( WARNING, "* WARNING: QPA on with large CTU for <=HD sequences, limiting CTU size! *\n" );
@@ -3050,7 +3213,11 @@ bool EncAppCfg::xCheckParameter()
   {
     const int minCUSize = 1 << m_log2MinCuSize;
     xConfirmPara(m_wrapAroundOffset <= m_uiCTUSize + minCUSize, "Wrap-around offset must be greater than CtbSizeY + MinCbSize");
+#if JVET_AA0146_WRAP_AROUND_FIX
+    xConfirmPara(m_wrapAroundOffset > m_sourceWidth, "Wrap-around offset must not be greater than the source picture width");
+#else
     xConfirmPara(m_wrapAroundOffset > m_iSourceWidth, "Wrap-around offset must not be greater than the source picture width");
+#endif
     xConfirmPara( m_wrapAroundOffset % minCUSize != 0, "Wrap-around offset must be an integer multiple of the specified minimum CU size" );
   }
 #if MULTI_HYP_PRED
@@ -3325,7 +3492,11 @@ bool EncAppCfg::xCheckParameter()
 #endif
   xConfirmPara( m_uiMinQT[0] < minCuSize,                                                   "Min Luma QT size in I slices should be larger than or equal to minCuSize");
   xConfirmPara( m_uiMinQT[1] < minCuSize,                                                   "Min Luma QT size in non-I slices should be larger than or equal to minCuSize");
+#if JVET_AA0146_WRAP_AROUND_FIX
+  xConfirmPara((m_sourceWidth % minCuSize ) || (m_sourceHeight % minCuSize),              "Picture width or height is not a multiple of minCuSize");
+#else
   xConfirmPara((m_iSourceWidth % minCuSize ) || (m_iSourceHeight % minCuSize),              "Picture width or height is not a multiple of minCuSize");
+#endif
   const int minDiff = (int)floorLog2(m_uiMinQT[2]) - std::max(MIN_CU_LOG2, (int)m_log2MinCuSize - (int)getChannelTypeScaleX(CHANNEL_TYPE_CHROMA, m_chromaFormatIDC));
   xConfirmPara( minDiff < 0 ,                                                               "Min Chroma QT size in I slices is smaller than Min Luma CU size even considering color format");
   xConfirmPara( (m_uiMinQT[2] << (int)getChannelTypeScaleX(CHANNEL_TYPE_CHROMA, m_chromaFormatIDC)) > std::min(64, (int)m_uiCTUSize),
@@ -3354,8 +3525,13 @@ bool EncAppCfg::xCheckParameter()
   xConfirmPara( m_uiMaxTT[2] < (m_uiMinQT[2] << (int)getChannelTypeScaleX(CHANNEL_TYPE_CHROMA, m_chromaFormatIDC)),
                                                                                             "Maximum TT size for chroma block in I slice should be larger than minimum QT size");
   xConfirmPara( m_uiMaxTT[2] > m_uiCTUSize,                                                 "Maximum TT size for chroma block in I slice should be smaller than or equal to CTUSize");
+#if JVET_AA0146_WRAP_AROUND_FIX
+  xConfirmPara( (m_sourceWidth  % (std::max(8u, m_log2MinCuSize))) != 0,                   "Resulting coded frame width must be a multiple of Max(8, the minimum CU size)");
+  xConfirmPara( (m_sourceHeight % (std::max(8u, m_log2MinCuSize))) != 0,                   "Resulting coded frame height must be a multiple of Max(8, the minimum CU size)");
+#else
   xConfirmPara( (m_iSourceWidth  % (std::max(8u, m_log2MinCuSize))) != 0,                   "Resulting coded frame width must be a multiple of Max(8, the minimum CU size)");
   xConfirmPara( (m_iSourceHeight % (std::max(8u, m_log2MinCuSize))) != 0,                   "Resulting coded frame height must be a multiple of Max(8, the minimum CU size)");
+#endif
   if (m_uiMaxMTTHierarchyDepthI == 0)
   {
     xConfirmPara(m_uiMaxBT[0] != m_uiMinQT[0], "MaxBTLumaISlice shall be equal to MinQTLumaISlice when MaxMTTHierarchyDepthISliceL is 0.");
@@ -3431,11 +3607,19 @@ bool EncAppCfg::xCheckParameter()
   }
 
 
+#if JVET_AA0146_WRAP_AROUND_FIX
+  xConfirmPara( m_sourceWidth  % SPS::getWinUnitX(m_chromaFormatIDC) != 0, "Picture width must be an integer multiple of the specified chroma subsampling");
+  xConfirmPara( m_sourceHeight % SPS::getWinUnitY(m_chromaFormatIDC) != 0, "Picture height must be an integer multiple of the specified chroma subsampling");
+
+    xConfirmPara( m_sourcePadding[0] % SPS::getWinUnitX(m_chromaFormatIDC) != 0, "Horizontal padding must be an integer multiple of the specified chroma subsampling");
+    xConfirmPara( m_sourcePadding[1] % SPS::getWinUnitY(m_chromaFormatIDC) != 0, "Vertical padding must be an integer multiple of the specified chroma subsampling");
+#else
   xConfirmPara( m_iSourceWidth  % SPS::getWinUnitX(m_chromaFormatIDC) != 0, "Picture width must be an integer multiple of the specified chroma subsampling");
   xConfirmPara( m_iSourceHeight % SPS::getWinUnitY(m_chromaFormatIDC) != 0, "Picture height must be an integer multiple of the specified chroma subsampling");
 
   xConfirmPara( m_aiPad[0] % SPS::getWinUnitX(m_chromaFormatIDC) != 0, "Horizontal padding must be an integer multiple of the specified chroma subsampling");
   xConfirmPara( m_aiPad[1] % SPS::getWinUnitY(m_chromaFormatIDC) != 0, "Vertical padding must be an integer multiple of the specified chroma subsampling");
+#endif
 
   xConfirmPara( m_confWinLeft   % SPS::getWinUnitX(m_chromaFormatIDC) != 0, "Left conformance window offset must be an integer multiple of the specified chroma subsampling");
   xConfirmPara( m_confWinRight  % SPS::getWinUnitX(m_chromaFormatIDC) != 0, "Right conformance window offset must be an integer multiple of the specified chroma subsampling");
@@ -3897,8 +4081,13 @@ bool EncAppCfg::xCheckParameter()
     uint32_t colIdx, rowIdx;
     uint32_t remSize;
 
+#if JVET_AA0146_WRAP_AROUND_FIX
+    pps.setPicWidthInLumaSamples( m_sourceWidth );
+    pps.setPicHeightInLumaSamples( m_sourceHeight );
+#else
     pps.setPicWidthInLumaSamples( m_iSourceWidth );
     pps.setPicHeightInLumaSamples( m_iSourceHeight );
+#endif
     pps.setLog2CtuSize( floorLog2(m_uiCTUSize) );
 
     // set default tile column if not provided
@@ -4343,8 +4532,13 @@ void EncAppCfg::xPrintParameter()
   msg( DETAILS, "Input          File                    : %s\n", m_inputFileName.c_str() );
   msg( DETAILS, "Bitstream      File                    : %s\n", m_bitstreamFileName.c_str() );
   msg( DETAILS, "Reconstruction File                    : %s\n", m_reconFileName.c_str() );
+#if JVET_AA0146_WRAP_AROUND_FIX
+  msg( DETAILS, "Real     Format                        : %dx%d %gHz\n", m_sourceWidth - m_confWinLeft - m_confWinRight, m_sourceHeight - m_confWinTop - m_confWinBottom, (double)m_iFrameRate / m_temporalSubsampleRatio );
+  msg( DETAILS, "Internal Format                        : %dx%d %gHz\n", m_sourceWidth, m_sourceHeight, (double)m_iFrameRate / m_temporalSubsampleRatio );
+#else
   msg( DETAILS, "Real     Format                        : %dx%d %gHz\n", m_iSourceWidth - m_confWinLeft - m_confWinRight, m_iSourceHeight - m_confWinTop - m_confWinBottom, (double)m_iFrameRate / m_temporalSubsampleRatio );
   msg( DETAILS, "Internal Format                        : %dx%d %gHz\n", m_iSourceWidth, m_iSourceHeight, (double)m_iFrameRate / m_temporalSubsampleRatio );
+#endif
   msg( DETAILS, "Sequence PSNR output                   : %s\n", ( m_printMSEBasedSequencePSNR ? "Linear average, MSE-based" : "Linear average only" ) );
   msg( DETAILS, "Hexadecimal PSNR output                : %s\n", ( m_printHexPsnr ? "Enabled" : "Disabled" ) );
   msg( DETAILS, "Sequence MSE output                    : %s\n", ( m_printSequenceMSE ? "Enabled" : "Disabled" ) );
@@ -4548,7 +4742,11 @@ void EncAppCfg::xPrintParameter()
   msg( VERBOSE, "WPP:%d ", (int)m_useWeightedPred);
   msg( VERBOSE, "WPB:%d ", (int)m_useWeightedBiPred);
   msg( VERBOSE, "PME:%d ", m_log2ParallelMergeLevel);
+#if JVET_AA0146_WRAP_AROUND_FIX
+  const int iWaveFrontSubstreams = m_entropyCodingSyncEnabledFlag ? (m_sourceHeight + m_uiMaxCUHeight - 1) / m_uiMaxCUHeight : 1;
+#else
   const int iWaveFrontSubstreams = m_entropyCodingSyncEnabledFlag ? (m_iSourceHeight + m_uiMaxCUHeight - 1) / m_uiMaxCUHeight : 1;
+#endif
   msg( VERBOSE, " WaveFrontSynchro:%d WaveFrontSubstreams:%d", m_entropyCodingSyncEnabledFlag?1:0, iWaveFrontSubstreams);
   msg( VERBOSE, " ScalingList:%d ", m_useScalingListId );
   msg( VERBOSE, "TMVPMode:%d ", m_TMVPModeId );

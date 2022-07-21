@@ -1064,7 +1064,21 @@ void InterPrediction::xPredInterBiSubPuBDOF(PredictionUnit &pu, PelUnitBuf &pcYu
             bool isOOB[2] = { false,false };
             if (pu.interDir == 3)
             {
+#if JVET_AA0146_WRAP_AROUND_FIX
+              if (subPu.cu->slice->getRefPic(REF_PIC_LIST_0, subPu.refIdx[0])->isWrapAroundEnabled( subPu.cs->pps ))
+              {
+                isOOB[0] = false;
+              }
+              else
+#endif
               isOOB[0] = isMvOOB(subPu.mv[0], subPu.Y().topLeft(), subPu.lumaSize(), subPu.cu->slice->getSPS(), subPu.cu->slice->getPPS(), pu.cs->mcMask[0], pu.cs->mcMaskChroma[0]);
+#if JVET_AA0146_WRAP_AROUND_FIX
+              if (subPu.cu->slice->getRefPic(REF_PIC_LIST_1, subPu.refIdx[1])->isWrapAroundEnabled( subPu.cs->pps ))
+              {
+                isOOB[1] = false;
+              }
+              else
+#endif
               isOOB[1] = isMvOOB(subPu.mv[1], subPu.Y().topLeft(), subPu.lumaSize(), subPu.cu->slice->getSPS(), subPu.cu->slice->getPPS(), pu.cs->mcMask[1], pu.cs->mcMaskChroma[1]);
               xWeightedAverage(false/*isBdofMvRefine*/, 0/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf, slice.getSPS()->getBitDepths(), slice.clpRngs(), false, lumaOnly, true, NULL, pu.cs->mcMask, subYuvPredBuf.Y().width, pu.cs->mcMaskChroma, subYuvPredBuf.Cb().width, isOOB);
             }
@@ -1084,7 +1098,21 @@ void InterPrediction::xPredInterBiSubPuBDOF(PredictionUnit &pu, PelUnitBuf &pcYu
           bool isOOB[2] = { false,false };
           if (pu.interDir == 3)
           {
+#if JVET_AA0146_WRAP_AROUND_FIX
+            if (subPu.cu->slice->getRefPic(REF_PIC_LIST_0, subPu.refIdx[0])->isWrapAroundEnabled( subPu.cs->pps ))
+            {
+              isOOB[0] = false;
+            }
+            else
+#endif
             isOOB[0] = isMvOOB(subPu.mv[0], subPu.Y().topLeft(), subPu.lumaSize(), subPu.cu->slice->getSPS(), subPu.cu->slice->getPPS(), pu.cs->mcMask[0], pu.cs->mcMaskChroma[0]);
+#if JVET_AA0146_WRAP_AROUND_FIX
+            if (subPu.cu->slice->getRefPic(REF_PIC_LIST_1, subPu.refIdx[1])->isWrapAroundEnabled( subPu.cs->pps ))
+            {
+              isOOB[1] = false;
+            }
+            else
+#endif
             isOOB[1] = isMvOOB(subPu.mv[1], subPu.Y().topLeft(), subPu.lumaSize(), subPu.cu->slice->getSPS(), subPu.cu->slice->getPPS(), pu.cs->mcMask[1], pu.cs->mcMaskChroma[1]);
             xWeightedAverage(false/*isBdofMvRefine*/, 0/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf, slice.getSPS()->getBitDepths(), slice.clpRngs(), bioApplied, lumaOnly, chromaOnly, NULL, pu.cs->mcMask, subYuvPredBuf.Y().width, pu.cs->mcMaskChroma, subYuvPredBuf.Cb().width, isOOB);
           }
@@ -1319,7 +1347,21 @@ void InterPrediction::xPredInterBiBDMVR(PredictionUnit &pu, PelUnitBuf &pcYuvPre
           bool isOOB[2] = { false,false };
           if (pu.interDir == 3)
           {
+#if JVET_AA0146_WRAP_AROUND_FIX
+            if (subPu.cu->slice->getRefPic(REF_PIC_LIST_0, subPu.refIdx[0])->isWrapAroundEnabled( subPu.cs->pps ))
+            {
+              isOOB[0] = false;
+            }
+            else
+#endif
             isOOB[0] = isMvOOB(subPu.mv[0], subPu.Y().topLeft(), subPu.lumaSize(), subPu.cu->slice->getSPS(), subPu.cu->slice->getPPS(), pu.cs->mcMask[0], pu.cs->mcMaskChroma[0]);
+#if JVET_AA0146_WRAP_AROUND_FIX
+            if (subPu.cu->slice->getRefPic(REF_PIC_LIST_1, subPu.refIdx[1])->isWrapAroundEnabled( subPu.cs->pps ))
+            {
+              isOOB[1] = false;
+            }
+            else
+#endif
             isOOB[1] = isMvOOB(subPu.mv[1], subPu.Y().topLeft(), subPu.lumaSize(), subPu.cu->slice->getSPS(), subPu.cu->slice->getPPS(), pu.cs->mcMask[1], pu.cs->mcMaskChroma[1]);
             xWeightedAverage(true/*isBdofMvRefine*/, bioSubPuOffset/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf, slice.getSPS()->getBitDepths(), slice.clpRngs(), bioApplied, lumaOnly, chromaOnly, yuvPredTmp, pu.cs->mcMask, subYuvPredBuf.Y().width, pu.cs->mcMaskChroma, subYuvPredBuf.Cb().width, isOOB);
           }
@@ -1448,7 +1490,21 @@ void InterPrediction::xPredInterBiBDMVR(PredictionUnit &pu, PelUnitBuf &pcYuvPre
         bool isOOB[2] = { false,false };
         if (pu.interDir == 3)
         {
+#if JVET_AA0146_WRAP_AROUND_FIX
+          if (subPu.cu->slice->getRefPic(REF_PIC_LIST_0, subPu.refIdx[0])->isWrapAroundEnabled( subPu.cs->pps ))
+          {
+            isOOB[0] = false;
+          }
+          else
+#endif
           isOOB[0] = isMvOOB(subPu.mv[0], subPu.Y().topLeft(), subPu.lumaSize(), subPu.cu->slice->getSPS(), subPu.cu->slice->getPPS(), pu.cs->mcMask[0], pu.cs->mcMaskChroma[0]);
+#if JVET_AA0146_WRAP_AROUND_FIX
+          if (subPu.cu->slice->getRefPic(REF_PIC_LIST_1, subPu.refIdx[1])->isWrapAroundEnabled( subPu.cs->pps ))
+          {
+            isOOB[1] = false;
+          }
+          else
+#endif
           isOOB[1] = isMvOOB(subPu.mv[1], subPu.Y().topLeft(), subPu.lumaSize(), subPu.cu->slice->getSPS(), subPu.cu->slice->getPPS(), pu.cs->mcMask[1], pu.cs->mcMaskChroma[1]);
           xWeightedAverage(true/*isBdofMvRefine*/, bioSubPuOffset/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf, slice.getSPS()->getBitDepths(), slice.clpRngs(), bioApplied, lumaOnly, chromaOnly, yuvPredTmp, pu.cs->mcMask, subYuvPredBuf.Y().width, pu.cs->mcMaskChroma, subYuvPredBuf.Cb().width, isOOB);
         }
@@ -1513,7 +1569,21 @@ void InterPrediction::xPredInterBi(PredictionUnit &pu, PelUnitBuf &pcYuvPred, co
         bool isOOB[2] = { false,false };
         if (pu.interDir == 3)
         {
+#if JVET_AA0146_WRAP_AROUND_FIX
+          if (pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0])->isWrapAroundEnabled( pu.cs->pps ))
+          {
+            isOOB[0] = false;
+          }
+          else
+#endif
           isOOB[0] = isMvOOB(pu.mv[0], pu.Y().topLeft(), pu.lumaSize(), pu.cu->slice->getSPS(), pu.cu->slice->getPPS(), pu.cs->mcMask[0], pu.cs->mcMaskChroma[0]);
+#if JVET_AA0146_WRAP_AROUND_FIX
+          if (pu.cu->slice->getRefPic(REF_PIC_LIST_1, pu.refIdx[1])->isWrapAroundEnabled( pu.cs->pps ))
+          {
+            isOOB[1] = false;
+          }
+          else
+#endif
           isOOB[1] = isMvOOB(pu.mv[1], pu.Y().topLeft(), pu.lumaSize(), pu.cu->slice->getSPS(), pu.cu->slice->getPPS(), pu.cs->mcMask[1], pu.cs->mcMaskChroma[1]);
           xWeightedAverage(false/*isBdofMvRefine*/, 0/*bioSubPuOffset*/, pu, srcPred0, srcPred1, *yuvPredTmp, slice.getSPS()->getBitDepths(), slice.clpRngs(), false, lumaOnly, chromaOnly, NULL, pu.cs->mcMask, yuvPredTmp->Y().width, pu.cs->mcMaskChroma, yuvPredTmp->Cb().width, isOOB);
         }
@@ -1644,7 +1714,21 @@ void InterPrediction::xPredInterBi(PredictionUnit &pu, PelUnitBuf &pcYuvPred, co
       bool isOOB[2] = { false,false };
       if (pu.interDir == 3)
       {
+#if JVET_AA0146_WRAP_AROUND_FIX
+        if (pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0])->isWrapAroundEnabled( pu.cs->pps ))
+        {
+          isOOB[0] = false;
+        }
+        else
+#endif
         isOOB[0] = isMvOOB(pu.mv[0], pu.Y().topLeft(), pu.lumaSize(), pu.cu->slice->getSPS(), pu.cu->slice->getPPS(), pu.cs->mcMask[0], pu.cs->mcMaskChroma[0]);
+#if JVET_AA0146_WRAP_AROUND_FIX
+        if (pu.cu->slice->getRefPic(REF_PIC_LIST_1, pu.refIdx[1])->isWrapAroundEnabled( pu.cs->pps ))
+        {
+          isOOB[1] = false;
+        }
+        else
+#endif
         isOOB[1] = isMvOOB(pu.mv[1], pu.Y().topLeft(), pu.lumaSize(), pu.cu->slice->getSPS(), pu.cu->slice->getPPS(), pu.cs->mcMask[1], pu.cs->mcMaskChroma[1]);
         xWeightedAverage(false/*isBdofMvRefine*/, 0/*bioSubPuOffset*/, pu, srcPred0, srcPred1, *yuvPredTmp, slice.getSPS()->getBitDepths(), slice.clpRngs(), false, lumaOnly, chromaOnly, NULL, pu.cs->mcMask, yuvPredTmp->Y().width, pu.cs->mcMaskChroma, yuvPredTmp->Cb().width, isOOB);
       }
@@ -1769,7 +1853,21 @@ void InterPrediction::xPredInterBi(PredictionUnit &pu, PelUnitBuf &pcYuvPred, co
         }
         else
         {
+#if JVET_AA0146_WRAP_AROUND_FIX
+          if (pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0])->isWrapAroundEnabled( pu.cs->pps ))
+          {
+            isOOB[0] = false;
+          }
+          else
+#endif
           isOOB[0] = isMvOOB(pu.mv[0], pu.Y().topLeft(), pu.lumaSize(), pu.cu->slice->getSPS(), pu.cu->slice->getPPS(), pu.cs->mcMask[0], pu.cs->mcMaskChroma[0]);
+#if JVET_AA0146_WRAP_AROUND_FIX
+          if (pu.cu->slice->getRefPic(REF_PIC_LIST_1, pu.refIdx[1])->isWrapAroundEnabled( pu.cs->pps ))
+          {
+            isOOB[1] = false;
+          }
+          else
+#endif
           isOOB[1] = isMvOOB(pu.mv[1], pu.Y().topLeft(), pu.lumaSize(), pu.cu->slice->getSPS(), pu.cu->slice->getPPS(), pu.cs->mcMask[1], pu.cs->mcMaskChroma[1]);
         }
         xWeightedAverage(true/*isBdofMvRefine*/, 0/*bioSubPuOffset*/, pu, srcPred0, srcPred1, pcYuvPred, slice.getSPS()->getBitDepths(), slice.clpRngs(), bioApplied, lumaOnly, chromaOnly, yuvPredTmp, pu.cs->mcMask, pcYuvPred.Y().width, pu.cs->mcMaskChroma, pcYuvPred.Cb().width, isOOB);
@@ -1803,7 +1901,21 @@ void InterPrediction::xPredInterBi(PredictionUnit &pu, PelUnitBuf &pcYuvPred, co
         }
         else
         {
+#if JVET_AA0146_WRAP_AROUND_FIX
+          if (pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0])->isWrapAroundEnabled( pu.cs->pps ))
+          {
+            isOOB[0] = false;
+          }
+          else
+#endif
           isOOB[0] = isMvOOB(pu.mv[0], pu.Y().topLeft(), pu.lumaSize(), pu.cu->slice->getSPS(), pu.cu->slice->getPPS(), pu.cs->mcMask[0], pu.cs->mcMaskChroma[0]);
+#if JVET_AA0146_WRAP_AROUND_FIX
+          if (pu.cu->slice->getRefPic(REF_PIC_LIST_1, pu.refIdx[1])->isWrapAroundEnabled( pu.cs->pps ))
+          {
+            isOOB[1] = false;
+          }
+          else
+#endif
           isOOB[1] = isMvOOB(pu.mv[1], pu.Y().topLeft(), pu.lumaSize(), pu.cu->slice->getSPS(), pu.cu->slice->getPPS(), pu.cs->mcMask[1], pu.cs->mcMaskChroma[1]);
         }
         xWeightedAverage(pu, srcPred0, srcPred1, pcYuvPred, slice.getSPS()->getBitDepths(), slice.clpRngs(), bioApplied, lumaOnly, chromaOnly, yuvPredTmp, pu.cs->mcMask, pcYuvPred.Y().width, pu.cs->mcMaskChroma, pcYuvPred.Cb().width, isOOB);
@@ -2117,11 +2229,41 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
       if( isAML )
       {
+#if JVET_AA0146_WRAP_AROUND_FIX
+        bool wrapRef = false;
+        Mv mvCurrClip(mvCurr);
+        if (refPic->isWrapAroundEnabled( pu.cs->pps ))
+        {
+          wrapRef = wrapClipMv(mvCurrClip, pu.lumaPos(), pu.lumaSize(), pu.cs->sps, pu.cs->pps);
+        }
+        else
+        {
+          clipMv(mvCurrClip, pu.lumaPos(), pu.lumaSize(), *pu.cu->cs->sps, *pu.cu->cs->pps);
+        }
+        xLocalIlluComp(pu, compID, *refPic, mvCurrClip, bi, dstBuf, wrapRef);
+#else
         xLocalIlluComp(pu, compID, *refPic, mvCurr, bi, dstBuf);
+#endif
       }
       else
 #endif
+#if JVET_AA0146_WRAP_AROUND_FIX
+      {
+        bool wrapRef = false;
+        Mv mvClip(mv);
+        if (refPic->isWrapAroundEnabled( pu.cs->pps ))
+        {
+          wrapRef = wrapClipMv(mvClip, pu.lumaPos(), pu.lumaSize(), pu.cs->sps, pu.cs->pps);
+        }
+        else
+        {
+          clipMv(mvClip, pu.lumaPos(), pu.lumaSize(), *pu.cu->cs->sps, *pu.cu->cs->pps);
+        }
+        xLocalIlluComp(pu, compID, *refPic, mvClip, bi, dstBuf, wrapRef);
+      }
+#else
       xLocalIlluComp( pu, compID, *refPic, _mv, bi, dstBuf );
+#endif
 #if RPR_ENABLE
       }
 #endif
@@ -2574,6 +2716,27 @@ void InterPrediction::xPredAffineBlk(const ComponentID &compID, const Prediction
           bool *pMcMaskChroma = pu.cs->mcMaskChroma[int(eRefPicList)] + (w >> chromaScale) + (h >> chromaScale) * (cxWidth >> chromaScale);
           int cxWidthChroma = cxWidth >> chromaScale;
 
+#if JVET_AA0146_WRAP_AROUND_FIX
+          if ( refPic->isWrapAroundEnabled( pu.cs->pps ) )
+          {
+            bool *pMcMask0 = pMcMask;
+            for (int y = 0; y < blockHeight; y++)
+            {
+              memset(pMcMask0, false, blockWidth);
+              pMcMask0 += cxWidth;
+            }
+
+            bool *pMcMaskChroma0 = pMcMaskChroma;
+            int widthChroma = blockWidth >> chromaScale;
+            int heightChroma = blockHeight >> chromaScale;
+            for (int y = 0; y < heightChroma; y++)
+            {
+              memset(pMcMaskChroma0, false, widthChroma);
+              pMcMaskChroma0 += cxWidthChroma;
+            }
+          }
+          else
+#endif
           isMvOOBSubBlk(tmpMv, Position(pu.Y().x + w, pu.Y().y + h), Size(blockWidth, blockHeight), pu.cu->slice->getSPS(), pu.cu->slice->getPPS(), pMcMask, cxWidth, pMcMaskChroma, cxWidthChroma);
         }
 #endif
@@ -2612,7 +2775,11 @@ void InterPrediction::xPredAffineBlk(const ComponentID &compID, const Prediction
 #if INTER_LIC
         if (pu.cu->LICFlag && (w == 0 || h == 0))
         {
+#if JVET_AA0146_WRAP_AROUND_FIX
+          xGetSublkTemplate(*pu.cu, compID, *refPic, Mv(iMvScaleTmpHor, iMvScaleTmpVer), blockWidth, blockHeight, w, h, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate, wrapRef);
+#else
           xGetSublkTemplate(*pu.cu, compID, *refPic, Mv(iMvScaleTmpHor, iMvScaleTmpVer), blockWidth, blockHeight, w, h, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate);
+#endif
         }
 #endif
         // get the MV in high precision
@@ -3722,15 +3889,34 @@ void InterPrediction::xPredAffineTpl(const PredictionUnit &pu, const RefPicList 
         iMvScaleTmpVer = tmpMv.getVer();
 
         // clip and scale
+#if JVET_AA0146_WRAP_AROUND_FIX
+        bool wrapRef = false;
+        if ( refPic->isWrapAroundEnabled( pu.cs->pps ) )
+        {
+          Mv tmpMv(iMvScaleTmpHor, iMvScaleTmpVer);
+          wrapRef = wrapClipMv( tmpMv, pu.lumaPos(), pu.lumaSize(), pu.cs->sps, pu.cs->pps );
+          iMvScaleTmpHor = tmpMv.getHor();
+          iMvScaleTmpVer = tmpMv.getVer();
+        }
+        else
+        {
+          wrapRef = false;
+#endif
         if (refPic->isRefScaled(pu.cs->pps) == false)
         {
           clipMv(tmpMv, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
           iMvScaleTmpHor = tmpMv.getHor();
           iMvScaleTmpVer = tmpMv.getVer();
         }
+#if JVET_AA0146_WRAP_AROUND_FIX
+        }
+#endif
         xGetSublkAMLTemplate(*pu.cu, COMPONENT_Y, *refPic, Mv(iMvScaleTmpHor, iMvScaleTmpVer), blockWidth, blockHeight, w, h, numTemplate, refLeftTemplate, refAboveTemplate
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
                              , pu.afMmvdFlag
+#endif
+#if JVET_AA0146_WRAP_AROUND_FIX
+                             , wrapRef
 #endif
                              );
       }
@@ -6799,6 +6985,9 @@ void InterPrediction::xGetSublkAMLTemplate(const CodingUnit& cu,
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
      , bool afMMVD
 #endif
+#if JVET_AA0146_WRAP_AROUND_FIX
+  , bool wrapRef
+#endif
                                            )
 {
   const int       bitDepth = cu.cs->sps->getBitDepth(toChannelType(compID));
@@ -6806,7 +6995,11 @@ void InterPrediction::xGetSublkAMLTemplate(const CodingUnit& cu,
 
   const CodingUnit* const cuAbove = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID));
   const CodingUnit* const cuLeft = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID));
+#if JVET_AA0146_WRAP_AROUND_FIX
+  const CPelBuf refBuf = cuAbove || cuLeft ? refPic.getRecoBuf(refPic.blocks[compID], wrapRef) : CPelBuf();
+#else
   const CPelBuf refBuf = cuAbove || cuLeft ? refPic.getRecoBuf(refPic.blocks[compID]) : CPelBuf();
+#endif
 
   // above
   if (cuAbove && posH == 0)
@@ -8572,6 +8765,9 @@ void InterPrediction::xLocalIlluComp(const PredictionUnit& pu,
                                      const Mv&             mv,
                                      const bool            biPred,
                                      PelBuf&               dstBuf
+#if JVET_AA0146_WRAP_AROUND_FIX
+                                     , bool wrapRef
+#endif
 )
 {
   Pel* refLeftTemplate  = m_pcLICRefLeftTemplate;
@@ -8579,7 +8775,11 @@ void InterPrediction::xLocalIlluComp(const PredictionUnit& pu,
   Pel* recLeftTemplate  = m_pcLICRecLeftTemplate;
   Pel* recAboveTemplate = m_pcLICRecAboveTemplate;
   int numTemplate[2] = { 0 , 0 }; // 0:Above, 1:Left
+#if JVET_AA0146_WRAP_AROUND_FIX
+  xGetSublkTemplate(*pu.cu, compID, refPic, mv, pu.blocks[compID].width, pu.blocks[compID].height, 0, 0, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate, wrapRef);
+#else
   xGetSublkTemplate(*pu.cu, compID, refPic, mv, pu.blocks[compID].width, pu.blocks[compID].height, 0, 0, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate);
+#endif
 
   int shift = 0, scale = 0, offset = 0;
   xGetLICParamGeneral(*pu.cu, compID, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate, shift, scale, offset);
@@ -8600,7 +8800,11 @@ void InterPrediction::xGetSublkTemplate(const CodingUnit& cu,
                                         Pel*              refLeftTemplate,
                                         Pel*              refAboveTemplate,
                                         Pel*              recLeftTemplate,
-                                        Pel*              recAboveTemplate)
+                                        Pel*              recAboveTemplate
+#if JVET_AA0146_WRAP_AROUND_FIX
+                                        , bool              wrapRef
+#endif
+                                        )
 {
   const int       bitDepth = cu.cs->sps->getBitDepth(toChannelType(compID));
   const int       precShift = std::max(0, bitDepth - 12);
@@ -8609,7 +8813,11 @@ void InterPrediction::xGetSublkTemplate(const CodingUnit& cu,
   const CodingUnit* const cuAbove = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID));
   const CodingUnit* const cuLeft = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID));
   const CPelBuf recBuf = cuAbove || cuLeft ? currPic.getRecoBuf(cu.cs->picture->blocks[compID]) : CPelBuf();
+#if JVET_AA0146_WRAP_AROUND_FIX
+  const CPelBuf refBuf = cuAbove || cuLeft ? refPic.getRecoBuf(refPic.blocks[compID], wrapRef) : CPelBuf();
+#else
   const CPelBuf refBuf = cuAbove || cuLeft ? refPic.getRecoBuf(refPic.blocks[compID]) : CPelBuf();
+#endif
 
   std::vector<Pel>& invLUT = m_pcReshape->getInvLUT();
 
@@ -9188,10 +9396,27 @@ PelBuf TplMatchingCtrl::xGetRefTemplate(const PredictionUnit& curPu, const Pictu
   Position blkPos  = ( trueAfalseL ? Position(curPu.lx(), curPu.ly() - tplSize) : Position(curPu.lx() - tplSize, curPu.ly()) );
   Size     blkSize = Size(dstBuf.width, dstBuf.height);
   Mv       mv      = _mv - Mv(sr << MV_FRACTIONAL_BITS_INTERNAL, sr << MV_FRACTIONAL_BITS_INTERNAL);
+#if JVET_AA0146_WRAP_AROUND_FIX
+  bool wrapRef = false;
+#if JVET_Z0084_IBC_TM
+  if( !CU::isIBC(m_cu) )
+#endif
+  {
+    if ( m_cu.cs->pps->getWrapAroundEnabledFlag() )
+    {
+      wrapRef = wrapClipMv(mv, blkPos, blkSize, m_cu.cs->sps, m_cu.cs->pps);
+    }
+    else
+    {
+      clipMv( mv, blkPos, blkSize, *m_cu.cs->sps, *m_cu.cs->pps );
+    }
+  }
+#else
 #if JVET_Z0084_IBC_TM
   if( !CU::isIBC(m_cu) )
 #endif
   clipMv( mv, blkPos, blkSize, *m_cu.cs->sps, *m_cu.cs->pps );
+#endif
 
   const int lumaShift = 2 + MV_FRACTIONAL_BITS_DIFF;
   const int horShift  = (lumaShift + ::getComponentScaleX(m_compID, m_cu.chromaFormat));
@@ -9202,7 +9427,11 @@ PelBuf TplMatchingCtrl::xGetRefTemplate(const PredictionUnit& curPu, const Pictu
   const int xFrac = mv.getHor() & ((1 << horShift) - 1);
   const int yFrac = mv.getVer() & ((1 << verShift) - 1);
 
+#if JVET_AA0146_WRAP_AROUND_FIX
+  const CPelBuf refBuf = refPic.getRecoBuf(refPic.blocks[m_compID], wrapRef);
+#else
   const CPelBuf refBuf = refPic.getRecoBuf(refPic.blocks[m_compID]);
+#endif
   const Pel* ref       = refBuf.bufAt(blkPos.offset(xInt, yInt));
         Pel* dst       = dstBuf.buf;
         int  refStride = refBuf.stride;
@@ -10095,14 +10324,31 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
 void InterPrediction::xBDMVRFillBlkPredPelBuffer(const PredictionUnit& pu, const Picture& refPic, const Mv &_mv, PelUnitBuf &dstBuf, const ClpRng& clpRng)
 {
   const ComponentID compID = COMPONENT_Y;
+#if JVET_AA0146_WRAP_AROUND_FIX
+  bool wrapRef = false;
+  Mv mv(_mv);
+
+  if (refPic.isWrapAroundEnabled( pu.cs->pps ))
+  {
+    wrapRef = wrapClipMv(mv, pu.lumaPos(), pu.lumaSize(), pu.cs->sps, pu.cs->pps);
+  }
+  else
+  {
+    clipMv(mv, pu.lumaPos(), pu.lumaSize(), *pu.cu->cs->sps, *pu.cu->cs->pps);
+  }
+  const CPelBuf     refBuf = refPic.getRecoBuf(refPic.blocks[compID], wrapRef);
+#else
   const CPelBuf     refBuf = refPic.getRecoBuf(refPic.blocks[compID]);
+#endif
 
   const int lumaShift = 2 + MV_FRACTIONAL_BITS_DIFF;
   const int horShift = (lumaShift + ::getComponentScaleX(compID, pu.chromaFormat));
   const int verShift = (lumaShift + ::getComponentScaleY(compID, pu.chromaFormat));
 
+#if !JVET_AA0146_WRAP_AROUND_FIX
   Mv mv(_mv);
   clipMv(mv, pu.lumaPos(), pu.lumaSize(), *pu.cu->cs->sps, *pu.cu->cs->pps);
+#endif
   const int xInt  = mv.getHor() >> horShift;
   const int yInt  = mv.getVer() >> verShift;
   const int xFrac = mv.getHor() & ((1 << horShift) - 1);
@@ -13174,10 +13420,22 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
           Mv tmpMv(iMvScaleTmpHor, iMvScaleTmpVer);
           tmpMv.clipToStorageBitDepth();
           //clip
+#if JVET_AA0146_WRAP_AROUND_FIX
+          bool wrapRef = false;
+          if (refPic.isWrapAroundEnabled( pu.cs->pps ))
+          {
+            wrapRef = wrapClipMv(tmpMv, pu.lumaPos(), pu.lumaSize(), pu.cs->sps, pu.cs->pps);
+          }
+          else
+#endif
           clipMv(tmpMv, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
           iMvScaleTmpHor = tmpMv.getHor();
           iMvScaleTmpVer = tmpMv.getVer();
+#if JVET_AA0146_WRAP_AROUND_FIX
+          uiCost += xGetSublkTemplateCost(*pu.cu, COMPONENT_Y, refPic, Mv(iMvScaleTmpHor, iMvScaleTmpVer), blockWidth, blockHeight, w, h, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate, wrapRef);
+#else
           uiCost += xGetSublkTemplateCost(*pu.cu, COMPONENT_Y, refPic, Mv(iMvScaleTmpHor, iMvScaleTmpVer), blockWidth, blockHeight, w, h, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate);
+#endif
         }
       }
       aMvCostVec[n] = { n, uiCost };
@@ -13209,7 +13467,11 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
                                                     Pel*              refLeftTemplate,
                                                     Pel*              refAboveTemplate,
                                                     Pel*              recLeftTemplate,
-                                                    Pel*              recAboveTemplate)
+                                                    Pel*              recAboveTemplate
+#if JVET_AA0146_WRAP_AROUND_FIX
+                                                    , bool wrapRef
+#endif
+                                                    )
   {
 #if JVET_Z0067_RPR_ENABLE
     CHECK(refPic.isRefScaled(cu.cs->pps), "xGetSublkTemplateCost ref Scaled not supported");
@@ -13222,7 +13484,11 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
     const CodingUnit* const cuAbove = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID));
     const CodingUnit* const cuLeft = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID));
     const CPelBuf recBuf = cuAbove || cuLeft ? currPic.getRecoBuf(cu.cs->picture->blocks[compID]) : CPelBuf();
+#if JVET_AA0146_WRAP_AROUND_FIX
+    const CPelBuf refBuf = cuAbove || cuLeft ? refPic.getRecoBuf(refPic.blocks[compID], wrapRef) : CPelBuf();
+#else
     const CPelBuf refBuf = cuAbove || cuLeft ? refPic.getRecoBuf(refPic.blocks[compID]) : CPelBuf();
+#endif
     
     std::vector<Pel>& invLUT = m_pcReshape->getInvLUT();
     

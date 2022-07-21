@@ -95,8 +95,13 @@ protected:
   int       m_iFrameRate;                                     ///< source frame-rates (Hz)
   uint32_t      m_FrameSkip;                                      ///< number of skipped frames from the beginning
   uint32_t      m_temporalSubsampleRatio;                         ///< temporal subsample ratio, 2 means code every two frames
+#if JVET_AA0146_WRAP_AROUND_FIX
+  int       m_sourceWidth;                                   ///< source width in pixel
+  int       m_sourceHeight;                                  ///< source height in pixel (when interlaced = field height)
+#else
   int       m_iSourceWidth;                                   ///< source width in pixel
   int       m_iSourceHeight;                                  ///< source height in pixel (when interlaced = field height)
+#endif
 #if EXTENSION_360_VIDEO
   int       m_inputFileWidth;                                 ///< width of image in input file  (this is equivalent to sourceWidth,  if sourceWidth  is not subsequently altered due to padding)
   int       m_inputFileHeight;                                ///< height of image in input file (this is equivalent to sourceHeight, if sourceHeight is not subsequently altered due to padding)
@@ -116,7 +121,11 @@ protected:
   int       m_firstValidFrame;
   int       m_lastValidFrame;
   int       m_framesToBeEncoded;                              ///< number of encoded frames
+#if JVET_AA0146_WRAP_AROUND_FIX
+  int       m_sourcePadding[2];                               ///< number of padded pixels for width and height
+#else
   int       m_aiPad[2];                                       ///< number of padded pixels for width and height
+#endif
   bool      m_AccessUnitDelimiter;                            ///< add Access Unit Delimiter NAL units
   bool      m_enablePictureHeaderInSliceHeader;               ///< Enable Picture Header in Slice Header
 
