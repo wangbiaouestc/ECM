@@ -2228,7 +2228,7 @@ const CtxSet ContextSetCfg::LFNSTIdx = ContextSetCfg::addCtxSet
   { 28, 43, 42, 27 },
   {  9,  9,  9, 10 },
   {  9,  9,  6, 13 },
-  {  9, 10,  9, 10 }
+  {  9, 10,  9, 10 },
   {DWE, DWE, DWE, DWE},
   {DWE, DWE, DWE, DWE},
   {DWE, DWE, DWE, DWE},
@@ -2240,7 +2240,7 @@ const CtxSet ContextSetCfg::LFNSTIdx = ContextSetCfg::addCtxSet
   { 28, 43, 42 },
   {  9,  9,  9 },
   {  9,  9,  6 },
-  {  9, 10,  9 }
+  {  9, 10,  9 },
   {DWE, DWE, DWE},
   {DWE, DWE, DWE},
   {DWE, DWE, DWE},
@@ -5452,18 +5452,29 @@ void CtxStore<BinProbModel>::init( int qp, int initId )
   }
 }
 
+#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
 template <class BinProbModel>
-void CtxStore<BinProbModel>::setWinSizes( const std::vector<uint8_t>& log2WindowSizes )
+void CtxStore<BinProbModel>::saveWinSizes( std::vector<uint8_t>& windows ) const
 {
-  CHECK( m_CtxBuffer.size() != log2WindowSizes.size(),
-        "Size of window size table (" << log2WindowSizes.size() << ") does not match size of context buffer (" << m_CtxBuffer.size() << ")." );
+  windows.resize( m_CtxBuffer.size(), uint8_t( 0 ) );
+
   for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
   {
-    m_CtxBuffer[k].setLog2WindowSize( log2WindowSizes[k] );
+    windows[k] = m_CtxBuffer[k].getWinSizes();
   }
 }
 
-#if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+template <class BinProbModel>
+void CtxStore<BinProbModel>::loadWinSizes( const std::vector<uint8_t>& windows )
+{
+  CHECK( m_CtxBuffer.size() != windows.size(),
+         "Size of prob states table (" << windows.size() << ") does not match size of context buffer (" << m_CtxBuffer.size() << ")." );
+  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  {
+    m_CtxBuffer[k].setWinSizes( windows[k] );
+  }
+}
+
 template <class BinProbModel>
 void CtxStore<BinProbModel>::loadWeights( const std::vector<uint8_t>& weights )
 {

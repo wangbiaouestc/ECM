@@ -167,6 +167,8 @@ public:
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   void     setAdaptRateWeight( uint8_t weight ) { m_weight = weight; }
   uint8_t  getAdaptRateWeight() const           { return m_weight; }
+  void     setWinSizes( uint8_t rate )          { m_rate = rate; }
+  uint8_t  getWinSizes() const                  { return m_rate; }
   void     setAdaptRateOffset(uint8_t rateOffset, bool bin ) { m_rateOffset[bin] = rateOffset;}
 #endif
 
@@ -524,8 +526,9 @@ public:
   void copyFrom   ( const CtxStore<BinProbModel>& src )                        { checkInit(); ::memcpy( m_Ctx,               src.m_Ctx,               sizeof( BinProbModel ) * ContextSetCfg::NumberOfContexts ); }
   void copyFrom   ( const CtxStore<BinProbModel>& src, const CtxSet& ctxSet )  { checkInit(); ::memcpy( m_Ctx+ctxSet.Offset, src.m_Ctx+ctxSet.Offset, sizeof( BinProbModel ) * ctxSet.Size ); }
   void init       ( int qp, int initId );
-  void setWinSizes( const std::vector<uint8_t>&   log2WindowSizes );
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
+  void loadWinSizes( const std::vector<uint8_t>&   windows );
+  void saveWinSizes( std::vector<uint8_t>&         windows ) const;
   void loadWeights( const std::vector <uint8_t>&  weights );
   void saveWeights( std::vector<uint8_t>&         weights )  const;
   void loadPStates( const std::vector<std::pair<uint16_t, uint16_t>>&  probStates );
@@ -625,6 +628,24 @@ public:
     switch( m_BPMType )
     {
     case BPM_Std:   m_CtxStore_Std.saveWeights( weights );  break;
+    default:        break;
+    }
+  }
+
+  void  loadWinSizes( const std::vector<uint8_t>& windows )
+  {
+    switch( m_BPMType )
+    {
+    case BPM_Std:   m_CtxStore_Std.loadWinSizes( windows );  break;
+    default:        break;
+    }
+  }
+
+  void  saveWinSizes( std::vector<uint8_t>& windows ) const
+  {
+    switch( m_BPMType )
+    {
+    case BPM_Std:   m_CtxStore_Std.saveWinSizes( windows );  break;
     default:        break;
     }
   }
@@ -747,6 +768,7 @@ public:
     {
       ctx.loadPStates( m_states );
       ctx.loadWeights( m_weights );
+      ctx.loadWinSizes( m_rate );
       return true;
     }
     return false;
@@ -755,6 +777,7 @@ public:
   {
     ctx.savePStates( m_states );
     ctx.saveWeights( m_weights );
+    ctx.saveWinSizes( m_rate );
     m_valid = true;
   }
 
@@ -762,6 +785,7 @@ private:
   std::vector<std::pair<uint16_t, uint16_t>> m_states;
   bool                 m_valid;
   std::vector<uint8_t> m_weights;
+  std::vector<uint8_t> m_rate;
 };
 
 class CtxStateArray

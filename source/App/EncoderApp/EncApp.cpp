@@ -1244,6 +1244,11 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setGopBasedTemporalFilterEnabled(m_gopBasedTemporalFilterEnabled);
 #if JVET_Y0240_BIM
   m_cEncLib.setBIM                                               (m_bimEnabled);
+  if (m_cEncLib.getBIM())
+  {
+      std::map<int, int*> adaptQPmap;
+      m_cEncLib.setAdaptQPmap(adaptQPmap);
+  }
 #endif
   m_cEncLib.setNumRefLayers                                       ( m_numRefLayers );
 
@@ -1290,6 +1295,13 @@ void EncApp::xCreateLib( std::list<PelUnitBuf*>& recBufList, const int layerId )
         reconFileName.append( std::to_string( layerId ) );
       }
     }
+#if Y4M_SUPPORT
+    if (isY4mFileExt(reconFileName))
+    {
+      m_cVideoIOYuvReconFile.setOutputY4mInfo(m_iSourceWidth, m_iSourceHeight, m_iFrameRate, 1, m_internalBitDepth[0],
+                                              m_chromaFormatIDC);
+    }
+#endif
     m_cVideoIOYuvReconFile.open( reconFileName, true, m_outputBitDepth, m_outputBitDepth, m_internalBitDepth );  // write mode
   }
 
@@ -1344,13 +1356,6 @@ void EncApp::createLib( const int layerIdx )
     m_filteredOrgPic = new PelStorage;
     m_filteredOrgPic->create( unitArea );
   }
-#if JVET_Y0240_BIM
-  if ( m_cEncLib.getBIM() )
-  {
-    std::map<int, int*> adaptQPmap;
-    m_cEncLib.setAdaptQPmap(adaptQPmap);
-  }
-#endif
 
   if( !m_bitstream.is_open() )
   {

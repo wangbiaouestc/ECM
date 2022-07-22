@@ -61,11 +61,27 @@ private:
   int       m_fileBitdepth[MAX_NUM_CHANNEL_TYPE]; ///< bitdepth of input/output video file
   int       m_MSBExtendedBitDepth[MAX_NUM_CHANNEL_TYPE];  ///< bitdepth after addition of MSBs (with value 0)
   int       m_bitdepthShift[MAX_NUM_CHANNEL_TYPE];  ///< number of bits to increase or decrease image by before/after write/read
+#if Y4M_SUPPORT
+  int          m_inY4mFileHeaderLength = 0;
+  int          m_outPicWidth           = 0;
+  int          m_outPicHeight          = 0;
+  int          m_outBitDepth           = 0;
+  int          m_outFrameRate          = 0;
+  int          m_outFrameScale         = 1;
+  ChromaFormat m_outChromaFormat       = CHROMA_420;
+  bool         m_outY4m                = false;
+#endif
 
 public:
   VideoIOYuv()           {}
   virtual ~VideoIOYuv()  {}
 
+#if Y4M_SUPPORT
+  void  parseY4mFileHeader(const std::string &fileName, int &width, int &height, int &frameRate, int &bitDepth,
+                           ChromaFormat &chromaFormat);
+  void  setOutputY4mInfo(int width, int height, int frameRate, int frameScale, int bitDepth, ChromaFormat chromaFormat);
+  void  writeY4mFileHeader();
+#endif
   void  open  ( const std::string &fileName, bool bWriteMode, const int fileBitDepth[MAX_NUM_CHANNEL_TYPE], const int MSBExtendedBitDepth[MAX_NUM_CHANNEL_TYPE], const int internalBitDepth[MAX_NUM_CHANNEL_TYPE] ); ///< open or create file
   void  close ();                                           ///< close file
 #if EXTENSION_360_VIDEO
@@ -101,6 +117,10 @@ public:
     const InputColourSpaceConversion ipCSC, const bool bPackedYUVOutputMode, int outputChoice = 0, ChromaFormat format = NUM_CHROMA_FORMAT, const bool bClipToRec709 = false ); ///< write one upsaled YUV frame
 
 };
+
+#if Y4M_SUPPORT
+bool isY4mFileExt(const std::string &fileName);
+#endif
 
 #endif // __VIDEOIOYUV__
 

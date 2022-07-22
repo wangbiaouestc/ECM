@@ -257,7 +257,7 @@
 #define JVET_Y0240_BIM                                    1 // JVET-Y0240: Block importance mapping
 #define JVET_Z0067_RPR_ENABLE                             1 // JVET-Z0067: Fixes for RPR
 #define JVET_Z0150_MEMORY_USAGE_PRINT                     1 // JVET-Z0150: Print memory usage
-#define JVET_Z0118_GDR                                    0 // JVET-Z0118: GDR
+#define JVET_Z0118_GDR                                    1 // JVET-Z0118: GDR
 
 #if JVET_Z0118_GDR
 #define GDR_LEAK_TEST                                     0
@@ -573,6 +573,8 @@ typedef std::pair<int, int>  TrCost;
 #define QP_SWITCHING_FOR_PARALLEL                         1 ///< Replace floating point QP with a source-file frame number. After switching POC, increase base QP instead of frame level QP.
 
 #define LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET         1 /// JVET-L0414 (CE11.2.2) with explicit signalling of num interval, threshold and qpOffset
+
+#define Y4M_SUPPORT                                       1
 // ====================================================================================================================
 // Derived macros
 // ====================================================================================================================

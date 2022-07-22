@@ -1896,7 +1896,7 @@ void EncGOP::xPicInitLMCS(Picture *pic, PicHeader *picHeader, Slice *slice)
       {
         int modIP = pic->getPOC() - pic->getPOC() / m_pcCfg->getReshapeCW().rspFpsToIp * m_pcCfg->getReshapeCW().rspFpsToIp;
 #if JVET_Z0118_GDR
-        if (slice->getSPS()->getGDREnabledFlag() && slice->isInterGDR())
+        if (m_pcCfg->getGdrEnabled() && slice->isInterGDR())
         {
           modIP = 0;
         }
@@ -2767,14 +2767,22 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     }
 
 #if JVET_Y0128_NON_CTC
-#if JVET_Z0118_GDR
-    PicHeader *picHeader = new PicHeader;
-    *picHeader = *pcPic->cs->picHeader;
-    bool  bDisableTMVP = pcSlice->scaleRefPicList( scaledRefPic, picHeader, m_pcEncLib->getApss(), picHeader->getLmcsAPS(), picHeader->getScalingListAPS(), false );
-    picHeader = pcPic->cs->picHeader;
+#if JVET_Z0118_GDR // seuhong: scaleRefPicList
+    bool  bDisableTMVP;
+    if (pcPic->cs->isGdrEnabled())
+    {
+      PicHeader *picHeader = new PicHeader;
+      *picHeader = *pcPic->cs->picHeader;
+      bDisableTMVP = pcSlice->scaleRefPicList(scaledRefPic, picHeader, m_pcEncLib->getApss(), picHeader->getLmcsAPS(), picHeader->getScalingListAPS(), false);
+    }
+    else
+    {
+      bDisableTMVP = pcSlice->scaleRefPicList(scaledRefPic, pcPic->cs->picHeader, m_pcEncLib->getApss(), picHeader->getLmcsAPS(), picHeader->getScalingListAPS(), false);
+    }
 #else
     bool  bDisableTMVP = pcSlice->scaleRefPicList( scaledRefPic, pcPic->cs->picHeader, m_pcEncLib->getApss(), picHeader->getLmcsAPS(), picHeader->getScalingListAPS(), false );
 #endif
+
     if ( picHeader->getEnableTMVPFlag() && bDisableTMVP )
     {
       picHeader->setEnableTMVPFlag( 0 );
@@ -3994,10 +4002,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 
 #if JVET_Z0118_GDR
       pcPic->setCleanDirty(false);
-      if (pcPic->cs->sps->getGDREnabledFlag())
-      {
-        pcPic->copyCleanCurPicture();
-      }
+      pcPic->copyCleanCurPicture();      
 #endif
 
       //-- For time output for each slice
@@ -5962,11 +5967,7 @@ void EncGOP::updateCompositeReference(Slice* pcSlice, PicList& rcListPic, int po
   // Update background reference
   if (pcSlice->isIRAP())//(pocCurr == 0)
   {
-#if JVET_Z0118_GDR
-    curPic->extendPicBorder( pcSlice->getSPS(), pcSlice->getPPS() );
-#else
     curPic->extendPicBorder( pcSlice->getPPS() );
-#endif
     curPic->setBorderExtension(true);
 
     m_picBg->getRecoBuf().copyFrom(curPic->getRecoBuf());
@@ -6005,27 +6006,15 @@ void EncGOP::updateCompositeReference(Slice* pcSlice, PicList& rcListPic, int po
       }
     }
     m_picBg->setBorderExtension(false);
-#if JVET_Z0118_GDR
-    m_picBg->extendPicBorder( pcSlice->getSPS(), pcSlice->getPPS() );
-#else
     m_picBg->extendPicBorder( pcSlice->getPPS() );
-#endif
     m_picBg->setBorderExtension(true);
 
-#if JVET_Z0118_GDR
-    curPic->extendPicBorder( pcSlice->getSPS(), pcSlice->getPPS() );
-#else
     curPic->extendPicBorder( pcSlice->getPPS() );
-#endif
     curPic->setBorderExtension(true);
     m_picOrig->getOrigBuf().copyFrom(curPic->getOrigBuf());
 
     m_picBg->setBorderExtension(false);
-#if JVET_Z0118_GDR
-    m_picBg->extendPicBorder( pcSlice->getSPS(), pcSlice->getPPS() );
-#else
     m_picBg->extendPicBorder( pcSlice->getPPS() );
-#endif
     m_picBg->setBorderExtension(true);
   }
 }

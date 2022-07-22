@@ -121,7 +121,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 
 #if JVET_Z0118_GDR
   // reset current IBC Buffer only when VB pass through
-  if (cs.isInGdrIntervalOrRecoveryPoc())
+  if (cs.isGdrEnabled() && cs.isInGdrIntervalOrRecoveryPoc())
   {
 #if JVET_Z0153_IBC_EXT_REF    
     m_pcInterPred->resetCurIBCBuffer(
@@ -158,76 +158,80 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
       m_pcInterPred->setFillCurTplAboveARMC(false);
       m_pcInterPred->setFillCurTplLeftARMC(false);
 #endif
+
 #if JVET_Z0118_GDR
-      Slice   *slice = currCU.slice;      
-      Picture *refPic;
-      
-      bool isInGdrInterval  = slice->getPicHeader()->getInGdrInterval();
-      bool isRecoveryPocPic = slice->getPicHeader()->getIsGdrRecoveryPocPic();
-      bool isNorPicture = !(isInGdrInterval || isRecoveryPocPic) && slice->isInterB();
+      if (cs.isGdrEnabled())
+      {
+        Slice   *slice = currCU.slice;
+        Picture *refPic;
 
-      if (isNorPicture) 
-      {        
-        currCU.cs->setReconBuf(PIC_RECONSTRUCTION_0);
-        currCU.cs->picture->setCleanDirty(false);
+        bool isInGdrInterval = slice->getPicHeader()->getInGdrInterval();
+        bool isRecoveryPocPic = slice->getPicHeader()->getIsGdrRecoveryPocPic();
+        bool isNorPicture = !(isInGdrInterval || isRecoveryPocPic) && slice->isInterB();
 
-        // 1.01 use only dirty reference picture
-        for (int rlist = REF_PIC_LIST_0; rlist < NUM_REF_PIC_LIST_01; rlist++)
+        if (isNorPicture)
         {
-          int n = slice->getNumRefIdx((RefPicList)rlist);
-          for (int idx = 0; idx < n; idx++)
-          {
-            Picture *refPic = slice->getReferencePicture((RefPicList)rlist, idx);
-            if (refPic)
-            {
-              // when cur picture is normal picture and ref picture is gdr/recovery picture
-              // note: pic.slice.picHeader and pic.cs.picHeader could be different    
-              // bool isGdrPic = refPic->cs->picHeader->getInGdrPeriod();
-              bool isRefInGdrInterval  = refPic->cs->picHeader->getInGdrInterval();
-              bool isRefRecoveryPocPic = refPic->cs->picHeader->getIsGdrRecoveryPocPic();
+          currCU.cs->setReconBuf(PIC_RECONSTRUCTION_0);
+          currCU.cs->picture->setCleanDirty(false);
 
-              if (isRefInGdrInterval || isRefRecoveryPocPic)
+          // 1.01 use only dirty reference picture
+          for (int rlist = REF_PIC_LIST_0; rlist < NUM_REF_PIC_LIST_01; rlist++)
+          {
+            int n = slice->getNumRefIdx((RefPicList)rlist);
+            for (int idx = 0; idx < n; idx++)
+            {
+              Picture *refPic = slice->getReferencePicture((RefPicList)rlist, idx);
+              if (refPic)
               {
-                refPic->setCleanDirty(true);                                
+                // when cur picture is normal picture and ref picture is gdr/recovery picture
+                // note: pic.slice.picHeader and pic.cs.picHeader could be different    
+                // bool isGdrPic = refPic->cs->picHeader->getInGdrPeriod();
+                bool isRefInGdrInterval = refPic->cs->picHeader->getInGdrInterval();
+                bool isRefRecoveryPocPic = refPic->cs->picHeader->getIsGdrRecoveryPocPic();
+
+                if (isRefInGdrInterval || isRefRecoveryPocPic)
+                {
+                  refPic->setCleanDirty(true);
+                }
+                else
+                {
+                  refPic->setCleanDirty(false);
+                }
               }
-              else 
-              {
-                refPic->setCleanDirty(false);                                
-              }
-            }          
+            }
           }
         }
-      }
 
-      // 1.02 use clean reference pictures for some CU when gdr starts
-      if (isInGdrInterval || isRecoveryPocPic)
-      {
-        // 1.01 switch recon based on clean/dirty current area
-        bool cleanDirtyFlag;
-
-        bool isCuClean = currCU.Y().valid() ? cs.isClean(currCU.Y().topLeft(), CHANNEL_TYPE_LUMA) : cs.isClean(currCU.Cb().topLeft(), CHANNEL_TYPE_CHROMA);
-
-        if (isCuClean) 
+        // 1.02 use clean reference pictures for some CU when gdr starts
+        if (isInGdrInterval || isRecoveryPocPic)
         {
-          cleanDirtyFlag = true;
-        }
-        else 
-        {
-          cleanDirtyFlag = false;
-        }       
-        
-        currCU.cs->setReconBuf(( cleanDirtyFlag ) ? PIC_RECONSTRUCTION_1 : PIC_RECONSTRUCTION_0);
-        currCU.cs->picture->setCleanDirty( cleanDirtyFlag );
+          // 1.01 switch recon based on clean/dirty current area
+          bool cleanDirtyFlag;
 
-        for (int rlist = REF_PIC_LIST_0; rlist < NUM_REF_PIC_LIST_01; rlist++)
-        {
-          int n = slice->getNumRefIdx((RefPicList)rlist);
-          for (int idx = 0; idx < n; idx++)
+          bool isCuClean = currCU.Y().valid() ? cs.isClean(currCU.Y().topLeft(), CHANNEL_TYPE_LUMA) : cs.isClean(currCU.Cb().topLeft(), CHANNEL_TYPE_CHROMA);
+
+          if (isCuClean)
           {
-            refPic = slice->getReferencePicture((RefPicList)rlist, idx);            
-            if (refPic)
+            cleanDirtyFlag = true;
+          }
+          else
+          {
+            cleanDirtyFlag = false;
+          }
+
+          currCU.cs->setReconBuf((cleanDirtyFlag) ? PIC_RECONSTRUCTION_1 : PIC_RECONSTRUCTION_0);
+          currCU.cs->picture->setCleanDirty(cleanDirtyFlag);
+
+          for (int rlist = REF_PIC_LIST_0; rlist < NUM_REF_PIC_LIST_01; rlist++)
+          {
+            int n = slice->getNumRefIdx((RefPicList)rlist);
+            for (int idx = 0; idx < n; idx++)
             {
-              refPic->setCleanDirty( cleanDirtyFlag );
+              refPic = slice->getReferencePicture((RefPicList)rlist, idx);
+              if (refPic)
+              {
+                refPic->setCleanDirty(cleanDirtyFlag);
+              }
             }
           }
         }
@@ -1303,7 +1307,11 @@ void DecCu::xReconInter(CodingUnit &cu)
         tmpPred.copyFrom(cs.getPredBuf(cu).get(COMPONENT_Y));
       }
 #endif
+#if JVET_Y0065_GPM_INTRA
+      if (!cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
+#else
       if (!cu.firstPU->ciipFlag && !CU::isIBC(cu))
+#endif
         cs.getPredBuf(cu).get(COMPONENT_Y).rspSignal(m_pcReshape->getFwdLUT());
     }
 #if KEEP_PRED_AND_RESI_SIGNALS
@@ -1325,7 +1333,11 @@ void DecCu::xReconInter(CodingUnit &cu)
   else
   {
     cs.getRecoBuf(cu).copyClip(cs.getPredBuf(cu), cs.slice->clpRngs());
+#if JVET_Y0065_GPM_INTRA
+    if (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
+#else
     if (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !CU::isIBC(cu))
+#endif
     {
       cs.getRecoBuf(cu).get(COMPONENT_Y).rspSignal(m_pcReshape->getFwdLUT());
     }
@@ -1972,7 +1984,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               if (tplAvail)
               {
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
-                m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, pu.tmMergeFlag ? pu.cs->sps->getMaxNumTMMergeCand() : pu.cs->sps->getMaxNumMergeCand());
+                m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, 
+#if TM_MRG
+                                                     pu.tmMergeFlag ? pu.cs->sps->getMaxNumTMMergeCand() : 
+#endif
+                                                     pu.cs->sps->getMaxNumMergeCand());
 #else
                 m_pcInterPred->adjustMergeCandidatesInOneCandidateGroup(pu, mrgCtx, pu.mergeIdx + 1, pu.mergeIdx);
 #endif
@@ -2092,7 +2108,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
       if (!cu.cs->pcv->isEncoder)
 #endif
       {
+#if TM_AMVP
         m_pcInterPred->clearTplAmvpBuffer();
+#endif
         if (pu.cu->affine)
         {
           for (uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
@@ -2346,7 +2364,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               );
               pu.mvpNum [eRefList] = amvpInfo.numCand;
 #if JVET_Z0054_BLK_REF_PIC_REORDER
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+              if( (!PU::useRefCombList(pu) && !PU::useRefPairList(pu)) || (pu.amvpMergeModeFlag[REF_PIC_LIST_0] || pu.amvpMergeModeFlag[REF_PIC_LIST_1]))
+#else
               if(!PU::useRefCombList(pu) && !PU::useRefPairList(pu))
+#endif
               {
 #else
               if (!cu.cs->pcv->isEncoder)
@@ -2438,7 +2460,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
       int xPred = pu.mv[0].getHor() >> MV_FRACTIONAL_BITS_INTERNAL;
       int yPred = pu.mv[0].getVer() >> MV_FRACTIONAL_BITS_INTERNAL;
 #if JVET_Z0118_GDR
-      if (cu.cs->slice->getSPS()->getGDREnabledFlag())
+      if (cu.cs->isGdrEnabled())
       {
         if (cu.cs->isClean(cu)) 
         {

@@ -173,7 +173,11 @@ InterSearch::InterSearch()
   }
   for (int i=0; i<AMVP_MAX_NUM_CANDS+1; i++)
   {
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+    memset (m_auiMVPIdxCost[i], 0, (AMVP_MAX_NUM_CANDS+1+1) * sizeof (uint32_t) );
+#else
     memset (m_auiMVPIdxCost[i], 0, (AMVP_MAX_NUM_CANDS+1) * sizeof (uint32_t) );
+#endif
   }
 
   setWpScalingDistParam( -1, REF_PIC_LIST_X, nullptr );
@@ -342,6 +346,10 @@ void InterSearch::init( EncCfg*        pcEncCfg,
       }
     }
   }
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+  m_auiMVPIdxCost[0][3] = m_auiMVPIdxCost[0][2];
+  m_auiMVPIdxCost[1][3] = m_auiMVPIdxCost[1][2];
+#endif
 
   const ChromaFormat cform = pcEncCfg->getChromaFormatIdc();
 #if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -1687,7 +1695,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
     m_pcRdCost->setPredictors(cMvPred);
     m_pcRdCost->setCostScale(0);
-#if JVET_Z0084_IBC_TM
+#if JVET_Z0084_IBC_TM && TM_AMVP
     m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &pu.cu->imv, &bvpIdxBest, true, &amvpInfo4Pel);
 #else
     m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &pu.cu->imv, &bvpIdxBest);
@@ -3278,6 +3286,15 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           int refIdxTar = cs.slice->getSymRefIdx( tarRefList );
           CHECK (refIdxCur==-1 || refIdxTar==-1, "Uninitialized reference index not allowed");
 
+#if TM_AMVP
+          unsigned amvpNumCandCur = aacAMVPInfo[curRefList][refIdxCur].numCand;
+          unsigned amvpNumCandTar = aacAMVPInfo[tarRefList][refIdxTar].numCand;
+          if (!pu.cs->sps->getUseDMVDMode())
+          {
+            amvpNumCandCur = AMVP_MAX_NUM_CANDS;
+            amvpNumCandTar = AMVP_MAX_NUM_CANDS;
+          }
+#endif
           if ( aacAMVPInfo[curRefList][refIdxCur].mvCand[0] == aacAMVPInfo[curRefList][refIdxCur].mvCand[1] )
             aacAMVPInfo[curRefList][refIdxCur].numCand = 1;
           if ( aacAMVPInfo[tarRefList][refIdxTar].mvCand[0] == aacAMVPInfo[tarRefList][refIdxTar].mvCand[1] )
@@ -3313,8 +3330,8 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           mv.changeTransPrecInternal2Amvr(pu.cu->imv);
           uint32_t bits = m_pcRdCost->getBitsOfVectorWithPredictor(mv.hor, mv.ver, 0);
 #if TM_AMVP
-          bits += m_auiMVPIdxCost[mvpIdxSym[curRefList]][aacAMVPInfo[curRefList][refIdxCur].numCand];
-          bits += m_auiMVPIdxCost[mvpIdxSym[tarRefList]][aacAMVPInfo[tarRefList][refIdxTar].numCand];
+          bits += m_auiMVPIdxCost[mvpIdxSym[curRefList]][amvpNumCandCur];
+          bits += m_auiMVPIdxCost[mvpIdxSym[tarRefList]][amvpNumCandTar];
 #else
           bits += m_auiMVPIdxCost[mvpIdxSym[curRefList]][AMVP_MAX_NUM_CANDS];
           bits += m_auiMVPIdxCost[mvpIdxSym[tarRefList]][AMVP_MAX_NUM_CANDS];
@@ -3382,8 +3399,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           Mv startPtMv = cCurMvField.mv;
 
 #if TM_AMVP
-          Distortion mvpCost = m_pcRdCost->getCost(m_auiMVPIdxCost[mvpIdxSym[curRefList]][aacAMVPInfo[curRefList][refIdxCur].numCand]
-                                                 + m_auiMVPIdxCost[mvpIdxSym[tarRefList]][aacAMVPInfo[tarRefList][refIdxTar].numCand]);
+          Distortion mvpCost = m_pcRdCost->getCost(m_auiMVPIdxCost[mvpIdxSym[curRefList]][amvpNumCandCur] + m_auiMVPIdxCost[mvpIdxSym[tarRefList]][amvpNumCandTar]);
 #else
           Distortion mvpCost = m_pcRdCost->getCost(m_auiMVPIdxCost[mvpIdxSym[curRefList]][AMVP_MAX_NUM_CANDS] + m_auiMVPIdxCost[mvpIdxSym[tarRefList]][AMVP_MAX_NUM_CANDS]);
 #endif
@@ -3865,7 +3881,11 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     setWpScalingDistParam(-1, REF_PIC_LIST_X, cu.cs->slice);
     return;
   }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  if ((!PU::useRefCombList(pu) && !PU::useRefPairList(pu)) || (pu.amvpMergeModeFlag[REF_PIC_LIST_0] || pu.amvpMergeModeFlag[REF_PIC_LIST_1]))
+#else
   if(!PU::useRefPairList(pu) && !PU::useRefCombList(pu))
+#endif
 #endif
   if (pu.isMvsdApplicable())
   {
@@ -10555,6 +10575,15 @@ void InterSearch::symmvdCheckBestMvp(
   cCurMvField.setMvField(curMv, refIdxCur);
   AMVPInfo& amvpCur = amvpInfo[curRefList][refIdxCur];
   AMVPInfo& amvpTar = amvpInfo[tarRefList][refIdxTar];
+#if TM_AMVP
+  unsigned amvpNumCandCur = amvpCur.numCand;
+  unsigned amvpNumCandTar = amvpTar.numCand;
+  if (!pu.cs->sps->getUseDMVDMode())
+  {
+    amvpNumCandCur = AMVP_MAX_NUM_CANDS;
+    amvpNumCandTar = AMVP_MAX_NUM_CANDS;
+  }
+#endif
   m_pcRdCost->setCostScale(0);
 
 
@@ -10620,8 +10649,8 @@ void InterSearch::symmvdCheckBestMvp(
       mv.changeTransPrecInternal2Amvr(pu.cu->imv);
       uint32_t bits = m_pcRdCost->getBitsOfVectorWithPredictor(mv.hor, mv.ver, 0);
 #if TM_AMVP
-      bits += m_auiMVPIdxCost[i][amvpCur.numCand];
-      bits += m_auiMVPIdxCost[j][amvpTar.numCand];
+      bits += m_auiMVPIdxCost[i][amvpNumCandCur];
+      bits += m_auiMVPIdxCost[j][amvpNumCandTar];
 #else
       bits += m_auiMVPIdxCost[i][AMVP_MAX_NUM_CANDS];
       bits += m_auiMVPIdxCost[j][AMVP_MAX_NUM_CANDS];

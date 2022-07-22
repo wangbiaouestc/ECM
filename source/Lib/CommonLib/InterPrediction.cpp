@@ -347,6 +347,7 @@ void InterPrediction::destroy()
     xFree(m_cRefSamplesDMVRL1[ch]);
     m_cRefSamplesDMVRL1[ch] = nullptr;
   }
+
 #if JVET_Z0118_GDR
   m_IBCBuffer0.destroy();
   m_IBCBuffer1.destroy();
@@ -5920,20 +5921,6 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
       PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
       PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
 
-#if JVET_Z0067_RPR_ENABLE
-    bool bRefIsRescaled = false;
-    for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
-    {
-      const RefPicList eRefPicList = refList ? REF_PIC_LIST_1 : REF_PIC_LIST_0;
-      bRefIsRescaled |= (pu.refIdx[refList] >= 0) ? pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->isRefScaled(pu.cs->pps) : false;
-    }
-    if (bRefIsRescaled)
-    {
-      uiCost = std::numeric_limits<Distortion>::max();
-    }
-    else
-    {
-#endif
       getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
 
       if (m_bAMLTemplateAvailabe[0])
@@ -5949,9 +5936,6 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
 
         uiCost += cDistParam.distFunc(cDistParam);
       }
-#if JVET_Z0067_RPR_ENABLE
-    }
-#endif
     }
     else
     {
@@ -6025,20 +6009,6 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
       PelUnitBuf pcBufPredRefLeft =
         (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
 
-#if JVET_Z0067_RPR_ENABLE
-    bool bRefIsRescaled = false;
-    for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
-    {
-      const RefPicList eRefPicList = refList ? REF_PIC_LIST_1 : REF_PIC_LIST_0;
-      bRefIsRescaled |= (pu.refIdx[refList] >= 0) ? pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->isRefScaled(pu.cs->pps) : false;
-    }
-    if (bRefIsRescaled)
-    {
-      uiCost = std::numeric_limits<Distortion>::max();
-    }
-    else
-    {
-#endif
       getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
 
       if (m_bAMLTemplateAvailabe[0])
@@ -6056,15 +6026,12 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
 
         uiCost += cDistParam.distFunc(cDistParam);
       }
-#if JVET_Z0067_RPR_ENABLE
-    }
-#endif
     }
     else
     {
       uiCost = mvpMergeCandCtx.candCost[uiMergeCand];
     }
-
+    
     updateCandList(uiMergeCand, uiCost, mvpMergeCandCtx.numValidMergeCand, RdCandList, candCostList);
 
   }
@@ -12624,7 +12591,7 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
       tmpPU.mvd[0] = *it;
       tmpPU.mv[0] = amvpInfo.mvCand[tmpPU.mvpIdx[0]] + tmpPU.mvd[0];
       tmpPU.mv[0].mvCliptoStorageBitDepth();
-      tmpPU.mv[1] = amvpInfo.mvCand[tmpPU.mvpIdx[1]] - tmpPU.mvd[0];
+      tmpPU.mv[1] = amvpInfo1.mvCand[tmpPU.mvpIdx[1]] - tmpPU.mvd[0];
       tmpPU.mv[1].mvCliptoStorageBitDepth();
       getBlkAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft);
 

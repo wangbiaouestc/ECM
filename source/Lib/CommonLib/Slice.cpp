@@ -853,11 +853,8 @@ void Slice::constructRefPicList(PicList& rcListPic)
       pcRefPic->longTerm = true;
     }
 
-#if JVET_Z0118_GDR
-    pcRefPic->extendPicBorder( getSPS(), getPPS() );
-#else
     pcRefPic->extendPicBorder( getPPS() );
-#endif
+
     m_apcRefPicList[REF_PIC_LIST_0][ii] = pcRefPic;
     m_bIsUsedAsLongTerm[REF_PIC_LIST_0][ii] = pcRefPic->longTerm;
   }
@@ -898,11 +895,8 @@ void Slice::constructRefPicList(PicList& rcListPic)
       pcRefPic->longTerm = true;
     }
 
-#if JVET_Z0118_GDR
-    pcRefPic->extendPicBorder( getSPS(), getPPS() );
-#else
     pcRefPic->extendPicBorder( getPPS() );
-#endif
+
     m_apcRefPicList[REF_PIC_LIST_1][ii] = pcRefPic;
     m_bIsUsedAsLongTerm[REF_PIC_LIST_1][ii] = pcRefPic->longTerm;
   }
@@ -3385,6 +3379,22 @@ void PicHeader::initPicHeader()
   m_localRPL1.setLtrpInSliceHeaderFlag(0);
 
   m_alfApsId.resize(0);
+
+#if JVET_Z0118_GDR
+  m_pcPic  = nullptr;
+  m_pocLsb = -1;
+
+  m_gdrPicFlag        = false;
+  m_gdrOrIrapPicFlag  = false;  
+  m_gdrRecoveryPocPic = false;
+  m_inGdrInterval     = false;
+
+  m_recoveryPocCnt     =  0;  
+  m_lastGdrIntervalPoc = -1;
+  
+  m_gdrBegX = -1;
+  m_gdrEndX = -1;  
+#endif
 }
 
 const WPScalingParam *PicHeader::getWpScaling(const RefPicList refPicList, const int refIdx) const
@@ -5082,7 +5092,11 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
 
             scaledRefPic[j]->poc = NOT_VALID;
 
+#if JVET_Z0118_GDR
+            scaledRefPic[j]->create(sps->getGDREnabledFlag(), sps->getChromaFormatIdc(), Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()), sps->getMaxCUWidth(), sps->getMaxCUWidth() + 16, isDecoder, layerId);
+#else
             scaledRefPic[j]->create( sps->getChromaFormatIdc(), Size( pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples() ), sps->getMaxCUWidth(), sps->getMaxCUWidth() + 16, isDecoder, layerId );
+#endif
           }
 
           scaledRefPic[j]->poc = poc;
@@ -5096,12 +5110,7 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
                                    sps->getChromaFormatIdc(), sps->getBitDepths(), true, downsampling,
                                    sps->getHorCollocatedChromaFlag(), sps->getVerCollocatedChromaFlag() );
           scaledRefPic[j]->unscaledPic = m_apcRefPicList[refList][rIdx];
-
-#if JVET_Z0118_GDR
-          scaledRefPic[j]->extendPicBorder( getSPS(), getPPS() );
-#else
           scaledRefPic[j]->extendPicBorder( getPPS() );
-#endif
 
           m_scaledRefPicList[refList][rIdx] = scaledRefPic[j];
         }

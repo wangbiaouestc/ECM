@@ -1792,11 +1792,10 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
   const Slice& slice = *cs.slice;
   MotionInfo miNeighbor;
 
-#if JVET_Z0075_IBC_HMVP_ENLARGE
 #if JVET_Z0118_GDR  
   bool isClean = cs.isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
 #endif
-
+#if JVET_Z0075_IBC_HMVP_ENLARGE
 #if JVET_Z0118_GDR  
   auto &lut = (isClean) ? cs.motionLut.lut1 : cs.motionLut.lut0;
 #else
@@ -1808,7 +1807,6 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
 #else
   auto &lut = ibcFlag ? cs.motionLut.lutIbc : cs.motionLut.lut;
 #endif
-
 #endif
 
   int num_avai_candInLUT = (int)lut.size();
@@ -2676,7 +2674,7 @@ uint32_t PU::getBDMVRMvdThreshold(const PredictionUnit &pu)
 }
 #endif
 
-#if TM_MRG
+#if TM_MRG || TM_AMVP
 uint32_t PU::getTMMvdThreshold(const PredictionUnit &pu)
 {
   uint32_t numPixels = pu.lwidth() * pu.lheight();
@@ -2693,7 +2691,9 @@ uint32_t PU::getTMMvdThreshold(const PredictionUnit &pu)
     return 4 << MV_FRACTIONAL_BITS_INTERNAL;
   }
 }
+#endif
 
+#if TM_MRG
 int PU::reorderInterMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, int numCand, uint32_t mvdSimilarityThresh)
 {
   Slice& slice = *pu.cu->slice;
@@ -4921,7 +4921,11 @@ void PU::getNonAdjacentBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 
       const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+      bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu) && puNonAdjacent->getMotionInfo(posLT.offset(offsetX, offsetY)).isInter;
+#else
       bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu);
+#endif
 
       if (isAvailableNonAdjacent)
       {
@@ -4966,7 +4970,11 @@ void PU::getNonAdjacentBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 
       const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+      bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu) && puNonAdjacent->getMotionInfo(posLT.offset(offsetX, offsetY)).isInter;
+#else
       bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu);
+#endif
 
       if (isAvailableNonAdjacent)
       {
@@ -5001,7 +5009,9 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
   const CodingStructure &cs = *pu.cs;
   const Slice &slice = *pu.cs->slice;
 
+#if TM_MRG
   const uint32_t mvdSimilarityThresh = 1;
+#endif
   const uint32_t maxNumMergeCand = NUM_TMVP_CANDS;
   for (uint32_t ui = 0; ui < maxNumMergeCand; ++ui)
   {
@@ -5268,7 +5278,9 @@ void PU::getNonAdjacentMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
   const CodingStructure &cs = *pu.cs;
   const Slice &slice = *pu.cs->slice;
 
+#if TM_MRG
   const uint32_t mvdSimilarityThresh = getBDMVRMvdThreshold(pu);
+#endif
   const uint32_t maxNumMergeCand = NUM_NON_ADJ_CANDS;
 
   for (uint32_t ui = 0; ui < maxNumMergeCand; ++ui)
@@ -5323,7 +5335,11 @@ void PU::getNonAdjacentMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 
       const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+      bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu) && puNonAdjacent->getMotionInfo(posLT.offset(offsetX, offsetY)).isInter;
+#else
       bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu);
+#endif
 
       if (isAvailableNonAdjacent)
       {
@@ -5383,7 +5399,11 @@ void PU::getNonAdjacentMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 
       const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+      bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu) && puNonAdjacent->getMotionInfo(posLT.offset(offsetX, offsetY)).isInter;
+#else
       bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu);
+#endif
 
       if (isAvailableNonAdjacent)
       {
@@ -6045,13 +6065,17 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
 #if JVET_Z0084_IBC_TM && TM_AMVP
   pInfo->maxSimilarityThreshold = (pu.cs->sps->getUseDMVDMode() && pcInter) ? PU::getTMMvdThreshold(pu) : 1;
 
+#if TM_MRG
   pu.tmMergeFlag = true;
+#endif
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   PU::getIBCMergeCandidates(pu, mergeCtx, pu.cs->sps->getMaxNumIBCMergeCand());
 #else
   PU::getIBCMergeCandidates(pu, mergeCtx);
 #endif
+#if TM_MRG
   pu.tmMergeFlag = false;
+#endif
 
   int candIdx = 0;
   while ((pInfo->numCand < AMVP_MAX_NUM_CANDS_MEM) && (candIdx < mergeCtx.numValidMergeCand))
@@ -7019,6 +7043,7 @@ bool PU::addMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrgCtx
 #endif
       ))
       {
+
 #if JVET_X0083_BM_AMVP_MERGE_MODE
         int8_t candRefIdx[2];
         candRefIdx[0] = mrgCtx.mvFieldNeighbours[(cnt << 1) + 0].refIdx;
@@ -7319,6 +7344,7 @@ bool PU::addSpatialAffineMergeHMVPCand(const PredictionUnit& pu, AffineMergeCtx&
     {
       if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
       {
+        affMrgCtx.numValidMergeCand++;
         return true;
       }
 
@@ -9005,6 +9031,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 #endif
       if ( affMrgCtx.numValidMergeCand == mrgCandIdx )
       {
+        affMrgCtx.numValidMergeCand++;
         return;
       }
 
@@ -9121,6 +9148,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 #endif
       if ( affMrgCtx.numValidMergeCand == mrgCandIdx )
       {
+        affMrgCtx.numValidMergeCand++;
         return;
       }
 
@@ -9307,6 +9335,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
         {
           if (affMrgCtx.numValidMergeCand == mrgCandIdx)
           {
+            affMrgCtx.numValidMergeCand++;
             return;
           }
           affMrgCtx.numValidMergeCand ++;
@@ -9348,6 +9377,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
           {
             if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
             {
+              affMrgCtx.numValidMergeCand++;
               return;
             }
 
@@ -9416,6 +9446,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       {
         if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
         {
+          affMrgCtx.numValidMergeCand++;
           return;
         }
 
@@ -9456,6 +9487,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
         {
           if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
           {
+            affMrgCtx.numValidMergeCand++;
             return;
           }
 
@@ -9480,6 +9512,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       {
         if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
         {
+          affMrgCtx.numValidMergeCand++;
           return;
         }
 
@@ -9564,6 +9597,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       {
         if (affMrgCtx.numValidMergeCand == mrgCandIdx) // for decoder 
         {
+          affMrgCtx.numValidMergeCand++;
           return;
         }
 
@@ -9600,6 +9634,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
     affMrgCtx.affineType[cnt] = AFFINEMODEL_4PARAM;
     if ( cnt == mrgCandIdx )
     {
+      affMrgCtx.numValidMergeCand++;
       return;
     }
     cnt++;
@@ -10791,9 +10826,9 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
 
   // add at most two average based geo candidates
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
-  if (geoMrgCtx.numValidMergeCand == maxNumGeoMergeCand)
+  if (geoMrgCtx.numValidMergeCand < maxNumGeoMergeCand)
 #else
-  if (geoMrgCtx.numValidMergeCand == pu.cs->sps->getMaxNumGeoCand())
+  if (geoMrgCtx.numValidMergeCand < pu.cs->sps->getMaxNumGeoCand())
 #endif
   {
     // add one L0 cand by averaging the first two available L0 candidates
