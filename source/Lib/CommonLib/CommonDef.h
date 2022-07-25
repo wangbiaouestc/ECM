@@ -815,7 +815,11 @@ static const int NTAPS_LUMA               =                         8; ///< Numb
 #endif
 #if JVET_Z0117_CHROMA_IF
 static const int NTAPS_CHROMA             =                         6; ///< Number of taps for chroma
+#if JVET_AA0042_RPR_FILTERS
+static const int NTAPS_CHROMA_RPR         =                         6; ///< Number of taps for chroma RPR
+#else
 static const int NTAPS_CHROMA_RPR         =                         4; ///< Number of taps for chroma RPR
+#endif
 #else
 static const int NTAPS_CHROMA             =                         4; ///< Number of taps for chroma
 #endif

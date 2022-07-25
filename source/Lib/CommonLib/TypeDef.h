@@ -155,6 +155,7 @@
 #endif
 #define IF_12TAP                                          1 // 12-tap IF
 #define JVET_Z0117_CHROMA_IF                              1 // JVET-Z0117: 6-tap interpolation filter for chroma MC
+#define JVET_AA0042_RPR_FILTERS                           1 // JVET-AA0042: luma 12-tap non-affine 10-tap affine, chroma 6-tap      
 #define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
 
 #if JVET_X0049_BDMVR_SW_OPT
