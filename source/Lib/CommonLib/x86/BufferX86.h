@@ -2016,7 +2016,7 @@ void linTf_SSE_entry( const Pel* src, int srcStride, Pel *dst, int dstStride, in
   }
 }
 
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 template<X86_VEXT vext>
 int64_t getSumOfDifference_SSE(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int rowSubShift, int bitDepth)
 {
@@ -2578,7 +2578,7 @@ void PelBufferOps::_initPelBufOpsX86()
   profGradFilter = gradFilter_SSE<vext, false>;
   applyPROF      = applyPROF_SSE<vext>;
   roundIntVector = roundIntVector_SIMD<vext>;
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   getSumOfDifference = getSumOfDifference_SSE<vext>;
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING

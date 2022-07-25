@@ -69,7 +69,7 @@ void applyPROFCore(Pel* dst, int dstStride, const Pel* src, int srcStride, int w
   }
 }
 
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 int64_t getSumOfDifferenceCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int rowSubShift, int bitDepth)
 {
   height     >>= rowSubShift;
@@ -908,7 +908,7 @@ PelBufferOps::PelBufferOps()
   profGradFilter = gradFilterCore <false>;
   applyPROF      = applyPROFCore;
   roundIntVector = nullptr;
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   getSumOfDifference = getSumOfDifferenceCore;
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING

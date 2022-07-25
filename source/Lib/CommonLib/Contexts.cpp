@@ -862,7 +862,7 @@ const CtxSet ContextSetCfg::MergeIdx = ContextSetCfg::addCtxSet
 #endif
   });
 
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
 const CtxSet ContextSetCfg::TmMergeIdx = ContextSetCfg::addCtxSet
 ({
 #if NON_ADJACENT_MRG_CAND
@@ -1079,10 +1079,10 @@ const CtxSet ContextSetCfg::AfMmvdOffsetStep = ContextSetCfg::addCtxSet
   });
 #endif
 
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
 const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
 ({
-#if JVET_Z0084_IBC_TM
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
   {  25,  33 },
   {  33,  25 },
   { CNU,  35 },
@@ -1107,8 +1107,10 @@ const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
   { 119, },
   { 125, },
 #endif
-  });
+});
+#endif
 
+#if TM_MRG
 #if JVET_X0141_CIIP_TIMD_TM
 const CtxSet ContextSetCfg::CiipTMMergeFlag = ContextSetCfg::addCtxSet
 ({
@@ -2913,7 +2915,7 @@ const CtxSet ContextSetCfg::MergeIdx = ContextSetCfg::addCtxSet
 #endif
 });
 
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
 const CtxSet ContextSetCfg::TmMergeIdx = ContextSetCfg::addCtxSet
 ({
 #if NON_ADJACENT_MRG_CAND
@@ -3060,29 +3062,28 @@ const CtxSet ContextSetCfg::AfMmvdOffsetStep = ContextSetCfg::addCtxSet
 });
 #endif
 
-#if TM_MRG
-#if JVET_Z0084_IBC_TM
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
 const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
   { 25, 33 },
   { 26, 25 },
   { 35, 35 },
   {  4,  5 },
   {  4,  5 },
   {  4,  4 }
-});
 #else
-const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
-({
 	{ 25 },
 	{ 26 },
 	{ 35 },
 	{ 4 },
 	{ 4 },
 	{ 4 }
+#endif
 });
 #endif
 
+#if TM_MRG
 #if JVET_X0141_CIIP_TIMD_TM
 const CtxSet ContextSetCfg::CiipTMMergeFlag = ContextSetCfg::addCtxSet
 ({
@@ -4387,7 +4388,7 @@ const CtxSet ContextSetCfg::MergeIdx = ContextSetCfg::addCtxSet
 #endif
 });
 
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
 const CtxSet ContextSetCfg::TmMergeIdx = ContextSetCfg::addCtxSet
 ({
 #if NON_ADJACENT_MRG_CAND
@@ -4480,25 +4481,24 @@ const CtxSet ContextSetCfg::AfMmvdOffsetStep = ContextSetCfg::addCtxSet
 });
 #endif
 
-#if TM_MRG
-#if JVET_Z0084_IBC_TM
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
 const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
   {  25,  33 },
   {  26,  25 },
   { CNU, CNU },
   {   4,   5 }
-});
 #else
-const CtxSet ContextSetCfg::TMMergeFlag = ContextSetCfg::addCtxSet
-({
   {  25, },
   {  26, },
   { CNU, },
   {   4, },
+#endif
 });
 #endif
 
+#if TM_MRG
 #if JVET_X0141_CIIP_TIMD_TM
 const CtxSet ContextSetCfg::CiipTMMergeFlag = ContextSetCfg::addCtxSet
 ({

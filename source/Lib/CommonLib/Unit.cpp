@@ -682,7 +682,7 @@ void PredictionUnit::initData()
   afMmvdMergeIdx = UINT8_MAX;
 #endif
 #endif
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   tmMergeFlag = false;
 #endif
 #if JVET_X0049_ADAPT_DMVR
@@ -801,7 +801,7 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   afMmvdMergeIdx = predData.afMmvdMergeIdx;
 #endif
 #endif
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   tmMergeFlag = predData.tmMergeFlag;
 #endif
 #if JVET_X0049_ADAPT_DMVR
@@ -916,7 +916,7 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   afMmvdMergeIdx = other.afMmvdMergeIdx;
 #endif
 #endif
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   tmMergeFlag = other.tmMergeFlag;
 #endif
 #if JVET_X0049_ADAPT_DMVR

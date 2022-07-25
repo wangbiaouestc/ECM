@@ -401,7 +401,7 @@ protected:
 #if AFFINE_MMVD
   bool      m_AffineMmvdMode;
 #endif
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool      m_DMVDMode;
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -1313,7 +1313,7 @@ public:
   void      setAffineMmvdMode               ( bool b )       { m_AffineMmvdMode = b; }
   bool      getAffineMmvdMode               ()         const { return m_AffineMmvdMode; }
 #endif
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void      setUseDMVDMode                  (bool b)         { m_DMVDMode = b; }
   bool      getUseDMVDMode                  ()         const { return m_DMVDMode; }
 #endif

@@ -135,7 +135,11 @@
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
 #define JVET_Z0075_IBC_HMVP_ENLARGE                       1 // JVET-Z0075: Enlarged HMVP table for IBC
-#define JVET_Z0084_IBC_TM                                 1 // JVET-Z0084: Add template matching in IBC modes (controlled by TM_MRG or TM_AMVP)
+#define JVET_Z0084_IBC_TM                                 1 // JVET-Z0084: Add template matching in IBC modes. [0 = disable, 1 (default) = enable for IBC-AMVP and IBC-MRG, 2 = enable for IBC-AMVP, 3 = enable for IBC-MRG]
+#if JVET_Z0084_IBC_TM
+#define IBC_TM_AMVP                                       ((JVET_Z0084_IBC_TM) == 1 || (JVET_Z0084_IBC_TM) == 2) // Add template matching to IBC to refine IBC AMVP candidates
+#define IBC_TM_MRG                                        ((JVET_Z0084_IBC_TM) == 1 || (JVET_Z0084_IBC_TM) == 3) // Add template matching to IBC to refine IBC merge candidates
+#endif
 #define JVET_Z0131_IBC_BVD_BINARIZATION                   1 // JVET-Z0131: Block vector difference binarization
 #define JVET_Z0153_IBC_EXT_REF                            1 // JVET-Z0153: Extend reference area for IBC
 #define JVET_Z0160_IBC_ZERO_PADDING                       1 // JVET-Z0160: Replacement of zero-padding candidates
@@ -938,7 +942,7 @@ enum DFunc
   DF_SAD_INTERMEDIATE_BITDEPTH = 63,
 
   DF_SAD_WITH_MASK   = 64,
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   DF_TM_A_WSAD_FULL_NBIT,
   DF_TM_L_WSAD_FULL_NBIT,
   DF_TM_A_WMRSAD_FULL_NBIT,

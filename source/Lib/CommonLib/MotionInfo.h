@@ -71,13 +71,13 @@ typedef static_vector<MultiHypPredictionData, MULTI_HYP_PRED_MAX_CANDS> MultiHyp
 /// parameters for AMVP
 struct AMVPInfo
 {
-#if TM_AMVP
+#if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP)
   Mv       mvCand[REGULAR_AMVP_MAX_NUM_CANDS + 1];  ///< array of motion vector predictor candidates
 #else
   Mv       mvCand[AMVP_MAX_NUM_CANDS_MEM];  ///< array of motion vector predictor candidates
 #endif
   unsigned numCand;                       ///< number of motion vector predictor candidates
-#if TM_AMVP
+#if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP)
   unsigned maxStorageSize;
   unsigned maxSimilarityThreshold;
 

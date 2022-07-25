@@ -163,7 +163,7 @@ public:
 #if AFFINE_MMVD
   void        affine_mmvd_data          ( const PredictionUnit&         pu );
 #endif
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   void        tm_merge_flag             ( const PredictionUnit&         pu);
 #endif
 #if JVET_W0097_GPM_MMVD_TM

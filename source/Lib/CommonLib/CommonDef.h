@@ -151,7 +151,7 @@ static const int MAX_NUM_REF =                                     16; ///< max.
 static const int MAX_QP =                                          63;
 static const int NOT_VALID =                                       -1;
 
-#if TM_AMVP
+#if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP)
 static const int REGULAR_AMVP_MAX_NUM_CANDS =                       5; ///< AMVP: advanced motion vector prediction - max number of final candidate for regular inter mode
 #endif
 static const int AMVP_MAX_NUM_CANDS =                               2; ///< AMVP: advanced motion vector prediction - max number of final candidates
@@ -716,7 +716,7 @@ static const int    NUM_AF_MMVD_SATD_CAND = std::min((int)1, MRG_MAX_NUM_CANDS);
 static const int    LIC_MIN_CU_PIXELS =                            32; ///< smallest CU size (in terms of number of luma samples) of LIC
 static const double LIC_AMVP_SKIP_TH  =                           1.2; ///< Given a IMV mode, LIC is not tested if RD cost of non-LIC IMV AMVP mode is 1.2x worse than the current best RD cost
 #endif
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 static const int    TM_TPL_SIZE =                                   4; ///< template size for template matching
 static const int    TM_SEARCH_RANGE =                               8; ///< search range (in pixel) of TM refinement
 static const int    TM_MIN_CU_SIZE_FOR_ALT_WEIGHTED_COST =          8; ///< minimal CU size (both width and height) to use alternative weight to compute template matching cost
@@ -757,7 +757,7 @@ static const int    BM_MRG_MAX_NUM_CANDS = 6; ///< maximum number of BM merge ca
 static const int    BM_MRG_SUB_PU_INT_MAX_SRCH_ROUND = 3;
 #endif
 #endif
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
 static const int    DECODER_SIDE_MV_WEIGHT =                        4; ///< lambda for decoder-side derived MVs
 #endif
 

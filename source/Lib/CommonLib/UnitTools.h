@@ -173,7 +173,7 @@ namespace PU
 #if MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM
   uint32_t getBDMVRMvdThreshold       (const PredictionUnit &pu);
 #endif
-#if TM_MRG || TM_AMVP
+#if TM_MRG || TM_AMVP || JVET_Z0084_IBC_TM
   uint32_t getTMMvdThreshold          (const PredictionUnit &pu);
 #endif
 #if TM_MRG
@@ -211,7 +211,7 @@ namespace PU
                                      , InterPrediction* interPred = nullptr
 #endif
   );
-#if JVET_Z0084_IBC_TM && TM_AMVP
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
   void fillIBCMvpCand                 (      PredictionUnit &pu, AMVPInfo &amvpInfo, InterPrediction* pcInter);
 #else
   void fillIBCMvpCand                 (PredictionUnit &pu, AMVPInfo &amvpInfo);

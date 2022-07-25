@@ -107,7 +107,7 @@ public:
   int                   subShift;
   int                   cShiftX;
   int                   cShiftY;
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   int                   tmWeightIdx;
 #endif
   DistParam() :
@@ -118,7 +118,7 @@ public:
   maskStride2(0),
   step( 1 ), bitDepth( 0 ), useMR( false ), applyWeight( false ), isBiPred( false ), wpCur( nullptr ), compID( MAX_NUM_COMPONENT ), maximumDistortionForEarlyExit( std::numeric_limits<Distortion>::max() ), subShift( 0 )
   , cShiftX(-1), cShiftY(-1)
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   , tmWeightIdx(-1)
 #endif
   { }
@@ -206,7 +206,7 @@ public:
   void           setTimdDistParam( DistParam &rcDP, const Pel* pOrg, const Pel* piRefY, int iOrgStride, int iRefStride, int bitDepth, ComponentID compID, int width, int height, int subShiftMode = 0, int step = 1, bool useHadamard = false );
 #endif
   void           setDistParam( DistParam &rcDP, const CPelBuf &org, const Pel* piRefY, int iRefStride, const Pel* mask01, int iMaskStride, int stepX, int iMaskStride2, int bitDepth,  ComponentID compID);
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   void           setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &cur, int bitDepth, bool trueAfalseL, int wIdx, int subShift, ComponentID compID );
 #endif
 
@@ -233,7 +233,7 @@ public:
   { 
     return &m_cBvdBitCosts; 
   }
-#if JVET_Z0084_IBC_TM && TM_AMVP
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
   inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL, bool flag = false, AMVPInfo* amvpInfo4Pel = NULL)
 #else
   inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL)
@@ -259,7 +259,7 @@ public:
     if (bestRes && x % 4 == 0 && y % 4 == 0)
     {
       Mv cMv(x >> 2, y >> 2);
-#if JVET_Z0084_IBC_TM && TM_AMVP
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
       Mv tmpBv0;
       Mv tmpBv1;
       if (flag) 
@@ -560,7 +560,7 @@ private:
   static Distortion xCalcHADs4x8      ( const Pel *piOrg, const Pel *piCur, int iStrideOrg, int iStrideCur );
   static Distortion xCalcHADs8x4      ( const Pel *piOrg, const Pel *piCur, int iStrideOrg, int iStrideCur );
 
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   template < int tplSize, bool trueAfalseL, bool mr >
   static Distortion xGetTMErrorFull   ( const DistParam& rcDtParam );
 #endif
@@ -585,11 +585,11 @@ private:
   template<X86_VEXT vext>
   static Distortion xGetHADs_SIMD   ( const DistParam& pcDtParam );
 
-#if INTER_LIC || (TM_AMVP || TM_MRG)
+#if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM)
   template< X86_VEXT vext >
   static Distortion xGetMRSAD_SIMD(const DistParam &rcDtParam);
 #endif
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   template < X86_VEXT vext, int tplSize, bool trueAfalseL, bool mr >
   static Distortion xGetTMErrorFull_SIMD(const DistParam& rcDtParam);
 #endif

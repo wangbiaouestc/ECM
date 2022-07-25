@@ -1004,7 +1004,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if AFFINE_MMVD
   ("AffineMMVD",                                      m_AffineMmvdMode,                                  true, "Affine MMVD mode (0:off, 1:on)  [default: on]" )
 #endif
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   ("DMVD",                                            m_DMVDMode,                                        true, "DMVD mode (0:off, 1:on)  [default: on]" )
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -4922,7 +4922,7 @@ void EncAppCfg::xPrintParameter()
 #if JVET_W0090_ARMC_TM
   msg( VERBOSE, "AML:%d ", m_AML );
 #endif
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   msg( VERBOSE, "DMVD:%d ", m_DMVDMode );
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
