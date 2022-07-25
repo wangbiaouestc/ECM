@@ -54,6 +54,7 @@
 
 //########### place macros to be removed in next cycle below this line ###############
 
+#define JVET_AA0098_MAX_MTT_DEPTH_TID                      1 // JVET-X0144: max MTT hierarchy depth set by temporal ID
 
 #define JVET_Y0152_TT_ENC_SPEEDUP                         1 // TT encoding speedup
 #define JVET_V0056                                        1 // MCTF changes as presented in JVET-V0056
