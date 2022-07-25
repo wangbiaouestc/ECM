@@ -1103,6 +1103,10 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setNumRefLayers                                       ( m_numRefLayers );
 
   m_cEncLib.setVPSParameters(m_cfgVPSParameters);
+
+#if JVET_AA0098_MAX_MTT_DEPTH_TID
+  m_cEncLib.setMaxMTTHierarchyDepthByTid(m_maxMTTHierarchyDepthByTid);
+#endif
 }
 
 void EncApp::xCreateLib( std::list<PelUnitBuf*>& recBufList, const int layerId )

@@ -303,6 +303,10 @@ protected:
   unsigned m_subPicIdLen;
   std::vector<uint16_t> m_subPicId;
   bool      m_SplitConsOverrideEnabledFlag;
+#if JVET_AA0098_MAX_MTT_DEPTH_TID
+  std::string m_sMaxMTTHierarchyDepthByTid;
+  unsigned    m_maxMTTHierarchyDepthByTid[MAX_TLAYER];
+#endif
   unsigned  m_uiMinQT[3]; // 0: I slice luma; 1: P/B slice; 2: I slice chroma
   unsigned  m_uiMaxMTTHierarchyDepth;
   unsigned  m_uiMaxMTTHierarchyDepthI;

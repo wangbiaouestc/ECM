@@ -2343,6 +2343,14 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
         int refLayer = pcSlice->getDepth();
         if( refLayer > 9 ) refLayer = 9; // Max layer is 10
 
+#if JVET_AA0098_MAX_MTT_DEPTH_TID
+        if (m_pcCfg->getMaxMTTHierarchyDepthByTid(refLayer) != m_pcCfg->getMaxMTTHierarchyDepth())
+        {
+          picHeader->setSplitConsOverrideFlag(true);
+          picHeader->setMaxMTTHierarchyDepth(P_SLICE, m_pcCfg->getMaxMTTHierarchyDepthByTid(refLayer));
+        }
+#endif
+
         if( m_bInitAMaxBT && pcSlice->getPOC() > m_uiPrevISlicePOC )
         {
           ::memset( m_uiBlkSize, 0, sizeof( m_uiBlkSize ) );
