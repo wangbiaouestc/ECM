@@ -248,8 +248,13 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setFrameRate                                         ( m_iFrameRate );
   m_cEncLib.setFrameSkip                                         ( m_FrameSkip );
   m_cEncLib.setTemporalSubsampleRatio                            ( m_temporalSubsampleRatio );
+#if JVET_AA0146_WRAP_AROUND_FIX
+  m_cEncLib.setSourceWidth                                       ( m_sourceWidth );
+  m_cEncLib.setSourceHeight                                      ( m_sourceHeight );
+#else
   m_cEncLib.setSourceWidth                                       ( m_iSourceWidth );
   m_cEncLib.setSourceHeight                                      ( m_iSourceHeight );
+#endif
   m_cEncLib.setConformanceWindow                                 ( m_confWinLeft / SPS::getWinUnitX( m_InputChromaFormatIDC ), m_confWinRight / SPS::getWinUnitX( m_InputChromaFormatIDC ), m_confWinTop / SPS::getWinUnitY( m_InputChromaFormatIDC ), m_confWinBottom / SPS::getWinUnitY( m_InputChromaFormatIDC ) );
   m_cEncLib.setScalingRatio                                      ( m_scalingRatioHor, m_scalingRatioVer );
 #if JVET_Q0114_ASPECT5_GCI_FLAG
@@ -623,7 +628,11 @@ void EncApp::xInitLibCfg()
 #endif
   m_cEncLib.setChromaQpMappingTableParams                         (m_chromaQpMappingTableParams);
 
+#if JVET_AA0146_WRAP_AROUND_FIX
+  m_cEncLib.setSourcePadding                                     ( m_sourcePadding );
+#else
   m_cEncLib.setPad                                               ( m_aiPad );
+#endif
 
   m_cEncLib.setAccessUnitDelimiter                               ( m_AccessUnitDelimiter );
   m_cEncLib.setEnablePictureHeaderInSliceHeader                  ( m_enablePictureHeaderInSliceHeader );
@@ -1266,18 +1275,33 @@ void EncApp::xCreateLib( std::list<PelUnitBuf*>& recBufList, const int layerId )
 #if EXTENSION_360_VIDEO
   m_cVideoIOYuvInputFile.skipFrames(m_FrameSkip, m_inputFileWidth, m_inputFileHeight, m_InputChromaFormatIDC);
 #else
+#if JVET_AA0146_WRAP_AROUND_FIX
+  const int sourceHeight = m_isField ? m_iSourceHeightOrg : m_sourceHeight;
+  m_cVideoIOYuvInputFile.skipFrames(m_FrameSkip, m_sourceWidth - m_sourcePadding[0], sourceHeight - m_sourcePadding[1], m_InputChromaFormatIDC);
+#else
   const int sourceHeight = m_isField ? m_iSourceHeightOrg : m_iSourceHeight;
   m_cVideoIOYuvInputFile.skipFrames(m_FrameSkip, m_iSourceWidth - m_aiPad[0], sourceHeight - m_aiPad[1], m_InputChromaFormatIDC);
 #endif
+#endif
   if (!m_reconFileName.empty())
   {
+#if JVET_AA0146_WRAP_AROUND_FIX
+    if (m_packedYUVMode && ((m_outputBitDepth[CH_L] != 10 && m_outputBitDepth[CH_L] != 12)
+        || ((m_sourceWidth & (1 + (m_outputBitDepth[CH_L] & 3))) != 0)))
+#else
     if (m_packedYUVMode && ((m_outputBitDepth[CH_L] != 10 && m_outputBitDepth[CH_L] != 12)
         || ((m_iSourceWidth & (1 + (m_outputBitDepth[CH_L] & 3))) != 0)))
+#endif
     {
       EXIT ("Invalid output bit-depth or image width for packed YUV output, aborting\n");
     }
+#if JVET_AA0146_WRAP_AROUND_FIX
+    if (m_packedYUVMode && (m_chromaFormatIDC != CHROMA_400) && ((m_outputBitDepth[CH_C] != 10 && m_outputBitDepth[CH_C] != 12)
+        || (((m_sourceWidth / SPS::getWinUnitX (m_chromaFormatIDC)) & (1 + (m_outputBitDepth[CH_C] & 3))) != 0)))
+#else
     if (m_packedYUVMode && (m_chromaFormatIDC != CHROMA_400) && ((m_outputBitDepth[CH_C] != 10 && m_outputBitDepth[CH_C] != 12)
         || (((m_iSourceWidth / SPS::getWinUnitX (m_chromaFormatIDC)) & (1 + (m_outputBitDepth[CH_C] & 3))) != 0)))
+#endif
     {
       EXIT ("Invalid chroma output bit-depth or image width for packed YUV output, aborting\n");
     }
@@ -1298,8 +1322,13 @@ void EncApp::xCreateLib( std::list<PelUnitBuf*>& recBufList, const int layerId )
 #if Y4M_SUPPORT
     if (isY4mFileExt(reconFileName))
     {
+#if JVET_AA0146_WRAP_AROUND_FIX
+      m_cVideoIOYuvReconFile.setOutputY4mInfo(m_sourceWidth, m_sourceHeight, m_iFrameRate, 1, m_internalBitDepth[0],
+                                              m_chromaFormatIDC);
+#else
       m_cVideoIOYuvReconFile.setOutputY4mInfo(m_iSourceWidth, m_iSourceHeight, m_iFrameRate, 1, m_internalBitDepth[0],
                                               m_chromaFormatIDC);
+#endif
     }
 #endif
     m_cVideoIOYuvReconFile.open( reconFileName, true, m_outputBitDepth, m_outputBitDepth, m_internalBitDepth );  // write mode
@@ -1339,8 +1368,13 @@ void EncApp::xInitLib(bool isFieldCoding)
 
 void EncApp::createLib( const int layerIdx )
 {
+#if JVET_AA0146_WRAP_AROUND_FIX
+  const int sourceHeight = m_isField ? m_iSourceHeightOrg : m_sourceHeight;
+  UnitArea unitArea( m_chromaFormatIDC, Area( 0, 0, m_sourceWidth, sourceHeight ) );
+#else
   const int sourceHeight = m_isField ? m_iSourceHeightOrg : m_iSourceHeight;
   UnitArea unitArea( m_chromaFormatIDC, Area( 0, 0, m_iSourceWidth, sourceHeight ) );
+#endif
 
   m_orgPic = new PelStorage;
   m_trueOrgPic = new PelStorage;
@@ -1384,6 +1418,17 @@ void EncApp::createLib( const int layerIdx )
   if( m_gopBasedTemporalFilterEnabled )
 #endif
   {
+#if JVET_AA0146_WRAP_AROUND_FIX
+    m_temporalFilter.init( m_FrameSkip, m_inputBitDepth, m_MSBExtendedBitDepth, m_internalBitDepth, m_sourceWidth,
+                           sourceHeight, m_sourcePadding, m_bClipInputVideoToRec709Range, m_inputFileName,
+                           m_chromaFormatIDC, m_inputColourSpaceConvert, m_iQP, m_gopBasedTemporalFilterStrengths,
+                           m_gopBasedTemporalFilterPastRefs, m_gopBasedTemporalFilterFutureRefs, m_firstValidFrame,
+                           m_lastValidFrame
+#if JVET_Y0240_BIM
+                           , m_gopBasedTemporalFilterEnabled, m_cEncLib.getAdaptQPmap(), m_cEncLib.getBIM(), m_uiCTUSize
+#endif
+                           );
+#else
     m_temporalFilter.init( m_FrameSkip, m_inputBitDepth, m_MSBExtendedBitDepth, m_internalBitDepth, m_iSourceWidth,
                            sourceHeight, m_aiPad, m_bClipInputVideoToRec709Range, m_inputFileName,
                            m_chromaFormatIDC, m_inputColourSpaceConvert, m_iQP, m_gopBasedTemporalFilterStrengths,
@@ -1393,6 +1438,7 @@ void EncApp::createLib( const int layerIdx )
                            , m_gopBasedTemporalFilterEnabled, m_cEncLib.getAdaptQPmap(), m_cEncLib.getBIM(), m_uiCTUSize
 #endif
                            );
+#endif
   }
 }
 
@@ -1464,10 +1510,18 @@ bool EncApp::encodePrep( bool& eos )
   }
   else
   {
+#if JVET_AA0146_WRAP_AROUND_FIX
+    m_cVideoIOYuvInputFile.read( *m_orgPic, *m_trueOrgPic, ipCSC, m_sourcePadding, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range );
+#else
     m_cVideoIOYuvInputFile.read( *m_orgPic, *m_trueOrgPic, ipCSC, m_aiPad, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range );
+#endif
   }
 #else
+#if JVET_AA0146_WRAP_AROUND_FIX
+  m_cVideoIOYuvInputFile.read( *m_orgPic, *m_trueOrgPic, ipCSC, m_sourcePadding, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range );
+#else
   m_cVideoIOYuvInputFile.read( *m_orgPic, *m_trueOrgPic, ipCSC, m_aiPad, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range );
+#endif
 #endif
 
 #if JVET_Y0240_BIM
@@ -1542,8 +1596,13 @@ bool EncApp::encode()
 #if EXTENSION_360_VIDEO
       m_cVideoIOYuvInputFile.skipFrames( m_temporalSubsampleRatio - 1, m_inputFileWidth, m_inputFileHeight, m_InputChromaFormatIDC );
 #else
+#if JVET_AA0146_WRAP_AROUND_FIX
+    const int sourceHeight = m_isField ? m_iSourceHeightOrg : m_sourceHeight;
+    m_cVideoIOYuvInputFile.skipFrames( m_temporalSubsampleRatio - 1, m_sourceWidth - m_sourcePadding[0], sourceHeight - m_sourcePadding[1], m_InputChromaFormatIDC );
+#else
     const int sourceHeight = m_isField ? m_iSourceHeightOrg : m_iSourceHeight;
     m_cVideoIOYuvInputFile.skipFrames( m_temporalSubsampleRatio - 1, m_iSourceWidth - m_aiPad[0], sourceHeight - m_aiPad[1], m_InputChromaFormatIDC );
+#endif
 #endif
     }
   }

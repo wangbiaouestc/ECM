@@ -50,7 +50,6 @@
 #include <assert.h>
 #include <cassert>
 
-
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -173,6 +172,7 @@
 #define JVET_Z0083_PARSINGERROR_FIX                       1 // JVET-Z0083: Fix on MHP parsing condition
 #define JVET_Z0139_HIST_AFF                               1 // JVET-Z0139: Affine HMVP 
 #define JVET_Z0139_NA_AFF                                 1 // JVET-Z0139: Constructed non-adjacent spatial neighbors for affine mode
+#define JVET_AA0146_WRAP_AROUND_FIX                       1 // JVET-AA0146: bugfix&cleanup for wrap around motion compensation
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
