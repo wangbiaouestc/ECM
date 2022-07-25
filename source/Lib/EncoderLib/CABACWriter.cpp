@@ -4270,11 +4270,11 @@ void CABACWriter::mvp_flag( const PredictionUnit& pu, RefPicList eRefList )
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   else if (PU::useRefCombList(pu))
   {
-    needToCodeMvpIdx = pu.refIdxLC >= pu.cs->slice->getNumNonScaledRefPic() || PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false;
+    needToCodeMvpIdx = pu.refIdxLC >= pu.cs->slice->getNumNonScaledRefPic() || !pu.cs->sps->getUseDMVDMode();
   }
   else if (PU::useRefPairList(pu))
   {
-    needToCodeMvpIdx = pu.refPairIdx >= pu.cs->slice->getNumNonScaledRefPicPair() || PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false;
+    needToCodeMvpIdx = pu.refPairIdx >= pu.cs->slice->getNumNonScaledRefPicPair() || !pu.cs->sps->getUseDMVDMode();
   }
 #endif
   else if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
