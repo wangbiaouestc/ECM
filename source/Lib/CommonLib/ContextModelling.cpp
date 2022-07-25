@@ -503,7 +503,7 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
   pu.cu->BcwIdx = ( interDirNeighbours[candIdx] == 3 ) ? BcwIdx[candIdx] : BCW_DEFAULT;
 #if MULTI_HYP_PRED
   if (pu.ciipFlag
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
     || pu.tmMergeFlag
 #endif
 #if JVET_X0049_ADAPT_DMVR

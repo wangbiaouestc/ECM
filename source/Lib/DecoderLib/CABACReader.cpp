@@ -3375,14 +3375,14 @@ void CABACReader::affine_mmvd_data(PredictionUnit& pu)
 }
 #endif
 
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
 void CABACReader::tm_merge_flag(PredictionUnit& pu)
 {
   pu.tmMergeFlag = false;
   if (pu.cs->slice->getSPS()->getUseDMVDMode())
   {
     RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MERGE_FLAG, pu.lumaSize());
-#if JVET_Z0084_IBC_TM && TM_MRG
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
     pu.tmMergeFlag = (m_BinDecoder.decodeBin(Ctx::TMMergeFlag(CU::isIBC(*pu.cu) ? 1 : 0)));
 #else
     pu.tmMergeFlag = (m_BinDecoder.decodeBin(Ctx::TMMergeFlag()));
@@ -3438,7 +3438,7 @@ void CABACReader::merge_data( PredictionUnit& pu )
 {
   if (CU::isIBC(*pu.cu))
   {
-#if JVET_Z0084_IBC_TM && TM_MRG
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
     tm_merge_flag(pu);
 #endif
     merge_idx(pu);
@@ -3798,14 +3798,14 @@ void CABACReader::merge_idx( PredictionUnit& pu )
 #endif
   if( numCandminus1 > 0 )
   {
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
     const CtxSet mrgIdxCtxSet = pu.tmMergeFlag ? Ctx::TmMergeIdx : Ctx::MergeIdx;
 #endif
 #if NON_ADJACENT_MRG_CAND
     unsigned int uiUnaryIdx = 0;
     for (; uiUnaryIdx < numCandminus1; ++uiUnaryIdx)
     {
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
       if (!m_BinDecoder.decodeBin(mrgIdxCtxSet((uiUnaryIdx > LAST_MERGE_IDX_CABAC - 1 ? LAST_MERGE_IDX_CABAC - 1 : uiUnaryIdx))))
 #else
       if (!m_BinDecoder.decodeBin(Ctx::MergeIdx((uiUnaryIdx > LAST_MERGE_IDX_CABAC - 1 ? LAST_MERGE_IDX_CABAC - 1 : uiUnaryIdx))))
@@ -3816,7 +3816,7 @@ void CABACReader::merge_idx( PredictionUnit& pu )
     }
     pu.mergeIdx = uiUnaryIdx;
 #else
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
     if (m_BinDecoder.decodeBin(mrgIdxCtxSet()))
 #else
     if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
@@ -4449,7 +4449,7 @@ void CABACReader::mh_pred_data(PredictionUnit& pu)
   {
     return;
   }
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   if (pu.tmMergeFlag)
   {
     return;

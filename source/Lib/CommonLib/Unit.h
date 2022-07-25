@@ -468,7 +468,7 @@ struct InterPredictionData
   uint8_t     afMmvdMergeIdx;
 #endif
 #endif
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   bool        tmMergeFlag;
 #endif
 #if JVET_X0049_ADAPT_DMVR

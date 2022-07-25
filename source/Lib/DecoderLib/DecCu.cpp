@@ -2006,11 +2006,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.mergeIdx);
 #endif
           mrgCtx.setMergeInfo( pu, pu.mergeIdx );
-#if TM_MRG && !MULTI_PASS_DMVR
+#if (TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)) && !MULTI_PASS_DMVR
           if (pu.tmMergeFlag)
           {
             m_pcInterPred->deriveTMMv(pu);
-#if JVET_Z0084_IBC_TM && TM_MRG
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
             if (CU::isIBC(*pu.cu))
             {
               pu.bv = pu.mv[0];
@@ -2053,13 +2053,13 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               pu.bdmvrRefine = m_pcInterPred->processBDMVR( pu );
             }
           }
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
           else
           {
             if (pu.tmMergeFlag)
             {
               m_pcInterPred->deriveTMMv(pu);
-#if JVET_Z0084_IBC_TM && TM_MRG
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
               if (CU::isIBC(*pu.cu))
               {
                 pu.bv = pu.mv[0];
@@ -2267,7 +2267,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         else if (CU::isIBC(*pu.cu) && pu.interDir == 1)
         {
           AMVPInfo amvpInfo;
-#if JVET_Z0084_IBC_TM && TM_AMVP
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
           PU::fillIBCMvpCand(pu, amvpInfo, m_pcInterPred);
 #else
           PU::fillIBCMvpCand(pu, amvpInfo);

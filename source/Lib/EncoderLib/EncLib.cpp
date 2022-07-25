@@ -1489,7 +1489,7 @@ void EncLib::xInitSPS( SPS& sps )
 #if AFFINE_MMVD
   sps.setUseAffineMmvdMode     ( m_AffineMmvdMode );
 #endif
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   sps.setUseDMVDMode           ( m_DMVDMode );
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING

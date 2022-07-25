@@ -44,7 +44,7 @@
 #include <memory.h>
 #include <algorithm>
 
-#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
+#if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
 #include "Reshape.h"
 #endif
 
@@ -74,7 +74,7 @@ InterPrediction::InterPrediction()
 #if INTER_LIC
   m_storeBeforeLIC  (false),
 #endif
-#if INTER_LIC || (TM_AMVP || TM_MRG) // note: already refactor
+#if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) // note: already refactor
   m_pcReshape            ( nullptr ),
 #endif
 #if INTER_LIC || JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -83,7 +83,7 @@ InterPrediction::InterPrediction()
   m_pcLICRecLeftTemplate ( nullptr ),
   m_pcLICRecAboveTemplate( nullptr ),
 #endif
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   m_pcCurTplLeft ( nullptr ),
   m_pcCurTplAbove( nullptr ),
   m_pcRefTplLeft ( nullptr ),
@@ -355,7 +355,7 @@ void InterPrediction::destroy()
   m_IBCBuffer.destroy();
 #endif
 
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   xFree(m_pcCurTplLeft ); m_pcCurTplLeft  = nullptr;
   xFree(m_pcCurTplAbove); m_pcCurTplAbove = nullptr;
   xFree(m_pcRefTplLeft ); m_pcRefTplLeft  = nullptr;
@@ -411,7 +411,7 @@ void InterPrediction::destroy()
 #endif
 }
 
-#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
+#if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
 #if JVET_Z0153_IBC_EXT_REF
 void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape, const int picWidth )
 #else
@@ -422,7 +422,7 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
 #endif
 {
   m_pcRdCost = pcRdCost;
-#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
+#if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
   m_pcReshape = reshape;
 #endif
 
@@ -534,7 +534,7 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
 #if !JVET_J0090_MEMORY_BANDWITH_MEASURE
   m_if.initInterpolationFilter( true );
 #endif
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   if (m_pcCurTplLeft == nullptr)
   {
     m_pcCurTplLeft  = (Pel*)xMalloc(Pel, TM_TPL_SIZE * MAX_CU_SIZE);
@@ -811,7 +811,7 @@ void InterPrediction::xSubPuBio(PredictionUnit& pu, PelUnitBuf& predBuf, const R
   subPu.mergeFlag = pu.mergeFlag;
   subPu.ciipFlag = pu.ciipFlag;
   subPu.mvRefine = pu.mvRefine;
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   subPu.tmMergeFlag = pu.tmMergeFlag;
 #endif
   subPu.refIdx[0] = pu.refIdx[0];
@@ -3993,7 +3993,7 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
   subPu.cu->LICFlag = false;
 #endif
   subPu.ciipFlag = false;
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   subPu.tmMergeFlag = false;
 #endif
 #if MULTI_PASS_DMVR
@@ -8846,7 +8846,7 @@ void InterPrediction::xGetPredBlkTpl(const CodingUnit& cu, const ComponentID com
 }
 #endif // INTER_LIC
 
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl, Distortion curBestCost, RefPicList eRefList, int refIdx, int maxSearchRounds, Mv& mv, const MvField* otherMvf)
 {
   CHECK(refIdx < 0, "Invalid reference index for TM");
@@ -8904,7 +8904,7 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
   }
 }
 
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
 void InterPrediction::deriveTMMv(PredictionUnit& pu)
 {
   if( !pu.tmMergeFlag )
@@ -8945,10 +8945,10 @@ void InterPrediction::deriveTMMv(PredictionUnit& pu)
     }
   }
 }
-#endif // TM_MRG
-#endif // TM_AMVP || TM_MRG
+#endif // TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
+#endif // TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 TplMatchingCtrl::TplMatchingCtrl( const PredictionUnit&     pu,
                                         InterPredResources& interRes,
                                   const Picture&            refPic,
@@ -9583,9 +9583,9 @@ Distortion TplMatchingCtrl::xGetTempMatchError(const Mv& mv)
 
   return partSum;
 }
-#endif // TM_AMVP || TM_MRG
+#endif // TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
 Distortion InterPrediction::getDecoderSideDerivedMvCost(const Mv& mvStart, const Mv& mvCur, int searchRangeInFullPel, int weight)
 {
   int searchRange = searchRangeInFullPel << MV_FRACTIONAL_BITS_INTERNAL;

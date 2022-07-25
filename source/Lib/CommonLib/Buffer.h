@@ -104,7 +104,7 @@ struct PelBufferOps
   void (*profGradFilter) (Pel* pSrc, int srcStride, int width, int height, int gradStride, Pel* gradX, Pel* gradY, const int bitDepth);
   void (*applyPROF)      (Pel* dst, int dstStride, const Pel* src, int srcStride, int width, int height, const Pel* gradX, const Pel* gradY, int gradStride, const int* dMvX, const int* dMvY, int dMvStride, const bool& bi, int shiftNum, Pel offset, const ClpRng& clpRng);
   void (*roundIntVector) (int* v, int size, unsigned int nShift, const int dmvLimit);
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   int64_t (*getSumOfDifference) ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int rowSubShift, int bitDepth );
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -129,7 +129,7 @@ extern PelBufferOps g_pelBufOP;
 
 void paddingCore(Pel *ptr, int stride, int width, int height, int padSize);
 void copyBufferCore(Pel *src, int srcStride, Pel *Dst, int dstStride, int width, int height);
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 int64_t getSumOfDifferenceCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int rowSubShift, int bitDepth);
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING

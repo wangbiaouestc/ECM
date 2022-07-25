@@ -1358,7 +1358,7 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #endif
   WRITE_UVLC(MRG_MAX_NUM_CANDS - pcSPS->getMaxNumMergeCand(), "six_minus_max_num_merge_cand");
   WRITE_FLAG( pcSPS->getUseSBT() ? 1 : 0,                                                      "sps_sbt_enabled_flag");
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   WRITE_FLAG( pcSPS->getUseDMVDMode() ? 1 : 0,                                                 "sps_dmvd_enabled_flag" );
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING

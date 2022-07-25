@@ -54,7 +54,7 @@
 #endif
 // forward declaration
 class Mv;
-#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
+#if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
 class Reshape;
 #endif
 
@@ -77,7 +77,7 @@ public:
   bool isMvOOB(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, bool *mcMaskChroma, bool lumaOnly = false);
   bool isMvOOBSubBlk(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, int mcStride, bool *mcMaskChroma, int mcCStride, bool lumaOnly = false);
 #endif
-#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC // note: already refactor
+#if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC // note: already refactor
   Reshape*          m_pcReshape;
 #endif
 
@@ -96,7 +96,7 @@ private:
   Pel* m_pcLICRecLeftTemplate;
   Pel* m_pcLICRecAboveTemplate;
 #endif
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   // buffer size for left/above current templates
   Pel* m_pcCurTplLeft;
   Pel* m_pcCurTplAbove;
@@ -365,7 +365,7 @@ public:
   InterPrediction();
   virtual ~InterPrediction();
 
-#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
+#if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
 #if JVET_Z0153_IBC_EXT_REF
   void    init                (RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape, const int picWidth);
 #else
@@ -646,20 +646,22 @@ public:
                       );
 #endif
 
-#if TM_AMVP || TM_MRG
-#if TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   void       deriveTMMv         (PredictionUnit& pu);
 #endif
   Distortion deriveTMMv         (const PredictionUnit& pu, bool fillCurTpl, Distortion curBestCost, RefPicList eRefList, int refIdx, int maxSearchRounds, Mv& mv, const MvField* otherMvf = nullptr);
+#endif // TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 #if TM_AMVP
   void       clearTplAmvpBuffer ();
   void       writeTplAmvpBuffer (const AMVPInfo& src, const CodingUnit& cu, RefPicList eRefList, int refIdx);
   bool       readTplAmvpBuffer  (      AMVPInfo& dst, const CodingUnit& cu, RefPicList eRefList, int refIdx);
 #endif
-#endif // TM_AMVP || TM_MRG
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   static Distortion getDecoderSideDerivedMvCost (const Mv& mvStart, const Mv& mvCur, int searchRangeInFullPel, int weight);
+#if MULTI_PASS_DMVR
   void       xBDMVRUpdateSquareSearchCostLog (Distortion* costLog, int bestDirect);
+#endif
 #endif
 #if MULTI_PASS_DMVR
 private:
@@ -743,7 +745,7 @@ public:
 #endif
 };
 
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 struct InterPredResources // Bridge required resource from InterPrediction
 {
   Reshape*              m_pcReshape;
