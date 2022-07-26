@@ -11479,7 +11479,14 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
     {
       continue;
     }
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+    if (pu.cu->slice->getSPS()->getUseDMVDMode() == true)
+    {
+#endif
     CHECK(pu.cu->slice->getRefPic(refListAmvp, refIdxAmvp)->isRefScaled(pu.cu->cs->pps), "this is not possible");
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+    }
+#endif
 #else
     const int amvpRefPoc = pu.cu->slice->getRefPOC(refListAmvp, refIdxAmvp);
     bool findValidMergeRefPic = false;
@@ -11554,7 +11561,14 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
           mvAmBdmvr[refListAmvp] = amvpInfo.mvCand[bestMvpIdxToTest];
           mvAmBdmvr[refListMerge] = bmMergeCtx.mvFieldNeighbours[(mergeIdx << 1) + refListMerge].mv;
 #if JVET_Y0128_NON_CTC
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+          if (pu.cu->slice->getSPS()->getUseDMVDMode() == true)
+          {
+#endif
           CHECK(pu.cu->slice->getRefPic((RefPicList)refListMerge, pu.refIdx[refListMerge])->isRefScaled(pu.cs->pps), "this is not possible");
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+          }
+#endif
 #endif
 #if JVET_Z0085_AMVPMERGE_DMVD_OFF
           if (pu.cu->cs->sps->getUseDMVDMode())
@@ -11633,8 +11647,15 @@ void InterPrediction::amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvF
   const bool useMR = pu.lumaSize().area() > 64;
   const int amvpRefPoc = pu.cu->slice->getRefPOC(refListAmvp, pu.refIdx[refListAmvp]);
 #if JVET_Y0128_NON_CTC
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+  if (pu.cu->slice->getSPS()->getUseDMVDMode() == true)
+  {
+#endif
   CHECK(pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0])->isRefScaled(pu.cs->pps), "this is not possible");
   CHECK(pu.cu->slice->getRefPic(REF_PIC_LIST_1, pu.refIdx[1])->isRefScaled(pu.cs->pps), "this is not possible");
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+  }
+#endif
 #endif
 #if JVET_Z0085_AMVPMERGE_DMVD_OFF
   if (pu.cu->cs->sps->getUseDMVDMode())

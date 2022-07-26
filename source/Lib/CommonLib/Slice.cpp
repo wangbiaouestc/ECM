@@ -303,11 +303,18 @@ void Slice::checkAmvpMergeModeAvailability(Slice* pcSlice)
     bool validCandidate = false;
     for (int refIdxInList1 = 0; refIdxInList1 < pcSlice->getNumRefIdx(REF_PIC_LIST_1); refIdxInList1++)
     {
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+      if (pcSlice->getSPS()->getUseDMVDMode())
+      {
+#endif
       if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->isRefScaled(pcSlice->getPPS()) ||
         pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->isRefScaled(pcSlice->getPPS()))
       {
         continue;
       }
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+      }
+#endif
       if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->longTerm ||
         pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->longTerm)
       {
@@ -347,11 +354,18 @@ void Slice::checkAmvpMergeModeAvailability(Slice* pcSlice)
     bool validCandidate = false;
     for (int refIdxInList0 = 0; refIdxInList0 < pcSlice->getNumRefIdx(REF_PIC_LIST_0); refIdxInList0++)
     {
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+      if (pcSlice->getSPS()->getUseDMVDMode())
+      {
+#endif
       if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->isRefScaled(pcSlice->getPPS()) ||
         pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->isRefScaled(pcSlice->getPPS()))
       {
         continue;
       }
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+      }
+#endif
       if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->longTerm ||
         pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->longTerm)
       {

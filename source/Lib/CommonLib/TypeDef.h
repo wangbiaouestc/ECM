@@ -170,6 +170,9 @@
 #if JVET_X0083_BM_AMVP_MERGE_MODE
 #define JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE             1 // JVET-Y0129: MVD signalling for AMVP-merge mode
 #define JVET_Z0085_AMVPMERGE_DMVD_OFF                     1 // JVET-Z0085: Enabling amvpMerge when DMVD is off
+#if JVET_Z0085_AMVPMERGE_DMVD_OFF
+#define JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON             1
+#endif
 #endif
 #define JVET_Y0089_DMVR_BCW                               1 // JVET-Y0089: DMVR with BCW enabled
 #define JVET_Y0065_GPM_INTRA                              1 // JVET-Y0065: Intra prediction for GPM
