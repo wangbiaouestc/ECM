@@ -2330,9 +2330,9 @@ bool isMvOOB_SSE(const Mv& rcMv, const struct Position pos, const struct Size si
   int offsetY = (pos.y << MV_FRACTIONAL_BITS_INTERNAL) + rcMv.getVer();
   bool isOOB = false;
   if ((offsetX <= horMin)
-    || ((offsetX + (size.width << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= horMax)
+    || ((offsetX + ((size.width - 1) << MV_FRACTIONAL_BITS_INTERNAL) ) >= horMax)
     || (offsetY <= verMin)
-    || ((offsetY + (size.height << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= verMax))
+    || ((offsetY + ((size.height - 1) << MV_FRACTIONAL_BITS_INTERNAL)) >= verMax))
   {
     isOOB = true;
   }
@@ -2436,9 +2436,9 @@ bool isMvOOBSubBlk_SSE(const Mv& rcMv, const struct Position pos, const struct S
   int offsetY = (pos.y << MV_FRACTIONAL_BITS_INTERNAL) + rcMv.getVer();
   bool isOOB = false;
   if ((offsetX <= horMin)
-    || ((offsetX + (size.width << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= horMax)
+    || ((offsetX + ((size.width - 1) << MV_FRACTIONAL_BITS_INTERNAL) ) >= horMax)
     || (offsetY <= verMin)
-    || ((offsetY + (size.height << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= verMax))
+    || ((offsetY + ((size.height - 1) << MV_FRACTIONAL_BITS_INTERNAL)) >= verMax))
   {
     isOOB = true;
   }
