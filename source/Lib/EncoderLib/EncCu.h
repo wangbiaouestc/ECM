@@ -302,7 +302,11 @@ private:
   PelStorage            m_ciipBuffer[2];
 
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AA0058_GPM_ADP_BLD
+  PelStorage            m_acGeoWeightedBuffer[GEO_MAX_TRY_WEIGHTED_SAD*GEO_NUM_BLD+1]; // to store weighted prediction pixels
+#else
   PelStorage            m_acGeoWeightedBuffer[GEO_MAX_TRY_WEIGHTED_SAD+1]; // to store weighted prediction pixles
+#endif
 #else
   PelStorage            m_acGeoWeightedBuffer[GEO_MAX_TRY_WEIGHTED_SAD]; // to store weighted prediction pixels
 #endif

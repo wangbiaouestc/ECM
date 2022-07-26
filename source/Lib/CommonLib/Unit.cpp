@@ -671,6 +671,9 @@ void PredictionUnit::initData()
   geoTmFlag1 = false;
 #endif
 #endif
+#if JVET_AA0058_GPM_ADP_BLD
+  geoBldIdx = MAX_UCHAR;
+#endif
   mmvdMergeFlag = false;
   mmvdMergeIdx = MAX_UCHAR;
 #if AFFINE_MMVD
@@ -790,6 +793,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   geoTmFlag1 = predData.geoTmFlag1;
 #endif
 #endif
+#if JVET_AA0058_GPM_ADP_BLD
+  geoBldIdx = predData.geoBldIdx;
+#endif
   mmvdMergeFlag = predData.mmvdMergeFlag;
   mmvdMergeIdx = predData.mmvdMergeIdx;
 #if AFFINE_MMVD
@@ -904,6 +910,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   geoTmFlag0 = other.geoTmFlag0;
   geoTmFlag1 = other.geoTmFlag1;
 #endif
+#endif
+#if JVET_AA0058_GPM_ADP_BLD
+  geoBldIdx = other.geoBldIdx;
 #endif
   mmvdMergeFlag = other.mmvdMergeFlag;
   mmvdMergeIdx = other.mmvdMergeIdx;

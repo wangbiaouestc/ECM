@@ -164,6 +164,9 @@ public:
   void        geo_merge_idx1(PredictionUnit&          pu);
 #endif
 #endif
+#if JVET_AA0058_GPM_ADP_BLD
+  void        geoAdaptiveBlendingIdx ( PredictionUnit&          pu );
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void        geoModeIdx                ( PredictionUnit&          pu );
 #endif
