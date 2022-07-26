@@ -3625,6 +3625,9 @@ void CABACReader::merge_idx( PredictionUnit& pu )
     if (pu.cu->geoFlag)
     {
       RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__GEO_INDEX, pu.lumaSize());
+#if JVET_AA0058_GPM_ADP_BLD
+      geoAdaptiveBlendingIdx(pu);
+#endif
 #if JVET_W0097_GPM_MMVD_TM
 #if JVET_Y0065_GPM_INTRA
       bool isIntra0 = false;
@@ -3911,6 +3914,45 @@ void CABACReader::geo_merge_idx(PredictionUnit& pu)
   pu.geoMergeIdx0 = mergeCand0;
   pu.geoMergeIdx1 = mergeCand1;
 }
+
+#if JVET_AA0058_GPM_ADP_BLD
+void CABACReader::geoAdaptiveBlendingIdx(PredictionUnit& pu)
+{
+  int bin0 = m_BinDecoder.decodeBin(Ctx::GeoBldFlag(0));
+  if (bin0 == 1)
+  {
+    pu.geoBldIdx = 2; //1
+  }
+  else
+  {
+    int bin1 = m_BinDecoder.decodeBin(Ctx::GeoBldFlag(1));
+    if (bin1 == 0)
+    {
+      int bin2 = m_BinDecoder.decodeBin(Ctx::GeoBldFlag(3));
+      if (bin2 == 0)
+      {
+        pu.geoBldIdx = 4; //000
+      }
+      else
+      {
+        pu.geoBldIdx = 3; //001
+      }
+    }
+    else
+    {
+      int bin2 = m_BinDecoder.decodeBin(Ctx::GeoBldFlag(2));
+      if (bin2 == 0)
+      {
+        pu.geoBldIdx = 1; //010
+      }
+      else
+      {
+        pu.geoBldIdx = 0; //011
+      }
+    }
+  }
+}
+#endif
 
 #if JVET_Y0065_GPM_INTRA
 void CABACReader::geo_merge_idx1(PredictionUnit& pu, bool isIntra0, bool isIntra1)

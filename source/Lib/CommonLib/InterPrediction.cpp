@@ -4822,6 +4822,9 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
   const bool    geoTmFlag1 = cu.firstPU->geoTmFlag1;
 #endif
 #endif
+#if JVET_AA0058_GPM_ADP_BLD
+  const uint8_t bldIdx = cu.firstPU->geoBldIdx;
+#endif
 
   for( auto &pu : CU::traversePUs( cu ) )
   {
@@ -4956,11 +4959,19 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
           tmpGeoBuf0.Y().rspSignal(*reshapeLUT);
         }
       }
+#if JVET_AA0058_GPM_ADP_BLD
+      weightedGeoBlkRounded(pu, splitDir, bldIdx, isChromaEnabled(pu.chromaFormat) ? MAX_NUM_CHANNEL_TYPE : CHANNEL_TYPE_LUMA, predBuf, tmpGeoBuf0, tmpGeoBuf1);
+#else
       weightedGeoBlkRounded(pu, splitDir, isChromaEnabled(pu.chromaFormat)? MAX_NUM_CHANNEL_TYPE : CHANNEL_TYPE_LUMA, predBuf, tmpGeoBuf0, tmpGeoBuf1);
+#endif
     }
     else
 #endif
+#if JVET_AA0058_GPM_ADP_BLD
+    weightedGeoBlk(pu, splitDir, bldIdx, isChromaEnabled(pu.chromaFormat) ? MAX_NUM_CHANNEL_TYPE : CHANNEL_TYPE_LUMA, predBuf, tmpGeoBuf0, tmpGeoBuf1);
+#else
     weightedGeoBlk(pu, splitDir, isChromaEnabled(pu.chromaFormat)? MAX_NUM_CHANNEL_TYPE : CHANNEL_TYPE_LUMA, predBuf, tmpGeoBuf0, tmpGeoBuf1);
+#endif
   }
 }
 
@@ -5120,6 +5131,57 @@ void InterPrediction::weightedGeoTpl( PredictionUnit &pu, const uint8_t splitDir
 }
 #endif
 
+#if JVET_AA0058_GPM_ADP_BLD
+void InterPrediction::weightedGeoBlk(PredictionUnit &pu, const uint8_t splitDir, const uint8_t bldIdx, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+{
+  if (channel == CHANNEL_TYPE_LUMA)
+  {
+    m_if.weightedGeoBlk(pu, pu.lumaSize().width, pu.lumaSize().height, COMPONENT_Y, splitDir, bldIdx, predDst, predSrc0, predSrc1);
+  }
+  else if (channel == CHANNEL_TYPE_CHROMA)
+  {
+    m_if.weightedGeoBlk(pu, pu.chromaSize().width, pu.chromaSize().height, COMPONENT_Cb, splitDir, bldIdx, predDst, predSrc0, predSrc1);
+    m_if.weightedGeoBlk(pu, pu.chromaSize().width, pu.chromaSize().height, COMPONENT_Cr, splitDir, bldIdx, predDst, predSrc0, predSrc1);
+  }
+  else
+  {
+    m_if.weightedGeoBlk(pu, pu.lumaSize().width, pu.lumaSize().height, COMPONENT_Y, splitDir, bldIdx, predDst, predSrc0, predSrc1);
+    if (isChromaEnabled(pu.chromaFormat))
+    {
+      m_if.weightedGeoBlk(pu, pu.chromaSize().width, pu.chromaSize().height, COMPONENT_Cb, splitDir, bldIdx, predDst, predSrc0,
+        predSrc1);
+      m_if.weightedGeoBlk(pu, pu.chromaSize().width, pu.chromaSize().height, COMPONENT_Cr, splitDir, bldIdx, predDst, predSrc0,
+        predSrc1);
+    }
+  }
+}
+
+#if JVET_Y0065_GPM_INTRA
+void InterPrediction::weightedGeoBlkRounded(PredictionUnit &pu, const uint8_t splitDir, const uint8_t bldIdx, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+{
+  if (channel == CHANNEL_TYPE_LUMA)
+  {
+    m_if.weightedGeoBlkRounded(pu, pu.lumaSize().width, pu.lumaSize().height, COMPONENT_Y, splitDir, bldIdx, predDst, predSrc0, predSrc1);
+  }
+  else if (channel == CHANNEL_TYPE_CHROMA)
+  {
+    m_if.weightedGeoBlkRounded(pu, pu.chromaSize().width, pu.chromaSize().height, COMPONENT_Cb, splitDir, bldIdx, predDst, predSrc0, predSrc1);
+    m_if.weightedGeoBlkRounded(pu, pu.chromaSize().width, pu.chromaSize().height, COMPONENT_Cr, splitDir, bldIdx, predDst, predSrc0, predSrc1);
+  }
+  else
+  {
+    m_if.weightedGeoBlkRounded(pu, pu.lumaSize().width, pu.lumaSize().height, COMPONENT_Y, splitDir, bldIdx, predDst, predSrc0, predSrc1);
+    if (isChromaEnabled(pu.chromaFormat))
+    {
+      m_if.weightedGeoBlkRounded(pu, pu.chromaSize().width, pu.chromaSize().height, COMPONENT_Cb, splitDir, bldIdx, predDst, predSrc0,
+        predSrc1);
+      m_if.weightedGeoBlkRounded(pu, pu.chromaSize().width, pu.chromaSize().height, COMPONENT_Cr, splitDir, bldIdx, predDst, predSrc0,
+        predSrc1);
+    }
+  }
+}
+#endif
+#else
 void InterPrediction::weightedGeoBlk( PredictionUnit &pu, const uint8_t splitDir, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
 {
   if( channel == CHANNEL_TYPE_LUMA )
@@ -5168,6 +5230,7 @@ void InterPrediction::weightedGeoBlkRounded( PredictionUnit &pu, const uint8_t s
     }
   }
 }
+#endif
 #endif
 
 void InterPrediction::xPrefetch(PredictionUnit& pu, PelUnitBuf &pcPad, RefPicList refId, bool forLuma)

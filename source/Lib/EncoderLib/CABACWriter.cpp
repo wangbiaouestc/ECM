@@ -3254,6 +3254,10 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
   {
     if( pu.cu->geoFlag )
     {
+#if JVET_AA0058_GPM_ADP_BLD
+      geoAdaptiveBlendingIdx(pu.geoBldIdx);
+#endif
+
 #if JVET_W0097_GPM_MMVD_TM
 #if JVET_Y0065_GPM_INTRA
       bool isIntra0 = (pu.geoMergeIdx0 >= GEO_MAX_NUM_UNI_CANDS);
@@ -3871,6 +3875,41 @@ uint64_t CABACWriter::geo_mmvdIdx_est(const TempCtx& ctxStart, const int geoMMVD
   return getEstFracBits();
 }
 #endif
+
+#if JVET_AA0058_GPM_ADP_BLD
+uint64_t CABACWriter::geoBldFlagEst(const TempCtx& ctxStart, const int flag)
+{
+  getCtx() = ctxStart;
+  resetBits();
+
+  geoAdaptiveBlendingIdx(flag);
+
+  return getEstFracBits();
+}
+
+void CABACWriter::geoAdaptiveBlendingIdx(const int flag)
+{
+  if (flag == 2)
+  {
+    m_BinEncoder.encodeBin(1, Ctx::GeoBldFlag(0));
+  }
+  else
+  {
+    m_BinEncoder.encodeBin(0, Ctx::GeoBldFlag(0));
+    if (flag == 0 || flag == 1)
+    {
+      m_BinEncoder.encodeBin(1, Ctx::GeoBldFlag(1));
+      m_BinEncoder.encodeBin(flag == 0, Ctx::GeoBldFlag(2));
+    }
+    else
+    {
+      m_BinEncoder.encodeBin(0, Ctx::GeoBldFlag(1));
+      m_BinEncoder.encodeBin(flag == 3, Ctx::GeoBldFlag(3));
+    }
+  }
+}
+#endif
+
 void CABACWriter::inter_pred_idc( const PredictionUnit& pu )
 {
   if( !pu.cs->slice->isInterB() )

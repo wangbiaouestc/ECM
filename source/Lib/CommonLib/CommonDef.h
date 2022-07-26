@@ -889,6 +889,10 @@ static const int GEO_MAX_TRY_WEIGHTED_SAD = 60;
 #endif
 static const int GEO_MAX_TRY_WEIGHTED_SATD = 8;
 
+#if JVET_AA0058_GPM_ADP_BLD
+static const int GEO_NUM_BLD = 5;
+#endif
+
 #if ENABLE_OBMC
 static const unsigned int defaultWeight[2][4] = { {27, 16, 6, 0}, {27, 0, 0, 0} };
 #endif

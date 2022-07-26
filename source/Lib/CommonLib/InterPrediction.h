@@ -476,9 +476,16 @@ public:
 #endif
 #endif
 #endif
+#if JVET_AA0058_GPM_ADP_BLD
+  void    weightedGeoBlk(PredictionUnit &pu, const uint8_t splitDir, const uint8_t bldIdx, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+#if JVET_Y0065_GPM_INTRA
+  void    weightedGeoBlkRounded(PredictionUnit &pu, const uint8_t splitDir, const uint8_t bldIdx, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+#endif
+#else
   void    weightedGeoBlk(PredictionUnit &pu, const uint8_t splitDir, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
 #if JVET_Y0065_GPM_INTRA
   void    weightedGeoBlkRounded( PredictionUnit &pu, const uint8_t splitDir, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+#endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG

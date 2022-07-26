@@ -1001,6 +1001,23 @@ const CtxSet ContextSetCfg::GeoMmvdStepMvpIdx = ContextSetCfg::addCtxSet
   });
 #endif
 
+#if JVET_AA0058_GPM_ADP_BLD
+const CtxSet ContextSetCfg::GeoBldFlag = ContextSetCfg::addCtxSet
+({
+  { 59,  59,  59,  59 },
+  { 60,  60,  60,  60 },
+  { CNU, CNU, CNU, CNU },
+  { 1,   1,   1,   1 },
+  { 1,   1,   1,   1 },
+  { DWS, DWS, DWS, DWS },
+  { 11,  11,  11,  11 },
+  { 11,  11,  11,  11 },
+  { DWE, DWE, DWE, DWE },
+  { 126, 126, 126, 126 },
+  { 122, 122, 122, 122 },
+});
+#endif
+
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 const CtxSet ContextSetCfg::GeoSubModeIdx = ContextSetCfg::addCtxSet
 ( {
@@ -3007,6 +3024,18 @@ const CtxSet ContextSetCfg::GeoMmvdStepMvpIdx = ContextSetCfg::addCtxSet
   { 0 },
   { 0 }
   });
+#endif
+
+#if JVET_AA0058_GPM_ADP_BLD
+const CtxSet ContextSetCfg::GeoBldFlag = ContextSetCfg::addCtxSet
+({
+  { 59 },
+  { 60 },
+  { 35 },
+  { 0 },
+  { 0 },
+  { 0 }
+});
 #endif
 
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
