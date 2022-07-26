@@ -431,7 +431,11 @@ protected:
   void xFillPCMBuffer         ( CodingUnit &cu);
 #endif
 
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+  bool xCheckRDCostHashInter  ( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode );
+#else
   void xCheckRDCostHashInter  ( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode );
+#endif
 #if MERGE_ENC_OPT
   void xCheckSATDCostRegularMerge 
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx mergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer, PelUnitBuf  acMergeTmpBuffer[MRG_MAX_NUM_CANDS]
@@ -505,7 +509,11 @@ protected:
   void xCheckRDCostTMMerge2Nx2N
                               ( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode );
 #endif
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+  bool xCheckRDCostInter      ( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode );
+#else
   void xCheckRDCostInter      ( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode );
+#endif
   bool xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode, double &bestIntPelCost);
   void xEncodeDontSplit       ( CodingStructure &cs, Partitioner &partitioner);
 

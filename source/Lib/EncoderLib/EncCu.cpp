@@ -1129,6 +1129,12 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     {
 #if ENABLE_OBMC
       bool tryObmc = true;
+#if JVET_AA0129_INTERHASH_OBMCOFF_RD
+      if (m_pcEncCfg->getUseHashME())
+      {
+        tryObmc = false;
+      }
+#endif
 #endif
 
       if( ( currTestMode.opts & ETO_IMV ) != 0 )
@@ -1152,7 +1158,11 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       else
       {
         tempCS->bestCS = bestCS;
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+        tryObmc = xCheckRDCostInter(tempCS, bestCS, partitioner, currTestMode);
+#else
         xCheckRDCostInter( tempCS, bestCS, partitioner, currTestMode );
+#endif
         tempCS->bestCS = nullptr;
 #if JVET_Y0152_TT_ENC_SPEEDUP
         splitRdCostBest[CTU_LEVEL] = bestCS->cost;
@@ -1160,7 +1170,11 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #endif
       }
 #if ENABLE_OBMC
+#if JVET_AA0129_INTERHASH_OBMCOFF_RD
+      if ((!m_pcEncCfg->getUseHashME() && tryObmc && tempCS->cus.size() != 0) || (m_pcEncCfg->getUseHashME() && tryObmc))//todo 
+#else
       if (tryObmc && tempCS->cus.size() != 0)//todo
+#endif
       {
         xCheckRDCostInterWoOBMC(tempCS, bestCS, partitioner, currTestMode);
       }
@@ -1168,10 +1182,20 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
     else if (currTestMode.type == ETM_HASH_INTER)
     {
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+      bool tryObmc = xCheckRDCostHashInter( tempCS, bestCS, partitioner, currTestMode );
+#else
       xCheckRDCostHashInter( tempCS, bestCS, partitioner, currTestMode );
+#endif
 #if JVET_Y0152_TT_ENC_SPEEDUP
       splitRdCostBest[CTU_LEVEL] = bestCS->cost;
       tempCS->splitRdCostBest = splitRdCostBest;
+#endif
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+      if (tryObmc)
+      {
+        xCheckRDCostInterWoOBMC(  tempCS, bestCS, partitioner, currTestMode );
+      }
 #endif
     }
 #if !MERGE_ENC_OPT
@@ -3017,10 +3041,17 @@ void EncCu::xFillPCMBuffer( CodingUnit &cu )
 }
 #endif
 
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+bool EncCu::xCheckRDCostHashInter( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode )
+#else
 void EncCu::xCheckRDCostHashInter( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode )
+#endif
 {
 #if ENABLE_OBMC
   double bestOBMCCost = MAX_DOUBLE;
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+  bool   validMode = false;
+#endif
 #endif
   bool isPerfectMatch = false;
 
@@ -3076,6 +3107,9 @@ void EncCu::xCheckRDCostHashInter( CodingStructure *&tempCS, CodingStructure *&b
     m_pTempCUWoOBMC[wIdx][hIdx]->getPredBuf(cu).copyFrom(prevCS->getPredBuf(cu));
 
     bestOBMCCost = tempCost;
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+    validMode = true;
+#endif
   }
 #endif
     if ( m_bestModeUpdated && bestCS->cost != MAX_DOUBLE )
@@ -3090,6 +3124,9 @@ void EncCu::xCheckRDCostHashInter( CodingStructure *&tempCS, CodingStructure *&b
     isPerfectMatch = false;
   }
   m_modeCtrl->setIsHashPerfectMatch(isPerfectMatch);
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+  return validMode;
+#endif
 }
 
 void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode )
@@ -10447,12 +10484,23 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
   // check ibc mode in encoder RD
   //////////////////////////////////////////////////////////////////////////////////////////////
 
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+bool EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode )
+#else
 void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode )
+#endif
 {
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+  bool validMode = false;
+#endif
 #if INTER_LIC
   if (m_pcInterSearch->m_fastLicCtrl.skipRDCheckForLIC((encTestMode.opts & ETO_LIC) > 0, IMV_OFF, bestCS->cost, tempCS->area.Y().area()))
   {
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+    return (m_pcEncCfg->getUseHashME() ? validMode : true);
+#else
     return;
+#endif
   }
 #endif
 #if ENABLE_OBMC
@@ -10649,6 +10697,9 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
     m_pTempCUWoOBMC[wIdx][hIdx]->getPredBuf(cu).copyFrom(prevCS->getPredBuf(cu));
 
     bestOBMCCost = tempCost;
+#if JVET_AA0129_INTERHASH_OBMCOFF_RD
+    validMode = true;
+#endif
   }
 #endif
   if( g_BcwSearchOrder[bcwLoopIdx] == BCW_DEFAULT )
@@ -10681,6 +10732,9 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   }
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   }
+#endif
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+  return (m_pcEncCfg->getUseHashME() ? validMode : true);
 #endif
 }
 
@@ -10733,6 +10787,9 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
   }
 
   bool validMode = false;
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+  bool availMode = false;
+#endif
   double curBestCost = bestCS->cost;
   double equBcwCost = MAX_DOUBLE;
 
@@ -10916,6 +10973,9 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
     m_pTempCUWoOBMC[wIdx][hIdx]->getPredBuf(cu).copyFrom(prevCS->getPredBuf(cu));
 
     bestOBMCCost = tempCost;
+#if JVET_AA0129_INTERHASH_OBMCOFF_RD
+    availMode = true;
+#endif
   }
 #endif
   if( cu.imv == IMV_FPEL && tempCS->cost < bestIntPelCost )
@@ -10950,6 +11010,13 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
     xCalDebCost( *bestCS, partitioner );
   }
 
+#if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
+  if (m_pcEncCfg->getUseHashME())
+  {
+    return availMode;
+  }
+  else
+#endif
   return tempCS->slice->getSPS()->getAffineAmvrEnabledFlag() ? validMode : true;
 }
 
