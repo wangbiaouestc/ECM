@@ -132,6 +132,9 @@ public:
   void        intra_chroma_pred_modes   ( const CodingUnit&             cu );
   void        intra_chroma_lmc_mode     ( const PredictionUnit&         pu );
   void        intra_chroma_pred_mode    ( const PredictionUnit&         pu );
+#if JVET_AA0057_CCCM
+  void        cccmFlag                  ( const PredictionUnit&         pu );
+#endif
   void        cu_residual               ( const CodingUnit&             cu,       Partitioner&      pm,         CUCtx& cuCtx );
   void        rqt_root_cbf              ( const CodingUnit&             cu );
   void        adaptive_color_transform(const CodingUnit&             cu);

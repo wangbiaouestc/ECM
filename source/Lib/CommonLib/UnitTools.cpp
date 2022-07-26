@@ -1538,6 +1538,49 @@ bool PU::isDMChromaMIP(const PredictionUnit &pu)
 #endif
 }
 
+#if JVET_AA0057_CCCM
+void PU::getCccmRefLineNum(const PredictionUnit& pu, int& th, int& tv)
+{
+  const Area area = pu.blocks[COMPONENT_Cb];
+  
+  th = area.x < CCCM_WINDOW_SIZE ? area.x : CCCM_WINDOW_SIZE;
+  tv = area.y < CCCM_WINDOW_SIZE ? area.y : CCCM_WINDOW_SIZE;
+
+#if CCCM_REF_LINES_ABOVE_CTU
+  int ctuHeight  = pu.cs->sps->getMaxCUHeight() >> getComponentScaleY(COMPONENT_Cb, pu.chromaFormat);
+  int borderDist = area.y % ctuHeight;
+  int tvMax      = borderDist + CCCM_REF_LINES_ABOVE_CTU;
+  
+  tv = tv > tvMax ? tvMax : tv;
+#endif
+}
+
+bool PU::cccmSingleModeAvail(const PredictionUnit& pu, int intraMode)
+{
+  const Area area = pu.blocks[COMPONENT_Cb];
+  bool modeIsOk   = intraMode == LM_CHROMA_IDX;
+  modeIsOk        = modeIsOk && ( area.width * area.height >= CCCM_MIN_PU_SIZE );
+              
+  return modeIsOk && (area.x > 0 || area.y > 0);
+}
+  
+bool PU::cccmMultiModeAvail(const PredictionUnit& pu, int intraMode)
+{
+#if MMLM
+  const Area area = pu.blocks[COMPONENT_Cb];
+  bool modeIsOk   = intraMode == MMLM_CHROMA_IDX;
+  modeIsOk        = modeIsOk && ( area.width * area.height >= CCCM_MIN_PU_SIZE );
+
+  int th, tv;
+  PU::getCccmRefLineNum(pu, th, tv);
+  const int nsamples = ((area.width + th) * (area.height + tv) - (area.area()));
+  return modeIsOk && nsamples >= 128;
+#else
+  return false;
+#endif
+}
+#endif
+
 uint32_t PU::getIntraDirLuma( const PredictionUnit &pu )
 {
 #if JVET_V0130_INTRA_TMP

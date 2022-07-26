@@ -2832,6 +2832,23 @@ const CtxSet ContextSetCfg::CclmDeltaFlags = ContextSetCfg::addCtxSet
 });
 #endif
 
+#if JVET_AA0057_CCCM
+const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+});
+#endif
+
 #elif SLICE_TYPE_WIN_SIZE
 const CtxSet ContextSetCfg::SplitFlag = ContextSetCfg::addCtxSet
 ({
@@ -4335,6 +4352,18 @@ const CtxSet ContextSetCfg::CclmDeltaFlags = ContextSetCfg::addCtxSet
 });
 #endif
 
+#if JVET_AA0057_CCCM
+const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+});
+#endif
+
 #else
 const CtxSet ContextSetCfg::SplitFlag = ContextSetCfg::addCtxSet
 ({
@@ -5403,6 +5432,16 @@ const CtxSet ContextSetCfg::CclmDeltaFlags = ContextSetCfg::addCtxSet
   {  CNU, CNU, CNU, CNU, CNU, },
   {  CNU, CNU, CNU, CNU, CNU, },
   {  DWS, DWS, DWS, DWS, DWS, },
+});
+#endif
+
+#if JVET_AA0057_CCCM
+const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
 });
 #endif
 

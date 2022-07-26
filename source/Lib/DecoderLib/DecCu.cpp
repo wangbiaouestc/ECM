@@ -535,12 +535,31 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       m_pcIntraPred->initIntraPatternChTypeISP(*tu.cu, area, pReco);
     }
   }
+#if JVET_AA0057_CCCM
+  else if ( isLuma(compID) || !pu.cccmFlag )
+#else
   else
+#endif
   {
     m_pcIntraPred->initIntraPatternChType(*tu.cu, area);
   }
 
   //===== get prediction signal =====
+#if JVET_AA0057_CCCM
+  if( compID != COMPONENT_Y && pu.cccmFlag )
+  {
+    // Create both Cb and Cr predictions when here for Cb
+    if( compID == COMPONENT_Cb )
+    {
+      const PredictionUnit& pu = *tu.cu->firstPU;
+      PelBuf predCr            = cs.getPredBuf( tu.blocks[COMPONENT_Cr] );
+      
+      m_pcIntraPred->xGetLumaRecPixels( pu, area );
+      m_pcIntraPred->predIntraCCCM( pu, piPred, predCr, uiChFinalMode );
+    }
+  }
+  else
+#endif
   if( compID != COMPONENT_Y && PU::isLMCMode( uiChFinalMode ) )
   {
     const PredictionUnit& pu = *tu.cu->firstPU;
@@ -603,7 +622,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
     }
   }
 #if SIGN_PREDICTION
+#if JVET_AA0057_CCCM
+  if(isJCCR && compID == COMPONENT_Cb && !pu.cccmFlag) // Cr prediction was done already for CCCM
+#else
   if(isJCCR && compID == COMPONENT_Cb)
+#endif
   {
     m_pcIntraPred->initIntraPatternChType(*tu.cu, areaCr);
     if( PU::isLMCMode( uiChFinalMode ) )
