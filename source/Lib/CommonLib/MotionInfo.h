@@ -119,7 +119,16 @@ struct AffineAMVPInfo
   Mv       mvCandLB[ AMVP_MAX_NUM_CANDS_MEM ];  ///< array of affine motion vector predictor candidates for left-bottom corner
   unsigned numCand;                       ///< number of motion vector predictor candidates
 };
-
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+struct RMVFInfo
+{
+  Mv mvp;
+  Position pos;
+  int8_t refIdx;
+  RMVFInfo() : mvp(Mv(0, 0)), pos(Position(0, 0)), refIdx(-1) {};
+  RMVFInfo(Mv const cMv, Position const cPos, int8_t const cIdx) : mvp(cMv), pos(cPos), refIdx(cIdx) {};
+};
+#endif
 // ====================================================================================================================
 // Class definition
 // ====================================================================================================================

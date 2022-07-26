@@ -6842,14 +6842,24 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
 #if JVET_Z0139_NA_AFF
   const uint32_t maxNumAffineMergeCand = (sortedCandNum > 0) ? sortedCandNum: pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand();
 #endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+  uint32_t rdCandList[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE][RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+  Distortion candCostList[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE][RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#else
   uint32_t RdCandList[AFFINE_MRG_MAX_NUM_CANDS][AFFINE_MRG_MAX_NUM_CANDS];
   Distortion candCostList[AFFINE_MRG_MAX_NUM_CANDS][AFFINE_MRG_MAX_NUM_CANDS];
-
+#endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+  for (uint32_t i = 0; i < RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE; i++)
+  {
+    for (uint32_t j = 0; j < RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE; j++)
+#else
   for (uint32_t i = 0; i < AFFINE_MRG_MAX_NUM_CANDS; i++)
   {
     for (uint32_t j = 0; j < AFFINE_MRG_MAX_NUM_CANDS; j++)
+#endif
     {
-      RdCandList[i][j] = j;
+      rdCandList[i][j] = j;
       candCostList[i][j] = MAX_UINT;
     }
   }
@@ -6875,6 +6885,17 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
     {
       break;
     }
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+    bool lowPrio = false;
+    if (uiMergeCand >= affMrgCtx.numAffCandToTestEnc)
+    {
+      affMrgCtx.candCost[uiMergeCand] = MAX_UINT64 >> 1;
+      uiCost = MAX_UINT >> 1;
+      lowPrio = true;
+    }
+    if (affMrgCtx.candCost[uiMergeCand] == MAX_UINT64)
+    {
+#endif
     uiCost = 0;
 
     // set merge information
@@ -6959,22 +6980,41 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
       }
 #endif
     }
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+    }
+    else if (!lowPrio)
+    {
+      uiCost = affMrgCtx.candCost[uiMergeCand];
+    }
+#endif
 #if JVET_Z0139_NA_AFF
-    updateCandList(uiMergeCand, uiCost, maxNumAffineMergeCand, RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE], candCostList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE]);
+    updateCandList(uiMergeCand, uiCost, maxNumAffineMergeCand, rdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE], candCostList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE]);
 #else
     updateCandList(uiMergeCand, uiCost, ADAPTIVE_AFFINE_SUB_GROUP_SIZE, RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE], candCostList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE]);
 #endif
   }
   pu.mergeIdx = mrgCandIdx;    //restore the merge index
-  updateAffineCandInfo(pu, affMrgCtx, RdCandList
+  updateAffineCandInfo(pu, affMrgCtx, rdCandList
     , mrgCandIdx
   );
 
 }
-void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, uint32_t(*RdCandList)[AFFINE_MRG_MAX_NUM_CANDS], int mrgCandIdx)
+
+void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, 
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+  uint32_t(*RdCandList)[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE],
+#else
+  uint32_t(*RdCandList)[AFFINE_MRG_MAX_NUM_CANDS], 
+#endif
+  int mrgCandIdx)
 {
   AffineMergeCtx affMrgCtxTmp;
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+  const uint32_t maxNumAffineMergeCand = pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand() + ADDITIONAL_AFFINE_CAND_NUM;
+  const uint32_t outputListSize = pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand();
+#else
   const uint32_t maxNumAffineMergeCand = pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand();
+#endif
   for (int i = 0; i < maxNumAffineMergeCand; i++)
   {
     for (int mvNum = 0; mvNum < 3; mvNum++)
@@ -7020,6 +7060,12 @@ void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& 
     {
       break;
     }
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+    if (uiMergeCand == outputListSize)
+    {
+      break;
+    }
+#endif
     for (int mvNum = 0; mvNum < 3; mvNum++)
     {
       affMrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0][mvNum] = affMrgCtxTmp.mvFieldNeighbours[(RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_AFFINE_SUB_GROUP_SIZE] << 1) + 0][mvNum];
@@ -7628,6 +7674,156 @@ void  InterPrediction::updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, u
     mrgCtx.useAltHpelIf[uiMergeCand] = mrgCtxTmp.useAltHpelIf[RdCandList[uiMergeCand -startPos]];
 #if INTER_LIC
     mrgCtx.LICFlags[uiMergeCand] = mrgCtxTmp.LICFlags[RdCandList[uiMergeCand -startPos]];
+#endif
+  }
+}
+#endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+void  InterPrediction::adjustAffineMergeCandidatesOneGroup(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, int listsize, int mrgCandIdx)
+{
+  uint32_t rdCandList[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE][RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+  Distortion candCostList[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE][RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+  const uint32_t maxNumAffineMergeCand = listsize;
+
+  for (uint32_t i = 0; i < maxNumAffineMergeCand; i++)
+  {
+    for (uint32_t j = 0; j < maxNumAffineMergeCand; j++)
+    {
+      rdCandList[i][j] = j;
+      candCostList[i][j] = MAX_UINT;
+    }
+  }
+  Distortion uiCost;
+
+  DistParam cDistParam;
+  cDistParam.applyWeight = false;
+
+  int nWidth = pu.lumaSize().width;
+  int nHeight = pu.lumaSize().height;
+
+  if (!xAMLGetCurBlkTemplate(pu, nWidth, nHeight))
+  {
+    return;
+  }
+  for (uint32_t uiMergeCand = 0; uiMergeCand < listsize; ++uiMergeCand)
+  {
+    uiCost = 0;
+
+    // set merge information
+    pu.interDir = affMrgCtx.interDirNeighbours[uiMergeCand];
+    pu.mergeFlag = true;
+    pu.regularMergeFlag = false;
+    pu.mergeIdx = uiMergeCand;
+    pu.cu->affine = true;
+    pu.cu->affineType = affMrgCtx.affineType[uiMergeCand];
+#if AFFINE_MMVD
+    pu.afMmvdFlag = false;
+#endif
+    pu.cu->BcwIdx = affMrgCtx.BcwIdx[uiMergeCand];
+#if INTER_LIC
+    pu.cu->LICFlag = affMrgCtx.LICFlags[uiMergeCand];
+#endif
+    pu.mergeType = affMrgCtx.mergeType[uiMergeCand];
+#if JVET_Z0139_NA_AFF
+    if (pu.mergeType == MRG_TYPE_DEFAULT_N)
+#else
+    if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
+    {
+      pu.refIdx[0] = affMrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0][0].refIdx;
+      pu.refIdx[1] = affMrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 1][0].refIdx;
+      PU::spanMotionInfo(pu, *affMrgCtx.mrgCtx);
+    }
+    else
+#endif
+    {
+      for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
+      {
+        for (int i = 0; i < 3; i++)
+        {
+          pu.mvAffi[refList][i] = affMrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + refList][i].mv;
+        }
+        pu.refIdx[refList] = affMrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + refList][0].refIdx;
+      }
+
+      PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+      PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+      PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+
+#if RPR_ENABLE
+      bool bRefIsRescaled = false;
+      for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
+      {
+        const RefPicList eRefPicList = refList ? REF_PIC_LIST_1 : REF_PIC_LIST_0;
+        bRefIsRescaled |= (pu.refIdx[refList] >= 0) ? pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->isRefScaled(pu.cs->pps) : false;
+      }
+      if (!bRefIsRescaled)
+      {
+#endif
+
+        getAffAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
+
+        if (m_bAMLTemplateAvailabe[0])
+        {
+          m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+
+          uiCost += cDistParam.distFunc(cDistParam);
+        }
+
+        if (m_bAMLTemplateAvailabe[1])
+        {
+          m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+
+          uiCost += cDistParam.distFunc(cDistParam);
+        }
+
+#if RPR_ENABLE
+      }
+#endif
+    }
+    updateCandList(uiMergeCand, uiCost, maxNumAffineMergeCand, rdCandList[uiMergeCand / RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE], candCostList[uiMergeCand / RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE]);
+  }
+  pu.mergeIdx = mrgCandIdx;    //restore the merge index
+  updateAffineCandInfo2(pu, affMrgCtx, rdCandList, listsize, mrgCandIdx
+  );
+  for (int idx = 0; idx < listsize; idx++)
+  {
+    affMrgCtx.candCost[idx] = candCostList[0][idx];
+  }
+}
+void  InterPrediction::updateAffineCandInfo2(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, uint32_t(*rdCandList)[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE], int listsize, int mrgCandIdx)
+{
+  AffineMergeCtx affMrgCtxTmp;
+
+  for (uint32_t uiMergeCand = 0; uiMergeCand < listsize; ++uiMergeCand)
+  {
+    for (int mvNum = 0; mvNum < 3; mvNum++)
+    {
+      affMrgCtxTmp.mvFieldNeighbours[(uiMergeCand << 1) + 0][mvNum] = affMrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0][mvNum];
+      affMrgCtxTmp.mvFieldNeighbours[(uiMergeCand << 1) + 1][mvNum] = affMrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 1][mvNum];
+    }
+    affMrgCtxTmp.interDirNeighbours[uiMergeCand] = affMrgCtx.interDirNeighbours[uiMergeCand];
+    affMrgCtxTmp.affineType[uiMergeCand] = affMrgCtx.affineType[uiMergeCand];
+    affMrgCtxTmp.mergeType[uiMergeCand] = affMrgCtx.mergeType[uiMergeCand];
+    affMrgCtxTmp.BcwIdx[uiMergeCand] = affMrgCtx.BcwIdx[uiMergeCand];
+#if INTER_LIC                                                   
+    affMrgCtxTmp.LICFlags[uiMergeCand] = affMrgCtx.LICFlags[uiMergeCand];
+#endif
+  }
+  //update
+  for (uint32_t uiMergeCand = 0; uiMergeCand < listsize; ++uiMergeCand)
+  {
+    for (int mvNum = 0; mvNum < 3; mvNum++)
+    {
+      affMrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0][mvNum] = affMrgCtxTmp.mvFieldNeighbours[(rdCandList[uiMergeCand / listsize][uiMergeCand%listsize] << 1) + 0][mvNum];
+      affMrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 1][mvNum] = affMrgCtxTmp.mvFieldNeighbours[(rdCandList[uiMergeCand / listsize][uiMergeCand%listsize] << 1) + 1][mvNum];
+    }
+    affMrgCtx.interDirNeighbours[uiMergeCand] = affMrgCtxTmp.interDirNeighbours[rdCandList[uiMergeCand / listsize][uiMergeCand%listsize]];
+    affMrgCtx.affineType[uiMergeCand] = affMrgCtxTmp.affineType[rdCandList[uiMergeCand / listsize][uiMergeCand%listsize]];
+    affMrgCtx.mergeType[uiMergeCand] = affMrgCtxTmp.mergeType[rdCandList[uiMergeCand / listsize][uiMergeCand%listsize]];
+    affMrgCtx.BcwIdx[uiMergeCand] = affMrgCtxTmp.BcwIdx[rdCandList[uiMergeCand / listsize][uiMergeCand%listsize]];
+#if INTER_LIC 
+    affMrgCtx.LICFlags[uiMergeCand] = affMrgCtxTmp.LICFlags[rdCandList[uiMergeCand / listsize][uiMergeCand%listsize]];
 #endif
   }
 }

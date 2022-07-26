@@ -625,6 +625,29 @@ public:
 #endif
 };
 
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+class AffineMergeCtx
+{
+public:
+  AffineMergeCtx() : numValidMergeCand(0) { for (unsigned i = 0; i < RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE; i++) affineType[i] = AFFINEMODEL_4PARAM; }
+  ~AffineMergeCtx() {}
+public:
+  MvField       mvFieldNeighbours[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE << 1][3]; // double length for mv of both lists
+  unsigned char interDirNeighbours[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+  Distortion    candCost[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+  EAffineModel  affineType[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#if INTER_LIC
+  bool          LICFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#endif
+  uint8_t       BcwIdx[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+  int           numValidMergeCand;
+  int           numAffCandToTestEnc;
+  int           maxNumMergeCand;
+
+  MergeCtx     *mrgCtx;
+  MergeType     mergeType[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+};
+#else
 class AffineMergeCtx
 {
 public:
@@ -644,7 +667,7 @@ public:
   MergeCtx     *mrgCtx;
   MergeType     mergeType[AFFINE_MRG_MAX_NUM_CANDS];
 };
-
+#endif
 
 namespace DeriveCtx
 {

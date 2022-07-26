@@ -2534,7 +2534,522 @@ bool isMvOOBSubBlk_SSE(const Mv& rcMv, const struct Position pos, const struct S
   return isOOB;
 }
 #endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+template<X86_VEXT vext>
+void computeDeltaAndShiftCore_SSE(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri)
+{
+#if USE_AVX2
+  int quotient = int(mvpInfoVecOri.size()) / 8;
+  int reminder = int(mvpInfoVecOri.size()) % 8;
+  int tempHor[8];
+  int tempVer[8];
+  int tempposHor[8];
+  int tempposVer[8];
 
+  __m256i baseHor = _mm256_set1_epi32(firstMv.hor);
+  __m256i baseVer = _mm256_set1_epi32(firstMv.ver);
+
+  for (int i = 0; i < quotient; i++)
+  {
+    // mv hor
+    __m256i mvHor = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].mvp.hor, mvpInfoVecOri[(i << 3) + 6].mvp.hor,
+      mvpInfoVecOri[(i << 3) + 5].mvp.hor, mvpInfoVecOri[(i << 3) + 4].mvp.hor, mvpInfoVecOri[(i << 3) + 3].mvp.hor,
+      mvpInfoVecOri[(i << 3) + 2].mvp.hor, mvpInfoVecOri[(i << 3) + 1].mvp.hor, mvpInfoVecOri[(i << 3) + 0].mvp.hor);
+    __m256i sign = _mm256_min_epi32(mvHor, _mm256_set1_epi32(1));
+    sign = _mm256_max_epi32(sign, _mm256_set1_epi32(-1));
+    __m256i absmvHor = _mm256_abs_epi32(mvHor);
+    __m256i absmvHorShift = _mm256_slli_epi32(absmvHor, 2);
+    __m256i resHor = _mm256_mullo_epi32(absmvHorShift, sign);
+    resHor = _mm256_sub_epi32(resHor, baseHor);
+    _mm256_storeu_si256((__m256i *)&tempHor[0], resHor);
+
+    // mv ver
+    __m256i mvVer = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].mvp.ver, mvpInfoVecOri[(i << 3) + 6].mvp.ver,
+      mvpInfoVecOri[(i << 3) + 5].mvp.ver, mvpInfoVecOri[(i << 3) + 4].mvp.ver, mvpInfoVecOri[(i << 3) + 3].mvp.ver,
+      mvpInfoVecOri[(i << 3) + 2].mvp.ver, mvpInfoVecOri[(i << 3) + 1].mvp.ver, mvpInfoVecOri[(i << 3) + 0].mvp.ver);
+    sign = _mm256_min_epi32(mvVer, _mm256_set1_epi32(1));
+    sign = _mm256_max_epi32(sign, _mm256_set1_epi32(-1));
+    __m256i absmvVer = _mm256_abs_epi32(mvVer);
+    __m256i absmvVerShift = _mm256_slli_epi32(absmvVer, 2);
+    __m256i resVer = _mm256_mullo_epi32(absmvVerShift, sign);
+    resVer = _mm256_sub_epi32(resVer, baseVer);
+    _mm256_storeu_si256((__m256i *)&tempVer[0], resVer);
+
+    // pos x
+    __m256i posHor = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].pos.x, mvpInfoVecOri[(i << 3) + 6].pos.x,
+      mvpInfoVecOri[(i << 3) + 5].pos.x, mvpInfoVecOri[(i << 3) + 4].pos.x, mvpInfoVecOri[(i << 3) + 3].pos.x,
+      mvpInfoVecOri[(i << 3) + 2].pos.x, mvpInfoVecOri[(i << 3) + 1].pos.x, mvpInfoVecOri[(i << 3) + 0].pos.x);
+    __m256i posHorLT = _mm256_set1_epi32(posLT.x);
+    __m256i resposHor = _mm256_sub_epi32(posHor, posHorLT);
+    _mm256_storeu_si256((__m256i *)&tempposHor[0], resposHor);
+
+    // pos y
+    __m256i posVer = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].pos.y, mvpInfoVecOri[(i << 3) + 6].pos.y,
+      mvpInfoVecOri[(i << 3) + 5].pos.y, mvpInfoVecOri[(i << 3) + 4].pos.y, mvpInfoVecOri[(i << 3) + 3].pos.y,
+      mvpInfoVecOri[(i << 3) + 2].pos.y, mvpInfoVecOri[(i << 3) + 1].pos.y, mvpInfoVecOri[(i << 3) + 0].pos.y);
+    __m256i posVerLT = _mm256_set1_epi32(posLT.y);
+    __m256i resposVer = _mm256_sub_epi32(posVer, posVerLT);
+    _mm256_storeu_si256((__m256i *)&tempposVer[0], resposVer);
+
+    for (int j = 0; j < 8; j++)
+    {
+      mvpInfoVecOri[(i << 3) + j].mvp = Mv(tempHor[j], tempVer[j]);
+      mvpInfoVecOri[(i << 3) + j].pos = Position(tempposHor[j], tempposVer[j]);
+    }
+  }
+  for (int i = (quotient << 3); i < (quotient << 3) + reminder; i++)
+  {
+    mvpInfoVecOri[i].mvp.hor = mvpInfoVecOri[i].mvp.hor >= 0 ? mvpInfoVecOri[i].mvp.hor << 2 : -(-mvpInfoVecOri[i].mvp.hor << 2);
+    mvpInfoVecOri[i].mvp.ver = mvpInfoVecOri[i].mvp.ver >= 0 ? mvpInfoVecOri[i].mvp.ver << 2 : -(-mvpInfoVecOri[i].mvp.ver << 2);
+    mvpInfoVecOri[i].mvp.set(mvpInfoVecOri[i].mvp.getHor() - firstMv.getHor(), mvpInfoVecOri[i].mvp.getVer() - firstMv.getVer());
+    mvpInfoVecOri[i].pos = Position(mvpInfoVecOri[i].pos.x - posLT.x, mvpInfoVecOri[i].pos.y - posLT.y);
+  }
+#else
+  int quotient = int(mvpInfoVecOri.size()) / 4;
+  int reminder = int(mvpInfoVecOri.size()) % 4;
+  int tempHor[4];
+  int tempVer[4];
+  int tempposHor[4];
+  int tempposVer[4];
+
+  __m128i baseHor = _mm_set1_epi32(firstMv.hor);
+  __m128i baseVer = _mm_set1_epi32(firstMv.ver);
+
+  for (int i = 0; i < quotient; i++)
+  {
+    // mv hor
+    __m128i mvHor = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].mvp.hor,
+      mvpInfoVecOri[(i << 2) + 2].mvp.hor, mvpInfoVecOri[(i << 2) + 1].mvp.hor, mvpInfoVecOri[(i << 2) + 0].mvp.hor);
+    __m128i sign = _mm_min_epi32(mvHor, _mm_set1_epi32(1));
+    sign = _mm_max_epi32(sign, _mm_set1_epi32(-1));
+    __m128i absmvHor = _mm_abs_epi32(mvHor);
+    __m128i absmvHorShift = _mm_slli_epi32(absmvHor, 2);
+    __m128i resHor = _mm_mullo_epi32(absmvHorShift, sign);
+    resHor = _mm_sub_epi32(resHor, baseHor);
+    _mm_storeu_si128((__m128i *)&tempHor[0], resHor);
+
+    // mv ver
+    __m128i mvVer = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].mvp.ver,
+      mvpInfoVecOri[(i << 2) + 2].mvp.ver, mvpInfoVecOri[(i << 2) + 1].mvp.ver, mvpInfoVecOri[(i << 2) + 0].mvp.ver);
+    sign = _mm_min_epi32(mvVer, _mm_set1_epi32(1));
+    sign = _mm_max_epi32(sign, _mm_set1_epi32(-1));
+    __m128i absmvVer = _mm_abs_epi32(mvVer);
+    __m128i absmvVerShift = _mm_slli_epi32(absmvVer, 2);
+    __m128i resVer = _mm_mullo_epi32(absmvVerShift, sign);
+    resVer = _mm_sub_epi32(resVer, baseVer);
+    _mm_storeu_si128((__m128i *)&tempVer[0], resVer);
+
+    // pos x
+    __m128i posHor = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].pos.x,
+      mvpInfoVecOri[(i << 2) + 2].pos.x, mvpInfoVecOri[(i << 2) + 1].pos.x, mvpInfoVecOri[(i << 2) + 0].pos.x);
+    __m128i posHorLT = _mm_set1_epi32(posLT.x);
+    __m128i resposHor = _mm_sub_epi32(posHor, posHorLT);
+    _mm_storeu_si128((__m128i *)&tempposHor[0], resposHor);
+
+    // pos y
+    __m128i posVer = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].pos.y,
+      mvpInfoVecOri[(i << 2) + 2].pos.y, mvpInfoVecOri[(i << 2) + 1].pos.y, mvpInfoVecOri[(i << 2) + 0].pos.y);
+    __m128i posVerLT = _mm_set1_epi32(posLT.y);
+    __m128i resposVer = _mm_sub_epi32(posVer, posVerLT);
+    _mm_storeu_si128((__m128i *)&tempposVer[0], resposVer);
+
+    for (int j = 0; j < 4; j++)
+    {
+      mvpInfoVecOri[(i << 2) + j].mvp = Mv(tempHor[j], tempVer[j]);
+      mvpInfoVecOri[(i << 2) + j].pos = Position(tempposHor[j], tempposVer[j]);
+    }
+  }
+  for (int i = (quotient << 2); i < (quotient << 2) + reminder; i++)
+  {
+    mvpInfoVecOri[i].mvp.hor = mvpInfoVecOri[i].mvp.hor >= 0 ? mvpInfoVecOri[i].mvp.hor << 2 : -(-mvpInfoVecOri[i].mvp.hor << 2);
+    mvpInfoVecOri[i].mvp.ver = mvpInfoVecOri[i].mvp.ver >= 0 ? mvpInfoVecOri[i].mvp.ver << 2 : -(-mvpInfoVecOri[i].mvp.ver << 2);
+    mvpInfoVecOri[i].mvp.set(mvpInfoVecOri[i].mvp.getHor() - firstMv.getHor(), mvpInfoVecOri[i].mvp.getVer() - firstMv.getVer());
+    mvpInfoVecOri[i].pos = Position(mvpInfoVecOri[i].pos.x - posLT.x, mvpInfoVecOri[i].pos.y - posLT.y);
+  }
+#endif
+}
+template<X86_VEXT vext>
+void computeDeltaAndShiftCoreAddi_SSE(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri, std::vector<RMVFInfo> &mvpInfoVecRes)
+{
+#if USE_AVX2
+  int quotient = int(mvpInfoVecOri.size()) / 8;
+  int reminder = int(mvpInfoVecOri.size()) % 8;
+  int tempHor[8];
+  int tempVer[8];
+  int tempposHor[8];
+  int tempposVer[8];
+
+  __m256i  baseHor = _mm256_set1_epi32(firstMv.hor);
+  __m256i  baseVer = _mm256_set1_epi32(firstMv.ver);
+  for (int i = 0; i < quotient; i++)
+  {
+    // mv hor
+    __m256i mvHor = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].mvp.hor, mvpInfoVecOri[(i << 3) + 6].mvp.hor,
+      mvpInfoVecOri[(i << 3) + 5].mvp.hor, mvpInfoVecOri[(i << 3) + 4].mvp.hor, mvpInfoVecOri[(i << 3) + 3].mvp.hor,
+      mvpInfoVecOri[(i << 3) + 2].mvp.hor, mvpInfoVecOri[(i << 3) + 1].mvp.hor, mvpInfoVecOri[(i << 3) + 0].mvp.hor);
+    __m256i sign = _mm256_min_epi32(mvHor, _mm256_set1_epi32(1));
+    sign = _mm256_max_epi32(sign, _mm256_set1_epi32(-1));
+    __m256i absmvHor = _mm256_abs_epi32(mvHor);
+    __m256i absmvHorShift = _mm256_slli_epi32(absmvHor, 2);
+    __m256i resHor = _mm256_mullo_epi32(absmvHorShift, sign);
+    resHor = _mm256_sub_epi32(resHor, baseHor);
+    _mm256_storeu_si256((__m256i *)&tempHor[0], resHor);
+
+    // mv ver
+    __m256i mvVer = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].mvp.ver, mvpInfoVecOri[(i << 3) + 6].mvp.ver,
+      mvpInfoVecOri[(i << 3) + 5].mvp.ver, mvpInfoVecOri[(i << 3) + 4].mvp.ver, mvpInfoVecOri[(i << 3) + 3].mvp.ver,
+      mvpInfoVecOri[(i << 3) + 2].mvp.ver, mvpInfoVecOri[(i << 3) + 1].mvp.ver, mvpInfoVecOri[(i << 3) + 0].mvp.ver);
+    sign = _mm256_min_epi32(mvVer, _mm256_set1_epi32(1));
+    sign = _mm256_max_epi32(sign, _mm256_set1_epi32(-1));
+    __m256i absmvVer = _mm256_abs_epi32(mvVer);
+    __m256i absmvVerShift = _mm256_slli_epi32(absmvVer, 2);
+    __m256i resVer = _mm256_mullo_epi32(absmvVerShift, sign);
+    resVer = _mm256_sub_epi32(resVer, baseVer);
+    _mm256_storeu_si256((__m256i *)&tempVer[0], resVer);
+
+    // pos x
+    __m256i posHor = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].pos.x, mvpInfoVecOri[(i << 3) + 6].pos.x,
+      mvpInfoVecOri[(i << 3) + 5].pos.x, mvpInfoVecOri[(i << 3) + 4].pos.x, mvpInfoVecOri[(i << 3) + 3].pos.x,
+      mvpInfoVecOri[(i << 3) + 2].pos.x, mvpInfoVecOri[(i << 3) + 1].pos.x, mvpInfoVecOri[(i << 3) + 0].pos.x);
+    __m256i posHorLT = _mm256_set1_epi32(posLT.x);
+    __m256i resposHor = _mm256_sub_epi32(posHor, posHorLT);
+    _mm256_storeu_si256((__m256i *)&tempposHor[0], resposHor);
+
+    // pos y
+    __m256i posVer = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].pos.y, mvpInfoVecOri[(i << 3) + 6].pos.y,
+      mvpInfoVecOri[(i << 3) + 5].pos.y, mvpInfoVecOri[(i << 3) + 4].pos.y, mvpInfoVecOri[(i << 3) + 3].pos.y,
+      mvpInfoVecOri[(i << 3) + 2].pos.y, mvpInfoVecOri[(i << 3) + 1].pos.y, mvpInfoVecOri[(i << 3) + 0].pos.y);
+    __m256i posVerLT = _mm256_set1_epi32(posLT.y);
+    __m256i resposVer = _mm256_sub_epi32(posVer, posVerLT);
+    _mm256_storeu_si256((__m256i *)&tempposVer[0], resposVer);
+
+    for (int j = 0; j < 8; j++)
+    {
+      mvpInfoVecRes.push_back(RMVFInfo(Mv(tempHor[j], tempVer[j]), Position(tempposHor[j], tempposVer[j]), -1));
+    }
+  }
+  int oriSize = (int)mvpInfoVecRes.size();
+  int offset = (quotient << 3) - oriSize;
+  for (int i = oriSize; i < oriSize + reminder; i++)
+  {
+    mvpInfoVecRes.push_back(RMVFInfo(Mv(
+      (mvpInfoVecOri[i + offset].mvp.hor >= 0 ? mvpInfoVecOri[i + offset].mvp.hor << 2 : -(-mvpInfoVecOri[i + offset].mvp.hor << 2)) - firstMv.getHor(),
+      (mvpInfoVecOri[i + offset].mvp.ver >= 0 ? mvpInfoVecOri[i + offset].mvp.ver << 2 : -(-mvpInfoVecOri[i + offset].mvp.ver << 2)) - firstMv.getVer()
+    ),
+      Position(mvpInfoVecOri[i + offset].pos.x - posLT.x, mvpInfoVecOri[i + offset].pos.y - posLT.y),
+      -1
+    ));
+  }
+#else
+  int quotient = int(mvpInfoVecOri.size()) / 4;
+  int reminder = int(mvpInfoVecOri.size()) % 4;
+  int tempHor[4];
+  int tempVer[4];
+  int tempposHor[4];
+  int tempposVer[4];
+
+  __m128i  baseHor = _mm_set1_epi32(firstMv.hor);
+  __m128i  baseVer = _mm_set1_epi32(firstMv.ver);
+  for (int i = 0; i < quotient; i++)
+  {
+    // mv hor
+    __m128i mvHor = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].mvp.hor,
+      mvpInfoVecOri[(i << 2) + 2].mvp.hor, mvpInfoVecOri[(i << 2) + 1].mvp.hor, mvpInfoVecOri[(i << 2) + 0].mvp.hor);
+    __m128i sign = _mm_min_epi32(mvHor, _mm_set1_epi32(1));
+    sign = _mm_max_epi32(sign, _mm_set1_epi32(-1));
+    __m128i absmvHor = _mm_abs_epi32(mvHor);
+    __m128i absmvHorShift = _mm_slli_epi32(absmvHor, 2);
+    __m128i resHor = _mm_mullo_epi32(absmvHorShift, sign);
+    resHor = _mm_sub_epi32(resHor, baseHor);
+    _mm_storeu_si128((__m128i *)&tempHor[0], resHor);
+
+    // mv ver
+    __m128i mvVer = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].mvp.ver,
+      mvpInfoVecOri[(i << 2) + 2].mvp.ver, mvpInfoVecOri[(i << 2) + 1].mvp.ver, mvpInfoVecOri[(i << 2) + 0].mvp.ver);
+    sign = _mm_min_epi32(mvVer, _mm_set1_epi32(1));
+    sign = _mm_max_epi32(sign, _mm_set1_epi32(-1));
+    __m128i absmvVer = _mm_abs_epi32(mvVer);
+    __m128i absmvVerShift = _mm_slli_epi32(absmvVer, 2);
+    __m128i resVer = _mm_mullo_epi32(absmvVerShift, sign);
+    resVer = _mm_sub_epi32(resVer, baseVer);
+    _mm_storeu_si128((__m128i *)&tempVer[0], resVer);
+
+    // pos x
+    __m128i posHor = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].pos.x,
+      mvpInfoVecOri[(i << 2) + 2].pos.x, mvpInfoVecOri[(i << 2) + 1].pos.x, mvpInfoVecOri[(i << 2) + 0].pos.x);
+    __m128i posHorLT = _mm_set1_epi32(posLT.x);
+    __m128i resposHor = _mm_sub_epi32(posHor, posHorLT);
+    _mm_storeu_si128((__m128i *)&tempposHor[0], resposHor);
+
+    // pos y
+    __m128i posVer = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].pos.y,
+      mvpInfoVecOri[(i << 2) + 2].pos.y, mvpInfoVecOri[(i << 2) + 1].pos.y, mvpInfoVecOri[(i << 2) + 0].pos.y);
+    __m128i posVerLT = _mm_set1_epi32(posLT.y);
+    __m128i resposVer = _mm_sub_epi32(posVer, posVerLT);
+    _mm_storeu_si128((__m128i *)&tempposVer[0], resposVer);
+
+    for (int j = 0; j < 4; j++)
+    {
+      mvpInfoVecRes.push_back(RMVFInfo(Mv(tempHor[j], tempVer[j]), Position(tempposHor[j], tempposVer[j]), -1));
+    }
+  }
+  int oriSize = (int)mvpInfoVecRes.size();
+  int offset = (quotient << 2) - oriSize;
+  for (int i = oriSize; i < oriSize + reminder; i++)
+  {
+    mvpInfoVecRes.push_back(RMVFInfo(Mv(
+      (mvpInfoVecOri[i + offset].mvp.hor >= 0 ? mvpInfoVecOri[i + offset].mvp.hor << 2 : -(-mvpInfoVecOri[i + offset].mvp.hor << 2)) - firstMv.getHor(),
+      (mvpInfoVecOri[i + offset].mvp.ver >= 0 ? mvpInfoVecOri[i + offset].mvp.ver << 2 : -(-mvpInfoVecOri[i + offset].mvp.ver << 2)) - firstMv.getVer()
+    ),
+      Position(mvpInfoVecOri[i + offset].pos.x - posLT.x, mvpInfoVecOri[i + offset].pos.y - posLT.y),
+      -1
+    ));
+  }
+#endif
+}
+template<X86_VEXT vext>
+void buildRegressionMatrixCore_SSE(std::vector<RMVFInfo> &mvpInfoVecOriSrc, int sumbb[2][3][3], int sumeb[2][3], uint16_t addedSize)
+{
+#if USE_AVX2
+  std::vector<RMVFInfo> mvpInfoVecOri;
+  if (addedSize)
+  {
+    mvpInfoVecOri.assign(mvpInfoVecOriSrc.end() - addedSize, mvpInfoVecOriSrc.end());
+  }
+  else
+  {
+    mvpInfoVecOri.assign(mvpInfoVecOriSrc.begin(), mvpInfoVecOriSrc.end());
+  }
+  int iNum = (uint16_t)mvpInfoVecOri.size();
+
+  int b[3];
+  int e[2];
+  int quotient = iNum / 8;
+  int reminder = iNum % 8;
+  for (int i = 0; i < quotient; i++)
+  {
+    // set e[]
+    __m256i ezero = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].mvp.getHor(), mvpInfoVecOri[(i << 3) + 6].mvp.getHor(),
+      mvpInfoVecOri[(i << 3) + 5].mvp.getHor(), mvpInfoVecOri[(i << 3) + 4].mvp.getHor(), mvpInfoVecOri[(i << 3) + 3].mvp.getHor(),
+      mvpInfoVecOri[(i << 3) + 2].mvp.getHor(), mvpInfoVecOri[(i << 3) + 1].mvp.getHor(), mvpInfoVecOri[(i << 3) + 0].mvp.getHor());
+    __m256i eone = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].mvp.getVer(), mvpInfoVecOri[(i << 3) + 6].mvp.getVer(),
+      mvpInfoVecOri[(i << 3) + 5].mvp.getVer(), mvpInfoVecOri[(i << 3) + 4].mvp.getVer(), mvpInfoVecOri[(i << 3) + 3].mvp.getVer(),
+      mvpInfoVecOri[(i << 3) + 2].mvp.getVer(), mvpInfoVecOri[(i << 3) + 1].mvp.getVer(), mvpInfoVecOri[(i << 3) + 0].mvp.getVer());
+
+    // set b[]
+    __m256i bzero = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].pos.x, mvpInfoVecOri[(i << 3) + 6].pos.x,
+      mvpInfoVecOri[(i << 3) + 5].pos.x, mvpInfoVecOri[(i << 3) + 4].pos.x, mvpInfoVecOri[(i << 3) + 3].pos.x,
+      mvpInfoVecOri[(i << 3) + 2].pos.x, mvpInfoVecOri[(i << 3) + 1].pos.x, mvpInfoVecOri[(i << 3) + 0].pos.x);
+    __m256i bone = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].pos.y, mvpInfoVecOri[(i << 3) + 6].pos.y,
+      mvpInfoVecOri[(i << 3) + 5].pos.y, mvpInfoVecOri[(i << 3) + 4].pos.y, mvpInfoVecOri[(i << 3) + 3].pos.y,
+      mvpInfoVecOri[(i << 3) + 2].pos.y, mvpInfoVecOri[(i << 3) + 1].pos.y, mvpInfoVecOri[(i << 3) + 0].pos.y);
+
+    // sumeb[][]
+    __m256i tempRes00 = _mm256_mullo_epi32(ezero, bzero);
+    __m256i tempRes01 = _mm256_mullo_epi32(ezero, bone);
+    __m256i tempRes10 = _mm256_mullo_epi32(eone, bzero);
+    __m256i tempRes11 = _mm256_mullo_epi32(eone, bone);
+
+    __m256i vsum = _mm256_add_epi32(tempRes00, _mm256_srli_si256(tempRes00, 8));
+    vsum = _mm256_add_epi64(vsum, _mm256_srli_si256(vsum, 4));
+    sumeb[0][0] += _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(vsum, 1));
+
+    vsum = _mm256_add_epi32(tempRes01, _mm256_srli_si256(tempRes01, 8));
+    vsum = _mm256_add_epi64(vsum, _mm256_srli_si256(vsum, 4));
+    sumeb[0][1] += _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(vsum, 1));
+
+    vsum = _mm256_add_epi32(tempRes10, _mm256_srli_si256(tempRes10, 8));
+    vsum = _mm256_add_epi64(vsum, _mm256_srli_si256(vsum, 4));
+    sumeb[1][0] += _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(vsum, 1));
+
+    vsum = _mm256_add_epi32(tempRes11, _mm256_srli_si256(tempRes11, 8));
+    vsum = _mm256_add_epi64(vsum, _mm256_srli_si256(vsum, 4));
+    sumeb[1][1] += _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(vsum, 1));
+
+    vsum = _mm256_add_epi32(ezero, _mm256_srli_si256(ezero, 8));
+    vsum = _mm256_add_epi64(vsum, _mm256_srli_si256(vsum, 4));
+    sumeb[0][2] += _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(vsum, 1));
+
+    vsum = _mm256_add_epi32(eone, _mm256_srli_si256(eone, 8));
+    vsum = _mm256_add_epi64(vsum, _mm256_srli_si256(vsum, 4));
+    sumeb[1][2] += _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(vsum, 1));
+
+    //sumbb[][][]
+    tempRes00 = _mm256_mullo_epi32(bzero, bzero);
+    tempRes01 = _mm256_mullo_epi32(bzero, bone);
+
+    tempRes11 = _mm256_mullo_epi32(bone, bone);
+
+    vsum = _mm256_add_epi32(tempRes00, _mm256_srli_si256(tempRes00, 8));
+    vsum = _mm256_add_epi64(vsum, _mm256_srli_si256(vsum, 4));
+    sumbb[0][0][0] += _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(vsum, 1));
+
+    vsum = _mm256_add_epi32(tempRes01, _mm256_srli_si256(tempRes01, 8));
+    vsum = _mm256_add_epi64(vsum, _mm256_srli_si256(vsum, 4));
+    sumbb[0][0][1] += _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(vsum, 1));
+
+    vsum = _mm256_add_epi32(tempRes11, _mm256_srli_si256(tempRes11, 8));
+    vsum = _mm256_add_epi64(vsum, _mm256_srli_si256(vsum, 4));
+    sumbb[0][1][1] += _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(vsum, 1));
+
+    vsum = _mm256_add_epi32(bzero, _mm256_srli_si256(bzero, 8));
+    vsum = _mm256_add_epi64(vsum, _mm256_srli_si256(vsum, 4));
+    sumbb[0][0][2] += _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(vsum, 1));
+
+    vsum = _mm256_add_epi32(bone, _mm256_srli_si256(bone, 8));
+    vsum = _mm256_add_epi64(vsum, _mm256_srli_si256(vsum, 4));
+    sumbb[0][1][2] += _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(vsum, 1));
+  }
+  sumbb[1][0][0] = sumbb[0][0][0];
+  sumbb[0][1][0] = sumbb[1][0][1] = sumbb[1][1][0] = sumbb[0][0][1];
+  sumbb[1][1][1] = sumbb[0][1][1];
+  sumbb[1][0][2] = sumbb[1][2][0] = sumbb[0][2][0] = sumbb[0][0][2];
+  sumbb[1][1][2] = sumbb[1][2][1] = sumbb[0][2][1] = sumbb[0][1][2];
+  for (int ni = quotient << 3; ni < (quotient << 3) + reminder; ni++)//for all neighbor PUs
+  {
+    // to avoid big values in matrix, it is better to use delta_x and delta_y value, ie.e. use the x,y with respect to the top,left corner of current PU
+    b[0] = mvpInfoVecOri[ni].pos.x;
+    b[1] = mvpInfoVecOri[ni].pos.y;
+    b[2] = 1;
+
+    e[0] = mvpInfoVecOri[ni].mvp.getHor();
+    e[1] = mvpInfoVecOri[ni].mvp.getVer();
+
+    for (int c = 0; c < 2; c++)
+    {
+      for (int d = 0; d < 3; d++)
+      {
+        sumeb[c][d] += (e[c] * b[d]);
+      }
+      for (int d1 = 0; d1 < 3; d1++)
+      {
+        for (int d = 0; d < 3; d++)
+        {
+          sumbb[c][d1][d] += (b[d1] * b[d]);
+        }
+      }
+    }
+  }
+  sumbb[1][2][2] = sumbb[0][2][2] = (int)mvpInfoVecOriSrc.size();
+#else
+  std::vector<RMVFInfo> mvpInfoVecOri;
+  if (addedSize)
+  {
+    mvpInfoVecOri.assign(mvpInfoVecOriSrc.end() - addedSize, mvpInfoVecOriSrc.end());
+  }
+  else
+  {
+    mvpInfoVecOri.assign(mvpInfoVecOriSrc.begin(), mvpInfoVecOriSrc.end());
+  }
+  int iNum = (uint16_t)mvpInfoVecOri.size();
+  int b[3];
+  int e[2];
+  int quotient = iNum / 4;
+  int reminder = iNum % 4;
+  for (int i = 0; i < quotient; i++)
+  {
+    // set e[]
+    __m128i ezero = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].mvp.getHor(),
+      mvpInfoVecOri[(i << 2) + 2].mvp.getHor(), mvpInfoVecOri[(i << 2) + 1].mvp.getHor(), mvpInfoVecOri[(i << 2) + 0].mvp.getHor());
+    __m128i eone = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].mvp.getVer(),
+      mvpInfoVecOri[(i << 2) + 2].mvp.getVer(), mvpInfoVecOri[(i << 2) + 1].mvp.getVer(), mvpInfoVecOri[(i << 2) + 0].mvp.getVer());
+
+    // set b[]
+    __m128i bzero = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].pos.x,
+      mvpInfoVecOri[(i << 2) + 2].pos.x, mvpInfoVecOri[(i << 2) + 1].pos.x, mvpInfoVecOri[(i << 2) + 0].pos.x);
+    __m128i bone = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].pos.y,
+      mvpInfoVecOri[(i << 2) + 2].pos.y, mvpInfoVecOri[(i << 2) + 1].pos.y, mvpInfoVecOri[(i << 2) + 0].pos.y);
+
+    // sumeb[][]
+    __m128i tempRes00 = _mm_mullo_epi32(ezero, bzero);
+    __m128i tempRes01 = _mm_mullo_epi32(ezero, bone);
+    __m128i tempRes10 = _mm_mullo_epi32(eone, bzero);
+    __m128i tempRes11 = _mm_mullo_epi32(eone, bone);
+
+    __m128i vsum = _mm_add_epi32(tempRes00, _mm_srli_si128(tempRes00, 8));
+    vsum = _mm_add_epi32(vsum, _mm_srli_si128(vsum, 4));
+    sumeb[0][0] += _mm_cvtsi128_si32(vsum);
+
+    vsum = _mm_add_epi32(tempRes01, _mm_srli_si128(tempRes01, 8));
+    vsum = _mm_add_epi32(vsum, _mm_srli_si128(vsum, 4));
+    sumeb[0][1] += _mm_cvtsi128_si32(vsum);
+
+    vsum = _mm_add_epi32(tempRes10, _mm_srli_si128(tempRes10, 8));
+    vsum = _mm_add_epi32(vsum, _mm_srli_si128(vsum, 4));
+    sumeb[1][0] += _mm_cvtsi128_si32(vsum);
+
+    vsum = _mm_add_epi32(tempRes11, _mm_srli_si128(tempRes11, 8));
+    vsum = _mm_add_epi32(vsum, _mm_srli_si128(vsum, 4));
+    sumeb[1][1] += _mm_cvtsi128_si32(vsum);
+
+    vsum = _mm_add_epi32(ezero, _mm_srli_si128(ezero, 8));
+    vsum = _mm_add_epi32(vsum, _mm_srli_si128(vsum, 4));
+    sumeb[0][2] += _mm_cvtsi128_si32(vsum);
+
+    vsum = _mm_add_epi32(eone, _mm_srli_si128(eone, 8));
+    vsum = _mm_add_epi32(vsum, _mm_srli_si128(vsum, 4));
+    sumeb[1][2] += _mm_cvtsi128_si32(vsum);
+
+    //sumbb[][][]
+    tempRes00 = _mm_mullo_epi32(bzero, bzero);
+    tempRes01 = _mm_mullo_epi32(bzero, bone);
+
+    tempRes11 = _mm_mullo_epi32(bone, bone);
+
+    vsum = _mm_add_epi32(tempRes00, _mm_srli_si128(tempRes00, 8));
+    vsum = _mm_add_epi32(vsum, _mm_srli_si128(vsum, 4));
+    sumbb[0][0][0] += _mm_cvtsi128_si32(vsum);
+
+    vsum = _mm_add_epi32(tempRes01, _mm_srli_si128(tempRes01, 8));
+    vsum = _mm_add_epi32(vsum, _mm_srli_si128(vsum, 4));
+    sumbb[0][0][1] += _mm_cvtsi128_si32(vsum);
+
+    vsum = _mm_add_epi32(tempRes11, _mm_srli_si128(tempRes11, 8));
+    vsum = _mm_add_epi32(vsum, _mm_srli_si128(vsum, 4));
+    sumbb[0][1][1] += _mm_cvtsi128_si32(vsum);
+
+    vsum = _mm_add_epi32(bzero, _mm_srli_si128(bzero, 8));
+    vsum = _mm_add_epi32(vsum, _mm_srli_si128(vsum, 4));
+    sumbb[0][0][2] += _mm_cvtsi128_si32(vsum);
+
+    vsum = _mm_add_epi32(bone, _mm_srli_si128(bone, 8));
+    vsum = _mm_add_epi32(vsum, _mm_srli_si128(vsum, 4));
+    sumbb[0][1][2] += _mm_cvtsi128_si32(vsum);
+  }
+  sumbb[1][0][0] = sumbb[0][0][0];
+  sumbb[0][1][0] = sumbb[1][0][1] = sumbb[1][1][0] = sumbb[0][0][1];
+  sumbb[1][1][1] = sumbb[0][1][1];
+  sumbb[1][0][2] = sumbb[1][2][0] = sumbb[0][2][0] = sumbb[0][0][2];
+  sumbb[1][1][2] = sumbb[1][2][1] = sumbb[0][2][1] = sumbb[0][1][2];
+  for (int ni = quotient << 2; ni < (quotient << 2) + reminder; ni++)//for all neighbor PUs
+  {
+    // to avoid big values in matrix, it is better to use delta_x and delta_y value, ie.e. use the x,y with respect to the top,left corner of current PU
+    b[0] = mvpInfoVecOri[ni].pos.x;
+    b[1] = mvpInfoVecOri[ni].pos.y;
+    b[2] = 1;
+
+    e[0] = mvpInfoVecOri[ni].mvp.getHor();
+    e[1] = mvpInfoVecOri[ni].mvp.getVer();
+
+    for (int c = 0; c < 2; c++)
+    {
+      for (int d = 0; d < 3; d++)
+      {
+        sumeb[c][d] += (e[c] * b[d]);
+      }
+      for (int d1 = 0; d1 < 3; d1++)
+      {
+        for (int d = 0; d < 3; d++)
+        {
+          sumbb[c][d1][d] += (b[d1] * b[d]);
+        }
+      }
+    }
+  }
+  sumbb[1][2][2] = sumbb[0][2][2] = (int)mvpInfoVecOriSrc.size();
+#endif
+}
+#endif
 template<X86_VEXT vext>
 void PelBufferOps::_initPelBufOpsX86()
 {
@@ -2591,6 +3106,11 @@ void PelBufferOps::_initPelBufOpsX86()
 #if JVET_Z0136_OOB
   isMvOOB = isMvOOB_SSE<vext>;
   isMvOOBSubBlk = isMvOOBSubBlk_SSE<vext>;
+#endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+  computeDeltaAndShift = computeDeltaAndShiftCore_SSE<vext>;
+  computeDeltaAndShiftAddi = computeDeltaAndShiftCoreAddi_SSE<vext>;
+  buildRegressionMatrix = buildRegressionMatrixCore_SSE<vext>;
 #endif
 }
 

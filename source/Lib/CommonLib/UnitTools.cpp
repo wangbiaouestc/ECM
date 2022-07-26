@@ -4028,7 +4028,608 @@ bool PU::addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const i
   }
   return false;
 }
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+void computeDeltaAndShift(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri)
+{
+  g_pelBufOP.computeDeltaAndShift(posLT, firstMv, mvpInfoVecOri);
+}
+void computeDeltaAndShiftAddi(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri, std::vector<RMVFInfo> &mvpInfoVecRes)
+{
+  g_pelBufOP.computeDeltaAndShiftAddi(posLT, firstMv, mvpInfoVecOri, mvpInfoVecRes);
+}
+void buildRegressionMatrix(std::vector<RMVFInfo> &mvpInfoVecOri, int sumbb[2][3][3], int sumeb[2][3], uint16_t addedSize)
+{
+  g_pelBufOP.buildRegressionMatrix(mvpInfoVecOri, sumbb, sumeb, addedSize);
+}
+int64_t det(int n, int64_t mat[3][3]) // n:the actual size of "mat"
+{
+  int p[2] = { 1, -1 };
+  int64_t d = 0;
+  int64_t submat[3][3];
+  if (n == 2)
+  {
+    return((mat[0][0] * mat[1][1]) - (mat[1][0] * mat[0][1]));
+  }
+  else
+  {
+    for (int c = 0; c < n; c++)
+    {
+      int subi = 0;   //submatrix's i value
+      for (int i = 1; i < n; i++)
+      {
+        int subj = 0;
+        for (int j = 0; j < n; j++)
+        {
+          if (j == c)
+          {
+            continue;
+          }
+          submat[subi][subj] = mat[i][j];
+          subj++;
+        }
+        subi++;
+      }
+      d += (p[c % 2] * mat[0][c] * det(n - 1, submat));
+    }
+  }
+  return d;
+}
 
+static int getRMVFMSB(int64_t x)
+{
+  int msb = 0, bits = (sizeof(int64_t) << 3);
+  int64_t y = 1;
+  while (x > 1)
+  {
+    bits >>= 1;
+    y = x >> bits;
+    if (y)
+    {
+      x = y;
+      msb += bits;
+    }
+  }
+  msb += (int)y;
+  return msb;
+}
+
+int64_t divideRMVF(int64_t numer, int64_t denom) // out = numer/denom
+{
+  if (numer == 0 || denom == 1)
+  {
+    return numer;
+  }
+  int64_t d;
+  const int64_t iShiftA2 = 6;
+  const int64_t iAccuracyShift = 15;
+  const int64_t iMaxVal = 63;
+  int64_t iScaleShiftA2 = 0;
+  int64_t iScaleShiftA1 = 0;
+
+  uint8_t signA1 = numer < 0;
+  uint8_t signA2 = denom < 0;
+
+  numer = (signA1) ? -numer : numer;
+  denom = (signA2) ? -denom : denom;
+
+  iScaleShiftA2 = getRMVFMSB(denom) - iShiftA2;
+  iScaleShiftA1 = iScaleShiftA2 - 12;
+
+  if (iScaleShiftA1 < 0)
+  {
+    iScaleShiftA1 = 0;
+  }
+
+  if (iScaleShiftA2 < 0)
+  {
+    iScaleShiftA2 = 0;
+  }
+
+  int64_t iScaleShiftA = iScaleShiftA2 + iAccuracyShift - iScaleShiftA1;
+
+  int64_t a2s = (denom >> iScaleShiftA2) > iMaxVal ? iMaxVal : (denom >> iScaleShiftA2);
+  int64_t a1s = (numer >> iScaleShiftA1);
+
+  int64_t aI64 = (a1s * (int64_t)g_rmvfMultApproxTbl[a2s]) >> iScaleShiftA;
+
+  d = (signA1 + signA2 == 1) ? -aI64 : aI64;
+
+  return d;
+}
+
+void PU::xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[2][4], int sumbbfinal[2][3][3], int sumebfinal[2][3], uint16_t addedSize)
+{
+  int shift = 1;
+  int iNum = int(mvpInfoVec.size());
+  int shiftDets = 5 * (getRMVFMSB(iNum) - 4);
+  if (shiftDets < 0) shiftDets = 0;
+  int sumbb[2][3][3];
+  int sumeb[2][3];
+  int64_t m[3][3]; // parameter=det(md)/det(m)
+  int64_t md[3][3];
+  ////////////////// Extract statistics: Start
+  //initialize values to zero
+  if (!addedSize)
+  {
+    for (int c = 0; c < 2; c++)
+    {
+      for (int d = 0; d < 3; d++)
+      {
+        sumebfinal[c][d] = 0;
+      }
+      for (int d1 = 0; d1 < 3; d1++)
+      {
+        for (int d = 0; d < 3; d++)
+        {
+          sumbbfinal[c][d1][d] = 0;
+        }
+      }
+    }
+  }
+  buildRegressionMatrix(mvpInfoVec, sumbbfinal, sumebfinal, addedSize);
+
+  for (int c = 0; c < 2; c++)
+  {
+    for (int d = 0; d < 3; d++)
+    {
+      sumeb[c][d] = sumebfinal[c][d] >> shift;
+    }
+    for (int d1 = 0; d1 < 3; d1++)
+    {
+      for (int d = 0; d < 3; d++)
+      {
+        sumbb[c][d1][d] = sumbbfinal[c][d1][d] >> shift;
+      }
+    }
+  }
+  ////////////////// Extract statistics: End
+  ////////////////// Extract Weight: Start
+  for (int i = 0; i < 3; i++)
+  {
+    for (int j = 0; j < 3; j++)
+    {
+      m[i][j] = sumbb[0][i][j];
+    }
+  }
+  bool bBadMatrix = false;
+  int64_t det2 = det(3, m);
+  det2 >>= shiftDets;
+  if (det2 == 0)
+  {
+    bBadMatrix = true;
+  }
+  for (int c = 0; c < 2; c++)
+  {
+    // 1) find matrix parameters with cross-component model
+    // Find w[c][d]
+    int64_t dets[3];
+    if (!bBadMatrix)
+    {
+      for (int d = 0; d < 3; d++)
+      {
+        // Initialize md matrix
+        for (int i = 0; i < 3; i++)
+        {
+          for (int j = 0; j < 3; j++)
+          {
+            md[i][j] = m[i][j];
+          }
+        }
+        // Replace coloumn D in md matrix
+        for (int j = 0; j < 3; j++)
+        {
+          md[j][d] = sumeb[c][j];
+        }
+
+        int64_t det1 = det(3, md);
+        det1 >>= shiftDets;
+
+        dets[d] = det1;
+        dMatrix[c][d] = iNum * det1;
+
+        // calcualte offset
+        if (d == 2)
+        {
+          dMatrix[c][2] = (det2 * sumeb[c][2] - dets[0] * sumbb[c][0][2] - dets[1] * sumbb[c][1][2]) << shift;
+          dMatrix[c][3] = iNum * det2;
+        }
+      } // for d
+    }
+
+    if (bBadMatrix)
+    {
+      // 2) Find simple weight and offset, with non-corss component between x and y, i.e.: MVx=weight[0]*x+offset[0], MVy=weight[1]*y+offset[1]
+      for (int d = 0; d < 3; d++)
+      {
+        dMatrix[c][d] = 0;
+      }
+      int64_t det1 = (iNum * sumeb[c][c] - sumbb[c][c][2] * sumeb[c][2]);
+      int64_t det2 = (iNum * sumbb[c][c][c] - sumbb[c][c][2] * sumbb[c][c][2]);
+      if (det2 == 0)
+      {
+        dMatrix[c][c] = 0;
+        det1 = 0;
+        det2 = 1;
+        dMatrix[c][3] = iNum;
+      }
+      else
+      {
+        dMatrix[c][c] = iNum * det1;
+        dMatrix[c][3] = iNum * det2;
+      }
+      dMatrix[c][2] = (det2 * sumeb[c][2] - det1 * sumbb[c][c][2]) << shift;
+    } // End "bBadMatrix"
+
+  } // end "for c"
+    ////////////////// Extract Weights: End
+  return;
+}
+void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &abovePU, AffineMergeCtx &affMrgCtx
+  , std::vector<RMVFInfo> mvp[2][4]
+  , int mrgCandIdx
+)
+{
+  const CodingStructure &cs = *pu.cs;
+
+  int iNumPredDir = cs.slice->isInterP() ? 1 : 2;
+  Mv cMV[2][3];
+  Mv cMVOri[2][3];
+
+  std::vector<RMVFInfo> mvpInfoVec[2];
+  std::vector<RMVFInfo> mvpInfoVecOri;
+
+  bool available[2] = { false, false };
+  //-- Collect non-adj affine subblock info
+  Position anchorPosAbove = abovePU.Y().topLeft();
+  Position neibPos;
+  int stepsize = 1 << ATMVP_SUB_BLOCK_SIZE;
+  int hSearchAbove = abovePU.Y().width;
+  int vSearchAbove = abovePU.Y().height;
+  if (abovePU.interDir == 3)
+  {
+    for (int i = 0; i < vSearchAbove; i += stepsize)
+    {
+      for (int j = 0; j < hSearchAbove; j += stepsize)
+      {
+        neibPos = anchorPosAbove.offset(j + 2, i + 2);
+        const MotionInfo& neibMi = abovePU.getMotionInfo(neibPos);
+
+        mvpInfoVec[REF_PIC_LIST_0].push_back(RMVFInfo(neibMi.mv[REF_PIC_LIST_0], neibPos, -1));
+        mvpInfoVec[REF_PIC_LIST_1].push_back(RMVFInfo(neibMi.mv[REF_PIC_LIST_1], neibPos, -1));
+      }
+    }
+  }
+  else if (abovePU.interDir == 1)
+  {
+    for (int i = 0; i < vSearchAbove; i += stepsize)
+    {
+      for (int j = 0; j < hSearchAbove; j += stepsize)
+      {
+        neibPos = anchorPosAbove.offset(j + 2, i + 2);
+        const MotionInfo& neibMi = abovePU.getMotionInfo(neibPos);
+
+        mvpInfoVec[REF_PIC_LIST_0].push_back(RMVFInfo(neibMi.mv[REF_PIC_LIST_0], neibPos, -1));
+      }
+    }
+  }
+  else if (abovePU.interDir == 2)
+  {
+    for (int i = 0; i < vSearchAbove; i += stepsize)
+    {
+      for (int j = 0; j < hSearchAbove; j += stepsize)
+      {
+        neibPos = anchorPosAbove.offset(j + 2, i + 2);
+        const MotionInfo& neibMi = abovePU.getMotionInfo(neibPos);
+
+        mvpInfoVec[REF_PIC_LIST_1].push_back(RMVFInfo(neibMi.mv[REF_PIC_LIST_1], neibPos, -1));
+      }
+    }
+  }
+  for (unsigned int list = 0; list < iNumPredDir; ++list)
+  {
+    RefPicList eRefPicList = list == 0 ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+    if (abovePU.interDir == 1 && eRefPicList == REF_PIC_LIST_1)
+    {
+      continue;
+    }
+    if (abovePU.interDir == 2 && eRefPicList == REF_PIC_LIST_0)
+    {
+      continue;
+    }
+
+    const Position posLT = pu.Y().topLeft();
+
+    int64_t cMvX = 0, cMvY = 0;
+    Mv cMv;
+    Mv firstMv;
+    int64_t parametersRMVF[2][4];
+    firstMv.set(mvpInfoVec[eRefPicList][0].mvp.getHor(), mvpInfoVec[eRefPicList][0].mvp.getVer());
+    firstMv.hor = firstMv.hor >= 0 ? firstMv.hor << 2 : -(-firstMv.hor << 2);
+    firstMv.ver = firstMv.ver >= 0 ? firstMv.ver << 2 : -(-firstMv.ver << 2);
+    computeDeltaAndShift(posLT, firstMv, mvpInfoVec[eRefPicList]);
+
+    //-- Model with Linear Regression
+    //-- Calculate RMVF parameters:
+    int sumbb[2][3][3];
+    int sumeb[2][3];
+
+    xCalcRMVFParameters(mvpInfoVec[eRefPicList], parametersRMVF, sumbb, sumeb, 0);
+
+    // top-left CPMV
+    cMvX = parametersRMVF[0][2];
+    cMvY = parametersRMVF[1][2];
+    cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
+    cMvY = divideRMVF(cMvY, parametersRMVF[1][3]);
+    cMvX += firstMv.getHor();
+    cMvY += firstMv.getVer();
+    cMv = Mv((int)(cMvX), (int)(cMvY));
+    cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
+    cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+    cMVOri[list][0] = cMv;
+
+
+    // top-right CPMV
+    cMvX = parametersRMVF[0][0] * pu.lumaSize().width + parametersRMVF[0][2];
+    cMvY = parametersRMVF[1][0] * pu.lumaSize().width + parametersRMVF[1][2];
+    cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
+    cMvY = divideRMVF(cMvY, parametersRMVF[1][3]);
+    cMvX += firstMv.getHor();
+    cMvY += firstMv.getVer();
+    cMv = Mv((int)(cMvX), (int)(cMvY));
+    cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
+    cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+
+    cMVOri[list][1] = cMv;
+
+    // bottom-left CPMV
+    cMvX = parametersRMVF[0][1] * pu.lumaSize().height + parametersRMVF[0][2];
+    cMvY = parametersRMVF[1][1] * pu.lumaSize().height + parametersRMVF[1][2];
+    cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
+    cMvY = divideRMVF(cMvY, parametersRMVF[1][3]);
+    cMvX += firstMv.getHor();
+    cMvY += firstMv.getVer();
+    cMv = Mv((int)(cMvX), (int)(cMvY));
+    cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
+    cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+
+    cMVOri[list][2] = cMv;
+    int refIdx = 0;
+
+    refIdx = abovePU.refIdx[eRefPicList];
+    if ((int)mvp[eRefPicList][refIdx].size() < 3)
+    {
+      available[eRefPicList] = true;
+      cMV[list][0] = cMVOri[list][0];
+      cMV[list][1] = cMVOri[list][1];
+      cMV[list][2] = cMVOri[list][2];
+      mvpInfoVec[eRefPicList].clear();
+      mvpInfoVecOri.clear();
+      continue;
+    }
+    for (int i = 0; i < (int)(mvp[eRefPicList][refIdx]).size(); i++)
+    {
+      mvpInfoVecOri.push_back(mvp[eRefPicList][refIdx][i]);
+    }
+
+    uint16_t addedSize = (uint16_t)mvpInfoVecOri.size();
+
+    computeDeltaAndShiftAddi(posLT, firstMv, mvpInfoVecOri, mvpInfoVec[eRefPicList]);
+
+    //-- Model with Linear Regression
+    //-- Calculate RMVF parameters:
+    xCalcRMVFParameters(mvpInfoVec[eRefPicList], parametersRMVF, sumbb, sumeb, addedSize);
+
+    //-- Generate prediction signal 
+    cMvX = 0, cMvY = 0;
+    // top-left CPMV
+    cMvX = parametersRMVF[0][2];
+    cMvY = parametersRMVF[1][2];
+    cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
+    cMvY = divideRMVF(cMvY, parametersRMVF[1][3]);
+    cMvX += firstMv.getHor();
+    cMvY += firstMv.getVer();
+    cMv = Mv((int)(cMvX), (int)(cMvY));
+    cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
+    cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+    cMV[list][0] = cMv;
+
+
+    // top-right CPMV
+    cMvX = parametersRMVF[0][0] * pu.lumaSize().width + parametersRMVF[0][2];
+    cMvY = parametersRMVF[1][0] * pu.lumaSize().width + parametersRMVF[1][2];
+    cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
+    cMvY = divideRMVF(cMvY, parametersRMVF[1][3]);
+    cMvX += firstMv.getHor();
+    cMvY += firstMv.getVer();
+    cMv = Mv((int)(cMvX), (int)(cMvY));
+    cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
+    cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+
+    cMV[list][1] = cMv;
+
+    // bottom-left CPMV
+    cMvX = parametersRMVF[0][1] * pu.lumaSize().height + parametersRMVF[0][2];
+    cMvY = parametersRMVF[1][1] * pu.lumaSize().height + parametersRMVF[1][2];
+    cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
+    cMvY = divideRMVF(cMvY, parametersRMVF[1][3]);
+    cMvX += firstMv.getHor();
+    cMvY += firstMv.getVer();
+    cMv = Mv((int)(cMvX), (int)(cMvY));
+    cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
+    cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+
+    cMV[list][2] = cMv;
+    available[eRefPicList] = true;
+
+    mvpInfoVec[eRefPicList].clear();
+    mvpInfoVecOri.clear();
+  }
+  int8_t referenceidx[2];
+  referenceidx[0] = abovePU.refIdx[0];
+  referenceidx[1] = abovePU.refIdx[1];
+  if (!xCPMVSimCheck(pu, affMrgCtx, cMVOri, abovePU.interDir, referenceidx, AFFINEMODEL_6PARAM, abovePU.cu->BcwIdx, abovePU.cu->LICFlag))
+  {
+    int i = affMrgCtx.numValidMergeCand;
+    for (int mvNum = 0; mvNum < 3; mvNum++)
+    {
+      affMrgCtx.mvFieldNeighbours[i << 1][mvNum].setMvField(cMVOri[0][mvNum], referenceidx[0]);
+      affMrgCtx.mvFieldNeighbours[(i << 1) + 1][mvNum].setMvField(cMVOri[1][mvNum], referenceidx[1]);
+    }
+    affMrgCtx.interDirNeighbours[i] = abovePU.interDir;
+    affMrgCtx.affineType[i] = AFFINEMODEL_6PARAM;
+    affMrgCtx.mergeType[i] = MRG_TYPE_DEFAULT_N;
+    affMrgCtx.BcwIdx[i] = abovePU.cu->BcwIdx;
+#if INTER_LIC
+    affMrgCtx.LICFlags[i] = abovePU.cu->LICFlag;
+#endif
+    if (affMrgCtx.numValidMergeCand == mrgCandIdx)
+    {
+      affMrgCtx.numValidMergeCand++;
+      return;
+    }
+    affMrgCtx.numValidMergeCand++;
+    if (affMrgCtx.numValidMergeCand == affMrgCtx.maxNumMergeCand)
+    {
+      return;
+    }
+  }
+  if (available[REF_PIC_LIST_0] || available[REF_PIC_LIST_1])
+  {
+    if (!xCPMVSimCheck(pu, affMrgCtx, cMV, abovePU.interDir, referenceidx, AFFINEMODEL_6PARAM, BCW_DEFAULT, false))
+    {
+      int i = affMrgCtx.numValidMergeCand;
+      for (int mvNum = 0; mvNum < 3; mvNum++)
+      {
+        affMrgCtx.mvFieldNeighbours[i << 1][mvNum].setMvField(cMV[0][mvNum], referenceidx[0]);
+        affMrgCtx.mvFieldNeighbours[(i << 1) + 1][mvNum].setMvField(cMV[1][mvNum], referenceidx[1]);
+      }
+      affMrgCtx.interDirNeighbours[i] = abovePU.interDir;
+      affMrgCtx.affineType[i] = AFFINEMODEL_6PARAM;
+      affMrgCtx.mergeType[i] = MRG_TYPE_DEFAULT_N;
+      affMrgCtx.BcwIdx[i] = BCW_DEFAULT;
+#if INTER_LIC
+      affMrgCtx.LICFlags[i] = false;
+#endif
+      if (affMrgCtx.numValidMergeCand == mrgCandIdx)
+      {
+        affMrgCtx.numValidMergeCand++;
+        return;
+      }
+      affMrgCtx.numValidMergeCand++;
+      if (affMrgCtx.numValidMergeCand == affMrgCtx.maxNumMergeCand)
+      {
+        return;
+      }
+    }
+  }
+}
+void PU::xReturnMvpVec(std::vector<RMVFInfo> mvp[2][4], const PredictionUnit &pu, const Position &pos, const MvpDir &eDir)
+{
+  CodingStructure &cs = *pu.cs;
+  const PredictionUnit *neibPU = NULL;
+  Position neibPos;
+  int offset = 2;
+  switch (eDir)
+  {
+  case MD_LEFT:
+    neibPos = pos.offset(-offset, 0);
+    break;
+  case MD_ABOVE:
+    neibPos = pos.offset(0, -offset);
+    break;
+  case MD_ABOVE_RIGHT:
+    neibPos = pos.offset(1, -1);
+    break;
+  case MD_BELOW_LEFT:
+    neibPos = pos.offset(-1, 1);
+    break;
+  case MD_ABOVE_LEFT:
+    neibPos = pos.offset(-1, -1);
+    break;
+  default:
+    break;
+  }
+
+  neibPU = cs.getPURestricted(neibPos, pu, pu.chType);
+  if (neibPU == NULL || !CU::isInter(*neibPU->cu))
+  {
+    return;
+  }
+  const MotionInfo& neibMi = neibPU->getMotionInfo(neibPos);
+  if (neibMi.refIdx[0] >= 0)
+  {
+    mvp[0][neibMi.refIdx[0]].push_back(RMVFInfo(neibMi.mv[0], neibPos, neibMi.refIdx[0]));
+  }
+  if (neibMi.refIdx[1] >= 0)
+  {
+    mvp[1][neibMi.refIdx[1]].push_back(RMVFInfo(neibMi.mv[1], neibPos, neibMi.refIdx[1]));
+  }
+}
+void PU::collectNeiMotionInfo(std::vector<RMVFInfo> mvpInfoVec[2][4], const PredictionUnit &pu)
+{
+  Position anchorPos = pu.Y().topLeft();
+  Position neibPos;
+
+  int imHeight = pu.cs->slice->getPic()->lheight();
+  int imWidth = pu.cs->slice->getPic()->lwidth();
+  int hSearch = pu.Y().width;
+  int vSearch = pu.Y().height;
+  int horSearch = hSearch >> 1;
+  int verSearch = vSearch >> 1;
+  int stepsize = 4;
+
+  neibPos = anchorPos;
+  if (neibPos.y - 2 >= 0)
+  {
+    neibPos = anchorPos.offset(-2, 0);
+    for (int j = 0; j < hSearch; j += stepsize)
+    {
+      neibPos.x += stepsize;
+      xReturnMvpVec(mvpInfoVec, pu, neibPos, MD_ABOVE);
+    }
+    neibPos = anchorPos.offset(2, 0);
+    for (int j = 0; j < horSearch; j += stepsize)
+    {
+      neibPos.x -= stepsize;
+      if (neibPos.x < 0)
+      {
+        break;
+      }
+      xReturnMvpVec(mvpInfoVec, pu, neibPos, MD_ABOVE);
+    }
+    neibPos = anchorPos.offset(hSearch - 2, 0);
+    for (int j = 0; j < horSearch; j += stepsize)
+    {
+      neibPos.x += stepsize;
+      if (neibPos.x > imWidth - 1)
+      {
+        break;
+      }
+      xReturnMvpVec(mvpInfoVec, pu, neibPos, MD_ABOVE);
+    }
+  }
+  neibPos = anchorPos;
+  if (neibPos.x - 2 >= 0)
+  {
+    neibPos = anchorPos.offset(0, -2);
+    for (int i = 0; i < vSearch; i += stepsize)
+    {
+      neibPos.y += stepsize;
+      xReturnMvpVec(mvpInfoVec, pu, neibPos, MD_LEFT);
+    }
+    neibPos = anchorPos.offset(0, vSearch - 2);
+    for (int i = 0; i < verSearch; i += stepsize)
+    {
+      neibPos.y += stepsize;
+      if (neibPos.y > imHeight - 1)
+      {
+        break;
+      }
+      xReturnMvpVec(mvpInfoVec, pu, neibPos, MD_LEFT);
+    }
+  }
+}
+#endif
 void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
   const int& mrgCandIdx
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
@@ -7325,7 +7926,15 @@ bool PU::addOneInheritedHMVPAffineMergeCand(const PredictionUnit& pu, AffineMerg
 bool PU::addSpatialAffineMergeHMVPCand(const PredictionUnit& pu, AffineMergeCtx& affMrgCtx, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int affHMVPIdx, const PredictionUnit* neiPUs[], Position neiPositions[], int iNeiNum, const int mrgCandIdx)
 {
   const Slice& slice = *pu.cs->slice;
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#if JVET_W0090_ARMC_TM
+  const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand() + (pu.cs->sps->getUseAML() ? ADDITIONAL_AFFINE_CAND_NUM : 0);
+#else
   const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand();
+#endif
+#else
+  const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand();
+#endif
 
   for (int nei = 0; nei < iNeiNum; nei++)
   {
@@ -8188,7 +8797,173 @@ void PU::getAffineControlPointCand(const PredictionUnit &pu, MotionInfo mi[4], b
   return;
 #endif
 }
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+const int getNonAdjAvailableAffineNeighboursByDistance(const PredictionUnit &pu, const PredictionUnit *npu[], AffineMergeCtx &affMrgCtx, const int mrgCandStart, const int mrgCandIdx)
+{
+#if JVET_Z0118_GDR
+  bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
+#endif
+  const Position posLT = pu.Y().topLeft();
+  const unsigned plevel = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
+  int            num = mrgCandStart;
+  uint8_t   cntLeftCand = 0;
+  uint8_t  cntAboveCand = 0;
+  int      log2CtuSize = floorLog2(pu.cs->sps->getCTUSize());
+  int      ctuX = ((posLT.x >> log2CtuSize) << log2CtuSize);
+  int      ctuY = ((posLT.y >> log2CtuSize) << log2CtuSize);
 
+  int       offsetX = 0;
+  int       offsetY = 0;
+  for (int pos = 1; pos < (AFF_NON_ADJACENT_DIST + 1); pos++)
+  {
+    bool isAboveAva = (cntAboveCand < AFF_MAX_NON_ADJACENT_INHERITED_CANDS);
+    bool isLeftAva = (cntLeftCand < AFF_MAX_NON_ADJACENT_INHERITED_CANDS);
+    for (int posA = 0; ; posA++)
+    {
+      offsetX = ((int)pu.Y().width) * (pos + 1 - posA);
+      offsetY = -((int)pu.Y().height * pos) - 1;
+      if (offsetX < (-((int)pu.Y().width * pos) - 1))
+      {
+        break;
+      }
+
+      const Position posTemp = PU::convertNonAdjAffineBlkPos(posLT.offset(offsetX, offsetY), ctuX, ctuY);
+      if (posTemp == Position(-1, -1))
+      {
+        break;
+      }
+      const PredictionUnit *puTemp = pu.cs->getPURestricted(posTemp, pu, pu.chType);
+      if (puTemp && puTemp->cu->affine && puTemp->mergeType == MRG_TYPE_DEFAULT_N
+        && PU::isDiffMER(pu.lumaPos(), posTemp, plevel))
+      {
+        bool redudant = false;
+        for (int i = 0; i < num; i++)
+        {
+          if (puTemp == npu[i])
+          {
+            redudant = true;
+            break;
+          }
+        }
+        if (!redudant && isAboveAva)
+        {
+          npu[num++] = puTemp;
+          cntAboveCand++;
+
+          isAboveAva = (cntAboveCand < AFF_MAX_NON_ADJACENT_INHERITED_CANDS);
+          if (!isAboveAva)
+          {
+            break;
+          }
+        }
+      }
+    }
+
+    for (int posL = 0; ; posL++)
+    {
+      offsetX = -((int)pu.Y().width * pos);
+      offsetY = ((int)pu.Y().height) * (pos + 1 - posL) - 1;
+      if (offsetY < (-((int)pu.Y().height * pos) - 1))
+      {
+        break;
+      }
+
+      const Position posTemp = PU::convertNonAdjAffineBlkPos(posLT.offset(offsetX, offsetY), ctuX, ctuY);
+      if (posTemp == Position(-1, -1))
+      {
+        break;
+      }
+      const PredictionUnit *puTemp = pu.cs->getPURestricted(posTemp, pu, pu.chType);
+      if (puTemp && puTemp->cu->affine && puTemp->mergeType == MRG_TYPE_DEFAULT_N
+        && PU::isDiffMER(pu.lumaPos(), posTemp, plevel))
+      {
+        bool redudant = false;
+        for (int i = 0; i < num; i++)
+        {
+          if (puTemp == npu[i])
+          {
+            redudant = true;
+            break;
+          }
+        }
+        if (!redudant && isLeftAva)
+        {
+          npu[num++] = puTemp;
+          cntLeftCand++;
+
+          isLeftAva = (cntLeftCand < AFF_MAX_NON_ADJACENT_INHERITED_CANDS);
+          if (!isLeftAva)
+          {
+            break;
+          }
+        }
+      }
+    }
+  }
+#if JVET_Z0118_GDR
+  int lutSize = (isClean) ? (int)pu.cs->motionLut.lutAffInherit1.size() : (int)pu.cs->motionLut.lutAffInherit0.size();
+#else
+  int lutSize = (int)pu.cs->motionLut.lutAffInherit.size();
+#endif
+  for (int listIdx = 0; listIdx < lutSize; listIdx++)
+  {
+#if JVET_Z0118_GDR
+    AffineInheritInfo& affHistInfo = (isClean) ? pu.cs->motionLut.lutAffInherit1[lutSize - 1 - listIdx] : pu.cs->motionLut.lutAffInherit0[lutSize - 1 - listIdx];
+#else
+    AffineInheritInfo& affHistInfo = pu.cs->motionLut.lutAffInherit[lutSize - 1 - listIdx];
+#endif
+    const Position posTemp = affHistInfo.basePos;
+    const PredictionUnit *puTemp = pu.cs->getPURestricted(posTemp, pu, pu.chType);
+    if (puTemp && puTemp->cu->affine && puTemp->mergeType == MRG_TYPE_DEFAULT_N
+      && PU::isDiffMER(pu.lumaPos(), posTemp, plevel))
+    {
+      bool redudant = false;
+      for (int i = 0; i < num; i++)
+      {
+        if (puTemp == npu[i])
+        {
+          redudant = true;
+          break;
+        }
+      }
+      if (!redudant)
+      {
+        npu[num++] = puTemp;
+      }
+    }
+  }
+  return num;
+}
+Position PU::convertNonAdjAffineBlkPos(const Position &pos, int curCtuX, int curCtuY)
+{
+  if (pos.x < 0 || pos.y < 0)
+  {
+    return Position(-1, -1);
+  }
+
+  PosType newX = pos.x;
+  PosType newY = pos.y;
+  if (newY < curCtuY && newX < curCtuX)
+  {
+    return Position(curCtuX - 1, curCtuY - 1);
+  }
+
+  if (newY < curCtuY && newX >= curCtuX)
+  {
+    return Position(newX, curCtuY - 1);
+  }
+
+  if (newY >= curCtuY && newX < curCtuX)
+  {
+    return Position(curCtuX - 1, newY);
+  }
+
+  newX = ((newX >> 4) << 4);
+  newY = ((newY >> 4) << 4);
+
+  return Position(newX, newY);
+}
+#endif
 #if JVET_Z0139_NA_AFF
 int PU::getMvDiffThresholdByWidthAndHeight(const PredictionUnit &pu, bool width)
 {
@@ -8728,7 +9503,15 @@ void PU::getNonAdjCstMergeCand(const PredictionUnit &pu, AffineMergeCtx &affMrgC
 {
   const CodingStructure &cs    = *pu.cs;
   const Slice &          slice = *pu.cs->slice;
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#if JVET_W0090_ARMC_TM
+  const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand() + (pu.cs->sps->getUseAML() ? ADDITIONAL_AFFINE_CAND_NUM : 0);
+#else
   const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand();
+#endif
+#else
+  const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand();
+#endif
   const unsigned plevel = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
   const Position posLT[3] = { pu.Y().topLeft().offset( -1, -1 ), pu.Y().topLeft().offset( 0, -1 ), pu.Y().topLeft().offset( -1, 0 ) };
   const Position posRT[2] = { pu.Y().topRight().offset(0, -1), pu.Y().topRight().offset(1, -1) };
@@ -8921,6 +9704,9 @@ const int getAvailableAffineNeighboursForAbovePredictor( const PredictionUnit &p
 }
 
 void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx,
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION && JVET_W0090_ARMC_TM
+  InterPrediction* m_pcInterSearch,
+#endif
 #if !AFFINE_MMVD
                              const int mrgCandIdx
 #else
@@ -8933,13 +9719,24 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 {
   const CodingStructure &cs = *pu.cs;
   const Slice &slice = *pu.cs->slice;
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#if JVET_W0090_ARMC_TM
+  const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand() + (pu.cs->sps->getUseAML() ? ADDITIONAL_AFFINE_CAND_NUM : 0);
+#else
   const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand();
+#endif
+#else
+  const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand();
+#endif
   const unsigned plevel = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
 #if JVET_Z0118_GDR
   bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
 #endif
-
-  for ( int i = 0; i < maxNumAffineMergeCand; i++ )
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+  for (int i = 0; i < RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE; i++)
+#else
+  for (int i = 0; i < maxNumAffineMergeCand; i++)
+#endif
   {
     for ( int mvNum = 0; mvNum < 3; mvNum++ )
     {
@@ -8952,6 +9749,10 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
     affMrgCtx.BcwIdx[i] = BCW_DEFAULT;
 #if INTER_LIC
     affMrgCtx.LICFlags[i] = false;
+#endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+    affMrgCtx.numAffCandToTestEnc = maxNumAffineMergeCand;
+    affMrgCtx.candCost[i] = MAX_UINT64;
 #endif
   }
 
@@ -9056,7 +9857,11 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
     ///> Start: inherited affine candidates
 #if JVET_Z0139_HIST_AFF
     const int CHECKED_NEI_NUM = 7;
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+    const PredictionUnit *npu[CHECKED_NEI_NUM + AFF_MAX_NON_ADJACENT_INHERITED_CANDS + MAX_NUM_AFF_INHERIT_HMVP_CANDS];
+#else
     const PredictionUnit* npu[CHECKED_NEI_NUM];
+#endif
     const PredictionUnit* npuGroup2[CHECKED_NEI_NUM];
     Position posGroup2[CHECKED_NEI_NUM];
     int numGroup2;
@@ -9159,6 +9964,125 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
         return;
       }
     }
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+    int numAffNeighExtend2 = getNonAdjAvailableAffineNeighboursByDistance(pu, npu, affMrgCtx, 0, -1);
+    if (numAffNeighExtend2 > 0)
+    {
+      AffineMergeCtx affMrgCtxTemp;
+      for (int i = 0; i < RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE; i++)
+      {
+        for (int mvNum = 0; mvNum < 3; mvNum++)
+        {
+          affMrgCtxTemp.mvFieldNeighbours[(i << 1) + 0][mvNum].setMvField(Mv(), -1);
+          affMrgCtxTemp.mvFieldNeighbours[(i << 1) + 1][mvNum].setMvField(Mv(), -1);
+        }
+        affMrgCtxTemp.interDirNeighbours[i] = 0;
+        affMrgCtxTemp.affineType[i] = AFFINEMODEL_4PARAM;
+        affMrgCtxTemp.mergeType[i] = MRG_TYPE_DEFAULT_N;
+        affMrgCtxTemp.BcwIdx[i] = BCW_DEFAULT;
+#if INTER_LIC
+        affMrgCtxTemp.LICFlags[i] = false;
+#endif
+        affMrgCtxTemp.candCost[i] = MAX_UINT64;
+      }
+      affMrgCtxTemp.numValidMergeCand = 0;
+      affMrgCtxTemp.maxNumMergeCand = RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE;
+
+      std::vector<RMVFInfo> mvpInfoVec[2][4];
+      collectNeiMotionInfo(mvpInfoVec, pu);
+
+#if JVET_W0090_ARMC_TM
+      if (pu.cs->sps->getUseAML())
+      {
+        for (int i = 0; i < numAffNeighExtend2; i++)
+        {
+          getRMVFAffineGuideCand(pu, *npu[i], affMrgCtxTemp, mvpInfoVec);
+          if (affMrgCtxTemp.numValidMergeCand == affMrgCtxTemp.maxNumMergeCand)
+          {
+            break;
+          }
+        }
+        PredictionUnit pu2 = pu;
+        m_pcInterSearch->adjustAffineMergeCandidatesOneGroup(pu2, affMrgCtxTemp, affMrgCtxTemp.numValidMergeCand);
+        int counter = 0;
+
+        Mv cMv[2][3];
+        int8_t referenceidx[2];
+        for (int i = 0; i < affMrgCtxTemp.numValidMergeCand; i++)
+        {
+          cMv[0][0] = affMrgCtxTemp.mvFieldNeighbours[(i << 1) + 0][0].mv;
+          cMv[0][1] = affMrgCtxTemp.mvFieldNeighbours[(i << 1) + 0][1].mv;
+          cMv[0][2] = affMrgCtxTemp.mvFieldNeighbours[(i << 1) + 0][2].mv;
+          cMv[1][0] = affMrgCtxTemp.mvFieldNeighbours[(i << 1) + 1][0].mv;
+          cMv[1][1] = affMrgCtxTemp.mvFieldNeighbours[(i << 1) + 1][1].mv;
+          cMv[1][2] = affMrgCtxTemp.mvFieldNeighbours[(i << 1) + 1][2].mv;
+          referenceidx[0] = affMrgCtxTemp.mvFieldNeighbours[(i << 1) + 0][0].refIdx;
+          referenceidx[1] = affMrgCtxTemp.mvFieldNeighbours[(i << 1) + 1][0].refIdx;
+          if (xCPMVSimCheck(pu, affMrgCtx, cMv, affMrgCtxTemp.interDirNeighbours[i], referenceidx, EAffineModel(affMrgCtxTemp.affineType[i]), affMrgCtxTemp.BcwIdx[i], affMrgCtxTemp.LICFlags[i]))
+          {
+            continue;
+          }
+          counter++;
+          for (int mvNum = 0; mvNum < 3; mvNum++)
+          {
+            affMrgCtx.mvFieldNeighbours[(affMrgCtx.numValidMergeCand << 1) + 0][mvNum].setMvField(cMv[0][mvNum], referenceidx[0]);
+            affMrgCtx.mvFieldNeighbours[(affMrgCtx.numValidMergeCand << 1) + 1][mvNum].setMvField(cMv[1][mvNum], referenceidx[1]);
+          }
+          affMrgCtx.interDirNeighbours[affMrgCtx.numValidMergeCand] = affMrgCtxTemp.interDirNeighbours[i];
+          affMrgCtx.affineType[affMrgCtx.numValidMergeCand] = EAffineModel(affMrgCtxTemp.affineType[i]);
+          affMrgCtx.mergeType[affMrgCtx.numValidMergeCand] = MRG_TYPE_DEFAULT_N;
+          affMrgCtx.BcwIdx[affMrgCtx.numValidMergeCand] = affMrgCtxTemp.BcwIdx[i];
+#if INTER_LIC
+          affMrgCtx.LICFlags[affMrgCtx.numValidMergeCand] = affMrgCtxTemp.LICFlags[i];
+#endif
+          affMrgCtx.candCost[affMrgCtx.numValidMergeCand] = affMrgCtxTemp.candCost[i];
+
+          if (affMrgCtx.numValidMergeCand == mrgCandIdx)
+          {
+            affMrgCtx.numValidMergeCand++;
+            return;
+          }
+
+          // early termination
+          affMrgCtx.numValidMergeCand++;
+          if (affMrgCtx.numValidMergeCand == maxNumAffineMergeCand)
+          {
+            return;
+          }
+          if (counter >= numAffNeighExtend2)
+          {
+            break;
+          }
+        }
+      }
+      else
+      {
+#endif
+        int counter = 0;
+        int numAdded = 0;
+        for (int i = 0; i < numAffNeighExtend2; i++)
+        {
+          numAdded = affMrgCtx.numValidMergeCand;
+          getRMVFAffineGuideCand(pu, *npu[i], affMrgCtx, mvpInfoVec, mrgCandIdx);
+          if (affMrgCtx.numValidMergeCand != 0 && (affMrgCtx.numValidMergeCand - 1 == mrgCandIdx))
+          {
+            return;
+          }
+          if (affMrgCtx.numValidMergeCand == maxNumAffineMergeCand)
+          {
+            return;
+          }
+          counter += affMrgCtx.numValidMergeCand - numAdded;
+          if (counter >= numAffNeighExtend2)
+          {
+            break;
+          }
+        }
+#if JVET_W0090_ARMC_TM
+      }
+#endif
+    }
+#endif
 #if JVET_Z0139_HIST_AFF
     MotionInfo tmvpInfo;
     tmvpInfo.interDir = 0;
@@ -9459,7 +10383,12 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
         }
       }
     }
-
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION && JVET_W0090_ARMC_TM
+    if (pu.cs->sps->getUseAML())
+    {
+      affMrgCtx.numAffCandToTestEnc = affMrgCtx.numValidMergeCand;
+    }
+#endif
     for (int iAffListIdx = 1; iAffListIdx < MAX_NUM_AFF_HMVP_CANDS; iAffListIdx++)
     {
 #if JVET_Z0118_GDR
