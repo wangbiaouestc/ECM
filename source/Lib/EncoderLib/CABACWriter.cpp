@@ -3229,6 +3229,18 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
     int numCandminus1 = int( pu.cs->picHeader->getMaxNumAffineMergeCand() ) - 1;
     if ( numCandminus1 > 0 )
     {
+#if JVET_AA0128_AFFINE_MERGE_CTX_INC
+      unsigned int unaryIdx = 0;
+      for (; unaryIdx < numCandminus1; ++unaryIdx)
+      {
+        unsigned int symbol = pu.mergeIdx == unaryIdx ? 0 : 1;
+        m_BinEncoder.encodeBin(symbol, Ctx::AffMergeIdx((unaryIdx > 2 ? 2 : unaryIdx)));
+        if (symbol == 0)
+        {
+          break;
+        }
+      }
+#else
       if ( pu.mergeIdx == 0 )
       {
         m_BinEncoder.encodeBin( 0, Ctx::AffMergeIdx() );
@@ -3247,6 +3259,7 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
           }
         }
       }
+#endif
     }
     DTRACE( g_trace_ctx, D_SYNTAX, "aff_merge_idx() aff_merge_idx=%d\n", pu.mergeIdx );
   }

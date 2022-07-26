@@ -1546,6 +1546,22 @@ const CtxSet ContextSetCfg::AffineType = ContextSetCfg::addCtxSet
   { 211, },
   });
 
+#if JVET_AA0128_AFFINE_MERGE_CTX_INC
+const CtxSet ContextSetCfg::AffMergeIdx = ContextSetCfg::addCtxSet
+({
+  {   4, CNU, CNU, },
+  {   4, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  {   1, DWS, DWS, },
+  {   1, DWS, DWS, },
+  { DWS, DWS, DWS, },
+  {  18, DWE, DWE, },
+  {  25, DWE, DWE, },
+  { DWE, DWE, DWE, },
+  { 118, DWO, DWO, },
+  { 148, DWO, DWO, },
+  });
+#else
 const CtxSet ContextSetCfg::AffMergeIdx = ContextSetCfg::addCtxSet
 ({
   {   4, },
@@ -1560,6 +1576,7 @@ const CtxSet ContextSetCfg::AffMergeIdx = ContextSetCfg::addCtxSet
   { 118, },
   { 148, },
   });
+#endif
 
 #if INTER_LIC
 const CtxSet ContextSetCfg::LICFlag = ContextSetCfg::addCtxSet
