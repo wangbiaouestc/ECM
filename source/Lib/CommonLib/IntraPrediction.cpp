@@ -112,6 +112,9 @@ IntraPrediction::IntraPrediction()
 #if JVET_V0130_INTRA_TMP
   m_pppTarPatch = NULL;
 #endif
+#if JVET_AA0057_CCCM
+  m_cccmLumaBuf = nullptr;
+#endif
 }
 
 IntraPrediction::~IntraPrediction()
@@ -169,6 +172,11 @@ void IntraPrediction::destroy()
     delete[] m_pppTarPatch;
     m_pppTarPatch = NULL;
   }
+#endif
+
+#if JVET_AA0057_CCCM
+  delete[] m_cccmLumaBuf;
+  m_cccmLumaBuf = nullptr;
 #endif
 }
 
@@ -266,6 +274,13 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
   }
 
   m_calcTemplateDiff = calcTemplateDiff;
+#endif
+
+#if JVET_AA0057_CCCM
+  if (m_cccmLumaBuf == nullptr)
+  {
+    m_cccmLumaBuf = new Pel[(2*MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2*CCCM_FILTER_PADDING) * (2*MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2*CCCM_FILTER_PADDING)];
+  }
 #endif
 
 #if ENABLE_SIMD_TMP
@@ -4731,6 +4746,14 @@ int isBelowLeftAvailable(const CodingUnit &cu, const ChannelType &chType, const 
 // LumaRecPixels
 void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chromaArea)
 {
+#if JVET_AA0057_CCCM
+  if ( pu.cccmFlag )
+  {
+    xCccmCreateLumaRef(pu);
+    return;
+  }
+#endif
+  
   int iDstStride = 0;
   Pel* pDst0 = 0;
   int curChromaMode = pu.intraDir[1];
@@ -6766,6 +6789,687 @@ int IntraPrediction::calcTemplateDiff( Pel* ref, unsigned int uiStride, Pel** ta
 #endif
 
   return diffSum;
+}
+#endif
+
+#if JVET_AA0057_CCCM
+void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr, int intraDir )
+{
+  if ( pu.cccmFlag )
+  {
+    CccmModel cccmModelCb( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) );
+    CccmModel cccmModelCr( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) );
+
+    if ( PU::cccmSingleModeAvail(pu, intraDir) )
+    {
+      xCccmCalcModels(pu, cccmModelCb,  cccmModelCr, 0, 0);
+      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 0, 0, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 0, 0, predCr);
+    }
+    else
+    {
+      // Multimode case
+      int modelThr = xCccmCalcRefAver(pu);
+      
+      xCccmCalcModels(pu, cccmModelCb,  cccmModelCr, 1, modelThr);
+      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 1, modelThr, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 1, modelThr, predCr);
+
+      xCccmCalcModels(pu, cccmModelCb,  cccmModelCr, 2, modelThr);
+      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 2, modelThr, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 2, modelThr, predCr);
+    }
+  }
+}
+
+void IntraPrediction::xCccmApplyModel(const PredictionUnit& pu, const ComponentID compId, CccmModel &cccmModel, int modelId, int modelThr, PelBuf &piPred) const
+{
+  const  ClpRng& clpRng(pu.cu->cs->slice->clpRng(compId));
+  static Pel     samples[CCCM_NUM_PARAMS];
+
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu);
+
+  for (int y = 0; y < refLumaBlk.height; y++)
+  {
+    for (int x = 0; x < refLumaBlk.width; x++)
+    {
+      if ( modelId == 1 && refLumaBlk.at( x, y ) > modelThr ) // Model 1: Include only samples below or equal to the threshold
+      {
+        continue;
+      }
+      if ( modelId == 2 && refLumaBlk.at( x, y ) <= modelThr) // Model 2: Include only samples above the threshold
+      {
+        continue;
+      }
+      
+      // 7-tap cross
+      samples[0] = refLumaBlk.at( x  , y   ); // C
+      samples[1] = refLumaBlk.at( x  , y-1 ); // N
+      samples[2] = refLumaBlk.at( x  , y+1 ); // S
+      samples[3] = refLumaBlk.at( x-1, y   ); // W
+      samples[4] = refLumaBlk.at( x+1, y   ); // E
+      samples[5] = cccmModel.nonlinear( refLumaBlk.at( x, y) );
+      samples[6] = cccmModel.bias();
+
+      piPred.at(x, y) = ClipPel<Pel>( cccmModel.convolve(samples, CCCM_NUM_PARAMS), clpRng );
+    }
+  }
+}
+
+void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel &cccmModelCb, CccmModel &cccmModelCr, int modelId, int modelThr) const
+{
+  int areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY;
+
+  const CPelBuf recoCb  = pu.cs->picture->getRecoBuf(COMPONENT_Cb);
+  const CPelBuf recoCr  = pu.cs->picture->getRecoBuf(COMPONENT_Cr);
+  PelBuf        refLuma = xCccmGetLumaRefBuf(pu, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY);
+
+  int M = CCCM_NUM_PARAMS;
+  
+  int sampleNum = areaWidth * areaHeight - pu.blocks[COMPONENT_Cb].width * pu.blocks[COMPONENT_Cb].height;
+  int sampleInd = 0;
+  
+  // Collect reference data to input matrix A and target vector Y
+  static Pel A[CCCM_NUM_PARAMS][CCCM_MAX_REF_SAMPLES];
+  static Pel YCb[CCCM_MAX_REF_SAMPLES];
+  static Pel YCr[CCCM_MAX_REF_SAMPLES];
+
+  for (int y = 0; y < areaHeight; y++)
+  {
+    for (int x = 0; x < areaWidth; x++)
+    {
+      if ( x >= refSizeX && y >= refSizeY )
+      {
+        continue;
+      }
+      
+      if ( modelId == 1 && refLuma.at( x, y ) > modelThr ) // Model 1: Include only samples below or equal to the threshold
+      {
+        continue;
+      }
+      if ( modelId == 2 && refLuma.at( x, y ) <= modelThr) // Model 2: Include only samples above the threshold
+      {
+        continue;
+      }
+
+      // 7-tap cross
+      A[0][sampleInd] = refLuma.at( x  , y   ); // C
+      A[1][sampleInd] = refLuma.at( x  , y-1 ); // N
+      A[2][sampleInd] = refLuma.at( x  , y+1 ); // S
+      A[3][sampleInd] = refLuma.at( x-1, y   ); // W
+      A[4][sampleInd] = refLuma.at( x+1, y   ); // E
+      A[5][sampleInd] = cccmModelCb.nonlinear( refLuma.at( x, y) );
+      A[6][sampleInd] = cccmModelCb.bias();
+
+      YCb[sampleInd]   = recoCb.at(refPosPicX + x, refPosPicY + y);
+      YCr[sampleInd++] = recoCr.at(refPosPicX + x, refPosPicY + y);
+    }
+  }
+
+  if ( sampleInd == 0 ) // Number of samples can go to zero in the multimode case
+  {
+    cccmModelCb.clearModel(M);
+    cccmModelCr.clearModel(M);
+    return;
+  }
+  else
+  {
+    sampleNum = sampleInd;
+  }
+  
+  // Calculate autocorrelation matrix and cross-correlation vector
+  static CccmCovarianceInt::TE ATA;
+  static CccmCovarianceInt::Ty ATYCb;
+  static CccmCovarianceInt::Ty ATYCr;
+
+  memset(ATA  , 0x00, sizeof(TCccmCoeff) * CCCM_NUM_PARAMS * CCCM_NUM_PARAMS);
+  memset(ATYCb, 0x00, sizeof(TCccmCoeff) * CCCM_NUM_PARAMS);
+  memset(ATYCr, 0x00, sizeof(TCccmCoeff) * CCCM_NUM_PARAMS);
+
+  for (int coli0 = 0; coli0 < M; coli0++)
+  {
+    for (int coli1 = coli0; coli1 < M; coli1++)
+    {
+      Pel *col0 = A[coli0];
+      Pel *col1 = A[coli1];
+      
+      for (int rowi = 0; rowi < sampleNum; rowi++)
+      {
+        ATA[coli0][coli1] += col0[rowi] * col1[rowi];
+      }
+    }
+  }
+
+  for (int coli = 0; coli < M; coli++)
+  {
+    Pel *col = A[coli];
+    
+    for (int rowi = 0; rowi < sampleNum; rowi++)
+    {
+      ATYCb[coli] += col[rowi] * YCb[rowi];
+      ATYCr[coli] += col[rowi] * YCr[rowi];
+    }
+  }
+
+  // Scale the matrix and vector to selected dynamic range
+  int matrixShift = CCCM_MATRIX_BITS - 2 * pu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA) - ceilLog2(sampleNum);
+
+  if ( matrixShift > 0 )
+  {
+    for (int coli0 = 0; coli0 < M; coli0++)
+    {
+      for (int coli1 = coli0; coli1 < M; coli1++)
+      {
+        ATA[coli0][coli1] <<= matrixShift;
+      }
+    }
+
+    for (int coli = 0; coli < M; coli++)
+    {
+      ATYCb[coli] <<= matrixShift;
+    }
+
+    for (int coli = 0; coli < M; coli++)
+    {
+      ATYCr[coli] <<= matrixShift;
+    }
+  }
+  else if ( matrixShift < 0 )
+  {
+    matrixShift = -matrixShift;
+    
+    for (int coli0 = 0; coli0 < M; coli0++)
+    {
+      for (int coli1 = coli0; coli1 < M; coli1++)
+      {
+        ATA[coli0][coli1] >>= matrixShift;
+      }
+    }
+
+    for (int coli = 0; coli < M; coli++)
+    {
+      ATYCb[coli] >>= matrixShift;
+    }
+
+    for (int coli = 0; coli < M; coli++)
+    {
+      ATYCr[coli] >>= matrixShift;
+    }
+  }
+  
+  // Solve the filter coefficients using LDL decomposition
+  CccmCovarianceInt cccmSolver;
+  CccmCovarianceInt::TE U;       // Upper triangular L' of ATA's LDL decomposition
+  CccmCovarianceInt::Ty diag;    // Diagonal of D
+
+  bool decompOk = cccmSolver.ldlDecompose(ATA, U, diag, M);
+  
+  cccmSolver.ldlSolve(U, diag, ATYCb, cccmModelCb.params, M, decompOk);
+  cccmSolver.ldlSolve(U, diag, ATYCr, cccmModelCr.params, M, decompOk);
+}
+
+// Calculate a single downsampled luma reference value (copied from IntraPrediction::xGetLumaRecPixels)
+Pel IntraPrediction::xCccmGetLumaVal(const PredictionUnit& pu, const CPelBuf pi, const int x, const int y) const
+{
+  const Pel* piSrc = pi.buf;
+  const int iRecStride = pi.stride;
+  Pel ypval = 0;
+  if (pu.chromaFormat == CHROMA_444)
+  {
+    ypval = piSrc[x + iRecStride * y];
+  }
+  else if (pu.chromaFormat == CHROMA_422)
+  {
+    int s       = 2;
+    int offLeft = x > 0 ? -1 : 0;
+    s += piSrc[2 * x +           iRecStride * y] * 2;
+    s += piSrc[2 * x + offLeft + iRecStride * y];
+    s += piSrc[2 * x +       1 + iRecStride * y];
+    ypval = s >> 2;
+  }
+  else if (pu.cs->sps->getCclmCollocatedChromaFlag())
+  {
+    int s        = 4;
+    int offLeft  = x > 0 ? -1 : 0;
+    int offAbove = y > 0 ? -1 : 0;
+    s += piSrc[2 * x +           iRecStride *  2 * y            ] * 4;
+    s += piSrc[2 * x + offLeft + iRecStride *  2 * y            ];
+    s += piSrc[2 * x +       1 + iRecStride *  2 * y            ];
+    s += piSrc[2 * x +           iRecStride * (2 * y + 1)       ];
+    s += piSrc[2 * x +           iRecStride * (2 * y + offAbove)];
+    ypval = s >> 3;
+  }
+  else
+  {
+    int s       = 4;
+    int offLeft = x > 0 ? -1 : 0;
+    s += piSrc[2 * x +           iRecStride *  y * 2            ] * 2;
+    s += piSrc[2 * x + offLeft + iRecStride *  y * 2            ];
+    s += piSrc[2 * x +       1 + iRecStride *  y * 2            ];
+    s += piSrc[2 * x +           iRecStride * (y * 2 + 1)       ] * 2;
+    s += piSrc[2 * x + offLeft + iRecStride * (y * 2 + 1)       ];
+    s += piSrc[2 * x +       1 + iRecStride * (y * 2 + 1)       ];
+    ypval = s >> 3;
+  }
+  return ypval;
+}
+
+// Using the same availability checking as in IntraPrediction::xGetLumaRecPixels
+void IntraPrediction::xCccmCalcRefArea(const PredictionUnit& pu)
+{
+  CompArea chromaArea = pu.Cb();
+  CompArea lumaArea   = CompArea( COMPONENT_Y, pu.chromaFormat, chromaArea.lumaPos(), recalcSize( pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, chromaArea.size() ) );//needed for correct pos/size (4x4 Tus)
+
+  const SizeType uiCWidth  = chromaArea.width;
+  const SizeType uiCHeight = chromaArea.height;
+
+  const CodingUnit& lumaCU = isChroma( pu.chType ) ? *pu.cs->picture->cs->getCU( lumaArea.pos(), CH_L ) : *pu.cu;
+  const CodingUnit&     cu = *pu.cu;
+  const CompArea& area     = isChroma( pu.chType ) ? chromaArea : lumaArea;
+
+  const uint32_t uiTuWidth  = area.width;
+  const uint32_t uiTuHeight = area.height;
+
+  int iBaseUnitSize = ( 1 << MIN_CU_LOG2 );
+
+  const int  iUnitWidth  = iBaseUnitSize >> getComponentScaleX(area.compID, area.chromaFormat );
+  const int  iUnitHeight = iBaseUnitSize >> getComponentScaleY(area.compID, area.chromaFormat);
+
+  const int  iTUWidthInUnits  = uiTuWidth / iUnitWidth;
+  const int  iTUHeightInUnits = uiTuHeight / iUnitHeight;
+  const int  iAboveUnits      = iTUWidthInUnits;
+  const int  iLeftUnits       = iTUHeightInUnits;
+  const int  chromaUnitWidth  = iBaseUnitSize >> getComponentScaleX(COMPONENT_Cb, area.chromaFormat);
+  const int  chromaUnitHeight = iBaseUnitSize >> getComponentScaleY(COMPONENT_Cb, area.chromaFormat);
+  const int  topTemplateSampNum  = 2 * uiCWidth;
+  const int  leftTemplateSampNum = 2 * uiCHeight;
+  const int  totalAboveUnits = (topTemplateSampNum  + (chromaUnitWidth  - 1)) / chromaUnitWidth;
+  const int  totalLeftUnits  = (leftTemplateSampNum + (chromaUnitHeight - 1)) / chromaUnitHeight;
+  const int  totalUnits = totalLeftUnits + totalAboveUnits + 1;
+  const int  aboveRightUnits = totalAboveUnits - iAboveUnits;
+  const int  leftBelowUnits  = totalLeftUnits - iLeftUnits;
+
+  int avaiAboveRightUnits = 0;
+  int avaiLeftBelowUnits  = 0;
+  bool  bNeighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1];
+  memset(bNeighborFlags, 0, totalUnits);
+  bool aboveIsAvailable, leftIsAvailable;
+
+  int availlableUnit = isLeftAvailable(isChroma(pu.chType) ? cu : lumaCU, toChannelType(area.compID), area.pos(),
+                                       iLeftUnits, iUnitHeight, (bNeighborFlags + iLeftUnits + leftBelowUnits - 1));
+
+  leftIsAvailable = availlableUnit == iTUHeightInUnits;
+
+  availlableUnit = isAboveAvailable(isChroma(pu.chType) ? cu : lumaCU, toChannelType(area.compID), area.pos(),
+                                    iAboveUnits, iUnitWidth, (bNeighborFlags + iLeftUnits + leftBelowUnits + 1));
+
+  aboveIsAvailable = availlableUnit == iTUWidthInUnits;
+
+  if (leftIsAvailable)   // if left is not available, then the below left is not available
+  {
+    avaiLeftBelowUnits = isBelowLeftAvailable(isChroma(pu.chType) ? cu : lumaCU, toChannelType(area.compID), area.bottomLeftComp(area.compID), leftBelowUnits, iUnitHeight, (bNeighborFlags + leftBelowUnits - 1));
+  }
+
+  if (aboveIsAvailable)   // if above is not available, then  the above right is not available.
+  {
+    avaiAboveRightUnits = isAboveRightAvailable(isChroma(pu.chType) ? cu : lumaCU, toChannelType(area.compID), area.topRightComp(area.compID), aboveRightUnits, iUnitWidth, (bNeighborFlags + iLeftUnits + leftBelowUnits + iAboveUnits + 1));
+  }
+
+  int columnsLeft, rowsAbove;
+  
+  PU::getCccmRefLineNum(pu, columnsLeft, rowsAbove);            // Reference lines available left and above
+
+  int refWidth  = pu.blocks[COMPONENT_Cb].width  + columnsLeft; // Reference buffer size excluding paddings
+  int refHeight = pu.blocks[COMPONENT_Cb].height + rowsAbove;
+  
+  int extWidth  = avaiAboveRightUnits * chromaUnitWidth;
+  int extHeight = avaiLeftBelowUnits  * chromaUnitHeight;
+  
+  refWidth  += rowsAbove   ? extWidth  : 0; // Add above right if above is available
+  refHeight += columnsLeft ? extHeight : 0; // Add below left if left is available
+  
+  m_cccmRefArea = Area( columnsLeft, rowsAbove, refWidth, refHeight); // Position with respect to the PU
+}
+
+// Return downsampled luma buffer that contains PU and the reference areas above and left of the PU
+PelBuf IntraPrediction::xCccmGetLumaRefBuf(const PredictionUnit& pu, int &areaWidth, int &areaHeight, int &refSizeX, int &refSizeY, int &refPosPicX, int &refPosPicY ) const
+{
+  refSizeX   = m_cccmRefArea.x;                        // Reference lines available left and above
+  refSizeY   = m_cccmRefArea.y;
+  areaWidth  = m_cccmRefArea.width;                    // Reference buffer size excluding paddings
+  areaHeight = m_cccmRefArea.height;
+  refPosPicX = pu.blocks[COMPONENT_Cb].x - refSizeX; // Position of the reference area in picture coordinates
+  refPosPicY = pu.blocks[COMPONENT_Cb].y - refSizeY;
+
+  int refStride = areaWidth + 2 * CCCM_FILTER_PADDING; // Including paddings required for the 2D filter
+  int refOrigin = refStride * CCCM_FILTER_PADDING + CCCM_FILTER_PADDING;
+
+  return PelBuf(m_cccmLumaBuf + refOrigin, refStride, areaWidth, areaHeight); // Points to the top-left corner of the reference area
+}
+
+// Return downsampled luma buffer for a PU
+PelBuf IntraPrediction::xCccmGetLumaPuBuf(const PredictionUnit& pu) const
+{
+  int puWidth   = pu.blocks[COMPONENT_Cb].width;
+  int puHeight  = pu.blocks[COMPONENT_Cb].height;
+  
+  int refStride = m_cccmRefArea.width + 2 * CCCM_FILTER_PADDING; // Including paddings required for the 2D filter
+  int refOrigin = refStride * (m_cccmRefArea.y + CCCM_FILTER_PADDING) + m_cccmRefArea.x + CCCM_FILTER_PADDING;
+
+  return PelBuf(m_cccmLumaBuf + refOrigin, refStride, puWidth, puHeight);  // Points to the top-left corner of the block
+}
+
+int IntraPrediction::xCccmCalcRefAver(const PredictionUnit& pu) const
+{
+  int areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY;
+
+  PelBuf refLuma = xCccmGetLumaRefBuf(pu, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY);
+  
+  int numSamples = 0;
+  int sumSamples = 0;
+  
+  // Top samples
+  for (int y = 0; y < refSizeY; y++)
+  {
+    for (int x = 0; x < areaWidth; x++)
+    {
+      sumSamples += refLuma.at(x, y);
+      numSamples++;
+    }
+  }
+
+  // Left samples
+  for (int y = refSizeY; y < areaHeight; y++)
+  {
+    for (int x = 0; x < refSizeX; x++)
+    {
+      sumSamples += refLuma.at(x, y);
+      numSamples++;
+    }
+  }
+
+  return numSamples == 0 ? 512 : ( sumSamples + numSamples/2) / numSamples;
+}
+
+void IntraPrediction::xCccmCreateLumaRef(const PredictionUnit& pu)
+{
+  const CPelBuf recoLuma = pu.cs->picture->getRecoBuf(COMPONENT_Y);
+  const int  maxPosPicX  = pu.cs->picture->chromaSize().width  - 1;
+  const int  maxPosPicY  = pu.cs->picture->chromaSize().height - 1;
+
+  xCccmCalcRefArea(pu); // Find the reference area
+  
+  int areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY;
+
+  PelBuf refLuma = xCccmGetLumaRefBuf(pu, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY);
+  
+  int puBorderX = refSizeX + pu.blocks[COMPONENT_Cb].width;
+  int puBorderY = refSizeY + pu.blocks[COMPONENT_Cb].height;
+  
+  // Generate down-sampled luma for the area covering both the PU and the top/left reference areas (+ top and left paddings)
+  for (int y = -CCCM_FILTER_PADDING; y < areaHeight; y++)
+  {
+    for (int x = -CCCM_FILTER_PADDING; x < areaWidth; x++)
+    {
+      if (( x >= puBorderX && y >= refSizeY ) ||
+          ( y >= puBorderY && x >= refSizeX ))
+      {
+        continue;
+      }
+
+      int chromaPosPicX = refPosPicX + x;
+      int chromaPosPicY = refPosPicY + y;
+      
+      chromaPosPicX = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+      chromaPosPicY = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+      
+      refLuma.at( x, y ) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, chromaPosPicY);
+    }
+  }
+
+  CHECK( CCCM_FILTER_PADDING != 1, "Only padding with one sample implemented" );
+
+  // Pad right of top reference area
+  for (int y = -1; y < refSizeY; y++)
+  {
+    refLuma.at( areaWidth, y ) = refLuma.at( areaWidth - 1, y );
+  }
+
+  // Pad right of PU
+  for (int y = refSizeY; y < puBorderY; y++)
+  {
+    refLuma.at( puBorderX, y ) = refLuma.at( puBorderX - 1, y );
+  }
+
+  // Pad right of left reference area
+  for (int y = puBorderY; y < areaHeight; y++)
+  {
+    refLuma.at( refSizeX, y ) = refLuma.at( refSizeX - 1, y );
+  }
+
+  // Pad below left reference area
+  for (int x = -1; x < refSizeX + 1; x++)
+  {
+    refLuma.at( x, areaHeight ) = refLuma.at( x, areaHeight - 1 );
+  }
+
+  // Pad below PU
+  for (int x = refSizeX; x < puBorderX + 1; x++)
+  {
+    refLuma.at( x, puBorderY ) = refLuma.at( x, puBorderY - 1 );
+  }
+
+  // Pad below right reference area
+  for (int x = puBorderX + 1; x < areaWidth + 1; x++)
+  {
+    refLuma.at( x, refSizeY ) = refLuma.at( x, refSizeY - 1 );
+  }
+  
+  // In dualtree we can also use luma from the right and below (if not on CTU/picture boundary)
+  if ( CS::isDualITree( *pu.cs ) )
+  {
+    int ctuWidth  = pu.cs->sps->getMaxCUWidth()  >> getComponentScaleX(COMPONENT_Cb, pu.chromaFormat);
+    int ctuHeight = pu.cs->sps->getMaxCUHeight() >> getComponentScaleY(COMPONENT_Cb, pu.chromaFormat);
+
+    // Samples right of top reference area
+    int padPosPicX = refPosPicX + areaWidth;
+
+    if ( padPosPicX <= maxPosPicX && (padPosPicX % ctuWidth) )
+    {
+      for (int y = -1; y < refSizeY; y++)
+      {
+        int chromaPosPicY = refPosPicY + y;
+        chromaPosPicY     = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+
+        refLuma.at( areaWidth, y ) = xCccmGetLumaVal(pu, recoLuma, padPosPicX, chromaPosPicY);
+      }
+    }
+
+    // Samples right of PU
+    padPosPicX = refPosPicX + puBorderX;
+
+    if ( padPosPicX <= maxPosPicX && (padPosPicX % ctuWidth) )
+    {
+      for (int y = refSizeY; y < puBorderY; y++)
+      {
+        int chromaPosPicY = refPosPicY + y;
+        chromaPosPicY     = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+
+        refLuma.at( puBorderX, y ) = xCccmGetLumaVal(pu, recoLuma, padPosPicX, chromaPosPicY);
+      }
+    }
+
+    // Samples right of left reference area
+    padPosPicX = refPosPicX + refSizeX;
+
+    if ( padPosPicX <= maxPosPicX )
+    {
+      for (int y = puBorderY; y < areaHeight; y++)
+      {
+        int chromaPosPicY = refPosPicY + y;
+        chromaPosPicY     = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+
+        refLuma.at( refSizeX, y ) = xCccmGetLumaVal(pu, recoLuma, padPosPicX, chromaPosPicY);
+      }
+    }
+    
+    // Samples below left reference area
+    int padPosPicY = refPosPicY + areaHeight;
+    
+    if ( padPosPicY <= maxPosPicY && (padPosPicY % ctuHeight) )
+    {
+      for (int x = -1; x < refSizeX + 1; x++)
+      {
+        int chromaPosPicX = refPosPicX + x;
+        chromaPosPicX     = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+        
+        refLuma.at( x, areaHeight ) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, padPosPicY);
+      }
+    }
+    
+    // Samples below PU
+    padPosPicY = refPosPicY + puBorderY;
+    
+    if ( padPosPicY <= maxPosPicY && (padPosPicY % ctuHeight) )
+    {
+      for (int x = refSizeX; x < puBorderX; x++) // Just go to PU border as the next sample may be out of CTU (and not needed anyways)
+      {
+        int chromaPosPicX = refPosPicX + x;
+        chromaPosPicX     = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+        
+        refLuma.at( x, puBorderY ) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, padPosPicY);
+      }
+    }
+
+    // Samples below right reference area
+    padPosPicY = refPosPicY + refSizeY;
+    
+    if ( padPosPicY <= maxPosPicY )
+    {
+      // Avoid going outside of right CTU border where these samples are not yet available
+      int puPosPicX        = pu.blocks[COMPONENT_Cb].x;
+      int ctuRightEdgeDist = ctuWidth - (puPosPicX % ctuWidth) + refSizeX;
+      int lastPosX         = ctuRightEdgeDist < areaWidth ? ctuRightEdgeDist : areaWidth;
+
+      for (int x = puBorderX + 1; x < lastPosX; x++) // Just go to ref area border as the next sample may be out of CTU (and not needed anyways)
+      {
+        int chromaPosPicX = refPosPicX + x;
+        chromaPosPicX     = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+        
+        refLuma.at( x, refSizeY ) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, padPosPicY);
+      }
+    }
+  }
+}
+
+// LDL decomposing A to U'*diag*U
+bool CccmCovarianceInt::ldlDecomp(TE A, TE U, Ty diag, int numEq) const
+{
+  for (int i = 0; i < numEq; i++)
+  {
+    diag[i] = A[i][i];
+    
+    for (int k = i - 1; k >= 0; k--)
+    {
+      TCccmCoeff tmp = FIXED_MULT(U[k][i], U[k][i]);
+      diag[i]       -= FIXED_MULT(tmp, diag[k]);
+    }
+
+    if ( diag[i] <= 0) // A is singular
+    {
+      return false;
+    }
+
+    for (int j = i + 1; j < numEq; j++)
+    {
+      TCccmCoeff scale = A[i][j];
+      
+      for (int k = i - 1; k >= 0; k--)
+      {
+        TCccmCoeff tmp = FIXED_MULT(U[k][j], U[k][i]);
+        scale         -= FIXED_MULT(tmp, diag[k]);
+      }
+
+      U[i][j] = FIXED_DIV(scale, diag[i]);
+    }
+  }
+
+  return true;
+}
+
+// Solve U'z = y for z
+void CccmCovarianceInt::ldlTransposeBacksubstitution(TE U, TCccmCoeff* y, TCccmCoeff* z, int numEq) const
+{
+  z[0] = y[0];
+  
+  for (int i = 1; i < numEq; i++)
+  {
+    TCccmCoeff sum = 0;
+
+    for (int j = 0; j < i; j++)
+    {
+      sum += FIXED_MULT(z[j], U[j][i]);
+    }
+
+    z[i] = y[i] - sum;
+  }
+}
+
+// Solve Ux = z for x
+void CccmCovarianceInt::ldlBacksubstitution(TE U, TCccmCoeff* z, TCccmCoeff* x, int numEq) const
+{
+  x[numEq - 1] = z[numEq - 1];
+
+  for (int i = numEq - 2; i >= 0; i--)
+  {
+    TCccmCoeff sum = 0;
+
+    for (int j = i + 1; j < numEq; j++)
+    {
+      sum += FIXED_MULT(U[i][j], x[j]);
+    }
+
+    x[i] = z[i] - sum;
+  }
+}
+
+bool CccmCovarianceInt::ldlDecompose(TE A, TE U, Ty diag, int numEq) const
+{
+  // Compute upper triangular U and diagonal D such that U'*D*U = A
+  // (U being the tranpose of L in LDL decomposition: L*D*L' = A)
+
+  // Regularize A to reduce singularities
+  for (int i = 0; i < numEq; i++)
+  {
+    A[i][i] += 1;
+  }
+  
+  return ldlDecomp(A, U, diag, numEq);
+}
+
+void CccmCovarianceInt::ldlSolve(TE U, Ty diag, TCccmCoeff* y, TCccmCoeff* x, int numEq, bool decompOk) const
+{
+  if ( decompOk )
+  {
+    // Now, the equation is  U'*D*U*x = y, where U is upper triangular
+    // Solve U'*aux = y for aux
+    Ty aux;
+    
+    ldlTransposeBacksubstitution(U, y, aux, numEq);
+
+    // The equation is now D*U*x = aux, remove diagonal by scaling
+    for (int i = 0; i < numEq; i++)
+    {
+      aux[i] = FIXED_DIV(aux[i], diag[i]);
+    }
+    
+    // The equation is now U*x = aux, solve it for x (filter coefficients)
+    ldlBacksubstitution(U, aux, x, numEq);
+  }
+  else // A was singular
+  {
+    std::memset(x, 0, sizeof(TCccmCoeff) * numEq);
+  }
 }
 #endif
 

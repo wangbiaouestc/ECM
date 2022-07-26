@@ -1879,6 +1879,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
     Distortion uiBestDist = 0;
     double     dBestCost = MAX_DOUBLE;
     int32_t bestBDPCMMode = 0;
+#if JVET_AA0057_CCCM
+    int      cccmModeBest = 0;
+#endif
 #if JVET_Z0050_CCLM_SLOPE
     CclmOffsets bestCclmOffsets = {};
     CclmOffsets satdCclmOffsetsBest[NUM_CHROMA_MODE];
@@ -2407,6 +2410,88 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       pu.cclmOffsets.setAllZero();
 #endif
 
+#if JVET_AA0057_CCCM
+#if MMLM
+      for (int32_t uiMode = 0; uiMode < 2; uiMode++)
+      {
+        int chromaIntraMode = uiMode ? MMLM_CHROMA_IDX : LM_CHROMA_IDX;
+#else
+      for (int32_t uiMode = 0; uiMode < 1; uiMode++)
+      {
+        int chromaIntraMode = LM_CHROMA_IDX;
+#endif
+
+        if ( PU::cccmSingleModeAvail(pu, chromaIntraMode) || PU::cccmMultiModeAvail(pu, chromaIntraMode) )
+        {
+          pu.cccmFlag = 1;
+
+          // Original RD check code replicated from above
+          cs.setDecomp( pu.Cb(), false );
+          cs.dist = baseDist;
+          //----- restore context models -----
+          m_CABACEstimator->getCtx() = ctxStart;
+
+          //----- chroma coding -----
+          pu.intraDir[1] = chromaIntraMode;
+
+          xRecurIntraChromaCodingQT( cs, partitioner, bestCostSoFar, ispType );
+          if( lumaUsesISP && cs.dist == MAX_UINT )
+          {
+            continue;
+          }
+
+          if (cs.sps->getTransformSkipEnabledFlag())
+          {
+            m_CABACEstimator->getCtx() = ctxStart;
+          }
+
+          uint64_t fracBits   = xGetIntraFracBitsQT( cs, partitioner, false, true, -1, ispType );
+          Distortion uiDist = cs.dist;
+          double    dCost   = m_pcRdCost->calcRdCost( fracBits, uiDist - baseDist );
+
+          //----- compare -----
+          if( dCost < dBestCost )
+          {
+            if( lumaUsesISP && dCost < bestCostSoFar )
+            {
+              bestCostSoFar = dCost;
+            }
+            for( uint32_t i = getFirstComponentOfChannel( CHANNEL_TYPE_CHROMA ); i < numberValidComponents; i++ )
+            {
+              const CompArea &area = pu.blocks[i];
+
+              saveCS.getRecoBuf     ( area ).copyFrom( cs.getRecoBuf   ( area ) );
+#if KEEP_PRED_AND_RESI_SIGNALS
+              saveCS.getPredBuf     ( area ).copyFrom( cs.getPredBuf   ( area ) );
+              saveCS.getResiBuf     ( area ).copyFrom( cs.getResiBuf   ( area ) );
+#endif
+              saveCS.getPredBuf     ( area ).copyFrom( cs.getPredBuf   (area ) );
+              cs.picture->getPredBuf( area ).copyFrom( cs.getPredBuf   (area ) );
+              cs.picture->getRecoBuf( area ).copyFrom( cs.getRecoBuf( area ) );
+
+              for( uint32_t j = 0; j < saveCS.tus.size(); j++ )
+              {
+                saveCS.tus[j]->copyComponentFrom( *orgTUs[j], area.compID );
+              }
+            }
+
+            dBestCost  = dCost;
+            uiBestDist = uiDist;
+            uiBestMode = chromaIntraMode;
+            bestBDPCMMode = cu.bdpcmModeChroma;
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+            isChromaFusion  = pu.isChromaFusion;
+#endif
+#if JVET_Z0050_CCLM_SLOPE
+            bestCclmOffsets = pu.cclmOffsets;
+#endif
+            cccmModeBest    = pu.cccmFlag;
+          }
+        }
+      }
+        
+      pu.cccmFlag = 0;
+#endif
       for( uint32_t i = getFirstComponentOfChannel( CHANNEL_TYPE_CHROMA ); i < numberValidComponents; i++ )
       {
         const CompArea &area = pu.blocks[i];
@@ -2437,6 +2522,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
     cu.bdpcmModeChroma = bestBDPCMMode;
 #if JVET_Z0050_CCLM_SLOPE
     pu.cclmOffsets     = bestCclmOffsets;
+#endif
+#if JVET_AA0057_CCCM
+    pu.cccmFlag        = cccmModeBest;
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
     pu.isChromaFusion = isChromaFusion;
@@ -6670,6 +6758,14 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     initIntraPatternChType( *currTU.cu, cbArea);
     initIntraPatternChType( *currTU.cu, crArea);
 
+#if JVET_AA0057_CCCM
+    if( pu.cccmFlag )
+    {
+      xGetLumaRecPixels( pu, cbArea );
+      predIntraCCCM( pu, piPredCb, piPredCr, predMode );
+    }
+    else
+#endif
     if( PU::isLMCMode( predMode ) )
     {
       xGetLumaRecPixels( pu, cbArea );

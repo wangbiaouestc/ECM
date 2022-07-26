@@ -648,6 +648,9 @@ void PredictionUnit::initData()
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = {};
 #endif
+#if JVET_AA0057_CCCM
+  cccmFlag    = 0;
+#endif
   // inter data
   mergeFlag   = false;
   regularMergeFlag = false;
@@ -766,6 +769,9 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = predData.cclmOffsets;
 #endif
+#if JVET_AA0057_CCCM
+  cccmFlag    = predData.cccmFlag;
+#endif
   return *this;
 }
 
@@ -880,6 +886,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   multiRefIdx = other.multiRefIdx;
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = other.cclmOffsets;
+#endif
+#if JVET_AA0057_CCCM
+  cccmFlag    = other.cccmFlag;
 #endif
 
   mergeFlag   = other.mergeFlag;

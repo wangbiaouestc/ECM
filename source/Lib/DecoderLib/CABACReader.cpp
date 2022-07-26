@@ -2166,6 +2166,13 @@ void CABACReader::cclmDelta(PredictionUnit& pu, int8_t &delta)
 
 void CABACReader::cclmDeltaSlope(PredictionUnit& pu)
 {
+#if JVET_AA0057_CCCM
+  if ( pu.cccmFlag )
+  {
+    return;
+  }
+#endif
+
   if ( PU::hasCclmDeltaFlag( pu ) )
   {
     bool deltaActive = m_BinDecoder.decodeBin(Ctx::CclmDeltaFlags(0));
@@ -2275,12 +2282,28 @@ bool CABACReader::intra_chroma_lmc_mode(PredictionUnit& pu)
 #endif
   }
   
+#if JVET_AA0057_CCCM
+  cccmFlag( pu );
+#endif
+
 #if JVET_Z0050_CCLM_SLOPE
   cclmDeltaSlope( pu );
 #endif
 
   return true; //it will only enter this function for LMC modes, so always return true ;
 }
+
+#if JVET_AA0057_CCCM
+void CABACReader::cccmFlag(PredictionUnit& pu)
+{
+  const unsigned intraDir = pu.intraDir[1];
+  
+  if ( PU::cccmSingleModeAvail(pu, intraDir) || PU::cccmMultiModeAvail(pu, intraDir) )
+  {
+    pu.cccmFlag = m_BinDecoder.decodeBin( Ctx::CccmFlag( 0 ) );
+  }
+}
+#endif
 
 void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
 {

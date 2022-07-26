@@ -119,6 +119,9 @@ public:
   void        intra_chroma_pred_modes   ( CodingUnit&                   cu );
   bool        intra_chroma_lmc_mode     ( PredictionUnit&               pu );
   void        intra_chroma_pred_mode    ( PredictionUnit&               pu );
+#if JVET_AA0057_CCCM
+  void        cccmFlag                  ( PredictionUnit&               pu );
+#endif
 #if ENABLE_DIMD
   void        cu_dimd_flag              (CodingUnit&                   cu);
  #endif

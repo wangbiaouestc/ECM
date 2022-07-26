@@ -804,6 +804,18 @@ static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD =   MMVD_MAX_REFINE_NUM;
 static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM;
 #endif
 
+#if JVET_AA0057_CCCM
+static const int CCCM_WINDOW_SIZE         = 6;
+static const int CCCM_NUM_PARAMS          = 7;
+static const int CCCM_MIN_PU_SIZE         = 0; // Set to 0 for no size restriction
+static const int CCCM_REF_LINES_ABOVE_CTU = 0; // Number of chroma lines allowed to be included in the reference area above the CTU (0: no restrictions)
+static const int CCCM_FILTER_PADDING      = 1; // E.g. 3x3 filter needs one padded sample
+static const int CCCM_MAX_REF_SAMPLES     = ( 2 * CCCM_WINDOW_SIZE * ( 2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE ) );
+static const int CCCM_MATRIX_BITS         = 28;
+static const int CCCM_DECIM_BITS          = 22;
+static const int CCCM_DECIM_ROUND         = ( 1 << (CCCM_DECIM_BITS - 1 ) );
+#endif
+
 #if JVET_Y0152_TT_ENC_SPEEDUP
 static constexpr int   FAST_METHOD_TT_ENC_SPEEDUP = 0x0001;  ///< Embedding flag, which, if false, de-activates all the following ABT_ENC_SPEEDUP_* modes
 static constexpr int FAST_METHOD_HOR_XOR_VER = 0x0002;

@@ -494,6 +494,9 @@ public:
 #if JVET_Z0050_CCLM_SLOPE
   static const CtxSet   CclmDeltaFlags;
 #endif
+#if JVET_AA0057_CCCM
+  static const CtxSet   CccmFlag;
+#endif
   static const unsigned NumberOfContexts;
 
   // combined sets for less complex copying

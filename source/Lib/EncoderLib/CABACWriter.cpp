@@ -1903,6 +1903,13 @@ void CABACWriter::cclmDelta(const PredictionUnit& pu, int8_t delta)
 
 void CABACWriter::cclmDeltaSlope(const PredictionUnit& pu)
 {
+#if JVET_AA0057_CCCM
+  if ( pu.cccmFlag )
+  {
+    return;
+  }
+#endif
+
   if ( PU::hasCclmDeltaFlag( pu ) )
   {
     bool deltaActive = pu.cclmOffsets.isActive();
@@ -2009,11 +2016,26 @@ void CABACWriter::intra_chroma_lmc_mode(const PredictionUnit& pu)
 #endif
   }
 
+#if JVET_AA0057_CCCM
+  cccmFlag( pu );
+#endif
+
 #if JVET_Z0050_CCLM_SLOPE
   cclmDeltaSlope( pu );
 #endif
 }
 
+#if JVET_AA0057_CCCM
+void CABACWriter::cccmFlag(const PredictionUnit& pu)
+{
+  const unsigned intraDir = pu.intraDir[1];
+  
+  if ( PU::cccmSingleModeAvail(pu, intraDir) || PU::cccmMultiModeAvail(pu, intraDir) )
+  {
+    m_BinEncoder.encodeBin( pu.cccmFlag ? 1 : 0, Ctx::CccmFlag( 0 ) );
+  }
+}
+#endif
 
 void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
 {
