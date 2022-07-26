@@ -865,7 +865,63 @@ bool isMvOOBSubBlkCore(const Mv& rcMv, const struct Position pos, const struct S
   return isOOB;
 }
 #endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+void computeDeltaAndShiftCore(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri)
+{
+  for (int i = 0; i < int(mvpInfoVecOri.size()); i++)
+  {
+    mvpInfoVecOri[i].mvp.hor = mvpInfoVecOri[i].mvp.hor >= 0 ? mvpInfoVecOri[i].mvp.hor << 2 : -(-mvpInfoVecOri[i].mvp.hor << 2);
+    mvpInfoVecOri[i].mvp.ver = mvpInfoVecOri[i].mvp.ver >= 0 ? mvpInfoVecOri[i].mvp.ver << 2 : -(-mvpInfoVecOri[i].mvp.ver << 2);
+    mvpInfoVecOri[i].pos.x = mvpInfoVecOri[i].pos.x - posLT.x;
+    mvpInfoVecOri[i].pos.y = mvpInfoVecOri[i].pos.y - posLT.y;
+    mvpInfoVecOri[i].mvp.set(mvpInfoVecOri[i].mvp.getHor() - firstMv.getHor(), mvpInfoVecOri[i].mvp.getVer() - firstMv.getVer());
+  }
+}
+void computeDeltaAndShiftCoreAddi(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri, std::vector<RMVFInfo> &mvpInfoVecRes)
+{
+  int offset = (int)mvpInfoVecRes.size();
+  for (int i = 0; i < int(mvpInfoVecOri.size()); i++)
+  {
+    mvpInfoVecRes.push_back(RMVFInfo());
+    mvpInfoVecOri[i].mvp.hor = mvpInfoVecOri[i].mvp.hor >= 0 ? mvpInfoVecOri[i].mvp.hor << 2 : -(-mvpInfoVecOri[i].mvp.hor << 2);
+    mvpInfoVecOri[i].mvp.ver = mvpInfoVecOri[i].mvp.ver >= 0 ? mvpInfoVecOri[i].mvp.ver << 2 : -(-mvpInfoVecOri[i].mvp.ver << 2);
+    mvpInfoVecRes[offset + i].pos.x = mvpInfoVecOri[i].pos.x - posLT.x;
+    mvpInfoVecRes[offset + i].pos.y = mvpInfoVecOri[i].pos.y - posLT.y;
+    mvpInfoVecRes[offset + i].mvp.set(mvpInfoVecOri[i].mvp.getHor() - firstMv.getHor(), mvpInfoVecOri[i].mvp.getVer() - firstMv.getVer());
+  }
+}
+void buildRegressionMatrixCore(std::vector<RMVFInfo> &mvpInfoVecOri, int sumbb[2][3][3], int sumeb[2][3], uint16_t addedSize)
+{
+  int iNum = (int)mvpInfoVecOri.size();
+  int b[3];
+  int e[2];
+  for (int ni = addedSize ? iNum - addedSize : 0; ni < iNum; ni++)//for all neighbor PUs
+  {
+    // to avoid big values in matrix, it is better to use delta_x and delta_y value, ie.e. use the x,y with respect to the top,left corner of current PU
+    b[0] = mvpInfoVecOri[ni].pos.x;
+    b[1] = mvpInfoVecOri[ni].pos.y;
+    b[2] = 1;
 
+    e[0] = mvpInfoVecOri[ni].mvp.getHor();
+    e[1] = mvpInfoVecOri[ni].mvp.getVer();
+
+    for (int c = 0; c < 2; c++)
+    {
+      for (int d = 0; d < 3; d++)
+      {
+        sumeb[c][d] += (e[c] * b[d]);
+      }
+      for (int d1 = 0; d1 < 3; d1++)
+      {
+        for (int d = 0; d < 3; d++)
+        {
+          sumbb[c][d1][d] += (b[d1] * b[d]);
+        }
+      }
+    }
+  }
+}
+#endif
 PelBufferOps::PelBufferOps()
 {
 #if JVET_W0097_GPM_MMVD_TM
@@ -921,6 +977,11 @@ PelBufferOps::PelBufferOps()
 #if JVET_Z0136_OOB
   isMvOOB = isMvOOBCore;
   isMvOOBSubBlk = isMvOOBSubBlkCore;
+#endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+  computeDeltaAndShift = computeDeltaAndShiftCore;
+  computeDeltaAndShiftAddi = computeDeltaAndShiftCoreAddi;
+  buildRegressionMatrix = buildRegressionMatrixCore;
 #endif
 }
 

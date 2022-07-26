@@ -4573,6 +4573,13 @@ void initROM()
     c <<= 1;
   }
 #endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+  g_rmvfMultApproxTbl[0] = 0;
+  for (int k = 1; k < (3 << sizeof(int64_t)); k++)
+  {
+    g_rmvfMultApproxTbl[k] = ((1 << 15) + (k >> 1)) / k;
+  }
+#endif
 }
 
 void destroyROM()
@@ -5264,5 +5271,8 @@ unsigned int g_uiDepth2Width[5] = { 4, 8, 16, 32, 64 };
 #endif
 #if JVET_X0149_TIMD_DIMD_LUT
 int g_gradDivTable[16] = { 0, 7, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0 };
+#endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+int g_rmvfMultApproxTbl[3 << sizeof(int64_t)];
 #endif
 //! \}

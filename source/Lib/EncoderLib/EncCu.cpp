@@ -3430,15 +3430,27 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     {
       pu.regularMergeFlag = false;
       cu.affine = true;
-      PU::getAffineMergeCand(pu, affineMergeCtx);
+      PU::getAffineMergeCand(pu, affineMergeCtx
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION && JVET_W0090_ARMC_TM
+        , m_pcInterSearch
+#endif
+      );
 #if JVET_W0090_ARMC_TM
       affineMergeCtxTmp = affineMergeCtx;
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+      affineMergeCtxTmp.numValidMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand();
+      affineMergeCtxTmp.maxNumMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand();
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
       m_pcInterSearch->sortAffineMergeCandidates(pu, affineMergeCtxTmp, affMmvdLUT);
 #endif
       if (sps.getUseAML())
       {
         m_pcInterSearch->adjustAffineMergeCandidates(pu, affineMergeCtx);
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+        affineMergeCtx.numValidMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand();
+        affineMergeCtx.maxNumMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand();
+#endif
       }
 #endif
       cu.affine = false;
@@ -8987,7 +8999,11 @@ void EncCu::xCheckRDCostAffineMerge2Nx2N( CodingStructure *&tempCS, CodingStruct
     pu.cu = &cu;
     pu.cs = tempCS;
     pu.regularMergeFlag = false;
-    PU::getAffineMergeCand( pu, affineMergeCtx );
+    PU::getAffineMergeCand( pu, affineMergeCtx 
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION && JVET_W0090_ARMC_TM
+      ,m_pcInterPred
+#endif
+    );
 #if JVET_W0090_ARMC_TM
     if (sps.getUseAML())
     {

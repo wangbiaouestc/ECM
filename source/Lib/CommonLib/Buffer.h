@@ -115,6 +115,11 @@ struct PelBufferOps
   bool(*isMvOOB)  (const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, bool *mcMaskChroma, bool lumaOnly, ChromaFormat componentID);
   bool(*isMvOOBSubBlk) (const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, int mcStride, bool *mcMaskChroma, int mcCStride, bool lumaOnly, ChromaFormat componentID);
 #endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+  void(*computeDeltaAndShift)(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri);
+  void(*computeDeltaAndShiftAddi)(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri, std::vector<RMVFInfo> &mvpInfoVecRes);
+  void(*buildRegressionMatrix)(std::vector<RMVFInfo> &mvpInfoVecOri, int sumbb[2][3][3], int sumeb[2][3], uint16_t addedSize);
+#endif
 };
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #define GetAbsDiffPerSample(dstBuf, srcBuf0, srcBuf1)  g_pelBufOP.getAbsoluteDifferencePerSample((dstBuf).buf, (dstBuf).stride, (srcBuf0).buf, (srcBuf0).stride, (srcBuf1).buf, (srcBuf1).stride, (dstBuf).width, (dstBuf).height)

@@ -186,6 +186,11 @@ static const int AFFINE_MRG_MAX_NUM_CANDS =                         15; ///< AFF
 #else
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFINE MERGE
 #endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+static const int AFF_MAX_NON_ADJACENT_INHERITED_CANDS = 6;
+static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 30;
+static const int ADDITIONAL_AFFINE_CAND_NUM = 15;
+#endif
 static const int IBC_MRG_MAX_NUM_CANDS =                            6; ///< IBC MERGE
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 static const int IBC_MRG_MAX_NUM_CANDS_MEM =                        20; ///< IBC MERGE- max number of candidates 
@@ -771,7 +776,11 @@ static const double AMAXBT_TH128 =                                 60.0;
 static const int AML_MERGE_TEMPLATE_SIZE =                         1;
 static const int ADAPTIVE_SUB_GROUP_SIZE =                         5;
 #if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE = RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE;
+#else
 static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE = AFFINE_MRG_MAX_NUM_CANDS;
+#endif
 #else
 static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE =                  3;
 #endif
