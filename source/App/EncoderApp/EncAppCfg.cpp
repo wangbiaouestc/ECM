@@ -1731,6 +1731,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 
     int8_t sliceType = m_GOPList[0].m_sliceType;
 
+    memset(m_GOPList, 0, sizeof(m_GOPList));
+    m_GOPList[0].m_sliceType = sliceType;
+    for (int i = 1; i < MAX_GOP; i++)
+    {
+      m_GOPList[i].m_POC = -1;
+    }
+
     m_GOPList[0].m_POC = 1;    
     m_GOPList[0].m_QPOffset = 0;
     m_GOPList[0].m_QPOffsetModelOffset = 0;
