@@ -212,7 +212,7 @@ void RdCost::init()
   m_afpDistortFunc[DF_SAD_INTERMEDIATE_BITDEPTH] = RdCost::xGetSAD;
 
   m_afpDistortFunc[DF_SAD_WITH_MASK] = RdCost::xGetSADwMask;
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   m_afpDistortFunc[DF_TM_A_WSAD_FULL_NBIT  ] = RdCost::xGetTMErrorFull<TM_TPL_SIZE, true,  false>;
   m_afpDistortFunc[DF_TM_L_WSAD_FULL_NBIT  ] = RdCost::xGetTMErrorFull<TM_TPL_SIZE, false, false>;
   m_afpDistortFunc[DF_TM_A_WMRSAD_FULL_NBIT] = RdCost::xGetTMErrorFull<TM_TPL_SIZE, true,  true>;
@@ -503,7 +503,7 @@ void RdCost::setTimdDistParam( DistParam &rcDP, const Pel* pOrg, const Pel* piRe
 }
 #endif
 
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 void RdCost::setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &cur, int bitDepth, bool trueAfalseL, int wIdx, int subShift, ComponentID compID )
 {
   rcDP.org          = org;
@@ -3666,7 +3666,7 @@ Distortion RdCost::xGetSADwMask( const DistParam& rcDtParam )
   return (sum >> distortionShift );
 }
 
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 template <int tplSize, bool trueAfalseL, bool mr>
 Distortion RdCost::xGetTMErrorFull( const DistParam& rcDtParam )
 {

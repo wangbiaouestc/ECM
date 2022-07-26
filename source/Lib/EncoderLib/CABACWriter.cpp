@@ -2975,7 +2975,7 @@ void CABACWriter::affine_mmvd_data(const PredictionUnit& pu)
 }
 #endif
 
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
 void CABACWriter::tm_merge_flag(const PredictionUnit& pu)
 {
   if (!pu.cs->slice->getSPS()->getUseDMVDMode())
@@ -2983,7 +2983,7 @@ void CABACWriter::tm_merge_flag(const PredictionUnit& pu)
     return;
   }
 
-#if JVET_Z0084_IBC_TM && TM_MRG
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
 #if JVET_X0049_ADAPT_DMVR
   m_BinEncoder.encodeBin(pu.tmMergeFlag || pu.bmMergeFlag, Ctx::TMMergeFlag(CU::isIBC(*pu.cu) ? 1 : 0));
 #else
@@ -3037,7 +3037,7 @@ void CABACWriter::merge_data(const PredictionUnit& pu)
 {
   if (CU::isIBC(*pu.cu))
   {
-#if JVET_Z0084_IBC_TM && TM_MRG
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
     tm_merge_flag(pu);
 #endif
     merge_idx(pu);
@@ -3423,7 +3423,7 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
       numCandminus1 = int(pu.cs->sps->getMaxNumMergeCand()) - 1;
   if( numCandminus1 > 0 )
   {
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
     const CtxSet mrgIdxCtxSet = pu.tmMergeFlag ? Ctx::TmMergeIdx : Ctx::MergeIdx;
 #endif
 #if NON_ADJACENT_MRG_CAND
@@ -3435,7 +3435,7 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
 #else
       unsigned int uiSymbol = pu.mergeIdx == uiUnaryIdx ? 0 : 1;
 #endif
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
       m_BinEncoder.encodeBin(uiSymbol, mrgIdxCtxSet((uiUnaryIdx > LAST_MERGE_IDX_CABAC - 1 ? LAST_MERGE_IDX_CABAC - 1 : uiUnaryIdx)));
 #else
       m_BinEncoder.encodeBin(uiSymbol, Ctx::MergeIdx((uiUnaryIdx > LAST_MERGE_IDX_CABAC - 1 ? LAST_MERGE_IDX_CABAC - 1 : uiUnaryIdx)));
@@ -3452,7 +3452,7 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
     if (pu.mergeIdx == 0)
 #endif
     {
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
       m_BinEncoder.encodeBin( 0, mrgIdxCtxSet() );
 #else
       m_BinEncoder.encodeBin( 0, Ctx::MergeIdx() );
@@ -3462,7 +3462,7 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
     }
     else
     {
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
       m_BinEncoder.encodeBin( 1, mrgIdxCtxSet() );
 #else
       m_BinEncoder.encodeBin( 1, Ctx::MergeIdx() );
@@ -4089,7 +4089,7 @@ void CABACWriter::mh_pred_data(const PredictionUnit& pu)
     CHECK(!pu.addHypData.empty(), "Multi Hyp: !pu.addHypData.empty()");
     return;
   }
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   if (pu.tmMergeFlag)
   {
     CHECK(!pu.addHypData.empty(), "Multi Hyp: !pu.addHypData.empty()");
@@ -4270,11 +4270,11 @@ void CABACWriter::mvp_flag( const PredictionUnit& pu, RefPicList eRefList )
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   else if (PU::useRefCombList(pu))
   {
-    needToCodeMvpIdx = pu.refIdxLC >= pu.cs->slice->getNumNonScaledRefPic() || PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false;
+    needToCodeMvpIdx = pu.refIdxLC >= pu.cs->slice->getNumNonScaledRefPic() || !pu.cs->sps->getUseDMVDMode();
   }
   else if (PU::useRefPairList(pu))
   {
-    needToCodeMvpIdx = pu.refPairIdx >= pu.cs->slice->getNumNonScaledRefPicPair() || PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false;
+    needToCodeMvpIdx = pu.refPairIdx >= pu.cs->slice->getNumNonScaledRefPicPair() || !pu.cs->sps->getUseDMVDMode();
   }
 #endif
   else if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)

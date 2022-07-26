@@ -336,7 +336,7 @@ public:
   static const CtxSet   MergeFlag;
   static const CtxSet   RegularMergeFlag;
   static const CtxSet   MergeIdx;
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   static const CtxSet   TmMergeIdx;
 #endif
 #if JVET_X0049_ADAPT_DMVR
@@ -396,8 +396,10 @@ public:
   static const CtxSet   AfMmvdIdx;
   static const CtxSet   AfMmvdOffsetStep;
 #endif
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   static const CtxSet   TMMergeFlag;
+#endif
+#if TM_MRG
 #if JVET_X0141_CIIP_TIMD_TM
   static const CtxSet   CiipTMMergeFlag;
 #endif

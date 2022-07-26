@@ -2632,7 +2632,7 @@ void RdCost::_initRdCostX86()
 
   m_afpDistortFunc[DF_SAD_INTERMEDIATE_BITDEPTH] = RdCost::xGetSAD_IBD_SIMD<vext>;
 
-#if INTER_LIC || (TM_AMVP || TM_MRG)
+#if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM)
   m_afpDistortFunc[DF_MRSAD] = RdCost::xGetMRSAD_SIMD<vext>;
   m_afpDistortFunc[DF_MRSAD2] = RdCost::xGetMRSAD_SIMD<vext>;
   m_afpDistortFunc[DF_MRSAD4] = RdCost::xGetMRSAD_SIMD<vext>;
@@ -2646,7 +2646,7 @@ void RdCost::_initRdCostX86()
   m_afpDistortFunc[DF_MRSAD48] = RdCost::xGetMRSAD_SIMD<vext>;
 #endif
 
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   m_afpDistortFunc[DF_TM_A_WSAD_FULL_NBIT  ] = RdCost::xGetTMErrorFull_SIMD<vext, TM_TPL_SIZE, true,  false>;
   m_afpDistortFunc[DF_TM_L_WSAD_FULL_NBIT  ] = RdCost::xGetTMErrorFull_SIMD<vext, TM_TPL_SIZE, false, false>;
   m_afpDistortFunc[DF_TM_A_WMRSAD_FULL_NBIT] = RdCost::xGetTMErrorFull_SIMD<vext, TM_TPL_SIZE, true,  true>;
@@ -2656,7 +2656,7 @@ void RdCost::_initRdCostX86()
   m_afpDistortFunc[DF_SAD_WITH_MASK] = xGetSADwMask_SIMD<vext>;
 }
 
-#if INTER_LIC || (TM_AMVP || TM_MRG)
+#if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM)
 template< X86_VEXT vext >
 Distortion RdCost::xGetMRSAD_SIMD(const DistParam &rcDtParam)
 {
@@ -2863,7 +2863,7 @@ Distortion RdCost::xGetMRSAD_SIMD(const DistParam &rcDtParam)
 }
 #endif
 
-#if TM_AMVP || TM_MRG
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 template < X86_VEXT vext, int tplSize, bool trueAfalseL, bool mr >
 Distortion RdCost::xGetTMErrorFull_SIMD(const DistParam& rcDtParam)
 {

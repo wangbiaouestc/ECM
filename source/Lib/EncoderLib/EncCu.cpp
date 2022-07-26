@@ -3169,7 +3169,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     PredictionUnit pu( tempCS->area );
     pu.cu = &cu;
     pu.cs = tempCS;
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
     pu.tmMergeFlag = false;
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
@@ -3771,7 +3771,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if AFFINE_MMVD
       pu.afMmvdFlag = false;
 #endif
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
       pu.tmMergeFlag = false;
 #endif
 #if JVET_X0049_ADAPT_DMVR
@@ -4300,7 +4300,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if AFFINE_MMVD && MERGE_ENC_OPT
       pu.afMmvdFlag       = false;
 #endif
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
       pu.tmMergeFlag      = false;
 #endif
 #if JVET_X0049_ADAPT_DMVR
@@ -4997,7 +4997,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
   PredictionUnit &pu = tempCS->addPU(cu, pm.chType);
   pu.mergeFlag = true;
   pu.regularMergeFlag = false;
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   pu.tmMergeFlag = false;
 #endif
 #if JVET_X0049_ADAPT_DMVR
@@ -5945,7 +5945,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
     PredictionUnit &pu = tempCS->addPU(cu, pm.chType);
     pu.mergeFlag = true;
     pu.regularMergeFlag = false;
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
     pu.tmMergeFlag = false;
 #endif
     bool simpleGPMMMVDStep = (m_pcEncCfg->getIntraPeriod() == -1);
@@ -7186,7 +7186,7 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
   PredictionUnit &pu = tempCS->addPU(cu, pm.chType);
   pu.mergeFlag = true;
   pu.regularMergeFlag = false;
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   pu.tmMergeFlag = false;
 #endif
   PU::getGeoMergeCandidates(pu, mergeCtx);
@@ -9576,7 +9576,7 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 
   tempCS->initStructData(encTestMode.qp);
   MergeCtx mergeCtx;
-#if JVET_Z0084_IBC_TM && TM_MRG
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
   MergeCtx mergeCtxTm;
 #endif
 
@@ -9616,7 +9616,7 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
     }
 #endif
 
-#if JVET_Z0084_IBC_TM && TM_MRG
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
     if (pu.cs->sps->getUseDMVDMode() == true)
     {
     pu.tmMergeFlag = true;
@@ -9640,7 +9640,7 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
   }
 
-#if JVET_Z0084_IBC_TM && TM_MRG
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
   int candHasNoResidual[IBC_MRG_MAX_NUM_CANDS<<1];
   for (unsigned int ui = 0; ui < IBC_MRG_MAX_NUM_CANDS<<1; ui++)
   {
@@ -9725,7 +9725,7 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
       const unsigned int lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
 #endif
 
-#if JVET_Z0084_IBC_TM && TM_MRG
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
       int numValidBv = mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand;
 #else
       int numValidBv = mergeCtx.numValidMergeCand;
@@ -9769,7 +9769,7 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
          , numMrgSATDCand);
       }
 
-#if JVET_Z0084_IBC_TM && TM_MRG
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
     // Add TM refined candidates
     for (unsigned int mergeCand = 0; mergeCand < mergeCtxTm.numValidMergeCand; mergeCand++)
     {
@@ -9883,7 +9883,7 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
             pu.mmvdMergeFlag = false;
             pu.regularMergeFlag = false;
             cu.geoFlag = false;
-#if JVET_Z0084_IBC_TM && TM_MRG
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
             pu.tmMergeFlag      = false;
             if (mergeCand >= mergeCtx.numValidMergeCand)
             {
@@ -11865,7 +11865,7 @@ void EncCu::xCheckSATDCostBMMerge(CodingStructure*& tempCS,
   pu.mmvdMergeFlag = false;
   pu.regularMergeFlag = false;
   pu.bmMergeFlag = true;
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   pu.tmMergeFlag = false;
 #endif
   pu.mvRefine = false;
@@ -11937,7 +11937,7 @@ void EncCu::xCheckSATDCostBMMerge(CodingStructure*& tempCS,
   pu.bmDir = 0;
   pu.bmMergeFlag = false;
   pu.regularMergeFlag = true;
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   pu.tmMergeFlag = false;
 #endif
   cu.affine = false;

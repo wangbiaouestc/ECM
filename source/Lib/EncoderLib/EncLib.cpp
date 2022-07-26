@@ -160,13 +160,22 @@ void EncLib::create( const int layerId )
   }
   if ( m_RCEnableRateControl )
   {
+#if JVET_AA0146_WRAP_AROUND_FIX
+    m_cRateCtrl.init(m_framesToBeEncoded, m_RCTargetBitrate, (int)((double)m_iFrameRate / m_temporalSubsampleRatio + 0.5), m_iGOPSize, m_sourceWidth, m_sourceHeight,
+      m_maxCUWidth, m_maxCUHeight, getBitDepth(CHANNEL_TYPE_LUMA), m_RCKeepHierarchicalBit, m_RCUseLCUSeparateModel, m_GOPList);
+#else
     m_cRateCtrl.init(m_framesToBeEncoded, m_RCTargetBitrate, (int)((double)m_iFrameRate / m_temporalSubsampleRatio + 0.5), m_iGOPSize, m_iSourceWidth, m_iSourceHeight,
       m_maxCUWidth, m_maxCUHeight, getBitDepth(CHANNEL_TYPE_LUMA), m_RCKeepHierarchicalBit, m_RCUseLCUSeparateModel, m_GOPList);
+#endif
   }
 
   if (m_alf)
   {
+#if JVET_AA0146_WRAP_AROUND_FIX
+    m_cEncALF.create(this, m_sourceWidth, m_sourceHeight, m_chromaFormatIDC, m_maxCUWidth, m_maxCUHeight, floorLog2(m_maxCUWidth) - m_log2MinCUSize, m_bitDepth, m_inputBitDepth);
+#else
     m_cEncALF.create(this, m_iSourceWidth, m_iSourceHeight, m_chromaFormatIDC, m_maxCUWidth, m_maxCUHeight, floorLog2(m_maxCUWidth) - m_log2MinCUSize, m_bitDepth, m_inputBitDepth);
+#endif
   }
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_W0066_CCSAO
@@ -198,10 +207,17 @@ void EncLib::create( const int layerId )
 #endif
 #endif
   {
+#if JVET_AA0146_WRAP_AROUND_FIX
+    const uint32_t widthInCtus = (m_sourceWidth + m_maxCUWidth - 1) / m_maxCUWidth;
+    const uint32_t heightInCtus = (m_sourceHeight + m_maxCUHeight - 1) / m_maxCUHeight;
+    const uint32_t numCtuInFrame = widthInCtus * heightInCtus;
+    m_cEncSAO.create(m_sourceWidth, m_sourceHeight, m_chromaFormatIDC, m_maxCUWidth, m_maxCUHeight, floorLog2(m_maxCUWidth) - m_log2MinCUSize, (uint32_t)std::max(0, m_bitDepth[CHANNEL_TYPE_LUMA] - MAX_SAO_TRUNCATED_BITDEPTH), (uint32_t)std::max(0, m_bitDepth[CHANNEL_TYPE_CHROMA] - MAX_SAO_TRUNCATED_BITDEPTH));
+#else
     const uint32_t widthInCtus = (m_iSourceWidth + m_maxCUWidth - 1) / m_maxCUWidth;
     const uint32_t heightInCtus = (m_iSourceHeight + m_maxCUHeight - 1) / m_maxCUHeight;
     const uint32_t numCtuInFrame = widthInCtus * heightInCtus;
     m_cEncSAO.create(m_iSourceWidth, m_iSourceHeight, m_chromaFormatIDC, m_maxCUWidth, m_maxCUHeight, floorLog2(m_maxCUWidth) - m_log2MinCUSize, (uint32_t)std::max(0, m_bitDepth[CHANNEL_TYPE_LUMA] - MAX_SAO_TRUNCATED_BITDEPTH), (uint32_t)std::max(0, m_bitDepth[CHANNEL_TYPE_CHROMA] - MAX_SAO_TRUNCATED_BITDEPTH));
+#endif
     m_cEncSAO.createEncData(m_saoCtuBoundary, numCtuInFrame);
   }
 }
@@ -316,8 +332,13 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
 #endif
 
   // initialize PPS
+#if JVET_AA0146_WRAP_AROUND_FIX
+  pps0.setPicWidthInLumaSamples( m_sourceWidth );
+  pps0.setPicHeightInLumaSamples( m_sourceHeight );
+#else
   pps0.setPicWidthInLumaSamples( m_iSourceWidth );
   pps0.setPicHeightInLumaSamples( m_iSourceHeight );
+#endif
 #if JVET_R0068_ASPECT6_ENC_RESTRICTION
   if (pps0.getPicWidthInLumaSamples() == sps0.getMaxPicWidthInLumaSamples() && pps0.getPicHeightInLumaSamples() == sps0.getMaxPicHeightInLumaSamples())
   {
@@ -1426,12 +1447,22 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setGDREnabledFlag(false);
 #endif
 
+#if JVET_AA0146_WRAP_AROUND_FIX
+  sps.setMaxPicWidthInLumaSamples( m_sourceWidth );
+  sps.setMaxPicHeightInLumaSamples( m_sourceHeight );
+#else
   sps.setMaxPicWidthInLumaSamples( m_iSourceWidth );
   sps.setMaxPicHeightInLumaSamples( m_iSourceHeight );
+#endif
   if (m_resChangeInClvsEnabled)
   {
+#if JVET_AA0146_WRAP_AROUND_FIX
+    int maxPicWidth = std::max(m_sourceWidth, (int)((double)m_sourceWidth / m_scalingRatioHor + 0.5));
+    int maxPicHeight = std::max(m_sourceHeight, (int)((double)m_sourceHeight / m_scalingRatioVer + 0.5));
+#else
     int maxPicWidth = std::max(m_iSourceWidth, (int)((double)m_iSourceWidth / m_scalingRatioHor + 0.5));
     int maxPicHeight = std::max(m_iSourceHeight, (int)((double)m_iSourceHeight / m_scalingRatioVer + 0.5));
+#endif
     const int minCuSize = std::max(8, 1 << m_log2MinCUSize);
     if (maxPicWidth % minCuSize)
     {
@@ -1489,7 +1520,7 @@ void EncLib::xInitSPS( SPS& sps )
 #if AFFINE_MMVD
   sps.setUseAffineMmvdMode     ( m_AffineMmvdMode );
 #endif
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   sps.setUseDMVDMode           ( m_DMVDMode );
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -1711,7 +1742,11 @@ void EncLib::xInitSPS( SPS& sps )
     sps.setSubPicSameSizeFlag(m_subPicSameSizeFlag);
     if (m_subPicSameSizeFlag)
     {
+#if JVET_AA0146_WRAP_AROUND_FIX
+      uint32_t numSubpicCols = (m_sourceWidth + m_CTUSize - 1) / m_CTUSize / m_subPicWidth[0];
+#else
       uint32_t numSubpicCols = (m_iSourceWidth + m_CTUSize - 1) / m_CTUSize / m_subPicWidth[0];
+#endif
       for (unsigned int i = 0; i < m_numSubPics; i++)
       {
         sps.setSubPicCtuTopLeftX(i, (i % numSubpicCols) * m_subPicWidth[0]);
@@ -1751,8 +1786,13 @@ void EncLib::xInitSPS( SPS& sps )
     sps.setNumSubPics(1);
     sps.setSubPicCtuTopLeftX(0, 0);
     sps.setSubPicCtuTopLeftY(0, 0);
+#if JVET_AA0146_WRAP_AROUND_FIX
+    sps.setSubPicWidth(0, m_sourceWidth);
+    sps.setSubPicHeight(0, m_sourceHeight);
+#else
     sps.setSubPicWidth(0, m_iSourceWidth);
     sps.setSubPicHeight(0, m_iSourceHeight);
+#endif
     sps.setSubPicTreatedAsPicFlag(0, 1);
     sps.setLoopFilterAcrossSubpicEnabledFlag(0, 0);
     sps.setSubPicIdLen(0);

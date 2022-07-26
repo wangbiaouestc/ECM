@@ -352,7 +352,7 @@ void InterSearch::init( EncCfg*        pcEncCfg,
 #endif
 
   const ChromaFormat cform = pcEncCfg->getChromaFormatIdc();
-#if INTER_LIC || (TM_AMVP || TM_MRG) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if JVET_Z0153_IBC_EXT_REF
   InterPrediction::init( pcRdCost, cform, maxCUHeight, m_pcReshape, curPicWidthY );
 #else
@@ -1643,7 +1643,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     /// ibc search
     pu.cu->imv = 2;
     AMVPInfo amvpInfo4Pel;
-#if JVET_Z0084_IBC_TM && TM_AMVP
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
     PU::fillIBCMvpCand(pu, amvpInfo4Pel, this);
 #else
     PU::fillIBCMvpCand(pu, amvpInfo4Pel);
@@ -1652,7 +1652,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     pu.cu->imv = 0;// (Int)cu.cs->sps->getUseIMV(); // set as IMV=0 initially
     Mv    cMv, cMvPred[2];
     AMVPInfo amvpInfo;
-#if JVET_Z0084_IBC_TM && TM_AMVP
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
     PU::fillIBCMvpCand(pu, amvpInfo, this);
 #else
     PU::fillIBCMvpCand(pu, amvpInfo);
@@ -1695,7 +1695,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
     m_pcRdCost->setPredictors(cMvPred);
     m_pcRdCost->setCostScale(0);
-#if JVET_Z0084_IBC_TM && TM_AMVP
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
     m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &pu.cu->imv, &bvpIdxBest, true, &amvpInfo4Pel);
 #else
     m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &pu.cu->imv, &bvpIdxBest);
@@ -4065,7 +4065,7 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
       fakePredData.ciipFlag = false;
       fakePredData.addHypData.clear();
       fakePredData.regularMergeFlag = false;
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
       fakePredData.tmMergeFlag = false;
 #endif
 #if JVET_X0049_ADAPT_DMVR

@@ -161,9 +161,17 @@ protected:
   int       m_iFrameRate;
   int       m_FrameSkip;
   uint32_t  m_temporalSubsampleRatio;
+#if JVET_AA0146_WRAP_AROUND_FIX
+  int       m_sourceWidth;
+  int       m_sourceHeight;
+#else
   int       m_iSourceWidth;
   int       m_iSourceHeight;
+#endif
   Window    m_conformanceWindow;
+#if JVET_AA0146_WRAP_AROUND_FIX
+  int       m_sourcePadding[2];
+#endif
   int       m_framesToBeEncoded;
   int       m_firstValidFrame;
   int       m_lastValidFrame;
@@ -321,7 +329,9 @@ protected:
   int       m_intraQPOffset;                    ///< QP offset for intra slice (integer)
   int       m_lambdaFromQPEnable;               ///< enable lambda derivation from QP
 #endif
+#if !JVET_AA0146_WRAP_AROUND_FIX
   int       m_aiPad[2];
+#endif
 
   bool      m_AccessUnitDelimiter;               ///< add Access Unit Delimiter NAL units
   bool      m_enablePictureHeaderInSliceHeader;  ///< Enable Picture Header in Slice Header
@@ -391,7 +401,7 @@ protected:
 #if AFFINE_MMVD
   bool      m_AffineMmvdMode;
 #endif
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool      m_DMVDMode;
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -1097,8 +1107,13 @@ public:
   void      setFrameRate                    ( int   i )      { m_iFrameRate = i; }
   void      setFrameSkip                    ( uint32_t  i )      { m_FrameSkip = i; }
   void      setTemporalSubsampleRatio       ( uint32_t  i )      { m_temporalSubsampleRatio = i; }
+#if JVET_AA0146_WRAP_AROUND_FIX
+  void      setSourceWidth                  ( int   i )      { m_sourceWidth = i; }
+  void      setSourceHeight                 ( int   i )      { m_sourceHeight = i; }
+#else
   void      setSourceWidth                  ( int   i )      { m_iSourceWidth = i; }
   void      setSourceHeight                 ( int   i )      { m_iSourceHeight = i; }
+#endif
 
   Window   &getConformanceWindow()                           { return m_conformanceWindow; }
   void      setConformanceWindow (int confLeft, int confRight, int confTop, int confBottom ) { m_conformanceWindow.setWindow (confLeft, confRight, confTop, confBottom); }
@@ -1171,7 +1186,11 @@ public:
 #endif
   void      setChromaQpMappingTableParams   (const ChromaQpMappingTableParams &params) { m_chromaQpMappingTableParams = params; }
 
+#if JVET_AA0146_WRAP_AROUND_FIX
+  void      setSourcePadding                ( int*  padding                )      { for ( int i = 0; i < 2; i++ ) m_sourcePadding[i] = padding[i]; }
+#else
   void      setPad                          ( int*  iPad                   )      { for ( int i = 0; i < 2; i++ ) m_aiPad[i] = iPad[i]; }
+#endif
 
   int       getMaxRefPicNum                 ()                              { return m_iMaxRefPicNum;           }
   void      setMaxRefPicNum                 ( int iMaxRefPicNum )           { m_iMaxRefPicNum = iMaxRefPicNum;  }
@@ -1294,7 +1313,7 @@ public:
   void      setAffineMmvdMode               ( bool b )       { m_AffineMmvdMode = b; }
   bool      getAffineMmvdMode               ()         const { return m_AffineMmvdMode; }
 #endif
-#if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void      setUseDMVDMode                  (bool b)         { m_DMVDMode = b; }
   bool      getUseDMVDMode                  ()         const { return m_DMVDMode; }
 #endif
@@ -1606,8 +1625,13 @@ public:
   int       getFrameRate                    () const     { return  m_iFrameRate; }
   uint32_t      getFrameSkip                    () const     { return  m_FrameSkip; }
   uint32_t      getTemporalSubsampleRatio       () const     { return  m_temporalSubsampleRatio; }
+#if JVET_AA0146_WRAP_AROUND_FIX
+  int       getSourceWidth                  () const     { return  m_sourceWidth; }
+  int       getSourceHeight                 () const     { return  m_sourceHeight; }
+#else
   int       getSourceWidth                  () const     { return  m_iSourceWidth; }
   int       getSourceHeight                 () const     { return  m_iSourceHeight; }
+#endif
   int       getFramesToBeEncoded            () const     { return  m_framesToBeEncoded; }
 
   //====== Lambda Modifiers ========
@@ -1635,7 +1659,11 @@ public:
 #else
   int       getBaseQP                       ()       { return  m_iQP; }
 #endif
+#if JVET_AA0146_WRAP_AROUND_FIX
+  int       getSourcePadding                ( int i )      { CHECK(i >= 2, "Invalid index");                      return  m_sourcePadding[i]; }
+#else
   int       getPad                          ( int i )      { CHECK(i >= 2, "Invalid index");                      return  m_aiPad[i]; }
+#endif
 
   bool      getAccessUnitDelimiter() const  { return m_AccessUnitDelimiter; }
   void      setAccessUnitDelimiter(bool val){ m_AccessUnitDelimiter = val; }

@@ -2040,7 +2040,7 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
   const uint32_t maxNumMergeCand = pu.cs->sps->getMaxNumIBCMergeCand();
 #endif
 #if JVET_Z0084_IBC_TM
-#if TM_MRG
+#if IBC_TM_MRG
   const uint32_t mvdSimilarityThresh = pu.tmMergeFlag ? PU::getTMMvdThreshold(pu) : 1;
 #else
   const uint32_t mvdSimilarityThresh = 1;
@@ -2222,7 +2222,7 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 
   // above left
 #if JVET_Z0084_IBC_TM && JVET_Z0075_IBC_HMVP_ENLARGE && JVET_W0090_ARMC_TM
-  if ((cnt < 4) && pu.cs->sps->getUseAML() && (mrgCandIdx >= 0)) //Only for AMVP case
+  if ((cnt < 4 && pu.cs->sps->getUseAML() && mrgCandIdx >= 0)) //Only for AMVP case
 #elif !JVET_Z0075_IBC_HMVP_ENLARGE
   if (cnt < 4)
 #endif
@@ -2674,7 +2674,7 @@ uint32_t PU::getBDMVRMvdThreshold(const PredictionUnit &pu)
 }
 #endif
 
-#if TM_MRG || TM_AMVP
+#if TM_MRG || TM_AMVP || JVET_Z0084_IBC_TM
 uint32_t PU::getTMMvdThreshold(const PredictionUnit &pu)
 {
   uint32_t numPixels = pu.lwidth() * pu.lheight();
@@ -5467,7 +5467,7 @@ bool PU::checkDMVRCondition(const PredictionUnit& pu)
 
     return pu.mergeFlag && pu.mergeType == MRG_TYPE_DEFAULT_N && !pu.ciipFlag && !pu.cu->affine && !pu.mmvdMergeFlag
       && !pu.cu->mmvdSkip && PU::isBiPredFromDifferentDirEqDistPoc( pu )
-#if TM_MRG
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
       && !pu.tmMergeFlag
 #endif
       && ( pu.lheight() >= 8 ) && ( pu.lwidth() >= 8 )
@@ -6052,7 +6052,7 @@ bool PU::getDerivedBV(PredictionUnit &pu, const Mv& currentMv, Mv& derivedMv)
 /**
  * Constructs a list of candidates for IBC AMVP (See specification, section "Derivation process for motion vector predictor candidates")
  */
-#if JVET_Z0084_IBC_TM && TM_AMVP
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
 void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo, InterPrediction* pcInter)
 #else
 void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
@@ -6062,10 +6062,10 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
   pInfo->numCand = 0;
 
   MergeCtx mergeCtx;
-#if JVET_Z0084_IBC_TM && TM_AMVP
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
   pInfo->maxSimilarityThreshold = (pu.cs->sps->getUseDMVDMode() && pcInter) ? PU::getTMMvdThreshold(pu) : 1;
 
-#if TM_MRG
+#if IBC_TM_MRG
   pu.tmMergeFlag = true;
 #endif
 #if JVET_Z0075_IBC_HMVP_ENLARGE
@@ -6073,7 +6073,7 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
 #else
   PU::getIBCMergeCandidates(pu, mergeCtx);
 #endif
-#if TM_MRG
+#if IBC_TM_MRG
   pu.tmMergeFlag = false;
 #endif
 
@@ -10524,11 +10524,11 @@ void PU::applyImv( PredictionUnit& pu, MergeCtx &mrgCtx, InterPrediction *interP
 #if JVET_Z0084_IBC_TM
         pu.mvd[0].changeIbcPrecAmvr2Internal(pu.cu->imv);
 #endif
-#if JVET_Z0084_IBC_TM && TM_AMVP
-        PU::fillIBCMvpCand(pu, amvpInfo, interPred);
-#else
-        PU::fillIBCMvpCand(pu, amvpInfo);
+        PU::fillIBCMvpCand(pu, amvpInfo
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+                         , interPred
 #endif
+        );
       }
       else
       {
