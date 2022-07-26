@@ -3460,7 +3460,11 @@ static void simdFilter( const ClpRng& clpRng, Pel const *src, int srcStride, Pel
 }
 
 template< X86_VEXT vext >
+#if JVET_AA0058_GPM_ADP_BLD
+void xWeightedGeoBlk_SSE(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, const uint8_t bldIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+#else
 void xWeightedGeoBlk_SSE(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+#endif
 {
   Pel* dst = predDst.get(compIdx).buf;
   Pel* src0 = predSrc0.get(compIdx).buf;
@@ -3469,7 +3473,11 @@ void xWeightedGeoBlk_SSE(const PredictionUnit &pu, const uint32_t width, const u
   int32_t strideSrc0 = predSrc0.get(compIdx).stride;
   int32_t strideSrc1 = predSrc1.get(compIdx).stride;
 
+#if JVET_AA0058_GPM_ADP_BLD
+  const char    log2WeightBase = 5;
+#else
   const char    log2WeightBase = 3;
+#endif
   const ClpRng  clpRng = pu.cu->slice->clpRngs().comp[compIdx];
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
   const int32_t shiftWeighted = IF_INTERNAL_FRAC_BITS(clpRng.bd) + log2WeightBase;
@@ -3483,6 +3491,23 @@ void xWeightedGeoBlk_SSE(const PredictionUnit &pu, const uint32_t width, const u
   int16_t angle = g_GeoParams[splitDir][0];
   int16_t stepY = 0;
   int16_t* weight = nullptr;
+#if JVET_AA0058_GPM_ADP_BLD
+  if (g_angle2mirror[angle] == 2)
+  {
+    stepY = -GEO_WEIGHT_MASK_SIZE;
+    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+  }
+  else if (g_angle2mirror[angle] == 1)
+  {
+    stepY = GEO_WEIGHT_MASK_SIZE;
+    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
+  }
+  else
+  {
+    stepY = GEO_WEIGHT_MASK_SIZE;
+    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+  }
+#else
   if (g_angle2mirror[angle] == 2)
   {
     stepY = -GEO_WEIGHT_MASK_SIZE;
@@ -3498,8 +3523,13 @@ void xWeightedGeoBlk_SSE(const PredictionUnit &pu, const uint32_t width, const u
     stepY = GEO_WEIGHT_MASK_SIZE;
     weight = &g_globalGeoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
+#endif
 
+#if JVET_AA0058_GPM_ADP_BLD
+  const __m128i mmEight = _mm_set1_epi16(32);
+#else
   const __m128i mmEight = _mm_set1_epi16(8);
+#endif
   const __m128i mmOffset = _mm_set1_epi32(offsetWeighted);
   const __m128i mmShift = _mm_cvtsi32_si128(shiftWeighted);
   const __m128i mmMin = _mm_set1_epi16(clpRng.min);
@@ -3545,7 +3575,11 @@ void xWeightedGeoBlk_SSE(const PredictionUnit &pu, const uint32_t width, const u
 #if USE_AVX2
   else if (width >= 16)
   {
+#if JVET_AA0058_GPM_ADP_BLD
+    const __m256i mmEightAVX2 = _mm256_set1_epi16(32);
+#else
     const __m256i mmEightAVX2 = _mm256_set1_epi16(8);
+#endif
     const __m256i mmOffsetAVX2 = _mm256_set1_epi32(offsetWeighted);
     const __m256i mmMinAVX2 = _mm256_set1_epi16(clpRng.min);
     const __m256i mmMaxAVX2 = _mm256_set1_epi16(clpRng.max);
@@ -3686,7 +3720,11 @@ void xWeightedGeoBlk_SSE(const PredictionUnit &pu, const uint32_t width, const u
 
 #if JVET_Y0065_GPM_INTRA
 template< X86_VEXT vext >
+#if JVET_AA0058_GPM_ADP_BLD
+void xWeightedGeoBlkRounded_SSE(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, const uint8_t bldIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+#else
 void xWeightedGeoBlkRounded_SSE(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
+#endif
 {
   Pel* dst = predDst.get(compIdx).buf;
   Pel* src0 = predSrc0.get(compIdx).buf;
@@ -3700,6 +3738,23 @@ void xWeightedGeoBlkRounded_SSE(const PredictionUnit &pu, const uint32_t width, 
   int16_t angle = g_GeoParams[splitDir][0];
   int16_t stepY = 0;
   int16_t* weight = nullptr;
+#if JVET_AA0058_GPM_ADP_BLD
+  if (g_angle2mirror[angle] == 2)
+  {
+    stepY = -GEO_WEIGHT_MASK_SIZE;
+    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+  }
+  else if (g_angle2mirror[angle] == 1)
+  {
+    stepY = GEO_WEIGHT_MASK_SIZE;
+    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
+  }
+  else
+  {
+    stepY = GEO_WEIGHT_MASK_SIZE;
+    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+  }
+#else
   if (g_angle2mirror[angle] == 2)
   {
     stepY = -GEO_WEIGHT_MASK_SIZE;
@@ -3715,10 +3770,17 @@ void xWeightedGeoBlkRounded_SSE(const PredictionUnit &pu, const uint32_t width, 
     stepY = GEO_WEIGHT_MASK_SIZE;
     weight = &g_globalGeoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
+#endif
 
+#if JVET_AA0058_GPM_ADP_BLD
+  const __m128i mmEight = _mm_set1_epi16(32);
+  const __m128i mmOffset = _mm_set1_epi32(16);
+  const __m128i mmShift = _mm_cvtsi32_si128(5);
+#else
   const __m128i mmEight = _mm_set1_epi16(8);
   const __m128i mmOffset = _mm_set1_epi32(4);
   const __m128i mmShift = _mm_cvtsi32_si128(3);
+#endif
 
   if (compIdx != COMPONENT_Y && pu.chromaFormat == CHROMA_420)
   {
@@ -3759,8 +3821,13 @@ void xWeightedGeoBlkRounded_SSE(const PredictionUnit &pu, const uint32_t width, 
 #if USE_AVX2
   else if (width >= 16)
   {
+#if JVET_AA0058_GPM_ADP_BLD
+    const __m256i mmEightAVX2 = _mm256_set1_epi16(32);
+    const __m256i mmOffsetAVX2 = _mm256_set1_epi32(16);
+#else
     const __m256i mmEightAVX2 = _mm256_set1_epi16(8);
     const __m256i mmOffsetAVX2 = _mm256_set1_epi32(4);
+#endif
     for (int y = 0; y < height; y++)
     {
       for (int x = 0; x < width; x += 16)

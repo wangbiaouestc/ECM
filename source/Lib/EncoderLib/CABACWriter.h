@@ -187,6 +187,10 @@ public:
   uint64_t    geo_tmFlag_est(const TempCtx& ctxStart, const int flag);
 #endif
 #endif
+#if JVET_AA0058_GPM_ADP_BLD
+  uint64_t    geoBldFlagEst(const TempCtx& ctxStart, const int flag);
+  void        geoAdaptiveBlendingIdx(const int idx);
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void        geoModeIdx                ( const PredictionUnit&         pu);
   void        geoModeIdx                ( const uint8_t geoMode, const uint8_t altCodeIdx = 0);

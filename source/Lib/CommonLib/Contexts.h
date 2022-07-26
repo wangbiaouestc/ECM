@@ -384,6 +384,9 @@ public:
   static const CtxSet   GeoMmvdFlag;
   static const CtxSet   GeoMmvdStepMvpIdx;
 #endif
+#if JVET_AA0058_GPM_ADP_BLD
+  static const CtxSet   GeoBldFlag;
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   static const CtxSet   GeoSubModeIdx;
 #endif

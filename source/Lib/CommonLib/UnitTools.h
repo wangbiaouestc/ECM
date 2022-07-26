@@ -403,9 +403,17 @@ namespace PU
   void spanGeoMotionInfo              (      PredictionUnit &pu, MergeCtx &GeoMrgCtx, const uint8_t splitDir, const uint8_t candIdx0, const uint8_t candIdx1);
 #if JVET_W0097_GPM_MMVD_TM
 #if TM_MRG
+#if JVET_AA0058_GPM_ADP_BLD
+  void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx);
+#else
   void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1);
+#endif
+#else
+#if JVET_AA0058_GPM_ADP_BLD
+  void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &GeoMrgCtx, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx);
 #else
   void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &GeoMrgCtx, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool mmvdFlag1, const uint8_t mmvdIdx1);
+#endif
 #endif
 #endif
   bool isAddNeighborMv  (const Mv& currMv, Mv* neighborMvs, int numNeighborMv);
@@ -523,6 +531,51 @@ uint32_t updateCandList(T uiMode, double uiCost, static_vector<T, N>& candModeLi
   return 0;
 }
 #if JVET_W0097_GPM_MMVD_TM
+#if JVET_AA0058_GPM_ADP_BLD
+template<size_t N>
+void orderCandList(uint8_t uiMode, bool bNonMMVDListCand, int splitDir, double uiCost, uint8_t bldIdx, static_vector<uint8_t, N>& candModeList, static_vector<bool, N>& isNonMMVDListIdx, static_vector<int, N>&  candSplitDirList, static_vector<double, N>& candCostList, static_vector<uint8_t, N>&  geoBldList, size_t uiFastCandNum = N)
+{
+  CHECK(std::min(uiFastCandNum, candModeList.size()) != std::min(uiFastCandNum, candCostList.size()), "Sizes do not match!");
+  CHECK(uiFastCandNum > candModeList.capacity(), "The vector is to small to hold all the candidates!");
+
+  size_t i;
+  size_t shift = 0;
+  size_t currSize = std::min(uiFastCandNum, candCostList.size());
+
+  while (shift < uiFastCandNum && shift < currSize && uiCost < candCostList[currSize - 1 - shift])
+  {
+    shift++;
+  }
+
+  if (candModeList.size() >= uiFastCandNum && shift != 0)
+  {
+    for (i = 1; i < shift; i++)
+    {
+      candModeList[currSize - i] = candModeList[currSize - 1 - i];
+      isNonMMVDListIdx[currSize - i] = isNonMMVDListIdx[currSize - 1 - i];
+      candSplitDirList[currSize - i] = candSplitDirList[currSize - 1 - i];
+      candCostList[currSize - i] = candCostList[currSize - 1 - i];
+      geoBldList[currSize - i] = geoBldList[currSize - 1 - i];
+    }
+    candModeList[currSize - shift] = uiMode;
+    isNonMMVDListIdx[currSize - shift] = bNonMMVDListCand;
+    candSplitDirList[currSize - shift] = splitDir;
+    candCostList[currSize - shift] = uiCost;
+    geoBldList[currSize - shift] = bldIdx;
+    return;
+  }
+  else if (currSize < uiFastCandNum)
+  {
+    candModeList.insert(candModeList.end() - shift, uiMode);
+    isNonMMVDListIdx.insert(isNonMMVDListIdx.end() - shift, bNonMMVDListCand);
+    candSplitDirList.insert(candSplitDirList.end() - shift, splitDir);
+    candCostList.insert(candCostList.end() - shift, uiCost);
+    geoBldList.insert(geoBldList.end() - shift, bldIdx);
+    return;
+  }
+  return;
+}
+#else
 template<size_t N>
 void orderCandList(uint8_t uiMode, bool bNonMMVDListCand, int splitDir, double uiCost, static_vector<uint8_t, N>& candModeList, static_vector<bool, N>& isNonMMVDListIdx, static_vector<int, N>&  candSplitDirList, static_vector<double, N>& candCostList, size_t uiFastCandNum = N)
 {
@@ -563,6 +616,7 @@ void orderCandList(uint8_t uiMode, bool bNonMMVDListCand, int splitDir, double u
   }
   return;
 }
+#endif
 
 template<size_t N>
 uint32_t updateGeoMMVDCandList(double uiCost, int splitDir, int mergeCand0, int mergeCand1, int mmvdCand0, int mmvdCand1,

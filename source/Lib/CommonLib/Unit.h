@@ -457,6 +457,9 @@ struct InterPredictionData
   uint8_t     geoTmType;
 #endif
 #endif
+#if JVET_AA0058_GPM_ADP_BLD
+  uint8_t     geoBldIdx;
+#endif
   bool           mmvdMergeFlag;
   uint8_t       mmvdMergeIdx;
 #if AFFINE_MMVD
