@@ -184,6 +184,9 @@
 #define JVET_AA0058_GPM_ADP_BLD                           1 // JVET-AA0058: GPM adaptive blending
 #define JVET_AA0146_WRAP_AROUND_FIX                       1 // JVET-AA0146: bugfix&cleanup for wrap around motion compensation
 #define JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION          1 // JVET-AA0107 Regression based affine merge candidate derivation
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#define JVET_AA0128_AFFINE_MERGE_CTX_INC                  1 // JVET-AA0128 test b: Increased number of CABAC contexts of affine merge index
+#endif
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
