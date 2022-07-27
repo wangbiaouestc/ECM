@@ -356,6 +356,29 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
   xInitPPS(pps0, sps0);
   // initialize APS
   xInitRPL(sps0, isFieldCoding);
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  if (sps0.getUseAML())
+  {
+    sps0.setNumLambda(m_numQPOffset);
+    int maxBits = 0;
+    for (int idx = 0; idx < m_numQPOffset; idx++)
+    {
+      sps0.setQPOffsets(idx, m_qpOffsetList[idx]);
+      sps0.setLambdaVal(idx, (uint32_t)LAMBDA_DEC_SIDE[26 + pps0.getPicInitQPMinus26() + m_qpOffsetList[idx] - 4 * ((int)m_isRA)]);
+      uint32_t lambda = (uint32_t)LAMBDA_DEC_SIDE[26 + pps0.getPicInitQPMinus26() + m_qpOffsetList[idx] - 4 * ((int)m_isRA)];
+      for (int shift = 0; shift < 16; shift++)
+        if (lambda >> shift == 0)
+        {
+          if (shift > maxBits)
+          {
+            maxBits = shift;
+          }
+          break;
+        }
+    }
+    sps0.setMaxbitsLambdaVal(maxBits);
+  }
+#endif
 
   if (m_resChangeInClvsEnabled)
   {
@@ -943,6 +966,13 @@ bool EncLib::encode( const InputColourSpaceConversion snrCSC, std::list<PelUnitB
   return false;
 }
 
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+void EncLib::setQPOffsetList(const int QPOffset[MAX_GOP])
+{
+  std::memcpy(m_qpOffsetList, QPOffset,(MAX_GOP) * sizeof(int));
+}
+#endif
+
 /**------------------------------------------------
  Separate interlaced frame into two fields
  -------------------------------------------------**/
@@ -1504,6 +1534,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setBDOFEnabledFlag                    ( m_BIO );
 #if JVET_W0090_ARMC_TM
   sps.setUseAML                             ( m_AML );
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  sps.setUseArmcRefinedMotion               ( m_armcRefinedMotion );
 #endif
   sps.setMaxNumMergeCand(getMaxNumMergeCand());
 #if JVET_X0049_ADAPT_DMVR

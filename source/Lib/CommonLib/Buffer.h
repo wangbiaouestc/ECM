@@ -95,6 +95,10 @@ struct PelBufferOps
   void(*calcBlkGradient)(int sx, int sy, int    *arraysGx2, int     *arraysGxGy, int     *arraysGxdI, int     *arraysGy2, int     *arraysGydI, int     &sGx2, int     &sGy2, int     &sGxGy, int     &sGxdI, int     &sGydI, int width, int height, int unitSize);
   void(*copyBuffer)(Pel *src, int srcStride, Pel *dst, int dstStride, int width, int height);
   void(*padding)(Pel *dst, int stride, int width, int height, int padSize);
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  void ( *removeWeightHighFreq1)  ( Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int shift, int bcwWeight);
+  void ( *removeHighFreq1)        ( Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height);
+#endif
 #if ENABLE_SIMD_OPT_BCW && defined(TARGET_SIMD_X86)
   void ( *removeWeightHighFreq8)  ( Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int shift, int bcwWeight);
   void ( *removeWeightHighFreq4)  ( Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int shift, int bcwWeight);
@@ -550,7 +554,11 @@ void AreaBuf<T>::removeWeightHighFreq(const AreaBuf<T>& other, const bool bClip,
     else if(!(width & 3))
       g_pelBufOP.removeWeightHighFreq4(dst, dstStride, src, srcStride, width, height, 16, bcwWeight);
     else
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+      g_pelBufOP.removeWeightHighFreq1(dst, dstStride, src, srcStride, width, height, 16, bcwWeight);
+#else
       CHECK(true, "Not supported");
+#endif
   }
   else
   {
@@ -613,7 +621,11 @@ void AreaBuf<T>::removeHighFreq( const AreaBuf<T>& other, const bool bClip, cons
     else if (!(width & 3))
       g_pelBufOP.removeHighFreq4(dst, dstStride, src, srcStride, width, height);
     else
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+      g_pelBufOP.removeHighFreq1(dst, dstStride, src, srcStride, width, height);
+#else
       CHECK(true, "Not supported");
+#endif
   }
   else
   {

@@ -201,8 +201,13 @@
 #define JVET_Y0134_TMVP_NAMVP_CAND_REORDERING             1 // JVET-Y0134: MV candidate reordering for TMVP and NAMVP types (controlled by JVET_W0090_ARMC_TM), and reference picture selection for TMVP 
 #if JVET_W0090_ARMC_TM
 #define JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED            1 // JVET-Y0067: TM based reordering for MMVD and affine MMVD and MVD sign prediction
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#define JVET_AA0093_ENHANCED_MMVD_EXTENSION               1 // JVET-AA0093: Test 2.3 part: Extension on TM based reordering for MMVD and affine MMVD
+#endif
 #define JVET_Z0102_NO_ARMC_FOR_ZERO_CAND                  1 // JVET-Z0102: No ARMC for the zero candidates of regular, TM and BM merge modes
 #define JVET_Z0054_BLK_REF_PIC_REORDER                    1 // JVET-Z0054: Block level TM based reordering of reference pictures
+#define JVET_AA0093_REFINED_MOTION_FOR_ARMC               1 // JVET-AA0093: Refined motion for ARMC
+#define JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC          1 // JVET-AA0093: Diversity criterion for ARMC reordering
 #endif
 
 // Transform and coefficient coding

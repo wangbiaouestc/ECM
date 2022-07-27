@@ -649,6 +649,96 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
   return false;
 }
 #endif
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+bool MergeCtx::xCheckSimilarMotion2Lists(int mergeCandIndex, MergeCtx *mrgCtx, uint32_t mvdSimilarityThresh ) const
+{
+  if (mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1)].refIdx < 0 && mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx < 0)
+  {
+    return true;
+  }
+
+  if (mvdSimilarityThresh > 1)
+  {
+    for (uint32_t ui = 0; ui < numValidMergeCand; ui++)
+    {
+      if (interDirNeighbours[ui] == mrgCtx->interDirNeighbours[mergeCandIndex])
+      {
+        if (interDirNeighbours[ui] == 3)
+        {
+          if (mvFieldNeighbours[(ui << 1)].refIdx == mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1)].refIdx &&
+            mvFieldNeighbours[(ui << 1) + 1].refIdx == mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx)
+          {
+            Mv mvDiffL0 = mvFieldNeighbours[(ui << 1)].mv - mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1)].mv;
+            Mv mvDiffL1 = mvFieldNeighbours[(ui << 1) + 1].mv - mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1) + 1].mv;
+
+            if (mvDiffL0.getAbsHor() < mvdSimilarityThresh && mvDiffL0.getAbsVer() < mvdSimilarityThresh
+              && mvDiffL1.getAbsHor() < mvdSimilarityThresh && mvDiffL1.getAbsVer() < mvdSimilarityThresh)
+            {
+              return true;
+            }
+          }
+        }
+        else if (interDirNeighbours[ui] == 1)
+        {
+          if (mvFieldNeighbours[(ui << 1)].refIdx == mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1)].refIdx)
+          {
+            Mv mvDiff = mvFieldNeighbours[(ui << 1)].mv - mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1)].mv;
+            if (mvDiff.getAbsHor() < mvdSimilarityThresh && mvDiff.getAbsVer() < mvdSimilarityThresh)
+            {
+              return true;
+            }
+          }
+        }
+        else if (interDirNeighbours[ui] == 2)
+        {
+          if (mvFieldNeighbours[(ui << 1) + 1].refIdx == mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx)
+          {
+            Mv mvDiff = mvFieldNeighbours[(ui << 1) + 1].mv - mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1) + 1].mv;
+            if (mvDiff.getAbsHor() < mvdSimilarityThresh && mvDiff.getAbsVer() < mvdSimilarityThresh)
+            {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+  for (uint32_t ui = 0; ui < numValidMergeCand; ui++)
+  {
+    if (interDirNeighbours[ui] == mrgCtx->interDirNeighbours[mergeCandIndex])
+    {
+      if (interDirNeighbours[ui] == 3)
+      {
+        if (mvFieldNeighbours[(ui << 1)].refIdx == mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1)].refIdx &&
+          mvFieldNeighbours[(ui << 1) + 1].refIdx == mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx &&
+          mvFieldNeighbours[(ui << 1)].mv == mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1)].mv &&
+          mvFieldNeighbours[(ui << 1) + 1].mv == mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1) + 1].mv)
+        {
+          return true;
+        }
+      }
+      else if (interDirNeighbours[ui] == 1)
+      {
+        if (mvFieldNeighbours[(ui << 1)].refIdx == mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1)].refIdx &&
+          mvFieldNeighbours[(ui << 1)].mv == mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1)].mv)
+        {
+          return true;
+        }
+      }
+      else if (interDirNeighbours[ui] == 2)
+      {
+        if (mvFieldNeighbours[(ui << 1) + 1].refIdx == mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx &&
+          mvFieldNeighbours[(ui << 1) + 1].mv == mrgCtx->mvFieldNeighbours[(mergeCandIndex << 1) + 1].mv)
+        {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+#endif
 #if JVET_Z0084_IBC_TM
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 bool MergeCtx::xCheckSimilarIBCMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh, int compareNum) const
@@ -855,10 +945,55 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
   const int refList1 = mmvdBaseMv[fPosBaseIdx][1].refIdx;
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+                    //0   1   2   3   4   5   6   7  8   9  10  11 12  13  14  15
+  const int xDir[] = {1, -1,  0,  0,  1, -1,  1, -1, 2, -2, -2,  2, 1, -1, -1,  1};
+  const int yDir[] = {0,  0,  1, -1,  1, -1, -1,  1, 1, -1,  1, -1, 2, -2,  2, -2};
+#else
   const int xDir[] = {1, -1,  0,  0,  1, -1,  1, -1, 2, -2,  2, -2, 1,  1, -1, -1};
   const int yDir[] = {0,  0,  1, -1,  1, -1, -1,  1, 1,  1, -1, -1, 2, -2,  2, -2};
 #endif
-    
+#endif
+   
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  if ((refList0 != -1) && (refList1 != -1))
+  {
+    tempMv[0] = Mv(0,0);
+    tempMv[1] = Mv(0,0);
+    int cutOff1 = 2 * MMVD_MAX_DIR_UNI;
+    int cutOff2 = MMVD_MAX_DIR_UNI;
+    if (fPosPosition >= cutOff1)
+    {
+      fPosPosition -= cutOff1;
+      const int poc0 = slice.getRefPOC(REF_PIC_LIST_0, refList0);
+      const int poc1 = slice.getRefPOC(REF_PIC_LIST_1, refList1);
+      const int currPoc = slice.getPOC();
+      tempMv[0] = Mv(xDir[fPosPosition] * offset, yDir[fPosPosition] * offset);
+      if ((poc1 - currPoc)*(poc0 - currPoc) > 0)
+      {
+        tempMv[1] = tempMv[0];
+      }
+      else
+      {
+        tempMv[1].set(-1 * tempMv[0].getHor(), -1 * tempMv[0].getVer());
+      }
+    }
+    else if (fPosPosition >= cutOff2)
+    {
+      fPosPosition -= cutOff2;
+      tempMv[1] = Mv(xDir[fPosPosition] * offset, yDir[fPosPosition] * offset);
+    }
+    else
+    {
+      tempMv[0] = Mv(xDir[fPosPosition] * offset, yDir[fPosPosition] * offset);
+    }
+    pu.interDir = 3;
+    pu.mv[REF_PIC_LIST_0] = mmvdBaseMv[fPosBaseIdx][0].mv + tempMv[0];
+    pu.refIdx[REF_PIC_LIST_0] = refList0;
+    pu.mv[REF_PIC_LIST_1] = mmvdBaseMv[fPosBaseIdx][1].mv + tempMv[1];
+    pu.refIdx[REF_PIC_LIST_1] = refList1;
+  }
+#else
   if ((refList0 != -1) && (refList1 != -1))
   {
     const int poc0 = slice.getRefPOC(REF_PIC_LIST_0, refList0);
@@ -934,6 +1069,7 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
     pu.mv[REF_PIC_LIST_1] = mmvdBaseMv[fPosBaseIdx][1].mv + tempMv[1];
     pu.refIdx[REF_PIC_LIST_1] = refList1;
   }
+#endif
   else if (refList0 != -1)
   {
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED

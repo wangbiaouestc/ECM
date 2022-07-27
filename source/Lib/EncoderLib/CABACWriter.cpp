@@ -2922,17 +2922,35 @@ void CABACWriter::affine_mmvd_data(const PredictionUnit& pu)
   // Base affine merge candidate idx
   uint8_t afMmvdBaseIdx = pu.afMmvdBaseIdx;
 
-  int numCandminus1_base = AF_MMVD_BASE_NUM - 1;
-  if (numCandminus1_base > 0)
+  int numCandMinus1Base = AF_MMVD_BASE_NUM - 1;
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  unsigned ctxId = 0;
+  const CodingStructure *cs = pu.cu->cs;
+  const CodingUnit *cuLeft = cs->getCURestricted( pu.cu->lumaPos().offset( -1, 0 ), *pu.cu, CH_L );
+  ctxId = (cuLeft && cuLeft->affine) ? 1 : 0;
+  const CodingUnit *cuAbove = cs->getCURestricted( pu.cu->lumaPos().offset( 0, -1 ), *pu.cu, CH_L );
+  ctxId += (cuAbove && cuAbove->affine) ? 1 : 0;
+  numCandMinus1Base = (ctxId == 0) ? 0 : ((ctxId == 1) ? 1 : AF_MMVD_BASE_NUM-1);
+#endif
+  if (numCandMinus1Base > 0)
   {
     // to support more base candidates
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+    int ctx2 =  (numCandMinus1Base == 1) ? 1 : 0;
+    m_BinEncoder.encodeBin((afMmvdBaseIdx == 0 ? 0 : 1), Ctx::AfMmvdIdx(ctx2));
+#else
     m_BinEncoder.encodeBin((afMmvdBaseIdx == 0 ? 0 : 1), Ctx::AfMmvdIdx());
-
+#endif
+    
     if (afMmvdBaseIdx > 0)
     {
-      for (unsigned idx = 1; idx < numCandminus1_base; idx++)
+      for (unsigned idx = 1; idx < numCandMinus1Base; idx++)
       {
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+        m_BinEncoder.encodeBin(afMmvdBaseIdx == idx ? 0 : 1, Ctx::AfMmvdIdx(idx + 1));
+#else
         m_BinEncoder.encodeBinEP(afMmvdBaseIdx == idx ? 0 : 1);
+#endif
         if (afMmvdBaseIdx == idx)
         {
           break;
@@ -2943,15 +2961,30 @@ void CABACWriter::affine_mmvd_data(const PredictionUnit& pu)
   DTRACE(g_trace_ctx, D_SYNTAX, "afMmvd_base_idx() afMmvd_base_idx=%d\n", afMmvdBaseIdx);
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  uint16_t sym = pu.afMmvdMergeIdx;
+#else
   uint8_t sym = pu.afMmvdMergeIdx;
+#endif
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  sym -= afMmvdBaseIdx * AF_MMVD_MAX_REFINE_NUM;
+#endif
   unsigned int ricePar = 1;
-  int numCandminus1_step =  ((AF_MMVD_MAX_REFINE_NUM >> ricePar) >> AFFINE_MMVD_SIZE_SHIFT) - 1;
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  int numStepCandMinus1 =  ((AF_MMVD_MAX_REFINE_NUM >> ricePar) >> AFFINE_MMVD_SIZE_SHIFT) / AFFINE_BI_DIR - 1;
+#else
+  int numStepCandMinus1 =  ((AF_MMVD_MAX_REFINE_NUM >> ricePar) >> AFFINE_MMVD_SIZE_SHIFT) - 1;
+#endif
   if(ricePar > 0)
   {
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+    m_BinEncoder.encodeBin( sym % (1 << ricePar), Ctx::AfMmvdOffsetStep(5));
+#else
     m_BinEncoder.encodeBinsEP( sym % (1 << ricePar), ricePar);
+#endif
   }
   sym >>= ricePar;
-  for (unsigned int uiUnaryIdx = 0; uiUnaryIdx < numCandminus1_step; ++uiUnaryIdx)
+  for (unsigned int uiUnaryIdx = 0; uiUnaryIdx < numStepCandMinus1; ++uiUnaryIdx)
   {
     unsigned int uiSymbol = sym == uiUnaryIdx ? 0 : 1;
     m_BinEncoder.encodeBin(uiSymbol, Ctx::AfMmvdOffsetStep((uiUnaryIdx > LAST_MERGE_MMVD_IDX_CABAC - 1 ? LAST_MERGE_MMVD_IDX_CABAC - 1 : uiUnaryIdx)));
@@ -2964,14 +2997,14 @@ void CABACWriter::affine_mmvd_data(const PredictionUnit& pu)
   {
     // Code Step Value
     uint8_t step = pu.afMmvdStep;
-    int numCandminus1_base = AF_MMVD_STEP_NUM - 1;
-    if (numCandminus1_base > 0)
+    int numCandMinus1Base = AF_MMVD_STEP_NUM - 1;
+    if (numCandMinus1Base > 0)
     {
       m_BinEncoder.encodeBin((step == 0 ? 0 : 1), Ctx::AfMmvdOffsetStep());
 
       if (step > 0)
       {
-        for (unsigned idx = 1; idx < numCandminus1_base; idx++)
+        for (unsigned idx = 1; idx < numCandMinus1Base; idx++)
         {
           m_BinEncoder.encodeBinEP(step == idx ? 0 : 1);
           if (step == idx)
@@ -3123,7 +3156,12 @@ void CABACWriter::merge_data(const PredictionUnit& pu)
 #endif
       )
     {
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+      unsigned  ctxId = pu.cu->skip ? 0 : 1;
+      m_BinEncoder.encodeBin(pu.mmvdMergeFlag, Ctx::MmvdFlag(ctxId));
+#else
       m_BinEncoder.encodeBin(pu.mmvdMergeFlag, Ctx::MmvdFlag(0));
+#endif
       DTRACE(g_trace_ctx, D_SYNTAX, "mmvd_merge_flag() mmvd_merge=%d pos=(%d,%d) size=%dx%d\n", pu.mmvdMergeFlag ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
     }
     if (pu.mmvdMergeFlag || pu.cu->mmvdSkip)
@@ -3414,7 +3452,11 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
     }
     int numCandminus1;
 #if JVET_X0049_ADAPT_DMVR
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+    uint16_t mergeIdx = pu.mergeIdx;
+#else
     uint8_t mergeIdx = pu.mergeIdx;
+#endif
 #endif
     if (pu.cu->predMode == MODE_IBC)
       numCandminus1 = int(pu.cs->sps->getMaxNumIBCMergeCand()) - 1;
@@ -3524,21 +3566,45 @@ void CABACWriter::mmvd_merge_idx(const PredictionUnit& pu)
   int var0;
   var0 = mvpIdx / MMVD_MAX_REFINE_NUM;
   mvpIdx -= var0 * MMVD_MAX_REFINE_NUM;
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  int numCandMinus1Base = std::min<int>(MMVD_BASE_MV_NUM, pu.cs->sps->getMaxNumMergeCand()) - 1;
+  if (numCandMinus1Base > 0)
+  {
+    // to support more base candidates
+    m_BinEncoder.encodeBin((var0 == 0 ? 0 : 1), Ctx::MmvdMergeIdx(0));
+    if (var0 > 0)
+    {
+      for (unsigned idx = 1; idx < numCandMinus1Base; idx++)
+      {
+        m_BinEncoder.encodeBin((var0 == idx ? 0 : 1), Ctx::MmvdMergeIdx(idx));
+        if (var0 == idx)
+        {
+          break;
+        }
+      }
+    }
+  }
+#else
   if (pu.cs->sps->getMaxNumMergeCand() > 1)
   {
     static_assert(MMVD_BASE_MV_NUM == 2, "");
     assert(var0 < 2);
     m_BinEncoder.encodeBin(var0, Ctx::MmvdMergeIdx());
   }
+#endif
   DTRACE(g_trace_ctx, D_SYNTAX, "mmvd_merge_idx() base_mvp_idx=%d\n", var0);
   unsigned int ricePar = 1;
-  int numCandminus1_step =  ((MMVD_MAX_REFINE_NUM >> ricePar) >> MMVD_SIZE_SHIFT) - 1;
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  int numStepCandMinus1 =  ((MMVD_MAX_REFINE_NUM >> ricePar) >> MMVD_SIZE_SHIFT)/MMVD_BI_DIR - 1;
+#else
+  int numStepCandMinus1 =  ((MMVD_MAX_REFINE_NUM >> ricePar) >> MMVD_SIZE_SHIFT) - 1;
+#endif
   if(ricePar > 0)
   {
     m_BinEncoder.encodeBinsEP( mvpIdx % (1 << ricePar), ricePar);
   }
   mvpIdx >>= ricePar;
-  for (unsigned int uiUnaryIdx = 0; uiUnaryIdx < numCandminus1_step; ++uiUnaryIdx)
+  for (unsigned int uiUnaryIdx = 0; uiUnaryIdx < numStepCandMinus1; ++uiUnaryIdx)
   {
     unsigned int uiSymbol = mvpIdx == uiUnaryIdx ? 0 : 1;
     m_BinEncoder.encodeBin(uiSymbol, Ctx::MmvdStepMvpIdx((uiUnaryIdx > LAST_MERGE_MMVD_IDX_CABAC - 1 ? LAST_MERGE_MMVD_IDX_CABAC - 1 : uiUnaryIdx)));
@@ -3566,8 +3632,8 @@ void CABACWriter::mmvd_merge_idx(const PredictionUnit& pu)
   }
   DTRACE(g_trace_ctx, D_SYNTAX, "base_mvp_idx() base_mvp_idx=%d\n", var0);
 
-  int numCandminus1_step = MMVD_REFINE_STEP - 1;
-  if (numCandminus1_step > 0)
+  int numStepCandMinus1 = MMVD_REFINE_STEP - 1;
+  if (numStepCandMinus1 > 0)
   {
     if (var1 == 0)
     {
@@ -3576,7 +3642,7 @@ void CABACWriter::mmvd_merge_idx(const PredictionUnit& pu)
     else
     {
       m_BinEncoder.encodeBin(1, Ctx::MmvdStepMvpIdx());
-      for (unsigned idx = 1; idx < numCandminus1_step; idx++)
+      for (unsigned idx = 1; idx < numStepCandMinus1; idx++)
       {
         m_BinEncoder.encodeBinEP(var1 == idx ? 0 : 1);
         if (var1 == idx)
@@ -3668,8 +3734,8 @@ void CABACWriter::geo_mmvd_idx(const PredictionUnit& pu, RefPicList eRefPicList)
   int mmvdStepToIdx[GPM_EXT_MMVD_REFINE_STEP] = { 5, 0, 1, 2, 3, 4, 6, 7, 8 };
   step = mmvdStepToIdx[step];
 
-  int numCandminus1_step = (extMMVD ? GPM_EXT_MMVD_REFINE_STEP : GPM_MMVD_REFINE_STEP) - 1;
-  if (numCandminus1_step > 0)
+  int numStepCandMinus1 = (extMMVD ? GPM_EXT_MMVD_REFINE_STEP : GPM_MMVD_REFINE_STEP) - 1;
+  if (numStepCandMinus1 > 0)
   {
     if (step == 0)
     {
@@ -3678,7 +3744,7 @@ void CABACWriter::geo_mmvd_idx(const PredictionUnit& pu, RefPicList eRefPicList)
     else
     {
       m_BinEncoder.encodeBin(1, Ctx::GeoMmvdStepMvpIdx());
-      for (unsigned idx = 1; idx < numCandminus1_step; idx++)
+      for (unsigned idx = 1; idx < numStepCandMinus1; idx++)
       {
         m_BinEncoder.encodeBinEP(step == idx ? 0 : 1);
         if (step == idx)
@@ -3872,8 +3938,8 @@ uint64_t CABACWriter::geo_mmvdIdx_est(const TempCtx& ctxStart, const int geoMMVD
   int mmvdStepToIdx[GPM_EXT_MMVD_REFINE_STEP] = { 5, 0, 1, 2, 3, 4, 6, 7, 8 };
   step = mmvdStepToIdx[step];
 
-  int numCandminus1_step = (extMMVD ? GPM_EXT_MMVD_REFINE_STEP : GPM_MMVD_REFINE_STEP) - 1;
-  if (numCandminus1_step > 0)
+  int numStepCandMinus1 = (extMMVD ? GPM_EXT_MMVD_REFINE_STEP : GPM_MMVD_REFINE_STEP) - 1;
+  if (numStepCandMinus1 > 0)
   {
     if (step == 0)
     {
@@ -3882,7 +3948,7 @@ uint64_t CABACWriter::geo_mmvdIdx_est(const TempCtx& ctxStart, const int geoMMVD
     else
     {
       m_BinEncoder.encodeBin(1, Ctx::GeoMmvdStepMvpIdx());
-      for (unsigned idx = 1; idx < numCandminus1_step; idx++)
+      for (unsigned idx = 1; idx < numStepCandMinus1; idx++)
       {
         m_BinEncoder.encodeBinEP(step == idx ? 0 : 1);
         if (step == idx)

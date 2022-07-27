@@ -705,6 +705,9 @@ void PredictionUnit::initData()
 #else
   ::memset(mvdL0SubPu, 0, sizeof(mvdL0SubPu));
 #endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  reduceTplSize = false;
+#endif
 
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   refIdxLC = -1;
@@ -830,6 +833,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 #else
   ::memcpy(mvdL0SubPu, predData.mvdL0SubPu, sizeof(mvdL0SubPu));
 #endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  reduceTplSize = predData.reduceTplSize;
+#endif
 
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
   {
@@ -950,6 +956,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   bdmvrRefine = other.bdmvrRefine;
 #else
   ::memcpy(mvdL0SubPu, other.mvdL0SubPu, sizeof(mvdL0SubPu));
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  reduceTplSize = other.reduceTplSize;
 #endif
 
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)

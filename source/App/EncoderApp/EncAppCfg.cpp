@@ -1015,6 +1015,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_W0090_ARMC_TM
   ("AML",                                             m_AML,                                             true, "Enable adaptive merge list")
 #endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  ("ArmcRefinedMotion",                               m_armcRefinedMotion,                               true, "Enable adaptive re-ordering of merge candidates with refined motion")
+#endif
   ("IMV",                                             m_ImvMode,                                            1, "Adaptive MV precision Mode (IMV)\n"
                                                                                                                "\t0: disabled\n"
                                                                                                                "\t1: enabled (1/2-Pel, Full-Pel and 4-PEL)\n")
@@ -1880,6 +1883,76 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
       }
     }
   }
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  int numQPOffset[MAX_GOP][2];
+  int numQPOffsetadded = 0;
+
+  for (int i = 0; i < m_iGOPSize; i++)
+  {
+    numQPOffset[i][0] = MAX_INT;
+    numQPOffset[i][1] = 0;
+  }
+  for (int i = 0; i < m_iGOPSize; i++)
+  {
+    if (!(m_GOPList[i].m_numRefPicsActive0 > 0 || m_GOPList[i].m_numRefPicsActive1 > 0))
+    {
+      continue;
+    }
+
+    int qp = m_iQP + m_GOPList[i].m_QPOffset;
+
+    // adjust QP according to QPOffsetModel for the GOP entry.
+    double dqpOffset = qp * m_GOPList[i].m_QPOffsetModelScale + m_GOPList[i].m_QPOffsetModelOffset + 0.5;
+    int    qpOffset  = (int) floor(Clip3<double>(0.0, 3.0, dqpOffset));
+    qp += qpOffset;
+
+    bool isQpOffsetAllreadyIdentified = false;
+    for (int j = 0; j < numQPOffsetadded; j++)
+    {
+      if (numQPOffset[j][0] == qp - m_iQP && m_GOPList[i].m_sliceType != 0)
+      {
+        isQpOffsetAllreadyIdentified = true;
+        numQPOffset[j][1]++;
+        break;
+      }
+    }
+    if (!isQpOffsetAllreadyIdentified)
+    {
+      numQPOffset[numQPOffsetadded][0] = qp - m_iQP;
+      numQPOffset[numQPOffsetadded][1]++;
+      numQPOffsetadded++;
+    }
+  }
+
+  m_numQPOffset = numQPOffsetadded;
+  if (m_GOPList[0].m_deltaRefPics0[0] > 1)
+  {
+    m_isRA = true;
+  }
+  else
+  {
+    m_isRA = false;
+  }
+
+  for (int j = 0; j < m_numQPOffset; j++)
+  {
+    int max = MAX_INT;
+    int pos = -1;
+    for (int i = 0; i < numQPOffsetadded; i++)
+    {
+      if ((numQPOffset[i][1]>0) && (max > numQPOffset[i][0]))
+      {
+        max = numQPOffset[i][0];
+        pos = i;
+      }
+    }
+    if (pos != -1)
+    {
+      m_qpOffsetList[j] = numQPOffset[pos][0];
+    }
+    numQPOffset[pos][1] = -1;
+  }
+#endif 
 
   for (list<const char*>::const_iterator it = argv_unhandled.begin(); it != argv_unhandled.end(); it++)
   {
@@ -4778,6 +4851,9 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "DualITree:%d ", m_dualTree );
     msg( VERBOSE, "IMV:%d ", m_ImvMode );
     msg( VERBOSE, "BIO:%d ", m_BIO );
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+    msg( VERBOSE, "ArmcRefinedMotion:%d ", m_armcRefinedMotion );
+#endif
     msg( VERBOSE, "LMChroma:%d ", m_LMChroma );
     msg( VERBOSE, "HorCollocatedChroma:%d ", m_horCollocatedChromaFlag );
     msg( VERBOSE, "VerCollocatedChroma:%d ", m_verCollocatedChromaFlag );

@@ -607,6 +607,9 @@ public:
 #else
   bool xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  bool xCheckSimilarMotion2Lists(int mergeCandIndex, MergeCtx *mrgCtx, uint32_t mvdSimilarityThresh = 1) const;
+#endif
 #endif
 #if JVET_Z0084_IBC_TM
 #if JVET_Z0075_IBC_HMVP_ENLARGE

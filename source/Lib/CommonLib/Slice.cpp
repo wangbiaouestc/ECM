@@ -1533,6 +1533,9 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
   m_pcPicHeader          = pSrc->m_pcPicHeader;
   m_colFromL0Flag        = pSrc->m_colFromL0Flag;
   m_colRefIdx            = pSrc->m_colRefIdx;
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  m_costForARMC          = pSrc->m_costForARMC;
+#endif
 
   if( cpyAlmostAll ) setLambdas(pSrc->getLambdas());
 
@@ -3517,6 +3520,9 @@ SPS::SPS()
 , m_uiMaxCUHeight             ( 32)
 , m_numRPL0                   ( 0 )
 , m_numRPL1                   ( 0 )
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  , m_numLambda               ( 0 )
+#endif
 , m_rpl1CopyFromRpl0Flag      ( false )
 , m_rpl1IdxPresentFlag        ( false )
 , m_allRplEntriesHasSameSignFlag ( true )
@@ -3610,6 +3616,9 @@ SPS::SPS()
 #if JVET_W0090_ARMC_TM
 , m_AML                       ( false )
 #endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+, m_armcRefinedMotion         ( false )
+#endif
 , m_GDREnabledFlag            ( true )
 , m_SubLayerCbpParametersPresentFlag ( true )
 , m_rprEnabledFlag            ( false )
@@ -3670,7 +3679,29 @@ void  SPS::createRPLList1(int numRPL)
 
   m_rpl1IdxPresentFlag = (m_numRPL0 != m_numRPL1) ? true : false;
 }
-
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+int  SPS::getIdx(uint32_t val) const {
+  for (int i = 0; i < m_numLambda; i++)
+  {
+    if (m_lambdaVal[i] == val)
+    {
+      return i;
+    }
+  }
+  return -1;
+}
+int  SPS::getQPOffsetsIdx(int val) const
+{
+  for (int i = 0; i < m_numLambda; i++)
+  {
+    if (m_qpOffsets[i] == val)
+    {
+      return i;
+    }
+  }
+  return -1;
+}
+#endif
 
 const int SPS::m_winUnitX[]={1,2,2,1};
 const int SPS::m_winUnitY[]={1,2,1,1};

@@ -320,6 +320,10 @@ public:
 #if DUMP_BEFORE_INLOOP
   std::string m_reconFileName;
 #endif
+
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  void setQPOffsetList(const int QPOffset[MAX_GOP]);
+#endif
 };
 
 //! \}

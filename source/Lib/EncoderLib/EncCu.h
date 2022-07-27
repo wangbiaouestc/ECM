@@ -331,13 +331,22 @@ private:
 #if MULTI_PASS_DMVR
   Mv                    m_mvBufBDMVR[(MRG_MAX_NUM_CANDS << 1)][MAX_NUM_SUBCU_DMVR];
 #if TM_MRG
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  Mv                    m_mvBufBDMVR4TM[(TM_MRG_MAX_NUM_INIT_CANDS << 1)][MAX_NUM_SUBCU_DMVR];
+#else
   Mv                    m_mvBufBDMVR4TM[(TM_MRG_MAX_NUM_CANDS << 1)][MAX_NUM_SUBCU_DMVR];
+#endif
 #endif
   Mv                    m_mvBufEncBDOF[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
   Mv                    m_mvBufEncBDOF4TM[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
 #if JVET_X0049_ADAPT_DMVR
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  Mv                    m_mvBufBDMVR4BM[(BM_MRG_MAX_NUM_INIT_CANDS << 1)<<1][MAX_NUM_SUBCU_DMVR];
+  Mv                    m_mvBufEncBDOF4BM[BM_MRG_MAX_NUM_INIT_CANDS<<1][BDOF_SUBPU_MAX_NUM];
+#else
   Mv                    m_mvBufBDMVR4BM[(BM_MRG_MAX_NUM_CANDS << 1)<<1][MAX_NUM_SUBCU_DMVR];
   Mv                    m_mvBufEncBDOF4BM[BM_MRG_MAX_NUM_CANDS<<1][BDOF_SUBPU_MAX_NUM];
+#endif
 #endif
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
@@ -448,6 +457,15 @@ protected:
 #endif
                               );
 #if JVET_X0049_ADAPT_DMVR
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  void xCheckSATDCostBMMerge
+                              ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx& mrgCtx, MergeCtx& mrgCtxDir2, bool armcRefinedMotion, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
+                                , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart
+#if MULTI_PASS_DMVR
+                                , bool* applyBDMVR
+#endif
+                              );
+#else
   void xCheckSATDCostBMMerge
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
                                 , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart
@@ -455,6 +473,7 @@ protected:
                                 , bool* applyBDMVR
 #endif
                               );
+#endif
 #endif
   void xCheckSATDCostCiipMerge 
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx mergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer, PelUnitBuf  acMergeTmpBuffer[MRG_MAX_NUM_CANDS]
@@ -480,6 +499,9 @@ protected:
                                 , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &RdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
                                           , uint32_t * affMmvdLUT
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  , uint8_t numBaseAffine = AF_MMVD_BASE_NUM
+#endif
 #endif
                                );
 #endif
