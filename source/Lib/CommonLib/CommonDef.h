@@ -300,9 +300,21 @@ static const int MAX_NUM_ALF_CLASSES         =                     25;
 #if ALF_IMPROVEMENT
 static const int MAX_NUM_ALF_ALTERNATIVES_LUMA = 4;
 static const int EXT_LENGTH = 2;
-static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH;
-static const int MAX_NUM_ALF_CHROMA_COEFF    =                     21;
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+static const int NUM_DB                      =                      3;
+static const int NUM_DB_SAMPLE               =                      5;
+static const int NUM_DB_PAD                  =                      1;
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB;
+#if JVET_AA0095_ALF_LONGER_FILTER
+static const int MAX_ALF_FILTER_LENGTH       =                     13;
+#else
 static const int MAX_ALF_FILTER_LENGTH       =                      9;
+#endif
+#else
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH;
+static const int MAX_ALF_FILTER_LENGTH       =                      9;
+#endif
+static const int MAX_NUM_ALF_CHROMA_COEFF    =                     21;
 #else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     13;
 static const int MAX_NUM_ALF_CHROMA_COEFF    =                      7;

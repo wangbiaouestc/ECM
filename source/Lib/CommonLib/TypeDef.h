@@ -50,6 +50,7 @@
 #include <assert.h>
 #include <cassert>
 
+
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -248,7 +249,8 @@
 #define JVET_X0071_ALF_BAND_CLASSIFIER                    1 // JVET-X0071/JVET-X0070: Alternative band classifier for ALF
 #define JVET_Y0106_CCSAO_EDGE_CLASSIFIER                  1 // JVET-Y0106: Edge based classifier for CCSAO
 #define JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY           1 // JVET-Z0105: Enable virtual boundary processing for in-loop filters
-
+#define JVET_AA0095_ALF_LONGER_FILTER                     1 // JVET-AA0095: Longer luma filter shape 
+#define JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF           1 // JVET-AA0095: Using samples before deblocking filter for ALF
 
 // SIMD optimizations
 #if IF_12TAP

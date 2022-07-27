@@ -3273,8 +3273,14 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         {
           pcPic->getOrigBuf().copyFrom( pcPic->getTrueOrigBuf() );
         }
-
       }
+
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+      if (pcSlice->getSPS()->getALFEnabledFlag())
+      {
+        m_pcALF->copyDbData(cs);
+      }
+#endif
 
 #if RPR_ENABLE
       // create SAO object based on the picture size

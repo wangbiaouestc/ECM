@@ -622,7 +622,15 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
     {
       WRITE_UVLC(param.numAlternativesLuma - 1, "alf_luma_num_alts_minus1" );
     }
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF && JVET_AA0095_ALF_LONGER_FILTER
+    WRITE_FLAG(param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_9_EXT_DB ? 1 : 0, "alf_luma_9_ext_db");
+#elif JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+    WRITE_FLAG(param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_9_EXT_DB ? 1 : 0, "alf_luma_9_ext_db");
+#elif JVET_AA0095_ALF_LONGER_FILTER
+    WRITE_FLAG(param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_13_EXT ? 1 : 0, "alf_luma_13_ext");
+#else
     WRITE_FLAG( param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_9_EXT ? 1 : 0, "alf_luma_ext" );
+#endif
     for (int altIdx = 0; altIdx < param.numAlternativesLuma; ++altIdx)
     {
 #if JVET_X0071_ALF_BAND_CLASSIFIER
@@ -643,7 +651,11 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
         }
       }
       AlfFilterType alfFilterType = param.filterType[CHANNEL_TYPE_LUMA];
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF || JVET_AA0095_ALF_LONGER_FILTER
+      AlfFilterShape  filterShape( alfTypeToSize[alfFilterType] );
+#else
       AlfFilterShape filterShape(alfFilterType == ALF_FILTER_5 ? 5 : (alfFilterType == ALF_FILTER_9_EXT ? size_ALF_FILTER_9_EXT : ((alfFilterType == ALF_FILTER_7 ? 7 : (alfFilterType == ALF_FILTER_EXT ? size_ALF_FILTER_EXT : 9)))));
+#endif
       int bestK[2] = { 0 };
       for (int orderIdx = 0; orderIdx < filterShape.numOrder; orderIdx++)
       {
@@ -700,7 +712,11 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
 #if ALF_IMPROVEMENT
       WRITE_FLAG( param.nonLinearFlag[CHANNEL_TYPE_CHROMA][altIdx], "alf_nonlinear_enable_flag_chroma" );
       AlfFilterType alfFilterType = param.filterType[CHANNEL_TYPE_CHROMA];
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF || JVET_AA0095_ALF_LONGER_FILTER
+      AlfFilterShape  filterShape( alfTypeToSize[alfFilterType] );
+#else
       AlfFilterShape filterShape(alfFilterType == ALF_FILTER_5 ? 5 : (alfFilterType == ALF_FILTER_9_EXT ? size_ALF_FILTER_9_EXT : ((alfFilterType == ALF_FILTER_7 ? 7 : (alfFilterType == ALF_FILTER_EXT ? size_ALF_FILTER_EXT : 9)))));
+#endif
       int bestK[2] = { 0 };
       for (int orderIdx = 0; orderIdx < filterShape.numOrder; orderIdx++)
       {
@@ -3860,7 +3876,11 @@ void HLSWriter::alfFilter( const AlfParam& alfParam, const bool isChroma, const 
 {
 #if ALF_IMPROVEMENT
   AlfFilterType alfFilterType = isChroma ? alfParam.filterType[CHANNEL_TYPE_CHROMA] : alfParam.filterType[CHANNEL_TYPE_LUMA];
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF || JVET_AA0095_ALF_LONGER_FILTER
+  AlfFilterShape alfShape( alfTypeToSize[alfFilterType] );
+#else
   AlfFilterShape alfShape(alfFilterType == ALF_FILTER_5 ? 5 : (alfFilterType == ALF_FILTER_9_EXT ? size_ALF_FILTER_9_EXT : ((alfFilterType == ALF_FILTER_7 ? 7 : (alfFilterType == ALF_FILTER_EXT ? size_ALF_FILTER_EXT :9)))));
+#endif
   const int numFilters = isChroma ? 1 : alfParam.numLumaFilters[altIdx];
   const short* coeff = isChroma ? alfParam.chromaCoeff[altIdx] : alfParam.lumaCoeff[altIdx];
   int offset = isChroma ? MAX_NUM_ALF_CHROMA_COEFF : MAX_NUM_ALF_LUMA_COEFF;
