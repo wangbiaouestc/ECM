@@ -219,6 +219,10 @@ private:
 
   Pel* m_piTemp;
   Pel* m_pMdlmTemp; // for MDLM mode
+#if JVET_AA0126_GLM
+  Pel* m_glmTempCb[NUM_GLM_IDC];
+  Pel* m_glmTempCr[NUM_GLM_IDC];
+#endif
   MatrixIntraPrediction m_matrixIntraPred;
 
 
@@ -374,6 +378,10 @@ public:
   // Cross-component Chroma
   void predIntraChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea& chromaArea, int intraDir, bool createModel = true, CclmModel *cclmModelStored = nullptr);
   void xGetLumaRecPixels(const PredictionUnit &pu, CompArea chromaArea);
+#if JVET_AA0126_GLM
+  void xGetLumaRecPixelsGlmAll(const PredictionUnit &pu, CompArea chromaArea);
+  Pel xGlmGetLumaVal    (const int s[6], const int c[6], const int glmIdx, const Pel val) const;
+#endif
   /// set parameters from CU data for accessing intra data
   void initIntraPatternChType     (const CodingUnit &cu, const CompArea &area, const bool forceRefFilterFlag = false); // use forceRefFilterFlag to get both filtered and unfiltered buffers
   void initIntraPatternChTypeISP  (const CodingUnit& cu, const CompArea& area, PelBuf& piReco, const bool forceRefFilterFlag = false); // use forceRefFilterFlag to get both filtered and unfiltered buffers

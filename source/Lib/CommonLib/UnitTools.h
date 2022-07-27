@@ -459,6 +459,9 @@ namespace PU
 #if JVET_Z0050_CCLM_SLOPE
   bool hasCclmDeltaFlag(const PredictionUnit &pu, const int mode = -1);
 #endif
+#if JVET_AA0126_GLM
+  bool hasGlmFlag      (const PredictionUnit &pu, const int mode = -1);
+#endif
 #if JVET_AA0057_CCCM
   void getCccmRefLineNum  (const PredictionUnit& pu, int& th, int& tv);
   bool cccmSingleModeAvail(const PredictionUnit& pu, int intraMode);

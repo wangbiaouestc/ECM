@@ -132,7 +132,7 @@
 #define JVET_Z0050_DIMD_CHROMA_FUSION                     1 // JVET-Z0050: DIMD chroma mode and fusion of chroma intra prediction modes
 #define JVET_Z0050_CCLM_SLOPE                             1 // JVET-Z0050: CCLM with slope adjustments
 #define JVET_AA0057_CCCM                                  1 // JVET-AA0057: Convolutional cross-component model (CCCM)
-
+#define JVET_AA0126_GLM                                   1 // JVET-AA0126: Gradient linear model
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -1393,6 +1393,21 @@ struct CclmOffsets
       }
     }
   }
+};
+#endif
+
+#if JVET_AA0126_GLM
+struct GlmIdc
+{
+  int8_t cb0 = 0, cr0 = 0;
+  int8_t cb1 = 0, cr1 = 0;
+  
+  bool isActive()                         const { return cb0 || cr0 || cb1 || cr1;                                                           }
+  bool isActive(ComponentID c)            const { return (c == COMPONENT_Cb) ? (cb0 || cb1) : (cr0 || cr1);                                  }
+  void setAllZero()                             { cb0 = 0;  cr0 = 0;  cb1 = 0;  cr1 = 0;                                                     }
+  void setIdcs(int b0, int r0, int b1, int r1)  { cb0 = b0; cr0 = r0; cb1 = b1; cr1 = r1;                                                    }
+  void setIdc(ComponentID c, int model, int v)  { (c == COMPONENT_Cb) ? (model == 0 ? cb0 = v : cb1 = v) : (model == 0 ? cr0 = v : cr1 = v); }
+  int  getIdc(ComponentID c, int model)   const { return (c == COMPONENT_Cb) ? (model == 0 ? cb0 : cb1) : (model == 0 ? cr0 : cr1);          }
 };
 #endif
 

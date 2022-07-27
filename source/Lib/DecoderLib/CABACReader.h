@@ -195,6 +195,9 @@ public:
   void        cclmDelta             ( PredictionUnit&               pu, int8_t &delta );
   void        cclmDeltaSlope       ( PredictionUnit&               pu );
 #endif
+#if JVET_AA0126_GLM
+  void        glmIdc                ( PredictionUnit&               pu );
+#endif
 
 
   // transform tree (clause 7.3.8.8)

@@ -543,6 +543,9 @@ protected:
 #if JVET_Z0050_CCLM_SLOPE
   void xFindBestCclmDeltaSlopeSATD        ( PredictionUnit &pu, ComponentID compID, int cclmModel, int &deltaBest, int64_t &satdBest );
 #endif
+#if JVET_AA0126_GLM
+  void xFindBestGlmIdcSATD                ( PredictionUnit &pu, ComponentID compID, int &idcBest, int64_t &satdBest );
+#endif
 };// END CLASS DEFINITION EncSearch
 
 //! \}

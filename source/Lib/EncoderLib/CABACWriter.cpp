@@ -1967,6 +1967,57 @@ void CABACWriter::cclmDeltaSlope(const PredictionUnit& pu)
 }
 #endif
 
+#if JVET_AA0126_GLM
+void CABACWriter::glmIdc(const PredictionUnit& pu)
+{
+  if ( PU::hasGlmFlag( pu ) )
+  {
+    bool glmActive = pu.glmIdc.isActive();
+
+    m_BinEncoder.encodeBin( glmActive ? 1 : 0, Ctx::GlmFlags(0) );
+    
+    if ( glmActive )
+    {
+      bool bothActive = pu.glmIdc.cb0 && pu.glmIdc.cr0;
+
+      m_BinEncoder.encodeBin( bothActive ? 1 : 0, Ctx::GlmFlags(3) );
+
+      if ( !bothActive )
+      {
+        m_BinEncoder.encodeBin( pu.glmIdc.cb0 ? 1 : 0, Ctx::GlmFlags(1) );
+      }
+
+      if ( pu.glmIdc.cb0 ) 
+      {
+        int glmIdx = pu.glmIdc.cb0 - 1;
+#if NUM_GLM_WEIGHT
+        m_BinEncoder.encodeBin( glmIdx >= NUM_GLM_PATTERN ? 1 : 0, Ctx::GlmFlags(2) );
+        glmIdx -= glmIdx >= NUM_GLM_PATTERN ? NUM_GLM_PATTERN : 0;
+#endif
+        m_BinEncoder.encodeBinsEP( glmIdx, NUM_GLM_PATTERN_BITS );
+      }
+      
+      if ( pu.glmIdc.cr0 ) 
+      {
+        int glmIdx = pu.glmIdc.cr0 - 1;
+#if NUM_GLM_WEIGHT
+        m_BinEncoder.encodeBin( glmIdx >= NUM_GLM_PATTERN ? 1 : 0, Ctx::GlmFlags(4) );
+        glmIdx -= glmIdx >= NUM_GLM_PATTERN ? NUM_GLM_PATTERN : 0;
+#endif
+        m_BinEncoder.encodeBinsEP( glmIdx, NUM_GLM_PATTERN_BITS );
+      }
+        
+#if MMLM
+      if ( PU::isMultiModeLM( pu.intraDir[1] ) )
+      {
+        CHECK(pu.glmIdc.cb0 != pu.glmIdc.cb1 
+           || pu.glmIdc.cr0 != pu.glmIdc.cr1, "GLM cb0 != cb1 || cr0 != cr1")
+      }
+#endif
+    }
+  }
+}
+#endif
 void CABACWriter::intra_chroma_lmc_mode(const PredictionUnit& pu)
 {
   const unsigned intraDir = pu.intraDir[1];
@@ -2019,7 +2070,9 @@ void CABACWriter::intra_chroma_lmc_mode(const PredictionUnit& pu)
 #if JVET_AA0057_CCCM
   cccmFlag( pu );
 #endif
-
+#if JVET_AA0126_GLM
+  glmIdc( pu );
+#endif
 #if JVET_Z0050_CCLM_SLOPE
   cclmDeltaSlope( pu );
 #endif
