@@ -67,6 +67,9 @@
 
 // Software optimization
 #define JVET_X0144_MAX_MTT_DEPTH_TID                      1 // JVET-X0144: max MTT hierarchy depth set by temporal ID
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+#define JVET_AA0098_MTT_DEPTH_TID_BY_QP                    1
+#endif
 #define JVET_X0049_BDMVR_SW_OPT                           1 // JVET-X0049: software optimization for BDMVR (lossless)
 #define INTRA_TRANS_ENC_OPT                               1 // JVET-Y0141: Software optimization, including TIMD/DIMD/MTS/LFNS encoder fast algorithm, SIMD implementation and CM initial value retraining 
 #define JVET_AA0129_INTERHASH_OBMCOFF_RD                  1 // JVET-AA0129: improved encoder RDO of inter-hash based ME considering OBMC off
