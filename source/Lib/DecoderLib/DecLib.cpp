@@ -726,6 +726,14 @@ void DecLib::executeLoopFilters()
       m_cReshaper.setRecReshaped(false);
       m_cSAO.setReshaper(&m_cReshaper);
   }
+
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+  if (cs.sps->getALFEnabledFlag())
+  {
+    m_cALF.copyDbData(cs);
+  }
+#endif
+
   // deblocking filter
 #if DB_PARAM_TID
   const PPS* pcPPS = cs.slice->getPPS();

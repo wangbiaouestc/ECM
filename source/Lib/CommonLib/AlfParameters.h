@@ -54,6 +54,15 @@ enum AlfFilterType
   ALF_FILTER_9,
   ALF_FILTER_9_EXT,
   ALF_FILTER_EXT,
+#if JVET_AA0095_ALF_LONGER_FILTER
+  ALF_FILTER_13_EXT,
+#endif
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+  ALF_FILTER_9_EXT_DB,
+#endif
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF && JVET_AA0095_ALF_LONGER_FILTER
+  ALF_FILTER_13_EXT_DB,
+#endif
 #endif
   ALF_NUM_OF_FILTER_TYPES
 };
@@ -63,6 +72,18 @@ static const int size_CC_ALF = -1;
 #if ALF_IMPROVEMENT
 static const int size_ALF_FILTER_9_EXT = -2;
 static const int size_ALF_FILTER_EXT = -3;
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF && JVET_AA0095_ALF_LONGER_FILTER
+static const int size_ALF_FILTER_13_EXT = -4;
+static const int size_ALF_FILTER_9_EXT_DB = -5;
+static const int size_ALF_FILTER_13_EXT_DB = -6;
+const int alfTypeToSize[ALF_NUM_OF_FILTER_TYPES] = { 5, 7, size_CC_ALF, 9, size_ALF_FILTER_9_EXT, size_ALF_FILTER_EXT, size_ALF_FILTER_13_EXT, size_ALF_FILTER_9_EXT_DB, size_ALF_FILTER_13_EXT_DB };
+#elif JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+static const int size_ALF_FILTER_9_EXT_DB = -4;
+const int alfTypeToSize[ALF_NUM_OF_FILTER_TYPES] = { 5, 7, size_CC_ALF, 9, size_ALF_FILTER_9_EXT, size_ALF_FILTER_EXT, size_ALF_FILTER_9_EXT_DB };
+#elif JVET_AA0095_ALF_LONGER_FILTER
+static const int size_ALF_FILTER_13_EXT = -4;
+const int alfTypeToSize[ALF_NUM_OF_FILTER_TYPES] = { 5, 7, size_CC_ALF, 9, size_ALF_FILTER_9_EXT, size_ALF_FILTER_EXT, size_ALF_FILTER_13_EXT };
+#endif
 #endif
 
 struct AlfFilterShape
@@ -170,8 +191,13 @@ struct AlfFilterShape
     else if( size == size_ALF_FILTER_9_EXT )
     {
       size = 9;
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+      numCoeff = 21 + EXT_LENGTH;
+      filterSize = 21 + EXT_LENGTH;
+#else
       numCoeff = MAX_NUM_ALF_LUMA_COEFF;
       filterSize = MAX_NUM_ALF_LUMA_COEFF;
+#endif
       filterLength = 9;
       filterType = ALF_FILTER_9_EXT;
       pattern = {
@@ -191,6 +217,86 @@ struct AlfFilterShape
       offset0 = 0;
 #endif
     }
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+    else if( size == size_ALF_FILTER_9_EXT_DB )
+    {
+      size = 9;
+      numCoeff = 21 + EXT_LENGTH + NUM_DB;
+      filterSize = 21 + EXT_LENGTH + NUM_DB;
+      filterLength = 9;
+      filterType = ALF_FILTER_9_EXT_DB;
+      pattern = {
+                     0,
+                 1,  2,  3,
+             4,  5,  6,  7,  8,
+         9, 10, 11, 12, 13, 14, 15,
+    16, 17, 18, 19, 20, 19, 18, 17, 16,
+        15, 14, 13, 12, 11, 10,  9,
+             8,  7,  6,  5,  4,
+                 3,  2,  1,
+                     0
+      };
+      numOrder = 2;
+      indexSecOrder = 19 + NUM_DB;
+      offset0 = 0;
+    }
+#endif
+#if JVET_AA0095_ALF_LONGER_FILTER
+    else if( size == size_ALF_FILTER_13_EXT )
+    {
+      size = 13;
+      numCoeff = 21 + EXT_LENGTH;
+      filterSize = 21 + EXT_LENGTH;
+      filterLength = 13;
+      filterType = ALF_FILTER_13_EXT;
+      pattern = {
+                            0,
+                            1,
+                            2,  
+                            3,
+                    4,  5,  6,  7,  8,
+                    9, 10, 11, 12, 13, 
+   14, 15, 16, 17, 18, 19, 20, 19, 18, 17, 16, 15, 14, 
+                   13, 12, 11, 10,  9,
+                    8,  7,  6,  5,  4,
+                            3,  
+                            2,  
+                            1,
+                            0
+      };
+      numOrder = 2;
+      indexSecOrder = 20;
+      offset0 = 0;
+    }
+#endif
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF && JVET_AA0095_ALF_LONGER_FILTER
+    else if( size == size_ALF_FILTER_13_EXT_DB )
+    {
+      size = 13;
+      numCoeff = 21 + EXT_LENGTH + NUM_DB;
+      filterSize = 21 + EXT_LENGTH + NUM_DB;
+      filterLength = 13;
+      filterType = ALF_FILTER_13_EXT_DB;
+      pattern = {
+                            0,
+                            1,
+                            2,  
+                            3,
+                    4,  5,  6,  7,  8,
+                    9, 10, 11, 12, 13, 
+   14, 15, 16, 17, 18, 19, 20, 19, 18, 17, 16, 15, 14, 
+                   13, 12, 11, 10,  9,
+                    8,  7,  6,  5,  4,
+                            3,  
+                            2,  
+                            1,
+                            0
+      };
+      numOrder = 2;
+      indexSecOrder = 19 + NUM_DB;
+      offset0 = 0;
+    }
+#endif
 #endif
     else if( size == size_CC_ALF )
     {
