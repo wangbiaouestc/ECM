@@ -2580,6 +2580,53 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     {
       pcSlice->setCheckLDC(true);
     }
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+    if (!pcSlice->isIntra() && pcSlice->getSPS()->getUseAML())
+    {
+      int index = pcSlice->getSPS()->getQPOffsetsIdx(pcSlice->getSliceQp() - (pcSlice->getPPS()->getPicInitQPMinus26() + 26));
+      if (index != -1)
+      {
+        const SPS* sps = pcSlice->getSPS();
+        pcSlice->setCostForARMC(sps->getLambdaVal(index));
+      }
+      else
+      {
+        pcSlice->setCostForARMC((uint32_t) LAMBDA_DEC_SIDE[min(max(pcSlice->getSliceQp(), 0), MAX_QP)]);
+      }
+
+      if (pcSlice->getCheckLDC())
+      {
+        int iCurrPOC = pcSlice->getPOC();
+        int iRefIdx  = 0;
+        int mindist  = MAX_INT;
+        for (iRefIdx = 0; iRefIdx < pcSlice->getNumRefIdx(REF_PIC_LIST_0); iRefIdx++)
+        {
+          if (abs(pcSlice->getRefPic(REF_PIC_LIST_0, iRefIdx)->getPOC() - iCurrPOC) < mindist)
+          {
+            mindist = abs(pcSlice->getRefPic(REF_PIC_LIST_0, iRefIdx)->getPOC() - iCurrPOC);
+          }
+        }
+        if (pcSlice->isInterB())
+        {
+          for (iRefIdx = 0; iRefIdx < pcSlice->getNumRefIdx(REF_PIC_LIST_1); iRefIdx++)
+          {
+            if (abs(pcSlice->getRefPic(REF_PIC_LIST_1, iRefIdx)->getPOC() - iCurrPOC) < mindist)
+            {
+              mindist = abs(pcSlice->getRefPic(REF_PIC_LIST_1, iRefIdx)->getPOC() - iCurrPOC);
+            }
+          }
+        }
+        if (mindist != 1 )
+        {
+          pcSlice->setCostForARMC((uint32_t) LAMBDA_DEC_SIDE[min(max(pcSlice->getSliceQp() - 4, 0), MAX_QP)]);
+        }
+      }
+      else
+      {
+        pcSlice->setCostForARMC((uint32_t) LAMBDA_DEC_SIDE[min(max(pcSlice->getSliceQp() - 4, 0), MAX_QP)]);
+      }
+    }
+#endif
 
 
     //-------------------------------------------------------------

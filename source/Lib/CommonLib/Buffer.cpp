@@ -960,6 +960,10 @@ PelBufferOps::PelBufferOps()
   removeHighFreq8 = removeHighFreq;
   removeHighFreq4 = removeHighFreq;
 #endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  removeWeightHighFreq1 = removeWeightHighFreq;
+  removeHighFreq1 = removeHighFreq;
+#endif
 
   profGradFilter = gradFilterCore <false>;
   applyPROF      = applyPROFCore;

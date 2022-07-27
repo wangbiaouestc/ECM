@@ -1334,6 +1334,41 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_W0090_ARMC_TM
   WRITE_FLAG( pcSPS->getUseAML() ? 1 : 0,                                             "sps_aml_enabled_flag" );
 #endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  if (pcSPS->getUseAML())
+  {
+    WRITE_FLAG( pcSPS->getUseArmcRefinedMotion() ? 1 : 0,                             "sps_ArmcRefinedMotion_enabled_flag" );
+  }
+#endif
+
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  if (pcSPS->getUseAML())
+  {
+    WRITE_UVLC(pcSPS->getNumLambda(), "num_Lambda");
+    WRITE_CODE(pcSPS->getMaxbitsLambdaVal(), 4, "MaxBitsLambda");
+
+    for (int i = 0; i < pcSPS->getNumLambda(); i++)
+    {
+      int code = pcSPS->getQPOffsets(i);
+      if (i == 0)
+      {
+        WRITE_SVLC(code, "QP_Offset");
+      }
+      else
+      {
+        if (pcSPS->getQPOffsets(i - 1) < 0)
+        {
+          WRITE_SVLC((code - pcSPS->getQPOffsets(i - 1)), "QP_Offset");
+        }
+        else
+        {
+          WRITE_UVLC((code - pcSPS->getQPOffsets(i - 1)), "QP_Offset");
+        }
+      }
+      WRITE_CODE(pcSPS->getLambdaVal(i), pcSPS->getMaxbitsLambdaVal(), "Lambda");
+      }
+    }
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   WRITE_FLAG( pcSPS->getUseARL() ? 1 : 0,                                             "sps_arl_enabled_flag" );
 #endif
@@ -2995,6 +3030,25 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
   {
     WRITE_FLAG(pcSlice->getTSResidualCodingDisabledFlag() ? 1 : 0, "slice_ts_residual_coding_disabled_flag");
   }
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  if ( !pcSlice->isIntra() && pcSlice->getSPS()->getUseAML())
+  {
+    // Prediction of the Lambda value
+    int index = pcSlice->getSPS()->getQPOffsetsIdx(pcSlice->getSliceQp() - (pcSlice->getPPS()->getPicInitQPMinus26() + 26));
+    bool lambdaCanBePredicted = false;
+    if (index !=-1)
+    {
+      if(pcSlice->getSPS()->getLambdaVal(index) == pcSlice->getCostForARMC())
+      {
+        lambdaCanBePredicted = true;
+      }
+    }
+    if (!lambdaCanBePredicted)
+    {
+      WRITE_CODE(pcSlice->getCostForARMC(), 9, "Lambda");
+    }
+  }
+#endif
 
 #if MULTI_HYP_PRED
   if (pcSlice->getSPS()->getUseInterMultiHyp() && pcSlice->isInterB())

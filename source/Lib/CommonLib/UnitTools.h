@@ -400,6 +400,9 @@ namespace PU
 #endif
   bool isLMCModeEnabled               (const PredictionUnit &pu, unsigned mode);
   bool isChromaIntraModeCrossCheckMode(const PredictionUnit &pu);
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  bool isArmcRefinedMotionEnabled(const PredictionUnit &pu, unsigned mode);
+#endif
 
 #if JVET_W0097_GPM_MMVD_TM
 #if TM_MRG

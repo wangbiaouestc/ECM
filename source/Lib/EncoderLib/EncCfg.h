@@ -322,6 +322,11 @@ protected:
   int       m_maxDecPicBuffering[MAX_TLAYER];
   int       m_numReorderPics[MAX_TLAYER];
   int       m_drapPeriod;
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  bool      m_isRA;
+  int       m_numQPOffset;
+  int       m_qpOffsetList[MAX_GOP];
+#endif
 
   int       m_iQP;                              //  if (AdaptiveQP == OFF)
   ChromaQpMappingTableParams m_chromaQpMappingTableParams;
@@ -411,6 +416,9 @@ protected:
   bool      m_BIO;
 #if JVET_W0090_ARMC_TM
   bool      m_AML;
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  bool      m_armcRefinedMotion;
 #endif
 
   bool      m_SMVD;
@@ -1172,6 +1180,10 @@ public:
       if (m_RPLList1[i].m_POC != -1) m_numRPLList1++;
     }
   }
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  void      setIsRA                         (bool b)         { m_isRA = b; }
+  void      setNumQPOffset                  (int num)        { m_numQPOffset = num; }
+#endif
   const RPLEntry &getRPLEntry(int L01, int idx) const { return (L01 == 0) ? m_RPLList0[idx] : m_RPLList1[idx]; }
   int       getRPLCandidateSize(int L01) const { return  (L01 == 0) ? m_numRPLList0 : m_numRPLList1; }
   void      setEncodedFlag(uint32_t  i, bool value) { m_RPLList0[i].m_isEncoded = value; m_RPLList1[i].m_isEncoded = value; m_GOPList[i].m_isEncoded = value; }
@@ -1328,6 +1340,10 @@ public:
 #if JVET_W0090_ARMC_TM
   void      setAML(bool b)                                   { m_AML = b; }
   bool      getAML()                                   const { return m_AML; }
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  void      setArmcRefinedMotion(bool b)                     { m_armcRefinedMotion = b; }
+  bool      getArmcRefinedMotion()                     const { return m_armcRefinedMotion; }
 #endif
 #if ENABLE_OBMC
   void      setUseOBMC                      ( bool n )       { m_OBMC = n; }

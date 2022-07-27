@@ -1581,6 +1581,13 @@ private:
   RPLList           m_RPLList1;
   uint32_t          m_numRPL0;
   uint32_t          m_numRPL1;
+  
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  uint32_t          m_numLambda;
+  uint32_t          m_lambdaVal[MAX_GOP];
+  int               m_qpOffsets[MAX_GOP];
+  int               m_maxbitsLambdaVal;
+#endif
 
   bool              m_rpl1CopyFromRpl0Flag;
   bool              m_rpl1IdxPresentFlag;
@@ -1719,6 +1726,9 @@ private:
   bool              m_MIP;
 #if JVET_W0090_ARMC_TM || JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0075_IBC_HMVP_ENLARGE
   bool              m_AML;
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  bool              m_armcRefinedMotion;
 #endif
   ChromaQpMappingTable m_chromaQpMappingTable;
   bool m_GDREnabledFlag;
@@ -1935,6 +1945,18 @@ public:
   RPLList*                getRPLList1()                                                                       { return &m_RPLList1;                                                  }
   uint32_t                getNumRPL0() const                                                                  { return m_numRPL0;                                                    }
   uint32_t                getNumRPL1() const                                                                  { return m_numRPL1;                                                    }
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  uint32_t                getNumLambda() const                                                                { return m_numLambda;                                                  }
+  int                     getIdx(uint32_t val) const;
+  uint32_t                getLambdaVal(int idx) const                                                         { return m_lambdaVal[idx];                                             }
+  void                    setNumLambda(uint32_t numL)                                                         { m_numLambda = numL;                                                  }
+  void                    setLambdaVal(int idx, uint32_t val)                                                 { m_lambdaVal[idx] = val;                                              }
+  uint32_t                getMaxbitsLambdaVal() const                                                         { return m_maxbitsLambdaVal;                                           }
+  void                    setMaxbitsLambdaVal(int numL)                                                       { m_maxbitsLambdaVal = numL;                                           }
+  void                    setQPOffsets(int idx, int val)                                                      { m_qpOffsets[idx] = val;                                              }
+  int                     getQPOffsets(int idx) const                                                         { return m_qpOffsets[idx];                                             }
+  int                     getQPOffsetsIdx(int val) const;
+#endif 
   void                    setRPL1CopyFromRPL0Flag(bool isCopy)                                                { m_rpl1CopyFromRpl0Flag = isCopy;                                     }
   bool                    getRPL1CopyFromRPL0Flag() const                                                     { return m_rpl1CopyFromRpl0Flag;                                       }
   bool                    getRPL1IdxPresentFlag() const                                                       { return m_rpl1IdxPresentFlag;                                         }
@@ -2199,6 +2221,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_W0090_ARMC_TM || JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0075_IBC_HMVP_ENLARGE
   void      setUseAML             ( bool b )                                        { m_AML = b; }
   bool      getUseAML             ()                                      const     { return m_AML; }
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  void      setUseArmcRefinedMotion ( bool b )                                      { m_armcRefinedMotion = b; }
+  bool      getUseArmcRefinedMotion  ()                                   const     { return m_armcRefinedMotion; }
 #endif
   bool      getUseWP              ()                                      const     { return m_useWeightPred; }
   bool      getUseWPBiPred        ()                                      const     { return m_useWeightedBiPred; }
@@ -2759,6 +2785,9 @@ private:
   bool                        m_enableTMVPFlag;                                         //!< enable temporal motion vector prediction
   bool                        m_picColFromL0Flag;                                       //!< syntax element collocated_from_l0_flag
   uint32_t                    m_colRefIdx;
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  uint32_t                    m_costForARMC;                                            //!< Cost for diversity criterion
+#endif
   bool                        m_mvdL1ZeroFlag;                                          //!< L1 MVD set to zero flag
   uint32_t                    m_maxNumAffineMergeCand;                                  //!< max number of sub-block merge candidates
   bool                        m_disFracMMVD;                                            //!< fractional MMVD offsets disabled flag
@@ -2896,6 +2925,10 @@ public:
   bool                        getPicColFromL0Flag() const                               { return m_picColFromL0Flag;                                                                    }
   void                        setColRefIdx( uint32_t refIdx)                             { m_colRefIdx = refIdx;                                                                       }
   uint32_t                    getColRefIdx()                                             { return m_colRefIdx;                                                                         }
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  void                        setCostForARMC(uint32_t cost)                             { m_costForARMC = cost;                                                                        }
+  uint32_t                    getCostForARMC()                                          { return m_costForARMC;                                                                        }
+#endif
   void                        setMvdL1ZeroFlag( bool b )                                { m_mvdL1ZeroFlag = b;                                                                         }
   bool                        getMvdL1ZeroFlag() const                                  { return m_mvdL1ZeroFlag;                                                                      }
   void                        setMaxNumAffineMergeCand( uint32_t val )                  { m_maxNumAffineMergeCand = val;                                                               }
@@ -3136,6 +3169,9 @@ private:
 
 
   uint32_t                   m_colRefIdx;
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  uint32_t                   m_costForARMC;
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
   std::vector<int>           m_implicitRefIdx[NUM_REF_PIC_LIST_01][NUM_REF_PIC_LIST_01][MAX_NUM_REF + 1];
 #endif
@@ -3295,6 +3331,9 @@ public:
   bool                        getColFromL0Flag() const                               { return m_colFromL0Flag;                                       }
   uint32_t                    getColRefIdx() const                                   { return m_colRefIdx;                                           }
   void                        checkColRefIdx(uint32_t curSliceSegmentIdx, const Picture* pic);
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  uint32_t                    getCostForARMC() const                                 { return m_costForARMC;                                         }
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
   void resizeImBuf(int numSlices)
   {
@@ -3392,6 +3431,9 @@ public:
   void                        setColRefIdx( uint32_t refIdx)                             { m_colRefIdx = refIdx;                                         }
   void                        setCheckLDC( bool b )                                  { m_bCheckLDC = b;                                              }
 
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  void                        setCostForARMC(uint32_t cost)                          { m_costForARMC = cost;                                         }
+#endif
   void                        setBiDirPred( bool b, int refIdx0, int refIdx1 ) { m_biDirPred = b; m_symRefIdx[0] = refIdx0; m_symRefIdx[1] = refIdx1; }
   bool                        getBiDirPred() const { return m_biDirPred; }
   int                         getSymRefIdx( int refList ) const { return m_symRefIdx[refList]; }

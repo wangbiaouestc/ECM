@@ -2193,6 +2193,48 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_W0090_ARMC_TM
   READ_FLAG( uiCode, "sps_aml_enabled_flag");                        pcSPS->setUseAML ( uiCode != 0 );
 #endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  if (pcSPS->getUseAML())
+  {
+    READ_FLAG( uiCode, "sps_ArmcRefinedMotion_enabled_flag");        pcSPS->setUseArmcRefinedMotion ( uiCode != 0 );
+  }
+#endif
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  if (pcSPS->getUseAML())
+  {
+    READ_UVLC(uiCode, "num_Lambda");
+    pcSPS->setNumLambda(uiCode);
+
+    READ_CODE(4, uiCode, "MaxBitsLambda");
+    pcSPS->setMaxbitsLambdaVal(uiCode);
+
+    for (int i = 0; i < pcSPS->getNumLambda(); i++)
+    {
+      int32_t qpOffset = 0;
+      if (i == 0)
+      {
+        READ_SVLC(qpOffset, "QP_Offset");
+        pcSPS->setQPOffsets(i, (int)qpOffset);
+      }
+      else
+      {
+        if (pcSPS->getQPOffsets(i - 1) < 0)
+        {
+          READ_SVLC(qpOffset, "QP_Offset");
+          pcSPS->setQPOffsets(i, (int)qpOffset + pcSPS->getQPOffsets(i - 1));
+        }
+        else
+        {
+          READ_UVLC(uiCode, "QP_Offset");
+          pcSPS->setQPOffsets(i, (int)uiCode + pcSPS->getQPOffsets(i - 1));
+        }
+      }
+
+      READ_CODE(pcSPS->getMaxbitsLambdaVal(), uiCode, "Lambda");
+      pcSPS->setLambdaVal(i, uiCode);
+    }
+  }
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   READ_FLAG( uiCode, "sps_arl_enabled_flag");                        pcSPS->setUseARL ( uiCode != 0 );
 #endif
@@ -4899,6 +4941,23 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
     pcSlice->setDefaultClpRng( *sps );
 
   }
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  if (!pcSlice->isIntra() && sps->getUseAML())
+  {
+    int index = sps->getQPOffsetsIdx(pcSlice->getSliceQp() - (pps->getPicInitQPMinus26() + 26));
+    bool lambdaCanBePredicted = false;
+    if (index != -1)
+    {
+      lambdaCanBePredicted = true;
+      pcSlice->setCostForARMC(sps->getLambdaVal((int) index));
+    }
+    if (!lambdaCanBePredicted)
+    {
+      READ_CODE(9, uiCode, "lambda");
+      pcSlice->setCostForARMC((uint32_t)uiCode);
+    }
+  }
+#endif
 
 #if MULTI_HYP_PRED
   if (sps->getUseInterMultiHyp() && pcSlice->isInterB())

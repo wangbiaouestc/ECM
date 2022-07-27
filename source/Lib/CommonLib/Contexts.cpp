@@ -912,6 +912,19 @@ const CtxSet ContextSetCfg::GPMIntraFlag = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::MmvdFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  {  18, 18, 18, 18},
+  {  18, 18, 18, 18},
+  { CNU, CNU, CNU, CNU },
+  {   6, 6, 6, 6 },
+  {   5, 5, 5, 5},
+  { DWS, DWS, DWS, DWS},
+  {  18, 18, 18, 18},
+  {  18, 18, 18, 18},
+  { DWE, DWE, DWE, DWE},
+  { 117, 117, 117, 117},
+  { 117, 117, 117, 117},
+#else
   {  18, },
   {  18, },
   { CNU, },
@@ -923,10 +936,24 @@ const CtxSet ContextSetCfg::MmvdFlag = ContextSetCfg::addCtxSet
   { DWE, },
   { 117, },
   { 117, },
+#endif
   });
 
 const CtxSet ContextSetCfg::MmvdMergeIdx = ContextSetCfg::addCtxSet
 ({
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  {  58, 58, 58, 58},
+  {  43, 43, 43, 43},
+  { CNU, CNU, CNU, CNU },
+  {   9, 9, 9, 9},
+  {  10, 10, 10, 10},
+  { DWS, DWS,DWS,DWS},
+  {  18, 18,18,18},
+  {  11, 11,11,11},
+  { DWE, DWE,DWE,DWE},
+  { 116, 116,116,116},
+  { 118, 118,118,118},
+#else
   {  58, },
   {  43, },
   { CNU, },
@@ -938,6 +965,7 @@ const CtxSet ContextSetCfg::MmvdMergeIdx = ContextSetCfg::addCtxSet
   { DWE, },
   { 116, },
   { 118, },
+#endif
   });
 
 const CtxSet ContextSetCfg::MmvdStepMvpIdx = ContextSetCfg::addCtxSet
@@ -1053,6 +1081,19 @@ const CtxSet ContextSetCfg::AfMmvdFlag = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::AfMmvdIdx = ContextSetCfg::addCtxSet
 ({
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  { CNU, CNU,CNU,CNU},
+  { CNU, CNU,CNU,CNU},
+  { CNU, CNU,CNU,CNU},
+  { DWS, DWS,DWS,DWS},
+  { DWS, DWS,DWS,DWS},
+  { DWS, DWS,DWS,DWS},
+  { DWE, DWE,DWE,DWE},
+  { DWE, DWE,DWE,DWE},
+  { DWE, DWE,DWE,DWE},
+  { 119, 119,119,119},
+  { 119, 119,119,119},
+#else
   { CNU, },
   { CNU, },
   { CNU, },
@@ -1064,11 +1105,25 @@ const CtxSet ContextSetCfg::AfMmvdIdx = ContextSetCfg::addCtxSet
   { DWE, },
   { 119, },
   { 119, },
+#endif
   });
 
 const CtxSet ContextSetCfg::AfMmvdOffsetStep = ContextSetCfg::addCtxSet
 ({
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  {  21,  29,  29,  29,  44, CNU},
+  {  13,  21,  36,  29,  44, CNU},
+  { CNU, CNU, CNU, CNU, CNU, CNU},
+  {   5,   5,   5,   4,   5, DWS},
+  {   5,   5,   4,   5,   9, DWS},
+  { DWS, DWS, DWS, DWS, DWS, DWS},
+  {  18,  18,  18,  11,  11, DWE},
+  {  18,  18,  11,  18,  25, DWE},
+  { DWE, DWE, DWE, DWE, DWE, DWE},
+  { 126, 141, 187, 219, 238, DWO},
+  { 117, 102, 100, 100,  87, DWO},
+#else
   {  21,  29,  29,  29,  44, },
   {  13,  21,  36,  29,  44, },
   { CNU, CNU, CNU, CNU, CNU, },
@@ -1080,6 +1135,7 @@ const CtxSet ContextSetCfg::AfMmvdOffsetStep = ContextSetCfg::addCtxSet
   { DWE, DWE, DWE, DWE, DWE, },
   { 126, 141, 187, 219, 238, },
   { 117, 102, 100, 100,  87, },
+#endif
 #else
   {  21 },
   {  13 },

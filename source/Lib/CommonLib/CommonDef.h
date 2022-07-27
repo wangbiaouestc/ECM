@@ -162,15 +162,25 @@ static const int AMVP_DECIMATION_FACTOR =                           1;
 static const int AMVP_DECIMATION_FACTOR =                           2;
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+static const int NUM_MERGE_CANDS =                                 28; ///< for maximum buffer of merging candidates
+static const int NUM_TMVP_CANDS =                                  8; ///< TMVP
+static const int MAX_PAIR_CANDS =                                  4; ///< MAX Pairiwse candidates for Regular TM and BM merge modes
+#else
 static const int NUM_MERGE_CANDS =                                 30; ///< for maximum buffer of merging candidates
 static const int NUM_TMVP_CANDS =                                   9; ///< TMVP
+#endif
 #elif JVET_Z0075_IBC_HMVP_ENLARGE
 static const int NUM_MERGE_CANDS =                                 20;
 #endif
 #if NON_ADJACENT_MRG_CAND
 static const int MRG_MAX_NUM_CANDS =                                15; ///< MERGE
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+static const int NUM_NON_ADJ_CANDS =                                16; ///< Non-Adj
+#else
 static const int NUM_NON_ADJ_CANDS =                                18; ///< Non-Adj
+#endif
 #endif
 static const int LAST_MERGE_IDX_CABAC =                              5;
 #else
@@ -203,6 +213,20 @@ static const int MAX_NUM_AMVP_CANDS_MAX_REF =                       MAX_NUM_REF 
 #endif
 static const int AMVP_MERGE_MODE_MERGE_LIST_MAX_CANDS =             6;
 static const int AMVP_MERGE_MODE_REDUCED_MV_REFINE_SEARCH_ROUND =   8;
+#endif
+
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+static const double LAMBDA_DEC_SIDE[MAX_QP] = {
+  0.777106,       0.872272,       0.979092,       1.098994,       1.233579,       1.384646,       1.554212,
+  1.744544,       1.958185,       2.197988,       2.467158,       2.769291,       3.108425,       3.489089,
+  3.916370,       4.395976,       4.934316,       5.538583,       6.216849,       6.978177,       7.832739,
+  8.791952,       9.868633,       11.077166,      12.433698,      13.956355,      15.665478,      17.583905,
+  19.737266,       22.154332,      24.867397,      27.912709,      31.330957,      35.167810,      39.474532,
+  44.308664,       49.734793,      55.825418,      62.661913,      70.335619,      78.949063,      88.617327,
+  99.469587,       111.650836,     125.323826,     140.671239,     157.898127,     177.234655,     198.939174,
+  223.301672,       250.647653,     281.342477,     315.796254,     354.469310,     397.878347,     446.603345,
+  501.295305,       562.684955,     631.592507,     708.938619,     795.756695,     893.206689,     1002.590610
+};
 #endif
 
 static const int MAX_TLAYER =                                       7; ///< Explicit temporal layer QP offset - max number of temporal layer
@@ -577,14 +601,24 @@ static const int LAST_SIGNIFICANT_GROUPS =                         14;
 #endif
 
 static const int AFFINE_MIN_BLOCK_SIZE =                            4; ///< Minimum affine MC block size
-
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int MMVD_BI_DIR =                                      3;
+static const int AFFINE_BI_DIR =                                    3;
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 static const int MMVD_REFINE_STEP =                                 6; ///< max number of distance step
 #else
 static const int MMVD_REFINE_STEP =                                 8; ///< max number of distance step
 #endif
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int MMVD_MAX_DIR_UNI =                                 16;
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int MMVD_MAX_DIR =                                     MMVD_MAX_DIR_UNI * MMVD_BI_DIR;
+#else
 static const int MMVD_MAX_DIR =                                     16;
+#endif
 #endif
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -596,7 +630,11 @@ static const int MMVD_MAX_REFINE_NUM =                              (MMVD_REFINE
 static const int MMVD_MAX_REFINE_NUM =                              (MMVD_REFINE_STEP * 4); ///< max number of candidate from a base candidate
 #endif
 
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int MMVD_BASE_MV_NUM =                                 3; ///< max number of base candidate
+#else
 static const int MMVD_BASE_MV_NUM =                                 2; ///< max number of base candidate
+#endif
 static const int MMVD_ADD_NUM =                                     (MMVD_MAX_REFINE_NUM * MMVD_BASE_MV_NUM);///< total number of mmvd candidate
 #if MERGE_ENC_OPT
 static const int MMVD_MRG_MAX_RD_NUM =                              20;
@@ -701,10 +739,22 @@ static const int    NUM_MRG_SATD_CAND =                             4;
 static const double MRG_FAST_RATIO    =                             1.25;
 static const int    NUM_AFF_MRG_SATD_CAND =                         2;
 #if AFFINE_MMVD
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int    AF_MMVD_BASE_NUM =                              3;
+#else
 static const int    AF_MMVD_BASE_NUM =                              1;
+#endif
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int    AF_MMVD_STEP_NUM =                              4; // number of distance offset
+#else
 static const int    AF_MMVD_STEP_NUM =                              5; // number of distance offset
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int    AF_MMVD_OFFSET_DIR =                            8 * AFFINE_BI_DIR;
+#else
 static const int    AF_MMVD_OFFSET_DIR =                            8;
+#endif
 #else
 static const int    AF_MMVD_OFFSET_DIR =                            4; // 00: (+, 0); 01: (-, 0); 10: (0, +); 11 (0, -);
 #endif
@@ -730,7 +780,7 @@ static const int    TM_LOG2_BASE_WEIGHT =                           5; ///< base
 static const int    TM_DISTANCE_WEIGHTS[][4] = { { 0, 1, 2, 3 }, { 1, 2, 3, 3 } }; ///< far to near
 static const int    TM_SPATIAL_WEIGHTS [][4] = { { 2, 2, 2, 2 }, { 0, 1, 1, 2 } }; ///< "left to right for above template" or "top to bottom for left template"
 #if TM_MRG
-#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+#if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING || JVET_AA0093_REFINED_MOTION_FOR_ARMC) && JVET_W0090_ARMC_TM
 static const int    TM_MRG_MAX_NUM_INIT_CANDS =                    10; ///< maximum number of TM merge candidates for ARMC (note: should be at most equal to MRG_MAX_NUM_CANDS)
 #endif
 static const int    TM_MRG_MAX_NUM_CANDS =                          4; ///< maximum number of TM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
@@ -744,7 +794,7 @@ static const int    TM_MAX_NUM_SATD_CAND = std::min((int)4, TM_MRG_MAX_NUM_CANDS
 #endif
 #endif
 #endif
-#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+#if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING || JVET_AA0093_REFINED_MOTION_FOR_ARMC) && JVET_W0090_ARMC_TM
 static const int    BM_MRG_MAX_NUM_INIT_CANDS =                    10; ///< maximum number of BM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
 #endif
 #if MULTI_PASS_DMVR
@@ -801,7 +851,11 @@ static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD =   MMVD_MAX_REFINE_NUM;
 #endif
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM >> 1;
+#else
 static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM;
+#endif
 #endif
 
 #if JVET_AA0057_CCCM

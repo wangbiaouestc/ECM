@@ -3317,42 +3317,68 @@ void CABACReader::affine_mmvd_data(PredictionUnit& pu)
     return;
   }
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__AFFINE_MMVD, pu.lumaSize());
-
+  
   pu.afMmvdFlag = (m_BinDecoder.decodeBin(Ctx::AfMmvdFlag()));
   DTRACE(g_trace_ctx, D_SYNTAX, "affine_mmvd_flag() af_mmvd_merge=%d pos=(%d,%d) size=%dx%d\n", pu.afMmvdFlag ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
-
+  
   if (!pu.afMmvdFlag)
   {
     return;
   }
-
+  
   // Base affine merge candidate idx
   uint8_t afMmvdBaseIdx = 0;
-  int numCandminus1_base = AF_MMVD_BASE_NUM - 1;
-  if (numCandminus1_base > 0)
+  int numCandMinus1Base = AF_MMVD_BASE_NUM - 1;
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  unsigned ctxId = 0;
+  const CodingStructure *cs = pu.cu->cs;
+  const CodingUnit *cuLeft = cs->getCURestricted( pu.cu->lumaPos().offset( -1, 0 ), *pu.cu, CH_L );
+  ctxId = (cuLeft && cuLeft->affine) ? 1 : 0;
+  const CodingUnit *cuAbove = cs->getCURestricted( pu.cu->lumaPos().offset( 0, -1 ), *pu.cu, CH_L );
+  ctxId += (cuAbove && cuAbove->affine) ? 1 : 0;
+  numCandMinus1Base = (ctxId == 0) ? 0 : ((ctxId == 1) ? 1 : AF_MMVD_BASE_NUM-1);
+#endif
+  if (numCandMinus1Base > 0)
   {
     // to support more base candidates
-    if (m_BinDecoder.decodeBin(Ctx::AfMmvdIdx()))
-    {
-      afMmvdBaseIdx++;
-      for (; afMmvdBaseIdx < numCandminus1_base; afMmvdBaseIdx++)
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+    int ctx2 =  (numCandMinus1Base == 1) ? 1 : 0;
+    if (m_BinDecoder.decodeBin(Ctx::AfMmvdIdx(ctx2)))
+#else
+      if (m_BinDecoder.decodeBin(Ctx::AfMmvdIdx()))
+#endif
       {
-        if (!m_BinDecoder.decodeBinEP())
+        afMmvdBaseIdx++;
+        for (; afMmvdBaseIdx < numCandMinus1Base; afMmvdBaseIdx++)
         {
-          break;
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+          if (!m_BinDecoder.decodeBin(Ctx::AfMmvdIdx(afMmvdBaseIdx + 1)))
+#else
+            if (!m_BinDecoder.decodeBinEP())
+#endif
+            {
+              break;
+            }
         }
       }
-    }
   }
   pu.afMmvdBaseIdx = afMmvdBaseIdx;
   DTRACE(g_trace_ctx, D_SYNTAX, "afMmvd_base_idx() afMmvd_base_idx=%d\n", afMmvdBaseIdx);
-
+  
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   unsigned int ricePar = 1;
-  int numCandminus1_step =  (AF_MMVD_MAX_REFINE_NUM >> (ricePar + AFFINE_MMVD_SIZE_SHIFT))  - 1;
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  int numStepCandMinus1 =  (AF_MMVD_MAX_REFINE_NUM >> (ricePar+AFFINE_MMVD_SIZE_SHIFT)) / AFFINE_BI_DIR  - 1;
+#else
+  int numStepCandMinus1 =  (AF_MMVD_MAX_REFINE_NUM >> (ricePar + AFFINE_MMVD_SIZE_SHIFT))  - 1;
+#endif
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  int temp = m_BinDecoder.decodeBin(Ctx::AfMmvdOffsetStep(5));
+#else
   int temp = (ricePar == 0) ? 0 : m_BinDecoder.decodeBinsEP(ricePar);
+#endif
   int uiUnaryIdx = 0;
-  for (; uiUnaryIdx < numCandminus1_step; ++uiUnaryIdx)
+  for (; uiUnaryIdx < numStepCandMinus1; ++uiUnaryIdx)
   {
     if (!m_BinDecoder.decodeBin(Ctx::AfMmvdOffsetStep((uiUnaryIdx > LAST_MERGE_MMVD_IDX_CABAC - 1 ? LAST_MERGE_MMVD_IDX_CABAC - 1 : uiUnaryIdx))))
     {
@@ -3361,6 +3387,9 @@ void CABACReader::affine_mmvd_data(PredictionUnit& pu)
   }
   uiUnaryIdx <<= ricePar;
   uiUnaryIdx += temp;
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  uiUnaryIdx += afMmvdBaseIdx * AF_MMVD_MAX_REFINE_NUM;
+#endif
   pu.afMmvdMergeIdx = uiUnaryIdx;
   pu.afMmvdStep = 0;
   pu.afMmvdDir = 0;
@@ -3368,13 +3397,13 @@ void CABACReader::affine_mmvd_data(PredictionUnit& pu)
   {
     // Decode Step Value
     uint8_t stepOffset = 0;
-    int numCandminus1_step = AF_MMVD_STEP_NUM - 1;
-    if (numCandminus1_step > 0)
+    int numStepCandMinus1 = AF_MMVD_STEP_NUM - 1;
+    if (numStepCandMinus1 > 0)
     {
       if (m_BinDecoder.decodeBin(Ctx::AfMmvdOffsetStep()))
       {
         stepOffset++;
-        for (; stepOffset < numCandminus1_step; stepOffset++)
+        for (; stepOffset < numStepCandMinus1; stepOffset++)
         {
           if (!m_BinDecoder.decodeBinEP())
           {
@@ -3542,8 +3571,13 @@ void CABACReader::merge_data( PredictionUnit& pu )
 #endif
         )
       {
-        RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MERGE_FLAG, pu.lumaSize()); 
+        RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MERGE_FLAG, pu.lumaSize());
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+        unsigned  ctxId = pu.cu->skip ? 0 : 1;
+        cu.firstPU->mmvdMergeFlag = m_BinDecoder.decodeBin(Ctx::MmvdFlag(ctxId));
+#else
         cu.firstPU->mmvdMergeFlag = m_BinDecoder.decodeBin(Ctx::MmvdFlag(0));
+#endif
         DTRACE(g_trace_ctx, D_SYNTAX, "mmvd_merge_flag() mmvd_merge=%d pos=(%d,%d) size=%dx%d\n", cu.firstPU->mmvdMergeFlag ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
       }
       else
@@ -3873,12 +3907,12 @@ void CABACReader::merge_idx( PredictionUnit& pu )
 void CABACReader::geo_mmvd_idx(PredictionUnit& pu, RefPicList eRefPicList)
 {
   bool extMMVD = pu.cs->picHeader->getGPMMMVDTableFlag();
-  int numCandminus1_step = (extMMVD ? GPM_EXT_MMVD_REFINE_STEP : GPM_MMVD_REFINE_STEP) - 1;
+  int numStepCandMinus1 = (extMMVD ? GPM_EXT_MMVD_REFINE_STEP : GPM_MMVD_REFINE_STEP) - 1;
   int step = 0;
   if (m_BinDecoder.decodeBin(Ctx::GeoMmvdStepMvpIdx()))
   {
     step++;
-    for (; step < numCandminus1_step; step++)
+    for (; step < numStepCandMinus1; step++)
     {
       if (!m_BinDecoder.decodeBinEP())
       {
@@ -4093,18 +4127,41 @@ void CABACReader::mmvd_merge_idx(PredictionUnit& pu)
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MERGE_INDEX, pu.lumaSize());
   unsigned int uiUnaryIdx = 0;
   int var0 = 0;
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  int numCandMinus1Base = std::min<int>(MMVD_BASE_MV_NUM, pu.cs->sps->getMaxNumMergeCand()) - 1;
+  if (numCandMinus1Base > 0)
+  {
+    // to support more base candidates
+    if (m_BinDecoder.decodeBin(Ctx::MmvdMergeIdx(0)))
+    {
+      var0++;
+      for (; var0 < numCandMinus1Base; var0++)
+      {
+        if (!m_BinDecoder.decodeBin(Ctx::MmvdMergeIdx(var0)))
+        {
+          break;
+        }
+      }
+    }
+  }
+#else
   if (pu.cs->sps->getMaxNumMergeCand() > 1)
   {
     static_assert(MMVD_BASE_MV_NUM == 2, "");
     var0 = m_BinDecoder.decodeBin(Ctx::MmvdMergeIdx());
   }
+#endif
   DTRACE(g_trace_ctx, D_SYNTAX, "mmvd_merge_idx() base_mvp_idx=%d\n", var0);
   unsigned int ricePar = 1;
-  int numCandminus1_step =  (MMVD_MAX_REFINE_NUM >> (ricePar+MMVD_SIZE_SHIFT))  - 1;
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  int numStepCandMinus1 =  ((MMVD_MAX_REFINE_NUM >> (ricePar+MMVD_SIZE_SHIFT)))/MMVD_BI_DIR  - 1;
+#else
+  int numStepCandMinus1 =  (MMVD_MAX_REFINE_NUM >> (ricePar+MMVD_SIZE_SHIFT))  - 1;
+#endif
   int temp = 0;
   temp = m_BinDecoder.decodeBinsEP(ricePar);
   
-  for (; uiUnaryIdx < numCandminus1_step; ++uiUnaryIdx)
+  for (; uiUnaryIdx < numStepCandMinus1; ++uiUnaryIdx)
   {
     if (!m_BinDecoder.decodeBin(Ctx::MmvdStepMvpIdx((uiUnaryIdx > LAST_MERGE_MMVD_IDX_CABAC - 1 ? LAST_MERGE_MMVD_IDX_CABAC - 1 : uiUnaryIdx))))
     {
@@ -4128,12 +4185,12 @@ void CABACReader::mmvd_merge_idx(PredictionUnit& pu)
     var0 = m_BinDecoder.decodeBin(Ctx::MmvdMergeIdx());
   }
   DTRACE(g_trace_ctx, D_SYNTAX, "base_mvp_idx() base_mvp_idx=%d\n", var0);
-  int numCandminus1_step = MMVD_REFINE_STEP - 1;
+  int numStepCandMinus1 = MMVD_REFINE_STEP - 1;
   int var1 = 0;
   if (m_BinDecoder.decodeBin(Ctx::MmvdStepMvpIdx()))
   {
     var1++;
-    for (; var1 < numCandminus1_step; var1++)
+    for (; var1 < numStepCandMinus1; var1++)
     {
       if (!m_BinDecoder.decodeBinEP())
       {

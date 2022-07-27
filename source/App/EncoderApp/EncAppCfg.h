@@ -297,6 +297,11 @@ protected:
   bool      m_cabacBypassAlignmentEnabledFlag;
   bool      m_ISP;
   bool      m_useFastISP;                                    ///< flag for enabling fast methods for ISP
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  bool      m_isRA;
+  int       m_numQPOffset;
+  int       m_qpOffsetList[MAX_GOP];
+#endif
 
   // coding quality
 #if QP_SWITCHING_FOR_PARALLEL
@@ -396,6 +401,9 @@ protected:
   bool      m_BIO;
 #if JVET_W0090_ARMC_TM
   bool      m_AML;
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  bool      m_armcRefinedMotion;
 #endif
   int       m_LMChroma;
   bool      m_horCollocatedChromaFlag;

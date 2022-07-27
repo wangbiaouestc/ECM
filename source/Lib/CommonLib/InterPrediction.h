@@ -542,11 +542,19 @@ public:
   static bool isSubblockVectorSpreadOverLimit( int a, int b, int c, int d, int predType );
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  void    sortInterMergeMMVDCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t * mmvdLUT, int16_t MMVDIdx = -1);
+#else
   void    sortInterMergeMMVDCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t * mmvdLUT, uint32_t MMVDIdx = -1);
+#endif
 #endif
     
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  void    sortAffineMergeCandidates(PredictionUnit pu, AffineMergeCtx& affMrgCtx, uint32_t * affMmvdLUT, int16_t afMMVDIdx = -1, bool fromStart = false);
+#else
   void    sortAffineMergeCandidates(PredictionUnit pu, AffineMergeCtx& affMrgCtx, uint32_t * affMmvdLUT, uint32_t afMMVDIdx = -1);
+#endif
 #endif
     
 #if JVET_W0090_ARMC_TM
@@ -575,7 +583,11 @@ public:
   void    updateCandInfo(MergeCtx& mrgCtx, uint32_t(*RdCandList)[MRG_MAX_NUM_CANDS], int mrgCandIdx = -1);
 #endif
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  void    getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft, int8_t posList0 = -1, int8_t posList1 = -1, bool load0 = false, bool load1 = false);
+#else
   void    getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft);
+#endif
 #endif
 #if JVET_W0090_ARMC_TM
   void    adjustAffineMergeCandidates(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, int mrgCandIdx = -1
@@ -598,13 +610,24 @@ public:
     , bool wrapRef = false
 #endif
                                );
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  void    getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft, int8_t posList0 = -1, int8_t posList1 = -1, bool loadSave0 = false, bool loadSave1 = false);
+#else
   void    getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft);
+#endif
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
   void adjustMergeCandidates(PredictionUnit& pu, MergeCtx& smvpMergeCandCtx, int numRetrievedMergeCand);
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
   void    adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& smvpMergeCandCtx, int numRetrievedMergeCand, int mrgCandIdx = -1);
   void    updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t* RdCandList, int numCandInCategory = -1);
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  void    updateCandInTwoCandidateGroups(MergeCtx& mrgCtx, uint32_t* rdCandList, int numCandInCategory, MergeCtx mrgCtx2);
+#endif
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  void    adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& smvpMergeCandCtx, bool* applyBDMVR, Mv** mvBufBDMVR, Mv** mvBufBDMVRTmp, int numRetrievedMergeCand, bool subRefineList[][2] = NULL, bool subRefineListTmp[][2] = NULL, int mrgCandIdx = -1);
+  void    updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t* rdCandList, bool* applyBDMVR, Mv** mvBufBDMVR, Mv** mvBufBDMVRTmp, bool subRefineList[][2] = NULL, bool subRefineListTmp[][2] = NULL, int numCandInCategory = -1);
 #endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
   void    adjustAffineMergeCandidatesOneGroup(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, int listsize, int mrgCandIdx = -1);
@@ -678,7 +701,11 @@ public:
 
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  void       deriveTMMv         (PredictionUnit& pu, Distortion* tmCost = NULL);
+#else
   void       deriveTMMv         (PredictionUnit& pu);
+#endif
 #endif
   Distortion deriveTMMv         (const PredictionUnit& pu, bool fillCurTpl, Distortion curBestCost, RefPicList eRefList, int refIdx, int maxSearchRounds, Mv& mv, const MvField* otherMvf = nullptr);
 #endif // TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
@@ -745,7 +772,11 @@ public:
 public:
   Mv*       getBdofSubPuMvOffset() {return m_bdofSubPuMvOffset;}
   void      setBdmvrSubPuMvBuf(Mv* mvBuf0, Mv* mvBuf1) { m_bdmvrSubPuMvBuf[0] = mvBuf0; m_bdmvrSubPuMvBuf[1] = mvBuf1; }
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  bool      processBDMVR              (PredictionUnit& pu, int step = 0, Distortion* tmCost = NULL);
+#else
   bool      processBDMVR              (PredictionUnit& pu);
+#endif
 #if JVET_X0049_ADAPT_DMVR
   bool      processBDMVRPU2Dir        (PredictionUnit& pu, bool subPURefine[2], Mv(&finalMvDir)[2]);
   void      processBDMVRSubPU         (PredictionUnit& pu, bool subPURefine);

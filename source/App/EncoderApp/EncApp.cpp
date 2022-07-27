@@ -607,6 +607,12 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setRPLList1                                          ( m_RPLList1);
   m_cEncLib.setIDRRefParamListPresent                            ( m_idrRefParamList );
   m_cEncLib.setGopList                                           ( m_GOPList );
+  
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  m_cEncLib.setIsRA                                              ( m_isRA );
+  m_cEncLib.setNumQPOffset                                       ( m_numQPOffset );
+  m_cEncLib.setQPOffsetList                                      ( m_qpOffsetList );
+#endif
 
   for(int i = 0; i < MAX_TLAYER; i++)
   {
@@ -775,6 +781,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setBIO                                               (m_BIO);
 #if JVET_W0090_ARMC_TM
   m_cEncLib.setAML                                               ( m_AML );
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  m_cEncLib.setArmcRefinedMotion                                 ( m_iQP < 25 ? false : m_armcRefinedMotion );
 #endif
   m_cEncLib.setUseLMChroma                                       ( m_LMChroma );
   m_cEncLib.setHorCollocatedChromaFlag                           ( m_horCollocatedChromaFlag );
