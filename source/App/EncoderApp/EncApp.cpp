@@ -814,6 +814,9 @@ void EncApp::xInitLibCfg()
     }
   }
 #endif
+#if JVET_AA0133_INTER_MTS_OPT
+  m_cEncLib.setInterMTSMaxSize(m_interMTSMaxSize);
+#endif
 #if ENABLE_DIMD
   m_cEncLib.setUseDimd                                           ( m_dimd );
 #endif

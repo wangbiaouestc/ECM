@@ -236,6 +236,7 @@
 #define JVET_Y0159_INTER_MTS                              1 // JVET-Y0159: Inter MTS uses fixed 4 candidates
 #endif
 #endif
+#define JVET_AA0133_INTER_MTS_OPT                         1 // JVET-AA0133: Inter MTS optimization
 
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision
@@ -677,6 +678,19 @@ enum QuantFlags
 enum TransType
 {
 #if JVET_W0103_INTRA_MTS
+#if JVET_AA0133_INTER_MTS_OPT
+  DCT2 = 0,
+  DCT8 = 1,
+  DST7 = 2,
+  DCT5 = 3,
+  DST4 = 4,
+  DST1 = 5,
+  IDTR = 6,
+  KLT0 = 7,
+  KLT1 = 8,
+  NUM_TRANS_TYPE = 9,
+  DCT2_EMT = 10
+#else
   DCT2 = 0,
   DCT8 = 1,
   DST7 = 2,
@@ -686,6 +700,7 @@ enum TransType
   IDTR = 6,
   NUM_TRANS_TYPE = 7,
   DCT2_EMT = 8
+#endif
 #else
   DCT2 = 0,
   DCT8 = 1,

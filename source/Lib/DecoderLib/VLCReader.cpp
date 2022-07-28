@@ -2041,6 +2041,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   {
     READ_FLAG(uiCode, "sps_explicit_mts_intra_enabled_flag");               pcSPS->setUseIntraMTS(uiCode != 0);
     READ_FLAG(uiCode, "sps_explicit_mts_inter_enabled_flag");               pcSPS->setUseInterMTS(uiCode != 0);
+#if JVET_AA0133_INTER_MTS_OPT
+    if (pcSPS->getUseInterMTS())
+    {
+      READ_FLAG(uiCode, "sps_inter_mts_max_size");                          pcSPS->setInterMTSMaxSize((uiCode != 0) ? 16 : 32);
+    }
+#endif
   }
   READ_FLAG(uiCode, "sps_lfnst_enabled_flag");                    pcSPS->setUseLFNST(uiCode != 0);
 #endif

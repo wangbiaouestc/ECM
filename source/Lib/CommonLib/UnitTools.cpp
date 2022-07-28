@@ -13396,7 +13396,11 @@ bool CU::bdpcmAllowed( const CodingUnit& cu, const ComponentID compID )
 bool CU::isMTSAllowed(const CodingUnit &cu, const ComponentID compID)
 {
   SizeType tsMaxSize = 1 << cu.cs->sps->getLog2MaxTransformSkipBlockSize();
+#if JVET_AA0133_INTER_MTS_OPT
+  const int maxSize = CU::isIntra(cu) ? MTS_INTRA_MAX_CU_SIZE : cu.cs->sps->getInterMTSMaxSize();
+#else
   const int maxSize  = CU::isIntra( cu ) ? MTS_INTRA_MAX_CU_SIZE : MTS_INTER_MAX_CU_SIZE;
+#endif
   const int cuWidth  = cu.blocks[0].lumaSize().width;
   const int cuHeight = cu.blocks[0].lumaSize().height;
   bool mtsAllowed    = cu.chType == CHANNEL_TYPE_LUMA && compID == COMPONENT_Y;

@@ -431,6 +431,9 @@ protected:
   int       m_LadfQpOffset[MAX_LADF_INTERVALS];
   int       m_LadfIntervalLowerBound[MAX_LADF_INTERVALS];
 #endif
+#if JVET_AA0133_INTER_MTS_OPT
+  int      m_interMTSMaxSize;
+#endif
 #if ENABLE_DIMD
   bool      m_dimd;
 #endif
@@ -1384,6 +1387,10 @@ public:
   void      setLadfIntervalLowerBound       ( int value, int idx ){ m_LadfIntervalLowerBound[ idx ] = value; }
   int       getLadfIntervalLowerBound       ( int idx ) const { return m_LadfIntervalLowerBound[ idx ]; }
 
+#endif
+#if JVET_AA0133_INTER_MTS_OPT
+  void      setInterMTSMaxSize(int size) { m_interMTSMaxSize = size; }
+  int       getInterMTSMaxSize()        const { return m_interMTSMaxSize; }
 #endif
 
 #if ENABLE_DIMD

@@ -351,7 +351,10 @@ protected:
   CABACWriter*    m_CABACEstimator;
   CtxCache*       m_CtxCache;
   DistParam       m_cDistParam;
-
+#if JVET_AA0133_INTER_MTS_OPT
+  double          m_globalBestLumaCost;
+  double          m_bestDCT2PassLumaCost;
+#endif
   RefPicList      m_currRefPicList;
   int             m_currRefPicIndex;
   bool            m_skipFracME;
@@ -418,6 +421,7 @@ public:
     m_geoMrgCtx = geoMrgCtx;
   }
 #endif
+
   InterSearch();
   virtual ~InterSearch();
 
@@ -458,6 +462,9 @@ public:
   void resetCtuRecord               ()             { m_ctuRecord.clear(); }
 #if ENABLE_SPLIT_PARALLELISM
   void copyState                    ( const InterSearch& other );
+#endif
+#if JVET_AA0133_INTER_MTS_OPT
+  void setBestCost(double cost) { m_globalBestLumaCost = cost; }
 #endif
   void setAffineModeSelected        ( bool flag) { m_affineModeSelected = flag; }
   void resetAffineMVList() { m_affMVListIdx = 0; m_affMVListSize = 0; }
@@ -984,15 +991,27 @@ protected:
 private:
   void  xxIBCHashSearch(PredictionUnit& pu, Mv* mvPred, int numMvPred, Mv &mv, int& idxMvPred, IbcHashMap& ibcHashMap);
 public:
-
+#if JVET_AA0133_INTER_MTS_OPT
+  bool encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &partitioner, const bool &skipResidual
+    , const bool luma = true, const bool chroma = true
+  );
+#else
   void encodeResAndCalcRdInterCU  (CodingStructure &cs, Partitioner &partitioner, const bool &skipResidual
     , const bool luma = true, const bool chroma = true
   );
+#endif
   void xEncodeInterResidualQT     (CodingStructure &cs, Partitioner &partitioner, const ComponentID &compID);
+#if JVET_AA0133_INTER_MTS_OPT
+  bool xEstimateInterResidualQT(CodingStructure &cs, Partitioner &partitioner, Distortion *puiZeroDist = NULL
+    , const bool luma = true, const bool chroma = true
+    , PelUnitBuf* orgResi = NULL
+  );
+#else
   void xEstimateInterResidualQT   (CodingStructure &cs, Partitioner &partitioner, Distortion *puiZeroDist = NULL
     , const bool luma = true, const bool chroma = true
     , PelUnitBuf* orgResi = NULL
   );
+#endif
   uint64_t xGetSymbolFracBitsInter  (CodingStructure &cs, Partitioner &partitioner);
   uint64_t xCalcPuMeBits            (PredictionUnit& pu);
 

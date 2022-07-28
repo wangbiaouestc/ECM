@@ -245,6 +245,10 @@ void TrQuant::init( const Quant* otherQuant,
     { nullptr,            fastForwardDST4_B4, fastForwardDST4_B8, fastForwardDST4_B16, fastForwardDST4_B32, fastForwardDST4_B64, fastForwardDST4_B128, fastForwardDST4_B256 },
     { nullptr,            fastForwardDST1_B4, fastForwardDST1_B8, fastForwardDST1_B16, fastForwardDST1_B32, fastForwardDST1_B64, fastForwardDST1_B128, fastForwardDST1_B256 },
     { nullptr,            fastForwardIDTR_B4, fastForwardIDTR_B8, fastForwardIDTR_B16, fastForwardIDTR_B32, fastForwardIDTR_B64, fastForwardIDTR_B128, fastForwardIDTR_B256 },
+#if JVET_AA0133_INTER_MTS_OPT
+    {nullptr,             fastForwardKLT0_B4, fastForwardKLT0_B8, fastForwardKLT0_B16,  nullptr,             nullptr,             nullptr,              nullptr             },
+    {nullptr,             fastForwardKLT1_B4, fastForwardKLT1_B8, fastForwardKLT1_B16,  nullptr,             nullptr,             nullptr,              nullptr             },
+#endif
 #endif
   } };
 
@@ -258,6 +262,10 @@ void TrQuant::init( const Quant* otherQuant,
     { nullptr,            fastInverseDST4_B4, fastInverseDST4_B8, fastInverseDST4_B16, fastInverseDST4_B32, fastInverseDST4_B64, fastInverseDST4_B128, fastInverseDST4_B256 },
     { nullptr,            fastInverseDST1_B4, fastInverseDST1_B8, fastInverseDST1_B16, fastInverseDST1_B32, fastInverseDST1_B64, fastInverseDST1_B128, fastInverseDST1_B256 },
     { nullptr,            fastInverseIDTR_B4, fastInverseIDTR_B8, fastInverseIDTR_B16, fastInverseIDTR_B32, fastInverseIDTR_B64, fastInverseIDTR_B128, fastInverseIDTR_B256 },
+#if JVET_AA0133_INTER_MTS_OPT
+    {nullptr,             fastInverseKLT0_B4, fastInverseKLT0_B8, fastInverseKLT0_B16,  nullptr,             nullptr,             nullptr,              nullptr             },
+    {nullptr,             fastInverseKLT1_B4, fastInverseKLT1_B8, fastInverseKLT1_B16,  nullptr,             nullptr,             nullptr,              nullptr             },
+#endif
 #endif
   } };
 #else
@@ -1167,6 +1175,16 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
       int indVer = (tu.mtsIdx[compID] - MTS_DST7_DST7) >> 1;
       trTypeHor = indHor ? DCT8 : DST7;
       trTypeVer = indVer ? DCT8 : DST7;
+#if JVET_AA0133_INTER_MTS_OPT
+      uint32_t width = tu.blocks[compID].width;
+      uint32_t height = tu.blocks[compID].height;
+      CHECK(width < 4 || height < 4, "width < 4 || height < 4 for KLT");
+      if (width <= 16 && height <= 16)
+      {
+        trTypeHor = indHor ? KLT1 : KLT0;
+        trTypeVer = indVer ? KLT1 : KLT0;
+      }
+#endif
     }
   }
 }
@@ -1409,10 +1427,12 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
 #else
   const double facBB[] = { 1.2, 1.3, 1.3, 1.4, 1.5 };
 #endif
+
   while( it != trModes->end() )
   {
     tu.mtsIdx[compID] = it->first;
     CoeffBuf tempCoeff( m_mtsCoeffs[tu.mtsIdx[compID]], rect);
+
     if( tu.noResidual )
     {
       int sumAbs = 0;
@@ -1420,7 +1440,6 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
       it++;
       continue;
     }
-
     if ( tu.mtsIdx[compID] == MTS_SKIP )
     {
       xTransformSkip( tu, compID, resiBuf, tempCoeff.buf );
@@ -1451,7 +1470,6 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
                                       tu.cu->slice->getSPS()->getMaxLog2TrDynamicRange(toChannelType(compID)));
       scaleSAD *= pow(2, trShift);
     }
-
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
     trCosts.push_back( TrCost( int(std::min<double>(sumAbs*scaleSAD, std::numeric_limits<int>::max())), pos++ ) );
 #else
@@ -1459,7 +1477,25 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
 #endif
     it++;
   }
-
+#if JVET_AA0133_INTER_MTS_OPT
+  if (CU::isInter(*tu.cu) && tu.cu->mtsFlag && compID == COMPONENT_Y)
+  {
+    std::stable_sort(trCosts.begin(), trCosts.end(), [](const TrCost  l, const TrCost r) {return l.first < r.first; });
+    std::vector<TrMode> trModesTemp;
+    trModesTemp.resize(trModes->size());
+    for (int i = 0; i < trModes->size(); i++)
+    {
+      trModesTemp[i] = trModes->at(i);
+    }
+    for (int i = 0; i < trModes->size(); i++)
+    {
+      int index = trCosts[i].second;
+      trModes->at(i) = trModesTemp[index];
+    }
+    trModesTemp.resize(0);
+    return;
+  }
+#endif
   int numTests = 0;
   std::vector<TrCost>::iterator itC = trCosts.begin();
   const double fac   = facBB[std::max(0, floorLog2(std::max(width, height)) - 2)];

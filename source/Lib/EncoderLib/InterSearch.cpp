@@ -8684,11 +8684,17 @@ uint8_t InterSearch::skipSbtByRDCost( int width, int height, int mtDepth, uint8_
   }
   return MAX_UCHAR;
 }
-
+#if JVET_AA0133_INTER_MTS_OPT
+bool InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &partitioner, Distortion *puiZeroDist /*= NULL*/
+  , const bool luma, const bool chroma
+  , PelUnitBuf* orgResi
+)
+#else
 void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &partitioner, Distortion *puiZeroDist /*= NULL*/
   , const bool luma, const bool chroma
   , PelUnitBuf* orgResi
 )
+#endif
 {
   const UnitArea& currArea = partitioner.currArea();
   const SPS &sps           = *cs.sps;
@@ -8798,10 +8804,21 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
       }
 
 
-      const bool tsAllowed  = TU::isTSAllowed(tu, compID) && (isLuma(compID) || (isChroma(compID) && m_pcEncCfg->getUseChromaTS()));
+#if JVET_AA0133_INTER_MTS_OPT
+      const bool mtsAllowed = CU::isMTSAllowed(*tu.cu, compID) && cu.mtsFlag;
+      const bool tsAllowed = TU::isTSAllowed(tu, compID) && ((isLuma(compID) && !cu.mtsFlag) || (isChroma(compID) && m_pcEncCfg->getUseChromaTS()));
+#else
+      const bool tsAllowed = TU::isTSAllowed(tu, compID) && (isLuma(compID) || (isChroma(compID) && m_pcEncCfg->getUseChromaTS()));
       const bool mtsAllowed = CU::isMTSAllowed( *tu.cu, compID );
+#endif
 
       uint8_t nNumTransformCands = 1 + ( tsAllowed ? 1 : 0 ) + ( mtsAllowed ? 4 : 0 ); // DCT + TS + 4 MTS = 6 tests
+#if JVET_AA0133_INTER_MTS_OPT
+      if (cu.mtsFlag && compID == COMPONENT_Y)
+      {
+        nNumTransformCands = (mtsAllowed ? 4 : 0);
+      }
+#endif
       std::vector<TrMode> trModes;
 #if TU_256
       if(tu.idx != cu.firstTU->idx)
@@ -8816,11 +8833,21 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
       {
         nNumTransformCands = 0;
       }
+#if JVET_AA0133_INTER_MTS_OPT
+      else if(!(cu.mtsFlag && compID == COMPONENT_Y))
+#else
       else
+#endif
       {
       trModes.push_back( TrMode( 0, true ) ); //DCT2
       nNumTransformCands = 1;
       }
+#if JVET_AA0133_INTER_MTS_OPT
+      else
+      {
+        nNumTransformCands = 0;
+      }
+#endif
       //for a SBT-no-residual TU, the RDO process should be called once, in order to get the RD cost
       if( tsAllowed && !tu.noResidual )
       {
@@ -8866,11 +8893,16 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #endif
         m_pcRdCost->lambdaAdjustColorTrans(true, compID);
       }
-
+#if JVET_AA0133_INTER_MTS_OPT
+      bool skipRemainingMTS = false;
+      bool skipMTSPass = false;
+      int  countSkipMTSLoop = 0;
+#endif
       const int numTransformCandidates = nNumTransformCands;
       for( int transformMode = 0; transformMode < numTransformCandidates; transformMode++ )
       {
           const bool isFirstMode  = transformMode == 0;
+
           // copy the original residual into the residual buffer
 #if JVET_S0234_ACT_CRS_FIX
           if (colorTransFlag)
@@ -8898,6 +8930,12 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             }
             tu.mtsIdx[compID] = trModes[transformMode].first;
           }
+#if JVET_AA0133_INTER_MTS_OPT
+          if (compID == COMPONENT_Y && cu.mtsFlag && skipRemainingMTS)
+          {
+            break;
+          }
+#endif
           QpParam cQP(tu, compID);  // note: uses tu.transformSkip[compID]
 
 #if RDOQ_CHROMA_LAMBDA
@@ -9185,7 +9223,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #endif
             }
           }
+#if JVET_AA0133_INTER_MTS_OPT
+          else if ((cu.mtsFlag && compID == COMPONENT_Y) || (transformMode > 0))
+#else
           else if( transformMode > 0 )
+#endif
           {
             currCompCost = MAX_DOUBLE;
           }
@@ -9197,7 +9239,23 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 
             tu.cbf[compID] = 0;
           }
-
+#if JVET_AA0133_INTER_MTS_OPT
+          if (compID == COMPONENT_Y && cu.mtsFlag && currCompCost < MAX_DOUBLE)
+          {
+            double globalMinCost = std::min(minCost[compID], m_bestDCT2PassLumaCost);
+            double fac = std::max((1.0 + 1.0 / sqrt(tu.lumaSize().width * tu.lumaSize().height)), 1.06);
+            if (currCompCost > fac*globalMinCost)
+            {
+              skipRemainingMTS = true;
+              if (countSkipMTSLoop == 0)
+              {
+                //skip MTS candidate condition fulfilled for first valid MTS candidate (count = 0), so skip chroma coding.
+                skipMTSPass = true;
+              }
+            }
+            countSkipMTSLoop++;
+          }
+ #endif
           // evaluate
 #if TU_256
           if( isFirstMode || ( currCompCost < minCost[compID] ) || ( transformMode == 1 && currCompCost == minCost[compID] ) )
@@ -9230,7 +9288,29 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             CHECK( currCompFracBits > 0 || currAbsSum, "currCompFracBits > 0 when tu noResidual" );
           }
       }
-
+#if JVET_AA0133_INTER_MTS_OPT
+      if (compID == 0)
+      {
+        if (cu.mtsFlag)
+        {
+          if (minCost[compID] == MAX_DOUBLE || bestTU.cbf[0] == 0) //When checking only MTS cands, cbf can't be zero, or just only contain DC coefficients.
+          {
+            return false;
+          }
+          if (skipMTSPass) //Luma is not selecting any MTS (skipping), so skip chroma coding (Encoder speedup).
+          {
+            return false;
+          }
+        }
+        else
+        {
+          if (!cu.sbtInfo)
+          {
+            m_bestDCT2PassLumaCost = minCost[compID];
+          }
+        }
+      }
+#endif
         // copy component
         tu.copyComponentFrom( bestTU, compID );
         csFull->getResiBuf( compArea ).copyFrom( saveCS.getResiBuf( compArea ) );
@@ -9756,11 +9836,19 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
       csFull ->releaseIntermediateData();
     }
   }
+#if JVET_AA0133_INTER_MTS_OPT
+  return true;
+#endif
 }
-
+#if JVET_AA0133_INTER_MTS_OPT
+bool InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &partitioner, const bool &skipResidual
+  , const bool luma, const bool chroma
+)
+#else
 void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &partitioner, const bool &skipResidual
   , const bool luma, const bool chroma
 )
+#endif
 {
   m_pcRdCost->setChromaFormat(cs.sps->getChromaFormatIdc());
 
@@ -9851,8 +9939,11 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
     cs.dist     = distortion;
     cs.fracBits = m_CABACEstimator->getEstFracBits();
     cs.cost     = m_pcRdCost->calcRdCost(cs.fracBits, cs.dist);
-
+#if JVET_AA0133_INTER_MTS_OPT
+    return true;
+#else
     return;
+#endif
   }
 
   //  Residual coding.
@@ -10027,7 +10118,15 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
     cs.getOrgResiBuf().bufs[1].copyFrom(orgResidual.bufs[1]);
     cs.getOrgResiBuf().bufs[2].copyFrom(orgResidual.bufs[2]);
   }
+#if JVET_AA0133_INTER_MTS_OPT
+  bool isValidReturn = xEstimateInterResidualQT(cs, partitioner, &zeroDistortion, luma, chroma);
+  if (cu.mtsFlag && !isValidReturn)
+  {
+    return false;
+  }
+#else
   xEstimateInterResidualQT(cs, partitioner, &zeroDistortion, luma, chroma);
+#endif
   }
   TransformUnit &firstTU = *cs.getTU( partitioner.chType );
 
@@ -10387,6 +10486,9 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
   }
 
   CHECK(cs.tus.size() == 0, "No TUs present");
+#if JVET_AA0133_INTER_MTS_OPT
+  return true;
+#endif
 }
 
 uint64_t InterSearch::xGetSymbolFracBitsInter(CodingStructure &cs, Partitioner &partitioner)

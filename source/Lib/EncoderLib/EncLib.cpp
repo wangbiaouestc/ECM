@@ -1585,6 +1585,9 @@ void EncLib::xInitSPS( SPS& sps )
     CHECK( m_LadfIntervalLowerBound[0] != 0, "abnormal value set to LadfIntervalLowerBound[0]" );
   }
 #endif
+#if JVET_AA0133_INTER_MTS_OPT
+  sps.setInterMTSMaxSize(m_interMTSMaxSize);
+#endif
 #if ENABLE_DIMD
   sps.setUseDimd            ( m_dimd );
 #endif
