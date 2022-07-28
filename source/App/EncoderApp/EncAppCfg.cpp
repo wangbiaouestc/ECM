@@ -3554,6 +3554,24 @@ bool EncAppCfg::xCheckParameter()
     msg( WARNING, "****************************************************************************\n");
     m_dualTree = false;
   }
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if (m_chromaBIF && (m_chromaFormatIDC == CHROMA_400))
+  {
+    msg( WARNING, "****************************************************************************\n");
+    msg( WARNING, "** WARNING: --ChromaBIF has been disabled because the chromaFormat is 400 **\n");
+    msg( WARNING, "****************************************************************************\n");
+    m_chromaBIF = false;
+  }
+#endif
+#if JVET_W0066_CCSAO
+  if (m_CCSAO && (m_chromaFormatIDC == CHROMA_400))
+  {
+    msg( WARNING, "****************************************************************************\n");
+    msg( WARNING, "** WARNING: --CCSAO has been disabled because the chromaFormat is 400 **\n");
+    msg( WARNING, "****************************************************************************\n");
+    m_CCSAO = false;
+  }
+#endif
   if (m_ccalf && (m_chromaFormatIDC == CHROMA_400))
   {
     msg( WARNING, "****************************************************************************\n");
