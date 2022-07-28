@@ -1059,6 +1059,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("LadfQpOffset",                                    cfg_LadfQpOffset,                      cfg_LadfQpOffset, "LADF QP offset")
   ("LadfIntervalLowerBound",                          cfg_LadfIntervalLowerBound,  cfg_LadfIntervalLowerBound, "LADF lower bound for 2nd lowest interval")
 #endif
+#if JVET_AA0133_INTER_MTS_OPT
+  ("InterMTSMaxSize",                                 m_interMTSMaxSize,                                   32, "InterMTSMaxSize")
+#endif
 #if ENABLE_DIMD
   ( "DIMD",                                           m_dimd,                                            true, "Enable decoder side intra mode derivation\n" )
 #endif
@@ -2800,7 +2803,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
     }
   }
 #endif
-
+#if JVET_AA0133_INTER_MTS_OPT
+#if JVET_AA0146_WRAP_AROUND_FIX
+  m_interMTSMaxSize = (m_sourceHeight > 1080) ? 32 : 16;
+#else
+  m_interMTSMaxSize = (m_iSourceHeight > 1080)? 32 : 16;
+#endif
+#endif
   if (m_chromaFormatIDC != CHROMA_420)
   {
     if (!m_horCollocatedChromaFlag)
@@ -4879,6 +4888,12 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "HorCollocatedChroma:%d ", m_horCollocatedChromaFlag );
     msg( VERBOSE, "VerCollocatedChroma:%d ", m_verCollocatedChromaFlag );
     msg( VERBOSE, "MTS: %1d(intra) %1d(inter) ", m_MTS & 1, ( m_MTS >> 1 ) & 1 );
+#if JVET_AA0133_INTER_MTS_OPT
+    if ((m_MTS >> 1) & 1)
+    {
+      msg(VERBOSE, "InterMTSMaxSize: %d ", m_interMTSMaxSize);
+    }
+#endif
     msg( VERBOSE, "SBT:%d ", m_SBT );
     msg( VERBOSE, "ISP:%d ", m_ISP );
     msg( VERBOSE, "SMVD:%d ", m_SMVD );

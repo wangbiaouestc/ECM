@@ -169,6 +169,23 @@ void fastInverseIDTR_B128(const TCoeff *src, TCoeff *dst, int shift, int line, i
 void fastForwardIDTR_B256(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2);
 void fastInverseIDTR_B256(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum);
 #endif
+#if JVET_AA0133_INTER_MTS_OPT
+//KLT0 transforms
+void fastForwardKLT0_B4(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2);
+void fastInverseKLT0_B4(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum);
+void fastForwardKLT0_B8(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2);
+void fastInverseKLT0_B8(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum);
+void fastForwardKLT0_B16(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2);
+void fastInverseKLT0_B16(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum);
+
+//KLT1 transforms
+void fastForwardKLT1_B4(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2);
+void fastInverseKLT1_B4(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum);
+void fastForwardKLT1_B8(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2);
+void fastInverseKLT1_B8(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum);
+void fastForwardKLT1_B16(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2);
+void fastInverseKLT1_B16(const TCoeff *src, TCoeff *dst, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum);
+#endif
 #endif
 
 #endif // __TRQUANT__

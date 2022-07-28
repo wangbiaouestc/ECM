@@ -370,6 +370,9 @@ private:
                               const bool updateRdCostLambda );
 #endif
   double                m_sbtCostSave[2];
+#if JVET_AA0133_INTER_MTS_OPT
+  double                m_mtsCostSave;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
   MergeCtx              m_mergeCand;
   bool                  m_mergeCandAvail;

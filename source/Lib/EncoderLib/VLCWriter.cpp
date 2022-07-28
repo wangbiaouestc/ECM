@@ -1234,6 +1234,14 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   {
     WRITE_FLAG(pcSPS->getUseIntraMTS() ? 1 : 0, "sps_explicit_mts_intra_enabled_flag");
     WRITE_FLAG(pcSPS->getUseInterMTS() ? 1 : 0, "sps_explicit_mts_inter_enabled_flag");
+#if JVET_AA0133_INTER_MTS_OPT
+    if (pcSPS->getUseInterMTS())
+    {
+      int interMTSMaxCU = pcSPS->getInterMTSMaxSize();
+      CHECK((interMTSMaxCU != 16 && interMTSMaxCU != 32), "interMTSMaxSize != 32 or 16");
+      WRITE_FLAG(interMTSMaxCU == 16? 1 : 0, "sps_inter_mts_max_size");
+    }
+#endif
   }
   WRITE_FLAG(pcSPS->getUseLFNST() ? 1 : 0, "sps_lfnst_enabled_flag");
 #endif

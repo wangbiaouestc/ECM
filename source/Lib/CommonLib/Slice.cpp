@@ -3604,7 +3604,9 @@ SPS::SPS()
 , m_LadfQpOffset              { 0 }
 , m_LadfIntervalLowerBound    { 0 }
 #endif
-
+#if JVET_AA0133_INTER_MTS_OPT
+, m_interMTSMaxSize           ( 32 )
+#endif
 #if MULTI_HYP_PRED
 , m_InterMultiHyp(false)
 , m_maxNumAddHyps(0)

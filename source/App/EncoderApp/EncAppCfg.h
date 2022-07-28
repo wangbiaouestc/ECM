@@ -424,6 +424,9 @@ protected:
   std::vector<int> m_LadfQpOffset;
   int       m_LadfIntervalLowerBound[MAX_LADF_INTERVALS];
 #endif
+#if JVET_AA0133_INTER_MTS_OPT
+  int       m_interMTSMaxSize;
+#endif
 #if ENABLE_DIMD
   bool      m_dimd;
 #endif

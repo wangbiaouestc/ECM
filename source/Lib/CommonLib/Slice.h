@@ -1715,7 +1715,9 @@ private:
   int               m_LadfQpOffset[MAX_LADF_INTERVALS];
   int               m_LadfIntervalLowerBound[MAX_LADF_INTERVALS];
 #endif
-
+#if JVET_AA0133_INTER_MTS_OPT
+  int               m_interMTSMaxSize;
+#endif
 #if MULTI_HYP_PRED
   bool              m_InterMultiHyp;              // multi hypothesis inter prediction
   int               m_maxNumAddHyps;
@@ -2173,7 +2175,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setLadfIntervalLowerBound( int value, int idx )                         { m_LadfIntervalLowerBound[ idx ] = value; }
   int       getLadfIntervalLowerBound( int idx )                          const     { return m_LadfIntervalLowerBound[ idx ]; }
 #endif
-
+#if JVET_AA0133_INTER_MTS_OPT
+  void      setInterMTSMaxSize(int size)                                            { m_interMTSMaxSize = size; }
+  int       getInterMTSMaxSize()                                          const     { return m_interMTSMaxSize; }
+#endif
 #if MULTI_HYP_PRED
   bool      getUseInterMultiHyp()                                      const { return m_InterMultiHyp; }
   int       getMaxNumAddHyps()                                      const { return m_maxNumAddHyps; }
