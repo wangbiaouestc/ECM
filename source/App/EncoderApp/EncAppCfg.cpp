@@ -699,6 +699,10 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 
   SMultiValueInput<Level::Name>  cfg_sliRefLevels(Level::NONE, Level::LEVEL15_5, 0, 8 * MAX_VPS_SUBLAYERS);
 
+#if JVET_AA0098_MTT_DEPTH_TID_BY_QP
+  std::string sMaxMTTHierarchyDepthByTidOverrideByQP;
+#endif
+
   int warnUnknowParameter = 0;
 
 #if ENABLE_TRACING
@@ -900,6 +904,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MaxMTTHierarchyDepth",                            m_uiMaxMTTHierarchyDepth,                            3u, "MaxMTTHierarchyDepth")
 #if JVET_AA0098_MAX_MTT_DEPTH_TID
   ("MaxMTTHierarchyDepthByTid",                       m_sMaxMTTHierarchyDepthByTid,          string("333333"), "MaxMTTHierarchyDepthByTid")
+#if JVET_AA0098_MTT_DEPTH_TID_BY_QP
+  ("MaxMTTHierarchyDepthByTidOverrideByQP",           sMaxMTTHierarchyDepthByTidOverrideByQP, string("22 333333"), "MaxMTTHierarchyDepthByTidOverrideByQP")
+#endif
 #endif
   ("MaxMTTHierarchyDepthI",                           m_uiMaxMTTHierarchyDepthI,                           3u, "MaxMTTHierarchyDepthI")
   ("MaxMTTHierarchyDepthISliceL",                     m_uiMaxMTTHierarchyDepthI,                           3u, "MaxMTTHierarchyDepthISliceL")
@@ -2493,6 +2500,19 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   m_uiMaxCUWidth = m_uiMaxCUHeight = m_uiCTUSize;
 
 #if JVET_AA0098_MAX_MTT_DEPTH_TID
+#if JVET_AA0098_MTT_DEPTH_TID_BY_QP
+  std::istringstream iss(sMaxMTTHierarchyDepthByTidOverrideByQP);
+  std::string        sQp;
+  std::string        sMaxMttDepthByTidOverride;
+  getline(iss, sQp, ' ');
+  getline(iss, sMaxMttDepthByTidOverride, ' ');
+  int overriddenQP = std::stoi(sQp);
+  if (m_iQP == overriddenQP)
+  {
+    m_sMaxMTTHierarchyDepthByTid = sMaxMttDepthByTidOverride;
+  }
+#endif
+
   CHECK(m_sMaxMTTHierarchyDepthByTid.size() > MAX_TLAYER, "MaxMTTHierarchyDepthByTid is greater than MAX_TLAYER");
 
   for (int i = 0; i < (int) m_sMaxMTTHierarchyDepthByTid.size(); i++)
