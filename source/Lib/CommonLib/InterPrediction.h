@@ -804,6 +804,14 @@ public:
   void setFillCurTplAboveARMC(bool b) { m_fillCurTplAboveARMC = b; }
   void setFillCurTplLeftARMC(bool b) { m_fillCurTplLeftARMC = b; }
 #endif
+
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+  void mcFramePad(Picture *pcCurPic, Slice &slice);
+  void mcFramePadOneSide(Picture *pcCurPic, Slice &slice, PadDirection padDir, PelStorage *pPadBuffYUV,
+                         PredictionUnit *blkDataTmp, PelStorage *pPadYUVContainerDyn, const UnitArea blkUnitAreaBuff,
+                         PelStorage *pCurBuffYUV);
+  void mcFramePadRepExt(Picture *pcCurPic, Slice &slice);
+#endif
 };
 
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM

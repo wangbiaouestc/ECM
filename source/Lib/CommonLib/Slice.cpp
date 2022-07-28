@@ -867,8 +867,9 @@ void Slice::constructRefPicList(PicList& rcListPic)
       pcRefPic->longTerm = true;
     }
 
+#if !JVET_AA0096_MC_BOUNDARY_PADDING
     pcRefPic->extendPicBorder( getPPS() );
-
+#endif
     m_apcRefPicList[REF_PIC_LIST_0][ii] = pcRefPic;
     m_bIsUsedAsLongTerm[REF_PIC_LIST_0][ii] = pcRefPic->longTerm;
   }
@@ -909,8 +910,9 @@ void Slice::constructRefPicList(PicList& rcListPic)
       pcRefPic->longTerm = true;
     }
 
+#if !JVET_AA0096_MC_BOUNDARY_PADDING
     pcRefPic->extendPicBorder( getPPS() );
-
+#endif
     m_apcRefPicList[REF_PIC_LIST_1][ii] = pcRefPic;
     m_bIsUsedAsLongTerm[REF_PIC_LIST_1][ii] = pcRefPic->longTerm;
   }
@@ -5140,9 +5142,21 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
             scaledRefPic[j]->poc = NOT_VALID;
 
 #if JVET_Z0118_GDR
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+            scaledRefPic[j]->create(sps->getGDREnabledFlag(), sps->getChromaFormatIdc(),
+                                    Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()),
+                                    sps->getMaxCUWidth(), sps->getMaxCUWidth() + 16 + MC_PAD_SIZE, isDecoder, layerId);
+#else
             scaledRefPic[j]->create(sps->getGDREnabledFlag(), sps->getChromaFormatIdc(), Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()), sps->getMaxCUWidth(), sps->getMaxCUWidth() + 16, isDecoder, layerId);
+#endif
+#else
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+            scaledRefPic[j]->create(sps->getChromaFormatIdc(),
+                                    Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()),
+                                    sps->getMaxCUWidth(), sps->getMaxCUWidth() + 16 + MC_PAD_SIZE, isDecoder, layerId);
 #else
             scaledRefPic[j]->create( sps->getChromaFormatIdc(), Size( pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples() ), sps->getMaxCUWidth(), sps->getMaxCUWidth() + 16, isDecoder, layerId );
+#endif
 #endif
           }
 
@@ -5157,7 +5171,9 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
                                    sps->getChromaFormatIdc(), sps->getBitDepths(), true, downsampling,
                                    sps->getHorCollocatedChromaFlag(), sps->getVerCollocatedChromaFlag() );
           scaledRefPic[j]->unscaledPic = m_apcRefPicList[refList][rIdx];
+#if !JVET_AA0096_MC_BOUNDARY_PADDING
           scaledRefPic[j]->extendPicBorder( getPPS() );
+#endif
 
           m_scaledRefPicList[refList][rIdx] = scaledRefPic[j];
         }

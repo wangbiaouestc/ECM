@@ -154,6 +154,9 @@ private:
   bool                    m_isPrepareLTRef;
   bool                    m_isUseLTRef;
   int                     m_lastLTRefPoc;
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+  InterPrediction *m_pcFrameMcPadPrediction;   ///< encoder search class
+#endif
   //--Adaptive Loop filter
   EncSampleAdaptiveOffset*  m_pcSAO;
   EncAdaptiveLoopFilter*    m_pcALF;
