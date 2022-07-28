@@ -222,6 +222,9 @@ void EncGOP::init ( EncLib* pcEncLib )
   m_pcSAO                = pcEncLib->getSAO();
   m_pcALF                = pcEncLib->getALF();
   m_pcRateCtrl           = pcEncLib->getRateCtrl();
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+  m_pcFrameMcPadPrediction = pcEncLib->getFrameMcPadPredSearch();
+#endif
   ::memset(m_lastBPSEI, 0, sizeof(m_lastBPSEI));
   ::memset(m_totalCoded, 0, sizeof(m_totalCoded));
   m_HRD                = pcEncLib->getHRD();
@@ -4226,6 +4229,11 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     pcPic->destroyTempBuffers();
     pcPic->cs->destroyCoeffs();
     pcPic->cs->releaseIntermediateData();
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+    m_pcFrameMcPadPrediction->init(m_pcEncLib->getRdCost(), pcSlice->getSPS()->getChromaFormatIdc(),
+                                   pcSlice->getSPS()->getMaxCUHeight(), NULL, pcPic->getPicWidthInLumaSamples());
+    m_pcFrameMcPadPrediction->mcFramePad(pcPic, *(pcPic->slices[0]));
+#endif
   } // iGOPid-loop
 
   delete pcBitstreamRedirect;

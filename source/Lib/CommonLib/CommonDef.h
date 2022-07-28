@@ -1102,6 +1102,11 @@ static const int TEMP_CABAC_BUFFER_SIZE =                        5;
 static const int ADJUSTMENT_RANGE =                              7;
 #endif
 
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+static const int MC_PAD_SIZE = 16;
+static const int PAD_MORE_TL = 1;
+#endif
+
 // ====================================================================================================================
 // Macro functions
 // ====================================================================================================================

@@ -191,6 +191,7 @@
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
 #define JVET_AA0128_AFFINE_MERGE_CTX_INC                  1 // JVET-AA0128 test b: Increased number of CABAC contexts of affine merge index
 #endif
+#define JVET_AA0096_MC_BOUNDARY_PADDING                   1 // JVET-AA0096: motion compensated picture boundary padding
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
@@ -658,6 +659,16 @@ typedef       uint64_t        Distortion;        ///< distortion measurement
 // Enumeration
 // ====================================================================================================================
 
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+enum PadDirection
+{
+  PAD_TOP           = 0,
+  PAD_BOTTEM        = 1,
+  PAD_RIGHT         = 2,
+  PAD_LEFT          = 3,
+  MAX_PAD_DIRECTION = 4
+};
+#endif
 
 enum ApsType
 {

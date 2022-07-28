@@ -905,7 +905,19 @@ void InterPrediction::xPredInterUni(const PredictionUnit &pu, const RefPicList &
     {
       if( !pu.cs->pps->getWrapAroundEnabledFlag() )
       {
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+        if (bioApplied)
+        {
+          clipMv(mv[0], pu.lumaPos().offset(-(BIO_EXTEND_SIZE + 1), -(BIO_EXTEND_SIZE + 1)), pu.lumaSize(), sps,
+                 *pu.cs->pps);
+        }
+        else
+        {
+          clipMv(mv[0], pu.lumaPos(), pu.lumaSize(), sps, *pu.cs->pps);
+        }
+#else
         clipMv( mv[0], pu.cu->lumaPos(), pu.cu->lumaSize(), sps, *pu.cs->pps );
+#endif
       }
     }
   }
@@ -15664,5 +15676,620 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
       }
     }
     return cMvd;
+  }
+#endif
+
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+  void InterPrediction::mcFramePad(Picture *pcCurPic, Slice &slice)
+  {
+    const Size     blkSizeBuff = Size(slice.getSPS()->getMaxCUWidth(), slice.getSPS()->getMaxCUWidth());
+    const Area     blkAreaBuff = Area(Position(), blkSizeBuff);
+    const UnitArea blkUnitAreaBuff(slice.getSPS()->getChromaFormatIdc(), blkAreaBuff);
+
+    const Size     blkSizeCurBuff = Size(4, 4);
+    const Area     blkAreaCurBuff = Area(Position(), blkSizeCurBuff);
+    const UnitArea blkUnitCurAreaBuff(slice.getSPS()->getChromaFormatIdc(), blkAreaCurBuff);
+
+    const Size     blkSizeConBuff = Size(MC_PAD_SIZE, MC_PAD_SIZE);
+    const Area     blkAreaConBuff = Area(Position(), blkSizeConBuff);
+    const UnitArea blkUnitConAreaBuff(slice.getSPS()->getChromaFormatIdc(), blkAreaConBuff);
+
+    PelStorage *pPadBuffYUV = new PelStorage;
+    pPadBuffYUV->create(blkUnitAreaBuff);
+    PelStorage *pPadYUVContainerDyn = new PelStorage;
+    pPadYUVContainerDyn->create(blkUnitConAreaBuff);
+    PelStorage *pCurBuffYUV = new PelStorage;
+    pCurBuffYUV->create(blkUnitCurAreaBuff);
+
+    PredictionUnit blkDataTmp(blkUnitAreaBuff);
+    CodingUnit     blkCUTmp(blkUnitAreaBuff);
+    blkDataTmp.cs          = pcCurPic->cs;
+    blkDataTmp.cu          = &blkCUTmp;
+    blkDataTmp.cu->BcwIdx  = BCW_DEFAULT;
+    blkDataTmp.cu->LICFlag = false;
+    blkDataTmp.cu->affine  = false;
+    blkDataTmp.cu->geoFlag = false;
+    blkDataTmp.cu->imv     = IMV_OFF;
+    blkDataTmp.cu->slice   = &slice;
+    blkDataTmp.cu->cs      = pcCurPic->cs;
+
+    // four directions MC padding
+    mcFramePadOneSide(pcCurPic, slice, PAD_TOP, pPadBuffYUV, &blkDataTmp, pPadYUVContainerDyn, blkUnitAreaBuff,
+                      pCurBuffYUV);
+    mcFramePadOneSide(pcCurPic, slice, PAD_BOTTEM, pPadBuffYUV, &blkDataTmp, pPadYUVContainerDyn, blkUnitAreaBuff,
+                      pCurBuffYUV);
+    mcFramePadOneSide(pcCurPic, slice, PAD_LEFT, pPadBuffYUV, &blkDataTmp, pPadYUVContainerDyn, blkUnitAreaBuff,
+                      pCurBuffYUV);
+    mcFramePadOneSide(pcCurPic, slice, PAD_RIGHT, pPadBuffYUV, &blkDataTmp, pPadYUVContainerDyn, blkUnitAreaBuff,
+                      pCurBuffYUV);
+
+    // repetitive padding for the extend padding area
+    mcFramePadRepExt(pcCurPic, slice);
+
+    pPadBuffYUV->destroy();
+    delete pPadBuffYUV;
+    pPadYUVContainerDyn->destroy();
+    delete pPadYUVContainerDyn;
+    pCurBuffYUV->destroy();
+    delete pCurBuffYUV;
+  }
+
+  void InterPrediction::mcFramePadOneSide(Picture *pcCurPic, Slice &slice, PadDirection padDir, PelStorage *pPadBuffYUV,
+                                          PredictionUnit *blkDataTmp, PelStorage *pPadYUVContainerDyn,
+                                          const UnitArea blkUnitAreaBuff, PelStorage *pCurBuffYUV)
+  {
+    const int ctuSize        = slice.getSPS()->getMaxCUWidth();
+    const int iWidthFrm      = slice.getSPS()->getMaxPicWidthInLumaSamples();
+    const int iHeightFrm     = slice.getSPS()->getMaxPicHeightInLumaSamples();
+    const int numCtuInWidth  = iWidthFrm / ctuSize + (iWidthFrm % ctuSize != 0);
+    const int numCtuInHeight = iHeightFrm / ctuSize + (iHeightFrm % ctuSize != 0);
+    const int xBlkBoundIdx   = (iWidthFrm % ctuSize) == 0 ? (ctuSize / 4 - 1) : ((iWidthFrm % ctuSize) / 4) - 1;
+    const int yBlkBoundIdx   = (iHeightFrm % ctuSize) == 0 ? (ctuSize / 4 - 1) : ((iHeightFrm % ctuSize) / 4) - 1;
+    const int maxCtuIdx      = (padDir == PAD_TOP || padDir == PAD_BOTTEM) ? numCtuInWidth : numCtuInHeight;
+
+    for (int ctuIdx = 0; ctuIdx < maxCtuIdx; ctuIdx++)
+    {
+      Position ctuPos;
+      if (padDir == PAD_TOP)
+      {
+        ctuPos = ctuPos.offset(ctuSize * ctuIdx, 0);
+      }
+      else if (padDir == PAD_BOTTEM)
+      {
+        ctuPos = ctuPos.offset(ctuSize * ctuIdx, ctuSize * (numCtuInHeight - 1));
+      }
+      else if (padDir == PAD_LEFT)
+      {
+        ctuPos = ctuPos.offset(0, ctuSize * ctuIdx);
+      }
+      else
+      {
+        ctuPos = ctuPos.offset(ctuSize * (numCtuInWidth - 1), ctuSize * ctuIdx);
+      }
+
+      int maxIdxSubBlkPlus1;
+      if (padDir == PAD_TOP || padDir == PAD_BOTTEM)
+      {
+        maxIdxSubBlkPlus1 = (ctuIdx == (numCtuInWidth - 1)) ? (xBlkBoundIdx + 1) : (ctuSize / 4);
+      }
+      else
+      {
+        maxIdxSubBlkPlus1 = (ctuIdx == (numCtuInHeight - 1)) ? (yBlkBoundIdx + 1) : (ctuSize / 4);
+      }
+
+      // MC
+      for (int subBlkIdx = 0; subBlkIdx < maxIdxSubBlkPlus1; subBlkIdx++)
+      {
+        blkDataTmp->cu->BcwIdx = BCW_DEFAULT;
+        Position subBlkPos     = ctuPos;
+        if (padDir == PAD_TOP || padDir == PAD_BOTTEM)
+        {
+          subBlkPos = subBlkPos.offset(subBlkIdx * 4, 0);
+        }
+        else
+        {
+          subBlkPos = subBlkPos.offset(0, subBlkIdx * 4);
+        }
+        Position subBlkMvPos = subBlkPos;
+        if (padDir == PAD_BOTTEM)
+        {
+          subBlkMvPos = subBlkMvPos.offset(0, yBlkBoundIdx * 4);
+        }
+        else if (padDir == PAD_RIGHT)
+        {
+          subBlkMvPos = subBlkMvPos.offset(xBlkBoundIdx * 4, 0);
+        }
+
+        short reflistIdx[2] = { -1, -1 };
+        Mv    subBlkMv[2];
+
+        if (pcCurPic->cs->getMotionInfo(subBlkMvPos).isInter && !pcCurPic->cs->getMotionInfo(subBlkMvPos).isIBCmot)
+        {
+          reflistIdx[0] = pcCurPic->cs->getMotionInfo(subBlkMvPos).refIdx[REF_PIC_LIST_0];
+          reflistIdx[1] = pcCurPic->cs->getMotionInfo(subBlkMvPos).refIdx[REF_PIC_LIST_1];
+          subBlkMv[0]   = pcCurPic->cs->getMotionInfo(subBlkMvPos).mv[REF_PIC_LIST_0];
+          subBlkMv[1]   = pcCurPic->cs->getMotionInfo(subBlkMvPos).mv[REF_PIC_LIST_1];
+        }
+        int useList = -1;
+        if (reflistIdx[0] >= 0 && reflistIdx[1] >= 0)
+        {
+          CHECK(CU::isIBC(*blkDataTmp->cu), "this is not possible");
+          if (padDir == PAD_TOP)
+          {
+            useList = (subBlkMv[0].getVer() > subBlkMv[1].getVer()) ? 0 : 1;
+          }
+          else if (padDir == PAD_BOTTEM)
+          {
+            useList = (subBlkMv[0].getVer() <= subBlkMv[1].getVer()) ? 0 : 1;
+          }
+          else if (padDir == PAD_LEFT)
+          {
+            useList = (subBlkMv[0].getHor() > subBlkMv[1].getHor()) ? 0 : 1;
+          }
+          else
+          {
+            useList = (subBlkMv[0].getHor() <= subBlkMv[1].getHor()) ? 0 : 1;
+          }
+        }
+        else
+        {
+          useList = (reflistIdx[0] >= 0) ? 0 : 1;
+        }
+        reflistIdx[1 - useList] = -1;
+        int validPadSize        = 0;
+        if (reflistIdx[useList] >= 0)
+        {
+          int      iMVBitShift = MV_FRACTIONAL_BITS_INTERNAL;
+          MvField  tempBiMvFieldAddOffset[2];
+          Mv       mvAddOffset;
+          Position subBlkMCPos = subBlkPos, mcBlksize;
+
+          if (padDir == PAD_TOP)
+          {
+            mvAddOffset.set(0, -ctuSize << iMVBitShift);
+            validPadSize = (((subBlkMv[useList].getVer() >> iMVBitShift) + 3) >> 2) << 2;
+
+            if (subBlkMv[useList].getVer() > 0
+                && !slice.getRefPic((useList == 1) ? REF_PIC_LIST_1 : REF_PIC_LIST_0, reflistIdx[useList])->cs->slice->isIntra()
+                && slice.getTLayer() >= PAD_MORE_TL)
+            {
+                validPadSize = std::max(validPadSize, 4);
+            }
+
+            validPadSize = std::max(validPadSize, 0);
+            validPadSize = std::min(validPadSize, MC_PAD_SIZE);
+            mcBlksize    = mcBlksize.offset(4, validPadSize);
+            subBlkMCPos  = subBlkMCPos.offset(0, (ctuSize - validPadSize));
+          }
+          else if (padDir == PAD_BOTTEM)
+          {
+            mvAddOffset.set(0, ((yBlkBoundIdx + 1) * 4) << iMVBitShift);
+            validPadSize = (((-subBlkMv[useList].getVer() >> iMVBitShift) + 3) >> 2) << 2;
+
+            if (subBlkMv[useList].getVer() < 0
+                && !slice.getRefPic((useList == 1) ? REF_PIC_LIST_1 : REF_PIC_LIST_0, reflistIdx[useList])->cs->slice->isIntra()
+                && slice.getTLayer() >= PAD_MORE_TL)
+            {
+                validPadSize = std::max(validPadSize, 4);
+            }
+
+            validPadSize = std::max(validPadSize, 0);
+            validPadSize = std::min(validPadSize, MC_PAD_SIZE);
+            mcBlksize    = mcBlksize.offset(4, validPadSize);
+          }
+          else if (padDir == PAD_LEFT)
+          {
+            mvAddOffset.set(-ctuSize << iMVBitShift, 0);
+            validPadSize = (((subBlkMv[useList].getHor() >> iMVBitShift) + 3) >> 2) << 2;
+
+            if (subBlkMv[useList].getHor() > 0
+                && !slice.getRefPic((useList == 1) ? REF_PIC_LIST_1 : REF_PIC_LIST_0, reflistIdx[useList])->cs->slice->isIntra()
+                && slice.getTLayer() >= PAD_MORE_TL)
+            {
+                validPadSize = std::max(validPadSize, 4);
+            }
+
+            validPadSize = std::max(validPadSize, 0);
+            validPadSize = std::min(validPadSize, MC_PAD_SIZE);
+            mcBlksize    = mcBlksize.offset(validPadSize, 4);
+            subBlkMCPos  = subBlkMCPos.offset((ctuSize - validPadSize), 0);
+          }
+          else
+          {
+            mvAddOffset.set(((xBlkBoundIdx + 1) * 4) << iMVBitShift, 0);
+            validPadSize = (((-subBlkMv[useList].getHor() >> iMVBitShift) + 3) >> 2) << 2;
+
+            if (subBlkMv[useList].getHor() < 0
+                && !slice.getRefPic((useList == 1) ? REF_PIC_LIST_1 : REF_PIC_LIST_0, reflistIdx[useList])->cs->slice->isIntra()
+                && slice.getTLayer() >= PAD_MORE_TL)
+            {
+                validPadSize = std::max(validPadSize, 4);
+            }
+
+            validPadSize = std::max(validPadSize, 0);
+            validPadSize = std::min(validPadSize, MC_PAD_SIZE);
+            mcBlksize    = mcBlksize.offset(validPadSize, 4);
+          }
+
+          tempBiMvFieldAddOffset[useList].mv     = mvAddOffset + subBlkMv[useList];
+          tempBiMvFieldAddOffset[useList].refIdx = (int8_t) (reflistIdx[useList]);
+          if (reflistIdx[1 - useList] >= 0)
+          {
+            tempBiMvFieldAddOffset[1 - useList].mv     = mvAddOffset + subBlkMv[1 - useList];
+            tempBiMvFieldAddOffset[1 - useList].refIdx = (int8_t) reflistIdx[1 - useList];
+          }
+
+          if (validPadSize > 0)
+          {
+            // start to predict the DC compensate area
+            const Size     blkSizeCurBuff = Size(4, 4);
+            const Area     blkAreaCurBuff = Area(Position(), blkSizeCurBuff);
+            const UnitArea blkUnitCurAreaBuff(slice.getSPS()->getChromaFormatIdc(), blkAreaCurBuff);
+            int            CompDiff[3] = { 0, 0, 0 };
+            for (int chan = 0; chan < 3; chan++)
+            {
+              Position curposition(subBlkMvPos.getX() >> getComponentScaleX(ComponentID(chan), CHROMA_420),
+                                   subBlkMvPos.getY() >> getComponentScaleY(ComponentID(chan), CHROMA_420));
+              blkDataTmp->blocks[chan].pos().repositionTo(curposition);
+              blkDataTmp->cu->blocks[chan].pos().repositionTo(curposition);
+            }
+            PelUnitBuf     pcYuvPred   = pCurBuffYUV->getBuf(blkUnitCurAreaBuff);
+            PredictionUnit resizePu4X4 = *blkDataTmp;
+            
+            CHECK(pcYuvPred.Y().width != 4, "this is not possible");
+            CHECK(pcYuvPred.Y().height != 4, "this is not possible");
+            resizePu4X4.UnitArea::operator=(
+              UnitArea(blkDataTmp->chromaFormat, Area(blkDataTmp->lumaPos().x, blkDataTmp->lumaPos().y, 4, 4)));
+            blkDataTmp->refIdx[useList]     = (int8_t) reflistIdx[useList];
+            blkDataTmp->mv[useList]         = subBlkMv[useList];
+            blkDataTmp->refIdx[1 - useList] = (int8_t) reflistIdx[1 - useList];
+            blkDataTmp->mv[1 - useList]     = subBlkMv[1 - useList];
+            blkDataTmp->interDir            = useList + 1;
+            resizePu4X4                     = *blkDataTmp;
+            xPredInterUni(resizePu4X4, RefPicList(useList), pcYuvPred, false, false, true, true);
+
+            for (int chan = 0; chan < 3; chan++)
+            {
+              const ComponentID ch = ComponentID(chan);
+
+              Pel *piTxtRec = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION)
+                                .bufAt(subBlkMvPos.getX() >> getComponentScaleX(ComponentID(chan), CHROMA_420),
+                                       subBlkMvPos.getY() >> getComponentScaleY(ComponentID(chan), CHROMA_420));
+              const int iStrideRec = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).stride;
+
+              Pel *     piTxtBuff   = pCurBuffYUV->getBuf(blkUnitCurAreaBuff).bufs[ch].bufAt(0, 0);
+              const int iStrideBuff = pCurBuffYUV->getBuf(blkUnitCurAreaBuff).bufs[ch].stride;
+              for (int idy = 0; idy < (4 >> getComponentScaleY(ComponentID(chan), CHROMA_420)); idy++)
+              {
+                for (int idx = 0; idx < (4 >> getComponentScaleX(ComponentID(chan), CHROMA_420)); idx++)
+                {
+                  CompDiff[chan] += (piTxtRec[idx] - piTxtBuff[idx]);
+                }
+                piTxtRec += iStrideRec;
+                piTxtBuff += iStrideBuff;
+              }
+              CompDiff[chan] /= 16 >> getComponentScaleX(ComponentID(chan), CHROMA_420)
+                                >> getComponentScaleY(ComponentID(chan), CHROMA_420);
+            }
+            // start to predict the padding area
+            for (int chan = 0; chan < 3; chan++)
+            {
+              Position curposition(subBlkMCPos.getX() >> getComponentScaleX(ComponentID(chan), CHROMA_420),
+                                   subBlkMCPos.getY() >> getComponentScaleY(ComponentID(chan), CHROMA_420));
+              blkDataTmp->blocks[chan].pos().repositionTo(curposition);
+              blkDataTmp->cu->blocks[chan].pos().repositionTo(curposition);
+            }
+            Size           blkSizeConBuff = Size(mcBlksize.getX(), mcBlksize.getY());
+            Area           blkAreaConBuff = Area(Position(), blkSizeConBuff);
+            UnitArea       blkUnitConAreaBuff(slice.getSPS()->getChromaFormatIdc(), blkAreaConBuff);
+            PelUnitBuf     pcYuvPad    = pPadYUVContainerDyn->getBuf(blkUnitConAreaBuff);
+            PredictionUnit resizePuPad = *blkDataTmp;
+            CHECK(pcYuvPad.Y().width != mcBlksize.getX(), "this is not possible");
+            CHECK(pcYuvPad.Y().height != mcBlksize.getY(), "this is not possible");
+            resizePuPad.UnitArea::operator=(
+              UnitArea(blkDataTmp->chromaFormat,
+                       Area(blkDataTmp->lumaPos().x, blkDataTmp->lumaPos().y, mcBlksize.getX(), mcBlksize.getY())));
+            blkDataTmp->refIdx[useList]     = tempBiMvFieldAddOffset[useList].refIdx;
+            blkDataTmp->mv[useList]         = tempBiMvFieldAddOffset[useList].mv;
+            blkDataTmp->refIdx[1 - useList] = tempBiMvFieldAddOffset[1 - useList].refIdx;
+            blkDataTmp->mv[1 - useList]     = tempBiMvFieldAddOffset[1 - useList].mv;
+            blkDataTmp->interDir            = useList + 1;
+            resizePuPad                     = *blkDataTmp;
+
+            xPredInterUni(resizePuPad, RefPicList(useList), pcYuvPad, false, false, true, true);
+
+            for (int chan = 0; chan < 3; chan++)
+            {
+              const ComponentID ch = ComponentID(chan);
+
+              Pel *piTxtBuff =
+                pPadBuffYUV->getBuf(blkUnitAreaBuff)
+                  .bufs[ch]
+                  .bufAt((subBlkMCPos - ctuPos).getX() >> getComponentScaleX(ComponentID(chan), CHROMA_420),
+                         (subBlkMCPos - ctuPos).getY() >> getComponentScaleY(ComponentID(chan), CHROMA_420));
+              const int iStrideBuff = pPadBuffYUV->getBuf(blkUnitAreaBuff).bufs[ch].stride;
+              Pel *     piTmpBuff   = pPadYUVContainerDyn->getBuf(blkUnitConAreaBuff).bufs[ch].bufAt(0, 0);
+              const int iStrideTmp  = pPadYUVContainerDyn->getBuf(blkUnitConAreaBuff).bufs[ch].stride;
+
+              for (int idy = 0; idy < mcBlksize.getY() >> getComponentScaleY(ComponentID(chan), CHROMA_420); idy++)
+              {
+                for (int idx = 0; idx < mcBlksize.getX() >> getComponentScaleX(ComponentID(chan), CHROMA_420); idx++)
+                {
+                  piTxtBuff[idx] = piTmpBuff[idx];
+                  piTxtBuff[idx] += CompDiff[chan];
+
+                  piTxtBuff[idx] = (piTxtBuff[idx] < 0) ? 0 : piTxtBuff[idx];
+                  piTxtBuff[idx] = (piTxtBuff[idx] > 1023) ? 1023 : piTxtBuff[idx];
+                }
+                piTxtBuff += iStrideBuff;
+                piTmpBuff += iStrideTmp;
+              }
+            }
+          }
+        }
+
+        for (int chan = 0; chan < 3; chan++)
+        {
+          const ComponentID ch = ComponentID(chan);
+          Position          subBlkRepSrcPos;
+          Position          subBlkRepPos;
+          Position          repBlkSize;
+
+          const int iStrideBuff = pPadBuffYUV->getBuf(blkUnitAreaBuff).bufs[ch].stride;
+          int       iStrideSrc;
+
+          if (padDir == PAD_TOP)
+          {
+            repBlkSize     = repBlkSize.offset(4 >> getComponentScaleX(ch, CHROMA_420),
+                                           (ctuSize - validPadSize) >> getComponentScaleY(ch, CHROMA_420));
+            subBlkRepPos   = subBlkRepPos.offset(subBlkIdx * 4, 0);
+            Pel *piTxtBuff = pPadBuffYUV->getBuf(blkUnitAreaBuff)
+                               .bufs[ch]
+                               .bufAt(subBlkRepPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                      subBlkRepPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+            Pel *piTxtSrc;
+            if (validPadSize == 0)
+            {
+              subBlkRepSrcPos = subBlkRepSrcPos.offset(subBlkPos.getX(), subBlkPos.getY());
+              piTxtSrc        = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION)
+                           .bufAt(subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                  subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+            }
+            else
+            {
+              subBlkRepSrcPos = subBlkRepSrcPos.offset(subBlkIdx * 4, (ctuSize - validPadSize));
+              piTxtSrc        = pPadBuffYUV->getBuf(blkUnitAreaBuff)
+                           .bufs[ch]
+                           .bufAt(subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                  subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+            }
+            for (int idy = 0; idy < repBlkSize.getY(); idy++)
+            {
+              memcpy(piTxtBuff, piTxtSrc, sizeof(Pel) * repBlkSize.getX());
+              piTxtBuff += iStrideBuff;
+            }
+          }
+          else if (padDir == PAD_BOTTEM)
+          {
+            repBlkSize     = repBlkSize.offset(4 >> getComponentScaleX(ch, CHROMA_420),
+                                           (ctuSize - validPadSize) >> getComponentScaleY(ch, CHROMA_420));
+            subBlkRepPos   = subBlkRepPos.offset(subBlkIdx * 4, validPadSize);
+            Pel *piTxtBuff = pPadBuffYUV->getBuf(blkUnitAreaBuff)
+                               .bufs[ch]
+                               .bufAt(subBlkRepPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                      subBlkRepPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+            Pel *piTxtSrc;
+            if (validPadSize == 0)
+            {
+              subBlkRepSrcPos = subBlkRepSrcPos.offset(subBlkPos.getX(), iHeightFrm);
+              piTxtSrc        = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION)
+                           .bufAt(subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                  (subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420)) - 1);
+            }
+            else
+            {
+              subBlkRepSrcPos = subBlkRepSrcPos.offset(subBlkIdx * 4, validPadSize);
+              piTxtSrc        = pPadBuffYUV->getBuf(blkUnitAreaBuff)
+                           .bufs[ch]
+                           .bufAt(subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                  (subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420)) - 1);
+            }
+            for (int idy = 0; idy < repBlkSize.getY(); idy++)
+            {
+              memcpy(piTxtBuff, piTxtSrc, sizeof(Pel) * repBlkSize.getX());
+              piTxtBuff += iStrideBuff;
+            }
+          }
+          else if (padDir == PAD_LEFT)
+          {
+            repBlkSize     = repBlkSize.offset((ctuSize - validPadSize) >> getComponentScaleX(ch, CHROMA_420),
+                                           4 >> getComponentScaleY(ch, CHROMA_420));
+            subBlkRepPos   = subBlkRepPos.offset(0, subBlkIdx * 4);
+            Pel *piTxtBuff = pPadBuffYUV->getBuf(blkUnitAreaBuff)
+                               .bufs[ch]
+                               .bufAt(subBlkRepPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                      subBlkRepPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+            Pel *piTxtSrc;
+            if (validPadSize == 0)
+            {
+              subBlkRepSrcPos = subBlkRepSrcPos.offset(subBlkPos.getX(), subBlkPos.getY());
+              piTxtSrc        = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION)
+                           .bufAt(subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                  subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+              iStrideSrc = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).stride;
+            }
+            else
+            {
+              subBlkRepSrcPos = subBlkRepSrcPos.offset((ctuSize - validPadSize), subBlkIdx * 4);
+              piTxtSrc        = pPadBuffYUV->getBuf(blkUnitAreaBuff)
+                           .bufs[ch]
+                           .bufAt(subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                  subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+              iStrideSrc = pPadBuffYUV->getBuf(blkUnitAreaBuff).bufs[ch].stride;
+            }
+            for (int idy = 0; idy < repBlkSize.getY(); idy++)
+            {
+              for (int idx = 0; idx < repBlkSize.getX(); idx++)
+              {
+                piTxtBuff[idx] = piTxtSrc[0];
+              }
+              piTxtBuff += iStrideBuff;
+              piTxtSrc += iStrideSrc;
+            }
+          }
+          else
+          {
+            subBlkRepPos   = subBlkRepPos.offset(validPadSize, subBlkIdx * 4);
+            Pel *piTxtBuff = pPadBuffYUV->getBuf(blkUnitAreaBuff)
+                               .bufs[ch]
+                               .bufAt(subBlkRepPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                      subBlkRepPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+            repBlkSize = repBlkSize.offset((ctuSize - validPadSize) >> getComponentScaleX(ch, CHROMA_420),
+                                           4 >> getComponentScaleY(ch, CHROMA_420));
+            Pel *piTxtSrc;
+            if (validPadSize == 0)
+            {
+              subBlkRepSrcPos = subBlkRepSrcPos.offset(iWidthFrm, subBlkPos.getY());
+              piTxtSrc        = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION)
+                           .bufAt((subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420)) - 1,
+                                  subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+              iStrideSrc = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).stride;
+            }
+            else
+            {
+              subBlkRepSrcPos = subBlkRepSrcPos.offset(validPadSize, subBlkIdx * 4);
+              piTxtSrc        = pPadBuffYUV->getBuf(blkUnitAreaBuff)
+                           .bufs[ch]
+                           .bufAt((subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420)) - 1,
+                                  subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+              iStrideSrc = pPadBuffYUV->getBuf(blkUnitAreaBuff).bufs[ch].stride;
+            }
+            for (int idy = 0; idy < repBlkSize.getY(); idy++)
+            {
+              for (int idx = 0; idx < repBlkSize.getX(); idx++)
+              {
+                piTxtBuff[idx] = piTxtSrc[0];
+              }
+              piTxtBuff += iStrideBuff;
+              piTxtSrc += iStrideSrc;
+            }
+          }
+        }
+      }
+      // Copy MC results from Buffer to Rec
+      for (int chan = 0; chan < 3; chan++)
+      {
+        const ComponentID ch       = ComponentID(chan);
+        Pel *             piTxtRec = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION)
+                          .bufAt(ctuPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                 ctuPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+        const int iStrideRec  = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).stride;
+        Pel *     piTxtBuff   = pPadBuffYUV->getBuf(blkUnitAreaBuff).bufs[ch].bufAt(0, 0);
+        const int iStrideBuff = pPadBuffYUV->getBuf(blkUnitAreaBuff).bufs[ch].stride;
+        int       iWidthBuff, iHeightBuff;
+        if (padDir == PAD_TOP || padDir == PAD_BOTTEM)
+        {
+          iWidthBuff  = (maxIdxSubBlkPlus1 * 4) >> getComponentScaleX(ch, CHROMA_420);
+          iHeightBuff = ctuSize >> getComponentScaleY(ch, CHROMA_420);
+        }
+        else
+        {
+          iWidthBuff  = ctuSize >> getComponentScaleX(ch, CHROMA_420);
+          iHeightBuff = (maxIdxSubBlkPlus1 * 4) >> getComponentScaleY(ch, CHROMA_420);
+        }
+
+        const int blkSize = (4 >> getComponentScaleX(ch, CHROMA_420));
+        if (padDir == PAD_TOP)
+        {
+          piTxtRec -= iStrideRec * iHeightBuff;
+        }
+        else if (padDir == PAD_BOTTEM)
+        {
+          piTxtRec += iStrideRec * (yBlkBoundIdx + 1) * blkSize;
+        }
+        else if (padDir == PAD_LEFT)
+        {
+          piTxtRec -= iWidthBuff;
+        }
+        else
+        {
+          piTxtRec += (xBlkBoundIdx + 1) * blkSize;
+        }
+
+        for (int idy = -iHeightBuff; idy < 0; idy++)
+        {
+          memcpy(piTxtRec, piTxtBuff, sizeof(Pel) * iWidthBuff);
+          piTxtBuff += iStrideBuff;
+          piTxtRec += iStrideRec;
+        }
+      }
+    }
+  }
+
+  void InterPrediction::mcFramePadRepExt(Picture *pcCurPic, Slice &slice)
+  {
+    for (int chan = 0; chan < 3; chan++)
+    {
+      const ComponentID ch         = ComponentID(chan);
+      Pel *             piTxtRec   = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).bufAt(0, 0);
+      const int         iStrideRec = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).stride;
+      const int         iWidthFrm = slice.getSPS()->getMaxPicWidthInLumaSamples() >> getComponentScaleX(ch, CHROMA_420);
+      const int iHeightFrm  = slice.getSPS()->getMaxPicHeightInLumaSamples() >> getComponentScaleY(ch, CHROMA_420);
+      int       ctuSize     = slice.getSPS()->getMaxCUWidth() >> getComponentScaleX(ch, CHROMA_420);
+      int       extPadSizeX = (16 + MC_PAD_SIZE) >> getComponentScaleX(ch, CHROMA_420);
+      int       extPadSizeY = (16 + MC_PAD_SIZE) >> getComponentScaleY(ch, CHROMA_420);
+      // left and right
+
+      piTxtRec -= ctuSize * iStrideRec;
+      for (int idy = -ctuSize; idy < iHeightFrm + ctuSize; idy++)
+      {
+        for (int idx = -(ctuSize + extPadSizeX); idx < -ctuSize; idx++)
+        {
+          piTxtRec[idx] = piTxtRec[-ctuSize];
+        }
+        for (int idx = iWidthFrm + ctuSize; idx < iWidthFrm + ctuSize + extPadSizeX; idx++)
+        {
+          piTxtRec[idx] = piTxtRec[iWidthFrm + ctuSize - 1];
+        }
+        piTxtRec += iStrideRec;
+      }
+
+      // Top
+      Pel *piTxtRecSrc;
+      piTxtRec = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).bufAt(0, 0);
+      piTxtRec -= (ctuSize + extPadSizeX);
+      piTxtRecSrc = piTxtRec;
+      for (int idy = 0; idy < ctuSize; idy++)
+      {
+        piTxtRec -= iStrideRec;
+        memcpy(piTxtRec, piTxtRecSrc, sizeof(Pel) * (ctuSize + extPadSizeX));
+        memcpy(piTxtRec + (ctuSize + extPadSizeX + iWidthFrm), piTxtRecSrc + (ctuSize + extPadSizeX + iWidthFrm),
+               sizeof(Pel) * (ctuSize + extPadSizeX));
+      }
+      piTxtRecSrc -= ctuSize * iStrideRec;
+      for (int idy = 0; idy < extPadSizeY; idy++)
+      {
+        piTxtRec -= iStrideRec;
+        memcpy(piTxtRec, piTxtRecSrc, sizeof(Pel) * (((ctuSize + extPadSizeX) << 1) + iWidthFrm));
+      }
+      // Bottem
+      piTxtRec = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).bufAt(0, 0);
+      piTxtRec -= (ctuSize + extPadSizeX);
+      piTxtRec += (iHeightFrm - 1) * iStrideRec;
+      piTxtRecSrc = piTxtRec;
+      for (int idy = 0; idy < ctuSize; idy++)
+      {
+        piTxtRec += iStrideRec;
+        memcpy(piTxtRec, piTxtRecSrc, sizeof(Pel) * (ctuSize + extPadSizeX));
+        memcpy(piTxtRec + (ctuSize + extPadSizeX + iWidthFrm), piTxtRecSrc + (ctuSize + extPadSizeX + iWidthFrm),
+               sizeof(Pel) * (ctuSize + extPadSizeX));
+      }
+      piTxtRecSrc += ctuSize * iStrideRec;
+      for (int idy = 0; idy < extPadSizeY; idy++)
+      {
+        piTxtRec += iStrideRec;
+        memcpy(piTxtRec, piTxtRecSrc, sizeof(Pel) * (((ctuSize + extPadSizeX) << 1) + iWidthFrm));
+      }
+    }
   }
 #endif

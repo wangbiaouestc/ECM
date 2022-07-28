@@ -5422,7 +5422,14 @@ void InterSearch::xMotionEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Ref
   {
     PelUnitBuf predTempBuf = m_tmpStorageLCU.getBuf(UnitAreaRelative(*pu.cu, pu));
     const Picture* picRef = pu.cu->slice->getRefPic(eRefPicList, iRefIdxPred);
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+    Mv rcMvClipped(rcMv);
+    clipMv(rcMvClipped, pu.cu->lumaPos(), pu.cu->lumaSize(), *pu.cs->sps, *pu.cs->pps);
+    xPredInterBlk(COMPONENT_Y, pu, picRef, rcMvClipped, predTempBuf, false, pu.cu->slice->clpRng(COMPONENT_Y), false,
+                  false);
+#else
     xPredInterBlk(COMPONENT_Y, pu, picRef, rcMv, predTempBuf, false, pu.cu->slice->clpRng(COMPONENT_Y), false, false);
+#endif
 
     DistParam distParam;
     m_pcRdCost->setDistParam(distParam, origBuf.Y(), predTempBuf.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, !pu.cs->slice->getDisableSATDForRD());
