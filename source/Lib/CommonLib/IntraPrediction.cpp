@@ -106,6 +106,13 @@ IntraPrediction::IntraPrediction()
 #endif
   m_piTemp = nullptr;
   m_pMdlmTemp = nullptr;
+#if JVET_AA0126_GLM
+  for (int i = 0; i < NUM_GLM_IDC; i++)
+  {
+    m_glmTempCb[i] = nullptr;
+    m_glmTempCr[i] = nullptr;
+  }
+#endif
 #if MMLM
   m_encPreRDRun = false;
 #endif
@@ -142,6 +149,13 @@ void IntraPrediction::destroy()
   m_piTemp = nullptr;
   delete[] m_pMdlmTemp;
   m_pMdlmTemp = nullptr;
+#if JVET_AA0126_GLM
+  for (int i = 0; i < NUM_GLM_IDC; i++)
+  {
+    delete[] m_glmTempCb[i]; m_glmTempCb[i] = nullptr;
+    delete[] m_glmTempCr[i]; m_glmTempCr[i] = nullptr;
+  }
+#endif
 
   for( auto &buffer : m_tempBuffer )
   {
@@ -234,7 +248,13 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
   {
     m_pMdlmTemp = new Pel[(2 * MAX_CU_SIZE + 1)*(2 * MAX_CU_SIZE + 1)];//MDLM will use top-above and left-below samples.
   }
-
+#if JVET_AA0126_GLM
+  for (int i = 0; i < NUM_GLM_IDC; i++)
+  {
+    if (m_glmTempCb[i] == nullptr) m_glmTempCb[i] = new Pel[(2 * MAX_CU_SIZE + 1)*(2 * MAX_CU_SIZE + 1)];
+    if (m_glmTempCr[i] == nullptr) m_glmTempCr[i] = new Pel[(2 * MAX_CU_SIZE + 1)*(2 * MAX_CU_SIZE + 1)];
+  }
+#endif
 
   for( auto &buffer : m_tempBuffer )
   {
@@ -1157,6 +1177,17 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
 {
   int  iLumaStride = 0;
   PelBuf Temp;
+#if JVET_AA0126_GLM
+  if (pu.glmIdc.isActive())
+  {
+    int glmIdc = pu.glmIdc.getIdc(compID, 0);
+    Pel* glmTemp = compID == COMPONENT_Cb ? m_glmTempCb[glmIdc] : m_glmTempCr[glmIdc];
+    iLumaStride = 2 * MAX_CU_SIZE + 1;
+    Temp = PelBuf(glmTemp + iLumaStride + 1, iLumaStride, Size(chromaArea));
+  }
+  else
+  {
+#endif
 #if MMLM
   if ((intraDir == MDLM_L_IDX) || (intraDir == MDLM_T_IDX) || (intraDir == MMLM_L_IDX) || (intraDir == MMLM_T_IDX) || (m_encPreRDRun && intraDir == MMLM_CHROMA_IDX))
 #else
@@ -1171,7 +1202,10 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
     iLumaStride = MAX_CU_SIZE + 1;
     Temp = PelBuf(m_piTemp + iLumaStride + 1, iLumaStride, Size(chromaArea));
   }
-  
+#if JVET_AA0126_GLM
+  }
+#endif
+
   CclmModel cclmModel;
 
   if ( createModel )
@@ -4743,6 +4777,223 @@ int isBelowLeftAvailable(const CodingUnit &cu, const ChannelType &chType, const 
   return numIntra;
 }
 
+#if JVET_AA0126_GLM
+Pel IntraPrediction::xGlmGetLumaVal(const int s[6], const int c[6], const int glmIdx, const Pel val) const
+{
+  Pel grad = c[0] * s[0] + c[1] * s[1] + c[2] * s[2] 
+           + c[3] * s[3] + c[4] * s[4] + c[5] * s[5];
+#if NUM_GLM_WEIGHT
+  return (glmIdx >= NUM_GLM_PATTERN ? val + grad : grad);
+#else
+  return grad;
+#endif
+}
+
+void IntraPrediction::xGetLumaRecPixelsGlmAll(const PredictionUnit &pu, CompArea chromaArea)
+{
+  int c[6] = { 0 };
+
+  int iDstStride = 2 * MAX_CU_SIZE + 1;
+  Pel* pDst0Cb[NUM_GLM_IDC];
+  Pel* pDst0Cr[NUM_GLM_IDC];
+
+  for (int k = 0; k < NUM_GLM_IDC; k++)
+  {
+    pDst0Cb[k] = m_glmTempCb[k] + iDstStride + 1;
+    pDst0Cr[k] = m_glmTempCr[k] + iDstStride + 1;
+  }
+
+  //assert 420 chroma subsampling
+  CompArea lumaArea = CompArea( COMPONENT_Y, pu.chromaFormat, chromaArea.lumaPos(), recalcSize( pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, chromaArea.size() ) );//needed for correct pos/size (4x4 Tus)
+
+  CHECK(lumaArea.width == chromaArea.width && CHROMA_444 != pu.chromaFormat, "");
+  CHECK(lumaArea.height == chromaArea.height && CHROMA_444 != pu.chromaFormat && CHROMA_422 != pu.chromaFormat, "");
+
+  const SizeType uiCWidth = chromaArea.width;
+  const SizeType uiCHeight = chromaArea.height;
+
+  const CPelBuf Src = pu.cs->picture->getRecoBuf( lumaArea );
+  Pel const* pRecSrc0   = Src.bufAt( 0, 0 );
+  int iRecStride        = Src.stride;
+  int logSubWidthC  = getChannelTypeScaleX(CHANNEL_TYPE_CHROMA, pu.chromaFormat);
+  int logSubHeightC = getChannelTypeScaleY(CHANNEL_TYPE_CHROMA, pu.chromaFormat);
+
+  int iRecStride2       = iRecStride << logSubHeightC;
+
+  const CodingUnit& lumaCU = isChroma( pu.chType ) ? *pu.cs->picture->cs->getCU( lumaArea.pos(), CH_L ) : *pu.cu;
+  const CodingUnit&     cu = *pu.cu;
+
+  const CompArea& area = isChroma( pu.chType ) ? chromaArea : lumaArea;
+
+  const uint32_t uiTuWidth  = area.width;
+  const uint32_t uiTuHeight = area.height;
+
+  int iBaseUnitSize = ( 1 << MIN_CU_LOG2 );
+
+  const int  iUnitWidth       = iBaseUnitSize >> getComponentScaleX( area.compID, area.chromaFormat );
+  const int  iUnitHeight = iBaseUnitSize >> getComponentScaleY(area.compID, area.chromaFormat);
+
+  const int  iTUWidthInUnits = uiTuWidth / iUnitWidth;
+  const int  iTUHeightInUnits = uiTuHeight / iUnitHeight;
+  const int  iAboveUnits      = iTUWidthInUnits;
+  const int  iLeftUnits       = iTUHeightInUnits;
+  const int  chromaUnitWidth = iBaseUnitSize >> getComponentScaleX(COMPONENT_Cb, area.chromaFormat);
+  const int  chromaUnitHeight = iBaseUnitSize >> getComponentScaleY(COMPONENT_Cb, area.chromaFormat);
+  const int  topTemplateSampNum = 2 * uiCWidth; // for MDLM, the number of template samples is 2W or 2H.
+  const int  leftTemplateSampNum = 2 * uiCHeight;
+  assert(m_topRefLength >= topTemplateSampNum);
+  assert(m_leftRefLength >= leftTemplateSampNum);
+  const int  totalAboveUnits = (topTemplateSampNum + (chromaUnitWidth - 1)) / chromaUnitWidth;
+  const int  totalLeftUnits = (leftTemplateSampNum + (chromaUnitHeight - 1)) / chromaUnitHeight;
+  const int  totalUnits = totalLeftUnits + totalAboveUnits + 1;
+  const int  aboveRightUnits = totalAboveUnits - iAboveUnits;
+  const int  leftBelowUnits = totalLeftUnits - iLeftUnits;
+
+  int avaiAboveRightUnits = 0;
+  int avaiLeftBelowUnits = 0;
+  bool  bNeighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1];
+  memset(bNeighborFlags, 0, totalUnits);
+  bool aboveIsAvailable, leftIsAvailable;
+
+  int availlableUnit = isLeftAvailable(isChroma(pu.chType) ? cu : lumaCU, toChannelType(area.compID), area.pos(),
+                                       iLeftUnits, iUnitHeight, (bNeighborFlags + iLeftUnits + leftBelowUnits - 1));
+
+  leftIsAvailable = availlableUnit == iTUHeightInUnits;
+
+  availlableUnit = isAboveAvailable(isChroma(pu.chType) ? cu : lumaCU, toChannelType(area.compID), area.pos(),
+                                    iAboveUnits, iUnitWidth, (bNeighborFlags + iLeftUnits + leftBelowUnits + 1));
+
+  aboveIsAvailable = availlableUnit == iTUWidthInUnits;
+
+  if (leftIsAvailable)   // if left is not available, then the below left is not available
+  {
+    avaiLeftBelowUnits = isBelowLeftAvailable(isChroma(pu.chType) ? cu : lumaCU, toChannelType(area.compID), area.bottomLeftComp(area.compID), leftBelowUnits, iUnitHeight, (bNeighborFlags + leftBelowUnits - 1));
+  }
+
+  if (aboveIsAvailable)   // if above is not available, then  the above right is not available.
+  {
+    avaiAboveRightUnits = isAboveRightAvailable(isChroma(pu.chType) ? cu : lumaCU, toChannelType(area.compID), area.topRightComp(area.compID), aboveRightUnits, iUnitWidth, (bNeighborFlags + iLeftUnits + leftBelowUnits + iAboveUnits + 1));
+  }
+
+  Pel*       pDstCb[NUM_GLM_IDC];
+  Pel*       pDstCr[NUM_GLM_IDC];
+  Pel const* piSrc = nullptr;
+
+  if (aboveIsAvailable)
+  {
+    for (int k = 0; k < NUM_GLM_IDC; k++)
+    {
+      pDstCb[k]  = pDst0Cb[k]    - iDstStride;
+      pDstCr[k]  = pDst0Cr[k]    - iDstStride;
+    }
+
+    int addedAboveRight = avaiAboveRightUnits*chromaUnitWidth;
+
+    for (int i = 0; i < uiCWidth + addedAboveRight; i++)
+    {
+      const int l = (i == 0 && !leftIsAvailable) ? 0 : 1;
+      {
+        piSrc = pRecSrc0 - iRecStride2;
+        int s[6] = { piSrc[2 * i              - l], piSrc[2 * i                 ], piSrc[2 * i              + 1],
+                     piSrc[2 * i + iRecStride - l], piSrc[2 * i + iRecStride    ], piSrc[2 * i + iRecStride + 1] };
+        int val = (1 * s[0] + 2 * s[1] + 1 * s[2] 
+                 + 1 * s[3] + 2 * s[4] + 1 * s[5] + 4) >> 3;
+        pDstCb[0][i] = val;
+        pDstCr[0][i] = val;
+
+        for (int k = 1; k < NUM_GLM_IDC; k++)
+        {
+          int p = (k - 1 < NUM_GLM_PATTERN) ? (k - 1) : (k - 1 - NUM_GLM_PATTERN);
+          c[0] = g_glmPattern[p][0], c[1] = g_glmPattern[p][1], c[2] = g_glmPattern[p][2];
+          c[3] = g_glmPattern[p][3], c[4] = g_glmPattern[p][4], c[5] = g_glmPattern[p][5];
+          int grad = c[0] * s[0] + c[1] * s[1] + c[2] * s[2] 
+                   + c[3] * s[3] + c[4] * s[4] + c[5] * s[5];
+          pDstCb[k][i] = (k - 1 < NUM_GLM_PATTERN) ? grad : val + grad;
+          pDstCr[k][i] = (k - 1 < NUM_GLM_PATTERN) ? grad : val + grad;
+        }
+      }
+    }
+  }
+
+  if (leftIsAvailable)
+  {
+    for (int k = 0; k < NUM_GLM_IDC; k++)
+    {
+      pDstCb[k]  = pDst0Cb[k]    - 1;
+      pDstCr[k]  = pDst0Cr[k]    - 1;
+    }
+    piSrc = pRecSrc0 - 1 - logSubWidthC;
+
+    int addedLeftBelow = avaiLeftBelowUnits*chromaUnitHeight;
+
+    for (int j = 0; j < uiCHeight + addedLeftBelow; j++)
+    {
+      {
+        int s[6] = { piSrc[           - 1], piSrc[             0], piSrc[             1],
+                     piSrc[iRecStride - 1], piSrc[iRecStride    ], piSrc[iRecStride + 1] };
+        int val = (1 * s[0] + 2 * s[1] + 1 * s[2] 
+                 + 1 * s[3] + 2 * s[4] + 1 * s[5] + 4) >> 3;
+        pDstCb[0][0] = val;
+        pDstCr[0][0] = val;
+
+        for (int k = 1; k < NUM_GLM_IDC; k++)
+        {
+          int p = (k - 1 < NUM_GLM_PATTERN) ? (k - 1) : (k - 1 - NUM_GLM_PATTERN);
+          c[0] = g_glmPattern[p][0], c[1] = g_glmPattern[p][1], c[2] = g_glmPattern[p][2];
+          c[3] = g_glmPattern[p][3], c[4] = g_glmPattern[p][4], c[5] = g_glmPattern[p][5];
+          int grad = c[0] * s[0] + c[1] * s[1] + c[2] * s[2] 
+                   + c[3] * s[3] + c[4] * s[4] + c[5] * s[5];
+          pDstCb[k][0] = (k - 1 < NUM_GLM_PATTERN) ? grad : val + grad;
+          pDstCr[k][0] = (k - 1 < NUM_GLM_PATTERN) ? grad : val + grad;
+        }
+      }
+
+      piSrc += iRecStride2;
+      for (int k = 0; k < NUM_GLM_IDC; k++)
+      {
+        pDstCb[k] += iDstStride;
+        pDstCr[k] += iDstStride;
+      }
+    }
+  }
+
+  // inner part from reconstructed picture buffer
+  for( int j = 0; j < uiCHeight; j++ )
+  {
+    for( int i = 0; i < uiCWidth; i++ )
+    {
+      const int l = (i == 0 && !leftIsAvailable) ? 0 : 1;
+      {
+        int s[6] = { pRecSrc0[2 * i              - l], pRecSrc0[2 * i                 ], pRecSrc0[2 * i              + 1],
+                     pRecSrc0[2 * i + iRecStride - l], pRecSrc0[2 * i + iRecStride    ], pRecSrc0[2 * i + iRecStride + 1] };
+        int val = (1 * s[0] + 2 * s[1] + 1 * s[2] 
+                 + 1 * s[3] + 2 * s[4] + 1 * s[5] + 4) >> 3;
+        pDst0Cb[0][i] = val;
+        pDst0Cr[0][i] = val;
+
+        for (int k = 1; k < NUM_GLM_IDC; k++)
+        {
+          int p = (k - 1 < NUM_GLM_PATTERN) ? (k - 1) : (k - 1 - NUM_GLM_PATTERN);
+          c[0] = g_glmPattern[p][0], c[1] = g_glmPattern[p][1], c[2] = g_glmPattern[p][2];
+          c[3] = g_glmPattern[p][3], c[4] = g_glmPattern[p][4], c[5] = g_glmPattern[p][5];
+          int grad = c[0] * s[0] + c[1] * s[1] + c[2] * s[2] 
+                   + c[3] * s[3] + c[4] * s[4] + c[5] * s[5];
+          pDst0Cb[k][i] = (k - 1 < NUM_GLM_PATTERN) ? grad : val + grad;
+          pDst0Cr[k][i] = (k - 1 < NUM_GLM_PATTERN) ? grad : val + grad;
+        }
+      }
+    }
+
+    for (int k = 0; k < NUM_GLM_IDC; k++)
+    {
+      pDst0Cb[k]    += iDstStride;
+      pDst0Cr[k]    += iDstStride;
+    }
+    pRecSrc0 += iRecStride2;
+  }
+}
+#endif
+
 // LumaRecPixels
 void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chromaArea)
 {
@@ -4753,10 +5004,36 @@ void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chrom
     return;
   }
 #endif
-  
+
+#if JVET_AA0126_GLM
+  ComponentID compID = chromaArea.compID;
+  int glmIdc = pu.glmIdc.getIdc(compID, 0);
+  int c[6] = { 0 };
+  CHECK(glmIdc < 0 || glmIdc >= NUM_GLM_IDC, "glmIdc out of range");
+
+  if (glmIdc != 0)
+  {
+    int glmIdx = glmIdc - 1;
+    int p = glmIdx >= NUM_GLM_PATTERN ? glmIdx - NUM_GLM_PATTERN : glmIdx;
+    CHECK(p < 0 || p >= NUM_GLM_PATTERN, "glmPattern out of range");
+    c[0] = g_glmPattern[p][0], c[1] = g_glmPattern[p][1], c[2] = g_glmPattern[p][2];
+    c[3] = g_glmPattern[p][3], c[4] = g_glmPattern[p][4], c[5] = g_glmPattern[p][5];
+  }
+#endif
+
   int iDstStride = 0;
   Pel* pDst0 = 0;
   int curChromaMode = pu.intraDir[1];
+#if JVET_AA0126_GLM
+  if (pu.glmIdc.isActive())
+  {
+    iDstStride = 2 * MAX_CU_SIZE + 1;
+    Pel* glmTemp = compID == COMPONENT_Cb ? m_glmTempCb[glmIdc] : m_glmTempCr[glmIdc];
+    pDst0 = glmTemp + iDstStride + 1;
+  }
+  else
+  {
+#endif
 #if MMLM
   if ((curChromaMode == MDLM_L_IDX) || (curChromaMode == MDLM_T_IDX) || (curChromaMode == MMLM_L_IDX) || (curChromaMode == MMLM_T_IDX))
 #else
@@ -4771,6 +5048,9 @@ void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chrom
     iDstStride = MAX_CU_SIZE + 1;
     pDst0 = m_piTemp + iDstStride + 1; //MMLM_SAMPLE_NEIGHBOR_LINES;
   }
+#if JVET_AA0126_GLM
+  }
+#endif
   //assert 420 chroma subsampling
   CompArea lumaArea = CompArea( COMPONENT_Y, pu.chromaFormat, chromaArea.lumaPos(), recalcSize( pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, chromaArea.size() ) );//needed for correct pos/size (4x4 Tus)
 
@@ -4907,6 +5187,16 @@ void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chrom
         s += piSrc[2 * i + iRecStride - (leftPadding ? 0 : 1)];
         pDst[i] = s >> 3;
       }
+#if JVET_AA0126_GLM
+      if (glmIdc != 0)
+      {
+        piSrc = pRecSrc0 - iRecStride2;
+        int l = leftPadding ? 0 : 1;
+        int s[6] = { piSrc[2 * i              - l], piSrc[2 * i                 ], piSrc[2 * i              + 1],
+                     piSrc[2 * i + iRecStride - l], piSrc[2 * i + iRecStride    ], piSrc[2 * i + iRecStride + 1] };
+        pDst[i] = xGlmGetLumaVal(s, c, glmIdc - 1, pDst[i]);
+      }
+#endif
     }
   }
 
@@ -4962,6 +5252,14 @@ void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chrom
         s += piSrc[iRecStride - 1];
         pDst[0] = s >> 3;
       }
+#if JVET_AA0126_GLM
+      if (glmIdc != 0)
+      {
+        int s[6] = { piSrc[           - 1], piSrc[             0], piSrc[             1],
+                     piSrc[iRecStride - 1], piSrc[iRecStride    ], piSrc[iRecStride + 1] };
+        pDst[0] = xGlmGetLumaVal(s, c, glmIdc - 1, pDst[0]);
+      }
+#endif
 
       piSrc += iRecStride2;
       pDst  += iDstStride;
@@ -5014,6 +5312,16 @@ void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chrom
         s += pRecSrc0[2 * i + iRecStride - (leftPadding ? 0 : 1)];
         pDst0[i] = s >> 3;
       }
+#if JVET_AA0126_GLM
+      if (glmIdc != 0)
+      {
+        const bool leftPadding = i == 0 && !leftIsAvailable;
+        int l = leftPadding ? 0 : 1;
+        int s[6] = { pRecSrc0[2 * i              - l], pRecSrc0[2 * i                 ], pRecSrc0[2 * i              + 1],
+                     pRecSrc0[2 * i + iRecStride - l], pRecSrc0[2 * i + iRecStride    ], pRecSrc0[2 * i + iRecStride + 1] };
+        pDst0[i] = xGlmGetLumaVal(s, c, glmIdc - 1, pDst0[i]);
+      }
+#endif
     }
 
     pDst0    += iDstStride;
@@ -5956,6 +6264,17 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
   int srcStride;
 
   PelBuf temp;
+#if JVET_AA0126_GLM
+  if (pu.glmIdc.isActive())
+  {
+    int glmIdc = pu.glmIdc.getIdc(compID, 0);
+    Pel* glmTemp = compID == COMPONENT_Cb ? m_glmTempCb[glmIdc] : m_glmTempCr[glmIdc];
+    srcStride = 2 * MAX_CU_SIZE + 1;
+    temp = PelBuf(glmTemp + srcStride + 1, srcStride, Size(chromaArea));
+  }
+  else
+  {
+#endif
 #if MMLM
   if ((curChromaMode == MDLM_L_IDX) || (curChromaMode == MDLM_T_IDX) || (curChromaMode == MMLM_L_IDX) || (curChromaMode == MMLM_T_IDX)
     || (m_encPreRDRun && curChromaMode == MMLM_CHROMA_IDX))
@@ -5971,6 +6290,9 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
     srcStride = MAX_CU_SIZE + 1;
     temp = PelBuf(m_piTemp + srcStride + 1, srcStride, Size(chromaArea));
   }
+#if JVET_AA0126_GLM
+  }
+#endif
   srcColor0 = temp.bufAt(0, 0);
   curChroma0 = getPredictorPtr(compID);
 

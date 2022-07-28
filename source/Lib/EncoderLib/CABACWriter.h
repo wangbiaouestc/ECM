@@ -222,6 +222,9 @@ public:
   void        cclmDelta             ( const PredictionUnit&         pu, int8_t delta);
   void        cclmDeltaSlope       ( const PredictionUnit&         pu );
 #endif
+#if JVET_AA0126_GLM
+  void        glmIdc                    ( const PredictionUnit&         pu );
+#endif
 
   // transform tree (clause 7.3.8.8)
   void        transform_tree            ( const CodingStructure&        cs,       Partitioner&      pm,     CUCtx& cuCtx,                         const PartSplit ispType = TU_NO_ISP, const int subTuIdx = -1 );

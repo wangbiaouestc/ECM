@@ -1654,8 +1654,24 @@ void PU::getIntraChromaCandModes(const PredictionUnit &pu, unsigned modeList[NUM
   bool hasDeltaFlag = chrMode == LM_CHROMA_IDX;
 #endif
   hasDeltaFlag     &= pu.Cb().width * pu.Cb().height >= 128;
+#if JVET_AA0126_GLM
+  hasDeltaFlag     &= !pu.glmIdc.isActive();
+#endif
 
   return hasDeltaFlag;
+}
+#endif
+
+#if JVET_AA0126_GLM
+bool PU::hasGlmFlag(const PredictionUnit &pu, const int mode)
+{
+  int  chrMode      = mode < 0 ? pu.intraDir[1] : mode;
+  bool hasGlmFlag   = chrMode == LM_CHROMA_IDX || chrMode == MDLM_L_IDX || chrMode == MDLM_T_IDX;
+#if JVET_AA0057_CCCM
+  hasGlmFlag       &= !pu.cccmFlag;
+#endif
+  
+  return hasGlmFlag;
 }
 #endif
 

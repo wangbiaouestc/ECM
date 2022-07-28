@@ -2239,6 +2239,53 @@ void CABACReader::cclmDeltaSlope(PredictionUnit& pu)
 }
 #endif
 
+#if JVET_AA0126_GLM
+void CABACReader::glmIdc(PredictionUnit& pu)
+{
+  if ( PU::hasGlmFlag( pu ) )
+  {
+    bool glmActive = m_BinDecoder.decodeBin(Ctx::GlmFlags(0));
+
+    if ( glmActive )
+    {
+      bool bothActive = m_BinDecoder.decodeBin(Ctx::GlmFlags(3));
+
+      pu.glmIdc.cb0 = bothActive;
+      pu.glmIdc.cr0 = bothActive;
+      
+      if ( !bothActive )
+      {
+        pu.glmIdc.cb0 = m_BinDecoder.decodeBin(Ctx::GlmFlags(1));
+        pu.glmIdc.cr0 = !pu.glmIdc.cb0;
+      }
+
+      if ( pu.glmIdc.cb0 )
+      {
+#if NUM_GLM_WEIGHT
+        pu.glmIdc.cb0 += m_BinDecoder.decodeBin(Ctx::GlmFlags(2)) ? NUM_GLM_PATTERN : 0;
+#endif
+        pu.glmIdc.cb0 += m_BinDecoder.decodeBinsEP(NUM_GLM_PATTERN_BITS);
+      }
+
+      if ( pu.glmIdc.cr0 )
+      {
+#if NUM_GLM_WEIGHT
+        pu.glmIdc.cr0 += m_BinDecoder.decodeBin(Ctx::GlmFlags(4)) ? NUM_GLM_PATTERN : 0;
+#endif
+        pu.glmIdc.cr0 += m_BinDecoder.decodeBinsEP(NUM_GLM_PATTERN_BITS);
+      }
+
+#if MMLM
+      if ( PU::isMultiModeLM( pu.intraDir[1] ) )
+      {
+        pu.glmIdc.cb1 = pu.glmIdc.cb0;
+        pu.glmIdc.cr1 = pu.glmIdc.cr0;
+      }
+#endif
+    }
+  }
+}
+#endif
 bool CABACReader::intra_chroma_lmc_mode(PredictionUnit& pu)
 {
 #if MMLM
@@ -2285,7 +2332,9 @@ bool CABACReader::intra_chroma_lmc_mode(PredictionUnit& pu)
 #if JVET_AA0057_CCCM
   cccmFlag( pu );
 #endif
-
+#if JVET_AA0126_GLM
+  glmIdc( pu );
+#endif
 #if JVET_Z0050_CCLM_SLOPE
   cclmDeltaSlope( pu );
 #endif

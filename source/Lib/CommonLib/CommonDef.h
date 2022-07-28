@@ -882,6 +882,20 @@ static const int CCCM_DECIM_BITS          = 22;
 static const int CCCM_DECIM_ROUND         = ( 1 << (CCCM_DECIM_BITS - 1 ) );
 #endif
 
+#if JVET_AA0126_GLM
+#if JVET_AA0057_CCCM
+#define NUM_GLM_WEIGHT                                              0
+static const int NUM_GLM_PATTERN =                                  4;
+static const int NUM_GLM_PATTERN_BITS =                             2;
+static const int NUM_GLM_IDC =                                      5;
+#else
+#define NUM_GLM_WEIGHT                                              2
+static const int NUM_GLM_PATTERN =                                 16;
+static const int NUM_GLM_PATTERN_BITS =                             4;
+static const int NUM_GLM_IDC =                                     33;
+#endif
+#endif
+
 #if JVET_Y0152_TT_ENC_SPEEDUP
 static constexpr int   FAST_METHOD_TT_ENC_SPEEDUP = 0x0001;  ///< Embedding flag, which, if false, de-activates all the following ABT_ENC_SPEEDUP_* modes
 static constexpr int FAST_METHOD_HOR_XOR_VER = 0x0002;

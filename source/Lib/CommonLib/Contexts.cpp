@@ -2905,6 +2905,23 @@ const CtxSet ContextSetCfg::CclmDeltaFlags = ContextSetCfg::addCtxSet
 });
 #endif
 
+#if JVET_AA0126_GLM
+const CtxSet ContextSetCfg::GlmFlags = ContextSetCfg::addCtxSet
+({
+  {  CNU, CNU, CNU, CNU, CNU, },
+  {  CNU, CNU, CNU, CNU, CNU, },
+  {  CNU, CNU, CNU, CNU, CNU, },
+  {  DWS, DWS, DWS, DWS, DWS, },
+  {  DWS, DWS, DWS, DWS, DWS, },
+  {  DWS, DWS, DWS, DWS, DWS, },
+  {  DWE, DWE, DWE, DWE, DWE, },
+  {  DWE, DWE, DWE, DWE, DWE, },
+  {  DWE, DWE, DWE, DWE, DWE, },
+  {  DWO, DWO, DWO, DWO, DWO, },
+  {  DWO, DWO, DWO, DWO, DWO, },
+});
+#endif
+
 #if JVET_AA0057_CCCM
 const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
 ({
@@ -4425,6 +4442,18 @@ const CtxSet ContextSetCfg::CclmDeltaFlags = ContextSetCfg::addCtxSet
 });
 #endif
 
+#if JVET_AA0126_GLM
+const CtxSet ContextSetCfg::GlmFlags = ContextSetCfg::addCtxSet
+({
+  {  CNU, CNU, CNU, CNU, CNU, },
+  {  CNU, CNU, CNU, CNU, CNU, },
+  {  CNU, CNU, CNU, CNU, CNU, },
+  {  DWS, DWS, DWS, DWS, DWS, },
+  {  DWS, DWS, DWS, DWS, DWS, },
+  {  DWS, DWS, DWS, DWS, DWS, },
+});
+#endif
+
 #if JVET_AA0057_CCCM
 const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
 ({
@@ -5500,6 +5529,16 @@ const CtxSet ContextSetCfg::signPred[2] =
 
 #if JVET_Z0050_CCLM_SLOPE
 const CtxSet ContextSetCfg::CclmDeltaFlags = ContextSetCfg::addCtxSet
+({
+  {  CNU, CNU, CNU, CNU, CNU, },
+  {  CNU, CNU, CNU, CNU, CNU, },
+  {  CNU, CNU, CNU, CNU, CNU, },
+  {  DWS, DWS, DWS, DWS, DWS, },
+});
+#endif
+
+#if JVET_AA0126_GLM
+const CtxSet ContextSetCfg::GlmFlags = ContextSetCfg::addCtxSet
 ({
   {  CNU, CNU, CNU, CNU, CNU, },
   {  CNU, CNU, CNU, CNU, CNU, },

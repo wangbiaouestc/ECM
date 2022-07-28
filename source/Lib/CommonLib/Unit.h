@@ -430,6 +430,9 @@ struct IntraPredictionData
 #if JVET_Z0050_CCLM_SLOPE
   CclmOffsets cclmOffsets;
 #endif
+#if JVET_AA0126_GLM
+  GlmIdc    glmIdc;
+#endif
 #if JVET_AA0057_CCCM
   int       cccmFlag;
 #endif
