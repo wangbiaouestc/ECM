@@ -3896,7 +3896,7 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND 
   mrgCtx.numCandToTestEnc = cnt;
 #endif
-  int iNumRefIdx = slice.isInterB() ? std::min(slice.getNumRefIdx(REF_PIC_LIST_0), slice.getNumRefIdx(REF_PIC_LIST_1)) : slice.getNumRefIdx(REF_PIC_LIST_0);
+   int iNumRefIdx = slice.isInterB() ? (useAmvpMergeMode ? slice.getNumRefIdx(RefPicList(1 - amvpRefList)) : std::min(slice.getNumRefIdx(REF_PIC_LIST_0), slice.getNumRefIdx(REF_PIC_LIST_1))) : slice.getNumRefIdx(REF_PIC_LIST_0);
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   if (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1])
   {
