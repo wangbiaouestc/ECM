@@ -191,15 +191,15 @@ protected:
 #endif
   bool                 m_subPuMC;
 
-  int                  m_IBCBufferWidth;
+  int                  m_ibcBufferWidth;
 #if JVET_Z0153_IBC_EXT_REF
-  int                  m_IBCBufferHeight;
+  int                  m_ibcBufferHeight;
 #endif
 #if JVET_Z0118_GDR
-  PelStorage           m_IBCBuffer0; // for dirty
-  PelStorage           m_IBCBuffer1; // for clean
+  PelStorage           m_ibcBuffer0; // for dirty
+  PelStorage           m_ibcBuffer1; // for clean
 #else
-  PelStorage           m_IBCBuffer;
+  PelStorage           m_ibcBuffer;
 #endif
   void xIntraBlockCopy          (PredictionUnit &pu, PelUnitBuf &predBuf, const ComponentID compID);
   int             rightShiftMSB(int numer, int    denom);

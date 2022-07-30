@@ -2638,6 +2638,38 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
   }
 
 #if JVET_Z0153_IBC_EXT_REF
+#if JVET_AA0106_IBCBUF_CTU256
+  if(256 == ctuSize)
+  {
+    if ((refTopY >> ctuSizeLog2) + 1 < (yPos >> ctuSizeLog2))
+    {
+      return false;
+    }
+    if (((refTopY >> ctuSizeLog2) == (yPos >> ctuSizeLog2)) && ((refRightX >> ctuSizeLog2) > (xPos >> ctuSizeLog2)))
+    {
+      return false;
+    }
+    if (((refTopY >> ctuSizeLog2) + 1 == (yPos >> ctuSizeLog2)) && ((refLeftX >> ctuSizeLog2) + 1 < (xPos >> ctuSizeLog2)))
+    {
+      return false;
+    }
+  }
+  else
+  {
+    if ((refTopY >> ctuSizeLog2) + 2 < (yPos >> ctuSizeLog2))
+    {
+      return false;
+    }
+    if (((refTopY >> ctuSizeLog2) == (yPos >> ctuSizeLog2)) && ((refRightX >> ctuSizeLog2) > (xPos >> ctuSizeLog2)))
+    {
+      return false;
+    }
+    if (((refTopY >> ctuSizeLog2) + 2 == (yPos >> ctuSizeLog2)) && ((refLeftX >> ctuSizeLog2) + 2 < (xPos >> ctuSizeLog2)))
+    {
+      return false;
+    }
+  }
+#else
   if ((refTopY >> ctuSizeLog2) + 2 < (yPos >> ctuSizeLog2))
   {
     return false;
@@ -2650,6 +2682,7 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
   {
     return false;
   }
+#endif
 #else
   // in the same CTU line
 #if CTU_256
