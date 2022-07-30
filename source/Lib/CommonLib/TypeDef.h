@@ -149,6 +149,7 @@
 #define JVET_Z0131_IBC_BVD_BINARIZATION                   1 // JVET-Z0131: Block vector difference binarization
 #define JVET_Z0153_IBC_EXT_REF                            1 // JVET-Z0153: Extend reference area for IBC
 #define JVET_Z0160_IBC_ZERO_PADDING                       1 // JVET-Z0160: Replacement of zero-padding candidates
+#define JVET_AA0106_IBCBUF_CTU256                         1 // JVET-AA0106: Adjust IBC reference area to 2*128 rows above the current CTU
 
 // Inter
 #define CIIP_PDPC                                         1 // Apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
