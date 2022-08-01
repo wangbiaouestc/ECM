@@ -1216,6 +1216,46 @@ void AreaBuf<Pel>::rspSignal( const AreaBuf<Pel> &toReshape, std::vector<Pel>& p
   }
 }
 
+#if JVET_AA0070_RRIBC
+template<>
+void AreaBuf<Pel>::flipSignal(bool isFlipHor)
+{
+  Pel *tempPel;
+  Size tSize(width, height);
+  tempPel       = new Pel[tSize.area()];
+  PelBuf tmpBuf = PelBuf(tempPel, tSize);
+  copyBufferCore(buf, stride, tmpBuf.buf, tmpBuf.stride, tmpBuf.width, tmpBuf.height);
+
+  Pel *dstbuf = buf;
+  Pel *srcbuf = tmpBuf.buf;
+  if (isFlipHor)
+  {
+    for (unsigned y = 0; y < height; y++)
+    {
+      for (unsigned x = 0; x < width; x++)
+      {
+        dstbuf[x] = srcbuf[width - 1 - x];
+      }
+      dstbuf += stride;
+      srcbuf += tmpBuf.stride;
+    }
+  }
+  else
+  {
+    for (unsigned y = 0; y < height; y++)
+    {
+      for (unsigned x = 0; x < width; x++)
+      {
+        dstbuf[x] = srcbuf[(height - 1 - y) * tmpBuf.stride + x];
+      }
+      dstbuf += stride;
+    }
+  }
+
+  delete[] tempPel;
+}
+#endif
+
 template<>
 void AreaBuf<Pel>::rspSignalAllAndSubtract( const AreaBuf<Pel> &buffer1, const AreaBuf<Pel> &buffer2, std::vector<Pel>& pLUT )
 {

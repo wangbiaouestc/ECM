@@ -176,6 +176,10 @@ struct MotionInfo
 #if INTER_LIC
   bool     usesLIC;
 #endif
+#if JVET_AA0070_RRIBC
+  int  rribcFlipType;
+  Position centerPos;
+#endif
 #if MULTI_HYP_PRED  
   MultiHypVec addHypData;
 #endif

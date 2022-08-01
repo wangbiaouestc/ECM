@@ -464,6 +464,9 @@ protected:
   unsigned  m_IBCHashSearchMaxCand;
   unsigned  m_IBCHashSearchRange4SmallBlk;
   unsigned  m_IBCFastMethod;
+#if JVET_AA0061_IBC_MBVD
+  bool      m_ibcMbvd;
+#endif
 
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;

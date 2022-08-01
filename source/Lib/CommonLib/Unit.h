@@ -350,6 +350,9 @@ struct CodingUnit : public UnitArea
 #if INTER_LIC
   bool           LICFlag;
 #endif
+#if JVET_AA0070_RRIBC
+  int    rribcFlipType;
+#endif
 
   // needed for fast imv mode decisions
   int8_t          imvNumCand;
@@ -475,6 +478,10 @@ struct InterPredictionData
   uint16_t      mmvdMergeIdx;
 #else
   uint8_t       mmvdMergeIdx;
+#endif
+#if JVET_AA0061_IBC_MBVD
+  bool          ibcMbvdMergeFlag;
+  int           ibcMbvdMergeIdx;
 #endif
 #if AFFINE_MMVD
   bool        afMmvdFlag;

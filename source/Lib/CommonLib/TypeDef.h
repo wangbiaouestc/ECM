@@ -150,6 +150,8 @@
 #define JVET_Z0153_IBC_EXT_REF                            1 // JVET-Z0153: Extend reference area for IBC
 #define JVET_Z0160_IBC_ZERO_PADDING                       1 // JVET-Z0160: Replacement of zero-padding candidates
 #define JVET_AA0106_IBCBUF_CTU256                         1 // JVET-AA0106: Adjust IBC reference area to 2*128 rows above the current CTU
+#define JVET_AA0061_IBC_MBVD                              1 // JVET-AA0061: IBC merge mode with block vector differences
+#define JVET_AA0070_RRIBC                                 1 // JVET-AA0070: Reconstruction-Reordered IBC
 
 // Inter
 #define CIIP_PDPC                                         1 // Apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode

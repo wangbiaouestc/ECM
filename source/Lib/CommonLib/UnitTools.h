@@ -192,11 +192,22 @@ namespace PU
   void getNonAdjacentMergeCand        (const PredictionUnit &pu, MergeCtx& mvpMrgCtx);
 #endif
   void getIBCMergeCandidates          (const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx = -1);
+#if JVET_AA0070_RRIBC
+  void rribcAdjustMotion(const PredictionUnit &pu, const Position *cPos, MotionInfo &miNeighbor);
+#if  JVET_Y0058_IBC_LIST_MODIFY
+  bool checkIsIBCCandidateValid       (const PredictionUnit &pu,const MotionInfo miNeighbor, bool isRefTemplate = false, bool isRefAbove = false );
+#endif
+#else
 #if  JVET_Y0058_IBC_LIST_MODIFY
   bool checkIsIBCCandidateValid       (const PredictionUnit &pu,const MotionInfo miNeighbor);
 #endif
-#if JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0084_IBC_TM
+#endif
+#if JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0084_IBC_TM || JVET_AA0061_IBC_MBVD
   bool searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int height, int picWidth, int picHeight, int xBv, int yBv, int ctuSize);
+#endif
+#if JVET_AA0061_IBC_MBVD
+  void getIbcMbvdMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, int numValidBv);
+  int32_t getIbcMbvdEstBits      (const PredictionUnit &pu, unsigned int mmvdMergeCand);
 #endif
   void getInterMMVDMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx = -1);
   int getDistScaleFactor(const int &currPOC, const int &currRefPOC, const int &colPOC, const int &colRefPOC);

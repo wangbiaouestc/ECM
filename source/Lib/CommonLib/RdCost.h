@@ -155,14 +155,18 @@ private:
 
   // for motion cost
   Mv                      m_mvPredictor;
+#if JVET_AA0070_RRIBC
+  Mv                      m_bvPredictors[3][2];
+#else
   Mv                      m_bvPredictors[2];
+#endif
   double                  m_motionLambda;
   int                     m_iCostScale;
-
   double                  m_dCost; // for ibc
 #if JVET_Z0131_IBC_BVD_BINARIZATION
   EstBvdBitsStruct        m_cBvdBitCosts;
 #endif
+
 public:
   RdCost();
   virtual ~RdCost();
@@ -221,17 +225,234 @@ public:
   // for ibc
   void           getMotionCost(int add) { m_dCost = m_dLambdaMotionSAD + add; }
 
-  void    setPredictors(Mv* pcMv)
+
+#if JVET_AA0070_RRIBC
+  void setPredictors(Mv pcMv[3][2]);
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+  EstBvdBitsStruct *getBvdBitCosts() { return &m_cBvdBitCosts; }
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+  inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, int rribcFlipType, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL, bool flag = false, AMVPInfo *amvpInfo4Pel = NULL)
+#else
+  inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, int rribcFlipType, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL)
+#endif
   {
-    for (int i = 0; i<2; i++)
+    uint32_t b0 = (rribcFlipType == 1) ? 0 : xGetExpGolombNumberOfBitsIBCV(y - m_bvPredictors[rribcFlipType][0].getVer());
+    b0 += (rribcFlipType == 2) ? 0 : xGetExpGolombNumberOfBitsIBCH(x - m_bvPredictors[rribcFlipType][0].getHor());
+    b0 += m_cBvdBitCosts.bitsIdx[0];
+
+    uint32_t b1 = (rribcFlipType == 1) ? 0 : xGetExpGolombNumberOfBitsIBCV(y - m_bvPredictors[rribcFlipType][1].getVer());
+    b1 += (rribcFlipType == 2) ? 0 : xGetExpGolombNumberOfBitsIBCH(x - m_bvPredictors[rribcFlipType][1].getHor());
+    b1 += m_cBvdBitCosts.bitsIdx[1];
+
+    if (useIMV)
     {
-      m_bvPredictors[i] = pcMv[i];
+      if (rribcFlipType == 0)
+      {
+        b0 += (x != m_bvPredictors[rribcFlipType][0].getHor() || y != m_bvPredictors[rribcFlipType][0].getVer()) ? m_cBvdBitCosts.bitsImv[0] : 0;
+        b1 += (x != m_bvPredictors[rribcFlipType][1].getHor() || y != m_bvPredictors[rribcFlipType][1].getVer()) ? m_cBvdBitCosts.bitsImv[0] : 0;
+      }
+      else if (rribcFlipType == 1)
+      {
+        b0 += (x != m_bvPredictors[rribcFlipType][0].getHor()) ? m_cBvdBitCosts.bitsImv[0] : 0;
+        b1 += (x != m_bvPredictors[rribcFlipType][1].getHor()) ? m_cBvdBitCosts.bitsImv[0] : 0;
+      }
+      else
+      {
+        b0 += (y != m_bvPredictors[rribcFlipType][0].getVer()) ? m_cBvdBitCosts.bitsImv[0] : 0;
+        b1 += (y != m_bvPredictors[rribcFlipType][1].getVer()) ? m_cBvdBitCosts.bitsImv[0] : 0;
+      }
+    }
+    uint32_t bBest    = (b1 < b0) ? b1 : b0;
+    int      bBestIdx = (b1 < b0) ? 1 : 0;
+    uint8_t  bestRes;
+    if (rribcFlipType == 0)
+    {
+      bestRes = (useIMV && (x != m_bvPredictors[rribcFlipType][bBestIdx].getHor() || y != m_bvPredictors[rribcFlipType][bBestIdx].getVer())) ? 1 : 0;
+    }
+    else if (rribcFlipType == 1)
+    {
+      bestRes = (useIMV && (x != m_bvPredictors[rribcFlipType][bBestIdx].getHor())) ? 1 : 0;
+    }
+    else
+    {
+      bestRes = (useIMV && (y != m_bvPredictors[rribcFlipType][bBestIdx].getVer())) ? 1 : 0;
+    }
+
+    if (bvImvResBest)
+    {
+      *bvImvResBest = bestRes;
+      *bvpIdxBest   = bBestIdx;
+    }
+
+    if (bestRes && x % 4 == 0 && y % 4 == 0)
+    {
+      Mv cMv(x >> 2, y >> 2);
+
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+      Mv tmpBv0;
+      Mv tmpBv1;
+      if (flag)
+      {
+        tmpBv0 = amvpInfo4Pel->mvCand[0];
+        tmpBv1 = amvpInfo4Pel->mvCand[1];
+        tmpBv0.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_4PEL);
+        tmpBv1.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_4PEL);
+      }
+      else
+      {
+        tmpBv0 = m_bvPredictors[rribcFlipType][0];
+        tmpBv1 = m_bvPredictors[rribcFlipType][1];
+        tmpBv0.changePrecision(MV_PRECISION_INT, MV_PRECISION_4PEL);
+        tmpBv1.changePrecision(MV_PRECISION_INT, MV_PRECISION_4PEL);
+      }
+#else
+      Mv tmpBv0 = m_bvPredictors[rribcFlipType][0];
+      Mv tmpBv1 = m_bvPredictors[rribcFlipType][1];
+      tmpBv0.changePrecision(MV_PRECISION_INT, MV_PRECISION_4PEL);
+      tmpBv1.changePrecision(MV_PRECISION_INT, MV_PRECISION_4PEL);
+#endif
+
+      uint32_t bQ0, bQ1;
+      if (rribcFlipType == 0)
+      {
+        bQ0 = (cMv == tmpBv0) ? std::numeric_limits<uint32_t>::max() : (xGetExpGolombNumberOfBitsIBCH(cMv.getHor() - tmpBv0.getHor()) + xGetExpGolombNumberOfBitsIBCV(cMv.getVer() - tmpBv0.getVer()) + m_cBvdBitCosts.bitsIdx[0]);
+        bQ1 = (cMv == tmpBv1) ? std::numeric_limits<uint32_t>::max() : (xGetExpGolombNumberOfBitsIBCH(cMv.getHor() - tmpBv1.getHor()) + xGetExpGolombNumberOfBitsIBCV(cMv.getVer() - tmpBv1.getVer()) + m_cBvdBitCosts.bitsIdx[1]);
+      }
+      else if (rribcFlipType == 1)
+      {
+        bQ0 = (cMv.getHor() == tmpBv0.getHor()) ? std::numeric_limits<uint32_t>::max() : (xGetExpGolombNumberOfBitsIBCH(cMv.getHor() - tmpBv0.getHor()) + m_cBvdBitCosts.bitsIdx[0]);
+        bQ1 = (cMv.getHor() == tmpBv1.getHor()) ? std::numeric_limits<uint32_t>::max() : (xGetExpGolombNumberOfBitsIBCH(cMv.getHor() - tmpBv1.getHor()) + m_cBvdBitCosts.bitsIdx[1]);
+      }
+      else
+      {
+        bQ0 = (cMv.getVer() == tmpBv0.getVer()) ? std::numeric_limits<uint32_t>::max() : (xGetExpGolombNumberOfBitsIBCV(cMv.getVer() - tmpBv0.getVer()) + m_cBvdBitCosts.bitsIdx[0]);
+        bQ1 = (cMv.getVer() == tmpBv1.getVer()) ? std::numeric_limits<uint32_t>::max() : (xGetExpGolombNumberOfBitsIBCV(cMv.getVer() - tmpBv1.getVer()) + m_cBvdBitCosts.bitsIdx[1]);
+      }
+
+      uint32_t bQBest = (bQ1 < bQ0) ? bQ1 : bQ0;
+      bQBest += (bQBest < std::numeric_limits<uint32_t>::max()) ? m_cBvdBitCosts.bitsImv[1] : 0;
+
+      if (bQBest < bBest)
+      {
+        if (bvImvResBest)
+        {
+          *bvImvResBest = 2;
+          *bvpIdxBest   = (bQ1 < bQ0) ? 1 : 0;
+        }
+        bBest = bQBest;
+      }
+    }
+    return Distortion(m_dCost * bBest) >> SCALE_BITS;
+  }
+#else
+  inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, int rribcFlipType)
+  {
+    return Distortion(m_dCost * getBitsMultiplePreds(x, y, useIMV, rribcFlipType));
+  }
+  unsigned int getBitsMultiplePreds(int x, int y, bool useIMV, int rribcFlipType)
+  {
+    int rmvH[2];
+    int rmvV[2];
+    rmvH[0] = x - m_bvPredictors[rribcFlipType][0].getHor();
+    rmvH[1] = x - m_bvPredictors[rribcFlipType][1].getHor();
+
+    rmvV[0] = y - m_bvPredictors[rribcFlipType][0].getVer();
+    rmvV[1] = y - m_bvPredictors[rribcFlipType][1].getVer();
+
+    int absCand[2];
+    absCand[0] = abs(rmvH[0]) + abs(rmvV[0]);
+    absCand[1] = abs(rmvH[1]) + abs(rmvV[1]);
+
+    int rmvHQP[2];
+    int rmvVQP[2];
+    if (x % 4 == 0 && y % 4 == 0 && useIMV)
+    {
+      int imvShift = 2;
+      int offset   = 1 << (imvShift - 1);
+
+      rmvHQP[0] = (x >> 2) - ((m_bvPredictors[rribcFlipType][0].getHor() + offset) >> 2);
+      rmvHQP[1] = (x >> 2) - ((m_bvPredictors[rribcFlipType][1].getHor() + offset) >> 2);
+      rmvVQP[0] = (y >> 2) - ((m_bvPredictors[rribcFlipType][0].getVer() + offset) >> 2);
+      rmvVQP[1] = (y >> 2) - ((m_bvPredictors[rribcFlipType][1].getVer() + offset) >> 2);
+
+      int absCandQP[2];
+      absCandQP[0] = abs(rmvHQP[0]) + abs(rmvVQP[0]);
+      absCandQP[1] = abs(rmvHQP[1]) + abs(rmvVQP[1]);
+      unsigned int candBits0QP, candBits1QP;
+      if (absCand[0] < absCand[1])
+      {
+        unsigned int candBits0 = (rribcFlipType == 1) ? 0 : getIComponentBits(rmvV[0]);
+        candBits0 += (rribcFlipType == 2) ? 0 : getIComponentBits(rmvH[0]);
+        if (absCandQP[0] < absCandQP[1])
+        {
+          candBits0QP = (rribcFlipType == 1) ? 0 : getIComponentBits(rmvVQP[0]);
+          candBits0QP += (rribcFlipType == 2) ? 0 : getIComponentBits(rmvHQP[0]);
+          return candBits0QP < candBits0 ? candBits0QP : candBits0;
+        }
+        else
+        {
+          candBits1QP = (rribcFlipType == 1) ? 0 : getIComponentBits(rmvVQP[1]);
+          candBits1QP = (rribcFlipType == 2) ? 0 : getIComponentBits(rmvHQP[1]);
+          return candBits1QP < candBits0 ? candBits1QP : candBits0;
+        }
+      }
+      else
+      {
+        unsigned int candBits1 = (rribcFlipType == 1) ? 0 : getIComponentBits(rmvV[1]);
+        candBits1 += (rribcFlipType == 2) ? 0 : getIComponentBits(rmvH[1]);
+        if (absCandQP[0] < absCandQP[1])
+        {
+          candBits0QP = (rribcFlipType == 1) ? 0 : getIComponentBits(rmvVQP[0]);
+          candBits0QP += (rribcFlipType == 2) ? 0 : getIComponentBits(rmvHQP[0]);
+          return candBits0QP < candBits1 ? candBits0QP : candBits1;
+        }
+        else
+        {
+          candBits1QP = (rribcFlipType == 1) ? 0 : getIComponentBits(rmvVQP[1]);
+          candBits1QP = (rribcFlipType == 2) ? 0 : getIComponentBits(rmvHQP[1]);
+          return candBits1QP < candBits1 ? candBits1QP : candBits1;
+        }
+      }
+    }
+    else
+    {
+      if (absCand[0] < absCand[1])
+      {
+        return ((rribcFlipType == 1) ? (getIComponentBits(rmvH[0])) : ((rribcFlipType == 2) ? (getIComponentBits(rmvV[0])) : (getIComponentBits(rmvH[0]) + getIComponentBits(rmvV[0]))));
+      }
+      else
+      {
+        return ((rribcFlipType == 1) ? (getIComponentBits(rmvH[1])) : ((rribcFlipType == 2) ? (getIComponentBits(rmvV[1])) : (getIComponentBits(rmvH[1]) + getIComponentBits(rmvV[1]))));
+      }
     }
   }
+
+  unsigned int getIComponentBits(int val)
+  {
+    if (!val)
+    {
+      return 1;
+    }
+
+    unsigned int length = 1;
+    unsigned int temp   = (val <= 0) ? (-val << 1) + 1 : (val << 1);
+
+    while (1 != temp)
+    {
+      temp >>= 1;
+      length += 2;
+    }
+
+    return length;
+  }
+#endif
+#else
+  void            setPredictors(Mv *pcMv);
+
 #if JVET_Z0131_IBC_BVD_BINARIZATION
-  EstBvdBitsStruct*  getBvdBitCosts() 
-  { 
-    return &m_cBvdBitCosts; 
+  EstBvdBitsStruct*  getBvdBitCosts()
+  {
+    return &m_cBvdBitCosts;
   }
 #if JVET_Z0084_IBC_TM && IBC_TM_AMVP
   inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL, bool flag = false, AMVPInfo* amvpInfo4Pel = NULL)
@@ -262,7 +483,7 @@ public:
 #if JVET_Z0084_IBC_TM && IBC_TM_AMVP
       Mv tmpBv0;
       Mv tmpBv1;
-      if (flag) 
+      if (flag)
       {
         tmpBv0 = amvpInfo4Pel->mvCand[0];
         tmpBv1 = amvpInfo4Pel->mvCand[1];
@@ -381,7 +602,10 @@ public:
 
   unsigned int getIComponentBits(int val)
   {
-    if (!val) return 1;
+    if (!val)
+    {
+      return 1;
+    }
 
     unsigned int length = 1;
     unsigned int temp = (val <= 0) ? (-val << 1) + 1 : (val << 1);
@@ -394,6 +618,7 @@ public:
 
     return length;
   }
+#endif
 #endif
 
 #if ENABLE_SPLIT_PARALLELISM
@@ -414,8 +639,19 @@ public:
 
     return uiLength2 + ( floorLog2(uiTemp2) << 1 );
   }
+
   Distortion     getCostOfVectorWithPredictor( const int x, const int y, const unsigned imvShift )  { return Distortion( m_motionLambda * getBitsOfVectorWithPredictor(x, y, imvShift )); }
-  uint32_t           getBitsOfVectorWithPredictor( const int x, const int y, const unsigned imvShift )  { return xGetExpGolombNumberOfBits(((x << m_iCostScale) - m_mvPredictor.getHor())>>imvShift) + xGetExpGolombNumberOfBits(((y << m_iCostScale) - m_mvPredictor.getVer())>>imvShift); }
+#if JVET_AA0070_RRIBC && !JVET_Z0131_IBC_BVD_BINARIZATION
+  uint32_t getBitsOfVectorWithPredictor( const int x, const int y, const unsigned imvShift, const int &rribcFlipType = 0)
+  {
+    return ((rribcFlipType == 1) ? (xGetExpGolombNumberOfBits(((x << m_iCostScale) - m_mvPredictor.getHor()) >> imvShift)) : ((rribcFlipType == 2) ? xGetExpGolombNumberOfBits(((y << m_iCostScale) - m_mvPredictor.getVer()) >> imvShift)
+                  : (xGetExpGolombNumberOfBits(((x << m_iCostScale) - m_mvPredictor.getHor()) >> imvShift) + xGetExpGolombNumberOfBits(((y << m_iCostScale) - m_mvPredictor.getVer()) >> imvShift))));
+  }
+#else
+  uint32_t       getBitsOfVectorWithPredictor( const int x, const int y, const unsigned imvShift )  { return xGetExpGolombNumberOfBits(((x << m_iCostScale) - m_mvPredictor.getHor())>>imvShift) + xGetExpGolombNumberOfBits(((y << m_iCostScale) - m_mvPredictor.getVer())>>imvShift); }
+#endif
+
+
 #if JVET_Z0131_IBC_BVD_BINARIZATION
   // for block vector cost
   uint32_t    xGetExpGolombNumberOfBitsIBCH( int iVal )
@@ -472,6 +708,7 @@ public:
     }
   }
 
+#if !JVET_AA0070_RRIBC
   Distortion     getCostOfVectorWithPredictorIBC( const int x, const int y, const unsigned imvShift )  
   { 
     return Distortion( m_motionLambda * getBitsOfVectorWithPredictorIBC(x, y, imvShift )) >> SCALE_BITS; 
@@ -480,6 +717,7 @@ public:
   { 
     return xGetExpGolombNumberOfBitsIBCH(((x << m_iCostScale) - m_mvPredictor.getHor())>>imvShift) + xGetExpGolombNumberOfBitsIBCV(((y << m_iCostScale) - m_mvPredictor.getVer())>>imvShift); 
   }
+#endif
 #endif
 #if WCG_EXT
          void    saveUnadjustedLambda       ();

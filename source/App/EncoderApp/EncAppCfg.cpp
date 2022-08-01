@@ -1101,6 +1101,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ( "IBCHashSearchMaxCand",                           m_IBCHashSearchMaxCand,                            256u, "Max candidates for hash based IBC search")
   ( "IBCHashSearchRange4SmallBlk",                    m_IBCHashSearchRange4SmallBlk,                     256u, "Small block search range in based IBC search")
   ( "IBCFastMethod",                                  m_IBCFastMethod,                                     6u, "Fast methods for IBC")
+#if JVET_AA0061_IBC_MBVD
+  ("IBCMBVD",                                         m_ibcMbvd,                                         true, "IBC MMVD mode (0:off, 1:on)  [default: on]" )
+#endif
 
   ("WrapAround",                                      m_wrapAround,                                     false, "Enable horizontal wrap-around motion compensation for inter prediction (0:off, 1:on)  [default: off]")
   ("WrapAroundOffset",                                m_wrapAroundOffset,                                  0u, "Offset in luma samples used for computing the horizontal wrap-around position")
@@ -4944,6 +4947,9 @@ void EncAppCfg::xPrintParameter()
   msg(VERBOSE, "ACT:%d ", m_useColorTrans);
     msg(VERBOSE, "PLT:%d ", m_PLTMode);
     msg(VERBOSE, "IBC:%d ", m_IBCMode);
+#if JVET_AA0061_IBC_MBVD
+    msg( VERBOSE, "IBCMBVD:%d ", m_ibcMbvd );
+#endif
   msg( VERBOSE, "HashME:%d ", m_HashME );
   msg( VERBOSE, "WrapAround:%d ", m_wrapAround);
   if( m_wrapAround )

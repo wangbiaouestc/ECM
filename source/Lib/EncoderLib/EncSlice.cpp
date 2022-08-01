@@ -1751,7 +1751,11 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 
   if( ( !pcSlice->isIntra() && pcSlice->getSPS()->getFpelMmvdEnabledFlag() ) || ( pcSlice->getSPS()->getIBCFlag() && m_pcCuEncoder->getEncCfg()->getIBCHashSearch() ) )
   {
+#if JVET_AA0070_RRIBC
+    m_pcCuEncoder->getIbcHashMap().rebuildPicHashMap(cs.picture->getTrueOrigBuf(), CS::isDualITree(cs));
+#else
     m_pcCuEncoder->getIbcHashMap().rebuildPicHashMap(cs.picture->getTrueOrigBuf());
+#endif
     if (m_pcCfg->getIntraPeriod() != -1)
     {
       int hashBlkHitPerc = m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y());

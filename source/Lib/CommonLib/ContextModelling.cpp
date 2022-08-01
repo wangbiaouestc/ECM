@@ -324,6 +324,23 @@ unsigned DeriveCtx::CtxBMMrgFlag(const CodingUnit& cu)
   return ctxId;
 }
 #endif
+
+#if JVET_AA0070_RRIBC
+unsigned DeriveCtx::CtxRribcFlipType(const CodingUnit& cu)
+{
+  const CodingStructure *cs = cu.cs;
+  unsigned ctxId = 0;
+
+  const CodingUnit *cuLeft = cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+  ctxId = (cuLeft && cuLeft->predMode == MODE_IBC && !cuLeft->firstPU->mergeFlag && cuLeft->rribcFlipType) ? 1 : 0;
+
+  const CodingUnit *cuAbove = cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+  ctxId += (cuAbove && cuAbove->predMode == MODE_IBC && !cuAbove->firstPU->mergeFlag && cuAbove->rribcFlipType) ? 1 : 0;
+
+  return ctxId;
+}
+#endif
+
 unsigned DeriveCtx::CtxAffineFlag( const CodingUnit& cu )
 {
   const CodingStructure *cs = cu.cs;
@@ -498,6 +515,13 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 #if MULTI_HYP_PRED
     pu.addHypData.clear();
     pu.numMergedAddHyps = 0;
+#endif
+#if JVET_AA0070_RRIBC
+    pu.cu->rribcFlipType = rribcFlipTypes[candIdx];
+  }
+  else
+  {
+    pu.cu->rribcFlipType = 0;
 #endif
   }
   pu.cu->BcwIdx = ( interDirNeighbours[candIdx] == 3 ) ? BcwIdx[candIdx] : BCW_DEFAULT;
@@ -1163,6 +1187,93 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
 
   PU::restrictBiPredMergeCandsOne(pu);
 }
+
+#if JVET_AA0061_IBC_MBVD
+bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int candIdxMaped)
+{
+  const int mvShift = MV_FRACTIONAL_BITS_DIFF + 2;
+  const int refMvdCands[IBC_MBVD_STEP_NUM] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 12 << mvShift , 16 << mvShift , 24 << mvShift , 32 << mvShift , 40 << mvShift , 48 << mvShift , 56 << mvShift ,
+    64 << mvShift , 72 << mvShift , 80 << mvShift , 88 << mvShift , 96 << mvShift , 104 << mvShift , 112 << mvShift , 120 << mvShift , 128 << mvShift };
+  int fPosGroup = 0;
+  int fPosBaseIdx = 0;
+  int fPosStep = 0;
+  int tempIdx = 0;
+  int fPosPosition = 0;
+  Mv tempMv;
+
+  if(candIdxMaped == -1)
+  {
+    candIdxMaped = candIdx;
+  }
+  tempIdx = candIdxMaped;
+
+  fPosGroup = tempIdx / (IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM);
+  tempIdx = tempIdx - fPosGroup * (IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM);
+  fPosBaseIdx = tempIdx / IBC_MBVD_MAX_REFINE_NUM;
+  tempIdx = tempIdx - fPosBaseIdx * (IBC_MBVD_MAX_REFINE_NUM);
+  fPosStep = tempIdx / IBC_MBVD_OFFSET_DIR;
+  fPosPosition = tempIdx - fPosStep * (IBC_MBVD_OFFSET_DIR);
+  int offset = refMvdCands[fPosStep];
+
+  const int refList0 = ibcMbvdBaseBv[fPosBaseIdx][0].refIdx;
+  const int xDir[] = {1, -1,  0,  0,  1, -1,  1, -1, 2, -2,  2, -2, 1,  1, -1, -1};
+  const int yDir[] = {0,  0,  1, -1,  1, -1, -1,  1, 1,  1, -1, -1, 2, -2,  2, -2};
+
+  if (refList0 != -1)
+  {
+    tempMv = Mv(xDir[fPosPosition] * offset, yDir[fPosPosition] * offset);
+#if JVET_AA0070_RRIBC
+    //check the BVD direction and base BV flip direction
+    if ((rribcFlipTypes[fPosBaseIdx] == 1) && (yDir[fPosPosition] != 0))
+    {
+      return true;
+    }
+    if ((rribcFlipTypes[fPosBaseIdx] == 2) && (xDir[fPosPosition] != 0))
+    {
+      return true;
+    }
+#endif
+    pu.interDir = 1;
+    pu.mv[REF_PIC_LIST_0] = ibcMbvdBaseBv[fPosBaseIdx][0].mv + tempMv;
+    pu.refIdx[REF_PIC_LIST_0] = refList0;
+    pu.mv[REF_PIC_LIST_1] = Mv(0, 0);
+    pu.refIdx[REF_PIC_LIST_1] = -1;
+  }
+
+  pu.ibcMbvdMergeFlag = true;
+  pu.ibcMbvdMergeIdx = candIdx;
+  pu.mergeFlag = true;
+  pu.mergeType = MRG_TYPE_IBC;
+
+  pu.mvd[REF_PIC_LIST_0] = Mv();
+  pu.mvd[REF_PIC_LIST_1] = Mv();
+  pu.mvpIdx[REF_PIC_LIST_0] = NOT_VALID;
+  pu.mvpIdx[REF_PIC_LIST_1] = NOT_VALID;
+  pu.mvpNum[REF_PIC_LIST_0] = NOT_VALID;
+  pu.mvpNum[REF_PIC_LIST_1] = NOT_VALID;
+
+  pu.cu->BcwIdx = (interDirNeighbours[fPosBaseIdx] == 3) ? BcwIdx[fPosBaseIdx] : BCW_DEFAULT;
+
+  for (int refList = 0; refList < 2; refList++)
+  {
+    if (pu.refIdx[refList] >= 0)
+    {
+      pu.mv[refList].clipToStorageBitDepth();
+    }
+  }
+  pu.bv = pu.mv[REF_PIC_LIST_0];
+  pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT); // used for only integer resolution
+  pu.cu->imv = pu.cu->imv == IMV_HPEL ? 0 : pu.cu->imv;
+#if JVET_AA0070_RRIBC
+  pu.cu->rribcFlipType = rribcFlipTypes[fPosBaseIdx];
+#endif
+#if MULTI_HYP_PRED
+  pu.addHypData.clear();
+  pu.numMergedAddHyps = 0;
+#endif
+  return false;
+}
+#endif
 
 #if JVET_V0130_INTRA_TMP
 unsigned DeriveCtx::CtxTmpFlag(const CodingUnit& cu)

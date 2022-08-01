@@ -58,6 +58,26 @@ RdCost::RdCost()
 RdCost::~RdCost()
 {
 }
+#if JVET_AA0070_RRIBC
+void RdCost::setPredictors(Mv pcMv[3][2])
+  {
+    for (int j = 0; j < 3; j++)
+    {
+      for (int i = 0; i < 2; i++)
+      {
+        m_bvPredictors[j][i] = pcMv[j][i];
+      }
+    }
+  }
+#else
+void RdCost::setPredictors(Mv* pcMv)
+  {
+    for (int i = 0; i < 2; i++)
+    {
+      m_bvPredictors[i] = pcMv[i];
+    }
+  }
+#endif
 
 #if WCG_EXT
 double RdCost::calcRdCost( uint64_t fracBits, Distortion distortion, bool useUnadjustedLambda )

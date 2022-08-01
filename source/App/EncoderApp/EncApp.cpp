@@ -854,6 +854,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setIBCHashSearchMaxCand                              ( m_IBCHashSearchMaxCand );
   m_cEncLib.setIBCHashSearchRange4SmallBlk                       ( m_IBCHashSearchRange4SmallBlk );
   m_cEncLib.setIBCFastMethod                                     ( m_IBCFastMethod );
+#if JVET_AA0061_IBC_MBVD
+  m_cEncLib.setIbcMbvd                                           ( m_ibcMbvd );
+#endif
 
   m_cEncLib.setUseWrapAround                                     ( m_wrapAround );
   m_cEncLib.setWrapAroundOffset                                  ( m_wrapAroundOffset );

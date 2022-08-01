@@ -3485,6 +3485,9 @@ SPS::SPS()
 #if AFFINE_MMVD
  , m_AffineMmvdMode           ( false )
 #endif
+#if JVET_AA0061_IBC_MBVD
+  , m_ibcMbvd                 ( false )
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
  , m_DMVDMode                 ( false )
 #endif

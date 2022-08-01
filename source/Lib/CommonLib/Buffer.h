@@ -206,6 +206,10 @@ struct AreaBuf : public Size
 
   void toLast               ( const ClpRng& clpRng );
 
+#if JVET_AA0070_RRIBC
+  void flipSignal(bool isFlipHor);
+#endif
+
   void rspSignal            ( std::vector<Pel>& pLUT );
   void rspSignal            ( const AreaBuf<const Pel>& other, std::vector<Pel>& pLUT );
   void rspSignal            ( const AreaBuf<Pel> &toReshape, std::vector<Pel>& pLUT );
