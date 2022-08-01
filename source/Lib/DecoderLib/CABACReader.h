@@ -155,6 +155,9 @@ public:
 #if AFFINE_MMVD
   void        affine_mmvd_data          ( PredictionUnit&               pu );
 #endif
+#if JVET_AA0061_IBC_MBVD
+  void        ibcMbvdData             ( PredictionUnit&               pu );
+#endif
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   void        tm_merge_flag             ( PredictionUnit&               pu );
 #endif
@@ -205,6 +208,17 @@ public:
   bool        cbf_comp                  ( CodingStructure&              cs,     const CompArea& area,     unsigned depth, const bool prevCbf = false, const bool useISP = false );
 
   // mvd coding (clause 7.3.8.9)
+#if JVET_AA0070_RRIBC
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+   void        mvd_coding                ( Mv &rMvd, bool codeSign = true, const int &rribcFlipType = 0);
+#else
+   void        mvd_coding                ( Mv &rMvd, const int &rribcFlipType = 0);
+#endif
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+  void        bvdCoding                ( Mv &rMvd, const int &rribcFlipType = 0);
+  unsigned    xReadBvdContext(unsigned ctxT, int offset, int param);
+#endif
+#else
   void        mvd_coding                ( Mv &rMvd 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
     , bool codeSign = true
@@ -213,6 +227,7 @@ public:
 #if JVET_Z0131_IBC_BVD_BINARIZATION
   void        bvdCoding                ( Mv &rMvd );
   unsigned    xReadBvdContext(unsigned ctxT, int offset, int param);
+#endif
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   void        mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList);
@@ -268,6 +283,9 @@ public:
   void        cu_lic_flag               ( CodingUnit& cu );
 #endif
 
+#if JVET_AA0070_RRIBC
+  void        rribcData                ( CodingUnit &cu );
+#endif
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   CABACDataStore*         m_CABACDataStore;
 #endif

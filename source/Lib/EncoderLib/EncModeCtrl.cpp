@@ -2259,6 +2259,9 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
         }
         else if (CU::isIBC(*bestCU))
         {
+#if JVET_AA0070_RRIBC
+          relatedCU.isRribcCoded = bestCU->rribcFlipType > 0;
+#endif
           relatedCU.isIBC = true;
           relatedCU.isSkip |= bestCU->skip;
           if (bestCU->slice->getSPS()->getUseColorTrans())

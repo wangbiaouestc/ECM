@@ -470,6 +470,9 @@ protected:
   unsigned  m_IBCHashSearchMaxCand;
   unsigned  m_IBCHashSearchRange4SmallBlk;
   unsigned  m_IBCFastMethod;
+#if JVET_AA0061_IBC_MBVD
+  bool      m_ibcMbvd;
+#endif
 
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;
@@ -1327,6 +1330,10 @@ public:
 #if AFFINE_MMVD
   void      setAffineMmvdMode               ( bool b )       { m_AffineMmvdMode = b; }
   bool      getAffineMmvdMode               ()         const { return m_AffineMmvdMode; }
+#endif
+#if JVET_AA0061_IBC_MBVD
+  void      setIbcMbvd                      ( bool b )       { m_ibcMbvd = b; }
+  bool      getIbcMbvd                      ()         const { return m_ibcMbvd; }
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void      setUseDMVDMode                  (bool b)         { m_DMVDMode = b; }

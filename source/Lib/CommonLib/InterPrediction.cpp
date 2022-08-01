@@ -5903,6 +5903,109 @@ void InterPrediction::xProcessDMVR(PredictionUnit& pu, PelUnitBuf &pcYuvDst, con
 #endif
 }
 
+#if JVET_AA0061_IBC_MBVD
+void  InterPrediction::sortIbcMergeMbvdCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t * ibcMbvdLUT,uint32_t * ibcMbvdValidNum, int ibcMbvdIdx)
+{
+
+  const int tempNum = (const int) (std::min<int>(IBC_MBVD_BASE_NUM, mrgCtx.numValidMergeCand) * IBC_MBVD_MAX_REFINE_NUM);
+  const int groupSize = std::min<int>(tempNum, ADAPTIVE_SUB_GROUP_SIZE_IBC_MBVD);
+
+  Distortion candCostList[IBC_MBVD_BASE_NUM* IBC_MBVD_MAX_REFINE_NUM];
+
+  for (uint32_t i = 0; i < tempNum; i++)
+  {
+    ibcMbvdLUT[i] = i;
+    candCostList[i] = MAX_UINT;
+  }
+  Distortion uiCost;
+  DistParam cDistParam;
+  cDistParam.applyWeight = false;
+  int nWidth = pu.lumaSize().width;
+  int nHeight = pu.lumaSize().height;
+  if (!xAMLIBCGetCurBlkTemplate(pu, nWidth, nHeight))
+  {
+    return;
+  }
+
+  int startMMVDIdx = 0;
+  int endMMVDIdx = tempNum;
+  if(ibcMbvdIdx!= -1)
+  {
+    uint32_t gpId = ibcMbvdIdx/groupSize;
+    startMMVDIdx = gpId * groupSize;
+    endMMVDIdx = (gpId+1) * groupSize;
+  }
+
+  int encGrpSize = IBC_MBVD_SIZE_ENC;
+  int baseIdx = 0;
+  const int cuPelX = pu.Y().x;
+  const int cuPelY = pu.Y().y;
+  int roiWidth = pu.lwidth();
+  int roiHeight = pu.lheight();
+  const int picWidth = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
+  const int picHeight = pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
+  const unsigned int  lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
+  for (int mmvdMergeCand = startMMVDIdx; mmvdMergeCand < endMMVDIdx; mmvdMergeCand++)
+  {
+    bool mbvdCandMisAlign = mrgCtx.setIbcMbvdMergeCandiInfo(pu, mmvdMergeCand, mmvdMergeCand);
+    if (mbvdCandMisAlign)
+    {
+      continue;
+    }
+    int xPred = pu.bv.getHor();
+    int yPred = pu.bv.getVer();
+
+    if (!PU::searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, xPred, yPred, lcuWidth)) // not valid bv derived
+    {
+      continue;
+    }
+    baseIdx = mmvdMergeCand / IBC_MBVD_MAX_REFINE_NUM;
+    ibcMbvdValidNum[baseIdx]++;
+    uiCost = 0;
+
+    PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+    PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+    PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+    PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+
+    getIBCAMLRefTemplate(pu, nWidth, nHeight);
+
+    if (m_bAMLTemplateAvailabe[0])
+    {
+      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+
+      uiCost += cDistParam.distFunc(cDistParam);
+    }
+
+    if (m_bAMLTemplateAvailabe[1])
+    {
+      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+
+      uiCost += cDistParam.distFunc(cDistParam);
+    }
+    // update part
+    uint32_t i;
+    uint32_t shift = 0;
+    uint32_t gpIdx = mmvdMergeCand/groupSize;
+    uint32_t endIdx = gpIdx * groupSize + encGrpSize;
+    while (shift < encGrpSize && uiCost < candCostList[endIdx - 1 - shift])
+    {
+      shift++;
+    }
+    if (shift != 0)
+    {
+      for (i = 1; i < shift; i++)
+      {
+        ibcMbvdLUT[endIdx - i] = ibcMbvdLUT[endIdx - 1 - i];
+        candCostList[endIdx - i] = candCostList[endIdx - 1 - i];
+      }
+      ibcMbvdLUT[endIdx - shift] = mmvdMergeCand;
+      candCostList[endIdx - shift] = uiCost;
+    }
+  }
+}
+#endif
+
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
 void InterPrediction::cacheAssign( CacheModel *cache )
 {
@@ -8687,6 +8790,9 @@ void  InterPrediction::updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, u
 #if INTER_LIC
     mrgCtxTmp.LICFlags[ui] = false;
 #endif
+#if JVET_AA0070_RRIBC
+    mrgCtxTmp.rribcFlipTypes[ui] = 0;
+#endif
   }
   for (uint32_t uiMergeCand = ((mrgCandIdx < 0) ? 0 : (mrgCandIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE)*ADAPTIVE_IBC_SUB_GROUP_SIZE); uiMergeCand < (((mrgCandIdx < 0) || ((mrgCandIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE + 1)*ADAPTIVE_IBC_SUB_GROUP_SIZE > mrgCtx.numValidMergeCand)) ? mrgCtx.numValidMergeCand : ((mrgCandIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE + 1)*ADAPTIVE_IBC_SUB_GROUP_SIZE)); ++uiMergeCand)
   {
@@ -8708,6 +8814,9 @@ void  InterPrediction::updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, u
     mrgCtxTmp.useAltHpelIf[uiMergeCand] = mrgCtx.useAltHpelIf[uiMergeCand];
 #if INTER_LIC 
     mrgCtxTmp.LICFlags[uiMergeCand] = mrgCtx.LICFlags[uiMergeCand];
+#endif
+#if JVET_AA0070_RRIBC
+    mrgCtxTmp.rribcFlipTypes[uiMergeCand] = mrgCtx.rribcFlipTypes[uiMergeCand];
 #endif
   }
   //update
@@ -8731,6 +8840,9 @@ void  InterPrediction::updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, u
     mrgCtx.useAltHpelIf[uiMergeCand] = mrgCtxTmp.useAltHpelIf[RdCandList[uiMergeCand / ADAPTIVE_IBC_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_IBC_SUB_GROUP_SIZE]];
 #if INTER_LIC
     mrgCtx.LICFlags[uiMergeCand] = mrgCtxTmp.LICFlags[RdCandList[uiMergeCand / ADAPTIVE_IBC_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_IBC_SUB_GROUP_SIZE]];
+#endif
+#if JVET_AA0070_RRIBC
+    mrgCtx.rribcFlipTypes[uiMergeCand] = mrgCtxTmp.rribcFlipTypes[RdCandList[uiMergeCand / ADAPTIVE_IBC_SUB_GROUP_SIZE][uiMergeCand % ADAPTIVE_IBC_SUB_GROUP_SIZE]];
 #endif
   }
 }
@@ -8758,12 +8870,6 @@ bool InterPrediction::xAMLIBCGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWi
       for (int l = 0; l < AML_MERGE_TEMPLATE_SIZE; l++)
       {
         int recVal = rec[k + l * recBuf.stride];
-
-        //if (m_pcReshape->getSliceReshaperInfo().getUseSliceReshaper() && m_pcReshape->getCTUFlag())
-        //{
-        //  recVal = invLUT[recVal];
-        //}
-
         pcY[k + l * nCurBlkWidth] = recVal;
       }
     }
@@ -8779,12 +8885,6 @@ bool InterPrediction::xAMLIBCGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWi
       for (int l = 0; l < AML_MERGE_TEMPLATE_SIZE; l++)
       {
         int recVal = rec[recBuf.stride * k + l];
-
-        //if (m_pcReshape->getSliceReshaperInfo().getUseSliceReshaper() && m_pcReshape->getCTUFlag())
-        //{
-        //  recVal = invLUT[recVal];
-        //}
-
         pcY[AML_MERGE_TEMPLATE_SIZE * k + l] = recVal;
       }
     }
@@ -8805,11 +8905,27 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
   if (m_bAMLTemplateAvailabe[0])
   {
     Mv mvTop(0, -AML_MERGE_TEMPLATE_SIZE);
+#if JVET_AA0070_RRIBC
+    if (pu.cu->rribcFlipType == 2)
+    {
+      mvTop.setVer(nCurBlkHeight);
+    }
+#endif
     mvTop += mvCurr;
 
     MotionInfo miTop;
     miTop.mv[0] = Mv(mvTop.hor <<horShift , mvTop.ver<< verShift);
     miTop.refIdx[0] = MAX_NUM_REF;
+#if JVET_AA0070_RRIBC
+    if (pu.cu->rribcFlipType == 2)
+    {
+      if (!PU::checkIsIBCCandidateValid(pu, miTop, true, true))
+      {
+        mvTop.setVer(mvCurr.getVer() + nCurBlkHeight - AML_MERGE_TEMPLATE_SIZE);
+      }
+    }
+    else
+#endif
     if (!PU::checkIsIBCCandidateValid(pu, miTop))
     {
       mvTop = mvCurr;
@@ -8821,13 +8937,23 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
     {
       for (int l = 0; l < AML_MERGE_TEMPLATE_SIZE; l++)
       {
+#if JVET_AA0070_RRIBC
+        int recVal;
+        if (pu.cu->rribcFlipType == 0)
+        {
+           recVal = rec[k + l * recBuf.stride];
+        }
+        else if (pu.cu->rribcFlipType == 1)
+        {
+          recVal = rec[nCurBlkWidth - 1 - k + l * recBuf.stride];
+        }
+        else
+        {
+          recVal = rec[k + (AML_MERGE_TEMPLATE_SIZE - 1 - l) * recBuf.stride];
+        }
+#else
         int recVal = rec[k + l * recBuf.stride];
-
-        //if (m_pcReshape->getSliceReshaperInfo().getUseSliceReshaper() && m_pcReshape->getCTUFlag())
-        //{
-        //  recVal = invLUT[recVal];
-        //}
-
+#endif
         pcY[k + l * nCurBlkWidth] = recVal;
       }
     }
@@ -8836,11 +8962,27 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
   if (m_bAMLTemplateAvailabe[1])
   {
     Mv mvLeft(-AML_MERGE_TEMPLATE_SIZE, 0);
+#if JVET_AA0070_RRIBC
+    if (pu.cu->rribcFlipType == 1)
+    {
+      mvLeft.setHor(nCurBlkWidth);
+    }
+#endif
     mvLeft += mvCurr;
 
     MotionInfo miLeft;
     miLeft.mv[0] = Mv(mvLeft.hor <<horShift , mvLeft.ver<< verShift);
     miLeft.refIdx[0] = MAX_NUM_REF;
+#if JVET_AA0070_RRIBC
+    if (pu.cu->rribcFlipType == 1)
+    {
+      if (!PU::checkIsIBCCandidateValid(pu, miLeft, true, false))
+      {
+         mvLeft.setHor(mvCurr.getHor() + nCurBlkWidth - AML_MERGE_TEMPLATE_SIZE);
+      }
+    }
+    else
+#endif
     if (!PU::checkIsIBCCandidateValid(pu, miLeft))
     {
       mvLeft = mvCurr;
@@ -8852,19 +8994,30 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
     {
       for (int l = 0; l < AML_MERGE_TEMPLATE_SIZE; l++)
       {
+#if JVET_AA0070_RRIBC
+        int recVal;
+        if (pu.cu->rribcFlipType == 0)
+        {
+          recVal = rec[recBuf.stride * k + l];
+        }
+        else if (pu.cu->rribcFlipType == 1) 
+        {
+          recVal = rec[recBuf.stride * k + AML_MERGE_TEMPLATE_SIZE - 1 - l];
+        }
+        else
+        {
+          recVal = rec[recBuf.stride * (nCurBlkHeight - 1 - k) + l];
+        }
+#else
         int recVal = rec[recBuf.stride * k + l];
-
-        //if (m_pcReshape->getSliceReshaperInfo().getUseSliceReshaper() && m_pcReshape->getCTUFlag())
-        //{
-        //  recVal = invLUT[recVal];
-        //}
-
+#endif
         pcY[AML_MERGE_TEMPLATE_SIZE * k + l] = recVal;
       }
     }
   }
 }
 #endif
+
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 void  InterPrediction::adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx,uint32_t startPos,uint32_t endPos)
 {
@@ -8949,6 +9102,9 @@ void  InterPrediction::updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, u
 #if INTER_LIC
     mrgCtxTmp.LICFlags[ui] = false;
 #endif
+#if JVET_AA0070_RRIBC
+    mrgCtxTmp.rribcFlipTypes[ui] = 0;
+#endif
   }
   for (uint32_t uiMergeCand = startPos; uiMergeCand < endPos; ++uiMergeCand)
   {
@@ -8964,6 +9120,9 @@ void  InterPrediction::updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, u
     mrgCtxTmp.useAltHpelIf[uiMergeCand] = mrgCtx.useAltHpelIf[uiMergeCand];
 #if INTER_LIC 
     mrgCtxTmp.LICFlags[uiMergeCand] = mrgCtx.LICFlags[uiMergeCand];
+#endif
+#if JVET_AA0070_RRIBC
+    mrgCtxTmp.rribcFlipTypes[uiMergeCand] = mrgCtx.rribcFlipTypes[uiMergeCand];
 #endif
   }
   //update
@@ -8981,6 +9140,9 @@ void  InterPrediction::updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, u
     mrgCtx.useAltHpelIf[uiMergeCand] = mrgCtxTmp.useAltHpelIf[RdCandList[uiMergeCand -startPos]];
 #if INTER_LIC
     mrgCtx.LICFlags[uiMergeCand] = mrgCtxTmp.LICFlags[RdCandList[uiMergeCand -startPos]];
+#endif
+#if JVET_AA0070_RRIBC
+    mrgCtx.rribcFlipTypes[uiMergeCand] = mrgCtxTmp.rribcFlipTypes[RdCandList[uiMergeCand -startPos]];
 #endif
   }
 }

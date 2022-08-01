@@ -3044,6 +3044,11 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
   {
     merge_flag( pu );
   }
+
+#if JVET_AA0070_RRIBC
+  rribcData(*pu.cu);
+#endif
+
   if( pu.mergeFlag )
   {
     merge_data(pu);
@@ -3061,10 +3066,18 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
     pu.cu->affine = false;
     pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
     RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MVD, pu.lumaSize());
+#if JVET_AA0070_RRIBC
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.cu->rribcFlipType);
+#else
+    mvd_coding(pu.mvd[REF_PIC_LIST_0], true, pu.cu->rribcFlipType);
+#endif
+#else
 #if JVET_Z0131_IBC_BVD_BINARIZATION
     bvdCoding(pu.mvd[REF_PIC_LIST_0]);
 #else
     mvd_coding(pu.mvd[REF_PIC_LIST_0]);
+#endif
 #endif
     if (pu.cs->sps->getMaxNumIBCMergeCand() == 1)
     {
@@ -3476,6 +3489,62 @@ void CABACReader::affine_mmvd_data(PredictionUnit& pu)
 }
 #endif
 
+#if JVET_AA0061_IBC_MBVD
+void CABACReader::ibcMbvdData(PredictionUnit& pu)
+{
+  if (!pu.cs->sps->getUseIbcMbvd() || !pu.mergeFlag || !CU::isIBC(*pu.cu))
+  {
+    return;
+  }
+
+  pu.ibcMbvdMergeFlag = (m_BinDecoder.decodeBin(Ctx::IbcMbvdFlag()));
+  DTRACE(g_trace_ctx, D_SYNTAX, "IBC_mbvd_flag() IBC_mbvd_merge=%d pos=(%d,%d) size=%dx%d\n", pu.ibcMbvdMergeFlag ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
+
+  if (!pu.ibcMbvdMergeFlag)
+  {
+    return;
+  }
+
+  // Base IBC merge candidate idx
+  uint8_t var0 = 0;
+  int numBaseCandMinus1 = IBC_MBVD_BASE_NUM - 1;
+  if (numBaseCandMinus1 > 0)
+  {
+    // to support more base candidates
+    if (m_BinDecoder.decodeBin(Ctx::IbcMbvdMergeIdx()))
+    {
+      var0++;
+      for (; var0 < numBaseCandMinus1; var0++)
+      {
+        if (!m_BinDecoder.decodeBinEP())
+        {
+          break;
+        }
+      }
+    }
+  }
+  DTRACE(g_trace_ctx, D_SYNTAX, "ibcMbvdBaseIdx() ibcMbvdBaseIdx=%d\n", var0);
+
+  unsigned int uiUnaryIdx = 0;
+  unsigned int ricePar = 1;
+  int numCandStepMinus1 = (IBC_MBVD_SIZE_ENC >> ricePar) - 1;
+  int temp = 0;
+  temp = m_BinDecoder.decodeBinsEP(ricePar);
+
+  for (; uiUnaryIdx < numCandStepMinus1; ++uiUnaryIdx)
+  {
+    if (!m_BinDecoder.decodeBin(Ctx::IbcMbvdStepMvpIdx((uiUnaryIdx > LAST_MERGE_MMVD_IDX_CABAC - 1 ? LAST_MERGE_MMVD_IDX_CABAC - 1 : uiUnaryIdx))))
+    {
+      break;
+    }
+  }
+  uiUnaryIdx <<= ricePar;
+  uiUnaryIdx += temp;
+  pu.ibcMbvdMergeIdx = var0 * IBC_MBVD_MAX_REFINE_NUM  +uiUnaryIdx;
+  DTRACE(g_trace_ctx, D_SYNTAX, "IBC_mbvd_merge_idx() IBC_mbvd_merge_idx=%d\n", pu.ibcMbvdMergeIdx);
+}
+#endif
+
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
 void CABACReader::tm_merge_flag(PredictionUnit& pu)
 {
@@ -3539,8 +3608,18 @@ void CABACReader::merge_data( PredictionUnit& pu )
 {
   if (CU::isIBC(*pu.cu))
   {
+#if JVET_AA0061_IBC_MBVD
+    ibcMbvdData(pu);
+#endif
 #if JVET_Z0084_IBC_TM && IBC_TM_MRG
-    tm_merge_flag(pu);
+#if JVET_AA0061_IBC_MBVD
+    if (!pu.ibcMbvdMergeFlag)
+    {
+#endif
+      tm_merge_flag(pu);
+#if JVET_AA0061_IBC_MBVD
+    }
+#endif
 #endif
     merge_idx(pu);
     return;
@@ -3892,6 +3971,12 @@ void CABACReader::merge_idx( PredictionUnit& pu )
 
   if (pu.cu->predMode == MODE_IBC)
   {
+#if JVET_AA0061_IBC_MBVD
+    if (pu.ibcMbvdMergeFlag)
+    {
+      return;
+    }
+#endif
     numCandminus1 = int(pu.cs->sps->getMaxNumIBCMergeCand()) - 1;
   }
 #if TM_MRG
@@ -4851,8 +4936,26 @@ bool CABACReader::cbf_comp( CodingStructure& cs, const CompArea& area, unsigned 
 //--------------------------------------------------------------------------------
 //    void  mvd_coding( pu, refList )
 //================================================================================
-
-void CABACReader::mvd_coding( Mv &rMvd 
+#if JVET_AA0070_RRIBC
+void CABACReader::mvd_coding( Mv &rMvd
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  , bool codeSign
+#endif
+  , const int &rribcFlipType
+)
+{
+  // abs_mvd_greater0_flag[ 0 | 1 ]
+  int horAbs = 0, verAbs = 0;
+  if (rribcFlipType != 2)
+  {
+    horAbs = (int) m_BinDecoder.decodeBin(Ctx::Mvd());
+  }
+  if (rribcFlipType != 1)
+  {
+    verAbs = (int) m_BinDecoder.decodeBin(Ctx::Mvd());
+  }
+#else
+void CABACReader::mvd_coding( Mv &rMvd
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   , bool codeSign
 #endif
@@ -4861,6 +4964,7 @@ void CABACReader::mvd_coding( Mv &rMvd
   // abs_mvd_greater0_flag[ 0 | 1 ]
   int horAbs = (int)m_BinDecoder.decodeBin(Ctx::Mvd());
   int verAbs = (int)m_BinDecoder.decodeBin(Ctx::Mvd());
+#endif
 
   // abs_mvd_greater1_flag[ 0 | 1 ]
   if (horAbs)
@@ -4934,10 +5038,24 @@ unsigned CABACReader::xReadBvdContext(unsigned ctxT, int offset, int param)
 #endif
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
+#if JVET_AA0070_RRIBC
+void CABACReader::bvdCoding(Mv &rMvd, const int &rribcFlipType)
+{
+  int horAbs = 0, verAbs = 0;
+  if (rribcFlipType != 2)
+  {
+    horAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
+  }
+  if (rribcFlipType != 1)
+  {
+    verAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
+  }
+#else
 void CABACReader::bvdCoding( Mv &rMvd )
 {
   int horAbs = (int)m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
   int verAbs = (int)m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
+#endif
 
   if (horAbs)
   {
@@ -6426,6 +6544,27 @@ void CABACReader::cu_lic_flag( CodingUnit& cu )
   }
 }
 #endif
+
+#if JVET_AA0070_RRIBC
+void CABACReader::rribcData(CodingUnit &cu)
+{
+  if (!CU::isIBC(cu) || cu.firstPU->mergeFlag)
+  {
+    return;
+  }
+
+  cu.rribcFlipType = 0;
+
+  unsigned ctxId   = DeriveCtx::CtxRribcFlipType(cu);
+  cu.rribcFlipType = (m_BinDecoder.decodeBin(Ctx::rribcFlipType(ctxId)));
+  if (cu.rribcFlipType)
+  {
+    cu.rribcFlipType += m_BinDecoder.decodeBin(Ctx::rribcFlipType(3));
+  }
+  DTRACE(g_trace_ctx, D_SYNTAX, "rribcData() rribcFlipType = %d\n", cu.rribcFlipType);
+}
+#endif
+
 
 #if SIGN_PREDICTION
 void CABACReader::parsePredictedSigns( TransformUnit &tu, ComponentID compID )

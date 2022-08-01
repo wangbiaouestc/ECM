@@ -1520,6 +1520,9 @@ private:
 #if AFFINE_MMVD
   bool              m_AffineMmvdMode;
 #endif
+#if JVET_AA0061_IBC_MBVD
+  bool              m_ibcMbvd;
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool              m_DMVDMode;
 #endif
@@ -2017,6 +2020,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if AFFINE_MMVD
   void                    setUseAffineMmvdMode(bool b)                                                    { m_AffineMmvdMode = b; }
   bool                    getUseAffineMmvdMode() const                                                    { return m_AffineMmvdMode; }
+#endif
+#if JVET_AA0061_IBC_MBVD
+  void                    setUseIbcMbvd(bool b)                                                           { m_ibcMbvd = b; }
+  bool                    getUseIbcMbvd() const                                                           { return m_ibcMbvd; }
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void                    setUseDMVDMode(bool b)                                                          { m_DMVDMode = b; }

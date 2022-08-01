@@ -1654,6 +1654,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseColorTrans(m_useColorTrans);
   sps.setPLTMode                            ( m_PLTMode);
   sps.setIBCFlag                            ( m_IBCMode);
+#if JVET_AA0061_IBC_MBVD
+  sps.setUseIbcMbvd                         ( m_ibcMbvd );
+#endif
   sps.setWrapAroundEnabledFlag                      ( m_wrapAround );
 #if MULTI_HYP_PRED
   sps.setMaxNumAddHyps(m_maxNumAddHyps);

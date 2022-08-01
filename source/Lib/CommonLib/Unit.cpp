@@ -320,6 +320,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if INTER_LIC
   LICFlag           = other.LICFlag;
 #endif
+#if JVET_AA0070_RRIBC
+  rribcFlipType = other.rribcFlipType;
+#endif
 
   for (int idx = 0; idx < MAX_NUM_CHANNEL_TYPE; idx++)
   {
@@ -414,6 +417,9 @@ void CodingUnit::initData()
 #endif
 #if INTER_LIC
   LICFlag = false;
+#endif
+#if JVET_AA0070_RRIBC
+  rribcFlipType = 0;
 #endif
 
   for (int idx = 0; idx < MAX_NUM_CHANNEL_TYPE; idx++)
@@ -682,6 +688,10 @@ void PredictionUnit::initData()
 #endif
   mmvdMergeFlag = false;
   mmvdMergeIdx = MAX_UCHAR;
+#if JVET_AA0061_IBC_MBVD
+  ibcMbvdMergeFlag = false;
+  ibcMbvdMergeIdx = MAX_INT;
+#endif
 #if AFFINE_MMVD
   afMmvdFlag    = false;
   afMmvdBaseIdx = UINT8_MAX;
@@ -813,6 +823,10 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 #endif
   mmvdMergeFlag = predData.mmvdMergeFlag;
   mmvdMergeIdx = predData.mmvdMergeIdx;
+#if JVET_AA0061_IBC_MBVD
+  ibcMbvdMergeFlag = predData.ibcMbvdMergeFlag;
+  ibcMbvdMergeIdx = predData.ibcMbvdMergeIdx;
+#endif
 #if AFFINE_MMVD
   afMmvdFlag    = predData.afMmvdFlag;
   afMmvdBaseIdx = predData.afMmvdBaseIdx;
@@ -940,6 +954,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
   mmvdMergeFlag = other.mmvdMergeFlag;
   mmvdMergeIdx = other.mmvdMergeIdx;
+#if JVET_AA0061_IBC_MBVD
+  ibcMbvdMergeFlag = other.ibcMbvdMergeFlag;
+  ibcMbvdMergeIdx = other.ibcMbvdMergeIdx;
+#endif
 #if AFFINE_MMVD
   afMmvdFlag    = other.afMmvdFlag;
   afMmvdBaseIdx = other.afMmvdBaseIdx;

@@ -342,6 +342,9 @@ public:
 #if JVET_X0049_ADAPT_DMVR
   static const CtxSet   BMMergeFlag;
 #endif
+#if JVET_AA0070_RRIBC
+  static const CtxSet   rribcFlipType;
+#endif
 #if JVET_Y0065_GPM_INTRA
   static const CtxSet   GPMIntraFlag;
 #endif
@@ -399,6 +402,12 @@ public:
   static const CtxSet   AfMmvdIdx;
   static const CtxSet   AfMmvdOffsetStep;
 #endif
+  #if JVET_AA0061_IBC_MBVD
+  static const CtxSet   IbcMbvdFlag;
+  static const CtxSet   IbcMbvdMergeIdx;
+  static const CtxSet   IbcMbvdStepMvpIdx;
+#endif
+
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   static const CtxSet   TMMergeFlag;
 #endif

@@ -654,7 +654,7 @@ static const int MMVD_MRG_MAX_RD_NUM =                              20;
 static const int MMVD_MRG_MAX_RD_NUM =                              MRG_MAX_NUM_CANDS;
 #endif
 static const int MMVD_MRG_MAX_RD_BUF_NUM =                          (MMVD_MRG_MAX_RD_NUM + 1);///< increase buffer size by 1
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AA0061_IBC_MBVD
 static const int LAST_MERGE_MMVD_IDX_CABAC =                        5;
 #endif
 #if JVET_W0097_GPM_MMVD_TM
@@ -747,6 +747,9 @@ static const int    THRES_AFFINE =                                  4;
 #endif
 #if !MERGE_ENC_OPT
 static const int    NUM_MRG_SATD_CAND =                             4;
+#endif
+#if JVET_AA0061_IBC_MBVD
+static const int    NUM_IBC_MRG_SATD_CAND =                         3;
 #endif
 static const double MRG_FAST_RATIO    =                             1.25;
 static const int    NUM_AFF_MRG_SATD_CAND =                         2;
@@ -1021,6 +1024,15 @@ static const int CHROMA_REFINEMENT_CANDIDATES = 8; /// 8 candidates BV to choose
 static const int IBC_FAST_METHOD_NOINTRA_IBCCBF0 = 0x01;
 static const int IBC_FAST_METHOD_BUFFERBV = 0X02;
 static const int IBC_FAST_METHOD_ADAPTIVE_SEARCHRANGE = 0X04;
+#if JVET_AA0061_IBC_MBVD
+static const int IBC_MBVD_BASE_NUM =                                 5;
+static const int IBC_MBVD_STEP_NUM =                                 20; // number of distance offset
+static const int IBC_MBVD_OFFSET_DIR =                               4; // (+, 0); (-, 0); (0, +); (0, -);
+static const int IBC_MBVD_MAX_REFINE_NUM = IBC_MBVD_STEP_NUM * IBC_MBVD_OFFSET_DIR; ///< max number of candidate from a base candidate
+static const int IBC_MBVD_NUM = IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM;        ///< total number of IBC mmvd candidate
+static const int IBC_MBVD_SIZE_ENC =                                 8;
+static const int ADAPTIVE_SUB_GROUP_SIZE_IBC_MBVD = IBC_MBVD_MAX_REFINE_NUM;
+#endif
 static constexpr int MV_EXPONENT_BITCOUNT    = 4;
 static constexpr int MV_MANTISSA_BITCOUNT    = 6;
 static constexpr int MV_MANTISSA_UPPER_LIMIT = ((1 << (MV_MANTISSA_BITCOUNT - 1)) - 1);

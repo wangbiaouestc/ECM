@@ -967,6 +967,10 @@ struct CodedCUInfo
   int     geoMrgIdx0List[GEO_MAX_TRY_WEIGHTED_SATD];
   int     geoMrgIdx1List[GEO_MAX_TRY_WEIGHTED_SATD];
 #endif
+#if JVET_AA0070_RRIBC
+  bool    isRribcCoded;
+  bool    isRribcTested;
+#endif
   bool validMv[NUM_REF_PIC_LIST_01][MAX_STORED_CU_INFO_REFS];
   Mv   saveMv [NUM_REF_PIC_LIST_01][MAX_STORED_CU_INFO_REFS];
 
