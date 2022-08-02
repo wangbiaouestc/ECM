@@ -3755,7 +3755,9 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     else if (tmvpMrgCtx->numValidMergeCand > 0)
     {
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+#if TM_MRG
       if (!pu.tmMergeFlag)
+#endif
       {
         for (uint32_t ui = 0; ui < tmvpMrgCtx->numValidMergeCand && cnt < maxNumMergeCand - 1; ++ui)
         {
@@ -3794,6 +3796,7 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #endif
         }
       }
+#if TM_MRG
       else
       {
         mrgCtx.BcwIdx[cnt] = tmvpMrgCtx->BcwIdx[0];
@@ -3830,6 +3833,7 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
         }
 #endif
       }
+#endif
     }
 #else
       mrgCtx.BcwIdx[cnt] = tmvpMrgCtx->BcwIdx[0];
@@ -6133,7 +6137,7 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 #if TM_MRG
   const uint32_t mvdSimilarityThresh = 1;
 #endif
-#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+#if TM_MRG && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   const uint32_t maxNumMergeCand = pu.tmMergeFlag ? 1 :NUM_TMVP_CANDS;
 #else
   const uint32_t maxNumMergeCand = NUM_TMVP_CANDS;

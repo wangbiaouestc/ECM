@@ -1983,7 +1983,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
 {
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
 #if  JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
   int filterIdx = isAML && (pu.mmvdMergeFlag || (pu.tmMergeFlag && !pu.ciipFlag && !pu.cu->geoFlag)) ? 1 : 0;
 #else
   int filterIdx = isAML && pu.mmvdMergeFlag ? 1 : 0;
@@ -7112,10 +7112,12 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
   { 
     int          cnt = 0;
     int maxPairToBeAdded = std::min(mvpMergeCandCtx.numCandToTestEnc, numCandInCategory); 
+#if TM_MRG
     if (pu.tmMergeFlag)
     {
       maxPairToBeAdded = std::min(mvpMergeCandCtx.numCandToTestEnc, TM_MRG_MAX_NUM_INIT_CANDS);
     }
+#endif
 
     int cand1 = 0;
     cnt = 0;
@@ -7189,9 +7191,15 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
           pairMergeCand.LICFlags[cnt] = false;
         }
 #endif
+#if TM_MRG
         if (!pairMergeCand.xCheckSimilarMotion(cnt, pu.tmMergeFlag ? PU::getTMMvdThreshold(pu) : 1))
         {
           if (!mvpMergeCandCtx.xCheckSimilarMotion2Lists(cnt, &pairMergeCand, pu.tmMergeFlag ? PU::getTMMvdThreshold(pu) : 1))
+#else
+        if (!pairMergeCand.xCheckSimilarMotion(cnt, 1))
+        {
+          if (!mvpMergeCandCtx.xCheckSimilarMotion2Lists(cnt, &pairMergeCand, 1))
+#endif
           {
             pairAdded = true;
             cnt++;
@@ -7259,11 +7267,13 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
     for (int sizeCandList = mvpMergeCandCtx.numCandToTestEnc+ pairMergeCand.numValidMergeCand; sizeCandList > 1; sizeCandList--)
     {
       min = MAX_UINT64;
+#if TM_MRG
       if(pu.tmMergeFlag)
       {
         candToBeRemoved = 0;
         min = candCostList[0];
       }
+#endif
       for (uint32_t uiMergeCand = 0; uiMergeCand < sizeCandList - 1; ++uiMergeCand)
       {
         if (min > abs((int)(candCostList[uiMergeCand + 1] - candCostList[uiMergeCand])))
@@ -7551,7 +7561,11 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
         mvpMergeCandCtx.candCost[uiMergeCand] = MAX_UINT64 - 1;
       }
     }
+#if TM_MRG
     if (pu.tmMergeFlag || (mvpMergeCandCtx.numCandToTestEnc != mvpMergeCandCtx.numValidMergeCand && uiMergeCand > mvpMergeCandCtx.numCandToTestEnc ))
+#else
+    if ((mvpMergeCandCtx.numCandToTestEnc != mvpMergeCandCtx.numValidMergeCand && uiMergeCand > mvpMergeCandCtx.numCandToTestEnc ))
+#endif
     {
       uiCost = mvpMergeCandCtx.candCost[uiMergeCand];
     }
@@ -10833,7 +10847,7 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
 
   if (otherMvf == nullptr) // uni prediction
   {
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
     if (pu.reduceTplSize && pu.tmMergeFlag)
     {
       tplCtrl.deriveMvUni<1>();
@@ -10842,7 +10856,7 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
     {
 #endif
     tplCtrl.deriveMvUni<TM_TPL_SIZE>();
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
     }
 #endif
     mv = tplCtrl.getFinalMv();
@@ -10857,7 +10871,7 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
     }
 #endif
     const Picture& otherRefPic = *cu.slice->getRefPic((RefPicList)(1-eRefList), otherMvf->refIdx)->unscaledPic;
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
     if (pu.reduceTplSize && pu.tmMergeFlag)
     {
       tplCtrl.removeHighFreq<1>(otherRefPic, otherMvf->mv, getBcwWeight(cu.BcwIdx, eRefList));
@@ -10868,7 +10882,7 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
 #endif
     tplCtrl.removeHighFreq<TM_TPL_SIZE>(otherRefPic, otherMvf->mv, getBcwWeight(cu.BcwIdx, eRefList));
     tplCtrl.deriveMvUni<TM_TPL_SIZE>();
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
     }
 #endif
     mv = tplCtrl.getFinalMv();
@@ -10973,7 +10987,7 @@ TplMatchingCtrl::TplMatchingCtrl( const PredictionUnit&     pu,
   }
 #endif
   // Initialization
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
   if (m_pu.reduceTplSize && pu.tmMergeFlag)
   {
     bool tplAvalableAbove = xFillCurTemplate<1, true >((fillCurTpl ? curTplAbove : nullptr));
@@ -11055,7 +11069,7 @@ TplMatchingCtrl::TplMatchingCtrl( const PredictionUnit&     pu,
     m_refSrLeft = xGetRefTemplate<TM_TPL_SIZE, false, TM_SEARCH_RANGE>(m_pu, m_refPic, mvStart, m_refSrLeft);
     m_refSrLeft = m_refSrLeft.subBuf(Position(TM_SEARCH_RANGE, TM_SEARCH_RANGE), m_curTplLeft);
   }
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
   }
 #endif
 }
@@ -11951,9 +11965,6 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
   const int lumaArea = pu.lumaSize().area();
   bool subPURefine = true;
   Mv puOrgMv[2] = { pu.mv[0], pu.mv[1] };
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
-  if (step != 2)
-#endif
   {
     Distortion minCost = std::numeric_limits<Distortion>::max();
     bool       bUseMR = lumaArea > 64;
@@ -12001,11 +12012,7 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
   }
 
 #if TM_MRG
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
-  if (pu.tmMergeFlag && step != 2)
-#else
   if (pu.tmMergeFlag)
-#endif
   {
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
     deriveTMMv(pu, tmCost);
@@ -12020,23 +12027,9 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
 #endif
 
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
-  if (step == 2 && pu.interDir != 3)
-  {
-    return false;
-  }
-  else if (step == 1)
+  if (step == 1)
   {
     return true;
-  }
-  else if (step == 2)
-  {
-    bool       bUseMR = lumaArea > 64;
-#if JVET_Y0089_DMVR_BCW
-    bUseMR    |= (pu.cu->BcwIdx != BCW_DEFAULT);
-#endif
-    Mv         mvInitial_PU[2] = { pu.mv[0], pu.mv[1] };
-    Distortion initCost = xBDMVRGetMatchingError(pu, mvInitial_PU, bUseMR, false);
-    subPURefine = initCost >= lumaArea;
   }
 #endif
 

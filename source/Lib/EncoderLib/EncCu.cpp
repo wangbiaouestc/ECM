@@ -3230,7 +3230,6 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
   bool applyBDMVR[MRG_MAX_NUM_CANDS] = { false };
 #if TM_MRG && MERGE_ENC_OPT
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
-  bool admvrRefinedMotion = false;
   bool applyBDMVR4TM[TM_MRG_MAX_NUM_INIT_CANDS] = { false };
 #else
   bool applyBDMVR4TM[TM_MRG_MAX_NUM_CANDS] = { false };
@@ -3238,6 +3237,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if JVET_X0049_ADAPT_DMVR
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  bool admvrRefinedMotion = false;
   bool applyBDMVR4BM[(BM_MRG_MAX_NUM_INIT_CANDS << 1)<<1] = { false };
 #else
   bool applyBDMVR4BM[(BM_MRG_MAX_NUM_CANDS << 1)<<1] = { false };
@@ -3320,7 +3320,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     if (!tplAvail)
     {
       PU::getInterMergeCandidates(pu, mergeCtx, 0, -1);
-      tmMrgCtx.numValidMergeCand = pu.cs->sps->getMaxNumMergeCand();
+      mergeCtx.numValidMergeCand = pu.cs->sps->getMaxNumMergeCand();
     }
     else
 #endif
@@ -13049,11 +13049,7 @@ void EncCu::xCheckSATDCostBMMerge(CodingStructure*& tempCS,
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   uint32_t maxNumCand = armcRefinedMotion ? mrgCtx.numValidMergeCand : ((pu.cs->sps->getUseAML()) ? min(mrgCtx.numValidMergeCand, mrgCtx.numCandToTestEnc) : mrgCtx.numCandToTestEnc);
 #else
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
-  uint32_t maxNumCand = armcRefinedMotion ? mrgCtx.numValidMergeCand : mrgCtx.numCandToTestEnc;
-#else
   const uint32_t maxNumCand = mrgCtx.numCandToTestEnc;
-#endif
 #endif
 #endif
   bool subPuRefine[2] = { false, false };
