@@ -1959,8 +1959,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         else
         {
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if TM_MRG
           bool applyBDMVR4TM[TM_MRG_MAX_NUM_INIT_CANDS] = { false };
           bool tmMergeRefinedMotion = false;
+#endif
           bool admvrRefinedMotion = false;
 #endif
           if (CU::isIBC(*pu.cu))
@@ -2258,20 +2260,24 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               if (!tplAvail)
               {
                 PU::getInterMergeCandidates(pu, mrgCtx, 0, -1);
+#if TM_MRG
                 mrgCtx.numValidMergeCand = pu.tmMergeFlag ? pu.cs->sps->getMaxNumTMMergeCand() : pu.cs->sps->getMaxNumMergeCand();
+#else
+                mrgCtx.numValidMergeCand = pu.cs->sps->getMaxNumMergeCand();
+#endif
               }
               else
 #endif
 
               PU::getInterMergeCandidates(pu, mrgCtx, 0, -1, &tmvpMergeCandCtx, &namvpMergeCandCtx);
 
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
               tmMergeRefinedMotion = PU::isArmcRefinedMotionEnabled(pu, 2);
               tmMergeRefinedMotion &= tplAvail;
 #endif
               if (tplAvail)
               {
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
                 if (pu.tmMergeFlag && tmMergeRefinedMotion)
                 {
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
@@ -2467,7 +2473,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if JVET_AA0061_IBC_MBVD
           }
 #endif
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
           if (pu.tmMergeFlag && tmMergeRefinedMotion)
           {
             pu.bdmvrRefine = applyBDMVR4TM[pu.mergeIdx];
@@ -2481,6 +2487,8 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               m_pcInterPred->deriveTMMv(pu);
             }
           }
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
           if (pu.bmMergeFlag)
           {
             pu.bdmvrRefine = true;
@@ -2501,7 +2509,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #endif
 #if MULTI_PASS_DMVR
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if TM_MRG
           if (PU::checkBDMVRCondition(pu) && (!pu.tmMergeFlag || (pu.tmMergeFlag && !tmMergeRefinedMotion)) && (!pu.bmMergeFlag || (pu.bmMergeFlag && !admvrRefinedMotion)))
+#else
+          if (PU::checkBDMVRCondition(pu) && (!pu.bmMergeFlag || (pu.bmMergeFlag && !admvrRefinedMotion)))
+#endif
 #else
           if (PU::checkBDMVRCondition(pu))
 #endif
