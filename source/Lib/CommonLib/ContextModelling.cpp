@@ -928,7 +928,7 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
 {
   const Slice &slice = *pu.cs->slice;
   const int mvShift = MV_FRACTIONAL_BITS_DIFF;
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED && !JVET_AA0132_CONFIGURABLE_TM_TOOLS
   const int refMvdCands[] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 16 << mvShift ,  32 << mvShift };
 #else
   const int refMvdCands[8] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 16 << mvShift , 32 << mvShift,  64 << mvShift , 128 << mvShift };
@@ -949,6 +949,10 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
 #else
   tempIdx = candIdx;
 #endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  if (pu.cs->sps->getUseTMMMVD())
+  {
+#endif
   fPosGroup = tempIdx / (MMVD_BASE_MV_NUM * MMVD_MAX_REFINE_NUM);
   tempIdx = tempIdx - fPosGroup * (MMVD_BASE_MV_NUM * MMVD_MAX_REFINE_NUM);
   fPosBaseIdx = tempIdx / MMVD_MAX_REFINE_NUM;
@@ -959,6 +963,18 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
 #else
   fPosStep = tempIdx / 4;
   fPosPosition = tempIdx - fPosStep * (4);
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  }
+  else
+  {
+    fPosGroup = tempIdx / (VVC_MMVD_BASE_MV_NUM * VVC_MMVD_MAX_REFINE_NUM);
+    tempIdx = tempIdx - fPosGroup * (VVC_MMVD_BASE_MV_NUM * VVC_MMVD_MAX_REFINE_NUM);
+    fPosBaseIdx = tempIdx / VVC_MMVD_MAX_REFINE_NUM;
+    tempIdx = tempIdx - fPosBaseIdx * (VVC_MMVD_MAX_REFINE_NUM);
+    fPosStep = tempIdx / VVC_MMVD_MAX_DIR;
+    fPosPosition = tempIdx - fPosStep * VVC_MMVD_MAX_DIR;
+  }
 #endif
   int offset = refMvdCands[fPosStep];
   if ( pu.cu->slice->getPicHeader()->getDisFracMMVD() )
@@ -980,7 +996,11 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
 #endif
    
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
-  if ((refList0 != -1) && (refList1 != -1))
+  if ((refList0 != -1) && (refList1 != -1)
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    && pu.cs->sps->getUseTMMMVD()
+#endif
+    )
   {
     tempMv[0] = Mv(0,0);
     tempMv[1] = Mv(0,0);
@@ -1017,7 +1037,11 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
     pu.mv[REF_PIC_LIST_1] = mmvdBaseMv[fPosBaseIdx][1].mv + tempMv[1];
     pu.refIdx[REF_PIC_LIST_1] = refList1;
   }
-#else
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  else
+#endif
+#endif
+#if !JVET_AA0093_ENHANCED_MMVD_EXTENSION || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_ENHANCED_MMVD_EXTENSION)
   if ((refList0 != -1) && (refList1 != -1))
   {
     const int poc0 = slice.getRefPOC(REF_PIC_LIST_0, refList0);

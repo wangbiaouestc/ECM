@@ -942,17 +942,17 @@ const CtxSet ContextSetCfg::MmvdFlag = ContextSetCfg::addCtxSet
 const CtxSet ContextSetCfg::MmvdMergeIdx = ContextSetCfg::addCtxSet
 ({
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
-  {  58, 58, 58, 58},
-  {  43, 43, 43, 43},
-  { CNU, CNU, CNU, CNU },
-  {   9, 9, 9, 9},
-  {  10, 10, 10, 10},
-  { DWS, DWS,DWS,DWS},
-  {  18, 18,18,18},
-  {  11, 11,11,11},
-  { DWE, DWE,DWE,DWE},
-  { 116, 116,116,116},
-  { 118, 118,118,118},
+  {  58,  58,  58,  58, },
+  {  43,  43,  43,  43, },
+  { CNU, CNU, CNU, CNU, },
+  {   9,   9,   9,   9, },
+  {  10,  10,  10,  10, },
+  { DWS, DWS, DWS, DWS, },
+  {  18,  18,  18,  18, },
+  {  11,  11,  11,  11, },
+  { DWE, DWE, DWE, DWE, },
+  { 116, 116, 116, 116, },
+  { 118, 118, 118, 118, },
 #else
   {  58, },
   {  43, },
@@ -996,6 +996,23 @@ const CtxSet ContextSetCfg::MmvdStepMvpIdx = ContextSetCfg::addCtxSet
   { DWO },
 #endif
   });
+
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+const CtxSet ContextSetCfg::MmvdStepMvpIdxECM3 = ContextSetCfg::addCtxSet
+({
+  {  59 },
+  {  60 },
+  {  35 },
+  {   0 },
+  {   0 },
+  {   0 },
+  { DWE },
+  { DWE },
+  { DWE },
+  { DWO },
+  { DWO },
+});
+#endif
 
 #if JVET_W0097_GPM_MMVD_TM
 const CtxSet ContextSetCfg::GeoMmvdFlag = ContextSetCfg::addCtxSet
@@ -1150,6 +1167,23 @@ const CtxSet ContextSetCfg::AfMmvdOffsetStep = ContextSetCfg::addCtxSet
   { 117 },
 #endif
   });
+
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+const CtxSet ContextSetCfg::AfMmvdOffsetStepECM3 = ContextSetCfg::addCtxSet
+({
+  {  21 },
+  {  13 },
+  { CNU },
+  {   5 },
+  {   5 },
+  { DWS },
+  {  18 },
+  {  18 },
+  { DWE },
+  { 126 },
+  { 117 },
+});
+#endif
 #endif
 
 #if JVET_AA0061_IBC_MBVD
@@ -3175,6 +3209,18 @@ const CtxSet ContextSetCfg::MmvdStepMvpIdx = ContextSetCfg::addCtxSet
 #endif
 });
 
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+const CtxSet ContextSetCfg::MmvdStepMvpIdxECM3 = ContextSetCfg::addCtxSet
+({
+  { 59 },
+  { 60 },
+  { 35 },
+  { 0 },
+  { 0 },
+  { 0 }
+});
+#endif
+
 #if JVET_W0097_GPM_MMVD_TM
 const CtxSet ContextSetCfg::GeoMmvdFlag = ContextSetCfg::addCtxSet
 ({
@@ -3260,6 +3306,18 @@ const CtxSet ContextSetCfg::AfMmvdOffsetStep = ContextSetCfg::addCtxSet
   { 0 }
 #endif
 });
+
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+const CtxSet ContextSetCfg::AfMmvdOffsetStepECM3 = ContextSetCfg::addCtxSet
+({
+  { 51 },
+  { 60 },
+  { 35 },
+  {  0 },
+  {  0 },
+  {  0 }
+});
+#endif
 #endif
 
 #if JVET_AA0061_IBC_MBVD
@@ -4697,6 +4755,16 @@ const CtxSet ContextSetCfg::MmvdStepMvpIdx = ContextSetCfg::addCtxSet
   {   0, },
 });
 
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+const CtxSet ContextSetCfg::MmvdStepMvpIdxECM3 = ContextSetCfg::addCtxSet
+({
+  {  59, },
+  {  60, },
+  { CNU, },
+  {   0, },
+});
+#endif
+
 #if JVET_W0097_GPM_MMVD_TM
 const CtxSet ContextSetCfg::GeoMmvdFlag = ContextSetCfg::addCtxSet
 ({
@@ -4747,6 +4815,15 @@ const CtxSet ContextSetCfg::AfMmvdOffsetStep = ContextSetCfg::addCtxSet
 	{ 35 },
 	{ 0 }
 });
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+const CtxSet ContextSetCfg::AfMmvdOffsetStepECM3 = ContextSetCfg::addCtxSet
+({
+  { 51 },
+  { 60 },
+  { 35 },
+  {  0 }
+  });
+#endif
 #endif
 
 #if JVET_AA0061_IBC_MBVD

@@ -1526,6 +1526,27 @@ private:
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool              m_DMVDMode;
 #endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  bool              m_tmToolsEnableFlag;
+#if TM_AMVP
+  bool              m_tmAmvpMode;
+#endif
+#if TM_MRG
+  bool              m_tmMrgMode;
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  bool              m_tmGPMMode;
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  bool              m_tmOBMCMode;
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  bool              m_useTmvpNmvpReorder;
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  bool              m_useTMMMVD;
+#endif
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   bool              m_altGPMSplitModeCode;
 #endif
@@ -2028,6 +2049,34 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void                    setUseDMVDMode(bool b)                                                          { m_DMVDMode = b; }
   bool                    getUseDMVDMode() const                                                          { return m_DMVDMode; }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  void                    setTMToolsEnableFlag(bool b)                                                    { m_tmToolsEnableFlag = b; }
+  bool                    getTMToolsEnableFlag() const                                                    { return m_tmToolsEnableFlag; }
+#if TM_AMVP
+  void                    setUseTMAmvpMode(bool b)                                                        { m_tmAmvpMode = b; }
+  bool                    getUseTMAmvpMode() const                                                        { return m_tmAmvpMode; }
+#endif
+#if TM_MRG
+  void                    setUseTMMrgMode(bool b)                                                         { m_tmMrgMode = b; }
+  bool                    getUseTMMrgMode() const                                                         { return m_tmMrgMode; } // Controls regular merge mode with TM, while others (e.g., GPM-TM, CIIP-TM, OBMC-TM) are controlled separately
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  void                    setUseGPMTMMode(bool b)                                                         { m_tmGPMMode = b; }
+  bool                    getUseGPMTMMode() const                                                         { return m_tmGPMMode; }
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  void                    setUseOBMCTMMode(bool b)                                                        { m_tmOBMCMode = b; }
+  bool                    getUseOBMCTMMode() const                                                        { return m_tmOBMCMode; }
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  void                    setUseTmvpNmvpReordering(bool b)                                                { m_useTmvpNmvpReorder = b; }
+  bool                    getUseTmvpNmvpReordering() const                                                { return m_useTmvpNmvpReorder; }
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void                    setUseTMMMVD(bool b)                                                            { m_useTMMMVD = b; }
+  bool                    getUseTMMMVD() const                                                            { return m_useTMMMVD; }
+#endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void                    setUseAltGPMSplitModeCode(bool b)                                               { m_altGPMSplitModeCode = b; }

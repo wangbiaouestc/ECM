@@ -205,6 +205,9 @@ struct ModeInfo
 #if AFFINE_MMVD
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
     mergeCand = pu.afMmvdFlag ?  pu.afMmvdMergeIdx : pu.mergeIdx;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    mergeCand = !pu.cs->sps->getUseTMMMVD() && pu.afMmvdFlag ? pu.afMmvdBaseIdx * ECM3_AF_MMVD_MAX_REFINE_NUM + pu.afMmvdStep * ECM3_AF_MMVD_OFFSET_DIR + pu.afMmvdDir : mergeCand;
+#endif
 #else
     mergeCand = pu.afMmvdFlag ? pu.afMmvdBaseIdx * AF_MMVD_MAX_REFINE_NUM + pu.afMmvdStep * AF_MMVD_OFFSET_DIR + pu.afMmvdDir : pu.mergeIdx;
 #endif

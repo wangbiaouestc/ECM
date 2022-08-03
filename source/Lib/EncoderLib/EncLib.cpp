@@ -1582,6 +1582,27 @@ void EncLib::xInitSPS( SPS& sps )
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   sps.setUseDMVDMode           ( m_DMVDMode );
 #endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  sps.setTMToolsEnableFlag     ( m_tmToolsEnableFlag );
+#if TM_AMVP
+  sps.setUseTMAmvpMode         ( m_tmAmvpMode );
+#endif
+#if TM_MRG
+  sps.setUseTMMrgMode          ( m_tmMrgMode );
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  sps.setUseGPMTMMode          ( m_tmGPMMode );
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  sps.setUseOBMCTMMode         ( m_tmOBMCMode );
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  sps.setUseTmvpNmvpReordering ( m_useTmvpNmvpReorder );
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  sps.setUseTMMMVD             ( m_useTMMMVD );
+#endif
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   sps.setUseAltGPMSplitModeCode( m_altGPMSplitModeCode );
 #endif
@@ -1627,6 +1648,10 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
   if(sps.getUseCiip())
   {
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+   if(m_tmCIIPMode == 2)
+   {
+#endif
    if(getIntraPeriod() < 0)
    {
       sps.setUseCiipTmMrg (false);
@@ -1635,6 +1660,13 @@ void EncLib::xInitSPS( SPS& sps )
    {
       sps.setUseCiipTmMrg (true);
    }
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+   }
+   else
+   {
+      sps.setUseCiipTmMrg  (m_tmCIIPMode == 1);
+   }
+#endif
   }
 #endif
   sps.setUseGeo                ( m_Geo );

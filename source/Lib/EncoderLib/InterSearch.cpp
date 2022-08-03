@@ -2137,7 +2137,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 
       // prepare imv = 2 accuracy predictor info
       pu.cu->imv      = 2;
-#if JVET_Z0084_IBC_TM && TM_AMVP
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
       PU::fillIBCMvpCand(pu, amvpInfo4Pel[i], this);
 #else
       PU::fillIBCMvpCand(pu, amvpInfo4Pel[i]);
@@ -2145,7 +2145,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 
       // prepare imv = 0 accuracy predictor info
       pu.cu->imv = 0;
-#if JVET_Z0084_IBC_TM && TM_AMVP
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
       PU::fillIBCMvpCand(pu, amvpInfo[i], this);
 #else
       PU::fillIBCMvpCand(pu, amvpInfo[i]);
@@ -3202,7 +3202,7 @@ bool InterSearch::predInterHashSearch(CodingUnit& cu, Partitioner& partitioner, 
     pu.mvpIdx[bestRefPicList] = bestMVPIndex;
 
 #if TM_AMVP
-#if JVET_Y0128_NON_CTC
+#if JVET_Y0128_NON_CTC || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP)
     pu.mvpNum[bestRefPicList] = PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(bestRefPicList, bestRefIndex)) ? 1 : 2;
 #else
     pu.mvpNum[bestRefPicList] = 1;
@@ -3965,7 +3965,11 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #if TM_AMVP
           unsigned amvpNumCandCur = aacAMVPInfo[curRefList][refIdxCur].numCand;
           unsigned amvpNumCandTar = aacAMVPInfo[tarRefList][refIdxTar].numCand;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+          if (!pu.cs->sps->getUseTMAmvpMode())
+#else
           if (!pu.cs->sps->getUseDMVDMode())
+#endif
           {
             amvpNumCandCur = AMVP_MAX_NUM_CANDS;
             amvpNumCandTar = AMVP_MAX_NUM_CANDS;
@@ -4510,6 +4514,10 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     {
 #if !TM_AMVP
       m_storeBeforeLIC = true;
+#else
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP
+      m_storeBeforeLIC = pu.cs->sps->getUseTMAmvpMode() ? false : true;
+#endif
 #endif
       m_predictionBeforeLIC = m_tmpStorageLCU.getBuf(UnitAreaRelative(*pu.cu, pu));
     }
@@ -4521,15 +4529,19 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
       PU::spanMotionInfo( *cu.firstPU, MergeCtx(), mvBufEncAmBDMVR_L0, mvBufEncAmBDMVR_L1, getBdofSubPuMvOffset() );
     }
 #endif
-#if INTER_LIC && !TM_AMVP
+#if INTER_LIC && (!TM_AMVP || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP))
     m_storeBeforeLIC = false;
 #endif
     puIdx++;
   }
 
 #if INTER_LIC
-#if !TM_AMVP // This LIC optimization must be off; otherwise, enc/dec mismatching will result. Because the cost metrics (MRSAD or SAD) of TM mode is adaptive to LIC flag, refined MVs would change when LIC flag is 1 or 0.
-  if (cu.LICFlag && pu.interDir != 10) // xCheckRDCostInterIMV initializes pu.interDir by using 10. When checkAffine and checkNonAffine are both false, pu.interDir remains 10 which should be avoided
+#if !TM_AMVP || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP) // This LIC optimization must be off; otherwise, enc/dec mismatching will result. Because the cost metrics (MRSAD or SAD) of TM mode is adaptive to LIC flag, refined MVs would change when LIC flag is 1 or 0.
+  if (cu.LICFlag && pu.interDir != 10
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP
+    && !pu.cs->sps->getUseTMAmvpMode()
+#endif
+    ) // xCheckRDCostInterIMV initializes pu.interDir by using 10. When checkAffine and checkNonAffine are both false, pu.interDir remains 10 which should be avoided
   {
     CHECK(pu.interDir != 1 && pu.interDir != 2, "Invalid InterDir for LIC");
 
@@ -5540,13 +5552,20 @@ void InterSearch::xEstimateMvPredAMVP( PredictionUnit& pu, PelUnitBuf& origBuf, 
 #endif
       pcAMVPInfo->mvCand[0] = mvFieldAmListCommon[mvFieldAmvpIdx0].mv;
       pcAMVPInfo->numCand = 1;
-#if !TM_AMVP || JVET_Y0128_NON_CTC || JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+#if !TM_AMVP || JVET_Y0128_NON_CTC || JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE || JVET_AA0132_CONFIGURABLE_TM_TOOLS
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && (TM_AMVP && !JVET_Y0128_NON_CTC && !JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE)
+      if(!pu.cu->cs->sps->getUseTMAmvpMode())
+      {
+#endif
       const int mvFieldAmvpIdx1 = mvFieldAmvpIdx0 + 1;
       if (mvFieldAmListCommon[mvFieldAmvpIdx1].refIdx >= 0)
       {
         pcAMVPInfo->mvCand[1] = mvFieldAmListCommon[mvFieldAmvpIdx1].mv;
         pcAMVPInfo->numCand = 2;
       }
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && (TM_AMVP && !JVET_Y0128_NON_CTC && !JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE)
+      }
+#endif
 #endif
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
       const int mvFieldAmvpIdx2 = mvFieldAmvpIdx0 + 2;
@@ -11437,7 +11456,11 @@ void InterSearch::symmvdCheckBestMvp(
 #if TM_AMVP
   unsigned amvpNumCandCur = amvpCur.numCand;
   unsigned amvpNumCandTar = amvpTar.numCand;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  if (!pu.cs->sps->getUseTMAmvpMode())
+#else
   if (!pu.cs->sps->getUseDMVDMode())
+#endif
   {
     amvpNumCandCur = AMVP_MAX_NUM_CANDS;
     amvpNumCandTar = AMVP_MAX_NUM_CANDS;

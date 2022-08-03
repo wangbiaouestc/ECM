@@ -774,6 +774,30 @@ void EncApp::xInitLibCfg()
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   m_cEncLib.setUseDMVDMode                                       ( m_DMVDMode );
 #endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  m_cEncLib.setTMToolsEnableFlag                                 ( m_tmToolsEnableFlag );
+#if TM_AMVP
+  m_cEncLib.setUseTMAmvpMode                                     ( m_tmAmvpMode );
+#endif
+#if TM_MRG
+  m_cEncLib.setUseTMMrgMode                                      ( m_tmMrgMode );
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  m_cEncLib.setUseGPMTMMode                                      ( m_tmGPMMode );
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  m_cEncLib.setUseOBMCTMMode                                     ( m_tmOBMCMode );
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  m_cEncLib.setUseCIIPTMMode                                     ( m_tmCIIPMode );
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  m_cEncLib.setUseTmvpNmvpReordering                             ( m_useTmvpNmvpReorder );
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  m_cEncLib.setUseTMMMVD                                         ( m_useTMMMVD );
+#endif
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   m_cEncLib.setUseAltGPMSplitModeCode                            ( m_altGPMSplitModeCode );
 #endif

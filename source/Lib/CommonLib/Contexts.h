@@ -383,6 +383,9 @@ public:
   static const CtxSet   MmvdFlag;
   static const CtxSet   MmvdMergeIdx;
   static const CtxSet   MmvdStepMvpIdx;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  static const CtxSet   MmvdStepMvpIdxECM3;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
   static const CtxSet   GeoMmvdFlag;
   static const CtxSet   GeoMmvdStepMvpIdx;
@@ -401,6 +404,9 @@ public:
   static const CtxSet   AfMmvdFlag;
   static const CtxSet   AfMmvdIdx;
   static const CtxSet   AfMmvdOffsetStep;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  static const CtxSet   AfMmvdOffsetStepECM3;
+#endif
 #endif
   #if JVET_AA0061_IBC_MBVD
   static const CtxSet   IbcMbvdFlag;

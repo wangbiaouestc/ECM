@@ -1340,6 +1340,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     }
   }
 
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  WRITE_FLAG(pcSPS->getTMToolsEnableFlag() ? 1 : 0, "sps_tm_tools_enabled_flag");
+#endif
 #if INTER_LIC
   WRITE_FLAG(pcSPS->getLicEnabledFlag() ? 1 : 0, "sps_lic_enabled_flag");
 #endif
@@ -1356,7 +1359,20 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   WRITE_FLAG( pcSPS->getAMVREnabledFlag() ? 1 : 0,                                   "sps_amvr_enabled_flag" );
 
 #if JVET_W0090_ARMC_TM
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  if(pcSPS->getTMToolsEnableFlag())
+#endif
   WRITE_FLAG( pcSPS->getUseAML() ? 1 : 0,                                             "sps_aml_enabled_flag" );
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  if (pcSPS->getUseAML())
+  {
+    WRITE_FLAG( pcSPS->getUseTmvpNmvpReordering() ? 1 : 0,                            "sps_aml_tmvp_nmvp_enabled_flag" );
+  }
+  else
+  {
+    CHECK(pcSPS->getUseTmvpNmvpReordering(), "Reordering for TMVP and non-adjacent MVP cannot be used when ARMC is disabled");
+  }
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   if (pcSPS->getUseAML())
@@ -1390,10 +1406,13 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
         }
       }
       WRITE_CODE(pcSPS->getLambdaVal(i), pcSPS->getMaxbitsLambdaVal(), "Lambda");
-      }
     }
+  }
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  if (pcSPS->getTMToolsEnableFlag())
+#endif
   WRITE_FLAG( pcSPS->getUseARL() ? 1 : 0,                                             "sps_arl_enabled_flag" );
 #endif
   WRITE_FLAG( pcSPS->getBDOFEnabledFlag() ? 1 : 0,                                   "sps_bdof_enabled_flag" );
@@ -1413,6 +1432,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     WRITE_FLAG(pcSPS->getFpelMmvdEnabledFlag() ? 1 : 0,                               "sps_mmvd_fullpel_only_flag");
   }
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  if (pcSPS->getTMToolsEnableFlag())
+#endif
   WRITE_FLAG(pcSPS->getUseMVSD() ? 1 : 0,                                                      "sps_mvsd_enabled_flag");
 #endif
   WRITE_UVLC(MRG_MAX_NUM_CANDS - pcSPS->getMaxNumMergeCand(), "six_minus_max_num_merge_cand");
@@ -1420,8 +1442,21 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   WRITE_FLAG( pcSPS->getUseDMVDMode() ? 1 : 0,                                                 "sps_dmvd_enabled_flag" );
 #endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  if (pcSPS->getTMToolsEnableFlag())
+  {
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP
+  WRITE_FLAG( pcSPS->getUseTMAmvpMode() ? 1 : 0,                                               "sps_tm_amvp_enabled_flag" );
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_MRG
+  WRITE_FLAG(pcSPS->getUseTMMrgMode() ? 1 : 0,                                                 "sps_tm_mrg_enabled_flag");
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   WRITE_FLAG( pcSPS->getUseAltGPMSplitModeCode() ? 1 : 0,                                      "sps_alt_gpm_code_enabled_flag" );
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  }
 #endif
 #if JVET_X0049_ADAPT_DMVR
   WRITE_UVLC(BM_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumBMMergeCand(), "six_minus_max_num_bm_merge_cand");
@@ -1444,16 +1479,33 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
       WRITE_FLAG(pcSPS->getProfControlPresentFlag() ? 1 : 0,                                   "sps_prof_pic_present_flag" );
     }
   }
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  if (pcSPS->getUseMMVD() || pcSPS->getUseAffineMmvdMode())
+  {
+    if (pcSPS->getTMToolsEnableFlag())
+    {
+      WRITE_FLAG(pcSPS->getUseTMMMVD() ? 1 : 0, "sps_tm_mmvd_enabled_flag");
+    }
+  }
+  else
+  {
+    CHECK(pcSPS->getUseTMMMVD(), "TM-MMVD cannot be used when neither MMVD not AffineMMVD is enabled");
+  }
+#endif
 
   WRITE_FLAG(pcSPS->getUseBcw() ? 1 : 0, "sps_bcw_enabled_flag");
 
   WRITE_FLAG( pcSPS->getUseCiip() ? 1 : 0,                                                  "sps_ciip_enabled_flag" );
-  #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
-  if (pcSPS->getUseCiip())
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  if (pcSPS->getUseCiip()
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    && pcSPS->getTMToolsEnableFlag()
+#endif
+    )
   {
     WRITE_FLAG(pcSPS->getUseCiipTmMrg() ? 1 : 0, "sps_ciip_tm_merge_enabled_flag");
   }
-  #endif
+#endif
   if (pcSPS->getMaxNumMergeCand() >= 2)
   {
     WRITE_FLAG(pcSPS->getUseGeo() ? 1 : 0, "sps_gpm_enabled_flag");
@@ -1468,7 +1520,19 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
         WRITE_UVLC(pcSPS->getMaxNumMergeCand() - pcSPS->getMaxNumGeoCand(),
                    "max_num_merge_cand_minus_max_num_gpm_cand");
       }
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
+      if (pcSPS->getTMToolsEnableFlag())
+      {
+        WRITE_FLAG(pcSPS->getUseGPMTMMode() ? 1 : 0, "sps_gpm_tm_enabled_flag");
+      }
+#endif
     }
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
+    else
+    {
+      CHECK(pcSPS->getUseGPMTMMode(), "GPM-TM mode cannot be used when GPM is disabled");
+    }
+#endif
   }
 #if MULTI_HYP_PRED
   WRITE_FLAG(pcSPS->getUseInterMultiHyp() ? 1 : 0, "inter_multi_hyp_enable_flag");
@@ -1568,6 +1632,19 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #endif
 #if ENABLE_OBMC
   WRITE_FLAG(pcSPS->getUseOBMC() ? 1 : 0, "sps_obmc_flag");
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Z0061_TM_OBMC
+  if (pcSPS->getUseOBMC())
+  {
+    if (pcSPS->getTMToolsEnableFlag())
+    {
+      WRITE_FLAG(pcSPS->getUseOBMCTMMode() ? 1 : 0, "sps_obmc_tm_flag");
+    }
+  }
+  else
+  {
+    CHECK(pcSPS->getUseOBMCTMMode(), "OBMC-TM mode cannot be used when OBMC is disabled");
+  }
+#endif
 #endif
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   WRITE_FLAG( pcSPS->getTempCabacInitMode() ? 1 : 0, "sps_cabac_temp_init_flag" );
