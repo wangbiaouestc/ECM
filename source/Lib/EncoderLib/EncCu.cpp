@@ -11920,6 +11920,20 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
     
     if( cs.pps->getUseBIF() && ( !CS::isDualITree( cs ) || isLuma( partitioner.chType ) ) )
     {
+      if( leftEdgeAvai && topEdgeAvai )
+      {
+        Pel* pDst = picDbBuf.bufs[COMPONENT_Y].buf + ( currCsArea.block( COMPONENT_Y ).y - 1 ) * picDbBuf.bufs[COMPONENT_Y].stride + currCsArea.block( COMPONENT_Y ).x - 1;
+        Pel* pSrc = cs.picture->getRecoBuf().bufs[COMPONENT_Y].buf + ( currCsArea.block( COMPONENT_Y ).y - 1) * cs.picture->getRecoBuf().bufs[COMPONENT_Y].stride + currCsArea.block( COMPONENT_Y ).x - 1;
+        if ( cs.slice->getLmcsEnabledFlag() && m_pcReshape->getSliceReshaperInfo().getUseSliceReshaper() )
+        {
+          *pDst = m_pcReshape->getInvLUT()[*pSrc];
+        }
+        else
+        {
+          *pDst = *pSrc;
+        }        
+      }
+
       for (auto &currTU : CU::traverseTUs(*cu))
       {
         bool isInter = (cu->predMode == MODE_INTER) ? true : false;
@@ -11945,6 +11959,18 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
       bool isDualTree = CS::isDualITree(cs);
       bool chromaValid = cu->Cb().valid() && cu->Cr().valid();
       bool applyChromaBIF = false;
+
+      if (leftEdgeAvai && topEdgeAvai)
+      {
+        Pel* pDst = picDbBuf.bufs[COMPONENT_Cb].buf + ( currCsArea.block( COMPONENT_Cb ).y - 1 ) * picDbBuf.bufs[COMPONENT_Cb].stride + currCsArea.block( COMPONENT_Cb ).x - 1;
+        Pel* pSrc = cs.picture->getRecoBuf().bufs[COMPONENT_Cb].buf + ( currCsArea.block( COMPONENT_Cb ).y - 1) * cs.picture->getRecoBuf().bufs[COMPONENT_Cb].stride + currCsArea.block( COMPONENT_Cb ).x - 1;
+        *pDst = *pSrc;
+
+        pDst = picDbBuf.bufs[COMPONENT_Cr].buf + ( currCsArea.block( COMPONENT_Cr ).y - 1 ) * picDbBuf.bufs[COMPONENT_Cr].stride + currCsArea.block( COMPONENT_Cr ).x - 1;
+        pSrc = cs.picture->getRecoBuf().bufs[COMPONENT_Cr].buf + ( currCsArea.block( COMPONENT_Cr ).y - 1) * cs.picture->getRecoBuf().bufs[COMPONENT_Cr].stride + currCsArea.block( COMPONENT_Cr ).x - 1;
+        *pDst = *pSrc;
+      }
+
       for (auto &currTU : CU::traverseTUs(*cu))
       {
         bool isInter = (cu->predMode == MODE_INTER) ? true : false;
