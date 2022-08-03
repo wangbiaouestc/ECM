@@ -746,8 +746,6 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   pReco.reconstruct( piPred, piResi, tu.cu->cs->slice->clpRng( compID ) );
 #else
   piPred.reconstruct( piPred, piResi, tu.cu->cs->slice->clpRng( compID ) );
-#endif
-#if !KEEP_PRED_AND_RESI_SIGNALS
   pReco.copyFrom( piPred );
 #endif
   if (slice.getLmcsEnabledFlag() && (m_pcReshape->getCTUFlag() || slice.isIntra()) && compID == COMPONENT_Y)

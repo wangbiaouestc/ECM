@@ -5130,35 +5130,14 @@ void initGeoTemplate()
       int16_t rho = (g_Dis[distanceX] << (GEO_MAX_CU_LOG2 + 1)) + (g_Dis[distanceY] << (GEO_MAX_CU_LOG2 + 1));
       static const int16_t maskOffset = (2 * GEO_MAX_CU_SIZE - GEO_WEIGHT_MASK_SIZE) >> 1;
       int index = 0;
-#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
-      for (int y = 0; y < GEO_WEIGHT_MASK_SIZE; y++)
-      {
-        int16_t lookUpY = (((y + maskOffset) << 1) + 1) * g_Dis[distanceY];
-        for (int x = 0; x < GEO_WEIGHT_MASK_SIZE; x++, index++)
-        {
-          int16_t sx_i = ((x + maskOffset) << 1) + 1;
-          int16_t weightIdx = sx_i * g_Dis[distanceX] + lookUpY - rho;
 
-          if (g_bld2Width[bldIdx] > 1)
-          {
-            int weightLinearIdx = 8 * g_bld2Width[bldIdx] + weightIdx;
-            g_globalGeoWeights[bldIdx][g_angle2mask[angleIdx]][index] = Clip3(0, 32, (weightLinearIdx + (g_bld2Width[bldIdx] >> 2)) >> floorLog2(g_bld2Width[bldIdx] >> 1));
-          }
-          else
-          {
-            int weightLinearIdx = 8 + weightIdx;
-            g_globalGeoWeights[bldIdx][g_angle2mask[angleIdx]][index] = Clip3(0, 32, weightLinearIdx << 1);
-          }
-        }
-      }
-#else
       for (int y = 0; y < GEO_WEIGHT_MASK_SIZE; y++)
       {
         int16_t lookUpY = (((y + maskOffset) << 1) + 1) * g_Dis[distanceY];
         for (int x = 0; x < GEO_WEIGHT_MASK_SIZE; x++, index++)
         {
-          int16_t sx_i = ((x + maskOffset) << 1) + 1;
-          int16_t weightIdx = sx_i * g_Dis[distanceX] + lookUpY - rho;
+          int16_t sxi = ((x + maskOffset) << 1) + 1;
+          int16_t weightIdx = sxi * g_Dis[distanceX] + lookUpY - rho;
           if (g_bld2Width[bldIdx] > 1)
           {
             int weightLinearIdx = 8 * g_bld2Width[bldIdx] + weightIdx;
@@ -5171,7 +5150,6 @@ void initGeoTemplate()
           }
         }
       }
-#endif
     }
   }
 
