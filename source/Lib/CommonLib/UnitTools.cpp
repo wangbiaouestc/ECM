@@ -1553,13 +1553,14 @@ void PU::getCccmRefLineNum(const PredictionUnit& pu, int& th, int& tv)
   th = area.x < CCCM_WINDOW_SIZE ? area.x : CCCM_WINDOW_SIZE;
   tv = area.y < CCCM_WINDOW_SIZE ? area.y : CCCM_WINDOW_SIZE;
 
-#if CCCM_REF_LINES_ABOVE_CTU
-  int ctuHeight  = pu.cs->sps->getMaxCUHeight() >> getComponentScaleY(COMPONENT_Cb, pu.chromaFormat);
-  int borderDist = area.y % ctuHeight;
-  int tvMax      = borderDist + CCCM_REF_LINES_ABOVE_CTU;
-  
-  tv = tv > tvMax ? tvMax : tv;
-#endif
+  if( CCCM_REF_LINES_ABOVE_CTU )
+  {
+    int ctuHeight  = pu.cs->sps->getMaxCUHeight() >> getComponentScaleY(COMPONENT_Cb, pu.chromaFormat);
+    int borderDist = area.y % ctuHeight;
+    int tvMax      = borderDist + CCCM_REF_LINES_ABOVE_CTU;
+
+    tv = tv > tvMax ? tvMax : tv;
+  }
 }
 
 bool PU::cccmSingleModeAvail(const PredictionUnit& pu, int intraMode)
