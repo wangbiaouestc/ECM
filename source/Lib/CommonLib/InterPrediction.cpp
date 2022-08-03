@@ -236,7 +236,7 @@ InterPrediction::InterPrediction()
   CHECK(mvSearchIdx_bilMrg != (2 * BDMVR_INTME_RANGE + 1) * (2 * BDMVR_INTME_RANGE + 1),
       "this is wrong, mvSearchIdx_bilMrg != (2 * BDMVR_INTME_RANGE + 1) * (2 * BDMVR_INTME_RANGE + 1)");
 #endif
-#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC || JVET_AA0061_IBC_MBVD
   for (uint32_t ch = 0; ch < MAX_NUM_COMPONENT; ch++)
   {
     for (uint32_t tmplt = 0; tmplt < 2; tmplt++)
@@ -370,7 +370,7 @@ void InterPrediction::destroy()
 #if MULTI_HYP_PRED
   m_additionalHypothesisStorage.destroy();
 #endif
-#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC || JVET_AA0061_IBC_MBVD
   for (uint32_t ch = 0; ch < MAX_NUM_COMPONENT; ch++)
   {
     for (uint32_t tmplt = 0; tmplt < 2; tmplt++)
@@ -555,7 +555,7 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
     m_pcLICRecAboveTemplate = (Pel*)xMalloc(Pel, MAX_CU_SIZE);
   }
 #endif
-#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC || JVET_AA0061_IBC_MBVD
   for (uint32_t ch = 0; ch < MAX_NUM_COMPONENT; ch++)
   {
     for (uint32_t tmplt = 0; tmplt < 2; tmplt++)
@@ -6006,6 +6006,180 @@ void  InterPrediction::sortIbcMergeMbvdCandidates(PredictionUnit &pu, MergeCtx& 
 }
 #endif
 
+#if JVET_AA0061_IBC_MBVD || (JVET_W0090_ARMC_TM && JVET_Y0058_IBC_LIST_MODIFY)
+bool InterPrediction::xAMLIBCGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWidth, int nCurBlkHeight)
+{
+  m_bAMLTemplateAvailabe[0] = xAMLIsTopTempAvailable(pu);
+  m_bAMLTemplateAvailabe[1] = xAMLIsLeftTempAvailable(pu);
+
+  if (!m_bAMLTemplateAvailabe[0] && !m_bAMLTemplateAvailabe[1])
+  {
+    return false;
+  }
+
+  const Picture&  currPic = *pu.cs->picture;
+  const CPelBuf recBuf = currPic.getRecoBuf(pu.cs->picture->blocks[COMPONENT_Y]);
+  /* std::vector<Pel>& invLUT = m_pcReshape->getInvLUT();*/
+
+  if (m_bAMLTemplateAvailabe[0])
+  {
+    const Pel*    rec = recBuf.bufAt(pu.blocks[COMPONENT_Y].pos().offset(0, -AML_MERGE_TEMPLATE_SIZE));
+    PelBuf pcYBuf = PelBuf(m_acYuvCurAMLTemplate[0][0], nCurBlkWidth, AML_MERGE_TEMPLATE_SIZE);
+    Pel*   pcY = pcYBuf.bufAt(0, 0);
+    for (int k = 0; k < nCurBlkWidth; k++)
+    {
+      for (int l = 0; l < AML_MERGE_TEMPLATE_SIZE; l++)
+      {
+        int recVal = rec[k + l * recBuf.stride];
+        pcY[k + l * nCurBlkWidth] = recVal;
+      }
+    }
+  }
+
+  if (m_bAMLTemplateAvailabe[1])
+  {
+    PelBuf pcYBuf = PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nCurBlkHeight);
+    Pel*   pcY = pcYBuf.bufAt(0, 0);
+    const Pel*    rec = recBuf.bufAt(pu.blocks[COMPONENT_Y].pos().offset(-AML_MERGE_TEMPLATE_SIZE, 0));
+    for (int k = 0; k < nCurBlkHeight; k++)
+    {
+      for (int l = 0; l < AML_MERGE_TEMPLATE_SIZE; l++)
+      {
+        int recVal = rec[recBuf.stride * k + l];
+        pcY[AML_MERGE_TEMPLATE_SIZE * k + l] = recVal;
+      }
+    }
+  }
+
+  return true;
+}
+
+void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight)
+{
+  Mv mvCurr;
+  mvCurr = pu.bv;
+  const int lumaShift = 2 + MV_FRACTIONAL_BITS_DIFF;
+  const int horShift  = (lumaShift + ::getComponentScaleX(COMPONENT_Y, pu.chromaFormat));
+  const int verShift  = (lumaShift + ::getComponentScaleY(COMPONENT_Y, pu.chromaFormat));
+  const Picture&  currPic = *pu.cs->picture;
+  const CPelBuf recBuf = currPic.getRecoBuf(pu.cs->picture->blocks[COMPONENT_Y]);
+  /* std::vector<Pel>& invLUT = m_pcReshape->getInvLUT();*/
+  if (m_bAMLTemplateAvailabe[0])
+  {
+    Mv mvTop(0, -AML_MERGE_TEMPLATE_SIZE);
+#if JVET_AA0070_RRIBC
+    if (pu.cu->rribcFlipType == 2)
+    {
+      mvTop.setVer(nCurBlkHeight);
+    }
+#endif
+    mvTop += mvCurr;
+
+    MotionInfo miTop;
+    miTop.mv[0] = Mv(mvTop.hor <<horShift , mvTop.ver<< verShift);
+    miTop.refIdx[0] = MAX_NUM_REF;
+#if JVET_AA0070_RRIBC
+    if (pu.cu->rribcFlipType == 2)
+    {
+      if (!PU::checkIsIBCCandidateValid(pu, miTop, true, true))
+      {
+        mvTop.setVer(mvCurr.getVer() + nCurBlkHeight - AML_MERGE_TEMPLATE_SIZE);
+      }
+    }
+    else
+#endif
+    if (!PU::checkIsIBCCandidateValid(pu, miTop))
+    {
+      mvTop = mvCurr;
+    }
+    const Pel*    rec = recBuf.bufAt(pu.blocks[COMPONENT_Y].pos().offset(mvTop.hor, mvTop.ver));
+    PelBuf pcYBuf = PelBuf(m_acYuvRefAMLTemplate[0][0], nCurBlkWidth, AML_MERGE_TEMPLATE_SIZE);
+    Pel*   pcY = pcYBuf.bufAt(0, 0);
+    for (int k = 0; k < nCurBlkWidth; k++)
+    {
+      for (int l = 0; l < AML_MERGE_TEMPLATE_SIZE; l++)
+      {
+#if JVET_AA0070_RRIBC
+        int recVal;
+        if (pu.cu->rribcFlipType == 0)
+        {
+           recVal = rec[k + l * recBuf.stride];
+        }
+        else if (pu.cu->rribcFlipType == 1)
+        {
+          recVal = rec[nCurBlkWidth - 1 - k + l * recBuf.stride];
+        }
+        else
+        {
+          recVal = rec[k + (AML_MERGE_TEMPLATE_SIZE - 1 - l) * recBuf.stride];
+        }
+#else
+        int recVal = rec[k + l * recBuf.stride];
+#endif
+        pcY[k + l * nCurBlkWidth] = recVal;
+      }
+    }
+  }
+
+  if (m_bAMLTemplateAvailabe[1])
+  {
+    Mv mvLeft(-AML_MERGE_TEMPLATE_SIZE, 0);
+#if JVET_AA0070_RRIBC
+    if (pu.cu->rribcFlipType == 1)
+    {
+      mvLeft.setHor(nCurBlkWidth);
+    }
+#endif
+    mvLeft += mvCurr;
+
+    MotionInfo miLeft;
+    miLeft.mv[0] = Mv(mvLeft.hor <<horShift , mvLeft.ver<< verShift);
+    miLeft.refIdx[0] = MAX_NUM_REF;
+#if JVET_AA0070_RRIBC
+    if (pu.cu->rribcFlipType == 1)
+    {
+      if (!PU::checkIsIBCCandidateValid(pu, miLeft, true, false))
+      {
+         mvLeft.setHor(mvCurr.getHor() + nCurBlkWidth - AML_MERGE_TEMPLATE_SIZE);
+      }
+    }
+    else
+#endif
+    if (!PU::checkIsIBCCandidateValid(pu, miLeft))
+    {
+      mvLeft = mvCurr;
+    }
+    PelBuf pcYBuf = PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nCurBlkHeight);
+    Pel*   pcY = pcYBuf.bufAt(0, 0);
+    const Pel*    rec = recBuf.bufAt(pu.blocks[COMPONENT_Y].pos().offset( mvLeft.hor,  mvLeft.ver));
+    for (int k = 0; k < nCurBlkHeight; k++)
+    {
+      for (int l = 0; l < AML_MERGE_TEMPLATE_SIZE; l++)
+      {
+#if JVET_AA0070_RRIBC
+        int recVal;
+        if (pu.cu->rribcFlipType == 0)
+        {
+          recVal = rec[recBuf.stride * k + l];
+        }
+        else if (pu.cu->rribcFlipType == 1) 
+        {
+          recVal = rec[recBuf.stride * k + AML_MERGE_TEMPLATE_SIZE - 1 - l];
+        }
+        else
+        {
+          recVal = rec[recBuf.stride * (nCurBlkHeight - 1 - k) + l];
+        }
+#else
+        int recVal = rec[recBuf.stride * k + l];
+#endif
+        pcY[AML_MERGE_TEMPLATE_SIZE * k + l] = recVal;
+      }
+    }
+  }
+}
+#endif
+
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
 void InterPrediction::cacheAssign( CacheModel *cache )
 {
@@ -7678,7 +7852,7 @@ void  InterPrediction::updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t*
 #endif
 #endif
 
-#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC || JVET_AA0061_IBC_MBVD || JVET_Y0058_IBC_LIST_MODIFY
 bool InterPrediction::xAMLGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWidth, int nCurBlkHeight)
 {
   m_bAMLTemplateAvailabe[0] = xAMLIsTopTempAvailable(pu);
@@ -8858,176 +9032,6 @@ void  InterPrediction::updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, u
 #if JVET_AA0070_RRIBC
     mrgCtx.rribcFlipTypes[uiMergeCand] = mrgCtxTmp.rribcFlipTypes[RdCandList[uiMergeCand / ADAPTIVE_IBC_SUB_GROUP_SIZE][uiMergeCand % ADAPTIVE_IBC_SUB_GROUP_SIZE]];
 #endif
-  }
-}
-bool InterPrediction::xAMLIBCGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWidth, int nCurBlkHeight)
-{
-  m_bAMLTemplateAvailabe[0] = xAMLIsTopTempAvailable(pu);
-  m_bAMLTemplateAvailabe[1] = xAMLIsLeftTempAvailable(pu);
-
-  if (!m_bAMLTemplateAvailabe[0] && !m_bAMLTemplateAvailabe[1])
-  {
-    return false;
-  }
-
-  const Picture&  currPic = *pu.cs->picture;
-  const CPelBuf recBuf = currPic.getRecoBuf(pu.cs->picture->blocks[COMPONENT_Y]);
-  /* std::vector<Pel>& invLUT = m_pcReshape->getInvLUT();*/
-
-  if (m_bAMLTemplateAvailabe[0])
-  {
-    const Pel*    rec = recBuf.bufAt(pu.blocks[COMPONENT_Y].pos().offset(0, -AML_MERGE_TEMPLATE_SIZE));
-    PelBuf pcYBuf = PelBuf(m_acYuvCurAMLTemplate[0][0], nCurBlkWidth, AML_MERGE_TEMPLATE_SIZE);
-    Pel*   pcY = pcYBuf.bufAt(0, 0);
-    for (int k = 0; k < nCurBlkWidth; k++)
-    {
-      for (int l = 0; l < AML_MERGE_TEMPLATE_SIZE; l++)
-      {
-        int recVal = rec[k + l * recBuf.stride];
-        pcY[k + l * nCurBlkWidth] = recVal;
-      }
-    }
-  }
-
-  if (m_bAMLTemplateAvailabe[1])
-  {
-    PelBuf pcYBuf = PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nCurBlkHeight);
-    Pel*   pcY = pcYBuf.bufAt(0, 0);
-    const Pel*    rec = recBuf.bufAt(pu.blocks[COMPONENT_Y].pos().offset(-AML_MERGE_TEMPLATE_SIZE, 0));
-    for (int k = 0; k < nCurBlkHeight; k++)
-    {
-      for (int l = 0; l < AML_MERGE_TEMPLATE_SIZE; l++)
-      {
-        int recVal = rec[recBuf.stride * k + l];
-        pcY[AML_MERGE_TEMPLATE_SIZE * k + l] = recVal;
-      }
-    }
-  }
-
-  return true;
-}
-void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight)
-{
-  Mv mvCurr;
-  mvCurr = pu.bv;
-  const int lumaShift = 2 + MV_FRACTIONAL_BITS_DIFF;
-  const int horShift  = (lumaShift + ::getComponentScaleX(COMPONENT_Y, pu.chromaFormat));
-  const int verShift  = (lumaShift + ::getComponentScaleY(COMPONENT_Y, pu.chromaFormat));
-  const Picture&  currPic = *pu.cs->picture;
-  const CPelBuf recBuf = currPic.getRecoBuf(pu.cs->picture->blocks[COMPONENT_Y]);
-  /* std::vector<Pel>& invLUT = m_pcReshape->getInvLUT();*/
-  if (m_bAMLTemplateAvailabe[0])
-  {
-    Mv mvTop(0, -AML_MERGE_TEMPLATE_SIZE);
-#if JVET_AA0070_RRIBC
-    if (pu.cu->rribcFlipType == 2)
-    {
-      mvTop.setVer(nCurBlkHeight);
-    }
-#endif
-    mvTop += mvCurr;
-
-    MotionInfo miTop;
-    miTop.mv[0] = Mv(mvTop.hor <<horShift , mvTop.ver<< verShift);
-    miTop.refIdx[0] = MAX_NUM_REF;
-#if JVET_AA0070_RRIBC
-    if (pu.cu->rribcFlipType == 2)
-    {
-      if (!PU::checkIsIBCCandidateValid(pu, miTop, true, true))
-      {
-        mvTop.setVer(mvCurr.getVer() + nCurBlkHeight - AML_MERGE_TEMPLATE_SIZE);
-      }
-    }
-    else
-#endif
-    if (!PU::checkIsIBCCandidateValid(pu, miTop))
-    {
-      mvTop = mvCurr;
-    }
-    const Pel*    rec = recBuf.bufAt(pu.blocks[COMPONENT_Y].pos().offset(mvTop.hor, mvTop.ver));
-    PelBuf pcYBuf = PelBuf(m_acYuvRefAMLTemplate[0][0], nCurBlkWidth, AML_MERGE_TEMPLATE_SIZE);
-    Pel*   pcY = pcYBuf.bufAt(0, 0);
-    for (int k = 0; k < nCurBlkWidth; k++)
-    {
-      for (int l = 0; l < AML_MERGE_TEMPLATE_SIZE; l++)
-      {
-#if JVET_AA0070_RRIBC
-        int recVal;
-        if (pu.cu->rribcFlipType == 0)
-        {
-           recVal = rec[k + l * recBuf.stride];
-        }
-        else if (pu.cu->rribcFlipType == 1)
-        {
-          recVal = rec[nCurBlkWidth - 1 - k + l * recBuf.stride];
-        }
-        else
-        {
-          recVal = rec[k + (AML_MERGE_TEMPLATE_SIZE - 1 - l) * recBuf.stride];
-        }
-#else
-        int recVal = rec[k + l * recBuf.stride];
-#endif
-        pcY[k + l * nCurBlkWidth] = recVal;
-      }
-    }
-  }
-
-  if (m_bAMLTemplateAvailabe[1])
-  {
-    Mv mvLeft(-AML_MERGE_TEMPLATE_SIZE, 0);
-#if JVET_AA0070_RRIBC
-    if (pu.cu->rribcFlipType == 1)
-    {
-      mvLeft.setHor(nCurBlkWidth);
-    }
-#endif
-    mvLeft += mvCurr;
-
-    MotionInfo miLeft;
-    miLeft.mv[0] = Mv(mvLeft.hor <<horShift , mvLeft.ver<< verShift);
-    miLeft.refIdx[0] = MAX_NUM_REF;
-#if JVET_AA0070_RRIBC
-    if (pu.cu->rribcFlipType == 1)
-    {
-      if (!PU::checkIsIBCCandidateValid(pu, miLeft, true, false))
-      {
-         mvLeft.setHor(mvCurr.getHor() + nCurBlkWidth - AML_MERGE_TEMPLATE_SIZE);
-      }
-    }
-    else
-#endif
-    if (!PU::checkIsIBCCandidateValid(pu, miLeft))
-    {
-      mvLeft = mvCurr;
-    }
-    PelBuf pcYBuf = PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nCurBlkHeight);
-    Pel*   pcY = pcYBuf.bufAt(0, 0);
-    const Pel*    rec = recBuf.bufAt(pu.blocks[COMPONENT_Y].pos().offset( mvLeft.hor,  mvLeft.ver));
-    for (int k = 0; k < nCurBlkHeight; k++)
-    {
-      for (int l = 0; l < AML_MERGE_TEMPLATE_SIZE; l++)
-      {
-#if JVET_AA0070_RRIBC
-        int recVal;
-        if (pu.cu->rribcFlipType == 0)
-        {
-          recVal = rec[recBuf.stride * k + l];
-        }
-        else if (pu.cu->rribcFlipType == 1) 
-        {
-          recVal = rec[recBuf.stride * k + AML_MERGE_TEMPLATE_SIZE - 1 - l];
-        }
-        else
-        {
-          recVal = rec[recBuf.stride * (nCurBlkHeight - 1 - k) + l];
-        }
-#else
-        int recVal = rec[recBuf.stride * k + l];
-#endif
-        pcY[AML_MERGE_TEMPLATE_SIZE * k + l] = recVal;
-      }
-    }
   }
 }
 #endif
