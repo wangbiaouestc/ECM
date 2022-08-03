@@ -1972,7 +1972,13 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             {
               int fPosIBCBaseIdx = pu.ibcMbvdMergeIdx / IBC_MBVD_MAX_REFINE_NUM;
               PU::getIBCMergeCandidates(pu, mrgCtx);
+#if JVET_Y0058_IBC_LIST_MODIFY && JVET_W0090_ARMC_TM
+#if JVET_Z0075_IBC_HMVP_ENLARGE
               m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
+#else
+              m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx);
+#endif
+#endif
 
               PU::getIbcMbvdMergeCandidates(pu, mrgCtx, fPosIBCBaseIdx + 1);
 

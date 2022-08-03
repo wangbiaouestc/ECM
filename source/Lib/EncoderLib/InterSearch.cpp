@@ -2137,7 +2137,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 
       // prepare imv = 2 accuracy predictor info
       pu.cu->imv      = 2;
-#if JVET_Z0084_IBC_TM && TM_AMVP
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
       PU::fillIBCMvpCand(pu, amvpInfo4Pel[i], this);
 #else
       PU::fillIBCMvpCand(pu, amvpInfo4Pel[i]);
@@ -2145,7 +2145,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 
       // prepare imv = 0 accuracy predictor info
       pu.cu->imv = 0;
-#if JVET_Z0084_IBC_TM && TM_AMVP
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
       PU::fillIBCMvpCand(pu, amvpInfo[i], this);
 #else
       PU::fillIBCMvpCand(pu, amvpInfo[i]);

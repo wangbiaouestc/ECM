@@ -1025,6 +1025,9 @@ static const int IBC_FAST_METHOD_NOINTRA_IBCCBF0 = 0x01;
 static const int IBC_FAST_METHOD_BUFFERBV = 0X02;
 static const int IBC_FAST_METHOD_ADAPTIVE_SEARCHRANGE = 0X04;
 #if JVET_AA0061_IBC_MBVD
+#if !JVET_W0090_ARMC_TM && !JVET_Z0061_TM_OBMC && !JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+static const int AML_MERGE_TEMPLATE_SIZE =                           1;
+#endif
 static const int IBC_MBVD_BASE_NUM =                                 5;
 static const int IBC_MBVD_STEP_NUM =                                 20; // number of distance offset
 static const int IBC_MBVD_OFFSET_DIR =                               4; // (+, 0); (-, 0); (0, +); (0, -);
