@@ -1567,7 +1567,12 @@ bool PU::cccmSingleModeAvail(const PredictionUnit& pu, int intraMode)
   const Area area = pu.blocks[COMPONENT_Cb];
   bool modeIsOk   = intraMode == LM_CHROMA_IDX;
   modeIsOk        = modeIsOk && ( area.width * area.height >= CCCM_MIN_PU_SIZE );
-              
+#if CCLM_LATENCY_RESTRICTION_RMV
+  modeIsOk       &= pu.cs->sps->getUseLMChroma();
+#else
+  modeIsOk       &= pu.cs->sps->getUseLMChroma() && pu.cu->checkCCLMAllowed();
+#endif
+
   return modeIsOk && (area.x > 0 || area.y > 0);
 }
   
@@ -1577,6 +1582,11 @@ bool PU::cccmMultiModeAvail(const PredictionUnit& pu, int intraMode)
   const Area area = pu.blocks[COMPONENT_Cb];
   bool modeIsOk   = intraMode == MMLM_CHROMA_IDX;
   modeIsOk        = modeIsOk && ( area.width * area.height >= CCCM_MIN_PU_SIZE );
+#if CCLM_LATENCY_RESTRICTION_RMV
+  modeIsOk       &= pu.cs->sps->getUseLMChroma();
+#else
+  modeIsOk       &= pu.cs->sps->getUseLMChroma() && pu.cu->checkCCLMAllowed();
+#endif
 
   int th, tv;
   PU::getCccmRefLineNum(pu, th, tv);
