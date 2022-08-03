@@ -1670,7 +1670,12 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           mrgCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
         }
 
-        int   fPosBaseIdx = pu.mmvdMergeIdx / MMVD_MAX_REFINE_NUM;
+        int   fPosBaseIdx = 
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+                            !pu.cs->sps->getUseTMMMVD() ? 
+                            pu.mmvdMergeIdx / VVC_MMVD_MAX_REFINE_NUM :
+#endif
+                            pu.mmvdMergeIdx / MMVD_MAX_REFINE_NUM;
         PU::getInterMergeCandidates(pu, mrgCtx, 1, fPosBaseIdx + 1);
         PU::getInterMMVDMergeCandidates(pu, mrgCtx,
           pu.mmvdMergeIdx
@@ -1801,36 +1806,29 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if AFFINE_MMVD
 #if JVET_W0090_ARMC_TM
           int affMrgIdx = pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE + 1)*ADAPTIVE_AFFINE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumAffineMergeCand()) || (pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE * ADAPTIVE_AFFINE_SUB_GROUP_SIZE + ADAPTIVE_AFFINE_SUB_GROUP_SIZE - 1 : pu.mergeIdx;
+		  if (pu.afMmvdFlag)
+		  {
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+            affMrgIdx = 
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_ENHANCED_MMVD_EXTENSION
+                        !pu.cs->sps->getUseTMMMVD() ?
+                        ECM3_AF_MMVD_BASE_NUM :
+#endif
+			            AF_MMVD_BASE_NUM;
+#else
+			affMrgIdx = pu.afMmvdBaseIdx;
+#endif			  
+		  }
+          PU::getAffineMergeCand(pu, affineMergeCtx
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+                               , m_pcInterPred
+#endif
+                               , affMrgIdx
+							   , pu.afMmvdFlag
 #if JVET_Z0139_NA_AFF
-          PU::getAffineMergeCand(pu, affineMergeCtx, 
-#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
-            m_pcInterPred,
+							   , pu.mergeIdx == 0
 #endif
-            (pu.afMmvdFlag ? AF_MMVD_BASE_NUM : affMrgIdx), pu.afMmvdFlag, pu.mergeIdx == 0);
-#else
-          PU::getAffineMergeCand(pu, affineMergeCtx, 
-#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
-            m_pcInterPred,
-#endif
-            (pu.afMmvdFlag ? AF_MMVD_BASE_NUM : affMrgIdx), pu.afMmvdFlag);
-#endif
-#else
-#if JVET_Z0139_NA_AFF
-          PU::getAffineMergeCand(pu, affineMergeCtx, 
-#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
-            m_pcInterPred,
-#endif
-            (pu.afMmvdFlag ? pu.afMmvdBaseIdx : affMrgIdx), pu.afMmvdFlag, pu.mergeIdx == 0);
-#else
-          PU::getAffineMergeCand(pu, affineMergeCtx, 
-#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
-            m_pcInterPred,
-#endif
-            (pu.afMmvdFlag ? pu.afMmvdBaseIdx : affMrgIdx), pu.afMmvdFlag);
-#endif
-#endif
-
+		  );
 #else
           PU::getAffineMergeCand(pu, affineMergeCtx, (pu.afMmvdFlag ? pu.afMmvdBaseIdx : pu.mergeIdx), pu.afMmvdFlag);
 #endif
@@ -1840,6 +1838,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             pu.mergeIdx = PU::getMergeIdxFromAfMmvdBaseIdx(affineMergeCtx, pu.afMmvdBaseIdx);
             CHECK(pu.mergeIdx >= pu.cu->slice->getPicHeader()->getMaxNumAffineMergeCand(), "Affine MMVD mode doesn't have a valid base candidate!");
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+            if(pu.cs->sps->getUseTMMMVD())
+            {
+#endif
             uint32_t affMmvdLUT[AF_MMVD_NUM];
             uint32_t tempVal = pu.afMmvdMergeIdx;
             m_pcInterPred->sortAffineMergeCandidates(pu, affineMergeCtx, affMmvdLUT, tempVal );
@@ -1851,6 +1853,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             stepIdx = stepIdx / AF_MMVD_OFFSET_DIR;
             pu.afMmvdDir      = (uint8_t)dirIdx;
             pu.afMmvdStep     = (uint8_t)stepIdx;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+            }
+#endif
 #endif
             PU::getAfMmvdMvf(pu, affineMergeCtx, affineMergeCtx.mvFieldNeighbours + (pu.mergeIdx << 1), pu.mergeIdx, pu.afMmvdStep, pu.afMmvdDir);
           }
@@ -2022,6 +2027,17 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             {
               uint8_t mergeIdx = pu.bmDir == 2 ? pu.mergeIdx - BM_MRG_MAX_NUM_CANDS : pu.mergeIdx;
 #if JVET_W0090_ARMC_TM
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+              if (pu.cs->sps->getUseAML() && !pu.cs->sps->getUseTmvpNmvpReordering())
+              {
+                PU::getInterBMCandidates(pu, mrgCtx, pu.cs->sps->getUseAML() && (((mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumBMMergeCand()) || (mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : mergeIdx);
+                uint8_t bmDir = pu.bmDir;
+                pu.bmDir = 0;
+                m_pcInterPred->adjustInterMergeCandidates(pu, mrgCtx, mergeIdx);
+                pu.bmDir = bmDir;
+              }
+              else
+#endif
               if (pu.cs->sps->getUseAML())
               {
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
@@ -2218,6 +2234,14 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             else
 #endif
 #if JVET_W0090_ARMC_TM
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+            if (pu.cs->sps->getUseAML() && !pu.cs->sps->getUseTmvpNmvpReordering())
+            {
+              PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumMergeCand()) || (pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : pu.mergeIdx);
+              m_pcInterPred->adjustInterMergeCandidates(pu, mrgCtx, pu.mergeIdx);
+            }
+            else
+#endif
             if (pu.cs->sps->getUseAML())
             {
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
@@ -2266,11 +2290,14 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               if (!tplAvail)
               {
                 PU::getInterMergeCandidates(pu, mrgCtx, 0, -1);
+                mrgCtx.numValidMergeCand =
 #if TM_MRG
-                mrgCtx.numValidMergeCand = pu.tmMergeFlag ? pu.cs->sps->getMaxNumTMMergeCand() : pu.cs->sps->getMaxNumMergeCand();
-#else
-                mrgCtx.numValidMergeCand = pu.cs->sps->getMaxNumMergeCand();
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+                                           pu.cs->sps->getUseTMMrgMode() &&
 #endif
+                                           pu.tmMergeFlag ? pu.cs->sps->getMaxNumTMMergeCand() :
+#endif
+                                           pu.cs->sps->getMaxNumMergeCand();
               }
               else
 #endif
@@ -2280,6 +2307,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
               tmMergeRefinedMotion = PU::isArmcRefinedMotionEnabled(pu, 2);
               tmMergeRefinedMotion &= tplAvail;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+              tmMergeRefinedMotion &= pu.cs->sps->getUseTMMrgMode();
+#endif
 #endif
               if (tplAvail)
               {
@@ -2381,12 +2411,15 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               }
 #else
               PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumMergeCand()) || (pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : pu.mergeIdx);
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
               tmMergeRefinedMotion = PU::isArmcRefinedMotionEnabled(pu, 2);
               int nWidth = pu.lumaSize().width;
               int nHeight = pu.lumaSize().height;
               bool tplAvail = m_pcInterPred->xAMLGetCurBlkTemplate(pu, nWidth, nHeight);
               tmMergeRefinedMotion &= tplAvail;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+              tmMergeRefinedMotion &= pu.cs->sps->getUseTMMrgMode();
+#endif
               if (pu.tmMergeFlag && tmMergeRefinedMotion)
               {
                 int tmpPuMrgIdx = pu.mergeIdx;
@@ -2558,7 +2591,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
           else
           {
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
             if (pu.tmMergeFlag && !tmMergeRefinedMotion)
 #else
             if (pu.tmMergeFlag)
@@ -2844,7 +2877,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                 if (pu.amvpMergeModeFlag[1 - eRefList] == true)
                 {
 #if TM_AMVP
-#if JVET_Y0128_NON_CTC
+#if JVET_Y0128_NON_CTC || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP)
                   amvpInfo.numCand = PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) ? 1 : 2;
 #else
                   amvpInfo.numCand = 1;

@@ -358,7 +358,7 @@ namespace PU
                            const int mrgCandIdx = -1
 #endif
 #if JVET_Z0139_NA_AFF && JVET_W0090_ARMC_TM
-    , bool isZeroCandIdx = false 
+                         , bool isZeroCandIdx = false 
 #endif
   );
 #if AFFINE_MMVD
@@ -450,7 +450,7 @@ namespace PU
 #if INTER_LIC && RPR_ENABLE
   bool checkRprLicCondition(const PredictionUnit& pu);
 #endif
-#if JVET_Y0128_NON_CTC
+#if JVET_Y0128_NON_CTC || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP)
   bool checkTmEnableCondition(const SPS* sps, const PPS* pps, const Picture* refPic);
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING

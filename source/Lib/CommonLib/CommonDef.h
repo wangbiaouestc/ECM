@@ -648,6 +648,13 @@ static const int MMVD_BASE_MV_NUM =                                 3; ///< max 
 static const int MMVD_BASE_MV_NUM =                                 2; ///< max number of base candidate
 #endif
 static const int MMVD_ADD_NUM =                                     (MMVD_MAX_REFINE_NUM * MMVD_BASE_MV_NUM);///< total number of mmvd candidate
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int VVC_MMVD_BASE_MV_NUM =                             2; ///< max number of base candidate
+static const int VVC_MMVD_REFINE_STEP =                             8; ///< max number of distance step
+static const int VVC_MMVD_MAX_DIR =                                 4;
+static const int VVC_MMVD_MAX_REFINE_NUM =                          (VVC_MMVD_REFINE_STEP * VVC_MMVD_MAX_DIR); ///< max number of candidate from a base candidate
+static const int VVC_MMVD_ADD_NUM =                                 (VVC_MMVD_MAX_REFINE_NUM * VVC_MMVD_BASE_MV_NUM);///< total number of mmvd candidate
+#endif
 #if MERGE_ENC_OPT
 static const int MMVD_MRG_MAX_RD_NUM =                              20;
 #else
@@ -778,6 +785,13 @@ static const int    AFFINE_MMVD_SIZE_SHIFT =                        1;
 #endif
 static const int    AF_MMVD_MAX_REFINE_NUM = AF_MMVD_STEP_NUM * AF_MMVD_OFFSET_DIR; ///< max number of candidate from a base candidate
 static const int    AF_MMVD_NUM = AF_MMVD_BASE_NUM * AF_MMVD_MAX_REFINE_NUM;        ///< total number of affine mmvd candidate
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int    ECM3_AF_MMVD_BASE_NUM =                         1;
+static const int    ECM3_AF_MMVD_STEP_NUM =                         5; // number of distance offset used in ECM3
+static const int    ECM3_AF_MMVD_OFFSET_DIR =                       4; // 00: (+, 0); 01: (-, 0); 10: (0, +); 11 (0, -);
+static const int    ECM3_AF_MMVD_MAX_REFINE_NUM = ECM3_AF_MMVD_STEP_NUM * ECM3_AF_MMVD_OFFSET_DIR; ///< max number of candidate from a base candidate used in ECM3
+static const int    ECM3_AF_MMVD_NUM = ECM3_AF_MMVD_BASE_NUM * ECM3_AF_MMVD_MAX_REFINE_NUM;   ///< total number of affine mmvd candidate used in ECM3
+#endif
 #if !MERGE_ENC_OPT
 static const int    NUM_AF_MMVD_SATD_CAND = std::min((int)1, MRG_MAX_NUM_CANDS);
 #endif

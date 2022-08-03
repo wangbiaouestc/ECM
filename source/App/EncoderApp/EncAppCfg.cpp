@@ -1014,6 +1014,30 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   ("DMVD",                                            m_DMVDMode,                                        true, "DMVD mode (0:off, 1:on)  [default: on]" )
 #endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  ("EnableTMTools",                                   m_tmToolsEnableFlag,                               true, "Enable TM tools (0:off, 1:on)  [default: on]" )
+#if TM_AMVP
+  ("TMAmvp",                                          m_tmAmvpMode,                                      true, "TM-AMVP mode (0:off, 1:on)  [default: on]" )
+#endif
+#if TM_MRG
+  ("TMMrg",                                           m_tmMrgMode,                                       true, "TM-MRG mode (0:off, 1:on)  [default: on]" )
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  ("GPMTM",                                           m_tmGPMMode,                                       true, "GPM-TM mode (0:off, 1:on)  [default: on]" )
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  ("OBMCTM",                                          m_tmOBMCMode,                                      true, "OBMC-TM mode (0:off, 1:on)  [default: on]")
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  ("CIIPTM",                                          m_tmCIIPMode,                                         2, "CIIP-TM mode (0:off, 1:on, 2:on conditionally for non-negative intra period)  [default: 2]")
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  ("TmvpNmvpAML",                                     m_useTmvpNmvpReorder,                              true, "Enable ARMC for TMVP and non-adjacent MVP (0:off, 1:on)  [default: on]")
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  ("TMMMVD",                                          m_useTMMMVD,                                       true, "Enable TM-MMVD (0:off, 1:on)  [default: on]")
+#endif
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   ("AltGPMSplitModeCode",                             m_altGPMSplitModeCode,                             true, "Enable alternative GPM split mode coding (0:off, 1:on)  [default: on]" )
 #endif
@@ -3720,6 +3744,151 @@ bool EncAppCfg::xCheckParameter()
     m_DMVR = false;
   }
 #endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  if (!m_tmToolsEnableFlag)
+  {
+#if TM_AMVP
+    if (m_tmAmvpMode)
+    {
+      msg(WARNING, "TM-AMVP mode is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_tmAmvpMode = false;
+    }
+#endif
+#if TM_MRG
+    if (m_tmMrgMode)
+    {
+      msg(WARNING, "TM-MRG mode is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_tmMrgMode = false;
+    }
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+    if (m_tmGPMMode)
+    {
+      msg(WARNING, "GPM-TM mode is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_tmGPMMode = false;
+    }
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+    if (m_tmOBMCMode)
+    {
+      msg(WARNING, "OBMC-TM mode is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_tmOBMCMode = false;
+    }
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+    if (m_tmCIIPMode != 0)
+    {
+      msg(WARNING, "CIIP-TM mode is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_tmCIIPMode = 0;
+    }
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+    if (m_useTmvpNmvpReorder)
+    {
+      msg(WARNING, "Reordering for TMVP and non-adjacent MVP is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_useTmvpNmvpReorder = false;
+    }
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    if (m_useTMMMVD)
+    {
+      msg(WARNING, "TM-MMVD mode is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_useTMMMVD = false;
+    }
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+    if (m_altGPMSplitModeCode)
+    {
+      msg(WARNING, "GPM split mode reordering is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_altGPMSplitModeCode = false;
+    }
+#endif
+#if JVET_W0090_ARMC_TM
+    if (m_AML)
+    {
+      msg(WARNING, "ARMC is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_AML = false;
+    }
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+    if (m_armcRefinedMotion)
+    {
+      msg(WARNING, "Refined motion for ARMC is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_armcRefinedMotion = false;
+    }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+    if (m_numQPOffset)
+    {
+      msg(WARNING, "Diversity criterion for ARMC is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_numQPOffset = 0;
+    }
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    if (m_useARL)
+    {
+      msg(WARNING, "Reference picture reordering is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_useARL = false;
+    }
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    if (m_MVSD)
+    {
+      msg(WARNING, "MVD sign prediction is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_MVSD = false;
+    }
+#endif
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
+  if (!m_Geo && m_tmGPMMode)
+  {
+    msg(WARNING, "GPM-TM mode is forcefully disabled since GPM is disabled. \n");
+    m_tmGPMMode = false;
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  if (!m_OBMC && m_tmOBMCMode)
+  {
+    msg(WARNING, "OBMC-TM mode is forcefully disabled since OBMC is disabled. \n");
+    m_tmOBMCMode = false;
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  if (!m_ciip && m_tmCIIPMode != 0)
+  {
+    msg(WARNING, "CIIP-TM mode is forcefully disabled since CIIP is disabled. \n");
+    m_tmCIIPMode = 0;
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  if (!m_AML && m_useTmvpNmvpReorder)
+  {
+    msg(WARNING, "Forcefully disable reordering for TMVP and non-adjacent MVP since ARMC is disabled. \n");
+    m_useTmvpNmvpReorder = false;
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  if (!m_AML && m_armcRefinedMotion)
+  {
+    msg(WARNING, "Forcefully disable refined motion for ARMC since ARMC is disabled. \n");
+    m_armcRefinedMotion = false;
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  if (!m_AML && m_numQPOffset)
+  {
+    msg(WARNING, "Forcefully disable diversity criterion for ARMC since ARMC is disabled. \n");
+    m_numQPOffset = 0;
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  if (!m_MMVD && !m_AffineMmvdMode && m_useTMMMVD)
+  {
+    msg(WARNING, "Forcefully disable TM-MMVD since neither MMVD nor AffineMMVD is enabled. \n");
+    m_useTMMMVD = 0;
+  }
+#endif
 
   xConfirmPara( m_MTS < 0 || m_MTS > 3, "MTS must be greater than 0 smaller than 4" );
   xConfirmPara( m_MTSIntraMaxCand < 0 || m_MTSIntraMaxCand > 5, "m_MTSIntraMaxCand must be greater than 0 and smaller than 6" );
@@ -4902,7 +5071,7 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "DualITree:%d ", m_dualTree );
     msg( VERBOSE, "IMV:%d ", m_ImvMode );
     msg( VERBOSE, "BIO:%d ", m_BIO );
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC && !JVET_AA0132_CONFIGURABLE_TM_TOOLS
     msg( VERBOSE, "ArmcRefinedMotion:%d ", m_armcRefinedMotion );
 #endif
     msg( VERBOSE, "LMChroma:%d ", m_LMChroma );
@@ -4935,11 +5104,13 @@ void EncAppCfg::xPrintParameter()
     msg(VERBOSE, "AffineAmvp:%d ", m_AffineAmvp);
     msg(VERBOSE, "DMVR:%d ", m_DMVR);
     msg(VERBOSE, "MmvdDisNum:%d ", m_MmvdDisNum);
+#if !JVET_AA0132_CONFIGURABLE_TM_TOOLS
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
     msg(VERBOSE, "MVSD:%d ", m_MVSD);
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
     msg(VERBOSE, "ARL:%d ", m_useARL);
+#endif
 #endif
     msg(VERBOSE, "JointCbCr:%d ", m_JointCbCrMode);
   }
@@ -5062,17 +5233,55 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "FastPicLevelLIC:%d ", m_fastPicLevelLIC );
   }
 #endif
+#if !JVET_AA0132_CONFIGURABLE_TM_TOOLS
 #if JVET_W0090_ARMC_TM
   msg( VERBOSE, "AML:%d ", m_AML );
 #endif
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   msg( VERBOSE, "DMVD:%d ", m_DMVDMode );
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  msg( VERBOSE, "EnableTMTools:%d ( ", m_tmToolsEnableFlag );
+#if TM_AMVP
+  msg( VERBOSE, "TMAmvp:%d ", m_tmAmvpMode );
+#endif
+#if TM_MRG
+  msg( VERBOSE, "TMMrg:%d ", m_tmMrgMode );
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  msg( VERBOSE, "GPMTM:%d ", m_tmGPMMode );
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  msg( VERBOSE, "OBMCTM:%d ", m_tmOBMCMode );
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  msg( VERBOSE, "CIIPTM:%d ", m_tmCIIPMode );
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  msg( VERBOSE, "TmvpNmvpAML:%d ", m_useTmvpNmvpReorder );
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  msg( VERBOSE, "TMMMVD:%d ", m_useTMMMVD );
+#endif
+#if JVET_W0090_ARMC_TM
+  msg( VERBOSE, "AML:%d ", m_AML );
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  msg(VERBOSE, "ArmcRefinedMotion:%d ", m_armcRefinedMotion);
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  msg( VERBOSE, "ARL:%d ", m_useARL );
+#endif
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   msg( VERBOSE, "MVSD:%d ", m_MVSD );
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
-    msg(VERBOSE, "AltGPMSplitModeCode:%d ", m_altGPMSplitModeCode);
+  msg( VERBOSE, "AltGPMSplitModeCode:%d ", m_altGPMSplitModeCode );
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  msg( VERBOSE, ") " );
 #endif
 
   // transform and coefficient coding

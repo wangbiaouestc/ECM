@@ -2187,6 +2187,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
       copyRefPicList(pcSPS, rplListSource->getReferencePictureList(ii), rplListDest->getReferencePictureList(ii));
   }
 
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  READ_FLAG( uiCode, "sps_tm_tools_enabled_flag" );                 pcSPS->setTMToolsEnableFlag( uiCode );
+#endif
 #if INTER_LIC
   READ_FLAG( uiCode, "sps_lic_enabled_flag" );                      pcSPS->setLicEnabledFlag( uiCode );
 #endif
@@ -2216,15 +2219,36 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   READ_FLAG( uiCode,  "sps_amvr_enabled_flag" );                     pcSPS->setAMVREnabledFlag ( uiCode != 0 );
 
 #if JVET_W0090_ARMC_TM
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  pcSPS->setUseAML(false);
+  if(pcSPS->getTMToolsEnableFlag())
+  {
+#endif
   READ_FLAG( uiCode, "sps_aml_enabled_flag");                        pcSPS->setUseAML ( uiCode != 0 );
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  }
+#endif
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  pcSPS->setUseTmvpNmvpReordering(false);
+  if (pcSPS->getUseAML())
+  {
+    READ_FLAG( uiCode, "sps_aml_tmvp_nmvp_enabled_flag");            pcSPS->setUseTmvpNmvpReordering ( uiCode != 0 );
+  }
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  pcSPS->setUseArmcRefinedMotion (false);
+#endif
   if (pcSPS->getUseAML())
   {
     READ_FLAG( uiCode, "sps_ArmcRefinedMotion_enabled_flag");        pcSPS->setUseArmcRefinedMotion ( uiCode != 0 );
   }
 #endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  pcSPS->setNumLambda(0);
+#endif
   if (pcSPS->getUseAML())
   {
     READ_UVLC(uiCode, "num_Lambda");
@@ -2261,7 +2285,15 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   }
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  pcSPS->setUseARL(false);
+  if (pcSPS->getTMToolsEnableFlag())
+  {
+#endif
   READ_FLAG( uiCode, "sps_arl_enabled_flag");                        pcSPS->setUseARL ( uiCode != 0 );
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  }
+#endif
 #endif
   READ_FLAG( uiCode, "sps_bdof_enabled_flag" );                      pcSPS->setBDOFEnabledFlag ( uiCode != 0 );
   if (pcSPS->getBDOFEnabledFlag())
@@ -2290,6 +2322,10 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     pcSPS->setFpelMmvdEnabledFlag( false );
   }
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  uiCode = 0;
+  if (pcSPS->getTMToolsEnableFlag())
+#endif
   READ_FLAG(uiCode, "sps_mvsd_enabled_flag");
   pcSPS->setUseMVSD(uiCode != 0);
 #endif
@@ -2300,8 +2336,30 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   READ_FLAG( uiCode,    "sps_dmvd_enabled_flag" );                      pcSPS->setUseDMVDMode( uiCode != 0 );
 #endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP
+  pcSPS->setUseTMAmvpMode(false);
+  if (pcSPS->getTMToolsEnableFlag())
+  {
+    READ_FLAG( uiCode,    "sps_tm_amvp_enabled_flag" );                   pcSPS->setUseTMAmvpMode( uiCode != 0 );
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_MRG
+  pcSPS->setUseTMMrgMode(false);
+  if (pcSPS->getTMToolsEnableFlag())
+  {
+    READ_FLAG( uiCode,    "sps_tm_mrg_enabled_flag" );                    pcSPS->setUseTMMrgMode( uiCode != 0 );
+  }
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  pcSPS->setUseAltGPMSplitModeCode(false);
+  if (pcSPS->getTMToolsEnableFlag())
+  {
+#endif
   READ_FLAG( uiCode,    "sps_alt_gpm_code_enabled_flag" );              pcSPS->setUseAltGPMSplitModeCode( uiCode != 0 );
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  }
+#endif
 #endif
 #if JVET_X0049_ADAPT_DMVR
   READ_UVLC(uiCode, "six_minus_max_num_bm_merge_cand");
@@ -2340,11 +2398,22 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
       pcSPS->setProfControlPresentFlag( false );
     }
   }
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  pcSPS->setUseTMMMVD(false);
+  if (pcSPS->getTMToolsEnableFlag() && (pcSPS->getUseMMVD() || pcSPS->getUseAffineMmvdMode()))
+  {
+    READ_FLAG(uiCode, "sps_tm_mmvd_enabled_flag");                  pcSPS->setUseTMMMVD(uiCode != 0);
+  }
+#endif
 
   READ_FLAG( uiCode,    "sps_bcw_enabled_flag" );                   pcSPS->setUseBcw( uiCode != 0 );
   READ_FLAG( uiCode,     "sps_ciip_enabled_flag" );                           pcSPS->setUseCiip             ( uiCode != 0 );
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
-  if (pcSPS->getUseCiip())
+  if (pcSPS->getUseCiip()
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    && pcSPS->getTMToolsEnableFlag()
+#endif
+    )
   {
     READ_FLAG(uiCode, "sps_ciip_tm_merge_enabled_flag");                           pcSPS->setUseCiipTmMrg(uiCode != 0);
   }
@@ -2370,7 +2439,20 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
       {
         pcSPS->setMaxNumGeoCand(2);
       }
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
+      pcSPS->setUseGPMTMMode( false );
+      if (pcSPS->getTMToolsEnableFlag())
+      {
+        READ_FLAG( uiCode,    "sps_gpm_tm_enabled_flag" );                      pcSPS->setUseGPMTMMode( uiCode != 0 );
+      }
+#endif
     }
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
+    else
+    {
+      pcSPS->setUseGPMTMMode( false );
+    }
+#endif
   }
   else
   {
@@ -2493,6 +2575,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #endif
 #if ENABLE_OBMC
   READ_FLAG(uiCode, "sps_obmc_flag");                              pcSPS->setUseOBMC(uiCode != 0);
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Z0061_TM_OBMC
+  pcSPS->setUseOBMCTMMode(false);
+  if (pcSPS->getTMToolsEnableFlag() && pcSPS->getUseOBMC())
+  {
+    READ_FLAG(uiCode, "sps_obmc_tm_flag");                         pcSPS->setUseOBMCTMMode(uiCode != 0);
+  }
+#endif
 #endif
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   READ_FLAG( uiCode, "sps_cabac_temp_init_flag" );							pcSPS->setTempCabacInitMode( uiCode != 0 );

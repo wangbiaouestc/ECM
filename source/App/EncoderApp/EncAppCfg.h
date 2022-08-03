@@ -394,6 +394,30 @@ protected:
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool      m_DMVDMode;
 #endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  bool      m_tmToolsEnableFlag;
+#if TM_AMVP
+  bool      m_tmAmvpMode;
+#endif
+#if TM_MRG
+  bool      m_tmMrgMode;
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  bool      m_tmGPMMode;
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  bool      m_tmOBMCMode;
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  int       m_tmCIIPMode;
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  bool      m_useTmvpNmvpReorder;
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  bool      m_useTMMMVD;
+#endif
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   bool      m_altGPMSplitModeCode;
 #endif

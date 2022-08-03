@@ -2468,7 +2468,11 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 
   // above left
 #if JVET_Z0084_IBC_TM && JVET_Z0075_IBC_HMVP_ENLARGE && JVET_W0090_ARMC_TM
-  if ((cnt < 4 && pu.cs->sps->getUseAML() && mrgCandIdx >= 0)) //Only for AMVP case
+  if ((cnt < 4 && pu.cs->sps->getUseAML() && mrgCandIdx >= 0)
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0090_ARMC_TM
+	  || !pu.cs->sps->getUseAML()
+#endif
+  ) //Only for AMVP case
 #elif !JVET_Z0075_IBC_HMVP_ENLARGE
   if (cnt < 4)
 #endif
@@ -3103,6 +3107,13 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #endif
 )
 {
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  if (!pu.cs->sps->getUseAML() || !pu.cs->sps->getUseTmvpNmvpReordering())
+  {
+    tmvpMrgCtx  = nullptr;
+    namvpMrgCtx = nullptr;
+  }
+#endif
   const unsigned plevel = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
   const CodingStructure &cs  = *pu.cs;
   const Slice &slice         = *pu.cs->slice;
@@ -3118,11 +3129,20 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   {
     additionalMRGCand += namvpMrgCtx->numValidMergeCand;
   }
-  const uint32_t maxNumMergeCand = pu.tmMergeFlag ? std::min((int)(TM_MRG_MAX_NUM_INIT_CANDS + additionalMRGCand), ((int)NUM_MERGE_CANDS - (3)))
-                                                  : std::min((int) (pu.cs->sps->getMaxNumMergeCand() + additionalMRGCand), ((int)NUM_MERGE_CANDS - (3)));
+  const uint32_t maxNumMergeCand =
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+                                   !pu.cs->sps->getUseAML() || !pu.cs->sps->getUseTmvpNmvpReordering() ?
+                                   (pu.tmMergeFlag ? pu.cs->sps->getMaxNumTMMergeCand() : pu.cs->sps->getMaxNumMergeCand()) :
+#endif
+                                   (pu.tmMergeFlag ? std::min((int)(TM_MRG_MAX_NUM_INIT_CANDS        + additionalMRGCand), ((int)NUM_MERGE_CANDS - (3)))
+                                                   : std::min((int)(pu.cs->sps->getMaxNumMergeCand() + additionalMRGCand), ((int)NUM_MERGE_CANDS - (3))));
 #else
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
-  const uint32_t maxNumMergeCand = pu.tmMergeFlag ? (pu.cs->sps->getUseAML()) ? TM_MRG_MAX_NUM_INIT_CANDS : pu.cs->sps->getMaxNumTMMergeCand() : pu.cs->sps->getMaxNumMergeCand();
+  const uint32_t maxNumMergeCand = pu.tmMergeFlag ? ((pu.cs->sps->getUseAML()
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+                                                  && pu.cs->sps->getUseTmvpNmvpReordering()
+#endif
+                                                    ) ? TM_MRG_MAX_NUM_INIT_CANDS : pu.cs->sps->getMaxNumTMMergeCand()) : pu.cs->sps->getMaxNumMergeCand();
 #else
   const uint32_t maxNumMergeCand     = pu.tmMergeFlag ? pu.cs->sps->getMaxNumTMMergeCand() : pu.cs->sps->getMaxNumMergeCand();
 #endif
@@ -3756,7 +3776,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     {
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
 #if TM_MRG
-      if (!pu.tmMergeFlag)
+      if (!pu.tmMergeFlag
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+          || !pu.cs->sps->getUseTMMrgMode()
+#endif
+      )
 #endif
       {
         for (uint32_t ui = 0; ui < tmvpMrgCtx->numValidMergeCand && cnt < maxNumMergeCand - 1; ++ui)
@@ -3897,6 +3921,12 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   for (int iDistanceIndex = 0; iDistanceIndex < NADISTANCE_LEVEL && cnt < maxNumMergeCand - 1; iDistanceIndex++)
 #endif
   {
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+    if (!pu.cs->sps->getUseAML() && cnt >= maxNumMergeCand - 1)
+    {
+      continue;
+    }
+#endif
     const int iNADistanceHor = pu.Y().width  * (iDistanceIndex + 1);
     const int iNADistanceVer = pu.Y().height * (iDistanceIndex + 1);
 
@@ -3906,6 +3936,12 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     for (int NASPIdx = 0; NASPIdx < iNACANDIDATE_NUM[iDistanceIndex] && cnt < maxNumMergeCand - 1; NASPIdx++)
 #endif
     {
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+      if (!pu.cs->sps->getUseAML() && cnt >= maxNumMergeCand - 1)
+      {
+        continue;
+      }
+#endif
       switch (idxMap[iDistanceIndex][NASPIdx])
       {
       case 0:offsetX = -iNADistanceHor - 1; offsetY = pu.Y().height + iNADistanceVer - 1; break;
@@ -4034,6 +4070,9 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   int maxNumMergeCandMin1 = maxNumMergeCand;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  maxNumMergeCandMin1 -= !pu.cs->sps->getUseAML() ? 1 : 0;
+#endif
 #else
   int maxNumMergeCandMin1 = maxNumMergeCand - 1;
 #endif
@@ -4068,10 +4107,14 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     }
   }
 
-#if !JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC 
+#if !JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC)
   // pairwise-average candidates
   {
-    if (cnt > 1 && cnt < maxNumMergeCand)
+    if (cnt > 1 && cnt < maxNumMergeCand
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+      && !pu.cs->sps->getUseAML()
+#endif
+      )
     {
       mrgCtx.mvFieldNeighbours[cnt * 2].setMvField( Mv( 0, 0 ), NOT_VALID );
       mrgCtx.mvFieldNeighbours[cnt * 2 + 1].setMvField( Mv( 0, 0 ), NOT_VALID );
@@ -5114,25 +5157,31 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
 #endif
 )
 {
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  if (!pu.cs->sps->getUseAML() || !pu.cs->sps->getUseTmvpNmvpReordering())
+  {
+    mvpMrgCtx1 = nullptr;
+    mvpMrgCtx2 = nullptr;
+  }
+#endif
   const unsigned plevel = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
   const CodingStructure &cs = *pu.cs;
   const Slice &slice = *pu.cs->slice;
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
-  uint32_t additionalMRGCand = 0;
-  if (mvpMrgCtx1 != NULL)
-  {
-    additionalMRGCand = mvpMrgCtx1->numValidMergeCand;
-  }
-  if (mvpMrgCtx2 != NULL)
-  {
-    additionalMRGCand += mvpMrgCtx2->numValidMergeCand;
-  }
-  const uint32_t maxNumMergeCand = (pu.cs->sps->getUseAML()) ? std::min((int)(BM_MRG_MAX_NUM_INIT_CANDS + additionalMRGCand), ((int)NUM_MERGE_CANDS - (3))) 
-                                                             : pu.cs->sps->getMaxNumBMMergeCand();
-#else
-  const uint32_t maxNumMergeCand = (pu.cs->sps->getUseAML()) ? BM_MRG_MAX_NUM_INIT_CANDS : pu.cs->sps->getMaxNumBMMergeCand();
+  uint32_t additionalMRGCand = (mvpMrgCtx1 != NULL ? mvpMrgCtx1->numValidMergeCand : 0)
+                             + (mvpMrgCtx2 != NULL ? mvpMrgCtx2->numValidMergeCand : 0);
 #endif
+  const uint32_t maxNumMergeCand = pu.cs->sps->getUseAML()
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+                                && pu.cs->sps->getUseTmvpNmvpReordering()
+#endif
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+                                 ? std::min((int)(BM_MRG_MAX_NUM_INIT_CANDS + additionalMRGCand), ((int)NUM_MERGE_CANDS - (3)))
+#else
+                                 ? BM_MRG_MAX_NUM_INIT_CANDS
+#endif
+								 : pu.cs->sps->getMaxNumBMMergeCand();
 #else
   const uint32_t maxNumMergeCand = pu.cs->sps->getMaxNumBMMergeCand();
 #endif
@@ -5572,6 +5621,9 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
 
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   int maxNumMergeCandMin1 = maxNumMergeCand;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  maxNumMergeCandMin1 -= !pu.cs->sps->getUseAML() ? 1 : 0;
+#endif
 #else
   int maxNumMergeCandMin1 = maxNumMergeCand - 1;
 #endif
@@ -5696,7 +5748,10 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
     }
   }
 
-#if !JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+#if !JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC)
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  if (!pu.cs->sps->getUseAML())
+#endif
   {
     if (cnt > 1 && cnt < maxNumMergeCand)
     {
@@ -5799,6 +5854,14 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
 void PU::getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 {
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  if (!pu.cs->sps->getUseTmvpNmvpReordering())
+  {
+    mrgCtx.numValidMergeCand = 0;
+    return;
+  }
+#endif
+
   const CodingStructure &cs = *pu.cs;
   const Slice &slice = *pu.cs->slice;
 
@@ -5987,6 +6050,13 @@ void PU::getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 #if NON_ADJACENT_MRG_CAND && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
 void PU::getNonAdjacentBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 {
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  if (!pu.cs->sps->getUseTmvpNmvpReordering())
+  {
+    mrgCtx.numValidMergeCand = 0;
+    return;
+  }
+#endif
   const unsigned plevel = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
   const CodingStructure &cs = *pu.cs;
 
@@ -6131,6 +6201,13 @@ void PU::getNonAdjacentBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
 void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 {
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  if (!pu.cs->sps->getUseTmvpNmvpReordering())
+  {
+    mrgCtx.numValidMergeCand = 0;
+    return;
+  }
+#endif
   const CodingStructure &cs = *pu.cs;
   const Slice &slice = *pu.cs->slice;
 
@@ -6138,7 +6215,11 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
   const uint32_t mvdSimilarityThresh = 1;
 #endif
 #if TM_MRG && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
-  const uint32_t maxNumMergeCand = pu.tmMergeFlag ? 1 :NUM_TMVP_CANDS;
+  const uint32_t maxNumMergeCand =
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+                                   pu.cs->sps->getUseTMMrgMode() &&
+#endif
+                                   pu.tmMergeFlag ? 1 :NUM_TMVP_CANDS;
 #else
   const uint32_t maxNumMergeCand = NUM_TMVP_CANDS;
 #endif
@@ -6403,16 +6484,32 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM && NON_ADJACENT_MRG_CAND
 void PU::getNonAdjacentMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 {
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  if (!pu.cs->sps->getUseTmvpNmvpReordering())
+  {
+    mrgCtx.numValidMergeCand = 0;
+    return;
+  }
+#endif
   const unsigned plevel = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
   const CodingStructure &cs = *pu.cs;
   const Slice &slice = *pu.cs->slice;
 
 #if TM_MRG
-#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC 
-  const uint32_t mvdSimilarityThresh = pu.tmMergeFlag ? PU::getTMMvdThreshold(pu) : 1;
-#else
-  const uint32_t mvdSimilarityThresh = getBDMVRMvdThreshold(pu);
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS || JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  bool useMvdThreshold = true;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  useMvdThreshold &= pu.cs->sps->getUseTMMrgMode();
 #endif
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  useMvdThreshold &= pu.tmMergeFlag;
+#endif
+#endif
+  const uint32_t mvdSimilarityThresh =
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS || JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+                                       !useMvdThreshold ? 1 :
+#endif
+                                       getBDMVRMvdThreshold(pu);
 #endif
   const uint32_t maxNumMergeCand = NUM_NON_ADJ_CANDS;
 
@@ -6692,11 +6789,15 @@ bool PU::checkRprLicCondition( const PredictionUnit & pu )
 }
 #endif
 
-#if JVET_Y0128_NON_CTC
+#if JVET_Y0128_NON_CTC || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP)
 bool PU::checkTmEnableCondition(const SPS* sps, const PPS* pps, const Picture* refPic)
 {
 #if TM_AMVP || TM_MRG || MULTI_PASS_DMVR
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP
+  if (sps->getUseTMAmvpMode())
+#else
   if (sps->getUseDMVDMode())
+#endif
   {
     if (sps->getRprEnabledFlag())
     {
@@ -6804,7 +6905,15 @@ void PU::getInterMMVDMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
   int refIdxList0, refIdxList1;
   int k;
   int currBaseNum = 0;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  const uint16_t maxNumMergeCand = std::min<int>(mrgCtx.numValidMergeCand, (pu.cs->sps->getUseTMMMVD() ? MMVD_BASE_MV_NUM : VVC_MMVD_BASE_MV_NUM));
+#else
+  const uint16_t maxNumMergeCand = std::min<int>(mrgCtx.numValidMergeCand, MMVD_BASE_MV_NUM);
+#endif
+#else
   const uint16_t maxNumMergeCand = mrgCtx.numValidMergeCand;
+#endif
 
   for( k = 0; k < maxNumMergeCand; k++ )
   {
@@ -6829,10 +6938,12 @@ void PU::getInterMMVDMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
     mrgCtx.mmvdUseAltHpelIf[currBaseNum] = mrgCtx.useAltHpelIf[k];
     currBaseNum++;
 
+#if !JVET_AA0132_CONFIGURABLE_TM_TOOLS
     if( currBaseNum == MMVD_BASE_MV_NUM )
     {
       break;
     }
+#endif
   }
 }
 bool PU::getColocatedMVP(const PredictionUnit &pu, const RefPicList &eRefPicList, const Position &_pos, Mv& rcMv, const int &refIdx, bool sbFlag
@@ -7305,7 +7416,7 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
 {
   CodingStructure &cs = *pu.cs;
 #if TM_AMVP
-#if JVET_Y0128_NON_CTC
+#if JVET_Y0128_NON_CTC || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP)
   interPred = PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefPicList, refIdx)) ? interPred : nullptr;
 #else
   interPred = pu.cu->cs->sps->getUseDMVDMode() ? interPred : nullptr;
@@ -7526,7 +7637,13 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
 #endif
 
 #if TM_AMVP
-  if (pu.cu->cs->sps->getUseDMVDMode() && interPred != nullptr && pInfo->numCand > 0)
+  if (
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    pu.cu->cs->sps->getUseTMAmvpMode()
+#else
+    pu.cu->cs->sps->getUseDMVDMode()
+#endif
+    && interPred != nullptr && pInfo->numCand > 0)
   {
     struct AMVPSort
     {
@@ -7571,18 +7688,13 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
 #endif
     for (int candIdx = 0; candIdx < pInfo->numCand; ++candIdx)
     {
+      tmCost[candIdx] = interPred->deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), eRefPicList, refIdx
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
-      if (armcRefinedMotion)
-      {
-        tmCost[candIdx] = interPred->deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), eRefPicList, refIdx, TM_MAX_NUM_OF_ITERATIONS, pInfo->mvCand[candIdx]);
-      }
-      else
-      {
-        tmCost[candIdx] = interPred->deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), eRefPicList, refIdx, 0, pInfo->mvCand[candIdx]);
-      }
+                                            , (armcRefinedMotion ? TM_MAX_NUM_OF_ITERATIONS : 0)
 #else
-      tmCost[candIdx] = interPred->deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), eRefPicList, refIdx, 0, pInfo->mvCand[candIdx]);
+                                            , 0
 #endif
+                                            , pInfo->mvCand[candIdx]);
       temp.AMVPCand = pInfo->mvCand[candIdx];
       temp.cost = tmCost[candIdx];
       input.push_back(temp);
@@ -7618,7 +7730,13 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
     pInfo->numCand++;
   }
 #if TM_AMVP
-  pInfo->numCand = (pu.cu->cs->sps->getUseDMVDMode() && interPred != nullptr ? 1 : pInfo->numCand);
+  pInfo->numCand = (
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+                    pu.cu->cs->sps->getUseTMAmvpMode() 
+#else
+                    pu.cu->cs->sps->getUseDMVDMode() 
+#endif
+                 && interPred != nullptr ? 1 : pInfo->numCand);
 #endif
 
   for (Mv &mv : pInfo->mvCand)
@@ -10306,7 +10424,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
                                    int mrgCandIdx, bool isAfMmvd
 #endif
 #if JVET_Z0139_NA_AFF && JVET_W0090_ARMC_TM
-    , bool isZeroCandIdx
+                           ,       bool isZeroCandIdx
 #endif
 )
 {
@@ -11188,11 +11306,12 @@ void PU::getAfMmvdMvf(const PredictionUnit& pu, const AffineMergeCtx& affineMerg
   CHECK(!pu.cu->affine, "Affine flag is not on for Affine MMVD mode!");
   CHECK(affineMergeCtx.mergeType[afMmvdBase] != MRG_TYPE_DEFAULT_N, "AFF_MMVD base candidate type is not regular Affine!");
 
-#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
-  static const int32_t refMvdCands[AF_MMVD_STEP_NUM] = { 1, 2, 4, 8 };
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION && !JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  static const int32_t refMvdCands[] = { 1, 2, 4, 8 };
 #else
-  static const int32_t refMvdCands[AF_MMVD_STEP_NUM] = { 1, 2, 4, 8, 16 };
+  static const int32_t refMvdCands[] = { 1, 2, 4, 8, 16 };
 #endif
+
 #if JVET_Y0128_NON_CTC
   const int32_t iPicSize = pu.cu->slice->getPic()->lumaSize().area();
   const int32_t mvShift  = iPicSize < 921600 ? 0 : ( iPicSize < 4096000 ? 2 : MV_FRACTIONAL_BITS_INTERNAL - 1); // 921600 = 1280x720, 4096000 = 2560x1600
@@ -11250,7 +11369,11 @@ void PU::getAfMmvdMvf(const PredictionUnit& pu, const AffineMergeCtx& affineMerg
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
     else if (interDir == 3)
     {
-      if (offsetDir >=  16)
+      if (offsetDir >= 16
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+        || !pu.cs->sps->getUseTMMMVD()
+#endif
+        )
       {
         int poc_cur = pu.cu->slice->getPOC();
         int poc_l0  = pu.cu->slice->getRefPOC(REF_PIC_LIST_0, refIdxL0);
@@ -11289,6 +11412,16 @@ void PU::getAfMmvdMvf(const PredictionUnit& pu, const AffineMergeCtx& affineMerg
 
 int32_t PU::getAfMmvdEstBits(const PredictionUnit &pu)
 {
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  if (!pu.cs->sps->getUseTMMMVD())
+  {
+    int baseBits = (ECM3_AF_MMVD_BASE_NUM == 1 ? 0 : pu.afMmvdBaseIdx + (pu.afMmvdBaseIdx == ECM3_AF_MMVD_BASE_NUM - 1 ? 0: 1));
+    int stepBits = pu.afMmvdStep + (pu.afMmvdStep == ECM3_AF_MMVD_STEP_NUM - 1 ? 0 : 1);
+    int dirBits  = gp_sizeIdxInfo->idxFrom(ECM3_AF_MMVD_OFFSET_DIR);
+    return stepBits + dirBits + baseBits;
+  }
+#endif
+
   int baseBits = (AF_MMVD_BASE_NUM == 1 ? 0 : pu.afMmvdBaseIdx + (pu.afMmvdBaseIdx == AF_MMVD_BASE_NUM - 1 ? 0: 1));
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   int stepBits = pu.afMmvdMergeIdx + (pu.afMmvdMergeIdx == AF_MMVD_MAX_REFINE_NUM - 1 ? 0 : 1);
@@ -13571,7 +13704,6 @@ Mv PU::getMultiHypMVP(PredictionUnit &pu, const MultiHypPredictionData &mhData)
   return mvp;
 }
 #endif
-
 
 bool CU::isBcwIdxCoded( const CodingUnit &cu )
 {

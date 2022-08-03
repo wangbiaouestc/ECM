@@ -3491,6 +3491,27 @@ SPS::SPS()
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
  , m_DMVDMode                 ( false )
 #endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+, m_tmToolsEnableFlag         ( false )
+#if TM_AMVP
+ , m_tmAmvpMode               ( false )
+#endif
+#if TM_MRG
+ , m_tmMrgMode                ( false )
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+ , m_tmGPMMode                ( false )
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+ , m_tmOBMCMode               ( false )
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+ , m_useTmvpNmvpReorder       ( false )
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+ , m_useTMMMVD                ( false )
+#endif
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 , m_altGPMSplitModeCode       ( false )
 #endif
