@@ -99,6 +99,9 @@ Slice::Slice()
 , m_pcPicHeader                   ( NULL )
 , m_colFromL0Flag                 ( true )
 , m_colRefIdx                     ( 0 )
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+, m_costForARMC                   ( MAX_UINT )
+#endif
 #if INTER_LIC
 , m_UseLIC                        ( false )
 #endif
@@ -184,6 +187,9 @@ void Slice::initSlice()
   m_colourPlaneId = 0;
 #endif
   m_colRefIdx = 0;
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  m_costForARMC = MAX_UINT;
+#endif
   m_lmcsEnabledFlag = 0;
   m_explicitScalingListUsed = 0;
   initEqualRef();
