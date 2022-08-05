@@ -4132,6 +4132,7 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #if INTER_LIC
       mrgCtx.LICFlags[cnt] = false;
 #endif
+      mrgCtx.BcwIdx[cnt] = BCW_DEFAULT;
 #if MULTI_HYP_PRED
       mrgCtx.addHypNeighbours[cnt].clear();
 #endif
@@ -8330,6 +8331,7 @@ bool PU::addMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrgCtx
 #if INTER_LIC
           mrgCtx.LICFlags[cnt] = false;
 #endif
+          mrgCtx.useAltHpelIf[cnt] = false;
           continue;
         }
 #endif
@@ -8385,6 +8387,7 @@ bool PU::addMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrgCtx
 #if INTER_LIC
           mrgCtx.LICFlags[cnt] = false;
 #endif
+          mrgCtx.useAltHpelIf[cnt] = false;
           continue;
         }
 #endif
@@ -8427,6 +8430,7 @@ bool PU::addOneMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrg
 #if INTER_LIC
   mrgCtx.LICFlags[cnt] = false;
 #endif
+  mrgCtx.useAltHpelIf[cnt] = false;
   mrgCtx.mvFieldNeighbours[(cnt << 1) + 0].setMvField(Mv(), -1);
   mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), -1);
 
@@ -8473,6 +8477,7 @@ bool PU::addOneMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrg
 #if INTER_LIC
     mrgCtx.LICFlags[cnt] = false;
 #endif
+    mrgCtx.useAltHpelIf[cnt] = false;
     mrgCtx.mvFieldNeighbours[(cnt << 1) + 0].setMvField(Mv(), -1);
     mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), -1);
     return false;
@@ -8496,6 +8501,7 @@ bool PU::addOneMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrg
 #if INTER_LIC
     mrgCtx.LICFlags[cnt] = false;
 #endif
+    mrgCtx.useAltHpelIf[cnt] = false;
     mrgCtx.mvFieldNeighbours[(cnt << 1) + 0].setMvField(Mv(), -1);
     mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), -1);
     return false;
@@ -8565,7 +8571,7 @@ bool PU::addOneAffineMergeHMVPCand(const PredictionUnit & pu, AffineMergeCtx & a
   }
   affMrgCtx.affineType[affMrgCtx.numValidMergeCand] = AFFINEMODEL_6PARAM;
 
-  affMrgCtx.BcwIdx[affMrgCtx.numValidMergeCand] = iGBiIdx;
+  affMrgCtx.BcwIdx[affMrgCtx.numValidMergeCand] = (affMrgCtx.interDirNeighbours[affMrgCtx.numValidMergeCand] == 3) ? iGBiIdx : BCW_DEFAULT;
 
 #if INTER_LIC
   affMrgCtx.LICFlags[affMrgCtx.numValidMergeCand] = bICflag;
