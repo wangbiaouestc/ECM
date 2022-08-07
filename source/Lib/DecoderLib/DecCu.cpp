@@ -1974,13 +1974,23 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             if (pu.ibcMbvdMergeFlag)
             {
               int fPosIBCBaseIdx = pu.ibcMbvdMergeIdx / IBC_MBVD_MAX_REFINE_NUM;
-              PU::getIBCMergeCandidates(pu, mrgCtx);
 #if JVET_Y0058_IBC_LIST_MODIFY && JVET_W0090_ARMC_TM
+              if (pu.cs->sps->getUseAML())
+              {
 #if JVET_Z0075_IBC_HMVP_ENLARGE
-              m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
+                PU::getIBCMergeCandidates(pu, mrgCtx);
+                m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
 #else
-              m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx);
+                PU::getIBCMergeCandidates(pu, mrgCtx, (((fPosIBCBaseIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE + 1) * ADAPTIVE_IBC_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumIBCMergeCand()) || (fPosIBCBaseIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE) == 0) ? fPosIBCBaseIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE * ADAPTIVE_IBC_SUB_GROUP_SIZE + ADAPTIVE_IBC_SUB_GROUP_SIZE - 1 : fPosIBCBaseIdx);
+                m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, fPosIBCBaseIdx);
 #endif
+              }
+              else
+              {
+#endif
+                PU::getIBCMergeCandidates(pu, mrgCtx, fPosIBCBaseIdx);
+#if JVET_Y0058_IBC_LIST_MODIFY && JVET_W0090_ARMC_TM
+              }
 #endif
 
               PU::getIbcMbvdMergeCandidates(pu, mrgCtx, fPosIBCBaseIdx + 1);
