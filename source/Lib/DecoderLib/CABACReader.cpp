@@ -2389,7 +2389,7 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
   {
     pu.intraDir[1] = DM_CHROMA_IDX;
 #if JVET_Z0050_DIMD_CHROMA_FUSION
-    if (pu.cs->slice->getSliceType() == I_SLICE)
+    if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
     {
       if (m_BinDecoder.decodeBin(Ctx::ChromaFusionMode()) == 1)
       {
@@ -2406,9 +2406,12 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
     if (m_BinDecoder.decodeBin(Ctx::DimdChromaMode()) == 0)
     {
       pu.intraDir[1] = DIMD_CHROMA_IDX;
-      if (m_BinDecoder.decodeBin(Ctx::ChromaFusionMode()) == 1)
+      if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
       {
-        pu.isChromaFusion = true;
+        if (m_BinDecoder.decodeBin(Ctx::ChromaFusionMode()) == 1)
+        {
+          pu.isChromaFusion = true;
+        }
       }
       return;
     }
@@ -2420,7 +2423,7 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
 #endif
   unsigned candId = m_BinDecoder.decodeBinsEP(2);
 #if JVET_Z0050_DIMD_CHROMA_FUSION
-  if (pu.cs->slice->getSliceType() == I_SLICE)
+  if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
   {
     if (m_BinDecoder.decodeBin(Ctx::ChromaFusionMode()) == 1)
     {

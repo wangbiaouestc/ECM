@@ -481,6 +481,9 @@ namespace PU
   bool cccmSingleModeAvail(const PredictionUnit& pu, int intraMode);
   bool cccmMultiModeAvail (const PredictionUnit& pu, int intraMode);
 #endif
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+  bool hasChromaFusionFlag(const PredictionUnit &pu, int intraMode);
+#endif
 }
 
 // TU tools
