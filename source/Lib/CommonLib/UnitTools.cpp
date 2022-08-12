@@ -1599,6 +1599,23 @@ bool PU::cccmMultiModeAvail(const PredictionUnit& pu, int intraMode)
 }
 #endif
 
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+bool PU::hasChromaFusionFlag(const PredictionUnit &pu, int intraMode)
+{
+#if ENABLE_DIMD
+  bool hasChromaFusionFlag = pu.cs->slice->getSliceType() == I_SLICE || (pu.cs->sps->getUseDimd() && intraMode == DIMD_CHROMA_IDX);
+#else
+  bool hasChromaFusionFlag = pu.cs->slice->getSliceType() == I_SLICE;
+#endif
+#if MMLM
+  hasChromaFusionFlag &= PU::isLMCModeEnabled(pu, MMLM_CHROMA_IDX);
+#else
+  hasChromaFusionFlag &= PU::isLMCModeEnabled(pu, LM_CHROMA_IDX);
+#endif
+  return hasChromaFusionFlag;
+}
+#endif
+
 uint32_t PU::getIntraDirLuma( const PredictionUnit &pu )
 {
 #if JVET_V0130_INTRA_TMP

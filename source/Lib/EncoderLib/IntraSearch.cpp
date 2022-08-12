@@ -2383,69 +2383,63 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       for (int32_t uiMode = 0; uiMode < 1; uiMode++)
       {
         int chromaIntraMode = bestNonLmMode;
-        if (!pu.cs->slice->isIntra())
-        {
 #if ENABLE_DIMD
-          if (cu.slice->getSPS()->getUseDimd())
-          {
-            chromaIntraMode = DIMD_CHROMA_IDX;
-          }
-          else
-          {
-            break;
-          }
-#else
-          break;
+        if (!pu.cs->slice->isIntra() && cu.slice->getSPS()->getUseDimd())
+        {
+          chromaIntraMode = DIMD_CHROMA_IDX;
+        }
 #endif
-        }
-        pu.isChromaFusion = true;
-        cs.setDecomp(pu.Cb(), false);
-        cs.dist = baseDist;
-        //----- restore context models -----
-        m_CABACEstimator->getCtx() = ctxStart;
-
-        //----- chroma coding -----
-        pu.intraDir[1] = chromaIntraMode;
-        xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType);
-        if (lumaUsesISP && cs.dist == MAX_UINT)
+        if (PU::hasChromaFusionFlag(pu, chromaIntraMode))
         {
-          continue;
-        }
-        if (cs.sps->getTransformSkipEnabledFlag())
-        {
+          pu.isChromaFusion = true;
+          cs.setDecomp(pu.Cb(), false);
+          cs.dist = baseDist;
+          //----- restore context models -----
           m_CABACEstimator->getCtx() = ctxStart;
-        }
-        uint64_t fracBits = xGetIntraFracBitsQT(cs, partitioner, false, true, -1, ispType);
-        Distortion uiDist = cs.dist;
-        double    dCost = m_pcRdCost->calcRdCost(fracBits, uiDist - baseDist);
-        if (dCost < dBestCost)
-        {
-          if (lumaUsesISP && dCost < bestCostSoFar)
+
+          //----- chroma coding -----
+          pu.intraDir[1] = chromaIntraMode;
+          xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType);
+          if (lumaUsesISP && cs.dist == MAX_UINT)
           {
-            bestCostSoFar = dCost;
+            continue;
           }
-          for (uint32_t i = getFirstComponentOfChannel(CHANNEL_TYPE_CHROMA); i < numberValidComponents; i++)
+          if (cs.sps->getTransformSkipEnabledFlag())
           {
-            const CompArea &area = pu.blocks[i];
-            saveCS.getRecoBuf(area).copyFrom(cs.getRecoBuf(area));
-            saveCS.getPredBuf(area).copyFrom(cs.getPredBuf(area));
-            saveCS.getResiBuf(area).copyFrom(cs.getResiBuf(area));
-            saveCS.getPredBuf(area).copyFrom(cs.getPredBuf(area));
-            cs.picture->getPredBuf(area).copyFrom(cs.getPredBuf(area));
-            cs.picture->getRecoBuf(area).copyFrom(cs.getRecoBuf(area));
-            for (uint32_t j = 0; j < saveCS.tus.size(); j++)
+            m_CABACEstimator->getCtx() = ctxStart;
+          }
+          uint64_t fracBits = xGetIntraFracBitsQT(cs, partitioner, false, true, -1, ispType);
+          Distortion uiDist = cs.dist;
+          double    dCost = m_pcRdCost->calcRdCost(fracBits, uiDist - baseDist);
+          if (dCost < dBestCost)
+          {
+            if (lumaUsesISP && dCost < bestCostSoFar)
             {
-              saveCS.tus[j]->copyComponentFrom(*orgTUs[j], area.compID);
+              bestCostSoFar = dCost;
             }
-          }
-          dBestCost = dCost;
-          uiBestDist = uiDist;
-          uiBestMode = chromaIntraMode;
-          bestBDPCMMode = cu.bdpcmModeChroma;
-          isChromaFusion = pu.isChromaFusion;
+            for (uint32_t i = getFirstComponentOfChannel(CHANNEL_TYPE_CHROMA); i < numberValidComponents; i++)
+            {
+              const CompArea &area = pu.blocks[i];
+              saveCS.getRecoBuf(area).copyFrom(cs.getRecoBuf(area));
+              saveCS.getPredBuf(area).copyFrom(cs.getPredBuf(area));
+              saveCS.getResiBuf(area).copyFrom(cs.getResiBuf(area));
+              saveCS.getPredBuf(area).copyFrom(cs.getPredBuf(area));
+              cs.picture->getPredBuf(area).copyFrom(cs.getPredBuf(area));
+              cs.picture->getRecoBuf(area).copyFrom(cs.getRecoBuf(area));
+              for (uint32_t j = 0; j < saveCS.tus.size(); j++)
+              {
+                saveCS.tus[j]->copyComponentFrom(*orgTUs[j], area.compID);
+              }
+            }
+            dBestCost = dCost;
+            uiBestDist = uiDist;
+            uiBestMode = chromaIntraMode;
+            bestBDPCMMode = cu.bdpcmModeChroma;
+            isChromaFusion = pu.isChromaFusion;
 #if JVET_AA0126_GLM
-          bestGlmIdc = pu.glmIdc;
+            bestGlmIdc = pu.glmIdc;
 #endif
+          }
         }
       }
       pu.isChromaFusion = false;

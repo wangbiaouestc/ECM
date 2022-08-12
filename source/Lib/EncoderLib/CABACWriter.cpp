@@ -2125,7 +2125,7 @@ void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
   if (isDerivedMode)
   {
 #if JVET_Z0050_DIMD_CHROMA_FUSION
-    if (pu.cs->slice->getSliceType() == I_SLICE)
+    if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
     {
       const bool     isFusion = pu.isChromaFusion;
       m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
@@ -2141,8 +2141,11 @@ void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
     m_BinEncoder.encodeBin(isDimdChromaMode ? 0 : 1, Ctx::DimdChromaMode());
     if (isDimdChromaMode)
     {
-      const bool     isFusion = pu.isChromaFusion;
-      m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
+      if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
+      {
+        const bool     isFusion = pu.isChromaFusion;
+        m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
+      }
       return;
     }
   }
@@ -2166,7 +2169,7 @@ void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
   {
     m_BinEncoder.encodeBinsEP(candId, 2);
 #if JVET_Z0050_DIMD_CHROMA_FUSION
-    if (pu.cs->slice->getSliceType() == I_SLICE)
+    if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
     {
       const bool     isFusion = pu.isChromaFusion;
       m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
