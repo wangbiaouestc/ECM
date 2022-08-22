@@ -2009,6 +2009,8 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       {
         // Generate all GLM templates at encoder
         xGetLumaRecPixelsGlmAll(pu, pu.Cb());
+        pu.intraDir[1] = LM_CHROMA_IDX;
+        xGetLumaRecPixels(pu, pu.Cb());
 
         for ( int mode = LM_CHROMA_IDX; mode <= MMLM_T_IDX; mode++ )
         {
