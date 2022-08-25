@@ -100,8 +100,15 @@ private:
   PelStorage        m_ciipBuffer;
 
   MotionInfo        m_SubPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  bool applyBDMVR4BM[BM_MRG_MAX_NUM_INIT_CANDS];
+#endif
 #if MULTI_PASS_DMVR
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  Mv                m_mvBufBDMVR[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR];
+#else
   Mv                m_mvBufBDMVR[2][MAX_NUM_SUBCU_DMVR];
+#endif
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   MvField           m_mvFieldAmListDec[MAX_NUM_AMVP_CANDS_MAX_REF << 1];

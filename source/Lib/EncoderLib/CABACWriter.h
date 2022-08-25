@@ -132,6 +132,9 @@ public:
   void        intra_chroma_pred_modes   ( const CodingUnit&             cu );
   void        intra_chroma_lmc_mode     ( const PredictionUnit&         pu );
   void        intra_chroma_pred_mode    ( const PredictionUnit&         pu );
+#if JVET_AA0057_CCCM
+  void        cccmFlag                  ( const PredictionUnit&         pu );
+#endif
   void        cu_residual               ( const CodingUnit&             cu,       Partitioner&      pm,         CUCtx& cuCtx );
   void        rqt_root_cbf              ( const CodingUnit&             cu );
   void        adaptive_color_transform(const CodingUnit&             cu);
@@ -162,6 +165,9 @@ public:
   void        mmvd_merge_idx(const PredictionUnit&         pu);
 #if AFFINE_MMVD
   void        affine_mmvd_data          ( const PredictionUnit&         pu );
+#endif
+#if JVET_AA0061_IBC_MBVD
+  void        ibcMbvdData             ( const PredictionUnit&         pu );
 #endif
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   void        tm_merge_flag             ( const PredictionUnit&         pu);
@@ -219,20 +225,36 @@ public:
   void        cclmDelta             ( const PredictionUnit&         pu, int8_t delta);
   void        cclmDeltaSlope       ( const PredictionUnit&         pu );
 #endif
+#if JVET_AA0126_GLM
+  void        glmIdc                    ( const PredictionUnit&         pu );
+#endif
 
   // transform tree (clause 7.3.8.8)
   void        transform_tree            ( const CodingStructure&        cs,       Partitioner&      pm,     CUCtx& cuCtx,                         const PartSplit ispType = TU_NO_ISP, const int subTuIdx = -1 );
   void        cbf_comp                  ( const CodingStructure&        cs,       bool              cbf,    const CompArea& area, unsigned depth, const bool prevCbf = false, const bool useISP = false );
 
   // mvd coding (clause 7.3.8.9)
+#if JVET_AA0070_RRIBC
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void        mvd_coding                ( const Mv &rMvd, int8_t imv, bool codeSign = true, const int &rribcFlipType = 0 );
+#else
+  void        mvd_coding                ( const Mv &rMvd, int8_t imv, const int &rribcFlipType = 0 );
+#endif
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+  void        bvdCoding                ( const Mv &rMvd, int8_t imv, const int &rribcFlipType = 0 );
+  void        xWriteBvdContext(unsigned uiSymbol, unsigned ctxT, int offset, int param);
+#endif
+#else
   void        mvd_coding                ( const Mv &rMvd, int8_t imv 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
     , bool codeSign = true
 #endif
   );
+
 #if JVET_Z0131_IBC_BVD_BINARIZATION
   void        bvdCoding                ( const Mv &rMvd, int8_t imv );
   void        xWriteBvdContext(unsigned uiSymbol, unsigned ctxT, int offset, int param);
+#endif
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   void mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList);
@@ -282,6 +304,9 @@ public:
   void        cu_lic_flag               ( const CodingUnit& cu );
 #endif
 
+#if JVET_AA0070_RRIBC
+  void        rribcData                ( const CodingUnit &cu);
+#endif
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   CABACDataStore*         m_CABACDataStore;
 #endif

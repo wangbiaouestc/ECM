@@ -713,6 +713,10 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   SMultiValueInput<Level::Name>  cfg_sliRefLevels(Level::NONE, Level::LEVEL15_5,  0, 8);
 #endif
 
+#if JVET_AA0098_MTT_DEPTH_TID_BY_QP
+  std::string sMaxMTTHierarchyDepthByTidOverrideByQP;
+#endif
+
   int warnUnknowParameter = 0;
 
 #if ENABLE_TRACING
@@ -980,6 +984,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MaxMTTHierarchyDepth",                            m_uiMaxMTTHierarchyDepth,                            3u, "MaxMTTHierarchyDepth")
 #if JVET_X0144_MAX_MTT_DEPTH_TID
   ("MaxMTTHierarchyDepthByTid",                       m_sMaxMTTHierarchyDepthByTid,          string("333333"), "MaxMTTHierarchyDepthByTid")
+#if JVET_AA0098_MTT_DEPTH_TID_BY_QP
+  ("MaxMTTHierarchyDepthByTidOverrideByQP",           sMaxMTTHierarchyDepthByTidOverrideByQP, string("22 333333"), "MaxMTTHierarchyDepthByTidOverrideByQP")
+#endif
 #endif
   ("MaxMTTHierarchyDepthI",                           m_uiMaxMTTHierarchyDepthI,                           3u, "MaxMTTHierarchyDepthI")
   ("MaxMTTHierarchyDepthISliceL",                     m_uiMaxMTTHierarchyDepthI,                           3u, "MaxMTTHierarchyDepthISliceL")
@@ -1007,6 +1014,30 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   ("DMVD",                                            m_DMVDMode,                                        true, "DMVD mode (0:off, 1:on)  [default: on]" )
 #endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  ("EnableTMTools",                                   m_tmToolsEnableFlag,                               true, "Enable TM tools (0:off, 1:on)  [default: on]" )
+#if TM_AMVP
+  ("TMAmvp",                                          m_tmAmvpMode,                                      true, "TM-AMVP mode (0:off, 1:on)  [default: on]" )
+#endif
+#if TM_MRG
+  ("TMMrg",                                           m_tmMrgMode,                                       true, "TM-MRG mode (0:off, 1:on)  [default: on]" )
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  ("GPMTM",                                           m_tmGPMMode,                                       true, "GPM-TM mode (0:off, 1:on)  [default: on]" )
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  ("OBMCTM",                                          m_tmOBMCMode,                                      true, "OBMC-TM mode (0:off, 1:on)  [default: on]")
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  ("CIIPTM",                                          m_tmCIIPMode,                                         2, "CIIP-TM mode (0:off, 1:on, 2:on conditionally for non-negative intra period)  [default: 2]")
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  ("TmvpNmvpAML",                                     m_useTmvpNmvpReorder,                              true, "Enable ARMC for TMVP and non-adjacent MVP (0:off, 1:on)  [default: on]")
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  ("TMMMVD",                                          m_useTMMMVD,                                       true, "Enable TM-MMVD (0:off, 1:on)  [default: on]")
+#endif
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   ("AltGPMSplitModeCode",                             m_altGPMSplitModeCode,                             true, "Enable alternative GPM split mode coding (0:off, 1:on)  [default: on]" )
 #endif
@@ -1014,6 +1045,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("BIO",                                             m_BIO,                                            false, "Enable bi-directional optical flow")
 #if JVET_W0090_ARMC_TM
   ("AML",                                             m_AML,                                             true, "Enable adaptive merge list")
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  ("ArmcRefinedMotion",                               m_armcRefinedMotion,                               true, "Enable adaptive re-ordering of merge candidates with refined motion")
 #endif
   ("IMV",                                             m_ImvMode,                                            1, "Adaptive MV precision Mode (IMV)\n"
                                                                                                                "\t0: disabled\n"
@@ -1048,6 +1082,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("LadfNumIntervals",                                m_LadfNumIntervals,                                   3, "LADF number of intervals (2-5, inclusive)")
   ("LadfQpOffset",                                    cfg_LadfQpOffset,                      cfg_LadfQpOffset, "LADF QP offset")
   ("LadfIntervalLowerBound",                          cfg_LadfIntervalLowerBound,  cfg_LadfIntervalLowerBound, "LADF lower bound for 2nd lowest interval")
+#endif
+#if JVET_AA0133_INTER_MTS_OPT
+  ("InterMTSMaxSize",                                 m_interMTSMaxSize,                                   32, "InterMTSMaxSize")
 #endif
 #if ENABLE_DIMD
   ( "DIMD",                                           m_dimd,                                            true, "Enable decoder side intra mode derivation\n" )
@@ -1088,6 +1125,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ( "IBCHashSearchMaxCand",                           m_IBCHashSearchMaxCand,                            256u, "Max candidates for hash based IBC search")
   ( "IBCHashSearchRange4SmallBlk",                    m_IBCHashSearchRange4SmallBlk,                     256u, "Small block search range in based IBC search")
   ( "IBCFastMethod",                                  m_IBCFastMethod,                                     6u, "Fast methods for IBC")
+#if JVET_AA0061_IBC_MBVD
+  ("IBCMBVD",                                         m_ibcMbvd,                                         true, "IBC MMVD mode (0:off, 1:on)  [default: on]" )
+#endif
 
   ("WrapAround",                                      m_wrapAround,                                     false, "Enable horizontal wrap-around motion compensation for inter prediction (0:off, 1:on)  [default: off]")
   ("WrapAroundOffset",                                m_wrapAroundOffset,                                  0u, "Offset in luma samples used for computing the horizontal wrap-around position")
@@ -1731,6 +1771,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 
     int8_t sliceType = m_GOPList[0].m_sliceType;
 
+    memset(m_GOPList, 0, sizeof(m_GOPList));
+    m_GOPList[0].m_sliceType = sliceType;
+    for (int i = 1; i < MAX_GOP; i++)
+    {
+      m_GOPList[i].m_POC = -1;
+    }
+
     m_GOPList[0].m_POC = 1;    
     m_GOPList[0].m_QPOffset = 0;
     m_GOPList[0].m_QPOffsetModelOffset = 0;
@@ -1873,6 +1920,76 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
       }
     }
   }
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  int numQPOffset[MAX_GOP][2];
+  int numQPOffsetadded = 0;
+
+  for (int i = 0; i < m_iGOPSize; i++)
+  {
+    numQPOffset[i][0] = MAX_INT;
+    numQPOffset[i][1] = 0;
+  }
+  for (int i = 0; i < m_iGOPSize; i++)
+  {
+    if (!(m_GOPList[i].m_numRefPicsActive0 > 0 || m_GOPList[i].m_numRefPicsActive1 > 0))
+    {
+      continue;
+    }
+
+    int qp = m_iQP + m_GOPList[i].m_QPOffset;
+
+    // adjust QP according to QPOffsetModel for the GOP entry.
+    double dqpOffset = qp * m_GOPList[i].m_QPOffsetModelScale + m_GOPList[i].m_QPOffsetModelOffset + 0.5;
+    int    qpOffset  = (int) floor(Clip3<double>(0.0, 3.0, dqpOffset));
+    qp += qpOffset;
+
+    bool isQpOffsetAllreadyIdentified = false;
+    for (int j = 0; j < numQPOffsetadded; j++)
+    {
+      if (numQPOffset[j][0] == qp - m_iQP && m_GOPList[i].m_sliceType != 0)
+      {
+        isQpOffsetAllreadyIdentified = true;
+        numQPOffset[j][1]++;
+        break;
+      }
+    }
+    if (!isQpOffsetAllreadyIdentified)
+    {
+      numQPOffset[numQPOffsetadded][0] = qp - m_iQP;
+      numQPOffset[numQPOffsetadded][1]++;
+      numQPOffsetadded++;
+    }
+  }
+
+  m_numQPOffset = numQPOffsetadded;
+  if (m_GOPList[0].m_deltaRefPics0[0] > 1)
+  {
+    m_isRA = true;
+  }
+  else
+  {
+    m_isRA = false;
+  }
+
+  for (int j = 0; j < m_numQPOffset; j++)
+  {
+    int max = MAX_INT;
+    int pos = -1;
+    for (int i = 0; i < numQPOffsetadded; i++)
+    {
+      if ((numQPOffset[i][1]>0) && (max > numQPOffset[i][0]))
+      {
+        max = numQPOffset[i][0];
+        pos = i;
+      }
+    }
+    if (pos != -1)
+    {
+      m_qpOffsetList[j] = numQPOffset[pos][0];
+    }
+    numQPOffset[pos][1] = -1;
+  }
+#endif 
 
   for (list<const char*>::const_iterator it = argv_unhandled.begin(); it != argv_unhandled.end(); it++)
   {
@@ -2713,7 +2830,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
     }
   }
 #endif
-
+#if JVET_AA0133_INTER_MTS_OPT
+#if JVET_AA0146_WRAP_AROUND_FIX
+  m_interMTSMaxSize = (m_sourceHeight > 1080) ? 32 : 16;
+#else
+  m_interMTSMaxSize = (m_iSourceHeight > 1080)? 32 : 16;
+#endif
+#endif
   if (m_chromaFormatIDC != CHROMA_420)
   {
     if (!m_horCollocatedChromaFlag)
@@ -3071,13 +3194,27 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 
 #if JVET_X0144_MAX_MTT_DEPTH_TID
-  CHECK( m_sMaxMTTHierarchyDepthByTid.size() > MAX_TLAYER, "MaxMTTHierarchyDepthByTid is greater than MAX_TLAYER" );
+#if JVET_AA0098_MTT_DEPTH_TID_BY_QP
+  std::istringstream iss(sMaxMTTHierarchyDepthByTidOverrideByQP);
+  std::string        sQp;
+  std::string        sMaxMttDepthByTidOverride;
+  getline(iss, sQp, ' ');
+  getline(iss, sMaxMttDepthByTidOverride, ' ');
+  int overriddenQP = std::stoi(sQp);
+  if (m_iQP == overriddenQP)
+  {
+    m_sMaxMTTHierarchyDepthByTid = sMaxMttDepthByTidOverride;
+  }
+#endif
+
+  CHECK(m_sMaxMTTHierarchyDepthByTid.size() > MAX_TLAYER, "MaxMTTHierarchyDepthByTid is greater than MAX_TLAYER");
 
   for( int i = 0; i < (int)m_sMaxMTTHierarchyDepthByTid.size(); i++ )
   {
     CHECK( i >= MAX_TLAYER, "Index exceeds MAX_TLAYER" );
     m_maxMTTHierarchyDepthByTid[i] = std::stoul( m_sMaxMTTHierarchyDepthByTid.substr( i, 1 ) );
   }
+
 
   for( int i = (int)m_sMaxMTTHierarchyDepthByTid.size(); i < MAX_TLAYER; i++ )
   {
@@ -3444,6 +3581,24 @@ bool EncAppCfg::xCheckParameter()
     msg( WARNING, "****************************************************************************\n");
     m_dualTree = false;
   }
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if (m_chromaBIF && (m_chromaFormatIDC == CHROMA_400))
+  {
+    msg( WARNING, "****************************************************************************\n");
+    msg( WARNING, "** WARNING: --ChromaBIF has been disabled because the chromaFormat is 400 **\n");
+    msg( WARNING, "****************************************************************************\n");
+    m_chromaBIF = false;
+  }
+#endif
+#if JVET_W0066_CCSAO
+  if (m_CCSAO && (m_chromaFormatIDC == CHROMA_400))
+  {
+    msg( WARNING, "****************************************************************************\n");
+    msg( WARNING, "** WARNING: --CCSAO has been disabled because the chromaFormat is 400 **\n");
+    msg( WARNING, "****************************************************************************\n");
+    m_CCSAO = false;
+  }
+#endif
   if (m_ccalf && (m_chromaFormatIDC == CHROMA_400))
   {
     msg( WARNING, "****************************************************************************\n");
@@ -3587,6 +3742,151 @@ bool EncAppCfg::xCheckParameter()
   {
     msg(WARNING, "DMVR is forcefully disabled since it has been disabled by the macro MULTI_PASS_DMVR. \n");
     m_DMVR = false;
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  if (!m_tmToolsEnableFlag)
+  {
+#if TM_AMVP
+    if (m_tmAmvpMode)
+    {
+      msg(WARNING, "TM-AMVP mode is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_tmAmvpMode = false;
+    }
+#endif
+#if TM_MRG
+    if (m_tmMrgMode)
+    {
+      msg(WARNING, "TM-MRG mode is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_tmMrgMode = false;
+    }
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+    if (m_tmGPMMode)
+    {
+      msg(WARNING, "GPM-TM mode is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_tmGPMMode = false;
+    }
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+    if (m_tmOBMCMode)
+    {
+      msg(WARNING, "OBMC-TM mode is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_tmOBMCMode = false;
+    }
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+    if (m_tmCIIPMode != 0)
+    {
+      msg(WARNING, "CIIP-TM mode is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_tmCIIPMode = 0;
+    }
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+    if (m_useTmvpNmvpReorder)
+    {
+      msg(WARNING, "Reordering for TMVP and non-adjacent MVP is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_useTmvpNmvpReorder = false;
+    }
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    if (m_useTMMMVD)
+    {
+      msg(WARNING, "TM-MMVD mode is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_useTMMMVD = false;
+    }
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+    if (m_altGPMSplitModeCode)
+    {
+      msg(WARNING, "GPM split mode reordering is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_altGPMSplitModeCode = false;
+    }
+#endif
+#if JVET_W0090_ARMC_TM
+    if (m_AML)
+    {
+      msg(WARNING, "ARMC is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_AML = false;
+    }
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+    if (m_armcRefinedMotion)
+    {
+      msg(WARNING, "Refined motion for ARMC is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_armcRefinedMotion = false;
+    }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+    if (m_numQPOffset)
+    {
+      msg(WARNING, "Diversity criterion for ARMC is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_numQPOffset = 0;
+    }
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    if (m_useARL)
+    {
+      msg(WARNING, "Reference picture reordering is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_useARL = false;
+    }
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+    if (m_MVSD)
+    {
+      msg(WARNING, "MVD sign prediction is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_MVSD = false;
+    }
+#endif
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
+  if (!m_Geo && m_tmGPMMode)
+  {
+    msg(WARNING, "GPM-TM mode is forcefully disabled since GPM is disabled. \n");
+    m_tmGPMMode = false;
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  if (!m_OBMC && m_tmOBMCMode)
+  {
+    msg(WARNING, "OBMC-TM mode is forcefully disabled since OBMC is disabled. \n");
+    m_tmOBMCMode = false;
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  if (!m_ciip && m_tmCIIPMode != 0)
+  {
+    msg(WARNING, "CIIP-TM mode is forcefully disabled since CIIP is disabled. \n");
+    m_tmCIIPMode = 0;
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  if (!m_AML && m_useTmvpNmvpReorder)
+  {
+    msg(WARNING, "Forcefully disable reordering for TMVP and non-adjacent MVP since ARMC is disabled. \n");
+    m_useTmvpNmvpReorder = false;
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  if (!m_AML && m_armcRefinedMotion)
+  {
+    msg(WARNING, "Forcefully disable refined motion for ARMC since ARMC is disabled. \n");
+    m_armcRefinedMotion = false;
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  if (!m_AML && m_numQPOffset)
+  {
+    msg(WARNING, "Forcefully disable diversity criterion for ARMC since ARMC is disabled. \n");
+    m_numQPOffset = 0;
+  }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  if (!m_MMVD && !m_AffineMmvdMode && m_useTMMMVD)
+  {
+    msg(WARNING, "Forcefully disable TM-MMVD since neither MMVD nor AffineMMVD is enabled. \n");
+    m_useTMMMVD = 0;
   }
 #endif
 
@@ -4771,10 +5071,19 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "DualITree:%d ", m_dualTree );
     msg( VERBOSE, "IMV:%d ", m_ImvMode );
     msg( VERBOSE, "BIO:%d ", m_BIO );
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC && !JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    msg( VERBOSE, "ArmcRefinedMotion:%d ", m_armcRefinedMotion );
+#endif
     msg( VERBOSE, "LMChroma:%d ", m_LMChroma );
     msg( VERBOSE, "HorCollocatedChroma:%d ", m_horCollocatedChromaFlag );
     msg( VERBOSE, "VerCollocatedChroma:%d ", m_verCollocatedChromaFlag );
     msg( VERBOSE, "MTS: %1d(intra) %1d(inter) ", m_MTS & 1, ( m_MTS >> 1 ) & 1 );
+#if JVET_AA0133_INTER_MTS_OPT
+    if ((m_MTS >> 1) & 1)
+    {
+      msg(VERBOSE, "InterMTSMaxSize: %d ", m_interMTSMaxSize);
+    }
+#endif
     msg( VERBOSE, "SBT:%d ", m_SBT );
     msg( VERBOSE, "ISP:%d ", m_ISP );
     msg( VERBOSE, "SMVD:%d ", m_SMVD );
@@ -4795,11 +5104,13 @@ void EncAppCfg::xPrintParameter()
     msg(VERBOSE, "AffineAmvp:%d ", m_AffineAmvp);
     msg(VERBOSE, "DMVR:%d ", m_DMVR);
     msg(VERBOSE, "MmvdDisNum:%d ", m_MmvdDisNum);
+#if !JVET_AA0132_CONFIGURABLE_TM_TOOLS
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
     msg(VERBOSE, "MVSD:%d ", m_MVSD);
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
     msg(VERBOSE, "ARL:%d ", m_useARL);
+#endif
 #endif
     msg(VERBOSE, "JointCbCr:%d ", m_JointCbCrMode);
   }
@@ -4807,6 +5118,9 @@ void EncAppCfg::xPrintParameter()
   msg(VERBOSE, "ACT:%d ", m_useColorTrans);
     msg(VERBOSE, "PLT:%d ", m_PLTMode);
     msg(VERBOSE, "IBC:%d ", m_IBCMode);
+#if JVET_AA0061_IBC_MBVD
+    msg( VERBOSE, "IBCMBVD:%d ", m_ibcMbvd );
+#endif
   msg( VERBOSE, "HashME:%d ", m_HashME );
   msg( VERBOSE, "WrapAround:%d ", m_wrapAround);
   if( m_wrapAround )
@@ -4919,17 +5233,55 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "FastPicLevelLIC:%d ", m_fastPicLevelLIC );
   }
 #endif
+#if !JVET_AA0132_CONFIGURABLE_TM_TOOLS
 #if JVET_W0090_ARMC_TM
   msg( VERBOSE, "AML:%d ", m_AML );
 #endif
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   msg( VERBOSE, "DMVD:%d ", m_DMVDMode );
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  msg( VERBOSE, "EnableTMTools:%d ( ", m_tmToolsEnableFlag );
+#if TM_AMVP
+  msg( VERBOSE, "TMAmvp:%d ", m_tmAmvpMode );
+#endif
+#if TM_MRG
+  msg( VERBOSE, "TMMrg:%d ", m_tmMrgMode );
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  msg( VERBOSE, "GPMTM:%d ", m_tmGPMMode );
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  msg( VERBOSE, "OBMCTM:%d ", m_tmOBMCMode );
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  msg( VERBOSE, "CIIPTM:%d ", m_tmCIIPMode );
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  msg( VERBOSE, "TmvpNmvpAML:%d ", m_useTmvpNmvpReorder );
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  msg( VERBOSE, "TMMMVD:%d ", m_useTMMMVD );
+#endif
+#if JVET_W0090_ARMC_TM
+  msg( VERBOSE, "AML:%d ", m_AML );
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  msg(VERBOSE, "ArmcRefinedMotion:%d ", m_armcRefinedMotion);
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  msg( VERBOSE, "ARL:%d ", m_useARL );
+#endif
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   msg( VERBOSE, "MVSD:%d ", m_MVSD );
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
-    msg(VERBOSE, "AltGPMSplitModeCode:%d ", m_altGPMSplitModeCode);
+  msg( VERBOSE, "AltGPMSplitModeCode:%d ", m_altGPMSplitModeCode );
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  msg( VERBOSE, ") " );
 #endif
 
   // transform and coefficient coding

@@ -48,7 +48,7 @@ struct AlfCovariance
 {
   static constexpr int MaxAlfNumClippingValues = AdaptiveLoopFilter::MaxAlfNumClippingValues;
 
-#if JVET_X0071_LONGER_CCALF
+#if JVET_X0071_LONGER_CCALF && !JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
   using TE = double[MAX_NUM_CC_ALF_CHROMA_COEFF][MAX_NUM_CC_ALF_CHROMA_COEFF];
   using Ty = double[MAX_NUM_CC_ALF_CHROMA_COEFF];
 #else
@@ -381,15 +381,31 @@ private:
 #if ALF_IMPROVEMENT
   template<bool m_alfWSSD>
 #if JVET_X0071_ALF_BAND_CLASSIFIER
-  void   getBlkStats(AlfCovariance* alfCovariace, const AlfFilterShape& shape, AlfClassifier** classifier, const Pel* org, const int orgStride, const Pel* rec, const int recStride, const CompArea& areaDst, const CompArea& area, const ChannelType channel, int fixedFilterSetIdx, int classifierIdx);
+  void   getBlkStats(AlfCovariance* alfCovariace, const AlfFilterShape& shape, AlfClassifier** classifier, const Pel* org, const int orgStride, const Pel* rec, const int recStride,
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+    const Pel* recBeforeDb, const int recBeforeDbStride,
+#endif
+    const CompArea& areaDst, const CompArea& area, const ChannelType channel, int fixedFilterSetIdx, int classifierIdx);
 #else
-  void   getBlkStats(AlfCovariance* alfCovariace, const AlfFilterShape& shape, AlfClassifier** classifier, const Pel* org, const int orgStride, const Pel* rec, const int recStride, const CompArea& areaDst, const CompArea& area, const ChannelType channel, int fixedFilterSetIdx);
+  void   getBlkStats(AlfCovariance* alfCovariace, const AlfFilterShape& shape, AlfClassifier** classifier, const Pel* org, const int orgStride, const Pel* rec, const int recStride,
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+    const Pel* recBeforeDb, const int recBeforeDbStride,
+#endif
+    const CompArea& areaDst, const CompArea& area, const ChannelType channel, int fixedFilterSetIdx);
 #endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
-  void   calcCovariance(Pel ELocal[MAX_NUM_ALF_LUMA_COEFF][MaxAlfNumClippingValues], const Pel *rec, const int stride, const AlfFilterShape& shape, const int transposeIdx, const ChannelType channel, Pel ***fixedFitlerResults, Position pos, int fixedFilterSetIdx);
+  void   calcCovariance(Pel ELocal[MAX_NUM_ALF_LUMA_COEFF][MaxAlfNumClippingValues], const Pel *rec, const int stride,
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+    const Pel* recBeforeDb, const int recBeforeDbStride,
+#endif
+    const AlfFilterShape& shape, const int transposeIdx, const ChannelType channel, Pel ***fixedFitlerResults, Position pos, int fixedFilterSetIdx);
 #else  
-  void   calcCovariance(int ELocal[MAX_NUM_ALF_LUMA_COEFF][MaxAlfNumClippingValues], const Pel *rec, const int stride, const AlfFilterShape& shape, const int transposeIdx, const ChannelType channel, Pel ***fixedFitlerResults, Position pos, int fixedFilterSetIdx);
-#endif   
+  void   calcCovariance(int ELocal[MAX_NUM_ALF_LUMA_COEFF][MaxAlfNumClippingValues], const Pel *rec, const int stride,
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+    const Pel* recBeforeDb, const int recBeforeDbStride,
+#endif
+    const AlfFilterShape& shape, const int transposeIdx, const ChannelType channel, Pel ***fixedFitlerResults, Position pos, int fixedFilterSetIdx);
+#endif
 #else
   void   getBlkStats(AlfCovariance* alfCovariace, const AlfFilterShape& shape, AlfClassifier** classifier, Pel* org, const int orgStride, Pel* rec, const int recStride, const CompArea& areaDst, const CompArea& area, const ChannelType channel, int vbCTUHeight, int vbPos);
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
@@ -398,7 +414,6 @@ private:
   void   calcCovariance(int ELocal[MAX_NUM_ALF_LUMA_COEFF][MaxAlfNumClippingValues], const Pel *rec, const int stride, const AlfFilterShape& shape, const int transposeIdx, const ChannelType channel, int vbDistance);
 #endif
 #endif
-
   template<bool alfWSSD>
   void   deriveStatsForCcAlfFiltering(const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const int compIdx,
                                       const int maskStride, const uint8_t filterIdc, CodingStructure &cs);

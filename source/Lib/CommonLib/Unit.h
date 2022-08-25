@@ -350,6 +350,9 @@ struct CodingUnit : public UnitArea
 #if INTER_LIC
   bool           LICFlag;
 #endif
+#if JVET_AA0070_RRIBC
+  int    rribcFlipType;
+#endif
 
   // needed for fast imv mode decisions
   int8_t          imvNumCand;
@@ -430,13 +433,23 @@ struct IntraPredictionData
 #if JVET_Z0050_CCLM_SLOPE
   CclmOffsets cclmOffsets;
 #endif
+#if JVET_AA0126_GLM
+  GlmIdc    glmIdc;
+#endif
+#if JVET_AA0057_CCCM
+  int       cccmFlag;
+#endif
 };
 
 struct InterPredictionData
 {
   bool      mergeFlag;
   bool      regularMergeFlag;
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  uint16_t    mergeIdx;
+#else
   uint8_t     mergeIdx;
+#endif
   uint8_t     geoSplitDir;
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   uint8_t     geoSyntaxMode;
@@ -461,14 +474,26 @@ struct InterPredictionData
   uint8_t     geoBldIdx;
 #endif
   bool           mmvdMergeFlag;
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  uint16_t      mmvdMergeIdx;
+#else
   uint8_t       mmvdMergeIdx;
+#endif
+#if JVET_AA0061_IBC_MBVD
+  bool          ibcMbvdMergeFlag;
+  int           ibcMbvdMergeIdx;
+#endif
 #if AFFINE_MMVD
   bool        afMmvdFlag;
   uint8_t     afMmvdBaseIdx; // base vector's merge index at the affine merge list, excluding sbTmvp
   uint8_t     afMmvdStep;
   uint8_t     afMmvdDir;
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+  uint16_t    afMmvdMergeIdx;
+#else
   uint8_t     afMmvdMergeIdx;
+#endif
 #endif
 #endif
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
@@ -487,6 +512,9 @@ struct InterPredictionData
   bool      bdmvrRefine;
 #else
   Mv        mvdL0SubPu[MAX_NUM_SUBCU_DMVR];
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  bool      reduceTplSize;
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   bool      amvpMergeModeFlag[NUM_REF_PIC_LIST_01];

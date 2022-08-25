@@ -320,6 +320,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if INTER_LIC
   LICFlag           = other.LICFlag;
 #endif
+#if JVET_AA0070_RRIBC
+  rribcFlipType = other.rribcFlipType;
+#endif
 
   for (int idx = 0; idx < MAX_NUM_CHANNEL_TYPE; idx++)
   {
@@ -414,6 +417,9 @@ void CodingUnit::initData()
 #endif
 #if INTER_LIC
   LICFlag = false;
+#endif
+#if JVET_AA0070_RRIBC
+  rribcFlipType = 0;
 #endif
 
   for (int idx = 0; idx < MAX_NUM_CHANNEL_TYPE; idx++)
@@ -648,6 +654,12 @@ void PredictionUnit::initData()
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = {};
 #endif
+#if JVET_AA0126_GLM
+  glmIdc      = {};
+#endif
+#if JVET_AA0057_CCCM
+  cccmFlag    = 0;
+#endif
   // inter data
   mergeFlag   = false;
   regularMergeFlag = false;
@@ -676,6 +688,10 @@ void PredictionUnit::initData()
 #endif
   mmvdMergeFlag = false;
   mmvdMergeIdx = MAX_UCHAR;
+#if JVET_AA0061_IBC_MBVD
+  ibcMbvdMergeFlag = false;
+  ibcMbvdMergeIdx = MAX_INT;
+#endif
 #if AFFINE_MMVD
   afMmvdFlag    = false;
   afMmvdBaseIdx = UINT8_MAX;
@@ -701,6 +717,9 @@ void PredictionUnit::initData()
   bdmvrRefine = false;
 #else
   ::memset(mvdL0SubPu, 0, sizeof(mvdL0SubPu));
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  reduceTplSize = false;
 #endif
 
 #if JVET_Z0054_BLK_REF_PIC_REORDER
@@ -766,6 +785,12 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = predData.cclmOffsets;
 #endif
+#if JVET_AA0126_GLM
+  glmIdc      = predData.glmIdc;
+#endif
+#if JVET_AA0057_CCCM
+  cccmFlag    = predData.cccmFlag;
+#endif
   return *this;
 }
 
@@ -798,6 +823,10 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 #endif
   mmvdMergeFlag = predData.mmvdMergeFlag;
   mmvdMergeIdx = predData.mmvdMergeIdx;
+#if JVET_AA0061_IBC_MBVD
+  ibcMbvdMergeFlag = predData.ibcMbvdMergeFlag;
+  ibcMbvdMergeIdx = predData.ibcMbvdMergeIdx;
+#endif
 #if AFFINE_MMVD
   afMmvdFlag    = predData.afMmvdFlag;
   afMmvdBaseIdx = predData.afMmvdBaseIdx;
@@ -823,6 +852,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   bdmvrRefine = predData.bdmvrRefine;
 #else
   ::memcpy(mvdL0SubPu, predData.mvdL0SubPu, sizeof(mvdL0SubPu));
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  reduceTplSize = predData.reduceTplSize;
 #endif
 
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
@@ -881,6 +913,12 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = other.cclmOffsets;
 #endif
+#if JVET_AA0126_GLM
+  glmIdc      = other.glmIdc;
+#endif
+#if JVET_AA0057_CCCM
+  cccmFlag    = other.cccmFlag;
+#endif
 
   mergeFlag   = other.mergeFlag;
   regularMergeFlag = other.regularMergeFlag;
@@ -916,6 +954,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
   mmvdMergeFlag = other.mmvdMergeFlag;
   mmvdMergeIdx = other.mmvdMergeIdx;
+#if JVET_AA0061_IBC_MBVD
+  ibcMbvdMergeFlag = other.ibcMbvdMergeFlag;
+  ibcMbvdMergeIdx = other.ibcMbvdMergeIdx;
+#endif
 #if AFFINE_MMVD
   afMmvdFlag    = other.afMmvdFlag;
   afMmvdBaseIdx = other.afMmvdBaseIdx;
@@ -941,6 +983,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   bdmvrRefine = other.bdmvrRefine;
 #else
   ::memcpy(mvdL0SubPu, other.mvdL0SubPu, sizeof(mvdL0SubPu));
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  reduceTplSize = other.reduceTplSize;
 #endif
 
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)

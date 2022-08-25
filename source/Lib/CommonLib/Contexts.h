@@ -342,6 +342,9 @@ public:
 #if JVET_X0049_ADAPT_DMVR
   static const CtxSet   BMMergeFlag;
 #endif
+#if JVET_AA0070_RRIBC
+  static const CtxSet   rribcFlipType;
+#endif
 #if JVET_Y0065_GPM_INTRA
   static const CtxSet   GPMIntraFlag;
 #endif
@@ -380,6 +383,9 @@ public:
   static const CtxSet   MmvdFlag;
   static const CtxSet   MmvdMergeIdx;
   static const CtxSet   MmvdStepMvpIdx;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  static const CtxSet   MmvdStepMvpIdxECM3;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
   static const CtxSet   GeoMmvdFlag;
   static const CtxSet   GeoMmvdStepMvpIdx;
@@ -398,7 +404,16 @@ public:
   static const CtxSet   AfMmvdFlag;
   static const CtxSet   AfMmvdIdx;
   static const CtxSet   AfMmvdOffsetStep;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  static const CtxSet   AfMmvdOffsetStepECM3;
 #endif
+#endif
+  #if JVET_AA0061_IBC_MBVD
+  static const CtxSet   IbcMbvdFlag;
+  static const CtxSet   IbcMbvdMergeIdx;
+  static const CtxSet   IbcMbvdStepMvpIdx;
+#endif
+
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   static const CtxSet   TMMergeFlag;
 #endif
@@ -493,6 +508,12 @@ public:
 #endif
 #if JVET_Z0050_CCLM_SLOPE
   static const CtxSet   CclmDeltaFlags;
+#endif
+#if JVET_AA0126_GLM
+  static const CtxSet   GlmFlags;
+#endif
+#if JVET_AA0057_CCCM
+  static const CtxSet   CccmFlag;
 #endif
   static const unsigned NumberOfContexts;
 

@@ -322,6 +322,11 @@ protected:
   int       m_maxDecPicBuffering[MAX_TLAYER];
   int       m_numReorderPics[MAX_TLAYER];
   int       m_drapPeriod;
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  bool      m_isRA;
+  int       m_numQPOffset;
+  int       m_qpOffsetList[MAX_GOP];
+#endif
 
   int       m_iQP;                              //  if (AdaptiveQP == OFF)
   ChromaQpMappingTableParams m_chromaQpMappingTableParams;
@@ -404,6 +409,30 @@ protected:
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool      m_DMVDMode;
 #endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  bool      m_tmToolsEnableFlag;
+#if TM_AMVP
+  bool      m_tmAmvpMode;
+#endif
+#if TM_MRG
+  bool      m_tmMrgMode;
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  bool      m_tmGPMMode;
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  bool      m_tmOBMCMode;
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  int       m_tmCIIPMode;
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  bool      m_useTmvpNmvpReorder;
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  bool      m_useTMMMVD;
+#endif
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   bool      m_altGPMSplitModeCode;
 #endif
@@ -411,6 +440,9 @@ protected:
   bool      m_BIO;
 #if JVET_W0090_ARMC_TM
   bool      m_AML;
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  bool      m_armcRefinedMotion;
 #endif
 
   bool      m_SMVD;
@@ -422,6 +454,9 @@ protected:
   int       m_LadfNumIntervals;
   int       m_LadfQpOffset[MAX_LADF_INTERVALS];
   int       m_LadfIntervalLowerBound[MAX_LADF_INTERVALS];
+#endif
+#if JVET_AA0133_INTER_MTS_OPT
+  int      m_interMTSMaxSize;
 #endif
 #if ENABLE_DIMD
   bool      m_dimd;
@@ -459,6 +494,9 @@ protected:
   unsigned  m_IBCHashSearchMaxCand;
   unsigned  m_IBCHashSearchRange4SmallBlk;
   unsigned  m_IBCFastMethod;
+#if JVET_AA0061_IBC_MBVD
+  bool      m_ibcMbvd;
+#endif
 
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;
@@ -1172,6 +1210,10 @@ public:
       if (m_RPLList1[i].m_POC != -1) m_numRPLList1++;
     }
   }
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  void      setIsRA                         (bool b)         { m_isRA = b; }
+  void      setNumQPOffset                  (int num)        { m_numQPOffset = num; }
+#endif
   const RPLEntry &getRPLEntry(int L01, int idx) const { return (L01 == 0) ? m_RPLList0[idx] : m_RPLList1[idx]; }
   int       getRPLCandidateSize(int L01) const { return  (L01 == 0) ? m_numRPLList0 : m_numRPLList1; }
   void      setEncodedFlag(uint32_t  i, bool value) { m_RPLList0[i].m_isEncoded = value; m_RPLList1[i].m_isEncoded = value; m_GOPList[i].m_isEncoded = value; }
@@ -1313,9 +1355,45 @@ public:
   void      setAffineMmvdMode               ( bool b )       { m_AffineMmvdMode = b; }
   bool      getAffineMmvdMode               ()         const { return m_AffineMmvdMode; }
 #endif
+#if JVET_AA0061_IBC_MBVD
+  void      setIbcMbvd                      ( bool b )       { m_ibcMbvd = b; }
+  bool      getIbcMbvd                      ()         const { return m_ibcMbvd; }
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void      setUseDMVDMode                  (bool b)         { m_DMVDMode = b; }
   bool      getUseDMVDMode                  ()         const { return m_DMVDMode; }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  void      setTMToolsEnableFlag            (bool b)         { m_tmToolsEnableFlag = b; }
+  bool      getTMToolsEnableFlag            ()         const { return m_tmToolsEnableFlag; }
+#if TM_AMVP
+  void      setUseTMAmvpMode                (bool b)         { m_tmAmvpMode = b; }
+  bool      getUseTMAmvpMode                ()         const { return m_tmAmvpMode; }
+#endif
+#if TM_MRG
+  void      setUseTMMrgMode                 (bool b)         { m_tmMrgMode = b; }
+  bool      getUseTMMrgMode                 ()         const { return m_tmMrgMode; }
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  void      setUseGPMTMMode                  (bool b)         { m_tmGPMMode = b; }
+  bool      getUseGPMTMMode                  ()         const { return m_tmGPMMode; }
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  void      setUseOBMCTMMode                (bool b)         { m_tmOBMCMode = b; }
+  bool      getUseOBMCTMMode                ()         const { return m_tmOBMCMode; }
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  void      setUseCIIPTMMode                (int i)          { m_tmCIIPMode = i; }
+  int       getUseCIIPTMMode                ()         const { return m_tmCIIPMode; }
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  void      setUseTmvpNmvpReordering        (bool b)         { m_useTmvpNmvpReorder = b; }
+  bool      getUseTmvpNmvpReordering        ()         const { return m_useTmvpNmvpReorder; }
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void      setUseTMMMVD                    (bool b)         { m_useTMMMVD = b; }
+  bool      getUseTMMMVD                    ()         const { return m_useTMMMVD; }
+#endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void      setUseAltGPMSplitModeCode       (bool b)         { m_altGPMSplitModeCode = b; }
@@ -1328,6 +1406,10 @@ public:
 #if JVET_W0090_ARMC_TM
   void      setAML(bool b)                                   { m_AML = b; }
   bool      getAML()                                   const { return m_AML; }
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  void      setArmcRefinedMotion(bool b)                     { m_armcRefinedMotion = b; }
+  bool      getArmcRefinedMotion()                     const { return m_armcRefinedMotion; }
 #endif
 #if ENABLE_OBMC
   void      setUseOBMC                      ( bool n )       { m_OBMC = n; }
@@ -1368,6 +1450,10 @@ public:
   void      setLadfIntervalLowerBound       ( int value, int idx ){ m_LadfIntervalLowerBound[ idx ] = value; }
   int       getLadfIntervalLowerBound       ( int idx ) const { return m_LadfIntervalLowerBound[ idx ]; }
 
+#endif
+#if JVET_AA0133_INTER_MTS_OPT
+  void      setInterMTSMaxSize(int size) { m_interMTSMaxSize = size; }
+  int       getInterMTSMaxSize()        const { return m_interMTSMaxSize; }
 #endif
 
 #if ENABLE_DIMD

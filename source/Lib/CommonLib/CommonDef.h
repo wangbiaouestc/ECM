@@ -162,15 +162,25 @@ static const int AMVP_DECIMATION_FACTOR =                           1;
 static const int AMVP_DECIMATION_FACTOR =                           2;
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+static const int NUM_MERGE_CANDS =                                 28; ///< for maximum buffer of merging candidates
+static const int NUM_TMVP_CANDS =                                  8; ///< TMVP
+static const int MAX_PAIR_CANDS =                                  4; ///< MAX Pairiwse candidates for Regular TM and BM merge modes
+#else
 static const int NUM_MERGE_CANDS =                                 30; ///< for maximum buffer of merging candidates
 static const int NUM_TMVP_CANDS =                                   9; ///< TMVP
+#endif
 #elif JVET_Z0075_IBC_HMVP_ENLARGE
 static const int NUM_MERGE_CANDS =                                 20;
 #endif
 #if NON_ADJACENT_MRG_CAND
 static const int MRG_MAX_NUM_CANDS =                                15; ///< MERGE
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+static const int NUM_NON_ADJ_CANDS =                                16; ///< Non-Adj
+#else
 static const int NUM_NON_ADJ_CANDS =                                18; ///< Non-Adj
+#endif
 #endif
 static const int LAST_MERGE_IDX_CABAC =                              5;
 #else
@@ -186,6 +196,11 @@ static const int AFFINE_MRG_MAX_NUM_CANDS =                         15; ///< AFF
 #else
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFINE MERGE
 #endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+static const int AFF_MAX_NON_ADJACENT_INHERITED_CANDS = 6;
+static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 30;
+static const int ADDITIONAL_AFFINE_CAND_NUM = 15;
+#endif
 static const int IBC_MRG_MAX_NUM_CANDS =                            6; ///< IBC MERGE
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 static const int IBC_MRG_MAX_NUM_CANDS_MEM =                        20; ///< IBC MERGE- max number of candidates 
@@ -198,6 +213,20 @@ static const int MAX_NUM_AMVP_CANDS_MAX_REF =                       MAX_NUM_REF 
 #endif
 static const int AMVP_MERGE_MODE_MERGE_LIST_MAX_CANDS =             6;
 static const int AMVP_MERGE_MODE_REDUCED_MV_REFINE_SEARCH_ROUND =   8;
+#endif
+
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+static const double LAMBDA_DEC_SIDE[MAX_QP] = {
+  0.777106,       0.872272,       0.979092,       1.098994,       1.233579,       1.384646,       1.554212,
+  1.744544,       1.958185,       2.197988,       2.467158,       2.769291,       3.108425,       3.489089,
+  3.916370,       4.395976,       4.934316,       5.538583,       6.216849,       6.978177,       7.832739,
+  8.791952,       9.868633,       11.077166,      12.433698,      13.956355,      15.665478,      17.583905,
+  19.737266,       22.154332,      24.867397,      27.912709,      31.330957,      35.167810,      39.474532,
+  44.308664,       49.734793,      55.825418,      62.661913,      70.335619,      78.949063,      88.617327,
+  99.469587,       111.650836,     125.323826,     140.671239,     157.898127,     177.234655,     198.939174,
+  223.301672,       250.647653,     281.342477,     315.796254,     354.469310,     397.878347,     446.603345,
+  501.295305,       562.684955,     631.592507,     708.938619,     795.756695,     893.206689,     1002.590610
+};
 #endif
 
 static const int MAX_TLAYER =                                       7; ///< Explicit temporal layer QP offset - max number of temporal layer
@@ -271,9 +300,21 @@ static const int MAX_NUM_ALF_CLASSES         =                     25;
 #if ALF_IMPROVEMENT
 static const int MAX_NUM_ALF_ALTERNATIVES_LUMA = 4;
 static const int EXT_LENGTH = 2;
-static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH;
-static const int MAX_NUM_ALF_CHROMA_COEFF    =                     21;
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+static const int NUM_DB                      =                      3;
+static const int NUM_DB_SAMPLE               =                      5;
+static const int NUM_DB_PAD                  =                      1;
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB;
+#if JVET_AA0095_ALF_LONGER_FILTER
+static const int MAX_ALF_FILTER_LENGTH       =                     13;
+#else
 static const int MAX_ALF_FILTER_LENGTH       =                      9;
+#endif
+#else
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH;
+static const int MAX_ALF_FILTER_LENGTH       =                      9;
+#endif
+static const int MAX_NUM_ALF_CHROMA_COEFF    =                     21;
 #else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     13;
 static const int MAX_NUM_ALF_CHROMA_COEFF    =                      7;
@@ -572,14 +613,24 @@ static const int LAST_SIGNIFICANT_GROUPS =                         14;
 #endif
 
 static const int AFFINE_MIN_BLOCK_SIZE =                            4; ///< Minimum affine MC block size
-
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int MMVD_BI_DIR =                                      3;
+static const int AFFINE_BI_DIR =                                    3;
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 static const int MMVD_REFINE_STEP =                                 6; ///< max number of distance step
 #else
 static const int MMVD_REFINE_STEP =                                 8; ///< max number of distance step
 #endif
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int MMVD_MAX_DIR_UNI =                                 16;
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int MMVD_MAX_DIR =                                     MMVD_MAX_DIR_UNI * MMVD_BI_DIR;
+#else
 static const int MMVD_MAX_DIR =                                     16;
+#endif
 #endif
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -591,15 +642,26 @@ static const int MMVD_MAX_REFINE_NUM =                              (MMVD_REFINE
 static const int MMVD_MAX_REFINE_NUM =                              (MMVD_REFINE_STEP * 4); ///< max number of candidate from a base candidate
 #endif
 
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int MMVD_BASE_MV_NUM =                                 3; ///< max number of base candidate
+#else
 static const int MMVD_BASE_MV_NUM =                                 2; ///< max number of base candidate
+#endif
 static const int MMVD_ADD_NUM =                                     (MMVD_MAX_REFINE_NUM * MMVD_BASE_MV_NUM);///< total number of mmvd candidate
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int VVC_MMVD_BASE_MV_NUM =                             2; ///< max number of base candidate
+static const int VVC_MMVD_REFINE_STEP =                             8; ///< max number of distance step
+static const int VVC_MMVD_MAX_DIR =                                 4;
+static const int VVC_MMVD_MAX_REFINE_NUM =                          (VVC_MMVD_REFINE_STEP * VVC_MMVD_MAX_DIR); ///< max number of candidate from a base candidate
+static const int VVC_MMVD_ADD_NUM =                                 (VVC_MMVD_MAX_REFINE_NUM * VVC_MMVD_BASE_MV_NUM);///< total number of mmvd candidate
+#endif
 #if MERGE_ENC_OPT
 static const int MMVD_MRG_MAX_RD_NUM =                              20;
 #else
 static const int MMVD_MRG_MAX_RD_NUM =                              MRG_MAX_NUM_CANDS;
 #endif
 static const int MMVD_MRG_MAX_RD_BUF_NUM =                          (MMVD_MRG_MAX_RD_NUM + 1);///< increase buffer size by 1
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AA0061_IBC_MBVD
 static const int LAST_MERGE_MMVD_IDX_CABAC =                        5;
 #endif
 #if JVET_W0097_GPM_MMVD_TM
@@ -693,13 +755,28 @@ static const int    THRES_AFFINE =                                  4;
 #if !MERGE_ENC_OPT
 static const int    NUM_MRG_SATD_CAND =                             4;
 #endif
+#if JVET_AA0061_IBC_MBVD
+static const int    NUM_IBC_MRG_SATD_CAND =                         3;
+#endif
 static const double MRG_FAST_RATIO    =                             1.25;
 static const int    NUM_AFF_MRG_SATD_CAND =                         2;
 #if AFFINE_MMVD
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int    AF_MMVD_BASE_NUM =                              3;
+#else
 static const int    AF_MMVD_BASE_NUM =                              1;
+#endif
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int    AF_MMVD_STEP_NUM =                              4; // number of distance offset
+#else
 static const int    AF_MMVD_STEP_NUM =                              5; // number of distance offset
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int    AF_MMVD_OFFSET_DIR =                            8 * AFFINE_BI_DIR;
+#else
 static const int    AF_MMVD_OFFSET_DIR =                            8;
+#endif
 #else
 static const int    AF_MMVD_OFFSET_DIR =                            4; // 00: (+, 0); 01: (-, 0); 10: (0, +); 11 (0, -);
 #endif
@@ -708,6 +785,13 @@ static const int    AFFINE_MMVD_SIZE_SHIFT =                        1;
 #endif
 static const int    AF_MMVD_MAX_REFINE_NUM = AF_MMVD_STEP_NUM * AF_MMVD_OFFSET_DIR; ///< max number of candidate from a base candidate
 static const int    AF_MMVD_NUM = AF_MMVD_BASE_NUM * AF_MMVD_MAX_REFINE_NUM;        ///< total number of affine mmvd candidate
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+static const int    ECM3_AF_MMVD_BASE_NUM =                         1;
+static const int    ECM3_AF_MMVD_STEP_NUM =                         5; // number of distance offset used in ECM3
+static const int    ECM3_AF_MMVD_OFFSET_DIR =                       4; // 00: (+, 0); 01: (-, 0); 10: (0, +); 11 (0, -);
+static const int    ECM3_AF_MMVD_MAX_REFINE_NUM = ECM3_AF_MMVD_STEP_NUM * ECM3_AF_MMVD_OFFSET_DIR; ///< max number of candidate from a base candidate used in ECM3
+static const int    ECM3_AF_MMVD_NUM = ECM3_AF_MMVD_BASE_NUM * ECM3_AF_MMVD_MAX_REFINE_NUM;   ///< total number of affine mmvd candidate used in ECM3
+#endif
 #if !MERGE_ENC_OPT
 static const int    NUM_AF_MMVD_SATD_CAND = std::min((int)1, MRG_MAX_NUM_CANDS);
 #endif
@@ -725,7 +809,7 @@ static const int    TM_LOG2_BASE_WEIGHT =                           5; ///< base
 static const int    TM_DISTANCE_WEIGHTS[][4] = { { 0, 1, 2, 3 }, { 1, 2, 3, 3 } }; ///< far to near
 static const int    TM_SPATIAL_WEIGHTS [][4] = { { 2, 2, 2, 2 }, { 0, 1, 1, 2 } }; ///< "left to right for above template" or "top to bottom for left template"
 #if TM_MRG
-#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+#if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING || JVET_AA0093_REFINED_MOTION_FOR_ARMC) && JVET_W0090_ARMC_TM
 static const int    TM_MRG_MAX_NUM_INIT_CANDS =                    10; ///< maximum number of TM merge candidates for ARMC (note: should be at most equal to MRG_MAX_NUM_CANDS)
 #endif
 static const int    TM_MRG_MAX_NUM_CANDS =                          4; ///< maximum number of TM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
@@ -739,7 +823,7 @@ static const int    TM_MAX_NUM_SATD_CAND = std::min((int)4, TM_MRG_MAX_NUM_CANDS
 #endif
 #endif
 #endif
-#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+#if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING || JVET_AA0093_REFINED_MOTION_FOR_ARMC) && JVET_W0090_ARMC_TM
 static const int    BM_MRG_MAX_NUM_INIT_CANDS =                    10; ///< maximum number of BM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
 #endif
 #if MULTI_PASS_DMVR
@@ -771,7 +855,11 @@ static const double AMAXBT_TH128 =                                 60.0;
 static const int AML_MERGE_TEMPLATE_SIZE =                         1;
 static const int ADAPTIVE_SUB_GROUP_SIZE =                         5;
 #if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE = RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE;
+#else
 static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE = AFFINE_MRG_MAX_NUM_CANDS;
+#endif
 #else
 static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE =                  3;
 #endif
@@ -792,7 +880,37 @@ static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD =   MMVD_MAX_REFINE_NUM;
 #endif
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM >> 1;
+#else
 static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM;
+#endif
+#endif
+
+#if JVET_AA0057_CCCM
+static const int CCCM_WINDOW_SIZE         = 6;
+static const int CCCM_NUM_PARAMS          = 7;
+static const int CCCM_MIN_PU_SIZE         = 0; // Set to 0 for no size restriction
+static const int CCCM_REF_LINES_ABOVE_CTU = 0; // Number of chroma lines allowed to be included in the reference area above the CTU (0: no restrictions)
+static const int CCCM_FILTER_PADDING      = 1; // E.g. 3x3 filter needs one padded sample
+static const int CCCM_MAX_REF_SAMPLES     = ( 2 * CCCM_WINDOW_SIZE * ( 2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE ) );
+static const int CCCM_MATRIX_BITS         = 28;
+static const int CCCM_DECIM_BITS          = 22;
+static const int CCCM_DECIM_ROUND         = ( 1 << (CCCM_DECIM_BITS - 1 ) );
+#endif
+
+#if JVET_AA0126_GLM
+#if JVET_AA0057_CCCM
+#define NUM_GLM_WEIGHT                                              0
+static const int NUM_GLM_PATTERN =                                  4;
+static const int NUM_GLM_PATTERN_BITS =                             2;
+static const int NUM_GLM_IDC =                                      5;
+#else
+#define NUM_GLM_WEIGHT                                              2
+static const int NUM_GLM_PATTERN =                                 16;
+static const int NUM_GLM_PATTERN_BITS =                             4;
+static const int NUM_GLM_IDC =                                     33;
+#endif
 #endif
 
 #if JVET_Y0152_TT_ENC_SPEEDUP
@@ -920,6 +1038,18 @@ static const int CHROMA_REFINEMENT_CANDIDATES = 8; /// 8 candidates BV to choose
 static const int IBC_FAST_METHOD_NOINTRA_IBCCBF0 = 0x01;
 static const int IBC_FAST_METHOD_BUFFERBV = 0X02;
 static const int IBC_FAST_METHOD_ADAPTIVE_SEARCHRANGE = 0X04;
+#if JVET_AA0061_IBC_MBVD
+#if !JVET_W0090_ARMC_TM && !JVET_Z0061_TM_OBMC && !JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+static const int AML_MERGE_TEMPLATE_SIZE =                           1;
+#endif
+static const int IBC_MBVD_BASE_NUM =                                 5;
+static const int IBC_MBVD_STEP_NUM =                                 20; // number of distance offset
+static const int IBC_MBVD_OFFSET_DIR =                               4; // (+, 0); (-, 0); (0, +); (0, -);
+static const int IBC_MBVD_MAX_REFINE_NUM = IBC_MBVD_STEP_NUM * IBC_MBVD_OFFSET_DIR; ///< max number of candidate from a base candidate
+static const int IBC_MBVD_NUM = IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM;        ///< total number of IBC mmvd candidate
+static const int IBC_MBVD_SIZE_ENC =                                 8;
+static const int ADAPTIVE_SUB_GROUP_SIZE_IBC_MBVD = IBC_MBVD_MAX_REFINE_NUM;
+#endif
 static constexpr int MV_EXPONENT_BITCOUNT    = 4;
 static constexpr int MV_MANTISSA_BITCOUNT    = 6;
 static constexpr int MV_MANTISSA_UPPER_LIMIT = ((1 << (MV_MANTISSA_BITCOUNT - 1)) - 1);
@@ -999,6 +1129,11 @@ static const auto AFF_PARA_SHIFT =                               0;
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
 static const int TEMP_CABAC_BUFFER_SIZE =                        5;
 static const int ADJUSTMENT_RANGE =                              7;
+#endif
+
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+static const int MC_PAD_SIZE = 16;
+static const int PAD_MORE_TL = 1;
 #endif
 
 // ====================================================================================================================

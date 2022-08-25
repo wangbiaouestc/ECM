@@ -243,7 +243,11 @@ void IbcHashMap::xxBuildPicHashMap(const PelUnitBuf& pic)
   }
 }
 
+#if JVET_AA0070_RRIBC
+void IbcHashMap::rebuildPicHashMap(const PelUnitBuf &pic, bool isDualTree)
+#else
 void IbcHashMap::rebuildPicHashMap(const PelUnitBuf& pic)
+#endif
 {
   m_hash2Pos.clear();
 
@@ -252,9 +256,13 @@ void IbcHashMap::rebuildPicHashMap(const PelUnitBuf& pic)
   case CHROMA_400:
     xxBuildPicHashMap<CHROMA_400>(pic);
     break;
+#if JVET_AA0070_RRIBC
+  case CHROMA_420: isDualTree ? xxBuildPicHashMap<CHROMA_400>(pic) :  xxBuildPicHashMap<CHROMA_420>(pic); break;
+#else
   case CHROMA_420:
     xxBuildPicHashMap<CHROMA_420>(pic);
     break;
+#endif
   case CHROMA_422:
     xxBuildPicHashMap<CHROMA_422>(pic);
     break;
@@ -267,8 +275,90 @@ void IbcHashMap::rebuildPicHashMap(const PelUnitBuf& pic)
   }
 }
 
+#if JVET_AA0070_RRIBC
+void IbcHashMap::buildFlipHashTable(PredictionUnit &pu, unsigned int pos2HashCurPU[MAX_CU_SIZE][MAX_CU_SIZE], const int rribcFlipType)
+{
+  if (rribcFlipType == 0)
+  {
+    return;
+  }
+  for (int i = 0; i < MAX_CU_SIZE; i++)
+  {
+    std::fill_n(pos2HashCurPU[i], MAX_CU_SIZE, 0x1FF);
+  }
+  PelStorage m_tmpStorageCU;
+  m_tmpStorageCU.create(UnitArea(pu.chromaFormat, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
+  const UnitArea tmpArea(pu.chromaFormat, Area(0, 0, pu.cs->getOrgBuf(pu).Y().width, pu.cs->getOrgBuf(pu).Y().height));
+  PelUnitBuf     flipCU = m_tmpStorageCU.getBuf(tmpArea);
+  if (CS::isDualITree(*pu.cs))
+  {
+    flipCU.Y().copyFrom(pu.cs->getOrgBuf(pu).Y());
+  }
+  else
+  {
+    flipCU.copyFrom(pu.cs->getOrgBuf(pu));
+  }
+  flipCU.Y().flipSignal(rribcFlipType == 1);
+  if (pu.chromaFormat != CHROMA_400 && !(CS::isDualITree(*pu.cs)))
+  {
+    flipCU.Cb().flipSignal(rribcFlipType == 1);
+    flipCU.Cr().flipSignal(rribcFlipType == 1);
+  }
+
+  const int  chromaScalingX     = getChannelTypeScaleX(CHANNEL_TYPE_CHROMA, pu.chromaFormat);
+  const int  chromaScalingY     = getChannelTypeScaleY(CHANNEL_TYPE_CHROMA, pu.chromaFormat);
+  const int  chromaMinBlkWidth  = MIN_PU_SIZE >> chromaScalingX;
+  const int  chromaMinBlkHeight = MIN_PU_SIZE >> chromaScalingY;
+  const Pel *pelY               = NULL;
+  const Pel *pelCb              = NULL;
+  const Pel *pelCr              = NULL;
+
+  Position pos;
+  for (pos.y = 0; pos.y < flipCU.Y().height; pos.y += MIN_PU_SIZE)
+  {
+    // row pointer
+    pelY = flipCU.Y().bufAt(0, pos.y);
+    if (pu.chromaFormat != CHROMA_400 && !(CS::isDualITree(*pu.cs)))
+    {
+      int chromaY = pos.y >> chromaScalingY;
+      pelCb       = flipCU.Cb().bufAt(0, chromaY);
+      pelCr       = flipCU.Cr().bufAt(0, chromaY);
+    }
+
+    for (pos.x = 0; pos.x < flipCU.Y().width; pos.x += MIN_PU_SIZE)
+    {
+      // 0x1FF is just an initial value
+      unsigned int hashValue = 0x1FF;
+
+      // luma part
+      hashValue = xxCalcBlockHash(&pelY[pos.x], flipCU.Y().stride, MIN_PU_SIZE, MIN_PU_SIZE, hashValue);
+
+      // chroma part
+      if (pu.chromaFormat != CHROMA_400 && !(CS::isDualITree(*pu.cs)))
+      {
+        int chromaX = pos.x >> chromaScalingX;
+        hashValue = xxCalcBlockHash(&pelCb[chromaX], flipCU.Cb().stride, chromaMinBlkWidth, chromaMinBlkHeight, hashValue);
+        hashValue = xxCalcBlockHash(&pelCr[chromaX], flipCU.Cr().stride, chromaMinBlkWidth, chromaMinBlkHeight, hashValue);
+      }
+
+      pos2HashCurPU[pos.y][pos.x] = hashValue;
+    }
+  }
+
+  m_tmpStorageCU.destroy();
+}
+
+bool IbcHashMap::ibcHashMatch(PredictionUnit &pu, const Area &lumaArea, std::vector<Position> &cand,
+                              const CodingStructure &cs, const int maxCand, const int searchRange4SmallBlk,
+                              const int rribcFlipType)
+{
+  unsigned int pos2HashCurPU[MAX_CU_SIZE][MAX_CU_SIZE];
+
+  buildFlipHashTable(pu, pos2HashCurPU, rribcFlipType);
+#else
 bool IbcHashMap::ibcHashMatch(const Area& lumaArea, std::vector<Position>& cand, const CodingStructure& cs, const int maxCand, const int searchRange4SmallBlk)
 {
+#endif
   cand.clear();
 
   // find the block with least candidates
@@ -280,6 +370,12 @@ bool IbcHashMap::ibcHashMatch(const Area& lumaArea, std::vector<Position>& cand,
     for (SizeType x = 0; x < lumaArea.width && minSize > 1; x += MIN_PU_SIZE)
     {
       unsigned int hash = m_pos2Hash[lumaArea.pos().y + y][lumaArea.pos().x + x];
+#if JVET_AA0070_RRIBC
+      if (rribcFlipType)
+      {
+        hash = pos2HashCurPU[y][x];
+      }
+#endif
       if (m_hash2Pos[hash].size() < minSize)
       {
         minSize = m_hash2Pos[hash].size();
@@ -291,7 +387,7 @@ bool IbcHashMap::ibcHashMatch(const Area& lumaArea, std::vector<Position>& cand,
 
   if (m_hash2Pos[targetHashOneBlock].size() > 1)
   {
-    std::vector<Position>& candOneBlock = m_hash2Pos[targetHashOneBlock];
+    std::vector<Position> &candOneBlock = m_hash2Pos[targetHashOneBlock];
 
     // check whether whole block match
     for (std::vector<Position>::iterator refBlockPos = candOneBlock.begin(); refBlockPos != candOneBlock.end(); refBlockPos++)
@@ -310,6 +406,13 @@ bool IbcHashMap::ibcHashMatch(const Area& lumaArea, std::vector<Position>& cand,
           for (SizeType x = 0; x < lumaArea.width && wholeBlockMatch; x += MIN_PU_SIZE)
           {
             // whether the reference block and current block has the same hash
+#if JVET_AA0070_RRIBC
+            if (rribcFlipType)
+            {
+              wholeBlockMatch &= (pos2HashCurPU[y][x] == m_pos2Hash[topLeft.y + y][topLeft.x + x]);
+            }
+            else
+#endif
             wholeBlockMatch &= (m_pos2Hash[lumaArea.pos().y + y][lumaArea.pos().x + x] == m_pos2Hash[topLeft.y + y][topLeft.x + x]);
           }
         }

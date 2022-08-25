@@ -222,6 +222,9 @@ void EncGOP::init ( EncLib* pcEncLib )
   m_pcSAO                = pcEncLib->getSAO();
   m_pcALF                = pcEncLib->getALF();
   m_pcRateCtrl           = pcEncLib->getRateCtrl();
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+  m_pcFrameMcPadPrediction = pcEncLib->getFrameMcPadPredSearch();
+#endif
   ::memset(m_lastBPSEI, 0, sizeof(m_lastBPSEI));
   ::memset(m_totalCoded, 0, sizeof(m_totalCoded));
   m_HRD                = pcEncLib->getHRD();
@@ -2580,6 +2583,53 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     {
       pcSlice->setCheckLDC(true);
     }
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+    if (!pcSlice->isIntra() && pcSlice->getSPS()->getUseAML())
+    {
+      int index = pcSlice->getSPS()->getQPOffsetsIdx(pcSlice->getSliceQp() - (pcSlice->getPPS()->getPicInitQPMinus26() + 26));
+      if (index != -1)
+      {
+        const SPS* sps = pcSlice->getSPS();
+        pcSlice->setCostForARMC(sps->getLambdaVal(index));
+      }
+      else
+      {
+        pcSlice->setCostForARMC((uint32_t) LAMBDA_DEC_SIDE[min(max(pcSlice->getSliceQp(), 0), MAX_QP)]);
+      }
+
+      if (pcSlice->getCheckLDC())
+      {
+        int iCurrPOC = pcSlice->getPOC();
+        int iRefIdx  = 0;
+        int mindist  = MAX_INT;
+        for (iRefIdx = 0; iRefIdx < pcSlice->getNumRefIdx(REF_PIC_LIST_0); iRefIdx++)
+        {
+          if (abs(pcSlice->getRefPic(REF_PIC_LIST_0, iRefIdx)->getPOC() - iCurrPOC) < mindist)
+          {
+            mindist = abs(pcSlice->getRefPic(REF_PIC_LIST_0, iRefIdx)->getPOC() - iCurrPOC);
+          }
+        }
+        if (pcSlice->isInterB())
+        {
+          for (iRefIdx = 0; iRefIdx < pcSlice->getNumRefIdx(REF_PIC_LIST_1); iRefIdx++)
+          {
+            if (abs(pcSlice->getRefPic(REF_PIC_LIST_1, iRefIdx)->getPOC() - iCurrPOC) < mindist)
+            {
+              mindist = abs(pcSlice->getRefPic(REF_PIC_LIST_1, iRefIdx)->getPOC() - iCurrPOC);
+            }
+          }
+        }
+        if (mindist != 1 )
+        {
+          pcSlice->setCostForARMC((uint32_t) LAMBDA_DEC_SIDE[min(max(pcSlice->getSliceQp() - 4, 0), MAX_QP)]);
+        }
+      }
+      else
+      {
+        pcSlice->setCostForARMC((uint32_t) LAMBDA_DEC_SIDE[min(max(pcSlice->getSliceQp() - 4, 0), MAX_QP)]);
+      }
+    }
+#endif
 
 
     //-------------------------------------------------------------
@@ -3226,8 +3276,14 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         {
           pcPic->getOrigBuf().copyFrom( pcPic->getTrueOrigBuf() );
         }
-
       }
+
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+      if (pcSlice->getSPS()->getALFEnabledFlag())
+      {
+        m_pcALF->copyDbData(cs);
+      }
+#endif
 
 #if RPR_ENABLE
       // create SAO object based on the picture size
@@ -4173,6 +4229,11 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     pcPic->destroyTempBuffers();
     pcPic->cs->destroyCoeffs();
     pcPic->cs->releaseIntermediateData();
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+    m_pcFrameMcPadPrediction->init(m_pcEncLib->getRdCost(), pcSlice->getSPS()->getChromaFormatIdc(),
+                                   pcSlice->getSPS()->getMaxCUHeight(), NULL, pcPic->getPicWidthInLumaSamples());
+    m_pcFrameMcPadPrediction->mcFramePad(pcPic, *(pcPic->slices[0]));
+#endif
   } // iGOPid-loop
 
   delete pcBitstreamRedirect;

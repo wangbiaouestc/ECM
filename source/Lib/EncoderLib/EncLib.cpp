@@ -356,6 +356,29 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
   xInitPPS(pps0, sps0);
   // initialize APS
   xInitRPL(sps0, isFieldCoding);
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  if (sps0.getUseAML())
+  {
+    sps0.setNumLambda(m_numQPOffset);
+    int maxBits = 0;
+    for (int idx = 0; idx < m_numQPOffset; idx++)
+    {
+      sps0.setQPOffsets(idx, m_qpOffsetList[idx]);
+      sps0.setLambdaVal(idx, (uint32_t)LAMBDA_DEC_SIDE[26 + pps0.getPicInitQPMinus26() + m_qpOffsetList[idx] - 4 * ((int)m_isRA)]);
+      uint32_t lambda = (uint32_t)LAMBDA_DEC_SIDE[26 + pps0.getPicInitQPMinus26() + m_qpOffsetList[idx] - 4 * ((int)m_isRA)];
+      for (int shift = 0; shift < 16; shift++)
+        if (lambda >> shift == 0)
+        {
+          if (shift > maxBits)
+          {
+            maxBits = shift;
+          }
+          break;
+        }
+    }
+    sps0.setMaxbitsLambdaVal(maxBits);
+  }
+#endif
 
   if (m_resChangeInClvsEnabled)
   {
@@ -578,11 +601,19 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     Picture *picBg = new Picture;
 #if JVET_Z0118_GDR
     picBg->create(sps0.getGDREnabledFlag(), sps0.getChromaFormatIdc(), Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples()),
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+                   sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + 16 + MC_PAD_SIZE, false, m_layerId,
+#else
       sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + 16, false, m_layerId,
+#endif
       getGopBasedTemporalFilterEnabled());
 #else
     picBg->create( sps0.getChromaFormatIdc(), Size( pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples() ),
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+                   sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + 16 + MC_PAD_SIZE, false, m_layerId,
+#else
                    sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + 16, false, m_layerId,
+#endif
                    getGopBasedTemporalFilterEnabled() );
 #endif
     picBg->getRecoBuf().fill(0);
@@ -596,11 +627,19 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     Picture *picOrig = new Picture;
 #if JVET_Z0118_GDR
     picOrig->create(sps0.getGDREnabledFlag(), sps0.getChromaFormatIdc(), Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples()),
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+                     sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + 16 + MC_PAD_SIZE, false, m_layerId,
+#else
       sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + 16, false, m_layerId,
+#endif
       getGopBasedTemporalFilterEnabled());
 #else
     picOrig->create( sps0.getChromaFormatIdc(), Size( pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples() ),
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+                     sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + 16 + MC_PAD_SIZE, false, m_layerId,
+#else
                      sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + 16, false, m_layerId,
+#endif
                      getGopBasedTemporalFilterEnabled() );
 #endif
     picOrig->getOrigBuf().fill(0);
@@ -943,6 +982,13 @@ bool EncLib::encode( const InputColourSpaceConversion snrCSC, std::list<PelUnitB
   return false;
 }
 
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+void EncLib::setQPOffsetList(const int QPOffset[MAX_GOP])
+{
+  std::memcpy(m_qpOffsetList, QPOffset,(MAX_GOP) * sizeof(int));
+}
+#endif
+
 /**------------------------------------------------
  Separate interlaced frame into two fields
  -------------------------------------------------**/
@@ -1147,10 +1193,20 @@ void EncLib::xGetNewPicBuffer ( std::list<PelUnitBuf*>& rcListPicYuvRecOut, Pict
     rpcPic = new Picture;
 #if JVET_Z0118_GDR
     rpcPic->create( getGdrEnabled(), sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ),
-                    sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, false, m_layerId, getGopBasedTemporalFilterEnabled() );
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+                   sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16 + MC_PAD_SIZE, false, m_layerId,
+                   getGopBasedTemporalFilterEnabled());
+#else
+                    sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, false, m_layerId, getGopBasedTemporalFilterEnabled());
+#endif
 #else
     rpcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()),
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+                   sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16 + MC_PAD_SIZE, false, m_layerId,
+                   getGopBasedTemporalFilterEnabled());
+#else
       sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, false, m_layerId, getGopBasedTemporalFilterEnabled());
+#endif
 #endif
 
 
@@ -1505,6 +1561,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_W0090_ARMC_TM
   sps.setUseAML                             ( m_AML );
 #endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  sps.setUseArmcRefinedMotion               ( m_armcRefinedMotion );
+#endif
   sps.setMaxNumMergeCand(getMaxNumMergeCand());
 #if JVET_X0049_ADAPT_DMVR
   sps.setMaxNumBMMergeCand(getMaxNumBMMergeCand());
@@ -1522,6 +1581,27 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   sps.setUseDMVDMode           ( m_DMVDMode );
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  sps.setTMToolsEnableFlag     ( m_tmToolsEnableFlag );
+#if TM_AMVP
+  sps.setUseTMAmvpMode         ( m_tmAmvpMode );
+#endif
+#if TM_MRG
+  sps.setUseTMMrgMode          ( m_tmMrgMode );
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  sps.setUseGPMTMMode          ( m_tmGPMMode );
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  sps.setUseOBMCTMMode         ( m_tmOBMCMode );
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  sps.setUseTmvpNmvpReordering ( m_useTmvpNmvpReorder );
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  sps.setUseTMMMVD             ( m_useTMMMVD );
+#endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   sps.setUseAltGPMSplitModeCode( m_altGPMSplitModeCode );
@@ -1552,6 +1632,9 @@ void EncLib::xInitSPS( SPS& sps )
     CHECK( m_LadfIntervalLowerBound[0] != 0, "abnormal value set to LadfIntervalLowerBound[0]" );
   }
 #endif
+#if JVET_AA0133_INTER_MTS_OPT
+  sps.setInterMTSMaxSize(m_interMTSMaxSize);
+#endif
 #if ENABLE_DIMD
   sps.setUseDimd            ( m_dimd );
 #endif
@@ -1565,6 +1648,10 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
   if(sps.getUseCiip())
   {
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+   if(m_tmCIIPMode == 2)
+   {
+#endif
    if(getIntraPeriod() < 0)
    {
       sps.setUseCiipTmMrg (false);
@@ -1573,6 +1660,13 @@ void EncLib::xInitSPS( SPS& sps )
    {
       sps.setUseCiipTmMrg (true);
    }
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+   }
+   else
+   {
+      sps.setUseCiipTmMrg  (m_tmCIIPMode == 1);
+   }
+#endif
   }
 #endif
   sps.setUseGeo                ( m_Geo );
@@ -1592,6 +1686,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseColorTrans(m_useColorTrans);
   sps.setPLTMode                            ( m_PLTMode);
   sps.setIBCFlag                            ( m_IBCMode);
+#if JVET_AA0061_IBC_MBVD
+  sps.setUseIbcMbvd                         ( m_ibcMbvd );
+#endif
   sps.setWrapAroundEnabledFlag                      ( m_wrapAround );
 #if MULTI_HYP_PRED
   sps.setMaxNumAddHyps(m_maxNumAddHyps);

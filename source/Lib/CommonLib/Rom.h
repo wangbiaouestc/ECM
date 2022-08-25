@@ -380,5 +380,11 @@ extern unsigned int g_uiDepth2Width[5];
 #if JVET_X0149_TIMD_DIMD_LUT
 extern int g_gradDivTable[16];
 #endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+extern int g_rmvfMultApproxTbl[3 << sizeof(int64_t)];
+#endif
+#if JVET_AA0126_GLM
+extern const int8_t g_glmPattern[NUM_GLM_PATTERN][6];
+#endif
 #endif  //__TCOMROM__
 

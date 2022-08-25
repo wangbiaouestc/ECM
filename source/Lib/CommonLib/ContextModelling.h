@@ -561,6 +561,9 @@ public:
 #if INTER_LIC
   bool          LICFlags[NUM_MERGE_CANDS];
 #endif
+#if JVET_AA0070_RRIBC
+  int       rribcFlipTypes[NUM_MERGE_CANDS];
+#endif
   unsigned char interDirNeighbours[NUM_MERGE_CANDS];
 #if MULTI_HYP_PRED
   MultiHypVec   addHypNeighbours[NUM_MERGE_CANDS];
@@ -574,6 +577,9 @@ public:
   uint8_t       BcwIdx            [ MRG_MAX_NUM_CANDS      ];
 #if INTER_LIC
   bool          LICFlags          [ MRG_MAX_NUM_CANDS      ];
+#endif
+#if JVET_AA0070_RRIBC
+  int rribcFlipTypes[MRG_MAX_NUM_CANDS];
 #endif
   unsigned char interDirNeighbours[ MRG_MAX_NUM_CANDS      ];
 #if MULTI_HYP_PRED
@@ -594,6 +600,10 @@ public:
 #else
   void setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx);
 #endif
+#if JVET_AA0061_IBC_MBVD
+  MvField ibcMbvdBaseBv[IBC_MBVD_BASE_NUM][2];
+  bool setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int candIdxMaped = -1);
+#endif
   bool          mmvdUseAltHpelIf  [ MMVD_BASE_MV_NUM ];
 #if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Z0075_IBC_HMVP_ENLARGE
   bool          useAltHpelIf      [ NUM_MERGE_CANDS ];
@@ -606,6 +616,9 @@ public:
   bool xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1, int compareNum = -1) const;
 #else
   bool xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
+#endif
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  bool xCheckSimilarMotion2Lists(int mergeCandIndex, MergeCtx *mrgCtx, uint32_t mvdSimilarityThresh = 1) const;
 #endif
 #endif
 #if JVET_Z0084_IBC_TM
@@ -625,6 +638,29 @@ public:
 #endif
 };
 
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+class AffineMergeCtx
+{
+public:
+  AffineMergeCtx() : numValidMergeCand(0) { for (unsigned i = 0; i < RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE; i++) affineType[i] = AFFINEMODEL_4PARAM; }
+  ~AffineMergeCtx() {}
+public:
+  MvField       mvFieldNeighbours[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE << 1][3]; // double length for mv of both lists
+  unsigned char interDirNeighbours[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+  Distortion    candCost[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+  EAffineModel  affineType[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#if INTER_LIC
+  bool          LICFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#endif
+  uint8_t       BcwIdx[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+  int           numValidMergeCand;
+  int           numAffCandToTestEnc;
+  int           maxNumMergeCand;
+
+  MergeCtx     *mrgCtx;
+  MergeType     mergeType[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+};
+#else
 class AffineMergeCtx
 {
 public:
@@ -644,7 +680,7 @@ public:
   MergeCtx     *mrgCtx;
   MergeType     mergeType[AFFINE_MRG_MAX_NUM_CANDS];
 };
-
+#endif
 
 namespace DeriveCtx
 {
@@ -658,6 +694,9 @@ unsigned CtxSkipFlag  ( const CodingUnit& cu );
 unsigned CtxAffineFlag( const CodingUnit& cu );
 #if JVET_X0049_ADAPT_DMVR
 unsigned CtxBMMrgFlag(const CodingUnit& cu);
+#endif
+#if JVET_AA0070_RRIBC
+unsigned CtxRribcFlipType(const CodingUnit& cu);
 #endif
 unsigned CtxPredModeFlag( const CodingUnit& cu );
 unsigned CtxIBCFlag(const CodingUnit& cu);

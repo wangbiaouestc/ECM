@@ -78,8 +78,14 @@ public:
 
   void    init(const int picWidth, const int picHeight);
   void    destroy();
+#if JVET_AA0070_RRIBC
+  void rebuildPicHashMap(const PelUnitBuf &pic, bool isDualTree);
+  void buildFlipHashTable(PredictionUnit &pu, unsigned int pos2HashCurPU[MAX_CU_SIZE][MAX_CU_SIZE], const int rribcFlipType);
+  bool ibcHashMatch(PredictionUnit &pu, const Area &lumaArea, std::vector<Position> &cand, const CodingStructure &cs, const int maxCand, const int searchRange4SmallBlk, const int rribcFlipType);
+#else
   void    rebuildPicHashMap(const PelUnitBuf& pic);
   bool    ibcHashMatch(const Area& lumaArea, std::vector<Position>& cand, const CodingStructure& cs, const int maxCand, const int searchRange4SmallBlk);
+#endif
   int     getHashHitRatio(const Area& lumaArea);
 
   int     calHashBlkMatchPerc(const Area& lumaArea);

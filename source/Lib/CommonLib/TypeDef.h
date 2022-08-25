@@ -50,6 +50,7 @@
 #include <assert.h>
 #include <cassert>
 
+
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -66,8 +67,12 @@
 
 // Software optimization
 #define JVET_X0144_MAX_MTT_DEPTH_TID                      1 // JVET-X0144: max MTT hierarchy depth set by temporal ID
+#if JVET_X0144_MAX_MTT_DEPTH_TID
+#define JVET_AA0098_MTT_DEPTH_TID_BY_QP                   1 // JVET-AA0098: MTT depth based on QP
+#endif
 #define JVET_X0049_BDMVR_SW_OPT                           1 // JVET-X0049: software optimization for BDMVR (lossless)
 #define INTRA_TRANS_ENC_OPT                               1 // JVET-Y0141: Software optimization, including TIMD/DIMD/MTS/LFNS encoder fast algorithm, SIMD implementation and CM initial value retraining 
+#define JVET_AA0129_INTERHASH_OBMCOFF_RD                  1 // JVET-AA0129: improved encoder RDO of inter-hash based ME considering OBMC off
 
 // SIMD optimizations
 #define MCIF_SIMD_NEW                                     1 // SIMD for interpolation
@@ -130,7 +135,8 @@
 #define JVET_Y0116_EXTENDED_MRL_LIST                      1 // JVET-Y0116: Extended MRL Candidate List
 #define JVET_Z0050_DIMD_CHROMA_FUSION                     1 // JVET-Z0050: DIMD chroma mode and fusion of chroma intra prediction modes
 #define JVET_Z0050_CCLM_SLOPE                             1 // JVET-Z0050: CCLM with slope adjustments
-
+#define JVET_AA0057_CCCM                                  1 // JVET-AA0057: Convolutional cross-component model (CCCM)
+#define JVET_AA0126_GLM                                   1 // JVET-AA0126: Gradient linear model
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -143,6 +149,9 @@
 #define JVET_Z0131_IBC_BVD_BINARIZATION                   1 // JVET-Z0131: Block vector difference binarization
 #define JVET_Z0153_IBC_EXT_REF                            1 // JVET-Z0153: Extend reference area for IBC
 #define JVET_Z0160_IBC_ZERO_PADDING                       1 // JVET-Z0160: Replacement of zero-padding candidates
+#define JVET_AA0106_IBCBUF_CTU256                         1 // JVET-AA0106: Adjust IBC reference area to 2*128 rows above the current CTU
+#define JVET_AA0061_IBC_MBVD                              1 // JVET-AA0061: IBC merge mode with block vector differences
+#define JVET_AA0070_RRIBC                                 1 // JVET-AA0070: Reconstruction-Reordered IBC
 
 // Inter
 #define CIIP_PDPC                                         1 // Apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
@@ -169,6 +178,9 @@
 #if JVET_X0083_BM_AMVP_MERGE_MODE
 #define JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE             1 // JVET-Y0129: MVD signalling for AMVP-merge mode
 #define JVET_Z0085_AMVPMERGE_DMVD_OFF                     1 // JVET-Z0085: Enabling amvpMerge when DMVD is off
+#if JVET_Z0085_AMVPMERGE_DMVD_OFF
+#define JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON             1
+#endif
 #endif
 #define JVET_Y0089_DMVR_BCW                               1 // JVET-Y0089: DMVR with BCW enabled
 #define JVET_Y0065_GPM_INTRA                              1 // JVET-Y0065: Intra prediction for GPM
@@ -178,6 +190,11 @@
 #define JVET_Z0139_NA_AFF                                 1 // JVET-Z0139: Constructed non-adjacent spatial neighbors for affine mode
 #define JVET_AA0058_GPM_ADP_BLD                           1 // JVET-AA0058: GPM adaptive blending
 #define JVET_AA0146_WRAP_AROUND_FIX                       1 // JVET-AA0146: bugfix&cleanup for wrap around motion compensation
+#define JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION          1 // JVET-AA0107 Regression based affine merge candidate derivation
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#define JVET_AA0128_AFFINE_MERGE_CTX_INC                  1 // JVET-AA0128 test b: Increased number of CABAC contexts of affine merge index
+#endif
+#define JVET_AA0096_MC_BOUNDARY_PADDING                   1 // JVET-AA0096: motion compensated picture boundary padding
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
@@ -189,14 +206,20 @@
 #if ENABLE_OBMC
 #define JVET_Z0061_TM_OBMC                                1 // JVET-Z0061: Template matching based OBMC
 #endif
+#define JVET_AA0132_CONFIGURABLE_TM_TOOLS                 1 // JVET-AA0132: Configuration parameters and SPS flags for template matching tools
 #endif
 #define JVET_W0097_GPM_MMVD_TM                            1 // JVET-W0097: GPM-MMVD and GPM-TM, GPM-TM part is controlled by TM_MRG
 #define JVET_X0141_CIIP_TIMD_TM                           1 // JVET-X0141: CIIP with TIMD and TM merge, CIIP-TM part is controlled by TM_MRG, and CIIP-TIMD part is controlled by JVET_W0123_TIMD_FUSION
 #define JVET_Y0134_TMVP_NAMVP_CAND_REORDERING             1 // JVET-Y0134: MV candidate reordering for TMVP and NAMVP types (controlled by JVET_W0090_ARMC_TM), and reference picture selection for TMVP 
 #if JVET_W0090_ARMC_TM
 #define JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED            1 // JVET-Y0067: TM based reordering for MMVD and affine MMVD and MVD sign prediction
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#define JVET_AA0093_ENHANCED_MMVD_EXTENSION               1 // JVET-AA0093: Test 2.3 part: Extension on TM based reordering for MMVD and affine MMVD
+#endif
 #define JVET_Z0102_NO_ARMC_FOR_ZERO_CAND                  1 // JVET-Z0102: No ARMC for the zero candidates of regular, TM and BM merge modes
 #define JVET_Z0054_BLK_REF_PIC_REORDER                    1 // JVET-Z0054: Block level TM based reordering of reference pictures
+#define JVET_AA0093_REFINED_MOTION_FOR_ARMC               1 // JVET-AA0093: Refined motion for ARMC
+#define JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC          1 // JVET-AA0093: Diversity criterion for ARMC reordering
 #endif
 
 // Transform and coefficient coding
@@ -218,6 +241,7 @@
 #define JVET_Y0159_INTER_MTS                              1 // JVET-Y0159: Inter MTS uses fixed 4 candidates
 #endif
 #endif
+#define JVET_AA0133_INTER_MTS_OPT                         1 // JVET-AA0133: Inter MTS optimization
 
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision
@@ -234,7 +258,8 @@
 #define JVET_X0071_ALF_BAND_CLASSIFIER                    1 // JVET-X0071/JVET-X0070: Alternative band classifier for ALF
 #define JVET_Y0106_CCSAO_EDGE_CLASSIFIER                  1 // JVET-Y0106: Edge based classifier for CCSAO
 #define JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY           1 // JVET-Z0105: Enable virtual boundary processing for in-loop filters
-
+#define JVET_AA0095_ALF_LONGER_FILTER                     1 // JVET-AA0095: Longer luma filter shape 
+#define JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF           1 // JVET-AA0095: Using samples before deblocking filter for ALF
 
 // SIMD optimizations
 #if IF_12TAP
@@ -270,7 +295,6 @@
 #define GDR_ENC_TRACE                                     0
 #define GDR_DEC_TRACE                                     0
 #endif
-
 
 
 
@@ -638,6 +662,16 @@ typedef       uint64_t        Distortion;        ///< distortion measurement
 // Enumeration
 // ====================================================================================================================
 
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+enum PadDirection
+{
+  PAD_TOP           = 0,
+  PAD_BOTTEM        = 1,
+  PAD_RIGHT         = 2,
+  PAD_LEFT          = 3,
+  MAX_PAD_DIRECTION = 4
+};
+#endif
 
 enum ApsType
 {
@@ -658,6 +692,19 @@ enum QuantFlags
 enum TransType
 {
 #if JVET_W0103_INTRA_MTS
+#if JVET_AA0133_INTER_MTS_OPT
+  DCT2 = 0,
+  DCT8 = 1,
+  DST7 = 2,
+  DCT5 = 3,
+  DST4 = 4,
+  DST1 = 5,
+  IDTR = 6,
+  KLT0 = 7,
+  KLT1 = 8,
+  NUM_TRANS_TYPE = 9,
+  DCT2_EMT = 10
+#else
   DCT2 = 0,
   DCT8 = 1,
   DST7 = 2,
@@ -667,6 +714,7 @@ enum TransType
   IDTR = 6,
   NUM_TRANS_TYPE = 7,
   DCT2_EMT = 8
+#endif
 #else
   DCT2 = 0,
   DCT8 = 1,
@@ -1387,6 +1435,21 @@ struct CclmOffsets
       }
     }
   }
+};
+#endif
+
+#if JVET_AA0126_GLM
+struct GlmIdc
+{
+  int8_t cb0 = 0, cr0 = 0;
+  int8_t cb1 = 0, cr1 = 0;
+  
+  bool isActive()                         const { return cb0 || cr0 || cb1 || cr1;                                                           }
+  bool isActive(ComponentID c)            const { return (c == COMPONENT_Cb) ? (cb0 || cb1) : (cr0 || cr1);                                  }
+  void setAllZero()                             { cb0 = 0;  cr0 = 0;  cb1 = 0;  cr1 = 0;                                                     }
+  void setIdcs(int b0, int r0, int b1, int r1)  { cb0 = b0; cr0 = r0; cb1 = b1; cr1 = r1;                                                    }
+  void setIdc(ComponentID c, int model, int v)  { (c == COMPONENT_Cb) ? (model == 0 ? cb0 = v : cb1 = v) : (model == 0 ? cr0 = v : cr1 = v); }
+  int  getIdc(ComponentID c, int model)   const { return (c == COMPONENT_Cb) ? (model == 0 ? cb0 : cb1) : (model == 0 ? cr0 : cr1);          }
 };
 #endif
 

@@ -1520,8 +1520,32 @@ private:
 #if AFFINE_MMVD
   bool              m_AffineMmvdMode;
 #endif
+#if JVET_AA0061_IBC_MBVD
+  bool              m_ibcMbvd;
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool              m_DMVDMode;
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  bool              m_tmToolsEnableFlag;
+#if TM_AMVP
+  bool              m_tmAmvpMode;
+#endif
+#if TM_MRG
+  bool              m_tmMrgMode;
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  bool              m_tmGPMMode;
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  bool              m_tmOBMCMode;
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  bool              m_useTmvpNmvpReorder;
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  bool              m_useTMMMVD;
+#endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   bool              m_altGPMSplitModeCode;
@@ -1581,6 +1605,13 @@ private:
   RPLList           m_RPLList1;
   uint32_t          m_numRPL0;
   uint32_t          m_numRPL1;
+  
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  uint32_t          m_numLambda;
+  uint32_t          m_lambdaVal[MAX_GOP];
+  int               m_qpOffsets[MAX_GOP];
+  int               m_maxbitsLambdaVal;
+#endif
 
   bool              m_rpl1CopyFromRpl0Flag;
   bool              m_rpl1IdxPresentFlag;
@@ -1708,7 +1739,9 @@ private:
   int               m_LadfQpOffset[MAX_LADF_INTERVALS];
   int               m_LadfIntervalLowerBound[MAX_LADF_INTERVALS];
 #endif
-
+#if JVET_AA0133_INTER_MTS_OPT
+  int               m_interMTSMaxSize;
+#endif
 #if MULTI_HYP_PRED
   bool              m_InterMultiHyp;              // multi hypothesis inter prediction
   int               m_maxNumAddHyps;
@@ -1719,6 +1752,9 @@ private:
   bool              m_MIP;
 #if JVET_W0090_ARMC_TM || JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0075_IBC_HMVP_ENLARGE
   bool              m_AML;
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  bool              m_armcRefinedMotion;
 #endif
   ChromaQpMappingTable m_chromaQpMappingTable;
   bool m_GDREnabledFlag;
@@ -1935,6 +1971,18 @@ public:
   RPLList*                getRPLList1()                                                                       { return &m_RPLList1;                                                  }
   uint32_t                getNumRPL0() const                                                                  { return m_numRPL0;                                                    }
   uint32_t                getNumRPL1() const                                                                  { return m_numRPL1;                                                    }
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  uint32_t                getNumLambda() const                                                                { return m_numLambda;                                                  }
+  int                     getIdx(uint32_t val) const;
+  uint32_t                getLambdaVal(int idx) const                                                         { return m_lambdaVal[idx];                                             }
+  void                    setNumLambda(uint32_t numL)                                                         { m_numLambda = numL;                                                  }
+  void                    setLambdaVal(int idx, uint32_t val)                                                 { m_lambdaVal[idx] = val;                                              }
+  uint32_t                getMaxbitsLambdaVal() const                                                         { return m_maxbitsLambdaVal;                                           }
+  void                    setMaxbitsLambdaVal(int numL)                                                       { m_maxbitsLambdaVal = numL;                                           }
+  void                    setQPOffsets(int idx, int val)                                                      { m_qpOffsets[idx] = val;                                              }
+  int                     getQPOffsets(int idx) const                                                         { return m_qpOffsets[idx];                                             }
+  int                     getQPOffsetsIdx(int val) const;
+#endif 
   void                    setRPL1CopyFromRPL0Flag(bool isCopy)                                                { m_rpl1CopyFromRpl0Flag = isCopy;                                     }
   bool                    getRPL1CopyFromRPL0Flag() const                                                     { return m_rpl1CopyFromRpl0Flag;                                       }
   bool                    getRPL1IdxPresentFlag() const                                                       { return m_rpl1IdxPresentFlag;                                         }
@@ -1994,9 +2042,41 @@ void                    setCCALFEnabledFlag( bool b )                           
   void                    setUseAffineMmvdMode(bool b)                                                    { m_AffineMmvdMode = b; }
   bool                    getUseAffineMmvdMode() const                                                    { return m_AffineMmvdMode; }
 #endif
+#if JVET_AA0061_IBC_MBVD
+  void                    setUseIbcMbvd(bool b)                                                           { m_ibcMbvd = b; }
+  bool                    getUseIbcMbvd() const                                                           { return m_ibcMbvd; }
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void                    setUseDMVDMode(bool b)                                                          { m_DMVDMode = b; }
   bool                    getUseDMVDMode() const                                                          { return m_DMVDMode; }
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  void                    setTMToolsEnableFlag(bool b)                                                    { m_tmToolsEnableFlag = b; }
+  bool                    getTMToolsEnableFlag() const                                                    { return m_tmToolsEnableFlag; }
+#if TM_AMVP
+  void                    setUseTMAmvpMode(bool b)                                                        { m_tmAmvpMode = b; }
+  bool                    getUseTMAmvpMode() const                                                        { return m_tmAmvpMode; }
+#endif
+#if TM_MRG
+  void                    setUseTMMrgMode(bool b)                                                         { m_tmMrgMode = b; }
+  bool                    getUseTMMrgMode() const                                                         { return m_tmMrgMode; } // Controls regular merge mode with TM, while others (e.g., GPM-TM, CIIP-TM, OBMC-TM) are controlled separately
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  void                    setUseGPMTMMode(bool b)                                                         { m_tmGPMMode = b; }
+  bool                    getUseGPMTMMode() const                                                         { return m_tmGPMMode; }
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  void                    setUseOBMCTMMode(bool b)                                                        { m_tmOBMCMode = b; }
+  bool                    getUseOBMCTMMode() const                                                        { return m_tmOBMCMode; }
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  void                    setUseTmvpNmvpReordering(bool b)                                                { m_useTmvpNmvpReorder = b; }
+  bool                    getUseTmvpNmvpReordering() const                                                { return m_useTmvpNmvpReorder; }
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void                    setUseTMMMVD(bool b)                                                            { m_useTMMMVD = b; }
+  bool                    getUseTMMMVD() const                                                            { return m_useTMMMVD; }
+#endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void                    setUseAltGPMSplitModeCode(bool b)                                               { m_altGPMSplitModeCode = b; }
@@ -2151,7 +2231,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setLadfIntervalLowerBound( int value, int idx )                         { m_LadfIntervalLowerBound[ idx ] = value; }
   int       getLadfIntervalLowerBound( int idx )                          const     { return m_LadfIntervalLowerBound[ idx ]; }
 #endif
-
+#if JVET_AA0133_INTER_MTS_OPT
+  void      setInterMTSMaxSize(int size)                                            { m_interMTSMaxSize = size; }
+  int       getInterMTSMaxSize()                                          const     { return m_interMTSMaxSize; }
+#endif
 #if MULTI_HYP_PRED
   bool      getUseInterMultiHyp()                                      const { return m_InterMultiHyp; }
   int       getMaxNumAddHyps()                                      const { return m_maxNumAddHyps; }
@@ -2199,6 +2282,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_W0090_ARMC_TM || JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0075_IBC_HMVP_ENLARGE
   void      setUseAML             ( bool b )                                        { m_AML = b; }
   bool      getUseAML             ()                                      const     { return m_AML; }
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  void      setUseArmcRefinedMotion ( bool b )                                      { m_armcRefinedMotion = b; }
+  bool      getUseArmcRefinedMotion  ()                                   const     { return m_armcRefinedMotion; }
 #endif
   bool      getUseWP              ()                                      const     { return m_useWeightPred; }
   bool      getUseWPBiPred        ()                                      const     { return m_useWeightedBiPred; }
@@ -2759,6 +2846,9 @@ private:
   bool                        m_enableTMVPFlag;                                         //!< enable temporal motion vector prediction
   bool                        m_picColFromL0Flag;                                       //!< syntax element collocated_from_l0_flag
   uint32_t                    m_colRefIdx;
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  uint32_t                    m_costForARMC;                                            //!< Cost for diversity criterion
+#endif
   bool                        m_mvdL1ZeroFlag;                                          //!< L1 MVD set to zero flag
   uint32_t                    m_maxNumAffineMergeCand;                                  //!< max number of sub-block merge candidates
   bool                        m_disFracMMVD;                                            //!< fractional MMVD offsets disabled flag
@@ -2896,6 +2986,10 @@ public:
   bool                        getPicColFromL0Flag() const                               { return m_picColFromL0Flag;                                                                    }
   void                        setColRefIdx( uint32_t refIdx)                             { m_colRefIdx = refIdx;                                                                       }
   uint32_t                    getColRefIdx()                                             { return m_colRefIdx;                                                                         }
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  void                        setCostForARMC(uint32_t cost)                             { m_costForARMC = cost;                                                                        }
+  uint32_t                    getCostForARMC()                                          { return m_costForARMC;                                                                        }
+#endif
   void                        setMvdL1ZeroFlag( bool b )                                { m_mvdL1ZeroFlag = b;                                                                         }
   bool                        getMvdL1ZeroFlag() const                                  { return m_mvdL1ZeroFlag;                                                                      }
   void                        setMaxNumAffineMergeCand( uint32_t val )                  { m_maxNumAffineMergeCand = val;                                                               }
@@ -3136,6 +3230,9 @@ private:
 
 
   uint32_t                   m_colRefIdx;
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  uint32_t                   m_costForARMC;
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
   std::vector<int>           m_implicitRefIdx[NUM_REF_PIC_LIST_01][NUM_REF_PIC_LIST_01][MAX_NUM_REF + 1];
 #endif
@@ -3295,6 +3392,9 @@ public:
   bool                        getColFromL0Flag() const                               { return m_colFromL0Flag;                                       }
   uint32_t                    getColRefIdx() const                                   { return m_colRefIdx;                                           }
   void                        checkColRefIdx(uint32_t curSliceSegmentIdx, const Picture* pic);
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  uint32_t                    getCostForARMC() const                                 { return m_costForARMC;                                         }
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
   void resizeImBuf(int numSlices)
   {
@@ -3392,6 +3492,9 @@ public:
   void                        setColRefIdx( uint32_t refIdx)                             { m_colRefIdx = refIdx;                                         }
   void                        setCheckLDC( bool b )                                  { m_bCheckLDC = b;                                              }
 
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  void                        setCostForARMC(uint32_t cost)                          { m_costForARMC = cost;                                         }
+#endif
   void                        setBiDirPred( bool b, int refIdx0, int refIdx1 ) { m_biDirPred = b; m_symRefIdx[0] = refIdx0; m_symRefIdx[1] = refIdx1; }
   bool                        getBiDirPred() const { return m_biDirPred; }
   int                         getSymRefIdx( int refList ) const { return m_symRefIdx[refList]; }

@@ -125,6 +125,9 @@ private:
   AdaptiveLoopFilter      m_cALF;
   Reshape                 m_cReshaper;                        ///< reshaper class
   HRD                     m_HRD;
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+  InterPrediction         m_cFrameMcPadPrediction;
+#endif
   // decoder side RD cost computation
   RdCost                  m_cRdCost;                      ///< RD cost computation class
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE

@@ -91,6 +91,68 @@ public:
 typedef short TrainDataType;
 #endif
 
+#if JVET_AA0057_CCCM
+typedef int64_t TCccmCoeff;
+
+#define FIXED_MULT(x, y) TCccmCoeff((int64_t(x)*(y) + CCCM_DECIM_ROUND) >> CCCM_DECIM_BITS )
+#define FIXED_DIV(x, y)  TCccmCoeff((int64_t(x)    << CCCM_DECIM_BITS ) / (y) )
+
+struct CccmModel
+{
+  TCccmCoeff params[CCCM_NUM_PARAMS];
+  int        bd;
+  int        midVal;
+  
+  CccmModel(int bitdepth)
+  {
+    bd     = bitdepth;
+    midVal = (1 << ( bitdepth - 1));
+  }
+  
+  void clearModel(int numParams)
+  {
+    for( int i = 0; i < numParams - 1; i++)
+    {
+      params[i] = 0;
+    }
+
+    params[numParams - 1] = 1 << CCCM_DECIM_BITS; // Default bias to 1
+  }
+
+  Pel convolve(Pel* vector, int numParams)
+  {
+    TCccmCoeff sum = 0;
+    
+    for( int i = 0; i < numParams; i++)
+    {
+      sum += params[i] * vector[i];
+    }
+
+    return Pel( (sum + CCCM_DECIM_ROUND ) >> CCCM_DECIM_BITS );
+  }
+  
+  Pel nonlinear(const Pel val) { return (val * val + midVal) >> bd; }
+  Pel bias     ()              { return midVal; }
+};
+
+struct CccmCovarianceInt
+{
+  using TE = TCccmCoeff[CCCM_NUM_PARAMS][CCCM_NUM_PARAMS];
+  using Ty = TCccmCoeff[CCCM_NUM_PARAMS];
+
+  CccmCovarianceInt() {}
+  ~CccmCovarianceInt() {}
+
+  bool ldlDecompose                (TE A, TE U,          Ty diag,                      int numEq) const;
+  void ldlSolve                    (TE U, Ty diag,       TCccmCoeff* y, TCccmCoeff* x, int numEq, bool decompOk) const;
+
+private:
+  void ldlBacksubstitution         (TE U, TCccmCoeff* z, TCccmCoeff* x, int numEq) const;
+  void ldlTransposeBacksubstitution(TE U, TCccmCoeff* y, TCccmCoeff* z, int numEq) const;
+  bool ldlDecomp                   (TE A, TE U,          Ty outDiag,    int numEq) const;
+};
+#endif
+
 class IntraPrediction
 {
 #if MMLM
@@ -108,6 +170,11 @@ private:
   int  m_yuvExtSize2;
 #endif
 
+#if JVET_AA0057_CCCM
+  Area m_cccmRefArea;
+  Pel* m_cccmLumaBuf;
+#endif
+  
   static const uint8_t m_aucIntraFilter[MAX_INTRA_FILTER_DEPTHS];
 #if JVET_W0123_TIMD_FUSION
   static const uint8_t m_aucIntraFilterExt[MAX_INTRA_FILTER_DEPTHS];
@@ -152,6 +219,10 @@ private:
 
   Pel* m_piTemp;
   Pel* m_pMdlmTemp; // for MDLM mode
+#if JVET_AA0126_GLM
+  Pel* m_glmTempCb[NUM_GLM_IDC];
+  Pel* m_glmTempCr[NUM_GLM_IDC];
+#endif
   MatrixIntraPrediction m_matrixIntraPred;
 
 
@@ -234,6 +305,18 @@ public:
   virtual ~IntraPrediction();
 
   void init                       (ChromaFormat chromaFormatIDC, const unsigned bitDepthY);
+
+#if JVET_AA0057_CCCM
+  void   predIntraCCCM            (const PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, int intraDir);
+  void   xCccmCalcModels          (const PredictionUnit& pu, CccmModel &cccmModelCb, CccmModel &cccmModelCr, int modelId, int modelThr) const;
+  void   xCccmApplyModel          (const PredictionUnit& pu, const ComponentID compId, CccmModel &cccmModel, int modelId, int modelThr, PelBuf &piPred) const;
+  void   xCccmCreateLumaRef       (const PredictionUnit& pu);
+  PelBuf xCccmGetLumaRefBuf       (const PredictionUnit& pu, int &areaWidth, int &areaHeight, int &refSizeX, int &refSizeY, int &refPosPicX, int &refPosPicY) const;
+  PelBuf xCccmGetLumaPuBuf        (const PredictionUnit& pu) const;
+  Pel    xCccmGetLumaVal          (const PredictionUnit& pu, const CPelBuf pi, const int x, const int y) const;
+  int    xCccmCalcRefAver         (const PredictionUnit& pu) const;
+  void   xCccmCalcRefArea         (const PredictionUnit& pu);
+#endif
 #if ENABLE_DIMD
   static void deriveDimdMode      (const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu);
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
@@ -295,6 +378,10 @@ public:
   // Cross-component Chroma
   void predIntraChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea& chromaArea, int intraDir, bool createModel = true, CclmModel *cclmModelStored = nullptr);
   void xGetLumaRecPixels(const PredictionUnit &pu, CompArea chromaArea);
+#if JVET_AA0126_GLM
+  void xGetLumaRecPixelsGlmAll(const PredictionUnit &pu, CompArea chromaArea);
+  Pel xGlmGetLumaVal    (const int s[6], const int c[6], const int glmIdx, const Pel val) const;
+#endif
   /// set parameters from CU data for accessing intra data
   void initIntraPatternChType     (const CodingUnit &cu, const CompArea &area, const bool forceRefFilterFlag = false); // use forceRefFilterFlag to get both filtered and unfiltered buffers
   void initIntraPatternChTypeISP  (const CodingUnit& cu, const CompArea& area, PelBuf& piReco, const bool forceRefFilterFlag = false); // use forceRefFilterFlag to get both filtered and unfiltered buffers

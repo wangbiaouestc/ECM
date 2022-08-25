@@ -607,6 +607,12 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setRPLList1                                          ( m_RPLList1);
   m_cEncLib.setIDRRefParamListPresent                            ( m_idrRefParamList );
   m_cEncLib.setGopList                                           ( m_GOPList );
+  
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  m_cEncLib.setIsRA                                              ( m_isRA );
+  m_cEncLib.setNumQPOffset                                       ( m_numQPOffset );
+  m_cEncLib.setQPOffsetList                                      ( m_qpOffsetList );
+#endif
 
   for(int i = 0; i < MAX_TLAYER; i++)
   {
@@ -768,6 +774,30 @@ void EncApp::xInitLibCfg()
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   m_cEncLib.setUseDMVDMode                                       ( m_DMVDMode );
 #endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  m_cEncLib.setTMToolsEnableFlag                                 ( m_tmToolsEnableFlag );
+#if TM_AMVP
+  m_cEncLib.setUseTMAmvpMode                                     ( m_tmAmvpMode );
+#endif
+#if TM_MRG
+  m_cEncLib.setUseTMMrgMode                                      ( m_tmMrgMode );
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  m_cEncLib.setUseGPMTMMode                                      ( m_tmGPMMode );
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  m_cEncLib.setUseOBMCTMMode                                     ( m_tmOBMCMode );
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  m_cEncLib.setUseCIIPTMMode                                     ( m_tmCIIPMode );
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  m_cEncLib.setUseTmvpNmvpReordering                             ( m_useTmvpNmvpReorder );
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  m_cEncLib.setUseTMMMVD                                         ( m_useTMMMVD );
+#endif
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   m_cEncLib.setUseAltGPMSplitModeCode                            ( m_altGPMSplitModeCode );
 #endif
@@ -775,6 +805,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setBIO                                               (m_BIO);
 #if JVET_W0090_ARMC_TM
   m_cEncLib.setAML                                               ( m_AML );
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  m_cEncLib.setArmcRefinedMotion                                 ( m_iQP < 25 ? false : m_armcRefinedMotion );
 #endif
   m_cEncLib.setUseLMChroma                                       ( m_LMChroma );
   m_cEncLib.setHorCollocatedChromaFlag                           ( m_horCollocatedChromaFlag );
@@ -804,6 +837,9 @@ void EncApp::xInitLibCfg()
       m_cEncLib.setLadfIntervalLowerBound(m_LadfIntervalLowerBound[k], k);
     }
   }
+#endif
+#if JVET_AA0133_INTER_MTS_OPT
+  m_cEncLib.setInterMTSMaxSize(m_interMTSMaxSize);
 #endif
 #if ENABLE_DIMD
   m_cEncLib.setUseDimd                                           ( m_dimd );
@@ -842,6 +878,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setIBCHashSearchMaxCand                              ( m_IBCHashSearchMaxCand );
   m_cEncLib.setIBCHashSearchRange4SmallBlk                       ( m_IBCHashSearchRange4SmallBlk );
   m_cEncLib.setIBCFastMethod                                     ( m_IBCFastMethod );
+#if JVET_AA0061_IBC_MBVD
+  m_cEncLib.setIbcMbvd                                           ( m_ibcMbvd );
+#endif
 
   m_cEncLib.setUseWrapAround                                     ( m_wrapAround );
   m_cEncLib.setWrapAroundOffset                                  ( m_wrapAroundOffset );

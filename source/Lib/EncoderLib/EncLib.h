@@ -117,6 +117,10 @@ private:
   EncReshape                m_cReshaper;                        ///< reshaper class
 #endif
 
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+  InterPrediction m_cFrameMcPadPredSearch;
+#endif
+
   // processing unit
   EncGOP                    m_cGOPEncoder;                        ///< GOP encoder
   EncSlice                  m_cSliceEncoder;                      ///< slice encoder
@@ -237,7 +241,9 @@ public:
   CtxCache*               getCtxCache           ( int jId = 0 ) { return  &m_CtxCache[jId];        }
 #else
   CABACEncoder*           getCABACEncoder       ()              { return  &m_CABACEncoder;         }
-
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+  InterPrediction *         getFrameMcPadPredSearch() { return &m_cFrameMcPadPredSearch; }
+#endif
   RdCost*                 getRdCost             ()              { return  &m_cRdCost;              }
   CtxCache*               getCtxCache           ()              { return  &m_CtxCache;             }
 #endif
@@ -319,6 +325,10 @@ public:
 
 #if DUMP_BEFORE_INLOOP
   std::string m_reconFileName;
+#endif
+
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  void setQPOffsetList(const int QPOffset[MAX_GOP]);
 #endif
 };
 

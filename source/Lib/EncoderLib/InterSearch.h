@@ -122,6 +122,9 @@ struct ModeInfo
   bool     isBMMrg;
   uint8_t  bmDir;
 #endif
+#if JVET_AA0070_RRIBC
+  int rribcFlipType;
+#endif
   bool     isGeo;
   uint8_t     geoSplitDir;
   uint8_t     geoMergeIdx0;
@@ -147,6 +150,9 @@ struct ModeInfo
 #if JVET_X0049_ADAPT_DMVR
     , isBMMrg(false)
     , bmDir(0)
+#endif
+#if JVET_AA0070_RRIBC
+    , rribcFlipType(0)
 #endif
   , isGeo(false), geoSplitDir(0), geoMergeIdx0(0), geoMergeIdx1(0)
 #if ENABLE_OBMC
@@ -199,6 +205,9 @@ struct ModeInfo
 #if AFFINE_MMVD
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
     mergeCand = pu.afMmvdFlag ?  pu.afMmvdMergeIdx : pu.mergeIdx;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    mergeCand = !pu.cs->sps->getUseTMMMVD() && pu.afMmvdFlag ? pu.afMmvdBaseIdx * ECM3_AF_MMVD_MAX_REFINE_NUM + pu.afMmvdStep * ECM3_AF_MMVD_OFFSET_DIR + pu.afMmvdDir : mergeCand;
+#endif
 #else
     mergeCand = pu.afMmvdFlag ? pu.afMmvdBaseIdx * AF_MMVD_MAX_REFINE_NUM + pu.afMmvdStep * AF_MMVD_OFFSET_DIR + pu.afMmvdDir : pu.mergeIdx;
 #endif
@@ -224,6 +233,9 @@ struct ModeInfo
 #if JVET_X0049_ADAPT_DMVR
     isBMMrg = pu.bmMergeFlag;
     bmDir = pu.bmDir;
+#endif
+#if JVET_AA0070_RRIBC
+    rribcFlipType = cu.rribcFlipType;
 #endif
     isGeo = cu.geoFlag;
     geoSplitDir = pu.geoSplitDir;
@@ -314,6 +326,9 @@ private:
   BcwMotionParam  m_uniMotions;
   bool            m_affineModeSelected;
   std::unordered_map< Position, std::unordered_map< Size, BlkRecord> > m_ctuRecord;
+#if JVET_AA0070_RRIBC
+  Distortion      minCostProj;
+#endif
   AffineMVInfo       *m_affMVList;
   int             m_affMVListIdx;
   int             m_affMVListSize;
@@ -351,7 +366,10 @@ protected:
   CABACWriter*    m_CABACEstimator;
   CtxCache*       m_CtxCache;
   DistParam       m_cDistParam;
-
+#if JVET_AA0133_INTER_MTS_OPT
+  double          m_globalBestLumaCost;
+  double          m_bestDCT2PassLumaCost;
+#endif
   RefPicList      m_currRefPicList;
   int             m_currRefPicIndex;
   bool            m_skipFracME;
@@ -418,6 +436,7 @@ public:
     m_geoMrgCtx = geoMrgCtx;
   }
 #endif
+
   InterSearch();
   virtual ~InterSearch();
 
@@ -458,6 +477,9 @@ public:
   void resetCtuRecord               ()             { m_ctuRecord.clear(); }
 #if ENABLE_SPLIT_PARALLELISM
   void copyState                    ( const InterSearch& other );
+#endif
+#if JVET_AA0133_INTER_MTS_OPT
+  void setBestCost(double cost) { m_globalBestLumaCost = cost; }
 #endif
   void setAffineModeSelected        ( bool flag) { m_affineModeSelected = flag; }
   void resetAffineMVList() { m_affMVListIdx = 0; m_affMVListSize = 0; }
@@ -651,8 +673,13 @@ public:
 
   /// set ME search range
   void setAdaptiveSearchRange       ( int iDir, int iRefIdx, int iSearchRange) { CHECK(iDir >= MAX_NUM_REF_LIST_ADAPT_SR || iRefIdx>=int(MAX_IDX_ADAPT_SR), "Invalid index"); m_aaiAdaptSR[iDir][iRefIdx] = iSearchRange; }
+#if JVET_AA0070_RRIBC
+  bool  predIBCSearch           ( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, bool isSecondPass = false );
+  void  xIntraPatternSearch          ( PredictionUnit& pu, IntTZSearchStruct&  cStruct, Mv& rcMv, Distortion&  ruiCost, Mv* cMvSrchRngLT, Mv* cMvSrchRngRB, Mv* pcMvPred, int rribcFlipType );
+#else
   bool  predIBCSearch           ( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap);
-  void  xIntraPatternSearch         ( PredictionUnit& pu, IntTZSearchStruct&  cStruct, Mv& rcMv, Distortion&  ruiCost, Mv* cMvSrchRngLT, Mv* cMvSrchRngRB, Mv* pcMvPred);
+  void  xIntraPatternSearch         ( PredictionUnit& pu, IntTZSearchStruct&  cStruct, Mv& rcMv, Distortion&  ruiCost, Mv* cMvSrchRngLT, Mv* cMvSrchRngRB, Mv* pcMvPred );
+#endif
   void  xSetIntraSearchRange        ( PredictionUnit& pu, int iRoiWidth, int iRoiHeight, const int localSearchRangeX, const int localSearchRangeY, Mv& rcMvSrchRngLT, Mv& rcMvSrchRngRB);
   void  resetIbcSearch()
   {
@@ -662,9 +689,15 @@ public:
     }
     m_defaultCachedBvs.currCnt = 0;
   }
+#if JVET_AA0070_RRIBC
+  void xIBCEstimation(PredictionUnit &pu, PelUnitBuf &origBuf, Mv pcMvPred[3][2], Mv &rcMv, Distortion &ruiCost, const int localSearchRangeX, const int localSearchRangeY, int numRribcType);
+  void xIBCSearchMVCandUpdate( Distortion uiSad, int x, int y, Distortion *uiSadBestCand, Mv *cMVCand);
+  int  xIBCSearchMVChromaRefine( PredictionUnit &pu, int iRoiWidth, int iRoiHeight, int cuPelX, int cuPelY, Distortion *uiSadBestCand, Mv *cMVCand, int rribcFlipType );
+#else
   void  xIBCEstimation   ( PredictionUnit& pu, PelUnitBuf& origBuf, Mv     *pcMvPred, Mv     &rcMv, Distortion &ruiCost, const int localSearchRangeX, const int localSearchRangeY);
   void  xIBCSearchMVCandUpdate  ( Distortion  uiSad, int x, int y, Distortion* uiSadBestCand, Mv* cMVCand);
-  int   xIBCSearchMVChromaRefine( PredictionUnit& pu, int iRoiWidth, int iRoiHeight, int cuPelX, int cuPelY, Distortion* uiSadBestCand, Mv*     cMVCand);
+  int   xIBCSearchMVChromaRefine( PredictionUnit& pu, int iRoiWidth, int iRoiHeight, int cuPelX, int cuPelY, Distortion* uiSadBestCand, Mv*     cMVCand );
+#endif
   void addToSortList(std::list<BlockHash>& listBlockHash, std::list<int>& listCost, int cost, const BlockHash& blockHash);
   bool predInterHashSearch(CodingUnit& cu, Partitioner& partitioner, bool& isPerfectMatch);
   bool xHashInterEstimation(PredictionUnit& pu, RefPicList& bestRefPicList, int& bestRefIndex, Mv& bestMv, Mv& bestMvd, int& bestMVPIndex, bool& isPerfectMatch);
@@ -982,17 +1015,33 @@ protected:
 
   void  setWpScalingDistParam     ( int iRefIdx, RefPicList eRefPicListCur, Slice *slice );
 private:
+#if JVET_AA0070_RRIBC
+  void xxIBCHashSearch(PredictionUnit &pu, Mv mvPred[3][2], int numMvPred, Mv &mv, int &idxMvPred, IbcHashMap &ibcHashMap, AMVPInfo amvpInfo4Pel[3], int numRribcType);
+#else
   void  xxIBCHashSearch(PredictionUnit& pu, Mv* mvPred, int numMvPred, Mv &mv, int& idxMvPred, IbcHashMap& ibcHashMap);
+#endif
 public:
-
+#if JVET_AA0133_INTER_MTS_OPT
+  bool encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &partitioner, const bool &skipResidual
+    , const bool luma = true, const bool chroma = true
+  );
+#else
   void encodeResAndCalcRdInterCU  (CodingStructure &cs, Partitioner &partitioner, const bool &skipResidual
     , const bool luma = true, const bool chroma = true
   );
+#endif
   void xEncodeInterResidualQT     (CodingStructure &cs, Partitioner &partitioner, const ComponentID &compID);
+#if JVET_AA0133_INTER_MTS_OPT
+  bool xEstimateInterResidualQT(CodingStructure &cs, Partitioner &partitioner, Distortion *puiZeroDist = NULL
+    , const bool luma = true, const bool chroma = true
+    , PelUnitBuf* orgResi = NULL
+  );
+#else
   void xEstimateInterResidualQT   (CodingStructure &cs, Partitioner &partitioner, Distortion *puiZeroDist = NULL
     , const bool luma = true, const bool chroma = true
     , PelUnitBuf* orgResi = NULL
   );
+#endif
   uint64_t xGetSymbolFracBitsInter  (CodingStructure &cs, Partitioner &partitioner);
   uint64_t xCalcPuMeBits            (PredictionUnit& pu);
 

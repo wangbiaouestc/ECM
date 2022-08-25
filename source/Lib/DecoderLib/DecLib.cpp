@@ -466,6 +466,9 @@ DecLib::DecLib()
   , m_cLoopFilter()
   , m_cSAO()
   , m_cReshaper()
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+  , m_cFrameMcPadPrediction()
+#endif
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
   , m_cacheModel()
 #endif
@@ -618,9 +621,21 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
     pcPic = new Picture();
 
 #if JVET_Z0118_GDR
-    pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId);
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+    pcPic->create(sps.getGDREnabledFlag(), sps.getChromaFormatIdc(),
+                  Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()),
+                  sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16 + MC_PAD_SIZE, true, layerId);
 #else
-    pcPic->create( sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId );
+    pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId);
+#endif
+#else
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+    pcPic->create(sps.getChromaFormatIdc(),
+                  Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(),
+                  sps.getMaxCUWidth() + 16 + MC_PAD_SIZE, true, layerId);
+#else
+    pcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId);
+#endif
 #endif
 
     m_cListPic.push_back( pcPic );
@@ -658,9 +673,20 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
     m_cListPic.push_back( pcPic );
 
 #if JVET_Z0118_GDR
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+    pcPic->create(sps.getGDREnabledFlag(), sps.getChromaFormatIdc(),
+                  Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()),
+                  sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16 + MC_PAD_SIZE, true, layerId);
+#else
     pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId );
+#endif
+#else
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+    pcPic->create(sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()),
+                  sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16 + MC_PAD_SIZE, true, layerId);
 #else
     pcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId);
+#endif
 #endif
   }
   else
@@ -669,9 +695,20 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
     {
       pcPic->destroy();
 #if JVET_Z0118_GDR
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+      pcPic->create(sps.getGDREnabledFlag(), sps.getChromaFormatIdc(),
+                    Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()),
+                    sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16 + MC_PAD_SIZE, true, layerId);
+#else
       pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId);
+#endif
+#else
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+      pcPic->create(sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()),
+                    sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16 + MC_PAD_SIZE, true, layerId);
 #else
       pcPic->create( sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId );
+#endif
 #endif
     }
 #if JVET_Z0118_GDR // picHeader should be deleted in case pcPic slot gets reused
@@ -726,6 +763,14 @@ void DecLib::executeLoopFilters()
       m_cReshaper.setRecReshaped(false);
       m_cSAO.setReshaper(&m_cReshaper);
   }
+
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+  if (cs.sps->getALFEnabledFlag())
+  {
+    m_cALF.copyDbData(cs);
+  }
+#endif
+
   // deblocking filter
 #if DB_PARAM_TID
   const PPS* pcPPS = cs.slice->getPPS();
@@ -956,6 +1001,12 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
   m_pcPic->destroyTempBuffers();
   m_pcPic->cs->destroyCoeffs();
   m_pcPic->cs->releaseIntermediateData();
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+  m_cFrameMcPadPrediction.init(&m_cRdCost, pcSlice->getSPS()->getChromaFormatIdc(), pcSlice->getSPS()->getMaxCUHeight(),
+                               NULL, m_pcPic->getPicWidthInLumaSamples());
+  m_cFrameMcPadPrediction.mcFramePad(m_pcPic, *(m_pcPic->slices[0]));
+#endif
+
 #if !JVET_Z0118_GDR
   m_pcPic->cs->picHeader->initPicHeader();
 #endif

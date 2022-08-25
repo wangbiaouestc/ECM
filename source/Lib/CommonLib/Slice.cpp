@@ -99,6 +99,9 @@ Slice::Slice()
 , m_pcPicHeader                   ( NULL )
 , m_colFromL0Flag                 ( true )
 , m_colRefIdx                     ( 0 )
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+, m_costForARMC                   ( MAX_UINT )
+#endif
 #if INTER_LIC
 , m_UseLIC                        ( false )
 #endif
@@ -184,6 +187,9 @@ void Slice::initSlice()
   m_colourPlaneId = 0;
 #endif
   m_colRefIdx = 0;
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  m_costForARMC = MAX_UINT;
+#endif
   m_lmcsEnabledFlag = 0;
   m_explicitScalingListUsed = 0;
   initEqualRef();
@@ -303,11 +309,18 @@ void Slice::checkAmvpMergeModeAvailability(Slice* pcSlice)
     bool validCandidate = false;
     for (int refIdxInList1 = 0; refIdxInList1 < pcSlice->getNumRefIdx(REF_PIC_LIST_1); refIdxInList1++)
     {
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+      if (pcSlice->getSPS()->getUseDMVDMode())
+      {
+#endif
       if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->isRefScaled(pcSlice->getPPS()) ||
         pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->isRefScaled(pcSlice->getPPS()))
       {
         continue;
       }
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+      }
+#endif
       if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->longTerm ||
         pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->longTerm)
       {
@@ -347,11 +360,18 @@ void Slice::checkAmvpMergeModeAvailability(Slice* pcSlice)
     bool validCandidate = false;
     for (int refIdxInList0 = 0; refIdxInList0 < pcSlice->getNumRefIdx(REF_PIC_LIST_0); refIdxInList0++)
     {
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+      if (pcSlice->getSPS()->getUseDMVDMode())
+      {
+#endif
       if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->isRefScaled(pcSlice->getPPS()) ||
         pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->isRefScaled(pcSlice->getPPS()))
       {
         continue;
       }
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+      }
+#endif
       if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->longTerm ||
         pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->longTerm)
       {
@@ -853,8 +873,9 @@ void Slice::constructRefPicList(PicList& rcListPic)
       pcRefPic->longTerm = true;
     }
 
+#if !JVET_AA0096_MC_BOUNDARY_PADDING
     pcRefPic->extendPicBorder( getPPS() );
-
+#endif
     m_apcRefPicList[REF_PIC_LIST_0][ii] = pcRefPic;
     m_bIsUsedAsLongTerm[REF_PIC_LIST_0][ii] = pcRefPic->longTerm;
   }
@@ -895,8 +916,9 @@ void Slice::constructRefPicList(PicList& rcListPic)
       pcRefPic->longTerm = true;
     }
 
+#if !JVET_AA0096_MC_BOUNDARY_PADDING
     pcRefPic->extendPicBorder( getPPS() );
-
+#endif
     m_apcRefPicList[REF_PIC_LIST_1][ii] = pcRefPic;
     m_bIsUsedAsLongTerm[REF_PIC_LIST_1][ii] = pcRefPic->longTerm;
   }
@@ -1519,6 +1541,9 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
   m_pcPicHeader          = pSrc->m_pcPicHeader;
   m_colFromL0Flag        = pSrc->m_colFromL0Flag;
   m_colRefIdx            = pSrc->m_colRefIdx;
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  m_costForARMC          = pSrc->m_costForARMC;
+#endif
 
   if( cpyAlmostAll ) setLambdas(pSrc->getLambdas());
 
@@ -3466,8 +3491,32 @@ SPS::SPS()
 #if AFFINE_MMVD
  , m_AffineMmvdMode           ( false )
 #endif
+#if JVET_AA0061_IBC_MBVD
+  , m_ibcMbvd                 ( false )
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
  , m_DMVDMode                 ( false )
+#endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+, m_tmToolsEnableFlag         ( false )
+#if TM_AMVP
+ , m_tmAmvpMode               ( false )
+#endif
+#if TM_MRG
+ , m_tmMrgMode                ( false )
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+ , m_tmGPMMode                ( false )
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+ , m_tmOBMCMode               ( false )
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+ , m_useTmvpNmvpReorder       ( false )
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+ , m_useTMMMVD                ( false )
+#endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 , m_altGPMSplitModeCode       ( false )
@@ -3503,6 +3552,9 @@ SPS::SPS()
 , m_uiMaxCUHeight             ( 32)
 , m_numRPL0                   ( 0 )
 , m_numRPL1                   ( 0 )
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  , m_numLambda               ( 0 )
+#endif
 , m_rpl1CopyFromRpl0Flag      ( false )
 , m_rpl1IdxPresentFlag        ( false )
 , m_allRplEntriesHasSameSignFlag ( true )
@@ -3584,7 +3636,9 @@ SPS::SPS()
 , m_LadfQpOffset              { 0 }
 , m_LadfIntervalLowerBound    { 0 }
 #endif
-
+#if JVET_AA0133_INTER_MTS_OPT
+, m_interMTSMaxSize           ( 32 )
+#endif
 #if MULTI_HYP_PRED
 , m_InterMultiHyp(false)
 , m_maxNumAddHyps(0)
@@ -3595,6 +3649,9 @@ SPS::SPS()
 , m_MIP                       ( false )
 #if JVET_W0090_ARMC_TM
 , m_AML                       ( false )
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+, m_armcRefinedMotion         ( false )
 #endif
 , m_GDREnabledFlag            ( true )
 , m_SubLayerCbpParametersPresentFlag ( true )
@@ -3656,7 +3713,29 @@ void  SPS::createRPLList1(int numRPL)
 
   m_rpl1IdxPresentFlag = (m_numRPL0 != m_numRPL1) ? true : false;
 }
-
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+int  SPS::getIdx(uint32_t val) const {
+  for (int i = 0; i < m_numLambda; i++)
+  {
+    if (m_lambdaVal[i] == val)
+    {
+      return i;
+    }
+  }
+  return -1;
+}
+int  SPS::getQPOffsetsIdx(int val) const
+{
+  for (int i = 0; i < m_numLambda; i++)
+  {
+    if (m_qpOffsets[i] == val)
+    {
+      return i;
+    }
+  }
+  return -1;
+}
+#endif
 
 const int SPS::m_winUnitX[]={1,2,2,1};
 const int SPS::m_winUnitY[]={1,2,1,1};
@@ -5093,9 +5172,21 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
             scaledRefPic[j]->poc = NOT_VALID;
 
 #if JVET_Z0118_GDR
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+            scaledRefPic[j]->create(sps->getGDREnabledFlag(), sps->getChromaFormatIdc(),
+                                    Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()),
+                                    sps->getMaxCUWidth(), sps->getMaxCUWidth() + 16 + MC_PAD_SIZE, isDecoder, layerId);
+#else
             scaledRefPic[j]->create(sps->getGDREnabledFlag(), sps->getChromaFormatIdc(), Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()), sps->getMaxCUWidth(), sps->getMaxCUWidth() + 16, isDecoder, layerId);
+#endif
+#else
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+            scaledRefPic[j]->create(sps->getChromaFormatIdc(),
+                                    Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()),
+                                    sps->getMaxCUWidth(), sps->getMaxCUWidth() + 16 + MC_PAD_SIZE, isDecoder, layerId);
 #else
             scaledRefPic[j]->create( sps->getChromaFormatIdc(), Size( pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples() ), sps->getMaxCUWidth(), sps->getMaxCUWidth() + 16, isDecoder, layerId );
+#endif
 #endif
           }
 
@@ -5110,7 +5201,9 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
                                    sps->getChromaFormatIdc(), sps->getBitDepths(), true, downsampling,
                                    sps->getHorCollocatedChromaFlag(), sps->getVerCollocatedChromaFlag() );
           scaledRefPic[j]->unscaledPic = m_apcRefPicList[refList][rIdx];
+#if !JVET_AA0096_MC_BOUNDARY_PADDING
           scaledRefPic[j]->extendPicBorder( getPPS() );
+#endif
 
           m_scaledRefPicList[refList][rIdx] = scaledRefPic[j];
         }

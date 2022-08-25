@@ -100,6 +100,10 @@ struct PelBufferOps
   void ( *removeWeightHighFreq4)  ( Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int shift, int bcwWeight);
   void ( *removeHighFreq8)        ( Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height);
   void ( *removeHighFreq4)        ( Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height);
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  void ( *removeWeightHighFreq1)  ( Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int shift, int bcwWeight);
+  void ( *removeHighFreq1)        ( Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height);
+#endif
 #endif
   void (*profGradFilter) (Pel* pSrc, int srcStride, int width, int height, int gradStride, Pel* gradX, Pel* gradY, const int bitDepth);
   void (*applyPROF)      (Pel* dst, int dstStride, const Pel* src, int srcStride, int width, int height, const Pel* gradX, const Pel* gradY, int gradStride, const int* dMvX, const int* dMvY, int dMvStride, const bool& bi, int shiftNum, Pel offset, const ClpRng& clpRng);
@@ -114,6 +118,11 @@ struct PelBufferOps
 #if JVET_Z0136_OOB
   bool(*isMvOOB)  (const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, bool *mcMaskChroma, bool lumaOnly, ChromaFormat componentID);
   bool(*isMvOOBSubBlk) (const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, int mcStride, bool *mcMaskChroma, int mcCStride, bool lumaOnly, ChromaFormat componentID);
+#endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+  void(*computeDeltaAndShift)(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri);
+  void(*computeDeltaAndShiftAddi)(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri, std::vector<RMVFInfo> &mvpInfoVecRes);
+  void(*buildRegressionMatrix)(std::vector<RMVFInfo> &mvpInfoVecOri, int sumbb[2][3][3], int sumeb[2][3], uint16_t addedSize);
 #endif
 };
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -196,6 +205,10 @@ struct AreaBuf : public Size
   void transposedFrom       ( const AreaBuf<const T> &other );
 
   void toLast               ( const ClpRng& clpRng );
+
+#if JVET_AA0070_RRIBC
+  void flipSignal(bool isFlipHor);
+#endif
 
   void rspSignal            ( std::vector<Pel>& pLUT );
   void rspSignal            ( const AreaBuf<const Pel>& other, std::vector<Pel>& pLUT );
@@ -545,7 +558,11 @@ void AreaBuf<T>::removeWeightHighFreq(const AreaBuf<T>& other, const bool bClip,
     else if(!(width & 3))
       g_pelBufOP.removeWeightHighFreq4(dst, dstStride, src, srcStride, width, height, 16, bcwWeight);
     else
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+      g_pelBufOP.removeWeightHighFreq1(dst, dstStride, src, srcStride, width, height, 16, bcwWeight);
+#else
       CHECK(true, "Not supported");
+#endif
   }
   else
   {
@@ -608,7 +625,11 @@ void AreaBuf<T>::removeHighFreq( const AreaBuf<T>& other, const bool bClip, cons
     else if (!(width & 3))
       g_pelBufOP.removeHighFreq4(dst, dstStride, src, srcStride, width, height);
     else
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+      g_pelBufOP.removeHighFreq1(dst, dstStride, src, srcStride, width, height);
+#else
       CHECK(true, "Not supported");
+#endif
   }
   else
   {

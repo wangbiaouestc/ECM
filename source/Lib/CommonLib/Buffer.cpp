@@ -737,9 +737,9 @@ bool isMvOOBCore(const Mv& rcMv, const struct Position pos, const struct Size si
   int offsetY = (pos.y << MV_FRACTIONAL_BITS_INTERNAL) + rcMv.getVer();
   bool isOOB = false;
   if ((offsetX <= horMin)
-    || ((offsetX + (size.width << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= horMax)
+    || ((offsetX + ((size.width - 1) << MV_FRACTIONAL_BITS_INTERNAL) ) >= horMax)
     || (offsetY <= verMin)
-    || ((offsetY + (size.height << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= verMax))
+    || ((offsetY + ((size.height - 1) << MV_FRACTIONAL_BITS_INTERNAL)) >= verMax))
   {
     isOOB = true;
   }
@@ -805,9 +805,9 @@ bool isMvOOBSubBlkCore(const Mv& rcMv, const struct Position pos, const struct S
   int offsetY = (pos.y << MV_FRACTIONAL_BITS_INTERNAL) + rcMv.getVer();
   bool isOOB = false;
   if ((offsetX <= horMin)
-    || ((offsetX + (size.width << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= horMax)
+    || ((offsetX + ((size.width - 1) << MV_FRACTIONAL_BITS_INTERNAL) ) >= horMax)
     || (offsetY <= verMin)
-    || ((offsetY + (size.height << MV_FRACTIONAL_BITS_INTERNAL) - 1) >= verMax))
+    || ((offsetY + ((size.height - 1) << MV_FRACTIONAL_BITS_INTERNAL)) >= verMax))
   {
     isOOB = true;
   }
@@ -865,7 +865,63 @@ bool isMvOOBSubBlkCore(const Mv& rcMv, const struct Position pos, const struct S
   return isOOB;
 }
 #endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+void computeDeltaAndShiftCore(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri)
+{
+  for (int i = 0; i < int(mvpInfoVecOri.size()); i++)
+  {
+    mvpInfoVecOri[i].mvp.hor = mvpInfoVecOri[i].mvp.hor >= 0 ? mvpInfoVecOri[i].mvp.hor << 2 : -(-mvpInfoVecOri[i].mvp.hor << 2);
+    mvpInfoVecOri[i].mvp.ver = mvpInfoVecOri[i].mvp.ver >= 0 ? mvpInfoVecOri[i].mvp.ver << 2 : -(-mvpInfoVecOri[i].mvp.ver << 2);
+    mvpInfoVecOri[i].pos.x = mvpInfoVecOri[i].pos.x - posLT.x;
+    mvpInfoVecOri[i].pos.y = mvpInfoVecOri[i].pos.y - posLT.y;
+    mvpInfoVecOri[i].mvp.set(mvpInfoVecOri[i].mvp.getHor() - firstMv.getHor(), mvpInfoVecOri[i].mvp.getVer() - firstMv.getVer());
+  }
+}
+void computeDeltaAndShiftCoreAddi(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri, std::vector<RMVFInfo> &mvpInfoVecRes)
+{
+  int offset = (int)mvpInfoVecRes.size();
+  for (int i = 0; i < int(mvpInfoVecOri.size()); i++)
+  {
+    mvpInfoVecRes.push_back(RMVFInfo());
+    mvpInfoVecOri[i].mvp.hor = mvpInfoVecOri[i].mvp.hor >= 0 ? mvpInfoVecOri[i].mvp.hor << 2 : -(-mvpInfoVecOri[i].mvp.hor << 2);
+    mvpInfoVecOri[i].mvp.ver = mvpInfoVecOri[i].mvp.ver >= 0 ? mvpInfoVecOri[i].mvp.ver << 2 : -(-mvpInfoVecOri[i].mvp.ver << 2);
+    mvpInfoVecRes[offset + i].pos.x = mvpInfoVecOri[i].pos.x - posLT.x;
+    mvpInfoVecRes[offset + i].pos.y = mvpInfoVecOri[i].pos.y - posLT.y;
+    mvpInfoVecRes[offset + i].mvp.set(mvpInfoVecOri[i].mvp.getHor() - firstMv.getHor(), mvpInfoVecOri[i].mvp.getVer() - firstMv.getVer());
+  }
+}
+void buildRegressionMatrixCore(std::vector<RMVFInfo> &mvpInfoVecOri, int sumbb[2][3][3], int sumeb[2][3], uint16_t addedSize)
+{
+  int iNum = (int)mvpInfoVecOri.size();
+  int b[3];
+  int e[2];
+  for (int ni = addedSize ? iNum - addedSize : 0; ni < iNum; ni++)//for all neighbor PUs
+  {
+    // to avoid big values in matrix, it is better to use delta_x and delta_y value, ie.e. use the x,y with respect to the top,left corner of current PU
+    b[0] = mvpInfoVecOri[ni].pos.x;
+    b[1] = mvpInfoVecOri[ni].pos.y;
+    b[2] = 1;
 
+    e[0] = mvpInfoVecOri[ni].mvp.getHor();
+    e[1] = mvpInfoVecOri[ni].mvp.getVer();
+
+    for (int c = 0; c < 2; c++)
+    {
+      for (int d = 0; d < 3; d++)
+      {
+        sumeb[c][d] += (e[c] * b[d]);
+      }
+      for (int d1 = 0; d1 < 3; d1++)
+      {
+        for (int d = 0; d < 3; d++)
+        {
+          sumbb[c][d1][d] += (b[d1] * b[d]);
+        }
+      }
+    }
+  }
+}
+#endif
 PelBufferOps::PelBufferOps()
 {
 #if JVET_W0097_GPM_MMVD_TM
@@ -903,6 +959,10 @@ PelBufferOps::PelBufferOps()
   removeWeightHighFreq4 = removeWeightHighFreq;
   removeHighFreq8 = removeHighFreq;
   removeHighFreq4 = removeHighFreq;
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  removeWeightHighFreq1 = removeWeightHighFreq;
+  removeHighFreq1 = removeHighFreq;
+#endif
 #endif
 
   profGradFilter = gradFilterCore <false>;
@@ -921,6 +981,11 @@ PelBufferOps::PelBufferOps()
 #if JVET_Z0136_OOB
   isMvOOB = isMvOOBCore;
   isMvOOBSubBlk = isMvOOBSubBlkCore;
+#endif
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+  computeDeltaAndShift = computeDeltaAndShiftCore;
+  computeDeltaAndShiftAddi = computeDeltaAndShiftCoreAddi;
+  buildRegressionMatrix = buildRegressionMatrixCore;
 #endif
 }
 
@@ -1150,6 +1215,46 @@ void AreaBuf<Pel>::rspSignal( const AreaBuf<Pel> &toReshape, std::vector<Pel>& p
     src += srcStride;
   }
 }
+
+#if JVET_AA0070_RRIBC
+template<>
+void AreaBuf<Pel>::flipSignal(bool isFlipHor)
+{
+  Pel *tempPel;
+  Size tSize(width, height);
+  tempPel       = new Pel[tSize.area()];
+  PelBuf tmpBuf = PelBuf(tempPel, tSize);
+  copyBufferCore(buf, stride, tmpBuf.buf, tmpBuf.stride, tmpBuf.width, tmpBuf.height);
+
+  Pel *dstbuf = buf;
+  Pel *srcbuf = tmpBuf.buf;
+  if (isFlipHor)
+  {
+    for (unsigned y = 0; y < height; y++)
+    {
+      for (unsigned x = 0; x < width; x++)
+      {
+        dstbuf[x] = srcbuf[width - 1 - x];
+      }
+      dstbuf += stride;
+      srcbuf += tmpBuf.stride;
+    }
+  }
+  else
+  {
+    for (unsigned y = 0; y < height; y++)
+    {
+      for (unsigned x = 0; x < width; x++)
+      {
+        dstbuf[x] = srcbuf[(height - 1 - y) * tmpBuf.stride + x];
+      }
+      dstbuf += stride;
+    }
+  }
+
+  delete[] tempPel;
+}
+#endif
 
 template<>
 void AreaBuf<Pel>::rspSignalAllAndSubtract( const AreaBuf<Pel> &buffer1, const AreaBuf<Pel> &buffer2, std::vector<Pel>& pLUT )

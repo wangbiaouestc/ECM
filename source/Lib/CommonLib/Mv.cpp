@@ -63,6 +63,9 @@ void clipMvInPic ( Mv& rcMv, const struct Position& pos, const struct Size& size
 
   int mvShift = MV_FRACTIONAL_BITS_INTERNAL;
   int offset = 8;
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+  offset += MC_PAD_SIZE;
+#endif
   int horMax = (pps.getPicWidthInLumaSamples() + offset - (int)pos.x - 1) << mvShift;
   int horMin = (-(int)sps.getMaxCUWidth() - offset - (int)pos.x + 1) << mvShift;
 

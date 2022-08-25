@@ -297,6 +297,11 @@ protected:
   bool      m_cabacBypassAlignmentEnabledFlag;
   bool      m_ISP;
   bool      m_useFastISP;                                    ///< flag for enabling fast methods for ISP
+#if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+  bool      m_isRA;
+  int       m_numQPOffset;
+  int       m_qpOffsetList[MAX_GOP];
+#endif
 
   // coding quality
 #if QP_SWITCHING_FOR_PARALLEL
@@ -389,6 +394,30 @@ protected:
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool      m_DMVDMode;
 #endif
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+  bool      m_tmToolsEnableFlag;
+#if TM_AMVP
+  bool      m_tmAmvpMode;
+#endif
+#if TM_MRG
+  bool      m_tmMrgMode;
+#endif
+#if JVET_W0097_GPM_MMVD_TM && TM_MRG
+  bool      m_tmGPMMode;
+#endif
+#if JVET_Z0061_TM_OBMC && ENABLE_OBMC
+  bool      m_tmOBMCMode;
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && TM_MRG
+  int       m_tmCIIPMode;
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  bool      m_useTmvpNmvpReorder;
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  bool      m_useTMMMVD;
+#endif
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   bool      m_altGPMSplitModeCode;
 #endif
@@ -396,6 +425,9 @@ protected:
   bool      m_BIO;
 #if JVET_W0090_ARMC_TM
   bool      m_AML;
+#endif
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  bool      m_armcRefinedMotion;
 #endif
   int       m_LMChroma;
   bool      m_horCollocatedChromaFlag;
@@ -415,6 +447,9 @@ protected:
   int       m_LadfNumIntervals;
   std::vector<int> m_LadfQpOffset;
   int       m_LadfIntervalLowerBound[MAX_LADF_INTERVALS];
+#endif
+#if JVET_AA0133_INTER_MTS_OPT
+  int       m_interMTSMaxSize;
 #endif
 #if ENABLE_DIMD
   bool      m_dimd;
@@ -453,6 +488,9 @@ protected:
   unsigned  m_IBCHashSearchMaxCand;
   unsigned  m_IBCHashSearchRange4SmallBlk;
   unsigned  m_IBCFastMethod;
+#if JVET_AA0061_IBC_MBVD
+  bool      m_ibcMbvd;
+#endif
 
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;

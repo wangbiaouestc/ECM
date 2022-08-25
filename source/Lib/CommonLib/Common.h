@@ -59,6 +59,10 @@ struct Position
   void     relativeTo  (const Position origin)              { x -= origin.x; y -= origin.y; }
 
   Position operator-( const Position &other )         const { return{ x - other.x, y - other.y }; }
+#if JVET_AA0096_MC_BOUNDARY_PADDING
+  PosType getX() { return x; }
+  PosType getY() { return y; }
+#endif
 };
 #if JVET_Y0141_SIGN_PRED_IMPROVE
 struct PositionWithLevel

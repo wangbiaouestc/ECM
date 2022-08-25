@@ -1557,7 +1557,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
           m_ComprCUCtxList.back().testModes.push_back( { ETM_MERGE_GEO, ETO_STANDARD, qp } );
         }
 #if TM_MRG && !MERGE_ENC_OPT
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+        if (cs.sps->getUseTMMrgMode())
+#else
         if (cs.sps->getUseDMVDMode())
+#endif
         {
           m_ComprCUCtxList.back().testModes.push_back({ ETM_MERGE_TM,     ETO_STANDARD, qp });
         }
@@ -1589,7 +1593,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
           m_ComprCUCtxList.back().testModes.push_back( { ETM_MERGE_GEO, ETO_STANDARD, qp } );
         }
 #if TM_MRG && !MERGE_ENC_OPT
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+        if (cs.sps->getUseTMMrgMode())
+#else
         if (cs.sps->getUseDMVDMode())
+#endif
         {
           m_ComprCUCtxList.back().testModes.push_back( { ETM_MERGE_TM,     ETO_STANDARD, qp } );
         }
@@ -2259,6 +2267,9 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
         }
         else if (CU::isIBC(*bestCU))
         {
+#if JVET_AA0070_RRIBC
+          relatedCU.isRribcCoded = bestCU->rribcFlipType > 0;
+#endif
           relatedCU.isIBC = true;
           relatedCU.isSkip |= bestCU->skip;
           if (bestCU->slice->getSPS()->getUseColorTrans())
