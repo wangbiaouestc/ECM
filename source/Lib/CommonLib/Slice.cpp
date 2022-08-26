@@ -140,7 +140,7 @@ Slice::Slice()
     m_list1IdxToList0Idx[idx] = -1;
   }
 
-  for(int iNumCount = 0; iNumCount < MAX_NUM_REF; iNumCount++)
+  for(int iNumCount = 0; iNumCount <= MAX_NUM_REF; iNumCount++)
   {
     for(uint32_t i=0; i<NUM_REF_PIC_LIST_01; i++)
     {
