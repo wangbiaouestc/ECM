@@ -5804,6 +5804,7 @@ void EncAdaptiveLoopFilter::deriveCcAlfFilter( CodingStructure& cs, ComponentID 
   memset(m_bestFilterControl, 0, sizeof(uint8_t) * m_numCTUsInPic);
   int ccalfReuseApsId      = -1;
   m_reuseApsId[compID - 1] = -1;
+  m_bestFilterCount = 0;
 
   const TempCtx ctxStartCcAlfFilterControlFlag  ( m_CtxCache, SubCtx( Ctx::CcAlfFilterControlFlag, m_CABACEstimator->getCtx() ) );
 
