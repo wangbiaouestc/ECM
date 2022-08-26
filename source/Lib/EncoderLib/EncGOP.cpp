@@ -3281,6 +3281,14 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
       if (pcSlice->getSPS()->getALFEnabledFlag())
       {
+        // create ALF object based on the picture size
+        Size alfSize = m_pcALF->getAlfSize();
+        if (alfSize.width != picWidth || alfSize.height != picHeight)
+        {
+          m_pcALF->destroy();
+          m_pcALF->create(m_pcCfg, picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, m_pcCfg->getBitDepth(), m_pcCfg->getInputBitDepth());
+        }
+
         m_pcALF->copyDbData(cs);
       }
 #endif
@@ -3455,7 +3463,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       m_pcSAO->jointClipSaoBifCcSao( cs );
 #endif
 
-#if RPR_ENABLE
+#if RPR_ENABLE && !JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
       // create ALF object based on the picture size
       if ( pcSlice->getSPS()->getALFEnabledFlag() )
       {

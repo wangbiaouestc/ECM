@@ -16049,8 +16049,8 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
                                           const UnitArea blkUnitAreaBuff, PelStorage *pCurBuffYUV)
   {
     const int ctuSize        = slice.getSPS()->getMaxCUWidth();
-    const int iWidthFrm      = slice.getSPS()->getMaxPicWidthInLumaSamples();
-    const int iHeightFrm     = slice.getSPS()->getMaxPicHeightInLumaSamples();
+    const int iWidthFrm = slice.getPPS()->getPicWidthInLumaSamples();
+    const int iHeightFrm = slice.getPPS()->getPicHeightInLumaSamples();
     const int numCtuInWidth  = iWidthFrm / ctuSize + (iWidthFrm % ctuSize != 0);
     const int numCtuInHeight = iHeightFrm / ctuSize + (iHeightFrm % ctuSize != 0);
     const int xBlkBoundIdx   = (iWidthFrm % ctuSize) == 0 ? (ctuSize / 4 - 1) : ((iWidthFrm % ctuSize) / 4) - 1;
@@ -16162,7 +16162,7 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
             validPadSize = (((subBlkMv[useList].getVer() >> iMVBitShift) + 3) >> 2) << 2;
 
             if (subBlkMv[useList].getVer() > 0
-                && !slice.getRefPic((useList == 1) ? REF_PIC_LIST_1 : REF_PIC_LIST_0, reflistIdx[useList])->cs->slice->isIntra()
+                && !slice.getRefPic((useList == 1) ? REF_PIC_LIST_1 : REF_PIC_LIST_0, reflistIdx[useList])->unscaledPic->cs->slice->isIntra()
                 && slice.getTLayer() >= PAD_MORE_TL)
             {
                 validPadSize = std::max(validPadSize, 4);
@@ -16179,7 +16179,7 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
             validPadSize = (((-subBlkMv[useList].getVer() >> iMVBitShift) + 3) >> 2) << 2;
 
             if (subBlkMv[useList].getVer() < 0
-                && !slice.getRefPic((useList == 1) ? REF_PIC_LIST_1 : REF_PIC_LIST_0, reflistIdx[useList])->cs->slice->isIntra()
+                && !slice.getRefPic((useList == 1) ? REF_PIC_LIST_1 : REF_PIC_LIST_0, reflistIdx[useList])->unscaledPic->cs->slice->isIntra()
                 && slice.getTLayer() >= PAD_MORE_TL)
             {
                 validPadSize = std::max(validPadSize, 4);
@@ -16195,7 +16195,7 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
             validPadSize = (((subBlkMv[useList].getHor() >> iMVBitShift) + 3) >> 2) << 2;
 
             if (subBlkMv[useList].getHor() > 0
-                && !slice.getRefPic((useList == 1) ? REF_PIC_LIST_1 : REF_PIC_LIST_0, reflistIdx[useList])->cs->slice->isIntra()
+                && !slice.getRefPic((useList == 1) ? REF_PIC_LIST_1 : REF_PIC_LIST_0, reflistIdx[useList])->unscaledPic->cs->slice->isIntra()
                 && slice.getTLayer() >= PAD_MORE_TL)
             {
                 validPadSize = std::max(validPadSize, 4);
@@ -16212,7 +16212,7 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
             validPadSize = (((-subBlkMv[useList].getHor() >> iMVBitShift) + 3) >> 2) << 2;
 
             if (subBlkMv[useList].getHor() < 0
-                && !slice.getRefPic((useList == 1) ? REF_PIC_LIST_1 : REF_PIC_LIST_0, reflistIdx[useList])->cs->slice->isIntra()
+                && !slice.getRefPic((useList == 1) ? REF_PIC_LIST_1 : REF_PIC_LIST_0, reflistIdx[useList])->unscaledPic->cs->slice->isIntra()
                 && slice.getTLayer() >= PAD_MORE_TL)
             {
                 validPadSize = std::max(validPadSize, 4);
@@ -16546,8 +16546,8 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
       const ComponentID ch         = ComponentID(chan);
       Pel *             piTxtRec   = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).bufAt(0, 0);
       const int         iStrideRec = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).stride;
-      const int         iWidthFrm = slice.getSPS()->getMaxPicWidthInLumaSamples() >> getComponentScaleX(ch, CHROMA_420);
-      const int iHeightFrm  = slice.getSPS()->getMaxPicHeightInLumaSamples() >> getComponentScaleY(ch, CHROMA_420);
+      const int iWidthFrm = slice.getPPS()->getPicWidthInLumaSamples() >> getComponentScaleX(ch, CHROMA_420);
+      const int iHeightFrm = slice.getPPS()->getPicHeightInLumaSamples() >> getComponentScaleY(ch, CHROMA_420);
       int       ctuSize     = slice.getSPS()->getMaxCUWidth() >> getComponentScaleX(ch, CHROMA_420);
       int       extPadSizeX = (16 + MC_PAD_SIZE) >> getComponentScaleX(ch, CHROMA_420);
       int       extPadSizeY = (16 + MC_PAD_SIZE) >> getComponentScaleY(ch, CHROMA_420);
