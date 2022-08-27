@@ -2562,7 +2562,7 @@ void AdaptiveLoopFilter::filterBlk(AlfClassifier **classifier, const PelUnitBuf 
 #if ALF_IMPROVEMENT
 #if JVET_AA0095_ALF_LONGER_FILTER
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
-          if( filtType == ALF_FILTER_13_EXT || filtType == ALF_FILTER_13_EXT )
+          if( filtType == ALF_FILTER_13_EXT || filtType == ALF_FILTER_13_EXT_DB )
 #else
           if( filtType == ALF_FILTER_13_EXT )
 #endif
@@ -2659,7 +2659,11 @@ void AdaptiveLoopFilter::filterBlk(AlfClassifier **classifier, const PelUnitBuf 
             sum += filterCoeff[5] * ( clipALF(filterClipp[5], curr, pImg0[+1], pImg0[-1]) );
           }
 #if ALF_IMPROVEMENT
+#if JVET_AA0095_ALF_LONGER_FILTER
+          if( filtType == ALF_FILTER_9_EXT || filtType == ALF_FILTER_13_EXT )
+#else
           if( filtType == ALF_FILTER_9_EXT )
+#endif
           {
             for( int k = 0; k < EXT_LENGTH; k++ )
             {
