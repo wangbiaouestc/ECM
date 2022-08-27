@@ -113,6 +113,7 @@ const SAOBlkParam& SAOBlkParam::operator= (const SAOBlkParam& src)
 SampleAdaptiveOffset::SampleAdaptiveOffset()
 {
   m_numberOfComponents = 0;
+  m_ccSaoControl[0] = m_ccSaoControl[1] = m_ccSaoControl[2] = nullptr;
 }
 
 
