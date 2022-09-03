@@ -3559,6 +3559,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
         if (!sps.getUseTmvpNmvpReordering())
         {
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+          if (!tmMergeRefinedMotion)
+#endif
           m_pcInterSearch->adjustInterMergeCandidates(pu, tmMrgCtx);
         }
         else
@@ -3859,6 +3862,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
           if (!sps.getUseTmvpNmvpReordering())
           {
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+            if(!admvrRefinedMotion)
+#endif
             m_pcInterSearch->adjustInterMergeCandidates(pu, bmMrgCtx);
           }
           else
@@ -13281,21 +13287,6 @@ void EncCu::xCheckSATDCostBMMerge(CodingStructure*& tempCS,
 
   const double sqrtLambdaForFirstPassIntra = m_pcRdCost->getMotionLambda() * FRAC_BITS_SCALE;
   int insertPos = -1;
-/* // remove below commented code since it has been refactored" and remove it when the SW is going to be merged
-#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
-  uint32_t maxNumCand = armcRefinedMotion ? mrgCtx.numValidMergeCand : ((pu.cs->sps->getUseAML()) ? min(mrgCtx.numValidMergeCand, mrgCtx.numCandToTestEnc) : mrgCtx.numCandToTestEnc);
-#else
-  const uint32_t maxNumCand = (pu.cs->sps->getUseAML()) ? min(mrgCtx.numValidMergeCand, mrgCtx.numCandToTestEnc) : mrgCtx.numCandToTestEnc;
-#endif
-#else
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
-  uint32_t maxNumCand = armcRefinedMotion ? mrgCtx.numValidMergeCand : ((pu.cs->sps->getUseAML()) ? min(mrgCtx.numValidMergeCand, mrgCtx.numCandToTestEnc) : mrgCtx.numCandToTestEnc);
-#else
-  const uint32_t maxNumCand = mrgCtx.numCandToTestEnc;
-#endif
-#endif
-*/
   uint32_t maxNumCand = mrgCtx.numCandToTestEnc;
 #if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING || JVET_AA0093_REFINED_MOTION_FOR_ARMC) && JVET_W0090_ARMC_TM
   if (pu.cs->sps->getUseAML()

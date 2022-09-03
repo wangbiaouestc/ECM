@@ -2035,25 +2035,22 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             {
               uint8_t mergeIdx = pu.bmDir == 2 ? pu.mergeIdx - BM_MRG_MAX_NUM_CANDS : pu.mergeIdx;
 #if JVET_W0090_ARMC_TM
-#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
-              if (pu.cs->sps->getUseAML() && !pu.cs->sps->getUseTmvpNmvpReordering())
-              {
-                PU::getInterBMCandidates(pu, mrgCtx, pu.cs->sps->getUseAML() && (((mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumBMMergeCand()) || (mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : mergeIdx);
-                uint8_t bmDir = pu.bmDir;
-                pu.bmDir = 0;
-                m_pcInterPred->adjustInterMergeCandidates(pu, mrgCtx, mergeIdx);
-                pu.bmDir = bmDir;
-              }
-              else
-#endif
               if (pu.cs->sps->getUseAML())
               {
+                uint8_t bmDir = pu.bmDir;
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
                 int nWidth = pu.lumaSize().width;
                 int nHeight = pu.lumaSize().height;
-                bool tplAvail = m_pcInterPred->xAMLGetCurBlkTemplate(pu, nWidth, nHeight);
+                bool tplAvail = 
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && !JVET_AA0093_REFINED_MOTION_FOR_ARMC
+                                pu.cs->sps->getUseTmvpNmvpReordering() &&
+#endif
+                                m_pcInterPred->xAMLGetCurBlkTemplate(pu, nWidth, nHeight);
 
-                uint8_t bmDir = pu.bmDir;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+                if (pu.cs->sps->getUseTmvpNmvpReordering())
+                {
+#endif
                 MergeCtx tmvpMergeCandCtx;
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
                 if ( tplAvail)
@@ -2107,16 +2104,30 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                 else
 #endif
                 PU::getInterBMCandidates(pu, mrgCtx, -1, &tmvpMergeCandCtx, &namvpMergeCandCtx);
-#else
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+                }
+#endif
+#endif
+#if !JVET_Y0134_TMVP_NAMVP_CAND_REORDERING || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING)
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+                else
+                {
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
                 PU::getInterBMCandidates(pu, mrgCtx, -1);
 #else
                 PU::getInterBMCandidates(pu, mrgCtx, pu.cs->sps->getUseAML() && (((mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumBMMergeCand()) || (mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : mergeIdx);
 #endif
-                uint8_t bmDir = pu.bmDir;
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+                }
+#endif
 #endif
                 pu.bmDir = 0;
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+                if (pu.cs->sps->getUseTmvpNmvpReordering())
+                {
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
                 admvrRefinedMotion = PU::isArmcRefinedMotionEnabled(pu, 1);
                 admvrRefinedMotion &= tplAvail;
@@ -2178,12 +2189,17 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                   m_pcInterPred->adjustMergeCandidatesInOneCandidateGroup(pu, mrgCtx, mergeIdx + 1, mergeIdx);
 #endif
                 }
-#else
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+                }
+#endif
+#endif
+#if !JVET_Y0134_TMVP_NAMVP_CAND_REORDERING || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING)
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+                else
+                {
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
                 admvrRefinedMotion = PU::isArmcRefinedMotionEnabled(pu, 1);
-                int nWidth = pu.lumaSize().width;
-                int nHeight = pu.lumaSize().height;
-                bool tplAvail = m_pcInterPred->xAMLGetCurBlkTemplate(pu, nWidth, nHeight);
                 admvrRefinedMotion &= tplAvail;
                 if (admvrRefinedMotion)
                 {
@@ -2232,6 +2248,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                 else
 #endif
                 m_pcInterPred->adjustInterMergeCandidates(pu, mrgCtx, mergeIdx);
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+                }
+#endif
 #endif
                 pu.bmDir = bmDir;
               }
@@ -2242,17 +2261,13 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             else
 #endif
 #if JVET_W0090_ARMC_TM
-#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
-            if (pu.cs->sps->getUseAML() && !pu.cs->sps->getUseTmvpNmvpReordering())
-            {
-              PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumMergeCand()) || (pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : pu.mergeIdx);
-              m_pcInterPred->adjustInterMergeCandidates(pu, mrgCtx, pu.mergeIdx);
-            }
-            else
-#endif
             if (pu.cs->sps->getUseAML())
             {
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+              if (pu.cs->sps->getUseTmvpNmvpReordering())
+              {
+#endif
               int nWidth = pu.lumaSize().width;
               int nHeight = pu.lumaSize().height;
               bool tplAvail = m_pcInterPred->xAMLGetCurBlkTemplate(pu, nWidth, nHeight);
@@ -2417,7 +2432,15 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                 }
 #endif
               }
-#else
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+              }
+#endif
+#endif
+#if !JVET_Y0134_TMVP_NAMVP_CAND_REORDERING || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING)
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+              else
+              {
+#endif
               PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumMergeCand()) || (pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : pu.mergeIdx);
 #if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
               tmMergeRefinedMotion = PU::isArmcRefinedMotionEnabled(pu, 2);
@@ -2503,6 +2526,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               else
 #endif
               m_pcInterPred->adjustInterMergeCandidates(pu, mrgCtx, pu.mergeIdx);
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+              }
+#endif
 #endif
             }
             else
