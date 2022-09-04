@@ -2808,7 +2808,13 @@ void computeDeltaAndShiftCoreAddi_SSE(const Position posLT, Mv firstMv, std::vec
 #endif
 }
 template<X86_VEXT vext>
-void buildRegressionMatrixCore_SSE(std::vector<RMVFInfo> &mvpInfoVecOriSrc, int sumbb[2][3][3], int sumeb[2][3], uint16_t addedSize)
+void buildRegressionMatrixCore_SSE(std::vector<RMVFInfo> &mvpInfoVecOriSrc, 
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+  int64_t sumbb[2][3][3], int64_t sumeb[2][3],
+#else
+  int sumbb[2][3][3], int sumeb[2][3],
+#endif
+  uint16_t addedSize)
 {
 #if USE_AVX2
   std::vector<RMVFInfo> mvpInfoVecOri;

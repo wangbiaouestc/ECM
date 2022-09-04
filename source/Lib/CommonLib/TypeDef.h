@@ -192,6 +192,7 @@
 #define JVET_AA0146_WRAP_AROUND_FIX                       1 // JVET-AA0146: bugfix&cleanup for wrap around motion compensation
 #define JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION          1 // JVET-AA0107 Regression based affine merge candidate derivation
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#define JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX              1 // Overflow fix
 #define JVET_AA0128_AFFINE_MERGE_CTX_INC                  1 // JVET-AA0128 test b: Increased number of CABAC contexts of affine merge index
 #endif
 #define JVET_AA0096_MC_BOUNDARY_PADDING                   1 // JVET-AA0096: motion compensated picture boundary padding

@@ -231,7 +231,13 @@ namespace PU
   bool addMVPCandUnscaled             (const PredictionUnit &pu, const RefPicList &eRefPicList, const int &iRefIdx, const Position &pos, const MvpDir &eDir, AMVPInfo &amvpInfo);
   void xInheritedAffineMv             ( const PredictionUnit &pu, const PredictionUnit* puNeighbour, RefPicList eRefPicList, Mv rcMv[3] );
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
-  void xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[2][4], int sumbb[2][3][3], int sumeb[2][3], uint16_t addedSize);
+  void xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[2][4],
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+    int64_t sumbb[2][3][3], int64_t sumeb[2][3],
+#else
+    int sumbb[2][3][3], int sumeb[2][3],
+#endif
+    uint16_t addedSize);
   void xReturnMvpVec(std::vector<RMVFInfo> mvp[2][4], const PredictionUnit &pu, const Position &pos, const MvpDir &eDir);
   void getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &abovePU, AffineMergeCtx &affMrgCtx, std::vector<RMVFInfo> mvp[2][4], int mrgCandIdx = -1);
   Position convertNonAdjAffineBlkPos(const Position &pos, int curCtuX, int curCtuY);
