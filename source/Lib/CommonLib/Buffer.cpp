@@ -890,7 +890,13 @@ void computeDeltaAndShiftCoreAddi(const Position posLT, Mv firstMv, std::vector<
     mvpInfoVecRes[offset + i].mvp.set(mvpInfoVecOri[i].mvp.getHor() - firstMv.getHor(), mvpInfoVecOri[i].mvp.getVer() - firstMv.getVer());
   }
 }
-void buildRegressionMatrixCore(std::vector<RMVFInfo> &mvpInfoVecOri, int sumbb[2][3][3], int sumeb[2][3], uint16_t addedSize)
+void buildRegressionMatrixCore(std::vector<RMVFInfo> &mvpInfoVecOri, 
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+  int64_t sumbb[2][3][3], int64_t sumeb[2][3],
+#else
+  int sumbb[2][3][3], int sumeb[2][3],
+#endif
+  uint16_t addedSize)
 {
   int iNum = (int)mvpInfoVecOri.size();
   int b[3];
