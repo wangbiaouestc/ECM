@@ -910,15 +910,12 @@ void EncAdaptiveLoopFilter::destroy()
 #if ALF_IMPROVEMENT
     for( int j = 0; j< MAX_NUM_ALF_ALTERNATIVES_LUMA; j++ )
     {
-      if( m_distCtbApsLuma[i][j] )
+      for( int k = 0; k < 2; k++)
       {
-        for( int k = 0; k < 2; k++)
+        if( m_distCtbApsLuma[i][j][k] )
         {
-          if( m_distCtbApsLuma[i][j][k] )
-          {
-            delete[] m_distCtbApsLuma[i][j][k];
-            m_distCtbApsLuma[i][j][k] = nullptr;
-          }
+          delete[] m_distCtbApsLuma[i][j][k];
+          m_distCtbApsLuma[i][j][k] = nullptr;
         }
       }
     }
@@ -933,15 +930,12 @@ void EncAdaptiveLoopFilter::destroy()
 #if ALF_IMPROVEMENT
   for( int i = 0; i < MAX_NUM_ALF_ALTERNATIVES_LUMA; i++ )
   {
-    if( m_distCtbLumaNewFilt[i] )
+    for( int k = 0; k < 2; k++)
     {
-      for( int k = 0; k < 2; k++)
+      if( m_distCtbLumaNewFilt[i][k] )
       {
-        if( m_distCtbLumaNewFilt[i][k] )
-        {
-          delete[] m_distCtbLumaNewFilt[i][k];
-          m_distCtbLumaNewFilt[i][k] = nullptr;
-        }
+        delete[] m_distCtbLumaNewFilt[i][k];
+        m_distCtbLumaNewFilt[i][k] = nullptr;
       }
     }
   }
@@ -1499,7 +1493,7 @@ double EncAdaptiveLoopFilter::deriveCtbAlfEnableFlags( CodingStructure& cs, cons
         // Evaluate cost of signaling filter set index for convergence of filters enabled flag / filter derivation
         assert( cs.slice->getPic()->getAlfCtbFilterIndex()[ctuIdx] == NUM_FIXED_FILTER_SETS );
         assert( cs.slice->getTileGroupNumAps() == 1 );
-        m_CABACEstimator->codeAlfCtuFilterIndex(cs, ctuIdx, &m_alfParamTemp.enabledFlag[COMPONENT_Y]);
+        m_CABACEstimator->codeAlfCtuFilterIndex(cs, ctuIdx, true);
       }
       double costOn = distUnfilterCtu + ctuLambda * FRAC_BITS_SCALE * m_CABACEstimator->getEstFracBits();
 
@@ -2039,7 +2033,7 @@ double EncAdaptiveLoopFilter::getFilterCoeffAndCost( CodingStructure& cs, double
       // Evaluate cost of signaling filter set index for convergence of filters enabled flag / filter derivation
       assert( cs.slice->getPic()->getAlfCtbFilterIndex()[ctuIdx] == NUM_FIXED_FILTER_SETS );
       assert( cs.slice->getTileGroupNumAps() == 1 );
-      m_CABACEstimator->codeAlfCtuFilterIndex(cs, ctuIdx, &m_alfParamTemp.enabledFlag[COMPONENT_Y]);
+      m_CABACEstimator->codeAlfCtuFilterIndex(cs, ctuIdx, true);
 #if ALF_IMPROVEMENT
       m_CABACEstimator->codeAlfCtuAlternative(cs, ctuIdx, COMPONENT_Y, &m_alfParamTemp, m_alfParamTemp.numAlternativesLuma);
 #endif
@@ -2216,17 +2210,15 @@ double EncAdaptiveLoopFilter::mergeFiltersAndCost( AlfParam& alfParam, AlfFilter
     );
 #endif
     // filter coeffs are stored in m_filterCoeffSet
-    distForce0 = getDistForce0( alfShape, numFilters, errorForce0CoeffTab, codedVarBins 
 #if ALF_IMPROVEMENT
-      , altIdx
-#endif
-    );
+    distForce0 = getDistForce0( alfShape, numFilters, errorForce0CoeffTab, codedVarBins, altIdx );
+    coeffBits = deriveFilterCoefficientsPredictionMode( alfShape, m_filterCoeffSet, m_diffFilterCoeff, numFilters, m_alfParamTemp.nonLinearFlag[CHANNEL_TYPE_LUMA][altIdx] );
+    coeffBitsForce0 = getCostFilterCoeffForce0( alfShape, m_filterCoeffSet, numFilters, codedVarBins, altIdx );
+#else
+    distForce0 = getDistForce0( alfShape, numFilters, errorForce0CoeffTab, codedVarBins );
     coeffBits = deriveFilterCoefficientsPredictionMode( alfShape, m_filterCoeffSet, m_diffFilterCoeff, numFilters );
-    coeffBitsForce0 = getCostFilterCoeffForce0( alfShape, m_filterCoeffSet, numFilters, codedVarBins 
-#if ALF_IMPROVEMENT
-      , altIdx
+    coeffBitsForce0 = getCostFilterCoeffForce0( alfShape, m_filterCoeffSet, numFilters, codedVarBins );
 #endif
-    );
 
     cost = dist + m_lambda[COMPONENT_Y] * coeffBits;
     cost0 = distForce0 + m_lambda[COMPONENT_Y] * coeffBitsForce0;
@@ -2286,22 +2278,17 @@ double EncAdaptiveLoopFilter::mergeFiltersAndCost( AlfParam& alfParam, AlfFilter
   memcpy( alfParam.alfLumaCoeffFlag, bestCodedVarBins, sizeof( bestCodedVarBins ) );
   alfParam.numLumaFilters[altIdx] = numFiltersBest;
 #else
-  dist = deriveFilterCoeffs( covFrame, covMerged, clipMerged, alfShape, m_filterIndices[numFiltersBest - 1], numFiltersBest, errorForce0CoeffTab, alfParam 
 #if ALF_IMPROVEMENT
-    , m_alfParamTemp.nonLinearFlag[CHANNEL_TYPE_LUMA][altIdx]
-#endif
-  );
+  dist = deriveFilterCoeffs( covFrame, covMerged, clipMerged, alfShape, m_filterIndices[numFiltersBest - 1], numFiltersBest, errorForce0CoeffTab, alfParam, m_alfParamTemp.nonLinearFlag[CHANNEL_TYPE_LUMA][altIdx] );
+  coeffBits = deriveFilterCoefficientsPredictionMode( alfShape, m_filterCoeffSet, m_diffFilterCoeff, numFiltersBest, m_alfParamTemp.nonLinearFlag[CHANNEL_TYPE_LUMA][altIdx] );
+  distForce0 = getDistForce0( alfShape, numFiltersBest, errorForce0CoeffTab, codedVarBins, altIdx );
+  coeffBitsForce0 = getCostFilterCoeffForce0( alfShape, m_filterCoeffSet, numFiltersBest, codedVarBins, altIdx );
+#else
+  dist = deriveFilterCoeffs( covFrame, covMerged, clipMerged, alfShape, m_filterIndices[numFiltersBest - 1], numFiltersBest, errorForce0CoeffTab, alfParam );
   coeffBits = deriveFilterCoefficientsPredictionMode( alfShape, m_filterCoeffSet, m_diffFilterCoeff, numFiltersBest );
-  distForce0 = getDistForce0( alfShape, numFiltersBest, errorForce0CoeffTab, codedVarBins 
-#if ALF_IMPROVEMENT
-    , altIdx
+  distForce0 = getDistForce0( alfShape, numFiltersBest, errorForce0CoeffTab, codedVarBins );
+  coeffBitsForce0 = getCostFilterCoeffForce0( alfShape, m_filterCoeffSet, numFiltersBest, codedVarBins );
 #endif
-  );
-  coeffBitsForce0 = getCostFilterCoeffForce0( alfShape, m_filterCoeffSet, numFiltersBest, codedVarBins 
-#if ALF_IMPROVEMENT
-    , altIdx
-#endif
-  );
 
   cost = dist + m_lambda[COMPONENT_Y] * coeffBits;
   cost0 = distForce0 + m_lambda[COMPONENT_Y] * coeffBitsForce0;
@@ -2497,10 +2484,17 @@ int EncAdaptiveLoopFilter::getCostFilterCoeffForce0( AlfFilterShape& alfShape, i
   return len;
 }
 
+#if ALF_IMPROVEMENT
+int EncAdaptiveLoopFilter::deriveFilterCoefficientsPredictionMode( AlfFilterShape& alfShape, int **filterSet, int** filterCoeffDiff, const int numFilters, bool nonLinearFlag )
+{
+  return (nonLinearFlag ? getCostFilterClipp(alfShape, filterSet, numFilters) : 0) + getCostFilterCoeff(alfShape, filterSet, numFilters);
+}
+#else
 int EncAdaptiveLoopFilter::deriveFilterCoefficientsPredictionMode( AlfFilterShape& alfShape, int **filterSet, int** filterCoeffDiff, const int numFilters )
 {
   return (m_alfParamTemp.nonLinearFlag[CHANNEL_TYPE_LUMA] ? getCostFilterClipp(alfShape, filterSet, numFilters) : 0) + getCostFilterCoeff(alfShape, filterSet, numFilters);
 }
+#endif
 
 int EncAdaptiveLoopFilter::getCostFilterCoeff( AlfFilterShape& alfShape, int **pDiffQFilterCoeffIntPP, const int numFilters )
 {
@@ -4686,7 +4680,7 @@ void  EncAdaptiveLoopFilter::alfEncoderCtb(CodingStructure& cs, AlfParam& alfPar
                 m_CABACEstimator->resetBits();
                 m_CABACEstimator->codeAlfCtuEnableFlag(cs, ctbIdx, COMPONENT_Y, &m_alfParamTemp);
                 alfCtbFilterSetIndex[ctbIdx] = filterSetIdx;
-                m_CABACEstimator->codeAlfCtuFilterIndex(cs, ctbIdx, &m_alfParamTemp.enabledFlag[COMPONENT_Y]);
+                m_CABACEstimator->codeAlfCtuFilterIndex(cs, ctbIdx, true);
 #if ALF_IMPROVEMENT
                 m_ctuAlternative[COMPONENT_Y][ctbIdx] = altIdx;
                 if (filterSetIdx >= NUM_FIXED_FILTER_SETS)
