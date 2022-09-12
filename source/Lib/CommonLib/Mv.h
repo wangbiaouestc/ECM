@@ -276,12 +276,11 @@ public:
 
 namespace std
 {
-  template <>
-  struct hash<Mv> : public unary_function<Mv, uint64_t>
+  template <> struct hash<Mv>
   {
-    uint64_t operator()(const Mv& value) const
+    size_t operator()(const Mv& value) const
     {
-      return (((uint64_t)value.hor << 32) + value.ver);
+      return (((size_t)value.hor << 32) + value.ver);
     }
   };
 };
