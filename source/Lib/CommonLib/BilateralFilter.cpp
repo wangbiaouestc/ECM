@@ -2425,17 +2425,17 @@ bool BilateralFilter::isCrossedByVirtualBoundaries(const CodingStructure &cs, co
   {
     for (int i = 0; i < picHeader->getNumHorVirtualBoundaries(); i++)
     {
-      if (picHeader->getVirtualBoundariesPosY(i) == yPos - 2 || picHeader->getVirtualBoundariesPosY(i) == yPos - 1
-          || picHeader->getVirtualBoundariesPosY(i) == yPos)
+      int vy = picHeader->getVirtualBoundariesPosY(i);
+
+      if (yPos - NUMBER_PADDED_SAMPLES <= vy && vy <= yPos)
       {
         clipTop = true;
       }
-      else if (yPos + height + 2 >= picHeader->getVirtualBoundariesPosY(i))
+      else if (yPos + height - 1 <= vy && vy <= yPos + height + NUMBER_PADDED_SAMPLES)
       {
         clipBottom = true;
       }
-      else if (yPos - 2 < picHeader->getVirtualBoundariesPosY(i)
-               && picHeader->getVirtualBoundariesPosY(i) < yPos + height + 2)
+      else if (yPos < vy && vy < yPos + height - 1)
       {
         horVirBndryPos[numHorVirBndry++] = picHeader->getVirtualBoundariesPosY(i);
       }
@@ -2443,22 +2443,23 @@ bool BilateralFilter::isCrossedByVirtualBoundaries(const CodingStructure &cs, co
 
     for (int i = 0; i < picHeader->getNumVerVirtualBoundaries(); i++)
     {
-      if (picHeader->getVirtualBoundariesPosX(i) == xPos - 2 || picHeader->getVirtualBoundariesPosX(i) == xPos - 1
-          || picHeader->getVirtualBoundariesPosX(i) == xPos)
+      int vx = picHeader->getVirtualBoundariesPosX(i);
+
+      if (xPos - NUMBER_PADDED_SAMPLES <= vx && vx <= xPos)
       {
         clipLeft = true;
       }
-      else if (xPos + width + 2 >= picHeader->getVirtualBoundariesPosX(i))
+      else if (xPos + width - 1 <= vx && vx <= xPos + width + NUMBER_PADDED_SAMPLES)
       {
         clipRight = true;
       }
-      else if (xPos - 2 < picHeader->getVirtualBoundariesPosX(i)
-               && picHeader->getVirtualBoundariesPosX(i) < xPos + width + 2)
+      else if (xPos < vx && vx <xPos + width - 1)
       {
         verVirBndryPos[numVerVirBndry++] = picHeader->getVirtualBoundariesPosX(i);
       }
     }
   }
+
   if (!isEncoderRDO)
   {
     const Slice &     slice   = *(cs.slice);
