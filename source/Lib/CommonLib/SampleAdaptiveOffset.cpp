@@ -163,7 +163,10 @@ void SampleAdaptiveOffset::create( int picWidth, int picHeight, ChromaFormat for
 
   for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
   {
-    m_ccSaoControl[compIdx] = new uint8_t[m_numCTUsInPic];
+    if( m_ccSaoControl[compIdx] == nullptr )
+    {
+      m_ccSaoControl[compIdx] = new uint8_t[m_numCTUsInPic];
+    }
     ::memset(m_ccSaoControl[compIdx], 0, sizeof(uint8_t) * m_numCTUsInPic);
   }
 #endif
