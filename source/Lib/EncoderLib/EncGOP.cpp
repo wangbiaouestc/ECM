@@ -2179,7 +2179,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     }
     pcSlice->setTLayer(m_pcCfg->getGOPEntry(iGOPid).m_temporalId);
 #if JVET_Z0118_GDR
-    if (m_pcCfg->getGdrEnabled() && pocCurr >= m_pcCfg->getGdrPocStart() && ((pocCurr - m_pcCfg->getGdrPocStart()) % m_pcCfg->getGdrPeriod() == 0))
+    if (m_pcCfg->getGdrEnabled() && pocCurr >= m_pcCfg->getGdrPocStart())
     {
       pcSlice->setSliceType(B_SLICE);
     }
