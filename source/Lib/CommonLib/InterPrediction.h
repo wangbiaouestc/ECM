@@ -325,8 +325,6 @@ protected:
 #if !BDOF_RM_CONSTRAINTS
   void xSubPuBio(PredictionUnit& pu, PelUnitBuf& predBuf, const RefPicList &eRefPicList = REF_PIC_LIST_X, PelUnitBuf* yuvDstTmp = NULL);
 #endif
-  void destroy();
-
 
   MotionInfo      m_SubPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC || JVET_AA0061_IBC_MBVD
@@ -374,6 +372,8 @@ public:
 #else
   void    init                (RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize);
 #endif
+
+  void destroy();
 
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   void     setUniRefIdxLC(PredictionUnit &pu);

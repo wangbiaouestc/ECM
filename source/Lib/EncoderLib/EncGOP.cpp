@@ -4241,6 +4241,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     m_pcFrameMcPadPrediction->init(m_pcEncLib->getRdCost(), pcSlice->getSPS()->getChromaFormatIdc(),
                                    pcSlice->getSPS()->getMaxCUHeight(), NULL, pcPic->getPicWidthInLumaSamples());
     m_pcFrameMcPadPrediction->mcFramePad(pcPic, *(pcPic->slices[0]));
+    m_pcFrameMcPadPrediction->destroy();
 #endif
   } // iGOPid-loop
 

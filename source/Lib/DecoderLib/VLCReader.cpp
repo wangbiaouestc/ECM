@@ -286,6 +286,7 @@ HLSyntaxReader::HLSyntaxReader()
 {
 #if JVET_Z0118_GDR
   m_lastGdrPoc = -1;
+  m_lastGdrRecoveryPocCnt = -1;
 #endif
 }
 
