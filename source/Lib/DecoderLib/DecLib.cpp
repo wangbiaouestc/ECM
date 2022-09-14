@@ -712,7 +712,7 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
 #endif
     }
 #if JVET_Z0118_GDR // picHeader should be deleted in case pcPic slot gets reused
-    if (pcPic && pcPic->cs && pcPic->cs->picHeader)
+    if (pcPic && pcPic->cs && pcPic->cs->isGdrEnabled() && pcPic->cs->picHeader)
     {          
       delete pcPic->cs->picHeader;
       pcPic->cs->picHeader = nullptr;    
