@@ -5708,34 +5708,7 @@ void CABACReader::residual_coding( TransformUnit& tu, ComponentID compID, CUCtx&
 
 #if SIGN_PREDICTION
   CoeffBuf signBuff = tu.getCoeffSigns(compID);
-  uint32_t uiWidth  = tu.blocks[compID].width;
-  uint32_t uiHeight = tu.blocks[compID].height;
-
-  //if (sps.getNumPredSigns() > 0 && uiHeight >= 4 && uiWidth >= 4)
-  if ( tu.cs->sps->getNumPredSigns() > 0  && uiHeight >= 4 && uiWidth >= 4)
-  {
-    TCoeff *signs = signBuff.buf;
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-    uint32_t spArea = tu.cs->sps->getSignPredArea();
-    uint32_t spWidth = std::min(uiWidth, spArea);
-    uint32_t spHeight = std::min(uiHeight, spArea);
-    CHECK(TrQuant::SIGN_PRED_BYPASS, "SIGN_PRED_BYPASS should be equal to 0");
-    for (uint32_t y = 0; y < spHeight; y++)
-#else
-    for (uint32_t y = 0; y < SIGN_PRED_FREQ_RANGE; y++)
-#endif
-    {
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-      memset(signs, 0, sizeof(TCoeff) * spWidth);
-#else
-      signs[0] = TrQuant::SIGN_PRED_BYPASS;
-      signs[1] = TrQuant::SIGN_PRED_BYPASS;
-      signs[2] = TrQuant::SIGN_PRED_BYPASS;
-      signs[3] = TrQuant::SIGN_PRED_BYPASS;
-#endif
-      signs += signBuff.stride;
-    }
-  }
+  tu.initSignBuffers( compID );
 #endif
 
   // parse subblocks
