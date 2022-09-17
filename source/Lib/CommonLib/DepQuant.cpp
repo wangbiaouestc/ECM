@@ -1855,39 +1855,7 @@ namespace DQIntern
   {
     CHECKD( tu.cs->sps->getSpsRangeExtension().getExtendedPrecisionProcessingFlag(), "ext precision is not supported" );
 #if SIGN_PREDICTION
-    CoeffBuf signBuff = tu.getCoeffSigns(compID);
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-    IdxBuf signScanIdxBuff = tu.getCoeffSignsScanIdx( compID );
-#endif    
-    uint32_t uiWidth  = tu.blocks[compID].width;
-    uint32_t uiHeight = tu.blocks[compID].height;
-
-    if ( tu.cs->sps->getNumPredSigns() > 0  && uiHeight >= 4 && uiWidth >= 4)
-    {
-      TCoeff *coeff = signBuff.buf;
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-      uint32_t spArea = tu.cs->sps->getSignPredArea();
-      unsigned int *coeffIdx = signScanIdxBuff.buf;
-      uint32_t spWidth = std::min(uiWidth, spArea);
-      uint32_t spHeight = std::min(uiHeight, spArea);
-      CHECK(TrQuant::SIGN_PRED_BYPASS, "SIGN_PRED_BYPASS should be equal to 0");
-      for (uint32_t y = 0; y < spHeight; y++)
-#else
-      for (uint32_t y = 0; y < SIGN_PRED_FREQ_RANGE; y++)
-#endif
-      {
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-        memset(coeff, 0, sizeof(TCoeff) * spWidth);
-        memset( coeffIdx, 0, sizeof( unsigned int ) * spWidth );
-#else
-        coeff[0] = TrQuant::SIGN_PRED_BYPASS;
-        coeff[1] = TrQuant::SIGN_PRED_BYPASS;
-        coeff[2] = TrQuant::SIGN_PRED_BYPASS;
-        coeff[3] = TrQuant::SIGN_PRED_BYPASS;
-#endif
-        coeff += signBuff.stride;
-      }
-    }
+    tu.initSignBuffers( compID );
 #endif
 
     //===== reset / pre-init =====

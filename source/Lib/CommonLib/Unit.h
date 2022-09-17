@@ -685,6 +685,10 @@ struct TransformUnit : public UnitArea
   bool    cacheUsed;
 
 #endif
+#if SIGN_PREDICTION
+  void initSignBuffers( const ComponentID compID );
+#endif
+
 private:
   TCoeff *m_coeffs[ MAX_NUM_TBLOCKS ];
 #if SIGN_PREDICTION
