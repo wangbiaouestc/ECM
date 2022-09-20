@@ -4680,7 +4680,11 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
      if(tempCS->sps->getUseTMMMVD())
 #endif
+#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+       if (rdModeList[uiMrgHADIdx].isMMVD && (uiMergeCand - (uiMergeCand / MMVD_MAX_REFINE_NUM)* MMVD_MAX_REFINE_NUM >= (MMVD_MAX_REFINE_NUM >> MMVD_SIZE_SHIFT)/MMVD_BI_DIR))
+#else
      if (rdModeList[uiMrgHADIdx].isMMVD && (uiMergeCand - (uiMergeCand / MMVD_MAX_REFINE_NUM)* MMVD_MAX_REFINE_NUM >= (MMVD_MAX_REFINE_NUM >> MMVD_SIZE_SHIFT)))
+#endif
      {
 	     continue;
      }
