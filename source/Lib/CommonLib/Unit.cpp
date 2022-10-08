@@ -1448,7 +1448,7 @@ void TransformUnit::initSignBuffers( const ComponentID compID )
     {
 #if JVET_Y0141_SIGN_PRED_IMPROVE
       memset( coeff, 0, sizeof( TCoeff ) * spWidth );
-      memset( coeffIdx, 0, sizeof( unsigned int ) * spWidth );
+      memset( coeffIdx, MAX_UINT, sizeof( unsigned int ) * spWidth );
       coeffIdx += signScanIdxBuff.stride;
 #else
       coeff[0] = TrQuant::SIGN_PRED_BYPASS;
