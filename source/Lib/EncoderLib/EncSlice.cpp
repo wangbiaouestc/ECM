@@ -460,6 +460,10 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
         {
           eSliceType = B_SLICE;
         }
+        else if (m_pcCfg->getGdrEnabled() && (pocCurr != 0) && (pocCurr < m_pcCfg->getGdrPocStart()))
+        {
+          eSliceType = B_SLICE;
+        }
 #endif
       }
     }
@@ -629,6 +633,14 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
           {
             eSliceType = B_SLICE;
           }
+          else if (m_pcCfg->getGdrEnabled() && (pocCurr != 0) && (pocCurr < m_pcCfg->getGdrPocStart()))
+          {
+            eSliceType = B_SLICE;
+          }
+          else if (m_pcCfg->getGdrEnabled() && (pocCurr != 0) && (pocCurr < m_pcCfg->getGdrPocStart()))
+          {
+            eSliceType = B_SLICE;
+          }
 #endif
         }
         else
@@ -636,6 +648,10 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
           eSliceType = (pocLast == 0 || (pocCurr - (isField ? 1 : 0)) % (m_pcCfg->getIntraPeriod() * multipleFactor) == 0 || m_pcGOPEncoder->getGOPSize() == 0) && (!useIlRef) ? I_SLICE : eSliceType;
 #if JVET_Z0118_GDR
           if (m_pcCfg->getGdrEnabled() && (pocCurr >= m_pcCfg->getGdrPocStart()))
+          {
+            eSliceType = B_SLICE;
+          }
+          else if (m_pcCfg->getGdrEnabled() && (pocCurr != 0) && (pocCurr < m_pcCfg->getGdrPocStart()))
           {
             eSliceType = B_SLICE;
           }
@@ -776,13 +792,7 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
     m_pcCuEncoder->getIbcHashMap().destroy();
     m_pcCuEncoder->getIbcHashMap().init( pcPic->cs->pps->getPicWidthInLumaSamples(), pcPic->cs->pps->getPicHeightInLumaSamples() );
   }
-#if JVET_Z0118_GDR
-  pcPic->cs->picHeader->setGdrPicFlag(false);
-  pcPic->cs->picHeader->setRecoveryPocCnt(0);
-  pcPic->cs->picHeader->setInGdrInterval(false);  
-  pcPic->cs->picHeader->setIsGdrRecoveryPocPic(false);
-  pcPic->cs->picHeader->setVirtualBoundariesPresentFlag(false);
-    
+#if JVET_Z0118_GDR  
   if (m_pcCfg->getGdrEnabled())
   {
     int gdrPocStart = m_pcCuEncoder->getEncCfg()->getGdrPocStart();
@@ -804,6 +814,12 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
     bool isRecoveryPocPic = (curPoc == recoveryPicPoc);
     bool isOutGdrInterval = !(isInGdrInterval || isRecoveryPocPic);
     bool isGdrPic = (actualGdrStart == curPoc);
+
+    pcPic->cs->picHeader->setGdrPicFlag(false);
+    pcPic->cs->picHeader->setRecoveryPocCnt(0);
+    pcPic->cs->picHeader->setInGdrInterval(false);
+    pcPic->cs->picHeader->setIsGdrRecoveryPocPic(false);
+    pcPic->cs->picHeader->setVirtualBoundariesPresentFlag(false);
 
 #if GDR_ENC_TRACE
     printf("\n");

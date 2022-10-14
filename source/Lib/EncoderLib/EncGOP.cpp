@@ -2183,6 +2183,10 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     {
       pcSlice->setSliceType(B_SLICE);
     }
+    else if (m_pcCfg->getGdrEnabled() && (pocCurr != 0) && (pocCurr < m_pcCfg->getGdrPocStart()))
+    {
+      pcSlice->setSliceType(B_SLICE);
+    }
 
     // note : first picture is GDR(I_SLICE)
     if (m_pcCfg->getGdrEnabled() && pocCurr == 0)
@@ -2817,7 +2821,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     }
 
 #if JVET_Y0128_NON_CTC
-#if JVET_Z0118_GDR // seuhong: scaleRefPicList
+#if JVET_Z0118_GDR // scaleRefPicList
     bool  bDisableTMVP;
     if (pcPic->cs->isGdrEnabled())
     {
@@ -5800,6 +5804,11 @@ NalUnitType EncGOP::getNalUnitType(int pocCurr, int lastIDR, bool isField)
   {
     return NAL_UNIT_CODED_SLICE_GDR;
   }
+  else if (m_pcCfg->getGdrEnabled() && (pocCurr != 0) && (pocCurr < m_pcCfg->getGdrPocStart()))
+  {
+    return NAL_UNIT_CODED_SLICE_TRAIL;
+  }
+
   else
   {
     return NAL_UNIT_CODED_SLICE_TRAIL;
