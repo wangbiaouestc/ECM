@@ -13218,6 +13218,10 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
     }
 #endif
     pu.refIdx[refListAmvp] = refIdxAmvp;
+#if JVET_AB0078_AMVPMERGE_LDB
+    const int pocAmvp = pu.cu->slice->getRefPOC(refListAmvp, pu.refIdx[refListAmvp]);
+    const int curPoc = pu.cu->slice->getPOC();
+#endif
     AMVPInfo amvpInfo;
     PU::fillMvpCand( pu, refListAmvp, refIdxAmvp, amvpInfo
 #if TM_AMVP
@@ -13275,7 +13279,11 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
           mvAmBdmvr[refListMerge] = bmMergeCtx.mvFieldNeighbours[(mergeIdx << 1) + refListMerge].mv;
 #if JVET_Y0128_NON_CTC
 #if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+#if JVET_AB0078_AMVPMERGE_LDB
+          if (pu.cu->slice->getSPS()->getUseDMVDMode() == true && !pu.cu->slice->getCheckLDC())
+#else
           if (pu.cu->slice->getSPS()->getUseDMVDMode() == true)
+#endif
           {
 #endif
           CHECK(pu.cu->slice->getRefPic((RefPicList)refListMerge, pu.refIdx[refListMerge])->isRefScaled(pu.cs->pps), "this is not possible");
@@ -13284,7 +13292,12 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
 #endif
 #endif
 #if JVET_Z0085_AMVPMERGE_DMVD_OFF
+#if JVET_AB0078_AMVPMERGE_LDB
+          const int pocMerge = pu.cu->slice->getRefPOC(refListMerge, pu.refIdx[refListMerge]);
+          if (pu.cu->cs->sps->getUseDMVDMode() && ((pocAmvp - curPoc) * (pocMerge - curPoc) < 0))
+#else
           if (pu.cu->cs->sps->getUseDMVDMode())
+#endif
           {
 #endif
             Distortion tmpBmCost = xBDMVRGetMatchingError(pu, mvAmBdmvr, useMR);
