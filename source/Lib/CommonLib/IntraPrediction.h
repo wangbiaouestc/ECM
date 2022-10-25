@@ -171,6 +171,7 @@ private:
 #endif
 
 #if JVET_AA0057_CCCM
+  Area m_cccmBlkArea;
   Area m_cccmRefArea;
   Pel* m_cccmLumaBuf;
 #endif
@@ -310,12 +311,12 @@ public:
   void   predIntraCCCM            (const PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, int intraDir);
   void   xCccmCalcModels          (const PredictionUnit& pu, CccmModel &cccmModelCb, CccmModel &cccmModelCr, int modelId, int modelThr) const;
   void   xCccmApplyModel          (const PredictionUnit& pu, const ComponentID compId, CccmModel &cccmModel, int modelId, int modelThr, PelBuf &piPred) const;
-  void   xCccmCreateLumaRef       (const PredictionUnit& pu);
+  void   xCccmCreateLumaRef       (const PredictionUnit& pu, CompArea chromaArea);
   PelBuf xCccmGetLumaRefBuf       (const PredictionUnit& pu, int &areaWidth, int &areaHeight, int &refSizeX, int &refSizeY, int &refPosPicX, int &refPosPicY) const;
   PelBuf xCccmGetLumaPuBuf        (const PredictionUnit& pu) const;
   Pel    xCccmGetLumaVal          (const PredictionUnit& pu, const CPelBuf pi, const int x, const int y) const;
   int    xCccmCalcRefAver         (const PredictionUnit& pu) const;
-  void   xCccmCalcRefArea         (const PredictionUnit& pu);
+  void   xCccmCalcRefArea         (const PredictionUnit& pu, CompArea chromaArea);
 #endif
 #if ENABLE_DIMD
   static void deriveDimdMode      (const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu);

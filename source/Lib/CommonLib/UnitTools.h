@@ -483,7 +483,7 @@ namespace PU
   bool hasGlmFlag      (const PredictionUnit &pu, const int mode = -1);
 #endif
 #if JVET_AA0057_CCCM
-  void getCccmRefLineNum  (const PredictionUnit& pu, int& th, int& tv);
+  void getCccmRefLineNum  (const PredictionUnit& pu, const Area area, int& th, int& tv);
   bool cccmSingleModeAvail(const PredictionUnit& pu, int intraMode);
   bool cccmMultiModeAvail (const PredictionUnit& pu, int intraMode);
 #endif
