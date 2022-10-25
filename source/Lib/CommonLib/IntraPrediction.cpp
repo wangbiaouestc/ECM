@@ -4999,7 +4999,7 @@ void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chrom
 #if JVET_AA0057_CCCM
   if ( pu.cccmFlag )
   {
-    xCccmCreateLumaRef(pu);
+    xCccmCreateLumaRef(pu, chromaArea);
     return;
   }
 #endif
@@ -7188,7 +7188,7 @@ void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel &cccmM
 
   int M = CCCM_NUM_PARAMS;
   
-  int sampleNum = areaWidth * areaHeight - pu.blocks[COMPONENT_Cb].width * pu.blocks[COMPONENT_Cb].height;
+  int sampleNum = 0;
   int sampleInd = 0;
   
   // Collect reference data to input matrix A and target vector Y
@@ -7376,92 +7376,62 @@ Pel IntraPrediction::xCccmGetLumaVal(const PredictionUnit& pu, const CPelBuf pi,
   return ypval;
 }
 
-// Using the same availability checking as in IntraPrediction::xGetLumaRecPixels
-void IntraPrediction::xCccmCalcRefArea(const PredictionUnit& pu)
+// Using the same availability checking as in IntraPrediction::xFillReferenceSamples
+void IntraPrediction::xCccmCalcRefArea(const PredictionUnit& pu, CompArea chromaArea)
 {
-  CompArea chromaArea = pu.Cb();
-  CompArea lumaArea   = CompArea( COMPONENT_Y, pu.chromaFormat, chromaArea.lumaPos(), recalcSize( pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, chromaArea.size() ) );//needed for correct pos/size (4x4 Tus)
+  const ChannelType     chType  = CHANNEL_TYPE_CHROMA;
+  const CodingUnit&     cu      = *pu.cu;
+  const CodingStructure &cs     = *cu.cs;
+  const SPS             &sps    = *cs.sps;
+  const PreCalcValues   &pcv    = *cs.pcv;
 
-  const SizeType uiCWidth  = chromaArea.width;
-  const SizeType uiCHeight = chromaArea.height;
+  const int tuWidth      = chromaArea.width;
+  const int tuHeight     = chromaArea.height;
 
-  const CodingUnit& lumaCU = isChroma( pu.chType ) ? *pu.cs->picture->cs->getCU( lumaArea.pos(), CH_L ) : *pu.cu;
-  const CodingUnit&     cu = *pu.cu;
-  const CompArea& area     = isChroma( pu.chType ) ? chromaArea : lumaArea;
+  const bool noShift     = pcv.noChroma2x2 && chromaArea.width == 4;   // don't shift on the lowest level (chroma not-split)
+  const int  compScaleX  = getComponentScaleX(chromaArea.compID, sps.getChromaFormatIdc());
+  const int  compScaleY  = getComponentScaleY(chromaArea.compID, sps.getChromaFormatIdc());
+  const int  unitWidth   = pcv.minCUWidth  >> (noShift ? 0 : compScaleX);
+  const int  unitHeight  = pcv.minCUHeight >> (noShift ? 0 : compScaleY);
 
-  const uint32_t uiTuWidth  = area.width;
-  const uint32_t uiTuHeight = area.height;
+  const int  totalAboveUnits    = (2 * tuWidth + (unitWidth - 1)) / unitWidth;
+  const int  totalLeftUnits     = (2 * tuHeight + (unitHeight - 1)) / unitHeight;
+  const int  numAboveUnits      = std::max<int>( tuWidth / unitWidth, 1 );
+  const int  numLeftUnits       = std::max<int>( tuHeight / unitHeight, 1 );
+  const int  numAboveRightUnits = totalAboveUnits - numAboveUnits;
+  const int  numLeftBelowUnits  = totalLeftUnits - numLeftUnits;
 
-  int iBaseUnitSize = ( 1 << MIN_CU_LOG2 );
+  static bool neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1] = { false }; // Just a dummy array here, content not used
 
-  const int  iUnitWidth  = iBaseUnitSize >> getComponentScaleX(area.compID, area.chromaFormat );
-  const int  iUnitHeight = iBaseUnitSize >> getComponentScaleY(area.compID, area.chromaFormat);
-
-  const int  iTUWidthInUnits  = uiTuWidth / iUnitWidth;
-  const int  iTUHeightInUnits = uiTuHeight / iUnitHeight;
-  const int  iAboveUnits      = iTUWidthInUnits;
-  const int  iLeftUnits       = iTUHeightInUnits;
-  const int  chromaUnitWidth  = iBaseUnitSize >> getComponentScaleX(COMPONENT_Cb, area.chromaFormat);
-  const int  chromaUnitHeight = iBaseUnitSize >> getComponentScaleY(COMPONENT_Cb, area.chromaFormat);
-  const int  topTemplateSampNum  = 2 * uiCWidth;
-  const int  leftTemplateSampNum = 2 * uiCHeight;
-  const int  totalAboveUnits = (topTemplateSampNum  + (chromaUnitWidth  - 1)) / chromaUnitWidth;
-  const int  totalLeftUnits  = (leftTemplateSampNum + (chromaUnitHeight - 1)) / chromaUnitHeight;
-  const int  totalUnits = totalLeftUnits + totalAboveUnits + 1;
-  const int  aboveRightUnits = totalAboveUnits - iAboveUnits;
-  const int  leftBelowUnits  = totalLeftUnits - iLeftUnits;
-
-  int avaiAboveRightUnits = 0;
-  int avaiLeftBelowUnits  = 0;
-  bool  bNeighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1];
-  memset(bNeighborFlags, 0, totalUnits);
-  bool aboveIsAvailable, leftIsAvailable;
-
-  int availlableUnit = isLeftAvailable(isChroma(pu.chType) ? cu : lumaCU, toChannelType(area.compID), area.pos(),
-                                       iLeftUnits, iUnitHeight, (bNeighborFlags + iLeftUnits + leftBelowUnits - 1));
-
-  leftIsAvailable = availlableUnit == iTUHeightInUnits;
-
-  availlableUnit = isAboveAvailable(isChroma(pu.chType) ? cu : lumaCU, toChannelType(area.compID), area.pos(),
-                                    iAboveUnits, iUnitWidth, (bNeighborFlags + iLeftUnits + leftBelowUnits + 1));
-
-  aboveIsAvailable = availlableUnit == iTUWidthInUnits;
-
-  if (leftIsAvailable)   // if left is not available, then the below left is not available
-  {
-    avaiLeftBelowUnits = isBelowLeftAvailable(isChroma(pu.chType) ? cu : lumaCU, toChannelType(area.compID), area.bottomLeftComp(area.compID), leftBelowUnits, iUnitHeight, (bNeighborFlags + leftBelowUnits - 1));
-  }
-
-  if (aboveIsAvailable)   // if above is not available, then  the above right is not available.
-  {
-    avaiAboveRightUnits = isAboveRightAvailable(isChroma(pu.chType) ? cu : lumaCU, toChannelType(area.compID), area.topRightComp(area.compID), aboveRightUnits, iUnitWidth, (bNeighborFlags + iLeftUnits + leftBelowUnits + iAboveUnits + 1));
-  }
-
-  int columnsLeft, rowsAbove;
+  int avaiAboveRightUnits = isAboveRightAvailable( cu, chType, chromaArea.topRight(),   numAboveRightUnits, unitWidth,  (neighborFlags + totalLeftUnits + 1 + numAboveUnits) );
+  int avaiLeftBelowUnits  = isBelowLeftAvailable ( cu, chType, chromaArea.bottomLeft(), numLeftBelowUnits,  unitHeight, (neighborFlags + totalLeftUnits - 1 - numLeftUnits) );
   
-  PU::getCccmRefLineNum(pu, columnsLeft, rowsAbove);            // Reference lines available left and above
+  int refSizeX, refSizeY;
+  
+  PU::getCccmRefLineNum(pu, chromaArea, refSizeX, refSizeY); // Reference lines available left and above
 
-  int refWidth  = pu.blocks[COMPONENT_Cb].width  + columnsLeft; // Reference buffer size excluding paddings
-  int refHeight = pu.blocks[COMPONENT_Cb].height + rowsAbove;
+  int refWidth  = chromaArea.width  + refSizeX;              // Reference buffer size excluding paddings
+  int refHeight = chromaArea.height + refSizeY;
+
+  int extWidth  = avaiAboveRightUnits * unitWidth;
+  int extHeight = avaiLeftBelowUnits  * unitHeight;
   
-  int extWidth  = avaiAboveRightUnits * chromaUnitWidth;
-  int extHeight = avaiLeftBelowUnits  * chromaUnitHeight;
-  
-  refWidth  += rowsAbove   ? extWidth  : 0; // Add above right if above is available
-  refHeight += columnsLeft ? extHeight : 0; // Add below left if left is available
-  
-  m_cccmRefArea = Area( columnsLeft, rowsAbove, refWidth, refHeight); // Position with respect to the PU
+  refWidth  += refSizeY ? extWidth  : 0; // Add above right if above is available
+  refHeight += refSizeX ? extHeight : 0; // Add below left if left is available
+
+  m_cccmBlkArea = chromaArea;
+  m_cccmRefArea = Area(chromaArea.x - refSizeX, chromaArea.y - refSizeY, refWidth, refHeight);
 }
 
 // Return downsampled luma buffer that contains PU and the reference areas above and left of the PU
 PelBuf IntraPrediction::xCccmGetLumaRefBuf(const PredictionUnit& pu, int &areaWidth, int &areaHeight, int &refSizeX, int &refSizeY, int &refPosPicX, int &refPosPicY ) const
 {
-  refSizeX   = m_cccmRefArea.x;                        // Reference lines available left and above
-  refSizeY   = m_cccmRefArea.y;
-  areaWidth  = m_cccmRefArea.width;                    // Reference buffer size excluding paddings
+  refSizeX   = m_cccmBlkArea.x - m_cccmRefArea.x; // Reference lines available left and above
+  refSizeY   = m_cccmBlkArea.y - m_cccmRefArea.y;
+  areaWidth  = m_cccmRefArea.width;               // Reference buffer size excluding paddings
   areaHeight = m_cccmRefArea.height;
-  refPosPicX = pu.blocks[COMPONENT_Cb].x - refSizeX; // Position of the reference area in picture coordinates
-  refPosPicY = pu.blocks[COMPONENT_Cb].y - refSizeY;
+  refPosPicX = m_cccmRefArea.x;                   // Position of the reference area in picture coordinates
+  refPosPicY = m_cccmRefArea.y;
 
   int refStride = areaWidth + 2 * CCCM_FILTER_PADDING; // Including paddings required for the 2D filter
   int refOrigin = refStride * CCCM_FILTER_PADDING + CCCM_FILTER_PADDING;
@@ -7472,13 +7442,14 @@ PelBuf IntraPrediction::xCccmGetLumaRefBuf(const PredictionUnit& pu, int &areaWi
 // Return downsampled luma buffer for a PU
 PelBuf IntraPrediction::xCccmGetLumaPuBuf(const PredictionUnit& pu) const
 {
-  int puWidth   = pu.blocks[COMPONENT_Cb].width;
-  int puHeight  = pu.blocks[COMPONENT_Cb].height;
-  
+  int refSizeX  = m_cccmBlkArea.x - m_cccmRefArea.x; // Reference lines available left and above
+  int refSizeY  = m_cccmBlkArea.y - m_cccmRefArea.y;
+  int tuWidth   = m_cccmBlkArea.width;
+  int tuHeight  = m_cccmBlkArea.height;
   int refStride = m_cccmRefArea.width + 2 * CCCM_FILTER_PADDING; // Including paddings required for the 2D filter
-  int refOrigin = refStride * (m_cccmRefArea.y + CCCM_FILTER_PADDING) + m_cccmRefArea.x + CCCM_FILTER_PADDING;
+  int refOrigin = refStride * (refSizeY + CCCM_FILTER_PADDING) + refSizeX + CCCM_FILTER_PADDING;
 
-  return PelBuf(m_cccmLumaBuf + refOrigin, refStride, puWidth, puHeight);  // Points to the top-left corner of the block
+  return PelBuf(m_cccmLumaBuf + refOrigin, refStride, tuWidth, tuHeight);  // Points to the top-left corner of the block
 }
 
 int IntraPrediction::xCccmCalcRefAver(const PredictionUnit& pu) const
@@ -7513,20 +7484,20 @@ int IntraPrediction::xCccmCalcRefAver(const PredictionUnit& pu) const
   return numSamples == 0 ? 512 : ( sumSamples + numSamples/2) / numSamples;
 }
 
-void IntraPrediction::xCccmCreateLumaRef(const PredictionUnit& pu)
+void IntraPrediction::xCccmCreateLumaRef(const PredictionUnit& pu, CompArea chromaArea)
 {
   const CPelBuf recoLuma = pu.cs->picture->getRecoBuf(COMPONENT_Y);
   const int  maxPosPicX  = pu.cs->picture->chromaSize().width  - 1;
   const int  maxPosPicY  = pu.cs->picture->chromaSize().height - 1;
 
-  xCccmCalcRefArea(pu); // Find the reference area
+  xCccmCalcRefArea(pu, chromaArea); // Find the reference area
   
   int areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY;
 
   PelBuf refLuma = xCccmGetLumaRefBuf(pu, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY);
   
-  int puBorderX = refSizeX + pu.blocks[COMPONENT_Cb].width;
-  int puBorderY = refSizeY + pu.blocks[COMPONENT_Cb].height;
+  int puBorderX = refSizeX + m_cccmBlkArea.width;
+  int puBorderY = refSizeY + m_cccmBlkArea.height;
   
   // Generate down-sampled luma for the area covering both the PU and the top/left reference areas (+ top and left paddings)
   for (int y = -CCCM_FILTER_PADDING; y < areaHeight; y++)
@@ -7669,7 +7640,7 @@ void IntraPrediction::xCccmCreateLumaRef(const PredictionUnit& pu)
     if ( padPosPicY <= maxPosPicY )
     {
       // Avoid going outside of right CTU border where these samples are not yet available
-      int puPosPicX        = pu.blocks[COMPONENT_Cb].x;
+      int puPosPicX        = m_cccmBlkArea.x;
       int ctuRightEdgeDist = ctuWidth - (puPosPicX % ctuWidth) + refSizeX;
       int lastPosX         = ctuRightEdgeDist < areaWidth ? ctuRightEdgeDist : areaWidth;
 

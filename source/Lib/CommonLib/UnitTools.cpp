@@ -1546,10 +1546,8 @@ bool PU::isDMChromaMIP(const PredictionUnit &pu)
 }
 
 #if JVET_AA0057_CCCM
-void PU::getCccmRefLineNum(const PredictionUnit& pu, int& th, int& tv)
+void PU::getCccmRefLineNum(const PredictionUnit& pu, const Area area, int& th, int& tv)
 {
-  const Area area = pu.blocks[COMPONENT_Cb];
-  
   th = area.x < CCCM_WINDOW_SIZE ? area.x : CCCM_WINDOW_SIZE;
   tv = area.y < CCCM_WINDOW_SIZE ? area.y : CCCM_WINDOW_SIZE;
 
@@ -1590,7 +1588,7 @@ bool PU::cccmMultiModeAvail(const PredictionUnit& pu, int intraMode)
 #endif
 
   int th, tv;
-  PU::getCccmRefLineNum(pu, th, tv);
+  PU::getCccmRefLineNum(pu, area, th, tv);
   const int nsamples = ((area.width + th) * (area.height + tv) - (area.area()));
   return modeIsOk && nsamples >= 128;
 #else
