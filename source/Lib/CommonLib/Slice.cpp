@@ -292,9 +292,13 @@ void Slice::checkAmvpMergeModeAvailability(Slice* pcSlice)
     m_amvpMergeModeValidRefIdx[REF_PIC_LIST_1][refIdxInList0] = false;
   }
 
+#if JVET_AB0078_AMVPMERGE_LDB
+  if (pcSlice->getSliceType() != B_SLICE
+#else
   if( pcSlice->getCheckLDC()
 #if ( TM_AMVP || TM_MRG || MULTI_PASS_DMVR ) && !JVET_Z0085_AMVPMERGE_DMVD_OFF
       || !pcSlice->getSPS()->getUseDMVDMode()
+#endif
 #endif
       )
   {
@@ -304,6 +308,95 @@ void Slice::checkAmvpMergeModeAvailability(Slice* pcSlice)
   // collect slice enabling condition from L0
   int onlyOneValidRefIdxAmvp = -1;
   int candidateRefIdxCount = 0;
+#if JVET_AB0078_AMVPMERGE_LDB
+  if (pcSlice->getCheckLDC())
+  {
+    for (int refIdxInList0 = 0; refIdxInList0 < pcSlice->getNumRefIdx(REF_PIC_LIST_0); refIdxInList0++)
+    {
+      bool validCandidate = false;
+      for (int refIdxInList1 = 0; refIdxInList1 < pcSlice->getNumRefIdx(REF_PIC_LIST_1); refIdxInList1++)
+      {
+        const int tmpPoc0 = pcSlice->getRefPOC(REF_PIC_LIST_0, refIdxInList0);
+        const int tmpPoc1 = pcSlice->getRefPOC(REF_PIC_LIST_1, refIdxInList1);
+
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+        if (pcSlice->getSPS()->getUseDMVDMode())
+        {
+#endif
+          if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->isRefScaled(pcSlice->getPPS()) ||
+            pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->isRefScaled(pcSlice->getPPS()))
+          {
+            continue;
+          }
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+        }
+#endif
+        if (tmpPoc0 != tmpPoc1)
+        {
+          validCandidate = true;
+          m_amvpMergeModeValidCandPair[refIdxInList0][refIdxInList1] = true;
+        }
+      }
+      if (validCandidate)
+      {
+        m_useAmvpMergeMode = true;
+        m_amvpMergeModeValidRefIdx[REF_PIC_LIST_0][refIdxInList0] = true;
+        onlyOneValidRefIdxAmvp = refIdxInList0;
+        candidateRefIdxCount++;
+      }
+    }
+    if (candidateRefIdxCount == 1)
+    {
+      m_amvpMergeModeOnlyOneValidRefIdx[0] = onlyOneValidRefIdxAmvp;
+    }
+    // collect slice enabling condition from L1
+    onlyOneValidRefIdxAmvp = -1;
+    candidateRefIdxCount = 0;
+    for (int refIdxInList1 = 0; refIdxInList1 < pcSlice->getNumRefIdx(REF_PIC_LIST_1); refIdxInList1++)
+    {
+      bool validCandidate = false;
+      for (int refIdxInList0 = 0; refIdxInList0 < pcSlice->getNumRefIdx(REF_PIC_LIST_0); refIdxInList0++)
+      {
+        const int tmpPoc0 = pcSlice->getRefPOC(REF_PIC_LIST_0, refIdxInList0);
+        const int tmpPoc1 = pcSlice->getRefPOC(REF_PIC_LIST_1, refIdxInList1);
+        
+
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+        if (pcSlice->getSPS()->getUseDMVDMode())
+        {
+#endif
+          if (pcSlice->getRefPic(REF_PIC_LIST_0, refIdxInList0)->isRefScaled(pcSlice->getPPS()) ||
+            pcSlice->getRefPic(REF_PIC_LIST_1, refIdxInList1)->isRefScaled(pcSlice->getPPS()))
+          {
+            continue;
+          }
+#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
+        }
+#endif
+
+
+        if (tmpPoc0 != tmpPoc1)
+        {
+          validCandidate = true;
+          m_amvpMergeModeValidCandPair[refIdxInList0][refIdxInList1] = true;
+        }
+      }
+      if (validCandidate)
+      {
+        m_useAmvpMergeMode = true;
+        m_amvpMergeModeValidRefIdx[REF_PIC_LIST_1][refIdxInList1] = true;
+        onlyOneValidRefIdxAmvp = refIdxInList1;
+        candidateRefIdxCount++;
+      }
+    }
+    if (candidateRefIdxCount == 1)
+    {
+      m_amvpMergeModeOnlyOneValidRefIdx[1] = onlyOneValidRefIdxAmvp;
+    }
+  }
+  else
+  {
+#endif
   for (int refIdxInList0 = 0; refIdxInList0 < pcSlice->getNumRefIdx(REF_PIC_LIST_0); refIdxInList0++)
   {
     bool validCandidate = false;
@@ -403,6 +496,9 @@ void Slice::checkAmvpMergeModeAvailability(Slice* pcSlice)
   {
     m_amvpMergeModeOnlyOneValidRefIdx[1] = onlyOneValidRefIdxAmvp;
   }
+#if JVET_AB0078_AMVPMERGE_LDB
+  }
+#endif
 }
 #endif
 

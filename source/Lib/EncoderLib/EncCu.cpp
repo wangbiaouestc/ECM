@@ -11417,6 +11417,13 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   }
   if (cu.firstPU->amvpMergeModeFlag[0] || cu.firstPU->amvpMergeModeFlag[1])
   {
+#if JVET_AB0078_AMVPMERGE_LDB
+    if (bdmvrAmSearchLoop == 1 && tempCS->picHeader->getMvdL1ZeroFlag())
+    {
+      tempCS->initStructData(encTestMode.qp);
+      continue;
+    }
+#endif
     m_pcInterSearch->predInterSearch( cu, partitioner, bdmvrAmMergeNotValid,
         m_mvFieldAmListEnc, m_mvBufEncAmBDMVR[0], m_mvBufEncAmBDMVR[1] );
   }
