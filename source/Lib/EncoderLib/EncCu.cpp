@@ -2484,6 +2484,12 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #if JVET_W0123_TIMD_FUSION
             PU::spanIpmInfoIntra(*cu.firstPU);
 #endif
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+            if (cu.tmpFlag)
+            {
+              PU::spanMotionInfo(*cu.firstPU);
+            }
+#endif
 #if JVET_W0123_TIMD_FUSION
             if (m_pcEncCfg->getUseFastISP() && validCandRet && !mtsFlag && !lfnstIdx && !cu.colorTransform && !cu.timd)
 #else

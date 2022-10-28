@@ -6995,6 +6995,53 @@ bool IntraPrediction::generateTMPrediction( Pel* piPred, unsigned int uiStride, 
   return bSucceedFlag;
 }
 
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, int &foundCandiNum, PredictionUnit &pu)
+{
+  bool         bSucceedFlag  = true;
+  unsigned int uiPatchWidth  = pu.lwidth() + TMP_TEMPLATE_SIZE;
+  unsigned int uiPatchHeight = pu.lheight() + TMP_TEMPLATE_SIZE;
+
+  foundCandiNum = m_uiVaildCandiNum;
+  if (foundCandiNum < 1)
+  {
+    return false;
+  }
+
+  int          pX = m_tempLibFast.getX();
+  int          pY = m_tempLibFast.getY();
+  Pel *        ref;
+  int          picStride = getStride();
+  int          iOffsetY, iOffsetX;
+  Pel *        refTarget;
+  unsigned int uiHeight = uiPatchHeight - TMP_TEMPLATE_SIZE;
+  unsigned int uiWidth  = uiPatchWidth - TMP_TEMPLATE_SIZE;
+
+  // the data center: we use the prediction block as the center now.
+  // collect the candidates
+  ref = getRefPicUsed();
+  iOffsetY  = pY;
+  iOffsetX  = pX;
+  refTarget = ref + iOffsetY * picStride + iOffsetX;
+  for (unsigned int uiY = 0; uiY < uiHeight; uiY++)
+  {
+    for (unsigned int uiX = 0; uiX < uiWidth; uiX++)
+    {
+      piPred[uiX] = refTarget[uiX];
+    }
+    refTarget += picStride;
+    piPred += uiStride;
+  }
+
+  pu.interDir               = 1;
+  pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
+  pu.mv->set(pX << MV_FRACTIONAL_BITS_INTERNAL, pY << MV_FRACTIONAL_BITS_INTERNAL);
+  pu.bv.set(pX, pY);
+
+  return bSucceedFlag;
+}
+#endif
+
 #if JVET_W0069_TMP_BOUNDARY
 bool IntraPrediction::generateTmDcPrediction( Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val )
 {
