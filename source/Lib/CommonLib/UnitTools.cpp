@@ -2275,7 +2275,11 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
   //left
   const PredictionUnit* puLeft = cs.getPURestricted(posLB.offset(-1, 0), pu, pu.chType);
   bool isGt4x4 = pu.lwidth() * pu.lheight() > 16;
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  const bool isAvailableA1 = puLeft && pu.cu != puLeft->cu && (CU::isIBC(*puLeft->cu) || puLeft->cu->tmpFlag);
+#else
   const bool isAvailableA1 = puLeft && pu.cu != puLeft->cu && CU::isIBC(*puLeft->cu);
+#endif
   if (isGt4x4 && isAvailableA1)
   {
     miLeft = puLeft->getMotionInfo(posLB.offset(-1, 0));
@@ -2325,7 +2329,11 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 
   // above
   const PredictionUnit *puAbove = cs.getPURestricted(posRT.offset(0, -1), pu, pu.chType);
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  bool isAvailableB1 = puAbove && pu.cu != puAbove->cu && (CU::isIBC(*puAbove->cu) || puAbove->cu->tmpFlag);
+#else
   bool isAvailableB1 = puAbove && pu.cu != puAbove->cu && CU::isIBC(*puAbove->cu);
+#endif
   if (isGt4x4 && isAvailableB1)
   {
     miAbove = puAbove->getMotionInfo(posRT.offset(0, -1));
@@ -2385,7 +2393,11 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #if JVET_Y0058_IBC_LIST_MODIFY
   // above right
   const PredictionUnit *puAboveRight = cs.getPURestricted(posRT.offset(1, -1), pu, pu.chType);
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  bool isAvailableB0 = puAboveRight && pu.cu != puAboveRight->cu && (CU::isIBC(*puAboveRight->cu) || puAboveRight->cu->tmpFlag);
+#else
   bool isAvailableB0 = puAboveRight && pu.cu != puAboveRight->cu && CU::isIBC(*puAboveRight->cu);
+#endif
   if (isGt4x4 && isAvailableB0)
   {
     miAboveRight = puAboveRight->getMotionInfo(posRT.offset(1, -1));
@@ -2440,7 +2452,11 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 
   //left bottom
   const PredictionUnit *puLeftBottom = cs.getPURestricted(posLB.offset(-1, 1), pu, pu.chType);
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  bool isAvailableA0 = puLeftBottom && pu.cu != puLeftBottom->cu && (CU::isIBC(*puLeftBottom->cu) || puLeftBottom->cu->tmpFlag);
+#else
   bool isAvailableA0 = puLeftBottom && pu.cu != puLeftBottom->cu && CU::isIBC(*puLeftBottom->cu);
+#endif
   if (isGt4x4 && isAvailableA0)
   {
     miBelowLeft = puLeftBottom->getMotionInfo(posLB.offset(-1, 1));
@@ -2504,7 +2520,11 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #endif
   {
     const PredictionUnit *puAboveLeft = cs.getPURestricted(posLT.offset(-1, -1), pu, pu.chType);
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+    bool isAvailableB2 = puAboveLeft && pu.cu != puAboveLeft->cu && (CU::isIBC(*puAboveLeft->cu) || puAboveLeft->cu->tmpFlag);
+#else
     bool isAvailableB2 = puAboveLeft && pu.cu != puAboveLeft->cu && CU::isIBC(*puAboveLeft->cu);
+#endif
     if (isGt4x4 && isAvailableB2)
     {
       miAboveLeft = puAboveLeft->getMotionInfo(posLT.offset(-1, -1));
@@ -11866,8 +11886,13 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
   {
     MotionInfo mi;
 
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+    mi.isInter  = !CU::isIntra(*pu.cu) || pu.cu->tmpFlag;
+    mi.isIBCmot = CU::isIBC(*pu.cu) || pu.cu->tmpFlag;
+#else
     mi.isInter = !CU::isIntra(*pu.cu);
     mi.isIBCmot = CU::isIBC(*pu.cu);
+#endif
     mi.sliceIdx = pu.cu->slice->getIndependentSliceIdx();
 #if INTER_LIC
     mi.usesLIC = pu.cu->LICFlag;

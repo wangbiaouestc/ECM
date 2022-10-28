@@ -495,7 +495,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 
         PelBuf piPred       = cs.getPredBuf( area );
 
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  PredictionUnit &pu = *tu.cs->getPU(area.pos(), chType);
+#else
   const PredictionUnit &pu  = *tu.cs->getPU( area.pos(), chType );
+#endif
 #if ENABLE_DIMD
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   if (pu.intraDir[1] == DIMD_CHROMA_IDX && compID == COMPONENT_Cb)
@@ -579,12 +583,22 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 		  {
         m_pcIntraPred->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight(), tempType);
         m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight(), tempType);
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+        m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, foundCandiNum, pu);
+#else
         m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+#endif
 		  }
 		  else
 		  {
 			  foundCandiNum = 1;
         m_pcIntraPred->generateTmDcPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1));
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+        pu.interDir               = 1;             // use list 0 for IBC mode
+        pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;   // last idx in the list
+        pu.mv->set(0, 0);
+        pu.bv.set(0, 0);
+#endif
 		  }
 #else
       m_pcIntraPred->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
@@ -975,6 +989,12 @@ void DecCu::xReconIntraQT( CodingUnit &cu )
   if (cu.blocks[CHANNEL_TYPE_LUMA].valid())
   {
     PU::spanIpmInfoIntra(*cu.firstPU);
+  }
+#endif
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  if (cu.blocks[CHANNEL_TYPE_LUMA].valid() && cu.tmpFlag)
+  {
+    PU::spanMotionInfo(*cu.firstPU);
   }
 #endif
 }
