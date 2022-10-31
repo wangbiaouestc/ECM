@@ -651,7 +651,7 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
         }
       }
       AlfFilterType alfFilterType = param.filterType[CHANNEL_TYPE_LUMA];
-#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF || JVET_AA0095_ALF_LONGER_FILTER
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF || JVET_AA0095_ALF_LONGER_FILTER || JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
       AlfFilterShape  filterShape( alfTypeToSize[alfFilterType] );
 #else
       AlfFilterShape filterShape(alfFilterType == ALF_FILTER_5 ? 5 : (alfFilterType == ALF_FILTER_9_EXT ? size_ALF_FILTER_9_EXT : ((alfFilterType == ALF_FILTER_7 ? 7 : (alfFilterType == ALF_FILTER_EXT ? size_ALF_FILTER_EXT : 9)))));
@@ -712,7 +712,7 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
 #if ALF_IMPROVEMENT
       WRITE_FLAG( param.nonLinearFlag[CHANNEL_TYPE_CHROMA][altIdx], "alf_nonlinear_enable_flag_chroma" );
       AlfFilterType alfFilterType = param.filterType[CHANNEL_TYPE_CHROMA];
-#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF || JVET_AA0095_ALF_LONGER_FILTER
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF || JVET_AA0095_ALF_LONGER_FILTER || JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
       AlfFilterShape  filterShape( alfTypeToSize[alfFilterType] );
 #else
       AlfFilterShape filterShape(alfFilterType == ALF_FILTER_5 ? 5 : (alfFilterType == ALF_FILTER_9_EXT ? size_ALF_FILTER_9_EXT : ((alfFilterType == ALF_FILTER_7 ? 7 : (alfFilterType == ALF_FILTER_EXT ? size_ALF_FILTER_EXT : 9)))));
@@ -3964,7 +3964,7 @@ void HLSWriter::alfFilter( const AlfParam& alfParam, const bool isChroma, const 
 {
 #if ALF_IMPROVEMENT
   AlfFilterType alfFilterType = isChroma ? alfParam.filterType[CHANNEL_TYPE_CHROMA] : alfParam.filterType[CHANNEL_TYPE_LUMA];
-#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF || JVET_AA0095_ALF_LONGER_FILTER
+#if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF || JVET_AA0095_ALF_LONGER_FILTER || JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   AlfFilterShape alfShape( alfTypeToSize[alfFilterType] );
 #else
   AlfFilterShape alfShape(alfFilterType == ALF_FILTER_5 ? 5 : (alfFilterType == ALF_FILTER_9_EXT ? size_ALF_FILTER_9_EXT : ((alfFilterType == ALF_FILTER_7 ? 7 : (alfFilterType == ALF_FILTER_EXT ? size_ALF_FILTER_EXT :9)))));
