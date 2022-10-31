@@ -7122,7 +7122,11 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
     CccmModel cccmModelCb( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) );
     CccmModel cccmModelCr( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) );
 
+#if JVET_AB0143_CCCM_TS
+    if ( intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX )
+#else
     if ( PU::cccmSingleModeAvail(pu, intraDir) )
+#endif
     {
       xCccmCalcModels(pu, cccmModelCb,  cccmModelCr, 0, 0);
       xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 0, 0, predCb);
@@ -7196,6 +7200,43 @@ void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel &cccmM
   static Pel YCb[CCCM_MAX_REF_SAMPLES];
   static Pel YCr[CCCM_MAX_REF_SAMPLES];
 
+#if JVET_AB0143_CCCM_TS
+  int yStart = pu.cccmFlag == 2 ? refSizeY : 0;
+  int yEnd = pu.cccmFlag == 3 ? refSizeY : areaHeight;
+  int xStart = pu.cccmFlag == 3 ? refSizeX : 0;
+  int xEnd = pu.cccmFlag == 2 ? refSizeX : areaWidth;
+
+  for (int y = yStart; y < yEnd; y++)
+  {
+    for (int x = xStart; x < xEnd; x++)
+    {
+      if (x >= refSizeX && y >= refSizeY)
+      {
+        continue;
+      }
+
+      if (modelId == 1 && refLuma.at(x, y) > modelThr) // Model 1: Include only samples below or equal to the threshold
+      {
+        continue;
+      }
+      if (modelId == 2 && refLuma.at(x, y) <= modelThr) // Model 2: Include only samples above the threshold
+      {
+        continue;
+      }
+
+      // 7-tap cross
+      A[0][sampleInd] = refLuma.at(x, y); // C
+      A[1][sampleInd] = refLuma.at(x, y - 1); // N
+      A[2][sampleInd] = refLuma.at(x, y + 1); // S
+      A[3][sampleInd] = refLuma.at(x - 1, y); // W
+      A[4][sampleInd] = refLuma.at(x + 1, y); // E
+      A[5][sampleInd] = cccmModelCb.nonlinear(refLuma.at(x, y));
+      A[6][sampleInd] = cccmModelCb.bias();
+      YCb[sampleInd] = recoCb.at(refPosPicX + x, refPosPicY + y);
+      YCr[sampleInd++] = recoCr.at(refPosPicX + x, refPosPicY + y);
+    }
+  }
+#else
   for (int y = 0; y < areaHeight; y++)
   {
     for (int x = 0; x < areaWidth; x++)
@@ -7227,6 +7268,7 @@ void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel &cccmM
       YCr[sampleInd++] = recoCr.at(refPosPicX + x, refPosPicY + y);
     }
   }
+#endif
 
   if ( sampleInd == 0 ) // Number of samples can go to zero in the multimode case
   {
@@ -7461,6 +7503,50 @@ int IntraPrediction::xCccmCalcRefAver(const PredictionUnit& pu) const
   int numSamples = 0;
   int sumSamples = 0;
   
+#if JVET_AB0143_CCCM_TS && MMLM
+  if (pu.cccmFlag == 1)
+  {
+    for (int y = 0; y < refSizeY; y++)
+    {
+      for (int x = 0; x < areaWidth; x++)
+      {
+        sumSamples += refLuma.at(x, y);
+        numSamples++;
+      }
+    }
+
+    for (int y = refSizeY; y < areaHeight; y++)
+    {
+      for (int x = 0; x < refSizeX; x++)
+      {
+        sumSamples += refLuma.at(x, y);
+        numSamples++;
+      }
+    }
+  }
+  else if (pu.cccmFlag == 3)
+  {
+    for (int y = 0; y < refSizeY; y++)
+    {
+      for (int x = refSizeX; x < areaWidth; x++)
+      {
+        sumSamples += refLuma.at(x, y);
+        numSamples++;
+      }
+    }
+  }
+  else
+  {
+    for (int y = refSizeY; y < areaHeight; y++)
+    {
+      for (int x = 0; x < refSizeX; x++)
+      {
+        sumSamples += refLuma.at(x, y);
+        numSamples++;
+      }
+    }
+  }
+#else
   // Top samples
   for (int y = 0; y < refSizeY; y++)
   {
@@ -7480,6 +7566,7 @@ int IntraPrediction::xCccmCalcRefAver(const PredictionUnit& pu) const
       numSamples++;
     }
   }
+#endif
 
   return numSamples == 0 ? 512 : ( sumSamples + numSamples/2) / numSamples;
 }

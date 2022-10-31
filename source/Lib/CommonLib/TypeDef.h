@@ -136,6 +136,9 @@
 #define JVET_Z0050_DIMD_CHROMA_FUSION                     1 // JVET-Z0050: DIMD chroma mode and fusion of chroma intra prediction modes
 #define JVET_Z0050_CCLM_SLOPE                             1 // JVET-Z0050: CCLM with slope adjustments
 #define JVET_AA0057_CCCM                                  1 // JVET-AA0057: Convolutional cross-component model (CCCM)
+#if JVET_AA0057_CCCM
+#define JVET_AB0143_CCCM_TS                               1 // JVET-AB0143: CCCM template selection
+#endif
 #define JVET_AA0126_GLM                                   1 // JVET-AA0126: Gradient linear model
 
 //IBC

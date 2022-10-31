@@ -1579,7 +1579,11 @@ bool PU::cccmMultiModeAvail(const PredictionUnit& pu, int intraMode)
 {
 #if MMLM
   const Area area = pu.blocks[COMPONENT_Cb];
+#if JVET_AB0143_CCCM_TS
+  bool modeIsOk   = (intraMode == MMLM_CHROMA_IDX) || (intraMode == MMLM_L_IDX) || (intraMode == MMLM_T_IDX);
+#else
   bool modeIsOk   = intraMode == MMLM_CHROMA_IDX;
+#endif
   modeIsOk        = modeIsOk && ( area.width * area.height >= CCCM_MIN_PU_SIZE );
 #if CCLM_LATENCY_RESTRICTION_RMV
   modeIsOk       &= pu.cs->sps->getUseLMChroma();
@@ -1589,12 +1593,73 @@ bool PU::cccmMultiModeAvail(const PredictionUnit& pu, int intraMode)
 
   int th, tv;
   PU::getCccmRefLineNum(pu, area, th, tv);
+#if JVET_AB0143_CCCM_TS
+  int nsamples;
+  bool nSampleCheck;
+  if (intraMode == MMLM_CHROMA_IDX)
+  {
+    nsamples = ((area.width + th) * (area.height + tv) - (area.area()));
+    nSampleCheck = (nsamples >= 64);
+  }
+  else if (intraMode == MMLM_L_IDX)
+  {
+    nsamples = th * area.height;
+    nSampleCheck = (nsamples >= 16) && area.x && area.y;
+  }
+  else
+  {
+    nsamples = tv * area.width;
+    nSampleCheck = (nsamples >= 16) && area.x && area.y;
+  }
+  return modeIsOk && nSampleCheck;
+#else
   const int nsamples = ((area.width + th) * (area.height + tv) - (area.area()));
   return modeIsOk && nsamples >= 128;
+#endif
 #else
   return false;
 #endif
 }
+
+#if JVET_AB0143_CCCM_TS
+bool PU::isLeftCccmMode(const PredictionUnit& pu, int intraMode)
+{
+  const Area area = pu.blocks[COMPONENT_Cb];
+  bool modeIsOk = (intraMode == MDLM_L_IDX);
+  modeIsOk = modeIsOk && (area.width * area.height >= CCCM_MIN_PU_SIZE);
+#if CCLM_LATENCY_RESTRICTION_RMV
+  modeIsOk &= pu.cs->sps->getUseLMChroma();
+#else
+  modeIsOk &= pu.cs->sps->getUseLMChroma() && pu.cu->checkCCLMAllowed();
+#endif
+
+  int th, tv;
+  PU::getCccmRefLineNum(pu, area, th, tv);
+  const int nsamples = th * area.height;
+  modeIsOk = modeIsOk && (nsamples >= 16);
+
+  return modeIsOk && area.x && area.y;
+}
+
+bool PU::isTopCccmMode(const PredictionUnit& pu, int intraMode)
+{
+  const Area area = pu.blocks[COMPONENT_Cb];
+  bool modeIsOk = (intraMode == MDLM_T_IDX);
+  modeIsOk = modeIsOk && (area.width * area.height >= CCCM_MIN_PU_SIZE);
+#if CCLM_LATENCY_RESTRICTION_RMV
+  modeIsOk &= pu.cs->sps->getUseLMChroma();
+#else
+  modeIsOk &= pu.cs->sps->getUseLMChroma() && pu.cu->checkCCLMAllowed();
+#endif
+
+  int th, tv;
+  PU::getCccmRefLineNum(pu, area, th, tv);
+  const int nsamples = tv * area.width;
+  modeIsOk = modeIsOk && (nsamples >= 16);
+
+  return modeIsOk && area.x && area.y;
+}
+#endif
 #endif
 
 #if JVET_Z0050_DIMD_CHROMA_FUSION

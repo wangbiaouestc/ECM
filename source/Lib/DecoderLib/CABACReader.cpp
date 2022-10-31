@@ -2354,9 +2354,51 @@ void CABACReader::cccmFlag(PredictionUnit& pu)
 {
   const unsigned intraDir = pu.intraDir[1];
   
+#if JVET_AB0143_CCCM_TS
+  bool isCCCMEnabled = false;
+  if (intraDir == LM_CHROMA_IDX)
+  {
+    isCCCMEnabled = PU::cccmSingleModeAvail(pu, LM_CHROMA_IDX);
+  }
+  else if (intraDir == MDLM_L_IDX)
+  {
+    isCCCMEnabled = PU::isLeftCccmMode(pu, MDLM_L_IDX);
+  }
+  else if (intraDir == MDLM_T_IDX)
+  {
+    isCCCMEnabled = PU::isTopCccmMode(pu, MDLM_T_IDX);
+  }
+#if MMLM
+  else if (intraDir == MMLM_CHROMA_IDX)
+  {
+    isCCCMEnabled = PU::cccmMultiModeAvail(pu, MMLM_CHROMA_IDX);
+  }
+  else if (intraDir == MMLM_L_IDX)
+  {
+    isCCCMEnabled = PU::cccmMultiModeAvail(pu, MMLM_L_IDX);
+  }
+  else if (intraDir == MMLM_T_IDX)
+  {
+    isCCCMEnabled = PU::cccmMultiModeAvail(pu, MMLM_T_IDX);
+  }
+#endif
+
+  if (isCCCMEnabled)
+#else
   if ( PU::cccmSingleModeAvail(pu, intraDir) || PU::cccmMultiModeAvail(pu, intraDir) )
+#endif
   {
     pu.cccmFlag = m_BinDecoder.decodeBin( Ctx::CccmFlag( 0 ) );
+#if JVET_AB0143_CCCM_TS
+    if (pu.cccmFlag)
+    {
+#if MMLM
+      pu.cccmFlag = (intraDir == MDLM_T_IDX || intraDir == MMLM_T_IDX) ? 3 : (intraDir == MDLM_L_IDX || intraDir == MMLM_L_IDX) ? 2 : 1;
+#else
+      pu.cccmFlag = (intraDir == MDLM_T_IDX) ? 3 : (intraDir == MDLM_L_IDX) ? 2 : 1;
+#endif
+    }
+#endif
   }
 }
 #endif
