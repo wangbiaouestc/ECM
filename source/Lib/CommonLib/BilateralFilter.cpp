@@ -620,8 +620,8 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
   
   uint32_t   uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t   uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
-  
-  int iWidthExtSIMD = uiWidthExt;
+    
+  int iWidthExtSIMD = uiWidthExt | 0x04;  
   if( uiWidth < 8 )
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -868,8 +868,8 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
 
         uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
         uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
-
-        int iWidthExtSIMD = uiWidthExt;
+        
+        int iWidthExtSIMD = uiWidthExt | 0x04;
         if (uiWidth < 8)
         {
           iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -1135,7 +1135,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
     uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
     uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-    int iWidthExtSIMD = uiWidthExt;
+    int iWidthExtSIMD = uiWidthExt | 0x04;
     if (uiWidth < 8)
     {
       iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -1395,7 +1395,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
   uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-  int iWidthExtSIMD = uiWidthExt;
+  int iWidthExtSIMD = uiWidthExt | 0x04;
   if (uiWidth < 8)
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -1660,7 +1660,7 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
         uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
         uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-        int iWidthExtSIMD = uiWidthExt;
+        int iWidthExtSIMD = uiWidthExt | 0x04;
         if (uiWidth < 8)
         {
           iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -1901,7 +1901,7 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
     uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
     uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-    int iWidthExtSIMD = uiWidthExt;
+    int iWidthExtSIMD = uiWidthExt | 0x04;
     if (uiWidth < 8)
     {
       iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -2139,7 +2139,7 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
   uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-  int iWidthExtSIMD = uiWidthExt;
+  int iWidthExtSIMD = uiWidthExt | 0x04;
   if (uiWidth < 8)
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -2735,7 +2735,7 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5Chroma(PelBuf& resiBuf, const 
   uint32_t  uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t  uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-  int iWidthExtSIMD = uiWidthExt;
+  int iWidthExtSIMD = uiWidthExt | 0x04;
   if( uiWidth < 8 )
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -3219,7 +3219,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
         uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
         uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-        int iWidthExtSIMD = uiWidthExt;
+        int iWidthExtSIMD = uiWidthExt | 0x04;
         if (uiWidth < 8)
         {
           iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -3473,7 +3473,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
     uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
     uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-    int iWidthExtSIMD = uiWidthExt;
+    int iWidthExtSIMD = uiWidthExt | 0x04;
     if (uiWidth < 8)
     {
       iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -3721,7 +3721,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
   uint32_t uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-  int iWidthExtSIMD = uiWidthExt;
+  int iWidthExtSIMD = uiWidthExt | 0x04;
   if (uiWidth < 8)
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -4025,7 +4025,7 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
         uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
         uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-        int iWidthExtSIMD = uiWidthExt;
+        int iWidthExtSIMD = uiWidthExt | 0x04;
         if (uiWidth < 8)
         {
           iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -4278,7 +4278,7 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
     uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
     uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-    int iWidthExtSIMD = uiWidthExt;
+    int iWidthExtSIMD = uiWidthExt | 0x04;
     if (uiWidth < 8)
     {
       iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -4525,7 +4525,7 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
   uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-  int iWidthExtSIMD = uiWidthExt;
+  int iWidthExtSIMD = uiWidthExt | 0x04;
   if (uiWidth < 8)
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
