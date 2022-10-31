@@ -486,6 +486,10 @@ namespace PU
   void getCccmRefLineNum  (const PredictionUnit& pu, const Area area, int& th, int& tv);
   bool cccmSingleModeAvail(const PredictionUnit& pu, int intraMode);
   bool cccmMultiModeAvail (const PredictionUnit& pu, int intraMode);
+#if JVET_AB0143_CCCM_TS
+  bool isLeftCccmMode(const PredictionUnit& pu, int intraMode);
+  bool isTopCccmMode(const PredictionUnit& pu, int intraMode);
+#endif
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   bool hasChromaFusionFlag(const PredictionUnit &pu, int intraMode);
