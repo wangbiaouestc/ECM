@@ -69,10 +69,6 @@ enum PLTScanMode
 class SortingElement
 {
 public:
-  inline bool operator<(const SortingElement &other) const
-  {
-    return cnt > other.cnt;
-  }
   SortingElement() {
     cnt[0] = cnt[1] = cnt[2] = cnt[3] = 0;
     shift[0] = shift[1] = shift[2] = 0;
@@ -409,6 +405,9 @@ private:
 
   PelStorage      m_tmpStorageLCU;
   PelStorage      m_colorTransResiBuf;
+#if JVET_AB0143_CCCM_TS
+  PelStorage      m_cccmStorage[6];
+#endif
 protected:
   // interface to option
   EncCfg*         m_pcEncCfg;
@@ -517,7 +516,11 @@ protected:
   void xSelectAMTForFullRD(TransformUnit &tu);
   bool testISPforCurrCU(const CodingUnit &cu);
 #endif
-  ChromaCbfs xRecurIntraChromaCodingQT( CodingStructure &cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE,                          const PartSplit ispType = TU_NO_ISP );
+  ChromaCbfs xRecurIntraChromaCodingQT( CodingStructure &cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE,                          const PartSplit ispType = TU_NO_ISP 
+#if JVET_AB0143_CCCM_TS
+    , PelUnitBuf cccmStorage = UnitBuf<      Pel>()
+#endif
+  );
   bool       xRecurIntraCodingLumaQT  ( CodingStructure &cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE, const int subTuIdx = -1, const PartSplit ispType = TU_NO_ISP, const bool ispIsCurrentWinner = false, bool mtsCheckRangeFlag = false, int mtsFirstCheckId = 0, int mtsLastCheckId = 0, bool moreProbMTSIdxFirst = false );
   bool       xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner& pm, bool mtsCheckRangeFlag = false, int mtsFirstCheckId = 0, int mtsLastCheckId = 0, bool moreProbMTSIdxFirst = false);
   bool       xIntraCodingLumaISP      ( CodingStructure& cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE );

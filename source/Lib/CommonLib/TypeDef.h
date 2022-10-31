@@ -136,7 +136,12 @@
 #define JVET_Z0050_DIMD_CHROMA_FUSION                     1 // JVET-Z0050: DIMD chroma mode and fusion of chroma intra prediction modes
 #define JVET_Z0050_CCLM_SLOPE                             1 // JVET-Z0050: CCLM with slope adjustments
 #define JVET_AA0057_CCCM                                  1 // JVET-AA0057: Convolutional cross-component model (CCCM)
+#if JVET_AA0057_CCCM
+#define JVET_AB0143_CCCM_TS                               1 // JVET-AB0143: CCCM template selection
+#endif
 #define JVET_AA0126_GLM                                   1 // JVET-AA0126: Gradient linear model
+#define JVET_AB0061_ITMP_BV_FOR_IBC                       1 // JVET-AB0061: Storing IntraTMP BV for IBC BV prediction
+
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -192,9 +197,11 @@
 #define JVET_AA0146_WRAP_AROUND_FIX                       1 // JVET-AA0146: bugfix&cleanup for wrap around motion compensation
 #define JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION          1 // JVET-AA0107 Regression based affine merge candidate derivation
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#define JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX              1 // Overflow fix
 #define JVET_AA0128_AFFINE_MERGE_CTX_INC                  1 // JVET-AA0128 test b: Increased number of CABAC contexts of affine merge index
 #endif
 #define JVET_AA0096_MC_BOUNDARY_PADDING                   1 // JVET-AA0096: motion compensated picture boundary padding
+#define JVET_AB0078_AMVPMERGE_LDB                         1 // JVET-AB0078: enabling AmvpMerge for low delay picture
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
@@ -260,6 +267,7 @@
 #define JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY           1 // JVET-Z0105: Enable virtual boundary processing for in-loop filters
 #define JVET_AA0095_ALF_LONGER_FILTER                     1 // JVET-AA0095: Longer luma filter shape 
 #define JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF           1 // JVET-AA0095: Using samples before deblocking filter for ALF
+#define JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS     1 // JVET-AB0184: Extended Fixed-Filter-Output based Taps for ALF
 
 // SIMD optimizations
 #if IF_12TAP

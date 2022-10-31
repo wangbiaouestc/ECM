@@ -438,22 +438,29 @@ void Picture::finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHead
   picHeader->setPPSId( pps.getPPSId() );
 
 #if JVET_Z0118_GDR
-  setCleanDirty(false);
-
-  picHeader->setPic(this);
-
-  PicHeader *ph = new PicHeader;
-  ph->initPicHeader();
-  *ph = *picHeader;
-  ph->setPic(this);
-  
-  if (cs->picHeader)
+  if (cs->isGdrEnabled())
   {
-    delete cs->picHeader;
-    cs->picHeader = nullptr;
-  }
+    setCleanDirty(false);
 
-  cs->picHeader = ph;
+    picHeader->setPic(this);
+
+    PicHeader *ph = new PicHeader;
+    ph->initPicHeader();
+    *ph = *picHeader;
+    ph->setPic(this);
+
+    if (cs->picHeader)
+    {
+      delete cs->picHeader;
+      cs->picHeader = nullptr;
+    }
+
+    cs->picHeader = ph;
+  }
+  else
+  {
+    cs->picHeader = picHeader;
+  }
 #else
   cs->picHeader = picHeader;
 #endif

@@ -171,6 +171,7 @@ private:
 #endif
 
 #if JVET_AA0057_CCCM
+  Area m_cccmBlkArea;
   Area m_cccmRefArea;
   Pel* m_cccmLumaBuf;
 #endif
@@ -310,12 +311,12 @@ public:
   void   predIntraCCCM            (const PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, int intraDir);
   void   xCccmCalcModels          (const PredictionUnit& pu, CccmModel &cccmModelCb, CccmModel &cccmModelCr, int modelId, int modelThr) const;
   void   xCccmApplyModel          (const PredictionUnit& pu, const ComponentID compId, CccmModel &cccmModel, int modelId, int modelThr, PelBuf &piPred) const;
-  void   xCccmCreateLumaRef       (const PredictionUnit& pu);
+  void   xCccmCreateLumaRef       (const PredictionUnit& pu, CompArea chromaArea);
   PelBuf xCccmGetLumaRefBuf       (const PredictionUnit& pu, int &areaWidth, int &areaHeight, int &refSizeX, int &refSizeY, int &refPosPicX, int &refPosPicY) const;
   PelBuf xCccmGetLumaPuBuf        (const PredictionUnit& pu) const;
   Pel    xCccmGetLumaVal          (const PredictionUnit& pu, const CPelBuf pi, const int x, const int y) const;
   int    xCccmCalcRefAver         (const PredictionUnit& pu) const;
-  void   xCccmCalcRefArea         (const PredictionUnit& pu);
+  void   xCccmCalcRefArea         (const PredictionUnit& pu, CompArea chromaArea);
 #endif
 #if ENABLE_DIMD
   static void deriveDimdMode      (const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu);
@@ -433,6 +434,9 @@ public:
   void candidateSearchIntra          ( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
 #endif
   bool generateTMPrediction          ( Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int& foundCandiNum );
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  bool generateTMPrediction          (Pel *piPred, unsigned int uiStride, int &foundCandiNum, PredictionUnit &pu);
+#endif
 #if JVET_W0069_TMP_BOUNDARY
   bool generateTmDcPrediction        ( Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val );
   void getTargetTemplate             ( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType );

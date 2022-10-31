@@ -2354,9 +2354,51 @@ void CABACReader::cccmFlag(PredictionUnit& pu)
 {
   const unsigned intraDir = pu.intraDir[1];
   
+#if JVET_AB0143_CCCM_TS
+  bool isCCCMEnabled = false;
+  if (intraDir == LM_CHROMA_IDX)
+  {
+    isCCCMEnabled = PU::cccmSingleModeAvail(pu, LM_CHROMA_IDX);
+  }
+  else if (intraDir == MDLM_L_IDX)
+  {
+    isCCCMEnabled = PU::isLeftCccmMode(pu, MDLM_L_IDX);
+  }
+  else if (intraDir == MDLM_T_IDX)
+  {
+    isCCCMEnabled = PU::isTopCccmMode(pu, MDLM_T_IDX);
+  }
+#if MMLM
+  else if (intraDir == MMLM_CHROMA_IDX)
+  {
+    isCCCMEnabled = PU::cccmMultiModeAvail(pu, MMLM_CHROMA_IDX);
+  }
+  else if (intraDir == MMLM_L_IDX)
+  {
+    isCCCMEnabled = PU::cccmMultiModeAvail(pu, MMLM_L_IDX);
+  }
+  else if (intraDir == MMLM_T_IDX)
+  {
+    isCCCMEnabled = PU::cccmMultiModeAvail(pu, MMLM_T_IDX);
+  }
+#endif
+
+  if (isCCCMEnabled)
+#else
   if ( PU::cccmSingleModeAvail(pu, intraDir) || PU::cccmMultiModeAvail(pu, intraDir) )
+#endif
   {
     pu.cccmFlag = m_BinDecoder.decodeBin( Ctx::CccmFlag( 0 ) );
+#if JVET_AB0143_CCCM_TS
+    if (pu.cccmFlag)
+    {
+#if MMLM
+      pu.cccmFlag = (intraDir == MDLM_T_IDX || intraDir == MMLM_T_IDX) ? 3 : (intraDir == MDLM_L_IDX || intraDir == MMLM_L_IDX) ? 2 : 1;
+#else
+      pu.cccmFlag = (intraDir == MDLM_T_IDX) ? 3 : (intraDir == MDLM_L_IDX) ? 2 : 1;
+#endif
+    }
+#endif
   }
 }
 #endif
@@ -5708,34 +5750,7 @@ void CABACReader::residual_coding( TransformUnit& tu, ComponentID compID, CUCtx&
 
 #if SIGN_PREDICTION
   CoeffBuf signBuff = tu.getCoeffSigns(compID);
-  uint32_t uiWidth  = tu.blocks[compID].width;
-  uint32_t uiHeight = tu.blocks[compID].height;
-
-  //if (sps.getNumPredSigns() > 0 && uiHeight >= 4 && uiWidth >= 4)
-  if ( tu.cs->sps->getNumPredSigns() > 0  && uiHeight >= 4 && uiWidth >= 4)
-  {
-    TCoeff *signs = signBuff.buf;
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-    uint32_t spArea = tu.cs->sps->getSignPredArea();
-    uint32_t spWidth = std::min(uiWidth, spArea);
-    uint32_t spHeight = std::min(uiHeight, spArea);
-    CHECK(TrQuant::SIGN_PRED_BYPASS, "SIGN_PRED_BYPASS should be equal to 0");
-    for (uint32_t y = 0; y < spHeight; y++)
-#else
-    for (uint32_t y = 0; y < SIGN_PRED_FREQ_RANGE; y++)
-#endif
-    {
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-      memset(signs, 0, sizeof(TCoeff) * spWidth);
-#else
-      signs[0] = TrQuant::SIGN_PRED_BYPASS;
-      signs[1] = TrQuant::SIGN_PRED_BYPASS;
-      signs[2] = TrQuant::SIGN_PRED_BYPASS;
-      signs[3] = TrQuant::SIGN_PRED_BYPASS;
-#endif
-      signs += signBuff.stride;
-    }
-  }
+  tu.initSignBuffers( compID );
 #endif
 
   // parse subblocks

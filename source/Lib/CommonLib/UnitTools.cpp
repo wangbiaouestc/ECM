@@ -1546,10 +1546,8 @@ bool PU::isDMChromaMIP(const PredictionUnit &pu)
 }
 
 #if JVET_AA0057_CCCM
-void PU::getCccmRefLineNum(const PredictionUnit& pu, int& th, int& tv)
+void PU::getCccmRefLineNum(const PredictionUnit& pu, const Area area, int& th, int& tv)
 {
-  const Area area = pu.blocks[COMPONENT_Cb];
-  
   th = area.x < CCCM_WINDOW_SIZE ? area.x : CCCM_WINDOW_SIZE;
   tv = area.y < CCCM_WINDOW_SIZE ? area.y : CCCM_WINDOW_SIZE;
 
@@ -1581,7 +1579,11 @@ bool PU::cccmMultiModeAvail(const PredictionUnit& pu, int intraMode)
 {
 #if MMLM
   const Area area = pu.blocks[COMPONENT_Cb];
+#if JVET_AB0143_CCCM_TS
+  bool modeIsOk   = (intraMode == MMLM_CHROMA_IDX) || (intraMode == MMLM_L_IDX) || (intraMode == MMLM_T_IDX);
+#else
   bool modeIsOk   = intraMode == MMLM_CHROMA_IDX;
+#endif
   modeIsOk        = modeIsOk && ( area.width * area.height >= CCCM_MIN_PU_SIZE );
 #if CCLM_LATENCY_RESTRICTION_RMV
   modeIsOk       &= pu.cs->sps->getUseLMChroma();
@@ -1590,13 +1592,74 @@ bool PU::cccmMultiModeAvail(const PredictionUnit& pu, int intraMode)
 #endif
 
   int th, tv;
-  PU::getCccmRefLineNum(pu, th, tv);
+  PU::getCccmRefLineNum(pu, area, th, tv);
+#if JVET_AB0143_CCCM_TS
+  int nsamples;
+  bool nSampleCheck;
+  if (intraMode == MMLM_CHROMA_IDX)
+  {
+    nsamples = ((area.width + th) * (area.height + tv) - (area.area()));
+    nSampleCheck = (nsamples >= 64);
+  }
+  else if (intraMode == MMLM_L_IDX)
+  {
+    nsamples = th * area.height;
+    nSampleCheck = (nsamples >= 16) && area.x && area.y;
+  }
+  else
+  {
+    nsamples = tv * area.width;
+    nSampleCheck = (nsamples >= 16) && area.x && area.y;
+  }
+  return modeIsOk && nSampleCheck;
+#else
   const int nsamples = ((area.width + th) * (area.height + tv) - (area.area()));
   return modeIsOk && nsamples >= 128;
+#endif
 #else
   return false;
 #endif
 }
+
+#if JVET_AB0143_CCCM_TS
+bool PU::isLeftCccmMode(const PredictionUnit& pu, int intraMode)
+{
+  const Area area = pu.blocks[COMPONENT_Cb];
+  bool modeIsOk = (intraMode == MDLM_L_IDX);
+  modeIsOk = modeIsOk && (area.width * area.height >= CCCM_MIN_PU_SIZE);
+#if CCLM_LATENCY_RESTRICTION_RMV
+  modeIsOk &= pu.cs->sps->getUseLMChroma();
+#else
+  modeIsOk &= pu.cs->sps->getUseLMChroma() && pu.cu->checkCCLMAllowed();
+#endif
+
+  int th, tv;
+  PU::getCccmRefLineNum(pu, area, th, tv);
+  const int nsamples = th * area.height;
+  modeIsOk = modeIsOk && (nsamples >= 16);
+
+  return modeIsOk && area.x && area.y;
+}
+
+bool PU::isTopCccmMode(const PredictionUnit& pu, int intraMode)
+{
+  const Area area = pu.blocks[COMPONENT_Cb];
+  bool modeIsOk = (intraMode == MDLM_T_IDX);
+  modeIsOk = modeIsOk && (area.width * area.height >= CCCM_MIN_PU_SIZE);
+#if CCLM_LATENCY_RESTRICTION_RMV
+  modeIsOk &= pu.cs->sps->getUseLMChroma();
+#else
+  modeIsOk &= pu.cs->sps->getUseLMChroma() && pu.cu->checkCCLMAllowed();
+#endif
+
+  int th, tv;
+  PU::getCccmRefLineNum(pu, area, th, tv);
+  const int nsamples = tv * area.width;
+  modeIsOk = modeIsOk && (nsamples >= 16);
+
+  return modeIsOk && area.x && area.y;
+}
+#endif
 #endif
 
 #if JVET_Z0050_DIMD_CHROMA_FUSION
@@ -2277,7 +2340,11 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
   //left
   const PredictionUnit* puLeft = cs.getPURestricted(posLB.offset(-1, 0), pu, pu.chType);
   bool isGt4x4 = pu.lwidth() * pu.lheight() > 16;
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  const bool isAvailableA1 = puLeft && pu.cu != puLeft->cu && (CU::isIBC(*puLeft->cu) || puLeft->cu->tmpFlag);
+#else
   const bool isAvailableA1 = puLeft && pu.cu != puLeft->cu && CU::isIBC(*puLeft->cu);
+#endif
   if (isGt4x4 && isAvailableA1)
   {
     miLeft = puLeft->getMotionInfo(posLB.offset(-1, 0));
@@ -2327,7 +2394,11 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 
   // above
   const PredictionUnit *puAbove = cs.getPURestricted(posRT.offset(0, -1), pu, pu.chType);
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  bool isAvailableB1 = puAbove && pu.cu != puAbove->cu && (CU::isIBC(*puAbove->cu) || puAbove->cu->tmpFlag);
+#else
   bool isAvailableB1 = puAbove && pu.cu != puAbove->cu && CU::isIBC(*puAbove->cu);
+#endif
   if (isGt4x4 && isAvailableB1)
   {
     miAbove = puAbove->getMotionInfo(posRT.offset(0, -1));
@@ -2387,7 +2458,11 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #if JVET_Y0058_IBC_LIST_MODIFY
   // above right
   const PredictionUnit *puAboveRight = cs.getPURestricted(posRT.offset(1, -1), pu, pu.chType);
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  bool isAvailableB0 = puAboveRight && pu.cu != puAboveRight->cu && (CU::isIBC(*puAboveRight->cu) || puAboveRight->cu->tmpFlag);
+#else
   bool isAvailableB0 = puAboveRight && pu.cu != puAboveRight->cu && CU::isIBC(*puAboveRight->cu);
+#endif
   if (isGt4x4 && isAvailableB0)
   {
     miAboveRight = puAboveRight->getMotionInfo(posRT.offset(1, -1));
@@ -2442,7 +2517,11 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 
   //left bottom
   const PredictionUnit *puLeftBottom = cs.getPURestricted(posLB.offset(-1, 1), pu, pu.chType);
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  bool isAvailableA0 = puLeftBottom && pu.cu != puLeftBottom->cu && (CU::isIBC(*puLeftBottom->cu) || puLeftBottom->cu->tmpFlag);
+#else
   bool isAvailableA0 = puLeftBottom && pu.cu != puLeftBottom->cu && CU::isIBC(*puLeftBottom->cu);
+#endif
   if (isGt4x4 && isAvailableA0)
   {
     miBelowLeft = puLeftBottom->getMotionInfo(posLB.offset(-1, 1));
@@ -2506,7 +2585,11 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #endif
   {
     const PredictionUnit *puAboveLeft = cs.getPURestricted(posLT.offset(-1, -1), pu, pu.chType);
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+    bool isAvailableB2 = puAboveLeft && pu.cu != puAboveLeft->cu && (CU::isIBC(*puAboveLeft->cu) || puAboveLeft->cu->tmpFlag);
+#else
     bool isAvailableB2 = puAboveLeft && pu.cu != puAboveLeft->cu && CU::isIBC(*puAboveLeft->cu);
+#endif
     if (isGt4x4 && isAvailableB2)
     {
       miAboveLeft = puAboveLeft->getMotionInfo(posLT.offset(-1, -1));
@@ -4585,7 +4668,13 @@ void computeDeltaAndShiftAddi(const Position posLT, Mv firstMv, std::vector<RMVF
 {
   g_pelBufOP.computeDeltaAndShiftAddi(posLT, firstMv, mvpInfoVecOri, mvpInfoVecRes);
 }
-void buildRegressionMatrix(std::vector<RMVFInfo> &mvpInfoVecOri, int sumbb[2][3][3], int sumeb[2][3], uint16_t addedSize)
+void buildRegressionMatrix(std::vector<RMVFInfo> &mvpInfoVecOri, 
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+  int64_t sumbb[2][3][3], int64_t sumeb[2][3],
+#else
+  int sumbb[2][3][3], int sumeb[2][3],
+#endif
+  uint16_t addedSize)
 {
   g_pelBufOP.buildRegressionMatrix(mvpInfoVecOri, sumbb, sumeb, addedSize);
 }
@@ -4678,21 +4767,42 @@ int64_t divideRMVF(int64_t numer, int64_t denom) // out = numer/denom
   int64_t a2s = (denom >> iScaleShiftA2) > iMaxVal ? iMaxVal : (denom >> iScaleShiftA2);
   int64_t a1s = (numer >> iScaleShiftA1);
 
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+  uint64_t aI64 = ((uint64_t)a1s * (uint64_t)g_rmvfMultApproxTbl[a2s]) >> iScaleShiftA;
+  aI64 = aI64 > INT64_MAX ? INT64_MAX : aI64;
+  d = (signA1 + signA2 == 1) ? -(int64_t)aI64 : (int64_t)aI64;
+#else
   int64_t aI64 = (a1s * (int64_t)g_rmvfMultApproxTbl[a2s]) >> iScaleShiftA;
 
   d = (signA1 + signA2 == 1) ? -aI64 : aI64;
+#endif
 
   return d;
 }
-
-void PU::xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[2][4], int sumbbfinal[2][3][3], int sumebfinal[2][3], uint16_t addedSize)
+void PU::xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[2][4],
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+  int64_t sumbbfinal[2][3][3], int64_t sumebfinal[2][3],
+#else
+  int sumbbfinal[2][3][3], int sumebfinal[2][3],
+#endif
+  uint16_t addedSize)
 {
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+  int shift = 0;
+#else
   int shift = 1;
+#endif
   int iNum = int(mvpInfoVec.size());
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+  int shiftDets = 0;
+  int64_t sumbb[2][3][3];
+  int64_t sumeb[2][3];
+#else
   int shiftDets = 5 * (getRMVFMSB(iNum) - 4);
   if (shiftDets < 0) shiftDets = 0;
   int sumbb[2][3][3];
   int sumeb[2][3];
+#endif
   int64_t m[3][3]; // parameter=det(md)/det(m)
   int64_t md[3][3];
   ////////////////// Extract statistics: Start
@@ -4720,16 +4830,29 @@ void PU::xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[
   {
     for (int d = 0; d < 3; d++)
     {
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+      sumeb[c][d] = divideRMVF(sumebfinal[c][d], iNum);
+#else
       sumeb[c][d] = sumebfinal[c][d] >> shift;
+#endif
     }
     for (int d1 = 0; d1 < 3; d1++)
     {
       for (int d = 0; d < 3; d++)
       {
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+        sumbb[c][d1][d] = divideRMVF(sumbbfinal[c][d1][d], iNum);
+#else
         sumbb[c][d1][d] = sumbbfinal[c][d1][d] >> shift;
+#endif
       }
     }
   }
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+  sumbb[0][2][2] = 1;
+  sumbb[1][2][2] = 1;
+  iNum = 1;
+#endif
   ////////////////// Extract statistics: End
   ////////////////// Extract Weight: Start
   for (int i = 0; i < 3; i++)
@@ -4898,8 +5021,13 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
 
     //-- Model with Linear Regression
     //-- Calculate RMVF parameters:
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+    int64_t sumbb[2][3][3];
+    int64_t sumeb[2][3];
+#else
     int sumbb[2][3][3];
     int sumeb[2][3];
+#endif
 
     xCalcRMVFParameters(mvpInfoVec[eRefPicList], parametersRMVF, sumbb, sumeb, 0);
 
@@ -11823,8 +11951,13 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
   {
     MotionInfo mi;
 
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+    mi.isInter  = !CU::isIntra(*pu.cu) || pu.cu->tmpFlag;
+    mi.isIBCmot = CU::isIBC(*pu.cu) || pu.cu->tmpFlag;
+#else
     mi.isInter = !CU::isIntra(*pu.cu);
     mi.isIBCmot = CU::isIBC(*pu.cu);
+#endif
     mi.sliceIdx = pu.cu->slice->getIndependentSliceIdx();
 #if INTER_LIC
     mi.usesLIC = pu.cu->LICFlag;

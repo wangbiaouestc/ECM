@@ -620,8 +620,8 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
   
   uint32_t   uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t   uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
-  
-  int iWidthExtSIMD = uiWidthExt;
+    
+  int iWidthExtSIMD = uiWidthExt | 0x04;  
   if( uiWidth < 8 )
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -868,8 +868,8 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
 
         uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
         uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
-
-        int iWidthExtSIMD = uiWidthExt;
+        
+        int iWidthExtSIMD = uiWidthExt | 0x04;
         if (uiWidth < 8)
         {
           iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -1135,7 +1135,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
     uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
     uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-    int iWidthExtSIMD = uiWidthExt;
+    int iWidthExtSIMD = uiWidthExt | 0x04;
     if (uiWidth < 8)
     {
       iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -1395,7 +1395,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
   uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-  int iWidthExtSIMD = uiWidthExt;
+  int iWidthExtSIMD = uiWidthExt | 0x04;
   if (uiWidth < 8)
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -1660,7 +1660,7 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
         uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
         uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-        int iWidthExtSIMD = uiWidthExt;
+        int iWidthExtSIMD = uiWidthExt | 0x04;
         if (uiWidth < 8)
         {
           iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -1901,7 +1901,7 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
     uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
     uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-    int iWidthExtSIMD = uiWidthExt;
+    int iWidthExtSIMD = uiWidthExt | 0x04;
     if (uiWidth < 8)
     {
       iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -2139,7 +2139,7 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
   uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-  int iWidthExtSIMD = uiWidthExt;
+  int iWidthExtSIMD = uiWidthExt | 0x04;
   if (uiWidth < 8)
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -2425,17 +2425,17 @@ bool BilateralFilter::isCrossedByVirtualBoundaries(const CodingStructure &cs, co
   {
     for (int i = 0; i < picHeader->getNumHorVirtualBoundaries(); i++)
     {
-      if (picHeader->getVirtualBoundariesPosY(i) == yPos - 2 || picHeader->getVirtualBoundariesPosY(i) == yPos - 1
-          || picHeader->getVirtualBoundariesPosY(i) == yPos)
+      int vy = picHeader->getVirtualBoundariesPosY(i);
+
+      if (yPos - NUMBER_PADDED_SAMPLES <= vy && vy <= yPos)
       {
         clipTop = true;
       }
-      else if (yPos + height + 2 >= picHeader->getVirtualBoundariesPosY(i))
+      else if (yPos + height - 1 <= vy && vy <= yPos + height + NUMBER_PADDED_SAMPLES)
       {
         clipBottom = true;
       }
-      else if (yPos - 2 < picHeader->getVirtualBoundariesPosY(i)
-               && picHeader->getVirtualBoundariesPosY(i) < yPos + height + 2)
+      else if (yPos < vy && vy < yPos + height - 1)
       {
         horVirBndryPos[numHorVirBndry++] = picHeader->getVirtualBoundariesPosY(i);
       }
@@ -2443,22 +2443,23 @@ bool BilateralFilter::isCrossedByVirtualBoundaries(const CodingStructure &cs, co
 
     for (int i = 0; i < picHeader->getNumVerVirtualBoundaries(); i++)
     {
-      if (picHeader->getVirtualBoundariesPosX(i) == xPos - 2 || picHeader->getVirtualBoundariesPosX(i) == xPos - 1
-          || picHeader->getVirtualBoundariesPosX(i) == xPos)
+      int vx = picHeader->getVirtualBoundariesPosX(i);
+
+      if (xPos - NUMBER_PADDED_SAMPLES <= vx && vx <= xPos)
       {
         clipLeft = true;
       }
-      else if (xPos + width + 2 >= picHeader->getVirtualBoundariesPosX(i))
+      else if (xPos + width - 1 <= vx && vx <= xPos + width + NUMBER_PADDED_SAMPLES)
       {
         clipRight = true;
       }
-      else if (xPos - 2 < picHeader->getVirtualBoundariesPosX(i)
-               && picHeader->getVirtualBoundariesPosX(i) < xPos + width + 2)
+      else if (xPos < vx && vx <xPos + width - 1)
       {
         verVirBndryPos[numVerVirBndry++] = picHeader->getVirtualBoundariesPosX(i);
       }
     }
   }
+
   if (!isEncoderRDO)
   {
     const Slice &     slice   = *(cs.slice);
@@ -2734,7 +2735,7 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5Chroma(PelBuf& resiBuf, const 
   uint32_t  uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t  uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-  int iWidthExtSIMD = uiWidthExt;
+  int iWidthExtSIMD = uiWidthExt | 0x04;
   if( uiWidth < 8 )
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -3218,7 +3219,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
         uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
         uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-        int iWidthExtSIMD = uiWidthExt;
+        int iWidthExtSIMD = uiWidthExt | 0x04;
         if (uiWidth < 8)
         {
           iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -3472,7 +3473,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
     uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
     uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-    int iWidthExtSIMD = uiWidthExt;
+    int iWidthExtSIMD = uiWidthExt | 0x04;
     if (uiWidth < 8)
     {
       iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -3720,7 +3721,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
   uint32_t uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-  int iWidthExtSIMD = uiWidthExt;
+  int iWidthExtSIMD = uiWidthExt | 0x04;
   if (uiWidth < 8)
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -4024,7 +4025,7 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
         uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
         uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-        int iWidthExtSIMD = uiWidthExt;
+        int iWidthExtSIMD = uiWidthExt | 0x04;
         if (uiWidth < 8)
         {
           iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -4277,7 +4278,7 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
     uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
     uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-    int iWidthExtSIMD = uiWidthExt;
+    int iWidthExtSIMD = uiWidthExt | 0x04;
     if (uiWidth < 8)
     {
       iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
@@ -4524,7 +4525,7 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
   uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-  int iWidthExtSIMD = uiWidthExt;
+  int iWidthExtSIMD = uiWidthExt | 0x04;
   if (uiWidth < 8)
   {
     iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);

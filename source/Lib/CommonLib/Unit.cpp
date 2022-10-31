@@ -1422,3 +1422,42 @@ bool TransformUnit::checkLFNSTApplied(ComponentID compID)
 #endif
 int          TransformUnit::getChromaAdj()                     const { return m_chromaResScaleInv; }
 void         TransformUnit::setChromaAdj(int i)                      { m_chromaResScaleInv = i;    }
+
+#if SIGN_PREDICTION
+void TransformUnit::initSignBuffers( const ComponentID compID )
+{  
+  uint32_t uiWidth = blocks[compID].width;
+  uint32_t uiHeight = blocks[compID].height;
+
+  if( cs->sps->getNumPredSigns() > 0 && uiHeight >= 4 && uiWidth >= 4 )
+  {
+    CoeffBuf signBuff = getCoeffSigns( compID );
+    TCoeff *coeff = signBuff.buf;
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    IdxBuf signScanIdxBuff = getCoeffSignsScanIdx( compID );
+    uint32_t spArea = std::max( cs->sps->getSignPredArea(), SIGN_PRED_FREQ_RANGE );
+    unsigned int *coeffIdx = signScanIdxBuff.buf;
+    uint32_t spWidth = std::min( uiWidth, spArea );
+    uint32_t spHeight = std::min( uiHeight, spArea );
+    CHECK( TrQuant::SIGN_PRED_BYPASS, "SIGN_PRED_BYPASS should be equal to 0" );
+
+    for( uint32_t y = 0; y < spHeight; y++ )
+#else
+    for( uint32_t y = 0; y < SIGN_PRED_FREQ_RANGE; y++ )
+#endif
+    {
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+      memset( coeff, 0, sizeof( TCoeff ) * spWidth );
+      memset( coeffIdx, MAX_UINT, sizeof( unsigned int ) * spWidth );
+      coeffIdx += signScanIdxBuff.stride;
+#else
+      coeff[0] = TrQuant::SIGN_PRED_BYPASS;
+      coeff[1] = TrQuant::SIGN_PRED_BYPASS;
+      coeff[2] = TrQuant::SIGN_PRED_BYPASS;
+      coeff[3] = TrQuant::SIGN_PRED_BYPASS;
+#endif
+      coeff += signBuff.stride;
+    }
+  }
+}
+#endif

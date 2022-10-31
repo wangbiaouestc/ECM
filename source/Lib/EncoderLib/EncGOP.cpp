@@ -2179,7 +2179,11 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     }
     pcSlice->setTLayer(m_pcCfg->getGOPEntry(iGOPid).m_temporalId);
 #if JVET_Z0118_GDR
-    if (m_pcCfg->getGdrEnabled() && pocCurr >= m_pcCfg->getGdrPocStart() && ((pocCurr - m_pcCfg->getGdrPocStart()) % m_pcCfg->getGdrPeriod() == 0))
+    if (m_pcCfg->getGdrEnabled() && pocCurr >= m_pcCfg->getGdrPocStart())
+    {
+      pcSlice->setSliceType(B_SLICE);
+    }
+    else if (m_pcCfg->getGdrEnabled() && (pocCurr != 0) && (pocCurr < m_pcCfg->getGdrPocStart()))
     {
       pcSlice->setSliceType(B_SLICE);
     }
@@ -2817,7 +2821,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     }
 
 #if JVET_Y0128_NON_CTC
-#if JVET_Z0118_GDR // seuhong: scaleRefPicList
+#if JVET_Z0118_GDR // scaleRefPicList
     bool  bDisableTMVP;
     if (pcPic->cs->isGdrEnabled())
     {
@@ -4241,6 +4245,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     m_pcFrameMcPadPrediction->init(m_pcEncLib->getRdCost(), pcSlice->getSPS()->getChromaFormatIdc(),
                                    pcSlice->getSPS()->getMaxCUHeight(), NULL, pcPic->getPicWidthInLumaSamples());
     m_pcFrameMcPadPrediction->mcFramePad(pcPic, *(pcPic->slices[0]));
+    m_pcFrameMcPadPrediction->destroy();
 #endif
   } // iGOPid-loop
 
@@ -5799,6 +5804,11 @@ NalUnitType EncGOP::getNalUnitType(int pocCurr, int lastIDR, bool isField)
   {
     return NAL_UNIT_CODED_SLICE_GDR;
   }
+  else if (m_pcCfg->getGdrEnabled() && (pocCurr != 0) && (pocCurr < m_pcCfg->getGdrPocStart()))
+  {
+    return NAL_UNIT_CODED_SLICE_TRAIL;
+  }
+
   else
   {
     return NAL_UNIT_CODED_SLICE_TRAIL;

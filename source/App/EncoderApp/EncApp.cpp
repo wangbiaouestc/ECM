@@ -1362,11 +1362,11 @@ void EncApp::xCreateLib( std::list<PelUnitBuf*>& recBufList, const int layerId )
     if (isY4mFileExt(reconFileName))
     {
 #if JVET_AA0146_WRAP_AROUND_FIX
-      m_cVideoIOYuvReconFile.setOutputY4mInfo(m_sourceWidth, m_sourceHeight, m_iFrameRate, 1, m_internalBitDepth[0],
-                                              m_chromaFormatIDC);
+      m_cVideoIOYuvReconFile.setOutputY4mInfo(m_sourceWidth - m_confWinLeft - m_confWinRight, m_sourceHeight - m_confWinTop - m_confWinBottom,
+        m_iFrameRate, 1, m_internalBitDepth[0], m_chromaFormatIDC);
 #else
-      m_cVideoIOYuvReconFile.setOutputY4mInfo(m_iSourceWidth, m_iSourceHeight, m_iFrameRate, 1, m_internalBitDepth[0],
-                                              m_chromaFormatIDC);
+      m_cVideoIOYuvReconFile.setOutputY4mInfo(m_iSourceWidth - m_confWinLeft - m_confWinRight, m_iSourceHeight - m_confWinTop - m_confWinBottom, 
+        m_iFrameRate, 1, m_internalBitDepth[0], m_chromaFormatIDC);
 #endif
     }
 #endif
