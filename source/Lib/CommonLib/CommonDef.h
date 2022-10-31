@@ -300,18 +300,30 @@ static const int MAX_NUM_ALF_CLASSES         =                     25;
 #if ALF_IMPROVEMENT
 static const int MAX_NUM_ALF_ALTERNATIVES_LUMA = 4;
 static const int EXT_LENGTH = 2;
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+static const int ALF_PADDING_SIZE_FIXED_RESULTS  =                  2;
+static const int NUM_FIXED_BASED_COEFF       =                      7;
+#endif
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
 static const int NUM_DB                      =                      3;
 static const int NUM_DB_SAMPLE               =                      5;
 static const int NUM_DB_PAD                  =                      1;
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF;
+#else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB;
+#endif
 #if JVET_AA0095_ALF_LONGER_FILTER
 static const int MAX_ALF_FILTER_LENGTH       =                     13;
 #else
 static const int MAX_ALF_FILTER_LENGTH       =                      9;
 #endif
 #else
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_FIXED_BASED_COEFF;
+#else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH;
+#endif
 static const int MAX_ALF_FILTER_LENGTH       =                      9;
 #endif
 static const int MAX_NUM_ALF_CHROMA_COEFF    =                     21;
