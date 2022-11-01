@@ -7162,6 +7162,73 @@ int IntraPrediction::calcTemplateDiff( Pel* ref, unsigned int uiStride, Pel** ta
 #endif
 
 #if JVET_AA0057_CCCM
+
+#if JVET_AB0174_CCCM_DIV_FREE
+#define DIV_PREC_BITS       14
+#define DIV_PREC_BITS_POW2  8
+#define DIV_SLOT_BITS       3
+#define DIV_INTR_BITS      (DIV_PREC_BITS - DIV_SLOT_BITS)
+#define DIV_INTR_ROUND     (1 << DIV_INTR_BITS >> 1)
+
+int64_t xDivide(int64_t num, int64_t denom) // Note: assumes positive denominator
+{
+  static const int pow2W[8] = {   214,   153,   113,    86,    67,    53,    43,    35  }; // DIV_PREC_BITS_POW2
+  static const int pow2O[8] = {  4822,  5952,  6624,  6792,  6408,  5424,  3792,  1466  }; // DIV_PREC_BITS
+  static const int pow2B[8] = { 12784, 12054, 11670, 11583, 11764, 12195, 12870, 13782  }; // DIV_PREC_BITS
+
+  int shift     = floorLog2_uint64(denom);
+  int round     = 1 << shift >> 1;
+  int normDiff  = (((denom << DIV_PREC_BITS) + round) >> shift) & ((1 << DIV_PREC_BITS) - 1);
+  int diffFull  = normDiff >> DIV_INTR_BITS;
+  int normDiff2 = normDiff - pow2O[diffFull];
+
+  int scale     = ((pow2W[diffFull] * ((normDiff2 * normDiff2) >> DIV_PREC_BITS)) >> DIV_PREC_BITS_POW2) - (normDiff2 >> 1) + pow2B[diffFull];
+
+  return ( (num << (CCCM_DECIM_BITS - DIV_PREC_BITS)) * scale + round) >> shift;
+}
+
+#undef DIV_PREC_BITS
+#undef DIV_PREC_BITS_POW2
+#undef DIV_SLOT_BITS
+#undef DIV_INTR_BITS
+#undef DIV_INTR_ROUND
+
+int xCccmDivideLowPrec(int64_t num, int64_t denom)
+{
+  if ( num < 0 )
+  {
+    return -int(xDivide(-num, denom) >> CCCM_DECIM_BITS);
+  }
+  else
+  {
+    return int(xDivide(num, denom) >> CCCM_DECIM_BITS);
+  }
+}
+
+int64_t xCccmDivide(int64_t num, int64_t denom) // Note: assumes positive denominator
+{
+  return xDivide(num, denom);
+}
+
+void IntraPrediction::xCccmSetLumaRefValue( const PredictionUnit& pu )
+{
+  int lumaPosX = m_cccmBlkArea.x << getComponentScaleX(COMPONENT_Cb, pu.cu->chromaFormat);
+  int lumaPosY = m_cccmBlkArea.y << getComponentScaleY(COMPONENT_Cb, pu.cu->chromaFormat);
+  
+  if ( lumaPosX || lumaPosY )
+  {
+    lumaPosX = lumaPosX ? lumaPosX - 1 : 0;
+    lumaPosY = lumaPosY ? lumaPosY - 1 : 0;
+    
+    m_cccmLumaOffset = pu.cs->picture->getRecoBuf(COMPONENT_Y).at( lumaPosX, lumaPosY );
+  }
+  else
+  {
+    m_cccmLumaOffset = 1 << ( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - 1 );
+  }
+}
+#endif
+
 void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr, int intraDir )
 {
   if ( pu.cccmFlag )
@@ -7242,6 +7309,20 @@ void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel &cccmM
   int sampleNum = 0;
   int sampleInd = 0;
   
+#if JVET_AB0174_CCCM_DIV_FREE
+  int chromaOffsetCb = 1 << ( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - 1 );
+  int chromaOffsetCr = 1 << ( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - 1 );
+  
+  if ( refSizeX || refSizeY )
+  {
+    int refPosX = refSizeX > 0 ? refSizeX - 1 : 0;
+    int refPosY = refSizeY > 0 ? refSizeY - 1 : 0;
+    
+    chromaOffsetCb = recoCb.at(refPosPicX + refPosX, refPosPicY + refPosY);
+    chromaOffsetCr = recoCr.at(refPosPicX + refPosX, refPosPicY + refPosY);
+  }
+#endif
+
   // Collect reference data to input matrix A and target vector Y
   static Pel A[CCCM_NUM_PARAMS][CCCM_MAX_REF_SAMPLES];
   static Pel YCb[CCCM_MAX_REF_SAMPLES];
@@ -7362,6 +7443,15 @@ void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel &cccmM
     }
   }
 
+#if JVET_AB0174_CCCM_DIV_FREE
+  // Remove chromaOffset from stats to update cross-correlation
+  for (int coli = 0; coli < M; coli++)
+  {
+    ATYCb[coli] = ATYCb[coli] - ((ATA[coli][M - 1] * chromaOffsetCb) >> (cccmModelCb.bd - 1));
+    ATYCr[coli] = ATYCr[coli] - ((ATA[coli][M - 1] * chromaOffsetCr) >> (cccmModelCr.bd - 1));
+  }
+#endif
+
   // Scale the matrix and vector to selected dynamic range
   int matrixShift = CCCM_MATRIX_BITS - 2 * pu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA) - ceilLog2(sampleNum);
 
@@ -7417,6 +7507,12 @@ void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel &cccmM
   
   cccmSolver.ldlSolve(U, diag, ATYCb, cccmModelCb.params, M, decompOk);
   cccmSolver.ldlSolve(U, diag, ATYCr, cccmModelCr.params, M, decompOk);
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  // Add the chroma offset to bias term (after shifting up by CCCM_DECIM_BITS and down by cccmModelCb.bd - 1)
+  cccmModelCb.params[M-1] += chromaOffsetCb << (CCCM_DECIM_BITS - (cccmModelCb.bd - 1));
+  cccmModelCr.params[M-1] += chromaOffsetCr << (CCCM_DECIM_BITS - (cccmModelCr.bd - 1));
+#endif
 }
 
 // Calculate a single downsampled luma reference value (copied from IntraPrediction::xGetLumaRecPixels)
@@ -7462,7 +7558,12 @@ Pel IntraPrediction::xCccmGetLumaVal(const PredictionUnit& pu, const CPelBuf pi,
     s += piSrc[2 * x +       1 + iRecStride * (y * 2 + 1)       ];
     ypval = s >> 3;
   }
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  return ypval - m_cccmLumaOffset; // Note: this could have also been included in the rounding offset s to avoid the extra sample based operation
+#else
   return ypval;
+#endif
 }
 
 // Using the same availability checking as in IntraPrediction::xFillReferenceSamples
@@ -7615,7 +7716,11 @@ int IntraPrediction::xCccmCalcRefAver(const PredictionUnit& pu) const
   }
 #endif
 
+#if JVET_AB0174_CCCM_DIV_FREE
+  return numSamples == 0 ? 512 : xCccmDivideLowPrec(sumSamples, numSamples);
+#else
   return numSamples == 0 ? 512 : ( sumSamples + numSamples/2) / numSamples;
+#endif
 }
 
 void IntraPrediction::xCccmCreateLumaRef(const PredictionUnit& pu, CompArea chromaArea)
@@ -7633,6 +7738,10 @@ void IntraPrediction::xCccmCreateLumaRef(const PredictionUnit& pu, CompArea chro
   int puBorderX = refSizeX + m_cccmBlkArea.width;
   int puBorderY = refSizeY + m_cccmBlkArea.height;
   
+#if JVET_AB0174_CCCM_DIV_FREE
+  xCccmSetLumaRefValue( pu );
+#endif
+
   // Generate down-sampled luma for the area covering both the PU and the top/left reference areas (+ top and left paddings)
   for (int y = -CCCM_FILTER_PADDING; y < areaHeight; y++)
   {
@@ -7817,7 +7926,11 @@ bool CccmCovarianceInt::ldlDecomp(TE A, TE U, Ty diag, int numEq) const
         scale         -= FIXED_MULT(tmp, diag[k]);
       }
 
+#if JVET_AB0174_CCCM_DIV_FREE
+      U[i][j] = xCccmDivide(scale, diag[i]);
+#else
       U[i][j] = FIXED_DIV(scale, diag[i]);
+#endif
     }
   }
 
@@ -7887,7 +8000,11 @@ void CccmCovarianceInt::ldlSolve(TE U, Ty diag, TCccmCoeff* y, TCccmCoeff* x, in
     // The equation is now D*U*x = aux, remove diagonal by scaling
     for (int i = 0; i < numEq; i++)
     {
+#if JVET_AB0174_CCCM_DIV_FREE
+      aux[i] = xCccmDivide(aux[i], diag[i]);
+#else
       aux[i] = FIXED_DIV(aux[i], diag[i]);
+#endif
     }
     
     // The equation is now U*x = aux, solve it for x (filter coefficients)

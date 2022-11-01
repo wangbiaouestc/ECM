@@ -913,8 +913,13 @@ static const int CCCM_MIN_PU_SIZE         = 0; // Set to 0 for no size restricti
 static const int CCCM_REF_LINES_ABOVE_CTU = 0; // Number of chroma lines allowed to be included in the reference area above the CTU (0: no restrictions)
 static const int CCCM_FILTER_PADDING      = 1; // E.g. 3x3 filter needs one padded sample
 static const int CCCM_MAX_REF_SAMPLES     = ( 2 * CCCM_WINDOW_SIZE * ( 2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE ) );
+#if JVET_AB0174_CCCM_DIV_FREE
+static const int CCCM_MATRIX_BITS         = 22;
+static const int CCCM_DECIM_BITS          = 16;
+#else
 static const int CCCM_MATRIX_BITS         = 28;
 static const int CCCM_DECIM_BITS          = 22;
+#endif
 static const int CCCM_DECIM_ROUND         = ( 1 << (CCCM_DECIM_BITS - 1 ) );
 #endif
 
