@@ -704,6 +704,9 @@ static const int PROF_BORDER_EXT_H            =                     1;
 static const int BCW_NUM =                                          5; ///< the number of weight options
 static const int BCW_DEFAULT =                                      ((uint8_t)(BCW_NUM >> 1)); ///< Default weighting index representing for w=0.5
 static const int BCW_SIZE_CONSTRAINT =                            256; ///< disabling Bcw if cu size is smaller than 256
+#if JVET_AB0079_TM_BCW_MRG
+static const int BCW_MRG_NUM =                                      7;
+#endif
 #if NON_ADJACENT_MRG_CAND
 static const int MAX_NUM_HMVP_CANDS =                              5; ///< maximum number of HMVP candidates to be stored and used in merge list
 #else

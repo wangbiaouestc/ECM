@@ -3774,7 +3774,13 @@ public:
 };
 const int8_t g_BcwLog2WeightBase = 3;
 const int8_t g_BcwWeightBase = (1 << g_BcwLog2WeightBase);
+#if JVET_AB0079_TM_BCW_MRG
+const int8_t g_BcwWeights[BCW_NUM] = { 1, 3, 4, 5, 7 };
+const int8_t g_BcwMrgWeights[BCW_MRG_NUM] = { 1, 3, 4, 5, 7, 2, 6 };
+      int8_t g_BcwMrgParsingOrder[BCW_MRG_NUM];
+#else
 const int8_t g_BcwWeights[BCW_NUM] = { -2, 3, 4, 5, 10 };
+#endif
 const int8_t g_BcwSearchOrder[BCW_NUM] = { BCW_DEFAULT, BCW_DEFAULT - 2, BCW_DEFAULT + 2, BCW_DEFAULT - 1, BCW_DEFAULT + 1 };
 int8_t g_BcwCodingOrder[BCW_NUM];
 int8_t g_BcwParsingOrder[BCW_NUM];
@@ -3783,7 +3789,11 @@ int8_t getBcwWeight(uint8_t bcwIdx, uint8_t uhRefFrmList)
 {
   // Weghts for the model: P0 + w * (P1 - P0) = (1-w) * P0 + w * P1
   // Retuning  1-w for P0 or w for P1
+#if JVET_AB0079_TM_BCW_MRG
+  return (uhRefFrmList == REF_PIC_LIST_0 ? g_BcwWeightBase - g_BcwMrgWeights[bcwIdx] : g_BcwMrgWeights[bcwIdx]);
+#else
   return (uhRefFrmList == REF_PIC_LIST_0 ? g_BcwWeightBase - g_BcwWeights[bcwIdx] : g_BcwWeights[bcwIdx]);
+#endif
 }
 
 void resetBcwCodingOrder(bool bRunDecoding, const CodingStructure &cs)
@@ -3795,7 +3805,16 @@ void resetBcwCodingOrder(bool bRunDecoding, const CodingStructure &cs)
     g_BcwParsingOrder[2 * i - 1] = BCW_DEFAULT + (int8_t)i;
     g_BcwParsingOrder[2 * i] = BCW_DEFAULT - (int8_t)i;
   }
-
+#if JVET_AB0079_TM_BCW_MRG
+  for (int i = 0; i < BCW_NUM; i++)
+  {
+    g_BcwMrgParsingOrder[i] = g_BcwParsingOrder[i];
+  }
+  for (int i = BCW_NUM; i < BCW_MRG_NUM; i++)
+  {
+    g_BcwMrgParsingOrder[i] = i;
+  }
+#endif
   // Form encoding order
   if (!bRunDecoding)
   {

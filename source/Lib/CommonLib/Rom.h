@@ -283,6 +283,10 @@ extern const int8_t g_BcwWeights[BCW_NUM];
 extern const int8_t g_BcwSearchOrder[BCW_NUM];
 extern       int8_t g_BcwCodingOrder[BCW_NUM];
 extern       int8_t g_BcwParsingOrder[BCW_NUM];
+#if JVET_AB0079_TM_BCW_MRG
+extern const int8_t g_BcwMrgWeights[BCW_MRG_NUM];
+extern       int8_t g_BcwMrgParsingOrder[BCW_MRG_NUM];
+#endif
 
 class CodingStructure;
 int8_t getBcwWeight(uint8_t bcwIdx, uint8_t uhRefFrmList);
