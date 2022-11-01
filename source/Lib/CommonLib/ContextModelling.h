@@ -659,6 +659,9 @@ public:
 
   MergeCtx     *mrgCtx;
   MergeType     mergeType[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#if JVET_AB0112_AFFINE_DMVR
+  bool          xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
+#endif
 };
 #else
 class AffineMergeCtx
@@ -679,6 +682,9 @@ public:
 
   MergeCtx     *mrgCtx;
   MergeType     mergeType[AFFINE_MRG_MAX_NUM_CANDS];
+#if JVET_AB0112_AFFINE_DMVR
+  bool          xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
+#endif
 };
 #endif
 

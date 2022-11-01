@@ -336,6 +336,9 @@ private:
 #else
   Mv                    m_mvBufBDMVR4TM[(TM_MRG_MAX_NUM_CANDS << 1)][MAX_NUM_SUBCU_DMVR];
 #endif
+#if JVET_AB0112_AFFINE_DMVR
+  Mv                    m_mvBufBDMVR4AFFINE[(AFFINE_MRG_MAX_NUM_CANDS << 1)][MAX_NUM_SUBCU_DMVR];
+#endif
 #endif
   Mv                    m_mvBufEncBDOF[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
   Mv                    m_mvBufEncBDOF4TM[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];

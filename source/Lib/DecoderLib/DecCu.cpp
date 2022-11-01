@@ -51,7 +51,6 @@
 #include "CommonLib/ChromaFormat.h"
 #include "CommonLib/dtrace_blockstatistics.h"
 #endif
-
 //! \ingroup DecoderLib
 //! \{
 
@@ -1927,21 +1926,38 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           }
           else
           {
-          for( int i = 0; i < 2; ++i )
-          {
-            if( pu.cs->slice->getNumRefIdx( RefPicList( i ) ) > 0 )
+            for (int i = 0; i < 2; ++i)
             {
-              MvField* mvField = affineMergeCtx.mvFieldNeighbours[(pu.mergeIdx << 1) + i];
-              pu.mvpIdx[i] = 0;
-              pu.mvpNum[i] = 0;
-              pu.mvd[i]    = Mv();
-              pu.refIdx[i] = mvField[0].refIdx;
-              pu.mvAffi[i][0] = mvField[0].mv;
-              pu.mvAffi[i][1] = mvField[1].mv;
-              pu.mvAffi[i][2] = mvField[2].mv;
+              if (pu.cs->slice->getNumRefIdx(RefPicList(i)) > 0)
+              {
+                MvField* mvField = affineMergeCtx.mvFieldNeighbours[(pu.mergeIdx << 1) + i];
+                pu.mvpIdx[i] = 0;
+                pu.mvpNum[i] = 0;
+                pu.mvd[i] = Mv();
+                pu.refIdx[i] = mvField[0].refIdx;
+                pu.mvAffi[i][0] = mvField[0].mv;
+                pu.mvAffi[i][1] = mvField[1].mv;
+                pu.mvAffi[i][2] = mvField[2].mv;
+              }
             }
           }
-        }
+#if JVET_AB0112_AFFINE_DMVR
+          if (!pu.afMmvdFlag&&pu.mergeType != MRG_TYPE_SUBPU_ATMVP && PU::checkBDMVRCondition(pu))
+          {
+            m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
+            pu.bdmvrRefine = false;
+            if (!affineMergeCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu)))
+            {
+              m_pcInterPred->processBDMVR4Affine(pu);
+              pu.mvAffi[0][0] += m_mvBufBDMVR[0][0];
+              pu.mvAffi[0][1] += m_mvBufBDMVR[0][0];
+              pu.mvAffi[0][2] += m_mvBufBDMVR[0][0];
+              pu.mvAffi[1][0] += m_mvBufBDMVR[1][0];
+              pu.mvAffi[1][1] += m_mvBufBDMVR[1][0];
+              pu.mvAffi[1][2] += m_mvBufBDMVR[1][0];
+            }
+          }
+#endif
           PU::spanMotionInfo( pu, mrgCtx );
         }
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
