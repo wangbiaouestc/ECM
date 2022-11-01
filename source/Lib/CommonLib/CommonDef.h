@@ -852,6 +852,10 @@ static const int    BDMVR_CENTER_POSITION = BDMVR_INTME_RANGE * BDMVR_BUF_STRIDE
 static const int    BM_MRG_MAX_NUM_CANDS = 6; ///< maximum number of BM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
 static const int    BM_MRG_SUB_PU_INT_MAX_SRCH_ROUND = 3;
 #endif
+#if JVET_AB0112_AFFINE_DMVR
+static const int    AFFINE_DMVR_MAX_NUM_ITERATIONS = 26;
+static const int    AFFINE_DMVR_SEARCH_RANGE = 3;
+#endif
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
 static const int    DECODER_SIDE_MV_WEIGHT =                        4; ///< lambda for decoder-side derived MVs
