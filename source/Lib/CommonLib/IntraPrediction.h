@@ -95,7 +95,9 @@ typedef short TrainDataType;
 typedef int64_t TCccmCoeff;
 
 #define FIXED_MULT(x, y) TCccmCoeff((int64_t(x)*(y) + CCCM_DECIM_ROUND) >> CCCM_DECIM_BITS )
+#if !JVET_AB0174_CCCM_DIV_FREE
 #define FIXED_DIV(x, y)  TCccmCoeff((int64_t(x)    << CCCM_DECIM_BITS ) / (y) )
+#endif
 
 struct CccmModel
 {
@@ -174,6 +176,9 @@ private:
   Area m_cccmBlkArea;
   Area m_cccmRefArea;
   Pel* m_cccmLumaBuf;
+#if JVET_AB0174_CCCM_DIV_FREE
+  int  m_cccmLumaOffset;
+#endif
 #endif
   
   static const uint8_t m_aucIntraFilter[MAX_INTRA_FILTER_DEPTHS];
@@ -317,6 +322,9 @@ public:
   Pel    xCccmGetLumaVal          (const PredictionUnit& pu, const CPelBuf pi, const int x, const int y) const;
   int    xCccmCalcRefAver         (const PredictionUnit& pu) const;
   void   xCccmCalcRefArea         (const PredictionUnit& pu, CompArea chromaArea);
+#if JVET_AB0174_CCCM_DIV_FREE
+  void   xCccmSetLumaRefValue     (const PredictionUnit& pu);
+#endif
 #endif
 #if ENABLE_DIMD
   static void deriveDimdMode      (const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu);
