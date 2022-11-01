@@ -704,6 +704,9 @@ static const int PROF_BORDER_EXT_H            =                     1;
 static const int BCW_NUM =                                          5; ///< the number of weight options
 static const int BCW_DEFAULT =                                      ((uint8_t)(BCW_NUM >> 1)); ///< Default weighting index representing for w=0.5
 static const int BCW_SIZE_CONSTRAINT =                            256; ///< disabling Bcw if cu size is smaller than 256
+#if JVET_AB0079_TM_BCW_MRG
+static const int BCW_MRG_NUM =                                      7;
+#endif
 #if NON_ADJACENT_MRG_CAND
 static const int MAX_NUM_HMVP_CANDS =                              5; ///< maximum number of HMVP candidates to be stored and used in merge list
 #else
@@ -851,6 +854,10 @@ static const int    BDMVR_BUF_STRIDE = MAX_CU_SIZE + (BDMVR_INTME_RANGE << 1) + 
 static const int    BDMVR_CENTER_POSITION = BDMVR_INTME_RANGE * BDMVR_BUF_STRIDE + BDMVR_INTME_RANGE;
 static const int    BM_MRG_MAX_NUM_CANDS = 6; ///< maximum number of BM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
 static const int    BM_MRG_SUB_PU_INT_MAX_SRCH_ROUND = 3;
+#endif
+#if JVET_AB0112_AFFINE_DMVR
+static const int    AFFINE_DMVR_MAX_NUM_ITERATIONS = 26;
+static const int    AFFINE_DMVR_SEARCH_RANGE = 3;
 #endif
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR

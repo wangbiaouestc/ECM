@@ -6888,8 +6888,9 @@ bool PU::checkBDMVRCondition(const PredictionUnit& pu)
     const bool ref1IsScaled = refIdx1 < 0 || refIdx1 >= MAX_NUM_REF
       ? false
       : isResamplingPossible && pu.cu->slice->getRefPic( REF_PIC_LIST_1, refIdx1 )->isRefScaled( pu.cs->pps );
-
-#if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_AB0112_AFFINE_DMVR
+    return ((pu.mergeFlag && pu.mergeType == MRG_TYPE_DEFAULT_N && (!pu.cu->affine || !pu.afMmvdFlag)) || (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1])) && !pu.ciipFlag && !pu.mmvdMergeFlag
+#elif JVET_X0083_BM_AMVP_MERGE_MODE
     return ((pu.mergeFlag && pu.mergeType == MRG_TYPE_DEFAULT_N) || (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1])) && !pu.ciipFlag && !pu.cu->affine && !pu.mmvdMergeFlag
 #else
     return pu.mergeFlag && pu.mergeType == MRG_TYPE_DEFAULT_N && !pu.ciipFlag && !pu.cu->affine && !pu.mmvdMergeFlag

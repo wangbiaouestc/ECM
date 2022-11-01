@@ -51,7 +51,6 @@
 #include "CommonLib/ChromaFormat.h"
 #include "CommonLib/dtrace_blockstatistics.h"
 #endif
-
 //! \ingroup DecoderLib
 //! \{
 
@@ -1698,6 +1697,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         PU::getInterMMVDMergeCandidates(pu, mrgCtx,
           pu.mmvdMergeIdx
         );
+#if JVET_AB0079_TM_BCW_MRG
+        m_pcInterPred->adjustMergeCandidatesBcwIdx(pu, mrgCtx, fPosBaseIdx);
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
         uint32_t mmvdLUT[MMVD_ADD_NUM];
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
@@ -1924,21 +1926,38 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           }
           else
           {
-          for( int i = 0; i < 2; ++i )
-          {
-            if( pu.cs->slice->getNumRefIdx( RefPicList( i ) ) > 0 )
+            for (int i = 0; i < 2; ++i)
             {
-              MvField* mvField = affineMergeCtx.mvFieldNeighbours[(pu.mergeIdx << 1) + i];
-              pu.mvpIdx[i] = 0;
-              pu.mvpNum[i] = 0;
-              pu.mvd[i]    = Mv();
-              pu.refIdx[i] = mvField[0].refIdx;
-              pu.mvAffi[i][0] = mvField[0].mv;
-              pu.mvAffi[i][1] = mvField[1].mv;
-              pu.mvAffi[i][2] = mvField[2].mv;
+              if (pu.cs->slice->getNumRefIdx(RefPicList(i)) > 0)
+              {
+                MvField* mvField = affineMergeCtx.mvFieldNeighbours[(pu.mergeIdx << 1) + i];
+                pu.mvpIdx[i] = 0;
+                pu.mvpNum[i] = 0;
+                pu.mvd[i] = Mv();
+                pu.refIdx[i] = mvField[0].refIdx;
+                pu.mvAffi[i][0] = mvField[0].mv;
+                pu.mvAffi[i][1] = mvField[1].mv;
+                pu.mvAffi[i][2] = mvField[2].mv;
+              }
             }
           }
-        }
+#if JVET_AB0112_AFFINE_DMVR
+          if (!pu.afMmvdFlag&&pu.mergeType != MRG_TYPE_SUBPU_ATMVP && PU::checkBDMVRCondition(pu))
+          {
+            m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
+            pu.bdmvrRefine = false;
+            if (!affineMergeCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu)))
+            {
+              m_pcInterPred->processBDMVR4Affine(pu);
+              pu.mvAffi[0][0] += m_mvBufBDMVR[0][0];
+              pu.mvAffi[0][1] += m_mvBufBDMVR[0][0];
+              pu.mvAffi[0][2] += m_mvBufBDMVR[0][0];
+              pu.mvAffi[1][0] += m_mvBufBDMVR[1][0];
+              pu.mvAffi[1][1] += m_mvBufBDMVR[1][0];
+              pu.mvAffi[1][2] += m_mvBufBDMVR[1][0];
+            }
+          }
+#endif
           PU::spanMotionInfo( pu, mrgCtx );
         }
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
@@ -2191,12 +2210,25 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                     }
                     pu.bmDir = 0;
                     m_pcInterPred->adjustMergeCandidatesInOneCandidateGroup(pu, mrgCtx, bmDir == 2 ? applyBDMVR4BM : NULL, NULL, NULL, mergeIdx + 1, subPuRefineList, subPuRefineListTmp, mergeIdx);
+#if JVET_AB0079_TM_BCW_MRG
+                    m_pcInterPred->adjustMergeCandidatesBcwIdx(pu, mrgCtx, mergeIdx);
+#endif
                     pu.bmDir = bmDir;
                     pu.mergeIdx = orgMergeIdx;
                     mrgCtx.setMergeInfo( pu, pu.mergeIdx);
                     m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
                     m_pcInterPred->processBDMVRSubPU(pu, subPuRefineList[mergeIdx][pu.bmDir - 1]);
                   }
+#if JVET_AB0079_TM_BCW_MRG
+                  else
+                  {
+                    auto orgMergeIdx = pu.mergeIdx;
+                    pu.bmDir = 0;
+                    m_pcInterPred->adjustMergeCandidatesBcwIdx(pu, mrgCtx, mergeIdx);
+                    pu.bmDir = bmDir;
+                    pu.mergeIdx = orgMergeIdx;
+                  }
+#endif
 #if !JVET_AA0093_REFINED_MOTION_FOR_ARMC
                   else
 #endif
@@ -2258,6 +2290,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                     }
                     pu.bmDir = 0;
                     m_pcInterPred->adjustMergeCandidatesInOneCandidateGroup(pu, mrgCtx, bmDir == 2 ? applyBDMVR4BM : NULL, NULL, NULL, mergeIdx + 1, subPuRefineList, subPuRefineListTmp, mergeIdx);
+#if JVET_AB0079_TM_BCW_MRG
+                    m_pcInterPred->adjustMergeCandidatesBcwIdx(pu, mrgCtx, mergeIdx);
+#endif
                     pu.bmDir = bmDir;
                     pu.mergeIdx = orgMergeIdx;
                     mrgCtx.setMergeInfo( pu, pu.mergeIdx);
@@ -2267,7 +2302,18 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                 }
                 else
 #endif
+#if JVET_AB0079_TM_BCW_MRG
+                {
+#endif
                 m_pcInterPred->adjustInterMergeCandidates(pu, mrgCtx, mergeIdx);
+#if JVET_AB0079_TM_BCW_MRG
+                  auto orgMergeIdx = pu.mergeIdx;
+                  pu.bmDir = 0;
+                  m_pcInterPred->adjustMergeCandidatesBcwIdx(pu, mrgCtx, mergeIdx);
+                  pu.bmDir = bmDir;
+                  pu.mergeIdx = orgMergeIdx;
+                }
+#endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
                 }
 #endif
@@ -2432,9 +2478,15 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                   }
                   pu.reduceTplSize = false;
                   m_pcInterPred->adjustMergeCandidatesInOneCandidateGroup(pu, mrgCtx, applyBDMVR4TM, NULL, NULL, mrgCtx.numValidMergeCand);
+#if JVET_AB0079_TM_BCW_MRG
+                  m_pcInterPred->adjustMergeCandidatesBcwIdx(pu, mrgCtx, tmpPuMrgIdx);
+#endif
                   pu.mergeIdx = tmpPuMrgIdx;
                 }
                 else
+#endif
+#if JVET_AB0079_TM_BCW_MRG
+                {
 #endif
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
                 m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, 
@@ -2444,6 +2496,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                                                      pu.cs->sps->getMaxNumMergeCand());
 #else
                 m_pcInterPred->adjustMergeCandidatesInOneCandidateGroup(pu, mrgCtx, pu.mergeIdx + 1, pu.mergeIdx);
+#endif
+#if JVET_AB0079_TM_BCW_MRG
+                m_pcInterPred->adjustMergeCandidatesBcwIdx(pu, mrgCtx, pu.mergeIdx);
+                }
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
                 if (mrgCtx.numCandToTestEnc > mrgCtx.numValidMergeCand)
@@ -2541,11 +2597,21 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                 }
                 pu.reduceTplSize = false;
                 m_pcInterPred->adjustMergeCandidatesInOneCandidateGroup(pu, mrgCtx, applyBDMVR4TM, NULL, NULL, mrgCtx.numValidMergeCand);
+#if JVET_AB0079_TM_BCW_MRG
+                m_pcInterPred->adjustMergeCandidatesBcwIdx(pu, mrgCtx, tmpPuMrgIdx);
+#endif
                 pu.mergeIdx = tmpPuMrgIdx;
               }
               else
 #endif
+#if JVET_AB0079_TM_BCW_MRG
+              {
+#endif
               m_pcInterPred->adjustInterMergeCandidates(pu, mrgCtx, pu.mergeIdx);
+#if JVET_AB0079_TM_BCW_MRG
+              m_pcInterPred->adjustMergeCandidatesBcwIdx(pu, mrgCtx, pu.mergeIdx);
+              }
+#endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
               }
 #endif
