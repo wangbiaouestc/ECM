@@ -841,10 +841,17 @@ public:
 
 #if JVET_AA0096_MC_BOUNDARY_PADDING
   void mcFramePad(Picture *pcCurPic, Slice &slice);
+#if JVET_Z0118_GDR
+  void mcFramePadOneSide(Picture *pcCurPic, Slice &slice, PadDirection padDir, PelStorage *pPadBuffYUV,
+                         PredictionUnit *blkDataTmp, PelStorage *pPadYUVContainerDyn, const UnitArea blkUnitAreaBuff,
+                         PelStorage *pCurBuffYUV, PictureType pt);
+  void mcFramePadRepExt(Picture *pcCurPic, Slice &slice, PictureType pt);
+#else
   void mcFramePadOneSide(Picture *pcCurPic, Slice &slice, PadDirection padDir, PelStorage *pPadBuffYUV,
                          PredictionUnit *blkDataTmp, PelStorage *pPadYUVContainerDyn, const UnitArea blkUnitAreaBuff,
                          PelStorage *pCurBuffYUV);
   void mcFramePadRepExt(Picture *pcCurPic, Slice &slice);
+#endif
 #endif
 };
 

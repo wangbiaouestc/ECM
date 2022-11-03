@@ -10348,6 +10348,8 @@ void InterPrediction::xIntraBlockCopy(PredictionUnit &pu, PelUnitBuf &predBuf, c
 #if JVET_Z0153_IBC_EXT_REF
   refx = refx % (m_ibcBufferWidth  >> shiftSampleHor);
   refy = refy % (m_ibcBufferHeight >> shiftSampleVer);
+  refx += (refx < 0) ? (m_ibcBufferWidth  >> shiftSampleHor) : 0;
+  refy += (refy < 0) ? (m_ibcBufferHeight >> shiftSampleVer) : 0;
 #else
   refx &= ((m_ibcBufferWidth >> shiftSampleHor) - 1);
   refy &= ((1 << ctuSizeLog2Ver) - 1);
@@ -16839,6 +16841,25 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
     blkDataTmp.cu->cs      = pcCurPic->cs;
 
     // four directions MC padding
+#if JVET_Z0118_GDR
+    int numPt = pcCurPic->cs->isGdrEnabled() ? 2 : 1;    
+
+    for (int i = 0; i < numPt; i++)
+    {
+      PictureType pt = (i == 0) ? PIC_RECONSTRUCTION_0 : PIC_RECONSTRUCTION_1;
+      mcFramePadOneSide(pcCurPic, slice, PAD_TOP, pPadBuffYUV, &blkDataTmp, pPadYUVContainerDyn, blkUnitAreaBuff,
+        pCurBuffYUV, pt);
+      mcFramePadOneSide(pcCurPic, slice, PAD_BOTTEM, pPadBuffYUV, &blkDataTmp, pPadYUVContainerDyn, blkUnitAreaBuff,
+        pCurBuffYUV, pt);
+      mcFramePadOneSide(pcCurPic, slice, PAD_LEFT, pPadBuffYUV, &blkDataTmp, pPadYUVContainerDyn, blkUnitAreaBuff,
+        pCurBuffYUV, pt);
+      mcFramePadOneSide(pcCurPic, slice, PAD_RIGHT, pPadBuffYUV, &blkDataTmp, pPadYUVContainerDyn, blkUnitAreaBuff,
+        pCurBuffYUV, pt);
+
+      // repetitive padding for the extend padding area
+      mcFramePadRepExt(pcCurPic, slice, pt);
+    }
+#else
     mcFramePadOneSide(pcCurPic, slice, PAD_TOP, pPadBuffYUV, &blkDataTmp, pPadYUVContainerDyn, blkUnitAreaBuff,
                       pCurBuffYUV);
     mcFramePadOneSide(pcCurPic, slice, PAD_BOTTEM, pPadBuffYUV, &blkDataTmp, pPadYUVContainerDyn, blkUnitAreaBuff,
@@ -16850,6 +16871,7 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
 
     // repetitive padding for the extend padding area
     mcFramePadRepExt(pcCurPic, slice);
+#endif
 
     pPadBuffYUV->destroy();
     delete pPadBuffYUV;
@@ -16859,9 +16881,15 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
     delete pCurBuffYUV;
   }
 
+#if JVET_Z0118_GDR
+  void InterPrediction::mcFramePadOneSide(Picture *pcCurPic, Slice &slice, PadDirection padDir, PelStorage *pPadBuffYUV,
+                                          PredictionUnit *blkDataTmp, PelStorage *pPadYUVContainerDyn,
+                                          const UnitArea blkUnitAreaBuff, PelStorage *pCurBuffYUV, PictureType pt)
+#else
   void InterPrediction::mcFramePadOneSide(Picture *pcCurPic, Slice &slice, PadDirection padDir, PelStorage *pPadBuffYUV,
                                           PredictionUnit *blkDataTmp, PelStorage *pPadYUVContainerDyn,
                                           const UnitArea blkUnitAreaBuff, PelStorage *pCurBuffYUV)
+#endif
   {
     const int ctuSize        = slice.getSPS()->getMaxCUWidth();
     const int iWidthFrm = slice.getPPS()->getPicWidthInLumaSamples();
@@ -16873,6 +16901,27 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
     const int maxCtuIdx      = (padDir == PAD_TOP || padDir == PAD_BOTTEM) ? numCtuInWidth : numCtuInHeight;
 
     int maxCh = pcCurPic->chromaFormat == CHROMA_400 ? 0 : 2;
+
+#if JVET_Z0118_GDR        
+    if (pcCurPic->cs->isGdrEnabled() && pcCurPic->cs->isInGdrIntervalOrRecoveryPoc())
+    {
+      // switch recon based on picture type
+      pcCurPic->cs->setReconBuf(pt);
+
+      for (int rlist = REF_PIC_LIST_0; rlist < NUM_REF_PIC_LIST_01; rlist++)
+      {
+        int n = slice.getNumRefIdx((RefPicList)rlist);
+        for (int idx = 0; idx < n; idx++)
+        {
+          Picture *refPic = slice.getReferencePicture((RefPicList)rlist, idx);
+          if (refPic)
+          {
+            refPic->setCleanDirty((bool)pt);
+          }
+        }
+      }
+    }
+#endif
 
     for (int ctuIdx = 0; ctuIdx < maxCtuIdx; ctuIdx++)
     {
@@ -17079,10 +17128,17 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
             {
               const ComponentID ch = ComponentID(chan);
 
+#if JVET_Z0118_GDR
+              Pel *piTxtRec = pcCurPic->getBuf(ch, pt)
+                                .bufAt(subBlkMvPos.getX() >> getComponentScaleX(ComponentID(chan), CHROMA_420),
+                                       subBlkMvPos.getY() >> getComponentScaleY(ComponentID(chan), CHROMA_420));
+              const int iStrideRec = pcCurPic->getBuf(ch, pt).stride;
+#else
               Pel *piTxtRec = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION)
                                 .bufAt(subBlkMvPos.getX() >> getComponentScaleX(ComponentID(chan), CHROMA_420),
                                        subBlkMvPos.getY() >> getComponentScaleY(ComponentID(chan), CHROMA_420));
               const int iStrideRec = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).stride;
+#endif
 
               Pel *     piTxtBuff   = pCurBuffYUV->getBuf(blkUnitCurAreaBuff).bufs[ch].bufAt(0, 0);
               const int iStrideBuff = pCurBuffYUV->getBuf(blkUnitCurAreaBuff).bufs[ch].stride;
@@ -17178,9 +17234,15 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
             if (validPadSize == 0)
             {
               subBlkRepSrcPos = subBlkRepSrcPos.offset(subBlkPos.getX(), subBlkPos.getY());
+#if JVET_Z0118_GDR
+              piTxtSrc        = pcCurPic->getBuf(ch, pt)
+                           .bufAt(subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                  subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+#else
               piTxtSrc        = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION)
                            .bufAt(subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420),
                                   subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+#endif
             }
             else
             {
@@ -17209,9 +17271,15 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
             if (validPadSize == 0)
             {
               subBlkRepSrcPos = subBlkRepSrcPos.offset(subBlkPos.getX(), iHeightFrm);
+#if JVET_Z0118_GDR
+              piTxtSrc = pcCurPic->getBuf(ch, pt)
+                           .bufAt(subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                  (subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420)) - 1);
+#else
               piTxtSrc        = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION)
                            .bufAt(subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420),
                                   (subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420)) - 1);
+#endif
             }
             else
             {
@@ -17240,10 +17308,17 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
             if (validPadSize == 0)
             {
               subBlkRepSrcPos = subBlkRepSrcPos.offset(subBlkPos.getX(), subBlkPos.getY());
+#if JVET_Z0118_GDR
+              piTxtSrc = pcCurPic->getBuf(ch, pt)
+                           .bufAt(subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                  subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+              iStrideSrc = pcCurPic->getBuf(ch, pt).stride;
+#else
               piTxtSrc        = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION)
                            .bufAt(subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420),
                                   subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420));
               iStrideSrc = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).stride;
+#endif
             }
             else
             {
@@ -17277,10 +17352,17 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
             if (validPadSize == 0)
             {
               subBlkRepSrcPos = subBlkRepSrcPos.offset(iWidthFrm, subBlkPos.getY());
+#if JVET_Z0118_GDR
+              piTxtSrc        = pcCurPic->getBuf(ch, pt)
+                           .bufAt((subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420)) - 1,
+                                  subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+              iStrideSrc = pcCurPic->getBuf(ch, pt).stride;
+#else
               piTxtSrc        = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION)
                            .bufAt((subBlkRepSrcPos.getX() >> getComponentScaleX(ch, CHROMA_420)) - 1,
                                   subBlkRepSrcPos.getY() >> getComponentScaleY(ch, CHROMA_420));
               iStrideSrc = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).stride;
+#endif
             }
             else
             {
@@ -17307,10 +17389,17 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
       for (int chan = 0; chan <= maxCh; chan++)
       {
         const ComponentID ch       = ComponentID(chan);
+#if JVET_Z0118_GDR
+        Pel *             piTxtRec = pcCurPic->getBuf(ch, pt)
+                          .bufAt(ctuPos.getX() >> getComponentScaleX(ch, CHROMA_420),
+                                 ctuPos.getY() >> getComponentScaleY(ch, CHROMA_420));
+        const int iStrideRec  = pcCurPic->getBuf(ch, pt).stride;
+#else
         Pel *             piTxtRec = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION)
                           .bufAt(ctuPos.getX() >> getComponentScaleX(ch, CHROMA_420),
                                  ctuPos.getY() >> getComponentScaleY(ch, CHROMA_420));
         const int iStrideRec  = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).stride;
+#endif
         Pel *     piTxtBuff   = pPadBuffYUV->getBuf(blkUnitAreaBuff).bufs[ch].bufAt(0, 0);
         const int iStrideBuff = pPadBuffYUV->getBuf(blkUnitAreaBuff).bufs[ch].stride;
         int       iWidthBuff, iHeightBuff;
@@ -17353,14 +17442,23 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
     }
   }
 
+#if JVET_Z0118_GDR  
+  void InterPrediction::mcFramePadRepExt(Picture *pcCurPic, Slice &slice, PictureType pt)
+#else
   void InterPrediction::mcFramePadRepExt(Picture *pcCurPic, Slice &slice)
+#endif
   {
     int maxCh = pcCurPic->chromaFormat == CHROMA_400 ? 0 : 2;
     for (int chan = 0; chan <= maxCh; chan++)
     {
       const ComponentID ch         = ComponentID(chan);
+#if JVET_Z0118_GDR  
+      Pel *             piTxtRec = pcCurPic->getBuf(ch, pt).bufAt(0, 0);
+      const int         iStrideRec = pcCurPic->getBuf(ch, pt).stride;
+#else
       Pel *             piTxtRec   = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).bufAt(0, 0);
       const int         iStrideRec = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).stride;
+#endif
       const int iWidthFrm = slice.getPPS()->getPicWidthInLumaSamples() >> getComponentScaleX(ch, CHROMA_420);
       const int iHeightFrm = slice.getPPS()->getPicHeightInLumaSamples() >> getComponentScaleY(ch, CHROMA_420);
       int       ctuSize     = slice.getSPS()->getMaxCUWidth() >> getComponentScaleX(ch, CHROMA_420);
@@ -17384,7 +17482,11 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
 
       // Top
       Pel *piTxtRecSrc;
+#if JVET_Z0118_GDR  
+      piTxtRec = pcCurPic->getBuf(ch, pt).bufAt(0, 0);
+#else
       piTxtRec = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).bufAt(0, 0);
+#endif
       piTxtRec -= (ctuSize + extPadSizeX);
       piTxtRecSrc = piTxtRec;
       for (int idy = 0; idy < ctuSize; idy++)
@@ -17401,7 +17503,11 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
         memcpy(piTxtRec, piTxtRecSrc, sizeof(Pel) * (((ctuSize + extPadSizeX) << 1) + iWidthFrm));
       }
       // Bottem
+#if JVET_Z0118_GDR  
+      piTxtRec = pcCurPic->getBuf(ch, pt).bufAt(0, 0);
+#else
       piTxtRec = pcCurPic->getBuf(ch, PIC_RECONSTRUCTION).bufAt(0, 0);
+#endif
       piTxtRec -= (ctuSize + extPadSizeX);
       piTxtRec += (iHeightFrm - 1) * iStrideRec;
       piTxtRecSrc = piTxtRec;
