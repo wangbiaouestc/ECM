@@ -4669,7 +4669,7 @@ void computeDeltaAndShiftAddi(const Position posLT, Mv firstMv, std::vector<RMVF
   g_pelBufOP.computeDeltaAndShiftAddi(posLT, firstMv, mvpInfoVecOri, mvpInfoVecRes);
 }
 void buildRegressionMatrix(std::vector<RMVFInfo> &mvpInfoVecOri, 
-#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX || JVET_AB0189_RMVF_BITLENGTH_CONTROL
   int64_t sumbb[2][3][3], int64_t sumeb[2][3],
 #else
   int sumbb[2][3][3], int sumeb[2][3],
@@ -4678,6 +4678,7 @@ void buildRegressionMatrix(std::vector<RMVFInfo> &mvpInfoVecOri,
 {
   g_pelBufOP.buildRegressionMatrix(mvpInfoVecOri, sumbb, sumeb, addedSize);
 }
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
 int64_t det(int n, int64_t mat[3][3]) // n:the actual size of "mat"
 {
   int p[2] = { 1, -1 };
@@ -4711,7 +4712,7 @@ int64_t det(int n, int64_t mat[3][3]) // n:the actual size of "mat"
   }
   return d;
 }
-
+#endif
 static int getRMVFMSB(int64_t x)
 {
   int msb = 0, bits = (sizeof(int64_t) << 3);
@@ -4730,7 +4731,12 @@ static int getRMVFMSB(int64_t x)
   return msb;
 }
 
-int64_t divideRMVF(int64_t numer, int64_t denom) // out = numer/denom
+int64_t divideRMVF(int64_t numer, int64_t denom
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  , int scale
+  , bool isoffset
+#endif
+) // out = numer/denom
 {
   if (numer == 0 || denom == 1)
   {
@@ -4748,20 +4754,37 @@ int64_t divideRMVF(int64_t numer, int64_t denom) // out = numer/denom
 
   numer = (signA1) ? -numer : numer;
   denom = (signA2) ? -denom : denom;
-
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  if (isoffset)
+  {
+    denom = denom >> (3 * scale);
+    if (!denom)
+    {
+      return numer;
+    }
+  }
+#endif
   iScaleShiftA2 = getRMVFMSB(denom) - iShiftA2;
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
   iScaleShiftA1 = iScaleShiftA2 - 12;
 
   if (iScaleShiftA1 < 0)
   {
     iScaleShiftA1 = 0;
   }
+#endif
 
   if (iScaleShiftA2 < 0)
   {
     iScaleShiftA2 = 0;
   }
-
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  int numerBitlength = getRMVFMSB(abs(numer));
+  if (numerBitlength > 48)
+  {
+    iScaleShiftA1 = numerBitlength - 48;
+  }
+#endif
   int64_t iScaleShiftA = iScaleShiftA2 + iAccuracyShift - iScaleShiftA1;
 
   int64_t a2s = (denom >> iScaleShiftA2) > iMaxVal ? iMaxVal : (denom >> iScaleShiftA2);
@@ -4772,38 +4795,54 @@ int64_t divideRMVF(int64_t numer, int64_t denom) // out = numer/denom
   aI64 = aI64 > INT64_MAX ? INT64_MAX : aI64;
   d = (signA1 + signA2 == 1) ? -(int64_t)aI64 : (int64_t)aI64;
 #else
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  int64_t aI64 = (a1s * (int64_t)g_rmvfMultApproxTbl[a2s]) >> (iScaleShiftA - 8 < 0 ? 0 : iScaleShiftA - 8);
+#else
   int64_t aI64 = (a1s * (int64_t)g_rmvfMultApproxTbl[a2s]) >> iScaleShiftA;
+#endif
 
   d = (signA1 + signA2 == 1) ? -aI64 : aI64;
 #endif
-
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  return Clip3(int64_t(-RMVF_PARAM_THRED), int64_t(RMVF_PARAM_THRED - 1), d);
+#else
   return d;
+#endif
 }
 void PU::xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[2][4],
-#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX || JVET_AB0189_RMVF_BITLENGTH_CONTROL
   int64_t sumbbfinal[2][3][3], int64_t sumebfinal[2][3],
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  uint8_t shift,
+#endif
 #else
   int sumbbfinal[2][3][3], int sumebfinal[2][3],
 #endif
   uint16_t addedSize)
 {
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
 #if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
   int shift = 0;
 #else
   int shift = 1;
 #endif
+#endif
   int iNum = int(mvpInfoVec.size());
-#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX || JVET_AB0189_RMVF_BITLENGTH_CONTROL
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
   int shiftDets = 0;
+  int64_t m[3][3]; // parameter=det(md)/det(m)
+#endif
   int64_t sumbb[2][3][3];
   int64_t sumeb[2][3];
+  uint8_t initShift = 3 * shift;
+  uint8_t rightShift = 0;
 #else
   int shiftDets = 5 * (getRMVFMSB(iNum) - 4);
   if (shiftDets < 0) shiftDets = 0;
   int sumbb[2][3][3];
   int sumeb[2][3];
 #endif
-  int64_t m[3][3]; // parameter=det(md)/det(m)
   int64_t md[3][3];
   ////////////////// Extract statistics: Start
   //initialize values to zero
@@ -4833,7 +4872,11 @@ void PU::xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[
 #if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
       sumeb[c][d] = divideRMVF(sumebfinal[c][d], iNum);
 #else
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+      sumeb[c][d] = sumebfinal[c][d];
+#else
       sumeb[c][d] = sumebfinal[c][d] >> shift;
+#endif
 #endif
     }
     for (int d1 = 0; d1 < 3; d1++)
@@ -4843,7 +4886,11 @@ void PU::xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[
 #if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
         sumbb[c][d1][d] = divideRMVF(sumbbfinal[c][d1][d], iNum);
 #else
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+        sumbb[c][d1][d] = sumbbfinal[c][d1][d];
+#else
         sumbb[c][d1][d] = sumbbfinal[c][d1][d] >> shift;
+#endif
 #endif
       }
     }
@@ -4855,6 +4902,7 @@ void PU::xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[
 #endif
   ////////////////// Extract statistics: End
   ////////////////// Extract Weight: Start
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
   for (int i = 0; i < 3; i++)
   {
     for (int j = 0; j < 3; j++)
@@ -4862,9 +4910,17 @@ void PU::xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[
       m[i][j] = sumbb[0][i][j];
     }
   }
+#endif
   bool bBadMatrix = false;
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  int64_t det1 = 0;
+  int64_t det2 = (sumbb[0][2][0]) * ((sumbb[0][0][1] * sumbb[0][1][2] - sumbb[0][1][1] * sumbb[0][0][2]))
+    - (sumbb[0][2][1]) * ((sumbb[0][0][0] * sumbb[0][1][2] - sumbb[0][1][0] * sumbb[0][0][2]))
+    + (sumbb[0][2][2]) * ((sumbb[0][0][0] * sumbb[0][1][1] - sumbb[0][1][0] * sumbb[0][0][1]));
+#else
   int64_t det2 = det(3, m);
   det2 >>= shiftDets;
+#endif
   if (det2 == 0)
   {
     bBadMatrix = true;
@@ -4873,17 +4929,26 @@ void PU::xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[
   {
     // 1) find matrix parameters with cross-component model
     // Find w[c][d]
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
     int64_t dets[3];
+#endif
     if (!bBadMatrix)
     {
       for (int d = 0; d < 3; d++)
       {
         // Initialize md matrix
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+        rightShift = d == 2 ? initShift : 0;
+#endif
         for (int i = 0; i < 3; i++)
         {
           for (int j = 0; j < 3; j++)
           {
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+            md[i][j] = sumbb[0][i][j];
+#else
             md[i][j] = m[i][j];
+#endif
           }
         }
         // Replace coloumn D in md matrix
@@ -4891,18 +4956,27 @@ void PU::xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[
         {
           md[j][d] = sumeb[c][j];
         }
-
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+        det1 = (md[2][0]) * ((md[0][1] * md[1][2] - md[1][1] * md[0][2]) >> rightShift)
+          - (md[2][1]) * ((md[0][0] * md[1][2] - md[1][0] * md[0][2]) >> rightShift)
+          + (md[2][2]) * ((md[0][0] * md[1][1] - md[1][0] * md[0][1]) >> rightShift);
+        dMatrix[c][d] = det1;
+#else
         int64_t det1 = det(3, md);
         det1 >>= shiftDets;
-
         dets[d] = det1;
         dMatrix[c][d] = iNum * det1;
+#endif
 
         // calcualte offset
         if (d == 2)
         {
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+          dMatrix[c][3] = det2;
+#else
           dMatrix[c][2] = (det2 * sumeb[c][2] - dets[0] * sumbb[c][0][2] - dets[1] * sumbb[c][1][2]) << shift;
           dMatrix[c][3] = iNum * det2;
+#endif
         }
       } // for d
     }
@@ -4928,7 +5002,11 @@ void PU::xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[
         dMatrix[c][c] = iNum * det1;
         dMatrix[c][3] = iNum * det2;
       }
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+      dMatrix[c][2] = det2 * sumeb[c][2] - det1 * sumbb[c][c][2];
+#else
       dMatrix[c][2] = (det2 * sumeb[c][2] - det1 * sumbb[c][c][2]) << shift;
+#endif
     } // End "bBadMatrix"
 
   } // end "for c"
@@ -4956,6 +5034,73 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
   int stepsize = 1 << ATMVP_SUB_BLOCK_SIZE;
   int hSearchAbove = abovePU.Y().width;
   int vSearchAbove = abovePU.Y().height;
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  size_t blkCnt = 0;
+  size_t thred[2];
+
+  const Position anchorPos = pu.Y().topLeft();
+  bool enoughBlk[2] = { false, false };
+  int startX = anchorPos.x - anchorPosAbove.x > RMVF_DISTANCE_THRED ? anchorPos.x - RMVF_DISTANCE_THRED - anchorPosAbove.x : 0;
+  int endX = abovePU.Y().topRight().x - anchorPos.x > RMVF_DISTANCE_THRED ? hSearchAbove - (abovePU.Y().topRight().x - anchorPos.x - RMVF_DISTANCE_THRED) - 1 : hSearchAbove;
+  int startY = anchorPos.y - anchorPosAbove.y > RMVF_DISTANCE_THRED ? anchorPos.y - RMVF_DISTANCE_THRED - anchorPosAbove.y : 0;
+  int endY = abovePU.Y().bottomLeft().y - anchorPos.y > RMVF_DISTANCE_THRED ? vSearchAbove - (abovePU.Y().bottomLeft().y - anchorPos.y - RMVF_DISTANCE_THRED) - 1 : vSearchAbove;
+  bool outsideX = anchorPos.x - abovePU.Y().topRight().x > RMVF_DISTANCE_THRED || anchorPosAbove.x - anchorPos.x >= RMVF_DISTANCE_THRED;
+  bool outsideY = anchorPos.y - abovePU.Y().bottomLeft().y > RMVF_DISTANCE_THRED || anchorPosAbove.y - anchorPos.y >= RMVF_DISTANCE_THRED;
+  PredictionUnit tempPU = abovePU;
+  MotionBuf mb = tempPU.getMotionBuf();
+  MotionInfo *mi = mb.buf;
+  mi += (startY >> MIN_CU_LOG2) * mb.stride;
+  if (!outsideX && !outsideY)
+  {
+    if (abovePU.interDir & 1)
+    {
+      thred[0] = RMVF_NUM_SUBBLK_THRED - mvp[REF_PIC_LIST_0][abovePU.refIdx[REF_PIC_LIST_0]].size();
+      for (int i = startY; i < endY; i += stepsize)
+      {
+        for (int j = startX; j < endX; j += stepsize)
+        {
+          neibPos = anchorPosAbove.offset(j + 2, i + 2);
+          mvpInfoVec[REF_PIC_LIST_0].push_back(RMVFInfo(mi[j >> MIN_CU_LOG2].mv[REF_PIC_LIST_0], neibPos, -1));
+          blkCnt++;
+          if (blkCnt == thred[0])
+          {
+            break;
+          }
+        }
+        if (blkCnt == thred[0])
+        {
+          break;
+        }
+        mi += mb.stride;
+      }
+    }
+    blkCnt = 0;
+    mi = mb.buf;
+    mi += (startY >> MIN_CU_LOG2) * mb.stride;
+    if (abovePU.interDir & 2)
+    {
+      thred[1] = RMVF_NUM_SUBBLK_THRED - mvp[REF_PIC_LIST_1][abovePU.refIdx[REF_PIC_LIST_1]].size();
+      for (int i = startY; i < endY; i += stepsize)
+      {
+        for (int j = startX; j < endX; j += stepsize)
+        {
+          neibPos = anchorPosAbove.offset(j + 2, i + 2);
+          mvpInfoVec[REF_PIC_LIST_1].push_back(RMVFInfo(mi[j >> MIN_CU_LOG2].mv[REF_PIC_LIST_1], neibPos, -1));
+          blkCnt++;
+          if (blkCnt == thred[1])
+          {
+            break;
+          }
+        }
+        if (blkCnt == thred[1])
+        {
+          break;
+        }
+        mi += mb.stride;
+      }
+    }
+  }
+#else
   if (abovePU.interDir == 3)
   {
     for (int i = 0; i < vSearchAbove; i += stepsize)
@@ -4996,6 +5141,17 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
       }
     }
   }
+#endif
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  if (mvpInfoVec[REF_PIC_LIST_0].size() > 3)
+  {
+    enoughBlk[0] = true;
+  }
+  if (mvpInfoVec[REF_PIC_LIST_1].size() > 3)
+  {
+    enoughBlk[1] = true;
+  }
+#endif
   for (unsigned int list = 0; list < iNumPredDir; ++list)
   {
     RefPicList eRefPicList = list == 0 ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
@@ -5007,7 +5163,12 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
     {
       continue;
     }
-
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    if (!enoughBlk[eRefPicList])
+    {
+      continue;
+    }
+#endif
     const Position posLT = pu.Y().topLeft();
 
     int64_t cMvX = 0, cMvY = 0;
@@ -5015,23 +5176,50 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
     Mv firstMv;
     int64_t parametersRMVF[2][4];
     firstMv.set(mvpInfoVec[eRefPicList][0].mvp.getHor(), mvpInfoVec[eRefPicList][0].mvp.getVer());
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
     firstMv.hor = firstMv.hor >= 0 ? firstMv.hor << 2 : -(-firstMv.hor << 2);
     firstMv.ver = firstMv.ver >= 0 ? firstMv.ver << 2 : -(-firstMv.ver << 2);
+#endif
     computeDeltaAndShift(posLT, firstMv, mvpInfoVec[eRefPicList]);
 
     //-- Model with Linear Regression
     //-- Calculate RMVF parameters:
-#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX || JVET_AB0189_RMVF_BITLENGTH_CONTROL
     int64_t sumbb[2][3][3];
     int64_t sumeb[2][3];
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    int denumShift = (getRMVFMSB(mvpInfoVec[eRefPicList].size()) - 5);
+    if (denumShift < 0)
+    {
+      denumShift = 0;
+    }
+#endif
 #else
     int sumbb[2][3][3];
     int sumeb[2][3];
 #endif
 
-    xCalcRMVFParameters(mvpInfoVec[eRefPicList], parametersRMVF, sumbb, sumeb, 0);
 
     // top-left CPMV
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    xCalcRMVFParameters(mvpInfoVec[eRefPicList], parametersRMVF, sumbb, sumeb, denumShift, 0);
+    for (int i = 0; i < 2; i++)
+    {
+      parametersRMVF[0][i] = divideRMVF(parametersRMVF[0][i], parametersRMVF[0][3], denumShift, false);
+      parametersRMVF[1][i] = divideRMVF(parametersRMVF[1][i], parametersRMVF[1][3], denumShift, false);
+    }
+    parametersRMVF[0][2] = divideRMVF(parametersRMVF[0][2], parametersRMVF[0][3], denumShift, true);
+    parametersRMVF[1][2] = divideRMVF(parametersRMVF[1][2], parametersRMVF[1][3], denumShift, true);
+    cMvX = parametersRMVF[0][2];
+    cMvY = parametersRMVF[1][2];
+    cMvX = (firstMv.getHor() << MAX_CU_DEPTH) + cMvX;
+    cMvY = (firstMv.getVer() << MAX_CU_DEPTH) + cMvY;
+    int iMvX = int(cMvX);
+    int iMvY = int(cMvY);
+    roundAffineMv(iMvX, iMvY, MAX_CU_DEPTH);
+    cMv = Mv(iMvX, iMvY);
+#else
+    xCalcRMVFParameters(mvpInfoVec[eRefPicList], parametersRMVF, sumbb, sumeb, 0);
     cMvX = parametersRMVF[0][2];
     cMvY = parametersRMVF[1][2];
     cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
@@ -5041,12 +5229,23 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
     cMv = Mv((int)(cMvX), (int)(cMvY));
     cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
     cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+#endif
     cMVOri[list][0] = cMv;
-
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    cMVOri[list][0].clipToStorageBitDepth();
+#endif
 
     // top-right CPMV
     cMvX = parametersRMVF[0][0] * pu.lumaSize().width + parametersRMVF[0][2];
     cMvY = parametersRMVF[1][0] * pu.lumaSize().width + parametersRMVF[1][2];
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    cMvX = (firstMv.getHor() << MAX_CU_DEPTH) + cMvX;
+    cMvY = (firstMv.getVer() << MAX_CU_DEPTH) + cMvY;
+    iMvX = int(cMvX);
+    iMvY = int(cMvY);
+    roundAffineMv(iMvX, iMvY, MAX_CU_DEPTH);
+    cMv = Mv(iMvX, iMvY);
+#else
     cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
     cMvY = divideRMVF(cMvY, parametersRMVF[1][3]);
     cMvX += firstMv.getHor();
@@ -5054,12 +5253,26 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
     cMv = Mv((int)(cMvX), (int)(cMvY));
     cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
     cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+#endif
 
     cMVOri[list][1] = cMv;
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    cMVOri[list][1].clipToStorageBitDepth();
+#endif
+
 
     // bottom-left CPMV
     cMvX = parametersRMVF[0][1] * pu.lumaSize().height + parametersRMVF[0][2];
     cMvY = parametersRMVF[1][1] * pu.lumaSize().height + parametersRMVF[1][2];
+
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    cMvX = (firstMv.getHor() << MAX_CU_DEPTH) + cMvX;
+    cMvY = (firstMv.getVer() << MAX_CU_DEPTH) + cMvY;
+    iMvX = int(cMvX);
+    iMvY = int(cMvY);
+    roundAffineMv(iMvX, iMvY, MAX_CU_DEPTH);
+    cMv = Mv(iMvX, iMvY);
+#else
     cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
     cMvY = divideRMVF(cMvY, parametersRMVF[1][3]);
     cMvX += firstMv.getHor();
@@ -5067,8 +5280,12 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
     cMv = Mv((int)(cMvX), (int)(cMvY));
     cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
     cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+#endif
 
     cMVOri[list][2] = cMv;
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    cMVOri[list][2].clipToStorageBitDepth();
+#endif
     int refIdx = 0;
 
     refIdx = abovePU.refIdx[eRefPicList];
@@ -5090,14 +5307,37 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
     uint16_t addedSize = (uint16_t)mvpInfoVecOri.size();
 
     computeDeltaAndShiftAddi(posLT, firstMv, mvpInfoVecOri, mvpInfoVec[eRefPicList]);
-
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    denumShift = (getRMVFMSB(mvpInfoVec[eRefPicList].size()) - 5);
+    if (denumShift < 0)
+    {
+      denumShift = 0;
+    }
+#endif
     //-- Model with Linear Regression
     //-- Calculate RMVF parameters:
-    xCalcRMVFParameters(mvpInfoVec[eRefPicList], parametersRMVF, sumbb, sumeb, addedSize);
-
     //-- Generate prediction signal 
     cMvX = 0, cMvY = 0;
     // top-left CPMV
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    xCalcRMVFParameters(mvpInfoVec[eRefPicList], parametersRMVF, sumbb, sumeb, denumShift, addedSize);
+    for (int i = 0; i < 2; i++)
+    {
+      parametersRMVF[0][i] = divideRMVF(parametersRMVF[0][i], parametersRMVF[0][3], denumShift, false);
+      parametersRMVF[1][i] = divideRMVF(parametersRMVF[1][i], parametersRMVF[1][3], denumShift, false);
+    }
+    parametersRMVF[0][2] = divideRMVF(parametersRMVF[0][2], parametersRMVF[0][3], denumShift, true);
+    parametersRMVF[1][2] = divideRMVF(parametersRMVF[1][2], parametersRMVF[1][3], denumShift, true);
+    cMvX = parametersRMVF[0][2];
+    cMvY = parametersRMVF[1][2];
+    cMvX = (firstMv.getHor() << MAX_CU_DEPTH) + cMvX;
+    cMvY = (firstMv.getVer() << MAX_CU_DEPTH) + cMvY;
+    iMvX = int(cMvX);
+    iMvY = int(cMvY);
+    roundAffineMv(iMvX, iMvY, MAX_CU_DEPTH);
+    cMv = Mv(iMvX, iMvY);
+#else
+    xCalcRMVFParameters(mvpInfoVec[eRefPicList], parametersRMVF, sumbb, sumeb, addedSize);
     cMvX = parametersRMVF[0][2];
     cMvY = parametersRMVF[1][2];
     cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
@@ -5107,12 +5347,24 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
     cMv = Mv((int)(cMvX), (int)(cMvY));
     cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
     cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+#endif
     cMV[list][0] = cMv;
-
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    cMV[list][0].clipToStorageBitDepth();
+#endif
 
     // top-right CPMV
     cMvX = parametersRMVF[0][0] * pu.lumaSize().width + parametersRMVF[0][2];
     cMvY = parametersRMVF[1][0] * pu.lumaSize().width + parametersRMVF[1][2];
+
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    cMvX = (firstMv.getHor() << MAX_CU_DEPTH) + cMvX;
+    cMvY = (firstMv.getVer() << MAX_CU_DEPTH) + cMvY;
+    iMvX = int(cMvX);
+    iMvY = int(cMvY);
+    roundAffineMv(iMvX, iMvY, MAX_CU_DEPTH);
+    cMv = Mv(iMvX, iMvY);
+#else
     cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
     cMvY = divideRMVF(cMvY, parametersRMVF[1][3]);
     cMvX += firstMv.getHor();
@@ -5120,12 +5372,24 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
     cMv = Mv((int)(cMvX), (int)(cMvY));
     cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
     cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+#endif
 
     cMV[list][1] = cMv;
-
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    cMV[list][1].clipToStorageBitDepth();
+#endif  
     // bottom-left CPMV
     cMvX = parametersRMVF[0][1] * pu.lumaSize().height + parametersRMVF[0][2];
     cMvY = parametersRMVF[1][1] * pu.lumaSize().height + parametersRMVF[1][2];
+
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    cMvX = (firstMv.getHor() << MAX_CU_DEPTH) + cMvX;
+    cMvY = (firstMv.getVer() << MAX_CU_DEPTH) + cMvY;
+    iMvX = int(cMvX);
+    iMvY = int(cMvY);
+    roundAffineMv(iMvX, iMvY, MAX_CU_DEPTH);
+    cMv = Mv(iMvX, iMvY);
+#else
     cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
     cMvY = divideRMVF(cMvY, parametersRMVF[1][3]);
     cMvX += firstMv.getHor();
@@ -5133,8 +5397,12 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
     cMv = Mv((int)(cMvX), (int)(cMvY));
     cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
     cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+#endif
 
     cMV[list][2] = cMv;
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    cMV[list][2].clipToStorageBitDepth();
+#endif
     available[eRefPicList] = true;
 
     mvpInfoVec[eRefPicList].clear();
@@ -5143,32 +5411,39 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
   int8_t referenceidx[2];
   referenceidx[0] = abovePU.refIdx[0];
   referenceidx[1] = abovePU.refIdx[1];
-  if (!xCPMVSimCheck(pu, affMrgCtx, cMVOri, abovePU.interDir, referenceidx, AFFINEMODEL_6PARAM, abovePU.cu->BcwIdx, abovePU.cu->LICFlag))
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  if (enoughBlk[0] || enoughBlk[1])
   {
-    int i = affMrgCtx.numValidMergeCand;
-    for (int mvNum = 0; mvNum < 3; mvNum++)
-    {
-      affMrgCtx.mvFieldNeighbours[i << 1][mvNum].setMvField(cMVOri[0][mvNum], referenceidx[0]);
-      affMrgCtx.mvFieldNeighbours[(i << 1) + 1][mvNum].setMvField(cMVOri[1][mvNum], referenceidx[1]);
-    }
-    affMrgCtx.interDirNeighbours[i] = abovePU.interDir;
-    affMrgCtx.affineType[i] = AFFINEMODEL_6PARAM;
-    affMrgCtx.mergeType[i] = MRG_TYPE_DEFAULT_N;
-    affMrgCtx.BcwIdx[i] = abovePU.cu->BcwIdx;
-#if INTER_LIC
-    affMrgCtx.LICFlags[i] = abovePU.cu->LICFlag;
 #endif
-    if (affMrgCtx.numValidMergeCand == mrgCandIdx)
+    if (!xCPMVSimCheck(pu, affMrgCtx, cMVOri, abovePU.interDir, referenceidx, AFFINEMODEL_6PARAM, abovePU.cu->BcwIdx, abovePU.cu->LICFlag))
     {
+      int i = affMrgCtx.numValidMergeCand;
+      for (int mvNum = 0; mvNum < 3; mvNum++)
+      {
+        affMrgCtx.mvFieldNeighbours[i << 1][mvNum].setMvField(cMVOri[0][mvNum], referenceidx[0]);
+        affMrgCtx.mvFieldNeighbours[(i << 1) + 1][mvNum].setMvField(cMVOri[1][mvNum], referenceidx[1]);
+      }
+      affMrgCtx.interDirNeighbours[i] = abovePU.interDir;
+      affMrgCtx.affineType[i] = AFFINEMODEL_6PARAM;
+      affMrgCtx.mergeType[i] = MRG_TYPE_DEFAULT_N;
+      affMrgCtx.BcwIdx[i] = abovePU.cu->BcwIdx;
+  #if INTER_LIC
+      affMrgCtx.LICFlags[i] = abovePU.cu->LICFlag;
+  #endif
+      if (affMrgCtx.numValidMergeCand == mrgCandIdx)
+      {
+        affMrgCtx.numValidMergeCand++;
+        return;
+      }
       affMrgCtx.numValidMergeCand++;
-      return;
+      if (affMrgCtx.numValidMergeCand == affMrgCtx.maxNumMergeCand)
+      {
+        return;
+      }
     }
-    affMrgCtx.numValidMergeCand++;
-    if (affMrgCtx.numValidMergeCand == affMrgCtx.maxNumMergeCand)
-    {
-      return;
-    }
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
   }
+#endif
   if (available[REF_PIC_LIST_0] || available[REF_PIC_LIST_1])
   {
     if (!xCPMVSimCheck(pu, affMrgCtx, cMV, abovePU.interDir, referenceidx, AFFINEMODEL_6PARAM, BCW_DEFAULT, false))
@@ -5199,10 +5474,17 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
     }
   }
 }
-void PU::xReturnMvpVec(std::vector<RMVFInfo> mvp[2][4], const PredictionUnit &pu, const Position &pos, const MvpDir &eDir)
+void PU::xReturnMvpVec(std::vector<RMVFInfo> mvp[2][4], const PredictionUnit &pu, const Position &pos
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  , const MvpDir &eDir
+#endif
+  )
 {
   CodingStructure &cs = *pu.cs;
   const PredictionUnit *neibPU = NULL;
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  Position neibPos = pos;
+#else
   Position neibPos;
   int offset = 2;
   switch (eDir)
@@ -5225,7 +5507,7 @@ void PU::xReturnMvpVec(std::vector<RMVFInfo> mvp[2][4], const PredictionUnit &pu
   default:
     break;
   }
-
+#endif
   neibPU = cs.getPURestricted(neibPos, pu, pu.chType);
   if (neibPU == NULL || !CU::isInter(*neibPU->cu))
   {
@@ -5253,55 +5535,122 @@ void PU::collectNeiMotionInfo(std::vector<RMVFInfo> mvpInfoVec[2][4], const Pred
   int horSearch = hSearch >> 1;
   int verSearch = vSearch >> 1;
   int stepsize = 4;
-
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  if (pu.lumaSize().width > RMVF_CUSIZE_THRED)
+  {
+    stepsize = 8;
+  }
+#endif
   neibPos = anchorPos;
   if (neibPos.y - 2 >= 0)
   {
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    neibPos = anchorPos.offset(-2, -2);
+#else
     neibPos = anchorPos.offset(-2, 0);
+#endif
     for (int j = 0; j < hSearch; j += stepsize)
     {
       neibPos.x += stepsize;
-      xReturnMvpVec(mvpInfoVec, pu, neibPos, MD_ABOVE);
+      xReturnMvpVec(mvpInfoVec, pu, neibPos
+        
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
+        , MD_ABOVE
+#endif
+      );
     }
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    neibPos = anchorPos.offset(2, -2);
+    int leftend = anchorPos.x - horSearch < 0 ? anchorPos.x : horSearch;
+    for (int j = 0; j < leftend; j += stepsize)
+#else
     neibPos = anchorPos.offset(2, 0);
     for (int j = 0; j < horSearch; j += stepsize)
+#endif
     {
       neibPos.x -= stepsize;
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
       if (neibPos.x < 0)
       {
         break;
       }
-      xReturnMvpVec(mvpInfoVec, pu, neibPos, MD_ABOVE);
+#endif
+      xReturnMvpVec(mvpInfoVec, pu, neibPos
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
+        , MD_ABOVE
+#endif
+      );
     }
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    neibPos = anchorPos.offset(hSearch - 2, -2);
+    int rightend = pu.Y().topRight().x + horSearch > imWidth - 1 ? imWidth - 1 - pu.Y().topRight().x : horSearch;
+    rightend = pu.lumaSize().width == RMVF_DISTANCE_THRED ? 0 : rightend;
+    for (int j = 0; j < rightend; j += stepsize)
+#else
     neibPos = anchorPos.offset(hSearch - 2, 0);
     for (int j = 0; j < horSearch; j += stepsize)
+#endif
     {
       neibPos.x += stepsize;
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
       if (neibPos.x > imWidth - 1)
       {
         break;
       }
-      xReturnMvpVec(mvpInfoVec, pu, neibPos, MD_ABOVE);
+#endif
+      xReturnMvpVec(mvpInfoVec, pu, neibPos
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
+        , MD_ABOVE
+#endif
+      );
     }
   }
   neibPos = anchorPos;
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  stepsize = 4;
+  if (pu.lumaSize().height > RMVF_CUSIZE_THRED)
+  {
+    stepsize = 8;
+  }
+#endif
   if (neibPos.x - 2 >= 0)
   {
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    neibPos = anchorPos.offset(-2, -2);
+#else
     neibPos = anchorPos.offset(0, -2);
+#endif
     for (int i = 0; i < vSearch; i += stepsize)
     {
       neibPos.y += stepsize;
-      xReturnMvpVec(mvpInfoVec, pu, neibPos, MD_LEFT);
+      xReturnMvpVec(mvpInfoVec, pu, neibPos
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
+        , MD_LEFT
+#endif
+      );
     }
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    neibPos = anchorPos.offset(-2, vSearch - 2);
+    int belowend = pu.Y().bottomLeft().y + verSearch > imHeight - 1 ? imHeight - 1 - pu.Y().bottomLeft().y : verSearch;
+    belowend = pu.lumaSize().height == RMVF_DISTANCE_THRED ? 0 : belowend;
+    for (int j = 0; j < belowend; j += stepsize)
+#else
     neibPos = anchorPos.offset(0, vSearch - 2);
     for (int i = 0; i < verSearch; i += stepsize)
+#endif
     {
       neibPos.y += stepsize;
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
       if (neibPos.y > imHeight - 1)
       {
         break;
       }
-      xReturnMvpVec(mvpInfoVec, pu, neibPos, MD_LEFT);
+#endif
+      xReturnMvpVec(mvpInfoVec, pu, neibPos
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
+        , MD_LEFT
+#endif
+      );
     }
   }
 }

@@ -200,6 +200,13 @@ static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFI
 static const int AFF_MAX_NON_ADJACENT_INHERITED_CANDS = 6;
 static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 30;
 static const int ADDITIONAL_AFFINE_CAND_NUM = 15;
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+static const int RMVF_MV_RANGE = (1 << 12);
+static const int RMVF_CUSIZE_THRED = 128;
+static const int RMVF_DISTANCE_THRED = 256;
+static const int RMVF_NUM_SUBBLK_THRED = 255;
+static const int RMVF_PARAM_THRED = (1 << 20);
+#endif
 #endif
 static const int IBC_MRG_MAX_NUM_CANDS =                            6; ///< IBC MERGE
 #if JVET_Z0075_IBC_HMVP_ENLARGE
