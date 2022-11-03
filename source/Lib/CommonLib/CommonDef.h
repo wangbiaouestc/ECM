@@ -307,7 +307,14 @@ static const int NUM_FIXED_BASED_COEFF       =                      7;
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
 static const int NUM_DB                      =                      3;
 static const int NUM_DB_SAMPLE               =                      5;
+
+#if JVET_Z0118_GDR
+static const int NUM_DB_PAD                  =                      8;
+#else
 static const int NUM_DB_PAD                  =                      1;
+#endif
+
+
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF;
 #else
