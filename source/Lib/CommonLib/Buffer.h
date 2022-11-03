@@ -123,7 +123,7 @@ struct PelBufferOps
   void(*computeDeltaAndShift)(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri);
   void(*computeDeltaAndShiftAddi)(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri, std::vector<RMVFInfo> &mvpInfoVecRes);
   void(*buildRegressionMatrix)(std::vector<RMVFInfo> &mvpInfoVecOri, 
-#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX || JVET_AB0189_RMVF_BITLENGTH_CONTROL
     int64_t sumbb[2][3][3], int64_t sumeb[2][3],
 #else
     int sumbb[2][3][3], int sumeb[2][3],

@@ -232,13 +232,20 @@ namespace PU
   void xInheritedAffineMv             ( const PredictionUnit &pu, const PredictionUnit* puNeighbour, RefPicList eRefPicList, Mv rcMv[3] );
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
   void xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[2][4],
-#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX || JVET_AB0189_RMVF_BITLENGTH_CONTROL
     int64_t sumbb[2][3][3], int64_t sumeb[2][3],
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    uint8_t shift,
+#endif
 #else
     int sumbb[2][3][3], int sumeb[2][3],
 #endif
     uint16_t addedSize);
-  void xReturnMvpVec(std::vector<RMVFInfo> mvp[2][4], const PredictionUnit &pu, const Position &pos, const MvpDir &eDir);
+  void xReturnMvpVec(std::vector<RMVFInfo> mvp[2][4], const PredictionUnit &pu, const Position &pos
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    , const MvpDir &eDir
+#endif
+  );
   void getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &abovePU, AffineMergeCtx &affMrgCtx, std::vector<RMVFInfo> mvp[2][4], int mrgCandIdx = -1);
   Position convertNonAdjAffineBlkPos(const Position &pos, int curCtuX, int curCtuY);
   void collectNeiMotionInfo(std::vector<RMVFInfo> mvpInfoVec[2][4], const PredictionUnit &pu);
