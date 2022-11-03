@@ -86,7 +86,8 @@ if( XCODE )
                             -Wno-pessimizing-move
                             -Wno-absolute-value
                             -Wno-unused-const-variable
-                            -Wno-unused-command-line-argument )
+                            -Wno-unused-command-line-argument
+                            -Wno-shorten-64-to-32 )
 else()
   bb_enable_warnings( clang warnings-as-errors
                             -Wno-unknown-attributes
