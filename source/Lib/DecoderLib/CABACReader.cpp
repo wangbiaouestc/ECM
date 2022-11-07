@@ -2255,6 +2255,29 @@ void CABACReader::glmIdc(PredictionUnit& pu)
 
     if ( glmActive )
     {
+#if JVET_AB0092_GLM_WITH_LUMA
+      pu.glmIdc.cb0 = 1;
+#if NUM_GLM_WEIGHT
+      pu.glmIdc.cb0 += m_BinDecoder.decodeBin(Ctx::GlmFlags(1)) ? NUM_GLM_PATTERN : 0;
+#endif
+#if JVET_AA0057_CCCM
+      if (m_BinDecoder.decodeBin(Ctx::GlmFlags(2)))
+      {
+        pu.glmIdc.cb0 += 1;
+        if (m_BinDecoder.decodeBin(Ctx::GlmFlags(3)))
+        {
+          pu.glmIdc.cb0 += 1;
+          if (m_BinDecoder.decodeBin(Ctx::GlmFlags(4)))
+          {
+            pu.glmIdc.cb0 += 1;
+          }
+        }
+      }
+#else
+      pu.glmIdc.cb0 += m_BinDecoder.decodeBinsEP(NUM_GLM_PATTERN_BITS);
+#endif
+      pu.glmIdc.cr0 = pu.glmIdc.cb0;
+#else
       bool bothActive = m_BinDecoder.decodeBin(Ctx::GlmFlags(3));
 
       pu.glmIdc.cb0 = bothActive;
@@ -2281,6 +2304,7 @@ void CABACReader::glmIdc(PredictionUnit& pu)
 #endif
         pu.glmIdc.cr0 += m_BinDecoder.decodeBinsEP(NUM_GLM_PATTERN_BITS);
       }
+#endif
 
 #if MMLM
       if ( PU::isMultiModeLM( pu.intraDir[1] ) )

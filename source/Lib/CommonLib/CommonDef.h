@@ -920,7 +920,7 @@ static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM;
 #endif
 #endif
 
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
 static const int CCCM_WINDOW_SIZE         = 6;
 static const int CCCM_NUM_PARAMS          = 7;
 static const int CCCM_MIN_PU_SIZE         = 0; // Set to 0 for no size restriction
@@ -938,6 +938,17 @@ static const int CCCM_DECIM_ROUND         = ( 1 << (CCCM_DECIM_BITS - 1 ) );
 #endif
 
 #if JVET_AA0126_GLM
+#if JVET_AB0092_GLM_WITH_LUMA
+#define NUM_GLM_WEIGHT                                              2
+#if JVET_AA0057_CCCM
+static const int NUM_GLM_PATTERN =                                  4;
+static const int NUM_GLM_IDC =                                      5;
+#else
+static const int NUM_GLM_PATTERN =                                 16;
+static const int NUM_GLM_PATTERN_BITS =                             4;
+static const int NUM_GLM_IDC =                                     17;
+#endif
+#else
 #if JVET_AA0057_CCCM
 #define NUM_GLM_WEIGHT                                              0
 static const int NUM_GLM_PATTERN =                                  4;
@@ -948,6 +959,7 @@ static const int NUM_GLM_IDC =                                      5;
 static const int NUM_GLM_PATTERN =                                 16;
 static const int NUM_GLM_PATTERN_BITS =                             4;
 static const int NUM_GLM_IDC =                                     33;
+#endif
 #endif
 #endif
 

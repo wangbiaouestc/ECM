@@ -489,8 +489,10 @@ namespace PU
 #if JVET_AA0126_GLM
   bool hasGlmFlag      (const PredictionUnit &pu, const int mode = -1);
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
   void getCccmRefLineNum  (const PredictionUnit& pu, const Area area, int& th, int& tv);
+#endif
+#if JVET_AA0057_CCCM
   bool cccmSingleModeAvail(const PredictionUnit& pu, int intraMode);
   bool cccmMultiModeAvail (const PredictionUnit& pu, int intraMode);
 #if JVET_AB0143_CCCM_TS

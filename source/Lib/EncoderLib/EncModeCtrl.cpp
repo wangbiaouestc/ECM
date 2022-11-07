@@ -2349,6 +2349,12 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
             }
           }
 #endif
+#if JVET_AB0092_GLM_WITH_LUMA
+          if (!isLuma(partitioner.chType) && !(bestCU->firstPU->glmIdc.isActive()))
+          {
+            relatedCU.skipGLM = true;
+          }
+#endif
         }
 #if ENABLE_SPLIT_PARALLELISM
 #if REUSE_CU_RESULTS

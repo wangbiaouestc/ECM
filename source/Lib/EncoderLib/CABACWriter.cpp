@@ -1985,6 +1985,27 @@ void CABACWriter::glmIdc(const PredictionUnit& pu)
     
     if ( glmActive )
     {
+#if JVET_AB0092_GLM_WITH_LUMA
+      int glmIdx = pu.glmIdc.cb0 - 1;
+#if NUM_GLM_WEIGHT
+      m_BinEncoder.encodeBin(glmIdx >= NUM_GLM_PATTERN ? 1 : 0, Ctx::GlmFlags(1));
+      glmIdx -= glmIdx >= NUM_GLM_PATTERN ? NUM_GLM_PATTERN : 0;
+#endif
+      CHECK(pu.glmIdc.cb0 != pu.glmIdc.cr0, "wrong glm idx");
+#if JVET_AA0057_CCCM
+      m_BinEncoder.encodeBin(glmIdx > 0, Ctx::GlmFlags(2));
+      if (glmIdx > 0)
+      {
+        m_BinEncoder.encodeBin(glmIdx > 1, Ctx::GlmFlags(3));
+        if (glmIdx > 1)
+        {
+          m_BinEncoder.encodeBin(glmIdx > 2, Ctx::GlmFlags(4));
+        }
+      }
+#else
+      m_BinEncoder.encodeBinsEP(glmIdx, NUM_GLM_PATTERN_BITS);
+#endif
+#else
       bool bothActive = pu.glmIdc.cb0 && pu.glmIdc.cr0;
 
       m_BinEncoder.encodeBin( bothActive ? 1 : 0, Ctx::GlmFlags(3) );
@@ -2013,6 +2034,7 @@ void CABACWriter::glmIdc(const PredictionUnit& pu)
 #endif
         m_BinEncoder.encodeBinsEP( glmIdx, NUM_GLM_PATTERN_BITS );
       }
+#endif
         
 #if MMLM
       if ( PU::isMultiModeLM( pu.intraDir[1] ) )

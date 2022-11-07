@@ -111,6 +111,9 @@ IntraPrediction::IntraPrediction()
   {
     m_glmTempCb[i] = nullptr;
     m_glmTempCr[i] = nullptr;
+#if JVET_AB0092_GLM_WITH_LUMA
+    m_glmGradBuf[i] = nullptr;
+#endif
   }
 #endif
 #if MMLM
@@ -154,6 +157,9 @@ void IntraPrediction::destroy()
   {
     delete[] m_glmTempCb[i]; m_glmTempCb[i] = nullptr;
     delete[] m_glmTempCr[i]; m_glmTempCr[i] = nullptr;
+#if JVET_AB0092_GLM_WITH_LUMA
+    delete[] m_glmGradBuf[i]; m_glmGradBuf[i] = nullptr;
+#endif
   }
 #endif
 
@@ -251,8 +257,20 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
 #if JVET_AA0126_GLM
   for (int i = 0; i < NUM_GLM_IDC; i++)
   {
-    if (m_glmTempCb[i] == nullptr) m_glmTempCb[i] = new Pel[(2 * MAX_CU_SIZE + 1)*(2 * MAX_CU_SIZE + 1)];
-    if (m_glmTempCr[i] == nullptr) m_glmTempCr[i] = new Pel[(2 * MAX_CU_SIZE + 1)*(2 * MAX_CU_SIZE + 1)];
+    if (m_glmTempCb[i] == nullptr)
+    {
+      m_glmTempCb[i] = new Pel[(2 * MAX_CU_SIZE + 1)*(2 * MAX_CU_SIZE + 1)];
+    }
+    if (m_glmTempCr[i] == nullptr)
+    {
+      m_glmTempCr[i] = new Pel[(2 * MAX_CU_SIZE + 1)*(2 * MAX_CU_SIZE + 1)];
+    }
+#if JVET_AB0092_GLM_WITH_LUMA
+    if (m_glmGradBuf[i] == nullptr)
+    {
+      m_glmGradBuf[i] = new Pel[(2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE) * (2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE)];
+    }
+#endif
   }
 #endif
 
@@ -1174,6 +1192,17 @@ void IntraPrediction::xUpdateCclmModel(int &a, int &b, int &iShift, int midLuma,
 
 void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea& chromaArea, int intraDir, bool createModel, CclmModel *cclmModelStored)
 {
+#if JVET_AB0092_GLM_WITH_LUMA
+  if (pu.glmIdc.getIdc(compID, 0) > NUM_GLM_PATTERN)
+  {
+    CccmModel glmModel(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+    xGlmCalcModel(pu, compID, chromaArea, glmModel);
+    xGlmApplyModel(pu, compID, chromaArea, glmModel, piPred);
+    return;
+  }
+  else
+  {
+#endif
   int  iLumaStride = 0;
   PelBuf Temp;
 #if JVET_AA0126_GLM
@@ -1188,35 +1217,35 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
   {
 #endif
 #if MMLM
-  if ((intraDir == MDLM_L_IDX) || (intraDir == MDLM_T_IDX) || (intraDir == MMLM_L_IDX) || (intraDir == MMLM_T_IDX) || (m_encPreRDRun && intraDir == MMLM_CHROMA_IDX))
+    if ((intraDir == MDLM_L_IDX) || (intraDir == MDLM_T_IDX) || (intraDir == MMLM_L_IDX) || (intraDir == MMLM_T_IDX) || (m_encPreRDRun && intraDir == MMLM_CHROMA_IDX))
 #else
-  if ((intraDir == MDLM_L_IDX) || (intraDir == MDLM_T_IDX))
+    if ((intraDir == MDLM_L_IDX) || (intraDir == MDLM_T_IDX))
 #endif
-  {
-    iLumaStride = 2 * MAX_CU_SIZE + 1;
-    Temp = PelBuf(m_pMdlmTemp + iLumaStride + 1, iLumaStride, Size(chromaArea));
-  }
-  else
-  {
-    iLumaStride = MAX_CU_SIZE + 1;
-    Temp = PelBuf(m_piTemp + iLumaStride + 1, iLumaStride, Size(chromaArea));
-  }
+    {
+      iLumaStride = 2 * MAX_CU_SIZE + 1;
+      Temp = PelBuf(m_pMdlmTemp + iLumaStride + 1, iLumaStride, Size(chromaArea));
+    }
+    else
+    {
+      iLumaStride = MAX_CU_SIZE + 1;
+      Temp = PelBuf(m_piTemp + iLumaStride + 1, iLumaStride, Size(chromaArea));
+    }
 #if JVET_AA0126_GLM
   }
 #endif
 
   CclmModel cclmModel;
 
-  if ( createModel )
+  if (createModel)
   {
 #if LMS_LINEAR_MODEL
     xGetLMParametersLMS(pu, compID, chromaArea, cclmModel);
 #else
-    xGetLMParameters    (pu, compID, chromaArea, cclmModel);
+    xGetLMParameters(pu, compID, chromaArea, cclmModel);
 #endif
-    
+
     // Store the created model if storage struct was provided
-    if ( cclmModelStored != nullptr )
+    if (cclmModelStored != nullptr)
     {
       *cclmModelStored = cclmModel;
     }
@@ -1228,12 +1257,12 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
   }
 
 #if JVET_Z0050_CCLM_SLOPE
-  xUpdateCclmModel( cclmModel.a,  cclmModel.b,  cclmModel.shift,  cclmModel.midLuma,  compID == COMPONENT_Cb ? pu.cclmOffsets.cb0 : pu.cclmOffsets.cr0 );
+  xUpdateCclmModel(cclmModel.a, cclmModel.b, cclmModel.shift, cclmModel.midLuma, compID == COMPONENT_Cb ? pu.cclmOffsets.cb0 : pu.cclmOffsets.cr0);
 #if MMLM
-  xUpdateCclmModel( cclmModel.a2, cclmModel.b2, cclmModel.shift2, cclmModel.midLuma2, compID == COMPONENT_Cb ? pu.cclmOffsets.cb1 : pu.cclmOffsets.cr1 );
+  xUpdateCclmModel(cclmModel.a2, cclmModel.b2, cclmModel.shift2, cclmModel.midLuma2, compID == COMPONENT_Cb ? pu.cclmOffsets.cb1 : pu.cclmOffsets.cr1);
 #endif
 #endif
-  
+
   ////// final prediction
   piPred.copyFrom(Temp);
 #if MMLM
@@ -1264,7 +1293,10 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
   }
   else
 #endif
-  piPred.linearTransform(cclmModel.a, cclmModel.shift, cclmModel.b, true, pu.cs->slice->clpRng(compID));
+    piPred.linearTransform(cclmModel.a, cclmModel.shift, cclmModel.b, true, pu.cs->slice->clpRng(compID));
+#if JVET_AB0092_GLM_WITH_LUMA
+  }
+#endif
 }
 
 /** Function for deriving planar intra prediction. This function derives the prediction samples for planar mode (intra coding).
@@ -4781,7 +4813,7 @@ Pel IntraPrediction::xGlmGetLumaVal(const int s[6], const int c[6], const int gl
 {
   Pel grad = c[0] * s[0] + c[1] * s[1] + c[2] * s[2] 
            + c[3] * s[3] + c[4] * s[4] + c[5] * s[5];
-#if NUM_GLM_WEIGHT
+#if NUM_GLM_WEIGHT && !JVET_AB0092_GLM_WITH_LUMA
   return (glmIdx >= NUM_GLM_PATTERN ? val + grad : grad);
 #else
   return grad;
@@ -4790,6 +4822,47 @@ Pel IntraPrediction::xGlmGetLumaVal(const int s[6], const int c[6], const int gl
 
 void IntraPrediction::xGetLumaRecPixelsGlmAll(const PredictionUnit &pu, CompArea chromaArea)
 {
+#if JVET_AB0092_GLM_WITH_LUMA
+  const CPelBuf recoLuma = pu.cs->picture->getRecoBuf(COMPONENT_Y);
+  const int  maxPosPicX = pu.cs->picture->chromaSize().width - 1;
+  const int  maxPosPicY = pu.cs->picture->chromaSize().height - 1;
+
+  xGlmCalcRefArea(pu, chromaArea); // Find the reference area
+
+  int areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY;
+
+  PelBuf refGrad[NUM_GLM_IDC];
+  for (int i = 0; i < NUM_GLM_IDC; i++)
+  {
+    refGrad[i] = xGlmGetGradRefBuf(pu, chromaArea, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY, i);
+  }
+
+  int puBorderX = refSizeX + chromaArea.width;
+  int puBorderY = refSizeY + chromaArea.height;
+
+  // Generate down-sampled luma and luma gradients
+  for (int y = 0; y < areaHeight; y++)
+  {
+    for (int x = 0; x < areaWidth; x++)
+    {
+      if ((x >= puBorderX && y >= refSizeY) || (y >= puBorderY && x >= refSizeX))
+      {
+        continue;
+      }
+
+      int chromaPosPicX = refPosPicX + x;
+      int chromaPosPicY = refPosPicY + y;
+
+      chromaPosPicX = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+      chromaPosPicY = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+
+      for (int i = 0; i < NUM_GLM_IDC; i++)
+      {
+        refGrad[i].at(x, y) = xGlmGetGradVal(pu, i, recoLuma, chromaPosPicX, chromaPosPicY);
+      }
+    }
+  }
+#endif
   int c[6] = { 0 };
 
   int iDstStride = 2 * MAX_CU_SIZE + 1;
@@ -5000,6 +5073,14 @@ void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chrom
   if ( pu.cccmFlag )
   {
     xCccmCreateLumaRef(pu, chromaArea);
+    return;
+  }
+#endif
+
+#if JVET_AB0092_GLM_WITH_LUMA
+  if (pu.glmIdc.getIdc(chromaArea.compID, 0) > NUM_GLM_PATTERN)
+  {
+    xGlmCreateGradRef(pu, chromaArea);
     return;
   }
 #endif
@@ -7897,7 +7978,9 @@ void IntraPrediction::xCccmCreateLumaRef(const PredictionUnit& pu, CompArea chro
     }
   }
 }
+#endif
 
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
 // LDL decomposing A to U'*diag*U
 bool CccmCovarianceInt::ldlDecomp(TE A, TE U, Ty diag, int numEq) const
 {
@@ -8015,6 +8098,411 @@ void CccmCovarianceInt::ldlSolve(TE U, Ty diag, TCccmCoeff* y, TCccmCoeff* x, in
     std::memset(x, 0, sizeof(TCccmCoeff) * numEq);
   }
 }
+#endif
+
+#if JVET_AB0092_GLM_WITH_LUMA
+void IntraPrediction::xGlmApplyModel(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel &glmModel, PelBuf &piPred) const
+{
+  const  ClpRng& clpRng(pu.cu->cs->slice->clpRng(compId));
+  static Pel     samples[CCCM_NUM_PARAMS];
+
+  CPelBuf refLumaBlk = xGlmGetGradPuBuf(pu, chromaArea, 0);
+  CPelBuf refGradBlk = xGlmGetGradPuBuf(pu, chromaArea, pu.glmIdc.getIdc(compId, 0));
+
+  for (int y = 0; y < refLumaBlk.height; y++)
+  {
+    for (int x = 0; x < refLumaBlk.width; x++)
+    {
+
+      samples[0] = refGradBlk.at(x, y); // luma gradient
+      samples[1] = refLumaBlk.at(x, y); // luma value
+      samples[2] = glmModel.bias();
+      samples[3] = 0;
+      samples[4] = 0;
+      samples[5] = 0;
+      samples[6] = 0;
+
+      piPred.at(x, y) = ClipPel<Pel>(glmModel.convolve(samples, CCCM_NUM_PARAMS), clpRng);
+    }
+  }
+}
+
+void IntraPrediction::xGlmCalcModel(const PredictionUnit& pu, const ComponentID compID, const CompArea& chromaArea, CccmModel &glmModel) const
+{
+  int areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY;
+
+  const CPelBuf reco = pu.cs->picture->getRecoBuf(compID);
+  PelBuf        refLuma = xGlmGetGradRefBuf(pu, chromaArea, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY, 0);
+  PelBuf        refGrad = xGlmGetGradRefBuf(pu, chromaArea, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY, pu.glmIdc.getIdc(compID, 0));
+
+  int M = CCCM_NUM_PARAMS; // align CCCM parameter number to reuse CCCM LDL method
+#if JVET_AB0174_CCCM_DIV_FREE
+  int N = 3; 
+#endif
+
+  int sampleNum = 0;
+  int sampleInd = 0;
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  int chromaOffset = 1 << (pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - 1);
+
+  if (refSizeX || refSizeY)
+  {
+    int refPosX = refSizeX > 0 ? refSizeX - 1 : 0;
+    int refPosY = refSizeY > 0 ? refSizeY - 1 : 0;
+
+    chromaOffset = reco.at(refPosPicX + refPosX, refPosPicY + refPosY);
+  }
+#endif
+
+  // Collect reference data to input matrix A and target vector C
+  static Pel A[CCCM_NUM_PARAMS][CCCM_MAX_REF_SAMPLES];
+  static Pel C[CCCM_MAX_REF_SAMPLES];
+
+  int sizeX = refSizeX + chromaArea.width;
+  int sizeY = refSizeY + chromaArea.height;
+
+  for (int y = 0; y < areaHeight; y++)
+  {
+    for (int x = 0; x < areaWidth; x++)
+    {
+      if (x >= refSizeX && y >= refSizeY)
+      {
+        continue;
+      }
+      if (pu.intraDir[1] == MDLM_L_IDX)
+      {
+        if (y < refSizeY)
+        {
+          continue;
+        }
+      }
+      else if (pu.intraDir[1] == MDLM_T_IDX)
+      {
+        if (x < refSizeX)
+        {
+          continue;
+        }
+      }
+      else
+      {
+        if (x >= sizeX || y >= sizeY)
+        {
+          continue;
+        }
+      }
+
+      // 7-tap cross
+      A[0][sampleInd] = refGrad.at(x, y); // luma gradient
+      A[1][sampleInd] = refLuma.at(x, y); // luma value
+      A[2][sampleInd] = glmModel.bias();
+      A[3][sampleInd] = 0;
+      A[4][sampleInd] = 0;
+      A[5][sampleInd] = 0;
+      A[6][sampleInd] = 0;
+
+      C[sampleInd] = reco.at(refPosPicX + x, refPosPicY + y);
+      sampleInd++;
+    }
+  }
+  if (sampleInd == 0) // Number of sample can go to zero in the multimode case
+  {
+    glmModel.clearModel(M);
+    return;
+  }
+  else
+  {
+    sampleNum = sampleInd;
+  }
+
+  // Calculate autocorrelation matrix and cross-correlation vector
+  static CccmCovarianceInt::TE ATA;
+  static CccmCovarianceInt::Ty ATC;
+
+  memset(ATA, 0x00, sizeof(int64_t) * CCCM_NUM_PARAMS * CCCM_NUM_PARAMS);
+  memset(ATC, 0x00, sizeof(int64_t) * CCCM_NUM_PARAMS);
+
+  for (int coli0 = 0; coli0 < M; coli0++)
+  {
+    for (int coli1 = coli0; coli1 < M; coli1++)
+    {
+      Pel *col0 = A[coli0];
+      Pel *col1 = A[coli1];
+
+      for (int rowi = 0; rowi < sampleNum; rowi++)
+      {
+        ATA[coli0][coli1] += col0[rowi] * col1[rowi];
+      }
+    }
+  }
+
+  for (int coli = 0; coli < M; coli++)
+  {
+    Pel *col = A[coli];
+
+    for (int rowi = 0; rowi < sampleNum; rowi++)
+    {
+      ATC[coli] += col[rowi] * C[rowi];
+    }
+  }
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  // Remove chromaOffset from stats to update cross-correlation
+  for (int coli = 0; coli < N; coli++)
+  {
+    ATC[coli] = ATC[coli] - ((ATA[coli][N - 1] * chromaOffset) >> (glmModel.bd - 1));
+  }
+#endif
+
+  // Scale the matrix and vector to selected dynamic range
+  int matrixShift = 28 - 2 * pu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA) - ceilLog2(sampleNum);
+
+  if (matrixShift > 0)
+  {
+    for (int coli0 = 0; coli0 < M; coli0++)
+    {
+      for (int coli1 = coli0; coli1 < M; coli1++)
+      {
+        ATA[coli0][coli1] <<= matrixShift;
+      }
+    }
+
+    for (int coli = 0; coli < M; coli++)
+    {
+      ATC[coli] <<= matrixShift;
+    }
+  }
+  else if (matrixShift < 0)
+  {
+    matrixShift = -matrixShift;
+
+    for (int coli0 = 0; coli0 < M; coli0++)
+    {
+      for (int coli1 = coli0; coli1 < M; coli1++)
+      {
+        ATA[coli0][coli1] >>= matrixShift;
+      }
+    }
+
+    for (int coli = 0; coli < M; coli++)
+    {
+      ATC[coli] >>= matrixShift;
+    }
+  }
+
+  // Solve the filter coefficients using LDL decomposition
+  CccmCovarianceInt glmSolver;
+  CccmCovarianceInt::TE U;       // Upper triangular L' of ATA's LDL decomposition
+  CccmCovarianceInt::Ty diag;    // Diagonal of D
+
+  bool decompOk = glmSolver.ldlDecompose(ATA, U, diag, M);
+  glmSolver.ldlSolve(U, diag, ATC, glmModel.params, M, decompOk);
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  // Add the chroma offset to bias term (after shifting up by CCCM_DECIM_BITS and down by cccmModelCb.bd - 1)
+  glmModel.params[N - 1] += chromaOffset << (CCCM_DECIM_BITS - (glmModel.bd - 1));
+#endif
+}
+
+Pel IntraPrediction::xGlmGetGradVal(const PredictionUnit& pu, const int glmIdx, const CPelBuf pi, const int x, const int y) const
+{
+  const Pel* piSrc = pi.buf;
+  const int iRecStride = pi.stride;
+  Pel ypval = 0;
+  if (glmIdx == 0)
+  {
+    if (pu.chromaFormat == CHROMA_444)
+    {
+      ypval = piSrc[x + iRecStride * y];
+    }
+    else if (pu.chromaFormat == CHROMA_422)
+    {
+      int s = 2;
+      int offLeft = x > 0 ? -1 : 0;
+      s += piSrc[2 * x + iRecStride * y] * 2;
+      s += piSrc[2 * x + offLeft + iRecStride * y];
+      s += piSrc[2 * x + 1 + iRecStride * y];
+      ypval = s >> 2;
+    }
+    else if (pu.cs->sps->getCclmCollocatedChromaFlag())
+    {
+      int s = 4;
+      int offLeft = x > 0 ? -1 : 0;
+      int offAbove = y > 0 ? -1 : 0;
+      s += piSrc[2 * x + iRecStride * 2 * y] * 4;
+      s += piSrc[2 * x + offLeft + iRecStride * 2 * y];
+      s += piSrc[2 * x + 1 + iRecStride * 2 * y];
+      s += piSrc[2 * x + iRecStride * (2 * y + 1)];
+      s += piSrc[2 * x + iRecStride * (2 * y + offAbove)];
+      ypval = s >> 3;
+    }
+    else
+    {
+      int s = 4;
+      int offLeft = x > 0 ? -1 : 0;
+      s += piSrc[2 * x + iRecStride * y * 2] * 2;
+      s += piSrc[2 * x + offLeft + iRecStride * y * 2];
+      s += piSrc[2 * x + 1 + iRecStride * y * 2];
+      s += piSrc[2 * x + iRecStride * (y * 2 + 1)] * 2;
+      s += piSrc[2 * x + offLeft + iRecStride * (y * 2 + 1)];
+      s += piSrc[2 * x + 1 + iRecStride * (y * 2 + 1)];
+      ypval = s >> 3;
+    }
+#if JVET_AB0174_CCCM_DIV_FREE
+    ypval -= m_glmLumaOffset;
+#endif
+  }
+  else
+  {
+    int p = glmIdx > NUM_GLM_PATTERN ? glmIdx - NUM_GLM_PATTERN - 1 : glmIdx - 1;
+    int c[6] = { 0 };
+    c[0] = g_glmPattern[p][0], c[1] = g_glmPattern[p][1], c[2] = g_glmPattern[p][2];
+    c[3] = g_glmPattern[p][3], c[4] = g_glmPattern[p][4], c[5] = g_glmPattern[p][5];
+
+    int offLeft = x > 0 ? -1 : 0;
+    int s[6] = { piSrc[2 * x + offLeft + iRecStride * y * 2], piSrc[2 * x + iRecStride * y * 2], piSrc[2 * x + 1 + iRecStride * y * 2],
+                 piSrc[2 * x + offLeft + iRecStride * (y * 2 + 1)], piSrc[2 * x + iRecStride * (y * 2 + 1)], piSrc[2 * x + 1 + iRecStride * (y * 2 + 1)] };
+
+    ypval = xGlmGetLumaVal(s, c, p + 1, 0);
+  }
+
+  return ypval;
+}
+
+void IntraPrediction::xGlmCalcRefArea(const PredictionUnit& pu, CompArea chromaArea)
+{
+  const ChannelType     chType = CHANNEL_TYPE_CHROMA;
+  const CodingUnit&     cu = *pu.cu;
+  const CodingStructure &cs = *cu.cs;
+  const SPS             &sps = *cs.sps;
+  const PreCalcValues   &pcv = *cs.pcv;
+
+  const int tuWidth = chromaArea.width;
+  const int tuHeight = chromaArea.height;
+
+  const bool noShift = pcv.noChroma2x2 && chromaArea.width == 4;   // don't shift on the lowest level (chroma not-split)
+  const int  compScaleX = getComponentScaleX(chromaArea.compID, sps.getChromaFormatIdc());
+  const int  compScaleY = getComponentScaleY(chromaArea.compID, sps.getChromaFormatIdc());
+  const int  unitWidth = pcv.minCUWidth >> (noShift ? 0 : compScaleX);
+  const int  unitHeight = pcv.minCUHeight >> (noShift ? 0 : compScaleY);
+
+  const int  totalAboveUnits = (2 * tuWidth + (unitWidth - 1)) / unitWidth;
+  const int  totalLeftUnits = (2 * tuHeight + (unitHeight - 1)) / unitHeight;
+  const int  numAboveUnits = std::max<int>(tuWidth / unitWidth, 1);
+  const int  numLeftUnits = std::max<int>(tuHeight / unitHeight, 1);
+  const int  numAboveRightUnits = totalAboveUnits - numAboveUnits;
+  const int  numLeftBelowUnits = totalLeftUnits - numLeftUnits;
+
+  static bool neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1] = { false }; // Just a dummy array here, content not used
+
+  int avaiAboveRightUnits = isAboveRightAvailable(cu, chType, chromaArea.topRight(), numAboveRightUnits, unitWidth, (neighborFlags + totalLeftUnits + 1 + numAboveUnits));
+  int avaiLeftBelowUnits = isBelowLeftAvailable(cu, chType, chromaArea.bottomLeft(), numLeftBelowUnits, unitHeight, (neighborFlags + totalLeftUnits - 1 - numLeftUnits));
+
+  int refSizeX, refSizeY;
+
+  PU::getCccmRefLineNum(pu, chromaArea, refSizeX, refSizeY); // Reference lines available left and above
+
+  int refWidth = chromaArea.width + refSizeX;              // Reference buffer size excluding paddings
+  int refHeight = chromaArea.height + refSizeY;
+
+  int extWidth = avaiAboveRightUnits * unitWidth;
+  int extHeight = avaiLeftBelowUnits * unitHeight;
+
+  refWidth += refSizeY ? extWidth : 0; // Add above right if above is available
+  refHeight += refSizeX ? extHeight : 0; // Add below left if left is available
+
+  m_glmRefArea = Area(chromaArea.x - refSizeX, chromaArea.y - refSizeY, refWidth, refHeight); // Position with respect to the PU
+}
+
+PelBuf IntraPrediction::xGlmGetGradRefBuf(const PredictionUnit& pu, CompArea chromaArea, int &areaWidth, int &areaHeight, int &refSizeX, int &refSizeY, int &refPosPicX, int &refPosPicY, int glmIdx) const
+{
+  refSizeX = chromaArea.x - m_glmRefArea.x;                        // Reference lines available left and above
+  refSizeY = chromaArea.y - m_glmRefArea.y;
+  areaWidth = m_glmRefArea.width;                    // Reference buffer size excluding paddings
+  areaHeight = m_glmRefArea.height;
+  refPosPicX = m_glmRefArea.x; // Position of the reference area in picture coordinates
+  refPosPicY = m_glmRefArea.y;
+
+  int refStride = areaWidth;
+
+  int idx = glmIdx > NUM_GLM_PATTERN ? glmIdx - NUM_GLM_PATTERN : glmIdx;
+  return PelBuf(m_glmGradBuf[idx], refStride, areaWidth, areaHeight);
+}
+
+PelBuf IntraPrediction::xGlmGetGradPuBuf(const PredictionUnit& pu, CompArea chromaArea, int glmIdx) const
+{
+  int refSizeX = chromaArea.x - m_glmRefArea.x; // Reference lines available left and above
+  int refSizeY = chromaArea.y - m_glmRefArea.y;
+  int tuWidth = chromaArea.width;
+  int tuHeight = chromaArea.height;
+  int refStride = m_glmRefArea.width;
+  int refOrigin = refStride * refSizeY + refSizeX;
+
+  int idx = glmIdx > NUM_GLM_PATTERN ? glmIdx - NUM_GLM_PATTERN : glmIdx;
+  return PelBuf(m_glmGradBuf[idx] + refOrigin, refStride, tuWidth, tuHeight);
+}
+
+void IntraPrediction::xGlmCreateGradRef(const PredictionUnit& pu, CompArea chromaArea)
+{
+  const CPelBuf recoLuma = pu.cs->picture->getRecoBuf(COMPONENT_Y);
+  const int  maxPosPicX = pu.cs->picture->chromaSize().width - 1;
+  const int  maxPosPicY = pu.cs->picture->chromaSize().height - 1;
+
+  xGlmCalcRefArea(pu, chromaArea); // Find the reference area
+
+  int areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY;
+
+  PelBuf refLuma = xGlmGetGradRefBuf(pu, chromaArea, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY, 0);
+  PelBuf refGrad = xGlmGetGradRefBuf(pu, chromaArea, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY, pu.glmIdc.getIdc(chromaArea.compID, 0));
+
+  int puBorderX = refSizeX + chromaArea.width;
+  int puBorderY = refSizeY + chromaArea.height;
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  xGlmSetLumaRefValue(pu, chromaArea);
+#endif
+
+  for (int y = 0; y < areaHeight; y++)
+  {
+    for (int x = 0; x < areaWidth; x++)
+    {
+      if ((x >= puBorderX && y >= refSizeY) ||
+        (y >= puBorderY && x >= refSizeX))
+      {
+        continue;
+      }
+
+      int chromaPosPicX = refPosPicX + x;
+      int chromaPosPicY = refPosPicY + y;
+
+      chromaPosPicX = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+      chromaPosPicY = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+
+      refLuma.at(x, y) = xGlmGetGradVal(pu, 0, recoLuma, chromaPosPicX, chromaPosPicY);
+      refGrad.at(x, y) = xGlmGetGradVal(pu, pu.glmIdc.getIdc(chromaArea.compID, 0), recoLuma, chromaPosPicX, chromaPosPicY);
+    }
+  }
+}
+
+#if JVET_AB0174_CCCM_DIV_FREE
+void IntraPrediction::xGlmSetLumaRefValue(const PredictionUnit& pu, CompArea chromaArea)
+{
+  int lumaPosX = chromaArea.x << getComponentScaleX(chromaArea.compID, pu.cu->chromaFormat);
+  int lumaPosY = chromaArea.y << getComponentScaleY(chromaArea.compID, pu.cu->chromaFormat);
+
+  if (lumaPosX || lumaPosY)
+  {
+    lumaPosX = lumaPosX ? lumaPosX - 1 : 0;
+    lumaPosY = lumaPosY ? lumaPosY - 1 : 0;
+
+    m_glmLumaOffset = pu.cs->picture->getRecoBuf(COMPONENT_Y).at(lumaPosX, lumaPosY);
+  }
+  else
+  {
+    m_glmLumaOffset = 1 << (pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - 1);
+  }
+}
+#endif
 #endif
 
 //! \}

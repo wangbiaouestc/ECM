@@ -2039,11 +2039,20 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         {
           satdGlmIdcBest[mode - LM_CHROMA_IDX].setAllZero();
           
+#if JVET_AB0092_GLM_WITH_LUMA
+          CodedCUInfo& relatedCU = ((EncModeCtrlMTnoRQT *)m_modeCtrl)->getBlkInfo(partitioner.currArea());
+          if (PU::hasGlmFlag(pu, mode) && !relatedCU.skipGLM)
+#else
           if ( PU::hasGlmFlag( pu, mode ) )
+#endif
           {
+#if !JVET_AB0092_GLM_WITH_LUMA
             for ( int comp = COMPONENT_Cb; comp <= COMPONENT_Cr; comp++ )
             {
               ComponentID       compID = ComponentID( comp );
+#else
+            ComponentID       compID = COMPONENT_Cb;
+#endif
               int              idcBest = 0;
               int64_t         satdBest = 0;
               GlmIdc&         idcsBest = satdGlmIdcBest[mode - LM_CHROMA_IDX];
@@ -2055,14 +2064,21 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 
               idcsBest.setIdc(compID, 0, idcBest);
               idcsBest.setIdc(compID, 1, idcBest);
+
+#if JVET_AB0092_GLM_WITH_LUMA
+              idcsBest.setIdc(COMPONENT_Cr, 0, idcBest);
+              idcsBest.setIdc(COMPONENT_Cr, 1, idcBest);
+#endif
               
               satdGlmCosts[mode - LM_CHROMA_IDX] += satdBest; // Summing up Cb and Cr cost
+#if !JVET_AB0092_GLM_WITH_LUMA
             }
             
             if ( !satdGlmIdcBest[0].isActive() )
             {
               break;
             }
+#endif
           }
         }
       }
@@ -2557,11 +2573,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
               bestBDPCMMode   = cu.bdpcmModeChroma;
               bestGlmIdc      = pu.glmIdc;
             }
-            
+#if !JVET_AB0092_GLM_WITH_LUMA
             if ( chromaIntraMode == LM_CHROMA_IDX && !bestGlmIdc.isActive() )
             {
               break;
             }
+#endif
           }
         }
       }
@@ -3003,7 +3020,11 @@ void IntraSearch::xFindBestGlmIdcSATD(PredictionUnit &pu, ComponentID compID, in
   CompArea       area = compID == COMPONENT_Cb ? pu.Cb() : pu.Cr();
   PelBuf       orgBuf = cs.getOrgBuf(area);
   PelBuf      predBuf = cs.getPredBuf(area);
+#if JVET_AB0092_GLM_WITH_LUMA
+  int          maxIdc = NUM_GLM_PATTERN * NUM_GLM_WEIGHT;
+#else
   int          maxIdc = NUM_GLM_IDC - 1;
+#endif
   int            mode = pu.intraDir[1];
 
   DistParam distParamSad;
@@ -3017,6 +3038,21 @@ void IntraSearch::xFindBestGlmIdcSATD(PredictionUnit &pu, ComponentID compID, in
   
   sadBest = -1;
 
+#if JVET_AB0092_GLM_WITH_LUMA
+  CompArea       areacr = pu.Cr();
+  PelBuf       orgBufcr = cs.getOrgBuf(areacr);
+  PelBuf      predBufcr = cs.getPredBuf(areacr);
+
+  DistParam distParamSadcr;
+  DistParam distParamSatdcr;
+
+  m_pcRdCost->setDistParam(distParamSadcr, orgBufcr, predBufcr, pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), COMPONENT_Cr, false);
+  m_pcRdCost->setDistParam(distParamSatdcr, orgBufcr, predBufcr, pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), COMPONENT_Cr, true);
+
+  distParamSadcr.applyWeight = false;
+  distParamSatdcr.applyWeight = false;
+#endif
+
   // Search positive idcs
   for ( int idc = 0; idc <= maxIdc; idc++ )
   {
@@ -3028,6 +3064,18 @@ void IntraSearch::xFindBestGlmIdcSATD(PredictionUnit &pu, ComponentID compID, in
     int64_t sad     = distParamSad.distFunc(distParamSad) * 2;
     int64_t satd    = distParamSatd.distFunc(distParamSatd);
     int64_t sadThis = std::min(sad, satd);
+
+#if JVET_AB0092_GLM_WITH_LUMA
+    pu.glmIdc.setIdc(COMPONENT_Cr, 0, idc);
+    pu.glmIdc.setIdc(COMPONENT_Cr, 1, idc);
+
+    predIntraChromaLM(COMPONENT_Cr, predBufcr, pu, areacr, mode);
+
+    int64_t sadcr = distParamSadcr.distFunc(distParamSadcr) * 2;
+    int64_t satdcr = distParamSatdcr.distFunc(distParamSatdcr);
+    int64_t sadThiscr = std::min(sadcr, satdcr);
+    sadThis += sadThiscr;
+#endif
     
     if ( sadBest == -1 || sadThis < sadBest )
     {
@@ -7228,7 +7276,7 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     {
       xGetLumaRecPixels( pu, cbArea );
       predIntraChromaLM( COMPONENT_Cb, piPredCb, pu, cbArea, predMode );
-#if JVET_AA0126_GLM
+#if JVET_AA0126_GLM && !JVET_AB0092_GLM_WITH_LUMA
       xGetLumaRecPixels( pu, crArea ); // generate GLM luma samples for Cr prediction
 #endif
       predIntraChromaLM( COMPONENT_Cr, piPredCr, pu, crArea, predMode );

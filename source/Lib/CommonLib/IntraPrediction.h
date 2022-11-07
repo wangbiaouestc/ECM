@@ -91,7 +91,7 @@ public:
 typedef short TrainDataType;
 #endif
 
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
 typedef int64_t TCccmCoeff;
 
 #define FIXED_MULT(x, y) TCccmCoeff((int64_t(x)*(y) + CCCM_DECIM_ROUND) >> CCCM_DECIM_BITS )
@@ -228,6 +228,13 @@ private:
 #if JVET_AA0126_GLM
   Pel* m_glmTempCb[NUM_GLM_IDC];
   Pel* m_glmTempCr[NUM_GLM_IDC];
+#if JVET_AB0092_GLM_WITH_LUMA
+  Area m_glmRefArea;
+  Pel* m_glmGradBuf[NUM_GLM_IDC];
+#if JVET_AB0174_CCCM_DIV_FREE
+  int  m_glmLumaOffset;
+#endif
+#endif
 #endif
   MatrixIntraPrediction m_matrixIntraPred;
 
@@ -324,6 +331,18 @@ public:
   void   xCccmCalcRefArea         (const PredictionUnit& pu, CompArea chromaArea);
 #if JVET_AB0174_CCCM_DIV_FREE
   void   xCccmSetLumaRefValue     (const PredictionUnit& pu);
+#endif
+#endif
+#if JVET_AB0092_GLM_WITH_LUMA
+  void   xGlmCalcModel            (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel &glmModel) const;
+  void   xGlmApplyModel           (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel &glmModel, PelBuf &piPred) const;
+  void   xGlmCreateGradRef        (const PredictionUnit& pu, CompArea chromaArea);
+  PelBuf xGlmGetGradRefBuf        (const PredictionUnit& pu, CompArea chromaArea, int &areaWidth, int &areaHeight, int &refSizeX, int &refSizeY, int &refPosPicX, int &refPosPicY, int glmIdx) const;
+  PelBuf xGlmGetGradPuBuf         (const PredictionUnit& pu, CompArea chromaArea, int glmIdx) const;
+  Pel    xGlmGetGradVal           (const PredictionUnit& pu, const int glmIdx, const CPelBuf pi, const int x, const int y) const;
+  void   xGlmCalcRefArea          (const PredictionUnit& pu, CompArea chromaArea);
+#if JVET_AB0174_CCCM_DIV_FREE
+  void   xGlmSetLumaRefValue      (const PredictionUnit& pu, CompArea chromaArea);
 #endif
 #endif
 #if ENABLE_DIMD
