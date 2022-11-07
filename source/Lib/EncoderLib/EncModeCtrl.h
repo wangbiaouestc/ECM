@@ -995,6 +995,9 @@ struct CodedCUInfo
   uint64_t
        temporalId;
 #endif
+#if JVET_AB0092_GLM_WITH_LUMA
+  bool skipGLM;
+#endif
 };
 
 class CacheBlkInfoCtrl

@@ -50,7 +50,6 @@
 #include <assert.h>
 #include <cassert>
 
-
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -138,9 +137,14 @@
 #define JVET_AA0057_CCCM                                  1 // JVET-AA0057: Convolutional cross-component model (CCCM)
 #if JVET_AA0057_CCCM
 #define JVET_AB0143_CCCM_TS                               1 // JVET-AB0143: CCCM template selection
-#define JVET_AB0174_CCCM_DIV_FREE                         1 // JVET-AB0174: CCCM with division free operation
 #endif
 #define JVET_AA0126_GLM                                   1 // JVET-AA0126: Gradient linear model
+#if JVET_AA0126_GLM
+#define JVET_AB0092_GLM_WITH_LUMA                         1 // JVET-AB0092: Gradient linear model with luma value
+#endif
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
+#define JVET_AB0174_CCCM_DIV_FREE                         1 // JVET-AB0174: CCCM with division free operation
+#endif
 #define JVET_AB0061_ITMP_BV_FOR_IBC                       1 // JVET-AB0061: Storing IntraTMP BV for IBC BV prediction
 
 
