@@ -301,6 +301,15 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   timdFusionWeight[0] = other.timdFusionWeight[0];
   timdFusionWeight[1] = other.timdFusionWeight[1];
 #endif
+#if JVET_AB0155_SGPM
+  timdHor      = other.timdHor;
+  timdVer      = other.timdVer;
+  sgpm         = other.sgpm;
+  sgpmIdx      = other.sgpmIdx;
+  sgpmSplitDir = other.sgpmSplitDir;
+  sgpmMode0    = other.sgpmMode0;
+  sgpmMode1    = other.sgpmMode1;
+#endif
 #if ENABLE_OBMC
   obmcFlag          = other.obmcFlag;
   isobmcMC          = other.isobmcMC;
@@ -399,6 +408,15 @@ void CodingUnit::initData()
   timdIsBlended     = false;
   timdFusionWeight[0] = -1;
   timdFusionWeight[1] = -1;
+#endif
+#if JVET_AB0155_SGPM
+  timdHor      = -1;
+  timdVer      = -1;
+  sgpm         = false;
+  sgpmIdx      = -1;
+  sgpmSplitDir = -1;
+  sgpmMode0    = -1;
+  sgpmMode1    = -1;
 #endif
 #if ENABLE_OBMC
   obmcFlag          = true;
@@ -639,6 +657,10 @@ void PredictionUnit::initData()
 
   intraDir[0] = DC_IDX;
   intraDir[1] = PLANAR_IDX;
+#if JVET_AB0155_SGPM
+  intraDir1[0] = DC_IDX;
+  intraDir1[1] = PLANAR_IDX;
+#endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   isChromaFusion = false;
 #endif
@@ -769,6 +791,9 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   for (uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++)
   {
     intraDir[i] = predData.intraDir[i];
+#if JVET_AB0155_SGPM
+    intraDir1[i] = predData.intraDir1[i];
+#endif
   }
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   isChromaFusion = predData.isChromaFusion;
@@ -904,6 +929,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   for( uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++ )
   {
     intraDir[ i ] = other.intraDir[ i ];
+#if JVET_AB0155_SGPM
+    intraDir1[i] = other.intraDir1[i];
+#endif
   }
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   isChromaFusion = other.isChromaFusion;

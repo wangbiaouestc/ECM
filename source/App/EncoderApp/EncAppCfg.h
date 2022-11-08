@@ -208,6 +208,9 @@ protected:
 #if JVET_W0123_TIMD_FUSION
   bool      m_noTimdConstraintFlag;
 #endif
+#if JVET_AB0155_SGPM
+  bool      m_noSgpmConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool      m_noObmcConstraintFlag;
 #endif
@@ -456,6 +459,9 @@ protected:
 #endif
 #if JVET_W0123_TIMD_FUSION
   bool      m_timd;
+#endif
+#if JVET_AB0155_SGPM
+  bool      m_sgpm;
 #endif
 #if ENABLE_OBMC
   bool      m_OBMC;

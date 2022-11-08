@@ -322,6 +322,35 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
           pu->intraDir[0] = currCU.timdMode;
         }
 #endif
+
+#if JVET_AB0155_SGPM
+        else if (currCU.sgpm)
+        {
+          PredictionUnit *pu   = currCU.firstPU;
+          const CompArea &area = currCU.Y();
+#if SECONDARY_MPM
+          IntraPrediction::deriveDimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+#endif
+          static_vector<SgpmInfo, SGPM_NUM> sgpmInfoList;
+          static_vector<double, SGPM_NUM>   sgpmCostList;
+          int                         sgpmIdx = currCU.sgpmIdx;
+
+          if (currCU.lwidth() * currCU.lheight() <= 1024)
+          {
+            m_pcIntraPred->deriveTimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU, false, true);
+          }
+
+          m_pcIntraPred->deriveSgpmModeOrdered(currCU.cs->picture->getRecoBuf(area), area, currCU, sgpmInfoList, sgpmCostList);
+
+          currCU.sgpmSplitDir = sgpmInfoList[sgpmIdx].sgpmSplitDir;
+          currCU.sgpmMode0    = sgpmInfoList[sgpmIdx].sgpmMode0;
+          currCU.sgpmMode1    = sgpmInfoList[sgpmIdx].sgpmMode1;
+          
+          pu->intraDir[0]  = currCU.sgpmMode0;
+          pu->intraDir1[0] = currCU.sgpmMode1;
+        }
+#endif
+
         else if (currCU.firstPU->parseLumaMode)
         {
           const CompArea &area = currCU.Y();

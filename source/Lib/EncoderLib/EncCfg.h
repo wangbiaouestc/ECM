@@ -252,6 +252,9 @@ protected:
 #if JVET_W0123_TIMD_FUSION
   bool      m_noTimdConstraintFlag;
 #endif
+#if JVET_AB0155_SGPM
+  bool      m_noSgpmConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool      m_noObmcConstraintFlag;
 #endif
@@ -463,6 +466,9 @@ protected:
 #endif
 #if JVET_W0123_TIMD_FUSION
   bool      m_timd;
+#endif
+#if JVET_AB0155_SGPM
+  bool      m_sgpm;
 #endif
 #if ENABLE_OBMC
   bool      m_OBMC;
@@ -1098,6 +1104,10 @@ public:
   bool      getNoTimdConstraintFlag() const { return m_noTimdConstraintFlag; }
   void      setNoTimdConstraintFlag(bool val) { m_noTimdConstraintFlag = val; }
 #endif
+#if JVET_AB0155_SGPM
+  bool      getNoSgpmConstraintFlag() const { return m_noSgpmConstraintFlag; }
+  void      setNoSgpmConstraintFlag(bool val) { m_noSgpmConstraintFlag = val; }
+#endif
 #if ENABLE_OBMC
   bool      getNoObmcConstraintFlag() const { return m_noObmcConstraintFlag; }
   void      setNoObmcConstraintFlag(bool bVal) { m_noObmcConstraintFlag = bVal; }
@@ -1463,6 +1473,10 @@ public:
 #if JVET_W0123_TIMD_FUSION
   void      setUseTimd                   ( bool b )       { m_timd = b; }
   bool      getUseTimd                   () const         { return m_timd; }
+#endif
+#if JVET_AB0155_SGPM
+  void      setUseSgpm                   (bool b)         { m_sgpm = b; }
+  bool      getUseSgpm                   () const         { return m_sgpm; }
 #endif
 #if ENABLE_OBMC
   void      setUseObmc                   ( bool b )       { m_OBMC = b; }

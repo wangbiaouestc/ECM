@@ -2682,6 +2682,22 @@ const CtxSet ContextSetCfg::TimdFlag = ContextSetCfg::addCtxSet
   });
 #endif
 
+#if JVET_AB0155_SGPM
+const CtxSet ContextSetCfg::SgpmFlag = ContextSetCfg::addCtxSet
+({
+  {  41,  34,  42, },
+  {  34,  34,  34, },
+  {  42,  50,  58, },
+  {   6,   6,   6, },
+  {   7,   7,   5, },
+  {   6,   6,   2, },
+  {  11,  11,  18, },
+  {   4,   4,   4, },
+  {  11,  11,  11, },
+  { 124, 126, 126, },
+  { 126, 124, 117, },
+});
+#endif
 #if ENABLE_OBMC 
 const CtxSet ContextSetCfg::ObmcFlag = ContextSetCfg::addCtxSet
 ({

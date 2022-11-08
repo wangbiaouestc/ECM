@@ -487,6 +487,9 @@ public:
 #if JVET_W0123_TIMD_FUSION
   static const CtxSet   TimdFlag;
 #endif
+#if JVET_AB0155_SGPM
+  static const CtxSet   SgpmFlag;
+#endif
 #if ENABLE_OBMC
   static const CtxSet   ObmcFlag;
 #endif 

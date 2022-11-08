@@ -2238,6 +2238,10 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   bool timdIsBlended = false;
   int  timdFusionWeight[2] = { 0 };
 #endif
+#if JVET_AB0155_SGPM
+  int timdHorMode = 0;
+  int timdVerMode = 0;
+#endif
 
 
   double dct2Cost                =   MAX_DOUBLE;
@@ -2439,13 +2443,22 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             if (!timdDerived)
             {
               const CompArea &area = cu.Y();
+              
+#if JVET_AB0155_SGPM
+              cu.timdMode = m_pcIntraSearch->deriveTimdMode(bestCS->picture->getRecoBuf(area), area, cu, true, true);
+#else
               cu.timdMode = m_pcIntraSearch->deriveTimdMode(bestCS->picture->getRecoBuf(area), area, cu);
+#endif
               timdMode = cu.timdMode;
               timdDerived = true;
               timdModeSecondary = cu.timdModeSecondary;
               timdIsBlended     = cu.timdIsBlended;
               timdFusionWeight[0] = cu.timdFusionWeight[0];
               timdFusionWeight[1] = cu.timdFusionWeight[1];
+#if JVET_AB0155_SGPM
+              timdHorMode = cu.timdHor;
+              timdVerMode = cu.timdVer;
+#endif
             }
             else
             {
@@ -2454,6 +2467,10 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               cu.timdIsBlended     = timdIsBlended;
               cu.timdFusionWeight[0] = timdFusionWeight[0];
               cu.timdFusionWeight[1] = timdFusionWeight[1];
+#if JVET_AB0155_SGPM
+              cu.timdHor = timdHorMode;
+              cu.timdVer = timdVerMode;
+#endif
             }
           }
 #endif

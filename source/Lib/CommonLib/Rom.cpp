@@ -5132,7 +5132,7 @@ void initGeoTemplate()
       modeIdx++;
     }
   }
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADP_BLD || JVET_AB0155_SGPM
   // initialization of blending weights
   for (int angleIdx = 0; angleIdx < (GEO_NUM_ANGLES >> 2) + 1; angleIdx++)
   {
@@ -5140,7 +5140,11 @@ void initGeoTemplate()
     {
       continue;
     }
+#if JVET_AB0155_SGPM
+    for (int bldIdx = 0; bldIdx < TOTAL_GEO_NUM_BLD; bldIdx++)
+#else
     for (int bldIdx = 0; bldIdx < GEO_NUM_BLD; bldIdx++)
+#endif
     {
       g_globalGeoWeights[bldIdx][g_angle2mask[angleIdx]] = new int16_t[GEO_WEIGHT_MASK_SIZE * GEO_WEIGHT_MASK_SIZE];
 
@@ -5179,7 +5183,7 @@ void initGeoTemplate()
     {
       continue;
     }
-#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_AB0155_SGPM
     g_globalGeoWeightsTpl[g_angle2mask[angleIdx]] = new Pel[GEO_WEIGHT_MASK_SIZE_EXT * GEO_WEIGHT_MASK_SIZE_EXT];
 #endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
@@ -5193,7 +5197,7 @@ void initGeoTemplate()
     int16_t rho = (g_Dis[distanceX] << (GEO_MAX_CU_LOG2 + 1)) + (g_Dis[distanceY] << (GEO_MAX_CU_LOG2 + 1));
     static const int16_t maskOffset = (2 * GEO_MAX_CU_SIZE - GEO_WEIGHT_MASK_SIZE) >> 1;
     int index = 0;
-#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_AB0155_SGPM
     int indexGeoWeight = 0;
     for (int y = -GEO_TM_ADDED_WEIGHT_MASK_SIZE; y < GEO_WEIGHT_MASK_SIZE + GEO_TM_ADDED_WEIGHT_MASK_SIZE; y++)
     {
@@ -5231,7 +5235,7 @@ void initGeoTemplate()
       continue;
     }
     g_globalGeoWeights[g_angle2mask[angleIdx]] = new int16_t[GEO_WEIGHT_MASK_SIZE * GEO_WEIGHT_MASK_SIZE];
-#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_AB0155_SGPM
     g_globalGeoWeightsTpl[g_angle2mask[angleIdx]] = new Pel[GEO_WEIGHT_MASK_SIZE_EXT * GEO_WEIGHT_MASK_SIZE_EXT];
 #endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
@@ -5245,7 +5249,7 @@ void initGeoTemplate()
     int16_t rho = (g_Dis[distanceX] << (GEO_MAX_CU_LOG2+1)) + (g_Dis[distanceY] << (GEO_MAX_CU_LOG2 + 1));
     static const int16_t maskOffset = (2*GEO_MAX_CU_SIZE - GEO_WEIGHT_MASK_SIZE) >> 1;
     int index = 0;
-#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_AB0155_SGPM
     int indexGeoWeight = 0;
     for( int y = -GEO_TM_ADDED_WEIGHT_MASK_SIZE; y < GEO_WEIGHT_MASK_SIZE + GEO_TM_ADDED_WEIGHT_MASK_SIZE; y++ )
     {
@@ -5309,18 +5313,50 @@ void initGeoTemplate()
       }
     }
   }
-
+#if JVET_AB0155_SGPM
+  for (int hIdx = 0; hIdx < GEO_NUM_CU_SIZE_EX; hIdx++)
+  {
+    int16_t height = 1 << (hIdx + GEO_MIN_CU_LOG2_EX);
+    for (int wIdx = 0; wIdx < GEO_NUM_CU_SIZE_EX; wIdx++)
+    {
+      int16_t width = 1 << (wIdx + GEO_MIN_CU_LOG2_EX);
+      for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
+      {
+        int16_t angle    = g_GeoParams[splitDir][0];
+        int16_t distance = g_GeoParams[splitDir][1];
+        int16_t offsetX  = (GEO_WEIGHT_MASK_SIZE - width) >> 1;
+        int16_t offsetY  = (GEO_WEIGHT_MASK_SIZE - height) >> 1;
+        if (distance > 0)
+        {
+          if (angle % 16 == 8 || (angle % 16 != 0 && height >= width))
+          {
+            offsetY += angle < 16 ? ((distance * (int32_t) height) >> 3) : -((distance * (int32_t) height) >> 3);
+          }
+          else
+          {
+            offsetX += angle < 16 ? ((distance * (int32_t) width) >> 3) : -((distance * (int32_t) width) >> 3);
+          }
+        }
+        g_weightOffsetEx[splitDir][hIdx][wIdx][0] = offsetX;
+        g_weightOffsetEx[splitDir][hIdx][wIdx][1] = offsetY;
+      }
+    }
+  }
+#endif
 
 }
 
 int16_t** g_GeoParams;
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AB0155_SGPM
+int16_t *g_globalGeoWeights[TOTAL_GEO_NUM_BLD][GEO_NUM_PRESTORED_MASK];
+int      g_bld2Width[TOTAL_GEO_NUM_BLD] = { 1, 2, 4, 8, 16, 32 };
+#elif JVET_AA0058_GPM_ADP_BLD
 int16_t*  g_globalGeoWeights[GEO_NUM_BLD][GEO_NUM_PRESTORED_MASK];
 int       g_bld2Width[GEO_NUM_BLD] = { 1, 2, 4, 8, 16 };
 #else
 int16_t*  g_globalGeoWeights   [GEO_NUM_PRESTORED_MASK];
 #endif
-#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_AB0155_SGPM
 Pel*      g_globalGeoWeightsTpl[GEO_NUM_PRESTORED_MASK];
 #endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
@@ -5328,6 +5364,20 @@ Pel*      g_globalGeoEncSADmask[GEO_NUM_PRESTORED_MASK];
 #else
 int16_t*  g_globalGeoEncSADmask[GEO_NUM_PRESTORED_MASK];
 #endif
+#if JVET_AB0155_SGPM
+int16_t g_weightOffsetEx[GEO_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE_EX][GEO_NUM_CU_SIZE_EX][2];
+int8_t g_sgpm_splitDir[GEO_NUM_PARTITION_MODE] = {
+1,1,0,0,0,0,1,0,
+1,0,1,0,1,0,1,0,
+1,0,1,1,1,0,1,0,
+1,0,1,0,1,0,1,0,
+0,0,0,0,1,1,0,0,
+0,0,1,0,0,1,0,0,
+1,0,1,1,0,1,0,0,
+1,0,0,1,0,0,0,0
+};
+#endif
+
 int16_t   g_weightOffset       [GEO_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE][GEO_NUM_CU_SIZE][2];
 int8_t    g_angle2mask[GEO_NUM_ANGLES] = { 0, -1, 1, 2, 3, 4, -1, -1, 5, -1, -1, 4, 3, 2, 1, -1, 0, -1, 1, 2, 3, 4, -1, -1, 5, -1, -1, 4, 3, 2, 1, -1 };
 int8_t    g_Dis[GEO_NUM_ANGLES] = { 8, 8, 8, 8, 4, 4, 2, 1, 0, -1, -2, -4, -4, -8, -8, -8, -8, -8, -8, -8, -4, -4, -2, -1, 0, 1, 2, 4, 4, 8, 8, 8 };

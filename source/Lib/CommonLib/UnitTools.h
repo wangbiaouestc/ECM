@@ -152,23 +152,42 @@ namespace PU
 #endif
   void getGeoIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t splitDir, uint8_t shape );
 #endif
+#if JVET_AB0155_SGPM
+  void getSgpmIntraMPMs(const PredictionUnit &pu, uint8_t *mpm, uint8_t splitDir, uint8_t shape);
+#endif
   bool          isMIP                 (const PredictionUnit &pu, const ChannelType &chType = CHANNEL_TYPE_LUMA);
 #if JVET_V0130_INTRA_TMP
   bool          isTmp(const PredictionUnit& pu, const ChannelType& chType = CHANNEL_TYPE_LUMA);
 #endif
   bool          isDMChromaMIP         (const PredictionUnit &pu);
+#if JVET_AB0155_SGPM
+  bool isSgpm(const PredictionUnit &pu, const ChannelType &chType = CHANNEL_TYPE_LUMA);
+  bool isDMChromaSgpm(const PredictionUnit &pu);
+#endif
+#if JVET_AB0155_SGPM
+  uint32_t getIntraDirLuma(const PredictionUnit &pu, const int partIdx = 0);
+#else
   uint32_t      getIntraDirLuma       (const PredictionUnit &pu);
+#endif
   void getIntraChromaCandModes(const PredictionUnit &pu, unsigned modeList[NUM_CHROMA_MODE]);
 
   const PredictionUnit &getCoLocatedLumaPU(const PredictionUnit &pu);
+#if JVET_AB0155_SGPM
+  uint32_t getFinalIntraMode              (const PredictionUnit &pu, const ChannelType &chType, const int partIdx = 0);
+#else
   uint32_t getFinalIntraMode              (const PredictionUnit &pu, const ChannelType &chType);
+#endif
 #if JVET_W0119_LFNST_EXTENSION
   int      getLFNSTMatrixDim          ( int width, int height );
   bool     getUseLFNST8               ( int width, int height );
   uint8_t  getLFNSTIdx                ( int intraMode, int mtsMode = 0 );
   bool     getUseLFNST16              ( int width, int height );
 #endif
+#if JVET_AB0155_SGPM
+  uint32_t getCoLocatedIntraLumaMode(const PredictionUnit &pu, const int partIdx = 0);
+#else
   uint32_t getCoLocatedIntraLumaMode      (const PredictionUnit &pu);
+#endif
   int      getWideAngle                   ( const TransformUnit &tu, const uint32_t dirMode, const ComponentID compID );
 #if MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM
   uint32_t getBDMVRMvdThreshold       (const PredictionUnit &pu);
@@ -343,6 +362,9 @@ namespace PU
 #endif
   void spanIpmInfoIntra               (      PredictionUnit &pu );
   void spanIpmInfoInter               (      PredictionUnit &pu, MotionBuf &mb, IpmBuf &ib );
+#endif
+#if JVET_AB0155_SGPM
+  void spanIpmInfoSgpm                (      PredictionUnit &pu);
 #endif
 #if !JVET_Z0054_BLK_REF_PIC_REORDER
   void applyImv                       (      PredictionUnit &pu, MergeCtx &mrgCtx, InterPrediction *interPred = NULL );

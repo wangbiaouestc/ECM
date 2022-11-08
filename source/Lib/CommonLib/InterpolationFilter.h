@@ -213,6 +213,25 @@ public:
   void( *m_weightedGeoBlkRounded )(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
 #endif
 #endif
+#if JVET_AB0155_SGPM
+  void (*m_weightedSgpm)(const PredictionUnit &pu, const uint32_t width, const uint32_t height,
+                         const ComponentID compIdx, const uint8_t splitDir, PelBuf &predDst, PelBuf &predSrc0,
+                         PelBuf &predSrc1);
+  static void xWeightedSgpm(const PredictionUnit &pu, const uint32_t width, const uint32_t height,
+                         const ComponentID compIdx, const uint8_t splitDir, PelBuf &predDst, PelBuf &predSrc0,
+                         PelBuf &predSrc1);
+
+  int (*m_sadTM)(const PredictionUnit &pu, const int width, const int height, const int templateWidth,
+                 const int templateHeight, const ComponentID compIdx, PelBuf &predBuf, PelBuf &recBuf, PelBuf &adBuf);
+  static int xSadTM(const PredictionUnit &pu, const int width, const int height, const int templateWidth,
+                    const int templateHeight, const ComponentID compIdx, PelBuf &predBuf, PelBuf &recBuf,
+                    PelBuf &adBuf);
+  int (*m_sgpmSadTM)(const PredictionUnit &pu, const int width, const int height, const int templateWidth,
+                     const int templateHeight, const ComponentID compIdx, const uint8_t splitDir, PelBuf &adBuf);
+  static int xSgpmSadTM(const PredictionUnit &pu, const int width, const int height, const int templateWidth,
+                            const int templateHeight, const ComponentID compIdx, const uint8_t splitDir,
+                              PelBuf &adBuf);
+#endif
 
   void initInterpolationFilter( bool enable );
 #ifdef TARGET_SIMD_X86

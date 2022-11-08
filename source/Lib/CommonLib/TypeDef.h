@@ -146,7 +146,7 @@
 #define JVET_AB0174_CCCM_DIV_FREE                         1 // JVET-AB0174: CCCM with division free operation
 #endif
 #define JVET_AB0061_ITMP_BV_FOR_IBC                       1 // JVET-AB0061: Storing IntraTMP BV for IBC BV prediction
-
+#define JVET_AB0155_SGPM                                  1 // JVET-AB0155: spatial geometric partitioning mode
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -1651,7 +1651,24 @@ enum RESHAPE_SIGNAL_TYPE
   RESHAPE_SIGNAL_NULL = 100,
 };
 
+#if JVET_AB0155_SGPM
+struct SgpmInfo
+{
+  int sgpmSplitDir;
+  int sgpmMode0;
+  int sgpmMode1;
 
+  SgpmInfo() : sgpmSplitDir(0), sgpmMode0(0), sgpmMode1(0) {}
+  SgpmInfo(const int sd, const int sm0, const int sm1) : sgpmSplitDir(sd), sgpmMode0(sm0), sgpmMode1(sm1) {}
+  SgpmInfo &operator=(const SgpmInfo &other)
+  {
+    sgpmSplitDir = other.sgpmSplitDir;
+    sgpmMode0    = other.sgpmMode0;
+    sgpmMode1    = other.sgpmMode1;
+    return *this;
+  }
+};
+#endif
 // ---------------------------------------------------------------------------
 // exception class
 // ---------------------------------------------------------------------------

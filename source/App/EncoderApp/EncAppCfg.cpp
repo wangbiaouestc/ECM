@@ -920,6 +920,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_W0123_TIMD_FUSION
   ("NoTimdConstraintFlag",                             m_noTimdConstraintFlag,                          false, "Indicate that TIMD is deactivated")
 #endif
+#if JVET_AB0155_SGPM
+  ("NoSgpmConstraintFlag",                             m_noSgpmConstraintFlag,                          false, "Indicate that SGPM is deactivated")
+#endif
 #if ENABLE_OBMC
   ("NoObmcConstraintFlag",                             m_noObmcConstraintFlag,                            false, "Indicate that OBMC is deactivated")
 #endif
@@ -1095,6 +1098,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_W0123_TIMD_FUSION
   ( "TIMD",                                           m_timd,                                            true,  "Enable template based intra mode derivation\n" )
+#endif
+#if JVET_AB0155_SGPM
+  ( "SGPM",                                           m_sgpm,                                            true,  "Enable spatial geometric partitioning mode\n" )
 #endif
 #if ENABLE_OBMC
   ("OBMC",                                            m_OBMC,                                           true, "Overlapping Block Motion Compensation")
@@ -5208,6 +5214,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_W0123_TIMD_FUSION
   msg( VERBOSE, "TIMD:%d ", m_timd );
+#endif
+#if JVET_AB0155_SGPM
+  msg(VERBOSE, "SGPM:%d ", m_sgpm);
 #endif
 #if JVET_V0130_INTRA_TMP
   msg( VERBOSE, "IntraTMP:%d ", m_intraTMP );

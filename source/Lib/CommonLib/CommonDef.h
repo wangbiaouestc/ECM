@@ -473,6 +473,9 @@ static const int LM_CHROMA_IDX = NUM_LUMA_MODE; ///< chroma mode index for deriv
 #if ENABLE_DIMD
 static const int DIMD_IDX =                                        99; ///< index for intra DIMD mode
 #endif
+#if JVET_AB0155_SGPM
+static const int SGPM_IDX = 200;   ///< index for SGPM mode
+#endif
 #if JVET_W0123_TIMD_FUSION
 static const int TIMD_IDX =                                       199; ///< index for intra TIMD mode
 static const int DIMD_MAX_TEMP_SIZE =                               4;
@@ -548,7 +551,13 @@ static const int NUM_MOST_PROBABLE_MODES = 6;
 static const int LM_SYMBOL_NUM = (1 + NUM_LMC_MODE);
 
 static const int MAX_NUM_MIP_MODE =                                32; ///< maximum number of MIP pred. modes
+#if JVET_AB0155_SGPM
+static const int SGPM_NUM = 16;
+static const int FAST_UDI_MAX_RDMODE_NUM = (NUM_LUMA_MODE + MAX_NUM_MIP_MODE + SGPM_NUM);   ///< maximum number of RD comparison in fast-UDI estimation loop
+#else
+
 static const int FAST_UDI_MAX_RDMODE_NUM = (NUM_LUMA_MODE + MAX_NUM_MIP_MODE); ///< maximum number of RD comparison in fast-UDI estimation loop
+#endif
 
 static const int MAX_LFNST_COEF_NUM =                              16;
 
@@ -1026,13 +1035,28 @@ static const int GEO_NUM_ANGLES =                                  32;
 static const int GEO_NUM_DISTANCES =                                4;
 static const int GEO_NUM_PRESTORED_MASK =                           6;
 static const int GEO_WEIGHT_MASK_SIZE = 3 * (GEO_MAX_CU_SIZE >> 3) * 2 + GEO_MAX_CU_SIZE;
-#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+
+#if JVET_AB0155_SGPM
+static const int GEO_MIN_CU_LOG2_EX         = 2;
+static const int GEO_MAX_CU_LOG2_EX         = 6;
+static const int GEO_MIN_CU_SIZE_EX         = 1 << GEO_MIN_CU_LOG2_EX;
+static const int GEO_MAX_CU_SIZE_EX         = 1 << GEO_MAX_CU_LOG2_EX;
+static const int GEO_NUM_CU_SIZE_EX         = (GEO_MAX_CU_LOG2_EX - GEO_MIN_CU_LOG2_EX) + 1;
+
+static const int SGPM_MIN_PIX = 32;
+static const int SGPM_NUM_MPM = 3;
+static const int SGPM_TEMPLATE_SIZE = 1;
+#endif
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_AB0155_SGPM
 #if !JVET_W0090_ARMC_TM
 static const int AML_MERGE_TEMPLATE_SIZE =                          1;
 #endif
 static const int GEO_MODE_SEL_TM_SIZE =       AML_MERGE_TEMPLATE_SIZE;
 static const int GEO_TM_ADDED_WEIGHT_MASK_SIZE = GEO_MODE_SEL_TM_SIZE;
 static const int GEO_WEIGHT_MASK_SIZE_EXT = GEO_WEIGHT_MASK_SIZE + GEO_TM_ADDED_WEIGHT_MASK_SIZE * 2;
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 static const int GEO_SPLIT_MODE_RICE_CODE_DIVISOR =                 4;
 static const int GEO_MODE_COMPRESSION_RATIO =                       2;
 static const int GEO_NUM_SIG_PARTMODE = GEO_NUM_PARTITION_MODE / GEO_MODE_COMPRESSION_RATIO; ///< max number of splitting modes for signaling
@@ -1059,6 +1083,11 @@ static const int GEO_MAX_TRY_WEIGHTED_SATD = 8;
 
 #if JVET_AA0058_GPM_ADP_BLD
 static const int GEO_NUM_BLD = 5;
+#endif
+#if JVET_AB0155_SGPM
+static const int TOTAL_GEO_NUM_BLD = 6; // GPM 0~4, SGPM 1~5
+#define GET_SGPM_BLD_IDX(a, b)                                                                                           \
+  (std::min(a, b) <= 4 ? 1 : std::min(a, b) <= 8 ? 2 : std::min(a, b) <= 16 ? 3 : std::min(a, b) <= 32 ? 4 : 5)
 #endif
 
 #if ENABLE_OBMC
