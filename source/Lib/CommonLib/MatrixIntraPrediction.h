@@ -51,8 +51,13 @@ public:
   MatrixIntraPrediction();
 
   void prepareInputForPred(const CPelBuf &pSrc, const Area &block, const int bitDepth, const ComponentID compId);
+#if JVET_AB0067_MIP_DIMD_LFNST
+  void predBlock(int* const result, const int modeIdx, const bool transpose, const int bitDepth,
+    const ComponentID compId, int* reducedResult = nullptr);
+#else
   void predBlock(int *const result, const int modeIdx, const bool transpose, const int bitDepth,
                  const ComponentID compId);
+#endif
 
   private:
     ComponentID m_component;

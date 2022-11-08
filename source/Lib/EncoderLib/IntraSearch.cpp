@@ -5134,7 +5134,11 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
 #endif
         {
           initIntraMip( pu, area );
+#if JVET_AB0067_MIP_DIMD_LFNST
+          predIntraMip( compID, piPred, pu, pu.cu->lfnstIdx > 0 ? true : false);
+#else
           predIntraMip( compID, piPred, pu );
+#endif
         }
         else
         {
@@ -6706,7 +6710,11 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
 #endif
       {
         initIntraMip(pu, area);
+#if JVET_AB0067_MIP_DIMD_LFNST
+        predIntraMip(compID, piPred, pu, pu.cu->lfnstIdx > 0 ? true : false);
+#else
         predIntraMip(compID, piPred, pu);
+#endif
       }
       else
       {
