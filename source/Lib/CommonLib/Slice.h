@@ -325,6 +325,9 @@ class ConstraintInfo
 #if JVET_W0123_TIMD_FUSION
   bool              m_noTimdConstraintFlag;
 #endif
+#if JVET_AB0155_SGPM
+  bool              m_noSgpmConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool              m_noObmcConstraintFlag;
 #endif
@@ -634,6 +637,10 @@ public:
 #if JVET_W0123_TIMD_FUSION
   bool          getNoTimdConstraintFlag() const { return m_noTimdConstraintFlag; }
   void          setNoTimdConstraintFlag(bool bVal) { m_noTimdConstraintFlag = bVal; }
+#endif
+#if JVET_AB0155_SGPM
+  bool          getNoSgpmConstraintFlag() const { return m_noSgpmConstraintFlag; }
+  void          setNoSgpmConstraintFlag(bool bVal) { m_noSgpmConstraintFlag = bVal; }
 #endif
 #if ENABLE_OBMC
   bool          getNoObmcConstraintFlag() const { return m_noObmcConstraintFlag; }
@@ -1717,6 +1724,9 @@ private:
 #if JVET_W0123_TIMD_FUSION
   bool              m_timd;
 #endif
+#if JVET_AB0155_SGPM
+  bool              m_sgpm;
+#endif
 #if JVET_V0130_INTRA_TMP
   bool              m_intraTMP;                                       ///< intra Template Matching 
   unsigned          m_intraTmpMaxSize;                               ///< max CU size for which intra TMP is allowed
@@ -2258,6 +2268,11 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setUseTimd         ( bool b )                                        { m_timd = b; }
   bool      getUseTimd         ()                                      const     { return m_timd; }
 #endif
+#if JVET_AB0155_SGPM
+  void      setUseSgpm         (bool b)                                          { m_sgpm = b; }
+  bool      getUseSgpm         ()                                      const     { return m_sgpm; }
+#endif
+
 #if ENABLE_OBMC
   void      setUseOBMC         ( bool b )                                        { m_OBMC = b; }
   bool      getUseOBMC         ()                                      const     { return m_OBMC; }

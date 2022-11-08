@@ -335,6 +335,15 @@ struct CodingUnit : public UnitArea
   bool timdIsBlended;
   int8_t timdFusionWeight[2];
 #endif
+#if JVET_AB0155_SGPM
+  int timdHor;
+  int timdVer;
+  bool sgpm;
+  int  sgpmIdx;
+  int  sgpmSplitDir;
+  int  sgpmMode0;
+  int  sgpmMode1;
+#endif
 #if ENABLE_OBMC
   bool           obmcFlag;
   bool           isobmcMC;
@@ -425,6 +434,9 @@ struct IntraPredictionData
   uint8_t intraNonMPM[NUM_NON_MPM_MODES];
 #endif
   uint8_t  intraDir[MAX_NUM_CHANNEL_TYPE];
+#if JVET_AB0155_SGPM
+  uint8_t intraDir1[MAX_NUM_CHANNEL_TYPE];
+#endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   bool      isChromaFusion;
 #endif

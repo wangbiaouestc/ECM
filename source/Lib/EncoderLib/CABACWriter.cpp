@@ -1279,6 +1279,9 @@ void CABACWriter::extend_ref_line(const PredictionUnit& pu)
 #if ENABLE_DIMD
     || cu.dimd
 #endif
+#if JVET_AB0155_SGPM
+      || cu.sgpm
+#endif
     )
   {
     return;
@@ -1352,6 +1355,9 @@ void CABACWriter::extend_ref_line(const CodingUnit& cu)
   if ( !cu.Y().valid() || cu.predMode != MODE_INTRA || !isLuma(cu.chType) || cu.bdpcmMode
 #if ENABLE_DIMD 
     || cu.dimd
+#endif
+#if JVET_AB0155_SGPM
+    || cu.sgpm
 #endif
     )
   {
@@ -1461,6 +1467,13 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
   }
 #if JVET_W0123_TIMD_FUSION
   cu_timd_flag(cu);
+#endif
+#if JVET_AB0155_SGPM
+  sgpm_flag(cu);
+  if (cu.sgpm)
+  {
+    return;
+  }
 #endif
   extend_ref_line( cu );
 
@@ -1682,6 +1695,13 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
 #if JVET_W0123_TIMD_FUSION
   cu_timd_flag(*pu.cu);
 #endif
+#if JVET_AB0155_SGPM
+  sgpm_flag(*pu.cu);
+  if (pu.cu->sgpm)
+  {
+    return;
+  }
+#endif
   extend_ref_line( pu );
   isp_mode( *pu.cu );
 #if ENABLE_DIMD
@@ -1843,6 +1863,43 @@ void CABACWriter::cu_timd_flag( const CodingUnit& cu )
   unsigned ctxId = DeriveCtx::CtxTimdFlag(cu);
   m_BinEncoder.encodeBin(cu.timd, Ctx::TimdFlag(ctxId));
   DTRACE(g_trace_ctx, D_SYNTAX, "cu_timd_flag() ctx=%d pos=(%d,%d) timd=%d\n", ctxId, cu.lumaPos().x, cu.lumaPos().y, cu.timd);
+}
+#endif
+
+#if JVET_AB0155_SGPM
+void CABACWriter::sgpm_flag(const CodingUnit &cu)
+{
+  if (!cu.cs->sps->getUseSgpm())
+  {
+    return;
+  }
+  if (!(cu.lwidth() >= GEO_MIN_CU_SIZE_EX && cu.lheight() >= GEO_MIN_CU_SIZE_EX && cu.lwidth() <= GEO_MAX_CU_SIZE_EX
+        && cu.lheight() <= GEO_MAX_CU_SIZE_EX && cu.lwidth() < 8 * cu.lheight() && cu.lheight() < 8 * cu.lwidth()
+        && cu.lwidth() * cu.lheight() >= SGPM_MIN_PIX))
+  {
+    return;
+  }
+
+  if (cu.dimd || cu.timd || cu.mipFlag || cu.tmpFlag)
+  {
+    return;
+  }
+  if (!cu.Y().valid() || cu.predMode != MODE_INTRA || !isLuma(cu.chType))
+  {
+    return;
+  }
+  if (!(cu.lx() && cu.ly()))
+  {
+    return;
+  }
+
+  unsigned ctxId = DeriveCtx::CtxSgpmFlag(cu);
+  m_BinEncoder.encodeBin(cu.sgpm, Ctx::SgpmFlag(ctxId));
+
+  if (cu.sgpm)
+  {
+    xWriteTruncBinCode(cu.sgpmIdx, SGPM_NUM);
+  }
 }
 #endif
 
@@ -5754,6 +5811,9 @@ void CABACWriter::isp_mode( const CodingUnit& cu )
   if( !CU::isIntra( cu ) || !isLuma( cu.chType ) || cu.firstPU->multiRefIdx || !cu.cs->sps->getUseISP() || cu.bdpcmMode || !CU::canUseISP( cu, getFirstComponentOfChannel( cu.chType ) ) || cu.colorTransform 
 #if  ENABLE_DIMD && JVET_V0087_DIMD_NO_ISP
     || cu.dimd
+#endif
+#if JVET_AB0155_SGPM
+      || cu.sgpm
 #endif
     )
   {

@@ -1567,6 +1567,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_W0123_TIMD_FUSION
   WRITE_FLAG( pcSPS->getUseTimd() ? 1 : 0,                                          "sps_timd_enabled_flag");
 #endif
+#if JVET_AB0155_SGPM
+  WRITE_FLAG(pcSPS->getUseSgpm() ? 1 : 0, "sps_sgpm_enabled_flag");
+#endif
   if( pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
     WRITE_FLAG( pcSPS->getUseLMChroma() ? 1 : 0,                                      "sps_cclm_enabled_flag");
@@ -3229,6 +3232,9 @@ void  HLSWriter::codeConstraintInfo  ( const ConstraintInfo* cinfo )
 #endif
 #if JVET_W0123_TIMD_FUSION
     WRITE_FLAG(cinfo->getNoTimdConstraintFlag() ? 1 : 0, "gci_no_timd_constraint_flag" );
+#endif
+#if JVET_AB0155_SGPM
+    WRITE_FLAG(cinfo->getNoSgpmConstraintFlag() ? 1 : 0, "gci_no_sgpm_constraint_flag");
 #endif
 
     /* inter */

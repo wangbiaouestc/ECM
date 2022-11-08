@@ -1813,6 +1813,9 @@ void CABACReader::extend_ref_line(CodingUnit& cu)
 #if ENABLE_DIMD
     || cu.dimd
 #endif
+#if JVET_AB0155_SGPM
+    || cu.sgpm
+#endif
     )
   {
     cu.firstPU->multiRefIdx = 0;
@@ -1933,6 +1936,14 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
 #if JVET_W0123_TIMD_FUSION
   cu_timd_flag(cu);
 #endif
+#if JVET_AB0155_SGPM
+  sgpm_flag(cu);
+  if (cu.sgpm)
+  {
+    return;
+  }
+#endif
+
   extend_ref_line( cu );
   isp_mode( cu );
 #if ENABLE_DIMD
@@ -2129,6 +2140,50 @@ void CABACReader::cu_timd_flag( CodingUnit& cu )
   unsigned ctxId = DeriveCtx::CtxTimdFlag( cu );
   cu.timd = m_BinDecoder.decodeBin( Ctx::TimdFlag(ctxId) );
   DTRACE(g_trace_ctx, D_SYNTAX, "cu_timd_flag() ctx=%d pos=(%d,%d) timd=%d\n", ctxId, cu.lumaPos().x, cu.lumaPos().y, cu.timd);
+}
+#endif
+
+#if JVET_AB0155_SGPM
+void CABACReader::sgpm_flag(CodingUnit &cu)
+{
+  if (!cu.cs->sps->getUseSgpm())
+  {
+    cu.sgpm = false;
+    return;
+  }
+  if (!(cu.lwidth() >= GEO_MIN_CU_SIZE_EX && cu.lheight() >= GEO_MIN_CU_SIZE_EX && cu.lwidth() <= GEO_MAX_CU_SIZE_EX
+        && cu.lheight() <= GEO_MAX_CU_SIZE_EX && cu.lwidth() < 8 * cu.lheight() && cu.lheight() < 8 * cu.lwidth()
+        && cu.lwidth() * cu.lheight() >= SGPM_MIN_PIX))
+  {
+    cu.sgpm = false;
+    return;
+  }
+
+  if (cu.dimd || cu.timd || cu.mipFlag || cu.tmpFlag)
+  {
+    cu.sgpm = false;
+    return;
+  }
+  if (!cu.Y().valid() || cu.predMode != MODE_INTRA || !isLuma(cu.chType))
+  {
+    cu.sgpm = false;
+    return;
+  }
+  if (!(cu.lx() && cu.ly()))
+  {
+    cu.sgpm = false;
+    return;
+  }
+
+  unsigned ctxId = DeriveCtx::CtxSgpmFlag(cu);
+  cu.sgpm        = m_BinDecoder.decodeBin(Ctx::SgpmFlag(ctxId));
+
+  if (cu.sgpm)
+  {
+    uint32_t sgpmIdx = 0;
+    xReadTruncBinCode(sgpmIdx, SGPM_NUM);
+    cu.sgpmIdx = sgpmIdx;
+  }
 }
 #endif
 
@@ -5946,6 +6001,9 @@ void CABACReader::isp_mode( CodingUnit& cu )
   if( !CU::isIntra( cu ) || !isLuma( cu.chType ) || cu.firstPU->multiRefIdx || !cu.cs->sps->getUseISP() || cu.bdpcmMode || !CU::canUseISP( cu, getFirstComponentOfChannel( cu.chType ) ) || cu.colorTransform 
 #if ENABLE_DIMD && JVET_V0087_DIMD_NO_ISP
       || cu.dimd
+#endif
+#if JVET_AB0155_SGPM
+      || cu.sgpm
 #endif
     )
   {

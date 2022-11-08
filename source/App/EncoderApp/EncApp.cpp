@@ -420,6 +420,10 @@ void EncApp::xInitLibCfg()
     m_cEncLib.setNoTimdConstraintFlag(m_noTimdConstraintFlag);
     CHECK(m_noTimdConstraintFlag && m_timd, "TIMD shall be deactivated when m_noTimdConstraintFlag is equal to 1");
 #endif
+#if JVET_AB0155_SGPM
+    m_cEncLib.setNoSgpmConstraintFlag(m_noSgpmConstraintFlag);
+    CHECK(m_noSgpmConstraintFlag && m_sgpm, "SGPM shall be deactivated when m_noSgpmConstraintFlag is equal to 1");
+#endif
 #if ENABLE_OBMC
     m_cEncLib.setNoObmcConstraintFlag(m_noObmcConstraintFlag);
     CHECK(m_noObmcConstraintFlag && m_OBMC, "OBMC shall be deactivated when m_noObmcConstraintFlag is equal to 1");
@@ -556,6 +560,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_W0123_TIMD_FUSION
     m_cEncLib.setNoTimdConstraintFlag(false);
+#endif
+#if JVET_AB0155_SGPM
+    m_cEncLib.setNoSgpmConstraintFlag(false);
 #endif
 #if ENABLE_OBMC
     m_cEncLib.setNoObmcConstraintFlag(false);
@@ -846,6 +853,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_W0123_TIMD_FUSION
   m_cEncLib.setUseTimd                                           ( m_timd );
+#endif
+#if JVET_AB0155_SGPM
+  m_cEncLib.setUseSgpm                                           ( m_sgpm );
 #endif
 #if ENABLE_OBMC
   m_cEncLib.setUseObmc                                           ( m_OBMC );

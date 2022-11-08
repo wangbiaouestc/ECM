@@ -502,6 +502,12 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
     {
       intraMode = PLANAR_IDX;
     }
+#if JVET_AB0155_SGPM
+    if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
+    {
+      intraMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
+    }
+#endif
 #if JVET_V0130_INTRA_TMP
     if( PU::isTmp( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
     {
@@ -732,6 +738,12 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
     if( PU::isTmp( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
     {
       intraMode = PLANAR_IDX;
+    }
+#endif
+#if JVET_AB0155_SGPM
+    if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
+    {
+      intraMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
     }
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -1127,6 +1139,12 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
       if (tu.cu->timd && compID == COMPONENT_Y)
       {
         predMode = MAP131TO67(predMode);
+      }
+#endif
+#if JVET_AB0155_SGPM
+      if (tu.cu->sgpm)
+      {
+        predMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
       }
 #endif
       int ucMode;
@@ -2200,6 +2218,12 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
   if (PU::isTmp(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
   {
     intraMode = PLANAR_IDX;
+  }
+#endif
+#if JVET_AB0155_SGPM
+  if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
+  {
+    intraMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
   }
 #endif
 #if JVET_W0123_TIMD_FUSION

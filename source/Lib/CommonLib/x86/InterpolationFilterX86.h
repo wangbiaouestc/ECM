@@ -3459,6 +3459,717 @@ static void simdFilter( const ClpRng& clpRng, Pel const *src, int srcStride, Pel
   }
 }
 
+#if JVET_AB0155_SGPM
+
+template<X86_VEXT vext> 
+int xSadTM_SSE(const PredictionUnit &pu, const int width, const int height, const int templateWidth,
+                                const int templateHeight, const ComponentID compIdx, PelBuf &predBuf, PelBuf &recBuf,
+                                PelBuf &adBuf)
+{
+  int     sad        = 0;
+  int32_t iPredStride = predBuf.stride;
+  int32_t iRecStride  = recBuf.stride;
+  int32_t iAdStride   = adBuf.stride;
+
+  // top template
+  Pel *piPred = predBuf.buf + templateWidth;
+  // start point of predBuf is (-templateWidth, -templateHeight) of current block
+  Pel *piAd  = adBuf.buf + templateWidth;
+  Pel *piRec = recBuf.buf - templateHeight * iRecStride;   // start point of recBuf is (0,0) of current block
+
+  if (width == 4)
+  {
+    __m128i vzero = _mm_setzero_si128();
+    __m128i vsum32 = vzero;
+    // for luma, to be confirmed
+    for (int y = 0; y < templateHeight; y++)
+    {
+      __m128i vPred = _mm_loadl_epi64((__m128i *) (piPred));
+      __m128i vRec  = _mm_loadl_epi64((__m128i *) (piRec));
+      __m128i vAd   = _mm_abs_epi16(_mm_sub_epi16(vRec, vPred));
+      _mm_storel_epi64((__m128i *) (piAd), vAd);
+      __m128i vsumtemp = _mm_unpacklo_epi16(vAd, vzero);
+      vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+      piPred += iPredStride;
+      piAd += iAdStride;
+      piRec += iRecStride;
+    }
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+    sad  = _mm_cvtsi128_si32(vsum32);
+  }
+#if USE_AVX2
+  else if (0 == (width % 16))
+  {
+    __m256i vzero  = _mm256_setzero_si256();
+    __m256i vsum32 = vzero;
+    for (int y = 0; y < templateHeight; y++)
+    {
+      __m256i vsum16 = vzero;
+      for (int x = 0; x < width; x += 16)
+      {
+        __m256i vPred = _mm256_lddqu_si256((__m256i *) (piPred + x));   // why not aligned with 128/256 bit boundaries
+        __m256i vRec  = _mm256_lddqu_si256((__m256i *) (piRec + x));
+        __m256i vAd   = _mm256_abs_epi16(_mm256_sub_epi16(vRec, vPred));
+        _mm256_storeu_si256((__m256i *) (piAd + x), vAd);
+
+        vsum16 = _mm256_add_epi16(vsum16, vAd);
+      }
+      __m256i vsumtemp = _mm256_add_epi32(_mm256_unpacklo_epi16(vsum16, vzero), _mm256_unpackhi_epi16(vsum16, vzero));
+      vsum32           = _mm256_add_epi32(vsum32, vsumtemp);
+      piPred += iPredStride;
+      piAd += iAdStride;
+      piRec += iRecStride;
+    }
+    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
+    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
+    sad  = _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum32))
+            + _mm_cvtsi128_si32(_mm256_castsi256_si128(_mm256_permute2x128_si256(vsum32, vsum32, 0x11)));
+  }
+#endif
+  else
+  {
+    __m128i vzero  = _mm_setzero_si128();
+    __m128i vsum32 = vzero;
+    for (int y = 0; y < templateHeight; y++)
+    {
+      __m128i vsum16 = vzero;
+      for (int x = 0; x < width; x += 8)
+      {
+        __m128i vPred = _mm_lddqu_si128((__m128i *) (piPred + x));
+        __m128i vRec  = _mm_lddqu_si128((__m128i *) (piRec + x));
+        __m128i vAd   = _mm_abs_epi16(_mm_sub_epi16(vRec, vPred));
+        _mm_storeu_si128((__m128i *) (piAd + x), vAd);
+        vsum16 = _mm_add_epi16(vsum16, vAd);
+      }
+      __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+      vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+      piPred += iPredStride;
+      piAd += iAdStride;
+      piRec += iRecStride;
+    }
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+    sad  = _mm_cvtsi128_si32(vsum32);
+  }
+
+  // left template
+  piPred = predBuf.buf + templateHeight * iPredStride;
+  // start point of predBuf is (-templateWidth, -templateHeight) of current block
+  piAd  = adBuf.buf + templateHeight * iAdStride;
+  piRec = recBuf.buf - templateWidth;   // start point of recBuf is (0,0) of current block
+
+  if (templateWidth == 4)
+  {
+    __m128i vzero  = _mm_setzero_si128();
+    __m128i vsum32 = vzero;
+    // for luma, to be confirmed
+    for (int y = 0; y < height; y++)
+    {
+      __m128i vPred = _mm_loadl_epi64((__m128i *) (piPred));
+      __m128i vRec  = _mm_loadl_epi64((__m128i *) (piRec));
+      __m128i vAd   = _mm_abs_epi16(_mm_sub_epi16(vRec, vPred));
+      _mm_storel_epi64((__m128i *) (piAd), vAd);
+      __m128i vsumtemp = _mm_unpacklo_epi16(vAd, vzero);
+      vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+      piPred += iPredStride;
+      piAd += iAdStride;
+      piRec += iRecStride;
+    }
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+    sad    += _mm_cvtsi128_si32(vsum32);
+  }
+#if USE_AVX2
+  else if (0 == (templateWidth % 16))
+  {
+    __m256i vzero  = _mm256_setzero_si256();
+    __m256i vsum32 = vzero;
+    for (int y = 0; y < height; y++)
+    {
+      __m256i vsum16 = vzero;
+      for (int x = 0; x < templateWidth; x += 16)
+      {
+        __m256i vPred = _mm256_lddqu_si256((__m256i *) (piPred + x));   // why not aligned with 128/256 bit boundaries
+        __m256i vRec  = _mm256_lddqu_si256((__m256i *) (piRec + x));
+        __m256i vAd   = _mm256_abs_epi16(_mm256_sub_epi16(vRec, vPred));
+        _mm256_storeu_si256((__m256i *) (piAd + x), vAd);
+
+        vsum16 = _mm256_add_epi16(vsum16, vAd);
+      }
+      __m256i vsumtemp = _mm256_add_epi32(_mm256_unpacklo_epi16(vsum16, vzero), _mm256_unpackhi_epi16(vsum16, vzero));
+      vsum32           = _mm256_add_epi32(vsum32, vsumtemp);
+      piPred += iPredStride;
+      piAd += iAdStride;
+      piRec += iRecStride;
+    }
+    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
+    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
+    sad    += _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum32))
+          + _mm_cvtsi128_si32(_mm256_castsi256_si128(_mm256_permute2x128_si256(vsum32, vsum32, 0x11)));
+  }
+#endif
+  else if (0 == (templateWidth % 8))
+  {
+    __m128i vzero  = _mm_setzero_si128();
+    __m128i vsum32 = vzero;
+    for (int y = 0; y < height; y++)
+    {
+      __m128i vsum16 = vzero;
+      for (int x = 0; x < templateWidth; x += 8)
+      {
+        __m128i vPred = _mm_lddqu_si128((__m128i *) (piPred + x));
+        __m128i vRec  = _mm_lddqu_si128((__m128i *) (piRec + x));
+        __m128i vAd   = _mm_abs_epi16(_mm_sub_epi16(vRec, vPred));
+        _mm_storeu_si128((__m128i *) (piAd + x), vAd);
+        vsum16 = _mm_add_epi16(vsum16, vAd);
+      }
+      __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+      vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+      piPred += iPredStride;
+      piAd += iAdStride;
+      piRec += iRecStride;
+    }
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+    sad  += _mm_cvtsi128_si32(vsum32);
+  }
+  else
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < templateWidth; x++)
+      {
+        *piAd = abs(*piRec - *piPred);
+        sad += *piAd;
+        piRec++;
+        piPred++;
+        piAd++;
+      }
+
+      piPred += (iPredStride - templateWidth);
+      piAd += (iAdStride - templateWidth);
+      piRec += (iRecStride - templateWidth);
+    }
+  }
+
+  return sad;
+}
+
+template<X86_VEXT vext>
+int xSgpmSadTM_SSE(const PredictionUnit &pu, const int width, const int height, const int templateWidth,
+                    const int templateHeight, const ComponentID compIdx, const uint8_t splitDir, PelBuf &adBuf)
+{
+  int      sum        = 0;
+  int16_t  wIdx   = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2_EX;
+  int16_t  hIdx   = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2_EX;
+  int16_t  angle  = g_GeoParams[splitDir][0];
+  int16_t  stepY  = 0;
+  int16_t  stepX  = 1;
+  int16_t *weightMask = nullptr;
+
+  if (g_angle2mirror[angle] == 2)
+  {
+    stepY = -GEO_WEIGHT_MASK_SIZE_EXT;
+    weightMask = &g_globalGeoWeightsTpl[g_angle2mask[angle]]
+                                       [(GEO_WEIGHT_MASK_SIZE_EXT - 1
+                                                       - g_weightOffsetEx[splitDir][hIdx][wIdx][1] - GEO_TM_ADDED_WEIGHT_MASK_SIZE)
+                                                        * GEO_WEIGHT_MASK_SIZE_EXT
+                                                      + g_weightOffsetEx[splitDir][hIdx][wIdx][0] + GEO_TM_ADDED_WEIGHT_MASK_SIZE];
+  }
+  else if (g_angle2mirror[angle] == 1)
+  {
+    stepX  = -1;
+    stepY  = GEO_WEIGHT_MASK_SIZE_EXT;
+    weightMask = &g_globalGeoWeightsTpl[g_angle2mask[angle]]
+                                     [(g_weightOffsetEx[splitDir][hIdx][wIdx][1] + GEO_TM_ADDED_WEIGHT_MASK_SIZE)
+                                        * GEO_WEIGHT_MASK_SIZE_EXT
+                                      + (GEO_WEIGHT_MASK_SIZE_EXT - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][0]
+                                         - GEO_TM_ADDED_WEIGHT_MASK_SIZE)];
+  }
+  else
+  {
+    stepY = GEO_WEIGHT_MASK_SIZE_EXT;
+    weightMask = &g_globalGeoWeightsTpl[g_angle2mask[angle]]
+                                       [(g_weightOffsetEx[splitDir][hIdx][wIdx][1] + GEO_TM_ADDED_WEIGHT_MASK_SIZE)
+                                                        * GEO_WEIGHT_MASK_SIZE_EXT
+                                                      + g_weightOffsetEx[splitDir][hIdx][wIdx][0] + GEO_TM_ADDED_WEIGHT_MASK_SIZE];
+  }
+
+  int32_t iAdStride = adBuf.stride;
+
+  if (compIdx != COMPONENT_Y && pu.chromaFormat == CHROMA_420)
+  {
+    stepY <<= 1;
+  }
+
+  // top template
+  Pel *piAd = adBuf.buf + templateWidth;   // start point of adBuf is (-templateWidth, -templateHeight) of current block
+  int16_t *weightBackup = weightMask;
+  weightMask            = weightMask - templateHeight * stepY;
+  if (width == 4)
+  {
+    __m128i vzero  = _mm_setzero_si128();
+    __m128i vsum32 = vzero;
+    for (int y = 0; y < templateHeight; y++)
+    {
+      __m128i vAd = _mm_loadl_epi64((__m128i *) (piAd));
+      __m128i vMask;
+
+      if (g_angle2mirror[angle] == 1)
+      {
+        vMask                      = _mm_loadl_epi64((__m128i *) (weightMask - (4 - 1)));
+        const __m128i shuffle_mask = _mm_set_epi8(15, 14, 13, 12, 11, 10, 9, 8, 1, 0, 3, 2, 5, 4, 7, 6);
+        vMask                      = _mm_shuffle_epi8(vMask, shuffle_mask);
+      }
+      else
+      {
+        vMask = _mm_loadl_epi64((__m128i *) weightMask);
+      }
+      vsum32 = _mm_add_epi32(vsum32, _mm_madd_epi16(vMask, vAd));
+
+      piAd += iAdStride;
+      weightMask += stepY;
+    }
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+    sum    = _mm_cvtsi128_si32(vsum32);
+  }
+#if USE_AVX2
+  else if (0 == (width % 16))
+  {
+    __m256i vzero  = _mm256_setzero_si256();
+    __m256i vsum32 = vzero;
+    for (int y = 0; y < templateHeight; y++)
+    {
+      for (int x = 0; x < width; x += 16)
+      {
+        __m256i vAd = _mm256_lddqu_si256((__m256i *) (piAd + x));   
+
+        __m256i vMask;
+
+        if (g_angle2mirror[angle] == 1)
+        {
+          vMask                         = _mm256_lddqu_si256((__m256i *) (weightMask - x - (16 - 1)));
+          const __m256i shuffle_mask = _mm256_set_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14, 1, 0, 3, 2,
+                                                       5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+          vMask                         = _mm256_shuffle_epi8(vMask, shuffle_mask);
+          vMask                         = _mm256_permute4x64_epi64(vMask, _MM_SHUFFLE(1, 0, 3, 2));
+        }
+        else
+        {
+          vMask = _mm256_lddqu_si256((__m256i *) (weightMask + x));
+        }
+        vsum32 = _mm256_add_epi32(vsum32, _mm256_madd_epi16(vMask, vAd));
+      }
+      piAd += iAdStride;
+      weightMask += stepY;
+    }
+    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
+    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
+    sum    = _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum32))
+          + _mm_cvtsi128_si32(_mm256_castsi256_si128(_mm256_permute2x128_si256(vsum32, vsum32, 0x11)));
+  }
+#endif
+  else
+  {
+    __m128i vzero  = _mm_setzero_si128();
+    __m128i vsum32 = vzero;
+    for (int y = 0; y < templateHeight; y++)
+    {
+      for (int x = 0; x < width; x += 8)
+      {
+        __m128i vAd = _mm_lddqu_si128((__m128i *) (piAd + x));
+        __m128i vMask;
+
+        if (g_angle2mirror[angle] == 1)
+        {
+          vMask                         = _mm_lddqu_si128((__m128i *) (weightMask - x - (8 - 1)));
+          const __m128i shuffle_mask = _mm_set_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+          vMask                         = _mm_shuffle_epi8(vMask, shuffle_mask);
+        }
+        else
+        {
+          vMask = _mm_lddqu_si128((__m128i *) (weightMask + x));
+        }
+        vsum32     = _mm_add_epi32(vsum32, _mm_madd_epi16(vMask, vAd));
+      }
+      piAd += iAdStride;
+      weightMask += stepY;
+    }
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+    sum    = _mm_cvtsi128_si32(vsum32);
+  }
+
+  // left template
+  piAd   = adBuf.buf + templateHeight * iAdStride;
+  weightMask = weightBackup - templateWidth * stepX;
+  if (templateWidth == 4)
+  {
+    __m128i vzero  = _mm_setzero_si128();
+    __m128i vsum32 = vzero;
+    for (int y = 0; y < height; y++)
+    {
+      __m128i vAd = _mm_loadl_epi64((__m128i *) (piAd));
+      __m128i vMask;
+
+      if (g_angle2mirror[angle] == 1)
+      {
+        vMask                      = _mm_loadl_epi64((__m128i *) (weightMask - (4 - 1)));
+        const __m128i shuffle_mask = _mm_set_epi8(15, 14, 13, 12, 11, 10, 9, 8, 1, 0, 3, 2, 5, 4, 7, 6);
+        vMask                      = _mm_shuffle_epi8(vMask, shuffle_mask);
+      }
+      else
+      {
+        vMask = _mm_loadl_epi64((__m128i *) weightMask);
+      }
+      vsum32 = _mm_add_epi32(vsum32, _mm_madd_epi16(vMask, vAd));
+
+      piAd += iAdStride;
+      weightMask += stepY;
+    }
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+    sum    += _mm_cvtsi128_si32(vsum32);
+  }
+#if USE_AVX2
+  else if (0 == (templateWidth % 16))
+  {
+    __m256i vzero  = _mm256_setzero_si256();
+    __m256i vsum32 = vzero;
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < templateWidth; x += 16)
+      {
+        __m256i vAd = _mm256_lddqu_si256((__m256i *) (piAd + x));
+
+        __m256i vMask;
+
+        if (g_angle2mirror[angle] == 1)
+        {
+          vMask                      = _mm256_lddqu_si256((__m256i *) (weightMask - x - (16 - 1)));
+          const __m256i shuffle_mask = _mm256_set_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14, 1, 0, 3, 2,
+                                                       5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+          vMask                      = _mm256_shuffle_epi8(vMask, shuffle_mask);
+          vMask                      = _mm256_permute4x64_epi64(vMask, _MM_SHUFFLE(1, 0, 3, 2));
+        }
+        else
+        {
+          vMask = _mm256_lddqu_si256((__m256i *) (weightMask + x));
+        }
+        vsum32 = _mm256_add_epi32(vsum32, _mm256_madd_epi16(vMask, vAd));
+      }
+      piAd += iAdStride;
+      weightMask += stepY;
+    }
+    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
+    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
+    sum    += _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum32))
+          + _mm_cvtsi128_si32(_mm256_castsi256_si128(_mm256_permute2x128_si256(vsum32, vsum32, 0x11)));
+  }
+#endif
+  else if (0 == (templateWidth % 8))
+  {
+    __m128i vzero  = _mm_setzero_si128();
+    __m128i vsum32 = vzero;
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < templateWidth; x += 8)
+      {
+        __m128i vAd = _mm_lddqu_si128((__m128i *) (piAd + x));
+        __m128i vMask;
+
+        if (g_angle2mirror[angle] == 1)
+        {
+          vMask                      = _mm_lddqu_si128((__m128i *) (weightMask - x - (8 - 1)));
+          const __m128i shuffle_mask = _mm_set_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+          vMask                      = _mm_shuffle_epi8(vMask, shuffle_mask);
+        }
+        else
+        {
+          vMask = _mm_lddqu_si128((__m128i *) (weightMask + x));
+        }
+        vsum32 = _mm_add_epi32(vsum32, _mm_madd_epi16(vMask, vAd));
+      }
+      piAd += iAdStride;
+      weightMask += stepY;
+    }
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+    sum    += _mm_cvtsi128_si32(vsum32);
+  }
+  else
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < templateWidth; x++)
+      {
+        sum += *piAd * (*weightMask);
+        piAd++;
+        weightMask += stepX;
+      }
+
+      piAd += (iAdStride - templateWidth);
+      weightMask += (stepY - templateWidth * stepX);
+    }
+  }
+
+  return sum;
+}
+
+template<X86_VEXT vext>
+void xWeightedSgpm_SSE(const PredictionUnit &pu, const uint32_t width, const uint32_t height,
+                         const ComponentID compIdx, const uint8_t splitDir, PelBuf &predDst, PelBuf &predSrc0,
+                         PelBuf &predSrc1)
+{
+  Pel *   dst        = predDst.buf;
+  Pel *   src0       = predSrc0.buf;
+  Pel *   src1       = predSrc1.buf;
+  int32_t strideDst  = predDst.stride;
+  int32_t strideSrc0 = predSrc0.stride;
+  int32_t strideSrc1 = predSrc1.stride;
+
+  //const char   log2WeightBase = 3;
+  const ClpRng clpRng         = pu.cu->slice->clpRngs().comp[compIdx];
+
+  const int32_t shiftWeighted  = 5;
+  const int32_t offsetWeighted = 16;
+  int16_t  wIdx   = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2_EX;
+  int16_t  hIdx   = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2_EX;
+  int16_t  angle  = g_GeoParams[splitDir][0];
+  int16_t  stepY  = 0;
+  int16_t *weight = nullptr;
+  
+  if (g_angle2mirror[angle] == 2)
+  {
+    stepY = -GEO_WEIGHT_MASK_SIZE;
+    weight =
+      &g_globalGeoWeights[GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())][g_angle2mask[angle]]
+                         [(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][1])
+                            * GEO_WEIGHT_MASK_SIZE
+                          + g_weightOffsetEx[splitDir][hIdx][wIdx][0]];
+  }
+  else if (g_angle2mirror[angle] == 1)
+  {
+    stepY = GEO_WEIGHT_MASK_SIZE;
+    weight =
+      &g_globalGeoWeights[GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())][g_angle2mask[angle]]
+                         [g_weightOffsetEx[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE
+                          + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][0])];
+  }
+  else
+  {
+    stepY = GEO_WEIGHT_MASK_SIZE;
+    weight =
+      &g_globalGeoWeights[GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())][g_angle2mask[angle]]
+                         [g_weightOffsetEx[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE
+                          + g_weightOffsetEx[splitDir][hIdx][wIdx][0]];
+  }
+  const __m128i mmEight = _mm_set1_epi16(32);
+  const __m128i mmOffset = _mm_set1_epi32(offsetWeighted);
+  const __m128i mmShift  = _mm_cvtsi32_si128(shiftWeighted);
+  const __m128i mmMin    = _mm_set1_epi16(clpRng.min);
+  const __m128i mmMax    = _mm_set1_epi16(clpRng.max);
+
+  if (compIdx != COMPONENT_Y && pu.chromaFormat == CHROMA_420)
+    stepY <<= 1;
+  if (width == 4)
+  {
+    // for luma, to be confirmed
+    for (int y = 0; y < height; y++)
+    {
+      __m128i s0 = _mm_loadl_epi64((__m128i *) (src0));
+      __m128i s1 = _mm_loadl_epi64((__m128i *) (src1));
+      __m128i w0;
+      if (compIdx != COMPONENT_Y && pu.chromaFormat != CHROMA_444)
+      {
+        if (g_angle2mirror[angle] == 1)
+        {
+          w0                         = _mm_loadu_si128((__m128i *) (weight - (8 - 1)));
+          const __m128i shuffle_mask = _mm_set_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+          w0                         = _mm_shuffle_epi8(w0, shuffle_mask);
+        }
+        else
+        {
+          w0 = _mm_loadu_si128((__m128i *) (weight));
+        }
+        w0         = _mm_shuffle_epi8(w0, _mm_setr_epi8(0, 1, 4, 5, 8, 9, 12, 13, 0, 0, 0, 0, 0, 0, 0, 0));
+      }
+      else
+      {
+        if (g_angle2mirror[angle] == 1)
+        {
+          w0                         = _mm_loadl_epi64((__m128i *) (weight - (4 - 1)));
+          const __m128i shuffle_mask = _mm_set_epi8(15,14,13,12,11,10,9,8,1,0,3,2,5,4,7,6);
+          w0                         = _mm_shuffle_epi8(w0, shuffle_mask);
+        }
+        else
+        {
+          w0 = _mm_loadl_epi64((__m128i *) weight);
+        }
+      }
+      
+      __m128i w1 = _mm_sub_epi16(mmEight, w0);
+      s0         = _mm_unpacklo_epi16(s0, s1);
+      w0         = _mm_unpacklo_epi16(w0, w1);
+      s0         = _mm_add_epi32(_mm_madd_epi16(s0, w0), mmOffset);
+      s0         = _mm_sra_epi32(s0, mmShift);
+      s0         = _mm_packs_epi32(s0, s0);
+      s0         = _mm_min_epi16(mmMax, _mm_max_epi16(s0, mmMin));
+      _mm_storel_epi64((__m128i *) (dst), s0);
+      dst += strideDst;
+      src0 += strideSrc0;
+      src1 += strideSrc1;
+      weight += stepY;
+    }
+  }
+#if USE_AVX2
+  else if (0 == (width % 16))
+  {
+    const __m256i mmEightAVX2 = _mm256_set1_epi16(32);
+    const __m256i mmOffsetAVX2 = _mm256_set1_epi32(offsetWeighted);
+    const __m256i mmMinAVX2    = _mm256_set1_epi16(clpRng.min);
+    const __m256i mmMaxAVX2    = _mm256_set1_epi16(clpRng.max);
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x += 16)
+      {
+        __m256i s0 = _mm256_lddqu_si256((__m256i *) (src0 + x));   // why not aligned with 128/256 bit boundaries
+        __m256i s1 = _mm256_lddqu_si256((__m256i *) (src1 + x));
+
+        __m256i w0 = _mm256_lddqu_si256((__m256i *) (weight + x));
+        if (compIdx != COMPONENT_Y && pu.chromaFormat != CHROMA_444)
+        {
+          const __m256i mask = _mm256_set_epi16(0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1);
+          __m256i       w0p0, w0p1;
+          if (g_angle2mirror[angle] == 1)
+          {
+            w0p0 = _mm256_lddqu_si256(
+              (__m256i *) (weight - (x << 1) - (16 - 1)));   // first sub-sample the required weights.
+            w0p1                       = _mm256_lddqu_si256((__m256i *) (weight - (x << 1) - 16 - (16 - 1)));
+            const __m256i shuffle_mask = _mm256_set_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14, 1, 0, 3,
+                                                         2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+            w0p0                       = _mm256_shuffle_epi8(w0p0, shuffle_mask);
+            w0p0                       = _mm256_permute4x64_epi64(w0p0, _MM_SHUFFLE(1, 0, 3, 2));
+            w0p1                       = _mm256_shuffle_epi8(w0p1, shuffle_mask);
+            w0p1                       = _mm256_permute4x64_epi64(w0p1, _MM_SHUFFLE(1, 0, 3, 2));
+          }
+          else
+          {
+            w0p0 = _mm256_lddqu_si256((__m256i *) (weight + (x << 1)));   // first sub-sample the required weights.
+            w0p1 = _mm256_lddqu_si256((__m256i *) (weight + (x << 1) + 16));
+          }
+          w0p0 = _mm256_mullo_epi16(w0p0, mask);
+          w0p1 = _mm256_mullo_epi16(w0p1, mask);
+          w0   = _mm256_packs_epi16(w0p0, w0p1);
+          w0   = _mm256_permute4x64_epi64(w0, _MM_SHUFFLE(3, 1, 2, 0));
+        }
+        else
+        {
+          if (g_angle2mirror[angle] == 1)
+          {
+            w0                         = _mm256_lddqu_si256((__m256i *) (weight - x - (16 - 1)));
+            const __m256i shuffle_mask = _mm256_set_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14, 1, 0, 3,
+                                                         2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+            w0                         = _mm256_shuffle_epi8(w0, shuffle_mask);
+            w0                         = _mm256_permute4x64_epi64(w0, _MM_SHUFFLE(1, 0, 3, 2));
+          }
+          else
+          {
+            w0 = _mm256_lddqu_si256((__m256i *) (weight + x));
+          }
+        }
+        __m256i w1 = _mm256_sub_epi16(mmEightAVX2, w0);
+
+        __m256i s0tmp = _mm256_unpacklo_epi16(s0, s1);
+        __m256i w0tmp = _mm256_unpacklo_epi16(w0, w1);
+        s0tmp         = _mm256_add_epi32(_mm256_madd_epi16(s0tmp, w0tmp), mmOffsetAVX2);
+        s0tmp         = _mm256_sra_epi32(s0tmp, mmShift);
+
+        s0 = _mm256_unpackhi_epi16(s0, s1);
+        w0 = _mm256_unpackhi_epi16(w0, w1);
+        s0 = _mm256_add_epi32(_mm256_madd_epi16(s0, w0), mmOffsetAVX2);
+        s0 = _mm256_sra_epi32(s0, mmShift);
+
+        s0 = _mm256_packs_epi32(s0tmp, s0);
+        s0 = _mm256_min_epi16(mmMaxAVX2, _mm256_max_epi16(s0, mmMinAVX2));
+        _mm256_storeu_si256((__m256i *) (dst + x), s0);
+      }
+      dst += strideDst;
+      src0 += strideSrc0;
+      src1 += strideSrc1;
+      weight += stepY;
+    }
+  }
+#endif
+  else
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x += 8)
+      {
+        __m128i s0 = _mm_lddqu_si128((__m128i *) (src0 + x));
+        __m128i s1 = _mm_lddqu_si128((__m128i *) (src1 + x));
+        __m128i w0;
+        if (compIdx != COMPONENT_Y && pu.chromaFormat != CHROMA_444)
+        {
+          const __m128i mask = _mm_set_epi16(0, 1, 0, 1, 0, 1, 0, 1);
+          __m128i       w0p0, w0p1;
+          if (g_angle2mirror[angle] == 1)
+          {
+            w0p0 =
+              _mm_lddqu_si128((__m128i *) (weight - (x << 1) - (8 - 1)));   // first sub-sample the required weights.
+            w0p1                       = _mm_lddqu_si128((__m128i *) (weight - (x << 1) - 8 - (8 - 1)));
+            const __m128i shuffle_mask = _mm_set_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+            w0p0                       = _mm_shuffle_epi8(w0p0, shuffle_mask);
+            w0p1                       = _mm_shuffle_epi8(w0p1, shuffle_mask);
+          }
+          else
+          {
+            w0p0 = _mm_lddqu_si128((__m128i *) (weight + (x << 1)));   // first sub-sample the required weights.
+            w0p1 = _mm_lddqu_si128((__m128i *) (weight + (x << 1) + 8));
+          }
+          w0p0 = _mm_mullo_epi16(w0p0, mask);
+          w0p1 = _mm_mullo_epi16(w0p1, mask);
+          w0   = _mm_packs_epi32(w0p0, w0p1);
+        }
+        else
+        {
+          if (g_angle2mirror[angle] == 1)
+          {
+            w0                         = _mm_lddqu_si128((__m128i *) (weight - x - (8 - 1)));
+            const __m128i shuffle_mask = _mm_set_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14);
+            w0                         = _mm_shuffle_epi8(w0, shuffle_mask);
+          }
+          else
+          {
+            w0 = _mm_lddqu_si128((__m128i *) (weight + x));
+          }
+        }
+        __m128i w1 = _mm_sub_epi16(mmEight, w0);
+
+        __m128i s0tmp = _mm_unpacklo_epi16(s0, s1);
+        __m128i w0tmp = _mm_unpacklo_epi16(w0, w1);
+        s0tmp         = _mm_add_epi32(_mm_madd_epi16(s0tmp, w0tmp), mmOffset);
+        s0tmp         = _mm_sra_epi32(s0tmp, mmShift);
+
+        s0 = _mm_unpackhi_epi16(s0, s1);
+        w0 = _mm_unpackhi_epi16(w0, w1);
+        s0 = _mm_add_epi32(_mm_madd_epi16(s0, w0), mmOffset);
+        s0 = _mm_sra_epi32(s0, mmShift);
+
+        s0 = _mm_packs_epi32(s0tmp, s0);
+        s0 = _mm_min_epi16(mmMax, _mm_max_epi16(s0, mmMin));
+        _mm_storeu_si128((__m128i *) (dst + x), s0);
+      }
+      dst += strideDst;
+      src0 += strideSrc0;
+      src1 += strideSrc1;
+      weight += stepY;
+    }
+  }
+}
+#endif
+
 template< X86_VEXT vext >
 #if JVET_AA0058_GPM_ADP_BLD
 void xWeightedGeoBlk_SSE(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, const uint8_t bldIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
@@ -4242,6 +4953,11 @@ void InterpolationFilter::_initInterpolationFilterX86()
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   m_weightedGeoTplA = xWeightedGeoTpl_SSE<vext, true>;
+#endif
+#if JVET_AB0155_SGPM
+  m_weightedSgpm = xWeightedSgpm_SSE<vext>;
+  m_sadTM = xSadTM_SSE<vext>;
+  m_sgpmSadTM = xSgpmSadTM_SSE<vext>;
 #endif
 }
 
