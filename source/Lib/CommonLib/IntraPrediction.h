@@ -228,6 +228,9 @@ private:
 
   IntraPredParam m_ipaParam;
 
+#if JVET_AB0067_MIP_DIMD_LFNST
+  Pel* m_pMipTemp;
+#endif
   Pel* m_piTemp;
   Pel* m_pMdlmTemp; // for MDLM mode
 #if JVET_AA0126_GLM
@@ -365,6 +368,9 @@ public:
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   static void deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBuf &recoBufCb, const CPelBuf &recoBufCr, const CompArea &areaY, const CompArea &areaCb, const CompArea &areaCr, CodingUnit &cu);
 #endif
+#if JVET_AB0067_MIP_DIMD_LFNST && ENABLE_DIMD
+  static int deriveDimdMipMode(PelBuf& reducedPred, int width, int height, CodingUnit& cu);
+#endif
   static int  buildHistogram      ( const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int* piHistogram, int direction, int bw, int bh );
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -451,7 +457,11 @@ public:
 
   // Matrix-based intra prediction
   void initIntraMip               (const PredictionUnit &pu, const CompArea &area);
+#if JVET_AB0067_MIP_DIMD_LFNST
+  void predIntraMip(const ComponentID compId, PelBuf& piPred, const PredictionUnit& pu, bool useDimd = false);
+#else
   void predIntraMip               (const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
+#endif
 
   template<bool lmcs>
   void geneWeightedPred           ( const ComponentID compId, PelBuf& pred, const PredictionUnit &pu, const PelBuf& interPred, const PelBuf& intraPred, const Pel* pLUT = nullptr );

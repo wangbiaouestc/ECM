@@ -500,7 +500,11 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
     }
     if (PU::isMIP(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
     {
+#if JVET_AB0067_MIP_DIMD_LFNST
+      intraMode = tu.cu->mipDimdMode;
+#else
       intraMode = PLANAR_IDX;
+#endif
     }
 #if JVET_AB0155_SGPM
     if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
@@ -732,7 +736,11 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
     }
     if (PU::isMIP(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
     {
+#if JVET_AB0067_MIP_DIMD_LFNST
+      intraMode = tu.cu->mipDimdMode;
+#else
       intraMode = PLANAR_IDX;
+#endif
     }
 #if JVET_V0130_INTRA_TMP
     if( PU::isTmp( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
@@ -2212,7 +2220,11 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
   }
   if (PU::isMIP(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
   {
+#if JVET_AB0067_MIP_DIMD_LFNST
+    intraMode = tu.cu->mipDimdMode;
+#else
     intraMode = PLANAR_IDX;
+#endif
   }
 #if JVET_V0130_INTRA_TMP
   if (PU::isTmp(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))

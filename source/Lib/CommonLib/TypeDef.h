@@ -260,6 +260,7 @@
 #endif
 #endif
 #define JVET_AA0133_INTER_MTS_OPT                         1 // JVET-AA0133: Inter MTS optimization
+#define JVET_AB0067_MIP_DIMD_LFNST                        1 // JVET-AB0067: Modification of LFNST for MIP coded block
 
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision

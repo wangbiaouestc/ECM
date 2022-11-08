@@ -641,7 +641,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #endif
     {
       m_pcIntraPred->initIntraMip( pu, area );
+#if JVET_AB0067_MIP_DIMD_LFNST
+      m_pcIntraPred->predIntraMip( compID, piPred, pu, pu.cu->lfnstIdx > 0 ? true : false);
+#else
       m_pcIntraPred->predIntraMip( compID, piPred, pu );
+#endif
     }
     else
     {
@@ -865,7 +869,11 @@ void DecCu::xIntraRecACTBlk(TransformUnit& tu)
 #endif
     {
       m_pcIntraPred->initIntraMip(pu, area);
+#if JVET_AB0067_MIP_DIMD_LFNST
+      m_pcIntraPred->predIntraMip(compID, piPred, pu, pu.cu->lfnstIdx > 0 ? true : false);
+#else
       m_pcIntraPred->predIntraMip(compID, piPred, pu);
+#endif
     }
     else
     {

@@ -104,6 +104,9 @@ IntraPrediction::IntraPrediction()
 #if JVET_W0123_TIMD_FUSION
   m_timdSatdCost = nullptr;
 #endif
+  #if JVET_AB0067_MIP_DIMD_LFNST
+  m_pMipTemp = nullptr;
+#endif
   m_piTemp = nullptr;
   m_pMdlmTemp = nullptr;
 #if JVET_AA0126_GLM
@@ -156,6 +159,10 @@ void IntraPrediction::destroy()
   m_sgpmBuffer.clear();
 #endif
 
+#if JVET_AB0067_MIP_DIMD_LFNST
+  delete[] m_pMipTemp;
+  m_pMipTemp = nullptr;
+#endif
   delete[] m_piTemp;
   m_piTemp = nullptr;
   delete[] m_pMdlmTemp;
@@ -273,6 +280,12 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
   }
 #endif
 
+#if JVET_AB0067_MIP_DIMD_LFNST
+  if (m_pMipTemp == nullptr)
+  {
+    m_pMipTemp = new Pel[(MAX_CU_SIZE + 1) * (MAX_CU_SIZE + 1)];
+  }
+#endif
   if (m_piTemp == nullptr)
   {
     m_piTemp = new Pel[(MAX_CU_SIZE + 1) * (MAX_CU_SIZE + 1)];
@@ -5350,6 +5363,38 @@ void IntraPrediction::deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBu
 }
 #endif
 
+#if JVET_AB0067_MIP_DIMD_LFNST && ENABLE_DIMD
+int IntraPrediction::deriveDimdMipMode(PelBuf& reducedPred, int width, int height, CodingUnit& cu)
+{
+  if (!cu.slice->getSPS()->getUseDimd())
+  {
+    return PLANAR_IDX;
+  }
+  int sigcnt = 0;
+  const Pel* pPred = reducedPred.buf;
+  const int iStride = reducedPred.stride;
+
+  int histogram[NUM_LUMA_MODE] = { 0 };
+
+  pPred = pPred + iStride + 1;
+  sigcnt += buildHistogram(pPred, iStride, height - 2, width - 2, histogram, 0, width - 2, height - 2);
+
+  int firstAmp = 0, curAmp = 0;
+  int firstMode = 0, curMode = 0;
+  for (int i = 0; i < NUM_LUMA_MODE; i++)
+  {
+    curAmp = histogram[i];
+    curMode = i;
+    if (curAmp > firstAmp)
+    {
+      firstAmp = curAmp;
+      firstMode = curMode;
+    }
+  }
+  return firstMode;
+}
+#endif
+
 int IntraPrediction::buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int* piHistogram, int direction, int bw, int bh)
 {
   const int wStep = 1, hStep = 1;
@@ -6654,7 +6699,11 @@ void IntraPrediction::initIntraMip( const PredictionUnit &pu, const CompArea &ar
                                         pu.cu->slice->getSPS()->getBitDepth(toChannelType(area.compID)), area.compID);
 }
 
+#if JVET_AB0067_MIP_DIMD_LFNST
+void IntraPrediction::predIntraMip(const ComponentID compId, PelBuf& piPred, const PredictionUnit& pu, bool useDimd)
+#else
 void IntraPrediction::predIntraMip( const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu )
+#endif
 {
   CHECK( piPred.width > MIP_MAX_WIDTH || piPred.height > MIP_MAX_HEIGHT, "Error: block size not supported for MIP" );
   CHECK( piPred.width != (1 << floorLog2(piPred.width)) || piPred.height != (1 << floorLog2(piPred.height)), "Error: expecting blocks of size 2^M x 2^N" );
@@ -6682,8 +6731,35 @@ void IntraPrediction::predIntraMip( const ComponentID compId, PelBuf &piPred, co
   CHECK(modeIdx >= getNumModesMip(piPred), "Error: Wrong MIP mode index");
 
   static_vector<int, MIP_MAX_WIDTH* MIP_MAX_HEIGHT> predMip( piPred.width * piPred.height );
+#if JVET_AB0067_MIP_DIMD_LFNST
+  if (useDimd)
+  {
+    int sizeId = getMipSizeId(Size(piPred.width, piPred.height));
+    int reducedPredSize = (sizeId < 2) ? 4 : 8;
+    static_vector<int, MIP_MAX_WIDTH* MIP_MAX_HEIGHT> reducedPred(reducedPredSize * reducedPredSize);
+    m_matrixIntraPred.predBlock(predMip.data(), modeIdx, transposeFlag, bitDepth, compId, reducedPred.data());
+    int    iLumaStride = MAX_CU_SIZE + 1;
+    PelBuf reducedPredTemp = PelBuf(m_pMipTemp + iLumaStride + 1, iLumaStride, Size(reducedPredSize, reducedPredSize));
+    Pel* pReducePred = reducedPredTemp.buf;
+    int idx = 0;
+    for (int y = 0; y < reducedPredSize; y++)
+    {
+      for (int x = 0; x < reducedPredSize; x++)
+      {
+        pReducePred[x] = Pel(reducedPred[idx++]);
+      }
+      pReducePred += reducedPredTemp.stride;
+    }
+    int iMode = deriveDimdMipMode(reducedPredTemp, reducedPredSize, reducedPredSize, *pu.cu);
+    pu.cu->mipDimdMode = iMode;
+  }
+  else
+  {
+    m_matrixIntraPred.predBlock(predMip.data(), modeIdx, transposeFlag, bitDepth, compId);
+  }
+#else
   m_matrixIntraPred.predBlock(predMip.data(), modeIdx, transposeFlag, bitDepth, compId);
-
+#endif
   Pel *pred = piPred.buf;
   int idx = 0;
 

@@ -323,6 +323,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   smvdMode        = other.smvdMode;
   ispMode           = other.ispMode;
   mipFlag           = other.mipFlag;
+#if JVET_AB0067_MIP_DIMD_LFNST
+  mipDimdMode       = other.mipDimdMode;
+#endif
 #if JVET_V0130_INTRA_TMP
   tmpFlag           = other.tmpFlag;
 #endif
@@ -430,6 +433,9 @@ void CodingUnit::initData()
   smvdMode        = 0;
   ispMode           = 0;
   mipFlag           = false;
+#if JVET_AB0067_MIP_DIMD_LFNST
+  mipDimdMode       = 0;
+#endif
 #if JVET_V0130_INTRA_TMP
   tmpFlag = false;
 #endif

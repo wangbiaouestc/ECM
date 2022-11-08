@@ -120,8 +120,13 @@ void MatrixIntraPrediction::prepareInputForPred(const CPelBuf &pSrc, const Area 
   }
 }
 
+#if JVET_AB0067_MIP_DIMD_LFNST
+void MatrixIntraPrediction::predBlock(int* const result, const int modeIdx, const bool transpose, const int bitDepth,
+                                      const ComponentID compId, int* reducedResult)
+#else
 void MatrixIntraPrediction::predBlock(int *const result, const int modeIdx, const bool transpose, const int bitDepth,
                                       const ComponentID compId)
+#endif
 {
   CHECK(m_component != compId, "Boundary has not been prepared for this component.");
 
@@ -133,6 +138,12 @@ void MatrixIntraPrediction::predBlock(int *const result, const int modeIdx, cons
   int* const       reducedPred     = needUpsampling ? bufReducedPred.data() : result;
   const int* const reducedBoundary = transpose ? m_reducedBoundaryTransposed.data() : m_reducedBoundary.data();
   computeReducedPred(reducedPred, reducedBoundary, matrix, transpose, bitDepth);
+#if JVET_AB0067_MIP_DIMD_LFNST
+  if (reducedResult != nullptr)
+  {
+    memcpy(reducedResult, reducedPred, m_reducedPredSize * m_reducedPredSize * sizeof(int));
+  }
+#endif
   if( needUpsampling )
   {
     predictionUpsampling( result, reducedPred );

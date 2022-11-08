@@ -15146,7 +15146,11 @@ int getMipSizeId(const Size& block)
 
 bool allowLfnstWithMip(const Size& block)
 {
+#if JVET_AB0067_MIP_DIMD_LFNST
+  if (block.width >= 4 && block.height >= 4)
+#else
   if (block.width >= 16 && block.height >= 16)
+#endif
   {
     return true;
   }

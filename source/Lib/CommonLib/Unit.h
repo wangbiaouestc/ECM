@@ -353,6 +353,9 @@ struct CodingUnit : public UnitArea
   uint8_t         BcwIdx;
   int8_t          refIdxBi[2];
   bool           mipFlag;
+#if JVET_AB0067_MIP_DIMD_LFNST
+  int            mipDimdMode;
+#endif
 #if JVET_V0130_INTRA_TMP
   bool		    	 tmpFlag;
 #endif
