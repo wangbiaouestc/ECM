@@ -908,6 +908,9 @@ protected:
   double      m_fractionOfFrames;                             ///< encode a fraction of the frames as specified in FramesToBeEncoded
   int         m_switchPocPeriod;
   int         m_upscaledOutput;                               ////< Output upscaled (2), decoded cropped but in full resolution buffer (1) or decoded cropped (0, default) picture for RPR.
+#if JVET_AB0082
+  int         m_upscaleFilterForDisplay;
+#endif
   bool        m_avoidIntraInDepLayer;
 
   bool                  m_gopBasedTemporalFilterEnabled;               ///< GOP-based Temporal Filter enable/disable

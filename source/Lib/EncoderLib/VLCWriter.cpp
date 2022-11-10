@@ -3152,7 +3152,11 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
     }
     if (!lambdaCanBePredicted)
     {
+#if JVET_AB0082
+      WRITE_CODE(pcSlice->getCostForARMC(), 10, "Lambda");
+#else
       WRITE_CODE(pcSlice->getCostForARMC(), 9, "Lambda");
+#endif
     }
   }
 #endif

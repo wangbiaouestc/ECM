@@ -178,13 +178,21 @@ struct Picture : public UnitArea
                                 const CPelBuf& beforeScale, const int beforeScaleLeftOffset, const int beforeScaleTopOffset,
                                 const PelBuf& afterScale, const int afterScaleLeftOffset, const int afterScaleTopOffset,
                                 const int bitDepth, const bool useLumaFilter, const bool downsampling,
-                                const bool horCollocatedPositionFlag, const bool verCollocatedPositionFlag );
+                                const bool horCollocatedPositionFlag, const bool verCollocatedPositionFlag
+#if JVET_AB0082
+                              , const bool rescaleForDisplay, const int upscaleFilterForDisplay
+#endif
+  );
 
   static void   rescalePicture( const std::pair<int, int> scalingRatio,
                                 const CPelUnitBuf& beforeScaling, const Window& scalingWindowBefore,
                                 const PelUnitBuf& afterScaling, const Window& scalingWindowAfter,
                                 const ChromaFormat chromaFormatIDC, const BitDepths& bitDepths, const bool useLumaFilter, const bool downsampling,
-                                const bool horCollocatedChromaFlag, const bool verCollocatedChromaFlag );
+                                const bool horCollocatedChromaFlag, const bool verCollocatedChromaFlag
+#if JVET_AB0082
+                              , bool rescaleForDisplay = false, int upscaleFilterForDisplay = 2
+#endif
+  );
 
 #if JVET_Z0118_GDR
   void setCleanDirty(bool flag) { m_cleanDirtyFlag = flag; if (m_cleanDirtyFlag) cs->setReconBuf(PIC_RECONSTRUCTION_1); else cs->setReconBuf(PIC_RECONSTRUCTION_0); }

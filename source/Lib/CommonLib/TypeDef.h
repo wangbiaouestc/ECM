@@ -50,6 +50,9 @@
 #include <assert.h>
 #include <cassert>
 
+
+#define JVET_AB0082                                       1 // JVET-AB0082: AMRC fix and fix to use 12-tap MC for upscaling with flexibility to select other filters for upscaling
+
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
