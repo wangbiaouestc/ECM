@@ -151,6 +151,8 @@
 #endif
 #define JVET_AB0061_ITMP_BV_FOR_IBC                       1 // JVET-AB0061: Storing IntraTMP BV for IBC BV prediction
 #define JVET_AB0155_SGPM                                  1 // JVET-AB0155: spatial geometric partitioning mode
+#define JVET_AB0157_TMRL                                  1 // JVET-AB0157: Template-based multiple reference line intra prediction
+#define JVET_AB0157_INTRA_FUSION                          1 // JVET-AB0157: Intra prediction fusion
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM

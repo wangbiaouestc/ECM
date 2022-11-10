@@ -824,6 +824,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   const SPS &sps      = *tempCS->sps;
   const uint32_t uiLPelX  = tempCS->area.Y().lumaPos().x;
   const uint32_t uiTPelY  = tempCS->area.Y().lumaPos().y;
+
 #if ENABLE_OBMC
   const unsigned wIdx = gp_sizeIdxInfo->idxFrom(partitioner.currArea().lwidth());
   const unsigned hIdx = gp_sizeIdxInfo->idxFrom(partitioner.currArea().lheight());
@@ -2324,8 +2325,13 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #if ENABLE_DIMD
   bool dimdBlending = false;
   int  dimdMode = 0;
+#if JVET_AB0157_INTRA_FUSION
+  int  dimdBlendMode[DIMD_FUSION_NUM-1] = { 0 };
+  int  dimdRelWeight[DIMD_FUSION_NUM] = { 0 };
+#else
   int  dimdBlendMode[2] = { 0 };
   int  dimdRelWeight[3] = { 0 };
+#endif
   bool dimdDerived = false;
 
   if (isLuma(partitioner.chType))
@@ -2346,11 +2352,23 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
       dimdDerived = true;
       dimdBlending = cu.dimdBlending;
       dimdMode = cu.dimdMode;
+#if JVET_AB0157_INTRA_FUSION
+      for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
+      {
+        dimdBlendMode[i] = cu.dimdBlendMode[i];
+      }
+
+      for( int i = 0; i < DIMD_FUSION_NUM; i++ )
+      {
+        dimdRelWeight[i] = cu.dimdRelWeight[i];
+      }
+#else
       dimdBlendMode[0] = cu.dimdBlendMode[0];
       dimdBlendMode[1] = cu.dimdBlendMode[1];
       dimdRelWeight[0] = cu.dimdRelWeight[0];
       dimdRelWeight[1] = cu.dimdRelWeight[1];
       dimdRelWeight[2] = cu.dimdRelWeight[2];
+#endif
     }
 
 #if SECONDARY_MPM
@@ -2377,6 +2395,10 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #endif
 #if TMP_FAST_ENC
   bool tmpDerived = 0;
+#endif
+#if JVET_AB0157_TMRL
+  bool tmrlDerived = false;
+  TmrlMode tmrlList[MRL_LIST_SIZE];
 #endif
 #if INTRA_TRANS_ENC_OPT
   m_pcIntraSearch->m_skipTimdLfnstMtsPass = false;
@@ -2425,11 +2447,23 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
           {
             cu.dimdBlending = dimdBlending;
             cu.dimdMode = dimdMode;
+#if JVET_AB0157_INTRA_FUSION
+            for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
+            {
+              cu.dimdBlendMode[i] = dimdBlendMode[i];
+            }
+
+            for( int i = 0; i < DIMD_FUSION_NUM; i++ )
+            {
+              cu.dimdRelWeight[i] = dimdRelWeight[i];
+            }
+#else
             cu.dimdBlendMode[0] = dimdBlendMode[0];
             cu.dimdBlendMode[1] = dimdBlendMode[1];
             cu.dimdRelWeight[0] = dimdRelWeight[0];
             cu.dimdRelWeight[1] = dimdRelWeight[1];
             cu.dimdRelWeight[2] = dimdRelWeight[2];
+#endif
           }
 #endif
           cu.lfnstIdx         = lfnstIdx;
@@ -2477,6 +2511,28 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               cu.timdHor = timdHorMode;
               cu.timdVer = timdVerMode;
 #endif
+            }
+          }
+#endif
+#if JVET_AB0157_TMRL
+          cu.tmrlFlag = false;
+          if (CU::allowTmrl(cu))
+          {
+            if (!tmrlDerived)
+            {
+              m_pcIntraSearch->getTmrlList(cu);
+              tmrlDerived = true;
+              for (auto i = 0; i < MRL_LIST_SIZE; i++)
+              {
+                tmrlList[i] = cu.tmrlList[i];
+              }
+            }
+            else
+            {
+              for (auto i = 0; i < MRL_LIST_SIZE; i++)
+              {
+                cu.tmrlList[i] = tmrlList[i];
+              }
             }
           }
 #endif

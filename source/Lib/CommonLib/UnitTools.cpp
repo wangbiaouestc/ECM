@@ -15438,3 +15438,25 @@ bool storeContexts( const Slice* slice, const int ctuXPosInCtus, const int ctuYP
   return false;
 }
 #endif
+
+#if JVET_AB0157_TMRL
+bool CU::allowTmrl(const CodingUnit& cu)
+{
+  bool bReorder = true;
+  if (!cu.Y().valid() || cu.predMode != MODE_INTRA || !isLuma(cu.chType) || cu.bdpcmMode || !cu.cs->sps->getUseMRL()
+#if ENABLE_DIMD
+    || cu.dimd
+#endif
+    )
+  {
+    bReorder = false;
+  }
+  bool isFirstLineOfCtu = (((cu.block(COMPONENT_Y).y) & ((cu.cs->sps)->getMaxCUWidth() - 1)) == 0);
+  if (isFirstLineOfCtu)
+  {
+    bReorder = false;
+  }
+
+  return bReorder;
+}
+#endif

@@ -597,7 +597,11 @@ protected:
   bool       xIntraCodingLumaISP      ( CodingStructure& cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE );
 
   template<typename T, size_t N>
-  void reduceHadCandList(static_vector<T, N>& candModeList, static_vector<double, N>& candCostList, int& numModesForFullRD, const double thresholdHadCost, const double* mipHadCost, const PredictionUnit &pu, const bool fastMip);
+  void reduceHadCandList(static_vector<T, N>& candModeList, static_vector<double, N>& candCostList, int& numModesForFullRD, const double thresholdHadCost, const double* mipHadCost, const PredictionUnit &pu, const bool fastMip
+#if JVET_AB0157_TMRL
+    , const double* tmrlCostList
+#endif
+  );
   void   derivePLTLossy  (      CodingStructure& cs, Partitioner& partitioner, ComponentID compBegin, uint32_t numComp);
   void   calcPixelPred   (      CodingStructure& cs, Partitioner& partitioner, uint32_t    yPos,      uint32_t xPos,             ComponentID compBegin, uint32_t  numComp);
   void     preCalcPLTIndexRD      (CodingStructure& cs, Partitioner& partitioner, ComponentID compBegin, uint32_t numComp);

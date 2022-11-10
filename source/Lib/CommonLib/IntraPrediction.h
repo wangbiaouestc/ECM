@@ -169,6 +169,9 @@ protected:
 #if JVET_AB0155_SGPM
   InterpolationFilter m_if;
 #endif
+#if JVET_AB0157_INTRA_FUSION
+  Pel      m_refBuffer2nd[MAX_NUM_COMPONENT][(MAX_CU_SIZE * 2 + 1 + MAX_REF_LINE_IDX) * 2];
+#endif
 
 private:
 
@@ -207,6 +210,10 @@ private:
     int  absInvAngle;
     bool interpolationFlag;
     int  angularScale;
+#if JVET_AB0157_INTRA_FUSION
+    bool fetchRef2nd;
+    bool applyFusion;
+#endif
 
     // clang-format off
     IntraPredParam()
@@ -221,6 +228,10 @@ private:
       , absInvAngle(std::numeric_limits<int>::max())
       , interpolationFlag(false)
       , angularScale(-1)
+#if JVET_AB0157_INTRA_FUSION
+      , fetchRef2nd(false)
+      , applyFusion(false)
+#endif
     // clang-format on
     {
     }
@@ -273,7 +284,11 @@ protected:
   void xPredIntraPlanar           ( const CPelBuf &pSrc, PelBuf &pDst );
   void xPredIntraDc               ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const bool enableBoundaryFilter = true );
 #if JVET_W0123_TIMD_FUSION
+#if JVET_AB0157_INTRA_FUSION
+  void xPredIntraAng              ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng, const bool bExtIntraDir, const CPelBuf &pSrc2nd, bool isISP = true, int weightMode = 4);
+#else
   void xPredIntraAng              ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng, const bool bExtIntraDir);
+#endif
 #else
   void xPredIntraAng              ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng);
 #endif
@@ -411,6 +426,26 @@ public:
                              static_vector<SgpmInfo, SGPM_NUM> &candModeList,
                              static_vector<double, SGPM_NUM> &  candCostList);
 #endif
+#if JVET_AB0157_TMRL
+  struct TmrlInfo
+  {
+    uint32_t uiTemplateAbove;
+    uint32_t uiTemplateLeft;
+    uint32_t uiWidth;
+    uint32_t uiHeight;
+    uint32_t uiRefWidth;
+    uint32_t uiRefHeight;
+
+  };
+
+  TmrlInfo tmrlInfo;
+  void xPredTmrlIntraDc(const CPelBuf& pSrc, Pel* pDst, int iDstStride);
+  void xPredTmrlIntraAng(const CPelBuf& pSrc, const ClpRng& clpRng, Pel* pTrueDst, int iDstStride);
+  void predTmrlIntraAng(const PredictionUnit& pu, Pel* pPred, uint32_t uiStride);
+  void initTmrlIntraParams(const PredictionUnit& pu, const CompArea area, const SPS& sps);
+  void getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlRefList, uint8_t* tmrlIntraList, uint8_t& sizeRef, uint8_t& sizeMode);
+  void getTmrlList(CodingUnit& cu);
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING && JVET_Y0065_GPM_INTRA
 protected:
   bool    m_abFilledIntraGPMRefTpl[NUM_INTRA_MODE];
@@ -431,7 +466,11 @@ public:
   void       clearPrefilledIntraGPMRefTemplate () {memset(&m_abFilledIntraGPMRefTpl[0], 0, sizeof(m_abFilledIntraGPMRefTpl));}
 #endif
   // Angular Intra
+#if JVET_AB0157_INTRA_FUSION
+  void predIntraAng               ( const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu, const bool applyFusion = true);
+#else
   void predIntraAng               ( const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
+#endif
   Pel *getPredictorPtr(const ComponentID compId)
   {
     return m_refBuffer[compId][m_ipaParam.refFilterFlag ? PRED_BUF_FILTERED : PRED_BUF_UNFILTERED];
@@ -448,10 +487,17 @@ public:
   
 #if JVET_AB0155_SGPM
   void initIntraPatternChType(const CodingUnit &cu, const CompArea &area, const bool forceRefFilterFlag = false,
-    const int partIdx = 0);   // use forceRefFilterFlag to get both filtered and unfiltered buffers
+    const int partIdx = 0
+#if JVET_AB0157_INTRA_FUSION
+    , bool applyFusion = true
+#endif
+    );   // use forceRefFilterFlag to get both filtered and unfiltered buffers
 #else   // SGPM
-  void initIntraPatternChType(
-    const CodingUnit &cu, const CompArea &area, const bool forceRefFilterFlag = false);   // use forceRefFilterFlag to get both filtered and unfiltered buffers
+#if JVET_AB0157_INTRA_FUSION
+  void initIntraPatternChType     (const CodingUnit &cu, const CompArea &area, const bool forceRefFilterFlag = false, bool applyFusion = true ); // use forceRefFilterFlag to get both filtered and unfiltered buffers
+#else
+  void initIntraPatternChType     (const CodingUnit &cu, const CompArea &area, const bool forceRefFilterFlag = false); // use forceRefFilterFlag to get both filtered and unfiltered buffers
+#endif
 #endif
   void initIntraPatternChTypeISP  (const CodingUnit& cu, const CompArea& area, PelBuf& piReco, const bool forceRefFilterFlag = false); // use forceRefFilterFlag to get both filtered and unfiltered buffers
 

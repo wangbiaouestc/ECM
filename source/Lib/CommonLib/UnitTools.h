@@ -136,6 +136,9 @@ namespace CU
   bool    isSameSbtSize               (const uint8_t sbtInfo1, const uint8_t sbtInfo2);
   bool    getRprScaling               ( const SPS* sps, const PPS* curPPS, Picture* refPic, int& xScale, int& yScale );
   void    checkConformanceILRP        (Slice *slice);
+#if JVET_AB0157_TMRL
+  bool allowTmrl(const CodingUnit& cu);
+#endif
 }
 // PU tools
 namespace PU
@@ -606,6 +609,57 @@ uint32_t updateCandList(T uiMode, double uiCost, static_vector<T, N>& candModeLi
   }
   return 0;
 }
+
+#if JVET_AB0157_TMRL
+template<typename T, size_t N>
+uint32_t updateCandList(T uiMode, uint64_t uiCost, static_vector<T, N>& candModeList, static_vector<uint64_t, N>& candCostList
+  , size_t uiFastCandNum = N, int* iserttPos = nullptr)
+{
+  CHECK(std::min(uiFastCandNum, candModeList.size()) != std::min(uiFastCandNum, candCostList.size()), "Sizes do not match!");
+  CHECK(uiFastCandNum > candModeList.capacity(), "The vector is to small to hold all the candidates!");
+
+  size_t i;
+  size_t shift = 0;
+  size_t currSize = std::min(uiFastCandNum, candCostList.size());
+
+  while (shift < uiFastCandNum && shift < currSize && uiCost < candCostList[currSize - 1 - shift])
+  {
+    shift++;
+  }
+
+  if (candModeList.size() >= uiFastCandNum && shift != 0)
+  {
+    for (i = 1; i < shift; i++)
+    {
+      candModeList[currSize - i] = candModeList[currSize - 1 - i];
+      candCostList[currSize - i] = candCostList[currSize - 1 - i];
+    }
+    candModeList[currSize - shift] = uiMode;
+    candCostList[currSize - shift] = uiCost;
+    if (iserttPos != nullptr)
+    {
+      *iserttPos = int(currSize - shift);
+    }
+    return 1;
+  }
+  else if (currSize < uiFastCandNum)
+  {
+    candModeList.insert(candModeList.end() - shift, uiMode);
+    candCostList.insert(candCostList.end() - shift, uiCost);
+    if (iserttPos != nullptr)
+    {
+      *iserttPos = int(candModeList.size() - shift - 1);
+    }
+    return 1;
+  }
+  if (iserttPos != nullptr)
+  {
+    *iserttPos = -1;
+  }
+  return 0;
+}
+#endif
+
 #if JVET_W0097_GPM_MMVD_TM
 #if JVET_AA0058_GPM_ADP_BLD
 template<size_t N>

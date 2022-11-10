@@ -1475,8 +1475,15 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
     return;
   }
 #endif
+#if JVET_AB0157_TMRL
+  cuTmrlFlag(cu);
+  if (cu.tmrlFlag)
+  {
+    return;
+  }
+#else
   extend_ref_line( cu );
-
+#endif
   isp_mode( cu );
 #if ENABLE_DIMD
   if (cu.dimd)
@@ -1702,7 +1709,15 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
     return;
   }
 #endif
+#if JVET_AB0157_TMRL
+  cuTmrlFlag(*pu.cu);
+  if (pu.cu->tmrlFlag)
+  {
+    return;
+  }
+#else
   extend_ref_line( pu );
+#endif
   isp_mode( *pu.cu );
 #if ENABLE_DIMD
   if (pu.cu->dimd)
@@ -6996,6 +7011,62 @@ void CABACWriter::amvpMerge_mode( const PredictionUnit& pu )
       m_BinEncoder.encodeBin(0, Ctx::amFlagState());
     }
   }
+}
+#endif
+
+#if JVET_AB0157_TMRL
+void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
+{
+  if (!CU::allowTmrl(cu))
+  {
+    return;
+  }
+  const PredictionUnit* pu = cu.firstPU;
+#if JVET_W0123_TIMD_FUSION
+  if (cu.timd)
+  {
+    CHECK(cu.tmrlFlag, "TMRL cannot combine with TIMD.");
+    unsigned int bin = pu->multiRefIdx != MULTI_REF_LINE_IDX[0];
+    m_BinEncoder.encodeBin(bin, Ctx::MultiRefLineIdx(5)); // TIMD MRL
+    if (bin)
+    {
+      bin = pu->multiRefIdx != MULTI_REF_LINE_IDX[1];
+      m_BinEncoder.encodeBin(bin, Ctx::MultiRefLineIdx(6)); // which line
+    }
+    DTRACE(g_trace_ctx, D_SYNTAX, "extend_ref_line() idx=%d pos=(%d,%d) ref_idx=%d\n", bin, pu->lumaPos().x, pu->lumaPos().y, pu->multiRefIdx);
+  }
+  else
+  {
+#endif
+    int ctxId = 0;
+    m_BinEncoder.encodeBin(cu.tmrlFlag, Ctx::TmrlDerive(ctxId++));
+    if (cu.tmrlFlag)
+    {
+      const int maxNumCtxBins = (MRL_LIST_SIZE / MRL_IDX_RICE_CODE_DIVISOR) - 1;
+      int mrlIdxPrefix = cu.tmrlListIdx / MRL_IDX_RICE_CODE_DIVISOR;
+      for (int val = 0; val < maxNumCtxBins; val++)
+      {
+        unsigned int bin = (val == mrlIdxPrefix ? 0 : 1);
+        m_BinEncoder.encodeBin(bin, Ctx::TmrlDerive(ctxId++));
+        if (!bin)
+        {
+          break;
+        }
+      }
+
+      uint32_t mrlIdxSuffix = uint32_t(cu.tmrlListIdx & (MRL_IDX_RICE_CODE_DIVISOR - 1));
+      m_BinEncoder.encodeBin((mrlIdxSuffix & 1), Ctx::TmrlDerive(maxNumCtxBins + 1));
+      m_BinEncoder.encodeBin(((mrlIdxSuffix >> 1) & 1), Ctx::TmrlDerive(maxNumCtxBins + 2));
+      CHECK(cu.tmrlList[cu.tmrlListIdx].intraDir != pu->intraDir[0] || cu.tmrlList[cu.tmrlListIdx].multiRefIdx != pu->multiRefIdx, "? ");
+    }
+    else
+    {
+      CHECK(pu->multiRefIdx, "?");
+    }
+    DTRACE(g_trace_ctx, D_SYNTAX, "cu_tmrl_flag() ctx=%d pos=(%d,%d) tmrl=%d\n", 0, cu.lumaPos().x, cu.lumaPos().y, cu.tmrlFlag);
+#if JVET_W0123_TIMD_FUSION
+  }
+#endif
 }
 #endif
 //! \}
