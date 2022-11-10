@@ -4765,7 +4765,18 @@ void CABACWriter::mvp_flag( const PredictionUnit& pu, RefPicList eRefList )
     {
 #if TM_AMVP
 #if JVET_Y0128_NON_CTC || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP)
-      if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+      if (pu.cs->sps->getUseARL())
+      {
+        RefListAndRefIdx refListComb = pu.cs->slice->getRefPicCombinedListAmvpMerge()[pu.refIdxLC];
+        if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(refListComb.refList, refListComb.refIdx)) == false)
+        {
+          m_BinEncoder.encodeBin(0, Ctx::MVPIdx());
+        }
+      }
+      else
+#endif
+        if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
 #else
       if(!pu.cu->cs->sps->getUseDMVDMode() || pu.cu->affine || CU::isIBC(*pu.cu))
 #endif
