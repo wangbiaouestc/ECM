@@ -239,7 +239,6 @@
 #define JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC          1 // JVET-AA0093: Diversity criterion for ARMC reordering
 #endif
 #define JVET_AB0079_TM_BCW_MRG                            1 // JVET-AB0079: Template matching based BCW index derivation for merge mode with positive weights only
-
 // Transform and coefficient coding
 #define TCQ_8STATES                                       1
 #define JVET_W0119_LFNST_EXTENSION                        1 // JVET-W0119: LFNST extension with large kernel

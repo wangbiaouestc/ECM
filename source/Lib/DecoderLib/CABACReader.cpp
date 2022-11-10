@@ -4851,14 +4851,25 @@ void CABACReader::mvp_flag( PredictionUnit& pu, RefPicList eRefList )
     unsigned mvpIdx = 0;
 #if TM_AMVP
 #if JVET_Y0128_NON_CTC || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP)
-    if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
-#else
-    if(!pu.cu->cs->sps->getUseDMVDMode() || pu.cu->affine || CU::isIBC(*pu.cu))
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    if (pu.cs->sps->getUseARL())
+    {
+      RefListAndRefIdx refListComb = pu.cs->slice->getRefPicCombinedListAmvpMerge()[pu.refIdxLC];
+      if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(refListComb.refList, refListComb.refIdx)) == false)
+      {
+        mvpIdx = m_BinDecoder.decodeBin(Ctx::MVPIdx());
+      }
+    }
+    else
 #endif
+      if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
+#else
+    if (!pu.cu->cs->sps->getUseDMVDMode() || pu.cu->affine || CU::isIBC(*pu.cu))
 #endif
     {
-      mvpIdx = m_BinDecoder.decodeBin( Ctx::MVPIdx() );
+      mvpIdx = m_BinDecoder.decodeBin(Ctx::MVPIdx());
     }
+#endif
     if (mvpIdx == 0)
     {
       pu.mvpIdx [eRefList] = mvpIdx + m_BinDecoder.decodeBinEP();
