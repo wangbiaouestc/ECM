@@ -6899,7 +6899,7 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
       signs += signBuff.stride;
       signScanIdx += signScanIdxBuff.stride;
     }
-    std::sort(signCombList.begin(), signCombList.end(), compareOrderIdx);
+    std::stable_sort(signCombList.begin(), signCombList.end(), compareOrderIdx);
     numScanPos = 0;
     for (uint32_t idx = 0; idx < signCombList.size(); idx++)
     {

@@ -51,8 +51,6 @@
 #include <cassert>
 
 
-#define JVET_AB0082                                       1 // JVET-AB0082: AMRC fix and fix to use 12-tap MC for upscaling with flexibility to select other filters for upscaling
-
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -185,6 +183,7 @@
 #define JVET_Z0127_SPS_MHP_MAX_MRG_CAND                   1 // JVET-Z0127: Signal number of MHP candidates
 #endif
 #define IF_12TAP                                          1 // 12-tap IF
+#define JVET_AB0082                                       1 // JVET-AB0082: AMRC fix and fix to use 12-tap MC for upscaling with flexibility to select other filters for upscaling
 #define JVET_Z0117_CHROMA_IF                              1 // JVET-Z0117: 6-tap interpolation filter for chroma MC
 #define JVET_AA0042_RPR_FILTERS                           1 // JVET-AA0042: luma 12-tap non-affine 10-tap affine, chroma 6-tap      
 #define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
