@@ -425,6 +425,11 @@ static const int MLS_CG_SIZE =                                      4; ///< Coef
 
 static const int RVM_VCEGAM10_M =                                   4;
 
+#if JVET_AB0157_INTRA_FUSION
+static const int SIZE_CONSTRAINT =                                 32;
+static const int DIMD_FUSION_NUM =                                  6;
+#endif
+
 #if JVET_Y0116_EXTENDED_MRL_LIST
 static const int MAX_REF_LINE_IDX =                                 13; //highest refLine offset in the list
 static const int MRL_NUM_REF_LINES =                                6; //number of candidates in the array
@@ -485,6 +490,14 @@ static const int EXT_VER_IDX =                                     98;
 static const int EXT_VDIA_IDX =                                   130;
 #define MAP131TO67( mode )                 (mode<2?mode:((mode>>1)+1))
 #define MAP67TO131( mode )                 (mode<2?mode:((mode<<1)-2))
+#endif
+#if JVET_AB0157_TMRL
+static const int TMRL_TPL_SIZE =                                    1;
+static const int MRL_LIST_SIZE =                                   20;
+static const int MRL_IDX_RICE_CODE_DIVISOR =                        4;
+static const int TMRL_MPM_SIZE =                                   10;
+static const int TMRL_MODECOST =     NUM_LUMA_MODE * MAX_REF_LINE_IDX;
+static const int EXT_REF_LINE_IDX[] =              { 1, 3, 5, 7, 12 };
 #endif
 #if MMLM
 static const int MMLM_CHROMA_IDX = LM_CHROMA_IDX + 1; ///< MDLM_L

@@ -518,6 +518,9 @@ public:
 #if JVET_AA0057_CCCM
   static const CtxSet   CccmFlag;
 #endif
+#if JVET_AB0157_TMRL
+  static const CtxSet   TmrlDerive;
+#endif
   static const unsigned NumberOfContexts;
 
   // combined sets for less complex copying

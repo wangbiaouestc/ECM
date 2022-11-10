@@ -3053,6 +3053,23 @@ const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
 });
 #endif
 
+#if JVET_AB0157_TMRL
+const CtxSet ContextSetCfg::TmrlDerive = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, },
+  { CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, },
+  {  49,  50,  43,  43, CNU, CNU,  50, CNU, },
+  {   8,   8,   9,   9,   9,   8,   9, DWS, },
+  {   8,   8,   9,   9,   9,   8,   9, DWS, },
+  {   8,   8,   9,   9,   9,   8,   9, DWS, },
+  {  18, DWE, DWE, DWE, DWE, DWE, DWE, DWE, },
+  {  18, DWE, DWE, DWE, DWE, DWE, DWE, DWE, },
+  {  18, DWE, DWE, DWE, DWE, DWE, DWE, DWE, },
+  { 119, DWO, DWO, DWO, DWO, DWO, DWO, DWO, },
+  { 119, DWO, DWO, DWO, DWO, DWO, DWO, DWO, },
+  });
+#endif
+
 #elif SLICE_TYPE_WIN_SIZE
 const CtxSet ContextSetCfg::SplitFlag = ContextSetCfg::addCtxSet
 ({
@@ -3412,6 +3429,18 @@ const CtxSet ContextSetCfg::PredMode = ContextSetCfg::addCtxSet
 	{ 6,  2 },
 	{ 5,  1 }
 });
+
+#if JVET_AB0157_TMRL
+const CtxSet ContextSetCfg::TmrlDerive = ContextSetCfg::addCtxSet
+({
+  { CNU },
+  { CNU },
+  { CNU },
+  { DWS },
+  { DWS },
+  { DWS }
+  });
+#endif
 
 const CtxSet ContextSetCfg::MultiRefLineIdx = ContextSetCfg::addCtxSet
 ({
@@ -4904,6 +4933,16 @@ const CtxSet ContextSetCfg::PredMode = ContextSetCfg::addCtxSet
   { CNU, CNU, },
   {   5,   1, },
 });
+
+#if JVET_AB0157_TMRL
+const CtxSet ContextSetCfg::TmrlDerive = ContextSetCfg::addCtxSet
+({
+  { CNU },
+  { CNU },
+  { CNU },
+  { DWS },
+  });
+#endif
 
 const CtxSet ContextSetCfg::MultiRefLineIdx = ContextSetCfg::addCtxSet
 ({

@@ -51,6 +51,7 @@
 #include "CommonLib/ChromaFormat.h"
 #include "CommonLib/dtrace_blockstatistics.h"
 #endif
+
 //! \ingroup DecoderLib
 //! \{
 
@@ -351,6 +352,19 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         }
 #endif
 
+#if JVET_AB0157_TMRL
+        else if (currCU.tmrlFlag)
+        {
+          PredictionUnit* pu = currCU.firstPU;
+          const CompArea& area = currCU.Y();
+#if SECONDARY_MPM
+          IntraPrediction::deriveDimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+#endif
+          m_pcIntraPred->getTmrlList(currCU);
+          pu->multiRefIdx = currCU.tmrlList[currCU.tmrlListIdx].multiRefIdx;
+          pu->intraDir[0] = currCU.tmrlList[currCU.tmrlListIdx].intraDir;
+        }
+#endif
         else if (currCU.firstPU->parseLumaMode)
         {
           const CompArea &area = currCU.Y();

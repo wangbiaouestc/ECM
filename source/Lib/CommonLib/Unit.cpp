@@ -283,6 +283,17 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   dimdChromaMode = other.dimdChromaMode;
 #endif
+#if JVET_AB0157_INTRA_FUSION
+  for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
+  {
+    dimdBlendMode[i] = other.dimdBlendMode[i];
+  }
+
+  for( int i = 0; i < DIMD_FUSION_NUM; i++ )
+  {
+    dimdRelWeight[i] = other.dimdRelWeight[i];
+  }
+#else
   for( int i = 0; i < 2; i++ )
   {
     dimdBlendMode[i] = other.dimdBlendMode[i];
@@ -292,6 +303,7 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   {
     dimdRelWeight[i] = other.dimdRelWeight[i];
   }
+#endif
 #endif
 #if TMP_FAST_ENC
   tmpXdisp = other.tmpXdisp;
@@ -339,6 +351,14 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if JVET_AA0070_RRIBC
   rribcFlipType = other.rribcFlipType;
+#endif
+#if JVET_AB0157_TMRL
+  tmrlFlag = other.tmrlFlag;
+  tmrlListIdx = other.tmrlListIdx;
+  for (auto i = 0; i < MRL_LIST_SIZE; i++)
+  {
+    tmrlList[i] = other.tmrlList[i];
+  }
 #endif
 
   for (int idx = 0; idx < MAX_NUM_CHANNEL_TYPE; idx++)
@@ -399,6 +419,17 @@ void CodingUnit::initData()
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   dimdChromaMode   = -1;
 #endif
+#if JVET_AB0157_INTRA_FUSION
+  for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
+  {
+    dimdBlendMode[i] = -1;
+  }
+
+  for( int i = 0; i < DIMD_FUSION_NUM; i++ )
+  {
+    dimdRelWeight[i] = -1;
+  }
+#else
   for( int i = 0; i < 2; i++ )
   {
     dimdBlendMode[i] = -1;
@@ -408,6 +439,7 @@ void CodingUnit::initData()
   {
     dimdRelWeight[i] = -1;
   }
+#endif
 #endif
 #if TMP_FAST_ENC
   tmpXdisp = 0;
@@ -454,6 +486,10 @@ void CodingUnit::initData()
 #endif
 #if JVET_AA0070_RRIBC
   rribcFlipType = 0;
+#endif
+#if JVET_AB0157_TMRL
+  tmrlFlag = false;
+  tmrlListIdx = 0;
 #endif
 
   for (int idx = 0; idx < MAX_NUM_CHANNEL_TYPE; idx++)

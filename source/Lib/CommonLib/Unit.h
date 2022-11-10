@@ -285,6 +285,17 @@ struct TransformUnit;
 struct PredictionUnit;
 class  CodingStructure;
 
+#if JVET_AB0157_TMRL
+struct TmrlMode
+{
+  int8_t  multiRefIdx;
+  uint8_t intraDir;
+  TmrlMode() : multiRefIdx(0), intraDir(0) {}
+  TmrlMode(int8_t _multiRefIdx, uint8_t _intraDir) :
+    multiRefIdx(_multiRefIdx), intraDir(_intraDir) {}
+};
+#endif
+
 struct CodingUnit : public UnitArea
 {
   CodingStructure *cs;
@@ -325,8 +336,13 @@ struct CodingUnit : public UnitArea
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   int8_t         dimdChromaMode;
 #endif
+#if JVET_AB0157_INTRA_FUSION
+  int8_t         dimdBlendMode[DIMD_FUSION_NUM-1]; // max number of blend modes (the main mode is not counter) --> incoherent with dimdRelWeight
+  int8_t         dimdRelWeight[DIMD_FUSION_NUM]; // max number of predictions to blend
+#else
   int8_t         dimdBlendMode[2]; // max number of blend modes (the main mode is not counter) --> incoherent with dimdRelWeight
   int8_t         dimdRelWeight[3]; // max number of predictions to blend
+#endif
 #endif
 #if TMP_FAST_ENC
   int            tmpXdisp;
@@ -370,7 +386,11 @@ struct CodingUnit : public UnitArea
 #if JVET_AA0070_RRIBC
   int    rribcFlipType;
 #endif
-
+#if JVET_AB0157_TMRL
+  bool           tmrlFlag;
+  uint8_t        tmrlListIdx;
+  TmrlMode       tmrlList[MRL_LIST_SIZE];
+#endif
   // needed for fast imv mode decisions
   int8_t          imvNumCand;
   uint8_t          smvdMode;
