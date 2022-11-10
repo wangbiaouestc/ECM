@@ -328,6 +328,11 @@ struct CodingUnit : public UnitArea
   int8_t         dimdBlendMode[2]; // max number of blend modes (the main mode is not counter) --> incoherent with dimdRelWeight
   int8_t         dimdRelWeight[3]; // max number of predictions to blend
 #endif
+#if TMP_FAST_ENC
+  int            tmpXdisp;
+  int            tmpYdisp;
+  int            tmpNumCand;
+#endif
 #if JVET_W0123_TIMD_FUSION
   bool           timd;
   int            timdMode;

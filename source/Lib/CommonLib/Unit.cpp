@@ -293,6 +293,11 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
     dimdRelWeight[i] = other.dimdRelWeight[i];
   }
 #endif
+#if TMP_FAST_ENC
+  tmpXdisp = other.tmpXdisp;
+  tmpYdisp = other.tmpYdisp;
+  tmpNumCand = other.tmpNumCand;
+#endif
 #if JVET_W0123_TIMD_FUSION
   timd              = other.timd;
   timdMode          = other.timdMode;
@@ -403,6 +408,11 @@ void CodingUnit::initData()
   {
     dimdRelWeight[i] = -1;
   }
+#endif
+#if TMP_FAST_ENC
+  tmpXdisp = 0;
+  tmpYdisp = 0;
+  tmpNumCand = 0;
 #endif
 #if JVET_W0123_TIMD_FUSION
   timd              = false;

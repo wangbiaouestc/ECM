@@ -784,7 +784,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                                    : numModesForFullRD;
           }
 #if JVET_V0130_INTRA_TMP
+#if JVET_AB0130_ITMP_SAMPLING
+          if (testTpm && !m_pcEncCfg->getUseFastIntraTMP())
+#else
           if( testTpm )
+#endif
           {
             numModesForFullRD += 1; // testing tpm
           }
@@ -1054,6 +1058,69 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
             }
             CHECKD(uiRdModeList.size() != numModesForFullRD, "Error: RD mode list size");
 
+#if JVET_V0130_INTRA_TMP && JVET_AB0130_ITMP_SAMPLING
+            // derive TPM candidate using hadamard
+            if (testTpm)
+            {
+              cu.tmpFlag = true;
+              cu.mipFlag = false;
+              pu.multiRefIdx = 0;
+
+              int foundCandiNum = 0;
+              bool bsuccessfull = 0;
+              CodingUnit cuCopy = cu;
+
+#if JVET_W0069_TMP_BOUNDARY
+              RefTemplateType templateType = getRefTemplateType(cuCopy, cuCopy.blocks[COMPONENT_Y]);
+              if (templateType != NO_TEMPLATE)
+#else
+              if (isRefTemplateAvailable(cuCopy, cuCopy.blocks[COMPONENT_Y]))
+#endif
+              {
+#if JVET_W0069_TMP_BOUNDARY
+#if TMP_FAST_ENC
+                bsuccessfull = generateTMPrediction(piPred.buf, piPred.stride, pu.Y(), foundCandiNum, pu.cu);
+#else
+                getTargetTemplate(&cuCopy, pu.lwidth(), pu.lheight(), templateType);
+                candidateSearchIntra(&cuCopy, pu.lwidth(), pu.lheight(), templateType);
+                bsuccessfull = generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+#endif
+#else
+#if TMP_FAST_ENC
+                bsuccessfull = generateTMPrediction(piPred.buf, piPred.stride, pu.Y(), foundCandiNum, pu.cu);
+#else
+                getTargetTemplate(&cuCopy, pu.lwidth(), pu.lheight());
+                candidateSearchIntra(&cuCopy, pu.lwidth(), pu.lheight());
+                bsuccessfull = generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+#endif
+#endif
+              }
+#if JVET_W0069_TMP_BOUNDARY
+              else
+              {
+                foundCandiNum = 1;
+                bsuccessfull = generateTmDcPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (cuCopy.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1));
+              }
+#endif
+              if (bsuccessfull && foundCandiNum >= 1)
+              {
+
+                Distortion minSadHad =
+                  std::min(distParamSad.distFunc(distParamSad) * 2, distParamHad.distFunc(distParamHad));
+
+                m_CABACEstimator->getCtx() = SubCtx(Ctx::TmpFlag, ctxStartTpmFlag);
+
+                uint64_t fracModeBits = xFracModeBitsIntra(pu, 0, CHANNEL_TYPE_LUMA);
+
+                double cost = double(minSadHad) + double(fracModeBits) * sqrtLambdaForFirstPass;
+                DTRACE(g_trace_ctx, D_INTRA_COST, "IntraTPM: %u, %llu, %f (%d)\n", minSadHad, fracModeBits, cost, 0);
+
+                updateCandList(ModeInfo(0, 0, 0, NOT_INTRA_SUBPARTITIONS, 0, 1), cost, uiRdModeList, CandCostList, numModesForFullRD);
+                updateCandList(ModeInfo(0, 0, 0, NOT_INTRA_SUBPARTITIONS, 0, 1), 0.8 * double(minSadHad), uiHadModeList, CandHadList, numHadCand);
+              }
+            }
+#endif
+
             if (LFNSTSaveFlag && testMip
                 && !allowLfnstWithMip(cu.firstPU->lumaSize()))   // save a different set for the next run
             {
@@ -1072,7 +1139,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               m_dSavedHadListLFNST.resize(3);
               LFNSTSaveFlag = false;
             }
-#if JVET_V0130_INTRA_TMP
+#if JVET_V0130_INTRA_TMP && !JVET_AB0130_ITMP_SAMPLING
             // derive TPM candidate using hadamard
             if( testTpm )
             {
@@ -5100,6 +5167,15 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
           RefTemplateType tempType = getRefTemplateType( *(tu.cu), tu.cu->blocks[COMPONENT_Y] );
           if( tempType != NO_TEMPLATE )
           {
+#if TMP_FAST_ENC
+            generateTMPrediction(piPred.buf, piPred.stride, pu.Y(), foundCandiNum, tu.cu);
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+            pu.interDir = 1;             // use list 0 for IBC mode
+            pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;   // last idx in the list
+            pu.mv->set(m_tempLibFast.getX() << MV_FRACTIONAL_BITS_INTERNAL, m_tempLibFast.getY() << MV_FRACTIONAL_BITS_INTERNAL);
+            pu.bv.set(m_tempLibFast.getX(), m_tempLibFast.getY());
+#endif
+#else
             getTargetTemplate( tu.cu, pu.lwidth(), pu.lheight(), tempType );
             candidateSearchIntra( tu.cu, pu.lwidth(), pu.lheight(), tempType );
             generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
@@ -5108,6 +5184,7 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
             pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;   // last idx in the list
             pu.mv->set(m_tempLibFast.getX() << MV_FRACTIONAL_BITS_INTERNAL, m_tempLibFast.getY() << MV_FRACTIONAL_BITS_INTERNAL);
             pu.bv.set(m_tempLibFast.getX(), m_tempLibFast.getY());
+#endif
 #endif
           }
           else
