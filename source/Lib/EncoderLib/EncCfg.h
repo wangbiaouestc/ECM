@@ -918,6 +918,9 @@ protected:
 #if JVET_V0130_INTRA_TMP
   bool        m_intraTMP;                                       ///< intra Template Matching 
   unsigned    m_intraTmpMaxSize;                               ///< max CU size for which intra TMP is allowed
+#if JVET_AB0130_ITMP_SAMPLING
+  bool        m_fastIntraTMP;                                   ///< fast intra Template Matching RD search
+#endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   bool        m_BIF;
@@ -1542,6 +1545,10 @@ public:
   bool      getUseIntraTMP()                           const { return m_intraTMP; }
   void      setIntraTMPMaxSize              (unsigned n)     { m_intraTmpMaxSize = n; }
   unsigned  getIntraTMPMaxSize()                       const { return m_intraTmpMaxSize; }
+#if JVET_AB0130_ITMP_SAMPLING
+  void      setUseFastIntraTMP              (bool b)         { m_fastIntraTMP = b; }
+  bool      getUseFastIntraTMP()                       const { return m_fastIntraTMP; }
+#endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   void      setUseBIF                       ( bool b )       { m_BIF = b; }

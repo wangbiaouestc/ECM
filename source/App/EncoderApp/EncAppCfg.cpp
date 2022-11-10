@@ -1151,6 +1151,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_V0130_INTRA_TMP
   ("IntraTMP",                                        m_intraTMP,                                       false, "intra Template Matching (0: off, 1:on)  [default: on]")
   ("IntraTMPMaxSize",                                 m_intraTmpMaxSize,                                  64u, "intra Template Matching max CU size  [default: 64]")
+#if JVET_AB0130_ITMP_SAMPLING
+  ("FastIntraTMP",                                    m_fastIntraTMP,                                   true,  "fast intra Template Matching (0: off, 1:on)  [default: off]")
+#endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   ("BIF",                                             m_BIF,                                            true, "bilateral filter   (0: off, 1:on)  [default: on]")
@@ -5004,6 +5007,12 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_V0130_INTRA_TMP
   msg(DETAILS, "Intra TMP: %d\n", m_intraTMP);
+#if JVET_AB0130_ITMP_SAMPLING
+  if (m_intraTMP)
+  {
+    msg(DETAILS, "Fast Intra TMP: %d\n", m_fastIntraTMP);
+  }
+#endif
   msg(DETAILS, "Max CU size of TMP: %d\n", m_intraTmpMaxSize);
   msg(DETAILS, "dynamic search range with fixed comparison per pixel: \n");
   msg(DETAILS, "	searchRangeWidth = %d*Width \n", TMP_SEARCH_RANGE_MULT_FACTOR );
@@ -5221,6 +5230,9 @@ void EncAppCfg::xPrintParameter()
 #if JVET_V0130_INTRA_TMP
   msg( VERBOSE, "IntraTMP:%d ", m_intraTMP );
   msg( VERBOSE, "IntraTmpMaxSize:%d ", m_intraTmpMaxSize );
+#if JVET_AB0130_ITMP_SAMPLING
+  msg(VERBOSE, "FastIntraTMP:%d ", m_fastIntraTMP);
+#endif
 #endif
 
   //inter

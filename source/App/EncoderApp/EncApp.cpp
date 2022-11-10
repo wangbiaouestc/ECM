@@ -897,6 +897,9 @@ void EncApp::xInitLibCfg()
 #if JVET_V0130_INTRA_TMP
   m_cEncLib.setUseIntraTMP                                       ( m_intraTMP );
   m_cEncLib.setIntraTMPMaxSize                                   ( m_intraTmpMaxSize );
+#if JVET_AB0130_ITMP_SAMPLING
+  m_cEncLib.setUseFastIntraTMP(m_fastIntraTMP);
+#endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   m_cEncLib.setUseBIF                                            ( m_BIF );

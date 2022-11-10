@@ -1575,6 +1575,10 @@ static const int TMP_MAXSIZE_DEPTH =            6; // should be log2(TMP_TEMPLAT
 static const int USE_MORE_BLOCKSIZE_DEPTH_MAX = TMP_MAXSIZE_DEPTH - 1;
 static const int INIT_THRESHOULD_SHIFTBITS =    2;  ///< (default 2) Early skip threshold for checking distance.
 static const int TMP_SEARCH_RANGE_MULT_FACTOR = 5;
+#if JVET_AB0130_ITMP_SAMPLING
+static const int LOG2_TMP_SAMPLING = 1;
+static const int TMP_SAMPLING = 1 << LOG2_TMP_SAMPLING;
+#endif
 #endif
 
 #endif // end of #ifndef  __COMMONDEF__

@@ -122,6 +122,10 @@
 #define JVET_X0124_TMP_SIGNAL                             1 // JVET-X0124: Cleanup on signalling of intra template matching
 #endif
 #define JVET_V0130_INTRA_TMP                              1 // JVET-V0130: Template matching prediction
+#define JVET_AB0130_ITMP_SAMPLING                         1 // JVET-AB0130: Speedup of IntraTMP by search range sampling and refinement
+#if JVET_AB0130_ITMP_SAMPLING
+#define TMP_FAST_ENC                                      1 // Encoder-only modification
+#endif
 #define JVET_W0069_TMP_BOUNDARY                           1 // JVET-W0069: boundary handling for TMP
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
 #if JVET_W0123_TIMD_FUSION

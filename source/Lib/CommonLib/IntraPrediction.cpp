@@ -7620,6 +7620,87 @@ void clipMvIntraConstraint( CodingUnit* pcCU, int regionId, int& iHorMin, int& i
   }
 }
 
+#if JVET_AB0130_ITMP_SAMPLING
+void clipMvIntraConstraint_Refine(CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX, int pX, int pY, int RefinementRange)
+{
+  int searchRangeWidth = TMP_SEARCH_RANGE_MULT_FACTOR * uiBlkWidth;
+  int searchRangeHeight = TMP_SEARCH_RANGE_MULT_FACTOR * uiBlkHeight;
+  int iMvShift = 0;
+  int iTemplateSize = uiTemplateSize;
+  int iBlkWidth = uiBlkWidth;
+  int iBlkHeight = uiBlkHeight;
+  if (regionId == 0) //above outside LCU
+  {
+    iHorMax = std::min((iCurrX + searchRangeWidth) << iMvShift, (int)((pcCU->cs->pps->getPicWidthInLumaSamples() - iBlkWidth) << iMvShift));
+    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift);
+    iVerMax = (iCurrY - iBlkHeight - offsetLCUY) << iMvShift;
+    iVerMin = std::max(((iTemplateSize) << iMvShift), ((iCurrY - searchRangeHeight) << iMvShift));
+    int BestPosX = iCurrX + pX;
+    int BestPosY = iCurrY + pY;
+    iHorMin = std::max(iHorMin, BestPosX - RefinementRange);
+    iHorMax = std::min(iHorMax, BestPosX + RefinementRange);
+    iVerMin = std::max(iVerMin, BestPosY - RefinementRange);
+    iVerMax = std::min(iVerMax, BestPosY + RefinementRange);
+    iHorMin = iHorMin - iCurrX;
+    iHorMax = iHorMax - iCurrX;
+    iVerMax = iVerMax - iCurrY;
+    iVerMin = iVerMin - iCurrY;
+
+  }
+  else if (regionId == 1) //left outside LCU
+  {
+    iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
+    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift);
+    iVerMin = std::max((iTemplateSize) << iMvShift, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift);
+    iVerMax = (iCurrY) << iMvShift;
+    int BestPosX = iCurrX + pX;
+    int BestPosY = iCurrY + pY;
+    iHorMin = std::max(iHorMin, BestPosX - RefinementRange);
+    iHorMax = std::min(iHorMax, BestPosX + RefinementRange);
+    iVerMin = std::max(iVerMin, BestPosY - RefinementRange);
+    iVerMax = std::min(iVerMax, BestPosY + RefinementRange);
+    iHorMin = iHorMin - iCurrX;
+    iHorMax = iHorMax - iCurrX;
+    iVerMax = iVerMax - iCurrY;
+    iVerMin = iVerMin - iCurrY;
+  }
+  else if (regionId == 2) //left outside LCU (can reach the bottom row of LCU)
+  {
+    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift);
+    iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
+    iVerMin = (iCurrY + 1) << iMvShift;
+    iVerMax = std::min(pcCU->cs->pps->getPicHeightInLumaSamples() - iBlkHeight, (iCurrY - offsetLCUY + pcCU->cs->sps->getCTUSize() - iBlkHeight) << iMvShift);
+    int BestPosX = iCurrX + pX;
+    int BestPosY = iCurrY + pY;
+    iHorMin = std::max(iHorMin, BestPosX - RefinementRange);
+    iHorMax = std::min(iHorMax, BestPosX + RefinementRange);
+    iVerMin = std::max(iVerMin, BestPosY - RefinementRange);
+    iVerMax = std::min(iVerMax, BestPosY + RefinementRange);
+    iHorMin = iHorMin - iCurrX;
+    iHorMax = iHorMax - iCurrX;
+    iVerMax = iVerMax - iCurrY;
+    iVerMin = iVerMin - iCurrY;
+  }
+  else if (regionId == 3) // within CTU
+  {
+    iVerMin = std::max(((iTemplateSize) << iMvShift), (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift);
+    iVerMax = (iCurrY - iBlkHeight) << iMvShift;
+    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - offsetLCUX - iBlkWidth + 1) << iMvShift);
+    iHorMax = (iCurrX - iBlkWidth);
+    int BestPosX = iCurrX + pX;
+    int BestPosY = iCurrY + pY;
+    iHorMin = std::max(iHorMin, BestPosX - RefinementRange);
+    iHorMax = std::min(iHorMax, BestPosX + RefinementRange);
+    iVerMin = std::max(iVerMin, BestPosY - RefinementRange);
+    iVerMax = std::min(iVerMax, BestPosY + RefinementRange);
+    iHorMin = iHorMin - iCurrX;
+    iHorMax = iHorMax - iCurrX;
+    iVerMin = iVerMin - iCurrY;
+    iVerMax = iVerMax - iCurrY;
+  }
+}
+#endif
+
 TempLibFast::TempLibFast()
 {
 }
@@ -7745,6 +7826,9 @@ void IntraPrediction::candidateSearchIntra( CodingUnit* pcCU, unsigned int uiBlk
   {
     m_uiVaildCandiNum = 0;
   }
+#if TMP_FAST_ENC
+  pcCU->tmpNumCand = m_uiVaildCandiNum;
+#endif
 }
 
 #if JVET_W0069_TMP_BOUNDARY
@@ -7788,11 +7872,21 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   Pel* refCurr;
 
   const int regionNum = 3;
+#if JVET_AB0130_ITMP_SAMPLING
+  int mvYMins[regionNum + 1];
+  int mvYMaxs[regionNum + 1];
+  int mvXMins[regionNum + 1];
+  int mvXMaxs[regionNum + 1];
+#else
   int mvYMins[regionNum];
   int mvYMaxs[regionNum];
   int mvXMins[regionNum];
   int mvXMaxs[regionNum];
+#endif
   int regionId = 0;
+#if JVET_AB0130_ITMP_SAMPLING
+  int bestRegionId = 4;
+#endif
 
   //1. check the near pixels within LCU
   //above pixels in LCU
@@ -7823,11 +7917,17 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
     {
       continue;
     }
-
+#if JVET_AB0130_ITMP_SAMPLING
+    for (iYOffset = mvYMax; iYOffset >= mvYMin; iYOffset -= TMP_SAMPLING)
+    {
+      for (iXOffset = mvXMax; iXOffset >= mvXMin; iXOffset -= TMP_SAMPLING)
+      {
+#else
     for( iYOffset = mvYMax; iYOffset >= mvYMin; iYOffset-- )
     {
       for( iXOffset = mvXMax; iXOffset >= mvXMin; iXOffset-- )
       {
+#endif
         refCurr = ref + iYOffset * refStride + iXOffset;
 #if JVET_W0069_TMP_BOUNDARY
         diff = m_calcTemplateDiff( refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, pDiff, tempType );
@@ -7837,6 +7937,9 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
         if( diff < (pDiff) )
         {
           insertNode( diff, iXOffset, iYOffset, pDiff, pX, pY, pId, setId );
+#if JVET_AB0130_ITMP_SAMPLING
+          bestRegionId = 3;
+#endif
         }
         if( pDiff == 0 )
         {
@@ -7863,10 +7966,17 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
     {
       continue;
     }
+#if JVET_AB0130_ITMP_SAMPLING
+    for (iYOffset = mvYMax; iYOffset >= mvYMin; iYOffset -= TMP_SAMPLING)
+    {
+      for (iXOffset = mvXMax; iXOffset >= mvXMin; iXOffset -= TMP_SAMPLING)
+      {
+#else
     for( iYOffset = mvYMax; iYOffset >= mvYMin; iYOffset-- )
     {
       for( iXOffset = mvXMax; iXOffset >= mvXMin; iXOffset-- )
       {
+#endif
         refCurr = ref + iYOffset * refStride + iXOffset;
 #if JVET_W0069_TMP_BOUNDARY
         diff = m_calcTemplateDiff( refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, pDiff, tempType );
@@ -7877,6 +7987,9 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
         if( diff < (pDiff) )
         {
           insertNode( diff, iXOffset, iYOffset, pDiff, pX, pY, pId, setId );
+#if JVET_AB0130_ITMP_SAMPLING
+          bestRegionId = regionId;
+#endif
         }
 
         if( pDiff == 0 )
@@ -7887,35 +8000,98 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
     }
   }
 
+#if JVET_AB0130_ITMP_SAMPLING
+  // now perform refinment with horizontal and vertical flips
+  if (bestRegionId < 4)
+  {
+    for (int iRefineLog2 = LOG2_TMP_SAMPLING - 1; iRefineLog2 >= 0; iRefineLog2--)
+    {
+      int iRefine = 1 << iRefineLog2;
+      int tmpRefineRange = std::min(uiBlkHeight, uiBlkHeight) / 2;
+      clipMvIntraConstraint_Refine(pcCU, bestRegionId, mvXMins[bestRegionId], mvXMaxs[bestRegionId], mvYMins[bestRegionId], mvYMaxs[bestRegionId], TMP_TEMPLATE_SIZE, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX, pX, pY, iRefine * tmpRefineRange);
+      int mvYMin = mvYMins[bestRegionId];
+      int mvYMax = mvYMaxs[bestRegionId];
+      int mvXMin = mvXMins[bestRegionId];
+      int mvXMax = mvXMaxs[bestRegionId];
+      if (!(mvYMax < mvYMin || mvXMax < mvXMin))
+      {
+        for (iYOffset = mvYMax; iYOffset >= mvYMin; iYOffset -= iRefine)
+        {
+          for (iXOffset = mvXMax; iXOffset >= mvXMin; iXOffset -= iRefine)
+          {
+            refCurr = ref + iYOffset * refStride + iXOffset;
+#if JVET_W0069_TMP_BOUNDARY
+            diff = m_calcTemplateDiff(refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, pDiff, tempType);
+#else
+            diff = m_calcTemplateDiff(refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, pDiff);
+#endif
+            if (diff < (pDiff))
+            {
+              insertNode(diff, iXOffset, iYOffset, pDiff, pX, pY, pId, setId);
+            }
+
+          }
+        }
+      }
+    }
+  }
+#endif
+
   m_tempLibFast.m_pX = pX;
   m_tempLibFast.m_pY = pY;
   m_tempLibFast.m_pDiff = pDiff;
   m_tempLibFast.m_pId = pId;
+#if TMP_FAST_ENC
+  pcCU->tmpXdisp = pX;
+  pcCU->tmpYdisp = pY;
+#endif
 }
+#if TMP_FAST_ENC
+bool IntraPrediction::generateTMPrediction(Pel* piPred, unsigned int uiStride, CompArea area, int& foundCandiNum, CodingUnit* cu)
+#else
 bool IntraPrediction::generateTMPrediction( Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int& foundCandiNum )
+#endif
 {
   bool bSucceedFlag = true;
+#if !TMP_FAST_ENC
   unsigned int uiPatchWidth = uiBlkWidth + TMP_TEMPLATE_SIZE;
   unsigned int uiPatchHeight = uiBlkHeight + TMP_TEMPLATE_SIZE;
+#endif
 
+#if TMP_FAST_ENC
+  foundCandiNum = cu->tmpNumCand;
+#else
   foundCandiNum = m_uiVaildCandiNum;
+#endif
   if( foundCandiNum < 1 )
   {
     return false;
   }
 
+#if TMP_FAST_ENC
+  int pX = cu->tmpXdisp;
+  int pY = cu->tmpYdisp;
+#else
   int pX = m_tempLibFast.getX();
   int pY = m_tempLibFast.getY();
   Pel* ref;
   int picStride = getStride();
+#endif
   int iOffsetY, iOffsetX;
   Pel* refTarget;
+#if TMP_FAST_ENC
+  int uiHeight = area.height;
+  int uiWidth = area.width;
+  Pel* ref = cu->cs->picture->getRecoBuf(area).buf;
+  int picStride = cu->cs->picture->getRecoBuf(area).stride;
+#else
   unsigned int uiHeight = uiPatchHeight - TMP_TEMPLATE_SIZE;
   unsigned int uiWidth = uiPatchWidth - TMP_TEMPLATE_SIZE;
 
   //the data center: we use the prediction block as the center now.
   //collect the candidates
   ref = getRefPicUsed();
+#endif
   {
     iOffsetY = pY;
     iOffsetX = pX;
@@ -7937,27 +8113,48 @@ bool IntraPrediction::generateTMPrediction( Pel* piPred, unsigned int uiStride, 
 bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, int &foundCandiNum, PredictionUnit &pu)
 {
   bool         bSucceedFlag  = true;
+#if !TMP_FAST_ENC
   unsigned int uiPatchWidth  = pu.lwidth() + TMP_TEMPLATE_SIZE;
   unsigned int uiPatchHeight = pu.lheight() + TMP_TEMPLATE_SIZE;
+#endif
 
+#if TMP_FAST_ENC
+  foundCandiNum = pu.cu->tmpNumCand;
+#else
   foundCandiNum = m_uiVaildCandiNum;
+#endif
   if (foundCandiNum < 1)
   {
     return false;
   }
 
+#if TMP_FAST_ENC
+  int pX = pu.cu->tmpXdisp;
+  int pY = pu.cu->tmpYdisp;
+#else
   int          pX = m_tempLibFast.getX();
   int          pY = m_tempLibFast.getY();
+#endif
   Pel *        ref;
+#if !TMP_FAST_ENC
   int          picStride = getStride();
+#endif
   int          iOffsetY, iOffsetX;
   Pel *        refTarget;
+#if TMP_FAST_ENC
+  CompArea area = pu.Y();
+  int uiHeight = area.height;
+  int uiWidth = area.width;
+  ref = pu.cu->cs->picture->getRecoBuf(area).buf;
+  int picStride = pu.cu->cs->picture->getRecoBuf(area).stride;
+#else
   unsigned int uiHeight = uiPatchHeight - TMP_TEMPLATE_SIZE;
   unsigned int uiWidth  = uiPatchWidth - TMP_TEMPLATE_SIZE;
 
   // the data center: we use the prediction block as the center now.
   // collect the candidates
   ref = getRefPicUsed();
+#endif
   iOffsetY  = pY;
   iOffsetX  = pX;
   refTarget = ref + iOffsetY * picStride + iOffsetX;

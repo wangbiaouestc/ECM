@@ -505,9 +505,16 @@ public:
   void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId );
   void candidateSearchIntra          ( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
 #endif
+#if TMP_FAST_ENC
+  bool generateTMPrediction(Pel* piPred, unsigned int uiStride, CompArea area, int& foundCandiNum, CodingUnit* cu);
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  bool generateTMPrediction(Pel* piPred, unsigned int uiStride, int& foundCandiNum, PredictionUnit& pu);
+#endif
+#else
   bool generateTMPrediction          ( Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int& foundCandiNum );
 #if JVET_AB0061_ITMP_BV_FOR_IBC
   bool generateTMPrediction          (Pel *piPred, unsigned int uiStride, int &foundCandiNum, PredictionUnit &pu);
+#endif
 #endif
 #if JVET_W0069_TMP_BOUNDARY
   bool generateTmDcPrediction        ( Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val );

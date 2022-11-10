@@ -631,7 +631,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #else
       m_pcIntraPred->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
       m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
+#if TMP_FAST_ENC
+      m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, pu.Y(), foundCandiNum, pu.cu);
+#else
       m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+#endif
 #endif
 		  assert(foundCandiNum >= 1);
 	  }

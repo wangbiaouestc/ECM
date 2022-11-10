@@ -510,6 +510,9 @@ protected:
 #if JVET_V0130_INTRA_TMP
   bool      m_intraTMP;                                       ///< intra Template Matching 
   unsigned  m_intraTmpMaxSize;                               ///< max CU size for which intra TMP is allowed
+#if JVET_AB0130_ITMP_SAMPLING
+  bool      m_fastIntraTMP;                                   ///< fast IntraTMP RD search
+#endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   bool      m_BIF;                                            ///< bilateral filter

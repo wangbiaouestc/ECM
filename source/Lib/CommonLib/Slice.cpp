@@ -3713,7 +3713,7 @@ SPS::SPS()
 #endif
 #if JVET_V0130_INTRA_TMP
 , m_intraTMP                  ( false )
-, m_intraTmpMaxSize           ( 64 )                             
+, m_intraTmpMaxSize           ( 64 )
 #endif
 #if ENABLE_OBMC
 , m_OBMC                      ( false )

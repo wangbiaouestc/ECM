@@ -2242,6 +2242,9 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   int timdHorMode = 0;
   int timdVerMode = 0;
 #endif
+#if TMP_FAST_ENC
+  int tmpXdisp = 0, tmpYdisp = 0, tmpNumCand = 0;
+#endif
 
 
   double dct2Cost                =   MAX_DOUBLE;
@@ -2372,6 +2375,9 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #if JVET_W0123_TIMD_FUSION
   bool timdDerived = false;
 #endif
+#if TMP_FAST_ENC
+  bool tmpDerived = 0;
+#endif
 #if INTRA_TRANS_ENC_OPT
   m_pcIntraSearch->m_skipTimdLfnstMtsPass = false;
   m_modeCtrl->resetLfnstCost();
@@ -2471,6 +2477,38 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               cu.timdHor = timdHorMode;
               cu.timdVer = timdVerMode;
 #endif
+            }
+          }
+#endif
+
+#if TMP_FAST_ENC
+          if (isLuma(partitioner.chType) && cu.slice->getSPS()->getUseIntraTMP())
+          {
+            const bool tpmAllowed = sps.getUseIntraTMP() && isLuma(partitioner.chType) && ((cu.lfnstIdx == 0) || allowLfnstWithTmp());
+            const bool testTpm = tpmAllowed && (cu.lwidth() <= sps.getIntraTMPMaxSize() && cu.lheight() <= sps.getIntraTMPMaxSize());
+            if (testTpm == 1 && tmpDerived == 0)
+            {
+#if JVET_W0069_TMP_BOUNDARY
+              RefTemplateType templateType = m_pcIntraSearch->getRefTemplateType(cu, cu.blocks[COMPONENT_Y]);
+              if (templateType != NO_TEMPLATE)
+              {
+                m_pcIntraSearch->getTargetTemplate(&cu, cu.lwidth(), cu.lheight(), templateType);
+                m_pcIntraSearch->candidateSearchIntra(&cu, cu.lwidth(), cu.lheight(), templateType);
+              }
+#else
+              m_pcIntraSearch->getTargetTemplate(&cu, cu.lwidth(), cu.lheight());
+              m_pcIntraSearch->candidateSearchIntra(&cu, cu.lwidth(), cu.lheight());
+#endif
+              tmpDerived = 1;
+              tmpXdisp = cu.tmpXdisp;
+              tmpYdisp = cu.tmpYdisp;
+              tmpNumCand = cu.tmpNumCand;
+            }
+            else
+            {
+              cu.tmpXdisp = tmpXdisp;
+              cu.tmpYdisp = tmpYdisp;
+              cu.tmpNumCand = tmpNumCand;
             }
           }
 #endif
