@@ -1405,14 +1405,13 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
 #if JVET_AB0092_GLM_WITH_LUMA
   if (pu.glmIdc.getIdc(compID, 0) > NUM_GLM_PATTERN)
   {
-    CccmModel glmModel(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+    CccmModel<GLM_NUM_PARAMS> glmModel(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
     xGlmCalcModel(pu, compID, chromaArea, glmModel);
     xGlmApplyModel(pu, compID, chromaArea, glmModel, piPred);
     return;
   }
-  else
-  {
 #endif
+
   int  iLumaStride = 0;
   PelBuf Temp;
 #if JVET_AA0126_GLM
@@ -1504,9 +1503,6 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
   else
 #endif
     piPred.linearTransform(cclmModel.a, cclmModel.shift, cclmModel.b, true, pu.cs->slice->clpRng(compID));
-#if JVET_AB0092_GLM_WITH_LUMA
-  }
-#endif
 }
 
 /** Function for deriving planar intra prediction. This function derives the prediction samples for planar mode (intra coding).
@@ -8818,8 +8814,8 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
 {
   if ( pu.cccmFlag )
   {
-    CccmModel cccmModelCb( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) );
-    CccmModel cccmModelCr( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) );
+    CccmModel<CCCM_NUM_PARAMS> cccmModelCb( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) );
+    CccmModel<CCCM_NUM_PARAMS> cccmModelCr( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) );
 
 #if JVET_AB0143_CCCM_TS
     if ( intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX )
@@ -8847,7 +8843,7 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
   }
 }
 
-void IntraPrediction::xCccmApplyModel(const PredictionUnit& pu, const ComponentID compId, CccmModel &cccmModel, int modelId, int modelThr, PelBuf &piPred) const
+void IntraPrediction::xCccmApplyModel(const PredictionUnit& pu, const ComponentID compId, CccmModel<CCCM_NUM_PARAMS> &cccmModel, int modelId, int modelThr, PelBuf &piPred) const
 {
   const  ClpRng& clpRng(pu.cu->cs->slice->clpRng(compId));
   static Pel     samples[CCCM_NUM_PARAMS];
@@ -8876,23 +8872,20 @@ void IntraPrediction::xCccmApplyModel(const PredictionUnit& pu, const ComponentI
       samples[5] = cccmModel.nonlinear( refLumaBlk.at( x, y) );
       samples[6] = cccmModel.bias();
 
-      piPred.at(x, y) = ClipPel<Pel>( cccmModel.convolve(samples, CCCM_NUM_PARAMS), clpRng );
+      piPred.at(x, y) = ClipPel<Pel>( cccmModel.convolve(samples), clpRng );
     }
   }
 }
 
-void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel &cccmModelCb, CccmModel &cccmModelCr, int modelId, int modelThr) const
+void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel<CCCM_NUM_PARAMS> &cccmModelCb, CccmModel<CCCM_NUM_PARAMS> &cccmModelCr, int modelId, int modelThr)
 {
   int areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY;
 
   const CPelBuf recoCb  = pu.cs->picture->getRecoBuf(COMPONENT_Cb);
   const CPelBuf recoCr  = pu.cs->picture->getRecoBuf(COMPONENT_Cr);
   PelBuf        refLuma = xCccmGetLumaRefBuf(pu, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY);
-
-  int M = CCCM_NUM_PARAMS;
   
   int sampleNum = 0;
-  int sampleInd = 0;
   
 #if JVET_AB0174_CCCM_DIV_FREE
   int chromaOffsetCb = 1 << ( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - 1 );
@@ -8923,37 +8916,12 @@ void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel &cccmM
   {
     for (int x = xStart; x < xEnd; x++)
     {
-      if (x >= refSizeX && y >= refSizeY)
-      {
-        continue;
-      }
-
-      if (modelId == 1 && refLuma.at(x, y) > modelThr) // Model 1: Include only samples below or equal to the threshold
-      {
-        continue;
-      }
-      if (modelId == 2 && refLuma.at(x, y) <= modelThr) // Model 2: Include only samples above the threshold
-      {
-        continue;
-      }
-
-      // 7-tap cross
-      A[0][sampleInd] = refLuma.at(x, y); // C
-      A[1][sampleInd] = refLuma.at(x, y - 1); // N
-      A[2][sampleInd] = refLuma.at(x, y + 1); // S
-      A[3][sampleInd] = refLuma.at(x - 1, y); // W
-      A[4][sampleInd] = refLuma.at(x + 1, y); // E
-      A[5][sampleInd] = cccmModelCb.nonlinear(refLuma.at(x, y));
-      A[6][sampleInd] = cccmModelCb.bias();
-      YCb[sampleInd] = recoCb.at(refPosPicX + x, refPosPicY + y);
-      YCr[sampleInd++] = recoCr.at(refPosPicX + x, refPosPicY + y);
-    }
-  }
 #else
   for (int y = 0; y < areaHeight; y++)
   {
     for (int x = 0; x < areaWidth; x++)
     {
+#endif
       if ( x >= refSizeX && y >= refSizeY )
       {
         continue;
@@ -8969,135 +8937,32 @@ void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel &cccmM
       }
 
       // 7-tap cross
-      A[0][sampleInd] = refLuma.at( x  , y   ); // C
-      A[1][sampleInd] = refLuma.at( x  , y-1 ); // N
-      A[2][sampleInd] = refLuma.at( x  , y+1 ); // S
-      A[3][sampleInd] = refLuma.at( x-1, y   ); // W
-      A[4][sampleInd] = refLuma.at( x+1, y   ); // E
-      A[5][sampleInd] = cccmModelCb.nonlinear( refLuma.at( x, y) );
-      A[6][sampleInd] = cccmModelCb.bias();
+      A[0][sampleNum] = refLuma.at( x  , y   ); // C
+      A[1][sampleNum] = refLuma.at( x  , y-1 ); // N
+      A[2][sampleNum] = refLuma.at( x  , y+1 ); // S
+      A[3][sampleNum] = refLuma.at( x-1, y   ); // W
+      A[4][sampleNum] = refLuma.at( x+1, y   ); // E
+      A[5][sampleNum] = cccmModelCb.nonlinear( refLuma.at( x, y) );
+      A[6][sampleNum] = cccmModelCb.bias();
 
-      YCb[sampleInd]   = recoCb.at(refPosPicX + x, refPosPicY + y);
-      YCr[sampleInd++] = recoCr.at(refPosPicX + x, refPosPicY + y);
+      YCb[sampleNum]   = recoCb.at(refPosPicX + x, refPosPicY + y);
+      YCr[sampleNum++] = recoCr.at(refPosPicX + x, refPosPicY + y);
     }
   }
-#endif
 
-  if ( sampleInd == 0 ) // Number of samples can go to zero in the multimode case
+  if( !sampleNum ) // Number of samples can go to zero in the multimode case
   {
-    cccmModelCb.clearModel(M);
-    cccmModelCr.clearModel(M);
-    return;
+    cccmModelCb.clearModel();
+    cccmModelCr.clearModel();
   }
   else
   {
-    sampleNum = sampleInd;
-  }
-  
-  // Calculate autocorrelation matrix and cross-correlation vector
-  static CccmCovarianceInt::TE ATA;
-  static CccmCovarianceInt::Ty ATYCb;
-  static CccmCovarianceInt::Ty ATYCr;
-
-  memset(ATA  , 0x00, sizeof(TCccmCoeff) * CCCM_NUM_PARAMS * CCCM_NUM_PARAMS);
-  memset(ATYCb, 0x00, sizeof(TCccmCoeff) * CCCM_NUM_PARAMS);
-  memset(ATYCr, 0x00, sizeof(TCccmCoeff) * CCCM_NUM_PARAMS);
-
-  for (int coli0 = 0; coli0 < M; coli0++)
-  {
-    for (int coli1 = coli0; coli1 < M; coli1++)
-    {
-      Pel *col0 = A[coli0];
-      Pel *col1 = A[coli1];
-      
-      for (int rowi = 0; rowi < sampleNum; rowi++)
-      {
-        ATA[coli0][coli1] += col0[rowi] * col1[rowi];
-      }
-    }
-  }
-
-  for (int coli = 0; coli < M; coli++)
-  {
-    Pel *col = A[coli];
-    
-    for (int rowi = 0; rowi < sampleNum; rowi++)
-    {
-      ATYCb[coli] += col[rowi] * YCb[rowi];
-      ATYCr[coli] += col[rowi] * YCr[rowi];
-    }
-  }
-
 #if JVET_AB0174_CCCM_DIV_FREE
-  // Remove chromaOffset from stats to update cross-correlation
-  for (int coli = 0; coli < M; coli++)
-  {
-    ATYCb[coli] = ATYCb[coli] - ((ATA[coli][M - 1] * chromaOffsetCb) >> (cccmModelCb.bd - 1));
-    ATYCr[coli] = ATYCr[coli] - ((ATA[coli][M - 1] * chromaOffsetCr) >> (cccmModelCr.bd - 1));
-  }
+    m_cccmSolver.solve2( A, YCb, YCr, sampleNum, chromaOffsetCb, chromaOffsetCr, cccmModelCb, cccmModelCr );
+#else
+    m_cccmSolver.solve2( A, YCb, YCr, sampleNum, cccmModelCb, cccmModelCr );
 #endif
-
-  // Scale the matrix and vector to selected dynamic range
-  int matrixShift = CCCM_MATRIX_BITS - 2 * pu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA) - ceilLog2(sampleNum);
-
-  if ( matrixShift > 0 )
-  {
-    for (int coli0 = 0; coli0 < M; coli0++)
-    {
-      for (int coli1 = coli0; coli1 < M; coli1++)
-      {
-        ATA[coli0][coli1] <<= matrixShift;
-      }
-    }
-
-    for (int coli = 0; coli < M; coli++)
-    {
-      ATYCb[coli] <<= matrixShift;
-    }
-
-    for (int coli = 0; coli < M; coli++)
-    {
-      ATYCr[coli] <<= matrixShift;
-    }
   }
-  else if ( matrixShift < 0 )
-  {
-    matrixShift = -matrixShift;
-    
-    for (int coli0 = 0; coli0 < M; coli0++)
-    {
-      for (int coli1 = coli0; coli1 < M; coli1++)
-      {
-        ATA[coli0][coli1] >>= matrixShift;
-      }
-    }
-
-    for (int coli = 0; coli < M; coli++)
-    {
-      ATYCb[coli] >>= matrixShift;
-    }
-
-    for (int coli = 0; coli < M; coli++)
-    {
-      ATYCr[coli] >>= matrixShift;
-    }
-  }
-  
-  // Solve the filter coefficients using LDL decomposition
-  CccmCovarianceInt cccmSolver;
-  CccmCovarianceInt::TE U;       // Upper triangular L' of ATA's LDL decomposition
-  CccmCovarianceInt::Ty diag;    // Diagonal of D
-
-  bool decompOk = cccmSolver.ldlDecompose(ATA, U, diag, M);
-  
-  cccmSolver.ldlSolve(U, diag, ATYCb, cccmModelCb.params, M, decompOk);
-  cccmSolver.ldlSolve(U, diag, ATYCr, cccmModelCr.params, M, decompOk);
-
-#if JVET_AB0174_CCCM_DIV_FREE
-  // Add the chroma offset to bias term (after shifting up by CCCM_DECIM_BITS and down by cccmModelCb.bd - 1)
-  cccmModelCb.params[M-1] += chromaOffsetCb << (CCCM_DECIM_BITS - (cccmModelCb.bd - 1));
-  cccmModelCr.params[M-1] += chromaOffsetCr << (CCCM_DECIM_BITS - (cccmModelCr.bd - 1));
-#endif
 }
 
 // Calculate a single downsampled luma reference value (copied from IntraPrediction::xGetLumaRecPixels)
@@ -9237,17 +9102,22 @@ int IntraPrediction::xCccmCalcRefAver(const PredictionUnit& pu) const
   int sumSamples = 0;
   
 #if JVET_AB0143_CCCM_TS && MMLM
-  if (pu.cccmFlag == 1)
+  if( pu.cccmFlag == 1 || pu.cccmFlag == 3 )
   {
-    for (int y = 0; y < refSizeY; y++)
+    // above samples
+    for( int y = 0; y < refSizeY; y++ )
     {
-      for (int x = 0; x < areaWidth; x++)
+      for( int x = (pu.cccmFlag == 3 ? refSizeX : 0); x < areaWidth; x++ )
       {
-        sumSamples += refLuma.at(x, y);
+        sumSamples += refLuma.at( x, y );
         numSamples++;
       }
     }
+  }
 
+  if( pu.cccmFlag == 1 || pu.cccmFlag == 2 )
+  {
+    // left samples
     for (int y = refSizeY; y < areaHeight; y++)
     {
       for (int x = 0; x < refSizeX; x++)
@@ -9256,29 +9126,7 @@ int IntraPrediction::xCccmCalcRefAver(const PredictionUnit& pu) const
         numSamples++;
       }
     }
-  }
-  else if (pu.cccmFlag == 3)
-  {
-    for (int y = 0; y < refSizeY; y++)
-    {
-      for (int x = refSizeX; x < areaWidth; x++)
-      {
-        sumSamples += refLuma.at(x, y);
-        numSamples++;
-      }
-    }
-  }
-  else
-  {
-    for (int y = refSizeY; y < areaHeight; y++)
-    {
-      for (int x = 0; x < refSizeX; x++)
-      {
-        sumSamples += refLuma.at(x, y);
-        numSamples++;
-      }
-    }
-  }
+  }  
 #else
   // Top samples
   for (int y = 0; y < refSizeY; y++)
@@ -9486,7 +9334,8 @@ void IntraPrediction::xCccmCreateLumaRef(const PredictionUnit& pu, CompArea chro
 
 #if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
 // LDL decomposing A to U'*diag*U
-bool CccmCovarianceInt::ldlDecomp(TE A, TE U, Ty diag, int numEq) const
+template<const int M, const int N>
+bool CccmCovariance<M, N>::ldlDecomp(TE A, TE U, Ty diag, int numEq) const
 {
   for (int i = 0; i < numEq; i++)
   {
@@ -9525,7 +9374,8 @@ bool CccmCovarianceInt::ldlDecomp(TE A, TE U, Ty diag, int numEq) const
 }
 
 // Solve U'z = y for z
-void CccmCovarianceInt::ldlTransposeBacksubstitution(TE U, TCccmCoeff* y, TCccmCoeff* z, int numEq) const
+template<const int M, const int N>
+void CccmCovariance<M, N>::ldlTransposeBacksubstitution(TE U, TCccmCoeff* y, TCccmCoeff* z, int numEq) const
 {
   z[0] = y[0];
   
@@ -9543,7 +9393,8 @@ void CccmCovarianceInt::ldlTransposeBacksubstitution(TE U, TCccmCoeff* y, TCccmC
 }
 
 // Solve Ux = z for x
-void CccmCovarianceInt::ldlBacksubstitution(TE U, TCccmCoeff* z, TCccmCoeff* x, int numEq) const
+template<const int M, const int N>
+void CccmCovariance<M, N>::ldlBacksubstitution(TE U, TCccmCoeff* z, TCccmCoeff* x, int numEq) const
 {
   x[numEq - 1] = z[numEq - 1];
 
@@ -9560,7 +9411,8 @@ void CccmCovarianceInt::ldlBacksubstitution(TE U, TCccmCoeff* z, TCccmCoeff* x, 
   }
 }
 
-bool CccmCovarianceInt::ldlDecompose(TE A, TE U, Ty diag, int numEq) const
+template<const int M, const int N>
+bool CccmCovariance<M, N>::ldlDecompose(TE A, TE U, Ty diag, int numEq) const
 {
   // Compute upper triangular U and diagonal D such that U'*D*U = A
   // (U being the tranpose of L in LDL decomposition: L*D*L' = A)
@@ -9574,7 +9426,8 @@ bool CccmCovarianceInt::ldlDecompose(TE A, TE U, Ty diag, int numEq) const
   return ldlDecomp(A, U, diag, numEq);
 }
 
-void CccmCovarianceInt::ldlSolve(TE U, Ty diag, TCccmCoeff* y, TCccmCoeff* x, int numEq, bool decompOk) const
+template<const int M, const int N>
+void CccmCovariance<M, N>::ldlSolve(TE U, Ty diag, TCccmCoeff* y, TCccmCoeff* x, int numEq, bool decompOk) const
 {
   if ( decompOk )
   {
@@ -9602,13 +9455,213 @@ void CccmCovarianceInt::ldlSolve(TE U, Ty diag, TCccmCoeff* y, TCccmCoeff* x, in
     std::memset(x, 0, sizeof(TCccmCoeff) * numEq);
   }
 }
+
+template<const int M, const int N>
+#if JVET_AB0174_CCCM_DIV_FREE
+void CccmCovariance<M, N>::solve1( const MN A, const Pel* C, const int sampleNum, const int chromaOffset, CccmModel<M>& model )
+#else
+void CccmCovariance<M, N>::solve1( const MN A, const Pel* C, const int sampleNum, CccmModel<M>& model )
+#endif
+{
+  memset( ATA, 0x00, sizeof( TCccmCoeff ) * M * M );
+  memset( ATCb, 0x00, sizeof( TCccmCoeff ) * M );
+
+  for( int coli0 = 0; coli0 < M; coli0++ )
+  {
+    for( int coli1 = coli0; coli1 < M; coli1++ )
+    {
+      const Pel *col0 = A[coli0];
+      const Pel *col1 = A[coli1];
+
+      for( int rowi = 0; rowi < sampleNum; rowi++ )
+      {
+        ATA[coli0][coli1] += col0[rowi] * col1[rowi];
+      }
+    }
+  }
+
+  for( int coli = 0; coli < M; coli++ )
+  {
+    const Pel *col = A[coli];
+
+    for( int rowi = 0; rowi < sampleNum; rowi++ )
+    {
+      ATCb[coli] += col[rowi] * C[rowi];
+    }
+  }
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  // Remove chromaOffset from stats to update cross-correlation
+  for( int coli = 0; coli < M; coli++ )
+  {
+    ATCb[coli] = ATCb[coli] - ((ATA[coli][M - 1] * chromaOffset) >> (model.bd - 1));
+  }
+#endif
+
+  // Scale the matrix and vector to selected dynamic range
+  int matrixShift = 28 - 2 * model.bd - ceilLog2( sampleNum );
+
+  if( matrixShift > 0 )
+  {
+    for( int coli0 = 0; coli0 < M; coli0++ )
+    {
+      for( int coli1 = coli0; coli1 < M; coli1++ )
+      {
+        ATA[coli0][coli1] <<= matrixShift;
+      }
+    }
+
+    for( int coli = 0; coli < M; coli++ )
+    {
+      ATCb[coli] <<= matrixShift;
+    }
+  }
+  else if( matrixShift < 0 )
+  {
+    matrixShift = -matrixShift;
+
+    for( int coli0 = 0; coli0 < M; coli0++ )
+    {
+      for( int coli1 = coli0; coli1 < M; coli1++ )
+      {
+        ATA[coli0][coli1] >>= matrixShift;
+      }
+    }
+
+    for( int coli = 0; coli < M; coli++ )
+    {
+      ATCb[coli] >>= matrixShift;
+    }
+  }
+
+  // Solve the filter coefficients using LDL decomposition
+  TE U;       // Upper triangular L' of ATA's LDL decomposition
+  Ty diag;    // Diagonal of D
+
+  bool decompOk = ldlDecompose( ATA, U, diag, M );
+  ldlSolve( U, diag, ATCb, model.params, M, decompOk );
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  // Add the chroma offset to bias term (after shifting up by CCCM_DECIM_BITS and down by cccmModelCb.bd - 1)
+  model.params[M - 1] += chromaOffset << (CCCM_DECIM_BITS - (model.bd - 1));
+#endif
+}
+
+template<const int M, const int N>
+#if JVET_AB0174_CCCM_DIV_FREE
+void CccmCovariance<M, N>::solve2( const MN A, const Pel* Cb, const Pel* Cr, const int sampleNum, const int chromaOffsetCb, const int chromaOffsetCr, CccmModel<M>& modelCb, CccmModel<M>& modelCr )
+#else
+void CccmCovariance<M, N>::solve2( const MN A, const Pel* Cb, const Pel* Cr, const int sampleNum, CccmModel<M>& modelCb, CccmModel<M>& modelCr )
+#endif
+{
+  // Calculate autocorrelation matrix and cross-correlation vector
+  memset( ATA, 0x00, sizeof( TCccmCoeff ) * M * M );
+  memset( ATCb, 0x00, sizeof( TCccmCoeff ) * M );
+  memset( ATCr, 0x00, sizeof( TCccmCoeff ) * M );
+
+  for( int coli0 = 0; coli0 < M; coli0++ )
+  {
+    for( int coli1 = coli0; coli1 < M; coli1++ )
+    {
+      const Pel *col0 = A[coli0];
+      const Pel *col1 = A[coli1];
+
+      for( int rowi = 0; rowi < sampleNum; rowi++ )
+      {
+        ATA[coli0][coli1] += col0[rowi] * col1[rowi];
+      }
+    }
+  }
+
+  for( int coli = 0; coli < M; coli++ )
+  {
+    const Pel *col = A[coli];
+
+    for( int rowi = 0; rowi < sampleNum; rowi++ )
+    {
+      ATCb[coli] += col[rowi] * Cb[rowi];
+      ATCr[coli] += col[rowi] * Cr[rowi];
+    }
+  }
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  // Remove chromaOffset from stats to update cross-correlation
+  for( int coli = 0; coli < M; coli++ )
+  {
+    ATCb[coli] = ATCb[coli] - ((ATA[coli][M - 1] * chromaOffsetCb) >> (modelCb.bd - 1));
+    ATCr[coli] = ATCr[coli] - ((ATA[coli][M - 1] * chromaOffsetCr) >> (modelCr.bd - 1));
+  }
+#endif
+
+  // Scale the matrix and vector to selected dynamic range
+  CHECK( modelCb.bd != modelCr.bd, "Bitdepth of Cb and Cr is different" );
+  int matrixShift = CCCM_MATRIX_BITS - 2 * modelCb.bd - ceilLog2( sampleNum );
+
+  if( matrixShift > 0 )
+  {
+    for( int coli0 = 0; coli0 < M; coli0++ )
+    {
+      for( int coli1 = coli0; coli1 < M; coli1++ )
+      {
+        ATA[coli0][coli1] <<= matrixShift;
+      }
+    }
+
+    for( int coli = 0; coli < M; coli++ )
+    {
+      ATCb[coli] <<= matrixShift;
+    }
+
+    for( int coli = 0; coli < M; coli++ )
+    {
+      ATCr[coli] <<= matrixShift;
+    }
+  }
+  else if( matrixShift < 0 )
+  {
+    matrixShift = -matrixShift;
+
+    for( int coli0 = 0; coli0 < M; coli0++ )
+    {
+      for( int coli1 = coli0; coli1 < M; coli1++ )
+      {
+        ATA[coli0][coli1] >>= matrixShift;
+      }
+    }
+
+    for( int coli = 0; coli < M; coli++ )
+    {
+      ATCb[coli] >>= matrixShift;
+    }
+
+    for( int coli = 0; coli < M; coli++ )
+    {
+      ATCr[coli] >>= matrixShift;
+    }
+  }
+
+  // Solve the filter coefficients using LDL decomposition
+  TE U;       // Upper triangular L' of ATA's LDL decomposition
+  Ty diag;    // Diagonal of D
+
+  bool decompOk = ldlDecompose( ATA, U, diag, M );
+
+  ldlSolve( U, diag, ATCb, modelCb.params, M, decompOk );
+  ldlSolve( U, diag, ATCr, modelCr.params, M, decompOk );
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  // Add the chroma offset to bias term (after shifting up by CCCM_DECIM_BITS and down by cccmModelCb.bd - 1)
+  modelCb.params[M - 1] += chromaOffsetCb << (CCCM_DECIM_BITS - (modelCb.bd - 1));
+  modelCr.params[M - 1] += chromaOffsetCr << (CCCM_DECIM_BITS - (modelCr.bd - 1));
+#endif
+}
 #endif
 
 #if JVET_AB0092_GLM_WITH_LUMA
-void IntraPrediction::xGlmApplyModel(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel &glmModel, PelBuf &piPred) const
+void IntraPrediction::xGlmApplyModel(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel<GLM_NUM_PARAMS> &glmModel, PelBuf &piPred) const
 {
   const  ClpRng& clpRng(pu.cu->cs->slice->clpRng(compId));
-  static Pel     samples[CCCM_NUM_PARAMS];
+  static Pel     samples[GLM_NUM_PARAMS];
 
   CPelBuf refLumaBlk = xGlmGetGradPuBuf(pu, chromaArea, 0);
   CPelBuf refGradBlk = xGlmGetGradPuBuf(pu, chromaArea, pu.glmIdc.getIdc(compId, 0));
@@ -9617,21 +9670,16 @@ void IntraPrediction::xGlmApplyModel(const PredictionUnit& pu, const ComponentID
   {
     for (int x = 0; x < refLumaBlk.width; x++)
     {
-
       samples[0] = refGradBlk.at(x, y); // luma gradient
       samples[1] = refLumaBlk.at(x, y); // luma value
       samples[2] = glmModel.bias();
-      samples[3] = 0;
-      samples[4] = 0;
-      samples[5] = 0;
-      samples[6] = 0;
 
-      piPred.at(x, y) = ClipPel<Pel>(glmModel.convolve(samples, CCCM_NUM_PARAMS), clpRng);
+      piPred.at(x, y) = ClipPel<Pel>(glmModel.convolve(samples), clpRng);
     }
   }
 }
 
-void IntraPrediction::xGlmCalcModel(const PredictionUnit& pu, const ComponentID compID, const CompArea& chromaArea, CccmModel &glmModel) const
+void IntraPrediction::xGlmCalcModel(const PredictionUnit& pu, const ComponentID compID, const CompArea& chromaArea, CccmModel<GLM_NUM_PARAMS> &glmModel)
 {
   int areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY;
 
@@ -9639,13 +9687,7 @@ void IntraPrediction::xGlmCalcModel(const PredictionUnit& pu, const ComponentID 
   PelBuf        refLuma = xGlmGetGradRefBuf(pu, chromaArea, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY, 0);
   PelBuf        refGrad = xGlmGetGradRefBuf(pu, chromaArea, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY, pu.glmIdc.getIdc(compID, 0));
 
-  int M = CCCM_NUM_PARAMS; // align CCCM parameter number to reuse CCCM LDL method
-#if JVET_AB0174_CCCM_DIV_FREE
-  int N = 3; 
-#endif
-
   int sampleNum = 0;
-  int sampleInd = 0;
 
 #if JVET_AB0174_CCCM_DIV_FREE
   int chromaOffset = 1 << (pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - 1);
@@ -9660,8 +9702,8 @@ void IntraPrediction::xGlmCalcModel(const PredictionUnit& pu, const ComponentID 
 #endif
 
   // Collect reference data to input matrix A and target vector C
-  static Pel A[CCCM_NUM_PARAMS][CCCM_MAX_REF_SAMPLES];
-  static Pel C[CCCM_MAX_REF_SAMPLES];
+  static Pel A[GLM_NUM_PARAMS][GLM_MAX_REF_SAMPLES];
+  static Pel C[GLM_MAX_REF_SAMPLES];
 
   int sizeX = refSizeX + chromaArea.width;
   int sizeY = refSizeY + chromaArea.height;
@@ -9697,115 +9739,27 @@ void IntraPrediction::xGlmCalcModel(const PredictionUnit& pu, const ComponentID 
       }
 
       // 7-tap cross
-      A[0][sampleInd] = refGrad.at(x, y); // luma gradient
-      A[1][sampleInd] = refLuma.at(x, y); // luma value
-      A[2][sampleInd] = glmModel.bias();
-      A[3][sampleInd] = 0;
-      A[4][sampleInd] = 0;
-      A[5][sampleInd] = 0;
-      A[6][sampleInd] = 0;
+      A[0][sampleNum] = refGrad.at(x, y); // luma gradient
+      A[1][sampleNum] = refLuma.at(x, y); // luma value
+      A[2][sampleNum] = glmModel.bias();
 
-      C[sampleInd] = reco.at(refPosPicX + x, refPosPicY + y);
-      sampleInd++;
+      C[sampleNum] = reco.at(refPosPicX + x, refPosPicY + y);
+      sampleNum++;
     }
   }
-  if (sampleInd == 0) // Number of sample can go to zero in the multimode case
+
+  if( !sampleNum ) // Number of sample can go to zero in the multimode case
   {
-    glmModel.clearModel(M);
-    return;
+    glmModel.clearModel();
   }
   else
   {
-    sampleNum = sampleInd;
-  }
-
-  // Calculate autocorrelation matrix and cross-correlation vector
-  static CccmCovarianceInt::TE ATA;
-  static CccmCovarianceInt::Ty ATC;
-
-  memset(ATA, 0x00, sizeof(int64_t) * CCCM_NUM_PARAMS * CCCM_NUM_PARAMS);
-  memset(ATC, 0x00, sizeof(int64_t) * CCCM_NUM_PARAMS);
-
-  for (int coli0 = 0; coli0 < M; coli0++)
-  {
-    for (int coli1 = coli0; coli1 < M; coli1++)
-    {
-      Pel *col0 = A[coli0];
-      Pel *col1 = A[coli1];
-
-      for (int rowi = 0; rowi < sampleNum; rowi++)
-      {
-        ATA[coli0][coli1] += col0[rowi] * col1[rowi];
-      }
-    }
-  }
-
-  for (int coli = 0; coli < M; coli++)
-  {
-    Pel *col = A[coli];
-
-    for (int rowi = 0; rowi < sampleNum; rowi++)
-    {
-      ATC[coli] += col[rowi] * C[rowi];
-    }
-  }
-
 #if JVET_AB0174_CCCM_DIV_FREE
-  // Remove chromaOffset from stats to update cross-correlation
-  for (int coli = 0; coli < N; coli++)
-  {
-    ATC[coli] = ATC[coli] - ((ATA[coli][N - 1] * chromaOffset) >> (glmModel.bd - 1));
-  }
+    m_glmSolver.solve1( A, C, sampleNum, chromaOffset, glmModel );
+#else
+    m_glmSolver.solve1( A, C, sampleNum, glmModel );
 #endif
-
-  // Scale the matrix and vector to selected dynamic range
-  int matrixShift = 28 - 2 * pu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA) - ceilLog2(sampleNum);
-
-  if (matrixShift > 0)
-  {
-    for (int coli0 = 0; coli0 < M; coli0++)
-    {
-      for (int coli1 = coli0; coli1 < M; coli1++)
-      {
-        ATA[coli0][coli1] <<= matrixShift;
-      }
-    }
-
-    for (int coli = 0; coli < M; coli++)
-    {
-      ATC[coli] <<= matrixShift;
-    }
   }
-  else if (matrixShift < 0)
-  {
-    matrixShift = -matrixShift;
-
-    for (int coli0 = 0; coli0 < M; coli0++)
-    {
-      for (int coli1 = coli0; coli1 < M; coli1++)
-      {
-        ATA[coli0][coli1] >>= matrixShift;
-      }
-    }
-
-    for (int coli = 0; coli < M; coli++)
-    {
-      ATC[coli] >>= matrixShift;
-    }
-  }
-
-  // Solve the filter coefficients using LDL decomposition
-  CccmCovarianceInt glmSolver;
-  CccmCovarianceInt::TE U;       // Upper triangular L' of ATA's LDL decomposition
-  CccmCovarianceInt::Ty diag;    // Diagonal of D
-
-  bool decompOk = glmSolver.ldlDecompose(ATA, U, diag, M);
-  glmSolver.ldlSolve(U, diag, ATC, glmModel.params, M, decompOk);
-
-#if JVET_AB0174_CCCM_DIV_FREE
-  // Add the chroma offset to bias term (after shifting up by CCCM_DECIM_BITS and down by cccmModelCb.bd - 1)
-  glmModel.params[N - 1] += chromaOffset << (CCCM_DECIM_BITS - (glmModel.bd - 1));
-#endif
 }
 
 Pel IntraPrediction::xGlmGetGradVal(const PredictionUnit& pu, const int glmIdx, const CPelBuf pi, const int x, const int y) const

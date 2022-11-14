@@ -957,6 +957,13 @@ static const int CCCM_MATRIX_BITS         = 28;
 static const int CCCM_DECIM_BITS          = 22;
 #endif
 static const int CCCM_DECIM_ROUND         = ( 1 << (CCCM_DECIM_BITS - 1 ) );
+#if JVET_AB0143_CCCM_TS
+#if MMLM
+static const int CCCM_NUM_MODES           = 6;
+#else
+static const int CCCM_NUM_MODES           = 3;
+#endif
+#endif
 #endif
 
 #if JVET_AA0126_GLM
@@ -970,6 +977,8 @@ static const int NUM_GLM_PATTERN =                                 16;
 static const int NUM_GLM_PATTERN_BITS =                             4;
 static const int NUM_GLM_IDC =                                     17;
 #endif
+static const int GLM_NUM_PARAMS =                                   3;
+static const int GLM_MAX_REF_SAMPLES =           CCCM_MAX_REF_SAMPLES;
 #else
 #if JVET_AA0057_CCCM
 #define NUM_GLM_WEIGHT                                              0
@@ -986,11 +995,11 @@ static const int NUM_GLM_IDC =                                     33;
 #endif
 
 #if JVET_Y0152_TT_ENC_SPEEDUP
-static constexpr int   FAST_METHOD_TT_ENC_SPEEDUP = 0x0001;  ///< Embedding flag, which, if false, de-activates all the following ABT_ENC_SPEEDUP_* modes
-static constexpr int FAST_METHOD_HOR_XOR_VER = 0x0002;
-static constexpr int FAST_METHOD_ENC_SPEEDUP_BT_BASED = 0x0004;
-static constexpr int FAST_METHOD_TT_ENC_SPEEDUP_BSLICE = 0x0008;
-static constexpr int FAST_METHOD_TT_ENC_SPEEDUP_ISLICE = 0x0010;
+static constexpr int FAST_METHOD_TT_ENC_SPEEDUP =              0x0001;  ///< Embedding flag, which, if false, de-activates all the following ABT_ENC_SPEEDUP_* modes
+static constexpr int FAST_METHOD_HOR_XOR_VER =                 0x0002;
+static constexpr int FAST_METHOD_ENC_SPEEDUP_BT_BASED =        0x0004;
+static constexpr int FAST_METHOD_TT_ENC_SPEEDUP_BSLICE =       0x0008;
+static constexpr int FAST_METHOD_TT_ENC_SPEEDUP_ISLICE =       0x0010;
 #endif
 
 // need to know for static memory allocation

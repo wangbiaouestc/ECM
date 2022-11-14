@@ -101,9 +101,10 @@ typedef int64_t TCccmCoeff;
 #define FIXED_DIV(x, y)  TCccmCoeff((int64_t(x)    << CCCM_DECIM_BITS ) / (y) )
 #endif
 
+template<const int M>
 struct CccmModel
 {
-  TCccmCoeff params[CCCM_NUM_PARAMS];
+  TCccmCoeff params[M];
   int        bd;
   int        midVal;
   
@@ -113,21 +114,21 @@ struct CccmModel
     midVal = (1 << ( bitdepth - 1));
   }
   
-  void clearModel(int numParams)
+  void clearModel()
   {
-    for( int i = 0; i < numParams - 1; i++)
+    for( int i = 0; i < M - 1; i++)
     {
       params[i] = 0;
     }
 
-    params[numParams - 1] = 1 << CCCM_DECIM_BITS; // Default bias to 1
+    params[M - 1] = 1 << CCCM_DECIM_BITS; // Default bias to 1
   }
 
-  Pel convolve(Pel* vector, int numParams)
+  Pel convolve(Pel* vector)
   {
     TCccmCoeff sum = 0;
     
-    for( int i = 0; i < numParams; i++)
+    for( int i = 0; i < M; i++)
     {
       sum += params[i] * vector[i];
     }
@@ -139,18 +140,31 @@ struct CccmModel
   Pel bias     ()              { return midVal; }
 };
 
-struct CccmCovarianceInt
+template<const int M, const int N>
+struct CccmCovariance
 {
-  using TE = TCccmCoeff[CCCM_NUM_PARAMS][CCCM_NUM_PARAMS];
-  using Ty = TCccmCoeff[CCCM_NUM_PARAMS];
+  using TE = TCccmCoeff[M][M];
+  using Ty = TCccmCoeff[M];
+  using MN = Pel[M][N];
 
-  CccmCovarianceInt() {}
-  ~CccmCovarianceInt() {}
+  CccmCovariance() {}
+  ~CccmCovariance() {}
 
   bool ldlDecompose                (TE A, TE U,          Ty diag,                      int numEq) const;
   void ldlSolve                    (TE U, Ty diag,       TCccmCoeff* y, TCccmCoeff* x, int numEq, bool decompOk) const;
+#if JVET_AB0174_CCCM_DIV_FREE
+  void solve1                      ( const MN A, const Pel* C, const int sampleNum, const int chromaOffset, CccmModel<M>& model );
+  void solve2                      ( const MN A, const Pel* Cb, const Pel* Cr, const int sampleNum, const int chromaOffsetCb, const int chromaOffsetCr, CccmModel<M>& modelCb, CccmModel<M>& modelCr );
+#else
+  void solve1                      ( const MN A, const Pel* C, const int sampleNum, CccmModel<M>& model );
+  void solve2                      ( const MN A, const Pel* Cb, const Pel* Cr, const int sampleNum, CccmModel<M>& modelCb, CccmModel<M>& modelCr );
+#endif
 
 private:
+  TE ATA;
+  Ty ATCb;
+  Ty ATCr;
+
   void ldlBacksubstitution         (TE U, TCccmCoeff* z, TCccmCoeff* x, int numEq) const;
   void ldlTransposeBacksubstitution(TE U, TCccmCoeff* y, TCccmCoeff* z, int numEq) const;
   bool ldlDecomp                   (TE A, TE U,          Ty outDiag,    int numEq) const;
@@ -280,6 +294,13 @@ protected:
   Pel***       m_pppTarPatch;
 #endif
 
+#if JVET_AA0057_CCCM
+  CccmCovariance<CCCM_NUM_PARAMS, CCCM_MAX_REF_SAMPLES> m_cccmSolver;
+#endif
+#if JVET_AB0092_GLM_WITH_LUMA
+  CccmCovariance<GLM_NUM_PARAMS, GLM_MAX_REF_SAMPLES> m_glmSolver;
+#endif
+
   // prediction
   void xPredIntraPlanar           ( const CPelBuf &pSrc, PelBuf &pDst );
   void xPredIntraDc               ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const bool enableBoundaryFilter = true );
@@ -354,8 +375,8 @@ public:
 
 #if JVET_AA0057_CCCM
   void   predIntraCCCM            (const PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, int intraDir);
-  void   xCccmCalcModels          (const PredictionUnit& pu, CccmModel &cccmModelCb, CccmModel &cccmModelCr, int modelId, int modelThr) const;
-  void   xCccmApplyModel          (const PredictionUnit& pu, const ComponentID compId, CccmModel &cccmModel, int modelId, int modelThr, PelBuf &piPred) const;
+  void   xCccmCalcModels          (const PredictionUnit& pu, CccmModel<CCCM_NUM_PARAMS> &cccmModelCb, CccmModel<CCCM_NUM_PARAMS> &cccmModelCr, int modelId, int modelThr);
+  void   xCccmApplyModel          (const PredictionUnit& pu, const ComponentID compId, CccmModel<CCCM_NUM_PARAMS> &cccmModel, int modelId, int modelThr, PelBuf &piPred) const;
   void   xCccmCreateLumaRef       (const PredictionUnit& pu, CompArea chromaArea);
   PelBuf xCccmGetLumaRefBuf       (const PredictionUnit& pu, int &areaWidth, int &areaHeight, int &refSizeX, int &refSizeY, int &refPosPicX, int &refPosPicY) const;
   PelBuf xCccmGetLumaPuBuf        (const PredictionUnit& pu) const;
@@ -367,8 +388,8 @@ public:
 #endif
 #endif
 #if JVET_AB0092_GLM_WITH_LUMA
-  void   xGlmCalcModel            (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel &glmModel) const;
-  void   xGlmApplyModel           (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel &glmModel, PelBuf &piPred) const;
+  void   xGlmCalcModel            (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel<GLM_NUM_PARAMS> &glmModel);
+  void   xGlmApplyModel           (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel<GLM_NUM_PARAMS> &glmModel, PelBuf &piPred) const;
   void   xGlmCreateGradRef        (const PredictionUnit& pu, CompArea chromaArea);
   PelBuf xGlmGetGradRefBuf        (const PredictionUnit& pu, CompArea chromaArea, int &areaWidth, int &areaHeight, int &refSizeX, int &refSizeY, int &refPosPicX, int &refPosPicY, int glmIdx) const;
   PelBuf xGlmGetGradPuBuf         (const PredictionUnit& pu, CompArea chromaArea, int glmIdx) const;
