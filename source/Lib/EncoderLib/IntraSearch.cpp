@@ -1589,19 +1589,19 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
           numModesForFullRD = 0;
 #if JVET_W0103_INTRA_MTS
           double thresholdSkipMode = 1.0 + ((cu.lfnstIdx > 0) ? 0.1 : 0.8) * (1.4 / sqrt((double)(width * height)));
-          std::vector<std::pair<ModeInfo, double>> ModeInfoWithDCT2Cost(m_savedNumRdModes[0]);
+          std::vector<std::pair<ModeInfo, double>> modeInfoWithDCT2Cost(m_savedNumRdModes[0]);
           for (int i = 0; i < m_savedNumRdModes[0]; i++)
           {
-            ModeInfoWithDCT2Cost[i] = { m_savedRdModeList[0][i], m_modeCostStore[0][i] };
+            modeInfoWithDCT2Cost[i] = { m_savedRdModeList[0][i], m_modeCostStore[0][i] };
           }
-          std::stable_sort(ModeInfoWithDCT2Cost.begin(), ModeInfoWithDCT2Cost.end(), [](const std::pair<ModeInfo, double> & l, const std::pair<ModeInfo, double> & r) {return l.second < r.second; });
+          std::stable_sort(modeInfoWithDCT2Cost.begin(), modeInfoWithDCT2Cost.end(), [](const std::pair<ModeInfo, double> & l, const std::pair<ModeInfo, double> & r) {return l.second < r.second; });
 
-          // **Reorder the modes** and Skip checking the modes with much larger R-D cost than the best mode
+          // **Reorder the modes** and skip checking the modes with much larger R-D cost than the best mode
           for (int i = 0; i < m_savedNumRdModes[0]; i++)
           {
-            if (ModeInfoWithDCT2Cost[i].second <= thresholdSkipMode * ModeInfoWithDCT2Cost[0].second)
+            if (modeInfoWithDCT2Cost[i].second <= thresholdSkipMode * modeInfoWithDCT2Cost[0].second)
             {
-              uiRdModeList.push_back(ModeInfoWithDCT2Cost[i].first);
+              uiRdModeList.push_back(modeInfoWithDCT2Cost[i].first);
               numModesForFullRD++;
             }
           }

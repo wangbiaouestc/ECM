@@ -1420,7 +1420,7 @@ static inline int floorLog2(uint32_t x)
 }
 
 #if JVET_X0149_TIMD_DIMD_LUT
-static inline int floorLog2_uint64(uint64_t x)
+static inline int floorLog2Uint64(uint64_t x)
 {
   if (x == 0)
   {

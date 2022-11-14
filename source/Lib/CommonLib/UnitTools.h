@@ -569,7 +569,6 @@ uint32_t updateCandList(T uiMode, double uiCost, static_vector<T, N>& candModeLi
   CHECK( std::min( uiFastCandNum, candModeList.size() ) != std::min( uiFastCandNum, candCostList.size() ), "Sizes do not match!" );
   CHECK( uiFastCandNum > candModeList.capacity(), "The vector is to small to hold all the candidates!" );
 
-  size_t i;
   size_t shift = 0;
   size_t currSize = std::min( uiFastCandNum, candCostList.size() );
 
@@ -580,7 +579,7 @@ uint32_t updateCandList(T uiMode, double uiCost, static_vector<T, N>& candModeLi
 
   if( candModeList.size() >= uiFastCandNum && shift != 0 )
   {
-    for( i = 1; i < shift; i++ )
+    for( size_t i = 1; i < shift && i < currSize; i++ ) // i < currSize condition is not needed, but it avoids out of bound compiler errors for old compilers
     {
       candModeList[currSize - i] = candModeList[currSize - 1 - i];
       candCostList[currSize - i] = candCostList[currSize - 1 - i];

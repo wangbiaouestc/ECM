@@ -552,9 +552,9 @@ public:
   void candidateSearchIntra          ( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
 #endif
 #if TMP_FAST_ENC
-  bool generateTMPrediction(Pel* piPred, unsigned int uiStride, CompArea area, int& foundCandiNum, CodingUnit* cu);
+  bool generateTMPrediction          (Pel* piPred, unsigned int uiStride, CompArea area, int& foundCandiNum, CodingUnit* cu);
 #if JVET_AB0061_ITMP_BV_FOR_IBC
-  bool generateTMPrediction(Pel* piPred, unsigned int uiStride, int& foundCandiNum, PredictionUnit& pu);
+  bool generateTMPrediction          (Pel* piPred, unsigned int uiStride, int& foundCandiNum, PredictionUnit& pu);
 #endif
 #else
   bool generateTMPrediction          ( Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int& foundCandiNum );
