@@ -402,6 +402,19 @@ unsigned DeriveCtx::CtxTimdFlag(const CodingUnit& cu)
 }
 #endif
 
+#if JVET_AB0155_SGPM
+unsigned DeriveCtx::CtxSgpmFlag(const CodingUnit &cu)
+{
+  const CodingStructure *cs     = cu.cs;
+  unsigned               ctxId  = 0;
+  const CodingUnit *     cuLeft = cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+  ctxId                         = (cuLeft && cuLeft->sgpm) ? 1 : 0;
+  const CodingUnit *cuAbove     = cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+  ctxId += (cuAbove && cuAbove->sgpm) ? 1 : 0;
+  return ctxId;
+}
+#endif
+
 unsigned DeriveCtx::CtxPredModeFlag( const CodingUnit& cu )
 {
   const CodingUnit *cuLeft  = cu.cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);

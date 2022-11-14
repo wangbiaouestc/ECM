@@ -123,6 +123,10 @@
 #define JVET_X0124_TMP_SIGNAL                             1 // JVET-X0124: Cleanup on signalling of intra template matching
 #endif
 #define JVET_V0130_INTRA_TMP                              1 // JVET-V0130: Template matching prediction
+#define JVET_AB0130_ITMP_SAMPLING                         1 // JVET-AB0130: Speedup of IntraTMP by search range sampling and refinement
+#if JVET_AB0130_ITMP_SAMPLING
+#define TMP_FAST_ENC                                      1 // Encoder-only modification
+#endif
 #define JVET_W0069_TMP_BOUNDARY                           1 // JVET-W0069: boundary handling for TMP
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
 #if JVET_W0123_TIMD_FUSION
@@ -138,11 +142,18 @@
 #define JVET_AA0057_CCCM                                  1 // JVET-AA0057: Convolutional cross-component model (CCCM)
 #if JVET_AA0057_CCCM
 #define JVET_AB0143_CCCM_TS                               1 // JVET-AB0143: CCCM template selection
-#define JVET_AB0174_CCCM_DIV_FREE                         1 // JVET-AB0174: CCCM with division free operation
 #endif
 #define JVET_AA0126_GLM                                   1 // JVET-AA0126: Gradient linear model
+#if JVET_AA0126_GLM
+#define JVET_AB0092_GLM_WITH_LUMA                         1 // JVET-AB0092: Gradient linear model with luma value
+#endif
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
+#define JVET_AB0174_CCCM_DIV_FREE                         1 // JVET-AB0174: CCCM with division free operation
+#endif
 #define JVET_AB0061_ITMP_BV_FOR_IBC                       1 // JVET-AB0061: Storing IntraTMP BV for IBC BV prediction
-
+#define JVET_AB0155_SGPM                                  1 // JVET-AB0155: spatial geometric partitioning mode
+#define JVET_AB0157_TMRL                                  1 // JVET-AB0157: Template-based multiple reference line intra prediction
+#define JVET_AB0157_INTRA_FUSION                          1 // JVET-AB0157: Intra prediction fusion
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -172,6 +183,7 @@
 #define JVET_Z0127_SPS_MHP_MAX_MRG_CAND                   1 // JVET-Z0127: Signal number of MHP candidates
 #endif
 #define IF_12TAP                                          1 // 12-tap IF
+#define JVET_AB0082                                       1 // JVET-AB0082: AMRC fix and fix to use 12-tap MC for upscaling with flexibility to select other filters for upscaling
 #define JVET_Z0117_CHROMA_IF                              1 // JVET-Z0117: 6-tap interpolation filter for chroma MC
 #define JVET_AA0042_RPR_FILTERS                           1 // JVET-AA0042: luma 12-tap non-affine 10-tap affine, chroma 6-tap      
 #define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
@@ -198,7 +210,12 @@
 #define JVET_AA0146_WRAP_AROUND_FIX                       1 // JVET-AA0146: bugfix&cleanup for wrap around motion compensation
 #define JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION          1 // JVET-AA0107 Regression based affine merge candidate derivation
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#define JVET_AB0189_RMVF_BITLENGTH_CONTROL                1 // JVET-AB0189: Bit length control over regression based affine merge derivation method
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+#define JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX              0 // Overflow fix
+#else
 #define JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX              1 // Overflow fix
+#endif
 #define JVET_AA0128_AFFINE_MERGE_CTX_INC                  1 // JVET-AA0128 test b: Increased number of CABAC contexts of affine merge index
 #endif
 #define JVET_AA0096_MC_BOUNDARY_PADDING                   1 // JVET-AA0096: motion compensated picture boundary padding
@@ -230,7 +247,6 @@
 #define JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC          1 // JVET-AA0093: Diversity criterion for ARMC reordering
 #endif
 #define JVET_AB0079_TM_BCW_MRG                            1 // JVET-AB0079: Template matching based BCW index derivation for merge mode with positive weights only
-
 // Transform and coefficient coding
 #define TCQ_8STATES                                       1
 #define JVET_W0119_LFNST_EXTENSION                        1 // JVET-W0119: LFNST extension with large kernel
@@ -251,6 +267,7 @@
 #endif
 #endif
 #define JVET_AA0133_INTER_MTS_OPT                         1 // JVET-AA0133: Inter MTS optimization
+#define JVET_AB0067_MIP_DIMD_LFNST                        1 // JVET-AB0067: Modification of LFNST for MIP coded block
 
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision
@@ -1642,7 +1659,24 @@ enum RESHAPE_SIGNAL_TYPE
   RESHAPE_SIGNAL_NULL = 100,
 };
 
+#if JVET_AB0155_SGPM
+struct SgpmInfo
+{
+  int sgpmSplitDir;
+  int sgpmMode0;
+  int sgpmMode1;
 
+  SgpmInfo() : sgpmSplitDir(0), sgpmMode0(0), sgpmMode1(0) {}
+  SgpmInfo(const int sd, const int sm0, const int sm1) : sgpmSplitDir(sd), sgpmMode0(sm0), sgpmMode1(sm1) {}
+  SgpmInfo &operator=(const SgpmInfo &other)
+  {
+    sgpmSplitDir = other.sgpmSplitDir;
+    sgpmMode0    = other.sgpmMode0;
+    sgpmMode1    = other.sgpmMode1;
+    return *this;
+  }
+};
+#endif
 // ---------------------------------------------------------------------------
 // exception class
 // ---------------------------------------------------------------------------

@@ -717,6 +717,9 @@ unsigned CtxDIMDFlag(const CodingUnit& cu);
 #if JVET_W0123_TIMD_FUSION
 unsigned CtxTimdFlag( const CodingUnit& cu );
 #endif
+#if JVET_AB0155_SGPM
+unsigned CtxSgpmFlag(const CodingUnit &cu);
+#endif
 }
 
 #endif // __CONTEXTMODELLING__

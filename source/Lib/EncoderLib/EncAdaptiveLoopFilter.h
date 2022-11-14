@@ -398,7 +398,7 @@ private:
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
     const Pel* recBeforeDb, const int recBeforeDbStride,
 #endif
-    const AlfFilterShape& shape, const int transposeIdx, const ChannelType channel, Pel ***fixedFitlerResults, Position pos, int fixedFilterSetIdx
+    const AlfFilterShape& shape, const int transposeIdx, const ChannelType channel, Pel ***fixedFitlerResults, Position posDst, Position pos, int fixedFilterSetIdx
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
     , Position posInCtu
 #endif

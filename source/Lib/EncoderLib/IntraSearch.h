@@ -227,7 +227,53 @@ private:
     uint32_t modeId; // PU::intraDir[CHANNEL_TYPE_LUMA]
 #if JVET_V0130_INTRA_TMP
 	  bool     tmpFlag; // CU::tmpFlag
-
+#endif
+#if JVET_AB0155_SGPM
+          bool sgpmFlag;   // CU::sgpmFlag
+          int  sgpmSplitDir;
+          int  sgpmMode0;
+          int  sgpmMode1;
+          int  sgpmIdx;
+#endif
+#if JVET_AB0155_SGPM && JVET_V0130_INTRA_TMP
+    ModeInfo() : mipFlg(false), mipTrFlg(false), mRefId(0), ispMod(NOT_INTRA_SUBPARTITIONS), modeId(0), tmpFlag(0), sgpmFlag(0), sgpmSplitDir(0), sgpmMode0(0), sgpmMode1(0), sgpmIdx(0){}
+    ModeInfo(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode,
+             const bool tpmf = 0, const bool sf = 0, const int sd = 0, const int sm0 = 0, const int sm1 = 0, const int si = 0)
+      : mipFlg(mipf)
+      , mipTrFlg(miptf)
+      , mRefId(mrid)
+      , ispMod(ispm)
+      , modeId(mode)
+      , tmpFlag(tpmf)
+      , sgpmFlag(sf)
+      , sgpmSplitDir(sd)
+      , sgpmMode0(sm0)
+      , sgpmMode1(sm1)
+      , sgpmIdx(si)
+    {
+    }
+    ModeInfo &operator=(const ModeInfo &other)
+    {
+      mipFlg       = other.mipFlg;     // CU::mipFlag
+      mipTrFlg     = other.mipTrFlg;   // PU::mipTransposedFlag
+      mRefId       = other.mRefId;     // PU::multiRefIdx
+      ispMod       = other.ispMod;     // CU::ispMode
+      modeId       = other.modeId;     // PU::intraDir[CHANNEL_TYPE_LUMA]
+      tmpFlag      = other.tmpFlag;    // CU::tmpFlag
+      sgpmFlag     = other.sgpmFlag;   // CU::sgpmFlag
+      sgpmSplitDir = other.sgpmSplitDir;
+      sgpmMode0    = other.sgpmMode0;
+      sgpmMode1    = other.sgpmMode1;
+      sgpmIdx      = other.sgpmIdx;
+      return *this;
+    }
+    bool operator==(const ModeInfo cmp) const
+    {
+      return (mipFlg == cmp.mipFlg && mipTrFlg == cmp.mipTrFlg && mRefId == cmp.mRefId && ispMod == cmp.ispMod
+                && modeId == cmp.modeId && tmpFlag == cmp.tmpFlag && sgpmFlag == cmp.sgpmFlag
+                && sgpmSplitDir == cmp.sgpmSplitDir); // sgpmMode0 and sgpmMode1 seems no need
+    }
+#elif JVET_V0130_INTRA_TMP
 	  ModeInfo() : mipFlg(false), mipTrFlg(false), mRefId(0), ispMod(NOT_INTRA_SUBPARTITIONS), modeId(0), tmpFlag(0) {}
 	  ModeInfo(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode, const bool tpmf = 0) : mipFlg(mipf), mipTrFlg(miptf), mRefId(mrid), ispMod(ispm), modeId(mode), tmpFlag(tpmf) {}
 	  bool operator==(const ModeInfo cmp) const { return (mipFlg == cmp.mipFlg && mipTrFlg == cmp.mipTrFlg && mRefId == cmp.mRefId && ispMod == cmp.ispMod && modeId == cmp.modeId && tmpFlag == cmp.tmpFlag); }
@@ -241,7 +287,19 @@ private:
   {
     double rdCost;
     ModeInfoWithCost() : ModeInfo(), rdCost(MAX_DOUBLE) {}
-#if JVET_V0130_INTRA_TMP
+#if JVET_AB0155_SGPM && JVET_V0130_INTRA_TMP
+    ModeInfoWithCost(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode,
+                     const bool tpmf, double cost, const bool sf = 0, const int sd = 0, const int sm0 = 0, const int sm1 = 0)
+      : ModeInfo(mipf, miptf, mrid, ispm, mode, tpmf, sf, sd, sm0, sm1), rdCost(cost)
+    {
+    }
+    bool operator==(const ModeInfoWithCost cmp) const
+    {
+      return (mipFlg == cmp.mipFlg && mipTrFlg == cmp.mipTrFlg && mRefId == cmp.mRefId && ispMod == cmp.ispMod
+              && modeId == cmp.modeId && tmpFlag == cmp.tmpFlag && rdCost == cmp.rdCost && sgpmFlag == cmp.sgpmFlag
+              && sgpmSplitDir == cmp.sgpmSplitDir);   // sgpmMode0 and sgpmMode1 seems no need
+    }
+#elif JVET_V0130_INTRA_TMP
 	  ModeInfoWithCost(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode, const bool tpmf, double cost) : ModeInfo(mipf, miptf, mrid, ispm, mode, tpmf), rdCost(cost) {}
 	  bool operator==(const ModeInfoWithCost cmp) const { return (mipFlg == cmp.mipFlg && mipTrFlg == cmp.mipTrFlg && mRefId == cmp.mRefId && ispMod == cmp.ispMod && modeId == cmp.modeId && tmpFlag == cmp.tmpFlag && rdCost == cmp.rdCost); }
 #else
@@ -403,10 +461,23 @@ private:
   static_vector<double,   FAST_UDI_MAX_RDMODE_NUM> m_dSavedModeCostLFNST;
   static_vector<double,   FAST_UDI_MAX_RDMODE_NUM> m_dSavedHadListLFNST;
 
+#if JVET_AB0155_SGPM
+  static_vector<ModeInfo, SGPM_NUM> m_uiSavedRdModeListSGPM;
+  static_vector<ModeInfo, SGPM_NUM> m_uiSavedHadModeListSGPM;
+  static_vector<double, SGPM_NUM>   m_dSavedModeCostSGPM;
+  static_vector<double, SGPM_NUM>   m_dSavedHadListSGPM;
+
+  Pel* m_intraPredBuf[NUM_LUMA_MODE];
+  Pel* m_sgpmPredBuf[SGPM_NUM];
+  uint8_t    m_intraModeReady[NUM_LUMA_MODE];
+
+  size_t m_numSGPMCands;
+#endif
+
   PelStorage      m_tmpStorageLCU;
   PelStorage      m_colorTransResiBuf;
 #if JVET_AB0143_CCCM_TS
-  PelStorage      m_cccmStorage[6];
+  PelStorage      m_cccmStorage[CCCM_NUM_MODES];
 #endif
 protected:
   // interface to option
@@ -526,7 +597,11 @@ protected:
   bool       xIntraCodingLumaISP      ( CodingStructure& cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE );
 
   template<typename T, size_t N>
-  void reduceHadCandList(static_vector<T, N>& candModeList, static_vector<double, N>& candCostList, int& numModesForFullRD, const double thresholdHadCost, const double* mipHadCost, const PredictionUnit &pu, const bool fastMip);
+  void reduceHadCandList(static_vector<T, N>& candModeList, static_vector<double, N>& candCostList, int& numModesForFullRD, const double thresholdHadCost, const double* mipHadCost, const PredictionUnit &pu, const bool fastMip
+#if JVET_AB0157_TMRL
+    , const double* tmrlCostList
+#endif
+  );
   void   derivePLTLossy  (      CodingStructure& cs, Partitioner& partitioner, ComponentID compBegin, uint32_t numComp);
   void   calcPixelPred   (      CodingStructure& cs, Partitioner& partitioner, uint32_t    yPos,      uint32_t xPos,             ComponentID compBegin, uint32_t  numComp);
   void     preCalcPLTIndexRD      (CodingStructure& cs, Partitioner& partitioner, ComponentID compBegin, uint32_t numComp);

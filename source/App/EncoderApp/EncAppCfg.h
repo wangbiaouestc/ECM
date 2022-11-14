@@ -208,6 +208,9 @@ protected:
 #if JVET_W0123_TIMD_FUSION
   bool      m_noTimdConstraintFlag;
 #endif
+#if JVET_AB0155_SGPM
+  bool      m_noSgpmConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool      m_noObmcConstraintFlag;
 #endif
@@ -457,6 +460,9 @@ protected:
 #if JVET_W0123_TIMD_FUSION
   bool      m_timd;
 #endif
+#if JVET_AB0155_SGPM
+  bool      m_sgpm;
+#endif
 #if ENABLE_OBMC
   bool      m_OBMC;
 #endif
@@ -504,6 +510,9 @@ protected:
 #if JVET_V0130_INTRA_TMP
   bool      m_intraTMP;                                       ///< intra Template Matching 
   unsigned  m_intraTmpMaxSize;                               ///< max CU size for which intra TMP is allowed
+#if JVET_AB0130_ITMP_SAMPLING
+  bool      m_fastIntraTMP;                                   ///< fast IntraTMP RD search
+#endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   bool      m_BIF;                                            ///< bilateral filter
@@ -899,6 +908,9 @@ protected:
   double      m_fractionOfFrames;                             ///< encode a fraction of the frames as specified in FramesToBeEncoded
   int         m_switchPocPeriod;
   int         m_upscaledOutput;                               ////< Output upscaled (2), decoded cropped but in full resolution buffer (1) or decoded cropped (0, default) picture for RPR.
+#if JVET_AB0082
+  int         m_upscaleFilterForDisplay;
+#endif
   bool        m_avoidIntraInDepLayer;
 
   bool                  m_gopBasedTemporalFilterEnabled;               ///< GOP-based Temporal Filter enable/disable

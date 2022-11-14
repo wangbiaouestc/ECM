@@ -285,6 +285,17 @@ struct TransformUnit;
 struct PredictionUnit;
 class  CodingStructure;
 
+#if JVET_AB0157_TMRL
+struct TmrlMode
+{
+  int8_t  multiRefIdx;
+  uint8_t intraDir;
+  TmrlMode() : multiRefIdx(0), intraDir(0) {}
+  TmrlMode(int8_t _multiRefIdx, uint8_t _intraDir) :
+    multiRefIdx(_multiRefIdx), intraDir(_intraDir) {}
+};
+#endif
+
 struct CodingUnit : public UnitArea
 {
   CodingStructure *cs;
@@ -325,8 +336,18 @@ struct CodingUnit : public UnitArea
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   int8_t         dimdChromaMode;
 #endif
+#if JVET_AB0157_INTRA_FUSION
+  int8_t         dimdBlendMode[DIMD_FUSION_NUM-1]; // max number of blend modes (the main mode is not counter) --> incoherent with dimdRelWeight
+  int8_t         dimdRelWeight[DIMD_FUSION_NUM]; // max number of predictions to blend
+#else
   int8_t         dimdBlendMode[2]; // max number of blend modes (the main mode is not counter) --> incoherent with dimdRelWeight
   int8_t         dimdRelWeight[3]; // max number of predictions to blend
+#endif
+#endif
+#if TMP_FAST_ENC
+  int            tmpXdisp;
+  int            tmpYdisp;
+  int            tmpNumCand;
 #endif
 #if JVET_W0123_TIMD_FUSION
   bool           timd;
@@ -334,6 +355,15 @@ struct CodingUnit : public UnitArea
   int timdModeSecondary;
   bool timdIsBlended;
   int8_t timdFusionWeight[2];
+#endif
+#if JVET_AB0155_SGPM
+  int timdHor;
+  int timdVer;
+  bool sgpm;
+  int  sgpmIdx;
+  int  sgpmSplitDir;
+  int  sgpmMode0;
+  int  sgpmMode1;
 #endif
 #if ENABLE_OBMC
   bool           obmcFlag;
@@ -344,6 +374,9 @@ struct CodingUnit : public UnitArea
   uint8_t         BcwIdx;
   int8_t          refIdxBi[2];
   bool           mipFlag;
+#if JVET_AB0067_MIP_DIMD_LFNST
+  int            mipDimdMode;
+#endif
 #if JVET_V0130_INTRA_TMP
   bool		    	 tmpFlag;
 #endif
@@ -353,7 +386,11 @@ struct CodingUnit : public UnitArea
 #if JVET_AA0070_RRIBC
   int    rribcFlipType;
 #endif
-
+#if JVET_AB0157_TMRL
+  bool           tmrlFlag;
+  uint8_t        tmrlListIdx;
+  TmrlMode       tmrlList[MRL_LIST_SIZE];
+#endif
   // needed for fast imv mode decisions
   int8_t          imvNumCand;
   uint8_t          smvdMode;
@@ -425,6 +462,9 @@ struct IntraPredictionData
   uint8_t intraNonMPM[NUM_NON_MPM_MODES];
 #endif
   uint8_t  intraDir[MAX_NUM_CHANNEL_TYPE];
+#if JVET_AB0155_SGPM
+  uint8_t intraDir1[MAX_NUM_CHANNEL_TYPE];
+#endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   bool      isChromaFusion;
 #endif

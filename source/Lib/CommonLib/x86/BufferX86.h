@@ -2548,31 +2548,48 @@ void computeDeltaAndShiftCore_SSE(const Position posLT, Mv firstMv, std::vector<
 
   __m256i baseHor = _mm256_set1_epi32(firstMv.hor);
   __m256i baseVer = _mm256_set1_epi32(firstMv.ver);
-
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  __m256i vibdmin = _mm256_set1_epi32(-RMVF_MV_RANGE);
+  __m256i vibdmax = _mm256_set1_epi32(RMVF_MV_RANGE - 1);
+#endif
   for (int i = 0; i < quotient; i++)
   {
     // mv hor
     __m256i mvHor = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].mvp.hor, mvpInfoVecOri[(i << 3) + 6].mvp.hor,
       mvpInfoVecOri[(i << 3) + 5].mvp.hor, mvpInfoVecOri[(i << 3) + 4].mvp.hor, mvpInfoVecOri[(i << 3) + 3].mvp.hor,
       mvpInfoVecOri[(i << 3) + 2].mvp.hor, mvpInfoVecOri[(i << 3) + 1].mvp.hor, mvpInfoVecOri[(i << 3) + 0].mvp.hor);
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
     __m256i sign = _mm256_min_epi32(mvHor, _mm256_set1_epi32(1));
     sign = _mm256_max_epi32(sign, _mm256_set1_epi32(-1));
     __m256i absmvHor = _mm256_abs_epi32(mvHor);
     __m256i absmvHorShift = _mm256_slli_epi32(absmvHor, 2);
     __m256i resHor = _mm256_mullo_epi32(absmvHorShift, sign);
+#endif
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    __m256i resHor = _mm256_sub_epi32(mvHor, baseHor);
+    resHor = _mm256_min_epi32(vibdmax, _mm256_max_epi32(vibdmin, resHor));
+#else
     resHor = _mm256_sub_epi32(resHor, baseHor);
+#endif
     _mm256_storeu_si256((__m256i *)&tempHor[0], resHor);
 
     // mv ver
     __m256i mvVer = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].mvp.ver, mvpInfoVecOri[(i << 3) + 6].mvp.ver,
       mvpInfoVecOri[(i << 3) + 5].mvp.ver, mvpInfoVecOri[(i << 3) + 4].mvp.ver, mvpInfoVecOri[(i << 3) + 3].mvp.ver,
       mvpInfoVecOri[(i << 3) + 2].mvp.ver, mvpInfoVecOri[(i << 3) + 1].mvp.ver, mvpInfoVecOri[(i << 3) + 0].mvp.ver);
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
     sign = _mm256_min_epi32(mvVer, _mm256_set1_epi32(1));
     sign = _mm256_max_epi32(sign, _mm256_set1_epi32(-1));
     __m256i absmvVer = _mm256_abs_epi32(mvVer);
     __m256i absmvVerShift = _mm256_slli_epi32(absmvVer, 2);
     __m256i resVer = _mm256_mullo_epi32(absmvVerShift, sign);
+#endif
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    __m256i resVer = _mm256_sub_epi32(mvVer, baseVer);
+    resVer = _mm256_min_epi32(vibdmax, _mm256_max_epi32(vibdmin, resVer));
+#else
     resVer = _mm256_sub_epi32(resVer, baseVer);
+#endif
     _mm256_storeu_si256((__m256i *)&tempVer[0], resVer);
 
     // pos x
@@ -2599,9 +2616,15 @@ void computeDeltaAndShiftCore_SSE(const Position posLT, Mv firstMv, std::vector<
   }
   for (int i = (quotient << 3); i < (quotient << 3) + reminder; i++)
   {
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
     mvpInfoVecOri[i].mvp.hor = mvpInfoVecOri[i].mvp.hor >= 0 ? mvpInfoVecOri[i].mvp.hor << 2 : -(-mvpInfoVecOri[i].mvp.hor << 2);
     mvpInfoVecOri[i].mvp.ver = mvpInfoVecOri[i].mvp.ver >= 0 ? mvpInfoVecOri[i].mvp.ver << 2 : -(-mvpInfoVecOri[i].mvp.ver << 2);
+#endif
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    mvpInfoVecOri[i].mvp.set(Clip3(-RMVF_MV_RANGE, RMVF_MV_RANGE - 1, mvpInfoVecOri[i].mvp.getHor() - firstMv.getHor()), Clip3(-RMVF_MV_RANGE, RMVF_MV_RANGE - 1, mvpInfoVecOri[i].mvp.getVer() - firstMv.getVer()));
+#else
     mvpInfoVecOri[i].mvp.set(mvpInfoVecOri[i].mvp.getHor() - firstMv.getHor(), mvpInfoVecOri[i].mvp.getVer() - firstMv.getVer());
+#endif    
     mvpInfoVecOri[i].pos = Position(mvpInfoVecOri[i].pos.x - posLT.x, mvpInfoVecOri[i].pos.y - posLT.y);
   }
 #else
@@ -2614,29 +2637,46 @@ void computeDeltaAndShiftCore_SSE(const Position posLT, Mv firstMv, std::vector<
 
   __m128i baseHor = _mm_set1_epi32(firstMv.hor);
   __m128i baseVer = _mm_set1_epi32(firstMv.ver);
-
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  __m128i vibdmin = _mm_set1_epi32(-RMVF_MV_RANGE);
+  __m128i vibdmax = _mm_set1_epi32(RMVF_MV_RANGE - 1);
+#endif
   for (int i = 0; i < quotient; i++)
   {
     // mv hor
     __m128i mvHor = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].mvp.hor,
       mvpInfoVecOri[(i << 2) + 2].mvp.hor, mvpInfoVecOri[(i << 2) + 1].mvp.hor, mvpInfoVecOri[(i << 2) + 0].mvp.hor);
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
     __m128i sign = _mm_min_epi32(mvHor, _mm_set1_epi32(1));
     sign = _mm_max_epi32(sign, _mm_set1_epi32(-1));
     __m128i absmvHor = _mm_abs_epi32(mvHor);
     __m128i absmvHorShift = _mm_slli_epi32(absmvHor, 2);
     __m128i resHor = _mm_mullo_epi32(absmvHorShift, sign);
+#endif
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    __m128i resHor = _mm_sub_epi32(mvHor, baseHor);
+    resHor = _mm_min_epi32(vibdmax, _mm_max_epi32(vibdmin, resHor));
+#else
     resHor = _mm_sub_epi32(resHor, baseHor);
+#endif
     _mm_storeu_si128((__m128i *)&tempHor[0], resHor);
 
     // mv ver
     __m128i mvVer = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].mvp.ver,
       mvpInfoVecOri[(i << 2) + 2].mvp.ver, mvpInfoVecOri[(i << 2) + 1].mvp.ver, mvpInfoVecOri[(i << 2) + 0].mvp.ver);
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
     sign = _mm_min_epi32(mvVer, _mm_set1_epi32(1));
     sign = _mm_max_epi32(sign, _mm_set1_epi32(-1));
     __m128i absmvVer = _mm_abs_epi32(mvVer);
     __m128i absmvVerShift = _mm_slli_epi32(absmvVer, 2);
     __m128i resVer = _mm_mullo_epi32(absmvVerShift, sign);
+#endif
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    __m128i resVer = _mm_sub_epi32(mvVer, baseVer);
+    resVer = _mm_min_epi32(vibdmax, _mm_max_epi32(vibdmin, resVer));
+#else
     resVer = _mm_sub_epi32(resVer, baseVer);
+#endif
     _mm_storeu_si128((__m128i *)&tempVer[0], resVer);
 
     // pos x
@@ -2661,9 +2701,15 @@ void computeDeltaAndShiftCore_SSE(const Position posLT, Mv firstMv, std::vector<
   }
   for (int i = (quotient << 2); i < (quotient << 2) + reminder; i++)
   {
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
     mvpInfoVecOri[i].mvp.hor = mvpInfoVecOri[i].mvp.hor >= 0 ? mvpInfoVecOri[i].mvp.hor << 2 : -(-mvpInfoVecOri[i].mvp.hor << 2);
     mvpInfoVecOri[i].mvp.ver = mvpInfoVecOri[i].mvp.ver >= 0 ? mvpInfoVecOri[i].mvp.ver << 2 : -(-mvpInfoVecOri[i].mvp.ver << 2);
+#endif
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    mvpInfoVecOri[i].mvp.set(Clip3(-RMVF_MV_RANGE, RMVF_MV_RANGE - 1, mvpInfoVecOri[i].mvp.getHor() - firstMv.getHor()), Clip3(-RMVF_MV_RANGE, RMVF_MV_RANGE - 1, mvpInfoVecOri[i].mvp.getVer() - firstMv.getVer()));
+#else
     mvpInfoVecOri[i].mvp.set(mvpInfoVecOri[i].mvp.getHor() - firstMv.getHor(), mvpInfoVecOri[i].mvp.getVer() - firstMv.getVer());
+#endif
     mvpInfoVecOri[i].pos = Position(mvpInfoVecOri[i].pos.x - posLT.x, mvpInfoVecOri[i].pos.y - posLT.y);
   }
 #endif
@@ -2681,30 +2727,48 @@ void computeDeltaAndShiftCoreAddi_SSE(const Position posLT, Mv firstMv, std::vec
 
   __m256i  baseHor = _mm256_set1_epi32(firstMv.hor);
   __m256i  baseVer = _mm256_set1_epi32(firstMv.ver);
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  __m256i vibdmin = _mm256_set1_epi32(-RMVF_MV_RANGE);
+  __m256i vibdmax = _mm256_set1_epi32(RMVF_MV_RANGE - 1);
+#endif
   for (int i = 0; i < quotient; i++)
   {
     // mv hor
     __m256i mvHor = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].mvp.hor, mvpInfoVecOri[(i << 3) + 6].mvp.hor,
       mvpInfoVecOri[(i << 3) + 5].mvp.hor, mvpInfoVecOri[(i << 3) + 4].mvp.hor, mvpInfoVecOri[(i << 3) + 3].mvp.hor,
       mvpInfoVecOri[(i << 3) + 2].mvp.hor, mvpInfoVecOri[(i << 3) + 1].mvp.hor, mvpInfoVecOri[(i << 3) + 0].mvp.hor);
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
     __m256i sign = _mm256_min_epi32(mvHor, _mm256_set1_epi32(1));
     sign = _mm256_max_epi32(sign, _mm256_set1_epi32(-1));
     __m256i absmvHor = _mm256_abs_epi32(mvHor);
     __m256i absmvHorShift = _mm256_slli_epi32(absmvHor, 2);
     __m256i resHor = _mm256_mullo_epi32(absmvHorShift, sign);
+#endif
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    __m256i resHor = _mm256_sub_epi32(mvHor, baseHor);
+    resHor = _mm256_min_epi32(vibdmax, _mm256_max_epi32(vibdmin, resHor));
+#else
     resHor = _mm256_sub_epi32(resHor, baseHor);
+#endif
     _mm256_storeu_si256((__m256i *)&tempHor[0], resHor);
 
     // mv ver
     __m256i mvVer = _mm256_set_epi32(mvpInfoVecOri[(i << 3) + 7].mvp.ver, mvpInfoVecOri[(i << 3) + 6].mvp.ver,
       mvpInfoVecOri[(i << 3) + 5].mvp.ver, mvpInfoVecOri[(i << 3) + 4].mvp.ver, mvpInfoVecOri[(i << 3) + 3].mvp.ver,
       mvpInfoVecOri[(i << 3) + 2].mvp.ver, mvpInfoVecOri[(i << 3) + 1].mvp.ver, mvpInfoVecOri[(i << 3) + 0].mvp.ver);
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
     sign = _mm256_min_epi32(mvVer, _mm256_set1_epi32(1));
     sign = _mm256_max_epi32(sign, _mm256_set1_epi32(-1));
     __m256i absmvVer = _mm256_abs_epi32(mvVer);
     __m256i absmvVerShift = _mm256_slli_epi32(absmvVer, 2);
     __m256i resVer = _mm256_mullo_epi32(absmvVerShift, sign);
+#endif
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    __m256i resVer = _mm256_sub_epi32(mvVer, baseVer);
+    resVer = _mm256_min_epi32(vibdmax, _mm256_max_epi32(vibdmin, resVer));
+#else
     resVer = _mm256_sub_epi32(resVer, baseVer);
+#endif
     _mm256_storeu_si256((__m256i *)&tempVer[0], resVer);
 
     // pos x
@@ -2732,6 +2796,15 @@ void computeDeltaAndShiftCoreAddi_SSE(const Position posLT, Mv firstMv, std::vec
   int offset = (quotient << 3) - oriSize;
   for (int i = oriSize; i < oriSize + reminder; i++)
   {
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    mvpInfoVecRes.push_back(RMVFInfo(Mv(
+      Clip3(-RMVF_MV_RANGE, RMVF_MV_RANGE - 1, mvpInfoVecOri[i + offset].mvp.hor - firstMv.getHor()),
+      Clip3(-RMVF_MV_RANGE, RMVF_MV_RANGE - 1, mvpInfoVecOri[i + offset].mvp.ver - firstMv.getVer())
+    ),
+      Position(mvpInfoVecOri[i + offset].pos.x - posLT.x, mvpInfoVecOri[i + offset].pos.y - posLT.y),
+      -1
+    ));
+#else
     mvpInfoVecRes.push_back(RMVFInfo(Mv(
       (mvpInfoVecOri[i + offset].mvp.hor >= 0 ? mvpInfoVecOri[i + offset].mvp.hor << 2 : -(-mvpInfoVecOri[i + offset].mvp.hor << 2)) - firstMv.getHor(),
       (mvpInfoVecOri[i + offset].mvp.ver >= 0 ? mvpInfoVecOri[i + offset].mvp.ver << 2 : -(-mvpInfoVecOri[i + offset].mvp.ver << 2)) - firstMv.getVer()
@@ -2739,6 +2812,7 @@ void computeDeltaAndShiftCoreAddi_SSE(const Position posLT, Mv firstMv, std::vec
       Position(mvpInfoVecOri[i + offset].pos.x - posLT.x, mvpInfoVecOri[i + offset].pos.y - posLT.y),
       -1
     ));
+#endif
   }
 #else
   int quotient = int(mvpInfoVecOri.size()) / 4;
@@ -2750,28 +2824,46 @@ void computeDeltaAndShiftCoreAddi_SSE(const Position posLT, Mv firstMv, std::vec
 
   __m128i  baseHor = _mm_set1_epi32(firstMv.hor);
   __m128i  baseVer = _mm_set1_epi32(firstMv.ver);
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  __m128i vibdmin = _mm_set1_epi32(-RMVF_MV_RANGE);
+  __m128i vibdmax = _mm_set1_epi32(RMVF_MV_RANGE - 1);
+#endif
   for (int i = 0; i < quotient; i++)
   {
     // mv hor
     __m128i mvHor = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].mvp.hor,
       mvpInfoVecOri[(i << 2) + 2].mvp.hor, mvpInfoVecOri[(i << 2) + 1].mvp.hor, mvpInfoVecOri[(i << 2) + 0].mvp.hor);
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
     __m128i sign = _mm_min_epi32(mvHor, _mm_set1_epi32(1));
     sign = _mm_max_epi32(sign, _mm_set1_epi32(-1));
     __m128i absmvHor = _mm_abs_epi32(mvHor);
     __m128i absmvHorShift = _mm_slli_epi32(absmvHor, 2);
     __m128i resHor = _mm_mullo_epi32(absmvHorShift, sign);
+#endif
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    __m128i resHor = _mm_sub_epi32(mvHor, baseHor);
+    resHor = _mm_min_epi32(vibdmax, _mm_max_epi32(vibdmin, resHor));
+#else
     resHor = _mm_sub_epi32(resHor, baseHor);
+#endif
     _mm_storeu_si128((__m128i *)&tempHor[0], resHor);
 
     // mv ver
     __m128i mvVer = _mm_set_epi32(mvpInfoVecOri[(i << 2) + 3].mvp.ver,
       mvpInfoVecOri[(i << 2) + 2].mvp.ver, mvpInfoVecOri[(i << 2) + 1].mvp.ver, mvpInfoVecOri[(i << 2) + 0].mvp.ver);
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
     sign = _mm_min_epi32(mvVer, _mm_set1_epi32(1));
     sign = _mm_max_epi32(sign, _mm_set1_epi32(-1));
     __m128i absmvVer = _mm_abs_epi32(mvVer);
     __m128i absmvVerShift = _mm_slli_epi32(absmvVer, 2);
     __m128i resVer = _mm_mullo_epi32(absmvVerShift, sign);
+#endif
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    __m128i resVer = _mm_sub_epi32(mvVer, baseVer);
+    resVer = _mm_min_epi32(vibdmax, _mm_max_epi32(vibdmin, resVer));
+#else
     resVer = _mm_sub_epi32(resVer, baseVer);
+#endif
     _mm_storeu_si128((__m128i *)&tempVer[0], resVer);
 
     // pos x
@@ -2797,6 +2889,15 @@ void computeDeltaAndShiftCoreAddi_SSE(const Position posLT, Mv firstMv, std::vec
   int offset = (quotient << 2) - oriSize;
   for (int i = oriSize; i < oriSize + reminder; i++)
   {
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    mvpInfoVecRes.push_back(RMVFInfo(Mv(
+      Clip3(-RMVF_MV_RANGE, RMVF_MV_RANGE - 1, mvpInfoVecOri[i + offset].mvp.hor - firstMv.getHor()),
+      Clip3(-RMVF_MV_RANGE, RMVF_MV_RANGE - 1, mvpInfoVecOri[i + offset].mvp.ver - firstMv.getVer())
+    ),
+      Position(mvpInfoVecOri[i + offset].pos.x - posLT.x, mvpInfoVecOri[i + offset].pos.y - posLT.y),
+      -1
+    ));
+#else
     mvpInfoVecRes.push_back(RMVFInfo(Mv(
       (mvpInfoVecOri[i + offset].mvp.hor >= 0 ? mvpInfoVecOri[i + offset].mvp.hor << 2 : -(-mvpInfoVecOri[i + offset].mvp.hor << 2)) - firstMv.getHor(),
       (mvpInfoVecOri[i + offset].mvp.ver >= 0 ? mvpInfoVecOri[i + offset].mvp.ver << 2 : -(-mvpInfoVecOri[i + offset].mvp.ver << 2)) - firstMv.getVer()
@@ -2804,12 +2905,13 @@ void computeDeltaAndShiftCoreAddi_SSE(const Position posLT, Mv firstMv, std::vec
       Position(mvpInfoVecOri[i + offset].pos.x - posLT.x, mvpInfoVecOri[i + offset].pos.y - posLT.y),
       -1
     ));
+#endif
   }
 #endif
 }
 template<X86_VEXT vext>
 void buildRegressionMatrixCore_SSE(std::vector<RMVFInfo> &mvpInfoVecOriSrc, 
-#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX || JVET_AB0189_RMVF_BITLENGTH_CONTROL
   int64_t sumbb[2][3][3], int64_t sumeb[2][3],
 #else
   int sumbb[2][3][3], int sumeb[2][3],

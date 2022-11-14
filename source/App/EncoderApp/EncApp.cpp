@@ -263,6 +263,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setResChangeInClvsEnabled                            ( m_resChangeInClvsEnabled );
   m_cEncLib.setSwitchPocPeriod                                   ( m_switchPocPeriod );
   m_cEncLib.setUpscaledOutput                                    ( m_upscaledOutput );
+#if JVET_AB0082
+  m_cEncLib.setUpscaleFilerForDisplay                            (m_upscaleFilterForDisplay);
+#endif
   m_cEncLib.setFramesToBeEncoded                                 ( m_framesToBeEncoded );
   m_cEncLib.setValidFrames                                       ( m_firstValidFrame, m_lastValidFrame );
   m_cEncLib.setAvoidIntraInDepLayer                              ( m_avoidIntraInDepLayer );
@@ -420,6 +423,10 @@ void EncApp::xInitLibCfg()
     m_cEncLib.setNoTimdConstraintFlag(m_noTimdConstraintFlag);
     CHECK(m_noTimdConstraintFlag && m_timd, "TIMD shall be deactivated when m_noTimdConstraintFlag is equal to 1");
 #endif
+#if JVET_AB0155_SGPM
+    m_cEncLib.setNoSgpmConstraintFlag(m_noSgpmConstraintFlag);
+    CHECK(m_noSgpmConstraintFlag && m_sgpm, "SGPM shall be deactivated when m_noSgpmConstraintFlag is equal to 1");
+#endif
 #if ENABLE_OBMC
     m_cEncLib.setNoObmcConstraintFlag(m_noObmcConstraintFlag);
     CHECK(m_noObmcConstraintFlag && m_OBMC, "OBMC shall be deactivated when m_noObmcConstraintFlag is equal to 1");
@@ -556,6 +563,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_W0123_TIMD_FUSION
     m_cEncLib.setNoTimdConstraintFlag(false);
+#endif
+#if JVET_AB0155_SGPM
+    m_cEncLib.setNoSgpmConstraintFlag(false);
 #endif
 #if ENABLE_OBMC
     m_cEncLib.setNoObmcConstraintFlag(false);
@@ -847,6 +857,9 @@ void EncApp::xInitLibCfg()
 #if JVET_W0123_TIMD_FUSION
   m_cEncLib.setUseTimd                                           ( m_timd );
 #endif
+#if JVET_AB0155_SGPM
+  m_cEncLib.setUseSgpm                                           ( m_sgpm );
+#endif
 #if ENABLE_OBMC
   m_cEncLib.setUseObmc                                           ( m_OBMC );
 #endif
@@ -887,6 +900,9 @@ void EncApp::xInitLibCfg()
 #if JVET_V0130_INTRA_TMP
   m_cEncLib.setUseIntraTMP                                       ( m_intraTMP );
   m_cEncLib.setIntraTMPMaxSize                                   ( m_intraTmpMaxSize );
+#if JVET_AB0130_ITMP_SAMPLING
+  m_cEncLib.setUseFastIntraTMP(m_fastIntraTMP);
+#endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   m_cEncLib.setUseBIF                                            ( m_BIF );
@@ -1699,7 +1715,11 @@ void EncApp::xWriteOutput( int iNumEncoded, std::list<PelUnitBuf*>& recBufList )
           const SPS& sps = *m_cEncLib.getSPS( 0 );
           const PPS& pps = *m_cEncLib.getPPS( ( sps.getMaxPicWidthInLumaSamples() != pcPicYuvRec->get( COMPONENT_Y ).width || sps.getMaxPicHeightInLumaSamples() != pcPicYuvRec->get( COMPONENT_Y ).height ) ? ENC_PPS_ID_RPR : 0 );
 
+#if JVET_AB0082
+          m_cVideoIOYuvReconFile.writeUpscaledPicture(sps, pps, *pcPicYuvRec, ipCSC, m_packedYUVMode, m_cEncLib.getUpscaledOutput(), NUM_CHROMA_FORMAT, m_bClipOutputVideoToRec709Range, m_upscaleFilterForDisplay);
+#else
           m_cVideoIOYuvReconFile.writeUpscaledPicture( sps, pps, *pcPicYuvRec, ipCSC, m_packedYUVMode, m_cEncLib.getUpscaledOutput(), NUM_CHROMA_FORMAT, m_bClipOutputVideoToRec709Range );
+#endif
         }
         else
         {

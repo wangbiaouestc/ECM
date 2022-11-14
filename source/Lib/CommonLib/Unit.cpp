@@ -283,6 +283,17 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   dimdChromaMode = other.dimdChromaMode;
 #endif
+#if JVET_AB0157_INTRA_FUSION
+  for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
+  {
+    dimdBlendMode[i] = other.dimdBlendMode[i];
+  }
+
+  for( int i = 0; i < DIMD_FUSION_NUM; i++ )
+  {
+    dimdRelWeight[i] = other.dimdRelWeight[i];
+  }
+#else
   for( int i = 0; i < 2; i++ )
   {
     dimdBlendMode[i] = other.dimdBlendMode[i];
@@ -293,6 +304,12 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
     dimdRelWeight[i] = other.dimdRelWeight[i];
   }
 #endif
+#endif
+#if TMP_FAST_ENC
+  tmpXdisp = other.tmpXdisp;
+  tmpYdisp = other.tmpYdisp;
+  tmpNumCand = other.tmpNumCand;
+#endif
 #if JVET_W0123_TIMD_FUSION
   timd              = other.timd;
   timdMode          = other.timdMode;
@@ -300,6 +317,15 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   timdIsBlended     = other.timdIsBlended;
   timdFusionWeight[0] = other.timdFusionWeight[0];
   timdFusionWeight[1] = other.timdFusionWeight[1];
+#endif
+#if JVET_AB0155_SGPM
+  timdHor      = other.timdHor;
+  timdVer      = other.timdVer;
+  sgpm         = other.sgpm;
+  sgpmIdx      = other.sgpmIdx;
+  sgpmSplitDir = other.sgpmSplitDir;
+  sgpmMode0    = other.sgpmMode0;
+  sgpmMode1    = other.sgpmMode1;
 #endif
 #if ENABLE_OBMC
   obmcFlag          = other.obmcFlag;
@@ -314,6 +340,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   smvdMode        = other.smvdMode;
   ispMode           = other.ispMode;
   mipFlag           = other.mipFlag;
+#if JVET_AB0067_MIP_DIMD_LFNST
+  mipDimdMode       = other.mipDimdMode;
+#endif
 #if JVET_V0130_INTRA_TMP
   tmpFlag           = other.tmpFlag;
 #endif
@@ -322,6 +351,14 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if JVET_AA0070_RRIBC
   rribcFlipType = other.rribcFlipType;
+#endif
+#if JVET_AB0157_TMRL
+  tmrlFlag = other.tmrlFlag;
+  tmrlListIdx = other.tmrlListIdx;
+  for (auto i = 0; i < MRL_LIST_SIZE; i++)
+  {
+    tmrlList[i] = other.tmrlList[i];
+  }
 #endif
 
   for (int idx = 0; idx < MAX_NUM_CHANNEL_TYPE; idx++)
@@ -382,6 +419,17 @@ void CodingUnit::initData()
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   dimdChromaMode   = -1;
 #endif
+#if JVET_AB0157_INTRA_FUSION
+  for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
+  {
+    dimdBlendMode[i] = -1;
+  }
+
+  for( int i = 0; i < DIMD_FUSION_NUM; i++ )
+  {
+    dimdRelWeight[i] = -1;
+  }
+#else
   for( int i = 0; i < 2; i++ )
   {
     dimdBlendMode[i] = -1;
@@ -392,6 +440,12 @@ void CodingUnit::initData()
     dimdRelWeight[i] = -1;
   }
 #endif
+#endif
+#if TMP_FAST_ENC
+  tmpXdisp = 0;
+  tmpYdisp = 0;
+  tmpNumCand = 0;
+#endif
 #if JVET_W0123_TIMD_FUSION
   timd              = false;
   timdMode          = -1;
@@ -399,6 +453,15 @@ void CodingUnit::initData()
   timdIsBlended     = false;
   timdFusionWeight[0] = -1;
   timdFusionWeight[1] = -1;
+#endif
+#if JVET_AB0155_SGPM
+  timdHor      = -1;
+  timdVer      = -1;
+  sgpm         = false;
+  sgpmIdx      = -1;
+  sgpmSplitDir = -1;
+  sgpmMode0    = -1;
+  sgpmMode1    = -1;
 #endif
 #if ENABLE_OBMC
   obmcFlag          = true;
@@ -412,6 +475,9 @@ void CodingUnit::initData()
   smvdMode        = 0;
   ispMode           = 0;
   mipFlag           = false;
+#if JVET_AB0067_MIP_DIMD_LFNST
+  mipDimdMode       = 0;
+#endif
 #if JVET_V0130_INTRA_TMP
   tmpFlag = false;
 #endif
@@ -420,6 +486,10 @@ void CodingUnit::initData()
 #endif
 #if JVET_AA0070_RRIBC
   rribcFlipType = 0;
+#endif
+#if JVET_AB0157_TMRL
+  tmrlFlag = false;
+  tmrlListIdx = 0;
 #endif
 
   for (int idx = 0; idx < MAX_NUM_CHANNEL_TYPE; idx++)
@@ -639,6 +709,10 @@ void PredictionUnit::initData()
 
   intraDir[0] = DC_IDX;
   intraDir[1] = PLANAR_IDX;
+#if JVET_AB0155_SGPM
+  intraDir1[0] = DC_IDX;
+  intraDir1[1] = PLANAR_IDX;
+#endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   isChromaFusion = false;
 #endif
@@ -769,6 +843,9 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   for (uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++)
   {
     intraDir[i] = predData.intraDir[i];
+#if JVET_AB0155_SGPM
+    intraDir1[i] = predData.intraDir1[i];
+#endif
   }
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   isChromaFusion = predData.isChromaFusion;
@@ -904,6 +981,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   for( uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++ )
   {
     intraDir[ i ] = other.intraDir[ i ];
+#if JVET_AB0155_SGPM
+    intraDir1[i] = other.intraDir1[i];
+#endif
   }
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   isChromaFusion = other.isChromaFusion;

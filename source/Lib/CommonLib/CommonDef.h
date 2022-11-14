@@ -200,6 +200,13 @@ static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFI
 static const int AFF_MAX_NON_ADJACENT_INHERITED_CANDS = 6;
 static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 30;
 static const int ADDITIONAL_AFFINE_CAND_NUM = 15;
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+static const int RMVF_MV_RANGE = (1 << 12);
+static const int RMVF_CUSIZE_THRED = 128;
+static const int RMVF_DISTANCE_THRED = 256;
+static const int RMVF_NUM_SUBBLK_THRED = 255;
+static const int RMVF_PARAM_THRED = (1 << 20);
+#endif
 #endif
 static const int IBC_MRG_MAX_NUM_CANDS =                            6; ///< IBC MERGE
 #if JVET_Z0075_IBC_HMVP_ENLARGE
@@ -307,7 +314,14 @@ static const int NUM_FIXED_BASED_COEFF       =                      7;
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
 static const int NUM_DB                      =                      3;
 static const int NUM_DB_SAMPLE               =                      5;
+
+#if JVET_Z0118_GDR
+static const int NUM_DB_PAD                  =                      8;
+#else
 static const int NUM_DB_PAD                  =                      1;
+#endif
+
+
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF;
 #else
@@ -411,6 +425,11 @@ static const int MLS_CG_SIZE =                                      4; ///< Coef
 
 static const int RVM_VCEGAM10_M =                                   4;
 
+#if JVET_AB0157_INTRA_FUSION
+static const int SIZE_CONSTRAINT =                                 32;
+static const int DIMD_FUSION_NUM =                                  6;
+#endif
+
 #if JVET_Y0116_EXTENDED_MRL_LIST
 static const int MAX_REF_LINE_IDX =                                 13; //highest refLine offset in the list
 static const int MRL_NUM_REF_LINES =                                6; //number of candidates in the array
@@ -459,6 +478,9 @@ static const int LM_CHROMA_IDX = NUM_LUMA_MODE; ///< chroma mode index for deriv
 #if ENABLE_DIMD
 static const int DIMD_IDX =                                        99; ///< index for intra DIMD mode
 #endif
+#if JVET_AB0155_SGPM
+static const int SGPM_IDX = 200;   ///< index for SGPM mode
+#endif
 #if JVET_W0123_TIMD_FUSION
 static const int TIMD_IDX =                                       199; ///< index for intra TIMD mode
 static const int DIMD_MAX_TEMP_SIZE =                               4;
@@ -468,6 +490,14 @@ static const int EXT_VER_IDX =                                     98;
 static const int EXT_VDIA_IDX =                                   130;
 #define MAP131TO67( mode )                 (mode<2?mode:((mode>>1)+1))
 #define MAP67TO131( mode )                 (mode<2?mode:((mode<<1)-2))
+#endif
+#if JVET_AB0157_TMRL
+static const int TMRL_TPL_SIZE =                                    1;
+static const int MRL_LIST_SIZE =                                   20;
+static const int MRL_IDX_RICE_CODE_DIVISOR =                        4;
+static const int TMRL_MPM_SIZE =                                   10;
+static const int TMRL_MODECOST =     NUM_LUMA_MODE * MAX_REF_LINE_IDX;
+static const int EXT_REF_LINE_IDX[] =              { 1, 3, 5, 7, 12 };
 #endif
 #if MMLM
 static const int MMLM_CHROMA_IDX = LM_CHROMA_IDX + 1; ///< MDLM_L
@@ -534,7 +564,13 @@ static const int NUM_MOST_PROBABLE_MODES = 6;
 static const int LM_SYMBOL_NUM = (1 + NUM_LMC_MODE);
 
 static const int MAX_NUM_MIP_MODE =                                32; ///< maximum number of MIP pred. modes
+#if JVET_AB0155_SGPM
+static const int SGPM_NUM = 16;
+static const int FAST_UDI_MAX_RDMODE_NUM = (NUM_LUMA_MODE + MAX_NUM_MIP_MODE + SGPM_NUM);   ///< maximum number of RD comparison in fast-UDI estimation loop
+#else
+
 static const int FAST_UDI_MAX_RDMODE_NUM = (NUM_LUMA_MODE + MAX_NUM_MIP_MODE); ///< maximum number of RD comparison in fast-UDI estimation loop
+#endif
 
 static const int MAX_LFNST_COEF_NUM =                              16;
 
@@ -906,7 +942,7 @@ static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM;
 #endif
 #endif
 
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
 static const int CCCM_WINDOW_SIZE         = 6;
 static const int CCCM_NUM_PARAMS          = 7;
 static const int CCCM_MIN_PU_SIZE         = 0; // Set to 0 for no size restriction
@@ -921,9 +957,29 @@ static const int CCCM_MATRIX_BITS         = 28;
 static const int CCCM_DECIM_BITS          = 22;
 #endif
 static const int CCCM_DECIM_ROUND         = ( 1 << (CCCM_DECIM_BITS - 1 ) );
+#if JVET_AB0143_CCCM_TS
+#if MMLM
+static const int CCCM_NUM_MODES           = 6;
+#else
+static const int CCCM_NUM_MODES           = 3;
+#endif
+#endif
 #endif
 
 #if JVET_AA0126_GLM
+#if JVET_AB0092_GLM_WITH_LUMA
+#define NUM_GLM_WEIGHT                                              2
+#if JVET_AA0057_CCCM
+static const int NUM_GLM_PATTERN =                                  4;
+static const int NUM_GLM_IDC =                                      5;
+#else
+static const int NUM_GLM_PATTERN =                                 16;
+static const int NUM_GLM_PATTERN_BITS =                             4;
+static const int NUM_GLM_IDC =                                     17;
+#endif
+static const int GLM_NUM_PARAMS =                                   3;
+static const int GLM_MAX_REF_SAMPLES =           CCCM_MAX_REF_SAMPLES;
+#else
 #if JVET_AA0057_CCCM
 #define NUM_GLM_WEIGHT                                              0
 static const int NUM_GLM_PATTERN =                                  4;
@@ -936,13 +992,14 @@ static const int NUM_GLM_PATTERN_BITS =                             4;
 static const int NUM_GLM_IDC =                                     33;
 #endif
 #endif
+#endif
 
 #if JVET_Y0152_TT_ENC_SPEEDUP
-static constexpr int   FAST_METHOD_TT_ENC_SPEEDUP = 0x0001;  ///< Embedding flag, which, if false, de-activates all the following ABT_ENC_SPEEDUP_* modes
-static constexpr int FAST_METHOD_HOR_XOR_VER = 0x0002;
-static constexpr int FAST_METHOD_ENC_SPEEDUP_BT_BASED = 0x0004;
-static constexpr int FAST_METHOD_TT_ENC_SPEEDUP_BSLICE = 0x0008;
-static constexpr int FAST_METHOD_TT_ENC_SPEEDUP_ISLICE = 0x0010;
+static constexpr int FAST_METHOD_TT_ENC_SPEEDUP =              0x0001;  ///< Embedding flag, which, if false, de-activates all the following ABT_ENC_SPEEDUP_* modes
+static constexpr int FAST_METHOD_HOR_XOR_VER =                 0x0002;
+static constexpr int FAST_METHOD_ENC_SPEEDUP_BT_BASED =        0x0004;
+static constexpr int FAST_METHOD_TT_ENC_SPEEDUP_BSLICE =       0x0008;
+static constexpr int FAST_METHOD_TT_ENC_SPEEDUP_ISLICE =       0x0010;
 #endif
 
 // need to know for static memory allocation
@@ -1000,13 +1057,28 @@ static const int GEO_NUM_ANGLES =                                  32;
 static const int GEO_NUM_DISTANCES =                                4;
 static const int GEO_NUM_PRESTORED_MASK =                           6;
 static const int GEO_WEIGHT_MASK_SIZE = 3 * (GEO_MAX_CU_SIZE >> 3) * 2 + GEO_MAX_CU_SIZE;
-#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+
+#if JVET_AB0155_SGPM
+static const int GEO_MIN_CU_LOG2_EX         = 2;
+static const int GEO_MAX_CU_LOG2_EX         = 6;
+static const int GEO_MIN_CU_SIZE_EX         = 1 << GEO_MIN_CU_LOG2_EX;
+static const int GEO_MAX_CU_SIZE_EX         = 1 << GEO_MAX_CU_LOG2_EX;
+static const int GEO_NUM_CU_SIZE_EX         = (GEO_MAX_CU_LOG2_EX - GEO_MIN_CU_LOG2_EX) + 1;
+
+static const int SGPM_MIN_PIX = 32;
+static const int SGPM_NUM_MPM = 3;
+static const int SGPM_TEMPLATE_SIZE = 1;
+#endif
+
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_AB0155_SGPM
 #if !JVET_W0090_ARMC_TM
 static const int AML_MERGE_TEMPLATE_SIZE =                          1;
 #endif
 static const int GEO_MODE_SEL_TM_SIZE =       AML_MERGE_TEMPLATE_SIZE;
 static const int GEO_TM_ADDED_WEIGHT_MASK_SIZE = GEO_MODE_SEL_TM_SIZE;
 static const int GEO_WEIGHT_MASK_SIZE_EXT = GEO_WEIGHT_MASK_SIZE + GEO_TM_ADDED_WEIGHT_MASK_SIZE * 2;
+#endif
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 static const int GEO_SPLIT_MODE_RICE_CODE_DIVISOR =                 4;
 static const int GEO_MODE_COMPRESSION_RATIO =                       2;
 static const int GEO_NUM_SIG_PARTMODE = GEO_NUM_PARTITION_MODE / GEO_MODE_COMPRESSION_RATIO; ///< max number of splitting modes for signaling
@@ -1033,6 +1105,11 @@ static const int GEO_MAX_TRY_WEIGHTED_SATD = 8;
 
 #if JVET_AA0058_GPM_ADP_BLD
 static const int GEO_NUM_BLD = 5;
+#endif
+#if JVET_AB0155_SGPM
+static const int TOTAL_GEO_NUM_BLD = 6; // GPM 0~4, SGPM 1~5
+#define GET_SGPM_BLD_IDX(a, b)                                                                                           \
+  (std::min(a, b) <= 4 ? 1 : std::min(a, b) <= 8 ? 2 : std::min(a, b) <= 16 ? 3 : std::min(a, b) <= 32 ? 4 : 5)
 #endif
 
 #if ENABLE_OBMC
@@ -1352,7 +1429,7 @@ static inline int floorLog2(uint32_t x)
 }
 
 #if JVET_X0149_TIMD_DIMD_LUT
-static inline int floorLog2_uint64(uint64_t x)
+static inline int floorLog2Uint64(uint64_t x)
 {
   if (x == 0)
   {
@@ -1520,6 +1597,10 @@ static const int TMP_MAXSIZE_DEPTH =            6; // should be log2(TMP_TEMPLAT
 static const int USE_MORE_BLOCKSIZE_DEPTH_MAX = TMP_MAXSIZE_DEPTH - 1;
 static const int INIT_THRESHOULD_SHIFTBITS =    2;  ///< (default 2) Early skip threshold for checking distance.
 static const int TMP_SEARCH_RANGE_MULT_FACTOR = 5;
+#if JVET_AB0130_ITMP_SAMPLING
+static const int LOG2_TMP_SAMPLING = 1;
+static const int TMP_SAMPLING = 1 << LOG2_TMP_SAMPLING;
+#endif
 #endif
 
 #endif // end of #ifndef  __COMMONDEF__

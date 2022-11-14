@@ -1813,6 +1813,9 @@ void CABACReader::extend_ref_line(CodingUnit& cu)
 #if ENABLE_DIMD
     || cu.dimd
 #endif
+#if JVET_AB0155_SGPM
+    || cu.sgpm
+#endif
     )
   {
     cu.firstPU->multiRefIdx = 0;
@@ -1933,7 +1936,23 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
 #if JVET_W0123_TIMD_FUSION
   cu_timd_flag(cu);
 #endif
+#if JVET_AB0155_SGPM
+  sgpm_flag(cu);
+  if (cu.sgpm)
+  {
+    return;
+  }
+#endif
+
+#if JVET_AB0157_TMRL
+  cuTmrlFlag(cu);
+  if (cu.tmrlFlag)
+  {
+    return;
+  }
+#else
   extend_ref_line( cu );
+#endif
   isp_mode( cu );
 #if ENABLE_DIMD
   if (cu.dimd)
@@ -2132,6 +2151,50 @@ void CABACReader::cu_timd_flag( CodingUnit& cu )
 }
 #endif
 
+#if JVET_AB0155_SGPM
+void CABACReader::sgpm_flag(CodingUnit &cu)
+{
+  if (!cu.cs->sps->getUseSgpm())
+  {
+    cu.sgpm = false;
+    return;
+  }
+  if (!(cu.lwidth() >= GEO_MIN_CU_SIZE_EX && cu.lheight() >= GEO_MIN_CU_SIZE_EX && cu.lwidth() <= GEO_MAX_CU_SIZE_EX
+        && cu.lheight() <= GEO_MAX_CU_SIZE_EX && cu.lwidth() < 8 * cu.lheight() && cu.lheight() < 8 * cu.lwidth()
+        && cu.lwidth() * cu.lheight() >= SGPM_MIN_PIX))
+  {
+    cu.sgpm = false;
+    return;
+  }
+
+  if (cu.dimd || cu.timd || cu.mipFlag || cu.tmpFlag)
+  {
+    cu.sgpm = false;
+    return;
+  }
+  if (!cu.Y().valid() || cu.predMode != MODE_INTRA || !isLuma(cu.chType))
+  {
+    cu.sgpm = false;
+    return;
+  }
+  if (!(cu.lx() && cu.ly()))
+  {
+    cu.sgpm = false;
+    return;
+  }
+
+  unsigned ctxId = DeriveCtx::CtxSgpmFlag(cu);
+  cu.sgpm        = m_BinDecoder.decodeBin(Ctx::SgpmFlag(ctxId));
+
+  if (cu.sgpm)
+  {
+    uint32_t sgpmIdx = 0;
+    xReadTruncBinCode(sgpmIdx, SGPM_NUM);
+    cu.sgpmIdx = sgpmIdx;
+  }
+}
+#endif
+
 void CABACReader::intra_chroma_pred_modes( CodingUnit& cu )
 {
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -2255,6 +2318,29 @@ void CABACReader::glmIdc(PredictionUnit& pu)
 
     if ( glmActive )
     {
+#if JVET_AB0092_GLM_WITH_LUMA
+      pu.glmIdc.cb0 = 1;
+#if NUM_GLM_WEIGHT
+      pu.glmIdc.cb0 += m_BinDecoder.decodeBin(Ctx::GlmFlags(1)) ? NUM_GLM_PATTERN : 0;
+#endif
+#if JVET_AA0057_CCCM
+      if (m_BinDecoder.decodeBin(Ctx::GlmFlags(2)))
+      {
+        pu.glmIdc.cb0 += 1;
+        if (m_BinDecoder.decodeBin(Ctx::GlmFlags(3)))
+        {
+          pu.glmIdc.cb0 += 1;
+          if (m_BinDecoder.decodeBin(Ctx::GlmFlags(4)))
+          {
+            pu.glmIdc.cb0 += 1;
+          }
+        }
+      }
+#else
+      pu.glmIdc.cb0 += m_BinDecoder.decodeBinsEP(NUM_GLM_PATTERN_BITS);
+#endif
+      pu.glmIdc.cr0 = pu.glmIdc.cb0;
+#else
       bool bothActive = m_BinDecoder.decodeBin(Ctx::GlmFlags(3));
 
       pu.glmIdc.cb0 = bothActive;
@@ -2281,6 +2367,7 @@ void CABACReader::glmIdc(PredictionUnit& pu)
 #endif
         pu.glmIdc.cr0 += m_BinDecoder.decodeBinsEP(NUM_GLM_PATTERN_BITS);
       }
+#endif
 
 #if MMLM
       if ( PU::isMultiModeLM( pu.intraDir[1] ) )
@@ -4772,14 +4859,25 @@ void CABACReader::mvp_flag( PredictionUnit& pu, RefPicList eRefList )
     unsigned mvpIdx = 0;
 #if TM_AMVP
 #if JVET_Y0128_NON_CTC || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP)
-    if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
-#else
-    if(!pu.cu->cs->sps->getUseDMVDMode() || pu.cu->affine || CU::isIBC(*pu.cu))
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+    if (pu.cs->sps->getUseARL())
+    {
+      RefListAndRefIdx refListComb = pu.cs->slice->getRefPicCombinedListAmvpMerge()[pu.refIdxLC];
+      if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(refListComb.refList, refListComb.refIdx)) == false)
+      {
+        mvpIdx = m_BinDecoder.decodeBin(Ctx::MVPIdx());
+      }
+    }
+    else
 #endif
+      if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
+#else
+    if (!pu.cu->cs->sps->getUseDMVDMode() || pu.cu->affine || CU::isIBC(*pu.cu))
 #endif
     {
-      mvpIdx = m_BinDecoder.decodeBin( Ctx::MVPIdx() );
+      mvpIdx = m_BinDecoder.decodeBin(Ctx::MVPIdx());
     }
+#endif
     if (mvpIdx == 0)
     {
       pu.mvpIdx [eRefList] = mvpIdx + m_BinDecoder.decodeBinEP();
@@ -5923,6 +6021,9 @@ void CABACReader::isp_mode( CodingUnit& cu )
 #if ENABLE_DIMD && JVET_V0087_DIMD_NO_ISP
       || cu.dimd
 #endif
+#if JVET_AB0155_SGPM
+      || cu.sgpm
+#endif
     )
   {
     cu.ispMode = NOT_INTRA_SUBPARTITIONS;
@@ -6864,5 +6965,64 @@ void CABACReader::amvpMerge_mode( PredictionUnit& pu )
     pu.amvpMergeModeFlag[mergeDir] = true;
     pu.amvpMergeModeFlag[1 - mergeDir] = false;
   }
+}
+#endif
+
+#if JVET_AB0157_TMRL
+void CABACReader::cuTmrlFlag(CodingUnit& cu)
+{
+  if (!CU::allowTmrl(cu))
+  {
+    cu.firstPU->multiRefIdx = 0;
+    cu.tmrlFlag = false;
+    cu.tmrlListIdx = 0;
+    return;
+  }
+  PredictionUnit* pu = cu.firstPU;
+#if JVET_W0123_TIMD_FUSION
+  if (cu.timd)
+  {
+    CHECK(cu.tmrlFlag, "TMRL cannot combine with TIMD.");
+    uint8_t bin = 0;
+    bin = m_BinDecoder.decodeBin(Ctx::MultiRefLineIdx(5)); // TIMD MRL
+    if (bin)
+    {
+      bin += m_BinDecoder.decodeBin(Ctx::MultiRefLineIdx(6)); // which line
+    }
+    pu->multiRefIdx = MULTI_REF_LINE_IDX[bin];
+    DTRACE(g_trace_ctx, D_SYNTAX, "extend_ref_line() idx=%d pos=(%d,%d) ref_idx=%d\n", bin, pu->lumaPos().x, pu->lumaPos().y, pu->multiRefIdx);
+  }
+  else
+  {
+#endif
+    int ctxId = 0;
+    cu.tmrlFlag = bool(m_BinDecoder.decodeBin(Ctx::TmrlDerive(ctxId++)));
+    DTRACE(g_trace_ctx, D_SYNTAX, "cu_tmrl_flag() ctx=%d pos=(%d,%d) tmrl=%d\n", 0, cu.lumaPos().x, cu.lumaPos().y, cu.tmrlFlag);
+    if (cu.tmrlFlag)
+    {
+      const int maxNumCtxBins = (MRL_LIST_SIZE / MRL_IDX_RICE_CODE_DIVISOR) - 1;
+      int mrlIdxPrefix = 0;
+      for (int val = 0; val < maxNumCtxBins; val++)
+      {
+        unsigned int bin = m_BinDecoder.decodeBin(Ctx::TmrlDerive(ctxId++));
+        mrlIdxPrefix += bin;
+        if (!bin)
+        {
+          break;
+        }
+      }
+      uint32_t mrlSuffixBin0 = 0, mrlSuffixBin1 = 0;
+      mrlSuffixBin0 = m_BinDecoder.decodeBin(Ctx::TmrlDerive(maxNumCtxBins + 1));
+      mrlSuffixBin1 = m_BinDecoder.decodeBin(Ctx::TmrlDerive(maxNumCtxBins + 2));
+      cu.tmrlListIdx = mrlIdxPrefix * MRL_IDX_RICE_CODE_DIVISOR + (mrlSuffixBin0 + (mrlSuffixBin1 << 1));
+      DTRACE(g_trace_ctx, D_SYNTAX, "cu_tmrl_idx() ctx=%d pos=(%d,%d) tmrlidx=%d\n", 0, cu.lumaPos().x, cu.lumaPos().y, cu.tmrlListIdx);
+    }
+    else
+    {
+      cu.tmrlListIdx = 0;
+    }
+#if JVET_W0123_TIMD_FUSION
+  }
+#endif
 }
 #endif

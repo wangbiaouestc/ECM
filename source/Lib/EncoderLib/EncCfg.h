@@ -252,6 +252,9 @@ protected:
 #if JVET_W0123_TIMD_FUSION
   bool      m_noTimdConstraintFlag;
 #endif
+#if JVET_AB0155_SGPM
+  bool      m_noSgpmConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool      m_noObmcConstraintFlag;
 #endif
@@ -463,6 +466,9 @@ protected:
 #endif
 #if JVET_W0123_TIMD_FUSION
   bool      m_timd;
+#endif
+#if JVET_AB0155_SGPM
+  bool      m_sgpm;
 #endif
 #if ENABLE_OBMC
   bool      m_OBMC;
@@ -912,6 +918,9 @@ protected:
 #if JVET_V0130_INTRA_TMP
   bool        m_intraTMP;                                       ///< intra Template Matching 
   unsigned    m_intraTmpMaxSize;                               ///< max CU size for which intra TMP is allowed
+#if JVET_AB0130_ITMP_SAMPLING
+  bool        m_fastIntraTMP;                                   ///< fast intra Template Matching RD search
+#endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   bool        m_BIF;
@@ -954,6 +963,9 @@ protected:
   bool        m_resChangeInClvsEnabled;
   int         m_switchPocPeriod;
   int         m_upscaledOutput;
+#if JVET_AB0082
+  int         m_upscaleFilterForDisplay;
+#endif
   int         m_numRefLayers[MAX_VPS_LAYERS];
   bool        m_avoidIntraInDepLayer;
 #if SIGN_PREDICTION
@@ -1097,6 +1109,10 @@ public:
 #if JVET_W0123_TIMD_FUSION
   bool      getNoTimdConstraintFlag() const { return m_noTimdConstraintFlag; }
   void      setNoTimdConstraintFlag(bool val) { m_noTimdConstraintFlag = val; }
+#endif
+#if JVET_AB0155_SGPM
+  bool      getNoSgpmConstraintFlag() const { return m_noSgpmConstraintFlag; }
+  void      setNoSgpmConstraintFlag(bool val) { m_noSgpmConstraintFlag = val; }
 #endif
 #if ENABLE_OBMC
   bool      getNoObmcConstraintFlag() const { return m_noObmcConstraintFlag; }
@@ -1464,6 +1480,10 @@ public:
   void      setUseTimd                   ( bool b )       { m_timd = b; }
   bool      getUseTimd                   () const         { return m_timd; }
 #endif
+#if JVET_AB0155_SGPM
+  void      setUseSgpm                   (bool b)         { m_sgpm = b; }
+  bool      getUseSgpm                   () const         { return m_sgpm; }
+#endif
 #if ENABLE_OBMC
   void      setUseObmc                   ( bool b )       { m_OBMC = b; }
   bool      getUseObmc                   ()         const { return m_OBMC; }
@@ -1528,6 +1548,10 @@ public:
   bool      getUseIntraTMP()                           const { return m_intraTMP; }
   void      setIntraTMPMaxSize              (unsigned n)     { m_intraTmpMaxSize = n; }
   unsigned  getIntraTMPMaxSize()                       const { return m_intraTmpMaxSize; }
+#if JVET_AB0130_ITMP_SAMPLING
+  void      setUseFastIntraTMP              (bool b)         { m_fastIntraTMP = b; }
+  bool      getUseFastIntraTMP()                       const { return m_fastIntraTMP; }
+#endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   void      setUseBIF                       ( bool b )       { m_BIF = b; }
@@ -2446,7 +2470,10 @@ public:
   void        setSwitchPocPeriod( int p )                            { m_switchPocPeriod = p;}
   void        setUpscaledOutput( int b )                             { m_upscaledOutput = b; }
   int         getUpscaledOutput()                              const { return m_upscaledOutput; }
-
+#if JVET_AB0082
+  void        setUpscaleFilerForDisplay(int b)                       { m_upscaleFilterForDisplay = b; }
+  int         getUpscaleFilerForDisplay()                      const { return m_upscaleFilterForDisplay; }
+#endif
   void        setNumRefLayers( int* numRefLayers )                   { std::memcpy( m_numRefLayers, numRefLayers, sizeof( m_numRefLayers ) ); }
   int         getNumRefLayers( int layerIdx )                  const { return m_numRefLayers[layerIdx];  }
 

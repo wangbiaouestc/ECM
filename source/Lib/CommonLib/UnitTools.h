@@ -136,6 +136,9 @@ namespace CU
   bool    isSameSbtSize               (const uint8_t sbtInfo1, const uint8_t sbtInfo2);
   bool    getRprScaling               ( const SPS* sps, const PPS* curPPS, Picture* refPic, int& xScale, int& yScale );
   void    checkConformanceILRP        (Slice *slice);
+#if JVET_AB0157_TMRL
+  bool allowTmrl(const CodingUnit& cu);
+#endif
 }
 // PU tools
 namespace PU
@@ -152,23 +155,42 @@ namespace PU
 #endif
   void getGeoIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t splitDir, uint8_t shape );
 #endif
+#if JVET_AB0155_SGPM
+  void getSgpmIntraMPMs(const PredictionUnit &pu, uint8_t *mpm, uint8_t splitDir, uint8_t shape);
+#endif
   bool          isMIP                 (const PredictionUnit &pu, const ChannelType &chType = CHANNEL_TYPE_LUMA);
 #if JVET_V0130_INTRA_TMP
   bool          isTmp(const PredictionUnit& pu, const ChannelType& chType = CHANNEL_TYPE_LUMA);
 #endif
   bool          isDMChromaMIP         (const PredictionUnit &pu);
+#if JVET_AB0155_SGPM
+  bool isSgpm(const PredictionUnit &pu, const ChannelType &chType = CHANNEL_TYPE_LUMA);
+  bool isDMChromaSgpm(const PredictionUnit &pu);
+#endif
+#if JVET_AB0155_SGPM
+  uint32_t getIntraDirLuma(const PredictionUnit &pu, const int partIdx = 0);
+#else
   uint32_t      getIntraDirLuma       (const PredictionUnit &pu);
+#endif
   void getIntraChromaCandModes(const PredictionUnit &pu, unsigned modeList[NUM_CHROMA_MODE]);
 
   const PredictionUnit &getCoLocatedLumaPU(const PredictionUnit &pu);
+#if JVET_AB0155_SGPM
+  uint32_t getFinalIntraMode              (const PredictionUnit &pu, const ChannelType &chType, const int partIdx = 0);
+#else
   uint32_t getFinalIntraMode              (const PredictionUnit &pu, const ChannelType &chType);
+#endif
 #if JVET_W0119_LFNST_EXTENSION
   int      getLFNSTMatrixDim          ( int width, int height );
   bool     getUseLFNST8               ( int width, int height );
   uint8_t  getLFNSTIdx                ( int intraMode, int mtsMode = 0 );
   bool     getUseLFNST16              ( int width, int height );
 #endif
+#if JVET_AB0155_SGPM
+  uint32_t getCoLocatedIntraLumaMode(const PredictionUnit &pu, const int partIdx = 0);
+#else
   uint32_t getCoLocatedIntraLumaMode      (const PredictionUnit &pu);
+#endif
   int      getWideAngle                   ( const TransformUnit &tu, const uint32_t dirMode, const ComponentID compID );
 #if MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM
   uint32_t getBDMVRMvdThreshold       (const PredictionUnit &pu);
@@ -232,13 +254,20 @@ namespace PU
   void xInheritedAffineMv             ( const PredictionUnit &pu, const PredictionUnit* puNeighbour, RefPicList eRefPicList, Mv rcMv[3] );
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
   void xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[2][4],
-#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX || JVET_AB0189_RMVF_BITLENGTH_CONTROL
     int64_t sumbb[2][3][3], int64_t sumeb[2][3],
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    uint8_t shift,
+#endif
 #else
     int sumbb[2][3][3], int sumeb[2][3],
 #endif
     uint16_t addedSize);
-  void xReturnMvpVec(std::vector<RMVFInfo> mvp[2][4], const PredictionUnit &pu, const Position &pos, const MvpDir &eDir);
+  void xReturnMvpVec(std::vector<RMVFInfo> mvp[2][4], const PredictionUnit &pu, const Position &pos
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    , const MvpDir &eDir
+#endif
+  );
   void getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &abovePU, AffineMergeCtx &affMrgCtx, std::vector<RMVFInfo> mvp[2][4], int mrgCandIdx = -1);
   Position convertNonAdjAffineBlkPos(const Position &pos, int curCtuX, int curCtuY);
   void collectNeiMotionInfo(std::vector<RMVFInfo> mvpInfoVec[2][4], const PredictionUnit &pu);
@@ -336,6 +365,9 @@ namespace PU
 #endif
   void spanIpmInfoIntra               (      PredictionUnit &pu );
   void spanIpmInfoInter               (      PredictionUnit &pu, MotionBuf &mb, IpmBuf &ib );
+#endif
+#if JVET_AB0155_SGPM
+  void spanIpmInfoSgpm                (      PredictionUnit &pu);
 #endif
 #if !JVET_Z0054_BLK_REF_PIC_REORDER
   void applyImv                       (      PredictionUnit &pu, MergeCtx &mrgCtx, InterPrediction *interPred = NULL );
@@ -482,8 +514,10 @@ namespace PU
 #if JVET_AA0126_GLM
   bool hasGlmFlag      (const PredictionUnit &pu, const int mode = -1);
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
   void getCccmRefLineNum  (const PredictionUnit& pu, const Area area, int& th, int& tv);
+#endif
+#if JVET_AA0057_CCCM
   bool cccmSingleModeAvail(const PredictionUnit& pu, int intraMode);
   bool cccmMultiModeAvail (const PredictionUnit& pu, int intraMode);
 #if JVET_AB0143_CCCM_TS
@@ -535,7 +569,6 @@ uint32_t updateCandList(T uiMode, double uiCost, static_vector<T, N>& candModeLi
   CHECK( std::min( uiFastCandNum, candModeList.size() ) != std::min( uiFastCandNum, candCostList.size() ), "Sizes do not match!" );
   CHECK( uiFastCandNum > candModeList.capacity(), "The vector is to small to hold all the candidates!" );
 
-  size_t i;
   size_t shift = 0;
   size_t currSize = std::min( uiFastCandNum, candCostList.size() );
 
@@ -546,7 +579,7 @@ uint32_t updateCandList(T uiMode, double uiCost, static_vector<T, N>& candModeLi
 
   if( candModeList.size() >= uiFastCandNum && shift != 0 )
   {
-    for( i = 1; i < shift; i++ )
+    for( size_t i = 1; i < shift && i < currSize; i++ ) // i < currSize condition is not needed, but it avoids out of bound compiler errors for old compilers
     {
       candModeList[currSize - i] = candModeList[currSize - 1 - i];
       candCostList[currSize - i] = candCostList[currSize - 1 - i];
@@ -575,6 +608,57 @@ uint32_t updateCandList(T uiMode, double uiCost, static_vector<T, N>& candModeLi
   }
   return 0;
 }
+
+#if JVET_AB0157_TMRL
+template<typename T, size_t N>
+uint32_t updateCandList(T uiMode, uint64_t uiCost, static_vector<T, N>& candModeList, static_vector<uint64_t, N>& candCostList
+  , size_t uiFastCandNum = N, int* iserttPos = nullptr)
+{
+  CHECK(std::min(uiFastCandNum, candModeList.size()) != std::min(uiFastCandNum, candCostList.size()), "Sizes do not match!");
+  CHECK(uiFastCandNum > candModeList.capacity(), "The vector is to small to hold all the candidates!");
+
+  size_t i;
+  size_t shift = 0;
+  size_t currSize = std::min(uiFastCandNum, candCostList.size());
+
+  while (shift < uiFastCandNum && shift < currSize && uiCost < candCostList[currSize - 1 - shift])
+  {
+    shift++;
+  }
+
+  if (candModeList.size() >= uiFastCandNum && shift != 0)
+  {
+    for (i = 1; i < shift; i++)
+    {
+      candModeList[currSize - i] = candModeList[currSize - 1 - i];
+      candCostList[currSize - i] = candCostList[currSize - 1 - i];
+    }
+    candModeList[currSize - shift] = uiMode;
+    candCostList[currSize - shift] = uiCost;
+    if (iserttPos != nullptr)
+    {
+      *iserttPos = int(currSize - shift);
+    }
+    return 1;
+  }
+  else if (currSize < uiFastCandNum)
+  {
+    candModeList.insert(candModeList.end() - shift, uiMode);
+    candCostList.insert(candCostList.end() - shift, uiCost);
+    if (iserttPos != nullptr)
+    {
+      *iserttPos = int(candModeList.size() - shift - 1);
+    }
+    return 1;
+  }
+  if (iserttPos != nullptr)
+  {
+    *iserttPos = -1;
+  }
+  return 0;
+}
+#endif
+
 #if JVET_W0097_GPM_MMVD_TM
 #if JVET_AA0058_GPM_ADP_BLD
 template<size_t N>

@@ -114,7 +114,11 @@ public:
   bool  isOpen() { return m_cHandle.is_open(); }
 
   bool  writeUpscaledPicture( const SPS& sps, const PPS& pps, const CPelUnitBuf& pic,
-    const InputColourSpaceConversion ipCSC, const bool bPackedYUVOutputMode, int outputChoice = 0, ChromaFormat format = NUM_CHROMA_FORMAT, const bool bClipToRec709 = false ); ///< write one upsaled YUV frame
+    const InputColourSpaceConversion ipCSC, const bool bPackedYUVOutputMode, int outputChoice = 0, ChromaFormat format = NUM_CHROMA_FORMAT, const bool bClipToRec709 = false
+#if JVET_AB0082
+    , const int upscaleFilterForDisplay = 2
+#endif
+  ); ///< write one upsaled YUV frame
 
 };
 

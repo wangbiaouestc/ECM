@@ -116,6 +116,12 @@ public:
 #if JVET_W0123_TIMD_FUSION
   void        cu_timd_flag              ( CodingUnit&                   cu );
 #endif
+#if JVET_AB0155_SGPM
+  void        sgpm_flag                 ( CodingUnit&                   cu );
+#endif
+#if JVET_AB0157_TMRL
+  void        cuTmrlFlag                ( CodingUnit&                   cu );
+#endif
   void        intra_chroma_pred_modes   ( CodingUnit&                   cu );
   bool        intra_chroma_lmc_mode     ( PredictionUnit&               pu );
   void        intra_chroma_pred_mode    ( PredictionUnit&               pu );

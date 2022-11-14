@@ -487,6 +487,9 @@ public:
 #if JVET_W0123_TIMD_FUSION
   static const CtxSet   TimdFlag;
 #endif
+#if JVET_AB0155_SGPM
+  static const CtxSet   SgpmFlag;
+#endif
 #if ENABLE_OBMC
   static const CtxSet   ObmcFlag;
 #endif 
@@ -514,6 +517,9 @@ public:
 #endif
 #if JVET_AA0057_CCCM
   static const CtxSet   CccmFlag;
+#endif
+#if JVET_AB0157_TMRL
+  static const CtxSet   TmrlDerive;
 #endif
   static const unsigned NumberOfContexts;
 

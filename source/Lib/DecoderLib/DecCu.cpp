@@ -51,6 +51,7 @@
 #include "CommonLib/ChromaFormat.h"
 #include "CommonLib/dtrace_blockstatistics.h"
 #endif
+
 //! \ingroup DecoderLib
 //! \{
 
@@ -322,6 +323,48 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
           pu->intraDir[0] = currCU.timdMode;
         }
 #endif
+
+#if JVET_AB0155_SGPM
+        else if (currCU.sgpm)
+        {
+          PredictionUnit *pu   = currCU.firstPU;
+          const CompArea &area = currCU.Y();
+#if SECONDARY_MPM
+          IntraPrediction::deriveDimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+#endif
+          static_vector<SgpmInfo, SGPM_NUM> sgpmInfoList;
+          static_vector<double, SGPM_NUM>   sgpmCostList;
+          int                         sgpmIdx = currCU.sgpmIdx;
+
+          if (currCU.lwidth() * currCU.lheight() <= 1024)
+          {
+            m_pcIntraPred->deriveTimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU, false, true);
+          }
+
+          m_pcIntraPred->deriveSgpmModeOrdered(currCU.cs->picture->getRecoBuf(area), area, currCU, sgpmInfoList, sgpmCostList);
+
+          currCU.sgpmSplitDir = sgpmInfoList[sgpmIdx].sgpmSplitDir;
+          currCU.sgpmMode0    = sgpmInfoList[sgpmIdx].sgpmMode0;
+          currCU.sgpmMode1    = sgpmInfoList[sgpmIdx].sgpmMode1;
+          
+          pu->intraDir[0]  = currCU.sgpmMode0;
+          pu->intraDir1[0] = currCU.sgpmMode1;
+        }
+#endif
+
+#if JVET_AB0157_TMRL
+        else if (currCU.tmrlFlag)
+        {
+          PredictionUnit* pu = currCU.firstPU;
+          const CompArea& area = currCU.Y();
+#if SECONDARY_MPM
+          IntraPrediction::deriveDimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+#endif
+          m_pcIntraPred->getTmrlList(currCU);
+          pu->multiRefIdx = currCU.tmrlList[currCU.tmrlListIdx].multiRefIdx;
+          pu->intraDir[0] = currCU.tmrlList[currCU.tmrlListIdx].intraDir;
+        }
+#endif
         else if (currCU.firstPU->parseLumaMode)
         {
           const CompArea &area = currCU.Y();
@@ -584,6 +627,8 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
         m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight(), tempType);
 #if JVET_AB0061_ITMP_BV_FOR_IBC
         m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, foundCandiNum, pu);
+#elif TMP_FAST_ENC
+        m_pcIntraPred->generateTMPrediction( piPred.buf, piPred.stride, pu.Y(), foundCandiNum, pu.cu );
 #else
         m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
 #endif
@@ -602,7 +647,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #else
       m_pcIntraPred->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
       m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
+#if TMP_FAST_ENC
+      m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, pu.Y(), foundCandiNum, pu.cu);
+#else
       m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+#endif
 #endif
 		  assert(foundCandiNum >= 1);
 	  }
@@ -612,7 +661,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #endif
     {
       m_pcIntraPred->initIntraMip( pu, area );
+#if JVET_AB0067_MIP_DIMD_LFNST
+      m_pcIntraPred->predIntraMip( compID, piPred, pu, pu.cu->lfnstIdx > 0 ? true : false);
+#else
       m_pcIntraPred->predIntraMip( compID, piPred, pu );
+#endif
     }
     else
     {
@@ -836,7 +889,11 @@ void DecCu::xIntraRecACTBlk(TransformUnit& tu)
 #endif
     {
       m_pcIntraPred->initIntraMip(pu, area);
+#if JVET_AB0067_MIP_DIMD_LFNST
+      m_pcIntraPred->predIntraMip(compID, piPred, pu, pu.cu->lfnstIdx > 0 ? true : false);
+#else
       m_pcIntraPred->predIntraMip(compID, piPred, pu);
+#endif
     }
     else
     {

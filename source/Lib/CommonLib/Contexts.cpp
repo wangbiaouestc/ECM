@@ -2682,6 +2682,22 @@ const CtxSet ContextSetCfg::TimdFlag = ContextSetCfg::addCtxSet
   });
 #endif
 
+#if JVET_AB0155_SGPM
+const CtxSet ContextSetCfg::SgpmFlag = ContextSetCfg::addCtxSet
+({
+  {  41,  34,  42, },
+  {  34,  34,  34, },
+  {  42,  50,  58, },
+  {   6,   6,   6, },
+  {   7,   7,   5, },
+  {   6,   6,   2, },
+  {  11,  11,  18, },
+  {   4,   4,   4, },
+  {  11,  11,  11, },
+  { 124, 126, 126, },
+  { 126, 124, 117, },
+});
+#endif
 #if ENABLE_OBMC 
 const CtxSet ContextSetCfg::ObmcFlag = ContextSetCfg::addCtxSet
 ({
@@ -3035,6 +3051,23 @@ const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
   { DWO, },
   { DWO, },
 });
+#endif
+
+#if JVET_AB0157_TMRL
+const CtxSet ContextSetCfg::TmrlDerive = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, },
+  { CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, },
+  {  49,  50,  43,  43, CNU, CNU,  50, CNU, },
+  {   8,   8,   9,   9,   9,   8,   9, DWS, },
+  {   8,   8,   9,   9,   9,   8,   9, DWS, },
+  {   8,   8,   9,   9,   9,   8,   9, DWS, },
+  {  18, DWE, DWE, DWE, DWE, DWE, DWE, DWE, },
+  {  18, DWE, DWE, DWE, DWE, DWE, DWE, DWE, },
+  {  18, DWE, DWE, DWE, DWE, DWE, DWE, DWE, },
+  { 119, DWO, DWO, DWO, DWO, DWO, DWO, DWO, },
+  { 119, DWO, DWO, DWO, DWO, DWO, DWO, DWO, },
+  });
 #endif
 
 #elif SLICE_TYPE_WIN_SIZE
@@ -3396,6 +3429,18 @@ const CtxSet ContextSetCfg::PredMode = ContextSetCfg::addCtxSet
 	{ 6,  2 },
 	{ 5,  1 }
 });
+
+#if JVET_AB0157_TMRL
+const CtxSet ContextSetCfg::TmrlDerive = ContextSetCfg::addCtxSet
+({
+  { CNU },
+  { CNU },
+  { CNU },
+  { DWS },
+  { DWS },
+  { DWS }
+  });
+#endif
 
 const CtxSet ContextSetCfg::MultiRefLineIdx = ContextSetCfg::addCtxSet
 ({
@@ -4888,6 +4933,16 @@ const CtxSet ContextSetCfg::PredMode = ContextSetCfg::addCtxSet
   { CNU, CNU, },
   {   5,   1, },
 });
+
+#if JVET_AB0157_TMRL
+const CtxSet ContextSetCfg::TmrlDerive = ContextSetCfg::addCtxSet
+({
+  { CNU },
+  { CNU },
+  { CNU },
+  { DWS },
+  });
+#endif
 
 const CtxSet ContextSetCfg::MultiRefLineIdx = ContextSetCfg::addCtxSet
 ({

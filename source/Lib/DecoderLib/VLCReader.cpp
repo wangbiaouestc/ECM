@@ -2495,6 +2495,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_W0123_TIMD_FUSION
   READ_FLAG(uiCode, "sps_timd_enabled_flag");                        pcSPS->setUseTimd( uiCode != 0 );
 #endif
+#if JVET_AB0155_SGPM
+  READ_FLAG(uiCode, "sps_sgpm_enabled_flag");                       pcSPS->setUseSgpm(uiCode != 0);
+#endif
   if( pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
     READ_FLAG( uiCode, "sps_cclm_enabled_flag" );                   pcSPS->setUseLMChroma( uiCode != 0 );
@@ -5071,7 +5074,11 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
     }
     if (!lambdaCanBePredicted)
     {
+#if JVET_AB0082
+      READ_CODE(10, uiCode, "lambda");
+#else
       READ_CODE(9, uiCode, "lambda");
+#endif
       pcSlice->setCostForARMC((uint32_t)uiCode);
     }
   }
@@ -5352,6 +5359,9 @@ void HLSyntaxReader::parseConstraintInfo(ConstraintInfo *cinfo)
 #endif
 #if JVET_W0123_TIMD_FUSION
     READ_FLAG(symbol, "gci_no_timd_constraint_flag");                    cinfo->setNoTimdConstraintFlag(symbol > 0 ? true : false);
+#endif
+#if JVET_AB0155_SGPM
+    READ_FLAG(symbol, "gci_no_sgpm_constraint_flag");                    cinfo->setNoSgpmConstraintFlag(symbol > 0 ? true : false);
 #endif
     /* inter */
     READ_FLAG(symbol, "gci_no_ref_pic_resampling_constraint_flag");      cinfo->setNoRprConstraintFlag(symbol > 0 ? true : false);

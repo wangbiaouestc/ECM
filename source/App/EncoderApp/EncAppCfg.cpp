@@ -920,6 +920,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_W0123_TIMD_FUSION
   ("NoTimdConstraintFlag",                             m_noTimdConstraintFlag,                          false, "Indicate that TIMD is deactivated")
 #endif
+#if JVET_AB0155_SGPM
+  ("NoSgpmConstraintFlag",                             m_noSgpmConstraintFlag,                          false, "Indicate that SGPM is deactivated")
+#endif
 #if ENABLE_OBMC
   ("NoObmcConstraintFlag",                             m_noObmcConstraintFlag,                            false, "Indicate that OBMC is deactivated")
 #endif
@@ -1096,6 +1099,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_W0123_TIMD_FUSION
   ( "TIMD",                                           m_timd,                                            true,  "Enable template based intra mode derivation\n" )
 #endif
+#if JVET_AB0155_SGPM
+  ( "SGPM",                                           m_sgpm,                                            true,  "Enable spatial geometric partitioning mode\n" )
+#endif
 #if ENABLE_OBMC
   ("OBMC",                                            m_OBMC,                                           true, "Overlapping Block Motion Compensation")
 #endif
@@ -1145,6 +1151,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_V0130_INTRA_TMP
   ("IntraTMP",                                        m_intraTMP,                                       false, "intra Template Matching (0: off, 1:on)  [default: on]")
   ("IntraTMPMaxSize",                                 m_intraTmpMaxSize,                                  64u, "intra Template Matching max CU size  [default: 64]")
+#if JVET_AB0130_ITMP_SAMPLING
+  ("FastIntraTMP",                                    m_fastIntraTMP,                                   true,  "fast intra Template Matching (0: off, 1:on)  [default: off]")
+#endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   ("BIF",                                             m_BIF,                                            true, "bilateral filter   (0: off, 1:on)  [default: on]")
@@ -1666,6 +1675,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ( "FractionNumFrames",                              m_fractionOfFrames,                         1.0, "Encode a fraction of the specified in FramesToBeEncoded frames" )
   ( "SwitchPocPeriod",                                m_switchPocPeriod,                            0, "Switch POC period for RPR" )
   ( "UpscaledOutput",                                 m_upscaledOutput,                             0, "Output upscaled (2), decoded but in full resolution buffer (1) or decoded cropped (0, default) picture for RPR" )
+#if JVET_AB0082
+  ("UpscaleFilterForDisplay",                         m_upscaleFilterForDisplay,                    2, "Filters used for upscaling reconstruction to full resolution (2: ECM 12-tap luma and 6-tap chroma MC filters, 1: Alternative 12-tap luma and 6-tap chroma filters, 0: VVC 8-tap luma and 4-tap chroma MC filters)")
+#endif
   ( "MaxLayers",                                      m_maxLayers,                                  1, "Max number of layers" )
   ( "TargetOutputLayerSet,p",                         m_targetOlsIdx,                              -1, "Target output layer set index" )
   ;
@@ -4998,6 +5010,12 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_V0130_INTRA_TMP
   msg(DETAILS, "Intra TMP: %d\n", m_intraTMP);
+#if JVET_AB0130_ITMP_SAMPLING
+  if (m_intraTMP)
+  {
+    msg(DETAILS, "Fast Intra TMP: %d\n", m_fastIntraTMP);
+  }
+#endif
   msg(DETAILS, "Max CU size of TMP: %d\n", m_intraTmpMaxSize);
   msg(DETAILS, "dynamic search range with fixed comparison per pixel: \n");
   msg(DETAILS, "	searchRangeWidth = %d*Width \n", TMP_SEARCH_RANGE_MULT_FACTOR );
@@ -5209,9 +5227,15 @@ void EncAppCfg::xPrintParameter()
 #if JVET_W0123_TIMD_FUSION
   msg( VERBOSE, "TIMD:%d ", m_timd );
 #endif
+#if JVET_AB0155_SGPM
+  msg(VERBOSE, "SGPM:%d ", m_sgpm);
+#endif
 #if JVET_V0130_INTRA_TMP
   msg( VERBOSE, "IntraTMP:%d ", m_intraTMP );
   msg( VERBOSE, "IntraTmpMaxSize:%d ", m_intraTmpMaxSize );
+#if JVET_AB0130_ITMP_SAMPLING
+  msg(VERBOSE, "FastIntraTMP:%d ", m_fastIntraTMP);
+#endif
 #endif
 
   //inter

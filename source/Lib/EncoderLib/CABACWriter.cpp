@@ -1279,6 +1279,9 @@ void CABACWriter::extend_ref_line(const PredictionUnit& pu)
 #if ENABLE_DIMD
     || cu.dimd
 #endif
+#if JVET_AB0155_SGPM
+      || cu.sgpm
+#endif
     )
   {
     return;
@@ -1352,6 +1355,9 @@ void CABACWriter::extend_ref_line(const CodingUnit& cu)
   if ( !cu.Y().valid() || cu.predMode != MODE_INTRA || !isLuma(cu.chType) || cu.bdpcmMode
 #if ENABLE_DIMD 
     || cu.dimd
+#endif
+#if JVET_AB0155_SGPM
+    || cu.sgpm
 #endif
     )
   {
@@ -1462,8 +1468,22 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
 #if JVET_W0123_TIMD_FUSION
   cu_timd_flag(cu);
 #endif
+#if JVET_AB0155_SGPM
+  sgpm_flag(cu);
+  if (cu.sgpm)
+  {
+    return;
+  }
+#endif
+#if JVET_AB0157_TMRL
+  cuTmrlFlag(cu);
+  if (cu.tmrlFlag)
+  {
+    return;
+  }
+#else
   extend_ref_line( cu );
-
+#endif
   isp_mode( cu );
 #if ENABLE_DIMD
   if (cu.dimd)
@@ -1682,7 +1702,22 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
 #if JVET_W0123_TIMD_FUSION
   cu_timd_flag(*pu.cu);
 #endif
+#if JVET_AB0155_SGPM
+  sgpm_flag(*pu.cu);
+  if (pu.cu->sgpm)
+  {
+    return;
+  }
+#endif
+#if JVET_AB0157_TMRL
+  cuTmrlFlag(*pu.cu);
+  if (pu.cu->tmrlFlag)
+  {
+    return;
+  }
+#else
   extend_ref_line( pu );
+#endif
   isp_mode( *pu.cu );
 #if ENABLE_DIMD
   if (pu.cu->dimd)
@@ -1846,6 +1881,43 @@ void CABACWriter::cu_timd_flag( const CodingUnit& cu )
 }
 #endif
 
+#if JVET_AB0155_SGPM
+void CABACWriter::sgpm_flag(const CodingUnit &cu)
+{
+  if (!cu.cs->sps->getUseSgpm())
+  {
+    return;
+  }
+  if (!(cu.lwidth() >= GEO_MIN_CU_SIZE_EX && cu.lheight() >= GEO_MIN_CU_SIZE_EX && cu.lwidth() <= GEO_MAX_CU_SIZE_EX
+        && cu.lheight() <= GEO_MAX_CU_SIZE_EX && cu.lwidth() < 8 * cu.lheight() && cu.lheight() < 8 * cu.lwidth()
+        && cu.lwidth() * cu.lheight() >= SGPM_MIN_PIX))
+  {
+    return;
+  }
+
+  if (cu.dimd || cu.timd || cu.mipFlag || cu.tmpFlag)
+  {
+    return;
+  }
+  if (!cu.Y().valid() || cu.predMode != MODE_INTRA || !isLuma(cu.chType))
+  {
+    return;
+  }
+  if (!(cu.lx() && cu.ly()))
+  {
+    return;
+  }
+
+  unsigned ctxId = DeriveCtx::CtxSgpmFlag(cu);
+  m_BinEncoder.encodeBin(cu.sgpm, Ctx::SgpmFlag(ctxId));
+
+  if (cu.sgpm)
+  {
+    xWriteTruncBinCode(cu.sgpmIdx, SGPM_NUM);
+  }
+}
+#endif
+
 #if ENABLE_DIMD
 void CABACWriter::cu_dimd_flag(const CodingUnit& cu)
 {
@@ -1985,6 +2057,27 @@ void CABACWriter::glmIdc(const PredictionUnit& pu)
     
     if ( glmActive )
     {
+#if JVET_AB0092_GLM_WITH_LUMA
+      int glmIdx = pu.glmIdc.cb0 - 1;
+#if NUM_GLM_WEIGHT
+      m_BinEncoder.encodeBin(glmIdx >= NUM_GLM_PATTERN ? 1 : 0, Ctx::GlmFlags(1));
+      glmIdx -= glmIdx >= NUM_GLM_PATTERN ? NUM_GLM_PATTERN : 0;
+#endif
+      CHECK(pu.glmIdc.cb0 != pu.glmIdc.cr0, "wrong glm idx");
+#if JVET_AA0057_CCCM
+      m_BinEncoder.encodeBin(glmIdx > 0, Ctx::GlmFlags(2));
+      if (glmIdx > 0)
+      {
+        m_BinEncoder.encodeBin(glmIdx > 1, Ctx::GlmFlags(3));
+        if (glmIdx > 1)
+        {
+          m_BinEncoder.encodeBin(glmIdx > 2, Ctx::GlmFlags(4));
+        }
+      }
+#else
+      m_BinEncoder.encodeBinsEP(glmIdx, NUM_GLM_PATTERN_BITS);
+#endif
+#else
       bool bothActive = pu.glmIdc.cb0 && pu.glmIdc.cr0;
 
       m_BinEncoder.encodeBin( bothActive ? 1 : 0, Ctx::GlmFlags(3) );
@@ -2013,6 +2106,7 @@ void CABACWriter::glmIdc(const PredictionUnit& pu)
 #endif
         m_BinEncoder.encodeBinsEP( glmIdx, NUM_GLM_PATTERN_BITS );
       }
+#endif
         
 #if MMLM
       if ( PU::isMultiModeLM( pu.intraDir[1] ) )
@@ -4686,7 +4780,18 @@ void CABACWriter::mvp_flag( const PredictionUnit& pu, RefPicList eRefList )
     {
 #if TM_AMVP
 #if JVET_Y0128_NON_CTC || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP)
-      if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+      if (pu.cs->sps->getUseARL())
+      {
+        RefListAndRefIdx refListComb = pu.cs->slice->getRefPicCombinedListAmvpMerge()[pu.refIdxLC];
+        if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(refListComb.refList, refListComb.refIdx)) == false)
+        {
+          m_BinEncoder.encodeBin(0, Ctx::MVPIdx());
+        }
+      }
+      else
+#endif
+        if (PU::checkTmEnableCondition(pu.cs->sps, pu.cs->pps, pu.cu->slice->getRefPic(eRefList, pu.refIdx[eRefList])) == false)
 #else
       if(!pu.cu->cs->sps->getUseDMVDMode() || pu.cu->affine || CU::isIBC(*pu.cu))
 #endif
@@ -5732,6 +5837,9 @@ void CABACWriter::isp_mode( const CodingUnit& cu )
   if( !CU::isIntra( cu ) || !isLuma( cu.chType ) || cu.firstPU->multiRefIdx || !cu.cs->sps->getUseISP() || cu.bdpcmMode || !CU::canUseISP( cu, getFirstComponentOfChannel( cu.chType ) ) || cu.colorTransform 
 #if  ENABLE_DIMD && JVET_V0087_DIMD_NO_ISP
     || cu.dimd
+#endif
+#if JVET_AB0155_SGPM
+      || cu.sgpm
 #endif
     )
   {
@@ -6791,7 +6899,7 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
       signs += signBuff.stride;
       signScanIdx += signScanIdxBuff.stride;
     }
-    std::sort(signCombList.begin(), signCombList.end(), compareOrderIdx);
+    std::stable_sort(signCombList.begin(), signCombList.end(), compareOrderIdx);
     numScanPos = 0;
     for (uint32_t idx = 0; idx < signCombList.size(); idx++)
     {
@@ -6903,6 +7011,62 @@ void CABACWriter::amvpMerge_mode( const PredictionUnit& pu )
       m_BinEncoder.encodeBin(0, Ctx::amFlagState());
     }
   }
+}
+#endif
+
+#if JVET_AB0157_TMRL
+void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
+{
+  if (!CU::allowTmrl(cu))
+  {
+    return;
+  }
+  const PredictionUnit* pu = cu.firstPU;
+#if JVET_W0123_TIMD_FUSION
+  if (cu.timd)
+  {
+    CHECK(cu.tmrlFlag, "TMRL cannot combine with TIMD.");
+    unsigned int bin = pu->multiRefIdx != MULTI_REF_LINE_IDX[0];
+    m_BinEncoder.encodeBin(bin, Ctx::MultiRefLineIdx(5)); // TIMD MRL
+    if (bin)
+    {
+      bin = pu->multiRefIdx != MULTI_REF_LINE_IDX[1];
+      m_BinEncoder.encodeBin(bin, Ctx::MultiRefLineIdx(6)); // which line
+    }
+    DTRACE(g_trace_ctx, D_SYNTAX, "extend_ref_line() idx=%d pos=(%d,%d) ref_idx=%d\n", bin, pu->lumaPos().x, pu->lumaPos().y, pu->multiRefIdx);
+  }
+  else
+  {
+#endif
+    int ctxId = 0;
+    m_BinEncoder.encodeBin(cu.tmrlFlag, Ctx::TmrlDerive(ctxId++));
+    if (cu.tmrlFlag)
+    {
+      const int maxNumCtxBins = (MRL_LIST_SIZE / MRL_IDX_RICE_CODE_DIVISOR) - 1;
+      int mrlIdxPrefix = cu.tmrlListIdx / MRL_IDX_RICE_CODE_DIVISOR;
+      for (int val = 0; val < maxNumCtxBins; val++)
+      {
+        unsigned int bin = (val == mrlIdxPrefix ? 0 : 1);
+        m_BinEncoder.encodeBin(bin, Ctx::TmrlDerive(ctxId++));
+        if (!bin)
+        {
+          break;
+        }
+      }
+
+      uint32_t mrlIdxSuffix = uint32_t(cu.tmrlListIdx & (MRL_IDX_RICE_CODE_DIVISOR - 1));
+      m_BinEncoder.encodeBin((mrlIdxSuffix & 1), Ctx::TmrlDerive(maxNumCtxBins + 1));
+      m_BinEncoder.encodeBin(((mrlIdxSuffix >> 1) & 1), Ctx::TmrlDerive(maxNumCtxBins + 2));
+      CHECK(cu.tmrlList[cu.tmrlListIdx].intraDir != pu->intraDir[0] || cu.tmrlList[cu.tmrlListIdx].multiRefIdx != pu->multiRefIdx, "? ");
+    }
+    else
+    {
+      CHECK(pu->multiRefIdx, "?");
+    }
+    DTRACE(g_trace_ctx, D_SYNTAX, "cu_tmrl_flag() ctx=%d pos=(%d,%d) tmrl=%d\n", 0, cu.lumaPos().x, cu.lumaPos().y, cu.tmrlFlag);
+#if JVET_W0123_TIMD_FUSION
+  }
+#endif
 }
 #endif
 //! \}

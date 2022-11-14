@@ -824,6 +824,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   const SPS &sps      = *tempCS->sps;
   const uint32_t uiLPelX  = tempCS->area.Y().lumaPos().x;
   const uint32_t uiTPelY  = tempCS->area.Y().lumaPos().y;
+
 #if ENABLE_OBMC
   const unsigned wIdx = gp_sizeIdxInfo->idxFrom(partitioner.currArea().lwidth());
   const unsigned hIdx = gp_sizeIdxInfo->idxFrom(partitioner.currArea().lheight());
@@ -2238,6 +2239,13 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   bool timdIsBlended = false;
   int  timdFusionWeight[2] = { 0 };
 #endif
+#if JVET_AB0155_SGPM
+  int timdHorMode = 0;
+  int timdVerMode = 0;
+#endif
+#if TMP_FAST_ENC
+  int tmpXdisp = 0, tmpYdisp = 0, tmpNumCand = 0;
+#endif
 
 
   double dct2Cost                =   MAX_DOUBLE;
@@ -2317,8 +2325,13 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #if ENABLE_DIMD
   bool dimdBlending = false;
   int  dimdMode = 0;
+#if JVET_AB0157_INTRA_FUSION
+  int  dimdBlendMode[DIMD_FUSION_NUM-1] = { 0 };
+  int  dimdRelWeight[DIMD_FUSION_NUM] = { 0 };
+#else
   int  dimdBlendMode[2] = { 0 };
   int  dimdRelWeight[3] = { 0 };
+#endif
   bool dimdDerived = false;
 
   if (isLuma(partitioner.chType))
@@ -2339,11 +2352,23 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
       dimdDerived = true;
       dimdBlending = cu.dimdBlending;
       dimdMode = cu.dimdMode;
+#if JVET_AB0157_INTRA_FUSION
+      for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
+      {
+        dimdBlendMode[i] = cu.dimdBlendMode[i];
+      }
+
+      for( int i = 0; i < DIMD_FUSION_NUM; i++ )
+      {
+        dimdRelWeight[i] = cu.dimdRelWeight[i];
+      }
+#else
       dimdBlendMode[0] = cu.dimdBlendMode[0];
       dimdBlendMode[1] = cu.dimdBlendMode[1];
       dimdRelWeight[0] = cu.dimdRelWeight[0];
       dimdRelWeight[1] = cu.dimdRelWeight[1];
       dimdRelWeight[2] = cu.dimdRelWeight[2];
+#endif
     }
 
 #if SECONDARY_MPM
@@ -2367,6 +2392,13 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 
 #if JVET_W0123_TIMD_FUSION
   bool timdDerived = false;
+#endif
+#if TMP_FAST_ENC
+  bool tmpDerived = 0;
+#endif
+#if JVET_AB0157_TMRL
+  bool tmrlDerived = false;
+  TmrlMode tmrlList[MRL_LIST_SIZE];
 #endif
 #if INTRA_TRANS_ENC_OPT
   m_pcIntraSearch->m_skipTimdLfnstMtsPass = false;
@@ -2415,11 +2447,23 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
           {
             cu.dimdBlending = dimdBlending;
             cu.dimdMode = dimdMode;
+#if JVET_AB0157_INTRA_FUSION
+            for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
+            {
+              cu.dimdBlendMode[i] = dimdBlendMode[i];
+            }
+
+            for( int i = 0; i < DIMD_FUSION_NUM; i++ )
+            {
+              cu.dimdRelWeight[i] = dimdRelWeight[i];
+            }
+#else
             cu.dimdBlendMode[0] = dimdBlendMode[0];
             cu.dimdBlendMode[1] = dimdBlendMode[1];
             cu.dimdRelWeight[0] = dimdRelWeight[0];
             cu.dimdRelWeight[1] = dimdRelWeight[1];
             cu.dimdRelWeight[2] = dimdRelWeight[2];
+#endif
           }
 #endif
           cu.lfnstIdx         = lfnstIdx;
@@ -2439,13 +2483,22 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             if (!timdDerived)
             {
               const CompArea &area = cu.Y();
+              
+#if JVET_AB0155_SGPM
+              cu.timdMode = m_pcIntraSearch->deriveTimdMode(bestCS->picture->getRecoBuf(area), area, cu, true, true);
+#else
               cu.timdMode = m_pcIntraSearch->deriveTimdMode(bestCS->picture->getRecoBuf(area), area, cu);
+#endif
               timdMode = cu.timdMode;
               timdDerived = true;
               timdModeSecondary = cu.timdModeSecondary;
               timdIsBlended     = cu.timdIsBlended;
               timdFusionWeight[0] = cu.timdFusionWeight[0];
               timdFusionWeight[1] = cu.timdFusionWeight[1];
+#if JVET_AB0155_SGPM
+              timdHorMode = cu.timdHor;
+              timdVerMode = cu.timdVer;
+#endif
             }
             else
             {
@@ -2454,6 +2507,64 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               cu.timdIsBlended     = timdIsBlended;
               cu.timdFusionWeight[0] = timdFusionWeight[0];
               cu.timdFusionWeight[1] = timdFusionWeight[1];
+#if JVET_AB0155_SGPM
+              cu.timdHor = timdHorMode;
+              cu.timdVer = timdVerMode;
+#endif
+            }
+          }
+#endif
+#if JVET_AB0157_TMRL
+          cu.tmrlFlag = false;
+          if (CU::allowTmrl(cu))
+          {
+            if (!tmrlDerived)
+            {
+              m_pcIntraSearch->getTmrlList(cu);
+              tmrlDerived = true;
+              for (auto i = 0; i < MRL_LIST_SIZE; i++)
+              {
+                tmrlList[i] = cu.tmrlList[i];
+              }
+            }
+            else
+            {
+              for (auto i = 0; i < MRL_LIST_SIZE; i++)
+              {
+                cu.tmrlList[i] = tmrlList[i];
+              }
+            }
+          }
+#endif
+
+#if TMP_FAST_ENC
+          if (isLuma(partitioner.chType) && cu.slice->getSPS()->getUseIntraTMP())
+          {
+            const bool tpmAllowed = sps.getUseIntraTMP() && isLuma(partitioner.chType) && ((cu.lfnstIdx == 0) || allowLfnstWithTmp());
+            const bool testTpm = tpmAllowed && (cu.lwidth() <= sps.getIntraTMPMaxSize() && cu.lheight() <= sps.getIntraTMPMaxSize());
+            if (testTpm == 1 && tmpDerived == 0)
+            {
+#if JVET_W0069_TMP_BOUNDARY
+              RefTemplateType templateType = m_pcIntraSearch->getRefTemplateType(cu, cu.blocks[COMPONENT_Y]);
+              if (templateType != NO_TEMPLATE)
+              {
+                m_pcIntraSearch->getTargetTemplate(&cu, cu.lwidth(), cu.lheight(), templateType);
+                m_pcIntraSearch->candidateSearchIntra(&cu, cu.lwidth(), cu.lheight(), templateType);
+              }
+#else
+              m_pcIntraSearch->getTargetTemplate(&cu, cu.lwidth(), cu.lheight());
+              m_pcIntraSearch->candidateSearchIntra(&cu, cu.lwidth(), cu.lheight());
+#endif
+              tmpDerived = 1;
+              tmpXdisp = cu.tmpXdisp;
+              tmpYdisp = cu.tmpYdisp;
+              tmpNumCand = cu.tmpNumCand;
+            }
+            else
+            {
+              cu.tmpXdisp = tmpXdisp;
+              cu.tmpYdisp = tmpYdisp;
+              cu.tmpNumCand = tmpNumCand;
             }
           }
 #endif
@@ -2728,7 +2839,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             {
               double bestCostDct2NoIsp = m_modeCtrl->getMtsFirstPassNoIspCost();
               double bestIspCost       = m_modeCtrl->getIspCost();
-              CHECKD( bestCostDct2NoIsp <= bestIspCost, "wrong cost!" );
+              CHECKD( cu.ispMode && bestCostDct2NoIsp <= bestIspCost, "wrong cost!" );
               double threshold = 1.4;
               
               double lfnstThreshold = 1.01 * threshold;

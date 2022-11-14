@@ -870,11 +870,16 @@ void computeDeltaAndShiftCore(const Position posLT, Mv firstMv, std::vector<RMVF
 {
   for (int i = 0; i < int(mvpInfoVecOri.size()); i++)
   {
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
     mvpInfoVecOri[i].mvp.hor = mvpInfoVecOri[i].mvp.hor >= 0 ? mvpInfoVecOri[i].mvp.hor << 2 : -(-mvpInfoVecOri[i].mvp.hor << 2);
     mvpInfoVecOri[i].mvp.ver = mvpInfoVecOri[i].mvp.ver >= 0 ? mvpInfoVecOri[i].mvp.ver << 2 : -(-mvpInfoVecOri[i].mvp.ver << 2);
+#endif
     mvpInfoVecOri[i].pos.x = mvpInfoVecOri[i].pos.x - posLT.x;
     mvpInfoVecOri[i].pos.y = mvpInfoVecOri[i].pos.y - posLT.y;
     mvpInfoVecOri[i].mvp.set(mvpInfoVecOri[i].mvp.getHor() - firstMv.getHor(), mvpInfoVecOri[i].mvp.getVer() - firstMv.getVer());
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    mvpInfoVecOri[i].mvp.set(Clip3(-RMVF_MV_RANGE, RMVF_MV_RANGE - 1, mvpInfoVecOri[i].mvp.hor), Clip3(-RMVF_MV_RANGE, RMVF_MV_RANGE - 1, mvpInfoVecOri[i].mvp.ver));
+#endif
   }
 }
 void computeDeltaAndShiftCoreAddi(const Position posLT, Mv firstMv, std::vector<RMVFInfo> &mvpInfoVecOri, std::vector<RMVFInfo> &mvpInfoVecRes)
@@ -883,15 +888,20 @@ void computeDeltaAndShiftCoreAddi(const Position posLT, Mv firstMv, std::vector<
   for (int i = 0; i < int(mvpInfoVecOri.size()); i++)
   {
     mvpInfoVecRes.push_back(RMVFInfo());
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
     mvpInfoVecOri[i].mvp.hor = mvpInfoVecOri[i].mvp.hor >= 0 ? mvpInfoVecOri[i].mvp.hor << 2 : -(-mvpInfoVecOri[i].mvp.hor << 2);
     mvpInfoVecOri[i].mvp.ver = mvpInfoVecOri[i].mvp.ver >= 0 ? mvpInfoVecOri[i].mvp.ver << 2 : -(-mvpInfoVecOri[i].mvp.ver << 2);
+#endif
     mvpInfoVecRes[offset + i].pos.x = mvpInfoVecOri[i].pos.x - posLT.x;
     mvpInfoVecRes[offset + i].pos.y = mvpInfoVecOri[i].pos.y - posLT.y;
     mvpInfoVecRes[offset + i].mvp.set(mvpInfoVecOri[i].mvp.getHor() - firstMv.getHor(), mvpInfoVecOri[i].mvp.getVer() - firstMv.getVer());
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+    mvpInfoVecRes[offset + i].mvp.set(Clip3(-RMVF_MV_RANGE, RMVF_MV_RANGE - 1, mvpInfoVecRes[offset + i].mvp.hor), Clip3(-RMVF_MV_RANGE, RMVF_MV_RANGE - 1, mvpInfoVecRes[offset + i].mvp.ver));
+#endif
   }
 }
 void buildRegressionMatrixCore(std::vector<RMVFInfo> &mvpInfoVecOri, 
-#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX
+#if JVET_AA0107_RMVF_AFFINE_OVERFLOW_FIX || JVET_AB0189_RMVF_BITLENGTH_CONTROL
   int64_t sumbb[2][3][3], int64_t sumeb[2][3],
 #else
   int sumbb[2][3][3], int sumeb[2][3],

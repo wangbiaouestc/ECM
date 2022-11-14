@@ -342,13 +342,16 @@ const int g_IBCBufferSize = 256 * 128;
 
 void initGeoTemplate();
 extern int16_t** g_GeoParams;
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AB0155_SGPM
+extern int16_t *g_globalGeoWeights[TOTAL_GEO_NUM_BLD][GEO_NUM_PRESTORED_MASK];
+extern int      g_bld2Width[TOTAL_GEO_NUM_BLD];
+#elif JVET_AA0058_GPM_ADP_BLD
 extern int16_t*  g_globalGeoWeights   [GEO_NUM_BLD][GEO_NUM_PRESTORED_MASK];
 extern int       g_bld2Width          [GEO_NUM_BLD];
 #else
 extern int16_t*  g_globalGeoWeights   [GEO_NUM_PRESTORED_MASK];
 #endif
-#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_AB0155_SGPM
 extern Pel*      g_globalGeoWeightsTpl[GEO_NUM_PRESTORED_MASK];
 #endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
@@ -360,6 +363,11 @@ extern int16_t   g_weightOffset       [GEO_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE][
 extern int8_t    g_angle2mask         [GEO_NUM_ANGLES];
 extern int8_t    g_Dis[GEO_NUM_ANGLES];
 extern int8_t    g_angle2mirror[GEO_NUM_ANGLES];
+
+#if JVET_AB0155_SGPM
+extern int16_t   g_weightOffsetEx[GEO_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE_EX][GEO_NUM_CU_SIZE_EX][2];
+extern int8_t g_sgpm_splitDir[GEO_NUM_PARTITION_MODE];
+#endif
 #if JVET_Y0065_GPM_INTRA
 extern int8_t    g_geoAngle2IntraAng  [GEO_NUM_ANGLES];
 #endif
