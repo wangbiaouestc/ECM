@@ -8745,8 +8745,6 @@ int IntraPrediction::calcTemplateDiff( Pel* ref, unsigned int uiStride, Pel** ta
 }
 #endif
 
-#if JVET_AA0057_CCCM
-
 #if JVET_AB0174_CCCM_DIV_FREE
 #define DIV_PREC_BITS       14
 #define DIV_PREC_BITS_POW2  8
@@ -8793,7 +8791,10 @@ int64_t xCccmDivide(int64_t num, int64_t denom) // Note: assumes positive denomi
 {
   return xDivide(num, denom);
 }
+#endif
 
+#if JVET_AA0057_CCCM
+#if JVET_AB0174_CCCM_DIV_FREE
 void IntraPrediction::xCccmSetLumaRefValue( const PredictionUnit& pu )
 {
   int lumaPosX = m_cccmBlkArea.x << getComponentScaleX(COMPONENT_Cb, pu.cu->chromaFormat);
