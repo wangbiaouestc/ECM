@@ -477,7 +477,7 @@ private:
   PelStorage      m_tmpStorageLCU;
   PelStorage      m_colorTransResiBuf;
 #if JVET_AB0143_CCCM_TS
-  PelStorage      m_cccmStorage[6];
+  PelStorage      m_cccmStorage[CCCM_NUM_MODES];
 #endif
 protected:
   // interface to option

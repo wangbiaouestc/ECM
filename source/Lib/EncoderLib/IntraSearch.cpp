@@ -178,7 +178,7 @@ void IntraSearch::destroy()
   }
 
 #if JVET_AB0143_CCCM_TS
-  for (uint32_t cccmIdx = 0; cccmIdx < 6; cccmIdx++)
+  for (uint32_t cccmIdx = 0; cccmIdx < CCCM_NUM_MODES; cccmIdx++)
   {
     m_cccmStorage[cccmIdx].destroy();
   }
@@ -281,7 +281,7 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
   m_colorTransResiBuf.create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
 
 #if JVET_AB0143_CCCM_TS
-  for (uint32_t cccmIdx = 0; cccmIdx < 6; cccmIdx++)
+  for (uint32_t cccmIdx = 0; cccmIdx < CCCM_NUM_MODES; cccmIdx++)
   {
     m_cccmStorage[cccmIdx].create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
   }
@@ -2541,7 +2541,7 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
             {
               ComponentID       compID = ComponentID( comp );
 #else
-            ComponentID       compID = COMPONENT_Cb;
+              ComponentID       compID = COMPONENT_Cb;
 #endif
               int              idcBest = 0;
               int64_t         satdBest = 0;
@@ -2695,13 +2695,14 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 
 #if JVET_AB0143_CCCM_TS
 #if MMLM
-      uint32_t chromaCandCccmModes[6] = { LM_CHROMA_IDX, MDLM_L_IDX, MDLM_T_IDX, MMLM_CHROMA_IDX, MMLM_L_IDX, MMLM_T_IDX };
+      uint32_t chromaCandCccmModes[CCCM_NUM_MODES] = { LM_CHROMA_IDX, MDLM_L_IDX, MDLM_T_IDX, MMLM_CHROMA_IDX, MMLM_L_IDX, MMLM_T_IDX };
 #else
-      uint32_t chromaCandCccmModes[6] = { LM_CHROMA_IDX, MDLM_L_IDX, MDLM_T_IDX };
+      uint32_t chromaCandCccmModes[CCCM_NUM_MODES] = { LM_CHROMA_IDX, MDLM_L_IDX, MDLM_T_IDX };
 #endif
-      int64_t satdCccmSortedCost[6];
-      int satdCccmModeList[6];
-      for (int i = 0; i < 6; i++)
+      int64_t satdCccmSortedCost[CCCM_NUM_MODES];
+      int satdCccmModeList[CCCM_NUM_MODES];
+
+      for (int i = 0; i < CCCM_NUM_MODES; i++)
       {
         satdCccmSortedCost[i] = LLONG_MAX; // for the mode not pre-select by SATD, do RDO by default, so set the initial value 0.
         satdCccmModeList[i] = chromaCandCccmModes[i];
@@ -2718,17 +2719,14 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #endif
 
       const UnitArea localUnitArea(cs.area.chromaFormat, Area(0, 0, (pu.Cb().width) << 1, (pu.Cb().height) << 1));
-      PelUnitBuf cccmStorage[6];
+      PelUnitBuf cccmStorage[CCCM_NUM_MODES];
 
       pu.cccmFlag = 1;
       xGetLumaRecPixels(pu, pu.Cb());
 
-      bool isCCCMEnabled;
-#if MMLM
-      for (int idx = 0; idx < 6; idx++)
-#else
-      for (int idx = 0; idx < 3; idx++)
-#endif
+      bool isCCCMEnabled = false;
+
+      for (int idx = 0; idx < CCCM_NUM_MODES; idx++)
       {
         int mode = chromaCandCccmModes[idx];
         if (idx == 0)
@@ -3236,11 +3234,8 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       isCCCMEnabled = isCccmFullEnabled;
 
       pu.cccmFlag = 1;
-#if MMLM
-      for (int32_t uiMode = 0; uiMode < 6; uiMode++)
-#else
-      for (int32_t uiMode = 0; uiMode < 3; uiMode++)
-#endif
+
+      for (int32_t uiMode = 0; uiMode < CCCM_NUM_MODES; uiMode++)
       {
         if (uiMode == 1)
         {
