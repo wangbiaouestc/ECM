@@ -2520,6 +2520,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #if JVET_AA0126_GLM
       if ( PU::isLMCModeEnabled( pu, LM_CHROMA_IDX ) && PU::hasGlmFlag( pu, LM_CHROMA_IDX ) )
       {
+#if JVET_AB0092_GLM_WITH_LUMA && JVET_AB0174_CCCM_DIV_FREE
+        xGlmSetLumaRefValue(pu, pu.Cb());
+#endif
         // Generate all GLM templates at encoder
         xGetLumaRecPixelsGlmAll(pu, pu.Cb());
         pu.intraDir[1] = LM_CHROMA_IDX;

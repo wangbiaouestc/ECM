@@ -2099,6 +2099,7 @@ bool PU::hasGlmFlag(const PredictionUnit &pu, const int mode)
 #if JVET_AA0057_CCCM
   hasGlmFlag       &= !pu.cccmFlag;
 #endif
+  hasGlmFlag       &= pu.cu->chromaFormat == CHROMA_420; // GLM shall be disabled for non-4:2:0 format
   
   return hasGlmFlag;
 }
