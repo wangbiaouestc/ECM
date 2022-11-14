@@ -1413,14 +1413,14 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
 #endif
 
   int  iLumaStride = 0;
-  PelBuf Temp;
+  PelBuf temp;
 #if JVET_AA0126_GLM
   if (pu.glmIdc.isActive())
   {
     int glmIdc = pu.glmIdc.getIdc(compID, 0);
     Pel* glmTemp = compID == COMPONENT_Cb ? m_glmTempCb[glmIdc] : m_glmTempCr[glmIdc];
     iLumaStride = 2 * MAX_CU_SIZE + 1;
-    Temp = PelBuf(glmTemp + iLumaStride + 1, iLumaStride, Size(chromaArea));
+    temp = PelBuf(glmTemp + iLumaStride + 1, iLumaStride, Size(chromaArea));
   }
   else
   {
@@ -1432,12 +1432,12 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
 #endif
     {
       iLumaStride = 2 * MAX_CU_SIZE + 1;
-      Temp = PelBuf(m_pMdlmTemp + iLumaStride + 1, iLumaStride, Size(chromaArea));
+      temp = PelBuf(m_pMdlmTemp + iLumaStride + 1, iLumaStride, Size(chromaArea));
     }
     else
     {
       iLumaStride = MAX_CU_SIZE + 1;
-      Temp = PelBuf(m_piTemp + iLumaStride + 1, iLumaStride, Size(chromaArea));
+      temp = PelBuf(m_piTemp + iLumaStride + 1, iLumaStride, Size(chromaArea));
     }
 #if JVET_AA0126_GLM
   }
@@ -1473,12 +1473,12 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
 #endif
 
   ////// final prediction
-  piPred.copyFrom(Temp);
+  piPred.copyFrom(temp);
 #if MMLM
   if (PU::isMultiModeLM(pu.intraDir[1]))
   {
     Pel*  pPred = piPred.bufAt(0, 0);
-    Pel  *pLuma = Temp.bufAt(0, 0);
+    Pel  *pLuma = temp.bufAt(0, 0);
     int uiPredStride = piPred.stride;
     int uiCWidth = chromaArea.width;
     int uiCHeight = chromaArea.height;
@@ -4906,7 +4906,7 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
         uint64_t s0                 = uiSecondaryCost;
         // uiBestCost + uiSecondaryCost can overlow uint64_t
         uint64_t s1 = (MAX_UINT64 - uiSecondaryCost < uiBestCost) ? MAX_UINT64 : (uiBestCost + uiSecondaryCost);
-        int      x  = floorLog2_uint64(s1);
+        int      x  = floorLog2Uint64(s1);
         CHECK(x < 0, "floor log2 value should be no negative");
         int norm_s1 = int(s1 << 4 >> x) & 15;
         int v       = g_gradDivTable[norm_s1] | 8;
@@ -5343,7 +5343,7 @@ int IntraPrediction::deriveTimdMode( const CPelBuf &recoBuf, const CompArea &are
     uint64_t s0 = uiSecondaryCost;
     // uiBestCost + uiSecondaryCost can overlow uint64_t
     uint64_t s1 = (MAX_UINT64 - uiSecondaryCost < uiBestCost) ? MAX_UINT64 : (uiBestCost + uiSecondaryCost);
-    int x = floorLog2_uint64(s1);
+    int x = floorLog2Uint64(s1);
     CHECK(x < 0, "floor log2 value should be no negative");
     int norm_s1 = int(s1 << 4 >> x) & 15;
     int v = g_gradDivTable[norm_s1] | 8;
@@ -8754,7 +8754,7 @@ int64_t xDivide(int64_t num, int64_t denom) // Note: assumes positive denominato
   static const int pow2O[8] = {  4822,  5952,  6624,  6792,  6408,  5424,  3792,  1466  }; // DIV_PREC_BITS
   static const int pow2B[8] = { 12784, 12054, 11670, 11583, 11764, 12195, 12870, 13782  }; // DIV_PREC_BITS
 
-  int shift     = floorLog2_uint64(denom);
+  int shift     = floorLog2Uint64(denom);
   int round     = 1 << shift >> 1;
   int normDiff  = (((denom << DIV_PREC_BITS) + round) >> shift) & ((1 << DIV_PREC_BITS) - 1);
   int diffFull  = normDiff >> DIV_INTR_BITS;
