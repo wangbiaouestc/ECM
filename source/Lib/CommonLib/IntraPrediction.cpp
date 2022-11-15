@@ -10240,9 +10240,14 @@ void IntraPrediction::getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlR
   CodingUnit& cu = *pu.cu;
   int aboveLines = (cu.block(COMPONENT_Y).y) % ((cu.cs->sps)->getMaxCUWidth());
   sizeRef = 0;
-  for (; EXT_REF_LINE_IDX[sizeRef] < aboveLines && sizeRef < 5; sizeRef++)
+
+  for (; sizeRef < 5; sizeRef++)
   {
     tmrlRefList[sizeRef] = EXT_REF_LINE_IDX[sizeRef];
+    if (EXT_REF_LINE_IDX[sizeRef] >= aboveLines)
+    {
+      break;
+    }
   }
 
   // intra mode candidates
