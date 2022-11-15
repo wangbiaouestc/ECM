@@ -5201,11 +5201,12 @@ void PU::xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[
 #if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
   int shiftDets = 0;
   int64_t m[3][3]; // parameter=det(md)/det(m)
+#else
+  uint8_t initShift = 3 * shift;
+  uint8_t rightShift = 0;
 #endif
   int64_t sumbb[2][3][3];
   int64_t sumeb[2][3];
-  uint8_t initShift = 3 * shift;
-  uint8_t rightShift = 0;
 #else
   int shiftDets = 5 * (getRMVFMSB(iNum) - 4);
   if (shiftDets < 0) shiftDets = 0;
