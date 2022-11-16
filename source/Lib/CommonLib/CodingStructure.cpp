@@ -2298,7 +2298,11 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
   }
 #endif  
 
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  if (!subStruct.m_isTuEnc && ((!slice->isIntra() || slice->getSPS()->getIBCFlag() || slice->getSPS()->getUseIntraTMP()) && chType != CHANNEL_TYPE_CHROMA))
+#else
   if (!subStruct.m_isTuEnc && ((!slice->isIntra() || slice->getSPS()->getIBCFlag()) && chType != CHANNEL_TYPE_CHROMA))
+#endif
   {
     // copy motion buffer
     MotionBuf ownMB  = getMotionBuf          ( clippedArea );
@@ -2434,7 +2438,11 @@ void CodingStructure::copyStructure( const CodingStructure& other, const Channel
     pu = *ppu;
   }
 
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  if (!other.slice->isIntra() || other.slice->getSPS()->getIBCFlag() || other.slice->getSPS()->getUseIntraTMP() )
+#else
   if (!other.slice->isIntra() || other.slice->getSPS()->getIBCFlag())
+#endif
   {
     // copy motion buffer
     MotionBuf  ownMB = getMotionBuf();
@@ -2524,7 +2532,11 @@ void CodingStructure::initStructData( const int &QP, const bool &skipMotBuf )
     currQP[0] = currQP[1] = QP;
   }
 
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  if (!skipMotBuf && (!parent || ((!slice->isIntra() || slice->getSPS()->getIBCFlag() || slice->getSPS()->getUseIntraTMP()) && !m_isTuEnc)))
+#else
   if (!skipMotBuf && (!parent || ((!slice->isIntra() || slice->getSPS()->getIBCFlag()) && !m_isTuEnc)))
+#endif
   {
 #if JVET_Z0118_GDR
   getMotionBuf(PIC_RECONSTRUCTION_0).memset(0);
