@@ -233,9 +233,12 @@ void CABACReader::coding_tree_unit( CodingStructure& cs, const UnitArea& area, i
 #if ALF_IMPROVEMENT
             while( decoded < numAlts-1 && m_BinDecoder.decodeBin( Ctx::ctbAlfAlternative( compIdx ) ) )
 #else
-            while( decoded < numAlts-1 && m_BinDecoder.decodeBin( Ctx::ctbAlfAlternative( compIdx-1 ) ) )
+            while( decoded < numAlts - 1 && m_BinDecoder.decodeBin( Ctx::ctbAlfAlternative( compIdx - 1 ) ) )
 #endif
-              ++ decoded;
+            {
+              ++decoded;
+            }
+
             ctbAlfAlternative[ctuRsAddr] = decoded;
           }
         }

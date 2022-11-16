@@ -2824,7 +2824,7 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       for (int i = 1; i < 3; i++)
 #endif
       {
-        for (int j = i + 1; j < 6; j++)
+        for (int j = i + 1; j < CCCM_NUM_MODES; j++)
         {
           if (satdCccmSortedCost[j] < satdCccmSortedCost[i])
           {
@@ -5315,22 +5315,16 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
           {
 #if TMP_FAST_ENC
             generateTMPrediction(piPred.buf, piPred.stride, pu.Y(), foundCandiNum, tu.cu);
-#if JVET_AB0061_ITMP_BV_FOR_IBC
-            pu.interDir = 1;             // use list 0 for IBC mode
-            pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;   // last idx in the list
-            pu.mv->set(m_tempLibFast.getX() << MV_FRACTIONAL_BITS_INTERNAL, m_tempLibFast.getY() << MV_FRACTIONAL_BITS_INTERNAL);
-            pu.bv.set(m_tempLibFast.getX(), m_tempLibFast.getY());
-#endif
 #else
             getTargetTemplate( tu.cu, pu.lwidth(), pu.lheight(), tempType );
             candidateSearchIntra( tu.cu, pu.lwidth(), pu.lheight(), tempType );
             generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
+#endif
 #if JVET_AB0061_ITMP_BV_FOR_IBC
             pu.interDir               = 1;             // use list 0 for IBC mode
             pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;   // last idx in the list
             pu.mv->set(m_tempLibFast.getX() << MV_FRACTIONAL_BITS_INTERNAL, m_tempLibFast.getY() << MV_FRACTIONAL_BITS_INTERNAL);
             pu.bv.set(m_tempLibFast.getX(), m_tempLibFast.getY());
-#endif
 #endif
           }
           else

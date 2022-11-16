@@ -2508,8 +2508,10 @@ void CABACWriter::cu_palette_info(const CodingUnit& cu, ComponentID compBegin, u
   uint32_t reusedPLTnum = 0;
   for (int idx = 0; idx < cu.lastPLTSize[compBegin]; idx++)
   {
-    if (cu.reuseflag[compBegin][idx])
+    if( cu.reuseflag[compBegin][idx] )
+    {
       reusedPLTnum++;
+    }
   }
   if (reusedPLTnum < maxPltSize)
   {
@@ -2536,10 +2538,14 @@ void CABACWriter::cu_palette_info(const CodingUnit& cu, ComponentID compBegin, u
 
   m_scanOrder = g_scanOrder[SCAN_UNGROUPED][(cu.useRotation[compBegin]) ? SCAN_TRAV_VER : SCAN_TRAV_HOR][gp_sizeIdxInfo->idxFrom(width)][gp_sizeIdxInfo->idxFrom(height)];
   uint32_t total = height * width;
-  if (indexMaxSize > 1)
-    codeScanRotationModeFlag(cu, compBegin);
+  if( indexMaxSize > 1 )
+  {
+    codeScanRotationModeFlag( cu, compBegin );
+  }
   else
-    assert(!cu.useRotation[compBegin]);
+  {
+    assert( !cu.useRotation[compBegin] );
+  }
 
   if (cu.useEscape[compBegin] && cu.cs->pps->getUseDQP() && !cuCtx.isDQPCoded)
   {
@@ -2585,11 +2591,15 @@ void CABACWriter::cuPaletteSubblockInfo(const CodingUnit& cu, ComponentID compBe
   maxSubPos = (maxSubPos > totalPel) ? totalPel : maxSubPos; // if last position is out of the current CU size
 
   unsigned runCopyFlag[(1 << LOG2_PALETTE_CG_SIZE)];
-  for (int i = 0; i < (1 << LOG2_PALETTE_CG_SIZE); i++)
+  for( int i = 0; i < (1 << LOG2_PALETTE_CG_SIZE); i++ )
+  {
     runCopyFlag[i] = MAX_INT;
+  }
 
-  if (minSubPos == 0)
+  if( minSubPos == 0 )
+  {
     runCopyFlag[0] = 0;
+  }
 
 // PLT runCopy flag and runType - context coded
   int curPos = minSubPos;
@@ -6414,15 +6424,22 @@ void CABACWriter::codeAlfCtuEnableFlags( CodingStructure& cs, ChannelType channe
 {
   if( isLuma( channel ) )
   {
-    if (alfParam->enabledFlag[COMPONENT_Y])
+    if( alfParam->enabledFlag[COMPONENT_Y] )
+    {
       codeAlfCtuEnableFlags( cs, COMPONENT_Y, alfParam );
+    }
   }
   else
   {
-    if (alfParam->enabledFlag[COMPONENT_Cb])
+    if( alfParam->enabledFlag[COMPONENT_Cb] )
+    {
       codeAlfCtuEnableFlags( cs, COMPONENT_Cb, alfParam );
-    if (alfParam->enabledFlag[COMPONENT_Cr])
+    }
+
+    if( alfParam->enabledFlag[COMPONENT_Cr] )
+    {
       codeAlfCtuEnableFlags( cs, COMPONENT_Cr, alfParam );
+    }
   }
 }
 void CABACWriter::codeAlfCtuEnableFlags( CodingStructure& cs, ComponentID compID, AlfParam* alfParam)
@@ -6685,16 +6702,24 @@ void CABACWriter::codeAlfCtuAlternatives( CodingStructure& cs, ChannelType chann
 {
   if( isChroma( channel ) )
   {
-    if (alfParam->enabledFlag[COMPONENT_Cb])
+    if( alfParam->enabledFlag[COMPONENT_Cb] )
+    {
       codeAlfCtuAlternatives( cs, COMPONENT_Cb, alfParam );
-    if (alfParam->enabledFlag[COMPONENT_Cr])
+    }
+
+    if( alfParam->enabledFlag[COMPONENT_Cr] )
+    {
       codeAlfCtuAlternatives( cs, COMPONENT_Cr, alfParam );
+    }
   }
 }
 void CABACWriter::codeAlfCtuAlternatives( CodingStructure& cs, ComponentID compID, AlfParam* alfParam)
 {
   if( compID == COMPONENT_Y )
+  {
     return;
+  }
+
   uint32_t numCTUs = cs.pcv->sizeInCtus;
   uint8_t* ctbAlfFlag = cs.slice->getPic()->getAlfCtuEnableFlag( compID );
 
@@ -6725,10 +6750,16 @@ void CABACWriter::codeAlfCtuAlternative( CodingStructure& cs, uint32_t ctuRsAddr
         uint8_t* ctbAlfAlternative = cs.slice->getPic()->getAlfCtuAlternativeData(compIdx);
         unsigned numOnes = ctbAlfAlternative[ctuRsAddr];
         assert(ctbAlfAlternative[ctuRsAddr] < numAltLuma);
-        for (int i = 0; i < numOnes; ++i)
-          m_BinEncoder.encodeBin(1, Ctx::ctbAlfAlternative(compIdx));
-        if (numOnes < numAltLuma - 1)
-          m_BinEncoder.encodeBin(0, Ctx::ctbAlfAlternative(compIdx));
+
+        for( int i = 0; i < numOnes; ++i )
+        {
+          m_BinEncoder.encodeBin( 1, Ctx::ctbAlfAlternative( compIdx ) );
+        }
+
+        if( numOnes < numAltLuma - 1 )
+        {
+          m_BinEncoder.encodeBin( 0, Ctx::ctbAlfAlternative( compIdx ) );
+        }
       }
     }
   }
@@ -6762,9 +6793,14 @@ void CABACWriter::codeAlfCtuAlternative( CodingStructure& cs, uint32_t ctuRsAddr
       }
 #else
       for( int i = 0; i < numOnes; ++i )
-        m_BinEncoder.encodeBin( 1, Ctx::ctbAlfAlternative( compIdx-1 ) );
-      if( numOnes < numAlts-1 )
-        m_BinEncoder.encodeBin( 0, Ctx::ctbAlfAlternative( compIdx-1 ) );
+      {
+        m_BinEncoder.encodeBin( 1, Ctx::ctbAlfAlternative( compIdx - 1 ) );
+      }
+
+      if( numOnes < numAlts - 1 )
+      {
+        m_BinEncoder.encodeBin( 0, Ctx::ctbAlfAlternative( compIdx - 1 ) );
+      }
 #endif
     }
   }

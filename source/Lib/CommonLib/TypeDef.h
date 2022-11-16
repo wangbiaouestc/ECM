@@ -122,12 +122,17 @@
 #define JVET_V0087_DIMD_NO_ISP                            1 // JVET-V0087: Disallow combination of DIMD and ISP
 #define JVET_X0124_TMP_SIGNAL                             1 // JVET-X0124: Cleanup on signalling of intra template matching
 #endif
+
 #define JVET_V0130_INTRA_TMP                              1 // JVET-V0130: Template matching prediction
+#if JVET_V0130_INTRA_TMP
 #define JVET_AB0130_ITMP_SAMPLING                         1 // JVET-AB0130: Speedup of IntraTMP by search range sampling and refinement
 #if JVET_AB0130_ITMP_SAMPLING
 #define TMP_FAST_ENC                                      1 // Encoder-only modification
 #endif
-#define JVET_W0069_TMP_BOUNDARY                           1 // JVET-W0069: boundary handling for TMP
+#define JVET_W0069_TMP_BOUNDARY                           1 // JVET-W0069: Boundary handling for TMP
+#define JVET_AB0061_ITMP_BV_FOR_IBC                       1 // JVET-AB0061: Storing IntraTMP BV for IBC BV prediction
+#endif
+
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
 #if JVET_W0123_TIMD_FUSION
 #define JVET_X0148_TIMD_PDPC                              1 // JVET-X0148: PDPC handling for TIMD
@@ -150,8 +155,7 @@
 #if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
 #define JVET_AB0174_CCCM_DIV_FREE                         1 // JVET-AB0174: CCCM with division free operation
 #endif
-#define JVET_AB0061_ITMP_BV_FOR_IBC                       1 // JVET-AB0061: Storing IntraTMP BV for IBC BV prediction
-#define JVET_AB0155_SGPM                                  1 // JVET-AB0155: spatial geometric partitioning mode
+#define JVET_AB0155_SGPM                                  1 // JVET-AB0155: Spatial geometric partitioning mode
 #define JVET_AB0157_TMRL                                  1 // JVET-AB0157: Template-based multiple reference line intra prediction
 #define JVET_AB0157_INTRA_FUSION                          1 // JVET-AB0157: Intra prediction fusion
 
@@ -219,7 +223,7 @@
 #define JVET_AA0128_AFFINE_MERGE_CTX_INC                  1 // JVET-AA0128 test b: Increased number of CABAC contexts of affine merge index
 #endif
 #define JVET_AA0096_MC_BOUNDARY_PADDING                   1 // JVET-AA0096: motion compensated picture boundary padding
-#define JVET_AB0078_AMVPMERGE_LDB                         1 // JVET-AB0078: enabling AmvpMerge for low delay picture
+#define JVET_AB0078_AMVPMERGE_LDB                         1 // JVET-AB0078: Enabling AmvpMerge for low delay picture
 #define JVET_AB0112_AFFINE_DMVR                           1 // JVET-AB0112: DMVR (baseMV refinement) for affine
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
@@ -693,7 +697,7 @@ typedef       uint64_t        Distortion;        ///< distortion measurement
 enum PadDirection
 {
   PAD_TOP           = 0,
-  PAD_BOTTEM        = 1,
+  PAD_BOTTOM        = 1,
   PAD_RIGHT         = 2,
   PAD_LEFT          = 3,
   MAX_PAD_DIRECTION = 4

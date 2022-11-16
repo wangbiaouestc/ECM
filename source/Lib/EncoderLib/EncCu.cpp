@@ -1953,7 +1953,7 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
         }
 #endif
 
-#if JVET_Z0118_GDR      
+#if JVET_Z0118_GDR
         tempCS->motionLut = oldMotionLut;
         tempCS->prevPLT = oldPLT;
         tempCS->releaseIntermediateData();
