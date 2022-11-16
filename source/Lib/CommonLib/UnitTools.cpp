@@ -407,7 +407,7 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
 
     pu.getAffineMotionInfo(addMi, addRefIdx);
     
-#if JVET_Z0118_GDR    
+#if JVET_Z0118_GDR 
     cu.cs->addAffMiToLut((isClean) ? cu.cs->motionLut.lutAff1 : cu.cs->motionLut.lutAff0, addMi, addRefIdx);
 #else
     cu.cs->addAffMiToLut(cu.cs->motionLut.lutAff, addMi, addRefIdx);
@@ -463,7 +463,7 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
     if (enableInsertion)
     {
 #if JVET_Z0075_IBC_HMVP_ENLARGE
-#if JVET_Z0118_GDR      
+#if JVET_Z0118_GDR
       if (isClean)
       {
         if (CU::isIBC(cu))
@@ -495,7 +495,7 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
       }
 #endif
 #else
-#if JVET_Z0118_GDR      
+#if JVET_Z0118_GDR
       if (isClean)
       {
         cu.cs->addMiToLut(CU::isIBC(cu) ? cu.cs->motionLut.lutIbc1 : cu.cs->motionLut.lut1, mi);
@@ -2318,17 +2318,17 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
   const Slice& slice = *cs.slice;
   MotionInfo miNeighbor;
 
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   bool isClean = cs.isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
 #endif
 #if JVET_Z0075_IBC_HMVP_ENLARGE
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   auto &lut = (isClean) ? cs.motionLut.lut1 : cs.motionLut.lut0;
 #else
   auto &lut = cs.motionLut.lut;
 #endif
 #else
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   auto &lut = ibcFlag ? (isClean ? cs.motionLut.lutIbc1 : cs.motionLut.lutIbc0) : (isClean ? cs.motionLut.lut1 : cs.motionLut.lut0);
 #else
   auto &lut = ibcFlag ? cs.motionLut.lutIbc : cs.motionLut.lut;
@@ -4904,18 +4904,18 @@ bool PU::addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const i
 {
   const Slice& slice = *cs.slice;
   MotionInfo miNeighbor;
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   bool isClean = cs.isClean(cs.area.Y().bottomRight(), CHANNEL_TYPE_LUMA);
 #endif
 
 #if JVET_Z0075_IBC_HMVP_ENLARGE
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   auto &lut = (isClean) ? cs.motionLut.lut1 : cs.motionLut.lut0;
 #else
   auto &lut = cs.motionLut.lut;
 #endif
 #else
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   auto &lut = ibcFlag ? (isClean ? cs.motionLut.lutIbc1 : cs.motionLut.lutIbc0) : (isClean ? cs.motionLut.lut1 : cs.motionLut.lut0);
 #else
   auto &lut = ibcFlag ? cs.motionLut.lutIbc : cs.motionLut.lut;
@@ -8057,7 +8057,7 @@ void PU::getIbcMVPsEncOnly(PredictionUnit &pu, Mv* mvPred, int& nbPred)
   nbPred = 0;
   Position posLT = pu.Y().topLeft();
 
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
 #endif
 
@@ -8097,7 +8097,7 @@ void PU::getIbcMVPsEncOnly(PredictionUnit &pu, Mv* mvPred, int& nbPred)
     }
   }
 
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   size_t numAvaiCandInLUT = isClean ? pu.cs->motionLut.lutIbc1.size() : pu.cs->motionLut.lutIbc0.size();
 #else
   size_t numAvaiCandInLUT = pu.cs->motionLut.lutIbc.size();
@@ -10107,18 +10107,18 @@ void PU::addAMVPHMVPCand(const PredictionUnit &pu, const RefPicList eRefPicList,
   const Slice &slice = *(*pu.cs).slice;
 
   MotionInfo neibMi;
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
 #endif
 
 #if JVET_Z0075_IBC_HMVP_ENLARGE
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   auto &lut = (isClean) ? pu.cs->motionLut.lut1 : pu.cs->motionLut.lut0;
 #else
   auto &lut = pu.cs->motionLut.lut;
 #endif
 #else
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   auto &lut = CU::isIBC(*pu.cu) ? (isClean ? pu.cs->motionLut.lutIbc1 : pu.cs->motionLut.lutIbc0) : (isClean ? pu.cs->motionLut.lut1 : pu.cs->motionLut.lut0);
 #else
   auto &lut = CU::isIBC(*pu.cu) ? pu.cs->motionLut.lutIbc : pu.cs->motionLut.lut;

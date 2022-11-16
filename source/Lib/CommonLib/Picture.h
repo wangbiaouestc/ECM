@@ -99,7 +99,7 @@ struct Picture : public UnitArea
   uint32_t margin;
   Picture();
 
-#if JVET_Z0118_GDR       
+#if JVET_Z0118_GDR
   void create(const bool gdrEnabled, const ChromaFormat &_chromaFormat, const Size &size, const unsigned _maxCUSize, const unsigned _margin, const bool _decoder, const int _layerId, const bool gopBasedTemporalFilterEnabled = false);
 #else
   void create( const ChromaFormat &_chromaFormat, const Size &size, const unsigned _maxCUSize, const unsigned margin, const bool bDecoder, const int layerId, const bool gopBasedTemporalFilterEnabled = false );

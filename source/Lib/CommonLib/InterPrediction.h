@@ -817,7 +817,7 @@ public:
 #endif
 #endif
   void xFillIBCBuffer(CodingUnit &cu);
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   void resetCurIBCBuffer(const ChromaFormat chromaFormatIDC, const Area ctuArea, const int ctuSize, const Pel dirtyPel);  
 #endif
   void resetIBCBuffer(const ChromaFormat chromaFormatIDC, const int ctuSize);

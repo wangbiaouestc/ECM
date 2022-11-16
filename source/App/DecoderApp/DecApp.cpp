@@ -380,7 +380,7 @@ uint32_t DecApp::decode()
 
     if( pcListPic )
     {
-#if JVET_Z0118_GDR 
+#if JVET_Z0118_GDR
       if ( gdrRecoveryPeriod[nalu.m_nuhLayerId] ) // Suppress YUV and OPL output during GDR recovery
       {
         PicList::iterator iterPic = pcListPic->begin();

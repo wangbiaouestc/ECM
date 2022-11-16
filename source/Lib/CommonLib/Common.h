@@ -108,7 +108,7 @@ struct Area : public Position, public Size
 
   bool contains(const Position &_pos)       const { return (_pos.x >= x) && (_pos.x < (x + width)) && (_pos.y >= y) && (_pos.y < (y + height)); }
   bool contains(const Area &_area)          const { return contains(_area.pos()) && contains(_area.bottomRight()); }
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   bool overlap(const Area &_area) const 
   { 
     Area thisArea = Area(pos(), size());
