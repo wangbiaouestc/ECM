@@ -5207,10 +5207,6 @@ void CABACWriter::mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
   
   if (TrMv != Mv(0, 0))
   {
-    if (TrMv != Mv(0, 0) && mvsdIdx == -1)
-    {
-      mvsdIdx = mvsdIdx;
-    }
     CHECK(mvsdIdx == -1, "mvsdIdx == -1 for transMv");
   }
   if (pu.mvd[eRefList].getHor())
@@ -5295,10 +5291,6 @@ void CABACWriter::mvsdAffineIdxFunc(const PredictionUnit &pu, RefPicList eRefLis
   int mvsdIdx = pu.mvsdIdx[eRefList];
   if (AffMv[0] != Mv(0, 0) || AffMv[1] != Mv(0, 0) || (pu.cu->affineType == AFFINEMODEL_6PARAM && AffMv[2] != Mv(0, 0)))
   {
-    if (mvsdIdx == -1)
-    {
-      mvsdIdx = mvsdIdx;
-    }
     CHECK(mvsdIdx == -1, "mvsdIdx == -1 for AffineMv");
   }
   if (pu.mvdAffi[eRefList][0].getHor())

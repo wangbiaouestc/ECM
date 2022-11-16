@@ -467,11 +467,9 @@ private:
   static_vector<double, SGPM_NUM>   m_dSavedModeCostSGPM;
   static_vector<double, SGPM_NUM>   m_dSavedHadListSGPM;
 
-  Pel* m_intraPredBuf[NUM_LUMA_MODE];
-  Pel* m_sgpmPredBuf[SGPM_NUM];
-  uint8_t    m_intraModeReady[NUM_LUMA_MODE];
-
-  size_t m_numSGPMCands;
+  Pel*            m_intraPredBuf[NUM_LUMA_MODE];
+  Pel*            m_sgpmPredBuf[SGPM_NUM];
+  uint8_t         m_intraModeReady[NUM_LUMA_MODE];
 #endif
 
   PelStorage      m_tmpStorageLCU;

@@ -1217,7 +1217,6 @@ void QuantRDOQ::xRateDistOptQuantTS( TransformUnit &tu, const ComponentID &compI
     transformShift = std::max<int>( 0, transformShift );
   }
 
-        double   blockUncodedCost                   = 0;
   const uint32_t maxNumCoeff                        = rect.area();
 
   CHECK( compID >= MAX_NUM_TBLOCKS, "Invalid component ID" );
@@ -1310,7 +1309,6 @@ void QuantRDOQ::xRateDistOptQuantTS( TransformUnit &tu, const ComponentID &compI
       coeffLevelError[0] = dErr * dErr * errorScale;
 
       costCoeff0[scanPos] = coeffLevelError[0];
-      blockUncodedCost   += costCoeff0[ scanPos ];
       dstCoeff[blkPos]    = coeffLevels[0];
 
       //===== coefficient level estimation =====
@@ -1439,7 +1437,6 @@ void QuantRDOQ::forwardBDPCM(TransformUnit &tu, const ComponentID &compID, const
     transformShift = std::max<int>(0, transformShift);
   }
 
-  double   blockUncodedCost = 0;
   const uint32_t maxNumCoeff = rect.area();
 
   CHECK(compID >= MAX_NUM_TBLOCKS, "Invalid component ID");
@@ -1529,7 +1526,6 @@ void QuantRDOQ::forwardBDPCM(TransformUnit &tu, const ComponentID &compID, const
       coeffLevelError[0]  = dErr * dErr * errorScale;
 
       costCoeff0[scanPos] = coeffLevelError[0];
-      blockUncodedCost   += costCoeff0[scanPos];
       dstCoeff[blkPos]    = coeffLevels[0];
 
       //===== coefficient level estimation =====
