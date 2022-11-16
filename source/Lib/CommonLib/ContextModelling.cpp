@@ -373,6 +373,9 @@ unsigned DeriveCtx::CtxSkipFlag( const CodingUnit& cu )
 #if ENABLE_DIMD 
 unsigned DeriveCtx::CtxDIMDFlag(const CodingUnit& cu)
 {
+#if 1 // one context
+  return 0;
+#else
   const CodingStructure *cs = cu.cs;
   unsigned ctxId = 0;
 
@@ -384,8 +387,8 @@ unsigned DeriveCtx::CtxDIMDFlag(const CodingUnit& cu)
   const CodingUnit *cuAbove = cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
   ctxId += (cuAbove && cuAbove->dimd) ? 1 : 0;
 
-  // return ctxId;
-  return 0;
+  return ctxId;
+#endif
 }
 #endif
 
