@@ -572,6 +572,7 @@ void IntraPrediction::xIntraPredPlanarDcPdpc(const CPelBuf &pSrc, Pel* pDst, int
     }
   }
   else
+  {
 #endif
     for (int y = 0; y < iHeight; y++)
     {
@@ -592,6 +593,9 @@ void IntraPrediction::xIntraPredPlanarDcPdpc(const CPelBuf &pSrc, Pel* pDst, int
       srcLeft++;
       pDst += iDstStride;
     }
+#if CIIP_PDPC
+  }
+#endif
 }
 #endif
 #endif
@@ -1347,6 +1351,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
         }
       }
       else
+      {
 #endif
 
       for (int y = 0; y < iHeight; y++)
@@ -1368,6 +1373,9 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
         srcLeft++;
         dst += dstBuf.stride;
       }
+#if CIIP_PDPC
+      }
+#endif
     }
   }
 #endif
@@ -1501,8 +1509,12 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
     }
   }
   else
+  {
 #endif
     piPred.linearTransform(cclmModel.a, cclmModel.shift, cclmModel.b, true, pu.cs->slice->clpRng(compID));
+#if MMLM
+  }
+#endif
 }
 
 /** Function for deriving planar intra prediction. This function derives the prediction samples for planar mode (intra coding).
@@ -1680,7 +1692,7 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
     || !isLuma( chType )
     || useISP
 #if JVET_V0130_INTRA_TMP
-	  || PU::isTmp(pu, chType)
+    || PU::isTmp(pu, chType)
 #endif
     || PU::isMIP( pu, chType )
     || m_ipaParam.multiRefIndex
@@ -2910,64 +2922,67 @@ RefTemplateType IntraPrediction::getRefTemplateType(CodingUnit& cu, CompArea& ar
 bool IntraPrediction::isRefTemplateAvailable(CodingUnit& cu, CompArea& area)
 #endif
 {
-	const ChannelType      chType = toChannelType(area.compID);
-	const CodingStructure& cs = *cu.cs;
-	const SPS& sps = *cs.sps;
-	const PreCalcValues& pcv = *cs.pcv;
+  const ChannelType      chType = toChannelType(area.compID);
+  const CodingStructure& cs = *cu.cs;
+  const SPS& sps = *cs.sps;
+  const PreCalcValues& pcv = *cs.pcv;
+  setReferenceArrayLengths( area );
 
-	const int  tuWidth = area.width;
-	const int  tuHeight = area.height;
-	const int  predSize = m_topRefLength;
-	const int  predHSize = m_leftRefLength;
-	//const int predStride = predSize;
+  const int  tuWidth = area.width;
+  const int  tuHeight = area.height;
+  const int  predSize = m_topRefLength;
+  const int  predHSize = m_leftRefLength;
 
-	const int  unitWidth = pcv.minCUWidth >> getComponentScaleX(area.compID, sps.getChromaFormatIdc());
-	const int  unitHeight = pcv.minCUHeight >> getComponentScaleY(area.compID, sps.getChromaFormatIdc());
+  const int  unitWidth = pcv.minCUWidth >> getComponentScaleX(area.compID, sps.getChromaFormatIdc());
+  const int  unitHeight = pcv.minCUHeight >> getComponentScaleY(area.compID, sps.getChromaFormatIdc());
 
-	const int  totalAboveUnits = (predSize + (unitWidth - 1)) / unitWidth;
-	const int  totalLeftUnits = (predHSize + (unitHeight - 1)) / unitHeight;
-	const int  totalUnits = totalAboveUnits + totalLeftUnits + 1; //+1 for top-left
-	const int  numAboveUnits = std::max<int>(tuWidth / unitWidth, 1);
-	const int  numLeftUnits = std::max<int>(tuHeight / unitHeight, 1);
-	const int  numAboveRightUnits = totalAboveUnits - numAboveUnits;
-	const int  numLeftBelowUnits = totalLeftUnits - numLeftUnits;
+  const int  totalAboveUnits = (predSize + (unitWidth - 1)) / unitWidth;
+  const int  totalLeftUnits = (predHSize + (unitHeight - 1)) / unitHeight;
+  const int  totalUnits = totalAboveUnits + totalLeftUnits + 1; //+1 for top-left
+  const int  numAboveUnits = std::max<int>(tuWidth / unitWidth, 1);
+  const int  numLeftUnits = std::max<int>(tuHeight / unitHeight, 1);
+  const int  numAboveRightUnits = totalAboveUnits - numAboveUnits;
+  const int  numLeftBelowUnits = totalLeftUnits - numLeftUnits;
 
   if( numAboveUnits <= 0 || numLeftUnits <= 0 || numAboveRightUnits <= 0 || numLeftBelowUnits <= 0 )
   {
 #if JVET_W0069_TMP_BOUNDARY
-	  return NO_TEMPLATE;
+    return NO_TEMPLATE;
 #else
     return false;
 #endif
   }
 
-	// ----- Step 1: analyze neighborhood -----
-	const Position posLT = area;
-	//const Position posRT = area.topRight();
-	//const Position posLB = area.bottomLeft();
+  // ----- Step 1: analyze neighborhood -----
+  const Position posLT = area;
 
-	bool  neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1];
-	//int   numIntraNeighbor = 0;
+  bool  neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1];
 
-	memset(neighborFlags, 0, totalUnits);
+  memset(neighborFlags, 0, totalUnits);
 
-	//bool retVal = 1;
 
 #if JVET_W0069_TMP_BOUNDARY
-	if (isAboveLeftAvailable(cu, chType, posLT) && isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)) && isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1)))
-		return L_SHAPE_TEMPLATE;
-	else if (isAboveLeftAvailable(cu, chType, posLT))
-		return LEFT_TEMPLATE;
-	else if (isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)))
-		return ABOVE_TEMPLATE;
-	else
-		return NO_TEMPLATE;
-	CHECK(1, "un defined template type");
+  if (isAboveLeftAvailable(cu, chType, posLT) && isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)) && isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1)))
+  {
+    return L_SHAPE_TEMPLATE;
+  }
+  else if (isAboveLeftAvailable(cu, chType, posLT))
+  {
+    return LEFT_TEMPLATE;
+  }
+  else if (isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)))
+  {
+    return ABOVE_TEMPLATE;
+  }
+  else
+  {
+    return NO_TEMPLATE;
+  }
+  CHECK(1, "un defined template type");
 #else
-	return isAboveLeftAvailable(cu, chType, posLT) && isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)) && isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1));
+  return isAboveLeftAvailable(cu, chType, posLT) && isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)) && isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1));
 #endif
 
-	//return retVal;
 }
 #endif
 void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu )
