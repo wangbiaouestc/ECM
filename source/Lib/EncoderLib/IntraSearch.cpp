@@ -833,7 +833,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
           cu.mipFlag = false;
 
           //===== init pattern for luma prediction =====
-#if JVET_AB0157_INTRA_FUSION
+#if JVET_AB0157_INTRA_FUSION && JVET_AB0155_SGPM
+          initIntraPatternChType(cu, pu.Y(), true, 0, false);
+#elif JVET_AB0157_INTRA_FUSION
           initIntraPatternChType(cu, pu.Y(), true, false);
 #else
           initIntraPatternChType(cu, pu.Y(), true);
@@ -1106,7 +1108,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
               pu.multiRefIdx = multiRefIdx;
               {
-#if JVET_AB0157_INTRA_FUSION
+#if JVET_AB0157_INTRA_FUSION && JVET_AB0155_SGPM
+                initIntraPatternChType(cu, pu.Y(), true, 0, false);
+#elif JVET_AB0157_INTRA_FUSION
                 initIntraPatternChType(cu, pu.Y(), true, false);
 #else
                 initIntraPatternChType(cu, pu.Y(), true);
@@ -1331,7 +1335,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
               double mipHadCost[MAX_NUM_MIP_MODE] = { MAX_DOUBLE };
 
+#if JVET_AB0157_INTRA_FUSION && JVET_AB0155_SGPM
+              initIntraPatternChType(cu, pu.Y(), false, 0, false);
+#elif JVET_AB0157_INTRA_FUSION
+              initIntraPatternChType(cu, pu.Y(), false, false);
+#else
               initIntraPatternChType(cu, pu.Y());
+#endif
               initIntraMip(pu, pu.Y());
 
               const int transpOff    = getNumModesMip(pu.Y());
