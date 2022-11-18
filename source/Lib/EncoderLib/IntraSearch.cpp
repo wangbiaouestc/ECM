@@ -1069,6 +1069,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #if JVET_W0123_TIMD_FUSION
                   m_CABACEstimator->getCtx() = SubCtx(Ctx::TimdFlag, ctxStartTimdFlag);
 #endif
+#if JVET_AB0155_SGPM
+                  m_CABACEstimator->getCtx() = SubCtx(Ctx::SgpmFlag, ctxStartSgpmFlag);
+#endif
                   m_CABACEstimator->getCtx() = SubCtx(Ctx::ISPMode, ctxStartIspMode);
 #if SECONDARY_MPM
                   m_CABACEstimator->getCtx() = SubCtx(Ctx::IntraLumaMPMIdx, ctxStartMPMIdxFlag);
@@ -1471,6 +1474,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               m_CABACEstimator->getCtx() = SubCtx(Ctx::IntraLumaSecondMpmFlag, ctxStartIntraMode2);
 #endif
               m_CABACEstimator->getCtx() = SubCtx(Ctx::MultiRefLineIdx, ctxStartMrlIdx);
+#if JVET_AB0157_TMRL
+              m_CABACEstimator->getCtx() = SubCtx(Ctx::TmrlDerive, ctxStartTmrlDerive);
+#endif
 
               uint64_t fracModeBits = xFracModeBitsIntra(pu, 0, CHANNEL_TYPE_LUMA);
 
@@ -8469,8 +8475,8 @@ void IntraSearch::reduceHadCandList(static_vector<T, N>& candModeList, static_ve
 
       if (!alreadyIncluded)
       {
-        tempRdModeList.push_back(tmrlMode);
-        tempCandCostList.push_back(0);
+        const auto numRd = tempRdModeList.size() + 1;
+        updateCandList(tmrlMode, sortedTmrlCost[idx], tempRdModeList, tempCandCostList, numRd);
         break;
       }
     }
