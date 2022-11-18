@@ -4702,8 +4702,8 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
     {
       uint64_t uiCost    = 0;
       int      iMode     = mpmExtraList[i];
-      uint64_t uiCostVer = -1;
-      uint64_t uiCostHor = -1;
+      uint64_t uiCostVer = UINT64_MAX;
+      uint64_t uiCostHor = UINT64_MAX;
       uint64_t tmpCost0  = 0;
       uint64_t tmpCost1  = 0;
       if (iMode > DC_IDX)
@@ -4782,20 +4782,20 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
         {
           if (iMode > EXT_DIA_IDX)
           {
-            uiCostVer += tmpCost0;
+            uiCostVer = tmpCost0;
           }
           else
           {
-            uiCostHor += tmpCost1;
+            uiCostHor = tmpCost1;
           }
         }
         else if (eTempType == LEFT_NEIGHBOR)
         {
-          uiCostHor += tmpCost1;
+          uiCostHor = tmpCost1;
         }
         else if (eTempType == ABOVE_NEIGHBOR)
         {
-          uiCostVer += tmpCost0;
+          uiCostVer = tmpCost0;
         }
         if (uiCostHor < uiBestCostHor)
         {
