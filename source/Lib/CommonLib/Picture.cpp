@@ -1466,7 +1466,7 @@ void Picture::extendWrapBorder( const PPS *pps )
 
 PelBuf Picture::getBuf( const ComponentID compID, const PictureType &type )
 {
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   if (type == PIC_RECONSTRUCTION_0 || type == PIC_RECONSTRUCTION_1)
   {
     return M_BUFS(scheduler.getSplitPicId(), type).getBuf(compID);
@@ -1478,7 +1478,7 @@ PelBuf Picture::getBuf( const ComponentID compID, const PictureType &type )
 
 const CPelBuf Picture::getBuf( const ComponentID compID, const PictureType &type ) const
 {
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   if (type == PIC_RECONSTRUCTION_0 || type == PIC_RECONSTRUCTION_1)
   {
     return M_BUFS(scheduler.getSplitPicId(), type).getBuf(compID);

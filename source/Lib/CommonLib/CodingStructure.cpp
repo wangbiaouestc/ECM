@@ -992,7 +992,7 @@ CodingUnit* CodingStructure::getCU( const Position &pos, const ChannelType effCh
 
 const CodingUnit* CodingStructure::getCU( const Position &pos, const ChannelType effChType ) const
 {
-#if JVET_Z0118_GDR    
+#if JVET_Z0118_GDR
   if (m_gdrEnabled)
   {
     Size lumaSize = slice->getPic()->Y().lumaSize();
@@ -1085,7 +1085,7 @@ PredictionUnit* CodingStructure::getPU( const Position &pos, const ChannelType e
 
 const PredictionUnit * CodingStructure::getPU( const Position &pos, const ChannelType effChType ) const
 {
-#if JVET_Z0118_GDR    
+#if JVET_Z0118_GDR
   if (m_gdrEnabled)
   {
     Size lumaSize = slice->getPic()->Y().lumaSize();
@@ -1196,7 +1196,7 @@ TransformUnit* CodingStructure::getTU( const Position &pos, const ChannelType ef
 
 const TransformUnit * CodingStructure::getTU( const Position &pos, const ChannelType effChType, const int subTuIdx ) const
 {
-#if JVET_Z0118_GDR    
+#if JVET_Z0118_GDR
   if (m_gdrEnabled)
   {
     Size lumaSize = slice->getPic()->Y().lumaSize();
@@ -2019,7 +2019,7 @@ void CodingStructure::rebindPicBufs()
 {
   CHECK( parent, "rebindPicBufs can only be used for the top level CodingStructure" );
 
-#if JVET_Z0118_GDR    
+#if JVET_Z0118_GDR
   if (!picture->M_BUFS(0, PIC_RECONSTRUCTION).bufs.empty())
   {
     m_pt = PIC_RECONSTRUCTION_0;
@@ -2276,7 +2276,7 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
   if( cpyPred ) picture->getPredBuf( clippedArea ).copyFrom( subPredBuf );
   if( cpyResi ) picture->getResiBuf( clippedArea ).copyFrom( subResiBuf );
 
-#if JVET_Z0118_GDR   
+#if JVET_Z0118_GDR
   if (isInGdrIntervalOrRecoveryPoc())
   {
     if (cpyReco)
@@ -2298,7 +2298,11 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
   }
 #endif  
 
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  if (!subStruct.m_isTuEnc && ((!slice->isIntra() || slice->getSPS()->getIBCFlag() || slice->getSPS()->getUseIntraTMP()) && chType != CHANNEL_TYPE_CHROMA))
+#else
   if (!subStruct.m_isTuEnc && ((!slice->isIntra() || slice->getSPS()->getIBCFlag()) && chType != CHANNEL_TYPE_CHROMA))
+#endif
   {
     // copy motion buffer
     MotionBuf ownMB  = getMotionBuf          ( clippedArea );
@@ -2434,7 +2438,11 @@ void CodingStructure::copyStructure( const CodingStructure& other, const Channel
     pu = *ppu;
   }
 
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  if (!other.slice->isIntra() || other.slice->getSPS()->getIBCFlag() || other.slice->getSPS()->getUseIntraTMP() )
+#else
   if (!other.slice->isIntra() || other.slice->getSPS()->getIBCFlag())
+#endif
   {
     // copy motion buffer
     MotionBuf  ownMB = getMotionBuf();
@@ -2479,7 +2487,7 @@ void CodingStructure::copyStructure( const CodingStructure& other, const Channel
     }
 
     // copy data to picture
-#if JVET_Z0118_GDR   
+#if JVET_Z0118_GDR
     if (isInGdrIntervalOrRecoveryPoc())
     {
       updateReconMotIPM(area, recoBuf); // xcomrpessCU - need
@@ -2524,7 +2532,11 @@ void CodingStructure::initStructData( const int &QP, const bool &skipMotBuf )
     currQP[0] = currQP[1] = QP;
   }
 
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  if (!skipMotBuf && (!parent || ((!slice->isIntra() || slice->getSPS()->getIBCFlag() || slice->getSPS()->getUseIntraTMP()) && !m_isTuEnc)))
+#else
   if (!skipMotBuf && (!parent || ((!slice->isIntra() || slice->getSPS()->getIBCFlag()) && !m_isTuEnc)))
+#endif
   {
 #if JVET_Z0118_GDR
   getMotionBuf(PIC_RECONSTRUCTION_0).memset(0);
@@ -2624,7 +2636,7 @@ void CodingStructure::clearCUs()
 
 MotionBuf CodingStructure::getMotionBuf( const Area& _area )
 {
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   return getMotionBuf(_area, m_pt);
 #else
   const CompArea& _luma = area.Y();
@@ -2640,7 +2652,7 @@ MotionBuf CodingStructure::getMotionBuf( const Area& _area )
 
 const CMotionBuf CodingStructure::getMotionBuf( const Area& _area ) const
 {
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   return getMotionBuf(_area, m_pt);
 #else
   const CompArea& _luma = area.Y();
@@ -2673,7 +2685,7 @@ bool  CodingStructure::picContain(const Position _pos)
 
 MotionInfo& CodingStructure::getMotionInfo( const Position& pos )
 {
-#if JVET_Z0118_GDR 
+#if JVET_Z0118_GDR
   return getMotionInfo(pos, m_pt);
 #else
 #if JVET_W0123_TIMD_FUSION && RPR_ENABLE
@@ -2693,7 +2705,7 @@ MotionInfo& CodingStructure::getMotionInfo( const Position& pos )
 
 const MotionInfo& CodingStructure::getMotionInfo( const Position& pos ) const
 {
-#if JVET_Z0118_GDR 
+#if JVET_Z0118_GDR
   return getMotionInfo(pos, m_pt);;
 #else
   CHECKD( !area.Y().contains( pos ), "Trying to access motion information outside of this coding structure" );
@@ -2706,7 +2718,7 @@ const MotionInfo& CodingStructure::getMotionInfo( const Position& pos ) const
   return *( m_motionBuf + miPos.y * stride + miPos.x );
 #endif
 }
-#if JVET_Z0118_GDR 
+#if JVET_Z0118_GDR
 MotionBuf CodingStructure::getMotionBuf(const Area& _area, PictureType pt)
 {
   const CompArea& _luma = area.Y();
@@ -2759,7 +2771,7 @@ const MotionInfo& CodingStructure::getMotionInfo(const Position& pos, PictureTyp
 #if JVET_W0123_TIMD_FUSION
 IpmBuf CodingStructure::getIpmBuf( const Area& _area )
 {
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   return getIpmBuf(_area, m_pt);
 #else
   const CompArea& _luma = area.Y();
@@ -2775,7 +2787,7 @@ IpmBuf CodingStructure::getIpmBuf( const Area& _area )
 
 const CIpmBuf CodingStructure::getIpmBuf( const Area& _area ) const
 {
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   return getIpmBuf(_area, m_pt);
 #else
   const CompArea& _luma = area.Y();
@@ -2791,7 +2803,7 @@ const CIpmBuf CodingStructure::getIpmBuf( const Area& _area ) const
 
 uint8_t& CodingStructure::getIpmInfo( const Position& pos )
 {
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   return getIpmInfo(pos, m_pt);
 #else
 #if RPR_ENABLE
@@ -2811,7 +2823,7 @@ uint8_t& CodingStructure::getIpmInfo( const Position& pos )
 
 const uint8_t& CodingStructure::getIpmInfo( const Position& pos ) const
 {
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   return getIpmInfo(pos, m_pt);
 #else
   CHECKD( !area.Y().contains( pos ), "Trying to access motion information outside of this coding structure" );
@@ -2853,7 +2865,7 @@ const CIpmBuf CodingStructure::getIpmBuf(const Area& _area, PictureType pt) cons
 
 uint8_t& CodingStructure::getIpmInfo(const Position& pos, PictureType pt)
 {
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   static uint8_t constIpm = 0;
   
   if (!picContain(pos))
@@ -2945,7 +2957,7 @@ PelBuf CodingStructure::getBuf( const CompArea &blk, const PictureType &type )
 
   const ComponentID compID = blk.compID;
   
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   PelStorage* buf = type == PIC_PREDICTION ? &m_pred : ( type == PIC_RESIDUAL ? &m_resi : (type == PIC_RECONSTRUCTION_0 ? &m_reco0 : (type == PIC_RECONSTRUCTION_1 ? &m_reco1 : (type == PIC_ORG_RESI ? &m_orgr : nullptr ))));
 #else
   PelStorage* buf = type == PIC_PREDICTION ? &m_pred : ( type == PIC_RESIDUAL ? &m_resi : ( type == PIC_RECONSTRUCTION ? &m_reco : ( type == PIC_ORG_RESI ? &m_orgr : nullptr ) ) );
@@ -3044,7 +3056,7 @@ const CodingUnit* CodingStructure::getCURestricted( const Position &pos, const C
   bool addCheck = (wavefrontsEnabled && (xNbY >> ctuSizeBit) >= (xCurr >> ctuSizeBit) + 1 ) ? false : true;
   if( cu && CU::isSameSliceAndTile( *cu, curCu ) && ( cu->cs != curCu.cs || cu->idx <= curCu.idx ) && addCheck)
   {
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
     if (m_gdrEnabled)
     {
       const Position posRB = (_chType == CHANNEL_TYPE_LUMA) ? curCu.Y().bottomRight() : curCu.Cb().bottomRight();
@@ -3077,7 +3089,7 @@ const CodingUnit* CodingStructure::getCURestricted(const Position &pos, const Po
   int xCurr = curPos.x << getChannelTypeScaleX(_chType, this->area.chromaFormat);
   bool addCheck = (wavefrontsEnabled && (xNbY >> ctuSizeBit) >= (xCurr >> ctuSizeBit) + 1) ? false : true;
 
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   if (m_gdrEnabled)
   {
     bool isSrcClean = isClean(curPos, _chType);
@@ -3105,7 +3117,7 @@ const PredictionUnit* CodingStructure::getPURestricted( const Position &pos, con
   bool addCheck = (wavefrontsEnabled && (xNbY >> ctuSizeBit) >= (xCurr >> ctuSizeBit) + 1 ) ? false : true;
   if (pu && CU::isSameSliceAndTile(*pu->cu, *curPu.cu) && (pu->cs != curPu.cs || pu->idx <= curPu.idx) && addCheck)
   {
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
     if (m_gdrEnabled)
     {
       const Position posRB = (_chType == CHANNEL_TYPE_LUMA) ? curPu.Y().bottomRight() : curPu.Cb().bottomRight();
@@ -3141,7 +3153,7 @@ const TransformUnit* CodingStructure::getTURestricted( const Position &pos, cons
   bool addCheck = (wavefrontsEnabled && (xNbY >> ctuSizeBit) >= (xCurr >> ctuSizeBit) + 1 ) ? false : true;
   if (tu && CU::isSameSliceAndTile(*tu->cu, *curTu.cu) && (tu->cs != curTu.cs || tu->idx <= curTu.idx) && addCheck)
   {
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
     if (m_gdrEnabled)
     {
       const Position posRB = (_chType == CHANNEL_TYPE_LUMA) ? curTu.Y().bottomRight() : curTu.Cb().bottomRight();

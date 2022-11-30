@@ -3674,7 +3674,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 #endif
 
       // write various parameter sets
-#if JVET_Z0118_GDR // Note : insert SPS/PPS at every GDR picture
+#if JVET_Z0118_GDR // note : insert SPS/PPS at every GDR picture
       bool writePS = m_bSeqFirst || (m_pcCfg->getReWriteParamSets() && (pcSlice->isIRAP())) || pcSlice->isInterGDR();
 #else
       bool writePS = m_bSeqFirst || (m_pcCfg->getReWriteParamSets() && (pcSlice->isIRAP()));

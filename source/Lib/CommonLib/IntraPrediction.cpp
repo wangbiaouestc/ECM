@@ -572,6 +572,7 @@ void IntraPrediction::xIntraPredPlanarDcPdpc(const CPelBuf &pSrc, Pel* pDst, int
     }
   }
   else
+  {
 #endif
     for (int y = 0; y < iHeight; y++)
     {
@@ -592,6 +593,9 @@ void IntraPrediction::xIntraPredPlanarDcPdpc(const CPelBuf &pSrc, Pel* pDst, int
       srcLeft++;
       pDst += iDstStride;
     }
+#if CIIP_PDPC
+  }
+#endif
 }
 #endif
 #endif
@@ -1347,6 +1351,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
         }
       }
       else
+      {
 #endif
 
       for (int y = 0; y < iHeight; y++)
@@ -1368,6 +1373,9 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
         srcLeft++;
         dst += dstBuf.stride;
       }
+#if CIIP_PDPC
+      }
+#endif
     }
   }
 #endif
@@ -1501,8 +1509,12 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
     }
   }
   else
+  {
 #endif
     piPred.linearTransform(cclmModel.a, cclmModel.shift, cclmModel.b, true, pu.cs->slice->clpRng(compID));
+#if MMLM
+  }
+#endif
 }
 
 /** Function for deriving planar intra prediction. This function derives the prediction samples for planar mode (intra coding).
@@ -1680,7 +1692,7 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
     || !isLuma( chType )
     || useISP
 #if JVET_V0130_INTRA_TMP
-	  || PU::isTmp(pu, chType)
+    || PU::isTmp(pu, chType)
 #endif
     || PU::isMIP( pu, chType )
     || m_ipaParam.multiRefIndex
@@ -2910,64 +2922,67 @@ RefTemplateType IntraPrediction::getRefTemplateType(CodingUnit& cu, CompArea& ar
 bool IntraPrediction::isRefTemplateAvailable(CodingUnit& cu, CompArea& area)
 #endif
 {
-	const ChannelType      chType = toChannelType(area.compID);
-	const CodingStructure& cs = *cu.cs;
-	const SPS& sps = *cs.sps;
-	const PreCalcValues& pcv = *cs.pcv;
+  const ChannelType      chType = toChannelType(area.compID);
+  const CodingStructure& cs = *cu.cs;
+  const SPS& sps = *cs.sps;
+  const PreCalcValues& pcv = *cs.pcv;
+  setReferenceArrayLengths( area );
 
-	const int  tuWidth = area.width;
-	const int  tuHeight = area.height;
-	const int  predSize = m_topRefLength;
-	const int  predHSize = m_leftRefLength;
-	//const int predStride = predSize;
+  const int  tuWidth = area.width;
+  const int  tuHeight = area.height;
+  const int  predSize = m_topRefLength;
+  const int  predHSize = m_leftRefLength;
 
-	const int  unitWidth = pcv.minCUWidth >> getComponentScaleX(area.compID, sps.getChromaFormatIdc());
-	const int  unitHeight = pcv.minCUHeight >> getComponentScaleY(area.compID, sps.getChromaFormatIdc());
+  const int  unitWidth = pcv.minCUWidth >> getComponentScaleX(area.compID, sps.getChromaFormatIdc());
+  const int  unitHeight = pcv.minCUHeight >> getComponentScaleY(area.compID, sps.getChromaFormatIdc());
 
-	const int  totalAboveUnits = (predSize + (unitWidth - 1)) / unitWidth;
-	const int  totalLeftUnits = (predHSize + (unitHeight - 1)) / unitHeight;
-	const int  totalUnits = totalAboveUnits + totalLeftUnits + 1; //+1 for top-left
-	const int  numAboveUnits = std::max<int>(tuWidth / unitWidth, 1);
-	const int  numLeftUnits = std::max<int>(tuHeight / unitHeight, 1);
-	const int  numAboveRightUnits = totalAboveUnits - numAboveUnits;
-	const int  numLeftBelowUnits = totalLeftUnits - numLeftUnits;
+  const int  totalAboveUnits = (predSize + (unitWidth - 1)) / unitWidth;
+  const int  totalLeftUnits = (predHSize + (unitHeight - 1)) / unitHeight;
+  const int  totalUnits = totalAboveUnits + totalLeftUnits + 1; //+1 for top-left
+  const int  numAboveUnits = std::max<int>(tuWidth / unitWidth, 1);
+  const int  numLeftUnits = std::max<int>(tuHeight / unitHeight, 1);
+  const int  numAboveRightUnits = totalAboveUnits - numAboveUnits;
+  const int  numLeftBelowUnits = totalLeftUnits - numLeftUnits;
 
   if( numAboveUnits <= 0 || numLeftUnits <= 0 || numAboveRightUnits <= 0 || numLeftBelowUnits <= 0 )
   {
 #if JVET_W0069_TMP_BOUNDARY
-	  return NO_TEMPLATE;
+    return NO_TEMPLATE;
 #else
     return false;
 #endif
   }
 
-	// ----- Step 1: analyze neighborhood -----
-	const Position posLT = area;
-	//const Position posRT = area.topRight();
-	//const Position posLB = area.bottomLeft();
+  // ----- Step 1: analyze neighborhood -----
+  const Position posLT = area;
 
-	bool  neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1];
-	//int   numIntraNeighbor = 0;
+  bool  neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1];
 
-	memset(neighborFlags, 0, totalUnits);
+  memset(neighborFlags, 0, totalUnits);
 
-	//bool retVal = 1;
 
 #if JVET_W0069_TMP_BOUNDARY
-	if (isAboveLeftAvailable(cu, chType, posLT) && isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)) && isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1)))
-		return L_SHAPE_TEMPLATE;
-	else if (isAboveLeftAvailable(cu, chType, posLT))
-		return LEFT_TEMPLATE;
-	else if (isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)))
-		return ABOVE_TEMPLATE;
-	else
-		return NO_TEMPLATE;
-	CHECK(1, "un defined template type");
+  if (isAboveLeftAvailable(cu, chType, posLT) && isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)) && isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1)))
+  {
+    return L_SHAPE_TEMPLATE;
+  }
+  else if (isAboveLeftAvailable(cu, chType, posLT))
+  {
+    return LEFT_TEMPLATE;
+  }
+  else if (isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)))
+  {
+    return ABOVE_TEMPLATE;
+  }
+  else
+  {
+    return NO_TEMPLATE;
+  }
+  CHECK(1, "un defined template type");
 #else
-	return isAboveLeftAvailable(cu, chType, posLT) && isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)) && isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1));
+  return isAboveLeftAvailable(cu, chType, posLT) && isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1)) && isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1));
 #endif
 
-	//return retVal;
 }
 #endif
 void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu )
@@ -4331,9 +4346,6 @@ void IntraPrediction::deriveSgpmModeOrdered(const CPelBuf &recoBuf, const CompAr
   
   const CodingStructure &cs = *cu.cs;
   m_ipaParam.multiRefIndex  = iTempWidth;
-  Pel *piOrg                = cs.picture->getRecoBuf(area).buf;
-  int  iOrgStride           = cs.picture->getRecoBuf(area).stride;
-  piOrg += (iRefY - iCurY) * iOrgStride + (iRefX - iCurX);
 
   initTimdIntraPatternLuma(cu, area, eTempType != ABOVE_NEIGHBOR ? iTempWidth : 0,
                            eTempType != LEFT_NEIGHBOR ? iTempHeight : 0, uiRefWidth, uiRefHeight);
@@ -4690,8 +4702,8 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
     {
       uint64_t uiCost    = 0;
       int      iMode     = mpmExtraList[i];
-      uint64_t uiCostVer = -1;
-      uint64_t uiCostHor = -1;
+      uint64_t uiCostVer = UINT64_MAX;
+      uint64_t uiCostHor = UINT64_MAX;
       uint64_t tmpCost0  = 0;
       uint64_t tmpCost1  = 0;
       if (iMode > DC_IDX)
@@ -4770,20 +4782,20 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
         {
           if (iMode > EXT_DIA_IDX)
           {
-            uiCostVer += tmpCost0;
+            uiCostVer = tmpCost0;
           }
           else
           {
-            uiCostHor += tmpCost1;
+            uiCostHor = tmpCost1;
           }
         }
         else if (eTempType == LEFT_NEIGHBOR)
         {
-          uiCostHor += tmpCost1;
+          uiCostHor = tmpCost1;
         }
         else if (eTempType == ABOVE_NEIGHBOR)
         {
-          uiCostVer += tmpCost0;
+          uiCostVer = tmpCost0;
         }
         if (uiCostHor < uiBestCostHor)
         {
@@ -5414,7 +5426,6 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
     return;
   }
 
-  int sigcnt = 0;
   const CodingStructure  &cs = *cu.cs;
   const SPS             &sps = *cs.sps;
   const PreCalcValues   &pcv = *cs.pcv;
@@ -5457,20 +5468,20 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
   {
     uint32_t uiHeightLeft = numIntraLeft * unitHeight - 1 - (!numIntraAbove ? 1 : 0);
     const Pel *pRecoLeft = pReco - 2 + iStride * (!numIntraAbove ? 1 : 0);
-    sigcnt += buildHistogram(pRecoLeft, iStride, uiHeightLeft, 1, histogram, 1, uiWidth, uiHeight);
+    buildHistogram(pRecoLeft, iStride, uiHeightLeft, 1, histogram, 1, uiWidth, uiHeight);
   }
 
   if (numIntraAbove)
   {
     uint32_t uiWidthAbove = numIntraAbove * unitWidth - 1 - (!numIntraLeft ? 1 : 0);
     const Pel *pRecoAbove = pReco - iStride * 2 + (!numIntraLeft ? 1 : 0);
-    sigcnt += buildHistogram(pRecoAbove, iStride, 1, uiWidthAbove, histogram, 2, uiWidth, uiHeight);
+    buildHistogram(pRecoAbove, iStride, 1, uiWidthAbove, histogram, 2, uiWidth, uiHeight);
   }
 
   if (numIntraLeft && numIntraAbove)
   {
     const Pel *pRecoAboveLeft = pReco - 2 - iStride * 2;
-    sigcnt += buildHistogram(pRecoAboveLeft, iStride, 2, 2, histogram, 3, uiWidth, uiHeight);
+    buildHistogram(pRecoAboveLeft, iStride, 2, 2, histogram, 3, uiWidth, uiHeight);
   }
 
 #if JVET_AB0157_INTRA_FUSION
@@ -5688,8 +5699,6 @@ void IntraPrediction::deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBu
     return;
   }
 
-  int sigcnt = 0;
-
   const CodingStructure  &cs = *cu.cs;
   const SPS             &sps = *cs.sps;
   const PreCalcValues   &pcv = *cs.pcv;
@@ -5746,9 +5755,9 @@ void IntraPrediction::deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBu
     const Pel *pRecoLeftY = pRecoY - 2 + iStrideY * (!numIntraAbove ? 1 : 0);
     const Pel *pRecoLeftCb = pRecoCb - 2 + iStrideCb * (!numIntraAbove ? 1 : 0);
     const Pel *pRecoLeftCr = pRecoCr - 2 + iStrideCr * (!numIntraAbove ? 1 : 0);
-    sigcnt += buildHistogram(pRecoLeftY, iStrideY, uiHeightLeftY, 1, piHistogram, 1, uiWidthY, uiHeightY);
-    sigcnt += buildHistogram(pRecoLeftCb, iStrideCb, uiHeightLeftC, 1, piHistogram, 1, uiWidthCb, uiHeightCb);
-    sigcnt += buildHistogram(pRecoLeftCr, iStrideCr, uiHeightLeftC, 1, piHistogram, 1, uiWidthCr, uiHeightCr);
+    buildHistogram(pRecoLeftY, iStrideY, uiHeightLeftY, 1, piHistogram, 1, uiWidthY, uiHeightY);
+    buildHistogram(pRecoLeftCb, iStrideCb, uiHeightLeftC, 1, piHistogram, 1, uiWidthCb, uiHeightCb);
+    buildHistogram(pRecoLeftCr, iStrideCr, uiHeightLeftC, 1, piHistogram, 1, uiWidthCr, uiHeightCr);
   }
   if (numIntraAbove)
   {
@@ -5757,18 +5766,18 @@ void IntraPrediction::deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBu
     const Pel *pRecoAboveY = pRecoY - iStrideY * 2 + (!numIntraLeft ? 1 : 0);
     const Pel *pRecoAboveCb = pRecoCb - iStrideCb * 2 + (!numIntraLeft ? 1 : 0);
     const Pel *pRecoAboveCr = pRecoCr - iStrideCr * 2 + (!numIntraLeft ? 1 : 0);
-    sigcnt += buildHistogram(pRecoAboveY, iStrideY, 1, uiWidthAboveY, piHistogram, 2, uiWidthY, uiHeightY);
-    sigcnt += buildHistogram(pRecoAboveCb, iStrideCb, 1, uiWidthAboveC, piHistogram, 2, uiWidthCb, uiHeightCb);
-    sigcnt += buildHistogram(pRecoAboveCr, iStrideCr, 1, uiWidthAboveC, piHistogram, 2, uiWidthCr, uiHeightCr);
+    buildHistogram(pRecoAboveY, iStrideY, 1, uiWidthAboveY, piHistogram, 2, uiWidthY, uiHeightY);
+    buildHistogram(pRecoAboveCb, iStrideCb, 1, uiWidthAboveC, piHistogram, 2, uiWidthCb, uiHeightCb);
+    buildHistogram(pRecoAboveCr, iStrideCr, 1, uiWidthAboveC, piHistogram, 2, uiWidthCr, uiHeightCr);
   }
   if (numIntraLeft && numIntraAbove)
   {
     const Pel *pRecoAboveLeftY = pRecoY - 2 - iStrideY * 2;
     const Pel *pRecoAboveLeftCb = pRecoCb - 2 - iStrideCb * 2;
     const Pel *pRecoAboveLeftCr = pRecoCr - 2 - iStrideCr * 2;
-    sigcnt += buildHistogram(pRecoAboveLeftY, iStrideY, 2, 2, piHistogram, 3, uiWidthY, uiHeightY);
-    sigcnt += buildHistogram(pRecoAboveLeftCb, iStrideCb, 2, 2, piHistogram, 3, uiWidthCb, uiHeightCb);
-    sigcnt += buildHistogram(pRecoAboveLeftCr, iStrideCr, 2, 2, piHistogram, 3, uiWidthCr, uiHeightCr);
+    buildHistogram(pRecoAboveLeftY, iStrideY, 2, 2, piHistogram, 3, uiWidthY, uiHeightY);
+    buildHistogram(pRecoAboveLeftCb, iStrideCb, 2, 2, piHistogram, 3, uiWidthCb, uiHeightCb);
+    buildHistogram(pRecoAboveLeftCr, iStrideCr, 2, 2, piHistogram, 3, uiWidthCr, uiHeightCr);
   }
 
   int firstAmp = 0, secondAmp = 0, curAmp = 0;
@@ -5815,14 +5824,13 @@ int IntraPrediction::deriveDimdMipMode(PelBuf& reducedPred, int width, int heigh
   {
     return PLANAR_IDX;
   }
-  int sigcnt = 0;
   const Pel* pPred = reducedPred.buf;
   const int iStride = reducedPred.stride;
 
   int histogram[NUM_LUMA_MODE] = { 0 };
 
   pPred = pPred + iStride + 1;
-  sigcnt += buildHistogram(pPred, iStride, height - 2, width - 2, histogram, 0, width - 2, height - 2);
+  buildHistogram(pPred, iStride, height - 2, width - 2, histogram, 0, width - 2, height - 2);
 
   int firstAmp = 0, curAmp = 0;
   int firstMode = 0, curMode = 0;
@@ -10240,9 +10248,14 @@ void IntraPrediction::getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlR
   CodingUnit& cu = *pu.cu;
   int aboveLines = (cu.block(COMPONENT_Y).y) % ((cu.cs->sps)->getMaxCUWidth());
   sizeRef = 0;
-  for (; EXT_REF_LINE_IDX[sizeRef] < aboveLines && sizeRef < 5; sizeRef++)
+
+  for (; sizeRef < 5; sizeRef++)
   {
     tmrlRefList[sizeRef] = EXT_REF_LINE_IDX[sizeRef];
+    if (EXT_REF_LINE_IDX[sizeRef] >= aboveLines)
+    {
+      break;
+    }
   }
 
   // intra mode candidates

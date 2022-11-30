@@ -91,7 +91,7 @@ struct SmallerThanComboCost
 {
   inline bool operator() (const GeoMergeCombo& first, const GeoMergeCombo& second)
   {
-#if JVET_Z0118_GDR 
+#if JVET_Z0118_GDR
     bool ret = true;
     
     ret = (first.cost < second.cost);

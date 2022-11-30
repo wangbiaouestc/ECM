@@ -2419,7 +2419,7 @@ void EncLib::xInitPicHeader(PicHeader &picHeader, const SPS &sps, const PPS &pps
     }
   }
 
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
     picHeader.setGdrOrIrapPicFlag(false);    
 #endif
 

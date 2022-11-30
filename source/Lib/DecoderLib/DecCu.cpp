@@ -2238,8 +2238,8 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                   }
                   if (admvrRefinedMotion)
                   {
-                    bool subPuRefineList[BM_MRG_MAX_NUM_INIT_CANDS][2] = { false, };
-                    bool subPuRefineListTmp[BM_MRG_MAX_NUM_INIT_CANDS][2] = { false, };
+                    bool subPuRefineList[BM_MRG_MAX_NUM_INIT_CANDS][2] = { { false, } };
+                    bool subPuRefineListTmp[BM_MRG_MAX_NUM_INIT_CANDS][2] = { { false, } };
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
                     uint16_t orgMergeIdx = pu.mergeIdx;
 #else
@@ -2318,8 +2318,8 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                   }
                   if (admvrRefinedMotion)
                   {
-                    bool subPuRefineList[BM_MRG_MAX_NUM_INIT_CANDS][2] = { false, };
-                    bool subPuRefineListTmp[BM_MRG_MAX_NUM_INIT_CANDS][2] = { false, };
+                    bool subPuRefineList[BM_MRG_MAX_NUM_INIT_CANDS][2] = { { false, } };
+                    bool subPuRefineListTmp[BM_MRG_MAX_NUM_INIT_CANDS][2] = { { false, } };
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
                     uint16_t orgMergeIdx = pu.mergeIdx;
 #else

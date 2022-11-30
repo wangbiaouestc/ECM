@@ -272,7 +272,7 @@ protected:
 #endif
   // coding structure
   int       m_iIntraPeriod;                                   ///< period of I-slice (random access period)
-#if JVET_Z0118_GDR 
+#if JVET_Z0118_GDR
   bool      m_gdrEnabled;
   int       m_gdrPocStart;
   int       m_gdrPeriod;

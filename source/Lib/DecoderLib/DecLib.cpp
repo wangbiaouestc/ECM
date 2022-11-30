@@ -3179,7 +3179,7 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
   }
 #endif
   
-#if JVET_Z0118_GDR 
+#if JVET_Z0118_GDR
     m_pcPic->initCleanCurPicture();
 #endif
 
@@ -3405,7 +3405,7 @@ bool DecLib::decode(InputNALUnit& nalu, int& iSkipFrame, int& iPOCLastDisplay, i
       m_associatedIRAPType[nalu.m_nuhLayerId] = NAL_UNIT_INVALID;
       m_pocCRA[nalu.m_nuhLayerId] = MAX_INT;
       m_prevGDRInSameLayerPOC[nalu.m_nuhLayerId] = MAX_INT;
-#if JVET_Z0118_GDR      
+#if JVET_Z0118_GDR
       m_prevGDRInSameLayerRecoveryPOC[nalu.m_nuhLayerId] = -MAX_INT;
 #endif
       std::fill_n(m_prevGDRSubpicPOC[nalu.m_nuhLayerId], MAX_NUM_SUB_PICS, MAX_INT);

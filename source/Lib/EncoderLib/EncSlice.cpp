@@ -792,7 +792,7 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
     m_pcCuEncoder->getIbcHashMap().destroy();
     m_pcCuEncoder->getIbcHashMap().init( pcPic->cs->pps->getPicWidthInLumaSamples(), pcPic->cs->pps->getPicHeightInLumaSamples() );
   }
-#if JVET_Z0118_GDR  
+#if JVET_Z0118_GDR
   if (m_pcCfg->getGdrEnabled())
   {
     int gdrPocStart = m_pcCuEncoder->getEncCfg()->getGdrPocStart();
@@ -928,7 +928,7 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
 #endif
     }
 
-#if JVET_Z0118_GDR        
+#if JVET_Z0118_GDR
     pcPic->initCleanCurPicture();    
 #endif
 

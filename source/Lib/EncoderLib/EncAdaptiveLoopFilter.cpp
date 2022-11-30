@@ -2180,8 +2180,8 @@ double EncAdaptiveLoopFilter::mergeFiltersAndCost( AlfParam& alfParam, AlfFilter
   int bestBits = 0;
   bool   bestCodedVarBins[MAX_NUM_ALF_CLASSES] = { false };
   bool   bestAlfLumaCoeffDeltaFlag = false;
-  static int mergedPair[MAX_NUM_ALF_CLASSES][2] = { 0 };
-  int mergedCoeff[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF] = { 0 };
+  static int mergedPair[MAX_NUM_ALF_CLASSES][2] = { { 0 } };
+  int mergedCoeff[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF] = { { 0 } };
   double mergedErr[MAX_NUM_ALF_CLASSES] = { 0 };
   if( m_alfParamTemp.nonLinearFlag[CHANNEL_TYPE_LUMA][altIdx] == false )
   {

@@ -833,7 +833,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
           cu.mipFlag = false;
 
           //===== init pattern for luma prediction =====
-#if JVET_AB0157_INTRA_FUSION
+#if JVET_AB0157_INTRA_FUSION && JVET_AB0155_SGPM
+          initIntraPatternChType(cu, pu.Y(), true, 0, false);
+#elif JVET_AB0157_INTRA_FUSION
           initIntraPatternChType(cu, pu.Y(), true, false);
 #else
           initIntraPatternChType(cu, pu.Y(), true);
@@ -1069,6 +1071,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #if JVET_W0123_TIMD_FUSION
                   m_CABACEstimator->getCtx() = SubCtx(Ctx::TimdFlag, ctxStartTimdFlag);
 #endif
+#if JVET_AB0155_SGPM
+                  m_CABACEstimator->getCtx() = SubCtx(Ctx::SgpmFlag, ctxStartSgpmFlag);
+#endif
                   m_CABACEstimator->getCtx() = SubCtx(Ctx::ISPMode, ctxStartIspMode);
 #if SECONDARY_MPM
                   m_CABACEstimator->getCtx() = SubCtx(Ctx::IntraLumaMPMIdx, ctxStartMPMIdxFlag);
@@ -1103,7 +1108,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
               pu.multiRefIdx = multiRefIdx;
               {
-#if JVET_AB0157_INTRA_FUSION
+#if JVET_AB0157_INTRA_FUSION && JVET_AB0155_SGPM
+                initIntraPatternChType(cu, pu.Y(), true, 0, false);
+#elif JVET_AB0157_INTRA_FUSION
                 initIntraPatternChType(cu, pu.Y(), true, false);
 #else
                 initIntraPatternChType(cu, pu.Y(), true);
@@ -1328,7 +1335,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
               double mipHadCost[MAX_NUM_MIP_MODE] = { MAX_DOUBLE };
 
+#if JVET_AB0157_INTRA_FUSION && JVET_AB0155_SGPM
+              initIntraPatternChType(cu, pu.Y(), false, 0, false);
+#elif JVET_AB0157_INTRA_FUSION
+              initIntraPatternChType(cu, pu.Y(), false, false);
+#else
               initIntraPatternChType(cu, pu.Y());
+#endif
               initIntraMip(pu, pu.Y());
 
               const int transpOff    = getNumModesMip(pu.Y());
@@ -1471,6 +1484,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               m_CABACEstimator->getCtx() = SubCtx(Ctx::IntraLumaSecondMpmFlag, ctxStartIntraMode2);
 #endif
               m_CABACEstimator->getCtx() = SubCtx(Ctx::MultiRefLineIdx, ctxStartMrlIdx);
+#if JVET_AB0157_TMRL
+              m_CABACEstimator->getCtx() = SubCtx(Ctx::TmrlDerive, ctxStartTmrlDerive);
+#endif
 
               uint64_t fracModeBits = xFracModeBitsIntra(pu, 0, CHANNEL_TYPE_LUMA);
 
@@ -2824,7 +2840,7 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       for (int i = 1; i < 3; i++)
 #endif
       {
-        for (int j = i + 1; j < 6; j++)
+        for (int j = i + 1; j < CCCM_NUM_MODES; j++)
         {
           if (satdCccmSortedCost[j] < satdCccmSortedCost[i])
           {
@@ -5315,22 +5331,16 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
           {
 #if TMP_FAST_ENC
             generateTMPrediction(piPred.buf, piPred.stride, pu.Y(), foundCandiNum, tu.cu);
-#if JVET_AB0061_ITMP_BV_FOR_IBC
-            pu.interDir = 1;             // use list 0 for IBC mode
-            pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;   // last idx in the list
-            pu.mv->set(m_tempLibFast.getX() << MV_FRACTIONAL_BITS_INTERNAL, m_tempLibFast.getY() << MV_FRACTIONAL_BITS_INTERNAL);
-            pu.bv.set(m_tempLibFast.getX(), m_tempLibFast.getY());
-#endif
 #else
             getTargetTemplate( tu.cu, pu.lwidth(), pu.lheight(), tempType );
             candidateSearchIntra( tu.cu, pu.lwidth(), pu.lheight(), tempType );
             generateTMPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum );
+#endif
 #if JVET_AB0061_ITMP_BV_FOR_IBC
             pu.interDir               = 1;             // use list 0 for IBC mode
             pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;   // last idx in the list
             pu.mv->set(m_tempLibFast.getX() << MV_FRACTIONAL_BITS_INTERNAL, m_tempLibFast.getY() << MV_FRACTIONAL_BITS_INTERNAL);
             pu.bv.set(m_tempLibFast.getX(), m_tempLibFast.getY());
-#endif
 #endif
           }
           else
@@ -8475,8 +8485,8 @@ void IntraSearch::reduceHadCandList(static_vector<T, N>& candModeList, static_ve
 
       if (!alreadyIncluded)
       {
-        tempRdModeList.push_back(tmrlMode);
-        tempCandCostList.push_back(0);
+        const auto numRd = tempRdModeList.size() + 1;
+        updateCandList(tmrlMode, sortedTmrlCost[idx], tempRdModeList, tempCandCostList, numRd);
         break;
       }
     }
