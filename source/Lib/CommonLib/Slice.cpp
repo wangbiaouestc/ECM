@@ -287,9 +287,9 @@ void Slice::checkAmvpMergeModeAvailability(Slice* pcSlice)
     for (int refIdxInList1 = 0; refIdxInList1 < pcSlice->getNumRefIdx(REF_PIC_LIST_1); refIdxInList1++)
     {
       m_amvpMergeModeValidCandPair[refIdxInList0][refIdxInList1] = false;
+      m_amvpMergeModeValidRefIdx[REF_PIC_LIST_1][refIdxInList1] = false;
     }
     m_amvpMergeModeValidRefIdx[REF_PIC_LIST_0][refIdxInList0] = false;
-    m_amvpMergeModeValidRefIdx[REF_PIC_LIST_1][refIdxInList0] = false;
   }
 
 #if JVET_AB0078_AMVPMERGE_LDB
