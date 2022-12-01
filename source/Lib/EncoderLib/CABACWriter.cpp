@@ -1895,7 +1895,17 @@ void CABACWriter::sgpm_flag(const CodingUnit &cu)
     return;
   }
 
-  if (cu.dimd || cu.timd || cu.mipFlag || cu.tmpFlag)
+  if( cu.mipFlag
+#if ENABLE_DIMD
+    || cu.dimd
+#endif
+#if JVET_W0123_TIMD_FUSION
+    || cu.timd
+#endif
+#if JVET_V0130_INTRA_TMP
+    || cu.tmpFlag
+#endif
+    )
   {
     return;
   }
