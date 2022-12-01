@@ -1519,7 +1519,8 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               cu.sgpm = false;
             }
 
-            int updateNum = (numModesForFullRD + 1) / 2;
+            int updateNum = std::min<int>( (numModesForFullRD + 1) / 2, (int)m_uiSavedRdModeListSGPM.size() );
+
             for (auto listIdx = 0; listIdx < updateNum; listIdx++)
             {
               updateCandList(m_uiSavedRdModeListSGPM[listIdx], m_dSavedModeCostSGPM[listIdx], uiRdModeList,
