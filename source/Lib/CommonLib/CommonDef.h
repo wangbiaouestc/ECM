@@ -479,7 +479,7 @@ static const int LM_CHROMA_IDX = NUM_LUMA_MODE; ///< chroma mode index for deriv
 static const int DIMD_IDX =                                        99; ///< index for intra DIMD mode
 #endif
 #if JVET_AB0155_SGPM
-static const int SGPM_IDX = 200;   ///< index for SGPM mode
+static const int SGPM_IDX =                                       200;   ///< index for SGPM mode
 #endif
 #if JVET_W0123_TIMD_FUSION
 static const int TIMD_IDX =                                       199; ///< index for intra TIMD mode

@@ -229,22 +229,30 @@ private:
 	  bool     tmpFlag; // CU::tmpFlag
 #endif
 #if JVET_AB0155_SGPM
-          bool sgpmFlag;   // CU::sgpmFlag
-          int  sgpmSplitDir;
-          int  sgpmMode0;
-          int  sgpmMode1;
-          int  sgpmIdx;
+    bool     sgpmFlag;   // CU::sgpmFlag
+    int      sgpmSplitDir;
+    int      sgpmMode0;
+    int      sgpmMode1;
+    int      sgpmIdx;
 #endif
-#if JVET_AB0155_SGPM && JVET_V0130_INTRA_TMP
-    ModeInfo() : mipFlg(false), mipTrFlg(false), mRefId(0), ispMod(NOT_INTRA_SUBPARTITIONS), modeId(0), tmpFlag(0), sgpmFlag(0), sgpmSplitDir(0), sgpmMode0(0), sgpmMode1(0), sgpmIdx(0){}
+#if JVET_AB0155_SGPM
+#if JVET_V0130_INTRA_TMP
+    ModeInfo() : mipFlg( false ), mipTrFlg( false ), mRefId( 0 ), ispMod( NOT_INTRA_SUBPARTITIONS ), modeId( 0 ), tmpFlag( 0 ), sgpmFlag( 0 ), sgpmSplitDir( 0 ), sgpmMode0( 0 ), sgpmMode1( 0 ), sgpmIdx( 0 ) {}
+    ModeInfo( const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode,
+      const bool tmpf = 0, const bool sf = 0, const int sd = 0, const int sm0 = 0, const int sm1 = 0, const int si = 0 )
+#else
+    ModeInfo() : mipFlg(false), mipTrFlg(false), mRefId(0), ispMod(NOT_INTRA_SUBPARTITIONS), modeId(0), sgpmFlag(0), sgpmSplitDir(0), sgpmMode0(0), sgpmMode1(0), sgpmIdx(0){}
     ModeInfo(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode,
-             const bool tpmf = 0, const bool sf = 0, const int sd = 0, const int sm0 = 0, const int sm1 = 0, const int si = 0)
+             const bool sf = 0, const int sd = 0, const int sm0 = 0, const int sm1 = 0, const int si = 0)
+#endif
       : mipFlg(mipf)
       , mipTrFlg(miptf)
       , mRefId(mrid)
       , ispMod(ispm)
       , modeId(mode)
-      , tmpFlag(tpmf)
+#if JVET_V0130_INTRA_TMP
+      , tmpFlag(tmpf)
+#endif
       , sgpmFlag(sf)
       , sgpmSplitDir(sd)
       , sgpmMode0(sm0)
@@ -259,7 +267,9 @@ private:
       mRefId       = other.mRefId;     // PU::multiRefIdx
       ispMod       = other.ispMod;     // CU::ispMode
       modeId       = other.modeId;     // PU::intraDir[CHANNEL_TYPE_LUMA]
+#if JVET_V0130_INTRA_TMP
       tmpFlag      = other.tmpFlag;    // CU::tmpFlag
+#endif
       sgpmFlag     = other.sgpmFlag;   // CU::sgpmFlag
       sgpmSplitDir = other.sgpmSplitDir;
       sgpmMode0    = other.sgpmMode0;
@@ -270,7 +280,11 @@ private:
     bool operator==(const ModeInfo cmp) const
     {
       return (mipFlg == cmp.mipFlg && mipTrFlg == cmp.mipTrFlg && mRefId == cmp.mRefId && ispMod == cmp.ispMod
-                && modeId == cmp.modeId && tmpFlag == cmp.tmpFlag && sgpmFlag == cmp.sgpmFlag
+                && modeId == cmp.modeId 
+#if JVET_V0130_INTRA_TMP
+                && tmpFlag == cmp.tmpFlag
+#endif
+                && sgpmFlag == cmp.sgpmFlag
                 && sgpmSplitDir == cmp.sgpmSplitDir); // sgpmMode0 and sgpmMode1 seems no need
     }
 #elif JVET_V0130_INTRA_TMP
