@@ -2931,8 +2931,11 @@ static void simdInterpolateN2_10BIT_M4(const int16_t* src, int srcStride, int16_
     }
 
     // last 4 samples
-    __m128i mmFiltered = simdInterpolateLuma10Bit2P4(src + col, cStride, mmCoeff, mmOffset, mmShift);
-    _mm_storel_epi64((__m128i *)(dst + col), mmFiltered);
+    for (; col < ((width >> 2) << 2); col += 4)
+    {
+      __m128i mmFiltered = simdInterpolateLuma10Bit2P4(src + col, cStride, mmCoeff, mmOffset, mmShift);
+      _mm_storel_epi64((__m128i *)(dst + col), mmFiltered);
+    }
     src += srcStride;
     dst += dstStride;
   }
