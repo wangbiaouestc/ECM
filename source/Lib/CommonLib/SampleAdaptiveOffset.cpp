@@ -163,6 +163,15 @@ void SampleAdaptiveOffset::create( int picWidth, int picHeight, ChromaFormat for
 
   for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
   {
+    if( m_ccSaoControl[compIdx] )
+    {
+      delete[] m_ccSaoControl[compIdx];
+      m_ccSaoControl[compIdx] = nullptr;
+    }
+  }
+
+  for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
+  {
     if( m_ccSaoControl[compIdx] == nullptr )
     {
       m_ccSaoControl[compIdx] = new uint8_t[m_numCTUsInPic];
