@@ -3235,23 +3235,14 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 }
 
 #if  JVET_Y0058_IBC_LIST_MODIFY
-#if JVET_AA0070_RRIBC
 bool PU::checkIsIBCCandidateValid(const PredictionUnit& pu, const MotionInfo miNeighbor, bool isRefTemplate, bool isRefAbove)
-#else
-bool PU::checkIsIBCCandidateValid(const PredictionUnit& pu, const MotionInfo miNeighbor)
-#endif
 {
   Mv bv = miNeighbor.mv[REF_PIC_LIST_0];
   bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT); // used for only integer resolution
   const int cuPelX = pu.Y().x;
   const int cuPelY = pu.Y().y;
-#if JVET_AA0070_RRIBC
   int roiWidth  = (isRefTemplate && !isRefAbove) ? AML_MERGE_TEMPLATE_SIZE : pu.lwidth();
   int roiHeight = (isRefTemplate && isRefAbove) ? AML_MERGE_TEMPLATE_SIZE : pu.lheight();
-#else
-  int roiWidth = pu.lwidth();
-  int roiHeight = pu.lheight();
-#endif
   const int picWidth = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
   const int picHeight = pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
   const unsigned int  lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
