@@ -5268,21 +5268,9 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
             scaledRefPic[j]->poc = NOT_VALID;
 
 #if JVET_Z0118_GDR
-#if JVET_AA0096_MC_BOUNDARY_PADDING
-            scaledRefPic[j]->create(sps->getGDREnabledFlag(), sps->getChromaFormatIdc(),
-                                    Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()),
-                                    sps->getMaxCUWidth(), sps->getMaxCUWidth() + 16 + MC_PAD_SIZE, isDecoder, layerId);
+            scaledRefPic[j]->create(sps->getGDREnabledFlag(), sps->getChromaFormatIdc(), Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()), sps->getMaxCUWidth(), sps->getMaxCUWidth() + EXT_PICTURE_SIZE, isDecoder, layerId);
 #else
-            scaledRefPic[j]->create(sps->getGDREnabledFlag(), sps->getChromaFormatIdc(), Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()), sps->getMaxCUWidth(), sps->getMaxCUWidth() + 16, isDecoder, layerId);
-#endif
-#else
-#if JVET_AA0096_MC_BOUNDARY_PADDING
-            scaledRefPic[j]->create(sps->getChromaFormatIdc(),
-                                    Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()),
-                                    sps->getMaxCUWidth(), sps->getMaxCUWidth() + 16 + MC_PAD_SIZE, isDecoder, layerId);
-#else
-            scaledRefPic[j]->create( sps->getChromaFormatIdc(), Size( pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples() ), sps->getMaxCUWidth(), sps->getMaxCUWidth() + 16, isDecoder, layerId );
-#endif
+            scaledRefPic[j]->create( sps->getChromaFormatIdc(), Size( pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples() ), sps->getMaxCUWidth(), sps->getMaxCUWidth() + EXT_PICTURE_SIZE, isDecoder, layerId );
 #endif
           }
 

@@ -17462,8 +17462,8 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
       const int iWidthFrm = slice.getPPS()->getPicWidthInLumaSamples() >> getComponentScaleX(ch, CHROMA_420);
       const int iHeightFrm = slice.getPPS()->getPicHeightInLumaSamples() >> getComponentScaleY(ch, CHROMA_420);
       int       ctuSize     = slice.getSPS()->getMaxCUWidth() >> getComponentScaleX(ch, CHROMA_420);
-      int       extPadSizeX = (16 + MC_PAD_SIZE) >> getComponentScaleX(ch, CHROMA_420);
-      int       extPadSizeY = (16 + MC_PAD_SIZE) >> getComponentScaleY(ch, CHROMA_420);
+      int       extPadSizeX = EXT_PICTURE_SIZE >> getComponentScaleX(ch, CHROMA_420);
+      int       extPadSizeY = EXT_PICTURE_SIZE >> getComponentScaleY(ch, CHROMA_420);
       // left and right
 
       piTxtRec -= ctuSize * iStrideRec;
