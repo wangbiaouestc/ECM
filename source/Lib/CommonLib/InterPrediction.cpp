@@ -6143,7 +6143,7 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
     }
     else
 #endif
-    if (!PU::checkIsIBCCandidateValid(pu, miTop))
+    if (!PU::checkIsIBCCandidateValid(pu, miTop, true, true))
     {
       mvTop = mvCurr;
     }
@@ -6200,7 +6200,7 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
     }
     else
 #endif
-    if (!PU::checkIsIBCCandidateValid(pu, miLeft))
+    if (!PU::checkIsIBCCandidateValid(pu, miLeft, true, false))
     {
       mvLeft = mvCurr;
     }
