@@ -1233,9 +1233,21 @@ static const int ADJUSTMENT_RANGE =                              7;
 #endif
 
 #if JVET_AA0096_MC_BOUNDARY_PADDING
-static const int MC_PAD_SIZE = 16;
-static const int PAD_MORE_TL = 1;
+static const int MC_PAD_SIZE =                                  16;
+static const int PAD_MORE_TL =                                   1;
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
+static const int EXT_PICTURE_SIZE = 16 + TM_TPL_SIZE + TM_SEARCH_RANGE + MC_PAD_SIZE;
+#else
+static const int EXT_PICTURE_SIZE =               16 + MC_PAD_SIZE;
 #endif
+#else
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
+static const int EXT_PICTURE_SIZE = 16 + TM_TPL_SIZE + TM_SEARCH_RANGE;
+#else
+static const int EXT_PICTURE_SIZE =                             16;
+#endif
+#endif
+
 
 // ====================================================================================================================
 // Macro functions
