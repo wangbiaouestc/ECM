@@ -533,7 +533,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
   LFNSTSaveFlag &= sps.getUseIntraMTS() ? cu.mtsFlag == 0 : true;
 #if JVET_AB0155_SGPM
-  bool SGPMSaveFlag = LFNSTSaveFlag;
+  bool SGPMSaveFlag = (cu.lfnstIdx == 0 && cu.mtsFlag == 0);
 #endif
 
   const uint32_t lfnstIdx = cu.lfnstIdx;
