@@ -4363,45 +4363,6 @@ void CABACReader::geo_merge_idx(PredictionUnit& pu)
   pu.geoMergeIdx1 = mergeCand1;
 }
 
-#if JVET_AA0058_GPM_ADP_BLD
-void CABACReader::geoAdaptiveBlendingIdx(PredictionUnit& pu)
-{
-  int bin0 = m_BinDecoder.decodeBin(Ctx::GeoBldFlag(0));
-  if (bin0 == 1)
-  {
-    pu.geoBldIdx = 2; //1
-  }
-  else
-  {
-    int bin1 = m_BinDecoder.decodeBin(Ctx::GeoBldFlag(1));
-    if (bin1 == 0)
-    {
-      int bin2 = m_BinDecoder.decodeBin(Ctx::GeoBldFlag(3));
-      if (bin2 == 0)
-      {
-        pu.geoBldIdx = 4; //000
-      }
-      else
-      {
-        pu.geoBldIdx = 3; //001
-      }
-    }
-    else
-    {
-      int bin2 = m_BinDecoder.decodeBin(Ctx::GeoBldFlag(2));
-      if (bin2 == 0)
-      {
-        pu.geoBldIdx = 1; //010
-      }
-      else
-      {
-        pu.geoBldIdx = 0; //011
-      }
-    }
-  }
-}
-#endif
-
 #if JVET_Y0065_GPM_INTRA
 void CABACReader::geo_merge_idx1(PredictionUnit& pu, bool isIntra0, bool isIntra1)
 #else
@@ -4457,6 +4418,45 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu)
 #endif
   pu.geoMergeIdx0 = mergeCand0;
   pu.geoMergeIdx1 = mergeCand1;
+}
+#endif
+
+#if JVET_AA0058_GPM_ADP_BLD
+void CABACReader::geoAdaptiveBlendingIdx( PredictionUnit& pu )
+{
+  int bin0 = m_BinDecoder.decodeBin( Ctx::GeoBldFlag( 0 ) );
+  if( bin0 == 1 )
+  {
+    pu.geoBldIdx = 2; //1
+  }
+  else
+  {
+    int bin1 = m_BinDecoder.decodeBin( Ctx::GeoBldFlag( 1 ) );
+    if( bin1 == 0 )
+    {
+      int bin2 = m_BinDecoder.decodeBin( Ctx::GeoBldFlag( 3 ) );
+      if( bin2 == 0 )
+      {
+        pu.geoBldIdx = 4; //000
+      }
+      else
+      {
+        pu.geoBldIdx = 3; //001
+      }
+    }
+    else
+    {
+      int bin2 = m_BinDecoder.decodeBin( Ctx::GeoBldFlag( 2 ) );
+      if( bin2 == 0 )
+      {
+        pu.geoBldIdx = 1; //010
+      }
+      else
+      {
+        pu.geoBldIdx = 0; //011
+      }
+    }
+  }
 }
 #endif
 
@@ -4887,10 +4887,10 @@ void CABACReader::mvp_flag( PredictionUnit& pu, RefPicList eRefList )
 #else
     if (!pu.cu->cs->sps->getUseDMVDMode() || pu.cu->affine || CU::isIBC(*pu.cu))
 #endif
+#endif
     {
       mvpIdx = m_BinDecoder.decodeBin(Ctx::MVPIdx());
     }
-#endif
     if (mvpIdx == 0)
     {
       pu.mvpIdx [eRefList] = mvpIdx + m_BinDecoder.decodeBinEP();
@@ -6847,7 +6847,7 @@ void CABACReader::parsePredictedSigns( TransformUnit &tu, ComponentID compID )
   int ctxOffset = CU::isIntra( *tu.cu ) ? 0 : 2;
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   bool lfnstEnabled = tu.checkLFNSTApplied(compID);
-  const int32_t maxNumPredSigns = lfnstEnabled ? 4 : tu.cs->sps->getNumPredSigns();
+  const int32_t maxNumPredSigns = lfnstEnabled ? std::min<int>(4, tu.cs->sps->getNumPredSigns()) : tu.cs->sps->getNumPredSigns();
 #else
   const int32_t maxNumPredSigns = tu.cs->sps->getNumPredSigns();
 #endif
@@ -6862,9 +6862,9 @@ void CABACReader::parsePredictedSigns( TransformUnit &tu, ComponentID compID )
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   uint32_t extAreaWidth = std::min(tu.blocks[compID].width, (uint32_t)SIGN_PRED_FREQ_RANGE);
   uint32_t extAreaHeight = std::min(tu.blocks[compID].height, (uint32_t)SIGN_PRED_FREQ_RANGE);
-  uint32_t extAreaSize = (lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea());
-  uint32_t spAreaWidth = std::min(tu.blocks[compID].width, extAreaSize);
-  uint32_t spAreaHeight = std::min(tu.blocks[compID].height, extAreaSize);
+  uint32_t extAreaSize  = lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea();
+  uint32_t spAreaWidth  = useSignPred ? std::min(tu.blocks[compID].width, extAreaSize)  : extAreaWidth;
+  uint32_t spAreaHeight = useSignPred ? std::min(tu.blocks[compID].height, extAreaSize) : extAreaHeight;
 
   for ( uint32_t y = 0; y < spAreaHeight; y++ )
 #else

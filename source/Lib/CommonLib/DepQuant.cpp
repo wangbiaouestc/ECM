@@ -2143,7 +2143,7 @@ uint32_t DepQuant::getPredictedSigns(TransformUnit& tu, const ComponentID compID
   if (bUseSignPred)
   {
     bool lfnstEnabled = tu.checkLFNSTApplied(compID);
-    const int32_t maxNumPredSigns = lfnstEnabled ? 4 : tu.cs->sps->getNumPredSigns();
+    const int32_t maxNumPredSigns = lfnstEnabled ? std::min<int>( 4, tu.cs->sps->getNumPredSigns() ) : tu.cs->sps->getNumPredSigns();
     CoeffBuf bufQCoeffs = tu.getCoeffs(compID);
     CoeffBuf bufSigns = tu.getCoeffSigns(compID);
     TCoeff *coeff = bufQCoeffs.buf;
