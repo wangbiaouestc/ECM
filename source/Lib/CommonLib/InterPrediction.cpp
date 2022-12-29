@@ -6250,11 +6250,7 @@ void  InterPrediction::sortInterMergeMMVDCandidates(PredictionUnit &pu, MergeCtx
 {
   const int tempNum = (const int) (std::min<int>(MMVD_BASE_MV_NUM, mrgCtx.numValidMergeCand) * MMVD_MAX_REFINE_NUM);
   const int groupSize = std::min<int>(tempNum, ADAPTIVE_SUB_GROUP_SIZE_MMVD);
-#if _WINDOWS
   Distortion candCostList[MMVD_BASE_MV_NUM* MMVD_MAX_REFINE_NUM];
-#else
-  Distortion candCostList[tempNum] ;
-#endif
 
   for (uint32_t i = 0; i < tempNum; i++)
   {
@@ -6760,11 +6756,7 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
   int baseCount               = std::min<int>((int)AF_MMVD_BASE_NUM, affMrgCtx.numValidMergeCand - baseIdxToMergeIdxOffset);
   const int tempNum = baseCount * AF_MMVD_MAX_REFINE_NUM;
   const int groupSize = std::min<int>(tempNum, ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF);
-#if _WINDOWS
   Distortion candCostList[AF_MMVD_BASE_NUM * AF_MMVD_MAX_REFINE_NUM];
-#else
-  Distortion candCostList[tempNum];
-#endif
   for (uint32_t i = 0; i < tempNum; i++)
   {
     affMmvdLUT[i] = i;
