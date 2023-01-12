@@ -725,7 +725,7 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
       for(x= firstLineStartX; x< firstLineEndX; x++)
       {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
         {
           continue;
         }
