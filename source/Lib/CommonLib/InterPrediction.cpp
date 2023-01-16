@@ -6143,7 +6143,7 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
     }
     else
 #endif
-    if (!PU::checkIsIBCCandidateValid(pu, miTop))
+    if (!PU::checkIsIBCCandidateValid(pu, miTop, true, true))
     {
       mvTop = mvCurr;
     }
@@ -6200,7 +6200,7 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
     }
     else
 #endif
-    if (!PU::checkIsIBCCandidateValid(pu, miLeft))
+    if (!PU::checkIsIBCCandidateValid(pu, miLeft, true, false))
     {
       mvLeft = mvCurr;
     }
@@ -6250,11 +6250,7 @@ void  InterPrediction::sortInterMergeMMVDCandidates(PredictionUnit &pu, MergeCtx
 {
   const int tempNum = (const int) (std::min<int>(MMVD_BASE_MV_NUM, mrgCtx.numValidMergeCand) * MMVD_MAX_REFINE_NUM);
   const int groupSize = std::min<int>(tempNum, ADAPTIVE_SUB_GROUP_SIZE_MMVD);
-#if _WINDOWS
   Distortion candCostList[MMVD_BASE_MV_NUM* MMVD_MAX_REFINE_NUM];
-#else
-  Distortion candCostList[tempNum] ;
-#endif
 
   for (uint32_t i = 0; i < tempNum; i++)
   {
@@ -6760,11 +6756,7 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
   int baseCount               = std::min<int>((int)AF_MMVD_BASE_NUM, affMrgCtx.numValidMergeCand - baseIdxToMergeIdxOffset);
   const int tempNum = baseCount * AF_MMVD_MAX_REFINE_NUM;
   const int groupSize = std::min<int>(tempNum, ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF);
-#if _WINDOWS
   Distortion candCostList[AF_MMVD_BASE_NUM * AF_MMVD_MAX_REFINE_NUM];
-#else
-  Distortion candCostList[tempNum];
-#endif
   for (uint32_t i = 0; i < tempNum; i++)
   {
     affMmvdLUT[i] = i;
@@ -17462,8 +17454,8 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
       const int iWidthFrm = slice.getPPS()->getPicWidthInLumaSamples() >> getComponentScaleX(ch, CHROMA_420);
       const int iHeightFrm = slice.getPPS()->getPicHeightInLumaSamples() >> getComponentScaleY(ch, CHROMA_420);
       int       ctuSize     = slice.getSPS()->getMaxCUWidth() >> getComponentScaleX(ch, CHROMA_420);
-      int       extPadSizeX = (16 + MC_PAD_SIZE) >> getComponentScaleX(ch, CHROMA_420);
-      int       extPadSizeY = (16 + MC_PAD_SIZE) >> getComponentScaleY(ch, CHROMA_420);
+      int       extPadSizeX = EXT_PICTURE_SIZE >> getComponentScaleX(ch, CHROMA_420);
+      int       extPadSizeY = EXT_PICTURE_SIZE >> getComponentScaleY(ch, CHROMA_420);
       // left and right
 
       piTxtRec -= ctuSize * iStrideRec;

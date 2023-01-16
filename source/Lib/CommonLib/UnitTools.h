@@ -216,13 +216,9 @@ namespace PU
   void getIBCMergeCandidates          (const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx = -1);
 #if JVET_AA0070_RRIBC
   void rribcAdjustMotion(const PredictionUnit &pu, const Position *cPos, MotionInfo &miNeighbor);
-#if  JVET_Y0058_IBC_LIST_MODIFY
-  bool checkIsIBCCandidateValid       (const PredictionUnit &pu,const MotionInfo miNeighbor, bool isRefTemplate = false, bool isRefAbove = false );
 #endif
-#else
 #if  JVET_Y0058_IBC_LIST_MODIFY
-  bool checkIsIBCCandidateValid       (const PredictionUnit &pu,const MotionInfo miNeighbor);
-#endif
+  bool checkIsIBCCandidateValid(const PredictionUnit &pu, const MotionInfo miNeighbor, bool isRefTemplate = false, bool isRefAbove = false);
 #endif
 #if JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0084_IBC_TM || JVET_AA0061_IBC_MBVD
   bool searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int height, int picWidth, int picHeight, int xBv, int yBv, int ctuSize);

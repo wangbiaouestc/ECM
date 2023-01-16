@@ -621,21 +621,9 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
     pcPic = new Picture();
 
 #if JVET_Z0118_GDR
-#if JVET_AA0096_MC_BOUNDARY_PADDING
-    pcPic->create(sps.getGDREnabledFlag(), sps.getChromaFormatIdc(),
-                  Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()),
-                  sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16 + MC_PAD_SIZE, true, layerId);
+    pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
 #else
-    pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId);
-#endif
-#else
-#if JVET_AA0096_MC_BOUNDARY_PADDING
-    pcPic->create(sps.getChromaFormatIdc(),
-                  Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(),
-                  sps.getMaxCUWidth() + 16 + MC_PAD_SIZE, true, layerId);
-#else
-    pcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId);
-#endif
+    pcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
 #endif
 
     m_cListPic.push_back( pcPic );
@@ -673,20 +661,9 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
     m_cListPic.push_back( pcPic );
 
 #if JVET_Z0118_GDR
-#if JVET_AA0096_MC_BOUNDARY_PADDING
-    pcPic->create(sps.getGDREnabledFlag(), sps.getChromaFormatIdc(),
-                  Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()),
-                  sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16 + MC_PAD_SIZE, true, layerId);
+    pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId );
 #else
-    pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId );
-#endif
-#else
-#if JVET_AA0096_MC_BOUNDARY_PADDING
-    pcPic->create(sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()),
-                  sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16 + MC_PAD_SIZE, true, layerId);
-#else
-    pcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId);
-#endif
+    pcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
 #endif
   }
   else
@@ -695,20 +672,9 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
     {
       pcPic->destroy();
 #if JVET_Z0118_GDR
-#if JVET_AA0096_MC_BOUNDARY_PADDING
-      pcPic->create(sps.getGDREnabledFlag(), sps.getChromaFormatIdc(),
-                    Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()),
-                    sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16 + MC_PAD_SIZE, true, layerId);
+      pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
 #else
-      pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId);
-#endif
-#else
-#if JVET_AA0096_MC_BOUNDARY_PADDING
-      pcPic->create(sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()),
-                    sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16 + MC_PAD_SIZE, true, layerId);
-#else
-      pcPic->create( sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + 16, true, layerId );
-#endif
+      pcPic->create( sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId );
 #endif
     }
 #if JVET_Z0118_GDR // picHeader should be deleted in case pcPic slot gets reused
@@ -1854,7 +1820,7 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
     m_cIntraPred.init( sps->getChromaFormatIdc(), sps->getBitDepth( CHANNEL_TYPE_LUMA ) );
 #if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if JVET_Z0153_IBC_EXT_REF
-    m_cInterPred.init( &m_cRdCost, sps->getChromaFormatIdc(), sps->getMaxCUHeight(), &m_cReshaper, m_pcPic->getPicWidthInLumaSamples());
+    m_cInterPred.init(&m_cRdCost, sps->getChromaFormatIdc(), sps->getMaxCUHeight(), &m_cReshaper, sps->getMaxPicWidthInLumaSamples());
 #else
     m_cInterPred.init( &m_cRdCost, sps->getChromaFormatIdc(), sps->getMaxCUHeight(), &m_cReshaper);
 #endif

@@ -479,7 +479,7 @@ static const int LM_CHROMA_IDX = NUM_LUMA_MODE; ///< chroma mode index for deriv
 static const int DIMD_IDX =                                        99; ///< index for intra DIMD mode
 #endif
 #if JVET_AB0155_SGPM
-static const int SGPM_IDX = 200;   ///< index for SGPM mode
+static const int SGPM_IDX =                                       200;   ///< index for SGPM mode
 #endif
 #if JVET_W0123_TIMD_FUSION
 static const int TIMD_IDX =                                       199; ///< index for intra TIMD mode
@@ -888,13 +888,14 @@ static const int    BDMVR_INTME_FULL_SEARCH_MAX_NUM_ITERATIONS   =  5; ///< maxi
 #if JVET_X0049_BDMVR_SW_OPT
 static const int    BDMVR_BUF_STRIDE = MAX_CU_SIZE + (BDMVR_INTME_RANGE << 1) + (BDMVR_SIMD_IF_FACTOR - 2);
 static const int    BDMVR_CENTER_POSITION = BDMVR_INTME_RANGE * BDMVR_BUF_STRIDE + BDMVR_INTME_RANGE;
-static const int    BM_MRG_MAX_NUM_CANDS = 6; ///< maximum number of BM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
-static const int    BM_MRG_SUB_PU_INT_MAX_SRCH_ROUND = 3;
+static const int    BM_MRG_MAX_NUM_CANDS                          = 6; ///< maximum number of BM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
+static const int    BM_MRG_SUB_PU_INT_MAX_SRCH_ROUND              = 3;
 #endif
 #if JVET_AB0112_AFFINE_DMVR
-static const int    AFFINE_DMVR_MAX_NUM_ITERATIONS = 26;
-static const int    AFFINE_DMVR_SEARCH_RANGE = 3;
+static const int    AFFINE_DMVR_MAX_NUM_ITERATIONS               = 26;
+static const int    AFFINE_DMVR_SEARCH_RANGE                      = 3;
 #endif
+static const int    AML_MERGE_TEMPLATE_SIZE                       = 1;
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
 static const int    DECODER_SIDE_MV_WEIGHT =                        4; ///< lambda for decoder-side derived MVs
@@ -907,7 +908,6 @@ static const double AMAXBT_TH128 =                                 60.0;
 #endif
 
 #if JVET_W0090_ARMC_TM
-static const int AML_MERGE_TEMPLATE_SIZE =                         1;
 static const int ADAPTIVE_SUB_GROUP_SIZE =                         5;
 #if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
@@ -925,9 +925,6 @@ static const int ADAPTIVE_IBC_SUB_GROUP_SIZE =                     6;
 
 #if JVET_Z0061_TM_OBMC
 static const int TM_OBMC_TEMPLATE_SIZE =                           1;
-#if (!JVET_W0090_ARMC_TM) && (!JVET_Z0056_GPM_SPLIT_MODE_REORDERING)
-static const int AML_MERGE_TEMPLATE_SIZE =                         1;
-#endif
 #endif
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -1071,9 +1068,6 @@ static const int SGPM_TEMPLATE_SIZE = 1;
 #endif
 
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_AB0155_SGPM
-#if !JVET_W0090_ARMC_TM
-static const int AML_MERGE_TEMPLATE_SIZE =                          1;
-#endif
 static const int GEO_MODE_SEL_TM_SIZE =       AML_MERGE_TEMPLATE_SIZE;
 static const int GEO_TM_ADDED_WEIGHT_MASK_SIZE = GEO_MODE_SEL_TM_SIZE;
 static const int GEO_WEIGHT_MASK_SIZE_EXT = GEO_WEIGHT_MASK_SIZE + GEO_TM_ADDED_WEIGHT_MASK_SIZE * 2;
@@ -1140,9 +1134,6 @@ static const int IBC_FAST_METHOD_NOINTRA_IBCCBF0 = 0x01;
 static const int IBC_FAST_METHOD_BUFFERBV = 0X02;
 static const int IBC_FAST_METHOD_ADAPTIVE_SEARCHRANGE = 0X04;
 #if JVET_AA0061_IBC_MBVD
-#if !JVET_W0090_ARMC_TM && !JVET_Z0061_TM_OBMC && !JVET_Z0056_GPM_SPLIT_MODE_REORDERING
-static const int AML_MERGE_TEMPLATE_SIZE =                           1;
-#endif
 static const int IBC_MBVD_BASE_NUM =                                 5;
 static const int IBC_MBVD_STEP_NUM =                                 20; // number of distance offset
 static const int IBC_MBVD_OFFSET_DIR =                               4; // (+, 0); (-, 0); (0, +); (0, -);
@@ -1233,9 +1224,21 @@ static const int ADJUSTMENT_RANGE =                              7;
 #endif
 
 #if JVET_AA0096_MC_BOUNDARY_PADDING
-static const int MC_PAD_SIZE = 16;
-static const int PAD_MORE_TL = 1;
+static const int MC_PAD_SIZE =                                  16;
+static const int PAD_MORE_TL =                                   1;
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
+static const int EXT_PICTURE_SIZE = 16 + TM_TPL_SIZE + TM_SEARCH_RANGE + MC_PAD_SIZE;
+#else
+static const int EXT_PICTURE_SIZE =               16 + MC_PAD_SIZE;
 #endif
+#else
+#if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
+static const int EXT_PICTURE_SIZE = 16 + TM_TPL_SIZE + TM_SEARCH_RANGE;
+#else
+static const int EXT_PICTURE_SIZE =                             16;
+#endif
+#endif
+
 
 // ====================================================================================================================
 // Macro functions

@@ -533,7 +533,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
   LFNSTSaveFlag &= sps.getUseIntraMTS() ? cu.mtsFlag == 0 : true;
 #if JVET_AB0155_SGPM
-  bool SGPMSaveFlag = LFNSTSaveFlag;
+  bool SGPMSaveFlag = (cu.lfnstIdx == 0 && cu.mtsFlag == 0);
 #endif
 
   const uint32_t lfnstIdx = cu.lfnstIdx;
@@ -1416,7 +1416,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               m_uiSavedHadModeListSGPM.clear();
               m_dSavedHadListSGPM.clear();
 
+#if JVET_V0130_INTRA_TMP
               cu.tmpFlag      = false;
+#endif
               pu.multiRefIdx  = 0;
               cu.mipFlag      = false;
               
@@ -1506,12 +1508,18 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                 minSadHad += std::min(distParamSad.distFunc(distParamSad) * 2, distParamHad.distFunc(distParamHad));
                 double cost = (double) minSadHad + (double) fracModeBits * sqrtLambdaForFirstPass;
 
-                updateCandList(ModeInfo(false, false, 0, NOT_INTRA_SUBPARTITIONS, SGPM_IDX, 0, 1,
-                                        sgpmInfoList[sgpmIdx].sgpmSplitDir, sgpmInfoList[sgpmIdx].sgpmMode0,
+                updateCandList(ModeInfo(false, false, 0, NOT_INTRA_SUBPARTITIONS, SGPM_IDX,
+#if JVET_V0130_INTRA_TMP
+                                        false, //tmpFlag
+#endif
+                                        true, sgpmInfoList[sgpmIdx].sgpmSplitDir, sgpmInfoList[sgpmIdx].sgpmMode0,
                                         sgpmInfoList[sgpmIdx].sgpmMode1, sgpmIdx),
                                cost, m_uiSavedRdModeListSGPM, m_dSavedModeCostSGPM, SGPM_NUM);
-                updateCandList(ModeInfo(false, false, 0, NOT_INTRA_SUBPARTITIONS, SGPM_IDX, 0, 1,
-                                        sgpmInfoList[sgpmIdx].sgpmSplitDir, sgpmInfoList[sgpmIdx].sgpmMode0,
+                updateCandList(ModeInfo(false, false, 0, NOT_INTRA_SUBPARTITIONS, SGPM_IDX,
+#if JVET_V0130_INTRA_TMP
+                                        false, //tmpFlag
+#endif
+                                        true, sgpmInfoList[sgpmIdx].sgpmSplitDir, sgpmInfoList[sgpmIdx].sgpmMode0,
                                         sgpmInfoList[sgpmIdx].sgpmMode1, sgpmIdx),
                                double(minSadHad), m_uiSavedHadModeListSGPM, m_dSavedHadListSGPM, SGPM_NUM);
               }
@@ -1519,7 +1527,8 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               cu.sgpm = false;
             }
 
-            int updateNum = (numModesForFullRD + 1) / 2;
+            int updateNum = std::min<int>( (numModesForFullRD + 1) / 2, (int)m_uiSavedRdModeListSGPM.size() );
+
             for (auto listIdx = 0; listIdx < updateNum; listIdx++)
             {
               updateCandList(m_uiSavedRdModeListSGPM[listIdx], m_dSavedModeCostSGPM[listIdx], uiRdModeList,
@@ -2022,12 +2031,18 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       CHECK( cu.tmpFlag && pu.multiRefIdx, "Error: combination of TPM and MRL not supported" );
 #endif
 #if JVET_AB0155_SGPM
+#if JVET_V0130_INTRA_TMP
       CHECK(cu.sgpm && cu.tmpFlag, "Error: combination of SGPM and TPM not supported");
+#endif
       CHECK(cu.sgpm && cu.ispMode, "Error: combination of SGPM and ISP not supported");
       CHECK(cu.sgpm && pu.multiRefIdx, "Error: combination of SGPM and MRL not supported");
       CHECK(cu.sgpm && cu.mipFlag, "Error: combination of SGPM and MIP not supported");
+#if JVET_W0123_TIMD_FUSION
       CHECK(cu.sgpm && cu.timd, "Error: combination of SGPM and TIMD not supported");
+#endif
+#if ENABLE_DIMD
       CHECK(cu.sgpm && cu.dimd, "Error: combination of SGPM and DIMD not supported");
+#endif
       CHECK(cu.sgpm && cu.bdpcmMode, "Error: combination of SGPM and BDPCM not supported");
 #endif
 

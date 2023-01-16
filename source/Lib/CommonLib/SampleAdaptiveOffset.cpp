@@ -163,6 +163,15 @@ void SampleAdaptiveOffset::create( int picWidth, int picHeight, ChromaFormat for
 
   for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
   {
+    if( m_ccSaoControl[compIdx] )
+    {
+      delete[] m_ccSaoControl[compIdx];
+      m_ccSaoControl[compIdx] = nullptr;
+    }
+  }
+
+  for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
+  {
     if( m_ccSaoControl[compIdx] == nullptr )
     {
       m_ccSaoControl[compIdx] = new uint8_t[m_numCTUsInPic];
@@ -716,7 +725,7 @@ void SampleAdaptiveOffset::offsetBlockNoClip(const int channelBitDepth, const Cl
       for(x= firstLineStartX; x< firstLineEndX; x++)
       {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
         {
           continue;
         }

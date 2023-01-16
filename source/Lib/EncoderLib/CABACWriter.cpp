@@ -1895,7 +1895,17 @@ void CABACWriter::sgpm_flag(const CodingUnit &cu)
     return;
   }
 
-  if (cu.dimd || cu.timd || cu.mipFlag || cu.tmpFlag)
+  if( cu.mipFlag
+#if ENABLE_DIMD
+    || cu.dimd
+#endif
+#if JVET_W0123_TIMD_FUSION
+    || cu.timd
+#endif
+#if JVET_V0130_INTRA_TMP
+    || cu.tmpFlag
+#endif
+    )
   {
     return;
   }
@@ -2371,10 +2381,14 @@ void CABACWriter::cu_residual( const CodingUnit& cu, Partitioner& partitioner, C
         }
         if(currTU.jointCbCr)
         {
-          if( !(currTU.jointCbCr>>1) && compID == COMPONENT_Cb)
+          if( !( currTU.jointCbCr >> 1 ) && compID == COMPONENT_Cb )
+          {
             continue;
-          if( (currTU.jointCbCr>>1) && compID == COMPONENT_Cr)
+          }
+          if( ( currTU.jointCbCr >> 1 ) && compID == COMPONENT_Cr )
+          {
             continue;
+          }
         }
 
         if(currTU.blocks[compID].valid() && TU::getCbf( currTU, compID ) && TU::getDelayedSignCoding(currTU, compID))
@@ -6886,7 +6900,7 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
     std::vector<signCombInfo> signCombList;
     bool lfnstEnabled = tu.checkLFNSTApplied(compID);
     std::vector<uint32_t> levelList;
-    const int32_t maxNumPredSigns = lfnstEnabled ? 4 : tu.cs->sps->getNumPredSigns();
+    const int32_t maxNumPredSigns = lfnstEnabled ? std::min<int>( 4, tu.cs->sps->getNumPredSigns() ) : tu.cs->sps->getNumPredSigns();
     int numScanPos = 0;
     uint32_t extAreaSize = (lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea());
     uint32_t spAreaWidth = std::min(tu.blocks[compID].width, extAreaSize);
