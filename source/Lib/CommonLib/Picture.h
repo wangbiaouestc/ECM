@@ -122,6 +122,9 @@ struct Picture : public UnitArea
         PelBuf      getTrueOrigBuf(const CompArea &blk);
   const CPelBuf     getTrueOrigBuf(const CompArea &blk) const;
 
+         PelBuf     getTrueOrigBuf(const ComponentID compID);
+  const CPelBuf     getTrueOrigBuf(const ComponentID compID) const;
+
          PelUnitBuf getFilteredOrigBuf();
   const CPelUnitBuf getFilteredOrigBuf() const;
          PelBuf     getFilteredOrigBuf(const CompArea &blk);
