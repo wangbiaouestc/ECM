@@ -752,6 +752,18 @@ void DecLib::executeLoopFilters()
     cs.slice->setDeblockingFilterCrTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx]);
   }
 #endif
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  if (pcPPS->getAsymmetricILF() && (cs.picHeader->getInGdrInterval() || cs.picHeader->getIsGdrRecoveryPocPic()))
+  {
+    m_cLoopFilter.setAsymmetricDB(true);
+  }
+  else
+  {
+    m_cLoopFilter.setAsymmetricDB(false);
+  }  
+#endif
+
+
   m_cLoopFilter.loopFilterPic( cs );
 #if !MULTI_PASS_DMVR
   CS::setRefinedMotionField(cs);

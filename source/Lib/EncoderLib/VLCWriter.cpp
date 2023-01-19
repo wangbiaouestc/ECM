@@ -267,6 +267,10 @@ void HLSWriter::codePPS( const PPS* pcPPS )
 
   WRITE_UVLC( pcPPS->getPicWidthInLumaSamples(), "pic_width_in_luma_samples" );
   WRITE_UVLC( pcPPS->getPicHeightInLumaSamples(), "pic_height_in_luma_samples" );
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  WRITE_FLAG(pcPPS->getAsymmetricILF() ? 1 : 0, "pps_aysmmetric_ILF_flag");
+#endif
+
   Window conf = pcPPS->getConformanceWindow();
 #if JVET_R0068_ASPECT6_ENC_RESTRICTION
   WRITE_FLAG(pcPPS->getConformanceWindowFlag(), "pps_conformance_window_flag");

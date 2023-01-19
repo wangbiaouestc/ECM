@@ -448,6 +448,11 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
 
   READ_UVLC( uiCode, "pic_width_in_luma_samples" );          pcPPS->setPicWidthInLumaSamples( uiCode );
   READ_UVLC( uiCode, "pic_height_in_luma_samples" );         pcPPS->setPicHeightInLumaSamples( uiCode );
+
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  READ_FLAG(uiCode, "aysmmetric_ILF_flag");                  pcPPS->setAsymmetricILF(uiCode == 1);
+#endif
+
   READ_FLAG(uiCode, "pps_conformance_window_flag");
   pcPPS->setConformanceWindowFlag( uiCode );
   if (uiCode != 0)

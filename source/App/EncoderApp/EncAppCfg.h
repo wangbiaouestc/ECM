@@ -598,6 +598,10 @@ protected:
   bool      m_saoCtuBoundary;                                 ///< SAO parameter estimation using non-deblocked pixels for CTU bottom and right boundary areas
   bool      m_saoGreedyMergeEnc;                              ///< SAO greedy merge encoding algorithm
   // coding tools (loop filter)
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  bool      m_asymmetricILF;
+#endif
+
   bool      m_bLoopFilterDisable;                             ///< flag for using deblocking filter
   bool      m_loopFilterOffsetInPPS;                         ///< offset for deblocking filter in 0 = slice header, 1 = PPS
 #if DB_PARAM_TID

@@ -291,6 +291,7 @@
 #define JVET_AA0095_ALF_LONGER_FILTER                     1 // JVET-AA0095: Longer luma filter shape 
 #define JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF           1 // JVET-AA0095: Using samples before deblocking filter for ALF
 #define JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS     1 // JVET-AB0184: Extended Fixed-Filter-Output based Taps for ALF
+#define JVET_AB0171_ASYMMETRIC_DB_FOR_GDR                 1 // JVET-AB0171: Asymmetric Deblocking for GDR
 
 // SIMD optimizations
 #if IF_12TAP

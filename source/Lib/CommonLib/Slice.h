@@ -2731,6 +2731,13 @@ public:
 
   int                     getMixedNaluTypesInPicFlag() const                              { return m_mixedNaluTypesInPicFlag; }
   void                    setMixedNaluTypesInPicFlag( const bool flag )                   { m_mixedNaluTypesInPicFlag = flag; }
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+private:
+  bool                         m_asymmetricILF;
+public:
+  bool getAsymmetricILF() const  { return m_asymmetricILF; }
+  void setAsymmetricILF(bool b)  { m_asymmetricILF = b; }
+#endif
 };
 
 class APS

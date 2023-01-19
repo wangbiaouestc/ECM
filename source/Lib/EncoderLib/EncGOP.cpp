@@ -3375,6 +3375,16 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
           }
         }
       }
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+      if (m_pcCfg->getAsymmetricILF() && (pcPic->cs->picHeader->getInGdrInterval() || pcPic->cs->picHeader->getIsGdrRecoveryPocPic()))
+      {
+        m_pcLoopFilter->setAsymmetricDB(true);
+      }
+      else
+      {
+        m_pcLoopFilter->setAsymmetricDB(false);
+      }
+#endif
 
       m_pcLoopFilter->loopFilterPic( cs );
 
@@ -4521,6 +4531,17 @@ void EncGOP::printOutSummary(uint32_t uiNumAllPicCoded, bool isField, const bool
 uint64_t EncGOP::preLoopFilterPicAndCalcDist( Picture* pcPic )
 {
   CodingStructure& cs = *pcPic->cs;
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  if (m_pcCfg->getAsymmetricILF() && (pcPic->cs->picHeader->getInGdrInterval() || pcPic->cs->picHeader->getIsGdrRecoveryPocPic()))
+  {
+    m_pcLoopFilter->setAsymmetricDB(true);
+  }
+  else
+  {
+    m_pcLoopFilter->setAsymmetricDB(false);
+  } 
+#endif
+
   m_pcLoopFilter->loopFilterPic( cs );
 
   const CPelUnitBuf picOrg = pcPic->getRecoBuf();
