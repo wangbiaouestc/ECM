@@ -984,6 +984,10 @@ protected:
   unsigned int m_tempCabacInitMode;
 #endif
 
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR  
+  bool      m_asymmetricILF;
+#endif
+
 public:
   EncCfg()
   {
@@ -1652,6 +1656,10 @@ public:
   void      setLog2MaxTbSize                ( uint32_t  u )   { m_log2MaxTbSize = u; }
 
   //====== Loop/Deblock Filter ========
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  void      setAsymmetricILF(bool b) { m_asymmetricILF = b; }  
+#endif
+
   void      setLoopFilterDisable            ( bool  b )      { m_bLoopFilterDisable       = b; }
   void      setLoopFilterOffsetInPPS        ( bool  b )      { m_loopFilterOffsetInPPS      = b; }
 #if DB_PARAM_TID
@@ -1781,6 +1789,10 @@ public:
   void      setEnablePictureHeaderInSliceHeader(bool val) { m_enablePictureHeaderInSliceHeader = val; }
 
   //==== Loop/Deblock Filter ========
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR  
+  bool      getAsymmetricILF()               { return m_asymmetricILF; }
+#endif  
+
   bool      getLoopFilterDisable            ()      { return  m_bLoopFilterDisable;       }
   bool      getLoopFilterOffsetInPPS        ()      { return m_loopFilterOffsetInPPS; }
 #if  DB_PARAM_TID

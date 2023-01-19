@@ -1320,6 +1320,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
   ("RDpenalty",                                       m_rdPenalty,                                          0, "RD-penalty for 32x32 TU for intra in non-intra slices. 0:disabled  1:RD-penalty  2:maximum RD-penalty")
 
+
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  ("AsymmetricILF",                                   m_asymmetricILF,                                  false, "Enable Asymmetric InloopFilter" )
+#endif
+
   // Deblocking filter parameters
   ("LoopFilterDisable",                               m_bLoopFilterDisable,                             false)
   ("LoopFilterOffsetInPPS",                           m_loopFilterOffsetInPPS,                           true)

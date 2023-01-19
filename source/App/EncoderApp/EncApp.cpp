@@ -658,6 +658,9 @@ void EncApp::xInitLibCfg()
   //===== Slice ========
 
   //====== Loop/Deblock Filter ========
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  m_cEncLib.setAsymmetricILF(m_asymmetricILF);
+#endif
   m_cEncLib.setLoopFilterDisable                                 ( m_bLoopFilterDisable       );
   m_cEncLib.setLoopFilterOffsetInPPS                             ( m_loopFilterOffsetInPPS );
   m_cEncLib.setLoopFilterBetaOffset                              ( m_loopFilterBetaOffsetDiv2  );
@@ -1320,6 +1323,10 @@ void EncApp::xInitLibCfg()
 
 #if JVET_X0144_MAX_MTT_DEPTH_TID
   m_cEncLib.setMaxMTTHierarchyDepthByTid                          ( m_maxMTTHierarchyDepthByTid );
+#endif
+
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  m_cEncLib.setAsymmetricILF(m_asymmetricILF);
 #endif
 }
 

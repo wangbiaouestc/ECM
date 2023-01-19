@@ -1952,6 +1952,10 @@ void EncLib::xInitPPS(PPS &pps, const SPS &sps)
     bUseDQP = true;
   }
 
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  pps.setAsymmetricILF(getAsymmetricILF());
+#endif
+
 #if SHARP_LUMA_DELTA_QP
   if ( getLumaLevelToDeltaQPMapping().isEnabled() )
   {
