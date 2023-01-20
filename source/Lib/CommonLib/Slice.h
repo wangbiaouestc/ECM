@@ -1727,6 +1727,9 @@ private:
 #if JVET_AB0155_SGPM
   bool              m_sgpm;
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  int               m_cccm;
+#endif
 #if JVET_V0130_INTRA_TMP
   bool              m_intraTMP;                                       ///< intra Template Matching 
   unsigned          m_intraTmpMaxSize;                               ///< max CU size for which intra TMP is allowed
@@ -2271,6 +2274,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AB0155_SGPM
   void      setUseSgpm         (bool b)                                          { m_sgpm = b; }
   bool      getUseSgpm         ()                                      const     { return m_sgpm; }
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  void      setUseCccm( int i )                                                  { m_cccm = i; }
+  int       getUseCccm()                                               const     { return m_cccm; }
 #endif
 
 #if ENABLE_OBMC

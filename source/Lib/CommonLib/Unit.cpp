@@ -739,6 +739,9 @@ void PredictionUnit::initData()
 #endif
 #if JVET_AA0057_CCCM
   cccmFlag    = 0;
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  cccmNoSubFlag = 0;
+#endif
 #endif
   // inter data
   mergeFlag   = false;
@@ -873,6 +876,9 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #endif
 #if JVET_AA0057_CCCM
   cccmFlag    = predData.cccmFlag;
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  cccmNoSubFlag = predData.cccmNoSubFlag;
+#endif
 #endif
   return *this;
 }
@@ -1004,6 +1010,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
 #if JVET_AA0057_CCCM
   cccmFlag    = other.cccmFlag;
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  cccmNoSubFlag = other.cccmNoSubFlag;
+#endif
 #endif
 
   mergeFlag   = other.mergeFlag;

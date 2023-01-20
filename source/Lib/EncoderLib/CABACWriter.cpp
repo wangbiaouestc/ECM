@@ -2214,6 +2214,12 @@ void CABACWriter::intra_chroma_lmc_mode(const PredictionUnit& pu)
 #if JVET_AA0057_CCCM
 void CABACWriter::cccmFlag(const PredictionUnit& pu)
 {
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  if ( pu.cs->sps->getUseCccm() == 0 )
+  {    
+    return;
+  }
+#endif
   const unsigned intraDir = pu.intraDir[1];
   
 #if JVET_AB0143_CCCM_TS
@@ -2251,6 +2257,12 @@ void CABACWriter::cccmFlag(const PredictionUnit& pu)
 #endif
   {
     m_BinEncoder.encodeBin( pu.cccmFlag ? 1 : 0, Ctx::CccmFlag( 0 ) );
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+    if ( pu.cccmFlag && ( pu.cs->sps->getUseCccm() == 2 ) ) 
+    {
+      m_BinEncoder.encodeBin( pu.cccmNoSubFlag ? 1 : 0, Ctx::CccmFlag( 1 ) );
+    }
+#endif
   }
 }
 #endif

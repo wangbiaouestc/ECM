@@ -1845,6 +1845,16 @@ void PU::getCccmRefLineNum(const PredictionUnit& pu, const Area area, int& th, i
 #if JVET_AA0057_CCCM
 bool PU::cccmSingleModeAvail(const PredictionUnit& pu, int intraMode)
 {
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  if ( pu.cs->sps->getUseCccm() == 0 )
+  {    
+    return false;
+  }
+  else if( ( pu.cs->sps->getUseCccm() == 1 ) && ( pu.cccmNoSubFlag == 1 )  )
+  {    
+    return false;
+  }
+#endif
   const Area area = pu.blocks[COMPONENT_Cb];
   bool modeIsOk   = intraMode == LM_CHROMA_IDX;
   modeIsOk        = modeIsOk && ( area.width * area.height >= CCCM_MIN_PU_SIZE );
@@ -1859,6 +1869,16 @@ bool PU::cccmSingleModeAvail(const PredictionUnit& pu, int intraMode)
   
 bool PU::cccmMultiModeAvail(const PredictionUnit& pu, int intraMode)
 {
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  if ( pu.cs->sps->getUseCccm() == 0 )
+  {    
+    return false;
+  }
+  else if( ( pu.cs->sps->getUseCccm() == 1 ) && ( pu.cccmNoSubFlag == 1 )  )
+  {    
+    return false;
+  }
+#endif
 #if MMLM
   const Area area = pu.blocks[COMPONENT_Cb];
 #if JVET_AB0143_CCCM_TS
@@ -1906,6 +1926,16 @@ bool PU::cccmMultiModeAvail(const PredictionUnit& pu, int intraMode)
 #if JVET_AB0143_CCCM_TS
 bool PU::isLeftCccmMode(const PredictionUnit& pu, int intraMode)
 {
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  if ( pu.cs->sps->getUseCccm() == 0 )
+  {    
+    return false;
+  }
+  else if( ( pu.cs->sps->getUseCccm() == 1 ) && ( pu.cccmNoSubFlag == 1 )  )
+  {    
+    return false;
+  }
+#endif
   const Area area = pu.blocks[COMPONENT_Cb];
   bool modeIsOk = (intraMode == MDLM_L_IDX);
   modeIsOk = modeIsOk && (area.width * area.height >= CCCM_MIN_PU_SIZE);
@@ -1925,6 +1955,16 @@ bool PU::isLeftCccmMode(const PredictionUnit& pu, int intraMode)
 
 bool PU::isTopCccmMode(const PredictionUnit& pu, int intraMode)
 {
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  if ( pu.cs->sps->getUseCccm() == 0 )
+  {    
+    return false;
+  }
+  else if( ( pu.cs->sps->getUseCccm() == 1 ) && ( pu.cccmNoSubFlag == 1 )  )
+  {    
+    return false;
+  }
+#endif
   const Area area = pu.blocks[COMPONENT_Cb];
   bool modeIsOk = (intraMode == MDLM_T_IDX);
   modeIsOk = modeIsOk && (area.width * area.height >= CCCM_MIN_PU_SIZE);

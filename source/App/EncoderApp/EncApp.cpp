@@ -863,6 +863,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AB0155_SGPM
   m_cEncLib.setUseSgpm                                           ( m_sgpm );
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  m_cEncLib.setUseCccm                                           ( m_cccm );
+#endif
 #if ENABLE_OBMC
   m_cEncLib.setUseObmc                                           ( m_OBMC );
 #endif

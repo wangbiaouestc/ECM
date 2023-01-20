@@ -481,6 +481,9 @@ struct IntraPredictionData
 #endif
 #if JVET_AA0057_CCCM
   int       cccmFlag;
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  int       cccmNoSubFlag;
+#endif
 #endif
 };
 

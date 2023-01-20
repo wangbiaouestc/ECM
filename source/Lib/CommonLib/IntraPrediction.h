@@ -197,7 +197,11 @@ private:
 #if JVET_AA0057_CCCM
   Area m_cccmBlkArea;
   Area m_cccmRefArea;
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  Pel* m_cccmLumaBuf[2];
+#else
   Pel* m_cccmLumaBuf;
+#endif
 #if JVET_AB0174_CCCM_DIV_FREE
   int  m_cccmLumaOffset;
 #endif
@@ -300,6 +304,9 @@ protected:
 #if JVET_AB0092_GLM_WITH_LUMA
   CccmCovariance<GLM_NUM_PARAMS, GLM_MAX_REF_SAMPLES> m_glmSolver;
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  CccmCovariance<CCCM_NO_SUB_NUM_PARAMS, GLM_MAX_REF_SAMPLES> m_cccmNoSubSolver;
+#endif
 
   // prediction
   void xPredIntraPlanar           ( const CPelBuf &pSrc, PelBuf &pDst
@@ -389,6 +396,11 @@ public:
   void   xCccmCalcRefArea         (const PredictionUnit& pu, CompArea chromaArea);
 #if JVET_AB0174_CCCM_DIV_FREE
   void   xCccmSetLumaRefValue     (const PredictionUnit& pu);
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  void   xCccmCreateLumaNoSubRef  ( const PredictionUnit& pu, CompArea chromaArea );
+  void   xCccmApplyModel          ( const PredictionUnit& pu, const ComponentID compId, CccmModel<CCCM_NO_SUB_NUM_PARAMS> &cccmModel, int modelId, int modelThr, PelBuf &piPred ) const;
+  void   xCccmCalcModels          ( const PredictionUnit& pu, CccmModel<CCCM_NO_SUB_NUM_PARAMS> &cccmModelCb, CccmModel<CCCM_NO_SUB_NUM_PARAMS> &cccmModelCr, int modelId, int modelThr );
 #endif
 #endif
 #if JVET_AB0092_GLM_WITH_LUMA

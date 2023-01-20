@@ -2469,6 +2469,12 @@ bool CABACReader::intra_chroma_lmc_mode(PredictionUnit& pu)
 #if JVET_AA0057_CCCM
 void CABACReader::cccmFlag(PredictionUnit& pu)
 {
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  if ( pu.cs->sps->getUseCccm() == 0 )
+  {    
+    return;
+  }
+#endif
   const unsigned intraDir = pu.intraDir[1];
   
 #if JVET_AB0143_CCCM_TS
@@ -2513,6 +2519,13 @@ void CABACReader::cccmFlag(PredictionUnit& pu)
       pu.cccmFlag = (intraDir == MDLM_T_IDX || intraDir == MMLM_T_IDX) ? 3 : (intraDir == MDLM_L_IDX || intraDir == MMLM_L_IDX) ? 2 : 1;
 #else
       pu.cccmFlag = (intraDir == MDLM_T_IDX) ? 3 : (intraDir == MDLM_L_IDX) ? 2 : 1;
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+      pu.cccmNoSubFlag = 0;
+      if ( pu.cs->sps->getUseCccm() == 2 )
+      {    
+        pu.cccmNoSubFlag += m_BinDecoder.decodeBin( Ctx::CccmFlag( 1 ) );
+      }         
 #endif
     }
 #endif

@@ -463,6 +463,9 @@ protected:
 #if JVET_AB0155_SGPM
   bool      m_sgpm;
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  int       m_cccm;
+#endif
 #if ENABLE_OBMC
   bool      m_OBMC;
 #endif

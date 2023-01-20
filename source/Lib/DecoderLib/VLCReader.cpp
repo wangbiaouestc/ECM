@@ -2503,6 +2503,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AB0155_SGPM
   READ_FLAG(uiCode, "sps_sgpm_enabled_flag");                       pcSPS->setUseSgpm(uiCode != 0);
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  READ_UVLC(uiCode, "sps_cccm_cand");                               pcSPS->setUseCccm(uiCode);
+#endif
   if( pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
     READ_FLAG( uiCode, "sps_cclm_enabled_flag" );                   pcSPS->setUseLMChroma( uiCode != 0 );
