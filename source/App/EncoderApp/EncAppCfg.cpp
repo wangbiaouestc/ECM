@@ -1101,6 +1101,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_AB0155_SGPM
   ( "SGPM",                                           m_sgpm,                                            true,  "Enable spatial geometric partitioning mode\n" )
+#if JVET_AC0189_SGPM_NO_BLD
+  ( "SGPMnoBlend",                                    m_sgpmNoBlend,                                     false,  "Enable spatial geometric partitioning mode without blending\n" )
+#endif
 #endif
 #if ENABLE_OBMC
   ("OBMC",                                            m_OBMC,                                           true, "Overlapping Block Motion Compensation")
@@ -5234,6 +5237,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AB0155_SGPM
   msg(VERBOSE, "SGPM:%d ", m_sgpm);
+#if JVET_AC0189_SGPM_NO_BLD
+  msg(VERBOSE, "SGPMnoBlend:%d ", m_sgpmNoBlend);
+#endif
 #endif
 #if JVET_V0130_INTRA_TMP
   msg( VERBOSE, "IntraTMP:%d ", m_intraTMP );
