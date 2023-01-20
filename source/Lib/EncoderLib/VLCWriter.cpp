@@ -458,6 +458,9 @@ void HLSWriter::codePPS( const PPS* pcPPS )
     }
   }
   }
+#if JVET_AC0189_SGPM_NO_BLD
+  WRITE_FLAG(pcPPS->getUseSgpmNoBlend() ? 1 : 0, "sgpm_no_blend_flag" );
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   WRITE_FLAG(pcPPS->getUseBIF() ? 1 : 0, "bilateral_filter_flag" );
   if(pcPPS->getUseBIF())

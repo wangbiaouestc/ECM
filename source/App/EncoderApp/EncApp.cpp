@@ -862,6 +862,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AB0155_SGPM
   m_cEncLib.setUseSgpm                                           ( m_sgpm );
+#if JVET_AC0189_SGPM_NO_BLD
+  m_cEncLib.setUseSgpmNoBlend                                    ( m_sgpmNoBlend );
+#endif
 #endif
 #if ENABLE_OBMC
   m_cEncLib.setUseObmc                                           ( m_OBMC );

@@ -811,6 +811,9 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
     pcPPS->clearChromaQpOffsetList();
   }
   
+#if JVET_AC0189_SGPM_NO_BLD
+  READ_FLAG(uiCode, "sgpm_no_blend_flag" );                         pcPPS->setUseSgpmNoBlend(uiCode != 0) ;
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   READ_FLAG( uiCode, "bilateral_filter_flag" );                        pcPPS->setUseBIF(uiCode != 0) ;
   if(pcPPS->getUseBIF())
