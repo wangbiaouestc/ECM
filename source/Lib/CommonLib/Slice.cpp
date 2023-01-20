@@ -5285,9 +5285,7 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
                                    sps->getChromaFormatIdc(), sps->getBitDepths(), true, downsampling,
                                    sps->getHorCollocatedChromaFlag(), sps->getVerCollocatedChromaFlag() );
           scaledRefPic[j]->unscaledPic = m_apcRefPicList[refList][rIdx];
-#if !JVET_AA0096_MC_BOUNDARY_PADDING
           scaledRefPic[j]->extendPicBorder( getPPS() );
-#endif
 
           m_scaledRefPicList[refList][rIdx] = scaledRefPic[j];
         }
