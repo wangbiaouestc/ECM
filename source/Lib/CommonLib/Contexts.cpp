@@ -1404,6 +1404,19 @@ const CtxSet ContextSetCfg::IntraLumaMPMIdx = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::IntraLumaPlanarFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+  {   6,   6,  CNU,  CNU, },
+  {   6,  28,  CNU,  CNU, },
+  {  23,  21,  CNU,  CNU, },
+  {   1,   2,  DWS,  DWS, },
+  {   1,   2,  DWS,  DWS, },
+  {   1,   6,  DWS,  DWS, },
+  {  18,  18,  DWE,  DWE, },
+  {  18,  18,  DWE,  DWE, },
+  {  11,  25,  DWE,  DWE, },
+  { 125, 116,  DWO,  DWO, },
+  { 116, 117,  DWO,  DWO, },
+#else
   {   6,   6, },
   {   6,  28, },
   {  23,  21, },
@@ -1415,6 +1428,7 @@ const CtxSet ContextSetCfg::IntraLumaPlanarFlag = ContextSetCfg::addCtxSet
   {  11,  25, },
   { 125, 116, },
   { 116, 117, },
+#endif
   });
 
 const CtxSet ContextSetCfg::CclmModeFlag = ContextSetCfg::addCtxSet

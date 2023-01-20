@@ -158,6 +158,7 @@
 #define JVET_AB0155_SGPM                                  1 // JVET-AB0155: Spatial geometric partitioning mode
 #define JVET_AB0157_TMRL                                  1 // JVET-AB0157: Template-based multiple reference line intra prediction
 #define JVET_AB0157_INTRA_FUSION                          1 // JVET-AB0157: Intra prediction fusion
+#define JVET_AC0105_DIRECTIONAL_PLANAR                    1 // JVET-AC0105: Directional planar
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM

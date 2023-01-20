@@ -2097,6 +2097,23 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
       pu->intraDir[0] = ipred_mode;
     }
 
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    if (CU::isDirectionalPlanarAvailable(cu) && pu->ipred_idx == 0 && mpmFlag[k])
+    {
+      uint8_t plIdx = 0;
+      plIdx         = m_BinDecoder.decodeBin(Ctx::IntraLumaPlanarFlag(2));
+      if (plIdx)
+      {
+        plIdx += m_BinDecoder.decodeBin(Ctx::IntraLumaPlanarFlag(3));
+      }
+      cu.plIdx = plIdx;
+    }
+    else
+    {
+      cu.plIdx = 0;
+    }
+#endif
+
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
     DTRACE( g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) predIdx=%d mpm=%d secondmpm=%d \n", k, pu->lumaPos().x, pu->lumaPos().y, pu->ipred_idx, pu->mpmFlag, pu->secondMpmFlag);
 #else

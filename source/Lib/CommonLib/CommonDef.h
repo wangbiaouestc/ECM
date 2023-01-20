@@ -491,6 +491,10 @@ static const int EXT_VDIA_IDX =                                   130;
 #define MAP131TO67( mode )                 (mode<2?mode:((mode>>1)+1))
 #define MAP67TO131( mode )                 (mode<2?mode:((mode<<1)-2))
 #endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+static const int PL_HOR_IDX = 299;
+static const int PL_VER_IDX = 399;
+#endif
 #if JVET_AB0157_TMRL
 static const int TMRL_TPL_SIZE =                                    1;
 static const int MRL_LIST_SIZE =                                   20;

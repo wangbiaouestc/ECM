@@ -952,7 +952,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #endif
     switch (uiDirMode)
     {
-    case(PLANAR_IDX): xPredIntraPlanar(srcBuf, piPred); break;
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    case (PLANAR_IDX): xPredIntraPlanar(srcBuf, piPred, isLuma(compID) ? pu.cu->plIdx : 0); break;
+#else
+    case (PLANAR_IDX): xPredIntraPlanar(srcBuf, piPred); break;
+#endif
     case(DC_IDX):     xPredIntraDc(srcBuf, piPred, channelType, false); break;
     case(BDPCM_IDX):  xPredIntraBDPCM(srcBuf, piPred, isLuma(compID) ? pu.cu->bdpcmMode : pu.cu->bdpcmModeChroma, clpRng); break;
 #if JVET_W0123_TIMD_FUSION
@@ -1000,7 +1004,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 
     PelBuf planarBuffer = m_tempBuffer[0].getBuf( localUnitArea.Y() );
 
-    xPredIntraPlanar( srcBuf, planarBuffer );
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    xPredIntraPlanar(srcBuf, planarBuffer, 0);
+#else
+    xPredIntraPlanar(srcBuf, planarBuffer);
+#endif
 
     const bool applyPdpc = m_ipaParam.applyPDPC;
 
@@ -1217,7 +1225,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 
     switch (pu.cu->timdModeSecondary)
     {
-    case(PLANAR_IDX): xPredIntraPlanar(srcBuf, predFusion); break;
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    case (PLANAR_IDX): xPredIntraPlanar(srcBuf, predFusion, 0); break;
+#else
+    case (PLANAR_IDX): xPredIntraPlanar(srcBuf, predFusion); break;
+#endif
     case(DC_IDX):     xPredIntraDc(srcBuf, predFusion, channelType, false); break;
 #if JVET_AB0157_INTRA_FUSION
     default:          xPredIntraAng(srcBuf, predFusion, channelType, clpRng, bExtIntraDir, srcBuf2nd, pu.cu->ispMode!=NOT_INTRA_SUBPARTITIONS, 0); break;
@@ -1285,7 +1297,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     const CPelBuf &srcBuf2 = CPelBuf(getPredictorPtr(compID), srcStride, srcHStride);
     switch (uiDirMode2)
     {
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    case (PLANAR_IDX): xPredIntraPlanar(srcBuf2, predFusion, 0); break;
+#else
     case (PLANAR_IDX): xPredIntraPlanar(srcBuf2, predFusion); break;
+#endif
     case (DC_IDX): xPredIntraDc(srcBuf2, predFusion, channelType, false); break;
 #if JVET_AB0157_INTRA_FUSION
     default:
@@ -1521,7 +1537,11 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
  */
 
 //NOTE: Bit-Limit - 24-bit source
-void IntraPrediction::xPredIntraPlanar( const CPelBuf &pSrc, PelBuf &pDst )
+void IntraPrediction::xPredIntraPlanar( const CPelBuf &pSrc, PelBuf &pDst
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+  , uint8_t plidx
+#endif
+)
 {
   const uint32_t width  = pDst.width;
   const uint32_t height = pDst.height;
@@ -1546,7 +1566,89 @@ void IntraPrediction::xPredIntraPlanar( const CPelBuf &pSrc, PelBuf &pDst )
   {
     leftColumn[k] = src[k];
   }
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+  if (plidx == 0)   // original planar
+  {
+    // Prepare intermediate variables used in interpolation
+    int bottomLeft = leftColumn[height];
+    int topRight   = topRow[width];
 
+    for (int k = 0; k < width; k++)
+    {
+      bottomRow[k] = bottomLeft - topRow[k];
+      topRow[k]    = topRow[k] << log2H;
+    }
+
+    for (int k = 0; k < height; k++)
+    {
+      rightColumn[k] = topRight - leftColumn[k];
+      leftColumn[k]  = leftColumn[k] << log2W;
+    }
+
+    const uint32_t finalShift = 1 + log2W + log2H;
+    const uint32_t stride     = pDst.stride;
+    Pel *          pred       = pDst.buf;
+    for (int y = 0; y < height; y++, pred += stride)
+    {
+      int horPred = leftColumn[y];
+
+      for (int x = 0; x < width; x++)
+      {
+        horPred += rightColumn[y];
+        topRow[x] += bottomRow[x];
+
+        int vertPred = topRow[x];
+        pred[x]      = ((horPred << log2H) + (vertPred << log2W) + offset) >> finalShift;
+      }
+    }
+  }
+  else if (plidx == 1)   // planar hor
+  {
+    // Prepare intermediate variables used in interpolation
+    int topRight = topRow[width];
+    for (int k = 0; k < height; k++)
+    {
+      rightColumn[k] = topRight - leftColumn[k];
+      leftColumn[k]  = leftColumn[k] << log2W;
+    }
+
+    const uint32_t stride = pDst.stride;
+    Pel *          pred   = pDst.buf;
+    int            horPred;
+    for (int y = 0; y < height; y++, pred += stride)
+    {
+      horPred = leftColumn[y];
+      for (int x = 0; x < width; x++)
+      {
+        horPred += rightColumn[y];
+        pred[x] = (horPred + (1 << (log2W - 1))) >> log2W;
+      }
+    }
+  }
+  else   // planar ver
+  {
+    // Prepare intermediate variables used in interpolation
+    int bottomLeft = leftColumn[height];
+    for (int k = 0; k < width; k++)
+    {
+      bottomRow[k] = bottomLeft - topRow[k];
+      topRow[k]    = topRow[k] << log2H;
+    }
+
+    const uint32_t stride = pDst.stride;
+    Pel *          pred   = pDst.buf;
+    int            vertPred;
+    for (int y = 0; y < height; y++, pred += stride)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        topRow[x] += bottomRow[x];
+        vertPred = topRow[x];
+        pred[x]  = (vertPred + (1 << (log2H - 1))) >> log2H;
+      }
+    }
+  }
+#else
   // Prepare intermediate variables used in interpolation
   int bottomLeft = leftColumn[height];
   int topRight = topRow[width];
@@ -1579,6 +1681,7 @@ void IntraPrediction::xPredIntraPlanar( const CPelBuf &pSrc, PelBuf &pDst )
       pred[x]      = ( ( horPred << log2H ) + ( vertPred << log2W ) + offset ) >> finalShift;
     }
   }
+#endif
 }
 
 void IntraPrediction::xPredIntraDc( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const bool enableBoundaryFilter )
