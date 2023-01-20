@@ -613,6 +613,9 @@ protected:
 #if JVET_AB0157_TMRL
     , const double* tmrlCostList
 #endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    , const double* dirPlanarCostList
+#endif
   );
   void   derivePLTLossy  (      CodingStructure& cs, Partitioner& partitioner, ComponentID compBegin, uint32_t numComp);
   void   calcPixelPred   (      CodingStructure& cs, Partitioner& partitioner, uint32_t    yPos,      uint32_t xPos,             ComponentID compBegin, uint32_t  numComp);

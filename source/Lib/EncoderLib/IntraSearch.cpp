@@ -670,6 +670,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #if JVET_W0123_TIMD_FUSION
     bool bestTimdMode = false;
 #endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    uint8_t bestPlMode = 0;
+#endif
 #if JVET_AB0155_SGPM
     bool bestSgpmMode = false;
     const CompArea &area = pu.Y();
@@ -828,6 +831,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #if JVET_AB0157_TMRL
           double tmrlCostList[MRL_LIST_SIZE]{ MAX_DOUBLE };
 #endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+          double dirPlanarCostList[2]{ MAX_DOUBLE };
+#endif
 
           //*** Derive (regular) candidates using Hadamard
           cu.mipFlag = false;
@@ -916,6 +922,73 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               updateCandList(ModeInfo(false, false, 0, NOT_INTRA_SUBPARTITIONS, uiMode), double(minSadHad),
                              uiHadModeList, CandHadList, numHadCand);
             }
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+            bool testDirPlanar = isLuma(partitioner.chType);
+            if (testDirPlanar)
+            {
+              for (int dirPlanarModeIdx = 0; dirPlanarModeIdx < 2; dirPlanarModeIdx++)
+              {
+                cu.sgpm        = false;
+                cu.ispMode     = 0;
+                cu.tmpFlag     = false;
+                cu.tmrlFlag    = false;
+                pu.multiRefIdx = 0;
+                cu.mipFlag     = false;
+                pu.intraDir[0] = PLANAR_IDX;
+                cu.plIdx       = dirPlanarModeIdx + 1;
+
+                initPredIntraParams(pu, pu.Y(), sps);
+#if JVET_AB0157_INTRA_FUSION
+                predIntraAng(COMPONENT_Y, piPred, pu, false);
+#else
+                predIntraAng(COMPONENT_Y, piPred, pu);
+#endif
+
+                // Use the min between SAD and SATD as the cost criterion
+                // SAD is scaled by 2 to align with the scaling of HAD
+                Distortion minSadHad =
+                  std::min(distParamSad.distFunc(distParamSad) * 2, distParamHad.distFunc(distParamHad));
+
+                // NB xFracModeBitsIntra will not affect the mode for chroma that may have already been
+                // pre-estimated.
+#if JVET_V0130_INTRA_TMP
+                m_CABACEstimator->getCtx() = SubCtx(Ctx::TmpFlag, ctxStartTpmFlag);
+#endif
+                m_CABACEstimator->getCtx() = SubCtx(Ctx::MipFlag, ctxStartMipFlag);
+#if JVET_W0123_TIMD_FUSION
+                m_CABACEstimator->getCtx() = SubCtx(Ctx::TimdFlag, ctxStartTimdFlag);
+#endif
+#if JVET_AB0155_SGPM
+                m_CABACEstimator->getCtx() = SubCtx(Ctx::SgpmFlag, ctxStartSgpmFlag);
+#endif
+                m_CABACEstimator->getCtx() = SubCtx(Ctx::ISPMode, ctxStartIspMode);
+#if SECONDARY_MPM
+                m_CABACEstimator->getCtx() = SubCtx(Ctx::IntraLumaMPMIdx, ctxStartMPMIdxFlag);
+#endif
+                m_CABACEstimator->getCtx() = SubCtx(Ctx::IntraLumaPlanarFlag, ctxStartPlanarFlag);
+                m_CABACEstimator->getCtx() = SubCtx(Ctx::IntraLumaMpmFlag, ctxStartIntraMode);
+#if SECONDARY_MPM
+                m_CABACEstimator->getCtx() = SubCtx(Ctx::IntraLumaSecondMpmFlag, ctxStartIntraMode2);
+#endif
+                m_CABACEstimator->getCtx() = SubCtx(Ctx::MultiRefLineIdx, ctxStartMrlIdx);
+#if JVET_AB0157_TMRL
+                m_CABACEstimator->getCtx() = SubCtx(Ctx::TmrlDerive, ctxStartTmrlDerive);
+#endif
+
+                uint64_t fracModeBits = xFracModeBitsIntra(pu, PLANAR_IDX, CHANNEL_TYPE_LUMA);
+                double cost = (double) minSadHad + (double) fracModeBits * sqrtLambdaForFirstPass;
+
+                updateCandList(
+                  ModeInfo(false, false, 0, NOT_INTRA_SUBPARTITIONS, dirPlanarModeIdx ? PL_VER_IDX : PL_HOR_IDX), cost,
+                  uiRdModeList, CandCostList, numModesForFullRD);
+                updateCandList(
+                  ModeInfo(false, false, 0, NOT_INTRA_SUBPARTITIONS, dirPlanarModeIdx ? PL_VER_IDX : PL_HOR_IDX),
+                  double(minSadHad), uiHadModeList, CandHadList, numHadCand);
+                dirPlanarCostList[dirPlanarModeIdx] = cost;
+              }
+            }
+            cu.plIdx = 0;
+#endif
             if (!sps.getUseMIP() && LFNSTSaveFlag)
             {
               // save found best modes
@@ -1022,6 +1095,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               // we save the regular intra modes list
               m_ispCandListHor = uiRdModeList;
             }
+
 #if !JVET_AB0157_TMRL
             pu.multiRefIdx    = 1;
 #if SECONDARY_MPM
@@ -1381,6 +1455,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #if JVET_AB0157_TMRL
                 , tmrlCostList
 #endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+                , dirPlanarCostList
+#endif
               );
             }
             if (sps.getUseMIP() && LFNSTSaveFlag)
@@ -1674,6 +1751,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #else
       CHECK(numModesForFullRD != uiRdModeList.size(), "Inconsistent state!");
 #endif
+
       // after this point, don't use numModesForFullRD
       // PBINTRA fast
       if (m_pcEncCfg->getUsePbIntraFast() && !cs.slice->isIntra() && uiRdModeList.size() < numModesAvailable
@@ -1942,6 +2020,27 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       {
         uiOrgMode.modeId = cu.dimdMode;
         cu.dimd = true;
+      }
+#endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+      cu.plIdx = 0;
+      if (mode >= 0 && uiOrgMode.modeId == PL_HOR_IDX)
+      {
+        if (cu.ispMode)
+        {
+          continue;
+        }
+        uiOrgMode.modeId = PLANAR_IDX;
+        cu.plIdx         = 1;
+      }
+      if (mode >= 0 && uiOrgMode.modeId == PL_VER_IDX)
+      {
+        if (cu.ispMode)
+        {
+          continue;
+        }
+        uiOrgMode.modeId = PLANAR_IDX;
+        cu.plIdx         = 2;
       }
 #endif
 #if JVET_AB0155_SGPM
@@ -2234,6 +2333,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #if JVET_W0123_TIMD_FUSION
           bestTimdMode = cu.timd;
 #endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+          bestPlMode = cu.plIdx;
+#endif
 #if JVET_AB0155_SGPM
           bestSgpmMode = cu.sgpm;
 #endif
@@ -2359,6 +2461,19 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       if (cu.timd)
       {
         pu.intraDir[ CHANNEL_TYPE_LUMA ] = cu.timdMode;
+      }
+#endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+      cu.plIdx = bestPlMode;
+      if (cu.plIdx)
+      {
+        CHECK(pu.multiRefIdx > 0, "use of PL");
+        CHECK(cu.mipFlag, "use of PL");
+        CHECK(cu.dimd, "use of PL");
+        CHECK(cu.tmpFlag, "use of PL");
+        CHECK(cu.tmrlFlag, "use of PL");
+        CHECK(cu.sgpm, "use of PL");
+        CHECK(cu.timd, "use of PL");
       }
 #endif
 #if JVET_AB0155_SGPM
@@ -8395,6 +8510,9 @@ void IntraSearch::reduceHadCandList(static_vector<T, N>& candModeList, static_ve
 #if JVET_AB0157_TMRL
   , const double* tmrlCostList
 #endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+  , const double* dirPlanarCostList
+#endif
 )
 {
   const int maxCandPerType = numModesForFullRD >> 1;
@@ -8471,11 +8589,11 @@ void IntraSearch::reduceHadCandList(static_vector<T, N>& candModeList, static_ve
   }
 
 #if JVET_AB0157_TMRL
-  if( pu.lwidth() > 8 && pu.lheight() > 8 && CU::allowTmrl(*pu.cu))
+  if (pu.lwidth() > 8 && pu.lheight() > 8 && CU::allowTmrl(*pu.cu))
   {
     // Sort TMRL candidates by cost.
     static_vector<uint8_t, FAST_UDI_MAX_RDMODE_NUM> sortedTmrlModes(0);
-    static_vector<double, FAST_UDI_MAX_RDMODE_NUM> sortedTmrlCost(0);
+    static_vector<double, FAST_UDI_MAX_RDMODE_NUM>  sortedTmrlCost(0);
     for (uint8_t tmrlListIdx = 0; tmrlListIdx < MRL_LIST_SIZE; tmrlListIdx++)
     {
       CHECK(tmrlCostList[tmrlListIdx] == MAX_DOUBLE, "tmrlCostList is not filled.");
@@ -8486,9 +8604,9 @@ void IntraSearch::reduceHadCandList(static_vector<T, N>& candModeList, static_ve
     const int modeListSize = int(tempRdModeList.size());
     for (int idx = 0; idx < 3; idx++)
     {
-      const uint8_t tmrlListIdx = sortedTmrlModes[idx];
+      const uint8_t  tmrlListIdx = sortedTmrlModes[idx];
       const ModeInfo tmrlMode(false, false, tmrlListIdx + MAX_REF_LINE_IDX, NOT_INTRA_SUBPARTITIONS, 0);
-      bool alreadyIncluded = false;
+      bool           alreadyIncluded = false;
       for (int modeListIdx = 0; modeListIdx < modeListSize; modeListIdx++)
       {
         if (tempRdModeList[modeListIdx] == tmrlMode)
@@ -8504,6 +8622,40 @@ void IntraSearch::reduceHadCandList(static_vector<T, N>& candModeList, static_ve
         updateCandList(tmrlMode, sortedTmrlCost[idx], tempRdModeList, tempCandCostList, numRd);
         break;
       }
+    }
+  }
+#endif
+
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+  static_vector<uint8_t, FAST_UDI_MAX_RDMODE_NUM> sortedDirPlanarModes(0);
+  static_vector<double, FAST_UDI_MAX_RDMODE_NUM>  sortedDirPlanarCost(0);
+  for (uint8_t Idx = 0; Idx < 2; Idx++)
+  {
+    CHECK(dirPlanarCostList[Idx] == MAX_DOUBLE, "dirPlanarCostList is not filled.");
+    updateCandList(Idx, dirPlanarCostList[Idx], sortedDirPlanarModes, sortedDirPlanarCost, 2);
+  }
+
+  const int modeListSize = int(tempRdModeList.size());
+  for (int idx = 0; idx < 2; idx++)
+  {
+    const uint8_t  dirPlanarListIdx = sortedDirPlanarModes[idx];
+    const ModeInfo dirPlanarMode(false, false, 0, NOT_INTRA_SUBPARTITIONS,
+                                  dirPlanarListIdx == 0 ? PL_HOR_IDX : PL_VER_IDX);
+    bool alreadyIncluded = false;
+    for (int modeListIdx = 0; modeListIdx < modeListSize; modeListIdx++)
+    {
+      if (tempRdModeList[modeListIdx] == dirPlanarMode)
+      {
+        alreadyIncluded = true;
+        break;
+      }
+    }
+
+    if (!alreadyIncluded)
+    {
+      const auto numRd = tempRdModeList.size() + 1;
+      updateCandList(dirPlanarMode, sortedDirPlanarCost[idx], tempRdModeList, tempCandCostList, numRd);
+      break;
     }
   }
 #endif
@@ -8699,6 +8851,9 @@ void IntraSearch::xGetNextISPMode(ModeInfo& modeInfo, const ModeInfo* lastMode, 
 #endif
 #if JVET_W0123_TIMD_FUSION
       candidate.modeId != TIMD_IDX &&
+#endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+      candidate.modeId != PL_HOR_IDX && candidate.modeId != PL_VER_IDX &&
 #endif
       maxNumSubPartitions > 2 && (curIspLfnstIdx > 0 || (candidate.modeId >= DC_IDX && ispTestedModes.numTestedModes[nextISPcandSplitType - 1] >= 2)))
     {
@@ -8937,6 +9092,9 @@ bool IntraSearch::xSortISPCandList(double bestCostSoFar, double bestNonISPCost, 
 #if JVET_W0123_TIMD_FUSION
       origHadList.at(k).modeId == TIMD_IDX ||
 #endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+      origHadList.at(k).modeId == PL_HOR_IDX || origHadList.at(k).modeId == PL_VER_IDX ||
+#endif
 	!modeIsInList[origHadList.at(k).modeId])
     {
       destListPtr->push_back( ModeInfo( refMode.mipFlg, refMode.mipTrFlg, refMode.mRefId, refMode.ispMod, origHadList.at(k).modeId ) );
@@ -8990,6 +9148,12 @@ void IntraSearch::xSortISPCandListLFNST()
 #endif
 #if JVET_W0123_TIMD_FUSION
         if( candList[i].modeId == TIMD_IDX )
+        {
+          continue;
+        }
+#endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+        if (candList[i].modeId == PL_HOR_IDX || candList[i].modeId == PL_VER_IDX)
         {
           continue;
         }

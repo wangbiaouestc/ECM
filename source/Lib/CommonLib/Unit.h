@@ -329,6 +329,9 @@ struct CodingUnit : public UnitArea
   bool           rootCbf;
   uint8_t        sbtInfo;
   uint32_t           tileIdx;
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+  uint8_t        plIdx;
+#endif
 #if ENABLE_DIMD
   bool           dimd;
   bool           dimdBlending;

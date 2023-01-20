@@ -526,6 +526,20 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
 #endif
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
 
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    if (intraMode == PLANAR_IDX)
+    {
+      if (tu.cu->plIdx == 2)
+      {
+        intraMode = HOR_IDX;
+      }
+      else if (tu.cu->plIdx == 1)
+      {
+        intraMode = VER_IDX;
+      }
+    }
+#endif
+
 #if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
     if (lfnstIdx < 4)
 #else
@@ -761,6 +775,20 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
     }
 #endif
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
+
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    if (intraMode == PLANAR_IDX)
+    {
+      if (tu.cu->plIdx == 2)
+      {
+        intraMode = HOR_IDX;
+      }
+      else if (tu.cu->plIdx == 1)
+      {
+        intraMode = VER_IDX;
+      }
+    }
+#endif
 
 #if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
     if ( lfnstIdx < 4 )
@@ -1170,6 +1198,19 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
         predMode = PU::getWideAngle(tu, (uint32_t)predMode, compID);
         CHECK(predMode < -(NUM_EXT_LUMA_MODE >> 1) || predMode >= NUM_LUMA_MODE + (NUM_EXT_LUMA_MODE >> 1), "luma mode out of range");
         predMode = (predMode < 0) ? 2 : (predMode >= NUM_LUMA_MODE) ? 66 : predMode;
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+        if (predMode == PLANAR_IDX)
+        {
+          if (tu.cu->plIdx == 2)
+          {
+            predMode = HOR_IDX;
+          }
+          else if (tu.cu->plIdx == 1)
+          {
+            predMode = VER_IDX;
+          }
+        }
+#endif
         nMdIdx = predMode > DIA_IDX ? (NUM_LUMA_MODE + 1 - predMode) : predMode;
         isTrTransposed = (predMode > DIA_IDX) ? true : false;
       }
@@ -2242,6 +2283,20 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
   if (tu.cu->timd && compID == COMPONENT_Y)
   {
     intraMode = MAP131TO67(intraMode);
+  }
+#endif
+
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+  if (intraMode == PLANAR_IDX)
+  {
+    if (tu.cu->plIdx == 2)
+    {
+      intraMode = HOR_IDX;
+    }
+    else if (tu.cu->plIdx == 1)
+    {
+      intraMode = VER_IDX;
+    }
   }
 #endif
 

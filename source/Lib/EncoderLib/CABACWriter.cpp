@@ -1666,6 +1666,17 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
       }
     }
 
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    if (CU::isDirectionalPlanarAvailable(cu) && mpm_idx == 0)
+    {
+      m_BinEncoder.encodeBin(cu.plIdx > 0, Ctx::IntraLumaPlanarFlag(2));
+      if (cu.plIdx)
+      {
+        m_BinEncoder.encodeBin(cu.plIdx > 1, Ctx::IntraLumaPlanarFlag(3));
+      }
+    }
+#endif
+
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
     DTRACE(g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) predIdx=%d mpm=%d secondmpm=%d \n", k, pu->lumaPos().x, pu->lumaPos().y, pred_idx, mpm_idx < numMPMs, secondMpmFlag);
 #else
@@ -1851,6 +1862,17 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
 #endif
     }
   }
+
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+  if (CU::isDirectionalPlanarAvailable(*pu.cu) && mpm_idx == 0)
+  {
+    m_BinEncoder.encodeBin(pu.cu->plIdx > 0, Ctx::IntraLumaPlanarFlag(2));
+    if (pu.cu->plIdx)
+    {
+      m_BinEncoder.encodeBin(pu.cu->plIdx > 1, Ctx::IntraLumaPlanarFlag(3));
+    }
+  }
+#endif
 }
 
 #if JVET_W0123_TIMD_FUSION

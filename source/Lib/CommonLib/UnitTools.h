@@ -139,6 +139,9 @@ namespace CU
 #if JVET_AB0157_TMRL
   bool allowTmrl(const CodingUnit& cu);
 #endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+  bool isDirectionalPlanarAvailable(const CodingUnit &cu);
+#endif
 }
 // PU tools
 namespace PU

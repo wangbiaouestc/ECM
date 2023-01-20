@@ -276,6 +276,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   mtsFlag           = other.mtsFlag;
   lfnstIdx          = other.lfnstIdx;
   tileIdx           = other.tileIdx;
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+  plIdx = other.plIdx;
+#endif
 #if ENABLE_DIMD
   dimd = other.dimd;
   dimdBlending = other.dimdBlending;
@@ -412,6 +415,9 @@ void CodingUnit::initData()
   mtsFlag           = 0;
   lfnstIdx          = 0;
   tileIdx           = 0;
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+  plIdx = 0;
+#endif
 #if ENABLE_DIMD
   dimd = false;
   dimdBlending = false;

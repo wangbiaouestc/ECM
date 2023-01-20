@@ -302,7 +302,11 @@ protected:
 #endif
 
   // prediction
-  void xPredIntraPlanar           ( const CPelBuf &pSrc, PelBuf &pDst );
+  void xPredIntraPlanar           ( const CPelBuf &pSrc, PelBuf &pDst
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    , uint8_t plidx
+#endif
+  );
   void xPredIntraDc               ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const bool enableBoundaryFilter = true );
 #if JVET_W0123_TIMD_FUSION
 #if JVET_AB0157_INTRA_FUSION
