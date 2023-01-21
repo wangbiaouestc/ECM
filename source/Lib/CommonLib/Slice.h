@@ -2446,6 +2446,9 @@ private:
   bool             m_wrapAroundEnabledFlag;               //< reference wrap around enabled or not
   unsigned         m_picWidthMinusWrapAroundOffset;          // <pic_width_in_minCbSizeY - wraparound_offset_in_minCbSizeY
   unsigned         m_wrapAroundOffset;                    //< reference wrap around offset in luma samples
+#if JVET_AC0189_SGPM_NO_BLENDING
+  bool             m_sgpmNoBlend;
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   bool             m_BIF;
   int              m_BIFStrength;
@@ -2651,6 +2654,10 @@ public:
 
   void                   setCabacInitPresentFlag( bool flag )                             { m_cabacInitPresentFlag = flag;                }
   bool                   getCabacInitPresentFlag() const                                  { return m_cabacInitPresentFlag;                }
+#if JVET_AC0189_SGPM_NO_BLENDING
+  void                   setUseSgpmNoBlend( bool b)                                               { m_sgpmNoBlend = b;                                    }
+  bool                   getUseSgpmNoBlend() const                                                { return m_sgpmNoBlend;                                 }
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   void                   setUseBIF( bool b)                                               { m_BIF = b;                                    }
   bool                   getUseBIF() const                                                { return m_BIF;                                 }

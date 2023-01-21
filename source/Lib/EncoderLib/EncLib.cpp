@@ -2153,6 +2153,9 @@ void EncLib::xInitPPS(PPS &pps, const SPS &sps)
   pps.setWPBiPred( m_useWeightedBiPred );
   pps.setOutputFlagPresentFlag( false );
 
+#if JVET_AC0189_SGPM_NO_BLENDING
+  pps.setUseSgpmNoBlend                ( m_sgpmNoBlend );
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   pps.setUseBIF                ( m_BIF );
   pps.setBIFStrength           ( m_BIFStrength );
