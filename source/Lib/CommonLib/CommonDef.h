@@ -898,6 +898,10 @@ static const int    BM_MRG_SUB_PU_INT_MAX_SRCH_ROUND              = 3;
 #if JVET_AB0112_AFFINE_DMVR
 static const int    AFFINE_DMVR_MAX_NUM_ITERATIONS               = 26;
 static const int    AFFINE_DMVR_SEARCH_RANGE                      = 3;
+#if JVET_AC0144_AFFINE_DMVR_REGRESSION
+static const int    AFFINE_DMVR_INT_SRCH_RANGE                    = 2;
+static const int    AFFINE_DMVR_MIN_SUBBLK_SIZE                   = 4;
+#endif
 #endif
 static const int    AML_MERGE_TEMPLATE_SIZE                       = 1;
 #endif

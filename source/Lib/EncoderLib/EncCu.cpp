@@ -3949,10 +3949,17 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if JVET_AB0112_AFFINE_DMVR
       if (affineMrgAvail)
       {
+#if JVET_AC0144_AFFINE_DMVR_REGRESSION
+        EAffineModel affType[AFFINE_MRG_MAX_NUM_CANDS];
+        Mv refinedAffineMv[AFFINE_MRG_MAX_NUM_CANDS << 1][3];
+        bool applyBDMVR4Affine[AFFINE_MRG_MAX_NUM_CANDS] = { false };
+#endif
         for (uint32_t uiAffMergeCand = 0; uiAffMergeCand < affineMergeCtx.numValidMergeCand; uiAffMergeCand++)
         {
+#if !JVET_AC0144_AFFINE_DMVR_REGRESSION
           m_mvBufBDMVR4AFFINE[uiAffMergeCand << 1][0].setZero();
           m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 1][0].setZero();
+#endif
           pu.bdmvrRefine = false;
           if (affineMergeCtx.interDirNeighbours[uiAffMergeCand] == 3 && affineMergeCtx.mergeType[uiAffMergeCand] != MRG_TYPE_SUBPU_ATMVP)
           {
@@ -3982,23 +3989,49 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             pu.mvAffi[REF_PIC_LIST_1][2] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][2].mv;
             if(PU::checkBDMVRCondition(pu))
             {
+#if !JVET_AC0144_AFFINE_DMVR_REGRESSION
                 // set merge information   
               m_pcInterSearch->setBdmvrSubPuMvBuf(m_mvBufBDMVR4AFFINE[uiAffMergeCand << 1], m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 1]);
+#endif
               if (!affineMergeCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu)))
               {
                 m_pcInterSearch->processBDMVR4Affine(pu);
+#if JVET_AC0144_AFFINE_DMVR_REGRESSION
+                refinedAffineMv[(uiAffMergeCand << 1) + 0][0] = pu.mvAffi[REF_PIC_LIST_0][0];
+                refinedAffineMv[(uiAffMergeCand << 1) + 0][1] = pu.mvAffi[REF_PIC_LIST_0][1];
+                refinedAffineMv[(uiAffMergeCand << 1) + 0][2] = pu.mvAffi[REF_PIC_LIST_0][2];
+                refinedAffineMv[(uiAffMergeCand << 1) + 1][0] = pu.mvAffi[REF_PIC_LIST_1][0];
+                refinedAffineMv[(uiAffMergeCand << 1) + 1][1] = pu.mvAffi[REF_PIC_LIST_1][1];
+                refinedAffineMv[(uiAffMergeCand << 1) + 1][2] = pu.mvAffi[REF_PIC_LIST_1][2];
+                affType[uiAffMergeCand] = (EAffineModel)pu.cu->affineType;
+                applyBDMVR4Affine[uiAffMergeCand] = true;
+#endif
               }
             }
           }
         }
         for (uint32_t uiAffMergeCand = 0; uiAffMergeCand < affineMergeCtx.numValidMergeCand; uiAffMergeCand++)
         {
+#if JVET_AC0144_AFFINE_DMVR_REGRESSION
+          if (!applyBDMVR4Affine[uiAffMergeCand])
+          {
+            continue;
+          }
+          affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][0].mv = refinedAffineMv[(uiAffMergeCand << 1) + 0][0];
+          affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][1].mv = refinedAffineMv[(uiAffMergeCand << 1) + 0][1];
+          affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][2].mv = refinedAffineMv[(uiAffMergeCand << 1) + 0][2];
+          affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][0].mv = refinedAffineMv[(uiAffMergeCand << 1) + 1][0];
+          affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][1].mv = refinedAffineMv[(uiAffMergeCand << 1) + 1][1];
+          affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][2].mv = refinedAffineMv[(uiAffMergeCand << 1) + 1][2];
+          affineMergeCtx.affineType[uiAffMergeCand] = affType[uiAffMergeCand];
+#else
           affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][0].mv += m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 0][0];
           affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][1].mv += m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 0][0];
           affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][2].mv += m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 0][0];
           affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][0].mv += m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 1][0];
           affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][1].mv += m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 1][0];
           affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][2].mv += m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 1][0];
+#endif
         }
       }
 #endif

@@ -1709,6 +1709,13 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 {
   for( auto &pu : CU::traversePUs( cu ) )
   {
+#if JVET_AC0144_AFFINE_DMVR_REGRESSION
+    if (cu.cs->pcv->isEncoder && !cu.geoFlag && !(!pu.cu->affine && PU::checkBDMVRCondition(pu)) && pu.mergeType != MRG_TYPE_SUBPU_ATMVP)
+    {
+      PU::spanMotionInfo(pu);
+      continue;
+    }
+#endif
     MergeCtx mrgCtx;
 
 #if RExt__DECODER_DEBUG_TOOL_STATISTICS
@@ -2001,17 +2008,21 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if JVET_AB0112_AFFINE_DMVR
           if (!pu.afMmvdFlag&&pu.mergeType != MRG_TYPE_SUBPU_ATMVP && PU::checkBDMVRCondition(pu))
           {
+#if !JVET_AC0144_AFFINE_DMVR_REGRESSION
             m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
+#endif
             pu.bdmvrRefine = false;
             if (!affineMergeCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu)))
             {
               m_pcInterPred->processBDMVR4Affine(pu);
+#if !JVET_AC0144_AFFINE_DMVR_REGRESSION
               pu.mvAffi[0][0] += m_mvBufBDMVR[0][0];
               pu.mvAffi[0][1] += m_mvBufBDMVR[0][0];
               pu.mvAffi[0][2] += m_mvBufBDMVR[0][0];
               pu.mvAffi[1][0] += m_mvBufBDMVR[1][0];
               pu.mvAffi[1][1] += m_mvBufBDMVR[1][0];
               pu.mvAffi[1][2] += m_mvBufBDMVR[1][0];
+#endif
             }
           }
 #endif

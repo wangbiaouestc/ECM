@@ -15453,7 +15453,240 @@ bool CU::allowTmrl(const CodingUnit& cu)
   return bReorder;
 }
 #endif
+#if JVET_AC0144_AFFINE_DMVR_REGRESSION
+int deriveAffineSubBlkSize(const int sz, const int minSbSz, const int deltaMvX, const int deltaMvY, const int shift)
+{
+  int sbSz = minSbSz;
+  if (deltaMvX == 0 && deltaMvY == 0)
+  {
+    sbSz = sz;
+  }
+  else
+  {
+    int maxDmv = std::max(abs(deltaMvX), abs(deltaMvY)) * sbSz;
+    int thred = 1 << (shift - 1);
+    while (maxDmv < thred && sbSz < sz)
+    {
+      sbSz <<= 1;
+      maxDmv <<= 1;
+    }
+  }
+  return sbSz;
+}
 
+void PU::deriveAffineCandFromMvField(Position posLT, const int width, const int height, std::vector<RMVFInfo> mvInfoVec, Mv mvAffi[3])
+{
+  int64_t cMvX = 0, cMvY = 0;
+  Mv cMv;
+  Mv firstMv;
+  int64_t parametersRMVF[2][4];
+
+  firstMv.set(mvInfoVec[0].mvp.getHor(), mvInfoVec[0].mvp.getVer());
+#if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  firstMv.hor = firstMv.hor >= 0 ? firstMv.hor << 2 : -(-firstMv.hor << 2);
+  firstMv.ver = firstMv.ver >= 0 ? firstMv.ver << 2 : -(-firstMv.ver << 2);
+#endif
+  computeDeltaAndShift(posLT, firstMv, mvInfoVec);
+
+  //-- Model with Linear Regression
+  //-- Calculate RMVF parameters:
+  int64_t sumbb[2][3][3];
+  int64_t sumeb[2][3];
+
+#if JVET_AB0189_RMVF_BITLENGTH_CONTROL
+  int denumShift = (getRMVFMSB(mvInfoVec.size()) - 5);
+  if (denumShift < 0)
+  {
+    denumShift = 0;
+  }
+
+  xCalcRMVFParameters(mvInfoVec, parametersRMVF, sumbb, sumeb, denumShift, 0);
+  for (int i = 0; i < 2; i++)
+  {
+    parametersRMVF[0][i] = divideRMVF(parametersRMVF[0][i], parametersRMVF[0][3], denumShift, false);
+    parametersRMVF[1][i] = divideRMVF(parametersRMVF[1][i], parametersRMVF[1][3], denumShift, false);
+  }
+  parametersRMVF[0][2] = divideRMVF(parametersRMVF[0][2], parametersRMVF[0][3], denumShift, true);
+  parametersRMVF[1][2] = divideRMVF(parametersRMVF[1][2], parametersRMVF[1][3], denumShift, true);
+  cMvX = parametersRMVF[0][2];
+  cMvY = parametersRMVF[1][2];
+  cMvX = (firstMv.getHor() << MAX_CU_DEPTH) + cMvX;
+  cMvY = (firstMv.getVer() << MAX_CU_DEPTH) + cMvY;
+  int iMvX = int(cMvX);
+  int iMvY = int(cMvY);
+  roundAffineMv(iMvX, iMvY, MAX_CU_DEPTH);
+  cMv = Mv(iMvX, iMvY);
+  mvAffi[0] = cMv;
+  mvAffi[0].clipToStorageBitDepth();
+
+  cMvX = parametersRMVF[0][0] * width + parametersRMVF[0][2];
+  cMvY = parametersRMVF[1][0] * width + parametersRMVF[1][2];
+  cMvX = (firstMv.getHor() << MAX_CU_DEPTH) + cMvX;
+  cMvY = (firstMv.getVer() << MAX_CU_DEPTH) + cMvY;
+  iMvX = int(cMvX);
+  iMvY = int(cMvY);
+  roundAffineMv(iMvX, iMvY, MAX_CU_DEPTH);
+  cMv = Mv(iMvX, iMvY);
+
+  mvAffi[1] = cMv;
+  mvAffi[1].clipToStorageBitDepth();
+
+
+  // bottom-left CPMV
+  cMvX = parametersRMVF[0][1] * height + parametersRMVF[0][2];
+  cMvY = parametersRMVF[1][1] * height + parametersRMVF[1][2];
+
+  cMvX = (firstMv.getHor() << MAX_CU_DEPTH) + cMvX;
+  cMvY = (firstMv.getVer() << MAX_CU_DEPTH) + cMvY;
+  iMvX = int(cMvX);
+  iMvY = int(cMvY);
+  roundAffineMv(iMvX, iMvY, MAX_CU_DEPTH);
+  cMv = Mv(iMvX, iMvY);
+
+  mvAffi[2] = cMv;
+  mvAffi[2].clipToStorageBitDepth();
+#else
+  int shift = 2;
+  int iNum = int(mvInfoVec.size());
+  int shiftDets = 5 * (getRMVFMSB(iNum) - 4);
+  if (shiftDets < 0) shiftDets = 0;
+  int sumbb[2][3][3];
+  int sumeb[2][3];
+  int64_t m[3][3]; // parameter=det(md)/det(m)
+  int64_t md[3][3];
+  ////////////////// Extract statistics: Start
+  //initialize values to zero
+  memset(sumeb, 0, sizeof(sumeb));
+  memset(sumbb, 0, sizeof(sumbb));
+  buildRegressionMatrix(mvInfoVec, sumbb, sumeb, false);
+
+  for (int c = 0; c < 2; c++)
+  {
+    for (int d = 0; d < 3; d++)
+    {
+      sumeb[c][d] >>= shift;
+    }
+    for (int d1 = 0; d1 < 3; d1++)
+    {
+      for (int d = 0; d < 3; d++)
+      {
+        sumbb[c][d1][d] >>= shift;
+      }
+    }
+  }
+  ////////////////// Extract statistics: End
+  ////////////////// Extract Weight: Start
+  memcpy(m, sumbb[0], sizeof(sumbb[0]));
+  bool bBadMatrix = false;
+  int64_t det2 = (sumbb[0][2][0]) * ((sumbb[0][0][1] * sumbb[0][1][2] - sumbb[0][1][1] * sumbb[0][0][2]))
+    - (sumbb[0][2][1]) * ((sumbb[0][0][0] * sumbb[0][1][2] - sumbb[0][1][0] * sumbb[0][0][2]))
+    + (sumbb[0][2][2]) * ((sumbb[0][0][0] * sumbb[0][1][1] - sumbb[0][1][0] * sumbb[0][0][1]));//det(3, m);
+  det2 >>= shiftDets;
+  if (det2 == 0)
+  {
+    bBadMatrix = true;
+  }
+  for (int c = 0; c < 2; c++)
+  {
+    // 1) find matrix parameters with cross-component model
+    // Find w[c][d]
+    //int64_t dets[3];
+    if (!bBadMatrix)
+    {
+      for (int d = 0; d < 3; d++)
+      {
+        // Initialize md matrix
+        memcpy(md, m, sizeof(m));
+        // Replace coloumn D in md matrix
+        for (int j = 0; j < 3; j++)
+        {
+          md[j][d] = sumeb[c][j];
+        }
+
+        int64_t det1 = (md[2][0]) * ((md[0][1] * md[1][2] - md[1][1] * md[0][2])/* >> rightShift*/)
+          - (md[2][1]) * ((md[0][0] * md[1][2] - md[1][0] * md[0][2])/* >> rightShift*/)
+          + (md[2][2]) * ((md[0][0] * md[1][1] - md[1][0] * md[0][1])/* >> rightShift*/);//det(3, md);
+        det1 >>= shiftDets;
+
+        //dets[d] = det1;
+        parametersRMVF[c][d] = iNum * det1;
+
+        // calcualte offset
+        if (d == 2)
+        {
+          //parametersRMVF[c][2] = (det2 * sumeb[c][2] - dets[0] * sumbb[c][0][2] - dets[1] * sumbb[c][1][2]) << shift;
+          parametersRMVF[c][3] = iNum * det2;
+        }
+      } // for d
+    }
+
+    if (bBadMatrix)
+    {
+      // 2) Find simple weight and offset, with non-corss component between x and y, i.e.: MVx=weight[0]*x+offset[0], MVy=weight[1]*y+offset[1]
+      for (int d = 0; d < 3; d++)
+      {
+        parametersRMVF[c][d] = 0;
+      }
+      int64_t det1 = (iNum * sumeb[c][c] - sumbb[c][c][2] * sumeb[c][2]);
+      int64_t det2 = (iNum * sumbb[c][c][c] - sumbb[c][c][2] * sumbb[c][c][2]);
+      if (det2 == 0)
+      {
+        parametersRMVF[c][c] = 0;
+        det1 = 0;
+        det2 = 1;
+        parametersRMVF[c][3] = iNum;
+      }
+      else
+      {
+        parametersRMVF[c][c] = iNum * det1;
+        parametersRMVF[c][3] = iNum * det2;
+      }
+      parametersRMVF[c][2] = (det2 * sumeb[c][2] - det1 * sumbb[c][c][2]) << shift;
+    } // End "bBadMatrix"
+
+  } // end "for c"
+    ////////////////// Extract Weights: End
+
+  // top-left CPMV
+  cMvX = parametersRMVF[0][2];
+  cMvY = parametersRMVF[1][2];
+  cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
+  cMvY = divideRMVF(cMvY, parametersRMVF[1][3]);
+  cMvX += firstMv.getHor();
+  cMvY += firstMv.getVer();
+  cMv = Mv((int)(cMvX), (int)(cMvY));
+  cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
+  cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+  mvAffi[0] = cMv;
+
+
+  // top-right CPMV
+  cMvX = parametersRMVF[0][0] * width + parametersRMVF[0][2];
+  cMvY = parametersRMVF[1][0] * width + parametersRMVF[1][2];
+  cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
+  cMvY = divideRMVF(cMvY, parametersRMVF[1][3]);
+  cMvX += firstMv.getHor();
+  cMvY += firstMv.getVer();
+  cMv = Mv((int)(cMvX), (int)(cMvY));
+  cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
+  cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+
+  mvAffi[1] = cMv;
+
+  // bottom-left CPMV
+  cMvX = parametersRMVF[0][1] * height + parametersRMVF[0][2];
+  cMvY = parametersRMVF[1][1] * height + parametersRMVF[1][2];
+  cMvX = divideRMVF(cMvX, parametersRMVF[0][3]);
+  cMvY = divideRMVF(cMvY, parametersRMVF[1][3]);
+  cMvX += firstMv.getHor();
+  cMvY += firstMv.getVer();
+  cMv = Mv((int)(cMvX), (int)(cMvY));
+  cMv.hor = cMv.hor >= 0 ? (cMv.hor + 1) >> 2 : (cMv.hor + 2) >> 2;
+  cMv.ver = cMv.ver >= 0 ? (cMv.ver + 1) >> 2 : (cMv.ver + 2) >> 2;
+  mvAffi[2] = cMv;
+#endif
+}
+#endif
 #if JVET_AC0105_DIRECTIONAL_PLANAR
 bool CU::isDirectionalPlanarAvailable(const CodingUnit &cu)
 {
