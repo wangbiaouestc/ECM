@@ -527,6 +527,9 @@ namespace PU
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   bool hasChromaFusionFlag(const PredictionUnit &pu, int intraMode);
 #endif
+#if JVET_AC0144_AFFINE_DMVR_REGRESSION
+  void deriveAffineCandFromMvField(Position posLT, const int width, const int height, std::vector<RMVFInfo> mvInfoVec, Mv mvAffi[3]);
+#endif
 }
 
 // TU tools
@@ -849,5 +852,9 @@ void sortIntraCandList(double uiCost, int mergeCand, static_vector<double, N>& c
 
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
 bool storeContexts( const Slice* slice, const int ctuXPosInCtus, const int ctuYPosInCtus );
+#endif
+
+#if JVET_AC0144_AFFINE_DMVR_REGRESSION
+int deriveAffineSubBlkSize(const int sz, const int minSbSz, const int deltaMvX, const int deltaMvY, const int shift);
 #endif
 #endif

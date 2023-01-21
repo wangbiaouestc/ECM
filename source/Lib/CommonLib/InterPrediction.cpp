@@ -137,7 +137,7 @@ InterPrediction::InterPrediction()
       m_filteredBlockTmp[i][c] = nullptr;
     }
   }
-#if JVET_AB0112_AFFINE_DMVR
+#if JVET_AB0112_AFFINE_DMVR && !JVET_AC0144_AFFINE_DMVR_REGRESSION
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
   {
     m_affineDmvrBlockTmp[i] = nullptr;
@@ -304,7 +304,7 @@ void InterPrediction::destroy()
       m_filteredBlockTmp[i][c] = nullptr;
     }
   }
-#if JVET_AB0112_AFFINE_DMVR
+#if JVET_AB0112_AFFINE_DMVR && !JVET_AC0144_AFFINE_DMVR_REGRESSION
   for (uint32_t i = 0; i < 2; i++)
   {
     xFree(m_affineDmvrBlockTmp[i]);
@@ -486,7 +486,7 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
         m_acYuvPred[i][c] = ( Pel* ) xMalloc( Pel, MAX_CU_SIZE * MAX_CU_SIZE );
       }
     }
-#if JVET_AB0112_AFFINE_DMVR
+#if JVET_AB0112_AFFINE_DMVR && !JVET_AC0144_AFFINE_DMVR_REGRESSION
     int memBlockWidth = AFFINE_MIN_BLOCK_SIZE + (AFFINE_DMVR_SEARCH_RANGE << 1);
     int memBlockHeight = AFFINE_MIN_BLOCK_SIZE + (AFFINE_DMVR_SEARCH_RANGE << 1);
     int memBlockWidthOffset = BDMVR_SIMD_IF_FACTOR - (memBlockWidth & (BDMVR_SIMD_IF_FACTOR - 1));
@@ -12232,6 +12232,504 @@ void InterPrediction::processBDMVRSubPU(PredictionUnit& pu, bool subPURefine)
 
 #endif
 #if JVET_AB0112_AFFINE_DMVR
+#if JVET_AC0144_AFFINE_DMVR_REGRESSION
+void InterPrediction::bmAffineInit(const PredictionUnit &pu)
+{
+  m_bmChFmt = pu.chromaFormat;
+  m_bmClpRng = pu.cs->slice->clpRng(COMPONENT_Y);
+
+  m_bmRefPic[REF_PIC_LIST_0] = pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[REF_PIC_LIST_0])->unscaledPic;
+  m_bmRefPic[REF_PIC_LIST_1] = pu.cu->slice->getRefPic(REF_PIC_LIST_1, pu.refIdx[REF_PIC_LIST_1])->unscaledPic;
+  m_bmRefBuf[REF_PIC_LIST_0] = m_bmRefPic[REF_PIC_LIST_0]->getRecoBuf(COMPONENT_Y, false);
+  m_bmRefBuf[REF_PIC_LIST_1] = m_bmRefPic[REF_PIC_LIST_1]->getRecoBuf(COMPONENT_Y, false);
+
+  int width = pu.Y().width;
+  int height = pu.Y().height;
+  Position puPos = pu.lumaPos();
+  int shift = MAX_CU_DEPTH;
+  int deltaMvHorX[2], deltaMvHorY[2], deltaMvVerX[2], deltaMvVerY[2];
+  int mvScaleHor[2];
+  int mvScaleVer[2];
+  int blockWidth[2] = { AFFINE_DMVR_MIN_SUBBLK_SIZE, AFFINE_DMVR_MIN_SUBBLK_SIZE }, blockHeight[2] = { AFFINE_DMVR_MIN_SUBBLK_SIZE, AFFINE_DMVR_MIN_SUBBLK_SIZE };
+  int minSbW = width > 16 ? 8 : 4;
+  int minSbH = height > 16 ? 8 : 4;
+  blockWidth[0] = blockWidth[1] = minSbW;
+  blockHeight[0] = blockHeight[1] = minSbH;
+
+  for (int i = 0; i < 2; i++)
+  {
+    deltaMvHorX[i] = (pu.mvAffi[i][1] - pu.mvAffi[i][0]).getHor() << (shift - floorLog2(width));
+    deltaMvHorY[i] = (pu.mvAffi[i][1] - pu.mvAffi[i][0]).getVer() << (shift - floorLog2(width));
+    if (pu.cu->affineType == AFFINEMODEL_6PARAM)
+    {
+      deltaMvVerX[i] = (pu.mvAffi[i][2] - pu.mvAffi[i][0]).getHor() << (shift - floorLog2(height));
+      deltaMvVerY[i] = (pu.mvAffi[i][2] - pu.mvAffi[i][0]).getVer() << (shift - floorLog2(height));
+    }
+    else
+    {
+      deltaMvVerX[i] = -deltaMvHorY[i];
+      deltaMvVerY[i] = deltaMvHorX[i];
+    }
+    mvScaleHor[i] = pu.mvAffi[i][0].getHor() << shift;
+    mvScaleVer[i] = pu.mvAffi[i][0].getVer() << shift;
+
+    blockWidth[i] = deriveAffineSubBlkSize(width, blockWidth[i], deltaMvHorX[i], deltaMvHorY[i], shift);
+    blockHeight[i] = deriveAffineSubBlkSize(height, blockHeight[i], deltaMvVerX[i], deltaMvVerY[i], shift);
+  }
+
+  const int dx = std::min(blockWidth[0], blockWidth[1]);
+  const int dy = std::min(blockHeight[0], blockHeight[1]);
+
+  m_bmSubBlkW = dx;
+  m_bmSubBlkH = dy;
+  m_bmInterpolationTmpBuf = PelBuf(m_filteredBlockTmp[0][COMPONENT_Y], m_bmSubBlkW, m_bmSubBlkH);
+  m_bmFilterSize = 2;
+  m_bmInterpolationHOfst = ((m_bmFilterSize >> 1) - 1)*m_bmRefBuf[REF_PIC_LIST_0].stride;
+  m_bmInterpolationVOfst = ((m_bmFilterSize >> 1) - 1)*m_bmInterpolationTmpBuf.stride;
+
+
+  bmInitAffineSubBlocks(puPos, width, height, dx, dy, mvScaleHor, mvScaleVer, deltaMvHorX, deltaMvHorY, deltaMvVerX, deltaMvVerY);
+
+  xInitBilateralMatching(m_bmSubBlkW, m_bmSubBlkH, m_bmClpRng.bd, false, true);
+}
+
+void InterPrediction::bmInitAffineSubBlocks(const Position puPos, const int width, const int height, const int dx, const int dy,
+  int mvScaleHor[2], int mvScaleVer[2], int deltaMvHorX[2], int deltaMvHorY[2], int deltaMvVerX[2], int deltaMvVerY[2])
+{
+  const int stepY = dy;
+  const int stepX = dx;
+  const int halfBW = dx >> 1;
+  const int halfBH = dy >> 1;
+
+  int mvScaleTmpHor[2];
+  int mvScaleTmpVer[2];
+
+  BMSubBlkInfo currSubBlk;
+  m_bmSubBlkList.clear();
+  for (int y = puPos.y, yStart = halfBH; y < (puPos.y + height); y = y + stepY, yStart = yStart + stepY)
+  {
+    for (int x = puPos.x, xStart = halfBW; x < (puPos.x + width); x = x + stepX, xStart = xStart + stepX)
+    {
+      currSubBlk.Area::operator=(Area(x, y, dx, dy));
+      currSubBlk.m_cXInPU = xStart;
+      currSubBlk.m_cYInPU = yStart;
+      // derive subblock MV 
+      for (int list = 0; list < 2; list++)
+      {
+        mvScaleTmpHor[list] = mvScaleHor[list] + deltaMvHorX[list] * xStart + deltaMvVerX[list] * yStart;
+        mvScaleTmpVer[list] = mvScaleVer[list] + deltaMvHorY[list] * xStart + deltaMvVerY[list] * yStart;
+
+        roundAffineMv(mvScaleTmpHor[list], mvScaleTmpVer[list], MAX_CU_DEPTH);
+        currSubBlk.m_mv[list] = Mv(mvScaleTmpHor[list], mvScaleTmpVer[list]);
+      }
+      m_bmSubBlkList.push_back(currSubBlk);
+    }
+  }
+}
+
+void InterPrediction::bmAffineIntSearch(const PredictionUnit &pu, Mv(&mvOffset)[2], Distortion &minCost, Distortion totalCost[(AFFINE_DMVR_INT_SRCH_RANGE << 1) + 1][(AFFINE_DMVR_INT_SRCH_RANGE << 1) + 1])
+{
+
+  int iWidthExt = m_bmSubBlkW + (AFFINE_DMVR_INT_SRCH_RANGE << 1);
+  int iHeightExt = m_bmSubBlkH + (AFFINE_DMVR_INT_SRCH_RANGE << 1);
+  int dstStride = iWidthExt;
+  int searchCenterBufPos = AFFINE_DMVR_INT_SRCH_RANGE * dstStride + AFFINE_DMVR_INT_SRCH_RANGE;
+
+
+  Mv mvInitial[2];
+  Mv mvPreInterOffset = Mv((AFFINE_DMVR_INT_SRCH_RANGE << MV_FRACTIONAL_BITS_INTERNAL), (AFFINE_DMVR_INT_SRCH_RANGE << MV_FRACTIONAL_BITS_INTERNAL));
+
+  bool useHadmard = true;
+  DistParam cDistParam;
+  cDistParam.applyWeight = false;
+  cDistParam.useMR = false;
+  int bmCostShift = 0;
+  int bitDepth = pu.cu->slice->clpRng(COMPONENT_Y).bd;
+#if FULL_NBIT
+  if (useHadmard)
+  {
+    bmCostShift = 1;  // magic shift, benefit for early terminate
+  }
+  else
+  {
+    bmCostShift = bitDepth > 8 ? bitDepth - 8 : 0;
+  }
+#else
+  bmCostShift = 0;
+#endif
+
+  Pel*     pelBuffer[2] = { m_filteredBlock[3][REF_PIC_LIST_0][0] + searchCenterBufPos, m_filteredBlock[3][REF_PIC_LIST_1][0] + searchCenterBufPos };
+  PelUnitBuf predBuf[2];
+  predBuf[REF_PIC_LIST_0] = (PelUnitBuf(pu.chromaFormat, PelBuf(m_filteredBlock[3][REF_PIC_LIST_0][0], dstStride, iWidthExt, iHeightExt)));
+  predBuf[REF_PIC_LIST_1] = (PelUnitBuf(pu.chromaFormat, PelBuf(m_filteredBlock[3][REF_PIC_LIST_1][0], dstStride, iWidthExt, iHeightExt)));
+
+  for (int i = -AFFINE_DMVR_INT_SRCH_RANGE; i <= AFFINE_DMVR_INT_SRCH_RANGE; i++)
+  {
+    for (int j = -AFFINE_DMVR_INT_SRCH_RANGE; j <= AFFINE_DMVR_INT_SRCH_RANGE; j++)
+    {
+      totalCost[AFFINE_DMVR_INT_SRCH_RANGE + i][AFFINE_DMVR_INT_SRCH_RANGE + j] = (abs(i) + abs(j)) << 4;
+    }
+  }
+
+  PredictionUnit subPu = pu;
+  Distortion costArray[2 * AFFINE_DMVR_INT_SRCH_RANGE + 1][2 * AFFINE_DMVR_INT_SRCH_RANGE + 1];
+
+  for (std::vector<BMSubBlkInfo>::iterator it = m_bmSubBlkList.begin(); it != m_bmSubBlkList.end(); ++it)
+  {
+    subPu.UnitArea::operator=(UnitArea(pu.chromaFormat, *it));
+    for (int list = 0; list < 2; list++)
+    {
+      mvInitial[list] = it->m_mv[list];
+
+      xBDMVRFillBlkPredPelBuffer(subPu, *m_bmRefPic[list], mvInitial[list] - mvPreInterOffset, predBuf[list], pu.cs->slice->clpRng(COMPONENT_Y)); //bi-linear interpolation
+    }
+    Distortion currSubBlkCost;
+    Distortion bestSubBlkCost = std::numeric_limits<Distortion>::max();
+    Mv bestSubBlkDeltaMv;
+    int ibest = 0, jbest = 0;
+    for (int i = -AFFINE_DMVR_INT_SRCH_RANGE; i <= AFFINE_DMVR_INT_SRCH_RANGE; i++)
+    {
+      for (int j = -AFFINE_DMVR_INT_SRCH_RANGE; j <= AFFINE_DMVR_INT_SRCH_RANGE; j++)
+      {
+        int ofst = i * dstStride + j;
+        PelBuf     currBuf[2] = { PelBuf(pelBuffer[REF_PIC_LIST_0] + ofst, dstStride, m_bmSubBlkW, m_bmSubBlkH),
+          PelBuf(pelBuffer[REF_PIC_LIST_1] - ofst, dstStride, m_bmSubBlkW, m_bmSubBlkH) };
+
+        m_pcRdCost->setDistParam(cDistParam, currBuf[0], currBuf[1], bitDepth, COMPONENT_Y, useHadmard);
+        currSubBlkCost = cDistParam.distFunc(cDistParam) >> bmCostShift;
+
+        totalCost[AFFINE_DMVR_INT_SRCH_RANGE + i][AFFINE_DMVR_INT_SRCH_RANGE + j] += currSubBlkCost;
+        if (i == 0 && j == 0)
+        {
+          currSubBlkCost -= (currSubBlkCost >> 2);
+        }
+        costArray[AFFINE_DMVR_INT_SRCH_RANGE + i][AFFINE_DMVR_INT_SRCH_RANGE + j] = currSubBlkCost;
+        if (currSubBlkCost < bestSubBlkCost)
+        {
+          bestSubBlkCost = currSubBlkCost;
+          ibest = i;
+          jbest = j;
+        }
+      }
+    }
+    bestSubBlkDeltaMv.set(jbest << MV_FRACTIONAL_BITS_INTERNAL, ibest << MV_FRACTIONAL_BITS_INTERNAL);
+    if (abs(ibest) != AFFINE_DMVR_INT_SRCH_RANGE && abs(jbest) != AFFINE_DMVR_INT_SRCH_RANGE)
+    {
+      uint64_t sadbuffer[5];
+      int32_t tempDeltaMv[2] = { 0,0 };
+      ibest += AFFINE_DMVR_INT_SRCH_RANGE;
+      jbest += AFFINE_DMVR_INT_SRCH_RANGE;
+      sadbuffer[0] = costArray[ibest][jbest];
+      sadbuffer[1] = costArray[ibest][jbest - 1];
+      sadbuffer[2] = costArray[ibest - 1][jbest];
+      sadbuffer[3] = costArray[ibest][jbest + 1];
+      sadbuffer[4] = costArray[ibest + 1][jbest];
+      xSubPelErrorSrfc(sadbuffer, tempDeltaMv);
+      bestSubBlkDeltaMv += Mv(tempDeltaMv[0], tempDeltaMv[1]);
+    }
+    it->m_mvRefine[0] = mvInitial[0] + bestSubBlkDeltaMv;
+    it->m_mvRefine[1] = mvInitial[1] - bestSubBlkDeltaMv;
+  }
+
+  int ibest = 0, jbest = 0;
+  Distortion tmpCost;
+  for (int i = -AFFINE_DMVR_INT_SRCH_RANGE; i <= AFFINE_DMVR_INT_SRCH_RANGE; i++)
+  {
+    for (int j = -AFFINE_DMVR_INT_SRCH_RANGE; j <= AFFINE_DMVR_INT_SRCH_RANGE; j++)
+    {
+      tmpCost = totalCost[AFFINE_DMVR_INT_SRCH_RANGE + i][AFFINE_DMVR_INT_SRCH_RANGE + j];
+      if (tmpCost < minCost)
+      {
+        minCost = tmpCost;
+        ibest = i;
+        jbest = j;
+      }
+    }
+  }
+
+  mvOffset[0].set(jbest << MV_FRACTIONAL_BITS_INTERNAL, ibest << MV_FRACTIONAL_BITS_INTERNAL);
+  mvOffset[1] = Mv(0, 0) - mvOffset[0];
+}
+
+void InterPrediction::bmAffineHPelSearch(const PredictionUnit &pu, Mv(&curBestMv)[2], Distortion &minCost, Distortion localCostArray[9])
+{
+  static const Mv   cSearchOffset[8] = { Mv(-1 , 1) , Mv(0 , 1) , Mv(1 ,  1) , Mv(1 ,  0) , Mv(1 , -1) , Mv(0 , -1) , Mv(-1 , -1) , Mv(-1 , 0) };
+  int  nDirectStart = 0;
+  int  nDirectEnd = 7;
+  const int  nDirectRounding = 8;
+  const int  nDirectMask = 0x07;
+  if (minCost == std::numeric_limits<Distortion>::max())
+  {
+    Distortion tmCost = getDecoderSideDerivedMvCost(Mv(0, 0), curBestMv[0], AFFINE_DMVR_SEARCH_RANGE + 1, DECODER_SIDE_MV_WEIGHT);
+    minCost = xGetBilateralMatchingErrorAffine(pu, curBestMv);
+    if (minCost < tmCost)
+    {
+      return;
+    }
+
+    minCost += tmCost;
+  }
+
+  int maxSearchRounds = 2;
+  int searchStepShift = MV_FRACTIONAL_BITS_INTERNAL - 1;
+
+  for (uint32_t uiRound = 0; uiRound < maxSearchRounds; uiRound++)
+  {
+    int nBestDirect = -1;
+    Mv  mvCurCenter[2] = { curBestMv[0], curBestMv[1] };
+
+    for (int nIdx = nDirectStart; nIdx <= nDirectEnd; nIdx++)
+    {
+      int nDirect = (nIdx + nDirectRounding) & nDirectMask;
+
+      Mv mvOffset(cSearchOffset[nDirect].getHor() << searchStepShift, cSearchOffset[nDirect].getVer() << searchStepShift);
+
+      if (uiRound > 0)
+      {
+        if ((nDirect % 2) == 0)
+        {
+          continue;
+        }
+      }
+      Mv mvCand[2] = { mvCurCenter[0] + mvOffset, mvCurCenter[1] - mvOffset };
+      Distortion tmCost = getDecoderSideDerivedMvCost(Mv(0, 0), mvCand[0], AFFINE_DMVR_SEARCH_RANGE + 1, DECODER_SIDE_MV_WEIGHT);
+      if (tmCost > minCost)
+      {
+        localCostArray[nDirect] = 2 * tmCost;
+        continue;
+      }
+      tmCost += xGetBilateralMatchingErrorAffine(pu, mvCand);
+      localCostArray[nDirect] = tmCost;
+
+      if (uiRound > 0)
+      {
+        continue;
+      }
+
+      if (tmCost < minCost)
+      {
+        nBestDirect = nDirect;
+        minCost = tmCost;
+        curBestMv[0] = mvCand[0];
+        curBestMv[1] = mvCand[1];
+      }
+    }
+    if (nBestDirect == -1)
+    {
+      break;
+    }
+
+    int nStep = 2 - (nBestDirect & 0x01);
+    nDirectStart = nBestDirect - nStep;
+    nDirectEnd = nBestDirect + nStep;
+
+    if ((uiRound + 1) < maxSearchRounds)
+    {
+      xBDMVRUpdateSquareSearchCostLog(localCostArray, nBestDirect);
+    }
+  }
+}
+
+void InterPrediction::xInitBilateralMatching(const int width, const int height, const int bitDepth, const bool useMR, const bool useHadmard)
+{
+  Pel*     pelBuffer[2] = { m_filteredBlock[3][REF_PIC_LIST_0][0] + BDMVR_CENTER_POSITION, m_filteredBlock[3][REF_PIC_LIST_1][0] + BDMVR_CENTER_POSITION };
+  const SizeType stride = BDMVR_BUF_STRIDE;
+
+  m_bmPredBuf[REF_PIC_LIST_0] = PelBuf(pelBuffer[REF_PIC_LIST_0], stride, width, height);
+  m_bmPredBuf[REF_PIC_LIST_1] = PelBuf(pelBuffer[REF_PIC_LIST_1], stride, width, height);
+
+  m_bmDistParam.applyWeight = false;
+  m_bmDistParam.useMR = useMR;
+
+  m_pcRdCost->setDistParam(m_bmDistParam, m_bmPredBuf[REF_PIC_LIST_0], m_bmPredBuf[REF_PIC_LIST_1], bitDepth, COMPONENT_Y, useHadmard);
+
+#if FULL_NBIT
+  if (useHadmard)
+  {
+    m_bmCostShift = 1;  // magic shift, benefit for early terminate
+  }
+  else
+  {
+    m_bmCostShift = bitDepth > 8 ? bitDepth - 8 : 0;
+  }
+#else
+  m_bmCostShift = 0;
+#endif
+
+}
+
+Distortion InterPrediction::xGetBilateralMatchingErrorAffine(const PredictionUnit& pu, Mv(&mvOffset)[2])
+{
+  int refStride = m_bmRefBuf[0].stride;      CHECK(refStride != m_bmRefBuf[1].stride, "refStride != m_bmRefBuf[1].stride");
+  int dstStride = m_bmPredBuf[0].stride; CHECK(dstStride != m_bmPredBuf[1].stride, "dstStride != m_bmPredBuf[1].stride");
+
+  Pel *dst[2] = { m_bmPredBuf[0].buf, m_bmPredBuf[1].buf };
+
+  int iMvScaleTmpHor, iMvScaleTmpVer;
+
+  Distortion cost = 0;
+  for (std::vector<BMSubBlkInfo>::iterator it = m_bmSubBlkList.begin(); it != m_bmSubBlkList.end(); ++it)
+  {
+    for (int i = 0; i < 2; i++)
+    {
+
+      Mv mv = it->m_mv[i] + mvOffset[i];
+      clipMv(mv, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
+      iMvScaleTmpHor = mv.getHor();
+      iMvScaleTmpVer = mv.getVer();
+
+      int xFrac, yFrac, xInt, yInt;
+
+      xInt = iMvScaleTmpHor >> 4;
+      xFrac = iMvScaleTmpHor & 15;
+      yInt = iMvScaleTmpVer >> 4;
+      yFrac = iMvScaleTmpVer & 15;
+
+      const Pel* ref = m_bmRefBuf[i].buf + xInt + it->x + (yInt + it->y) * refStride;
+
+      if (yFrac == 0)
+      {
+        m_if.filterHor(COMPONENT_Y, ref, refStride, dst[i], dstStride, m_bmSubBlkW, m_bmSubBlkH, xFrac, false, m_bmChFmt, m_bmClpRng
+          , 1, true, false);
+      }
+      else if (xFrac == 0)
+      {
+        m_if.filterVer(COMPONENT_Y, ref, refStride, dst[i], dstStride, m_bmSubBlkW, m_bmSubBlkH, yFrac, true, false, m_bmChFmt, m_bmClpRng
+          , 1, true, false);
+      }
+      else
+      {
+        m_if.filterHor(COMPONENT_Y, ref - m_bmInterpolationHOfst, refStride, m_bmInterpolationTmpBuf.buf, m_bmInterpolationTmpBuf.stride, m_bmSubBlkW, m_bmSubBlkH + m_bmFilterSize - 1, xFrac, false, m_bmChFmt, m_bmClpRng
+          , 1, true, false);
+        JVET_J0090_SET_CACHE_ENABLE(false);
+        m_if.filterVer(COMPONENT_Y, m_bmInterpolationTmpBuf.buf + m_bmInterpolationVOfst, m_bmInterpolationTmpBuf.stride, dst[i], dstStride, m_bmSubBlkW, m_bmSubBlkH, yFrac, false, false, m_bmChFmt, m_bmClpRng
+          , 1, true, false);
+        JVET_J0090_SET_CACHE_ENABLE(true);
+      }
+    }
+    cost += (m_bmDistParam.distFunc(m_bmDistParam) >> m_bmCostShift);
+  }
+  return cost;
+}
+
+Distortion InterPrediction::xGetBilateralMatchingErrorAffine(const PredictionUnit& pu, Mv(&mvAffi)[2][3])
+{
+  const int width = pu.Y().width;
+  const int height = pu.Y().height;
+  int deltaMvHorX[2], deltaMvHorY[2], deltaMvVerX[2], deltaMvVerY[2];
+
+  for (int i = 0; i < 2; i++)
+  {
+    deltaMvHorX[i] = (mvAffi[i][1] - mvAffi[i][0]).getHor() << (MAX_CU_DEPTH - floorLog2(width));
+    deltaMvHorY[i] = (mvAffi[i][1] - mvAffi[i][0]).getVer() << (MAX_CU_DEPTH - floorLog2(width));
+    if (pu.cu->affineType == AFFINEMODEL_6PARAM)
+    {
+      deltaMvVerX[i] = (mvAffi[i][2] - mvAffi[i][0]).getHor() << (MAX_CU_DEPTH - floorLog2(height));
+      deltaMvVerY[i] = (mvAffi[i][2] - mvAffi[i][0]).getVer() << (MAX_CU_DEPTH - floorLog2(height));
+    }
+    else
+    {
+      deltaMvVerX[i] = -deltaMvHorY[i];
+      deltaMvVerY[i] = deltaMvHorX[i];
+    }
+  }
+
+  int iMvScaleTmpHor, iMvScaleTmpVer;
+  int iMvScaleTmpHor0[2] = { mvAffi[0][0].getHor() << MAX_CU_DEPTH, mvAffi[1][0].getHor() << MAX_CU_DEPTH };
+  int iMvScaleTmpVer0[2] = { mvAffi[0][0].getVer() << MAX_CU_DEPTH, mvAffi[1][0].getVer() << MAX_CU_DEPTH };
+
+  int refStride = m_bmRefBuf[0].stride;  CHECK(refStride != m_bmRefBuf[1].stride, "refStride != m_bmRefBuf[1].stride");
+  int dstStride = m_bmPredBuf[0].stride; CHECK(dstStride != m_bmPredBuf[1].stride, "dstStride != m_bmPredBuf[1].stride");
+
+  Pel *dst[2] = { m_bmPredBuf[0].buf, m_bmPredBuf[1].buf };
+
+  Mv mv[2];
+  Distortion cost = 0;
+  for (std::vector<BMSubBlkInfo>::iterator it = m_bmSubBlkList.begin(); it != m_bmSubBlkList.end(); ++it)
+  {
+    for (int i = 0; i < 2; i++)
+    {
+      iMvScaleTmpHor = iMvScaleTmpHor0[i] + deltaMvHorX[i] * it->m_cXInPU + deltaMvVerX[i] * it->m_cYInPU;
+      iMvScaleTmpVer = iMvScaleTmpVer0[i] + deltaMvHorY[i] * it->m_cXInPU + deltaMvVerY[i] * it->m_cYInPU;
+      roundAffineMv(iMvScaleTmpHor, iMvScaleTmpVer, MAX_CU_DEPTH);
+      mv[i] = Mv(iMvScaleTmpHor, iMvScaleTmpVer);
+      clipMv(mv[i], pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
+    }
+    for (int i = 0; i < 2; i++)
+    {
+      iMvScaleTmpHor = mv[i].getHor();
+      iMvScaleTmpVer = mv[i].getVer();
+
+      int xFrac, yFrac, xInt, yInt;
+
+      xInt = iMvScaleTmpHor >> 4;
+      xFrac = iMvScaleTmpHor & 15;
+      yInt = iMvScaleTmpVer >> 4;
+      yFrac = iMvScaleTmpVer & 15;
+
+      const Pel* ref = m_bmRefBuf[i].buf + xInt + it->x + (yInt + it->y) * refStride;
+
+      if (yFrac == 0)
+      {
+        m_if.filterHor(COMPONENT_Y, ref, refStride, dst[i], dstStride, m_bmSubBlkW, m_bmSubBlkH, xFrac, false, m_bmChFmt, m_bmClpRng
+          , 1, true, false);
+      }
+      else if (xFrac == 0)
+      {
+        m_if.filterVer(COMPONENT_Y, ref, refStride, dst[i], dstStride, m_bmSubBlkW, m_bmSubBlkH, yFrac, true, false, m_bmChFmt, m_bmClpRng
+          , 1, true, false);
+      }
+      else
+      {
+        m_if.filterHor(COMPONENT_Y, ref - m_bmInterpolationHOfst, refStride, m_bmInterpolationTmpBuf.buf, m_bmInterpolationTmpBuf.stride, m_bmSubBlkW, m_bmSubBlkH + m_bmFilterSize - 1, xFrac, false, m_bmChFmt, m_bmClpRng
+          , 1, true, false);
+        JVET_J0090_SET_CACHE_ENABLE(false);
+        m_if.filterVer(COMPONENT_Y, m_bmInterpolationTmpBuf.buf + m_bmInterpolationVOfst, m_bmInterpolationTmpBuf.stride, dst[i], dstStride, m_bmSubBlkW, m_bmSubBlkH, yFrac, false, false, m_bmChFmt, m_bmClpRng
+          , 1, true, false);
+        JVET_J0090_SET_CACHE_ENABLE(true);
+      }
+    }
+    it->m_bmCost = (m_bmDistParam.distFunc(m_bmDistParam) >> m_bmCostShift);
+    cost += it->m_bmCost;
+  }
+  return cost;
+}
+
+bool InterPrediction::bmAffineRegression(PredictionUnit &pu, Distortion &minCost)
+{
+  std::vector<RMVFInfo> mvInfoVec[2];
+  for (std::vector<BMSubBlkInfo>::iterator it = m_bmSubBlkList.begin(); it != m_bmSubBlkList.end(); ++it)
+  {
+    Position mvPos = Position(it->m_cXInPU, it->m_cYInPU);
+    mvInfoVec[0].push_back(RMVFInfo(it->m_mvRefine[0], mvPos, -1));
+    mvInfoVec[1].push_back(RMVFInfo(it->m_mvRefine[1], mvPos, -1));
+  }
+
+  Mv mvAffieRMVF[2][3];
+  for (int list = 0; list < 2; list++)
+  {
+    PU::deriveAffineCandFromMvField(Position(0, 0), pu.lwidth(), pu.lheight(), mvInfoVec[list], mvAffieRMVF[list]);
+  }
+
+  auto savedAffineType = pu.cu->affineType;
+  pu.cu->affineType = AFFINEMODEL_6PARAM;
+  Distortion tmCost = xGetBilateralMatchingErrorAffine(pu, mvAffieRMVF);
+  if (tmCost < minCost)
+  {
+    for (int cpmvIdx = 0; cpmvIdx < 3; cpmvIdx++)
+    {
+      pu.mvAffi[0][cpmvIdx] = mvAffieRMVF[0][cpmvIdx];
+      pu.mvAffi[1][cpmvIdx] = mvAffieRMVF[1][cpmvIdx];
+    }
+    return true;
+  }
+  else
+  {
+    pu.cu->affineType = savedAffineType;
+    return false;
+  }
+}
+#endif
 bool InterPrediction::processBDMVR4Affine(PredictionUnit& pu)
 {
   if (!pu.cs->slice->getSPS()->getUseDMVDMode() || !pu.cs->slice->isInterB())
@@ -12240,15 +12738,59 @@ bool InterPrediction::processBDMVR4Affine(PredictionUnit& pu)
   }
   CHECK(!pu.mergeFlag, "Merge mode must be used here");
   CHECK(pu.refIdx[0] < 0 || pu.refIdx[1] < 0, "Bilateral DMVR is performed for bi-prediction");
-
+#if !JVET_AC0144_AFFINE_DMVR_REGRESSION
   const int lumaArea = pu.lumaSize().area();
+#endif
   Mv mvFinal_PU[2];
   Mv mvInitial_PU[2];
   mvFinal_PU[0].setZero();
   mvFinal_PU[1].setZero();
   mvInitial_PU[0].setZero();
   mvInitial_PU[1].setZero();
+#if JVET_AC0144_AFFINE_DMVR_REGRESSION
+  bmAffineInit(pu);
 
+  Distortion minCost = std::numeric_limits<Distortion>::max();
+  Distortion totalCost[(AFFINE_DMVR_INT_SRCH_RANGE << 1) + 1][(AFFINE_DMVR_INT_SRCH_RANGE << 1) + 1] = { { 0, } };
+  bmAffineIntSearch(pu, mvFinal_PU, minCost, totalCost);
+
+  Distortion localCostArray[9] = { std::numeric_limits<Distortion>::max(), std::numeric_limits<Distortion>::max(), std::numeric_limits<Distortion>::max(),
+    std::numeric_limits<Distortion>::max(), std::numeric_limits<Distortion>::max(), std::numeric_limits<Distortion>::max(),
+    std::numeric_limits<Distortion>::max(), std::numeric_limits<Distortion>::max(), minCost };
+
+  bmAffineHPelSearch(pu, mvFinal_PU, minCost, localCostArray);
+  // Model-based fractional MVD optimization
+  if (localCostArray[8] > 0 && localCostArray[8] == minCost)
+  {
+    uint64_t sadbuffer[5];
+    sadbuffer[0] = (uint64_t)localCostArray[8]; // center
+    sadbuffer[1] = (uint64_t)localCostArray[7]; // left
+    sadbuffer[2] = (uint64_t)localCostArray[5]; // above
+    sadbuffer[3] = (uint64_t)localCostArray[3]; // right
+    sadbuffer[4] = (uint64_t)localCostArray[1]; // bottom
+
+    int32_t tempDeltaMv[2] = { 0, 0 };
+    xSubPelErrorSrfc(sadbuffer, tempDeltaMv);
+    if (tempDeltaMv[0] != 0 || tempDeltaMv[1] != 0)
+    {
+      mvFinal_PU[0] += Mv(tempDeltaMv[0], tempDeltaMv[1]);
+      mvFinal_PU[1] -= Mv(tempDeltaMv[0], tempDeltaMv[1]);
+    }
+  }
+
+  pu.mvAffi[0][0] += mvFinal_PU[0];
+  pu.mvAffi[0][1] += mvFinal_PU[0];
+  pu.mvAffi[0][2] += mvFinal_PU[0];
+  pu.mvAffi[1][0] += mvFinal_PU[1];
+  pu.mvAffi[1][1] += mvFinal_PU[1];
+  pu.mvAffi[1][2] += mvFinal_PU[1];
+
+  if (m_bmSubBlkList.size() > 2)
+  {
+    minCost = xGetBilateralMatchingErrorAffine(pu, pu.mvAffi);
+    bmAffineRegression(pu, minCost);
+  }
+#else
   {
     Distortion minCost = std::numeric_limits<Distortion>::max();
     bool       bUseMR = lumaArea > 64;
@@ -12264,6 +12806,7 @@ bool InterPrediction::processBDMVR4Affine(PredictionUnit& pu)
         // span motion to subPU
   m_bdmvrSubPuMvBuf[REF_PIC_LIST_0][0] = mvFinal_PU[0];
   m_bdmvrSubPuMvBuf[REF_PIC_LIST_1][0] = mvFinal_PU[1];
+#endif
   return true; 
 }
 #endif
@@ -12525,7 +13068,7 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
   pu.mv[1] = puOrgMv[1];
   return true;
 }
-#if JVET_AB0112_AFFINE_DMVR
+#if JVET_AB0112_AFFINE_DMVR && !JVET_AC0144_AFFINE_DMVR_REGRESSION
 void InterPrediction::xBDMVRFillBlkPredPelBufferAffine(const PredictionUnit& pu, const Picture& refPic, const Mv(&_mv)[3], PelUnitBuf& dstUnitBuf, const ClpRng& clpRng)
 {
 
@@ -13351,7 +13894,7 @@ Distortion InterPrediction::xBDMVRMvSquareSearch(Mv (&curBestMv)[2], Distortion 
 
   return curBestCost;
 }
-#if JVET_AB0112_AFFINE_DMVR
+#if JVET_AB0112_AFFINE_DMVR && !JVET_AC0144_AFFINE_DMVR_REGRESSION
 template<bool hPel>
 Distortion InterPrediction::xBDMVRMvSquareSearchAffine(Mv(&curBestMv)[2], Distortion curBestCost, PredictionUnit& pu, const Mv(&initialMv)[2], int32_t maxSearchRounds, int32_t searchStepShift, bool useMR, bool useHadmard)
 {
@@ -13631,7 +14174,7 @@ Distortion InterPrediction::xBDMVRMvOneTemplateHPelSquareSearch(Mv(&curBestMv)[2
   return curBestCost;
 }
 #endif
-#if JVET_AB0112_AFFINE_DMVR
+#if JVET_AB0112_AFFINE_DMVR && !JVET_AC0144_AFFINE_DMVR_REGRESSION
 Distortion InterPrediction::xBDMVRGetMatchingErrorAffine(const PredictionUnit& pu, Mv(&mv)[2][3] 
   ,Mv(&mvOffset)[2]
   ,const Mv(&initialMv)[2]

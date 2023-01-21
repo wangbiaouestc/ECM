@@ -65,7 +65,16 @@ class Reshape;
 // ====================================================================================================================
 // Class definition
 // ====================================================================================================================
-
+#if JVET_AC0144_AFFINE_DMVR_REGRESSION
+struct BMSubBlkInfo : Area
+{
+  Distortion m_bmCost;
+  Mv       m_mv[2];
+  Mv       m_mvRefine[2];
+  PosType  m_cXInPU; // x coordinate of center relative to PU's top left sample
+  PosType  m_cYInPU; // y coordinate of center relative to PU's top left sample
+};
+#endif
 class InterPrediction : public WeightPrediction
 {
 #if INTER_LIC
@@ -110,13 +119,32 @@ private:
 #endif
 #endif
 
+#if JVET_AC0144_AFFINE_DMVR_REGRESSION
+  const Picture* m_bmRefPic[2];
+  CPelBuf   m_bmRefBuf[2];
+  PelBuf    m_bmInterpolationTmpBuf;
+  int       m_bmFilterSize;
+  int       m_bmInterpolationHOfst;
+  int       m_bmInterpolationVOfst;
+
+  ClpRng    m_bmClpRng;
+  ChromaFormat m_bmChFmt;
+  PelBuf    m_bmPredBuf[2];
+  DistParam m_bmDistParam;
+  int32_t   m_bmCostShift;   // bilateral matching cost shift
+
+  int32_t m_bmSubBlkW;
+  int32_t m_bmSubBlkH;
+  std::vector<BMSubBlkInfo> m_bmSubBlkList;
+#endif
+
 protected:
   InterpolationFilter  m_if;
 
   Pel*                 m_acYuvPred            [NUM_REF_PIC_LIST_01][MAX_NUM_COMPONENT];
   Pel*                 m_filteredBlock        [LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS_SIGNAL][LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS_SIGNAL][MAX_NUM_COMPONENT];
   Pel*                 m_filteredBlockTmp     [LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS_SIGNAL][MAX_NUM_COMPONENT];
-#if JVET_AB0112_AFFINE_DMVR
+#if JVET_AB0112_AFFINE_DMVR && !JVET_AC0144_AFFINE_DMVR_REGRESSION
   Pel*                 m_affineDmvrBlockTmp[NUM_REF_PIC_LIST_01];
 #endif
 
@@ -167,7 +195,7 @@ protected:
 
   Pel                  m_gradBuf[2][(AFFINE_MIN_BLOCK_SIZE + 2) * (AFFINE_MIN_BLOCK_SIZE + 2)];
   int                  m_dMvBuf[2][16 * 2];
-#if JVET_AB0112_AFFINE_DMVR
+#if JVET_AB0112_AFFINE_DMVR && !JVET_AC0144_AFFINE_DMVR_REGRESSION
   int                  m_affineSbMvIntX[NUM_REF_PIC_LIST_01][MAX_CU_SIZE / AFFINE_MIN_BLOCK_SIZE][MAX_CU_SIZE / AFFINE_MIN_BLOCK_SIZE];
   int                  m_affineSbMvIntY[NUM_REF_PIC_LIST_01][MAX_CU_SIZE / AFFINE_MIN_BLOCK_SIZE][MAX_CU_SIZE / AFFINE_MIN_BLOCK_SIZE];
   int                  m_affineSbMvFracX[NUM_REF_PIC_LIST_01][MAX_CU_SIZE / AFFINE_MIN_BLOCK_SIZE][MAX_CU_SIZE / AFFINE_MIN_BLOCK_SIZE];
@@ -742,7 +770,7 @@ public:
 private:
   void       xBDMVRFillBlkPredPelBuffer(const PredictionUnit& pu, const Picture& refPic, const Mv &_mv, PelUnitBuf &dstBuf, const ClpRng& clpRng);
 
-#if JVET_AB0112_AFFINE_DMVR
+#if JVET_AB0112_AFFINE_DMVR && !JVET_AC0144_AFFINE_DMVR_REGRESSION
   void      xBDMVRFillBlkPredPelBufferAffine(const PredictionUnit& pu, const Picture& refPic, const Mv(&_mv)[3], PelUnitBuf& dstUnitBuf, const ClpRng& clpRng);
   void      xBDMVRFillBlkPredPelBufferAffineOPT(const PredictionUnit& pu, const Picture& refPic, const RefPicList eRefPicList, const Mv(&_mv)[3], const Mv mvCur, const Mv mvCenter, const bool doInterpolation, PelUnitBuf& dstUnitBuf, const ClpRng& clpRng, const bool profTh,const int blockWidth,const int blockHeight     ,const int memBlockWidthExt,const int memBlockHeight,const int memHeight,const int memStride);
   void      xCalculteAffineParameters(const PredictionUnit& pu, const Picture& refPic, const Mv(&_mv)[3],int refList, bool& profTH, int& blockWidth, int& blockHeight, int& memBlockWidthExt, int& memBlockHeight, int& memHeight, int& memStride);
@@ -751,7 +779,7 @@ private:
   template <uint8_t dir>
 #endif
   void       xBDMVRPreInterpolation    (const PredictionUnit& pu, const Mv (&mvCenter)[2], bool doPreInterpolationFP, bool doPreInterpolationHP);
-#if JVET_AB0112_AFFINE_DMVR
+#if JVET_AB0112_AFFINE_DMVR && !JVET_AC0144_AFFINE_DMVR_REGRESSION
   Distortion xBDMVRGetMatchingErrorAffine(const PredictionUnit& pu, Mv(&mv)[2][3],Mv(&mvOffset)[2],const Mv(&initialMv)[2],bool& doInterpolation,bool hPel,bool useMR, bool useHadmard, const bool(&profTh)[2], const int(&blockWidth)[2], const int(&blockHeight)[2], const int(&memBlockWidthExt)[2], const int(&memBlockHeight)[2], const int(&memHeight)[2], const int(&memStride)[2]);
 #endif
 #if JVET_X0049_BDMVR_SW_OPT
@@ -778,7 +806,7 @@ private:
 
   template<bool hPel>
   Distortion xBDMVRMvSquareSearch(Mv(&curBestMv)[2], Distortion curBestCost, PredictionUnit& pu, const Mv(&initialMv)[2], int32_t maxSearchRounds, int32_t searchStepShift, bool useMR, bool useHadmard);
-#if JVET_AB0112_AFFINE_DMVR
+#if JVET_AB0112_AFFINE_DMVR && !JVET_AC0144_AFFINE_DMVR_REGRESSION
   template<bool hPel>
   Distortion xBDMVRMvSquareSearchAffine(Mv(&curBestMv)[2], Distortion curBestCost, PredictionUnit& pu, const Mv(&initialMv)[2], int32_t maxSearchRounds, int32_t searchStepShift, bool useMR, bool useHadmard);
 #endif
@@ -799,7 +827,18 @@ public:
   void      getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvFieldAmListCommon, const int decAmvpRefIdx = -1);
   void      amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvFieldAmListCommon, const int mvFieldMergeIdx, const int mvFieldAmvpIdx);
 #endif
+#if JVET_AC0144_AFFINE_DMVR_REGRESSION
+  void bmAffineInit(const PredictionUnit &pu);
+  void bmInitAffineSubBlocks(const Position puPos, const int width, const int height, const int dx, const int dy,
+    int mvScaleHor[2], int mvScaleVer[2], int deltaMvHorX[2], int deltaMvHorY[2], int deltaMvVerX[2], int deltaMvVerY[2]);
+  void bmAffineIntSearch(const PredictionUnit &pu, Mv(&mvOffset)[2], Distortion &minCost, Distortion totalCost[(AFFINE_DMVR_INT_SRCH_RANGE << 1) + 1][(AFFINE_DMVR_INT_SRCH_RANGE << 1) + 1]);
+  void bmAffineHPelSearch(const PredictionUnit &pu, Mv(&mvOffset)[2], Distortion &minCost, Distortion localCostArray[9]);
 
+  void xInitBilateralMatching(const int width, const int height, const int bitDepth, const bool useMR, const bool useHadmard);
+  Distortion xGetBilateralMatchingErrorAffine(const PredictionUnit& pu, Mv(&mvOffset)[2]);
+  Distortion xGetBilateralMatchingErrorAffine(const PredictionUnit& pu, Mv(&mvAffi)[2][3]);
+  bool bmAffineRegression(PredictionUnit &pu, Distortion &minCost);
+#endif
 public:
   Mv*       getBdofSubPuMvOffset() {return m_bdofSubPuMvOffset;}
   void      setBdmvrSubPuMvBuf(Mv* mvBuf0, Mv* mvBuf1) { m_bdmvrSubPuMvBuf[0] = mvBuf0; m_bdmvrSubPuMvBuf[1] = mvBuf1; }
