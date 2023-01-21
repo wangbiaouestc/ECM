@@ -147,6 +147,7 @@
 #define JVET_AA0057_CCCM                                  1 // JVET-AA0057: Convolutional cross-component model (CCCM)
 #if JVET_AA0057_CCCM
 #define JVET_AB0143_CCCM_TS                               1 // JVET-AB0143: CCCM template selection
+#define JVET_AC0147_CCCM_NO_SUBSAMPLING                   1 // JVET-AC0147: Subsampling is not applied to CCCM
 #endif
 #define JVET_AA0126_GLM                                   1 // JVET-AA0126: Gradient linear model
 #if JVET_AA0126_GLM

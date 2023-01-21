@@ -473,6 +473,9 @@ protected:
   bool      m_sgpmNoBlend;
 #endif
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  int       m_cccm;
+#endif
 #if ENABLE_OBMC
   bool      m_OBMC;
 #endif
@@ -1494,6 +1497,10 @@ public:
   void      setUseSgpmNoBlend            ( bool b )       { m_sgpmNoBlend = b; }
   bool      getUseSgpmNoBlend            ()         const { return m_sgpmNoBlend; }
 #endif
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  void      setUseCccm                   (int i)          { m_cccm = i; }
+  int       getUseCccm                   () const         { return m_cccm; }
 #endif
 #if ENABLE_OBMC
   void      setUseObmc                   ( bool b )       { m_OBMC = b; }

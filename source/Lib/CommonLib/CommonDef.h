@@ -969,6 +969,10 @@ static const int CCCM_NUM_MODES           = 6;
 static const int CCCM_NUM_MODES           = 3;
 #endif
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+static const int CCCM_NO_SUB_NUM_PARAMS   = 11;
+static const double CCCM_NO_SUB_WEIGHT    = 1.1; 
+#endif
 #endif
 
 #if JVET_AA0126_GLM

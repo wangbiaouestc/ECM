@@ -1617,6 +1617,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AB0155_SGPM
   sps.setUseSgpm            ( m_sgpm );
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  sps.setUseCccm            ( m_cccm );
+#endif
 #if ENABLE_OBMC
   sps.setUseOBMC            ( m_OBMC );
 #endif
