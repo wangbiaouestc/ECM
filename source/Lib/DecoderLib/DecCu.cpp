@@ -1288,6 +1288,12 @@ void DecCu::xReconInter(CodingUnit &cu)
 #endif
 #endif
   }
+#if JVET_AC0112_IBC_GPM
+  else if (cu.firstPU->ibcGpmFlag)
+  {
+    m_pcInterPred->motionCompensationIbcGpm(cu, m_ibcMrgCtx, m_pcIntraPred);
+  }
+#endif
   else
   {
 #if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
@@ -1309,7 +1315,41 @@ void DecCu::xReconInter(CodingUnit &cu)
       }
     }
 #endif
+
+#if JVET_AC0112_IBC_CIIP
+    uint8_t savedIntraDir[2] = {cu.firstPU->intraDir[0], cu.firstPU->intraDir[1]};
+    if (CU::isIBC(cu) && cu.firstPU->ibcCiipFlag)
+    {
+      uint8_t ibcCiipIntraList[IBC_CIIP_MAX_NUM_INTRA_CANDS] = {PLANAR_IDX, HOR_IDX};
+      m_pcIntraPred->deriveDimdMode(cu.cs->picture->getRecoBuf(cu.Y()), cu.Y(), cu);
+      cu.timdMode = m_pcIntraPred->deriveTimdMode(cu.cs->picture->getRecoBuf(cu.Y()), cu.Y(), cu);
+      ibcCiipIntraList[0] = MAP131TO67(cu.timdMode);
+      ibcCiipIntraList[1] = ibcCiipIntraList[0] == HOR_IDX ? PLANAR_IDX : HOR_IDX;
+      if (cu.firstPU->mergeFlag && cu.firstPU->ibcCiipIntraIdx > 0)
+      {
+        const PredictionUnit *puBv = cu.cs->getPURestricted(cu.lumaPos().offset(cu.firstPU->bv.getHor(), cu.firstPU->bv.getVer()), *cu.firstPU, cu.chType);
+        uint8_t intraDir = puBv ? puBv->getIpmInfo(cu.lumaPos().offset(cu.firstPU->bv.getHor(), cu.firstPU->bv.getVer())) : PLANAR_IDX;
+        if (intraDir != ibcCiipIntraList[0])
+        {
+          ibcCiipIntraList[1] = intraDir;
+        }
+        else
+        {
+          ibcCiipIntraList[1] = ibcCiipIntraList[0] == PLANAR_IDX ? HOR_IDX : PLANAR_IDX;
+        }
+      }
+      cu.firstPU->intraDir[0] = ibcCiipIntraList[cu.firstPU->ibcCiipIntraIdx];
+      cu.firstPU->intraDir[1] = cu.firstPU->intraDir[0];
+    }
+#endif
     m_pcIntraPred->geneIntrainterPred(cu, m_ciipBuffer);
+#if JVET_AC0112_IBC_CIIP
+    if (CU::isIBC(cu) && cu.firstPU->ibcCiipFlag)
+    {
+      cu.firstPU->intraDir[0] = savedIntraDir[0];
+      cu.firstPU->intraDir[1] = savedIntraDir[1];
+    }
+#endif
 
     // inter prediction
     CHECK(CU::isIBC(cu) && cu.firstPU->ciipFlag, "IBC and Ciip cannot be used together");
@@ -1336,6 +1376,22 @@ void DecCu::xReconInter(CodingUnit &cu)
   }
   if (cu.Y().valid())
   {
+#if JVET_AC0112_IBC_CIIP
+    if (CU::isIBC(cu) && cu.firstPU->ibcCiipFlag)
+    {
+      const UnitArea localUnitArea( cu.cs->area.chromaFormat, Area( 0, 0, cu.Y().width, cu.Y().height ) );
+      m_pcIntraPred->geneWeightedPred( COMPONENT_Y, cu.cs->getPredBuf( *cu.firstPU ).Y(), *cu.firstPU, cu.cs->getPredBuf( *cu.firstPU ).Y(), m_ciipBuffer.getBuf( localUnitArea.Y() ) );
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+      if( isChromaEnabled( cu.chromaFormat ) && cu.Cb().valid())
+#else
+      if( isChromaEnabled( cu.chromaFormat ) && cu.Cb().valid() && cu.chromaSize().width > 2 )
+#endif
+      {
+        m_pcIntraPred->geneWeightedPred( COMPONENT_Cb, cu.cs->getPredBuf( *cu.firstPU ).Cb(), *cu.firstPU, cu.cs->getPredBuf( *cu.firstPU ).Cb(), m_ciipBuffer.getBuf( localUnitArea.Cb() ) );
+        m_pcIntraPred->geneWeightedPred( COMPONENT_Cr, cu.cs->getPredBuf( *cu.firstPU ).Cr(), *cu.firstPU, cu.cs->getPredBuf( *cu.firstPU ).Cr(), m_ciipBuffer.getBuf( localUnitArea.Cr() ) );
+      }
+    }
+#endif
     bool isIbcSmallBlk = CU::isIBC(cu) && (cu.lwidth() * cu.lheight() <= 16);
     CU::saveMotionInHMVP( cu, isIbcSmallBlk );
   }
@@ -2086,7 +2142,13 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               {
 #if JVET_Z0075_IBC_HMVP_ENLARGE
                 PU::getIBCMergeCandidates(pu, mrgCtx);
+#if JVET_AC0112_IBC_LIC && !JVET_AA0070_RRIBC
+                pu.ibcMbvdMergeFlag = false;
+#endif
                 m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
+#if JVET_AC0112_IBC_LIC && !JVET_AA0070_RRIBC
+                pu.ibcMbvdMergeFlag = true;
+#endif
 #else
                 PU::getIBCMergeCandidates(pu, mrgCtx, (((fPosIBCBaseIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE + 1) * ADAPTIVE_IBC_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumIBCMergeCand()) || (fPosIBCBaseIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE) == 0) ? fPosIBCBaseIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE * ADAPTIVE_IBC_SUB_GROUP_SIZE + ADAPTIVE_IBC_SUB_GROUP_SIZE - 1 : fPosIBCBaseIdx);
                 m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, fPosIBCBaseIdx);
@@ -2123,6 +2185,12 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #endif
                 PU::getIBCMergeCandidates(pu, mrgCtx);
                 m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
+#if JVET_AC0112_IBC_GPM && JVET_AA0070_RRIBC
+                if (pu.ibcGpmFlag)
+                {
+                  m_pcInterPred->adjustIbcMergeRribcCand(pu, mrgCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
+                }
+#endif
                 pu.mergeIdx = mrgCandIdx;
 #else
                 PU::getIBCMergeCandidates(pu, mrgCtx, (((pu.mergeIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE + 1) * ADAPTIVE_IBC_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumIBCMergeCand()) || (pu.mergeIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_IBC_SUB_GROUP_SIZE * ADAPTIVE_IBC_SUB_GROUP_SIZE + ADAPTIVE_IBC_SUB_GROUP_SIZE - 1 : pu.mergeIdx);
@@ -2132,6 +2200,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               else
 #endif
                 PU::getIBCMergeCandidates(pu, mrgCtx, pu.mergeIdx);
+#if JVET_AC0112_IBC_GPM
+              m_ibcMrgCtx = mrgCtx;
+#endif
 #if JVET_AA0061_IBC_MBVD
             }
 #endif

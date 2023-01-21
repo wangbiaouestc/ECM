@@ -532,6 +532,9 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
     pu.addHypData.clear();
     pu.numMergedAddHyps = 0;
 #endif
+#if JVET_AC0112_IBC_LIC
+    pu.cu->ibcLicFlag = ibcLicFlags[candIdx];
+#endif
 #if JVET_AA0070_RRIBC
     pu.cu->rribcFlipType = rribcFlipTypes[candIdx];
   }
@@ -1426,6 +1429,9 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
   pu.bv = pu.mv[REF_PIC_LIST_0];
   pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT); // used for only integer resolution
   pu.cu->imv = pu.cu->imv == IMV_HPEL ? 0 : pu.cu->imv;
+#if JVET_AC0112_IBC_LIC
+  pu.cu->ibcLicFlag = ibcLicFlags[fPosBaseIdx];
+#endif
 #if JVET_AA0070_RRIBC
   pu.cu->rribcFlipType = rribcFlipTypes[fPosBaseIdx];
 #endif

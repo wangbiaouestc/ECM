@@ -2564,6 +2564,15 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AA0061_IBC_MBVD
     READ_FLAG( uiCode, "sps_ibc_mbvd_enabled_flag" );                   pcSPS->setUseIbcMbvd             ( uiCode != 0 );
 #endif
+#if JVET_AC0112_IBC_CIIP
+    READ_FLAG( uiCode, "sps_ibc_ciip_enabled_flag" );                   pcSPS->setUseIbcCiip             ( uiCode != 0 );
+#endif
+#if JVET_AC0112_IBC_GPM
+    READ_FLAG( uiCode, "sps_ibc_gpm_enabled_flag" );                    pcSPS->setUseIbcGpm              ( uiCode != 0 );
+#endif
+#if JVET_AC0112_IBC_LIC
+    READ_FLAG( uiCode, "sps_ibc_lic_enabled_flag" );                    pcSPS->setUseIbcLic              ( uiCode != 0 );
+#endif
   }
   else
     pcSPS->setMaxNumIBCMergeCand(0);

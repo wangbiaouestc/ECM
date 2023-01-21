@@ -1530,6 +1530,15 @@ private:
 #if JVET_AA0061_IBC_MBVD
   bool              m_ibcMbvd;
 #endif
+#if JVET_AC0112_IBC_CIIP
+  bool              m_ibcCiip;
+#endif
+#if JVET_AC0112_IBC_GPM
+  bool              m_ibcGpm;
+#endif
+#if JVET_AC0112_IBC_LIC
+  bool              m_ibcLic;
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool              m_DMVDMode;
 #endif
@@ -2058,6 +2067,18 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AA0061_IBC_MBVD
   void                    setUseIbcMbvd(bool b)                                                           { m_ibcMbvd = b; }
   bool                    getUseIbcMbvd() const                                                           { return m_ibcMbvd; }
+#endif
+#if JVET_AC0112_IBC_CIIP
+  void                    setUseIbcCiip(bool b)                                                           { m_ibcCiip = b; }
+  bool                    getUseIbcCiip() const                                                           { return m_ibcCiip; }
+#endif
+#if JVET_AC0112_IBC_GPM
+  void                    setUseIbcGpm(bool b)                                                            { m_ibcGpm = b; }
+  bool                    getUseIbcGpm() const                                                            { return m_ibcGpm; }
+#endif
+#if JVET_AC0112_IBC_LIC
+  void                    setUseIbcLic(bool b)                                                            { m_ibcLic = b; }
+  bool                    getUseIbcLic() const                                                            { return m_ibcLic; }
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void                    setUseDMVDMode(bool b)                                                          { m_DMVDMode = b; }

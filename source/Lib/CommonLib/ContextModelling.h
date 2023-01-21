@@ -561,6 +561,9 @@ public:
 #if INTER_LIC
   bool          LICFlags[NUM_MERGE_CANDS];
 #endif
+#if JVET_AC0112_IBC_LIC
+  bool          ibcLicFlags[NUM_MERGE_CANDS];
+#endif
 #if JVET_AA0070_RRIBC
   int       rribcFlipTypes[NUM_MERGE_CANDS];
 #endif
@@ -577,6 +580,9 @@ public:
   uint8_t       BcwIdx            [ MRG_MAX_NUM_CANDS      ];
 #if INTER_LIC
   bool          LICFlags          [ MRG_MAX_NUM_CANDS      ];
+#endif
+#if JVET_AC0112_IBC_LIC
+  bool          ibcLicFlags       [ MRG_MAX_NUM_CANDS      ];
 #endif
 #if JVET_AA0070_RRIBC
   int rribcFlipTypes[MRG_MAX_NUM_CANDS];

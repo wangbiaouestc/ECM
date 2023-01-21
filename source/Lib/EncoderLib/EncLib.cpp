@@ -1668,6 +1668,15 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AA0061_IBC_MBVD
   sps.setUseIbcMbvd                         ( m_ibcMbvd );
 #endif
+#if JVET_AC0112_IBC_CIIP
+  sps.setUseIbcCiip                         ( m_ibcCiip );
+#endif
+#if JVET_AC0112_IBC_GPM
+  sps.setUseIbcGpm                          ( m_ibcGpm );
+#endif
+#if JVET_AC0112_IBC_LIC
+  sps.setUseIbcLic                          ( m_ibcLic );
+#endif
   sps.setWrapAroundEnabledFlag                      ( m_wrapAround );
 #if MULTI_HYP_PRED
   sps.setMaxNumAddHyps(m_maxNumAddHyps);

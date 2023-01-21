@@ -349,6 +349,9 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
 #if JVET_W0123_TIMD_FUSION && INTRA_TRANS_ENC_OPT
   m_timdBlending = timdBlending;
 #endif
+#if JVET_AC0112_IBC_CIIP && INTRA_TRANS_ENC_OPT
+  m_ibcCiipBlending = ibcCiipBlending;
+#endif
 #if JVET_V0130_INTRA_TMP
   unsigned int blkSize;
   if( m_pppTarPatch == NULL )
@@ -994,6 +997,18 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       int weightMode = ((pu.cu->timd && pu.cu->timdIsBlended) || !applyFusion) ? 4 : 3;
 #else
       int weightMode = ((pu.cu->timd && pu.cu->timdIsBlended) || !applyFusion || (PU::isSgpm(pu, CHANNEL_TYPE_LUMA))) ? 4 : 3;
+#endif
+#if JVET_AC0112_IBC_CIIP
+      if (pu.ibcCiipFlag)
+      {
+        weightMode = 4;
+      }
+#endif
+#if JVET_AC0112_IBC_GPM
+      if (pu.ibcGpmFlag)
+      {
+        weightMode = 4;
+      }
 #endif
       xPredIntraAng(srcBuf, piPred, channelType, clpRng, bExtIntraDir, srcBuf2nd, pu.cu->ispMode != NOT_INTRA_SUBPARTITIONS, weightMode);
         break;
@@ -2757,9 +2772,44 @@ void IntraPrediction::geneWeightedPred( const ComponentID compId, PelBuf& pred, 
 #endif
 }
 
+#if JVET_AC0112_IBC_CIIP
+void IntraPrediction::geneWeightedPred( const ComponentID compId, PelBuf& pred, const PredictionUnit &pu, const PelBuf& interPred, const PelBuf& intraPred)
+{
+  const int            width = pred.width;
+  const int            height = pred.height;
+  const Pel*           interPredBuf = interPred.buf;
+  const int            interPredStride = interPred.stride;
+  Pel*                 intraPredBuf = intraPred.buf;
+  const int            intraPredStride = intraPred.stride;
+  const int            dstStride = pred.stride;
+  Pel*                 dstBuf = pred.buf;
+  int wMerge = 13;
+  int wIntra = 3;
+  int shift = 4;
+  if (!pu.mergeFlag)
+  {
+    wMerge = 1;
+    wIntra = 1;
+    shift = 1;
+  }
+  if (width < 4)
+  {
+    ibcCiipBlending(dstBuf, dstStride, interPredBuf, interPredStride, intraPredBuf, intraPredStride, wMerge, wIntra, shift, width, height);
+  }
+  else
+  {
+    m_ibcCiipBlending(dstBuf, dstStride, interPredBuf, interPredStride, intraPredBuf, intraPredStride, wMerge, wIntra, shift, width, height);
+  }
+}
+#endif
+
 void IntraPrediction::geneIntrainterPred(const CodingUnit &cu, PelStorage& pred)
 {
+#if JVET_AC0112_IBC_CIIP
+  if (!cu.firstPU->ciipFlag && !cu.firstPU->ibcCiipFlag)
+#else
   if (!cu.firstPU->ciipFlag)
+#endif
   {
     return;
   }
@@ -2771,6 +2821,17 @@ void IntraPrediction::geneIntrainterPred(const CodingUnit &cu, PelStorage& pred)
   const UnitArea localUnitArea(pu->cs->area.chromaFormat, Area(0, 0, pu->Y().width, pu->Y().height));
   PelBuf ciipBuff = pred.getBuf(localUnitArea.Y());
   predIntraAng(COMPONENT_Y, ciipBuff, *pu);
+#if JVET_AC0112_IBC_CIIP
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+  const bool chroma = !(CS::isDualITree(*pu->cs));
+#else
+  const bool chroma = !pu.cu->isSepTree();
+#endif
+  if (cu.firstPU->ibcCiipFlag && !chroma)
+  {
+    return;
+  }
+#endif
 
   if (isChromaEnabled(pu->chromaFormat))
   {
@@ -2881,6 +2942,12 @@ void IntraPrediction::initIntraPatternChType(const CodingUnit &cu, const CompAre
   m_ipaParam.fetchRef2nd  &= !(cu.dimd && cu.dimdBlending);
   m_ipaParam.fetchRef2nd  &= !(mrlIndex2D == MULTI_REF_LINE_IDX[MRL_NUM_REF_LINES - 1] && ((cu.block(COMPONENT_Y).y) % ((cu.cs->sps)->getMaxCUWidth()) <= MULTI_REF_LINE_IDX[MRL_NUM_REF_LINES - 1]));
   m_ipaParam.fetchRef2nd  &= !(mrlIndex2D == 0 && ((cu.block(COMPONENT_Y).y) % ((cu.cs->sps)->getMaxCUWidth()) == 0));
+#if JVET_AC0112_IBC_CIIP
+  m_ipaParam.fetchRef2nd &= !cu.firstPU->ibcCiipFlag;
+#endif
+#if JVET_AC0112_IBC_GPM
+  m_ipaParam.fetchRef2nd &= !cu.firstPU->ibcGpmFlag;
+#endif
 #endif
 
   if (!forceRefFilterFlag)
@@ -5547,6 +5614,28 @@ void IntraPrediction::timdBlending(Pel *pDst, int strideDst, Pel *pSrc, int stri
   }
 }
 #endif
+#endif
+
+#if JVET_AC0112_IBC_CIIP
+void IntraPrediction::ibcCiipBlending(Pel *pDst, int strideDst, const Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int shift, int width, int height)
+{
+  Pel *pelPred = pDst;
+  const Pel *pelPlanar = pSrc0;
+  Pel *pelPredAng = pSrc1;
+  int offset = 1 << (shift - 1);
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      int blend = pelPlanar[x] * w0;
+      blend += pelPredAng[x] * w1;
+      pelPred[x] = (Pel)((blend + offset) >> shift);
+    }
+    pelPred += strideDst;
+    pelPlanar += strideSrc0;
+    pelPredAng += strideSrc1;
+  }
+}
 #endif
 
 #if ENABLE_DIMD
@@ -10886,7 +10975,11 @@ void IntraPrediction::getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlR
     }
   }
   // left (Inter)
+#if JVET_AC0112_IBC_CIIP
+  if (puLeft && (CU::isInter(*puLeft->cu) || CU::isIBC(*puLeft->cu)))
+#else
   if (puLeft && CU::isInter(*puLeft->cu))
+#endif
   {
     tmrlIntraList[sizeMode] = puLeft->getIpmInfo(posL);
     if (!includedMode[tmrlIntraList[sizeMode]])
@@ -10895,7 +10988,11 @@ void IntraPrediction::getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlR
     }
   }
   // above (Inter)
+#if JVET_AC0112_IBC_CIIP
+  if (puAbove && (CU::isInter(*puAbove->cu) || CU::isIBC(*puAbove->cu)))
+#else
   if (puAbove && CU::isInter(*puAbove->cu))
+#endif
   {
     tmrlIntraList[sizeMode] = puAbove->getIpmInfo(posA);
     if (!includedMode[tmrlIntraList[sizeMode]])
@@ -10949,7 +11046,11 @@ void IntraPrediction::getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlR
   }
 
   // above left (Inter)
+#if JVET_AC0112_IBC_CIIP
+  if (puAboveLeft && (CU::isInter(*puAboveLeft->cu) || CU::isIBC(*puAboveLeft->cu)))
+#else
   if (puAboveLeft && CU::isInter(*puAboveLeft->cu))
+#endif
   {
     tmrlIntraList[sizeMode] = puAboveLeft->getIpmInfo(posAL);
     if (!includedMode[tmrlIntraList[sizeMode]])
@@ -10959,7 +11060,11 @@ void IntraPrediction::getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlR
   }
 
   // left bottom (Inter)
+#if JVET_AC0112_IBC_CIIP
+  if (puLeftBottom && (CU::isInter(*puLeftBottom->cu) || CU::isIBC(*puLeftBottom->cu)))
+#else
   if (puLeftBottom && CU::isInter(*puLeftBottom->cu))
+#endif
   {
     tmrlIntraList[sizeMode] = puLeftBottom->getIpmInfo(posLB);
     if (!includedMode[tmrlIntraList[sizeMode]])
@@ -10969,7 +11074,11 @@ void IntraPrediction::getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlR
   }
 
   // above right (Inter)
+#if JVET_AC0112_IBC_CIIP
+  if (puAboveRight && (CU::isInter(*puAboveRight->cu) || CU::isIBC(*puAboveRight->cu)))
+#else
   if (puAboveRight && CU::isInter(*puAboveRight->cu))
+#endif
   {
     tmrlIntraList[sizeMode] = puAboveRight->getIpmInfo(posAR);
     if (!includedMode[tmrlIntraList[sizeMode]])

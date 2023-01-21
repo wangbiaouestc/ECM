@@ -122,6 +122,9 @@ private:
   MergeCtx          m_geoTmMrgCtx0, m_geoTmMrgCtx1;
 #endif
 #endif
+#if JVET_AC0112_IBC_GPM
+  MergeCtx          m_ibcMrgCtx;
+#endif
 };
 
 //! \}

@@ -364,6 +364,9 @@ namespace PU
 #endif
   void spanIpmInfoIntra               (      PredictionUnit &pu );
   void spanIpmInfoInter               (      PredictionUnit &pu, MotionBuf &mb, IpmBuf &ib );
+#if JVET_AC0112_IBC_CIIP
+  void spanIpmInfoIBC                 (      PredictionUnit &pu, IpmBuf &ib, int bvx, int bvy );
+#endif
 #endif
 #if JVET_AB0155_SGPM
   void spanIpmInfoSgpm                (      PredictionUnit &pu);
@@ -797,6 +800,77 @@ uint32_t updateGeoMMVDCandList(double uiCost, int splitDir, int mergeCand0, int 
   }
   return 0;
 }
+
+#if JVET_AC0112_IBC_GPM
+template<size_t N>
+uint32_t updateGeoIbcCandList(double uiCost, int splitDir, int mergeCand0, int mergeCand1, int mmvdCand0, int mmvdCand1,
+  static_vector<double, N>& candCostList, static_vector<int, N>& geoSplitDirList, static_vector<int, N>& geoMergeCand0, static_vector<int, N>& geoMergeCand1, size_t uiFastCandNum)
+{
+  size_t i;
+  size_t shift = 0;
+  size_t currSize = std::min(uiFastCandNum, candCostList.size());
+
+  while (shift < uiFastCandNum && shift < currSize && uiCost < candCostList[currSize - 1 - shift])
+  {
+    shift++;
+  }
+
+  if (candCostList.size() >= uiFastCandNum && shift != 0)
+  {
+    for (i = 1; i < shift; i++)
+    {
+      geoSplitDirList[currSize - i] = geoSplitDirList[currSize - 1 - i];
+      geoMergeCand0[currSize - i] = geoMergeCand0[currSize - 1 - i];
+      geoMergeCand1[currSize - i] = geoMergeCand1[currSize - 1 - i];
+      candCostList[currSize - i] = candCostList[currSize - 1 - i];
+    }
+    geoSplitDirList[currSize - shift] = splitDir;
+    geoMergeCand0[currSize - shift] = mergeCand0;
+    geoMergeCand1[currSize - shift] = mergeCand1;
+    candCostList[currSize - shift] = uiCost;
+    return 1;
+  }
+  else if (currSize < uiFastCandNum)
+  {
+    geoSplitDirList.insert(geoSplitDirList.end() - shift, splitDir);
+    geoMergeCand0.insert(geoMergeCand0.end() - shift, mergeCand0);
+    geoMergeCand1.insert(geoMergeCand1.end() - shift, mergeCand1);
+    candCostList.insert(candCostList.end() - shift, uiCost);
+    return 1;
+  }
+  return 0;
+}
+
+template<size_t N>
+void sortCandList(double uiCost, int mergeCand, static_vector<double, N>& candCostList, static_vector<int, N>& mergeCandList, int fastCandNum)
+{
+  size_t i;
+  size_t shift = 0;
+  size_t currSize = candCostList.size();
+  CHECK(currSize > fastCandNum, "list overflow!");
+
+  while (shift < currSize && uiCost < candCostList[currSize - 1 - shift])
+  {
+    shift++;
+  }
+
+  if (currSize == fastCandNum && shift != 0)
+  {
+    for (i = 1; i < shift; i++)
+    {
+      mergeCandList[currSize - i] = mergeCandList[currSize - 1 - i];
+      candCostList[currSize - i] = candCostList[currSize - 1 - i];
+    }
+    mergeCandList[currSize - shift] = mergeCand;
+    candCostList[currSize - shift] = uiCost;
+  }
+  else if (currSize < fastCandNum)
+  {
+    mergeCandList.insert(mergeCandList.end() - shift, mergeCand);
+    candCostList.insert(candCostList.end() - shift, uiCost);
+  }
+}
+#endif
 
 template<size_t N>
 void sortCandList(double uiCost, int mergeCand, int mmvdCand, static_vector<double, N>& candCostList, static_vector<int, N>& mergeCandList, static_vector<int, N>& mmvdCandList, int fastCandNum)

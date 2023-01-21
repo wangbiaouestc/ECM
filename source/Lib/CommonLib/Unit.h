@@ -386,6 +386,9 @@ struct CodingUnit : public UnitArea
 #if INTER_LIC
   bool           LICFlag;
 #endif
+#if JVET_AC0112_IBC_LIC
+  bool ibcLicFlag;
+#endif
 #if JVET_AA0070_RRIBC
   int    rribcFlipType;
 #endif
@@ -528,6 +531,17 @@ struct InterPredictionData
 #if JVET_AA0061_IBC_MBVD
   bool          ibcMbvdMergeFlag;
   int           ibcMbvdMergeIdx;
+#endif
+#if JVET_AC0112_IBC_CIIP
+  bool        ibcCiipFlag;
+  int         ibcCiipIntraIdx;
+#endif
+#if JVET_AC0112_IBC_GPM
+  bool        ibcGpmFlag;
+  uint8_t     ibcGpmSplitDir;
+  uint8_t     ibcGpmMergeIdx0;
+  uint8_t     ibcGpmMergeIdx1;
+  uint8_t     ibcGpmBldIdx;
 #endif
 #if AFFINE_MMVD
   bool        afMmvdFlag;

@@ -176,6 +176,9 @@
 #define JVET_AA0106_IBCBUF_CTU256                         1 // JVET-AA0106: Adjust IBC reference area to 2*128 rows above the current CTU
 #define JVET_AA0061_IBC_MBVD                              1 // JVET-AA0061: IBC merge mode with block vector differences
 #define JVET_AA0070_RRIBC                                 1 // JVET-AA0070: Reconstruction-Reordered IBC
+#define JVET_AC0112_IBC_CIIP                              1 // JVET-AC0112: Combined IBC and intra prediction (IBC-CIIP)
+#define JVET_AC0112_IBC_GPM                               1 // JVET-AC0112: IBC with geometry partitioning mode (IBC-GPM)
+#define JVET_AC0112_IBC_LIC                               1 // JVET-AC0112: IBC with local illumination compensation (IBC-LIC)
 
 // Inter
 #define CIIP_PDPC                                         1 // Apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode

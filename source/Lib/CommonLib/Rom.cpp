@@ -5437,4 +5437,27 @@ const int8_t g_glmPattern[NUM_GLM_PATTERN][6] =
 #endif
 };
 #endif
+#if JVET_AC0112_IBC_GPM
+const int8_t g_ibcGpmFirstSetSplitDirToIdx[GEO_NUM_PARTITION_MODE] = {
+0,1,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,
+0,0,2,3,0,0,0,0,
+0,0,0,0,0,0,0,0,
+0,0,0,0,4,5,0,0,
+0,0,0,0,0,0,0,0,
+0,0,6,7,0,0,0,0,
+0,0,0,0,0,0,0,0
+};
+const int8_t g_ibcGpmFirstSetSplitDir[IBC_GPM_MAX_SPLIT_DIR_FIRST_SET_NUM] = {0, 1, 18, 19, 36, 37, 50, 51};
+const int8_t g_ibcGpmSecondSetSplitDir[GEO_NUM_PARTITION_MODE] = {
+0,0,1,1,0,1,1,1,
+0,1,1,1,0,1,1,1,
+0,1,0,0,1,1,0,1,
+1,1,0,1,1,1,0,1,
+1,1,0,1,0,0,1,0,
+1,1,0,1,1,0,1,1,
+0,1,0,0,1,0,1,1,
+0,1,1,0,1,1,0,1
+};
+#endif
 //! \}

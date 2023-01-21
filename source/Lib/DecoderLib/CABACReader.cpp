@@ -3230,6 +3230,9 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
 #if JVET_AA0070_RRIBC
   rribcData(*pu.cu);
 #endif
+#if JVET_AC0112_IBC_LIC
+  cuIbcLicFlag(*pu.cu);
+#endif
 
   if( pu.mergeFlag )
   {
@@ -3244,6 +3247,13 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
   }
   else if (CU::isIBC(*pu.cu))
   {
+#if JVET_AC0112_IBC_CIIP
+    ibcCiipFlag(pu);
+    if (pu.ibcCiipFlag)
+    {
+      ibcCiipIntraIdx(pu);
+    }
+#endif
     pu.interDir = 1;
     pu.cu->affine = false;
     pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
@@ -3829,6 +3839,204 @@ void CABACReader::tm_merge_flag(PredictionUnit& pu)
 }
 #endif
 
+#if JVET_AC0112_IBC_CIIP
+void CABACReader::ibcCiipFlag(PredictionUnit& pu)
+{
+  if (!pu.cs->sps->getUseIbcCiip() || ( pu.lx() == 0 && pu.ly() == 0))
+  {
+    pu.ibcCiipFlag = false;
+    return;
+  }
+  if (pu.lwidth() * pu.lheight() < 32 || pu.lwidth() > 32 || pu.lheight() > 32)
+  {
+    pu.ibcCiipFlag = false;
+    return;
+  }
+  if (pu.mergeFlag)
+  {
+    if (pu.cu->skip)
+    {
+      pu.ibcCiipFlag = false;
+      return;
+    }
+    pu.ibcCiipFlag = m_BinDecoder.decodeBin(Ctx::IbcCiipFlag(0));
+  }
+  else
+  {
+#if JVET_AA0070_RRIBC
+    if (pu.cu->rribcFlipType)
+    {
+      pu.ibcCiipFlag = false;
+      return;
+    }
+#endif
+#if JVET_AC0112_IBC_LIC
+    if (pu.cu->ibcLicFlag)
+    {
+      pu.ibcCiipFlag = false;
+      return;
+    }
+#endif
+    if (pu.cs->slice->getSliceType() != I_SLICE)
+    {
+      pu.ibcCiipFlag = false;
+      return;
+    }
+    pu.ibcCiipFlag = m_BinDecoder.decodeBin(Ctx::IbcCiipFlag(1));
+  }
+}
+
+void CABACReader::ibcCiipIntraIdx(PredictionUnit& pu)
+{
+  pu.ibcCiipIntraIdx = m_BinDecoder.decodeBin( Ctx::IbcCiipIntraIdx() );
+}
+#endif
+
+#if JVET_AC0112_IBC_GPM
+void CABACReader::ibcGpmFlag(PredictionUnit& pu)
+{
+  if (!pu.cs->sps->getUseIbcGpm() || (pu.lx() == 0 && pu.ly() == 0))
+  {
+    pu.ibcGpmFlag = false;
+    return;
+  }
+  if (pu.lwidth() < 8 || pu.lheight() < 8 || pu.lwidth() > 32 || pu.lheight() > 32)
+  {
+    pu.ibcGpmFlag = false;
+    return;
+  }
+  pu.ibcGpmFlag = (m_BinDecoder.decodeBin(Ctx::IbcGpmFlag()));
+}
+
+void CABACReader::ibcGpmMergeIdx(PredictionUnit& pu)
+{
+  uint32_t splitDir = 0;
+  bool splitDirFirstSet = m_BinDecoder.decodeBin( Ctx::IbcGpmSplitDirSetFlag() );
+  if (splitDirFirstSet)
+  {
+    int splitDirIdx = m_BinDecoder.decodeBinsEP(3);
+    splitDir = g_ibcGpmFirstSetSplitDir[splitDirIdx];
+  }
+  else
+  {
+    xReadTruncBinCode(splitDir, IBC_GPM_MAX_SPLIT_DIR_SECOND_SET_NUM);
+    uint8_t prefix = splitDir;
+    splitDir++;
+    for (uint8_t i = 0; i < GEO_NUM_PARTITION_MODE && splitDir != 0; i++)
+    {
+      if (!g_ibcGpmSecondSetSplitDir[i])
+      {
+        prefix++;
+      }
+      else
+      {
+        splitDir--;
+      }
+    }
+    splitDir = prefix;
+  }
+  pu.ibcGpmSplitDir = splitDir;
+
+  bool isIntra0 = m_BinDecoder.decodeBin( Ctx::IbcGpmIntraFlag() ) ? true : false;
+  bool isIntra1 = isIntra0 ? false : true;
+
+  const int maxNumIbcGpmCand = pu.cs->sps->getMaxNumIBCMergeCand();
+  int numCandminus2 = maxNumIbcGpmCand - 2;
+  int mergeCand0 = 0;
+  int mergeCand1 = 0;
+  if (isIntra0)
+  {
+    mergeCand0 = IBC_GPM_MAX_NUM_UNI_CANDS + unary_max_eqprob(IBC_GPM_MAX_NUM_INTRA_CANDS-1);
+  }
+  else if (numCandminus2 >= 0)
+  {
+    if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
+    {
+      mergeCand0 += unary_max_eqprob(numCandminus2) + 1;
+    }
+  }
+  if (isIntra1)
+  {
+    mergeCand1 = IBC_GPM_MAX_NUM_UNI_CANDS + unary_max_eqprob(IBC_GPM_MAX_NUM_INTRA_CANDS-1);
+  }
+  else if (numCandminus2 >= 0)
+  {
+    if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
+    {
+      mergeCand1 += unary_max_eqprob(numCandminus2) + 1;
+    }
+  }
+  pu.ibcGpmMergeIdx0 = mergeCand0;
+  pu.ibcGpmMergeIdx1 = mergeCand1;
+}
+
+void CABACReader::ibcGpmAdaptBlendIdx(PredictionUnit& pu)
+{
+  if (IBC_GPM_NUM_BLENDING == 1)
+  {
+    pu.ibcGpmBldIdx = 0;
+    return;
+  }
+  int bin0 = m_BinDecoder.decodeBin(Ctx::IbcGpmBldIdx(0));
+  if (bin0 == 1)
+  {
+    pu.ibcGpmBldIdx = 0;
+  }
+  else
+  {
+    int bin1 = m_BinDecoder.decodeBin(Ctx::IbcGpmBldIdx(1));
+    if (bin1 == 0)
+    {
+      int bin2 = m_BinDecoder.decodeBin(Ctx::IbcGpmBldIdx(3));
+      if (bin2 == 0)
+      {
+        pu.ibcGpmBldIdx = 4;
+      }
+      else
+      {
+        pu.ibcGpmBldIdx = 3;
+      }
+    }
+    else
+    {
+      int bin2 = m_BinDecoder.decodeBin(Ctx::IbcGpmBldIdx(2));
+      if (bin2 == 0)
+      {
+        pu.ibcGpmBldIdx = 1;
+      }
+      else
+      {
+        pu.ibcGpmBldIdx = 2;
+      }
+    }
+  }
+}
+#endif
+
+#if JVET_AC0112_IBC_LIC
+void CABACReader::cuIbcLicFlag( CodingUnit& cu )
+{
+  if (!cu.cs->sps->getUseIbcLic() || !CU::isIBC(cu) || cu.firstPU->mergeFlag)
+  {
+    cu.ibcLicFlag = false;
+    return;
+  }
+#if JVET_AA0070_RRIBC
+  if (cu.rribcFlipType > 0)
+  {
+    cu.ibcLicFlag = false;
+    return;
+  }
+#endif
+  if (cu.lwidth() * cu.lheight() < 32 || cu.lwidth() * cu.lheight() > 256)
+  {
+    cu.ibcLicFlag = false;
+    return;
+  }
+  cu.ibcLicFlag = m_BinDecoder.decodeBin( Ctx::IbcLicFlag() );
+}
+#endif
+
 #if JVET_X0049_ADAPT_DMVR
 void CABACReader::bm_merge_flag(PredictionUnit& pu)
 {
@@ -3883,6 +4091,34 @@ void CABACReader::merge_data( PredictionUnit& pu )
 #if JVET_AA0061_IBC_MBVD
     }
 #endif
+#endif
+#if JVET_AC0112_IBC_CIIP
+    ibcCiipFlag(pu);
+    if (pu.ibcCiipFlag)
+    {
+      ibcCiipIntraIdx(pu);
+    }
+#endif
+#if JVET_AC0112_IBC_GPM
+#if JVET_AC0112_IBC_CIIP && JVET_AA0061_IBC_MBVD
+    if (!pu.ibcMbvdMergeFlag && !pu.ibcCiipFlag)
+#else
+#if JVET_AA0061_IBC_MBVD
+    if (!pu.ibcMbvdMergeFlag)
+#else
+#if JVET_AC0112_IBC_CIIP
+    if (!pu.ibcCiipFlag)
+#endif
+#endif
+#endif
+    {
+      ibcGpmFlag(pu);
+      if (pu.ibcGpmFlag)
+      {
+        ibcGpmMergeIdx(pu);
+        ibcGpmAdaptBlendIdx(pu);
+      }
+    }
 #endif
     merge_idx(pu);
     return;
@@ -4249,6 +4485,13 @@ void CABACReader::merge_idx( PredictionUnit& pu )
 #if JVET_AA0061_IBC_MBVD
     if (pu.ibcMbvdMergeFlag)
     {
+      return;
+    }
+#endif
+#if JVET_AC0112_IBC_GPM
+    if (pu.ibcGpmFlag)
+    {
+      pu.mergeIdx = pu.ibcGpmMergeIdx0 < IBC_GPM_MAX_NUM_UNI_CANDS ? pu.ibcGpmMergeIdx0 : pu.ibcGpmMergeIdx1;
       return;
     }
 #endif

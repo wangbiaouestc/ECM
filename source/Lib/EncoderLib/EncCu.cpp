@@ -10841,6 +10841,32 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
   uint32_t ibcMbvdValidNum[IBC_MBVD_BASE_NUM] = { 0 };
 #endif
 
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
+  const UnitArea localUnitArea(tempCS->area.chromaFormat, Area(0, 0, tempCS->area.Y().width, tempCS->area.Y().height));
+  PelUnitBuf intraPredBuf[NUM_LUMA_MODE];
+  bool intraPredBufSet[NUM_LUMA_MODE] = {false, };
+#endif
+#if JVET_AC0112_IBC_CIIP
+  bool testIbcCiip = tempCS->sps->getUseIbcCiip() && (tempCS->area.lwidth() * tempCS->area.lheight() >= 32) && tempCS->area.lwidth() <= 32 && tempCS->area.lheight() <= 32 && (tempCS->area.lx() > 0 || tempCS->area.ly() > 0);
+  int wIbc = 13, wIntra = 3, shift = 4;
+  PelBuf ibcCiipBuf = m_ciipBuffer[1].getBuf(localUnitArea.Y());
+  int ibcCiipIntraList[IBC_CIIP_MAX_NUM_INTRA_CANDS];
+  double ibcCiipBestSatdCost = MAX_DOUBLE;
+  int ibcCiipBestMergeCand = 0;
+  int ibcCiipBestIntraCand = 0;
+#endif
+#if JVET_AC0112_IBC_GPM
+  MergeCtx mergeCtxIbcGeo;
+  int skipCandNum[IBC_MRG_MAX_NUM_CANDS] = {0, };
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
+  MergeCtx mergeCtxTmIbcGeo;
+  int skipCandNumTm[IBC_MRG_MAX_NUM_CANDS<<1] = {0, };
+#endif
+  DistParam distParamSad;
+  Distortion sadIntraWholeBlk[NUM_LUMA_MODE];
+  uint8_t ibcGpmIntraCandList[GEO_NUM_PARTITION_MODE][2][IBC_GPM_MAX_NUM_INTRA_CANDS];
+#endif
+
   if (sps.getSbTMVPEnabledFlag())
   {
     Size bufSize = g_miScaling.scale(tempCS->area.lumaSize());
@@ -10864,6 +10890,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
     cu.LICFlag = false;
 #endif
     cu.geoFlag = false;
+#if JVET_AC0112_IBC_LIC
+    cu.ibcLicFlag = false;
+#endif
 #if JVET_AA0070_RRIBC
     cu.rribcFlipType = 0;
     pu.mergeFlag = true;
@@ -10941,24 +10970,70 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
     numMrgSATDCand += 2;
   }
   numMrgSATDCand = std::min(numMrgSATDCand, (const int)(mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand));
+#if JVET_AC0112_IBC_CIIP
+  static_vector<ModeIbcInfo, ((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM)>  rdModeList((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM);
+  for (unsigned i = 0; i < ((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM); i++)
+  {
+    rdModeList[i].mergeCand = i;
+    rdModeList[i].isCIIP = false;
+#if JVET_AC0112_IBC_GPM
+    rdModeList[i].isIbcGpm = false;
+#endif
+  }
+#else
+#if JVET_AC0112_IBC_GPM
+  static_vector<ModeIbcInfo, ((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM)>  rdModeList((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM);
+  for (unsigned i = 0; i < ((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM); i++)
+  {
+    rdModeList[i].mergeCand = i;
+    rdModeList[i].isIbcGpm = false;
+  }
+#else
   static_vector<unsigned, ((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM)>  rdModeList((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM);
   for (unsigned i = 0; i < ((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM); i++)
   {
     rdModeList[i] = i;
   }
+#endif
+#endif
 
   static_vector<double, ((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM)>  candCostList(((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM), MAX_DOUBLE);
 #else
   int candHasNoResidual[IBC_MRG_MAX_NUM_CANDS<<1] = {0,};
   bool                                                 bestIsSkip = false;
   unsigned                                             numMrgSATDCand = mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand;
+#if JVET_AC0112_IBC_CIIP
+  static_vector<ModeIbcInfo, ((IBC_MRG_MAX_NUM_CANDS<<1)+2)>  rdModeList((IBC_MRG_MAX_NUM_CANDS<<1)+2);
+  for (unsigned i = 0; i < (IBC_MRG_MAX_NUM_CANDS<<1)+2; i++)
+  {
+    rdModeList[i].mergeCand = i;
+    rdModeList[i].isCIIP = false;
+#if JVET_AC0112_IBC_GPM
+    rdModeList[i].isIbcGpm = false;
+#endif
+  }
+#else
+#if JVET_AC0112_IBC_GPM
+  static_vector<ModeIbcInfo, ((IBC_MRG_MAX_NUM_CANDS<<1)+2)>  rdModeList((IBC_MRG_MAX_NUM_CANDS<<1)+2);
+  for (unsigned i = 0; i < (IBC_MRG_MAX_NUM_CANDS<<1)+2; i++)
+  {
+    rdModeList[i].mergeCand = i;
+    rdModeList[i].isIbcGpm = false;
+  }
+#else
   static_vector<unsigned, (IBC_MRG_MAX_NUM_CANDS<<1)>  rdModeList(IBC_MRG_MAX_NUM_CANDS<<1);
   for (unsigned i = 0; i < IBC_MRG_MAX_NUM_CANDS<<1; i++)
   {
     rdModeList[i] = i;
   }
+#endif
+#endif
 
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
+  static_vector<double, ((IBC_MRG_MAX_NUM_CANDS<<1)+2)>  candCostList((IBC_MRG_MAX_NUM_CANDS<<1)+2, MAX_DOUBLE);
+#else
   static_vector<double, (IBC_MRG_MAX_NUM_CANDS<<1)>  candCostList(IBC_MRG_MAX_NUM_CANDS<<1, MAX_DOUBLE);
+#endif
 #endif
 #else
 #if JVET_AA0061_IBC_MBVD
@@ -10988,6 +11063,24 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
     static_vector<double, MRG_MAX_NUM_CANDS>  candCostList(MRG_MAX_NUM_CANDS, MAX_DOUBLE);
 #endif
 #endif
+
+#if JVET_AC0112_IBC_GPM
+  Distortion sadWholeBlk[IBC_MRG_MAX_NUM_CANDS<<1];
+  bool isSkipThisCand[IBC_GPM_MAX_NUM_UNI_CANDS<<1] = {false, };
+  PelUnitBuf ibcPredBuf[IBC_MRG_MAX_NUM_CANDS<<1];
+  static_vector<int, IBC_MRG_MAX_NUM_CANDS<<1> mergeCandList0[GEO_NUM_PARTITION_MODE];
+  static_vector<int, IBC_MRG_MAX_NUM_CANDS<<1> mergeCandList1[GEO_NUM_PARTITION_MODE];
+  static_vector<double, IBC_MRG_MAX_NUM_CANDS<<1> sadCostList0[GEO_NUM_PARTITION_MODE];
+  static_vector<double, IBC_MRG_MAX_NUM_CANDS<<1> sadCostList1[GEO_NUM_PARTITION_MODE];
+  int ibcGpmCandNumValid = 0;
+  PelUnitBuf geoCombinations[IBC_GPM_MAX_TRY_WEIGHTED_SAD*IBC_GPM_NUM_BLENDING+1];
+  static_vector<int, IBC_GPM_MAX_NUM_INTRA_CANDS> intraCandList0[GEO_NUM_PARTITION_MODE];
+  static_vector<int, IBC_GPM_MAX_NUM_INTRA_CANDS> intraCandList1[GEO_NUM_PARTITION_MODE];
+  static_vector<double, IBC_GPM_MAX_NUM_INTRA_CANDS> intraSadCostList0[GEO_NUM_PARTITION_MODE];
+  static_vector<double, IBC_GPM_MAX_NUM_INTRA_CANDS> intraSadCostList1[GEO_NUM_PARTITION_MODE];
+  bool testIbcGpm = tempCS->sps->getUseIbcGpm() && (tempCS->area.lx() > 0 || tempCS->area.ly() > 0);
+#endif
+
     // 1. Pass: get SATD-cost for selected candidates and reduce their count
     {
       const double sqrtLambdaForFirstPass = m_pcRdCost->getMotionLambda( );
@@ -11005,6 +11098,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if INTER_LIC
       cu.LICFlag = false;
 #endif
+#if JVET_AC0112_IBC_LIC
+      cu.ibcLicFlag = false;
+#endif
       cu.geoFlag = false;
 
       PredictionUnit &pu = tempCS->addPU(cu, partitioner.chType); //tempCS->addPU(cu);
@@ -11016,6 +11112,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
       Picture* refPic = pu.cu->slice->getPic();
       const CPelBuf refBuf = refPic->getRecoBuf(pu.blocks[COMPONENT_Y]);
       const Pel*        piRefSrch = refBuf.buf;
+#if JVET_AC0112_IBC_LIC
+      PelBuf predBuf = tempCS->getPredBuf(pu.Y());
+#endif
 #if JVET_AA0070_RRIBC
       pu.cu->rribcFlipType = 0;
       const CompArea &area = cu.blocks[COMPONENT_Y];
@@ -11050,6 +11149,97 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
         m_pcRdCost->setDistParam(distParam, tempCS->getOrgBuf().Y(), refBuf, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
 #endif
 
+#if JVET_AC0112_IBC_GPM
+      int dimdMode = -1;
+      int timdMode = -1;
+#endif
+#if JVET_AC0112_IBC_CIIP
+      if (testIbcCiip)
+      {
+        IntraPrediction::deriveDimdMode(tempCS->picture->getRecoBuf(tempCS->area.Y()), tempCS->area.Y(), cu);
+        cu.timdMode = m_pcIntraSearch->deriveTimdMode(tempCS->picture->getRecoBuf(cu.Y()), cu.Y(), cu);
+        ibcCiipIntraList[0] = MAP131TO67(cu.timdMode);
+#if JVET_AC0112_IBC_GPM
+        dimdMode = cu.dimdMode;
+        timdMode = cu.timdMode;
+#endif
+        pu.ibcCiipFlag = true;
+        ibcCiipIntraList[1] = HOR_IDX;
+        pu.intraDir[0] = ibcCiipIntraList[0];
+        m_pcIntraSearch->initIntraPatternChType(*pu.cu, pu.Y(), true);
+        m_pcIntraSearch->initPredIntraParams(pu, pu.Y(), *pu.cs->sps, 0);
+        intraPredBuf[pu.intraDir[0]] = m_acMergeBuffer[pu.intraDir[0] + IBC_GPM_MAX_NUM_UNI_CANDS].getBuf(localUnitArea);
+        m_pcIntraSearch->predIntraAng(COMPONENT_Y, intraPredBuf[pu.intraDir[0]].Y(), pu);
+        intraPredBufSet[pu.intraDir[0]] = true;
+        pu.ibcCiipFlag = false;
+      }
+#endif
+#if JVET_AC0112_IBC_GPM
+      if (pu.lwidth() < 8 || pu.lheight() < 8 || pu.lwidth() > 32 || pu.lheight() > 32)
+      {
+        testIbcGpm &= false;
+      }
+      if (testIbcGpm)
+      {
+#if JVET_AA0070_RRIBC
+        m_pcRdCost->setDistParam(distParamSad, tmpOrgLuma, m_acMergeBuffer[0].Y().buf, m_acMergeBuffer[0].Y().stride, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y);
+#else
+        if (tempCS->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+        {
+          const CompArea &area = cu.blocks[COMPONENT_Y];
+          CompArea    tmpArea(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
+          PelBuf tmpLuma = m_tmpStorageLCU->getBuf(tmpArea);
+          tmpLuma.rspSignal( tempCS->getOrgBuf().Y(), m_pcReshape->getFwdLUT() );
+          m_pcRdCost->setDistParam(distParamSad, tmpLuma, m_acMergeBuffer[0].Y().buf, m_acMergeBuffer[0].Y().stride, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y);
+        }
+        else
+        {
+          m_pcRdCost->setDistParam(distParamSad, tempCS->getOrgBuf().Y(), m_acMergeBuffer[0].Y().buf, m_acMergeBuffer[0].Y().stride, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y);
+        }
+#endif
+        if (dimdMode == -1 || timdMode == -1)
+        {
+          IntraPrediction::deriveDimdMode(tempCS->picture->getRecoBuf(cu.Y()), cu.Y(), cu);
+          dimdMode = cu.dimdMode;
+          cu.timdMode = m_pcIntraSearch->deriveTimdMode(tempCS->picture->getRecoBuf(cu.Y()), cu.Y(), cu);
+          timdMode = cu.timdMode;
+        }
+        pu.ibcGpmFlag = true;
+        m_pcIntraSearch->initIntraPatternChType(*pu.cu, pu.Y(), true);
+        for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
+        {
+          if (!g_ibcGpmSecondSetSplitDir[splitDir] && g_GeoParams[splitDir][0] % 8 != 0)
+          {
+            continue;
+          }
+          for (int partIdx = 0; partIdx < 2; partIdx++)
+          {
+            PU::getGeoIntraMPMs(pu, ibcGpmIntraCandList[splitDir][partIdx], splitDir, g_geoTmShape[partIdx][g_GeoParams[splitDir][0]]
+#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+                                , (splitDir == 0 && partIdx == 0)
+#endif
+                                );
+            for (int intraIdx = 0; intraIdx < IBC_GPM_MAX_NUM_INTRA_CANDS; intraIdx++)
+            {
+              uint8_t intraCand = ibcGpmIntraCandList[splitDir][partIdx][intraIdx];
+              if (!intraPredBufSet[intraCand])
+              {
+                intraPredBufSet[intraCand] = true;
+                pu.intraDir[0] = intraCand;
+                intraPredBuf[intraCand] = m_acMergeBuffer[intraCand + IBC_GPM_MAX_NUM_UNI_CANDS].getBuf(localUnitArea);
+                m_pcIntraSearch->initPredIntraParams(pu, pu.Y(), *pu.cs->sps, 0);
+                m_pcIntraSearch->predIntraAng(COMPONENT_Y, intraPredBuf[intraCand].Y(), pu);
+              }
+              distParamSad.cur.buf = intraPredBuf[intraCand].Y().buf;
+              distParamSad.cur.stride = intraPredBuf[intraCand].Y().stride;
+              sadIntraWholeBlk[intraCand] = distParamSad.distFunc(distParamSad);
+            }
+          }
+        }
+        pu.ibcGpmFlag = false;
+      }
+#endif
+
       int refStride = refBuf.stride;
 #if !JVET_Y0058_IBC_LIST_MODIFY
       const UnitArea localUnitArea(tempCS->area.chromaFormat, Area(0, 0, tempCS->area.Y().width, tempCS->area.Y().height));
@@ -11073,6 +11263,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
       for (unsigned int mergeCand = 0; mergeCand < mergeCtx.numValidMergeCand; mergeCand++)
       {
         mergeCtx.setMergeInfo(pu, mergeCand); // set bv info in merge mode
+#if JVET_AC0112_IBC_GPM
+        int mergeCandIbcGpm = mergeCand - skipCandNum[mergeCand > 0 ? mergeCand - 1 : 0];
+#endif
 
         int xPred = pu.bv.getHor();
         int yPred = pu.bv.getVer();
@@ -11090,9 +11283,28 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if JVET_AA0061_IBC_MBVD && !JVET_AA0070_RRIBC
           numValidBvIBC--;
 #endif
+#if JVET_AC0112_IBC_GPM
+          isSkipThisCand[mergeCandIbcGpm] = true;
+#endif
           continue;
         }
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
+#if JVET_AC0112_IBC_GPM
+#if JVET_AA0070_RRIBC
+        if (pu.cu->rribcFlipType > 0)
+        {
+          isSkipThisCand[mergeCandIbcGpm] = true;
+          skipCandNum[mergeCand] = mergeCand > 0 ? skipCandNum[mergeCand - 1] + 1 : 1;
+        }
+        else
+#endif
+        {
+          skipCandNum[mergeCand] = mergeCand > 0 ? skipCandNum[mergeCand - 1] : 0;
+        }
+#endif
+#else
         PU::spanMotionInfo(pu, mergeCtx);
+#endif
 
 #if JVET_AA0070_RRIBC
         if (pu.cu->rribcFlipType == 0)
@@ -11109,6 +11321,23 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
         }
 #endif
 
+#if JVET_AC0112_IBC_LIC
+        if (pu.cu->ibcLicFlag)
+        {
+          Pel* piPred = predBuf.buf;
+          int predStride = predBuf.stride;
+          int height = predBuf.height;
+          int width = predBuf.width;
+          for (int h = 0; h < height; h++)
+          {
+            memcpy(piPred, piRefSrch + h * refStride + refStride * yPred + xPred, width * sizeof(Pel));
+            piPred += predStride;
+          }
+          m_pcInterSearch->xLocalIlluComp(pu, COMPONENT_Y, pu.bv, predBuf);
+          distParam.cur = predBuf;
+        }
+        else
+#endif
         distParam.cur.buf = piRefSrch + refStride * yPred + xPred;
 
         Distortion sad = distParam.distFunc(distParam);
@@ -11126,15 +11355,128 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
         double cost = (double)sad + (double)bitsCand * sqrtLambdaForFirstPass;
 
+#if JVET_AC0112_IBC_CIIP
+        if (testIbcCiip)
+        {
+          const PredictionUnit *puBv = pu.cs->getPURestricted(pu.lumaPos().offset(xPred, yPred), pu, pu.chType);
+          int intraDir = puBv ? puBv->getIpmInfo(pu.lumaPos().offset(xPred, yPred)) : PLANAR_IDX;
+          if (intraDir != ibcCiipIntraList[0])
+          {
+            ibcCiipIntraList[1] = intraDir;
+          }
+          else
+          {
+            ibcCiipIntraList[1] = ibcCiipIntraList[0] == PLANAR_IDX ? HOR_IDX : PLANAR_IDX;
+          }
+          intraDir = ibcCiipIntraList[1];
+          if (!intraPredBufSet[intraDir])
+          {
+            pu.ibcCiipFlag = true;
+            pu.intraDir[0] = intraDir;
+            intraPredBufSet[intraDir] = true;
+            intraPredBuf[intraDir] = m_acMergeBuffer[intraDir + IBC_GPM_MAX_NUM_UNI_CANDS].getBuf(localUnitArea);
+            m_pcIntraSearch->initPredIntraParams(pu, pu.Y(), *pu.cs->sps, 0);
+            m_pcIntraSearch->predIntraAng(COMPONENT_Y, intraPredBuf[intraDir].Y(), pu);
+            pu.ibcCiipFlag = false;
+          }
+          for (int dirIdx = 0; dirIdx < IBC_CIIP_MAX_NUM_INTRA_CANDS; dirIdx++)
+          {
+            int height = pu.lheight();
+            int width = pu.lwidth();
+            const Pel *pPredIbc = piRefSrch + refStride * yPred + xPred;
+            Pel *pPredDst = ibcCiipBuf.buf;
+            int dstStride = ibcCiipBuf.stride;
+            Pel *pPredIntra = intraPredBuf[ibcCiipIntraList[dirIdx]].Y().buf;
+            int intraStride = intraPredBuf[ibcCiipIntraList[dirIdx]].Y().stride;
+            m_pcIntraSearch->m_ibcCiipBlending(pPredDst, dstStride, pPredIbc, refStride, pPredIntra, intraStride, wIbc, wIntra, shift, width, height);
+
+            distParam.cur.buf = ibcCiipBuf.buf;
+            distParam.cur.stride = ibcCiipBuf.stride;
+
+            Distortion sad2 = distParam.distFunc(distParam);
+            unsigned int bitsCand2 = mergeCand + 1;
+#if JVET_Z0084_IBC_TM
+            if (mergeCand == tempCS->sps->getMaxNumIBCMergeCand() - 1)
+#else
+            if (mergeCand == tempCS->sps->getMaxNumMergeCand() - 1)
+#endif
+            {
+              bitsCand2--;
+            }
+            bitsCand2 += dirIdx + 1;
+            if (dirIdx == IBC_CIIP_MAX_NUM_INTRA_CANDS - 1)
+            {
+              bitsCand2--;
+            }
+            bitsCand2++; // for ibc_mbvd_flag
+            double cost2 = (double)sad2 + (double)bitsCand2 * sqrtLambdaForFirstPass;
+            if (cost2 < ibcCiipBestSatdCost)
+            {
+              ibcCiipBestMergeCand = mergeCand;
+              ibcCiipBestIntraCand = dirIdx;
+              ibcCiipBestSatdCost = cost2;
+            }
+          }
+        }
+#endif
+
+#if JVET_AC0112_IBC_GPM
+#if JVET_AA0070_RRIBC
+        if (pu.cu->rribcFlipType == 0 && testIbcGpm)
+#else
+        if (testIbcGpm)
+#endif
+        {
+          ibcGpmCandNumValid++;
+          distParamSad.cur.buf = piRefSrch + refStride * yPred + xPred;
+          distParamSad.cur.stride = refBuf.stride;
+          ibcPredBuf[mergeCandIbcGpm] = m_acMergeBuffer[mergeCandIbcGpm].getBuf(localUnitArea);
+          ibcPredBuf[mergeCandIbcGpm].bufs[COMPONENT_Y].copyFrom(distParamSad.cur);
+          sadWholeBlk[mergeCandIbcGpm] = distParamSad.distFunc(distParamSad);
+        }
+#endif
+
+#if JVET_AC0112_IBC_CIIP
+#if JVET_AC0112_IBC_GPM
+        updateCandList(ModeIbcInfo(mergeCand, false, 0, false, 0, 0, 0, 0, 0), cost, rdModeList, candCostList
+         , numMrgSATDCand);
+#else
+        updateCandList(ModeIbcInfo(mergeCand, false, 0), cost, rdModeList, candCostList
+         , numMrgSATDCand);
+#endif
+#else
+#if JVET_AC0112_IBC_GPM
+        updateCandList(ModeIbcInfo(mergeCand, false, 0, 0, 0, 0, 0), cost, rdModeList, candCostList
+         , numMrgSATDCand);
+#else
         updateCandList(mergeCand, cost, rdModeList, candCostList
          , numMrgSATDCand);
+#endif
+#endif
       }
+#if JVET_AC0112_IBC_GPM
+      if (testIbcGpm && mergeCtx.numValidMergeCand > 0)
+      {
+        mergeCtxIbcGeo = mergeCtx;
+#if JVET_AA0070_RRIBC
+        m_pcInterSearch->adjustIbcMergeRribcCand(pu, mergeCtxIbcGeo, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
+#endif
+        for (int i = 0; i < skipCandNum[mergeCtx.numValidMergeCand - 1]; i++)
+        {
+          isSkipThisCand[mergeCtx.numValidMergeCand - 1 - i] = true;
+        }
+      }
+#endif
+
 
 #if JVET_Z0084_IBC_TM && IBC_TM_MRG
     // Add TM refined candidates
     for (unsigned int mergeCand = 0; mergeCand < mergeCtxTm.numValidMergeCand; mergeCand++)
     {
       mergeCtxTm.setMergeInfo(pu, mergeCand); // set bv info in merge mode
+#if JVET_AC0112_IBC_GPM
+      int mergeCandIbcGpm = mergeCand - skipCandNumTm[mergeCtx.numValidMergeCand + (mergeCand  > 0 ? mergeCand - 1 : 0)];
+#endif
 
       Mv tempBv = pu.bv;
       pu.tmMergeFlag = true;
@@ -11147,6 +11489,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
       if (pu.bv == tempBv)
       {
         numValidBv--;
+#if JVET_AC0112_IBC_GPM
+        isSkipThisCand[mergeCtx.numValidMergeCand + mergeCandIbcGpm] = true;
+#endif
         continue;
       }
 
@@ -11162,9 +11507,28 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
       {
         numValidBv--;
+#if JVET_AC0112_IBC_GPM
+        isSkipThisCand[mergeCtx.numValidMergeCand + mergeCandIbcGpm] = true;
+#endif
         continue;
       }
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
+#if JVET_AC0112_IBC_GPM
+#if JVET_AA0070_RRIBC
+      if (pu.cu->rribcFlipType > 0)
+      {
+        isSkipThisCand[mergeCtx.numValidMergeCand + mergeCandIbcGpm] = true;
+        skipCandNumTm[mergeCtx.numValidMergeCand + mergeCand] = mergeCand > 0 ? skipCandNumTm[mergeCtx.numValidMergeCand + mergeCand - 1] + 1 : 1;
+      }
+      else
+#endif
+      {
+        skipCandNumTm[mergeCtx.numValidMergeCand + mergeCand] = mergeCand > 0 ? skipCandNumTm[mergeCtx.numValidMergeCand + mergeCand - 1] : 0;
+      }
+#endif
+#else
       PU::spanMotionInfo(pu, mergeCtxTm);
+#endif
 
 #if JVET_AA0070_RRIBC
       if (pu.cu->rribcFlipType == 0)
@@ -11180,6 +11544,23 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
         m_pcRdCost->setDistParam(distParam, tmpOrgLumaFlipV, refBuf, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
       }
 #endif
+#if JVET_AC0112_IBC_LIC
+      if (pu.cu->ibcLicFlag)
+      {
+        Pel* piPred = predBuf.buf;
+        int predStride = predBuf.stride;
+        int height = predBuf.height;
+        int width = predBuf.width;
+        for (int h = 0; h < height; h++)
+        {
+          memcpy(piPred, piRefSrch + h * refStride + refStride * yPred + xPred, width * sizeof(Pel));
+          piPred += predStride;
+        }
+        m_pcInterSearch->xLocalIlluComp(pu, COMPONENT_Y, pu.bv, predBuf);
+        distParam.cur = predBuf;
+      }
+      else
+#endif
       distParam.cur.buf = piRefSrch + refStride * yPred + xPred;
 
       Distortion sad = distParam.distFunc(distParam);
@@ -11193,9 +11574,116 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
       double cost = (double)sad + (double)bitsCand * sqrtLambdaForFirstPass;
 
+#if JVET_AC0112_IBC_CIIP
+      if (testIbcCiip)
+      {
+        const PredictionUnit *puBv = pu.cs->getPURestricted(pu.lumaPos().offset(xPred, yPred), pu, pu.chType);
+        int intraDir = puBv ? puBv->getIpmInfo(pu.lumaPos().offset(xPred, yPred)) : PLANAR_IDX;
+        if (intraDir != ibcCiipIntraList[0])
+        {
+          ibcCiipIntraList[1] = intraDir;
+        }
+        else
+        {
+          ibcCiipIntraList[1] = ibcCiipIntraList[0] == PLANAR_IDX ? HOR_IDX : PLANAR_IDX;
+        }
+        intraDir = ibcCiipIntraList[1];
+        if (!intraPredBufSet[intraDir])
+        {
+          pu.ibcCiipFlag = true;
+          pu.intraDir[0] = intraDir;
+          intraPredBufSet[intraDir] = true;
+          intraPredBuf[intraDir] = m_acMergeBuffer[intraDir + IBC_GPM_MAX_NUM_UNI_CANDS].getBuf(localUnitArea);
+          m_pcIntraSearch->initPredIntraParams(pu, pu.Y(), *pu.cs->sps, 0);
+          m_pcIntraSearch->predIntraAng(COMPONENT_Y, intraPredBuf[intraDir].Y(), pu);
+          pu.ibcCiipFlag = false;
+        }
+        for (int dirIdx = 0; dirIdx < IBC_CIIP_MAX_NUM_INTRA_CANDS; dirIdx++)
+        {
+          int height = pu.lheight();
+          int width = pu.lwidth();
+          const Pel *pPredIbc = piRefSrch + refStride * yPred + xPred;
+          Pel *pPredDst = ibcCiipBuf.buf;
+          int dstStride = ibcCiipBuf.stride;
+          Pel *pPredIntra = intraPredBuf[ibcCiipIntraList[dirIdx]].Y().buf;
+          int intraStride = intraPredBuf[ibcCiipIntraList[dirIdx]].Y().stride;
+          m_pcIntraSearch->m_ibcCiipBlending(pPredDst, dstStride, pPredIbc, refStride, pPredIntra, intraStride, wIbc, wIntra, shift, width, height);
+
+          distParam.cur.buf = ibcCiipBuf.buf;
+          distParam.cur.stride = ibcCiipBuf.stride;
+
+          Distortion sad2 = distParam.distFunc(distParam);
+          unsigned int bitsCand2 = mergeCand + 1;
+#if JVET_Z0084_IBC_TM
+          if (mergeCand == tempCS->sps->getMaxNumIBCMergeCand() - 1)
+#else
+          if (mergeCand == tempCS->sps->getMaxNumMergeCand() - 1)
+#endif
+          {
+            bitsCand2--;
+          }
+          bitsCand2 += dirIdx + 1;
+          if (dirIdx == IBC_CIIP_MAX_NUM_INTRA_CANDS - 1)
+          {
+            bitsCand2--;
+          }
+          bitsCand2++; // for ibc_mbvd_flag
+          double cost2 = (double)sad2 + (double)bitsCand2 * sqrtLambdaForFirstPass;
+          if (cost2 < ibcCiipBestSatdCost)
+          {
+            ibcCiipBestMergeCand = mergeCand+mergeCtx.numValidMergeCand;
+            ibcCiipBestIntraCand = dirIdx;
+            ibcCiipBestSatdCost = cost2;
+          }
+        }
+      }
+#endif
+
+#if JVET_AC0112_IBC_GPM
+#if JVET_AA0070_RRIBC
+      if (pu.cu->rribcFlipType == 0 && testIbcGpm)
+#else
+      if (testIbcGpm)
+#endif
+      {
+        ibcGpmCandNumValid++;
+        distParamSad.cur.buf = piRefSrch + refStride * yPred + xPred;
+        distParamSad.cur.stride = refBuf.stride;
+        ibcPredBuf[mergeCtx.numValidMergeCand + mergeCandIbcGpm] = m_acMergeBuffer[mergeCtx.numValidMergeCand + mergeCandIbcGpm].getBuf(localUnitArea);
+        ibcPredBuf[mergeCtx.numValidMergeCand + mergeCandIbcGpm].bufs[COMPONENT_Y].copyFrom(distParamSad.cur);
+        sadWholeBlk[mergeCtx.numValidMergeCand + mergeCandIbcGpm] = distParamSad.distFunc(distParamSad);
+      }
+#endif
+
+#if JVET_AC0112_IBC_CIIP
+#if JVET_AC0112_IBC_GPM
+      updateCandList(ModeIbcInfo(mergeCand+mergeCtx.numValidMergeCand, false, 0, false, 0, 0, 0, 0, 0), cost, rdModeList, candCostList, numMrgSATDCand);
+#else
+      updateCandList(ModeIbcInfo(mergeCand+mergeCtx.numValidMergeCand, false, 0), cost, rdModeList, candCostList, numMrgSATDCand);
+#endif
+#else
+#if JVET_AC0112_IBC_GPM
+      updateCandList(ModeIbcInfo(mergeCand+mergeCtx.numValidMergeCand, false, 0, 0, 0, 0, 0), cost, rdModeList, candCostList, numMrgSATDCand);
+#else
       updateCandList(mergeCand+mergeCtx.numValidMergeCand, cost, rdModeList, candCostList, numMrgSATDCand);
+#endif
+#endif
     }
 #endif
+#if JVET_AC0112_IBC_GPM
+    if (testIbcGpm && mergeCtxTm.numValidMergeCand > 0)
+    {
+      mergeCtxTmIbcGeo = mergeCtxTm;
+#if JVET_AA0070_RRIBC
+      m_pcInterSearch->adjustIbcMergeRribcCand(pu, mergeCtxTmIbcGeo, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
+#endif
+      for (int i = 0; i < skipCandNumTm[mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand - 1]; i++)
+      {
+        isSkipThisCand[mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand - 1 - i] = true;
+      }
+    }
+#endif
+
 #if JVET_AA0061_IBC_MBVD
 #if JVET_AA0070_RRIBC
     int numValidBvIBC = mergeCtxTmp.numValidMergeCand;
@@ -11272,15 +11760,108 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
             m_pcRdCost->setDistParam(distParam, tmpOrgLumaFlipV, refBuf, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
           }
 #endif
+#if JVET_AC0112_IBC_LIC
+          if (pu.cu->ibcLicFlag)
+          {
+            Pel* piPred = predBuf.buf;
+            int predStride = predBuf.stride;
+            int height = predBuf.height;
+            int width = predBuf.width;
+            for (int h = 0; h < height; h++)
+            {
+              memcpy(piPred, piRefSrch + h * refStride + refStride * yPred + xPred, width * sizeof(Pel));
+              piPred += predStride;
+            }
+            m_pcInterSearch->xLocalIlluComp(pu, COMPONENT_Y, pu.bv, predBuf);
+            distParam.cur = predBuf;
+          }
+          else
+#endif
           distParam.cur.buf = piRefSrch + refStride * yPred + xPred;
 
           Distortion sad = distParam.distFunc(distParam);
           uint32_t bitsCand = PU::getIbcMbvdEstBits(pu, mmvdMergeCandtemp);
+#if JVET_AC0112_IBC_CIIP
+          uint32_t ibcMbvdBits = bitsCand;
+#endif
           bitsCand++; // for ibc_mbvd_flag
           double cost = (double)sad + (double)bitsCand * sqrtLambdaForFirstPass;
+
+#if JVET_AC0112_IBC_CIIP
+          if (testIbcCiip)
+          {
+            const PredictionUnit *puBv = pu.cs->getPURestricted(pu.lumaPos().offset(xPred, yPred), pu, pu.chType);
+            int intraDir = puBv ? puBv->getIpmInfo(pu.lumaPos().offset(xPred, yPred)) : PLANAR_IDX;
+            if (intraDir != ibcCiipIntraList[0])
+            {
+              ibcCiipIntraList[1] = intraDir;
+            }
+            else
+            {
+              ibcCiipIntraList[1] = ibcCiipIntraList[0] == PLANAR_IDX ? HOR_IDX : PLANAR_IDX;
+            }
+            intraDir = ibcCiipIntraList[1];
+            if (!intraPredBufSet[intraDir])
+            {
+              pu.ibcCiipFlag = true;
+              pu.intraDir[0] = intraDir;
+              intraPredBufSet[intraDir] = true;
+              intraPredBuf[intraDir] = m_acMergeBuffer[intraDir + IBC_GPM_MAX_NUM_UNI_CANDS].getBuf(localUnitArea);
+              m_pcIntraSearch->initPredIntraParams(pu, pu.Y(), *pu.cs->sps, 0);
+              m_pcIntraSearch->predIntraAng(COMPONENT_Y, intraPredBuf[intraDir].Y(), pu);
+              pu.ibcCiipFlag = false;
+            }
+            for (int dirIdx = 0; dirIdx < IBC_CIIP_MAX_NUM_INTRA_CANDS; dirIdx++)
+            {
+              int height = pu.lheight();
+              int width = pu.lwidth();
+              const Pel *pPredIbc = piRefSrch + refStride * yPred + xPred;
+              Pel *pPredDst = ibcCiipBuf.buf;
+              int dstStride = ibcCiipBuf.stride;
+              Pel *pPredIntra = intraPredBuf[ibcCiipIntraList[dirIdx]].Y().buf;
+              int intraStride = intraPredBuf[ibcCiipIntraList[dirIdx]].Y().stride;
+              m_pcIntraSearch->m_ibcCiipBlending(pPredDst, dstStride, pPredIbc, refStride, pPredIntra, intraStride, wIbc, wIntra, shift, width, height);
+
+              distParam.cur.buf = ibcCiipBuf.buf;
+              distParam.cur.stride = ibcCiipBuf.stride;
+
+              Distortion sad2 = distParam.distFunc(distParam);
+              uint32_t bitsCand2 = ibcMbvdBits;
+              bitsCand2++; // for ibc_mbvd_flag
+              bitsCand2 += dirIdx + 1;
+              if (dirIdx == IBC_CIIP_MAX_NUM_INTRA_CANDS - 1)
+              {
+                bitsCand2--;
+              }
+              double cost2 = (double)sad2 + (double)bitsCand2 * sqrtLambdaForFirstPass;
+              if (cost2 < ibcCiipBestSatdCost)
+              {
+                ibcCiipBestMergeCand = mmvdMergeCandtemp + mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand;
+                ibcCiipBestIntraCand = dirIdx;
+                ibcCiipBestSatdCost = cost2;
+              }
+            }
+          }
+#endif
+
 #if JVET_Z0084_IBC_TM
+#if JVET_AC0112_IBC_CIIP
+#if JVET_AC0112_IBC_GPM
+          updateCandList(ModeIbcInfo(mmvdMergeCandtemp + mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand, false, 0, false, 0, 0, 0, 0, 0), cost, rdModeList, candCostList
+            , numMrgSATDCand);
+#else
+          updateCandList(ModeIbcInfo(mmvdMergeCandtemp + mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand, false, 0), cost, rdModeList, candCostList
+            , numMrgSATDCand);
+#endif
+#else
+#if JVET_AC0112_IBC_GPM
+          updateCandList(ModeIbcInfo(mmvdMergeCandtemp + mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand, false, 0, 0, 0, 0, 0), cost, rdModeList, candCostList
+            , numMrgSATDCand);
+#else
           updateCandList(mmvdMergeCandtemp + mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand, cost, rdModeList, candCostList
             , numMrgSATDCand);
+#endif
+#endif
 #else
           updateCandList(mmvdMergeCandtemp + mergeCtx.numValidMergeCand, cost, rdModeList, candCostList
             , numMrgSATDCand);
@@ -11292,6 +11873,258 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if JVET_AA0070_RRIBC
     m_tmpStorageCUflipH.destroy();
     m_tmpStorageCUflipV.destroy();
+#endif
+
+#if JVET_AC0112_IBC_GPM
+      static_vector<int, IBC_GPM_MAX_TRY_WEIGHTED_SATD> geoSplitDirList;
+      static_vector<int, IBC_GPM_MAX_TRY_WEIGHTED_SATD> geoMergeCand0;
+      static_vector<int, IBC_GPM_MAX_TRY_WEIGHTED_SATD> geoMergeCand1;
+      static_vector<uint8_t, IBC_GPM_MAX_TRY_WEIGHTED_SATD>  geoBldIdxList;
+      static_vector<double, IBC_GPM_MAX_TRY_WEIGHTED_SATD> geoSADCostList;
+      int numSATDCands = IBC_GPM_MAX_TRY_WEIGHTED_SATD;
+      double ibcGpmBestSatdCost = MAX_DOUBLE;
+      int bestCandidateIdx = 0;
+      int m_numIbcCandPerPar = 6;
+      if (testIbcGpm && ibcGpmCandNumValid > 0)
+      {
+        int bitsCandSplit = floorLog2(IBC_GPM_MAX_SPLIT_DIR_SECOND_SET_NUM) + 1;
+
+        int wIdx = floorLog2(cu.lwidth()) - GEO_MIN_CU_LOG2;
+        int hIdx = floorLog2(cu.lheight()) - GEO_MIN_CU_LOG2;
+        for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
+        {
+          if (!g_ibcGpmSecondSetSplitDir[splitDir] && g_GeoParams[splitDir][0] % 8 != 0)
+          {
+            continue;
+          }
+          int maskStride = 0, maskStride2 = 0;
+          int stepX = 1;
+          Pel* SADmask;
+          int16_t angle = g_GeoParams[splitDir][0];
+          if (g_angle2mirror[angle] == 2)
+          {
+            maskStride = -GEO_WEIGHT_MASK_SIZE;
+            maskStride2 = -(int)cu.lwidth();
+            SADmask = &g_globalGeoEncSADmask[g_angle2mask[g_GeoParams[splitDir][0]]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+          }
+          else if (g_angle2mirror[angle] == 1)
+          {
+            stepX = -1;
+            maskStride2 = cu.lwidth();
+            maskStride = GEO_WEIGHT_MASK_SIZE;
+            SADmask = &g_globalGeoEncSADmask[g_angle2mask[g_GeoParams[splitDir][0]]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
+          }
+          else
+          {
+            maskStride = GEO_WEIGHT_MASK_SIZE;
+            maskStride2 = -(int)cu.lwidth();
+            SADmask = &g_globalGeoEncSADmask[g_angle2mask[g_GeoParams[splitDir][0]]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+          }
+          Distortion sadSmall = 0, sadLarge = 0;
+          double tempCost = 0;
+#if JVET_AA0070_RRIBC
+          m_pcRdCost->setDistParam(distParam, tmpOrgLuma, refBuf.buf, refBuf.stride, SADmask, maskStride, stepX, maskStride2, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y);
+#else
+        if (tempCS->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+        {
+          const CompArea &area = cu.blocks[COMPONENT_Y];
+          CompArea    tmpArea(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
+          PelBuf tmpLuma = m_tmpStorageLCU->getBuf(tmpArea);
+          tmpLuma.rspSignal( tempCS->getOrgBuf().Y(), m_pcReshape->getFwdLUT() );
+          m_pcRdCost->setDistParam(distParam, tmpLuma, refBuf.buf, refBuf.stride, SADmask, maskStride, stepX, maskStride2, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y);
+        }
+        else
+        {
+          m_pcRdCost->setDistParam(distParam, tempCS->getOrgBuf().Y(), refBuf.buf, refBuf.stride, SADmask, maskStride, stepX, maskStride2, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y);
+        }
+#endif
+          for (unsigned int mergeCand = 0; mergeCand < mergeCtx.numValidMergeCand; mergeCand++)
+          {
+            if (isSkipThisCand[mergeCand])
+            {
+              continue;
+            }
+            distParam.cur = ibcPredBuf[mergeCand].Y();
+            sadLarge = distParam.distFunc(distParam);
+            tempCost = (double)sadLarge;
+            m_geoMMVDCostList.insert(splitDir, 0, mergeCand, 0, tempCost);
+            sortCandList(tempCost, mergeCand, sadCostList0[splitDir], mergeCandList0[splitDir], m_numIbcCandPerPar);
+            sadSmall = sadWholeBlk[mergeCand] - sadLarge;
+            tempCost = (double)sadSmall;
+            m_geoMMVDCostList.insert(splitDir, 1, mergeCand, 0, tempCost);
+            sortCandList(tempCost, mergeCand, sadCostList1[splitDir], mergeCandList1[splitDir], m_numIbcCandPerPar);
+          }
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
+          for (unsigned int mergeCand = 0; mergeCand < mergeCtxTm.numValidMergeCand; mergeCand++)
+          {
+            if (isSkipThisCand[mergeCtx.numValidMergeCand + mergeCand])
+            {
+              continue;
+            }
+            distParam.cur = ibcPredBuf[mergeCtx.numValidMergeCand + mergeCand].Y();
+            sadLarge = distParam.distFunc(distParam);
+            tempCost = (double)sadLarge;
+            m_geoMMVDCostList.insert(splitDir, 0, mergeCtx.numValidMergeCand + mergeCand, 0, tempCost);
+            sortCandList(tempCost, mergeCtx.numValidMergeCand + mergeCand, sadCostList0[splitDir], mergeCandList0[splitDir], m_numIbcCandPerPar);
+            sadSmall = sadWholeBlk[mergeCtx.numValidMergeCand + mergeCand] - sadLarge;
+            tempCost = (double)sadSmall;
+            m_geoMMVDCostList.insert(splitDir, 1, mergeCtx.numValidMergeCand + mergeCand, 0, tempCost);
+            sortCandList(tempCost, mergeCtx.numValidMergeCand + mergeCand, sadCostList1[splitDir], mergeCandList1[splitDir], m_numIbcCandPerPar);
+          }
+#endif
+          for (unsigned int mergeCand = IBC_GPM_MAX_NUM_UNI_CANDS; mergeCand < IBC_GPM_MAX_NUM_UNI_CANDS + IBC_GPM_MAX_NUM_INTRA_CANDS; mergeCand++)
+          {
+            int intraIdx = mergeCand - IBC_GPM_MAX_NUM_UNI_CANDS;
+            int rdobuffer = ibcGpmIntraCandList[splitDir][0][intraIdx];
+            distParam.cur =  intraPredBuf[rdobuffer].Y();
+            sadLarge = distParam.distFunc(distParam);
+            tempCost = (double)sadLarge;
+            m_geoMMVDCostList.insert(splitDir, 0, mergeCand, 0, tempCost);
+            sortIntraCandList(tempCost, mergeCand, intraSadCostList0[splitDir], intraCandList0[splitDir]);
+
+            if (ibcGpmIntraCandList[splitDir][0][intraIdx] != ibcGpmIntraCandList[splitDir][1][intraIdx])
+            {
+              rdobuffer = ibcGpmIntraCandList[splitDir][1][intraIdx];
+              distParam.cur = intraPredBuf[rdobuffer].Y();
+              sadLarge = distParam.distFunc(distParam);
+            }
+            sadSmall = sadIntraWholeBlk[rdobuffer] - sadLarge;
+            tempCost = (double)sadSmall;
+            m_geoMMVDCostList.insert(splitDir, 1, mergeCand, 0, tempCost);
+            sortIntraCandList(tempCost, mergeCand, intraSadCostList1[splitDir], intraCandList1[splitDir]);
+          }
+        }
+        for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
+        {
+          if (!g_ibcGpmSecondSetSplitDir[splitDir] && g_GeoParams[splitDir][0] % 8 != 0)
+          {
+            continue;
+          }
+          int numCandMerge0 = min(m_numIbcCandPerPar, (int)mergeCandList0[splitDir].size());
+          int numCandIntra0 = (int)intraCandList0[splitDir].size();
+          int numCandPart0 = numCandMerge0 + numCandIntra0;
+          for (int candIdx0 = 0; candIdx0 < numCandPart0; candIdx0++)
+          {
+            int mergeCand0 = candIdx0 < numCandMerge0 ? mergeCandList0[splitDir][candIdx0] : intraCandList0[splitDir][candIdx0-numCandMerge0];
+            int numCandMerge1 = min(m_numIbcCandPerPar, (int)mergeCandList1[splitDir].size());
+            int numCandIntra1 = candIdx0 < numCandMerge0 ? (int)intraCandList1[splitDir].size() : 0;
+            int numCandPart1 = numCandMerge1 + numCandIntra1;
+            int candStart1 = 0;
+            for (int candIdx1 = candStart1; candIdx1 < numCandPart1; candIdx1++)
+            {
+              int mergeCand1 = candIdx1 < numCandMerge1 ? mergeCandList1[splitDir][candIdx1] : intraCandList1[splitDir][candIdx1-numCandMerge1];
+              if (mergeCand0 == mergeCand1)
+              {
+                continue;
+              }
+              if ((candIdx0 < numCandMerge0 && candIdx1 < numCandMerge1) || (candIdx0 >= numCandMerge0 && candIdx1 >= numCandMerge1))
+              {
+                continue;
+              }
+              if (isSkipThisCand[mergeCand0] || isSkipThisCand[mergeCand1])
+              {
+                continue;
+              }
+              double tempCost = m_geoMMVDCostList.singleDistList[0][splitDir][mergeCand0][0].cost + m_geoMMVDCostList.singleDistList[1][splitDir][mergeCand1][0].cost;
+              updateGeoIbcCandList(tempCost, splitDir, mergeCand0, mergeCand1, 0, 0, geoSADCostList, geoSplitDirList, geoMergeCand0, geoMergeCand1, numSATDCands);
+            }
+          }
+        }
+
+#if JVET_AA0070_RRIBC
+        m_pcRdCost->setDistParam(distParam, tmpOrgLuma, m_acMergeBuffer[0].Y(), sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
+#else
+        if (tempCS->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+        {
+          const CompArea &area = cu.blocks[COMPONENT_Y];
+          CompArea    tmpArea(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
+          PelBuf tmpLuma = m_tmpStorageLCU->getBuf(tmpArea);
+          tmpLuma.rspSignal( tempCS->getOrgBuf().Y(), m_pcReshape->getFwdLUT() );
+          m_pcRdCost->setDistParam(distParam, tmpLuma, m_acMergeBuffer[0].Y(), sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
+        }
+        else
+        {
+          m_pcRdCost->setDistParam(distParam, tempCS->getOrgBuf().Y(), m_acMergeBuffer[0].Y(), sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
+        }
+#endif
+        int numberGeoCandChecked = (int)geoSADCostList.size();
+        for (uint8_t bldIdx = 0; bldIdx < IBC_GPM_NUM_BLENDING; bldIdx++)
+        {
+          for (uint8_t candidateIdx = 0; candidateIdx < numberGeoCandChecked; candidateIdx++)
+          {
+            int splitDir = geoSplitDirList[candidateIdx];
+            int mergeCand0 = geoMergeCand0[candidateIdx];
+            int mergeCand1 = geoMergeCand1[candidateIdx];
+            geoCombinations[candidateIdx * IBC_GPM_NUM_BLENDING + bldIdx] = m_acGeoWeightedBuffer[candidateIdx * IBC_GPM_NUM_BLENDING + bldIdx].getBuf(localUnitArea);
+            int isIntra0 = (mergeCand0 >= IBC_GPM_MAX_NUM_UNI_CANDS) ? 1 : 0;
+            int isIntra1 = (mergeCand1 >= IBC_GPM_MAX_NUM_UNI_CANDS) ? 1 : 0;
+            int bitsCand = 1 + (g_GeoParams[splitDir][0] % 8 == 0 ? 4 : bitsCandSplit);
+            if (IBC_GPM_NUM_BLENDING > 1)
+            {
+              bitsCand++;
+              if (bldIdx > 0)
+              {
+                bitsCand += 2;
+              }
+            }
+            {
+              PelUnitBuf predSrc0, predSrc1;
+              if (isIntra0)
+              {
+                int intraIdx0 = mergeCand0 - IBC_GPM_MAX_NUM_UNI_CANDS;
+                int rdoBuffer = ibcGpmIntraCandList[splitDir][0][intraIdx0];
+                predSrc0 = intraPredBuf[rdoBuffer];
+                bitsCand += intraIdx0 + 1;
+                if (intraIdx0 == IBC_GPM_MAX_NUM_INTRA_CANDS - 1)
+                {
+                  bitsCand--;
+                }
+              }
+              else
+              {
+                predSrc0 = ibcPredBuf[mergeCand0];
+                int tempMergeCand0 = mergeCand0 > mergeCtx.numValidMergeCand ? mergeCand0 - mergeCtx.numValidMergeCand : mergeCand0;
+                bitsCand += tempMergeCand0 + 1;
+                if (tempMergeCand0 == tempCS->sps->getMaxNumIBCMergeCand() - 1)
+                {
+                  bitsCand--;
+                }
+              }
+              if (isIntra1)
+              {
+                int intraIdx1 = mergeCand1 - IBC_GPM_MAX_NUM_UNI_CANDS;
+                int rdoBuffer = ibcGpmIntraCandList[splitDir][1][intraIdx1];
+                predSrc1 = intraPredBuf[rdoBuffer];
+                bitsCand += intraIdx1 + 1;
+                if (intraIdx1 == IBC_GPM_MAX_NUM_INTRA_CANDS - 1)
+                {
+                  bitsCand--;
+                }
+              }
+              else
+              {
+                predSrc1 = ibcPredBuf[mergeCand1];
+                int tempMergeCand1 = mergeCand1 > mergeCtx.numValidMergeCand ? mergeCand1 - mergeCtx.numValidMergeCand : mergeCand1;
+                bitsCand += tempMergeCand1 + 1;
+                if (tempMergeCand1 == tempCS->sps->getMaxNumIBCMergeCand() - 1)
+                {
+                  bitsCand--;
+                }
+              }
+              m_pcInterSearch->weightedGeoBlkRounded(pu, splitDir, bldIdx, CHANNEL_TYPE_LUMA, geoCombinations[candidateIdx*IBC_GPM_NUM_BLENDING+bldIdx], predSrc0, predSrc1);
+            }
+            distParam.cur = geoCombinations[candidateIdx * IBC_GPM_NUM_BLENDING + bldIdx].Y();
+            Distortion sad = distParam.distFunc(distParam);
+            double updateCost = (double)sad;
+            updateCost += bitsCand * sqrtLambdaForFirstPass;
+            if (updateCost < ibcGpmBestSatdCost)
+            {
+              bestCandidateIdx = candidateIdx * IBC_GPM_NUM_BLENDING + bldIdx;
+              ibcGpmBestSatdCost = updateCost;
+            }
+          }
+        }
+      }
 #endif
 
       // Try to limit number of candidates using SATD-costs
@@ -11311,6 +12144,34 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
             break;
           }
         }
+
+#if JVET_AC0112_IBC_CIIP
+        if (testIbcCiip && ibcCiipBestSatdCost != MAX_DOUBLE)
+        {
+          if (ibcCiipBestSatdCost < candCostList[candCostList.size() - 1])
+          {
+            rdModeList[numMrgSATDCand].mergeCand = ibcCiipBestMergeCand;
+            rdModeList[numMrgSATDCand].isCIIP = true;
+            rdModeList[numMrgSATDCand].dirIdx = ibcCiipBestIntraCand;
+            numMrgSATDCand++;
+          }
+        }
+#endif
+#if JVET_AC0112_IBC_GPM
+        if (testIbcGpm && ibcGpmBestSatdCost != MAX_DOUBLE && ibcGpmBestSatdCost < candCostList[candCostList.size() - 1])
+        {
+          uint8_t candidateIdx = bestCandidateIdx;
+          int splitDir = geoSplitDirList[candidateIdx/IBC_GPM_NUM_BLENDING];
+          int mergeCand0 = geoMergeCand0[candidateIdx/IBC_GPM_NUM_BLENDING];
+          int mergeCand1 = geoMergeCand1[candidateIdx/IBC_GPM_NUM_BLENDING];
+          int bldIdx = candidateIdx%IBC_GPM_NUM_BLENDING;
+#if JVET_AC0112_IBC_CIIP
+          rdModeList.at(numMrgSATDCand++) = ModeIbcInfo(0, false, 0, true, mergeCand0, mergeCand1, splitDir, bldIdx, candidateIdx);
+#else
+          rdModeList.at(numMrgSATDCand++) = ModeIbcInfo(0, true, mergeCand0, mergeCand1, splitDir, bldIdx, candidateIdx);
+#endif
+        }
+#endif
       }
       else
       {
@@ -11334,7 +12195,29 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
   {
     for (unsigned int mrgHADIdx = 0; mrgHADIdx < numMrgSATDCand; mrgHADIdx++)
     {
+#if JVET_AC0112_IBC_CIIP
+      unsigned int mergeCand = rdModeList[mrgHADIdx].mergeCand;
+      if (numResidualPass == 1 && rdModeList[mrgHADIdx].isCIIP)
+      {
+        continue;
+      }
+#if JVET_AC0112_IBC_GPM
+      if (rdModeList[mrgHADIdx].isIbcGpm)
+      {
+        mergeCand = rdModeList[mrgHADIdx].mergeIdx0 < IBC_GPM_MAX_NUM_UNI_CANDS ? rdModeList[mrgHADIdx].mergeIdx0 : rdModeList[mrgHADIdx].mergeIdx1;
+      }
+#endif
+#else
+#if JVET_AC0112_IBC_GPM
+      unsigned int mergeCand = rdModeList[mrgHADIdx].mergeCand;
+      if (rdModeList[mrgHADIdx].isIbcGpm)
+      {
+        mergeCand = rdModeList[mrgHADIdx].mergeIdx0 < IBC_GPM_MAX_NUM_UNI_CANDS ? rdModeList[mrgHADIdx].mergeIdx0 : rdModeList[mrgHADIdx].mergeIdx1;
+      }
+#else
       unsigned int mergeCand = rdModeList[mrgHADIdx];
+#endif
+#endif
       if (!(numResidualPass == 1 && candHasNoResidual[mergeCand] == 1))
       {
         if (!(bestIsSkip && (numResidualPass == 0)))
@@ -11355,6 +12238,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if INTER_LIC
             cu.LICFlag = false;
 #endif
+#if JVET_AC0112_IBC_LIC
+            cu.ibcLicFlag = false;
+#endif
 
 #if JVET_AA0070_RRIBC
             cu.rribcFlipType = 0;
@@ -11362,10 +12248,17 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
             PredictionUnit &pu = tempCS->addPU(cu, partitioner.chType);// tempCS->addPU(cu);
             pu.intraDir[0] = DC_IDX; // set intra pred for ibc block
             pu.intraDir[1] = PLANAR_IDX; // set intra pred for ibc block
+#if JVET_AC0112_IBC_CIIP
+            pu.ibcCiipFlag = rdModeList[mrgHADIdx].isCIIP;
+            pu.ibcCiipIntraIdx = rdModeList[mrgHADIdx].dirIdx;
+#endif
             cu.mmvdSkip = false;
             pu.mmvdMergeFlag = false;
             pu.regularMergeFlag = false;
             cu.geoFlag = false;
+#if JVET_AC0112_IBC_GPM
+            pu.ibcGpmFlag = rdModeList[mrgHADIdx].isIbcGpm;
+#endif
 #if JVET_AA0061_IBC_MBVD
 #if JVET_Z0084_IBC_TM && IBC_TM_MRG
             int numPreviousBv = mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand;
@@ -11387,14 +12280,38 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
               {
                 pu.tmMergeFlag = true;
                 mergeCand -= mergeCtx.numValidMergeCand;
+#if JVET_AC0112_IBC_GPM
+                if (pu.ibcGpmFlag)
+                {
+                  mergeCtxTmIbcGeo.setMergeInfo(pu, mergeCand);
+                  PU::spanMotionInfo(pu, mergeCtxTmIbcGeo);
+                }
+                else
+                {
+#endif
                 mergeCtxTm.setMergeInfo(pu, mergeCand);
                 PU::spanMotionInfo(pu, mergeCtxTm);
+#if JVET_AC0112_IBC_GPM
+                }
+#endif
               }
               else
 #endif
               {
+#if JVET_AC0112_IBC_GPM
+                if (pu.ibcGpmFlag)
+                {
+                  mergeCtxIbcGeo.setMergeInfo(pu, mergeCand);
+                  PU::spanMotionInfo(pu, mergeCtxIbcGeo);
+                }
+                else
+                {
+#endif
                 mergeCtx.setMergeInfo(pu, mergeCand);
                 PU::spanMotionInfo(pu, mergeCtx);
+#if JVET_AC0112_IBC_GPM
+                }
+#endif
               }
 #if JVET_AA0061_IBC_MBVD
             }
@@ -11405,7 +12322,101 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
             const bool chroma = !pu.cu->isSepTree();
 #endif
             //  MC
+#if JVET_AC0112_IBC_GPM
+            if (pu.ibcGpmFlag)
+            {
+              int candidateIdx = rdModeList[mrgHADIdx].combIdx;
+              pu.ibcGpmMergeIdx0 = rdModeList[mrgHADIdx].mergeIdx0;
+              pu.ibcGpmMergeIdx1 = rdModeList[mrgHADIdx].mergeIdx1;
+              if (rdModeList[mrgHADIdx].mergeIdx0 < IBC_GPM_MAX_NUM_UNI_CANDS && rdModeList[mrgHADIdx].mergeIdx0 >= mergeCtx.numValidMergeCand)
+              {
+                pu.ibcGpmMergeIdx0 =  pu.ibcGpmMergeIdx0 - mergeCtx.numValidMergeCand;
+              }
+              if (rdModeList[mrgHADIdx].mergeIdx1 < IBC_GPM_MAX_NUM_UNI_CANDS && rdModeList[mrgHADIdx].mergeIdx1 >= mergeCtx.numValidMergeCand)
+              {
+                pu.ibcGpmMergeIdx1 =  pu.ibcGpmMergeIdx1 - mergeCtx.numValidMergeCand;
+              }
+              pu.ibcGpmSplitDir = rdModeList[mrgHADIdx].splitDir;
+              pu.ibcGpmBldIdx = rdModeList[mrgHADIdx].bldIdx;
+              if (chroma)
+              {
+                m_pcInterSearch->motionCompensation(pu, REF_PIC_LIST_0, false, chroma);
+                if (pu.ibcGpmMergeIdx0 >= IBC_GPM_MAX_NUM_UNI_CANDS)
+                {
+                  pu.intraDir[1] = ibcGpmIntraCandList[pu.ibcGpmSplitDir][0][pu.ibcGpmMergeIdx0 - IBC_GPM_MAX_NUM_UNI_CANDS];
+                }
+                else
+                {
+                  pu.intraDir[1] = ibcGpmIntraCandList[pu.ibcGpmSplitDir][1][pu.ibcGpmMergeIdx1 - IBC_GPM_MAX_NUM_UNI_CANDS];
+                }
+                if (!intraPredBufSet[0])
+                {
+                  intraPredBuf[0] = m_acMergeBuffer[0 + IBC_GPM_MAX_NUM_UNI_CANDS].getBuf(localUnitArea);
+                  intraPredBufSet[0] = true;
+                }
+                m_pcIntraSearch->initIntraPatternChType(*pu.cu, pu.Cb());
+                m_pcIntraSearch->predIntraAng(COMPONENT_Cb, intraPredBuf[0].Cb(), pu);
+                m_pcIntraSearch->initIntraPatternChType(*pu.cu, pu.Cr());
+                m_pcIntraSearch->predIntraAng(COMPONENT_Cr, intraPredBuf[0].Cr(), pu);
+                pu.intraDir[1] = PLANAR_IDX;
+                PelUnitBuf predBuf = cu.cs->getPredBuf(pu);
+                if (pu.ibcGpmMergeIdx0 < IBC_GPM_MAX_NUM_UNI_CANDS)
+                {
+                  m_pcInterSearch->weightedGeoBlkRounded(pu, pu.ibcGpmSplitDir, pu.ibcGpmBldIdx, CHANNEL_TYPE_CHROMA, geoCombinations[candidateIdx], predBuf, intraPredBuf[0]);
+                }
+                else
+                {
+                  m_pcInterSearch->weightedGeoBlkRounded(pu, pu.ibcGpmSplitDir, pu.ibcGpmBldIdx, CHANNEL_TYPE_CHROMA, geoCombinations[candidateIdx], intraPredBuf[0], predBuf);
+                }
+              }
+              tempCS->getPredBuf().copyFrom(geoCombinations[candidateIdx]);
+            }
+            else
+#endif
             m_pcInterSearch->motionCompensation(pu,REF_PIC_LIST_0, true, chroma);
+#if JVET_AC0112_IBC_CIIP
+            if (pu.ibcCiipFlag)
+            {
+              if (pu.ibcCiipIntraIdx > 0)
+              {
+                int xPred = pu.bv.getHor();
+                int yPred = pu.bv.getVer();
+                const PredictionUnit *puBv = pu.cs->getPURestricted(pu.lumaPos().offset(xPred, yPred), pu, pu.chType);
+                int intraDir = puBv ? puBv->getIpmInfo(pu.lumaPos().offset(xPred, yPred)) : PLANAR_IDX;
+                if (intraDir != ibcCiipIntraList[0])
+                {
+                  ibcCiipIntraList[1] = intraDir;
+                }
+                else
+                {
+                  ibcCiipIntraList[1] = ibcCiipIntraList[0] == PLANAR_IDX ? HOR_IDX : PLANAR_IDX;
+                }
+                intraDir = ibcCiipIntraList[1];
+                if (!intraPredBufSet[intraDir])
+                {
+                  pu.intraDir[0] = intraDir;
+                  intraPredBufSet[intraDir] = true;
+                  intraPredBuf[intraDir] = m_acMergeBuffer[intraDir + IBC_GPM_MAX_NUM_UNI_CANDS].getBuf(localUnitArea);
+                  m_pcIntraSearch->initPredIntraParams(pu, pu.Y(), *pu.cs->sps, 0);
+                  m_pcIntraSearch->predIntraAng(COMPONENT_Y, intraPredBuf[intraDir].Y(), pu);
+                }
+              }
+              m_pcIntraSearch->geneWeightedPred( COMPONENT_Y, tempCS->getPredBuf(pu).Y(), pu, tempCS->getPredBuf(pu).Y(), intraPredBuf[ibcCiipIntraList[pu.ibcCiipIntraIdx]].Y() );
+
+              if (chroma)
+              {
+                pu.intraDir[1] = ibcCiipIntraList[pu.ibcCiipIntraIdx];
+                m_pcIntraSearch->initIntraPatternChType(*pu.cu, pu.Cb());
+                m_pcIntraSearch->predIntraAng(COMPONENT_Cb, intraPredBuf[pu.intraDir[1]].Cb(), pu);
+                m_pcIntraSearch->initIntraPatternChType(*pu.cu, pu.Cr());
+                m_pcIntraSearch->predIntraAng(COMPONENT_Cr, intraPredBuf[pu.intraDir[1]].Cr(), pu);
+                m_pcIntraSearch->geneWeightedPred( COMPONENT_Cb, tempCS->getPredBuf(pu).Cb(), pu, tempCS->getPredBuf(pu).Cb(), intraPredBuf[pu.intraDir[1]].Cb() );
+                m_pcIntraSearch->geneWeightedPred( COMPONENT_Cr, tempCS->getPredBuf(pu).Cr(), pu, tempCS->getPredBuf(pu).Cr(), intraPredBuf[pu.intraDir[1]].Cr() );
+              }
+              pu.intraDir[0] = DC_IDX;
+              pu.intraDir[1] = PLANAR_IDX;
+            }
+#endif
             m_CABACEstimator->getCtx() = m_CurrCtx->start;
 
             m_pcInterSearch->encodeResAndCalcRdInterCU(*tempCS, partitioner, (numResidualPass != 0), true, chroma);
@@ -11428,6 +12439,13 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
             xCheckChromaQPOffset( *tempCS, partitioner );
 
 
+#if JVET_AC0112_IBC_CIIP
+            if((tempCS->getCU(partitioner.chType))->skip && (tempCS->getCU(partitioner.chType))->firstPU->ibcCiipFlag)
+            {
+              tempCS->cost = MAX_DOUBLE;
+              tempCS->costDbOffset = 0;
+            }
+#endif
             DTRACE_MODE_COST(*tempCS, m_pcRdCost->getLambda());
             xCheckBestMode(tempCS, bestCS, partitioner, encTestMode);
 
@@ -11466,9 +12484,75 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
     return;
   }
 
-    tempCS->initStructData(encTestMode.qp);
+  m_bestModeUpdated = tempCS->useDbCost = bestCS->useDbCost = false;
 
-    m_bestModeUpdated = tempCS->useDbCost = bestCS->useDbCost = false;
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+  double curBestCost = bestCS->cost;
+  bool searchedByHash[1] = {false};
+  Distortion tempCost[1] = {0};
+  Distortion searchCost[2] = {0, 0};
+#endif
+#if JVET_AC0112_IBC_CIIP
+  const UnitArea localUnitArea(tempCS->area.chromaFormat, Area(0, 0, tempCS->area.Y().width, tempCS->area.Y().height));
+  PelBuf ibcCiipIntraBuf[3];
+  bool skipSecondIbcCiipPass = false;
+  Distortion intraCandCost[2] = {0, 0};
+#endif
+
+#if JVET_AC0112_IBC_LIC
+  bool skipSecondLicPass = false;
+  int licIdxMax = tempCS->slice->getSPS()->getUseIbcLic() && (tempCS->area.lx() > 0 || tempCS->area.ly() > 0) ? 2 : 1;
+  if (tempCS->area.lwidth() * tempCS->area.lheight() < 32 || tempCS->area.lwidth() * tempCS->area.lheight() > 256)
+  {
+    licIdxMax = 1;
+  }
+#endif
+#if JVET_AC0112_IBC_CIIP
+    int ibcCiipLoopNum = (tempCS->sps->getUseIbcCiip() && tempCS->slice->getSliceType() == I_SLICE && (tempCS->area.lwidth() * tempCS->area.lheight() >= 32) && tempCS->area.lwidth() <= 32 && tempCS->area.lheight() <= 32 && (tempCS->area.lx() > 0 || tempCS->area.ly() > 0)) ? 2 : 1;
+#if JVET_AA0070_RRIBC
+    if (isSecondPass && ibcCiipLoopNum > 1)
+    {
+      CodedCUInfo& relatedCU = ((EncModeCtrlMTnoRQT *)m_modeCtrl)->getBlkInfo(partitioner.currArea());
+      if (relatedCU.isRribcCoded)
+      {
+        ibcCiipLoopNum = 1;
+      }
+    }
+#endif
+    for (int ibcCiipIdx = 0; ibcCiipIdx < ibcCiipLoopNum; ibcCiipIdx++)
+    {
+#if JVET_AC0112_IBC_LIC
+      if (ibcCiipIdx > 0)
+      {
+        CodingUnit* preBestCu = bestCS->getCU(partitioner.chType);
+        if (preBestCu && preBestCu->ibcLicFlag)
+        {
+          continue;
+        }
+        licIdxMax = 1;
+      }
+      for (int licIdx = 0; licIdx < licIdxMax; licIdx++)
+      {
+        if (licIdx == 1 && skipSecondLicPass)
+        {
+          continue;
+        }
+#endif
+      if (ibcCiipIdx == 1 && skipSecondIbcCiipPass)
+      {
+        continue;
+      }
+#else
+#if JVET_AC0112_IBC_LIC
+      for (int licIdx = 0; licIdx < licIdxMax; licIdx++)
+      {
+        if (licIdx == 1 && skipSecondLicPass)
+        {
+          continue;
+        }
+#endif
+#endif
+    tempCS->initStructData(encTestMode.qp);
 
     CodingUnit &cu = tempCS->addCU(CS::getArea(*tempCS, tempCS->area, partitioner.chType), partitioner.chType);
 
@@ -11481,6 +12565,9 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
     cu.qp = encTestMode.qp;
     cu.imv = 0;
     cu.sbtInfo = 0;
+#if JVET_AC0112_IBC_LIC
+    cu.ibcLicFlag = licIdx;
+#endif
 
     CU::addPUs(cu);
 
@@ -11489,9 +12576,59 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
     PredictionUnit& pu = *cu.firstPU;
     cu.mmvdSkip = false;
     pu.mmvdMergeFlag = false;
+#if JVET_AC0112_IBC_CIIP
+    pu.ibcCiipFlag = ibcCiipIdx;
+#endif
     pu.regularMergeFlag = false;
 #if INTER_LIC
     cu.LICFlag = false;
+#endif
+
+#if JVET_AC0112_IBC_CIIP
+    if (ibcCiipIdx > 0)
+    {
+      int ibcCiipIntraList[IBC_CIIP_MAX_NUM_INTRA_CANDS] = {PLANAR_IDX, HOR_IDX};
+      IntraPrediction::deriveDimdMode(tempCS->picture->getRecoBuf(tempCS->area.Y()), tempCS->area.Y(), cu);
+      cu.timdMode = m_pcIntraSearch->deriveTimdMode(tempCS->picture->getRecoBuf(cu.Y()), cu.Y(), cu);
+      ibcCiipIntraList[0] = MAP131TO67(cu.timdMode);
+      ibcCiipIntraList[1] = ibcCiipIntraList[0] == HOR_IDX ? PLANAR_IDX : HOR_IDX;
+      m_pcIntraSearch->initIntraPatternChType(*pu.cu, pu.Y(), true);
+      for (int i = 0; i < IBC_CIIP_MAX_NUM_INTRA_CANDS; i++)
+      {
+        pu.ibcCiipIntraIdx = i;
+        ibcCiipIntraBuf[0] = m_ciipBuffer[i].getBuf(localUnitArea.Y());
+        pu.intraDir[0] = ibcCiipIntraList[i];
+        m_pcIntraSearch->initPredIntraParams(pu, pu.Y(), *pu.cs->sps, 0);
+        m_pcIntraSearch->predIntraAng(COMPONENT_Y, ibcCiipIntraBuf[0], pu);
+        pu.interDir = 1;
+        pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
+#if JVET_AA0070_RRIBC
+        pu.cu->rribcFlipType = 0;
+        m_pcInterSearch->predIBCSearch(cu, partitioner, m_ctuIbcSearchRangeX, m_ctuIbcSearchRangeY, m_ibcHashMap, tempCost, &ibcCiipIntraBuf[0], isSecondPass);
+#else
+        m_pcInterSearch->predIBCSearch(cu, partitioner, m_ctuIbcSearchRangeX, m_ctuIbcSearchRangeY, m_ibcHashMap, tempCost, &ibcCiipIntraBuf[0]);
+#endif
+        intraCandCost[i] = tempCost[0];
+      }
+      pu.ibcCiipIntraIdx = intraCandCost[0] <= intraCandCost[1] ? 0 : 1;
+      tempCost[0] = intraCandCost[0] <= intraCandCost[1] ? intraCandCost[0] : intraCandCost[1];
+      ibcCiipIntraBuf[0] = m_ciipBuffer[pu.ibcCiipIntraIdx].getBuf(localUnitArea.Y());
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+      const bool chroma = !(CS::isDualITree(*tempCS));
+#else
+      const bool chroma = !pu.cu->isSepTree();
+#endif
+      if (chroma)
+      {
+        ibcCiipIntraBuf[1] = m_ciipBuffer[0].getBuf(localUnitArea.Cb());
+        ibcCiipIntraBuf[2] = m_ciipBuffer[0].getBuf(localUnitArea.Cr());
+        pu.intraDir[1] = ibcCiipIntraList[pu.ibcCiipIntraIdx];
+        m_pcIntraSearch->initIntraPatternChType(*pu.cu, pu.Cb());
+        m_pcIntraSearch->predIntraAng(COMPONENT_Cb, ibcCiipIntraBuf[1], pu);
+        m_pcIntraSearch->initIntraPatternChType(*pu.cu, pu.Cr());
+        m_pcIntraSearch->predIntraAng(COMPONENT_Cr, ibcCiipIntraBuf[2], pu);
+      }
+    }
 #endif
 
     pu.intraDir[0] = DC_IDX; // set intra pred for ibc block
@@ -11501,13 +12638,69 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
     pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF; // last idx in the list
 #if JVET_AA0070_RRIBC
       pu.cu->rribcFlipType = 0;
+#if JVET_AC0112_IBC_CIIP
+      bool bValid = m_pcInterSearch->predIBCSearch(cu, partitioner, m_ctuIbcSearchRangeX, m_ctuIbcSearchRangeY, m_ibcHashMap, tempCost, pu.ibcCiipFlag ? &ibcCiipIntraBuf[0] : NULL, isSecondPass, pu.ibcCiipFlag ? NULL : searchedByHash);
+#else
+#if JVET_AC0112_IBC_LIC
+      bool bValid = m_pcInterSearch->predIBCSearch(cu, partitioner, m_ctuIbcSearchRangeX, m_ctuIbcSearchRangeY, m_ibcHashMap, tempCost, isSecondPass, searchedByHash);
+#else
       bool bValid = m_pcInterSearch->predIBCSearch(cu, partitioner, m_ctuIbcSearchRangeX, m_ctuIbcSearchRangeY, m_ibcHashMap, isSecondPass);
+#endif
+#endif
+#else
+#if JVET_AC0112_IBC_CIIP
+      bool bValid = m_pcInterSearch->predIBCSearch(cu, partitioner, m_ctuIbcSearchRangeX, m_ctuIbcSearchRangeY, m_ibcHashMap, tempCost, pu.ibcCiipFlag ? &ibcCiipIntraBuf[0] : NULL, pu.ibcCiipFlag ? NULL : searchedByHash);
+#else
+#if JVET_AC0112_IBC_LIC
+      bool bValid = m_pcInterSearch->predIBCSearch(cu, partitioner, m_ctuIbcSearchRangeX, m_ctuIbcSearchRangeY, m_ibcHashMap, tempCost, searchedByHash);
 #else
       bool bValid = m_pcInterSearch->predIBCSearch(cu, partitioner, m_ctuIbcSearchRangeX, m_ctuIbcSearchRangeY, m_ibcHashMap);
+#endif
+#endif
+#endif
+#if JVET_AC0112_IBC_LIC
+      if (licIdx == 0 && searchedByHash[0])
+      {
+        skipSecondLicPass = true;
+      }
+#endif
+#if JVET_AC0112_IBC_CIIP
+      if (ibcCiipIdx == 0 && searchedByHash[0])
+      {
+        skipSecondIbcCiipPass = true;
+      }
 #endif
 
       if (bValid)
       {
+#if JVET_AC0112_IBC_LIC
+#if JVET_AC0112_IBC_CIIP
+        if (ibcCiipIdx == 0)
+        {
+          searchCost[licIdx] = tempCost[0];
+        }
+#else
+        searchCost[licIdx] = tempCost[0];
+#endif
+        if (licIdx > 0 && searchCost[0] > 0 && searchCost[1] > 1.05 * searchCost[0])
+        {
+          continue;
+        }
+#endif
+#if JVET_AC0112_IBC_CIIP
+#if JVET_AC0112_IBC_LIC
+        if (licIdx == 0)
+        {
+          searchCost[ibcCiipIdx] = tempCost[0];
+        }
+#else
+        searchCost[ibcCiipIdx] = tempCost[0];
+#endif
+        if (ibcCiipIdx > 0 && searchCost[0] > 0 && searchCost[1] > 1.2 * searchCost[0])
+        {
+          continue;
+        }
+#endif
         PU::spanMotionInfo(pu);
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
         const bool chroma = !(CS::isDualITree(*tempCS));
@@ -11516,6 +12709,22 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
 #endif
         //  MC
         m_pcInterSearch->motionCompensation(pu, REF_PIC_LIST_0, true, chroma);
+#if JVET_AC0112_IBC_CIIP
+        if (pu.ibcCiipFlag)
+        {
+          m_pcIntraSearch->geneWeightedPred( COMPONENT_Y, cu.cs->getPredBuf(pu).Y(), pu, cu.cs->getPredBuf(pu).Y(), ibcCiipIntraBuf[0] );
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+          const bool chroma = !(CS::isDualITree(*tempCS));
+#else
+          const bool chroma = !pu.cu->isSepTree();
+#endif
+          if (chroma)
+          {
+            m_pcIntraSearch->geneWeightedPred( COMPONENT_Cb, cu.cs->getPredBuf(pu).Cb(), pu, cu.cs->getPredBuf(pu).Cb(), ibcCiipIntraBuf[1] );
+            m_pcIntraSearch->geneWeightedPred( COMPONENT_Cr, cu.cs->getPredBuf(pu).Cr(), pu, cu.cs->getPredBuf(pu).Cr(), ibcCiipIntraBuf[2] );
+          }
+        }
+#endif
 
         {
 
@@ -11544,6 +12753,18 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
           {
             xCalDebCost( *tempCS, partitioner );
           }
+#if JVET_AC0112_IBC_CIIP
+          if (ibcCiipIdx == 0 && tempCS->cost > curBestCost * 1.1)
+          {
+            skipSecondIbcCiipPass = true;
+          }
+#endif
+#if JVET_AC0112_IBC_LIC
+          if (licIdx == 0 && tempCS->cost > curBestCost * 1.4)
+          {
+            skipSecondLicPass = true;
+          }
+#endif
 
           DTRACE_MODE_COST(*tempCS, m_pcRdCost->getLambda());
           xCheckBestMode(tempCS, bestCS, partitioner, encTestMode);
@@ -11557,7 +12778,19 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
         tempCS->fracBits = 0;
         tempCS->cost = MAX_DOUBLE;
         tempCS->costDbOffset = 0;
+#if JVET_AC0112_IBC_CIIP
+        if (ibcCiipIdx == 0)
+        {
+          break;
+        }
+#endif
       }
+#if JVET_AC0112_IBC_LIC
+    }
+#endif
+#if JVET_AC0112_IBC_CIIP
+    }
+#endif
 }
   // check ibc mode in encoder RD
   //////////////////////////////////////////////////////////////////////////////////////////////

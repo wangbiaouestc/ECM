@@ -2867,6 +2867,9 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
 #if JVET_AA0070_RRIBC
   rribcData(*pu.cu);
 #endif
+#if JVET_AC0112_IBC_LIC
+  cuIbcLicFlag(*pu.cu);
+#endif
   if( pu.mergeFlag )
   {
     merge_data(pu);
@@ -2884,6 +2887,13 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
   }
   else if (CU::isIBC(*pu.cu))
   {
+#if JVET_AC0112_IBC_CIIP
+    ibcCiipFlag(pu);
+    if (pu.ibcCiipFlag)
+    {
+      ibcCiipIntraIdx(pu);
+    }
+#endif
     ref_idx(pu, REF_PIC_LIST_0);
     Mv mvd = pu.mvd[REF_PIC_LIST_0];
     mvd.changeIbcPrecInternal2Amvr(pu.cu->imv);
@@ -3451,6 +3461,175 @@ void CABACWriter::tm_merge_flag(const PredictionUnit& pu)
 }
 #endif
 
+#if JVET_AC0112_IBC_CIIP
+void CABACWriter::ibcCiipFlag(const PredictionUnit& pu)
+{
+  if (!pu.cs->sps->getUseIbcCiip() || (pu.lx() == 0 && pu.ly() == 0))
+  {
+    return;
+  }
+  if (pu.lwidth() * pu.lheight() < 32 || pu.lwidth() > 32 || pu.lheight() > 32)
+  {
+    return;
+  }
+  if (pu.mergeFlag)
+  {
+    if (pu.cu->skip)
+    {
+      return;
+    }
+    m_BinEncoder.encodeBin(pu.ibcCiipFlag, Ctx::IbcCiipFlag(0));
+  }
+  else
+  {
+  #if JVET_AA0070_RRIBC
+    if (pu.cu->rribcFlipType)
+    {
+      return;
+    }
+  #endif
+  #if JVET_AC0112_IBC_LIC
+    if (pu.cu->ibcLicFlag)
+    {
+      return;
+    }
+  #endif
+    if (pu.cs->slice->getSliceType() != I_SLICE)
+    {
+      return;
+    }
+    m_BinEncoder.encodeBin(pu.ibcCiipFlag, Ctx::IbcCiipFlag(1));
+  }
+}
+
+void CABACWriter::ibcCiipIntraIdx(const PredictionUnit& pu)
+{
+  m_BinEncoder.encodeBin( pu.ibcCiipIntraIdx > 0, Ctx::IbcCiipIntraIdx() );
+}
+#endif
+
+#if JVET_AC0112_IBC_GPM
+void CABACWriter::ibcGpmFlag(const PredictionUnit& pu)
+{
+  if (!pu.cs->sps->getUseIbcGpm() || (pu.lx() == 0 && pu.ly() == 0))
+  {
+    return;
+  }
+  if (pu.lwidth() < 8 || pu.lheight() < 8 || pu.lwidth() > 32 || pu.lheight() > 32)
+  {
+    return;
+  }
+  m_BinEncoder.encodeBin(pu.ibcGpmFlag, Ctx::IbcGpmFlag());
+}
+
+void CABACWriter::ibcGpmMergeIdx(const PredictionUnit& pu)
+{
+  uint8_t splitDir = pu.ibcGpmSplitDir;
+  uint8_t candIdx0 = pu.ibcGpmMergeIdx0;
+  uint8_t candIdx1 = pu.ibcGpmMergeIdx1;
+
+  uint8_t splitDirIdx = 0;
+  if (g_GeoParams[splitDir][0] % 8 == 0)
+  {
+    m_BinEncoder.encodeBin( 1, Ctx::IbcGpmSplitDirSetFlag() );
+    splitDirIdx = g_ibcGpmFirstSetSplitDirToIdx[splitDir];
+    m_BinEncoder.encodeBinsEP(splitDirIdx, 3);
+  }
+  else
+  {
+    m_BinEncoder.encodeBin( 0, Ctx::IbcGpmSplitDirSetFlag() );
+    uint8_t prefix = 0;
+    for (uint8_t i = 0; i < splitDir; i++)
+    {
+      if (!g_ibcGpmSecondSetSplitDir[i])
+      {
+        prefix++;
+      }
+    }
+    splitDirIdx = splitDir - prefix;
+    xWriteTruncBinCode(splitDirIdx, IBC_GPM_MAX_SPLIT_DIR_SECOND_SET_NUM);
+  }
+
+  bool isIntra0 = (pu.ibcGpmMergeIdx0 >= IBC_GPM_MAX_NUM_UNI_CANDS);
+  bool isIntra1 = (pu.ibcGpmMergeIdx1 >= IBC_GPM_MAX_NUM_UNI_CANDS);
+  m_BinEncoder.encodeBin( isIntra0 ? 1 : 0, Ctx::IbcGpmIntraFlag() );
+
+  const int maxNumIbcGpmCand = pu.cs->sps->getMaxNumIBCMergeCand();
+  int numCandminus2 = maxNumIbcGpmCand - 2;
+  if (isIntra0)
+  {
+    unary_max_eqprob(candIdx0 - IBC_GPM_MAX_NUM_UNI_CANDS, IBC_GPM_MAX_NUM_INTRA_CANDS-1);
+  }
+  else if (numCandminus2 >= 0)
+  {
+    m_BinEncoder.encodeBin(candIdx0 == 0 ? 0 : 1, Ctx::MergeIdx());
+    if (candIdx0 > 0)
+    {
+      unary_max_eqprob(candIdx0 - 1, numCandminus2);
+    }
+  }
+  if (isIntra1)
+  {
+    unary_max_eqprob(candIdx1 - IBC_GPM_MAX_NUM_UNI_CANDS, IBC_GPM_MAX_NUM_INTRA_CANDS-1);
+  }
+  else if (numCandminus2 >= 0)
+  {
+    m_BinEncoder.encodeBin(candIdx1 == 0 ? 0 : 1, Ctx::MergeIdx());
+    if (candIdx1 > 0)
+    {
+      unary_max_eqprob(candIdx1 - 1, numCandminus2);
+    }
+  }
+}
+
+void CABACWriter::ibcGpmAdaptBlendIdx(const int flag)
+{
+  if (IBC_GPM_NUM_BLENDING == 1)
+  {
+    return;
+  }
+  if (flag == 0)
+  {
+    m_BinEncoder.encodeBin(1, Ctx::IbcGpmBldIdx(0));
+  }
+  else
+  {
+    m_BinEncoder.encodeBin(0, Ctx::IbcGpmBldIdx(0));
+    if (flag == 2 || flag == 1)
+    {
+      m_BinEncoder.encodeBin(1, Ctx::IbcGpmBldIdx(1));
+      m_BinEncoder.encodeBin(flag == 2, Ctx::IbcGpmBldIdx(2));
+    }
+    else
+    {
+      m_BinEncoder.encodeBin(0, Ctx::IbcGpmBldIdx(1));
+      m_BinEncoder.encodeBin(flag == 3, Ctx::IbcGpmBldIdx(3));
+    }
+  }
+}
+#endif
+
+#if JVET_AC0112_IBC_LIC
+void CABACWriter::cuIbcLicFlag(const CodingUnit& cu)
+{
+  if (!cu.cs->sps->getUseIbcLic() || !CU::isIBC(cu) || cu.firstPU->mergeFlag)
+  {
+    return;
+  }
+#if JVET_AA0070_RRIBC
+  if (cu.rribcFlipType > 0)
+  {
+    return;
+  }
+#endif
+  if (cu.lwidth() * cu.lheight() < 32 || cu.lwidth() * cu.lheight() > 256)
+  {
+    return;
+  }
+  m_BinEncoder.encodeBin(cu.ibcLicFlag ? 1 : 0, Ctx::IbcLicFlag());
+}
+#endif
+
 #if JVET_X0049_ADAPT_DMVR
 void CABACWriter::bm_merge_flag(const PredictionUnit& pu)
 {
@@ -3495,6 +3674,34 @@ void CABACWriter::merge_data(const PredictionUnit& pu)
 #if JVET_AA0061_IBC_MBVD
     }
 #endif
+#endif
+#if JVET_AC0112_IBC_CIIP
+    ibcCiipFlag(pu);
+    if (pu.ibcCiipFlag)
+    {
+      ibcCiipIntraIdx(pu);
+    }
+#endif
+#if JVET_AC0112_IBC_GPM
+#if JVET_AC0112_IBC_CIIP && JVET_AA0061_IBC_MBVD
+    if (!pu.ibcMbvdMergeFlag && !pu.ibcCiipFlag)
+#else
+#if JVET_AA0061_IBC_MBVD
+    if (!pu.ibcMbvdMergeFlag)
+#else
+#if JVET_AC0112_IBC_CIIP
+    if (!pu.ibcCiipFlag)
+#endif
+#endif
+#endif
+    {
+      ibcGpmFlag(pu);
+      if (pu.ibcGpmFlag)
+      {
+        ibcGpmMergeIdx(pu);
+        ibcGpmAdaptBlendIdx(pu.ibcGpmBldIdx);
+      }
+    }
 #endif
     merge_idx(pu);
     return;
@@ -3889,17 +4096,21 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
 #endif
 #endif
     if (pu.cu->predMode == MODE_IBC)
-#if JVET_AA0061_IBC_MBVD
     {
+#if JVET_AA0061_IBC_MBVD
       if (pu.ibcMbvdMergeFlag)
       {
         return;
       }
 #endif
-      numCandminus1 = int(pu.cs->sps->getMaxNumIBCMergeCand()) - 1;
-#if JVET_AA0061_IBC_MBVD
-    }
+#if JVET_AC0112_IBC_GPM
+      if (pu.ibcGpmFlag)
+      {
+        return;
+      }
 #endif
+      numCandminus1 = int(pu.cs->sps->getMaxNumIBCMergeCand()) - 1;
+    }
 #if TM_MRG
     else if (pu.tmMergeFlag)
 #if JVET_X0141_CIIP_TIMD_TM
