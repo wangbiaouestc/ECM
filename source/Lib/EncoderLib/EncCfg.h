@@ -506,6 +506,15 @@ protected:
 #if JVET_AA0061_IBC_MBVD
   bool      m_ibcMbvd;
 #endif
+#if JVET_AC0112_IBC_CIIP
+  bool      m_ibcCiip;
+#endif
+#if JVET_AC0112_IBC_GPM
+  bool      m_ibcGpm;
+#endif
+#if JVET_AC0112_IBC_LIC
+  bool      m_ibcLic;
+#endif
 
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;
@@ -1381,6 +1390,18 @@ public:
 #if JVET_AA0061_IBC_MBVD
   void      setIbcMbvd                      ( bool b )       { m_ibcMbvd = b; }
   bool      getIbcMbvd                      ()         const { return m_ibcMbvd; }
+#endif
+#if JVET_AC0112_IBC_CIIP
+  void      setIbcCiip                      ( bool b )       { m_ibcCiip = b; }
+  bool      getIbcCiip                      ()         const { return m_ibcCiip; }
+#endif
+#if JVET_AC0112_IBC_GPM
+  void      setIbcGpm                       ( bool b )       { m_ibcGpm = b; }
+  bool      getIbcGpm                       ()         const { return m_ibcGpm; }
+#endif
+#if JVET_AC0112_IBC_LIC
+  void      setIbcLic                       ( bool b )       { m_ibcLic = b; }
+  bool      getIbcLic                       ()         const { return m_ibcLic; }
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void      setUseDMVDMode                  (bool b)         { m_DMVDMode = b; }

@@ -877,7 +877,11 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
 
 #if SECONDARY_MPM
 #if JVET_W0123_TIMD_FUSION
+#if JVET_AC0112_IBC_CIIP
+    if (puLeft && (CU::isInter(*puLeft->cu) || CU::isIBC(*puLeft->cu)))
+#else
     if (puLeft && CU::isInter(*puLeft->cu))
+#endif
     {
       mpm[numValidMPM] = puLeft->getIpmInfo(pu.lheight() >= pu.lwidth() ? posRT.offset(0, -1) : posLB.offset(-1, 0));
       if( !includedMode[mpm[numValidMPM]] )
@@ -885,7 +889,11 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
         includedMode[mpm[numValidMPM++]] = true;
       }
     }
+#if JVET_AC0112_IBC_CIIP
+    if (puAbove && (CU::isInter(*puAbove->cu) || CU::isIBC(*puAbove->cu)))
+#else
     if (puAbove && CU::isInter(*puAbove->cu))
+#endif
     {
       mpm[numValidMPM] = puAbove->getIpmInfo(pu.lheight() >= pu.lwidth() ? posLB.offset(-1, 0) : posRT.offset(0, -1));
       if( !includedMode[mpm[numValidMPM]] )
@@ -940,7 +948,11 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
       }
     }
 #if JVET_W0123_TIMD_FUSION
+#if JVET_AC0112_IBC_CIIP
+    if (puBelowLeft && (CU::isInter(*puBelowLeft->cu) || CU::isIBC(*puBelowLeft->cu)))
+#else
     if (puBelowLeft && CU::isInter(*puBelowLeft->cu))
+#endif
     {
       mpm[numValidMPM] = puBelowLeft->getIpmInfo(posLB.offset(-1, 1));
       if( !includedMode[mpm[numValidMPM]] )
@@ -948,7 +960,11 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
         includedMode[mpm[numValidMPM++]] = true;
       }
     }
+#if JVET_AC0112_IBC_CIIP
+    if (puAboveRight && (CU::isInter(*puAboveRight->cu) || CU::isIBC(*puAboveRight->cu)))
+#else
     if (puAboveRight && CU::isInter(*puAboveRight->cu))
+#endif
     {
       mpm[numValidMPM] = puAboveRight->getIpmInfo(posRT.offset(1, -1));
       if( !includedMode[mpm[numValidMPM]] )
@@ -956,7 +972,11 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
         includedMode[mpm[numValidMPM++]] = true;
       }
     }
+#if JVET_AC0112_IBC_CIIP
+    if (puAboveLeft && (CU::isInter(*puAboveLeft->cu) || CU::isIBC(*puAboveLeft->cu)))
+#else
     if (puAboveLeft && CU::isInter(*puAboveLeft->cu))
+#endif
     {
       mpm[numValidMPM] = puAboveLeft->getIpmInfo(posTL.offset(-1, -1));
       if( !includedMode[mpm[numValidMPM]] )
@@ -1636,7 +1656,11 @@ void PU::getSgpmIntraMPMs(const PredictionUnit &pu, uint8_t *mpm, uint8_t splitD
   if (shape == GEO_TM_SHAPE_L || shape == GEO_TM_SHAPE_AL)
   {
     const PredictionUnit *puLeft = pu.cs->getPURestricted(posL, pu, CHANNEL_TYPE_LUMA);
+#if JVET_AC0112_IBC_CIIP
+    if (puLeft && (CU::isInter(*puLeft->cu) || CU::isIBC(*puLeft->cu)))
+#else
     if (puLeft && CU::isInter(*puLeft->cu))
+#endif
     {
       mpm[numValidMPM] = puLeft->getIpmInfo(posL);
       if (!includedMode[mpm[numValidMPM]])
@@ -1653,7 +1677,11 @@ void PU::getSgpmIntraMPMs(const PredictionUnit &pu, uint8_t *mpm, uint8_t splitD
   if (shape == GEO_TM_SHAPE_A || shape == GEO_TM_SHAPE_AL)
   {
     const PredictionUnit *puAbove = pu.cs->getPURestricted(posA, pu, CHANNEL_TYPE_LUMA);
+#if JVET_AC0112_IBC_CIIP
+    if (puAbove && (CU::isInter(*puAbove->cu) || CU::isIBC(*puAbove->cu)))
+#else
     if (puAbove && CU::isInter(*puAbove->cu))
+#endif
     {
       mpm[numValidMPM] = puAbove->getIpmInfo(posA);
       if (!includedMode[mpm[numValidMPM]])
@@ -1737,7 +1765,11 @@ void PU::getSgpmIntraMPMs(const PredictionUnit &pu, uint8_t *mpm, uint8_t splitD
   if (shape == GEO_TM_SHAPE_L || shape == GEO_TM_SHAPE_AL)
   {
     const PredictionUnit *puBelowLeft = pu.cs->getPURestricted(posBL, pu, CHANNEL_TYPE_LUMA);
+#if JVET_AC0112_IBC_CIIP
+    if (puBelowLeft && (CU::isInter(*puBelowLeft->cu) || CU::isIBC(*puBelowLeft->cu)))
+#else
     if (puBelowLeft && CU::isInter(*puBelowLeft->cu))
+#endif
     {
       mpm[numValidMPM] = puBelowLeft->getIpmInfo(posBL);
       if (!includedMode[mpm[numValidMPM]])
@@ -1754,7 +1786,11 @@ void PU::getSgpmIntraMPMs(const PredictionUnit &pu, uint8_t *mpm, uint8_t splitD
   if (shape == GEO_TM_SHAPE_A || shape == GEO_TM_SHAPE_AL)
   {
     const PredictionUnit *puAboveRight = pu.cs->getPURestricted(posAR, pu, CHANNEL_TYPE_LUMA);
+#if JVET_AC0112_IBC_CIIP
+    if (puAboveRight && (CU::isInter(*puAboveRight->cu) || CU::isIBC(*puAboveRight->cu)))
+#else
     if (puAboveRight && CU::isInter(*puAboveRight->cu))
+#endif
     {
       mpm[numValidMPM] = puAboveRight->getIpmInfo(posAR);
       if (!includedMode[mpm[numValidMPM]])
@@ -1770,7 +1806,11 @@ void PU::getSgpmIntraMPMs(const PredictionUnit &pu, uint8_t *mpm, uint8_t splitD
 
   {
     const PredictionUnit *puAboveLeft = pu.cs->getPURestricted(posAL, pu, CHANNEL_TYPE_LUMA);
+#if JVET_AC0112_IBC_CIIP
+    if (puAboveLeft && (CU::isInter(*puAboveLeft->cu) || CU::isIBC(*puAboveLeft->cu)))
+#else
     if (puAboveLeft && CU::isInter(*puAboveLeft->cu))
+#endif
     {
       mpm[numValidMPM] = puAboveLeft->getIpmInfo(posAL);
       if (!includedMode[mpm[numValidMPM]])
@@ -2408,6 +2448,13 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
       }
 #endif
 #endif
+#if JVET_AC0112_IBC_LIC
+#if JVET_AA0070_RRIBC
+      mrgCtx.ibcLicFlags       [cnt] = mrgCtx.rribcFlipTypes[cnt] ? false : miNeighbor.useIbcLic;
+#else
+      mrgCtx.ibcLicFlags       [cnt] = miNeighbor.useIbcLic;
+#endif
+#endif
 
       mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNeighbor.mv[0], miNeighbor.refIdx[0]);
       if (slice.isInterB())
@@ -2684,6 +2731,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #if INTER_LIC
     mrgCtx.LICFlags[ui] = false;
 #endif
+#if JVET_AC0112_IBC_LIC
+    mrgCtx.ibcLicFlags[ui] =false;
+#endif
 #if JVET_AA0070_RRIBC
     mrgCtx.rribcFlipTypes[ui] = 0;
 #endif
@@ -2745,6 +2795,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #endif
 #endif
 #endif
+#if JVET_AC0112_IBC_LIC
+#if JVET_AA0070_RRIBC
+    mrgCtx.ibcLicFlags[cnt] = miLeft.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miLeft.useIbcLic : false;
+#else
+    mrgCtx.ibcLicFlags[cnt] = miLeft.isIBCmot? miLeft.useIbcLic : false;
+#endif
+#endif
     if (mrgCandIdx == cnt)
     {
       return;
@@ -2799,6 +2856,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #else
       mrgCtx.rribcFlipTypes[cnt] = miAbove.isIBCmot ? miAbove.rribcFlipType : 0;
 #endif
+#endif
+#endif
+#if JVET_AC0112_IBC_LIC
+#if JVET_AA0070_RRIBC
+      mrgCtx.ibcLicFlags[cnt] = miAbove.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miAbove.useIbcLic : false;
+#else
+      mrgCtx.ibcLicFlags[cnt] = miAbove.isIBCmot ? miAbove.useIbcLic : false;
 #endif
 #endif
 
@@ -2863,6 +2927,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #endif
 #endif
 #endif
+#if JVET_AC0112_IBC_LIC
+#if JVET_AA0070_RRIBC
+        mrgCtx.ibcLicFlags[cnt] = miAboveRight.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miAboveRight.useIbcLic : false;
+#else
+        mrgCtx.ibcLicFlags[cnt] = miAboveRight.isIBCmot? miAboveRight.useIbcLic : false;
+#endif
+#endif
 
 #if JVET_Z0084_IBC_TM
         if( !mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh) )
@@ -2919,6 +2990,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #else
         mrgCtx.rribcFlipTypes[cnt] = miBelowLeft.isIBCmot ? miBelowLeft.rribcFlipType : 0;
 #endif
+#endif
+#endif
+#if JVET_AC0112_IBC_LIC
+#if JVET_AA0070_RRIBC
+        mrgCtx.ibcLicFlags[cnt] = miBelowLeft.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miBelowLeft.useIbcLic : false;
+#else
+        mrgCtx.ibcLicFlags[cnt] = miBelowLeft.isIBCmot ? miBelowLeft.useIbcLic : false;
 #endif
 #endif
 
@@ -2987,6 +3065,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #else
         mrgCtx.rribcFlipTypes[cnt] = (miAboveLeft.isIBCmot) ? miAboveLeft.rribcFlipType : 0;
 #endif
+#endif
+#endif
+#if JVET_AC0112_IBC_LIC
+#if JVET_AA0070_RRIBC
+          mrgCtx.ibcLicFlags[cnt] = miAboveLeft.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miAboveLeft.useIbcLic : false;
+#else
+          mrgCtx.ibcLicFlags[cnt] = miAboveLeft.isIBCmot ? miAboveLeft.useIbcLic : false;
 #endif
 #endif
 
@@ -3183,6 +3268,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
     miCand.mv[0] = mvp;
     mrgCtx.mvFieldNeighbours[cnt * 2].setMvField(mvp, MAX_NUM_REF);
     mrgCtx.interDirNeighbours[cnt] = 1;
+#if JVET_AC0112_IBC_LIC
+    mrgCtx.ibcLicFlags[cnt] = false;
+#endif
 #if JVET_AA0070_RRIBC
     mrgCtx.rribcFlipTypes[cnt] = 0;
 #endif
@@ -3207,6 +3295,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
   {
     mrgCtx.interDirNeighbours[cnt] = 1;
     mrgCtx.mvFieldNeighbours[cnt * 2].setMvField(Mv(0, 0), MAX_NUM_REF);
+#if JVET_AC0112_IBC_LIC
+    mrgCtx.ibcLicFlags[cnt] = false;
+#endif
 #if JVET_AA0070_RRIBC
     mrgCtx.rribcFlipTypes[cnt] = 0;
 #endif
@@ -3626,6 +3717,9 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     mrgCtx.BcwIdx[ui] = BCW_DEFAULT;
 #if INTER_LIC
     mrgCtx.LICFlags[ui] = false;
+#endif
+#if JVET_AC0112_IBC_LIC
+    mrgCtx.ibcLicFlags[ui] = false;
 #endif
 #if JVET_AA0070_RRIBC
     mrgCtx.rribcFlipTypes[ui] = 0;
@@ -12673,6 +12767,9 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
 #if INTER_LIC
     mi.usesLIC = pu.cu->LICFlag;
 #endif
+#if JVET_AC0112_IBC_LIC
+    mi.useIbcLic = mi.isIBCmot ? pu.cu->ibcLicFlag : 0;
+#endif
 #if JVET_AA0070_RRIBC
     mi.rribcFlipType = mi.isIBCmot ? pu.cu->rribcFlipType : 0;
 #endif
@@ -12760,6 +12857,13 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
 #endif
         )
       {
+#if JVET_AC0112_IBC_CIIP
+        if (mi.isIBCmot)
+        {
+          spanIpmInfoIBC(pu, ib, mi.bv.getHor(), mi.bv.getVer());
+        }
+        else
+#endif
         ib.fill(PLANAR_IDX);
       }
       else
@@ -14314,6 +14418,36 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
   spanIpmInfoInter( pu, mb, ib );
 #endif
 }
+
+#if JVET_AC0112_IBC_CIIP
+void PU::spanIpmInfoIBC( PredictionUnit &pu, IpmBuf &ib, int bvx, int bvy )
+{
+  uint8_t* ii = ib.buf;
+  int ibH = ib.height;
+  int ibW = ib.width;
+  const unsigned scale = 4 * std::max<int>(1, 4 * AMVP_DECIMATION_FACTOR / 4);
+  const unsigned mask = ~(scale - 1);
+  Position PosY;
+  PosY.x = pu.Y().x + bvx;
+  PosY.y = pu.Y().y + bvy;
+  PosY.x = (PosY.x & mask);
+  PosY.y = (PosY.y & mask);
+  CodingStructure *cs = pu.cs;
+  while (cs != NULL && !cs->area.Y().contains(PosY))
+  {
+    cs = cs->parent;
+  }
+  const uint8_t ipm = cs->getIpmInfo(PosY);
+  for (int y = 0; y < ibH; y++)
+  {
+    for (int x = 0; x < ibW; x++)
+    {
+      ii[x] = ipm;
+    }
+    ii += ib.stride;
+  }
+}
+#endif
 #endif
 
 #if JVET_Z0054_BLK_REF_PIC_REORDER

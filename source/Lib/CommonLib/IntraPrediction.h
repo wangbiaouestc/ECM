@@ -317,10 +317,12 @@ protected:
 #else
   void xPredIntraAng              ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng);
 #endif
+#if !(JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM)
 #if JVET_AB0155_SGPM
   void initPredIntraParams(const PredictionUnit &pu, const CompArea compArea, const SPS &sps, const int partIdx = 0);
 #else
   void initPredIntraParams        ( const PredictionUnit & pu,  const CompArea compArea, const SPS& sps );
+#endif
 #endif
 
   static bool isIntegerSlope(const int absAng) { return (0 == (absAng & 0x1F)); }
@@ -510,6 +512,13 @@ public:
 #endif
   /// set parameters from CU data for accessing intra data
   
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
+#if JVET_AB0155_SGPM
+  void initPredIntraParams(const PredictionUnit &pu, const CompArea compArea, const SPS &sps, const int partIdx = 0);
+#else
+  void initPredIntraParams        ( const PredictionUnit & pu,  const CompArea compArea, const SPS& sps );
+#endif
+#endif
 #if JVET_AB0155_SGPM
   void initIntraPatternChType(const CodingUnit &cu, const CompArea &area, const bool forceRefFilterFlag = false,
     const int partIdx = 0
@@ -539,6 +548,11 @@ public:
   void geneIntrainterPred         (const CodingUnit &cu, PelStorage& pred);
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   void geneChromaFusionPred       (const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
+#endif
+#if JVET_AC0112_IBC_CIIP
+  void geneWeightedPred           ( const ComponentID compId, PelBuf& pred, const PredictionUnit &pu, const PelBuf& interPred, const PelBuf& intraPred);
+  void(*m_ibcCiipBlending)           ( Pel *pDst, int strideDst, const Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int shift, int width, int height );
+  static void ibcCiipBlending        ( Pel *pDst, int strideDst, const Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int shift, int width, int height );
 #endif
   void reorderPLT                 (CodingStructure& cs, Partitioner& partitioner, ComponentID compBegin, uint32_t numComp);
 #if !MERGE_ENC_OPT

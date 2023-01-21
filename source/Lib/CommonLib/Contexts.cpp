@@ -2877,6 +2877,117 @@ const CtxSet ContextSetCfg::IBCFlag = ContextSetCfg::addCtxSet
   { 147, 117, 146, },
   });
 
+#if JVET_AC0112_IBC_CIIP
+const CtxSet ContextSetCfg::IbcCiipFlag = ContextSetCfg::addCtxSet
+({
+  {  CNU, CNU, CNU, },
+  {  CNU, CNU, CNU, },
+  {  CNU, CNU, CNU, },
+  {  DWS, DWS, DWS, },
+  {  DWS, DWS, DWS, },
+  {  DWS, DWS, DWS, },
+  {  DWE, DWE, DWE, },
+  {  DWE, DWE, DWE, },
+  {  DWE, DWE, DWE, },
+  {  DWO, DWO, DWO, },
+  {  DWO, DWO, DWO, },
+  });
+
+const CtxSet ContextSetCfg::IbcCiipIntraIdx = ContextSetCfg::addCtxSet
+({
+  {  CNU, },
+  {  CNU, },
+  {  CNU, },
+  {  DWS, },
+  {  DWS, },
+  {  DWS, },
+  {  DWE, },
+  {  DWE, },
+  {  DWE, },
+  {  DWO, },
+  {  DWO, },
+  });
+#endif
+
+#if JVET_AC0112_IBC_GPM
+const CtxSet ContextSetCfg::IbcGpmFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+
+const CtxSet ContextSetCfg::IbcGpmIntraFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+
+const CtxSet ContextSetCfg::IbcGpmSplitDirSetFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+
+const CtxSet ContextSetCfg::IbcGpmBldIdx = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU },
+  { DWS, DWS, DWS, DWS },
+  { DWS, DWS, DWS, DWS },
+  { DWS, DWS, DWS, DWS },
+  { DWE, DWE, DWE, DWE },
+  { DWE, DWE, DWE, DWE },
+  { DWE, DWE, DWE, DWE },
+  { DWO, DWO, DWO, DWO },
+  { DWO, DWO, DWO, DWO },
+});
+#endif
+
+#if JVET_AC0112_IBC_LIC
+const CtxSet ContextSetCfg::IbcLicFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+#endif
+
 const CtxSet ContextSetCfg::JointCbCrFlag = ContextSetCfg::addCtxSet
 ({
   {  34,  28,  52, },

@@ -1622,6 +1622,15 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AA0061_IBC_MBVD
     WRITE_FLAG( pcSPS->getUseIbcMbvd() ? 1 : 0,                                         "sps_ibc_mbvd_enabled_flag" );
 #endif
+#if JVET_AC0112_IBC_CIIP
+    WRITE_FLAG( pcSPS->getUseIbcCiip() ? 1 : 0,                                         "sps_ibc_ciip_enabled_flag" );
+#endif
+#if JVET_AC0112_IBC_GPM
+    WRITE_FLAG( pcSPS->getUseIbcGpm() ? 1 : 0,                                          "sps_ibc_gpm_enabled_flag" );
+#endif
+#if JVET_AC0112_IBC_LIC
+    WRITE_FLAG( pcSPS->getUseIbcLic() ? 1 : 0,                                          "sps_ibc_lic_enabled_flag" );
+#endif
   }
 #if !JVET_S0074_SPS_REORDER
   WRITE_FLAG(pcSPS->getUseLmcs() ? 1 : 0, "sps_lmcs_enable_flag");

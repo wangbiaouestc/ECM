@@ -352,6 +352,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if INTER_LIC
   LICFlag           = other.LICFlag;
 #endif
+#if JVET_AC0112_IBC_LIC
+  ibcLicFlag = other.ibcLicFlag;
+#endif
 #if JVET_AA0070_RRIBC
   rribcFlipType = other.rribcFlipType;
 #endif
@@ -489,6 +492,9 @@ void CodingUnit::initData()
 #endif
 #if INTER_LIC
   LICFlag = false;
+#endif
+#if JVET_AC0112_IBC_LIC
+  ibcLicFlag = false;
 #endif
 #if JVET_AA0070_RRIBC
   rribcFlipType = 0;
@@ -801,6 +807,13 @@ void PredictionUnit::initData()
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = false;
 #endif
+#if JVET_AC0112_IBC_GPM
+  ibcGpmFlag = false;
+  ibcGpmSplitDir = MAX_UCHAR;
+  ibcGpmMergeIdx0 = MAX_UCHAR;
+  ibcGpmMergeIdx1 = MAX_UCHAR;
+  ibcGpmBldIdx = MAX_UCHAR;
+#endif
 
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   refIdxLC = -1;
@@ -831,6 +844,10 @@ void PredictionUnit::initData()
   ciipFlag = false;
 #if CIIP_PDPC
   ciipPDPC = false;
+#endif
+#if JVET_AC0112_IBC_CIIP
+  ibcCiipFlag = false;
+  ibcCiipIntraIdx = 0;
 #endif
   mmvdEncOptMode = 0;
 #if MULTI_HYP_PRED
@@ -939,6 +956,13 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = predData.reduceTplSize;
 #endif
+#if JVET_AC0112_IBC_GPM
+  ibcGpmFlag = predData.ibcGpmFlag;
+  ibcGpmSplitDir = predData.ibcGpmSplitDir;
+  ibcGpmMergeIdx0 = predData.ibcGpmMergeIdx0;
+  ibcGpmMergeIdx1 = predData.ibcGpmMergeIdx1;
+  ibcGpmBldIdx = predData.ibcGpmBldIdx;
+#endif
 
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
   {
@@ -969,6 +993,10 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   ciipFlag = predData.ciipFlag;
 #if CIIP_PDPC
   ciipPDPC = predData.ciipPDPC;
+#endif
+#if JVET_AC0112_IBC_CIIP
+  ibcCiipFlag = predData.ibcCiipFlag;
+  ibcCiipIntraIdx = predData.ibcCiipIntraIdx;
 #endif
 #if MULTI_HYP_PRED
   addHypData = predData.addHypData;
@@ -1073,6 +1101,13 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = other.reduceTplSize;
 #endif
+#if JVET_AC0112_IBC_GPM
+  ibcGpmFlag = other.ibcGpmFlag;
+  ibcGpmSplitDir = other.ibcGpmSplitDir;
+  ibcGpmMergeIdx0 = other.ibcGpmMergeIdx0;
+  ibcGpmMergeIdx1 = other.ibcGpmMergeIdx1;
+  ibcGpmBldIdx = other.ibcGpmBldIdx;
+#endif
 
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
   {
@@ -1103,6 +1138,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   ciipFlag = other.ciipFlag;
 #if CIIP_PDPC
   ciipPDPC = other.ciipPDPC;
+#endif
+#if JVET_AC0112_IBC_CIIP
+  ibcCiipFlag = other.ibcCiipFlag;
+  ibcCiipIntraIdx = other.ibcCiipIntraIdx;
 #endif
 #if MULTI_HYP_PRED
   addHypData = other.addHypData;

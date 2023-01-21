@@ -221,6 +221,9 @@ void InterSearch::destroy()
   }
   m_tmpStorageLCU.destroy();
   m_tmpAffiStorage.destroy();
+#if JVET_AC0112_IBC_CIIP
+  m_ibcCiipBuffer.destroy();
+#endif
 
   if ( m_tmpAffiError != NULL )
   {
@@ -375,6 +378,9 @@ void InterSearch::init( EncCfg*        pcEncCfg,
 #else
   m_tmpAffiDeri[0] = new int[MAX_CU_SIZE * MAX_CU_SIZE];
   m_tmpAffiDeri[1] = new int[MAX_CU_SIZE * MAX_CU_SIZE];
+#endif
+#if JVET_AC0112_IBC_CIIP
+  m_ibcCiipBuffer.create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
 #endif
   m_pTempPel = new Pel[maxCUWidth*maxCUHeight];
   m_affMVListMaxSize = (pcEncCfg->getIntraPeriod() == (uint32_t)-1) ? AFFINE_ME_LIST_SIZE_LD : AFFINE_ME_LIST_SIZE;
@@ -1606,9 +1612,17 @@ end:
 
 // based on xMotionEstimation
 #if JVET_AA0070_RRIBC
+#if JVET_AC0112_IBC_CIIP
+void InterSearch::xIBCEstimation(PredictionUnit &pu, PelUnitBuf &origBuf, PelBuf &ibcCiipIntraBuf, Mv pcMvPred[3][2], Mv &rcMv, Distortion &ruiCost, const int localSearchRangeX, const int localSearchRangeY, int numRribcType)
+#else
 void InterSearch::xIBCEstimation(PredictionUnit &pu, PelUnitBuf &origBuf, Mv pcMvPred[3][2], Mv &rcMv, Distortion &ruiCost, const int localSearchRangeX, const int localSearchRangeY, int numRribcType)
+#endif
+#else
+#if JVET_AC0112_IBC_CIIP
+void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, PelBuf &ibcCiipIntraBuf, Mv *pcMvPred, Mv &rcMv, Distortion &ruiCost, const int localSearchRangeX, const int localSearchRangeY)
 #else
 void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pcMvPred, Mv &rcMv, Distortion &ruiCost, const int localSearchRangeX, const int localSearchRangeY)
+#endif
 #endif
 {
   const int iPicWidth = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
@@ -1676,6 +1690,26 @@ void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pc
   }
 #endif
 
+#if JVET_AC0112_IBC_CIIP
+  if (pu.ibcCiipFlag)
+  {
+    const Pel *pelOrig = pcPatternKey->buf;
+    Pel *pelIntra = ibcCiipIntraBuf.buf;
+    int height = ibcCiipIntraBuf.height;
+    int width = ibcCiipIntraBuf.width;
+    for( int y = 0; y < height; y++ )
+    {
+      for( int x = 0; x < width; x++ )
+      {
+        pelIntra[x] = (pelOrig[x] << 1) - pelIntra[x];
+      }
+      pelIntra += ibcCiipIntraBuf.stride;
+      pelOrig += pcPatternKey->stride;
+    }
+    pcPatternKey = (CPelBuf*)&ibcCiipIntraBuf;
+  }
+#endif
+
   m_lumaClpRng = pu.cs->slice->clpRng(COMPONENT_Y);
   Picture* refPic = pu.cu->slice->getPic();
   const CPelBuf refBuf = refPic->getRecoBuf(pu.blocks[COMPONENT_Y]);
@@ -1698,6 +1732,9 @@ void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pc
   m_pcRdCost->setCostScale(0);
 
   m_cDistParam.useMR = false;
+#if JVET_AC0112_IBC_LIC
+  m_cDistParam.useMR = pu.cu->ibcLicFlag;
+#endif
 #if !JVET_AA0070_RRIBC
   m_pcRdCost->setDistParam(m_cDistParam, *cStruct.pcPatternKey, cStruct.piRefY, cStruct.iRefStride, m_lumaClpRng.bd, COMPONENT_Y, cStruct.subShiftMode);
 #endif
@@ -2090,9 +2127,25 @@ void InterSearch::xSetIntraSearchRange(PredictionUnit& pu, int iRoiWidth, int iR
 }
 
 #if JVET_AA0070_RRIBC
+#if JVET_AC0112_IBC_CIIP
+bool InterSearch::predIBCSearch( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, Distortion* bvSearchCost, PelBuf* ibcCiipIntraBuf, bool isSecondPass, bool* searchedByHash)
+#else
+#if JVET_AC0112_IBC_LIC
+bool InterSearch::predIBCSearch( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, Distortion* bvSearchCost, bool isSecondPass, bool* searchedByHash)
+#else
 bool InterSearch::predIBCSearch( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, bool isSecondPass)
+#endif
+#endif
+#else
+#if JVET_AC0112_IBC_CIIP
+bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, Distortion* bvSearchCost, PelBuf* ibcCiipIntraBuf, bool* searchedByHash)
+#else
+#if JVET_AC0112_IBC_LIC
+bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, Distortion* bvSearchCost, bool* searchedByHash)
 #else
 bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap)
+#endif
+#endif
 #endif
 {
   Mv           cMvSrchRngLT;
@@ -2106,6 +2159,12 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 #endif
 #if JVET_AA0070_RRIBC
   CodedCUInfo& relatedCU = ((EncModeCtrlMTnoRQT *)m_modeCtrl)->getBlkInfo(partitioner.currArea());
+#if JVET_AC0112_IBC_LIC
+  if (isSecondPass && relatedCU.isRribcCoded && cu.ibcLicFlag)
+  {
+    return false;
+  }
+#endif
 #endif
 
   for (auto &pu : CU::traversePUs(cu))
@@ -2122,6 +2181,18 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
         numRribcType = 1;
       }
     }
+#if JVET_AC0112_IBC_CIIP
+    if (pu.ibcCiipFlag)
+    {
+      numRribcType = 1;
+    }
+#endif
+#if JVET_AC0112_IBC_LIC
+    if (pu.cu->ibcLicFlag)
+    {
+      numRribcType = 1;
+    }
+#endif
     Mv       cMv;
     cMv.setZero();
     int iBvpNum    = 2;
@@ -2137,18 +2208,62 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 
       // prepare imv = 2 accuracy predictor info
       pu.cu->imv      = 2;
+#if JVET_AC0112_IBC_CIIP
+#if JVET_AC0112_IBC_LIC
+      if (!pu.ibcCiipFlag && !pu.cu->ibcLicFlag)
+      {
+#else
+      if (!pu.ibcCiipFlag)
+      {
+#endif
+#else
+#if JVET_AC0112_IBC_LIC
+      if (!pu.cu->ibcLicFlag)
+      {
+#endif
+#endif
 #if JVET_Z0084_IBC_TM && IBC_TM_AMVP
       PU::fillIBCMvpCand(pu, amvpInfo4Pel[i], this);
 #else
       PU::fillIBCMvpCand(pu, amvpInfo4Pel[i]);
 #endif
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+      m_amvpInfo4Pel[i] = amvpInfo4Pel[i];
+      }
+      else
+      {
+        amvpInfo4Pel[i] = m_amvpInfo4Pel[i];
+      }
+#endif
 
       // prepare imv = 0 accuracy predictor info
       pu.cu->imv = 0;
+#if JVET_AC0112_IBC_CIIP
+#if JVET_AC0112_IBC_LIC
+      if (!pu.ibcCiipFlag && !pu.cu->ibcLicFlag)
+      {
+#else
+      if (!pu.ibcCiipFlag)
+      {
+#endif
+#else
+#if JVET_AC0112_IBC_LIC
+      if (!pu.cu->ibcLicFlag)
+      {
+#endif
+#endif
 #if JVET_Z0084_IBC_TM && IBC_TM_AMVP
       PU::fillIBCMvpCand(pu, amvpInfo[i], this);
 #else
       PU::fillIBCMvpCand(pu, amvpInfo[i]);
+#endif
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+      m_amvpInfo[i] = amvpInfo[i];
+      }
+      else
+      {
+        amvpInfo[i] = m_amvpInfo[i];
+      }
 #endif
 
       // store in full pel accuracy, shift before use in search
@@ -2168,19 +2283,63 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     /// ibc search
     pu.cu->imv = 2;
     AMVPInfo amvpInfo4Pel;
+#if JVET_AC0112_IBC_CIIP
+#if JVET_AC0112_IBC_LIC
+    if (!pu.ibcCiipFlag && !pu.cu->ibcLicFlag)
+    {
+#else
+    if (!pu.ibcCiipFlag)
+    {
+#endif
+#else
+#if JVET_AC0112_IBC_LIC
+    if (!pu.cu->ibcLicFlag)
+    {
+#endif
+#endif
 #if JVET_Z0084_IBC_TM && IBC_TM_AMVP
     PU::fillIBCMvpCand(pu, amvpInfo4Pel, this);
 #else
     PU::fillIBCMvpCand(pu, amvpInfo4Pel);
 #endif
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+      m_amvpInfo4Pel = amvpInfo4Pel;
+    }
+    else
+    {
+      amvpInfo4Pel = m_amvpInfo4Pel;
+    }
+#endif
 
     pu.cu->imv = 0;// (Int)cu.cs->sps->getUseIMV(); // set as IMV=0 initially
     Mv    cMv, cMvPred[2];
     AMVPInfo amvpInfo;
+#if JVET_AC0112_IBC_CIIP
+#if JVET_AC0112_IBC_LIC
+    if (!pu.ibcCiipFlag && !pu.cu->ibcLicFlag)
+    {
+#else
+    if (!pu.ibcCiipFlag)
+    {
+#endif
+#else
+#if JVET_AC0112_IBC_LIC
+    if (!pu.cu->ibcLicFlag)
+    {
+#endif
+#endif
 #if JVET_Z0084_IBC_TM && IBC_TM_AMVP
     PU::fillIBCMvpCand(pu, amvpInfo, this);
 #else
     PU::fillIBCMvpCand(pu, amvpInfo);
+#endif
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+      m_amvpInfo = amvpInfo;
+    }
+    else
+    {
+      amvpInfo = m_amvpInfo;
+    }
 #endif
 
     // store in full pel accuracy, shift before use in search
@@ -2200,23 +2359,57 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     }
 #endif
 
+#if JVET_AC0112_IBC_CIIP
+    const CompArea &area = pu.blocks[COMPONENT_Y];
+    const UnitArea localUnitArea(area.chromaFormat, Area(0, 0, area.width, area.height));
+    PelBuf ibcCiipIntraBuff = m_ibcCiipBuffer.getBuf(localUnitArea.Y());
+    if (pu.ibcCiipFlag)
+    {
+      ibcCiipIntraBuff.copyFrom(*ibcCiipIntraBuf);
+    }
+#endif
+
+#if JVET_AC0112_IBC_CIIP
+    if (m_pcEncCfg->getIBCHashSearch() && !pu.ibcCiipFlag)
+#else
     if (m_pcEncCfg->getIBCHashSearch())
+#endif
     {
 #if JVET_AA0070_RRIBC
       xxIBCHashSearch(pu, cMvPred, iBvpNum, cMv, bvpIdxBest, ibcHashMap, amvpInfo4Pel, numRribcType);
 #else
       xxIBCHashSearch(pu, cMvPred, iBvpNum, cMv, bvpIdxBest, ibcHashMap);
 #endif
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+      if (searchedByHash)
+      {
+        *searchedByHash = true;
+      }
+#endif
     }
 
     if (cMv.getHor() == 0 && cMv.getVer() == 0)
     {
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+      if (searchedByHash)
+      {
+        *searchedByHash = false;
+      }
+#endif
       // if hash search does not work or is not enabled
       PelUnitBuf origBuf = pu.cs->getOrgBuf(pu);
 #if JVET_AA0070_RRIBC
+#if JVET_AC0112_IBC_CIIP
+      xIBCEstimation(pu, origBuf, ibcCiipIntraBuff, cMvPred, cMv, cost, localSearchRangeX, localSearchRangeY, numRribcType);
+#else
       xIBCEstimation(pu, origBuf, cMvPred, cMv, cost, localSearchRangeX, localSearchRangeY, numRribcType);
+#endif
+#else
+#if JVET_AC0112_IBC_CIIP
+      xIBCEstimation(pu, origBuf, ibcCiipIntraBuff, cMvPred, cMv, cost, localSearchRangeX, localSearchRangeY);
 #else
       xIBCEstimation(pu, origBuf, cMvPred, cMv, cost, localSearchRangeX, localSearchRangeY);
+#endif
 #endif
     }
 
@@ -2226,6 +2419,12 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     }
     /// ibc search
     /////////////////////////////////////////////////////////
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+    if (bvSearchCost)
+    {
+      *bvSearchCost = cost;
+    }
+#endif
 #if JVET_Z0131_IBC_BVD_BINARIZATION
     m_pcRdCost->setPredictors(cMvPred);
     m_pcRdCost->setCostScale(0);

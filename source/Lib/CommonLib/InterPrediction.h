@@ -551,7 +551,11 @@ public:
 #endif
 #if JVET_AA0061_IBC_MBVD || (JVET_W0090_ARMC_TM && JVET_Y0058_IBC_LIST_MODIFY)
   bool xAMLIBCGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWidth, int nCurBlkHeight);
+#if JVET_AC0112_IBC_LIC
+  void getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight, bool doIbcLic = false);
+#else
   void getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight);
+#endif
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 #if JVET_Z0054_BLK_REF_PIC_REORDER
@@ -689,6 +693,12 @@ public:
   void    updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t* RdCandList, uint32_t startPos,uint32_t endPos);
 #endif
 #endif
+#if JVET_AC0112_IBC_GPM
+  void    motionCompensationIbcGpm(CodingUnit &cu, MergeCtx &ibcGpmMrgCtx, IntraPrediction* pcIntraPred);
+#if JVET_AA0070_RRIBC
+  void    adjustIbcMergeRribcCand(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t startPos, uint32_t endPos);
+#endif
+#endif
 
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   template <uint8_t partIdx, bool useDefaultPelBuffer = true>
@@ -727,8 +737,10 @@ public:
     fillPartGPMRefTemplate<partIdx, useDefaultPelBuffer>(pu, bufTop, bufLeft);
   }
 #endif
-#if INTER_LIC
+#if INTER_LIC || JVET_AC0112_IBC_LIC
   void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset);
+#endif
+#if INTER_LIC
 #if JVET_AA0146_WRAP_AROUND_FIX
   void xGetSublkTemplate   (const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, bool wrapRef = false);
   void xLocalIlluComp      (const PredictionUnit& pu, const ComponentID compID, const Picture& refPic, const Mv& mv, const bool biPred, PelBuf& dstBuf, bool wrapRef = false);
@@ -743,6 +755,13 @@ public:
                       , bool AML = false
 #endif
                       );
+#endif
+
+#if JVET_AC0112_IBC_LIC
+  void xGetSublkTemplate (const CodingUnit& cu, const ComponentID compID, const Mv& bv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate);
+  void xLocalIlluComp (const PredictionUnit& pu, const ComponentID compID, const Mv& bv, PelBuf& dstBuf);
+  template <bool trueAfalseL>
+  void xGetIbcLicPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl);
 #endif
 
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM

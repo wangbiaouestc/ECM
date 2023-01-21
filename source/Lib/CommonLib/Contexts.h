@@ -413,6 +413,19 @@ public:
   static const CtxSet   IbcMbvdMergeIdx;
   static const CtxSet   IbcMbvdStepMvpIdx;
 #endif
+#if JVET_AC0112_IBC_CIIP
+  static const CtxSet   IbcCiipFlag;
+  static const CtxSet   IbcCiipIntraIdx;
+#endif
+#if JVET_AC0112_IBC_GPM
+  static const CtxSet   IbcGpmFlag;
+  static const CtxSet   IbcGpmIntraFlag;
+  static const CtxSet   IbcGpmSplitDirSetFlag;
+  static const CtxSet   IbcGpmBldIdx;
+#endif
+#if JVET_AC0112_IBC_LIC
+  static const CtxSet   IbcLicFlag;
+#endif
 
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   static const CtxSet   TMMergeFlag;

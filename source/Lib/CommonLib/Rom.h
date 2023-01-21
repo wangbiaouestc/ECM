@@ -398,5 +398,10 @@ extern int g_rmvfMultApproxTbl[3 << sizeof(int64_t)];
 #if JVET_AA0126_GLM
 extern const int8_t g_glmPattern[NUM_GLM_PATTERN][6];
 #endif
+#if JVET_AC0112_IBC_GPM
+extern const int8_t g_ibcGpmFirstSetSplitDirToIdx[GEO_NUM_PARTITION_MODE];
+extern const int8_t g_ibcGpmFirstSetSplitDir[IBC_GPM_MAX_SPLIT_DIR_FIRST_SET_NUM];
+extern const int8_t g_ibcGpmSecondSetSplitDir[GEO_NUM_PARTITION_MODE];
+#endif
 #endif  //__TCOMROM__
 

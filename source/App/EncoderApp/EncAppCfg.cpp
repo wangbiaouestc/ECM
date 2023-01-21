@@ -1141,6 +1141,15 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AA0061_IBC_MBVD
   ("IBCMBVD",                                         m_ibcMbvd,                                         true, "IBC MMVD mode (0:off, 1:on)  [default: on]" )
 #endif
+#if JVET_AC0112_IBC_CIIP
+  ("IBCCIIP",                                         m_ibcCiip,                                         true, "IBC CIIP mode (0:off, 1:on)  [default: on]" )
+#endif
+#if JVET_AC0112_IBC_GPM
+  ("IBCGPM",                                          m_ibcGpm,                                          true, "IBC GPM mode (0:off, 1:on)  [default: on]" )
+#endif
+#if JVET_AC0112_IBC_LIC
+  ("IBCLIC",                                          m_ibcLic,                                          true, "IBC LIC mode (0:off, 1:on)  [default: on]" )
+#endif
 
   ("WrapAround",                                      m_wrapAround,                                     false, "Enable horizontal wrap-around motion compensation for inter prediction (0:off, 1:on)  [default: off]")
   ("WrapAroundOffset",                                m_wrapAroundOffset,                                  0u, "Offset in luma samples used for computing the horizontal wrap-around position")
@@ -5153,6 +5162,15 @@ void EncAppCfg::xPrintParameter()
     msg(VERBOSE, "IBC:%d ", m_IBCMode);
 #if JVET_AA0061_IBC_MBVD
     msg( VERBOSE, "IBCMBVD:%d ", m_ibcMbvd );
+#endif
+#if JVET_AC0112_IBC_CIIP
+  msg( VERBOSE, "IBCCIIP:%d ", m_ibcCiip);
+#endif
+#if JVET_AC0112_IBC_GPM
+  msg( VERBOSE, "IBCGPM:%d ", m_ibcGpm);
+#endif
+#if JVET_AC0112_IBC_LIC
+  msg( VERBOSE, "IBCLIC:%d ", m_ibcLic );
 #endif
   msg( VERBOSE, "HashME:%d ", m_HashME );
   msg( VERBOSE, "WrapAround:%d ", m_wrapAround);

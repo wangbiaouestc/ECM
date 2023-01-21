@@ -3590,6 +3590,15 @@ SPS::SPS()
 #if JVET_AA0061_IBC_MBVD
   , m_ibcMbvd                 ( false )
 #endif
+#if JVET_AC0112_IBC_CIIP
+  , m_ibcCiip                 ( false )
+#endif
+#if JVET_AC0112_IBC_GPM
+  , m_ibcGpm                  ( false )
+#endif
+#if JVET_AC0112_IBC_LIC
+  , m_ibcLic                  ( false )
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
  , m_DMVDMode                 ( false )
 #endif

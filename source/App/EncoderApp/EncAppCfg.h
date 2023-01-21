@@ -500,6 +500,15 @@ protected:
 #if JVET_AA0061_IBC_MBVD
   bool      m_ibcMbvd;
 #endif
+#if JVET_AC0112_IBC_CIIP
+  bool     m_ibcCiip;
+#endif
+#if JVET_AC0112_IBC_GPM
+  bool      m_ibcGpm;
+#endif
+#if JVET_AC0112_IBC_LIC
+  bool      m_ibcLic;
+#endif
 
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;
