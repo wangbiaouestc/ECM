@@ -469,6 +469,9 @@ protected:
 #endif
 #if JVET_AB0155_SGPM
   bool      m_sgpm;
+#if JVET_AC0189_SGPM_NO_BLENDING
+  bool      m_sgpmNoBlend;
+#endif
 #endif
 #if ENABLE_OBMC
   bool      m_OBMC;
@@ -1487,6 +1490,10 @@ public:
 #if JVET_AB0155_SGPM
   void      setUseSgpm                   (bool b)         { m_sgpm = b; }
   bool      getUseSgpm                   () const         { return m_sgpm; }
+#if JVET_AC0189_SGPM_NO_BLENDING
+  void      setUseSgpmNoBlend            ( bool b )       { m_sgpmNoBlend = b; }
+  bool      getUseSgpmNoBlend            ()         const { return m_sgpmNoBlend; }
+#endif
 #endif
 #if ENABLE_OBMC
   void      setUseObmc                   ( bool b )       { m_OBMC = b; }

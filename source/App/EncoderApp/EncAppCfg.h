@@ -462,6 +462,9 @@ protected:
 #endif
 #if JVET_AB0155_SGPM
   bool      m_sgpm;
+#if JVET_AC0189_SGPM_NO_BLENDING
+  bool      m_sgpmNoBlend;
+#endif
 #endif
 #if ENABLE_OBMC
   bool      m_OBMC;

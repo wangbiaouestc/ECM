@@ -3941,31 +3941,54 @@ void xWeightedSgpm_SSE(const PredictionUnit &pu, const uint32_t width, const uin
   int16_t  angle  = g_GeoParams[splitDir][0];
   int16_t  stepY  = 0;
   int16_t *weight = nullptr;
-  
-  if (g_angle2mirror[angle] == 2)
+
+#if JVET_AC0189_SGPM_NO_BLENDING
+  int blendWIdx = 0;
+  if (pu.cs->pps->getUseSgpmNoBlend())
   {
-    stepY = -GEO_WEIGHT_MASK_SIZE;
-    weight =
-      &g_globalGeoWeights[GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())][g_angle2mask[angle]]
-                         [(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][1])
-                            * GEO_WEIGHT_MASK_SIZE
-                          + g_weightOffsetEx[splitDir][hIdx][wIdx][0]];
-  }
-  else if (g_angle2mirror[angle] == 1)
-  {
-    stepY = GEO_WEIGHT_MASK_SIZE;
-    weight =
-      &g_globalGeoWeights[GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())][g_angle2mask[angle]]
-                         [g_weightOffsetEx[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE
-                          + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][0])];
+    blendWIdx = 0;
   }
   else
   {
-    stepY = GEO_WEIGHT_MASK_SIZE;
-    weight =
-      &g_globalGeoWeights[GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())][g_angle2mask[angle]]
-                         [g_weightOffsetEx[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE
-                          + g_weightOffsetEx[splitDir][hIdx][wIdx][0]];
+    blendWIdx= GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight());
+  }
+#endif
+  if (g_angle2mirror[angle] == 2)
+  {
+    stepY  = -GEO_WEIGHT_MASK_SIZE;
+    weight = &g_globalGeoWeights
+#if JVET_AC0189_SGPM_NO_BLENDING
+               [blendWIdx]
+#else
+               [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]
+#endif
+               [g_angle2mask[angle]]
+               [(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE
+                + g_weightOffsetEx[splitDir][hIdx][wIdx][0]];
+  }
+  else if (g_angle2mirror[angle] == 1)
+  {
+    stepY  = GEO_WEIGHT_MASK_SIZE;
+    weight = &g_globalGeoWeights
+#if JVET_AC0189_SGPM_NO_BLENDING
+               [blendWIdx]
+#else
+               [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]
+#endif
+               [g_angle2mask[angle]][g_weightOffsetEx[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE
+                                     + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][0])];
+  }
+  else
+  {
+    stepY  = GEO_WEIGHT_MASK_SIZE;
+    weight = &g_globalGeoWeights
+#if JVET_AC0189_SGPM_NO_BLENDING
+               [blendWIdx]
+#else
+               [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]
+#endif
+               [g_angle2mask[angle]][g_weightOffsetEx[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE
+                                     + g_weightOffsetEx[splitDir][hIdx][wIdx][0]];
   }
   const __m128i mmEight = _mm_set1_epi16(32);
   const __m128i mmOffset = _mm_set1_epi32(offsetWeighted);
