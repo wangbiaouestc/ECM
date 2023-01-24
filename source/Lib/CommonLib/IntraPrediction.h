@@ -146,6 +146,9 @@ struct CccmCovariance
   using TE = TCccmCoeff[M][M];
   using Ty = TCccmCoeff[M];
   using MN = Pel[M][N];
+#if JVET_AC0053_GAUSSIAN_SOLVER
+  using TE2 = TCccmCoeff[M][M+2];
+#endif
 
   CccmCovariance() {}
   ~CccmCovariance() {}
@@ -165,9 +168,14 @@ private:
   Ty ATCb;
   Ty ATCr;
 
+#if JVET_AC0053_GAUSSIAN_SOLVER
+  void gaussBacksubstitution       (TE2 C, Ty x, int numEq, int col);
+  void gaussElimination            (TE A, Ty y0, Ty x0, Ty y1, Ty x1, int numEq, int numFilters, int bd);
+#else
   void ldlBacksubstitution         (TE U, TCccmCoeff* z, TCccmCoeff* x, int numEq) const;
   void ldlTransposeBacksubstitution(TE U, TCccmCoeff* y, TCccmCoeff* z, int numEq) const;
   bool ldlDecomp                   (TE A, TE U,          Ty outDiag,    int numEq) const;
+#endif
 };
 #endif
 

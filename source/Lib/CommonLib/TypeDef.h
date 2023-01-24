@@ -155,6 +155,7 @@
 #endif
 #if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
 #define JVET_AB0174_CCCM_DIV_FREE                         1 // JVET-AB0174: CCCM with division free operation
+#define JVET_AC0053_GAUSSIAN_SOLVER                       1 // JVET-AC0053: Filter parameters using Gaussian elimination steps
 #endif
 #define JVET_AB0155_SGPM                                  1 // JVET-AB0155: Spatial geometric partitioning mode
 #define JVET_AC0189_SGPM_NO_BLENDING                      1 // JVET-AC0189: Allow no blending for SGPM
