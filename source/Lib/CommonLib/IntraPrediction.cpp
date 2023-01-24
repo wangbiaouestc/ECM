@@ -9000,6 +9000,24 @@ int64_t xDivide(int64_t num, int64_t denom) // Note: assumes positive denominato
   return ( (num << (CCCM_DECIM_BITS - DIV_PREC_BITS)) * scale + round) >> shift;
 }
 
+#if JVET_AC0053_GAUSSIAN_SOLVER
+void xGetDivScaleRoundShift(int64_t denom, int &scale, int &round, int &shift) // Note: assumes positive denominator
+{
+  static const int pow2W[8] = {   214,   153,   113,    86,    67,    53,    43,    35  }; // DIV_PREC_BITS_POW2
+  static const int pow2O[8] = {  4822,  5952,  6624,  6792,  6408,  5424,  3792,  1466  }; // DIV_PREC_BITS
+  static const int pow2B[8] = { 12784, 12054, 11670, 11583, 11764, 12195, 12870, 13782  }; // DIV_PREC_BITS
+
+  shift         = floorLog2Uint64(denom);
+  round         = 1 << shift >> 1;
+  int normDiff  = (((denom << DIV_PREC_BITS) + round) >> shift) & ((1 << DIV_PREC_BITS) - 1);
+  int diffFull  = normDiff >> DIV_INTR_BITS;
+  int normDiff2 = normDiff - pow2O[diffFull];
+
+  scale         = ((pow2W[diffFull] * ((normDiff2 * normDiff2) >> DIV_PREC_BITS)) >> DIV_PREC_BITS_POW2) - (normDiff2 >> 1) + pow2B[diffFull];
+  scale       <<= CCCM_DECIM_BITS - DIV_PREC_BITS;
+}
+#endif
+
 #undef DIV_PREC_BITS
 #undef DIV_PREC_BITS_POW2
 #undef DIV_SLOT_BITS
@@ -10015,6 +10033,93 @@ void IntraPrediction::xCccmCreateLumaRef(const PredictionUnit& pu, CompArea chro
 #endif
 
 #if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
+    
+#if JVET_AC0053_GAUSSIAN_SOLVER
+template<const int M, const int N>
+void CccmCovariance<M, N>::gaussBacksubstitution(TE2 C, Ty x, int numEq, int col)
+{
+  x[numEq-1] = C[numEq-1][col];
+
+  for( int i = numEq-2; i >= 0; i-- )
+  {
+    x[i] = C[i][col];
+
+    for( int j = i+1; j < numEq; j++ )
+    {
+      x[i] -= FIXED_MULT(C[i][j], x[j]);
+    }
+  }
+}
+
+template<const int M, const int N>
+void CccmCovariance<M, N>::gaussElimination(TE A, Ty y0, Ty x0, Ty y1, Ty x1, int numEq, int numFilters, int bd)
+{
+  static TE2 C;
+  
+  int colChr0 = numEq;
+  int colChr1 = numEq + 1;
+  int reg     = 2 << (bd - 8);
+  
+  // Create an [M][M+2] matrix system (could have been done already when calculating auto/cross-correlations)
+  for( int i = 0; i < numEq; i++ )
+  {
+    for( int j = 0; j < numEq; j++ )
+    {
+      C[i][j] = j >= i ? A[i][j] : A[j][i];
+    }
+    
+    C[i][i]      += reg; // Regularization
+    C[i][colChr0] = y0[i];
+    C[i][colChr1] = numFilters == 2 ? y1[i] : 0; // Only applicable if solving for 2 filters at the same time
+  }
+
+  for( int i = 0; i < numEq; i++ )
+  {
+    TCccmCoeff *src = C[i];
+    TCccmCoeff diag = src[i] < 1 ? 1 : src[i];
+
+#if JVET_AB0174_CCCM_DIV_FREE
+    int scale, round, shift;
+    
+    xGetDivScaleRoundShift(diag, scale, round, shift);
+#endif
+
+    for( int j = i+1; j < numEq+numFilters; j++ )
+    {
+#if JVET_AB0174_CCCM_DIV_FREE
+      src[j] = ( int64_t(src[j]) * scale + round ) >> shift;
+#else
+      src[j] = FIXED_DIV(src[j], diag);
+#endif
+    }
+    
+    for( int j = i + 1; j < numEq; j++ )
+    {
+      TCccmCoeff *dst  = C[j];
+      TCccmCoeff scale = dst[i];
+
+      // On row j all elements with k < i+1 are now zero (not zeroing those here as backsubstitution does not need them)
+      for( int k = i + 1; k < numEq+numFilters; k++ )
+      {
+         dst[k] -= FIXED_MULT(scale, src[k]);
+      }
+    }
+  }
+
+  // Solve with backsubstitution
+  if ( numFilters == 2 )
+  {
+    gaussBacksubstitution(C, x0, numEq, colChr0);
+    gaussBacksubstitution(C, x1, numEq, colChr1);
+  }
+  else
+  {
+    gaussBacksubstitution(C, x0, numEq, colChr0);
+  }
+}
+
+#else
+
 // LDL decomposing A to U'*diag*U
 template<const int M, const int N>
 bool CccmCovariance<M, N>::ldlDecomp(TE A, TE U, Ty diag, int numEq) const
@@ -10137,6 +10242,7 @@ void CccmCovariance<M, N>::ldlSolve(TE U, Ty diag, TCccmCoeff* y, TCccmCoeff* x,
     std::memset(x, 0, sizeof(TCccmCoeff) * numEq);
   }
 }
+#endif
 
 template<const int M, const int N>
 #if JVET_AB0174_CCCM_DIV_FREE
@@ -10216,12 +10322,17 @@ void CccmCovariance<M, N>::solve1( const MN A, const Pel* C, const int sampleNum
     }
   }
 
+#if JVET_AC0053_GAUSSIAN_SOLVER
+  // Solve the filter coefficients
+  gaussElimination(ATA, ATCb, model.params, nullptr, nullptr, M, 1, model.bd);
+#else
   // Solve the filter coefficients using LDL decomposition
   TE U;       // Upper triangular L' of ATA's LDL decomposition
   Ty diag;    // Diagonal of D
 
   bool decompOk = ldlDecompose( ATA, U, diag, M );
   ldlSolve( U, diag, ATCb, model.params, M, decompOk );
+#endif
 
 #if JVET_AB0174_CCCM_DIV_FREE
   // Add the chroma offset to bias term (after shifting up by CCCM_DECIM_BITS and down by cccmModelCb.bd - 1)
@@ -10322,6 +10433,10 @@ void CccmCovariance<M, N>::solve2( const MN A, const Pel* Cb, const Pel* Cr, con
     }
   }
 
+#if JVET_AC0053_GAUSSIAN_SOLVER
+  // Solve the filter coefficients
+  gaussElimination(ATA, ATCb, modelCb.params, ATCr, modelCr.params, M, 2, modelCb.bd);
+#else
   // Solve the filter coefficients using LDL decomposition
   TE U;       // Upper triangular L' of ATA's LDL decomposition
   Ty diag;    // Diagonal of D
@@ -10330,6 +10445,7 @@ void CccmCovariance<M, N>::solve2( const MN A, const Pel* Cb, const Pel* Cr, con
 
   ldlSolve( U, diag, ATCb, modelCb.params, M, decompOk );
   ldlSolve( U, diag, ATCr, modelCr.params, M, decompOk );
+#endif
 
 #if JVET_AB0174_CCCM_DIV_FREE
   // Add the chroma offset to bias term (after shifting up by CCCM_DECIM_BITS and down by cccmModelCb.bd - 1)
