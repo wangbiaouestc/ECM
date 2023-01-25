@@ -529,6 +529,9 @@ protected:
   bool      m_fastIntraTMP;                                   ///< fast IntraTMP RD search
 #endif
 #endif
+#if JVET_AC0071_DBV
+  bool m_intraDBV; ///< Direct Block Vector
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   bool      m_BIF;                                            ///< bilateral filter
   unsigned  m_BIFStrength;                                    /// Bilateral filter strength

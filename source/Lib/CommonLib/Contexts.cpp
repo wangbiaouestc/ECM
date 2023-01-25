@@ -1510,6 +1510,23 @@ const CtxSet ContextSetCfg::ChromaFusionMode = ContextSetCfg::addCtxSet
   });
 #endif
 
+#if JVET_AC0071_DBV
+const CtxSet ContextSetCfg::DbvChromaMode = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+#endif
+
 const CtxSet ContextSetCfg::MipFlag = ContextSetCfg::addCtxSet
 ({
   {  48,  49,  42,  33, },
@@ -3714,6 +3731,18 @@ const CtxSet ContextSetCfg::ChromaFusionMode = ContextSetCfg::addCtxSet
   { DWS, },
   { DWS, },
   } );
+#endif
+
+#if JVET_AC0071_DBV
+const CtxSet ContextSetCfg::DbvChromaMode = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  });
 #endif
 
 const CtxSet ContextSetCfg::MipFlag = ContextSetCfg::addCtxSet

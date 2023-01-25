@@ -194,6 +194,15 @@ namespace PU
 #else
   uint32_t getCoLocatedIntraLumaMode      (const PredictionUnit &pu);
 #endif
+#if JVET_AC0071_DBV
+  bool dbvModeAvail(const PredictionUnit &pu);
+  void deriveChromaBv(PredictionUnit &pu);
+#if JVET_AA0070_RRIBC
+  Mv adjustChromaBv(const PredictionUnit &lumaPU, const CompArea &lumaArea);
+#endif
+  bool xCheckSimilarChromaBv(std::vector<Mv> &chromaBvList, const Mv chromaBv);
+  bool checkIsChromaBvCandidateValid(const PredictionUnit &pu, const Mv chromaBv, bool isRefTemplate = false, bool isRefAbove = false);
+#endif
   int      getWideAngle                   ( const TransformUnit &tu, const uint32_t dirMode, const ComponentID compID );
 #if MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM
   uint32_t getBDMVRMvdThreshold       (const PredictionUnit &pu);
@@ -529,6 +538,9 @@ namespace PU
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   bool hasChromaFusionFlag(const PredictionUnit &pu, int intraMode);
+#endif
+#if JVET_AC0071_DBV
+  bool hasChromaBvFlag(const PredictionUnit &pu);
 #endif
 #if JVET_AC0144_AFFINE_DMVR_REGRESSION
   void deriveAffineCandFromMvField(Position posLT, const int width, const int height, std::vector<RMVFInfo> mvInfoVec, Mv mvAffi[3]);

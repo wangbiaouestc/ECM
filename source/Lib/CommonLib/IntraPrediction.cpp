@@ -104,6 +104,9 @@ IntraPrediction::IntraPrediction()
 #if JVET_W0123_TIMD_FUSION
   m_timdSatdCost = nullptr;
 #endif
+#if JVET_AC0071_DBV
+  m_dbvSadCost = nullptr;
+#endif
   #if JVET_AB0067_MIP_DIMD_LFNST
   m_pMipTemp = nullptr;
 #endif
@@ -155,6 +158,9 @@ void IntraPrediction::destroy()
 
 #if JVET_W0123_TIMD_FUSION
   delete m_timdSatdCost;
+#endif
+#if JVET_AC0071_DBV
+  delete m_dbvSadCost;
 #endif
 #if JVET_AB0155_SGPM
   for (auto &buffer: m_sgpmBuffer)
@@ -276,6 +282,12 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
   if (m_timdSatdCost == nullptr)
   {
     m_timdSatdCost = new RdCost;
+  }
+#endif
+#if JVET_AC0071_DBV
+  if (m_dbvSadCost == nullptr)
+  {
+    m_dbvSadCost = new RdCost;
   }
 #endif
 #if JVET_AB0155_SGPM
@@ -1440,6 +1452,215 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #endif
 }
 
+#if JVET_AC0071_DBV
+void IntraPrediction::PredIntraDbv(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu)
+{
+  const int shiftSampleHor = ::getComponentScaleX(compId, pu.chromaFormat);
+  const int shiftSampleVer = ::getComponentScaleY(compId, pu.chromaFormat);
+  Mv chromaBv = Mv(pu.bv.hor >> shiftSampleHor, pu.bv.ver >> shiftSampleVer);
+  chromaBv = refineChromaBv(compId, pu);
+  int refx = pu.blocks[compId].x + chromaBv.hor;
+  int refy = pu.blocks[compId].y + chromaBv.ver;
+  int refStride = pu.cs->picture->getRecoBuf(compId).stride;
+  Pel *ref = pu.cs->picture->getRecoBuf(compId).buf;
+  Pel *refTarget = ref + refy * refStride + refx;
+  int iStride = piPred.stride;
+  Pel *pred = piPred.buf;
+  int iHeight = piPred.height;
+  int iWidth = piPred.width;
+  for (int uiY = 0; uiY < iHeight; uiY++)
+  {
+    for (int uiX = 0; uiX < iWidth; uiX++)
+    {
+      pred[uiX] = refTarget[uiX];
+    }
+    refTarget += refStride;
+    pred += iStride;
+  }
+}
+
+Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUnit &pu)
+{
+  const CodingStructure &cs = *pu.cs;
+  Position posRT = pu.blocks[compId].topRight();
+  const PredictionUnit *puAbove = cs.getPURestricted(posRT.offset(0, -1), pu, pu.chType);
+  bool topCanUse = puAbove && pu.cu != puAbove->cu;
+  Position posLB = pu.blocks[compId].bottomLeft();
+  const PredictionUnit *puLeft = cs.getPURestricted(posLB.offset(-1, 0), pu, pu.chType);
+  bool leftCanUse = puLeft && pu.cu != puLeft->cu;
+  const int shiftSampleHor = ::getComponentScaleX(compId, pu.chromaFormat);
+  const int shiftSampleVer = ::getComponentScaleY(compId, pu.chromaFormat);
+  if (topCanUse == false && leftCanUse == false)
+  {
+    return Mv(pu.bv.hor >> shiftSampleHor, pu.bv.ver >> shiftSampleVer);
+  }
+
+  Mv lumaBv = pu.bv;
+  Mv chromaBv(lumaBv.hor >> shiftSampleHor, lumaBv.ver >> shiftSampleVer);
+  std::vector<Mv> chromaBvList;
+  chromaBvList.push_back(chromaBv);
+  for (int stephor = 0; stephor < 2; stephor++)
+  {
+    for (int stepver = 0; stepver < 2; stepver++)
+    {
+      lumaBv.set(pu.bv.hor + stephor, pu.bv.ver + stepver);
+      chromaBv.set(lumaBv.hor >> shiftSampleHor, lumaBv.ver >> shiftSampleVer);
+      if (!PU::xCheckSimilarChromaBv(chromaBvList, chromaBv) && PU::checkIsChromaBvCandidateValid(pu, chromaBv))
+      {
+        chromaBvList.push_back(chromaBv);
+      }
+    }
+  }
+  if (chromaBvList.size() == 1)
+  {
+    return chromaBvList[0];
+  }
+
+  CompArea area = pu.blocks[compId];
+  int uiHeight = area.height;
+  int uiWidth = area.width;
+  Pel *cur = m_refBuffer[compId][PRED_BUF_UNFILTERED];
+  PelBuf tempCurTop = PelBuf(cur + 1, uiWidth, Size(uiWidth, DBV_TEMPLATE_SIZE));
+  PelBuf tempCurLeft = PelBuf(cur + 1 + m_refBufferStride[compId], uiHeight, Size(uiHeight, DBV_TEMPLATE_SIZE));
+
+  Pel temp[(MAX_CU_SIZE + 1) * 2];
+  memset(temp, 0, (MAX_CU_SIZE + 1) * 2 * sizeof(Pel));
+  int stride = MAX_CU_SIZE + 1;
+  Pel *refPix = temp;
+  Pel *refPixTemp;
+  const CPelBuf recBuf = pu.cs->picture->getRecoBuf(pu.cs->picture->blocks[compId]);
+
+  DistParam cDistParam;
+  cDistParam.applyWeight = false;
+  Distortion uiCost;
+  std::vector<std::pair<Mv, Distortion>> aBvCostVec;
+  for (std::vector<Mv>::iterator it = chromaBvList.begin(); it != chromaBvList.end(); ++it)
+  {
+    Mv mvCurr = *it;
+    if (topCanUse)
+    {
+      Mv mvTop(0, -DBV_TEMPLATE_SIZE);
+#if JVET_AA0070_RRIBC
+      if (pu.cu->rribcFlipType == 2)
+      {
+        mvTop.setVer(uiHeight);
+      }
+#endif
+      mvTop += mvCurr;
+#if JVET_AA0070_RRIBC
+      if (pu.cu->rribcFlipType == 2)
+      {
+        if (!PU::checkIsChromaBvCandidateValid(pu, mvTop, true, true))
+        {
+          mvTop.setVer(mvCurr.getVer() + uiHeight - DBV_TEMPLATE_SIZE);
+        }
+      }
+      else
+#endif
+      if (!PU::checkIsChromaBvCandidateValid(pu, mvTop, true, true))
+      {
+        mvTop = mvCurr;
+      }
+      refPixTemp = refPix + 1;
+      const Pel *rec = recBuf.bufAt(pu.blocks[compId].pos().offset(mvTop.hor, mvTop.ver));
+      for (int k = 0; k < uiWidth; k++)
+      {
+        for (int l = 0; l < DBV_TEMPLATE_SIZE; l++)
+        {
+#if JVET_AA0070_RRIBC
+          int recVal;
+          if (pu.cu->rribcFlipType == 0)
+          {
+            recVal = rec[k + l * recBuf.stride];
+          }
+          else if (pu.cu->rribcFlipType == 1)
+          {
+            recVal = rec[uiWidth - 1 - k + l * recBuf.stride];
+          }
+          else
+          {
+            recVal = rec[k + (DBV_TEMPLATE_SIZE - 1 - l) * recBuf.stride];
+          }
+#else
+          int recVal = rec[k + l * recBuf.stride];
+#endif
+          refPixTemp[k] = recVal;
+        }
+      }
+    }
+
+    if (leftCanUse)
+    {
+      Mv mvLeft(-DBV_TEMPLATE_SIZE, 0);
+#if JVET_AA0070_RRIBC
+      if (pu.cu->rribcFlipType == 1)
+      {
+        mvLeft.setHor(uiWidth);
+      }
+#endif
+      mvLeft += mvCurr;
+#if JVET_AA0070_RRIBC
+      if (pu.cu->rribcFlipType == 1)
+      {
+        if (!PU::checkIsChromaBvCandidateValid(pu, mvLeft, true, false))
+        {
+          mvLeft.setHor(mvCurr.getHor() + uiWidth - DBV_TEMPLATE_SIZE);
+        }
+      }
+      else
+#endif
+      if (!PU::checkIsChromaBvCandidateValid(pu, mvLeft, true, false))
+      {
+        mvLeft = mvCurr;
+      }
+      refPixTemp = refPix + 1 + stride;
+      const Pel *rec = recBuf.bufAt(pu.blocks[compId].pos().offset(mvLeft.hor, mvLeft.ver));
+      for (int k = 0; k < uiHeight; k++)
+      {
+        for (int l = 0; l < DBV_TEMPLATE_SIZE; l++)
+        {
+#if JVET_AA0070_RRIBC
+          int recVal;
+          if (pu.cu->rribcFlipType == 0)
+          {
+            recVal = rec[recBuf.stride * k + l];
+          }
+          else if (pu.cu->rribcFlipType == 1)
+          {
+            recVal = rec[recBuf.stride * k + DBV_TEMPLATE_SIZE - 1 - l];
+          }
+          else
+          {
+            recVal = rec[recBuf.stride * (uiHeight - 1 - k) + l];
+          }
+#else
+          int recVal = rec[recBuf.stride * k + l];
+#endif
+          refPixTemp[k] = recVal;
+        }
+      }
+    }
+
+    uiCost = 0;
+    if (topCanUse)
+    {
+      PelBuf tempRef = PelBuf(refPix + 1, uiWidth, Size(uiWidth, DBV_TEMPLATE_SIZE));
+      m_dbvSadCost->setDistParam(cDistParam, tempCurTop, tempRef, pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), compId, false);
+      uiCost += cDistParam.distFunc(cDistParam);
+    }
+    if (leftCanUse)
+    {
+      PelBuf tempRef = PelBuf(refPix + 1 + stride, uiHeight, Size(uiHeight, DBV_TEMPLATE_SIZE));
+      m_dbvSadCost->setDistParam(cDistParam, tempCurLeft, tempRef, pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), compId, false);
+      uiCost += cDistParam.distFunc(cDistParam);
+    }
+    aBvCostVec.push_back(std::pair<Mv, Distortion>(*it, uiCost));
+  }
+  std::stable_sort(aBvCostVec.begin(), aBvCostVec.end(), [](const std::pair<Mv, Distortion> &l, const std::pair<Mv, Distortion> &r) { return l.second < r.second; });
+  return aBvCostVec[0].first;
+}
+#endif
+
 #if JVET_Z0050_CCLM_SLOPE
 void IntraPrediction::xUpdateCclmModel(int &a, int &b, int &iShift, int midLuma, int delta)
 {
@@ -2460,6 +2681,12 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
 
   xGetLumaRecPixels(pu2, area);
   predIntraChromaLM(compId, predLmBuffer, pu2, area, pu2.intraDir[1]);
+#if JVET_AC0071_DBV && JVET_AA0070_RRIBC
+  if (pu.intraDir[1] == DBV_CHROMA_IDX && pu.cu->rribcFlipType != 0)
+  {
+    predLmBuffer.flipSignal(pu.cu->rribcFlipType == 1);
+  }
+#endif
 
   Pel *pelPred = piPred.buf;
   Pel *pelLm = predLmBuffer.buf;

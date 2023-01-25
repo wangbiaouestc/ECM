@@ -524,6 +524,12 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
       intraMode = MAP131TO67(intraMode);
     }
 #endif
+#if JVET_AC0071_DBV
+    if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
+    {
+      intraMode = PLANAR_IDX;
+    }
+#endif
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
 
 #if JVET_AC0105_DIRECTIONAL_PLANAR
@@ -772,6 +778,12 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
     if (tu.cu->timd && compID == COMPONENT_Y)
     {
       intraMode = MAP131TO67(intraMode);
+    }
+#endif
+#if JVET_AC0071_DBV
+    if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
+    {
+      intraMode = PLANAR_IDX;
     }
 #endif
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
@@ -2285,7 +2297,12 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
     intraMode = MAP131TO67(intraMode);
   }
 #endif
-
+#if JVET_AC0071_DBV
+  if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
+  {
+    intraMode = PLANAR_IDX;
+  }
+#endif
 #if JVET_AC0105_DIRECTIONAL_PLANAR
   if (intraMode == PLANAR_IDX)
   {

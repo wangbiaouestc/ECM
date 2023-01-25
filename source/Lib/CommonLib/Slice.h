@@ -1743,6 +1743,9 @@ private:
   bool              m_intraTMP;                                       ///< intra Template Matching 
   unsigned          m_intraTmpMaxSize;                               ///< max CU size for which intra TMP is allowed
 #endif
+#if JVET_AC0071_DBV
+  bool m_intraDBV;
+#endif
 #if ENABLE_OBMC
   bool              m_OBMC;
 #endif
@@ -2287,6 +2290,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   bool      getUseIntraTMP     ()                                      const     { return m_intraTMP; }
   void      setIntraTMPMaxSize (unsigned n)                                      { m_intraTmpMaxSize = n; }
   unsigned  getIntraTMPMaxSize ()                                      const     { return m_intraTmpMaxSize; }
+#endif
+#if JVET_AC0071_DBV
+  void setUseIntraDBV(bool b) { m_intraDBV = b; }
+  bool getUseIntraDBV() const { return m_intraDBV; }
 #endif
 #if JVET_W0123_TIMD_FUSION
   void      setUseTimd         ( bool b )                                        { m_timd = b; }

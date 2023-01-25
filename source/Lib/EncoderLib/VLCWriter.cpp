@@ -1570,6 +1570,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     WRITE_UVLC(floorLog2(pcSPS->getIntraTMPMaxSize()),                                 "sps_log2_intra_tmp_max_size");
   }
 #endif
+#if JVET_AC0071_DBV
+  WRITE_FLAG(pcSPS->getUseIntraDBV() ? 1 : 0, "sps_intraDBV_enabled_flag");
+#endif
 
 #if JVET_W0123_TIMD_FUSION
   WRITE_FLAG( pcSPS->getUseTimd() ? 1 : 0,                                          "sps_timd_enabled_flag");

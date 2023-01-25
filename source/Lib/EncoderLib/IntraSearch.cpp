@@ -2582,6 +2582,16 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, areaCb.lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, areaCb.size()));//needed for correct pos/size (4x4 Tus)
       IntraPrediction::deriveDimdChromaMode(cs.picture->getRecoBuf(lumaArea), cs.picture->getRecoBuf(areaCb), cs.picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, *pu.cu);
 #endif
+#if JVET_AC0071_DBV
+      if (PU::hasChromaBvFlag(pu))
+      {
+        PU::deriveChromaBv(pu);
+      }
+      else
+      {
+        uiMaxMode--;
+      }
+#endif
 
       // create a temporary CS
       CodingStructure &saveCS = *m_pSaveCS[0];
@@ -2656,6 +2666,21 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         satdModeList[i] = 0;
       }
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+#if JVET_AC0071_DBV
+      bool modeIsEnable[NUM_INTRA_MODE + 3]; // use intra mode idx to check whether enable
+      for (int i = 0; i < NUM_INTRA_MODE + 3; i++)
+      {
+        modeIsEnable[i] = 1;
+      }
+#else
+      bool modeIsEnable[NUM_INTRA_MODE + 2]; // use intra mode idx to check whether enable
+      for (int i = 0; i < NUM_INTRA_MODE + 2; i++)
+      {
+        modeIsEnable[i] = 1;
+      }
+#endif
+#else
+#if JVET_AC0071_DBV
       bool modeIsEnable[NUM_INTRA_MODE + 2]; // use intra mode idx to check whether enable
       for (int i = 0; i < NUM_INTRA_MODE + 2; i++)
       {
@@ -2667,6 +2692,7 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       {
         modeIsEnable[i] = 1;
       }
+#endif
 #endif
       DistParam distParamSad;
       DistParam distParamSatd;
@@ -2800,6 +2826,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         if ((mode == LM_CHROMA_IDX) || (mode == PLANAR_IDX) || (mode == DM_CHROMA_IDX)
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
           || (mode == DIMD_CHROMA_IDX)
+#endif
+#if JVET_AC0071_DBV
+          || (mode == DBV_CHROMA_IDX)
 #endif
           ) // only pre-check regular modes and MDLM modes, not including DM, DIMD, Planar, and LM
         {
@@ -3355,6 +3384,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           }
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
           if (chromaIntraMode == DIMD_CHROMA_IDX && !cu.slice->getSPS()->getUseDimd()) // when DIMD is disable, then DIMD_CHROMA is disable.
+          {
+            continue;
+          }
+#endif
+#if JVET_AC0071_DBV
+          if (chromaIntraMode == DBV_CHROMA_IDX && !PU::hasChromaBvFlag(pu))
           {
             continue;
           }
@@ -6089,6 +6124,17 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       crReco.reconstruct(crPred, crResi, cs.slice->clpRng( COMPONENT_Cr ));
     }
   }
+#if JVET_AC0071_DBV && JVET_AA0070_RRIBC
+  if (compID != COMPONENT_Y && uiChFinalMode == DBV_CHROMA_IDX && pu.cu->rribcFlipType)
+  {
+    cs.getRecoBuf(area).flipSignal(pu.cu->rribcFlipType == 1);
+    if (jointCbCr)
+    {
+      const CompArea &crArea = tu.blocks[COMPONENT_Cr];
+      cs.getRecoBuf(crArea).flipSignal(pu.cu->rribcFlipType == 1);
+    }
+  }
+#endif
 #if SIGN_PREDICTION
 #if INTRA_TRANS_ENC_OPT 
   bool doSignPrediction = true;
@@ -8266,8 +8312,20 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     }
     else
     {
+#if JVET_AC0071_DBV
+      if (predMode == DBV_CHROMA_IDX)
+      {
+        PredIntraDbv(COMPONENT_Cb, piPredCb, pu);
+        PredIntraDbv(COMPONENT_Cr, piPredCr, pu);
+      }
+      else
+      {
+#endif
       predIntraAng( COMPONENT_Cb, piPredCb, pu);
       predIntraAng( COMPONENT_Cr, piPredCr, pu);
+#if JVET_AC0071_DBV
+      }
+#endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
       if (pu.isChromaFusion)
       {
@@ -8281,10 +8339,26 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     //----- get chroma residuals -----
     PelBuf resiCb  = cs.getResiBuf(cbArea);
     PelBuf resiCr  = cs.getResiBuf(crArea);
+#if JVET_AC0071_DBV && JVET_AA0070_RRIBC
+    if (predMode == DBV_CHROMA_IDX && currTU.cu->rribcFlipType)
+    {
+      resiCb.copyFrom(cs.getOrgBuf(cbArea));
+      resiCr.copyFrom(cs.getOrgBuf(crArea));
+      resiCb.flipSignal(currTU.cu->rribcFlipType == 1);
+      resiCr.flipSignal(currTU.cu->rribcFlipType == 1);
+      resiCb.subtract(piPredCb);
+      resiCr.subtract(piPredCr);
+    }
+    else
+    {
+#endif
     resiCb.copyFrom( cs.getOrgBuf (cbArea) );
     resiCr.copyFrom( cs.getOrgBuf (crArea) );
     resiCb.subtract( piPredCb );
     resiCr.subtract( piPredCr );
+#if JVET_AC0071_DBV && JVET_AA0070_RRIBC
+    }
+#endif
 
     //----- get reshape parameter ----
     bool doReshaping = ( cs.slice->getLmcsEnabledFlag() && cs.picHeader->getLmcsChromaResidualScaleFlag()
