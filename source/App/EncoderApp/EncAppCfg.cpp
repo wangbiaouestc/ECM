@@ -992,7 +992,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_X0144_MAX_MTT_DEPTH_TID
   ("MaxMTTHierarchyDepthByTid",                       m_sMaxMTTHierarchyDepthByTid,          string("333333"), "MaxMTTHierarchyDepthByTid")
 #if JVET_AA0098_MTT_DEPTH_TID_BY_QP
-  ("MaxMTTHierarchyDepthByTidOverrideByQP",           sMaxMTTHierarchyDepthByTidOverrideByQP, string("22 333333"), "MaxMTTHierarchyDepthByTidOverrideByQP")
+  ("MaxMTTHierarchyDepthByTidOverrideByQP",           sMaxMTTHierarchyDepthByTidOverrideByQP, string("64 333333"), "MaxMTTHierarchyDepthByTidOverrideByQP")
 #endif
 #endif
   ("MaxMTTHierarchyDepthI",                           m_uiMaxMTTHierarchyDepthI,                           3u, "MaxMTTHierarchyDepthI")
