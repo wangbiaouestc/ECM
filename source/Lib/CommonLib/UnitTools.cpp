@@ -16033,3 +16033,102 @@ bool CU::isDirectionalPlanarAvailable(const CodingUnit &cu)
   return false;
 }
 #endif
+
+#if JVET_AC0130_NSPT
+int PU::getNSPTMatrixDim( int width, int height )
+{
+  int dimension = ( width == 8 && height == 8 ) ? 32 : ( ( ( width == 4 && height == 8 ) || ( width == 8 && height == 4 ) ) ? 20 : 16 );
+
+  dimension = ( ( width == 4 && height == 16 ) || ( width == 16 && height == 4 ) ) ? 24 : ( ( ( width == 8 && height == 16 ) || ( width == 16 && height == 8 ) ) ? 40 : dimension );
+
+  return dimension;
+}
+
+uint32_t PU::getFinalIntraModeForTransform( const TransformUnit &tu, const ComponentID compID )
+{
+  const CompArea& area = tu.blocks[ compID ];
+  uint32_t intraMode = PU::getFinalIntraMode( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) );
+
+#if JVET_W0123_TIMD_FUSION
+  if( compID != COMPONENT_Y && PU::isLMCMode( tu.cs->getPU( area.pos(), toChannelType( compID ) )->intraDir[ toChannelType( compID ) ] ) )
+#else
+  if( PU::isLMCMode( tu.cs->getPU( area.pos(), toChannelType( compID ) )->intraDir[ toChannelType( compID ) ] ) )
+#endif
+  {
+    intraMode = PU::getCoLocatedIntraLumaMode( *tu.cs->getPU( area.pos(), toChannelType( compID ) ) );
+  }
+  if( PU::isMIP( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
+  {
+#if JVET_AB0067_MIP_DIMD_LFNST
+    intraMode = tu.cu->mipDimdMode;
+#else
+    intraMode = PLANAR_IDX;
+#endif
+  }
+#if JVET_V0130_INTRA_TMP
+  if( PU::isTmp( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
+  {
+    intraMode = PLANAR_IDX;
+  }
+#endif
+#if JVET_AB0155_SGPM
+  if( PU::isSgpm( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
+  {
+    intraMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
+  }
+#endif
+#if JVET_W0123_TIMD_FUSION
+  if( tu.cu->timd && compID == COMPONENT_Y )
+  {
+    intraMode = MAP131TO67( intraMode );
+  }
+#endif
+
+  CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
+
+  intraMode = PU::getNSPTIntraMode( PU::getWideAngle( tu, intraMode, compID ) );
+
+  return intraMode;
+}
+
+uint32_t PU::getNSPTIntraMode( int wideAngPredMode )
+{
+  uint32_t intraMode;
+  if( wideAngPredMode < 0 )
+  {
+    intraMode = ( uint32_t ) ( wideAngPredMode + ( NUM_EXT_LUMA_MODE >> 1 ) + NUM_LUMA_MODE );
+  }
+  else if( wideAngPredMode >= NUM_LUMA_MODE )
+  {
+    intraMode = ( uint32_t ) ( wideAngPredMode + ( NUM_EXT_LUMA_MODE >> 1 ) );
+  }
+  else
+  {
+    intraMode = ( uint32_t ) wideAngPredMode;
+  }
+  return intraMode;
+}
+
+bool CU::isNSPTAllowed( const TransformUnit &tu, const ComponentID compID, int width, int height, bool isIntra )
+{
+  bool allowNSPT = isIntra;
+  if( allowNSPT )
+  {
+    allowNSPT = ( ( width == 4 && height ==  4 ) || ( width ==  8 && height == 8 ) || ( width == 4 && height ==  8 ) || ( width ==  8 && height == 4 ) ||
+                  ( width == 4 && height == 16 ) || ( width == 16 && height == 4 ) || ( width == 8 && height == 16 ) || ( width == 16 && height == 8 ) );
+  }
+
+  return allowNSPT;
+}
+
+bool CU::nsptApplyCond( const TransformUnit& tu, ComponentID compID, bool allowNSPT )
+{
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+  bool cond = allowNSPT && tu.cu->lfnstIdx > 0 && ( tu.cu->isSepTree() ? true : isLuma( compID ) );
+#else
+  bool cond = allowNSPT && tu.cu->lfnstIdx > 0 && ( CS::isDualITree( *tu.cs ) ? true : isLuma( compID ) );
+#endif
+
+  return cond;
+}
+#endif

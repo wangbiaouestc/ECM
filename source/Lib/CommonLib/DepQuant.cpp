@@ -1915,9 +1915,35 @@ namespace DQIntern
     if (lfnstIdx > 0 && tu.mtsIdx[compID] != MTS_SKIP && width >= 4 && height >= 4)
     {
 #if JVET_W0119_LFNST_EXTENSION
+#if JVET_AC0130_NSPT
+      bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *( tu.cu ) ) );
+
+      if( allowNSPT )
+      {
+        firstTestPos = PU::getNSPTMatrixDim( width, height ) - 1;
+      }
+      else
+      {
+        firstTestPos = PU::getLFNSTMatrixDim( width, height ) - 1;
+      }
+#else
       firstTestPos = PU::getLFNSTMatrixDim( width, height ) - 1;
+#endif
+#else
+#if JVET_AC0130_NSPT
+      bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *( tu.cu ) ) );
+
+      if( allowNSPT )
+      {
+        firstTestPos = PU::getNSPTMatrixDim( width, height ) - 1;
+      }
+      else
+      {
+        firstTestPos = ( ( width == 4 && height == 4 ) || ( width == 8 && height == 8 ) ) ? 7 : 15;
+      }
 #else
       firstTestPos = ( ( width == 4 && height == 4 ) || ( width == 8 && height == 8 ) )  ? 7 : 15 ;
+#endif
 #endif
     }
 #endif
