@@ -6113,10 +6113,22 @@ void CABACReader::residual_coding( TransformUnit& tu, ComponentID compID, CUCtx&
 #if !EXTENDED_LFNST
   if (tu.mtsIdx[compID] != MTS_SKIP && tu.blocks[compID].height >= 4 && tu.blocks[compID].width >= 4 )
   {
+#if JVET_AC0130_NSPT
+    uint32_t  width = tu.blocks[ compID ].width;
+    uint32_t height = tu.blocks[ compID ].height;
+    bool  allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *( tu.cu ) ) );
+
+#if JVET_W0119_LFNST_EXTENSION
+    const int maxLfnstPos = ( allowNSPT ? PU::getNSPTMatrixDim( width, height ) : PU::getLFNSTMatrixDim( width, height ) ) - 1;
+#else
+    const int maxLfnstPos = allowNSPT ? PU::getNSPTMatrixDim( width, height ) - 1: ( ((tu.blocks[compID].height == 4 && tu.blocks[compID].width == 4) || (tu.blocks[compID].height == 8 && tu.blocks[compID].width == 8)) ? 7 : 15 );
+#endif
+#else
 #if JVET_W0119_LFNST_EXTENSION
     const int maxLfnstPos = PU::getLFNSTMatrixDim( tu.blocks[ compID ].width, tu.blocks[ compID ].height ) - 1;
 #else
     const int maxLfnstPos = ((tu.blocks[compID].height == 4 && tu.blocks[compID].width == 4) || (tu.blocks[compID].height == 8 && tu.blocks[compID].width == 8)) ? 7 : 15;
+#endif
 #endif
     cuCtx.violatesLfnstConstrained[ toChannelType(compID) ] |= cctx.scanPosLast() > maxLfnstPos;
   }
@@ -7135,9 +7147,14 @@ void CABACReader::parsePredictedSigns( TransformUnit &tu, ComponentID compID )
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   uint32_t extAreaWidth = std::min(tu.blocks[compID].width, (uint32_t)SIGN_PRED_FREQ_RANGE);
   uint32_t extAreaHeight = std::min(tu.blocks[compID].height, (uint32_t)SIGN_PRED_FREQ_RANGE);
-  uint32_t extAreaSize  = lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea();
-  uint32_t spAreaWidth  = useSignPred ? std::min(tu.blocks[compID].width, extAreaSize)  : extAreaWidth;
+  uint32_t extAreaSize = (lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea());
+#if JVET_AC0130_NSPT
+  uint32_t spAreaWidth = useSignPred ? std::min( tu.blocks[compID].width, extAreaSize ) : extAreaWidth;
+  uint32_t spAreaHeight = useSignPred ? std::min( tu.blocks[compID].height, extAreaSize ) : extAreaHeight;
+#else
+  uint32_t spAreaWidth = useSignPred ? std::min(tu.blocks[compID].width, extAreaSize) : extAreaWidth;
   uint32_t spAreaHeight = useSignPred ? std::min(tu.blocks[compID].height, extAreaSize) : extAreaHeight;
+#endif
 
   for ( uint32_t y = 0; y < spAreaHeight; y++ )
 #else

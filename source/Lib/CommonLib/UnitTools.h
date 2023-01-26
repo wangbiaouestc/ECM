@@ -98,6 +98,10 @@ namespace CU
 #if INTER_LIC
   bool isLICFlagPresent               (const CodingUnit& cu);
 #endif
+#if JVET_AC0130_NSPT
+  bool  isNSPTAllowed                 ( const TransformUnit& tu, const ComponentID compID, int width, int height, bool isIntra );
+  bool  nsptApplyCond                 ( const TransformUnit& tu, ComponentID compID, bool allowNSPT );
+#endif
 
   bool      divideTuInRows            ( const CodingUnit &cu );
   PartSplit getISPType                ( const CodingUnit &cu,                         const ComponentID compID );
@@ -183,8 +187,15 @@ namespace PU
 #else
   uint32_t getFinalIntraMode              (const PredictionUnit &pu, const ChannelType &chType);
 #endif
+#if JVET_AC0130_NSPT
+  uint32_t getFinalIntraModeForTransform  ( const TransformUnit &tu, const ComponentID compID );
+  uint32_t getNSPTIntraMode               ( int wideAngPredMode );
+#endif
 #if JVET_W0119_LFNST_EXTENSION
   int      getLFNSTMatrixDim          ( int width, int height );
+#if JVET_AC0130_NSPT
+  int      getNSPTMatrixDim           ( int width, int height );
+#endif
   bool     getUseLFNST8               ( int width, int height );
   uint8_t  getLFNSTIdx                ( int intraMode, int mtsMode = 0 );
   bool     getUseLFNST16              ( int width, int height );

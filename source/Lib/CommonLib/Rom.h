@@ -223,6 +223,19 @@ extern const     uint8_t  g_lfnstLut[NUM_LFNST_INTRA_MODES];
 extern const     uint8_t  g_lfnstLut[ NUM_INTRA_MODE + NUM_EXT_LUMA_MODE - 1 ];
 #endif
 
+#if JVET_AC0130_NSPT
+extern const     uint8_t  g_nsptLut[ 97 ];                      // 97= NUM_LUMA_MODE + NUM_EXT_LUMA_MODE - 1
+
+extern const     int8_t   g_nspt4x4[ 35 ][ 3 ][ 16 ][ 16 ];
+extern const     int8_t   g_nspt4x8[ 35 ][ 3 ][ 20 ][ 32 ];
+extern const     int8_t   g_nspt8x4[ 35 ][ 3 ][ 20 ][ 32 ];
+extern const     int8_t   g_nspt8x8[ 35 ][ 3 ][ 32 ][ 64 ];
+extern const     int8_t   g_nspt4x16[ 35 ][ 3 ][ 24 ][ 64 ];
+extern const     int8_t   g_nspt16x4[ 35 ][ 3 ][ 24 ][ 64 ];
+extern const     int8_t   g_nspt8x16[ 35 ][ 3 ][ 40 ][ 128 ];
+extern const     int8_t   g_nspt16x8[ 35 ][ 3 ][ 40 ][ 128 ];
+#endif
+
 // ====================================================================================================================
 // Misc.
 // ====================================================================================================================
