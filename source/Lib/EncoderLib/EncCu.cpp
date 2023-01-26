@@ -3237,7 +3237,11 @@ void EncCu::xCheckRDCostHashInter( CodingStructure *&tempCS, CodingStructure *&b
   PelUnitBuf tempWoOBMCBuf = m_tempWoOBMCBuffer.subBuf(UnitAreaRelative(cu, cu));
   tempWoOBMCBuf.copyFrom(tempCS->getPredBuf(cu));
   cu.isobmcMC = true;
+#if JVET_AC0158_PIXEL_AFFINE_MC
+  cu.obmcFlag = (cu.lwidth() * cu.lheight() < 32) || (cu.LICFlag == true || tempCS->sps->getUseOBMC() == false) ? false : true;
+#else
   cu.obmcFlag = true;
+#endif
   m_pcInterSearch->subBlockOBMC(*cu.firstPU);
   cu.isobmcMC = false;
 #endif
@@ -3247,7 +3251,11 @@ void EncCu::xCheckRDCostHashInter( CodingStructure *&tempCS, CodingStructure *&b
     );
 #if ENABLE_OBMC // xCheckRDCostInter
   double tempCost = (prevCS == tempCS) ? tempCS->cost : bestCS->cost;
+#if JVET_AC0158_PIXEL_AFFINE_MC
+  if (m_pTempCUWoOBMC && tempCost < bestOBMCCost && tempCS->sps->getUseOBMC() == true)
+#else
   if (m_pTempCUWoOBMC && tempCost < bestOBMCCost)
+#endif
   {
     const unsigned hIdx = gp_sizeIdxInfo->idxFrom(prevCS->area.lheight());
     m_pTempCUWoOBMC[wIdx][hIdx]->clearCUs();
@@ -12905,6 +12913,13 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   uint8_t bcwIdx = cu.BcwIdx;
   bool  testBcw = (bcwIdx != BCW_DEFAULT);
 
+#if JVET_AC0158_PIXEL_AFFINE_MC
+  if ((tempCS->area.lwidth() * tempCS->area.lheight() < 32) || (lic == true) || tempCS->sps->getUseOBMC() == false)
+  {
+    cu.obmcFlag = false;
+  }
+#endif
+
 #if INTER_LIC
   if (cu.slice->getUseLIC() && lic) { m_pcInterSearch->swapUniMvBuffer(); }
 #endif
@@ -12987,6 +13002,65 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
     m_pcInterSearch->setBiRefPairIdx(pu);
   }
 #endif
+#if JVET_AC0158_PIXEL_AFFINE_MC
+  if (cu.affine == true)
+  {
+    if (lic == true || tempCS->sps->getUseOBMC() == false)
+    {
+      CHECK(cu.obmcFlag == true, "this is not possible");
+      xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
+                            , 0
+                            , &equBcwCost
+      );
+    }
+    else
+    {
+      CodingStructure *prevCS = tempCS;
+      CHECK(cu.obmcFlag == false, "this is not possible");
+      cu.isobmcMC = true;
+      m_pcInterSearch->subBlockOBMC(*cu.firstPU);
+      cu.isobmcMC = false;
+      xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
+                            , 0
+                            , &equBcwCost
+      );
+      if (prevCS == tempCS)
+      {
+        cu.obmcFlag = false;
+        PelUnitBuf predBuf = tempCS->getPredBuf(cu);
+        m_pcInterSearch->motionCompensation( *(cu.firstPU), predBuf, REF_PIC_LIST_X );
+        xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
+                              , 0
+                              , &equBcwCost
+        );
+      }
+      else
+      {
+        CHECK(prevCS != bestCS, "this is not possible");
+        tempCS->initStructData(encTestMode.qp);
+        tempCS->copyStructure(*bestCS, partitioner.chType);
+        CodingUnit * cuBest = tempCS->getCU(partitioner.chType);
+        cuBest->obmcFlag = false;
+        PelUnitBuf predBuf = tempCS->getPredBuf(*cuBest);
+        m_pcInterSearch->motionCompensation( *(cuBest->firstPU), predBuf, REF_PIC_LIST_X );
+        xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
+                              , 0
+                              , &equBcwCost
+        );
+      }
+    }
+  }
+  else if ((tempCS->area.lwidth() * tempCS->area.lheight() < 32) || (lic == true) || tempCS->sps->getUseOBMC() == false)
+  {
+    CHECK(cu.obmcFlag == true, "this is not possible");
+    xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
+                          , 0
+                          , &equBcwCost
+    );
+  }
+  else
+  {
+#endif
 #if ENABLE_OBMC //normal inter
   const unsigned wIdx = gp_sizeIdxInfo->idxFrom(partitioner.currArea().lwidth());
   CodingStructure *prevCS = tempCS;
@@ -13003,7 +13077,11 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   );
 #if ENABLE_OBMC // xCheckRDCostInter
   double tempCost = (prevCS == tempCS) ? tempCS->cost : bestCS->cost;
+#if JVET_AC0158_PIXEL_AFFINE_MC
+  if (m_pTempCUWoOBMC && tempCost < bestOBMCCost && tempCS->sps->getUseOBMC() == true)
+#else
   if (m_pTempCUWoOBMC && tempCost < bestOBMCCost)
+#endif
   {
     const unsigned hIdx = gp_sizeIdxInfo->idxFrom(prevCS->area.lheight());
     m_pTempCUWoOBMC[wIdx][hIdx]->clearCUs();
@@ -13018,6 +13096,9 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 #if JVET_AA0129_INTERHASH_OBMCOFF_RD
     validMode = true;
 #endif
+  }
+#endif
+#if JVET_AC0158_PIXEL_AFFINE_MC
   }
 #endif
   if( g_BcwSearchOrder[bcwLoopIdx] == BCW_DEFAULT )
@@ -13178,6 +13259,13 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
   bcwIdx = cu.BcwIdx;
   testBcw = (bcwIdx != BCW_DEFAULT);
 
+#if JVET_AC0158_PIXEL_AFFINE_MC
+  if ((tempCS->area.lwidth() * tempCS->area.lheight() < 32) || (lic == true) || tempCS->sps->getUseOBMC() == false)
+  {
+    cu.obmcFlag = false;
+  }
+#endif
+
   cu.firstPU->interDir = 10;
 
 #if INTER_LIC
@@ -13262,6 +13350,63 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
     m_pcInterSearch->setBiRefPairIdx(pu);
   }
 #endif
+#if JVET_AC0158_PIXEL_AFFINE_MC
+  if (cu.affine == true)
+  {
+    if (lic == true || tempCS->sps->getUseOBMC() == false)
+    {
+      xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
+                            , 0
+                            , &equBcwCost
+      );
+    }
+    else
+    {
+      CodingStructure *prevCS = tempCS;
+      cu.isobmcMC = true;
+      m_pcInterSearch->subBlockOBMC(*cu.firstPU);
+      cu.isobmcMC = false;
+      xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
+                            , 0
+                            , &equBcwCost
+      );
+      if (prevCS == tempCS)
+      {
+        cu.obmcFlag = false;
+        PelUnitBuf predBuf = tempCS->getPredBuf(cu);
+        m_pcInterSearch->motionCompensation( *(cu.firstPU), predBuf, REF_PIC_LIST_X );
+        xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
+                              , 0
+                              , &equBcwCost
+        );
+      }
+      else
+      {
+        CHECK(prevCS != bestCS, "this is not possible");
+        tempCS->initStructData(encTestMode.qp);
+        tempCS->copyStructure(*bestCS, partitioner.chType);
+        CodingUnit * cuBest = tempCS->getCU(partitioner.chType);
+        cuBest->obmcFlag = false;
+        PelUnitBuf predBuf = tempCS->getPredBuf(*cuBest);
+        m_pcInterSearch->motionCompensation( *(cuBest->firstPU), predBuf, REF_PIC_LIST_X );
+        xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
+                              , 0
+                              , &equBcwCost
+        );
+      }
+    }
+  }
+  else if ((tempCS->area.lwidth() * tempCS->area.lheight() < 32) || (lic == true) || tempCS->sps->getUseOBMC() == false)
+  {
+    CHECK(cu.obmcFlag == true, "this is not possible");
+    xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
+                          , 0
+                          , &equBcwCost
+    );
+  }
+  else
+  {
+#endif
 #if ENABLE_OBMC //normal inter IMV
   CodingStructure *prevCS = tempCS;
   PelUnitBuf tempWoOBMCBuf = m_tempWoOBMCBuffer.subBuf(UnitAreaRelative(cu, cu));
@@ -13277,7 +13422,11 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
   );
 #if ENABLE_OBMC
   double tempCost = (prevCS == tempCS) ? tempCS->cost : bestCS->cost;
+#if JVET_AC0158_PIXEL_AFFINE_MC
+  if (m_pTempCUWoOBMC && tempCost < bestOBMCCost && tempCS->sps->getUseOBMC() == true)
+#else
   if (m_pTempCUWoOBMC && tempCost < bestOBMCCost)
+#endif
   {
     const unsigned wIdx = gp_sizeIdxInfo->idxFrom(tempCS->area.lwidth());
     const unsigned hIdx = gp_sizeIdxInfo->idxFrom(tempCS->area.lheight());
@@ -13294,6 +13443,9 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
 #if JVET_AA0129_INTERHASH_OBMCOFF_RD
     availMode = true;
 #endif
+  }
+#endif
+#if JVET_AC0158_PIXEL_AFFINE_MC
   }
 #endif
   if( cu.imv == IMV_FPEL && tempCS->cost < bestIntPelCost )
@@ -14495,6 +14647,9 @@ void EncCu::predInterSearchAdditionalHypothesisMulti(const MEResultVec& in, MERe
   {
     *pu.cu = x.cu;
     pu = x.pu;
+#if JVET_AC0158_PIXEL_AFFINE_MC
+    pu.cu->obmcFlag = (pu.lwidth() * pu.lheight() < 32) || (pu.cu->LICFlag == true || pu.cu->cs->sps->getUseOBMC() == false) ? false : true;
+#endif
 
     if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
     {
@@ -14671,7 +14826,11 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
     PelUnitBuf tempWoOBMCBuf = m_tempWoOBMCBuffer.subBuf(UnitAreaRelative(cu, cu));
     tempWoOBMCBuf.copyFrom(tempCS->getPredBuf(cu));
     cu.isobmcMC = true;
+#if JVET_AC0158_PIXEL_AFFINE_MC
+    cu.obmcFlag = (pu.lwidth() * pu.lheight() < 32) || (pu.cu->LICFlag == true || pu.cu->cs->sps->getUseOBMC() == false) ? false : true;
+#else
     cu.obmcFlag = true;
+#endif
     m_pcInterSearch->subBlockOBMC(*cu.firstPU);
     cu.isobmcMC = false;
 #endif
@@ -14756,6 +14915,10 @@ void EncCu::xCheckRDCostInterWoOBMC(CodingStructure *&tempCS, CodingStructure *&
   tempCS->copyStructure(*CSWoOBMC, partitioner.chType);
   tempCS->getPredBuf(*cu).copyFrom(m_pPredBufWoOBMC[wIdx][hIdx]);
   cu = tempCS->getCU(partitioner.chType);
+#if JVET_AC0158_PIXEL_AFFINE_MC
+  CHECK(cu->affine == true, "this is not possible");
+  CHECK(cu->lwidth() * cu->lheight() < 32, "this is not possible");
+#endif
   cu->obmcFlag = false;
   //
   xEncodeInterResidual(tempCS, bestCS, partitioner, encTestMode, 0);

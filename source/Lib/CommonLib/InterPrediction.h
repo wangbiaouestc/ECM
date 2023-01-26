@@ -238,6 +238,9 @@ protected:
 #else
   PelStorage           m_ibcBuffer;
 #endif
+#if JVET_AC0158_PIXEL_AFFINE_MC
+  Mv                   m_pixelAffineMotionBuf[MAX_CU_SIZE][MAX_CU_SIZE];
+#endif
   void xIntraBlockCopy          (PredictionUnit &pu, PelUnitBuf &predBuf, const ComponentID compID);
   int             rightShiftMSB(int numer, int    denom);
 #if MULTI_PASS_DMVR
