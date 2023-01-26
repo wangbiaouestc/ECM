@@ -470,9 +470,17 @@ static const int BDPCM_IDX =                  (5 * (NUM_DIR - 1) + 2); ///< inde
 #endif
 static const int NOMODE_IDX =                               MAX_UCHAR; ///< indicating uninitialized elements
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+#if JVET_AC0071_DBV
+static const int NUM_CHROMA_MODE = (7 + NUM_LMC_MODE); ///< total number of chroma modes
+#else
+static const int NUM_CHROMA_MODE = (6 + NUM_LMC_MODE); ///< total number of chroma modes
+#endif
+#else
+#if JVET_AC0071_DBV
 static const int NUM_CHROMA_MODE = (6 + NUM_LMC_MODE); ///< total number of chroma modes
 #else
 static const int NUM_CHROMA_MODE = (5 + NUM_LMC_MODE); ///< total number of chroma modes
+#endif
 #endif
 static const int LM_CHROMA_IDX = NUM_LUMA_MODE; ///< chroma mode index for derived from LM mode
 #if ENABLE_DIMD
@@ -515,9 +523,19 @@ static const int MDLM_T_IDX =                          LM_CHROMA_IDX + 2; ///< M
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
 static const int DIMD_CHROMA_IDX =                     NUM_INTRA_MODE; ///< chroma mode index for derived by DIMD method
+#if JVET_AC0071_DBV
+static const int DBV_CHROMA_IDX = NUM_INTRA_MODE + 1;
+static const int DM_CHROMA_IDX = NUM_INTRA_MODE + 2; ///< chroma mode index for derived from luma intra mode
+#else
 static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE + 1; ///< chroma mode index for derived from luma intra mode
+#endif
+#else
+#if JVET_AC0071_DBV
+static const int DBV_CHROMA_IDX = NUM_INTRA_MODE;
+static const int DM_CHROMA_IDX = NUM_INTRA_MODE + 1; ///< chroma mode index for derived from luma intra mode
 #else
 static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE; ///< chroma mode index for derived from luma intra mode
+#endif
 #endif
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
@@ -1001,6 +1019,10 @@ static const int NUM_GLM_PATTERN_BITS =                             4;
 static const int NUM_GLM_IDC =                                     33;
 #endif
 #endif
+#endif
+#if JVET_AC0071_DBV
+static const int NUM_DBV_POSITION = 5;
+static const int DBV_TEMPLATE_SIZE = 1;
 #endif
 
 #if JVET_Y0152_TT_ENC_SPEEDUP

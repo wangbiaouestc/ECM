@@ -367,6 +367,9 @@ public:
 #endif
   static const CtxSet   ChromaFusionMode;
 #endif
+#if JVET_AC0071_DBV
+  static const CtxSet DbvChromaMode;
+#endif
   static const CtxSet   MipFlag;
 #if JVET_V0130_INTRA_TMP
   static const CtxSet   TmpFlag;

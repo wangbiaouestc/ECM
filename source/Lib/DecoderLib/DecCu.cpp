@@ -552,6 +552,12 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
     IntraPrediction::deriveDimdChromaMode(cs.picture->getRecoBuf(lumaArea), cs.picture->getRecoBuf(areaCb), cs.picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, *pu.cu);
   }
 #endif
+#if JVET_AC0071_DBV
+  if (pu.intraDir[1] == DBV_CHROMA_IDX && compID == COMPONENT_Cb)
+  {
+    PU::deriveChromaBv(pu);
+  }
+#endif
   uint32_t uiChFinalMode = PU::getFinalIntraMode(pu, chType);
 #else
   const uint32_t uiChFinalMode = PU::getFinalIntraMode(pu, chType);
@@ -678,6 +684,13 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
         }
       }
       else
+#if JVET_AC0071_DBV
+      if (compID != COMPONENT_Y && uiChFinalMode == DBV_CHROMA_IDX)
+      {
+        m_pcIntraPred->PredIntraDbv(compID, piPred, pu);
+      }
+      else
+#endif
         m_pcIntraPred->predIntraAng(compID, piPred, pu);
 #if JVET_Z0050_DIMD_CHROMA_FUSION
       if (compID != COMPONENT_Y && pu.isChromaFusion)
@@ -710,6 +723,13 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       }
       else
       {
+#if JVET_AC0071_DBV
+        if (uiChFinalMode == DBV_CHROMA_IDX)
+        {
+          m_pcIntraPred->PredIntraDbv(COMPONENT_Cr, piPredCr, pu);
+        }
+        else
+#endif
         m_pcIntraPred->predIntraAng(COMPONENT_Cr, piPredCr, pu);
 #if JVET_Z0050_DIMD_CHROMA_FUSION
         if (pu.isChromaFusion)
@@ -813,6 +833,12 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #else
   piPred.reconstruct( piPred, piResi, tu.cu->cs->slice->clpRng( compID ) );
   pReco.copyFrom( piPred );
+#endif
+#if JVET_AC0071_DBV && JVET_AA0070_RRIBC
+  if (compID != COMPONENT_Y && uiChFinalMode == DBV_CHROMA_IDX && tu.cu->rribcFlipType)
+  {
+    pReco.flipSignal(tu.cu->rribcFlipType == 1);
+  }
 #endif
   if (slice.getLmcsEnabledFlag() && (m_pcReshape->getCTUFlag() || slice.isIntra()) && compID == COMPONENT_Y)
   {

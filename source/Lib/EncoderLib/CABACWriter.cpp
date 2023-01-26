@@ -2290,6 +2290,23 @@ void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
     }
   }
 
+#if JVET_AC0071_DBV
+  if (PU::hasChromaBvFlag(pu))
+  {
+    const bool isDbvChromaMode = intraDir == DBV_CHROMA_IDX;
+    m_BinEncoder.encodeBin(isDbvChromaMode ? 0 : 1, Ctx::DbvChromaMode());
+    if (isDbvChromaMode)
+    {
+      if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
+      {
+        const bool isFusion = pu.isChromaFusion;
+        m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
+      }
+      return;
+    }
+  }
+#endif
+
   const bool     isDerivedMode = intraDir == DM_CHROMA_IDX;
   m_BinEncoder.encodeBin(isDerivedMode ? 0 : 1, Ctx::IntraChromaPredMode(0));
   if (isDerivedMode)

@@ -922,6 +922,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setUseFastIntraTMP(m_fastIntraTMP);
 #endif
 #endif
+#if JVET_AC0071_DBV
+  m_cEncLib.setUseIntraDBV(m_intraDBV);
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   m_cEncLib.setUseBIF                                            ( m_BIF );
   m_cEncLib.setBIFStrength                                       ( m_BIFStrength );

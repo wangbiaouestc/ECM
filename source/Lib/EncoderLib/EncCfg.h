@@ -937,6 +937,9 @@ protected:
   bool        m_fastIntraTMP;                                   ///< fast intra Template Matching RD search
 #endif
 #endif
+#if JVET_AC0071_DBV
+  bool m_intraDBV;
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   bool        m_BIF;
   int         m_BIFStrength;
@@ -1591,6 +1594,10 @@ public:
   void      setUseFastIntraTMP              (bool b)         { m_fastIntraTMP = b; }
   bool      getUseFastIntraTMP()                       const { return m_fastIntraTMP; }
 #endif
+#endif
+#if JVET_AC0071_DBV
+  void setUseIntraDBV(bool b) { m_intraDBV = b; }
+  bool getUseIntraDBV() const { return m_intraDBV; }
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   void      setUseBIF                       ( bool b )       { m_BIF = b; }

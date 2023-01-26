@@ -2500,6 +2500,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     READ_UVLC(uiCode, "sps_log2_intra_tmp_max_size");                 pcSPS->setIntraTMPMaxSize(1 << uiCode);
   }
 #endif
+#if JVET_AC0071_DBV
+  READ_FLAG(uiCode, "sps_intraDBV_enabled_flag"); pcSPS->setUseIntraDBV(uiCode != 0);
+#endif
 #if JVET_W0123_TIMD_FUSION
   READ_FLAG(uiCode, "sps_timd_enabled_flag");                        pcSPS->setUseTimd( uiCode != 0 );
 #endif

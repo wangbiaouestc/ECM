@@ -1170,6 +1170,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("FastIntraTMP",                                    m_fastIntraTMP,                                   true,  "fast intra Template Matching (0: off, 1:on)  [default: off]")
 #endif
 #endif
+#if JVET_AC0071_DBV
+ ("IntraDBV", m_intraDBV, false, "Direct Block Vector (0: off, 1:on)  [default: off]")
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   ("BIF",                                             m_BIF,                                            true, "bilateral filter   (0: off, 1:on)  [default: on]")
   ("BIFStrength",                                     m_BIFStrength,                                       1u, "bilateral filter strength  (0: half, 1: full, 2: double)  [default: full]")
@@ -5271,6 +5274,9 @@ void EncAppCfg::xPrintParameter()
 #if JVET_AB0130_ITMP_SAMPLING
   msg(VERBOSE, "FastIntraTMP:%d ", m_fastIntraTMP);
 #endif
+#endif
+#if JVET_AC0071_DBV
+  msg(VERBOSE, "IntraDBV:%d ", m_intraDBV);
 #endif
 
   //inter

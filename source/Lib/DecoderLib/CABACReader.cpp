@@ -2557,6 +2557,24 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
     }
   }
 
+#if JVET_AC0071_DBV
+  if (PU::hasChromaBvFlag(pu))
+  {
+    if (m_BinDecoder.decodeBin(Ctx::DbvChromaMode()) == 0)
+    {
+      pu.intraDir[1] = DBV_CHROMA_IDX;
+      if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
+      {
+        if (m_BinDecoder.decodeBin(Ctx::ChromaFusionMode()) == 1)
+        {
+          pu.isChromaFusion = true;
+        }
+      }
+      return;
+    }
+  }
+#endif
+
   if (m_BinDecoder.decodeBin(Ctx::IntraChromaPredMode(0)) == 0)
   {
     pu.intraDir[1] = DM_CHROMA_IDX;

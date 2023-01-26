@@ -220,6 +220,9 @@ private:
   static const uint8_t m_aucIntraFilterExt[MAX_INTRA_FILTER_DEPTHS];
   RdCost* m_timdSatdCost;
 #endif
+#if JVET_AC0071_DBV
+  RdCost *m_dbvSadCost;
+#endif
 #if LMS_LINEAR_MODEL
   unsigned m_auShiftLM[32]; // Table for substituting division operation by multiplication
 #endif
@@ -522,6 +525,12 @@ public:
   {
     return m_refBuffer[compId][m_ipaParam.refFilterFlag ? PRED_BUF_FILTERED : PRED_BUF_UNFILTERED];
   }
+
+#if JVET_AC0071_DBV
+  // Direct Block Vector
+  void PredIntraDbv(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
+  Mv refineChromaBv(const ComponentID compId, const PredictionUnit &pu);
+#endif
 
   // Cross-component Chroma
   void predIntraChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea& chromaArea, int intraDir, bool createModel = true, CclmModel *cclmModelStored = nullptr);

@@ -2041,6 +2041,17 @@ bool PU::hasChromaFusionFlag(const PredictionUnit &pu, int intraMode)
 }
 #endif
 
+#if JVET_AC0071_DBV
+bool PU::hasChromaBvFlag(const PredictionUnit &pu)
+{
+  if (CS::isDualITree(*pu.cs) && pu.cu->slice->getSPS()->getUseIntraDBV())
+  {
+    return dbvModeAvail(pu);
+  }
+  return false;
+}
+#endif
+
 #if JVET_AB0155_SGPM
 bool PU::isSgpm(const PredictionUnit &pu, const ChannelType &chType)
 {
@@ -2116,8 +2127,14 @@ void PU::getIntraChromaCandModes(const PredictionUnit &pu, unsigned modeList[NUM
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   modeList[10] = DM_CHROMA_IDX;
   modeList[11] = DIMD_CHROMA_IDX;
+#if JVET_AC0071_DBV
+  modeList[12] = DBV_CHROMA_IDX;
+#endif
 #else
   modeList[10] = DM_CHROMA_IDX;
+#if JVET_AC0071_DBV
+  modeList[11] = DBV_CHROMA_IDX;
+#endif
 #endif
 #else
   modeList[5] = MDLM_L_IDX;
@@ -2125,8 +2142,14 @@ void PU::getIntraChromaCandModes(const PredictionUnit &pu, unsigned modeList[NUM
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   modeList[7] = DM_CHROMA_IDX;
   modeList[8] = DIMD_CHROMA_IDX;
+#if JVET_AC0071_DBV
+  modeList[9] = DBV_CHROMA_IDX;
+#endif
 #else
   modeList[7] = DM_CHROMA_IDX;
+#if JVET_AC0071_DBV
+  modeList[8] = DBV_CHROMA_IDX;
+#endif
 #endif
 #endif
 
@@ -2276,6 +2299,12 @@ uint32_t PU::getFinalIntraMode( const PredictionUnit &pu, const ChannelType &chT
     uiIntraMode = pu.cu->dimdChromaMode;
   }
 #endif
+#if JVET_AC0071_DBV
+  if (uiIntraMode == DBV_CHROMA_IDX && !isLuma(chType) && pu.bv == Mv())
+  {
+    uiIntraMode = PLANAR_IDX;
+  }
+#endif
   return uiIntraMode;
 }
 
@@ -2315,6 +2344,137 @@ uint32_t PU::getCoLocatedIntraLumaMode(const PredictionUnit &pu)
   }
 #endif
   return PU::getIntraDirLuma(PU::getCoLocatedLumaPU(pu));
+}
+#endif
+
+#if JVET_AC0071_DBV
+bool PU::dbvModeAvail(const PredictionUnit &pu)
+{
+  CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, pu.Cb().lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, pu.Cb().size()));
+  lumaArea = clipArea(lumaArea, pu.cs->picture->block(COMPONENT_Y));
+  Position posList[5] = { lumaArea.center(), lumaArea.topLeft(), lumaArea.topRight(), lumaArea.bottomLeft(), lumaArea.bottomRight() };
+  for (int n = 0; n < NUM_DBV_POSITION; n++)
+  {
+    const PredictionUnit *lumaPU = pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+    if (CU::isIBC(*lumaPU->cu) || isTmp(*lumaPU))
+#else
+    if (CU::isIBC(*lumaPU->cu))
+#endif
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+void PU::deriveChromaBv(PredictionUnit &pu)
+{
+  pu.bv.set(0, 0);
+#if JVET_AA0070_RRIBC
+  pu.cu->rribcFlipType = 0;
+#endif
+  const int shiftSampleHor = ::getComponentScaleX(COMPONENT_Cb, pu.chromaFormat);
+  const int shiftSampleVer = ::getComponentScaleY(COMPONENT_Cb, pu.chromaFormat);
+  CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, pu.Cb().lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, pu.Cb().size()));
+  lumaArea = clipArea(lumaArea, pu.cs->picture->block(COMPONENT_Y));
+
+  Position posList[5] = { lumaArea.center(), lumaArea.topLeft(), lumaArea.topRight(), lumaArea.bottomLeft(), lumaArea.bottomRight() };
+  for (int n = 0; n < NUM_DBV_POSITION; n++)
+  {
+    const PredictionUnit *lumaPU = pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+    if (CU::isIBC(*lumaPU->cu) || isTmp(*lumaPU))
+#else
+    if (CU::isIBC(*lumaPU->cu))
+#endif
+    {
+      Mv lumaBv = lumaPU->bv;
+#if JVET_AA0070_RRIBC
+      lumaBv = adjustChromaBv(*lumaPU, lumaArea);
+#endif
+      Mv chromaBv = Mv(lumaBv.hor >> shiftSampleHor, lumaBv.ver >> shiftSampleVer);
+      if (PU::checkIsChromaBvCandidateValid(pu, chromaBv))
+      {
+        pu.bv = lumaBv;
+#if JVET_AA0070_RRIBC
+        pu.cu->rribcFlipType = lumaPU->cu->rribcFlipType;
+#endif
+        return;
+      }
+    }
+  }
+}
+
+#if JVET_AA0070_RRIBC
+Mv PU::adjustChromaBv(const PredictionUnit &parentPU, const CompArea &lumaArea)
+{
+  Mv lumaBv = parentPU.bv;
+  int flipType = parentPU.cu->rribcFlipType;
+  Position parentCPos = parentPU.Y().center();
+  Position curCPos = lumaArea.center();
+  if (flipType)
+  {
+    if (flipType == 1)
+    {
+      int shift = (parentCPos.x - curCPos.x) << 1;
+      if (shift)
+      {
+        lumaBv.setHor(lumaBv.hor + shift);
+      }
+    }
+    else if (flipType == 2)
+    {
+      int shift = (parentCPos.y - curCPos.y) << 1;
+      if (shift)
+      {
+        lumaBv.setVer(lumaBv.ver + shift);
+      }
+    }
+  }
+  return lumaBv;
+}
+#endif
+
+bool PU::xCheckSimilarChromaBv(std::vector<Mv> &chromaBvList, const Mv chromaBv)
+{
+  for (int i = 0; i < chromaBvList.size(); i++)
+  {
+    if (chromaBv == chromaBvList[i])
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool PU::checkIsChromaBvCandidateValid(const PredictionUnit &pu, const Mv chromaBv, bool isRefTemplate, bool isRefAbove)
+{
+  const int cuPelX = pu.Cb().x;
+  const int cuPelY = pu.Cb().y;
+  int roiWidth = (isRefTemplate && !isRefAbove) ? DBV_TEMPLATE_SIZE : pu.Cb().width;
+  int roiHeight = (isRefTemplate && isRefAbove) ? DBV_TEMPLATE_SIZE : pu.Cb().height;
+  int xPred = chromaBv.getHor();
+  int yPred = chromaBv.getVer();
+  if ((xPred + roiWidth) > 0 && (yPred + roiHeight) > 0)
+  {
+    return false;
+  }
+  int refRightX = cuPelX + xPred + roiWidth - 1;
+  int refLeftX = cuPelX + xPred;
+  int refBottomY = cuPelY + yPred + roiHeight - 1;
+  int refTopY = cuPelY + yPred;
+  const Position refPosLT(refLeftX, refTopY);
+  const Position refPosBR(refRightX, refBottomY);
+  if (!pu.cs->isDecomp(refPosBR, pu.chType))
+  {
+    return false;
+  }
+  if (!pu.cs->isDecomp(refPosLT, pu.chType))
+  {
+    return false;
+  }
+  return true;
 }
 #endif
 

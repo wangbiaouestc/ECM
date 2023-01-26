@@ -3724,6 +3724,9 @@ SPS::SPS()
 , m_intraTMP                  ( false )
 , m_intraTmpMaxSize           ( 64 )
 #endif
+#if JVET_AC0071_DBV
+, m_intraDBV                  ( false )
+#endif
 #if ENABLE_OBMC
 , m_OBMC                      ( false )
 #endif
