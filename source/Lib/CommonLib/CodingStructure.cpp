@@ -2268,13 +2268,35 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
   {
     // copy data to picture
     if( cpyPred )    getPredBuf   ( clippedArea ).copyFrom( subPredBuf );
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+    if (cpyResi)
+    {
+      getResiBuf(clippedArea).copyFrom(subResiBuf);
+    }
+    else
+    {
+      getResiBuf(clippedArea).copyFrom(subStruct.getResiBuf(clippedArea), true);
+    }
+#else
     if( cpyResi )    getResiBuf   ( clippedArea ).copyFrom( subResiBuf );
+#endif
     if( cpyReco )    getRecoBuf   ( clippedArea ).copyFrom( subRecoBuf );
     if( cpyOrgResi ) getOrgResiBuf( clippedArea ).copyFrom( subStruct.getOrgResiBuf( clippedArea ) );
   }
 
   if( cpyPred ) picture->getPredBuf( clippedArea ).copyFrom( subPredBuf );
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  if (cpyResi)
+  {
+    picture->getResiBuf(clippedArea).copyFrom(subResiBuf);
+  }
+  else
+  {
+    picture->getResiBuf(clippedArea).copyFrom(subStruct.getResiBuf(clippedArea), true);
+  }
+#else
   if( cpyResi ) picture->getResiBuf( clippedArea ).copyFrom( subResiBuf );
+#endif
 
 #if JVET_Z0118_GDR
   if (isInGdrIntervalOrRecoveryPoc())
@@ -2971,11 +2993,19 @@ PelBuf CodingStructure::getBuf( const CompArea &blk, const PictureType &type )
   cFinal.relativeTo( area.blocks[compID] );
 
 #if !KEEP_PRED_AND_RESI_SIGNALS
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  if (!parent && (type == PIC_PREDICTION))
+  {
+    cFinal.x &= (pcv->maxCUWidthMask >> getComponentScaleX(blk.compID, blk.chromaFormat));
+    cFinal.y &= (pcv->maxCUHeightMask >> getComponentScaleY(blk.compID, blk.chromaFormat));
+  }
+#else
   if( !parent && ( type == PIC_RESIDUAL || type == PIC_PREDICTION ) )
   {
     cFinal.x &= ( pcv->maxCUWidthMask  >> getComponentScaleX( blk.compID, blk.chromaFormat ) );
     cFinal.y &= ( pcv->maxCUHeightMask >> getComponentScaleY( blk.compID, blk.chromaFormat ) );
   }
+#endif
 #endif
 
   return buf->getBuf( cFinal );
@@ -3008,11 +3038,19 @@ const CPelBuf CodingStructure::getBuf( const CompArea &blk, const PictureType &t
   cFinal.relativeTo( area.blocks[compID] );
 
 #if !KEEP_PRED_AND_RESI_SIGNALS
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  if (!parent && (type == PIC_PREDICTION))
+  {
+    cFinal.x &= (pcv->maxCUWidthMask >> getComponentScaleX(blk.compID, blk.chromaFormat));
+    cFinal.y &= (pcv->maxCUHeightMask >> getComponentScaleY(blk.compID, blk.chromaFormat));
+  }
+#else
   if( !parent && ( type == PIC_RESIDUAL || type == PIC_PREDICTION ) )
   {
     cFinal.x &= ( pcv->maxCUWidthMask  >> getComponentScaleX( blk.compID, blk.chromaFormat ) );
     cFinal.y &= ( pcv->maxCUHeightMask >> getComponentScaleY( blk.compID, blk.chromaFormat ) );
   }
+#endif
 #endif
 
   return buf->getBuf( cFinal );

@@ -3416,6 +3416,21 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         m_pcALF->copyDbData(cs);
       }
 #endif
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+      if (pcSlice->getSPS()->getALFEnabledFlag())
+      {
+        // create ALF object based on the picture size
+        Size alfSize = m_pcALF->getAlfSize();
+        if (alfSize.width != picWidth || alfSize.height != picHeight)
+        {
+          m_pcALF->destroy();
+          m_pcALF->create(m_pcCfg, picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth,
+                          m_pcCfg->getBitDepth(), m_pcCfg->getInputBitDepth());
+        }
+
+        m_pcALF->copyResiData(cs);
+      }
+#endif
 
 #if RPR_ENABLE
       // create SAO object based on the picture size
@@ -3622,6 +3637,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
           , (m_pcCfg->getUsePerceptQPA() && !m_pcCfg->getUseRateCtrl() && pcSlice->getPPS()->getUseDQP() ? m_pcEncLib->getRdCost(PARL_PARAM0(0))->getChromaWeight() : 0.0)
 #endif
           , pcPic, uiNumSliceSegments
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+          , m_pcCfg->getIntraPeriod()
+#endif
         );
 
         //assign ALF slice header
