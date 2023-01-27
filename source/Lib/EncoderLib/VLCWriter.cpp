@@ -629,6 +629,10 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
     {
       WRITE_UVLC(param.numAlternativesLuma - 1, "alf_luma_num_alts_minus1" );
     }
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+    WRITE_FLAG(param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_13_EXT_DB_RESI_DIRECT ? 1 : 0,
+               "alf_luma_13_ext_db_resi_direct : alf_luma_13_ext_db_resi");
+#else
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF && JVET_AA0095_ALF_LONGER_FILTER
     WRITE_FLAG(param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_9_EXT_DB ? 1 : 0, "alf_luma_9_ext_db");
 #elif JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
@@ -637,6 +641,7 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
     WRITE_FLAG(param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_13_EXT ? 1 : 0, "alf_luma_13_ext");
 #else
     WRITE_FLAG( param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_9_EXT ? 1 : 0, "alf_luma_ext" );
+#endif
 #endif
     for (int altIdx = 0; altIdx < param.numAlternativesLuma; ++altIdx)
     {

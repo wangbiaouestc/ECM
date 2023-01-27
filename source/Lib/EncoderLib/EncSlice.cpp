@@ -2081,6 +2081,10 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     }
   }
 
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  pcPic->setResiBufPLT();
+#endif
+
   // this is wpp exclusive section
 
 //  m_uiPicTotalBits += actualBits;

@@ -736,6 +736,12 @@ void DecLib::executeLoopFilters()
     m_cALF.copyDbData(cs);
   }
 #endif
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  if (cs.sps->getALFEnabledFlag())
+  {
+    m_cALF.copyResiData(cs);
+  }
+#endif
 
   // deblocking filter
 #if DB_PARAM_TID

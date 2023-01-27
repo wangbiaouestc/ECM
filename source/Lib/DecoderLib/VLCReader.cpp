@@ -1097,6 +1097,11 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
     else
       code = 0;
     param.numAlternativesLuma = code + 1;
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+    READ_FLAG(code, "alf_luma_13_ext_db_resi_direct : alf_luma_13_ext_db_resi");
+    param.filterType[CHANNEL_TYPE_LUMA] =
+      code ? ALF_FILTER_13_EXT_DB_RESI_DIRECT : ALF_FILTER_13_EXT_DB_RESI;
+#else
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF && JVET_AA0095_ALF_LONGER_FILTER
     READ_FLAG(code, "alf_luma_9_ext_db : alf_luma_13_ext_db");
     param.filterType[CHANNEL_TYPE_LUMA] = code ? ALF_FILTER_9_EXT_DB : ALF_FILTER_13_EXT_DB;
@@ -1109,6 +1114,7 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
 #else
     READ_FLAG(code, "alf_luma_ext");
     param.filterType[CHANNEL_TYPE_LUMA] = code ? ALF_FILTER_9_EXT : ALF_FILTER_EXT;
+#endif
 #endif
     for (int altIdx = 0; altIdx < param.numAlternativesLuma; ++altIdx)
     {

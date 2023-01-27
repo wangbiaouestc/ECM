@@ -63,6 +63,10 @@ enum AlfFilterType
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF && JVET_AA0095_ALF_LONGER_FILTER
   ALF_FILTER_13_EXT_DB,
 #endif
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  ALF_FILTER_13_EXT_DB_RESI_DIRECT,
+  ALF_FILTER_13_EXT_DB_RESI,
+#endif
 #endif
   ALF_NUM_OF_FILTER_TYPES
 };
@@ -76,7 +80,15 @@ static const int size_ALF_FILTER_EXT = -3;
 static const int size_ALF_FILTER_13_EXT = -4;
 static const int size_ALF_FILTER_9_EXT_DB = -5;
 static const int size_ALF_FILTER_13_EXT_DB = -6;
-const int alfTypeToSize[ALF_NUM_OF_FILTER_TYPES] = { 5, 7, size_CC_ALF, 9, size_ALF_FILTER_9_EXT, size_ALF_FILTER_EXT, size_ALF_FILTER_13_EXT, size_ALF_FILTER_9_EXT_DB, size_ALF_FILTER_13_EXT_DB };
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+static const int size_ALF_FILTER_13_EXT_DB_RESI_DIRECT = -7;
+static const int size_ALF_FILTER_13_EXT_DB_RESI        = -8;
+#endif
+const int alfTypeToSize[ALF_NUM_OF_FILTER_TYPES] = { 5, 7, size_CC_ALF, 9, size_ALF_FILTER_9_EXT, size_ALF_FILTER_EXT, size_ALF_FILTER_13_EXT, size_ALF_FILTER_9_EXT_DB, size_ALF_FILTER_13_EXT_DB 
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+                                                     ,size_ALF_FILTER_13_EXT_DB_RESI_DIRECT, size_ALF_FILTER_13_EXT_DB_RESI
+#endif
+};
 #elif JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
 static const int size_ALF_FILTER_9_EXT_DB = -4;
 const int alfTypeToSize[ALF_NUM_OF_FILTER_TYPES] = { 5, 7, size_CC_ALF, 9, size_ALF_FILTER_9_EXT, size_ALF_FILTER_EXT, size_ALF_FILTER_9_EXT_DB };
@@ -333,6 +345,60 @@ struct AlfFilterShape
       indexSecOrder = 19 + NUM_DB;
 #endif
       offset0 = 0;
+    }
+#endif
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+    else if (size == size_ALF_FILTER_13_EXT_DB_RESI_DIRECT)
+    {
+      size          = 13;
+      numCoeff      = 21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF - 1 + NUM_RESI;
+      filterSize    = 21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF - 1 + NUM_RESI;
+      filterLength  = 13;
+      filterType    = ALF_FILTER_13_EXT_DB_RESI_DIRECT;
+      pattern = {
+                            0,
+                            1,
+                            2,  
+                            3,
+                    4,  5,  6,  7,  8,
+                    9, 10, 11, 12, 13, 
+   14, 15, 16, 17, 18, 19, 20, 19, 18, 17, 16, 15, 14, 
+                   13, 12, 11, 10,  9,
+                    8,  7,  6,  5,  4,
+                            3,  
+                            2,  
+                            1,
+                            0
+      };
+      numOrder      = 2;
+      indexSecOrder = 18 + NUM_DB + NUM_FIXED_BASED_COEFF - 1 + NUM_RESI;
+      offset0       = 0;
+    }
+    else if (size == size_ALF_FILTER_13_EXT_DB_RESI)
+    {
+      size          = 13;
+      numCoeff      = 21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF - 1 + NUM_RESI + 1;
+      filterSize    = 21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF - 1 + NUM_RESI + 1;
+      filterLength  = 13;
+      filterType    = ALF_FILTER_13_EXT_DB_RESI;
+      pattern = {
+                            0,
+                            1,
+                            2,  
+                            3,
+                    4,  5,  6,  7,  8,
+                    9, 10, 11, 12, 13, 
+   14, 15, 16, 17, 18, 19, 20, 19, 18, 17, 16, 15, 14, 
+                   13, 12, 11, 10,  9,
+                    8,  7,  6,  5,  4,
+                            3,  
+                            2,  
+                            1,
+                            0
+      };
+      numOrder      = 2;
+      indexSecOrder = 18 + NUM_DB + NUM_FIXED_BASED_COEFF - 1 + NUM_RESI;
+      offset0       = 0;
     }
 #endif
 #endif

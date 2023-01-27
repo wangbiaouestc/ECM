@@ -7165,6 +7165,10 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
             saveCS.getOrgResiBuf( tu.Y() ).copyFrom( csFull->getOrgResiBuf( tu.Y() ) );
           }
 
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+          saveCS.getResiBuf(tu.Y()).copyFrom(csFull->getResiBuf(tu.Y()));
+#endif
+
           tmpTU->copyComponentFrom( tu, COMPONENT_Y );
 
           ctxBest = m_CABACEstimator->getCtx();
@@ -7193,6 +7197,10 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
           csFull->getResiBuf   ( tu.Y() ).copyFrom( saveCS.getResiBuf   ( tu.Y() ) );
           csFull->getOrgResiBuf( tu.Y() ).copyFrom( saveCS.getOrgResiBuf( tu.Y() ) );
         }
+
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+        csFull->getResiBuf(tu.Y()).copyFrom(saveCS.getResiBuf(tu.Y()));
+#endif
 
         tu.copyComponentFrom( *tmpTU, COMPONENT_Y );
 

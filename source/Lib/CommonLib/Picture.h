@@ -140,6 +140,10 @@ struct Picture : public UnitArea
          PelUnitBuf getResiBuf(const UnitArea &unit);
   const CPelUnitBuf getResiBuf(const UnitArea &unit) const;
   
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  void setResiBufPLT();
+#endif
+
          PelBuf     getRecoBuf(const ComponentID compID, bool wrap=false);
   const CPelBuf     getRecoBuf(const ComponentID compID, bool wrap=false) const;
          PelBuf     getRecoBuf(const CompArea &blk, bool wrap=false);

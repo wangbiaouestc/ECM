@@ -1173,6 +1173,9 @@ void DecCu::xReconPLT(CodingUnit &cu, ComponentID compBegin, uint32_t numComp)
 #endif
     cu.cs->setDecomp(area);
   }
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  cu.cs->getResiBuf(cu).bufs[0].fill(0);
+#endif
 }
 
 /** Function for deriving reconstructed PU/CU chroma samples with QTree structure
@@ -1687,6 +1690,9 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
   {
 #if SIGN_PREDICTION
     CodingStructure &cs = *cu.cs;
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+    cs.getResiBuf(cu).bufs[0].fill(0);
+#endif
     cs.getRecoBuf(cu).copyClip(cs.getPredBuf(cu), cs.slice->clpRngs());
 #if JVET_Y0065_GPM_INTRA
     if (cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
