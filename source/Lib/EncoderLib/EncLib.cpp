@@ -1534,6 +1534,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_W0090_ARMC_TM
   sps.setUseAML                             ( m_AML );
 #endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+  sps.setUseFastSubTmvp                     ((m_sourceWidth * m_sourceHeight) > (m_intraPeriod == -1 ? 0 : 832 * 480));
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   sps.setUseArmcRefinedMotion               ( m_armcRefinedMotion );
 #endif

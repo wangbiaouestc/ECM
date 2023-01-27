@@ -261,6 +261,7 @@
 #define JVET_Z0054_BLK_REF_PIC_REORDER                    1 // JVET-Z0054: Block level TM based reordering of reference pictures
 #define JVET_AA0093_REFINED_MOTION_FOR_ARMC               1 // JVET-AA0093: Refined motion for ARMC
 #define JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC          1 // JVET-AA0093: Diversity criterion for ARMC reordering
+#define JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION   1 // JVET-AC0185: Enhanced temporal motion information derivation
 #endif
 // Transform and coefficient coding
 #define TCQ_8STATES                                       1
