@@ -2576,11 +2576,32 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       uint32_t chromaCandModes[ NUM_CHROMA_MODE ];
       PU::getIntraChromaCandModes( pu, chromaCandModes );
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+#if JVET_AC0094_REF_SAMPLES_OPT
+    if (!CS::isDualITree(*cu.cs))
+    {
+      const CompArea areaCb = pu.Cb();
+      const CompArea areaCr = pu.Cr();
+      const CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, areaCb.lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, areaCb.size()));//needed for correct pos/size (4x4 Tus)
+      IntraPrediction::deriveDimdChromaMode(cs.picture->getRecoBuf(lumaArea), cs.picture->getRecoBuf(areaCb), cs.picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, *pu.cu);
+    }
+    if (PU::getCoLocatedIntraLumaMode(*cu.firstPU) == cu.dimdChromaMode)
+    {
+      if (cu.dimdChromaMode == cu.dimdChromaModeSecond)
+      {
+        cu.dimdChromaMode = DC_IDX;
+      }
+      else
+      {
+        cu.dimdChromaMode = cu.dimdChromaModeSecond;
+      }
+    }
+#else
       // derive DIMD chroma mode
       CompArea areaCb = pu.Cb();
       CompArea areaCr = pu.Cr();
       CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, areaCb.lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, areaCb.size()));//needed for correct pos/size (4x4 Tus)
       IntraPrediction::deriveDimdChromaMode(cs.picture->getRecoBuf(lumaArea), cs.picture->getRecoBuf(areaCb), cs.picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, *pu.cu);
+#endif
 #endif
 #if JVET_AC0071_DBV
       if (PU::hasChromaBvFlag(pu))

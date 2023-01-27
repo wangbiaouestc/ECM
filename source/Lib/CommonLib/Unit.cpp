@@ -285,6 +285,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   dimdMode = other.dimdMode;
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   dimdChromaMode = other.dimdChromaMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  dimdChromaModeSecond = other.dimdChromaModeSecond;
+#endif
 #endif
 #if JVET_AB0157_INTRA_FUSION
   for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
@@ -317,6 +320,10 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   timd              = other.timd;
   timdMode          = other.timdMode;
   timdModeSecondary = other.timdModeSecondary;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  timdModeCheckWA          = other.timdModeCheckWA;
+  timdModeSecondaryCheckWA = other.timdModeSecondaryCheckWA;
+#endif
   timdIsBlended     = other.timdIsBlended;
   timdFusionWeight[0] = other.timdFusionWeight[0];
   timdFusionWeight[1] = other.timdFusionWeight[1];
@@ -365,6 +372,10 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   {
     tmrlList[i] = other.tmrlList[i];
   }
+#endif
+#if JVET_AC0094_REF_SAMPLES_OPT
+  areAboveRightUnavail = other.areAboveRightUnavail;
+  areBelowLeftUnavail  = other.areBelowLeftUnavail;
 #endif
 
   for (int idx = 0; idx < MAX_NUM_CHANNEL_TYPE; idx++)
@@ -427,6 +438,9 @@ void CodingUnit::initData()
   dimdMode = -1;
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   dimdChromaMode   = -1;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  dimdChromaModeSecond = -1;
+#endif
 #endif
 #if JVET_AB0157_INTRA_FUSION
   for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
@@ -456,9 +470,16 @@ void CodingUnit::initData()
   tmpNumCand = 0;
 #endif
 #if JVET_W0123_TIMD_FUSION
-  timd              = false;
+  timd                     = false;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  timdMode                 = INVALID_TIMD_IDX;
+  timdModeSecondary        = INVALID_TIMD_IDX;
+  timdModeCheckWA          = true;
+  timdModeSecondaryCheckWA = true;
+#else
   timdMode          = -1;
   timdModeSecondary = -1;
+#endif
   timdIsBlended     = false;
   timdFusionWeight[0] = -1;
   timdFusionWeight[1] = -1;
@@ -502,6 +523,10 @@ void CodingUnit::initData()
 #if JVET_AB0157_TMRL
   tmrlFlag = false;
   tmrlListIdx = 0;
+#endif
+#if JVET_AC0094_REF_SAMPLES_OPT
+  areAboveRightUnavail = false;
+  areBelowLeftUnavail  = false;
 #endif
 
   for (int idx = 0; idx < MAX_NUM_CHANNEL_TYPE; idx++)

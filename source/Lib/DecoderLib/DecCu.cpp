@@ -377,7 +377,11 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #if SECONDARY_MPM
           uint8_t* mpm_pred = currCU.firstPU->intraMPM;  // mpm_idx / rem_intra_luma_pred_mode
           uint8_t* non_mpm_pred = currCU.firstPU->intraNonMPM;
-          PU::getIntraMPMs( *currCU.firstPU, mpm_pred, non_mpm_pred );
+          PU::getIntraMPMs( *currCU.firstPU, mpm_pred, non_mpm_pred
+#if JVET_AC0094_REF_SAMPLES_OPT
+                           , false
+#endif
+          );
 #else
           unsigned int mpm_pred[NUM_MOST_PROBABLE_MODES];  // mpm_idx / rem_intra_luma_pred_mode
           PU::getIntraMPMs(*currCU.firstPU, mpm_pred);
@@ -550,6 +554,19 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
     CompArea areaCr = pu.Cr();
     CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, areaCb.lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, areaCb.size()));
     IntraPrediction::deriveDimdChromaMode(cs.picture->getRecoBuf(lumaArea), cs.picture->getRecoBuf(areaCb), cs.picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, *pu.cu);
+#if JVET_AC0094_REF_SAMPLES_OPT
+    if (PU::getCoLocatedIntraLumaMode(pu) == (tu.cu)->dimdChromaMode)
+    {
+      if ((tu.cu)->dimdChromaMode == (tu.cu)->dimdChromaModeSecond)
+      {
+        (tu.cu)->dimdChromaMode = DC_IDX;
+      }
+      else
+      {
+        (tu.cu)->dimdChromaMode = (tu.cu)->dimdChromaModeSecond;
+      }
+    }
+#endif
   }
 #endif
 #if JVET_AC0071_DBV

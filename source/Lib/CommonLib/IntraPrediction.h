@@ -186,7 +186,11 @@ public:
   bool m_encPreRDRun;
 #endif
 protected:
+#if JVET_AC0094_REF_SAMPLES_OPT
+  Pel m_refBuffer[MAX_NUM_COMPONENT][NUM_PRED_BUF][((MAX_CU_SIZE << 3) + 1 + MAX_REF_LINE_IDX) * 2];
+#else
   Pel      m_refBuffer[MAX_NUM_COMPONENT][NUM_PRED_BUF][(MAX_CU_SIZE * 2 + 1 + MAX_REF_LINE_IDX) * 2];
+#endif
   uint32_t m_refBufferStride[MAX_NUM_COMPONENT];
 #if JVET_AB0155_SGPM
   InterpolationFilter m_if;
@@ -366,8 +370,15 @@ protected:
 #else
   static int getWideAngleExt      ( int width, int height, int predMode );
 #endif
+#if JVET_AC0094_REF_SAMPLES_OPT
+  static int getTimdWideAngleExt(int width, int height, int predMode);
+  static int getTimdRegularAngleExt(int width, int height, int predMode);
+#endif
 #endif
 
+#if JVET_AC0094_REF_SAMPLES_OPT
+  static int getTimdWideAngle(int width, int height, int predMode);
+#endif
   void setReferenceArrayLengths   ( const CompArea &area );
 
   void destroy                    ();
@@ -449,7 +460,11 @@ public:
   void xFillTimdReferenceSamples  ( const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu, int iTemplateWidth, int iTemplateHeight );
   Pel  xGetPredTimdValDc          ( const CPelBuf &pSrc, const Size &dstSize, TEMPLATE_TYPE eTempType, int iTempHeight, int iTempWidth );
 #if JVET_AB0155_SGPM
-  void initPredTimdIntraParams(const PredictionUnit &pu, const CompArea area, int dirMode, bool bSgpm = false);
+  void initPredTimdIntraParams(const PredictionUnit &pu, const CompArea area, int dirMode, bool bSgpm = false
+#if JVET_AC0094_REF_SAMPLES_OPT
+                               , bool checkWideAngle = true
+#endif
+  );
 #else
   void initPredTimdIntraParams    (const PredictionUnit & pu, const CompArea area, int dirMode);
 #endif

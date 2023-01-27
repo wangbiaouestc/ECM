@@ -338,6 +338,9 @@ struct CodingUnit : public UnitArea
   int8_t         dimdMode;
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   int8_t         dimdChromaMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  int8_t         dimdChromaModeSecond;
+#endif
 #endif
 #if JVET_AB0157_INTRA_FUSION
   int8_t         dimdBlendMode[DIMD_FUSION_NUM-1]; // max number of blend modes (the main mode is not counter) --> incoherent with dimdRelWeight
@@ -355,6 +358,10 @@ struct CodingUnit : public UnitArea
 #if JVET_W0123_TIMD_FUSION
   bool           timd;
   int            timdMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  bool timdModeCheckWA;
+  bool timdModeSecondaryCheckWA;
+#endif
   int timdModeSecondary;
   bool timdIsBlended;
   int8_t timdFusionWeight[2];
@@ -396,6 +403,10 @@ struct CodingUnit : public UnitArea
   bool           tmrlFlag;
   uint8_t        tmrlListIdx;
   TmrlMode       tmrlList[MRL_LIST_SIZE];
+#endif
+#if JVET_AC0094_REF_SAMPLES_OPT
+  bool areAboveRightUnavail;
+  bool areBelowLeftUnavail;
 #endif
   // needed for fast imv mode decisions
   int8_t          imvNumCand;
