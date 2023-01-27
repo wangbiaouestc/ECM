@@ -1019,6 +1019,10 @@ void CABACReader::coding_tree( CodingStructure& cs, Partitioner& partitioner, CU
 
   cu.qp = cuCtx.qp;                 //NOTE: CU QP can be changed by deltaQP signaling at TU level
   cu.chromaQpAdj = cs.chromaQpAdj;  //NOTE: CU chroma QP adjustment can be changed by adjustment signaling at TU level
+#if JVET_AC0094_REF_SAMPLES_OPT
+  cu.areAboveRightUnavail = cs.getCURestricted(cu.Y().topRight().offset(1, -1), cu, partitioner.chType) == nullptr;
+  cu.areBelowLeftUnavail = cs.getCURestricted(cu.Y().bottomLeft().offset(-1, 1), cu, partitioner.chType) == nullptr;
+#endif
 
   // coding unit
 
@@ -1999,7 +2003,11 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
   for( int k = 0; k < numBlocks; k++ )
   {
 #if SECONDARY_MPM
-    PU::getIntraMPMs( *pu, mpm_pred, non_mpm_pred);
+    PU::getIntraMPMs( *pu, mpm_pred, non_mpm_pred
+#if JVET_AC0094_REF_SAMPLES_OPT
+                     , false
+#endif
+    );
 #else
     PU::getIntraMPMs(*pu, mpm_pred);
 #endif

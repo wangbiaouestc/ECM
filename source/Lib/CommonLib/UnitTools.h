@@ -143,6 +143,10 @@ namespace CU
 #if JVET_AB0157_TMRL
   bool allowTmrl(const CodingUnit& cu);
 #endif
+#if JVET_AC0094_REF_SAMPLES_OPT
+  void getNbModesRemovedFirstLast(const bool &areAboveRightUnavail, const bool &areBelowLeftUnavail, const SizeType &height, const SizeType &width, int &nbRemovedFirst, int &nbRemovedLast);
+  bool isIdxModeValid(const bool &areAboveRightUnavail, const bool &areBelowLeftUnavail, const SizeType &height, const SizeType &width, const SizeType &idx_mode_tested, const bool &isForcedValid);
+#endif
 #if JVET_AC0105_DIRECTIONAL_PLANAR
   bool isDirectionalPlanarAvailable(const CodingUnit &cu);
 #endif
@@ -152,7 +156,12 @@ namespace PU
 {
   int  getLMSymbolList(const PredictionUnit &pu, int *modeList);
 #if SECONDARY_MPM
-  int getIntraMPMs(const PredictionUnit &pu, uint8_t *mpm, uint8_t* non_mpm, const ChannelType &channelType = CHANNEL_TYPE_LUMA);
+  int getIntraMPMs(const PredictionUnit &pu, uint8_t *mpm, uint8_t* non_mpm
+#if JVET_AC0094_REF_SAMPLES_OPT
+                   , const bool &isForcedValid
+#endif
+      , const ChannelType &channelType = CHANNEL_TYPE_LUMA
+  );
 #else
   int  getIntraMPMs(const PredictionUnit &pu, unsigned *mpm, const ChannelType &channelType = CHANNEL_TYPE_LUMA);
 #endif

@@ -162,6 +162,7 @@
 #define JVET_AC0189_SGPM_NO_BLENDING                      1 // JVET-AC0189: Allow no blending for SGPM
 #define JVET_AB0157_TMRL                                  1 // JVET-AB0157: Template-based multiple reference line intra prediction
 #define JVET_AB0157_INTRA_FUSION                          1 // JVET-AB0157: Intra prediction fusion
+#define JVET_AC0094_REF_SAMPLES_OPT                       1 // JVET-AC0094: Optimizing the use of reference samples
 #define JVET_AC0105_DIRECTIONAL_PLANAR                    1 // JVET-AC0105: Directional planar
 #define JVET_AC0071_DBV                                   1 // JVET-AC0071: Direct block vector mode for chroma prediction
 

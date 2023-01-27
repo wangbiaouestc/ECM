@@ -772,10 +772,120 @@ cTUTraverser CU::traverseTUs( const CodingUnit& cu )
   return cTUTraverser( cu.firstTU, cu.lastTU->next );
 }
 
+#if JVET_AC0094_REF_SAMPLES_OPT
+void CU::getNbModesRemovedFirstLast(const bool &areAboveRightUnavail, const bool &areBelowLeftUnavail, const SizeType &height, const SizeType &width, int &nbRemovedFirst, int &nbRemovedLast)
+{
+  nbRemovedFirst = 0;
+  nbRemovedLast  = 0;
+  if (areAboveRightUnavail)
+  {
+    if (width > height)
+    {
+      const int deltaSize{ abs(floorLog2(width) - floorLog2(height)) };
+      if (deltaSize == 1)
+      {
+        /*
+        The first 6 horizontal positive modes subtituted via
+        the wide-angle process are removed.
+        */
+        nbRemovedFirst += 6;
+      }
+      else if (deltaSize == 2)
+      {
+        nbRemovedFirst += 10;
+      }
+      else
+      {
+        nbRemovedFirst += 12;
+      }
+    }
+    else if (height == width)
+    {
+      /*
+      The last `NUM_MODES_REMOVED_POSITIVE` vertical positive
+      modes are removed.
+      */
+      nbRemovedLast += NUM_MODES_REMOVED_POSITIVE;
+    }
+
+    /*
+    If none of the decoded reference samples on the above-right
+    side of the current luminance CB is available and `height`
+    is strictly larger than `width`, the wide-angle process
+    results in an underuse of these padded decoded reference
+    samples.
+    */
+  }
+  if (areBelowLeftUnavail)
+  {
+    if (height > width)
+    {
+      const int deltaSize{ abs(floorLog2(height) - floorLog2(width)) };
+      if (deltaSize == 1)
+      {
+        /*
+        The last 6 vertical positive modes subtituted via
+        the wide-angle process are removed.
+        */
+        nbRemovedLast += 6;
+      }
+      else if (deltaSize == 2)
+      {
+        nbRemovedLast += 10;
+      }
+      else
+      {
+        nbRemovedLast += 12;
+      }
+    }
+    else if (height == width)
+    {
+      /*
+      The first `NUM_MODES_REMOVED_POSITIVE` horizontal positive
+      modes are removed.
+      */
+      nbRemovedFirst += NUM_MODES_REMOVED_POSITIVE;
+    }
+
+    /*
+    If none of the decoded reference samples on the below-left
+    side of the current luminance CB is available and `width`
+    is strictly larger than `height`, the wide-angle process
+    results in an underuse of these padded decoded reference
+    samples.
+    */
+  }
+}
+
+bool CU::isIdxModeValid(const bool &areAboveRightUnavail, const bool &areBelowLeftUnavail,
+                        const SizeType &height, const SizeType &width, const SizeType &idx_mode_tested,
+                        const bool &isForcedValid)
+{
+  CHECK(idx_mode_tested < PLANAR_IDX || idx_mode_tested >= NUM_LUMA_MODE,
+        "`idx_mode_tested` does not belong to [|" + std::to_string(PLANAR_IDX) + ", "
+          + std::to_string(NUM_LUMA_MODE - 1) + "|].");
+  if (isForcedValid || idx_mode_tested == PLANAR_IDX || idx_mode_tested == DC_IDX)
+  {
+    return true;
+  }
+  else
+  {
+    int nbRemovedFirst{ 0 };
+    int nbRemovedLast{ 0 };
+    getNbModesRemovedFirstLast(areAboveRightUnavail, areBelowLeftUnavail, height, width, nbRemovedFirst,
+                               nbRemovedLast);
+    return idx_mode_tested > DC_IDX + nbRemovedFirst && idx_mode_tested < NUM_LUMA_MODE - nbRemovedLast;
+  }
+}
+#endif
 // PU tools
 
 #if SECONDARY_MPM
-int PU::getIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t* non_mpm, const ChannelType &channelType /*= CHANNEL_TYPE_LUMA*/ )
+int PU::getIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t* non_mpm
+#if JVET_AC0094_REF_SAMPLES_OPT
+                     , const bool& isForcedValid
+#endif
+    , const ChannelType &channelType /*= CHANNEL_TYPE_LUMA*/)
 #else
 int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType &channelType /*= CHANNEL_TYPE_LUMA*/)
 #endif
@@ -783,6 +893,10 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
 #if SECONDARY_MPM
   bool includedMode[NUM_INTRA_MODE];
   memset(includedMode, false, sizeof(includedMode));
+#if JVET_AC0094_REF_SAMPLES_OPT
+  uint8_t arrayReserved[5];
+  int     nbReserved{ 0 };
+#endif
 
   int numValidMPM = 0;
   mpm[numValidMPM++] = PLANAR_IDX;
@@ -819,7 +933,19 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
 #endif
       if( !includedMode[mpm[numValidMPM]] )
       {
+#if JVET_AC0094_REF_SAMPLES_OPT
+        if ( CU::isIdxModeValid((pu.cu)->areAboveRightUnavail, (pu.cu)->areBelowLeftUnavail, (pu.cu)->lheight(), (pu.cu)->lwidth(), mpm[numValidMPM], isForcedValid) )
+        {
+#endif
         includedMode[mpm[numValidMPM++]] = true;
+#if JVET_AC0094_REF_SAMPLES_OPT
+        }
+        else
+        {
+          arrayReserved[nbReserved] = mpm[numValidMPM];
+          nbReserved++;
+        }
+#endif
       }
 #else
       leftIntraDir = PU::getIntraDirLuma( *puLeft );
@@ -856,7 +982,19 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
 #endif
       if (!includedMode[mpm[numValidMPM]])
       {
+#if JVET_AC0094_REF_SAMPLES_OPT
+        if ( CU::isIdxModeValid((pu.cu)->areAboveRightUnavail, (pu.cu)->areBelowLeftUnavail, (pu.cu)->lheight(), (pu.cu)->lwidth(), mpm[numValidMPM], isForcedValid) )
+        {
+#endif
         includedMode[mpm[numValidMPM++]] = true;
+#if JVET_AC0094_REF_SAMPLES_OPT
+        }
+        else
+        {
+          arrayReserved[nbReserved] = mpm[numValidMPM];
+          nbReserved++;
+        }
+#endif
       }
 #else
       aboveIntraDir = PU::getIntraDirLuma(*puAbove);
@@ -886,7 +1024,19 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
       mpm[numValidMPM] = puLeft->getIpmInfo(pu.lheight() >= pu.lwidth() ? posRT.offset(0, -1) : posLB.offset(-1, 0));
       if( !includedMode[mpm[numValidMPM]] )
       {
+#if JVET_AC0094_REF_SAMPLES_OPT
+        if ( CU::isIdxModeValid((pu.cu)->areAboveRightUnavail, (pu.cu)->areBelowLeftUnavail, (pu.cu)->lheight(), (pu.cu)->lwidth(), mpm[numValidMPM], isForcedValid) )
+        {
+#endif
         includedMode[mpm[numValidMPM++]] = true;
+#if JVET_AC0094_REF_SAMPLES_OPT
+        }
+        else
+        {
+          arrayReserved[nbReserved] = mpm[numValidMPM];
+          nbReserved++;
+        }
+#endif
       }
     }
 #if JVET_AC0112_IBC_CIIP
@@ -898,7 +1048,19 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
       mpm[numValidMPM] = puAbove->getIpmInfo(pu.lheight() >= pu.lwidth() ? posLB.offset(-1, 0) : posRT.offset(0, -1));
       if( !includedMode[mpm[numValidMPM]] )
       {
+#if JVET_AC0094_REF_SAMPLES_OPT
+        if ( CU::isIdxModeValid((pu.cu)->areAboveRightUnavail, (pu.cu)->areBelowLeftUnavail, (pu.cu)->lheight(), (pu.cu)->lwidth(), mpm[numValidMPM], isForcedValid) )
+        {
+#endif
         includedMode[mpm[numValidMPM++]] = true;
+#if JVET_AC0094_REF_SAMPLES_OPT
+        }
+        else
+        {
+          arrayReserved[nbReserved] = mpm[numValidMPM];
+          nbReserved++;
+        }
+#endif
       }
     }
 #endif
@@ -913,7 +1075,19 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
 #endif
       if( !includedMode[mpm[numValidMPM]] )
       {
+#if JVET_AC0094_REF_SAMPLES_OPT
+        if ( CU::isIdxModeValid((pu.cu)->areAboveRightUnavail, (pu.cu)->areBelowLeftUnavail, (pu.cu)->lheight(), (pu.cu)->lwidth(), mpm[numValidMPM], isForcedValid) )
+        {
+#endif
         includedMode[mpm[numValidMPM++]] = true;
+#if JVET_AC0094_REF_SAMPLES_OPT
+        }
+        else
+        {
+          arrayReserved[nbReserved] = mpm[numValidMPM];
+          nbReserved++;
+        }
+#endif
       }
     }
 
@@ -928,7 +1102,19 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
 #endif
       if( !includedMode[mpm[numValidMPM]] )
       {
+#if JVET_AC0094_REF_SAMPLES_OPT
+        if ( CU::isIdxModeValid((pu.cu)->areAboveRightUnavail, (pu.cu)->areBelowLeftUnavail, (pu.cu)->lheight(), (pu.cu)->lwidth(), mpm[numValidMPM], isForcedValid) )
+        {
+#endif
         includedMode[mpm[numValidMPM++]] = true;
+#if JVET_AC0094_REF_SAMPLES_OPT
+        }
+        else
+        {
+          arrayReserved[nbReserved] = mpm[numValidMPM];
+          nbReserved++;
+        }
+#endif
       }
     }
 
@@ -944,7 +1130,19 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
 #endif
       if( !includedMode[mpm[numValidMPM]] )
       {
+#if JVET_AC0094_REF_SAMPLES_OPT
+        if ( CU::isIdxModeValid((pu.cu)->areAboveRightUnavail, (pu.cu)->areBelowLeftUnavail, (pu.cu)->lheight(), (pu.cu)->lwidth(), mpm[numValidMPM], isForcedValid) )
+        {
+#endif
         includedMode[mpm[numValidMPM++]] = true;
+#if JVET_AC0094_REF_SAMPLES_OPT
+        }
+        else
+        {
+          arrayReserved[nbReserved] = mpm[numValidMPM];
+          nbReserved++;
+        }
+#endif
       }
     }
 #if JVET_W0123_TIMD_FUSION
@@ -957,7 +1155,19 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
       mpm[numValidMPM] = puBelowLeft->getIpmInfo(posLB.offset(-1, 1));
       if( !includedMode[mpm[numValidMPM]] )
       {
+#if JVET_AC0094_REF_SAMPLES_OPT
+        if ( CU::isIdxModeValid((pu.cu)->areAboveRightUnavail, (pu.cu)->areBelowLeftUnavail, (pu.cu)->lheight(), (pu.cu)->lwidth(), mpm[numValidMPM], isForcedValid) )
+        {
+#endif
         includedMode[mpm[numValidMPM++]] = true;
+#if JVET_AC0094_REF_SAMPLES_OPT
+        }
+        else
+        {
+          arrayReserved[nbReserved] = mpm[numValidMPM];
+          nbReserved++;
+        }
+#endif
       }
     }
 #if JVET_AC0112_IBC_CIIP
@@ -969,7 +1179,19 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
       mpm[numValidMPM] = puAboveRight->getIpmInfo(posRT.offset(1, -1));
       if( !includedMode[mpm[numValidMPM]] )
       {
+#if JVET_AC0094_REF_SAMPLES_OPT
+        if ( CU::isIdxModeValid((pu.cu)->areAboveRightUnavail, (pu.cu)->areBelowLeftUnavail, (pu.cu)->lheight(), (pu.cu)->lwidth(), mpm[numValidMPM], isForcedValid) )
+        {
+#endif
         includedMode[mpm[numValidMPM++]] = true;
+#if JVET_AC0094_REF_SAMPLES_OPT
+        }
+        else
+        {
+          arrayReserved[nbReserved] = mpm[numValidMPM];
+          nbReserved++;
+        }
+#endif
       }
     }
 #if JVET_AC0112_IBC_CIIP
@@ -981,10 +1203,35 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
       mpm[numValidMPM] = puAboveLeft->getIpmInfo(posTL.offset(-1, -1));
       if( !includedMode[mpm[numValidMPM]] )
       {
+#if JVET_AC0094_REF_SAMPLES_OPT
+        if ( CU::isIdxModeValid((pu.cu)->areAboveRightUnavail, (pu.cu)->areBelowLeftUnavail, (pu.cu)->lheight(), (pu.cu)->lwidth(), mpm[numValidMPM], isForcedValid) )
+        {
+#endif
         includedMode[mpm[numValidMPM++]] = true;
+#if JVET_AC0094_REF_SAMPLES_OPT
+        }
+        else
+        {
+          arrayReserved[nbReserved] = mpm[numValidMPM];
+          nbReserved++;
+        }
+#endif
       }
     }
 #endif
+#endif
+#if JVET_AC0094_REF_SAMPLES_OPT
+    if (!isForcedValid)
+    {
+      for (int i{ 0 }; i < nbReserved; i++)
+      {
+        if (!includedMode[arrayReserved[i]])
+        {
+          mpm[numValidMPM]                 = arrayReserved[i];
+          includedMode[mpm[numValidMPM++]] = true;
+        }
+      }
+    }
 #endif
 
     CHECK(2 >= numMPMs, "Invalid number of most probable modes");
@@ -1302,7 +1549,11 @@ void PU::getGeoIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t splitD
   }
 #endif
 #if JVET_W0123_TIMD_FUSION
+#if JVET_AC0094_REF_SAMPLES_OPT
+  if (cu->slice->getSPS()->getUseTimd() && cu->timdMode != INVALID_TIMD_IDX)
+#else
   if (cu->slice->getSPS()->getUseTimd() && cu->timdMode != -1)
+#endif
   {
     mpm[numValidMPM] = MAP131TO67(cu->timdMode);
     if( !includedMode[mpm[numValidMPM]] )

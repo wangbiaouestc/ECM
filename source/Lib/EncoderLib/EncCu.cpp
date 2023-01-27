@@ -2238,6 +2238,10 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   int timdModeSecondary = 0;
   bool timdIsBlended = false;
   int  timdFusionWeight[2] = { 0 };
+#if JVET_AC0094_REF_SAMPLES_OPT
+  bool timdModeCheckWA          = true;
+  bool timdModeSecondaryCheckWA = true;
+#endif
 #endif
 #if JVET_AB0155_SGPM
   int timdHorMode = 0;
@@ -2322,6 +2326,10 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
     CHECK(adaptiveColorTrans && (CS::isDualITree(*tempCS) || partitioner.chType != CHANNEL_TYPE_LUMA), "adaptive color transform cannot be applied to dual-tree");
   }
 #endif
+#if JVET_AC0094_REF_SAMPLES_OPT
+  bool areAboveRightUnavail{ false };
+  bool areBelowLeftUnavail{ false };
+#endif
 #if ENABLE_DIMD
   bool dimdBlending = false;
   int  dimdMode = 0;
@@ -2333,7 +2341,10 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   int  dimdRelWeight[3] = { 0 };
 #endif
   bool dimdDerived = false;
-
+#if JVET_Z0050_DIMD_CHROMA_FUSION && (JVET_AC0094_REF_SAMPLES_OPT)
+  int8_t dimdChromaMode = -1;
+  int8_t dimdChromaModeSecond = -1;
+#endif
   if (isLuma(partitioner.chType))
   {
     CodingUnit cu(tempCS->area);
@@ -2343,6 +2354,12 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
     PredictionUnit pu(tempCS->area);
     pu.cu = &cu;
     pu.cs = tempCS;
+#if JVET_AC0094_REF_SAMPLES_OPT
+    areAboveRightUnavail = tempCS->getCURestricted(cu.Y().topRight().offset(1, -1), cu, partitioner.chType) == nullptr;
+    areBelowLeftUnavail = tempCS->getCURestricted(cu.Y().bottomLeft().offset(-1, 1), cu, partitioner.chType) == nullptr;
+    cu.areAboveRightUnavail = areAboveRightUnavail;
+    cu.areBelowLeftUnavail = areBelowLeftUnavail;
+#endif
 
     if( cu.slice->getSPS()->getUseDimd() )
     {
@@ -2372,9 +2389,28 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
     }
 
 #if SECONDARY_MPM
-    m_pcIntraSearch->getMpmListSize() = PU::getIntraMPMs(pu, m_pcIntraSearch->getMPMList(), m_pcIntraSearch->getNonMPMList());
+    m_pcIntraSearch->getMpmListSize() = PU::getIntraMPMs(pu, m_pcIntraSearch->getMPMList(), m_pcIntraSearch->getNonMPMList()
+#if JVET_AC0094_REF_SAMPLES_OPT
+                                                         , false
+#endif
+);
 #endif
   }
+#if JVET_Z0050_DIMD_CHROMA_FUSION && (JVET_AC0094_REF_SAMPLES_OPT)
+  if (tempCS->slice->getSPS()->getUseDimd() && (CS::isDualITree(*tempCS) ? isChroma(partitioner.chType) : false))
+  {
+    CodingUnit cu(tempCS->area);
+    cu.cs = tempCS;
+    cu.slice = tempCS->slice;
+    cu.tileIdx = tempCS->pps->getTileIdx(tempCS->area.lumaPos());
+    const CompArea areaCb = tempCS->area.Cb();
+    const CompArea areaCr = tempCS->area.Cr();
+    const CompArea lumaArea = CompArea(COMPONENT_Y, (tempCS->area).chromaFormat, areaCb.lumaPos(), recalcSize((tempCS->area).chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, areaCb.size()));
+    IntraPrediction::deriveDimdChromaMode(bestCS->picture->getRecoBuf(lumaArea), bestCS->picture->getRecoBuf(areaCb), bestCS->picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, cu);
+    dimdChromaMode = cu.dimdChromaMode;
+    dimdChromaModeSecond = cu.dimdChromaModeSecond;
+  }
+#endif
 #elif SECONDARY_MPM
   if( isLuma( partitioner.chType ) )
   {
@@ -2468,6 +2504,13 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             cu.dimdRelWeight[2] = dimdRelWeight[2];
 #endif
           }
+#if JVET_Z0050_DIMD_CHROMA_FUSION && (JVET_AC0094_REF_SAMPLES_OPT)
+          if (cu.slice->getSPS()->getUseDimd() && (CS::isDualITree(*tempCS) ? isChroma(partitioner.chType) : false))
+          {
+            cu.dimdChromaMode = dimdChromaMode;
+            cu.dimdChromaModeSecond = dimdChromaModeSecond;
+          }
+#endif
 #endif
           cu.lfnstIdx         = lfnstIdx;
           cu.mtsFlag          = mtsFlag;
@@ -2475,6 +2518,16 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
           cu.colorTransform = adaptiveColorTrans;
 
           CU::addPUs( cu );
+#if JVET_AC0094_REF_SAMPLES_OPT
+#if !ENABLE_DIMD && !SECONDARY_MPM
+          areAboveRightUnavail =
+            tempCS->getCURestricted(cu.Y().topRight().offset(cu.lwidth(), -1), cu, partitioner.chType) == nullptr;
+          areBelowLeftUnavail =
+            tempCS->getCURestricted(cu.Y().bottomLeft().offset(-1, cu.lheight()), cu, partitioner.chType) == nullptr;
+#endif
+          cu.areAboveRightUnavail = areAboveRightUnavail;
+          cu.areBelowLeftUnavail  = areBelowLeftUnavail;
+#endif
 #if JVET_W0123_TIMD_FUSION
           cu.timd = false;
           if (isLuma(partitioner.chType) && cu.slice->getSPS()->getUseTimd())
@@ -2486,7 +2539,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             if (!timdDerived)
             {
               const CompArea &area = cu.Y();
-              
+
 #if JVET_AB0155_SGPM
               cu.timdMode = m_pcIntraSearch->deriveTimdMode(bestCS->picture->getRecoBuf(area), area, cu, true, true);
 #else
@@ -2496,6 +2549,10 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               timdDerived = true;
               timdModeSecondary = cu.timdModeSecondary;
               timdIsBlended     = cu.timdIsBlended;
+#if JVET_AC0094_REF_SAMPLES_OPT
+              timdModeCheckWA          = cu.timdModeCheckWA;
+              timdModeSecondaryCheckWA = cu.timdModeSecondaryCheckWA;
+#endif
               timdFusionWeight[0] = cu.timdFusionWeight[0];
               timdFusionWeight[1] = cu.timdFusionWeight[1];
 #if JVET_AB0155_SGPM
@@ -2506,6 +2563,10 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             else
             {
               cu.timdMode = timdMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+              cu.timdModeCheckWA          = timdModeCheckWA;
+              cu.timdModeSecondaryCheckWA = timdModeSecondaryCheckWA;
+#endif
               cu.timdModeSecondary = timdModeSecondary;
               cu.timdIsBlended     = timdIsBlended;
               cu.timdFusionWeight[0] = timdFusionWeight[0];
@@ -5916,6 +5977,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 #if JVET_W0123_TIMD_FUSION
   int timdMode = cu.timdMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  bool timdModeCheckWA = cu.timdModeCheckWA;
+#endif
 #endif
   for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
   {
@@ -6690,6 +6754,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 #if JVET_W0123_TIMD_FUSION
       cu.timdMode = timdMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+      cu.timdModeCheckWA = timdModeCheckWA;
+#endif
 #endif
 #endif
 #if JVET_AA0058_GPM_ADP_BLD
@@ -8221,6 +8288,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 #if JVET_W0123_TIMD_FUSION
         cu.timdMode = timdMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+        cu.timdModeCheckWA = timdModeCheckWA;
+#endif
 #endif
 #endif
 #if TM_MRG

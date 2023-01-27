@@ -896,6 +896,33 @@ int IntraPrediction::getModifiedWideAngle( int width, int height, int predMode )
   }
   return predMode;
 }
+#if JVET_AC0094_REF_SAMPLES_OPT
+int IntraPrediction::getTimdWideAngle(int width, int height, int predMode)
+{
+  int modeShift[] = { 0, 6, 10, 12, 14, 15 };
+  int deltaSize   = abs(floorLog2(width) - floorLog2(height));
+  int maxIndex    = modeShift[std::min(deltaSize + 2, 5)];
+  // Case 1: using a regular mode removed due to WAIP
+  if (width > height && predMode < DC_IDX + 1 + maxIndex)
+  {
+    predMode = (predMode == VDIA_IDX ? DC_IDX + 1 : predMode + 1);
+  }
+  else if (height > width && predMode > VDIA_IDX - maxIndex)
+  {
+    predMode = (predMode == DC_IDX + 1 ? VDIA_IDX : predMode - 1);
+  }
+  // Case 2: using a mode not usually allowed on this block size
+  else if (predMode > VDIA_IDX)
+  {
+    predMode -= (VDIA_IDX - 2);
+  }
+  else if (predMode < VDIA_IDX)
+  {
+    predMode += (VDIA_IDX - 2);
+  }
+  return predMode;
+}
+#endif
 
 #if JVET_W0123_TIMD_FUSION
 #if JVET_AB0155_SGPM
@@ -941,6 +968,69 @@ int IntraPrediction::getWideAngleExt( int width, int height, int predMode )
   }
   return predMode;
 }
+#if JVET_AC0094_REF_SAMPLES_OPT
+int IntraPrediction::getTimdWideAngleExt(int width, int height, int predMode)
+{
+  int modeShift[] = { 0, 11, 19, 23, 27, 29 };
+  int deltaSize   = abs(floorLog2(width) - floorLog2(height));
+  int maxIndex    = modeShift[std::min(deltaSize, 5)];
+  // Case 1: using a regular mode removed due to WAIP
+  if (width > height && predMode < DC_IDX + 1 + maxIndex)
+  {
+    predMode = (predMode == EXT_VDIA_IDX ? DC_IDX + 1 : predMode + 1);
+  }
+  else if (height > width && predMode > EXT_VDIA_IDX - maxIndex)
+  {
+    predMode = (predMode == DC_IDX + 1 ? EXT_VDIA_IDX : predMode - 1);
+  }
+  // Case 2: using a mode not usually allowed on this block size
+  else if (predMode > EXT_DIA_IDX)
+  {
+    predMode -= (EXT_VDIA_IDX - 2);
+  }
+  else if (predMode < EXT_DIA_IDX)
+  {
+    predMode += (EXT_VDIA_IDX - 2);
+  }
+  return predMode;
+}
+
+int IntraPrediction::getTimdRegularAngleExt(int width, int height, int predMode)
+{
+  int modeShift[] = { 0, 11, 19, 23, 27, 29 };
+  int deltaSize   = abs(floorLog2(width) - floorLog2(height));
+  int maxIndex    = modeShift[std::min(deltaSize + 2, 5)];
+  // Treat edge cases for first and last angular IPMs, 2 and EXT_VDIA_IDX
+  if (predMode == EXT_VDIA_IDX)
+  {
+    return DC_IDX + 1;
+  }
+  if (predMode == DC_IDX + 1)
+  {
+    return EXT_VDIA_IDX;
+  }
+  // Case 1: using a regular mode removed due to WAIP
+  if (width > height && predMode <= DC_IDX + 1 + maxIndex && predMode > DC_IDX)
+  {
+    predMode = predMode - 1;
+  }
+  else if (height > width && predMode >= EXT_VDIA_IDX - maxIndex && predMode <= EXT_VDIA_IDX)
+  {
+    predMode = predMode + 1;
+  }
+  // Case 2: using a mode not usually allowed on this block size
+  else if (predMode > EXT_VER_IDX)
+  {
+    predMode -= (EXT_VDIA_IDX - 2);
+  }
+  else if (predMode < EXT_HOR_IDX)
+  {
+    predMode += (EXT_VDIA_IDX - 2);
+  }
+  CHECK(predMode < DC_IDX + 1 || predMode > EXT_VDIA_IDX, "luma mode out of range");
+  return predMode;
+}
+#endif
 #endif
 
 void IntraPrediction::setReferenceArrayLengths( const CompArea &area )
@@ -949,8 +1039,13 @@ void IntraPrediction::setReferenceArrayLengths( const CompArea &area )
   const int  width    = area.width;
   const int  height   = area.height;
 
+#if JVET_AC0094_REF_SAMPLES_OPT
+  m_leftRefLength = height << 3;
+  m_topRefLength  = width << 3;
+#else
   m_leftRefLength     = (height << 1);
   m_topRefLength      = (width << 1);
+#endif
 }
 
 #if JVET_AB0157_INTRA_FUSION
@@ -1275,8 +1370,17 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 
     const bool applyPdpc = m_ipaParam.applyPDPC;
     PredictionUnit pu2 = pu;
+#if JVET_AC0094_REF_SAMPLES_OPT
+    pu2.intraDir[0]  = pu.cu->timdModeSecondary;
+    int tmpTimdMode  = pu2.cu->timdMode;
+    pu2.cu->timdMode = INVALID_TIMD_IDX;
+#else
     pu2.intraDir[0] = pu.cu->timdModeSecondary;
+#endif
     initPredIntraParams(pu2, pu.Y(), *(pu.cs->sps));
+#if JVET_AC0094_REF_SAMPLES_OPT
+    pu2.cu->timdMode = tmpTimdMode;
+#endif
 
     switch (pu.cu->timdModeSecondary)
     {
@@ -1978,7 +2082,18 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
   const int      dirMode = PU::getFinalIntraMode(pu, chType);
 #endif
 #if JVET_W0123_TIMD_FUSION
+#if JVET_AC0094_REF_SAMPLES_OPT
+  if (bExtIntraDir)
+  {
+    CHECK(pu.cu->timdMode != dirMode && pu.cu->timdModeSecondary != dirMode, "Unexpected dirMode");
+  }
+  bool checkWideAngle = !bExtIntraDir ? true : (pu.cu->timdMode != INVALID_TIMD_IDX ? pu.cu->timdModeCheckWA : pu.cu->timdModeSecondaryCheckWA);
+  const int predMode = checkWideAngle ? (bExtIntraDir ? getWideAngleExt(blockSize.width, blockSize.height, dirMode) : getModifiedWideAngle(blockSize.width, blockSize.height, dirMode))
+                         : (bExtIntraDir ? getTimdWideAngleExt(blockSize.width, blockSize.height, dirMode) : getTimdWideAngle(blockSize.width, blockSize.height, dirMode));
+  CHECK(!checkWideAngle && dirMode <= DC_IDX, "Unexpected mode");
+#else
   const int     predMode = bExtIntraDir ? getWideAngleExt( blockSize.width, blockSize.height, dirMode ) : getModifiedWideAngle( blockSize.width, blockSize.height, dirMode );
+#endif
 #else
   const int     predMode = getModifiedWideAngle( blockSize.width, blockSize.height, dirMode );
 #endif
@@ -2088,6 +2203,9 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
       CHECK( log2Size >= MAX_INTRA_FILTER_DEPTHS, "Size not supported" );
 #if JVET_W0123_TIMD_FUSION
       filterFlag = (diff > (bExtIntraDir ? m_aucIntraFilterExt[log2Size] : m_aucIntraFilter[log2Size]));
+#if JVET_AC0094_REF_SAMPLES_OPT
+      filterFlag = filterFlag && (puSize.width * puSize.height > 32);
+#endif
 #else
       filterFlag = (diff > m_aucIntraFilter[log2Size]);
 #endif
@@ -2177,8 +2295,13 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
   Pel  refLeft [2 * MAX_CU_SIZE + 3 + 33 * MAX_REF_LINE_IDX];
 #else
   // 2 pixels more for 6 tap filter.
+#if JVET_AC0094_REF_SAMPLES_OPT
+  Pel refAbove[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
+  Pel refLeft[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
+#else
   Pel  refAbove[2 * MAX_CU_SIZE + 5 + 33 * MAX_REF_LINE_IDX];
   Pel  refLeft[2 * MAX_CU_SIZE + 5 + 33 * MAX_REF_LINE_IDX];
+#endif
 #if JVET_AB0157_INTRA_FUSION
   if( !bRefL1Only)
   {
@@ -2191,9 +2314,13 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
 
   Pel *refMain2nd = NULL;
   Pel *refSide2nd = NULL;
-
+#if JVET_AC0094_REF_SAMPLES_OPT
+  Pel refAbove2nd[(MAX_CU_SIZE << 3) + 10 + 33 * (MAX_REF_LINE_IDX + 1)];
+  Pel refLeft2nd[(MAX_CU_SIZE << 3) + 10 + 33 * (MAX_REF_LINE_IDX + 1)];
+#else
   Pel refAbove2nd[2 * MAX_CU_SIZE + 10 + 33 * (MAX_REF_LINE_IDX+1)];
   Pel refLeft2nd[2 * MAX_CU_SIZE + 10 + 33 * (MAX_REF_LINE_IDX+1)];
+#endif
 #endif
 #endif
 
@@ -3455,7 +3582,11 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
   const Position posLB          = area.bottomLeft();
 
 #if JVET_Y0116_EXTENDED_MRL_LIST
+#if JVET_AC0094_REF_SAMPLES_OPT
+  bool neighborFlags[4 * (MAX_NUM_PART_IDXS_IN_CTU_WIDTH << 2) + MAX_REF_LINE_IDX + 1];
+#else
   bool  neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + MAX_REF_LINE_IDX + 1];
+#endif
 #else
   bool  neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1];
 #endif
@@ -4102,7 +4233,11 @@ void IntraPrediction::xPredTimdIntraDc( const PredictionUnit &pu, const CPelBuf 
 }
 
 #if JVET_AB0155_SGPM
-void IntraPrediction::initPredTimdIntraParams(const PredictionUnit &pu, const CompArea area, int dirMode, bool bSgpm)
+void IntraPrediction::initPredTimdIntraParams(const PredictionUnit &pu, const CompArea area, int dirMode, bool bSgpm
+#if JVET_AC0094_REF_SAMPLES_OPT
+                                              , bool checkWideAngle
+#endif
+)
 #else
 void IntraPrediction::initPredTimdIntraParams(const PredictionUnit & pu, const CompArea area, int dirMode)
 #endif
@@ -4110,7 +4245,12 @@ void IntraPrediction::initPredTimdIntraParams(const PredictionUnit & pu, const C
   const Size   puSize    = Size( area.width, area.height );
   const Size&  blockSize = puSize;
 #if JVET_AB0155_SGPM
+#if JVET_AC0094_REF_SAMPLES_OPT
+  const int predMode = checkWideAngle ? getWideAngleExt(blockSize.width, blockSize.height, dirMode, bSgpm)
+                                      : getTimdWideAngleExt(blockSize.width, blockSize.height, dirMode);
+#else
   const int predMode = getWideAngleExt(blockSize.width, blockSize.height, dirMode, bSgpm);
+#endif
 #else
   const int     predMode = getWideAngleExt( blockSize.width, blockSize.height, dirMode );
 #endif
@@ -4166,8 +4306,13 @@ void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpR
   const int  invAngle       = m_ipaParam.absInvAngle;
   Pel* refMain;
   Pel* refSide;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  Pel refAbove[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
+  Pel refLeft[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
+#else
   static Pel  refAbove[2 * MAX_CU_SIZE + 5 + 33 * MAX_REF_LINE_IDX];
   static Pel  refLeft[2 * MAX_CU_SIZE + 5 + 33 * MAX_REF_LINE_IDX];
+#endif
 
   // Initialize the Main and Left reference array.
   if (intraPredAngle < 0)
@@ -4483,9 +4628,15 @@ void IntraPrediction::initTimdIntraPatternLuma(const CodingUnit &cu, const CompA
 {
   const CodingStructure& cs   = *cu.cs;
   Pel *refBufUnfiltered = m_refBuffer[area.compID][PRED_BUF_UNFILTERED];
+#if JVET_AC0094_REF_SAMPLES_OPT
+  bool bLeftAbove = iTemplateHeight > 0 && iTemplateWidth > 0;
+  m_leftRefLength = bLeftAbove ? (uiRefHeight << 3) : ((uiRefHeight + iTemplateHeight) << 3);
+  m_topRefLength  = bLeftAbove ? (uiRefWidth << 3) : ((uiRefWidth + iTemplateWidth) << 3);
+#else
   bool bLeftAbove = iTemplateHeight > 0 && iTemplateWidth > 0;
   m_leftRefLength     = bLeftAbove ? (uiRefHeight << 1) : ((uiRefHeight + iTemplateHeight) << 1);
   m_topRefLength      = bLeftAbove ? (uiRefWidth << 1) : ((uiRefWidth + iTemplateWidth) << 1);
+#endif
   xFillTimdReferenceSamples(cs.picture->getRecoBuf(area), refBufUnfiltered, area, cu, iTemplateWidth, iTemplateHeight);
 }
 
@@ -4530,7 +4681,11 @@ void IntraPrediction::xFillTimdReferenceSamples(const CPelBuf &recoBuf, Pel* ref
   const Position posRT          = area.topRight();
   const Position posLB          = area.bottomLeft();
 
+#if JVET_AC0094_REF_SAMPLES_OPT
+  bool neighborFlags[4 * (MAX_NUM_PART_IDXS_IN_CTU_WIDTH << 2) + 1];
+#else
   bool  neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1];
+#endif
   int   numIntraNeighbor = 0;
 
   memset( neighborFlags, 0, totalUnits );
@@ -4939,6 +5094,10 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
     int      iBestMode       = PLANAR_IDX;
     uint64_t uiSecondaryCost = MAX_UINT64;
     int      iSecondaryMode  = PLANAR_IDX;
+#if JVET_AC0094_REF_SAMPLES_OPT
+    bool bBestModeCheckWA      = true;
+    bool bSecondaryModeCheckWA = true;
+#endif
 
     uint64_t uiBestCostHor = MAX_UINT64;
     uint64_t uiBestCostVer = MAX_UINT64;
@@ -4948,6 +5107,12 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
     const Position posLTx = pu.Y().topLeft();
     const Position posRTx = pu.Y().topRight();
     const Position posLBx = pu.Y().bottomLeft();
+#if JVET_AC0094_REF_SAMPLES_OPT
+    bool increaseMaxClose = true;
+    bool decreaseMinClose = true;
+    bool increaseMaxFar   = true;
+    bool decreaseMinFar   = true;
+#endif
 
     // left
     const PredictionUnit *puLeftx = pu.cs->getPURestricted(posLBx.offset(-1, 0), pu, pu.chType);
@@ -4994,6 +5159,17 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
         modeIdx++;
       }
     }
+#if JVET_AC0094_REF_SAMPLES_OPT
+    if (!puLeftx)
+    {
+      decreaseMinClose = false;
+    }
+    const PredictionUnit *puLeftBottomFarx = cs.getPURestricted(posLBx.offset(-1, uiHeight), pu, pu.chType);
+    if (!puLeftBottomFarx)
+    {
+      decreaseMinFar = false;
+    }
+#endif
     // above right
     const PredictionUnit *puAboveRightx = cs.getPURestricted(posRTx.offset(1, -1), pu, pu.chType);
     if (puAboveRightx && CU::isIntra(*puAboveRightx->cu))
@@ -5009,6 +5185,17 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
         modeIdx++;
       }
     }
+#if JVET_AC0094_REF_SAMPLES_OPT
+    if (!puAbovex)
+    {
+      increaseMaxClose = false;
+    }
+    const PredictionUnit *puAboveRightFarx = cs.getPURestricted(posRTx.offset(uiWidth, -1), pu, pu.chType);
+    if (!puAboveRightFarx)
+    {
+      increaseMaxFar = false;
+    }
+#endif
     // above left
     const PredictionUnit *puAboveLeftx = cs.getPURestricted(posLTx.offset(-1, -1), pu, pu.chType);
     if (puAboveLeftx && CU::isIntra(*puAboveLeftx->cu))
@@ -5078,6 +5265,9 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
           }
         }
         cu.timdMode      = iBestMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+        cu.timdModeCheckWA = true;
+#endif
         cu.timdIsBlended = false;
       }
       if (bHorVer)
@@ -5090,7 +5280,11 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
 #if SECONDARY_MPM
     uint8_t mpmList[NUM_MOST_PROBABLE_MODES];
     uint8_t intraNonMPM[NUM_NON_MPM_MODES];
-    PU::getIntraMPMs(pu, mpmList, intraNonMPM);
+    PU::getIntraMPMs(pu, mpmList, intraNonMPM
+#if JVET_AC0094_REF_SAMPLES_OPT
+                     , true
+#endif
+    );
 #else
     unsigned mpmList[NUM_MOST_PROBABLE_MODES];
     PU::getIntraMPMs(pu, mpmList);
@@ -5233,22 +5427,157 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
           iBestModeVer  = iMode;
         }
       }
-      
+    }
+#if JVET_AC0094_REF_SAMPLES_OPT
+    // Check modes removed due to WAIP
+    int modeShiftExt[] = { 0, 11, 19, 23, 27, 29 };
+    int deltaSize      = abs(floorLog2(uiWidth) - floorLog2(uiHeight));
+
+    // Compute max allowed mode and min allowed mode to not exceed ref
+    int maxModeOrig =
+      uiWidth >= uiHeight ? EXT_VDIA_IDX + modeShiftExt[deltaSize] : EXT_VDIA_IDX - modeShiftExt[deltaSize];
+    int minModeOrig = uiWidth >= uiHeight ? DC_IDX + 1 + modeShiftExt[deltaSize] : DC_IDX + 1 - modeShiftExt[deltaSize];
+
+    int newMinMode = minModeOrig;
+    int newMaxMode = maxModeOrig;
+
+    if (uiWidth >= uiHeight)
+    {
+      if (increaseMaxFar)
+      {
+        newMaxMode += modeShiftExt[std::min(deltaSize + 2, 5)] - modeShiftExt[deltaSize];
+      }
+      else if (increaseMaxClose)
+      {
+        newMaxMode += modeShiftExt[std::min(deltaSize + 1, 5)] - modeShiftExt[deltaSize];
+      }
+    }
+    if (uiWidth <= uiHeight)
+    {
+      if (decreaseMinFar)
+      {
+        newMinMode -= modeShiftExt[std::min(deltaSize + 2, 5)] - modeShiftExt[deltaSize];
+      }
+      else if (decreaseMinClose)
+      {
+        newMinMode -= modeShiftExt[std::min(deltaSize + 1, 5)] - modeShiftExt[deltaSize];
+      }
+    }
+    int previous = deltaSize;
+    int extRef   = (decreaseMinFar || increaseMaxFar) ? 2 : (decreaseMinClose || increaseMaxClose) ? 1 : 0;
+    for (int d = 1; d <= extRef; d++)
+    {
+      if (uiWidth > uiHeight)
+      {
+        newMinMode -= abs(modeShiftExt[abs(previous)] - modeShiftExt[std::min(abs(deltaSize - d), 5)]);
+      }
+      if (uiWidth < uiHeight)
+      {
+        newMaxMode += abs(modeShiftExt[abs(previous)] - modeShiftExt[std::min(abs(deltaSize - d), 5)]);
+      }
+      previous = deltaSize - d;
     }
 
+    {
+      for (int i = newMinMode + 1; i < newMaxMode; i += 5)
+      {
+        // Mode is a regular mode (already tested)
+        if (i >= minModeOrig && i <= maxModeOrig)
+        {
+          i = maxModeOrig - 1;
+          continue;
+        }
+        uint64_t uiCost = 0;
+        int      iMode  = i;
+        iMode           = getTimdRegularAngleExt(uiWidth, uiHeight, iMode);
+        initPredTimdIntraParams(pu, area, iMode, false, false);
+        iMode = getTimdWideAngleExt(uiWidth, uiHeight, iMode);
+        predTimdIntraAng(COMPONENT_Y, pu, iMode, piPred, uiPredStride, uiRealW, uiRealH, eTempType,
+                         (eTempType == ABOVE_NEIGHBOR) ? 0 : iTempWidth,
+                         (eTempType == LEFT_NEIGHBOR) ? 0 : iTempHeight);
+        if (eTempType == LEFT_ABOVE_NEIGHBOR)
+        {
+          uiCost += distParamSad[0].distFunc(distParamSad[0]);
+          uiCost += distParamSad[1].distFunc(distParamSad[1]);
+        }
+        else if (eTempType == LEFT_NEIGHBOR)
+        {
+          uiCost = distParamSad[1].distFunc(distParamSad[1]);
+        }
+        else if (eTempType == ABOVE_NEIGHBOR)
+        {
+          uiCost += distParamSad[0].distFunc(distParamSad[0]);
+        }
+        else
+        {
+          assert(0);
+        }
+
+        if (uiCost < uiBestCost)
+        {
+          uiSecondaryCost = uiBestCost;
+          iSecondaryMode  = iBestMode;
+          uiBestCost      = uiCost;
+          iBestMode             = iMode;
+          bSecondaryModeCheckWA = bBestModeCheckWA;
+          bBestModeCheckWA      = false;
+        }
+        else if (uiCost < uiSecondaryCost)
+        {
+          uiSecondaryCost = uiCost;
+          iSecondaryMode        = iMode;
+          bSecondaryModeCheckWA = false;
+        }
+        if (uiSecondaryCost <= maxCost)
+        {
+          break;
+        }
+      }
+    }
+#endif
     if(bFull)
     {
       int midMode = iBestMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+      bool checkWideAngle = bBestModeCheckWA;
+      if ((midMode > DC_IDX && uiBestCost > maxCost && checkWideAngle) || (uiBestCost > maxCost && !checkWideAngle))
+#else
       if (midMode > DC_IDX && uiBestCost > maxCost)
+#endif
       {
         for (int i = -1; i <= 1; i += 2)
         {
           int iMode = midMode + i;
+#if JVET_AC0094_REF_SAMPLES_OPT
+          if (checkWideAngle && (iMode <= DC_IDX || iMode > EXT_VDIA_IDX))
+          {
+            continue;
+          }
+          if (!checkWideAngle)
+          {
+            if (iMode >= minModeOrig && iMode <= maxModeOrig)
+            {
+              continue;
+            }
+            iMode = getTimdRegularAngleExt(uiWidth, uiHeight, iMode);
+          }
+#else
           if (iMode <= DC_IDX || iMode > EXT_VDIA_IDX)
           {
             continue;
           }
-          initPredTimdIntraParams(pu, area, iMode);
+#endif
+          initPredTimdIntraParams(pu, area, iMode
+#if JVET_AC0094_REF_SAMPLES_OPT
+              , false, checkWideAngle
+#endif
+          );
+#if JVET_AC0094_REF_SAMPLES_OPT
+          if (!checkWideAngle)
+          {
+            iMode = getTimdWideAngleExt(uiWidth, uiHeight, iMode);
+          }
+#endif
           predTimdIntraAng(COMPONENT_Y, pu, iMode, piPred, uiPredStride, uiRealW, uiRealH, eTempType,
                            (eTempType == ABOVE_NEIGHBOR) ? 0 : iTempWidth,
                            (eTempType == LEFT_NEIGHBOR) ? 0 : iTempHeight);
@@ -5284,16 +5613,45 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
       }
 
       midMode = iSecondaryMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+      checkWideAngle = bSecondaryModeCheckWA;
+      if ((midMode > DC_IDX && uiBestCost > maxCost && checkWideAngle) || (uiBestCost > maxCost && !checkWideAngle))
+#else
       if (midMode > DC_IDX && uiSecondaryCost > maxCost)
+#endif
       {
         for (int i = -1; i <= 1; i += 2)
         {
           int iMode = midMode + i;
+#if JVET_AC0094_REF_SAMPLES_OPT
+          if (checkWideAngle && (iMode <= DC_IDX || iMode > EXT_VDIA_IDX))
+#else
           if (iMode <= DC_IDX || iMode > EXT_VDIA_IDX)
+#endif
           {
             continue;
           }
-          initPredTimdIntraParams(pu, area, iMode);
+#if JVET_AC0094_REF_SAMPLES_OPT
+          if (!checkWideAngle)
+          {
+            if (iMode >= minModeOrig && iMode <= maxModeOrig)
+            {
+              continue;
+            }
+            iMode = getTimdRegularAngleExt(uiWidth, uiHeight, iMode);
+          }
+#endif
+          initPredTimdIntraParams(pu, area, iMode
+#if JVET_AC0094_REF_SAMPLES_OPT
+        , false, checkWideAngle
+#endif
+        );
+#if JVET_AC0094_REF_SAMPLES_OPT
+          if (!checkWideAngle)
+          {
+            iMode = getTimdWideAngleExt(uiWidth, uiHeight, iMode);
+          }
+#endif
           predTimdIntraAng(COMPONENT_Y, pu, iMode, piPred, uiPredStride, uiRealW, uiRealH, eTempType,
                            (eTempType == ABOVE_NEIGHBOR) ? 0 : iTempWidth,
                            (eTempType == LEFT_NEIGHBOR) ? 0 : iTempHeight);
@@ -5328,12 +5686,26 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
         }
       }
 
+#if JVET_AC0094_REF_SAMPLES_OPT
+      if (!bBestModeCheckWA)
+      {
+        iBestMode = getTimdRegularAngleExt(uiWidth, uiHeight, iBestMode);
+      }
+      if (!bSecondaryModeCheckWA)
+      {
+        iSecondaryMode = getTimdRegularAngleExt(uiWidth, uiHeight, iSecondaryMode);
+      }
+#endif
       // if( uiSecondaryCost < 2 * uiBestCost ), 2 * uiBestCost can overflow uint64_t
       if (uiSecondaryCost < uiBestCost || (uiSecondaryCost - uiBestCost < uiBestCost))
       {
         cu.timdMode          = iBestMode;
         cu.timdIsBlended     = true;
         cu.timdModeSecondary = iSecondaryMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+        cu.timdModeCheckWA          = bBestModeCheckWA;
+        cu.timdModeSecondaryCheckWA = bSecondaryModeCheckWA;
+#endif
 
         const int blend_sum_weight = 6;
         int       sum_weight       = 1 << blend_sum_weight;
@@ -5368,6 +5740,10 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
       }
       else
       {
+#if JVET_AC0094_REF_SAMPLES_OPT
+        cu.timdModeCheckWA          = bBestModeCheckWA;
+        cu.timdModeSecondaryCheckWA = true;
+#endif
         cu.timdMode      = iBestMode;
         cu.timdIsBlended = false;
       }
@@ -5382,6 +5758,10 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
   }
   else
   {
+#if JVET_AC0094_REF_SAMPLES_OPT
+    cu.timdModeCheckWA          = true;
+    cu.timdModeSecondaryCheckWA = true;
+#endif
     if (bFull)
     {
       cu.timdMode      = PLANAR_IDX;
@@ -5907,20 +6287,32 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
 
   int numIntraAbove = isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1));
   int numIntraLeft = isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1));
+#if JVET_AC0094_REF_SAMPLES_OPT
+  const int numIntraAboveRight = isAboveRightAvailable(cu, chType, area.topRight(), numAboveRightUnits, unitWidth, neighborFlags + totalLeftUnits + 1 + numAboveUnits);
+  const int numIntraBottomLeft = isBelowLeftAvailable(cu, chType, area.bottomLeft(), numLeftBelowUnits, unitHeight, neighborFlags + totalLeftUnits - 1 - numLeftUnits);
+#endif
 
   // ----- Step 2: build histogram of gradients -----
   int histogram[NUM_LUMA_MODE] = { 0 };
-  
+
   if (numIntraLeft)
   {
+#if JVET_AC0094_REF_SAMPLES_OPT
+    const uint32_t uiHeightLeft = (numIntraLeft + numIntraBottomLeft) * unitHeight - 1 - (!numIntraAbove ? 1 : 0);
+#else
     uint32_t uiHeightLeft = numIntraLeft * unitHeight - 1 - (!numIntraAbove ? 1 : 0);
+#endif
     const Pel *pRecoLeft = pReco - 2 + iStride * (!numIntraAbove ? 1 : 0);
     buildHistogram(pRecoLeft, iStride, uiHeightLeft, 1, histogram, 1, uiWidth, uiHeight);
   }
 
   if (numIntraAbove)
   {
+#if JVET_AC0094_REF_SAMPLES_OPT
+    const uint32_t uiWidthAbove = (numIntraAbove + numIntraAboveRight)*unitWidth - 1 - (!numIntraLeft ? 1 : 0);
+#else
     uint32_t uiWidthAbove = numIntraAbove * unitWidth - 1 - (!numIntraLeft ? 1 : 0);
+#endif
     const Pel *pRecoAbove = pReco - iStride * 2 + (!numIntraLeft ? 1 : 0);
     buildHistogram(pRecoAbove, iStride, 1, uiWidthAbove, histogram, 2, uiWidth, uiHeight);
   }
@@ -6192,37 +6584,72 @@ void IntraPrediction::deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBu
   int numIntraAbove = isAboveAvailable(cu, CHANNEL_TYPE_CHROMA, pos, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1));
   pos = posLT.offset(-2, 0); // get the availability of the third neighboring column
   int numIntraLeft = isLeftAvailable(cu, CHANNEL_TYPE_CHROMA, pos, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1));
+#if JVET_AC0094_REF_SAMPLES_OPT
+  const int numIntraAboveRight = std::min( isAboveRightAvailable(cu, CHANNEL_TYPE_CHROMA, areaCb.topRight().offset(0, -2), numAboveRightUnits, unitWidth, neighborFlags + totalLeftUnits + 1 + numAboveUnits)
+    , isAboveRightAvailable(cu, CHANNEL_TYPE_CHROMA, areaCb.topRight(), numAboveRightUnits, unitWidth, neighborFlags + totalLeftUnits + 1 + numAboveUnits) );
+  const int numIntraBottomLeft = std::min( isBelowLeftAvailable(cu, CHANNEL_TYPE_CHROMA, areaCb.bottomLeft().offset(-2, 0), numLeftBelowUnits, unitHeight, neighborFlags + totalLeftUnits - 1 - numLeftUnits)
+    , isBelowLeftAvailable(cu, CHANNEL_TYPE_CHROMA, areaCb.bottomLeft(), numLeftBelowUnits, unitHeight, neighborFlags + totalLeftUnits - 1 - numLeftUnits) );
+#endif
 
   int piHistogram[NUM_LUMA_MODE] = { 0 };
-
+#if JVET_AC0094_REF_SAMPLES_OPT
+  const uint32_t uiHeightLeftY = (numLeftUnits*unitHeight << getChannelTypeScaleY(CHANNEL_TYPE_CHROMA, sps.getChromaFormatIdc())) - 2;
+  const Pel* const pRecoLeftY = pRecoY + 1 + iStrideY;
+  buildHistogram(pRecoLeftY, iStrideY, uiHeightLeftY, 2, piHistogram, 1, uiWidthY, uiHeightY);
+#endif
   if (numIntraLeft)
   {
+#if JVET_AC0094_REF_SAMPLES_OPT
+    const uint32_t uiHeightLeftC = (numIntraLeft + numIntraBottomLeft)*unitHeight - 1 - (!numIntraAbove ? 1 : 0);
+#else
     uint32_t uiHeightLeftY = ((numIntraLeft * unitHeight) << getChannelTypeScaleY(CHANNEL_TYPE_CHROMA, sps.getChromaFormatIdc())) - 1 - (!numIntraAbove ? 1 : 0);
     uint32_t uiHeightLeftC = numIntraLeft * unitHeight - 1 - (!numIntraAbove ? 1 : 0);
+#endif
+#if !JVET_AC0094_REF_SAMPLES_OPT
     const Pel *pRecoLeftY = pRecoY - 2 + iStrideY * (!numIntraAbove ? 1 : 0);
+#endif
     const Pel *pRecoLeftCb = pRecoCb - 2 + iStrideCb * (!numIntraAbove ? 1 : 0);
     const Pel *pRecoLeftCr = pRecoCr - 2 + iStrideCr * (!numIntraAbove ? 1 : 0);
+#if !JVET_AC0094_REF_SAMPLES_OPT
     buildHistogram(pRecoLeftY, iStrideY, uiHeightLeftY, 1, piHistogram, 1, uiWidthY, uiHeightY);
+#endif
     buildHistogram(pRecoLeftCb, iStrideCb, uiHeightLeftC, 1, piHistogram, 1, uiWidthCb, uiHeightCb);
     buildHistogram(pRecoLeftCr, iStrideCr, uiHeightLeftC, 1, piHistogram, 1, uiWidthCr, uiHeightCr);
   }
+#if JVET_AC0094_REF_SAMPLES_OPT
+  const uint32_t uiWidthAboveY = (numAboveUnits*unitWidth << getChannelTypeScaleX(CHANNEL_TYPE_CHROMA, sps.getChromaFormatIdc())) - 4;
+  const Pel* const pRecoAboveY = pRecoY + 3 + iStrideY;
+  buildHistogram(pRecoAboveY, iStrideY, 2, uiWidthAboveY, piHistogram, 2, uiWidthY, uiHeightY);
+#endif
   if (numIntraAbove)
   {
+#if JVET_AC0094_REF_SAMPLES_OPT
+    const uint32_t uiWidthAboveC = (numIntraAbove + numIntraAboveRight)*unitWidth - 1 - (!numIntraLeft ? 1 : 0);
+#else
     uint32_t uiWidthAboveY = ((numIntraAbove * unitWidth) << getChannelTypeScaleX(CHANNEL_TYPE_CHROMA, sps.getChromaFormatIdc())) - 1 - (!numIntraLeft ? 1 : 0);
     uint32_t uiWidthAboveC = numIntraAbove * unitWidth - 1 - (!numIntraLeft ? 1 : 0);
+#endif
+#if !JVET_AC0094_REF_SAMPLES_OPT
     const Pel *pRecoAboveY = pRecoY - iStrideY * 2 + (!numIntraLeft ? 1 : 0);
+#endif
     const Pel *pRecoAboveCb = pRecoCb - iStrideCb * 2 + (!numIntraLeft ? 1 : 0);
     const Pel *pRecoAboveCr = pRecoCr - iStrideCr * 2 + (!numIntraLeft ? 1 : 0);
+#if !JVET_AC0094_REF_SAMPLES_OPT
     buildHistogram(pRecoAboveY, iStrideY, 1, uiWidthAboveY, piHistogram, 2, uiWidthY, uiHeightY);
+#endif
     buildHistogram(pRecoAboveCb, iStrideCb, 1, uiWidthAboveC, piHistogram, 2, uiWidthCb, uiHeightCb);
     buildHistogram(pRecoAboveCr, iStrideCr, 1, uiWidthAboveC, piHistogram, 2, uiWidthCr, uiHeightCr);
   }
   if (numIntraLeft && numIntraAbove)
   {
+#if !JVET_AC0094_REF_SAMPLES_OPT
     const Pel *pRecoAboveLeftY = pRecoY - 2 - iStrideY * 2;
+#endif
     const Pel *pRecoAboveLeftCb = pRecoCb - 2 - iStrideCb * 2;
     const Pel *pRecoAboveLeftCr = pRecoCr - 2 - iStrideCr * 2;
+#if !JVET_AC0094_REF_SAMPLES_OPT
     buildHistogram(pRecoAboveLeftY, iStrideY, 2, 2, piHistogram, 3, uiWidthY, uiHeightY);
+#endif
     buildHistogram(pRecoAboveLeftCb, iStrideCb, 2, 2, piHistogram, 3, uiWidthCb, uiHeightCb);
     buildHistogram(pRecoAboveLeftCr, iStrideCr, 2, 2, piHistogram, 3, uiWidthCr, uiHeightCr);
   }
@@ -6252,6 +6679,9 @@ void IntraPrediction::deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBu
   }
 
   cu.dimdChromaMode = firstMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  cu.dimdChromaModeSecond = secondMode;
+#else
   int dmMode = PU::getCoLocatedIntraLumaMode(*cu.firstPU);
   if (dmMode == firstMode)
   {
@@ -6261,6 +6691,7 @@ void IntraPrediction::deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBu
       cu.dimdChromaMode = DC_IDX;
     }
   }
+#endif
 }
 #endif
 
@@ -11076,8 +11507,13 @@ void IntraPrediction::xPredTmrlIntraAng(const CPelBuf& pSrc, const ClpRng& clpRn
   Pel* refMain;
   Pel* refSide;
 
+#if JVET_AC0094_REF_SAMPLES_OPT
+  Pel  refAbove[(MAX_CU_SIZE << 3)+ 3 + 33 * MAX_REF_LINE_IDX];
+  Pel  refLeft[(MAX_CU_SIZE << 3) + 3 + 33 * MAX_REF_LINE_IDX];
+#else
   Pel  refAbove[2 * MAX_CU_SIZE + 3 + 33 * MAX_REF_LINE_IDX];
   Pel  refLeft[2 * MAX_CU_SIZE + 3 + 33 * MAX_REF_LINE_IDX];
+#endif
   // initializing for safeguard.
   ::memset(refAbove, 0, sizeof(refAbove));
   ::memset(refLeft, 0, sizeof(refAbove));

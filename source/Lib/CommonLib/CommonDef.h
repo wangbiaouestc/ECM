@@ -496,6 +496,10 @@ static const int EXT_HOR_IDX =                                     34;
 static const int EXT_DIA_IDX =                                     66;
 static const int EXT_VER_IDX =                                     98;
 static const int EXT_VDIA_IDX =                                   130;
+#if JVET_AC0094_REF_SAMPLES_OPT
+static const int INVALID_TIMD_IDX =                                -1;
+static const int NUM_MODES_REMOVED_POSITIVE =                       5;
+#endif
 #define MAP131TO67( mode )                 (mode<2?mode:((mode>>1)+1))
 #define MAP67TO131( mode )                 (mode<2?mode:((mode<<1)-2))
 #endif
