@@ -1764,6 +1764,9 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 
     prevQP[0] = prevQP[1] = pcSlice->getSliceQp();
 
+#if JVET_AC0335_CONTENT_ADAPTIVE_OBMC_ENABLING && ENABLE_OBMC
+    int hashBlkHitPerc = -1;
+#endif
 
   if( ( !pcSlice->isIntra() && pcSlice->getSPS()->getFpelMmvdEnabledFlag() ) || ( pcSlice->getSPS()->getIBCFlag() && m_pcCuEncoder->getEncCfg()->getIBCHashSearch() ) )
   {
@@ -1774,10 +1777,30 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 #endif
     if (m_pcCfg->getIntraPeriod() != -1)
     {
+#if JVET_AC0335_CONTENT_ADAPTIVE_OBMC_ENABLING && ENABLE_OBMC
+      hashBlkHitPerc = m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y());
+#else
       int hashBlkHitPerc = m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y());
+#endif
       cs.slice->setDisableSATDForRD(hashBlkHitPerc > 59);
     }
   }
+
+#if JVET_AC0335_CONTENT_ADAPTIVE_OBMC_ENABLING && ENABLE_OBMC
+  if (m_pcCuEncoder->getEncCfg()->getUseOBMC())
+  {
+    if (cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE) // ensure sequential and parallel simulation generate same output
+    {
+      SPS* spsTmp = const_cast<SPS*>(cs.sps);
+      hashBlkHitPerc == -1 ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
+      bool hashScc = hashBlkHitPerc < 57;
+      spsTmp->setUseOBMC(hashScc);
+#if JVET_Z0061_TM_OBMC
+      spsTmp->setUseOBMCTMMode(hashScc);
+#endif
+    }
+  }
+#endif
 
   // for every CTU in the slice
   for( uint32_t ctuIdx = 0; ctuIdx < pcSlice->getNumCtuInSlice(); ctuIdx++ )

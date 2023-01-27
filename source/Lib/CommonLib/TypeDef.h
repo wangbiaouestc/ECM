@@ -246,6 +246,7 @@
 #define JVET_Z0056_GPM_SPLIT_MODE_REORDERING              1 // JVET-Z0056: Template matching based reordering for GPM split modes
 #if ENABLE_OBMC
 #define JVET_Z0061_TM_OBMC                                1 // JVET-Z0061: Template matching based OBMC
+#define JVET_AC0335_CONTENT_ADAPTIVE_OBMC_ENABLING        1 // JVET-AC0335: Content adaptive OBMC enabling
 #endif
 #define JVET_AA0132_CONFIGURABLE_TM_TOOLS                 1 // JVET-AA0132: Configuration parameters and SPS flags for template matching tools
 #define JVET_AB0079_TM_BCW_MRG                            1 // JVET-AB0079: Template matching based BCW index derivation for merge mode with positive weights only
