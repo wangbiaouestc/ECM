@@ -2238,6 +2238,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   }
 #endif
 #endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+  READ_FLAG( uiCode, "sps_fast_sub_tmvp_enabled_flag");              pcSPS->setUseFastSubTmvp( uiCode != 0 );
+#endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
   pcSPS->setUseTmvpNmvpReordering(false);
   if (pcSPS->getUseAML())
@@ -3792,10 +3795,17 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
       {
         READ_CODE(1, uiCode, "ph_collocated_from_l0_flag");
         picHeader->setPicColFromL0Flag(uiCode);
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        READ_CODE(1, uiCode, "ph_collocated_from_l0_flag_2nd");
+        picHeader->setPicColFromL0Flag2nd(uiCode);
+#endif
       }
       else
       {
         picHeader->setPicColFromL0Flag(1);
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        picHeader->setPicColFromL0Flag2nd(1);
+#endif
       }
       if ((picHeader->getPicColFromL0Flag() == 1 && picHeader->getRPL(0)->getNumRefEntries() > 1) ||
         (picHeader->getPicColFromL0Flag() == 0 && picHeader->getRPL(1)->getNumRefEntries() > 1))
@@ -3807,10 +3817,25 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
       {
         picHeader->setColRefIdx(0);
       }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+      if ((picHeader->getPicColFromL0Flag2nd() == 1 && picHeader->getRPL(0)->getNumRefEntries() > 1) ||
+        (picHeader->getPicColFromL0Flag2nd() == 0 && picHeader->getRPL(1)->getNumRefEntries() > 1))
+      {
+        READ_UVLC(uiCode, "ph_collocated_ref_idx_2nd");
+        picHeader->setColRefIdx2nd(uiCode);
+      }
+      else
+      {
+        picHeader->setColRefIdx2nd(0);
+      }
+#endif
     }
     else
     {
       picHeader->setPicColFromL0Flag(0);
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+      picHeader->setPicColFromL0Flag2nd(0);
+#endif
     }
 
 #if !JVET_R0324_REORDER
@@ -4813,15 +4838,25 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
       if( pcSlice->getSliceType() == P_SLICE )
       {
         pcSlice->setColFromL0Flag( true );
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+        pcSlice->setColFromL0Flag2nd( true );
+#endif
       }
       else if( !pps->getRplInfoInPhFlag() && pcSlice->getSliceType() == B_SLICE )
       {
         READ_FLAG( uiCode, "collocated_from_l0_flag" );
         pcSlice->setColFromL0Flag( uiCode );
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+        READ_FLAG( uiCode, "collocated_from_l0_flag_2nd" );
+        pcSlice->setColFromL0Flag2nd( uiCode );
+#endif
       }
       else
       {
         pcSlice->setColFromL0Flag( picHeader->getPicColFromL0Flag() );
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+        pcSlice->setColFromL0Flag2nd(picHeader->getPicColFromL0Flag2nd());
+#endif
       }
 
       if (!pps->getRplInfoInPhFlag())
@@ -4837,11 +4872,26 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
       {
         pcSlice->setColRefIdx(0);
       }
-
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+      if (pcSlice->getSliceType() != I_SLICE &&
+        ((pcSlice->getColFromL0Flag2nd() == 1 && pcSlice->getNumRefIdx(REF_PIC_LIST_0) > 1) ||
+        (pcSlice->getColFromL0Flag2nd() == 0 && pcSlice->getNumRefIdx(REF_PIC_LIST_1) > 1)))
+      {
+        READ_UVLC(uiCode, "collocated_ref_idx_2nd");
+        pcSlice->setColRefIdx2nd(uiCode);
+      }
+      else
+      {
+        pcSlice->setColRefIdx2nd(0);
+      }
+#endif
       }
       else
       {
         pcSlice->setColRefIdx(picHeader->getColRefIdx());
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+        pcSlice->setColRefIdx2nd(picHeader->getColRefIdx2nd());
+#endif
       }
     }
     if ( (pps->getUseWP() && pcSlice->getSliceType()==P_SLICE) || (pps->getWPBiPred() && pcSlice->getSliceType()==B_SLICE) )

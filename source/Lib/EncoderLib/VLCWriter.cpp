@@ -1371,6 +1371,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #endif
   WRITE_FLAG( pcSPS->getUseAML() ? 1 : 0,                                             "sps_aml_enabled_flag" );
 #endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+  WRITE_FLAG( pcSPS->getUseFastSubTmvp() ? 1 : 0,                                     "sps_fast_sub_tmvp_enabled_flag");
+#endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
   if (pcSPS->getUseAML())
   {
@@ -2440,12 +2443,22 @@ void HLSWriter::codePictureHeader( PicHeader* picHeader, bool writeRbspTrailingB
         if (picHeader->getRPL(1)->getNumRefEntries() > 0)
         {
           WRITE_CODE(picHeader->getPicColFromL0Flag(), 1, "ph_collocated_from_l0_flag");
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          WRITE_CODE(picHeader->getPicColFromL0Flag2nd(), 1, "ph_collocated_from_l0_flag_2nd");
+#endif
         }
         if ((picHeader->getPicColFromL0Flag() && picHeader->getRPL(0)->getNumRefEntries() > 1) ||
           (!picHeader->getPicColFromL0Flag() && picHeader->getRPL(1)->getNumRefEntries() > 1))
         {
           WRITE_UVLC(picHeader->getColRefIdx(), "ph_collocated_ref_idx");
         }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        if ((picHeader->getPicColFromL0Flag2nd() && picHeader->getRPL(0)->getNumRefEntries() > 1) ||
+          (!picHeader->getPicColFromL0Flag2nd() && picHeader->getRPL(1)->getNumRefEntries() > 1))
+        {
+          WRITE_UVLC(picHeader->getColRefIdx2nd(), "ph_collocated_ref_idx_2nd");
+        }
+#endif
       }
     }
     else
@@ -3000,6 +3013,9 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
         if (pcSlice->getSliceType() == B_SLICE)
         {
           WRITE_FLAG(pcSlice->getColFromL0Flag(), "collocated_from_l0_flag");
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          WRITE_FLAG(pcSlice->getColFromL0Flag2nd(), "collocated_from_l0_flag_2nd");
+#endif
         }
       }
 
@@ -3009,6 +3025,14 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
       {
         WRITE_UVLC( pcSlice->getColRefIdx(), "collocated_ref_idx" );
       }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+      if (pcSlice->getSliceType() != I_SLICE &&
+        ((pcSlice->getColFromL0Flag2nd() == 1 && pcSlice->getNumRefIdx(REF_PIC_LIST_0) > 1) ||
+        (pcSlice->getColFromL0Flag2nd() == 0 && pcSlice->getNumRefIdx(REF_PIC_LIST_1) > 1)))
+      {
+        WRITE_UVLC(pcSlice->getColRefIdx2nd(), "collocated_ref_idx_2nd");
+      }
+#endif
     }
 
     if( ( pcSlice->getPPS()->getUseWP() && pcSlice->getSliceType() == P_SLICE ) || ( pcSlice->getPPS()->getWPBiPred() && pcSlice->getSliceType() == B_SLICE ) )

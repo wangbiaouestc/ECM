@@ -1037,6 +1037,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   if (!slice.isIntra())
   {
     m_pcInterSearch->clearTplAmvpBuffer();
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    m_pcInterSearch->clearAmvpTmvpBuffer();
+#endif
   }
 #endif
 #if INTER_LIC
@@ -3419,17 +3422,38 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
   if (sps.getSbTMVPEnabledFlag())
   {
     Size bufSize = g_miScaling.scale(tempCS->area.lumaSize());
-    mergeCtx.subPuMvpMiBuf = MotionBuf( m_SubPuMiBuf, bufSize );
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+    for (int i = 0; i < SUB_TMVP_NUM; i++)
+    {
+      mergeCtx.subPuMvpMiBuf[i] = MotionBuf(m_SubPuMiBuf[i], bufSize);
+      mrgCtx.subPuMvpMiBuf[i] = MotionBuf(m_SubPuMiBuf[i], bufSize);
+    }
+#else
+    mergeCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
     mrgCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+#endif
     affineMergeCtx.mrgCtx = &mrgCtx;
 #if TM_MRG
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+    for (int i = 0; i < SUB_TMVP_NUM; i++)
+    {
+      tmMrgCtx.subPuMvpMiBuf[i] = MotionBuf(m_SubPuMiBuf[i], bufSize);
+#if JVET_X0141_CIIP_TIMD_TM
+      ciipTmMrgCtx.subPuMvpMiBuf[i] = MotionBuf(m_SubPuMiBuf[i], bufSize);
+#endif
+#if JVET_AB0079_TM_BCW_MRG
+      mrgCtxCiip.subPuMvpMiBuf[i] = MotionBuf(m_SubPuMiBuf[i], bufSize);
+#endif
+    }
+#else
     tmMrgCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
 #if JVET_X0141_CIIP_TIMD_TM
     ciipTmMrgCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
 #endif
-#endif
 #if JVET_AB0079_TM_BCW_MRG
     mrgCtxCiip.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+#endif
+#endif
 #endif
   }
 #endif
@@ -3608,7 +3632,43 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
     PU::getInterMergeCandidates(pu, mergeCtxtmp, 0);
 #endif
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+    MergeCtx mrgCtxAll[2];
+    for (int i = 0; i < 2; i++)
+    {
+      mrgCtxAll[i].numValidMergeCand = 0;
+    }
+    if (pu.cs->picHeader->getEnableTMVPFlag())
+    {
+      if (pu.cs->sps->getUseAML())
+      {
+        MergeCtx namvpMergeCandCtxSubTMVP[2];
+        int nWidth = pu.lumaSize().width;
+        int nHeight = pu.lumaSize().height;
+        bool tplAvail = m_pcInterSearch->xAMLGetCurBlkTemplate(pu, nWidth, nHeight);
+        int poc0 = slice.getRefPic(RefPicList(1 - slice.getColFromL0Flag()), slice.getColRefIdx())->getPOC();
+        int poc1 = slice.getRefPic(RefPicList(1 - slice.getColFromL0Flag2nd()), slice.getColRefIdx2nd())->getPOC();
+        for (int col = 0; col < ((pu.cu->slice->getCheckLDC() || (poc0 == poc1)) ? 1 : 2); col++)
+        {
+          PU::getNonAdjacentMergeCandSubTMVP(pu, namvpMergeCandCtxSubTMVP[col], col);
+          if (col == 0 && tplAvail)
+          {
+            m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroupSubTMVP(pu, namvpMergeCandCtxSubTMVP[col], 9);
+          }
+          else
+          {
+            namvpMergeCandCtxSubTMVP[col].numValidMergeCand = std::min(9, namvpMergeCandCtxSubTMVP[col].numValidMergeCand);
+          }
+          PU::getInterMergeCandidatesSubTMVP(pu, mrgCtxAll[col], col, -1, &namvpMergeCandCtxSubTMVP[col]);
 
+          if (col == 0 && tplAvail)
+          {
+            m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroupSubTMVP(pu, mrgCtxAll[col], pu.cs->sps->getMaxNumMergeCand());
+          }
+        }
+      }
+    }
+#endif
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
     if (cu.cs->sps->getUseCiipTmMrg())
     {
@@ -3955,6 +4015,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       pu.regularMergeFlag = false;
       cu.affine = true;
       PU::getAffineMergeCand(pu, affineMergeCtx
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION  
+        , mrgCtxAll
+#endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION && JVET_W0090_ARMC_TM
         , m_pcInterSearch
 #endif
@@ -5237,6 +5300,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         pu.interDir = affineMergeCtx.interDirNeighbours[uiMergeCand];
         cu.affineType = affineMergeCtx.affineType[uiMergeCand];
         cu.BcwIdx = affineMergeCtx.BcwIdx[uiMergeCand];
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        pu.colIdx = affineMergeCtx.colIdx[uiMergeCand];
+#endif
 #if INTER_LIC
         cu.LICFlag = affineMergeCtx.LICFlags[uiMergeCand];
 #endif
@@ -5253,7 +5319,11 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         {
           pu.refIdx[0] = affineMergeCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0][0].refIdx;
           pu.refIdx[1] = affineMergeCtx.mvFieldNeighbours[(uiMergeCand << 1) + 1][0].refIdx;
-          PU::spanMotionInfo(pu, mrgCtx);
+          PU::spanMotionInfo(pu, mrgCtx
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            , pu.colIdx
+#endif
+          );
         }
         else
         {
@@ -5344,10 +5414,18 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if MULTI_PASS_DMVR
       if( !pu.bdmvrRefine )
       {
-        PU::spanMotionInfo( pu, mergeCtx );
+        PU::spanMotionInfo(pu, mergeCtx
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          , pu.colIdx
+#endif
+        );
       }
 #else
-      PU::spanMotionInfo( pu, mergeCtx );
+        PU::spanMotionInfo(pu, mergeCtx
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          , pu.colIdx
+#endif
+        );
 #endif
 
       if( m_pcEncCfg->getMCTSEncConstraint() )
@@ -5489,18 +5567,30 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
               if ( pu.tmMergeFlag )
 #endif
               {
-                PU::spanMotionInfo( pu, mergeCtx, m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[( uiMergeCand << 1 ) + 1], m_pcInterSearch->getBdofSubPuMvOffset() );
+                PU::spanMotionInfo(pu, mergeCtx,
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                  pu.colIdx,
+#endif
+                  m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[(uiMergeCand << 1) + 1], m_pcInterSearch->getBdofSubPuMvOffset());
               }
               else
 #endif
 #if JVET_X0049_ADAPT_DMVR
               if( pu.bmMergeFlag ) 
               {
-                PU::spanMotionInfo( pu, bmMrgCtx, m_mvBufBDMVR4BM[uiMergeCand << 1], m_mvBufBDMVR4BM[( uiMergeCand << 1 ) + 1], m_pcInterSearch->getBdofSubPuMvOffset() );
+                PU::spanMotionInfo(pu, bmMrgCtx,
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                  pu.colIdx,
+#endif
+                  m_mvBufBDMVR4BM[uiMergeCand << 1], m_mvBufBDMVR4BM[(uiMergeCand << 1) + 1], m_pcInterSearch->getBdofSubPuMvOffset());
               }
               else
 #endif
-              PU::spanMotionInfo(pu, mergeCtx, m_mvBufBDMVR[uiMergeCand << 1], m_mvBufBDMVR[(uiMergeCand << 1) + 1], m_pcInterSearch->getBdofSubPuMvOffset());
+                PU::spanMotionInfo(pu, mergeCtx,
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                  pu.colIdx,
+#endif
+                  m_mvBufBDMVR[uiMergeCand << 1], m_mvBufBDMVR[(uiMergeCand << 1) + 1], m_pcInterSearch->getBdofSubPuMvOffset());
             }
 #endif
           }
@@ -5547,18 +5637,30 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if TM_MRG
               if( pu.tmMergeFlag )
               {
-                PU::spanMotionInfo( pu, mergeCtx, m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[( uiMergeCand << 1 ) + 1], m_mvBufEncBDOF4TM[uiMergeCand] );
+                PU::spanMotionInfo(pu, mergeCtx,
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                  pu.colIdx,
+#endif
+                  m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[(uiMergeCand << 1) + 1], m_mvBufEncBDOF4TM[uiMergeCand]);
               }
               else
 #endif
 #if JVET_X0049_ADAPT_DMVR
               if( pu.bmMergeFlag )
               {
-                PU::spanMotionInfo( pu, bmMrgCtx, m_mvBufBDMVR4BM[uiMergeCand << 1], m_mvBufBDMVR4BM[( uiMergeCand << 1 ) + 1], m_mvBufEncBDOF4BM[uiMergeCand] );
+                PU::spanMotionInfo(pu, bmMrgCtx,
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                  pu.colIdx,
+#endif
+                  m_mvBufBDMVR4BM[uiMergeCand << 1], m_mvBufBDMVR4BM[(uiMergeCand << 1) + 1], m_mvBufEncBDOF4BM[uiMergeCand]);
               }
               else
 #endif
-              PU::spanMotionInfo(pu, mergeCtx, m_mvBufBDMVR[uiMergeCand << 1], m_mvBufBDMVR[(uiMergeCand << 1) + 1], m_mvBufEncBDOF[uiMergeCand]);
+                PU::spanMotionInfo(pu, mergeCtx,
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                  pu.colIdx,
+#endif
+                  m_mvBufBDMVR[uiMergeCand << 1], m_mvBufBDMVR[(uiMergeCand << 1) + 1], m_mvBufEncBDOF[uiMergeCand]);
             }
 #endif
           }
@@ -5575,18 +5677,30 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if TM_MRG
           if( pu.tmMergeFlag )
           {
-            PU::spanMotionInfo( pu, mergeCtx, m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[( uiMergeCand << 1 ) + 1], m_pcInterSearch->getBdofSubPuMvOffset() );
+            PU::spanMotionInfo(pu, mergeCtx,
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+              pu.colIdx,
+#endif
+              m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[(uiMergeCand << 1) + 1], m_pcInterSearch->getBdofSubPuMvOffset());
           }
           else
 #endif
 #if JVET_X0049_ADAPT_DMVR 
             if (pu.bmMergeFlag)
             {
-              PU::spanMotionInfo(pu, bmMrgCtx, m_mvBufBDMVR4BM[uiMergeCand << 1], m_mvBufBDMVR4BM[(uiMergeCand << 1) + 1], m_mvBufEncBDOF4BM[uiMergeCand]);
+              PU::spanMotionInfo(pu, bmMrgCtx,
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                pu.colIdx,
+#endif
+                m_mvBufBDMVR4BM[uiMergeCand << 1], m_mvBufBDMVR4BM[(uiMergeCand << 1) + 1], m_mvBufEncBDOF4BM[uiMergeCand]);
             }
             else
 #endif
-            PU::spanMotionInfo(pu, mergeCtx, m_mvBufBDMVR[uiMergeCand << 1], m_mvBufBDMVR[(uiMergeCand << 1) + 1], m_pcInterSearch->getBdofSubPuMvOffset());
+              PU::spanMotionInfo(pu, mergeCtx,
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                pu.colIdx,
+#endif
+                m_mvBufBDMVR[uiMergeCand << 1], m_mvBufBDMVR[(uiMergeCand << 1) + 1], m_pcInterSearch->getBdofSubPuMvOffset());
         }
 #endif
       }
@@ -5693,7 +5807,14 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if TM_MRG
     for (int i = 0; i < GEO_NUM_TM_MV_CAND; i++)
     {
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+      for (int j = 0; j < SUB_TMVP_NUM; j++)
+      {
+        mergeCtx[i].subPuMvpMiBuf[j] = MotionBuf(m_SubPuMiBuf[j], bufSize);
+    }
+#else
       mergeCtx[i].subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+#endif
     }
 #else
     mergeCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
@@ -8402,7 +8523,14 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
   if (sps.getSbTMVPEnabledFlag())
   {
     Size bufSize = g_miScaling.scale(tempCS->area.lumaSize());
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+    for (int i = 0; i < SUB_TMVP_NUM; i++)
+    {
+      mergeCtx.subPuMvpMiBuf[i] = MotionBuf(m_SubPuMiBuf[i], bufSize);
+    }
+#else
     mergeCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+#endif
   }
 
   CodingUnit &cu = tempCS->addCU(tempCS->area, pm.chType);
@@ -9321,14 +9449,20 @@ void EncCu::xCheckSATDCostAffineMerge(CodingStructure *&tempCS, CodingUnit &cu, 
     pu.mv[0].setZero();
     pu.mv[1].setZero();
     cu.imv = 0;
-
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    pu.colIdx = affineMergeCtx.colIdx[uiAffMergeCand];
+#endif
     pu.mergeType = affineMergeCtx.mergeType[uiAffMergeCand];
     if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
     {
       pu.refIdx[0] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][0].refIdx;
       pu.refIdx[1] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][0].refIdx;
       // the SbTmvp use xSubPuMC which will need to access the motion buffer for subblock MV
-      PU::spanMotionInfo(pu, mrgCtx);
+      PU::spanMotionInfo(pu, mrgCtx
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        , pu.colIdx
+#endif 
+      );
     }
     else
     {
@@ -10031,7 +10165,11 @@ void EncCu::xCheckRDCostAffineMerge2Nx2N( CodingStructure *&tempCS, CodingStruct
         {
           pu.refIdx[0] = affineMergeCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0][0].refIdx;
           pu.refIdx[1] = affineMergeCtx.mvFieldNeighbours[(uiMergeCand << 1) + 1][0].refIdx;
-          PU::spanMotionInfo( pu, mrgCtx );
+          PU::spanMotionInfo(pu, mrgCtx
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            , pu.colIdx
+#endif
+          );
         }
         else
         {
@@ -10248,7 +10386,14 @@ void EncCu::xCheckRDCostAffineMmvd2Nx2N(CodingStructure *&tempCS, CodingStructur
   if (sps.getSbTMVPEnabledFlag())
   {
     Size bufSize = g_miScaling.scale(tempCS->area.lumaSize());
-    mrgCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+    for (int i = 0; i < SUB_TMVP_NUM; i++)
+    {
+      mergeCtx.subPuMvpMiBuf[i] = MotionBuf(m_SubPuMiBuf[i], bufSize);
+    }
+#else
+    mergeCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+#endif
     affineMergeCtx.mrgCtx = &mrgCtx;
   }
 
@@ -10560,7 +10705,14 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
   if (sps.getSbTMVPEnabledFlag())
   {
     Size bufSize = g_miScaling.scale(tempCS->area.lumaSize());
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+    for (int i = 0; i < SUB_TMVP_NUM; i++)
+    {
+      mergeCtx.subPuMvpMiBuf[i] = MotionBuf(m_SubPuMiBuf[i], bufSize);
+    }
+#else
     mergeCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+#endif
   }
 #if MULTI_PASS_DMVR
   bool applyBDMVR4TM[TM_MRG_MAX_NUM_CANDS] = { false };
@@ -10948,7 +11100,14 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
   if (sps.getSbTMVPEnabledFlag())
   {
     Size bufSize = g_miScaling.scale(tempCS->area.lumaSize());
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+    for (int i = 0; i < SUB_TMVP_NUM; i++)
+    {
+      mergeCtx.subPuMvpMiBuf[i] = MotionBuf(m_SubPuMiBuf[i], bufSize);
+    }
+#else
     mergeCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+#endif
   }
 
   {
@@ -11605,7 +11764,11 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
       }
 #endif
 #else
-      PU::spanMotionInfo(pu, mergeCtxTm);
+      PU::spanMotionInfo(pu, mergeCtxTm
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        , pu.colIdx
+#endif
+      );
 #endif
 
 #if JVET_AA0070_RRIBC
@@ -12347,7 +12510,11 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
             {
               bool mbvdCandMisAlign = mergeCtxTmp.setIbcMbvdMergeCandiInfo(pu, mergeCand - numPreviousBv, ibcMbvdLUT[mergeCand - numPreviousBv]);
               CHECK(mbvdCandMisAlign, "MBVD candidate is invalid");
-              PU::spanMotionInfo(pu, mergeCtxTmp);
+              PU::spanMotionInfo(pu, mergeCtxTmp
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                , pu.colIdx
+#endif
+              );
             }
             else
             {
@@ -12368,7 +12535,11 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
                 {
 #endif
                 mergeCtxTm.setMergeInfo(pu, mergeCand);
-                PU::spanMotionInfo(pu, mergeCtxTm);
+                PU::spanMotionInfo(pu, mergeCtxTm
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                  , pu.colIdx
+#endif
+                );
 #if JVET_AC0112_IBC_GPM
                 }
 #endif
@@ -12386,7 +12557,11 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
                 {
 #endif
                 mergeCtx.setMergeInfo(pu, mergeCand);
-                PU::spanMotionInfo(pu, mergeCtx);
+                PU::spanMotionInfo(pu, mergeCtx
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                  , pu.colIdx
+#endif
+                );
 #if JVET_AC0112_IBC_GPM
                 }
 #endif
@@ -14724,7 +14899,11 @@ void EncCu::predInterSearchAdditionalHypothesisMulti(const MEResultVec& in, MERe
     if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
     {
       // the SbTmvp use xSubPuMC which will need to access the motion buffer for subblock MV
-      PU::spanMotionInfo(pu, mrgCtx);
+      PU::spanMotionInfo(pu, mrgCtx
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        , pu.colIdx
+#endif       
+      );
     }
     else if (x.cu.affine)
     {
@@ -14782,7 +14961,14 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
   if (sps.getSbTMVPEnabledFlag())
   {
     Size bufSize = g_miScaling.scale(tempCS->area.lumaSize());
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION   
+    for (int i = 0; i < SUB_TMVP_NUM; i++)
+    {
+      mrgCtx.subPuMvpMiBuf[i] = MotionBuf(m_SubPuMiBuf[i], bufSize);
+    }
+#else
     mrgCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+#endif
   }
 
   // Hadamard-based pre-search
@@ -14855,10 +15041,18 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
     }
     else
     {
-      PU::spanMotionInfo(pu, mrgCtx);
+      PU::spanMotionInfo(pu, mrgCtx
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        , pu.colIdx
+#endif
+      );
     }
 #else
-    PU::spanMotionInfo(pu, mrgCtx);
+    PU::spanMotionInfo(pu, mrgCtx
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+      , pu.colIdx
+#endif
+    );
 #endif
     cu.skip = false;
     cu.mmvdSkip = false;
@@ -14875,18 +15069,30 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
 #if TM_MRG
       if( pu.tmMergeFlag )
       {
-        PU::spanMotionInfo( pu, mrgCtx, m_mvBufBDMVR4TM[pu.mergeIdx << 1], m_mvBufBDMVR4TM[( pu.mergeIdx << 1 ) + 1], m_pcInterSearch->getBdofSubPuMvOffset() );
+        PU::spanMotionInfo(pu, mrgCtx,
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          pu.colIdx,
+#endif
+          m_mvBufBDMVR4TM[pu.mergeIdx << 1], m_mvBufBDMVR4TM[(pu.mergeIdx << 1) + 1], m_pcInterSearch->getBdofSubPuMvOffset());
       }
       else
 #endif
 #if JVET_X0049_ADAPT_DMVR
       if( pu.bmMergeFlag )
       {
-        PU::spanMotionInfo( pu, mrgCtx, m_mvBufBDMVR4BM[pu.mergeIdx << 1], m_mvBufBDMVR4BM[( pu.mergeIdx << 1 ) + 1], m_pcInterSearch->getBdofSubPuMvOffset() );
+        PU::spanMotionInfo(pu, mrgCtx,
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          pu.colIdx,
+#endif
+          m_mvBufBDMVR4BM[pu.mergeIdx << 1], m_mvBufBDMVR4BM[(pu.mergeIdx << 1) + 1], m_pcInterSearch->getBdofSubPuMvOffset());
       }
       else
 #endif
-      PU::spanMotionInfo(pu, mrgCtx, m_mvBufBDMVR[pu.mergeIdx << 1], m_mvBufBDMVR[(pu.mergeIdx << 1) + 1], m_pcInterSearch->getBdofSubPuMvOffset());
+        PU::spanMotionInfo(pu, mrgCtx,
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          pu.colIdx,
+#endif
+          m_mvBufBDMVR[pu.mergeIdx << 1], m_mvBufBDMVR[(pu.mergeIdx << 1) + 1], m_pcInterSearch->getBdofSubPuMvOffset());
     }
 #endif
     pu.mvRefine = false;

@@ -598,7 +598,11 @@ public:
 #endif
   bool          hasMergedCandList;
 
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+  MotionBuf     subPuMvpMiBuf[SUB_TMVP_NUM];
+#else
   MotionBuf     subPuMvpMiBuf;
+#endif
   MotionBuf     subPuMvpExtMiBuf;
   MvField mmvdBaseMv[MMVD_BASE_MV_NUM][2];
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -615,6 +619,9 @@ public:
   bool          useAltHpelIf      [ NUM_MERGE_CANDS ];
 #else
   bool          useAltHpelIf      [ MRG_MAX_NUM_CANDS ];
+#endif
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  void saveMergeInfo(PredictionUnit& puTmp, PredictionUnit pu);
 #endif
   void setMergeInfo( PredictionUnit& pu, int candIdx );
 #if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Y0058_IBC_LIST_MODIFY
@@ -633,6 +640,9 @@ public:
 #else
   bool xCheckSimilarIBCMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
+#endif
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
+  bool xCheckSimilarMotionSubTMVP(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
 #if TM_MRG
   void copyRegularMergeCand( int dstCandIdx, MergeCtx& srcCtx, int srcCandIdx );
@@ -665,6 +675,9 @@ public:
 
   MergeCtx     *mrgCtx;
   MergeType     mergeType[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  int           colIdx[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#endif
 #if JVET_AB0112_AFFINE_DMVR
   bool          xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
@@ -688,6 +701,9 @@ public:
 
   MergeCtx     *mrgCtx;
   MergeType     mergeType[AFFINE_MRG_MAX_NUM_CANDS];
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  int           colIdx[AFFINE_MRG_MAX_NUM_CANDS];
+#endif
 #if JVET_AB0112_AFFINE_DMVR
   bool          xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif

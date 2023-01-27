@@ -2785,7 +2785,119 @@ uint8_t PU::getLFNSTIdx( int intraMode, int mtsMode )
   return g_lfnstLut[ intraMode ];
 }
 #endif
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+void PU::addMergeHMVPCandSubTMVP(const CodingStructure &cs, MergeCtx &mrgCtx, const int &mrgCandIdx,
+  const uint32_t maxNumMergeCand, int &cnt, const bool isAvailableA1,
+  const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove,
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
+  , const bool ibcFlag
+  , const bool isGt4x4
+#endif
+  const PredictionUnit &pu, int col
+#if TM_MRG || (JVET_Z0084_IBC_TM && !JVET_Z0075_IBC_HMVP_ENLARGE)
+  , const uint32_t mvdSimilarityThresh
+#endif
+)
+{
+  const Slice& slice = *cs.slice;
+  MotionInfo miNeighbor;
 
+  const Picture *pColPic = slice.getRefPic(RefPicList(col == 0 ? 1 - slice.getColFromL0Flag() : 1 - slice.getColFromL0Flag2nd()), col == 0 ? slice.getColRefIdx() : slice.getColRefIdx2nd());
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+#if JVET_Z0118_GDR  
+  bool isClean = cs.isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
+#endif // JVET_Z0118_GDR
+
+#if JVET_Z0118_GDR  
+  auto &lut = (isClean) ? cs.motionLut.lut1 : cs.motionLut.lut0;
+#else
+  auto &lut = cs.motionLut.lut;
+#endif // JVET_Z0118_GDR
+#else
+
+#if JVET_Z0118_GDR  
+  auto &lut = ibcFlag ? (isClean ? cs.motionLut.lutIbc1 : cs.motionLut.lutIbc0) : (isClean ? cs.motionLut.lut1 : cs.motionLut.lut0);
+#else
+  auto &lut = ibcFlag ? cs.motionLut.lutIbc : cs.motionLut.lut;
+#endif // JVET_Z0118_GDR
+
+#endif // JVET_Z0075_IBC_HMVP_ENLARGE
+  int numCandInLUT = (int)lut.size();
+
+  for (int mrgIdx = 1; mrgIdx <= numCandInLUT; mrgIdx++)
+  {
+    miNeighbor = lut[numCandInLUT - mrgIdx];
+
+#if !JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0128_NON_CTC
+    bool isValidAmMode = checkIsValidMergeMvCand(pu, miNeighbor.refIdx);
+#else
+    bool isValidAmMode = checkIsValidMergeMvCand(cs, pu, curPoc, amvpPoc, miNeighbor.refIdx);
+#endif
+    if (isValidAmMode &&
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+    (mrgIdx > 2
+#else
+      (mrgIdx > 2 || ((mrgIdx > 1 || !isGt4x4) && ibcFlag)
+#endif
+        || ((!isAvailableA1 || (miLeft != miNeighbor)) && (!isAvailableB1 || (miAbove != miNeighbor))))
+    )
+#else
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+    if (mrgIdx > 2
+#else
+    if (mrgIdx > 2 || ((mrgIdx > 1 || !isGt4x4) && ibcFlag)
+#endif
+      || ((!isAvailableA1 || (miLeft != miNeighbor)) && (!isAvailableB1 || (miAbove != miNeighbor))))
+#endif
+    {
+      int index = 0;
+      if ((miNeighbor.interDir & (1 << REF_PIC_LIST_0)) && slice.getRefPic(REF_PIC_LIST_0, miNeighbor.refIdx[0]) == pColPic)
+      {
+        index = 1;
+      }
+      else if (slice.isInterB() && (miNeighbor.interDir & (1 << REF_PIC_LIST_1)) && slice.getRefPic(REF_PIC_LIST_1, miNeighbor.refIdx[1]) == pColPic)
+      {
+        index = 2;
+      }
+      if (index > 0)
+      {
+        // get Inter Dir
+        mrgCtx.interDirNeighbours[cnt] = index;
+        miNeighbor.mv[index - 1].roundToPrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+        if (index == 1)
+        {
+          mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNeighbor.mv[index - 1], miNeighbor.refIdx[index - 1]);
+          mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), NOT_VALID);
+        }
+        else
+        {
+          mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(Mv(), NOT_VALID);
+          mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miNeighbor.mv[index - 1], miNeighbor.refIdx[index - 1]);
+        }
+
+#if NON_ADJACENT_MRG_CAND
+        if (mrgCtx.xCheckSimilarMotionSubTMVP(cnt
+#if TM_MRG
+          , mvdSimilarityThresh
+#endif
+        ))
+        {
+          continue;
+        }
+#endif
+        cnt++;
+
+        if (cnt == maxNumMergeCand)
+        {
+          break;
+        }
+      }
+    }
+    return;
+  }
+}
+#endif
 bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int &mrgCandIdx,
                           const uint32_t maxNumMergeCandMin1, int &cnt, const bool isAvailableA1,
                           const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
@@ -4110,7 +4222,396 @@ int PU::reorderInterMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, 
   }
 }
 #endif
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+void PU::getInterMergeCandidatesSubTMVP(const PredictionUnit &pu, MergeCtx& mrgCtx,
+  int col,
+  const int& mrgCandIdx
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  , MergeCtx* namvpMrgCtx
+#endif
+)
+{
+  const unsigned plevel = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
+  const CodingStructure &cs = *pu.cs;
+  const Slice &slice = *pu.cs->slice;
+  const Picture *pColPic = slice.getRefPic(RefPicList(col == 0 ? 1 - slice.getColFromL0Flag() : 1 - slice.getColFromL0Flag2nd()), col == 0 ? slice.getColRefIdx() : slice.getColRefIdx2nd());
+#if TM_MRG
+  const uint32_t mvdSimilarityThresh = SUB_TMVP_MV_THRESHOLD;
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  const uint32_t maxNumMergeCand = pu.tmMergeFlag ? TM_MRG_MAX_NUM_INIT_CANDS : SUB_TMVP_CANDIDATE_NUM;
+#else
+  const uint32_t maxNumMergeCand = pu.tmMergeFlag ? pu.cs->sps->getMaxNumTMMergeCand() : pu.cs->sps->getMaxNumMergeCand();
+#endif
+#else
+  const uint32_t maxNumMergeCand = pu.cs->sps->getMaxNumMergeCand();
+#endif
+  for (uint32_t ui = 0; ui < maxNumMergeCand; ++ui)
+  {
+    mrgCtx.BcwIdx[ui] = BCW_DEFAULT;
+#if INTER_LIC
+    mrgCtx.LICFlags[ui] = false;
+#endif
+    mrgCtx.interDirNeighbours[ui] = 0;
+    mrgCtx.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
+    mrgCtx.mvFieldNeighbours[(ui << 1) + 1].refIdx = NOT_VALID;
+    mrgCtx.useAltHpelIf[ui] = false;
+#if MULTI_HYP_PRED
+    mrgCtx.addHypNeighbours[ui].clear();
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+    mrgCtx.candCost[ui] = MAX_UINT64;
+#endif
+  }
+#if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
+  mrgCtx.numCandToTestEnc = maxNumMergeCand;
+#endif
+  // compute the location of the current PU
 
+  int cnt = 0;
+
+  const Position posLT = pu.Y().topLeft();
+  const Position posRT = pu.Y().topRight();
+  const Position posLB = pu.Y().bottomLeft();
+  MotionInfo miAbove, miLeft, miAboveLeft, miAboveRight, miBelowLeft;
+
+  // above
+  const PredictionUnit *puAbove = cs.getPURestricted(posRT.offset(0, -1), pu, pu.chType);
+
+#if JVET_Y0065_GPM_INTRA
+  bool isAvailableB1 = puAbove && isDiffMER(pu.lumaPos(), posRT.offset(0, -1), plevel) && pu.cu != puAbove->cu && CU::isInter(*puAbove->cu) && puAbove->getMotionInfo(posRT.offset(0, -1)).isInter;
+#else
+  bool isAvailableB1 = puAbove && isDiffMER(pu.lumaPos(), posRT.offset(0, -1), plevel) && pu.cu != puAbove->cu && CU::isInter(*puAbove->cu);
+#endif
+
+  if (isAvailableB1)
+  {
+    miAbove = puAbove->getMotionInfo(posRT.offset(0, -1));
+
+    int index = 0;
+    if ((miAbove.interDir & (1 << REF_PIC_LIST_0)) && slice.getRefPic(REF_PIC_LIST_0, miAbove.refIdx[0]) == pColPic)
+    {
+      index = 1;
+    }
+    else if (slice.isInterB() && (miAbove.interDir & (1 << REF_PIC_LIST_1)) && slice.getRefPic(REF_PIC_LIST_1, miAbove.refIdx[1]) == pColPic)
+    {
+      index = 2;
+    }
+    if (index > 0)
+    {
+      // get Inter Dir
+      mrgCtx.interDirNeighbours[cnt] = index;
+      miAbove.mv[index - 1].roundToPrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+      if (index == 1)
+      {
+        mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miAbove.mv[index - 1], miAbove.refIdx[index - 1]);
+        mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), NOT_VALID);
+      }
+      else
+      {
+        mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(Mv(), NOT_VALID);
+        mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miAbove.mv[index - 1], miAbove.refIdx[index - 1]);
+      }
+
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+      if (!mrgCtx.xCheckSimilarMotionSubTMVP(cnt
+#if TM_MRG
+        , mvdSimilarityThresh
+#endif
+      ))
+#endif
+      {
+        cnt++;
+      }
+    }
+  }
+
+  // early termination
+  if (cnt == maxNumMergeCand)
+  {
+    mrgCtx.numValidMergeCand = cnt;
+    return;
+  }
+
+  //left
+  const PredictionUnit* puLeft = cs.getPURestricted(posLB.offset(-1, 0), pu, pu.chType);
+
+#if JVET_Y0065_GPM_INTRA
+  const bool isAvailableA1 = puLeft && isDiffMER(pu.lumaPos(), posLB.offset(-1, 0), plevel) && pu.cu != puLeft->cu && CU::isInter(*puLeft->cu) && puLeft->getMotionInfo(posLB.offset(-1, 0)).isInter;
+#else
+  const bool isAvailableA1 = puLeft && isDiffMER(pu.lumaPos(), posLB.offset(-1, 0), plevel) && pu.cu != puLeft->cu && CU::isInter(*puLeft->cu);
+#endif
+
+  if (isAvailableA1)
+  {
+    miLeft = puLeft->getMotionInfo(posLB.offset(-1, 0));
+
+    {
+      int index = 0;
+      if ((miLeft.interDir & (1 << REF_PIC_LIST_0)) && slice.getRefPic(REF_PIC_LIST_0, miLeft.refIdx[0]) == pColPic)
+      {
+        index = 1;
+      }
+      else if (slice.isInterB() && (miLeft.interDir & (1 << REF_PIC_LIST_1)) && slice.getRefPic(REF_PIC_LIST_1, miLeft.refIdx[1]) == pColPic)
+      {
+        index = 2;
+      }
+      if (index > 0)
+      {
+        // get Inter Dir
+        mrgCtx.interDirNeighbours[cnt] = index;
+        miLeft.mv[index - 1].roundToPrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+        if (index == 1)
+        {
+          mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miLeft.mv[index - 1], miLeft.refIdx[index - 1]);
+          mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), NOT_VALID);
+        }
+        else
+        {
+          mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(Mv(), NOT_VALID);
+          mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miLeft.mv[index - 1], miLeft.refIdx[index - 1]);
+        }
+
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+        if (!mrgCtx.xCheckSimilarMotionSubTMVP(cnt
+#if TM_MRG
+          , mvdSimilarityThresh
+#endif
+        ))
+#endif
+        {
+          cnt++;
+        }
+      }
+    }
+  }
+
+  // early termination
+  if (cnt == maxNumMergeCand)
+  {
+    mrgCtx.numValidMergeCand = cnt;
+    return;
+  }
+
+  // above right
+  const PredictionUnit *puAboveRight = cs.getPURestricted(posRT.offset(1, -1), pu, pu.chType);
+
+#if JVET_Y0065_GPM_INTRA
+  bool isAvailableB0 = puAboveRight && isDiffMER(pu.lumaPos(), posRT.offset(1, -1), plevel) && CU::isInter(*puAboveRight->cu) && puAboveRight->getMotionInfo(posRT.offset(1, -1)).isInter;
+#else
+  bool isAvailableB0 = puAboveRight && isDiffMER(pu.lumaPos(), posRT.offset(1, -1), plevel) && CU::isInter(*puAboveRight->cu);
+#endif
+
+  if (isAvailableB0)
+  {
+    miAboveRight = puAboveRight->getMotionInfo(posRT.offset(1, -1));
+
+    {
+      int index = 0;
+      if ((miAboveRight.interDir & (1 << REF_PIC_LIST_0)) && slice.getRefPic(REF_PIC_LIST_0, miAboveRight.refIdx[0]) == pColPic)
+      {
+        index = 1;
+      }
+      else if (slice.isInterB() && (miAboveRight.interDir & (1 << REF_PIC_LIST_1)) && slice.getRefPic(REF_PIC_LIST_1, miAboveRight.refIdx[1]) == pColPic)
+      {
+        index = 2;
+      }
+      if (index > 0)
+      {
+        // get Inter Dir
+        mrgCtx.interDirNeighbours[cnt] = index;
+        miAboveRight.mv[index - 1].roundToPrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+        if (index == 1)
+        {
+          mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miAboveRight.mv[index - 1], miAboveRight.refIdx[index - 1]);
+          mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), NOT_VALID);
+        }
+        else
+        {
+          mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(Mv(), NOT_VALID);
+          mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miAboveRight.mv[index - 1], miAboveRight.refIdx[index - 1]);
+        }
+
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+        if (!mrgCtx.xCheckSimilarMotionSubTMVP(cnt
+#if TM_MRG
+          , mvdSimilarityThresh
+#endif
+        ))
+#endif
+        {
+          cnt++;
+        }
+      }
+    }
+  }
+  // early termination
+  if (cnt == maxNumMergeCand)
+  {
+    mrgCtx.numValidMergeCand = cnt;
+    return;
+  }
+
+  //left bottom
+  const PredictionUnit *puLeftBottom = cs.getPURestricted(posLB.offset(-1, 1), pu, pu.chType);
+
+#if JVET_Y0065_GPM_INTRA
+  bool isAvailableA0 = puLeftBottom && isDiffMER(pu.lumaPos(), posLB.offset(-1, 1), plevel) && CU::isInter(*puLeftBottom->cu) && puLeftBottom->getMotionInfo(posLB.offset(-1, 1)).isInter;
+#else
+  bool isAvailableA0 = puLeftBottom && isDiffMER(pu.lumaPos(), posLB.offset(-1, 1), plevel) && CU::isInter(*puLeftBottom->cu);
+#endif
+
+  if (isAvailableA0)
+  {
+    miBelowLeft = puLeftBottom->getMotionInfo(posLB.offset(-1, 1));
+
+    {
+      int index = 0;
+      if ((miBelowLeft.interDir & (1 << REF_PIC_LIST_0)) && slice.getRefPic(REF_PIC_LIST_0, miBelowLeft.refIdx[0]) == pColPic)
+      {
+        index = 1;
+      }
+      else if (slice.isInterB() && (miBelowLeft.interDir & (1 << REF_PIC_LIST_1)) && slice.getRefPic(REF_PIC_LIST_1, miBelowLeft.refIdx[1]) == pColPic)
+      {
+        index = 2;
+      }
+      if (index > 0)
+      {
+        // get Inter Dir
+        mrgCtx.interDirNeighbours[cnt] = index;
+        miBelowLeft.mv[index - 1].roundToPrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+        if (index == 1)
+        {
+          mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miBelowLeft.mv[index - 1], miBelowLeft.refIdx[index - 1]);
+          mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), NOT_VALID);
+        }
+        else
+        {
+          mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(Mv(), NOT_VALID);
+          mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miBelowLeft.mv[index - 1], miBelowLeft.refIdx[index - 1]);
+        }
+
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+        if (!mrgCtx.xCheckSimilarMotionSubTMVP(cnt
+#if TM_MRG
+          , mvdSimilarityThresh
+#endif
+        ))
+#endif
+        {
+          cnt++;
+        }
+      }
+    }
+  }
+  // early termination
+  if (cnt == maxNumMergeCand)
+  {
+    mrgCtx.numValidMergeCand = cnt;
+    return;
+  }
+
+  // above left
+  if (cnt < 4)
+  {
+    const PredictionUnit *puAboveLeft = cs.getPURestricted(posLT.offset(-1, -1), pu, pu.chType);
+
+#if JVET_Y0065_GPM_INTRA
+    bool isAvailableB2 = puAboveLeft && isDiffMER(pu.lumaPos(), posLT.offset(-1, -1), plevel) && CU::isInter(*puAboveLeft->cu) && puAboveLeft->getMotionInfo(posLT.offset(-1, -1)).isInter;
+#else
+    bool isAvailableB2 = puAboveLeft && isDiffMER(pu.lumaPos(), posLT.offset(-1, -1), plevel) && CU::isInter(*puAboveLeft->cu);
+#endif
+
+    if (isAvailableB2)
+    {
+      miAboveLeft = puAboveLeft->getMotionInfo(posLT.offset(-1, -1));
+
+      {
+
+        int index = 0;
+        if ((miAboveLeft.interDir & (1 << REF_PIC_LIST_0)) && slice.getRefPic(REF_PIC_LIST_0, miAboveLeft.refIdx[0]) == pColPic)
+        {
+          index = 1;
+        }
+        else if (slice.isInterB() && (miAboveLeft.interDir & (1 << REF_PIC_LIST_1)) && slice.getRefPic(REF_PIC_LIST_1, miAboveLeft.refIdx[1]) == pColPic)
+        {
+          index = 2;
+        }
+        if (index > 0)
+        {
+          // get Inter Dir
+          mrgCtx.interDirNeighbours[cnt] = index;
+          miAboveLeft.mv[index - 1].roundToPrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+          if (index == 1)
+          {
+            mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miAboveLeft.mv[index - 1], miAboveLeft.refIdx[index - 1]);
+            mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), NOT_VALID);
+          }
+          else
+          {
+            mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(Mv(), NOT_VALID);
+            mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miAboveLeft.mv[index - 1], miAboveLeft.refIdx[index - 1]);
+          }
+
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+          if (!mrgCtx.xCheckSimilarMotionSubTMVP(cnt
+#if TM_MRG
+            , mvdSimilarityThresh
+#endif
+          ))
+#endif
+          {
+            cnt++;
+          }
+        }
+      }
+    }
+    // early termination
+    if (cnt == maxNumMergeCand)
+    {
+      mrgCtx.numValidMergeCand = cnt;
+      return;
+    }
+  }
+#if NON_ADJACENT_MRG_CAND
+  if (namvpMrgCtx != NULL)
+  {
+    for (uint32_t ui = 0; ui < namvpMrgCtx->numValidMergeCand && cnt < maxNumMergeCand; ++ui)
+    {
+      mrgCtx.interDirNeighbours[cnt] = namvpMrgCtx->interDirNeighbours[ui];
+      mrgCtx.mvFieldNeighbours[cnt << 1] = namvpMrgCtx->mvFieldNeighbours[ui << 1];
+      mrgCtx.mvFieldNeighbours[(cnt << 1) + 1] = namvpMrgCtx->mvFieldNeighbours[(ui << 1) + 1];
+
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+      if (!mrgCtx.xCheckSimilarMotionSubTMVP(cnt
+#if TM_MRG
+        , mvdSimilarityThresh
+#endif
+      ))
+      {
+#endif
+        mrgCtx.candCost[cnt] = namvpMrgCtx->candCost[ui];
+        cnt++;
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+      }
+#endif
+    }
+  }
+#endif
+
+  if (cnt != maxNumMergeCand)
+  {
+    addMergeHMVPCandSubTMVP(cs, mrgCtx, mrgCandIdx, maxNumMergeCand, cnt
+      , isAvailableA1, miLeft, isAvailableB1, miAbove, pu, col
+#if TM_MRG
+      , mvdSimilarityThresh
+#endif
+    );
+  }
+  mrgCtx.numValidMergeCand = cnt;
+
+  return;
+}
+#endif
 void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
                                  int mmvdList,
                                  const int& mrgCandIdx
@@ -4679,7 +5180,7 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 
     Position posC0;
     Position posC1 = pu.Y().center();
-    bool C0Avail = false;
+    bool isC0Avail = false;
     bool boundaryCond = ((posRB.x + pcv.minCUWidth) < pcv.lumaWidth) && ((posRB.y + pcv.minCUHeight) < pcv.lumaHeight);
     const SubPic& curSubPic = pu.cs->slice->getPPS()->getSubPicFromPos(pu.lumaPos());
     if (curSubPic.getTreatedAsPicFlag())
@@ -4693,7 +5194,7 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
       if (posYInCtu + 4 < pcv.maxCUHeight)
       {
         posC0 = posRB.offset(4, 4);
-        C0Avail = true;
+        isC0Avail = true;
       }
     }
 
@@ -4701,91 +5202,120 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     int       iRefIdx     = 0;
     int       dir         = 0;
     unsigned  uiArrayAddr = cnt;
-    bool      bExistMV    = ( C0Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC0, cColMv, iRefIdx, false
-#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
-      , &iRefIdx
-#endif
-    ) )
-                              || getColocatedMVP( pu, REF_PIC_LIST_0, posC1, cColMv, iRefIdx, false
-#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
-                                , &iRefIdx
-#endif
-                              );
-    if (bExistMV)
+#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    int cntTmp = cnt;
+    for (int colIdx = 0; colIdx < (pu.cu->slice->isInterB() ? 2 : 1); colIdx++)
     {
-      dir     |= 1;
-      mrgCtx.mvFieldNeighbours[2 * uiArrayAddr].setMvField(cColMv, iRefIdx);
-    }
-
-    if (slice.isInterB())
-    {
-      bExistMV = ( C0Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC0, cColMv, iRefIdx, false
+      if (colIdx && cnt != cntTmp)
+      {
+        break;
+      }
+#endif
+      bool      bExistMV = (isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC0, cColMv, iRefIdx, false
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        , colIdx
+#elif JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        , 0
+#endif
         , &iRefIdx
 #endif
-      ) )
-                   || getColocatedMVP( pu, REF_PIC_LIST_1, posC1, cColMv, iRefIdx, false
+      ))
+        || getColocatedMVP(pu, REF_PIC_LIST_0, posC1, cColMv, iRefIdx, false
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
-                     , &iRefIdx
+#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          , colIdx
+#elif JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          , 0
 #endif
-                   );
+          , &iRefIdx
+#endif
+        );
       if (bExistMV)
       {
-        dir     |= 2;
-        mrgCtx.mvFieldNeighbours[2 * uiArrayAddr + 1].setMvField(cColMv, iRefIdx);
+        dir |= 1;
+        mrgCtx.mvFieldNeighbours[2 * uiArrayAddr].setMvField(cColMv, iRefIdx);
       }
-    }
+
+      if (slice.isInterB())
+      {
+        bExistMV = (isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC0, cColMv, iRefIdx, false
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          , colIdx
+#elif JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          , 0
+#endif
+          , &iRefIdx
+#endif
+        ))
+          || getColocatedMVP(pu, REF_PIC_LIST_1, posC1, cColMv, iRefIdx, false
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            , colIdx
+#elif JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            , 0
+#endif
+            , &iRefIdx
+#endif
+          );
+        if (bExistMV)
+        {
+          dir |= 2;
+          mrgCtx.mvFieldNeighbours[2 * uiArrayAddr + 1].setMvField(cColMv, iRefIdx);
+        }
+      }
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
-    int8_t tempRefIdx[2] = { mrgCtx.mvFieldNeighbours[2 * uiArrayAddr].refIdx, mrgCtx.mvFieldNeighbours[2 * uiArrayAddr + 1].refIdx };
+      int8_t tempRefIdx[2] = { mrgCtx.mvFieldNeighbours[2 * uiArrayAddr].refIdx, mrgCtx.mvFieldNeighbours[2 * uiArrayAddr + 1].refIdx };
 #if JVET_Y0128_NON_CTC
-    bool isValidAmMode = checkIsValidMergeMvCand(pu, tempRefIdx);
+      bool isValidAmMode = checkIsValidMergeMvCand(pu, tempRefIdx);
 #else
-    bool isValidAmMode = checkIsValidMergeMvCand(cs, pu, curPoc, amvpPoc, tempRefIdx);
+      bool isValidAmMode = checkIsValidMergeMvCand(cs, pu, curPoc, amvpPoc, tempRefIdx);
 #endif
-    if (isValidAmMode && ( dir != 0 ))
+      if (isValidAmMode && (dir != 0))
 #else
-    if( dir != 0 )
+      if (dir != 0)
 #endif
-    {
-      bool addTMvp = true;
-      if( addTMvp )
       {
-        mrgCtx.interDirNeighbours[uiArrayAddr] = dir;
+        bool addTMvp = true;
+        if (addTMvp)
+        {
+          mrgCtx.interDirNeighbours[uiArrayAddr] = dir;
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
-        if (useAmvpMergeMode)
-        {
-          mrgCtx.interDirNeighbours[cnt] = amvpMergeCtxMergeDir;
-          mrgCtx.mvFieldNeighbours[(cnt << 1) + amvpRefList].setMvField(Mv(), -1);
-        }
+          if (useAmvpMergeMode)
+          {
+            mrgCtx.interDirNeighbours[cnt] = amvpMergeCtxMergeDir;
+            mrgCtx.mvFieldNeighbours[(cnt << 1) + amvpRefList].setMvField(Mv(), -1);
+          }
 #endif
-        mrgCtx.BcwIdx[uiArrayAddr] = BCW_DEFAULT;
+          mrgCtx.BcwIdx[uiArrayAddr] = BCW_DEFAULT;
 #if INTER_LIC
-        mrgCtx.LICFlags[uiArrayAddr] = false;
+          mrgCtx.LICFlags[uiArrayAddr] = false;
 #endif
-        mrgCtx.useAltHpelIf[uiArrayAddr] = false;
+          mrgCtx.useAltHpelIf[uiArrayAddr] = false;
 #if MULTI_HYP_PRED
-        mrgCtx.addHypNeighbours[uiArrayAddr].clear();
+          mrgCtx.addHypNeighbours[uiArrayAddr].clear();
 #endif
 #if NON_ADJACENT_MRG_CAND || TM_MRG
-        if( !mrgCtx.xCheckSimilarMotion(cnt
+          if (!mrgCtx.xCheckSimilarMotion(cnt
 #if TM_MRG
-                               , mvdSimilarityThresh
+            , mvdSimilarityThresh
 #endif
-        ) )
-        {
+          ))
+          {
 #endif
-        if (mrgCandIdx == cnt)
-        {
-          return;
-        }
+            if (mrgCandIdx == cnt)
+            {
+              return;
+            }
 
-        cnt++;
+            cnt++;
 #if NON_ADJACENT_MRG_CAND || TM_MRG
-        }
+          }
 #endif
+        }
       }
-    }
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
     }
     else if (tmvpMrgCtx->numValidMergeCand > 0)
@@ -4794,9 +5324,9 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #if TM_MRG
       if (!pu.tmMergeFlag
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
-          || !pu.cs->sps->getUseTMMrgMode()
+        || !pu.cs->sps->getUseTMMrgMode()
 #endif
-      )
+        )
 #endif
       {
         for (uint32_t ui = 0; ui < tmvpMrgCtx->numValidMergeCand && cnt < maxNumMergeCand - 1; ++ui)
@@ -4805,9 +5335,9 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #if INTER_LIC
           mrgCtx.LICFlags[cnt] = tmvpMrgCtx->LICFlags[ui];
 #endif
-          mrgCtx.interDirNeighbours[cnt]     = tmvpMrgCtx->interDirNeighbours[ui];
+          mrgCtx.interDirNeighbours[cnt] = tmvpMrgCtx->interDirNeighbours[ui];
           mrgCtx.mvFieldNeighbours[cnt << 1] = tmvpMrgCtx->mvFieldNeighbours[ui << 1];
-          mrgCtx.useAltHpelIf[cnt]           = tmvpMrgCtx->useAltHpelIf[ui];
+          mrgCtx.useAltHpelIf[cnt] = tmvpMrgCtx->useAltHpelIf[ui];
           if (slice.isInterB())
           {
             mrgCtx.mvFieldNeighbours[(cnt << 1) + 1] = tmvpMrgCtx->mvFieldNeighbours[(ui << 1) + 1];
@@ -4819,9 +5349,9 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #if NON_ADJACENT_MRG_CAND || TM_MRG
           if (!mrgCtx.xCheckSimilarMotion(cnt
 #if TM_MRG
-                                          , mvdSimilarityThresh
+            , mvdSimilarityThresh
 #endif
-                                          ))
+          ))
           {
 #endif
             mrgCtx.candCost[cnt] = tmvpMrgCtx->candCost[ui];
@@ -4843,9 +5373,9 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #if INTER_LIC
         mrgCtx.LICFlags[cnt] = tmvpMrgCtx->LICFlags[0];
 #endif
-        mrgCtx.interDirNeighbours[cnt]     = tmvpMrgCtx->interDirNeighbours[0];
+        mrgCtx.interDirNeighbours[cnt] = tmvpMrgCtx->interDirNeighbours[0];
         mrgCtx.mvFieldNeighbours[cnt << 1] = tmvpMrgCtx->mvFieldNeighbours[0];
-        mrgCtx.useAltHpelIf[cnt]           = tmvpMrgCtx->useAltHpelIf[0];
+        mrgCtx.useAltHpelIf[cnt] = tmvpMrgCtx->useAltHpelIf[0];
         if (slice.isInterB())
         {
           mrgCtx.mvFieldNeighbours[(cnt << 1) + 1] = tmvpMrgCtx->mvFieldNeighbours[1];
@@ -4857,9 +5387,9 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #if NON_ADJACENT_MRG_CAND || TM_MRG
         if (!mrgCtx.xCheckSimilarMotion(cnt
 #if TM_MRG
-                                        ,mvdSimilarityThresh
+          , mvdSimilarityThresh
 #endif
-                                        ))
+        ))
         {
 #endif
           mrgCtx.candCost[cnt] = tmvpMrgCtx->candCost[0];
@@ -4912,6 +5442,9 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     }
 #endif
 #endif
+#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  }
+#endif
   }
 
   // early termination
@@ -4928,7 +5461,7 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   MotionInfo miNeighbor;
   int offsetX = 0;
   int offsetY = 0;
-  const int iNACANDIDATE_NUM[4] = { 3, 5, 5, 5 };
+  const int numNACandidate[4] = { 3, 5, 5, 5 };
   const int idxMap[4][5] = { { 0, 1, 4 },{ 0, 1, 2, 3, 4 },{ 0, 1, 2, 3, 4 },{ 0, 1, 2, 3, 4 } };
 
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
@@ -4947,9 +5480,9 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     const int iNADistanceVer = pu.Y().height * (iDistanceIndex + 1);
 
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
-    for (int NASPIdx = 0; NASPIdx < iNACANDIDATE_NUM[iDistanceIndex] && cnt < maxNumMergeCand; NASPIdx++)
+    for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex] && cnt < maxNumMergeCand; iNASPIdx++)
 #else
-    for (int NASPIdx = 0; NASPIdx < iNACANDIDATE_NUM[iDistanceIndex] && cnt < maxNumMergeCand - 1; NASPIdx++)
+    for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex] && cnt < maxNumMergeCand - 1; iNASPIdx++)
 #endif
     {
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
@@ -4958,7 +5491,7 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
         continue;
       }
 #endif
-      switch (idxMap[iDistanceIndex][NASPIdx])
+      switch (idxMap[iDistanceIndex][iNASPIdx])
       {
       case 0:offsetX = -iNADistanceHor - 1; offsetY = pu.Y().height + iNADistanceVer - 1; break;
       case 1:offsetX = pu.Y().width + iNADistanceHor - 1; offsetY = -iNADistanceVer - 1; break;
@@ -5458,11 +5991,11 @@ bool PU::addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const i
 #endif
 #endif
 
-  int num_avai_candInLUT = (int)lut.size();
+  int numCandInLUT = (int)lut.size();
 
-  for (int mrgIdx = 1; mrgIdx <= num_avai_candInLUT; mrgIdx++)
+  for (int mrgIdx = 1; mrgIdx <= numCandInLUT; mrgIdx++)
   {
-    miNeighbor = lut[num_avai_candInLUT - mrgIdx];
+    miNeighbor = lut[numCandInLUT - mrgIdx];
 
 #if JVET_Z0075_IBC_HMVP_ENLARGE
     if ( mrgIdx > 2
@@ -6899,7 +7432,7 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
 
     Position posC0;
     Position posC1 = pu.Y().center();
-    bool C0Avail = false;
+    bool isC0Avail = false;
     bool boundaryCond = ((posRB.x + pcv.minCUWidth) < pcv.lumaWidth) && ((posRB.y + pcv.minCUHeight) < pcv.lumaHeight);
     const SubPic& curSubPic = pu.cs->slice->getPPS()->getSubPicFromPos(pu.lumaPos());
     if (curSubPic.getTreatedAsPicFlag())
@@ -6913,7 +7446,7 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
       if (posYInCtu + 4 < pcv.maxCUHeight)
       {
         posC0 = posRB.offset(4, 4);
-        C0Avail = true;
+        isC0Avail = true;
       }
     }
 
@@ -6921,7 +7454,7 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
     int       iRefIdx = 0;
     int       dir = 0;
     unsigned  uiArrayAddr = cnt;
-    bool      bExistMV = (C0Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC0, cColMv, iRefIdx, false))
+    bool      bExistMV = (isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC0, cColMv, iRefIdx, false))
       || getColocatedMVP(pu, REF_PIC_LIST_0, posC1, cColMv, iRefIdx, false);
     if (bExistMV)
     {
@@ -6931,7 +7464,7 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
 
     if (slice.isInterB())
     {
-      bExistMV = (C0Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC0, cColMv, iRefIdx, false))
+      bExistMV = (isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC0, cColMv, iRefIdx, false))
         || getColocatedMVP(pu, REF_PIC_LIST_1, posC1, cColMv, iRefIdx, false);
       if (bExistMV)
       {
@@ -7047,7 +7580,7 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
   MotionInfo miNeighbor;
   int offsetX = 0;
   int offsetY = 0;
-  const int iNACANDIDATE_NUM[4] = { 3, 5, 5, 5 };
+  const int numNACandidate[4] = { 3, 5, 5, 5 };
   const int idxMap[4][5] = { { 0, 1, 4 },{ 0, 1, 2, 3, 4 },{ 0, 1, 2, 3, 4 },{ 0, 1, 2, 3, 4 } };
 
   for (int iDistanceIndex = 0; iDistanceIndex < NADISTANCE_LEVEL && cnt < maxNumMergeCandMin1; iDistanceIndex++)
@@ -7055,9 +7588,9 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
     const int iNADistanceHor = pu.Y().width  * (iDistanceIndex + 1);
     const int iNADistanceVer = pu.Y().height * (iDistanceIndex + 1);
 
-    for (int NASPIdx = 0; NASPIdx < iNACANDIDATE_NUM[iDistanceIndex] && cnt < maxNumMergeCandMin1; NASPIdx++)
+    for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex] && cnt < maxNumMergeCandMin1; iNASPIdx++)
     {
-      switch (idxMap[iDistanceIndex][NASPIdx])
+      switch (idxMap[iDistanceIndex][iNASPIdx])
       {
       case 0:offsetX = -iNADistanceHor - 1; offsetY = pu.Y().height + iNADistanceVer - 1; break;
       case 1:offsetX = pu.Y().width + iNADistanceHor - 1; offsetY = -iNADistanceVer - 1; break;
@@ -7306,8 +7839,8 @@ void PU::getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
     //>> MTK colocated-RightBottom
     // offset the pos to be sure to "point" to the same position the uiAbsPartIdx would've pointed to
     const PreCalcValues& pcv = *cs.pcv;
-    bool C0Avail;
-    bool C1Avail;
+    bool isC0Avail;
+    bool isC1Avail;
     bool boundaryCond;
     const SubPic& curSubPic = pu.cs->slice->getPPS()->getSubPicFromPos(pu.lumaPos());
     Position posRB = pu.Y().bottomRight().offset(-3, -3);
@@ -7323,23 +7856,23 @@ void PU::getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
     int offsetX0 = 0, offsetX1 = 0, offsetX2 = 0, offsetX3 = pu.Y().width >> 1;
     int offsetY0 = 0, offsetY1 = 0, offsetY2 = 0, offsetY3 = pu.Y().height >> 1;
 
-    const int iNACANDIDATE_NUM[5] = { 2, 2, 2, 2, 2 };
+    const int numNACandidate[5] = { 2, 2, 2, 2, 2 };
     const int idxMap[5][2] = { { 0, 1 },{ 0, 2 },{ 0, 2 },{ 0, 2 },{ 0, 2 } };
     for (int iDistanceIndex = 0; iDistanceIndex < TMVP_DISTANCE_LEVEL && cnt < maxNumMergeCand; iDistanceIndex++)
     {
       const int iNADistanceHor = pu.Y().width  * iDistanceIndex;
       const int iNADistanceVer = pu.Y().height * iDistanceIndex;
 
-      for (int NASPIdx = 0; NASPIdx < iNACANDIDATE_NUM[iDistanceIndex] && cnt < maxNumMergeCand; NASPIdx++)
+      for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex] && cnt < maxNumMergeCand; iNASPIdx++)
       {
-        switch (idxMap[iDistanceIndex][NASPIdx])
+        switch (idxMap[iDistanceIndex][iNASPIdx])
         {
         case 0: offsetX0 = offsetX2 = 4 + iNADistanceHor; offsetY0 = offsetY2 = 4 + iNADistanceVer; offsetX1 = iNADistanceHor; offsetY1 = iNADistanceVer; break;
         case 1: offsetX0 = 4; offsetY0 = 0; offsetX1 = 0; offsetY1 = 4; break;
         case 2: offsetX0 = offsetX2; offsetY0 = 4 - offsetY3; offsetX1 = 4 - offsetX3; offsetY1 = offsetY2; break;
         default: printf("error!"); exit(0); break;
         }
-        C0Avail = false;
+        isC0Avail = false;
         if (curSubPic.getTreatedAsPicFlag())
         {
           boundaryCond = ((posRB.x + offsetX0) <= curSubPic.getSubPicRight() && (posRB.y + offsetY0) <= curSubPic.getSubPicBottom());
@@ -7354,13 +7887,13 @@ void PU::getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
           if (posYInCtu + offsetY0 < pcv.maxCUHeight)
           {
             posC0 = posRB.offset(offsetX0, offsetY0);
-            C0Avail = true;
+            isC0Avail = true;
           }
         }
 
-        if (idxMap[iDistanceIndex][NASPIdx] == 0)
+        if (idxMap[iDistanceIndex][iNASPIdx] == 0)
         {
-          C1Avail = false;
+          isC1Avail = false;
           if (curSubPic.getTreatedAsPicFlag())
           {
             boundaryCond = ((posCenter.x + offsetX1) <= curSubPic.getSubPicRight() && (posCenter.y + offsetY1) <= curSubPic.getSubPicBottom());
@@ -7375,13 +7908,13 @@ void PU::getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
             if (posYInCtu + offsetY1 < pcv.maxCUHeight)
             {
               posC1 = posCenter.offset(offsetX1, offsetY1);
-              C1Avail = true;
+              isC1Avail = true; 
             }
           }
         }
         else
         {
-          C1Avail = false;
+          isC1Avail = false;
           if (curSubPic.getTreatedAsPicFlag())
           {
             boundaryCond = ((posRB.x + offsetX1) <= curSubPic.getSubPicRight() && (posRB.y + offsetY1) <= curSubPic.getSubPicBottom());
@@ -7396,7 +7929,7 @@ void PU::getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
             if (posYInCtu + offsetY1 < pcv.maxCUHeight)
             {
               posC1 = posRB.offset(offsetX1, offsetY1);
-              C1Avail = true;
+              isC1Avail = true;
             }
           }
         }
@@ -7405,8 +7938,16 @@ void PU::getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 
         // Candidate with L0 and L1
         dir = 0;
-        bExistMV0 = (C0Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC0, cColMv0, iRefIdx, false))
-          || (C1Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC1, cColMv0, iRefIdx, false));
+        bExistMV0 = (isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC0, cColMv0, iRefIdx, false
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          , 0
+#endif
+        ))
+          || (isC1Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC1, cColMv0, iRefIdx, false
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            , 0
+#endif
+          ));
         if (bExistMV0)
         {
           dir |= 1;
@@ -7418,8 +7959,16 @@ void PU::getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
         }
         if (slice.isInterB())
         {
-          bExistMV1 = (C0Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC0, cColMv1, iRefIdx, false))
-            || (C1Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC1, cColMv1, iRefIdx, false));
+          bExistMV1 = (isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC0, cColMv1, iRefIdx, false
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            , 0
+#endif
+          ))
+            || (isC1Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC1, cColMv1, iRefIdx, false
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+              , 0
+#endif
+            ));
           if (bExistMV1)
           {
             dir |= 2;
@@ -7502,7 +8051,7 @@ void PU::getNonAdjacentBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
   int offsetX0 = 0; int offsetX1 = 0; int offsetX2 = pu.Y().width >> 1;
   int offsetY0 = 0; int offsetY1 = 0; int offsetY2 = pu.Y().height >> 1;
 
-  const int iNACANDIDATE_NUM[7] = { 5, 9, 9, 9, 9, 9, 9 };
+  const int numNACandidate[7] = { 5, 9, 9, 9, 9, 9, 9 };
   const int idxMap[7][9] = { { 0, 1, 2, 3, 4 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 } };
 
   for (int iDistanceIndex = 0; iDistanceIndex < 7 && cnt < maxNumMergeCand; iDistanceIndex++)
@@ -7510,9 +8059,9 @@ void PU::getNonAdjacentBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
     const int iNADistanceHor = pu.Y().width  * (iDistanceIndex + 1);
     const int iNADistanceVer = pu.Y().height * (iDistanceIndex + 1);
 
-    for (int NASPIdx = 0; NASPIdx < iNACANDIDATE_NUM[iDistanceIndex] && cnt < maxNumMergeCand; NASPIdx++)
+    for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex] && cnt < maxNumMergeCand; iNASPIdx++)
     {
-      switch (idxMap[iDistanceIndex][NASPIdx])
+      switch (idxMap[iDistanceIndex][iNASPIdx])
       {
       case 0:offsetX = offsetX0 = -iNADistanceHor - 1;               offsetY = offsetY0 = pu.Y().height + iNADistanceVer - 1; break;
       case 1:offsetX = offsetX1 = pu.Y().width + iNADistanceHor - 1; offsetY = offsetY1 = -iNADistanceVer - 1;                break;
@@ -7556,7 +8105,7 @@ void PU::getNonAdjacentBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
     }
   }
 
-  const int iNACANDIDATE_NUM2[7] = { 4, 4, 4, 4, 4, 4, 4 };
+  const int numNACandidate2[7] = { 4, 4, 4, 4, 4, 4, 4 };
   const int idxMap2[7][5] = { { 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 } };
 
   for (int iDistanceIndex = 0; iDistanceIndex < 7 && cnt < maxNumMergeCand; iDistanceIndex++)
@@ -7564,9 +8113,9 @@ void PU::getNonAdjacentBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
     const int iNADistanceHor = pu.Y().width  * (iDistanceIndex + 1);
     const int iNADistanceVer = pu.Y().height * (iDistanceIndex + 1);
 
-    for (int NASPIdx = 0; NASPIdx < iNACANDIDATE_NUM2[iDistanceIndex] && cnt < maxNumMergeCand; NASPIdx++)
+    for (int iNASPIdx = 0; iNASPIdx < numNACandidate2[iDistanceIndex] && cnt < maxNumMergeCand; iNASPIdx++)
     {
-      switch (idxMap2[iDistanceIndex][NASPIdx])
+      switch (idxMap2[iDistanceIndex][iNASPIdx])
       {
       case 0:offsetX = offsetX0 = -iNADistanceHor - 1;                                                         offsetY = offsetY2 + ((pu.Y().height + iNADistanceVer - 1 - offsetY2) >> 1); break;
       case 1:offsetX = offsetX2 + ((pu.Y().width + iNADistanceHor - 1 - offsetX2) >> 1);                       offsetY = offsetY0 = -iNADistanceVer - 1; break;
@@ -7631,7 +8180,7 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
                                    pu.cs->sps->getUseTMMrgMode() &&
 #endif
-                                   pu.tmMergeFlag ? 1 :NUM_TMVP_CANDS;
+                                   pu.tmMergeFlag ? 1 : NUM_TMVP_CANDS;
 #else
   const uint32_t maxNumMergeCand = NUM_TMVP_CANDS;
 #endif
@@ -7652,7 +8201,6 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
   }
 
   int cnt = 0;
-
 #if INTER_RM_SIZE_CONSTRAINTS
   if (slice.getPicHeader()->getEnableTMVPFlag())
 #else
@@ -7662,8 +8210,8 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
     //>> MTK colocated-RightBottom
     // offset the pos to be sure to "point" to the same position the uiAbsPartIdx would've pointed to
     const PreCalcValues& pcv = *cs.pcv;
-    bool C0Avail;
-    bool C1Avail;
+    bool isC0Avail;
+    bool isC1Avail;
     bool boundaryCond;
     const SubPic& curSubPic = pu.cs->slice->getPPS()->getSubPicFromPos(pu.lumaPos());
     Position posRB = pu.Y().bottomRight().offset(-3, -3);
@@ -7679,23 +8227,23 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
     int offsetX0 = 0, offsetX1 = 0, offsetX2 = 0, offsetX3 = pu.Y().width >> 1;
     int offsetY0 = 0, offsetY1 = 0, offsetY2 = 0, offsetY3 = pu.Y().height >> 1;
 
-    const int iNACANDIDATE_NUM[5] = { 2, 2, 2, 2, 2 };
+    const int numNACandidate[5] = { 2, 2, 2, 2, 2 };
     const int idxMap[5][2] = { { 0, 1 },{ 0, 2 },{ 0, 2 },{ 0, 2 },{ 0, 2 } };
     for (int iDistanceIndex = 0; iDistanceIndex < TMVP_DISTANCE_LEVEL && cnt < maxNumMergeCand; iDistanceIndex++)
     {
       const int iNADistanceHor = pu.Y().width  * iDistanceIndex;
       const int iNADistanceVer = pu.Y().height * iDistanceIndex;
 
-      for (int NASPIdx = 0; NASPIdx < iNACANDIDATE_NUM[iDistanceIndex] && cnt < maxNumMergeCand; NASPIdx++)
+      for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex] && cnt < maxNumMergeCand; iNASPIdx++)
       {
-        switch (idxMap[iDistanceIndex][NASPIdx])
+        switch (idxMap[iDistanceIndex][iNASPIdx])
         {
         case 0: offsetX0 = offsetX2 = 4 + iNADistanceHor; offsetY0 = offsetY2 = 4 + iNADistanceVer; offsetX1 = iNADistanceHor; offsetY1 = iNADistanceVer; break;
         case 1: offsetX0 = 4; offsetY0 = 0; offsetX1 = 0; offsetY1 = 4; break;
         case 2: offsetX0 = offsetX2; offsetY0 = 4 - offsetY3; offsetX1 = 4 - offsetX3; offsetY1 = offsetY2; break;
         default: printf("error!"); exit(0); break;
         }
-        C0Avail = false;
+        isC0Avail = false;
         if (curSubPic.getTreatedAsPicFlag())
         {
           boundaryCond = ((posRB.x + offsetX0) <= curSubPic.getSubPicRight() && (posRB.y + offsetY0) <= curSubPic.getSubPicBottom());
@@ -7710,13 +8258,13 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
           if (posYInCtu + offsetY0 < pcv.maxCUHeight)
           {
             posC0 = posRB.offset(offsetX0, offsetY0);
-            C0Avail = true;
+            isC0Avail = true;
           }
         }
 
-        if (idxMap[iDistanceIndex][NASPIdx] == 0)
+        if (idxMap[iDistanceIndex][iNASPIdx] == 0)
         {
-          C1Avail = false;
+          isC1Avail = false;
           if (curSubPic.getTreatedAsPicFlag())
           {
             boundaryCond = ((posCenter.x + offsetX1) <= curSubPic.getSubPicRight() && (posCenter.y + offsetY1) <= curSubPic.getSubPicBottom());
@@ -7731,13 +8279,13 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
             if (posYInCtu + offsetY1 < pcv.maxCUHeight)
             {
               posC1 = posCenter.offset(offsetX1, offsetY1);
-              C1Avail = true;
+              isC1Avail = true;
             }
           }
         }
         else
         {
-          C1Avail = false;
+          isC1Avail = false;
           if (curSubPic.getTreatedAsPicFlag())
           {
             boundaryCond = ((posRB.x + offsetX1) <= curSubPic.getSubPicRight() && (posRB.y + offsetY1) <= curSubPic.getSubPicBottom());
@@ -7752,7 +8300,7 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
             if (posYInCtu + offsetY1 < pcv.maxCUHeight)
             {
               posC1 = posRB.offset(offsetX1, offsetY1);
-              C1Avail = true;
+              isC1Avail = true;
             }
           }
         }
@@ -7762,8 +8310,16 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
         // Candidate with L0 and L1
         dir = 0;
         int refIdx[NUM_REF_PIC_LIST_01] = { 0, 0 };
-        bExistMV0 = (C0Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC0, cColMv0, iRefIdx, false, &refIdx[REF_PIC_LIST_0]))
-          || (C1Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC1, cColMv0, iRefIdx, false, &refIdx[REF_PIC_LIST_0]));
+        bExistMV0 = (isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC0, cColMv0, iRefIdx, false,
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          0,
+#endif
+          &refIdx[REF_PIC_LIST_0]))
+          || (isC1Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC1, cColMv0, iRefIdx, false,
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            0,
+#endif
+            &refIdx[REF_PIC_LIST_0]));
 
         if (bExistMV0)
         {
@@ -7776,8 +8332,16 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
         }
         if (slice.isInterB())
         {
-          bExistMV1 = (C0Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC0, cColMv1, iRefIdx, false, &refIdx[REF_PIC_LIST_1]))
-            || (C1Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC1, cColMv1, iRefIdx, false, &refIdx[REF_PIC_LIST_1]));
+          bExistMV1 = (isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC0, cColMv1, iRefIdx, false,
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            0,
+#endif
+            &refIdx[REF_PIC_LIST_1]))
+            || (isC1Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC1, cColMv1, iRefIdx, false,
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+              0,
+#endif
+              &refIdx[REF_PIC_LIST_1]));
 
           if (bExistMV1)
           {
@@ -7817,7 +8381,6 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
           }
 #endif
         }
-
         if (!slice.getCheckLDC() && bExistMV0 && bExistMV1)
         {
           // Candidate without L1
@@ -7887,6 +8450,236 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
         }
       }
     }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    if (pu.tmMergeFlag)
+    {
+      offsetX0 = 0, offsetX1 = 0, offsetX2 = 0, offsetX3 = pu.Y().width >> 1;
+      offsetY0 = 0, offsetY1 = 0, offsetY2 = 0, offsetY3 = pu.Y().height >> 1;
+
+      for (int iDistanceIndex = 0; iDistanceIndex < TMVP_DISTANCE_LEVEL && cnt < (maxNumMergeCand + 1); iDistanceIndex++)
+      {
+        const int iNADistanceHor = pu.Y().width  * iDistanceIndex;
+        const int iNADistanceVer = pu.Y().height * iDistanceIndex;
+
+        for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex] && cnt < (maxNumMergeCand + 1); iNASPIdx++)
+        {
+          switch (idxMap[iDistanceIndex][iNASPIdx])
+          {
+          case 0: offsetX0 = offsetX2 = 4 + iNADistanceHor; offsetY0 = offsetY2 = 4 + iNADistanceVer; offsetX1 = iNADistanceHor; offsetY1 = iNADistanceVer; break;
+          case 1: offsetX0 = 4; offsetY0 = 0; offsetX1 = 0; offsetY1 = 4; break;
+          case 2: offsetX0 = offsetX2; offsetY0 = 4 - offsetY3; offsetX1 = 4 - offsetX3; offsetY1 = offsetY2; break;
+          default: printf("error!"); exit(0); break;
+          }
+          isC0Avail = false;
+          if (curSubPic.getTreatedAsPicFlag())
+          {
+            boundaryCond = ((posRB.x + offsetX0) <= curSubPic.getSubPicRight() && (posRB.y + offsetY0) <= curSubPic.getSubPicBottom());
+          }
+          else
+          {
+            boundaryCond = ((posRB.x + offsetX0) < pcv.lumaWidth) && ((posRB.y + offsetY0) < pcv.lumaHeight);
+          }
+          if (boundaryCond)
+          {
+            int posYInCtu = posRB.y & pcv.maxCUHeightMask;
+            if (posYInCtu + offsetY0 < pcv.maxCUHeight)
+            {
+              posC0 = posRB.offset(offsetX0, offsetY0);
+              isC0Avail = true;
+            }
+          }
+
+          if (idxMap[iDistanceIndex][iNASPIdx] == 0)
+          {
+            isC1Avail = false;
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+              boundaryCond = ((posCenter.x + offsetX1) <= curSubPic.getSubPicRight() && (posCenter.y + offsetY1) <= curSubPic.getSubPicBottom());
+            }
+            else
+            {
+              boundaryCond = ((posCenter.x + offsetX1) < pcv.lumaWidth) && ((posCenter.y + offsetY1) < pcv.lumaHeight);
+            }
+            if (boundaryCond)
+            {
+              int posYInCtu = posCenter.y & pcv.maxCUHeightMask;
+              if (posYInCtu + offsetY1 < pcv.maxCUHeight)
+              {
+                posC1 = posCenter.offset(offsetX1, offsetY1);
+                isC1Avail = true;
+              }
+            }
+          }
+          else
+          {
+            isC1Avail = false;
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+              boundaryCond = ((posRB.x + offsetX1) <= curSubPic.getSubPicRight() && (posRB.y + offsetY1) <= curSubPic.getSubPicBottom());
+            }
+            else
+            {
+              boundaryCond = ((posRB.x + offsetX1) < pcv.lumaWidth) && ((posRB.y + offsetY1) < pcv.lumaHeight);
+            }
+            if (boundaryCond)
+            {
+              int posYInCtu = posRB.y & pcv.maxCUHeightMask;
+              if (posYInCtu + offsetY1 < pcv.maxCUHeight)
+              {
+                posC1 = posRB.offset(offsetX1, offsetY1);
+                isC1Avail = true;
+              }
+            }
+          }
+
+          bExistMV0 = bExistMV1 = false;
+
+          // Candidate with L0 and L1
+          dir = 0;
+          int refIdx[NUM_REF_PIC_LIST_01] = { 0, 0 };
+          bExistMV0 = (isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC0, cColMv0, iRefIdx, false,
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            1,
+#endif
+            &refIdx[REF_PIC_LIST_0]))
+            || (isC1Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC1, cColMv0, iRefIdx, false,
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+              1,
+#endif
+              &refIdx[REF_PIC_LIST_0]));
+
+          if (bExistMV0)
+          {
+            dir |= 1;
+            mrgCtx.mvFieldNeighbours[2 * cnt].setMvField(cColMv0, refIdx[REF_PIC_LIST_0]);
+          }
+          else
+          {
+            mrgCtx.mvFieldNeighbours[2 * cnt].setMvField(Mv(), NOT_VALID);
+          }
+          if (slice.isInterB())
+          {
+            bExistMV1 = (isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC0, cColMv1, iRefIdx, false,
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+              1,
+#endif
+              &refIdx[REF_PIC_LIST_1]))
+              || (isC1Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC1, cColMv1, iRefIdx, false,
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                1,
+#endif
+                &refIdx[REF_PIC_LIST_1]));
+
+            if (bExistMV1)
+            {
+              dir |= 2;
+              mrgCtx.mvFieldNeighbours[2 * cnt + 1].setMvField(cColMv1, refIdx[REF_PIC_LIST_1]);
+            }
+            else
+            {
+              mrgCtx.mvFieldNeighbours[2 * cnt + 1].setMvField(Mv(), NOT_VALID);
+            }
+          }
+          if (dir != 0)
+          {
+            mrgCtx.interDirNeighbours[cnt] = dir;
+            mrgCtx.BcwIdx[cnt] = BCW_DEFAULT;
+#if INTER_LIC
+            mrgCtx.LICFlags[cnt] = false;
+#endif
+            mrgCtx.useAltHpelIf[cnt] = false;
+#if MULTI_HYP_PRED
+            mrgCtx.addHypNeighbours[cnt].clear();
+#endif
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+            if (!mrgCtx.xCheckSimilarMotion(cnt
+#if TM_MRG
+              , mvdSimilarityThresh
+#endif
+            ))
+            {
+#endif
+              cnt++;
+              if (cnt == (maxNumMergeCand + 1))
+              {
+                break;
+              }
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+            }
+#endif
+          }
+
+          if (!slice.getCheckLDC() && bExistMV0 && bExistMV1)
+          {
+            // Candidate without L1
+            dir = 0;
+            dir |= 1;
+            mrgCtx.mvFieldNeighbours[2 * cnt].setMvField(cColMv0, refIdx[REF_PIC_LIST_0]);
+            mrgCtx.mvFieldNeighbours[2 * cnt + 1].setMvField(Mv(), NOT_VALID);
+            if (dir != 0)
+            {
+              mrgCtx.interDirNeighbours[cnt] = dir;
+              mrgCtx.BcwIdx[cnt] = BCW_DEFAULT;
+#if INTER_LIC
+              mrgCtx.LICFlags[cnt] = false;
+#endif
+              mrgCtx.useAltHpelIf[cnt] = false;
+#if MULTI_HYP_PRED
+              mrgCtx.addHypNeighbours[cnt].clear();
+#endif
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+              if (!mrgCtx.xCheckSimilarMotion(cnt
+#if TM_MRG
+                , mvdSimilarityThresh
+#endif
+              ))
+              {
+#endif
+                cnt++;
+                if (cnt == (maxNumMergeCand + 1)) break;
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+              }
+#endif
+            }
+
+            // Candidate without L0
+            dir = 0;
+            mrgCtx.mvFieldNeighbours[2 * cnt].setMvField(Mv(), NOT_VALID);
+            dir |= 2;
+            mrgCtx.mvFieldNeighbours[2 * cnt + 1].setMvField(cColMv1, refIdx[REF_PIC_LIST_1]);
+            if (dir != 0)
+            {
+              mrgCtx.interDirNeighbours[cnt] = dir;
+              mrgCtx.BcwIdx[cnt] = BCW_DEFAULT;
+#if INTER_LIC
+              mrgCtx.LICFlags[cnt] = false;
+#endif
+              mrgCtx.useAltHpelIf[cnt] = false;
+#if MULTI_HYP_PRED
+              mrgCtx.addHypNeighbours[cnt].clear();
+#endif
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+              if (!mrgCtx.xCheckSimilarMotion(cnt
+#if TM_MRG
+                , mvdSimilarityThresh
+#endif
+              ))
+              {
+#endif
+                cnt++;
+                if (cnt == (maxNumMergeCand + 1))
+                {
+                  break;
+                }
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+              }
+#endif
+            }
+          }
+        }
+      }
+    }
+#endif
   }
 
   mrgCtx.numValidMergeCand = cnt;
@@ -7894,6 +8687,186 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 #endif
 
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM && NON_ADJACENT_MRG_CAND
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+void PU::getNonAdjacentMergeCandSubTMVP(const PredictionUnit &pu, MergeCtx& mrgCtx, int col)
+{
+  const unsigned plevel = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
+  const CodingStructure &cs = *pu.cs;
+  const Slice &slice = *pu.cs->slice;
+
+  const uint32_t mvdSimilarityThresh = SUB_TMVP_MV_THRESHOLD;
+  const uint32_t maxNumMergeCand = NUM_NON_ADJ_CANDS;
+
+  const Picture *pColPic = slice.getRefPic(RefPicList(col == 0 ? 1 - slice.getColFromL0Flag() : 1 - slice.getColFromL0Flag2nd()), col == 0 ? slice.getColRefIdx() : slice.getColRefIdx2nd());
+
+  for (uint32_t ui = 0; ui < maxNumMergeCand; ++ui)
+  {
+    mrgCtx.BcwIdx[ui] = BCW_DEFAULT;
+#if INTER_LIC
+    mrgCtx.LICFlags[ui] = false;
+#endif
+    mrgCtx.interDirNeighbours[ui] = 0;
+    mrgCtx.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
+    mrgCtx.mvFieldNeighbours[(ui << 1) + 1].refIdx = NOT_VALID;
+    mrgCtx.useAltHpelIf[ui] = false;
+#if MULTI_HYP_PRED
+    mrgCtx.addHypNeighbours[ui].clear();
+#endif
+    mrgCtx.candCost[ui] = MAX_UINT64;
+  }
+
+  int cnt = 0;
+
+  const Position posLT = pu.Y().topLeft();
+
+  MotionInfo miNeighbor;
+  int offsetX = 0;
+  int offsetY = 0;
+  int offsetX0 = 0; int offsetX1 = 0; int offsetX2 = pu.Y().width >> 1;
+  int offsetY0 = 0; int offsetY1 = 0; int offsetY2 = pu.Y().height >> 1;
+
+  const int numNACandidate[7] = { 5, 9, 9, 9, 9, 9, 9 };
+  const int idxMap[7][9] = { { 0, 1, 2, 3, 4 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 } };
+
+  for (int iDistanceIndex = 0; iDistanceIndex < 7 && cnt < maxNumMergeCand; iDistanceIndex++)
+  {
+    const int iNADistanceHor = pu.Y().width  * (iDistanceIndex + 1);
+    const int iNADistanceVer = pu.Y().height * (iDistanceIndex + 1);
+
+    for (int NASPIdx = 0; NASPIdx < numNACandidate[iDistanceIndex] && cnt < maxNumMergeCand; NASPIdx++)
+    {
+      switch (idxMap[iDistanceIndex][NASPIdx])
+      {
+      case 0:offsetX = offsetX0 = -iNADistanceHor - 1;               offsetY = offsetY0 = pu.Y().height + iNADistanceVer - 1; break;
+      case 1:offsetX = offsetX1 = pu.Y().width + iNADistanceHor - 1; offsetY = offsetY1 = -iNADistanceVer - 1;                break;
+      case 2:offsetX = offsetX2;                                     offsetY = offsetY1;                                      break;
+      case 3:offsetX = offsetX0;                                     offsetY = offsetY2;                                      break;
+      case 4:offsetX = offsetX0;                                     offsetY = offsetY1;                                      break;
+      case 5:offsetX = -1;                                           offsetY = offsetY0;                                      break;
+      case 6:offsetX = offsetX1;                                     offsetY = -1;                                            break;
+      case 7:offsetX = offsetX0 >> 1;                                offsetY = offsetY0;                                      break;
+      case 8:offsetX = offsetX1;                                     offsetY = offsetY1 >> 1;                                 break;
+      default: printf("error!"); exit(0); break;
+      }
+
+      const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
+
+      bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu);
+
+      if (isAvailableNonAdjacent)
+      {
+        miNeighbor = puNonAdjacent->getMotionInfo(posLT.offset(offsetX, offsetY));
+
+        int index = 0;
+        if ((miNeighbor.interDir & (1 << REF_PIC_LIST_0)) && slice.getRefPic(REF_PIC_LIST_0, miNeighbor.refIdx[0]) == pColPic)
+        {
+          index = 1;
+        }
+        else if (slice.isInterB() && (miNeighbor.interDir & (1 << REF_PIC_LIST_1)) && slice.getRefPic(REF_PIC_LIST_1, miNeighbor.refIdx[1]) == pColPic)
+        {
+          index = 2;
+        }
+        if (index > 0)
+        {
+          // get Inter Dir
+          mrgCtx.interDirNeighbours[cnt] = index;
+          miNeighbor.mv[index - 1].roundToPrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+          if (index == 1)
+          {
+            mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNeighbor.mv[index - 1], miNeighbor.refIdx[index - 1]);
+            mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), NOT_VALID);
+          }
+          else
+          {
+            mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(Mv(), NOT_VALID);
+            mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miNeighbor.mv[index - 1], miNeighbor.refIdx[index - 1]);
+          }
+
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+          if (!mrgCtx.xCheckSimilarMotionSubTMVP(cnt
+#if TM_MRG
+            , mvdSimilarityThresh
+#endif
+          ))
+#endif
+          {
+            cnt++;
+          }
+        }
+      }
+
+    }
+  }
+
+  const int numNACandidate2[7] = { 4, 4, 4, 4, 4, 4, 4 };
+  const int idxMap2[7][5] = { { 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 } };
+
+  for (int iDistanceIndex = 0; iDistanceIndex < 7 && cnt < maxNumMergeCand; iDistanceIndex++)
+  {
+    const int iNADistanceHor = pu.Y().width  * (iDistanceIndex + 1);
+    const int iNADistanceVer = pu.Y().height * (iDistanceIndex + 1);
+
+    for (int iNASPIdx = 0; iNASPIdx < numNACandidate2[iDistanceIndex] && cnt < maxNumMergeCand; iNASPIdx++)
+    {
+      switch (idxMap2[iDistanceIndex][iNASPIdx])
+      {
+      case 0:offsetX = offsetX0 = -iNADistanceHor - 1;                                                         offsetY = offsetY2 + ((pu.Y().height + iNADistanceVer - 1 - offsetY2) >> 1); break;
+      case 1:offsetX = offsetX2 + ((pu.Y().width + iNADistanceHor - 1 - offsetX2) >> 1);                       offsetY = offsetY0 = -iNADistanceVer - 1; break;
+      case 2:offsetX = offsetX0;                                                                               offsetY = offsetY0 + ((offsetY2 - offsetY0) >> 1); break;
+      case 3:offsetX = offsetX0 + ((offsetX2 - offsetX0) >> 1);                                                offsetY = offsetY0; break;
+      default: printf("error!"); exit(0); break;
+      }
+
+      const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
+
+      bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu);
+
+      if (isAvailableNonAdjacent)
+      {
+        miNeighbor = puNonAdjacent->getMotionInfo(posLT.offset(offsetX, offsetY));
+
+        int index = 0;
+        if ((miNeighbor.interDir & (1 << REF_PIC_LIST_0)) && slice.getRefPic(REF_PIC_LIST_0, miNeighbor.refIdx[0]) == pColPic)
+        {
+          index = 1;
+        }
+        else if (slice.isInterB() && (miNeighbor.interDir & (1 << REF_PIC_LIST_1)) && slice.getRefPic(REF_PIC_LIST_1, miNeighbor.refIdx[1]) == pColPic)
+        {
+          index = 2;
+        }
+        if (index > 0)
+        {
+          // get Inter Dir
+          mrgCtx.interDirNeighbours[cnt] = index;
+          miNeighbor.mv[index - 1].roundToPrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+          if (index == 1)
+          {
+            mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNeighbor.mv[index - 1], miNeighbor.refIdx[index - 1]);
+            mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(Mv(), NOT_VALID);
+          }
+          else
+          {
+            mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(Mv(), NOT_VALID);
+            mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(miNeighbor.mv[index - 1], miNeighbor.refIdx[index - 1]);
+          }
+        }
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+        if (!mrgCtx.xCheckSimilarMotionSubTMVP(cnt
+#if TM_MRG
+          , mvdSimilarityThresh
+#endif
+        ))
+#endif
+        {
+          cnt++;
+        }
+      }
+    }
+  }
+
+  mrgCtx.numValidMergeCand = cnt;
+}
+#endif
 void PU::getNonAdjacentMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
 {
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
@@ -7951,7 +8924,7 @@ void PU::getNonAdjacentMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
   int offsetX0 = 0; int offsetX1 = 0; int offsetX2 = pu.Y().width >> 1;
   int offsetY0 = 0; int offsetY1 = 0; int offsetY2 = pu.Y().height >> 1;
 
-  const int iNACANDIDATE_NUM[7] = { 5, 9, 9, 9, 9, 9, 9 };
+  const int numNACandidate[7] = { 5, 9, 9, 9, 9, 9, 9 };
   const int idxMap[7][9] = { { 0, 1, 2, 3, 4 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },{ 0, 1, 2, 3, 4, 5, 6, 7, 8 } };
 
   for (int iDistanceIndex = 0; iDistanceIndex < 7 && cnt < maxNumMergeCand; iDistanceIndex++)
@@ -7959,9 +8932,9 @@ void PU::getNonAdjacentMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
     const int iNADistanceHor = pu.Y().width  * (iDistanceIndex + 1);
     const int iNADistanceVer = pu.Y().height * (iDistanceIndex + 1);
 
-    for (int NASPIdx = 0; NASPIdx < iNACANDIDATE_NUM[iDistanceIndex] && cnt < maxNumMergeCand; NASPIdx++)
+    for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex] && cnt < maxNumMergeCand; iNASPIdx++)
     {
-      switch (idxMap[iDistanceIndex][NASPIdx])
+      switch (idxMap[iDistanceIndex][iNASPIdx])
       {
       case 0:offsetX = offsetX0 = -iNADistanceHor - 1;               offsetY = offsetY0 = pu.Y().height + iNADistanceVer - 1; break;
       case 1:offsetX = offsetX1 = pu.Y().width + iNADistanceHor - 1; offsetY = offsetY1 = -iNADistanceVer - 1;                break;
@@ -8020,7 +8993,7 @@ void PU::getNonAdjacentMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
     }
   }
 
-  const int iNACANDIDATE_NUM2[7] = { 4, 4, 4, 4, 4, 4, 4 };
+  const int numNACandidate2[7] = { 4, 4, 4, 4, 4, 4, 4 };
   const int idxMap2[7][5] = { { 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 },{ 0, 1, 2, 3 } };
 
   for (int iDistanceIndex = 0; iDistanceIndex < 7 && cnt < maxNumMergeCand; iDistanceIndex++)
@@ -8028,9 +9001,9 @@ void PU::getNonAdjacentMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
     const int iNADistanceHor = pu.Y().width  * (iDistanceIndex + 1);
     const int iNADistanceVer = pu.Y().height * (iDistanceIndex + 1);
 
-    for (int NASPIdx = 0; NASPIdx < iNACANDIDATE_NUM2[iDistanceIndex] && cnt < maxNumMergeCand; NASPIdx++)
+    for (int iNASPIdx = 0; iNASPIdx < numNACandidate2[iDistanceIndex] && cnt < maxNumMergeCand; iNASPIdx++)
     {
-      switch (idxMap2[iDistanceIndex][NASPIdx])
+      switch (idxMap2[iDistanceIndex][iNASPIdx])
       {
       case 0:offsetX = offsetX0 = -iNADistanceHor - 1;                                                         offsetY = offsetY2 + ((pu.Y().height + iNADistanceVer - 1 - offsetY2) >> 1); break;
       case 1:offsetX = offsetX2 + ((pu.Y().width + iNADistanceHor - 1 - offsetX2) >> 1);                       offsetY = offsetY0 = -iNADistanceVer - 1; break;
@@ -8361,6 +9334,9 @@ void PU::getInterMMVDMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
 }
 bool PU::getColocatedMVP(const PredictionUnit &pu, const RefPicList &eRefPicList, const Position &_pos, Mv& rcMv, const int &refIdx, bool sbFlag
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  , int col
+#endif
   , int* targetRefIdx
 #endif
 )
@@ -8374,7 +9350,11 @@ bool PU::getColocatedMVP(const PredictionUnit &pu, const RefPicList &eRefPicList
   const Slice &slice = *pu.cs->slice;
 
   // use coldir.
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  const Picture* const pColPic = slice.getRefPic(RefPicList(col == 0 ? 1 - slice.getColFromL0Flag() : 1 - slice.getColFromL0Flag2nd()), col == 0 ? slice.getColRefIdx() : slice.getColRefIdx2nd());
+#else
   const Picture* const pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx());
+#endif
 
   if( !pColPic )
   {
@@ -8390,7 +9370,13 @@ bool PU::getColocatedMVP(const PredictionUnit &pu, const RefPicList &eRefPicList
       return false;
     }
   }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  int pocCur = slice.getPOC();
+  int pocCol = pColPic->getPOC();
+  RefPicList eColRefPicList = slice.getCheckLDC() ? eRefPicList : RefPicList(pocCur > pocCol);
+#else
   RefPicList eColRefPicList = slice.getCheckLDC() ? eRefPicList : RefPicList(slice.getColFromL0Flag());
+#endif
 
   const MotionInfo& mi = pColPic->cs->getMotionInfo( pos );
 
@@ -8448,7 +9434,11 @@ bool PU::getColocatedMVP(const PredictionUnit &pu, const RefPicList &eRefPicList
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
   if (targetRefIdx != nullptr)
   {
-    *targetRefIdx = slice.getImRefIdx(mi.sliceIdx, eColRefPicList, eRefPicList, iColRefIdx);
+    *targetRefIdx = slice.getImRefIdx(mi.sliceIdx, eColRefPicList, eRefPicList, iColRefIdx
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+      , col
+#endif
+    );
     if (*targetRefIdx == -1)
     {
       return false;
@@ -8906,6 +9896,209 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
     }
   }
 
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if TM_AMVP
+  if (cs.picHeader->getEnableTMVPFlag() && pInfo->numCand < pInfo->maxStorageSize && (pu.lumaSize().width + pu.lumaSize().height > 8))
+#else
+  if (cs.picHeader->getEnableTMVPFlag() && pInfo->numCand < AMVP_MAX_NUM_CANDS && (pu.lumaSize().width + pu.lumaSize().height > 8))
+#endif
+  {
+    MergeCtx mrgCtxAll[2];
+    MergeCtx MrgTmvp[2];
+    MergeCtx namvpMergeCandCtx[2];
+    bool isSaved = true;
+    if (pu.cs->sps->getUseAML() && interPred != NULL)
+    {
+      int nWidth = pu.lumaSize().width;
+      int nHeight = pu.lumaSize().height;
+      bool tplAvail = interPred->xAMLGetCurBlkTemplate(pu, nWidth, nHeight);
+      if (tplAvail)
+      {
+        int poc0 = pu.cu->slice->getRefPic(RefPicList(1 - pu.cu->slice->getColFromL0Flag()), pu.cu->slice->getColRefIdx())->getPOC();
+        int poc1 = pu.cu->slice->getRefPic(RefPicList(1 - pu.cu->slice->getColFromL0Flag2nd()), pu.cu->slice->getColRefIdx2nd())->getPOC();
+        for (int col = 0; col < ((pu.cu->slice->getCheckLDC() || (poc0 == poc1)) ? 1 : 2); col++)
+        {
+          if (col == 0 || (!pu.cs->sps->getUseFastSubTmvp()))
+          {
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+            if (!interPred->readMergeBuffer(mrgCtxAll[0], mrgCtxAll[1], *pu.cu))
+#else
+            if (cs.pcv->isEncoder && interPred->readMergeBuffer(mrgCtxAll[0], mrgCtxAll[1], *pu.cu))
+#endif
+            {
+              PU::getNonAdjacentMergeCandSubTMVP(pu, namvpMergeCandCtx[col], col);
+              interPred->adjustMergeCandidatesInOneCandidateGroup(pu, namvpMergeCandCtx[col], 9);
+              PU::getInterMergeCandidatesSubTMVP(pu, mrgCtxAll[col], col, -1, &namvpMergeCandCtx[col]);
+              isSaved = false;
+            }
+
+            PU::getTMVPCandOpt(pu, eRefPicList, refIdx, MrgTmvp[col], mrgCtxAll[col], col);
+            interPred->adjustMergeCandidatesInOneCandidateGroup(pu, MrgTmvp[col], AMVP_TMVP_INDEX);
+            if (MrgTmvp[col].numValidMergeCand > 0)
+            {
+              Mv mvTmp = MrgTmvp[col].mvFieldNeighbours[eRefPicList].mv;
+              mvTmp.roundTransPrecInternal2Amvr(pu.cu->imv);
+#if TM_AMVP
+              pInfo->mvCand[pInfo->numCand] = mvTmp;
+              if (!pInfo->xCheckSimilarMotion(pInfo->numCand))
+              {
+                pInfo->numCand++;
+              }
+#else
+              pInfo->mvCand[pInfo->numCand++] = cColMv;
+#endif
+            }
+          }
+          else
+          {
+            // Get Temporal Motion Predictor
+            const int refIdxCol = refIdx;
+
+            Position posRB = pu.Y().bottomRight().offset(-3, -3);
+
+            const PreCalcValues& pcv = *cs.pcv;
+
+            Position posC0;
+            bool isC0Avail = false;
+            Position posC1 = pu.Y().center();
+            Mv cColMv;
+
+            bool boundaryCond = ((posRB.x + pcv.minCUWidth) < pcv.lumaWidth) && ((posRB.y + pcv.minCUHeight) < pcv.lumaHeight);
+            const SubPic &curSubPic = pu.cs->slice->getPPS()->getSubPicFromPos(pu.lumaPos());
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+              boundaryCond = ((posRB.x + pcv.minCUWidth) <= curSubPic.getSubPicRight() &&
+                (posRB.y + pcv.minCUHeight) <= curSubPic.getSubPicBottom());
+            }
+            if (boundaryCond)
+            {
+              int posYInCtu = posRB.y & pcv.maxCUHeightMask;
+              if (posYInCtu + 4 < pcv.maxCUHeight)
+              {
+                posC0 = posRB.offset(4, 4);
+                isC0Avail = true;
+              }
+            }
+            for (int colIdx = 1; colIdx < (pu.cu->slice->isInterB() ? 2 : 1); colIdx++)
+            {
+              if ((isC0Avail && getColocatedMVP(pu, eRefPicList, posC0, cColMv, refIdxCol, false, colIdx)) || getColocatedMVP(pu, eRefPicList, posC1, cColMv, refIdxCol, false, colIdx))
+              {
+                cColMv.roundTransPrecInternal2Amvr(pu.cu->imv);
+#if TM_AMVP
+                pInfo->mvCand[pInfo->numCand] = cColMv;
+                if (!pInfo->xCheckSimilarMotion(pInfo->numCand))
+                {
+                  pInfo->numCand++;
+                }
+#else
+                pInfo->mvCand[pInfo->numCand++] = cColMv;
+#endif
+              }
+            }
+          }
+        }
+      }
+      else
+      {
+        // Get Temporal Motion Predictor
+        const int refIdxCol = refIdx;
+
+        Position posRB = pu.Y().bottomRight().offset(-3, -3);
+
+        const PreCalcValues& pcv = *cs.pcv;
+
+        Position posC0;
+        bool isC0Avail = false;
+        Position posC1 = pu.Y().center();
+        Mv cColMv;
+
+        bool boundaryCond = ((posRB.x + pcv.minCUWidth) < pcv.lumaWidth) && ((posRB.y + pcv.minCUHeight) < pcv.lumaHeight);
+        const SubPic &curSubPic = pu.cs->slice->getPPS()->getSubPicFromPos(pu.lumaPos());
+        if (curSubPic.getTreatedAsPicFlag())
+        {
+          boundaryCond = ((posRB.x + pcv.minCUWidth) <= curSubPic.getSubPicRight() &&
+            (posRB.y + pcv.minCUHeight) <= curSubPic.getSubPicBottom());
+        }
+        if (boundaryCond)
+        {
+          int posYInCtu = posRB.y & pcv.maxCUHeightMask;
+          if (posYInCtu + 4 < pcv.maxCUHeight)
+          {
+            posC0 = posRB.offset(4, 4);
+            isC0Avail = true;
+          }
+        }
+        for (int colIdx = 0; colIdx < (pu.cu->slice->isInterB() ? 2 : 1); colIdx++)
+        {
+          if ((isC0Avail && getColocatedMVP(pu, eRefPicList, posC0, cColMv, refIdxCol, false, colIdx)) || getColocatedMVP(pu, eRefPicList, posC1, cColMv, refIdxCol, false, colIdx))
+          {
+            cColMv.roundTransPrecInternal2Amvr(pu.cu->imv);
+#if TM_AMVP
+            pInfo->mvCand[pInfo->numCand] = cColMv;
+            if (!pInfo->xCheckSimilarMotion(pInfo->numCand))
+            {
+              pInfo->numCand++;
+            }
+#else
+            pInfo->mvCand[pInfo->numCand++] = cColMv;
+#endif
+          }
+        }
+      }
+    }
+    else
+    {
+      // Get Temporal Motion Predictor
+      const int refIdxCol = refIdx;
+
+      Position posRB = pu.Y().bottomRight().offset(-3, -3);
+
+      const PreCalcValues& pcv = *cs.pcv;
+
+      Position posC0;
+      bool isC0Avail = false;
+      Position posC1 = pu.Y().center();
+      Mv cColMv;
+
+      bool boundaryCond = ((posRB.x + pcv.minCUWidth) < pcv.lumaWidth) && ((posRB.y + pcv.minCUHeight) < pcv.lumaHeight);
+      const SubPic &curSubPic = pu.cs->slice->getPPS()->getSubPicFromPos(pu.lumaPos());
+      if (curSubPic.getTreatedAsPicFlag())
+      {
+        boundaryCond = ((posRB.x + pcv.minCUWidth) <= curSubPic.getSubPicRight() &&
+          (posRB.y + pcv.minCUHeight) <= curSubPic.getSubPicBottom());
+      }
+      if (boundaryCond)
+      {
+        int posYInCtu = posRB.y & pcv.maxCUHeightMask;
+        if (posYInCtu + 4 < pcv.maxCUHeight)
+        {
+          posC0 = posRB.offset(4, 4);
+          isC0Avail = true;
+        }
+      }
+      for (int colIdx = 0; colIdx < (pu.cu->slice->isInterB() ? 2 : 1); colIdx++)
+      {
+        if ((isC0Avail && getColocatedMVP(pu, eRefPicList, posC0, cColMv, refIdxCol, false, colIdx)) || getColocatedMVP(pu, eRefPicList, posC1, cColMv, refIdxCol, false, colIdx))
+        {
+          cColMv.roundTransPrecInternal2Amvr(pu.cu->imv);
+#if TM_AMVP
+          pInfo->mvCand[pInfo->numCand] = cColMv;
+          if (!pInfo->xCheckSimilarMotion(pInfo->numCand))
+          {
+            pInfo->numCand++;
+          }
+#else
+          pInfo->mvCand[pInfo->numCand++] = cColMv;
+#endif
+        }
+      }
+    }
+    if (!isSaved)
+    {
+      interPred->writeMergeBuffer(mrgCtxAll[0], mrgCtxAll[1], *pu.cu);
+    }
+  }
+#else
 #if TM_AMVP
   if (cs.picHeader->getEnableTMVPFlag() && pInfo->numCand < pInfo->maxStorageSize && (pu.lumaSize().width + pu.lumaSize().height > 12))
 #else
@@ -8913,14 +10106,14 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
 #endif
   {
     // Get Temporal Motion Predictor
-    const int refIdx_Col = refIdx;
+    const int refIdxCol = refIdx;
 
     Position posRB = pu.Y().bottomRight().offset(-3, -3);
 
     const PreCalcValues& pcv = *cs.pcv;
 
     Position posC0;
-    bool C0Avail = false;
+    bool isC0Avail = false;
     Position posC1 = pu.Y().center();
     Mv cColMv;
 
@@ -8929,7 +10122,7 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
     if (curSubPic.getTreatedAsPicFlag())
     {
       boundaryCond = ((posRB.x + pcv.minCUWidth) <= curSubPic.getSubPicRight() &&
-                      (posRB.y + pcv.minCUHeight) <= curSubPic.getSubPicBottom());
+        (posRB.y + pcv.minCUHeight) <= curSubPic.getSubPicBottom());
     }
     if (boundaryCond)
     {
@@ -8937,23 +10130,51 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
       if (posYInCtu + 4 < pcv.maxCUHeight)
       {
         posC0 = posRB.offset(4, 4);
-        C0Avail = true;
+        isC0Avail = true;
       }
     }
-    if ( ( C0Avail && getColocatedMVP( pu, eRefPicList, posC0, cColMv, refIdx_Col, false ) ) || getColocatedMVP( pu, eRefPicList, posC1, cColMv, refIdx_Col, false ) )
-    {
-      cColMv.roundTransPrecInternal2Amvr(pu.cu->imv);
-#if TM_AMVP
-      pInfo->mvCand[pInfo->numCand] = cColMv;
-      if (!pInfo->xCheckSimilarMotion(pInfo->numCand))
-      {
-        pInfo->numCand++;
-      }
-#else
-      pInfo->mvCand[pInfo->numCand++] = cColMv;
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if !ENABLE_INTER_TEMPLATE_MATCHING
+    int count = 0;
 #endif
+    for (int colIdx = 0; colIdx < (pu.cu->slice->isInterB() ? 2 : 1); colIdx++)
+    {
+#endif
+#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+      if (count)
+      {
+        break;
+      }
+#endif
+      if ((isC0Avail && getColocatedMVP(pu, eRefPicList, posC0, cColMv, refIdxCol, false
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        , colIdx
+#endif
+      )) || getColocatedMVP(pu, eRefPicList, posC1, cColMv, refIdxCol, false
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        , colIdx
+#endif
+      ))
+      {
+#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        count++;
+#endif
+        cColMv.roundTransPrecInternal2Amvr(pu.cu->imv);
+#if TM_AMVP
+        pInfo->mvCand[pInfo->numCand] = cColMv;
+        if (!pInfo->xCheckSimilarMotion(pInfo->numCand))
+        {
+          pInfo->numCand++;
+        }
+#else
+        pInfo->mvCand[pInfo->numCand++] = cColMv;
+#endif
+      }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     }
+#endif
   }
+#endif
 
 #if TM_AMVP
   // Non-adjacent candidates
@@ -8963,7 +10184,7 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
     MotionInfo miNeighbor;
     int offsetX = 0;
     int offsetY = 0;
-    const int iNACANDIDATE_NUM[4] = { 3, 5, 5, 5 };
+    const int numNACandidate[4] = { 3, 5, 5, 5 };
     const int idxMap[4][5] = { { 0, 1, 4 },{ 0, 1, 2, 3, 4 },{ 0, 1, 2, 3, 4 },{ 0, 1, 2, 3, 4 } };
 
     for (int iDistanceIndex = 0; iDistanceIndex < NADISTANCE_LEVEL && pInfo->numCand < pInfo->maxStorageSize; iDistanceIndex++)
@@ -8971,9 +10192,9 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
       const int iNADistanceHor = pu.Y().width  * (iDistanceIndex + 1);
       const int iNADistanceVer = pu.Y().height * (iDistanceIndex + 1);
 
-      for (int NASPIdx = 0; NASPIdx < iNACANDIDATE_NUM[iDistanceIndex] && pInfo->numCand < pInfo->maxStorageSize; NASPIdx++)
+      for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex] && pInfo->numCand < pInfo->maxStorageSize; iNASPIdx++)
       {
-        switch (idxMap[iDistanceIndex][NASPIdx])
+        switch (idxMap[iDistanceIndex][iNASPIdx])
         {
         case 0: offsetX = -iNADistanceHor - 1;               offsetY = pu.Y().height + iNADistanceVer - 1; break;
         case 1: offsetX = pu.Y().width + iNADistanceHor - 1; offsetY = -iNADistanceVer - 1;                break;
@@ -10512,17 +11733,17 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
           bC0Avail = true;
         }
       }
-      if ( (bC0Avail && getColocatedMVP( pu, eRefPicList, posC0, cColMv, refIdxCol, false ) ) || getColocatedMVP( pu, eRefPicList, posC1, cColMv, refIdxCol, false ) )
-      {
-        cColMv.roundAffinePrecInternal2Amvr(pu.cu->imv);
-        affiAMVPInfo.mvCandLT[affiAMVPInfo.numCand] = cColMv;
-        affiAMVPInfo.mvCandRT[affiAMVPInfo.numCand] = cColMv;
-        affiAMVPInfo.mvCandLB[affiAMVPInfo.numCand] = cColMv;
+        if ((bC0Avail && getColocatedMVP(pu, eRefPicList, posC0, cColMv, refIdxCol, false)) || getColocatedMVP(pu, eRefPicList, posC1, cColMv, refIdxCol, false))
+        {
+          cColMv.roundAffinePrecInternal2Amvr(pu.cu->imv);
+          affiAMVPInfo.mvCandLT[affiAMVPInfo.numCand] = cColMv;
+          affiAMVPInfo.mvCandRT[affiAMVPInfo.numCand] = cColMv;
+          affiAMVPInfo.mvCandLB[affiAMVPInfo.numCand] = cColMv;
 #if JVET_Z0139_HIST_AFF
-        if (checkLastAffineAMVPCandRedundancy(pu, affiAMVPInfo))
+          if (checkLastAffineAMVPCandRedundancy(pu, affiAMVPInfo))
 #endif
-          affiAMVPInfo.numCand++;
-      }
+            affiAMVPInfo.numCand++;
+        }
     }
 
 #if JVET_Z0139_NA_AFF
@@ -10909,6 +12130,9 @@ void PU::getAffineControlPointCand(const PredictionUnit &pu, MotionInfo mi[4], b
     affMrgType.mvFieldNeighbours[(affMrgType.numValidMergeCand << 1) + 1][i].mv = cMv[1][i];
     affMrgType.mvFieldNeighbours[(affMrgType.numValidMergeCand << 1) + 1][i].refIdx = refIdx[1];
   }
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  affMrgType.colIdx[affMrgType.numValidMergeCand] = 0;
+#endif
   affMrgType.interDirNeighbours[affMrgType.numValidMergeCand] = dir;
   affMrgType.affineType[affMrgType.numValidMergeCand] = curType;
   affMrgType.BcwIdx[affMrgType.numValidMergeCand] = (dir == 3) ? bcwIdx : BCW_DEFAULT;
@@ -11833,6 +13057,9 @@ const int getAvailableAffineNeighboursForAbovePredictor( const PredictionUnit &p
 }
 
 void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx,
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION   
+  MergeCtx mrgCtxIn[2],
+#endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION && JVET_W0090_ARMC_TM
   InterPrediction* m_pcInterSearch,
 #endif
@@ -11883,6 +13110,9 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
     affMrgCtx.numAffCandToTestEnc = maxNumAffineMergeCand;
     affMrgCtx.candCost[i] = MAX_UINT64;
 #endif
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    affMrgCtx.colIdx[i] = 0;
+#endif
   }
 
   affMrgCtx.numValidMergeCand = 0;
@@ -11897,88 +13127,141 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
     bool tmpLICFlag = false;
 
 #if JVET_Z0139_NA_AFF && JVET_W0090_ARMC_TM
+#if !JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
     if (cs.pcv->isEncoder || isZeroCandIdx)
-    {
 #endif
-    CHECK( mrgCtx.subPuMvpMiBuf.area() == 0 || !mrgCtx.subPuMvpMiBuf.buf, "Buffer not initialized" );
-    mrgCtx.subPuMvpMiBuf.fill( MotionInfo() );
+    {
+#endif    
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+      for (int i = 0; i < SUB_TMVP_NUM; i++)
+      {
+        CHECK(mrgCtx.subPuMvpMiBuf[i].area() == 0 || !mrgCtx.subPuMvpMiBuf[i].buf, "Buffer not initialized");
+        mrgCtx.subPuMvpMiBuf[i].fill(MotionInfo());
+      }
+#else
+      CHECK(mrgCtx.subPuMvpMiBuf.area() == 0 || !mrgCtx.subPuMvpMiBuf.buf, "Buffer not initialized");
+      mrgCtx.subPuMvpMiBuf.fill(MotionInfo());
+#endif
+
 #if JVET_Z0139_NA_AFF && JVET_W0090_ARMC_TM
     }
 #endif
 
     int pos = 0;
+#if !(JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION && ENABLE_INTER_TEMPLATE_MATCHING)
     // Get spatial MV
     const Position posCurLB = pu.Y().bottomLeft();
     MotionInfo miLeft;
 
     //left
-    const PredictionUnit* puLeft = cs.getPURestricted( posCurLB.offset( -1, 0 ), pu, pu.chType );
+    const PredictionUnit* puLeft = cs.getPURestricted(posCurLB.offset(-1, 0), pu, pu.chType);
 #if JVET_Y0065_GPM_INTRA
-    const bool isAvailableA1 = puLeft && isDiffMER(pu.lumaPos(), posCurLB.offset(-1, 0), plevel) && pu.cu != puLeft->cu && CU::isInter( *puLeft->cu ) && puLeft->getMotionInfo( posCurLB.offset( -1, 0 ) ).isInter;
+    const bool isAvailableA1 = puLeft && isDiffMER(pu.lumaPos(), posCurLB.offset(-1, 0), plevel) && pu.cu != puLeft->cu && CU::isInter(*puLeft->cu) && puLeft->getMotionInfo(posCurLB.offset(-1, 0)).isInter;
 #else
-    const bool isAvailableA1 = puLeft && isDiffMER(pu.lumaPos(), posCurLB.offset(-1, 0), plevel) && pu.cu != puLeft->cu && CU::isInter( *puLeft->cu );
+    const bool isAvailableA1 = puLeft && isDiffMER(pu.lumaPos(), posCurLB.offset(-1, 0), plevel) && pu.cu != puLeft->cu && CU::isInter(*puLeft->cu);
 #endif
-    if ( isAvailableA1 )
+    if (isAvailableA1)
     {
 #if INTER_LIC
       affMrgCtx.mrgCtx->LICFlags[pos] = false;
 #endif
 
-      miLeft = puLeft->getMotionInfo( posCurLB.offset( -1, 0 ) );
+      miLeft = puLeft->getMotionInfo(posCurLB.offset(-1, 0));
       // get Inter Dir
       mrgCtx.interDirNeighbours[pos] = miLeft.interDir;
 
       // get Mv from Left
-      mrgCtx.mvFieldNeighbours[pos << 1].setMvField( miLeft.mv[0], miLeft.refIdx[0] );
+      mrgCtx.mvFieldNeighbours[pos << 1].setMvField(miLeft.mv[0], miLeft.refIdx[0]);
 
-      if ( slice.isInterB() )
+      if (slice.isInterB())
       {
-        mrgCtx.mvFieldNeighbours[(pos << 1) + 1].setMvField( miLeft.mv[1], miLeft.refIdx[1] );
+        mrgCtx.mvFieldNeighbours[(pos << 1) + 1].setMvField(miLeft.mv[1], miLeft.refIdx[1]);
       }
       pos++;
     }
 
     mrgCtx.numValidMergeCand = pos;
-
-#if JVET_Z0139_NA_AFF && JVET_W0090_ARMC_TM
-    isAvailableSubPu = getInterMergeSubPuMvpCand(pu, mrgCtx, tmpLICFlag, pos, (!isZeroCandIdx && !cs.pcv->isEncoder) ? 1: 0);
-#else
-    isAvailableSubPu = getInterMergeSubPuMvpCand(pu, mrgCtx, tmpLICFlag, pos, 0);
 #endif
-    if ( isAvailableSubPu )
+
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    int poc0 = pu.cu->slice->getRefPic(RefPicList(1 - pu.cu->slice->getColFromL0Flag()), pu.cu->slice->getColRefIdx())->getPOC();
+    int poc1 = pu.cu->slice->getRefPic(RefPicList(1 - pu.cu->slice->getColFromL0Flag2nd()), pu.cu->slice->getColRefIdx2nd())->getPOC();
+#if ENABLE_INTER_TEMPLATE_MATCHING
+    for (int index = 0; index < SUB_TMVP_INDEX; index++)
     {
-      for ( int mvNum = 0; mvNum < 3; mvNum++ )
-      {
-        affMrgCtx.mvFieldNeighbours[(affMrgCtx.numValidMergeCand << 1) + 0][mvNum].setMvField( mrgCtx.mvFieldNeighbours[(pos << 1) + 0].mv, mrgCtx.mvFieldNeighbours[(pos << 1) + 0].refIdx );
-        affMrgCtx.mvFieldNeighbours[(affMrgCtx.numValidMergeCand << 1) + 1][mvNum].setMvField( mrgCtx.mvFieldNeighbours[(pos << 1) + 1].mv, mrgCtx.mvFieldNeighbours[(pos << 1) + 1].refIdx );
-      }
-      affMrgCtx.interDirNeighbours[affMrgCtx.numValidMergeCand] = mrgCtx.interDirNeighbours[pos];
-
-      affMrgCtx.affineType[affMrgCtx.numValidMergeCand] = AFFINE_MODEL_NUM;
-      affMrgCtx.mergeType[affMrgCtx.numValidMergeCand] = MRG_TYPE_SUBPU_ATMVP;
-#if AFFINE_MMVD
-      mrgCandIdx += (isAfMmvd && mrgCandIdx >= 0 ? 1 : 0);
 #endif
-      if ( affMrgCtx.numValidMergeCand == mrgCandIdx )
+      for (int colFrameIdx = 0; colFrameIdx < ((pu.cu->slice->getCheckLDC() || (poc0 == poc1)) ? 1 : 2); colFrameIdx++)
       {
-        affMrgCtx.numValidMergeCand++;
-        return;
-      }
+#endif
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+        if (index > 0 && colFrameIdx == 1)
+        {
+          continue;
+        }
+#endif
+#if !ENABLE_INTER_TEMPLATE_MATCHING
+        if (affMrgCtx.numValidMergeCand == 1)
+        {
+          break;
+        }
+#endif
+#if JVET_Z0139_NA_AFF && JVET_W0090_ARMC_TM
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+        isAvailableSubPu = getInterMergeSubPuMvpCand(pu, mrgCtx, tmpLICFlag, 0, index, mrgCtxIn[colFrameIdx], colFrameIdx);
+#else
+        isAvailableSubPu = getInterMergeSubPuMvpCand(pu, mrgCtx, tmpLICFlag, pos, (!isZeroCandIdx && !cs.pcv->isEncoder) ? 1 : 0);
+#endif
+#else
+        isAvailableSubPu = getInterMergeSubPuMvpCand(pu, mrgCtx, tmpLICFlag, pos
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          , colFrameIdx
+#else
+          , 0
+#endif         
+        );
+#endif
+        if (isAvailableSubPu)
+        {
+          for (int mvNum = 0; mvNum < 3; mvNum++)
+          {
+            affMrgCtx.mvFieldNeighbours[(affMrgCtx.numValidMergeCand << 1) + 0][mvNum].setMvField(mrgCtx.mvFieldNeighbours[(pos << 1) + 0].mv, mrgCtx.mvFieldNeighbours[(pos << 1) + 0].refIdx);
+            affMrgCtx.mvFieldNeighbours[(affMrgCtx.numValidMergeCand << 1) + 1][mvNum].setMvField(mrgCtx.mvFieldNeighbours[(pos << 1) + 1].mv, mrgCtx.mvFieldNeighbours[(pos << 1) + 1].refIdx);
+          }
+          affMrgCtx.interDirNeighbours[affMrgCtx.numValidMergeCand] = mrgCtx.interDirNeighbours[pos];
 
-      affMrgCtx.numValidMergeCand++;
+          affMrgCtx.affineType[affMrgCtx.numValidMergeCand] = AFFINE_MODEL_NUM;
+          affMrgCtx.mergeType[affMrgCtx.numValidMergeCand] = MRG_TYPE_SUBPU_ATMVP;
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          affMrgCtx.colIdx[affMrgCtx.numValidMergeCand] = (index << 1) + colFrameIdx;
+#endif
+#if AFFINE_MMVD
+          mrgCandIdx += (isAfMmvd && mrgCandIdx >= 0 ? 1 : 0);
+#endif
+          if (affMrgCtx.numValidMergeCand == mrgCandIdx)
+          {
+            return;
+          }
+
+          affMrgCtx.numValidMergeCand++;
 
 #if JVET_Z0139_NA_AFF && JVET_W0090_ARMC_TM
-      if (isZeroCandIdx && !cs.pcv->isEncoder)
-      {
-        return;
-      }
+          if (isZeroCandIdx && !cs.pcv->isEncoder)
+          {
+            return;
+          }
 #endif
-      // early termination
-      if ( affMrgCtx.numValidMergeCand == maxNumAffineMergeCand )
-      {
-        return;
+          // early termination
+          if (affMrgCtx.numValidMergeCand == maxNumAffineMergeCand)
+          {
+            return;
+          }
+        }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
       }
+#if ENABLE_INTER_TEMPLATE_MATCHING
     }
+#endif
+#endif
   }
 
   if ( slice.getSPS()->getUseAffine() )
@@ -12070,6 +13353,9 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       affMrgCtx.interDirNeighbours[affMrgCtx.numValidMergeCand] = puNeigh->interDir;
       affMrgCtx.affineType[affMrgCtx.numValidMergeCand] = (EAffineModel)(puNeigh->cu->affineType);
       affMrgCtx.BcwIdx[affMrgCtx.numValidMergeCand] = puNeigh->cu->BcwIdx;
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+      affMrgCtx.colIdx[affMrgCtx.numValidMergeCand] = 0;
+#endif
 #if INTER_LIC
       CHECK( puNeigh->interDir == 3 && puNeigh->cu->LICFlag, "LIC should not be enabled for affine bi-pred" );
       affMrgCtx.LICFlags[affMrgCtx.numValidMergeCand] = puNeigh->cu->LICFlag;
@@ -12115,7 +13401,18 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
         affMrgCtxTemp.candCost[i] = MAX_UINT64;
       }
       affMrgCtxTemp.numValidMergeCand = 0;
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+      if (pu.cs->sps->getUseFastSubTmvp())
+      {
+        affMrgCtxTemp.maxNumMergeCand = 17;
+      }
+      else
+      {
+        affMrgCtxTemp.maxNumMergeCand = 16;
+      }
+#else
       affMrgCtxTemp.maxNumMergeCand = RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE;
+#endif
 
       std::vector<RMVFInfo> mvpInfoVec[2][4];
       collectNeiMotionInfo(mvpInfoVec, pu);
@@ -12300,7 +13597,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 
         const PreCalcValues& pcv = *cs.pcv;
         Position posC0;
-        bool C0Avail = false;
+        bool isC0Avail = false;
 
         bool boundaryCond = ((posRB.x + pcv.minCUWidth) < pcv.lumaWidth) && ((posRB.y + pcv.minCUHeight) < pcv.lumaHeight);
         const SubPic &curSubPic = pu.cs->slice->getPPS()->getSubPicFromPos(pu.lumaPos());
@@ -12315,15 +13612,18 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
           if (posYInCtu + 4 < pcv.maxCUHeight)
           {
             posC0 = posRB.offset(4, 4);
-            C0Avail = true;
+            isC0Avail = true;
           }
         }
 
         Mv        cColMv;
         int       refIdx = 0;
-        bool      bExistMV = C0Avail && getColocatedMVP( pu, REF_PIC_LIST_0, posC0, cColMv, refIdx, false 
+        bool      bExistMV = isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC0, cColMv, refIdx, false
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
-                                                       , &refIdx
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          , 0
+#endif
+          , &refIdx
 #endif
         );
         if ( bExistMV )
@@ -12342,9 +13642,12 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 
         if ( slice.isInterB() )
         {
-          bExistMV = C0Avail && getColocatedMVP( pu, REF_PIC_LIST_1, posC0, cColMv, refIdx, false
+          bExistMV = isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC0, cColMv, refIdx, false
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
-                                               , &refIdx
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            , 0
+#endif
+            , &refIdx
 #endif
           );
           if ( bExistMV )
@@ -12585,7 +13888,18 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
     }
     const int MAX_PAIRWISE_NUM = 9;
     const int preDefinedPairs[MAX_PAIRWISE_NUM][2] = { {0, 1}, {0, 2}, {1, 2}, {0, 3}, {1, 3}, { 2, 3}, { 0, 4}, {1, 4}, { 2, 4} };
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    int iATMVPoffset = 0;
+    for (int index = 0; index < affMrgCtx.numValidMergeCand; index++)
+    {
+      if (affMrgCtx.mergeType[index] == MRG_TYPE_SUBPU_ATMVP)
+      {
+        iATMVPoffset++;
+      }
+    }
+#else
     int iATMVPoffset = affMrgCtx.mergeType[0] == MRG_TYPE_SUBPU_ATMVP ? 1 : 0;
+#endif
     int currSize = affMrgCtx.numValidMergeCand;
     for (int pairIdx = 0; pairIdx < MAX_PAIRWISE_NUM; pairIdx++)
     {
@@ -12680,6 +13994,9 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       affMrgCtx.mvFieldNeighbours[(cnt << 1) + 0][mvNum].setMvField( Mv( 0, 0 ), 0 );
     }
     affMrgCtx.interDirNeighbours[cnt] = 1;
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    affMrgCtx.colIdx[cnt] = 0;
+#endif
 
     if ( slice.isInterB() )
     {
@@ -12993,6 +14310,29 @@ void PU::setAllAffineMv(PredictionUnit& pu, Mv affLT, Mv affRT, Mv affLB, RefPic
 
 void clipColPos(int& posX, int& posY, const PredictionUnit& pu)
 {
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  Position puPos = pu.lumaPos();
+  int log2CtuSize = floorLog2(pu.cs->sps->getCTUSize());
+  int ctuY = ((puPos.y >> log2CtuSize) << log2CtuSize);
+  int horMax;
+  int horMin;
+  const SubPic &curSubPic = pu.cu->slice->getPPS()->getSubPicFromPos(puPos);
+  if (curSubPic.getTreatedAsPicFlag())
+  {
+    horMax = (int)curSubPic.getSubPicRight();
+    horMin = (int)curSubPic.getSubPicLeft();
+  }
+  else
+  {
+    horMax = (int)pu.cs->pps->getPicWidthInLumaSamples() - 1;
+    horMin = 0;
+  }
+  int verMax = std::min((int)pu.cs->pps->getPicHeightInLumaSamples() - 1, ctuY + (int)pu.cs->sps->getCTUSize() - 1);
+  int verMin = std::max((int)0, ctuY);
+
+  posX = std::min(horMax, std::max(horMin, posX));
+  posY = std::min(verMax, std::max(verMin, posY));
+#else
   Position puPos = pu.lumaPos();
   int log2CtuSize = floorLog2(pu.cs->sps->getCTUSize());
   int ctuX = ((puPos.x >> log2CtuSize) << log2CtuSize);
@@ -13008,15 +14348,131 @@ void clipColPos(int& posX, int& posY, const PredictionUnit& pu)
     horMax = std::min((int)pu.cs->pps->getPicWidthInLumaSamples() - 1, ctuX + (int)pu.cs->sps->getCTUSize() + 3);
   }
   int horMin = std::max((int)0, ctuX);
-  int verMax = std::min( (int)pu.cs->pps->getPicHeightInLumaSamples() - 1, ctuY + (int)pu.cs->sps->getCTUSize() - 1 );
+  int verMax = std::min((int)pu.cs->pps->getPicHeightInLumaSamples() - 1, ctuY + (int)pu.cs->sps->getCTUSize() - 1);
   int verMin = std::max((int)0, ctuY);
 
   posX = std::min(horMax, std::max(horMin, posX));
   posY = std::min(verMax, std::max(verMin, posY));
+#endif
 }
 
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+void PU::getTMVPCandOpt(const PredictionUnit &pu, RefPicList refList, int refIdx, MergeCtx& mrgCtx, MergeCtx mergeCtxIn, int col)
+{
+  const uint32_t maxNumMergeCand = NUM_TMVP_CANDS;
+  for (uint32_t ui = 0; ui < pu.cs->sps->getMaxNumMergeCand(); ++ui)
+  {
+    mrgCtx.BcwIdx[ui] = BCW_DEFAULT;
+#if INTER_LIC
+    mrgCtx.LICFlags[ui] = false;
+#endif
+    mrgCtx.interDirNeighbours[ui] = 0;
+    mrgCtx.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
+    mrgCtx.mvFieldNeighbours[(ui << 1) + 1].refIdx = NOT_VALID;
+    mrgCtx.useAltHpelIf[ui] = false;
+#if MULTI_HYP_PRED
+    mrgCtx.addHypNeighbours[ui].clear();
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+    mrgCtx.candCost[ui] = MAX_UINT64;
+#endif
+  }
+  mrgCtx.numValidMergeCand = 0;
+#if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
+  mrgCtx.numCandToTestEnc = 0;
+#endif
+
+  const Slice   &slice = *pu.cs->slice;
+  const unsigned scale = 4 * std::max<int>(1, 4 * AMVP_DECIMATION_FACTOR / 4);
+  const unsigned mask = ~(scale - 1);
+  const Picture *pColPic = slice.getRefPic(RefPicList(col == 0 ? 1 - slice.getColFromL0Flag() : 1 - slice.getColFromL0Flag2nd()), col == 0 ? slice.getColRefIdx() : slice.getColRefIdx2nd());
+
+  Mv cTMv;
+  for (int i = 0; i < mergeCtxIn.numValidMergeCand; i++)
+  {
+    if ((mergeCtxIn.interDirNeighbours[i] & (1 << REF_PIC_LIST_0)) && slice.getRefPic(REF_PIC_LIST_0, mergeCtxIn.mvFieldNeighbours[i << 1].refIdx) == pColPic)
+    {
+      cTMv = mergeCtxIn.mvFieldNeighbours[i << 1].mv;
+    }
+    else if (slice.isInterB() && (mergeCtxIn.interDirNeighbours[i] & (1 << REF_PIC_LIST_1)) && slice.getRefPic(REF_PIC_LIST_1, mergeCtxIn.mvFieldNeighbours[(i << 1) + 1].refIdx) == pColPic)
+    {
+      cTMv = mergeCtxIn.mvFieldNeighbours[(i << 1) + 1].mv;
+    }
+    else
+    {
+      CHECK(true, "Wrong TMVP candidate");
+    }
+
+    ///////////////////////////////////////////////////////////////////////
+    ////////          GET Initial Temporal Vector                  ////////
+    ///////////////////////////////////////////////////////////////////////
+
+    Mv cTempVector = cTMv;
+    Mv cColMv;
+
+    // compute the location of the current PU
+    Position puPos = pu.lumaPos();
+    Size puSize = pu.lumaSize();
+    Position centerPos;
+    cTempVector = cTMv;
+
+    cTempVector.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+    int tempX = cTempVector.getHor();
+    int tempY = cTempVector.getVer();
+
+    centerPos.x = puPos.x + (puSize.width >> 1) + tempX;
+    centerPos.y = puPos.y + (puSize.height >> 1) + tempY;
+
+    clipColPos(centerPos.x, centerPos.y, pu);
+
+    centerPos = Position{ PosType(centerPos.x & mask), PosType(centerPos.y & mask) };
+
+    // derivation of center motion parameters from the collocated CU
+    const MotionInfo &mi = pColPic->cs->getMotionInfo(centerPos);
+
+    if (mi.isInter && mi.isIBCmot == false)
+    {
+      if (getColocatedMVP(pu, refList, centerPos, cColMv, refIdx, false
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+        , col
+#endif
+      ))
+      {
+        // set as default, for further motion vector field spanning
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+        mrgCtx.mvFieldNeighbours[(mrgCtx.numValidMergeCand << 1) + refList].setMvField(cColMv, refIdx);
+        mrgCtx.mvFieldNeighbours[(mrgCtx.numValidMergeCand << 1) + 1 - refList].setMvField(Mv(), NOT_VALID);
+#else
+        mrgCtx.mvFieldNeighbours[(mrgCtx.numValidMergeCand << 1) + currRefListId].setMvField(cColMv, 0);
+#endif
+        mrgCtx.interDirNeighbours[mrgCtx.numValidMergeCand] = refList + 1;
+        mrgCtx.BcwIdx[mrgCtx.numValidMergeCand] = BCW_DEFAULT;
+      }
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+      if (!mrgCtx.xCheckSimilarMotion(mrgCtx.numValidMergeCand))
+      {
+#endif
+        mrgCtx.numValidMergeCand++;
+        if (mrgCtx.numValidMergeCand == maxNumMergeCand)
+        {
+          break;
+        }
+#if NON_ADJACENT_MRG_CAND || TM_MRG
+      }
+#endif
+      }
+    }
+    }
+#endif
 bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, bool& LICFlag, const int count
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if ENABLE_INTER_TEMPLATE_MATCHING
+  , int subIdx, MergeCtx mergeCtxIn
+#endif
+  , int col
+#else
   , int mmvdList
+#endif
 )
 {
   const Slice   &slice = *pu.cs->slice;
@@ -13026,20 +14482,43 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
   LICFlag = false;
 #endif
 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  const Picture *pColPic = slice.getRefPic(RefPicList(col == 0 ? 1 - slice.getColFromL0Flag() : 1 - slice.getColFromL0Flag2nd()), col == 0 ? slice.getColRefIdx() : slice.getColRefIdx2nd());
+#else
   const Picture *pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx());
+#endif
   Mv cTMv;
 
-  if ( count )
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  if (subIdx > mergeCtxIn.numValidMergeCand)
   {
-    if ( (mrgCtx.interDirNeighbours[0] & (1 << REF_PIC_LIST_0)) && slice.getRefPic( REF_PIC_LIST_0, mrgCtx.mvFieldNeighbours[REF_PIC_LIST_0].refIdx ) == pColPic )
+    return false;
+  }
+  else if (subIdx < mergeCtxIn.numValidMergeCand)
+  {
+    if ((mergeCtxIn.interDirNeighbours[subIdx] & (1 << REF_PIC_LIST_0)) && slice.getRefPic(REF_PIC_LIST_0, mergeCtxIn.mvFieldNeighbours[subIdx << 1].refIdx) == pColPic)
+    {
+      cTMv = mergeCtxIn.mvFieldNeighbours[subIdx << 1].mv;
+    }
+    else if (slice.isInterB() && (mergeCtxIn.interDirNeighbours[subIdx] & (1 << REF_PIC_LIST_1)) && slice.getRefPic(REF_PIC_LIST_1, mergeCtxIn.mvFieldNeighbours[(subIdx << 1) + 1].refIdx) == pColPic)
+    {
+      cTMv = mergeCtxIn.mvFieldNeighbours[(subIdx << 1) + 1].mv;
+    }
+  }
+
+#else
+  if (count)
+  {
+    if ((mrgCtx.interDirNeighbours[0] & (1 << REF_PIC_LIST_0)) && slice.getRefPic(REF_PIC_LIST_0, mrgCtx.mvFieldNeighbours[REF_PIC_LIST_0].refIdx) == pColPic)
     {
       cTMv = mrgCtx.mvFieldNeighbours[REF_PIC_LIST_0].mv;
     }
-    else if ( slice.isInterB() && (mrgCtx.interDirNeighbours[0] & (1 << REF_PIC_LIST_1)) && slice.getRefPic( REF_PIC_LIST_1, mrgCtx.mvFieldNeighbours[REF_PIC_LIST_1].refIdx ) == pColPic )
+    else if (slice.isInterB() && (mrgCtx.interDirNeighbours[0] & (1 << REF_PIC_LIST_1)) && slice.getRefPic(REF_PIC_LIST_1, mrgCtx.mvFieldNeighbours[REF_PIC_LIST_1].refIdx) == pColPic)
     {
       cTMv = mrgCtx.mvFieldNeighbours[REF_PIC_LIST_1].mv;
     }
   }
+#endif
 
   ///////////////////////////////////////////////////////////////////////
   ////////          GET Initial Temporal Vector                  ////////
@@ -13090,7 +14569,10 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
 
       if (getColocatedMVP(pu, currRefPicList, centerPos, cColMv, refIdx, true
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
-                        , &refIdx
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        , col
+#endif
+        , &refIdx
 #endif
       ))
       {
@@ -13112,17 +14594,22 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
       }
     }
   }
-
   if (!found)
   {
     return false;
   }
+#if !JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   if (mmvdList != 1)
   {
+#endif
     int xOff = (puWidth >> 1) + tempX;
     int yOff = (puHeight >> 1) + tempY;
 
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    MotionBuf &mb = mrgCtx.subPuMvpMiBuf[(subIdx << 1) + col];
+#else
     MotionBuf &mb = mrgCtx.subPuMvpMiBuf;
+#endif
 
     const bool isBiPred = isBipredRestriction(pu);
 
@@ -13140,8 +14627,8 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
 
         MotionInfo mi;
 
-        found       = false;
-        mi.isInter  = true;
+        found = false;
+        mi.isInter = true;
         mi.sliceIdx = slice.getIndependentSliceIdx();
         mi.isIBCmot = false;
         if (colMi.isInter && colMi.isIBCmot == false)
@@ -13151,6 +14638,9 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
             RefPicList currRefPicList = RefPicList(currRefListId);
             if (getColocatedMVP(pu, currRefPicList, colPos, cColMv, refIdx, true
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+              , col
+#endif
               , &refIdx
 #endif
             ))
@@ -13160,15 +14650,15 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
 #else
               mi.refIdx[currRefListId] = 0;
 #endif
-              mi.mv[currRefListId]     = cColMv;
-              found                    = true;
+              mi.mv[currRefListId] = cColMv;
+              found = true;
             }
           }
         }
         if (!found)
         {
-          mi.mv[0]     = mrgCtx.mvFieldNeighbours[(count << 1) + 0].mv;
-          mi.mv[1]     = mrgCtx.mvFieldNeighbours[(count << 1) + 1].mv;
+          mi.mv[0] = mrgCtx.mvFieldNeighbours[(count << 1) + 0].mv;
+          mi.mv[1] = mrgCtx.mvFieldNeighbours[(count << 1) + 1].mv;
           mi.refIdx[0] = mrgCtx.mvFieldNeighbours[(count << 1) + 0].refIdx;
           mi.refIdx[1] = mrgCtx.mvFieldNeighbours[(count << 1) + 1].refIdx;
         }
@@ -13177,8 +14667,8 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
 
         if (isBiPred && mi.interDir == 3)
         {
-          mi.interDir  = 1;
-          mi.mv[1]     = Mv();
+          mi.interDir = 1;
+          mi.mv[1] = Mv();
           mi.refIdx[1] = NOT_VALID;
         }
 
@@ -13186,12 +14676,18 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
           .fill(mi);
       }
     }
+#if !JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   }
+#endif
   return true;
 }
 
 #if MULTI_PASS_DMVR
-void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx, Mv* bdmvrSubPuMv0, Mv* bdmvrSubPuMv1, Mv* bdofSubPuMvOffset)
+void PU::spanMotionInfo(PredictionUnit &pu, const MergeCtx &mrgCtx,
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  int colIdx,
+#endif
+  Mv* bdmvrSubPuMv0, Mv* bdmvrSubPuMv1, Mv* bdofSubPuMvOffset)
 #else
 void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
 #endif
@@ -13326,11 +14822,22 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
   }
   else if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
   {
-    CHECK(mrgCtx.subPuMvpMiBuf.area() == 0 || !mrgCtx.subPuMvpMiBuf.buf, "Buffer not initialized");
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  for (int i = 0; i < SUB_TMVP_NUM; i++)
+  {
+    CHECK(mrgCtx.subPuMvpMiBuf[i].area() == 0 || !mrgCtx.subPuMvpMiBuf[i].buf, "Buffer not initialized");
+  }
+#else
+  CHECK(mrgCtx.subPuMvpMiBuf.area() == 0 || !mrgCtx.subPuMvpMiBuf.buf, "Buffer not initialized");
+#endif
 #if MULTI_PASS_DMVR
     MotionBuf mb = pu.getMotionBuf();
 #endif
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    mb.copyFrom(mrgCtx.subPuMvpMiBuf[pu.colIdx]);
+#else
     mb.copyFrom(mrgCtx.subPuMvpMiBuf);
+#endif
 #if JVET_W0123_TIMD_FUSION
     spanIpmInfoInter(pu, mb, ib);
 #endif
@@ -13339,7 +14846,11 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
 
 #if JVET_W0123_TIMD_FUSION
 #if MULTI_PASS_DMVR
-void PU::spanMotionInfo2( PredictionUnit &pu, const MergeCtx &mrgCtx, Mv* bdmvrSubPuMv0, Mv* bdmvrSubPuMv1, Mv* bdofSubPuMvOffset)
+void PU::spanMotionInfo2(PredictionUnit &pu, const MergeCtx &mrgCtx,
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  int colIdx,
+#endif
+  Mv* bdmvrSubPuMv0, Mv* bdmvrSubPuMv1, Mv* bdofSubPuMvOffset)
 #else
 void PU::spanMotionInfo2( PredictionUnit &pu, const MergeCtx &mrgCtx )
 #endif
@@ -13422,11 +14933,22 @@ void PU::spanMotionInfo2( PredictionUnit &pu, const MergeCtx &mrgCtx )
   }
   else if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
   {
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    for (int i = 0; i < SUB_TMVP_NUM; i++)
+    {
+      CHECK(mrgCtx.subPuMvpMiBuf[i].area() == 0 || !mrgCtx.subPuMvpMiBuf[i].buf, "Buffer not initialized");
+    }
+#else
     CHECK(mrgCtx.subPuMvpMiBuf.area() == 0 || !mrgCtx.subPuMvpMiBuf.buf, "Buffer not initialized");
+#endif
 #if MULTI_PASS_DMVR
     MotionBuf mb = pu.getMotionBuf();
 #endif
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    mb.copyFrom(mrgCtx.subPuMvpMiBuf[pu.colIdx]);
+#else
     mb.copyFrom(mrgCtx.subPuMvpMiBuf);
+#endif
   }
 }
 

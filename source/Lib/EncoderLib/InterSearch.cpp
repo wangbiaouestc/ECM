@@ -3578,7 +3578,14 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     if (cu.cs->sps->getSbTMVPEnabledFlag())
     {
       Size bufSize = g_miScaling.scale(pu.lumaSize());
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+      for (int i = 0; i < SUB_TMVP_NUM; i++)
+      {
+        mergeCtx.subPuMvpMiBuf[i] = MotionBuf(m_SubPuMiBuf[i], bufSize);
+      }
+#else
       mergeCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+#endif
     }
 
     Distortion   uiHevcCost = std::numeric_limits<Distortion>::max();
@@ -4693,7 +4700,11 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     if (!pu.bdmvrRefine)
 #endif
     {
-      PU::spanMotionInfo( pu, mergeCtx );
+      PU::spanMotionInfo(pu, mergeCtx
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        , pu.colIdx
+#endif
+      );
     }
 
     m_skipPROF = false;
@@ -4725,7 +4736,11 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #if JVET_X0083_BM_AMVP_MERGE_MODE
     if (pu.bdmvrRefine)
     {
-      PU::spanMotionInfo( *cu.firstPU, MergeCtx(), mvBufEncAmBDMVR_L0, mvBufEncAmBDMVR_L1, getBdofSubPuMvOffset() );
+      PU::spanMotionInfo(*cu.firstPU, MergeCtx(),
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        pu.colIdx,
+#endif
+        mvBufEncAmBDMVR_L0, mvBufEncAmBDMVR_L1, getBdofSubPuMvOffset());
     }
 #endif
 #if INTER_LIC && (!TM_AMVP || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP))

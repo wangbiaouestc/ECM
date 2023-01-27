@@ -242,7 +242,15 @@ namespace PU
 #endif
   );
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
-  void getTmvpMergeCand               (const PredictionUnit &pu, MergeCtx& mvpMrgCtx);
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  void getNonAdjacentMergeCandSubTMVP(const PredictionUnit &pu, MergeCtx& mvpMrgCtx, int col);
+  void getInterMergeCandidatesSubTMVP(const PredictionUnit &pu, MergeCtx& mrgCtx, int col, const int& mrgCandIdx = -1
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+    , MergeCtx* mvpMrgCtx1 = NULL
+#endif
+  );
+#endif
+  void getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mvpMrgCtxz);
   void getNonAdjacentMergeCand        (const PredictionUnit &pu, MergeCtx& mvpMrgCtx);
 #endif
   void getIBCMergeCandidates          (const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx = -1);
@@ -264,6 +272,9 @@ namespace PU
   bool isDiffMER                      (const Position &pos1, const Position &pos2, const unsigned plevel);
   bool getColocatedMVP                (const PredictionUnit &pu, const RefPicList &eRefPicList, const Position &pos, Mv& rcMv, const int &refIdx, bool sbFlag
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    , int col = 0
+#endif
     , int* targetRefIdx = nullptr
 #endif
   );
@@ -319,6 +330,19 @@ namespace PU
     , const uint32_t mvdSimilarityThresh = 1
 #endif
   );
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  void addMergeHMVPCandSubTMVP(const CodingStructure &cs, MergeCtx& mrgCtx, const int& mrgCandIdx, const uint32_t maxNumMergeCand, int &cnt
+    , const bool isAvailableA1, const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
+    , const bool ibcFlag
+    , const bool isGt4x4
+#endif
+    , const PredictionUnit &pu, int col
+#if TM_MRG || (JVET_Z0084_IBC_TM && !JVET_Z0075_IBC_HMVP_ENLARGE)
+    , const uint32_t mvdSimilarityThresh = 1
+#endif
+  );
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
 #if JVET_Y0128_NON_CTC
   bool checkIsValidMergeMvCand        (const PredictionUnit &pu, int8_t mergeRefIdx[ NUM_REF_PIC_LIST_01 ]);
@@ -381,13 +405,21 @@ namespace PU
   );
   bool isBipredRestriction            (const PredictionUnit &pu);
 #if MULTI_PASS_DMVR
-  void spanMotionInfo                 (      PredictionUnit &pu, const MergeCtx &mrgCtx = MergeCtx(), Mv* bdmvrSubPuMv0 = nullptr, Mv* bdmvrSubPuMv1 = nullptr, Mv* bdofSubPuMvOffset = nullptr );
+  void spanMotionInfo                 (      PredictionUnit &pu, const MergeCtx &mrgCtx = MergeCtx(), 
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    int colIdx = 0,
+#endif
+    Mv* bdmvrSubPuMv0 = nullptr, Mv* bdmvrSubPuMv1 = nullptr, Mv* bdofSubPuMvOffset = nullptr );
 #else
   void spanMotionInfo                 (      PredictionUnit &pu, const MergeCtx &mrgCtx = MergeCtx() );
 #endif
 #if JVET_W0123_TIMD_FUSION
 #if MULTI_PASS_DMVR
-  void spanMotionInfo2                (      PredictionUnit &pu, const MergeCtx &mrgCtx = MergeCtx(), Mv* bdmvrSubPuMv0 = nullptr, Mv* bdmvrSubPuMv1 = nullptr, Mv* bdofSubPuMvOffset = nullptr );
+  void spanMotionInfo2                (      PredictionUnit &pu, const MergeCtx &mrgCtx = MergeCtx(),
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    int colIdx = 0,
+#endif
+    Mv* bdmvrSubPuMv0 = nullptr, Mv* bdmvrSubPuMv1 = nullptr, Mv* bdofSubPuMvOffset = nullptr );
 #else
   void spanMotionInfo2                (      PredictionUnit &pu, const MergeCtx &mrgCtx = MergeCtx() );
 #endif
@@ -418,6 +450,9 @@ namespace PU
   int  getNonAdjAffParaDivFun(int num1, int num2);
 #endif
   void getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx, 
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION   
+    MergeCtx mrgCtx[2],
+#endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION && JVET_W0090_ARMC_TM
     InterPrediction* m_pcInterSearch,
 #endif
@@ -437,7 +472,19 @@ namespace PU
 #endif
   void setAllAffineMvField            (      PredictionUnit &pu, MvField *mvField, RefPicList eRefList );
   void setAllAffineMv                 (      PredictionUnit &pu, Mv affLT, Mv affRT, Mv affLB, RefPicList eRefList, bool clipCPMVs = false );
-  bool getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx &mrgCtx, bool& LICFlag, const int count, int mmvdList);
+  bool getInterMergeSubPuMvpCand      (const PredictionUnit &pu, MergeCtx& mrgCtx, bool& LICFlag, const int count
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if ENABLE_INTER_TEMPLATE_MATCHING
+    , int subIdx, MergeCtx mergeCtxIn
+#endif
+    , int col = 0
+#else
+    , int mmvdList
+#endif
+  );
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+  void getTMVPCandOpt(const PredictionUnit &pu, RefPicList refList, int refIdx, MergeCtx &mrgCtx, MergeCtx mergeCtx, int col = 0);
+#endif
 #if JVET_Y0128_NON_CTC
   bool isBiRefScaled(const CodingStructure& cs, const int refIdx0, const int refIdx1);
 #endif

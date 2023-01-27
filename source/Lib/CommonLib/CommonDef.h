@@ -113,6 +113,13 @@
 #define NULL              0
 #endif
 
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+static const int SUB_TMVP_CANDIDATE_NUM = 10;
+static const int SUB_TMVP_INDEX = 3;  // 1: 2 subtmvp; 2: 4 subtmvp
+static const int SUB_TMVP_NUM = 2 * SUB_TMVP_INDEX;
+static const int SUB_TMVP_MV_THRESHOLD = 2;
+static const int AMVP_TMVP_INDEX = 1;  // 1: 2 AMVP tmvp; 2: 4 AMVP tmvp
+#endif
 typedef enum
 {
   AFFINEMODEL_4PARAM,

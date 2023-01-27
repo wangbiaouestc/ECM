@@ -678,7 +678,30 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
 // ====================================================================================================================
 // Public member functions
 // ====================================================================================================================
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+bool InterPrediction::xCheckIdenticalMotionSubTMVP(const PredictionUnit &pu)
+{
+  const Slice &slice = *pu.cs->slice;
 
+  if (slice.isInterB() && !pu.cs->pps->getWPBiPred())
+  {
+    if (pu.interDir == 3)
+    {
+      int refPOCL0 = slice.getRefPic(REF_PIC_LIST_0, pu.refIdx[0])->getPOC();
+      int refPOCL1 = slice.getRefPic(REF_PIC_LIST_1, pu.refIdx[1])->getPOC();
+
+      if (refPOCL0 == refPOCL1)
+      {
+        if (pu.mv[0] == pu.mv[1])
+        {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+#endif
 bool InterPrediction::xCheckIdenticalMotion( const PredictionUnit &pu )
 {
   const Slice &slice = *pu.cs->slice;
@@ -4167,150 +4190,226 @@ void InterPrediction::xWeightedAverageY(const PredictionUnit& pu, const CPelUnit
 #endif
 
 #if JVET_W0090_ARMC_TM
-void InterPrediction::xPredAffineTpl(const PredictionUnit &pu, const RefPicList &eRefPicList, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate)
+void InterPrediction::xPredAffineTpl(const PredictionUnit &pu, const RefPicList &eRefPicList, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  , AffineMergeCtx affMrgCtx, bool isBilinear
+#endif
+)
 {
   int iRefIdx = pu.refIdx[eRefPicList];
   CHECK(iRefIdx < 0, "iRefIdx incorrect.");
   const Picture* refPic = pu.cu->slice->getRefPic(eRefPicList, iRefIdx)->unscaledPic;
-  Mv mvLT = pu.mvAffi[eRefPicList][0];
-  Mv mvRT = pu.mvAffi[eRefPicList][1];
-  Mv mvLB = pu.mvAffi[eRefPicList][2];
-  // get affine sub-block width and height
-  const int width = pu.Y().width;
-  const int height = pu.Y().height;
-  int blockWidth = AFFINE_MIN_BLOCK_SIZE;
-  int blockHeight = AFFINE_MIN_BLOCK_SIZE;
-
-  CHECK(blockWidth > width, "Sub Block width  > Block width");
-  CHECK(blockHeight > height, "Sub Block height > Block height");
-
-  const int cxWidth = width;
-  const int cxHeight = height;
-  const int iBit = MAX_CU_DEPTH;
-  int iDMvHorX, iDMvHorY, iDMvVerX, iDMvVerY;
-  iDMvHorX = (mvRT - mvLT).getHor() << (iBit - floorLog2(width));
-  iDMvHorY = (mvRT - mvLT).getVer() << (iBit - floorLog2(width));
-  if (pu.cu->affineType == AFFINEMODEL_6PARAM)
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
   {
-    iDMvVerX = (mvLB - mvLT).getHor() << (iBit - floorLog2(height));
-    iDMvVerY = (mvLB - mvLT).getVer() << (iBit - floorLog2(height));
-  }
-  else
-  {
-    iDMvVerX = -iDMvHorY;
-    iDMvVerY = iDMvHorX;
-  }
-  int iMvScaleHor = mvLT.getHor() << iBit;
-  int iMvScaleVer = mvLT.getVer() << iBit;
-
-  const int shift = iBit - 4 + MV_FRACTIONAL_BITS_INTERNAL;
-#if !AFFINE_RM_CONSTRAINTS_AND_OPT
-  const bool subblkMVSpreadOverLimit = isSubblockVectorSpreadOverLimit(iDMvHorX, iDMvHorY, iDMvVerX, iDMvVerY, pu.interDir);
-#endif
-#if AFFINE_RM_CONSTRAINTS_AND_OPT
-  if (iDMvHorX == 0 && iDMvHorY == 0)
-    blockWidth = width;
-  else
-  {
-    int maxDmv = std::max(abs(iDMvHorX), abs(iDMvHorY)) * blockWidth;
-    int TH = 1 << (iBit - 1); // Half pel
-    while (maxDmv < TH && blockWidth < width)
+    Size puSize = pu.lumaSize();
+    int numPartLine = std::max(puSize.width >> ATMVP_SUB_BLOCK_SIZE, 1u);
+    int numPartCol = std::max(puSize.height >> ATMVP_SUB_BLOCK_SIZE, 1u);
+    int puHeight = numPartCol == 1 ? puSize.height : 1 << ATMVP_SUB_BLOCK_SIZE;
+    int puWidth = numPartLine == 1 ? puSize.width : 1 << ATMVP_SUB_BLOCK_SIZE;
+    for (int h = 0; h < puSize.height; h += puHeight)
     {
-      blockWidth <<= 1;
-      maxDmv <<= 1;
-    }
-  }
-  if (iDMvVerX == 0 && iDMvVerY == 0)
-    blockHeight = height;
-  else
-  {
-    int maxDmv = std::max(abs(iDMvVerX), abs(iDMvVerY)) * blockHeight;
-    int TH = 1 << (iBit - 1); // Half pel
-    while (maxDmv < TH && blockHeight < height)
-    {
-      blockHeight <<= 1;
-      maxDmv <<= 1;
-    }
-  }
-#endif
-  int iMvScaleTmpHor0 = iMvScaleHor + ((iDMvHorX * blockWidth + iDMvVerX * blockHeight) >> 1);
-  int iMvScaleTmpVer0 = iMvScaleVer + ((iDMvHorY * blockWidth + iDMvVerY * blockHeight) >> 1);
-
-#if JVET_Z0139_NA_AFF
-  const CodingUnit *const cuAbove = pu.cu->cs->getCU(pu.cu->blocks[COMPONENT_Y].pos().offset(0, -1), toChannelType(COMPONENT_Y));
-  const CodingUnit *const cuLeft  = pu.cu->cs->getCU(pu.cu->blocks[COMPONENT_Y].pos().offset(-1, 0), toChannelType(COMPONENT_Y));
-
-  // get prediction block by block
-  for (int h = 0; (cuLeft && h < cxHeight) || h < 1; h += blockHeight)
-  {
-    for (int w = 0; (cuAbove && w < cxWidth) || w < 1; w += blockWidth)
-#else
-  for (int h = 0; h < cxHeight; h += blockHeight)
-  {
-    for (int w = 0; w < cxWidth; w += blockWidth)
-#endif
-    {
-      if (w == 0 || h == 0)
+      for (int w = 0; w < puSize.width; w += puWidth)
       {
-        int iMvScaleTmpHor, iMvScaleTmpVer;
-
-#if !AFFINE_RM_CONSTRAINTS_AND_OPT
-        if (!subblkMVSpreadOverLimit)
-#endif
+        if (w == 0 || h == 0)
         {
-          iMvScaleTmpHor = iMvScaleTmpHor0 + iDMvHorX * w + iDMvVerX * h;
-          iMvScaleTmpVer = iMvScaleTmpVer0 + iDMvHorY * w + iDMvVerY * h;
-        }
-#if !AFFINE_RM_CONSTRAINTS_AND_OPT
-        else
-        {
-          iMvScaleTmpHor = iMvScaleHor + iDMvHorX * (cxWidth >> 1) + iDMvVerX * (cxHeight >> 1);
-          iMvScaleTmpVer = iMvScaleVer + iDMvHorY * (cxWidth >> 1) + iDMvVerY * (cxHeight >> 1);
-        }
-#endif
-        roundAffineMv(iMvScaleTmpHor, iMvScaleTmpVer, shift);
-        Mv tmpMv(iMvScaleTmpHor, iMvScaleTmpVer);
-        tmpMv.clipToStorageBitDepth();
-        iMvScaleTmpHor = tmpMv.getHor();
-        iMvScaleTmpVer = tmpMv.getVer();
-
-        // clip and scale
-#if JVET_AA0146_WRAP_AROUND_FIX
-        bool wrapRef = false;
-        if ( refPic->isWrapAroundEnabled( pu.cs->pps ) )
-        {
+          int iMvScaleTmpHor, iMvScaleTmpVer;
+          MotionBuf mb = affMrgCtx.mrgCtx->subPuMvpMiBuf[pu.colIdx];
+          iMvScaleTmpHor = mb.buf[(w >> ATMVP_SUB_BLOCK_SIZE) + (h >> ATMVP_SUB_BLOCK_SIZE) * (affMrgCtx.mrgCtx->subPuMvpMiBuf[0].stride)].mv[eRefPicList].hor;
+          iMvScaleTmpVer = mb.buf[(w >> ATMVP_SUB_BLOCK_SIZE) + (h >> ATMVP_SUB_BLOCK_SIZE) * (affMrgCtx.mrgCtx->subPuMvpMiBuf[0].stride)].mv[eRefPicList].ver;
           Mv tmpMv(iMvScaleTmpHor, iMvScaleTmpVer);
-          wrapRef = wrapClipMv( tmpMv, pu.lumaPos(), pu.lumaSize(), pu.cs->sps, pu.cs->pps );
-          iMvScaleTmpHor = tmpMv.getHor();
-          iMvScaleTmpVer = tmpMv.getVer();
-        }
-        else
-        {
-          wrapRef = false;
-#endif
-        if (refPic->isRefScaled(pu.cs->pps) == false)
-        {
-          clipMv(tmpMv, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
-          iMvScaleTmpHor = tmpMv.getHor();
-          iMvScaleTmpVer = tmpMv.getVer();
-        }
-#if JVET_AA0146_WRAP_AROUND_FIX
-        }
-#endif
-        xGetSublkAMLTemplate(*pu.cu, COMPONENT_Y, *refPic, Mv(iMvScaleTmpHor, iMvScaleTmpVer), blockWidth, blockHeight, w, h, numTemplate, refLeftTemplate, refAboveTemplate
+          // clip and scale
+          if (refPic->isRefScaled(pu.cs->pps) == false)
+          {
+            clipMv(tmpMv, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
+            iMvScaleTmpHor = tmpMv.getHor();
+            iMvScaleTmpVer = tmpMv.getVer();
+          }
+
+          xGetSublkAMLTemplate(*pu.cu, COMPONENT_Y, *refPic, Mv(iMvScaleTmpHor, iMvScaleTmpVer), puWidth, puHeight, w, h, numTemplate, refLeftTemplate, refAboveTemplate
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-                             , pu.afMmvdFlag
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            , (pu.afMmvdFlag
+#else
+              , pu.afMmvdFlag
+#endif 
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
-                            && pu.cs->sps->getUseTMMMVD()
+              && pu.cs->sps->getUseTMMMVD()
+#endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+              )
+#endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            || (isBilinear
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+              && pu.cs->sps->getUseTMMMVD())
 #endif
 #endif
-#if JVET_AA0146_WRAP_AROUND_FIX
-                             , wrapRef
 #endif
-                             );
+          );
+        }
       }
     }
   }
+  else
+  {
+#endif
+    Mv mvLT = pu.mvAffi[eRefPicList][0];
+    Mv mvRT = pu.mvAffi[eRefPicList][1];
+    Mv mvLB = pu.mvAffi[eRefPicList][2];
+    // get affine sub-block width and height
+    const int width = pu.Y().width;
+    const int height = pu.Y().height;
+    int blockWidth = AFFINE_MIN_BLOCK_SIZE;
+    int blockHeight = AFFINE_MIN_BLOCK_SIZE;
+
+    CHECK(blockWidth > width, "Sub Block width  > Block width");
+    CHECK(blockHeight > height, "Sub Block height > Block height");
+
+    const int cxWidth = width;
+    const int cxHeight = height;
+    const int iBit = MAX_CU_DEPTH;
+    int iDMvHorX, iDMvHorY, iDMvVerX, iDMvVerY;
+    iDMvHorX = (mvRT - mvLT).getHor() << (iBit - floorLog2(width));
+    iDMvHorY = (mvRT - mvLT).getVer() << (iBit - floorLog2(width));
+    if (pu.cu->affineType == AFFINEMODEL_6PARAM)
+    {
+      iDMvVerX = (mvLB - mvLT).getHor() << (iBit - floorLog2(height));
+      iDMvVerY = (mvLB - mvLT).getVer() << (iBit - floorLog2(height));
+    }
+    else
+    {
+      iDMvVerX = -iDMvHorY;
+      iDMvVerY = iDMvHorX;
+    }
+    int iMvScaleHor = mvLT.getHor() << iBit;
+    int iMvScaleVer = mvLT.getVer() << iBit;
+
+    const int shift = iBit - 4 + MV_FRACTIONAL_BITS_INTERNAL;
+#if !AFFINE_RM_CONSTRAINTS_AND_OPT
+    const bool subblkMVSpreadOverLimit = isSubblockVectorSpreadOverLimit(iDMvHorX, iDMvHorY, iDMvVerX, iDMvVerY, pu.interDir);
+#endif
+#if AFFINE_RM_CONSTRAINTS_AND_OPT
+    if (iDMvHorX == 0 && iDMvHorY == 0)
+      blockWidth = width;
+    else
+    {
+      int maxDmv = std::max(abs(iDMvHorX), abs(iDMvHorY)) * blockWidth;
+      int TH = 1 << (iBit - 1); // Half pel
+      while (maxDmv < TH && blockWidth < width)
+      {
+        blockWidth <<= 1;
+        maxDmv <<= 1;
+      }
+    }
+    if (iDMvVerX == 0 && iDMvVerY == 0)
+      blockHeight = height;
+    else
+    {
+      int maxDmv = std::max(abs(iDMvVerX), abs(iDMvVerY)) * blockHeight;
+      int TH = 1 << (iBit - 1); // Half pel
+      while (maxDmv < TH && blockHeight < height)
+      {
+        blockHeight <<= 1;
+        maxDmv <<= 1;
+      }
+    }
+#endif
+    int iMvScaleTmpHor0 = iMvScaleHor + ((iDMvHorX * blockWidth + iDMvVerX * blockHeight) >> 1);
+    int iMvScaleTmpVer0 = iMvScaleVer + ((iDMvHorY * blockWidth + iDMvVerY * blockHeight) >> 1);
+
+#if JVET_Z0139_NA_AFF
+    const CodingUnit *const cuAbove = pu.cu->cs->getCU(pu.cu->blocks[COMPONENT_Y].pos().offset(0, -1), toChannelType(COMPONENT_Y));
+    const CodingUnit *const cuLeft = pu.cu->cs->getCU(pu.cu->blocks[COMPONENT_Y].pos().offset(-1, 0), toChannelType(COMPONENT_Y));
+
+    // get prediction block by block
+    for (int h = 0; (cuLeft && h < cxHeight) || h < 1; h += blockHeight)
+    {
+      for (int w = 0; (cuAbove && w < cxWidth) || w < 1; w += blockWidth)
+#else
+    for (int h = 0; h < cxHeight; h += blockHeight)
+    {
+      for (int w = 0; w < cxWidth; w += blockWidth)
+#endif
+      {
+        if (w == 0 || h == 0)
+        {
+          int iMvScaleTmpHor, iMvScaleTmpVer;
+
+#if !AFFINE_RM_CONSTRAINTS_AND_OPT
+          if (!subblkMVSpreadOverLimit)
+#endif
+          {
+            iMvScaleTmpHor = iMvScaleTmpHor0 + iDMvHorX * w + iDMvVerX * h;
+            iMvScaleTmpVer = iMvScaleTmpVer0 + iDMvHorY * w + iDMvVerY * h;
+          }
+#if !AFFINE_RM_CONSTRAINTS_AND_OPT
+          else
+          {
+            iMvScaleTmpHor = iMvScaleHor + iDMvHorX * (cxWidth >> 1) + iDMvVerX * (cxHeight >> 1);
+            iMvScaleTmpVer = iMvScaleVer + iDMvHorY * (cxWidth >> 1) + iDMvVerY * (cxHeight >> 1);
+          }
+#endif
+          roundAffineMv(iMvScaleTmpHor, iMvScaleTmpVer, shift);
+          Mv tmpMv(iMvScaleTmpHor, iMvScaleTmpVer);
+          tmpMv.clipToStorageBitDepth();
+          iMvScaleTmpHor = tmpMv.getHor();
+          iMvScaleTmpVer = tmpMv.getVer();
+
+          // clip and scale
+#if JVET_AA0146_WRAP_AROUND_FIX
+          bool wrapRef = false;
+          if (refPic->isWrapAroundEnabled(pu.cs->pps))
+          {
+            Mv tmpMv(iMvScaleTmpHor, iMvScaleTmpVer);
+            wrapRef = wrapClipMv(tmpMv, pu.lumaPos(), pu.lumaSize(), pu.cs->sps, pu.cs->pps);
+            iMvScaleTmpHor = tmpMv.getHor();
+            iMvScaleTmpVer = tmpMv.getVer();
+          }
+          else
+          {
+            wrapRef = false;
+#endif
+            if (refPic->isRefScaled(pu.cs->pps) == false)
+            {
+              clipMv(tmpMv, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
+              iMvScaleTmpHor = tmpMv.getHor();
+              iMvScaleTmpVer = tmpMv.getVer();
+            }
+#if JVET_AA0146_WRAP_AROUND_FIX
+          }
+#endif
+          xGetSublkAMLTemplate(*pu.cu, COMPONENT_Y, *refPic, Mv(iMvScaleTmpHor, iMvScaleTmpVer), blockWidth, blockHeight, w, h, numTemplate, refLeftTemplate, refAboveTemplate
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            , (pu.afMmvdFlag
+#else
+              , pu.afMmvdFlag
+#endif                          
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+              && pu.cs->sps->getUseTMMMVD()
+#endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+              )
+#endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            || (isBilinear
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+              && pu.cs->sps->getUseTMMMVD()
+#endif
+              )
+#endif
+#endif
+#if JVET_AA0146_WRAP_AROUND_FIX
+            , wrapRef
+#endif
+          );
+        }
+      }
+    }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  }
+#endif
 }
 #endif
 
@@ -7711,11 +7810,19 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
         //Store
         if (pu.interDir == 3)
         {
-          getAffAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft, posList0, posList1, load0, load1);
+          getAffAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft,
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            false, affMrgCtx,
+#endif
+            posList0, posList1, load0, load1);
         }
         else
         {
-          getAffAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
+          getAffAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            , false, affMrgCtx
+#endif
+          );
         }
         if (m_bAMLTemplateAvailabe[0])
         {
@@ -7876,7 +7983,11 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
     PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
     PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
     PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-    getAffAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
+    getAffAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+      , affMrgCtx
+#endif
+    );
     
     if (m_bAMLTemplateAvailabe[0])
     {
@@ -7920,7 +8031,82 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
 }
 #endif
 #endif
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+void InterPrediction::adjustMergeCandidatesInOneCandidateGroupSubTMVP(PredictionUnit &pu, MergeCtx& mvpMergeCandCtx, int numRetrievedMergeCand, int mrgCandIdx)
+{
+  if (mvpMergeCandCtx.numValidMergeCand <= 1)
+  {
+    return;
+  }
 
+  const int numCandInCategory = std::min(numRetrievedMergeCand, mvpMergeCandCtx.numValidMergeCand);
+
+  uint32_t rdCandList[MRG_MAX_NUM_CANDS];
+  Distortion candCostList[MRG_MAX_NUM_CANDS];
+
+  for (uint32_t j = 0; j < MRG_MAX_NUM_CANDS; j++)
+  {
+    rdCandList[j] = j;
+    candCostList[j] = MAX_UINT;
+  }
+
+  Distortion uiCost;
+
+  DistParam cDistParam;
+  cDistParam.applyWeight = false;
+
+  int nWidth = pu.lumaSize().width;
+  int nHeight = pu.lumaSize().height;
+
+  auto origMergeIdx = pu.mergeIdx;
+  for (uint32_t uiMergeCand = 0; uiMergeCand < mvpMergeCandCtx.numValidMergeCand; uiMergeCand++)
+  {
+    if (mvpMergeCandCtx.candCost[uiMergeCand] == MAX_UINT64)
+    {
+      uiCost = 0;
+
+      mvpMergeCandCtx.setMergeInfo(pu, uiMergeCand);
+
+      PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+      PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+      PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+
+      getBlkAMLRefTemplateSubTMVP(pu, pcBufPredRefTop, pcBufPredRefLeft);
+
+      if (m_bAMLTemplateAvailabe[0])
+      {
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+
+        uiCost += cDistParam.distFunc(cDistParam);
+      }
+
+      if (m_bAMLTemplateAvailabe[1])
+      {
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+
+        uiCost += cDistParam.distFunc(cDistParam);
+      }
+    }
+    else
+    {
+      uiCost = mvpMergeCandCtx.candCost[uiMergeCand];
+    }
+
+    updateCandList(uiMergeCand, uiCost, numCandInCategory, rdCandList, candCostList);
+  }
+  pu.mergeIdx = origMergeIdx;
+
+  updateCandInOneCandidateGroup(mvpMergeCandCtx, rdCandList, numCandInCategory);
+
+  mvpMergeCandCtx.numValidMergeCand = numCandInCategory;
+
+  for (int idx = 0; idx < numCandInCategory; idx++)
+  {
+    mvpMergeCandCtx.candCost[idx] = candCostList[idx];
+  }
+}
+#endif
 #if JVET_W0090_ARMC_TM
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
 void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& mvpMergeCandCtx, int numRetrievedMergeCand, int mrgCandIdx)
@@ -7950,6 +8136,13 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
   int nHeight = pu.lumaSize().height;
 
   auto origMergeIdx = pu.mergeIdx;
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  PredictionUnit puTmp;
+  CodingUnit cuTmp;
+  puTmp.cu = &cuTmp;
+  mvpMergeCandCtx.saveMergeInfo(puTmp, pu);
+#endif
+
   for (uint32_t uiMergeCand = 0; uiMergeCand < mvpMergeCandCtx.numValidMergeCand; uiMergeCand++)
   {
     if (mvpMergeCandCtx.candCost[uiMergeCand] == MAX_UINT64)
@@ -7996,6 +8189,9 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
   {
     mvpMergeCandCtx.candCost[idx] = candCostList[idx];
   }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  mvpMergeCandCtx.saveMergeInfo(pu, puTmp);
+#endif
 }
 
 #if JVET_AB0079_TM_BCW_MRG
@@ -9065,7 +9261,226 @@ void  InterPrediction::updateCandInfo(MergeCtx& mrgCtx, uint32_t(*RdCandList)[MR
   }
 }
 #endif
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+void InterPrediction::getBlkAMLRefTemplateSubTMVP(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft)
+{
+  Mv mvCurr;
+  const int lumaShift = 2 + MV_FRACTIONAL_BITS_DIFF;
+  const int horShift = (lumaShift + ::getComponentScaleX(COMPONENT_Y, pu.chromaFormat));
+  const int verShift = (lumaShift + ::getComponentScaleY(COMPONENT_Y, pu.chromaFormat));
 
+  if (xCheckIdenticalMotionSubTMVP(pu))
+  {
+    mvCurr = pu.mv[0];
+    /*const int horIntMv = (mvCurr.getHor() + ((1 << horShift) >> 1)) >> horShift;
+    const int verIntMv = (mvCurr.getVer() + ((1 << verShift) >> 1)) >> verShift;
+    Mv    subPelMv(horIntMv << horShift, verIntMv << verShift);*/
+    Mv subPelMv = mvCurr;
+    clipMv(mvCurr, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
+    CHECK(pu.refIdx[0] < 0, "invalid ref idx");
+
+    if (m_bAMLTemplateAvailabe[0])
+    {
+      Mv mvTop(0, -(AML_MERGE_TEMPLATE_SIZE << verShift));
+      mvTop += subPelMv;
+
+      clipMv(mvTop, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
+
+#if RPR_ENABLE
+      const Picture* picRef = pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0])->unscaledPic;
+      const std::pair<int, int>& scalingRatio = pu.cu->slice->getScalingRatio(REF_PIC_LIST_0, pu.refIdx[0]);
+#if INTER_LIC
+      xPredInterBlk(COMPONENT_Y, pu, picRef, mvTop, pcBufPredRefTop,
+        false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true, true, mvCurr);
+#else
+      xPredInterBlk(COMPONENT_Y, pu, picRef, mvTop, pcBufPredRefTop,
+        false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true);
+#endif
+#else
+#if INTER_LIC
+      xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0]), mvTop, pcBufPredRefTop,
+        false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true, true,
+        mvCurr);
+#else
+      xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0]), mvTop, pcBufPredRefTop,
+        false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true);
+#endif
+#endif
+    }
+    if (m_bAMLTemplateAvailabe[1])
+    {
+      Mv mvLeft(-(AML_MERGE_TEMPLATE_SIZE << horShift), 0);
+      mvLeft += subPelMv;
+
+      clipMv(mvLeft, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
+
+#if RPR_ENABLE
+      const Picture* picRef = pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0])->unscaledPic;
+      const std::pair<int, int>& scalingRatio = pu.cu->slice->getScalingRatio(REF_PIC_LIST_0, pu.refIdx[0]);
+#if INTER_LIC
+      xPredInterBlk(COMPONENT_Y, pu, picRef, mvLeft, pcBufPredRefLeft,
+        false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true, true, mvCurr);
+#else
+      xPredInterBlk(COMPONENT_Y, pu, picRef, mvLeft, pcBufPredRefLeft,
+        false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true);
+#endif
+#else
+#if INTER_LIC
+      xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0]), mvLeft, pcBufPredRefLeft,
+        false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true, true,
+        mvCurr);
+#else
+      xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0]), mvLeft, pcBufPredRefLeft,
+        false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true);
+#endif
+#endif
+    }
+  }
+  else
+  {
+    for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
+    {
+      if (!(pu.interDir & (1 << refList)))
+      {
+        continue;
+      }
+      RefPicList eRefPicList = (refList ? REF_PIC_LIST_1 : REF_PIC_LIST_0);
+      CHECK(pu.refIdx[refList] >= pu.cu->slice->getNumRefIdx(eRefPicList), "Invalid reference index");
+
+      m_iRefListIdx = refList;
+      mvCurr = pu.mv[refList];
+      Mv subPelMv = mvCurr;
+      clipMv(mvCurr, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
+
+      if (m_bAMLTemplateAvailabe[0])
+      {
+        Mv mvTop(0, -(AML_MERGE_TEMPLATE_SIZE << verShift));
+        mvTop += subPelMv;
+
+        clipMv(mvTop, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
+
+        PelUnitBuf pcMbBuf =
+          PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAboveTemplate[refList][0], pcBufPredRefTop.Y()));
+
+        if (pu.interDir == 3)
+        {
+#if RPR_ENABLE
+          const Picture* picRef = pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->unscaledPic;
+          const std::pair<int, int>& scalingRatio = pu.cu->slice->getScalingRatio(eRefPicList, pu.refIdx[refList]);
+#if INTER_LIC
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvTop, pcMbBuf, true,
+            pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true, true, mvCurr);
+#else
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvTop, pcMbBuf, true,
+            pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true);
+#endif
+#else
+#if INTER_LIC
+          xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvTop, pcMbBuf, true,
+            pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true, true,
+            mvCurr);
+#else
+          xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvTop, pcMbBuf, true,
+            pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true);
+#endif
+#endif
+        }
+        else
+        {
+#if RPR_ENABLE
+          const Picture* picRef = pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->unscaledPic;
+          const std::pair<int, int>& scalingRatio = pu.cu->slice->getScalingRatio(eRefPicList, pu.refIdx[refList]);
+#if INTER_LIC
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvTop, pcMbBuf,
+            false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true, true, mvCurr);
+#else
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvTop, pcMbBuf,
+            false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true);
+#endif
+#else
+#if INTER_LIC
+          xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvTop, pcMbBuf,
+            false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true, true, mvCurr);
+#else
+          xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvTop, pcMbBuf,
+            false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true);
+#endif
+#endif
+        }
+      }
+      if (m_bAMLTemplateAvailabe[1])
+      {
+        Mv mvLeft(-(AML_MERGE_TEMPLATE_SIZE << horShift), 0);
+        mvLeft += subPelMv;
+
+        clipMv(mvLeft, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
+
+        PelUnitBuf pcMbBuf =
+          PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[refList][0], pcBufPredRefLeft.Y()));
+
+        if (pu.interDir == 3)
+        {
+#if RPR_ENABLE
+          const Picture* picRef = pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->unscaledPic;
+          const std::pair<int, int>& scalingRatio = pu.cu->slice->getScalingRatio(eRefPicList, pu.refIdx[refList]);
+#if INTER_LIC
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvLeft, pcMbBuf,
+            true, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true, true, mvCurr);
+#else
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvLeft, pcMbBuf,
+            true, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true);
+#endif
+#else
+#if INTER_LIC
+          xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvLeft, pcMbBuf,
+            true, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true, true, mvCurr);
+#else
+          xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvLeft, pcMbBuf,
+            true, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true);
+#endif
+#endif
+        }
+        else
+        {
+#if RPR_ENABLE
+          const Picture* picRef = pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->unscaledPic;
+          const std::pair<int, int>& scalingRatio = pu.cu->slice->getScalingRatio(eRefPicList, pu.refIdx[refList]);
+#if INTER_LIC
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvLeft, pcMbBuf,
+            false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true, true, mvCurr);
+#else
+          xPredInterBlk(COMPONENT_Y, pu, picRef, mvLeft, pcMbBuf,
+            false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true);
+#endif
+#else
+#if INTER_LIC
+          xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvLeft, pcMbBuf,
+            false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true, true, mvCurr);
+#else
+          xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvLeft, pcMbBuf,
+            false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true);
+#endif
+#endif
+        }
+      }
+    }
+    if (m_bAMLTemplateAvailabe[0])
+    {
+      CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAboveTemplate[0][0], pcBufPredRefTop.Y()));
+      CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAboveTemplate[1][0], pcBufPredRefTop.Y()));
+      xWeightedAverageY(pu, srcPred0, srcPred1, pcBufPredRefTop, pu.cu->slice->getSPS()->getBitDepths(),
+        pu.cu->slice->clpRngs());
+    }
+    if (m_bAMLTemplateAvailabe[1])
+    {
+      CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0], pcBufPredRefLeft.Y()));
+      CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0], pcBufPredRefLeft.Y()));
+      xWeightedAverageY(pu, srcPred0, srcPred1, pcBufPredRefLeft, pu.cu->slice->getSPS()->getBitDepths(),
+        pu.cu->slice->clpRngs());
+    }
+  }
+}
+#endif
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
 void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft, int8_t posList0, int8_t posList1, bool load0, bool load1)
@@ -9420,10 +9835,16 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
 #if INTER_LIC
     pu.cu->LICFlag = affMrgCtx.LICFlags[uiMergeCand];
 #endif
-
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    pu.colIdx = affMrgCtx.colIdx[uiMergeCand];
+#endif
     pu.mergeType = affMrgCtx.mergeType[uiMergeCand];
 #if JVET_Z0139_NA_AFF
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    if ((pu.mergeType == MRG_TYPE_DEFAULT_N) || (pu.mergeType == MRG_TYPE_SUBPU_ATMVP && uiMergeCand))
+#else
     if (pu.mergeType == MRG_TYPE_DEFAULT_N)
+#endif
 #else
     if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
     {
@@ -9468,7 +9889,11 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
       {
 #endif
 
-      getAffAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
+      getAffAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        , pu.cs->sps->getUseFastSubTmvp(), affMrgCtx
+#endif
+      );
 
       if (m_bAMLTemplateAvailabe[0])
       {
@@ -9602,6 +10027,9 @@ void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& 
     affMrgCtxTmp.affineType[i] = AFFINEMODEL_4PARAM;
     affMrgCtxTmp.mergeType[i] = MRG_TYPE_DEFAULT_N;
     affMrgCtxTmp.BcwIdx[i] = BCW_DEFAULT;
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    affMrgCtxTmp.colIdx[i] = 0;
+#endif
 #if INTER_LIC
     affMrgCtxTmp.LICFlags[i] = false;
 #endif
@@ -9623,6 +10051,9 @@ void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& 
     affMrgCtxTmp.affineType[uiMergeCand] = affMrgCtx.affineType[uiMergeCand];
     affMrgCtxTmp.mergeType[uiMergeCand] = affMrgCtx.mergeType[uiMergeCand];
     affMrgCtxTmp.BcwIdx[uiMergeCand] = affMrgCtx.BcwIdx[uiMergeCand];
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    affMrgCtxTmp.colIdx[uiMergeCand] = affMrgCtx.colIdx[uiMergeCand];
+#endif
 #if INTER_LIC                                                   
     affMrgCtxTmp.LICFlags[uiMergeCand] = affMrgCtx.LICFlags[uiMergeCand];
 #endif
@@ -9651,6 +10082,9 @@ void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& 
     affMrgCtx.affineType[uiMergeCand] = affMrgCtxTmp.affineType[RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_AFFINE_SUB_GROUP_SIZE]];
     affMrgCtx.mergeType[uiMergeCand] = affMrgCtxTmp.mergeType[RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_AFFINE_SUB_GROUP_SIZE]];
     affMrgCtx.BcwIdx[uiMergeCand] = affMrgCtxTmp.BcwIdx[RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_AFFINE_SUB_GROUP_SIZE]];
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    affMrgCtx.colIdx[uiMergeCand] = affMrgCtxTmp.colIdx[RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_AFFINE_SUB_GROUP_SIZE]];
+#endif
 #if INTER_LIC 
     affMrgCtx.LICFlags[uiMergeCand] = affMrgCtxTmp.LICFlags[RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_AFFINE_SUB_GROUP_SIZE]];
 #endif
@@ -9723,9 +10157,17 @@ void InterPrediction::xGetSublkAMLTemplate(const CodingUnit& cu,
   }
 }
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
-void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft, int8_t posList0, int8_t posList1, bool load0, bool load1)
+void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft, 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  bool isBilinear, AffineMergeCtx affMrgCtx,
+#endif
+  int8_t posList0, int8_t posList1, bool load0, bool load1)
 #else
-void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft)
+void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  AffineMergeCtx affMrgCtx,
+#endif
+)
 #endif
 {
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
@@ -9750,7 +10192,11 @@ void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
 #if JVET_Z0067_RPR_ENABLE
       CHECK(pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[eRefPicList])->isRefScaled(pu.cs->pps), "getAffAMLRefTemplate not supported with ref scaled.");
 #endif
-      xPredAffineTpl(pu, eRefPicList, numTemplate, refLeftTemplate, refAboveTemplate);
+      xPredAffineTpl(pu, eRefPicList, numTemplate, refLeftTemplate, refAboveTemplate
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        , affMrgCtx, isBilinear
+#endif
+      );
 #if INTER_LIC
       if (pu.cu->LICFlag)
       {
@@ -9802,7 +10248,11 @@ void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
         }
 #endif
         int  numTemplate[2]   = { 0, 0 };   // 0:Above, 1:Left
-        xPredAffineTpl(pu, eRefPicList, numTemplate, refLeftTemplate, refAboveTemplate);
+        xPredAffineTpl(pu, eRefPicList, numTemplate, refLeftTemplate, refAboveTemplate
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          , affMrgCtx, isBilinear
+#endif
+        );
 #if INTER_LIC
         if (pu.cu->LICFlag)
         {
@@ -10272,6 +10722,9 @@ void  InterPrediction::adjustAffineMergeCandidatesOneGroup(PredictionUnit &pu, A
 #if INTER_LIC
     pu.cu->LICFlag = affMrgCtx.LICFlags[uiMergeCand];
 #endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    pu.colIdx = affMrgCtx.colIdx[uiMergeCand];
+#endif
     pu.mergeType = affMrgCtx.mergeType[uiMergeCand];
 #if JVET_Z0139_NA_AFF
     if (pu.mergeType == MRG_TYPE_DEFAULT_N)
@@ -10310,8 +10763,11 @@ void  InterPrediction::adjustAffineMergeCandidatesOneGroup(PredictionUnit &pu, A
       {
 #endif
 
-        getAffAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
-
+        getAffAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          , true, affMrgCtx
+#endif
+        );
         if (m_bAMLTemplateAvailabe[0])
         {
           m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
@@ -10355,6 +10811,9 @@ void  InterPrediction::updateAffineCandInfo2(PredictionUnit &pu, AffineMergeCtx&
     affMrgCtxTmp.affineType[uiMergeCand] = affMrgCtx.affineType[uiMergeCand];
     affMrgCtxTmp.mergeType[uiMergeCand] = affMrgCtx.mergeType[uiMergeCand];
     affMrgCtxTmp.BcwIdx[uiMergeCand] = affMrgCtx.BcwIdx[uiMergeCand];
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    affMrgCtxTmp.colIdx[uiMergeCand] = affMrgCtx.colIdx[uiMergeCand];
+#endif
 #if INTER_LIC                                                   
     affMrgCtxTmp.LICFlags[uiMergeCand] = affMrgCtx.LICFlags[uiMergeCand];
 #endif
@@ -13011,6 +13470,29 @@ bool InterPrediction::readTplAmvpBuffer(AMVPInfo& dst, const CodingUnit& cu, Ref
     return true;
   }
   return false;
+}
+#endif
+
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+void InterPrediction::writeMergeBuffer(const MergeCtx& srcList0, const MergeCtx& srcList1, const CodingUnit& cu)
+{
+  m_pcMergeCtxList0 = srcList0;
+  m_pcMergeCtxList1 = srcList1;
+}
+bool InterPrediction::readMergeBuffer( MergeCtx& dstList0, MergeCtx& dstList1, const CodingUnit& cu)
+{
+  if (m_pcMergeCtxList0.numValidMergeCand > 0 || m_pcMergeCtxList1.numValidMergeCand > 0)
+  {
+    dstList0 = m_pcMergeCtxList0;
+    dstList1 = m_pcMergeCtxList1;
+    return true;
+  }
+  return false;
+}
+void InterPrediction::clearAmvpTmvpBuffer()
+{
+  m_pcMergeCtxList0 = MergeCtx();
+  m_pcMergeCtxList1 = MergeCtx();
 }
 #endif
 
@@ -15997,7 +16479,12 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
       tmpPU.mvAffi[eRefList][2] = mvLB;
 
 #if !JVET_Z0067_RPR_ENABLE
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+      AffineMergeCtx tmp;
+      getAffAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft, tmp);
+#else
       getAffAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft);
+#endif
 #endif
 
       uiCost = 0;
@@ -16009,7 +16496,12 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
       else
       {
 #if JVET_Z0067_RPR_ENABLE
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        AffineMergeCtx tmp;
+        getAffAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft, pu.cs->sps->getUseFastSubTmvp(), tmp);
+#else
         getAffAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft);
+#endif
 #endif
         if (m_bAMLTemplateAvailabe[0])
         {
@@ -16468,7 +16960,12 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
 
 #endif
 #if !JVET_Z0067_RPR_ENABLE
-      getAffAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft);
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          AffineMergeCtx tmp;
+          getAffAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft, tmp);
+#else
+          getAffAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft);
+#endif
 #endif
 
       uiCost = 0;
@@ -16485,7 +16982,12 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
       else
       {
 #if JVET_Z0067_RPR_ENABLE
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        AffineMergeCtx tmp;
+        getAffAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft, pu.cs->sps->getUseFastSubTmvp(), tmp);
+#else
         getAffAMLRefTemplate(tmpPU, pcBufPredRefTop, pcBufPredRefLeft);
+#endif
 #endif
         if (m_bAMLTemplateAvailabe[0])
         {

@@ -775,6 +775,9 @@ void PredictionUnit::initData()
 #endif
 #endif
   // inter data
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  colIdx = 0;
+#endif
   mergeFlag   = false;
   regularMergeFlag = false;
   mergeIdx    = MAX_UCHAR;
@@ -927,6 +930,9 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 
 PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 {
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  colIdx = predData.colIdx;
+#endif
   mergeFlag   = predData.mergeFlag;
   regularMergeFlag = predData.regularMergeFlag;
   mergeIdx    = predData.mergeIdx;
@@ -1070,6 +1076,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 
   mergeFlag   = other.mergeFlag;
   regularMergeFlag = other.regularMergeFlag;
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  colIdx = other.colIdx;
+#endif
   mergeIdx    = other.mergeIdx;
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   parseLumaMode = other.parseLumaMode;

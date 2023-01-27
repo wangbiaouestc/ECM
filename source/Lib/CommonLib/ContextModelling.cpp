@@ -492,7 +492,38 @@ void MergeCtx::convertRegularMergeCandToBi(int candIdx)
   } 
 }
 #endif
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+void MergeCtx::saveMergeInfo(PredictionUnit& puTmp, PredictionUnit pu)
+{
+  puTmp.mergeIdx = pu.mergeIdx;
+#if !JVET_Z0075_IBC_HMVP_ENLARGE
+  CHECK(candIdx >= numValidMergeCand, "Merge candidate does not exist");
+#endif
 
+  puTmp.regularMergeFlag = pu.regularMergeFlag;
+  puTmp.mergeFlag = pu.mergeFlag;
+  puTmp.mmvdMergeFlag = pu.mmvdMergeFlag;
+  puTmp.interDir = pu.interDir;
+  puTmp.cu->imv = pu.cu->imv;
+  puTmp.mergeType = pu.mergeType;
+  puTmp.mv[REF_PIC_LIST_0] = pu.mv[REF_PIC_LIST_0];
+  puTmp.mv[REF_PIC_LIST_1] = pu.mv[REF_PIC_LIST_1];
+#if MULTI_PASS_DMVR
+  puTmp.bdmvrRefine = pu.bdmvrRefine;
+#endif
+  puTmp.refIdx[REF_PIC_LIST_0] = pu.refIdx[REF_PIC_LIST_0];
+  puTmp.refIdx[REF_PIC_LIST_1] = pu.refIdx[REF_PIC_LIST_1];
+
+  puTmp.bv = pu.bv;
+
+  puTmp.cu->BcwIdx = pu.cu->BcwIdx;
+  puTmp.addHypData = pu.addHypData;
+  puTmp.numMergedAddHyps = pu.numMergedAddHyps;
+
+  puTmp.mmvdEncOptMode = pu.mmvdEncOptMode;
+  puTmp.cu->LICFlag = pu.cu->LICFlag;
+}
+#endif
 void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 {
 #if JVET_X0049_ADAPT_DMVR
@@ -584,7 +615,33 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
   }
 #endif
 }
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
+bool MergeCtx::xCheckSimilarMotionSubTMVP(int mergeCandIndex, uint32_t mvdSimilarityThresh) const
+{
+  if (interDirNeighbours[mergeCandIndex] == 0)
+  {
+    return true;
+  }
+  Mv cVector;
 
+  CHECK(interDirNeighbours[mergeCandIndex] != 1 && interDirNeighbours[mergeCandIndex] != 2, "Wrong interDir.");
+
+  cVector = (interDirNeighbours[mergeCandIndex] == 1) ? mvFieldNeighbours[(mergeCandIndex << 1)].mv : mvFieldNeighbours[(mergeCandIndex << 1) + 1].mv;
+  cVector.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+
+  for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
+  {
+    Mv cTempVector = (interDirNeighbours[ui] == 1) ? mvFieldNeighbours[(ui << 1)].mv : mvFieldNeighbours[(ui << 1) + 1].mv;
+    cTempVector.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+    Mv mvDiff = cTempVector - cVector;
+    if (mvDiff.getAbsHor() < mvdSimilarityThresh && mvDiff.getAbsVer() < mvdSimilarityThresh)
+    {
+      return true;
+    }
+  }
+  return false;
+}
+#endif
 #if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Y0058_IBC_LIST_MODIFY
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh, int compareNum) const
