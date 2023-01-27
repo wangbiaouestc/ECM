@@ -16083,6 +16083,19 @@ uint32_t PU::getFinalIntraModeForTransform( const TransformUnit &tu, const Compo
     intraMode = MAP131TO67( intraMode );
   }
 #endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+  if (intraMode == PLANAR_IDX)
+  {
+    if (tu.cu->plIdx == 2)
+    {
+      intraMode = HOR_IDX;
+    }
+    else if (tu.cu->plIdx == 1)
+    {
+      intraMode = VER_IDX;
+    }
+  }
+#endif
 
   CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
 
