@@ -17869,6 +17869,12 @@ uint32_t PU::getFinalIntraModeForTransform( const TransformUnit &tu, const Compo
     }
   }
 #endif
+#if JVET_AC0071_DBV
+  if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
+  {
+    intraMode = PLANAR_IDX;
+  }
+#endif
 
   CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
 
