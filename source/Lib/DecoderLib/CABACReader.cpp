@@ -1019,6 +1019,10 @@ void CABACReader::coding_tree( CodingStructure& cs, Partitioner& partitioner, CU
 
   cu.qp = cuCtx.qp;                 //NOTE: CU QP can be changed by deltaQP signaling at TU level
   cu.chromaQpAdj = cs.chromaQpAdj;  //NOTE: CU chroma QP adjustment can be changed by adjustment signaling at TU level
+#if JVET_AC0094_REF_SAMPLES_OPT
+  cu.areAboveRightUnavail = cs.getCURestricted(cu.Y().topRight().offset(1, -1), cu, partitioner.chType) == nullptr;
+  cu.areBelowLeftUnavail = cs.getCURestricted(cu.Y().bottomLeft().offset(-1, 1), cu, partitioner.chType) == nullptr;
+#endif
 
   // coding unit
 
@@ -1999,7 +2003,11 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
   for( int k = 0; k < numBlocks; k++ )
   {
 #if SECONDARY_MPM
-    PU::getIntraMPMs( *pu, mpm_pred, non_mpm_pred);
+    PU::getIntraMPMs( *pu, mpm_pred, non_mpm_pred
+#if JVET_AC0094_REF_SAMPLES_OPT
+                     , false
+#endif
+    );
 #else
     PU::getIntraMPMs(*pu, mpm_pred);
 #endif
@@ -2469,6 +2477,12 @@ bool CABACReader::intra_chroma_lmc_mode(PredictionUnit& pu)
 #if JVET_AA0057_CCCM
 void CABACReader::cccmFlag(PredictionUnit& pu)
 {
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  if ( pu.cs->sps->getUseCccm() == 0 )
+  {    
+    return;
+  }
+#endif
   const unsigned intraDir = pu.intraDir[1];
   
 #if JVET_AB0143_CCCM_TS
@@ -2514,6 +2528,13 @@ void CABACReader::cccmFlag(PredictionUnit& pu)
 #else
       pu.cccmFlag = (intraDir == MDLM_T_IDX) ? 3 : (intraDir == MDLM_L_IDX) ? 2 : 1;
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+      pu.cccmNoSubFlag = 0;
+      if ( pu.cs->sps->getUseCccm() == 2 )
+      {    
+        pu.cccmNoSubFlag += m_BinDecoder.decodeBin( Ctx::CccmFlag( 1 ) );
+      }         
+#endif
     }
 #endif
   }
@@ -2543,6 +2564,24 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
       return;
     }
   }
+
+#if JVET_AC0071_DBV
+  if (PU::hasChromaBvFlag(pu))
+  {
+    if (m_BinDecoder.decodeBin(Ctx::DbvChromaMode()) == 0)
+    {
+      pu.intraDir[1] = DBV_CHROMA_IDX;
+      if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
+      {
+        if (m_BinDecoder.decodeBin(Ctx::ChromaFusionMode()) == 1)
+        {
+          pu.isChromaFusion = true;
+        }
+      }
+      return;
+    }
+  }
+#endif
 
   if (m_BinDecoder.decodeBin(Ctx::IntraChromaPredMode(0)) == 0)
   {
@@ -3217,6 +3256,9 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
 #if JVET_AA0070_RRIBC
   rribcData(*pu.cu);
 #endif
+#if JVET_AC0112_IBC_LIC
+  cuIbcLicFlag(*pu.cu);
+#endif
 
   if( pu.mergeFlag )
   {
@@ -3231,6 +3273,13 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
   }
   else if (CU::isIBC(*pu.cu))
   {
+#if JVET_AC0112_IBC_CIIP
+    ibcCiipFlag(pu);
+    if (pu.ibcCiipFlag)
+    {
+      ibcCiipIntraIdx(pu);
+    }
+#endif
     pu.interDir = 1;
     pu.cu->affine = false;
     pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
@@ -3816,6 +3865,204 @@ void CABACReader::tm_merge_flag(PredictionUnit& pu)
 }
 #endif
 
+#if JVET_AC0112_IBC_CIIP
+void CABACReader::ibcCiipFlag(PredictionUnit& pu)
+{
+  if (!pu.cs->sps->getUseIbcCiip() || ( pu.lx() == 0 && pu.ly() == 0))
+  {
+    pu.ibcCiipFlag = false;
+    return;
+  }
+  if (pu.lwidth() * pu.lheight() < 32 || pu.lwidth() > 32 || pu.lheight() > 32)
+  {
+    pu.ibcCiipFlag = false;
+    return;
+  }
+  if (pu.mergeFlag)
+  {
+    if (pu.cu->skip)
+    {
+      pu.ibcCiipFlag = false;
+      return;
+    }
+    pu.ibcCiipFlag = m_BinDecoder.decodeBin(Ctx::IbcCiipFlag(0));
+  }
+  else
+  {
+#if JVET_AA0070_RRIBC
+    if (pu.cu->rribcFlipType)
+    {
+      pu.ibcCiipFlag = false;
+      return;
+    }
+#endif
+#if JVET_AC0112_IBC_LIC
+    if (pu.cu->ibcLicFlag)
+    {
+      pu.ibcCiipFlag = false;
+      return;
+    }
+#endif
+    if (pu.cs->slice->getSliceType() != I_SLICE)
+    {
+      pu.ibcCiipFlag = false;
+      return;
+    }
+    pu.ibcCiipFlag = m_BinDecoder.decodeBin(Ctx::IbcCiipFlag(1));
+  }
+}
+
+void CABACReader::ibcCiipIntraIdx(PredictionUnit& pu)
+{
+  pu.ibcCiipIntraIdx = m_BinDecoder.decodeBin( Ctx::IbcCiipIntraIdx() );
+}
+#endif
+
+#if JVET_AC0112_IBC_GPM
+void CABACReader::ibcGpmFlag(PredictionUnit& pu)
+{
+  if (!pu.cs->sps->getUseIbcGpm() || (pu.lx() == 0 && pu.ly() == 0))
+  {
+    pu.ibcGpmFlag = false;
+    return;
+  }
+  if (pu.lwidth() < 8 || pu.lheight() < 8 || pu.lwidth() > 32 || pu.lheight() > 32)
+  {
+    pu.ibcGpmFlag = false;
+    return;
+  }
+  pu.ibcGpmFlag = (m_BinDecoder.decodeBin(Ctx::IbcGpmFlag()));
+}
+
+void CABACReader::ibcGpmMergeIdx(PredictionUnit& pu)
+{
+  uint32_t splitDir = 0;
+  bool splitDirFirstSet = m_BinDecoder.decodeBin( Ctx::IbcGpmSplitDirSetFlag() );
+  if (splitDirFirstSet)
+  {
+    int splitDirIdx = m_BinDecoder.decodeBinsEP(3);
+    splitDir = g_ibcGpmFirstSetSplitDir[splitDirIdx];
+  }
+  else
+  {
+    xReadTruncBinCode(splitDir, IBC_GPM_MAX_SPLIT_DIR_SECOND_SET_NUM);
+    uint8_t prefix = splitDir;
+    splitDir++;
+    for (uint8_t i = 0; i < GEO_NUM_PARTITION_MODE && splitDir != 0; i++)
+    {
+      if (!g_ibcGpmSecondSetSplitDir[i])
+      {
+        prefix++;
+      }
+      else
+      {
+        splitDir--;
+      }
+    }
+    splitDir = prefix;
+  }
+  pu.ibcGpmSplitDir = splitDir;
+
+  bool isIntra0 = m_BinDecoder.decodeBin( Ctx::IbcGpmIntraFlag() ) ? true : false;
+  bool isIntra1 = isIntra0 ? false : true;
+
+  const int maxNumIbcGpmCand = pu.cs->sps->getMaxNumIBCMergeCand();
+  int numCandminus2 = maxNumIbcGpmCand - 2;
+  int mergeCand0 = 0;
+  int mergeCand1 = 0;
+  if (isIntra0)
+  {
+    mergeCand0 = IBC_GPM_MAX_NUM_UNI_CANDS + unary_max_eqprob(IBC_GPM_MAX_NUM_INTRA_CANDS-1);
+  }
+  else if (numCandminus2 >= 0)
+  {
+    if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
+    {
+      mergeCand0 += unary_max_eqprob(numCandminus2) + 1;
+    }
+  }
+  if (isIntra1)
+  {
+    mergeCand1 = IBC_GPM_MAX_NUM_UNI_CANDS + unary_max_eqprob(IBC_GPM_MAX_NUM_INTRA_CANDS-1);
+  }
+  else if (numCandminus2 >= 0)
+  {
+    if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
+    {
+      mergeCand1 += unary_max_eqprob(numCandminus2) + 1;
+    }
+  }
+  pu.ibcGpmMergeIdx0 = mergeCand0;
+  pu.ibcGpmMergeIdx1 = mergeCand1;
+}
+
+void CABACReader::ibcGpmAdaptBlendIdx(PredictionUnit& pu)
+{
+  if (IBC_GPM_NUM_BLENDING == 1)
+  {
+    pu.ibcGpmBldIdx = 0;
+    return;
+  }
+  int bin0 = m_BinDecoder.decodeBin(Ctx::IbcGpmBldIdx(0));
+  if (bin0 == 1)
+  {
+    pu.ibcGpmBldIdx = 0;
+  }
+  else
+  {
+    int bin1 = m_BinDecoder.decodeBin(Ctx::IbcGpmBldIdx(1));
+    if (bin1 == 0)
+    {
+      int bin2 = m_BinDecoder.decodeBin(Ctx::IbcGpmBldIdx(3));
+      if (bin2 == 0)
+      {
+        pu.ibcGpmBldIdx = 4;
+      }
+      else
+      {
+        pu.ibcGpmBldIdx = 3;
+      }
+    }
+    else
+    {
+      int bin2 = m_BinDecoder.decodeBin(Ctx::IbcGpmBldIdx(2));
+      if (bin2 == 0)
+      {
+        pu.ibcGpmBldIdx = 1;
+      }
+      else
+      {
+        pu.ibcGpmBldIdx = 2;
+      }
+    }
+  }
+}
+#endif
+
+#if JVET_AC0112_IBC_LIC
+void CABACReader::cuIbcLicFlag( CodingUnit& cu )
+{
+  if (!cu.cs->sps->getUseIbcLic() || !CU::isIBC(cu) || cu.firstPU->mergeFlag)
+  {
+    cu.ibcLicFlag = false;
+    return;
+  }
+#if JVET_AA0070_RRIBC
+  if (cu.rribcFlipType > 0)
+  {
+    cu.ibcLicFlag = false;
+    return;
+  }
+#endif
+  if (cu.lwidth() * cu.lheight() < 32 || cu.lwidth() * cu.lheight() > 256)
+  {
+    cu.ibcLicFlag = false;
+    return;
+  }
+  cu.ibcLicFlag = m_BinDecoder.decodeBin( Ctx::IbcLicFlag() );
+}
+#endif
+
 #if JVET_X0049_ADAPT_DMVR
 void CABACReader::bm_merge_flag(PredictionUnit& pu)
 {
@@ -3870,6 +4117,34 @@ void CABACReader::merge_data( PredictionUnit& pu )
 #if JVET_AA0061_IBC_MBVD
     }
 #endif
+#endif
+#if JVET_AC0112_IBC_CIIP
+    ibcCiipFlag(pu);
+    if (pu.ibcCiipFlag)
+    {
+      ibcCiipIntraIdx(pu);
+    }
+#endif
+#if JVET_AC0112_IBC_GPM
+#if JVET_AC0112_IBC_CIIP && JVET_AA0061_IBC_MBVD
+    if (!pu.ibcMbvdMergeFlag && !pu.ibcCiipFlag)
+#else
+#if JVET_AA0061_IBC_MBVD
+    if (!pu.ibcMbvdMergeFlag)
+#else
+#if JVET_AC0112_IBC_CIIP
+    if (!pu.ibcCiipFlag)
+#endif
+#endif
+#endif
+    {
+      ibcGpmFlag(pu);
+      if (pu.ibcGpmFlag)
+      {
+        ibcGpmMergeIdx(pu);
+        ibcGpmAdaptBlendIdx(pu);
+      }
+    }
 #endif
     merge_idx(pu);
     return;
@@ -4236,6 +4511,13 @@ void CABACReader::merge_idx( PredictionUnit& pu )
 #if JVET_AA0061_IBC_MBVD
     if (pu.ibcMbvdMergeFlag)
     {
+      return;
+    }
+#endif
+#if JVET_AC0112_IBC_GPM
+    if (pu.ibcGpmFlag)
+    {
+      pu.mergeIdx = pu.ibcGpmMergeIdx0 < IBC_GPM_MAX_NUM_UNI_CANDS ? pu.ibcGpmMergeIdx0 : pu.ibcGpmMergeIdx1;
       return;
     }
 #endif
@@ -5857,10 +6139,22 @@ void CABACReader::residual_coding( TransformUnit& tu, ComponentID compID, CUCtx&
 #if !EXTENDED_LFNST
   if (tu.mtsIdx[compID] != MTS_SKIP && tu.blocks[compID].height >= 4 && tu.blocks[compID].width >= 4 )
   {
+#if JVET_AC0130_NSPT
+    uint32_t  width = tu.blocks[ compID ].width;
+    uint32_t height = tu.blocks[ compID ].height;
+    bool  allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *( tu.cu ) ) );
+
+#if JVET_W0119_LFNST_EXTENSION
+    const int maxLfnstPos = ( allowNSPT ? PU::getNSPTMatrixDim( width, height ) : PU::getLFNSTMatrixDim( width, height ) ) - 1;
+#else
+    const int maxLfnstPos = allowNSPT ? PU::getNSPTMatrixDim( width, height ) - 1: ( ((tu.blocks[compID].height == 4 && tu.blocks[compID].width == 4) || (tu.blocks[compID].height == 8 && tu.blocks[compID].width == 8)) ? 7 : 15 );
+#endif
+#else
 #if JVET_W0119_LFNST_EXTENSION
     const int maxLfnstPos = PU::getLFNSTMatrixDim( tu.blocks[ compID ].width, tu.blocks[ compID ].height ) - 1;
 #else
     const int maxLfnstPos = ((tu.blocks[compID].height == 4 && tu.blocks[compID].width == 4) || (tu.blocks[compID].height == 8 && tu.blocks[compID].width == 8)) ? 7 : 15;
+#endif
 #endif
     cuCtx.violatesLfnstConstrained[ toChannelType(compID) ] |= cctx.scanPosLast() > maxLfnstPos;
   }
@@ -6879,9 +7173,14 @@ void CABACReader::parsePredictedSigns( TransformUnit &tu, ComponentID compID )
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   uint32_t extAreaWidth = std::min(tu.blocks[compID].width, (uint32_t)SIGN_PRED_FREQ_RANGE);
   uint32_t extAreaHeight = std::min(tu.blocks[compID].height, (uint32_t)SIGN_PRED_FREQ_RANGE);
-  uint32_t extAreaSize  = lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea();
-  uint32_t spAreaWidth  = useSignPred ? std::min(tu.blocks[compID].width, extAreaSize)  : extAreaWidth;
+  uint32_t extAreaSize = (lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea());
+#if JVET_AC0130_NSPT
+  uint32_t spAreaWidth = useSignPred ? std::min( tu.blocks[compID].width, extAreaSize ) : extAreaWidth;
+  uint32_t spAreaHeight = useSignPred ? std::min( tu.blocks[compID].height, extAreaSize ) : extAreaHeight;
+#else
+  uint32_t spAreaWidth = useSignPred ? std::min(tu.blocks[compID].width, extAreaSize) : extAreaWidth;
   uint32_t spAreaHeight = useSignPred ? std::min(tu.blocks[compID].height, extAreaSize) : extAreaHeight;
+#endif
 
   for ( uint32_t y = 0; y < spAreaHeight; y++ )
 #else

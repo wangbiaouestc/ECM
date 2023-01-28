@@ -113,6 +113,13 @@
 #define NULL              0
 #endif
 
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+static const int SUB_TMVP_CANDIDATE_NUM = 10;
+static const int SUB_TMVP_INDEX = 3;  // 1: 2 subtmvp; 2: 4 subtmvp
+static const int SUB_TMVP_NUM = 2 * SUB_TMVP_INDEX;
+static const int SUB_TMVP_MV_THRESHOLD = 2;
+static const int AMVP_TMVP_INDEX = 1;  // 1: 2 AMVP tmvp; 2: 4 AMVP tmvp
+#endif
 typedef enum
 {
   AFFINEMODEL_4PARAM,
@@ -311,6 +318,11 @@ static const int EXT_LENGTH = 2;
 static const int ALF_PADDING_SIZE_FIXED_RESULTS  =                  2;
 static const int NUM_FIXED_BASED_COEFF       =                      7;
 #endif
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+static const int NUM_RESI                    =                      1;
+static const int NUM_RESI_SAMPLE             =                      1;
+static const int NUM_RESI_PAD                =                      0;
+#endif
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
 static const int NUM_DB                      =                      3;
 static const int NUM_DB_SAMPLE               =                      5;
@@ -321,11 +333,14 @@ static const int NUM_DB_PAD                  =                      8;
 static const int NUM_DB_PAD                  =                      1;
 #endif
 
-
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF + NUM_RESI + 1;
+#else
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF;
 #else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB;
+#endif
 #endif
 #if JVET_AA0095_ALF_LONGER_FILTER
 static const int MAX_ALF_FILTER_LENGTH       =                     13;
@@ -470,9 +485,17 @@ static const int BDPCM_IDX =                  (5 * (NUM_DIR - 1) + 2); ///< inde
 #endif
 static const int NOMODE_IDX =                               MAX_UCHAR; ///< indicating uninitialized elements
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+#if JVET_AC0071_DBV
+static const int NUM_CHROMA_MODE = (7 + NUM_LMC_MODE); ///< total number of chroma modes
+#else
+static const int NUM_CHROMA_MODE = (6 + NUM_LMC_MODE); ///< total number of chroma modes
+#endif
+#else
+#if JVET_AC0071_DBV
 static const int NUM_CHROMA_MODE = (6 + NUM_LMC_MODE); ///< total number of chroma modes
 #else
 static const int NUM_CHROMA_MODE = (5 + NUM_LMC_MODE); ///< total number of chroma modes
+#endif
 #endif
 static const int LM_CHROMA_IDX = NUM_LUMA_MODE; ///< chroma mode index for derived from LM mode
 #if ENABLE_DIMD
@@ -488,6 +511,10 @@ static const int EXT_HOR_IDX =                                     34;
 static const int EXT_DIA_IDX =                                     66;
 static const int EXT_VER_IDX =                                     98;
 static const int EXT_VDIA_IDX =                                   130;
+#if JVET_AC0094_REF_SAMPLES_OPT
+static const int INVALID_TIMD_IDX =                                -1;
+static const int NUM_MODES_REMOVED_POSITIVE =                       5;
+#endif
 #define MAP131TO67( mode )                 (mode<2?mode:((mode>>1)+1))
 #define MAP67TO131( mode )                 (mode<2?mode:((mode<<1)-2))
 #endif
@@ -515,9 +542,19 @@ static const int MDLM_T_IDX =                          LM_CHROMA_IDX + 2; ///< M
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
 static const int DIMD_CHROMA_IDX =                     NUM_INTRA_MODE; ///< chroma mode index for derived by DIMD method
+#if JVET_AC0071_DBV
+static const int DBV_CHROMA_IDX = NUM_INTRA_MODE + 1;
+static const int DM_CHROMA_IDX = NUM_INTRA_MODE + 2; ///< chroma mode index for derived from luma intra mode
+#else
 static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE + 1; ///< chroma mode index for derived from luma intra mode
+#endif
+#else
+#if JVET_AC0071_DBV
+static const int DBV_CHROMA_IDX = NUM_INTRA_MODE;
+static const int DM_CHROMA_IDX = NUM_INTRA_MODE + 1; ///< chroma mode index for derived from luma intra mode
 #else
 static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE; ///< chroma mode index for derived from luma intra mode
+#endif
 #endif
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
@@ -898,6 +935,10 @@ static const int    BM_MRG_SUB_PU_INT_MAX_SRCH_ROUND              = 3;
 #if JVET_AB0112_AFFINE_DMVR
 static const int    AFFINE_DMVR_MAX_NUM_ITERATIONS               = 26;
 static const int    AFFINE_DMVR_SEARCH_RANGE                      = 3;
+#if JVET_AC0144_AFFINE_DMVR_REGRESSION
+static const int    AFFINE_DMVR_INT_SRCH_RANGE                    = 2;
+static const int    AFFINE_DMVR_MIN_SUBBLK_SIZE                   = 4;
+#endif
 #endif
 static const int    AML_MERGE_TEMPLATE_SIZE                       = 1;
 #endif
@@ -965,6 +1006,10 @@ static const int CCCM_NUM_MODES           = 6;
 static const int CCCM_NUM_MODES           = 3;
 #endif
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+static const int CCCM_NO_SUB_NUM_PARAMS   = 11;
+static const double CCCM_NO_SUB_WEIGHT    = 1.1; 
+#endif
 #endif
 
 #if JVET_AA0126_GLM
@@ -993,6 +1038,10 @@ static const int NUM_GLM_PATTERN_BITS =                             4;
 static const int NUM_GLM_IDC =                                     33;
 #endif
 #endif
+#endif
+#if JVET_AC0071_DBV
+static const int NUM_DBV_POSITION = 5;
+static const int DBV_TEMPLATE_SIZE = 1;
 #endif
 
 #if JVET_Y0152_TT_ENC_SPEEDUP
@@ -1043,7 +1092,11 @@ static const int GEO_MAX_NUM_UNI_CANDS =                            6;
 #if JVET_Y0065_GPM_INTRA
 static const int GEO_MAX_NUM_INTRA_CANDS =                          3;
 static const int GEO_NUM_INTRA_RDO_BUFFER =                         23;
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
+static const int GEO_NUM_RDO_BUFFER =                               GEO_MAX_NUM_UNI_CANDS + 67;
+#else
 static const int GEO_NUM_RDO_BUFFER =                               GEO_MAX_NUM_UNI_CANDS + GEO_NUM_INTRA_RDO_BUFFER;
+#endif
 static const int GEO_MAX_NUM_CANDS = (GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS) * ((GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS) - 1);
 #else
 static const int GEO_MAX_NUM_CANDS = GEO_MAX_NUM_UNI_CANDS * (GEO_MAX_NUM_UNI_CANDS - 1);
@@ -1145,6 +1198,20 @@ static const int IBC_MBVD_MAX_REFINE_NUM = IBC_MBVD_STEP_NUM * IBC_MBVD_OFFSET_D
 static const int IBC_MBVD_NUM = IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM;        ///< total number of IBC mmvd candidate
 static const int IBC_MBVD_SIZE_ENC =                                 8;
 static const int ADAPTIVE_SUB_GROUP_SIZE_IBC_MBVD = IBC_MBVD_MAX_REFINE_NUM;
+#endif
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
+static const int IBC_GPM_MAX_NUM_UNI_CANDS =                        15;
+#endif
+#if JVET_AC0112_IBC_CIIP
+static const int IBC_CIIP_MAX_NUM_INTRA_CANDS =                      2;
+#endif
+#if JVET_AC0112_IBC_GPM
+static const int IBC_GPM_MAX_NUM_INTRA_CANDS =                       3;
+static const int IBC_GPM_MAX_TRY_WEIGHTED_SAD =                     36;
+static const int IBC_GPM_MAX_TRY_WEIGHTED_SATD =                    20;
+static const int IBC_GPM_MAX_SPLIT_DIR_FIRST_SET_NUM =               8;
+static const int IBC_GPM_MAX_SPLIT_DIR_SECOND_SET_NUM =             40;
+static const int IBC_GPM_NUM_BLENDING =                              1; // 1 or 5
 #endif
 static constexpr int MV_EXPONENT_BITCOUNT    = 4;
 static constexpr int MV_MANTISSA_BITCOUNT    = 6;

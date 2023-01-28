@@ -3942,7 +3942,7 @@ void xWeightedSgpm_SSE(const PredictionUnit &pu, const uint32_t width, const uin
   int16_t  stepY  = 0;
   int16_t *weight = nullptr;
 
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
   int blendWIdx = 0;
   if (pu.cs->pps->getUseSgpmNoBlend())
   {
@@ -3957,7 +3957,7 @@ void xWeightedSgpm_SSE(const PredictionUnit &pu, const uint32_t width, const uin
   {
     stepY  = -GEO_WEIGHT_MASK_SIZE;
     weight = &g_globalGeoWeights
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
                [blendWIdx]
 #else
                [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]
@@ -3970,7 +3970,7 @@ void xWeightedSgpm_SSE(const PredictionUnit &pu, const uint32_t width, const uin
   {
     stepY  = GEO_WEIGHT_MASK_SIZE;
     weight = &g_globalGeoWeights
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
                [blendWIdx]
 #else
                [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]
@@ -3982,7 +3982,7 @@ void xWeightedSgpm_SSE(const PredictionUnit &pu, const uint32_t width, const uin
   {
     stepY  = GEO_WEIGHT_MASK_SIZE;
     weight = &g_globalGeoWeights
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
                [blendWIdx]
 #else
                [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]

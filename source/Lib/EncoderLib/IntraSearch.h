@@ -489,7 +489,11 @@ private:
   PelStorage      m_tmpStorageLCU;
   PelStorage      m_colorTransResiBuf;
 #if JVET_AB0143_CCCM_TS
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  PelStorage      m_cccmStorage[2][CCCM_NUM_MODES];
+#else
   PelStorage      m_cccmStorage[CCCM_NUM_MODES];
+#endif
 #endif
 protected:
   // interface to option
@@ -524,6 +528,10 @@ public:
 #if INTRA_TRANS_ENC_OPT
   bool            m_skipTimdLfnstMtsPass;
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  bool            m_skipCCCMSATD;
+  int             m_isCccmNoSubModeEnabledInRdo[MMLM_T_IDX + 1];
+#endif 
   IntraSearch();
   ~IntraSearch();
 

@@ -51,6 +51,7 @@
 #include <cassert>
 
 
+
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -147,6 +148,7 @@
 #define JVET_AA0057_CCCM                                  1 // JVET-AA0057: Convolutional cross-component model (CCCM)
 #if JVET_AA0057_CCCM
 #define JVET_AB0143_CCCM_TS                               1 // JVET-AB0143: CCCM template selection
+#define JVET_AC0147_CCCM_NO_SUBSAMPLING                   1 // JVET-AC0147: Subsampling is not applied to CCCM
 #endif
 #define JVET_AA0126_GLM                                   1 // JVET-AA0126: Gradient linear model
 #if JVET_AA0126_GLM
@@ -154,12 +156,15 @@
 #endif
 #if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
 #define JVET_AB0174_CCCM_DIV_FREE                         1 // JVET-AB0174: CCCM with division free operation
+#define JVET_AC0053_GAUSSIAN_SOLVER                       1 // JVET-AC0053: Filter parameters using Gaussian elimination steps
 #endif
 #define JVET_AB0155_SGPM                                  1 // JVET-AB0155: Spatial geometric partitioning mode
-#define JVET_AC0189_SGPM_NO_BLD                           1 // JVET-AC0189: Allow no blending for SGPM
+#define JVET_AC0189_SGPM_NO_BLENDING                      1 // JVET-AC0189: Allow no blending for SGPM
 #define JVET_AB0157_TMRL                                  1 // JVET-AB0157: Template-based multiple reference line intra prediction
 #define JVET_AB0157_INTRA_FUSION                          1 // JVET-AB0157: Intra prediction fusion
+#define JVET_AC0094_REF_SAMPLES_OPT                       1 // JVET-AC0094: Optimizing the use of reference samples
 #define JVET_AC0105_DIRECTIONAL_PLANAR                    1 // JVET-AC0105: Directional planar
+#define JVET_AC0071_DBV                                   1 // JVET-AC0071: Direct block vector mode for chroma prediction
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -175,6 +180,9 @@
 #define JVET_AA0106_IBCBUF_CTU256                         1 // JVET-AA0106: Adjust IBC reference area to 2*128 rows above the current CTU
 #define JVET_AA0061_IBC_MBVD                              1 // JVET-AA0061: IBC merge mode with block vector differences
 #define JVET_AA0070_RRIBC                                 1 // JVET-AA0070: Reconstruction-Reordered IBC
+#define JVET_AC0112_IBC_CIIP                              1 // JVET-AC0112: Combined IBC and intra prediction (IBC-CIIP)
+#define JVET_AC0112_IBC_GPM                               1 // JVET-AC0112: IBC with geometry partitioning mode (IBC-GPM)
+#define JVET_AC0112_IBC_LIC                               1 // JVET-AC0112: IBC with local illumination compensation (IBC-LIC)
 
 // Inter
 #define CIIP_PDPC                                         1 // Apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
@@ -227,6 +235,8 @@
 #endif
 #define JVET_AA0096_MC_BOUNDARY_PADDING                   1 // JVET-AA0096: motion compensated picture boundary padding
 #define JVET_AB0112_AFFINE_DMVR                           1 // JVET-AB0112: DMVR (baseMV refinement) for affine
+#define JVET_AC0144_AFFINE_DMVR_REGRESSION                1 // JVET-AC0144: DMVR for affine with regression refinement
+#define JVET_AC0158_PIXEL_AFFINE_MC                       1 // JVET-AC0158: Pixel based affine motion compensation
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
 #if ENABLE_INTER_TEMPLATE_MATCHING
@@ -236,6 +246,7 @@
 #define JVET_Z0056_GPM_SPLIT_MODE_REORDERING              1 // JVET-Z0056: Template matching based reordering for GPM split modes
 #if ENABLE_OBMC
 #define JVET_Z0061_TM_OBMC                                1 // JVET-Z0061: Template matching based OBMC
+#define JVET_AC0335_CONTENT_ADAPTIVE_OBMC_ENABLING        1 // JVET-AC0335: Content adaptive OBMC enabling
 #endif
 #define JVET_AA0132_CONFIGURABLE_TM_TOOLS                 1 // JVET-AA0132: Configuration parameters and SPS flags for template matching tools
 #define JVET_AB0079_TM_BCW_MRG                            1 // JVET-AB0079: Template matching based BCW index derivation for merge mode with positive weights only
@@ -252,6 +263,7 @@
 #define JVET_Z0054_BLK_REF_PIC_REORDER                    1 // JVET-Z0054: Block level TM based reordering of reference pictures
 #define JVET_AA0093_REFINED_MOTION_FOR_ARMC               1 // JVET-AA0093: Refined motion for ARMC
 #define JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC          1 // JVET-AA0093: Diversity criterion for ARMC reordering
+#define JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION   1 // JVET-AC0185: Enhanced temporal motion information derivation
 #endif
 // Transform and coefficient coding
 #define TCQ_8STATES                                       1
@@ -274,7 +286,7 @@
 #endif
 #define JVET_AA0133_INTER_MTS_OPT                         1 // JVET-AA0133: Inter MTS optimization
 #define JVET_AB0067_MIP_DIMD_LFNST                        1 // JVET-AB0067: Modification of LFNST for MIP coded block
-
+#define JVET_AC0130_NSPT                                  1 // JVET-AC0130: NSPT replacing DCT-II + LFNST for certain block shapes
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision
 #define SLICE_TYPE_WIN_SIZE                               1 // Context window initialization based on slice type
@@ -294,6 +306,7 @@
 #define JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF           1 // JVET-AA0095: Using samples before deblocking filter for ALF
 #define JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS     1 // JVET-AB0184: Extended Fixed-Filter-Output based Taps for ALF
 #define JVET_AB0171_ASYMMETRIC_DB_FOR_GDR                 1 // JVET-AB0171: Asymmetric Deblocking for GDR
+#define JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT            1 // JVET-AC0162: ALF using residaul samples as additional inputs
 
 // SIMD optimizations
 #if IF_12TAP

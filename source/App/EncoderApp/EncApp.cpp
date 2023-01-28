@@ -862,9 +862,12 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AB0155_SGPM
   m_cEncLib.setUseSgpm                                           ( m_sgpm );
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
   m_cEncLib.setUseSgpmNoBlend                                    ( m_sgpmNoBlend );
 #endif
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  m_cEncLib.setUseCccm                                           ( m_cccm );
 #endif
 #if ENABLE_OBMC
   m_cEncLib.setUseObmc                                           ( m_OBMC );
@@ -900,6 +903,15 @@ void EncApp::xInitLibCfg()
 #if JVET_AA0061_IBC_MBVD
   m_cEncLib.setIbcMbvd                                           ( m_ibcMbvd );
 #endif
+#if JVET_AC0112_IBC_CIIP
+  m_cEncLib.setIbcCiip                                           ( m_ibcCiip );
+#endif
+#if JVET_AC0112_IBC_GPM
+  m_cEncLib.setIbcGpm                                            ( m_ibcGpm );
+#endif
+#if JVET_AC0112_IBC_LIC
+  m_cEncLib.setIbcLic                                            ( m_ibcLic );
+#endif
 
   m_cEncLib.setUseWrapAround                                     ( m_wrapAround );
   m_cEncLib.setWrapAroundOffset                                  ( m_wrapAroundOffset );
@@ -909,6 +921,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AB0130_ITMP_SAMPLING
   m_cEncLib.setUseFastIntraTMP(m_fastIntraTMP);
 #endif
+#endif
+#if JVET_AC0071_DBV
+  m_cEncLib.setUseIntraDBV(m_intraDBV);
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   m_cEncLib.setUseBIF                                            ( m_BIF );

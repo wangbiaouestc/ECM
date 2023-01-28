@@ -1534,6 +1534,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_W0090_ARMC_TM
   sps.setUseAML                             ( m_AML );
 #endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+  sps.setUseFastSubTmvp                     ((m_sourceWidth * m_sourceHeight) > (m_intraPeriod == -1 ? 0 : 832 * 480));
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   sps.setUseArmcRefinedMotion               ( m_armcRefinedMotion );
 #endif
@@ -1617,6 +1620,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AB0155_SGPM
   sps.setUseSgpm            ( m_sgpm );
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  sps.setUseCccm            ( m_cccm );
+#endif
 #if ENABLE_OBMC
   sps.setUseOBMC            ( m_OBMC );
 #endif
@@ -1665,6 +1671,15 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AA0061_IBC_MBVD
   sps.setUseIbcMbvd                         ( m_ibcMbvd );
 #endif
+#if JVET_AC0112_IBC_CIIP
+  sps.setUseIbcCiip                         ( m_ibcCiip );
+#endif
+#if JVET_AC0112_IBC_GPM
+  sps.setUseIbcGpm                          ( m_ibcGpm );
+#endif
+#if JVET_AC0112_IBC_LIC
+  sps.setUseIbcLic                          ( m_ibcLic );
+#endif
   sps.setWrapAroundEnabledFlag                      ( m_wrapAround );
 #if MULTI_HYP_PRED
   sps.setMaxNumAddHyps(m_maxNumAddHyps);
@@ -1674,6 +1689,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_V0130_INTRA_TMP
   sps.setUseIntraTMP(m_intraTMP);
   sps.setIntraTMPMaxSize(m_intraTmpMaxSize);
+#endif
+#if JVET_AC0071_DBV
+  sps.setUseIntraDBV(m_intraDBV);
 #endif
   // ADD_NEW_TOOL : (encoder lib) set tool enabling flags and associated parameters here
   sps.setUseISP                             ( m_ISP );
@@ -2153,7 +2171,7 @@ void EncLib::xInitPPS(PPS &pps, const SPS &sps)
   pps.setWPBiPred( m_useWeightedBiPred );
   pps.setOutputFlagPresentFlag( false );
 
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
   pps.setUseSgpmNoBlend                ( m_sgpmNoBlend );
 #endif
 #if JVET_V0094_BILATERAL_FILTER

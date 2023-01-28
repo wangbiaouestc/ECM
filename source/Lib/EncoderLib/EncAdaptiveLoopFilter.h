@@ -330,6 +330,9 @@ public:
     , const double lambdaChromaWeight
 #endif
     , Picture* pcPic, uint32_t numSliceSegments
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+    , const int intraPreiod
+#endif
   );
 
   void getDistApsFilter( CodingStructure& cs, std::vector<int> apsIds );
@@ -385,6 +388,9 @@ private:
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
     const Pel* recBeforeDb, const int recBeforeDbStride,
 #endif
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+    const Pel *resi, const int resiStride,
+#endif
     const CompArea& areaDst, const CompArea& area, const ChannelType channel, int fixedFilterSetIdx, int classifierIdx);
 #else
   void   getBlkStats(AlfCovariance* alfCovariace, const AlfFilterShape& shape, AlfClassifier** classifier, const Pel* org, const int orgStride, const Pel* rec, const int recStride,
@@ -398,7 +404,14 @@ private:
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
     const Pel* recBeforeDb, const int recBeforeDbStride,
 #endif
-    const AlfFilterShape& shape, const int transposeIdx, const ChannelType channel, Pel ***fixedFitlerResults, Position posDst, Position pos, int fixedFilterSetIdx
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+    const Pel *resi, const int resiStride,
+#endif
+    const AlfFilterShape& shape, const int transposeIdx, const ChannelType channel, Pel ***fixedFitlerResults, 
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+    Pel ***fixedFitlerResiResults,
+#endif
+    Position posDst, Position pos, int fixedFilterSetIdx
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
     , Position posInCtu
 #endif

@@ -992,7 +992,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_X0144_MAX_MTT_DEPTH_TID
   ("MaxMTTHierarchyDepthByTid",                       m_sMaxMTTHierarchyDepthByTid,          string("333333"), "MaxMTTHierarchyDepthByTid")
 #if JVET_AA0098_MTT_DEPTH_TID_BY_QP
-  ("MaxMTTHierarchyDepthByTidOverrideByQP",           sMaxMTTHierarchyDepthByTidOverrideByQP, string("22 333333"), "MaxMTTHierarchyDepthByTidOverrideByQP")
+  ("MaxMTTHierarchyDepthByTidOverrideByQP",           sMaxMTTHierarchyDepthByTidOverrideByQP, string("64 333333"), "MaxMTTHierarchyDepthByTidOverrideByQP")
 #endif
 #endif
   ("MaxMTTHierarchyDepthI",                           m_uiMaxMTTHierarchyDepthI,                           3u, "MaxMTTHierarchyDepthI")
@@ -1101,9 +1101,12 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_AB0155_SGPM
   ( "SGPM",                                           m_sgpm,                                            true,  "Enable spatial geometric partitioning mode\n" )
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
   ( "SGPMnoBlend",                                    m_sgpmNoBlend,                                     false,  "Enable spatial geometric partitioning mode without blending\n" )
 #endif
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  ( "CCCM",                                           m_cccm,                                               2,  "CCCM mode (0:off, 1:on, 2:on subsampling and no subsampling)  [default: 2]")
 #endif
 #if ENABLE_OBMC
   ("OBMC",                                            m_OBMC,                                           true, "Overlapping Block Motion Compensation")
@@ -1141,6 +1144,15 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AA0061_IBC_MBVD
   ("IBCMBVD",                                         m_ibcMbvd,                                         true, "IBC MMVD mode (0:off, 1:on)  [default: on]" )
 #endif
+#if JVET_AC0112_IBC_CIIP
+  ("IBCCIIP",                                         m_ibcCiip,                                         true, "IBC CIIP mode (0:off, 1:on)  [default: on]" )
+#endif
+#if JVET_AC0112_IBC_GPM
+  ("IBCGPM",                                          m_ibcGpm,                                          true, "IBC GPM mode (0:off, 1:on)  [default: on]" )
+#endif
+#if JVET_AC0112_IBC_LIC
+  ("IBCLIC",                                          m_ibcLic,                                          true, "IBC LIC mode (0:off, 1:on)  [default: on]" )
+#endif
 
   ("WrapAround",                                      m_wrapAround,                                     false, "Enable horizontal wrap-around motion compensation for inter prediction (0:off, 1:on)  [default: off]")
   ("WrapAroundOffset",                                m_wrapAroundOffset,                                  0u, "Offset in luma samples used for computing the horizontal wrap-around position")
@@ -1157,6 +1169,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AB0130_ITMP_SAMPLING
   ("FastIntraTMP",                                    m_fastIntraTMP,                                   true,  "fast intra Template Matching (0: off, 1:on)  [default: off]")
 #endif
+#endif
+#if JVET_AC0071_DBV
+ ("IntraDBV", m_intraDBV, false, "Direct Block Vector (0: off, 1:on)  [default: off]")
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   ("BIF",                                             m_BIF,                                            true, "bilateral filter   (0: off, 1:on)  [default: on]")
@@ -5154,6 +5169,15 @@ void EncAppCfg::xPrintParameter()
 #if JVET_AA0061_IBC_MBVD
     msg( VERBOSE, "IBCMBVD:%d ", m_ibcMbvd );
 #endif
+#if JVET_AC0112_IBC_CIIP
+  msg( VERBOSE, "IBCCIIP:%d ", m_ibcCiip);
+#endif
+#if JVET_AC0112_IBC_GPM
+  msg( VERBOSE, "IBCGPM:%d ", m_ibcGpm);
+#endif
+#if JVET_AC0112_IBC_LIC
+  msg( VERBOSE, "IBCLIC:%d ", m_ibcLic );
+#endif
   msg( VERBOSE, "HashME:%d ", m_HashME );
   msg( VERBOSE, "WrapAround:%d ", m_wrapAround);
   if( m_wrapAround )
@@ -5237,9 +5261,12 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AB0155_SGPM
   msg(VERBOSE, "SGPM:%d ", m_sgpm);
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
   msg(VERBOSE, "SGPMnoBlend:%d ", m_sgpmNoBlend);
 #endif
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  msg(VERBOSE, "CCCM:%d ", m_cccm);
 #endif
 #if JVET_V0130_INTRA_TMP
   msg( VERBOSE, "IntraTMP:%d ", m_intraTMP );
@@ -5247,6 +5274,9 @@ void EncAppCfg::xPrintParameter()
 #if JVET_AB0130_ITMP_SAMPLING
   msg(VERBOSE, "FastIntraTMP:%d ", m_fastIntraTMP);
 #endif
+#endif
+#if JVET_AC0071_DBV
+  msg(VERBOSE, "IntraDBV:%d ", m_intraDBV);
 #endif
 
   //inter

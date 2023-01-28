@@ -469,9 +469,12 @@ protected:
 #endif
 #if JVET_AB0155_SGPM
   bool      m_sgpm;
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
   bool      m_sgpmNoBlend;
 #endif
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  int       m_cccm;
 #endif
 #if ENABLE_OBMC
   bool      m_OBMC;
@@ -505,6 +508,15 @@ protected:
   unsigned  m_IBCFastMethod;
 #if JVET_AA0061_IBC_MBVD
   bool      m_ibcMbvd;
+#endif
+#if JVET_AC0112_IBC_CIIP
+  bool      m_ibcCiip;
+#endif
+#if JVET_AC0112_IBC_GPM
+  bool      m_ibcGpm;
+#endif
+#if JVET_AC0112_IBC_LIC
+  bool      m_ibcLic;
 #endif
 
   bool      m_wrapAround;
@@ -924,6 +936,9 @@ protected:
 #if JVET_AB0130_ITMP_SAMPLING
   bool        m_fastIntraTMP;                                   ///< fast intra Template Matching RD search
 #endif
+#endif
+#if JVET_AC0071_DBV
+  bool m_intraDBV;
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   bool        m_BIF;
@@ -1382,6 +1397,18 @@ public:
   void      setIbcMbvd                      ( bool b )       { m_ibcMbvd = b; }
   bool      getIbcMbvd                      ()         const { return m_ibcMbvd; }
 #endif
+#if JVET_AC0112_IBC_CIIP
+  void      setIbcCiip                      ( bool b )       { m_ibcCiip = b; }
+  bool      getIbcCiip                      ()         const { return m_ibcCiip; }
+#endif
+#if JVET_AC0112_IBC_GPM
+  void      setIbcGpm                       ( bool b )       { m_ibcGpm = b; }
+  bool      getIbcGpm                       ()         const { return m_ibcGpm; }
+#endif
+#if JVET_AC0112_IBC_LIC
+  void      setIbcLic                       ( bool b )       { m_ibcLic = b; }
+  bool      getIbcLic                       ()         const { return m_ibcLic; }
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void      setUseDMVDMode                  (bool b)         { m_DMVDMode = b; }
   bool      getUseDMVDMode                  ()         const { return m_DMVDMode; }
@@ -1490,10 +1517,14 @@ public:
 #if JVET_AB0155_SGPM
   void      setUseSgpm                   (bool b)         { m_sgpm = b; }
   bool      getUseSgpm                   () const         { return m_sgpm; }
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
   void      setUseSgpmNoBlend            ( bool b )       { m_sgpmNoBlend = b; }
   bool      getUseSgpmNoBlend            ()         const { return m_sgpmNoBlend; }
 #endif
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  void      setUseCccm                   (int i)          { m_cccm = i; }
+  int       getUseCccm                   () const         { return m_cccm; }
 #endif
 #if ENABLE_OBMC
   void      setUseObmc                   ( bool b )       { m_OBMC = b; }
@@ -1563,6 +1594,10 @@ public:
   void      setUseFastIntraTMP              (bool b)         { m_fastIntraTMP = b; }
   bool      getUseFastIntraTMP()                       const { return m_fastIntraTMP; }
 #endif
+#endif
+#if JVET_AC0071_DBV
+  void setUseIntraDBV(bool b) { m_intraDBV = b; }
+  bool getUseIntraDBV() const { return m_intraDBV; }
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   void      setUseBIF                       ( bool b )       { m_BIF = b; }

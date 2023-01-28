@@ -369,6 +369,74 @@ void timdBlendingSIMD( Pel *pDst, int strideDst, Pel *pSrc, int strideSrc, int w
 }
 #endif
 
+#if JVET_AC0112_IBC_CIIP && INTRA_TRANS_ENC_OPT
+template< X86_VEXT vext >
+void ibcCiipBlendingSIMD( Pel *pDst, int strideDst, const Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int shift, int width, int height )
+{
+#if USE_AVX2
+  if ((vext >= AVX2) && (width & 0x7) == 0)
+  {
+    const int offset = 1 << (shift - 1);
+    __m256i mw = _mm256_unpacklo_epi16(_mm256_set1_epi16(w0), _mm256_set1_epi16(w1));
+    __m256i voffset = _mm256_set1_epi32(offset);
+    __m256i msrc0, msrc1, msum0, msum1;
+
+    for (int row = 0; row < height; row++)
+    {
+      for (int col = 0; col < width; col += 8)
+      {
+        msrc0 = _mm256_castsi128_si256(_mm_lddqu_si128((__m128i*)(&pSrc0[col])));
+        msrc1 = _mm256_castsi128_si256(_mm_lddqu_si128((__m128i*)(&pSrc1[col])));
+        msum0 = _mm256_unpacklo_epi16(msrc0, msrc1);
+        msum1 = _mm256_unpackhi_epi16(msrc0, msrc1);
+        msum0 = _mm256_madd_epi16(msum0, mw);
+        msum1 = _mm256_madd_epi16(msum1, mw);
+        msum0 = _mm256_add_epi32(msum0, voffset);
+        msum1 = _mm256_add_epi32(msum1, voffset);
+        msum0 = _mm256_srai_epi32(msum0, shift);
+        msum1 = _mm256_srai_epi32(msum1, shift);
+        msum0 = _mm256_packs_epi32(msum0, msum1);
+        _mm_storeu_si128((__m128i *)&pDst[col], _mm256_castsi256_si128(msum0));
+      }
+      pSrc0 += strideSrc0;
+      pSrc1 += strideSrc1;
+      pDst += strideDst;
+    }
+  }
+  else
+  {
+#endif
+    __m128i vw0 = _mm_set1_epi32( w0 );
+    __m128i vw1 = _mm_set1_epi32( w1 );
+    const int offset = 1 << (shift - 1);
+    __m128i voffset  = _mm_set1_epi32( offset );
+
+    for( int i = 0; i < height; i++ )
+    {
+      for( int j = 0; j < width; j += 4 )
+      {
+        __m128i vdst = _mm_cvtepi16_epi32( _mm_loadl_epi64( (__m128i*)(pDst + j) ) );
+        __m128i vsrc0 = _mm_cvtepi16_epi32( _mm_loadl_epi64( (__m128i*)(pSrc0 + j) ) );
+        __m128i vsrc1 = _mm_cvtepi16_epi32( _mm_loadl_epi64( (__m128i*)(pSrc1 + j) ) );
+
+        vdst = _mm_mullo_epi32( vsrc0, vw0 );
+        vdst = _mm_add_epi32( vdst, _mm_mullo_epi32( vsrc1, vw1 ) );
+
+        vdst = _mm_add_epi32( vdst, voffset );
+        vdst = _mm_srai_epi32( vdst, shift );
+        vdst = _mm_packs_epi32( vdst, vdst );
+        _mm_storel_epi64( (__m128i*)(pDst + j), vdst );
+      }
+      pDst += strideDst;
+      pSrc0 += strideSrc0;
+      pSrc1 += strideSrc1;
+    }
+#if USE_AVX2
+  }
+#endif
+}
+#endif
+
 template <X86_VEXT vext>
 void IntraPrediction::_initIntraX86()
 {
@@ -380,6 +448,9 @@ void IntraPrediction::_initIntraX86()
 #endif
 #if JVET_W0123_TIMD_FUSION && INTRA_TRANS_ENC_OPT
   m_timdBlending = timdBlendingSIMD<vext>;
+#endif
+#if JVET_AC0112_IBC_CIIP && INTRA_TRANS_ENC_OPT
+  m_ibcCiipBlending = ibcCiipBlendingSIMD<vext>;
 #endif
 }
 

@@ -2310,7 +2310,7 @@ void InterpolationFilter::xWeightedSgpm(const PredictionUnit &pu, const uint32_t
   int16_t  stepY  = 0;
   int16_t *weight = nullptr;
 
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
   int blendWIdx = 0;
   if (pu.cs->pps->getUseSgpmNoBlend())
   {
@@ -2325,7 +2325,7 @@ void InterpolationFilter::xWeightedSgpm(const PredictionUnit &pu, const uint32_t
   {
     stepY  = -(int) ((GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth());
     weight = &g_globalGeoWeights
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
                [blendWIdx]
 #else
                [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]
@@ -2340,7 +2340,7 @@ void InterpolationFilter::xWeightedSgpm(const PredictionUnit &pu, const uint32_t
     stepX  = -1 << scaleX;
     stepY  = (GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth();
     weight = &g_globalGeoWeights
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
                [blendWIdx]
 #else
                [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]
@@ -2353,7 +2353,7 @@ void InterpolationFilter::xWeightedSgpm(const PredictionUnit &pu, const uint32_t
   {
     stepY  = (GEO_WEIGHT_MASK_SIZE << scaleY) - pu.lwidth();
     weight = &g_globalGeoWeights
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
                [blendWIdx]
 #else
                [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]

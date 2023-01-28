@@ -462,9 +462,12 @@ protected:
 #endif
 #if JVET_AB0155_SGPM
   bool      m_sgpm;
-#if JVET_AC0189_SGPM_NO_BLD
+#if JVET_AC0189_SGPM_NO_BLENDING
   bool      m_sgpmNoBlend;
 #endif
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  int       m_cccm;
 #endif
 #if ENABLE_OBMC
   bool      m_OBMC;
@@ -500,6 +503,15 @@ protected:
 #if JVET_AA0061_IBC_MBVD
   bool      m_ibcMbvd;
 #endif
+#if JVET_AC0112_IBC_CIIP
+  bool     m_ibcCiip;
+#endif
+#if JVET_AC0112_IBC_GPM
+  bool      m_ibcGpm;
+#endif
+#if JVET_AC0112_IBC_LIC
+  bool      m_ibcLic;
+#endif
 
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;
@@ -516,6 +528,9 @@ protected:
 #if JVET_AB0130_ITMP_SAMPLING
   bool      m_fastIntraTMP;                                   ///< fast IntraTMP RD search
 #endif
+#endif
+#if JVET_AC0071_DBV
+  bool m_intraDBV; ///< Direct Block Vector
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   bool      m_BIF;                                            ///< bilateral filter

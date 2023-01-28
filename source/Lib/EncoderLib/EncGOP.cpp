@@ -2675,88 +2675,198 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       picHeader->setEnableTMVPFlag(0);
     }
 
-    if( pcSlice->getSliceType() != I_SLICE && picHeader->getEnableTMVPFlag() )
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    int poc1stCol = -1;
+    int list1stCol = 0;
+    int list2ndCol = 0;
+#endif
+    if (pcSlice->getSliceType() != I_SLICE && picHeader->getEnableTMVPFlag())
     {
       int colRefIdxL0 = -1, colRefIdxL1 = -1;
 
       const bool isResamplingPossible = pcSlice->getSPS()->getRprEnabledFlag();
 
-      for( int refIdx = 0; refIdx < pcSlice->getNumRefIdx( REF_PIC_LIST_0 ); refIdx++ )
+      for (int refIdx = 0; refIdx < pcSlice->getNumRefIdx(REF_PIC_LIST_0); refIdx++)
       {
-        CHECK( pcSlice->getRefPic( REF_PIC_LIST_0, refIdx )->unscaledPic == nullptr, "unscaledPic is not set for L0 reference picture" );
-
-        if( !isResamplingPossible || !pcSlice->getRefPic( REF_PIC_LIST_0, refIdx )->isRefScaled( pcSlice->getPPS() ) )
+        CHECK(pcSlice->getRefPic(REF_PIC_LIST_0, refIdx)->unscaledPic == nullptr, "unscaledPic is not set for L0 reference picture");
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        if ((!isResamplingPossible || !pcSlice->getRefPic(REF_PIC_LIST_0, refIdx)->isRefScaled(pcSlice->getPPS())) /*&& (pcSlice->getRefPic(REF_PIC_LIST_0, refIdx)->slices[0]->getSliceType() != I_SLICE)*/)
+#else
+        if (!isResamplingPossible || !pcSlice->getRefPic(REF_PIC_LIST_0, refIdx)->isRefScaled(pcSlice->getPPS()))
+#endif
         {
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          poc1stCol = pcSlice->getRefPic(REF_PIC_LIST_0, refIdx)->getPOC();
+          list1stCol = 0;
+#endif
           colRefIdxL0 = refIdx;
           break;
         }
       }
 
-      if( pcSlice->getSliceType() == B_SLICE )
+      if (pcSlice->getSliceType() == B_SLICE)
       {
-        for( int refIdx = 0; refIdx < pcSlice->getNumRefIdx( REF_PIC_LIST_1 ); refIdx++ )
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        list2ndCol = 1;
+        if (colRefIdxL0 < 0)
         {
-          CHECK( pcSlice->getRefPic( REF_PIC_LIST_1, refIdx )->unscaledPic == nullptr, "unscaledPic is not set for L1 reference picture" );
-
-          if( !isResamplingPossible || !pcSlice->getRefPic( REF_PIC_LIST_1, refIdx )->isRefScaled( pcSlice->getPPS() ) )
+          for (int refIdx = 0; refIdx < pcSlice->getNumRefIdx(REF_PIC_LIST_1); refIdx++)
+          {
+            CHECK(pcSlice->getRefPic(REF_PIC_LIST_1, refIdx)->unscaledPic == nullptr, "unscaledPic is not set for L1 reference picture");
+            if ((!isResamplingPossible || !pcSlice->getRefPic(REF_PIC_LIST_1, refIdx)->isRefScaled(pcSlice->getPPS())) /*&& (pcSlice->getRefPic(REF_PIC_LIST_1, refIdx)->slices[0]->getSliceType() != I_SLICE)*/)
+            {
+              poc1stCol = pcSlice->getRefPic(REF_PIC_LIST_1, refIdx)->getPOC();
+              list1stCol = 1;
+              colRefIdxL0 = refIdx;
+              break;
+            }
+          }
+        }
+#endif
+        for (int refIdx = 0; refIdx < pcSlice->getNumRefIdx(REF_PIC_LIST_1); refIdx++)
+        {
+          CHECK(pcSlice->getRefPic(REF_PIC_LIST_1, refIdx)->unscaledPic == nullptr, "unscaledPic is not set for L1 reference picture");
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          int poc2ndCol = pcSlice->getRefPic(REF_PIC_LIST_1, refIdx)->getPOC();
+          if ((poc1stCol != poc2ndCol) && (!isResamplingPossible || !pcSlice->getRefPic(REF_PIC_LIST_1, refIdx)->isRefScaled(pcSlice->getPPS())) /*&& (pcSlice->getRefPic(REF_PIC_LIST_1, refIdx)->slices[0]->getSliceType() != I_SLICE)*/)
+#else
+          if (!isResamplingPossible || !pcSlice->getRefPic(REF_PIC_LIST_1, refIdx)->isRefScaled(pcSlice->getPPS()))
+#endif
+          {
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            list2ndCol = 1;
+#endif
+            colRefIdxL1 = refIdx;
+            break;
+          }
+        }
+      }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+      else
+      {
+        for (int refIdx = 0; refIdx < pcSlice->getNumRefIdx(REF_PIC_LIST_0); refIdx++)
+        {
+          int poc2ndCol = pcSlice->getRefPic(REF_PIC_LIST_0, refIdx)->getPOC();
+          CHECK(pcSlice->getRefPic(REF_PIC_LIST_0, refIdx)->unscaledPic == nullptr, "unscaledPic is not set for L0 reference picture");
+          if ((poc1stCol != poc2ndCol) && (!isResamplingPossible || !pcSlice->getRefPic(REF_PIC_LIST_0, refIdx)->isRefScaled(pcSlice->getPPS())) /*&& (pcSlice->getRefPic(REF_PIC_LIST_0, refIdx)->slices[0]->getSliceType() != I_SLICE)*/)
           {
             colRefIdxL1 = refIdx;
             break;
           }
         }
       }
-
-      if( colRefIdxL0 >= 0 && colRefIdxL1 >= 0 )
+#endif
+      if (colRefIdxL0 >= 0 && colRefIdxL1 >= 0)
       {
-        const Picture *refPicL0 = pcSlice->getRefPic( REF_PIC_LIST_0, colRefIdxL0 );
-        if( !refPicL0->slices.size() )
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        const Picture *refPicL0 = pcSlice->getRefPic(RefPicList(list1stCol), colRefIdxL0);
+        if (!refPicL0->slices.size())
         {
           refPicL0 = refPicL0->unscaledPic;
         }
 
-        const Picture *refPicL1 = pcSlice->getRefPic( REF_PIC_LIST_1, colRefIdxL1 );
-        if( !refPicL1->slices.size() )
+        const Picture *refPicL1 = pcSlice->getRefPic(RefPicList(list2ndCol), colRefIdxL1);
+        if (!refPicL1->slices.size())
+        {
+          refPicL1 = refPicL1->unscaledPic;
+        }
+        picHeader->setPicColFromL0Flag(1 - list1stCol);
+        pcSlice->setColFromL0Flag(1 - list1stCol);
+        pcSlice->setColRefIdx(colRefIdxL0);
+        picHeader->setColRefIdx(colRefIdxL0);
+        picHeader->setPicColFromL0Flag2nd(1 - list2ndCol);
+        pcSlice->setColFromL0Flag2nd(1 - list2ndCol);
+        pcSlice->setColRefIdx2nd(colRefIdxL1);
+        picHeader->setColRefIdx2nd(colRefIdxL1);
+
+        int poc1st = refPicL0->getPOC();
+        int poc2nd = refPicL1->getPOC();
+        int pocCur = pcSlice->getPOC();
+        if ((abs(poc1st - pocCur) == abs(poc2nd - pocCur)) && (refPicL0->slices[0]->getSliceQp() < refPicL1->slices[0]->getSliceQp()))
+        {
+          picHeader->setPicColFromL0Flag2nd(1 - list1stCol);
+          pcSlice->setColFromL0Flag2nd(1 - list1stCol);
+          pcSlice->setColRefIdx2nd(colRefIdxL0);
+          picHeader->setColRefIdx2nd(colRefIdxL0);
+          picHeader->setPicColFromL0Flag(1 - list2ndCol);
+          pcSlice->setColFromL0Flag(1 - list2ndCol);
+          pcSlice->setColRefIdx(colRefIdxL1);
+          picHeader->setColRefIdx(colRefIdxL1);
+        }
+#else
+        const Picture *refPicL0 = pcSlice->getRefPic(REF_PIC_LIST_0, colRefIdxL0);
+        if (!refPicL0->slices.size())
+        {
+          refPicL0 = refPicL0->unscaledPic;
+        }
+
+        const Picture *refPicL1 = pcSlice->getRefPic(REF_PIC_LIST_1, colRefIdxL1);
+        if (!refPicL1->slices.size())
         {
           refPicL1 = refPicL1->unscaledPic;
         }
 
-        CHECK( !refPicL0->slices.size(), "Wrong L0 reference picture" );
-        CHECK( !refPicL1->slices.size(), "Wrong L1 reference picture" );
+        CHECK(!refPicL0->slices.size(), "Wrong L0 reference picture");
+        CHECK(!refPicL1->slices.size(), "Wrong L1 reference picture");
 
         const uint32_t uiColFromL0 = refPicL0->slices[0]->getSliceQp() > refPicL1->slices[0]->getSliceQp();
-        picHeader->setPicColFromL0Flag( uiColFromL0 );
-        pcSlice->setColFromL0Flag( uiColFromL0 );
-        pcSlice->setColRefIdx( uiColFromL0 ? colRefIdxL0 : colRefIdxL1 );
-        picHeader->setColRefIdx( uiColFromL0 ? colRefIdxL0 : colRefIdxL1 );
+        picHeader->setPicColFromL0Flag(uiColFromL0);
+        pcSlice->setColFromL0Flag(uiColFromL0);
+        pcSlice->setColRefIdx(uiColFromL0 ? colRefIdxL0 : colRefIdxL1);
+        picHeader->setColRefIdx(uiColFromL0 ? colRefIdxL0 : colRefIdxL1);
+#endif
       }
-      else if( colRefIdxL0 < 0 && colRefIdxL1 >= 0 )
+#if !JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+      else if (colRefIdxL0 < 0 && colRefIdxL1 >= 0)
       {
-        picHeader->setPicColFromL0Flag( false );
-        pcSlice->setColFromL0Flag( false );
-        pcSlice->setColRefIdx( colRefIdxL1 );
-        picHeader->setColRefIdx( colRefIdxL1 );
+        picHeader->setPicColFromL0Flag(false);
+        pcSlice->setColFromL0Flag(false);
+        pcSlice->setColRefIdx(colRefIdxL1);
+        picHeader->setColRefIdx(colRefIdxL1);
       }
-      else if( colRefIdxL0 >= 0 && colRefIdxL1 < 0 )
+#endif
+      else if (colRefIdxL0 >= 0 && colRefIdxL1 < 0)
       {
-        picHeader->setPicColFromL0Flag( true );
-        pcSlice->setColFromL0Flag( true );
-        pcSlice->setColRefIdx( colRefIdxL0 );
-        picHeader->setColRefIdx( colRefIdxL0 );
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        picHeader->setPicColFromL0Flag(1 - list1stCol);
+        pcSlice->setColFromL0Flag(1 - list1stCol);
+        pcSlice->setColRefIdx(colRefIdxL0);
+        picHeader->setColRefIdx(colRefIdxL0);
+        picHeader->setPicColFromL0Flag2nd(1 - list2ndCol);
+        pcSlice->setColFromL0Flag2nd(1 - list2ndCol);
+        pcSlice->setColRefIdx2nd(0);
+        picHeader->setColRefIdx2nd(0);
+#else
+        picHeader->setPicColFromL0Flag(true);
+        pcSlice->setColFromL0Flag(true);
+        pcSlice->setColRefIdx(colRefIdxL0);
+        picHeader->setColRefIdx(colRefIdxL0);
+#endif
       }
       else
       {
-        picHeader->setEnableTMVPFlag( 0 );
+        picHeader->setEnableTMVPFlag(0);
       }
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
       if (picHeader->getEnableTMVPFlag())
       {
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        for (int colFrameIdx = 0; colFrameIdx < (pcSlice->isInterB() ? 2 : 1); colFrameIdx++)
+        {
+          const Picture* const pColPic = pcSlice->getRefPic(RefPicList(colFrameIdx == 0 ? 1 - pcSlice->getColFromL0Flag() : 1 - pcSlice->getColFromL0Flag2nd()), colFrameIdx == 0 ? pcSlice->getColRefIdx() : pcSlice->getColRefIdx2nd());
+#else
         const Picture* const pColPic = pcSlice->getRefPic(RefPicList(pcSlice->isInterB() ? 1 - pcSlice->getColFromL0Flag() : 0), pcSlice->getColRefIdx());
+#endif 
         if (pColPic)
         {
           const int currPOC = pcSlice->getPOC();
           const int colPOC = pColPic->getPOC();
 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          pcSlice->resizeImBuf(pColPic->numSlices, colFrameIdx);
+#else
           pcSlice->resizeImBuf(pColPic->numSlices);
+#endif
           Slice *pColSlice = nullptr;
           for (int sliceIdx = 0; sliceIdx < pColPic->numSlices; sliceIdx++)
           {
@@ -2810,12 +2920,19 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
                     }
                   } // curRefIdx
                     //printf("sliceIdx:%d, colRefPicListIdx:%d, curRefPicListIdx:%d, colRefIdx:%d, targetRefIdx:%d\n", sliceIdx, colRefPicListIdx, curRefPicListIdx, colRefIdx, targetRefIdx);
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                  pcSlice->setImRefIdx(sliceIdx, RefPicList(colRefPicListIdx), RefPicList(curRefPicListIdx), colRefIdx, targetRefIdx, colFrameIdx);
+#else
                   pcSlice->setImRefIdx(sliceIdx, RefPicList(colRefPicListIdx), RefPicList(curRefPicListIdx), colRefIdx, targetRefIdx);
+#endif
                 } // curRefPicListIdx
               }
             }
           }
         }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        }
+#endif
       }
 #endif
     }
@@ -3299,6 +3416,21 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         m_pcALF->copyDbData(cs);
       }
 #endif
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+      if (pcSlice->getSPS()->getALFEnabledFlag())
+      {
+        // create ALF object based on the picture size
+        Size alfSize = m_pcALF->getAlfSize();
+        if (alfSize.width != picWidth || alfSize.height != picHeight)
+        {
+          m_pcALF->destroy();
+          m_pcALF->create(m_pcCfg, picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth,
+                          m_pcCfg->getBitDepth(), m_pcCfg->getInputBitDepth());
+        }
+
+        m_pcALF->copyResiData(cs);
+      }
+#endif
 
 #if RPR_ENABLE
       // create SAO object based on the picture size
@@ -3505,6 +3637,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
           , (m_pcCfg->getUsePerceptQPA() && !m_pcCfg->getUseRateCtrl() && pcSlice->getPPS()->getUseDQP() ? m_pcEncLib->getRdCost(PARL_PARAM0(0))->getChromaWeight() : 0.0)
 #endif
           , pcPic, uiNumSliceSegments
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+          , m_pcCfg->getIntraPeriod()
+#endif
         );
 
         //assign ALF slice header

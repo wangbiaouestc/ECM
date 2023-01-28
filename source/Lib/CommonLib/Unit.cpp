@@ -285,6 +285,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   dimdMode = other.dimdMode;
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   dimdChromaMode = other.dimdChromaMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  dimdChromaModeSecond = other.dimdChromaModeSecond;
+#endif
 #endif
 #if JVET_AB0157_INTRA_FUSION
   for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
@@ -317,6 +320,10 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   timd              = other.timd;
   timdMode          = other.timdMode;
   timdModeSecondary = other.timdModeSecondary;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  timdModeCheckWA          = other.timdModeCheckWA;
+  timdModeSecondaryCheckWA = other.timdModeSecondaryCheckWA;
+#endif
   timdIsBlended     = other.timdIsBlended;
   timdFusionWeight[0] = other.timdFusionWeight[0];
   timdFusionWeight[1] = other.timdFusionWeight[1];
@@ -352,6 +359,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if INTER_LIC
   LICFlag           = other.LICFlag;
 #endif
+#if JVET_AC0112_IBC_LIC
+  ibcLicFlag = other.ibcLicFlag;
+#endif
 #if JVET_AA0070_RRIBC
   rribcFlipType = other.rribcFlipType;
 #endif
@@ -362,6 +372,10 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   {
     tmrlList[i] = other.tmrlList[i];
   }
+#endif
+#if JVET_AC0094_REF_SAMPLES_OPT
+  areAboveRightUnavail = other.areAboveRightUnavail;
+  areBelowLeftUnavail  = other.areBelowLeftUnavail;
 #endif
 
   for (int idx = 0; idx < MAX_NUM_CHANNEL_TYPE; idx++)
@@ -424,6 +438,9 @@ void CodingUnit::initData()
   dimdMode = -1;
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   dimdChromaMode   = -1;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  dimdChromaModeSecond = -1;
+#endif
 #endif
 #if JVET_AB0157_INTRA_FUSION
   for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
@@ -453,9 +470,16 @@ void CodingUnit::initData()
   tmpNumCand = 0;
 #endif
 #if JVET_W0123_TIMD_FUSION
-  timd              = false;
+  timd                     = false;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  timdMode                 = INVALID_TIMD_IDX;
+  timdModeSecondary        = INVALID_TIMD_IDX;
+  timdModeCheckWA          = true;
+  timdModeSecondaryCheckWA = true;
+#else
   timdMode          = -1;
   timdModeSecondary = -1;
+#endif
   timdIsBlended     = false;
   timdFusionWeight[0] = -1;
   timdFusionWeight[1] = -1;
@@ -490,12 +514,19 @@ void CodingUnit::initData()
 #if INTER_LIC
   LICFlag = false;
 #endif
+#if JVET_AC0112_IBC_LIC
+  ibcLicFlag = false;
+#endif
 #if JVET_AA0070_RRIBC
   rribcFlipType = 0;
 #endif
 #if JVET_AB0157_TMRL
   tmrlFlag = false;
   tmrlListIdx = 0;
+#endif
+#if JVET_AC0094_REF_SAMPLES_OPT
+  areAboveRightUnavail = false;
+  areBelowLeftUnavail  = false;
 #endif
 
   for (int idx = 0; idx < MAX_NUM_CHANNEL_TYPE; idx++)
@@ -739,8 +770,14 @@ void PredictionUnit::initData()
 #endif
 #if JVET_AA0057_CCCM
   cccmFlag    = 0;
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  cccmNoSubFlag = 0;
+#endif
 #endif
   // inter data
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  colIdx = 0;
+#endif
   mergeFlag   = false;
   regularMergeFlag = false;
   mergeIdx    = MAX_UCHAR;
@@ -801,6 +838,13 @@ void PredictionUnit::initData()
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = false;
 #endif
+#if JVET_AC0112_IBC_GPM
+  ibcGpmFlag = false;
+  ibcGpmSplitDir = MAX_UCHAR;
+  ibcGpmMergeIdx0 = MAX_UCHAR;
+  ibcGpmMergeIdx1 = MAX_UCHAR;
+  ibcGpmBldIdx = MAX_UCHAR;
+#endif
 
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   refIdxLC = -1;
@@ -831,6 +875,10 @@ void PredictionUnit::initData()
   ciipFlag = false;
 #if CIIP_PDPC
   ciipPDPC = false;
+#endif
+#if JVET_AC0112_IBC_CIIP
+  ibcCiipFlag = false;
+  ibcCiipIntraIdx = 0;
 #endif
   mmvdEncOptMode = 0;
 #if MULTI_HYP_PRED
@@ -873,12 +921,18 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #endif
 #if JVET_AA0057_CCCM
   cccmFlag    = predData.cccmFlag;
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  cccmNoSubFlag = predData.cccmNoSubFlag;
+#endif
 #endif
   return *this;
 }
 
 PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 {
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  colIdx = predData.colIdx;
+#endif
   mergeFlag   = predData.mergeFlag;
   regularMergeFlag = predData.regularMergeFlag;
   mergeIdx    = predData.mergeIdx;
@@ -939,6 +993,13 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = predData.reduceTplSize;
 #endif
+#if JVET_AC0112_IBC_GPM
+  ibcGpmFlag = predData.ibcGpmFlag;
+  ibcGpmSplitDir = predData.ibcGpmSplitDir;
+  ibcGpmMergeIdx0 = predData.ibcGpmMergeIdx0;
+  ibcGpmMergeIdx1 = predData.ibcGpmMergeIdx1;
+  ibcGpmBldIdx = predData.ibcGpmBldIdx;
+#endif
 
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
   {
@@ -969,6 +1030,10 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   ciipFlag = predData.ciipFlag;
 #if CIIP_PDPC
   ciipPDPC = predData.ciipPDPC;
+#endif
+#if JVET_AC0112_IBC_CIIP
+  ibcCiipFlag = predData.ibcCiipFlag;
+  ibcCiipIntraIdx = predData.ibcCiipIntraIdx;
 #endif
 #if MULTI_HYP_PRED
   addHypData = predData.addHypData;
@@ -1004,10 +1069,16 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
 #if JVET_AA0057_CCCM
   cccmFlag    = other.cccmFlag;
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  cccmNoSubFlag = other.cccmNoSubFlag;
+#endif
 #endif
 
   mergeFlag   = other.mergeFlag;
   regularMergeFlag = other.regularMergeFlag;
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  colIdx = other.colIdx;
+#endif
   mergeIdx    = other.mergeIdx;
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   parseLumaMode = other.parseLumaMode;
@@ -1073,6 +1144,13 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = other.reduceTplSize;
 #endif
+#if JVET_AC0112_IBC_GPM
+  ibcGpmFlag = other.ibcGpmFlag;
+  ibcGpmSplitDir = other.ibcGpmSplitDir;
+  ibcGpmMergeIdx0 = other.ibcGpmMergeIdx0;
+  ibcGpmMergeIdx1 = other.ibcGpmMergeIdx1;
+  ibcGpmBldIdx = other.ibcGpmBldIdx;
+#endif
 
   for (uint32_t i = 0; i < NUM_REF_PIC_LIST_01; i++)
   {
@@ -1103,6 +1181,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   ciipFlag = other.ciipFlag;
 #if CIIP_PDPC
   ciipPDPC = other.ciipPDPC;
+#endif
+#if JVET_AC0112_IBC_CIIP
+  ibcCiipFlag = other.ibcCiipFlag;
+  ibcCiipIntraIdx = other.ibcCiipIntraIdx;
 #endif
 #if MULTI_HYP_PRED
   addHypData = other.addHypData;

@@ -367,6 +367,9 @@ public:
 #endif
   static const CtxSet   ChromaFusionMode;
 #endif
+#if JVET_AC0071_DBV
+  static const CtxSet DbvChromaMode;
+#endif
   static const CtxSet   MipFlag;
 #if JVET_V0130_INTRA_TMP
   static const CtxSet   TmpFlag;
@@ -412,6 +415,19 @@ public:
   static const CtxSet   IbcMbvdFlag;
   static const CtxSet   IbcMbvdMergeIdx;
   static const CtxSet   IbcMbvdStepMvpIdx;
+#endif
+#if JVET_AC0112_IBC_CIIP
+  static const CtxSet   IbcCiipFlag;
+  static const CtxSet   IbcCiipIntraIdx;
+#endif
+#if JVET_AC0112_IBC_GPM
+  static const CtxSet   IbcGpmFlag;
+  static const CtxSet   IbcGpmIntraFlag;
+  static const CtxSet   IbcGpmSplitDirSetFlag;
+  static const CtxSet   IbcGpmBldIdx;
+#endif
+#if JVET_AC0112_IBC_LIC
+  static const CtxSet   IbcLicFlag;
 #endif
 
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)

@@ -1009,9 +1009,21 @@ void Quant::quant(TransformUnit &tu, const ComponentID &compID, const CCoeffBuf 
 
     const uint32_t lfnstIdx = tu.cu->lfnstIdx;
 #if JVET_W0119_LFNST_EXTENSION
+#if JVET_AC0130_NSPT
+    bool allowNSPT = CU::isNSPTAllowed( tu, compID, uiWidth, uiHeight, CU::isIntra( *( tu.cu ) ) );
+
+    const int maxNumberOfCoeffs = lfnstIdx > 0 ? ( allowNSPT ? PU::getNSPTMatrixDim( uiWidth, uiHeight ) : PU::getLFNSTMatrixDim( uiWidth, uiHeight ) ) : piQCoef.area();
+#else
     const int maxNumberOfCoeffs = lfnstIdx > 0 ? PU::getLFNSTMatrixDim( uiWidth, uiHeight ) : piQCoef.area();
+#endif
+#else
+#if JVET_AC0130_NSPT
+    bool allowNSPT = CU::isNSPTAllowed( tu, compID, uiWidth, uiHeight, CU::isIntra( *( tu.cu ) ) );
+
+    const int maxNumberOfCoeffs = lfnstIdx > 0 ? ( allowNSPT ? PU::getNSPTMatrixDim( uiWidth, uiHeight ) : ( ( ( uiWidth == 4 && uiHeight == 4 ) || ( uiWidth == 8 && uiHeight == 8 ) ) ? 8 : 16 ) ) : piQCoef.area();
 #else
     const int maxNumberOfCoeffs = lfnstIdx > 0 ? ((( uiWidth == 4 && uiHeight == 4 ) || ( uiWidth == 8 && uiHeight == 8) ) ? 8 : 16) : piQCoef.area();
+#endif
 #endif
     memset( piQCoef.buf, 0, sizeof(TCoeff) * piQCoef.area() );
 

@@ -164,6 +164,18 @@ public:
 #if JVET_AA0061_IBC_MBVD
   void        ibcMbvdData             ( PredictionUnit&               pu );
 #endif
+#if JVET_AC0112_IBC_CIIP
+  void        ibcCiipFlag               ( PredictionUnit&               pu );
+  void        ibcCiipIntraIdx           ( PredictionUnit&               pu );
+#endif
+#if JVET_AC0112_IBC_GPM
+  void        ibcGpmFlag                ( PredictionUnit&               pu );
+  void        ibcGpmMergeIdx            ( PredictionUnit&               pu );
+  void        ibcGpmAdaptBlendIdx       ( PredictionUnit&               pu );
+#endif
+#if JVET_AC0112_IBC_LIC
+  void        cuIbcLicFlag              ( CodingUnit&                   cu );
+#endif
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   void        tm_merge_flag             ( PredictionUnit&               pu );
 #endif

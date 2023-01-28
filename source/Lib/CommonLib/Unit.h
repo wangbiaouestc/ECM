@@ -338,6 +338,9 @@ struct CodingUnit : public UnitArea
   int8_t         dimdMode;
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   int8_t         dimdChromaMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  int8_t         dimdChromaModeSecond;
+#endif
 #endif
 #if JVET_AB0157_INTRA_FUSION
   int8_t         dimdBlendMode[DIMD_FUSION_NUM-1]; // max number of blend modes (the main mode is not counter) --> incoherent with dimdRelWeight
@@ -355,6 +358,10 @@ struct CodingUnit : public UnitArea
 #if JVET_W0123_TIMD_FUSION
   bool           timd;
   int            timdMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+  bool timdModeCheckWA;
+  bool timdModeSecondaryCheckWA;
+#endif
   int timdModeSecondary;
   bool timdIsBlended;
   int8_t timdFusionWeight[2];
@@ -386,6 +393,9 @@ struct CodingUnit : public UnitArea
 #if INTER_LIC
   bool           LICFlag;
 #endif
+#if JVET_AC0112_IBC_LIC
+  bool ibcLicFlag;
+#endif
 #if JVET_AA0070_RRIBC
   int    rribcFlipType;
 #endif
@@ -393,6 +403,10 @@ struct CodingUnit : public UnitArea
   bool           tmrlFlag;
   uint8_t        tmrlListIdx;
   TmrlMode       tmrlList[MRL_LIST_SIZE];
+#endif
+#if JVET_AC0094_REF_SAMPLES_OPT
+  bool areAboveRightUnavail;
+  bool areBelowLeftUnavail;
 #endif
   // needed for fast imv mode decisions
   int8_t          imvNumCand;
@@ -481,11 +495,17 @@ struct IntraPredictionData
 #endif
 #if JVET_AA0057_CCCM
   int       cccmFlag;
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  int       cccmNoSubFlag;
+#endif
 #endif
 };
 
 struct InterPredictionData
 {
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  uint8_t     colIdx;
+#endif
   bool      mergeFlag;
   bool      regularMergeFlag;
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
@@ -525,6 +545,17 @@ struct InterPredictionData
 #if JVET_AA0061_IBC_MBVD
   bool          ibcMbvdMergeFlag;
   int           ibcMbvdMergeIdx;
+#endif
+#if JVET_AC0112_IBC_CIIP
+  bool        ibcCiipFlag;
+  int         ibcCiipIntraIdx;
+#endif
+#if JVET_AC0112_IBC_GPM
+  bool        ibcGpmFlag;
+  uint8_t     ibcGpmSplitDir;
+  uint8_t     ibcGpmMergeIdx0;
+  uint8_t     ibcGpmMergeIdx1;
+  uint8_t     ibcGpmBldIdx;
 #endif
 #if AFFINE_MMVD
   bool        afMmvdFlag;
