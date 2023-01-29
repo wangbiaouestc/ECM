@@ -984,7 +984,7 @@ static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM;
 #endif
 #endif
 
-#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION
 static const int CCCM_WINDOW_SIZE         = 6;
 static const int CCCM_NUM_PARAMS          = 7;
 static const int CCCM_MIN_PU_SIZE         = 0; // Set to 0 for no size restriction
@@ -1038,6 +1038,10 @@ static const int NUM_GLM_PATTERN_BITS =                             4;
 static const int NUM_GLM_IDC =                                     33;
 #endif
 #endif
+#endif
+#if JVET_AC0119_LM_CHROMA_FUSION
+static const int CFLM_NUM_PARAMS = 3;
+static const int CFLM_MAX_REF_SAMPLES = CCCM_MAX_REF_SAMPLES;
 #endif
 #if JVET_AC0071_DBV
 static const int NUM_DBV_POSITION = 5;

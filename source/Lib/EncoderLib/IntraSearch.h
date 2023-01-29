@@ -495,6 +495,11 @@ private:
   PelStorage      m_cccmStorage[CCCM_NUM_MODES];
 #endif
 #endif
+
+#if JVET_AC0119_LM_CHROMA_FUSION
+  PelStorage      m_predStorage[2];
+  PelStorage      m_fusionStorage[6];
+#endif
 protected:
   // interface to option
   EncCfg*         m_pcEncCfg;
@@ -608,8 +613,8 @@ protected:
   bool testISPforCurrCU(const CodingUnit &cu);
 #endif
   ChromaCbfs xRecurIntraChromaCodingQT( CodingStructure &cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE,                          const PartSplit ispType = TU_NO_ISP 
-#if JVET_AB0143_CCCM_TS
-    , PelUnitBuf cccmStorage = UnitBuf<      Pel>()
+#if JVET_AB0143_CCCM_TS || JVET_AC0119_LM_CHROMA_FUSION
+    , const PelUnitBuf& predStorage = UnitBuf<Pel>()
 #endif
   );
   bool       xRecurIntraCodingLumaQT  ( CodingStructure &cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE, const int subTuIdx = -1, const PartSplit ispType = TU_NO_ISP, const bool ispIsCurrentWinner = false, bool mtsCheckRangeFlag = false, int mtsFirstCheckId = 0, int mtsLastCheckId = 0, bool moreProbMTSIdxFirst = false );

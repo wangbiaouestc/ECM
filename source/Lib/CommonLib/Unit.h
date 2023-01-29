@@ -483,7 +483,11 @@ struct IntraPredictionData
   uint8_t intraDir1[MAX_NUM_CHANNEL_TYPE];
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
+#if JVET_AC0119_LM_CHROMA_FUSION
+  uint8_t   isChromaFusion;
+#else
   bool      isChromaFusion;
+#endif
 #endif
   bool      mipTransposedFlag;
   int8_t    multiRefIdx;

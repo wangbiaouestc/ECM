@@ -144,6 +144,9 @@
 
 #define JVET_Y0116_EXTENDED_MRL_LIST                      1 // JVET-Y0116: Extended MRL Candidate List
 #define JVET_Z0050_DIMD_CHROMA_FUSION                     1 // JVET-Z0050: DIMD chroma mode and fusion of chroma intra prediction modes
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+#define JVET_AC0119_LM_CHROMA_FUSION                      1 // JVET-AC0119: On Chroma Fusion improvement
+#endif
 #define JVET_Z0050_CCLM_SLOPE                             1 // JVET-Z0050: CCLM with slope adjustments
 #define JVET_AA0057_CCCM                                  1 // JVET-AA0057: Convolutional cross-component model (CCCM)
 #if JVET_AA0057_CCCM

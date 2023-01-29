@@ -366,6 +366,10 @@ public:
   static const CtxSet   DimdChromaMode;
 #endif
   static const CtxSet   ChromaFusionMode;
+#if JVET_AC0119_LM_CHROMA_FUSION
+  static const CtxSet   ChromaFusionType;
+  static const CtxSet   ChromaFusionCclm;
+#endif
 #endif
 #if JVET_AC0071_DBV
   static const CtxSet DbvChromaMode;

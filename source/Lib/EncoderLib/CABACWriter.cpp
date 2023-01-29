@@ -2267,6 +2267,26 @@ void CABACWriter::cccmFlag(const PredictionUnit& pu)
 }
 #endif
 
+#if JVET_AC0119_LM_CHROMA_FUSION
+void CABACWriter::intraChromaFusionMode(const PredictionUnit& pu)
+{
+  int symbol = pu.isChromaFusion;
+  m_BinEncoder.encodeBin(symbol > 0 ? 1 : 0, Ctx::ChromaFusionMode());
+
+  if (symbol > 0)
+  {
+    m_BinEncoder.encodeBin(symbol > 1 ? 1 : 0, Ctx::ChromaFusionType()); // Default=1
+
+#if MMLM
+    if (symbol > 1)
+    {
+      m_BinEncoder.encodeBin(symbol > 2 ? 1 : 0, Ctx::ChromaFusionCclm());  // LM=2
+    }
+#endif
+  }
+}
+#endif
+
 void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
 {
 
@@ -2314,8 +2334,12 @@ void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
 #if JVET_Z0050_DIMD_CHROMA_FUSION
     if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
     {
+#if JVET_AC0119_LM_CHROMA_FUSION
+      intraChromaFusionMode(pu);
+#else
       const bool     isFusion = pu.isChromaFusion;
       m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
+#endif
     }
 #endif
     return;
@@ -2330,8 +2354,12 @@ void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
     {
       if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
       {
+#if JVET_AC0119_LM_CHROMA_FUSION
+        intraChromaFusionMode(pu);
+#else
         const bool     isFusion = pu.isChromaFusion;
         m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
+#endif
       }
       return;
     }
@@ -2358,8 +2386,12 @@ void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
 #if JVET_Z0050_DIMD_CHROMA_FUSION
     if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
     {
+#if JVET_AC0119_LM_CHROMA_FUSION
+      intraChromaFusionMode(pu);
+#else
       const bool     isFusion = pu.isChromaFusion;
       m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
+#endif
     }
 #endif
   }

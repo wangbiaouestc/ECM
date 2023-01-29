@@ -125,6 +125,9 @@ public:
   void        intra_chroma_pred_modes   ( CodingUnit&                   cu );
   bool        intra_chroma_lmc_mode     ( PredictionUnit&               pu );
   void        intra_chroma_pred_mode    ( PredictionUnit&               pu );
+#if JVET_AC0119_LM_CHROMA_FUSION
+  void        intraChromaFusionMode     ( PredictionUnit&               pu );
+#endif
 #if JVET_AA0057_CCCM
   void        cccmFlag                  ( PredictionUnit&               pu );
 #endif
