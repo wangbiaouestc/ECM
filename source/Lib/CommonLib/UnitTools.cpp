@@ -2116,7 +2116,7 @@ bool PU::isDMChromaMIP(const PredictionUnit &pu)
 #endif
 }
 
-#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION
 void PU::getCccmRefLineNum(const PredictionUnit& pu, const Area area, int& th, int& tv)
 {
   th = area.x < CCCM_WINDOW_SIZE ? area.x : CCCM_WINDOW_SIZE;
@@ -2282,6 +2282,9 @@ bool PU::hasChromaFusionFlag(const PredictionUnit &pu, int intraMode)
   bool hasChromaFusionFlag = pu.cs->slice->getSliceType() == I_SLICE || (pu.cs->sps->getUseDimd() && intraMode == DIMD_CHROMA_IDX);
 #else
   bool hasChromaFusionFlag = pu.cs->slice->getSliceType() == I_SLICE;
+#endif
+#if JVET_AC0119_LM_CHROMA_FUSION
+  hasChromaFusionFlag &= PU::isLMCModeEnabled(pu, LM_CHROMA_IDX);
 #endif
 #if MMLM
   hasChromaFusionFlag &= PU::isLMCModeEnabled(pu, MMLM_CHROMA_IDX);

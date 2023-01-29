@@ -93,7 +93,7 @@ public:
 typedef short TrainDataType;
 #endif
 
-#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION
 typedef int64_t TCccmCoeff;
 
 #define FIXED_MULT(x, y) TCccmCoeff((int64_t(x)*(y) + CCCM_DECIM_ROUND) >> CCCM_DECIM_BITS )
@@ -206,15 +206,24 @@ private:
   int  m_yuvExtSize2;
 #endif
 
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AC0119_LM_CHROMA_FUSION
   Area m_cccmBlkArea;
+#if JVET_AB0174_CCCM_DIV_FREE
+  int  m_cccmLumaOffset;
+#endif
+#endif
+
+#if JVET_AA0057_CCCM
+#if !JVET_AC0119_LM_CHROMA_FUSION
+  Area m_cccmBlkArea;
+#endif
   Area m_cccmRefArea;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   Pel* m_cccmLumaBuf[2];
 #else
   Pel* m_cccmLumaBuf;
 #endif
-#if JVET_AB0174_CCCM_DIV_FREE
+#if JVET_AB0174_CCCM_DIV_FREE && !JVET_AC0119_LM_CHROMA_FUSION
   int  m_cccmLumaOffset;
 #endif
 #endif
@@ -288,6 +297,10 @@ private:
 #endif
 #endif
 #endif
+#if JVET_AC0119_LM_CHROMA_FUSION
+  Area m_cflmRefArea;
+  Pel* m_cflmBuf[3];
+#endif
   MatrixIntraPrediction m_matrixIntraPred;
 
 
@@ -321,6 +334,9 @@ protected:
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   CccmCovariance<CCCM_NO_SUB_NUM_PARAMS, GLM_MAX_REF_SAMPLES> m_cccmNoSubSolver;
+#endif
+#if JVET_AC0119_LM_CHROMA_FUSION
+  CccmCovariance<CFLM_NUM_PARAMS, CFLM_MAX_REF_SAMPLES> m_cflmSolver;
 #endif
 
   // prediction
@@ -408,6 +424,12 @@ public:
 
   void init                       (ChromaFormat chromaFormatIDC, const unsigned bitDepthY);
 
+#if JVET_AA0057_CCCM || JVET_AC0119_LM_CHROMA_FUSION
+  Pel    xCccmGetLumaVal(const PredictionUnit& pu, const CPelBuf pi, const int x, const int y) const;
+#if JVET_AB0174_CCCM_DIV_FREE
+  void   xCccmSetLumaRefValue(const PredictionUnit& pu);
+#endif
+#endif
 #if JVET_AA0057_CCCM
   void   predIntraCCCM            (const PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, int intraDir);
   void   xCccmCalcModels          (const PredictionUnit& pu, CccmModel<CCCM_NUM_PARAMS> &cccmModelCb, CccmModel<CCCM_NUM_PARAMS> &cccmModelCr, int modelId, int modelThr);
@@ -415,10 +437,12 @@ public:
   void   xCccmCreateLumaRef       (const PredictionUnit& pu, CompArea chromaArea);
   PelBuf xCccmGetLumaRefBuf       (const PredictionUnit& pu, int &areaWidth, int &areaHeight, int &refSizeX, int &refSizeY, int &refPosPicX, int &refPosPicY) const;
   PelBuf xCccmGetLumaPuBuf        (const PredictionUnit& pu) const;
+#if !JVET_AC0119_LM_CHROMA_FUSION
   Pel    xCccmGetLumaVal          (const PredictionUnit& pu, const CPelBuf pi, const int x, const int y) const;
+#endif
   int    xCccmCalcRefAver         (const PredictionUnit& pu) const;
   void   xCccmCalcRefArea         (const PredictionUnit& pu, CompArea chromaArea);
-#if JVET_AB0174_CCCM_DIV_FREE
+#if JVET_AB0174_CCCM_DIV_FREE && !JVET_AC0119_LM_CHROMA_FUSION
   void   xCccmSetLumaRefValue     (const PredictionUnit& pu);
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
@@ -439,6 +463,17 @@ public:
   void   xGlmSetLumaRefValue      (const PredictionUnit& pu, CompArea chromaArea);
 #endif
 #endif
+#if JVET_AC0119_LM_CHROMA_FUSION
+  void   xCflmCalcModels(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel<CFLM_NUM_PARAMS>& cflmModel, int modelId, int modelThr);
+  void   xCflmApplyModel(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel<CFLM_NUM_PARAMS>& cflmModel, int modelId, int modelThr, PelBuf& piPred);
+  void   xCflmCreateLumaRef       (const PredictionUnit& pu, const CompArea& chromaArea);
+  bool   xCflmCreateChromaPred    (const PredictionUnit& pu, const ComponentID compId, PelBuf& piPred);
+  PelBuf xCflmGetRefBuf           (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, int& areaWidth, int& areaHeight, int& refSizeX, int& refSizeY, int& refPosPicX, int& refPosPicY) const;
+  PelBuf xCflmGetPuBuf            (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea) const;
+  int    xCflmCalcRefAver         (const PredictionUnit& pu, const CompArea& chromaArea);
+  void   xCflmCalcRefArea         (const PredictionUnit& pu, const CompArea& chromaArea);
+#endif
+
 #if ENABLE_DIMD
   static void deriveDimdMode      (const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu);
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
@@ -449,12 +484,19 @@ public:
 #endif
   static int  buildHistogram      ( const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int* piHistogram, int direction, int bw, int bh );
 #endif
-#if JVET_W0123_TIMD_FUSION
+#if JVET_W0123_TIMD_FUSION || JVET_AC0119_LM_CHROMA_FUSION
   void xIntraPredTimdHorVerPdpc   (Pel* pDsty,const int dstStride, Pel* refSide, const int width, const int height, int xOffset, int yOffset, int scale, const Pel* refMain, const ClpRng& clpRng);
   void xPredTimdIntraPlanar       (const CPelBuf &pSrc, Pel* pDst, int iDstStride, int width, int height, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight);
   void xPredTimdIntraDc           ( const PredictionUnit &pu, const CPelBuf &pSrc, Pel* pDst, int iDstStride, int iWidth, int iHeight, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight);
-  void xPredTimdIntraAng          ( const CPelBuf &pSrc, const ClpRng& clpRng, Pel* pTrueDst, int iDstStride, int iWidth, int iHeight, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight, uint32_t dirMode);
+  void xPredTimdIntraAng          ( const CPelBuf &pSrc, const ClpRng& clpRng, Pel* pTrueDst, int iDstStride, int iWidth, int iHeight, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight, uint32_t dirMode
+#if JVET_AC0119_LM_CHROMA_FUSION
+    , const ChannelType channelType
+#endif
+  );
   void xIntraPredTimdAngLuma(Pel* pDstBuf, const ptrdiff_t dstStride, Pel* refMain, int width, int height, int deltaPos, int intraPredAngle, const ClpRng& clpRng, int xOffset, int yOffset);
+#if JVET_AC0119_LM_CHROMA_FUSION
+  void xIntraPredTimdAngChroma(Pel* pDstBuf, const ptrdiff_t dstStride, Pel* refMain, int width, int height, int deltaPos, int intraPredAngle, const ClpRng& clpRng, int xOffset, int yOffset);
+#endif
   void xIntraPredTimdPlanarDcPdpc (const CPelBuf &pSrc, Pel* pDst, int iDstStride, int width, int height, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight);
   void xIntraPredTimdAngPdpc(Pel* pDsty,const int dstStride,Pel* refSide,const int width,const int height, int xOffset, int yOffset, int scale, int invAngle);
   void xFillTimdReferenceSamples  ( const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu, int iTemplateWidth, int iTemplateHeight );
@@ -476,7 +518,11 @@ public:
 #endif
   void initTimdIntraPatternLuma   (const CodingUnit &cu, const CompArea &area, int iTemplateWidth, int iTemplateHeight, uint32_t uiRefWidth, uint32_t uiRefHeight);
 #if GRAD_PDPC
-  void xIntraPredTimdAngGradPdpc  (Pel* pDsty, const int dstStride, Pel* refMain, Pel* refSide, const int width, const int height, int xOffset, int yOffset, int scale, int deltaPos, int intraPredAngle, const ClpRng& clpRng);
+  void xIntraPredTimdAngGradPdpc  (Pel* pDsty, const int dstStride, Pel* refMain, Pel* refSide, const int width, const int height, int xOffset, int yOffset, int scale, int deltaPos, int intraPredAngle, const ClpRng& clpRng
+#if JVET_AC0119_LM_CHROMA_FUSION
+    , const bool bExtIntraDir
+#endif
+  );
 #endif
 #if JVET_X0148_TIMD_PDPC
 #if CIIP_PDPC

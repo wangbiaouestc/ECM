@@ -3209,6 +3209,37 @@ const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
 });
 #endif
 
+#if JVET_AC0119_LM_CHROMA_FUSION
+const CtxSet ContextSetCfg::ChromaFusionType = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+const CtxSet ContextSetCfg::ChromaFusionCclm = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+#endif
+
 #if JVET_AB0157_TMRL
 const CtxSet ContextSetCfg::TmrlDerive = ContextSetCfg::addCtxSet
 ({
@@ -4854,6 +4885,27 @@ const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
 });
 #endif
 
+#if JVET_AC0119_LM_CHROMA_FUSION
+const CtxSet ContextSetCfg::ChromaFusionType = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  });
+const CtxSet ContextSetCfg::ChromaFusionCclm = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  });
+#endif
+
 #else
 const CtxSet ContextSetCfg::SplitFlag = ContextSetCfg::addCtxSet
 ({
@@ -6016,6 +6068,23 @@ const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
   { DWS, },
 #endif
 });
+#endif
+
+#if JVET_AC0119_LM_CHROMA_FUSION
+const CtxSet ContextSetCfg::ChromaFusionType = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  });
+const CtxSet ContextSetCfg::ChromaFusionCclm = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  });
 #endif
 
 #endif

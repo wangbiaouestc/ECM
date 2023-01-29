@@ -751,7 +751,11 @@ void PredictionUnit::initData()
   intraDir1[1] = PLANAR_IDX;
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
+#if JVET_AC0119_LM_CHROMA_FUSION
+  isChromaFusion = 0;
+#else
   isChromaFusion = false;
+#endif
 #endif
   mipTransposedFlag = false;
   multiRefIdx = 0;

@@ -2541,6 +2541,26 @@ void CABACReader::cccmFlag(PredictionUnit& pu)
 }
 #endif
 
+#if JVET_AC0119_LM_CHROMA_FUSION
+void CABACReader::intraChromaFusionMode(PredictionUnit& pu)
+{
+  int symbol = m_BinDecoder.decodeBin(Ctx::ChromaFusionMode());
+
+  if (symbol > 0)
+  {
+    symbol += m_BinDecoder.decodeBin(Ctx::ChromaFusionType()); // Default=1
+
+#if MMLM
+    if (symbol > 1)
+    {
+      symbol += m_BinDecoder.decodeBin(Ctx::ChromaFusionCclm());  // LM=2
+    }
+#endif
+  }
+  pu.isChromaFusion = symbol;
+}
+#endif
+
 void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
 {
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2(STATS__CABAC_BITS__INTRA_DIR_ANG, pu.cu->blocks[pu.chType].lumaSize(), CHANNEL_TYPE_CHROMA);
@@ -2589,10 +2609,14 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
 #if JVET_Z0050_DIMD_CHROMA_FUSION
     if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
     {
+#if JVET_AC0119_LM_CHROMA_FUSION
+      intraChromaFusionMode(pu);
+#else
       if (m_BinDecoder.decodeBin(Ctx::ChromaFusionMode()) == 1)
       {
         pu.isChromaFusion = true;
       }
+#endif
     }
 #endif
     return;
@@ -2606,10 +2630,14 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
       pu.intraDir[1] = DIMD_CHROMA_IDX;
       if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
       {
+#if JVET_AC0119_LM_CHROMA_FUSION
+        intraChromaFusionMode(pu);
+#else
         if (m_BinDecoder.decodeBin(Ctx::ChromaFusionMode()) == 1)
         {
           pu.isChromaFusion = true;
         }
+#endif
       }
       return;
     }
@@ -2623,10 +2651,14 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
   {
+#if JVET_AC0119_LM_CHROMA_FUSION
+    intraChromaFusionMode(pu);
+#else
     if (m_BinDecoder.decodeBin(Ctx::ChromaFusionMode()) == 1)
     {
       pu.isChromaFusion = true;
     }
+#endif
   }
 #endif
 

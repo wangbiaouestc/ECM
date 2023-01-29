@@ -177,6 +177,17 @@ void IntraSearch::destroy()
     m_pSharedPredTransformSkip[ch] = nullptr;
   }
 
+#if JVET_AC0119_LM_CHROMA_FUSION
+  for (uint32_t i = 0; i < 2; i++)
+  {
+    m_predStorage[i].destroy();
+  }
+  for (uint32_t i = 0; i < 6; i++)
+  {
+    m_fusionStorage[i].destroy();
+  }
+#endif
+
 #if JVET_AB0143_CCCM_TS
   for (uint32_t cccmIdx = 0; cccmIdx < CCCM_NUM_MODES; cccmIdx++)
   {
@@ -284,6 +295,17 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
   IntraPrediction::init( cform, pcEncCfg->getBitDepth( CHANNEL_TYPE_LUMA ) );
   m_tmpStorageLCU.create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
   m_colorTransResiBuf.create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
+
+#if JVET_AC0119_LM_CHROMA_FUSION
+  for (uint32_t i = 0; i < 2; i++)
+  {
+    m_predStorage[i].create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
+  }
+  for (uint32_t i = 0; i < 6; i++)
+  {
+    m_fusionStorage[i].create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
+  }
+#endif
 
 #if JVET_AB0143_CCCM_TS
   for (uint32_t cccmIdx = 0; cccmIdx < CCCM_NUM_MODES; cccmIdx++)
@@ -2565,7 +2587,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
     int64_t     satdGlmCosts       [NUM_CHROMA_MODE] = { 0 };
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
+#if JVET_AC0119_LM_CHROMA_FUSION
+    uint8_t isChromaFusion = 0;
+#else
     bool isChromaFusion = false;
+#endif
 #endif
 
     //----- init mode list ----
@@ -3375,11 +3401,29 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       testBDPCM = testBDPCM && CU::bdpcmAllowed(cu, COMPONENT_Cb) && cu.ispMode == 0 && cu.mtsFlag == 0 && cu.lfnstIdx == 0;
 #if JVET_Z0050_DIMD_CHROMA_FUSION
       double dBestNonLmCost = MAX_DOUBLE;
+#if JVET_AC0119_LM_CHROMA_FUSION
+      int bestNonLmMode = -1;
+#else
 #if ENABLE_DIMD
       int bestNonLmMode = (cu.slice->getSPS()->getUseDimd()) ? DIMD_CHROMA_IDX : DM_CHROMA_IDX;
 #else
       int bestNonLmMode = DM_CHROMA_IDX;
 #endif
+#endif
+#endif
+#if JVET_AC0119_LM_CHROMA_FUSION
+      int secondNonLmMode = -1;
+      double dSecondNonLmCost = MAX_DOUBLE;
+      PelUnitBuf predStorage[2], fusionStorage[6];
+      const UnitArea localArea(cs.area.chromaFormat, Area(0, 0, (pu.Cb().width) << 1, (pu.Cb().height) << 1));
+      for (uint32_t i = 0; i < 2; i++)
+      {
+        predStorage[i] = m_predStorage[i].getBuf(localArea);
+      }
+      for (uint32_t i = 0; i < 6; i++)
+      {
+        fusionStorage[i] = m_fusionStorage[i].getBuf(localArea);
+      }
 #endif
       for (int32_t uiMode = uiMinMode - (2 * int(testBDPCM)); uiMode < uiMaxMode; uiMode++)
       {
@@ -3475,12 +3519,34 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           bestBDPCMMode = cu.bdpcmModeChroma;
         }
 #if JVET_Z0050_DIMD_CHROMA_FUSION
+#if JVET_AC0119_LM_CHROMA_FUSION
+        bool findBestNonLm = !PU::isLMCMode(chromaIntraMode) && !cu.bdpcmModeChroma && PU::hasChromaFusionFlag(pu, chromaIntraMode);
+#else
         bool findBestNonLm = !PU::isLMCMode(chromaIntraMode) && !cu.bdpcmModeChroma && pu.cs->slice->isIntra();
+#endif
         if (findBestNonLm && dCost < dBestNonLmCost)
         {
+#if JVET_AC0119_LM_CHROMA_FUSION
+          predStorage[1].Cb().copyFrom(predStorage[0].Cb());
+          predStorage[1].Cr().copyFrom(predStorage[0].Cr());
+          secondNonLmMode = bestNonLmMode;
+          dSecondNonLmCost = dBestNonLmCost;
+
+          predStorage[0].Cb().copyFrom(cs.getPredBuf(pu.Cb()));
+          predStorage[0].Cr().copyFrom(cs.getPredBuf(pu.Cr()));
+#endif
           bestNonLmMode = chromaIntraMode;
           dBestNonLmCost = dCost;
         }
+#if JVET_AC0119_LM_CHROMA_FUSION
+        else if (findBestNonLm && dCost < dSecondNonLmCost)
+        {
+          predStorage[1].Cb().copyFrom(cs.getPredBuf(pu.Cb()));
+          predStorage[1].Cr().copyFrom(cs.getPredBuf(pu.Cr()));
+          secondNonLmMode = chromaIntraMode;
+          dSecondNonLmCost = dCost;
+        }
+#endif
 #endif
       }
 
@@ -3562,7 +3628,127 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #endif
 
 #if JVET_Z0050_DIMD_CHROMA_FUSION
+#if JVET_AC0119_LM_CHROMA_FUSION
+      uint32_t uiFusionModeNum = 2;
+#if MMLM
+      uiFusionModeNum += 1;
+#endif
+      bool fusionModeIsEnable[6] = { false };
+      int32_t fusionModeMap[6][2];
+      Distortion satdChromaFusionCost[6];
+      int satdChromaFusionModeList[6];
+      for (int i = 0; i < 6; i++)
+      {
+        satdChromaFusionCost[i] = MAX_UINT64; // for the mode not pre-select by SATD, do RDO by default, so set the initial value 0.
+        satdChromaFusionModeList[i] = i;
+      }
+
+      Distortion sad = 0;
+      Distortion sadCb = 0, satdCb = 0;
+      Distortion sadCr = 0, satdCr = 0;
+      CodingStructure& cs = *(pu.cs);
+
+      DistParam distParamSadCb, distParamSatdCb;
+      DistParam distParamSadCr, distParamSatdCr;
+
+      m_pcRdCost->setDistParam(distParamSadCb, cs.getOrgBuf(pu.Cb()), fusionStorage[0].Cb(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), COMPONENT_Cb, false);
+      m_pcRdCost->setDistParam(distParamSatdCb, cs.getOrgBuf(pu.Cb()), fusionStorage[0].Cb(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), COMPONENT_Cb, true);
+      m_pcRdCost->setDistParam(distParamSadCr, cs.getOrgBuf(pu.Cr()), fusionStorage[0].Cr(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), COMPONENT_Cr, false);
+      m_pcRdCost->setDistParam(distParamSatdCr, cs.getOrgBuf(pu.Cr()), fusionStorage[0].Cr(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), COMPONENT_Cr, true);
+
+      distParamSadCb.applyWeight = false;
+      distParamSatdCb.applyWeight = false;
+      distParamSadCr.applyWeight = false;
+      distParamSatdCr.applyWeight = false;
+
+      xCflmCreateLumaRef(pu, pu.Cb());
+
+      for (int32_t uiMode = 0; uiMode < 2; uiMode++)
+      {
+        int chromaIntraMode = (uiMode == 0) ? bestNonLmMode : secondNonLmMode;
+        if (chromaIntraMode == -1)
+        {
+          continue;
+        }
+
+        if (PU::hasChromaFusionFlag(pu, chromaIntraMode))
+        {
+          pu.intraDir[1] = chromaIntraMode;
+          if (!xCflmCreateChromaPred(pu, COMPONENT_Cb, predStorage[uiMode].Cb()) ||
+            !xCflmCreateChromaPred(pu, COMPONENT_Cr, predStorage[uiMode].Cr()))
+          {
+            break;
+          }
+
+          initIntraPatternChType(cu, pu.Cb());
+          initIntraPatternChType(cu, pu.Cr());
+
+          fusionStorage[uiMode * uiFusionModeNum].Cb().copyFrom(predStorage[uiMode].Cb());
+          fusionStorage[uiMode * uiFusionModeNum].Cr().copyFrom(predStorage[uiMode].Cr());
+
+          for (int32_t fusionMode = 0; fusionMode < uiFusionModeNum; fusionMode++)
+          {
+            pu.intraDir[1] = chromaIntraMode;
+            pu.isChromaFusion = fusionMode + 1;
+            int idx = uiMode * uiFusionModeNum + fusionMode;
+
+            geneChromaFusionPred(COMPONENT_Cb, fusionStorage[idx].Cb(), pu);
+            geneChromaFusionPred(COMPONENT_Cr, fusionStorage[idx].Cr(), pu);
+
+            distParamSadCb.cur = fusionStorage[idx].Cb();
+            distParamSatdCb.cur = fusionStorage[idx].Cb();
+            distParamSadCr.cur = fusionStorage[idx].Cr();
+            distParamSatdCr.cur = fusionStorage[idx].Cr();
+
+            sadCb = distParamSadCb.distFunc(distParamSadCb) * 2;
+            satdCb = distParamSatdCb.distFunc(distParamSatdCb);
+            sad = std::min(sadCb, satdCb);
+            sadCr = distParamSadCr.distFunc(distParamSadCr) * 2;
+            satdCr = distParamSatdCr.distFunc(distParamSatdCr);
+            sad += std::min(sadCr, satdCr);
+
+            fusionModeMap[idx][0] = chromaIntraMode;
+            fusionModeMap[idx][1] = fusionMode + 1;
+            satdChromaFusionCost[idx] = sad;
+            fusionModeIsEnable[idx] = true;
+          }
+        }
+      }
+
+      for (int i = 0; i < 3; i++)
+      {
+        for (int j = i + 1; j < 6; j++)
+        {
+          if (satdChromaFusionCost[j] < satdChromaFusionCost[i])
+          {
+            tempIdx = satdChromaFusionModeList[i];
+            satdChromaFusionModeList[i] = satdChromaFusionModeList[j];
+            satdChromaFusionModeList[j] = tempIdx;
+
+            tempCost = satdChromaFusionCost[i];
+            satdChromaFusionCost[i] = satdChromaFusionCost[j];
+            satdChromaFusionCost[j] = tempCost;
+          }
+        }
+      }
+
+      for (int i = 0; i < 3; i++)
+      {
+        fusionModeIsEnable[satdChromaFusionModeList[6 - 1 - i]] = false;
+      }
+#endif
+
       // RDO for chroma fusion mode
+#if JVET_AC0119_LM_CHROMA_FUSION
+      for (int32_t lstIdx = 0; lstIdx < 6; lstIdx++)
+      {
+        int iModedx = satdChromaFusionModeList[lstIdx];
+        if (!fusionModeIsEnable[iModedx])
+          break;
+
+        int chromaIntraMode = fusionModeMap[iModedx][0];
+        pu.isChromaFusion = fusionModeMap[iModedx][1];
+#else
       for (int32_t uiMode = 0; uiMode < 1; uiMode++)
       {
         int chromaIntraMode = bestNonLmMode;
@@ -3575,6 +3761,7 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         if (PU::hasChromaFusionFlag(pu, chromaIntraMode))
         {
           pu.isChromaFusion = true;
+#endif
           cs.setDecomp(pu.Cb(), false);
           cs.dist = baseDist;
           //----- restore context models -----
@@ -3582,7 +3769,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 
           //----- chroma coding -----
           pu.intraDir[1] = chromaIntraMode;
-          xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType);
+          xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType
+#if JVET_AC0119_LM_CHROMA_FUSION
+            , fusionStorage[iModedx]
+#endif
+          );
           if (lumaUsesISP && cs.dist == MAX_UINT)
           {
             continue;
@@ -3623,9 +3814,15 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
             bestGlmIdc = pu.glmIdc;
 #endif
           }
+#if !JVET_AC0119_LM_CHROMA_FUSION
         }
+#endif
       }
+#if JVET_AC0119_LM_CHROMA_FUSION
+      pu.isChromaFusion = 0;
+#else
       pu.isChromaFusion = false;
+#endif
 #endif
 
 #if JVET_Z0050_CCLM_SLOPE
@@ -3646,7 +3843,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
             pu.intraDir[1] = chromaIntraMode;
             pu.cclmOffsets = satdCclmOffsetsBest[chromaIntraMode - LM_CHROMA_IDX];
 #if JVET_Z0050_DIMD_CHROMA_FUSION
+#if JVET_AC0119_LM_CHROMA_FUSION
+            pu.isChromaFusion = 0;
+#else
             pu.isChromaFusion = false;
+#endif
 #endif
 
             // RD search replicated from above
@@ -8225,8 +8426,8 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
 }
 
 ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitioner& partitioner, const double bestCostSoFar, const PartSplit ispType 
-#if JVET_AB0143_CCCM_TS
-  , PelUnitBuf cccmStorage
+#if JVET_AB0143_CCCM_TS || JVET_AC0119_LM_CHROMA_FUSION
+  , const PelUnitBuf& predStorage
 #endif
 )
 {
@@ -8308,8 +8509,8 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
 #if JVET_AB0143_CCCM_TS
       if (pu.cs->slice->isIntra())
       {
-        piPredCb.copyFrom(cccmStorage.Cb());
-        piPredCr.copyFrom(cccmStorage.Cr());
+        piPredCb.copyFrom(predStorage.Cb());
+        piPredCr.copyFrom(predStorage.Cr());
       }
       else
       {
@@ -8341,6 +8542,15 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     }
     else
     {
+#if JVET_AC0119_LM_CHROMA_FUSION
+      if (pu.cs->slice->isIntra() && pu.isChromaFusion)
+      {
+        piPredCb.copyFrom(predStorage.Cb());
+        piPredCr.copyFrom(predStorage.Cr());
+      }
+      else
+      {
+#endif
 #if JVET_AC0071_DBV
       if (predMode == DBV_CHROMA_IDX)
       {
@@ -8362,7 +8572,10 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
         geneChromaFusionPred(COMPONENT_Cr, piPredCr, pu);
       }
 #endif
-    }
+#if JVET_AC0119_LM_CHROMA_FUSION
+      }
+#endif
+      }
 
     // determination of chroma residuals including reshaping and cross-component prediction
     //----- get chroma residuals -----

@@ -592,7 +592,7 @@ namespace PU
 #if JVET_AA0126_GLM
   bool hasGlmFlag      (const PredictionUnit &pu, const int mode = -1);
 #endif
-#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION
   void getCccmRefLineNum  (const PredictionUnit& pu, const Area area, int& th, int& tv);
 #endif
 #if JVET_AA0057_CCCM
