@@ -2335,6 +2335,13 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #endif
 #if ENABLE_DIMD
   bool dimdBlending = false;
+#if JVET_AC0098_LOC_DEP_DIMD
+#if JVET_AB0157_INTRA_FUSION
+  int dimdLocDep[DIMD_FUSION_NUM-1] = { 0 };
+#else
+  int dimdLocDep[2] = { 0 };
+#endif
+#endif
   int  dimdMode = 0;
 #if JVET_AB0157_INTRA_FUSION
   int  dimdBlendMode[DIMD_FUSION_NUM-1] = { 0 };
@@ -2371,6 +2378,17 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 
       dimdDerived = true;
       dimdBlending = cu.dimdBlending;
+#if JVET_AC0098_LOC_DEP_DIMD
+#if JVET_AB0157_INTRA_FUSION
+      for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
+      {
+        dimdLocDep[i] = cu.dimdLocDep[i];
+      }
+#else
+      dimdLocDep[0] = cu.dimdLocDep[0];
+      dimdLocDep[1] = cu.dimdLocDep[1];
+#endif
+#endif
       dimdMode = cu.dimdMode;
 #if JVET_AB0157_INTRA_FUSION
       for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
@@ -2488,6 +2506,17 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
           if( dimdDerived )
           {
             cu.dimdBlending = dimdBlending;
+#if JVET_AC0098_LOC_DEP_DIMD
+#if JVET_AB0157_INTRA_FUSION
+            for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
+            {
+              cu.dimdLocDep[i] = dimdLocDep[i];
+            }
+#else
+            cu.dimdLocDep[0] = dimdLocDep[0];
+            cu.dimdLocDep[1] = dimdLocDep[1];
+#endif
+#endif
             cu.dimdMode = dimdMode;
 #if JVET_AB0157_INTRA_FUSION
             for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )

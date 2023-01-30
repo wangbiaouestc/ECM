@@ -282,6 +282,17 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if ENABLE_DIMD
   dimd = other.dimd;
   dimdBlending = other.dimdBlending;
+#if JVET_AC0098_LOC_DEP_DIMD
+#if JVET_AB0157_INTRA_FUSION
+  for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
+  {
+    dimdLocDep[i] = other.dimdLocDep[i];
+  }
+#else
+  dimdLocDep[0] = other.dimdLocDep[0];
+  dimdLocDep[1] = other.dimdLocDep[1];
+#endif
+#endif
   dimdMode = other.dimdMode;
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   dimdChromaMode = other.dimdChromaMode;
@@ -435,6 +446,17 @@ void CodingUnit::initData()
 #if ENABLE_DIMD
   dimd = false;
   dimdBlending = false;
+#if JVET_AC0098_LOC_DEP_DIMD
+#if JVET_AB0157_INTRA_FUSION
+  for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
+  {
+    dimdLocDep[i] = 0;
+  }
+#else
+  dimdLocDep[0] = 0;
+  dimdLocDep[1] = 0;
+#endif
+#endif
   dimdMode = -1;
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   dimdChromaMode   = -1;

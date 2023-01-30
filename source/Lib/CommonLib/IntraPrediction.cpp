@@ -361,7 +361,11 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
 
   // the number of total temporal buffers can be adjusted by chaning the number here
 #if JVET_AB0157_INTRA_FUSION
+#if JVET_AC0098_LOC_DEP_DIMD
+  m_tempBuffer.resize( DIMD_FUSION_NUM+2 );
+#else
   m_tempBuffer.resize( DIMD_FUSION_NUM-1 );
+#endif
 #else
   m_tempBuffer.resize( 2 );
 #endif
@@ -1236,7 +1240,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     PelBuf predAngExtra[DIMD_FUSION_NUM-2];
     for( int i = 0; i < DIMD_FUSION_NUM-2; ++i)
     {
+#if JVET_AC0098_LOC_DEP_DIMD
+      blendModes[i] = (pu.cu->dimdBlendMode[i] != PLANAR_IDX);
+#else
       blendModes[i] = (i==0 || pu.cu->dimdBlendMode[i] != PLANAR_IDX);
+#endif
       if(blendModes[i])
       {
         predAngExtra[i] = m_tempBuffer[i + 1].getBuf( localUnitArea.Y() );
@@ -1254,6 +1262,176 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     m_ipaParam.applyPDPC = applyPdpc;
 
     // do blending
+#if JVET_AC0098_LOC_DEP_DIMD
+    PelBuf predAngNonLocDep = m_tempBuffer[7].getBuf( localUnitArea.Y() );
+    PelBuf predAngVer       = m_tempBuffer[5].getBuf( localUnitArea.Y() );
+    PelBuf predAngHor       = m_tempBuffer[6].getBuf( localUnitArea.Y() );
+
+    Pel* pelVer = predAngVer.buf;
+    int strideVer = predAngVer.stride;
+    Pel* pelHor = predAngHor.buf;
+    int strideHor = predAngHor.stride;
+    Pel *pelNonLocDep = predAngNonLocDep.buf;
+    int strideNonLocDep = predAngNonLocDep.stride;
+
+    bool useLocDepBlending = false;
+    int weightVer = 0, weightHor = 0, weightNonLocDep = 0;
+    weightNonLocDep += pu.cu->dimdRelWeight[1];
+    for (int i = 0; i < DIMD_FUSION_NUM-1; i++)
+    {
+      if (i == 0  || blendModes[i-1])
+      {
+        if (pu.cu->dimdLocDep[i] == 1)
+        {
+          weightVer += (i == 0 ? pu.cu->dimdRelWeight[0] : pu.cu->dimdRelWeight[i+ 1]);
+        }
+        else if (pu.cu->dimdLocDep[i] == 2)
+        {
+          weightHor += (i == 0 ? pu.cu->dimdRelWeight[0] : pu.cu->dimdRelWeight[i+ 1]);
+        }
+        else
+        {
+          weightNonLocDep += (i == 0 ? pu.cu->dimdRelWeight[0] : pu.cu->dimdRelWeight[i+1]);
+        }
+      }
+    }
+
+    if(weightHor || weightVer)
+    {
+      useLocDepBlending = true;
+    }
+
+    if(!useLocDepBlending)
+    {
+      pelNonLocDep = piPred.buf;
+      strideNonLocDep = piPred.stride;
+    }
+
+    for (int locDep = 0; locDep < 3; locDep++)
+    {
+      int totWeight = (locDep == 0 ? weightNonLocDep : (locDep == 1 ? weightVer : weightHor));
+      if (totWeight == 0)
+      {
+        continue;
+      }
+
+      int weights[6] = {0};
+      weights[0] =  (pu.cu->dimdLocDep[0] == locDep) ? pu.cu->dimdRelWeight[0] : 0;
+      weights[1] =  (blendModes[0] && pu.cu->dimdLocDep[1] == locDep) ? pu.cu->dimdRelWeight[2] : 0;
+      weights[2] =  (blendModes[1] && pu.cu->dimdLocDep[2] == locDep) ? pu.cu->dimdRelWeight[3] : 0;
+      weights[3] =  (blendModes[2] && pu.cu->dimdLocDep[3] == locDep) ? pu.cu->dimdRelWeight[4] : 0;
+      weights[4] =  (blendModes[3] && pu.cu->dimdLocDep[4] == locDep) ? pu.cu->dimdRelWeight[5] : 0;
+      weights[5] =  (locDep == 0) ? pu.cu->dimdRelWeight[1] : 0;
+
+      int num2blend = 0;
+      int blendIndexes[DIMD_FUSION_NUM] = {0};
+      for (int i = 0; i < DIMD_FUSION_NUM; i++)
+      {
+        if (weights[i] != 0)
+        {
+          blendIndexes[num2blend] = i;
+          num2blend++;
+        }
+      }
+#if JVET_W0123_TIMD_FUSION
+      if( (num2blend == 1 ) || (num2blend <=3 && (totWeight == (1 << (floorLog2(totWeight))) ) ))
+      {
+        int index = blendIndexes[0];    
+        if(locDep == 0)
+        {
+          pelNonLocDep = (index == 0 ? piPred.buf : (index == 5 ? planarBuffer.buf : predAngExtra[index-1].buf));
+          strideNonLocDep = (index == 0 ? piPred.stride : (index == 5 ? planarBuffer.stride : predAngExtra[index-1].stride));
+        }
+        else if(locDep == 1)
+        {
+          pelVer = (index == 0 ? piPred.buf : predAngExtra[index-1].buf);
+          strideVer = (index == 0 ? piPred.stride : predAngExtra[index-1].stride);
+        }
+        else
+        {
+          pelHor = (index == 0 ? piPred.buf : predAngExtra[index-1].buf);
+          strideHor = (index == 0 ? piPred.stride : predAngExtra[index-1].stride);
+        }
+        Pel* pCur = (locDep == 0 ? pelNonLocDep : (locDep == 1 ? pelVer : pelHor));
+        int strideCur = (locDep == 0 ? strideNonLocDep : (locDep == 1 ? strideVer : strideHor));
+
+        int factor = 64 / totWeight;
+        if (num2blend == 2)
+        {
+          int index1 = blendIndexes[1];
+          Pel* p1 = (index1 == 0 ? piPred.buf : (index1 == 5 ?  planarBuffer.buf : predAngExtra[index1-1].buf));
+          int stride1 = (index1 == 0 ? piPred.stride : (index1 == 5 ? planarBuffer.stride : predAngExtra[index1-1].stride));
+
+          int w0 = (weights[index]*factor);
+          int w1 = 64 - w0;
+          m_timdBlending(pCur, strideCur, p1, stride1, w0, w1,width, height);
+        }
+        else if(num2blend == 3)
+        {
+          int index1 = blendIndexes[1];
+          Pel* p1 = (index1 == 0 ? piPred.buf : (index1 == 5 ?  planarBuffer.buf : predAngExtra[index1-1].buf));
+          int stride1 = (index1 == 0 ? piPred.stride : (index1 == 5 ? planarBuffer.stride : predAngExtra[index1-1].stride));
+
+          int index2 = blendIndexes[2];
+          Pel* p2 = (index2 == 0 ? piPred.buf : (index2 == 5 ?  planarBuffer.buf : predAngExtra[index2-1].buf));
+          int stride2 = (index2 == 0 ? piPred.stride : (index2 == 5 ? planarBuffer.stride : predAngExtra[index2-1].stride));
+
+          int w0 = (weights[index]*factor);
+          int w1 = (weights[index1]*factor);
+          int w2 = 64  - w0 - w1;
+          m_dimdBlending(pCur, strideCur, p1, stride1, p2, stride2, w0, w1, w2, width, height);
+        }
+      }
+      else
+#endif
+      {
+        Pel* pCur = (locDep == 0 ? pelNonLocDep : (locDep == 1 ? pelVer : pelHor));
+        int strideCur = (locDep == 0 ? strideNonLocDep : (locDep == 1 ? strideVer : strideHor));
+
+        Pel *pelPredAng0 = piPred.buf;
+        Pel *pelPredAng1 = predAngExtra[0].buf;
+        Pel *pelPredAng2 = predAngExtra[1].buf;
+        Pel *pelPredAng3 = predAngExtra[2].buf;
+        Pel *pelPredAng4 = predAngExtra[3].buf;
+        Pel *pelPlanar = planarBuffer.buf;
+        int stride0 = piPred.stride;
+        int stride1 = predAngExtra[0].stride;
+        int stride2 = predAngExtra[1].stride;
+        int stride3 = predAngExtra[2].stride;
+        int stride4 = predAngExtra[3].stride;
+        int stridePlanar = planarBuffer.stride;
+        for( int y = 0; y < height; y++ )
+        {
+          for( int x = 0; x < width; x++ )
+          {
+            int blend = pelPredAng0[x] * weights[0];
+            blend += blendModes[0] ? pelPredAng1[x] * weights[1] : 0;
+            blend += blendModes[1] ? pelPredAng2[x] * weights[2] : 0;
+            blend += blendModes[2] ? pelPredAng3[x] * weights[3] : 0;
+            blend += blendModes[3] ? pelPredAng4[x] * weights[4] : 0;
+            blend += pelPlanar[x] * weights[5];
+            pCur[x] = (Pel)(blend / totWeight);
+          }
+          pCur += strideCur;
+          pelPredAng0 += stride0;
+          pelPredAng1 += stride1;
+          pelPredAng2 += stride2;
+          pelPredAng3 += stride3;
+          pelPredAng4 += stride4;
+          pelPlanar += stridePlanar;
+        }
+      }
+    }
+
+    if (useLocDepBlending)
+    {
+      int mode = ((weightHor > 0 && weightVer > 0) ? 0 : (weightVer > 0 ? 1 : 2));
+
+      Pel *pelDst = piPred.buf;
+      int strideDst = piPred.stride;
+      xDimdLocationdepBlending(pelDst, strideDst, pelVer, strideVer, pelHor, strideHor, pelNonLocDep,strideNonLocDep, width, height,mode, weightVer, weightHor, weightNonLocDep);
+    }
+#else
     const int log2WeightSum = 6;
     Pel *pelPred = piPred.buf;
     Pel *pelPlanar = planarBuffer.buf;
@@ -1273,7 +1451,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       {
         int blend = pelPred[x] * w0;
         blend += pelPlanar[x] * w1;
+#if JVET_AC0098_LOC_DEP_DIMD
+        blend += blendModes[0] ? pelPredAng[x] * w2 : 0;
+#else
         blend += pelPredAng[x] * w2;
+#endif
         blend += blendModes[1] ? pelPredAng2[x] * w3 : 0;
         blend += blendModes[2] ? pelPredAng3[x] * w4 : 0;
         blend += blendModes[3] ? pelPredAng4[x] * w5 : 0;
@@ -1287,6 +1469,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       pelPredAng3 += predAngExtra[2].stride;
       pelPredAng4 += predAngExtra[3].stride;
     }
+#endif
   }
 #else
   if (pu.cu->dimd && pu.cu->dimdBlending && isLuma(compID))
@@ -1297,9 +1480,18 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 
     PelBuf planarBuffer = m_tempBuffer[0].getBuf( localUnitArea.Y() );
     PelBuf predAng = m_tempBuffer[1].getBuf( localUnitArea.Y() );
-    xPredIntraPlanar( srcBuf, planarBuffer );
+
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    xPredIntraPlanar(srcBuf, planarBuffer, 0);
+#else
+    xPredIntraPlanar(srcBuf, planarBuffer);
+#endif
 
     const bool applyPdpc = m_ipaParam.applyPDPC;
+#if JVET_AC0098_LOC_DEP_DIMD
+    if (pu.cu->dimdBlendMode[0] != 0)
+    {
+#endif
 #if JVET_V0087_DIMD_NO_ISP   // this is pure cleanup to make code easier to read. It generates identical resut to the else part
     PredictionUnit pu2 = pu;
     pu2.intraDir[0] = pu.cu->dimdBlendMode[0];
@@ -1309,6 +1501,13 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     xPredIntraAng(srcBuf, predAng, channelType, clpRng, false);
 #else
     xPredIntraAng(srcBuf, predAng, channelType, clpRng);
+#endif
+#if JVET_AC0098_LOC_DEP_DIMD
+    }
+    else
+    {
+      predAng = piPred;
+    }
 #endif
 #else
     const bool   useISP = NOT_INTRA_SUBPARTITIONS != pu.cu->ispMode && isLuma( CHANNEL_TYPE_LUMA );//ok
@@ -1395,7 +1594,19 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #endif
 #endif
     m_ipaParam.applyPDPC = applyPdpc;
+#if JVET_AC0098_LOC_DEP_DIMD
+    if (pu.cu->dimdLocDep[0] != 0 || pu.cu->dimdLocDep[1] != 0)
+    {
+      Pel *pelPred = piPred.buf;
+      Pel *pelPlanar = planarBuffer.buf;
+      Pel *pelPredAng = predAng.buf;
+      int  wMain = pu.cu->dimdRelWeight[0], wPlanar = pu.cu->dimdRelWeight[1], wSecond = pu.cu->dimdRelWeight[2];
 
+      xDimdLocationdepBlending(pelPred, piPred.stride, pelPred, piPred.stride, pelPredAng, predAng.stride, pelPlanar, planarBuffer.stride, width, height, pu.cu->dimdLocDep[0], pu.cu->dimdLocDep[1], wMain, wSecond, wPlanar);
+    }
+    else
+    {
+#endif
     // do blending
 #if INTRA_TRANS_ENC_OPT
     Pel *pelPred = piPred.buf;
@@ -1423,6 +1634,9 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       pelPred += piPred.stride;
       pelPlanar += planarBuffer.stride;
       pelPredAng += predAng.stride;
+    }
+#endif
+#if JVET_AC0098_LOC_DEP_DIMD
     }
 #endif
   }
@@ -6463,8 +6677,13 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
   const uint32_t uiWidth = area.width;
   const uint32_t uiHeight = area.height;
   const int iStride = recoBuf.stride;
+#if JVET_AC0098_LOC_DEP_DIMD
+  const int predSize = uiWidth + 1;
+  const int predHSize = uiHeight + 1;
+#else
   const int predSize = (uiWidth << 1);
   const int predHSize = (uiHeight << 1);
+#endif
 
   const bool noShift = pcv.noChroma2x2 && uiWidth == 4; // don't shift on the lowest level (chroma not-split)
   const int  unitWidth = pcv.minCUWidth >> (noShift ? 0 : getComponentScaleX(area.compID, sps.getChromaFormatIdc()));
@@ -6488,41 +6707,65 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
 
   int numIntraAbove = isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1));
   int numIntraLeft = isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1));
-#if JVET_AC0094_REF_SAMPLES_OPT
+#if JVET_AC0094_REF_SAMPLES_OPT || JVET_AC0098_LOC_DEP_DIMD
   const int numIntraAboveRight = isAboveRightAvailable(cu, chType, area.topRight(), numAboveRightUnits, unitWidth, neighborFlags + totalLeftUnits + 1 + numAboveUnits);
   const int numIntraBottomLeft = isBelowLeftAvailable(cu, chType, area.bottomLeft(), numLeftBelowUnits, unitHeight, neighborFlags + totalLeftUnits - 1 - numLeftUnits);
 #endif
 
   // ----- Step 2: build histogram of gradients -----
+#if JVET_AC0098_LOC_DEP_DIMD
+  int histogramTop[NUM_LUMA_MODE] = { 0 };
+  int histogramLeft[NUM_LUMA_MODE] = { 0 };
+
+  int histogramTopLeft[NUM_LUMA_MODE] = { 0 };
+#endif
   int histogram[NUM_LUMA_MODE] = { 0 };
 
   if (numIntraLeft)
   {
-#if JVET_AC0094_REF_SAMPLES_OPT
+#if JVET_AC0094_REF_SAMPLES_OPT || JVET_AC0098_LOC_DEP_DIMD
     const uint32_t uiHeightLeft = (numIntraLeft + numIntraBottomLeft) * unitHeight - 1 - (!numIntraAbove ? 1 : 0);
 #else
     uint32_t uiHeightLeft = numIntraLeft * unitHeight - 1 - (!numIntraAbove ? 1 : 0);
 #endif
     const Pel *pRecoLeft = pReco - 2 + iStride * (!numIntraAbove ? 1 : 0);
+#if JVET_AC0098_LOC_DEP_DIMD
+    buildHistogram(pRecoLeft, iStride, uiHeightLeft, 1, histogramLeft, 1, uiWidth, uiHeight);
+#else
     buildHistogram(pRecoLeft, iStride, uiHeightLeft, 1, histogram, 1, uiWidth, uiHeight);
+#endif
   }
 
   if (numIntraAbove)
   {
-#if JVET_AC0094_REF_SAMPLES_OPT
+#if JVET_AC0094_REF_SAMPLES_OPT || JVET_AC0098_LOC_DEP_DIMD
     const uint32_t uiWidthAbove = (numIntraAbove + numIntraAboveRight)*unitWidth - 1 - (!numIntraLeft ? 1 : 0);
 #else
     uint32_t uiWidthAbove = numIntraAbove * unitWidth - 1 - (!numIntraLeft ? 1 : 0);
 #endif
     const Pel *pRecoAbove = pReco - iStride * 2 + (!numIntraLeft ? 1 : 0);
+#if JVET_AC0098_LOC_DEP_DIMD
+    buildHistogram(pRecoAbove, iStride, 1, uiWidthAbove, histogramTop, 2, uiWidth, uiHeight);
+#else
     buildHistogram(pRecoAbove, iStride, 1, uiWidthAbove, histogram, 2, uiWidth, uiHeight);
+#endif
   }
 
   if (numIntraLeft && numIntraAbove)
   {
     const Pel *pRecoAboveLeft = pReco - 2 - iStride * 2;
+#if JVET_AC0098_LOC_DEP_DIMD
+    buildHistogram(pRecoAboveLeft, iStride, 2, 2, histogramTopLeft, 3, uiWidth, uiHeight);
+#else
     buildHistogram(pRecoAboveLeft, iStride, 2, 2, histogram, 3, uiWidth, uiHeight);
+#endif
   }
+#if JVET_AC0098_LOC_DEP_DIMD
+  for (int i = 0; i < NUM_LUMA_MODE; i++)
+  {
+    histogram[i] = histogramTop[i] + histogramLeft[i] + histogramTopLeft[i];
+  }
+#endif
 
 #if JVET_AB0157_INTRA_FUSION
   int amp[DIMD_FUSION_NUM-1] = { 0 };
@@ -6549,12 +6792,51 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
     }
   }
 
+#if JVET_AC0098_LOC_DEP_DIMD
+  for (int i = 0; i < DIMD_FUSION_NUM - 1; i++)
+  {
+    cu.dimdLocDep[i] = 0;
+  }
+  for(int i = 0; i < DIMD_FUSION_NUM - 1; i++)
+  {
+    int secondMode = mode[i];
+    if (secondMode > DC_IDX)
+    {
+      cu.dimdLocDep[i] = 0;
+
+      int ampSecond = histogram[secondMode];
+      int ampSecondLeft = histogramLeft[secondMode];
+      int ampSecondAbove = histogramTop[secondMode];
+        
+      if (ampSecondLeft < (ampSecond / 3))
+      {
+        cu.dimdLocDep[i] = 1;
+      }
+      else if (ampSecondAbove < (ampSecond / 3))
+      {
+        cu.dimdLocDep[i] = 2;
+      }
+    }
+  }
+#endif
+
+
   cu.dimdMode = mode[0];
 
   cu.dimdBlending = true;
   cu.dimdBlending &= amp[1] > 0;
   cu.dimdBlending &= mode[1] > DC_IDX;
   cu.dimdBlending &= mode[0] > DC_IDX;
+
+#if JVET_AC0098_LOC_DEP_DIMD
+  if (cu.dimdLocDep[0] != 0 && amp[1] == 0)
+  {
+    cu.dimdBlending = true;
+    cu.dimdBlending &= mode[0] > DC_IDX;
+    mode[1] = 0;
+    CHECK( mode[2] != 0, "Wrong logic" );
+  } 
+#endif
 
   int countBlendMode = 2;
 
@@ -6582,6 +6864,20 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
   {
 #if JVET_X0149_TIMD_DIMD_LUT
     int g_gradDivTable[16] = { 0, 7, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0 };
+#if JVET_AC0098_LOC_DEP_DIMD
+    if (mode[1] == 0)
+    {    
+      CHECK( cu.dimdLocDep[0] == 0, "Wrong logic" );
+      cu.dimdRelWeight[0] = sumWeight - 21;
+      cu.dimdRelWeight[1] = 21;
+      cu.dimdRelWeight[2] = 0;
+      cu.dimdRelWeight[3] = 0;
+      cu.dimdRelWeight[4] = 0;
+      cu.dimdRelWeight[5] = 0;
+    }
+    else
+    {
+#endif
     sumWeight = sumWeight - dimdPlanarWeight;
     int s1 = 0;
     for (int i = 0; i < DIMD_FUSION_NUM - 1; i++)
@@ -6616,19 +6912,86 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
     int iRatio = static_cast<int>(dRatio * sumWeight);
 #endif
     cu.dimdRelWeight[0] = iRatio[0];
+#if JVET_AC0098_LOC_DEP_DIMD
+    int sumWeightReal = iRatio[0];
+    int countBlendModeNew = countBlendMode;
+    bool adjustWeights = false;
+    int lastFilled = 0;
+#endif
     for (int i = 1; i < countBlendMode - 2; i++)
     {
       cu.dimdRelWeight[i+1] = iRatio[i];
+#if JVET_AC0098_LOC_DEP_DIMD
+      sumWeightReal += iRatio[i];
+      if(sumWeightReal > sumWeight)
+      {
+        lastFilled = i;
+        break;
+      }
+#endif
     }
+#if JVET_AC0098_LOC_DEP_DIMD
+    if(sumWeightReal > sumWeight)
+    {
+      for (int i = lastFilled + 1; i <= countBlendMode - 2; i++)
+      {
+        iRatio[i] = 0;
+        cu.dimdBlendMode[i - 1] = 0;
+        countBlendModeNew--;  
+      }
+    }
+    if(adjustWeights)
+    {
+      iRatio[countBlendMode - 2] = 0;
+      cu.dimdRelWeight[countBlendMode - 1] = 0;
+      cu.dimdBlendMode[countBlendMode-3] = 0;
+    }
+    countBlendMode = countBlendModeNew;
+    if (sumWeightReal > sumWeight)
+    {
+      int diff = sumWeightReal - sumWeight;
+      for (int j = 0; j < sumWeight; j++)
+      {
+        for (int i = lastFilled; i >= 1; i--)
+        {
+          cu.dimdRelWeight[i+1] -=1;
+          iRatio[i] -=1;
+          if (cu.dimdRelWeight[i+1] == 0)
+          {
+            cu.dimdBlendMode[i-1] = 0;
+            countBlendMode--;
+          }
+          diff--;
+          if(diff == 0)
+          {
+            break;
+          }
+        }
+        if(diff == 0)
+        {
+          break;
+        }
+      }
+    }
+#endif
     cu.dimdRelWeight[countBlendMode-1] = sumWeight;
     for (int i = 0; i < countBlendMode - 2; i++)
     {
       cu.dimdRelWeight[countBlendMode-1] = cu.dimdRelWeight[countBlendMode-1] - iRatio[i];
+#if JVET_AC0098_LOC_DEP_DIMD
+      if (cu.dimdRelWeight[countBlendMode-1] == 0)
+      {
+        cu.dimdBlendMode[countBlendMode-3] = 0;
+      }
+#endif
     }
 #if JVET_X0149_TIMD_DIMD_LUT
     cu.dimdRelWeight[1] = dimdPlanarWeight;
 #else
     cu.dimdRelWeight[1] = (1 << blendSumWeight) - sumWeight;
+#endif
+#if JVET_AC0098_LOC_DEP_DIMD
+    }
 #endif
   }
   else
@@ -6664,6 +7027,55 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
     }
   }
 
+#if JVET_AC0098_LOC_DEP_DIMD
+  cu.dimdLocDep[0] = 0;
+  cu.dimdLocDep[1] = 0;
+
+  if (firstMode > DC_IDX)
+  {
+    cu.dimdLocDep[0] = 0;
+
+    int ampFirst = histogram[firstMode];
+    int ampFirstLeft = histogramLeft[firstMode];
+    int ampFirstAbove = histogramTop[firstMode];
+
+    if (ampFirstLeft == 0)
+    {
+      cu.dimdLocDep[0] = 1;
+    }  
+    else if (ampFirstAbove == 0)
+    {
+      cu.dimdLocDep[0] = 2;
+    }
+    else if (ampFirstLeft < (ampFirst / 3))
+    {
+      cu.dimdLocDep[0] = 3;
+    }
+    else if (ampFirstAbove < (ampFirst / 3))
+    {
+      cu.dimdLocDep[0] = 4;
+    }
+  }
+
+  if (secondMode > DC_IDX)
+  {
+    cu.dimdLocDep[1] = 0;
+
+    int ampSecond = histogram[secondMode];
+    int ampSecondLeft = histogramLeft[secondMode];
+    int ampSecondAbove = histogramTop[secondMode];
+
+    if  (ampSecondLeft < (ampSecond / 3))
+    {
+      cu.dimdLocDep[1] = 1;
+    }
+    else if (ampSecondAbove < (ampSecond / 3))
+    {
+      cu.dimdLocDep[1] = 2;
+    }
+  }
+#endif
+
   // ----- Step 3: derive best mode from histogram of gradients -----
   cu.dimdMode = firstMode;
 
@@ -6671,6 +7083,15 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
   cu.dimdBlending &= secondAmp > 0;
   cu.dimdBlending &= secondMode > DC_IDX;
   cu.dimdBlending &= firstMode > DC_IDX;
+
+#if JVET_AC0098_LOC_DEP_DIMD
+  if (cu.dimdLocDep[0] != 0 && secondMode == 0)
+  {
+    cu.dimdBlending = true;
+    cu.dimdBlending &= firstMode > DC_IDX;
+    secondAmp = 0;
+  } 
+#endif
 
   if( cu.dimdBlending )
   {
@@ -6687,6 +7108,16 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
 #endif
   if (cu.dimdBlending)
   {
+#if JVET_AC0098_LOC_DEP_DIMD
+    if (secondMode == 0)
+    {
+      cu.dimdRelWeight[0] = sumWeight - planarWeight;
+      cu.dimdRelWeight[2] = 0;
+      cu.dimdRelWeight[1] = planarWeight;
+    }
+    else
+    {
+#endif
 #if JVET_X0149_TIMD_DIMD_LUT
     sumWeight = sumWeight - planarWeight;
     int s0 = firstAmp;
@@ -6720,6 +7151,9 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
     cu.dimdRelWeight[1] = planarWeight;
 #else
     cu.dimdRelWeight[1] = (1 << blendSumWeight) - sumWeight;
+#endif
+#if JVET_AC0098_LOC_DEP_DIMD
+    }
 #endif
   }
   else
@@ -7021,6 +7455,399 @@ int IntraPrediction::buildHistogram(const Pel *pReco, int iStride, uint32_t uiHe
   }
   return 0;
 }
+
+#if JVET_AC0098_LOC_DEP_DIMD
+#if JVET_AB0157_INTRA_FUSION
+void xDimdLocationdepBlending(Pel *pDst, int strideDst, Pel *pVer, int strideVer, Pel *pHor, int strideHor,Pel *pNonLocDep, int strideNonLocDep, int width, int height, int mode, int wVer, int wHor, int wNonLocDep)
+{
+  int maxWeight = (1 << 6);
+  int weightShift = 6;
+  int weightOffset = 1 << (weightShift - 1);
+  int fixedRange = 10;
+  int sizeThreshold = 64;
+  int heightMinusOne = (height - 1);
+  int widthMinusOne = (width - 1);
+  if (mode == 0) // diagonal blending
+  {
+    int clipRangeVer = 64;
+    int clipRangeHor = 64;
+    {
+      int totRange = wNonLocDep;
+      int totDirWeight = wVer + wHor;
+      clipRangeVer = wVer +  (int)(((double)wVer / (double)totDirWeight)* (double)totRange);
+      clipRangeHor = wHor +  (int)(((double)wHor / (double)totDirWeight)* (double)totRange);
+    }
+    int rangeVer = fixedRange;
+    int rangeHor = fixedRange;  
+
+    if(height > sizeThreshold) 
+    {
+      rangeVer *= 2;
+    }
+    if(width > sizeThreshold)
+    {
+      rangeHor *= 2;
+    }
+
+    bool needClipVer = (((wVer + rangeVer) > clipRangeVer) || ((wVer - rangeVer) < 0));
+    bool needClipHor = (((wHor + rangeHor) > clipRangeHor) || ((wHor - rangeHor) < 0));
+    if(needClipVer && needClipHor)
+    {
+      for (int y = 0; y < height; y++)
+      {
+        int weightVer = Clip3(0, clipRangeVer, (((wVer + rangeVer) * heightMinusOne - ((rangeVer*y) << 1)) / heightMinusOne));
+        for (int x = 0; x < width; x++)
+        {
+          int weightHor =  Clip3(0, clipRangeHor, (((wHor + rangeHor) * widthMinusOne - ((rangeHor*x) << 1)) / widthMinusOne));
+          int weightNonLocDep =  maxWeight - weightVer - weightHor;
+          int blend = (int)pVer[x]  * weightVer + (int)pHor[x]  * weightHor + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pVer += strideVer;
+        pHor += strideHor;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+    else if (needClipVer)
+    {
+      for (int y = 0; y < height; y++)
+      {
+        int weightVer = Clip3(0, clipRangeVer, (((wVer + rangeVer) * heightMinusOne - ((rangeVer*y) << 1)) / heightMinusOne));
+        for (int x = 0; x < width; x++)
+        {
+          int weightHor =  (((wHor + rangeHor) * widthMinusOne - ((rangeHor*x) << 1)) / widthMinusOne);
+          int weightNonLocDep =  maxWeight - weightVer - weightHor;
+          int blend = (int)pVer[x]  * weightVer + (int)pHor[x]  * weightHor + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pVer += strideVer;
+        pHor += strideHor;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+    else if(needClipHor)
+    {
+      for (int y = 0; y < height; y++)
+      {
+        int weightVer =  (((wVer + rangeVer) * heightMinusOne - ((rangeVer*y) << 1)) / heightMinusOne);
+        for (int x = 0; x < width; x++)
+        {
+          int weightHor =  Clip3(0, clipRangeHor, (((wHor + rangeHor) * widthMinusOne - ((rangeHor*x) << 1)) / widthMinusOne));
+          int weightNonLocDep =  maxWeight - weightVer - weightHor;
+          int blend = (int)pVer[x]  * weightVer + (int)pHor[x]  * weightHor + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pVer += strideVer;
+        pHor += strideHor;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+    else
+    {
+      for (int y = 0; y < height; y++)
+      {
+        int weightVer =  (((wVer + rangeVer) * heightMinusOne - ((rangeVer*y) << 1)) / heightMinusOne);
+        for (int x = 0; x < width; x++)
+        {
+          int weightHor =  (((wHor + rangeHor) * widthMinusOne - ((rangeHor*x) << 1)) / widthMinusOne);
+          int weightNonLocDep =  maxWeight - weightVer - weightHor;
+          int blend = (int)pVer[x]  * weightVer + (int)pHor[x]  * weightHor + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pVer += strideVer;
+        pHor += strideHor;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+  }
+  else if(mode == 1) //ver blending
+  {
+    int clipRangeVer = 64; 
+    int rangeVer = fixedRange;
+
+    if(height > sizeThreshold)
+    {
+      rangeVer *= 2;
+    }
+    bool needClipVer = (((wVer + rangeVer) > clipRangeVer) || ((wVer - rangeVer) < 0));
+
+    if (needClipVer)
+    {
+      for (int y = 0; y < height; y++)
+      {
+        int weightVer = Clip3(0, clipRangeVer, (((wVer + rangeVer) * heightMinusOne - ((rangeVer*y) << 1)) / heightMinusOne));
+        for (int x = 0; x < width; x++)
+        {
+          int weightNonLocDep =  maxWeight - weightVer;
+          int blend = (int)pVer[x]  * weightVer + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pVer += strideVer;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+    else
+    {
+      for (int y = 0; y < height; y++)
+      {
+        int weightVer = (((wVer + rangeVer) * heightMinusOne - ((rangeVer*y) << 1)) / heightMinusOne);
+        for (int x = 0; x < width; x++)
+        {
+          int weightNonLocDep =  maxWeight - weightVer;
+          int blend = (int)pVer[x]  * weightVer + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pVer += strideVer;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+  }
+  else// if(mode == 2) //ver blending
+  {
+    int clipRangeHor = 64; 
+    int rangeHor = fixedRange;
+
+    if(width > sizeThreshold)
+    {
+      rangeHor *= 2;
+    }
+    bool needClipHor = (((wHor + rangeHor) > clipRangeHor) || ((wHor - rangeHor) < 0));
+
+    if (needClipHor)
+    {
+      for (int y = 0; y < height; y++)
+      {
+        for (int x = 0; x < width; x++)
+        {
+          int weightHor =  Clip3(0, clipRangeHor, (((wHor + rangeHor) * widthMinusOne - ((rangeHor*x) << 1)) / widthMinusOne));
+          int weightNonLocDep =  maxWeight - weightHor;
+          int blend = (int)pHor[x]  * weightHor + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pHor += strideHor;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+    else
+    {
+      for (int y = 0; y < height; y++)
+      {
+        for (int x = 0; x < width; x++)
+        {
+          int weightHor =  (((wHor + rangeHor) * widthMinusOne - ((rangeHor*x) << 1)) / widthMinusOne);
+          int weightNonLocDep =  maxWeight - weightHor;
+          int blend = (int)pHor[x]  * weightHor + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pHor += strideHor;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+  }
+}
+#else
+void xDimdLocationdepBlending(Pel *pDst, int strideDst, Pel *pMainAng, int strideMainAng, Pel *pSecondAng, int strideSecondAng,Pel *pPlanar, int stridePlanar, int width, int height, int sideMain, int sideSecond, int wMain, int wSecond, int wPlanar)
+{
+  int smallerWeightsTh = 2;
+
+  int maxWeight = (1 << 6);
+  int weightShift = 6;
+  int weightOffset = 32;
+
+  if(sideMain != 0 && sideSecond != 0)
+  {
+    wPlanar += 8;
+    wMain -= 4;
+    wSecond = 64 - wMain - wPlanar;
+  }
+
+  int weightMain = wMain;
+  int weightSecond = wSecond; 
+  int weightPlanar = wPlanar; 
+
+  int mainRange = 0, secondRange = 0;
+  
+
+  if(sideMain != 0)
+  {
+    int tempRange = (sideSecond == 0 ? 20 : 15);
+    mainRange = (weightMain < tempRange) ? weightMain : tempRange;
+    if(sideMain > smallerWeightsTh)
+    {
+      int tempRange = (sideSecond == 0 ? 10 : 5);
+      mainRange = (weightMain < tempRange) ? weightMain : tempRange;
+      sideMain -= smallerWeightsTh;
+    }
+    mainRange = Clip3(0, (64 - wMain), mainRange);
+  }
+  if(sideSecond != 0)
+  {
+    int tempRange = (sideMain == 0 ? 10 : 5);
+    secondRange = (weightSecond < tempRange) ? weightSecond : tempRange;
+    if(sideSecond > smallerWeightsTh)
+    {
+      sideSecond -= smallerWeightsTh;
+    }
+    secondRange = Clip3(0, (64 - wSecond), secondRange);
+  }
+  int blend;
+    
+  if(sideMain == 1 && sideSecond == 0)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      weightMain = ((wMain + mainRange) * (height - 1) - ((mainRange*y) << 1)) / (height - 1);
+      weightPlanar = wPlanar + (( wMain - weightMain ) >> 1);
+      weightSecond = maxWeight - weightMain - weightPlanar;
+      for (int x = 0; x < width; x++)
+      {
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+  else if(sideMain == 2 && sideSecond == 0)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        weightMain = ((wMain + mainRange) * (width - 1) - ((mainRange*x) << 1)) / (width - 1);
+        weightPlanar = wPlanar + (( wMain - weightMain ) >> 1);
+        weightSecond = maxWeight - weightMain - weightPlanar;
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+  else if(sideMain == 0 && sideSecond == 1)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      weightSecond = ((wSecond + secondRange) * (height - 1) - ((secondRange*y) << 1)) / (height - 1);
+      weightPlanar = wPlanar + (( wSecond - weightSecond ) >> 1);
+      weightMain = maxWeight - weightSecond - weightPlanar;
+      for (int x = 0; x < width; x++)
+      {
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+  else if(sideMain == 0 && sideSecond == 2)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        weightSecond = ((wSecond + secondRange) * (width - 1) - ((secondRange*x) << 1)) / (width - 1);
+        weightPlanar = wPlanar + (( wSecond - weightSecond ) >> 1);
+        weightMain = maxWeight - weightSecond - weightPlanar;
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+  else if(sideMain == 1 && sideSecond == 1)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      weightMain = ((wMain + mainRange) * (height - 1) - ((mainRange*y) << 1)) / (height - 1);
+      weightSecond = ((wSecond + secondRange) * (height - 1) - ((secondRange*y) << 1)) / (height - 1);
+      weightPlanar =  maxWeight - weightSecond - weightMain;
+      for (int x = 0; x < width; x++)
+      {
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+  else if(sideMain == 1 && sideSecond == 2)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      weightMain = ((wMain + mainRange) * (height - 1) - ((mainRange*y) << 1)) / (height - 1);
+      for (int x = 0; x < width; x++)
+      {
+        weightSecond = ((wSecond + secondRange) * (width - 1) - ((secondRange*x) << 1)) / (width - 1);
+        weightPlanar =  maxWeight - weightSecond - weightMain;
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+  else if(sideMain == 2 && sideSecond == 1)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      weightSecond = ((wSecond + secondRange) * (height - 1) - ((secondRange*y) << 1)) / (height - 1);
+      for (int x = 0; x < width; x++)
+      {
+        weightMain = ((wMain + mainRange) * (width - 1) - ((mainRange*x) << 1)) / (width - 1);
+        weightPlanar =  maxWeight - weightSecond - weightMain;
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+  else if(sideMain == 2 && sideSecond == 2)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        weightMain = ((wMain + mainRange) * (width - 1) - ((mainRange*x) << 1)) / (width - 1);
+        weightSecond = ((wSecond + secondRange) * (width - 1) - ((secondRange*x) << 1)) / (width - 1);
+        weightPlanar =  maxWeight - weightSecond - weightMain;
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+}
+#endif
+#endif
+
 #if INTRA_TRANS_ENC_OPT
 void IntraPrediction::dimdBlending(Pel *pDst, int strideDst, Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int w2, int width, int height)
 {
