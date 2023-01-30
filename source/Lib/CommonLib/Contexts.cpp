@@ -3181,7 +3181,19 @@ const CtxSet ContextSetCfg::GlmFlags = ContextSetCfg::addCtxSet
 #if JVET_AA0057_CCCM
 const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
 ({
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING  
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING && JVET_AC0054_GLCCCM
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+  { DWE, DWE, DWE, },
+  { DWE, DWE, DWE, },
+  { DWE, DWE, DWE, },
+  { DWO, DWO, DWO, },
+  { DWO, DWO, DWO, },
+#elif JVET_AC0147_CCCM_NO_SUBSAMPLING || JVET_AC0054_GLCCCM
   { CNU, CNU, },
   { CNU, CNU, },
   { CNU, CNU, },
@@ -4867,7 +4879,14 @@ const CtxSet ContextSetCfg::GlmFlags = ContextSetCfg::addCtxSet
 #if JVET_AA0057_CCCM
 const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
 ({
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING && JVET_AC0054_GLCCCM
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+#elif JVET_AC0147_CCCM_NO_SUBSAMPLING || JVET_AC0054_GLCCCM
   { CNU, CNU, },
   { CNU, CNU, },
   { CNU, CNU, },
@@ -6056,7 +6075,12 @@ const CtxSet ContextSetCfg::GlmFlags = ContextSetCfg::addCtxSet
 #if JVET_AA0057_CCCM
 const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
 ({
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING && JVET_AC0054_GLCCCM
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { DWS, DWS, DWS, },
+#elif JVET_AC0147_CCCM_NO_SUBSAMPLING || JVET_AC0054_GLCCCM
   { CNU, CNU, },
   { CNU, CNU, },
   { CNU, CNU, },
