@@ -335,6 +335,13 @@ struct CodingUnit : public UnitArea
 #if ENABLE_DIMD
   bool           dimd;
   bool           dimdBlending;
+#if JVET_AC0098_LOC_DEP_DIMD
+#if JVET_AB0157_INTRA_FUSION
+  int            dimdLocDep[DIMD_FUSION_NUM-1];
+#else
+  int            dimdLocDep[2];
+#endif
+#endif
   int8_t         dimdMode;
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   int8_t         dimdChromaMode;
