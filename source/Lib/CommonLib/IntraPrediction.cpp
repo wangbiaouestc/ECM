@@ -10830,7 +10830,10 @@ void IntraPrediction::xCccmApplyModel(const PredictionUnit& pu, const ComponentI
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   CHECK( pu.cccmNoSubFlag, "cccmNoSubFlag shall be disabled" );
 #endif
-
+#if JVET_AC0054_GLCCCM
+  int refSizeX   = m_cccmBlkArea.x - m_cccmRefArea.x; // Reference lines available left and above
+  int refSizeY   = m_cccmBlkArea.y - m_cccmRefArea.y;
+#endif
   CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu);
 
   for (int y = 0; y < refLumaBlk.height; y++)
@@ -10847,6 +10850,30 @@ void IntraPrediction::xCccmApplyModel(const PredictionUnit& pu, const ComponentI
       }
       
       // 7-tap cross
+#if JVET_AC0054_GLCCCM
+      if (!pu.glCccmFlag)
+      {
+        samples[0] = refLumaBlk.at( x  , y   ); // C
+        samples[1] = refLumaBlk.at( x  , y-1 ); // N
+        samples[2] = refLumaBlk.at( x  , y+1 ); // S
+        samples[3] = refLumaBlk.at( x-1, y   ); // W
+        samples[4] = refLumaBlk.at( x+1, y   ); // E
+        samples[5] = cccmModel.nonlinear( refLumaBlk.at( x, y) );
+        samples[6] = cccmModel.bias();
+      }
+      else
+      {
+        samples[0] = refLumaBlk.at( x  , y   ); // C
+        samples[1] = (2 * refLumaBlk.at( x  , y-1 ) + refLumaBlk.at( x-1  , y-1 ) + refLumaBlk.at( x+1  , y-1 ))
+          -(2 * refLumaBlk.at( x  , y+1 ) + refLumaBlk.at( x-1  , y+1 ) + refLumaBlk.at( x+1  , y+1 )); // Vertical gradient
+        samples[2] = (2 * refLumaBlk.at( x-1, y   ) + refLumaBlk.at( x-1  , y-1 ) + refLumaBlk.at( x-1  , y+1 ))
+          -(2 * refLumaBlk.at( x+1, y   ) + refLumaBlk.at( x+1  , y-1 ) + refLumaBlk.at( x+1  , y+1 )); // Horizontal gradient
+        samples[3] = ((y + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+        samples[4] = ((x + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+        samples[5] = cccmModel.nonlinear( refLumaBlk.at( x, y) );
+        samples[6] = cccmModel.bias();
+      }
+#else
       samples[0] = refLumaBlk.at( x  , y   ); // C
       samples[1] = refLumaBlk.at( x  , y-1 ); // N
       samples[2] = refLumaBlk.at( x  , y+1 ); // S
@@ -10854,7 +10881,8 @@ void IntraPrediction::xCccmApplyModel(const PredictionUnit& pu, const ComponentI
       samples[4] = refLumaBlk.at( x+1, y   ); // E
       samples[5] = cccmModel.nonlinear( refLumaBlk.at( x, y) );
       samples[6] = cccmModel.bias();
-
+#endif
+        
       piPred.at(x, y) = ClipPel<Pel>( cccmModel.convolve(samples), clpRng );
     }
   }
@@ -10924,6 +10952,30 @@ void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel<CCCM_N
       }
 
       // 7-tap cross
+#if JVET_AC0054_GLCCCM
+      if (!pu.glCccmFlag)
+      {
+        A[0][sampleNum] = refLuma.at( x  , y   ); // C
+        A[1][sampleNum] = refLuma.at( x  , y-1 ); // N
+        A[2][sampleNum] = refLuma.at( x  , y+1 ); // S
+        A[3][sampleNum] = refLuma.at( x-1, y   ); // W
+        A[4][sampleNum] = refLuma.at( x+1, y   ); // E
+        A[5][sampleNum] = cccmModelCb.nonlinear( refLuma.at( x, y) );
+        A[6][sampleNum] = cccmModelCb.bias();
+      }
+      else
+      {
+        A[0][sampleNum] = refLuma.at( x  , y   ); // C
+        A[1][sampleNum] = (2 * refLuma.at( x  , y-1 ) + refLuma.at( x-1  , y-1 ) + refLuma.at( x+1  , y-1 ))
+                           -(2 * refLuma.at( x  , y+1 ) + refLuma.at( x-1  , y+1 ) + refLuma.at( x+1  , y+1 )); // Vertical gradient
+        A[2][sampleNum] = (2 * refLuma.at( x-1, y   ) + refLuma.at( x-1  , y-1 ) + refLuma.at( x-1  , y+1 ))
+                           -(2 * refLuma.at( x+1, y   ) + refLuma.at( x+1  , y-1 ) + refLuma.at( x+1  , y+1 )); // Horizontal gradient
+        A[3][sampleNum] = ((y + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+        A[4][sampleNum] = ((x + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+        A[5][sampleNum] = cccmModelCb.nonlinear( refLuma.at( x, y) );
+        A[6][sampleNum] = cccmModelCb.bias();
+      }
+#else
       A[0][sampleNum] = refLuma.at( x  , y   ); // C
       A[1][sampleNum] = refLuma.at( x  , y-1 ); // N
       A[2][sampleNum] = refLuma.at( x  , y+1 ); // S
@@ -10931,7 +10983,8 @@ void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel<CCCM_N
       A[4][sampleNum] = refLuma.at( x+1, y   ); // E
       A[5][sampleNum] = cccmModelCb.nonlinear( refLuma.at( x, y) );
       A[6][sampleNum] = cccmModelCb.bias();
-
+#endif
+        
       YCb[sampleNum]   = recoCb.at(refPosPicX + x, refPosPicY + y);
       YCr[sampleNum++] = recoCr.at(refPosPicX + x, refPosPicY + y);
     }

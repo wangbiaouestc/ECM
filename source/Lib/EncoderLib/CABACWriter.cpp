@@ -2258,9 +2258,21 @@ void CABACWriter::cccmFlag(const PredictionUnit& pu)
   {
     m_BinEncoder.encodeBin( pu.cccmFlag ? 1 : 0, Ctx::CccmFlag( 0 ) );
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
-    if ( pu.cccmFlag && ( pu.cs->sps->getUseCccm() == 2 ) ) 
+    if ( pu.cccmFlag && ( pu.cs->sps->getUseCccm() == 2 ) )
     {
       m_BinEncoder.encodeBin( pu.cccmNoSubFlag ? 1 : 0, Ctx::CccmFlag( 1 ) );
+    }
+#endif
+#if JVET_AC0054_GLCCCM
+#if !JVET_AC0147_CCCM_NO_SUBSAMPLING
+    unsigned ctxId = 1;
+    if (pu.cccmFlag)
+#else
+    unsigned ctxId = 2;
+    if (pu.cccmFlag && !pu.cccmNoSubFlag)
+#endif
+    {
+      m_BinEncoder.encodeBin( pu.glCccmFlag ? 1 : 0, Ctx::CccmFlag( ctxId ) );
     }
 #endif
   }

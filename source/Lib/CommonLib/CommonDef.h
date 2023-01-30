@@ -1001,14 +1001,26 @@ static const int CCCM_DECIM_BITS          = 22;
 static const int CCCM_DECIM_ROUND         = ( 1 << (CCCM_DECIM_BITS - 1 ) );
 #if JVET_AB0143_CCCM_TS
 #if MMLM
+#if JVET_AC0054_GLCCCM
+static const int CCCM_NUM_MODES           = 12;
+#else
+static const int CCCM_NUM_MODES           = 6;
+#endif
+#else
+#if JVET_AC0054_GLCCCM
 static const int CCCM_NUM_MODES           = 6;
 #else
 static const int CCCM_NUM_MODES           = 3;
 #endif
 #endif
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
 static const int CCCM_NO_SUB_NUM_PARAMS   = 11;
 static const double CCCM_NO_SUB_WEIGHT    = 1.1; 
+#endif
+#if JVET_AC0054_GLCCCM
+static const int CCCM_LOC_SHIFT           = 3;
+static const int CCCM_LOC_OFFSET          = (1 << CCCM_LOC_SHIFT);
 #endif
 #endif
 

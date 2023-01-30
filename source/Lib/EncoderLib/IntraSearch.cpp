@@ -2575,6 +2575,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
     int      cccmNoSubBest = 0;
 #endif
+#if JVET_AC0054_GLCCCM
+    int      glCccmBest = 0;
+#endif
 #endif
 #if JVET_Z0050_CCLM_SLOPE
     CclmOffsets bestCclmOffsets = {};
@@ -2933,11 +2936,25 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 
 #if JVET_AB0143_CCCM_TS
 #if MMLM
+#if JVET_AC0054_GLCCCM
+      uint32_t chromaCandCccmModes[CCCM_NUM_MODES] = { LM_CHROMA_IDX, MDLM_L_IDX, MDLM_T_IDX, MMLM_CHROMA_IDX, MMLM_L_IDX, MMLM_T_IDX
+                                                     , LM_CHROMA_IDX, MDLM_L_IDX, MDLM_T_IDX, MMLM_CHROMA_IDX, MMLM_L_IDX, MMLM_T_IDX };
+#else
       uint32_t chromaCandCccmModes[CCCM_NUM_MODES] = { LM_CHROMA_IDX, MDLM_L_IDX, MDLM_T_IDX, MMLM_CHROMA_IDX, MMLM_L_IDX, MMLM_T_IDX };
+#endif
+#else
+#if JVET_AC0054_GLCCCM
+      uint32_t chromaCandCccmModes[CCCM_NUM_MODES] = { LM_CHROMA_IDX, MDLM_L_IDX, MDLM_T_IDX
+                                                     , LM_CHROMA_IDX, MDLM_L_IDX, MDLM_T_IDX };
 #else
       uint32_t chromaCandCccmModes[CCCM_NUM_MODES] = { LM_CHROMA_IDX, MDLM_L_IDX, MDLM_T_IDX };
 #endif
+#endif
 
+#if JVET_AC0054_GLCCCM
+      int satdCccmFlagList[CCCM_NUM_MODES];
+#endif
+        
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
       int64_t satdCccmSortedCost[2][CCCM_NUM_MODES];
       int satdCccmModeList[2][CCCM_NUM_MODES];
@@ -2948,6 +2965,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         satdCccmSortedCost[1][i] = LLONG_MAX; // for the mode not pre-select by SATD, do RDO by default, so set the initial value 0.
         satdCccmModeList[0][i] = chromaCandCccmModes[i];
         satdCccmModeList[1][i] = chromaCandCccmModes[i];
+#if JVET_AC0054_GLCCCM
+        satdCccmFlagList[i] = i < (CCCM_NUM_MODES / 2) ? 1 : 2; // 1: cccm, 2: glCccm
+#endif
       }
       int64_t bestCccmCost[2] = { LLONG_MAX, LLONG_MAX};
 
@@ -2975,6 +2995,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 
         for (int idx = 0; idx < CCCM_NUM_MODES; idx++)
         {
+#if JVET_AC0054_GLCCCM
+          if (sub && idx >= CCCM_NUM_MODES / 2)
+          {
+            continue;
+          }
+#endif
           int mode = chromaCandCccmModes[idx];
           if (idx == 0)
           {
@@ -3007,6 +3033,34 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
             isCCCMEnabled = isMultiCccmTopEnabled;
             pu.cccmFlag = 3;
           }
+#endif
+            
+#if JVET_AC0054_GLCCCM
+          if (idx < CCCM_NUM_MODES / 2)
+          {
+            pu.glCccmFlag = 0;
+          }
+          else
+          {
+            pu.glCccmFlag = 1;
+#if MMLM
+            isCCCMEnabled = idx == 6 ? isCccmFullEnabled
+            : idx == 7 ? isCccmLeftEnabled
+            : idx == 8 ? isCccmTopEnabled
+            : idx == 9 ? isMultiCccmFullEnabled
+            : idx == 10 ? isMultiCccmLeftEnabled : isMultiCccmTopEnabled;
+            pu.cccmFlag =  idx == 6 ? 1
+            : idx == 7 ? 2
+            : idx == 8 ? 3
+            : idx == 9 ? 1
+            : idx == 10 ? 2 : 3;
+#else
+            isCCCMEnabled = idx == 3 ? isCccmFullEnabled
+            : idx == 4 ? isCccmLeftEnabled : isCccmTopEnabled;
+            pu.cccmFlag =   idx == 3 ? 1
+            : idx == 4 ? 2 : 3;
+#endif
+         }
 #endif
 
           if (isCCCMEnabled)
@@ -3068,12 +3122,19 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           }
         }
       }
+#if JVET_AC0054_GLCCCM
+      int tempGlCccmFlag = 0;
+#endif
       int tempCccmIdx = 0;
       int64_t tempCccmCost = 0;
+#if JVET_AC0054_GLCCCM
+      for (int i = 1; i < CCCM_NUM_MODES; i++)
+#else
 #if MMLM
       for (int i = 1; i < 4; i++)
 #else
       for (int i = 1; i < 3; i++)
+#endif
 #endif
       {
         for (int j = i + 1; j < CCCM_NUM_MODES; j++)
@@ -3087,6 +3148,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
             tempCccmCost = satdCccmSortedCost[0][i];
             satdCccmSortedCost[0][i] = satdCccmSortedCost[0][j];
             satdCccmSortedCost[0][j] = tempCccmCost;
+#if JVET_AC0054_GLCCCM
+            tempGlCccmFlag = satdCccmFlagList[i];
+            satdCccmFlagList[i] = satdCccmFlagList[j];
+            satdCccmFlagList[j] = tempGlCccmFlag;
+#endif
           }
         }
       }
@@ -3094,10 +3160,26 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #if MMLM
       bool isCccmModeEnabledInRdo[2][MMLM_T_IDX + 1] = { false };
       isCccmModeEnabledInRdo[0][satdCccmModeList[0][0]] = true;
+#if JVET_AC0054_GLCCCM
+      bool isGlCccmModeEnabledInRdo[MMLM_T_IDX + 1] = { false };
+      if (satdCccmFlagList[0] == 2)
+      {
+        isCccmModeEnabledInRdo[0][satdCccmModeList[0][0]] = false;
+        isGlCccmModeEnabledInRdo[satdCccmModeList[0][0]] = true;
+      }
+#endif
       for (int i = 1; i < 4; i++)
 #else
       bool isCccmModeEnabledInRdo[MDLM_T_IDX + 1] = { false };
       isCccmModeEnabledInRdo[satdCccmModeList[0]] = true;
+#if JVET_AC0054_GLCCCM
+      bool isGlCccmModeEnabledInRdo[MDLM_T_IDX + 1] = { false };
+      if (satdCccmFlagList[0] == 2)
+      {
+        isCccmModeEnabledInRdo[0][satdCccmModeList[0][0]] = false;
+        isGlCccmModeEnabledInRdo[satdCccmModeList[0][0]] = true;
+      }
+#endif
       for (int i = 1; i < 3; i++)
 #endif
       {
@@ -3105,7 +3187,18 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         {
           break;
         }
+#if JVET_AC0054_GLCCCM
+        if (satdCccmFlagList[i] == 2)
+        {
+          isGlCccmModeEnabledInRdo[satdCccmModeList[0][i]] = true;
+        }
+        else
+        {
+          isCccmModeEnabledInRdo[0][satdCccmModeList[0][i]] = true;
+        }
+#else
         isCccmModeEnabledInRdo[0][satdCccmModeList[0][i]] = true;
+#endif
       }
 
       if (pu.cu->slice->getSPS()->getUseCccm() == 2)
@@ -3157,7 +3250,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         {
           if (satdCccmSortedCost[1][i] >= CCCM_NO_SUB_WEIGHT * bestCccmCost[1])
           {
+#if JVET_AC0054_GLCCCM
+            if (satdCccmSortedCost[1][i - 1] > bestCccmCost[0] && satdCccmFlagList[0] != 2)
+#else
             if (satdCccmSortedCost[1][i - 1] > bestCccmCost[0])
+#endif
             {
               bestCccmCost[0] = satdCccmSortedCost[1][i - 1];
             }
@@ -3177,6 +3274,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       }
       pu.cccmFlag = 0;
       pu.cccmNoSubFlag = 0;
+#if JVET_AC0054_GLCCCM
+      pu.glCccmFlag = 0;
+#endif
 #else
       int64_t satdCccmSortedCost[CCCM_NUM_MODES];
       int satdCccmModeList[CCCM_NUM_MODES];
@@ -3370,7 +3470,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
       if (pu.cu->slice->getSPS()->getUseCccm() == 2)
       {
+#if JVET_AC0054_GLCCCM
+        if (satdSortedCost[uiMaxMode - 1 - reducedModeNumber] > bestCccmCost[0] && satdCccmFlagList[uiMaxMode - 1 - reducedModeNumber] != 2)
+#else
         if (satdSortedCost[uiMaxMode - 1 - reducedModeNumber] > bestCccmCost[0])
+#endif
         {
           modeIsEnable[satdModeList[uiMaxMode - 1 - reducedModeNumber]] = 0; // disable the last reducedModeNumber modes
         }
@@ -3378,7 +3482,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         {
           for (int i = 3; i > 0; i--)
           {
+#if JVET_AC0054_GLCCCM
+            if ((satdCccmSortedCost[0][i] > satdSortedCost[uiMaxMode - 1 - reducedModeNumber]) && (isCccmModeEnabledInRdo[0][satdCccmModeList[0][i]]) && satdCccmFlagList[uiMaxMode - 1 - reducedModeNumber] != 2)
+#else
             if ((satdCccmSortedCost[0][i] > satdSortedCost[uiMaxMode - 1 - reducedModeNumber]) && (isCccmModeEnabledInRdo[0][satdCccmModeList[0][i]]))
+#endif
             {
               isCccmModeEnabledInRdo[0][satdCccmModeList[0][i]] = false;
               break;
@@ -3960,15 +4068,57 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           pu.cccmFlag = 3;
         }
 #endif
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
-        if (!isCccmModeEnabledInRdo[0][chromaIntraModeInCCCM] && !isCccmModeEnabledInRdo[1][chromaIntraModeInCCCM])
-#else
-        if (!isCccmModeEnabledInRdo[chromaIntraModeInCCCM])
-#endif
+          
+#if JVET_AC0054_GLCCCM
+        pu.glCccmFlag = 0;
+        if (uiMode >= CCCM_NUM_MODES / 2)
         {
-          continue;
+          pu.glCccmFlag = 1;
+#if MMLM
+          chromaIntraModeInCCCM = uiMode == 6 ? LM_CHROMA_IDX
+          : uiMode == 7 ? MDLM_L_IDX
+          : uiMode == 8 ? MDLM_T_IDX
+          : uiMode == 9 ? MMLM_CHROMA_IDX
+          : uiMode == 10 ? MMLM_L_IDX : MMLM_T_IDX;
+          isCCCMEnabled = uiMode == 6 ? isCccmFullEnabled
+          : uiMode == 7 ? isCccmLeftEnabled
+          : uiMode == 8 ? isCccmTopEnabled
+          : uiMode == 9 ? isMultiCccmFullEnabled
+          : uiMode == 10 ? isMultiCccmLeftEnabled : isMultiCccmTopEnabled;
+          pu.cccmFlag =   uiMode == 6 ? 1
+          : uiMode == 7 ? 2
+          : uiMode == 8 ? 3
+          : uiMode == 9 ? 1
+          : uiMode == 10 ? 2 : 3;
+#else
+          chromaIntraModeInCCCM = uiMode == 3 ? LM_CHROMA_IDX
+          : uiMode == 4 ? MDLM_L_IDX : MDLM_T_IDX;
+          isCCCMEnabled = uiMode == 3 ? isCccmFullEnabled
+          : uiMode == 4 ? isCccmLeftEnabled : isCccmTopEnabled;
+          pu.cccmFlag  =  uiMode == 3 ? 1
+          : uiMode == 4 ? 2 : 3;
+#endif
+          if (!isGlCccmModeEnabledInRdo[chromaIntraModeInCCCM])
+          {
+            continue;
+          }
         }
-
+        else
+        {
+#endif // JVET_AC0054_GLCCCM
+        
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+          if (!isCccmModeEnabledInRdo[0][chromaIntraModeInCCCM] && !isCccmModeEnabledInRdo[1][chromaIntraModeInCCCM])
+#else
+          if (!isCccmModeEnabledInRdo[chromaIntraModeInCCCM])
+#endif
+          {
+            continue;
+          }
+#if JVET_AC0054_GLCCCM
+        }
+#endif
+            
         if (isCCCMEnabled)
         {
 #else
@@ -3990,11 +4140,25 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
           for (int sub = 0; sub < pu.cu->slice->getSPS()->getUseCccm(); sub++)
           {
-            pu.cccmNoSubFlag = sub;
-            if (!isCccmModeEnabledInRdo[sub][chromaIntraModeInCCCM])
-            {
-              continue;
-            }
+              pu.cccmNoSubFlag = sub;
+#if JVET_AC0054_GLCCCM
+              if (sub && ((uiMode >= CCCM_NUM_MODES / 2) || pu.glCccmFlag))
+              {
+                continue;
+              }
+              else
+              {
+                if (!isCccmModeEnabledInRdo[sub][chromaIntraModeInCCCM])
+                {
+                  continue;
+                }
+              }
+#else // else of JVET_AC0054_GLCCCM
+              if (!isCccmModeEnabledInRdo[sub][chromaIntraModeInCCCM])
+              {
+                continue;
+              }
+#endif // end of JVET_AC0054_GLCCCM
 #endif
 
           // Original RD check code replicated from above
@@ -4076,7 +4240,10 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
             cccmModeBest    = pu.cccmFlag;
 #if JVET_AA0126_GLM
             bestGlmIdc      = pu.glmIdc;
-#endif 
+#endif
+#if JVET_AC0054_GLCCCM
+            glCccmBest      = pu.glCccmFlag;
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING 
             cccmNoSubBest  = pu.cccmNoSubFlag;
             }
@@ -4122,6 +4289,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
     pu.cccmFlag        = cccmModeBest;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING 
     pu.cccmNoSubFlag   = cccmNoSubBest;
+#endif
+#if JVET_AC0054_GLCCCM
+    pu.glCccmFlag = glCccmBest;
 #endif
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION

@@ -2528,12 +2528,25 @@ void CABACReader::cccmFlag(PredictionUnit& pu)
 #else
       pu.cccmFlag = (intraDir == MDLM_T_IDX) ? 3 : (intraDir == MDLM_L_IDX) ? 2 : 1;
 #endif
+        
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
       pu.cccmNoSubFlag = 0;
       if ( pu.cs->sps->getUseCccm() == 2 )
       {    
         pu.cccmNoSubFlag += m_BinDecoder.decodeBin( Ctx::CccmFlag( 1 ) );
-      }         
+      }
+#endif
+#if JVET_AC0054_GLCCCM
+      pu.glCccmFlag = 0;
+#if !JVET_AC0147_CCCM_NO_SUBSAMPLING
+      unsigned ctxId = 1;
+#else
+      unsigned ctxId = 2;
+      if (!pu.cccmNoSubFlag)
+#endif
+      {
+        pu.glCccmFlag = m_BinDecoder.decodeBin( Ctx::CccmFlag( ctxId ) );
+      }
 #endif
     }
 #endif
