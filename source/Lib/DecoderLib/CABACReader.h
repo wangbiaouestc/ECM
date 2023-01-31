@@ -236,8 +236,15 @@ public:
    void        mvd_coding                ( Mv &rMvd, const int &rribcFlipType = 0);
 #endif
 #if JVET_Z0131_IBC_BVD_BINARIZATION
-  void        bvdCoding                ( Mv &rMvd, const int &rribcFlipType = 0);
-  unsigned    xReadBvdContext(unsigned ctxT, int offset, int param);
+#if JVET_AC0104_IBC_BVD_PREDICTION
+   void        bvdCoding(Mv& rMvd, MvdSuffixInfo& si, const int& rribcFlipType = 0 );
+   unsigned    xReadBvdContextPrefix(unsigned ctxT, int offset, int param );
+   unsigned    xReadBvdContextSuffix(int symbol, int param );
+   void        bvdCodingRemainder(Mv& rMvd, MvdSuffixInfo& si, const int imv );
+#else // !JVET_AC0104_IBC_BVD_PREDICTION
+   void        bvdCoding(Mv& rMvd, const int& rribcFlipType = 0 );
+   unsigned    xReadBvdContext(unsigned ctxT, int offset, int param);
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
 #endif
 #else
   void        mvd_coding                ( Mv &rMvd 

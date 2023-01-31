@@ -418,6 +418,32 @@ unsigned DeriveCtx::CtxSgpmFlag(const CodingUnit &cu)
 }
 #endif
 
+#if JVET_AC0104_IBC_BVD_PREDICTION
+int DeriveCtx::CtxSmBvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrect, const int isHor, const int significance)
+{
+  bool constexpr checkPrev2 = false;
+  const int ctxNumInGroup = checkPrev2 ? 5 : 2;
+  CHECK(iPreviousBinIsCorrect2 < -1, "Illegal iPreviousBinIsCorrect2");
+  int iCtxIdx = (0 == iPreviousBinIsCorrect) ? 0 : 1;
+  if (checkPrev2)
+  {
+    if (iCtxIdx == 0)
+    {
+      iCtxIdx = iPreviousBinIsCorrect2 < 0 ? 2 : iPreviousBinIsCorrect2; // # 0, 1 and 2 for cases 00, 10 and X0
+    }
+    else // (iCtxIdx == 1) 
+    {
+      iCtxIdx = 2 + (iPreviousBinIsCorrect2 < 0 ? 2 : iPreviousBinIsCorrect2); // # 2, 3 and 4 for cases 01, 11 and X1
+    }
+  }
+  if (significance < 5)
+  {
+    return iCtxIdx;
+  }
+  return ctxNumInGroup + (0 == isHor ? 0 : ctxNumInGroup) + iCtxIdx;
+}
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
+
 unsigned DeriveCtx::CtxPredModeFlag( const CodingUnit& cu )
 {
   const CodingUnit *cuLeft  = cu.cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);

@@ -3158,11 +3158,18 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
 void    CABACWriter::mvsd_data(const PredictionUnit&  pu)
 {
   CHECK(pu.cu->slice->getSliceType() == I_SLICE && !CU::isIBC(*pu.cu), "cannot be I Slice");
+#if !JVET_AC0104_IBC_BVD_PREDICTION
   if (CU::isIBC(*pu.cu))
   {
     return;
   }
-  if (pu.cu->skip || pu.mergeFlag || CU::isIBC(*pu.cu) || !pu.isMvsdApplicable())
+#endif // !JVET_AC0104_IBC_BVD_PREDICTION
+
+  if (pu.cu->skip || pu.mergeFlag 
+#if !JVET_AC0104_IBC_BVD_PREDICTION
+    || CU::isIBC(*pu.cu)
+#endif // !JVET_AC0104_IBC_BVD_PREDICTION
+    || !pu.isMvsdApplicable())
   {
     return;
   }
@@ -3177,6 +3184,14 @@ void    CABACWriter::mvsd_data(const PredictionUnit&  pu)
       mvsdIdxFunc(pu, REF_PIC_LIST_0);
     }
   }
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  if (CU::isIBC(*pu.cu))
+  {
+    return;
+  }
+#endif // !JVET_AC0104_IBC_BVD_PREDICTION
+
   if (pu.interDir != 1 /* PRED_L0 */ && pu.cu->smvdMode != 1)
   {
     if (pu.cu->affine)
@@ -5412,7 +5427,42 @@ void CABACWriter::mvd_coding( const Mv &rMvd, int8_t imv
 }
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
-void CABACWriter::xWriteBvdContext(unsigned uiSymbol, unsigned ctxT, int offset, int param)
+#if JVET_AC0104_IBC_BVD_PREDICTION
+unsigned CABACWriter::xWriteBvdContextPrefix(unsigned uiSymbol, unsigned ctxT, int offset, int param )
+{ 
+  unsigned bins = 0;
+  unsigned numBins = 0;
+  while (uiSymbol >= (unsigned)(1 << param))
+  {
+    bins <<= 1;
+    bins++;
+    numBins++;
+    uiSymbol -= 1 << param;
+    param++;
+  }
+
+  bins <<= 1;
+  numBins++;
+
+  unsigned temp = 0;
+  unsigned bitCount = 0;
+  for (int i = numBins - 1; i >= 0; i--)
+  {
+    temp = bins >> i;
+    if (bitCount >= ctxT)
+    {
+      m_BinEncoder.encodeBinEP(temp);
+    }
+    else
+    {
+      m_BinEncoder.encodeBin(temp, Ctx::Bvd(offset + bitCount + 1));
+    }
+    bins -= (temp << i);
+    bitCount++;
+  }
+  return numBins - 1; // less by 1 as compared to what xReadBvdContextPrefix() returns
+}
+void CABACWriter::xWriteBvdContextSuffix(unsigned uiSymbol, int param, int param_updated, int numSkipMSB )
 {
   unsigned bins    = 0;
   unsigned numBins = 0;
@@ -5426,6 +5476,43 @@ void CABACWriter::xWriteBvdContext(unsigned uiSymbol, unsigned ctxT, int offset,
   }
   bins <<= 1;
   numBins++;
+  param_updated++;
+
+  CHECK(param_updated != numBins, "Enc side prefix bits check error");
+
+  if (0 != numSkipMSB)
+  {
+    CHECK(param_updated == 0, "param_updated = 0");
+    param_updated-= numSkipMSB;
+    unsigned skipMask = ( 1 << (param_updated + numSkipMSB)) -1 - ((1 << (param_updated)) - 1);
+    uiSymbol &= ~skipMask;
+    CHECK(uiSymbol >= (1 << param_updated), "uiSymbol >= (1<<param_updated)");
+  }
+
+  if (param_updated > 0)
+  {
+    CHECK(uiSymbol >= (1 << (param_updated+1)), "uiSymbol >= (1<<param_updated)");
+    m_BinEncoder.encodeBinsEP(uiSymbol, param_updated);
+  }
+}
+#else //!JVET_AC0104_IBC_BVD_PREDICTION
+void CABACWriter::xWriteBvdContext(unsigned uiSymbol, unsigned ctxT, int offset, int param)
+{
+  unsigned bins = 0;
+  unsigned numBins = 0;
+  while (uiSymbol >= (unsigned)(1 << param))
+  {
+    bins <<= 1;
+    bins++;
+    numBins++;
+    uiSymbol -= 1 << param;
+    param++;
+  }
+
+  bins <<= 1;
+  numBins++;
+
+
 
   unsigned temp = 0;
   unsigned bitCount = 0;
@@ -5445,7 +5532,86 @@ void CABACWriter::xWriteBvdContext(unsigned uiSymbol, unsigned ctxT, int offset,
   }
   m_BinEncoder.encodeBinsEP(uiSymbol, param);
 }
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
 #endif
+
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+void CABACWriter::bvdCodingRemainder(const Mv& rMvd, const MvdSuffixInfo& si, int8_t imv )
+{
+  int horAbs = rMvd.getAbsHor();
+  int verAbs = rMvd.getAbsVer();
+
+  const unsigned int horOffsetPrediction = si.horOffsetPrediction;
+  const unsigned int verOffsetPrediction = si.verOffsetPrediction;
+
+  const int horParam = si.horPrefix;
+  const int verParam = si.verPrefix;
+
+  if (horParam >= 0 || verParam >= 0)
+  {
+    const int iHorMSBins = si.horOffsetPredictionNumBins;
+    const int iVerMSBins = si.verOffsetPredictionNumBins;
+
+
+    if (horParam >= 0)
+    {
+      for (int i = iHorMSBins - 1; i >= 0; --i)
+      {
+        int bin = (horOffsetPrediction >> i) & 1;
+
+        const int prev2Bin = (i + 1 > iHorMSBins - 1)  ? -1 :
+                             (i + 1 == iHorMSBins - 1) ? si.horSignHypMatch :
+                                     /*otherwise*/       (horOffsetPrediction>> (i + 2)) & 1;
+        const int prevBin = (i == iHorMSBins - 1) ? si.horSignHypMatch : ((horOffsetPrediction >> (i+1)) & 1);
+        const int imvShift = Mv::getImvPrecShift(imv);
+
+        const int iCtxIdx = DeriveCtx::CtxSmBvdBin(prev2Bin, prevBin, true, i + imvShift);
+
+        const unsigned int ctx = Ctx::MvsdIdxBVDMSB(iCtxIdx);
+
+        m_BinEncoder.encodeBin((0 == bin) ? 1 : 0, ctx);
+      }
+
+      xWriteBvdContextSuffix(horAbs - 1, BVD_CODING_GOLOMB_ORDER, horParam, iHorMSBins );
+    }
+    if (verParam >= 0)
+    {
+      for (int i = iVerMSBins - 1; i >= 0; --i)
+      {
+        int bin = (verOffsetPrediction >> i) & 1;
+
+        const int prev2Bin = (i + 1 > iVerMSBins - 1) ? -1 :
+                             (i + 1 == iVerMSBins - 1) ? si.verSignHypMatch :
+                                     /*otherwise*/      (verOffsetPrediction>> (i + 2)) & 1;
+        const int prevBin = (i == iVerMSBins - 1) ? si.verSignHypMatch : ((verOffsetPrediction>>(i+1)) & 1);
+        const int imvShift = Mv::getImvPrecShift(imv);
+
+        const int iCtxIdx = DeriveCtx::CtxSmBvdBin(prev2Bin, prevBin, false, i + imvShift);
+
+        const unsigned int ctx = Ctx::MvsdIdxBVDMSB(iCtxIdx);
+
+        m_BinEncoder.encodeBin((0 == bin) ? 1 : 0, ctx);
+      }
+
+      xWriteBvdContextSuffix(verAbs - 1, BVD_CODING_GOLOMB_ORDER, verParam, iVerMSBins);
+    }
+  }
+  else
+  {
+    if (horAbs != 0)
+    {
+      xWriteBvdContextSuffix(horAbs - 1, BVD_CODING_GOLOMB_ORDER, horParam, 0 );
+    }
+    if (verAbs != 0)
+    {
+      xWriteBvdContextSuffix(verAbs - 1, BVD_CODING_GOLOMB_ORDER, verParam, 0 );
+    }
+  }
+
+}
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
+
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AA0070_RRIBC
@@ -5474,6 +5640,18 @@ void CABACWriter::bvdCoding( const Mv &rMvd, int8_t imv)
   m_BinEncoder.encodeBin( (verAbs > 0), Ctx::Bvd(VER_BVD_CTX_OFFSET) );
 #endif
 
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  if (horAbs)
+  {
+    xWriteBvdContextPrefix(horAbs - 1, NUM_HOR_BVD_CTX, HOR_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER );
+  }
+  if (verAbs)
+  {
+    xWriteBvdContextPrefix(verAbs - 1, NUM_VER_BVD_CTX, VER_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER );
+  }
+#else // !JVET_AC0104_IBC_BVD_PREDICTION
+
   if( horAbs > 0 )
   {
     xWriteBvdContext(horAbs - 1, NUM_HOR_BVD_CTX, HOR_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER);
@@ -5484,6 +5662,7 @@ void CABACWriter::bvdCoding( const Mv &rMvd, int8_t imv)
     xWriteBvdContext(verAbs-1, NUM_VER_BVD_CTX, VER_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER);
     m_BinEncoder.encodeBinEP( (verMvd < 0) );
   }
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
 }
 #endif
 
@@ -5529,22 +5708,107 @@ void CABACWriter::mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
   {
     CHECK(mvsdIdx == -1, "mvsdIdx == -1 for transMv");
   }
-  if (pu.mvd[eRefList].getHor())
+
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  if (CU::isIBC(*pu.cu))
   {
-    uint8_t ctxId = (TrMv.getHor() <= Thres) ? 0 : 1;
-    int bin = mvsdIdx & 1;
-    m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
-    mvsdIdx >>= 1;
+    Mv mvd = pu.mvd[eRefList];
+    mvd.changeIbcPrecInternal2Amvr(pu.cu->imv);
+
+    MvdSuffixInfo si = pu.bvdSuffixInfo;
+    si.initPrefixes(mvd, pu.cu->imv, false);
+    if (si.horPrefix >= 0)
+    {
+      CHECK(si.horOffsetPredictionNumBins != pu.bvdSuffixInfo.horOffsetPredictionNumBins, "mismatch in RDO and writing");
+      CHECK(si.horPrefix != pu.bvdSuffixInfo.horPrefix, "mismatch in RDO and writing");
+    }
+    if (si.verPrefix >= 0)
+    {
+      CHECK(si.verPrefix != pu.bvdSuffixInfo.verPrefix, "mismatch in RDO and writing");
+      CHECK(si.verOffsetPredictionNumBins != pu.bvdSuffixInfo.verOffsetPredictionNumBins, "mismatch in RDO and writing");
+    }
+
+    int horPrefix = si.horPrefix;
+    int verPrefix = si.verPrefix;
+
+
+    si.horSignHypMatch = -1;
+    si.verSignHypMatch = -1;
+
+    if (horPrefix >= 0 || verPrefix >= 0)
+    {
+      Mv trMv = Mv(horPrefix < 0 ? 0 : MvdSuffixInfo::xGetGolombGroupMinValue(horPrefix),
+        verPrefix < 0 ? 0 : MvdSuffixInfo::xGetGolombGroupMinValue(verPrefix));
+
+      trMv.changeTransPrecAmvr2Internal(pu.cu->imv);
+
+      if (pu.mvd[eRefList].getHor())
+      {
+
+        if (pu.bvdSuffixInfo.horEncodeSignInEP)
+        {
+          unsigned bin = pu.mvd[eRefList].getHor() < 0 ? 1 : 0;
+          m_BinEncoder.encodeBinEP(bin);
+        }
+        else
+        {
+          uint8_t ctxId = (trMv.getHor() <= Thres) ? 0 : 1;
+          int bin = mvsdIdx & 1;
+
+          m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
+
+
+          si.horSignHypMatch = 0 == bin;
+
+          mvsdIdx >>= 1;
+        }
+
+      }
+      if (pu.mvd[eRefList].getVer())
+      {
+        if (pu.bvdSuffixInfo.verEncodeSignInEP)
+        {
+          unsigned bin = pu.mvd[eRefList].getVer() < 0 ? 1 : 0;
+          m_BinEncoder.encodeBinEP(bin);
+        }
+        else
+        {
+          uint8_t ctxId = (trMv.getVer() <= Thres) ? 0 : 1;
+
+          int bin = mvsdIdx & 1;
+          m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
+
+          si.verSignHypMatch = 0 == bin;
+          mvsdIdx >>= 1;
+        }
+      }
+
+      bvdCodingRemainder(mvd, si, pu.cu->imv );
+
+      return;
+    }
   }
-  if (pu.mvd[eRefList].getVer())
-  {
-    
-    uint8_t ctxId = (TrMv.getVer() <= Thres) ? 0 : 1;
-    
-    int bin = mvsdIdx & 1;
-    m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
-    mvsdIdx >>= 1;
-  }
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
+
+
+    if (pu.mvd[eRefList].getHor())
+    {
+      uint8_t ctxId = (TrMv.getHor() <= Thres) ? 0 : 1;
+      int bin = mvsdIdx & 1;
+      m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
+      mvsdIdx >>= 1;
+    }
+    if (pu.mvd[eRefList].getVer())
+    {
+
+      uint8_t ctxId = (TrMv.getVer() <= Thres) ? 0 : 1;
+
+      int bin = mvsdIdx & 1;
+      m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
+      mvsdIdx >>= 1;
+    }
+
 }
 void CABACWriter::mvsdAffineIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
 {

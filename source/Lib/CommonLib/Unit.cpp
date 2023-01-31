@@ -1061,6 +1061,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
       mvAffi[i][j] = predData.mvAffi[i][j];
     }
   }
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bvdSuffixInfo = predData.bvdSuffixInfo;
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   refIdxLC = predData.refIdxLC;
   refPairIdx = predData.refPairIdx;
@@ -1215,6 +1218,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
       mvAffi[i][j] = other.mvAffi[i][j];
     }
   }
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bvdSuffixInfo = other.bvdSuffixInfo;
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
+
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   refIdxLC = other.refIdxLC;
   refPairIdx = other.refPairIdx;

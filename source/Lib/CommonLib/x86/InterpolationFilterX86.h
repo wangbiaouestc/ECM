@@ -508,6 +508,219 @@ static void simdFilterCopy( const ClpRng& clpRng, const Pel* src, int srcStride,
 #endif
 }
 
+#if JVET_AC0104_IBC_BVD_PREDICTION
+// ============================================
+// Full-pel copy 8-bit/16-bit with no clipping
+// ============================================
+
+template<typename Tsrc, int N>
+static void fullPelCopyWithNoClippingAVX2(const ClpRng& clpRng, const Pel* _src, int srcStride, int16_t* dst, int dstStride, int width, int height)
+{
+#ifdef USE_AVX2
+  Tsrc* src = (Tsrc*)_src;
+  __m256i vsum;
+
+
+  for (int row = 0; row < height; row++)
+  {
+    for (int col = 0; col < width; col += N)
+    {
+      _mm_prefetch((const char*)(src +                3 * srcStride), _MM_HINT_T0);
+      _mm_prefetch((const char*)(src + (width >> 1) + 3 * srcStride), _MM_HINT_T0);
+      _mm_prefetch((const char*)(src +  width - 1   + 3 * srcStride), _MM_HINT_T0);
+      for (int i = 0; i < N; i += 16)
+      {
+        vsum = (sizeof(Tsrc) == 1) ? _mm256_cvtepu8_epi16(_mm_loadu_si128((const __m128i*) & src[col + i]))
+                                   : _mm256_lddqu_si256((const __m256i*) & src[col + i]);
+#if JEM_UNALIGNED_DST
+        _mm256_storeu_si256((__m256i*) & dst[col + i], vsum);
+#else
+        _mm256_store_si256((__m256i*) & dst[col + i], vsum);
+#endif
+      }
+    }
+    src += srcStride;
+    dst += dstStride;
+  }
+#endif
+}
+
+template<typename Tsrc, int N>
+static void fullPelCopyWithNoClippingVerAVX2(const ClpRng& clpRng, const Pel* _src, int srcStride, int16_t* dst, int dstStride, int width, int height)
+{
+#ifdef USE_AVX2
+  Tsrc* src = (Tsrc*)_src;
+  short* dstinit = dst;
+  __m256i vsum;
+
+  for (int col = 0; col < width; col++)
+  {
+    src = (Tsrc*)_src;
+    dst = dstinit;
+    for (int row = 0; row < height; row += N)
+    {
+      _mm_prefetch((const char*)(src +                3 * srcStride), _MM_HINT_T0);
+      _mm_prefetch((const char*)(src + (width >> 1) + 3 * srcStride), _MM_HINT_T0);
+      _mm_prefetch((const char*)(src +  width - 1   + 3 * srcStride), _MM_HINT_T0);
+      {
+        vsum = _mm256_set_epi16(src[col + 15 * srcStride], src[col + 14 * srcStride], src[col + 13 * srcStride], src[col + 12 * srcStride]
+                              , src[col + 11 * srcStride], src[col + 10 * srcStride], src[col +  9 * srcStride], src[col +  8 * srcStride]
+                              , src[col +  7 * srcStride], src[col +  6 * srcStride], src[col +  5 * srcStride], src[col +  4 * srcStride]
+                              , src[col +  3 * srcStride], src[col +  2 * srcStride], src[col +  1 * srcStride], src[col]);
+
+        _mm256_storeu_si256((__m256i*) &(dst[col]), vsum);
+
+      }
+      src += srcStride * 16;
+      dst += dstStride * 16;
+    }
+  }
+#endif
+}
+
+template<typename Tsrc, int N>
+static void fullPelCopyWithNoClippingSSE(const ClpRng& clpRng, const Pel* _src, int srcStride, int16_t* dst, int dstStride, int width, int height)
+{
+  Tsrc* src = (Tsrc*)_src;
+  __m128i vsum;
+
+  for (int row = 0; row < height; row++)
+  {
+    for (int col = 0; col < width; col += N)
+    {
+      _mm_prefetch((const char*)src +                2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src + (width >> 1) + 2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src +  width - 1   + 2 * srcStride, _MM_HINT_T0);
+      for (int i = 0; i < N; i += 8)
+      {
+        vsum = (sizeof(Tsrc) == 1) ? _mm_cvtepu8_epi16(_mm_lddqu_si128((__m128i const*) & src[col + i]))
+                                   : _mm_lddqu_si128((__m128i const*) & src[col + i]);
+
+#if JEM_UNALIGNED_DST
+        _mm_storeu_si128((__m128i*) & dst[col + i], vsum);
+#else
+        _mm_store_si128((__m128i*) & dst[col + i], vsum);
+#endif
+      }
+    }
+    src += srcStride;
+    dst += dstStride;
+  }
+}
+
+template<typename Tsrc, int N>
+static void fullPelCopyWithNoClippingVerSSE(const ClpRng& clpRng, const Pel* _src, int srcStride, int16_t* dst, int dstStride, int width, int height)
+{
+  Tsrc* src = (Tsrc*)_src;
+  short* dstinit = dst;
+  __m128i vsum;
+  
+  for (int col = 0; col < width; col++)
+  {
+    src = (Tsrc*)_src;
+    dst = dstinit;
+    for (int row = 0; row < height; row += N)
+    {
+      _mm_prefetch((const char*)src +                2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src + (width >> 1) + 2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src +  width - 1   + 2 * srcStride, _MM_HINT_T0);
+      for (int i = 0; i < N; i += 8)
+      {
+        vsum = _mm_set_epi16(src[col + (7 + i) * srcStride], src[col + (6 + i) * srcStride], src[col + (5 + i) * srcStride], src[col + (4 + i) * srcStride]
+                           , src[col + (3 + i) * srcStride], src[col + (2 + i) * srcStride], src[col + (1 + i) * srcStride], src[col +      i  * srcStride]);
+
+        _mm_storeu_si128((__m128i*) & dst[col + (i) * dstStride], vsum);
+      }
+      src += srcStride * N;
+      dst += dstStride * N;
+    }
+  }
+}
+
+template<typename Tsrc>
+static void fullPelCopyWithNoClippingSSE_M4(const ClpRng& clpRng, const Pel* _src, int srcStride, int16_t* dst, int dstStride, int width, int height)
+{
+  Tsrc* src = (Tsrc*)_src;
+  __m128i vsum;
+
+  for (int row = 0; row < height; row++)
+  {
+    for (int col = 0; col < width; col += 4)
+    {
+      _mm_prefetch((const char*)src +                2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src + (width >> 1) + 2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src +  width - 1   + 2 * srcStride, _MM_HINT_T0);
+
+      vsum = (sizeof(Tsrc) == 1) ? _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i const*) & src[col]))
+                                 : _mm_loadl_epi64((__m128i const*) & src[col]);
+      _mm_storel_epi64((__m128i*) & dst[col], vsum);
+    }
+    src += srcStride;
+    dst += dstStride;
+  }
+}
+
+template<typename Tsrc>
+static void fullPelCopyWithNoClippingVerSSE_M4(const ClpRng& clpRng, const Pel* _src, int srcStride, int16_t* dst, int dstStride, int width, int height)
+{
+  Tsrc* src = (Tsrc*)_src;
+  __m128i vsum;
+
+  for (int col = 0; col < width; col++)
+  {
+    for (int row = 0; row < height; row += 4)
+    {
+      _mm_prefetch((const char*)src +                2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src + (width >> 1) + 2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src +  width - 1   + 2 * srcStride, _MM_HINT_T0);
+
+      vsum = _mm_set_epi16(0, 0, 0, 0, src[col + (row + 3) * srcStride], src[col + (row + 2) * srcStride], src[col + (row + 1) * srcStride], src[col + row * srcStride]);
+      _mm_storel_epi64((__m128i*) & dst[col + (row) * dstStride], vsum);
+    }
+  }
+}
+
+template<X86_VEXT vext>
+static void simdFilterCopyWithNoClipping(const ClpRng& clpRng, const Pel* src, int srcStride, int16_t* dst, int dstStride, int width, int height)
+{
+  if (vext >= AVX2 && (width % 16) == 0)
+  {
+    fullPelCopyWithNoClippingAVX2<Pel, 16>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else if ((width % 16) == 0)
+  {
+    fullPelCopyWithNoClippingSSE<Pel, 16>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else if ((width % 8) == 0)
+  {
+    fullPelCopyWithNoClippingSSE<Pel, 8>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else if ((width % 4) == 0)
+  {
+    fullPelCopyWithNoClippingSSE_M4<Pel>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else if (vext >= AVX2 && (height % 16) == 0)
+  {
+    fullPelCopyWithNoClippingVerAVX2<Pel, 16>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else if ((height % 16) == 0)
+  {
+    fullPelCopyWithNoClippingVerSSE<Pel, 16>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else if ((height % 8) == 0)
+  {
+    fullPelCopyWithNoClippingVerSSE<Pel, 8>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else if ((height % 4) == 0)
+  {
+    fullPelCopyWithNoClippingVerSSE_M4<Pel>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else
+  { //Scalar
+    InterpolationFilter::filterCopyWithNoClipping(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+}
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
 
 // SIMD interpolation horizontal, block width modulo 4
 template<X86_VEXT vext, int N, bool shiftBack>
@@ -4905,6 +5118,9 @@ void InterpolationFilter::_initInterpolationFilterX86()
   m_filterCopy[0][1] = simdFilterCopy<vext, false, true>;
   m_filterCopy[1][0] = simdFilterCopy<vext, true, false>;
   m_filterCopy[1][1] = simdFilterCopy<vext, true, true>;
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  m_filterCopyWithNoClipping = simdFilterCopyWithNoClipping<vext>;
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
 #else
   // [taps][bFirst][bLast]
   m_filterHor[0][0][0] = simdFilter<vext, 8, false, false, false>;
@@ -4972,6 +5188,9 @@ void InterpolationFilter::_initInterpolationFilterX86()
   m_filterCopy[0][1]   = simdFilterCopy<vext, false, true>;
   m_filterCopy[1][0]   = simdFilterCopy<vext, true, false>;
   m_filterCopy[1][1]   = simdFilterCopy<vext, true, true>;
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  m_filterCopyWithNoClipping = simdFilterCopyWithNoClipping<vext>;
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
 #endif
   m_weightedGeoBlk = xWeightedGeoBlk_SSE<vext>;
 #if JVET_Y0065_GPM_INTRA
