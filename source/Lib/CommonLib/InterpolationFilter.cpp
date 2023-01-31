@@ -1278,6 +1278,11 @@ InterpolationFilter::InterpolationFilter()
   m_filterCopy[0][1]   = filterCopy<false, true>;
   m_filterCopy[1][0]   = filterCopy<true, false>;
   m_filterCopy[1][1]   = filterCopy<true, true>;
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  m_filterCopyWithNoClipping = filterCopyWithNoClipping;
+  m_filterReverseCopy[0]     = filterReverseCopy <true>;
+  m_filterReverseCopy[1]     = filterReverseCopy <false>;
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
 #if !QC_SIF_SIMD
   m_weightedGeoBlk = xWeightedGeoBlk;
 #if JVET_Y0065_GPM_INTRA
@@ -1445,6 +1450,50 @@ void InterpolationFilter::filterCopy( const ClpRng& clpRng, const Pel *src, int 
     }
   }
 }
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+void InterpolationFilter::filterCopyWithNoClipping(const ClpRng& clpRng, const Pel* src, int srcStride, Pel* dst, int dstStride, int width, int height)
+{
+  const int lineSize = sizeof(Pel) * width;
+
+  for (int row = 0; row < height; row++)
+  {
+    std::memcpy(dst, src, lineSize);
+
+    src += srcStride;
+    dst += dstStride;
+  }
+}
+
+template<bool isVer>
+void InterpolationFilter::filterReverseCopy(const ClpRng& clpRng, const Pel* src, int srcStride, Pel* dst, int dstStride, int width, int height)
+{
+  const int lineSize = sizeof(Pel) * width;
+
+  if (isVer)
+  {
+    src += srcStride * (height - 1);
+    for (int row = 0; row < height; ++row)
+    {
+      std::memcpy(dst, src, lineSize);
+      src -= srcStride;
+      dst += dstStride;
+    }
+  }
+  else
+  {
+    for (int row = 0; row < height; ++row)
+    {
+      for (int col = 0; col < width; ++col)
+      {
+        dst[col] = src[width - col - 1];
+      }
+      src += srcStride;
+      dst += dstStride;
+    }
+  }
+}
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
 
 #if SIMD_4x4_12 && defined(TARGET_SIMD_X86)
 void InterpolationFilter::filter4x4( const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int xFrac, int yFrac, bool isLast)
@@ -1836,8 +1885,20 @@ void InterpolationFilter::filterVer(const ClpRng& clpRng, Pel const *src, int sr
  * \param  fmt        Chroma format
  * \param  bitDepth   Bit depth
  */
-void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx, bool biMCForDMVR, bool useAltHpelIf)
+void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx, bool biMCForDMVR, bool useAltHpelIf
+#if JVET_AC0104_IBC_BVD_PREDICTION
+                                  , const bool useCopyWithNoClipping
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
+)
 {
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  if (useCopyWithNoClipping)
+  {
+    m_filterCopyWithNoClipping(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
+
   if( frac == 0 && nFilterIdx < 2 )
   {
     m_filterCopy[true][isLast]( clpRng, src, srcStride, dst, dstStride, width, height, biMCForDMVR );

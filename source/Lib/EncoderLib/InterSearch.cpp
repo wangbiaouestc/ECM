@@ -2565,6 +2565,40 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 
     pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
 
+#if JVET_AC0104_IBC_BVD_PREDICTION 
+    pu.mvsdIdx[REF_PIC_LIST_0] = 0;
+    if (pu.mvd[REF_PIC_LIST_0].isMvsdApplicable())
+    {
+      pu.bvdSuffixInfo.initPrefixes(pu.mvd[REF_PIC_LIST_0], pu.cu->imv, true);
+
+      std::vector<Mv> cMvdDerivedVec;
+#if JVET_AA0070_RRIBC
+      Mv cMvPred2 = ((pu.cu->imv == 2 && cMv != amvpInfo4Pel[pu.cu->rribcFlipType].mvCand[bvpIdxBest]) ? amvpInfo4Pel[pu.cu->rribcFlipType] : amvpInfo[pu.cu->rribcFlipType]).mvCand[bvpIdxBest];
+      if (pu.cu->rribcFlipType == 1)
+      {
+        cMvPred2.setVer(0);
+      }
+      else if (pu.cu->rribcFlipType == 2)
+      {
+        cMvPred2.setHor(0);
+      }
+#else
+      const Mv cMvPred2 = ((pu.cu->imv == 2 && cMv != amvpInfo4Pel.mvCand[bvpIdxBest]) ? amvpInfo4Pel : amvpInfo).mvCand[bvpIdxBest];
+#endif // JVET_AA0070_RRIBC
+
+      const Mv cMvdKnownAtDecoder = pu.mvd[REF_PIC_LIST_0];// .getAbsMv();
+
+      deriveBvdSignIBC(cMvPred2, cMvdKnownAtDecoder, pu, cMvdDerivedVec, pu.cu->imv);
+
+      int idx = deriveMVSDIdxFromMVDTransIBC(pu.mvd[REF_PIC_LIST_0], cMvdDerivedVec, pu.bvdSuffixInfo);
+
+      initOffsets(pu.mvd[REF_PIC_LIST_0], cMvdDerivedVec, pu.bvdSuffixInfo, pu.cu->imv);
+
+      CHECK(idx == -1, "pu.mvsdIdx[REF_PIC_LIST_0] = -1");
+
+      pu.mvsdIdx[REF_PIC_LIST_0] = idx;
+    }
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
   }
 
   return true;

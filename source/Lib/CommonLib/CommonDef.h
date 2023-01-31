@@ -1326,6 +1326,10 @@ static const int EXT_PICTURE_SIZE =                             16;
 #endif
 #endif
 
+#if JVET_AC0104_IBC_BVD_PREDICTION
+static const int IBC_BVD_PREDICTION_MAX_BIN_NUM =                4;
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
+
 
 // ====================================================================================================================
 // Macro functions

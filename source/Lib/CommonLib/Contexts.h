@@ -449,6 +449,11 @@ public:
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   static const CtxSet   MvsdIdx;
 #endif
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  static const CtxSet   MvsdIdxBVDMSB;
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
+
 #if MULTI_HYP_PRED
   static const CtxSet   MultiHypothesisFlag;
   static const CtxSet   MHRefPic;

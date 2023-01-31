@@ -571,6 +571,19 @@ public:
   void getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight);
 #endif
 #endif
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  static constexpr bool checkBitMatch(unsigned int value1, unsigned int value2, int bitpos)
+  {
+    return ((value1 >> bitpos) & 1) == ((value2 >> bitpos) & 1);
+  };
+
+  void deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, std::vector<Mv>& cMvdDerived, int imv );
+
+  void initOffsets(Mv& cMvdInput, std::vector<Mv>& cMvdDerived,        MvdSuffixInfo& si, int imv);
+  void applyOffsets(Mv& cMvdInput, std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si, int imv);
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
+
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   void deriveMVDcand(const PredictionUnit& pu, RefPicList eRefPicList, std::vector<Mv>& cMvdCandList);
@@ -578,6 +591,11 @@ public:
 #endif
   void deriveMvdSign(const Mv& cMvPred, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, RefPicList eRefPicList, int iRefIdx, std::vector<Mv>& cMvdDerived);
   int deriveMVSDIdxFromMVDTrans(Mv cMvd, std::vector<Mv>& cMvdDerived);
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  int deriveMVSDIdxFromMVDTransIBC(const Mv& cMvd, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si) const ;
+  Mv  deriveMVDFromMVSDIdxTransIBC(int mvsdIdx, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si) const;
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
+
   Mv deriveMVDFromMVSDIdxTrans(int mvsdIdx, std::vector<Mv>& cMvdDerived);
   void deriveMvdSignSMVD(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, std::vector<Mv>& cMvdDerived);
   void deriveMvdSignAffine(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvPred3,
@@ -999,6 +1017,11 @@ class TplMatchingCtrl
   Distortion m_tmCostArrayCross[5];
 #endif
 
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bool m_useTop;
+  bool m_useLeft;
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
+
 public:
   TplMatchingCtrl(const PredictionUnit&     pu,
                         InterPredResources& interRes, // Bridge required resource from InterPrediction
@@ -1014,6 +1037,10 @@ public:
                   const Mv&                 mvStart,
                   const Mv*                 otherRefListMv,
                   const Distortion          curBestCost
+#if JVET_AC0104_IBC_BVD_PREDICTION
+                , const int tplSize = TM_TPL_SIZE
+                , const bool isForBmvdFlag = false
+#endif // JVET_AC0104_IBC_BVD_PREDICTION 
   );
 
   bool       getTemplatePresentFlag() { return m_curTplAbove.buf != nullptr || m_curTplLeft.buf != nullptr; }
@@ -1027,6 +1054,11 @@ public:
 private:
   template <int tplSize, bool trueAfalseL>         bool       xFillCurTemplate   (Pel* tpl);
   template <int tplSize, bool trueAfalseL, int sr> PelBuf     xGetRefTemplate    (const PredictionUnit& curPu, const Picture& refPic, const Mv& _mv, PelBuf& dstBuf);
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  template <int tplSize, bool trueAfalseL>         bool       xGetCurTemplateAvailable();
+  template <int tplSize, bool trueAfalseL>         PelBuf     xGetCurTemplateBvd(const PredictionUnit& curPu, const Picture& refPic, PelBuf& dstBuf);
+  template <int tplSize, bool trueAfalseL>         PelBuf     xGetRefTemplateBvd (const PredictionUnit& curPu, const Picture& refPic, const Mv& _mv, PelBuf& dstBuf);
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
   template <int tplSize, bool trueAfalseL>         void       xRemoveHighFreq    (const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight);
   template <int tplSize, int searchPattern>         void       xRefineMvSearch    (int maxSearchRounds, int searchStepShift);
 #if MULTI_PASS_DMVR
@@ -1039,7 +1071,16 @@ private:
 public:
 #endif
   template <int tplSize>                            Distortion xGetTempMatchError (const Mv& mv);
-  template <int tplSize, bool trueAfalseL>         Distortion xGetTempMatchError (const Mv& mv);
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  template <int tplSize>                            Distortion xGetTempMatchErrorBvd(const Mv& mv);
+  template <int tplSize, bool trueAfalseL, bool useForBvd=false>
+                                                    Distortion xGetTempMatchError (const Mv& mv);
+                                                    bool&      getCurTopRefAvailFlag() { return m_useTop; }
+                                                    bool&      getCurLeftRefAvailFlag() { return m_useLeft; }
+#else
+  template <int tplSize, bool trueAfalseL>          Distortion xGetTempMatchError(const Mv& mv);
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
+
 };
 #endif // TM_AMVP || TM_MRG
 

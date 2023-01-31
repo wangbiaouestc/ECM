@@ -246,6 +246,12 @@ public:
     roundToPrecision(MV_PRECISION_INTERNAL, m_amvrPrecIbc[amvr]);
   }
 
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  static int getImvPrecShift(const uint8_t imv)
+  {
+    return MV_PRECISION_4PEL == m_amvrPrecIbc[imv] ? 2 : 0;
+  }
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
 
   Mv getSymmvdMv(const Mv& curMvPred, const Mv& tarMvPred)
   {
@@ -273,6 +279,82 @@ public:
   Mv getAbsMv() { return Mv(abs(hor), abs(ver)); }
 #endif
 };// END CLASS DEFINITION MV
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+struct MvdSuffixInfo
+{
+  static const int paramOfGolombCode = 1;
+
+  unsigned horOffsetPrediction = 0;
+  unsigned verOffsetPrediction = 0;
+
+  int      horPrefix = -1;
+  int      verPrefix = -1;
+
+  int      iBinsInHorSuffix = -1;
+  int      iBinsInVerSuffix = -1;
+
+  int      horOffsetPredictionNumBins = -1;
+  int      verOffsetPredictionNumBins = -1;
+
+  int      horPrefixGroupStartValue = -1;
+  int      verPrefixGroupStartValue = -1;
+
+  bool     horEncodeSignInEP = false;
+  bool     verEncodeSignInEP = false;
+
+  int      horSignHypMatch = -1;
+  int      verSignHypMatch = -1;
+
+  void initPrefixes(const Mv& mv, const int imv, const bool isInternalPrecision);
+
+  void initSuffixesAndSigns(const Mv& mv, const int imv);
+
+  void defineNumberOfPredictedBinsInSuffix(const int iHorPrefix, const int iVerPrefix, const uint8_t imv  );
+
+  static int getMaxSuffix(const int prefix, const int maxAbs, const int maxGroupStartValue)
+  {
+    if (maxAbs <= 0)
+    {
+      return -1;
+    }
+    const int maxPrefix = getPrefixLength(maxAbs - 1);
+    return maxPrefix != prefix ? -1 : 1 + floorLog2(getSuffix(maxAbs - 1, maxGroupStartValue));
+  }
+
+  static unsigned int getSuffix(const int absVal, const int groupStartValue)
+  {
+    CHECK(absVal < 0, "Incorrect absVal in getSuffix()");
+    int suffix = absVal - groupStartValue;
+    return suffix;
+  }
+
+  static unsigned int getPrefixLength(int iSymbol)
+  {
+    if (iSymbol < 0)
+    {
+      return -1;
+    }
+    int param = BVD_CODING_GOLOMB_ORDER;
+    while (iSymbol >= (unsigned)(1 << param))
+    {
+      iSymbol -= 1 << param;
+      param++;
+    }
+    return param - 1; // "-1" is to compensate for separator
+  }
+
+
+  static unsigned     xGetGolombGroupMinValue(const int prefix)
+  {
+    CHECK(prefix < 0, "final_param < 0");
+    const int golomb_param = BVD_CODING_GOLOMB_ORDER;
+    return (1 << (prefix + golomb_param)) - 1 - ((1 << golomb_param) - 1);// (final_param > golomb_param + 1 ? ((1 << golomb_param) - 1) : 0);
+  }
+
+
+};
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
 
 namespace std
 {

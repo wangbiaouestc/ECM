@@ -626,6 +626,10 @@ struct InterPredictionData
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   int       mvsdIdx[NUM_REF_PIC_LIST_01];
 #endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  MvdSuffixInfo bvdSuffixInfo;
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
+
   Mv        bv;                             // block vector for IBC
   Mv        bvd;                            // block vector difference for IBC
   uint8_t   mmvdEncOptMode;                  // 0: no action 1: skip chroma MC for MMVD candidate pre-selection 2: skip chroma MC and BIO for MMVD candidate pre-selection

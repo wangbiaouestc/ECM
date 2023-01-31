@@ -742,6 +742,11 @@ unsigned CtxTimdFlag( const CodingUnit& cu );
 #if JVET_AB0155_SGPM
 unsigned CtxSgpmFlag(const CodingUnit &cu);
 #endif
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+int CtxSmBvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrect, const int isHor, const int significance);
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
+
 }
 
 #endif // __CONTEXTMODELLING__

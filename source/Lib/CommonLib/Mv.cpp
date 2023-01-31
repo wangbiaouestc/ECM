@@ -141,4 +141,162 @@ bool wrapClipMv( Mv& rcMv, const Position& pos, const struct Size& size, const S
   return wrapRef;
 }
 
+#if JVET_AC0104_IBC_BVD_PREDICTION
+void MvdSuffixInfo::initPrefixes(const Mv& mv, const int imv, const bool isInternalPrecision)
+{
+  Mv tmp = mv;
+  if (isInternalPrecision)
+  {
+    tmp.changeTransPrecInternal2Amvr(imv);
+  }
+
+  int       horMvd = tmp.getHor();
+  int       verMvd = tmp.getVer();
+
+  unsigned  absHor = unsigned(horMvd < 0 ? -horMvd : horMvd);
+  unsigned  absVer = unsigned(verMvd < 0 ? -verMvd : verMvd);
+  const auto horRemainderNonZero = (absHor > 0);
+  const auto verRemainderNonZero = (absVer > 0);
+
+  horPrefix = -1;
+  if (horRemainderNonZero)
+  {
+    horPrefix = getPrefixLength(absHor - 1 );
+  }
+
+  verPrefix = -1;
+  if (verRemainderNonZero)
+  {
+    verPrefix = getPrefixLength(absVer - 1 );
+  }
+
+  initSuffixesAndSigns(mv, imv);
+}
+
+
+void MvdSuffixInfo::initSuffixesAndSigns(const Mv& mv, const int imv)
+{
+  if (horPrefix >= 0)
+  {
+    horPrefixGroupStartValue = xGetGolombGroupMinValue(horPrefix);
+    iBinsInHorSuffix = horPrefix+1;
+  }
+  if (verPrefix >= 0)
+  {
+    verPrefixGroupStartValue = xGetGolombGroupMinValue(verPrefix);
+    iBinsInVerSuffix = verPrefix + 1;
+  }
+
+  defineNumberOfPredictedBinsInSuffix(horPrefix, verPrefix, imv);
+}
+
+void MvdSuffixInfo::defineNumberOfPredictedBinsInSuffix(const int iHorPrefix, const int iVerPrefix, const uint8_t imv)
+{
+  const int iNumberOfMSBins = IBC_BVD_PREDICTION_MAX_BIN_NUM;
+  CHECK(iNumberOfMSBins < 0, "Incorrect/negative value of bins to be predicted in suffixes of exp-Golomb code");
+
+
+
+  const unsigned int uiExpGolombParam = BVD_CODING_GOLOMB_ORDER;
+
+  const int iBinsInHorSuffix = iHorPrefix < 0 ? 0 : iHorPrefix + uiExpGolombParam;
+  const int iBinsInVerSuffix = iVerPrefix < 0 ? 0 : iVerPrefix + uiExpGolombParam;
+
+  const int iPrecShift = Mv::getImvPrecShift(imv);
+  constexpr int iMaxNumberOfInsignLSBins = 0;
+
+  const int iNumberOfInsignLSBins = std::max(0, iMaxNumberOfInsignLSBins - iPrecShift);
+  const int iAvailBinsInHorSuffix = std::max(0, iBinsInHorSuffix - iNumberOfInsignLSBins);
+  const int iAvailBinsInVerSuffix = std::max(0, iBinsInVerSuffix - iNumberOfInsignLSBins);
+  const int iTotalNumberOfPredBins = std::min(iNumberOfMSBins, iAvailBinsInHorSuffix + iAvailBinsInVerSuffix);
+
+  horEncodeSignInEP = false;
+  verEncodeSignInEP = false;
+
+  if (0 >= iTotalNumberOfPredBins)
+  {
+    horOffsetPredictionNumBins = 0;
+    verOffsetPredictionNumBins = 0;
+    return;
+  }
+
+  int iNumberOfHorMSBins = 0;
+  int iNumberOfVerMSBins = 0;
+  if (iHorPrefix > iVerPrefix)
+  {
+    if (iVerPrefix < 0)
+    {
+      iNumberOfHorMSBins = iTotalNumberOfPredBins;
+    }
+    else
+    {
+      const int iDiffHorVer = iAvailBinsInHorSuffix - iAvailBinsInVerSuffix;
+      const int iNumberOfEqSignBins = iTotalNumberOfPredBins - iDiffHorVer;
+      if (iNumberOfEqSignBins <= 0)
+      {
+
+        const bool magnitudeCheck = 2 * (verPrefixGroupStartValue + (1 << (iBinsInVerSuffix - 1))) < (1 << std::max(0, iBinsInHorSuffix - iTotalNumberOfPredBins - 1));
+        if (iAvailBinsInHorSuffix > iTotalNumberOfPredBins && magnitudeCheck)
+        {
+          iNumberOfHorMSBins = iTotalNumberOfPredBins + 1; //1 bin instead of VER sign
+          verEncodeSignInEP = true;
+        }
+        else
+        {
+          iNumberOfHorMSBins = iTotalNumberOfPredBins;
+        }
+      }
+      else
+      {
+        iNumberOfVerMSBins = iNumberOfEqSignBins >> 1;
+        CHECK(iAvailBinsInHorSuffix + iAvailBinsInVerSuffix == iTotalNumberOfPredBins && iNumberOfEqSignBins - (iNumberOfVerMSBins << 1) != 0, "iNumberOfEqSignBins is odd for iHorPrefix > iVerPrefix");
+        iNumberOfHorMSBins = iNumberOfEqSignBins - iNumberOfVerMSBins + iDiffHorVer;
+      }
+    }
+  }
+  else if (iVerPrefix > iHorPrefix)
+  {
+    if (iHorPrefix < 0)
+    {
+      iNumberOfVerMSBins = iTotalNumberOfPredBins;
+    }
+    else
+    {
+      const int iDiffVerHor = iAvailBinsInVerSuffix - iAvailBinsInHorSuffix;
+      const int iNumberOfEqSignBins = iTotalNumberOfPredBins - iDiffVerHor;
+      if (iNumberOfEqSignBins <= 0)
+      {
+        const bool magnitudeCheck = 2 * (horPrefixGroupStartValue + (1 << (iBinsInHorSuffix - 1))) < (1 << std::max(0, iBinsInVerSuffix - iTotalNumberOfPredBins - 1));
+        if (iAvailBinsInVerSuffix > iTotalNumberOfPredBins && magnitudeCheck)
+        {
+          iNumberOfVerMSBins = iTotalNumberOfPredBins + 1; //1 bin instead of HOR sign
+          horEncodeSignInEP = true;
+        }
+        else
+        {
+          iNumberOfVerMSBins = iTotalNumberOfPredBins;
+        }
+      }
+      else
+      {
+        iNumberOfHorMSBins = iNumberOfEqSignBins >> 1;
+        CHECK(iAvailBinsInHorSuffix + iAvailBinsInVerSuffix == iTotalNumberOfPredBins && iNumberOfEqSignBins - (iNumberOfHorMSBins << 1) != 0, "iNumberOfEqSignBins is odd for iVerPrefix > iHorPrefix");
+        iNumberOfVerMSBins = iNumberOfEqSignBins - iNumberOfHorMSBins + iDiffVerHor;
+      }
+    }
+  }
+  else
+  {
+    iNumberOfVerMSBins = std::min(iAvailBinsInVerSuffix, (iTotalNumberOfPredBins >> 1));
+    iNumberOfHorMSBins = iTotalNumberOfPredBins - iNumberOfVerMSBins;
+  };
+
+  CHECK(iNumberOfHorMSBins < 0, "iNumberOfHorMSBins < 0");
+  CHECK(iNumberOfVerMSBins < 0, "iNumberOfVerMSBins < 0");
+
+  horOffsetPredictionNumBins = std::min(iAvailBinsInHorSuffix, iNumberOfHorMSBins);
+  verOffsetPredictionNumBins = std::min(iAvailBinsInVerSuffix, iNumberOfVerMSBins);
+}
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
+
 //! \}

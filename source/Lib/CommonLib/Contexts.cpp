@@ -1827,6 +1827,24 @@ const CtxSet ContextSetCfg::Bvd = ContextSetCfg::addCtxSet
 });
 #endif
 
+#if JVET_AC0104_IBC_BVD_PREDICTION
+const CtxSet ContextSetCfg::MvsdIdxBVDMSB = ContextSetCfg::addCtxSet
+({
+  {  34,  41,  49,  41,  34,  41,  49,  41,  34,  41,  49,  41, 34,   41,  49,  41, },
+  {  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41, 34,   41,  34,  41, },
+  { CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, },
+  {  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12, 13,   13,  12,  12, },
+  {  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12, 13,   13,  12,  12, },
+  { DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, },
+  {   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4, },
+  {   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4, },
+  { DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, },
+  { 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, },
+  { 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, },
+  });
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
+
+
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 const CtxSet ContextSetCfg::MvsdIdx = ContextSetCfg::addCtxSet
 ({
