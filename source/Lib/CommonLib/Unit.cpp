@@ -366,6 +366,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if JVET_V0130_INTRA_TMP
   tmpFlag           = other.tmpFlag;
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
+  intraTmpDimdMode = other.intraTmpDimdMode;
+#endif
 #endif
 #if INTER_LIC
   LICFlag           = other.LICFlag;
@@ -532,6 +535,9 @@ void CodingUnit::initData()
 #endif
 #if JVET_V0130_INTRA_TMP
   tmpFlag = false;
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
+  intraTmpDimdMode = -1;
+#endif
 #endif
 #if INTER_LIC
   LICFlag = false;

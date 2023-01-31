@@ -1039,6 +1039,8 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
 #endif
       }
     }
+
+
 #if JVET_AC0112_IBC_CIIP
     if (puAbove && (CU::isInter(*puAbove->cu) || CU::isIBC(*puAbove->cu)))
 #else
@@ -1170,9 +1172,12 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
 #endif
       }
     }
+
+
 #if JVET_AC0112_IBC_CIIP
     if (puAboveRight && (CU::isInter(*puAboveRight->cu) || CU::isIBC(*puAboveRight->cu)))
 #else
+
     if (puAboveRight && CU::isInter(*puAboveRight->cu))
 #endif
     {
@@ -1194,6 +1199,8 @@ int PU::getIntraMPMs(const PredictionUnit &pu, unsigned* mpm, const ChannelType 
 #endif
       }
     }
+
+
 #if JVET_AC0112_IBC_CIIP
     if (puAboveLeft && (CU::isInter(*puAboveLeft->cu) || CU::isIBC(*puAboveLeft->cu)))
 #else
@@ -14966,6 +14973,7 @@ void PU::spanIpmInfoIntra( PredictionUnit &pu)
 #endif
 
   int ipm = PU::getIntraDirLuma(pu);
+
   if (pu.cu->timd)
   {
     ipm = MAP131TO67(ipm);
@@ -16916,7 +16924,9 @@ bool CU::isMTSAllowed(const CodingUnit &cu, const ComponentID compID)
   mtsAllowed &= !cu.ispMode;
   mtsAllowed &= !cu.sbtInfo;
 #if JVET_V0130_INTRA_TMP
+#if !JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
   mtsAllowed &= !cu.tmpFlag;
+#endif
 #endif
 #if JVET_W0123_TIMD_FUSION
   mtsAllowed &= !(cu.timd && cu.firstPU->multiRefIdx);

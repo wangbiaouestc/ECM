@@ -647,6 +647,7 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       if( tempType != NO_TEMPLATE )
 		  {
         m_pcIntraPred->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight(), tempType);
+
         m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight(), tempType);
 #if JVET_AB0061_ITMP_BV_FOR_IBC
         m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, foundCandiNum, pu);
@@ -659,7 +660,12 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 		  else
 		  {
 			  foundCandiNum = 1;
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
+        m_pcIntraPred->generateTmDcPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1), pu.cu);
+#else
         m_pcIntraPred->generateTmDcPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1));
+#endif // JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+
 #if JVET_AB0061_ITMP_BV_FOR_IBC
         pu.interDir               = 1;             // use list 0 for IBC mode
         pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;   // last idx in the list

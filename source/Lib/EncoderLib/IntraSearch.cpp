@@ -710,6 +710,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
     const CompArea &area = pu.Y();
     CompArea tmpArea(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
 #endif
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
+    int intraTmpDimdMode = 0;
+#endif 
 
     if (isSecondColorSpace)
     {
@@ -1316,7 +1319,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               else
               {
                 foundCandiNum = 1;
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
+                bsuccessfull = generateTmDcPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (cuCopy.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1), pu.cu);
+#else
                 bsuccessfull = generateTmDcPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (cuCopy.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1));
+#endif 
               }
 #endif
               if (bsuccessfull && foundCandiNum >= 1)
@@ -2090,7 +2097,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #if JVET_V0130_INTRA_TMP
       cu.tmpFlag = uiOrgMode.tmpFlag;
 #if JVET_W0103_INTRA_MTS
+#if !JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
       if (cu.tmpFlag && cu.mtsFlag) continue;
+#endif
 #endif
 #endif
       cu.mipFlag                     = uiOrgMode.mipFlg;
@@ -2371,6 +2380,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #if JVET_AB0155_SGPM
           bestSgpmMode = cu.sgpm;
 #endif
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
+          if (cu.tmpFlag)
+          {
+            CodingUnit* curCu = csBest->getCU(partitioner.currArea().lumaPos(), partitioner.chType);
+            intraTmpDimdMode = curCu->intraTmpDimdMode;
+          }
+#endif 
 
           if( sps.getUseLFNST() && mtsUsageFlag == 1 && !cu.ispMode )
           {
@@ -2532,6 +2548,12 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         pu.intraDir[0] = cu.tmrlList[tmrlListIdx].intraDir;
       }
 #endif
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
+      if (cu.tmpFlag)
+      {
+        cu.intraTmpDimdMode = intraTmpDimdMode;
+      }
+#endif 
       if (cu.colorTransform)
       {
         CHECK(pu.intraDir[CHANNEL_TYPE_CHROMA] != DM_CHROMA_IDX, "chroma should use DM mode for adaptive color transform");
@@ -6019,7 +6041,11 @@ void IntraSearch::xSelectAMTForFullRD(TransformUnit &tu)
   PelBuf         piResi = cs.getResiBuf(area);
 
 
-  const PredictionUnit &pu = *cs.getPU(area.pos(), chType);
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  PredictionUnit& pu = *cs.getPU(area.pos(), chType);
+#else
+  const PredictionUnit& pu = *cs.getPU(area.pos(), chType);
+#endif
 
   //===== init availability pattern =====
 
@@ -6027,6 +6053,75 @@ void IntraSearch::xSelectAMTForFullRD(TransformUnit &tu)
   initIntraPatternChType(*tu.cu, area);
 
   //===== get prediction signal =====
+#if JVET_V0130_INTRA_TMP && JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  if (PU::isTmp(pu, chType))
+  {
+    int foundCandiNum;
+#if JVET_W0069_TMP_BOUNDARY
+    RefTemplateType tempType = getRefTemplateType(*(tu.cu), tu.cu->blocks[COMPONENT_Y]);
+    if (tempType != NO_TEMPLATE)
+    {
+#if TMP_FAST_ENC
+      generateTMPrediction(piPred.buf, piPred.stride, pu.Y(), foundCandiNum, tu.cu);
+#else
+      getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight(), tempType);
+      candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight(), tempType);
+      generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+#endif
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+      pu.interDir = 1;              // use list 0 for IBC mode
+      pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;   // last idx in the list
+      pu.mv->set(m_tempLibFast.getX() << MV_FRACTIONAL_BITS_INTERNAL, m_tempLibFast.getY() << MV_FRACTIONAL_BITS_INTERNAL);
+      pu.bv.set(m_tempLibFast.getX(), m_tempLibFast.getY());
+#endif
+    }
+    else
+    {
+      foundCandiNum = 1;
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
+      generateTmDcPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1), pu.cu);
+#else
+      generateTmDcPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1));
+#endif 
+
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+      pu.interDir = 1;             // use list 0 for IBC mode
+      pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;   // last idx in the list
+      pu.mv->set(0, 0);
+      pu.bv.set(0, 0);
+#endif
+    }
+#else
+    getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight());
+    candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight());
+    generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+#endif
+    CHECK(foundCandiNum < 1, "");
+  
+  }
+  else if (PU::isMIP(pu, chType))
+  {
+    initIntraMip(pu, area);
+    predIntraMip(COMPONENT_Y, piPred, pu);
+  }
+  else
+  {
+#if JVET_AB0155_SGPM
+    if (pu.cu->sgpm)
+    {
+      CompArea tmpArea(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
+      PelBuf predBuf(m_sgpmPredBuf[pu.cu->sgpmIdx], tmpArea);
+      piPred.copyFrom(predBuf);
+    }
+    else
+#endif
+    {
+      predIntraAng(COMPONENT_Y, piPred, pu);
+    }
+  }
+
+#else
+
   if (PU::isMIP(pu, chType))
   {
     initIntraMip(pu, area);
@@ -6043,11 +6138,12 @@ void IntraSearch::xSelectAMTForFullRD(TransformUnit &tu)
     }
     else
 #endif
-
-    predIntraAng(COMPONENT_Y, piPred, pu);
+    {
+      predIntraAng(COMPONENT_Y, piPred, pu);
+    }
   }
 
-
+#endif
   // save prediction
   sharedPredTS.copyFrom(piPred);
 
@@ -6212,7 +6308,12 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
           else
           {
             foundCandiNum = 1;
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
+            generateTmDcPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1), pu.cu);
+#else
             generateTmDcPrediction( piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth( CHANNEL_TYPE_LUMA ) - 1) );
+#endif 
+
 #if JVET_AB0061_ITMP_BV_FOR_IBC
             pu.interDir               = 1;             // use list 0 for IBC mode
             pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;   // last idx in the list

@@ -2351,10 +2351,12 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   int  dimdRelWeight[3] = { 0 };
 #endif
   bool dimdDerived = false;
+
 #if JVET_Z0050_DIMD_CHROMA_FUSION && (JVET_AC0094_REF_SAMPLES_OPT)
   int8_t dimdChromaMode = -1;
   int8_t dimdChromaModeSecond = -1;
 #endif
+
   if (isLuma(partitioner.chType))
   {
     CodingUnit cu(tempCS->area);
@@ -2364,6 +2366,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
     PredictionUnit pu(tempCS->area);
     pu.cu = &cu;
     pu.cs = tempCS;
+
 #if JVET_AC0094_REF_SAMPLES_OPT
     areAboveRightUnavail = tempCS->getCURestricted(cu.Y().topRight().offset(1, -1), cu, partitioner.chType) == nullptr;
     areBelowLeftUnavail = tempCS->getCURestricted(cu.Y().bottomLeft().offset(-1, 1), cu, partitioner.chType) == nullptr;
@@ -2371,7 +2374,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
     cu.areBelowLeftUnavail = areBelowLeftUnavail;
 #endif
 
-    if( cu.slice->getSPS()->getUseDimd() )
+    if (cu.slice->getSPS()->getUseDimd())
     {
       const CompArea &area = cu.Y();
       IntraPrediction::deriveDimdMode(bestCS->picture->getRecoBuf(area), area, cu);
