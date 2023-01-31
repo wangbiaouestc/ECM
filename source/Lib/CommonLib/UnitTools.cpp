@@ -17854,7 +17854,11 @@ uint32_t PU::getFinalIntraModeForTransform( const TransformUnit &tu, const Compo
 #if JVET_V0130_INTRA_TMP
   if( PU::isTmp( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
   {
-    intraMode = PLANAR_IDX;
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+      intraMode = tu.cu->intraTmpDimdMode;
+#else
+      intraMode = PLANAR_IDX;
+#endif
   }
 #endif
 #if JVET_AB0155_SGPM
