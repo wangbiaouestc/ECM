@@ -52,6 +52,7 @@
 
 
 
+
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -296,6 +297,7 @@
 #define JVET_AA0133_INTER_MTS_OPT                         1 // JVET-AA0133: Inter MTS optimization
 #define JVET_AB0067_MIP_DIMD_LFNST                        1 // JVET-AB0067: Modification of LFNST for MIP coded block
 #define JVET_AC0130_NSPT                                  1 // JVET-AC0130: NSPT replacing DCT-II + LFNST for certain block shapes
+#define JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST              1 // JVET-AC0115: Modifications of MTS/LFNST for Intra TMP coded block
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision
 #define SLICE_TYPE_WIN_SIZE                               1 // Context window initialization based on slice type

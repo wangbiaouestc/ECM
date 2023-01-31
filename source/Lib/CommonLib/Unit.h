@@ -396,6 +396,9 @@ struct CodingUnit : public UnitArea
 #endif
 #if JVET_V0130_INTRA_TMP
   bool		    	 tmpFlag;
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
+  int            intraTmpDimdMode;
+#endif
 #endif
 #if INTER_LIC
   bool           LICFlag;

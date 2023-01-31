@@ -5498,6 +5498,7 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
                              eTempType != LEFT_NEIGHBOR ? iTempHeight : 0, uiRefWidth, uiRefHeight);
 
     uint32_t uiIntraDirNeighbor[5] = { 0 }, modeIdx = 0;
+
     bool     includedMode[EXT_VDIA_IDX + 1];
     memset(includedMode, false, (EXT_VDIA_IDX + 1) * sizeof(bool));
     auto &   pu      = *cu.firstPU;
@@ -5544,6 +5545,7 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
         modeIdx++;
       }
     }
+
     // above
     const PredictionUnit *puAbovex = pu.cs->getPURestricted(posRTx.offset(0, -1), pu, pu.chType);
     if (puAbovex && CU::isIntra(*puAbovex->cu) && CU::isSameCtu(*pu.cu, *puAbovex->cu))
@@ -5559,6 +5561,7 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
         modeIdx++;
       }
     }
+
     // below left
     const PredictionUnit *puLeftBottomx = cs.getPURestricted(posLBx.offset(-1, 1), pu, pu.chType);
     if (puLeftBottomx && CU::isIntra(*puLeftBottomx->cu))
@@ -5574,6 +5577,7 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
         modeIdx++;
       }
     }
+
 #if JVET_AC0094_REF_SAMPLES_OPT
     if (!puLeftx)
     {
@@ -5585,6 +5589,18 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
       decreaseMinFar = false;
     }
 #endif
+
+#if EE2_4_1b
+    if (puLeftBottomx && PU::UseIntraTmpDimdMode(*puLeftBottomx))
+    {
+      uiIntraDirNeighbor[modeIdx] = PU::GetIntraTmpDimdMode(*puLeftBottomx);
+      if (!includedMode[uiIntraDirNeighbor[modeIdx]])
+      {
+        includedMode[uiIntraDirNeighbor[modeIdx]] = true;
+        modeIdx++;
+      }
+    }
+#endif // EE2_4_1b
     // above right
     const PredictionUnit *puAboveRightx = cs.getPURestricted(posRTx.offset(1, -1), pu, pu.chType);
     if (puAboveRightx && CU::isIntra(*puAboveRightx->cu))
@@ -5611,6 +5627,17 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
       increaseMaxFar = false;
     }
 #endif
+#if EE2_4_1b
+    if (puAboveRightx && PU::UseIntraTmpDimdMode(*puAboveRightx))
+    {
+      uiIntraDirNeighbor[modeIdx] = PU::GetIntraTmpDimdMode(*puAboveRightx);
+      if (!includedMode[uiIntraDirNeighbor[modeIdx]])
+      {
+        includedMode[uiIntraDirNeighbor[modeIdx]] = true;
+        modeIdx++;
+      }
+    }
+#endif // EE2_4_1b
     // above left
     const PredictionUnit *puAboveLeftx = cs.getPURestricted(posLTx.offset(-1, -1), pu, pu.chType);
     if (puAboveLeftx && CU::isIntra(*puAboveLeftx->cu))
@@ -5626,6 +5653,7 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
         modeIdx++;
       }
     }
+
     bool bNoAngular = false;
     if (modeIdx >= 2)
     {
@@ -6661,6 +6689,37 @@ void IntraPrediction::ibcCiipBlending(Pel *pDst, int strideDst, const Pel *pSrc0
 #endif
 
 #if ENABLE_DIMD
+
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+int IntraPrediction::deriveDimdIntraTmpModePred(const CodingUnit cu, CPelBuf predBuf)
+{
+  int sigcnt = 0;
+  const Pel* pPred = predBuf.buf;
+  const int iStride = predBuf.stride;
+  int height = predBuf.height;
+  int width = predBuf.width;
+
+  int piHistogramClean[NUM_LUMA_MODE] = { 0 };
+
+  pPred = pPred + iStride + 1;
+  sigcnt += buildHistogram(pPred, iStride, height - 2, width - 2, piHistogramClean, 0, width - 2, height - 2);
+
+  int firstAmp = 0, curAmp = 0;
+  int firstMode = 0, curMode = 0;
+  for (int i = 0; i < NUM_LUMA_MODE; i++)
+  {
+    curAmp = piHistogramClean[i];
+    curMode = i;
+    if (curAmp > firstAmp)
+    {
+      firstAmp = curAmp;
+      firstMode = curMode;
+    }
+  }
+  return firstMode;
+}
+#endif // JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+
 void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu)
 {
   if( !cu.slice->getSPS()->getUseDimd() )
@@ -10442,6 +10501,10 @@ bool IntraPrediction::generateTMPrediction( Pel* piPred, unsigned int uiStride, 
     return false;
   }
 
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  Pel* pPred = piPred;
+#endif
+
 #if TMP_FAST_ENC
   int pX = cu->tmpXdisp;
   int pY = cu->tmpYdisp;
@@ -10480,6 +10543,11 @@ bool IntraPrediction::generateTMPrediction( Pel* piPred, unsigned int uiStride, 
       piPred += uiStride;
     }
   }
+
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  CPelBuf predBuf(pPred, uiStride, uiWidth, uiHeight);
+  cu->intraTmpDimdMode = deriveDimdIntraTmpModePred(*cu, predBuf);
+#endif
   return bSucceedFlag;
 }
 
@@ -10501,6 +10569,10 @@ bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, i
   {
     return false;
   }
+
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  Pel* pPred = piPred;
+#endif
 
 #if TMP_FAST_ENC
   int pX = pu.cu->tmpXdisp;
@@ -10547,13 +10619,25 @@ bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, i
   pu.mv->set(pX << MV_FRACTIONAL_BITS_INTERNAL, pY << MV_FRACTIONAL_BITS_INTERNAL);
   pu.bv.set(pX, pY);
 
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  CPelBuf predBuf(pPred, uiStride, uiWidth, uiHeight);
+  pu.cu->intraTmpDimdMode = deriveDimdIntraTmpModePred(*pu.cu, predBuf);
+#endif
+
   return bSucceedFlag;
 }
 #endif
 
 #if JVET_W0069_TMP_BOUNDARY
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
+bool IntraPrediction::generateTmDcPrediction(Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val, CodingUnit* cu)
+#else
 bool IntraPrediction::generateTmDcPrediction( Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val )
+#endif // JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
 {
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  Pel* pPred = piPred;
+#endif
   bool bSucceedFlag = true;
   {
     for( unsigned int uiY = 0; uiY < uiBlkHeight; uiY++ )
@@ -10565,6 +10649,10 @@ bool IntraPrediction::generateTmDcPrediction( Pel* piPred, unsigned int uiStride
       piPred += uiStride;
     }
   }
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  CPelBuf predBuf(pPred, uiStride, uiBlkWidth, uiBlkHeight);
+  cu->intraTmpDimdMode = deriveDimdIntraTmpModePred(*cu, predBuf);
+#endif
   return bSucceedFlag;
 }
 #endif

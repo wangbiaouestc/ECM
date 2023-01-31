@@ -526,7 +526,11 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
 #if JVET_V0130_INTRA_TMP
     if( PU::isTmp( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
     {
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+      intraMode = tu.cu->intraTmpDimdMode;
+#else
       intraMode = PLANAR_IDX;
+#endif
     }
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -783,7 +787,11 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
 #if JVET_V0130_INTRA_TMP
     if( PU::isTmp( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
     {
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+      intraMode = tu.cu->intraTmpDimdMode;
+#else
       intraMode = PLANAR_IDX;
+#endif
     }
 #endif
 #if JVET_AB0155_SGPM
@@ -1115,7 +1123,11 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
   }
 
 #if JVET_V0130_INTRA_TMP
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  if (isImplicitMTS || isISP)
+#else
   if (isImplicitMTS || isISP || tu.cu->tmpFlag)
+#endif
 #else
   if (isImplicitMTS || isISP)
 #endif
@@ -1200,7 +1212,19 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
       uint8_t nSzIdxW = std::min(3, (floorLog2(width) - 2));
       uint8_t nSzIdxH = std::min(3, (floorLog2(height) - 2));
       const CompArea& area = tu.blocks[compID];
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+      int predMode;
+      if (tu.cu->tmpFlag)
+      {
+        predMode = tu.cu->intraTmpDimdMode;
+      }
+      else
+      {
+        predMode = PU::getFinalIntraMode(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID));
+      }
+#else
       int predMode = PU::getFinalIntraMode(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID));
+#endif
 #if JVET_W0123_TIMD_FUSION
       if (tu.cu->timd && compID == COMPONENT_Y)
       {
@@ -2606,7 +2630,11 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
 #if JVET_V0130_INTRA_TMP
   if (PU::isTmp(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
   {
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+    intraMode = tu.cu->intraTmpDimdMode;
+#else
     intraMode = PLANAR_IDX;
+#endif
   }
 #endif
 #if JVET_AB0155_SGPM
