@@ -146,6 +146,9 @@ void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p)
   p->bitsIdx[1] = fracBits.getFracBitsArray(Ctx::MVPIdx()).intBits[1];
   p->bitsImv[0] = fracBits.getFracBitsArray(Ctx::ImvFlag(1)).intBits[0];
   p->bitsImv[1] = fracBits.getFracBitsArray(Ctx::ImvFlag(1)).intBits[1];
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  p->bitsRribc  = fracBits.getFracBitsArray(Ctx::rribcFlipType(0)).intBits[1];
+#endif
 }
 #endif
 
@@ -2430,7 +2433,28 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     m_pcRdCost->setCostScale(0);
 #if JVET_AA0070_RRIBC
 #if JVET_Z0084_IBC_TM && IBC_TM_AMVP
-    m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), pu.cu->rribcFlipType, &pu.cu->imv, &bvpIdxBest, true, &amvpInfo4Pel[pu.cu->rribcFlipType]);
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if !JVET_AC0112_IBC_CIIP && !JVET_AC0112_IBC_LIC
+    Distortion initCost = 
+#endif
+      m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), pu.cu->rribcFlipType, &pu.cu->imv, &bvpIdxBest, true, &amvpInfo4Pel[pu.cu->rribcFlipType]);
+
+    if (pu.cu->rribcFlipType)
+    {
+      pu.cu->bvOneNullComp = 1;
+      pu.cu->bvNullCompDir = pu.cu->rribcFlipType;
+    }
+#if !JVET_AC0112_IBC_CIIP && !JVET_AC0112_IBC_LIC
+    else
+    {
+      getBestBvpBvOneNullComp(pu, cMv, initCost, &bvpIdxBest , &amvpInfo[0], &amvpInfo4Pel[0]);
+    }
+#endif
+#else
+    m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(),
+                                       pu.cu->rribcFlipType, &pu.cu->imv, &bvpIdxBest, true,
+                                       &amvpInfo4Pel[pu.cu->rribcFlipType]);
+#endif
 #else
     m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), pu.cu->rribcFlipType, &pu.cu->imv, &bvpIdxBest);
 #endif
@@ -2525,7 +2549,6 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     }
 #endif
 
-
     pu.bv = cMv; // bv is always at integer accuracy
     cMv.changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
     pu.mv[REF_PIC_LIST_0] = cMv; // store in fractional pel accuracy
@@ -2603,6 +2626,52 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 
   return true;
 }
+
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+inline void InterSearch::getBestBvpBvOneNullComp(PredictionUnit &pu, Mv cMv, Distortion initCost,
+                                                 int *bvpIdxBest, AMVPInfo *amvp1Pel, AMVPInfo *amvp4Pel)
+{
+  Mv         bvpCand[2];
+  int        tempImv = 0, tempIdx = 0;
+  Distortion bvOneNullCompCost = std::numeric_limits<uint32_t>::max();
+  if (cMv.getVer() == 0)
+  {
+    bvpCand[0] = Mv(std::max(-(int) pu.lwidth(), -pu.Y().x), 0);
+    bvpCand[1] = Mv(-pu.Y().x, 0);
+    bvOneNullCompCost =
+      m_pcRdCost->getbvVerNullCompCost(cMv.getHor(), pu.cs->sps->getAMVREnabledFlag(), &tempImv, &tempIdx, bvpCand);
+  }
+  else if (cMv.getHor() == 0)
+  {
+    const int ctbSize     = pu.cs->sps->getCTUSize();
+    const int numCurrCtuY = (pu.Y().y >> (floorLog2(ctbSize)));
+    const int rrTop       = (numCurrCtuY < 3) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + 2 * ctbSize);
+
+    bvpCand[0] = Mv(0, std::max(-(int) pu.lheight(), rrTop));
+    bvpCand[1] = Mv(0, rrTop);
+    bvOneNullCompCost =
+      m_pcRdCost->getbvHorNullCompCost(cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &tempImv, &tempIdx, bvpCand);
+  }
+
+  if (bvOneNullCompCost < initCost)
+  {
+    pu.cu->bvOneNullComp = 1;
+    pu.cu->bvNullCompDir = (cMv.getVer() == 0) ? 1 : cMv.getHor() == 0 ? 2 : 0;
+    pu.cu->imv           = tempImv;
+    *bvpIdxBest          = tempIdx;
+    if (pu.cu->imv == 2)
+    {
+      amvp4Pel->mvCand[tempIdx] = bvpCand[tempIdx];
+      amvp4Pel->mvCand[tempIdx].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+    }
+    else
+    {
+      amvp1Pel->mvCand[tempIdx] = bvpCand[tempIdx];
+      amvp1Pel->mvCand[tempIdx].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+    }
+  }
+}
+#endif
 
 #if JVET_AA0070_RRIBC
 void InterSearch::xxIBCHashSearch(PredictionUnit &pu, Mv mvPred[3][2], int numMvPred, Mv &mv, int &idxMvPred, IbcHashMap &ibcHashMap, AMVPInfo amvpInfo4Pel[3], int numRribcType)

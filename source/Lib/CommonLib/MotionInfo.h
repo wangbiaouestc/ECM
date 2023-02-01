@@ -77,6 +77,9 @@ struct AMVPInfo
   Mv       mvCand[AMVP_MAX_NUM_CANDS_MEM];  ///< array of motion vector predictor candidates
 #endif
   unsigned numCand;                       ///< number of motion vector predictor candidates
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  Distortion mvCost[REGULAR_AMVP_MAX_NUM_CANDS + 1];
+#endif
 #if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP)
   unsigned maxStorageSize;
   unsigned maxSimilarityThreshold;

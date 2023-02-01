@@ -3099,6 +3099,87 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
   return false;
 }
 
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+inline void PU::getTemplateTop(const bool availableTop, const PredictionUnit &pu, CPelBuf pRecY, PelBuf pTempDest,
+                               Position tempOffset, int tempWidth, int tempHeight)
+{
+  if (availableTop)
+  {
+    const Pel *pOrg = pRecY.bufAt(pu.blocks[COMPONENT_Y].pos().offset(tempOffset));
+    for (int r = 0; r < tempHeight; r++)
+    {
+      for (int c = 0; c < tempWidth; c++)
+      {
+        *pTempDest.buf++ = pOrg[r * pRecY.stride + c];
+      }
+    }
+  }
+}
+
+inline void PU::getTemplateLeft(const bool availableLeft, const PredictionUnit &pu, CPelBuf pRecY, PelBuf pTempDest,
+                                Position tempOffset, int tempWidth, int tempHeight)
+{
+  if (availableLeft)
+  {
+    const Pel *pOrg = pRecY.bufAt(pu.blocks[COMPONENT_Y].pos().offset(tempOffset));
+    for (int c = 0; c < tempWidth; c++)
+    {
+      for (int r = 0; r < tempHeight; r++)
+      {
+        *pTempDest.buf++ = pOrg[r * pRecY.stride + c];
+      }
+    }
+  }
+}
+
+inline void PU::getTemplateRefTop(const PredictionUnit &pu, CPelBuf pRecY, PelBuf pTempDest, Mv CandMv, int tempWidth, int tempHeight)
+{
+  MotionInfo templateMv;
+  int        offset = -AML_MERGE_TEMPLATE_SIZE;
+  templateMv.mv[0]  = CandMv + Mv(0, offset << (MV_PRECISION_INTERNAL - MV_PRECISION_INT));
+  if (!PU::checkIsIBCCandidateValid(pu, templateMv))
+  {
+    offset = 0;
+  }
+  CandMv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+  PU::getTemplateTop(true, pu, pRecY, pTempDest, Position(CandMv.hor, CandMv.ver + offset), tempWidth, tempHeight);
+}
+
+inline void PU::getTemplateRefLeft(const PredictionUnit &pu, CPelBuf pRecY, PelBuf pTempDest, Mv CandMv, int tempWidth,
+                            int tempHeight)
+{
+  MotionInfo templateMv;
+  int        offset = -AML_MERGE_TEMPLATE_SIZE;
+  templateMv.mv[0]  = CandMv + Mv(offset << (MV_PRECISION_INTERNAL - MV_PRECISION_INT), 0);
+  if (!PU::checkIsIBCCandidateValid(pu, templateMv))
+  {
+    offset = 0;
+  }
+  CandMv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+  PU::getTemplateLeft(true, pu, pRecY, pTempDest, Position(CandMv.hor + offset, CandMv.ver), tempWidth, tempHeight);
+}
+
+inline Distortion PU::getTMCost(const PredictionUnit &pu, CPelBuf pRecY, Mv CandMv, bool availableTmTop,
+                                bool availableTmLeft,
+                         InterPrediction *pcInter)
+{
+  Distortion uiCost = 0;
+  if (availableTmTop)
+  {
+    PU::getTemplateRefTop(pu, pRecY, pu.cs->m_pcBufPredRefTop, CandMv, pu.cs->m_pcBufPredCurTop.width,
+                          AML_MERGE_TEMPLATE_SIZE);
+    uiCost += pcInter->getRdCostOTF(pu, pu.cs->m_pcBufPredCurTop, pu.cs->m_pcBufPredRefTop);
+  }
+  if (availableTmLeft)
+  {
+    PU::getTemplateRefLeft(pu, pRecY, pu.cs->m_pcBufPredRefLeft, CandMv, AML_MERGE_TEMPLATE_SIZE,
+                           pu.cs->m_pcBufPredCurLeft.height);
+    uiCost += pcInter->getRdCostOTF(pu, pu.cs->m_pcBufPredCurLeft, pu.cs->m_pcBufPredRefLeft);
+  }
+  return uiCost;
+}
+#endif
+
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 bool PU::addIBCMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int &mrgCandIdx,
   const uint32_t maxNumMergeCandMin1, int &cnt
@@ -3284,10 +3365,15 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #endif
 #if JVET_Z0084_IBC_TM
 #if IBC_TM_MRG
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  const uint32_t mvdSimilarityThresh = (pu.tmMergeFlag && pu.mergeFlag) ? PU::getTMMvdThreshold(pu) : 1;
+#else
 #if JVET_AA0070_RRIBC
-  const uint32_t mvdSimilarityThresh = ((pu.tmMergeFlag && pu.mergeFlag) || (!pu.mergeFlag && !pu.cu->rribcFlipType)) ? PU::getTMMvdThreshold(pu) : 1;
+  const uint32_t mvdSimilarityThresh =
+    ((pu.tmMergeFlag && pu.mergeFlag) || (!pu.mergeFlag && !pu.cu->rribcFlipType)) ? PU::getTMMvdThreshold(pu) : 1;
 #else
   const uint32_t mvdSimilarityThresh = pu.tmMergeFlag ? PU::getTMMvdThreshold(pu) : 1;
+#endif
 #endif
 #else
   const uint32_t mvdSimilarityThresh = 1;
@@ -3377,6 +3463,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #endif
     if (mrgCandIdx == cnt)
     {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+      mrgCtx.numAMVPMergeCand = cnt;
+#endif
       return;
     }
     cnt++;
@@ -3384,6 +3473,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
     // early termination
     if (cnt == maxNumMergeCand)
     {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+      mrgCtx.numAMVPMergeCand = cnt;
+#endif
       return;
     }
 #if JVET_Y0058_IBC_LIST_MODIFY
@@ -3445,6 +3537,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
       {
         if (mrgCandIdx == cnt)
         {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+          mrgCtx.numAMVPMergeCand = cnt;
+#endif
           return;
         }
         cnt++;
@@ -3452,6 +3547,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
         // early termination
         if (cnt == maxNumMergeCand)
         {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+          mrgCtx.numAMVPMergeCand = cnt;
+#endif
           return;
         }
       }
@@ -3514,6 +3612,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
         {
           if (mrgCandIdx == cnt)
           {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+            mrgCtx.numAMVPMergeCand = cnt;
+#endif
             return;
           }
           cnt++;
@@ -3521,6 +3622,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
           // early termination
           if (cnt == maxNumMergeCand)
           {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+            mrgCtx.numAMVPMergeCand = cnt;
+#endif
             return;
           }
         }
@@ -3579,6 +3683,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
         {
           if (mrgCandIdx == cnt)
           {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+            mrgCtx.numAMVPMergeCand = cnt;
+#endif
             return;
           }
           cnt++;
@@ -3586,6 +3693,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
           // early termination
           if (cnt == maxNumMergeCand)
           {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+            mrgCtx.numAMVPMergeCand = cnt;
+#endif
             return;
           }
         }
@@ -3654,6 +3764,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
           {
             if (mrgCandIdx == cnt)
             {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+              mrgCtx.numAMVPMergeCand = cnt;
+#endif
               return;
             }
             cnt++;
@@ -3661,6 +3774,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
             // early termination
             if (cnt == maxNumMergeCand)
             {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+              mrgCtx.numAMVPMergeCand = cnt;
+#endif
               return;
             }
           }
@@ -3705,12 +3821,18 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 
     if (bFound)
     {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+      mrgCtx.numAMVPMergeCand = cnt;
+#endif
       return;
     }
 
 #if JVET_Z0075_IBC_HMVP_ENLARGE
     if (cnt == maxNumMergeCand)
     {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+      mrgCtx.numAMVPMergeCand = cnt;
+#endif
       return;
     }
 #endif
@@ -3746,6 +3868,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
       {
         if (mrgCandIdx == cnt)
         {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+          mrgCtx.numAMVPMergeCand = cnt;
+#endif
           return;
         }
         cnt++;
@@ -3753,6 +3878,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
         // early termination
         if (cnt == maxNumMergeCand)
         {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+          mrgCtx.numAMVPMergeCand = cnt;
+#endif
           return;
         }
       }
@@ -3856,6 +3984,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
     {
       if (mrgCandIdx == cnt)
       {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+        mrgCtx.numAMVPMergeCand = cnt;
+#endif
         return;
       }
       cnt++;
@@ -3895,6 +4026,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
     mrgCtx.interDirNeighbours[cnt] = 1;
     mrgCtx.mvFieldNeighbours[cnt * 2].setMvField(Mv(0, 0), MAX_NUM_REF);
   }
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  mrgCtx.numAMVPMergeCand = cnt;
 #endif
 }
 
@@ -9706,6 +9840,84 @@ bool PU::getDerivedBV(PredictionUnit &pu, const Mv& currentMv, Mv& derivedMv)
   return isIBC;
 }
 
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AA0070_RRIBC
+inline void PU::getRribcBvpCand(PredictionUnit &pu, AMVPInfo *pInfo)
+{
+  pInfo->numCand = 2;
+  if (pu.cu->rribcFlipType == 1)
+  {
+    pInfo->mvCand[0] = Mv(std::max(-static_cast<int>(pu.lwidth()), -pu.Y().x),0);
+    pInfo->mvCand[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+    pInfo->mvCand[1] = Mv(- pu.Y().x,0);
+    pInfo->mvCand[1].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+  }
+  else if (pu.cu->rribcFlipType == 2)
+  {
+    const int ctbSize     = pu.cs->sps->getCTUSize();
+    const int numCurrCtuY = (pu.Y().y >> (floorLog2(ctbSize)));
+    const int rrTop       = (numCurrCtuY < 3) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + 2 * ctbSize);
+    pInfo->mvCand[0] = Mv(0,std::max(-static_cast<int>(pu.lheight()), rrTop));
+    pInfo->mvCand[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+    pInfo->mvCand[1] = Mv(0,rrTop);
+    pInfo->mvCand[1].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+  }
+}
+#endif
+
+inline void PU::clusterBvpCand(const int cbWidth, const int cbHeight, AMVPInfo *pInfo)
+{
+  int                                     numGroups = 0;
+  std::array<bool, IBC_MRG_MAX_NUM_CANDS> validCand;
+  validCand.fill(true);
+  Mv         bestCand;
+  Distortion bestCost;
+  int        sqrRadius;
+  sqrRadius = std::max(2, floorLog2((cbWidth * cbHeight) >> MIN_PU_SIZE));
+  sqrRadius = (sqrRadius * sqrRadius) << 8;
+  // Clustering of AMVP candidates into two groups
+  if (pInfo->numCand > 2)
+  {
+    for (int i = 0; i < pInfo->numCand - 1; i++)
+    {
+      if (validCand[i])
+      {
+        bestCand = pInfo->mvCand[i];
+        bestCost = pInfo->mvCost[i];
+        if (++numGroups > 2)
+        {
+          break;
+        }
+      }
+      else
+      {
+        continue;
+      }
+      for (int j = i + 1; j < pInfo->numCand; j++)
+      {
+        if (validCand[j])
+        {
+          Mv mvDiff = pInfo->mvCand[i] - pInfo->mvCand[j];
+
+          if ((mvDiff.getAbsHor() * mvDiff.getAbsHor() + mvDiff.getAbsVer() * mvDiff.getAbsVer())
+              <= sqrRadius)   // next candidate is inside the radius
+          {
+            validCand[j] = false;
+            if (bestCost > pInfo->mvCost[j])
+            {
+              bestCand = pInfo->mvCand[j];
+              bestCost = pInfo->mvCost[j];
+            }
+          }
+        }
+      }
+      pInfo->mvCand[i] = bestCand;
+      pInfo->mvCost[i] = bestCost;
+    }
+  }
+}
+#endif
+
 /**
  * Constructs a list of candidates for IBC AMVP (See specification, section "Derivation process for motion vector predictor candidates")
  */
@@ -9716,16 +9928,54 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
 #endif
 {
   AMVPInfo *pInfo = &amvpInfo;
-  pInfo->numCand = 0;
-
+  pInfo->numCand  = 0;
   MergeCtx mergeCtx;
+
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AA0070_RRIBC
+  if (pu.cu->rribcFlipType)
+  {
+    getRribcBvpCand(pu, pInfo);
+  }
+  else
+#endif
+  {
+    const int     cbWidth         = pu.lwidth();
+    const int     cbHeight        = pu.lheight();
+    const bool    availableTop    = (pu.cs->getPURestricted(pu.Y().topRight().offset(0, -1), pu, pu.chType))   ? true : false;
+    const bool    availableLeft   = (pu.cs->getPURestricted(pu.Y().bottomLeft().offset(-1, 0), pu, pu.chType)) ? true : false;
+    const CPelBuf pRecY           = pu.cs->picture->getRecoBuf(pu.cs->picture->blocks[COMPONENT_Y]);
+    pInfo->maxSimilarityThreshold = 1;
+  
+    PU::getIBCMergeCandidates(pu, mergeCtx);
+    pu.cs->createTMBuf(cbWidth, cbHeight);
+    PU::getTemplateTop(availableTop, pu, pRecY, pu.cs->m_pcBufPredCurTop, Position(0, -AML_MERGE_TEMPLATE_SIZE), cbWidth, AML_MERGE_TEMPLATE_SIZE);
+    PU::getTemplateLeft(availableLeft, pu, pRecY, pu.cs->m_pcBufPredCurLeft, Position(-AML_MERGE_TEMPLATE_SIZE, 0), AML_MERGE_TEMPLATE_SIZE, cbHeight);
+
+    int candIdx = 0;
+    while ((pInfo->numCand < IBC_MRG_MAX_NUM_CANDS) && (candIdx < mergeCtx.numAMVPMergeCand))
+    {
+      pInfo->mvCand[pInfo->numCand] = mergeCtx.mvFieldNeighbours[candIdx << 1].mv;
+      pInfo->mvCost[pInfo->numCand] = getTMCost(pu, pRecY, pInfo->mvCand[pInfo->numCand], availableTop, availableLeft, pcInter);
+      pInfo->mvCand[pInfo->numCand].roundIbcPrecInternal2Amvr(pu.cu->imv);
+      if (!pInfo->xCheckSimilarMotion(pInfo->numCand))
+      {
+        pInfo->numCand++;
+      }
+      candIdx++;
+    }
+    pu.cs->destroyTMBuf();
+    clusterBvpCand(cbWidth, cbHeight, pInfo);
+  }
+#else
 #if JVET_Z0084_IBC_TM && IBC_TM_AMVP
 #if JVET_AA0070_RRIBC
-  pInfo->maxSimilarityThreshold = (pu.cs->sps->getUseDMVDMode() && pcInter && !pu.cu->rribcFlipType) ? PU::getTMMvdThreshold(pu) : 1;
+  pInfo->maxSimilarityThreshold =
+    (pu.cs->sps->getUseDMVDMode() && pcInter && !pu.cu->rribcFlipType) ? PU::getTMMvdThreshold(pu) : 1;
 #if IBC_TM_MRG
   if (!pu.cu->rribcFlipType)
   {
-   pu.tmMergeFlag = true;
+    pu.tmMergeFlag = true;
   }
 #endif
 #else
@@ -9734,6 +9984,7 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
   pu.tmMergeFlag = true;
 #endif
 #endif
+
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   PU::getIBCMergeCandidates(pu, mergeCtx, pu.cs->sps->getMaxNumIBCMergeCand());
 #else
@@ -9773,10 +10024,11 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
 
     for (int candIdx = 0; candIdx < pInfo->numCand; ++candIdx)
     {
-      tmCost = pcInter->deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), REF_PIC_LIST_0, MAX_NUM_REF, TM_MAX_NUM_OF_ITERATIONS, pInfo->mvCand[candIdx]);
+      tmCost = pcInter->deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), REF_PIC_LIST_0, MAX_NUM_REF,
+                                   TM_MAX_NUM_OF_ITERATIONS, pInfo->mvCand[candIdx]);
       pInfo->mvCand[candIdx].roundIbcPrecInternal2Amvr(pu.cu->imv);
       temp.AMVPCand = pInfo->mvCand[candIdx];
-      temp.cost     = tmCost;
+      temp.cost = tmCost;
       input.push_back(temp);
     }
 
@@ -9801,15 +10053,17 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
   int candIdx = 0;
   while (pInfo->numCand < AMVP_MAX_NUM_CANDS)
   {
-    pInfo->mvCand[pInfo->numCand] = mergeCtx.mvFieldNeighbours[(candIdx << 1) + 0].mv;;
+    pInfo->mvCand[pInfo->numCand] = mergeCtx.mvFieldNeighbours[(candIdx << 1) + 0].mv;
+    ;
     pInfo->numCand++;
     candIdx++;
   }
 
-  for (Mv &mv : pInfo->mvCand)
+  for (Mv &mv: pInfo->mvCand)
   {
     mv.roundIbcPrecInternal2Amvr(pu.cu->imv);
   }
+#endif
 #endif
 }
 

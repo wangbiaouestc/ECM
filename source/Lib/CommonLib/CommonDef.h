@@ -216,8 +216,12 @@ static const int RMVF_PARAM_THRED = (1 << 20);
 #endif
 #endif
 static const int IBC_MRG_MAX_NUM_CANDS =                            6; ///< IBC MERGE
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+static const int IBC_MRG_MAX_NUM_CANDS_MEM =                        28;   ///< IBC AMVP- max number of candidates
+#else
 #if JVET_Z0075_IBC_HMVP_ENLARGE
-static const int IBC_MRG_MAX_NUM_CANDS_MEM =                        20; ///< IBC MERGE- max number of candidates 
+static const int IBC_MRG_MAX_NUM_CANDS_MEM =                        20;   ///< IBC MERGE- max number of candidates
+#endif
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE

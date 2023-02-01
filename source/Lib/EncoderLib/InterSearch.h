@@ -1134,6 +1134,10 @@ private:
 #else
   void  xxIBCHashSearch(PredictionUnit& pu, Mv* mvPred, int numMvPred, Mv &mv, int& idxMvPred, IbcHashMap& ibcHashMap);
 #endif
+  #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  inline void getBestBvpBvOneNullComp(PredictionUnit &pu, Mv cMv, Distortion initCost, int *bvpIdxBest,
+                                                   AMVPInfo *amvp1Pel = NULL, AMVPInfo *amvp4Pel = NULL);
+#endif
 public:
 #if JVET_AA0133_INTER_MTS_OPT
   bool encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &partitioner, const bool &skipResidual

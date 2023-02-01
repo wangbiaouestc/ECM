@@ -262,11 +262,16 @@ public:
   void        mvd_coding                ( const Mv &rMvd, int8_t imv, const int &rribcFlipType = 0 );
 #endif
 #if JVET_Z0131_IBC_BVD_BINARIZATION
-  void        bvdCoding                ( const Mv &rMvd, int8_t imv, const int &rribcFlipType = 0 );
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  void bvdCoding(const Mv &rMvd, int8_t imv, int bvOneNullComp = 0, int bvNullCompDir = 0);
+#else
+  void bvdCoding(const Mv &rMvd, int8_t imv, const int &rribcFlipType = 0);
+#endif
+
 #if JVET_AC0104_IBC_BVD_PREDICTION
-  void        bvdCodingRemainder       (const Mv& rMvd, const MvdSuffixInfo& si, int8_t imv );
-  unsigned    xWriteBvdContextPrefix   (unsigned uiSymbol, unsigned ctxT, int offset, int param);
-  void        xWriteBvdContextSuffix   (unsigned uiSymbol, int param, int param_updated, int numSkipMSB);
+  void        bvdCodingRemainder(const Mv& rMvd, const MvdSuffixInfo& si, int8_t imv);
+  unsigned    xWriteBvdContextPrefix(unsigned uiSymbol, unsigned ctxT, int offset, int param);
+  void        xWriteBvdContextSuffix(unsigned uiSymbol, int param, int param_updated, int numSkipMSB);
 #else //!JVET_AC0104_IBC_BVD_PREDICTION
   void        xWriteBvdContext(unsigned uiSymbol, unsigned ctxT, int offset, int param);
 #endif //JVET_AC0104_IBC_BVD_PREDICTION
@@ -341,6 +346,9 @@ public:
 
 #if JVET_AA0070_RRIBC
   void        rribcData                ( const CodingUnit &cu);
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  void        bvOneNullComp_data       ( const CodingUnit &cu );
 #endif
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   CABACDataStore*         m_CABACDataStore;

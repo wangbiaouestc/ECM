@@ -597,6 +597,9 @@ public:
   int           numCandToTestEnc;
 #endif
   bool          hasMergedCandList;
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  int numAMVPMergeCand;
+#endif
 
 #if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   MotionBuf     subPuMvpMiBuf[SUB_TMVP_NUM];
@@ -725,6 +728,9 @@ unsigned CtxBMMrgFlag(const CodingUnit& cu);
 #endif
 #if JVET_AA0070_RRIBC
 unsigned CtxRribcFlipType(const CodingUnit& cu);
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+unsigned CtxBvOneNullComp(const CodingUnit &cu);
 #endif
 unsigned CtxPredModeFlag( const CodingUnit& cu );
 unsigned CtxIBCFlag(const CodingUnit& cu);

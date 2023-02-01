@@ -3204,6 +3204,30 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           AMVPInfo amvpInfo;
 #if JVET_Z0084_IBC_TM && IBC_TM_AMVP
           PU::fillIBCMvpCand(pu, amvpInfo, m_pcInterPred);
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+          if (pu.cu->rribcFlipType == 0)
+          {
+            if (pu.cu->bvNullCompDir == 1)
+            {
+              for (int i = 0; i < 2; i++)
+              {
+                amvpInfo.mvCand[i] = Mv(i == 0 ? std::max(-(int) pu.lwidth(), -pu.Y().x) : -pu.Y().x, 0);
+                amvpInfo.mvCand[i].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+              }
+            }
+            else if (pu.cu->bvNullCompDir == 2)
+            {
+              const int ctbSize     = pu.cs->sps->getCTUSize();
+              const int numCurrCtuY = (pu.Y().y >> (floorLog2(ctbSize)));
+              const int rrTop       = (numCurrCtuY < 3) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + 2 * ctbSize);
+              for (int i = 0; i < 2; i++)
+              {
+                amvpInfo.mvCand[i] = Mv(0, i == 0 ? std::max(-(int) pu.lheight(), rrTop) : rrTop);
+                amvpInfo.mvCand[i].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+              }
+            }
+          }
+#endif
 #else
           PU::fillIBCMvpCand(pu, amvpInfo);
 #endif

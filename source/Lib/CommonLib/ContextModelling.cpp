@@ -341,6 +341,22 @@ unsigned DeriveCtx::CtxRribcFlipType(const CodingUnit& cu)
 }
 #endif
 
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+unsigned DeriveCtx::CtxBvOneNullComp(const CodingUnit &cu)
+{
+  const CodingStructure *cs    = cu.cs;
+  unsigned               ctxId = 0;
+
+  const CodingUnit *cuLeft = cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+  ctxId = (cuLeft && cuLeft->predMode == MODE_IBC && !cuLeft->firstPU->mergeFlag && cuLeft->bvOneNullComp) ? 1 : 0;
+
+  const CodingUnit *cuAbove = cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+  ctxId += (cuAbove && cuAbove->predMode == MODE_IBC && !cuAbove->firstPU->mergeFlag && cuAbove->bvOneNullComp) ? 1 : 0;
+
+  return ctxId;
+}
+#endif
+
 unsigned DeriveCtx::CtxAffineFlag( const CodingUnit& cu )
 {
   const CodingStructure *cs = cu.cs;

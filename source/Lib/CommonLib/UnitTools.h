@@ -278,6 +278,20 @@ namespace PU
     , int* targetRefIdx = nullptr
 #endif
   );
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  inline void       getTemplateTop(const bool availableTop, const PredictionUnit &pu, CPelBuf pRecY, PelBuf pTemplateDest,
+                                   Position offset, int Width, int templateSize);
+  inline void       getTemplateLeft(const bool availableLeft, const PredictionUnit &pu, CPelBuf pRecY, PelBuf pTemplateDest,
+                                    Position offset, int Height, int templateSize);
+  inline void       getTemplateRefTop(const PredictionUnit &pu, CPelBuf pRecY, PelBuf pTempDest, Mv CandMv, int tempWidth,
+                                      int tempHeight);
+  inline void       getTemplateRefLeft(const PredictionUnit &pu, CPelBuf pRecY, PelBuf pTempDest, Mv CandMv, int tempWidth,
+                                       int tempHeight);
+  inline Distortion getTMCost(const PredictionUnit &pu, CPelBuf pRecY, Mv CandMv, bool availableTmTop,
+                              bool availableTmLeft, InterPrediction *pcInter);
+  inline void       getRribcBvpCand(PredictionUnit &pu, AMVPInfo *amvpInfo);
+  inline void       clusterBvpCand(const int cbWidth, const int cbHeight, AMVPInfo *pInfo);
+#endif
   void fillMvpCand                    (      PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AMVPInfo &amvpInfo 
 #if TM_AMVP
                                      , InterPrediction* interPred = nullptr

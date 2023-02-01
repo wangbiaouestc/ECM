@@ -3298,8 +3298,12 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
     merge_flag( pu );
   }
 
+#if !JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
 #if JVET_AA0070_RRIBC
   rribcData(*pu.cu);
+#endif
+#else
+  bvOneNullComp_data(*pu.cu);
 #endif
 #if JVET_AC0112_IBC_LIC
   cuIbcLicFlag(*pu.cu);
@@ -3328,13 +3332,22 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
     pu.interDir = 1;
     pu.cu->affine = false;
     pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
+
     RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MVD, pu.lumaSize());
 #if JVET_AA0070_RRIBC
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AC0104_IBC_BVD_PREDICTION
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.bvdSuffixInfo, pu.cu->bvOneNullComp, pu.cu->bvNullCompDir);
+#else
     bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.bvdSuffixInfo, pu.cu->rribcFlipType);
+#endif
 #else // !JVET_AC0104_IBC_BVD_PREDICTION
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.cu->bvOneNullComp, pu.cu->bvNullCompDir);
+#else
     bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.cu->rribcFlipType);
+#endif
 #endif // JVET_AC0104_IBC_BVD_PREDICTION
 #else
 #if JVET_AC0104_IBC_BVD_PREDICTION
@@ -3360,6 +3373,19 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
     {
       mvp_flag(pu, REF_PIC_LIST_0);
     }
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+    if (pu.mvpIdx[REF_PIC_LIST_0] == 0)
+    {
+      if (pu.cu->bvNullCompDir == 1)
+      {
+        pu.mvd[REF_PIC_LIST_0].hor = -pu.mvd[REF_PIC_LIST_0].hor;
+      }
+      else if (pu.cu->bvNullCompDir == 2)
+      {
+        pu.mvd[REF_PIC_LIST_0].ver = -pu.mvd[REF_PIC_LIST_0].ver;
+      }
+    }
+#endif
   }
   else
   {
@@ -5857,18 +5883,42 @@ void CABACReader::bvdCodingRemainder(Mv& rMvd, MvdSuffixInfo& si, const int imv 
   }
 }
 #endif //JVET_AC0104_IBC_BVD_PREDICTION
-
-void CABACReader::bvdCoding(Mv& rMvd
-#if JVET_AC0104_IBC_BVD_PREDICTION
-                          , MvdSuffixInfo& si
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_AA0070_RRIBC
-                          , const int& rribcFlipType
-#endif //JVET_AA0070_RRIBC
-                           )
+#if JVET_AC0104_IBC_BVD_PREDICTION
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+void CABACReader::bvdCoding(Mv& rMvd, MvdSuffixInfo& si, int bvOneNullComp, int bvNullCompDir)
+#else
+void CABACReader::bvdCoding(Mv& rMvd, MvdSuffixInfo& si, const int& rribcFlipType)
+#endif
+#else   // !JVET_AC0104_IBC_BVD_PREDICTION
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+void CABACReader::bvdCoding(Mv& rMvd, int bvOneNullComp, int bvNullCompDir)
+#else
+void CABACReader::bvdCoding(Mv& rMvd, const int& rribcFlipType)
+#endif
+#endif   // JVET_AC0104_IBC_BVD_PREDICTION
 {
   int horAbs = 0, verAbs = 0;
-#if JVET_AA0070_RRIBC
+
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  if (bvOneNullComp)
+  {
+    if (bvNullCompDir == 1)
+    { 
+      horAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
+    }
+
+    if (bvNullCompDir == 2)
+    {
+      verAbs = (int)m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
+    }
+  }
+  else
+  {
+    horAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
+    verAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
+  }
+#else
   if (rribcFlipType != 2)
   {
     horAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
@@ -5877,7 +5927,10 @@ void CABACReader::bvdCoding(Mv& rMvd
   {
     verAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
   }
+#endif
 #else
+void CABACReader::bvdCoding(Mv & rMvd)
+{
   horAbs = (int)m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
   verAbs = (int)m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
 #endif
@@ -5891,20 +5944,38 @@ void CABACReader::bvdCoding(Mv& rMvd
   if (horAbs)
   {
     horAbs += xReadBvdContext(NUM_HOR_BVD_CTX, HOR_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER);
-
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+    if (!bvOneNullComp)
+    {
+      if (m_BinDecoder.decodeBinEP())
+      {
+        horAbs = -horAbs;
+      }
+    }
+#else
     if (m_BinDecoder.decodeBinEP())
     {
       horAbs = -horAbs;
     }
+#endif
   }
   if (verAbs)
   {
     verAbs += xReadBvdContext(NUM_VER_BVD_CTX, VER_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER);
-
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+    if (!bvOneNullComp)
+    {
+      if (m_BinDecoder.decodeBinEP())
+      {
+        verAbs = -verAbs;
+      }
+    }
+#else
     if (m_BinDecoder.decodeBinEP())
     {
       verAbs = -verAbs;
     }
+#endif
   }
 #endif // JVET_AC0104_IBC_BVD_PREDICTION
 
@@ -5987,60 +6058,66 @@ void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
     {
       bool setHorSignToNegative = false;
       bool setVerSignToNegative = false;
-      Mv TrMv = Mv(horPrefix < 0 ? 0 : MvdSuffixInfo::xGetGolombGroupMinValue(horPrefix),
+      Mv trMv = Mv(horPrefix < 0 ? 0 : MvdSuffixInfo::xGetGolombGroupMinValue(horPrefix),
                    verPrefix < 0 ? 0 : MvdSuffixInfo::xGetGolombGroupMinValue(verPrefix));
 #endif // JVET_AC0104_IBC_BVD_PREDICTION
-      TrMv.changeTransPrecAmvr2Internal(pu.cu->imv);
+      trMv.changeTransPrecAmvr2Internal(pu.cu->imv);
 
-      if (pu.mvd[eRefList].getHor())
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+      if (0 == pu.cu->rribcFlipType)
       {
+#endif
+        if (pu.mvd[eRefList].getHor())
+        {
 #if JVET_AC0104_IBC_BVD_PREDICTION
-        if (pu.bvdSuffixInfo.horEncodeSignInEP)
-        {
-          setHorSignToNegative = m_BinDecoder.decodeBinEP();
-        }
-        else
-        {
+          if (pu.bvdSuffixInfo.horEncodeSignInEP)
+          {
+            setHorSignToNegative = m_BinDecoder.decodeBinEP();
+          }
+          else
+          {
 #endif // JVET_AC0104_IBC_BVD_PREDICTION
-          uint8_t ctxId = (TrMv.getHor() <= Thres) ? 0 : 1;
+            uint8_t ctxId = (trMv.getHor() <= Thres) ? 0 : 1;
 
+            uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+            pu.bvdSuffixInfo.horSignHypMatch = 0==bin;
+#endif // JVET_AC0104_IBC_BVD_PREDICTION
+            mvsdIdx += (bin << shift);
+            shift++;
+#if JVET_AC0104_IBC_BVD_PREDICTION
+          }
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
+        }
+        if (pu.mvd[eRefList].getVer())
+        {
+#if JVET_AC0104_IBC_BVD_PREDICTION
+          if (pu.bvdSuffixInfo.verEncodeSignInEP)
+          {
+            setVerSignToNegative = m_BinDecoder.decodeBinEP();
+          }
+          else
+          {
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
+          uint8_t ctxId = (trMv.getVer() <= Thres) ? 0 : 1;
+       
           uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
-          pu.bvdSuffixInfo.horSignHypMatch = 0==bin;
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
-          mvsdIdx += (bin << shift);
+            pu.bvdSuffixInfo.verSignHypMatch = 0 == bin;
+#endif //JVET_AC0104_IBC_BVD_PREDICTION
+
+            mvsdIdx += (bin << shift);
           shift++;
 #if JVET_AC0104_IBC_BVD_PREDICTION
-        }
+          }
 #endif //JVET_AC0104_IBC_BVD_PREDICTION
+
+        }
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
       }
-      if (pu.mvd[eRefList].getVer())
-      {
-#if JVET_AC0104_IBC_BVD_PREDICTION
-        if (pu.bvdSuffixInfo.verEncodeSignInEP)
-        {
-          setVerSignToNegative = m_BinDecoder.decodeBinEP();
-        }
-        else
-        {
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
-        uint8_t ctxId = (TrMv.getVer() <= Thres) ? 0 : 1;
-       
-        uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
-
-#if JVET_AC0104_IBC_BVD_PREDICTION
-          pu.bvdSuffixInfo.verSignHypMatch = 0 == bin;
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
-
-          mvsdIdx += (bin << shift);
-        shift++;
-#if JVET_AC0104_IBC_BVD_PREDICTION
-        }
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
-
-      }
-
+#endif
       pu.mvsdIdx[eRefList] = mvsdIdx;
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
@@ -7463,6 +7540,34 @@ void CABACReader::cu_lic_flag( CodingUnit& cu )
     cu.LICFlag = m_BinDecoder.decodeBin( Ctx::LICFlag( 0 ) );
     DTRACE( g_trace_ctx, D_SYNTAX, "cu_lic_flag() lic_flag=%d\n", cu.LICFlag ? 1 : 0 );
   }
+}
+#endif
+
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+void CABACReader::bvOneNullComp_data(CodingUnit &cu)
+{
+  if (!CU::isIBC(cu) || cu.firstPU->mergeFlag)
+  {
+    return;
+  }
+  cu.bvNullCompDir = 0;
+  cu.rribcFlipType = 0;
+
+  unsigned ctxId   = DeriveCtx::CtxBvOneNullComp(cu);
+  cu.bvOneNullComp = m_BinDecoder.decodeBin(Ctx::bvOneNullComp(ctxId));
+  if (cu.bvOneNullComp)
+  {
+    // Read the BV direction
+    cu.bvNullCompDir = cu.bvOneNullComp;
+    cu.bvNullCompDir += m_BinDecoder.decodeBin(Ctx::bvOneNullComp(3));
+    ctxId            = DeriveCtx::CtxRribcFlipType(cu);
+    cu.rribcFlipType = m_BinDecoder.decodeBin(Ctx::rribcFlipType(ctxId));
+    if (cu.rribcFlipType)
+    {
+      cu.rribcFlipType = cu.bvNullCompDir;
+    }
+  }
+  DTRACE(g_trace_ctx, D_SYNTAX, "rribcData() rribcFlipType = %d\n", cu.rribcFlipType);
 }
 #endif
 

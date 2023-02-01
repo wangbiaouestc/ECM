@@ -51,8 +51,6 @@
 #include <cassert>
 
 
-
-
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -194,7 +192,7 @@
 #define JVET_AC0112_IBC_GPM                               1 // JVET-AC0112: IBC with geometry partitioning mode (IBC-GPM)
 #define JVET_AC0112_IBC_LIC                               1 // JVET-AC0112: IBC with local illumination compensation (IBC-LIC)
 #define JVET_AC0104_IBC_BVD_PREDICTION                    1 // JVET-AC0104: IBC block vector difference prediction (part of JVET-AC0113 Test 3.5a) 
-
+#define JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV  1 // JVET-AC0060: IBC BVP candidates clustering and BVD sign derivation for BV with one null component (part of JVET-AC0113 Test 3.5a) 
 // Inter
 #define CIIP_PDPC                                         1 // Apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
 #define JVET_X0090_CIIP_FIX                               1 // JVET-X0090: combination of CIIP, OBMC and LMCS

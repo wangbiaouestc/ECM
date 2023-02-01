@@ -2076,6 +2076,33 @@ void CodingStructure::rebindPicBufs()
   }
 }
 
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+void CodingStructure::createTMBuf(const int cbWidth, const int cbHeight)
+{
+  m_pCurrTmTop  = (Pel *) xMalloc(Pel, AML_MERGE_TEMPLATE_SIZE * cbWidth);
+  m_pCurrTmLeft = (Pel *) xMalloc(Pel, AML_MERGE_TEMPLATE_SIZE * cbHeight);
+  m_pRefTmTop   = (Pel *) xMalloc(Pel, AML_MERGE_TEMPLATE_SIZE * cbWidth);
+  m_pRefTmLeft  = (Pel *) xMalloc(Pel, AML_MERGE_TEMPLATE_SIZE * cbHeight);
+
+  m_pcBufPredCurTop  = PelBuf(m_pCurrTmTop, cbWidth, AML_MERGE_TEMPLATE_SIZE);
+  m_pcBufPredCurLeft = PelBuf(m_pCurrTmLeft, AML_MERGE_TEMPLATE_SIZE, cbHeight);
+  m_pcBufPredRefTop  = PelBuf(m_pRefTmTop, cbWidth, AML_MERGE_TEMPLATE_SIZE);
+  m_pcBufPredRefLeft = PelBuf(m_pRefTmLeft, AML_MERGE_TEMPLATE_SIZE, cbHeight);
+}
+
+void CodingStructure::destroyTMBuf()
+{
+  xFree(m_pCurrTmTop);
+  m_pCurrTmTop = nullptr;
+  xFree(m_pCurrTmLeft);
+  m_pCurrTmLeft = nullptr;
+  xFree(m_pRefTmTop);
+  m_pRefTmTop = nullptr;
+  xFree(m_pRefTmLeft);
+  m_pRefTmLeft = nullptr;
+}
+#endif
+
 void CodingStructure::createCoeffs(const bool isPLTused)
 {
   const unsigned numCh = getNumberValidComponents( area.chromaFormat );
