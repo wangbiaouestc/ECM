@@ -548,7 +548,7 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
 
 #if JVET_AC0105_DIRECTIONAL_PLANAR
-    if (intraMode == PLANAR_IDX)
+    if (compID == COMPONENT_Y && intraMode == PLANAR_IDX)
     {
       if (tu.cu->plIdx == 2)
       {
@@ -815,7 +815,7 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
 
 #if JVET_AC0105_DIRECTIONAL_PLANAR
-    if (intraMode == PLANAR_IDX)
+    if (compID == COMPONENT_Y && intraMode == PLANAR_IDX)
     {
       if (tu.cu->plIdx == 2)
       {
@@ -1253,7 +1253,7 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
         CHECK(predMode < -(NUM_EXT_LUMA_MODE >> 1) || predMode >= NUM_LUMA_MODE + (NUM_EXT_LUMA_MODE >> 1), "luma mode out of range");
         predMode = (predMode < 0) ? 2 : (predMode >= NUM_LUMA_MODE) ? 66 : predMode;
 #if JVET_AC0105_DIRECTIONAL_PLANAR
-        if (predMode == PLANAR_IDX)
+        if (compID == COMPONENT_Y && predMode == PLANAR_IDX)
         {
           if (tu.cu->plIdx == 2)
           {
@@ -2656,7 +2656,7 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
   }
 #endif
 #if JVET_AC0105_DIRECTIONAL_PLANAR
-  if (intraMode == PLANAR_IDX)
+  if (compID == COMPONENT_Y && intraMode == PLANAR_IDX)
   {
     if (tu.cu->plIdx == 2)
     {

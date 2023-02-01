@@ -17874,7 +17874,7 @@ uint32_t PU::getFinalIntraModeForTransform( const TransformUnit &tu, const Compo
   }
 #endif
 #if JVET_AC0105_DIRECTIONAL_PLANAR
-  if (intraMode == PLANAR_IDX)
+  if (compID == COMPONENT_Y && intraMode == PLANAR_IDX)
   {
     if (tu.cu->plIdx == 2)
     {
