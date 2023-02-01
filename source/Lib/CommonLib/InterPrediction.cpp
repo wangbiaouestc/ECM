@@ -10531,6 +10531,18 @@ void  InterPrediction::updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, u
 }
 #endif
 
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+Distortion InterPrediction::getRdCostOTF(const PredictionUnit &pu, const PelBuf &org, const PelBuf &cur)
+{
+  Distortion uiCost;
+  DistParam  cDistParam;
+  cDistParam.applyWeight = false;
+  m_pcRdCost->setDistParam(cDistParam, cur, org, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+  uiCost = cDistParam.distFunc(cDistParam);
+  return uiCost;
+}
+#endif
+
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 void  InterPrediction::adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx,uint32_t startPos,uint32_t endPos)
 {
@@ -17231,7 +17243,12 @@ void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtD
   verAbs = tmp.getAbsVer();
   
   const int iTotalNumberOfBins = iHorMSBins + iVerMSBins;
-  const int numSignBits = ((0 != horAbs && !pu.bvdSuffixInfo.horEncodeSignInEP) ? 1 : 0) + 
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  const int numSignBits = (pu.cu->rribcFlipType != 0) ? 0 :
+#else 
+  const int numSignBits =
+#endif // JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                          ((0 != horAbs && !pu.bvdSuffixInfo.horEncodeSignInEP) ? 1 : 0) + 
                           ((0 != verAbs && !pu.bvdSuffixInfo.verEncodeSignInEP) ? 1 : 0);
 
   patternsNum = 1 << (iTotalNumberOfBins + numSignBits);
@@ -17273,10 +17290,25 @@ void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtD
 
   const bool rrIBCmode = pu.cu->rribcFlipType != 0;
 
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  const bool horPositiveAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 1 && rrIBCmode;
+  const bool horNegativeAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 0 && rrIBCmode;
+  const bool verPositiveAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 1 && rrIBCmode;
+  const bool verNegativeAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 0 && rrIBCmode;
+
+  CHECK(pu.mvpIdx[REF_PIC_LIST_0] >= AMVP_MAX_NUM_CANDS, "pu.mvpIdx[REF_PIC_LIST_0] >= AMVP_MAX_NUM_CANDS");
+  CHECK(iHorKnown == 0 && cMvdKnownAtDecoder.getHor() != 0, "cMvdKnownAtDecoder.getHor() != 0");
+
+  const bool horPositiveAllowed = horPositiveAllowedRRIBC || (!rrIBCmode && !si.horEncodeSignInEP) || (!rrIBCmode && si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() > 0);
+  const bool horNegativeAllowed = horNegativeAllowedRRIBC || (!rrIBCmode && !si.horEncodeSignInEP) || (!rrIBCmode && si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() < 0);
+  const bool verPositiveAllowed = verPositiveAllowedRRIBC || (!rrIBCmode && !si.verEncodeSignInEP) || (!rrIBCmode && si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() > 0);
+  const bool verNegativeAllowed = verNegativeAllowedRRIBC || (!rrIBCmode && !si.verEncodeSignInEP) || (!rrIBCmode && si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() < 0);
+#else // !JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   const bool horPositiveAllowed = !si.horEncodeSignInEP || (si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() > 0);
   const bool horNegativeAllowed = !si.horEncodeSignInEP || (si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() < 0);
   const bool verPositiveAllowed = !si.verEncodeSignInEP || (si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() > 0);
   const bool verNegativeAllowed = !si.verEncodeSignInEP || (si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() < 0);
+#endif // JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
 
   if (rrIBCmode)
   {

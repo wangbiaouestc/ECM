@@ -237,12 +237,20 @@ public:
 #endif
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AC0104_IBC_BVD_PREDICTION
-   void        bvdCoding(Mv& rMvd, MvdSuffixInfo& si, const int& rribcFlipType = 0 );
-   unsigned    xReadBvdContextPrefix(unsigned ctxT, int offset, int param );
-   unsigned    xReadBvdContextSuffix(int symbol, int param );
-   void        bvdCodingRemainder(Mv& rMvd, MvdSuffixInfo& si, const int imv );
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+   void bvdCoding(Mv& rMvd, MvdSuffixInfo& si, int bvOneNullComp = 0, int bvNullCompDir = 0);
+#else
+   void bvdCoding(Mv& rMvd, MvdSuffixInfo& si, const int& rribcFlipType = 0);
+#endif
+   unsigned    xReadBvdContextPrefix(unsigned ctxT, int offset, int param);
+   unsigned    xReadBvdContextSuffix(int symbol, int param);
+   void        bvdCodingRemainder(Mv& rMvd, MvdSuffixInfo& si, const int imv);
 #else // !JVET_AC0104_IBC_BVD_PREDICTION
-   void        bvdCoding(Mv& rMvd, const int& rribcFlipType = 0 );
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+   void bvdCoding(Mv& rMvd, int bvOneNullComp = 0, int bvNullCompDir = 0);
+#else
+   void bvdCoding(Mv& rMvd, const int& rribcFlipType = 0);
+#endif
    unsigned    xReadBvdContext(unsigned ctxT, int offset, int param);
 #endif // JVET_AC0104_IBC_BVD_PREDICTION
 #endif
@@ -310,7 +318,9 @@ public:
 #if INTER_LIC
   void        cu_lic_flag               ( CodingUnit& cu );
 #endif
-
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  void bvOneNullComp_data               ( CodingUnit &cu );
+#endif
 #if JVET_AA0070_RRIBC
   void        rribcData                ( CodingUnit &cu );
 #endif

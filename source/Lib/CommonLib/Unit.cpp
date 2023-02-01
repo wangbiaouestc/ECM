@@ -379,6 +379,10 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if JVET_AA0070_RRIBC
   rribcFlipType = other.rribcFlipType;
 #endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bvOneNullComp = other.bvOneNullComp;
+  bvNullCompDir = other.bvNullCompDir;
+#endif
 #if JVET_AB0157_TMRL
   tmrlFlag = other.tmrlFlag;
   tmrlListIdx = other.tmrlListIdx;
@@ -551,6 +555,10 @@ void CodingUnit::initData()
 #if JVET_AB0157_TMRL
   tmrlFlag = false;
   tmrlListIdx = 0;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bvOneNullComp = 0;
+  bvNullCompDir = 0;
 #endif
 #if JVET_AC0094_REF_SAMPLES_OPT
   areAboveRightUnavail = false;

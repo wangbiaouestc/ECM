@@ -345,6 +345,9 @@ public:
 #if JVET_AA0070_RRIBC
   static const CtxSet   rribcFlipType;
 #endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  static const CtxSet bvOneNullComp;
+#endif
 #if JVET_Y0065_GPM_INTRA
   static const CtxSet   GPMIntraFlag;
 #endif

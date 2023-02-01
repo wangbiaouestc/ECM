@@ -409,6 +409,10 @@ struct CodingUnit : public UnitArea
 #if JVET_AA0070_RRIBC
   int    rribcFlipType;
 #endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  int bvOneNullComp;   // IBC BV has one null component
+  int bvNullCompDir;   // 1: vertical null comp.  2: horizontal null comp.
+#endif
 #if JVET_AB0157_TMRL
   bool           tmrlFlag;
   uint8_t        tmrlListIdx;

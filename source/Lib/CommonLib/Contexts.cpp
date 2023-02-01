@@ -1701,6 +1701,23 @@ const CtxSet ContextSetCfg::rribcFlipType = ContextSetCfg::addCtxSet
   });
 #endif
 
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+const CtxSet ContextSetCfg::bvOneNullComp = ContextSetCfg::addCtxSet
+({
+  {  48,  50,  50,  50, },
+  {  56,  50,  43,  28, },
+  { CNU, CNU, CNU, CNU, },
+  {   5,   5,   9,   5, },
+  {   5,   5,   5,   5, },
+  { DWS, DWS, DWS, DWS, },
+  {  18,  18,  25,  18, },
+  {  18,  18,  11,  18, },
+  { DWE, DWE, DWE, DWE, },
+  { 126, 126, 181, 126, },
+  { 117, 117, 110, 116, },
+  });
+#endif
+
 const CtxSet ContextSetCfg::AffineFlag = ContextSetCfg::addCtxSet
 ({
   {  19,   6,   7, },

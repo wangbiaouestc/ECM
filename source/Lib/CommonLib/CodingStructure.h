@@ -154,6 +154,10 @@ public:
 #endif
 
   void rebindPicBufs();
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  void createTMBuf(const int cbWidth, const int cbHeight);
+  void destroyTMBuf();
+#endif
 
   void createCoeffs(const bool isPLTused);
   void destroyCoeffs();
@@ -298,7 +302,17 @@ private:
   PelStorage m_resi;
 #if JVET_Z0118_GDR
 public:
-  PictureType m_pt;  
+  PictureType m_pt; 
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  Pel   *m_pCurrTmTop;
+  Pel   *m_pCurrTmLeft;
+  Pel   *m_pRefTmTop;
+  Pel   *m_pRefTmLeft;
+  PelBuf m_pcBufPredCurTop;
+  PelBuf m_pcBufPredCurLeft;
+  PelBuf m_pcBufPredRefTop;
+  PelBuf m_pcBufPredRefLeft;
+#endif
 private:
   PelStorage m_reco0; // for GDR dirty
   PelStorage m_reco1; // for GDR clean
