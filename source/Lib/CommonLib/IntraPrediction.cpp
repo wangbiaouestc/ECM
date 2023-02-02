@@ -5590,17 +5590,6 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
     }
 #endif
 
-#if EE2_4_1b
-    if (puLeftBottomx && PU::UseIntraTmpDimdMode(*puLeftBottomx))
-    {
-      uiIntraDirNeighbor[modeIdx] = PU::GetIntraTmpDimdMode(*puLeftBottomx);
-      if (!includedMode[uiIntraDirNeighbor[modeIdx]])
-      {
-        includedMode[uiIntraDirNeighbor[modeIdx]] = true;
-        modeIdx++;
-      }
-    }
-#endif // EE2_4_1b
     // above right
     const PredictionUnit *puAboveRightx = cs.getPURestricted(posRTx.offset(1, -1), pu, pu.chType);
     if (puAboveRightx && CU::isIntra(*puAboveRightx->cu))
@@ -5627,17 +5616,6 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
       increaseMaxFar = false;
     }
 #endif
-#if EE2_4_1b
-    if (puAboveRightx && PU::UseIntraTmpDimdMode(*puAboveRightx))
-    {
-      uiIntraDirNeighbor[modeIdx] = PU::GetIntraTmpDimdMode(*puAboveRightx);
-      if (!includedMode[uiIntraDirNeighbor[modeIdx]])
-      {
-        includedMode[uiIntraDirNeighbor[modeIdx]] = true;
-        modeIdx++;
-      }
-    }
-#endif // EE2_4_1b
     // above left
     const PredictionUnit *puAboveLeftx = cs.getPURestricted(posLTx.offset(-1, -1), pu, pu.chType);
     if (puAboveLeftx && CU::isIntra(*puAboveLeftx->cu))
