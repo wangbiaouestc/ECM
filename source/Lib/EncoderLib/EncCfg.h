@@ -788,6 +788,9 @@ protected:
   double      m_scalingRatioVer3;
 #endif
   int         m_upscaledOutput;
+#if JVET_AB0081
+  int         m_upscaleFilterForDisplay;
+#endif
   int         m_numRefLayers[MAX_VPS_LAYERS];
   bool        m_avoidIntraInDepLayer;
 
@@ -2037,7 +2040,10 @@ public:
 #endif
   void        setUpscaledOutput( int b )                             { m_upscaledOutput = b; }
   int         getUpscaledOutput()                              const { return m_upscaledOutput; }
-
+#if JVET_AB0081
+  void        setUpscaleFilerForDisplay(int b)                       { m_upscaleFilterForDisplay = b; }
+  int         getUpscaleFilerForDisplay()                      const { return m_upscaleFilterForDisplay; }
+#endif
   void        setNumRefLayers( int* numRefLayers )                   { std::memcpy( m_numRefLayers, numRefLayers, sizeof( m_numRefLayers ) ); }
   int         getNumRefLayers( int layerIdx )                  const { return m_numRefLayers[layerIdx];  }
 

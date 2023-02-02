@@ -1252,7 +1252,11 @@ void VideoIOYuv::ColourSpaceConvert(const CPelUnitBuf &src, PelUnitBuf &dest, co
   }
 }
 
+#if !JVET_AB0081
 bool VideoIOYuv::writeUpscaledPicture( const SPS& sps, const PPS& pps, const CPelUnitBuf& pic, const InputColourSpaceConversion ipCSC, const bool bPackedYUVOutputMode, int outputChoice, ChromaFormat format, const bool bClipToRec709 )
+#else
+bool VideoIOYuv::writeUpscaledPicture(const SPS& sps, const PPS& pps, const CPelUnitBuf& pic, const InputColourSpaceConversion ipCSC, const bool bPackedYUVOutputMode, int outputChoice, ChromaFormat format, const bool bClipToRec709, int upscaleFilterForDisplay)
+#endif
 {
   ChromaFormat chromaFormatIDC = sps.getChromaFormatIdc();
   bool ret = false;
@@ -1284,8 +1288,12 @@ bool VideoIOYuv::writeUpscaledPicture( const SPS& sps, const PPS& pps, const CPe
       int xScale = ( ( refPicWidth << SCALE_RATIO_BITS ) + ( curPicWidth >> 1 ) ) / curPicWidth;
       int yScale = ( ( refPicHeight << SCALE_RATIO_BITS ) + ( curPicHeight >> 1 ) ) / curPicHeight;
 
+#if JVET_AB0081
+      bool rescaleForDisplay = true;
+      Picture::rescalePicture(std::pair<int, int>(xScale, yScale), pic, pps.getScalingWindow(), upscaledPic, afterScaleWindowFullResolution, chromaFormatIDC, sps.getBitDepths(), false, false, sps.getHorCollocatedChromaFlag(), sps.getVerCollocatedChromaFlag(), rescaleForDisplay, upscaleFilterForDisplay);
+#else
       Picture::rescalePicture( std::pair<int, int>( xScale, yScale ), pic, pps.getScalingWindow(), upscaledPic, afterScaleWindowFullResolution, chromaFormatIDC, sps.getBitDepths(), false, false, sps.getHorCollocatedChromaFlag(), sps.getVerCollocatedChromaFlag() );
-
+#endif
       ret = write( sps.getMaxPicWidthInLumaSamples(), sps.getMaxPicHeightInLumaSamples(), upscaledPic,
         ipCSC,
         bPackedYUVOutputMode,
