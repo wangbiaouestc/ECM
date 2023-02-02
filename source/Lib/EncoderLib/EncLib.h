@@ -164,7 +164,9 @@ public:
   APS**                     getApss() { return m_apss; }
   Ctx                       m_entropyCodingSyncContextState;      ///< leave in addition to vector for compatibility
   PLTBuf                    m_palettePredictorSyncState;
-
+#if JVET_AC0096
+  int                       m_gopRprPpsId;
+#endif
 protected:
   void  xGetNewPicBuffer  ( std::list<PelUnitBuf*>& rcListPicYuvRecOut, Picture*& rpcPic, int ppsId ); ///< get picture buffer which will be processed. If ppsId<0, then the ppsMap will be queried for the first match.
 #if JVET_S0163_ON_TARGETOLS_SUBLAYERS

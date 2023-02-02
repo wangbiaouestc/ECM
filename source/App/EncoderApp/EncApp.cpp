@@ -271,6 +271,13 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setResChangeInClvsEnabled                            ( m_resChangeInClvsEnabled );
   m_cEncLib.setSwitchPocPeriod                                   ( m_switchPocPeriod );
   m_cEncLib.setUpscaledOutput                                    ( m_upscaledOutput );
+#if JVET_AC0096
+  m_cEncLib.setRprFunctionalityTestingEnabledFlag                (m_rprFunctionalityTestingEnabledFlag);
+  m_cEncLib.setRprSwitchingSegmentSize                           (m_rprSwitchingSegmentSize);
+  m_cEncLib.setRprPopulatePPSatIntraFlag                         (m_rprPopulatePPSatIntraFlag);
+  m_cEncLib.setScalingRatio2                                     (m_scalingRatioHor2, m_scalingRatioVer2);
+  m_cEncLib.setScalingRatio3                                     (m_scalingRatioHor3, m_scalingRatioVer3);
+#endif
   m_cEncLib.setFramesToBeEncoded                                 ( m_framesToBeEncoded );
   m_cEncLib.setValidFrames                                       ( m_firstValidFrame, m_lastValidFrame );
   m_cEncLib.setAvoidIntraInDepLayer                              ( m_avoidIntraInDepLayer );
@@ -705,6 +712,17 @@ void EncApp::xInitLibCfg()
       m_cEncLib.setLadfQpOffset( m_LadfQpOffset[k], k );
       m_cEncLib.setLadfIntervalLowerBound(m_LadfIntervalLowerBound[k], k);
     }
+  }
+#endif
+#if JVET_AC0096
+  if (m_rprFunctionalityTestingEnabledFlag)
+  {
+    for (int k = 0; k < m_rprSwitchingListSize; k++)
+    {
+      m_cEncLib.setRprSwitchingResolutionOrderList(m_rprSwitchingResolutionOrderList[k], k);
+      m_cEncLib.setRprSwitchingQPOffsetOrderList(m_rprSwitchingQPOffsetOrderList[k], k);
+    }
+    m_cEncLib.setRprSwitchingListSize(m_rprSwitchingListSize);
   }
 #endif
   m_cEncLib.setUseCiip                                        ( m_ciip );
@@ -1403,17 +1421,61 @@ void EncApp::xWriteOutput( int iNumEncoded, std::list<PelUnitBuf*>& recBufList )
       const PelUnitBuf* pcPicYuvRec = *(iterPicYuvRec++);
       if (!m_reconFileName.empty())
       {
+#if JVET_AC0096
+        const SPS& sps = *m_cEncLib.getSPS(0);
+        int ppsID = 0;
+        if (m_rprFunctionalityTestingEnabledFlag)
+        {
+          const PPS& pps1 = *m_cEncLib.getPPS(ENC_PPS_ID_RPR);
+          const PPS& pps2 = *m_cEncLib.getPPS(ENC_PPS_ID_RPR2);
+          const PPS& pps3 = *m_cEncLib.getPPS(ENC_PPS_ID_RPR3);
+          if (pps1.getPicWidthInLumaSamples() == pcPicYuvRec->get(COMPONENT_Y).width && pps1.getPicHeightInLumaSamples() == pcPicYuvRec->get(COMPONENT_Y).height)
+          {
+            ppsID = ENC_PPS_ID_RPR;
+          }
+          else if (pps2.getPicWidthInLumaSamples() == pcPicYuvRec->get(COMPONENT_Y).width && pps2.getPicHeightInLumaSamples() == pcPicYuvRec->get(COMPONENT_Y).height)
+          {
+            ppsID = ENC_PPS_ID_RPR2;
+          }
+          else if (pps3.getPicWidthInLumaSamples() == pcPicYuvRec->get(COMPONENT_Y).width && pps3.getPicHeightInLumaSamples() == pcPicYuvRec->get(COMPONENT_Y).height)
+          {
+            ppsID = ENC_PPS_ID_RPR3;
+          }
+          else
+          {
+            ppsID = 0;
+          }
+        }
+        else
+        {
+          ppsID = (sps.getMaxPicWidthInLumaSamples() != pcPicYuvRec->get(COMPONENT_Y).width || sps.getMaxPicHeightInLumaSamples() != pcPicYuvRec->get(COMPONENT_Y).height) ? ENC_PPS_ID_RPR : 0;
+        }
+        const PPS& pps = *m_cEncLib.getPPS(ppsID);
+#endif
         if( m_cEncLib.isResChangeInClvsEnabled() && m_cEncLib.getUpscaledOutput() )
         {
+#if !JVET_AC0096
           const SPS& sps = *m_cEncLib.getSPS( 0 );
           const PPS& pps = *m_cEncLib.getPPS( ( sps.getMaxPicWidthInLumaSamples() != pcPicYuvRec->get( COMPONENT_Y ).width || sps.getMaxPicHeightInLumaSamples() != pcPicYuvRec->get( COMPONENT_Y ).height ) ? ENC_PPS_ID_RPR : 0 );
-
+#endif
           m_cVideoIOYuvReconFile.writeUpscaledPicture( sps, pps, *pcPicYuvRec, ipCSC, m_packedYUVMode, m_cEncLib.getUpscaledOutput(), NUM_CHROMA_FORMAT, m_bClipOutputVideoToRec709Range );
         }
         else
         {
+#if JVET_AC0096
+          Window confWindowPPS = pps.getConformanceWindow();
+          m_cVideoIOYuvReconFile.write(
+            pcPicYuvRec->get(COMPONENT_Y).width, pcPicYuvRec->get(COMPONENT_Y).height, *pcPicYuvRec, ipCSC,
+            m_packedYUVMode, confWindowPPS.getWindowLeftOffset() * SPS::getWinUnitX(m_cEncLib.getChromaFormatIdc()),
+            confWindowPPS.getWindowRightOffset() * SPS::getWinUnitX(m_cEncLib.getChromaFormatIdc()),
+            confWindowPPS.getWindowTopOffset() * SPS::getWinUnitY(m_cEncLib.getChromaFormatIdc()),
+            confWindowPPS.getWindowBottomOffset() * SPS::getWinUnitY(m_cEncLib.getChromaFormatIdc()), NUM_CHROMA_FORMAT,
+            m_bClipOutputVideoToRec709Range);
+
+#else
           m_cVideoIOYuvReconFile.write( pcPicYuvRec->get( COMPONENT_Y ).width, pcPicYuvRec->get( COMPONENT_Y ).height, *pcPicYuvRec, ipCSC, m_packedYUVMode,
             m_confWinLeft, m_confWinRight, m_confWinTop, m_confWinBottom, NUM_CHROMA_FORMAT, m_bClipOutputVideoToRec709Range );
+#endif
         }
       }
     }
