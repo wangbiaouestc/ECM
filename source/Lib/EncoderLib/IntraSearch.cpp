@@ -9525,6 +9525,13 @@ void IntraSearch::reduceHadCandList(static_vector<T, N>& candModeList, static_ve
 #if JVET_AC0105_DIRECTIONAL_PLANAR
   static_vector<uint8_t, FAST_UDI_MAX_RDMODE_NUM> sortedDirPlanarModes(0);
   static_vector<double, FAST_UDI_MAX_RDMODE_NUM>  sortedDirPlanarCost(0);
+
+  for(int i = 0; i < FAST_UDI_MAX_RDMODE_NUM; i++ )
+  {
+    sortedDirPlanarModes[i] = 0;
+    sortedDirPlanarCost[i]  = 0.0;
+  }
+
   for (uint8_t Idx = 0; Idx < 2; Idx++)
   {
     CHECK(dirPlanarCostList[Idx] == MAX_DOUBLE, "dirPlanarCostList is not filled.");
