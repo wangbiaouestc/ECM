@@ -567,6 +567,21 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
     const bool bUseIntraOrPeriodicOffset = (rpcSlice->isIntra() && !rpcSlice->getSPS()->getIBCFlag()) || (m_pcCfg->getSliceChromaOffsetQpPeriodicity() > 0 && (rpcSlice->getPOC() % m_pcCfg->getSliceChromaOffsetQpPeriodicity()) == 0);
     int cbQP = bUseIntraOrPeriodicOffset ? m_pcCfg->getSliceChromaOffsetQpIntraOrPeriodic(false) : m_pcCfg->getGOPEntry(iGOPid).m_CbQPoffset;
     int crQP = bUseIntraOrPeriodicOffset ? m_pcCfg->getSliceChromaOffsetQpIntraOrPeriodic(true)  : m_pcCfg->getGOPEntry(iGOPid).m_CrQPoffset;
+
+#if JVET_AC0096
+    if (m_pcCfg->getRprFunctionalityTestingEnabledFlag())
+    {
+      auto mappedQpDelta = [&](ComponentID c, int qpOffset) -> int {
+        const int mappedQpBefore = rpcSlice->getSPS()->getMappedChromaQpValue(c, iQP - qpOffset);
+        const int mappedQpAfter = rpcSlice->getSPS()->getMappedChromaQpValue(c, iQP);
+        return mappedQpBefore - mappedQpAfter + qpOffset;
+      };
+      int currPoc = rpcSlice->getPOC() + m_pcCfg->getFrameSkip();
+      int rprSegment = m_pcCfg->getRprSwitchingSegment(currPoc);
+      cbQP += mappedQpDelta(COMPONENT_Cb, m_pcCfg->getRprSwitchingQPOffsetOrderList(rprSegment));
+      crQP += mappedQpDelta(COMPONENT_Cr, m_pcCfg->getRprSwitchingQPOffsetOrderList(rprSegment));
+    }
+#endif
     int cbCrQP = (cbQP + crQP) >> 1; // use floor of average chroma QP offset for joint-Cb/Cr coding
 
     cbQP = Clip3( -12, 12, cbQP + rpcSlice->getPPS()->getQpOffset(COMPONENT_Cb) ) - rpcSlice->getPPS()->getQpOffset(COMPONENT_Cb);

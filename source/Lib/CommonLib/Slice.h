@@ -1764,6 +1764,7 @@ private:
   int               m_LadfQpOffset[MAX_LADF_INTERVALS];
   int               m_LadfIntervalLowerBound[MAX_LADF_INTERVALS];
 #endif
+
 #if JVET_AA0133_INTER_MTS_OPT
   int               m_interMTSMaxSize;
 #endif
@@ -1791,7 +1792,11 @@ private:
   bool              m_rprEnabledFlag;
   bool              m_resChangeInClvsEnabledFlag;
   bool              m_interLayerPresentFlag;
-
+#if JVET_AC0096
+  bool              m_rprFunctionalityTestingEnabledFlag;
+  int               m_rprSwitchingResolutionOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
+  int               m_rprSwitchingQPOffsetOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
+#endif
   uint32_t          m_log2ParallelMergeLevelMinus2;
   bool              m_ppsValidFlag[64];
   Size              m_scalingWindowSizeInPPS[64];
@@ -2363,7 +2368,14 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setInterLayerPresentFlag( bool b )                                      { m_interLayerPresentFlag = b; }
   bool      getResChangeInClvsEnabledFlag()                               const     { return m_resChangeInClvsEnabledFlag; }
   void      setResChangeInClvsEnabledFlag(bool flag)                                { m_resChangeInClvsEnabledFlag = flag; }
-
+#if JVET_AC0096
+  bool      getRprFunctionalityTestingEnabledFlag()                       const { return m_rprFunctionalityTestingEnabledFlag; }
+  void      setRprFunctionalityTestingEnabledFlag(bool flag)                        { m_rprFunctionalityTestingEnabledFlag = flag; }
+  void      setRprSwitchingResolutionOrderList(int value, int idx)                  { m_rprSwitchingResolutionOrderList[idx] = value; }
+  int       getRprSwitchingResolutionOrderList(int idx)                  const { return m_rprSwitchingResolutionOrderList[idx]; }
+  void      setRprSwitchingQPOffsetOrderList(int value, int idx)                    { m_rprSwitchingQPOffsetOrderList[idx] = value; }
+  int       getRprSwitchingQPOffsetOrderList(int idx)                    const { return m_rprSwitchingQPOffsetOrderList[idx]; }
+#endif
   uint32_t  getLog2ParallelMergeLevelMinus2() const { return m_log2ParallelMergeLevelMinus2; }
   void      setLog2ParallelMergeLevelMinus2(uint32_t mrgLevel) { m_log2ParallelMergeLevelMinus2 = mrgLevel; }
   void          setPPSValidFlag(int i, bool b) { m_ppsValidFlag[i] = b; }

@@ -1095,7 +1095,9 @@ static const int NTAPS_CHROMA             =                         4; ///< Numb
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
 static const int MAX_LADF_INTERVALS       =                         5; /// max number of luma adaptive deblocking filter qp offset intervals
 #endif
-
+#if JVET_AC0096
+static const int MAX_RPR_SWITCHING_ORDER_LIST_SIZE           =     32; /// max number of pre-defined RPR switching segments
+#endif
 static const int NTAPS_BILINEAR           =                         2; ///< Number of taps for bilinear filter
 
 #if INTER_RM_SIZE_CONSTRAINTS
@@ -1269,6 +1271,10 @@ static const int PLT_FAST_RATIO = 100;
 static const int  EPBIN_WEIGHT_FACTOR =                           4;
 #endif
 static const int ENC_PPS_ID_RPR =                                 3;
+#if JVET_AC0096
+static const int ENC_PPS_ID_RPR2 =                                5;
+static const int ENC_PPS_ID_RPR3 =                                7;
+#endif
 static const int SCALE_RATIO_BITS =                              14;
 static const int MAX_SCALING_RATIO =                              2;  // max downsampling ratio for RPR
 static const std::pair<int, int> SCALE_1X = std::pair<int, int>( 1 << SCALE_RATIO_BITS, 1 << SCALE_RATIO_BITS );  // scale ratio 1x
