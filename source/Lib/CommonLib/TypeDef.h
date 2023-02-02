@@ -55,7 +55,6 @@
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
 
-
 #if BASE_ENCODER
 // Lossy encoder speedups
 #define AFFINE_ENC_OPT                                    1 // Affine encoder optimization
@@ -353,7 +352,7 @@
 #define GDR_DEC_TRACE                                     0
 #endif
 
-
+#define JVET_AC0096                                       1 // JVET-AC0096: RPR functionality testing
 
 
 

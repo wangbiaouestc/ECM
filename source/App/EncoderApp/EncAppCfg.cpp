@@ -694,6 +694,12 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   SMultiValueInput<int>  cfg_LadfQpOffset                    ( -MAX_QP, MAX_QP, 2, MAX_LADF_INTERVALS, defaultLadfQpOffset, 3 );
   SMultiValueInput<int>  cfg_LadfIntervalLowerBound          ( 0, std::numeric_limits<int>::max(), 1, MAX_LADF_INTERVALS - 1, defaultLadfIntervalLowerBound, 2 );
 #endif
+#if JVET_AC0096
+  const int defaultRprSwitchingResolutionOrderList[12] = { 1, 0, 2, 0, 3, 0, 1, 0, 2, 0, 3, 0 };
+  const int defaultRprSwitchingQPOffsetOrderList[12] = { -2, 0, -4, 0, -6, 0, -2, 0, -4, 0, -6, 0 };
+  SMultiValueInput<int>  cfg_rprSwitchingResolutionOrderList(0, 3, 0, MAX_RPR_SWITCHING_ORDER_LIST_SIZE, defaultRprSwitchingResolutionOrderList, 12);
+  SMultiValueInput<int>  cfg_rprSwitchingQPOffsetOrderList(-MAX_QP, MAX_QP, 0, MAX_RPR_SWITCHING_ORDER_LIST_SIZE, defaultRprSwitchingQPOffsetOrderList, 12);
+#endif
   SMultiValueInput<unsigned> cfg_virtualBoundariesPosX       (0, std::numeric_limits<uint32_t>::max(), 0, 3);
   SMultiValueInput<unsigned> cfg_virtualBoundariesPosY       (0, std::numeric_limits<uint32_t>::max(), 0, 3);
 
@@ -1698,6 +1704,18 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ( "FractionNumFrames",                              m_fractionOfFrames,                         1.0, "Encode a fraction of the specified in FramesToBeEncoded frames" )
   ( "SwitchPocPeriod",                                m_switchPocPeriod,                            0, "Switch POC period for RPR" )
   ( "UpscaledOutput",                                 m_upscaledOutput,                             0, "Output upscaled (2), decoded but in full resolution buffer (1) or decoded cropped (0, default) picture for RPR" )
+#if JVET_AC0096
+  ("RPRFunctionalityTesting",                         m_rprFunctionalityTestingEnabledFlag,     false, "Enables RPR functionality testing")
+  ("RPRSwitchingResolutionOrderList",                 cfg_rprSwitchingResolutionOrderList, cfg_rprSwitchingResolutionOrderList, "Order of resolutions for each segment in RPR functionality testing where 0,1,2,3 corresponds to full resolution,4/5,2/3 and 1/2")
+  ("RPRSwitchingQPOffsetOrderList",                   cfg_rprSwitchingQPOffsetOrderList,   cfg_rprSwitchingQPOffsetOrderList, "Order of QP offset for each segment in RPR functionality testing, where the QP is modified according to the given offset")
+  ("RPRSwitchingSegmentSize",                         m_rprSwitchingSegmentSize,                   32, "Number of frames with same resolution")
+  ("RPRSwitchingTime",                                m_rprSwitchingTime,                         0.0, "Segment switching time in seconds, when non-zero it defines the segment size according to frame rate (a multiple of 8)")
+  ("RPRPopulatePPSatIntra",                           m_rprPopulatePPSatIntraFlag,              false, "Populate all PPS which can be used in the sequence at the Intra, e.g. full-res, 4/5, 2/3 and 1/2")
+  ("ScalingRatioHor2",                                m_scalingRatioHor2,                         1.5, "Scaling ratio in hor direction (2/3)")
+  ("ScalingRatioVer2",                                m_scalingRatioVer2,                         1.5, "Scaling ratio in ver direction (2/3)")
+  ("ScalingRatioHor3",                                m_scalingRatioHor3,                        1.25, "Scaling ratio in hor direction (4/5)")
+  ("ScalingRatioVer3",                                m_scalingRatioVer3,                        1.25, "Scaling ratio in ver direction (4/5)")
+#endif
 #if JVET_AB0082
   ("UpscaleFilterForDisplay",                         m_upscaleFilterForDisplay,                    2, "Filters used for upscaling reconstruction to full resolution (2: ECM 12-tap luma and 6-tap chroma MC filters, 1: Alternative 12-tap luma and 6-tap chroma filters, 0: VVC 8-tap luma and 4-tap chroma MC filters)")
 #endif
@@ -1808,7 +1826,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   }
 #endif
 
+#if JVET_AC0096
+  m_resChangeInClvsEnabled = m_scalingRatioHor != 1.0 || m_scalingRatioVer != 1.0 || m_rprFunctionalityTestingEnabledFlag;
+#else
   m_resChangeInClvsEnabled = m_scalingRatioHor != 1.0 || m_scalingRatioVer != 1.0;
+#endif
 #if JVET_Q0114_ASPECT5_GCI_FLAG
   m_resChangeInClvsEnabled = m_resChangeInClvsEnabled && m_rprEnabledFlag;
 #endif
@@ -2855,7 +2877,31 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
       m_chromaQpMappingTableParams.m_deltaQpOutVal[2][i] = cfg_qpInValCbCr.values[i + 1] - cfg_qpInValCbCr.values[i];
     }
   }
-
+#if JVET_AC0096
+  if (m_rprFunctionalityTestingEnabledFlag)
+  {
+    m_upscaledOutput = 2;
+    if (m_scalingRatioHor == 1.0 && m_scalingRatioVer == 1.0)
+    {
+      m_scalingRatioHor = 2.0;
+      m_scalingRatioVer = 2.0;
+    }
+    CHECK(cfg_rprSwitchingResolutionOrderList.values.size() > MAX_RPR_SWITCHING_ORDER_LIST_SIZE, "Length of RPRSwitchingResolutionOrderList exceeds maximum length");
+    CHECK(cfg_rprSwitchingQPOffsetOrderList.values.size() > MAX_RPR_SWITCHING_ORDER_LIST_SIZE, "Length of RPRSwitchingQPOffsetOrderList exceeds maximum length");
+    CHECK(cfg_rprSwitchingResolutionOrderList.values.size() != cfg_rprSwitchingQPOffsetOrderList.values.size(), "RPRSwitchingResolutionOrderList and RPRSwitchingQPOffsetOrderList shall be the same size");
+    m_rprSwitchingListSize = (int)cfg_rprSwitchingResolutionOrderList.values.size();
+    for (int k = 0; k < m_rprSwitchingListSize; k++)
+    {
+      m_rprSwitchingResolutionOrderList[k] = cfg_rprSwitchingResolutionOrderList.values[k];
+      m_rprSwitchingQPOffsetOrderList[k] = cfg_rprSwitchingQPOffsetOrderList.values[k];
+    }
+    if (m_rprSwitchingTime != 0.0)
+    {
+      int segmentSize = 8 * int(((double)m_iFrameRate * m_rprSwitchingTime + 4) / 8);
+      m_rprSwitchingSegmentSize = segmentSize;
+    }
+  }
+#endif
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
   if ( m_LadfEnabed )
   {
@@ -5241,7 +5287,16 @@ void EncAppCfg::xPrintParameter()
 
   if (m_resChangeInClvsEnabled)
   {
-    msg( VERBOSE, "RPR:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor, m_scalingRatioVer, m_switchPocPeriod );
+#if JVET_AC0096
+    if (m_rprFunctionalityTestingEnabledFlag)
+    {
+      msg(VERBOSE, "RPR:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor, m_scalingRatioVer, m_rprSwitchingSegmentSize);
+      msg(VERBOSE, "RPR2:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor2, m_scalingRatioVer2, m_rprSwitchingSegmentSize);
+      msg(VERBOSE, "RPR3:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor3, m_scalingRatioVer3, m_rprSwitchingSegmentSize);
+    }
+#else
+    msg(VERBOSE, "RPR:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor, m_scalingRatioVer, m_switchPocPeriod);
+#endif
   }
   else
   {
