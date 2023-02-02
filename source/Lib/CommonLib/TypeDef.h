@@ -53,6 +53,7 @@
 // clang-format off
 
 //########### place macros to be removed in next cycle below this line ###############
+#define JVET_AC0096                                        1 // RPR functionality testing
 
 #define JVET_AA0098_MAX_MTT_DEPTH_TID                      1 // JVET-X0144: max MTT hierarchy depth set by temporal ID
 #if JVET_AA0098_MAX_MTT_DEPTH_TID

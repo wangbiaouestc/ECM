@@ -774,6 +774,19 @@ protected:
   bool        m_rprEnabledFlag;
   bool        m_resChangeInClvsEnabled;
   int         m_switchPocPeriod;
+#if JVET_AC0096
+  int         m_rprSwitchingListSize;
+  int         m_rprSwitchingResolutionOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
+  int         m_rprSwitchingQPOffsetOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
+  bool        m_rprFunctionalityTestingEnabledFlag;
+  bool        m_rprPopulatePPSatIntraFlag;
+  int         m_rprSwitchingSegmentSize;
+  double      m_rprSwitchingTime;
+  double      m_scalingRatioHor2;
+  double      m_scalingRatioVer2;
+  double      m_scalingRatioHor3;
+  double      m_scalingRatioVer3;
+#endif
   int         m_upscaledOutput;
   int         m_numRefLayers[MAX_VPS_LAYERS];
   bool        m_avoidIntraInDepLayer;
@@ -2001,6 +2014,27 @@ public:
   void        setResChangeInClvsEnabled(bool b)                      { m_resChangeInClvsEnabled = b; }
   bool        isResChangeInClvsEnabled()                        const { return m_resChangeInClvsEnabled; }
   void        setSwitchPocPeriod( int p )                            { m_switchPocPeriod = p;}
+#if JVET_AC0096
+  bool        getRprFunctionalityTestingEnabledFlag()             const { return m_rprFunctionalityTestingEnabledFlag; }
+  void        setRprFunctionalityTestingEnabledFlag(bool flag) { m_rprFunctionalityTestingEnabledFlag = flag; }
+  bool        getRprPopulatePPSatIntraFlag()                      const { return m_rprPopulatePPSatIntraFlag; }
+  void        setRprPopulatePPSatIntraFlag(bool flag) { m_rprPopulatePPSatIntraFlag = flag; }
+  int         getRprSwitchingSegmentSize()                        const { return m_rprSwitchingSegmentSize; }
+  void        setRprSwitchingSegmentSize(int size) { m_rprSwitchingSegmentSize = size; }
+  int         getRprSwitchingListSize()                           const { return m_rprSwitchingListSize; }
+  void        setRprSwitchingListSize(int size) { m_rprSwitchingListSize = size; }
+  double      getRprSwitchingTime()                               const { return m_rprSwitchingTime; }
+  void        setRprSwitchingTime(int size) { m_rprSwitchingTime = size; }
+  void        setRprSwitchingResolutionOrderList(int value, int idx) { m_rprSwitchingResolutionOrderList[idx] = value; }
+  int         getRprSwitchingResolutionOrderList(int idx)         const { return m_rprSwitchingResolutionOrderList[idx]; }
+  void        setRprSwitchingQPOffsetOrderList(int value, int idx) { m_rprSwitchingQPOffsetOrderList[idx] = value; }
+  int         getRprSwitchingQPOffsetOrderList(int idx)           const { return m_rprSwitchingQPOffsetOrderList[idx]; }
+  int         getRprSwitchingSegment(int currPoc)                 const { return (currPoc / m_rprSwitchingSegmentSize % m_rprSwitchingListSize); }
+  int         getRprSwitchingPPSID(int rprSegment)                const {int res2ppsid[4] = { 0, ENC_PPS_ID_RPR3, ENC_PPS_ID_RPR2, ENC_PPS_ID_RPR };
+                                                                        return res2ppsid[m_rprSwitchingResolutionOrderList[rprSegment]];}
+  void        setScalingRatio2(double hor, double ver) { m_scalingRatioHor2 = hor, m_scalingRatioVer2 = ver; }
+  void        setScalingRatio3(double hor, double ver) { m_scalingRatioHor3 = hor, m_scalingRatioVer3 = ver; }
+#endif
   void        setUpscaledOutput( int b )                             { m_upscaledOutput = b; }
   int         getUpscaledOutput()                              const { return m_upscaledOutput; }
 
