@@ -2511,19 +2511,6 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         pu.intraDir[ CHANNEL_TYPE_LUMA ] = cu.timdMode;
       }
 #endif
-#if JVET_AC0105_DIRECTIONAL_PLANAR
-      cu.plIdx = bestPlMode;
-      if (cu.plIdx)
-      {
-        CHECK(pu.multiRefIdx > 0, "use of PL");
-        CHECK(cu.mipFlag, "use of PL");
-        CHECK(cu.dimd, "use of PL");
-        CHECK(cu.tmpFlag, "use of PL");
-        CHECK(cu.tmrlFlag, "use of PL");
-        CHECK(cu.sgpm, "use of PL");
-        CHECK(cu.timd, "use of PL");
-      }
-#endif
 #if JVET_AB0155_SGPM
       cu.sgpm = uiBestPUMode.sgpmFlag;
       if (cu.sgpm)
@@ -2553,7 +2540,22 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       {
         cu.intraTmpDimdMode = intraTmpDimdMode;
       }
-#endif 
+#endif
+
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+      cu.plIdx = bestPlMode;
+      if (cu.plIdx)
+      {
+        CHECK(pu.multiRefIdx > 0, "use of PL");
+        CHECK(cu.mipFlag, "use of PL");
+        CHECK(cu.dimd, "use of PL");
+        CHECK(cu.tmpFlag, "use of PL");
+        CHECK(cu.tmrlFlag, "use of PL");
+        CHECK(cu.sgpm, "use of PL");
+        CHECK(cu.timd, "use of PL");
+      }
+#endif
+
       if (cu.colorTransform)
       {
         CHECK(pu.intraDir[CHANNEL_TYPE_CHROMA] != DM_CHROMA_IDX, "chroma should use DM mode for adaptive color transform");
@@ -9523,19 +9525,19 @@ void IntraSearch::reduceHadCandList(static_vector<T, N>& candModeList, static_ve
 #endif
 
 #if JVET_AC0105_DIRECTIONAL_PLANAR
-  static_vector<uint8_t, FAST_UDI_MAX_RDMODE_NUM> sortedDirPlanarModes(0);
-  static_vector<double, FAST_UDI_MAX_RDMODE_NUM>  sortedDirPlanarCost(0);
+  static_vector<uint8_t, 2> sortedDirPlanarModes(2);
+  static_vector<double, 2>  sortedDirPlanarCost(2);
 
-  for(int i = 0; i < FAST_UDI_MAX_RDMODE_NUM; i++ )
+  for(int i = 0; i < 2; i++ )
   {
     sortedDirPlanarModes[i] = 0;
-    sortedDirPlanarCost[i]  = 0.0;
+    sortedDirPlanarCost[i]  = MAX_DOUBLE;
   }
 
-  for (uint8_t Idx = 0; Idx < 2; Idx++)
+  for (uint8_t idx = 0; idx < 2; idx++)
   {
-    CHECK(dirPlanarCostList[Idx] == MAX_DOUBLE, "dirPlanarCostList is not filled.");
-    updateCandList(Idx, dirPlanarCostList[Idx], sortedDirPlanarModes, sortedDirPlanarCost, 2);
+    CHECK(dirPlanarCostList[idx] == MAX_DOUBLE, "dirPlanarCostList is not filled.");
+    updateCandList(idx, dirPlanarCostList[idx], sortedDirPlanarModes, sortedDirPlanarCost, 2);
   }
 
   const int modeListSize = int(tempRdModeList.size());
