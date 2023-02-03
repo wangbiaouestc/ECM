@@ -214,17 +214,11 @@ private:
 #endif
 
 #if JVET_AA0057_CCCM
-#if !JVET_AC0119_LM_CHROMA_FUSION
-  Area m_cccmBlkArea;
-#endif
   Area m_cccmRefArea;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   Pel* m_cccmLumaBuf[2];
 #else
   Pel* m_cccmLumaBuf;
-#endif
-#if JVET_AB0174_CCCM_DIV_FREE && !JVET_AC0119_LM_CHROMA_FUSION
-  int  m_cccmLumaOffset;
 #endif
 #endif
   
@@ -437,14 +431,8 @@ public:
   void   xCccmCreateLumaRef       (const PredictionUnit& pu, CompArea chromaArea);
   PelBuf xCccmGetLumaRefBuf       (const PredictionUnit& pu, int &areaWidth, int &areaHeight, int &refSizeX, int &refSizeY, int &refPosPicX, int &refPosPicY) const;
   PelBuf xCccmGetLumaPuBuf        (const PredictionUnit& pu) const;
-#if !JVET_AC0119_LM_CHROMA_FUSION
-  Pel    xCccmGetLumaVal          (const PredictionUnit& pu, const CPelBuf pi, const int x, const int y) const;
-#endif
   int    xCccmCalcRefAver         (const PredictionUnit& pu) const;
   void   xCccmCalcRefArea         (const PredictionUnit& pu, CompArea chromaArea);
-#if JVET_AB0174_CCCM_DIV_FREE && !JVET_AC0119_LM_CHROMA_FUSION
-  void   xCccmSetLumaRefValue     (const PredictionUnit& pu);
-#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   void   xCccmCreateLumaNoSubRef  ( const PredictionUnit& pu, CompArea chromaArea );
   void   xCccmApplyModel          ( const PredictionUnit& pu, const ComponentID compId, CccmModel<CCCM_NO_SUB_NUM_PARAMS> &cccmModel, int modelId, int modelThr, PelBuf &piPred ) const;

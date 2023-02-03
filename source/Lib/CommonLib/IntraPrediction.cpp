@@ -4652,6 +4652,8 @@ void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpR
 #if JVET_AC0094_REF_SAMPLES_OPT
   Pel refAbove[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
   Pel refLeft[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
+  ::memset(refAbove, 0, sizeof(refAbove));
+  ::memset(refLeft, 0, sizeof(refAbove));
 #else
   static Pel  refAbove[2 * MAX_CU_SIZE + 5 + 33 * MAX_REF_LINE_IDX];
   static Pel  refLeft[2 * MAX_CU_SIZE + 5 + 33 * MAX_REF_LINE_IDX];
@@ -10802,27 +10804,84 @@ int64_t xCccmDivide(int64_t num, int64_t denom) // Note: assumes positive denomi
 }
 #endif
 
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AC0119_LM_CHROMA_FUSION
 #if JVET_AB0174_CCCM_DIV_FREE
-void IntraPrediction::xCccmSetLumaRefValue( const PredictionUnit& pu )
+void IntraPrediction::xCccmSetLumaRefValue(const PredictionUnit& pu)
 {
   int lumaPosX = m_cccmBlkArea.x << getComponentScaleX(COMPONENT_Cb, pu.cu->chromaFormat);
   int lumaPosY = m_cccmBlkArea.y << getComponentScaleY(COMPONENT_Cb, pu.cu->chromaFormat);
-  
-  if ( lumaPosX || lumaPosY )
+
+  if (lumaPosX || lumaPosY)
   {
     lumaPosX = lumaPosX ? lumaPosX - 1 : 0;
     lumaPosY = lumaPosY ? lumaPosY - 1 : 0;
-    
-    m_cccmLumaOffset = pu.cs->picture->getRecoBuf(COMPONENT_Y).at( lumaPosX, lumaPosY );
+
+    m_cccmLumaOffset = pu.cs->picture->getRecoBuf(COMPONENT_Y).at(lumaPosX, lumaPosY);
   }
   else
   {
-    m_cccmLumaOffset = 1 << ( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - 1 );
+    m_cccmLumaOffset = 1 << (pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - 1);
   }
 }
 #endif
 
+// Calculate a single downsampled luma reference value (copied from IntraPrediction::xGetLumaRecPixels)
+Pel IntraPrediction::xCccmGetLumaVal(const PredictionUnit& pu, const CPelBuf pi, const int x, const int y) const
+{
+  const Pel* piSrc = pi.buf;
+  const int iRecStride = pi.stride;
+  Pel ypval = 0;
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  if (pu.cccmNoSubFlag || pu.chromaFormat == CHROMA_444)
+#else
+  if (pu.chromaFormat == CHROMA_444)
+#endif
+  {
+    ypval = piSrc[x + iRecStride * y];
+  }
+  else if (pu.chromaFormat == CHROMA_422)
+  {
+    int s = 2;
+    int offLeft = x > 0 ? -1 : 0;
+    s += piSrc[2 * x + iRecStride * y] * 2;
+    s += piSrc[2 * x + offLeft + iRecStride * y];
+    s += piSrc[2 * x + 1 + iRecStride * y];
+    ypval = s >> 2;
+  }
+  else if (pu.cs->sps->getCclmCollocatedChromaFlag())
+  {
+    int s = 4;
+    int offLeft = x > 0 ? -1 : 0;
+    int offAbove = y > 0 ? -1 : 0;
+    s += piSrc[2 * x + iRecStride * 2 * y] * 4;
+    s += piSrc[2 * x + offLeft + iRecStride * 2 * y];
+    s += piSrc[2 * x + 1 + iRecStride * 2 * y];
+    s += piSrc[2 * x + iRecStride * (2 * y + 1)];
+    s += piSrc[2 * x + iRecStride * (2 * y + offAbove)];
+    ypval = s >> 3;
+  }
+  else
+  {
+    int s = 4;
+    int offLeft = x > 0 ? -1 : 0;
+    s += piSrc[2 * x + iRecStride * y * 2] * 2;
+    s += piSrc[2 * x + offLeft + iRecStride * y * 2];
+    s += piSrc[2 * x + 1 + iRecStride * y * 2];
+    s += piSrc[2 * x + iRecStride * (y * 2 + 1)] * 2;
+    s += piSrc[2 * x + offLeft + iRecStride * (y * 2 + 1)];
+    s += piSrc[2 * x + 1 + iRecStride * (y * 2 + 1)];
+    ypval = s >> 3;
+  }
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  return ypval - m_cccmLumaOffset; // Note: this could have also been included in the rounding offset s to avoid the extra sample based operation
+#else
+  return ypval;
+#endif
+}
+#endif
+
+#if JVET_AA0057_CCCM
 void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr, int intraDir )
 {
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
@@ -11429,61 +11488,6 @@ void IntraPrediction::xCccmCreateLumaNoSubRef( const PredictionUnit& pu, CompAre
   }
 }
 #endif
-
-// Calculate a single downsampled luma reference value (copied from IntraPrediction::xGetLumaRecPixels)
-Pel IntraPrediction::xCccmGetLumaVal(const PredictionUnit& pu, const CPelBuf pi, const int x, const int y) const
-{
-  const Pel* piSrc = pi.buf;
-  const int iRecStride = pi.stride;
-  Pel ypval = 0;
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
-  if( pu.cccmNoSubFlag || pu.chromaFormat == CHROMA_444 )
-#else
-  if (pu.chromaFormat == CHROMA_444)
-#endif
-  {
-    ypval = piSrc[x + iRecStride * y];
-  }
-  else if (pu.chromaFormat == CHROMA_422)
-  {
-    int s       = 2;
-    int offLeft = x > 0 ? -1 : 0;
-    s += piSrc[2 * x +           iRecStride * y] * 2;
-    s += piSrc[2 * x + offLeft + iRecStride * y];
-    s += piSrc[2 * x +       1 + iRecStride * y];
-    ypval = s >> 2;
-  }
-  else if (pu.cs->sps->getCclmCollocatedChromaFlag())
-  {
-    int s        = 4;
-    int offLeft  = x > 0 ? -1 : 0;
-    int offAbove = y > 0 ? -1 : 0;
-    s += piSrc[2 * x +           iRecStride *  2 * y            ] * 4;
-    s += piSrc[2 * x + offLeft + iRecStride *  2 * y            ];
-    s += piSrc[2 * x +       1 + iRecStride *  2 * y            ];
-    s += piSrc[2 * x +           iRecStride * (2 * y + 1)       ];
-    s += piSrc[2 * x +           iRecStride * (2 * y + offAbove)];
-    ypval = s >> 3;
-  }
-  else
-  {
-    int s       = 4;
-    int offLeft = x > 0 ? -1 : 0;
-    s += piSrc[2 * x +           iRecStride *  y * 2            ] * 2;
-    s += piSrc[2 * x + offLeft + iRecStride *  y * 2            ];
-    s += piSrc[2 * x +       1 + iRecStride *  y * 2            ];
-    s += piSrc[2 * x +           iRecStride * (y * 2 + 1)       ] * 2;
-    s += piSrc[2 * x + offLeft + iRecStride * (y * 2 + 1)       ];
-    s += piSrc[2 * x +       1 + iRecStride * (y * 2 + 1)       ];
-    ypval = s >> 3;
-  }
-
-#if JVET_AB0174_CCCM_DIV_FREE
-  return ypval - m_cccmLumaOffset; // Note: this could have also been included in the rounding offset s to avoid the extra sample based operation
-#else
-  return ypval;
-#endif
-}
 
 // Using the same availability checking as in IntraPrediction::xFillReferenceSamples
 void IntraPrediction::xCccmCalcRefArea(const PredictionUnit& pu, CompArea chromaArea)
