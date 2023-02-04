@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -214,7 +214,7 @@ public:
   uint64_t    geo_tmFlag_est(const TempCtx& ctxStart, const int flag);
 #endif
 #endif
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   uint64_t    geoBldFlagEst(const TempCtx& ctxStart, const int flag);
   void        geoAdaptiveBlendingIdx(const int idx);
 #endif

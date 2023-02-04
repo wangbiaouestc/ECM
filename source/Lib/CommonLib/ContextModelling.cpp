@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -492,9 +492,9 @@ void MergeCtx::copyRegularMergeCand(int dstCandIdx, MergeCtx& srcCtx, int srcCan
 
   mvFieldNeighbours[ dstCandIdx << 1     ] = srcCtx.mvFieldNeighbours[ srcCandIdx << 1     ];
   mvFieldNeighbours[(dstCandIdx << 1) + 1] = srcCtx.mvFieldNeighbours[(srcCandIdx << 1) + 1];
-  BcwIdx            [dstCandIdx] = srcCtx.BcwIdx            [srcCandIdx];
+  bcwIdx            [dstCandIdx] = srcCtx.bcwIdx            [srcCandIdx];
 #if INTER_LIC
-  LICFlags          [dstCandIdx] = srcCtx.LICFlags          [srcCandIdx];
+  licFlags          [dstCandIdx] = srcCtx.licFlags          [srcCandIdx];
 #endif
   interDirNeighbours[dstCandIdx] = srcCtx.interDirNeighbours[srcCandIdx];
   useAltHpelIf      [dstCandIdx] = srcCtx.useAltHpelIf      [srcCandIdx];
@@ -507,7 +507,7 @@ void MergeCtx::convertRegularMergeCandToBi(int candIdx)
 {
   if( interDirNeighbours[candIdx] < 3
 #if INTER_LIC
-      && !LICFlags[candIdx]
+      && !licFlags[candIdx]
 #endif
     )
   {
@@ -530,7 +530,7 @@ void MergeCtx::convertRegularMergeCandToBi(int candIdx)
     }
 
     interDirNeighbours[candIdx] = 3;
-    BcwIdx            [candIdx] = BCW_DEFAULT;
+    bcwIdx            [candIdx] = BCW_DEFAULT;
   } 
 }
 #endif
@@ -558,12 +558,12 @@ void MergeCtx::saveMergeInfo(PredictionUnit& puTmp, PredictionUnit pu)
 
   puTmp.bv = pu.bv;
 
-  puTmp.cu->BcwIdx = pu.cu->BcwIdx;
+  puTmp.cu->bcwIdx = pu.cu->bcwIdx;
   puTmp.addHypData = pu.addHypData;
   puTmp.numMergedAddHyps = pu.numMergedAddHyps;
 
   puTmp.mmvdEncOptMode = pu.mmvdEncOptMode;
-  puTmp.cu->LICFlag = pu.cu->LICFlag;
+  puTmp.cu->licFlag = pu.cu->licFlag;
 }
 #endif
 void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
@@ -616,7 +616,7 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
     pu.cu->rribcFlipType = 0;
 #endif
   }
-  pu.cu->BcwIdx = ( interDirNeighbours[candIdx] == 3 ) ? BcwIdx[candIdx] : BCW_DEFAULT;
+  pu.cu->bcwIdx = ( interDirNeighbours[candIdx] == 3 ) ? bcwIdx[candIdx] : BCW_DEFAULT;
 #if MULTI_HYP_PRED
   if (pu.ciipFlag
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
@@ -650,10 +650,10 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
   pu.mmvdEncOptMode = 0;
 
 #if INTER_LIC
-  pu.cu->LICFlag = pu.cs->slice->getUseLIC() ? LICFlags[candIdx] : false;
+  pu.cu->licFlag = pu.cs->slice->getUseLIC() ? licFlags[candIdx] : false;
   if (pu.interDir == 3)
   {
-    CHECK(pu.cu->LICFlag, "LIC is not used with bi-prediction in merge");
+    CHECK(pu.cu->licFlag, "LIC is not used with bi-prediction in merge");
   }
 #endif
 }
@@ -1012,7 +1012,7 @@ void MergeCtx::setGeoMmvdMergeInfo(PredictionUnit& pu, int mergeIdx, int mmvdIdx
   pu.mvpIdx[REF_PIC_LIST_1] = NOT_VALID;
   pu.mvpNum[REF_PIC_LIST_0] = NOT_VALID;
   pu.mvpNum[REF_PIC_LIST_1] = NOT_VALID;
-  pu.cu->BcwIdx = (interDirNeighbours[mergeIdx] == 3) ? BcwIdx[mergeIdx] : BCW_DEFAULT;
+  pu.cu->bcwIdx = (interDirNeighbours[mergeIdx] == 3) ? bcwIdx[mergeIdx] : BCW_DEFAULT;
 
 #if MULTI_HYP_PRED
   pu.addHypData.clear();
@@ -1025,10 +1025,10 @@ void MergeCtx::setGeoMmvdMergeInfo(PredictionUnit& pu, int mergeIdx, int mmvdIdx
   pu.mmvdEncOptMode = 0;
 
 #if INTER_LIC
-  pu.cu->LICFlag = pu.cs->slice->getUseLIC() ? LICFlags[mergeIdx] : false;
+  pu.cu->licFlag = pu.cs->slice->getUseLIC() ? licFlags[mergeIdx] : false;
   if (pu.interDir == 3)
   {
-    CHECK(pu.cu->LICFlag, "LIC is not used with bi-prediction in merge");
+    CHECK(pu.cu->licFlag, "LIC is not used with bi-prediction in merge");
   }
 #endif
 }
@@ -1310,9 +1310,9 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
   pu.mvpNum[REF_PIC_LIST_1] = NOT_VALID;
   pu.cu->imv = mmvdUseAltHpelIf[fPosBaseIdx] ? IMV_HPEL : 0;
 #if INTER_LIC
-  pu.cu->LICFlag = LICFlags[fPosBaseIdx];
+  pu.cu->licFlag = licFlags[fPosBaseIdx];
 #endif
-  pu.cu->BcwIdx = (interDirNeighbours[fPosBaseIdx] == 3) ? BcwIdx[fPosBaseIdx] : BCW_DEFAULT;
+  pu.cu->bcwIdx = (interDirNeighbours[fPosBaseIdx] == 3) ? bcwIdx[fPosBaseIdx] : BCW_DEFAULT;
 
   for (int refList = 0; refList < 2; refList++)
   {
@@ -1516,7 +1516,7 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
   pu.mvpNum[REF_PIC_LIST_0] = NOT_VALID;
   pu.mvpNum[REF_PIC_LIST_1] = NOT_VALID;
 
-  pu.cu->BcwIdx = (interDirNeighbours[fPosBaseIdx] == 3) ? BcwIdx[fPosBaseIdx] : BCW_DEFAULT;
+  pu.cu->bcwIdx = (interDirNeighbours[fPosBaseIdx] == 3) ? bcwIdx[fPosBaseIdx] : BCW_DEFAULT;
 
   for (int refList = 0; refList < 2; refList++)
   {

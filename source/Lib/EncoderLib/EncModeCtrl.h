@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -954,31 +954,31 @@ static const int MAX_STORED_CU_INFO_REFS = 4;
 
 struct CodedCUInfo
 {
-  bool isInter;
-  bool isIntra;
-  bool isSkip;
-  bool isMMVDSkip;
-  bool isIBC;
+  bool     isInter;
+  bool     isIntra;
+  bool     isSkip;
+  bool     isMMVDSkip;
+  bool     isIBC;
 #if JVET_W0097_GPM_MMVD_TM
-  bool    skipGPM;
-  char    isGPMTested;
-  int     geoDirCandList[GEO_MAX_TRY_WEIGHTED_SATD];
-  int     numGeoDirCand;
-  int     geoMrgIdx0List[GEO_MAX_TRY_WEIGHTED_SATD];
-  int     geoMrgIdx1List[GEO_MAX_TRY_WEIGHTED_SATD];
+  bool     skipGPM;
+  char     isGPMTested;
+  int      geoDirCandList[GEO_MAX_TRY_WEIGHTED_SATD];
+  int      numGeoDirCand;
+  int      geoMrgIdx0List[GEO_MAX_TRY_WEIGHTED_SATD];
+  int      geoMrgIdx1List[GEO_MAX_TRY_WEIGHTED_SATD];
 #endif
 #if JVET_AA0070_RRIBC
-  bool    isRribcCoded;
-  bool    isRribcTested;
+  bool     isRribcCoded;
+  bool     isRribcTested;
 #endif
-  bool validMv[NUM_REF_PIC_LIST_01][MAX_STORED_CU_INFO_REFS];
-  Mv   saveMv [NUM_REF_PIC_LIST_01][MAX_STORED_CU_INFO_REFS];
+  bool     validMv[NUM_REF_PIC_LIST_01][MAX_STORED_CU_INFO_REFS];
+  Mv       saveMv [NUM_REF_PIC_LIST_01][MAX_STORED_CU_INFO_REFS];
 
 #if MULTI_HYP_PRED
-  uint8_t numAddHyp;
+  uint8_t  numAddHyp;
 #endif
-  uint8_t BcwIdx;
-  char    selectColorSpaceOption;  // 0 - test both two color spaces; 1 - only test the first color spaces; 2 - only test the second color spaces
+  uint8_t  bcwIdx;
+  char     selectColorSpaceOption;  // 0 - test both two color spaces; 1 - only test the first color spaces; 2 - only test the second color spaces
   uint16_t ispPredModeVal;
   double   bestDCT2NonISPCost;
   double   bestCost;
@@ -991,12 +991,10 @@ struct CodedCUInfo
   bool     skipLfnstTest;
 #endif
 #if ENABLE_SPLIT_PARALLELISM
-
-  uint64_t
-       temporalId;
+ uint64_t  temporalId;
 #endif
 #if JVET_AB0092_GLM_WITH_LUMA
-  bool skipGLM;
+  bool     skipGLM;
 #endif
 };
 

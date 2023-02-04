@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -290,15 +290,15 @@ extern int g_aiLMDivTableLow[];
 extern int g_aiLMDivTableHigh[];
 #endif
 
-extern const int8_t g_BcwLog2WeightBase;
-extern const int8_t g_BcwWeightBase;
-extern const int8_t g_BcwWeights[BCW_NUM];
-extern const int8_t g_BcwSearchOrder[BCW_NUM];
-extern       int8_t g_BcwCodingOrder[BCW_NUM];
-extern       int8_t g_BcwParsingOrder[BCW_NUM];
+extern const int8_t g_bcwLog2WeightBase;
+extern const int8_t g_bcwWeightBase;
+extern const int8_t g_bcwWeights[BCW_NUM];
+extern const int8_t g_bcwSearchOrder[BCW_NUM];
+extern       int8_t g_bcwCodingOrder[BCW_NUM];
+extern       int8_t g_bcwParsingOrder[BCW_NUM];
 #if JVET_AB0079_TM_BCW_MRG
-extern const int8_t g_BcwMrgWeights[BCW_MRG_NUM];
-extern       int8_t g_BcwMrgParsingOrder[BCW_MRG_NUM];
+extern const int8_t g_bcwMrgWeights[BCW_MRG_NUM];
+extern       int8_t g_bcwMrgParsingOrder[BCW_MRG_NUM];
 #endif
 
 class CodingStructure;
@@ -354,38 +354,38 @@ const int g_IBCBufferSize = 256 * 128;
 #endif
 
 void initGeoTemplate();
-extern int16_t** g_GeoParams;
+extern int16_t** g_geoParams;
 #if JVET_AB0155_SGPM
-extern int16_t *g_globalGeoWeights[TOTAL_GEO_NUM_BLD][GEO_NUM_PRESTORED_MASK];
-extern int      g_bld2Width[TOTAL_GEO_NUM_BLD];
-#elif JVET_AA0058_GPM_ADP_BLD
-extern int16_t*  g_globalGeoWeights   [GEO_NUM_BLD][GEO_NUM_PRESTORED_MASK];
-extern int       g_bld2Width          [GEO_NUM_BLD];
+extern int16_t *g_geoWeights[TOTAL_GEO_BLENDING_NUM][GEO_NUM_PRESTORED_MASK];
+extern int      g_bld2Width[TOTAL_GEO_BLENDING_NUM];
+#elif JVET_AA0058_GPM_ADAPTIVE_BLENDING
+extern int16_t*  g_geoWeights   [GEO_BLENDING_NUM][GEO_NUM_PRESTORED_MASK];
+extern int       g_bld2Width          [GEO_BLENDING_NUM];
 #else
-extern int16_t*  g_globalGeoWeights   [GEO_NUM_PRESTORED_MASK];
+extern int16_t*  g_geoWeights   [GEO_NUM_PRESTORED_MASK];
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_AB0155_SGPM
-extern Pel*      g_globalGeoWeightsTpl[GEO_NUM_PRESTORED_MASK];
+extern Pel*      g_geoWeightsTpl[GEO_NUM_PRESTORED_MASK];
 #endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
-extern Pel*      g_globalGeoEncSADmask[GEO_NUM_PRESTORED_MASK];
+extern Pel*      g_geoEncSadMask[GEO_NUM_PRESTORED_MASK];
 #else
-extern int16_t*  g_globalGeoEncSADmask[GEO_NUM_PRESTORED_MASK];
+extern int16_t*  g_geoEncSadMask[GEO_NUM_PRESTORED_MASK];
 #endif
 extern int16_t   g_weightOffset       [GEO_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE][GEO_NUM_CU_SIZE][2];
 extern int8_t    g_angle2mask         [GEO_NUM_ANGLES];
-extern int8_t    g_Dis[GEO_NUM_ANGLES];
+extern int8_t    g_dis[GEO_NUM_ANGLES];
 extern int8_t    g_angle2mirror[GEO_NUM_ANGLES];
 
 #if JVET_AB0155_SGPM
 extern int16_t   g_weightOffsetEx[GEO_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE_EX][GEO_NUM_CU_SIZE_EX][2];
-extern int8_t g_sgpm_splitDir[GEO_NUM_PARTITION_MODE];
+extern int8_t    g_sgpmSplitDir[GEO_NUM_PARTITION_MODE];
 #endif
 #if JVET_Y0065_GPM_INTRA
 extern int8_t    g_geoAngle2IntraAng  [GEO_NUM_ANGLES];
 #endif
 #if (JVET_W0097_GPM_MMVD_TM && TM_MRG) || JVET_Y0065_GPM_INTRA
-extern uint8_t g_geoTmShape[2][GEO_NUM_ANGLES];
+extern uint8_t   g_geoTmShape[2][GEO_NUM_ANGLES];
 #endif
 #if MULTI_HYP_PRED
 extern const int g_addHypWeight[MULTI_HYP_PRED_NUM_WEIGHTS];

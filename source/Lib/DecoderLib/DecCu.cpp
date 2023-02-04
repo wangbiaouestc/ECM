@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -375,42 +375,42 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         if (currCU.firstPU->parseLumaMode)
         {
 #if SECONDARY_MPM
-          uint8_t* mpm_pred = currCU.firstPU->intraMPM;  // mpm_idx / rem_intra_luma_pred_mode
-          uint8_t* non_mpm_pred = currCU.firstPU->intraNonMPM;
-          PU::getIntraMPMs( *currCU.firstPU, mpm_pred, non_mpm_pred
+          uint8_t* mpmPred = currCU.firstPU->intraMPM;  // mpm_idx / rem_intra_luma_pred_mode
+          uint8_t* nonMpmPred = currCU.firstPU->intraNonMPM;
+          PU::getIntraMPMs( *currCU.firstPU, mpmPred, nonMpmPred
 #if JVET_AC0094_REF_SAMPLES_OPT
                            , false
 #endif
           );
 #else
-          unsigned int mpm_pred[NUM_MOST_PROBABLE_MODES];  // mpm_idx / rem_intra_luma_pred_mode
-          PU::getIntraMPMs(*currCU.firstPU, mpm_pred);
+          unsigned int mpmPred[NUM_MOST_PROBABLE_MODES];  // mpm_idx / rem_intra_luma_pred_mode
+          PU::getIntraMPMs(*currCU.firstPU, mpmPred);
 #endif
           if (currCU.firstPU->mpmFlag)
           {
-            currCU.firstPU->intraDir[0] = mpm_pred[currCU.firstPU->ipred_idx];
+            currCU.firstPU->intraDir[0] = mpmPred[currCU.firstPU->ipredIdx];
           }
           else
           {
 #if SECONDARY_MPM
             if (currCU.firstPU->secondMpmFlag)
             {
-              currCU.firstPU->intraDir[0] = mpm_pred[currCU.firstPU->ipred_idx];
+              currCU.firstPU->intraDir[0] = mpmPred[currCU.firstPU->ipredIdx];
             }
             else
             {
-              currCU.firstPU->intraDir[0] = non_mpm_pred[currCU.firstPU->ipred_idx];
+              currCU.firstPU->intraDir[0] = nonMpmPred[currCU.firstPU->ipredIdx];
             }
 #else
             //postponed sorting of MPMs (only in remaining branch)
-            std::sort(mpm_pred, mpm_pred + NUM_MOST_PROBABLE_MODES);
-            unsigned ipred_mode = currCU.firstPU->ipred_idx;
+            std::sort(mpmPred, mpmPred + NUM_MOST_PROBABLE_MODES);
+            unsigned ipredMode = currCU.firstPU->ipredIdx;
 
             for (uint32_t i = 0; i < NUM_MOST_PROBABLE_MODES; i++)
             {
-              ipred_mode += (ipred_mode >= mpm_pred[i]);
+              ipredMode += (ipredMode >= mpmPred[i]);
             }
-            currCU.firstPU->intraDir[0] = ipred_mode;
+            currCU.firstPU->intraDir[0] = ipredMode;
 #endif
           }
         }
@@ -442,38 +442,38 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         if (currCU.firstPU->parseLumaMode)
         {
 #if SECONDARY_MPM
-          uint8_t* mpm_pred = currCU.firstPU->intraMPM;  // mpm_idx / rem_intra_luma_pred_mode
-          uint8_t* non_mpm_pred = currCU.firstPU->intraNonMPM;
-          PU::getIntraMPMs( *currCU.firstPU, mpm_pred, non_mpm_pred );
+          uint8_t* mpmPred = currCU.firstPU->intraMPM;  // mpm_idx / rem_intra_luma_pred_mode
+          uint8_t* nonMpmPred = currCU.firstPU->intraNonMPM;
+          PU::getIntraMPMs( *currCU.firstPU, mpmPred, nonMpmPred );
 #else
-          unsigned int mpm_pred[NUM_MOST_PROBABLE_MODES];  // mpm_idx / rem_intra_luma_pred_mode
-          PU::getIntraMPMs(*currCU.firstPU, mpm_pred);
+          unsigned int mpmPred[NUM_MOST_PROBABLE_MODES];  // mpm_idx / rem_intra_luma_pred_mode
+          PU::getIntraMPMs(*currCU.firstPU, mpmPred);
 #endif
           if (currCU.firstPU->mpmFlag)
           {
-            currCU.firstPU->intraDir[0] = mpm_pred[currCU.firstPU->ipred_idx];
+            currCU.firstPU->intraDir[0] = mpmPred[currCU.firstPU->ipredIdx];
           }
           else
           {
 #if SECONDARY_MPM
             if (currCU.firstPU->secondMpmFlag)
             {
-              currCU.firstPU->intraDir[0] = mpm_pred[currCU.firstPU->ipred_idx];
+              currCU.firstPU->intraDir[0] = mpmPred[currCU.firstPU->ipredIdx];
             }
             else
             {
-              currCU.firstPU->intraDir[0] = non_mpm_pred[currCU.firstPU->ipred_idx];
+              currCU.firstPU->intraDir[0] = nonMpmPred[currCU.firstPU->ipredIdx];
             }
 #else
             //postponed sorting of MPMs (only in remaining branch)
-            std::sort(mpm_pred, mpm_pred + NUM_MOST_PROBABLE_MODES);
-            unsigned ipred_mode = currCU.firstPU->ipred_idx;
+            std::sort(mpmPred, mpmPred + NUM_MOST_PROBABLE_MODES);
+            unsigned ipredMode = currCU.firstPU->ipredIdx;
 
             for (uint32_t i = 0; i < NUM_MOST_PROBABLE_MODES; i++)
             {
-              ipred_mode += (ipred_mode >= mpm_pred[i]);
+              ipredMode += (ipredMode >= mpmPred[i]);
             }
-            currCU.firstPU->intraDir[0] = ipred_mode;
+            currCU.firstPU->intraDir[0] = ipredMode;
 #endif
           }
         }
@@ -1278,8 +1278,8 @@ void DecCu::xReconInter(CodingUnit &cu)
 #endif
     );
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
-    MergeCtx& m_geoTmMrgCtx0 = m_geoTmMrgCtx[g_geoTmShape[0][g_GeoParams[cu.firstPU->geoSplitDir][0]]];
-    MergeCtx& m_geoTmMrgCtx1 = m_geoTmMrgCtx[g_geoTmShape[1][g_GeoParams[cu.firstPU->geoSplitDir][0]]];
+    MergeCtx& m_geoTmMrgCtx0 = m_geoTmMrgCtx[g_geoTmShape[0][g_geoParams[cu.firstPU->geoSplitDir][0]]];
+    MergeCtx& m_geoTmMrgCtx1 = m_geoTmMrgCtx[g_geoTmShape[1][g_geoParams[cu.firstPU->geoSplitDir][0]]];
 #endif
 #if JVET_W0097_GPM_MMVD_TM
     PU::spanGeoMMVDMotionInfo
@@ -1301,7 +1301,7 @@ void DecCu::xReconInter(CodingUnit &cu)
 #endif
 							                , cu.firstPU->geoMMVDFlag1, cu.firstPU->geoMMVDIdx1
 #endif
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
                               , cu.firstPU->geoBldIdx
 #endif
     );
@@ -1313,7 +1313,7 @@ void DecCu::xReconInter(CodingUnit &cu)
 #else
     m_pcInterPred->motionCompensationGeo(cu, m_geoMrgCtx, m_geoTmMrgCtx0, m_geoTmMrgCtx1);
 #endif
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
     PU::spanGeoMMVDMotionInfo(*cu.firstPU, m_geoMrgCtx, m_geoTmMrgCtx0, m_geoTmMrgCtx1, cu.firstPU->geoSplitDir, cu.firstPU->geoMergeIdx0, cu.firstPU->geoMergeIdx1, cu.firstPU->geoTmFlag0, cu.firstPU->geoMMVDFlag0, cu.firstPU->geoMMVDIdx0, cu.firstPU->geoTmFlag1, cu.firstPU->geoMMVDFlag1, cu.firstPU->geoMMVDIdx1, cu.firstPU->geoBldIdx);
 #else
     PU::spanGeoMMVDMotionInfo(*cu.firstPU, m_geoMrgCtx, m_geoTmMrgCtx0, m_geoTmMrgCtx1, cu.firstPU->geoSplitDir, cu.firstPU->geoMergeIdx0, cu.firstPU->geoMergeIdx1, cu.firstPU->geoTmFlag0, cu.firstPU->geoMMVDFlag0, cu.firstPU->geoMMVDIdx0, cu.firstPU->geoTmFlag1, cu.firstPU->geoMMVDFlag1, cu.firstPU->geoMMVDIdx1);
@@ -1324,7 +1324,7 @@ void DecCu::xReconInter(CodingUnit &cu)
 #else
     m_pcInterPred->motionCompensationGeo(cu, m_geoMrgCtx);
 #endif
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
     PU::spanGeoMMVDMotionInfo(*cu.firstPU, m_geoMrgCtx, cu.firstPU->geoSplitDir, cu.firstPU->geoMergeIdx0, cu.firstPU->geoMergeIdx1, cu.firstPU->geoMMVDFlag0, cu.firstPU->geoMMVDIdx0, cu.firstPU->geoMMVDFlag1, cu.firstPU->geoMMVDIdx1, cu.firstPU->geoBldIdx);
 #else
     PU::spanGeoMMVDMotionInfo(*cu.firstPU, m_geoMrgCtx, cu.firstPU->geoSplitDir, cu.firstPU->geoMergeIdx0, cu.firstPU->geoMergeIdx1, cu.firstPU->geoMMVDFlag0, cu.firstPU->geoMMVDIdx0, cu.firstPU->geoMMVDFlag1, cu.firstPU->geoMMVDIdx1);
@@ -1866,10 +1866,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
           for (int i = 0; i < SUB_TMVP_NUM; i++)
           {
-            mrgCtx.subPuMvpMiBuf[i] = MotionBuf(m_SubPuMiBuf[i], bufSize);
+            mrgCtx.subPuMvpMiBuf[i] = MotionBuf(m_subPuMiBuf[i], bufSize);
           }
 #else
-          mrgCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+          mrgCtx.subPuMvpMiBuf = MotionBuf(m_subPuMiBuf, bufSize);
 #endif
         }
 
@@ -1918,10 +1918,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             MergeCtx& m_geoTmMrgCtx0 = m_geoTmMrgCtx[GEO_TM_SHAPE_AL];
 #endif
             m_geoTmMrgCtx0.numValidMergeCand = m_geoMrgCtx.numValidMergeCand;
-            m_geoTmMrgCtx0.BcwIdx[pu.geoMergeIdx0] = BCW_DEFAULT;
+            m_geoTmMrgCtx0.bcwIdx[pu.geoMergeIdx0] = BCW_DEFAULT;
             m_geoTmMrgCtx0.useAltHpelIf[pu.geoMergeIdx0] = false;
 #if INTER_LIC
-            m_geoTmMrgCtx0.LICFlags[pu.geoMergeIdx0] = false;
+            m_geoTmMrgCtx0.licFlags[pu.geoMergeIdx0] = false;
 #endif
 #if MULTI_HYP_PRED
             m_geoTmMrgCtx0.addHypNeighbours[pu.geoMergeIdx0] = m_geoMrgCtx.addHypNeighbours[pu.geoMergeIdx0];
@@ -1938,7 +1938,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
             for (uint8_t tmType = GEO_TM_SHAPE_AL; tmType < GEO_NUM_TM_MV_CAND; ++tmType)
             {
-              if (tmType == GEO_TM_SHAPE_L || (!pu.cs->slice->getSPS()->getUseAltGPMSplitModeCode() && tmType != g_geoTmShape[0][g_GeoParams[pu.geoSplitDir][0]]))
+              if (tmType == GEO_TM_SHAPE_L || (!pu.cs->slice->getSPS()->getUseAltGPMSplitModeCode() && tmType != g_geoTmShape[0][g_geoParams[pu.geoSplitDir][0]]))
               {
                 continue;
               }
@@ -1950,7 +1950,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             }
 #else
             m_geoTmMrgCtx0.setMergeInfo(pu, pu.geoMergeIdx0);
-            pu.geoTmType = g_geoTmShape[0][g_GeoParams[pu.geoSplitDir][0]];
+            pu.geoTmType = g_geoTmShape[0][g_geoParams[pu.geoSplitDir][0]];
             m_pcInterPred->deriveTMMv(pu);
             m_geoTmMrgCtx0.mvFieldNeighbours[(pu.geoMergeIdx0 << 1)].mv.set(pu.mv[0].getHor(), pu.mv[0].getVer());
             m_geoTmMrgCtx0.mvFieldNeighbours[(pu.geoMergeIdx0 << 1) + 1].mv.set(pu.mv[1].getHor(), pu.mv[1].getVer());
@@ -1962,10 +1962,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             MergeCtx& m_geoTmMrgCtx1 = m_geoTmMrgCtx[GEO_TM_SHAPE_AL];
 #endif
             m_geoTmMrgCtx1.numValidMergeCand = m_geoMrgCtx.numValidMergeCand;
-            m_geoTmMrgCtx1.BcwIdx[pu.geoMergeIdx1] = BCW_DEFAULT;
+            m_geoTmMrgCtx1.bcwIdx[pu.geoMergeIdx1] = BCW_DEFAULT;
             m_geoTmMrgCtx1.useAltHpelIf[pu.geoMergeIdx1] = false;
 #if INTER_LIC
-            m_geoTmMrgCtx1.LICFlags[pu.geoMergeIdx1] = false;
+            m_geoTmMrgCtx1.licFlags[pu.geoMergeIdx1] = false;
 #endif
 #if MULTI_HYP_PRED
             m_geoTmMrgCtx1.addHypNeighbours[pu.geoMergeIdx1] = m_geoMrgCtx.addHypNeighbours[pu.geoMergeIdx1];
@@ -1982,7 +1982,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
             for (uint8_t tmType = GEO_TM_SHAPE_AL; tmType < GEO_NUM_TM_MV_CAND; ++tmType)
             {
-              if (tmType == GEO_TM_SHAPE_A || (!pu.cs->slice->getSPS()->getUseAltGPMSplitModeCode() && tmType != g_geoTmShape[1][g_GeoParams[pu.geoSplitDir][0]]))
+              if (tmType == GEO_TM_SHAPE_A || (!pu.cs->slice->getSPS()->getUseAltGPMSplitModeCode() && tmType != g_geoTmShape[1][g_geoParams[pu.geoSplitDir][0]]))
               {
                 continue;
               }
@@ -1994,7 +1994,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             }
 #else
             m_geoTmMrgCtx1.setMergeInfo(pu, pu.geoMergeIdx1);
-            pu.geoTmType = g_geoTmShape[1][g_GeoParams[pu.geoSplitDir][0]];
+            pu.geoTmType = g_geoTmShape[1][g_geoParams[pu.geoSplitDir][0]];
             m_pcInterPred->deriveTMMv(pu);
             m_geoTmMrgCtx1.mvFieldNeighbours[(pu.geoMergeIdx1 << 1)].mv.set(pu.mv[0].getHor(), pu.mv[0].getVer());
             m_geoTmMrgCtx1.mvFieldNeighbours[(pu.geoMergeIdx1 << 1) + 1].mv.set(pu.mv[1].getHor(), pu.mv[1].getVer());
@@ -2049,10 +2049,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
             for (int i = 0; i < SUB_TMVP_NUM; i++)
             {
-              mrgCtx.subPuMvpMiBuf[i] = MotionBuf(m_SubPuMiBuf[i], bufSize);
+              mrgCtx.subPuMvpMiBuf[i] = MotionBuf(m_subPuMiBuf[i], bufSize);
             }
 #else
-            mrgCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+            mrgCtx.subPuMvpMiBuf = MotionBuf(m_subPuMiBuf, bufSize);
 #endif
             affineMergeCtx.mrgCtx = &mrgCtx;
           }
@@ -2153,9 +2153,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #endif
           pu.interDir = affineMergeCtx.interDirNeighbours[pu.mergeIdx];
           pu.cu->affineType = affineMergeCtx.affineType[pu.mergeIdx];
-          pu.cu->BcwIdx = affineMergeCtx.BcwIdx[pu.mergeIdx];
+          pu.cu->bcwIdx = affineMergeCtx.bcwIdx[pu.mergeIdx];
 #if INTER_LIC
-          pu.cu->LICFlag = affineMergeCtx.LICFlags[pu.mergeIdx];
+          pu.cu->licFlag = affineMergeCtx.licFlags[pu.mergeIdx];
 #endif
 #if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
           pu.colIdx = affineMergeCtx.colIdx[pu.mergeIdx];
@@ -2224,7 +2224,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             m_pcInterPred->deriveTMMv(pu);
             // Store refined motion back to ciipTmMrgCtx
             mrgCtx.interDirNeighbours[uiMergeCand] = pu.interDir;
-            mrgCtx.BcwIdx[uiMergeCand] = pu.cu->BcwIdx;  // Bcw may change, because bi may be reduced to uni by deriveTMMv(pu)
+            mrgCtx.bcwIdx[uiMergeCand] = pu.cu->bcwIdx;  // Bcw may change, because bi may be reduced to uni by deriveTMMv(pu)
             mrgCtx.mvFieldNeighbours[2 * uiMergeCand].setMvField(pu.mv[0], pu.refIdx[0]);
             mrgCtx.mvFieldNeighbours[2 * uiMergeCand + 1].setMvField(pu.mv[1], pu.refIdx[1]);
             if (pu.interDir == 1)
@@ -2465,7 +2465,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                     for( uint32_t candIdx = 0; candIdx < mrgCtx.numValidMergeCand; candIdx++ )
                     {
                       pu.cu->imv = mrgCtx.useAltHpelIf[candIdx] ? IMV_HPEL : 0;
-                      pu.cu->BcwIdx = mrgCtx.BcwIdx[candIdx];
+                      pu.cu->bcwIdx = mrgCtx.bcwIdx[candIdx];
                       pu.mv[0] = mrgCtx.mvFieldNeighbours[candIdx << 1].mv;
                       pu.mv[1] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].mv;
                       pu.refIdx[0] = mrgCtx.mvFieldNeighbours[candIdx << 1].refIdx;
@@ -2545,7 +2545,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                     for( uint32_t candIdx = 0; candIdx < mrgCtx.numValidMergeCand; candIdx++ )
                     {
                       pu.cu->imv = mrgCtx.useAltHpelIf[candIdx] ? IMV_HPEL : 0;
-                      pu.cu->BcwIdx = mrgCtx.BcwIdx[candIdx];
+                      pu.cu->bcwIdx = mrgCtx.bcwIdx[candIdx];
                       pu.mv[0] = mrgCtx.mvFieldNeighbours[candIdx << 1].mv;
                       pu.mv[1] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].mv;
                       pu.refIdx[0] = mrgCtx.mvFieldNeighbours[candIdx << 1].refIdx;
@@ -2693,9 +2693,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 
                   for (uint32_t ui = mrgCtx.numValidMergeCand; ui < NUM_MERGE_CANDS; ++ui)
                   {
-                    mrgCtx.BcwIdx[ui] = BCW_DEFAULT;
+                    mrgCtx.bcwIdx[ui] = BCW_DEFAULT;
 #if INTER_LIC
-                    mrgCtx.LICFlags[ui] = false;
+                    mrgCtx.licFlags[ui] = false;
 #endif
                     mrgCtx.interDirNeighbours[ui] = 0;
                     mrgCtx.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
@@ -2729,7 +2729,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 
                     mrgCtx.candCost[uiMergeCand] = tempCost[0];
                     mrgCtx.interDirNeighbours[uiMergeCand] = pu.interDir;
-                    mrgCtx.BcwIdx[uiMergeCand] = pu.cu->BcwIdx;
+                    mrgCtx.bcwIdx[uiMergeCand] = pu.cu->bcwIdx;
                     mrgCtx.mvFieldNeighbours[2 * uiMergeCand].mv = pu.mv[0];
                     mrgCtx.mvFieldNeighbours[2 * uiMergeCand].refIdx = pu.refIdx[0];
                     mrgCtx.mvFieldNeighbours[2 * uiMergeCand + 1].mv = pu.mv[1];
@@ -2812,9 +2812,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 
                 for (uint32_t ui = mrgCtx.numValidMergeCand; ui < NUM_MERGE_CANDS; ++ui)
                 {
-                  mrgCtx.BcwIdx[ui] = BCW_DEFAULT;
+                  mrgCtx.bcwIdx[ui] = BCW_DEFAULT;
 #if INTER_LIC
-                  mrgCtx.LICFlags[ui] = false;
+                  mrgCtx.licFlags[ui] = false;
 #endif
                   mrgCtx.interDirNeighbours[ui] = 0;
                   mrgCtx.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
@@ -2848,7 +2848,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 
                   mrgCtx.candCost[uiMergeCand] = tempCost[0];
                   mrgCtx.interDirNeighbours[uiMergeCand] = pu.interDir;
-                  mrgCtx.BcwIdx[uiMergeCand] = pu.cu->BcwIdx;
+                  mrgCtx.bcwIdx[uiMergeCand] = pu.cu->bcwIdx;
                   mrgCtx.mvFieldNeighbours[2 * uiMergeCand].mv = pu.mv[0];
                   mrgCtx.mvFieldNeighbours[2 * uiMergeCand].refIdx = pu.refIdx[0];
                   mrgCtx.mvFieldNeighbours[2 * uiMergeCand + 1].mv = pu.mv[1];
@@ -3497,7 +3497,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
       {
         auto &mhData = pu.addHypData[i];
 #if INTER_LIC
-        mhData.LICFlag = pu.cu->LICFlag;
+        mhData.licFlag = pu.cu->licFlag;
 #endif
         mhData.imv = pu.cu->imv;
         if (mhData.isMrg)

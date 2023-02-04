@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -354,7 +354,7 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
   imv               = other.imv;
   imvNumCand        = other.imvNumCand;
-  BcwIdx            = other.BcwIdx;
+  bcwIdx            = other.bcwIdx;
   for (int i = 0; i<2; i++)
     refIdxBi[i] = other.refIdxBi[i];
 
@@ -371,7 +371,7 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #endif
 #if INTER_LIC
-  LICFlag           = other.LICFlag;
+  licFlag           = other.licFlag;
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = other.ibcLicFlag;
@@ -528,7 +528,7 @@ void CodingUnit::initData()
 #endif
   imv               = 0;
   imvNumCand        = 0;
-  BcwIdx            = BCW_DEFAULT;
+  bcwIdx            = BCW_DEFAULT;
   for (int i = 0; i < 2; i++)
     refIdxBi[i] = -1;
   smvdMode        = 0;
@@ -544,7 +544,7 @@ void CodingUnit::initData()
 #endif
 #endif
 #if INTER_LIC
-  LICFlag = false;
+  licFlag = false;
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = false;
@@ -800,7 +800,7 @@ void PredictionUnit::initData()
   candId = -1;
   parseChromaMode = false;
   mpmFlag = false;
-  ipred_idx = -1;
+  ipredIdx = -1;
 #endif
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = {};
@@ -843,7 +843,7 @@ void PredictionUnit::initData()
   geoTmFlag1 = false;
 #endif
 #endif
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   geoBldIdx = MAX_UCHAR;
 #endif
   mmvdMergeFlag = false;
@@ -954,7 +954,7 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   candId = predData.candId;
   parseChromaMode = predData.parseChromaMode;
   mpmFlag = predData.mpmFlag;
-  ipred_idx = predData.ipred_idx;
+  ipredIdx = predData.ipredIdx;
 #endif
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = predData.cclmOffsets;
@@ -1001,7 +1001,7 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   geoTmFlag1 = predData.geoTmFlag1;
 #endif
 #endif
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   geoBldIdx = predData.geoBldIdx;
 #endif
   mmvdMergeFlag = predData.mmvdMergeFlag;
@@ -1137,7 +1137,7 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   candId = other.candId;
   parseChromaMode = other.parseChromaMode;
   mpmFlag = other.mpmFlag;
-  ipred_idx = other.ipred_idx;
+  ipredIdx = other.ipredIdx;
 #endif
   geoSplitDir  = other.geoSplitDir;
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -1158,7 +1158,7 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   geoTmFlag1 = other.geoTmFlag1;
 #endif
 #endif
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   geoBldIdx = other.geoBldIdx;
 #endif
   mmvdMergeFlag = other.mmvdMergeFlag;

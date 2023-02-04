@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1167,20 +1167,20 @@ static const int GEO_ENC_MMVD_MAX_REFINE_NUM_ADJ = 1 // regular merge(1)
 static const int GEO_MV_MASK_SIZE =         GEO_WEIGHT_MASK_SIZE >> 2;
 #endif
 #if JVET_W0097_GPM_MMVD_TM
-static const int GEO_MAX_TRY_WEIGHTED_SAD = 70;
+static const int GEO_MAX_TRY_WEIGHTED_SAD =                        70;
 #if TM_MRG
 static const int GEO_TM_MAX_NUM_CANDS = GEO_MAX_NUM_UNI_CANDS * (GEO_NUM_TM_MV_CAND - 1);
 #endif
 #else
-static const int GEO_MAX_TRY_WEIGHTED_SAD = 60;
+static const int GEO_MAX_TRY_WEIGHTED_SAD =                        60;
 #endif
-static const int GEO_MAX_TRY_WEIGHTED_SATD = 8;
+static const int GEO_MAX_TRY_WEIGHTED_SATD =                        8;
 
-#if JVET_AA0058_GPM_ADP_BLD
-static const int GEO_NUM_BLD = 5;
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+static const int GEO_BLENDING_NUM =                                 5;
 #endif
 #if JVET_AB0155_SGPM
-static const int TOTAL_GEO_NUM_BLD = 6; // GPM 0~4, SGPM 1~5
+static const int TOTAL_GEO_BLENDING_NUM =                           6; // GPM 0~4, SGPM 1~5
 #define GET_SGPM_BLD_IDX(a, b)                                                                                           \
   (std::min(a, b) <= 4 ? 1 : std::min(a, b) <= 8 ? 2 : std::min(a, b) <= 16 ? 3 : std::min(a, b) <= 32 ? 4 : 5)
 #endif

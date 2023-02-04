@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -53,7 +53,7 @@ struct MultiHypPredictionData
 {
   int8_t   imv;
 #if INTER_LIC
-  bool     LICFlag;
+  bool     licFlag;
 #endif
   bool     isMrg;
   int8_t   mrgIdx;
@@ -175,7 +175,7 @@ struct MotionInfo
   uint16_t   sliceIdx;
   Mv      mv     [ NUM_REF_PIC_LIST_01 ];
   int8_t   refIdx [ NUM_REF_PIC_LIST_01 ];
-  uint8_t         BcwIdx;
+  uint8_t         bcwIdx;
 #if INTER_LIC
   bool     usesLIC;
 #endif
@@ -191,13 +191,13 @@ struct MotionInfo
 #endif
   Mv      bv;
 #if INTER_LIC
-  MotionInfo() : isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, BcwIdx(0), usesLIC(false) { }
+  MotionInfo() : isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, bcwIdx(0), usesLIC(false) { }
   // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this constructor for anything else
-  MotionInfo(int i) : isInter(i != 0), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, BcwIdx(0), usesLIC(false) { CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
+  MotionInfo(int i) : isInter(i != 0), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, bcwIdx(0), usesLIC(false) { CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
 #else
-  MotionInfo() : isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, BcwIdx(0) { }
+  MotionInfo() : isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, bcwIdx(0) { }
   // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this constructor for anything else
-  MotionInfo(int i) : isInter(i != 0), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, BcwIdx(0) { CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
+  MotionInfo(int i) : isInter(i != 0), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, bcwIdx(0) { CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
 #endif
 
   bool operator==( const MotionInfo& mi ) const

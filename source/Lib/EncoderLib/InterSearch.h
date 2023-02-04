@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -359,7 +359,7 @@ public:
 public:
   void setBestAmvpRDBeforeLIC(const CodingUnit& cu, double curCuRdCost)
   {
-    m_amvpRdBeforeLIC[cu.imv] = !cu.firstPU->mergeFlag && cu.predMode != MODE_IBC && !cu.LICFlag ? std::min(curCuRdCost, m_amvpRdBeforeLIC[cu.imv]) : m_amvpRdBeforeLIC[cu.imv];
+    m_amvpRdBeforeLIC[cu.imv] = !cu.firstPU->mergeFlag && cu.predMode != MODE_IBC && !cu.licFlag ? std::min(curCuRdCost, m_amvpRdBeforeLIC[cu.imv]) : m_amvpRdBeforeLIC[cu.imv];
   }
 private:
   bool skipLicBasedOnBestAmvpRDBeforeLIC(uint8_t curCuimvIdx, double curBestRdCost)

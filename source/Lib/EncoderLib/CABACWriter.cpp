@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -1179,7 +1179,7 @@ void CABACWriter::cu_bcw_flag(const CodingUnit& cu)
 #endif
 
   CHECK(!(BCW_NUM > 1 && (BCW_NUM == 2 || (BCW_NUM & 0x01) == 1)), " !( BCW_NUM > 1 && ( BCW_NUM == 2 || ( BCW_NUM & 0x01 ) == 1 ) ) ");
-  const uint8_t bcwCodingIdx = (uint8_t)g_BcwCodingOrder[CU::getValidBcwIdx(cu)];
+  const uint8_t bcwCodingIdx = (uint8_t)g_bcwCodingOrder[CU::getValidBcwIdx(cu)];
 
   const int32_t numBcw = (cu.slice->getCheckLDC()) ? 5 : 3;
   m_BinEncoder.encodeBin((bcwCodingIdx == 0 ? 0 : 1), Ctx::BcwIdx(0));
@@ -1204,7 +1204,7 @@ void CABACWriter::cu_bcw_flag(const CodingUnit& cu)
     }
   }
 
-  DTRACE(g_trace_ctx, D_SYNTAX, "cu_bcw_flag() bcw_idx=%d\n", cu.BcwIdx ? 1 : 0);
+  DTRACE(g_trace_ctx, D_SYNTAX, "cu_bcw_flag() bcw_idx=%d\n", cu.bcwIdx ? 1 : 0);
 #if MULTI_HYP_PRED
   mh_pred_data(*cu.firstPU);
 #endif
@@ -1216,7 +1216,7 @@ void CABACWriter::obmc_flag(const CodingUnit& cu)
   //obmc is false
   if (!cu.cs->sps->getUseOBMC() || CU::isIBC(cu) || cu.predMode == MODE_INTRA
 #if INTER_LIC
-    || cu.LICFlag
+    || cu.licFlag
 #endif
     || cu.lwidth() * cu.lheight() < 32
     )
@@ -1504,10 +1504,10 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
 #endif
   const int numBlocks = CU::getNumPUs( cu );
 #if !SECONDARY_MPM
-  unsigned  mpm_preds   [4][numMPMs];
+  unsigned  mpmPreds   [4][numMPMs];
 #endif
   unsigned  mpm_idxs    [4];
-  unsigned  ipred_modes [4];
+  unsigned  ipredModes [4];
 
   const PredictionUnit* pu = cu.firstPU;
 
@@ -1515,21 +1515,21 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
   for( int k = 0; k < numBlocks; k++ )
   {
 #if !SECONDARY_MPM
-    unsigned*  mpm_pred   = mpm_preds[k];
+    unsigned*  mpmPred   = mpmPreds[k];
 #endif
     unsigned&  mpm_idx    = mpm_idxs[k];
-    unsigned&  ipred_mode = ipred_modes[k];
+    unsigned&  ipredMode = ipredModes[k];
 #if SECONDARY_MPM
-    const uint8_t* mpm_pred = cu.firstPU->intraMPM;
+    const uint8_t* mpmPred = cu.firstPU->intraMPM;
 #else
-    PU::getIntraMPMs( *pu, mpm_pred );
+    PU::getIntraMPMs( *pu, mpmPred );
 #endif
 
-    ipred_mode = pu->intraDir[0];
+    ipredMode = pu->intraDir[0];
     mpm_idx    = numMPMs;
     for( unsigned idx = 0; idx < numMPMs; idx++ )
     {
-      if( ipred_mode == mpm_pred[idx] )
+      if( ipredMode == mpmPred[idx] )
       {
         mpm_idx = idx;
         break;
@@ -1597,13 +1597,13 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
     else
     {
 #if !SECONDARY_MPM
-      unsigned* mpm_pred   = mpm_preds[k];
+      unsigned* mpmPred   = mpmPreds[k];
 #endif
-      unsigned  ipred_mode = ipred_modes[k];
+      unsigned  ipredMode = ipredModes[k];
 
       // sorting of MPMs
 #if !SECONDARY_MPM
-      std::sort( mpm_pred, mpm_pred + numMPMs );
+      std::sort( mpmPred, mpmPred + numMPMs );
 #endif
 
       {        
@@ -1613,7 +1613,7 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
 
         for (unsigned idx = 0; idx < NUM_SECONDARY_MOST_PROBABLE_MODES; idx++)
         {
-          if (ipred_mode == secondaryMPMs[idx])
+          if (ipredMode == secondaryMPMs[idx])
           {
             secondaryMPMIdx = idx;
             break;
@@ -1637,7 +1637,7 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
 
           for (unsigned idx = 0; idx < NUM_NON_MPM_MODES; idx++)
           {
-            if (ipred_mode == cu.firstPU->intraNonMPM[idx])
+            if (ipredMode == cu.firstPU->intraNonMPM[idx])
             {
               nonMPMIdx = idx;
               break;
@@ -1650,18 +1650,18 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
 #endif
         }
 #else
-        std::sort(mpm_pred, mpm_pred + numMPMs);
+        std::sort(mpmPred, mpmPred + numMPMs);
 
         for (int idx = numMPMs - 1; idx >= 0; idx--)
         {
-          if (ipred_mode > mpm_pred[idx])
+          if (ipredMode > mpmPred[idx])
           {
-            ipred_mode--;
+            ipredMode--;
           }
         }
-        CHECK(ipred_mode >= 64, "Incorrect mode");
+        CHECK(ipredMode >= 64, "Incorrect mode");
 
-        xWriteTruncBinCode(ipred_mode, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES);  // Remaining mode is truncated binary coded
+        xWriteTruncBinCode(ipredMode, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES);  // Remaining mode is truncated binary coded
 #endif
       }
     }
@@ -1745,22 +1745,22 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
   // prev_intra_luma_pred_flag
 #if SECONDARY_MPM
   const int numMPMs = NUM_PRIMARY_MOST_PROBABLE_MODES;
-  const uint8_t* mpm_pred = pu.intraMPM;
+  const uint8_t* mpmPred = pu.intraMPM;
 #else
   const int numMPMs  = NUM_MOST_PROBABLE_MODES;
-  unsigned  mpm_pred[numMPMs];
+  unsigned  mpmPred[numMPMs];
 #endif
 
 #if !SECONDARY_MPM
-  PU::getIntraMPMs( pu, mpm_pred );
+  PU::getIntraMPMs( pu, mpmPred );
 #endif
 
-  unsigned ipred_mode = pu.intraDir[0];
+  unsigned ipredMode = pu.intraDir[0];
   unsigned mpm_idx = numMPMs;
 
   for( int idx = 0; idx < numMPMs; idx++ )
   {
-    if( ipred_mode == mpm_pred[idx] )
+    if( ipredMode == mpmPred[idx] )
     {
       mpm_idx = idx;
       break;
@@ -1810,16 +1810,16 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
   else
   {
 #if !SECONDARY_MPM
-    std::sort( mpm_pred, mpm_pred + numMPMs );
+    std::sort( mpmPred, mpmPred + numMPMs );
 #endif
     { 
 #if SECONDARY_MPM
-      auto second_mpm_pred = mpm_pred + NUM_PRIMARY_MOST_PROBABLE_MODES;
+      auto secondMpmPred = mpmPred + NUM_PRIMARY_MOST_PROBABLE_MODES;
       unsigned   second_mpm_idx = NUM_SECONDARY_MOST_PROBABLE_MODES;
 
       for (unsigned idx = 0; idx < NUM_SECONDARY_MOST_PROBABLE_MODES; idx++)
       {
-        if (ipred_mode == second_mpm_pred[idx])
+        if (ipredMode == secondMpmPred[idx])
         {
           second_mpm_idx = idx;
           break;
@@ -1838,7 +1838,7 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
         unsigned   non_mpm_idx = NUM_NON_MPM_MODES;
         for (unsigned idx = 0; idx < NUM_NON_MPM_MODES; idx++)
         {
-          if (ipred_mode == pu.intraNonMPM[idx])
+          if (ipredMode == pu.intraNonMPM[idx])
           {
             non_mpm_idx = idx;
             break;
@@ -1848,17 +1848,17 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
         xWriteTruncBinCode(non_mpm_idx, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES);  // Remaining mode is truncated binary coded
       }
 #else
-      std::sort(mpm_pred, mpm_pred + numMPMs);
+      std::sort(mpmPred, mpmPred + numMPMs);
 
       for (int idx = numMPMs - 1; idx >= 0; idx--)
       {
-        if (ipred_mode > mpm_pred[idx])
+        if (ipredMode > mpmPred[idx])
         {
-          ipred_mode--;
+          ipredMode--;
         }
       }
 
-      xWriteTruncBinCode(ipred_mode, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES);  // Remaining mode is truncated binary coded
+      xWriteTruncBinCode(ipredMode, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES);  // Remaining mode is truncated binary coded
 #endif
     }
   }
@@ -3613,7 +3613,7 @@ void CABACWriter::ibcGpmMergeIdx(const PredictionUnit& pu)
   uint8_t candIdx1 = pu.ibcGpmMergeIdx1;
 
   uint8_t splitDirIdx = 0;
-  if (g_GeoParams[splitDir][0] % 8 == 0)
+  if (g_geoParams[splitDir][0] % 8 == 0)
   {
     m_BinEncoder.encodeBin( 1, Ctx::IbcGpmSplitDirSetFlag() );
     splitDirIdx = g_ibcGpmFirstSetSplitDirToIdx[splitDir];
@@ -4035,7 +4035,7 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
   {
     if( pu.cu->geoFlag )
     {
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
       geoAdaptiveBlendingIdx(pu.geoBldIdx);
 #endif
 
@@ -4727,7 +4727,7 @@ uint64_t CABACWriter::geo_mmvdIdx_est(const TempCtx& ctxStart, const int geoMMVD
 }
 #endif
 
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 uint64_t CABACWriter::geoBldFlagEst(const TempCtx& ctxStart, const int flag)
 {
   getCtx() = ctxStart;
@@ -4999,7 +4999,7 @@ void CABACWriter::mh_pred_data(const PredictionUnit& pu)
     return;
   }
 #endif
-  if( !pu.mergeFlag && pu.cu->BcwIdx == BCW_DEFAULT )
+  if( !pu.mergeFlag && pu.cu->bcwIdx == BCW_DEFAULT )
   {
     return;
   }
@@ -7456,8 +7456,8 @@ void CABACWriter::cu_lic_flag(const CodingUnit& cu)
 {
   if (CU::isLICFlagPresent(cu))
   {
-    m_BinEncoder.encodeBin(cu.LICFlag ? 1 : 0, Ctx::LICFlag(0));
-    DTRACE(g_trace_ctx, D_SYNTAX, "cu_lic_flag() lic_flag=%d\n", cu.LICFlag ? 1 : 0);
+    m_BinEncoder.encodeBin(cu.licFlag ? 1 : 0, Ctx::LICFlag(0));
+    DTRACE(g_trace_ctx, D_SYNTAX, "cu_lic_flag() lic_flag=%d\n", cu.licFlag ? 1 : 0);
   }
 }
 #endif
