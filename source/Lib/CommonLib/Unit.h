@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -304,13 +304,13 @@ struct CodingUnit : public UnitArea
 
   PredMode       predMode;
 
-  uint8_t          depth;   // number of all splits, applied with generalized splits
-  uint8_t          qtDepth; // number of applied quad-splits, before switching to the multi-type-tree (mtt)
+  uint8_t        depth;   // number of all splits, applied with generalized splits
+  uint8_t        qtDepth; // number of applied quad-splits, before switching to the multi-type-tree (mtt)
   // a triple split would increase the mtDepth by 1, but the qtDepth by 2 in the first and last part and by 1 in the middle part (because of the 1-2-1 split proportions)
-  uint8_t          btDepth; // number of applied binary splits, after switching to the mtt (or it's equivalent)
-  uint8_t          mtDepth; // the actual number of splits after switching to mtt (equals btDepth if only binary splits are allowed)
-  int8_t          chromaQpAdj;
-  int8_t          qp;
+  uint8_t        btDepth; // number of applied binary splits, after switching to the mtt (or it's equivalent)
+  uint8_t        mtDepth; // the actual number of splits after switching to mtt (equals btDepth if only binary splits are allowed)
+  int8_t         chromaQpAdj;
+  int8_t         qp;
   SplitSeries    splitSeries;
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   TreeType       treeType;
@@ -325,10 +325,10 @@ struct CodingUnit : public UnitArea
   bool           geoFlag;
   int8_t         bdpcmMode;
   int8_t         bdpcmModeChroma;
-  uint8_t          imv;
+  uint8_t        imv;
   bool           rootCbf;
   uint8_t        sbtInfo;
-  uint32_t           tileIdx;
+  uint32_t       tileIdx;
 #if JVET_AC0105_DIRECTIONAL_PLANAR
   uint8_t        plIdx;
 #endif
@@ -366,30 +366,30 @@ struct CodingUnit : public UnitArea
   bool           timd;
   int            timdMode;
 #if JVET_AC0094_REF_SAMPLES_OPT
-  bool timdModeCheckWA;
-  bool timdModeSecondaryCheckWA;
+  bool           timdModeCheckWA;
+  bool           timdModeSecondaryCheckWA;
 #endif
-  int timdModeSecondary;
-  bool timdIsBlended;
-  int8_t timdFusionWeight[2];
+  int            timdModeSecondary;
+  bool           timdIsBlended;
+  int8_t         timdFusionWeight[2];
 #endif
 #if JVET_AB0155_SGPM
-  int timdHor;
-  int timdVer;
-  bool sgpm;
-  int  sgpmIdx;
-  int  sgpmSplitDir;
-  int  sgpmMode0;
-  int  sgpmMode1;
+  int            timdHor;
+  int            timdVer;
+  bool           sgpm;
+  int            sgpmIdx;
+  int            sgpmSplitDir;
+  int            sgpmMode0;
+  int            sgpmMode1;
 #endif
 #if ENABLE_OBMC
   bool           obmcFlag;
   bool           isobmcMC;
 #endif
-  uint8_t         mtsFlag;
+  uint8_t        mtsFlag;
   uint8_t        lfnstIdx;
-  uint8_t         BcwIdx;
-  int8_t          refIdxBi[2];
+  uint8_t        bcwIdx;
+  int8_t         refIdxBi[2];
   bool           mipFlag;
 #if JVET_AB0067_MIP_DIMD_LFNST
   int            mipDimdMode;
@@ -401,17 +401,17 @@ struct CodingUnit : public UnitArea
 #endif
 #endif
 #if INTER_LIC
-  bool           LICFlag;
+  bool           licFlag;
 #endif
 #if JVET_AC0112_IBC_LIC
-  bool ibcLicFlag;
+  bool           ibcLicFlag;
 #endif
 #if JVET_AA0070_RRIBC
-  int    rribcFlipType;
+  int            rribcFlipType;
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  int bvOneNullComp;   // IBC BV has one null component
-  int bvNullCompDir;   // 1: vertical null comp.  2: horizontal null comp.
+  int            bvOneNullComp;   // IBC BV has one null component
+  int            bvNullCompDir;   // 1: vertical null comp.  2: horizontal null comp.
 #endif
 #if JVET_AB0157_TMRL
   bool           tmrlFlag;
@@ -419,12 +419,12 @@ struct CodingUnit : public UnitArea
   TmrlMode       tmrlList[MRL_LIST_SIZE];
 #endif
 #if JVET_AC0094_REF_SAMPLES_OPT
-  bool areAboveRightUnavail;
-  bool areBelowLeftUnavail;
+  bool           areAboveRightUnavail;
+  bool           areBelowLeftUnavail;
 #endif
   // needed for fast imv mode decisions
-  int8_t          imvNumCand;
-  uint8_t          smvdMode;
+  int8_t         imvNumCand;
+  uint8_t        smvdMode;
   uint8_t        ispMode;
   bool           useEscape[MAX_NUM_CHANNEL_TYPE];
   bool           useRotation[MAX_NUM_CHANNEL_TYPE];
@@ -485,7 +485,7 @@ struct IntraPredictionData
   int8_t    candId = -1;
   bool      parseChromaMode = false;
   bool      mpmFlag = false;
-  int8_t    ipred_idx = -1;
+  int8_t    ipredIdx = -1;
   bool      secondMpmFlag = false;
 #endif
 #if SECONDARY_MPM
@@ -554,7 +554,7 @@ struct InterPredictionData
   uint8_t     geoTmType;
 #endif
 #endif
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   uint8_t     geoBldIdx;
 #endif
   bool           mmvdMergeFlag;

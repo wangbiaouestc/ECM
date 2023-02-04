@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -738,7 +738,7 @@ bool IntraPrediction::xFillIntraGPMRefTemplateAll(PredictionUnit& pu, TEMPLATE_T
     uint8_t* geoIntraMPMList = m_aiGpmIntraMPMLists[splitDir][partIdx];
     if (!readBufferedMPMList)
     {
-      PU::getGeoIntraMPMs(pu, geoIntraMPMList, splitDir, g_geoTmShape[partIdx][g_GeoParams[splitDir][0]], doInitMPMList, doInitAL, doInitA, doInitL);
+      PU::getGeoIntraMPMs(pu, geoIntraMPMList, splitDir, g_geoTmShape[partIdx][g_geoParams[splitDir][0]], doInitMPMList, doInitAL, doInitA, doInitL);
       doInitMPMList = false; // to prevent duplicating initialization
     }
 
@@ -5355,12 +5355,12 @@ void IntraPrediction::deriveSgpmModeOrdered(const CPelBuf &recoBuf, const CompAr
 
   for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
   {
-    if (!g_sgpm_splitDir[splitDir])
+    if (!g_sgpmSplitDir[splitDir])
     {
       continue;
     }
 
-    int16_t angle = g_GeoParams[splitDir][0];
+    int16_t angle = g_geoParams[splitDir][0];
     for (int partIdx = 0; partIdx < 2; partIdx++)
     {
       PU::getSgpmIntraMPMs(pu, ipmList[splitDir][partIdx], splitDir, g_geoTmShape[partIdx][angle]);
@@ -5404,7 +5404,7 @@ void IntraPrediction::deriveSgpmModeOrdered(const CPelBuf &recoBuf, const CompAr
   uint32_t cntComb = 0;
   for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
   {
-    if (!g_sgpm_splitDir[splitDir])
+    if (!g_sgpmSplitDir[splitDir])
     {
       continue;
     }

@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -520,7 +520,7 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
 #if JVET_AB0155_SGPM
     if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
     {
-      intraMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
+      intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
     }
 #endif
 #if JVET_V0130_INTRA_TMP
@@ -797,7 +797,7 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
 #if JVET_AB0155_SGPM
     if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
     {
-      intraMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
+      intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
     }
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -1234,7 +1234,7 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
 #if JVET_AB0155_SGPM
       if (tu.cu->sgpm)
       {
-        predMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
+        predMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
       }
 #endif
       int ucMode;
@@ -2640,7 +2640,7 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
 #if JVET_AB0155_SGPM
   if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
   {
-    intraMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
+    intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
   }
 #endif
 #if JVET_W0123_TIMD_FUSION

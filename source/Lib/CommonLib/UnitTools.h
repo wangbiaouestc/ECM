@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -557,13 +557,13 @@ namespace PU
   void spanGeoMotionInfo              (      PredictionUnit &pu, MergeCtx &GeoMrgCtx, const uint8_t splitDir, const uint8_t candIdx0, const uint8_t candIdx1);
 #if JVET_W0097_GPM_MMVD_TM
 #if TM_MRG
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx);
 #else
   void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1);
 #endif
 #else
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &GeoMrgCtx, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx);
 #else
   void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &GeoMrgCtx, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool mmvdFlag1, const uint8_t mmvdIdx1);
@@ -588,7 +588,7 @@ namespace PU
 #endif
 
 #if INTER_LIC
-  void spanLICFlags(PredictionUnit &pu, const bool LICFlag);
+  void spanLicFlags(PredictionUnit &pu, const bool LICFlag);
 #endif
 #if MULTI_HYP_PRED
   Mv   getMultiHypMVP(PredictionUnit &pu, const MultiHypPredictionData &mhData);
@@ -758,7 +758,7 @@ uint32_t updateCandList(T uiMode, uint64_t uiCost, static_vector<T, N>& candMode
 #endif
 
 #if JVET_W0097_GPM_MMVD_TM
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 template<size_t N>
 void orderCandList(uint8_t uiMode, bool bNonMMVDListCand, int splitDir, double uiCost, uint8_t bldIdx, static_vector<uint8_t, N>& candModeList, static_vector<bool, N>& isNonMMVDListIdx, static_vector<int, N>&  candSplitDirList, static_vector<double, N>& candCostList, static_vector<uint8_t, N>&  geoBldList, size_t uiFastCandNum = N)
 {

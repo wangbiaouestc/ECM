@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -121,7 +121,7 @@ void roundBD_SSE(const Pel* srcp, const int srcStride, Pel* dest, const int dest
 template< X86_VEXT vext >
 void weightedAvg_SSE(const Pel* src0, const unsigned src0Stride, const Pel* src1, const unsigned src1Stride, Pel* dest, const unsigned destStride, const int8_t w0, const int8_t w1, int width, int height, const ClpRng& clpRng)
 {
-  const int8_t log2WeightBase = g_BcwLog2WeightBase;
+  const int8_t log2WeightBase = g_bcwLog2WeightBase;
   const int    clipbd = clpRng.bd;
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
   const int shiftNum = IF_INTERNAL_FRAC_BITS(clipbd) + log2WeightBase;
@@ -1742,8 +1742,8 @@ template< X86_VEXT vext, int W >
 void removeWeightHighFreq_SSE(int16_t* src0, int src0Stride, const int16_t* src1, int src1Stride, int width, int height, int shift, int bcwWeight)
 {
   int normalizer = ((1 << 16) + (bcwWeight>0 ? (bcwWeight >> 1) : -(bcwWeight >> 1))) / bcwWeight;
-  int weight0 = normalizer << g_BcwLog2WeightBase;
-  int weight1 = (g_BcwWeightBase - bcwWeight)*normalizer;
+  int weight0 = normalizer << g_bcwLog2WeightBase;
+  int weight1 = (g_bcwWeightBase - bcwWeight)*normalizer;
   int offset = 1 << (shift - 1);
   if (W == 8)
   {

@@ -370,27 +370,27 @@ static void simdFilter5x5Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
   const size_t srcStride = srcBuffer.stride;
   const size_t dstStride = dstBuffer.stride;
 
-  constexpr int SHIFT = AdaptiveLoopFilter::m_NUM_BITS - 1;
-  constexpr int ROUND = 1 << (SHIFT - 1);
+  constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
+  constexpr int round = 1 << (shift - 1);
 #if !ALF_IMPROVEMENT
-  const __m128i mmOffset1 = _mm_set1_epi32((1 << ((SHIFT + 3) - 1)) - ROUND);
+  const __m128i mmOffset1 = _mm_set1_epi32((1 << ((shift + 3) - 1)) - round );
 #endif
 
   const size_t width  = blk.width;
   const size_t height = blk.height;
 
-  constexpr size_t STEP_X = 8;
+  constexpr size_t stepX = 8;
 #if ALF_IMPROVEMENT
   static_assert(sizeof(*filterSet) == 2, "ALF coeffs must be 16-bit wide");
   static_assert(sizeof(*fClipSet) == 2, "ALF clip values must be 16-bit wide");
-  size_t STEP_Y = isChroma(compId) ? 4 : 2;
+  size_t stepY = isChroma(compId) ? 4 : 2;
 #else
-  constexpr size_t STEP_Y = 4;
+  constexpr size_t stepY = 4;
 #endif
 
-  CHECK(blk.y % STEP_Y, "Wrong startHeight in filtering");
-  CHECK(blk.x % STEP_X, "Wrong startWidth in filtering");
-  CHECK(height % STEP_Y, "Wrong endHeight in filtering");
+  CHECK(blk.y % stepY, "Wrong startHeight in filtering");
+  CHECK(blk.x % stepX, "Wrong startWidth in filtering");
+  CHECK(height % stepY, "Wrong endHeight in filtering");
   CHECK(width % 4, "Wrong endWidth in filtering");
 
   const Pel *src = srcBuffer.buf + blk.y * srcStride + blk.x;
@@ -398,7 +398,7 @@ static void simdFilter5x5Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
 
 
 
-  const __m128i mmOffset = _mm_set1_epi32(ROUND);
+  const __m128i mmOffset = _mm_set1_epi32( round );
   const __m128i mmMin = _mm_set1_epi16( clpRng.min );
   const __m128i mmMax = _mm_set1_epi16( clpRng.max );
 
@@ -414,12 +414,12 @@ static void simdFilter5x5Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
   params[1][2] = _mm_shuffle_epi32(fc, 0xaa);
 #endif
 
-  for (size_t i = 0; i < height; i += STEP_Y)
+  for (size_t i = 0; i < height; i += stepY)
   {
 #if ALF_IMPROVEMENT
     const AlfClassifier *pClass = isChroma(compId) ? nullptr : classifier[blkDst.y + i] + blkDst.x;
 #endif
-    for (size_t j = 0; j < width; j += STEP_X)
+    for (size_t j = 0; j < width; j += stepX)
     {
 #if ALF_IMPROVEMENT
       __m128i params[2][2][3];
@@ -456,7 +456,7 @@ static void simdFilter5x5Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
         params[k][1][2] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip, 0xaa), _mm_shuffle_epi32(rawClip1, 0xaa));
       }
 #endif
-      for (size_t ii = 0; ii < STEP_Y; ii++)
+      for (size_t ii = 0; ii < stepY; ii++)
       {
         const Pel *pImg0, *pImg1, *pImg2, *pImg3, *pImg4;
 
@@ -551,28 +551,28 @@ static void simdFilter5x5Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
         process2coeffs(1, pImg1 + 0, pImg2 + 0, pImg1 - 1, pImg2 + 1);
         process2coeffs(2, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
 #if ALF_IMPROVEMENT
-        accumA = _mm_srai_epi32( accumA, SHIFT );
-        accumB = _mm_srai_epi32( accumB, SHIFT );
+        accumA = _mm_srai_epi32( accumA, shift );
+        accumB = _mm_srai_epi32( accumB, shift );
 #else
 
         bool isNearVBabove = yVb < vbPos && (yVb >= vbPos - 1);
         bool isNearVBbelow = yVb >= vbPos && (yVb <= vbPos);
         if (!(isNearVBabove || isNearVBbelow))
         {
-          accumA = _mm_srai_epi32(accumA, SHIFT);
-          accumB = _mm_srai_epi32(accumB, SHIFT);
+          accumA = _mm_srai_epi32(accumA, shift);
+          accumB = _mm_srai_epi32(accumB, shift);
         }
         else
         {
-          accumA = _mm_srai_epi32(_mm_add_epi32(accumA, mmOffset1), SHIFT + 3);
-          accumB = _mm_srai_epi32(_mm_add_epi32(accumB, mmOffset1), SHIFT + 3);
+          accumA = _mm_srai_epi32(_mm_add_epi32(accumA, mmOffset1), shift + 3);
+          accumB = _mm_srai_epi32(_mm_add_epi32(accumB, mmOffset1), shift + 3);
         }
 #endif
         accumA = _mm_packs_epi32(accumA, accumB);
         accumA = _mm_add_epi16(accumA, cur);
         accumA = _mm_min_epi16(mmMax, _mm_max_epi16(accumA, mmMin));
 
-        if (j + STEP_X <= width)
+        if (j + stepX <= width)
         {
           _mm_storeu_si128((__m128i *) (dst + ii * dstStride + j), accumA);
         }
@@ -584,8 +584,8 @@ static void simdFilter5x5Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
 
     }
 
-    src += srcStride * STEP_Y;
-    dst += dstStride * STEP_Y;
+    src += srcStride * stepY;
+    dst += dstStride * stepY;
   }
 }
 
@@ -647,37 +647,37 @@ static void simdFilter7x7Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
   const size_t srcStride = srcBuffer.stride;
   const size_t dstStride = dstBuffer.stride;
 
-  constexpr int SHIFT = AdaptiveLoopFilter::m_NUM_BITS - 1;
-  constexpr int ROUND = 1 << (SHIFT - 1);
+  constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
+  constexpr int round = 1 << (shift - 1);
 
   const size_t width  = blk.width;
   const size_t height = blk.height;
 
-  constexpr size_t STEP_X = 8;
+  constexpr size_t stepX = 8;
 #if ALF_IMPROVEMENT
-  size_t STEP_Y = isChroma(compId) ? 4 : 2;
+  size_t stepY = isChroma(compId) ? 4 : 2;
 #else
-  constexpr size_t STEP_Y = 4;
+  constexpr size_t stepY = 4;
 #endif
 
-  CHECK(blk.y % STEP_Y, "Wrong startHeight in filtering");
-  CHECK(blk.x % STEP_X, "Wrong startWidth in filtering");
-  CHECK(height % STEP_Y, "Wrong endHeight in filtering");
-  CHECK(width % STEP_X, "Wrong endWidth in filtering");
+  CHECK(blk.y % stepY, "Wrong startHeight in filtering");
+  CHECK(blk.x % stepX, "Wrong startWidth in filtering");
+  CHECK(height % stepY, "Wrong endHeight in filtering");
+  CHECK(width % stepX, "Wrong endWidth in filtering");
 
 
   const Pel *src = srcBuffer.buf + blk.y * srcStride + blk.x;
   Pel *      dst = dstBuffer.buf + blkDst.y * dstStride + blkDst.x;
 
-  const __m128i mmOffset = _mm_set1_epi32(ROUND);
+  const __m128i mmOffset = _mm_set1_epi32(round);
 #if !ALF_IMPROVEMENT
-  const __m128i mmOffset1 = _mm_set1_epi32((1 << ((SHIFT + 3) - 1)) - ROUND);
+  const __m128i mmOffset1 = _mm_set1_epi32((1 << ((shift + 3) - 1)) - ROUND);
 #endif
   const __m128i mmMin = _mm_set1_epi16( clpRng.min );
   const __m128i mmMax = _mm_set1_epi16( clpRng.max );
 
 
-  for (size_t i = 0; i < height; i += STEP_Y)
+  for (size_t i = 0; i < height; i += stepY)
   {
 #if ALF_IMPROVEMENT
     const AlfClassifier *pClass = isChroma(compId) ? nullptr : classifier[blkDst.y + i] + blkDst.x;
@@ -685,7 +685,7 @@ static void simdFilter7x7Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
     const AlfClassifier *pClass = classifier[blkDst.y + i] + blkDst.x;
 #endif
 
-    for (size_t j = 0; j < width; j += STEP_X)
+    for (size_t j = 0; j < width; j += stepX)
     {
       __m128i params[2][2][6];
 
@@ -771,7 +771,7 @@ static void simdFilter7x7Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
 #endif
       }
 
-      for (size_t ii = 0; ii < STEP_Y; ii++)
+      for (size_t ii = 0; ii < stepY; ii++)
       {
         const Pel *pImg0, *pImg1, *pImg2, *pImg3, *pImg4, *pImg5, *pImg6;
 
@@ -856,20 +856,20 @@ static void simdFilter7x7Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
         process2coeffs(5, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
 
 #if ALF_IMPROVEMENT
-        accumA = _mm_srai_epi32( accumA, SHIFT );
-        accumB = _mm_srai_epi32( accumB, SHIFT );
+        accumA = _mm_srai_epi32( accumA, shift );
+        accumB = _mm_srai_epi32( accumB, shift );
 #else
         bool isNearVBabove = yVb < vbPos && (yVb >= vbPos - 1);
         bool isNearVBbelow = yVb >= vbPos && (yVb <= vbPos);
         if (!(isNearVBabove || isNearVBbelow))
         {
-          accumA = _mm_srai_epi32(accumA, SHIFT);
-          accumB = _mm_srai_epi32(accumB, SHIFT);
+          accumA = _mm_srai_epi32(accumA, shift);
+          accumB = _mm_srai_epi32(accumB, shift);
         }
         else
         {
-          accumA = _mm_srai_epi32(_mm_add_epi32(accumA, mmOffset1), SHIFT + 3);
-          accumB = _mm_srai_epi32(_mm_add_epi32(accumB, mmOffset1), SHIFT + 3);
+          accumA = _mm_srai_epi32(_mm_add_epi32(accumA, mmOffset1), shift + 3);
+          accumB = _mm_srai_epi32(_mm_add_epi32(accumB, mmOffset1), shift + 3);
         }
 #endif
         accumA = _mm_packs_epi32(accumA, accumB);
@@ -880,8 +880,8 @@ static void simdFilter7x7Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
       }
     }
 
-    src += srcStride * STEP_Y;
-    dst += dstStride * STEP_Y;
+    src += srcStride * stepY;
+    dst += dstStride * stepY;
   }
 }
 
@@ -1107,34 +1107,34 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
   const size_t srcStride = srcBuffer.stride;
   const size_t dstStride = dstBuffer.stride;
 
-  constexpr int SHIFT = AdaptiveLoopFilter::m_NUM_BITS - 1;
-  constexpr int ROUND = 1 << (SHIFT - 1);
+  constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
+  constexpr int round = 1 << (shift - 1);
 
   const size_t width = blk.width;
   const size_t height = blk.height;
 
-  constexpr size_t STEP_X = 8;
-  size_t STEP_Y = isChroma(compId) ? 4 : 2;
+  constexpr size_t stepX = 8;
+  size_t stepY = isChroma(compId) ? 4 : 2;
 
   static_assert(sizeof(*filterSet) == 2, "ALF coeffs must be 16-bit wide");
   static_assert(sizeof(*fClipSet) == 2, "ALF clip values must be 16-bit wide");
 
-  CHECK(blk.y % STEP_Y, "Wrong startHeight in filtering");
-  CHECK(blk.x % STEP_X, "Wrong startWidth in filtering");
-  CHECK(height % STEP_Y, "Wrong endHeight in filtering");
+  CHECK(blk.y % stepY, "Wrong startHeight in filtering");
+  CHECK(blk.x % stepX, "Wrong startWidth in filtering");
+  CHECK(height % stepY, "Wrong endHeight in filtering");
   CHECK(width % 4, "Wrong endWidth in filtering");
 
   const Pel *src = srcBuffer.buf + blk.y * srcStride + blk.x;
   Pel *      dst = dstBuffer.buf + blkDst.y * dstStride + blkDst.x;
 
-  const __m128i mmOffset = _mm_set1_epi32(ROUND);
+  const __m128i mmOffset = _mm_set1_epi32(round);
   const __m128i mmMin = _mm_set1_epi16(clpRng.min);
   const __m128i mmMax = _mm_set1_epi16(clpRng.max);
 
-  for (size_t i = 0; i < height; i += STEP_Y)
+  for (size_t i = 0; i < height; i += stepY)
   {
     const AlfClassifier *pClass = isChroma(compId) ? nullptr : classifier[blkDst.y + i] + blkDst.x;
-    for (size_t j = 0; j < width; j += STEP_X)
+    for (size_t j = 0; j < width; j += stepX)
     {
       __m128i params[2][2][10];
       for (int k = 0; k < 2; k++)
@@ -1198,7 +1198,7 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
         params[k][1][9] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][2], 0x55), _mm_shuffle_epi32(rawClip[1][2], 0x55));
       }
 
-      for (size_t ii = 0; ii < STEP_Y; ii++)
+      for (size_t ii = 0; ii < stepY; ii++)
       {
         const Pel *pImg0, *pImg1, *pImg2, *pImg3, *pImg4, *pImg5, *pImg6, *pImg7, *pImg8;
 
@@ -1264,14 +1264,14 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
         process2coeffs(8, pImg0 + 4, pImg0 - 4, pImg0 + 3, pImg0 - 3);
         process2coeffs(9, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
 
-        accumA = _mm_srai_epi32(accumA, SHIFT);
-        accumB = _mm_srai_epi32(accumB, SHIFT);
+        accumA = _mm_srai_epi32(accumA, shift);
+        accumB = _mm_srai_epi32(accumB, shift);
 
         accumA = _mm_packs_epi32(accumA, accumB);
         accumA = _mm_add_epi16(accumA, cur);
         accumA = _mm_min_epi16(mmMax, _mm_max_epi16(accumA, mmMin));
 
-        if (j + STEP_X <= width)
+        if (j + stepX <= width)
         {
           _mm_storeu_si128((__m128i *) (dst + ii * dstStride + j), accumA);
         }
@@ -1279,10 +1279,10 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
         {
           _mm_storel_epi64((__m128i *) (dst + ii * dstStride + j), accumA);
         }
-      } //for (size_t ii = 0; ii < STEP_Y; ii++)
-    } //for (size_t j = 0; j < width; j += STEP_X)
-    src += srcStride * STEP_Y;
-    dst += dstStride * STEP_Y;
+      } //for (size_t ii = 0; ii < stepY; ii++)
+    } //for (size_t j = 0; j < width; j += stepX)
+    src += srcStride * stepY;
+    dst += dstStride * stepY;
   }
 }
 #endif
@@ -1318,16 +1318,16 @@ static void simdFilter9x9BlkExt(AlfClassifier **classifier, const PelUnitBuf &re
   const size_t srcStride = srcBuffer.stride;
   const size_t dstStride = dstBuffer.stride;
 
-  constexpr int SHIFT = AdaptiveLoopFilter::m_NUM_BITS - 1;
-  constexpr int ROUND = 1 << (SHIFT - 1);
+  constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
+  constexpr int round = 1 << (shift - 1);
 
   const size_t width = blk.width;
   const size_t height = blk.height;
 
-  constexpr size_t STEP_X = 8;
-  size_t STEP_Y = 1;
+  constexpr size_t stepX = 8;
+  size_t stepY = 1;
 
-  const __m128i mmOffset = _mm_set1_epi32(ROUND);
+  const __m128i mmOffset = _mm_set1_epi32(round);
   const __m128i mmMin = _mm_set1_epi16(clpRng.min);
   const __m128i mmMax = _mm_set1_epi16(clpRng.max);
 
@@ -1340,10 +1340,10 @@ static void simdFilter9x9BlkExt(AlfClassifier **classifier, const PelUnitBuf &re
   const int padSize = ALF_PADDING_SIZE_FIXED_RESULTS;
 #endif
 
-  for (size_t i = 0; i < height; i += STEP_Y)
+  for (size_t i = 0; i < height; i += stepY)
   {
     const AlfClassifier *pClass = classifier[blkDst.y + i] + blkDst.x;
-    for (size_t j = 0; j < width; j += STEP_X)
+    for (size_t j = 0; j < width; j += stepX)
     {
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
       __m128i params[2][2][14];
@@ -1576,8 +1576,8 @@ static void simdFilter9x9BlkExt(AlfClassifier **classifier, const PelUnitBuf &re
       accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
       accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
 
-      accumA = _mm_srai_epi32(accumA, SHIFT);
-      accumB = _mm_srai_epi32(accumB, SHIFT);
+      accumA = _mm_srai_epi32(accumA, shift);
+      accumB = _mm_srai_epi32(accumB, shift);
 
       accumA = _mm_packs_epi32(accumA, accumB);
       accumA = _mm_add_epi16(accumA, cur);
@@ -1585,8 +1585,8 @@ static void simdFilter9x9BlkExt(AlfClassifier **classifier, const PelUnitBuf &re
 
       _mm_storeu_si128((__m128i *) (dst + j), accumA);
     }//for j
-    src += srcStride * STEP_Y;
-    dst += dstStride * STEP_Y;
+    src += srcStride * stepY;
+    dst += dstStride * stepY;
   }//for i
 }
 
@@ -1810,16 +1810,16 @@ static void simdFilter9x9BlkExtDb(AlfClassifier **classifier, const PelUnitBuf &
   const size_t dstStride = dstBuffer.stride;
   const size_t srcBeforeDbStride = scrBufferBeforeDb.stride;
 
-  constexpr int SHIFT = AdaptiveLoopFilter::m_NUM_BITS - 1;
-  constexpr int ROUND = 1 << (SHIFT - 1);
+  constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
+  constexpr int round = 1 << (shift - 1);
 
   const size_t width = blk.width;
   const size_t height = blk.height;
 
-  constexpr size_t STEP_X = 8;
-  size_t STEP_Y = 1;
+  constexpr size_t stepX = 8;
+  size_t stepY = 1;
 
-  const __m128i mmOffset = _mm_set1_epi32(ROUND);
+  const __m128i mmOffset = _mm_set1_epi32(round);
   const __m128i mmMin = _mm_set1_epi16(clpRng.min);
   const __m128i mmMax = _mm_set1_epi16(clpRng.max);
 
@@ -1833,10 +1833,10 @@ static void simdFilter9x9BlkExtDb(AlfClassifier **classifier, const PelUnitBuf &
   const int padSize = ALF_PADDING_SIZE_FIXED_RESULTS;
 #endif
 
-  for (size_t i = 0; i < height; i += STEP_Y)
+  for (size_t i = 0; i < height; i += stepY)
   {
     const AlfClassifier *pClass = classifier[blkDst.y + i] + blkDst.x;
-    for (size_t j = 0; j < width; j += STEP_X)
+    for (size_t j = 0; j < width; j += stepX)
     {
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
       __m128i params[2][2][16];
@@ -2100,8 +2100,8 @@ static void simdFilter9x9BlkExtDb(AlfClassifier **classifier, const PelUnitBuf &
       accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
       accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
 
-      accumA = _mm_srai_epi32(accumA, SHIFT);
-      accumB = _mm_srai_epi32(accumB, SHIFT);
+      accumA = _mm_srai_epi32(accumA, shift);
+      accumB = _mm_srai_epi32(accumB, shift);
 
       accumA = _mm_packs_epi32(accumA, accumB);
       accumA = _mm_add_epi16(accumA, cur);
@@ -2109,9 +2109,9 @@ static void simdFilter9x9BlkExtDb(AlfClassifier **classifier, const PelUnitBuf &
 
       _mm_storeu_si128((__m128i *) (dst + j), accumA);
     }//for j
-    src += srcStride * STEP_Y;
-    dst += dstStride * STEP_Y;
-    srcBeforeDb += srcBeforeDbStride * STEP_Y;
+    src += srcStride * stepY;
+    dst += dstStride * stepY;
+    srcBeforeDb += srcBeforeDbStride * stepY;
   }//for i
 }
 #endif
@@ -2146,16 +2146,16 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
   const size_t srcStride = srcBuffer.stride;
   const size_t dstStride = dstBuffer.stride;
 
-  constexpr int SHIFT = AdaptiveLoopFilter::m_NUM_BITS - 1;
-  constexpr int ROUND = 1 << (SHIFT - 1);
+  constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
+  constexpr int round = 1 << (shift - 1);
 
   const size_t width = blk.width;
   const size_t height = blk.height;
 
-  constexpr size_t STEP_X = 8;
-  size_t STEP_Y = 1;
+  constexpr size_t stepX = 8;
+  size_t stepY = 1;
 
-  const __m128i mmOffset = _mm_set1_epi32(ROUND);
+  const __m128i mmOffset = _mm_set1_epi32(round);
   const __m128i mmMin = _mm_set1_epi16(clpRng.min);
   const __m128i mmMax = _mm_set1_epi16(clpRng.max);
 
@@ -2168,10 +2168,10 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
   const int padSize = ALF_PADDING_SIZE_FIXED_RESULTS;
 #endif
 
-  for (size_t i = 0; i < height; i += STEP_Y)
+  for (size_t i = 0; i < height; i += stepY)
   {
     const AlfClassifier *pClass = classifier[blkDst.y + i] + blkDst.x;
-    for (size_t j = 0; j < width; j += STEP_X)
+    for (size_t j = 0; j < width; j += stepX)
     {
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
       __m128i params[2][2][14];
@@ -2413,8 +2413,8 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
       accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
       accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
 
-      accumA = _mm_srai_epi32(accumA, SHIFT);
-      accumB = _mm_srai_epi32(accumB, SHIFT);
+      accumA = _mm_srai_epi32(accumA, shift);
+      accumB = _mm_srai_epi32(accumB, shift);
 
       accumA = _mm_packs_epi32(accumA, accumB);
       accumA = _mm_add_epi16(accumA, cur);
@@ -2422,8 +2422,8 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
 
       _mm_storeu_si128((__m128i *) (dst + j), accumA);
     }//for j
-    src += srcStride * STEP_Y;
-    dst += dstStride * STEP_Y;
+    src += srcStride * stepY;
+    dst += dstStride * stepY;
   }//for i
 }
 #endif
@@ -2457,16 +2457,16 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
   const size_t dstStride = dstBuffer.stride;
   const size_t srcBeforeDbStride = scrBufferBeforeDb.stride;
 
-  constexpr int SHIFT = AdaptiveLoopFilter::m_NUM_BITS - 1;
-  constexpr int ROUND = 1 << (SHIFT - 1);
+  constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
+  constexpr int round = 1 << (shift - 1);
 
   const size_t width = blk.width;
   const size_t height = blk.height;
 
-  constexpr size_t STEP_X = 8;
-  size_t STEP_Y = 1;
+  constexpr size_t stepX = 8;
+  size_t stepY = 1;
 
-  const __m128i mmOffset = _mm_set1_epi32(ROUND);
+  const __m128i mmOffset = _mm_set1_epi32(round);
   const __m128i mmMin = _mm_set1_epi16(clpRng.min);
   const __m128i mmMax = _mm_set1_epi16(clpRng.max);
 
@@ -2480,10 +2480,10 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
   const int padSize = ALF_PADDING_SIZE_FIXED_RESULTS;
 #endif
 
-  for (size_t i = 0; i < height; i += STEP_Y)
+  for (size_t i = 0; i < height; i += stepY)
   {
     const AlfClassifier *pClass = classifier[blkDst.y + i] + blkDst.x;
-    for (size_t j = 0; j < width; j += STEP_X)
+    for (size_t j = 0; j < width; j += stepX)
     {
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
       __m128i params[2][2][16];
@@ -2752,8 +2752,8 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
       accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
       accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
 
-      accumA = _mm_srai_epi32(accumA, SHIFT);
-      accumB = _mm_srai_epi32(accumB, SHIFT);
+      accumA = _mm_srai_epi32(accumA, shift);
+      accumB = _mm_srai_epi32(accumB, shift);
 
       accumA = _mm_packs_epi32(accumA, accumB);
       accumA = _mm_add_epi16(accumA, cur);
@@ -2761,9 +2761,9 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
 
       _mm_storeu_si128((__m128i *) (dst + j), accumA);
     }//for j
-    src += srcStride * STEP_Y;
-    dst += dstStride * STEP_Y;
-    srcBeforeDb += srcBeforeDbStride * STEP_Y;
+    src += srcStride * stepY;
+    dst += dstStride * stepY;
+    srcBeforeDb += srcBeforeDbStride * stepY;
   }//for i
 }
 #endif
@@ -3543,21 +3543,21 @@ static void simdFilter13x13Blk( AlfClassifier **classifier, const CPelBuf &srcLu
 {
   const int srcStride = srcLuma.stride;
 
-  constexpr int SHIFT = AdaptiveLoopFilter::m_NUM_BITS_FIXED_FILTER - 1;
-  constexpr int ROUND = 1 << (SHIFT - 1);
+  constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS_FIXED_FILTER - 1;
+  constexpr int round = 1 << (shift - 1);
 
   const int width = curBlk.width;
   const int height = curBlk.height;
 
-  constexpr int STEP_X = 8;
-  constexpr int STEP_Y = 2;
+  constexpr int stepX = 8;
+  constexpr int stepY = 2;
 
   const Pel *src = srcLuma.buf + curBlk.y * srcStride + curBlk.x;
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   const int padSize = ALF_PADDING_SIZE_FIXED_RESULTS;
 #endif
 
-  const __m128i mmOffset = _mm_set1_epi32(ROUND);
+  const __m128i mmOffset = _mm_set1_epi32(round);
   const __m128i mmMin = _mm_set1_epi16(clpRng.min);
   const __m128i mmMax = _mm_set1_epi16(clpRng.max);
   const __m128i mmClippingValues = _mm_loadl_epi64((const __m128i *)clippingValues);
@@ -3566,7 +3566,7 @@ static void simdFilter13x13Blk( AlfClassifier **classifier, const CPelBuf &srcLu
 
   const std::array<std::array<short, 42>, NUM_FIXED_FILTERS>& filterCoeffFixed = packedDataFixedFilters[fixedFiltQpInd][dirWindSize];
 
-  for (int i = 0; i < height; i += STEP_Y)
+  for (int i = 0; i < height; i += stepY)
   {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
     const AlfClassifier *pClass = classifier[blkDst.y + i] + blkDst.x;
@@ -3574,7 +3574,7 @@ static void simdFilter13x13Blk( AlfClassifier **classifier, const CPelBuf &srcLu
     const AlfClassifier *pClass = classifier[curBlk.y + i] + curBlk.x;
 #endif
 
-    for (int j = 0; j < width; j += STEP_X)
+    for (int j = 0; j < width; j += stepX)
     {
       __m128i params[21];
       __m128i rawCoef[4][6];
@@ -3644,7 +3644,7 @@ static void simdFilter13x13Blk( AlfClassifier **classifier, const CPelBuf &srcLu
       params[19] = _mm_unpacklo_epi64(_mm_unpackhi_epi32(rawCoef[0][5], rawCoef[1][5]), _mm_unpackhi_epi32(rawCoef[2][5], rawCoef[3][5]));
       params[20] = _mm_unpackhi_epi64(_mm_unpackhi_epi32(rawCoef[0][5], rawCoef[1][5]), _mm_unpackhi_epi32(rawCoef[2][5], rawCoef[3][5]));
 
-      for (int ii = 0; ii < STEP_Y; ii++)
+      for (int ii = 0; ii < stepY; ii++)
       {
         const Pel *pImg0, *pImg1, *pImg2, *pImg3, *pImg4, *pImg5, *pImg6, *pImg7, *pImg8, *pImg9, *pImg10, *pImg11, *pImg12;
         pImg0 = src + j + ii * srcStride;
@@ -3733,8 +3733,8 @@ static void simdFilter13x13Blk( AlfClassifier **classifier, const CPelBuf &srcLu
         process2coeffs(19, pImg3 - 3, pImg4 + 3, pImg1 - 4, pImg2 + 4);
         process2coeffs(20, pImg3 - 1, pImg4 + 1, pImg1 - 2, pImg2 + 2);
 
-        accumA = _mm_srai_epi32(accumA, SHIFT);
-        accumB = _mm_srai_epi32(accumB, SHIFT);
+        accumA = _mm_srai_epi32(accumA, shift);
+        accumB = _mm_srai_epi32(accumB, shift);
 
         accumA = _mm_blend_epi16(accumA, _mm_slli_si128(accumB, 2), 0xAA);
         accumA = _mm_add_epi16(accumA, cur);
@@ -3753,9 +3753,9 @@ static void simdFilter13x13Blk( AlfClassifier **classifier, const CPelBuf &srcLu
         _mm_storeu_si128((__m128i *) (&(fixedFilterResults[fixedFiltInd][curBlk.y + i + ii][curBlk.x + j])), accumA);
 #endif
 #endif
-      } //for (size_t ii = 0; ii < STEP_Y; ii++)
-    }//for (size_t j = 0; j < width; j += STEP_X)
-    src += srcStride * STEP_Y;
+      } //for (size_t ii = 0; ii < stepY; ii++)
+    }//for (size_t j = 0; j < width; j += stepX)
+    src += srcStride * stepY;
   }
 }
 
@@ -3998,8 +3998,8 @@ static void simdFilterResi13x13Blk(AlfClassifier **classifier, const CPelBuf &sr
 #else
         _mm_storeu_si128((__m128i *) (&(fixedFilterResiResults[fixedFiltInd][curBlk.y + i + ii][curBlk.x + j])), accumA);
 #endif
-      }   // for (size_t ii = 0; ii < STEP_Y; ii++)
-    }     // for (size_t j = 0; j < width; j += STEP_X)
+      }   // for (size_t ii = 0; ii < stepY; ii++)
+    }     // for (size_t j = 0; j < width; j += stepX)
     src += srcStride * stepY;
   }
 }

@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -547,8 +547,8 @@ void AreaBuf<Pel>::toLast( const ClpRng& clpRng );
 template<typename T>
 void AreaBuf<T>::removeWeightHighFreq(const AreaBuf<T>& other, const bool bClip, const ClpRng& clpRng, const int8_t bcwWeight)
 {
-  const int8_t bcwWeightOther = g_BcwWeightBase - bcwWeight;
-  const int8_t log2WeightBase = g_BcwLog2WeightBase;
+  const int8_t bcwWeightOther = g_bcwWeightBase - bcwWeight;
+  const int8_t log2WeightBase = g_bcwLog2WeightBase;
 
   const Pel* src = other.buf;
   const int  srcStride = other.stride;
@@ -951,7 +951,7 @@ struct UnitBuf
   void padBorderPel         ( unsigned margin, int dir );
   void extendBorderPel      ( unsigned margin );
   void removeHighFreq       ( const UnitBuf<T>& other, const bool bClip, const ClpRngs& clpRngs
-                            , const int8_t bcwWeight = g_BcwWeights[BCW_DEFAULT]
+                            , const int8_t bcwWeight = g_bcwWeights[BCW_DEFAULT]
                             );
 
         UnitBuf<      T> subBuf (const UnitArea& subArea);
@@ -1145,7 +1145,7 @@ void UnitBuf<T>::removeHighFreq( const UnitBuf<T>& other, const bool bClip, cons
                                , const int8_t bcwWeight
                                )
 {
-  if(bcwWeight != g_BcwWeights[BCW_DEFAULT])
+  if(bcwWeight != g_bcwWeights[BCW_DEFAULT])
   {
     bufs[0].removeWeightHighFreq(other.bufs[0], bClip, clpRngs.comp[0], bcwWeight);
     return;

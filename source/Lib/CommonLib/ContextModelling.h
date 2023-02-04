@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -557,15 +557,15 @@ class MergeCtx
 public:
 #if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Z0075_IBC_HMVP_ENLARGE
   MvField       mvFieldNeighbours[NUM_MERGE_CANDS << 1]; // double length for mv of both lists
-  uint8_t       BcwIdx[NUM_MERGE_CANDS];
+  uint8_t       bcwIdx[NUM_MERGE_CANDS];
 #if INTER_LIC
-  bool          LICFlags[NUM_MERGE_CANDS];
+  bool          licFlags[NUM_MERGE_CANDS];
 #endif
 #if JVET_AC0112_IBC_LIC
   bool          ibcLicFlags[NUM_MERGE_CANDS];
 #endif
 #if JVET_AA0070_RRIBC
-  int       rribcFlipTypes[NUM_MERGE_CANDS];
+  int           rribcFlipTypes[NUM_MERGE_CANDS];
 #endif
   unsigned char interDirNeighbours[NUM_MERGE_CANDS];
 #if MULTI_HYP_PRED
@@ -577,9 +577,9 @@ public:
   ~MergeCtx() {}
 public:
   MvField       mvFieldNeighbours [ MRG_MAX_NUM_CANDS << 1 ]; // double length for mv of both lists
-  uint8_t       BcwIdx            [ MRG_MAX_NUM_CANDS      ];
+  uint8_t       bcwIdx            [ MRG_MAX_NUM_CANDS      ];
 #if INTER_LIC
-  bool          LICFlags          [ MRG_MAX_NUM_CANDS      ];
+  bool          licFlags          [ MRG_MAX_NUM_CANDS      ];
 #endif
 #if JVET_AC0112_IBC_LIC
   bool          ibcLicFlags       [ MRG_MAX_NUM_CANDS      ];
@@ -669,9 +669,9 @@ public:
   Distortion    candCost[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
   EAffineModel  affineType[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
 #if INTER_LIC
-  bool          LICFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+  bool          licFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
 #endif
-  uint8_t       BcwIdx[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+  uint8_t       bcwIdx[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
   int           numValidMergeCand;
   int           numAffCandToTestEnc;
   int           maxNumMergeCand;
@@ -696,9 +696,9 @@ public:
   unsigned char interDirNeighbours[AFFINE_MRG_MAX_NUM_CANDS];
   EAffineModel  affineType[AFFINE_MRG_MAX_NUM_CANDS];
 #if INTER_LIC
-  bool          LICFlags[AFFINE_MRG_MAX_NUM_CANDS];
+  bool          licFlags[AFFINE_MRG_MAX_NUM_CANDS];
 #endif
-  uint8_t       BcwIdx[AFFINE_MRG_MAX_NUM_CANDS];
+  uint8_t       bcwIdx[AFFINE_MRG_MAX_NUM_CANDS];
   int           numValidMergeCand;
   int           maxNumMergeCand;
 

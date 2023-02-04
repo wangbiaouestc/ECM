@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -1749,10 +1749,10 @@ void CABACReader::cu_bcw_flag(CodingUnit& cu)
     }
   }
 
-  uint8_t bcwIdx = (uint8_t)g_BcwParsingOrder[idx];
+  uint8_t bcwIdx = (uint8_t)g_bcwParsingOrder[idx];
   CU::setBcwIdx(cu, bcwIdx);
 
-  DTRACE(g_trace_ctx, D_SYNTAX, "cu_bcw_flag() bcw_idx=%d\n", cu.BcwIdx ? 1 : 0);
+  DTRACE(g_trace_ctx, D_SYNTAX, "cu_bcw_flag() bcw_idx=%d\n", cu.bcwIdx ? 1 : 0);
 #if MULTI_HYP_PRED
   mh_pred_data(*cu.firstPU);
 #endif
@@ -1763,7 +1763,7 @@ void CABACReader::obmc_flag(CodingUnit& cu)
 {
   if (!cu.cs->sps->getUseOBMC() || CU::isIBC(cu) || cu.predMode == MODE_INTRA
 #if INTER_LIC
-    || cu.LICFlag
+    || cu.licFlag
 #endif
     || cu.lwidth() * cu.lheight() < 32
     )
@@ -1994,22 +1994,22 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
   PredictionUnit *pu = cu.firstPU;
 
 #if SECONDARY_MPM
-  uint8_t* mpm_pred = pu->intraMPM;  // mpm_idx / rem_intra_luma_pred_mode
-  uint8_t* non_mpm_pred = pu->intraNonMPM;
+  uint8_t* mpmPred = pu->intraMPM;  // mpm_idx / rem_intra_luma_pred_mode
+  uint8_t* nonMpmPred = pu->intraNonMPM;
 #else
-  unsigned int mpm_pred[NUM_MOST_PROBABLE_MODES];  // mpm_idx / rem_intra_luma_pred_mode
+  unsigned int mpmPred[NUM_MOST_PROBABLE_MODES];  // mpm_idx / rem_intra_luma_pred_mode
 #endif
 
   for( int k = 0; k < numBlocks; k++ )
   {
 #if SECONDARY_MPM
-    PU::getIntraMPMs( *pu, mpm_pred, non_mpm_pred
+    PU::getIntraMPMs( *pu, mpmPred, nonMpmPred
 #if JVET_AC0094_REF_SAMPLES_OPT
                      , false
 #endif
     );
 #else
-    PU::getIntraMPMs(*pu, mpm_pred);
+    PU::getIntraMPMs(*pu, mpmPred);
 #endif
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
     pu->parseLumaMode = true;
@@ -2017,7 +2017,7 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
 #endif
     if( mpmFlag[k] )
     {
-      uint32_t ipred_idx = 0;
+      uint32_t ipredIdx = 0;
       {
         unsigned ctx = (pu->cu->ispMode == NOT_INTRA_SUBPARTITIONS ? 1 : 0);
 #if SECONDARY_MPM
@@ -2025,88 +2025,86 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
 #endif
         if( pu->multiRefIdx == 0 )
         {
-          ipred_idx = m_BinDecoder.decodeBin( Ctx::IntraLumaPlanarFlag( ctx ) );
+          ipredIdx = m_BinDecoder.decodeBin( Ctx::IntraLumaPlanarFlag( ctx ) );
         }
         else
         {
-          ipred_idx = 1;
+          ipredIdx = 1;
         }
 
-        if( ipred_idx )
+        if( ipredIdx )
         {
 #if SECONDARY_MPM
-          ipred_idx += m_BinDecoder.decodeBin(Ctx::IntraLumaMPMIdx(0 + ctx2));
+          ipredIdx += m_BinDecoder.decodeBin(Ctx::IntraLumaMPMIdx(0 + ctx2));
 #else
-          ipred_idx += m_BinDecoder.decodeBinEP();
+          ipredIdx += m_BinDecoder.decodeBinEP();
 #endif
         }
-        if (ipred_idx > 1)
+        if (ipredIdx > 1)
         {
-          ipred_idx += m_BinDecoder.decodeBinEP();
+          ipredIdx += m_BinDecoder.decodeBinEP();
         }
-        if (ipred_idx > 2)
+        if (ipredIdx > 2)
         {
-          ipred_idx += m_BinDecoder.decodeBinEP();
+          ipredIdx += m_BinDecoder.decodeBinEP();
         }
-        if (ipred_idx > 3)
+        if (ipredIdx > 3)
         {
-          ipred_idx += m_BinDecoder.decodeBinEP();
+          ipredIdx += m_BinDecoder.decodeBinEP();
         }
       }
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
       pu->secondMpmFlag = false;
-      pu->ipred_idx = ipred_idx;
+      pu->ipredIdx = ipredIdx;
 #endif
-      pu->intraDir[0] = mpm_pred[ipred_idx];
+      pu->intraDir[0] = mpmPred[ipredIdx];
     }
     else
     {
-      unsigned ipred_mode = 0;
+      unsigned ipredMode = 0;
 
-      {
 #if SECONDARY_MPM
-        if (m_BinDecoder.decodeBin(Ctx::IntraLumaSecondMpmFlag()))
-        {
+      if( m_BinDecoder.decodeBin( Ctx::IntraLumaSecondMpmFlag() ) )
+      {
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
-          int idx = m_BinDecoder.decodeBinsEP(4) + NUM_PRIMARY_MOST_PROBABLE_MODES;
-          ipred_mode = mpm_pred[idx];
-          pu->secondMpmFlag = true;
-          pu->ipred_idx = idx;
+        int idx = m_BinDecoder.decodeBinsEP( 4 ) + NUM_PRIMARY_MOST_PROBABLE_MODES;
+        ipredMode = mpmPred[idx];
+        pu->secondMpmFlag = true;
+        pu->ipredIdx = idx;
 #else
-          ipred_mode = mpm_pred[m_BinDecoder.decodeBinsEP(4) + NUM_PRIMARY_MOST_PROBABLE_MODES];
-#endif
-        }
-        else
-        {
-          xReadTruncBinCode(ipred_mode, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES);
-#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
-          pu->secondMpmFlag = false;
-          pu->ipred_idx = ipred_mode;
-#endif
-          ipred_mode = non_mpm_pred[ipred_mode];
-        }
-#else
-        xReadTruncBinCode(ipred_mode, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES);
-#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
-        pu->ipred_idx = ipred_mode;
-#endif
+        ipredMode = mpmPred[m_BinDecoder.decodeBinsEP( 4 ) + NUM_PRIMARY_MOST_PROBABLE_MODES];
 #endif
       }
+      else
+      {
+        xReadTruncBinCode( ipredMode, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES );
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
+        pu->secondMpmFlag = false;
+        pu->ipredIdx = ipredMode;
+#endif
+        ipredMode = nonMpmPred[ipredMode];
+      }
+#else
+      xReadTruncBinCode( ipredMode, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES );
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
+      pu->ipredIdx = ipredMode;
+#endif
+#endif
 #if !SECONDARY_MPM
       //postponed sorting of MPMs (only in remaining branch)
-      std::sort( mpm_pred, mpm_pred + NUM_MOST_PROBABLE_MODES );
+      std::sort( mpmPred, mpmPred + NUM_MOST_PROBABLE_MODES );
 
       for( uint32_t i = 0; i < NUM_MOST_PROBABLE_MODES; i++ )
       {
-        ipred_mode += (ipred_mode >= mpm_pred[i]);
+        ipredMode += (ipredMode >= mpmPred[i]);
       }
 #endif
 
-      pu->intraDir[0] = ipred_mode;
+      pu->intraDir[0] = ipredMode;
     }
 
 #if JVET_AC0105_DIRECTIONAL_PLANAR
-    if (CU::isDirectionalPlanarAvailable(cu) && pu->ipred_idx == 0 && mpmFlag[k])
+    if (CU::isDirectionalPlanarAvailable(cu) && pu->ipredIdx == 0 && mpmFlag[k])
     {
       uint8_t plIdx = 0;
       plIdx         = m_BinDecoder.decodeBin(Ctx::IntraLumaPlanarFlag(2));
@@ -2123,7 +2121,7 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
 #endif
 
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
-    DTRACE( g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) predIdx=%d mpm=%d secondmpm=%d \n", k, pu->lumaPos().x, pu->lumaPos().y, pu->ipred_idx, pu->mpmFlag, pu->secondMpmFlag);
+    DTRACE( g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) predIdx=%d mpm=%d secondmpm=%d \n", k, pu->lumaPos().x, pu->lumaPos().y, pu->ipredIdx, pu->mpmFlag, pu->secondMpmFlag);
 #else
     DTRACE( g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) mode=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->intraDir[0] );
 #endif
@@ -3569,7 +3567,7 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
     pu.mv    [REF_PIC_LIST_1] = Mv(0, 0);
     pu.refIdx[REF_PIC_LIST_1] = -1;
     pu.interDir               =  1;
-    pu.cu->BcwIdx = BCW_DEFAULT;
+    pu.cu->bcwIdx = BCW_DEFAULT;
   }
 
   if ( pu.cu->smvdMode )
@@ -4455,7 +4453,7 @@ void CABACReader::merge_idx( PredictionUnit& pu )
     if (pu.cu->geoFlag)
     {
       RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__GEO_INDEX, pu.lumaSize());
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
       geoAdaptiveBlendingIdx(pu);
 #endif
 #if JVET_W0097_GPM_MMVD_TM
@@ -4816,7 +4814,7 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu)
 }
 #endif
 
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 void CABACReader::geoAdaptiveBlendingIdx( PredictionUnit& pu )
 {
   int bin0 = m_BinDecoder.decodeBin( Ctx::GeoBldFlag( 0 ) );
@@ -5427,7 +5425,7 @@ void CABACReader::mh_pred_data(PredictionUnit& pu)
     return;
   }
 #endif
-  if (!pu.mergeFlag && pu.cu->BcwIdx == BCW_DEFAULT)
+  if (!pu.mergeFlag && pu.cu->bcwIdx == BCW_DEFAULT)
   {
     return;
   }
@@ -7537,8 +7535,8 @@ void CABACReader::cu_lic_flag( CodingUnit& cu )
   if( CU::isLICFlagPresent( cu ) )
   {
     RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__LIC_FLAG, cu.lumaSize() );
-    cu.LICFlag = m_BinDecoder.decodeBin( Ctx::LICFlag( 0 ) );
-    DTRACE( g_trace_ctx, D_SYNTAX, "cu_lic_flag() lic_flag=%d\n", cu.LICFlag ? 1 : 0 );
+    cu.licFlag = m_BinDecoder.decodeBin( Ctx::LICFlag( 0 ) );
+    DTRACE( g_trace_ctx, D_SYNTAX, "cu_lic_flag() lic_flag=%d\n", cu.licFlag ? 1 : 0 );
   }
 }
 #endif

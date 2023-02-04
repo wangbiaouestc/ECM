@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -187,7 +187,7 @@ void roundBDCore(const Pel* srcp, const int srcStride, Pel* dest, const int dest
 
 void weightedAvgCore(const Pel* src0, const unsigned src0Stride, const Pel* src1, const unsigned src1Stride, Pel* dest, const unsigned destStride, const int8_t w0, const int8_t w1, int width, int height, const ClpRng& clpRng)
 {
-  const int8_t log2WeightBase = g_BcwLog2WeightBase;
+  const int8_t log2WeightBase = g_bcwLog2WeightBase;
   const int clipbd = clpRng.bd;
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
   const int shiftNum = IF_INTERNAL_FRAC_BITS(clipbd) + log2WeightBase;
@@ -660,8 +660,8 @@ void calcBlkGradientCore(int sx, int sy, int     *arraysGx2, int     *arraysGxGy
 void removeWeightHighFreq(int16_t* dst, int dstStride, const int16_t* src, int srcStride, int width, int height, int shift, int bcwWeight)
 {
   int normalizer = ((1 << 16) + (bcwWeight > 0 ? (bcwWeight >> 1) : -(bcwWeight >> 1))) / bcwWeight;
-  int weight0 = normalizer << g_BcwLog2WeightBase;
-  int weight1 = (g_BcwWeightBase - bcwWeight)*normalizer;
+  int weight0 = normalizer << g_bcwLog2WeightBase;
+  int weight1 = (g_bcwWeightBase - bcwWeight)*normalizer;
 #define REM_HF_INC  \
   src += srcStride; \
   dst += dstStride; \
@@ -1078,7 +1078,7 @@ void AreaBuf<Pel>::addWeightedAvg(const AreaBuf<const Pel> &other1, const AreaBu
   int8_t w0 = getBcwWeight(bcwIdx, REF_PIC_LIST_0);
   int8_t w1 = getBcwWeight(bcwIdx, REF_PIC_LIST_1);
 
-  const int8_t log2WeightBase = g_BcwLog2WeightBase;
+  const int8_t log2WeightBase = g_bcwLog2WeightBase;
   const Pel* src1 = other1.buf;
   const Pel* src2 = other2.buf;
   Pel* dest = buf;
@@ -1146,7 +1146,7 @@ void AreaBuf<Pel>::addWeightedAvg(const AreaBuf<const Pel> &other1, const AreaBu
 #else
   const int8_t w0 = getBcwWeight(bcwIdx, REF_PIC_LIST_0);
   const int8_t w1 = getBcwWeight(bcwIdx, REF_PIC_LIST_1);
-  const int8_t log2WeightBase = g_BcwLog2WeightBase;
+  const int8_t log2WeightBase = g_bcwLog2WeightBase;
 
   const Pel* src0 = other1.buf;
   const Pel* src2 = other2.buf;
