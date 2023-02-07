@@ -2290,6 +2290,9 @@ bool PU::hasChromaFusionFlag(const PredictionUnit &pu, int intraMode)
 #else
   bool hasChromaFusionFlag = pu.cs->slice->getSliceType() == I_SLICE;
 #endif
+#if JVET_AC0071_DBV && JVET_AC0119_LM_CHROMA_FUSION
+  hasChromaFusionFlag &= intraMode != DBV_CHROMA_IDX;
+#endif
 #if JVET_AC0119_LM_CHROMA_FUSION
   hasChromaFusionFlag &= PU::isLMCModeEnabled(pu, LM_CHROMA_IDX);
 #endif
