@@ -96,6 +96,12 @@ IntraSearch::IntraSearch()
   {
     m_statePtRDOQ[i] = nullptr;
   }
+
+  ::memset( m_indexMapRDOQ, 0, sizeof( m_indexMapRDOQ ) );
+  ::memset( m_runMapRDOQ, false, sizeof( m_runMapRDOQ ) );
+  ::memset( m_prevRunTypeRDOQ, false, sizeof( m_prevRunTypeRDOQ ) );
+  ::memset( m_prevRunPosRDOQ, 0, sizeof( m_prevRunPosRDOQ ) );
+  ::memset( m_stateCostRDOQ, 0, sizeof( m_stateCostRDOQ ) );
 }
 
 
