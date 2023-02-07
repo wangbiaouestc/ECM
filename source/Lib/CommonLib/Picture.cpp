@@ -446,6 +446,7 @@ void Picture::finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHead
   if( cs )
   {
     cs->initStructData();
+    cs->sps = &sps; 
   }
   else
   {
