@@ -2533,6 +2533,7 @@ void InterPrediction::xPredAffineBlk(const ComponentID &compID, const Prediction
   {
     enable1x1 = false;
   }
+  enable1x1 &= (refPic->isRefScaled(pu.cs->pps) == false);
   if (compID == COMPONENT_Y)
   {
     const int minBlkSize = enable1x1 ? 1 : 4;
