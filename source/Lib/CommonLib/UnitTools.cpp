@@ -9503,7 +9503,12 @@ bool PU::getColocatedMVP(const PredictionUnit &pu, const RefPicList &eRefPicList
   const Picture* const pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx());
 #endif
 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  bool isColPicScaled = pColPic->isRefScaled(pu.cs->pps);
+  if (!pColPic || isColPicScaled)
+#else
   if( !pColPic )
+#endif
   {
     return false;
   }
@@ -14654,6 +14659,10 @@ void PU::getTMVPCandOpt(const PredictionUnit &pu, RefPicList refList, int refIdx
   const unsigned mask = ~(scale - 1);
   const Picture *pColPic = slice.getRefPic(RefPicList(col == 0 ? 1 - slice.getColFromL0Flag() : 1 - slice.getColFromL0Flag2nd()), col == 0 ? slice.getColRefIdx() : slice.getColRefIdx2nd());
 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  if (!pColPic->isRefScaled(pu.cs->pps))
+    {
+#endif
   Mv cTMv;
   for (int i = 0; i < mergeCtxIn.numValidMergeCand; i++)
   {
@@ -14729,6 +14738,9 @@ void PU::getTMVPCandOpt(const PredictionUnit &pu, RefPicList refList, int refIdx
 #endif
       }
     }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    }
+#endif
     }
 #endif
 bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, bool& LICFlag, const int count
@@ -14751,6 +14763,10 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
 
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   const Picture *pColPic = slice.getRefPic(RefPicList(col == 0 ? 1 - slice.getColFromL0Flag() : 1 - slice.getColFromL0Flag2nd()), col == 0 ? slice.getColRefIdx() : slice.getColRefIdx2nd());
+  if (pColPic->isRefScaled(pu.cs->pps))
+  {
+    return false;
+  }
 #else
   const Picture *pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx());
 #endif
