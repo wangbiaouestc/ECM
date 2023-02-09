@@ -104,13 +104,20 @@ static void fullPelCopySSE( const ClpRng& clpRng, const void*_src, int srcStride
           vsrc = _mm_lddqu_si128( ( __m128i const * )&src[col+i] );
         }
 #if MCIF_SIMD_NEW
-        if ((isFirst == isLast) || biMCForDMVR)
+        if (biMCForDMVR)
+        {
+          vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
+        }
+        else if (isFirst == isLast)
+        {
+          vsum = vsrc;
+        }
 #else
         if (isFirst == isLast)
-#endif
         {
-          vsum =  _mm_min_epi16( vibdimax, _mm_max_epi16( vibdimin, vsrc ) );
+          vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
         }
+#endif
         else if( isFirst )
         {
           vsrc = _mm_slli_epi16( vsrc, headroom );
@@ -167,13 +174,13 @@ static void fullPelCopyVerSSE(const ClpRng& clpRng, const void*_src, int srcStri
           vsrc = _mm_set_epi16(src[col + (7 + i) * srcStride], src[col + (6 + i) * srcStride], src[col + (5 + i) * srcStride], src[col + (4 + i) * srcStride]
             , src[col + (3 + i) * srcStride], src[col + (2 + i) * srcStride], src[col + (1 + i) * srcStride], src[col + i * srcStride]);
         }
-#if FILTER_COPY_SIMD
-        if ((isFirst == isLast) || biMCForDMVR)
-#else
-        if (isFirst == isLast)
-#endif
+        if (biMCForDMVR)
         {
           vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
+        }
+        else if (isFirst == isLast)
+        {
+          vsum = vsrc;
         }
         else if (isFirst)
         {
@@ -234,9 +241,13 @@ static void fullPelCopySSE_M4(const ClpRng& clpRng, const void*_src, ptrdiff_t s
       {
         vsrc = _mm_loadl_epi64((__m128i const *)&src[col]);
       }
-      if ((isFirst == isLast) || biMCForDMVR)
+      if (biMCForDMVR)
       {
         vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
+      }
+      else if (isFirst == isLast)
+      {
+        vsum = vsrc;
       }
       else if (isFirst)
       {
@@ -288,9 +299,13 @@ static void fullPelCopyVerSSE_M4(const ClpRng& clpRng, const void*_src, ptrdiff_
         vsrc = _mm_set_epi16(0, 0, 0, 0
           , src[col + (row + 3) * srcStride], src[col + (row + 2) * srcStride], src[col + (row + 1) * srcStride], src[col + row * srcStride]);
       }
-      if ((isFirst == isLast) || biMCForDMVR)
+      if (biMCForDMVR)
       {
         vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
+      }
+      else if (isFirst == isLast)
+      {
+        vsum = vsrc;
       }
       else if (isFirst)
       {
@@ -359,13 +374,20 @@ static void fullPelCopyAVX2( const ClpRng& clpRng, const void*_src, int srcStrid
           vsrc = _mm256_lddqu_si256( ( const __m256i * )&src[col+i] );
         }
 #if MCIF_SIMD_NEW
-        if ((isFirst == isLast) || biMCForDMVR)
+        if (biMCForDMVR)
+        {
+          vsum = _mm256_min_epi16(vibdimax, _mm256_max_epi16(vibdimin, vsrc));
+        }
+        else if (isFirst == isLast)
+        {
+          vsum = vsrc;
+        }
 #else
         if (isFirst == isLast)
-#endif
         {
-          vsum = _mm256_min_epi16( vibdimax, _mm256_max_epi16( vibdimin, vsrc ) );
+          vsum = _mm256_min_epi16(vibdimax, _mm256_max_epi16(vibdimin, vsrc));
         }
+#endif
         else if( isFirst )
         {
           vsrc = _mm256_slli_epi16( vsrc, headroom );
@@ -428,9 +450,13 @@ static void fullPelCopyVerAVX2(const ClpRng& clpRng, const void*_src, int srcStr
             , src[col + 7 * srcStride], src[col + 6 * srcStride], src[col + 5 * srcStride], src[col + 4 * srcStride]
             , src[col + 3 * srcStride], src[col + 2 * srcStride], src[col + 1 * srcStride], src[col]);
         }
-        if ((isFirst == isLast) || biMCForDMVR)
+        if (biMCForDMVR)
         {
           vsum = _mm256_min_epi16(vibdimax, _mm256_max_epi16(vibdimin, vsrc));
+        }
+        else if (isFirst == isLast)
+        {
+          vsum = vsrc;
         }
         else if (isFirst)
         {
