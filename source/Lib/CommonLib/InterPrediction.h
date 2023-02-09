@@ -219,13 +219,13 @@ protected:
   Pel*                 m_dIy;
   Pel*                 m_dI;
   Pel*                 m_signGxGy;
-  int*                 m_tmpx_pixel_32bit;
-  int*                 m_tmpy_pixel_32bit;
-  int*                 m_sumAbsGX_pixel_32bit;
-  int*                 m_sumAbsGY_pixel_32bit;
-  int*                 m_sumDIX_pixel_32bit;
-  int*                 m_sumDIY_pixel_32bit;
-  int*                 m_sumSignGY_GX_pixel_32bit;
+  int*                 m_tmpxSample32bit;
+  int*                 m_tmpySample32bit;
+  int*                 m_sumAbsGxSample32bit;
+  int*                 m_sumAbsGySample32bit;
+  int*                 m_sumDIXSample32bit;
+  int*                 m_sumDIYSample32bit;
+  int*                 m_sumSignGyGxSample32bit;
   bool                 m_bdofMvRefined;
   Mv                   m_bdofSubPuMvOffset[BDOF_SUBPU_MAX_NUM];
 #endif

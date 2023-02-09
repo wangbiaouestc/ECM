@@ -580,7 +580,7 @@ public:
 
 #if JVET_AC0071_DBV
   // Direct Block Vector
-  void PredIntraDbv(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
+  void predIntraDbv(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
   Mv refineChromaBv(const ComponentID compId, const PredictionUnit &pu);
 #endif
 

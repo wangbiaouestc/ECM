@@ -7660,15 +7660,14 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
           saveCS.getPredBuf( tu.Y() ).copyFrom( csFull->getPredBuf( tu.Y() ) );
           saveCS.getRecoBuf( tu.Y() ).copyFrom( csFull->getRecoBuf( tu.Y() ) );
 
-          if( KEEP_PRED_AND_RESI_SIGNALS )
+          if( KEEP_PRED_AND_RESI_SIGNALS || JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT )
           {
             saveCS.getResiBuf   ( tu.Y() ).copyFrom( csFull->getResiBuf   ( tu.Y() ) );
+          }
+          if( KEEP_PRED_AND_RESI_SIGNALS )
+          {
             saveCS.getOrgResiBuf( tu.Y() ).copyFrom( csFull->getOrgResiBuf( tu.Y() ) );
           }
-
-#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
-          saveCS.getResiBuf(tu.Y()).copyFrom(csFull->getResiBuf(tu.Y()));
-#endif
 
           tmpTU->copyComponentFrom( tu, COMPONENT_Y );
 
@@ -7693,15 +7692,14 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
         csFull->getPredBuf( tu.Y() ).copyFrom( saveCS.getPredBuf( tu.Y() ) );
         csFull->getRecoBuf( tu.Y() ).copyFrom( saveCS.getRecoBuf( tu.Y() ) );
 
-        if( KEEP_PRED_AND_RESI_SIGNALS )
+        if( KEEP_PRED_AND_RESI_SIGNALS || JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT )
         {
           csFull->getResiBuf   ( tu.Y() ).copyFrom( saveCS.getResiBuf   ( tu.Y() ) );
+        }
+        if( KEEP_PRED_AND_RESI_SIGNALS )
+        {
           csFull->getOrgResiBuf( tu.Y() ).copyFrom( saveCS.getOrgResiBuf( tu.Y() ) );
         }
-
-#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
-        csFull->getResiBuf(tu.Y()).copyFrom(saveCS.getResiBuf(tu.Y()));
-#endif
 
         tu.copyComponentFrom( *tmpTU, COMPONENT_Y );
 
@@ -8833,8 +8831,8 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
 #if JVET_AC0071_DBV
       if (predMode == DBV_CHROMA_IDX)
       {
-        PredIntraDbv(COMPONENT_Cb, piPredCb, pu);
-        PredIntraDbv(COMPONENT_Cr, piPredCr, pu);
+        predIntraDbv(COMPONENT_Cb, piPredCb, pu);
+        predIntraDbv(COMPONENT_Cr, piPredCr, pu);
       }
       else
       {

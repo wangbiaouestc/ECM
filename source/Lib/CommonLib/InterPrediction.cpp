@@ -107,13 +107,13 @@ InterPrediction::InterPrediction()
 , m_dIy(nullptr)
 , m_dI(nullptr)
 , m_signGxGy(nullptr)
-, m_tmpx_pixel_32bit(nullptr)
-, m_tmpy_pixel_32bit(nullptr)
-, m_sumAbsGX_pixel_32bit(nullptr)
-, m_sumAbsGY_pixel_32bit(nullptr)
-, m_sumDIX_pixel_32bit(nullptr)
-, m_sumDIY_pixel_32bit(nullptr)
-, m_sumSignGY_GX_pixel_32bit(nullptr)
+, m_tmpxSample32bit(nullptr)
+, m_tmpySample32bit(nullptr)
+, m_sumAbsGxSample32bit(nullptr)
+, m_sumAbsGySample32bit(nullptr)
+, m_sumDIXSample32bit(nullptr)
+, m_sumDIYSample32bit(nullptr)
+, m_sumSignGyGxSample32bit(nullptr)
 #endif
 , m_subPuMC(false)
 {
@@ -332,15 +332,15 @@ void InterPrediction::destroy()
   xFree(m_absGy);    m_absGy = nullptr;
   xFree(m_dIx);      m_dIx = nullptr;
   xFree(m_dIy);      m_dIy = nullptr;
-  xFree(m_dI);    m_dI = nullptr;
+  xFree(m_dI);       m_dI = nullptr;
   xFree(m_signGxGy); m_signGxGy = nullptr;
-  xFree(m_tmpx_pixel_32bit); m_tmpx_pixel_32bit = nullptr;
-  xFree(m_tmpy_pixel_32bit); m_tmpy_pixel_32bit = nullptr;
-  xFree(m_sumAbsGX_pixel_32bit);     m_sumAbsGX_pixel_32bit = nullptr;
-  xFree(m_sumAbsGY_pixel_32bit);     m_sumAbsGY_pixel_32bit = nullptr;
-  xFree(m_sumDIX_pixel_32bit);       m_sumDIX_pixel_32bit = nullptr;
-  xFree(m_sumDIY_pixel_32bit);       m_sumDIY_pixel_32bit = nullptr;
-  xFree(m_sumSignGY_GX_pixel_32bit); m_sumSignGY_GX_pixel_32bit = nullptr;
+  xFree(m_tmpxSample32bit);         m_tmpxSample32bit = nullptr;
+  xFree(m_tmpySample32bit);         m_tmpySample32bit = nullptr;
+  xFree(m_sumAbsGxSample32bit);     m_sumAbsGxSample32bit = nullptr;
+  xFree(m_sumAbsGySample32bit);     m_sumAbsGySample32bit = nullptr;
+  xFree(m_sumDIXSample32bit);       m_sumDIXSample32bit = nullptr;
+  xFree(m_sumDIYSample32bit);       m_sumDIYSample32bit = nullptr;
+  xFree(m_sumSignGyGxSample32bit);  m_sumSignGyGxSample32bit = nullptr;
 #endif
 #if ENABLE_OBMC
   m_tmpObmcBufL0.destroy();
@@ -520,13 +520,13 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
     m_dIy = (Pel*)xMalloc(Pel, BIO_TEMP_BUFFER_SIZE);
     m_dI = (Pel*)xMalloc(Pel, BIO_TEMP_BUFFER_SIZE);
     m_signGxGy = (Pel*)xMalloc(Pel, BIO_TEMP_BUFFER_SIZE);
-    m_tmpx_pixel_32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
-    m_tmpy_pixel_32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
-    m_sumAbsGX_pixel_32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
-    m_sumAbsGY_pixel_32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
-    m_sumDIX_pixel_32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
-    m_sumDIY_pixel_32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
-    m_sumSignGY_GX_pixel_32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
+    m_tmpxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
+    m_tmpySample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
+    m_sumAbsGxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
+    m_sumAbsGySample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
+    m_sumDIXSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
+    m_sumDIYSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
+    m_sumSignGyGxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
 #endif
 #if ENABLE_OBMC
     m_tmpObmcBufL0.create(UnitArea(chromaFormatIDC, Area(0, 0, 4, MAX_CU_SIZE)));
@@ -1097,8 +1097,10 @@ void InterPrediction::xPredInterBiSubPuBDOF(PredictionUnit &pu, PelUnitBuf &pcYu
         if (bioMv.hor == 0 && bioMv.ver == 0)
         {
           // only chroma MC
-          if (!lumaOnly)
-            xPredInterUni ( subPu, eRefPicList, pcMbBuf, true, bioApplied, false, chroma, false );
+          if( !lumaOnly )
+          {
+            xPredInterUni( subPu, eRefPicList, pcMbBuf, true, bioApplied, false, chroma, false );
+          }
         }
         else
         {
@@ -1170,7 +1172,9 @@ void InterPrediction::xPredInterBiSubPuBDOF(PredictionUnit &pu, PelUnitBuf &pcYu
           }
 #else
           if (!lumaOnly)
+          {
             xWeightedAverage( false/*isBdofMvRefine*/, 0/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf, slice.getSPS()->getBitDepths(), slice.clpRngs(), false/*bioApplied*/, lumaOnly, true/*chromaOnly*/, NULL/*yuvPredTmp*/ );
+          }
 #endif
         }
         else
@@ -3617,26 +3621,35 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
           continue;
         }
 
-        int sumAbsGX_block = 0, sumAbsGY_block = 0, sumDIX_block = 0, sumDIY_block = 0, sumSignGY_GX_block = 0;
+        int sumAbsGxBlock = 0, sumAbsGyBlock = 0, sumDIXblock = 0, sumDIYblock = 0, sumSignGyGxBlock = 0;
         g_pelBufOP.calcBIOParamSum4(m_absGx + bioBlockParamOffset, m_absGy + bioBlockParamOffset, m_dIx + bioBlockParamOffset,
                                     m_dIy + bioBlockParamOffset, m_signGxGy + bioBlockParamOffset, bioDx + 4, bioDy + 4, widthG,
-                                    &sumAbsGX_block, &sumAbsGY_block, &sumDIX_block, &sumDIY_block, &sumSignGY_GX_block);
+                                    &sumAbsGxBlock, &sumAbsGyBlock, &sumDIXblock, &sumDIYblock, &sumSignGyGxBlock);
 
-        int tmpx_block = (sumAbsGX_block == 0 ? 0 : rightShiftMSB(sumDIX_block << 3, sumAbsGX_block));
-        int tmpData_block = ((tmpx_block * sumSignGY_GX_block) >> 1);
-        int tmpy_block = (sumAbsGY_block == 0 ? 0 : rightShiftMSB(((sumDIY_block << 3) - tmpData_block), sumAbsGY_block));
-        tmpx_block = Clip3(-256, 256, tmpx_block);
-        tmpy_block = Clip3(-256, 256, tmpy_block);
+        int tmpXblock = (sumAbsGxBlock == 0 ? 0 : rightShiftMSB(sumDIXblock << 3, sumAbsGxBlock));
+        int tmpDataBlock = ((tmpXblock * sumSignGyGxBlock) >> 1);
+        int tmpYblock = (sumAbsGyBlock == 0 ? 0 : rightShiftMSB(((sumDIYblock << 3) - tmpDataBlock), sumAbsGyBlock));
+        tmpXblock = Clip3(-256, 256, tmpXblock);
+        tmpYblock = Clip3(-256, 256, tmpYblock);
 
         Mv bioMv;
-        if (tmpx_block >= 0)
-          bioMv.hor = ((tmpx_block + 4) >> 3);
+        if( tmpXblock >= 0 )
+        {
+          bioMv.hor = ((tmpXblock + 4) >> 3);
+        }
         else
-          bioMv.hor = (-1) * ((((-1) * tmpx_block) + 4) >> 3);
-        if (tmpy_block >= 0)
-          bioMv.ver = ((tmpy_block + 4) >> 3);
+        {
+          bioMv.hor = (-1) * ((((-1) * tmpXblock) + 4) >> 3);
+        }
+        
+        if( tmpYblock >= 0 )
+        {
+          bioMv.ver = ((tmpYblock + 4) >> 3);
+        }
         else
-          bioMv.ver = (-1) * ((((-1) * tmpy_block) + 4) >> 3);
+        {
+          bioMv.ver = (-1) * ((((-1) * tmpYblock) + 4) >> 3);
+        }
 
         m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex] = bioMv;
         if (bioMv.hor == 0 && bioMv.ver == 0)
@@ -3734,9 +3747,9 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
   gradY0 = m_gradY0; gradY1 = m_gradY1;
 
   Pel *pGradX0Tmp, *pGradX1Tmp, *pGradY0Tmp, *pGradY1Tmp;
-  const Pel *SrcY0Tmp, *SrcY1Tmp;
+  const Pel *srcY0Tmp, *srcY1Tmp;
   int tmpx = 0, tmpy = 0;
-  int sumAbsGX = 0, sumAbsGY = 0, sumDIX = 0, sumDIY = 0, sumSignGY_GX = 0;
+  int sumAbsGX = 0, sumAbsGY = 0, sumDIX = 0, sumDIY = 0, sumSignGyGx = 0;
   int gradOfst, srcOfst, dstOfst, gradLineOfst = 0, srcLineOfst = 0, dstLineOfst = 0;
 
   for (int yu = 0; yu < yUnit; yu++)
@@ -3747,27 +3760,27 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
 
     for (int xu = 0; xu < xUnit; xu++)
     {
-      sumAbsGX = 0; sumAbsGY = 0; sumDIX = 0; sumDIY = 0, sumSignGY_GX = 0;
+      sumAbsGX = 0; sumAbsGY = 0; sumDIX = 0; sumDIY = 0, sumSignGyGx = 0;
       pGradX0Tmp = m_gradX0 + gradOfst;
       pGradX1Tmp = m_gradX1 + gradOfst;
       pGradY0Tmp = m_gradY0 + gradOfst;
       pGradY1Tmp = m_gradY1 + gradOfst;
-      SrcY1Tmp = srcY1 + srcOfst;
-      SrcY0Tmp = srcY0 + srcOfst;
+      srcY1Tmp = srcY1 + srcOfst;
+      srcY0Tmp = srcY0 + srcOfst;
 
-      g_pelBufOP.calcBIOSums(SrcY0Tmp, SrcY1Tmp, pGradX0Tmp, pGradX1Tmp, pGradY0Tmp, pGradY1Tmp, xu, yu, src0Stride, src1Stride, widthG, bitDepth, &sumAbsGX, &sumAbsGY, &sumDIX, &sumDIY, &sumSignGY_GX);
+      g_pelBufOP.calcBIOSums(srcY0Tmp, srcY1Tmp, pGradX0Tmp, pGradX1Tmp, pGradY0Tmp, pGradY1Tmp, xu, yu, src0Stride, src1Stride, widthG, bitDepth, &sumAbsGX, &sumAbsGY, &sumDIX, &sumDIY, &sumSignGyGx);
       tmpx = (sumAbsGX == 0 ? 0 : rightShiftMSB(sumDIX << 2, sumAbsGX));
       tmpx = Clip3(-limit, limit, tmpx);
 
-      int     mainsGxGy = sumSignGY_GX >> 12;
-      int     secsGxGy = sumSignGY_GX & ((1 << 12) - 1);
+      int     mainsGxGy = sumSignGyGx >> 12;
+      int     secsGxGy = sumSignGyGx & ((1 << 12) - 1);
       int     tmpData = tmpx * mainsGxGy;
       tmpData = ((tmpData << 12) + tmpx*secsGxGy) >> 1;
       tmpy = (sumAbsGY == 0 ? 0 : rightShiftMSB(((sumDIY << 2) - tmpData), sumAbsGY));
       tmpy = Clip3(-limit, limit, tmpy);
 
-      srcY0Temp = SrcY0Tmp + ( stridePredMC + 1 );
-      srcY1Temp = SrcY1Tmp + ( stridePredMC + 1 );
+      srcY0Temp = srcY0Tmp + ( stridePredMC + 1 );
+      srcY1Temp = srcY1Tmp + ( stridePredMC + 1 );
       gradX0 = pGradX0Tmp + offsetPos;
       gradX1 = pGradX1Tmp + offsetPos;
       gradY0 = pGradY0Tmp + offsetPos;
@@ -3797,32 +3810,32 @@ void InterPrediction::subBlockBiOptFlow(Pel* dstY, const int dstStride, const Pe
 #if SAMPLE_BASED_BDOF
   g_pelBufOP.calcBIOParamSum5(m_absGx + bioParamOffset, m_absGy + bioParamOffset, m_dIx + bioParamOffset,
                               m_dIy + bioParamOffset, m_signGxGy + bioParamOffset, bioParamStride, width, height,
-                              m_sumAbsGX_pixel_32bit, m_sumAbsGY_pixel_32bit, m_sumDIX_pixel_32bit, m_sumDIY_pixel_32bit, m_sumSignGY_GX_pixel_32bit);
+                              m_sumAbsGxSample32bit, m_sumAbsGySample32bit, m_sumDIXSample32bit, m_sumDIYSample32bit, m_sumSignGyGxSample32bit);
   // sumDIX and sumDIY left shift by 2 is calculated in previous step
   const int bioSubblockSize = width * height;
-  for (int pixel_index = 0; pixel_index < bioSubblockSize; pixel_index++)
+  for (int sampleIndex = 0; sampleIndex < bioSubblockSize; sampleIndex++)
   {
-    if (m_sumAbsGX_pixel_32bit[pixel_index] == 0)
+    if (m_sumAbsGxSample32bit[sampleIndex] == 0)
     {
-      m_sumDIX_pixel_32bit[pixel_index] = 0;
-      m_sumAbsGX_pixel_32bit[pixel_index] = 32;
+      m_sumDIXSample32bit[sampleIndex] = 0;
+      m_sumAbsGxSample32bit[sampleIndex] = 32;
     }
     else
     {
-      m_sumAbsGX_pixel_32bit[pixel_index] = floorLog2(m_sumAbsGX_pixel_32bit[pixel_index]);
+      m_sumAbsGxSample32bit[sampleIndex] = floorLog2(m_sumAbsGxSample32bit[sampleIndex]);
     }
-    if (m_sumAbsGY_pixel_32bit[pixel_index] == 0)
+    if (m_sumAbsGySample32bit[sampleIndex] == 0)
     {
-      m_sumDIY_pixel_32bit[pixel_index] = 0;
-      m_sumSignGY_GX_pixel_32bit[pixel_index] = 0;
-      m_sumAbsGY_pixel_32bit[pixel_index] = 32;
+      m_sumDIYSample32bit[sampleIndex] = 0;
+      m_sumSignGyGxSample32bit[sampleIndex] = 0;
+      m_sumAbsGySample32bit[sampleIndex] = 32;
     }
     else
     {
-      m_sumAbsGY_pixel_32bit[pixel_index] = floorLog2(m_sumAbsGY_pixel_32bit[pixel_index]);
+      m_sumAbsGySample32bit[sampleIndex] = floorLog2(m_sumAbsGySample32bit[sampleIndex]);
     }
   }
-  g_pelBufOP.calcBIOClippedVxVy(m_sumDIX_pixel_32bit, m_sumAbsGX_pixel_32bit, m_sumDIY_pixel_32bit, m_sumAbsGY_pixel_32bit, m_sumSignGY_GX_pixel_32bit, limit, bioSubblockSize, m_tmpx_pixel_32bit, m_tmpy_pixel_32bit);
+  g_pelBufOP.calcBIOClippedVxVy(m_sumDIXSample32bit, m_sumAbsGxSample32bit, m_sumDIYSample32bit, m_sumAbsGySample32bit, m_sumSignGyGxSample32bit, limit, bioSubblockSize, m_tmpxSample32bit, m_tmpySample32bit);
   bioParamOffset += ((bioParamStride + 1) << 1);
 #else
   bioParamOffset += ((bioParamStride + 1) << 1);
@@ -3832,7 +3845,7 @@ void InterPrediction::subBlockBiOptFlow(Pel* dstY, const int dstStride, const Pe
     for (int xUnit = 0; xUnit < width; xUnit += unitSize)
     {
       int subTmpx = 0, subTmpy = 0;
-      int subSumGx = 0, subSumGy = 0, subSumDIX = 0, subSumDIY = 0, subSumSignGY_GX = 0;
+      int subSumGx = 0, subSumGy = 0, subSumDIX = 0, subSumDIY = 0, subSumSignGyGx = 0;
       int subBioParamOffset = bioParamOffset + (yUnit - extendSize) * bioParamStride + xUnit;
       for (int ySub = -extendSize; ySub < (extendSize + unitSize); ySub++)
       {
@@ -3842,16 +3855,16 @@ void InterPrediction::subBlockBiOptFlow(Pel* dstY, const int dstStride, const Pe
           subSumGy += m_absGy[subBioParamOffset + xSub];
           subSumDIX += m_dIx[subBioParamOffset + xSub];
           subSumDIY += m_dIy[subBioParamOffset + xSub];
-          subSumSignGY_GX += m_signGxGy[subBioParamOffset + xSub];
+          subSumSignGyGx += m_signGxGy[subBioParamOffset + xSub];
         }
         subBioParamOffset += bioParamStride;
       }
       subTmpx = (subSumGx == 0 ? 0 : rightShiftMSB(subSumDIX << 2, subSumGx));
       subTmpx = Clip3(-limit, limit, subTmpx);
 
-      int     mainsGxGy = subSumSignGY_GX >> 12;
-      int     secsGxGy = subSumSignGY_GX & ((1 << 12) - 1);
-      int     tmpData = subTmpx * mainsGxGy;
+      int mainsGxGy = subSumSignGyGx >> 12;
+      int secsGxGy = subSumSignGyGx & ((1 << 12) - 1);
+      int tmpData = subTmpx * mainsGxGy;
       tmpData = ((tmpData << 12) + subTmpx*secsGxGy) >> 1;
       subTmpy = (subSumGy == 0 ? 0 : rightShiftMSB(((subSumDIY << 2) - tmpData), subSumGy));
       subTmpy = Clip3(-limit, limit, subTmpy);
@@ -3860,8 +3873,8 @@ void InterPrediction::subBlockBiOptFlow(Pel* dstY, const int dstStride, const Pe
       {
         for (int xSub = 0; xSub < unitSize; xSub++)
         {
-          m_tmpx_pixel_32bit[curSubIdx + xSub] = subTmpx;
-          m_tmpy_pixel_32bit[curSubIdx + xSub] = subTmpy;
+          m_tmpxSample32bit[curSubIdx + xSub] = subTmpx;
+          m_tmpySample32bit[curSubIdx + xSub] = subTmpy;
         }
         curSubIdx += width;
       }
@@ -3869,9 +3882,9 @@ void InterPrediction::subBlockBiOptFlow(Pel* dstY, const int dstStride, const Pe
   }
 #endif
 #if JVET_Z0136_OOB
-  g_pelBufOP.addBIOAvgN(src0, src0Stride, src1, src1Stride, dstY, dstStride, m_gradX0 + bioParamOffset, m_gradX1 + bioParamOffset, m_gradY0 + bioParamOffset, m_gradY1 + bioParamOffset, bioParamStride, width, height, m_tmpx_pixel_32bit, m_tmpy_pixel_32bit, shiftNum, offset, clpRng, mcMask, mcStride, isOOB);
+  g_pelBufOP.addBIOAvgN(src0, src0Stride, src1, src1Stride, dstY, dstStride, m_gradX0 + bioParamOffset, m_gradX1 + bioParamOffset, m_gradY0 + bioParamOffset, m_gradY1 + bioParamOffset, bioParamStride, width, height, m_tmpxSample32bit, m_tmpySample32bit, shiftNum, offset, clpRng, mcMask, mcStride, isOOB);
 #else
-  g_pelBufOP.addBIOAvgN(src0, src0Stride, src1, src1Stride, dstY, dstStride, m_gradX0 + bioParamOffset, m_gradX1 + bioParamOffset, m_gradY0 + bioParamOffset, m_gradY1 + bioParamOffset, bioParamStride, width, height, m_tmpx_pixel_32bit, m_tmpy_pixel_32bit, shiftNum, offset, clpRng);
+  g_pelBufOP.addBIOAvgN(src0, src0Stride, src1, src1Stride, dstY, dstStride, m_gradX0 + bioParamOffset, m_gradX1 + bioParamOffset, m_gradY0 + bioParamOffset, m_gradY1 + bioParamOffset, bioParamStride, width, height, m_tmpxSample32bit, m_tmpySample32bit, shiftNum, offset, clpRng);
 #endif
 }
 #endif

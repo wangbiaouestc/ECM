@@ -2294,35 +2294,47 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
   if( parent )
   {
     // copy data to picture
-    if( cpyPred )    getPredBuf   ( clippedArea ).copyFrom( subPredBuf );
-#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+    if( cpyPred )
+    {
+      getPredBuf( clippedArea ).copyFrom( subPredBuf );
+    }
+
     if (cpyResi)
     {
       getResiBuf(clippedArea).copyFrom(subResiBuf);
     }
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
     else
     {
       getResiBuf(clippedArea).copyFrom(subStruct.getResiBuf(clippedArea), true);
     }
-#else
-    if( cpyResi )    getResiBuf   ( clippedArea ).copyFrom( subResiBuf );
 #endif
-    if( cpyReco )    getRecoBuf   ( clippedArea ).copyFrom( subRecoBuf );
-    if( cpyOrgResi ) getOrgResiBuf( clippedArea ).copyFrom( subStruct.getOrgResiBuf( clippedArea ) );
+
+    if( cpyReco )
+    {
+      getRecoBuf( clippedArea ).copyFrom( subRecoBuf );
+    }
+
+    if( cpyOrgResi )
+    {
+      getOrgResiBuf( clippedArea ).copyFrom( subStruct.getOrgResiBuf( clippedArea ) );
+    }
   }
 
-  if( cpyPred ) picture->getPredBuf( clippedArea ).copyFrom( subPredBuf );
-#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  if( cpyPred )
+  {
+    picture->getPredBuf( clippedArea ).copyFrom( subPredBuf );
+  }
+
   if (cpyResi)
   {
     picture->getResiBuf(clippedArea).copyFrom(subResiBuf);
   }
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
   else
   {
     picture->getResiBuf(clippedArea).copyFrom(subStruct.getResiBuf(clippedArea), true);
   }
-#else
-  if( cpyResi ) picture->getResiBuf( clippedArea ).copyFrom( subResiBuf );
 #endif
 
 #if JVET_Z0118_GDR
@@ -3022,17 +3034,13 @@ PelBuf CodingStructure::getBuf( const CompArea &blk, const PictureType &type )
 #if !KEEP_PRED_AND_RESI_SIGNALS
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
   if (!parent && (type == PIC_PREDICTION))
-  {
-    cFinal.x &= (pcv->maxCUWidthMask >> getComponentScaleX(blk.compID, blk.chromaFormat));
-    cFinal.y &= (pcv->maxCUHeightMask >> getComponentScaleY(blk.compID, blk.chromaFormat));
-  }
 #else
   if( !parent && ( type == PIC_RESIDUAL || type == PIC_PREDICTION ) )
+#endif
   {
     cFinal.x &= ( pcv->maxCUWidthMask  >> getComponentScaleX( blk.compID, blk.chromaFormat ) );
     cFinal.y &= ( pcv->maxCUHeightMask >> getComponentScaleY( blk.compID, blk.chromaFormat ) );
   }
-#endif
 #endif
 
   return buf->getBuf( cFinal );
@@ -3067,17 +3075,13 @@ const CPelBuf CodingStructure::getBuf( const CompArea &blk, const PictureType &t
 #if !KEEP_PRED_AND_RESI_SIGNALS
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
   if (!parent && (type == PIC_PREDICTION))
-  {
-    cFinal.x &= (pcv->maxCUWidthMask >> getComponentScaleX(blk.compID, blk.chromaFormat));
-    cFinal.y &= (pcv->maxCUHeightMask >> getComponentScaleY(blk.compID, blk.chromaFormat));
-  }
 #else
   if( !parent && ( type == PIC_RESIDUAL || type == PIC_PREDICTION ) )
+#endif
   {
     cFinal.x &= ( pcv->maxCUWidthMask  >> getComponentScaleX( blk.compID, blk.chromaFormat ) );
     cFinal.y &= ( pcv->maxCUHeightMask >> getComponentScaleY( blk.compID, blk.chromaFormat ) );
   }
-#endif
 #endif
 
   return buf->getBuf( cFinal );
