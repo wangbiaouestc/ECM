@@ -710,7 +710,7 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #if JVET_AC0071_DBV
       if (compID != COMPONENT_Y && uiChFinalMode == DBV_CHROMA_IDX)
       {
-        m_pcIntraPred->PredIntraDbv(compID, piPred, pu);
+        m_pcIntraPred->predIntraDbv(compID, piPred, pu);
       }
       else
 #endif
@@ -749,7 +749,7 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #if JVET_AC0071_DBV
         if (uiChFinalMode == DBV_CHROMA_IDX)
         {
-          m_pcIntraPred->PredIntraDbv(COMPONENT_Cr, piPredCr, pu);
+          m_pcIntraPred->predIntraDbv(COMPONENT_Cr, piPredCr, pu);
         }
         else
 #endif

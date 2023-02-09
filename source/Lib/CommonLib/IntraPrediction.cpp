@@ -1841,7 +1841,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 }
 
 #if JVET_AC0071_DBV
-void IntraPrediction::PredIntraDbv(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu)
+void IntraPrediction::predIntraDbv(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu)
 {
   const int shiftSampleHor = ::getComponentScaleX(compId, pu.chromaFormat);
   const int shiftSampleVer = ::getComponentScaleY(compId, pu.chromaFormat);
