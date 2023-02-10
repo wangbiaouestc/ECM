@@ -9876,7 +9876,7 @@ inline void PU::getRribcBvpCand(PredictionUnit &pu, AMVPInfo *pInfo)
 inline void PU::clusterBvpCand(const int cbWidth, const int cbHeight, AMVPInfo *pInfo)
 {
   int                                     numGroups = 0;
-  std::array<bool, IBC_MRG_MAX_NUM_CANDS> validCand;
+  std::array<bool, (REGULAR_AMVP_MAX_NUM_CANDS + 1)> validCand;
   validCand.fill(true);
   Mv         bestCand;
   Distortion bestCost;
@@ -9886,7 +9886,8 @@ inline void PU::clusterBvpCand(const int cbWidth, const int cbHeight, AMVPInfo *
   // Clustering of AMVP candidates into two groups
   if (pInfo->numCand > 2)
   {
-    for (int i = 0; i < pInfo->numCand - 1; i++)
+    int numCand = std::min((int) pInfo->numCand, REGULAR_AMVP_MAX_NUM_CANDS + 1);
+    for (int i = 0; i < numCand - 1; i++)
     {
       if (validCand[i])
       {
@@ -9961,7 +9962,7 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
     PU::getTemplateLeft(availableLeft, pu, pRecY, pu.cs->m_pcBufPredCurLeft, Position(-AML_MERGE_TEMPLATE_SIZE, 0), AML_MERGE_TEMPLATE_SIZE, cbHeight);
 
     int candIdx = 0;
-    while ((pInfo->numCand < IBC_MRG_MAX_NUM_CANDS) && (candIdx < mergeCtx.numAMVPMergeCand))
+    while ((pInfo->numCand < (REGULAR_AMVP_MAX_NUM_CANDS + 1)) && (candIdx < mergeCtx.numAMVPMergeCand))
     {
       pInfo->mvCand[pInfo->numCand] = mergeCtx.mvFieldNeighbours[candIdx << 1].mv;
       pInfo->mvCost[pInfo->numCand] = getTMCost(pu, pRecY, pInfo->mvCand[pInfo->numCand], availableTop, availableLeft, pcInter);
