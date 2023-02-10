@@ -307,7 +307,6 @@ public:
 #if DUMP_BEFORE_INLOOP
   Picture* getPicture() { return m_pcPic; }
 #endif
-  const SPS *getActiveSPS() { return m_parameterSetManager.getActiveSPS(); }
 
 protected:
   void  xUpdateRasInit(Slice* slice);

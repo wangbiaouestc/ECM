@@ -630,9 +630,7 @@ void DecApp::xWriteOutput( PicList* pcListPic, uint32_t tId )
   PicList::iterator iterPic   = pcListPic->begin();
   int numPicsNotYetDisplayed = 0;
   int dpbFullness = 0;
-
-  const SPS *activeSPS = m_cDecLib.getActiveSPS();
-
+  const SPS* activeSPS = (pcListPic->front()->cs->sps);
   uint32_t numReorderPicsHighestTid;
   uint32_t maxDecPicBufferingHighestTid;
   uint32_t maxNrSublayers = activeSPS->getMaxTLayers();
