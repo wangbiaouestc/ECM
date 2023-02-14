@@ -3139,8 +3139,8 @@ void AdaptiveLoopFilter::filterBlk(AlfClassifier **classifier, const PelUnitBuf 
   Pel* recDb = isLuma( compId ) ? recBeforeDb.get( compId ).buf + blk.y * recDbStride : nullptr;
 #endif
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
-  const int resiStride = resi.get(compId).stride;
-  Pel      *resiC      = resi.get(compId).buf + blk.y * resiStride;
+  const int resiStride = isLuma( compId ) ? resi.get(compId).stride : 0;
+  Pel      *resiC      = isLuma( compId ) ? resi.get(compId).buf + blk.y * resiStride : nullptr;
 #endif
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   int padSize = ALF_PADDING_SIZE_FIXED_RESULTS;
