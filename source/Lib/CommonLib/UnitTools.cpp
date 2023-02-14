@@ -9875,7 +9875,7 @@ inline void PU::getRribcBvpCand(PredictionUnit &pu, AMVPInfo *pInfo)
 
 inline void PU::clusterBvpCand(const int cbWidth, const int cbHeight, AMVPInfo *pInfo)
 {
-  int                                     numGroups = 0;
+  int                                                numGroups = 0;
   std::array<bool, (REGULAR_AMVP_MAX_NUM_CANDS + 1)> validCand;
   validCand.fill(true);
   Mv         bestCand;
@@ -9884,19 +9884,15 @@ inline void PU::clusterBvpCand(const int cbWidth, const int cbHeight, AMVPInfo *
   sqrRadius = std::max(2, floorLog2((cbWidth * cbHeight) >> MIN_PU_SIZE));
   sqrRadius = (sqrRadius * sqrRadius) << 8;
   // Clustering of AMVP candidates into two groups
-  if (pInfo->numCand > 2)
+  if (pInfo->numCand > AMVP_MAX_NUM_CANDS)
   {
     int numCand = std::min((int) pInfo->numCand, REGULAR_AMVP_MAX_NUM_CANDS + 1);
-    for (int i = 0; i < numCand - 1; i++)
+    for (int i = 0; i < numCand; i++)
     {
       if (validCand[i])
       {
         bestCand = pInfo->mvCand[i];
         bestCost = pInfo->mvCost[i];
-        if (++numGroups > 2)
-        {
-          break;
-        }
       }
       else
       {
@@ -9920,9 +9916,14 @@ inline void PU::clusterBvpCand(const int cbWidth, const int cbHeight, AMVPInfo *
           }
         }
       }
-      pInfo->mvCand[i] = bestCand;
-      pInfo->mvCost[i] = bestCost;
+      pInfo->mvCand[numGroups] = bestCand;
+      pInfo->mvCost[numGroups] = bestCost;
+      if (++numGroups >= AMVP_MAX_NUM_CANDS)
+      {
+        break;
+      }
     }
+    pInfo->numCand = AMVP_MAX_NUM_CANDS;
   }
 }
 #endif
