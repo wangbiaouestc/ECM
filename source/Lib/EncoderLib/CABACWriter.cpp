@@ -5785,63 +5785,60 @@ void CABACWriter::mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
     si.horSignHypMatch = -1;
     si.verSignHypMatch = -1;
 
-    if (horPrefix >= 0 || verPrefix >= 0)
+    if (horPrefix < 0 && verPrefix < 0)
     {
-      Mv trMv = Mv(horPrefix < 0 ? 0 : MvdSuffixInfo::xGetGolombGroupMinValue(horPrefix),
-        verPrefix < 0 ? 0 : MvdSuffixInfo::xGetGolombGroupMinValue(verPrefix));
-
-      trMv.changeTransPrecAmvr2Internal(pu.cu->imv);
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-      if (0 == pu.cu->rribcFlipType)
-      {
-#endif
-        if (pu.mvd[eRefList].getHor())
-        {
-
-          if (pu.bvdSuffixInfo.horEncodeSignInEP)
-          {
-            unsigned bin = pu.mvd[eRefList].getHor() < 0 ? 1 : 0;
-            m_BinEncoder.encodeBinEP(bin);
-          }
-          else
-          {
-            uint8_t ctxId = (trMv.getHor() <= Thres) ? 0 : 1;
-            int bin = mvsdIdx & 1;
-
-            m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
-
-
-            si.horSignHypMatch = 0 == bin;
-
-            mvsdIdx >>= 1;
-          }
-
-        }
-        if (pu.mvd[eRefList].getVer())
-        {
-          if (pu.bvdSuffixInfo.verEncodeSignInEP)
-          {
-            unsigned bin = pu.mvd[eRefList].getVer() < 0 ? 1 : 0;
-            m_BinEncoder.encodeBinEP(bin);
-          }
-          else
-          {
-            uint8_t ctxId = (trMv.getVer() <= Thres) ? 0 : 1;
-
-            int bin = mvsdIdx & 1;
-            m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
-
-            si.verSignHypMatch = 0 == bin;
-            mvsdIdx >>= 1;
-          }
-        }
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-      } // (0 == pu.cu->rribcFlipType)
-#endif
-      bvdCodingRemainder(mvd, si, pu.cu->imv );
-
       return;
     }
+    Mv trMv = Mv(horPrefix < 0 ? 0 : MvdSuffixInfo::xGetGolombGroupMinValue(horPrefix),
+                 verPrefix < 0 ? 0 : MvdSuffixInfo::xGetGolombGroupMinValue(verPrefix));
+
+    trMv.changeTransPrecAmvr2Internal(pu.cu->imv);
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    if (0 != pu.cu->rribcFlipType)
+    {
+      bvdCodingRemainder(mvd, si, pu.cu->imv);
+      return;
+    }
+#endif
+    if (pu.mvd[eRefList].getHor())
+    {
+      if (pu.bvdSuffixInfo.horEncodeSignInEP)
+      {
+        unsigned bin = pu.mvd[eRefList].getHor() < 0 ? 1 : 0;
+        m_BinEncoder.encodeBinEP(bin);
+      }
+      else
+      {
+        uint8_t ctxId = (trMv.getHor() <= Thres) ? 0 : 1;
+        int     bin   = mvsdIdx & 1;
+
+        m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
+
+        si.horSignHypMatch = 0 == bin;
+        mvsdIdx >>= 1;
+      }
+    } // if (pu.mvd[eRefList].getHor())
+
+    if (pu.mvd[eRefList].getVer())
+    {
+      if (pu.bvdSuffixInfo.verEncodeSignInEP)
+      {
+        unsigned bin = pu.mvd[eRefList].getVer() < 0 ? 1 : 0;
+        m_BinEncoder.encodeBinEP(bin);
+      }
+      else
+      {
+        uint8_t ctxId = (trMv.getVer() <= Thres) ? 0 : 1;
+        int     bin   = mvsdIdx & 1;
+
+        m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
+
+        si.verSignHypMatch = 0 == bin;
+        mvsdIdx >>= 1;
+      }
+    } // if (pu.mvd[eRefList].getVer())
+    bvdCodingRemainder(mvd, si, pu.cu->imv );
+    return;
   }
 #endif // JVET_AC0104_IBC_BVD_PREDICTION
 
