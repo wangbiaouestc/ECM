@@ -8686,12 +8686,12 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
           int refIdx[NUM_REF_PIC_LIST_01] = { 0, 0 };
           bExistMV0 = (isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC0, cColMv0, iRefIdx, false,
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
-            1,
+            pu.cu->slice->isInterB(),
 #endif
             &refIdx[REF_PIC_LIST_0]))
             || (isC1Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC1, cColMv0, iRefIdx, false,
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
-              1,
+              pu.cu->slice->isInterB(),
 #endif
               &refIdx[REF_PIC_LIST_0]));
 
