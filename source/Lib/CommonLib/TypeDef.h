@@ -209,6 +209,9 @@
 #define JVET_Z0117_CHROMA_IF                              1 // JVET-Z0117: 6-tap interpolation filter for chroma MC
 #define JVET_AA0042_RPR_FILTERS                           1 // JVET-AA0042: luma 12-tap non-affine 10-tap affine, chroma 6-tap      
 #define ENABLE_OBMC                                       1 // Enable Overlapped Block Motion Compensation
+#if ENABLE_OBMC
+#define JVET_AC0335_CONTENT_ADAPTIVE_OBMC_ENABLING        1 // JVET-AC0335: Content adaptive OBMC enabling
+#endif
 
 #if JVET_X0049_BDMVR_SW_OPT
 #define JVET_X0049_ADAPT_DMVR                             1 // JVET-X0049: Adaptive DMVR
@@ -254,7 +257,6 @@
 #define JVET_Z0056_GPM_SPLIT_MODE_REORDERING              1 // JVET-Z0056: Template matching based reordering for GPM split modes
 #if ENABLE_OBMC
 #define JVET_Z0061_TM_OBMC                                1 // JVET-Z0061: Template matching based OBMC
-#define JVET_AC0335_CONTENT_ADAPTIVE_OBMC_ENABLING        1 // JVET-AC0335: Content adaptive OBMC enabling
 #endif
 #define JVET_AA0132_CONFIGURABLE_TM_TOOLS                 1 // JVET-AA0132: Configuration parameters and SPS flags for template matching tools
 #define JVET_AB0079_TM_BCW_MRG                            1 // JVET-AB0079: Template matching based BCW index derivation for merge mode with positive weights only
