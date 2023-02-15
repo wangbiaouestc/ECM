@@ -601,7 +601,7 @@ public:
   int numAMVPMergeCand;
 #endif
 
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   MotionBuf     subPuMvpMiBuf[SUB_TMVP_NUM];
 #else
   MotionBuf     subPuMvpMiBuf;
@@ -623,7 +623,7 @@ public:
 #else
   bool          useAltHpelIf      [ MRG_MAX_NUM_CANDS ];
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   void saveMergeInfo(PredictionUnit& puTmp, PredictionUnit pu);
 #endif
   void setMergeInfo( PredictionUnit& pu, int candIdx );
@@ -644,7 +644,7 @@ public:
   bool xCheckSimilarIBCMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
   bool xCheckSimilarMotionSubTMVP(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
 #if TM_MRG
@@ -678,7 +678,7 @@ public:
 
   MergeCtx     *mrgCtx;
   MergeType     mergeType[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   int           colIdx[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
 #endif
 #if JVET_AB0112_AFFINE_DMVR
@@ -704,7 +704,7 @@ public:
 
   MergeCtx     *mrgCtx;
   MergeType     mergeType[AFFINE_MRG_MAX_NUM_CANDS];
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   int           colIdx[AFFINE_MRG_MAX_NUM_CANDS];
 #endif
 #if JVET_AB0112_AFFINE_DMVR
@@ -730,7 +730,7 @@ unsigned CtxBMMrgFlag(const CodingUnit& cu);
 unsigned CtxRribcFlipType(const CodingUnit& cu);
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-unsigned CtxBvOneNullComp(const CodingUnit &cu);
+unsigned CtxbvOneZeroComp(const CodingUnit &cu);
 #endif
 unsigned CtxPredModeFlag( const CodingUnit& cu );
 unsigned CtxIBCFlag(const CodingUnit& cu);
@@ -751,7 +751,7 @@ unsigned CtxSgpmFlag(const CodingUnit &cu);
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
 int CtxSmBvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrect, const int isHor, const int significance);
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 }
 

@@ -136,7 +136,7 @@ public:
   static void filterCopyWithNoClipping( const ClpRng& clpRng, const Pel* src, int srcStride, Pel* dst, int dstStride, int width, int height );
   template<bool isVer>
   static void filterReverseCopy( const ClpRng& clpRng, const Pel* src, int srcStride, Pel* dst, int dstStride, int width, int height );
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
   template<int N, bool isVertical, bool isFirst, bool isLast>
   static void filter(const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, TFilterCoeff const *coeff, bool biMCForDMVR);
@@ -206,7 +206,7 @@ public:
 #if JVET_AC0104_IBC_BVD_PREDICTION
   void( *m_filterCopyWithNoClipping )(const ClpRng& clpRng, const Pel* src, int srcStride, Pel* dst, int dstStride, int width, int height);
   void( *m_filterReverseCopy[2] )(const ClpRng& clpRng, const Pel* src, int srcStride, Pel* dst, int dstStride, int width, int height);
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   void( *m_weightedGeoBlk )(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, const uint8_t bldIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
 #else
@@ -252,7 +252,7 @@ public:
   void filterHor(const ComponentID compID, Pel const* src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx = 0, bool biMCForDMVR = false, bool useAltHpelIf = false
 #if JVET_AC0104_IBC_BVD_PREDICTION
                , const bool useCopyWithNoClipping = false
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
                 );
   void filterVer(const ComponentID compID, Pel const* src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isFirst, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx = 0, bool biMCForDMVR = false, bool useAltHpelIf = false);
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE

@@ -146,7 +146,7 @@ void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p)
   p->bitsIdx[1] = fracBits.getFracBitsArray(Ctx::MVPIdx()).intBits[1];
   p->bitsImv[0] = fracBits.getFracBitsArray(Ctx::ImvFlag(1)).intBits[0];
   p->bitsImv[1] = fracBits.getFracBitsArray(Ctx::ImvFlag(1)).intBits[1];
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
   p->bitsRribc  = fracBits.getFracBitsArray(Ctx::rribcFlipType(0)).intBits[1];
 #endif
 }
@@ -2441,13 +2441,13 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 
     if (pu.cu->rribcFlipType)
     {
-      pu.cu->bvOneNullComp = 1;
-      pu.cu->bvNullCompDir = pu.cu->rribcFlipType;
+      pu.cu->bvOneZeroComp = 1;
+      pu.cu->bvZeroCompDir = pu.cu->rribcFlipType;
     }
 #if !JVET_AC0112_IBC_CIIP && !JVET_AC0112_IBC_LIC
     else
     {
-      getBestBvpBvOneNullComp(pu, cMv, initCost, &bvpIdxBest , &amvpInfo[0], &amvpInfo4Pel[0]);
+      getBestBvpBvOneZeroComp(pu, cMv, initCost, &bvpIdxBest , &amvpInfo[0], &amvpInfo4Pel[0]);
     }
 #endif
 #else
@@ -2607,7 +2607,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
       }
 #else
       const Mv cMvPred2 = ((pu.cu->imv == 2 && cMv != amvpInfo4Pel.mvCand[bvpIdxBest]) ? amvpInfo4Pel : amvpInfo).mvCand[bvpIdxBest];
-#endif // JVET_AA0070_RRIBC
+#endif
 
       const Mv cMvdKnownAtDecoder = pu.mvd[REF_PIC_LIST_0];// .getAbsMv();
 
@@ -2621,25 +2621,24 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 
       pu.mvsdIdx[REF_PIC_LIST_0] = idx;
     }
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
   }
 
   return true;
 }
 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-inline void InterSearch::getBestBvpBvOneNullComp(PredictionUnit &pu, Mv cMv, Distortion initCost,
+inline void InterSearch::getBestBvpBvOneZeroComp(PredictionUnit &pu, Mv cMv, Distortion initCost,
                                                  int *bvpIdxBest, AMVPInfo *amvp1Pel, AMVPInfo *amvp4Pel)
 {
   Mv         bvpCand[2];
   int        tempImv = 0, tempIdx = 0;
-  Distortion bvOneNullCompCost = std::numeric_limits<uint32_t>::max();
+  Distortion bvOneZeroCompCost = std::numeric_limits<uint32_t>::max();
   if (cMv.getVer() == 0)
   {
     bvpCand[0] = Mv(std::max(-(int) pu.lwidth(), -pu.Y().x), 0);
     bvpCand[1] = Mv(-pu.Y().x, 0);
-    bvOneNullCompCost =
-      m_pcRdCost->getbvVerNullCompCost(cMv.getHor(), pu.cs->sps->getAMVREnabledFlag(), &tempImv, &tempIdx, bvpCand);
+    bvOneZeroCompCost = m_pcRdCost->getBvVerZeroCompCost(cMv.getHor(), pu.cs->sps->getAMVREnabledFlag(), &tempImv, &tempIdx, bvpCand);
   }
   else if (cMv.getHor() == 0)
   {
@@ -2649,14 +2648,13 @@ inline void InterSearch::getBestBvpBvOneNullComp(PredictionUnit &pu, Mv cMv, Dis
 
     bvpCand[0] = Mv(0, std::max(-(int) pu.lheight(), rrTop));
     bvpCand[1] = Mv(0, rrTop);
-    bvOneNullCompCost =
-      m_pcRdCost->getbvHorNullCompCost(cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &tempImv, &tempIdx, bvpCand);
+    bvOneZeroCompCost = m_pcRdCost->getBvHorZeroCompCost(cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &tempImv, &tempIdx, bvpCand);
   }
 
-  if (bvOneNullCompCost < initCost)
+  if (bvOneZeroCompCost < initCost)
   {
-    pu.cu->bvOneNullComp = 1;
-    pu.cu->bvNullCompDir = (cMv.getVer() == 0) ? 1 : cMv.getHor() == 0 ? 2 : 0;
+    pu.cu->bvOneZeroComp = 1;
+    pu.cu->bvZeroCompDir = (cMv.getVer() == 0) ? 1 : cMv.getHor() == 0 ? 2 : 0;
     pu.cu->imv           = tempImv;
     *bvpIdxBest          = tempIdx;
     if (pu.cu->imv == 2)
@@ -3681,7 +3679,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     if (cu.cs->sps->getSbTMVPEnabledFlag())
     {
       Size bufSize = g_miScaling.scale(pu.lumaSize());
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
       for (int i = 0; i < SUB_TMVP_NUM; i++)
       {
         mergeCtx.subPuMvpMiBuf[i] = MotionBuf(m_subPuMiBuf[i], bufSize);
@@ -4804,7 +4802,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #endif
     {
       PU::spanMotionInfo(pu, mergeCtx
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
         , pu.colIdx
 #endif
       );
@@ -4840,7 +4838,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     if (pu.bdmvrRefine)
     {
       PU::spanMotionInfo(*cu.firstPU, MergeCtx(),
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
         pu.colIdx,
 #endif
         mvBufEncAmBDMVR_L0, mvBufEncAmBDMVR_L1, getBdofSubPuMvOffset());

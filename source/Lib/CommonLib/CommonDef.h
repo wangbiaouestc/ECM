@@ -113,7 +113,7 @@
 #define NULL              0
 #endif
 
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 static const int SUB_TMVP_CANDIDATE_NUM = 10;
 static const int SUB_TMVP_INDEX = 3;  // 1: 2 subtmvp; 2: 4 subtmvp
 static const int SUB_TMVP_NUM = 2 * SUB_TMVP_INDEX;
@@ -1338,7 +1338,7 @@ static const int EXT_PICTURE_SIZE =                             16;
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
 static const int IBC_BVD_PREDICTION_MAX_BIN_NUM =                4;
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 
 // ====================================================================================================================

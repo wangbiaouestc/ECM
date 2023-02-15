@@ -297,6 +297,6 @@ void MvdSuffixInfo::defineNumberOfPredictedBinsInSuffix(const int iHorPrefix, co
   horOffsetPredictionNumBins = std::min(iAvailBinsInHorSuffix, iNumberOfHorMSBins);
   verOffsetPredictionNumBins = std::min(iAvailBinsInVerSuffix, iNumberOfVerMSBins);
 }
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 //! \}

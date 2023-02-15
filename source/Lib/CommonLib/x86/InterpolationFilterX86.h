@@ -746,7 +746,7 @@ static void simdFilterCopyWithNoClipping(const ClpRng& clpRng, const Pel* src, i
     InterpolationFilter::filterCopyWithNoClipping(clpRng, src, srcStride, dst, dstStride, width, height);
   }
 }
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 // SIMD interpolation horizontal, block width modulo 4
 template<X86_VEXT vext, int N, bool shiftBack>
@@ -5146,7 +5146,7 @@ void InterpolationFilter::_initInterpolationFilterX86()
   m_filterCopy[1][1] = simdFilterCopy<vext, true, true>;
 #if JVET_AC0104_IBC_BVD_PREDICTION
   m_filterCopyWithNoClipping = simdFilterCopyWithNoClipping<vext>;
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 #else
   // [taps][bFirst][bLast]
   m_filterHor[0][0][0] = simdFilter<vext, 8, false, false, false>;
@@ -5216,7 +5216,7 @@ void InterpolationFilter::_initInterpolationFilterX86()
   m_filterCopy[1][1]   = simdFilterCopy<vext, true, true>;
 #if JVET_AC0104_IBC_BVD_PREDICTION
   m_filterCopyWithNoClipping = simdFilterCopyWithNoClipping<vext>;
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 #endif
   m_weightedGeoBlk = xWeightedGeoBlk_SSE<vext>;
 #if JVET_Y0065_GPM_INTRA

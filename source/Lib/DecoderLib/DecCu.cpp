@@ -1423,7 +1423,7 @@ void DecCu::xReconInter(CodingUnit &cu)
     if (cu.firstPU->bdmvrRefine)
     {
       PU::spanMotionInfo(*cu.firstPU, MergeCtx(),
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
         cu.firstPU->colIdx,
 #endif
         m_mvBufBDMVR[0], m_mvBufBDMVR[1], m_pcInterPred->getBdofSubPuMvOffset());
@@ -1863,7 +1863,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         if (pu.cs->sps->getSbTMVPEnabledFlag())
         {
           Size bufSize = g_miScaling.scale(pu.lumaSize());
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
           for (int i = 0; i < SUB_TMVP_NUM; i++)
           {
             mrgCtx.subPuMvpMiBuf[i] = MotionBuf(m_subPuMiBuf[i], bufSize);
@@ -1900,7 +1900,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #endif
 
         PU::spanMotionInfo(pu, mrgCtx
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
           , pu.colIdx
 #endif       
         );
@@ -2006,7 +2006,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         {
         if( pu.cu->affine )
         {
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
           MergeCtx mrgCtxAll[2];
           for (int i = 0; i < 2; i++)
           {
@@ -2046,7 +2046,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           if (pu.cs->sps->getSbTMVPEnabledFlag())
           {
             Size bufSize = g_miScaling.scale(pu.lumaSize());
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
             for (int i = 0; i < SUB_TMVP_NUM; i++)
             {
               mrgCtx.subPuMvpMiBuf[i] = MotionBuf(m_subPuMiBuf[i], bufSize);
@@ -2157,7 +2157,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if INTER_LIC
           pu.cu->licFlag = affineMergeCtx.licFlags[pu.mergeIdx];
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
           pu.colIdx = affineMergeCtx.colIdx[pu.mergeIdx];
 #endif
           pu.mergeType = affineMergeCtx.mergeType[pu.mergeIdx];
@@ -2205,7 +2205,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           }
 #endif
           PU::spanMotionInfo(pu, mrgCtx
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
             , pu.colIdx
 #endif
           );
@@ -3005,7 +3005,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           if( !pu.bdmvrRefine )
           {
             PU::spanMotionInfo(pu, mrgCtx
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
               , pu.colIdx
 #endif
             );
@@ -3205,9 +3205,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if JVET_Z0084_IBC_TM && IBC_TM_AMVP
           PU::fillIBCMvpCand(pu, amvpInfo, m_pcInterPred);
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AA0070_RRIBC
           if (pu.cu->rribcFlipType == 0)
+#endif
           {
-            if (pu.cu->bvNullCompDir == 1)
+            if (pu.cu->bvZeroCompDir == 1)
             {
               for (int i = 0; i < 2; i++)
               {
@@ -3215,7 +3217,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                 amvpInfo.mvCand[i].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
               }
             }
-            else if (pu.cu->bvNullCompDir == 2)
+            else if (pu.cu->bvZeroCompDir == 2)
             {
               const int ctbSize     = pu.cs->sps->getCTUSize();
               const int numCurrCtuY = (pu.Y().y >> (floorLog2(ctbSize)));
@@ -3250,9 +3252,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             {
               cMvPred.setHor(0);
             }
-#else // !// JVET_AA0070_RRIBC
-            cosnt auto cMvPred = amvpInfo.mvCand[pu.mvpIdx[REF_PIC_LIST_0]];
-#endif  // JVET_AA0070_RRIBC
+#else
+            const auto cMvPred = amvpInfo.mvCand[pu.mvpIdx[REF_PIC_LIST_0]];
+#endif
 
             pu.bvdSuffixInfo.initPrefixes(pu.mvd[REF_PIC_LIST_0], pu.cu->imv, true);
 
@@ -3269,7 +3271,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             CHECK(cMvd == Mv(0, 0), " zero MVD!");
             pu.mvd[REF_PIC_LIST_0] = cMvd;           
           }
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
           Mv mvd = pu.mvd[REF_PIC_LIST_0];
 #if !JVET_Z0054_BLK_REF_PIC_REORDER
@@ -3449,7 +3451,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         if (!pu.bdmvrRefine)
 #endif
           PU::spanMotionInfo(pu, mrgCtx
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
             , pu.colIdx
 #endif
           );

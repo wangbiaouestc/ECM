@@ -678,7 +678,7 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
 // ====================================================================================================================
 // Public member functions
 // ====================================================================================================================
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
 bool InterPrediction::xCheckIdenticalMotionSubTMVP(const PredictionUnit &pu)
 {
   const Slice &slice = *pu.cs->slice;
@@ -8045,7 +8045,7 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
 }
 #endif
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 void InterPrediction::adjustMergeCandidatesInOneCandidateGroupSubTMVP(PredictionUnit &pu, MergeCtx& mvpMergeCandCtx, int numRetrievedMergeCand, int mrgCandIdx)
 {
   if (mvpMergeCandCtx.numValidMergeCand <= 1)
@@ -9192,13 +9192,13 @@ bool InterPrediction::xAMLIsLeftTempAvailable(PredictionUnit& pu)
 }
 #endif
 
-#if JVET_W0090_ARMC_TM
-void InterPrediction::updateCandList(uint32_t uiCand, Distortion uiCost, uint32_t uiMrgCandNum, uint32_t* RdCandList, Distortion* CandCostList)
+#if JVET_W0090_ARMC_TM || JVET_AA0070_RRIBC
+void InterPrediction::updateCandList(uint32_t uiCand, Distortion uiCost, uint32_t uiMrgCandNum, uint32_t* rdCandList, Distortion* candCostList)
 {
   uint32_t i;
   uint32_t shift = 0;
 
-  while (shift < uiMrgCandNum && uiCost < CandCostList[uiMrgCandNum - 1 - shift])
+  while (shift < uiMrgCandNum && uiCost < candCostList[uiMrgCandNum - 1 - shift])
   {
     shift++;
   }
@@ -9207,13 +9207,16 @@ void InterPrediction::updateCandList(uint32_t uiCand, Distortion uiCost, uint32_
   {
     for (i = 1; i < shift; i++)
     {
-      RdCandList[uiMrgCandNum - i] = RdCandList[uiMrgCandNum - 1 - i];
-      CandCostList[uiMrgCandNum - i] = CandCostList[uiMrgCandNum - 1 - i];
+      rdCandList[uiMrgCandNum - i] = rdCandList[uiMrgCandNum - 1 - i];
+      candCostList[uiMrgCandNum - i] = candCostList[uiMrgCandNum - 1 - i];
     }
-    RdCandList[uiMrgCandNum - shift] = uiCand;
-    CandCostList[uiMrgCandNum - shift] = uiCost;
+    rdCandList[uiMrgCandNum - shift] = uiCand;
+    candCostList[uiMrgCandNum - shift] = uiCost;
   }
 }
+#endif
+
+#if JVET_W0090_ARMC_TM
 void  InterPrediction::updateCandInfo(MergeCtx& mrgCtx, uint32_t(*RdCandList)[MRG_MAX_NUM_CANDS], int mrgCandIdx)
 {
   MergeCtx mrgCtxTmp;
@@ -9275,7 +9278,7 @@ void  InterPrediction::updateCandInfo(MergeCtx& mrgCtx, uint32_t(*RdCandList)[MR
   }
 }
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
 void InterPrediction::getBlkAMLRefTemplateSubTMVP(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft)
 {
   Mv mvCurr;
@@ -10636,72 +10639,6 @@ void  InterPrediction::adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mr
 
   updateIBCCandInfo(pu, mrgCtx, rdCandList, startPos, endPos);
 }
-void  InterPrediction::updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t* RdCandList,uint32_t startPos,uint32_t endPos)
-{
-  MergeCtx mrgCtxTmp;
-  for (uint32_t ui = 0; ui < IBC_MRG_MAX_NUM_CANDS_MEM; ++ui)
-  {
-    mrgCtxTmp.bcwIdx[ui] = BCW_DEFAULT;
-    mrgCtxTmp.interDirNeighbours[ui] = 0;
-    mrgCtxTmp.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
-    mrgCtxTmp.mvFieldNeighbours[(ui << 1) + 1].refIdx = NOT_VALID;
-    mrgCtxTmp.useAltHpelIf[ui] = false;
-#if INTER_LIC
-    mrgCtxTmp.licFlags[ui] = false;
-#endif
-#if JVET_AC0112_IBC_LIC
-    mrgCtxTmp.ibcLicFlags[ui] = false;
-#endif
-#if JVET_AA0070_RRIBC
-    mrgCtxTmp.rribcFlipTypes[ui] = 0;
-#endif
-  }
-  for (uint32_t uiMergeCand = startPos; uiMergeCand < endPos; ++uiMergeCand)
-  {
-    mrgCtx.setMergeInfo(pu, uiMergeCand);
-    if (pu.bv == Mv(0, 0))
-    {
-      break;
-    }
-    mrgCtxTmp.bcwIdx[uiMergeCand] = mrgCtx.bcwIdx[uiMergeCand];
-    mrgCtxTmp.interDirNeighbours[uiMergeCand] = mrgCtx.interDirNeighbours[uiMergeCand];
-    mrgCtxTmp.mvFieldNeighbours[(uiMergeCand << 1)] = mrgCtx.mvFieldNeighbours[(uiMergeCand << 1)];
-    mrgCtxTmp.mvFieldNeighbours[(uiMergeCand << 1) + 1] = mrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 1];
-    mrgCtxTmp.useAltHpelIf[uiMergeCand] = mrgCtx.useAltHpelIf[uiMergeCand];
-#if INTER_LIC 
-    mrgCtxTmp.licFlags[uiMergeCand] = mrgCtx.licFlags[uiMergeCand];
-#endif
-#if JVET_AC0112_IBC_LIC
-    mrgCtxTmp.ibcLicFlags[uiMergeCand] = mrgCtx.ibcLicFlags[uiMergeCand];
-#endif
-#if JVET_AA0070_RRIBC
-    mrgCtxTmp.rribcFlipTypes[uiMergeCand] = mrgCtx.rribcFlipTypes[uiMergeCand];
-#endif
-  }
-  //update
-  for (uint32_t uiMergeCand = startPos; uiMergeCand < endPos; ++uiMergeCand)
-  {
-    mrgCtx.setMergeInfo(pu, uiMergeCand);
-    if (pu.bv == Mv(0, 0))
-    {
-      break;
-    }
-    mrgCtx.bcwIdx[uiMergeCand] = mrgCtxTmp.bcwIdx[RdCandList[uiMergeCand -startPos]];
-    mrgCtx.interDirNeighbours[uiMergeCand] = mrgCtxTmp.interDirNeighbours[RdCandList[uiMergeCand -startPos]];
-    mrgCtx.mvFieldNeighbours[(uiMergeCand << 1)] = mrgCtxTmp.mvFieldNeighbours[RdCandList[uiMergeCand -startPos] << 1];
-    mrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 1] = mrgCtxTmp.mvFieldNeighbours[(RdCandList[uiMergeCand -startPos] << 1) + 1];
-    mrgCtx.useAltHpelIf[uiMergeCand] = mrgCtxTmp.useAltHpelIf[RdCandList[uiMergeCand -startPos]];
-#if INTER_LIC
-    mrgCtx.licFlags[uiMergeCand] = mrgCtxTmp.licFlags[RdCandList[uiMergeCand -startPos]];
-#endif
-#if JVET_AC0112_IBC_LIC
-    mrgCtx.ibcLicFlags[uiMergeCand] = mrgCtxTmp.ibcLicFlags[RdCandList[uiMergeCand -startPos]];
-#endif
-#if JVET_AA0070_RRIBC
-    mrgCtx.rribcFlipTypes[uiMergeCand] = mrgCtxTmp.rribcFlipTypes[RdCandList[uiMergeCand -startPos]];
-#endif
-  }
-}
 #endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
 void  InterPrediction::adjustAffineMergeCandidatesOneGroup(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, int listsize, int mrgCandIdx)
@@ -10863,6 +10800,76 @@ void  InterPrediction::updateAffineCandInfo2(PredictionUnit &pu, AffineMergeCtx&
 }
 #endif
 #endif
+
+#if JVET_Z0075_IBC_HMVP_ENLARGE || JVET_AA0070_RRIBC
+void  InterPrediction::updateIBCCandInfo( PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t* RdCandList, uint32_t startPos, uint32_t endPos )
+{
+  MergeCtx mrgCtxTmp;
+  for( uint32_t ui = 0; ui < IBC_MRG_MAX_NUM_CANDS_MEM; ++ui )
+  {
+    mrgCtxTmp.bcwIdx[ui] = BCW_DEFAULT;
+    mrgCtxTmp.interDirNeighbours[ui] = 0;
+    mrgCtxTmp.mvFieldNeighbours[( ui << 1 )].refIdx = NOT_VALID;
+    mrgCtxTmp.mvFieldNeighbours[( ui << 1 ) + 1].refIdx = NOT_VALID;
+    mrgCtxTmp.useAltHpelIf[ui] = false;
+#if INTER_LIC
+    mrgCtxTmp.licFlags[ui] = false;
+#endif
+#if JVET_AC0112_IBC_LIC
+    mrgCtxTmp.ibcLicFlags[ui] = false;
+#endif
+#if JVET_AA0070_RRIBC
+    mrgCtxTmp.rribcFlipTypes[ui] = 0;
+#endif
+  }
+  for( uint32_t uiMergeCand = startPos; uiMergeCand < endPos; ++uiMergeCand )
+  {
+    mrgCtx.setMergeInfo( pu, uiMergeCand );
+    if( pu.bv == Mv( 0, 0 ) )
+    {
+      break;
+    }
+    mrgCtxTmp.bcwIdx[uiMergeCand] = mrgCtx.bcwIdx[uiMergeCand];
+    mrgCtxTmp.interDirNeighbours[uiMergeCand] = mrgCtx.interDirNeighbours[uiMergeCand];
+    mrgCtxTmp.mvFieldNeighbours[( uiMergeCand << 1 )] = mrgCtx.mvFieldNeighbours[( uiMergeCand << 1 )];
+    mrgCtxTmp.mvFieldNeighbours[( uiMergeCand << 1 ) + 1] = mrgCtx.mvFieldNeighbours[( uiMergeCand << 1 ) + 1];
+    mrgCtxTmp.useAltHpelIf[uiMergeCand] = mrgCtx.useAltHpelIf[uiMergeCand];
+#if INTER_LIC 
+    mrgCtxTmp.licFlags[uiMergeCand] = mrgCtx.licFlags[uiMergeCand];
+#endif
+#if JVET_AC0112_IBC_LIC
+    mrgCtxTmp.ibcLicFlags[uiMergeCand] = mrgCtx.ibcLicFlags[uiMergeCand];
+#endif
+#if JVET_AA0070_RRIBC
+    mrgCtxTmp.rribcFlipTypes[uiMergeCand] = mrgCtx.rribcFlipTypes[uiMergeCand];
+#endif
+  }
+  //update
+  for( uint32_t uiMergeCand = startPos; uiMergeCand < endPos; ++uiMergeCand )
+  {
+    mrgCtx.setMergeInfo( pu, uiMergeCand );
+    if( pu.bv == Mv( 0, 0 ) )
+    {
+      break;
+    }
+    mrgCtx.bcwIdx[uiMergeCand] = mrgCtxTmp.bcwIdx[RdCandList[uiMergeCand - startPos]];
+    mrgCtx.interDirNeighbours[uiMergeCand] = mrgCtxTmp.interDirNeighbours[RdCandList[uiMergeCand - startPos]];
+    mrgCtx.mvFieldNeighbours[( uiMergeCand << 1 )] = mrgCtxTmp.mvFieldNeighbours[RdCandList[uiMergeCand - startPos] << 1];
+    mrgCtx.mvFieldNeighbours[( uiMergeCand << 1 ) + 1] = mrgCtxTmp.mvFieldNeighbours[( RdCandList[uiMergeCand - startPos] << 1 ) + 1];
+    mrgCtx.useAltHpelIf[uiMergeCand] = mrgCtxTmp.useAltHpelIf[RdCandList[uiMergeCand - startPos]];
+#if INTER_LIC
+    mrgCtx.licFlags[uiMergeCand] = mrgCtxTmp.licFlags[RdCandList[uiMergeCand - startPos]];
+#endif
+#if JVET_AC0112_IBC_LIC
+    mrgCtx.ibcLicFlags[uiMergeCand] = mrgCtxTmp.ibcLicFlags[RdCandList[uiMergeCand - startPos]];
+#endif
+#if JVET_AA0070_RRIBC
+    mrgCtx.rribcFlipTypes[uiMergeCand] = mrgCtxTmp.rribcFlipTypes[RdCandList[uiMergeCand - startPos]];
+#endif
+  }
+}
+#endif
+
 #if JVET_Z0061_TM_OBMC
 void InterPrediction::xOBMCWeightedAverageY(const PredictionUnit &pu, const CPelUnitBuf &pcYuvSrc0,
                                             const CPelUnitBuf &pcYuvSrc1, PelUnitBuf &pcYuvDst,
@@ -12706,7 +12713,7 @@ TplMatchingCtrl::TplMatchingCtrl( const PredictionUnit&     pu,
 #if JVET_AC0104_IBC_BVD_PREDICTION
                                , const int tplSize 
                                , const bool isForBmvdFlag
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 )
 : m_cu              (*pu.cu)
 , m_pu              (pu)
@@ -12851,21 +12858,24 @@ TplMatchingCtrl::TplMatchingCtrl( const PredictionUnit&     pu,
   const bool tplAvalableAbove = xFillCurTemplate<TM_TPL_SIZE, true >((fillCurTpl ? curTplAbove : nullptr));
   const bool tplAvalableLeft  = xFillCurTemplate<TM_TPL_SIZE, false>((fillCurTpl ? curTplLeft  : nullptr));
 #endif
+
 #if JVET_AC0104_IBC_BVD_PREDICTION
   m_curTplAbove = tplAvalableAbove ? PelBuf(curTplAbove, pu.lwidth(),        tplSize) : PelBuf();
   m_curTplLeft =  tplAvalableLeft  ? PelBuf(curTplLeft , tplSize,       pu.lheight()) : PelBuf();
-#else // !JVET_AC0104_IBC_BVD_PREDICTION
+#else
   m_curTplAbove = tplAvalableAbove ? PelBuf(curTplAbove, pu.lwidth(), TM_TPL_SIZE) : PelBuf();
   m_curTplLeft  = tplAvalableLeft  ? PelBuf(curTplLeft , TM_TPL_SIZE,   pu.lheight()) : PelBuf();
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
+
   m_refTplAbove = tplAvalableAbove ? PelBuf(refTplAbove, m_curTplAbove              ) : PelBuf();
   m_refTplLeft  = tplAvalableLeft  ? PelBuf(refTplLeft , m_curTplLeft               ) : PelBuf();
+
 #if JVET_X0056_DMVD_EARLY_TERMINATION
 #if JVET_AC0104_IBC_BVD_PREDICTION
   m_earlyTerminateTh = tplSize * ((tplAvalableAbove ? m_pu.lwidth() : 0) + (tplAvalableLeft ? m_pu.lheight() : 0));
-#else // !JVET_AC0104_IBC_BVD_PREDICTION
+#else
   m_earlyTerminateTh = TM_TPL_SIZE * ((tplAvalableAbove ? m_pu.lwidth() : 0) + (tplAvalableLeft ? m_pu.lheight() : 0));
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 #endif
 
@@ -13077,7 +13087,7 @@ bool TplMatchingCtrl::xGetCurTemplateAvailable()
   return true;
 }
 
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 template <int tplSize, bool trueAfalseL, int sr>
 PelBuf TplMatchingCtrl::xGetRefTemplate(const PredictionUnit& curPu, const Picture& refPic, const Mv& _mv, PelBuf& dstBuf)
@@ -13097,22 +13107,28 @@ PelBuf TplMatchingCtrl::xGetRefTemplate(const PredictionUnit& curPu, const Pictu
     Mv tempBv = _mv;
     tempBv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
 #if JVET_AC0104_IBC_BVD_PREDICTION
+#if JVET_AA0070_RRIBC
     if (1 == curPu.cu->rribcFlipType && 0 == trueAfalseL)
     {
       tempBv += Mv(m_pu.lwidth() + tplSize - 1, 0); //at least, template size should be available
     }
     else
-      if (2 == curPu.cu->rribcFlipType && 1 == trueAfalseL)
+    {
+      if( 2 == curPu.cu->rribcFlipType && 1 == trueAfalseL )
       {
-        tempBv += Mv(0, m_pu.lheight() + tplSize - 1);
+        tempBv += Mv( 0, m_pu.lheight() + tplSize - 1 );
       }
       else
       {
-        tempBv += trueAfalseL ? Mv(0, -tplSize) : Mv(-tplSize, 0);
+        tempBv += trueAfalseL ? Mv( 0, -tplSize ) : Mv( -tplSize, 0 );
       }
-#else // !JVET_AC0104_IBC_BVD_PREDICTION
+    }
+#else
+    tempBv += trueAfalseL ? Mv( 0, -tplSize ) : Mv( -tplSize, 0 );
+#endif
+#else
     tempBv += trueAfalseL ? Mv(0, -tplSize) : Mv(-tplSize, 0);
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
     if (!PU::searchBv(m_pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, tempBv.getHor(), tempBv.getVer(), ctuSize))
     {
@@ -13236,7 +13252,7 @@ PelBuf TplMatchingCtrl::xGetCurTemplateBvd(const PredictionUnit& curPu, const Pi
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   const Pel* ref = refBuf.bufAt(blkPos);
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
         Pel* dst = dstBuf.buf;
   
   const int  refStride = refBuf.stride;
@@ -13248,6 +13264,7 @@ PelBuf TplMatchingCtrl::xGetCurTemplateBvd(const PredictionUnit& curPu, const Pi
   const bool useAltHpelIf = false;
   const bool biMCForDMVR  = false;
 
+#if JVET_AA0070_RRIBC
   if (0 != m_cu.rribcFlipType)
   {
     if (2 == m_cu.rribcFlipType)
@@ -13263,6 +13280,9 @@ PelBuf TplMatchingCtrl::xGetCurTemplateBvd(const PredictionUnit& curPu, const Pi
   { 
     m_interRes.m_if.filterHor(m_compID, (Pel*)ref, refStride, dst, dstStride, bw, bh, xFrac, true, m_cu.chromaFormat, m_cu.slice->clpRng(m_compID), nFilterIdx, biMCForDMVR, useAltHpelIf);
   }
+#else
+  m_interRes.m_if.filterHor( m_compID, (Pel*)ref, refStride, dst, dstStride, bw, bh, xFrac, true, m_cu.chromaFormat, m_cu.slice->clpRng( m_compID ), nFilterIdx, biMCForDMVR, useAltHpelIf );
+#endif
 
   return dstBuf;
 }
@@ -13281,6 +13301,7 @@ PelBuf  TplMatchingCtrl::xGetRefTemplateBvd(const PredictionUnit& curPu, const P
   // Do interpolation on the fly
   Position blkPos = Position(curPu.lx(), curPu.ly());
 
+#if JVET_AA0070_RRIBC
   if (0 == curPu.cu->rribcFlipType)
   {
     blkPos = blkPos.offset(trueAfalseL ? Position(0, 0 - tplSize) : Position(0 - tplSize, 0)); // default template offset
@@ -13297,6 +13318,9 @@ PelBuf  TplMatchingCtrl::xGetRefTemplateBvd(const PredictionUnit& curPu, const P
   {
     blkPos = blkPos.offset(trueAfalseL ? Position(0, 0 - tplSize) : Position(0 - tplSize, 0)); // default template offset
   }
+#else
+  blkPos = blkPos.offset( trueAfalseL ? Position( 0, 0 - tplSize ) : Position( 0 - tplSize, 0 ) ); // default template offset
+#endif
 
   const Size blkSize = Size(dstBuf.width, dstBuf.height);
 
@@ -13334,7 +13358,7 @@ PelBuf  TplMatchingCtrl::xGetRefTemplateBvd(const PredictionUnit& curPu, const P
   return dstBuf;
 }
 
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 template <int tplSize, bool trueAfalseL>
 void TplMatchingCtrl::xRemoveHighFreq(const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight)
@@ -13651,7 +13675,7 @@ Distortion TplMatchingCtrl::xGetTempMatchErrorBvd(const Mv& mv)
 
   return sum;
 }
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 template <int tplSize>
 Distortion TplMatchingCtrl::xGetTempMatchError(const Mv& mv)
@@ -13674,7 +13698,7 @@ Distortion TplMatchingCtrl::xGetTempMatchError(const Mv& mv)
 template <int tplSize, bool trueAfalseL, bool useForBvd>
 #else
 template <int tplSize, bool trueAfalseL>
-#endif //JVET_AC0104_IBC_BVD_PREDICTION 
+#endif
 Distortion TplMatchingCtrl::xGetTempMatchError(const Mv& mv)
 {
   PelBuf& curTplBuf = trueAfalseL ? m_curTplAbove : m_curTplLeft;
@@ -13692,9 +13716,9 @@ Distortion TplMatchingCtrl::xGetTempMatchError(const Mv& mv)
 #if JVET_AC0104_IBC_BVD_PREDICTION 
   refTplBuf = useForBvd ? xGetRefTemplateBvd<tplSize, trueAfalseL>(m_pu, m_refPic, mv, refTplBuf) 
                         : xGetRefTemplate<tplSize, trueAfalseL, 0>(m_pu, m_refPic, mv, refTplBuf);
-#else //!JVET_AC0104_IBC_BVD_PREDICTION
+#else
   refTplBuf = xGetRefTemplate<tplSize, trueAfalseL, 0>(m_pu, m_refPic, mv, refTplBuf);
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 #if JVET_Z0084_IBC_TM
   if (refTplBuf.buf == nullptr)
   {
@@ -13829,7 +13853,7 @@ bool InterPrediction::readTplAmvpBuffer(AMVPInfo& dst, const CodingUnit& cu, Ref
 }
 #endif
 
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
 void InterPrediction::writeMergeBuffer(const MergeCtx& srcList0, const MergeCtx& srcList1, const CodingUnit& cu)
 {
   m_pcMergeCtxList0 = srcList0;
@@ -17146,6 +17170,7 @@ struct CandCheckEnv
 
     if (res && doBoundaryCheck)
     {
+#if JVET_AA0070_RRIBC
       if (1 == pu.cu->rribcFlipType)
       {
         useTop = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred, lcuWidth);
@@ -17153,17 +17178,23 @@ struct CandCheckEnv
         useLeft = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred, yPred, lcuWidth);
       }
       else
-        if (2 == pu.cu->rribcFlipType)
+      {
+        if( 2 == pu.cu->rribcFlipType )
         {
-          useLeft = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred, yPred, lcuWidth);
+          useLeft = PU::searchBv( pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred, yPred, lcuWidth );
           yPred += pu.lheight(); //at least, template size of 1 should be available
-          useTop = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred, lcuWidth);
+          useTop = PU::searchBv( pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred, lcuWidth );
         }
         else
         {
-          useLeft = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred - 1, yPred, lcuWidth);
-          useTop = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred - 1, lcuWidth);
+          useLeft = PU::searchBv( pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred - 1, yPred, lcuWidth );
+          useTop = PU::searchBv( pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred - 1, lcuWidth );
         }
+      }
+#else
+      useLeft = PU::searchBv( pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred - 1, yPred, lcuWidth );
+      useTop = PU::searchBv( pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred - 1, lcuWidth );
+#endif
     }
     else if (!doBoundaryCheck)
     {
@@ -17257,11 +17288,11 @@ void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtD
   verAbs = tmp.getAbsVer();
   
   const int iTotalNumberOfBins = iHorMSBins + iVerMSBins;
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
   const int numSignBits = (pu.cu->rribcFlipType != 0) ? 0 :
 #else 
   const int numSignBits =
-#endif // JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#endif
                           ((0 != horAbs && !pu.bvdSuffixInfo.horEncodeSignInEP) ? 1 : 0) + 
                           ((0 != verAbs && !pu.bvdSuffixInfo.verEncodeSignInEP) ? 1 : 0);
 
@@ -17302,7 +17333,11 @@ void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtD
   CHECK(iHorRange < 0, "iHorRange < 0");
   CHECK(iVerRange < 0, "iVerRange < 0");
 
+#if JVET_AA0070_RRIBC
   const bool rrIBCmode = pu.cu->rribcFlipType != 0;
+#else
+  const bool rrIBCmode = false;
+#endif
 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   const bool horPositiveAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 1 && rrIBCmode;
@@ -17317,12 +17352,12 @@ void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtD
   const bool horNegativeAllowed = horNegativeAllowedRRIBC || (!rrIBCmode && !si.horEncodeSignInEP) || (!rrIBCmode && si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() < 0);
   const bool verPositiveAllowed = verPositiveAllowedRRIBC || (!rrIBCmode && !si.verEncodeSignInEP) || (!rrIBCmode && si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() > 0);
   const bool verNegativeAllowed = verNegativeAllowedRRIBC || (!rrIBCmode && !si.verEncodeSignInEP) || (!rrIBCmode && si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() < 0);
-#else // !JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#else
   const bool horPositiveAllowed = !si.horEncodeSignInEP || (si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() > 0);
   const bool horNegativeAllowed = !si.horEncodeSignInEP || (si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() < 0);
   const bool verPositiveAllowed = !si.verEncodeSignInEP || (si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() > 0);
   const bool verNegativeAllowed = !si.verEncodeSignInEP || (si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() < 0);
-#endif // JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#endif
 
   if (rrIBCmode)
   {
@@ -17364,7 +17399,9 @@ void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtD
   }
   else
   {
-    CHECK(pu.cu->rribcFlipType != 0, "pu.cu->rribcFlipType !=0");
+#if JVET_AA0070_RRIBC
+    CHECK(pu.cu->rribcFlipType != 0, "pu.cu->rribcFlipType != 0");
+#endif
 
     for (unsigned int iHorCnt = 0; iHorCnt < iHorRange; ++iHorCnt)
     {
@@ -17416,7 +17453,7 @@ void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtD
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
   TplMatchingCtrl tplCtrl(pu, interRes, recPic, true, COMPONENT_Y, false, 0, m_pcCurTplAbove, m_pcCurTplLeft, m_pcRefTplAbove, m_pcRefTplLeft, Mv(0, 0), nullptr, 0, 1, true);
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
   std::vector<std::pair<Mv, Distortion>> aMvCostVec(patternsNum);
 
@@ -17477,7 +17514,9 @@ void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtD
   }
   else
   {
-    CHECK(pu.cu->rribcFlipType != 0, "pu.cu->rribcFlipType !=0");
+#if JVET_AA0070_RRIBC
+    CHECK(pu.cu->rribcFlipType != 0, "pu.cu->rribcFlipType != 0");
+#endif
 
     step = (horNegativeAllowed ? 1 : 0) * ((verNegativeAllowed ? 1 : 0) + (verPositiveAllowed ? 1 : 0)) +
       (horPositiveAllowed ? 1 : 0) * ((verNegativeAllowed ? 1 : 0) + (verPositiveAllowed ? 1 : 0));
@@ -17928,7 +17967,7 @@ void InterPrediction::initOffsets(Mv& cMvdInput, std::vector<Mv>& cMvdDerived, M
     CHECK(numMSBver != verBitCount, "numMSBver != verBitCount");
   }
 }
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 void InterPrediction::setBiRefPairIdx(PredictionUnit &pu)
 {
@@ -20045,7 +20084,8 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
     }
     return cMvd;
   }
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
+
   Mv InterPrediction::deriveMVDFromMVSDIdxTrans(int mvsdIdx, std::vector<Mv>& cMvdDerived)
   {
     int bin = 0;

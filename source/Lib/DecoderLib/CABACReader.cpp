@@ -3301,7 +3301,7 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
   rribcData(*pu.cu);
 #endif
 #else
-  bvOneNullComp_data(*pu.cu);
+  bvOneZeroComp(*pu.cu);
 #endif
 #if JVET_AC0112_IBC_LIC
   cuIbcLicFlag(*pu.cu);
@@ -3336,28 +3336,28 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.bvdSuffixInfo, pu.cu->bvOneNullComp, pu.cu->bvNullCompDir);
+    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.bvdSuffixInfo, pu.cu->bvOneZeroComp, pu.cu->bvZeroCompDir);
 #else
     bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.bvdSuffixInfo, pu.cu->rribcFlipType);
 #endif
-#else // !JVET_AC0104_IBC_BVD_PREDICTION
+#else
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.cu->bvOneNullComp, pu.cu->bvNullCompDir);
+    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.cu->bvOneZeroComp, pu.cu->bvZeroCompDir);
 #else
     bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.cu->rribcFlipType);
 #endif
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 #else
 #if JVET_AC0104_IBC_BVD_PREDICTION
 #error Not implemented  
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
     mvd_coding(pu.mvd[REF_PIC_LIST_0], true, pu.cu->rribcFlipType);
 #endif
 #elif JVET_Z0131_IBC_BVD_BINARIZATION
     bvdCoding(pu.mvd[REF_PIC_LIST_0]
 #if JVET_AC0104_IBC_BVD_PREDICTION
             , pu.bvdSuffixInfo
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
              );
 #else
     mvd_coding(pu.mvd[REF_PIC_LIST_0]);
@@ -3374,11 +3374,11 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
     if (pu.mvpIdx[REF_PIC_LIST_0] == 0)
     {
-      if (pu.cu->bvNullCompDir == 1)
+      if (pu.cu->bvZeroCompDir == 1)
       {
         pu.mvd[REF_PIC_LIST_0].hor = -pu.mvd[REF_PIC_LIST_0].hor;
       }
-      else if (pu.cu->bvNullCompDir == 2)
+      else if (pu.cu->bvZeroCompDir == 2)
       {
         pu.mvd[REF_PIC_LIST_0].ver = -pu.mvd[REF_PIC_LIST_0].ver;
       }
@@ -3587,12 +3587,12 @@ void CABACReader::mvsd_data(PredictionUnit&  pu)
   {
     return;
   }
-#endif // !JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
   if (pu.cu->skip || pu.mergeFlag 
 #if !JVET_AC0104_IBC_BVD_PREDICTION
     || CU::isIBC(*pu.cu)
-#endif // !JVET_AC0104_IBC_BVD_PREDICTION
+#endif
       || !pu.isMvsdApplicable())
   {
     return;
@@ -3614,7 +3614,7 @@ void CABACReader::mvsd_data(PredictionUnit&  pu)
   {
     return;
   }
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
   if (pu.interDir != 1 /* PRED_L0 */ && pu.cu->smvdMode != 1)
   {
@@ -5743,7 +5743,7 @@ unsigned CABACReader::xReadBvdContextSuffix(int symbol, int param )
   return symbol;
 }
 
-#else //!JVET_AC0104_IBC_BVD_PREDICTION
+#else
 unsigned CABACReader::xReadBvdContext(unsigned ctxT, int offset, int param )
 {
   unsigned symbol = 0;
@@ -5771,7 +5771,7 @@ unsigned CABACReader::xReadBvdContext(unsigned ctxT, int offset, int param )
   }
   return symbol;
 }
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 #endif
 
@@ -5880,33 +5880,34 @@ void CABACReader::bvdCodingRemainder(Mv& rMvd, MvdSuffixInfo& si, const int imv 
     rMvd = Mv(horAbs, verAbs);
   }
 }
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
+
 #if JVET_AA0070_RRIBC
 #if JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-void CABACReader::bvdCoding(Mv& rMvd, MvdSuffixInfo& si, int bvOneNullComp, int bvNullCompDir)
+void CABACReader::bvdCoding(Mv& rMvd, MvdSuffixInfo& si, int bvOneZeroComp, int bvZeroCompDir)
 #else
 void CABACReader::bvdCoding(Mv& rMvd, MvdSuffixInfo& si, const int& rribcFlipType)
 #endif
-#else   // !JVET_AC0104_IBC_BVD_PREDICTION
+#else
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-void CABACReader::bvdCoding(Mv& rMvd, int bvOneNullComp, int bvNullCompDir)
+void CABACReader::bvdCoding(Mv& rMvd, int bvOneZeroComp, int bvZeroCompDir)
 #else
 void CABACReader::bvdCoding(Mv& rMvd, const int& rribcFlipType)
 #endif
-#endif   // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 {
   int horAbs = 0, verAbs = 0;
 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  if (bvOneNullComp)
+  if (bvOneZeroComp)
   {
-    if (bvNullCompDir == 1)
+    if (bvZeroCompDir == 1)
     { 
       horAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
     }
 
-    if (bvNullCompDir == 2)
+    if (bvZeroCompDir == 2)
     {
       verAbs = (int)m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
     }
@@ -5927,10 +5928,14 @@ void CABACReader::bvdCoding(Mv& rMvd, const int& rribcFlipType)
   }
 #endif
 #else
-void CABACReader::bvdCoding(Mv & rMvd)
+#if JVET_AC0104_IBC_BVD_PREDICTION
+void CABACReader::bvdCoding( Mv& rMvd, MvdSuffixInfo& si )
+#else
+void CABACReader::bvdCoding(Mv& rMvd)
+#endif
 {
-  horAbs = (int)m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
-  verAbs = (int)m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
+  int horAbs = (int)m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
+  int verAbs = (int)m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
 #endif
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
@@ -5938,12 +5943,12 @@ void CABACReader::bvdCoding(Mv & rMvd)
     xReadBvdContextPrefix(NUM_HOR_BVD_CTX, HOR_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER) : -1;
   int verParam = ( 0 != verAbs ) ? 
     xReadBvdContextPrefix(NUM_VER_BVD_CTX, VER_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER) : -1;
-#else // !JVET_AC0104_IBC_BVD_PREDICTION
+#else
   if (horAbs)
   {
     horAbs += xReadBvdContext(NUM_HOR_BVD_CTX, HOR_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER);
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
-    if (!bvOneNullComp)
+    if (!bvOneZeroComp)
     {
       if (m_BinDecoder.decodeBinEP())
       {
@@ -5961,7 +5966,7 @@ void CABACReader::bvdCoding(Mv & rMvd)
   {
     verAbs += xReadBvdContext(NUM_VER_BVD_CTX, VER_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER);
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
-    if (!bvOneNullComp)
+    if (!bvOneZeroComp)
     {
       if (m_BinDecoder.decodeBinEP())
       {
@@ -5975,19 +5980,19 @@ void CABACReader::bvdCoding(Mv & rMvd)
     }
 #endif
   }
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
   rMvd = Mv(horAbs, verAbs);
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
   si.horPrefix = horParam;
   si.verPrefix = verParam;
-#else //!JVET_AC0104_IBC_BVD_PREDICTION
+#else
   CHECK(!((horAbs >= MVD_MIN) && (horAbs <= MVD_MAX)) || !((verAbs >= MVD_MIN) && (verAbs <= MVD_MAX)), "Illegal BVD value");
-#endif //JVET_AC0104_IBC_BVD_PREDICTIONS
+#endif
 
 }
-#endif // JVET_Z0131_IBC_BVD_BINARIZATION
+#endif
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
@@ -6061,7 +6066,7 @@ void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
                  verPrefix < 0 ? 0 : MvdSuffixInfo::xGetGolombGroupMinValue(verPrefix));
     trMv.changeTransPrecAmvr2Internal(pu.cu->imv);
 
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
     if (0 != pu.cu->rribcFlipType)
     {
       pu.mvsdIdx[eRefList] = mvsdIdx;
@@ -6117,7 +6122,7 @@ void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
     }
     return;
   }
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
   
   
   if (pu.mvd[eRefList].getHor())
@@ -7527,28 +7532,33 @@ void CABACReader::cu_lic_flag( CodingUnit& cu )
 #endif
 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-void CABACReader::bvOneNullComp_data(CodingUnit &cu)
+void CABACReader::bvOneZeroComp(CodingUnit &cu)
 {
   if (!CU::isIBC(cu) || cu.firstPU->mergeFlag)
   {
     return;
   }
-  cu.bvNullCompDir = 0;
+  cu.bvZeroCompDir = 0;
+#if JVET_AA0070_RRIBC
   cu.rribcFlipType = 0;
+#endif
 
-  unsigned ctxId   = DeriveCtx::CtxBvOneNullComp(cu);
-  cu.bvOneNullComp = m_BinDecoder.decodeBin(Ctx::bvOneNullComp(ctxId));
-  if (cu.bvOneNullComp)
+  unsigned ctxId   = DeriveCtx::CtxbvOneZeroComp(cu);
+  cu.bvOneZeroComp = m_BinDecoder.decodeBin(Ctx::bvOneZeroComp(ctxId));
+  if (cu.bvOneZeroComp)
   {
     // Read the BV direction
-    cu.bvNullCompDir = cu.bvOneNullComp;
-    cu.bvNullCompDir += m_BinDecoder.decodeBin(Ctx::bvOneNullComp(3));
+    cu.bvZeroCompDir = cu.bvOneZeroComp;
+    cu.bvZeroCompDir += m_BinDecoder.decodeBin(Ctx::bvOneZeroComp(3));
+
+#if JVET_AA0070_RRIBC
     ctxId            = DeriveCtx::CtxRribcFlipType(cu);
     cu.rribcFlipType = m_BinDecoder.decodeBin(Ctx::rribcFlipType(ctxId));
     if (cu.rribcFlipType)
     {
-      cu.rribcFlipType = cu.bvNullCompDir;
+      cu.rribcFlipType = cu.bvZeroCompDir;
     }
+#endif
   }
   DTRACE(g_trace_ctx, D_SYNTAX, "rribcData() rribcFlipType = %d\n", cu.rribcFlipType);
 }

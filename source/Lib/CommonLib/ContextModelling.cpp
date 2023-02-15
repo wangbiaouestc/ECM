@@ -342,16 +342,16 @@ unsigned DeriveCtx::CtxRribcFlipType(const CodingUnit& cu)
 #endif
 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-unsigned DeriveCtx::CtxBvOneNullComp(const CodingUnit &cu)
+unsigned DeriveCtx::CtxbvOneZeroComp(const CodingUnit &cu)
 {
   const CodingStructure *cs    = cu.cs;
   unsigned               ctxId = 0;
 
   const CodingUnit *cuLeft = cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
-  ctxId = (cuLeft && cuLeft->predMode == MODE_IBC && !cuLeft->firstPU->mergeFlag && cuLeft->bvOneNullComp) ? 1 : 0;
+  ctxId = (cuLeft && cuLeft->predMode == MODE_IBC && !cuLeft->firstPU->mergeFlag && cuLeft->bvOneZeroComp) ? 1 : 0;
 
   const CodingUnit *cuAbove = cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
-  ctxId += (cuAbove && cuAbove->predMode == MODE_IBC && !cuAbove->firstPU->mergeFlag && cuAbove->bvOneNullComp) ? 1 : 0;
+  ctxId += (cuAbove && cuAbove->predMode == MODE_IBC && !cuAbove->firstPU->mergeFlag && cuAbove->bvOneZeroComp) ? 1 : 0;
 
   return ctxId;
 }
@@ -458,7 +458,7 @@ int DeriveCtx::CtxSmBvdBin(const int iPreviousBinIsCorrect2, const int iPrevious
   }
   return ctxNumInGroup + (0 == isHor ? 0 : ctxNumInGroup) + iCtxIdx;
 }
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 unsigned DeriveCtx::CtxPredModeFlag( const CodingUnit& cu )
 {
@@ -534,7 +534,7 @@ void MergeCtx::convertRegularMergeCandToBi(int candIdx)
   } 
 }
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 void MergeCtx::saveMergeInfo(PredictionUnit& puTmp, PredictionUnit pu)
 {
   puTmp.mergeIdx = pu.mergeIdx;
@@ -657,7 +657,7 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
   }
 #endif
 }
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
 bool MergeCtx::xCheckSimilarMotionSubTMVP(int mergeCandIndex, uint32_t mvdSimilarityThresh) const
 {
   if (interDirNeighbours[mergeCandIndex] == 0)
