@@ -1811,7 +1811,10 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       bool hashScc = hashBlkHitPerc < 57;
       spsTmp->setUseOBMC(hashScc);
 #if JVET_Z0061_TM_OBMC
-      spsTmp->setUseOBMCTMMode(hashScc);
+      if( m_pcLib->getUseOBMCTMMode() )
+      {
+        spsTmp->setUseOBMCTMMode( hashScc );
+      }
 #endif
     }
   }
