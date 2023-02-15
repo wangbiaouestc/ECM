@@ -2798,7 +2798,7 @@ uint8_t PU::getLFNSTIdx( int intraMode, int mtsMode )
   return g_lfnstLut[ intraMode ];
 }
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 void PU::addMergeHMVPCandSubTMVP(const CodingStructure &cs, MergeCtx &mrgCtx, const int &mrgCandIdx,
   const uint32_t maxNumMergeCand, int &cnt, const bool isAvailableA1,
   const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove,
@@ -2819,20 +2819,17 @@ void PU::addMergeHMVPCandSubTMVP(const CodingStructure &cs, MergeCtx &mrgCtx, co
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 #if JVET_Z0118_GDR  
   bool isClean = cs.isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
-#endif // JVET_Z0118_GDR
-
-#if JVET_Z0118_GDR  
   auto &lut = (isClean) ? cs.motionLut.lut1 : cs.motionLut.lut0;
 #else
   auto &lut = cs.motionLut.lut;
-#endif // JVET_Z0118_GDR
+#endif
 #else
 
 #if JVET_Z0118_GDR  
   auto &lut = ibcFlag ? (isClean ? cs.motionLut.lutIbc1 : cs.motionLut.lutIbc0) : (isClean ? cs.motionLut.lut1 : cs.motionLut.lut0);
 #else
   auto &lut = ibcFlag ? cs.motionLut.lutIbc : cs.motionLut.lut;
-#endif // JVET_Z0118_GDR
+#endif
 
 #endif // JVET_Z0075_IBC_HMVP_ENLARGE
   int numCandInLUT = (int)lut.size();
@@ -4369,7 +4366,7 @@ int PU::reorderInterMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, 
   }
 }
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 void PU::getInterMergeCandidatesSubTMVP(const PredictionUnit &pu, MergeCtx& mrgCtx,
   int col,
   const int& mrgCandIdx
@@ -5349,20 +5346,10 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     int       iRefIdx     = 0;
     int       dir         = 0;
     unsigned  uiArrayAddr = cnt;
-#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
-    int cntTmp = cnt;
-    for (int colIdx = 0; colIdx < (pu.cu->slice->isInterB() ? 2 : 1); colIdx++)
-    {
-      if (colIdx && cnt != cntTmp)
-      {
-        break;
-      }
-#endif
-      bool      bExistMV = (isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC0, cColMv, iRefIdx, false
+
+    bool      bExistMV = (isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_0, posC0, cColMv, iRefIdx, false
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
-#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
-        , colIdx
-#elif JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
         , 0
 #endif
         , &iRefIdx
@@ -5370,9 +5357,7 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
       ))
         || getColocatedMVP(pu, REF_PIC_LIST_0, posC1, cColMv, iRefIdx, false
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
-#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
-          , colIdx
-#elif JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
           , 0
 #endif
           , &iRefIdx
@@ -5388,9 +5373,7 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
       {
         bExistMV = (isC0Avail && getColocatedMVP(pu, REF_PIC_LIST_1, posC0, cColMv, iRefIdx, false
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
-#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
-          , colIdx
-#elif JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
           , 0
 #endif
           , &iRefIdx
@@ -5398,9 +5381,7 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
         ))
           || getColocatedMVP(pu, REF_PIC_LIST_1, posC1, cColMv, iRefIdx, false
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
-#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
-            , colIdx
-#elif JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
             , 0
 #endif
             , &iRefIdx
@@ -5588,9 +5569,6 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #endif
     }
 #endif
-#endif
-#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
-  }
 #endif
   }
 
@@ -10132,28 +10110,24 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
   Position posRT = pu.Y().topRight();
   Position posLB = pu.Y().bottomLeft();
 
+  bool bAdded = addMVPCandUnscaled( pu, eRefPicList, refIdx, posLB, MD_BELOW_LEFT, *pInfo );
+
+  if( !bAdded )
   {
-    bool bAdded = addMVPCandUnscaled( pu, eRefPicList, refIdx, posLB, MD_BELOW_LEFT, *pInfo );
+    bAdded = addMVPCandUnscaled( pu, eRefPicList, refIdx, posLB, MD_LEFT, *pInfo );
 
-    if( !bAdded )
-    {
-      bAdded = addMVPCandUnscaled( pu, eRefPicList, refIdx, posLB, MD_LEFT, *pInfo );
-
-    }
   }
 
   // Above predictor search
+  bAdded = addMVPCandUnscaled( pu, eRefPicList, refIdx, posRT, MD_ABOVE_RIGHT, *pInfo );
+
+  if( !bAdded )
   {
-    bool bAdded = addMVPCandUnscaled( pu, eRefPicList, refIdx, posRT, MD_ABOVE_RIGHT, *pInfo );
+    bAdded = addMVPCandUnscaled( pu, eRefPicList, refIdx, posRT, MD_ABOVE, *pInfo );
 
     if( !bAdded )
     {
-      bAdded = addMVPCandUnscaled( pu, eRefPicList, refIdx, posRT, MD_ABOVE, *pInfo );
-
-      if( !bAdded )
-      {
-        addMVPCandUnscaled( pu, eRefPicList, refIdx, posLT, MD_ABOVE_LEFT, *pInfo );
-      }
+      addMVPCandUnscaled( pu, eRefPicList, refIdx, posLT, MD_ABOVE_LEFT, *pInfo );
     }
   }
 
@@ -10170,7 +10144,7 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
     }
   }
 
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
 #if TM_AMVP
   if (cs.picHeader->getEnableTMVPFlag() && pInfo->numCand < pInfo->maxStorageSize && (pu.lumaSize().width + pu.lumaSize().height > 8))
 #else
@@ -10408,17 +10382,8 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
       }
     }
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
-#if !ENABLE_INTER_TEMPLATE_MATCHING
-    int count = 0;
-#endif
     for (int colIdx = 0; colIdx < (pu.cu->slice->isInterB() ? 2 : 1); colIdx++)
     {
-#endif
-#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
-      if (count)
-      {
-        break;
-      }
 #endif
       if ((isC0Avail && getColocatedMVP(pu, eRefPicList, posC0, cColMv, refIdxCol, false
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
@@ -10430,9 +10395,6 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
 #endif
       ))
       {
-#if !ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
-        count++;
-#endif
         cColMv.roundTransPrecInternal2Amvr(pu.cu->imv);
 #if TM_AMVP
         pInfo->mvCand[pInfo->numCand] = cColMv;
@@ -12404,7 +12366,7 @@ void PU::getAffineControlPointCand(const PredictionUnit &pu, MotionInfo mi[4], b
     affMrgType.mvFieldNeighbours[(affMrgType.numValidMergeCand << 1) + 1][i].mv = cMv[1][i];
     affMrgType.mvFieldNeighbours[(affMrgType.numValidMergeCand << 1) + 1][i].refIdx = refIdx[1];
   }
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   affMrgType.colIdx[affMrgType.numValidMergeCand] = 0;
 #endif
   affMrgType.interDirNeighbours[affMrgType.numValidMergeCand] = dir;
@@ -13331,7 +13293,7 @@ const int getAvailableAffineNeighboursForAbovePredictor( const PredictionUnit &p
 }
 
 void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx,
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION   
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION   
   MergeCtx mrgCtxIn[2],
 #endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION && JVET_W0090_ARMC_TM
@@ -13384,7 +13346,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
     affMrgCtx.numAffCandToTestEnc = maxNumAffineMergeCand;
     affMrgCtx.candCost[i] = MAX_UINT64;
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     affMrgCtx.colIdx[i] = 0;
 #endif
   }
@@ -13406,7 +13368,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 #endif
     {
 #endif    
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
       for (int i = 0; i < SUB_TMVP_NUM; i++)
       {
         CHECK(mrgCtx.subPuMvpMiBuf[i].area() == 0 || !mrgCtx.subPuMvpMiBuf[i].buf, "Buffer not initialized");
@@ -13422,7 +13384,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 #endif
 
     int pos = 0;
-#if !(JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION && ENABLE_INTER_TEMPLATE_MATCHING)
+#if !JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     // Get spatial MV
     const Position posCurLB = pu.Y().bottomLeft();
     MotionInfo miLeft;
@@ -13460,23 +13422,13 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     int poc0 = pu.cu->slice->getRefPic(RefPicList(1 - pu.cu->slice->getColFromL0Flag()), pu.cu->slice->getColRefIdx())->getPOC();
     int poc1 = pu.cu->slice->getRefPic(RefPicList(1 - pu.cu->slice->getColFromL0Flag2nd()), pu.cu->slice->getColRefIdx2nd())->getPOC();
-#if ENABLE_INTER_TEMPLATE_MATCHING
     for (int index = 0; index < SUB_TMVP_INDEX; index++)
     {
-#endif
       for (int colFrameIdx = 0; colFrameIdx < ((pu.cu->slice->getCheckLDC() || (poc0 == poc1)) ? 1 : 2); colFrameIdx++)
       {
-#endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
         if (index > 0 && colFrameIdx == 1)
         {
           continue;
-        }
-#endif
-#if !ENABLE_INTER_TEMPLATE_MATCHING
-        if (affMrgCtx.numValidMergeCand == 1)
-        {
-          break;
         }
 #endif
 #if JVET_Z0139_NA_AFF && JVET_W0090_ARMC_TM
@@ -13505,7 +13457,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 
           affMrgCtx.affineType[affMrgCtx.numValidMergeCand] = AFFINE_MODEL_NUM;
           affMrgCtx.mergeType[affMrgCtx.numValidMergeCand] = MRG_TYPE_SUBPU_ATMVP;
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
           affMrgCtx.colIdx[affMrgCtx.numValidMergeCand] = (index << 1) + colFrameIdx;
 #endif
 #if AFFINE_MMVD
@@ -13532,9 +13484,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
         }
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
       }
-#if ENABLE_INTER_TEMPLATE_MATCHING
     }
-#endif
 #endif
   }
 
@@ -13627,7 +13577,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       affMrgCtx.interDirNeighbours[affMrgCtx.numValidMergeCand] = puNeigh->interDir;
       affMrgCtx.affineType[affMrgCtx.numValidMergeCand] = (EAffineModel)(puNeigh->cu->affineType);
       affMrgCtx.bcwIdx[affMrgCtx.numValidMergeCand] = puNeigh->cu->bcwIdx;
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
       affMrgCtx.colIdx[affMrgCtx.numValidMergeCand] = 0;
 #endif
 #if INTER_LIC
@@ -14162,7 +14112,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
     }
     const int MAX_PAIRWISE_NUM = 9;
     const int preDefinedPairs[MAX_PAIRWISE_NUM][2] = { {0, 1}, {0, 2}, {1, 2}, {0, 3}, {1, 3}, { 2, 3}, { 0, 4}, {1, 4}, { 2, 4} };
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     int iATMVPoffset = 0;
     for (int index = 0; index < affMrgCtx.numValidMergeCand; index++)
     {
@@ -14268,7 +14218,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       affMrgCtx.mvFieldNeighbours[(cnt << 1) + 0][mvNum].setMvField( Mv( 0, 0 ), 0 );
     }
     affMrgCtx.interDirNeighbours[cnt] = 1;
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     affMrgCtx.colIdx[cnt] = 0;
 #endif
 
@@ -14630,7 +14580,7 @@ void clipColPos(int& posX, int& posY, const PredictionUnit& pu)
 #endif
 }
 
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 void PU::getTMVPCandOpt(const PredictionUnit &pu, RefPicList refList, int refIdx, MergeCtx& mrgCtx, MergeCtx mergeCtxIn, int col)
 {
   const uint32_t maxNumMergeCand = NUM_TMVP_CANDS;
@@ -14747,9 +14697,7 @@ void PU::getTMVPCandOpt(const PredictionUnit &pu, RefPicList refList, int refIdx
 #endif
 bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, bool& LICFlag, const int count
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
-#if ENABLE_INTER_TEMPLATE_MATCHING
   , int subIdx, MergeCtx mergeCtxIn
-#endif
   , int col
 #else
   , int mmvdList
@@ -14774,7 +14722,7 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
 #endif
   Mv cTMv;
 
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   if (subIdx > mergeCtxIn.numValidMergeCand)
   {
     return false;
@@ -14890,7 +14838,7 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
     int xOff = (puWidth >> 1) + tempX;
     int yOff = (puHeight >> 1) + tempY;
 
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     MotionBuf &mb = mrgCtx.subPuMvpMiBuf[(subIdx << 1) + col];
 #else
     MotionBuf &mb = mrgCtx.subPuMvpMiBuf;
@@ -14969,7 +14917,7 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
 
 #if MULTI_PASS_DMVR
 void PU::spanMotionInfo(PredictionUnit &pu, const MergeCtx &mrgCtx,
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   int colIdx,
 #endif
   Mv* bdmvrSubPuMv0, Mv* bdmvrSubPuMv1, Mv* bdofSubPuMvOffset)
@@ -15107,7 +15055,7 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
   }
   else if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
   {
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   for (int i = 0; i < SUB_TMVP_NUM; i++)
   {
     CHECK(mrgCtx.subPuMvpMiBuf[i].area() == 0 || !mrgCtx.subPuMvpMiBuf[i].buf, "Buffer not initialized");
@@ -15118,7 +15066,7 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
 #if MULTI_PASS_DMVR
     MotionBuf mb = pu.getMotionBuf();
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     mb.copyFrom(mrgCtx.subPuMvpMiBuf[pu.colIdx]);
 #else
     mb.copyFrom(mrgCtx.subPuMvpMiBuf);
@@ -15132,7 +15080,7 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
 #if JVET_W0123_TIMD_FUSION
 #if MULTI_PASS_DMVR
 void PU::spanMotionInfo2(PredictionUnit &pu, const MergeCtx &mrgCtx,
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   int colIdx,
 #endif
   Mv* bdmvrSubPuMv0, Mv* bdmvrSubPuMv1, Mv* bdofSubPuMvOffset)
@@ -15218,7 +15166,7 @@ void PU::spanMotionInfo2( PredictionUnit &pu, const MergeCtx &mrgCtx )
   }
   else if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
   {
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     for (int i = 0; i < SUB_TMVP_NUM; i++)
     {
       CHECK(mrgCtx.subPuMvpMiBuf[i].area() == 0 || !mrgCtx.subPuMvpMiBuf[i].buf, "Buffer not initialized");
@@ -15229,7 +15177,7 @@ void PU::spanMotionInfo2( PredictionUnit &pu, const MergeCtx &mrgCtx )
 #if MULTI_PASS_DMVR
     MotionBuf mb = pu.getMotionBuf();
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     mb.copyFrom(mrgCtx.subPuMvpMiBuf[pu.colIdx]);
 #else
     mb.copyFrom(mrgCtx.subPuMvpMiBuf);

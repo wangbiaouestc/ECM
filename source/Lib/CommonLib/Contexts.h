@@ -346,7 +346,7 @@ public:
   static const CtxSet   rribcFlipType;
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  static const CtxSet bvOneNullComp;
+  static const CtxSet bvOneZeroComp;
 #endif
 #if JVET_Y0065_GPM_INTRA
   static const CtxSet   GPMIntraFlag;
@@ -455,7 +455,7 @@ public:
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
   static const CtxSet   MvsdIdxBVDMSB;
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 #if MULTI_HYP_PRED
   static const CtxSet   MultiHypothesisFlag;

@@ -229,13 +229,8 @@ public:
   void           getMotionCost(int add) { m_dCost = m_dLambdaMotionSAD + add; }
 
 
-#if JVET_AA0070_RRIBC
-  void setPredictors(Mv pcMv[3][2]);
-#if JVET_Z0131_IBC_BVD_BINARIZATION
-  EstBvdBitsStruct *getBvdBitCosts() { return &m_cBvdBitCosts; }
-
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  inline Distortion getbvVerNullCompCost(int x, bool useIMV, int *tempImv, int *tempIdx, Mv bvp1Pel[2])
+  inline Distortion getBvVerZeroCompCost(int x, bool useIMV, int *tempImv, int *tempIdx, Mv bvp1Pel[2])
   {
     uint32_t b0 = xGetExpGolombNumberOfBitsIBCH(x - bvp1Pel[0].getHor()) + m_cBvdBitCosts.bitsIdx[0];
     uint32_t b1 = xGetExpGolombNumberOfBitsIBCH(x - bvp1Pel[1].getHor()) + m_cBvdBitCosts.bitsIdx[1];
@@ -272,7 +267,7 @@ public:
     return Distortion(m_dCost * bestCost) >> SCALE_BITS;
   }
 
-  inline Distortion getbvHorNullCompCost(int y, bool useIMV, int *tempImv, int *tempIdx, Mv bvp1Pel[2])
+  inline Distortion getBvHorZeroCompCost(int y, bool useIMV, int *tempImv, int *tempIdx, Mv bvp1Pel[2])
   {
     uint32_t b0 = xGetExpGolombNumberOfBitsIBCV(y - bvp1Pel[0].getVer()) + m_cBvdBitCosts.bitsIdx[0];
     uint32_t b1 = xGetExpGolombNumberOfBitsIBCV(y - bvp1Pel[1].getVer()) + m_cBvdBitCosts.bitsIdx[1];
@@ -310,6 +305,11 @@ public:
     return Distortion(m_dCost * bestCost) >> SCALE_BITS;
   }
 #endif
+
+#if JVET_AA0070_RRIBC
+  void setPredictors(Mv pcMv[3][2]);
+#if JVET_Z0131_IBC_BVD_BINARIZATION
+  EstBvdBitsStruct *getBvdBitCosts() { return &m_cBvdBitCosts; }
 
 #if JVET_Z0084_IBC_TM && IBC_TM_AMVP
   inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, int rribcFlipType, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL, bool flag = false, AMVPInfo *amvpInfo4Pel = NULL)

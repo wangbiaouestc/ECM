@@ -215,8 +215,8 @@ public:
 #endif
 #endif
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
-  uint64_t    geoBldFlagEst(const TempCtx& ctxStart, const int flag);
-  void        geoAdaptiveBlendingIdx(const int idx);
+  uint64_t    geoBldFlagEst             (const TempCtx& ctxStart, const int flag);
+  void        geoAdaptiveBlendingIdx    (const int idx);
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void        geoModeIdx                ( const PredictionUnit&         pu);
@@ -225,26 +225,26 @@ public:
   void        imv_mode                  ( const CodingUnit&             cu );
   void        affine_amvr_mode          ( const CodingUnit&             cu );
   void        inter_pred_idc            ( const PredictionUnit&         pu );
-  void        ref_idx                   ( const PredictionUnit&         pu,       RefPicList        eRefList );
+  void        ref_idx                   ( const PredictionUnit&         pu,       RefPicList eRefList );
 #if JVET_Z0054_BLK_REF_PIC_REORDER
-  void        refIdxLC                ( const PredictionUnit&               pu );
-  void        refPairIdx              ( const PredictionUnit&               pu );
+  void        refIdxLC                  ( const PredictionUnit&         pu );
+  void        refPairIdx                ( const PredictionUnit&         pu );
 #endif
-  void        mvp_flag                  ( const PredictionUnit&         pu,       RefPicList        eRefList );
+  void        mvp_flag                  ( const PredictionUnit&         pu,       RefPicList eRefList );
 
-  void        Ciip_flag              ( const PredictionUnit&         pu );
-  void        smvd_mode              ( const PredictionUnit&         pu );
+  void        Ciip_flag                 ( const PredictionUnit&         pu );
+  void        smvd_mode                 ( const PredictionUnit&         pu );
 
 #if MULTI_HYP_PRED
-  void        ref_idx_mh(const int                     numRef, const int         refIdx);
-  void        mh_pred_data(const PredictionUnit&         pu);
+  void        ref_idx_mh                (const int numRef, const int refIdx);
+  void        mh_pred_data              (const PredictionUnit&         pu);
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
-  void        amvpMerge_mode         ( const PredictionUnit&         pu );
+  void        amvpMerge_mode            ( const PredictionUnit&         pu );
 #endif
 #if JVET_Z0050_CCLM_SLOPE
-  void        cclmDelta             ( const PredictionUnit&         pu, int8_t delta);
-  void        cclmDeltaSlope       ( const PredictionUnit&         pu );
+  void        cclmDelta                 ( const PredictionUnit&         pu, int8_t delta);
+  void        cclmDeltaSlope            ( const PredictionUnit&         pu );
 #endif
 #if JVET_AA0126_GLM
   void        glmIdc                    ( const PredictionUnit&         pu );
@@ -263,18 +263,18 @@ public:
 #endif
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  void bvdCoding(const Mv &rMvd, int8_t imv, int bvOneNullComp = 0, int bvNullCompDir = 0);
+  void        bvdCoding                 (const Mv &rMvd, int8_t imv, int bvOneZeroComp = 0, int bvZeroCompDir = 0);
 #else
-  void bvdCoding(const Mv &rMvd, int8_t imv, const int &rribcFlipType = 0);
+  void        bvdCoding                 (const Mv &rMvd, int8_t imv, const int &rribcFlipType = 0);
 #endif
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
-  void        bvdCodingRemainder(const Mv& rMvd, const MvdSuffixInfo& si, int8_t imv);
-  unsigned    xWriteBvdContextPrefix(unsigned uiSymbol, unsigned ctxT, int offset, int param);
-  void        xWriteBvdContextSuffix(unsigned uiSymbol, int param, int param_updated, int numSkipMSB);
-#else //!JVET_AC0104_IBC_BVD_PREDICTION
-  void        xWriteBvdContext(unsigned uiSymbol, unsigned ctxT, int offset, int param);
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+  void        bvdCodingRemainder        (const Mv& rMvd, const MvdSuffixInfo& si, int8_t imv);
+  unsigned    xWriteBvdContextPrefix    (unsigned uiSymbol, unsigned ctxT, int offset, int param);
+  void        xWriteBvdContextSuffix    (unsigned uiSymbol, int param, int paramUpdated, int numSkipMSB);
+#else
+  void        xWriteBvdContext          (unsigned uiSymbol, unsigned ctxT, int offset, int param);
+#endif
 #endif
 #else
   void        mvd_coding                ( const Mv &rMvd, int8_t imv 
@@ -284,16 +284,20 @@ public:
   );
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  void        bvdCoding                 ( const Mv &rMvd, int8_t imv, int bvOneZeroComp = 0, int bvZeroCompDir = 0 );
+#elif JVET_AA0070_RRIBC
+  void        bvdCoding                 ( const Mv &rMvd, int8_t imv, const int &rribcFlipType = 0 );
+#else
+  void        bvdCoding                 ( const Mv &rMvd, int8_t imv );
+#endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
-  void        bvdCoding(const Mv& rMvd, int8_t imv);
-  void        bvdCodingRemainder(const Mv& rMvd, const MvdSuffixInfo& si, int8_t imv);
-
-  unsigned    xWriteBvdContextPrefix(unsigned uiSymbol, unsigned ctxT, int offset, int param);
-  void        xWriteBvdContextSuffix(unsigned uiSymbol, int param, int param_updated, int numSkipMSB = 0);
-#else // !JVET_AC0104_IBC_BVD_PREDICTION
-  void        bvdCoding                ( const Mv &rMvd, int8_t imv );
-  void        xWriteBvdContext(unsigned uiSymbol, unsigned ctxT, int offset, int param);
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+  void        bvdCodingRemainder        (const Mv& rMvd, const MvdSuffixInfo& si, int8_t imv);
+  unsigned    xWriteBvdContextPrefix    (unsigned uiSymbol, unsigned ctxT, int offset, int param);
+  void        xWriteBvdContextSuffix    (unsigned uiSymbol, int param, int paramUpdated, int numSkipMSB = 0);
+#else
+  void        xWriteBvdContext          (unsigned uiSymbol, unsigned ctxT, int offset, int param);
+#endif
 #endif
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -348,7 +352,7 @@ public:
   void        rribcData                ( const CodingUnit &cu);
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  void        bvOneNullComp_data       ( const CodingUnit &cu );
+  void        bvOneZeroComp            ( const CodingUnit &cu );
 #endif
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   CABACDataStore*         m_CABACDataStore;

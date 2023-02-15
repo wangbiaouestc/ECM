@@ -344,7 +344,7 @@ namespace PU
     , const uint32_t mvdSimilarityThresh = 1
 #endif
   );
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   void addMergeHMVPCandSubTMVP(const CodingStructure &cs, MergeCtx& mrgCtx, const int& mrgCandIdx, const uint32_t maxNumMergeCand, int &cnt
     , const bool isAvailableA1, const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
 #if !JVET_Z0075_IBC_HMVP_ENLARGE
@@ -420,7 +420,7 @@ namespace PU
   bool isBipredRestriction            (const PredictionUnit &pu);
 #if MULTI_PASS_DMVR
   void spanMotionInfo                 (      PredictionUnit &pu, const MergeCtx &mrgCtx = MergeCtx(), 
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     int colIdx = 0,
 #endif
     Mv* bdmvrSubPuMv0 = nullptr, Mv* bdmvrSubPuMv1 = nullptr, Mv* bdofSubPuMvOffset = nullptr );
@@ -430,7 +430,7 @@ namespace PU
 #if JVET_W0123_TIMD_FUSION
 #if MULTI_PASS_DMVR
   void spanMotionInfo2                (      PredictionUnit &pu, const MergeCtx &mrgCtx = MergeCtx(),
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     int colIdx = 0,
 #endif
     Mv* bdmvrSubPuMv0 = nullptr, Mv* bdmvrSubPuMv1 = nullptr, Mv* bdofSubPuMvOffset = nullptr );
@@ -464,7 +464,7 @@ namespace PU
   int  getNonAdjAffParaDivFun(int num1, int num2);
 #endif
   void getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx, 
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION   
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION   
     MergeCtx mrgCtx[2],
 #endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION && JVET_W0090_ARMC_TM
@@ -488,15 +488,13 @@ namespace PU
   void setAllAffineMv                 (      PredictionUnit &pu, Mv affLT, Mv affRT, Mv affLB, RefPicList eRefList, bool clipCPMVs = false );
   bool getInterMergeSubPuMvpCand      (const PredictionUnit &pu, MergeCtx& mrgCtx, bool& LICFlag, const int count
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
-#if ENABLE_INTER_TEMPLATE_MATCHING
     , int subIdx, MergeCtx mergeCtxIn
-#endif
     , int col = 0
 #else
     , int mmvdList
 #endif
   );
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   void getTMVPCandOpt(const PredictionUnit &pu, RefPicList refList, int refIdx, MergeCtx &mrgCtx, MergeCtx mergeCtx, int col = 0);
 #endif
 #if JVET_Y0128_NON_CTC

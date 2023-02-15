@@ -1702,7 +1702,7 @@ const CtxSet ContextSetCfg::rribcFlipType = ContextSetCfg::addCtxSet
 #endif
 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-const CtxSet ContextSetCfg::bvOneNullComp = ContextSetCfg::addCtxSet
+const CtxSet ContextSetCfg::bvOneZeroComp = ContextSetCfg::addCtxSet
 ({
   {  48,  50,  50,  50, },
   {  56,  50,  43,  28, },
@@ -1859,7 +1859,7 @@ const CtxSet ContextSetCfg::MvsdIdxBVDMSB = ContextSetCfg::addCtxSet
   { 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, },
   { 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, },
   });
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED

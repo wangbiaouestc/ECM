@@ -251,7 +251,7 @@ public:
   {
     return MV_PRECISION_4PEL == m_amvrPrecIbc[imv] ? 2 : 0;
   }
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
   Mv getSymmvdMv(const Mv& curMvPred, const Mv& tarMvPred)
   {
@@ -270,7 +270,7 @@ public:
     ver = (ver + mvClipPeriod) & (mvClipPeriod - 1);
     ver = (ver >= halMvClipPeriod) ? (ver - mvClipPeriod) : ver;
   }
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
   bool isMvsdApplicable() const
   {
     return (getAbsHor() + getAbsVer()) >= 1;
@@ -354,7 +354,7 @@ struct MvdSuffixInfo
 
 
 };
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 namespace std
 {

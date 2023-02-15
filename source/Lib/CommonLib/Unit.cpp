@@ -380,8 +380,8 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   rribcFlipType = other.rribcFlipType;
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  bvOneNullComp = other.bvOneNullComp;
-  bvNullCompDir = other.bvNullCompDir;
+  bvOneZeroComp = other.bvOneZeroComp;
+  bvZeroCompDir = other.bvZeroCompDir;
 #endif
 #if JVET_AB0157_TMRL
   tmrlFlag = other.tmrlFlag;
@@ -557,8 +557,8 @@ void CodingUnit::initData()
   tmrlListIdx = 0;
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  bvOneNullComp = 0;
-  bvNullCompDir = 0;
+  bvOneZeroComp = 0;
+  bvZeroCompDir = 0;
 #endif
 #if JVET_AC0094_REF_SAMPLES_OPT
   areAboveRightUnavail = false;
@@ -818,7 +818,7 @@ void PredictionUnit::initData()
 #endif
 #endif
   // inter data
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = 0;
 #endif
   mergeFlag   = false;
@@ -976,7 +976,7 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 
 PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 {
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = predData.colIdx;
 #endif
   mergeFlag   = predData.mergeFlag;
@@ -1071,7 +1071,7 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   }
 #if JVET_AC0104_IBC_BVD_PREDICTION
   bvdSuffixInfo = predData.bvdSuffixInfo;
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   refIdxLC = predData.refIdxLC;
   refPairIdx = predData.refPairIdx;
@@ -1128,7 +1128,7 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 
   mergeFlag   = other.mergeFlag;
   regularMergeFlag = other.regularMergeFlag;
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = other.colIdx;
 #endif
   mergeIdx    = other.mergeIdx;
@@ -1228,7 +1228,7 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   }
 #if JVET_AC0104_IBC_BVD_PREDICTION
   bvdSuffixInfo = other.bvdSuffixInfo;
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   refIdxLC = other.refIdxLC;

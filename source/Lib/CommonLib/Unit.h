@@ -410,8 +410,8 @@ struct CodingUnit : public UnitArea
   int            rribcFlipType;
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  int            bvOneNullComp;   // IBC BV has one null component
-  int            bvNullCompDir;   // 1: vertical null comp.  2: horizontal null comp.
+  int            bvOneZeroComp;   // IBC BV has one null component
+  int            bvZeroCompDir;   // 1: vertical null comp.  2: horizontal null comp.
 #endif
 #if JVET_AB0157_TMRL
   bool           tmrlFlag;
@@ -524,7 +524,7 @@ struct IntraPredictionData
 
 struct InterPredictionData
 {
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   uint8_t     colIdx;
 #endif
   bool      mergeFlag;
@@ -632,7 +632,7 @@ struct InterPredictionData
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   MvdSuffixInfo bvdSuffixInfo;
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
   Mv        bv;                             // block vector for IBC
   Mv        bvd;                            // block vector difference for IBC
