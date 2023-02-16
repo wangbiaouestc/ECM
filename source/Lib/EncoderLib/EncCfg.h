@@ -492,6 +492,9 @@ protected:
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   bool      m_MVSD;
 #endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bool      m_bvdPred;
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   bool      m_useARL;
 #endif
@@ -1566,6 +1569,10 @@ public:
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   void      setUseMVSD(bool b) { m_MVSD = b; }
   bool      getUseMVSD()                               const { return m_MVSD; }
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  void      setUseBvdPred(bool b)                            { m_bvdPred = b; }
+  bool      getUseBvdPred()                            const { return m_bvdPred; }
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   void      setUseARL(bool b) { m_useARL = b; }

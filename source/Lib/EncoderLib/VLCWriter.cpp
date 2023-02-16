@@ -1636,6 +1636,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AA0061_IBC_MBVD
     WRITE_FLAG( pcSPS->getUseIbcMbvd() ? 1 : 0,                                         "sps_ibc_mbvd_enabled_flag" );
 #endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+    WRITE_FLAG(pcSPS->getUseBvdPred() ? 1 : 0,                                          "sps_ibc_bvd_pred_enabled_flag");
+#endif
 #if JVET_AC0112_IBC_CIIP
     WRITE_FLAG( pcSPS->getUseIbcCiip() ? 1 : 0,                                         "sps_ibc_ciip_enabled_flag" );
 #endif

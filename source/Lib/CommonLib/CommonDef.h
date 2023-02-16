@@ -844,8 +844,10 @@ static const int    PICTURE_DISTANCE_TH =                           1;
 static const int    FAST_SKIP_DEPTH =                               2;
 
 static const double PBINTRA_RATIO     =                             1.1;
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
 static const int    THRES_TRANS =                                  16;
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 static const int    THRES_AFFINE =                                  4;
 #endif
 #if !MERGE_ENC_OPT

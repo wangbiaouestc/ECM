@@ -13240,19 +13240,14 @@ PelBuf TplMatchingCtrl::xGetCurTemplateBvd(const PredictionUnit& curPu, const Pi
   blkPos = blkPos.offset(trueAfalseL ? Position(0, 0 - tplSize) : Position(0 - tplSize, 0)); // default template offset
 
   const Size blkSize = Size(dstBuf.width, dstBuf.height);
-
-#if JVET_AC0104_IBC_BVD_PREDICTION
   const int xFrac = 0;
-#endif
 
 #if JVET_AA0146_WRAP_AROUND_FIX
   const CPelBuf refBuf = refPic.getRecoBuf(refPic.blocks[m_compID], false);
 #else
   const CPelBuf refBuf = refPic.getRecoBuf(refPic.blocks[m_compID]);
 #endif
-#if JVET_AC0104_IBC_BVD_PREDICTION
   const Pel* ref = refBuf.bufAt(blkPos);
-#endif
         Pel* dst = dstBuf.buf;
   
   const int  refStride = refBuf.stride;
@@ -17126,7 +17121,6 @@ void InterPrediction::setUniRefListAndIdx(PredictionUnit &pu)
 }
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
-
 struct CandCheckEnv
 {
   const std::vector<Mv>& cMvdDerived;
@@ -17335,11 +17329,9 @@ void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtD
 
 #if JVET_AA0070_RRIBC
   const bool rrIBCmode = pu.cu->rribcFlipType != 0;
-#else
-  const bool rrIBCmode = false;
 #endif
 
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
   const bool horPositiveAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 1 && rrIBCmode;
   const bool horNegativeAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 0 && rrIBCmode;
   const bool verPositiveAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 1 && rrIBCmode;
@@ -17358,13 +17350,13 @@ void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtD
   const bool verPositiveAllowed = !si.verEncodeSignInEP || (si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() > 0);
   const bool verNegativeAllowed = !si.verEncodeSignInEP || (si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() < 0);
 #endif
-
+#if JVET_AA0070_RRIBC
   if (rrIBCmode)
   {
     CHECK(si.horEncodeSignInEP, "si.horEncodeSignInEP in RRIBC mode");
     CHECK(si.verEncodeSignInEP, "si.verEncodeSignInEP in RRIBC mode");
   }
-
+#endif
   if (iHorKnown == 0)
   {
     for (unsigned int iVerCnt = 0; iVerCnt < iVerRange; ++iVerCnt)
@@ -17400,9 +17392,8 @@ void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtD
   else
   {
 #if JVET_AA0070_RRIBC
-    CHECK(pu.cu->rribcFlipType != 0, "pu.cu->rribcFlipType != 0");
+    CHECK(pu.cu->rribcFlipType != 0, "pu.cu->rribcFlipType !=0");
 #endif
-
     for (unsigned int iHorCnt = 0; iHorCnt < iHorRange; ++iHorCnt)
     {
       const int iHorComp = iHorKnown + (iHorCnt << iRemainedBinsInHorSuffix);
@@ -17451,17 +17442,12 @@ void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtD
     , m_filteredBlock[3][1][0], m_filteredBlock[3][0][0]
   );
 
-#if JVET_AC0104_IBC_BVD_PREDICTION
   TplMatchingCtrl tplCtrl(pu, interRes, recPic, true, COMPONENT_Y, false, 0, m_pcCurTplAbove, m_pcCurTplLeft, m_pcRefTplAbove, m_pcRefTplLeft, Mv(0, 0), nullptr, 0, 1, true);
-#endif
-
   std::vector<std::pair<Mv, Distortion>> aMvCostVec(patternsNum);
 
-
-  const int picWidth = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
-  const int picHeight = pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
-
-  const unsigned int  lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
+  const          int picWidth  = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
+  const          int picHeight = pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
+  const unsigned int lcuWidth  = pu.cs->slice->getSPS()->getMaxCUWidth();
 
   int step = -1;
   CandCheckEnv checkEnv(cMvdDerived, cMvPred, pu, picWidth, picHeight, lcuWidth, tplCtrl, aMvCostVec);
@@ -17515,9 +17501,8 @@ void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtD
   else
   {
 #if JVET_AA0070_RRIBC
-    CHECK(pu.cu->rribcFlipType != 0, "pu.cu->rribcFlipType != 0");
+    CHECK(pu.cu->rribcFlipType != 0, "pu.cu->rribcFlipType !=0");
 #endif
-
     step = (horNegativeAllowed ? 1 : 0) * ((verNegativeAllowed ? 1 : 0) + (verPositiveAllowed ? 1 : 0)) +
       (horPositiveAllowed ? 1 : 0) * ((verNegativeAllowed ? 1 : 0) + (verPositiveAllowed ? 1 : 0));
     for (unsigned int iHorCnt = 0; iHorCnt < iHorRange; ++iHorCnt)
@@ -20011,14 +19996,41 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
     return mvsdIdx;
   }
 
-  
+  Mv InterPrediction::deriveMVDFromMVSDIdxTrans(int mvsdIdx, std::vector<Mv>& cMvdDerived)
+  {
+    int bin = 0;
+    Mv cMvd = Mv(0, 0);
+    if (cMvdDerived[0].getHor())
+    {
+      bin = mvsdIdx & 1;
+      int val = bin ? -cMvdDerived[0].getHor() : cMvdDerived[0].getHor();
+      cMvd.setHor(val);
+      mvsdIdx >>= 1;
+    }
+    if (cMvdDerived[0].getVer())
+    {
+      for (int i = 0; i < (int)cMvdDerived.size(); i++)
+      {
+        if (cMvdDerived[i].getHor() == cMvd.getHor())
+        {
+          bin = mvsdIdx & 1;
+          int val = bin ? -cMvdDerived[i].getVer() : cMvdDerived[i].getVer();
+          cMvd.setVer(val);
+          mvsdIdx >>= 1;
+          break;
+        }
+      }
+    }
+    return cMvd;
+  }
+#endif
+
 #if JVET_AC0104_IBC_BVD_PREDICTION
-  int InterPrediction::deriveMVSDIdxFromMVDTransIBC(const Mv & cMvd, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si) const 
+  int InterPrediction::deriveMVSDIdxFromMVDTransIBC(const Mv& cMvd, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si) const
   {
     int mvsdIdx = 0;
     int shift = 0;
     int bin = 0;
-
 
     if (cMvd.getHor() && !si.horEncodeSignInEP)
     {
@@ -20043,7 +20055,7 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
     return mvsdIdx;
   }
 
-  Mv InterPrediction::deriveMVDFromMVSDIdxTransIBC(int mvsdIdx, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo & si) const
+  Mv InterPrediction::deriveMVDFromMVSDIdxTransIBC(int mvsdIdx, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si) const
   {
     int bin = 0;
     Mv cMvd = Mv(0, 0);
@@ -20073,35 +20085,6 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
       for (int i = 0; i < (int)cMvdDerived.size(); i++)
       {
         if (SIGN(cMvdDerived[i].getHor()) == SIGN(cMvd.getHor()))
-        {
-          bin = mvsdIdx & 1;
-          int val = bin ? -cMvdDerived[i].getVer() : cMvdDerived[i].getVer();
-          cMvd.setVer(val);
-          mvsdIdx >>= 1;
-          break;
-        }
-      }
-    }
-    return cMvd;
-  }
-#endif
-
-  Mv InterPrediction::deriveMVDFromMVSDIdxTrans(int mvsdIdx, std::vector<Mv>& cMvdDerived)
-  {
-    int bin = 0;
-    Mv cMvd = Mv(0, 0);
-    if (cMvdDerived[0].getHor())
-    {
-      bin = mvsdIdx & 1;
-      int val = bin ? -cMvdDerived[0].getHor() : cMvdDerived[0].getHor();
-      cMvd.setHor(val);
-      mvsdIdx >>= 1;
-    }
-    if (cMvdDerived[0].getVer())
-    {
-      for (int i = 0; i < (int)cMvdDerived.size(); i++)
-      {
-        if (cMvdDerived[i].getHor() == cMvd.getHor())
         {
           bin = mvsdIdx & 1;
           int val = bin ? -cMvdDerived[i].getVer() : cMvdDerived[i].getVer();

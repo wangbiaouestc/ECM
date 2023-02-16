@@ -1134,6 +1134,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   ("MVSD",                                            m_MVSD,                                            true, "Motion Vector difference Sign Derivation (0:off, 1:on)")
 #endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  ("BvdPred",                                         m_bvdPred,                                         true, "Block vector difference Prediction (0:off, 1:on)")
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   ("ARL",                                             m_useARL,                                          true, "Adaptive Reference List (0:off, 1:on)")
 #endif
@@ -3926,6 +3929,13 @@ bool EncAppCfg::xCheckParameter()
       m_MVSD = false;
     }
 #endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+    if (m_bvdPred)
+    {
+      msg(WARNING, "BVD prediction is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_bvdPred = false;
+    }
+#endif
   }
 #endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
@@ -5214,6 +5224,9 @@ void EncAppCfg::xPrintParameter()
     msg(VERBOSE, "IBC:%d ", m_IBCMode);
 #if JVET_AA0061_IBC_MBVD
     msg( VERBOSE, "IBCMBVD:%d ", m_ibcMbvd );
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+    msg(VERBOSE, "IBCBvdPred:%d ", m_bvdPred);
 #endif
 #if JVET_AC0112_IBC_CIIP
   msg( VERBOSE, "IBCCIIP:%d ", m_ibcCiip);

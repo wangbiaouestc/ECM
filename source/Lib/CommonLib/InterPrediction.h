@@ -579,9 +579,8 @@ public:
   };
 
   void deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, std::vector<Mv>& cMvdDerived, int imv );
-
-  void initOffsets(Mv& cMvdInput, std::vector<Mv>& cMvdDerived,        MvdSuffixInfo& si, int imv);
-  void applyOffsets(Mv& cMvdInput, std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si, int imv);
+  void initOffsets     (Mv& cMvdInput, std::vector<Mv>& cMvdDerived,       MvdSuffixInfo& si, int imv);
+  void applyOffsets    (Mv& cMvdInput, std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si, int imv);
 #endif
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -591,11 +590,6 @@ public:
 #endif
   void deriveMvdSign(const Mv& cMvPred, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, RefPicList eRefPicList, int iRefIdx, std::vector<Mv>& cMvdDerived);
   int deriveMVSDIdxFromMVDTrans(Mv cMvd, std::vector<Mv>& cMvdDerived);
-#if JVET_AC0104_IBC_BVD_PREDICTION
-  int deriveMVSDIdxFromMVDTransIBC(const Mv& cMvd, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si) const ;
-  Mv  deriveMVDFromMVSDIdxTransIBC(int mvsdIdx, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si) const;
-#endif
-
   Mv deriveMVDFromMVSDIdxTrans(int mvsdIdx, std::vector<Mv>& cMvdDerived);
   void deriveMvdSignSMVD(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, std::vector<Mv>& cMvdDerived);
   void deriveMvdSignAffine(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvPred3,
@@ -614,6 +608,10 @@ public:
 #endif
   int deriveMVSDIdxFromMVDAffine(PredictionUnit& pu, RefPicList eRefList, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3);
   void deriveMVDFromMVSDIdxAffine(PredictionUnit& pu, RefPicList eRefList, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3);
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  int deriveMVSDIdxFromMVDTransIBC(const Mv& cMvd, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si) const;
+  Mv  deriveMVDFromMVSDIdxTransIBC(int mvsdIdx, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si) const;
 #endif
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
   void    cacheAssign( CacheModel *cache );
@@ -1049,7 +1047,7 @@ public:
                 , const int tplSize = TM_TPL_SIZE
                 , const bool isForBmvdFlag = false
 #endif
-  );
+                 );
 
   bool       getTemplatePresentFlag() { return m_curTplAbove.buf != nullptr || m_curTplLeft.buf != nullptr; }
   Distortion getMinCost            () { return m_minCost; }
@@ -1075,7 +1073,7 @@ private:
   template <bool TrueX_FalseY>                      void       xDeriveCostBasedOffset (Distortion costLorA, Distortion costCenter, Distortion costRorB, int log2StepSize);
                                                     int        xBinaryDivision    (int64_t numerator, int64_t denominator, int fracBits);
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
 public:
 #endif
   template <int tplSize>                            Distortion xGetTempMatchError (const Mv& mv);

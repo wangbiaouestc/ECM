@@ -306,11 +306,9 @@ struct MvdSuffixInfo
   int      horSignHypMatch = -1;
   int      verSignHypMatch = -1;
 
-  void initPrefixes(const Mv& mv, const int imv, const bool isInternalPrecision);
-
-  void initSuffixesAndSigns(const Mv& mv, const int imv);
-
-  void defineNumberOfPredictedBinsInSuffix(const int iHorPrefix, const int iVerPrefix, const uint8_t imv  );
+  void initPrefixes                       (const Mv& mv, const int imv, const bool isInternalPrecision);
+  void initSuffixesAndSigns               (const Mv& mv, const int imv);
+  void defineNumberOfPredictedBinsInSuffix(const int iHorPrefix, const int iVerPrefix, const uint8_t imv);
 
   static int getMaxSuffix(const int prefix, const int maxAbs, const int maxGroupStartValue)
   {

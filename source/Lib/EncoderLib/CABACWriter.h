@@ -163,7 +163,7 @@ public:
   Pel         writePLTIndex             ( const CodingUnit&             cu,       uint32_t          idx,           PelBuf&  paletteIdx,       PLTtypeBuf&  paletteRunType, int         maxSymbol,   ComponentID compBegin );
   // prediction unit (clause 7.3.8.6)
   void        prediction_unit           ( const PredictionUnit&         pu );
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
   void        mvsd_data                 ( const PredictionUnit&         pu );
 #endif
   void        merge_flag                ( const PredictionUnit&         pu );
@@ -262,19 +262,27 @@ public:
   void        mvd_coding                ( const Mv &rMvd, int8_t imv, const int &rribcFlipType = 0 );
 #endif
 #if JVET_Z0131_IBC_BVD_BINARIZATION
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  void        bvdCoding                 (const Mv &rMvd, int8_t imv, int bvOneZeroComp = 0, int bvZeroCompDir = 0);
+  void        bvdCoding                 ( const Mv& rMvd, const bool useBvdPred = true, int bvOneZeroComp = 0, int bvZeroCompDir = 0 );
+#else                                     
+  void        bvdCoding                 ( const Mv& rMvd, const bool useBvdPred = true, const int& rribcFlipType = 0 );
+#endif
 #else
-  void        bvdCoding                 (const Mv &rMvd, int8_t imv, const int &rribcFlipType = 0);
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  void        bvdCoding                 ( const Mv& rMvd, int bvOneZeroComp = 0, int bvZeroCompDir = 0 );
+#else                                     
+  void        bvdCoding                 ( const Mv& rMvd, const int& rribcFlipType = 0 );
+#endif
 #endif
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
   void        bvdCodingRemainder        (const Mv& rMvd, const MvdSuffixInfo& si, int8_t imv);
   unsigned    xWriteBvdContextPrefix    (unsigned uiSymbol, unsigned ctxT, int offset, int param);
   void        xWriteBvdContextSuffix    (unsigned uiSymbol, int param, int paramUpdated, int numSkipMSB);
-#else
-  void        xWriteBvdContext          (unsigned uiSymbol, unsigned ctxT, int offset, int param);
 #endif
+  void        xWriteBvdContext          (unsigned uiSymbol, unsigned ctxT, int offset, int param);
 #endif
 #else
   void        mvd_coding                ( const Mv &rMvd, int8_t imv 
@@ -292,16 +300,25 @@ public:
   void        bvdCoding                 ( const Mv &rMvd, int8_t imv );
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
-  void        bvdCodingRemainder        (const Mv& rMvd, const MvdSuffixInfo& si, int8_t imv);
-  unsigned    xWriteBvdContextPrefix    (unsigned uiSymbol, unsigned ctxT, int offset, int param);
-  void        xWriteBvdContextSuffix    (unsigned uiSymbol, int param, int paramUpdated, int numSkipMSB = 0);
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  void        bvdCoding                 ( const Mv& rMvd, const bool useBvdPred = true, int bvOneZeroComp = 0, int bvZeroCompDir = 0 );
+#else                                     
+  void        bvdCoding                 ( const Mv& rMvd, const bool useBvdPred = true );
+#endif                                    
+  void        bvdCodingRemainder        ( const Mv& rMvd, const MvdSuffixInfo& si, int8_t imv );
+                                          
+  unsigned    xWriteBvdContextPrefix    ( unsigned uiSymbol, unsigned ctxT, int offset, int param );
+  void        xWriteBvdContextSuffix    ( unsigned uiSymbol, int param, int paramUpdated, int numSkipMSB = 0 );
 #else
-  void        xWriteBvdContext          (unsigned uiSymbol, unsigned ctxT, int offset, int param);
+  void        bvdCoding                 ( const Mv &rMvd);
+#endif
+  void        xWriteBvdContext(unsigned uiSymbol, unsigned ctxT, int offset, int param);
 #endif
 #endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
+  void mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList);
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  void mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList);
   void mvsdAffineIdxFunc(const PredictionUnit &pu, RefPicList eRefList);
 #endif
   // transform unit (clause 7.3.8.10)

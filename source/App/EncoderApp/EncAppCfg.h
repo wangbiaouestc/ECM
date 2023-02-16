@@ -485,6 +485,9 @@ protected:
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   bool      m_MVSD;
 #endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bool      m_bvdPred;
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   bool      m_useARL;
 #endif

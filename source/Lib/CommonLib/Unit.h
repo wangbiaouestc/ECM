@@ -627,7 +627,7 @@ struct InterPredictionData
 #if CIIP_PDPC
   bool      ciipPDPC;
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
   int       mvsdIdx[NUM_REF_PIC_LIST_01];
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
@@ -697,6 +697,9 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   bool              isMvsdApplicable() const;
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bool              isBvdPredApplicable() const;
 #endif
 };
 

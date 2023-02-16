@@ -3237,13 +3237,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
-          auto cMvPred = amvpInfo.mvCand[pu.mvpIdx[REF_PIC_LIST_0]];
-          if (pu.isMvsdApplicable() && pu.mvd[REF_PIC_LIST_0].isMvsdApplicable())
-          {            
-            std::vector<Mv> cMvdDerivedVec;
-
+          if (pu.isBvdPredApplicable() && pu.mvd[REF_PIC_LIST_0].isMvsdApplicable())
+          {
 #if JVET_AA0070_RRIBC
-
+            auto cMvPred = amvpInfo.mvCand[pu.mvpIdx[REF_PIC_LIST_0]];
             if (pu.cu->rribcFlipType == 1)
             {
               cMvPred.setVer(0);
@@ -3255,21 +3252,15 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #else
             const auto cMvPred = amvpInfo.mvCand[pu.mvpIdx[REF_PIC_LIST_0]];
 #endif
-
             pu.bvdSuffixInfo.initPrefixes(pu.mvd[REF_PIC_LIST_0], pu.cu->imv, true);
-
+            std::vector<Mv> cMvdDerivedVec;
             m_pcInterPred->deriveBvdSignIBC(cMvPred, pu.mvd[REF_PIC_LIST_0], pu, cMvdDerivedVec, pu.cu->imv);
-
             CHECK(pu.mvsdIdx[REF_PIC_LIST_0] >= cMvdDerivedVec.size(), "pu.mvsdIdx[REF_PIC_LIST_0] out of range");
-
             int mvsdIdx = pu.mvsdIdx[REF_PIC_LIST_0];
-
             Mv cMvd = m_pcInterPred->deriveMVDFromMVSDIdxTransIBC(mvsdIdx, cMvdDerivedVec, pu.bvdSuffixInfo);
-
             m_pcInterPred->applyOffsets(cMvd, cMvdDerivedVec, pu.bvdSuffixInfo, pu.cu->imv);
-
             CHECK(cMvd == Mv(0, 0), " zero MVD!");
-            pu.mvd[REF_PIC_LIST_0] = cMvd;           
+            pu.mvd[REF_PIC_LIST_0] = cMvd;
           }
 #endif
 

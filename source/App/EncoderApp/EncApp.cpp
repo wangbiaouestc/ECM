@@ -904,6 +904,9 @@ void EncApp::xInitLibCfg()
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   m_cEncLib.setUseMVSD                                           (m_MVSD);
 #endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  m_cEncLib.setUseBvdPred                                        (m_bvdPred);
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   m_cEncLib.setUseARL                                            (m_useARL);
 #endif

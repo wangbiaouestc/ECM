@@ -903,7 +903,7 @@ void PredictionUnit::initData()
     refIdx[i] = -1;
     mv[i]     .setZero();
     mvd[i]    .setZero();
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
     mvsdIdx[i] = -1;
 #endif
     for( uint32_t j = 0; j < 3; j++ )
@@ -1057,7 +1057,7 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
     mv[i]       = predData.mv[i];
     mvd[i]      = predData.mvd[i];
     refIdx[i]   = predData.refIdx[i];
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
     mvsdIdx[i] = predData.mvsdIdx[i];
 #endif
     for( uint32_t j = 0; j < 3; j++ )
@@ -1214,7 +1214,7 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
     mv[i]       = other.mv[i];
     mvd[i]      = other.mvd[i];
     refIdx[i]   = other.refIdx[i];
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
     mvsdIdx[i] = other.mvsdIdx[i];
 #endif
     for( uint32_t j = 0; j < 3; j++ )
@@ -1340,6 +1340,19 @@ bool PredictionUnit::isMvsdApplicable() const
   return true;
 }
 #endif
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+bool PredictionUnit::isBvdPredApplicable() const
+{
+  if (!cs->sps->getUseBvdPred())
+  {
+    return false;
+  }
+
+  return true;
+}
+#endif
+
 #if JVET_W0123_TIMD_FUSION
 const uint8_t& PredictionUnit::getIpmInfo() const
 {
