@@ -449,7 +449,7 @@ public:
 #if JVET_Z0131_IBC_BVD_BINARIZATION
   static const CtxSet   Bvd;
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
   static const CtxSet   MvsdIdx;
 #endif
 

@@ -2590,7 +2590,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 
 #if JVET_AC0104_IBC_BVD_PREDICTION 
     pu.mvsdIdx[REF_PIC_LIST_0] = 0;
-    if (pu.mvd[REF_PIC_LIST_0].isMvsdApplicable())
+    if (pu.isBvdPredApplicable() && pu.mvd[REF_PIC_LIST_0].isMvsdApplicable())
     {
       pu.bvdSuffixInfo.initPrefixes(pu.mvd[REF_PIC_LIST_0], pu.cu->imv, true);
 

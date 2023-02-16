@@ -1862,7 +1862,7 @@ const CtxSet ContextSetCfg::MvsdIdxBVDMSB = ContextSetCfg::addCtxSet
 #endif
 
 
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
 const CtxSet ContextSetCfg::MvsdIdx = ContextSetCfg::addCtxSet
 ({
   {  34,  41,  49,  41, },
@@ -4015,7 +4015,7 @@ const CtxSet ContextSetCfg::Bvd = ContextSetCfg::addCtxSet
 });
 #endif
 
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
 const CtxSet ContextSetCfg::MvsdIdx = ContextSetCfg::addCtxSet
 ({
   { 34, 34, 34, 34,},
