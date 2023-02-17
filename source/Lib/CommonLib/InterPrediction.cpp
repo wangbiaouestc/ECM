@@ -10547,19 +10547,6 @@ void  InterPrediction::updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, u
   }
 }
 #endif
-
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-Distortion InterPrediction::getRdCostOTF(const PredictionUnit &pu, const PelBuf &org, const PelBuf &cur)
-{
-  Distortion uiCost;
-  DistParam  cDistParam;
-  cDistParam.applyWeight = false;
-  m_pcRdCost->setDistParam(cDistParam, cur, org, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
-  uiCost = cDistParam.distFunc(cDistParam);
-  return uiCost;
-}
-#endif
-
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 void  InterPrediction::adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx,uint32_t startPos,uint32_t endPos)
 {
@@ -10867,6 +10854,18 @@ void  InterPrediction::updateIBCCandInfo( PredictionUnit &pu, MergeCtx& mrgCtx, 
     mrgCtx.rribcFlipTypes[uiMergeCand] = mrgCtxTmp.rribcFlipTypes[RdCandList[uiMergeCand - startPos]];
 #endif
   }
+}
+#endif
+
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+Distortion InterPrediction::getRdCostOTF(const PredictionUnit &pu, const PelBuf &org, const PelBuf &cur)
+{
+  Distortion uiCost;
+  DistParam  cDistParam;
+  cDistParam.applyWeight = false;
+  m_pcRdCost->setDistParam(cDistParam, cur, org, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+  uiCost = cDistParam.distFunc(cDistParam);
+  return uiCost;
 }
 #endif
 

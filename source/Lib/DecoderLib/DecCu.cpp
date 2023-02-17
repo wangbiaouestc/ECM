@@ -3202,7 +3202,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         else if (CU::isIBC(*pu.cu) && pu.interDir == 1)
         {
           AMVPInfo amvpInfo;
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
           PU::fillIBCMvpCand(pu, amvpInfo, m_pcInterPred);
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
 #if JVET_AA0070_RRIBC

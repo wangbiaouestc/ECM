@@ -2225,7 +2225,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
       {
 #endif
 #endif
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
       PU::fillIBCMvpCand(pu, amvpInfo4Pel[i], this);
 #else
       PU::fillIBCMvpCand(pu, amvpInfo4Pel[i]);
@@ -2255,7 +2255,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
       {
 #endif
 #endif
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
       PU::fillIBCMvpCand(pu, amvpInfo[i], this);
 #else
       PU::fillIBCMvpCand(pu, amvpInfo[i]);
@@ -2300,7 +2300,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     {
 #endif
 #endif
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
     PU::fillIBCMvpCand(pu, amvpInfo4Pel, this);
 #else
     PU::fillIBCMvpCand(pu, amvpInfo4Pel);
@@ -2331,7 +2331,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     {
 #endif
 #endif
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
     PU::fillIBCMvpCand(pu, amvpInfo, this);
 #else
     PU::fillIBCMvpCand(pu, amvpInfo);
