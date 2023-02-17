@@ -11553,6 +11553,7 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 #if JVET_AC0112_IBC_GPM
           isSkipThisCand[mergeCandIbcGpm] = true;
+          skipCandNum[mergeCand] = mergeCand > 0 ? skipCandNum[mergeCand - 1] + 1 : 1;
 #endif
           continue;
         }
@@ -11777,6 +11778,7 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
         numValidBv--;
 #if JVET_AC0112_IBC_GPM
         isSkipThisCand[mergeCtx.numValidMergeCand + mergeCandIbcGpm] = true;
+        skipCandNumTm[mergeCtx.numValidMergeCand + mergeCand] = mergeCand > 0 ? skipCandNumTm[mergeCtx.numValidMergeCand + mergeCand - 1] + 1 : 1;
 #endif
         continue;
       }
