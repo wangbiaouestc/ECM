@@ -8211,7 +8211,7 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
 #if JVET_AB0079_TM_BCW_MRG
 void InterPrediction::adjustMergeCandidatesBcwIdx(PredictionUnit& pu, MergeCtx& mrgCtx, const int mergeIdx)
 {
-  if (pu.ciipFlag || pu.cu->geoFlag || !pu.cs->sps->getUseAML())
+  if (pu.ciipFlag || pu.cu->geoFlag || !pu.cs->sps->getTMToolsEnableFlag() || !pu.cs->sps->getUseBcw() )
   {
     return;
   }
