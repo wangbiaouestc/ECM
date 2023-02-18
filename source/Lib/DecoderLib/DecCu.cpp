@@ -664,7 +664,7 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
         m_pcIntraPred->generateTmDcPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1), pu.cu);
 #else
         m_pcIntraPred->generateTmDcPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), 1 << (tu.cu->cs->sps->getBitDepth(CHANNEL_TYPE_LUMA) - 1));
-#endif // JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+#endif
 
 #if JVET_AB0061_ITMP_BV_FOR_IBC
         pu.interDir               = 1;             // use list 0 for IBC mode

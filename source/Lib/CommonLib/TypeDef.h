@@ -171,7 +171,28 @@
 #define JVET_AB0157_INTRA_FUSION                          1 // JVET-AB0157: Intra prediction fusion
 #define JVET_AC0094_REF_SAMPLES_OPT                       1 // JVET-AC0094: Optimizing the use of reference samples
 #define JVET_AC0105_DIRECTIONAL_PLANAR                    1 // JVET-AC0105: Directional planar
+
+//IBC
+#define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
+#define JVET_Z0075_IBC_HMVP_ENLARGE                       1 // JVET-Z0075: Enlarged HMVP table for IBC
+#define JVET_Z0084_IBC_TM                                 1 // JVET-Z0084: Add template matching in IBC modes. [0 = disable, 1 (default) = enable for IBC-AMVP and IBC-MRG, 2 = enable for IBC-AMVP, 3 = enable for IBC-MRG]
+#if JVET_Z0084_IBC_TM
+#define IBC_TM_AMVP                                       ((JVET_Z0084_IBC_TM) == 1 || (JVET_Z0084_IBC_TM) == 2) // Add template matching to IBC to refine IBC AMVP candidates
+#define IBC_TM_MRG                                        ((JVET_Z0084_IBC_TM) == 1 || (JVET_Z0084_IBC_TM) == 3) // Add template matching to IBC to refine IBC merge candidates
+#endif
+#define JVET_Z0131_IBC_BVD_BINARIZATION                   1 // JVET-Z0131: Block vector difference binarization
+#define JVET_Z0153_IBC_EXT_REF                            1 // JVET-Z0153: Extend reference area for IBC
+#define JVET_Z0160_IBC_ZERO_PADDING                       1 // JVET-Z0160: Replacement of zero-padding candidates
+#define JVET_AA0106_IBCBUF_CTU256                         1 // JVET-AA0106: Adjust IBC reference area to 2*128 rows above the current CTU
+#define JVET_AA0061_IBC_MBVD                              1 // JVET-AA0061: IBC merge mode with block vector differences
+#define JVET_AA0070_RRIBC                                 1 // JVET-AA0070: Reconstruction-Reordered IBC
+#define JVET_AC0112_IBC_CIIP                              1 // JVET-AC0112: Combined IBC and intra prediction (IBC-CIIP)
+#define JVET_AC0112_IBC_GPM                               1 // JVET-AC0112: IBC with geometry partitioning mode (IBC-GPM)
+#define JVET_AC0112_IBC_LIC                               1 // JVET-AC0112: IBC with local illumination compensation (IBC-LIC)
+#define JVET_AC0104_IBC_BVD_PREDICTION                    1 // JVET-AC0104: IBC block vector difference prediction (part of JVET-AC0113 Test 3.5a) 
+#define JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV  1 // JVET-AC0060: IBC BVP candidates clustering and BVD sign derivation for BV with one zero component (part of JVET-AC0113 Test 3.5a) 
 #define JVET_AC0071_DBV                                   1 // JVET-AC0071: Direct block vector mode for chroma prediction
+
 
 // Inter
 #define CIIP_PDPC                                         1 // Apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
@@ -229,6 +250,7 @@
 #define JVET_AB0112_AFFINE_DMVR                           1 // JVET-AB0112: DMVR (baseMV refinement) for affine
 #define JVET_AC0144_AFFINE_DMVR_REGRESSION                1 // JVET-AC0144: DMVR for affine with regression refinement
 #define JVET_AC0158_PIXEL_AFFINE_MC                       1 // JVET-AC0158: Pixel based affine motion compensation
+
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
 #if ENABLE_INTER_TEMPLATE_MATCHING
@@ -256,26 +278,6 @@
 #define JVET_AB0079_TM_BCW_MRG                            1 // JVET-AB0079: Template matching based BCW index derivation for merge mode with positive weights only
 #define JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION   1 // JVET-AC0185: Enhanced temporal motion information derivation
 #endif
-
-//IBC
-#define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
-#define JVET_Z0075_IBC_HMVP_ENLARGE                       1 // JVET-Z0075: Enlarged HMVP table for IBC
-#define JVET_Z0084_IBC_TM                                 1 // JVET-Z0084: Add template matching in IBC modes. [0 = disable, 1 (default) = enable for IBC-AMVP and IBC-MRG, 2 = enable for IBC-AMVP, 3 = enable for IBC-MRG]
-#if JVET_Z0084_IBC_TM
-#define IBC_TM_AMVP                                       ((JVET_Z0084_IBC_TM) == 1 || (JVET_Z0084_IBC_TM) == 2) // Add template matching to IBC to refine IBC AMVP candidates
-#define IBC_TM_MRG                                        ((JVET_Z0084_IBC_TM) == 1 || (JVET_Z0084_IBC_TM) == 3) // Add template matching to IBC to refine IBC merge candidates
-#endif
-#define JVET_Z0131_IBC_BVD_BINARIZATION                   1 // JVET-Z0131: Block vector difference binarization
-#define JVET_Z0153_IBC_EXT_REF                            1 // JVET-Z0153: Extend reference area for IBC
-#define JVET_Z0160_IBC_ZERO_PADDING                       1 // JVET-Z0160: Replacement of zero-padding candidates
-#define JVET_AA0106_IBCBUF_CTU256                         1 // JVET-AA0106: Adjust IBC reference area to 2*128 rows above the current CTU
-#define JVET_AA0061_IBC_MBVD                              1 // JVET-AA0061: IBC merge mode with block vector differences
-#define JVET_AA0070_RRIBC                                 1 // JVET-AA0070: Reconstruction-Reordered IBC
-#define JVET_AC0112_IBC_CIIP                              1 // JVET-AC0112: Combined IBC and intra prediction (IBC-CIIP)
-#define JVET_AC0112_IBC_GPM                               1 // JVET-AC0112: IBC with geometry partitioning mode (IBC-GPM)
-#define JVET_AC0112_IBC_LIC                               1 // JVET-AC0112: IBC with local illumination compensation (IBC-LIC)
-#define JVET_AC0104_IBC_BVD_PREDICTION                    1 // JVET-AC0104: IBC block vector difference prediction (part of JVET-AC0113 Test 3.5a) 
-#define JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV  1 // JVET-AC0060: IBC BVP candidates clustering and BVD sign derivation for BV with one null component (part of JVET-AC0113 Test 3.5a) 
 
 // Transform and coefficient coding
 #define TCQ_8STATES                                       1
