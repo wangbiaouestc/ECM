@@ -2579,12 +2579,20 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
       pu.mvd[REF_PIC_LIST_0] = cMv - amvpInfo.mvCand[bvpIdxBest];
 #endif
 
-    if (pu.mvd[REF_PIC_LIST_0] == Mv(0, 0))
+    if( pu.mvd[REF_PIC_LIST_0] == Mv( 0, 0 ) )
+    {
       pu.cu->imv = 0;
-    if (pu.cu->imv == 2)
-      assert((cMv.getHor() % 16 == 0) && (cMv.getVer() % 16 == 0));
-    if (cu.cs->sps->getAMVREnabledFlag())
-      assert(pu.cu->imv>0 || pu.mvd[REF_PIC_LIST_0] == Mv());
+    }
+
+    if( pu.cu->imv == 2 )
+    {
+      assert( ( cMv.getHor() % 16 == 0 ) && ( cMv.getVer() % 16 == 0 ) );
+    }
+
+    if( cu.cs->sps->getAMVREnabledFlag() )
+    {
+      assert( pu.cu->imv > 0 || pu.mvd[REF_PIC_LIST_0] == Mv() );
+    }
 
     pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
 

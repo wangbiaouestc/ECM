@@ -6698,7 +6698,7 @@ int IntraPrediction::deriveDimdIntraTmpModePred(const CodingUnit cu, CPelBuf pre
   }
   return firstMode;
 }
-#endif // JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+#endif
 
 void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu)
 {
@@ -10613,7 +10613,7 @@ bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, i
 bool IntraPrediction::generateTmDcPrediction(Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val, CodingUnit* cu)
 #else
 bool IntraPrediction::generateTmDcPrediction( Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val )
-#endif // JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+#endif
 {
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
   Pel* pPred = piPred;

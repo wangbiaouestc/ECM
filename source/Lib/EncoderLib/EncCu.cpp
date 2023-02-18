@@ -11228,107 +11228,78 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
   }
 
+
 #if JVET_Z0084_IBC_TM && IBC_TM_MRG
 #if JVET_AA0061_IBC_MBVD
-  int candHasNoResidual[((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM)] = {0,};
-  bool                                                 bestIsSkip = false;
-  int32_t                                              numMrgSATDCand = NUM_IBC_MRG_SATD_CAND;
-  if (m_pcEncCfg->getIntraPeriod() != 1)
+  const int numCandidates = ( IBC_MRG_MAX_NUM_CANDS << 1 ) + IBC_MBVD_NUM;
+#else
+  const int numCandidates = IBC_MRG_MAX_NUM_CANDS << 1;
+#endif
+#elif JVET_AA0061_IBC_MBVD
+  const int numCandidates = MRG_MAX_NUM_CANDS + IBC_MBVD_NUM;
+#else
+  const int numCandidates = MRG_MAX_NUM_CANDS;
+#endif
+
+#if JVET_AA0061_IBC_MBVD
+  int candHasNoResidual[numCandidates] = { 0, };
+  bool bestIsSkip = false;
+  int32_t numMrgSATDCand = NUM_IBC_MRG_SATD_CAND;
+
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
+  if( m_pcEncCfg->getIntraPeriod() != 1 )
   {
     numMrgSATDCand += 2;
   }
-  numMrgSATDCand = std::min(numMrgSATDCand, (const int)(mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand));
-#if JVET_AC0112_IBC_CIIP
-  static_vector<ModeIbcInfo, ((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM)>  rdModeList((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM);
-  for (unsigned i = 0; i < ((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM); i++)
-  {
-    rdModeList[i].mergeCand = i;
-    rdModeList[i].isCIIP = false;
-#if JVET_AC0112_IBC_GPM
-    rdModeList[i].isIbcGpm = false;
-#endif
-  }
+  numMrgSATDCand = std::min( numMrgSATDCand, (const int)( mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand ) );
 #else
-#if JVET_AC0112_IBC_GPM
-  static_vector<ModeIbcInfo, ((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM)>  rdModeList((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM);
-  for (unsigned i = 0; i < ((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM); i++)
-  {
-    rdModeList[i].mergeCand = i;
-    rdModeList[i].isIbcGpm = false;
-  }
-#else
-  static_vector<unsigned, ((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM)>  rdModeList((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM);
-  for (unsigned i = 0; i < ((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM); i++)
-  {
-    rdModeList[i] = i;
-  }
-#endif
+  numMrgSATDCand = std::min( numMrgSATDCand, (const int)( mergeCtx.numValidMergeCand ) );
 #endif
 
-  static_vector<double, ((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM)>  candCostList(((IBC_MRG_MAX_NUM_CANDS<<1)+IBC_MBVD_NUM), MAX_DOUBLE);
-#else
-  int candHasNoResidual[IBC_MRG_MAX_NUM_CANDS<<1] = {0,};
-  bool                                                 bestIsSkip = false;
-  unsigned                                             numMrgSATDCand = mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand;
+  static_vector<ModeIbcInfo, numCandidates>  rdModeList( numCandidates );
+  for( unsigned i = 0; i < numCandidates; i++ )
+  {
+    rdModeList[i].mergeCand = i;
 #if JVET_AC0112_IBC_CIIP
-  static_vector<ModeIbcInfo, ((IBC_MRG_MAX_NUM_CANDS<<1)+2)>  rdModeList((IBC_MRG_MAX_NUM_CANDS<<1)+2);
-  for (unsigned i = 0; i < (IBC_MRG_MAX_NUM_CANDS<<1)+2; i++)
-  {
-    rdModeList[i].mergeCand = i;
     rdModeList[i].isCIIP = false;
+#endif
 #if JVET_AC0112_IBC_GPM
     rdModeList[i].isIbcGpm = false;
 #endif
   }
+
+  static_vector<double, numCandidates>  candCostList( numCandidates, MAX_DOUBLE );
 #else
-#if JVET_AC0112_IBC_GPM
-  static_vector<ModeIbcInfo, ((IBC_MRG_MAX_NUM_CANDS<<1)+2)>  rdModeList((IBC_MRG_MAX_NUM_CANDS<<1)+2);
-  for (unsigned i = 0; i < (IBC_MRG_MAX_NUM_CANDS<<1)+2; i++)
-  {
-    rdModeList[i].mergeCand = i;
-    rdModeList[i].isIbcGpm = false;
-  }
+  int candHasNoResidual[numCandidates] = { 0, };
+  bool bestIsSkip = false;
+#if JVET_Z0084_IBC_TM && IBC_TM_MRG
+  unsigned numMrgSATDCand = mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand;
 #else
-  static_vector<unsigned, (IBC_MRG_MAX_NUM_CANDS<<1)>  rdModeList(IBC_MRG_MAX_NUM_CANDS<<1);
-  for (unsigned i = 0; i < IBC_MRG_MAX_NUM_CANDS<<1; i++)
-  {
-    rdModeList[i] = i;
-  }
-#endif
+  unsigned numMrgSATDCand = mergeCtx.numValidMergeCand;
 #endif
 
 #if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
-  static_vector<double, ((IBC_MRG_MAX_NUM_CANDS<<1)+2)>  candCostList((IBC_MRG_MAX_NUM_CANDS<<1)+2, MAX_DOUBLE);
-#else
-  static_vector<double, (IBC_MRG_MAX_NUM_CANDS<<1)>  candCostList(IBC_MRG_MAX_NUM_CANDS<<1, MAX_DOUBLE);
+  static_vector<ModeIbcInfo, numCandidates + 2>  rdModeList( numCandidates + 2 );
+  for( unsigned i = 0; i < numCandidates + 2; i++ )
+  {
+    rdModeList[i].mergeCand = i;
+#if JVET_AC0112_IBC_CIIP
+    rdModeList[i].isCIIP = false;
 #endif
+#if JVET_AC0112_IBC_GPM
+    rdModeList[i].isIbcGpm = false;
 #endif
+  }
+
+  static_vector<double, numCandidates + 2>  candCostList( numCandidates + 2, MAX_DOUBLE );
 #else
-#if JVET_AA0061_IBC_MBVD
-  int candHasNoResidual[MRG_MAX_NUM_CANDS + IBC_MBVD_NUM] = {0,};
-  bool                                        bestIsSkip = false;
-  int32_t                                     numMrgSATDCand = NUM_IBC_MRG_SATD_CAND;
-  numMrgSATDCand = std::min(numMrgSATDCand, (const int)(mergeCtx.numValidMergeCand));
-  static_vector<unsigned, MRG_MAX_NUM_CANDS + IBC_MBVD_NUM>  rdModeList(MRG_MAX_NUM_CANDS + IBC_MBVD_NUM);
-  for (unsigned i = 0; i < MRG_MAX_NUM_CANDS + IBC_MBVD_NUM; i++)
+  static_vector<unsigned, numCandidates>  rdModeList( numCandidates );
+  for( unsigned i = 0; i < numCandidates; i++ )
   {
     rdModeList[i] = i;
   }
 
-  //{
-  static_vector<double, MRG_MAX_NUM_CANDS + IBC_MBVD_NUM>  candCostList(MRG_MAX_NUM_CANDS + IBC_MBVD_NUM, MAX_DOUBLE);
-#else
-  int candHasNoResidual[MRG_MAX_NUM_CANDS] = {0,};
-  bool                                        bestIsSkip = false;
-  unsigned                                    numMrgSATDCand = mergeCtx.numValidMergeCand;
-  static_vector<unsigned, MRG_MAX_NUM_CANDS>  rdModeList(MRG_MAX_NUM_CANDS);
-  for (unsigned i = 0; i < MRG_MAX_NUM_CANDS; i++)
-  {
-    rdModeList[i] = i;
-  }
-
-  //{
-    static_vector<double, MRG_MAX_NUM_CANDS>  candCostList(MRG_MAX_NUM_CANDS, MAX_DOUBLE);
+  static_vector<double, numCandidates>  candCostList( numCandidates, MAX_DOUBLE );
 #endif
 #endif
 
@@ -11414,7 +11385,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
         m_pcRdCost->setDistParam(distParam, tmpLuma, refBuf, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
       }
       else
+      {
         m_pcRdCost->setDistParam(distParam, tempCS->getOrgBuf().Y(), refBuf, sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
+      }
 #endif
 
 #if JVET_AC0112_IBC_GPM
@@ -11943,7 +11916,6 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 #endif
     }
-#endif
 #if JVET_AC0112_IBC_GPM
     if (testIbcGpm && mergeCtxTm.numValidMergeCand > 0)
     {
@@ -11956,6 +11928,7 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
         isSkipThisCand[mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand - 1 - i] = true;
       }
     }
+#endif
 #endif
 
 #if JVET_AA0061_IBC_MBVD
@@ -12110,7 +12083,11 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
               double cost2 = (double)sad2 + (double)bitsCand2 * sqrtLambdaForFirstPass;
               if (cost2 < ibcCiipBestSatdCost)
               {
+#if JVET_Z0084_IBC_TM
                 ibcCiipBestMergeCand = mmvdMergeCandtemp + mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand;
+#else
+                ibcCiipBestMergeCand = mmvdMergeCandtemp + mergeCtx.numValidMergeCand;
+#endif
                 ibcCiipBestIntraCand = dirIdx;
                 ibcCiipBestSatdCost = cost2;
               }
@@ -12118,28 +12095,30 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
           }
 #endif
 
+          updateCandList( 
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
+            ModeIbcInfo(
+#endif
+              mmvdMergeCandtemp + mergeCtx.numValidMergeCand
 #if JVET_Z0084_IBC_TM
+              + mergeCtxTm.numValidMergeCand
+#endif
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
+              , false
+#endif
 #if JVET_AC0112_IBC_CIIP
+              , 0
 #if JVET_AC0112_IBC_GPM
-          updateCandList(ModeIbcInfo(mmvdMergeCandtemp + mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand, false, 0, false, 0, 0, 0, 0, 0), cost, rdModeList, candCostList
-            , numMrgSATDCand);
-#else
-          updateCandList(ModeIbcInfo(mmvdMergeCandtemp + mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand, false, 0), cost, rdModeList, candCostList
-            , numMrgSATDCand);
+              , false
 #endif
-#else
+#endif
 #if JVET_AC0112_IBC_GPM
-          updateCandList(ModeIbcInfo(mmvdMergeCandtemp + mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand, false, 0, 0, 0, 0, 0), cost, rdModeList, candCostList
-            , numMrgSATDCand);
-#else
-          updateCandList(mmvdMergeCandtemp + mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand, cost, rdModeList, candCostList
-            , numMrgSATDCand);
+              , 0, 0, 0, 0, 0
 #endif
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
+            ), 
 #endif
-#else
-          updateCandList(mmvdMergeCandtemp + mergeCtx.numValidMergeCand, cost, rdModeList, candCostList
-            , numMrgSATDCand);
-#endif
+            cost, rdModeList, candCostList, numMrgSATDCand );
         }
       }
     }
