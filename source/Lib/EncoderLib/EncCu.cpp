@@ -11256,15 +11256,23 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
   numMrgSATDCand = std::min( numMrgSATDCand, (const int)( mergeCtx.numValidMergeCand ) );
 #endif
 
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
   static_vector<ModeIbcInfo, numCandidates>  rdModeList( numCandidates );
+#else
+  static_vector<unsigned, numCandidates>  rdModeList( numCandidates );
+#endif
   for( unsigned i = 0; i < numCandidates; i++ )
   {
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
     rdModeList[i].mergeCand = i;
 #if JVET_AC0112_IBC_CIIP
     rdModeList[i].isCIIP = false;
 #endif
 #if JVET_AC0112_IBC_GPM
     rdModeList[i].isIbcGpm = false;
+#endif
+#else
+    rdModeList[i] = i;
 #endif
   }
 
@@ -12103,22 +12111,18 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if JVET_Z0084_IBC_TM
               + mergeCtxTm.numValidMergeCand
 #endif
-#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
-              , false
-#endif
 #if JVET_AC0112_IBC_CIIP
+              , false
               , 0
+#endif
 #if JVET_AC0112_IBC_GPM
               , false
-#endif
-#endif
-#if JVET_AC0112_IBC_GPM
               , 0, 0, 0, 0, 0
 #endif
 #if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
-            ), 
+            )
 #endif
-            cost, rdModeList, candCostList, numMrgSATDCand );
+            , cost, rdModeList, candCostList, numMrgSATDCand );
         }
       }
     }
