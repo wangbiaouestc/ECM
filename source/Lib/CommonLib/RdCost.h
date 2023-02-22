@@ -308,11 +308,13 @@ public:
 
 #if JVET_AA0070_RRIBC
   void setPredictors(Mv pcMv[3][2]);
-#if JVET_Z0131_IBC_BVD_BINARIZATION
+#if JVET_Z0131_IBC_BVD_BINARIZATION || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   EstBvdBitsStruct *getBvdBitCosts() { return &m_cBvdBitCosts; }
 
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
-  inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, int rribcFlipType, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL, bool flag = false, AMVPInfo *amvpInfo4Pel = NULL)
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, int rribcFlipType, uint8_t *bvImvResBest = NULL,
+                                           int *bvpIdxBest = NULL, bool flag = false, AMVPInfo *amvpInfo4Pel = NULL,
+                                           const bool useBvpCluster = true)
 #else
   inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, int rribcFlipType, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL)
 #endif
@@ -345,7 +347,10 @@ public:
     }
     uint32_t bBest    = (b1 < b0) ? b1 : b0;
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-    bBest += (rribcFlipType) ? m_cBvdBitCosts.bitsRribc : 0;
+    if (useBvpCluster)
+    {
+      bBest += (rribcFlipType) ? m_cBvdBitCosts.bitsRribc : 0;
+    }
 #endif
     int      bBestIdx = (b1 < b0) ? 1 : 0;
     uint8_t  bestRes;
@@ -372,7 +377,7 @@ public:
     {
       Mv cMv(x >> 2, y >> 2);
 
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV 
       Mv tmpBv0;
       Mv tmpBv1;
       if (flag)
@@ -413,12 +418,15 @@ public:
         bQ1 = (cMv.getVer() == tmpBv1.getVer()) ? std::numeric_limits<uint32_t>::max() : (xGetExpGolombNumberOfBitsIBCV(cMv.getVer() - tmpBv1.getVer()) + m_cBvdBitCosts.bitsIdx[1]);
       }
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-      bQ0 += (rribcFlipType && (cMv.getHor() != tmpBv0.getHor()) && (cMv.getVer() != tmpBv0.getVer()))
-               ? m_cBvdBitCosts.bitsRribc
-               : 0;
-      bQ1 += (rribcFlipType && (cMv.getHor() != tmpBv1.getHor()) && (cMv.getVer() != tmpBv1.getVer()))
-               ? m_cBvdBitCosts.bitsRribc
-               : 0;
+      if (useBvpCluster)
+      {
+        bQ0 += (rribcFlipType && (cMv.getHor() != tmpBv0.getHor()) && (cMv.getVer() != tmpBv0.getVer()))
+                 ? m_cBvdBitCosts.bitsRribc
+                 : 0;
+        bQ1 += (rribcFlipType && (cMv.getHor() != tmpBv1.getHor()) && (cMv.getVer() != tmpBv1.getVer()))
+                 ? m_cBvdBitCosts.bitsRribc
+                 : 0;
+      }
 #endif
       uint32_t bQBest = (bQ1 < bQ0) ? bQ1 : bQ0;
       bQBest += (bQBest < std::numeric_limits<uint32_t>::max()) ? m_cBvdBitCosts.bitsImv[1] : 0;

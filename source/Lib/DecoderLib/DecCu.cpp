@@ -3205,27 +3205,30 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
           PU::fillIBCMvpCand(pu, amvpInfo, m_pcInterPred);
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-#if JVET_AA0070_RRIBC
-          if (pu.cu->rribcFlipType == 0)
-#endif
+          if (pu.isBvpClusterApplicable())
           {
-            if (pu.cu->bvZeroCompDir == 1)
+#if JVET_AA0070_RRIBC
+            if (pu.cu->rribcFlipType == 0)
+#endif
             {
-              for (int i = 0; i < 2; i++)
+              if (pu.cu->bvZeroCompDir == 1)
               {
-                amvpInfo.mvCand[i] = Mv(i == 0 ? std::max(-(int) pu.lwidth(), -pu.Y().x) : -pu.Y().x, 0);
-                amvpInfo.mvCand[i].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+                for (int i = 0; i < 2; i++)
+                {
+                  amvpInfo.mvCand[i] = Mv(i == 0 ? std::max(-(int) pu.lwidth(), -pu.Y().x) : -pu.Y().x, 0);
+                  amvpInfo.mvCand[i].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+                }
               }
-            }
-            else if (pu.cu->bvZeroCompDir == 2)
-            {
-              const int ctbSize     = pu.cs->sps->getCTUSize();
-              const int numCurrCtuY = (pu.Y().y >> (floorLog2(ctbSize)));
-              const int rrTop       = (numCurrCtuY < 3) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + 2 * ctbSize);
-              for (int i = 0; i < 2; i++)
+              else if (pu.cu->bvZeroCompDir == 2)
               {
-                amvpInfo.mvCand[i] = Mv(0, i == 0 ? std::max(-(int) pu.lheight(), rrTop) : rrTop);
-                amvpInfo.mvCand[i].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+                const int ctbSize     = pu.cs->sps->getCTUSize();
+                const int numCurrCtuY = (pu.Y().y >> (floorLog2(ctbSize)));
+                const int rrTop       = (numCurrCtuY < 3) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + 2 * ctbSize);
+                for (int i = 0; i < 2; i++)
+                {
+                  amvpInfo.mvCand[i] = Mv(0, i == 0 ? std::max(-(int) pu.lheight(), rrTop) : rrTop);
+                  amvpInfo.mvCand[i].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+                }
               }
             }
           }

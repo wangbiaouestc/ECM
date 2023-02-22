@@ -158,7 +158,7 @@ static const int MAX_NUM_REF =                                     16; ///< max.
 static const int MAX_QP =                                          63;
 static const int NOT_VALID =                                       -1;
 
-#if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP)
+#if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
 static const int REGULAR_AMVP_MAX_NUM_CANDS =                       5; ///< AMVP: advanced motion vector prediction - max number of final candidate for regular inter mode
 #endif
 static const int AMVP_MAX_NUM_CANDS =                               2; ///< AMVP: advanced motion vector prediction - max number of final candidates

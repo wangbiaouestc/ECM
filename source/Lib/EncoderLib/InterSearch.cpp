@@ -87,7 +87,11 @@ static const Mv s_acMvRefineQ[9] =
 };
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p, const bool useBvpCluster)
+#else
 void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p)
+#endif
 {
   const FracBitsAccess& fracBits = m_CABACEstimator->getCtx().getFracBitsAcess();
 
@@ -147,7 +151,14 @@ void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p)
   p->bitsImv[0] = fracBits.getFracBitsArray(Ctx::ImvFlag(1)).intBits[0];
   p->bitsImv[1] = fracBits.getFracBitsArray(Ctx::ImvFlag(1)).intBits[1];
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
-  p->bitsRribc  = fracBits.getFracBitsArray(Ctx::rribcFlipType(0)).intBits[1];
+  if (useBvpCluster)
+  {
+    p->bitsRribc  = fracBits.getFracBitsArray(Ctx::rribcFlipType(0)).intBits[1];
+  }
+  else
+  {
+    p->bitsRribc = 0;
+  }
 #endif
 }
 #endif
@@ -2158,7 +2169,15 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
   Mv           cMvPred;
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  const PredictionUnit &pu = *cu.firstPU;
+  if (pu.isBvpClusterApplicable())
+  {
+    xEstBvdBitCosts(m_pcRdCost->getBvdBitCosts(), pu.isBvpClusterApplicable());
+  }
+#else
   xEstBvdBitCosts(m_pcRdCost->getBvdBitCosts());
+#endif
 #endif
 #if JVET_AA0070_RRIBC
   CodedCUInfo& relatedCU = ((EncModeCtrlMTnoRQT *)m_modeCtrl)->getBlkInfo(partitioner.currArea());
@@ -2432,12 +2451,16 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     m_pcRdCost->setPredictors(cMvPred);
     m_pcRdCost->setCostScale(0);
 #if JVET_AA0070_RRIBC
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    if (pu.isBvpClusterApplicable())
+    {
 #if !JVET_AC0112_IBC_CIIP && !JVET_AC0112_IBC_LIC
     Distortion initCost = 
 #endif
-      m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), pu.cu->rribcFlipType, &pu.cu->imv, &bvpIdxBest, true, &amvpInfo4Pel[pu.cu->rribcFlipType]);
+        m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(),
+                                           pu.cu->rribcFlipType, &pu.cu->imv, &bvpIdxBest, true,
+                                           &amvpInfo4Pel[pu.cu->rribcFlipType], pu.isBvpClusterApplicable());
 
     if (pu.cu->rribcFlipType)
     {
@@ -2450,6 +2473,13 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
       getBestBvpBvOneZeroComp(pu, cMv, initCost, &bvpIdxBest , &amvpInfo[0], &amvpInfo4Pel[0]);
     }
 #endif
+    }
+    else
+    {
+      m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(),
+                                         pu.cu->rribcFlipType, &pu.cu->imv, &bvpIdxBest, true,
+                                         &amvpInfo4Pel[pu.cu->rribcFlipType]);
+    }
 #else
     m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(),
                                        pu.cu->rribcFlipType, &pu.cu->imv, &bvpIdxBest, true,
@@ -2774,7 +2804,7 @@ void InterSearch::xxIBCHashSearch(PredictionUnit &pu, Mv *mvPred, int numMvPred,
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AA0070_RRIBC
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
         Distortion cost = m_pcRdCost->getBvCostMultiplePreds(candMv.getHor(), candMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), rribcFlipType, &pu.cu->imv, &idxMvPred, true, &amvpInfo4Pel[rribcFlipType]);
 #else
         Distortion cost = m_pcRdCost->getBvCostMultiplePreds(candMv.getHor(), candMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), rribcFlipType, &pu.cu->imv, &idxMvPred);

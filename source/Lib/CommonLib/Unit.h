@@ -701,6 +701,9 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
 #if JVET_AC0104_IBC_BVD_PREDICTION
   bool              isBvdPredApplicable() const;
 #endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bool isBvpClusterApplicable() const;
+#endif
 };
 
 // ---------------------------------------------------------------------------

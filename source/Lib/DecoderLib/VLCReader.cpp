@@ -2579,6 +2579,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AC0104_IBC_BVD_PREDICTION
     READ_FLAG( uiCode, "sps_bvd_pred_enabled_flag" );                   pcSPS->setUseBvdPred             ( uiCode != 0 );
 #endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    READ_FLAG( uiCode, "sps_bvp_cluster_enabled_flag" );                pcSPS->setUseBvpCluster          ( uiCode != 0 );
+#endif
 #if JVET_AC0112_IBC_CIIP
     READ_FLAG( uiCode, "sps_ibc_ciip_enabled_flag" );                   pcSPS->setUseIbcCiip             ( uiCode != 0 );
 #endif
