@@ -488,6 +488,9 @@ protected:
 #if JVET_AC0104_IBC_BVD_PREDICTION
   bool      m_bvdPred;
 #endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bool      m_bvpCluster;
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   bool      m_useARL;
 #endif

@@ -1137,6 +1137,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AC0104_IBC_BVD_PREDICTION
   ("BvdPred",                                         m_bvdPred,                                         true, "Block vector difference Prediction (0:off, 1:on)")
 #endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  ("BvpCluster",                                      m_bvpCluster,                                      true, "IBC BVP clusteriing and BV with one zero component sign prediction (0:off, 1:on)")
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   ("ARL",                                             m_useARL,                                          true, "Adaptive Reference List (0:off, 1:on)")
 #endif
@@ -3936,6 +3939,14 @@ bool EncAppCfg::xCheckParameter()
       m_bvdPred = false;
     }
 #endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    if (m_bvpCluster)
+    {
+      msg(WARNING, "BVP clustering and BV with one zero component prediction is forcefully disabled since the enable "
+                   "flag of TM tools is set off. \n");
+      m_bvpCluster = false;
+    }
+#endif
   }
 #endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
@@ -5227,6 +5238,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
     msg(VERBOSE, "IBCBvdPred:%d ", m_bvdPred);
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    msg(VERBOSE, "IBCBvpCluster:%d ", m_bvpCluster);
 #endif
 #if JVET_AC0112_IBC_CIIP
   msg( VERBOSE, "IBCCIIP:%d ", m_ibcCiip);

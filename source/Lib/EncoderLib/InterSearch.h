@@ -711,7 +711,11 @@ protected:
   Distortion  xPatternRefinement    ( const CPelBuf* pcPatternKey, Mv baseRefMv, int iFrac, Mv& rcMvFrac, bool bAllowUseOfHadamard );
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  void xEstBvdBitCosts(EstBvdBitsStruct *p, const bool useBvpCluster = true );
+#else
   void xEstBvdBitCosts(EstBvdBitsStruct *p);
+#endif
 #endif
 
    typedef struct
@@ -1134,7 +1138,7 @@ private:
 #else
   void  xxIBCHashSearch(PredictionUnit& pu, Mv* mvPred, int numMvPred, Mv &mv, int& idxMvPred, IbcHashMap& ibcHashMap);
 #endif
-  #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   inline void getBestBvpBvOneZeroComp(PredictionUnit &pu, Mv cMv, Distortion initCost, int *bvpIdxBest,
                                                    AMVPInfo *amvp1Pel = NULL, AMVPInfo *amvp4Pel = NULL);
 #endif

@@ -907,6 +907,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AC0104_IBC_BVD_PREDICTION
   m_cEncLib.setUseBvdPred                                        (m_bvdPred);
 #endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  m_cEncLib.setUseBvpCluster                                     (m_bvpCluster);
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   m_cEncLib.setUseARL                                            (m_useARL);
 #endif

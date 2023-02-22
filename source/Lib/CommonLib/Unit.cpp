@@ -1353,6 +1353,18 @@ bool PredictionUnit::isBvdPredApplicable() const
 }
 #endif
 
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+bool PredictionUnit::isBvpClusterApplicable() const
+{
+  if (!cs->sps->getUseBvpCluster())
+  {
+    return false;
+  }
+
+  return true;
+}
+#endif
+
 #if JVET_W0123_TIMD_FUSION
 const uint8_t& PredictionUnit::getIpmInfo() const
 {

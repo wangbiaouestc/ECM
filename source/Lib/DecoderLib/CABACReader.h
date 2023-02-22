@@ -238,7 +238,8 @@ public:
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-   void        bvdCoding                ( Mv& rMvd, MvdSuffixInfo& si, const bool useBvdPred = true, int bvOneZeroComp = 0, int bvZeroCompDir = 0 );
+   void bvdCoding(Mv &rMvd, MvdSuffixInfo &si, const bool useBvdPred = true, const bool useBvpCluster = true,
+                  int bvOneZeroComp = 0, int bvZeroCompDir = 0, const int &rribcFlipType = 0 );
 #else                                     
    void        bvdCoding                ( Mv& rMvd, MvdSuffixInfo& si, const bool useBvdPred = true, const int& rribcFlipType = 0 );
 #endif
@@ -247,7 +248,8 @@ public:
    void        bvdCodingRemainder       ( Mv& rMvd, MvdSuffixInfo& si, const int imv );
 #else
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-   void        bvdCoding                ( Mv& rMvd, int bvOneZeroComp = 0, int bvZeroCompDir = 0);
+   void bvdCoding(Mv &rMvd, const bool useBvpCluster = true, int bvOneZeroComp = 0, int bvZeroCompDir = 0,
+                  const int &rribcFlipType = 0 );
 #else                                     
    void        bvdCoding                ( Mv& rMvd, const int& rribcFlipType = 0);
 #endif
@@ -262,7 +264,8 @@ public:
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  void        bvdCoding                 ( Mv& rMvd, MvdSuffixInfo& si, const bool useBvdPred = true, int bvOneZeroComp = 0, int bvZeroCompDir = 0 );
+  void        bvdCoding(Mv &rMvd, MvdSuffixInfo &si, const bool useBvdPred = true, const bool useBvpCluster = true,
+                        int bvOneZeroComp = 0, int bvZeroCompDir = 0);
 #else                                     
   void        bvdCoding                 ( Mv& rMvd, MvdSuffixInfo& si, const bool useBvdPred = true );
 #endif
@@ -271,7 +274,7 @@ public:
   void        bvdCodingRemainder        ( Mv& rMvd, MvdSuffixInfo& si, const int imv );
 #else
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  void        bvdCoding                 ( Mv& rMvd, int bvOneZeroComp = 0, int bvZeroCompDir = 0 );
+  void bvdCoding(Mv &rMvd, const bool useBvpCluster = true, int bvOneZeroComp = 0, int bvZeroCompDir = 0);
 #else                                     
   void        bvdCoding                 ( Mv& rMvd );
 #endif

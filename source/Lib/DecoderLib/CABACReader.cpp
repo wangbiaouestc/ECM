@@ -3301,7 +3301,16 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
   rribcData(*pu.cu);
 #endif
 #else
-  bvOneZeroComp(*pu.cu);
+  if (pu.isBvpClusterApplicable())
+  {
+    bvOneZeroComp(*pu.cu);
+  }
+#if JVET_AA0070_RRIBC
+  else
+  {
+    rribcData(*pu.cu);
+  }
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   cuIbcLicFlag(*pu.cu);
@@ -3336,13 +3345,15 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.bvdSuffixInfo, pu.isBvdPredApplicable(), pu.cu->bvOneZeroComp, pu.cu->bvZeroCompDir);
+    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.bvdSuffixInfo, pu.isBvdPredApplicable(), pu.isBvpClusterApplicable(),
+              pu.cu->bvOneZeroComp, pu.cu->bvZeroCompDir, pu.cu->rribcFlipType);
 #else
     bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.bvdSuffixInfo, pu.isBvdPredApplicable(), pu.cu->rribcFlipType);
 #endif
 #else
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.cu->bvOneZeroComp, pu.cu->bvZeroCompDir);
+    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.isBvpClusterApplicable(), pu.cu->bvOneZeroComp, pu.cu->bvZeroCompDir,
+              pu.cu->rribcFlipType);
 #else
     bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.cu->rribcFlipType);
 #endif
@@ -3356,13 +3367,14 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
 #elif JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.bvdSuffixInfo, pu.isBvdPredApplicable(), pu.cu->bvOneZeroComp, pu.cu->bvZeroCompDir);
+    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.bvdSuffixInfo, pu.isBvdPredApplicable(), pu.isBvpClusterApplicable(),
+              pu.cu->bvOneZeroComp, pu.cu->bvZeroCompDir);
 #else
     bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.bvdSuffixInfo, pu.isBvdPredApplicable());
 #endif
 #else
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.cu->bvOneZeroComp, pu.cu->bvZeroCompDir);
+    bvdCoding(pu.mvd[REF_PIC_LIST_0], pu.isBvpClusterApplicable(), pu.cu->bvOneZeroComp, pu.cu->bvZeroCompDir);
 #else
     bvdCoding(pu.mvd[REF_PIC_LIST_0]);
 #endif
@@ -3380,15 +3392,18 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
       mvp_flag(pu, REF_PIC_LIST_0);
     }
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
-    if (pu.mvpIdx[REF_PIC_LIST_0] == 0)
+    if (pu.isBvpClusterApplicable())
     {
-      if (pu.cu->bvZeroCompDir == 1)
+      if (pu.mvpIdx[REF_PIC_LIST_0] == 0)
       {
-        pu.mvd[REF_PIC_LIST_0].hor = -pu.mvd[REF_PIC_LIST_0].hor;
-      }
-      else if (pu.cu->bvZeroCompDir == 2)
-      {
-        pu.mvd[REF_PIC_LIST_0].ver = -pu.mvd[REF_PIC_LIST_0].ver;
+        if (pu.cu->bvZeroCompDir == 1)
+        {
+          pu.mvd[REF_PIC_LIST_0].hor = -pu.mvd[REF_PIC_LIST_0].hor;
+        }
+        else if (pu.cu->bvZeroCompDir == 2)
+        {
+          pu.mvd[REF_PIC_LIST_0].ver = -pu.mvd[REF_PIC_LIST_0].ver;
+        }
       }
     }
 #endif
@@ -5897,13 +5912,15 @@ void CABACReader::bvdCodingRemainder(Mv& rMvd, MvdSuffixInfo& si, const int imv 
 #if JVET_AA0070_RRIBC
 #if JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-void CABACReader::bvdCoding(Mv& rMvd, MvdSuffixInfo& si, const bool useBvdPred, int bvOneZeroComp, int bvZeroCompDir)
+void CABACReader::bvdCoding(Mv &rMvd, MvdSuffixInfo &si, const bool useBvdPred, const bool useBvpCluster,
+                            int bvOneZeroComp, int bvZeroCompDir, const int &rribcFlipType)
 #else
 void CABACReader::bvdCoding(Mv& rMvd, MvdSuffixInfo& si, const bool useBvdPred, const int& rribcFlipType)
 #endif
 #else
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-void CABACReader::bvdCoding(Mv& rMvd, int bvOneZeroComp, int bvZeroCompDir)
+void CABACReader::bvdCoding(Mv &rMvd, const bool useBvpCluster, int bvOneZeroComp, int bvZeroCompDir,
+                            const int &rribcFlipType)
 #else
 void CABACReader::bvdCoding(Mv& rMvd, const int& rribcFlipType)
 #endif
@@ -5912,22 +5929,36 @@ void CABACReader::bvdCoding(Mv& rMvd, const int& rribcFlipType)
   int horAbs = 0, verAbs = 0;
 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  if (bvOneZeroComp)
+  if (useBvpCluster)
   {
-    if (bvZeroCompDir == 1)
-    { 
-      horAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
-    }
-
-    if (bvZeroCompDir == 2)
+    if (bvOneZeroComp)
     {
-      verAbs = (int)m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
+      if (bvZeroCompDir == 1)
+      {
+        horAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
+      }
+
+      if (bvZeroCompDir == 2)
+      {
+        verAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
+      }
+    }
+    else
+    {
+      horAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
+      verAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
     }
   }
   else
   {
-    horAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
-    verAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
+    if (rribcFlipType != 2)
+    {
+      horAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(HOR_BVD_CTX_OFFSET));
+    }
+    if (rribcFlipType != 1)
+    {
+      verAbs = (int) m_BinDecoder.decodeBin(Ctx::Bvd(VER_BVD_CTX_OFFSET));
+    }
   }
 #else
   if (rribcFlipType != 2)
@@ -5942,13 +5973,14 @@ void CABACReader::bvdCoding(Mv& rMvd, const int& rribcFlipType)
 #else
 #if JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-void CABACReader::bvdCoding(Mv & rMvd, MvdSuffixInfo & si, const bool useBvdPred, int bvOneZeroComp, int bvZeroCompDir)
+void CABACReader::bvdCoding(Mv &rMvd, MvdSuffixInfo &si, const bool useBvdPred, const bool useBvpCluster,
+                            int bvOneZeroComp, int bvZeroCompDir)
 #else
 void CABACReader::bvdCoding(Mv & rMvd, MvdSuffixInfo & si, const bool useBvdPred)
 #endif
 #else
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-void CABACReader::bvdCoding(Mv & rMvd, int bvOneZeroComp, int bvZeroCompDir)
+void CABACReader::bvdCoding(Mv &rMvd, const bool useBvpCluster, int bvOneZeroComp, int bvZeroCompDir)
 #else
 void CABACReader::bvdCoding(Mv & rMvd)
 #endif
@@ -5975,7 +6007,17 @@ void CABACReader::bvdCoding(Mv & rMvd)
     {
       horAbs += xReadBvdContext(NUM_HOR_BVD_CTX, HOR_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER);
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
-      if (!bvOneZeroComp)
+      if (useBvpCluster)
+      {
+        if (!bvOneZeroComp)
+        {
+          if (m_BinDecoder.decodeBinEP())
+          {
+            horAbs = -horAbs;
+          }
+        }
+      }
+      else 
       {
         if (m_BinDecoder.decodeBinEP())
         {
@@ -5993,7 +6035,17 @@ void CABACReader::bvdCoding(Mv & rMvd)
     {
       verAbs += xReadBvdContext(NUM_VER_BVD_CTX, VER_BVD_CTX_OFFSET, BVD_CODING_GOLOMB_ORDER);
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
-      if (!bvOneZeroComp)
+      if (useBvpCluster)
+      {
+        if (!bvOneZeroComp)
+        {
+          if (m_BinDecoder.decodeBinEP())
+          {
+            verAbs = -verAbs;
+          }
+        }
+      }
+      else
       {
         if (m_BinDecoder.decodeBinEP())
         {
@@ -6097,11 +6149,14 @@ void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
     trMv.changeTransPrecAmvr2Internal(pu.cu->imv);
 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
-    if (0 != pu.cu->rribcFlipType)
+    if (pu.isBvpClusterApplicable())
     {
-      pu.mvsdIdx[eRefList] = mvsdIdx;
-      bvdCodingRemainder(pu.mvd[REF_PIC_LIST_0], pu.bvdSuffixInfo, pu.cu->imv);
-      return;
+      if (0 != pu.cu->rribcFlipType)
+      {
+        pu.mvsdIdx[eRefList] = mvsdIdx;
+        bvdCodingRemainder(pu.mvd[REF_PIC_LIST_0], pu.bvdSuffixInfo, pu.cu->imv);
+        return;
+      }
     }
 #endif
     if (pu.mvd[eRefList].getHor())

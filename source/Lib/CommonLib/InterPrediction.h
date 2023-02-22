@@ -733,7 +733,7 @@ public:
 #endif
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  Distortion getRdCostOTF(const PredictionUnit &pu, const PelBuf &org, const PelBuf &cur);
+  Distortion getTempCost(const PredictionUnit &pu, const PelBuf &org, const PelBuf &cur);
 #endif
 #if JVET_AC0112_IBC_GPM
   void    motionCompensationIbcGpm(CodingUnit &cu, MergeCtx &ibcGpmMrgCtx, IntraPrediction* pcIntraPred);

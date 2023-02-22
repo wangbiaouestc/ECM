@@ -3168,13 +3168,13 @@ inline Distortion PU::getTMCost(const PredictionUnit &pu, CPelBuf pRecY, Mv Cand
   {
     PU::getTemplateRefTop(pu, pRecY, pu.cs->m_pcBufPredRefTop, CandMv, pu.cs->m_pcBufPredCurTop.width,
                           AML_MERGE_TEMPLATE_SIZE);
-    uiCost += pcInter->getRdCostOTF(pu, pu.cs->m_pcBufPredCurTop, pu.cs->m_pcBufPredRefTop);
+    uiCost += pcInter->getTempCost(pu, pu.cs->m_pcBufPredCurTop, pu.cs->m_pcBufPredRefTop);
   }
   if (availableTmLeft)
   {
     PU::getTemplateRefLeft(pu, pRecY, pu.cs->m_pcBufPredRefLeft, CandMv, AML_MERGE_TEMPLATE_SIZE,
                            pu.cs->m_pcBufPredCurLeft.height);
-    uiCost += pcInter->getRdCostOTF(pu, pu.cs->m_pcBufPredCurLeft, pu.cs->m_pcBufPredRefLeft);
+    uiCost += pcInter->getTempCost(pu, pu.cs->m_pcBufPredCurLeft, pu.cs->m_pcBufPredRefLeft);
   }
   return uiCost;
 }
@@ -3363,10 +3363,23 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #else
   const uint32_t maxNumMergeCand = pu.cs->sps->getMaxNumIBCMergeCand();
 #endif
-#if JVET_Z0084_IBC_TM
+#if JVET_Z0084_IBC_TM || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
 #if IBC_TM_MRG
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  const uint32_t mvdSimilarityThresh = (pu.tmMergeFlag && pu.mergeFlag) ? PU::getTMMvdThreshold(pu) : 1;
+  uint32_t       mvdSimilarityThresh = 1;
+  if (pu.isBvpClusterApplicable())
+  {
+    mvdSimilarityThresh = (pu.tmMergeFlag && pu.mergeFlag) ? PU::getTMMvdThreshold(pu) : 1;
+  }
+  else
+  {
+#if JVET_AA0070_RRIBC
+    mvdSimilarityThresh =
+      ((pu.tmMergeFlag && pu.mergeFlag) || (!pu.mergeFlag && !pu.cu->rribcFlipType)) ? PU::getTMMvdThreshold(pu) : 1;
+#else
+    const uint32_t mvdSimilarityThresh = pu.tmMergeFlag ? PU::getTMMvdThreshold(pu) : 1;
+#endif
+  }
 #else
 #if JVET_AA0070_RRIBC
   const uint32_t mvdSimilarityThresh =
@@ -9920,31 +9933,80 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
   MergeCtx mergeCtx;
 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-#if JVET_AA0070_RRIBC
-  if (pu.cu->rribcFlipType)
+  if (pu.isBvpClusterApplicable())
   {
-    getRribcBvpCand(pu, pInfo);
+#if JVET_AA0070_RRIBC
+    if (pu.cu->rribcFlipType)
+    {
+      getRribcBvpCand(pu, pInfo);
+    }
+    else
+#endif
+    {
+      const int  cbWidth      = pu.lwidth();
+      const int  cbHeight     = pu.lheight();
+      const bool availableTop = (pu.cs->getPURestricted(pu.Y().topRight().offset(0, -1), pu, pu.chType)) ? true : false;
+      const bool availableLeft =
+        (pu.cs->getPURestricted(pu.Y().bottomLeft().offset(-1, 0), pu, pu.chType)) ? true : false;
+      const CPelBuf pRecY           = pu.cs->picture->getRecoBuf(pu.cs->picture->blocks[COMPONENT_Y]);
+      pInfo->maxSimilarityThreshold = 1;
+
+      PU::getIBCMergeCandidates(pu, mergeCtx);
+      pu.cs->createTMBuf(cbWidth, cbHeight);
+      PU::getTemplateTop(availableTop, pu, pRecY, pu.cs->m_pcBufPredCurTop, Position(0, -AML_MERGE_TEMPLATE_SIZE),
+                         cbWidth, AML_MERGE_TEMPLATE_SIZE);
+      PU::getTemplateLeft(availableLeft, pu, pRecY, pu.cs->m_pcBufPredCurLeft, Position(-AML_MERGE_TEMPLATE_SIZE, 0),
+                          AML_MERGE_TEMPLATE_SIZE, cbHeight);
+
+      int candIdx = 0;
+      while ((pInfo->numCand < (REGULAR_AMVP_MAX_NUM_CANDS + 1)) && (candIdx < mergeCtx.numAMVPMergeCand))
+      {
+        pInfo->mvCand[pInfo->numCand] = mergeCtx.mvFieldNeighbours[candIdx << 1].mv;
+        pInfo->mvCost[pInfo->numCand] =
+          getTMCost(pu, pRecY, pInfo->mvCand[pInfo->numCand], availableTop, availableLeft, pcInter);
+        pInfo->mvCand[pInfo->numCand].roundIbcPrecInternal2Amvr(pu.cu->imv);
+        if (!pInfo->xCheckSimilarMotion(pInfo->numCand))
+        {
+          pInfo->numCand++;
+        }
+        candIdx++;
+      }
+      pu.cs->destroyTMBuf();
+      clusterBvpCand(cbWidth, cbHeight, pInfo);
+    }
   }
   else
-#endif
   {
-    const int     cbWidth         = pu.lwidth();
-    const int     cbHeight        = pu.lheight();
-    const bool    availableTop    = (pu.cs->getPURestricted(pu.Y().topRight().offset(0, -1), pu, pu.chType))   ? true : false;
-    const bool    availableLeft   = (pu.cs->getPURestricted(pu.Y().bottomLeft().offset(-1, 0), pu, pu.chType)) ? true : false;
-    const CPelBuf pRecY           = pu.cs->picture->getRecoBuf(pu.cs->picture->blocks[COMPONENT_Y]);
-    pInfo->maxSimilarityThreshold = 1;
-  
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if JVET_AA0070_RRIBC
+    pInfo->maxSimilarityThreshold =
+      (pu.cs->sps->getUseDMVDMode() && pcInter && !pu.cu->rribcFlipType) ? PU::getTMMvdThreshold(pu) : 1;
+#if IBC_TM_MRG
+    if (!pu.cu->rribcFlipType)
+    {
+      pu.tmMergeFlag = true;
+    }
+#endif
+#else
+    pInfo->maxSimilarityThreshold = (pu.cs->sps->getUseDMVDMode() && pcInter) ? PU::getTMMvdThreshold(pu) : 1;
+#if IBC_TM_MRG
+    pu.tmMergeFlag = true;
+#endif
+#endif
+
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+    PU::getIBCMergeCandidates(pu, mergeCtx, pu.cs->sps->getMaxNumIBCMergeCand());
+#else
     PU::getIBCMergeCandidates(pu, mergeCtx);
-    pu.cs->createTMBuf(cbWidth, cbHeight);
-    PU::getTemplateTop(availableTop, pu, pRecY, pu.cs->m_pcBufPredCurTop, Position(0, -AML_MERGE_TEMPLATE_SIZE), cbWidth, AML_MERGE_TEMPLATE_SIZE);
-    PU::getTemplateLeft(availableLeft, pu, pRecY, pu.cs->m_pcBufPredCurLeft, Position(-AML_MERGE_TEMPLATE_SIZE, 0), AML_MERGE_TEMPLATE_SIZE, cbHeight);
+#endif
+#if IBC_TM_MRG
+    pu.tmMergeFlag = false;
+#endif
 
     int candIdx = 0;
-    while ((pInfo->numCand < (REGULAR_AMVP_MAX_NUM_CANDS + 1)) && (candIdx < mergeCtx.numAMVPMergeCand))
+    while ((pInfo->numCand < AMVP_MAX_NUM_CANDS_MEM) && (candIdx < mergeCtx.numValidMergeCand))
     {
       pInfo->mvCand[pInfo->numCand] = mergeCtx.mvFieldNeighbours[candIdx << 1].mv;
-      pInfo->mvCost[pInfo->numCand] = getTMCost(pu, pRecY, pInfo->mvCand[pInfo->numCand], availableTop, availableLeft, pcInter);
       pInfo->mvCand[pInfo->numCand].roundIbcPrecInternal2Amvr(pu.cu->imv);
       if (!pInfo->xCheckSimilarMotion(pInfo->numCand))
       {
@@ -9952,8 +10014,64 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
       }
       candIdx++;
     }
-    pu.cs->destroyTMBuf();
-    clusterBvpCand(cbWidth, cbHeight, pInfo);
+
+#if JVET_AA0070_RRIBC
+    if (pu.cs->sps->getUseDMVDMode() && pcInter && pInfo->numCand > 0 && !pu.cu->rribcFlipType)
+#else
+    if (pu.cs->sps->getUseDMVDMode() && pcInter && pInfo->numCand > 0)
+#endif
+    {
+      struct amvpSort
+      {
+        Mv         amvpCand;
+        Distortion cost;
+      };
+      amvpSort              temp;
+      std::vector<amvpSort> input;
+      const auto            costIncSort = [](const amvpSort &x, const amvpSort &y) { return x.cost < y.cost; };
+      Distortion            tmCost      = std::numeric_limits<Distortion>::max();
+
+      for (int candIdx = 0; candIdx < pInfo->numCand; ++candIdx)
+      {
+        tmCost = pcInter->deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), REF_PIC_LIST_0, MAX_NUM_REF,
+                                     TM_MAX_NUM_OF_ITERATIONS, pInfo->mvCand[candIdx]);
+        pInfo->mvCand[candIdx].roundIbcPrecInternal2Amvr(pu.cu->imv);
+        temp.amvpCand = pInfo->mvCand[candIdx];
+        temp.cost     = tmCost;
+        input.push_back(temp);
+      }
+
+      stable_sort(input.begin(), input.end(), costIncSort);
+      for (int candIdx = 0; candIdx < pInfo->numCand; ++candIdx)
+      {
+        pInfo->mvCand[candIdx] = input.at(candIdx).amvpCand;
+      }
+    }
+
+    if (pInfo->numCand > AMVP_MAX_NUM_CANDS)
+    {
+      pInfo->numCand = AMVP_MAX_NUM_CANDS;
+    }
+
+    while (pInfo->numCand < AMVP_MAX_NUM_CANDS)
+    {
+      pInfo->mvCand[pInfo->numCand++] = Mv(0, 0);
+    }
+#else
+    PU::getIBCMergeCandidates(pu, mergeCtx, AMVP_MAX_NUM_CANDS - 1);
+    int candIdx = 0;
+    while (pInfo->numCand < AMVP_MAX_NUM_CANDS)
+    {
+      pInfo->mvCand[pInfo->numCand] = mergeCtx.mvFieldNeighbours[(candIdx << 1) + 0].mv;
+      pInfo->numCand++;
+      candIdx++;
+    }
+
+    for (Mv &mv: pInfo->mvCand)
+    {
+      mv.roundIbcPrecInternal2Amvr(pu.cu->imv);
+    }
+#endif
   }
 #else
 #if JVET_Z0084_IBC_TM && IBC_TM_AMVP
@@ -10000,14 +10118,14 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
   if (pu.cs->sps->getUseDMVDMode() && pcInter && pInfo->numCand > 0)
 #endif
   {
-    struct AMVPSort
+    struct amvpSort
     {
-      Mv AMVPCand;
+      Mv amvpCand;
       Distortion cost;
     };
-    AMVPSort temp;
-    std::vector<AMVPSort> input;
-    const auto CostIncSort = [](const AMVPSort &x, const AMVPSort &y) { return x.cost < y.cost; };
+    amvpSort temp;
+    std::vector<amvpSort> input;
+    const auto costIncSort = [](const amvpSort &x, const amvpSort &y) { return x.cost < y.cost; };
     Distortion tmCost = std::numeric_limits<Distortion>::max();
 
     for (int candIdx = 0; candIdx < pInfo->numCand; ++candIdx)
@@ -10015,15 +10133,15 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
       tmCost = pcInter->deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), REF_PIC_LIST_0, MAX_NUM_REF,
                                    TM_MAX_NUM_OF_ITERATIONS, pInfo->mvCand[candIdx]);
       pInfo->mvCand[candIdx].roundIbcPrecInternal2Amvr(pu.cu->imv);
-      temp.AMVPCand = pInfo->mvCand[candIdx];
+      temp.amvpCand = pInfo->mvCand[candIdx];
       temp.cost = tmCost;
       input.push_back(temp);
     }
 
-    stable_sort(input.begin(), input.end(), CostIncSort);
+    stable_sort(input.begin(), input.end(), costIncSort);
     for (int candIdx = 0; candIdx < pInfo->numCand; ++candIdx)
     {
-      pInfo->mvCand[candIdx] = input.at(candIdx).AMVPCand;
+      pInfo->mvCand[candIdx] = input.at(candIdx).amvpCand;
     }
   }
 
@@ -10515,14 +10633,14 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
 #endif
     && interPred != nullptr && pInfo->numCand > 0)
   {
-    struct AMVPSort
+    struct amvpSort
     {
-      Mv AMVPCand;
+      Mv amvpCand;
       Distortion cost;
     };
-    AMVPSort temp;
-    std::vector<AMVPSort> input;
-    const auto CostIncSort = [](const AMVPSort &x, const AMVPSort &y) { return x.cost < y.cost; };
+    amvpSort temp;
+    std::vector<amvpSort> input;
+    const auto costIncSort = [](const amvpSort &x, const amvpSort &y) { return x.cost < y.cost; };
     Distortion tmCost[REGULAR_AMVP_MAX_NUM_CANDS];
     for (int i = 0; i < REGULAR_AMVP_MAX_NUM_CANDS; i++)
     {
@@ -10540,11 +10658,11 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
       for (int candIdx = 0; candIdx < pInfo->numCand; ++candIdx)
       {
         tmCost[candIdx] = interPred->deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), eRefPicList, refIdx, 0, pInfo->mvCand[candIdx]);
-        temp.AMVPCand = pInfo->mvCand[candIdx];
+        temp.amvpCand = pInfo->mvCand[candIdx];
         temp.cost = tmCost[candIdx];
         input.push_back(temp);
       }
-      stable_sort(input.begin(), input.end(), CostIncSort);
+      stable_sort(input.begin(), input.end(), costIncSort);
       for (int candIdx = 1; candIdx < pInfo->numCand; ++candIdx)
       {
         if (input.at(candIdx).cost > 5 * input.at(0).cost)
@@ -10565,15 +10683,15 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
                                             , 0
 #endif
                                             , pInfo->mvCand[candIdx]);
-      temp.AMVPCand = pInfo->mvCand[candIdx];
+      temp.amvpCand = pInfo->mvCand[candIdx];
       temp.cost = tmCost[candIdx];
       input.push_back(temp);
     }
 
-    stable_sort(input.begin(), input.end(), CostIncSort);
+    stable_sort(input.begin(), input.end(), costIncSort);
     for (int candIdx = 0; candIdx < pInfo->numCand; ++candIdx)
     {
-      pInfo->mvCand[candIdx] = input.at(candIdx).AMVPCand;
+      pInfo->mvCand[candIdx] = input.at(candIdx).amvpCand;
       tmCost[candIdx] = input.at(candIdx).cost;
     }
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
