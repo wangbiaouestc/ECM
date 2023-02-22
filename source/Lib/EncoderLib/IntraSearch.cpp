@@ -8784,7 +8784,7 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     if( pu.cccmFlag )
     {
 #if JVET_AB0143_CCCM_TS
-      if (pu.cs->slice->isIntra())
+      if (pu.cs->slice->isIntra() && !predStorage.bufs.empty())
       {
         piPredCb.copyFrom(predStorage.Cb());
         piPredCr.copyFrom(predStorage.Cr());
@@ -8820,7 +8820,7 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     else
     {
 #if JVET_AC0119_LM_CHROMA_FUSION
-      if (pu.cs->slice->isIntra() && pu.isChromaFusion)
+      if (pu.cs->slice->isIntra() && pu.isChromaFusion && !predStorage.bufs.empty())
       {
         piPredCb.copyFrom(predStorage.Cb());
         piPredCr.copyFrom(predStorage.Cr());
