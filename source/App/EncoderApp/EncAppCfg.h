@@ -473,6 +473,9 @@ protected:
   bool      m_OBMC;
 #endif
   bool      m_ciip;
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  bool      m_ciipTimd;
+#endif
   bool      m_Geo;
   bool      m_HashME;
   bool      m_allowDisFracMMVD;

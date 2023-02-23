@@ -480,6 +480,9 @@ protected:
   bool      m_OBMC;
 #endif
   bool      m_ciip;
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  bool      m_ciipTimd;
+#endif
   bool      m_Geo;
   bool      m_allowDisFracMMVD;
   bool      m_AffineAmvr;
@@ -1551,6 +1554,10 @@ public:
 #endif
   void      setUseCiip                   ( bool b )       { m_ciip = b; }
   bool      getUseCiip                   ()         const { return m_ciip; }
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  void      setUseCiipTimd               (bool b)         { m_ciipTimd = b; }
+  bool      getUseCiipTImd               ()         const { return m_ciipTimd; }
+#endif
   void      setUseGeo                       ( bool b )       { m_Geo = b; }
   bool      getUseGeo                       ()         const { return m_Geo; }
   void      setAllowDisFracMMVD             ( bool b )       { m_allowDisFracMMVD = b;    }
