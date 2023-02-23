@@ -39,7 +39,7 @@
 #define __MV__
 
 #include "CommonDef.h"
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0147_CCCM_NO_SUBSAMPLING
 #include <limits.h>
 #endif
 //! \ingroup CommonLib

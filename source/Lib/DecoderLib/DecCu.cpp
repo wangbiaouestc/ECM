@@ -3088,7 +3088,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 
 #if !JVET_Z0054_BLK_REF_PIC_REORDER
 #if REUSE_CU_RESULTS
-      if ( cu.imv && !pu.cu->affine && !cu.cs->pcv->isEncoder )
+      if ( cu.imv && !pu.cu->affine && !cu.cs->pcv->isEncoder 
+#if JVET_AC0104_IBC_BVD_PREDICTION
+        && !CU::isIBC(cu)
+#endif
+         )
 #else
         if (cu.imv && !pu.cu->affine)
 #endif
@@ -3238,9 +3242,18 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #endif
           pu.mvpNum[REF_PIC_LIST_0] = amvpInfo.numCand;
 
+          Mv mvd = pu.mvd[REF_PIC_LIST_0];
+#if !JVET_Z0054_BLK_REF_PIC_REORDER
+#if REUSE_CU_RESULTS
+          if (!cu.cs->pcv->isEncoder)
+#endif
+          {
+            mvd.changeIbcPrecAmvr2Internal(pu.cu->imv);
+          }
+#endif
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
-          if (pu.isBvdPredApplicable() && pu.mvd[REF_PIC_LIST_0].isMvsdApplicable())
+          if (pu.isBvdPredApplicable() && mvd.isMvsdApplicable())
           {
 #if JVET_AA0070_RRIBC
             auto cMvPred = amvpInfo.mvCand[pu.mvpIdx[REF_PIC_LIST_0]];
@@ -3255,25 +3268,14 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #else
             const auto cMvPred = amvpInfo.mvCand[pu.mvpIdx[REF_PIC_LIST_0]];
 #endif
-            pu.bvdSuffixInfo.initPrefixes(pu.mvd[REF_PIC_LIST_0], pu.cu->imv, true);
+            pu.bvdSuffixInfo.initPrefixes(mvd, pu.cu->imv, true);
             std::vector<Mv> cMvdDerivedVec;
-            m_pcInterPred->deriveBvdSignIBC(cMvPred, pu.mvd[REF_PIC_LIST_0], pu, cMvdDerivedVec, pu.cu->imv);
+            m_pcInterPred->deriveBvdSignIBC(cMvPred, mvd, pu, cMvdDerivedVec, pu.cu->imv);
             CHECK(pu.mvsdIdx[REF_PIC_LIST_0] >= cMvdDerivedVec.size(), "pu.mvsdIdx[REF_PIC_LIST_0] out of range");
             int mvsdIdx = pu.mvsdIdx[REF_PIC_LIST_0];
-            Mv cMvd = m_pcInterPred->deriveMVDFromMVSDIdxTransIBC(mvsdIdx, cMvdDerivedVec, pu.bvdSuffixInfo);
-            m_pcInterPred->applyOffsets(cMvd, cMvdDerivedVec, pu.bvdSuffixInfo, pu.cu->imv);
-            CHECK(cMvd == Mv(0, 0), " zero MVD!");
-            pu.mvd[REF_PIC_LIST_0] = cMvd;
-          }
-#endif
-
-          Mv mvd = pu.mvd[REF_PIC_LIST_0];
-#if !JVET_Z0054_BLK_REF_PIC_REORDER
-#if REUSE_CU_RESULTS
-          if (!cu.cs->pcv->isEncoder)
-#endif
-          {
-            mvd.changeIbcPrecAmvr2Internal(pu.cu->imv);
+            mvd = m_pcInterPred->deriveMVDFromMVSDIdxTransIBC(mvsdIdx, cMvdDerivedVec, pu.bvdSuffixInfo);
+            m_pcInterPred->applyOffsets(mvd, cMvdDerivedVec, pu.bvdSuffixInfo, pu.cu->imv);
+            CHECK(mvd == Mv(0, 0), " zero MVD!");
           }
 #endif
           if (pu.cs->sps->getMaxNumIBCMergeCand() == 1)
