@@ -10270,8 +10270,17 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
 #endif
   {
     MergeCtx mrgCtxAll[2];
-    MergeCtx MrgTmvp[2];
+    mrgCtxAll[0].numValidMergeCand = 0;
+    mrgCtxAll[1].numValidMergeCand = 0;
+
+    MergeCtx mrgTmvp[2];
+    mrgTmvp[0].numValidMergeCand = 0;
+    mrgTmvp[1].numValidMergeCand = 0;
+
     MergeCtx namvpMergeCandCtx[2];
+    namvpMergeCandCtx[0].numValidMergeCand = 0;
+    namvpMergeCandCtx[1].numValidMergeCand = 0;
+
     bool isSaved = true;
     if (pu.cs->sps->getUseAML() && interPred != NULL)
     {
@@ -10298,11 +10307,11 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
               isSaved = false;
             }
 
-            PU::getTMVPCandOpt(pu, eRefPicList, refIdx, MrgTmvp[col], mrgCtxAll[col], col);
-            interPred->adjustMergeCandidatesInOneCandidateGroup(pu, MrgTmvp[col], AMVP_TMVP_INDEX);
-            if (MrgTmvp[col].numValidMergeCand > 0)
+            PU::getTMVPCandOpt(pu, eRefPicList, refIdx, mrgTmvp[col], mrgCtxAll[col], col);
+            interPred->adjustMergeCandidatesInOneCandidateGroup(pu, mrgTmvp[col], AMVP_TMVP_INDEX);
+            if (mrgTmvp[col].numValidMergeCand > 0)
             {
-              Mv mvTmp = MrgTmvp[col].mvFieldNeighbours[eRefPicList].mv;
+              Mv mvTmp = mrgTmvp[col].mvFieldNeighbours[eRefPicList].mv;
               mvTmp.roundTransPrecInternal2Amvr(pu.cu->imv);
 #if TM_AMVP
               pInfo->mvCand[pInfo->numCand] = mvTmp;

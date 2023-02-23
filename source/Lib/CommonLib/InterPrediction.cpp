@@ -13928,6 +13928,8 @@ void InterPrediction::clearAmvpTmvpBuffer()
 {
   m_pcMergeCtxList0 = MergeCtx();
   m_pcMergeCtxList1 = MergeCtx();
+  m_pcMergeCtxList0.numValidMergeCand = 0;
+  m_pcMergeCtxList1.numValidMergeCand = 0;
 }
 #endif
 
