@@ -12853,6 +12853,71 @@ TplMatchingCtrl::TplMatchingCtrl( const PredictionUnit&     pu,
       tplAvalableAbove &= !(tplAvalableLeft && pu.lwidth()*2 < pu.lheight());
       tplAvalableLeft &= !(tplAvalableAbove && pu.lheight()*2 < pu.lwidth());
     }
+#elif JVET_AC0104_IBC_BVD_PREDICTION
+  bool tplAvalableAbove = false;
+  bool tplAvalableLeft = false;
+  if (isForBmvdFlag)
+  {
+    auto initPelBufs = [&]()
+    {
+      m_curTplAbove = tplAvalableAbove ? PelBuf(curTplAbove, pu.lwidth(), tplSize) : PelBuf();
+      m_curTplLeft = tplAvalableLeft ? PelBuf(curTplLeft, tplSize, pu.lheight()) : PelBuf();
+    };
+    switch (tplSize)
+    {
+    case 1:
+      tplAvalableAbove = xGetCurTemplateAvailable<1, true >();
+      tplAvalableLeft = xGetCurTemplateAvailable<1, false>();
+
+      initPelBufs();
+
+      m_curTplAbove = tplAvalableAbove ? xGetCurTemplateBvd<1, true >(pu, refPic, m_curTplAbove) : PelBuf();
+      m_curTplLeft = tplAvalableLeft ? xGetCurTemplateBvd<1, false>(pu, refPic, m_curTplLeft) : PelBuf();
+      break;
+    case 2:
+      tplAvalableAbove = xGetCurTemplateAvailable<2, true >();
+      tplAvalableLeft = xGetCurTemplateAvailable<2, false>();
+
+      initPelBufs();
+
+      m_curTplAbove = tplAvalableAbove ? xGetCurTemplateBvd<2, true >(pu, refPic, m_curTplAbove) : PelBuf();
+      m_curTplLeft = tplAvalableLeft ? xGetCurTemplateBvd<2, false>(pu, refPic, m_curTplLeft) : PelBuf();
+
+      break;
+    case 4:
+      tplAvalableAbove = xGetCurTemplateAvailable<4, true >();
+      tplAvalableLeft = xGetCurTemplateAvailable<4, false>();
+
+      initPelBufs();
+
+      m_curTplAbove = tplAvalableAbove ? xGetCurTemplateBvd<4, true >(pu, refPic, m_curTplAbove) : PelBuf();
+      m_curTplLeft = tplAvalableLeft ? xGetCurTemplateBvd<4, false>(pu, refPic, m_curTplLeft) : PelBuf();
+
+      break;
+    default:
+      THROW("Unsupported");
+    }
+      }
+  else
+  {
+    switch (tplSize)
+    {
+    case 1:
+      tplAvalableAbove = xFillCurTemplate<1, true >((fillCurTpl ? curTplAbove : nullptr));
+      tplAvalableLeft = xFillCurTemplate<1, false>((fillCurTpl ? curTplLeft : nullptr));
+      break;
+    case 2:
+      tplAvalableAbove = xFillCurTemplate<2, true >((fillCurTpl ? curTplAbove : nullptr));
+      tplAvalableLeft = xFillCurTemplate<2, false>((fillCurTpl ? curTplLeft : nullptr));
+      break;
+    case 4:
+      tplAvalableAbove = xFillCurTemplate<4, true >((fillCurTpl ? curTplAbove : nullptr));
+      tplAvalableLeft = xFillCurTemplate<4, false>((fillCurTpl ? curTplLeft : nullptr));
+      break;
+    default:
+      THROW("Unsupported");
+    }
+  }
 #else
   const bool tplAvalableAbove = xFillCurTemplate<TM_TPL_SIZE, true >((fillCurTpl ? curTplAbove : nullptr));
   const bool tplAvalableLeft  = xFillCurTemplate<TM_TPL_SIZE, false>((fillCurTpl ? curTplLeft  : nullptr));
@@ -13030,64 +13095,6 @@ bool TplMatchingCtrl::xFillCurTemplate(Pel* tpl)
   return true;
 }
 
-#if JVET_AC0104_IBC_BVD_PREDICTION
-template <int tplSize, bool trueAfalseL>
-bool TplMatchingCtrl::xGetCurTemplateAvailable()
-{
-  const Position          posOffset = trueAfalseL ? Position(0, -tplSize) : Position(-tplSize, 0);
-  const CodingUnit* const cuNeigh = m_cu.cs->getCU(m_pu.blocks[m_compID].pos().offset(posOffset), toChannelType(m_compID));
-
-  if (cuNeigh == nullptr)
-  {
-    return false;
-  }
-
-#if JVET_Z0084_IBC_TM
-  // Stay in reference region for IBC
-  if (CU::isIBC(m_cu))
-  {
-    const int cuPelX = m_pu.lx();
-    const int cuPelY = m_pu.ly();
-    const int roiWidth = trueAfalseL ? m_pu.lwidth() : tplSize;
-    const int roiHeight = trueAfalseL ? tplSize : m_pu.lheight();
-    const int picWidth = m_pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
-    const int picHeight = m_pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
-    const uint32_t ctuSize = m_pu.cs->slice->getSPS()->getMaxCUWidth();
-    const Mv  tempBv = trueAfalseL ? Mv(0, -tplSize) : Mv(-tplSize, 0);
-
-    if (!PU::searchBv(m_pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, tempBv.getHor(), tempBv.getVer(), ctuSize))
-    {
-      return false;
-    }
-  }
-#endif
-
-#if JVET_W0097_GPM_MMVD_TM & TM_MRG
-  if (m_cu.geoFlag)
-  {
-    CHECK(m_pu.geoTmType == GEO_TM_OFF, "invalid geo template type value");
-    if (m_pu.geoTmType == GEO_TM_SHAPE_A)
-    {
-      if (trueAfalseL == 0)
-      {
-        return false;
-      }
-    }
-    if (m_pu.geoTmType == GEO_TM_SHAPE_L)
-    {
-      if (trueAfalseL == 1)
-      {
-        return false;
-      }
-    }
-  }
-#endif
-
-  return true;
-}
-
-#endif
-
 template <int tplSize, bool trueAfalseL, int sr>
 PelBuf TplMatchingCtrl::xGetRefTemplate(const PredictionUnit& curPu, const Picture& refPic, const Mv& _mv, PelBuf& dstBuf)
 {
@@ -13228,131 +13235,6 @@ PelBuf TplMatchingCtrl::xGetRefTemplate(const PredictionUnit& curPu, const Pictu
   return dstBuf;
 }
 
-#if JVET_AC0104_IBC_BVD_PREDICTION
-template <int tplSize, bool trueAfalseL>
-PelBuf TplMatchingCtrl::xGetCurTemplateBvd(const PredictionUnit& curPu, const Picture& refPic, PelBuf& dstBuf)
-{
-
-  // Do interpolation on the fly
-  Position blkPos = Position(curPu.lx(), curPu.ly());
-
-  blkPos = blkPos.offset(trueAfalseL ? Position(0, 0 - tplSize) : Position(0 - tplSize, 0)); // default template offset
-
-  const Size blkSize = Size(dstBuf.width, dstBuf.height);
-  const int xFrac = 0;
-
-#if JVET_AA0146_WRAP_AROUND_FIX
-  const CPelBuf refBuf = refPic.getRecoBuf(refPic.blocks[m_compID], false);
-#else
-  const CPelBuf refBuf = refPic.getRecoBuf(refPic.blocks[m_compID]);
-#endif
-  const Pel* ref = refBuf.bufAt(blkPos);
-        Pel* dst = dstBuf.buf;
-  
-  const int  refStride = refBuf.stride;
-  const int  dstStride = dstBuf.stride;
-  const int  bw        = static_cast<int>(blkSize.width);
-  const int  bh        = static_cast<int>(blkSize.height);
-
-  const int  nFilterIdx   = 1;
-  const bool useAltHpelIf = false;
-  const bool biMCForDMVR  = false;
-
-#if JVET_AA0070_RRIBC
-  if (0 != m_cu.rribcFlipType)
-  {
-    if (2 == m_cu.rribcFlipType)
-    {
-      InterpolationFilter::filterReverseCopy<true>(m_cu.slice->clpRng(m_compID), ref, refStride, dst, dstStride, bw, bh);
-    }
-    else
-    {
-      InterpolationFilter::filterReverseCopy<false>(m_cu.slice->clpRng(m_compID), ref, refStride, dst, dstStride, bw, bh);
-    }
-  }
-  else
-  { 
-    m_interRes.m_if.filterHor(m_compID, (Pel*)ref, refStride, dst, dstStride, bw, bh, xFrac, true, m_cu.chromaFormat, m_cu.slice->clpRng(m_compID), nFilterIdx, biMCForDMVR, useAltHpelIf);
-  }
-#else
-  m_interRes.m_if.filterHor( m_compID, (Pel*)ref, refStride, dst, dstStride, bw, bh, xFrac, true, m_cu.chromaFormat, m_cu.slice->clpRng( m_compID ), nFilterIdx, biMCForDMVR, useAltHpelIf );
-#endif
-
-  return dstBuf;
-}
-
-template <int tplSize, bool trueAfalseL>
-PelBuf  TplMatchingCtrl::xGetRefTemplateBvd(const PredictionUnit& curPu, const Picture& refPic, const Mv& mv, PelBuf& dstBuf)
-{
-  // Stay in reference region for IBC
-  const bool res = (trueAfalseL ? m_useTop : m_useLeft);
-
-  if (!res)
-  {
-    return PelBuf();
-  }
-
-  // Do interpolation on the fly
-  Position blkPos = Position(curPu.lx(), curPu.ly());
-
-#if JVET_AA0070_RRIBC
-  if (0 == curPu.cu->rribcFlipType)
-  {
-    blkPos = blkPos.offset(trueAfalseL ? Position(0, 0 - tplSize) : Position(0 - tplSize, 0)); // default template offset
-  }
-  else if (1 == curPu.cu->rribcFlipType && 0 == trueAfalseL)
-  {
-    blkPos = blkPos.offset(m_pu.lwidth(), 0);
-  }
-  else if (2 == curPu.cu->rribcFlipType && 1 == trueAfalseL)
-  {
-    blkPos = blkPos.offset(0, m_pu.lheight());
-  }
-  else
-  {
-    blkPos = blkPos.offset(trueAfalseL ? Position(0, 0 - tplSize) : Position(0 - tplSize, 0)); // default template offset
-  }
-#else
-  blkPos = blkPos.offset( trueAfalseL ? Position( 0, 0 - tplSize ) : Position( 0 - tplSize, 0 ) ); // default template offset
-#endif
-
-  const Size blkSize = Size(dstBuf.width, dstBuf.height);
-
-
-  constexpr int lumaShift = 2 + MV_FRACTIONAL_BITS_DIFF;
-  const     int horShift = (lumaShift + ::getComponentScaleX(m_compID, m_cu.chromaFormat));
-  const     int verShift = (lumaShift + ::getComponentScaleY(m_compID, m_cu.chromaFormat));
-
-  const int xInt = mv.getHor() >> horShift;
-  const int yInt = mv.getVer() >> verShift;
-  const int xFrac = mv.getHor() & ((1 << horShift) - 1);
-
-
-#if JVET_AA0146_WRAP_AROUND_FIX
-  const CPelBuf refBuf = refPic.getRecoBuf(refPic.blocks[m_compID], false);
-#else
-  const CPelBuf refBuf = refPic.getRecoBuf(refPic.blocks[m_compID]);
-#endif
-
-  const Pel* ref = refBuf.bufAt(blkPos.offset(xInt, yInt));
-
-  Pel* dst = dstBuf.buf;
-
-  const int  refStride = refBuf.stride;
-  const int  dstStride = dstBuf.stride;
-  const int  bw = static_cast<int>(blkSize.width);
-  const int  bh = static_cast<int>(blkSize.height);
-
-  const int  nFilterIdx = 1;
-  const bool useAltHpelIf = false;
-  const bool biMCForDMVR = false;
-
-  m_interRes.m_if.filterHor(m_compID, (Pel*)ref, refStride, dst, dstStride, bw, bh, xFrac, true, m_cu.chromaFormat, m_cu.slice->clpRng(m_compID), nFilterIdx, biMCForDMVR, useAltHpelIf, true);
-
-  return dstBuf;
-}
-
-#endif
 
 template <int tplSize, bool trueAfalseL>
 void TplMatchingCtrl::xRemoveHighFreq(const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight)
@@ -13632,7 +13514,186 @@ int TplMatchingCtrl::xBinaryDivision(int64_t numerator, int64_t denominator, int
 }
 #endif
 
-#if JVET_AC0104_IBC_BVD_PREDICTION 
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+template <int tplSize, bool trueAfalseL>
+bool TplMatchingCtrl::xGetCurTemplateAvailable()
+{
+  const Position          posOffset = trueAfalseL ? Position(0, -tplSize) : Position(-tplSize, 0);
+  const CodingUnit* const cuNeigh = m_cu.cs->getCU(m_pu.blocks[m_compID].pos().offset(posOffset), toChannelType(m_compID));
+
+  if (cuNeigh == nullptr)
+  {
+    return false;
+  }
+
+#if JVET_Z0084_IBC_TM
+  // Stay in reference region for IBC
+  if (CU::isIBC(m_cu))
+  {
+    const int cuPelX = m_pu.lx();
+    const int cuPelY = m_pu.ly();
+    const int roiWidth = trueAfalseL ? m_pu.lwidth() : tplSize;
+    const int roiHeight = trueAfalseL ? tplSize : m_pu.lheight();
+    const int picWidth = m_pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
+    const int picHeight = m_pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
+    const uint32_t ctuSize = m_pu.cs->slice->getSPS()->getMaxCUWidth();
+    const Mv  tempBv = trueAfalseL ? Mv(0, -tplSize) : Mv(-tplSize, 0);
+
+    if (!PU::searchBv(m_pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, tempBv.getHor(), tempBv.getVer(), ctuSize))
+    {
+      return false;
+    }
+  }
+#endif
+
+#if JVET_W0097_GPM_MMVD_TM & TM_MRG
+  if (m_cu.geoFlag)
+  {
+    CHECK(m_pu.geoTmType == GEO_TM_OFF, "invalid geo template type value");
+    if (m_pu.geoTmType == GEO_TM_SHAPE_A)
+    {
+      if (trueAfalseL == 0)
+      {
+        return false;
+      }
+    }
+    if (m_pu.geoTmType == GEO_TM_SHAPE_L)
+    {
+      if (trueAfalseL == 1)
+      {
+        return false;
+      }
+    }
+  }
+#endif
+
+  return true;
+}
+
+template <int tplSize, bool trueAfalseL>
+PelBuf TplMatchingCtrl::xGetCurTemplateBvd(const PredictionUnit& curPu, const Picture& refPic, PelBuf& dstBuf)
+{
+
+  // Do interpolation on the fly
+  Position blkPos = Position(curPu.lx(), curPu.ly());
+
+  blkPos = blkPos.offset(trueAfalseL ? Position(0, 0 - tplSize) : Position(0 - tplSize, 0)); // default template offset
+
+  const Size blkSize = Size(dstBuf.width, dstBuf.height);
+  const int xFrac = 0;
+
+#if JVET_AA0146_WRAP_AROUND_FIX
+  const CPelBuf refBuf = refPic.getRecoBuf(refPic.blocks[m_compID], false);
+#else
+  const CPelBuf refBuf = refPic.getRecoBuf(refPic.blocks[m_compID]);
+#endif
+  const Pel* ref = refBuf.bufAt(blkPos);
+  Pel* dst = dstBuf.buf;
+
+  const int  refStride = refBuf.stride;
+  const int  dstStride = dstBuf.stride;
+  const int  bw = static_cast<int>(blkSize.width);
+  const int  bh = static_cast<int>(blkSize.height);
+
+  const int  nFilterIdx = 1;
+  const bool useAltHpelIf = false;
+  const bool biMCForDMVR = false;
+
+#if JVET_AA0070_RRIBC
+  if (0 != m_cu.rribcFlipType)
+  {
+    if (2 == m_cu.rribcFlipType)
+    {
+      InterpolationFilter::filterReverseCopy<true>(m_cu.slice->clpRng(m_compID), ref, refStride, dst, dstStride, bw, bh);
+    }
+    else
+    {
+      InterpolationFilter::filterReverseCopy<false>(m_cu.slice->clpRng(m_compID), ref, refStride, dst, dstStride, bw, bh);
+    }
+  }
+  else
+  {
+    m_interRes.m_if.filterHor(m_compID, (Pel*)ref, refStride, dst, dstStride, bw, bh, xFrac, true, m_cu.chromaFormat, m_cu.slice->clpRng(m_compID), nFilterIdx, biMCForDMVR, useAltHpelIf);
+  }
+#else
+  m_interRes.m_if.filterHor(m_compID, (Pel*)ref, refStride, dst, dstStride, bw, bh, xFrac, true, m_cu.chromaFormat, m_cu.slice->clpRng(m_compID), nFilterIdx, biMCForDMVR, useAltHpelIf);
+#endif
+
+  return dstBuf;
+}
+
+template <int tplSize, bool trueAfalseL>
+PelBuf  TplMatchingCtrl::xGetRefTemplateBvd(const PredictionUnit& curPu, const Picture& refPic, const Mv& mv, PelBuf& dstBuf)
+{
+  // Stay in reference region for IBC
+  const bool res = (trueAfalseL ? m_useTop : m_useLeft);
+
+  if (!res)
+  {
+    return PelBuf();
+  }
+
+  // Do interpolation on the fly
+  Position blkPos = Position(curPu.lx(), curPu.ly());
+
+#if JVET_AA0070_RRIBC
+  if (0 == curPu.cu->rribcFlipType)
+  {
+    blkPos = blkPos.offset(trueAfalseL ? Position(0, 0 - tplSize) : Position(0 - tplSize, 0)); // default template offset
+  }
+  else if (1 == curPu.cu->rribcFlipType && 0 == trueAfalseL)
+  {
+    blkPos = blkPos.offset(m_pu.lwidth(), 0);
+  }
+  else if (2 == curPu.cu->rribcFlipType && 1 == trueAfalseL)
+  {
+    blkPos = blkPos.offset(0, m_pu.lheight());
+  }
+  else
+  {
+    blkPos = blkPos.offset(trueAfalseL ? Position(0, 0 - tplSize) : Position(0 - tplSize, 0)); // default template offset
+  }
+#else
+  blkPos = blkPos.offset(trueAfalseL ? Position(0, 0 - tplSize) : Position(0 - tplSize, 0)); // default template offset
+#endif
+
+  const Size blkSize = Size(dstBuf.width, dstBuf.height);
+
+
+  constexpr int lumaShift = 2 + MV_FRACTIONAL_BITS_DIFF;
+  const     int horShift = (lumaShift + ::getComponentScaleX(m_compID, m_cu.chromaFormat));
+  const     int verShift = (lumaShift + ::getComponentScaleY(m_compID, m_cu.chromaFormat));
+
+  const int xInt = mv.getHor() >> horShift;
+  const int yInt = mv.getVer() >> verShift;
+  const int xFrac = mv.getHor() & ((1 << horShift) - 1);
+
+
+#if JVET_AA0146_WRAP_AROUND_FIX
+  const CPelBuf refBuf = refPic.getRecoBuf(refPic.blocks[m_compID], false);
+#else
+  const CPelBuf refBuf = refPic.getRecoBuf(refPic.blocks[m_compID]);
+#endif
+
+  const Pel* ref = refBuf.bufAt(blkPos.offset(xInt, yInt));
+
+  Pel* dst = dstBuf.buf;
+
+  const int  refStride = refBuf.stride;
+  const int  dstStride = dstBuf.stride;
+  const int  bw = static_cast<int>(blkSize.width);
+  const int  bh = static_cast<int>(blkSize.height);
+
+  const int  nFilterIdx = 1;
+  const bool useAltHpelIf = false;
+  const bool biMCForDMVR = false;
+
+  m_interRes.m_if.filterHor(m_compID, (Pel*)ref, refStride, dst, dstStride, bw, bh, xFrac, true, m_cu.chromaFormat, m_cu.slice->clpRng(m_compID), nFilterIdx, biMCForDMVR, useAltHpelIf, true);
+
+  return dstBuf;
+}
+
 template <int tplSize>
 Distortion TplMatchingCtrl::xGetTempMatchErrorBvd(const Mv& mv)
 {
@@ -17119,855 +17180,6 @@ void InterPrediction::setUniRefListAndIdx(PredictionUnit &pu)
 #endif
 }
 
-#if JVET_AC0104_IBC_BVD_PREDICTION
-struct CandCheckEnv
-{
-  const std::vector<Mv>& cMvdDerived;
-  const Mv& cMvPred;
-  const PredictionUnit& pu;
-  const int picWidth;
-  const int picHeight;
-  const int lcuWidth;
-  TplMatchingCtrl& tplCtrl;
-  std::vector<std::pair<Mv, Distortion>>& aMvCostVec;
-
-  CandCheckEnv(const std::vector<Mv>& cMvdDerived_in, const Mv& cMvPred_in, const PredictionUnit& pu_in, const int picWidth_in, const int picHeight_in, const int lcuWidth_in
-    , TplMatchingCtrl& tplCtrl_in, std::vector<std::pair<Mv, Distortion>>& aMvCostVec_in) :
-    cMvdDerived(cMvdDerived_in),
-    cMvPred(cMvPred_in),
-    pu(pu_in),
-    picWidth(picWidth_in),
-    picHeight(picHeight_in),
-    lcuWidth(lcuWidth_in),
-    tplCtrl(tplCtrl_in),
-    aMvCostVec(aMvCostVec_in) {}
-
-
-  template <bool doBoundaryCheck>
-  bool estimate(const int n) // modified list
-  {
-    auto cMvdTest = cMvdDerived[n];
-    Mv cMvTest = cMvPred + cMvdTest;
-
-    int xPred = cMvTest.getHor() >> MV_FRACTIONAL_BITS_INTERNAL;
-    int yPred = cMvTest.getVer() >> MV_FRACTIONAL_BITS_INTERNAL;
-
-    bool res = true;
-
-    if (doBoundaryCheck)
-    {
-      res = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), pu.lheight(), picWidth, picHeight, xPred, yPred, lcuWidth);
-    }
-    bool & useTop = tplCtrl.getCurTopRefAvailFlag();
-    bool & useLeft = tplCtrl.getCurLeftRefAvailFlag();
-
-    if (res && doBoundaryCheck)
-    {
-#if JVET_AA0070_RRIBC
-      if (1 == pu.cu->rribcFlipType)
-      {
-        useTop = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred, lcuWidth);
-        xPred += pu.lwidth(); //at least, template size of 1 should be available
-        useLeft = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred, yPred, lcuWidth);
-      }
-      else
-      {
-        if( 2 == pu.cu->rribcFlipType )
-        {
-          useLeft = PU::searchBv( pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred, yPred, lcuWidth );
-          yPred += pu.lheight(); //at least, template size of 1 should be available
-          useTop = PU::searchBv( pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred, lcuWidth );
-        }
-        else
-        {
-          useLeft = PU::searchBv( pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred - 1, yPred, lcuWidth );
-          useTop = PU::searchBv( pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred - 1, lcuWidth );
-        }
-      }
-#else
-      useLeft = PU::searchBv( pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred - 1, yPred, lcuWidth );
-      useTop = PU::searchBv( pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred - 1, lcuWidth );
-#endif
-    }
-    else if (!doBoundaryCheck)
-    {
-      useTop = useLeft = true;
-    }
-
-    const auto matchFxn = &TplMatchingCtrl::xGetTempMatchErrorBvd<1>;
-
-    Distortion uiCost = res ?
-      (tplCtrl.*matchFxn)(cMvTest) : std::numeric_limits<Distortion>::max();
-
-    if (!doBoundaryCheck)
-    {
-      CHECK(!(res && (useTop || useLeft)), "candidate is invalid, but check is skipped");
-    }
-
-    aMvCostVec[n] = { cMvdTest, uiCost };
-
-    return res && useTop && useLeft;
-
-  }
-  template <bool leftChecked, bool rightChecked, int step>
-  bool checkSubRange(bool leftValid, bool rightValid, int idxLeft, int idxRight, int rangeLen)
-  {
-    if (!leftChecked)
-    {
-      leftValid = estimate<true>(idxLeft); // with boundary check
-    }
-    if (!rightChecked)
-    {
-      rightValid = estimate<true>(idxRight); // with boundary check
-    }
-
-    if (rangeLen <= 2)
-    {
-      return rightValid;
-    }
-    else
-      if (leftValid && rightValid) //get costs with no boundary checks: all values should be valid in the range
-      {
-        for (int n = idxLeft + step; n < idxRight; n += step)
-        {
-          estimate<false>(n); // no boundary check, assume the candidate is OK
-        }
-        return true;
-      }
-      else
-      {
-        int rangeLenLeft = (rangeLen >> 1) + (rangeLen % 2);
-        int rangeLenRight = rangeLen <= 1 ? 0 : rangeLen - rangeLenLeft;
-
-        if (rangeLenLeft > 0)
-        {
-          leftValid = checkSubRange<true, false, step>(leftValid, false /*rightValid*/
-            , idxLeft, idxLeft + (rangeLenLeft - 1) * step, rangeLenLeft); //leftValid is for the right interval
-        }
-        if (rangeLenRight > 0)
-        {
-          checkSubRange<true, true, step>(leftValid, rightValid
-            , idxRight - (rangeLenRight)*step, idxRight, rangeLenRight + 1); //leftValid is for the right interval
-        }
-        return rightValid;
-      }
-
-    return true;
-  }
-};
-
-
-void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, std::vector<Mv>& cMvdDerived, int imv)
-{
-  const int& horPrefix = pu.bvdSuffixInfo.horPrefix;
-  const int& verPrefix = pu.bvdSuffixInfo.verPrefix;
-
-  const int iHorMSBins = pu.bvdSuffixInfo.horOffsetPredictionNumBins;
-  const int iVerMSBins = pu.bvdSuffixInfo.verOffsetPredictionNumBins;
-
-  uint16_t patternsNum = 0;
-  Mv tmp = cMvdKnownAtDecoder;
-  tmp.changeIbcPrecInternal2Amvr(pu.cu->imv);
-
-  if (horPrefix < 0 && verPrefix < 0)
-  {
-    return;
-  }
-
-  int horAbs = -1;
-  int verAbs = -1;
-
-  horAbs = tmp.getAbsHor();
-  verAbs = tmp.getAbsVer();
-  
-  const int iTotalNumberOfBins = iHorMSBins + iVerMSBins;
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
-  const int numSignBits = (pu.cu->rribcFlipType != 0 && pu.isBvpClusterApplicable())
-                            ? 0
-                            :
-#else 
-  const int numSignBits =
-#endif
-                          ((0 != horAbs && !pu.bvdSuffixInfo.horEncodeSignInEP) ? 1 : 0) + 
-                          ((0 != verAbs && !pu.bvdSuffixInfo.verEncodeSignInEP) ? 1 : 0);
-
-  patternsNum = 1 << (iTotalNumberOfBins + numSignBits);
-  cMvdDerived.clear();
-  cMvdDerived.reserve(patternsNum);
-
-  auto getValueOfSuffixLSBins = [](const int absValue, const int iPrefix, const int iMSBins, const int groupMinValue)                      
-  {
-    CHECK(iPrefix + 1 < iMSBins, "Incorrect values of either prefix or the number of bins to be predicted");
-    const int offset = (1 << (iPrefix + 1)) - 1 - ((1 << (iPrefix + 1 - iMSBins)) - 1); //MSB position is prefix-1;
-
-    int iSuffix = absValue - 1 - groupMinValue;
-
-    iSuffix = iSuffix & ~(offset);
-
-    return iSuffix;
-  };
-
-  //extract suffix
-  const auto si = pu.bvdSuffixInfo;
-  const int iHorKnown = horPrefix < 0 ? 0 : 
-    pu.bvdSuffixInfo.horPrefixGroupStartValue + getValueOfSuffixLSBins(horAbs, horPrefix, iHorMSBins, si.horPrefixGroupStartValue) + 1;
-  const int iVerKnown = verPrefix < 0 ? 0 : 
-    pu.bvdSuffixInfo.verPrefixGroupStartValue + getValueOfSuffixLSBins(verAbs, verPrefix, iVerMSBins, si.verPrefixGroupStartValue) + 1;
-
-
-  const int iRemainedBinsInHorSuffix = (horPrefix < 0 ? 0 : pu.bvdSuffixInfo.iBinsInHorSuffix) - iHorMSBins;
-  CHECK(iRemainedBinsInHorSuffix < 0, "Incorrect number of remained bins in the suffix of a horizontal component");
-  const int iRemainedBinsInVerSuffix = (verPrefix < 0 ? 0 : pu.bvdSuffixInfo.iBinsInVerSuffix) - iVerMSBins;
-  CHECK(iRemainedBinsInVerSuffix < 0, "Incorrect number of remained bins in the suffix of a vertical component");
-
-  const int iHorRange = 1 << iHorMSBins;
-  const int iVerRange = 1 << iVerMSBins;
-  constexpr int maxPatternCount = 4096;
-  CHECK(iHorRange >= maxPatternCount, "iHorRange > 128");
-  CHECK(iVerRange >= maxPatternCount, "iVerRange > 128");
-  CHECK(iHorRange < 0, "iHorRange < 0");
-  CHECK(iVerRange < 0, "iVerRange < 0");
-
-#if JVET_AA0070_RRIBC
-  const bool rrIBCmode = pu.cu->rribcFlipType != 0;
-#endif
-
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
-  bool horPositiveAllowed;
-  bool horNegativeAllowed;
-  bool verPositiveAllowed;
-  bool verNegativeAllowed;
-  if (pu.isBvpClusterApplicable())
-  {
-  const bool horPositiveAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 1 && rrIBCmode;
-  const bool horNegativeAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 0 && rrIBCmode;
-  const bool verPositiveAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 1 && rrIBCmode;
-  const bool verNegativeAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 0 && rrIBCmode;
-
-  CHECK(pu.mvpIdx[REF_PIC_LIST_0] >= AMVP_MAX_NUM_CANDS, "pu.mvpIdx[REF_PIC_LIST_0] >= AMVP_MAX_NUM_CANDS");
-  CHECK(iHorKnown == 0 && cMvdKnownAtDecoder.getHor() != 0, "cMvdKnownAtDecoder.getHor() != 0");
-
-  horPositiveAllowed = horPositiveAllowedRRIBC || (!rrIBCmode && !si.horEncodeSignInEP) || (!rrIBCmode && si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() > 0);
-  horNegativeAllowed = horNegativeAllowedRRIBC || (!rrIBCmode && !si.horEncodeSignInEP) || (!rrIBCmode && si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() < 0);
-  verPositiveAllowed = verPositiveAllowedRRIBC || (!rrIBCmode && !si.verEncodeSignInEP) || (!rrIBCmode && si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() > 0);
-  verNegativeAllowed = verNegativeAllowedRRIBC || (!rrIBCmode && !si.verEncodeSignInEP) || (!rrIBCmode && si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() < 0);
-  }
-  else
-  {
-    horPositiveAllowed = !si.horEncodeSignInEP || (si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() > 0);
-    horNegativeAllowed = !si.horEncodeSignInEP || (si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() < 0);
-    verPositiveAllowed = !si.verEncodeSignInEP || (si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() > 0);
-    verNegativeAllowed = !si.verEncodeSignInEP || (si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() < 0);
-  }
-#else
-  const bool horPositiveAllowed = !si.horEncodeSignInEP || (si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() > 0);
-  const bool horNegativeAllowed = !si.horEncodeSignInEP || (si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() < 0);
-  const bool verPositiveAllowed = !si.verEncodeSignInEP || (si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() > 0);
-  const bool verNegativeAllowed = !si.verEncodeSignInEP || (si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() < 0);
-#endif
-#if JVET_AA0070_RRIBC
-  if (rrIBCmode)
-  {
-    CHECK(si.horEncodeSignInEP, "si.horEncodeSignInEP in RRIBC mode");
-    CHECK(si.verEncodeSignInEP, "si.verEncodeSignInEP in RRIBC mode");
-  }
-#endif
-  if (iHorKnown == 0)
-  {
-    for (unsigned int iVerCnt = 0; iVerCnt < iVerRange; ++iVerCnt)
-    {
-      const int iVerComp = iVerKnown + (iVerCnt << iRemainedBinsInVerSuffix);
-
-      CHECK(cMvdKnownAtDecoder.getHor() != 0, "cMvdKnownAtDecoder.getHor() != 0");
-      if (verNegativeAllowed)
-      {
-        cMvdDerived.push_back(Mv(0, -iVerComp));
-      }
-      if (verPositiveAllowed)
-      {
-        cMvdDerived.push_back(Mv(0,  iVerComp));
-      }
-    }
-  }
-  else if (iVerKnown == 0)
-  {
-    for (unsigned int iHorCnt = 0; iHorCnt < iHorRange; ++iHorCnt)
-    {
-      const int iHorComp = iHorKnown + (iHorCnt << iRemainedBinsInHorSuffix);
-      if (horNegativeAllowed)
-      {
-        cMvdDerived.push_back(Mv(-iHorComp, 0));
-      }
-      if (horPositiveAllowed)
-      {
-        cMvdDerived.push_back(Mv( iHorComp, 0));
-      }
-    }
-  }
-  else
-  {
-#if JVET_AA0070_RRIBC
-    CHECK(pu.cu->rribcFlipType != 0, "pu.cu->rribcFlipType !=0");
-#endif
-    for (unsigned int iHorCnt = 0; iHorCnt < iHorRange; ++iHorCnt)
-    {
-      const int iHorComp = iHorKnown + (iHorCnt << iRemainedBinsInHorSuffix);
-      for (unsigned int iVerCnt = 0; iVerCnt < iVerRange; ++iVerCnt)
-      {
-        const int iVerComp = iVerKnown + (iVerCnt << iRemainedBinsInVerSuffix);
-        if (horNegativeAllowed)
-        {
-          if (verNegativeAllowed)
-          {
-            cMvdDerived.push_back(Mv(-iHorComp, -iVerComp));
-          }
-          if (verPositiveAllowed)
-          {
-            cMvdDerived.push_back(Mv(-iHorComp, iVerComp));
-          }
-        }
-        if (horPositiveAllowed)
-        {
-          if (verNegativeAllowed)
-          {
-            cMvdDerived.push_back(Mv(iHorComp, -iVerComp));
-          }
-          if (verPositiveAllowed)
-          {
-            cMvdDerived.push_back(Mv(iHorComp, iVerComp));
-          }
-        }
-      }
-    }
-  }
-
-  for (auto& bvd_cand : cMvdDerived)
-  {
-    bvd_cand.changeIbcPrecAmvr2Internal(pu.cu->imv);
-  }
-
-  if (!pu.lumaPos().x && !pu.lumaPos().y)
-  {
-    return;
-  }
-
-  const Picture& recPic = *pu.cu->slice->getPic();
-
-  InterPredResources interRes(m_pcReshape, m_pcRdCost, m_if, m_filteredBlockTmp[0][COMPONENT_Y]
-    , m_filteredBlock[3][1][0], m_filteredBlock[3][0][0]
-  );
-
-  TplMatchingCtrl tplCtrl(pu, interRes, recPic, true, COMPONENT_Y, false, 0, m_pcCurTplAbove, m_pcCurTplLeft, m_pcRefTplAbove, m_pcRefTplLeft, Mv(0, 0), nullptr, 0, 1, true);
-  std::vector<std::pair<Mv, Distortion>> aMvCostVec(patternsNum);
-
-  const          int picWidth  = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
-  const          int picHeight = pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
-  const unsigned int lcuWidth  = pu.cs->slice->getSPS()->getMaxCUWidth();
-
-  int step = -1;
-  CandCheckEnv checkEnv(cMvdDerived, cMvPred, pu, picWidth, picHeight, lcuWidth, tplCtrl, aMvCostVec);
-  int idxOffset = 0;
-  //typedef void (CandCheckEnv::* RangeCheckFxn)(bool , bool , int , int , int );
-  auto checkRange = [&step, &checkEnv, &idxOffset, iHorRange, iVerRange](int idxRight, int rangeLen)
-  {
-    switch (step)
-    {
-    case 1:
-      checkEnv.checkSubRange<false, false, 1>(false, false, idxOffset, idxRight, rangeLen);
-      break;
-    case 2:
-      checkEnv.checkSubRange<false, false, 2>(false, false, idxOffset, idxRight, rangeLen);
-      break;
-    case 3:
-      checkEnv.checkSubRange<false, false, 3>(false, false, idxOffset, idxRight, rangeLen);
-      break;
-    case 4:
-      checkEnv.checkSubRange<false, false, 4>(false, false, idxOffset, idxRight, rangeLen);
-      break;
-    }
-    idxOffset++;
-  };
-
-  if (iHorKnown == 0)
-  {
-    step = (verNegativeAllowed ? 1 : 0) + (verPositiveAllowed ? 1 : 0);
-    if (verNegativeAllowed)
-    {
-      checkRange(idxOffset + (iVerRange - 1) * step, iVerRange);
-    }
-    if (verPositiveAllowed)
-    {
-      checkRange(idxOffset + (iVerRange - 1) * step, iVerRange);
-    }
-  }
-  else if (iVerKnown == 0)
-  {
-    step = (horNegativeAllowed ? 1 : 0) + (horPositiveAllowed ? 1 : 0);
-
-    if (horNegativeAllowed)
-    {
-      checkRange(idxOffset + (iHorRange - 1) * step, iHorRange);
-    }
-    if (horPositiveAllowed)
-    {
-      checkRange(idxOffset + (iHorRange - 1) * step, iHorRange);
-    }
-  }
-  else
-  {
-#if JVET_AA0070_RRIBC
-    CHECK(pu.cu->rribcFlipType != 0, "pu.cu->rribcFlipType !=0");
-#endif
-    step = (horNegativeAllowed ? 1 : 0) * ((verNegativeAllowed ? 1 : 0) + (verPositiveAllowed ? 1 : 0)) +
-      (horPositiveAllowed ? 1 : 0) * ((verNegativeAllowed ? 1 : 0) + (verPositiveAllowed ? 1 : 0));
-    for (unsigned int iHorCnt = 0; iHorCnt < iHorRange; ++iHorCnt)
-    {
-      //for (unsigned int iVerCnt = 0; iVerCnt < iVerRange; ++iVerCnt)
-      idxOffset = iHorCnt * iVerRange * step;
-      {
-        if (horNegativeAllowed)
-        {
-          if (verNegativeAllowed)
-          {
-            checkRange(idxOffset + (iVerRange - 1) * step, iVerRange);
-
-          }
-          if (verPositiveAllowed)
-          {
-            checkRange(idxOffset + (iVerRange - 1) * step, iVerRange);
-          }
-        }
-        if (horPositiveAllowed)
-        {
-          if (verNegativeAllowed)
-          {
-            checkRange(idxOffset + (iVerRange - 1) * step, iVerRange);
-          }
-          if (verPositiveAllowed)
-          {
-            checkRange(idxOffset + (iVerRange - 1) * step, iVerRange);
-          }
-        }
-      }
-    }
-  }
-
-
-  std::stable_sort(aMvCostVec.begin(), aMvCostVec.end(), [](const std::pair<Mv, Distortion>& l, const std::pair<Mv, Distortion>& r) {return l.second < r.second; });
-
-  for (int n = 0; n < patternsNum; ++n)
-  {
-    cMvdDerived[n] = aMvCostVec[n].first;
-  }
-}
-
-void InterPrediction::applyOffsets(Mv& cMvdInput, std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si, int imv)
-{
-  const int& horPrefix = si.horPrefix;
-  const int& verPrefix = si.verPrefix;
-
-  const int& horOffsetPrediction = si.horOffsetPrediction;
-  const int& verOffsetPrediction = si.verOffsetPrediction;
-
-  if (horPrefix < 0 && verPrefix < 0 )
-  {
-    return;
-  }
-  constexpr int maxPatternCount = 4096;
-  bool isCandValid[maxPatternCount];
-
-  size_t patternsCount = cMvdDerived.size();
-  int firstValidIdx = -1;
-  for (int i = 0; i < cMvdDerived.size(); ++i)
-  {
-    isCandValid[i] = SIGN(cMvdDerived[i].getHor()) == SIGN(cMvdInput.getHor()) && SIGN(cMvdDerived[i].getVer()) == SIGN(cMvdInput.getVer());
-    if (isCandValid[i] && firstValidIdx<0)
-    {
-      firstValidIdx = i;
-    }
-    cMvdDerived[i].changeIbcPrecInternal2Amvr(imv);
-  }
-
-  CHECK(firstValidIdx < 0, "firstValidIdx<0");
-
-  Mv tmp = cMvdInput;
-  tmp.changeIbcPrecInternal2Amvr(imv);
-
-
-  const int horSuffixMSBpos = si.iBinsInHorSuffix-1;
-  const int verSuffixMSBpos = si.iBinsInVerSuffix-1;
-
-  int numMSBhor = si.horOffsetPredictionNumBins;
-  int numMSBver = si.verOffsetPredictionNumBins;
-
-  int posLeastSignificant = std::numeric_limits<int>::max() , posMostSignificant = -1;
-  if (horPrefix >= 0 && numMSBhor > 0)
-  {
-    posLeastSignificant = std::min(posLeastSignificant, horSuffixMSBpos - numMSBhor);
-    posMostSignificant  = std::max(posMostSignificant , horSuffixMSBpos);
-  }
-  if (verPrefix >= 0 && numMSBver > 0)
-  {
-    posLeastSignificant = std::min(posLeastSignificant, verSuffixMSBpos - numMSBver);
-    posMostSignificant = std::max(posMostSignificant, verSuffixMSBpos);
-  }
-
-  // Check if x is in [low..high]
-  auto inRange = [](int low, int high, int x)
-  {
-    return ((x - high) * (x - low) <= 0);
-  };
-
-  typedef enum {
-    MV_HOR_COMPONENT,
-    MV_VER_COMPONENT
-  } MvComp;
-
-  auto getMagnitudeParams = [si](const Mv& derived, int significanceOffset, MvComp mvComp)
-  {
-    const bool useHor = mvComp == MV_HOR_COMPONENT;
-    //int prefix = useHor ? derived.horPrefix : derived.verPrefix;
-
-    int offsetMask = 1 << significanceOffset;
-    //extract suffix
-    int absValue = useHor ? derived.getAbsHor() : derived.getAbsVer();
-
-    int suffix = MvdSuffixInfo::getSuffix(absValue - 1, useHor ? si.horPrefixGroupStartValue : si.verPrefixGroupStartValue);
-
-    //Get bit values at desired positions
-    bool bitPresent = (suffix & offsetMask) != 0;
-
-    int baseVal = absValue - (bitPresent ? offsetMask : 0);
-
-    return std::pair<int, bool>(baseVal, bitPresent);
-  };
-
-  int horBitCount = 0;
-  int verBitCount = 0;
-  
-  int baseVal = 0;
-  bool bitPresent = false;
-
-
-  for (int i = posMostSignificant; i > posLeastSignificant; --i)
-  {
-    const Mv & derived = cMvdDerived[firstValidIdx];
-
-    const int significanceOffset = (1 << i);
-
-    bool useHor = (numMSBhor > 0 && horPrefix >= 0) ? inRange(horSuffixMSBpos - numMSBhor + 1, horSuffixMSBpos, i) : false;
-    bool useVer = (numMSBver > 0 && verPrefix >= 0) ? inRange(verSuffixMSBpos - numMSBver + 1, verSuffixMSBpos, i) : false;
-
-    if (useHor && useVer)
-    {
-      int bit = (horOffsetPrediction >> (numMSBhor - 1 - horBitCount)) & 1;
-      std::tie(baseVal, bitPresent) = getMagnitudeParams(derived, i, MV_HOR_COMPONENT);
-
-      if (0 == bit) // HOR hypothesis is not correct
-      {
-        bitPresent = !bitPresent;
-      }
-      tmp.setHor(SIGN(derived.getHor())* (baseVal + (bitPresent ? significanceOffset : 0)));
-
-      if (1 == bit) // HOR hypothesis is correct
-      {
-        int bit = (verOffsetPrediction >> (numMSBver - 1 - verBitCount)) & 1;
-        std::tie(baseVal, bitPresent) = getMagnitudeParams(derived, i, MV_VER_COMPONENT);
-        if (0 == bit) // VER hypothesis is not correct
-        {
-          bitPresent = !bitPresent;
-        }
-        tmp.setVer(SIGN(derived.getVer())* (baseVal + (bitPresent ? significanceOffset : 0)));
-      }
-      else
-      {
-        bool candFound = false;
-        for (int j = firstValidIdx; j < patternsCount; ++j)
-        {
-          if (!isCandValid[j])
-          {
-            continue;
-          }
-          Mv& v = cMvdDerived[j];
-
-          bool bitPresentHyp = false;
-          std::tie(baseVal, bitPresentHyp) = getMagnitudeParams(v, i, MV_HOR_COMPONENT);
-          candFound = bitPresent == bitPresentHyp; // "bitPresent" should be already XORed 
-
-          if (candFound)
-          {
-            int bit = (verOffsetPrediction >> (numMSBver - 1 - verBitCount)) & 1;
-
-            std::tie(baseVal, bitPresent) = getMagnitudeParams(v, i, MV_VER_COMPONENT);
-            if (0 == bit) // VER hypothesis is not correct
-            {
-              bitPresent = !bitPresent;
-            }
-            tmp.setVer(SIGN(v.getVer()) * (baseVal + (bitPresent ? significanceOffset : 0)));
-
-            break;
-          }
-        }
-        CHECK(!candFound, "Consistency check error!");
-      }
-      ++horBitCount;
-      ++verBitCount;
-
-      const int currentHorSuffix = MvdSuffixInfo::getSuffix(tmp.getAbsHor() - 1, si.horPrefixGroupStartValue);
-      const int currentVerSuffix = MvdSuffixInfo::getSuffix(tmp.getAbsVer() - 1, si.verPrefixGroupStartValue);
-
-      // Update validity
-      int firstValidIdxNew = -1;
-      for (int j = firstValidIdx; j < patternsCount; ++j)
-      {
-        if (!isCandValid[j])
-        {
-          continue;
-        }
-        isCandValid[j] = checkBitMatch(currentHorSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[j].getAbsHor() - 1, si.horPrefixGroupStartValue), i)
-                      && checkBitMatch(currentVerSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[j].getAbsVer() - 1, si.verPrefixGroupStartValue), i);
-
-        if (isCandValid[j] && firstValidIdxNew == -1)
-        {
-          firstValidIdxNew = j;
-        }
-      }
-      CHECK(firstValidIdxNew < firstValidIdx, "firstValidIdxNew< firstValidIdx");
-      firstValidIdx = firstValidIdxNew;
-    }
-    else if (useHor)
-    {
-      int bit = (horOffsetPrediction >> (numMSBhor - 1 - horBitCount)) & 1;
-      std::tie(baseVal, bitPresent) = getMagnitudeParams(derived, i, MV_HOR_COMPONENT);
-
-      if (0 == bit) // HOR hypothesis is not correct
-      {
-        bitPresent = !bitPresent;
-      }
-      tmp.setHor(SIGN(derived.getHor()) * (baseVal + (bitPresent ? significanceOffset : 0)));
-      ++horBitCount;
-
-      // Update validity
-      int firstValidIdxNew = -1;
-
-      const int currentSuffix = MvdSuffixInfo::getSuffix(tmp.getAbsHor() - 1, si.horPrefixGroupStartValue);
-
-      for (int j = firstValidIdx; j < patternsCount; ++j)
-      {
-        if (!isCandValid[j])
-        {
-          continue;
-        }
-        isCandValid[j] = checkBitMatch(currentSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[j].getAbsHor() - 1, si.horPrefixGroupStartValue), i);
-
-        if (isCandValid[j] && firstValidIdxNew == -1)
-        {
-          firstValidIdxNew = j;
-        }
-      }
-      CHECK(firstValidIdxNew < firstValidIdx, "firstValidIdxNew< firstValidIdx");
-      firstValidIdx = firstValidIdxNew;
-
-    }
-    else if (useVer)
-    {
-      int bit = (verOffsetPrediction >> (numMSBver - 1 - verBitCount)) & 1;
-      std::tie(baseVal, bitPresent) = getMagnitudeParams(derived, i, MV_VER_COMPONENT);
-
-      if (0 == bit) // VER hypothesis is not correct
-      {
-        bitPresent = !bitPresent;
-      }
-      tmp.setVer(SIGN(derived.getVer()) * (baseVal + (bitPresent ? significanceOffset : 0)));
-      ++verBitCount;
-
-      const int currentSuffix = MvdSuffixInfo::getSuffix(tmp.getAbsVer() - 1, si.verPrefixGroupStartValue);
-      // Update validity
-      int firstValidIdxNew = -1;
-      for (int j = firstValidIdx; j < patternsCount; ++j)
-      {
-        if (!isCandValid[j])
-        {
-          continue;
-        }
-        isCandValid[j] = checkBitMatch(currentSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[j].getAbsVer() - 1, si.verPrefixGroupStartValue), i);
-
-        if (isCandValid[j] && firstValidIdxNew == -1)
-        {
-          firstValidIdxNew = j;
-        }
-      }
-      CHECK(firstValidIdxNew < firstValidIdx, "firstValidIdxNew< firstValidIdx");
-      firstValidIdx = firstValidIdxNew;
-    }
-  }
-  CHECK(numMSBhor != horBitCount, "numMSBhor != horBitCount");
-  CHECK(numMSBver != verBitCount, "numMSBver != verBitCount");
-
-  cMvdInput = tmp;
-  cMvdInput.changeIbcPrecAmvr2Internal(imv);
-}
-
-void InterPrediction::initOffsets(Mv& cMvdInput, std::vector<Mv>& cMvdDerived, MvdSuffixInfo& si, int imv)
-{
-  unsigned int& horOffsetPrediction = si.horOffsetPrediction;
-  unsigned int& verOffsetPrediction = si.verOffsetPrediction;
-
-  const int horPrefix = si.horPrefix;
-  const int verPrefix = si.verPrefix;
-
-  Mv tmp = cMvdInput;
-  tmp.changeIbcPrecInternal2Amvr(imv);
-
-  horOffsetPrediction = 0;
-  verOffsetPrediction = 0;
-
-  //filter cMvdDerived to contain only elements with matching signs
-  std::vector<Mv> cMvdFiltered;
-  std::copy_if(cMvdDerived.begin(), cMvdDerived.end(), std::back_inserter(cMvdFiltered), 
-               [cMvdInput](Mv& mv) 
-               {
-                  return SIGN(mv.getHor()) == SIGN(cMvdInput.getHor()) 
-                      && SIGN(mv.getVer()) == SIGN(cMvdInput.getVer());
-               }
-              );
-
-
-  int numMSBhor = si.horOffsetPredictionNumBins; 
-  int numMSBver = si.verOffsetPredictionNumBins;
-
-  if (numMSBhor <= 0 && numMSBver <= 0)
-  {
-    return;
-  }
-
-  // all cand vectors -> back to amvr resolution
-  for (auto& v : cMvdFiltered)
-  {
-    v.changeIbcPrecInternal2Amvr(imv);
-  }
-
-  const int horSuffixMSBpos = si.iBinsInHorSuffix-1;
-  const int verSuffixMSBpos = si.iBinsInVerSuffix-1;
-
-  int posLeastSignificant = std::numeric_limits<int>::max(), posMostSignificant = -1;
-  if (horPrefix >= 0 && numMSBhor > 0)
-  {
-    posLeastSignificant = std::min(posLeastSignificant, horSuffixMSBpos - numMSBhor);
-    posMostSignificant = std::max(posMostSignificant, horSuffixMSBpos);
-  }
-  if (verPrefix >= 0 && numMSBver > 0)
-  {
-    posLeastSignificant = std::min(posLeastSignificant, verSuffixMSBpos - numMSBver);
-    posMostSignificant = std::max(posMostSignificant, verSuffixMSBpos);
-  }
-
-
-  // Check if x is in [low..high]
-  auto inRange = [](int low, int high, int x)
-  {
-    return ((x - high) * (x - low) <= 0);
-  };
-
-  int horBitCount = 0;
-  int verBitCount = 0;
-
-  const int inputHorSuffix = si.horPrefix >= 0 ? MvdSuffixInfo::getSuffix(tmp.getAbsHor() - 1, si.horPrefixGroupStartValue) : 0;
-  const int inputVerSuffix = si.verPrefix >= 0 ? MvdSuffixInfo::getSuffix(tmp.getAbsVer() - 1, si.verPrefixGroupStartValue) : 0;
-
-  for (int i = posMostSignificant; i > posLeastSignificant; --i)
-  {
-    cMvdDerived.clear();
-    cMvdDerived.reserve(cMvdFiltered.size());
-    std::copy(cMvdFiltered.begin(), cMvdFiltered.end(), back_inserter(cMvdDerived));
-
-    bool useHor = (numMSBhor > 0 && horSuffixMSBpos >= 0) ? inRange(horSuffixMSBpos - numMSBhor + 1, horSuffixMSBpos, i) : false;
-    bool useVer = (numMSBver > 0 && verSuffixMSBpos >= 0) ? inRange(verSuffixMSBpos - numMSBver + 1, verSuffixMSBpos, i) : false;
-
-    if (useHor && useVer)
-    {
-      if (checkBitMatch(inputHorSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[0].getAbsHor() - 1, si.horPrefixGroupStartValue), i))
-      {
-        int bit = 1 << (numMSBhor - 1 - horBitCount);
-        horOffsetPrediction |= bit;
-        int bitNonShifted = checkBitMatch(inputVerSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[0].getAbsVer() - 1, si.verPrefixGroupStartValue), i) ? 1 : 0;
-        bit = bitNonShifted << (numMSBver - 1 - verBitCount);
-        verOffsetPrediction |= bit;
-      }
-      else
-      {
-        bool candFound = false;
-        for (const auto& v : cMvdDerived)
-        {
-          candFound = checkBitMatch(inputHorSuffix, MvdSuffixInfo::getSuffix(v.getAbsHor() - 1, si.horPrefixGroupStartValue), i);
-          if (candFound)
-          {
-            int bitNonShifted = checkBitMatch(inputVerSuffix, MvdSuffixInfo::getSuffix(v.getAbsVer() - 1, si.verPrefixGroupStartValue), i);
-            int bit = bitNonShifted << (numMSBver - 1 - verBitCount);
-            verOffsetPrediction |= bit;
-            break;
-          }
-        }
-        CHECK(!candFound, "Consistency check error!");
-      }
-      ++horBitCount;
-      ++verBitCount;
-
-      cMvdFiltered.clear();
-      std::copy_if(cMvdDerived.begin(), cMvdDerived.end(), std::back_inserter(cMvdFiltered),
-        [inputHorSuffix, inputVerSuffix, i, si](Mv& mv)
-        {
-          return checkBitMatch(inputHorSuffix, MvdSuffixInfo::getSuffix(mv.getAbsHor() - 1, si.horPrefixGroupStartValue), i)
-              && checkBitMatch(inputVerSuffix, MvdSuffixInfo::getSuffix(mv.getAbsVer() - 1, si.verPrefixGroupStartValue), i);
-        }
-                  );
-    }
-    else if (useHor)
-    {
-      if (checkBitMatch(inputHorSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[0].getAbsHor() - 1, si.horPrefixGroupStartValue), i))
-      {
-        int bit = 1 << (numMSBhor - 1 - horBitCount);
-        horOffsetPrediction |= bit;
-      }
-      ++horBitCount;
-      cMvdFiltered.clear();
-      std::copy_if(cMvdDerived.begin(), cMvdDerived.end(), std::back_inserter(cMvdFiltered),
-        [inputHorSuffix, i, si](Mv& mv)
-        {
-          return checkBitMatch(inputHorSuffix, MvdSuffixInfo::getSuffix(mv.getAbsHor() - 1, si.horPrefixGroupStartValue), i);
-        }
-                  );
-
-    }
-    else if (useVer)
-    {
-      if (checkBitMatch(inputVerSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[0].getAbsVer() - 1, si.verPrefixGroupStartValue), i))
-      {
-        int bit = 1 << (numMSBver - 1 - verBitCount);
-        verOffsetPrediction |= bit;
-      }
-      ++verBitCount;
-      cMvdFiltered.clear();
-      std::copy_if(cMvdDerived.begin(), cMvdDerived.end(), std::back_inserter(cMvdFiltered),
-        [inputVerSuffix, i, si](Mv& mv)
-        {
-          return checkBitMatch(inputVerSuffix, MvdSuffixInfo::getSuffix(mv.getAbsVer() - 1, si.verPrefixGroupStartValue), i);
-        }
-                  );
-    }
-  }
-
-  if (horPrefix >= 0)
-  {
-    CHECK(numMSBhor != horBitCount, "numMSBhor != horBitCount");
-  }
-
-  if (verPrefix >= 0)
-  {
-    CHECK(numMSBver != verBitCount, "numMSBver != verBitCount");
-  }
-}
-#endif
 
 void InterPrediction::setBiRefPairIdx(PredictionUnit &pu)
 {
@@ -18344,7 +17556,6 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
   }
   std::stable_sort(refPairList.begin(), refPairList.end(), [](const RefPicPair & l, const RefPicPair & r) {return l.cost < r.cost; });
 }
-
 #endif
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -20041,6 +19252,852 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
 #endif
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
+  struct CandCheckEnv
+  {
+    const std::vector<Mv>& cMvdDerived;
+    const Mv& cMvPred;
+    const PredictionUnit& pu;
+    const int picWidth;
+    const int picHeight;
+    const int lcuWidth;
+    TplMatchingCtrl& tplCtrl;
+    std::vector<std::pair<Mv, Distortion>>& aMvCostVec;
+
+    CandCheckEnv(const std::vector<Mv>& cMvdDerived_in, const Mv& cMvPred_in, const PredictionUnit& pu_in, const int picWidth_in, const int picHeight_in, const int lcuWidth_in
+      , TplMatchingCtrl& tplCtrl_in, std::vector<std::pair<Mv, Distortion>>& aMvCostVec_in) :
+      cMvdDerived(cMvdDerived_in),
+      cMvPred(cMvPred_in),
+      pu(pu_in),
+      picWidth(picWidth_in),
+      picHeight(picHeight_in),
+      lcuWidth(lcuWidth_in),
+      tplCtrl(tplCtrl_in),
+      aMvCostVec(aMvCostVec_in) {}
+
+
+    template <bool doBoundaryCheck>
+    bool estimate(const int n) // modified list
+    {
+      auto cMvdTest = cMvdDerived[n];
+      Mv cMvTest = cMvPred + cMvdTest;
+
+      int xPred = cMvTest.getHor() >> MV_FRACTIONAL_BITS_INTERNAL;
+      int yPred = cMvTest.getVer() >> MV_FRACTIONAL_BITS_INTERNAL;
+
+      bool res = true;
+
+      if (doBoundaryCheck)
+      {
+        res = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), pu.lheight(), picWidth, picHeight, xPred, yPred, lcuWidth);
+      }
+      bool& useTop = tplCtrl.getCurTopRefAvailFlag();
+      bool& useLeft = tplCtrl.getCurLeftRefAvailFlag();
+
+      if (res && doBoundaryCheck)
+      {
+#if JVET_AA0070_RRIBC
+        if (1 == pu.cu->rribcFlipType)
+        {
+          useTop = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred, lcuWidth);
+          xPred += pu.lwidth(); //at least, template size of 1 should be available
+          useLeft = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred, yPred, lcuWidth);
+        }
+        else
+        {
+          if (2 == pu.cu->rribcFlipType)
+          {
+            useLeft = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred, yPred, lcuWidth);
+            yPred += pu.lheight(); //at least, template size of 1 should be available
+            useTop = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred, lcuWidth);
+          }
+          else
+          {
+            useLeft = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred - 1, yPred, lcuWidth);
+            useTop = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred - 1, lcuWidth);
+          }
+        }
+#else
+        useLeft = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred - 1, yPred, lcuWidth);
+        useTop = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred - 1, lcuWidth);
+#endif
+      }
+      else if (!doBoundaryCheck)
+      {
+        useTop = useLeft = true;
+      }
+
+      const auto matchFxn = &TplMatchingCtrl::xGetTempMatchErrorBvd<1>;
+
+      Distortion uiCost = res ?
+        (tplCtrl.*matchFxn)(cMvTest) : std::numeric_limits<Distortion>::max();
+
+      if (!doBoundaryCheck)
+      {
+        CHECK(!(res && (useTop || useLeft)), "candidate is invalid, but check is skipped");
+      }
+
+      aMvCostVec[n] = { cMvdTest, uiCost };
+
+      return res && useTop && useLeft;
+
+    }
+    template <bool leftChecked, bool rightChecked, int step>
+    bool checkSubRange(bool leftValid, bool rightValid, int idxLeft, int idxRight, int rangeLen)
+    {
+      if (!leftChecked)
+      {
+        leftValid = estimate<true>(idxLeft); // with boundary check
+      }
+      if (!rightChecked)
+      {
+        rightValid = estimate<true>(idxRight); // with boundary check
+      }
+
+      if (rangeLen <= 2)
+      {
+        return rightValid;
+      }
+      else
+        if (leftValid && rightValid) //get costs with no boundary checks: all values should be valid in the range
+        {
+          for (int n = idxLeft + step; n < idxRight; n += step)
+          {
+            estimate<false>(n); // no boundary check, assume the candidate is OK
+          }
+          return true;
+        }
+        else
+        {
+          int rangeLenLeft = (rangeLen >> 1) + (rangeLen % 2);
+          int rangeLenRight = rangeLen <= 1 ? 0 : rangeLen - rangeLenLeft;
+
+          if (rangeLenLeft > 0)
+          {
+            leftValid = checkSubRange<true, false, step>(leftValid, false /*rightValid*/
+              , idxLeft, idxLeft + (rangeLenLeft - 1) * step, rangeLenLeft); //leftValid is for the right interval
+          }
+          if (rangeLenRight > 0)
+          {
+            checkSubRange<true, true, step>(leftValid, rightValid
+              , idxRight - (rangeLenRight)*step, idxRight, rangeLenRight + 1); //leftValid is for the right interval
+          }
+          return rightValid;
+        }
+
+      return true;
+    }
+  };
+
+
+  void InterPrediction::deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, std::vector<Mv>& cMvdDerived, int imv)
+  {
+    const int& horPrefix = pu.bvdSuffixInfo.horPrefix;
+    const int& verPrefix = pu.bvdSuffixInfo.verPrefix;
+
+    const int iHorMSBins = pu.bvdSuffixInfo.horOffsetPredictionNumBins;
+    const int iVerMSBins = pu.bvdSuffixInfo.verOffsetPredictionNumBins;
+
+    uint16_t patternsNum = 0;
+    Mv tmp = cMvdKnownAtDecoder;
+    tmp.changeIbcPrecInternal2Amvr(pu.cu->imv);
+
+    if (horPrefix < 0 && verPrefix < 0)
+    {
+      return;
+    }
+
+    int horAbs = -1;
+    int verAbs = -1;
+
+    horAbs = tmp.getAbsHor();
+    verAbs = tmp.getAbsVer();
+
+    const int iTotalNumberOfBins = iHorMSBins + iVerMSBins;
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+    const int numSignBits = (pu.cu->rribcFlipType != 0 && pu.isBvpClusterApplicable()) ? 0 :
+#else 
+    const int numSignBits =
+#endif
+      ((0 != horAbs && !pu.bvdSuffixInfo.horEncodeSignInEP) ? 1 : 0) +
+      ((0 != verAbs && !pu.bvdSuffixInfo.verEncodeSignInEP) ? 1 : 0);
+
+    patternsNum = 1 << (iTotalNumberOfBins + numSignBits);
+    cMvdDerived.clear();
+    cMvdDerived.reserve(patternsNum);
+
+    auto getValueOfSuffixLSBins = [](const int absValue, const int iPrefix, const int iMSBins, const int groupMinValue)
+    {
+      CHECK(iPrefix + 1 < iMSBins, "Incorrect values of either prefix or the number of bins to be predicted");
+      const int offset = (1 << (iPrefix + 1)) - 1 - ((1 << (iPrefix + 1 - iMSBins)) - 1); //MSB position is prefix-1;
+
+      int iSuffix = absValue - 1 - groupMinValue;
+
+      iSuffix = iSuffix & ~(offset);
+
+      return iSuffix;
+    };
+
+    //extract suffix
+    const auto si = pu.bvdSuffixInfo;
+    const int iHorKnown = horPrefix < 0 ? 0 :
+      pu.bvdSuffixInfo.horPrefixGroupStartValue + getValueOfSuffixLSBins(horAbs, horPrefix, iHorMSBins, si.horPrefixGroupStartValue) + 1;
+    const int iVerKnown = verPrefix < 0 ? 0 :
+      pu.bvdSuffixInfo.verPrefixGroupStartValue + getValueOfSuffixLSBins(verAbs, verPrefix, iVerMSBins, si.verPrefixGroupStartValue) + 1;
+
+
+    const int iRemainedBinsInHorSuffix = (horPrefix < 0 ? 0 : pu.bvdSuffixInfo.iBinsInHorSuffix) - iHorMSBins;
+    CHECK(iRemainedBinsInHorSuffix < 0, "Incorrect number of remained bins in the suffix of a horizontal component");
+    const int iRemainedBinsInVerSuffix = (verPrefix < 0 ? 0 : pu.bvdSuffixInfo.iBinsInVerSuffix) - iVerMSBins;
+    CHECK(iRemainedBinsInVerSuffix < 0, "Incorrect number of remained bins in the suffix of a vertical component");
+
+    const int iHorRange = 1 << iHorMSBins;
+    const int iVerRange = 1 << iVerMSBins;
+    constexpr int maxPatternCount = 4096;
+    CHECK(iHorRange >= maxPatternCount, "iHorRange > 128");
+    CHECK(iVerRange >= maxPatternCount, "iVerRange > 128");
+    CHECK(iHorRange < 0, "iHorRange < 0");
+    CHECK(iVerRange < 0, "iVerRange < 0");
+
+#if JVET_AA0070_RRIBC
+    const bool rrIBCmode = pu.cu->rribcFlipType != 0;
+#endif
+
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+    bool horPositiveAllowed;
+    bool horNegativeAllowed;
+    bool verPositiveAllowed;
+    bool verNegativeAllowed;
+    if (pu.isBvpClusterApplicable())
+    {
+      const bool horPositiveAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 1 && rrIBCmode;
+      const bool horNegativeAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 0 && rrIBCmode;
+      const bool verPositiveAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 1 && rrIBCmode;
+      const bool verNegativeAllowedRRIBC = pu.mvpIdx[REF_PIC_LIST_0] == 0 && rrIBCmode;
+
+      CHECK(pu.mvpIdx[REF_PIC_LIST_0] >= AMVP_MAX_NUM_CANDS, "pu.mvpIdx[REF_PIC_LIST_0] >= AMVP_MAX_NUM_CANDS");
+      CHECK(iHorKnown == 0 && cMvdKnownAtDecoder.getHor() != 0, "cMvdKnownAtDecoder.getHor() != 0");
+
+      horPositiveAllowed = horPositiveAllowedRRIBC || (!rrIBCmode && !si.horEncodeSignInEP) || (!rrIBCmode && si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() > 0);
+      horNegativeAllowed = horNegativeAllowedRRIBC || (!rrIBCmode && !si.horEncodeSignInEP) || (!rrIBCmode && si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() < 0);
+      verPositiveAllowed = verPositiveAllowedRRIBC || (!rrIBCmode && !si.verEncodeSignInEP) || (!rrIBCmode && si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() > 0);
+      verNegativeAllowed = verNegativeAllowedRRIBC || (!rrIBCmode && !si.verEncodeSignInEP) || (!rrIBCmode && si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() < 0);
+    }
+    else
+    {
+      horPositiveAllowed = !si.horEncodeSignInEP || (si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() > 0);
+      horNegativeAllowed = !si.horEncodeSignInEP || (si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() < 0);
+      verPositiveAllowed = !si.verEncodeSignInEP || (si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() > 0);
+      verNegativeAllowed = !si.verEncodeSignInEP || (si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() < 0);
+    }
+#else
+    const bool horPositiveAllowed = !si.horEncodeSignInEP || (si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() > 0);
+    const bool horNegativeAllowed = !si.horEncodeSignInEP || (si.horEncodeSignInEP && cMvdKnownAtDecoder.getHor() < 0);
+    const bool verPositiveAllowed = !si.verEncodeSignInEP || (si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() > 0);
+    const bool verNegativeAllowed = !si.verEncodeSignInEP || (si.verEncodeSignInEP && cMvdKnownAtDecoder.getVer() < 0);
+#endif
+#if JVET_AA0070_RRIBC
+    if (rrIBCmode)
+    {
+      CHECK(si.horEncodeSignInEP, "si.horEncodeSignInEP in RRIBC mode");
+      CHECK(si.verEncodeSignInEP, "si.verEncodeSignInEP in RRIBC mode");
+    }
+#endif
+    if (iHorKnown == 0)
+    {
+      for (unsigned int iVerCnt = 0; iVerCnt < iVerRange; ++iVerCnt)
+      {
+        const int iVerComp = iVerKnown + (iVerCnt << iRemainedBinsInVerSuffix);
+
+        CHECK(cMvdKnownAtDecoder.getHor() != 0, "cMvdKnownAtDecoder.getHor() != 0");
+        if (verNegativeAllowed)
+        {
+          cMvdDerived.push_back(Mv(0, -iVerComp));
+        }
+        if (verPositiveAllowed)
+        {
+          cMvdDerived.push_back(Mv(0, iVerComp));
+        }
+      }
+    }
+    else if (iVerKnown == 0)
+    {
+      for (unsigned int iHorCnt = 0; iHorCnt < iHorRange; ++iHorCnt)
+      {
+        const int iHorComp = iHorKnown + (iHorCnt << iRemainedBinsInHorSuffix);
+        if (horNegativeAllowed)
+        {
+          cMvdDerived.push_back(Mv(-iHorComp, 0));
+        }
+        if (horPositiveAllowed)
+        {
+          cMvdDerived.push_back(Mv(iHorComp, 0));
+        }
+      }
+    }
+    else
+    {
+#if JVET_AA0070_RRIBC
+      CHECK(pu.cu->rribcFlipType != 0, "pu.cu->rribcFlipType !=0");
+#endif
+      for (unsigned int iHorCnt = 0; iHorCnt < iHorRange; ++iHorCnt)
+      {
+        const int iHorComp = iHorKnown + (iHorCnt << iRemainedBinsInHorSuffix);
+        for (unsigned int iVerCnt = 0; iVerCnt < iVerRange; ++iVerCnt)
+        {
+          const int iVerComp = iVerKnown + (iVerCnt << iRemainedBinsInVerSuffix);
+          if (horNegativeAllowed)
+          {
+            if (verNegativeAllowed)
+            {
+              cMvdDerived.push_back(Mv(-iHorComp, -iVerComp));
+            }
+            if (verPositiveAllowed)
+            {
+              cMvdDerived.push_back(Mv(-iHorComp, iVerComp));
+            }
+          }
+          if (horPositiveAllowed)
+          {
+            if (verNegativeAllowed)
+            {
+              cMvdDerived.push_back(Mv(iHorComp, -iVerComp));
+            }
+            if (verPositiveAllowed)
+            {
+              cMvdDerived.push_back(Mv(iHorComp, iVerComp));
+            }
+          }
+        }
+      }
+    }
+
+    for (auto& bvd_cand : cMvdDerived)
+    {
+      bvd_cand.changeIbcPrecAmvr2Internal(pu.cu->imv);
+    }
+
+    if (!pu.lumaPos().x && !pu.lumaPos().y)
+    {
+      return;
+    }
+
+    const Picture& recPic = *pu.cu->slice->getPic();
+
+    InterPredResources interRes(m_pcReshape, m_pcRdCost, m_if, m_filteredBlockTmp[0][COMPONENT_Y]
+      , m_filteredBlock[3][1][0], m_filteredBlock[3][0][0]
+    );
+
+    TplMatchingCtrl tplCtrl(pu, interRes, recPic, true, COMPONENT_Y, false, 0, m_pcCurTplAbove, m_pcCurTplLeft, m_pcRefTplAbove, m_pcRefTplLeft, Mv(0, 0), nullptr, 0, 1, true);
+    std::vector<std::pair<Mv, Distortion>> aMvCostVec(patternsNum);
+
+    const          int picWidth = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
+    const          int picHeight = pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
+    const unsigned int lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
+
+    int step = -1;
+    CandCheckEnv checkEnv(cMvdDerived, cMvPred, pu, picWidth, picHeight, lcuWidth, tplCtrl, aMvCostVec);
+    int idxOffset = 0;
+    //typedef void (CandCheckEnv::* RangeCheckFxn)(bool , bool , int , int , int );
+    auto checkRange = [&step, &checkEnv, &idxOffset, iHorRange, iVerRange](int idxRight, int rangeLen)
+    {
+      switch (step)
+      {
+      case 1:
+        checkEnv.checkSubRange<false, false, 1>(false, false, idxOffset, idxRight, rangeLen);
+        break;
+      case 2:
+        checkEnv.checkSubRange<false, false, 2>(false, false, idxOffset, idxRight, rangeLen);
+        break;
+      case 3:
+        checkEnv.checkSubRange<false, false, 3>(false, false, idxOffset, idxRight, rangeLen);
+        break;
+      case 4:
+        checkEnv.checkSubRange<false, false, 4>(false, false, idxOffset, idxRight, rangeLen);
+        break;
+      }
+      idxOffset++;
+    };
+
+    if (iHorKnown == 0)
+    {
+      step = (verNegativeAllowed ? 1 : 0) + (verPositiveAllowed ? 1 : 0);
+      if (verNegativeAllowed)
+      {
+        checkRange(idxOffset + (iVerRange - 1) * step, iVerRange);
+      }
+      if (verPositiveAllowed)
+      {
+        checkRange(idxOffset + (iVerRange - 1) * step, iVerRange);
+      }
+    }
+    else if (iVerKnown == 0)
+    {
+      step = (horNegativeAllowed ? 1 : 0) + (horPositiveAllowed ? 1 : 0);
+
+      if (horNegativeAllowed)
+      {
+        checkRange(idxOffset + (iHorRange - 1) * step, iHorRange);
+      }
+      if (horPositiveAllowed)
+      {
+        checkRange(idxOffset + (iHorRange - 1) * step, iHorRange);
+      }
+    }
+    else
+    {
+#if JVET_AA0070_RRIBC
+      CHECK(pu.cu->rribcFlipType != 0, "pu.cu->rribcFlipType !=0");
+#endif
+      step = (horNegativeAllowed ? 1 : 0) * ((verNegativeAllowed ? 1 : 0) + (verPositiveAllowed ? 1 : 0)) +
+        (horPositiveAllowed ? 1 : 0) * ((verNegativeAllowed ? 1 : 0) + (verPositiveAllowed ? 1 : 0));
+      for (unsigned int iHorCnt = 0; iHorCnt < iHorRange; ++iHorCnt)
+      {
+        //for (unsigned int iVerCnt = 0; iVerCnt < iVerRange; ++iVerCnt)
+        idxOffset = iHorCnt * iVerRange * step;
+        {
+          if (horNegativeAllowed)
+          {
+            if (verNegativeAllowed)
+            {
+              checkRange(idxOffset + (iVerRange - 1) * step, iVerRange);
+
+            }
+            if (verPositiveAllowed)
+            {
+              checkRange(idxOffset + (iVerRange - 1) * step, iVerRange);
+            }
+          }
+          if (horPositiveAllowed)
+          {
+            if (verNegativeAllowed)
+            {
+              checkRange(idxOffset + (iVerRange - 1) * step, iVerRange);
+            }
+            if (verPositiveAllowed)
+            {
+              checkRange(idxOffset + (iVerRange - 1) * step, iVerRange);
+            }
+          }
+        }
+      }
+    }
+
+
+    std::stable_sort(aMvCostVec.begin(), aMvCostVec.end(), [](const std::pair<Mv, Distortion>& l, const std::pair<Mv, Distortion>& r) {return l.second < r.second; });
+
+    for (int n = 0; n < patternsNum; ++n)
+    {
+      cMvdDerived[n] = aMvCostVec[n].first;
+    }
+  }
+
+  void InterPrediction::applyOffsets(Mv& cMvdInput, std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si, int imv)
+  {
+    const int& horPrefix = si.horPrefix;
+    const int& verPrefix = si.verPrefix;
+
+    const int& horOffsetPrediction = si.horOffsetPrediction;
+    const int& verOffsetPrediction = si.verOffsetPrediction;
+
+    if (horPrefix < 0 && verPrefix < 0)
+    {
+      return;
+    }
+    constexpr int maxPatternCount = 4096;
+    bool isCandValid[maxPatternCount];
+
+    size_t patternsCount = cMvdDerived.size();
+    int firstValidIdx = -1;
+    for (int i = 0; i < cMvdDerived.size(); ++i)
+    {
+      isCandValid[i] = SIGN(cMvdDerived[i].getHor()) == SIGN(cMvdInput.getHor()) && SIGN(cMvdDerived[i].getVer()) == SIGN(cMvdInput.getVer());
+      if (isCandValid[i] && firstValidIdx < 0)
+      {
+        firstValidIdx = i;
+      }
+      cMvdDerived[i].changeIbcPrecInternal2Amvr(imv);
+    }
+
+    CHECK(firstValidIdx < 0, "firstValidIdx<0");
+
+    Mv tmp = cMvdInput;
+    tmp.changeIbcPrecInternal2Amvr(imv);
+
+
+    const int horSuffixMSBpos = si.iBinsInHorSuffix - 1;
+    const int verSuffixMSBpos = si.iBinsInVerSuffix - 1;
+
+    int numMSBhor = si.horOffsetPredictionNumBins;
+    int numMSBver = si.verOffsetPredictionNumBins;
+
+    int posLeastSignificant = std::numeric_limits<int>::max(), posMostSignificant = -1;
+    if (horPrefix >= 0 && numMSBhor > 0)
+    {
+      posLeastSignificant = std::min(posLeastSignificant, horSuffixMSBpos - numMSBhor);
+      posMostSignificant = std::max(posMostSignificant, horSuffixMSBpos);
+    }
+    if (verPrefix >= 0 && numMSBver > 0)
+    {
+      posLeastSignificant = std::min(posLeastSignificant, verSuffixMSBpos - numMSBver);
+      posMostSignificant = std::max(posMostSignificant, verSuffixMSBpos);
+    }
+
+    // Check if x is in [low..high]
+    auto inRange = [](int low, int high, int x)
+    {
+      return ((x - high) * (x - low) <= 0);
+    };
+
+    typedef enum {
+      MV_HOR_COMPONENT,
+      MV_VER_COMPONENT
+    } MvComp;
+
+    auto getMagnitudeParams = [si](const Mv& derived, int significanceOffset, MvComp mvComp)
+    {
+      const bool useHor = mvComp == MV_HOR_COMPONENT;
+      //int prefix = useHor ? derived.horPrefix : derived.verPrefix;
+
+      int offsetMask = 1 << significanceOffset;
+      //extract suffix
+      int absValue = useHor ? derived.getAbsHor() : derived.getAbsVer();
+
+      int suffix = MvdSuffixInfo::getSuffix(absValue - 1, useHor ? si.horPrefixGroupStartValue : si.verPrefixGroupStartValue);
+
+      //Get bit values at desired positions
+      bool bitPresent = (suffix & offsetMask) != 0;
+
+      int baseVal = absValue - (bitPresent ? offsetMask : 0);
+
+      return std::pair<int, bool>(baseVal, bitPresent);
+    };
+
+    int horBitCount = 0;
+    int verBitCount = 0;
+
+    int baseVal = 0;
+    bool bitPresent = false;
+
+
+    for (int i = posMostSignificant; i > posLeastSignificant; --i)
+    {
+      const Mv& derived = cMvdDerived[firstValidIdx];
+
+      const int significanceOffset = (1 << i);
+
+      bool useHor = (numMSBhor > 0 && horPrefix >= 0) ? inRange(horSuffixMSBpos - numMSBhor + 1, horSuffixMSBpos, i) : false;
+      bool useVer = (numMSBver > 0 && verPrefix >= 0) ? inRange(verSuffixMSBpos - numMSBver + 1, verSuffixMSBpos, i) : false;
+
+      if (useHor && useVer)
+      {
+        int bit = (horOffsetPrediction >> (numMSBhor - 1 - horBitCount)) & 1;
+        std::tie(baseVal, bitPresent) = getMagnitudeParams(derived, i, MV_HOR_COMPONENT);
+
+        if (0 == bit) // HOR hypothesis is not correct
+        {
+          bitPresent = !bitPresent;
+        }
+        tmp.setHor(SIGN(derived.getHor()) * (baseVal + (bitPresent ? significanceOffset : 0)));
+
+        if (1 == bit) // HOR hypothesis is correct
+        {
+          int bit = (verOffsetPrediction >> (numMSBver - 1 - verBitCount)) & 1;
+          std::tie(baseVal, bitPresent) = getMagnitudeParams(derived, i, MV_VER_COMPONENT);
+          if (0 == bit) // VER hypothesis is not correct
+          {
+            bitPresent = !bitPresent;
+          }
+          tmp.setVer(SIGN(derived.getVer()) * (baseVal + (bitPresent ? significanceOffset : 0)));
+        }
+        else
+        {
+          bool candFound = false;
+          for (int j = firstValidIdx; j < patternsCount; ++j)
+          {
+            if (!isCandValid[j])
+            {
+              continue;
+            }
+            Mv& v = cMvdDerived[j];
+
+            bool bitPresentHyp = false;
+            std::tie(baseVal, bitPresentHyp) = getMagnitudeParams(v, i, MV_HOR_COMPONENT);
+            candFound = bitPresent == bitPresentHyp; // "bitPresent" should be already XORed 
+
+            if (candFound)
+            {
+              int bit = (verOffsetPrediction >> (numMSBver - 1 - verBitCount)) & 1;
+
+              std::tie(baseVal, bitPresent) = getMagnitudeParams(v, i, MV_VER_COMPONENT);
+              if (0 == bit) // VER hypothesis is not correct
+              {
+                bitPresent = !bitPresent;
+              }
+              tmp.setVer(SIGN(v.getVer()) * (baseVal + (bitPresent ? significanceOffset : 0)));
+
+              break;
+            }
+          }
+          CHECK(!candFound, "Consistency check error!");
+        }
+        ++horBitCount;
+        ++verBitCount;
+
+        const int currentHorSuffix = MvdSuffixInfo::getSuffix(tmp.getAbsHor() - 1, si.horPrefixGroupStartValue);
+        const int currentVerSuffix = MvdSuffixInfo::getSuffix(tmp.getAbsVer() - 1, si.verPrefixGroupStartValue);
+
+        // Update validity
+        int firstValidIdxNew = -1;
+        for (int j = firstValidIdx; j < patternsCount; ++j)
+        {
+          if (!isCandValid[j])
+          {
+            continue;
+          }
+          isCandValid[j] = checkBitMatch(currentHorSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[j].getAbsHor() - 1, si.horPrefixGroupStartValue), i)
+            && checkBitMatch(currentVerSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[j].getAbsVer() - 1, si.verPrefixGroupStartValue), i);
+
+          if (isCandValid[j] && firstValidIdxNew == -1)
+          {
+            firstValidIdxNew = j;
+          }
+        }
+        CHECK(firstValidIdxNew < firstValidIdx, "firstValidIdxNew< firstValidIdx");
+        firstValidIdx = firstValidIdxNew;
+      }
+      else if (useHor)
+      {
+        int bit = (horOffsetPrediction >> (numMSBhor - 1 - horBitCount)) & 1;
+        std::tie(baseVal, bitPresent) = getMagnitudeParams(derived, i, MV_HOR_COMPONENT);
+
+        if (0 == bit) // HOR hypothesis is not correct
+        {
+          bitPresent = !bitPresent;
+        }
+        tmp.setHor(SIGN(derived.getHor()) * (baseVal + (bitPresent ? significanceOffset : 0)));
+        ++horBitCount;
+
+        // Update validity
+        int firstValidIdxNew = -1;
+
+        const int currentSuffix = MvdSuffixInfo::getSuffix(tmp.getAbsHor() - 1, si.horPrefixGroupStartValue);
+
+        for (int j = firstValidIdx; j < patternsCount; ++j)
+        {
+          if (!isCandValid[j])
+          {
+            continue;
+          }
+          isCandValid[j] = checkBitMatch(currentSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[j].getAbsHor() - 1, si.horPrefixGroupStartValue), i);
+
+          if (isCandValid[j] && firstValidIdxNew == -1)
+          {
+            firstValidIdxNew = j;
+          }
+        }
+        CHECK(firstValidIdxNew < firstValidIdx, "firstValidIdxNew< firstValidIdx");
+        firstValidIdx = firstValidIdxNew;
+
+      }
+      else if (useVer)
+      {
+        int bit = (verOffsetPrediction >> (numMSBver - 1 - verBitCount)) & 1;
+        std::tie(baseVal, bitPresent) = getMagnitudeParams(derived, i, MV_VER_COMPONENT);
+
+        if (0 == bit) // VER hypothesis is not correct
+        {
+          bitPresent = !bitPresent;
+        }
+        tmp.setVer(SIGN(derived.getVer()) * (baseVal + (bitPresent ? significanceOffset : 0)));
+        ++verBitCount;
+
+        const int currentSuffix = MvdSuffixInfo::getSuffix(tmp.getAbsVer() - 1, si.verPrefixGroupStartValue);
+        // Update validity
+        int firstValidIdxNew = -1;
+        for (int j = firstValidIdx; j < patternsCount; ++j)
+        {
+          if (!isCandValid[j])
+          {
+            continue;
+          }
+          isCandValid[j] = checkBitMatch(currentSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[j].getAbsVer() - 1, si.verPrefixGroupStartValue), i);
+
+          if (isCandValid[j] && firstValidIdxNew == -1)
+          {
+            firstValidIdxNew = j;
+          }
+        }
+        CHECK(firstValidIdxNew < firstValidIdx, "firstValidIdxNew< firstValidIdx");
+        firstValidIdx = firstValidIdxNew;
+      }
+    }
+    CHECK(numMSBhor != horBitCount, "numMSBhor != horBitCount");
+    CHECK(numMSBver != verBitCount, "numMSBver != verBitCount");
+
+    cMvdInput = tmp;
+    cMvdInput.changeIbcPrecAmvr2Internal(imv);
+  }
+
+  void InterPrediction::initOffsets(Mv& cMvdInput, std::vector<Mv>& cMvdDerived, MvdSuffixInfo& si, int imv)
+  {
+    unsigned int& horOffsetPrediction = si.horOffsetPrediction;
+    unsigned int& verOffsetPrediction = si.verOffsetPrediction;
+
+    const int horPrefix = si.horPrefix;
+    const int verPrefix = si.verPrefix;
+
+    Mv tmp = cMvdInput;
+    tmp.changeIbcPrecInternal2Amvr(imv);
+
+    horOffsetPrediction = 0;
+    verOffsetPrediction = 0;
+
+    //filter cMvdDerived to contain only elements with matching signs
+    std::vector<Mv> cMvdFiltered;
+    std::copy_if(cMvdDerived.begin(), cMvdDerived.end(), std::back_inserter(cMvdFiltered),
+      [cMvdInput](Mv& mv)
+      {
+        return SIGN(mv.getHor()) == SIGN(cMvdInput.getHor())
+          && SIGN(mv.getVer()) == SIGN(cMvdInput.getVer());
+      }
+    );
+
+
+    int numMSBhor = si.horOffsetPredictionNumBins;
+    int numMSBver = si.verOffsetPredictionNumBins;
+
+    if (numMSBhor <= 0 && numMSBver <= 0)
+    {
+      return;
+    }
+
+    // all cand vectors -> back to amvr resolution
+    for (auto& v : cMvdFiltered)
+    {
+      v.changeIbcPrecInternal2Amvr(imv);
+    }
+
+    const int horSuffixMSBpos = si.iBinsInHorSuffix - 1;
+    const int verSuffixMSBpos = si.iBinsInVerSuffix - 1;
+
+    int posLeastSignificant = std::numeric_limits<int>::max(), posMostSignificant = -1;
+    if (horPrefix >= 0 && numMSBhor > 0)
+    {
+      posLeastSignificant = std::min(posLeastSignificant, horSuffixMSBpos - numMSBhor);
+      posMostSignificant = std::max(posMostSignificant, horSuffixMSBpos);
+    }
+    if (verPrefix >= 0 && numMSBver > 0)
+    {
+      posLeastSignificant = std::min(posLeastSignificant, verSuffixMSBpos - numMSBver);
+      posMostSignificant = std::max(posMostSignificant, verSuffixMSBpos);
+    }
+
+
+    // Check if x is in [low..high]
+    auto inRange = [](int low, int high, int x)
+    {
+      return ((x - high) * (x - low) <= 0);
+    };
+
+    int horBitCount = 0;
+    int verBitCount = 0;
+
+    const int inputHorSuffix = si.horPrefix >= 0 ? MvdSuffixInfo::getSuffix(tmp.getAbsHor() - 1, si.horPrefixGroupStartValue) : 0;
+    const int inputVerSuffix = si.verPrefix >= 0 ? MvdSuffixInfo::getSuffix(tmp.getAbsVer() - 1, si.verPrefixGroupStartValue) : 0;
+
+    for (int i = posMostSignificant; i > posLeastSignificant; --i)
+    {
+      cMvdDerived.clear();
+      cMvdDerived.reserve(cMvdFiltered.size());
+      std::copy(cMvdFiltered.begin(), cMvdFiltered.end(), back_inserter(cMvdDerived));
+
+      bool useHor = (numMSBhor > 0 && horSuffixMSBpos >= 0) ? inRange(horSuffixMSBpos - numMSBhor + 1, horSuffixMSBpos, i) : false;
+      bool useVer = (numMSBver > 0 && verSuffixMSBpos >= 0) ? inRange(verSuffixMSBpos - numMSBver + 1, verSuffixMSBpos, i) : false;
+
+      if (useHor && useVer)
+      {
+        if (checkBitMatch(inputHorSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[0].getAbsHor() - 1, si.horPrefixGroupStartValue), i))
+        {
+          int bit = 1 << (numMSBhor - 1 - horBitCount);
+          horOffsetPrediction |= bit;
+          int bitNonShifted = checkBitMatch(inputVerSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[0].getAbsVer() - 1, si.verPrefixGroupStartValue), i) ? 1 : 0;
+          bit = bitNonShifted << (numMSBver - 1 - verBitCount);
+          verOffsetPrediction |= bit;
+        }
+        else
+        {
+          bool candFound = false;
+          for (const auto& v : cMvdDerived)
+          {
+            candFound = checkBitMatch(inputHorSuffix, MvdSuffixInfo::getSuffix(v.getAbsHor() - 1, si.horPrefixGroupStartValue), i);
+            if (candFound)
+            {
+              int bitNonShifted = checkBitMatch(inputVerSuffix, MvdSuffixInfo::getSuffix(v.getAbsVer() - 1, si.verPrefixGroupStartValue), i);
+              int bit = bitNonShifted << (numMSBver - 1 - verBitCount);
+              verOffsetPrediction |= bit;
+              break;
+            }
+          }
+          CHECK(!candFound, "Consistency check error!");
+        }
+        ++horBitCount;
+        ++verBitCount;
+
+        cMvdFiltered.clear();
+        std::copy_if(cMvdDerived.begin(), cMvdDerived.end(), std::back_inserter(cMvdFiltered),
+          [inputHorSuffix, inputVerSuffix, i, si](Mv& mv)
+          {
+            return checkBitMatch(inputHorSuffix, MvdSuffixInfo::getSuffix(mv.getAbsHor() - 1, si.horPrefixGroupStartValue), i)
+              && checkBitMatch(inputVerSuffix, MvdSuffixInfo::getSuffix(mv.getAbsVer() - 1, si.verPrefixGroupStartValue), i);
+          }
+        );
+      }
+      else if (useHor)
+      {
+        if (checkBitMatch(inputHorSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[0].getAbsHor() - 1, si.horPrefixGroupStartValue), i))
+        {
+          int bit = 1 << (numMSBhor - 1 - horBitCount);
+          horOffsetPrediction |= bit;
+        }
+        ++horBitCount;
+        cMvdFiltered.clear();
+        std::copy_if(cMvdDerived.begin(), cMvdDerived.end(), std::back_inserter(cMvdFiltered),
+          [inputHorSuffix, i, si](Mv& mv)
+          {
+            return checkBitMatch(inputHorSuffix, MvdSuffixInfo::getSuffix(mv.getAbsHor() - 1, si.horPrefixGroupStartValue), i);
+          }
+        );
+
+      }
+      else if (useVer)
+      {
+        if (checkBitMatch(inputVerSuffix, MvdSuffixInfo::getSuffix(cMvdDerived[0].getAbsVer() - 1, si.verPrefixGroupStartValue), i))
+        {
+          int bit = 1 << (numMSBver - 1 - verBitCount);
+          verOffsetPrediction |= bit;
+        }
+        ++verBitCount;
+        cMvdFiltered.clear();
+        std::copy_if(cMvdDerived.begin(), cMvdDerived.end(), std::back_inserter(cMvdFiltered),
+          [inputVerSuffix, i, si](Mv& mv)
+          {
+            return checkBitMatch(inputVerSuffix, MvdSuffixInfo::getSuffix(mv.getAbsVer() - 1, si.verPrefixGroupStartValue), i);
+          }
+        );
+      }
+    }
+
+    if (horPrefix >= 0)
+    {
+      CHECK(numMSBhor != horBitCount, "numMSBhor != horBitCount");
+    }
+
+    if (verPrefix >= 0)
+    {
+      CHECK(numMSBver != verBitCount, "numMSBver != verBitCount");
+    }
+  }
+
   int InterPrediction::deriveMVSDIdxFromMVDTransIBC(const Mv& cMvd, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si) const
   {
     int mvsdIdx = 0;
