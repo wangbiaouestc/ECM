@@ -1118,6 +1118,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("OBMC",                                            m_OBMC,                                           true, "Overlapping Block Motion Compensation")
 #endif
   ("CIIP",                                            m_ciip,                                           false, "Enable CIIP mode")
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  ("CIIPTIMD",                                        m_ciipTimd,                                       true, "Enable CIIP-TIMD mode")
+#endif
   ("Geo",                                             m_Geo,                                            false, "Enable geometric partitioning mode (0:off, 1:on)")
   ("HashME",                                          m_HashME,                                         false, "Enable hash motion estimation (0:off, 1:on)")
 
@@ -3970,6 +3973,18 @@ bool EncAppCfg::xCheckParameter()
     m_tmCIIPMode = 0;
   }
 #endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  if (!m_ciip && m_ciipTimd)
+  {
+    msg(WARNING, "CIIP-TIMD mode is forcefully disabled since CIIP is disabled. \n");
+    m_ciipTimd = 0;
+  }
+  if (!m_timd && m_ciipTimd)
+  {
+    msg(WARNING, "CIIP-TIMD mode is forcefully disabled since TIMD is disabled. \n");
+    m_ciipTimd = 0;
+  }
+#endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
   if (!m_AML && m_useTmvpNmvpReorder)
   {
@@ -5209,6 +5224,9 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "LADF:%d ", m_LadfEnabed );
 #endif
     msg(VERBOSE, "CIIP:%d ", m_ciip);
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+    msg(VERBOSE, "CIIPTIMD:%d ", m_ciipTimd);
+#endif
     msg( VERBOSE, "Geo:%d ", m_Geo );
     m_allowDisFracMMVD = m_MMVD ? m_allowDisFracMMVD : false;
     if ( m_MMVD )

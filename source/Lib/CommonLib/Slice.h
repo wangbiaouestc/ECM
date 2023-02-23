@@ -1756,6 +1756,9 @@ private:
   bool              m_OBMC;
 #endif
   bool              m_ciip;
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  bool              m_ciipTimd;
+#endif
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
   bool              m_ciipTmMrg;
 #endif
@@ -2336,6 +2339,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #endif
   void      setUseCiip         ( bool b )                                        { m_ciip = b; }
   bool      getUseCiip         ()                                      const     { return m_ciip; }
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  void      setUseCiipTimd     (bool b)                                          { m_ciipTimd = b; }
+  bool      getUseCiipTimd     ()                                      const     { return m_ciipTimd; }
+#endif
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
   void      setUseCiipTmMrg         ( bool b )                                        { m_ciipTmMrg = b; }
   bool      getUseCiipTmMrg         ()                                      const     { return m_ciipTmMrg; }

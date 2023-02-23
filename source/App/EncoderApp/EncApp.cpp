@@ -891,6 +891,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setUseObmc                                           ( m_OBMC );
 #endif
   m_cEncLib.setUseCiip                                           ( m_ciip );
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  m_cEncLib.setUseCiipTimd                                       (m_ciipTimd);
+#endif
   m_cEncLib.setUseGeo                                            ( m_Geo );
   m_cEncLib.setUseHashME                                         ( m_HashME );
 

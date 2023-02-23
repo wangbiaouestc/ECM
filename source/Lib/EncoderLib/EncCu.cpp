@@ -4781,7 +4781,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         if (mergeCtx.numValidMergeCand)
         {
           const CompArea &area = cu.Y();
-          if (cu.slice->getSPS()->getUseTimd() && (cu.lwidth() * cu.lheight() <= CIIP_MAX_SIZE))
+          if (cu.slice->getSPS()->getUseTimd() && (cu.lwidth() * cu.lheight() <= CIIP_MAX_SIZE) && cu.cs->slice->getSPS()->getUseCiipTimd())
           {
 #if SECONDARY_MPM && ENABLE_DIMD
             IntraPrediction::deriveDimdMode(cu.cs->picture->getRecoBuf(area), area, cu);
@@ -9096,7 +9096,7 @@ void EncCu::xCheckSATDCostCiipMerge(CodingStructure *&tempCS, CodingUnit &cu, Pr
   if (mergeCtx.numValidMergeCand)
   {
     const CompArea &area = cu.Y();
-    if (cu.slice->getSPS()->getUseTimd() && (cu.lwidth() * cu.lheight() <= CIIP_MAX_SIZE))
+    if (cu.slice->getSPS()->getUseTimd() && (cu.lwidth() * cu.lheight() <= CIIP_MAX_SIZE) && cu.cs->slice->getSPS()->getUseCiipTimd())
     {
 #if SECONDARY_MPM && ENABLE_DIMD
       IntraPrediction::deriveDimdMode(cu.cs->picture->getRecoBuf(area), area, cu);

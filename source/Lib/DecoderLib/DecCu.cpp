@@ -1357,7 +1357,7 @@ void DecCu::xReconInter(CodingUnit &cu)
     {
       PredictionUnit *pu = cu.firstPU;
       const CompArea &area = cu.Y();
-      if (cu.slice->getSPS()->getUseTimd() && (cu.lwidth() * cu.lheight() <= CIIP_MAX_SIZE))
+      if (cu.slice->getSPS()->getUseTimd() && (cu.lwidth() * cu.lheight() <= CIIP_MAX_SIZE) && cu.cs->slice->getSPS()->getUseCiipTimd())
       {
 #if SECONDARY_MPM && ENABLE_DIMD
         IntraPrediction::deriveDimdMode(cu.cs->picture->getRecoBuf(area), area, cu);

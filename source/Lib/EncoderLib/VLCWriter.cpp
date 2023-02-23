@@ -1585,6 +1585,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_W0123_TIMD_FUSION
   WRITE_FLAG( pcSPS->getUseTimd() ? 1 : 0,                                          "sps_timd_enabled_flag");
 #endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  if (pcSPS->getUseCiip() && pcSPS->getUseTimd())
+  {
+    WRITE_FLAG(pcSPS->getUseCiipTimd() ? 1 : 0, "sps_ciip_timd_enabled_flag");
+  }
+#endif
 #if JVET_AB0155_SGPM
   WRITE_FLAG(pcSPS->getUseSgpm() ? 1 : 0, "sps_sgpm_enabled_flag");
 #endif
