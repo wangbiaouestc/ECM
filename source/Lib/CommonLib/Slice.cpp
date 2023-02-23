@@ -3731,6 +3731,9 @@ SPS::SPS()
 , m_OBMC                      ( false )
 #endif
 , m_ciip                      ( false )
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+, m_ciipTimd                  ( false )
+#endif
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
 , m_ciipTmMrg                 ( false )
 #endif

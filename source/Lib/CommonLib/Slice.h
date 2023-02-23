@@ -1750,7 +1750,7 @@ private:
   unsigned          m_intraTmpMaxSize;                               ///< max CU size for which intra TMP is allowed
 #endif
 #if JVET_AC0071_DBV
-  bool m_intraDBV;
+  bool              m_intraDBV;
 #endif
 #if ENABLE_OBMC
   bool              m_OBMC;
