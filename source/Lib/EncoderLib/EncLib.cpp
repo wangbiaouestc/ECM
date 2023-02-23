@@ -1836,6 +1836,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_W0123_TIMD_FUSION
   sps.setUseTimd            ( m_timd );
 #endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  sps.setUseCiipTimd        ( m_ciipTimd );
+#endif
 #if JVET_AB0155_SGPM
   sps.setUseSgpm            ( m_sgpm );
 #endif
