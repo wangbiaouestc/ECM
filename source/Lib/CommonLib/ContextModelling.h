@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -557,12 +557,15 @@ class MergeCtx
 public:
 #if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Z0075_IBC_HMVP_ENLARGE
   MvField       mvFieldNeighbours[NUM_MERGE_CANDS << 1]; // double length for mv of both lists
-  uint8_t       BcwIdx[NUM_MERGE_CANDS];
+  uint8_t       bcwIdx[NUM_MERGE_CANDS];
 #if INTER_LIC
-  bool          LICFlags[NUM_MERGE_CANDS];
+  bool          licFlags[NUM_MERGE_CANDS];
+#endif
+#if JVET_AC0112_IBC_LIC
+  bool          ibcLicFlags[NUM_MERGE_CANDS];
 #endif
 #if JVET_AA0070_RRIBC
-  int       rribcFlipTypes[NUM_MERGE_CANDS];
+  int           rribcFlipTypes[NUM_MERGE_CANDS];
 #endif
   unsigned char interDirNeighbours[NUM_MERGE_CANDS];
 #if MULTI_HYP_PRED
@@ -574,9 +577,12 @@ public:
   ~MergeCtx() {}
 public:
   MvField       mvFieldNeighbours [ MRG_MAX_NUM_CANDS << 1 ]; // double length for mv of both lists
-  uint8_t       BcwIdx            [ MRG_MAX_NUM_CANDS      ];
+  uint8_t       bcwIdx            [ MRG_MAX_NUM_CANDS      ];
 #if INTER_LIC
-  bool          LICFlags          [ MRG_MAX_NUM_CANDS      ];
+  bool          licFlags          [ MRG_MAX_NUM_CANDS      ];
+#endif
+#if JVET_AC0112_IBC_LIC
+  bool          ibcLicFlags       [ MRG_MAX_NUM_CANDS      ];
 #endif
 #if JVET_AA0070_RRIBC
   int rribcFlipTypes[MRG_MAX_NUM_CANDS];
@@ -591,8 +597,15 @@ public:
   int           numCandToTestEnc;
 #endif
   bool          hasMergedCandList;
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  int numAMVPMergeCand;
+#endif
 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+  MotionBuf     subPuMvpMiBuf[SUB_TMVP_NUM];
+#else
   MotionBuf     subPuMvpMiBuf;
+#endif
   MotionBuf     subPuMvpExtMiBuf;
   MvField mmvdBaseMv[MMVD_BASE_MV_NUM][2];
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -609,6 +622,9 @@ public:
   bool          useAltHpelIf      [ NUM_MERGE_CANDS ];
 #else
   bool          useAltHpelIf      [ MRG_MAX_NUM_CANDS ];
+#endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  void saveMergeInfo(PredictionUnit& puTmp, PredictionUnit pu);
 #endif
   void setMergeInfo( PredictionUnit& pu, int candIdx );
 #if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Y0058_IBC_LIST_MODIFY
@@ -627,6 +643,9 @@ public:
 #else
   bool xCheckSimilarIBCMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
+#endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
+  bool xCheckSimilarMotionSubTMVP(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
 #if TM_MRG
   void copyRegularMergeCand( int dstCandIdx, MergeCtx& srcCtx, int srcCandIdx );
@@ -650,15 +669,18 @@ public:
   Distortion    candCost[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
   EAffineModel  affineType[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
 #if INTER_LIC
-  bool          LICFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+  bool          licFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
 #endif
-  uint8_t       BcwIdx[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+  uint8_t       bcwIdx[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
   int           numValidMergeCand;
   int           numAffCandToTestEnc;
   int           maxNumMergeCand;
 
   MergeCtx     *mrgCtx;
   MergeType     mergeType[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  int           colIdx[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#endif
 #if JVET_AB0112_AFFINE_DMVR
   bool          xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
@@ -674,14 +696,17 @@ public:
   unsigned char interDirNeighbours[AFFINE_MRG_MAX_NUM_CANDS];
   EAffineModel  affineType[AFFINE_MRG_MAX_NUM_CANDS];
 #if INTER_LIC
-  bool          LICFlags[AFFINE_MRG_MAX_NUM_CANDS];
+  bool          licFlags[AFFINE_MRG_MAX_NUM_CANDS];
 #endif
-  uint8_t       BcwIdx[AFFINE_MRG_MAX_NUM_CANDS];
+  uint8_t       bcwIdx[AFFINE_MRG_MAX_NUM_CANDS];
   int           numValidMergeCand;
   int           maxNumMergeCand;
 
   MergeCtx     *mrgCtx;
   MergeType     mergeType[AFFINE_MRG_MAX_NUM_CANDS];
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  int           colIdx[AFFINE_MRG_MAX_NUM_CANDS];
+#endif
 #if JVET_AB0112_AFFINE_DMVR
   bool          xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
@@ -704,6 +729,9 @@ unsigned CtxBMMrgFlag(const CodingUnit& cu);
 #if JVET_AA0070_RRIBC
 unsigned CtxRribcFlipType(const CodingUnit& cu);
 #endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+unsigned CtxbvOneZeroComp(const CodingUnit &cu);
+#endif
 unsigned CtxPredModeFlag( const CodingUnit& cu );
 unsigned CtxIBCFlag(const CodingUnit& cu);
 unsigned CtxMipFlag   ( const CodingUnit& cu );
@@ -720,6 +748,11 @@ unsigned CtxTimdFlag( const CodingUnit& cu );
 #if JVET_AB0155_SGPM
 unsigned CtxSgpmFlag(const CodingUnit &cu);
 #endif
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+int CtxSmBvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrect, const int isHor, const int significance);
+#endif
+
 }
 
 #endif // __CONTEXTMODELLING__

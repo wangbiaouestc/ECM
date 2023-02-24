@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1166,7 +1166,6 @@ const TFilterCoeff InterpolationFilter::m_bilinearFilterPrec4[LUMA_INTERPOLATION
 InterpolationFilter::InterpolationFilter()
 {
 #if IF_12TAP
-#if !QC_SIF_SIMD
   m_filterHor[0][0][0] = filter<12, false, false, false>;
   m_filterHor[0][0][1] = filter<12, false, false, true>;
   m_filterHor[0][1][0] = filter<12, false, true, false>;
@@ -1240,9 +1239,7 @@ InterpolationFilter::InterpolationFilter()
   m_filterVer[3][1][0] = filter<2, true, true, false>;
   m_filterVer[3][1][1] = filter<2, true, true, true>;
 #endif
-#endif
 #else
-#if !QC_SIF_SIMD
   m_filterHor[0][0][0] = filter<8, false, false, false>;
   m_filterHor[0][0][1] = filter<8, false, false, true>;
   m_filterHor[0][1][0] = filter<8, false, true, false>;
@@ -1273,12 +1270,15 @@ InterpolationFilter::InterpolationFilter()
   m_filterVer[2][1][0] = filter<2, true, true, false>;
   m_filterVer[2][1][1] = filter<2, true, true, true>;
 #endif
-#endif
   m_filterCopy[0][0]   = filterCopy<false, false>;
   m_filterCopy[0][1]   = filterCopy<false, true>;
   m_filterCopy[1][0]   = filterCopy<true, false>;
   m_filterCopy[1][1]   = filterCopy<true, true>;
-#if !QC_SIF_SIMD
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  m_filterCopyWithNoClipping = filterCopyWithNoClipping;
+  m_filterReverseCopy[0]     = filterReverseCopy <true>;
+  m_filterReverseCopy[1]     = filterReverseCopy <false>;
+#endif
   m_weightedGeoBlk = xWeightedGeoBlk;
 #if JVET_Y0065_GPM_INTRA
   m_weightedGeoBlkRounded = xWeightedGeoBlkRounded;
@@ -1287,7 +1287,6 @@ InterpolationFilter::InterpolationFilter()
   m_weightedSgpm = xWeightedSgpm;
   m_sadTM     = xSadTM;
   m_sgpmSadTM = xSgpmSadTM;
-#endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   m_weightedGeoTplA = xWeightedGeoTpl<true>;
@@ -1445,6 +1444,50 @@ void InterpolationFilter::filterCopy( const ClpRng& clpRng, const Pel *src, int 
     }
   }
 }
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+void InterpolationFilter::filterCopyWithNoClipping(const ClpRng& clpRng, const Pel* src, int srcStride, Pel* dst, int dstStride, int width, int height)
+{
+  const int lineSize = sizeof(Pel) * width;
+
+  for (int row = 0; row < height; row++)
+  {
+    std::memcpy(dst, src, lineSize);
+
+    src += srcStride;
+    dst += dstStride;
+  }
+}
+
+template<bool isVer>
+void InterpolationFilter::filterReverseCopy(const ClpRng& clpRng, const Pel* src, int srcStride, Pel* dst, int dstStride, int width, int height)
+{
+  const int lineSize = sizeof(Pel) * width;
+
+  if (isVer)
+  {
+    src += srcStride * (height - 1);
+    for (int row = 0; row < height; ++row)
+    {
+      std::memcpy(dst, src, lineSize);
+      src -= srcStride;
+      dst += dstStride;
+    }
+  }
+  else
+  {
+    for (int row = 0; row < height; ++row)
+    {
+      for (int col = 0; col < width; ++col)
+      {
+        dst[col] = src[width - col - 1];
+      }
+      src += srcStride;
+      dst += dstStride;
+    }
+  }
+}
+#endif
 
 #if SIMD_4x4_12 && defined(TARGET_SIMD_X86)
 void InterpolationFilter::filter4x4( const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int xFrac, int yFrac, bool isLast)
@@ -1836,8 +1879,20 @@ void InterpolationFilter::filterVer(const ClpRng& clpRng, Pel const *src, int sr
  * \param  fmt        Chroma format
  * \param  bitDepth   Bit depth
  */
-void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx, bool biMCForDMVR, bool useAltHpelIf)
+void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx, bool biMCForDMVR, bool useAltHpelIf
+#if JVET_AC0104_IBC_BVD_PREDICTION
+                                  , const bool useCopyWithNoClipping
+#endif
+)
 {
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  if (useCopyWithNoClipping)
+  {
+    m_filterCopyWithNoClipping(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else
+#endif
+
   if( frac == 0 && nFilterIdx < 2 )
   {
     m_filterCopy[true][isLast]( clpRng, src, srcStride, dst, dstStride, width, height, biMCForDMVR );
@@ -2208,7 +2263,7 @@ int InterpolationFilter::xSgpmSadTM(const PredictionUnit &pu, const int width, c
                                          const int templateWidth, const int templateHeight, const ComponentID compIdx,
                                         const uint8_t splitDir, PelBuf &adBuf)
 {
-  int16_t angle = g_GeoParams[splitDir][0];
+  int16_t angle = g_geoParams[splitDir][0];
   int16_t wIdx  = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2_EX;
   int16_t hIdx  = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2_EX;
   int16_t stepX = 1;
@@ -2219,7 +2274,7 @@ int InterpolationFilter::xSgpmSadTM(const PredictionUnit &pu, const int width, c
   {
     stepX      = 1;
     maskStride = -GEO_WEIGHT_MASK_SIZE_EXT;
-    weight     = &g_globalGeoWeightsTpl[g_angle2mask[angle]]
+    weight     = &g_geoWeightsTpl[g_angle2mask[angle]]
                                    [(GEO_WEIGHT_MASK_SIZE_EXT - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][1]
                                      - GEO_TM_ADDED_WEIGHT_MASK_SIZE)
                                       * GEO_WEIGHT_MASK_SIZE_EXT
@@ -2229,7 +2284,7 @@ int InterpolationFilter::xSgpmSadTM(const PredictionUnit &pu, const int width, c
   {
     stepX      = -1;
     maskStride = GEO_WEIGHT_MASK_SIZE_EXT;
-    weight     = &g_globalGeoWeightsTpl[g_angle2mask[angle]]
+    weight     = &g_geoWeightsTpl[g_angle2mask[angle]]
                                    [(g_weightOffsetEx[splitDir][hIdx][wIdx][1] + GEO_TM_ADDED_WEIGHT_MASK_SIZE)
                                       * GEO_WEIGHT_MASK_SIZE_EXT
                                     + (GEO_WEIGHT_MASK_SIZE_EXT - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][0]
@@ -2239,7 +2294,7 @@ int InterpolationFilter::xSgpmSadTM(const PredictionUnit &pu, const int width, c
   {
     stepX      = 1;
     maskStride = GEO_WEIGHT_MASK_SIZE_EXT;
-    weight     = &g_globalGeoWeightsTpl[g_angle2mask[angle]]
+    weight     = &g_geoWeightsTpl[g_angle2mask[angle]]
                                    [(g_weightOffsetEx[splitDir][hIdx][wIdx][1] + GEO_TM_ADDED_WEIGHT_MASK_SIZE)
                                       * GEO_WEIGHT_MASK_SIZE_EXT
                                     + g_weightOffsetEx[splitDir][hIdx][wIdx][0] + GEO_TM_ADDED_WEIGHT_MASK_SIZE];
@@ -2303,18 +2358,33 @@ void InterpolationFilter::xWeightedSgpm(const PredictionUnit &pu, const uint32_t
   const uint32_t scaleX         = getComponentScaleX(compIdx, pu.chromaFormat);
   const uint32_t scaleY         = getComponentScaleY(compIdx, pu.chromaFormat);
 
-  int16_t  angle  = g_GeoParams[splitDir][0];
+  int16_t  angle  = g_geoParams[splitDir][0];
   int16_t  wIdx   = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2_EX;
   int16_t  hIdx   = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2_EX;
   int16_t  stepX  = 1 << scaleX;
   int16_t  stepY  = 0;
   int16_t *weight = nullptr;
 
+#if JVET_AC0189_SGPM_NO_BLENDING
+  int blendWIdx = 0;
+  if (pu.cs->pps->getUseSgpmNoBlend())
+  {
+    blendWIdx = 0;
+  }
+  else
+  {
+    blendWIdx= GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight());
+  }
+#endif
   if (g_angle2mirror[angle] == 2)
   {
     stepY  = -(int) ((GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth());
-    weight = &g_globalGeoWeights
+    weight = &g_geoWeights
+#if JVET_AC0189_SGPM_NO_BLENDING
+               [blendWIdx]
+#else
                [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]
+#endif
                [g_angle2mask[angle]]
                [(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][1])
                   * GEO_WEIGHT_MASK_SIZE
@@ -2324,8 +2394,12 @@ void InterpolationFilter::xWeightedSgpm(const PredictionUnit &pu, const uint32_t
   {
     stepX  = -1 << scaleX;
     stepY  = (GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth();
-    weight = &g_globalGeoWeights
+    weight = &g_geoWeights
+#if JVET_AC0189_SGPM_NO_BLENDING
+               [blendWIdx]
+#else
                [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]
+#endif
                [g_angle2mask[angle]]
                [g_weightOffsetEx[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE
                 + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][0])];
@@ -2333,8 +2407,12 @@ void InterpolationFilter::xWeightedSgpm(const PredictionUnit &pu, const uint32_t
   else
   {
     stepY  = (GEO_WEIGHT_MASK_SIZE << scaleY) - pu.lwidth();
-    weight = &g_globalGeoWeights
+    weight = &g_geoWeights
+#if JVET_AC0189_SGPM_NO_BLENDING
+               [blendWIdx]
+#else
                [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]
+#endif
                [g_angle2mask[angle]]
                [g_weightOffsetEx[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE
                 + g_weightOffsetEx[splitDir][hIdx][wIdx][0]];
@@ -2369,12 +2447,12 @@ void InterpolationFilter::xWeightedGeoTpl(const PredictionUnit &pu, const uint8_
   const uint32_t scaleX = getComponentScaleX(compIdx, pu.chromaFormat);
   const uint32_t scaleY = getComponentScaleY(compIdx, pu.chromaFormat);
 
-  int16_t angle = g_GeoParams[splitDir][0];
+  int16_t angle = g_geoParams[splitDir][0];
   int16_t wIdx  = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2;
   int16_t hIdx  = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2;
   int16_t stepX = 1 << scaleX;
   int16_t stepY = 0;
-  Pel*   weight = &g_globalGeoWeightsTpl[g_angle2mask[angle]][GEO_TM_ADDED_WEIGHT_MASK_SIZE * GEO_WEIGHT_MASK_SIZE_EXT + GEO_TM_ADDED_WEIGHT_MASK_SIZE];
+  Pel*   weight = &g_geoWeightsTpl[g_angle2mask[angle]][GEO_TM_ADDED_WEIGHT_MASK_SIZE * GEO_WEIGHT_MASK_SIZE_EXT + GEO_TM_ADDED_WEIGHT_MASK_SIZE];
   if (g_angle2mirror[angle] == 2)
   {
     stepY = -(int)(GEO_WEIGHT_MASK_SIZE_EXT << scaleY);
@@ -2420,7 +2498,7 @@ void InterpolationFilter::xWeightedGeoTpl(const PredictionUnit &pu, const uint8_
 }
 #endif
 
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 void InterpolationFilter::weightedGeoBlk(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, const uint8_t bldIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
 {
   m_weightedGeoBlk(pu, width, height, compIdx, splitDir, bldIdx, predDst, predSrc0, predSrc1);
@@ -2443,7 +2521,7 @@ void InterpolationFilter::xWeightedGeoBlk(const PredictionUnit &pu, const uint32
   int32_t strideSrc0 = predSrc0.get(compIdx).stride - width;
   int32_t strideSrc1 = predSrc1.get(compIdx).stride - width;
 
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   const char    log2WeightBase = 5;
 #else
   const char    log2WeightBase = 3;
@@ -2459,52 +2537,52 @@ void InterpolationFilter::xWeightedGeoBlk(const PredictionUnit &pu, const uint32
   const uint32_t scaleX = getComponentScaleX(compIdx, pu.chromaFormat);
   const uint32_t scaleY = getComponentScaleY(compIdx, pu.chromaFormat);
 
-  int16_t angle = g_GeoParams[splitDir][0];
+  int16_t angle = g_geoParams[splitDir][0];
   int16_t wIdx = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2;
   int16_t hIdx = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2;
   int16_t stepX = 1 << scaleX;
   int16_t stepY = 0;
   int16_t* weight = nullptr;
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   if (g_angle2mirror[angle] == 2)
   {
     stepY = -(int)((GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth());
-    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[bldIdx][g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
   else if (g_angle2mirror[angle] == 1)
   {
     stepX = -1 << scaleX;
     stepY = (GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth();
-    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
+    weight = &g_geoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
   }
   else
   {
     stepY = (GEO_WEIGHT_MASK_SIZE << scaleY) - pu.lwidth();
-    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
 #else
   if (g_angle2mirror[angle] == 2)
   {
     stepY = -(int)((GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth());
-    weight = &g_globalGeoWeights[g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
   else if (g_angle2mirror[angle] == 1)
   {
     stepX = -1 << scaleX;
     stepY = (GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth();
-    weight = &g_globalGeoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
+    weight = &g_geoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
   }
   else
   {
     stepY = (GEO_WEIGHT_MASK_SIZE << scaleY) - pu.lwidth();
-    weight = &g_globalGeoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
 #endif
   for( int y = 0; y < height; y++ )
   {
     for( int x = 0; x < width; x++ )
     {
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
       *dst++ = ClipPel(rightShift((*weight*(*src0++) + ((32 - *weight) * (*src1++)) + offsetWeighted), shiftWeighted), clipRng);
 #else
       *dst++  = ClipPel(rightShift((*weight*(*src0++) + ((8 - *weight) * (*src1++)) + offsetWeighted), shiftWeighted), clipRng);
@@ -2519,7 +2597,7 @@ void InterpolationFilter::xWeightedGeoBlk(const PredictionUnit &pu, const uint32
 }
 
 #if JVET_Y0065_GPM_INTRA
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 void InterpolationFilter::weightedGeoBlkRounded(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, const uint8_t bldIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
 {
   m_weightedGeoBlkRounded(pu, width, height, compIdx, splitDir, bldIdx, predDst, predSrc0, predSrc1);
@@ -2545,52 +2623,52 @@ void InterpolationFilter::xWeightedGeoBlkRounded(const PredictionUnit &pu, const
   const uint32_t scaleX = getComponentScaleX(compIdx, pu.chromaFormat);
   const uint32_t scaleY = getComponentScaleY(compIdx, pu.chromaFormat);
 
-  int16_t angle = g_GeoParams[splitDir][0];
+  int16_t angle = g_geoParams[splitDir][0];
   int16_t wIdx = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2;
   int16_t hIdx = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2;
   int16_t stepX = 1 << scaleX;
   int16_t stepY = 0;
   int16_t* weight = nullptr;
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   if (g_angle2mirror[angle] == 2)
   {
     stepY = -(int)((GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth());
-    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[bldIdx][g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
   else if (g_angle2mirror[angle] == 1)
   {
     stepX = -1 << scaleX;
     stepY = (GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth();
-    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
+    weight = &g_geoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
   }
   else
   {
     stepY = (GEO_WEIGHT_MASK_SIZE << scaleY) - pu.lwidth();
-    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
 #else
   if (g_angle2mirror[angle] == 2)
   {
     stepY = -(int)((GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth());
-    weight = &g_globalGeoWeights[g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
   else if (g_angle2mirror[angle] == 1)
   {
     stepX = -1 << scaleX;
     stepY = (GEO_WEIGHT_MASK_SIZE << scaleY) + pu.lwidth();
-    weight = &g_globalGeoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
+    weight = &g_geoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
   }
   else
   {
     stepY = (GEO_WEIGHT_MASK_SIZE << scaleY) - pu.lwidth();
-    weight = &g_globalGeoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
 #endif
   for( int y = 0; y < height; y++ )
   {
     for( int x = 0; x < width; x++ )
     {
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
       *dst++ = (*weight*(*src0++) + ((32 - *weight) * (*src1++)) + 16) >> 5;
 #else
       *dst++ = (*weight*(*src0++) + ((8 - *weight) * (*src1++)) + 4)>>3;

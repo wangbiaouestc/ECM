@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -263,6 +263,13 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setResChangeInClvsEnabled                            ( m_resChangeInClvsEnabled );
   m_cEncLib.setSwitchPocPeriod                                   ( m_switchPocPeriod );
   m_cEncLib.setUpscaledOutput                                    ( m_upscaledOutput );
+#if JVET_AC0096
+  m_cEncLib.setRprFunctionalityTestingEnabledFlag                (m_rprFunctionalityTestingEnabledFlag);
+  m_cEncLib.setRprSwitchingSegmentSize                           (m_rprSwitchingSegmentSize);
+  m_cEncLib.setRprPopulatePPSatIntraFlag                         (m_rprPopulatePPSatIntraFlag);
+  m_cEncLib.setScalingRatio2                                     (m_scalingRatioHor2, m_scalingRatioVer2);
+  m_cEncLib.setScalingRatio3                                     (m_scalingRatioHor3, m_scalingRatioVer3);
+#endif
 #if JVET_AB0082
   m_cEncLib.setUpscaleFilerForDisplay                            (m_upscaleFilterForDisplay);
 #endif
@@ -658,6 +665,9 @@ void EncApp::xInitLibCfg()
   //===== Slice ========
 
   //====== Loop/Deblock Filter ========
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  m_cEncLib.setAsymmetricILF(m_asymmetricILF);
+#endif
   m_cEncLib.setLoopFilterDisable                                 ( m_bLoopFilterDisable       );
   m_cEncLib.setLoopFilterOffsetInPPS                             ( m_loopFilterOffsetInPPS );
   m_cEncLib.setLoopFilterBetaOffset                              ( m_loopFilterBetaOffsetDiv2  );
@@ -848,6 +858,17 @@ void EncApp::xInitLibCfg()
     }
   }
 #endif
+#if JVET_AC0096
+  if (m_rprFunctionalityTestingEnabledFlag)
+  {
+    for (int k = 0; k < m_rprSwitchingListSize; k++)
+    {
+      m_cEncLib.setRprSwitchingResolutionOrderList(m_rprSwitchingResolutionOrderList[k], k);
+      m_cEncLib.setRprSwitchingQPOffsetOrderList(m_rprSwitchingQPOffsetOrderList[k], k);
+    }
+    m_cEncLib.setRprSwitchingListSize(m_rprSwitchingListSize);
+  }
+#endif
 #if JVET_AA0133_INTER_MTS_OPT
   m_cEncLib.setInterMTSMaxSize(m_interMTSMaxSize);
 #endif
@@ -859,11 +880,20 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AB0155_SGPM
   m_cEncLib.setUseSgpm                                           ( m_sgpm );
+#if JVET_AC0189_SGPM_NO_BLENDING
+  m_cEncLib.setUseSgpmNoBlend                                    ( m_sgpmNoBlend );
+#endif
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  m_cEncLib.setUseCccm                                           ( m_cccm );
 #endif
 #if ENABLE_OBMC
   m_cEncLib.setUseObmc                                           ( m_OBMC );
 #endif
   m_cEncLib.setUseCiip                                           ( m_ciip );
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  m_cEncLib.setUseCiipTimd                                       (m_ciipTimd);
+#endif
   m_cEncLib.setUseGeo                                            ( m_Geo );
   m_cEncLib.setUseHashME                                         ( m_HashME );
 
@@ -876,6 +906,12 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setMmvdDisNum                                        (m_MmvdDisNum);
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   m_cEncLib.setUseMVSD                                           (m_MVSD);
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  m_cEncLib.setUseBvdPred                                        (m_bvdPred);
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  m_cEncLib.setUseBvpCluster                                     (m_bvpCluster);
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   m_cEncLib.setUseARL                                            (m_useARL);
@@ -894,6 +930,15 @@ void EncApp::xInitLibCfg()
 #if JVET_AA0061_IBC_MBVD
   m_cEncLib.setIbcMbvd                                           ( m_ibcMbvd );
 #endif
+#if JVET_AC0112_IBC_CIIP
+  m_cEncLib.setIbcCiip                                           ( m_ibcCiip );
+#endif
+#if JVET_AC0112_IBC_GPM
+  m_cEncLib.setIbcGpm                                            ( m_ibcGpm );
+#endif
+#if JVET_AC0112_IBC_LIC
+  m_cEncLib.setIbcLic                                            ( m_ibcLic );
+#endif
 
   m_cEncLib.setUseWrapAround                                     ( m_wrapAround );
   m_cEncLib.setWrapAroundOffset                                  ( m_wrapAroundOffset );
@@ -903,6 +948,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AB0130_ITMP_SAMPLING
   m_cEncLib.setUseFastIntraTMP(m_fastIntraTMP);
 #endif
+#endif
+#if JVET_AC0071_DBV
+  m_cEncLib.setUseIntraDBV(m_intraDBV);
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   m_cEncLib.setUseBIF                                            ( m_BIF );
@@ -1321,6 +1369,10 @@ void EncApp::xInitLibCfg()
 #if JVET_X0144_MAX_MTT_DEPTH_TID
   m_cEncLib.setMaxMTTHierarchyDepthByTid                          ( m_maxMTTHierarchyDepthByTid );
 #endif
+
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  m_cEncLib.setAsymmetricILF(m_asymmetricILF);
+#endif
 }
 
 void EncApp::xCreateLib( std::list<PelUnitBuf*>& recBufList, const int layerId )
@@ -1710,11 +1762,43 @@ void EncApp::xWriteOutput( int iNumEncoded, std::list<PelUnitBuf*>& recBufList )
       const PelUnitBuf* pcPicYuvRec = *(iterPicYuvRec++);
       if (!m_reconFileName.empty())
       {
+#if JVET_AC0096
+        const SPS& sps = *m_cEncLib.getSPS(0);
+        int ppsID = 0;
+        if (m_rprFunctionalityTestingEnabledFlag)
+        {
+          const PPS& pps1 = *m_cEncLib.getPPS(ENC_PPS_ID_RPR);
+          const PPS& pps2 = *m_cEncLib.getPPS(ENC_PPS_ID_RPR2);
+          const PPS& pps3 = *m_cEncLib.getPPS(ENC_PPS_ID_RPR3);
+          if (pps1.getPicWidthInLumaSamples() == pcPicYuvRec->get(COMPONENT_Y).width && pps1.getPicHeightInLumaSamples() == pcPicYuvRec->get(COMPONENT_Y).height)
+          {
+            ppsID = ENC_PPS_ID_RPR;
+          }
+          else if (pps2.getPicWidthInLumaSamples() == pcPicYuvRec->get(COMPONENT_Y).width && pps2.getPicHeightInLumaSamples() == pcPicYuvRec->get(COMPONENT_Y).height)
+          {
+            ppsID = ENC_PPS_ID_RPR2;
+          }
+          else if (pps3.getPicWidthInLumaSamples() == pcPicYuvRec->get(COMPONENT_Y).width && pps3.getPicHeightInLumaSamples() == pcPicYuvRec->get(COMPONENT_Y).height)
+          {
+            ppsID = ENC_PPS_ID_RPR3;
+          }
+          else
+          {
+            ppsID = 0;
+          }
+        }
+        else
+        {
+          ppsID = (sps.getMaxPicWidthInLumaSamples() != pcPicYuvRec->get(COMPONENT_Y).width || sps.getMaxPicHeightInLumaSamples() != pcPicYuvRec->get(COMPONENT_Y).height) ? ENC_PPS_ID_RPR : 0;
+        }
+        const PPS& pps = *m_cEncLib.getPPS(ppsID);
+#endif
         if( m_cEncLib.isResChangeInClvsEnabled() && m_cEncLib.getUpscaledOutput() )
         {
+#if !JVET_AC0096
           const SPS& sps = *m_cEncLib.getSPS( 0 );
           const PPS& pps = *m_cEncLib.getPPS( ( sps.getMaxPicWidthInLumaSamples() != pcPicYuvRec->get( COMPONENT_Y ).width || sps.getMaxPicHeightInLumaSamples() != pcPicYuvRec->get( COMPONENT_Y ).height ) ? ENC_PPS_ID_RPR : 0 );
-
+#endif
 #if JVET_AB0082
           m_cVideoIOYuvReconFile.writeUpscaledPicture(sps, pps, *pcPicYuvRec, ipCSC, m_packedYUVMode, m_cEncLib.getUpscaledOutput(), NUM_CHROMA_FORMAT, m_bClipOutputVideoToRec709Range, m_upscaleFilterForDisplay);
 #else
@@ -1723,8 +1807,20 @@ void EncApp::xWriteOutput( int iNumEncoded, std::list<PelUnitBuf*>& recBufList )
         }
         else
         {
+#if JVET_AC0096
+          Window confWindowPPS = pps.getConformanceWindow();
+          m_cVideoIOYuvReconFile.write(
+            pcPicYuvRec->get(COMPONENT_Y).width, pcPicYuvRec->get(COMPONENT_Y).height, *pcPicYuvRec, ipCSC,
+            m_packedYUVMode, confWindowPPS.getWindowLeftOffset() * SPS::getWinUnitX(m_cEncLib.getChromaFormatIdc()),
+            confWindowPPS.getWindowRightOffset() * SPS::getWinUnitX(m_cEncLib.getChromaFormatIdc()),
+            confWindowPPS.getWindowTopOffset() * SPS::getWinUnitY(m_cEncLib.getChromaFormatIdc()),
+            confWindowPPS.getWindowBottomOffset() * SPS::getWinUnitY(m_cEncLib.getChromaFormatIdc()), NUM_CHROMA_FORMAT,
+            m_bClipOutputVideoToRec709Range);
+
+#else
           m_cVideoIOYuvReconFile.write( pcPicYuvRec->get( COMPONENT_Y ).width, pcPicYuvRec->get( COMPONENT_Y ).height, *pcPicYuvRec, ipCSC, m_packedYUVMode,
             m_confWinLeft, m_confWinRight, m_confWinTop, m_confWinBottom, NUM_CHROMA_FORMAT, m_bClipOutputVideoToRec709Range );
+#endif
         }
       }
     }

@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1915,9 +1915,35 @@ namespace DQIntern
     if (lfnstIdx > 0 && tu.mtsIdx[compID] != MTS_SKIP && width >= 4 && height >= 4)
     {
 #if JVET_W0119_LFNST_EXTENSION
+#if JVET_AC0130_NSPT
+      bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *( tu.cu ) ) );
+
+      if( allowNSPT )
+      {
+        firstTestPos = PU::getNSPTMatrixDim( width, height ) - 1;
+      }
+      else
+      {
+        firstTestPos = PU::getLFNSTMatrixDim( width, height ) - 1;
+      }
+#else
       firstTestPos = PU::getLFNSTMatrixDim( width, height ) - 1;
+#endif
+#else
+#if JVET_AC0130_NSPT
+      bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *( tu.cu ) ) );
+
+      if( allowNSPT )
+      {
+        firstTestPos = PU::getNSPTMatrixDim( width, height ) - 1;
+      }
+      else
+      {
+        firstTestPos = ( ( width == 4 && height == 4 ) || ( width == 8 && height == 8 ) ) ? 7 : 15;
+      }
 #else
       firstTestPos = ( ( width == 4 && height == 4 ) || ( width == 8 && height == 8 ) )  ? 7 : 15 ;
+#endif
 #endif
     }
 #endif

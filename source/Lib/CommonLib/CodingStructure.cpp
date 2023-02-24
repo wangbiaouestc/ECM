@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -2076,6 +2076,33 @@ void CodingStructure::rebindPicBufs()
   }
 }
 
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+void CodingStructure::createTMBuf(const int cbWidth, const int cbHeight)
+{
+  m_pCurrTmTop  = (Pel *) xMalloc(Pel, AML_MERGE_TEMPLATE_SIZE * cbWidth);
+  m_pCurrTmLeft = (Pel *) xMalloc(Pel, AML_MERGE_TEMPLATE_SIZE * cbHeight);
+  m_pRefTmTop   = (Pel *) xMalloc(Pel, AML_MERGE_TEMPLATE_SIZE * cbWidth);
+  m_pRefTmLeft  = (Pel *) xMalloc(Pel, AML_MERGE_TEMPLATE_SIZE * cbHeight);
+
+  m_pcBufPredCurTop  = PelBuf(m_pCurrTmTop, cbWidth, AML_MERGE_TEMPLATE_SIZE);
+  m_pcBufPredCurLeft = PelBuf(m_pCurrTmLeft, AML_MERGE_TEMPLATE_SIZE, cbHeight);
+  m_pcBufPredRefTop  = PelBuf(m_pRefTmTop, cbWidth, AML_MERGE_TEMPLATE_SIZE);
+  m_pcBufPredRefLeft = PelBuf(m_pRefTmLeft, AML_MERGE_TEMPLATE_SIZE, cbHeight);
+}
+
+void CodingStructure::destroyTMBuf()
+{
+  xFree(m_pCurrTmTop);
+  m_pCurrTmTop = nullptr;
+  xFree(m_pCurrTmLeft);
+  m_pCurrTmLeft = nullptr;
+  xFree(m_pRefTmTop);
+  m_pRefTmTop = nullptr;
+  xFree(m_pRefTmLeft);
+  m_pRefTmLeft = nullptr;
+}
+#endif
+
 void CodingStructure::createCoeffs(const bool isPLTused)
 {
   const unsigned numCh = getNumberValidComponents( area.chromaFormat );
@@ -2267,14 +2294,48 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
   if( parent )
   {
     // copy data to picture
-    if( cpyPred )    getPredBuf   ( clippedArea ).copyFrom( subPredBuf );
-    if( cpyResi )    getResiBuf   ( clippedArea ).copyFrom( subResiBuf );
-    if( cpyReco )    getRecoBuf   ( clippedArea ).copyFrom( subRecoBuf );
-    if( cpyOrgResi ) getOrgResiBuf( clippedArea ).copyFrom( subStruct.getOrgResiBuf( clippedArea ) );
+    if( cpyPred )
+    {
+      getPredBuf( clippedArea ).copyFrom( subPredBuf );
+    }
+
+    if (cpyResi)
+    {
+      getResiBuf(clippedArea).copyFrom(subResiBuf);
+    }
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+    else
+    {
+      getResiBuf(clippedArea).copyFrom(subStruct.getResiBuf(clippedArea), true);
+    }
+#endif
+
+    if( cpyReco )
+    {
+      getRecoBuf( clippedArea ).copyFrom( subRecoBuf );
+    }
+
+    if( cpyOrgResi )
+    {
+      getOrgResiBuf( clippedArea ).copyFrom( subStruct.getOrgResiBuf( clippedArea ) );
+    }
   }
 
-  if( cpyPred ) picture->getPredBuf( clippedArea ).copyFrom( subPredBuf );
-  if( cpyResi ) picture->getResiBuf( clippedArea ).copyFrom( subResiBuf );
+  if( cpyPred )
+  {
+    picture->getPredBuf( clippedArea ).copyFrom( subPredBuf );
+  }
+
+  if (cpyResi)
+  {
+    picture->getResiBuf(clippedArea).copyFrom(subResiBuf);
+  }
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  else
+  {
+    picture->getResiBuf(clippedArea).copyFrom(subStruct.getResiBuf(clippedArea), true);
+  }
+#endif
 
 #if JVET_Z0118_GDR
   if (isInGdrIntervalOrRecoveryPoc())
@@ -2971,7 +3032,11 @@ PelBuf CodingStructure::getBuf( const CompArea &blk, const PictureType &type )
   cFinal.relativeTo( area.blocks[compID] );
 
 #if !KEEP_PRED_AND_RESI_SIGNALS
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  if (!parent && (type == PIC_PREDICTION))
+#else
   if( !parent && ( type == PIC_RESIDUAL || type == PIC_PREDICTION ) )
+#endif
   {
     cFinal.x &= ( pcv->maxCUWidthMask  >> getComponentScaleX( blk.compID, blk.chromaFormat ) );
     cFinal.y &= ( pcv->maxCUHeightMask >> getComponentScaleY( blk.compID, blk.chromaFormat ) );
@@ -3008,7 +3073,11 @@ const CPelBuf CodingStructure::getBuf( const CompArea &blk, const PictureType &t
   cFinal.relativeTo( area.blocks[compID] );
 
 #if !KEEP_PRED_AND_RESI_SIGNALS
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  if (!parent && (type == PIC_PREDICTION))
+#else
   if( !parent && ( type == PIC_RESIDUAL || type == PIC_PREDICTION ) )
+#endif
   {
     cFinal.x &= ( pcv->maxCUWidthMask  >> getComponentScaleX( blk.compID, blk.chromaFormat ) );
     cFinal.y &= ( pcv->maxCUHeightMask >> getComponentScaleY( blk.compID, blk.chromaFormat ) );

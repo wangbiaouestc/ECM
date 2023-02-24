@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -267,6 +267,10 @@ void HLSWriter::codePPS( const PPS* pcPPS )
 
   WRITE_UVLC( pcPPS->getPicWidthInLumaSamples(), "pic_width_in_luma_samples" );
   WRITE_UVLC( pcPPS->getPicHeightInLumaSamples(), "pic_height_in_luma_samples" );
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  WRITE_FLAG(pcPPS->getAsymmetricILF() ? 1 : 0, "pps_aysmmetric_ILF_flag");
+#endif
+
   Window conf = pcPPS->getConformanceWindow();
 #if JVET_R0068_ASPECT6_ENC_RESTRICTION
   WRITE_FLAG(pcPPS->getConformanceWindowFlag(), "pps_conformance_window_flag");
@@ -454,6 +458,9 @@ void HLSWriter::codePPS( const PPS* pcPPS )
     }
   }
   }
+#if JVET_AC0189_SGPM_NO_BLENDING
+  WRITE_FLAG(pcPPS->getUseSgpmNoBlend() ? 1 : 0, "sgpm_no_blend_flag" );
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   WRITE_FLAG(pcPPS->getUseBIF() ? 1 : 0, "bilateral_filter_flag" );
   if(pcPPS->getUseBIF())
@@ -622,6 +629,10 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
     {
       WRITE_UVLC(param.numAlternativesLuma - 1, "alf_luma_num_alts_minus1" );
     }
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+    WRITE_FLAG(param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_13_EXT_DB_RESI_DIRECT ? 1 : 0,
+               "alf_luma_13_ext_db_resi_direct : alf_luma_13_ext_db_resi");
+#else
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF && JVET_AA0095_ALF_LONGER_FILTER
     WRITE_FLAG(param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_9_EXT_DB ? 1 : 0, "alf_luma_9_ext_db");
 #elif JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
@@ -630,6 +641,7 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
     WRITE_FLAG(param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_13_EXT ? 1 : 0, "alf_luma_13_ext");
 #else
     WRITE_FLAG( param.filterType[CHANNEL_TYPE_LUMA] == ALF_FILTER_9_EXT ? 1 : 0, "alf_luma_ext" );
+#endif
 #endif
     for (int altIdx = 0; altIdx < param.numAlternativesLuma; ++altIdx)
     {
@@ -1364,6 +1376,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #endif
   WRITE_FLAG( pcSPS->getUseAML() ? 1 : 0,                                             "sps_aml_enabled_flag" );
 #endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+  WRITE_FLAG( pcSPS->getUseFastSubTmvp() ? 1 : 0,                                     "sps_fast_sub_tmvp_enabled_flag");
+#endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
   if (pcSPS->getUseAML())
   {
@@ -1563,12 +1578,24 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     WRITE_UVLC(floorLog2(pcSPS->getIntraTMPMaxSize()),                                 "sps_log2_intra_tmp_max_size");
   }
 #endif
+#if JVET_AC0071_DBV
+  WRITE_FLAG(pcSPS->getUseIntraDBV() ? 1 : 0, "sps_intraDBV_enabled_flag");
+#endif
 
 #if JVET_W0123_TIMD_FUSION
   WRITE_FLAG( pcSPS->getUseTimd() ? 1 : 0,                                          "sps_timd_enabled_flag");
 #endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  if (pcSPS->getUseCiip() && pcSPS->getUseTimd())
+  {
+    WRITE_FLAG(pcSPS->getUseCiipTimd() ? 1 : 0, "sps_ciip_timd_enabled_flag");
+  }
+#endif
 #if JVET_AB0155_SGPM
   WRITE_FLAG(pcSPS->getUseSgpm() ? 1 : 0, "sps_sgpm_enabled_flag");
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  WRITE_UVLC(pcSPS->getUseCccm() , "sps_cccm_cand");
 #endif
   if( pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
@@ -1614,6 +1641,21 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     WRITE_UVLC(IBC_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumIBCMergeCand(), "six_minus_max_num_ibc_merge_cand");
 #if JVET_AA0061_IBC_MBVD
     WRITE_FLAG( pcSPS->getUseIbcMbvd() ? 1 : 0,                                         "sps_ibc_mbvd_enabled_flag" );
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+    WRITE_FLAG(pcSPS->getUseBvdPred() ? 1 : 0,                                          "sps_ibc_bvd_pred_enabled_flag");
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    WRITE_FLAG(pcSPS->getUseBvpCluster() ? 1 : 0,                                       "sps_ibc_bvp_cluster_enabled_flag");
+#endif
+#if JVET_AC0112_IBC_CIIP
+    WRITE_FLAG( pcSPS->getUseIbcCiip() ? 1 : 0,                                         "sps_ibc_ciip_enabled_flag" );
+#endif
+#if JVET_AC0112_IBC_GPM
+    WRITE_FLAG( pcSPS->getUseIbcGpm() ? 1 : 0,                                          "sps_ibc_gpm_enabled_flag" );
+#endif
+#if JVET_AC0112_IBC_LIC
+    WRITE_FLAG( pcSPS->getUseIbcLic() ? 1 : 0,                                          "sps_ibc_lic_enabled_flag" );
 #endif
   }
 #if !JVET_S0074_SPS_REORDER
@@ -2418,12 +2460,22 @@ void HLSWriter::codePictureHeader( PicHeader* picHeader, bool writeRbspTrailingB
         if (picHeader->getRPL(1)->getNumRefEntries() > 0)
         {
           WRITE_CODE(picHeader->getPicColFromL0Flag(), 1, "ph_collocated_from_l0_flag");
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          WRITE_CODE(picHeader->getPicColFromL0Flag2nd(), 1, "ph_collocated_from_l0_flag_2nd");
+#endif
         }
         if ((picHeader->getPicColFromL0Flag() && picHeader->getRPL(0)->getNumRefEntries() > 1) ||
           (!picHeader->getPicColFromL0Flag() && picHeader->getRPL(1)->getNumRefEntries() > 1))
         {
           WRITE_UVLC(picHeader->getColRefIdx(), "ph_collocated_ref_idx");
         }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        if ((picHeader->getPicColFromL0Flag2nd() && picHeader->getRPL(0)->getNumRefEntries() > 1) ||
+          (!picHeader->getPicColFromL0Flag2nd() && picHeader->getRPL(1)->getNumRefEntries() > 1))
+        {
+          WRITE_UVLC(picHeader->getColRefIdx2nd(), "ph_collocated_ref_idx_2nd");
+        }
+#endif
       }
     }
     else
@@ -2978,6 +3030,9 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
         if (pcSlice->getSliceType() == B_SLICE)
         {
           WRITE_FLAG(pcSlice->getColFromL0Flag(), "collocated_from_l0_flag");
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+          WRITE_FLAG(pcSlice->getColFromL0Flag2nd(), "collocated_from_l0_flag_2nd");
+#endif
         }
       }
 
@@ -2987,6 +3042,14 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
       {
         WRITE_UVLC( pcSlice->getColRefIdx(), "collocated_ref_idx" );
       }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+      if (pcSlice->getSliceType() != I_SLICE &&
+        ((pcSlice->getColFromL0Flag2nd() == 1 && pcSlice->getNumRefIdx(REF_PIC_LIST_0) > 1) ||
+        (pcSlice->getColFromL0Flag2nd() == 0 && pcSlice->getNumRefIdx(REF_PIC_LIST_1) > 1)))
+      {
+        WRITE_UVLC(pcSlice->getColRefIdx2nd(), "collocated_ref_idx_2nd");
+      }
+#endif
     }
 
     if( ( pcSlice->getPPS()->getUseWP() && pcSlice->getSliceType() == P_SLICE ) || ( pcSlice->getPPS()->getWPBiPred() && pcSlice->getSliceType() == B_SLICE ) )

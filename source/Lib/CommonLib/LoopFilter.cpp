@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -54,6 +54,10 @@
 #define DEBLOCK_SMALLEST_BLOCK  8
 #define DEFAULT_INTRA_TC_OFFSET 2 ///< Default intra TC offset
 
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+#define DEBLOCK_DIFFP_SIZE  2048
+#endif
+
 // ====================================================================================================================
 // Tables
 // ====================================================================================================================
@@ -94,6 +98,9 @@ static bool isAvailableAbove( const CodingUnit& cu, const CodingUnit& cu2, const
 
 LoopFilter::LoopFilter()
 {
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  m_asymmetricDB = false;
+#endif
 }
 
 LoopFilter::~LoopFilter()
@@ -462,7 +469,14 @@ inline bool LoopFilter::isCrossedByVirtualBoundaries(const int xPos, const int y
     {
       if (xPos <= picHeader->getVirtualBoundariesPosX(i) && picHeader->getVirtualBoundariesPosX(i) < xPos + width)
       {
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+        if (!isAsymmetricDB())
+        {
+          verVirBndryPos[numVerVirBndry++] = picHeader->getVirtualBoundariesPosX(i);
+        }
+#else
         verVirBndryPos[numVerVirBndry++] = picHeader->getVirtualBoundariesPosX(i);
+#endif
       }
     }
   }
@@ -560,7 +574,50 @@ void LoopFilter::xSetMaxFilterLengthPQFromTransformSizes( const DeblockEdgeDir e
           const TransformUnit& tuP = *cu.cs->getTU( posP, ch );
           const int sizePSide      = tuP.block(comp).width;
           m_transformEdge[cIdx][ctuXOff][ctuYOff+y] = true;
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+          bool isBorderVB = false;
+          PicHeader *ph = cu.cs->picHeader;
+          const Position lumaPosQ = Position(posQ.x << shiftHor, posQ.y << shiftVer);
 
+          if (ph->getVirtualBoundariesPresentFlag() && ph->getNumVerVirtualBoundaries() > 0)
+          {
+            for (int i = 0; i < ph->getNumVerVirtualBoundaries(); i++)
+            {
+              if (lumaPosQ.x == ph->getVirtualBoundariesPosX(i))
+              {
+                isBorderVB = true;
+              }
+            }
+          }
+
+          if ( comp == COMPONENT_Y )
+          {
+            if (isBorderVB)
+            {
+              m_maxFilterLengthQ[cIdx][ctuXOff][ctuYOff + y] = (sizeQSide <= 4) ? 1 : (sizeQSide >= 32) ? 7 : 3;
+              m_maxFilterLengthP[cIdx][ctuXOff][ctuYOff + y] = (sizePSide <= 4) ? 1 : (sizePSide >= 32) ? 7 : 3;
+            }
+            else
+            {
+              bool smallBlock = (sizePSide <= 4) || (sizeQSide <= 4);
+              if (smallBlock)
+              {
+                m_maxFilterLengthQ[cIdx][ctuXOff][ctuYOff + y] = 1;
+                m_maxFilterLengthP[cIdx][ctuXOff][ctuYOff + y] = 1;
+              }
+              else
+              {
+                m_maxFilterLengthQ[cIdx][ctuXOff][ctuYOff + y] = (sizeQSide >= 32) ? 7 : 3;
+                m_maxFilterLengthP[cIdx][ctuXOff][ctuYOff + y] = (sizePSide >= 32) ? 7 : 3;
+              }
+            }
+          }
+          else
+          {            
+            m_maxFilterLengthQ[cIdx][ctuXOff][ctuYOff + y] = (sizeQSide >= 8 && sizePSide >= 8) ? 3 : 1;
+            m_maxFilterLengthP[cIdx][ctuXOff][ctuYOff + y] = (sizeQSide >= 8 && sizePSide >= 8) ? 3 : 1;
+          }
+#else
           if ( comp == COMPONENT_Y )
           {
             bool smallBlock = (sizePSide <= 4) || (sizeQSide <= 4);
@@ -580,6 +637,7 @@ void LoopFilter::xSetMaxFilterLengthPQFromTransformSizes( const DeblockEdgeDir e
             m_maxFilterLengthQ[cIdx][ctuXOff][ctuYOff+y] = ( sizeQSide >= 8 && sizePSide >= 8 ) ? 3 : 1;
             m_maxFilterLengthP[cIdx][ctuXOff][ctuYOff+y] = ( sizeQSide >= 8 && sizePSide >= 8 ) ? 3 : 1;
           }
+#endif
         }
       }
     }
@@ -1011,6 +1069,24 @@ void LoopFilter::xEdgeFilterLuma( const CodingUnit& cu, const DeblockEdgeDir edg
     pos       = Position{ lumaArea.x - xoffset, lumaArea.y + iEdge * pelsInPart };
   }
 
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR  
+  m_applyAsymmetricDB = false;  
+  
+  if (isAsymmetricDB() && cu.cs->picHeader->getVirtualBoundariesPresentFlag() && edgeDir == EDGE_VER)
+  {
+    if (cu.cs->picHeader->getNumVerVirtualBoundaries() > 0)
+    {      
+      for (int i = 0; i < cu.cs->picHeader->getNumVerVirtualBoundaries(); i++)
+      {
+        if (pos.x == cu.cs->picHeader->getVirtualBoundariesPosX(i))
+        {
+          m_applyAsymmetricDB = true;
+        }
+      }
+    }
+  }
+#endif
+
   const int iBitdepthScale = 1 << (bitDepthLuma - 8);
 
   // dec pos since within the loop we first calc the pos
@@ -1283,6 +1359,24 @@ void LoopFilter::xEdgeFilterChroma(const CodingUnit& cu, const DeblockEdgeDir ed
     pos          = Position{ lumaPos.x - xoffset, lumaPos.y + iEdge*uiNumPelsLuma };
   }
 
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR  
+  m_applyAsymmetricDB = false;
+
+  if (isAsymmetricDB() && cu.cs->picHeader->getVirtualBoundariesPresentFlag() && edgeDir == EDGE_VER)
+  {
+    if (cu.cs->picHeader->getNumVerVirtualBoundaries() > 0)
+    {              
+      for (int i = 0; i < cu.cs->picHeader->getNumVerVirtualBoundaries(); i++)
+      {
+        if (pos.x == cu.cs->picHeader->getVirtualBoundariesPosX(i))
+        {
+          m_applyAsymmetricDB = true;
+        }
+      }
+    }
+  }
+#endif
+
   const int iBitdepthScale = 1 << (sps.getBitDepth(CHANNEL_TYPE_CHROMA) - 8);
 
   for( int iIdx = 0; iIdx < uiNumParts; iIdx++ )
@@ -1438,7 +1532,11 @@ void LoopFilter::xEdgeFilterChroma(const CodingUnit& cu, const DeblockEdgeDir ed
  \param bFilterSecondQ  decision weak filter/no filter for partQ
  \param bitDepthLuma    luma bit depth
 */
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR  
+inline void LoopFilter::xBilinearFilter(Pel* srcP, Pel* srcQ, int offset, int refMiddle, int refP, int refQ, int numberPSide, int numberQSide, const int* dbCoeffsP, const int* dbCoeffsQ, int tc, const ClpRng& clpRng) const
+#else
 inline void LoopFilter::xBilinearFilter(Pel* srcP, Pel* srcQ, int offset, int refMiddle, int refP, int refQ, int numberPSide, int numberQSide, const int* dbCoeffsP, const int* dbCoeffsQ, int tc) const
+#endif
 {
   const char tc7[7] = { 6, 5, 4, 3, 2, 1, 1 };
   const char tc3[3] = { 6, 4, 2 };
@@ -1446,23 +1544,63 @@ inline void LoopFilter::xBilinearFilter(Pel* srcP, Pel* srcQ, int offset, int re
   const char *tcP = (numberPSide == 3) ? tc3 : tc7;
   const char *tcQ = (numberQSide == 3) ? tc3 : tc7;
 
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR  
+  Pel dd[DEBLOCK_DIFFP_SIZE];
+  Pel *diffP = nullptr;
+  if (m_applyAsymmetricDB)
+  {
+    diffP = &dd[DEBLOCK_DIFFP_SIZE>>1];
+    memset(dd, 0, sizeof(dd));
+  }
+#endif
+  
   for (int pos = 0; pos < numberPSide; pos++)
   {
     int src    = srcP[-offset * pos];
     int cvalue = (tc * tcP[pos]) >> 1;
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+    if (m_applyAsymmetricDB)
+    {
+      diffP[-offset * pos] = Clip3(-cvalue, cvalue, ((refMiddle * dbCoeffsP[pos] + refP * (64 - dbCoeffsP[pos]) + 32) >> 6) - src);
+      srcP[-offset * pos]  = src;
+    }
+    else 
+    {
+      srcP[-offset * pos] =
+        Clip3(src - cvalue, src + cvalue, ((refMiddle * dbCoeffsP[pos] + refP * (64 - dbCoeffsP[pos]) + 32) >> 6));
+    }
+#else
     srcP[-offset * pos] =
       Clip3(src - cvalue, src + cvalue, ((refMiddle * dbCoeffsP[pos] + refP * (64 - dbCoeffsP[pos]) + 32) >> 6));
+#endif
   }
+
   for (int pos = 0; pos < numberQSide; pos++)
   {
     int src    = srcQ[offset * pos];
     int cvalue = (tc * tcQ[pos]) >> 1;
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+    if (m_applyAsymmetricDB)
+    {
+      srcQ[offset * pos] = ClipPel(Clip3(src - cvalue, src + cvalue, (((refMiddle * dbCoeffsQ[pos] + refQ * (64 - dbCoeffsQ[pos]) + 32) >> 6) - diffP[-offset * pos])), clpRng);
+    }
+    else
+    {
+      srcQ[offset * pos] =
+        Clip3(src - cvalue, src + cvalue, ((refMiddle * dbCoeffsQ[pos] + refQ * (64 - dbCoeffsQ[pos]) + 32) >> 6));
+    }
+#else
     srcQ[offset * pos] =
       Clip3(src - cvalue, src + cvalue, ((refMiddle * dbCoeffsQ[pos] + refQ * (64 - dbCoeffsQ[pos]) + 32) >> 6));
+#endif
   }
 }
 
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+inline void LoopFilter::xFilteringPandQ(Pel* src, int offset, int numberPSide, int numberQSide, int tc, const ClpRng& clpRng) const
+#else
 inline void LoopFilter::xFilteringPandQ(Pel* src, int offset, int numberPSide, int numberQSide, int tc) const
+#endif
 {
   CHECK(numberPSide <= 3 && numberQSide <= 3, "Short filtering in long filtering function");
   Pel* srcP = src-offset;
@@ -1533,7 +1671,11 @@ inline void LoopFilter::xFilteringPandQ(Pel* src, int offset, int numberPSide, i
       refMiddle = (srcP[0] + srcQ[0] + srcP[-offset] + srcQ[offset] + srcP[-2 * offset] + srcQ[2 * offset] + srcP[-3 * offset] + srcQ[3 * offset] + 4) >> 3;
     }
   }
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR    
+  xBilinearFilter(srcP, srcQ, offset, refMiddle, refP, refQ, numberPSide, numberQSide, dbCoeffsP, dbCoeffsQ, tc, clpRng);
+#else
   xBilinearFilter(srcP,srcQ,offset,refMiddle,refP,refQ,numberPSide,numberQSide,dbCoeffsP,dbCoeffsQ,tc);
+#endif
 }
 
 inline void LoopFilter::xPelFilterLuma(Pel* piSrc, const int iOffset, const int tc, const bool sw, const bool bPartPNoFilter, const bool bPartQNoFilter, const int iThrCut, const bool bFilterSecondP, const bool bFilterSecondQ, const ClpRng& clpRng, bool sidePisLarge, bool sideQisLarge, int maxFilterLengthP, int maxFilterLengthQ) const
@@ -1556,20 +1698,57 @@ inline void LoopFilter::xPelFilterLuma(Pel* piSrc, const int iOffset, const int 
   const Pel m9  = piSrc[ iOffset * 5];
   const Pel m10 = piSrc[ iOffset * 6];
   const char tc3[3] = { 3, 2, 1};
+
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  Pel dd[DEBLOCK_DIFFP_SIZE];
+  Pel *diffP = nullptr;
+  if (m_applyAsymmetricDB)
+  {
+    diffP = &dd[DEBLOCK_DIFFP_SIZE>>1];
+    memset(dd, 0, sizeof(dd));
+  }
+#endif
+
   if (sw)
   {
     if (sidePisLarge || sideQisLarge)
     {
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR      
+      xFilteringPandQ(piSrc, iOffset, sidePisLarge ? maxFilterLengthP : 3, sideQisLarge ? maxFilterLengthQ : 3, tc, clpRng);
+#else
       xFilteringPandQ(piSrc, iOffset, sidePisLarge ? maxFilterLengthP : 3, sideQisLarge ? maxFilterLengthQ : 3, tc);
+#endif
     }
     else
     {
-      piSrc[-iOffset]     = Clip3(m3 - tc3[0] * tc, m3 + tc3[0] * tc, ((m1 + 2 * m2 + 2 * m3 + 2 * m4 + m5 + 4) >> 3));
-      piSrc[0]            = Clip3(m4 - tc3[0] * tc, m4 + tc3[0] * tc, ((m2 + 2 * m3 + 2 * m4 + 2 * m5 + m6 + 4) >> 3));
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+      if (m_applyAsymmetricDB)
+      {        
+        diffP[-iOffset * 1] = Clip3(-tc3[0] * tc, tc3[0] * tc, ((m1 + 2 * m2 + 2 * m3 + 2 * m4 + m5 + 4) >> 3) - m3); // p0' - p0
+        diffP[-iOffset * 2] = Clip3(-tc3[1] * tc, tc3[1] * tc, ((m1 + m2 + m3 + m4 + 2) >> 2) - m2);                  // p1' - p1
+        diffP[-iOffset * 3] = Clip3(-tc3[2] * tc, tc3[2] * tc, ((2 * m0 + 3 * m1 + m2 + m3 + m4 + 4) >> 3) - m1);     // p2' - p2
+
+        piSrc[iOffset * 0] = ClipPel(Clip3(m4 - tc3[0] * tc, m4 + tc3[0] * tc, ((m2 + 2 * m3 + 2 * m4 + 2 * m5 + m6 + 4) >> 3) - diffP[-iOffset * 1]), clpRng); // q0
+        piSrc[iOffset * 1] = ClipPel(Clip3(m5 - tc3[1] * tc, m5 + tc3[1] * tc, ((m3 + m4 + m5 + m6 + 2) >> 2)                  - diffP[-iOffset * 2]), clpRng); // q1
+        piSrc[iOffset * 2] = ClipPel(Clip3(m6 - tc3[2] * tc, m6 + tc3[2] * tc, ((m3 + m4 + m5 + 3 * m6 + 2 * m7 + 4) >> 3)     - diffP[-iOffset * 3]), clpRng); // q2          
+      }
+      else
+      {
+        piSrc[-iOffset]     = Clip3(m3 - tc3[0] * tc, m3 + tc3[0] * tc, ((m1 + 2 * m2 + 2 * m3 + 2 * m4 + m5 + 4) >> 3));
+        piSrc[0]            = Clip3(m4 - tc3[0] * tc, m4 + tc3[0] * tc, ((m2 + 2 * m3 + 2 * m4 + 2 * m5 + m6 + 4) >> 3));
+        piSrc[-iOffset * 2] = Clip3(m2 - tc3[1] * tc, m2 + tc3[1] * tc, ((m1 + m2 + m3 + m4 + 2) >> 2));
+        piSrc[iOffset]      = Clip3(m5 - tc3[1] * tc, m5 + tc3[1] * tc, ((m3 + m4 + m5 + m6 + 2) >> 2));
+        piSrc[-iOffset * 3] = Clip3(m1 - tc3[2] * tc, m1 + tc3[2] * tc, ((2 * m0 + 3 * m1 + m2 + m3 + m4 + 4) >> 3));
+        piSrc[iOffset * 2]  = Clip3(m6 - tc3[2] * tc, m6 + tc3[2] * tc, ((m3 + m4 + m5 + 3 * m6 + 2 * m7 + 4) >> 3));
+      }
+#else
+      piSrc[-iOffset] = Clip3(m3 - tc3[0] * tc, m3 + tc3[0] * tc, ((m1 + 2 * m2 + 2 * m3 + 2 * m4 + m5 + 4) >> 3));
+      piSrc[0] = Clip3(m4 - tc3[0] * tc, m4 + tc3[0] * tc, ((m2 + 2 * m3 + 2 * m4 + 2 * m5 + m6 + 4) >> 3));
       piSrc[-iOffset * 2] = Clip3(m2 - tc3[1] * tc, m2 + tc3[1] * tc, ((m1 + m2 + m3 + m4 + 2) >> 2));
-      piSrc[iOffset]      = Clip3(m5 - tc3[1] * tc, m5 + tc3[1] * tc, ((m3 + m4 + m5 + m6 + 2) >> 2));
+      piSrc[iOffset] = Clip3(m5 - tc3[1] * tc, m5 + tc3[1] * tc, ((m3 + m4 + m5 + m6 + 2) >> 2));
       piSrc[-iOffset * 3] = Clip3(m1 - tc3[2] * tc, m1 + tc3[2] * tc, ((2 * m0 + 3 * m1 + m2 + m3 + m4 + 4) >> 3));
-      piSrc[iOffset * 2]  = Clip3(m6 - tc3[2] * tc, m6 + tc3[2] * tc, ((m3 + m4 + m5 + 3 * m6 + 2 * m7 + 4) >> 3));
+      piSrc[iOffset * 2] = Clip3(m6 - tc3[2] * tc, m6 + tc3[2] * tc, ((m3 + m4 + m5 + 3 * m6 + 2 * m7 + 4) >> 3));
+#endif      
     }
   }
   else
@@ -1580,48 +1759,147 @@ inline void LoopFilter::xPelFilterLuma(Pel* piSrc, const int iOffset, const int 
     if ( abs(delta) < iThrCut )
     {
       delta = Clip3( -tc, tc, delta );
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+      if (m_applyAsymmetricDB)
+      {       
+        piSrc[-iOffset] = m3;
+        diffP[-iOffset] = delta;              // (p0' - p0)
+        piSrc[0]        = ClipPel(m4 - delta - diffP[-iOffset], clpRng); // q0" = q0' - (p0' - p0)
+      }
+      else
+      {
+        piSrc[-iOffset] = ClipPel( m3 + delta, clpRng);
+        piSrc[0]        = ClipPel( m4 - delta, clpRng);
+      }
+#else
       piSrc[-iOffset] = ClipPel( m3 + delta, clpRng);
-      piSrc[0]        = ClipPel( m4 - delta, clpRng);
-
+      piSrc[0] = ClipPel(m4 - delta, clpRng);
+#endif
+      
       const int tc2 = tc >> 1;
       if( bFilterSecondP )
       {
         const int delta1 = Clip3( -tc2, tc2, ( ( ( ( m1 + m3 + 1 ) >> 1 ) - m2 + delta ) >> 1 ) );
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+        if (m_applyAsymmetricDB)
+        {          
+          diffP[-iOffset * 2] = delta1; // (p1' - p1)
+          piSrc[-iOffset * 2] = m2;
+        }
+        else
+        {
+          piSrc[-iOffset * 2] = ClipPel(m2 + delta1, clpRng); // q1
+        }
+#else
         piSrc[-iOffset * 2] = ClipPel( m2 + delta1, clpRng);
+#endif
       }
       if( bFilterSecondQ )
       {
         const int delta2 = Clip3( -tc2, tc2, ( ( ( ( m6 + m4 + 1 ) >> 1 ) - m5 - delta ) >> 1 ) );
-        piSrc[iOffset] = ClipPel( m5 + delta2, clpRng);
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+        if (m_applyAsymmetricDB)
+        {
+          piSrc[iOffset * 1] = ClipPel(m5 + delta2 - diffP[-iOffset * 2], clpRng);
+        }
+        else
+        {
+          piSrc[iOffset * 1] = ClipPel(m5 + delta2, clpRng);
+        }
+#else
+        piSrc[iOffset * 1] = ClipPel( m5 + delta2, clpRng);
+#endif        
       }
     }
   }
 
-  if(bPartPNoFilter)
-  {
-    piSrc[-iOffset    ] = m3;
+  if (bPartPNoFilter)
+  {    
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+    if (m_applyAsymmetricDB)
+    {
+      diffP[-iOffset * 1] = 0; // (p0' - p0)
+      diffP[-iOffset * 2] = 0; // (p1' - p1)
+      diffP[-iOffset * 3] = 0; // (p2' - p2)
+    }    
+
+    piSrc[-iOffset * 1] = m3;
+    piSrc[-iOffset * 2] = m2;
+    piSrc[-iOffset * 3] = m1;    
+#else
+    piSrc[-iOffset] = m3;
     piSrc[-iOffset * 2] = m2;
     piSrc[-iOffset * 3] = m1;
+#endif
+
     if (sidePisLarge)
-    {
+    {      
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+      if (m_applyAsymmetricDB)
+      {
+        diffP[-iOffset * 4] = 0; // (p3' - p3)
+        diffP[-iOffset * 5] = 0; // (p4' - p4)
+        diffP[-iOffset * 6] = 0; // (p5' - p5)
+        diffP[-iOffset * 7] = 0; // (p6' - p6)
+      }    
+
+      piSrc[-iOffset * 4] = m0;
+      piSrc[-iOffset * 5] = mP1;
+      piSrc[-iOffset * 6] = mP2;
+      piSrc[-iOffset * 7] = mP3;    
+#else
       piSrc[-iOffset * 4] = m0;
       piSrc[-iOffset * 5] = mP1;
       piSrc[-iOffset * 6] = mP2;
       piSrc[-iOffset * 7] = mP3;
+#endif
     }
   }
 
   if(bPartQNoFilter)
-  {
+  {  
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+    if (m_applyAsymmetricDB)
+    {
+      piSrc[iOffset * 0] = ClipPel(m4 - diffP[-iOffset * 1], clpRng);
+      piSrc[iOffset * 1] = ClipPel(m5 - diffP[-iOffset * 2], clpRng);
+      piSrc[iOffset * 2] = ClipPel(m6 - diffP[-iOffset * 3], clpRng);
+    }
+    else
+    {
+      piSrc[iOffset * 0] = m4;
+      piSrc[iOffset * 1] = m5;
+      piSrc[iOffset * 2] = m6;
+    }
+#else
     piSrc[ 0          ] = m4;
     piSrc[ iOffset    ] = m5;
     piSrc[ iOffset * 2] = m6;
+#endif
+
     if (sideQisLarge)
     {
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+      if (m_applyAsymmetricDB)
+      {
+        piSrc[iOffset * 3] = ClipPel(m7  - diffP[-iOffset * 4], clpRng);
+        piSrc[iOffset * 4] = ClipPel(m8  - diffP[-iOffset * 5], clpRng);
+        piSrc[iOffset * 5] = ClipPel(m9  - diffP[-iOffset * 6], clpRng);
+        piSrc[iOffset * 6] = ClipPel(m10 - diffP[-iOffset * 7], clpRng);
+      }
+      else
+      {
+        piSrc[iOffset * 3] = m7;
+        piSrc[iOffset * 4] = m8;
+        piSrc[iOffset * 5] = m9;
+        piSrc[iOffset * 6] = m10;
+      }
+#else
       piSrc[iOffset * 3] = m7;
       piSrc[iOffset * 4] = m8;
       piSrc[iOffset * 5] = m9;
       piSrc[iOffset * 6] = m10;
+#endif
     }
   }
 }
@@ -1649,6 +1927,16 @@ inline void LoopFilter::xPelFilterChroma(Pel* piSrc, const int iOffset, const in
   const Pel m6 = piSrc[iOffset * 2];
   const Pel m7 = piSrc[iOffset * 3];
 
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  Pel dd[DEBLOCK_DIFFP_SIZE];
+  Pel *diffP = nullptr;
+  if (m_applyAsymmetricDB)
+  {
+    diffP = &dd[DEBLOCK_DIFFP_SIZE>>1];
+    memset(dd, 0, sizeof(dd));
+  }
+#endif
+
   if (sw)
   {
     if (isChromaHorCTBBoundary)
@@ -1660,39 +1948,135 @@ inline void LoopFilter::xPelFilterChroma(Pel* piSrc, const int iOffset, const in
     }
     else
     {
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+      if (m_applyAsymmetricDB)
+      {
+        diffP[-iOffset * 3] = Clip3(-tc, tc, ((3 * m0 + 2 * m1 + m2 + m3 + m4 + 4) >> 3)       - m1); // (p'2 - p2)
+        diffP[-iOffset * 2] = Clip3(-tc, tc, ((2 * m0 + m1 + 2 * m2 + m3 + m4 + m5 + 4) >> 3)  - m2); // (p'1 - p1)
+        diffP[-iOffset * 1] = Clip3(-tc, tc, ((m0 + m1 + m2 + 2 * m3 + m4 + m5 + m6 + 4) >> 3) - m3); // (p'0 - p0)
+
+        piSrc[-iOffset * 3] = m1;
+        piSrc[-iOffset * 2] = m2;
+        piSrc[-iOffset * 1] = m3;
+
+        piSrc[iOffset * 0] = ClipPel(Clip3(m4 - tc, m4 + tc, ((m1 + m2 + m3 + 2 * m4 + m5 + m6 + m7 + 4) >> 3) - diffP[-iOffset * 1]), clpRng); // q0
+        piSrc[iOffset * 1] = ClipPel(Clip3(m5 - tc, m5 + tc, ((m2 + m3 + m4 + 2 * m5 + m6 + 2 * m7 + 4) >> 3)  - diffP[-iOffset * 2]), clpRng); // q1
+        piSrc[iOffset * 2] = ClipPel(Clip3(m6 - tc, m6 + tc, ((m3 + m4 + m5 + 2 * m6 + 3 * m7 + 4) >> 3)       - diffP[-iOffset * 3]), clpRng); // q2
+      }
+      else
+      {
+        piSrc[-iOffset * 3] = Clip3(m1 - tc, m1 + tc, ((3 * m0 + 2 * m1 + m2 + m3 + m4 + 4) >> 3));       // p2
+        piSrc[-iOffset * 2] = Clip3(m2 - tc, m2 + tc, ((2 * m0 + m1 + 2 * m2 + m3 + m4 + m5 + 4) >> 3));  // p1
+        piSrc[-iOffset * 1] = Clip3(m3 - tc, m3 + tc, ((m0 + m1 + m2 + 2 * m3 + m4 + m5 + m6 + 4) >> 3)); // p0
+
+        piSrc[ iOffset * 0] = Clip3(m4 - tc, m4 + tc, ((m1 + m2 + m3 + 2 * m4 + m5 + m6 + m7 + 4) >> 3)); // q0
+        piSrc[ iOffset * 1] = Clip3(m5 - tc, m5 + tc, ((m2 + m3 + m4 + 2 * m5 + m6 + 2 * m7 + 4) >> 3));  // q1
+        piSrc[ iOffset * 2] = Clip3(m6 - tc, m6 + tc, ((m3 + m4 + m5 + 2 * m6 + 3 * m7 + 4) >> 3));       // q2
+      }
+#else
       piSrc[-iOffset * 3] = Clip3(m1 - tc, m1 + tc, ((3 * m0 + 2 * m1 + m2 + m3 + m4 + 4) >> 3));       // p2
       piSrc[-iOffset * 2] = Clip3(m2 - tc, m2 + tc, ((2 * m0 + m1 + 2 * m2 + m3 + m4 + m5 + 4) >> 3));  // p1
       piSrc[-iOffset * 1] = Clip3(m3 - tc, m3 + tc, ((m0 + m1 + m2 + 2 * m3 + m4 + m5 + m6 + 4) >> 3)); // p0
       piSrc[0] = Clip3(m4 - tc, m4 + tc, ((m1 + m2 + m3 + 2 * m4 + m5 + m6 + m7 + 4) >> 3)); // q0
       piSrc[iOffset * 1] = Clip3(m5 - tc, m5 + tc, ((m2 + m3 + m4 + 2 * m5 + m6 + 2 * m7 + 4) >> 3));  // q1
       piSrc[iOffset * 2] = Clip3(m6 - tc, m6 + tc, ((m3 + m4 + m5 + 2 * m6 + 3 * m7 + 4) >> 3));       // q2
+#endif    
     }
   }
   else
   {
     delta           = Clip3(-tc, tc, ((((m4 - m3) << 2) + m2 - m5 + 4) >> 3));
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+    if (m_applyAsymmetricDB)
+    {
+      diffP[-iOffset] = delta;
+      piSrc[-iOffset] = m3;
+    }
+    else
+    {
+      piSrc[-iOffset] = ClipPel(m3 + delta, clpRng);
+    }
+#else
     piSrc[-iOffset] = ClipPel(m3 + delta, clpRng);
-    piSrc[0]        = ClipPel(m4 - delta, clpRng);
+#endif
+    
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+    if (m_applyAsymmetricDB)
+    {
+      piSrc[0] = ClipPel(m4 - delta - diffP[-iOffset], clpRng); // q'0 = q0 - (p0' - p0)
+    }
+    else
+    {
+      piSrc[0] = ClipPel(m4 - delta, clpRng);
+    }
+#else
+    piSrc[0] = ClipPel(m4 - delta, clpRng);
+#endif
   }
-
 
   if( bPartPNoFilter )
   {
     if (largeBoundary)
-    {
+    {      
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+      if (m_applyAsymmetricDB)
+      {
+        diffP[-iOffset * 3] = 0; // (p2' - p2)
+        diffP[-iOffset * 2] = 0; // (p1' - p1)
+      }
+      
+      piSrc[-iOffset * 3] = m1; // p2
+      piSrc[-iOffset * 2] = m2; // p1      
+#else
       piSrc[-iOffset * 3] = m1; // p2
       piSrc[-iOffset * 2] = m2; // p1
+#endif
     }
+    
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+    if (m_applyAsymmetricDB)
+    {
+      diffP[-iOffset * 1] = 0;
+    }    
+    piSrc[-iOffset] = m3;    
+#else
     piSrc[-iOffset] = m3;
+#endif
   }
+
   if( bPartQNoFilter )
   {
     if (largeBoundary)
     {
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+      if (m_applyAsymmetricDB)
+      {
+        piSrc[iOffset * 1] = ClipPel(m5 - diffP[-iOffset * 2], clpRng); // q1' = q1 - (p1' - p1)
+        piSrc[iOffset * 2] = ClipPel(m6 - diffP[-iOffset * 3], clpRng); // q2  = q2 - (p2' - p2)
+      }
+      else
+      {
+        piSrc[iOffset * 1] = m5; // q1
+        piSrc[iOffset * 2] = m6; // q2
+      }
+#else
       piSrc[iOffset * 1] = m5; // q1
       piSrc[iOffset * 2] = m6; // q2
+#endif
     }
-    piSrc[ 0      ] = m4;
+   
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+    if (m_applyAsymmetricDB)
+    {
+      piSrc[0] = ClipPel(m4 - diffP[-iOffset * 1], clpRng); // q'0 = q0 - (p0' - p0)
+    }
+    else
+    {
+      piSrc[0] = m4; // q0
+    }
+#else
+    piSrc[0] = m4; // q0
+#endif
   }
 }
 

@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1046,7 +1046,7 @@ const CtxSet ContextSetCfg::GeoMmvdStepMvpIdx = ContextSetCfg::addCtxSet
   });
 #endif
 
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 const CtxSet ContextSetCfg::GeoBldFlag = ContextSetCfg::addCtxSet
 ({
   { 59,  59,  59,  59 },
@@ -1404,6 +1404,19 @@ const CtxSet ContextSetCfg::IntraLumaMPMIdx = ContextSetCfg::addCtxSet
 
 const CtxSet ContextSetCfg::IntraLumaPlanarFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+  {   6,   6,  CNU,  CNU, },
+  {   6,  28,  CNU,  CNU, },
+  {  23,  21,  CNU,  CNU, },
+  {   1,   2,  DWS,  DWS, },
+  {   1,   2,  DWS,  DWS, },
+  {   1,   6,  DWS,  DWS, },
+  {  18,  18,  DWE,  DWE, },
+  {  18,  18,  DWE,  DWE, },
+  {  11,  25,  DWE,  DWE, },
+  { 125, 116,  DWO,  DWO, },
+  { 116, 117,  DWO,  DWO, },
+#else
   {   6,   6, },
   {   6,  28, },
   {  23,  21, },
@@ -1415,6 +1428,7 @@ const CtxSet ContextSetCfg::IntraLumaPlanarFlag = ContextSetCfg::addCtxSet
   {  11,  25, },
   { 125, 116, },
   { 116, 117, },
+#endif
   });
 
 const CtxSet ContextSetCfg::CclmModeFlag = ContextSetCfg::addCtxSet
@@ -1481,6 +1495,23 @@ const CtxSet ContextSetCfg::DimdChromaMode = ContextSetCfg::addCtxSet
 #endif
 
 const CtxSet ContextSetCfg::ChromaFusionMode = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+#endif
+
+#if JVET_AC0071_DBV
+const CtxSet ContextSetCfg::DbvChromaMode = ContextSetCfg::addCtxSet
 ({
   { CNU, },
   { CNU, },
@@ -1670,6 +1701,23 @@ const CtxSet ContextSetCfg::rribcFlipType = ContextSetCfg::addCtxSet
   });
 #endif
 
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+const CtxSet ContextSetCfg::bvOneZeroComp = ContextSetCfg::addCtxSet
+({
+  {  48,  50,  50,  50, },
+  {  56,  50,  43,  28, },
+  { CNU, CNU, CNU, CNU, },
+  {   5,   5,   9,   5, },
+  {   5,   5,   5,   5, },
+  { DWS, DWS, DWS, DWS, },
+  {  18,  18,  25,  18, },
+  {  18,  18,  11,  18, },
+  { DWE, DWE, DWE, DWE, },
+  { 126, 126, 181, 126, },
+  { 117, 117, 110, 116, },
+  });
+#endif
+
 const CtxSet ContextSetCfg::AffineFlag = ContextSetCfg::addCtxSet
 ({
   {  19,   6,   7, },
@@ -1796,7 +1844,25 @@ const CtxSet ContextSetCfg::Bvd = ContextSetCfg::addCtxSet
 });
 #endif
 
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AC0104_IBC_BVD_PREDICTION
+const CtxSet ContextSetCfg::MvsdIdxBVDMSB = ContextSetCfg::addCtxSet
+({
+  {  34,  41,  49,  41,  34,  41,  49,  41,  34,  41,  49,  41, 34,   41,  49,  41, },
+  {  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41, 34,   41,  34,  41, },
+  { CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, },
+  {  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12, 13,   13,  12,  12, },
+  {  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12, 13,   13,  12,  12, },
+  { DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, },
+  {   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4, },
+  {   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4, },
+  { DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, },
+  { 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, },
+  { 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, },
+  });
+#endif
+
+
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
 const CtxSet ContextSetCfg::MvsdIdx = ContextSetCfg::addCtxSet
 ({
   {  34,  41,  49,  41, },
@@ -2863,6 +2929,117 @@ const CtxSet ContextSetCfg::IBCFlag = ContextSetCfg::addCtxSet
   { 147, 117, 146, },
   });
 
+#if JVET_AC0112_IBC_CIIP
+const CtxSet ContextSetCfg::IbcCiipFlag = ContextSetCfg::addCtxSet
+({
+  {  CNU, CNU, CNU, },
+  {  CNU, CNU, CNU, },
+  {  CNU, CNU, CNU, },
+  {  DWS, DWS, DWS, },
+  {  DWS, DWS, DWS, },
+  {  DWS, DWS, DWS, },
+  {  DWE, DWE, DWE, },
+  {  DWE, DWE, DWE, },
+  {  DWE, DWE, DWE, },
+  {  DWO, DWO, DWO, },
+  {  DWO, DWO, DWO, },
+  });
+
+const CtxSet ContextSetCfg::IbcCiipIntraIdx = ContextSetCfg::addCtxSet
+({
+  {  CNU, },
+  {  CNU, },
+  {  CNU, },
+  {  DWS, },
+  {  DWS, },
+  {  DWS, },
+  {  DWE, },
+  {  DWE, },
+  {  DWE, },
+  {  DWO, },
+  {  DWO, },
+  });
+#endif
+
+#if JVET_AC0112_IBC_GPM
+const CtxSet ContextSetCfg::IbcGpmFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+
+const CtxSet ContextSetCfg::IbcGpmIntraFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+
+const CtxSet ContextSetCfg::IbcGpmSplitDirSetFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+
+const CtxSet ContextSetCfg::IbcGpmBldIdx = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU },
+  { DWS, DWS, DWS, DWS },
+  { DWS, DWS, DWS, DWS },
+  { DWS, DWS, DWS, DWS },
+  { DWE, DWE, DWE, DWE },
+  { DWE, DWE, DWE, DWE },
+  { DWE, DWE, DWE, DWE },
+  { DWO, DWO, DWO, DWO },
+  { DWO, DWO, DWO, DWO },
+});
+#endif
+
+#if JVET_AC0112_IBC_LIC
+const CtxSet ContextSetCfg::IbcLicFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+#endif
+
 const CtxSet ContextSetCfg::JointCbCrFlag = ContextSetCfg::addCtxSet
 ({
   {  34,  28,  52, },
@@ -3039,6 +3216,31 @@ const CtxSet ContextSetCfg::GlmFlags = ContextSetCfg::addCtxSet
 #if JVET_AA0057_CCCM
 const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING && JVET_AC0054_GLCCCM
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+  { DWE, DWE, DWE, },
+  { DWE, DWE, DWE, },
+  { DWE, DWE, DWE, },
+  { DWO, DWO, DWO, },
+  { DWO, DWO, DWO, },
+#elif JVET_AC0147_CCCM_NO_SUBSAMPLING || JVET_AC0054_GLCCCM
+  { CNU, CNU, },
+  { CNU, CNU, },
+  { CNU, CNU, },
+  { DWS, DWS, },
+  { DWS, DWS, },
+  { DWS, DWS, },
+  { DWE, DWE, },
+  { DWE, DWE, },
+  { DWE, DWE, },
+  { DWO, DWO, },
+  { DWO, DWO, },
+#else
   { CNU, },
   { CNU, },
   { CNU, },
@@ -3050,7 +3252,39 @@ const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
   { DWE, },
   { DWO, },
   { DWO, },
+#endif
 });
+#endif
+
+#if JVET_AC0119_LM_CHROMA_FUSION
+const CtxSet ContextSetCfg::ChromaFusionType = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+const CtxSet ContextSetCfg::ChromaFusionCclm = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
 #endif
 
 #if JVET_AB0157_TMRL
@@ -3276,7 +3510,7 @@ const CtxSet ContextSetCfg::GeoMmvdStepMvpIdx = ContextSetCfg::addCtxSet
   });
 #endif
 
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 const CtxSet ContextSetCfg::GeoBldFlag = ContextSetCfg::addCtxSet
 ({
   { 59 },
@@ -3577,6 +3811,18 @@ const CtxSet ContextSetCfg::ChromaFusionMode = ContextSetCfg::addCtxSet
   } );
 #endif
 
+#if JVET_AC0071_DBV
+const CtxSet ContextSetCfg::DbvChromaMode = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  });
+#endif
+
 const CtxSet ContextSetCfg::MipFlag = ContextSetCfg::addCtxSet
 ({
 	{ 56, 57, 50, 33 },
@@ -3769,7 +4015,7 @@ const CtxSet ContextSetCfg::Bvd = ContextSetCfg::addCtxSet
 });
 #endif
 
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
 const CtxSet ContextSetCfg::MvsdIdx = ContextSetCfg::addCtxSet
 ({
   { 34, 34, 34, 34,},
@@ -4668,13 +4914,50 @@ const CtxSet ContextSetCfg::GlmFlags = ContextSetCfg::addCtxSet
 #if JVET_AA0057_CCCM
 const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING && JVET_AC0054_GLCCCM
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+#elif JVET_AC0147_CCCM_NO_SUBSAMPLING || JVET_AC0054_GLCCCM
+  { CNU, CNU, },
+  { CNU, CNU, },
+  { CNU, CNU, },
+  { DWS, DWS, },
+  { DWS, DWS, },
+  { DWS, DWS, },   
+#else
   { CNU, },
   { CNU, },
   { CNU, },
   { DWS, },
   { DWS, },
   { DWS, },
+#endif
 });
+#endif
+
+#if JVET_AC0119_LM_CHROMA_FUSION
+const CtxSet ContextSetCfg::ChromaFusionType = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  });
+const CtxSet ContextSetCfg::ChromaFusionCclm = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  });
 #endif
 
 #else
@@ -5827,11 +6110,40 @@ const CtxSet ContextSetCfg::GlmFlags = ContextSetCfg::addCtxSet
 #if JVET_AA0057_CCCM
 const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING && JVET_AC0054_GLCCCM
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { DWS, DWS, DWS, },
+#elif JVET_AC0147_CCCM_NO_SUBSAMPLING || JVET_AC0054_GLCCCM
+  { CNU, CNU, },
+  { CNU, CNU, },
+  { CNU, CNU, },
+  { DWS, DWS, },
+#else
   { CNU, },
   { CNU, },
   { CNU, },
   { DWS, },
+#endif
 });
+#endif
+
+#if JVET_AC0119_LM_CHROMA_FUSION
+const CtxSet ContextSetCfg::ChromaFusionType = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  });
+const CtxSet ContextSetCfg::ChromaFusionCclm = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  });
 #endif
 
 #endif

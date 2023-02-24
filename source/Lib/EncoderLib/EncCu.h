@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -302,8 +302,8 @@ private:
   PelStorage            m_ciipBuffer[2];
 
 #if JVET_Y0065_GPM_INTRA
-#if JVET_AA0058_GPM_ADP_BLD
-  PelStorage            m_acGeoWeightedBuffer[GEO_MAX_TRY_WEIGHTED_SAD*GEO_NUM_BLD+1]; // to store weighted prediction pixels
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+  PelStorage            m_acGeoWeightedBuffer[GEO_MAX_TRY_WEIGHTED_SAD*GEO_BLENDING_NUM+1]; // to store weighted prediction pixels
 #else
   PelStorage            m_acGeoWeightedBuffer[GEO_MAX_TRY_WEIGHTED_SAD+1]; // to store weighted prediction pixles
 #endif
@@ -327,7 +327,11 @@ private:
 #endif
   double                m_AFFBestSATDCost;
   double                m_mergeBestSATDCost;
-  MotionInfo            m_SubPuMiBuf      [( MAX_CU_SIZE * MAX_CU_SIZE ) >> ( MIN_CU_LOG2 << 1 )];
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+  MotionInfo            m_subPuMiBuf[SUB_TMVP_NUM][(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#else
+  MotionInfo            m_subPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#endif
 #if MULTI_PASS_DMVR
   Mv                    m_mvBufBDMVR[(MRG_MAX_NUM_CANDS << 1)][MAX_NUM_SUBCU_DMVR];
 #if TM_MRG
@@ -337,7 +341,7 @@ private:
   Mv                    m_mvBufBDMVR4TM[(TM_MRG_MAX_NUM_CANDS << 1)][MAX_NUM_SUBCU_DMVR];
 #endif
 #endif
-#if JVET_AB0112_AFFINE_DMVR
+#if JVET_AB0112_AFFINE_DMVR && !JVET_AC0144_AFFINE_DMVR_REGRESSION
   Mv                    m_mvBufBDMVR4AFFINE[(AFFINE_MRG_MAX_NUM_CANDS << 1)][MAX_NUM_SUBCU_DMVR];
 #endif
   Mv                    m_mvBufEncBDOF[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];

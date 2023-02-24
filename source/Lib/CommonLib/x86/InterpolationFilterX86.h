@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -104,13 +104,20 @@ static void fullPelCopySSE( const ClpRng& clpRng, const void*_src, int srcStride
           vsrc = _mm_lddqu_si128( ( __m128i const * )&src[col+i] );
         }
 #if MCIF_SIMD_NEW
-        if ((isFirst == isLast) || biMCForDMVR)
+        if (biMCForDMVR)
+        {
+          vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
+        }
+        else if (isFirst == isLast)
+        {
+          vsum = vsrc;
+        }
 #else
         if (isFirst == isLast)
-#endif
         {
-          vsum =  _mm_min_epi16( vibdimax, _mm_max_epi16( vibdimin, vsrc ) );
+          vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
         }
+#endif
         else if( isFirst )
         {
           vsrc = _mm_slli_epi16( vsrc, headroom );
@@ -167,13 +174,13 @@ static void fullPelCopyVerSSE(const ClpRng& clpRng, const void*_src, int srcStri
           vsrc = _mm_set_epi16(src[col + (7 + i) * srcStride], src[col + (6 + i) * srcStride], src[col + (5 + i) * srcStride], src[col + (4 + i) * srcStride]
             , src[col + (3 + i) * srcStride], src[col + (2 + i) * srcStride], src[col + (1 + i) * srcStride], src[col + i * srcStride]);
         }
-#if FILTER_COPY_SIMD
-        if ((isFirst == isLast) || biMCForDMVR)
-#else
-        if (isFirst == isLast)
-#endif
+        if (biMCForDMVR)
         {
           vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
+        }
+        else if (isFirst == isLast)
+        {
+          vsum = vsrc;
         }
         else if (isFirst)
         {
@@ -234,9 +241,13 @@ static void fullPelCopySSE_M4(const ClpRng& clpRng, const void*_src, ptrdiff_t s
       {
         vsrc = _mm_loadl_epi64((__m128i const *)&src[col]);
       }
-      if ((isFirst == isLast) || biMCForDMVR)
+      if (biMCForDMVR)
       {
         vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
+      }
+      else if (isFirst == isLast)
+      {
+        vsum = vsrc;
       }
       else if (isFirst)
       {
@@ -288,9 +299,13 @@ static void fullPelCopyVerSSE_M4(const ClpRng& clpRng, const void*_src, ptrdiff_
         vsrc = _mm_set_epi16(0, 0, 0, 0
           , src[col + (row + 3) * srcStride], src[col + (row + 2) * srcStride], src[col + (row + 1) * srcStride], src[col + row * srcStride]);
       }
-      if ((isFirst == isLast) || biMCForDMVR)
+      if (biMCForDMVR)
       {
         vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
+      }
+      else if (isFirst == isLast)
+      {
+        vsum = vsrc;
       }
       else if (isFirst)
       {
@@ -359,13 +374,20 @@ static void fullPelCopyAVX2( const ClpRng& clpRng, const void*_src, int srcStrid
           vsrc = _mm256_lddqu_si256( ( const __m256i * )&src[col+i] );
         }
 #if MCIF_SIMD_NEW
-        if ((isFirst == isLast) || biMCForDMVR)
+        if (biMCForDMVR)
+        {
+          vsum = _mm256_min_epi16(vibdimax, _mm256_max_epi16(vibdimin, vsrc));
+        }
+        else if (isFirst == isLast)
+        {
+          vsum = vsrc;
+        }
 #else
         if (isFirst == isLast)
-#endif
         {
-          vsum = _mm256_min_epi16( vibdimax, _mm256_max_epi16( vibdimin, vsrc ) );
+          vsum = _mm256_min_epi16(vibdimax, _mm256_max_epi16(vibdimin, vsrc));
         }
+#endif
         else if( isFirst )
         {
           vsrc = _mm256_slli_epi16( vsrc, headroom );
@@ -428,9 +450,13 @@ static void fullPelCopyVerAVX2(const ClpRng& clpRng, const void*_src, int srcStr
             , src[col + 7 * srcStride], src[col + 6 * srcStride], src[col + 5 * srcStride], src[col + 4 * srcStride]
             , src[col + 3 * srcStride], src[col + 2 * srcStride], src[col + 1 * srcStride], src[col]);
         }
-        if ((isFirst == isLast) || biMCForDMVR)
+        if (biMCForDMVR)
         {
           vsum = _mm256_min_epi16(vibdimax, _mm256_max_epi16(vibdimin, vsrc));
+        }
+        else if (isFirst == isLast)
+        {
+          vsum = vsrc;
         }
         else if (isFirst)
         {
@@ -508,6 +534,219 @@ static void simdFilterCopy( const ClpRng& clpRng, const Pel* src, int srcStride,
 #endif
 }
 
+#if JVET_AC0104_IBC_BVD_PREDICTION
+// ============================================
+// Full-pel copy 8-bit/16-bit with no clipping
+// ============================================
+
+template<typename Tsrc, int N>
+static void fullPelCopyWithNoClippingAVX2(const ClpRng& clpRng, const Pel* _src, int srcStride, int16_t* dst, int dstStride, int width, int height)
+{
+#ifdef USE_AVX2
+  Tsrc* src = (Tsrc*)_src;
+  __m256i vsum;
+
+
+  for (int row = 0; row < height; row++)
+  {
+    for (int col = 0; col < width; col += N)
+    {
+      _mm_prefetch((const char*)(src +                3 * srcStride), _MM_HINT_T0);
+      _mm_prefetch((const char*)(src + (width >> 1) + 3 * srcStride), _MM_HINT_T0);
+      _mm_prefetch((const char*)(src +  width - 1   + 3 * srcStride), _MM_HINT_T0);
+      for (int i = 0; i < N; i += 16)
+      {
+        vsum = (sizeof(Tsrc) == 1) ? _mm256_cvtepu8_epi16(_mm_loadu_si128((const __m128i*) & src[col + i]))
+                                   : _mm256_lddqu_si256((const __m256i*) & src[col + i]);
+#if JEM_UNALIGNED_DST
+        _mm256_storeu_si256((__m256i*) & dst[col + i], vsum);
+#else
+        _mm256_store_si256((__m256i*) & dst[col + i], vsum);
+#endif
+      }
+    }
+    src += srcStride;
+    dst += dstStride;
+  }
+#endif
+}
+
+template<typename Tsrc, int N>
+static void fullPelCopyWithNoClippingVerAVX2(const ClpRng& clpRng, const Pel* _src, int srcStride, int16_t* dst, int dstStride, int width, int height)
+{
+#ifdef USE_AVX2
+  Tsrc* src = (Tsrc*)_src;
+  short* dstinit = dst;
+  __m256i vsum;
+
+  for (int col = 0; col < width; col++)
+  {
+    src = (Tsrc*)_src;
+    dst = dstinit;
+    for (int row = 0; row < height; row += N)
+    {
+      _mm_prefetch((const char*)(src +                3 * srcStride), _MM_HINT_T0);
+      _mm_prefetch((const char*)(src + (width >> 1) + 3 * srcStride), _MM_HINT_T0);
+      _mm_prefetch((const char*)(src +  width - 1   + 3 * srcStride), _MM_HINT_T0);
+      {
+        vsum = _mm256_set_epi16(src[col + 15 * srcStride], src[col + 14 * srcStride], src[col + 13 * srcStride], src[col + 12 * srcStride]
+                              , src[col + 11 * srcStride], src[col + 10 * srcStride], src[col +  9 * srcStride], src[col +  8 * srcStride]
+                              , src[col +  7 * srcStride], src[col +  6 * srcStride], src[col +  5 * srcStride], src[col +  4 * srcStride]
+                              , src[col +  3 * srcStride], src[col +  2 * srcStride], src[col +  1 * srcStride], src[col]);
+
+        _mm256_storeu_si256((__m256i*) &(dst[col]), vsum);
+
+      }
+      src += srcStride * 16;
+      dst += dstStride * 16;
+    }
+  }
+#endif
+}
+
+template<typename Tsrc, int N>
+static void fullPelCopyWithNoClippingSSE(const ClpRng& clpRng, const Pel* _src, int srcStride, int16_t* dst, int dstStride, int width, int height)
+{
+  Tsrc* src = (Tsrc*)_src;
+  __m128i vsum;
+
+  for (int row = 0; row < height; row++)
+  {
+    for (int col = 0; col < width; col += N)
+    {
+      _mm_prefetch((const char*)src +                2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src + (width >> 1) + 2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src +  width - 1   + 2 * srcStride, _MM_HINT_T0);
+      for (int i = 0; i < N; i += 8)
+      {
+        vsum = (sizeof(Tsrc) == 1) ? _mm_cvtepu8_epi16(_mm_lddqu_si128((__m128i const*) & src[col + i]))
+                                   : _mm_lddqu_si128((__m128i const*) & src[col + i]);
+
+#if JEM_UNALIGNED_DST
+        _mm_storeu_si128((__m128i*) & dst[col + i], vsum);
+#else
+        _mm_store_si128((__m128i*) & dst[col + i], vsum);
+#endif
+      }
+    }
+    src += srcStride;
+    dst += dstStride;
+  }
+}
+
+template<typename Tsrc, int N>
+static void fullPelCopyWithNoClippingVerSSE(const ClpRng& clpRng, const Pel* _src, int srcStride, int16_t* dst, int dstStride, int width, int height)
+{
+  Tsrc* src = (Tsrc*)_src;
+  short* dstinit = dst;
+  __m128i vsum;
+  
+  for (int col = 0; col < width; col++)
+  {
+    src = (Tsrc*)_src;
+    dst = dstinit;
+    for (int row = 0; row < height; row += N)
+    {
+      _mm_prefetch((const char*)src +                2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src + (width >> 1) + 2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src +  width - 1   + 2 * srcStride, _MM_HINT_T0);
+      for (int i = 0; i < N; i += 8)
+      {
+        vsum = _mm_set_epi16(src[col + (7 + i) * srcStride], src[col + (6 + i) * srcStride], src[col + (5 + i) * srcStride], src[col + (4 + i) * srcStride]
+                           , src[col + (3 + i) * srcStride], src[col + (2 + i) * srcStride], src[col + (1 + i) * srcStride], src[col +      i  * srcStride]);
+
+        _mm_storeu_si128((__m128i*) & dst[col + (i) * dstStride], vsum);
+      }
+      src += srcStride * N;
+      dst += dstStride * N;
+    }
+  }
+}
+
+template<typename Tsrc>
+static void fullPelCopyWithNoClippingSSE_M4(const ClpRng& clpRng, const Pel* _src, int srcStride, int16_t* dst, int dstStride, int width, int height)
+{
+  Tsrc* src = (Tsrc*)_src;
+  __m128i vsum;
+
+  for (int row = 0; row < height; row++)
+  {
+    for (int col = 0; col < width; col += 4)
+    {
+      _mm_prefetch((const char*)src +                2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src + (width >> 1) + 2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src +  width - 1   + 2 * srcStride, _MM_HINT_T0);
+
+      vsum = (sizeof(Tsrc) == 1) ? _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i const*) & src[col]))
+                                 : _mm_loadl_epi64((__m128i const*) & src[col]);
+      _mm_storel_epi64((__m128i*) & dst[col], vsum);
+    }
+    src += srcStride;
+    dst += dstStride;
+  }
+}
+
+template<typename Tsrc>
+static void fullPelCopyWithNoClippingVerSSE_M4(const ClpRng& clpRng, const Pel* _src, int srcStride, int16_t* dst, int dstStride, int width, int height)
+{
+  Tsrc* src = (Tsrc*)_src;
+  __m128i vsum;
+
+  for (int col = 0; col < width; col++)
+  {
+    for (int row = 0; row < height; row += 4)
+    {
+      _mm_prefetch((const char*)src +                2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src + (width >> 1) + 2 * srcStride, _MM_HINT_T0);
+      _mm_prefetch((const char*)src +  width - 1   + 2 * srcStride, _MM_HINT_T0);
+
+      vsum = _mm_set_epi16(0, 0, 0, 0, src[col + (row + 3) * srcStride], src[col + (row + 2) * srcStride], src[col + (row + 1) * srcStride], src[col + row * srcStride]);
+      _mm_storel_epi64((__m128i*) & dst[col + (row) * dstStride], vsum);
+    }
+  }
+}
+
+template<X86_VEXT vext>
+static void simdFilterCopyWithNoClipping(const ClpRng& clpRng, const Pel* src, int srcStride, int16_t* dst, int dstStride, int width, int height)
+{
+  if (vext >= AVX2 && (width % 16) == 0)
+  {
+    fullPelCopyWithNoClippingAVX2<Pel, 16>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else if ((width % 16) == 0)
+  {
+    fullPelCopyWithNoClippingSSE<Pel, 16>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else if ((width % 8) == 0)
+  {
+    fullPelCopyWithNoClippingSSE<Pel, 8>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else if ((width % 4) == 0)
+  {
+    fullPelCopyWithNoClippingSSE_M4<Pel>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else if (vext >= AVX2 && (height % 16) == 0)
+  {
+    fullPelCopyWithNoClippingVerAVX2<Pel, 16>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else if ((height % 16) == 0)
+  {
+    fullPelCopyWithNoClippingVerSSE<Pel, 16>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else if ((height % 8) == 0)
+  {
+    fullPelCopyWithNoClippingVerSSE<Pel, 8>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else if ((height % 4) == 0)
+  {
+    fullPelCopyWithNoClippingVerSSE_M4<Pel>(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+  else
+  { //Scalar
+    InterpolationFilter::filterCopyWithNoClipping(clpRng, src, srcStride, dst, dstStride, width, height);
+  }
+}
+#endif
 
 // SIMD interpolation horizontal, block width modulo 4
 template<X86_VEXT vext, int N, bool shiftBack>
@@ -3666,7 +3905,7 @@ int xSgpmSadTM_SSE(const PredictionUnit &pu, const int width, const int height, 
   int      sum        = 0;
   int16_t  wIdx   = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2_EX;
   int16_t  hIdx   = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2_EX;
-  int16_t  angle  = g_GeoParams[splitDir][0];
+  int16_t  angle  = g_geoParams[splitDir][0];
   int16_t  stepY  = 0;
   int16_t  stepX  = 1;
   int16_t *weightMask = nullptr;
@@ -3674,7 +3913,7 @@ int xSgpmSadTM_SSE(const PredictionUnit &pu, const int width, const int height, 
   if (g_angle2mirror[angle] == 2)
   {
     stepY = -GEO_WEIGHT_MASK_SIZE_EXT;
-    weightMask = &g_globalGeoWeightsTpl[g_angle2mask[angle]]
+    weightMask = &g_geoWeightsTpl[g_angle2mask[angle]]
                                        [(GEO_WEIGHT_MASK_SIZE_EXT - 1
                                                        - g_weightOffsetEx[splitDir][hIdx][wIdx][1] - GEO_TM_ADDED_WEIGHT_MASK_SIZE)
                                                         * GEO_WEIGHT_MASK_SIZE_EXT
@@ -3684,7 +3923,7 @@ int xSgpmSadTM_SSE(const PredictionUnit &pu, const int width, const int height, 
   {
     stepX  = -1;
     stepY  = GEO_WEIGHT_MASK_SIZE_EXT;
-    weightMask = &g_globalGeoWeightsTpl[g_angle2mask[angle]]
+    weightMask = &g_geoWeightsTpl[g_angle2mask[angle]]
                                      [(g_weightOffsetEx[splitDir][hIdx][wIdx][1] + GEO_TM_ADDED_WEIGHT_MASK_SIZE)
                                         * GEO_WEIGHT_MASK_SIZE_EXT
                                       + (GEO_WEIGHT_MASK_SIZE_EXT - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][0]
@@ -3693,7 +3932,7 @@ int xSgpmSadTM_SSE(const PredictionUnit &pu, const int width, const int height, 
   else
   {
     stepY = GEO_WEIGHT_MASK_SIZE_EXT;
-    weightMask = &g_globalGeoWeightsTpl[g_angle2mask[angle]]
+    weightMask = &g_geoWeightsTpl[g_angle2mask[angle]]
                                        [(g_weightOffsetEx[splitDir][hIdx][wIdx][1] + GEO_TM_ADDED_WEIGHT_MASK_SIZE)
                                                         * GEO_WEIGHT_MASK_SIZE_EXT
                                                       + g_weightOffsetEx[splitDir][hIdx][wIdx][0] + GEO_TM_ADDED_WEIGHT_MASK_SIZE];
@@ -3938,34 +4177,57 @@ void xWeightedSgpm_SSE(const PredictionUnit &pu, const uint32_t width, const uin
   const int32_t offsetWeighted = 16;
   int16_t  wIdx   = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2_EX;
   int16_t  hIdx   = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2_EX;
-  int16_t  angle  = g_GeoParams[splitDir][0];
+  int16_t  angle  = g_geoParams[splitDir][0];
   int16_t  stepY  = 0;
   int16_t *weight = nullptr;
-  
-  if (g_angle2mirror[angle] == 2)
+
+#if JVET_AC0189_SGPM_NO_BLENDING
+  int blendWIdx = 0;
+  if (pu.cs->pps->getUseSgpmNoBlend())
   {
-    stepY = -GEO_WEIGHT_MASK_SIZE;
-    weight =
-      &g_globalGeoWeights[GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())][g_angle2mask[angle]]
-                         [(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][1])
-                            * GEO_WEIGHT_MASK_SIZE
-                          + g_weightOffsetEx[splitDir][hIdx][wIdx][0]];
-  }
-  else if (g_angle2mirror[angle] == 1)
-  {
-    stepY = GEO_WEIGHT_MASK_SIZE;
-    weight =
-      &g_globalGeoWeights[GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())][g_angle2mask[angle]]
-                         [g_weightOffsetEx[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE
-                          + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][0])];
+    blendWIdx = 0;
   }
   else
   {
-    stepY = GEO_WEIGHT_MASK_SIZE;
-    weight =
-      &g_globalGeoWeights[GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())][g_angle2mask[angle]]
-                         [g_weightOffsetEx[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE
-                          + g_weightOffsetEx[splitDir][hIdx][wIdx][0]];
+    blendWIdx= GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight());
+  }
+#endif
+  if (g_angle2mirror[angle] == 2)
+  {
+    stepY  = -GEO_WEIGHT_MASK_SIZE;
+    weight = &g_geoWeights
+#if JVET_AC0189_SGPM_NO_BLENDING
+               [blendWIdx]
+#else
+               [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]
+#endif
+               [g_angle2mask[angle]]
+               [(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE
+                + g_weightOffsetEx[splitDir][hIdx][wIdx][0]];
+  }
+  else if (g_angle2mirror[angle] == 1)
+  {
+    stepY  = GEO_WEIGHT_MASK_SIZE;
+    weight = &g_geoWeights
+#if JVET_AC0189_SGPM_NO_BLENDING
+               [blendWIdx]
+#else
+               [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]
+#endif
+               [g_angle2mask[angle]][g_weightOffsetEx[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE
+                                     + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffsetEx[splitDir][hIdx][wIdx][0])];
+  }
+  else
+  {
+    stepY  = GEO_WEIGHT_MASK_SIZE;
+    weight = &g_geoWeights
+#if JVET_AC0189_SGPM_NO_BLENDING
+               [blendWIdx]
+#else
+               [GET_SGPM_BLD_IDX(pu.lwidth(), pu.lheight())]
+#endif
+               [g_angle2mask[angle]][g_weightOffsetEx[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE
+                                     + g_weightOffsetEx[splitDir][hIdx][wIdx][0]];
   }
   const __m128i mmEight = _mm_set1_epi16(32);
   const __m128i mmOffset = _mm_set1_epi32(offsetWeighted);
@@ -4174,7 +4436,7 @@ void xWeightedSgpm_SSE(const PredictionUnit &pu, const uint32_t width, const uin
 #endif
 
 template< X86_VEXT vext >
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 void xWeightedGeoBlk_SSE(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, const uint8_t bldIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
 #else
 void xWeightedGeoBlk_SSE(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
@@ -4187,7 +4449,7 @@ void xWeightedGeoBlk_SSE(const PredictionUnit &pu, const uint32_t width, const u
   int32_t strideSrc0 = predSrc0.get(compIdx).stride;
   int32_t strideSrc1 = predSrc1.get(compIdx).stride;
 
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   const char    log2WeightBase = 5;
 #else
   const char    log2WeightBase = 3;
@@ -4202,44 +4464,44 @@ void xWeightedGeoBlk_SSE(const PredictionUnit &pu, const uint32_t width, const u
 
   int16_t wIdx = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2;
   int16_t hIdx = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2;
-  int16_t angle = g_GeoParams[splitDir][0];
+  int16_t angle = g_geoParams[splitDir][0];
   int16_t stepY = 0;
   int16_t* weight = nullptr;
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   if (g_angle2mirror[angle] == 2)
   {
     stepY = -GEO_WEIGHT_MASK_SIZE;
-    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[bldIdx][g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
   else if (g_angle2mirror[angle] == 1)
   {
     stepY = GEO_WEIGHT_MASK_SIZE;
-    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
+    weight = &g_geoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
   }
   else
   {
     stepY = GEO_WEIGHT_MASK_SIZE;
-    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
 #else
   if (g_angle2mirror[angle] == 2)
   {
     stepY = -GEO_WEIGHT_MASK_SIZE;
-    weight = &g_globalGeoWeights[g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
   else if (g_angle2mirror[angle] == 1)
   {
     stepY = GEO_WEIGHT_MASK_SIZE;
-    weight = &g_globalGeoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
+    weight = &g_geoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
   }
   else
   {
     stepY = GEO_WEIGHT_MASK_SIZE;
-    weight = &g_globalGeoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
 #endif
 
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   const __m128i mmEight = _mm_set1_epi16(32);
 #else
   const __m128i mmEight = _mm_set1_epi16(8);
@@ -4289,7 +4551,7 @@ void xWeightedGeoBlk_SSE(const PredictionUnit &pu, const uint32_t width, const u
 #if USE_AVX2
   else if (width >= 16)
   {
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
     const __m256i mmEightAVX2 = _mm256_set1_epi16(32);
 #else
     const __m256i mmEightAVX2 = _mm256_set1_epi16(8);
@@ -4434,7 +4696,7 @@ void xWeightedGeoBlk_SSE(const PredictionUnit &pu, const uint32_t width, const u
 
 #if JVET_Y0065_GPM_INTRA
 template< X86_VEXT vext >
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 void xWeightedGeoBlkRounded_SSE(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, const uint8_t bldIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
 #else
 void xWeightedGeoBlkRounded_SSE(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1)
@@ -4449,44 +4711,44 @@ void xWeightedGeoBlkRounded_SSE(const PredictionUnit &pu, const uint32_t width, 
 
   int16_t wIdx = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2;
   int16_t hIdx = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2;
-  int16_t angle = g_GeoParams[splitDir][0];
+  int16_t angle = g_geoParams[splitDir][0];
   int16_t stepY = 0;
   int16_t* weight = nullptr;
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   if (g_angle2mirror[angle] == 2)
   {
     stepY = -GEO_WEIGHT_MASK_SIZE;
-    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[bldIdx][g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
   else if (g_angle2mirror[angle] == 1)
   {
     stepY = GEO_WEIGHT_MASK_SIZE;
-    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
+    weight = &g_geoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
   }
   else
   {
     stepY = GEO_WEIGHT_MASK_SIZE;
-    weight = &g_globalGeoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[bldIdx][g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
 #else
   if (g_angle2mirror[angle] == 2)
   {
     stepY = -GEO_WEIGHT_MASK_SIZE;
-    weight = &g_globalGeoWeights[g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[g_angle2mask[angle]][(GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][1]) * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
   else if (g_angle2mirror[angle] == 1)
   {
     stepY = GEO_WEIGHT_MASK_SIZE;
-    weight = &g_globalGeoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
+    weight = &g_geoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + (GEO_WEIGHT_MASK_SIZE - 1 - g_weightOffset[splitDir][hIdx][wIdx][0])];
   }
   else
   {
     stepY = GEO_WEIGHT_MASK_SIZE;
-    weight = &g_globalGeoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
+    weight = &g_geoWeights[g_angle2mask[angle]][g_weightOffset[splitDir][hIdx][wIdx][1] * GEO_WEIGHT_MASK_SIZE + g_weightOffset[splitDir][hIdx][wIdx][0]];
   }
 #endif
 
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   const __m128i mmEight = _mm_set1_epi16(32);
   const __m128i mmOffset = _mm_set1_epi32(16);
   const __m128i mmShift = _mm_cvtsi32_si128(5);
@@ -4535,7 +4797,7 @@ void xWeightedGeoBlkRounded_SSE(const PredictionUnit &pu, const uint32_t width, 
 #if USE_AVX2
   else if (width >= 16)
   {
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
     const __m256i mmEightAVX2 = _mm256_set1_epi16(32);
     const __m256i mmOffsetAVX2 = _mm256_set1_epi32(16);
 #else
@@ -4697,12 +4959,12 @@ void xWeightedGeoTpl_SSE(const PredictionUnit &pu, const uint8_t splitDir, PelUn
   const uint32_t scaleX = getComponentScaleX(compIdx, pu.chromaFormat);
   const uint32_t scaleY = getComponentScaleY(compIdx, pu.chromaFormat);
 
-  int16_t angle = g_GeoParams[splitDir][0];
+  int16_t angle = g_geoParams[splitDir][0];
   int16_t wIdx  = floorLog2(pu.lwidth()) - GEO_MIN_CU_LOG2;
   int16_t hIdx  = floorLog2(pu.lheight()) - GEO_MIN_CU_LOG2;
   int16_t stepX = 1 << scaleX;
   int16_t stepY = 0;
-  Pel*   weight = &g_globalGeoWeightsTpl[g_angle2mask[angle]][GEO_TM_ADDED_WEIGHT_MASK_SIZE * GEO_WEIGHT_MASK_SIZE_EXT + GEO_TM_ADDED_WEIGHT_MASK_SIZE];
+  Pel*   weight = &g_geoWeightsTpl[g_angle2mask[angle]][GEO_TM_ADDED_WEIGHT_MASK_SIZE * GEO_WEIGHT_MASK_SIZE_EXT + GEO_TM_ADDED_WEIGHT_MASK_SIZE];
   if (g_angle2mirror[angle] == 2)
   {
     stepY = -(int)(GEO_WEIGHT_MASK_SIZE_EXT << scaleY);
@@ -4882,6 +5144,9 @@ void InterpolationFilter::_initInterpolationFilterX86()
   m_filterCopy[0][1] = simdFilterCopy<vext, false, true>;
   m_filterCopy[1][0] = simdFilterCopy<vext, true, false>;
   m_filterCopy[1][1] = simdFilterCopy<vext, true, true>;
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  m_filterCopyWithNoClipping = simdFilterCopyWithNoClipping<vext>;
+#endif
 #else
   // [taps][bFirst][bLast]
   m_filterHor[0][0][0] = simdFilter<vext, 8, false, false, false>;
@@ -4949,6 +5214,9 @@ void InterpolationFilter::_initInterpolationFilterX86()
   m_filterCopy[0][1]   = simdFilterCopy<vext, false, true>;
   m_filterCopy[1][0]   = simdFilterCopy<vext, true, false>;
   m_filterCopy[1][1]   = simdFilterCopy<vext, true, true>;
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  m_filterCopyWithNoClipping = simdFilterCopyWithNoClipping<vext>;
+#endif
 #endif
   m_weightedGeoBlk = xWeightedGeoBlk_SSE<vext>;
 #if JVET_Y0065_GPM_INTRA

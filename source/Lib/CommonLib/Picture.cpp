@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -297,6 +297,9 @@ void Picture::createTempBuffers( const unsigned _maxCUSize )
   const Area a( Position{ 0, 0 }, lumaSize() );
 #else
   const Area a = m_ctuArea.Y();
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  const Area aOld( Position{ 0, 0 }, lumaSize() );
+#endif
 #endif
 
 #if ENABLE_SPLIT_PARALLELISM
@@ -306,7 +309,11 @@ void Picture::createTempBuffers( const unsigned _maxCUSize )
 #endif
   {
     M_BUFS( jId, PIC_PREDICTION                   ).create( chromaFormat, a,   _maxCUSize );
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT && !KEEP_PRED_AND_RESI_SIGNALS
+    M_BUFS( jId, PIC_RESIDUAL                     ).create(chromaFormat, aOld, _maxCUSize );
+#else
     M_BUFS( jId, PIC_RESIDUAL                     ).create( chromaFormat, a,   _maxCUSize );
+#endif
 #if ENABLE_SPLIT_PARALLELISM
     if (jId > 0)
     {
@@ -364,6 +371,11 @@ const CPelUnitBuf Picture::getTrueOrigBuf()                     const { return M
        PelBuf     Picture::getTrueOrigBuf(const CompArea &blk)        { return getBuf(blk, PIC_TRUE_ORIGINAL); }
 const CPelBuf     Picture::getTrueOrigBuf(const CompArea &blk)  const { return getBuf(blk, PIC_TRUE_ORIGINAL); }
 
+
+       PelBuf     Picture::getTrueOrigBuf(const ComponentID compID)       { return getBuf(compID, PIC_TRUE_ORIGINAL); }
+const CPelBuf     Picture::getTrueOrigBuf(const ComponentID compID) const { return getBuf(compID, PIC_TRUE_ORIGINAL); }
+
+
        PelUnitBuf Picture::getFilteredOrigBuf()                           { return M_BUFS(0, PIC_FILTERED_ORIGINAL); }
 const CPelUnitBuf Picture::getFilteredOrigBuf()                     const { return M_BUFS(0, PIC_FILTERED_ORIGINAL); }
        PelBuf     Picture::getFilteredOrigBuf(const CompArea &blk)        { return getBuf(blk, PIC_FILTERED_ORIGINAL); }
@@ -374,6 +386,26 @@ const CPelBuf     Picture::getFilteredOrigBuf(const CompArea &blk)  const { retu
 const CPelBuf     Picture::getPredBuf(const CompArea &blk)  const { return getBuf(blk,  PIC_PREDICTION); }
        PelUnitBuf Picture::getPredBuf(const UnitArea &unit)       { return getBuf(unit, PIC_PREDICTION); }
 const CPelUnitBuf Picture::getPredBuf(const UnitArea &unit) const { return getBuf(unit, PIC_PREDICTION); }
+
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+void Picture::setResiBufPLT()
+{
+  for (uint64_t k = 0; k < cs->cus.size(); k++)
+  {
+    CodingUnit *cu = cs->cus[k];
+    for (int compID = 0; compID < 1; compID++)
+    {
+      if (cu->predMode == MODE_PLT)
+      {
+        const ComponentID comp     = ComponentID(compID);
+        const CompArea   &compArea = cu->block(comp);
+
+        getResiBuf(compArea).fill(0);
+      }
+    }
+  }
+}
+#endif
 
        PelBuf     Picture::getResiBuf(const CompArea &blk)        { return getBuf(blk,  PIC_RESIDUAL); }
 const CPelBuf     Picture::getResiBuf(const CompArea &blk)  const { return getBuf(blk,  PIC_RESIDUAL); }
@@ -416,6 +448,7 @@ void Picture::finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHead
   if( cs )
   {
     cs->initStructData();
+    cs->sps = &sps; 
   }
   else
   {
@@ -1499,7 +1532,11 @@ PelBuf Picture::getBuf( const CompArea &blk, const PictureType &type )
   const int jId = ( type == PIC_ORIGINAL || type == PIC_TRUE_ORIGINAL || type == PIC_ORIGINAL_INPUT || type == PIC_TRUE_ORIGINAL_INPUT ) ? 0 : scheduler.getSplitPicId();
 #endif
 #if !KEEP_PRED_AND_RESI_SIGNALS
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  if (type == PIC_PREDICTION)
+#else
   if( type == PIC_RESIDUAL || type == PIC_PREDICTION )
+#endif
   {
     CompArea localBlk = blk;
     localBlk.x &= ( cs->pcv->maxCUWidthMask  >> getComponentScaleX( blk.compID, blk.chromaFormat ) );
@@ -1524,7 +1561,11 @@ const CPelBuf Picture::getBuf( const CompArea &blk, const PictureType &type ) co
 
 #endif
 #if !KEEP_PRED_AND_RESI_SIGNALS
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  if (type == PIC_PREDICTION)
+#else
   if( type == PIC_RESIDUAL || type == PIC_PREDICTION )
+#endif
   {
     CompArea localBlk = blk;
     localBlk.x &= ( cs->pcv->maxCUWidthMask  >> getComponentScaleX( blk.compID, blk.chromaFormat ) );

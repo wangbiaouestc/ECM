@@ -613,6 +613,174 @@ void inverseLfnst_SIMD(TCoeff* src, TCoeff*  dst, const int8_t*  trMat, const in
   }
 }
 #endif
+#if JVET_AC0130_NSPT && INTRA_TRANS_ENC_OPT
+template< X86_VEXT vext >
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+void computeFwdNspt_SIMD( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx )
+#else
+void computeFwdNspt_SIMD( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx )
+#endif
+{
+  int trSize = width * height;
+
+  const int8_t* trMat = g_nspt4x4[ mode ][ nsptIdx ][ 0 ];
+  if( width == 8 && height == 8 )
+  {
+    trMat = g_nspt8x8[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 4 && height == 8 )
+  {
+    trMat = g_nspt4x8[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 8 && height == 4 )
+  {
+    trMat = g_nspt8x4[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 4 && height == 16 )
+  {
+    trMat = g_nspt4x16[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 16 && height == 4 )
+  {
+    trMat = g_nspt16x4[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 8 && height == 16 )
+  {
+    trMat = g_nspt8x16[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 16 && height == 8 )
+  {
+    trMat = g_nspt16x8[ mode ][ nsptIdx ][ 0 ];
+  }
+
+  int shift = shift_1st + shift_2nd - 7;
+  int rnd = 1 << ( shift - 1 );
+
+  const __m128i vrnd = _mm_set1_epi32( rnd );
+  __m128i vmat[ 4 ], vcoef[ 4 ], vsrc;
+
+  int trSize2 = ( trSize << 1 );
+  int trSize3 = trSize2 + trSize;
+  int trSize4 = ( trSize << 2 );
+  for( int j = 0; j < zeroOutSize; j += 4 )
+  {
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+    TCoeff*       srcPtr = src;
+#else
+    int*          srcPtr = src;
+#endif
+    const int8_t* trMatTmp[ 4 ] = { trMat, trMat + trSize, trMat + trSize2, trMat + trSize3 };
+    vcoef[ 0 ] = vcoef[ 1 ] = vcoef[ 2 ] = vcoef[ 3 ] = _mm_setzero_si128();
+    for( int i = 0; i < trSize; i += 4 )
+    {
+      vsrc = _mm_loadu_si128( ( const __m128i* )srcPtr );
+      for( int idx = 0; idx < 4; idx++ )
+      {
+        vmat[ idx ] = _mm_cvtepi8_epi32( _mm_cvtsi32_si128( *( unsigned int const* ) trMatTmp[ idx ] ) );
+        vcoef[ idx ] = _mm_add_epi32( _mm_mullo_epi32( vsrc, vmat[ idx ] ), vcoef[ idx ] );
+      }
+      srcPtr += 4;
+      trMatTmp[ 0 ] += 4; trMatTmp[ 1 ] += 4; trMatTmp[ 2 ] += 4; trMatTmp[ 3 ] += 4;
+    }
+    vcoef[ 0 ] = _mm_hadd_epi32( vcoef[ 0 ], vcoef[ 1 ] );
+    vcoef[ 2 ] = _mm_hadd_epi32( vcoef[ 2 ], vcoef[ 3 ] );
+    vcoef[ 0 ] = _mm_hadd_epi32( vcoef[ 0 ], vcoef[ 2 ] );
+    vcoef[ 0 ] = _mm_srai_epi32( _mm_add_epi32( vcoef[ 0 ], vrnd ), shift );
+    _mm_storeu_si128( ( __m128i * )dst, vcoef[ 0 ] );
+
+    dst += 4;
+    trMat += trSize4;
+  }
+}
+
+template <X86_VEXT vext>
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+void computeInvNspt_SIMD( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd,
+  const int maxLog2TrDynamicRange, int zeroOutSize, int nsptIdx )
+{
+#else
+void TrQuant::computeInvNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx )
+{
+  int             maxLog2TrDynamicRange = 15;
+#endif
+  int trSize = width * height;
+
+  const TCoeff    outputMinimum = -( 1 << maxLog2TrDynamicRange );
+  const TCoeff    outputMaximum = ( 1 << maxLog2TrDynamicRange ) - 1;
+
+  const int8_t* trMat = g_nspt4x4[ mode ][ nsptIdx ][ 0 ];
+  if( width == 8 && height == 8 )
+  {
+    trMat = g_nspt8x8[ mode ][ nsptIdx ][ 0 ];
+  }
+  if( width == 4 && height == 8 )
+  {
+    trMat = g_nspt4x8[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 8 && height == 4 )
+  {
+    trMat = g_nspt8x4[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 4 && height == 16 )
+  {
+    trMat = g_nspt4x16[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 16 && height == 4 )
+  {
+    trMat = g_nspt16x4[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 8 && height == 16 )
+  {
+    trMat = g_nspt8x16[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 16 && height == 8 )
+  {
+    trMat = g_nspt16x8[ mode ][ nsptIdx ][ 0 ];
+  }
+
+  int shift = shift_1st + shift_2nd - 7;
+  int rnd = 1 << ( shift - 1 );
+
+  const __m128i vrnd = _mm_set1_epi32( rnd );
+  __m128i vmat[ 4 ], vcoef[ 4 ], vsrc;
+  __m128i vmin = _mm_set1_epi32( outputMinimum );
+  __m128i vmax = _mm_set1_epi32( outputMaximum );
+
+  int trSize2 = ( trSize << 1 );
+  int trSize3 = trSize2 + trSize;
+  int trSize4 = ( trSize << 2 );
+  for( int j = 0; j < trSize; j += 4 )
+  {
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+    TCoeff*       srcPtr = src;
+#else
+    int*          srcPtr = src;
+#endif
+    const int8_t* trMatTmp[ 4 ] = { trMat, trMat + 1, trMat + 2, trMat + 3 };
+    vcoef[ 0 ] = vcoef[ 1 ] = vcoef[ 2 ] = vcoef[ 3 ] = _mm_setzero_si128();
+    for( int i = 0; i < zeroOutSize; i += 4 )
+    {
+      vsrc = _mm_loadu_si128( ( const __m128i* )srcPtr );
+      for( int idx = 0; idx < 4; idx++ )
+      {
+        vmat[ idx ] = _mm_set_epi32( *( trMatTmp[ idx ] + trSize3 ), *( trMatTmp[ idx ] + trSize2 ), *( trMatTmp[ idx ] + trSize ), *trMatTmp[ idx ] );
+        vcoef[ idx ] = _mm_add_epi32( _mm_mullo_epi32( vsrc, vmat[ idx ] ), vcoef[ idx ] );
+      }
+      srcPtr += 4;
+      trMatTmp[ 0 ] += trSize4; trMatTmp[ 1 ] += trSize4; trMatTmp[ 2 ] += trSize4; trMatTmp[ 3 ] += trSize4;
+    }
+    vcoef[ 0 ] = _mm_hadd_epi32( vcoef[ 0 ], vcoef[ 1 ] );
+    vcoef[ 2 ] = _mm_hadd_epi32( vcoef[ 2 ], vcoef[ 3 ] );
+    vcoef[ 0 ] = _mm_hadd_epi32( vcoef[ 0 ], vcoef[ 2 ] );
+    vcoef[ 0 ] = _mm_srai_epi32( _mm_add_epi32( vcoef[ 0 ], vrnd ), shift );
+    vcoef[ 0 ] = _mm_min_epi32( vmax, _mm_max_epi32( vmin, vcoef[ 0 ] ) );
+    _mm_storeu_si128( ( __m128i * )dst, vcoef[ 0 ] );
+
+    dst += 4;
+    trMat += 4;
+  }
+}
+#endif
 #if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT
 template <X86_VEXT vext>
 void TrQuant::_initTrQuantX86()
@@ -627,6 +795,10 @@ void TrQuant::_initTrQuantX86()
 #if INTRA_TRANS_ENC_OPT 
   m_fwdLfnst = forwardLfnst_SIMD<vext>;
   m_invLfnst = inverseLfnst_SIMD<vext>;
+#endif
+#if JVET_AC0130_NSPT && INTRA_TRANS_ENC_OPT
+  m_computeFwdNspt = computeFwdNspt_SIMD<vext>;
+  m_computeInvNspt = computeInvNspt_SIMD<vext>;
 #endif
 #if TRANSFORM_SIMD_OPT
 #if TU_256

@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -121,7 +121,7 @@ void roundBD_SSE(const Pel* srcp, const int srcStride, Pel* dest, const int dest
 template< X86_VEXT vext >
 void weightedAvg_SSE(const Pel* src0, const unsigned src0Stride, const Pel* src1, const unsigned src1Stride, Pel* dest, const unsigned destStride, const int8_t w0, const int8_t w1, int width, int height, const ClpRng& clpRng)
 {
-  const int8_t log2WeightBase = g_BcwLog2WeightBase;
+  const int8_t log2WeightBase = g_bcwLog2WeightBase;
   const int    clipbd = clpRng.bd;
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
   const int shiftNum = IF_INTERNAL_FRAC_BITS(clipbd) + log2WeightBase;
@@ -579,7 +579,7 @@ void addBIOAvg4_SSE(const Pel* src0, int src0Stride, const Pel* src1, int src1St
 
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
 template< X86_VEXT vext >
-void calcBIOParameter_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGY_GX, Pel* dI)
+void calcBIOParameter_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, Pel* dI)
 {
   width -= 2;
   height -= 2;
@@ -590,7 +590,7 @@ void calcBIOParameter_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0,
   gradY0 += bioParamOffset;  gradY1 += bioParamOffset;
   absGX  += bioParamOffset;  absGY  += bioParamOffset;
   dIX    += bioParamOffset;  dIY    += bioParamOffset;
-  signGY_GX += bioParamOffset;
+  signGyGx += bioParamOffset;
   if (dI)
   {
     dI += bioParamOffset;
@@ -619,13 +619,13 @@ void calcBIOParameter_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0,
       }
       __m128i dIX_tmp       = _mm_sign_epi16(subTemp1,  packTempX );
       __m128i dIY_tmp       = _mm_sign_epi16(subTemp1,  packTempY );
-      __m128i signGY_GX_tmp = _mm_sign_epi16(packTempX, packTempY );
+      __m128i signGyGxTmp = _mm_sign_epi16(packTempX, packTempY );
 
       _mm_storeu_si128( ( __m128i * )absGX, gX_tmp );
       _mm_storeu_si128( ( __m128i * )absGY, gY_tmp );
       _mm_storeu_si128( ( __m128i * )dIX, dIX_tmp );
       _mm_storeu_si128( ( __m128i * )dIY, dIY_tmp );
-      _mm_storeu_si128( ( __m128i * )signGY_GX, signGY_GX_tmp );
+      _mm_storeu_si128( ( __m128i * )signGyGx, signGyGxTmp );
       srcY0Tmp += src0Stride;
       srcY1Tmp += src1Stride;
       gradX0 += widthG;
@@ -640,7 +640,7 @@ void calcBIOParameter_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0,
       }
       dIX += widthG;
       dIY += widthG;
-      signGY_GX += widthG;
+      signGyGx += widthG;
     }
   }
   else // width = 12, 20, 36, 68, 132, 260
@@ -666,13 +666,13 @@ void calcBIOParameter_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0,
         }
         __m256i dIX_tmp       = _mm256_sign_epi16(subTemp1,  packTempX );
         __m256i dIY_tmp       = _mm256_sign_epi16(subTemp1,  packTempY );
-        __m256i signGY_GX_tmp = _mm256_sign_epi16(packTempX, packTempY );
+        __m256i signGyGxTmp = _mm256_sign_epi16(packTempX, packTempY );
 
         _mm256_storeu_si256( ( __m256i * ) ( absGX + x ), gX_tmp );
         _mm256_storeu_si256( ( __m256i * ) ( absGY + x ), gY_tmp );
         _mm256_storeu_si256( ( __m256i * ) ( dIX + x ), dIX_tmp );
         _mm256_storeu_si256( ( __m256i * ) ( dIY + x ), dIY_tmp );
-        _mm256_storeu_si256( ( __m256i * ) ( signGY_GX + x ), signGY_GX_tmp );
+        _mm256_storeu_si256( ( __m256i * ) ( signGyGx + x ), signGyGxTmp );
       }
       srcY0Tmp += src0Stride;
       srcY1Tmp += src1Stride;
@@ -688,7 +688,7 @@ void calcBIOParameter_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0,
       }
       dIX += widthG;
       dIY += widthG;
-      signGY_GX += widthG;
+      signGyGx += widthG;
     }
   }
 #else
@@ -713,13 +713,13 @@ void calcBIOParameter_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0,
       }
       __m128i dIX_tmp       = _mm_sign_epi16(subTemp1,  packTempX );
       __m128i dIY_tmp       = _mm_sign_epi16(subTemp1,  packTempY );
-      __m128i signGY_GX_tmp = _mm_sign_epi16(packTempX, packTempY );
+      __m128i signGyGxTmp = _mm_sign_epi16(packTempX, packTempY );
 
       _mm_storeu_si128( ( __m128i * ) ( absGX + x ), gX_tmp );
       _mm_storeu_si128( ( __m128i * ) ( absGY + x ), gY_tmp );
       _mm_storeu_si128( ( __m128i * ) ( dIX + x ), dIX_tmp );
       _mm_storeu_si128( ( __m128i * ) ( dIY + x ), dIY_tmp );
-      _mm_storeu_si128( ( __m128i * ) ( signGY_GX + x ), signGY_GX_tmp );
+      _mm_storeu_si128( ( __m128i * ) ( signGyGx + x ), signGyGxTmp );
     }
     srcY0Tmp += src0Stride;
     srcY1Tmp += src1Stride;
@@ -735,12 +735,12 @@ void calcBIOParameter_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0,
     {
       dI += widthG;
     }
-    signGY_GX += widthG;
+    signGyGx += widthG;
   }
 #endif
 }
 template< X86_VEXT vext >
-void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGY_GX, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX)
+void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx)
 {
   __m128i vzero = _mm_setzero_si128();
   __m128i vmask = _mm_setr_epi16(1, 1, 1, 1, 1, 0, 0, 0);
@@ -782,9 +782,9 @@ void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
     sumDIYTmp16  = _mm_add_epi16(_mm_loadu_si128((const __m128i*)dIY), _mm_loadu_si128((const __m128i*)(dIY + widthG)));
     sumDIYTmp16  = _mm_add_epi16(sumDIYTmp16, _mm_loadu_si128((const __m128i*)(dIY + widthG_2)));
     sumDIYTmp16  = _mm_add_epi16(sumDIYTmp16, _mm_loadu_si128((const __m128i*)(dIY + widthG_3)));
-    sumSignGyGxTmp16  = _mm_add_epi16(_mm_loadu_si128((const __m128i*)signGY_GX), _mm_loadu_si128((const __m128i*)(signGY_GX + widthG)));
-    sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_loadu_si128((const __m128i*)(signGY_GX + widthG_2)));
-    sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_loadu_si128((const __m128i*)(signGY_GX + widthG_3)));
+    sumSignGyGxTmp16  = _mm_add_epi16(_mm_loadu_si128((const __m128i*)signGyGx), _mm_loadu_si128((const __m128i*)(signGyGx + widthG)));
+    sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_loadu_si128((const __m128i*)(signGyGx + widthG_2)));
+    sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_loadu_si128((const __m128i*)(signGyGx + widthG_3)));
 
     __m128i absGXOneRow = vzero;
     __m128i dIXOneRow = vzero;
@@ -806,8 +806,8 @@ void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
       dIYOneRow = _mm_loadu_si128((const __m128i*)dIY);
       sumDIYTmp16  = _mm_add_epi16(sumDIYTmp16, _mm_loadu_si128((const __m128i*)(dIY + widthG_4)));
       sumSignGyGxTmp16  = _mm_sub_epi16(sumSignGyGxTmp16, signGyGxOneRow);
-      signGyGxOneRow = _mm_loadu_si128((const __m128i*)signGY_GX);
-      sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_loadu_si128((const __m128i*)(signGY_GX+ widthG_4)));
+      signGyGxOneRow = _mm_loadu_si128((const __m128i*)signGyGx);
+      sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_loadu_si128((const __m128i*)(signGyGx+ widthG_4)));
 
       sumAbsGXTmp32 = _mm_madd_epi16(sumAbsGXTmp16, vmask);
       sumAbsGYTmp32 = _mm_madd_epi16(sumAbsGYTmp16, vmask);
@@ -830,33 +830,33 @@ void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
       sumSignGyGxTmp32 = _mm_madd_epi16(sumSignGyGxTmp16, vmask);
       sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0x4e));   // 01001110
       sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0xb1));   // 10110001
-      *sumSignGY_GX = _mm_cvtsi128_si32(sumSignGyGxTmp32);
+      *sumSignGyGx = _mm_cvtsi128_si32(sumSignGyGxTmp32);
 
       // bio parameter increment
       absGX += widthG;
       absGY += widthG;
       dIX += widthG;
       dIY += widthG;
-      signGY_GX += widthG;
+      signGyGx += widthG;
       // sum parameter increment
       sumAbsGX += width;
       sumAbsGY += width;
       sumDIX += width;
       sumDIY += width;
-      sumSignGY_GX += width;
+      sumSignGyGx += width;
     }
     // bio parameter back to first row
     absGX += widthG_N;
     absGY += widthG_N;
     dIX += widthG_N;
     dIY += widthG_N;
-    signGY_GX += widthG_N;
+    signGyGx += widthG_N;
     // sum parameter back to first row
     sumAbsGX += width_N;
     sumAbsGY += width_N;
     sumDIX += width_N;
     sumDIY += width_N;
-    sumSignGY_GX += width_N;
+    sumSignGyGx += width_N;
   }
   sumDIX -= width;
   sumDIY -= width;
@@ -883,7 +883,7 @@ void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
 #endif
 }
 template< X86_VEXT vext >
-void calcBIOParamSum4_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGY_GX, int width, int height, const int widthG, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX)
+void calcBIOParamSum4_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, int width, int height, const int widthG, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx)
 {
   __m128i vzero = _mm_setzero_si128();
 
@@ -900,13 +900,13 @@ void calcBIOParamSum4_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
       sumDIXTmp16  = _mm_add_epi16(sumDIXTmp16, _mm_loadu_si128((const __m128i*)dIX));
       sumAbsGYTmp16  = _mm_add_epi16(sumAbsGYTmp16, _mm_loadu_si128((const __m128i*)absGY));
       sumDIYTmp16  = _mm_add_epi16(sumDIYTmp16, _mm_loadu_si128((const __m128i*)dIY));
-      sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_loadu_si128((const __m128i*)signGY_GX));
+      sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_loadu_si128((const __m128i*)signGyGx));
       // bio parameter increment
       absGX += widthG;
       absGY += widthG;
       dIX += widthG;
       dIY += widthG;
-      signGY_GX += widthG;
+      signGyGx += widthG;
     }
   }
   else // (width == 12)
@@ -921,14 +921,14 @@ void calcBIOParamSum4_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
       sumAbsGYTmp16  = _mm_add_epi16(sumAbsGYTmp16, _mm_loadl_epi64((const __m128i*)(absGY + 8)));
       sumDIYTmp16  = _mm_add_epi16(sumDIYTmp16, _mm_loadu_si128((const __m128i*)dIY));
       sumDIYTmp16  = _mm_add_epi16(sumDIYTmp16, _mm_loadl_epi64((const __m128i*)(dIY + 8)));
-      sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_loadu_si128((const __m128i*)signGY_GX));
-      sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_loadl_epi64((const __m128i*)(signGY_GX + 8)));
+      sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_loadu_si128((const __m128i*)signGyGx));
+      sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_loadl_epi64((const __m128i*)(signGyGx + 8)));
       // bio parameter increment
       absGX += widthG;
       absGY += widthG;
       dIX += widthG;
       dIY += widthG;
-      signGY_GX += widthG;
+      signGyGx += widthG;
     }
   }
 
@@ -954,11 +954,11 @@ void calcBIOParamSum4_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
   __m128i sumSignGyGxTmp32 = _mm_madd_epi16(sumSignGyGxTmp16, _mm_set1_epi16(1));
   sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0x4e));   // 01001110
   sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0xb1));   // 10110001
-  *sumSignGY_GX = _mm_cvtsi128_si32(sumSignGyGxTmp32);
+  *sumSignGyGx = _mm_cvtsi128_si32(sumSignGyGxTmp32);
 }
 
 template< X86_VEXT vext >
-void calcBIOClippedVxVy_SSE(int* sumDIX_pixel_32bit, int* sumAbsGX_pixel_32bit, int* sumDIY_pixel_32bit, int* sumAbsGY_pixel_32bit, int* sumSignGY_GX_pixel_32bit, const int limit, const int bioSubblockSize, int* tmpx_pixel_32bit, int* tmpy_pixel_32bit)
+void calcBIOClippedVxVy_SSE(int* sumDIXSample32bit, int* sumAbsGxSample32bit, int* sumDIYSample32bit, int* sumAbsGySample32bit, int* sumSignGyGxSample32bit, const int limit, const int bioSubblockSize, int* tmpxSample32bit, int* tmpySample32bit)
 {
 #ifdef USE_AVX2
   __m256i vibdimin = _mm256_set1_epi32(-limit);
@@ -967,25 +967,25 @@ void calcBIOClippedVxVy_SSE(int* sumDIX_pixel_32bit, int* sumAbsGX_pixel_32bit, 
 
   for (int idx = 0; idx < bioSubblockSize; idx += 8)
   {
-    tmp256 = _mm256_loadu_si256((const __m256i*)sumDIX_pixel_32bit);
-    tmp256 = _mm256_srav_epi32(tmp256, _mm256_loadu_si256((const __m256i*)sumAbsGX_pixel_32bit));
+    tmp256 = _mm256_loadu_si256((const __m256i*)sumDIXSample32bit);
+    tmp256 = _mm256_srav_epi32(tmp256, _mm256_loadu_si256((const __m256i*)sumAbsGxSample32bit));
     tmp256 = _mm256_max_epi32(tmp256, vibdimin);
     tmp256 = _mm256_min_epi32(tmp256, vibdimax);
-    _mm256_storeu_si256( ( __m256i * )tmpx_pixel_32bit, tmp256);
-    tmp256 = _mm256_mullo_epi32(tmp256, _mm256_loadu_si256((const __m256i*)sumSignGY_GX_pixel_32bit));
+    _mm256_storeu_si256( ( __m256i * )tmpxSample32bit, tmp256);
+    tmp256 = _mm256_mullo_epi32(tmp256, _mm256_loadu_si256((const __m256i*)sumSignGyGxSample32bit));
     tmp256 = _mm256_srai_epi32(tmp256, 1);
-    tmp256 = _mm256_sub_epi32(_mm256_loadu_si256((const __m256i*)sumDIY_pixel_32bit), tmp256);
-    tmp256 = _mm256_srav_epi32(tmp256, _mm256_loadu_si256((const __m256i*)sumAbsGY_pixel_32bit));
+    tmp256 = _mm256_sub_epi32(_mm256_loadu_si256((const __m256i*)sumDIYSample32bit), tmp256);
+    tmp256 = _mm256_srav_epi32(tmp256, _mm256_loadu_si256((const __m256i*)sumAbsGySample32bit));
     tmp256 = _mm256_max_epi32(tmp256, vibdimin);
     tmp256 = _mm256_min_epi32(tmp256, vibdimax);
-    _mm256_storeu_si256( ( __m256i * )tmpy_pixel_32bit, tmp256);
-    sumDIX_pixel_32bit += 8;
-    sumAbsGX_pixel_32bit += 8;
-    sumDIY_pixel_32bit += 8;
-    sumAbsGY_pixel_32bit += 8;
-    sumSignGY_GX_pixel_32bit += 8;
-    tmpx_pixel_32bit += 8;
-    tmpy_pixel_32bit += 8;
+    _mm256_storeu_si256( ( __m256i * )tmpySample32bit, tmp256);
+    sumDIXSample32bit += 8;
+    sumAbsGxSample32bit += 8;
+    sumDIYSample32bit += 8;
+    sumAbsGySample32bit += 8;
+    sumSignGyGxSample32bit += 8;
+    tmpxSample32bit += 8;
+    tmpySample32bit += 8;
   }
 #else
   __m128i vibdimin = _mm_set1_epi32(-limit);
@@ -994,33 +994,33 @@ void calcBIOClippedVxVy_SSE(int* sumDIX_pixel_32bit, int* sumAbsGX_pixel_32bit, 
 
   for (int idx = 0; idx < bioSubblockSize; idx += 4)
   {
-    *sumDIX_pixel_32bit = (*sumDIX_pixel_32bit) >> (*sumAbsGX_pixel_32bit);
-    *(sumDIX_pixel_32bit + 1) = (*(sumDIX_pixel_32bit + 1)) >> (*(sumAbsGX_pixel_32bit + 1));
-    *(sumDIX_pixel_32bit + 2) = (*(sumDIX_pixel_32bit + 2)) >> (*(sumAbsGX_pixel_32bit + 2));
-    *(sumDIX_pixel_32bit + 3) = (*(sumDIX_pixel_32bit + 3)) >> (*(sumAbsGX_pixel_32bit + 3));
-    tmp128 = _mm_loadu_si128((const __m128i*)sumDIX_pixel_32bit);
+    *sumDIXSample32bit = (*sumDIXSample32bit) >> (*sumAbsGxSample32bit);
+    *(sumDIXSample32bit + 1) = (*(sumDIXSample32bit + 1)) >> (*(sumAbsGxSample32bit + 1));
+    *(sumDIXSample32bit + 2) = (*(sumDIXSample32bit + 2)) >> (*(sumAbsGxSample32bit + 2));
+    *(sumDIXSample32bit + 3) = (*(sumDIXSample32bit + 3)) >> (*(sumAbsGxSample32bit + 3));
+    tmp128 = _mm_loadu_si128((const __m128i*)sumDIXSample32bit);
     tmp128 = _mm_max_epi32(tmp128, vibdimin);
     tmp128 = _mm_min_epi32(tmp128, vibdimax);
-    _mm_storeu_si128( ( __m128i * )tmpx_pixel_32bit, tmp128);
-    tmp128 = _mm_mullo_epi32(tmp128, _mm_loadu_si128((const __m128i*)sumSignGY_GX_pixel_32bit));
+    _mm_storeu_si128( ( __m128i * )tmpxSample32bit, tmp128);
+    tmp128 = _mm_mullo_epi32(tmp128, _mm_loadu_si128((const __m128i*)sumSignGyGxSample32bit));
     tmp128 = _mm_srai_epi32(tmp128, 1);
-    tmp128 = _mm_sub_epi32(_mm_loadu_si128((const __m128i*)sumDIY_pixel_32bit), tmp128);
-    _mm_storeu_si128( ( __m128i * )sumDIY_pixel_32bit, tmp128);
-    *sumDIY_pixel_32bit = (*sumDIY_pixel_32bit) >> (*sumAbsGY_pixel_32bit);
-    *(sumDIY_pixel_32bit + 1) = (*(sumDIY_pixel_32bit + 1)) >> (*(sumAbsGY_pixel_32bit + 1));
-    *(sumDIY_pixel_32bit + 2) = (*(sumDIY_pixel_32bit + 2)) >> (*(sumAbsGY_pixel_32bit + 2));
-    *(sumDIY_pixel_32bit + 3) = (*(sumDIY_pixel_32bit + 3)) >> (*(sumAbsGY_pixel_32bit + 3));
-    tmp128 = _mm_loadu_si128((const __m128i*)sumDIY_pixel_32bit);
+    tmp128 = _mm_sub_epi32(_mm_loadu_si128((const __m128i*)sumDIYSample32bit), tmp128);
+    _mm_storeu_si128( ( __m128i * )sumDIYSample32bit, tmp128);
+    *sumDIYSample32bit = (*sumDIYSample32bit) >> (*sumAbsGySample32bit);
+    *(sumDIYSample32bit + 1) = (*(sumDIYSample32bit + 1)) >> (*(sumAbsGySample32bit + 1));
+    *(sumDIYSample32bit + 2) = (*(sumDIYSample32bit + 2)) >> (*(sumAbsGySample32bit + 2));
+    *(sumDIYSample32bit + 3) = (*(sumDIYSample32bit + 3)) >> (*(sumAbsGySample32bit + 3));
+    tmp128 = _mm_loadu_si128((const __m128i*)sumDIYSample32bit);
     tmp128 = _mm_max_epi32(tmp128, vibdimin);
     tmp128 = _mm_min_epi32(tmp128, vibdimax);
-    _mm_storeu_si128( ( __m128i * )tmpy_pixel_32bit, tmp128);
-    sumDIX_pixel_32bit += 4;
-    sumAbsGX_pixel_32bit += 4;
-    sumDIY_pixel_32bit += 4;
-    sumAbsGY_pixel_32bit += 4;
-    sumSignGY_GX_pixel_32bit += 4;
-    tmpx_pixel_32bit += 4;
-    tmpy_pixel_32bit += 4;
+    _mm_storeu_si128( ( __m128i * )tmpySample32bit, tmp128);
+    sumDIXSample32bit += 4;
+    sumAbsGxSample32bit += 4;
+    sumDIYSample32bit += 4;
+    sumAbsGySample32bit += 4;
+    sumSignGyGxSample32bit += 4;
+    tmpxSample32bit += 4;
+    tmpySample32bit += 4;
   }
 #endif
 }
@@ -1219,7 +1219,7 @@ void calAbsSum_SSE(const Pel* diff, int stride, int width, int height, int* absS
 #endif
 
 template< X86_VEXT vext >
-void calcBIOSums_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int xu, int yu, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX)
+void calcBIOSums_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int xu, int yu, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx)
 
 {
   int shift4 = 4;
@@ -1254,13 +1254,13 @@ void calcBIOSums_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel*
     __m128i gY = _mm_abs_epi16(packTempY);
     __m128i dIX       = _mm_sign_epi16(subTemp1,  packTempX );
     __m128i dIY       = _mm_sign_epi16(subTemp1,  packTempY );
-    __m128i signGY_GX = _mm_sign_epi16(packTempX, packTempY );
+    __m128i signGyGx = _mm_sign_epi16(packTempX, packTempY );
 
     sumAbsGXTmp = _mm_add_epi16(sumAbsGXTmp, gX);
     sumDIXTmp = _mm_add_epi16(sumDIXTmp, dIX);
     sumAbsGYTmp = _mm_add_epi16(sumAbsGYTmp, gY);
     sumDIYTmp = _mm_add_epi16(sumDIYTmp, dIY);
-    sumSignGyGxTmp = _mm_add_epi16(sumSignGyGxTmp, signGY_GX);
+    sumSignGyGxTmp = _mm_add_epi16(sumSignGyGxTmp, signGyGx);
     srcY0Tmp += src0Stride;
     srcY1Tmp += src1Stride;
     gradX0 += widthG;
@@ -1293,7 +1293,7 @@ void calcBIOSums_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel*
 
   sumSignGyGxTmp = _mm_add_epi32(sumSignGyGxTmp, _mm_shuffle_epi32(sumSignGyGxTmp, 0x4e));   // 01001110
   sumSignGyGxTmp = _mm_add_epi32(sumSignGyGxTmp, _mm_shuffle_epi32(sumSignGyGxTmp, 0xb1));   // 10110001
-  *sumSignGY_GX  = _mm_cvtsi128_si32(sumSignGyGxTmp);
+  *sumSignGyGx  = _mm_cvtsi128_si32(sumSignGyGxTmp);
 }
 
 template< X86_VEXT vext >
@@ -1742,8 +1742,8 @@ template< X86_VEXT vext, int W >
 void removeWeightHighFreq_SSE(int16_t* src0, int src0Stride, const int16_t* src1, int src1Stride, int width, int height, int shift, int bcwWeight)
 {
   int normalizer = ((1 << 16) + (bcwWeight>0 ? (bcwWeight >> 1) : -(bcwWeight >> 1))) / bcwWeight;
-  int weight0 = normalizer << g_BcwLog2WeightBase;
-  int weight1 = (g_BcwWeightBase - bcwWeight)*normalizer;
+  int weight0 = normalizer << g_bcwLog2WeightBase;
+  int weight1 = (g_bcwWeightBase - bcwWeight)*normalizer;
   int offset = 1 << (shift - 1);
   if (W == 8)
   {

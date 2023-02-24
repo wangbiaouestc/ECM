@@ -1,9 +1,9 @@
-﻿/* The copyright in this software is being made available under the BSD
+/* The copyright in this software is being made available under the BSD
  * License, included below. This software may be subject to other third party
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -87,7 +87,11 @@ static const Mv s_acMvRefineQ[9] =
 };
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p, const bool useBvpCluster)
+#else
 void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p)
+#endif
 {
   const FracBitsAccess& fracBits = m_CABACEstimator->getCtx().getFracBitsAcess();
 
@@ -146,6 +150,16 @@ void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p)
   p->bitsIdx[1] = fracBits.getFracBitsArray(Ctx::MVPIdx()).intBits[1];
   p->bitsImv[0] = fracBits.getFracBitsArray(Ctx::ImvFlag(1)).intBits[0];
   p->bitsImv[1] = fracBits.getFracBitsArray(Ctx::ImvFlag(1)).intBits[1];
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+  if (useBvpCluster)
+  {
+    p->bitsRribc  = fracBits.getFracBitsArray(Ctx::rribcFlipType(0)).intBits[1];
+  }
+  else
+  {
+    p->bitsRribc = 0;
+  }
+#endif
 }
 #endif
 
@@ -221,6 +235,9 @@ void InterSearch::destroy()
   }
   m_tmpStorageLCU.destroy();
   m_tmpAffiStorage.destroy();
+#if JVET_AC0112_IBC_CIIP
+  m_ibcCiipBuffer.destroy();
+#endif
 
   if ( m_tmpAffiError != NULL )
   {
@@ -375,6 +392,9 @@ void InterSearch::init( EncCfg*        pcEncCfg,
 #else
   m_tmpAffiDeri[0] = new int[MAX_CU_SIZE * MAX_CU_SIZE];
   m_tmpAffiDeri[1] = new int[MAX_CU_SIZE * MAX_CU_SIZE];
+#endif
+#if JVET_AC0112_IBC_CIIP
+  m_ibcCiipBuffer.create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
 #endif
   m_pTempPel = new Pel[maxCUWidth*maxCUHeight];
   m_affMVListMaxSize = (pcEncCfg->getIntraPeriod() == (uint32_t)-1) ? AFFINE_ME_LIST_SIZE_LD : AFFINE_ME_LIST_SIZE;
@@ -1606,9 +1626,17 @@ end:
 
 // based on xMotionEstimation
 #if JVET_AA0070_RRIBC
+#if JVET_AC0112_IBC_CIIP
+void InterSearch::xIBCEstimation(PredictionUnit &pu, PelUnitBuf &origBuf, PelBuf &ibcCiipIntraBuf, Mv pcMvPred[3][2], Mv &rcMv, Distortion &ruiCost, const int localSearchRangeX, const int localSearchRangeY, int numRribcType)
+#else
 void InterSearch::xIBCEstimation(PredictionUnit &pu, PelUnitBuf &origBuf, Mv pcMvPred[3][2], Mv &rcMv, Distortion &ruiCost, const int localSearchRangeX, const int localSearchRangeY, int numRribcType)
+#endif
+#else
+#if JVET_AC0112_IBC_CIIP
+void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, PelBuf &ibcCiipIntraBuf, Mv *pcMvPred, Mv &rcMv, Distortion &ruiCost, const int localSearchRangeX, const int localSearchRangeY)
 #else
 void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pcMvPred, Mv &rcMv, Distortion &ruiCost, const int localSearchRangeX, const int localSearchRangeY)
+#endif
 #endif
 {
   const int iPicWidth = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
@@ -1676,6 +1704,26 @@ void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pc
   }
 #endif
 
+#if JVET_AC0112_IBC_CIIP
+  if (pu.ibcCiipFlag)
+  {
+    const Pel *pelOrig = pcPatternKey->buf;
+    Pel *pelIntra = ibcCiipIntraBuf.buf;
+    int height = ibcCiipIntraBuf.height;
+    int width = ibcCiipIntraBuf.width;
+    for( int y = 0; y < height; y++ )
+    {
+      for( int x = 0; x < width; x++ )
+      {
+        pelIntra[x] = (pelOrig[x] << 1) - pelIntra[x];
+      }
+      pelIntra += ibcCiipIntraBuf.stride;
+      pelOrig += pcPatternKey->stride;
+    }
+    pcPatternKey = (CPelBuf*)&ibcCiipIntraBuf;
+  }
+#endif
+
   m_lumaClpRng = pu.cs->slice->clpRng(COMPONENT_Y);
   Picture* refPic = pu.cu->slice->getPic();
   const CPelBuf refBuf = refPic->getRecoBuf(pu.blocks[COMPONENT_Y]);
@@ -1698,6 +1746,9 @@ void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pc
   m_pcRdCost->setCostScale(0);
 
   m_cDistParam.useMR = false;
+#if JVET_AC0112_IBC_LIC
+  m_cDistParam.useMR = pu.cu->ibcLicFlag;
+#endif
 #if !JVET_AA0070_RRIBC
   m_pcRdCost->setDistParam(m_cDistParam, *cStruct.pcPatternKey, cStruct.piRefY, cStruct.iRefStride, m_lumaClpRng.bd, COMPONENT_Y, cStruct.subShiftMode);
 #endif
@@ -2090,9 +2141,25 @@ void InterSearch::xSetIntraSearchRange(PredictionUnit& pu, int iRoiWidth, int iR
 }
 
 #if JVET_AA0070_RRIBC
+#if JVET_AC0112_IBC_CIIP
+bool InterSearch::predIBCSearch( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, Distortion* bvSearchCost, PelBuf* ibcCiipIntraBuf, bool isSecondPass, bool* searchedByHash)
+#else
+#if JVET_AC0112_IBC_LIC
+bool InterSearch::predIBCSearch( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, Distortion* bvSearchCost, bool isSecondPass, bool* searchedByHash)
+#else
 bool InterSearch::predIBCSearch( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, bool isSecondPass)
+#endif
+#endif
+#else
+#if JVET_AC0112_IBC_CIIP
+bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, Distortion* bvSearchCost, PelBuf* ibcCiipIntraBuf, bool* searchedByHash)
+#else
+#if JVET_AC0112_IBC_LIC
+bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, Distortion* bvSearchCost, bool* searchedByHash)
 #else
 bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap)
+#endif
+#endif
 #endif
 {
   Mv           cMvSrchRngLT;
@@ -2102,10 +2169,24 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
   Mv           cMvPred;
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  const PredictionUnit &pu = *cu.firstPU;
+  if (pu.isBvpClusterApplicable())
+  {
+    xEstBvdBitCosts(m_pcRdCost->getBvdBitCosts(), pu.isBvpClusterApplicable());
+  }
+#else
   xEstBvdBitCosts(m_pcRdCost->getBvdBitCosts());
+#endif
 #endif
 #if JVET_AA0070_RRIBC
   CodedCUInfo& relatedCU = ((EncModeCtrlMTnoRQT *)m_modeCtrl)->getBlkInfo(partitioner.currArea());
+#if JVET_AC0112_IBC_LIC
+  if (isSecondPass && relatedCU.isRribcCoded && cu.ibcLicFlag)
+  {
+    return false;
+  }
+#endif
 #endif
 
   for (auto &pu : CU::traversePUs(cu))
@@ -2122,6 +2203,18 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
         numRribcType = 1;
       }
     }
+#if JVET_AC0112_IBC_CIIP
+    if (pu.ibcCiipFlag)
+    {
+      numRribcType = 1;
+    }
+#endif
+#if JVET_AC0112_IBC_LIC
+    if (pu.cu->ibcLicFlag)
+    {
+      numRribcType = 1;
+    }
+#endif
     Mv       cMv;
     cMv.setZero();
     int iBvpNum    = 2;
@@ -2137,18 +2230,62 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 
       // prepare imv = 2 accuracy predictor info
       pu.cu->imv      = 2;
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if JVET_AC0112_IBC_CIIP
+#if JVET_AC0112_IBC_LIC
+      if (!pu.ibcCiipFlag && !pu.cu->ibcLicFlag)
+      {
+#else
+      if (!pu.ibcCiipFlag)
+      {
+#endif
+#else
+#if JVET_AC0112_IBC_LIC
+      if (!pu.cu->ibcLicFlag)
+      {
+#endif
+#endif
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
       PU::fillIBCMvpCand(pu, amvpInfo4Pel[i], this);
 #else
       PU::fillIBCMvpCand(pu, amvpInfo4Pel[i]);
 #endif
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+      m_amvpInfo4Pel[i] = amvpInfo4Pel[i];
+      }
+      else
+      {
+        amvpInfo4Pel[i] = m_amvpInfo4Pel[i];
+      }
+#endif
 
       // prepare imv = 0 accuracy predictor info
       pu.cu->imv = 0;
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if JVET_AC0112_IBC_CIIP
+#if JVET_AC0112_IBC_LIC
+      if (!pu.ibcCiipFlag && !pu.cu->ibcLicFlag)
+      {
+#else
+      if (!pu.ibcCiipFlag)
+      {
+#endif
+#else
+#if JVET_AC0112_IBC_LIC
+      if (!pu.cu->ibcLicFlag)
+      {
+#endif
+#endif
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
       PU::fillIBCMvpCand(pu, amvpInfo[i], this);
 #else
       PU::fillIBCMvpCand(pu, amvpInfo[i]);
+#endif
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+      m_amvpInfo[i] = amvpInfo[i];
+      }
+      else
+      {
+        amvpInfo[i] = m_amvpInfo[i];
+      }
 #endif
 
       // store in full pel accuracy, shift before use in search
@@ -2168,19 +2305,63 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     /// ibc search
     pu.cu->imv = 2;
     AMVPInfo amvpInfo4Pel;
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if JVET_AC0112_IBC_CIIP
+#if JVET_AC0112_IBC_LIC
+    if (!pu.ibcCiipFlag && !pu.cu->ibcLicFlag)
+    {
+#else
+    if (!pu.ibcCiipFlag)
+    {
+#endif
+#else
+#if JVET_AC0112_IBC_LIC
+    if (!pu.cu->ibcLicFlag)
+    {
+#endif
+#endif
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
     PU::fillIBCMvpCand(pu, amvpInfo4Pel, this);
 #else
     PU::fillIBCMvpCand(pu, amvpInfo4Pel);
+#endif
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+      m_amvpInfo4Pel = amvpInfo4Pel;
+    }
+    else
+    {
+      amvpInfo4Pel = m_amvpInfo4Pel;
+    }
 #endif
 
     pu.cu->imv = 0;// (Int)cu.cs->sps->getUseIMV(); // set as IMV=0 initially
     Mv    cMv, cMvPred[2];
     AMVPInfo amvpInfo;
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if JVET_AC0112_IBC_CIIP
+#if JVET_AC0112_IBC_LIC
+    if (!pu.ibcCiipFlag && !pu.cu->ibcLicFlag)
+    {
+#else
+    if (!pu.ibcCiipFlag)
+    {
+#endif
+#else
+#if JVET_AC0112_IBC_LIC
+    if (!pu.cu->ibcLicFlag)
+    {
+#endif
+#endif
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
     PU::fillIBCMvpCand(pu, amvpInfo, this);
 #else
     PU::fillIBCMvpCand(pu, amvpInfo);
+#endif
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+      m_amvpInfo = amvpInfo;
+    }
+    else
+    {
+      amvpInfo = m_amvpInfo;
+    }
 #endif
 
     // store in full pel accuracy, shift before use in search
@@ -2200,23 +2381,57 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     }
 #endif
 
+#if JVET_AC0112_IBC_CIIP
+    const CompArea &area = pu.blocks[COMPONENT_Y];
+    const UnitArea localUnitArea(area.chromaFormat, Area(0, 0, area.width, area.height));
+    PelBuf ibcCiipIntraBuff = m_ibcCiipBuffer.getBuf(localUnitArea.Y());
+    if (pu.ibcCiipFlag)
+    {
+      ibcCiipIntraBuff.copyFrom(*ibcCiipIntraBuf);
+    }
+#endif
+
+#if JVET_AC0112_IBC_CIIP
+    if (m_pcEncCfg->getIBCHashSearch() && !pu.ibcCiipFlag)
+#else
     if (m_pcEncCfg->getIBCHashSearch())
+#endif
     {
 #if JVET_AA0070_RRIBC
       xxIBCHashSearch(pu, cMvPred, iBvpNum, cMv, bvpIdxBest, ibcHashMap, amvpInfo4Pel, numRribcType);
 #else
       xxIBCHashSearch(pu, cMvPred, iBvpNum, cMv, bvpIdxBest, ibcHashMap);
 #endif
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+      if (searchedByHash)
+      {
+        *searchedByHash = true;
+      }
+#endif
     }
 
     if (cMv.getHor() == 0 && cMv.getVer() == 0)
     {
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+      if (searchedByHash)
+      {
+        *searchedByHash = false;
+      }
+#endif
       // if hash search does not work or is not enabled
       PelUnitBuf origBuf = pu.cs->getOrgBuf(pu);
 #if JVET_AA0070_RRIBC
+#if JVET_AC0112_IBC_CIIP
+      xIBCEstimation(pu, origBuf, ibcCiipIntraBuff, cMvPred, cMv, cost, localSearchRangeX, localSearchRangeY, numRribcType);
+#else
       xIBCEstimation(pu, origBuf, cMvPred, cMv, cost, localSearchRangeX, localSearchRangeY, numRribcType);
+#endif
+#else
+#if JVET_AC0112_IBC_CIIP
+      xIBCEstimation(pu, origBuf, ibcCiipIntraBuff, cMvPred, cMv, cost, localSearchRangeX, localSearchRangeY);
 #else
       xIBCEstimation(pu, origBuf, cMvPred, cMv, cost, localSearchRangeX, localSearchRangeY);
+#endif
 #endif
     }
 
@@ -2226,12 +2441,50 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     }
     /// ibc search
     /////////////////////////////////////////////////////////
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+    if (bvSearchCost)
+    {
+      *bvSearchCost = cost;
+    }
+#endif
 #if JVET_Z0131_IBC_BVD_BINARIZATION
     m_pcRdCost->setPredictors(cMvPred);
     m_pcRdCost->setCostScale(0);
 #if JVET_AA0070_RRIBC
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
-    m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), pu.cu->rribcFlipType, &pu.cu->imv, &bvpIdxBest, true, &amvpInfo4Pel[pu.cu->rribcFlipType]);
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    if (pu.isBvpClusterApplicable())
+    {
+#if !JVET_AC0112_IBC_CIIP && !JVET_AC0112_IBC_LIC
+    Distortion initCost = 
+#endif
+        m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(),
+                                           pu.cu->rribcFlipType, &pu.cu->imv, &bvpIdxBest, true,
+                                           &amvpInfo4Pel[pu.cu->rribcFlipType], pu.isBvpClusterApplicable());
+
+    if (pu.cu->rribcFlipType)
+    {
+      pu.cu->bvOneZeroComp = 1;
+      pu.cu->bvZeroCompDir = pu.cu->rribcFlipType;
+    }
+#if !JVET_AC0112_IBC_CIIP && !JVET_AC0112_IBC_LIC
+    else
+    {
+      getBestBvpBvOneZeroComp(pu, cMv, initCost, &bvpIdxBest , &amvpInfo[0], &amvpInfo4Pel[0]);
+    }
+#endif
+    }
+    else
+    {
+      m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(),
+                                         pu.cu->rribcFlipType, &pu.cu->imv, &bvpIdxBest, true,
+                                         &amvpInfo4Pel[pu.cu->rribcFlipType]);
+    }
+#else
+    m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(),
+                                       pu.cu->rribcFlipType, &pu.cu->imv, &bvpIdxBest, true,
+                                       &amvpInfo4Pel[pu.cu->rribcFlipType]);
+#endif
 #else
     m_pcRdCost->getBvCostMultiplePreds(cMv.getHor(), cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), pu.cu->rribcFlipType, &pu.cu->imv, &bvpIdxBest);
 #endif
@@ -2326,7 +2579,6 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     }
 #endif
 
-
     pu.bv = cMv; // bv is always at integer accuracy
     cMv.changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
     pu.mv[REF_PIC_LIST_0] = cMv; // store in fractional pel accuracy
@@ -2357,19 +2609,105 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
       pu.mvd[REF_PIC_LIST_0] = cMv - amvpInfo.mvCand[bvpIdxBest];
 #endif
 
-    if (pu.mvd[REF_PIC_LIST_0] == Mv(0, 0))
+    if( pu.mvd[REF_PIC_LIST_0] == Mv( 0, 0 ) )
+    {
       pu.cu->imv = 0;
-    if (pu.cu->imv == 2)
-      assert((cMv.getHor() % 16 == 0) && (cMv.getVer() % 16 == 0));
-    if (cu.cs->sps->getAMVREnabledFlag())
-      assert(pu.cu->imv>0 || pu.mvd[REF_PIC_LIST_0] == Mv());
+    }
+
+    if( pu.cu->imv == 2 )
+    {
+      assert( ( cMv.getHor() % 16 == 0 ) && ( cMv.getVer() % 16 == 0 ) );
+    }
+
+    if( cu.cs->sps->getAMVREnabledFlag() )
+    {
+      assert( pu.cu->imv > 0 || pu.mvd[REF_PIC_LIST_0] == Mv() );
+    }
 
     pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
 
+#if JVET_AC0104_IBC_BVD_PREDICTION 
+    pu.mvsdIdx[REF_PIC_LIST_0] = 0;
+    if (pu.isBvdPredApplicable() && pu.mvd[REF_PIC_LIST_0].isMvsdApplicable())
+    {
+      pu.bvdSuffixInfo.initPrefixes(pu.mvd[REF_PIC_LIST_0], pu.cu->imv, true);
+
+      std::vector<Mv> cMvdDerivedVec;
+#if JVET_AA0070_RRIBC
+      Mv cMvPred2 = ((pu.cu->imv == 2 && cMv != amvpInfo4Pel[pu.cu->rribcFlipType].mvCand[bvpIdxBest]) ? amvpInfo4Pel[pu.cu->rribcFlipType] : amvpInfo[pu.cu->rribcFlipType]).mvCand[bvpIdxBest];
+      if (pu.cu->rribcFlipType == 1)
+      {
+        cMvPred2.setVer(0);
+      }
+      else if (pu.cu->rribcFlipType == 2)
+      {
+        cMvPred2.setHor(0);
+      }
+#else
+      const Mv cMvPred2 = ((pu.cu->imv == 2 && cMv != amvpInfo4Pel.mvCand[bvpIdxBest]) ? amvpInfo4Pel : amvpInfo).mvCand[bvpIdxBest];
+#endif
+
+      const Mv cMvdKnownAtDecoder = pu.mvd[REF_PIC_LIST_0];// .getAbsMv();
+
+      deriveBvdSignIBC(cMvPred2, cMvdKnownAtDecoder, pu, cMvdDerivedVec, pu.cu->imv);
+
+      int idx = deriveMVSDIdxFromMVDTransIBC(pu.mvd[REF_PIC_LIST_0], cMvdDerivedVec, pu.bvdSuffixInfo);
+
+      initOffsets(pu.mvd[REF_PIC_LIST_0], cMvdDerivedVec, pu.bvdSuffixInfo, pu.cu->imv);
+
+      CHECK(idx == -1, "pu.mvsdIdx[REF_PIC_LIST_0] = -1");
+
+      pu.mvsdIdx[REF_PIC_LIST_0] = idx;
+    }
+#endif
   }
 
   return true;
 }
+
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+inline void InterSearch::getBestBvpBvOneZeroComp(PredictionUnit &pu, Mv cMv, Distortion initCost,
+                                                 int *bvpIdxBest, AMVPInfo *amvp1Pel, AMVPInfo *amvp4Pel)
+{
+  Mv         bvpCand[2];
+  int        tempImv = 0, tempIdx = 0;
+  Distortion bvOneZeroCompCost = std::numeric_limits<uint32_t>::max();
+  if (cMv.getVer() == 0)
+  {
+    bvpCand[0] = Mv(std::max(-(int) pu.lwidth(), -pu.Y().x), 0);
+    bvpCand[1] = Mv(-pu.Y().x, 0);
+    bvOneZeroCompCost = m_pcRdCost->getBvVerZeroCompCost(cMv.getHor(), pu.cs->sps->getAMVREnabledFlag(), &tempImv, &tempIdx, bvpCand);
+  }
+  else if (cMv.getHor() == 0)
+  {
+    const int ctbSize     = pu.cs->sps->getCTUSize();
+    const int numCurrCtuY = (pu.Y().y >> (floorLog2(ctbSize)));
+    const int rrTop       = (numCurrCtuY < 3) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + 2 * ctbSize);
+
+    bvpCand[0] = Mv(0, std::max(-(int) pu.lheight(), rrTop));
+    bvpCand[1] = Mv(0, rrTop);
+    bvOneZeroCompCost = m_pcRdCost->getBvHorZeroCompCost(cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &tempImv, &tempIdx, bvpCand);
+  }
+
+  if (bvOneZeroCompCost < initCost)
+  {
+    pu.cu->bvOneZeroComp = 1;
+    pu.cu->bvZeroCompDir = (cMv.getVer() == 0) ? 1 : cMv.getHor() == 0 ? 2 : 0;
+    pu.cu->imv           = tempImv;
+    *bvpIdxBest          = tempIdx;
+    if (pu.cu->imv == 2)
+    {
+      amvp4Pel->mvCand[tempIdx] = bvpCand[tempIdx];
+      amvp4Pel->mvCand[tempIdx].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+    }
+    else
+    {
+      amvp1Pel->mvCand[tempIdx] = bvpCand[tempIdx];
+      amvp1Pel->mvCand[tempIdx].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+    }
+  }
+}
+#endif
 
 #if JVET_AA0070_RRIBC
 void InterSearch::xxIBCHashSearch(PredictionUnit &pu, Mv mvPred[3][2], int numMvPred, Mv &mv, int &idxMvPred, IbcHashMap &ibcHashMap, AMVPInfo amvpInfo4Pel[3], int numRribcType)
@@ -2466,7 +2804,7 @@ void InterSearch::xxIBCHashSearch(PredictionUnit &pu, Mv *mvPred, int numMvPred,
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AA0070_RRIBC
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
         Distortion cost = m_pcRdCost->getBvCostMultiplePreds(candMv.getHor(), candMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), rribcFlipType, &pu.cu->imv, &idxMvPred, true, &amvpInfo4Pel[rribcFlipType]);
 #else
         Distortion cost = m_pcRdCost->getBvCostMultiplePreds(candMv.getHor(), candMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), rribcFlipType, &pu.cu->imv, &idxMvPred);
@@ -3282,7 +3620,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
   int          bestBiPMvpL1    = 0;
   Distortion   biPDistTemp     = std::numeric_limits<Distortion>::max();
 
-  uint8_t      bcwIdx          = (cu.cs->slice->isInterB() ? cu.BcwIdx : BCW_DEFAULT);
+  uint8_t      bcwIdx          = (cu.cs->slice->isInterB() ? cu.bcwIdx : BCW_DEFAULT);
   bool         enforceBcwPred = false;
   MergeCtx     mergeCtx;
 
@@ -3379,7 +3717,14 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     if (cu.cs->sps->getSbTMVPEnabledFlag())
     {
       Size bufSize = g_miScaling.scale(pu.lumaSize());
-      mergeCtx.subPuMvpMiBuf = MotionBuf(m_SubPuMiBuf, bufSize);
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+      for (int i = 0; i < SUB_TMVP_NUM; i++)
+      {
+        mergeCtx.subPuMvpMiBuf[i] = MotionBuf(m_subPuMiBuf[i], bufSize);
+      }
+#else
+      mergeCtx.subPuMvpMiBuf = MotionBuf(m_subPuMiBuf, bufSize);
+#endif
     }
 
     Distortion   uiHevcCost = std::numeric_limits<Distortion>::max();
@@ -3477,7 +3822,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           {
             xMotionEstimation( pu, origBuf, eRefPicList, cMvPred[iRefList][iRefIdxTemp], iRefIdxTemp, cMvTemp[iRefList][iRefIdxTemp], aaiMvpIdx[iRefList][iRefIdxTemp], uiBitsTemp, uiCostTemp, amvp[eRefPicList] );
           }
-          if( cu.cs->sps->getUseBcw() && cu.BcwIdx == BCW_DEFAULT && cu.cs->slice->isInterB() )
+          if( cu.cs->sps->getUseBcw() && cu.bcwIdx == BCW_DEFAULT && cu.cs->slice->isInterB() )
           {
             const bool checkIdentical = true;
             m_uniMotions.setReadMode(checkIdentical, (uint32_t)iRefList, (uint32_t)iRefIdxTemp);
@@ -3527,7 +3872,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
         unsigned idx1, idx2, idx3, idx4;
         getAreaIdx(cu.Y(), *cu.slice->getPPS()->pcv, idx1, idx2, idx3, idx4);
 #if INTER_LIC
-        if (cu.slice->getUseLIC() && cu.LICFlag)
+        if (cu.slice->getUseLIC() && cu.licFlag)
         {
           ::memcpy(&(g_reusedUniMVsLIC[idx1][idx2][idx3][idx4][0][0]), cMvTemp, 2 * 33 * sizeof(Mv));
           g_isReusedUniMVsFilledLIC[idx1][idx2][idx3][idx4] = true;
@@ -3548,7 +3893,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
       if( ( cs.slice->isInterB() ) && ( PU::isBipredRestriction( pu ) == false )
         && (cu.slice->getCheckLDC() || bcwIdx == BCW_DEFAULT || !m_affineModeSelected || !m_pcEncCfg->getUseBcwFast())
 #if INTER_LIC
-        && !cu.LICFlag
+        && !cu.licFlag
 #endif
         )
       {
@@ -3751,7 +4096,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
               && (pu.cu->slice->getRefPic(eRefPicList, iRefIdxTemp)->getPOC() == pu.cu->slice->getRefPic(RefPicList(1 - iRefList), pu.refIdx[1 - iRefList])->getPOC())
               && (!pu.cu->imv && pu.cu->slice->getTLayer()>1)
 #if INTER_LIC
-              && !cu.LICFlag
+              && !cu.licFlag
 #endif
               )
             {
@@ -4304,7 +4649,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 
       if( bcwIdx != BCW_DEFAULT )
       {
-        cu.BcwIdx = BCW_DEFAULT; // Reset to default for the Non-NormalMC modes.
+        cu.bcwIdx = BCW_DEFAULT; // Reset to default for the Non-NormalMC modes.
       }
 
     uiHevcCost = ( uiCostBi <= uiCost[0] && uiCostBi <= uiCost[1] ) ? uiCostBi : ( ( uiCost[0] <= uiCost[1] ) ? uiCost[0] : uiCost[1] );
@@ -4474,7 +4819,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     {
       if (bcwIdx != BCW_DEFAULT)
       {
-        cu.BcwIdx = bcwIdx;
+        cu.bcwIdx = bcwIdx;
       }
     }
     m_maxCompIDToPred = MAX_NUM_COMPONENT;
@@ -4494,7 +4839,11 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     if (!pu.bdmvrRefine)
 #endif
     {
-      PU::spanMotionInfo( pu, mergeCtx );
+      PU::spanMotionInfo(pu, mergeCtx
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        , pu.colIdx
+#endif
+      );
     }
 
     m_skipPROF = false;
@@ -4510,7 +4859,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
       m_affineMotion.hevcCost[pu.cu->imv] = uiHevcCost;
     }
 #if INTER_LIC
-    if (cu.LICFlag)
+    if (cu.licFlag)
     {
 #if !TM_AMVP
       m_storeBeforeLIC = true;
@@ -4526,7 +4875,11 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #if JVET_X0083_BM_AMVP_MERGE_MODE
     if (pu.bdmvrRefine)
     {
-      PU::spanMotionInfo( *cu.firstPU, MergeCtx(), mvBufEncAmBDMVR_L0, mvBufEncAmBDMVR_L1, getBdofSubPuMvOffset() );
+      PU::spanMotionInfo(*cu.firstPU, MergeCtx(),
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        pu.colIdx,
+#endif
+        mvBufEncAmBDMVR_L0, mvBufEncAmBDMVR_L1, getBdofSubPuMvOffset());
     }
 #endif
 #if INTER_LIC && (!TM_AMVP || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP))
@@ -4537,7 +4890,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 
 #if INTER_LIC
 #if !TM_AMVP || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP) // This LIC optimization must be off; otherwise, enc/dec mismatching will result. Because the cost metrics (MRSAD or SAD) of TM mode is adaptive to LIC flag, refined MVs would change when LIC flag is 1 or 0.
-  if (cu.LICFlag && pu.interDir != 10
+  if (cu.licFlag && pu.interDir != 10
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP
     && !pu.cs->sps->getUseTMAmvpMode()
 #endif
@@ -4554,8 +4907,8 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     Distortion distLicOff = distParam.distFunc(distParam);
     if (distLicOn >= distLicOff)
     {
-      pu.cu->LICFlag = false;
-      PU::spanLICFlags(pu, false);
+      pu.cu->licFlag = false;
+      PU::spanLicFlags(pu, false);
       predBuf.copyFrom(m_predictionBeforeLIC);
     }
   }
@@ -4694,7 +5047,7 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
     return;
   }
 
-  CHECK(!pu.mergeFlag && pu.cu->BcwIdx == BCW_DEFAULT, "!pu.mergeFlag && pu.cu->BcwIdx == BCW_DEFAULT");
+  CHECK(!pu.mergeFlag && pu.cu->bcwIdx == BCW_DEFAULT, "!pu.mergeFlag && pu.cu->bcwIdx == BCW_DEFAULT");
   // get first prediction hypothesis
   PelUnitBuf tempPredBuf;
   if (x.predBuf != nullptr)
@@ -4727,7 +5080,7 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
   unsigned idx1, idx2, idx3, idx4;
   getAreaIdx(pu.Y(), *pu.cs->slice->getPPS()->pcv, idx1, idx2, idx3, idx4);
 #if INTER_LIC
-  auto savedLICFlag = pu.cu->LICFlag;
+  auto savedLICFlag = pu.cu->licFlag;
 #endif
   tempMHPredData.isMrg = true;
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
@@ -4775,7 +5128,7 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
       {
         if (m_mhpMrgTempBufSet // MC results already stored when checking GEO RD cost
 #if INTER_LIC
-          && (fakePredData.cu->LICFlag == m_geoMrgCtx.LICFlags[i])
+          && (fakePredData.cu->licFlag == m_geoMrgCtx.licFlags[i])
 #endif
           )
         {
@@ -4813,7 +5166,7 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
       tempMHPredData.mv = m_geoMrgCtx.mvFieldNeighbours[(i << 1) + refList].mv;
       tempMHPredData.imv = m_geoMrgCtx.useAltHpelIf[i] ? IMV_HPEL : 0;
 #if INTER_LIC 
-      tempMHPredData.LICFlag = savedLICFlag;
+      tempMHPredData.licFlag = savedLICFlag;
 #endif
       tempMHPredData.refList = refList;
       for (tempMHPredData.weightIdx = 0; tempMHPredData.weightIdx < numWeights; ++tempMHPredData.weightIdx)
@@ -4855,7 +5208,7 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
   }
   tempMHPredData.isMrg = false;
 #if INTER_LIC 
-  tempMHPredData.LICFlag = pu.cu->LICFlag;
+  tempMHPredData.licFlag = pu.cu->licFlag;
 #endif
   tempMHPredData.imv = pu.cu->imv;
   for (tempMHPredData.weightIdx = 0; tempMHPredData.weightIdx < numWeights; ++tempMHPredData.weightIdx)
@@ -4888,12 +5241,12 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
         }
         Distortion uiCostTemp = 0;
 #if INTER_LIC
-        pu.cu->LICFlag = tempMHPredData.LICFlag;
+        pu.cu->licFlag = tempMHPredData.licFlag;
 #endif
         xMotionEstimation(pu, tempOrigBuf, eRefPicList, cMvPred, iRefIdxPred, cMv, tempMHPredData.mvpIdx, uiBits, uiCostTemp, amvpInfo, false, g_addHypWeight[tempMHPredData.weightIdx]);
         xCheckBestMVP(eRefPicList, cMv, cMvPred, tempMHPredData.mvpIdx, amvpInfo, uiBits, uiCostTemp, pu.cu->imv);
 #if INTER_LIC
-        pu.cu->LICFlag = savedLICFlag;
+        pu.cu->licFlag = savedLICFlag;
 #endif
         tempMHPredData.mv = cMv;
         tempMHPredData.mv.mvCliptoStorageBitDepth();
@@ -5196,7 +5549,7 @@ void InterSearch::getBestGeoModeListEncoder(PredictionUnit &pu, uint8_t& numVali
 
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
-        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+        int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
         uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefTopPart0.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
         gpmTplCostPart0[0][splitDir] = tempDist;
@@ -5212,7 +5565,7 @@ void InterSearch::getBestGeoModeListEncoder(PredictionUnit &pu, uint8_t& numVali
 
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
-        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+        int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
         uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefTopPart1.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
         gpmTplCostPart1[0][splitDir] = tempDist;  // pre-calculated
@@ -5253,7 +5606,7 @@ void InterSearch::getBestGeoModeListEncoder(PredictionUnit &pu, uint8_t& numVali
 
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
-        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+        int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
         uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefLeftPart0.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
         gpmTplCostPart0[0][splitDir] += tempDist;
@@ -5269,7 +5622,7 @@ void InterSearch::getBestGeoModeListEncoder(PredictionUnit &pu, uint8_t& numVali
 
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
-        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+        int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
         uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefLeftPart1.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
         gpmTplCostPart1[0][splitDir] += tempDist;  // pre-calculated
@@ -5334,8 +5687,8 @@ void InterSearch::getBestGeoTMModeListEncoder(PredictionUnit &pu, uint8_t& numVa
 
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
-        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
-        uint8_t shapeIdx  = g_geoTmShape[0][g_GeoParams[splitDir][0]];
+        int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
+        uint8_t shapeIdx  = g_geoTmShape[0][g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
         uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefTopPart0[shapeIdx].Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
         gpmTplCostPart0[0][splitDir] = tempDist;
@@ -5350,8 +5703,8 @@ void InterSearch::getBestGeoTMModeListEncoder(PredictionUnit &pu, uint8_t& numVa
 
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
-        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
-        uint8_t shapeIdx  = g_geoTmShape[1][g_GeoParams[splitDir][0]];
+        int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
+        uint8_t shapeIdx  = g_geoTmShape[1][g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
         uint32_t tempDist = (uint32_t)Get01InvMaskedSampleSum(pcBufPredRefTopPart1[shapeIdx].Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
         gpmTplCostPart1[1][splitDir] = tempDist;
@@ -5395,8 +5748,8 @@ void InterSearch::getBestGeoTMModeListEncoder(PredictionUnit &pu, uint8_t& numVa
 
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
-        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
-        uint8_t shapeIdx  = g_geoTmShape[0][g_GeoParams[splitDir][0]];
+        int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
+        uint8_t shapeIdx  = g_geoTmShape[0][g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
         uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefLeftPart0[shapeIdx].Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
         gpmTplCostPart0[0][splitDir] += tempDist;
@@ -5411,8 +5764,8 @@ void InterSearch::getBestGeoTMModeListEncoder(PredictionUnit &pu, uint8_t& numVa
 
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
-        int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
-        uint8_t shapeIdx  = g_geoTmShape[1][g_GeoParams[splitDir][0]];
+        int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
+        uint8_t shapeIdx  = g_geoTmShape[1][g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
         uint32_t tempDist = (uint32_t)Get01InvMaskedSampleSum(pcBufPredRefLeftPart1[shapeIdx].Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
         gpmTplCostPart1[1][splitDir] += tempDist;
@@ -5479,7 +5832,7 @@ void InterSearch::xCollectIntraGeoPartCost(PredictionUnit &pu, IntraPrediction* 
         for (int i = 0; i < toSplitDir.size(); ++i)
         {
           int splitDir = toSplitDir[i];
-          int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+          int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
           Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
           gpmTplCost[splitDir] = (uint32_t)GetSampleSumFunc(partIdx + 2, pcBufDiffTop.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
         }
@@ -5513,7 +5866,7 @@ void InterSearch::xCollectIntraGeoPartCost(PredictionUnit &pu, IntraPrediction* 
         for (int i = 0; i < toSplitDir.size(); ++i)
         {
           int splitDir = toSplitDir[i];
-          int16_t mirrorIdx = g_angle2mirror[g_GeoParams[splitDir][0]];
+          int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
           Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
           gpmTplCost[splitDir] += (uint32_t)GetSampleSumFunc(partIdx + 2, pcBufDiffLeft.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
         }
@@ -5758,7 +6111,7 @@ Distortion InterSearch::xGetTemplateCost( const PredictionUnit& pu,
   // prediction pattern
   const bool bi = pu.cu->slice->testWeightPred() && pu.cu->slice->getSliceType()==P_SLICE
 #if INTER_LIC
-    && !pu.cu->LICFlag
+    && !pu.cu->licFlag
 #endif
     ;
 
@@ -5798,7 +6151,7 @@ Distortion InterSearch::xGetAffineTemplateCost( PredictionUnit& pu, PelUnitBuf& 
   // prediction pattern
   const bool bi = pu.cu->slice->testWeightPred() && pu.cu->slice->getSliceType()==P_SLICE
 #if INTER_LIC
-    && !pu.cu->LICFlag
+    && !pu.cu->licFlag
 #endif
     ;
   Mv mv[3];
@@ -5833,7 +6186,7 @@ void InterSearch::xMotionEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Ref
 #if MULTI_HYP_PRED
   if (!weight)
 #endif
-  if( pu.cu->cs->sps->getUseBcw() && pu.cu->BcwIdx != BCW_DEFAULT && !bBi && xReadBufferedUniMv(pu, eRefPicList, iRefIdxPred, rcMvPred, rcMv, ruiBits, ruiCost) )
+  if( pu.cu->cs->sps->getUseBcw() && pu.cu->bcwIdx != BCW_DEFAULT && !bBi && xReadBufferedUniMv(pu, eRefPicList, iRefIdxPred, rcMvPred, rcMv, ruiBits, ruiCost) )
   {
     return;
   }
@@ -5863,11 +6216,11 @@ void InterSearch::xMotionEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Ref
     PelUnitBuf otherBuf = m_tmpPredStorage[1 - (int)eRefPicList].getBuf( UnitAreaRelative(*pu.cu, pu ));
     origBufTmp.copyFrom(origBuf);
     origBufTmp.removeHighFreq( otherBuf, m_pcEncCfg->getClipForBiPredMeEnabled(), pu.cu->slice->clpRngs()
-                              ,getBcwWeight( pu.cu->BcwIdx, eRefPicList )
+                              ,getBcwWeight( pu.cu->bcwIdx, eRefPicList )
                               );
     pBuf = &origBufTmp;
 
-    fWeight = xGetMEDistortionWeight( pu.cu->BcwIdx, eRefPicList );
+    fWeight = xGetMEDistortionWeight( pu.cu->bcwIdx, eRefPicList );
   }
 #if MULTI_HYP_PRED
   else if (weight)
@@ -5878,7 +6231,7 @@ void InterSearch::xMotionEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Ref
 #endif
   m_cDistParam.isBiPred = bBi;
 #if INTER_LIC
-  m_cDistParam.useMR = pu.cu->LICFlag;
+  m_cDistParam.useMR = pu.cu->licFlag;
 #endif
 
   //  Search key pattern initialization
@@ -5931,7 +6284,7 @@ void InterSearch::xMotionEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Ref
   m_pcRdCost->setCostScale(2);
 
 #if INTER_LIC
-  if (pu.cu->LICFlag)
+  if (pu.cu->licFlag)
   {
     m_cDistParam.applyWeight = false;
   }
@@ -6113,7 +6466,7 @@ void InterSearch::xMotionEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Ref
   }
 
 #if INTER_LIC
-  if (pu.cu->LICFlag)
+  if (pu.cu->licFlag)
   {
     PelUnitBuf predTempBuf = m_tmpStorageLCU.getBuf(UnitAreaRelative(*pu.cu, pu));
     const Picture* picRef = pu.cu->slice->getRefPic(eRefPicList, iRefIdxPred);
@@ -7080,8 +7433,8 @@ Distortion InterSearch::xGetSymmetricCost( PredictionUnit& pu, PelUnitBuf& origB
 
   PelUnitBuf bufTmp = m_tmpStorageLCU.getBuf( UnitAreaRelative( *pu.cu, pu ) );
   bufTmp.copyFrom( origBuf );
-  bufTmp.removeHighFreq( predBufA, m_pcEncCfg->getClipForBiPredMeEnabled(), pu.cu->slice->clpRngs(), getBcwWeight( pu.cu->BcwIdx, eTarRefPicList ) );
-  double fWeight = xGetMEDistortionWeight( pu.cu->BcwIdx, eTarRefPicList );
+  bufTmp.removeHighFreq( predBufA, m_pcEncCfg->getClipForBiPredMeEnabled(), pu.cu->slice->clpRngs(), getBcwWeight( pu.cu->bcwIdx, eTarRefPicList ) );
+  double fWeight = xGetMEDistortionWeight( pu.cu->bcwIdx, eTarRefPicList );
 
   // calc distortion
   DFunc distFunc = (!pu.cu->slice->getDisableSATDForRD()) ? DF_HAD : DF_SAD;
@@ -7295,7 +7648,7 @@ void InterSearch::xPredAffineInterSearch( PredictionUnit&       pu,
   pu.regularMergeFlag = false;
   if( bcwIdx != BCW_DEFAULT )
   {
-    pu.cu->BcwIdx = bcwIdx;
+    pu.cu->bcwIdx = bcwIdx;
   }
 #if MULTI_HYP_PRED
   const bool saveMeResultsForMHP = pu.cs->sps->getUseInterMultiHyp()
@@ -7521,7 +7874,7 @@ void InterSearch::xPredAffineInterSearch( PredictionUnit&       pu,
                                  , aaiMvpIdx[iRefList][iRefIdxTemp], affiAMVPInfoTemp[eRefPicList]
         );
       }
-      if(pu.cu->cs->sps->getUseBcw() && pu.cu->BcwIdx == BCW_DEFAULT && pu.cu->slice->isInterB())
+      if(pu.cu->cs->sps->getUseBcw() && pu.cu->bcwIdx == BCW_DEFAULT && pu.cu->slice->isInterB())
       {
         m_uniMotions.setReadModeAffine(true, (uint8_t)iRefList, (uint8_t)iRefIdxTemp, pu.cu->affineType);
         m_uniMotions.copyAffineMvFrom(cMvTemp[iRefList][iRefIdxTemp], uiCostTemp - m_pcRdCost->getCost(uiBitsTemp), (uint8_t)iRefList, (uint8_t)iRefIdxTemp, pu.cu->affineType
@@ -7609,7 +7962,7 @@ void InterSearch::xPredAffineInterSearch( PredictionUnit&       pu,
     && !(pu.cu->affineType == AFFINEMODEL_6PARAM && (refIdx4Para[0] == NOT_VALID || refIdx4Para[1] == NOT_VALID))
 #endif
 #if INTER_LIC
-    && !pu.cu->LICFlag
+    && !pu.cu->licFlag
 #endif
     )
   {
@@ -7992,7 +8345,7 @@ void InterSearch::xPredAffineInterSearch( PredictionUnit&       pu,
   }
   if( bcwIdx != BCW_DEFAULT )
   {
-    pu.cu->BcwIdx = BCW_DEFAULT;
+    pu.cu->bcwIdx = BCW_DEFAULT;
   }
 }
 
@@ -8216,7 +8569,7 @@ void InterSearch::xAffineMotionEstimation( PredictionUnit& pu,
                                            const AffineAMVPInfo& aamvpi,
                                            bool            bBi)
 {
-  if( pu.cu->cs->sps->getUseBcw() && pu.cu->BcwIdx != BCW_DEFAULT && !bBi && xReadBufferedAffineUniMv(pu, eRefPicList, iRefIdxPred, acMvPred, acMv, ruiBits, ruiCost
+  if( pu.cu->cs->sps->getUseBcw() && pu.cu->bcwIdx != BCW_DEFAULT && !bBi && xReadBufferedAffineUniMv(pu, eRefPicList, iRefIdxPred, acMvPred, acMv, ruiBits, ruiCost
       , mvpIdx, aamvpi
   ) )
   {
@@ -8245,11 +8598,11 @@ void InterSearch::xAffineMotionEstimation( PredictionUnit& pu,
     PelUnitBuf otherBuf = m_tmpPredStorage[1 - (int)eRefPicList].getBuf( UnitAreaRelative( *pu.cu, pu ) );
     origBufTmp.copyFrom(origBuf);
     origBufTmp.removeHighFreq(otherBuf, m_pcEncCfg->getClipForBiPredMeEnabled(), pu.cu->slice->clpRngs()
-                             ,getBcwWeight(pu.cu->BcwIdx, eRefPicList)
+                             ,getBcwWeight(pu.cu->bcwIdx, eRefPicList)
                              );
     pBuf = &origBufTmp;
 
-    fWeight = xGetMEDistortionWeight( pu.cu->BcwIdx, eRefPicList );
+    fWeight = xGetMEDistortionWeight( pu.cu->bcwIdx, eRefPicList );
   }
 
   // pred YUV
@@ -11315,7 +11668,7 @@ double InterSearch::xGetMEDistortionWeight(uint8_t bcwIdx, RefPicList eRefPicLis
 {
   if( bcwIdx != BCW_DEFAULT )
   {
-    return fabs((double)getBcwWeight(bcwIdx, eRefPicList) / (double)g_BcwWeightBase);
+    return fabs((double)getBcwWeight(bcwIdx, eRefPicList) / (double)g_bcwWeightBase);
   }
   else
   {
@@ -11487,9 +11840,9 @@ void InterSearch::symmvdCheckBestMvp(
   }
   PelUnitBuf bufTmp = m_tmpStorageLCU.getBuf( UnitAreaRelative( *pu.cu, pu ) );
   bufTmp.copyFrom( origBuf );
-  bufTmp.removeHighFreq( predBufA, m_pcEncCfg->getClipForBiPredMeEnabled(), pu.cu->slice->clpRngs(), getBcwWeight( pu.cu->BcwIdx, tarRefList ) );
+  bufTmp.removeHighFreq( predBufA, m_pcEncCfg->getClipForBiPredMeEnabled(), pu.cu->slice->clpRngs(), getBcwWeight( pu.cu->bcwIdx, tarRefList ) );
 
-  double fWeight = xGetMEDistortionWeight( pu.cu->BcwIdx, tarRefList );
+  double fWeight = xGetMEDistortionWeight( pu.cu->bcwIdx, tarRefList );
 
   int32_t skipMvpIdx[2];
   skipMvpIdx[0] = skip ? mvpIdxSym[0] : -1;

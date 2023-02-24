@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -122,6 +122,9 @@ struct Picture : public UnitArea
         PelBuf      getTrueOrigBuf(const CompArea &blk);
   const CPelBuf     getTrueOrigBuf(const CompArea &blk) const;
 
+         PelBuf     getTrueOrigBuf(const ComponentID compID);
+  const CPelBuf     getTrueOrigBuf(const ComponentID compID) const;
+
          PelUnitBuf getFilteredOrigBuf();
   const CPelUnitBuf getFilteredOrigBuf() const;
          PelBuf     getFilteredOrigBuf(const CompArea &blk);
@@ -137,6 +140,10 @@ struct Picture : public UnitArea
          PelUnitBuf getResiBuf(const UnitArea &unit);
   const CPelUnitBuf getResiBuf(const UnitArea &unit) const;
   
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  void setResiBufPLT();
+#endif
+
          PelBuf     getRecoBuf(const ComponentID compID, bool wrap=false);
   const CPelBuf     getRecoBuf(const ComponentID compID, bool wrap=false) const;
          PelBuf     getRecoBuf(const CompArea &blk, bool wrap=false);

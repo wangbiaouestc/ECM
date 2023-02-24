@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -489,7 +489,16 @@ private:
   PelStorage      m_tmpStorageLCU;
   PelStorage      m_colorTransResiBuf;
 #if JVET_AB0143_CCCM_TS
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  PelStorage      m_cccmStorage[2][CCCM_NUM_MODES];
+#else
   PelStorage      m_cccmStorage[CCCM_NUM_MODES];
+#endif
+#endif
+
+#if JVET_AC0119_LM_CHROMA_FUSION
+  PelStorage      m_predStorage[2];
+  PelStorage      m_fusionStorage[6];
 #endif
 protected:
   // interface to option
@@ -524,6 +533,10 @@ public:
 #if INTRA_TRANS_ENC_OPT
   bool            m_skipTimdLfnstMtsPass;
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  bool            m_skipCCCMSATD;
+  int             m_isCccmNoSubModeEnabledInRdo[MMLM_T_IDX + 1];
+#endif 
   IntraSearch();
   ~IntraSearch();
 
@@ -600,8 +613,8 @@ protected:
   bool testISPforCurrCU(const CodingUnit &cu);
 #endif
   ChromaCbfs xRecurIntraChromaCodingQT( CodingStructure &cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE,                          const PartSplit ispType = TU_NO_ISP 
-#if JVET_AB0143_CCCM_TS
-    , PelUnitBuf cccmStorage = UnitBuf<      Pel>()
+#if JVET_AB0143_CCCM_TS || JVET_AC0119_LM_CHROMA_FUSION
+    , const PelUnitBuf& predStorage = UnitBuf<Pel>()
 #endif
   );
   bool       xRecurIntraCodingLumaQT  ( CodingStructure &cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE, const int subTuIdx = -1, const PartSplit ispType = TU_NO_ISP, const bool ispIsCurrentWinner = false, bool mtsCheckRangeFlag = false, int mtsFirstCheckId = 0, int mtsLastCheckId = 0, bool moreProbMTSIdxFirst = false );
@@ -612,6 +625,9 @@ protected:
   void reduceHadCandList(static_vector<T, N>& candModeList, static_vector<double, N>& candCostList, int& numModesForFullRD, const double thresholdHadCost, const double* mipHadCost, const PredictionUnit &pu, const bool fastMip
 #if JVET_AB0157_TMRL
     , const double* tmrlCostList
+#endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    , const double* dirPlanarCostList
 #endif
   );
   void   derivePLTLossy  (      CodingStructure& cs, Partitioner& partitioner, ComponentID compBegin, uint32_t numComp);

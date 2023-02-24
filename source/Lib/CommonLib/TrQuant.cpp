@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -307,6 +307,10 @@ void TrQuant::init( const Quant* otherQuant,
   m_fwdLfnst = forwardLfnst;
   m_invLfnst = inverseLfnst;
 #endif
+#if JVET_AC0130_NSPT && INTRA_TRANS_ENC_OPT
+  m_computeFwdNspt = computeFwdNspt;
+  m_computeInvNspt = computeInvNspt;
+#endif
 #if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT
 #ifdef TARGET_SIMD_X86
   initTrQuantX86();
@@ -478,6 +482,13 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
   if (lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (CS::isDualITree(*tu.cs) ? true : isLuma(compID)))
 #endif
   {
+#if JVET_AC0130_NSPT
+    bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *( tu.cu ) ) );
+    if( allowNSPT )
+    {
+      return;
+    }
+#endif
 #if JVET_W0119_LFNST_EXTENSION
     const bool whge4         = PU::getUseLFNST16( width, height );
     const bool whge3         = PU::getUseLFNST8 ( width, height );
@@ -509,13 +520,17 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
 #if JVET_AB0155_SGPM
     if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
     {
-      intraMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
+      intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
     }
 #endif
 #if JVET_V0130_INTRA_TMP
     if( PU::isTmp( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
     {
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+      intraMode = tu.cu->intraTmpDimdMode;
+#else
       intraMode = PLANAR_IDX;
+#endif
     }
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -524,7 +539,27 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
       intraMode = MAP131TO67(intraMode);
     }
 #endif
+#if JVET_AC0071_DBV
+    if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
+    {
+      intraMode = PLANAR_IDX;
+    }
+#endif
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
+
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    if (compID == COMPONENT_Y && intraMode == PLANAR_IDX)
+    {
+      if (tu.cu->plIdx == 2)
+      {
+        intraMode = HOR_IDX;
+      }
+      else if (tu.cu->plIdx == 1)
+      {
+        intraMode = VER_IDX;
+      }
+    }
+#endif
 
 #if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
     if (lfnstIdx < 4)
@@ -714,6 +749,13 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
   if (lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (CS::isDualITree(*tu.cs) ? true : isLuma(compID)))
 #endif
   {
+#if JVET_AC0130_NSPT
+    bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *( tu.cu ) ) );
+    if( allowNSPT )
+    {
+      return;
+    }
+#endif
 #if JVET_W0119_LFNST_EXTENSION
     const bool whge4         = PU::getUseLFNST16( width, height );  // width >= 16 && height >= 16;
     const bool whge3         = PU::getUseLFNST8( width, height );
@@ -745,13 +787,17 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
 #if JVET_V0130_INTRA_TMP
     if( PU::isTmp( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
     {
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+      intraMode = tu.cu->intraTmpDimdMode;
+#else
       intraMode = PLANAR_IDX;
+#endif
     }
 #endif
 #if JVET_AB0155_SGPM
     if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
     {
-      intraMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
+      intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
     }
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -760,7 +806,27 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
       intraMode = MAP131TO67(intraMode);
     }
 #endif
+#if JVET_AC0071_DBV
+    if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
+    {
+      intraMode = PLANAR_IDX;
+    }
+#endif
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
+
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    if (compID == COMPONENT_Y && intraMode == PLANAR_IDX)
+    {
+      if (tu.cu->plIdx == 2)
+      {
+        intraMode = HOR_IDX;
+      }
+      else if (tu.cu->plIdx == 1)
+      {
+        intraMode = VER_IDX;
+      }
+    }
+#endif
 
 #if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
     if ( lfnstIdx < 4 )
@@ -1057,7 +1123,11 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
   }
 
 #if JVET_V0130_INTRA_TMP
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  if (isImplicitMTS || isISP)
+#else
   if (isImplicitMTS || isISP || tu.cu->tmpFlag)
+#endif
 #else
   if (isImplicitMTS || isISP)
 #endif
@@ -1142,7 +1212,19 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
       uint8_t nSzIdxW = std::min(3, (floorLog2(width) - 2));
       uint8_t nSzIdxH = std::min(3, (floorLog2(height) - 2));
       const CompArea& area = tu.blocks[compID];
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+      int predMode;
+      if (tu.cu->tmpFlag)
+      {
+        predMode = tu.cu->intraTmpDimdMode;
+      }
+      else
+      {
+        predMode = PU::getFinalIntraMode(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID));
+      }
+#else
       int predMode = PU::getFinalIntraMode(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID));
+#endif
 #if JVET_W0123_TIMD_FUSION
       if (tu.cu->timd && compID == COMPONENT_Y)
       {
@@ -1152,7 +1234,7 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
 #if JVET_AB0155_SGPM
       if (tu.cu->sgpm)
       {
-        predMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
+        predMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
       }
 #endif
       int ucMode;
@@ -1170,6 +1252,19 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
         predMode = PU::getWideAngle(tu, (uint32_t)predMode, compID);
         CHECK(predMode < -(NUM_EXT_LUMA_MODE >> 1) || predMode >= NUM_LUMA_MODE + (NUM_EXT_LUMA_MODE >> 1), "luma mode out of range");
         predMode = (predMode < 0) ? 2 : (predMode >= NUM_LUMA_MODE) ? 66 : predMode;
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+        if (compID == COMPONENT_Y && predMode == PLANAR_IDX)
+        {
+          if (tu.cu->plIdx == 2)
+          {
+            predMode = HOR_IDX;
+          }
+          else if (tu.cu->plIdx == 1)
+          {
+            predMode = VER_IDX;
+          }
+        }
+#endif
         nMdIdx = predMode > DIA_IDX ? (NUM_LUMA_MODE + 1 - predMode) : predMode;
         isTrTransposed = (predMode > DIA_IDX) ? true : false;
       }
@@ -1235,6 +1330,10 @@ void TrQuant::xT( const TransformUnit &tu, const ComponentID &compID, const CPel
   int  skipHeight = ( trTypeVer != DCT2 && height == 32 ) ? 16 : height > JVET_C0024_ZERO_OUT_TH ? height - JVET_C0024_ZERO_OUT_TH : 0;
 #endif
 
+#if JVET_AC0130_NSPT
+  const bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *(tu.cu) ) );
+#endif
+
 #if EXTENDED_LFNST
   if( tu.cs->sps->getUseLFNST() && tu.cu->lfnstIdx && width >= 4 && height >= 4)
   {
@@ -1244,9 +1343,13 @@ void TrQuant::xT( const TransformUnit &tu, const ComponentID &compID, const CPel
     skipHeight = height - lfnst_threshold;
   }
 #else
+#if JVET_AC0130_NSPT
+  if( tu.cs->sps->getUseLFNST() && tu.cu->lfnstIdx && !allowNSPT )
+#else
   if( tu.cs->sps->getUseLFNST() && tu.cu->lfnstIdx )
+#endif
   {
-    if( (width == 4 && height > 4) || (width > 4 && height == 4) )
+    if( ( width == 4 && height > 16 ) || ( width > 16 && height == 4 ) )
     {
       skipWidth  = width  - 4;
       skipHeight = height - 4;
@@ -1258,7 +1361,7 @@ void TrQuant::xT( const TransformUnit &tu, const ComponentID &compID, const CPel
       skipHeight = height - 16;
     }
 #endif
-    else if( (width >= 8 && height >= 8) )
+    else if( ( width == 8 && height > 16 ) || ( width > 16 && height == 8 ) )
     {
       skipWidth  = width  - 8;
       skipHeight = height - 8;
@@ -1294,8 +1397,19 @@ void TrQuant::xT( const TransformUnit &tu, const ComponentID &compID, const CPel
     CHECK( shift_2nd < 0, "Negative shift" );
     TCoeff *tmp = (TCoeff *) alloca(width * height * sizeof(TCoeff));
 
+#if JVET_AC0130_NSPT
+    if( CU::nsptApplyCond( tu, compID, allowNSPT ) )
+    {
+      xFwdNspt( tu, block, dstCoeff.buf, compID, shift_1st, shift_2nd, tu.cu->lfnstIdx );
+    }
+    else
+    {
+#endif
     fastFwdTrans[trTypeHor][transformWidthIndex](block, tmp, shift_1st, height, 0, skipWidth);
     fastFwdTrans[trTypeVer][transformHeightIndex](tmp, dstCoeff.buf, shift_2nd, width, skipWidth, skipHeight);
+#if JVET_AC0130_NSPT
+    }
+#endif
   }
   else if( height == 1 ) //1-D horizontal transform
   {
@@ -1337,6 +1451,10 @@ void TrQuant::xIT( const TransformUnit &tu, const ComponentID &compID, const CCo
   int skipHeight = ( trTypeVer != DCT2 && height == 32 ) ? 16 : height > JVET_C0024_ZERO_OUT_TH ? height - JVET_C0024_ZERO_OUT_TH : 0;
 #endif
 
+#if JVET_AC0130_NSPT
+  const bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *(tu.cu) ) );
+#endif
+
 #if EXTENDED_LFNST
   if (tu.cs->sps->getUseLFNST() && tu.cu->lfnstIdx && width >= 4 && height >= 4)
   {
@@ -1346,9 +1464,13 @@ void TrQuant::xIT( const TransformUnit &tu, const ComponentID &compID, const CCo
     skipHeight = height - lfnst_threshold;
   }
 #else
+#if JVET_AC0130_NSPT
+  if( tu.cs->sps->getUseLFNST() && tu.cu->lfnstIdx && !allowNSPT )
+#else
   if( tu.cs->sps->getUseLFNST() && tu.cu->lfnstIdx )
+#endif
   {
-    if( (width == 4 && height > 4) || (width > 4 && height == 4) )
+    if( ( width == 4 && height > 16 ) || ( width > 16 && height == 4 ) )
     {
       skipWidth  = width  - 4;
       skipHeight = height - 4;
@@ -1360,7 +1482,7 @@ void TrQuant::xIT( const TransformUnit &tu, const ComponentID &compID, const CCo
       skipHeight = height - 16;
     }
 #endif
-    else if( (width >= 8 && height >= 8) )
+    else if( ( width == 8 && height > 16 ) || ( width > 16 && height == 8 ) )
     {
       skipWidth  = width  - 8;
       skipHeight = height - 8;
@@ -1377,8 +1499,20 @@ void TrQuant::xIT( const TransformUnit &tu, const ComponentID &compID, const CCo
     CHECK( shift_1st < 0, "Negative shift" );
     CHECK( shift_2nd < 0, "Negative shift" );
     TCoeff *tmp = ( TCoeff * ) alloca( width * height * sizeof( TCoeff ) );
+
+#if JVET_AC0130_NSPT
+    if( CU::nsptApplyCond( tu, compID, allowNSPT ) )
+    {
+      xInvNspt( tu, pCoeff.buf, block, compID, shift_1st, shift_2nd, tu.cu->lfnstIdx );
+    }
+    else
+    {
+#endif
   fastInvTrans[trTypeVer][transformHeightIndex](pCoeff.buf, tmp, shift_1st, width, skipWidth, skipHeight, clipMinimum, clipMaximum);
   fastInvTrans[trTypeHor][transformWidthIndex] (tmp,      block, shift_2nd, height,         0, skipWidth, clipMinimum, clipMaximum);
+#if JVET_AC0130_NSPT
+    }
+#endif
   }
   else if( width == 1 ) //1-D vertical transform
   {
@@ -1406,6 +1540,273 @@ void TrQuant::xIT( const TransformUnit &tu, const ComponentID &compID, const CCo
     }
   }
 }
+
+#if JVET_AC0130_NSPT
+void TrQuant::xFwdNspt( const TransformUnit &tu, TCoeff* src, TCoeff* dst, const ComponentID compID, const int shift_1st, const int shift_2nd, int lfnstIdx )
+{
+  const CompArea&   area = tu.blocks[ compID ];
+  const uint32_t   width = area.width;
+  const uint32_t  height = area.height;
+
+  const ScanElement * scan = g_scanOrder[ SCAN_GROUPED_4x4 ][ SCAN_DIAG ][ gp_sizeIdxInfo->idxFrom( width ) ][ gp_sizeIdxInfo->idxFrom( height ) ];
+  uint32_t intraMode = PU::getFinalIntraModeForTransform( tu, compID );
+
+  bool transposeFlag = getTransposeFlag( intraMode );
+
+  TCoeff*          nsptIn = m_nsptTempInMatrix;
+  TCoeff *        nsptOut = m_nsptTempOutMatrix;
+
+  if( transposeFlag )
+  {
+    TCoeff* srcTemp = src;
+    for( int y = 0; y < height; y++ )
+    {
+      TCoeff* nsptInTemp = nsptIn++;
+      for( int x = 0; x < width; x++ )
+      {
+        *nsptInTemp = *srcTemp++;
+        nsptInTemp += height;
+      }
+    }
+  }
+  else // transposeFlag = 0
+  {
+    ::memcpy( nsptIn, src, width * height * sizeof( TCoeff ) );
+  }
+
+  int         nsptIdx = lfnstIdx - 1;
+  uint8_t  nsptSetIdx = g_nsptLut[ intraMode ];
+  int     zeroOutSize = PU::getNSPTMatrixDim( transposeFlag ? height : width, transposeFlag ? width : height );
+
+#if INTRA_TRANS_ENC_OPT
+  m_computeFwdNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, zeroOutSize, nsptIdx );
+#else
+  computeFwdNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, zeroOutSize, nsptIdx );
+#endif
+
+  int nsptCoeffNum = PU::getNSPTMatrixDim( width, height );
+  const ScanElement *scanPtr = scan;
+
+  for( int y = 0; y < nsptCoeffNum; y++ )
+  {
+    dst[ scanPtr->idx ] = *nsptOut++;
+    scanPtr++;
+  } 
+}
+
+void TrQuant::xInvNspt( const TransformUnit &tu, const TCoeff* src, TCoeff* dst, const ComponentID compID, const int shift_1st, const int shift_2nd, int lfnstIdx )
+{
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+  const int maxLog2TrDynamicRange = tu.cs->sps->getMaxLog2TrDynamicRange( toChannelType( compID ) );
+#endif
+  const CompArea&   area = tu.blocks[ compID ];
+  const uint32_t   width = area.width;
+  const uint32_t  height = area.height;
+ 
+  const ScanElement * scan = g_scanOrder[ SCAN_GROUPED_4x4 ][ SCAN_DIAG ][ gp_sizeIdxInfo->idxFrom( width ) ][ gp_sizeIdxInfo->idxFrom( height ) ];
+  uint32_t intraMode = PU::getFinalIntraModeForTransform( tu, compID );
+
+#if RExt__DECODER_DEBUG_TOOL_STATISTICS
+  CodingStatistics::IncrementStatisticTool( CodingStatisticsClassType { STATS__TOOL_LFNST, width, height, compID } );
+#endif
+  bool transposeFlag = getTransposeFlag( intraMode );
+  TCoeff  *invNsptIn = m_nsptTempInMatrix;
+  int   nsptCoeffNum = PU::getNSPTMatrixDim( transposeFlag ? height : width, transposeFlag ? width : height );
+
+  const ScanElement *scanPtr = scan;
+  for( int i = 0; i < nsptCoeffNum; i++ )
+  {
+    *invNsptIn++ = src[ scanPtr->idx ];
+    scanPtr++;
+  }
+
+  int        nsptIdx = lfnstIdx - 1;
+  uint8_t nsptSetIdx = g_nsptLut[ intraMode ];
+  int    zeroOutSize = PU::getNSPTMatrixDim( transposeFlag ? height : width, transposeFlag ? width : height );
+
+#if INTRA_TRANS_ENC_OPT
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+  m_computeInvNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, maxLog2TrDynamicRange, zeroOutSize, nsptIdx );
+#else
+  m_computeInvNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, zeroOutSize, nsptIdx );
+#endif
+#else
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+  computeInvNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, maxLog2TrDynamicRange, zeroOutSize, nsptIdx );
+#else
+  computeInvNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, zeroOutSize, nsptIdx );
+#endif
+#endif
+
+  TCoeff*       nsptOut = m_nsptTempOutMatrix;
+
+  if( transposeFlag )
+  {
+    TCoeff* dstTemp = dst;
+    for( int y = 0; y < height; y++ )
+    {
+      TCoeff* nsptOutTemp = nsptOut++;
+      for( int x = 0; x < width; x++ )
+      {
+        *dstTemp++ = *nsptOutTemp;
+        nsptOutTemp += height;
+      }
+    }
+  }
+  else
+  {
+    ::memcpy( dst, nsptOut, width * height * sizeof( TCoeff ) );
+  }
+}
+
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+void TrQuant::computeFwdNspt( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx )
+#else
+void TrQuant::computeFwdNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx )
+#endif
+{
+  const int8_t* trMat = g_nspt4x4[ mode ][ nsptIdx ][ 0 ];
+  if( width == 8 && height == 8 )
+  {
+    trMat = g_nspt8x8[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 4 && height == 8 )
+  {
+    trMat = g_nspt4x8[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 8 && height == 4 )
+  {
+    trMat = g_nspt8x4[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 4 && height == 16 )
+  {
+    trMat = g_nspt4x16[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 16 && height == 4 )
+  {
+    trMat = g_nspt16x4[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 8 && height == 16 )
+  {
+    trMat = g_nspt8x16[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 16 && height == 8 )
+  {
+    trMat = g_nspt16x8[ mode ][ nsptIdx ][ 0 ];
+  }
+
+  int     trSize = width * height;
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+  TCoeff  coef;
+  TCoeff* out = dst;
+#else
+  int  coef;
+  int* out = dst;
+#endif
+
+  for( int j = 0; j < zeroOutSize; j++ )
+  {
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+    TCoeff*          srcPtr = src;
+#else
+    int*            srcPtr = src;
+#endif
+    const int8_t* trMatTmp = trMat;
+    coef = 0;
+    for( int i = 0; i < trSize; i++ )
+    {
+      coef += *srcPtr++ * *trMatTmp++;
+    }
+
+    int shift = shift_1st + shift_2nd - 7;
+    int rnd = 1 << ( shift - 1 );
+    *out++ = ( coef + rnd ) >> shift;
+
+    trMat += trSize;
+  }
+
+  std::fill_n( out, trSize - zeroOutSize, 0 );
+}
+
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+void TrQuant::computeInvNspt( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd,
+  const int maxLog2TrDynamicRange, int zeroOutSize, int nsptIdx )
+{
+#else
+void TrQuant::computeInvNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx )
+{
+  int             maxLog2TrDynamicRange = 15;
+#endif
+  const TCoeff    outputMinimum = -( 1 << maxLog2TrDynamicRange );
+  const TCoeff    outputMaximum = ( 1 << maxLog2TrDynamicRange ) - 1;
+
+  const int8_t* trMat = g_nspt4x4[ mode ][ nsptIdx ][ 0 ];
+  if( width == 8 && height == 8 )
+  {
+    trMat = g_nspt8x8[ mode ][ nsptIdx ][ 0 ];
+  }
+  if( width == 4 && height == 8 )
+  {
+    trMat = g_nspt4x8[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 8 && height == 4 )
+  {
+    trMat = g_nspt8x4[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 4 && height == 16 )
+  {
+    trMat = g_nspt4x16[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 16 && height == 4 )
+  {
+    trMat = g_nspt16x4[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 8 && height == 16 )
+  {
+    trMat = g_nspt8x16[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 16 && height == 8 )
+  {
+    trMat = g_nspt16x8[ mode ][ nsptIdx ][ 0 ];
+  }
+
+  int trSize = width * height;
+
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+  TCoeff  resi;
+  TCoeff* out = dst;
+#else
+  int  resi;
+  int* out = dst;
+#endif
+
+  for( int j = 0; j < trSize; j++ )
+  {
+    resi = 0;
+    const int8_t* trMatTmp = trMat;
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+    TCoeff*       srcPtr = src;
+#else
+    int*          srcPtr = src;
+#endif
+
+    for( int i = 0; i < zeroOutSize; i++ )
+    {
+      resi += *srcPtr++ * *trMatTmp;
+      trMatTmp += trSize;
+    }
+
+    int shift = shift_1st + shift_2nd - 7;
+    int rnd = 1 << ( shift - 1 );
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+    *out++ = Clip3<TCoeff>( outputMinimum, outputMaximum, ( resi + rnd ) >> shift );
+#else
+    *out++ = Clip3( outputMinimum, outputMaximum, ( int ) ( resi + rnd ) >> shift );
+#endif
+    trMat++;
+  }
+}
+#endif
 
 /** Wrapper function between HM interface and core NxN transform skipping
  */
@@ -1787,7 +2188,7 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     xFree(memTmpResid);
   };
 
-#if JVET_Y0141_SIGN_PRED_IMPROVE  
+#if JVET_Y0141_SIGN_PRED_IMPROVE
   auto createTemplateLFNST = [this, tu](ComponentID comp, uint32_t width, uint32_t height, uint32_t lfnstIdx) -> void
   {
     Pel      *memTmpResid = (Pel *)xMalloc(Pel, width*height);
@@ -2229,19 +2630,42 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
 #if JVET_V0130_INTRA_TMP
   if (PU::isTmp(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
   {
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+    intraMode = tu.cu->intraTmpDimdMode;
+#else
     intraMode = PLANAR_IDX;
+#endif
   }
 #endif
 #if JVET_AB0155_SGPM
   if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
   {
-    intraMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
+    intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
   }
 #endif
 #if JVET_W0123_TIMD_FUSION
   if (tu.cu->timd && compID == COMPONENT_Y)
   {
     intraMode = MAP131TO67(intraMode);
+  }
+#endif
+#if JVET_AC0071_DBV
+  if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
+  {
+    intraMode = PLANAR_IDX;
+  }
+#endif
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+  if (compID == COMPONENT_Y && intraMode == PLANAR_IDX)
+  {
+    if (tu.cu->plIdx == 2)
+    {
+      intraMode = HOR_IDX;
+    }
+    else if (tu.cu->plIdx == 1)
+    {
+      intraMode = VER_IDX;
+    }
   }
 #endif
 
@@ -2251,9 +2675,18 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
 #else
   CHECK((lfnstIdx != 1) && (lfnstIdx != 2), "invalid lfnst idx");
 #endif
+#if JVET_AC0130_NSPT
+  bool allowNSPT = CU::isNSPTAllowed( tu, compID, area.width, area.height, CU::isIntra( *( tu.cu ) ) );
+  intraMode = allowNSPT ? PU::getNSPTIntraMode( PU::getWideAngle( tu, intraMode, compID ) ) : getLFNSTIntraMode( PU::getWideAngle( tu, intraMode, compID ) );
+#else
   intraMode = getLFNSTIntraMode(PU::getWideAngle(tu, intraMode, compID));
+#endif
   bool transposeFlag = getTransposeFlag(intraMode);
+#if JVET_AC0130_NSPT
+  int mode = allowNSPT ? g_nsptLut[ intraMode ] : g_lfnstLut[ intraMode ];
+#else
   int mode = g_lfnstLut[intraMode];
+#endif
   int index = lfnstIdx - 1;
 #if JVET_W0119_LFNST_EXTENSION || EXTENDED_LFNST
   int result = (transposeFlag * 105) + (index * 35) + mode;

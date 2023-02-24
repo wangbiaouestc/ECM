@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -248,6 +248,84 @@ struct ModeInfo
 };
 #endif
 
+#if JVET_AC0112_IBC_CIIP
+struct ModeIbcInfo
+{
+#if JVET_AC0112_IBC_GPM
+  uint32_t mergeCand;
+  bool     isCIIP;
+  int      dirIdx;
+  bool     isIbcGpm;
+  int      mergeIdx0;
+  int      mergeIdx1;
+  int      splitDir;
+  int      bldIdx;
+  int      combIdx;
+  ModeIbcInfo() : mergeCand(0), isCIIP(false), dirIdx(0), isIbcGpm(false), mergeIdx0(0), mergeIdx1(0), splitDir(0), bldIdx(0), combIdx(0)
+  {}
+  ModeIbcInfo(const uint32_t mergeCand, const bool isCIIP, const int dirIdx, const bool isIbcGpm, const int mergeIdx0, const int mergeIdx1, const int splitDir, const int bldIdx, const int combIdx
+  ) :
+    mergeCand(mergeCand), isCIIP(isCIIP), dirIdx(dirIdx), isIbcGpm(isIbcGpm), mergeIdx0(mergeIdx0), mergeIdx1(mergeIdx1), splitDir(splitDir), bldIdx(bldIdx), combIdx(combIdx)
+  {}
+  ModeIbcInfo(const CodingUnit cu, const PredictionUnit pu)
+  {
+    mergeCand = pu.mergeIdx;
+    isCIIP = pu.ibcCiipFlag;
+    dirIdx = pu.ibcCiipIntraIdx;
+    isIbcGpm = pu.ibcGpmFlag;
+    mergeIdx0 = pu.ibcGpmMergeIdx0;
+    mergeIdx1 = pu.ibcGpmMergeIdx1;
+    splitDir = pu.ibcGpmSplitDir;
+    bldIdx = pu.ibcGpmBldIdx;
+  }
+#else
+  uint32_t mergeCand;
+  bool     isCIIP;
+  int      dirIdx;
+  ModeIbcInfo() : mergeCand(0), isCIIP(false), dirIdx(0)
+  {}
+  ModeIbcInfo(const uint32_t mergeCand, const bool isCIIP, const int dirIdx
+  ) :
+    mergeCand(mergeCand), isCIIP(isCIIP), dirIdx(dirIdx)
+  {}
+  ModeIbcInfo(const CodingUnit cu, const PredictionUnit pu)
+  {
+    mergeCand = pu.mergeIdx;
+    isCIIP = pu.ibcCiipFlag;
+    dirIdx = pu.ibcCiipIntraIdx;
+  }
+#endif
+};
+#endif
+
+#if JVET_AC0112_IBC_GPM && !JVET_AC0112_IBC_CIIP
+struct ModeIbcInfo
+{
+  uint32_t mergeCand;
+  bool     isIbcGpm;
+  int      mergeIdx0;
+  int      mergeIdx1;
+  int      splitDir;
+  int      bldIdx;
+  int      combIdx;
+  ModeIbcInfo() : mergeCand(0), isIbcGpm(false), mergeIdx0(0), mergeIdx1(0), splitDir(0), bldIdx(0), combIdx(0)
+  {}
+  ModeIbcInfo(const uint32_t mergeCand, const bool isIbcGpm, const int mergeIdx0, const int mergeIdx1, const int splitDir, const int bldIdx, const int combIdx
+  ) :
+    mergeCand(mergeCand), isIbcGpm(isIbcGpm), mergeIdx0(mergeIdx0), mergeIdx1(mergeIdx1), splitDir(splitDir), bldIdx(bldIdx), combIdx(combIdx)
+  {}
+  ModeIbcInfo(const CodingUnit cu, const PredictionUnit pu)
+  {
+    mergeCand = pu.mergeIdx;
+    isIbcGpm = pu.ibcGpmFlag;
+    mergeIdx0 = pu.ibcGpmMergeIdx0;
+    mergeIdx1 = pu.ibcGpmMergeIdx1;
+    splitDir = pu.ibcGpmSplitDir;
+    bldIdx = pu.ibcGpmBldIdx;
+  }
+};
+#endif
+
 #if INTER_LIC
 class EncFastLICCtrl
 {
@@ -281,7 +359,7 @@ public:
 public:
   void setBestAmvpRDBeforeLIC(const CodingUnit& cu, double curCuRdCost)
   {
-    m_amvpRdBeforeLIC[cu.imv] = !cu.firstPU->mergeFlag && cu.predMode != MODE_IBC && !cu.LICFlag ? std::min(curCuRdCost, m_amvpRdBeforeLIC[cu.imv]) : m_amvpRdBeforeLIC[cu.imv];
+    m_amvpRdBeforeLIC[cu.imv] = !cu.firstPU->mergeFlag && cu.predMode != MODE_IBC && !cu.licFlag ? std::min(curCuRdCost, m_amvpRdBeforeLIC[cu.imv]) : m_amvpRdBeforeLIC[cu.imv];
   }
 private:
   bool skipLicBasedOnBestAmvpRDBeforeLIC(uint8_t curCuimvIdx, double curBestRdCost)
@@ -306,6 +384,18 @@ private:
   Pel*            m_tmpAffiDeri[2];
 #else
   int*            m_tmpAffiDeri[2];
+#endif
+#if JVET_AC0112_IBC_CIIP
+  PelStorage      m_ibcCiipBuffer;
+#endif
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+#if JVET_AA0070_RRIBC
+  AMVPInfo        m_amvpInfo[3];
+  AMVPInfo        m_amvpInfo4Pel[3];
+#else
+  AMVPInfo        m_amvpInfo;
+  AMVPInfo        m_amvpInfo4Pel;
+#endif
 #endif
 
 #if MULTI_HYP_PRED
@@ -621,7 +711,11 @@ protected:
   Distortion  xPatternRefinement    ( const CPelBuf* pcPatternKey, Mv baseRefMv, int iFrac, Mv& rcMvFrac, bool bAllowUseOfHadamard );
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  void xEstBvdBitCosts(EstBvdBitsStruct *p, const bool useBvpCluster = true );
+#else
   void xEstBvdBitCosts(EstBvdBitsStruct *p);
+#endif
 #endif
 
    typedef struct
@@ -674,10 +768,26 @@ public:
   /// set ME search range
   void setAdaptiveSearchRange       ( int iDir, int iRefIdx, int iSearchRange) { CHECK(iDir >= MAX_NUM_REF_LIST_ADAPT_SR || iRefIdx>=int(MAX_IDX_ADAPT_SR), "Invalid index"); m_aaiAdaptSR[iDir][iRefIdx] = iSearchRange; }
 #if JVET_AA0070_RRIBC
+#if JVET_AC0112_IBC_CIIP
+  bool  predIBCSearch           ( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, Distortion* bvSearchCost = NULL, PelBuf* ciipIbcBuff = NULL, bool isSecondPass = false, bool* searchedByHash = NULL );
+#else
+#if JVET_AC0112_IBC_LIC
+  bool  predIBCSearch           ( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, Distortion* bvSearchCost = NULL, bool isSecondPass = false, bool* searchedByHash = NULL );
+#else
   bool  predIBCSearch           ( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, bool isSecondPass = false );
+#endif
+#endif
   void  xIntraPatternSearch          ( PredictionUnit& pu, IntTZSearchStruct&  cStruct, Mv& rcMv, Distortion&  ruiCost, Mv* cMvSrchRngLT, Mv* cMvSrchRngRB, Mv* pcMvPred, int rribcFlipType );
 #else
+#if JVET_AC0112_IBC_CIIP
+  bool  predIBCSearch           ( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, Distortion* bvSearchCost = NULL, PelBuf* ciipIbcBuff = NULL, bool* searchedByHash = NULL);
+#else
+#if JVET_AC0112_IBC_LIC
+  bool  predIBCSearch           ( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, Distortion* bvSearchCost = NULL, bool* searchedByHash = NULL);
+#else
   bool  predIBCSearch           ( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap);
+#endif
+#endif
   void  xIntraPatternSearch         ( PredictionUnit& pu, IntTZSearchStruct&  cStruct, Mv& rcMv, Distortion&  ruiCost, Mv* cMvSrchRngLT, Mv* cMvSrchRngRB, Mv* pcMvPred );
 #endif
   void  xSetIntraSearchRange        ( PredictionUnit& pu, int iRoiWidth, int iRoiHeight, const int localSearchRangeX, const int localSearchRangeY, Mv& rcMvSrchRngLT, Mv& rcMvSrchRngRB);
@@ -690,11 +800,19 @@ public:
     m_defaultCachedBvs.currCnt = 0;
   }
 #if JVET_AA0070_RRIBC
+#if JVET_AC0112_IBC_CIIP
+  void xIBCEstimation(PredictionUnit &pu, PelUnitBuf &origBuf, PelBuf &ciipIbcIntraBuff, Mv pcMvPred[3][2], Mv &rcMv, Distortion &ruiCost, const int localSearchRangeX, const int localSearchRangeY, int numRribcType);
+#else
   void xIBCEstimation(PredictionUnit &pu, PelUnitBuf &origBuf, Mv pcMvPred[3][2], Mv &rcMv, Distortion &ruiCost, const int localSearchRangeX, const int localSearchRangeY, int numRribcType);
+#endif
   void xIBCSearchMVCandUpdate( Distortion uiSad, int x, int y, Distortion *uiSadBestCand, Mv *cMVCand);
   int  xIBCSearchMVChromaRefine( PredictionUnit &pu, int iRoiWidth, int iRoiHeight, int cuPelX, int cuPelY, Distortion *uiSadBestCand, Mv *cMVCand, int rribcFlipType );
 #else
+#if JVET_AC0112_IBC_CIIP
+  void  xIBCEstimation   ( PredictionUnit& pu, PelUnitBuf& origBuf, PelBuf &ciipIbcIntraBuff, Mv     *pcMvPred, Mv     &rcMv, Distortion &ruiCost, const int localSearchRangeX, const int localSearchRangeY);
+#else
   void  xIBCEstimation   ( PredictionUnit& pu, PelUnitBuf& origBuf, Mv     *pcMvPred, Mv     &rcMv, Distortion &ruiCost, const int localSearchRangeX, const int localSearchRangeY);
+#endif
   void  xIBCSearchMVCandUpdate  ( Distortion  uiSad, int x, int y, Distortion* uiSadBestCand, Mv* cMVCand);
   int   xIBCSearchMVChromaRefine( PredictionUnit& pu, int iRoiWidth, int iRoiHeight, int cuPelX, int cuPelY, Distortion* uiSadBestCand, Mv*     cMVCand );
 #endif
@@ -1019,6 +1137,10 @@ private:
   void xxIBCHashSearch(PredictionUnit &pu, Mv mvPred[3][2], int numMvPred, Mv &mv, int &idxMvPred, IbcHashMap &ibcHashMap, AMVPInfo amvpInfo4Pel[3], int numRribcType);
 #else
   void  xxIBCHashSearch(PredictionUnit& pu, Mv* mvPred, int numMvPred, Mv &mv, int& idxMvPred, IbcHashMap& ibcHashMap);
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  inline void getBestBvpBvOneZeroComp(PredictionUnit &pu, Mv cMv, Distortion initCost, int *bvpIdxBest,
+                                                   AMVPInfo *amvp1Pel = NULL, AMVPInfo *amvp4Pel = NULL);
 #endif
 public:
 #if JVET_AA0133_INTER_MTS_OPT

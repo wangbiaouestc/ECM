@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1530,6 +1530,15 @@ private:
 #if JVET_AA0061_IBC_MBVD
   bool              m_ibcMbvd;
 #endif
+#if JVET_AC0112_IBC_CIIP
+  bool              m_ibcCiip;
+#endif
+#if JVET_AC0112_IBC_GPM
+  bool              m_ibcGpm;
+#endif
+#if JVET_AC0112_IBC_LIC
+  bool              m_ibcLic;
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool              m_DMVDMode;
 #endif
@@ -1559,6 +1568,12 @@ private:
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   bool              m_MVSD;
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bool              m_bvdPred;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bool              m_bvpCluster;
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   bool              m_useARL;
@@ -1727,14 +1742,23 @@ private:
 #if JVET_AB0155_SGPM
   bool              m_sgpm;
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  int               m_cccm;
+#endif
 #if JVET_V0130_INTRA_TMP
   bool              m_intraTMP;                                       ///< intra Template Matching 
   unsigned          m_intraTmpMaxSize;                               ///< max CU size for which intra TMP is allowed
+#endif
+#if JVET_AC0071_DBV
+  bool              m_intraDBV;
 #endif
 #if ENABLE_OBMC
   bool              m_OBMC;
 #endif
   bool              m_ciip;
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  bool              m_ciipTimd;
+#endif
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
   bool              m_ciipTmMrg;
 #endif
@@ -1749,6 +1773,7 @@ private:
   int               m_LadfQpOffset[MAX_LADF_INTERVALS];
   int               m_LadfIntervalLowerBound[MAX_LADF_INTERVALS];
 #endif
+
 #if JVET_AA0133_INTER_MTS_OPT
   int               m_interMTSMaxSize;
 #endif
@@ -1763,6 +1788,9 @@ private:
 #if JVET_W0090_ARMC_TM || JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0075_IBC_HMVP_ENLARGE
   bool              m_AML;
 #endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+  bool              m_fastSubTmvp;
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   bool              m_armcRefinedMotion;
 #endif
@@ -1773,7 +1801,11 @@ private:
   bool              m_rprEnabledFlag;
   bool              m_resChangeInClvsEnabledFlag;
   bool              m_interLayerPresentFlag;
-
+#if JVET_AC0096
+  bool              m_rprFunctionalityTestingEnabledFlag;
+  int               m_rprSwitchingResolutionOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
+  int               m_rprSwitchingQPOffsetOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
+#endif
   uint32_t          m_log2ParallelMergeLevelMinus2;
   bool              m_ppsValidFlag[64];
   Size              m_scalingWindowSizeInPPS[64];
@@ -2056,6 +2088,18 @@ void                    setCCALFEnabledFlag( bool b )                           
   void                    setUseIbcMbvd(bool b)                                                           { m_ibcMbvd = b; }
   bool                    getUseIbcMbvd() const                                                           { return m_ibcMbvd; }
 #endif
+#if JVET_AC0112_IBC_CIIP
+  void                    setUseIbcCiip(bool b)                                                           { m_ibcCiip = b; }
+  bool                    getUseIbcCiip() const                                                           { return m_ibcCiip; }
+#endif
+#if JVET_AC0112_IBC_GPM
+  void                    setUseIbcGpm(bool b)                                                            { m_ibcGpm = b; }
+  bool                    getUseIbcGpm() const                                                            { return m_ibcGpm; }
+#endif
+#if JVET_AC0112_IBC_LIC
+  void                    setUseIbcLic(bool b)                                                            { m_ibcLic = b; }
+  bool                    getUseIbcLic() const                                                            { return m_ibcLic; }
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void                    setUseDMVDMode(bool b)                                                          { m_DMVDMode = b; }
   bool                    getUseDMVDMode() const                                                          { return m_DMVDMode; }
@@ -2095,6 +2139,14 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   void                    setUseMVSD(bool b) { m_MVSD = b; }
   bool                    getUseMVSD()const                                                               { return m_MVSD; }
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  void                    setUseBvdPred(bool b)                                                           { m_bvdPred = b; }
+  bool                    getUseBvdPred() const                                                           { return m_bvdPred; }
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  void                    setUseBvpCluster(bool b)                                                        { m_bvpCluster = b; }
+  bool                    getUseBvpCluster() const                                                        { return m_bvpCluster; }
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   void                    setUseARL(bool b) { m_useARL = b; }
@@ -2264,6 +2316,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setIntraTMPMaxSize (unsigned n)                                      { m_intraTmpMaxSize = n; }
   unsigned  getIntraTMPMaxSize ()                                      const     { return m_intraTmpMaxSize; }
 #endif
+#if JVET_AC0071_DBV
+  void setUseIntraDBV(bool b) { m_intraDBV = b; }
+  bool getUseIntraDBV() const { return m_intraDBV; }
+#endif
 #if JVET_W0123_TIMD_FUSION
   void      setUseTimd         ( bool b )                                        { m_timd = b; }
   bool      getUseTimd         ()                                      const     { return m_timd; }
@@ -2272,6 +2328,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setUseSgpm         (bool b)                                          { m_sgpm = b; }
   bool      getUseSgpm         ()                                      const     { return m_sgpm; }
 #endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  void      setUseCccm( int i )                                                  { m_cccm = i; }
+  int       getUseCccm()                                               const     { return m_cccm; }
+#endif
 
 #if ENABLE_OBMC
   void      setUseOBMC         ( bool b )                                        { m_OBMC = b; }
@@ -2279,6 +2339,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #endif
   void      setUseCiip         ( bool b )                                        { m_ciip = b; }
   bool      getUseCiip         ()                                      const     { return m_ciip; }
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  void      setUseCiipTimd     (bool b)                                          { m_ciipTimd = b; }
+  bool      getUseCiipTimd     ()                                      const     { return m_ciipTimd; }
+#endif
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
   void      setUseCiipTmMrg         ( bool b )                                        { m_ciipTmMrg = b; }
   bool      getUseCiipTmMrg         ()                                      const     { return m_ciipTmMrg; }
@@ -2297,6 +2361,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_W0090_ARMC_TM || JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0075_IBC_HMVP_ENLARGE
   void      setUseAML             ( bool b )                                        { m_AML = b; }
   bool      getUseAML             ()                                      const     { return m_AML; }
+#endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+  void      setUseFastSubTmvp     ( bool b )                                        { m_fastSubTmvp = b; }
+  bool      getUseFastSubTmvp     ()                                      const     { return m_fastSubTmvp; }
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   void      setUseArmcRefinedMotion ( bool b )                                      { m_armcRefinedMotion = b; }
@@ -2321,7 +2389,14 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setInterLayerPresentFlag( bool b )                                      { m_interLayerPresentFlag = b; }
   bool      getResChangeInClvsEnabledFlag()                               const     { return m_resChangeInClvsEnabledFlag; }
   void      setResChangeInClvsEnabledFlag(bool flag)                                { m_resChangeInClvsEnabledFlag = flag; }
-
+#if JVET_AC0096
+  bool      getRprFunctionalityTestingEnabledFlag()                       const { return m_rprFunctionalityTestingEnabledFlag; }
+  void      setRprFunctionalityTestingEnabledFlag(bool flag)                        { m_rprFunctionalityTestingEnabledFlag = flag; }
+  void      setRprSwitchingResolutionOrderList(int value, int idx)                  { m_rprSwitchingResolutionOrderList[idx] = value; }
+  int       getRprSwitchingResolutionOrderList(int idx)                  const { return m_rprSwitchingResolutionOrderList[idx]; }
+  void      setRprSwitchingQPOffsetOrderList(int value, int idx)                    { m_rprSwitchingQPOffsetOrderList[idx] = value; }
+  int       getRprSwitchingQPOffsetOrderList(int idx)                    const { return m_rprSwitchingQPOffsetOrderList[idx]; }
+#endif
   uint32_t  getLog2ParallelMergeLevelMinus2() const { return m_log2ParallelMergeLevelMinus2; }
   void      setLog2ParallelMergeLevelMinus2(uint32_t mrgLevel) { m_log2ParallelMergeLevelMinus2 = mrgLevel; }
   void          setPPSValidFlag(int i, bool b) { m_ppsValidFlag[i] = b; }
@@ -2446,6 +2521,9 @@ private:
   bool             m_wrapAroundEnabledFlag;               //< reference wrap around enabled or not
   unsigned         m_picWidthMinusWrapAroundOffset;          // <pic_width_in_minCbSizeY - wraparound_offset_in_minCbSizeY
   unsigned         m_wrapAroundOffset;                    //< reference wrap around offset in luma samples
+#if JVET_AC0189_SGPM_NO_BLENDING
+  bool             m_sgpmNoBlend;
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   bool             m_BIF;
   int              m_BIFStrength;
@@ -2651,6 +2729,10 @@ public:
 
   void                   setCabacInitPresentFlag( bool flag )                             { m_cabacInitPresentFlag = flag;                }
   bool                   getCabacInitPresentFlag() const                                  { return m_cabacInitPresentFlag;                }
+#if JVET_AC0189_SGPM_NO_BLENDING
+  void                   setUseSgpmNoBlend( bool b)                                               { m_sgpmNoBlend = b;                                    }
+  bool                   getUseSgpmNoBlend() const                                                { return m_sgpmNoBlend;                                 }
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   void                   setUseBIF( bool b)                                               { m_BIF = b;                                    }
   bool                   getUseBIF() const                                                { return m_BIF;                                 }
@@ -2731,6 +2813,13 @@ public:
 
   int                     getMixedNaluTypesInPicFlag() const                              { return m_mixedNaluTypesInPicFlag; }
   void                    setMixedNaluTypesInPicFlag( const bool flag )                   { m_mixedNaluTypesInPicFlag = flag; }
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+private:
+  bool                         m_asymmetricILF;
+public:
+  bool getAsymmetricILF() const  { return m_asymmetricILF; }
+  void setAsymmetricILF(bool b)  { m_asymmetricILF = b; }
+#endif
 };
 
 class APS
@@ -2861,6 +2950,10 @@ private:
   bool                        m_enableTMVPFlag;                                         //!< enable temporal motion vector prediction
   bool                        m_picColFromL0Flag;                                       //!< syntax element collocated_from_l0_flag
   uint32_t                    m_colRefIdx;
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  bool                        m_picColFromL0Flag2nd;                                    //!< syntax element collocated_from_l0_flag
+  uint32_t                    m_colRefIdx2nd;
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   uint32_t                    m_costForARMC;                                            //!< Cost for diversity criterion
 #endif
@@ -3004,6 +3097,12 @@ public:
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   void                        setCostForARMC(uint32_t cost)                             { m_costForARMC = cost;                                                                        }
   uint32_t                    getCostForARMC()                                          { return m_costForARMC;                                                                        }
+#endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  void                        setPicColFromL0Flag2nd(bool val)                          { m_picColFromL0Flag2nd = val;                                                                 }
+  bool                        getPicColFromL0Flag2nd() const                            { return m_picColFromL0Flag2nd;                                                                }
+  void                        setColRefIdx2nd(uint32_t refIdx)                          { m_colRefIdx2nd = refIdx;                                                                     }
+  uint32_t                    getColRefIdx2nd()                                         { return m_colRefIdx2nd;                                                                       }
 #endif
   void                        setMvdL1ZeroFlag( bool b )                                { m_mvdL1ZeroFlag = b;                                                                         }
   bool                        getMvdL1ZeroFlag() const                                  { return m_mvdL1ZeroFlag;                                                                      }
@@ -3245,11 +3344,19 @@ private:
 
 
   uint32_t                   m_colRefIdx;
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  bool                       m_colFromL0Flag2nd;  // collocated picture from List0 flag
+  uint32_t                   m_colRefIdx2nd;
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   uint32_t                   m_costForARMC;
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  std::vector<int>           m_implicitRefIdx[2][NUM_REF_PIC_LIST_01][NUM_REF_PIC_LIST_01][MAX_NUM_REF + 1];
+#else
   std::vector<int>           m_implicitRefIdx[NUM_REF_PIC_LIST_01][NUM_REF_PIC_LIST_01][MAX_NUM_REF + 1];
+#endif
 #endif
   double                     m_lambdas[MAX_NUM_COMPONENT];
 #if INTER_LIC
@@ -3406,11 +3513,37 @@ public:
   int                         getDepth() const                                       { return m_iDepth;                                              }
   bool                        getColFromL0Flag() const                               { return m_colFromL0Flag;                                       }
   uint32_t                    getColRefIdx() const                                   { return m_colRefIdx;                                           }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  bool                        getColFromL0Flag2nd() const                            { return m_colFromL0Flag2nd;                                    }
+  uint32_t                    getColRefIdx2nd() const                                { return m_colRefIdx2nd;                                        }
+#endif
   void                        checkColRefIdx(uint32_t curSliceSegmentIdx, const Picture* pic);
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   uint32_t                    getCostForARMC() const                                 { return m_costForARMC;                                         }
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  void resizeImBuf(int numSlices, int col)
+  {
+    for (int refIdx = 0; refIdx < MAX_NUM_REF + 1; refIdx++)
+    {
+      m_implicitRefIdx[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].begin(), m_implicitRefIdx[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].end(), -1);
+
+      m_implicitRefIdx[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].begin(), m_implicitRefIdx[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].end(), -1);
+
+      m_implicitRefIdx[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].begin(), m_implicitRefIdx[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].end(), -1);
+
+      m_implicitRefIdx[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].begin(), m_implicitRefIdx[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].end(), -1);
+    }
+  }
+  void                        setImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int curRefIdx, int col) { m_implicitRefIdx[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx] = curRefIdx; }
+  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) { return m_implicitRefIdx[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) const { return m_implicitRefIdx[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+#else
   void resizeImBuf(int numSlices)
   {
     for (int refIdx = 0; refIdx < MAX_NUM_REF + 1; refIdx++)
@@ -3428,9 +3561,10 @@ public:
       std::fill(m_implicitRefIdx[REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].begin(), m_implicitRefIdx[REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].end(), -1);
     }
   }
-  void                        setImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int col_refIdx, int cur_refIdx) { m_implicitRefIdx[colRefPicList][curRefPicList][col_refIdx][sliceIdx] = cur_refIdx; }
-  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int col_refIdx) { return m_implicitRefIdx[colRefPicList][curRefPicList][col_refIdx][sliceIdx]; }
-  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int col_refIdx) const { return m_implicitRefIdx[colRefPicList][curRefPicList][col_refIdx][sliceIdx]; }
+  void                        setImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int curRefIdx) { m_implicitRefIdx[colRefPicList][curRefPicList][colRefIdx][sliceIdx] = curRefIdx; }
+  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx) { return m_implicitRefIdx[colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx) const { return m_implicitRefIdx[colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+#endif
 #endif
   bool                        getIsUsedAsLongTerm(int i, int j) const                { return m_bIsUsedAsLongTerm[i][j];                             }
   void                        setIsUsedAsLongTerm(int i, int j, bool value)          { m_bIsUsedAsLongTerm[i][j] = value;                            }
@@ -3506,7 +3640,10 @@ public:
   void                        setColFromL0Flag( bool colFromL0 )                     { m_colFromL0Flag = colFromL0;                                  }
   void                        setColRefIdx( uint32_t refIdx)                             { m_colRefIdx = refIdx;                                         }
   void                        setCheckLDC( bool b )                                  { m_bCheckLDC = b;                                              }
-
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  void                        setColFromL0Flag2nd(bool colFromL0)                    { m_colFromL0Flag2nd = colFromL0;                               }
+  void                        setColRefIdx2nd(uint32_t refIdx)                       { m_colRefIdx2nd = refIdx;                                      }
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   void                        setCostForARMC(uint32_t cost)                          { m_costForARMC = cost;                                         }
 #endif

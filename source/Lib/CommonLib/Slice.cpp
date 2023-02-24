@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -3590,6 +3590,15 @@ SPS::SPS()
 #if JVET_AA0061_IBC_MBVD
   , m_ibcMbvd                 ( false )
 #endif
+#if JVET_AC0112_IBC_CIIP
+  , m_ibcCiip                 ( false )
+#endif
+#if JVET_AC0112_IBC_GPM
+  , m_ibcGpm                  ( false )
+#endif
+#if JVET_AC0112_IBC_LIC
+  , m_ibcLic                  ( false )
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
  , m_DMVDMode                 ( false )
 #endif
@@ -3715,10 +3724,16 @@ SPS::SPS()
 , m_intraTMP                  ( false )
 , m_intraTmpMaxSize           ( 64 )
 #endif
+#if JVET_AC0071_DBV
+, m_intraDBV                  ( false )
+#endif
 #if ENABLE_OBMC
 , m_OBMC                      ( false )
 #endif
 , m_ciip                      ( false )
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+, m_ciipTimd                  ( false )
+#endif
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
 , m_ciipTmMrg                 ( false )
 #endif
@@ -3753,6 +3768,10 @@ SPS::SPS()
 , m_SubLayerCbpParametersPresentFlag ( true )
 , m_rprEnabledFlag            ( false )
 , m_resChangeInClvsEnabledFlag ( false )
+#if JVET_AC0096
+, m_rprSwitchingResolutionOrderList{ 0 }
+, m_rprSwitchingQPOffsetOrderList{ 0 }
+#endif
 , m_maxNumMergeCand(MRG_MAX_NUM_CANDS)
 #if JVET_X0049_ADAPT_DMVR
 , m_maxNumBMMergeCand(BM_MRG_MAX_NUM_CANDS)
@@ -5285,9 +5304,7 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
                                    sps->getChromaFormatIdc(), sps->getBitDepths(), true, downsampling,
                                    sps->getHorCollocatedChromaFlag(), sps->getVerCollocatedChromaFlag() );
           scaledRefPic[j]->unscaledPic = m_apcRefPicList[refList][rIdx];
-#if !JVET_AA0096_MC_BOUNDARY_PADDING
           scaledRefPic[j]->extendPicBorder( getPPS() );
-#endif
 
           m_scaledRefPicList[refList][rIdx] = scaledRefPic[j];
         }

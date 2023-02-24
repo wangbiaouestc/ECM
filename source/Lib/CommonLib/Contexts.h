@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -345,6 +345,9 @@ public:
 #if JVET_AA0070_RRIBC
   static const CtxSet   rribcFlipType;
 #endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  static const CtxSet bvOneZeroComp;
+#endif
 #if JVET_Y0065_GPM_INTRA
   static const CtxSet   GPMIntraFlag;
 #endif
@@ -366,6 +369,13 @@ public:
   static const CtxSet   DimdChromaMode;
 #endif
   static const CtxSet   ChromaFusionMode;
+#if JVET_AC0119_LM_CHROMA_FUSION
+  static const CtxSet   ChromaFusionType;
+  static const CtxSet   ChromaFusionCclm;
+#endif
+#endif
+#if JVET_AC0071_DBV
+  static const CtxSet DbvChromaMode;
 #endif
   static const CtxSet   MipFlag;
 #if JVET_V0130_INTRA_TMP
@@ -390,7 +400,7 @@ public:
   static const CtxSet   GeoMmvdFlag;
   static const CtxSet   GeoMmvdStepMvpIdx;
 #endif
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   static const CtxSet   GeoBldFlag;
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -413,6 +423,19 @@ public:
   static const CtxSet   IbcMbvdMergeIdx;
   static const CtxSet   IbcMbvdStepMvpIdx;
 #endif
+#if JVET_AC0112_IBC_CIIP
+  static const CtxSet   IbcCiipFlag;
+  static const CtxSet   IbcCiipIntraIdx;
+#endif
+#if JVET_AC0112_IBC_GPM
+  static const CtxSet   IbcGpmFlag;
+  static const CtxSet   IbcGpmIntraFlag;
+  static const CtxSet   IbcGpmSplitDirSetFlag;
+  static const CtxSet   IbcGpmBldIdx;
+#endif
+#if JVET_AC0112_IBC_LIC
+  static const CtxSet   IbcLicFlag;
+#endif
 
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   static const CtxSet   TMMergeFlag;
@@ -426,9 +449,14 @@ public:
 #if JVET_Z0131_IBC_BVD_BINARIZATION
   static const CtxSet   Bvd;
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
   static const CtxSet   MvsdIdx;
 #endif
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  static const CtxSet   MvsdIdxBVDMSB;
+#endif
+
 #if MULTI_HYP_PRED
   static const CtxSet   MultiHypothesisFlag;
   static const CtxSet   MHRefPic;

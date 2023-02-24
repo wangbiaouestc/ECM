@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -108,7 +108,7 @@ inline void dtraceModeCost(CodingStructure &cs, double lambda)
           cs.cus[0]->predMode,
           cs.cus[0]->skip,
           cs.pus[0]->mergeFlag,
-          cs.cus[0]->LICFlag,
+          cs.cus[0]->licFlag,
           0, 0,
           imvVal,
           0, 0,

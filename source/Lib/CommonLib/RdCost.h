@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -60,6 +60,9 @@ struct EstBvdBitsStruct
 
   uint32_t bitsIdx[2];
   uint32_t bitsImv[2];
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  uint32_t bitsRribc;
+#endif
 };
 #endif
 
@@ -226,12 +229,92 @@ public:
   void           getMotionCost(int add) { m_dCost = m_dLambdaMotionSAD + add; }
 
 
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  inline Distortion getBvVerZeroCompCost(int x, bool useIMV, int *tempImv, int *tempIdx, Mv bvp1Pel[2])
+  {
+    uint32_t b0 = xGetExpGolombNumberOfBitsIBCH(x - bvp1Pel[0].getHor()) + m_cBvdBitCosts.bitsIdx[0];
+    uint32_t b1 = xGetExpGolombNumberOfBitsIBCH(x - bvp1Pel[1].getHor()) + m_cBvdBitCosts.bitsIdx[1];
+    if (useIMV)
+    {
+      b0 += (x != bvp1Pel[0].getHor()) ? m_cBvdBitCosts.bitsImv[0] : 0;
+      b1 += (x != bvp1Pel[1].getHor()) ? m_cBvdBitCosts.bitsImv[0] : 0;
+    }
+    uint32_t bestCost = (b1 < b0) ? b1 : b0;
+    int      bestIdx  = (b1 < b0) ? 1 : 0;
+    int      imv      = (useIMV && (x != bvp1Pel[bestIdx].getHor())) ? 1 : 0;
+    if (imv && (x % 4 == 0))
+    {
+      int      x4Pel = x >> 2;
+      uint32_t bQ0, bQ1;
+      bQ0 = (x4Pel == (bvp1Pel[0].getHor() >> 2))
+              ? std::numeric_limits<uint32_t>::max()
+              : (xGetExpGolombNumberOfBitsIBCH(x4Pel - (bvp1Pel[0].getHor() >> 2)) + m_cBvdBitCosts.bitsIdx[0]);
+      bQ1 = (x4Pel == (bvp1Pel[1].getHor() >> 2))
+              ? std::numeric_limits<uint32_t>::max()
+              : (xGetExpGolombNumberOfBitsIBCH(x4Pel - (bvp1Pel[1].getHor() >> 2)) + m_cBvdBitCosts.bitsIdx[1]);
+
+      uint32_t bestCost4Pel = (bQ1 < bQ0) ? bQ1 : bQ0;
+      bestCost4Pel += (bestCost4Pel < std::numeric_limits<uint32_t>::max()) ? m_cBvdBitCosts.bitsImv[1] : 0;
+      if (bestCost4Pel < bestCost)
+      {
+        imv      = 2;
+        bestCost = bestCost4Pel;
+        bestIdx  = (bQ1 < bQ0) ? 1 : 0;
+      }
+    }
+    *tempImv = imv;
+    *tempIdx = bestIdx;
+    return Distortion(m_dCost * bestCost) >> SCALE_BITS;
+  }
+
+  inline Distortion getBvHorZeroCompCost(int y, bool useIMV, int *tempImv, int *tempIdx, Mv bvp1Pel[2])
+  {
+    uint32_t b0 = xGetExpGolombNumberOfBitsIBCV(y - bvp1Pel[0].getVer()) + m_cBvdBitCosts.bitsIdx[0];
+    uint32_t b1 = xGetExpGolombNumberOfBitsIBCV(y - bvp1Pel[1].getVer()) + m_cBvdBitCosts.bitsIdx[1];
+    if (useIMV)
+    {
+      b0 += (y != bvp1Pel[0].getVer()) ? m_cBvdBitCosts.bitsImv[0] : 0;
+      b1 += (y != bvp1Pel[1].getVer()) ? m_cBvdBitCosts.bitsImv[0] : 0;
+    }
+    uint32_t bestCost = (b1 < b0) ? b1 : b0;
+    int      bestIdx  = (b1 < b0) ? 1 : 0;
+    int      imv      = (useIMV && (y != bvp1Pel[bestIdx].getVer())) ? 1 : 0;
+    if (imv && (y % 4 == 0))
+    {
+      int      y4Pel = y >> 2;
+      uint32_t bQ0, bQ1;
+      bQ0 = (y4Pel == (bvp1Pel[0].getVer() >> 2))
+              ? std::numeric_limits<uint32_t>::max()
+              : (xGetExpGolombNumberOfBitsIBCV(y4Pel - (bvp1Pel[0].getVer() >> 2)) + m_cBvdBitCosts.bitsIdx[0]);
+      bQ1 = (y4Pel == (bvp1Pel[1].getVer() >> 2))
+              ? std::numeric_limits<uint32_t>::max()
+              : (xGetExpGolombNumberOfBitsIBCV(y4Pel - (bvp1Pel[1].getVer() >> 2)) + m_cBvdBitCosts.bitsIdx[1]);
+
+      uint32_t bestCost4Pel = (bQ1 < bQ0) ? bQ1 : bQ0;
+      bestCost4Pel += (bestCost4Pel < std::numeric_limits<uint32_t>::max()) ? m_cBvdBitCosts.bitsImv[1] : 0;
+
+      if (bestCost4Pel < bestCost)
+      {
+        imv      = 2;
+        bestCost = bestCost4Pel;
+        bestIdx  = (bQ1 < bQ0) ? 1 : 0;
+      }
+    }
+    *tempImv = imv;
+    *tempIdx = bestIdx;
+    return Distortion(m_dCost * bestCost) >> SCALE_BITS;
+  }
+#endif
+
 #if JVET_AA0070_RRIBC
   void setPredictors(Mv pcMv[3][2]);
-#if JVET_Z0131_IBC_BVD_BINARIZATION
+#if JVET_Z0131_IBC_BVD_BINARIZATION || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   EstBvdBitsStruct *getBvdBitCosts() { return &m_cBvdBitCosts; }
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
-  inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, int rribcFlipType, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL, bool flag = false, AMVPInfo *amvpInfo4Pel = NULL)
+
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, int rribcFlipType, uint8_t *bvImvResBest = NULL,
+                                           int *bvpIdxBest = NULL, bool flag = false, AMVPInfo *amvpInfo4Pel = NULL,
+                                           const bool useBvpCluster = true)
 #else
   inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, int rribcFlipType, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL)
 #endif
@@ -263,6 +346,12 @@ public:
       }
     }
     uint32_t bBest    = (b1 < b0) ? b1 : b0;
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    if (useBvpCluster)
+    {
+      bBest += (rribcFlipType) ? m_cBvdBitCosts.bitsRribc : 0;
+    }
+#endif
     int      bBestIdx = (b1 < b0) ? 1 : 0;
     uint8_t  bestRes;
     if (rribcFlipType == 0)
@@ -288,7 +377,7 @@ public:
     {
       Mv cMv(x >> 2, y >> 2);
 
-#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV 
       Mv tmpBv0;
       Mv tmpBv1;
       if (flag)
@@ -328,7 +417,17 @@ public:
         bQ0 = (cMv.getVer() == tmpBv0.getVer()) ? std::numeric_limits<uint32_t>::max() : (xGetExpGolombNumberOfBitsIBCV(cMv.getVer() - tmpBv0.getVer()) + m_cBvdBitCosts.bitsIdx[0]);
         bQ1 = (cMv.getVer() == tmpBv1.getVer()) ? std::numeric_limits<uint32_t>::max() : (xGetExpGolombNumberOfBitsIBCV(cMv.getVer() - tmpBv1.getVer()) + m_cBvdBitCosts.bitsIdx[1]);
       }
-
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+      if (useBvpCluster)
+      {
+        bQ0 += (rribcFlipType && (cMv.getHor() != tmpBv0.getHor()) && (cMv.getVer() != tmpBv0.getVer()))
+                 ? m_cBvdBitCosts.bitsRribc
+                 : 0;
+        bQ1 += (rribcFlipType && (cMv.getHor() != tmpBv1.getHor()) && (cMv.getVer() != tmpBv1.getVer()))
+                 ? m_cBvdBitCosts.bitsRribc
+                 : 0;
+      }
+#endif
       uint32_t bQBest = (bQ1 < bQ0) ? bQ1 : bQ0;
       bQBest += (bQBest < std::numeric_limits<uint32_t>::max()) ? m_cBvdBitCosts.bitsImv[1] : 0;
 

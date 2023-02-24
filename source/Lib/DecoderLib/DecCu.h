@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -99,7 +99,11 @@ private:
 
   PelStorage        m_ciipBuffer;
 
-  MotionInfo        m_SubPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+  MotionInfo        m_subPuMiBuf[SUB_TMVP_NUM][(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#else
+  MotionInfo        m_subPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   bool applyBDMVR4BM[BM_MRG_MAX_NUM_INIT_CANDS];
 #endif
@@ -121,6 +125,9 @@ private:
 #else
   MergeCtx          m_geoTmMrgCtx0, m_geoTmMrgCtx1;
 #endif
+#endif
+#if JVET_AC0112_IBC_GPM
+  MergeCtx          m_ibcMrgCtx;
 #endif
 };
 

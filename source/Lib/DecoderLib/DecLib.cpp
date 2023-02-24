@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -736,6 +736,12 @@ void DecLib::executeLoopFilters()
     m_cALF.copyDbData(cs);
   }
 #endif
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  if (cs.sps->getALFEnabledFlag())
+  {
+    m_cALF.copyResiData(cs);
+  }
+#endif
 
   // deblocking filter
 #if DB_PARAM_TID
@@ -752,6 +758,18 @@ void DecLib::executeLoopFilters()
     cs.slice->setDeblockingFilterCrTcOffsetDiv2(pcPPS->getDeblockingFilterTcOffsetDiv2()[tcIdx]);
   }
 #endif
+#if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
+  if (pcPPS->getAsymmetricILF() && (cs.picHeader->getInGdrInterval() || cs.picHeader->getIsGdrRecoveryPocPic()))
+  {
+    m_cLoopFilter.setAsymmetricDB(true);
+  }
+  else
+  {
+    m_cLoopFilter.setAsymmetricDB(false);
+  }  
+#endif
+
+
   m_cLoopFilter.loopFilterPic( cs );
 #if !MULTI_PASS_DMVR
   CS::setRefinedMotionField(cs);

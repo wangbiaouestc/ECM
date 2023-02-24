@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -146,13 +146,23 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
   if (slice->getPicHeader()->getEnableTMVPFlag())
   {
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    for (int colFrameIdx = 0; colFrameIdx < (slice->isInterB() ? 2 : 1); colFrameIdx++)
+    {
+      const Picture* const pColPic = slice->getRefPic(RefPicList(colFrameIdx == 0 ? 1 - slice->getColFromL0Flag() : 1 - slice->getColFromL0Flag2nd()), colFrameIdx == 0 ? slice->getColRefIdx() : slice->getColRefIdx2nd());
+#else
     const Picture* const pColPic = slice->getRefPic(RefPicList(slice->isInterB() ? 1 - slice->getColFromL0Flag() : 0), slice->getColRefIdx());
+#endif 
     if (pColPic)
     {
       const int currPOC = slice->getPOC();
       const int colPOC = pColPic->getPOC();
 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+      slice->resizeImBuf(pColPic->numSlices, colFrameIdx);
+#else
       slice->resizeImBuf(pColPic->numSlices);
+#endif
       Slice *pColSlice = nullptr;
       for (int sliceIdx = 0; sliceIdx < pColPic->numSlices; sliceIdx++)
       {
@@ -202,12 +212,19 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
                   }
                 }
               } // curRefIdx
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+              slice->setImRefIdx(sliceIdx, RefPicList(colRefPicListIdx), RefPicList(curRefPicListIdx), colRefIdx, targetRefIdx, colFrameIdx);
+#else
               slice->setImRefIdx(sliceIdx, RefPicList(colRefPicListIdx), RefPicList(curRefPicListIdx), colRefIdx, targetRefIdx);
+#endif
             } // curRefPicListIdx
           }
         }
       }
     }
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    }
+#endif
   }
 #endif
 
