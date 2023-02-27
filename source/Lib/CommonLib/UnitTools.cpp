@@ -16771,7 +16771,7 @@ void PU::spanIpmInfoIBC( PredictionUnit &pu, IpmBuf &ib, int bvx, int bvy )
   {
     cs = cs->parent;
   }
-  const uint8_t ipm = cs->getIpmInfo(PosY);
+  const uint8_t ipm = cs ? cs->getIpmInfo(PosY) : 0;
   for (int y = 0; y < ibH; y++)
   {
     for (int x = 0; x < ibW; x++)
