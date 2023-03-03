@@ -1807,7 +1807,7 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     if (cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE) // ensure sequential and parallel simulation generate same output
     {
       SPS* spsTmp = const_cast<SPS*>(cs.sps);
-      hashBlkHitPerc == -1 ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
+      hashBlkHitPerc = (hashBlkHitPerc == -1) ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
       bool hashScc = hashBlkHitPerc < 57;
       spsTmp->setUseOBMC(hashScc);
 #if JVET_Z0061_TM_OBMC
