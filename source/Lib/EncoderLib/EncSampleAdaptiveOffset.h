@@ -304,7 +304,7 @@ private: //methods
 private: //members
   //for RDO
   CABACWriter*           m_CABACEstimator;
-  CtxCache*              m_CtxCache;
+  CtxCache*              m_ctxCache;
   double                 m_lambda[MAX_NUM_COMPONENT];
 
   //statistics

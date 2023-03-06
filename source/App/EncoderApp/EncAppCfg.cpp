@@ -1881,8 +1881,6 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 
     int8_t sliceType = m_GOPList[0].m_sliceType;
 
-    memset(m_GOPList, 0, sizeof(m_GOPList));
-    m_GOPList[0].m_sliceType = sliceType;
     for (int i = 1; i < MAX_GOP; i++)
     {
       m_GOPList[i].m_POC = -1;
@@ -3306,7 +3304,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   for( int i = 0; i < (int)m_sMaxMTTHierarchyDepthByTid.size(); i++ )
   {
     CHECK( i >= MAX_TLAYER, "Index exceeds MAX_TLAYER" );
-    m_maxMTTHierarchyDepthByTid[i] = std::stoul( m_sMaxMTTHierarchyDepthByTid.substr( i, 1 ) );
+    m_maxMTTHierarchyDepthByTid[i] = (unsigned int) std::stoul( m_sMaxMTTHierarchyDepthByTid.substr( i, 1 ) );
   }
 
 

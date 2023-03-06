@@ -514,7 +514,7 @@ protected:
 
   // RD computation
   CABACWriter*    m_CABACEstimator;
-  CtxCache*       m_CtxCache;
+  CtxCache*       m_ctxCache;
 
   bool            m_isInitialized;
   uint32_t        m_symbolSize;

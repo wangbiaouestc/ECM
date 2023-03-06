@@ -301,14 +301,14 @@ unsigned BinDecoderBase::decodeAlignedBinsEP( unsigned numBins )
 template <class BinProbModel>
 TBinDecoder<BinProbModel>::TBinDecoder()
   : BinDecoderBase( static_cast<const BinProbModel*>    ( nullptr ) )
-  , m_Ctx         ( static_cast<CtxStore<BinProbModel>&>( *this   ) )
+  , m_ctx         ( static_cast<CtxStore<BinProbModel>&>( *this   ) )
 {}
 
 
 template <class BinProbModel>
 unsigned TBinDecoder<BinProbModel>::decodeBin( unsigned ctxId )
 {
-  BinProbModel& rcProbModel = m_Ctx[ctxId];
+  BinProbModel& rcProbModel = m_ctx[ctxId];
   unsigned      bin         = rcProbModel.mps();
   uint32_t      LPS         = rcProbModel.getLPS( m_Range );
 

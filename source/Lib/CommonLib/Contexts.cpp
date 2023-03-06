@@ -6160,63 +6160,63 @@ const CtxSet ContextSetCfg::Alf = { ContextSetCfg::ctbAlfFlag, ContextSetCfg::ct
 
 template <class BinProbModel>
 CtxStore<BinProbModel>::CtxStore()
-  : m_CtxBuffer ()
-  , m_Ctx       ( nullptr )
+  : m_ctxBuffer ()
+  , m_ctx       ( nullptr )
 {}
 
 template <class BinProbModel>
 CtxStore<BinProbModel>::CtxStore( bool dummy )
-  : m_CtxBuffer ( ContextSetCfg::NumberOfContexts )
-  , m_Ctx       ( m_CtxBuffer.data() )
+  : m_ctxBuffer ( ContextSetCfg::NumberOfContexts )
+  , m_ctx       ( m_ctxBuffer.data() )
 {}
 
 template <class BinProbModel>
 CtxStore<BinProbModel>::CtxStore( const CtxStore<BinProbModel>& ctxStore )
-  : m_CtxBuffer ( ctxStore.m_CtxBuffer )
-  , m_Ctx       ( m_CtxBuffer.data() )
+  : m_ctxBuffer ( ctxStore.m_ctxBuffer )
+  , m_ctx       ( m_ctxBuffer.data() )
 {}
 
 template <class BinProbModel>
 void CtxStore<BinProbModel>::init( int qp, int initId )
 {
   const std::vector<uint8_t>& initTable = ContextSetCfg::getInitTable( initId );
-  CHECK( m_CtxBuffer.size() != initTable.size(),
-        "Size of init table (" << initTable.size() << ") does not match size of context buffer (" << m_CtxBuffer.size() << ")." );
+  CHECK( m_ctxBuffer.size() != initTable.size(),
+        "Size of init table (" << initTable.size() << ") does not match size of context buffer (" << m_ctxBuffer.size() << ")." );
 #if SLICE_TYPE_WIN_SIZE
 	const std::vector<uint8_t> &rateInitTable = ContextSetCfg::getInitTable(NUMBER_OF_SLICE_TYPES + initId);
 #else
 	const std::vector<uint8_t> &rateInitTable = ContextSetCfg::getInitTable(NUMBER_OF_SLICE_TYPES);
 #endif
-  CHECK(m_CtxBuffer.size() != rateInitTable.size(),
+  CHECK(m_ctxBuffer.size() != rateInitTable.size(),
         "Size of rate init table (" << rateInitTable.size() << ") does not match size of context buffer ("
-                                    << m_CtxBuffer.size() << ").");
+                                    << m_ctxBuffer.size() << ").");
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   const std::vector<uint8_t> &weightInitTable = ContextSetCfg::getInitTable( (NUMBER_OF_SLICE_TYPES << 1) + initId );
-  CHECK( m_CtxBuffer.size() != weightInitTable.size(),
-         "Size of weight init table (" << weightInitTable.size() << ") does not match size of context buffer (" << m_CtxBuffer.size() << ")." );
+  CHECK( m_ctxBuffer.size() != weightInitTable.size(),
+         "Size of weight init table (" << weightInitTable.size() << ") does not match size of context buffer (" << m_ctxBuffer.size() << ")." );
 
   const std::vector<uint8_t> &rateOffsetInitTable0 = ContextSetCfg::getInitTable((NUMBER_OF_SLICE_TYPES * 3));
   const std::vector<uint8_t> &rateOffsetInitTable1 = ContextSetCfg::getInitTable((NUMBER_OF_SLICE_TYPES * 3) + 1);
 
-  CHECK(m_CtxBuffer.size() != rateOffsetInitTable0.size(),
+  CHECK(m_ctxBuffer.size() != rateOffsetInitTable0.size(),
         "Size of weight init table (" << rateOffsetInitTable0.size() << ") does not match size of context buffer ("
-                                      << m_CtxBuffer.size() << ").");
-  CHECK(m_CtxBuffer.size() != rateOffsetInitTable1.size(),
+                                      << m_ctxBuffer.size() << ").");
+  CHECK(m_ctxBuffer.size() != rateOffsetInitTable1.size(),
         "Size of weight init table (" << rateOffsetInitTable1.size() << ") does not match size of context buffer ("
-                                      << m_CtxBuffer.size() << ").");
+                                      << m_ctxBuffer.size() << ").");
 #endif
 
 
   int clippedQP = Clip3( 0, MAX_QP, qp );
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    m_CtxBuffer[k].init( clippedQP, initTable[k] );
-    m_CtxBuffer[k].setLog2WindowSize(rateInitTable[k]);
+    m_ctxBuffer[k].init( clippedQP, initTable[k] );
+    m_ctxBuffer[k].setLog2WindowSize(rateInitTable[k]);
 
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
-    m_CtxBuffer[k].setAdaptRateOffset(rateOffsetInitTable0[k], 0);
-    m_CtxBuffer[k].setAdaptRateOffset(rateOffsetInitTable1[k], 1);
-    m_CtxBuffer[k].setAdaptRateWeight( weightInitTable[k] );
+    m_ctxBuffer[k].setAdaptRateOffset(rateOffsetInitTable0[k], 0);
+    m_ctxBuffer[k].setAdaptRateOffset(rateOffsetInitTable1[k], 1);
+    m_ctxBuffer[k].setAdaptRateWeight( weightInitTable[k] );
 #endif
   }
 }
@@ -6225,87 +6225,87 @@ void CtxStore<BinProbModel>::init( int qp, int initId )
 template <class BinProbModel>
 void CtxStore<BinProbModel>::saveWinSizes( std::vector<uint8_t>& windows ) const
 {
-  windows.resize( m_CtxBuffer.size(), uint8_t( 0 ) );
+  windows.resize( m_ctxBuffer.size(), uint8_t( 0 ) );
 
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    windows[k] = m_CtxBuffer[k].getWinSizes();
+    windows[k] = m_ctxBuffer[k].getWinSizes();
   }
 }
 
 template <class BinProbModel>
 void CtxStore<BinProbModel>::loadWinSizes( const std::vector<uint8_t>& windows )
 {
-  CHECK( m_CtxBuffer.size() != windows.size(),
-         "Size of prob states table (" << windows.size() << ") does not match size of context buffer (" << m_CtxBuffer.size() << ")." );
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  CHECK( m_ctxBuffer.size() != windows.size(),
+         "Size of prob states table (" << windows.size() << ") does not match size of context buffer (" << m_ctxBuffer.size() << ")." );
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    m_CtxBuffer[k].setWinSizes( windows[k] );
+    m_ctxBuffer[k].setWinSizes( windows[k] );
   }
 }
 
 template <class BinProbModel>
 void CtxStore<BinProbModel>::loadWeights( const std::vector<uint8_t>& weights )
 {
-  CHECK( m_CtxBuffer.size() != weights.size(),
-         "Size of prob states table (" << weights.size() << ") does not match size of context buffer (" << m_CtxBuffer.size() << ")." );
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  CHECK( m_ctxBuffer.size() != weights.size(),
+         "Size of prob states table (" << weights.size() << ") does not match size of context buffer (" << m_ctxBuffer.size() << ")." );
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    m_CtxBuffer[k].setAdaptRateWeight( weights[k] );
+    m_ctxBuffer[k].setAdaptRateWeight( weights[k] );
   }
 }
 
 template <class BinProbModel>
 void CtxStore<BinProbModel>::saveWeights( std::vector<uint8_t>& weights ) const
 {
-  weights.resize( m_CtxBuffer.size(), uint8_t( 0 ) );
+  weights.resize( m_ctxBuffer.size(), uint8_t( 0 ) );
 
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    weights[k] = m_CtxBuffer[k].getAdaptRateWeight();
+    weights[k] = m_ctxBuffer[k].getAdaptRateWeight();
   }
 }
 
 template <class BinProbModel>
 void CtxStore<BinProbModel>::loadPStates( const std::vector<std::pair<uint16_t, uint16_t>>& probStates )
 {
-  CHECK( m_CtxBuffer.size() != probStates.size(),
-         "Size of prob states table (" << probStates.size() << ") does not match size of context buffer (" << m_CtxBuffer.size() << ")." );
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  CHECK( m_ctxBuffer.size() != probStates.size(),
+         "Size of prob states table (" << probStates.size() << ") does not match size of context buffer (" << m_ctxBuffer.size() << ")." );
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    m_CtxBuffer[k].setState( probStates[k] );
+    m_ctxBuffer[k].setState( probStates[k] );
   }
 }
 
 template <class BinProbModel>
 void CtxStore<BinProbModel>::savePStates( std::vector<std::pair<uint16_t, uint16_t>>& probStates ) const
 {
-  probStates.resize( m_CtxBuffer.size(), std::pair<uint16_t, uint16_t>( 0, 0 ) );
+  probStates.resize( m_ctxBuffer.size(), std::pair<uint16_t, uint16_t>( 0, 0 ) );
 
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    probStates[k] = m_CtxBuffer[k].getState();
+    probStates[k] = m_ctxBuffer[k].getState();
   }
 }
 #else
 template <class BinProbModel>
 void CtxStore<BinProbModel>::loadPStates( const std::vector<uint16_t>& probStates )
 {
-  CHECK( m_CtxBuffer.size() != probStates.size(),
-        "Size of prob states table (" << probStates.size() << ") does not match size of context buffer (" << m_CtxBuffer.size() << ")." );
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  CHECK( m_ctxBuffer.size() != probStates.size(),
+        "Size of prob states table (" << probStates.size() << ") does not match size of context buffer (" << m_ctxBuffer.size() << ")." );
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    m_CtxBuffer[k].setState( probStates[k] );
+    m_ctxBuffer[k].setState( probStates[k] );
   }
 }
 
 template <class BinProbModel>
 void CtxStore<BinProbModel>::savePStates( std::vector<uint16_t>& probStates ) const
 {
-  probStates.resize( m_CtxBuffer.size(), uint16_t(0) );
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  probStates.resize( m_ctxBuffer.size(), uint16_t(0) );
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    probStates[k] = m_CtxBuffer[k].getState();
+    probStates[k] = m_ctxBuffer[k].getState();
   }
 }
 #endif
@@ -6319,11 +6319,11 @@ template class CtxStore<BinProbModel_Std>;
 
 
 Ctx::Ctx()                                  : m_BPMType( BPM_Undefined )                        {}
-Ctx::Ctx( const BinProbModel_Std*   dummy ) : m_BPMType( BPM_Std   ), m_CtxStore_Std  ( true )  {}
+Ctx::Ctx( const BinProbModel_Std*   dummy ) : m_BPMType( BPM_Std   ), m_ctxStore_Std  ( true )  {}
 
 Ctx::Ctx( const Ctx& ctx )
   : m_BPMType         ( ctx.m_BPMType )
-  , m_CtxStore_Std    ( ctx.m_CtxStore_Std    )
+  , m_ctxStore_Std    ( ctx.m_ctxStore_Std    )
 {
   ::memcpy( m_GRAdaptStats, ctx.m_GRAdaptStats, sizeof( unsigned ) * RExt__GOLOMB_RICE_ADAPTATION_STATISTICS_SETS );
 }

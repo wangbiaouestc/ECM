@@ -454,7 +454,7 @@ protected:
 
   // RD computation
   CABACWriter*    m_CABACEstimator;
-  CtxCache*       m_CtxCache;
+  CtxCache*       m_ctxCache;
   DistParam       m_cDistParam;
 #if JVET_AA0133_INTER_MTS_OPT
   double          m_globalBestLumaCost;

@@ -97,7 +97,7 @@ public:
   ~TBinDecoder() {}
   unsigned decodeBin ( unsigned ctxId );
 private:
-  CtxStore<BinProbModel>& m_Ctx;
+  CtxStore<BinProbModel>& m_ctx;
 };
 
 
