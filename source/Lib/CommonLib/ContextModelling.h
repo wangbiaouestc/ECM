@@ -95,8 +95,8 @@ public:
   unsigned        posY(int scanPos) const { return m_scan[scanPos].y; }
   unsigned        maxLastPosX     ()                        const { return m_maxLastPosX; }
   unsigned        maxLastPosY     ()                        const { return m_maxLastPosY; }
-  unsigned        lastXCtxId      ( unsigned  posLastX  )   const { return m_CtxSetLastX( m_lastOffsetX + ( posLastX >> m_lastShiftX ) ); }
-  unsigned        lastYCtxId      ( unsigned  posLastY  )   const { return m_CtxSetLastY( m_lastOffsetY + ( posLastY >> m_lastShiftY ) ); }
+  unsigned        lastXCtxId      ( unsigned  posLastX  )   const { return m_ctxSetLastX( m_lastOffsetX + ( posLastX >> m_lastShiftX ) ); }
+  unsigned        lastYCtxId      ( unsigned  posLastY  )   const { return m_ctxSetLastY( m_lastOffsetY + ( posLastY >> m_lastShiftY ) ); }
   int             numCtxBins      ()                        const { return   m_remainingContextBins;      }
   void            setNumCtxBins   ( int n )                       {          m_remainingContextBins  = n; }
   unsigned        sigGroupCtxId   ( bool ts = false     )   const { return ts ? m_sigGroupCtxIdTS : m_sigGroupCtxId; }
@@ -459,8 +459,8 @@ private:
   CoeffScanType             m_scanType;
   const ScanElement *       m_scan;
   const ScanElement *       m_scanCG;
-  const CtxSet              m_CtxSetLastX;
-  const CtxSet              m_CtxSetLastY;
+  const CtxSet              m_ctxSetLastX;
+  const CtxSet              m_ctxSetLastY;
   const unsigned            m_maxLastPosX;
   const unsigned            m_maxLastPosY;
   const int                 m_lastOffsetX;

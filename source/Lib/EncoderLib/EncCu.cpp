@@ -274,7 +274,7 @@ void EncCu::create( EncCfg* encCfg )
   m_ciipBuffer[0].create(chromaFormat, Area(0, 0, uiMaxWidth, uiMaxHeight));
   m_ciipBuffer[1].create(chromaFormat, Area(0, 0, uiMaxWidth, uiMaxHeight));
 
-  m_CtxBuffer.resize( maxDepth );
+  m_ctxBuffer.resize( maxDepth );
   m_CurrCtx = 0;
 }
 
@@ -436,7 +436,7 @@ void EncCu::init( EncLib* pcEncLib, const SPS& sps PARL_PARAM( const int tId ) )
   m_pcRdCost           = pcEncLib->getRdCost ( PARL_PARAM0( tId ) );
   m_CABACEstimator     = pcEncLib->getCABACEncoder( PARL_PARAM0( tId ) )->getCABACEstimator( &sps );
   m_CABACEstimator->setEncCu(this);
-  m_CtxCache           = pcEncLib->getCtxCache( PARL_PARAM0( tId ) );
+  m_ctxCache           = pcEncLib->getCtxCache( PARL_PARAM0( tId ) );
   m_pcRateCtrl         = pcEncLib->getRateCtrl();
   m_pcSliceEncoder     = pcEncLib->getSliceEncoder();
 #if ENABLE_SPLIT_PARALLELISM
@@ -534,7 +534,7 @@ void EncCu::compressCtu( CodingStructure& cs, const UnitArea& area, const unsign
     }
   }
   // init current context pointer
-  m_CurrCtx = m_CtxBuffer.data();
+  m_CurrCtx = m_ctxBuffer.data();
 
   CodingStructure *tempCS = m_pTempCS[gp_sizeIdxInfo->idxFrom( area.lumaSize().width )][gp_sizeIdxInfo->idxFrom( area.lumaSize().height )];
   CodingStructure *bestCS = m_pBestCS[gp_sizeIdxInfo->idxFrom( area.lumaSize().width )][gp_sizeIdxInfo->idxFrom( area.lumaSize().height )];
@@ -1784,7 +1784,7 @@ void EncCu::copyState( EncCu* other, Partitioner& partitioner, const UnitArea& c
 
   if( isDist )
   {
-    m_CurrCtx = m_CtxBuffer.data();
+    m_CurrCtx = m_ctxBuffer.data();
   }
 
   m_pcInterSearch->copyState( *other->m_pcInterSearch );
@@ -1835,12 +1835,12 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
 
   m_CABACEstimator->getCtx() = m_CurrCtx->start;
 
-  const TempCtx ctxStartSP( m_CtxCache, SubCtx( Ctx::SplitFlag,   m_CABACEstimator->getCtx() ) );
-  const TempCtx ctxStartQt( m_CtxCache, SubCtx( Ctx::SplitQtFlag, m_CABACEstimator->getCtx() ) );
-  const TempCtx ctxStartHv( m_CtxCache, SubCtx( Ctx::SplitHvFlag, m_CABACEstimator->getCtx() ) );
-  const TempCtx ctxStart12( m_CtxCache, SubCtx( Ctx::Split12Flag, m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxStartSP( m_ctxCache, SubCtx( Ctx::SplitFlag,   m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxStartQt( m_ctxCache, SubCtx( Ctx::SplitQtFlag, m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxStartHv( m_ctxCache, SubCtx( Ctx::SplitHvFlag, m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxStart12( m_ctxCache, SubCtx( Ctx::Split12Flag, m_CABACEstimator->getCtx() ) );
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
-  const TempCtx ctxStartMC( m_CtxCache, SubCtx( Ctx::ModeConsFlag, m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxStartMC( m_ctxCache, SubCtx( Ctx::ModeConsFlag, m_CABACEstimator->getCtx() ) );
 #endif
   m_CABACEstimator->resetBits();
 
@@ -3168,7 +3168,7 @@ void EncCu::xCheckDQP( CodingStructure& cs, Partitioner& partitioner, bool bKeep
 
   if( hasResidual )
   {
-    TempCtx ctxTemp( m_CtxCache );
+    TempCtx ctxTemp( m_ctxCache );
     if( !bKeepCtx ) ctxTemp = SubCtx( Ctx::DeltaQP, m_CABACEstimator->getCtx() );
 
     m_CABACEstimator->resetBits();
@@ -3245,8 +3245,8 @@ void EncCu::xCheckChromaQPOffset( CodingStructure& cs, Partitioner& partitioner 
   if( hasResidual )
   {
     // estimate cost for coding cu_chroma_qp_offset
-    TempCtx ctxTempAdjFlag( m_CtxCache );
-    TempCtx ctxTempAdjIdc( m_CtxCache );
+    TempCtx ctxTempAdjFlag( m_ctxCache );
+    TempCtx ctxTempAdjIdc( m_ctxCache );
     ctxTempAdjFlag = SubCtx( Ctx::ChromaQpAdjFlag, m_CABACEstimator->getCtx() );
     ctxTempAdjIdc = SubCtx( Ctx::ChromaQpAdjIdc,   m_CABACEstimator->getCtx() );
     m_CABACEstimator->resetBits();
@@ -4558,7 +4558,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     {
       rdModeList.clear();
       mrgTempBufSet       = true;
-      const TempCtx ctxStart(m_CtxCache, m_CABACEstimator->getCtx());
+      const TempCtx ctxStart(m_ctxCache, m_CABACEstimator->getCtx());
 
       CodingUnit &cu      = tempCS->addCU( tempCS->area, partitioner.chType );
 #if !MERGE_ENC_OPT
@@ -5855,7 +5855,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
   // 1. bit estimation
   const double sqrtLambdaFracBits = m_pcRdCost->getMotionLambda() * FRAC_BITS_SCALE;
   uint8_t maxNumMergeCandidates = tempCS->sps->getMaxNumGeoCand();
-  const TempCtx ctxStart(m_CtxCache, m_CABACEstimator->getCtx());
+  const TempCtx ctxStart(m_ctxCache, m_CABACEstimator->getCtx());
 
   double geoModeCost[GEO_NUM_PARTITION_MODE], geoMergeIdxCost[MRG_MAX_NUM_CANDS], geoMMVDFlagCost[2], geoMMVDIdxCost[GPM_EXT_MMVD_MAX_REFINE_NUM];
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -10141,7 +10141,7 @@ void EncCu::xCheckRDCostAffineMerge2Nx2N( CodingStructure *&tempCS, CodingStruct
       mrgTempBufSet = true;
 #if JVET_W0097_GPM_MMVD_TM
       const double sqrtLambdaForFirstPassIntra = m_pcRdCost->getMotionLambda() * FRAC_BITS_SCALE;
-      const TempCtx ctxStart(m_CtxCache, m_CABACEstimator->getCtx());
+      const TempCtx ctxStart(m_ctxCache, m_CABACEstimator->getCtx());
 #else
       const double sqrtLambdaForFirstPass = m_pcRdCost->getMotionLambda( );
 #endif
@@ -10856,7 +10856,7 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
     {
       rdModeList.clear();
       mrgTempBufSet = true;
-      const TempCtx ctxStart(m_CtxCache, m_CABACEstimator->getCtx());
+      const TempCtx ctxStart(m_ctxCache, m_CABACEstimator->getCtx());
 
       CodingUnit &cu      = tempCS->addCU( tempCS->area, partitioner.chType );
       const double sqrtLambdaForFirstPassIntra = m_pcRdCost->getMotionLambda( ) * FRAC_BITS_SCALE;

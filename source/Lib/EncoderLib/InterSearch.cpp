@@ -177,7 +177,7 @@ InterSearch::InterSearch()
   , m_bipredSearchRange           (0)
   , m_motionEstimationSearchMethod(MESEARCH_FULL)
   , m_CABACEstimator              (nullptr)
-  , m_CtxCache                    (nullptr)
+  , m_ctxCache                    (nullptr)
   , m_pTempPel                    (nullptr)
   , m_isInitialized               (false)
 {
@@ -336,7 +336,7 @@ void InterSearch::init( EncCfg*        pcEncCfg,
   m_bipredSearchRange            = bipredSearchRange;
   m_motionEstimationSearchMethod = motionEstimationSearchMethod;
   m_CABACEstimator               = CABACEstimator;
-  m_CtxCache                     = ctxCache;
+  m_ctxCache                     = ctxCache;
   m_useCompositeRef              = useCompositeRef;
   m_pcReshape                    = pcReshape;
 
@@ -9784,8 +9784,8 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
   Distortion uiSingleDistComp [3] = { 0, 0, 0 };
   uint64_t   uiSingleFracBits[3] = { 0, 0, 0 };
 
-  const TempCtx ctxStart  ( m_CtxCache, m_CABACEstimator->getCtx() );
-  TempCtx       ctxBest   ( m_CtxCache );
+  const TempCtx ctxStart  ( m_ctxCache, m_CABACEstimator->getCtx() );
+  TempCtx       ctxBest   ( m_ctxCache );
 
   if (bCheckFull)
   {
@@ -11125,7 +11125,7 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
   }
 #endif
 
-  const TempCtx ctxStart(m_CtxCache, m_CABACEstimator->getCtx());
+  const TempCtx ctxStart(m_ctxCache, m_CABACEstimator->getCtx());
   int           numAllowedColorSpace = (colorTransAllowed ? 2 : 1);
   Distortion    zeroDistortion = 0;
 
