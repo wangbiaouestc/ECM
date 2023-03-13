@@ -11711,6 +11711,10 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if JVET_AA0070_RRIBC
         m_pcInterSearch->adjustIbcMergeRribcCand(pu, mergeCtxIbcGeo, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
 #endif
+        for (int i = 0; i < mergeCtx.numValidMergeCand; i++)
+        {
+          isSkipThisCand[i] = false;
+        }
         for (int i = 0; i < skipCandNum[mergeCtx.numValidMergeCand - 1]; i++)
         {
           isSkipThisCand[mergeCtx.numValidMergeCand - 1 - i] = true;
@@ -11740,7 +11744,15 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
       {
         numValidBv--;
 #if JVET_AC0112_IBC_GPM
-        isSkipThisCand[mergeCtx.numValidMergeCand + mergeCandIbcGpm] = true;
+        if (testIbcGpm)
+        {
+          ibcGpmCandNumValid++;
+          distParamSad.cur.buf = piRefSrch + refStride * pu.bv.getVer() + pu.bv.getHor();
+          distParamSad.cur.stride = refBuf.stride;
+          ibcPredBuf[mergeCtx.numValidMergeCand + mergeCandIbcGpm] = m_acMergeBuffer[mergeCtx.numValidMergeCand + mergeCandIbcGpm].getBuf(localUnitArea);
+          ibcPredBuf[mergeCtx.numValidMergeCand + mergeCandIbcGpm].bufs[COMPONENT_Y].copyFrom(distParamSad.cur);
+          sadWholeBlk[mergeCtx.numValidMergeCand + mergeCandIbcGpm] = distParamSad.distFunc(distParamSad);
+        }
 #endif
         continue;
       }
@@ -11931,6 +11943,10 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if JVET_AA0070_RRIBC
       m_pcInterSearch->adjustIbcMergeRribcCand(pu, mergeCtxTmIbcGeo, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
 #endif
+      for (int i = 0; i < mergeCtxTmIbcGeo.numValidMergeCand; i++)
+      {
+        isSkipThisCand[mergeCtx.numValidMergeCand + i] = false;
+      }
       for (int i = 0; i < skipCandNumTm[mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand - 1]; i++)
       {
         isSkipThisCand[mergeCtx.numValidMergeCand + mergeCtxTm.numValidMergeCand - 1 - i] = true;
