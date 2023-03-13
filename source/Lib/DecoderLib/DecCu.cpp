@@ -2329,8 +2329,25 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               }
               else
 #endif
+#if JVET_AC0112_IBC_GPM
+              {
+                uint16_t mrgCandIdx = pu.mergeIdx;
+                if (pu.ibcGpmFlag)
+                {
+                  PU::getIBCMergeCandidates(pu, mrgCtx);
+                }
+                else
+                {
+#endif
                 PU::getIBCMergeCandidates(pu, mrgCtx, pu.mergeIdx);
 #if JVET_AC0112_IBC_GPM
+                }
+                if (pu.ibcGpmFlag)
+                {
+                  m_pcInterPred->adjustIbcMergeRribcCand(pu, mrgCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
+                }
+                pu.mergeIdx = mrgCandIdx;
+              }
               m_ibcMrgCtx = mrgCtx;
 #endif
 #if JVET_AA0061_IBC_MBVD
