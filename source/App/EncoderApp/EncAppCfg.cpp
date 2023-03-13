@@ -3933,21 +3933,6 @@ bool EncAppCfg::xCheckParameter()
       m_MVSD = false;
     }
 #endif
-#if JVET_AC0104_IBC_BVD_PREDICTION
-    if (m_bvdPred)
-    {
-      msg(WARNING, "BVD prediction is forcefully disabled since the enable flag of TM tools is set off. \n");
-      m_bvdPred = false;
-    }
-#endif
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-    if (m_bvpCluster)
-    {
-      msg(WARNING, "BVP clustering and BV with one zero component prediction is forcefully disabled since the enable "
-                   "flag of TM tools is set off. \n");
-      m_bvpCluster = false;
-    }
-#endif
   }
 #endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG

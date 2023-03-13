@@ -1329,6 +1329,12 @@ CMotionBuf PredictionUnit::getMotionBuf() const
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 bool PredictionUnit::isMvsdApplicable() const
 {
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  if (CU::isIBC(*cu) && cs->sps->getUseBvdPred())
+  {
+    return true;
+  }
+#endif
   if (!cs->sps->getUseMVSD())
   {
     return false;
