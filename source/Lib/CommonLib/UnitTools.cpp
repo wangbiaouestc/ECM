@@ -9889,7 +9889,7 @@ inline void PU::clusterBvpCand(const int cbWidth, const int cbHeight, AMVPInfo *
       {
         continue;
       }
-      for (int j = i + 1; j < pInfo->numCand; j++)
+      for (int j = i + 1; j < numCand; j++)
       {
         if (validCand[j])
         {
