@@ -3469,7 +3469,7 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
                     isLuma( compID ) ? recBufDb.get( compID ).bufAt( compArea ) : nullptr, isLuma( compID ) ? recBufDb.get( compID ).stride : 0,
 #endif
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
-                    isLuma(compID) ? resiBuf.get(compID).bufAt(compAreaDst) : nullptr,
+                    isLuma(compID) ? resiBuf.get(compID).bufAt(compArea) : nullptr,
                     isLuma(compID) ? resiBuf.get(compID).stride : 0,
 #endif
                     compAreaDst, compArea, chType, fixedFilterSetIdx, classifierIdx );
@@ -3961,7 +3961,7 @@ void EncAdaptiveLoopFilter::calcCovariance( int ELocal[MAX_NUM_ALF_LUMA_COEFF][M
 #if JVET_AA0095_ALF_LONGER_FILTER
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
   if( shape.filterType == ALF_FILTER_13_EXT || shape.filterType == ALF_FILTER_13_EXT_DB 
-#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
       || shape.filterType == ALF_FILTER_13_EXT_DB_RESI
       || shape.filterType == ALF_FILTER_13_EXT_DB_RESI_DIRECT
 #endif
