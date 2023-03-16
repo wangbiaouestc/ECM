@@ -6591,7 +6591,7 @@ void PU::xCalcRMVFParameters(std::vector<RMVFInfo> &mvpInfoVec, int64_t dMatrix[
   return;
 }
 void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &abovePU, AffineMergeCtx &affMrgCtx
-  , std::vector<RMVFInfo> mvp[2][4]
+  , std::vector<RMVFInfo> mvp[NUM_REF_PIC_LIST_01][MAX_NUM_REF]
   , int mrgCandIdx
 )
 {
@@ -7051,7 +7051,7 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
     }
   }
 }
-void PU::xReturnMvpVec(std::vector<RMVFInfo> mvp[2][4], const PredictionUnit &pu, const Position &pos
+void PU::xReturnMvpVec(std::vector<RMVFInfo> mvp[NUM_REF_PIC_LIST_01][MAX_NUM_REF], const PredictionUnit &pu, const Position &pos
 #if !JVET_AB0189_RMVF_BITLENGTH_CONTROL
   , const MvpDir &eDir
 #endif
@@ -7100,7 +7100,7 @@ void PU::xReturnMvpVec(std::vector<RMVFInfo> mvp[2][4], const PredictionUnit &pu
     mvp[1][neibMi.refIdx[1]].push_back(RMVFInfo(neibMi.mv[1], neibPos, neibMi.refIdx[1]));
   }
 }
-void PU::collectNeiMotionInfo(std::vector<RMVFInfo> mvpInfoVec[2][4], const PredictionUnit &pu)
+void PU::collectNeiMotionInfo(std::vector<RMVFInfo> mvpInfoVec[NUM_REF_PIC_LIST_01][MAX_NUM_REF], const PredictionUnit &pu)
 {
   Position anchorPos = pu.Y().topLeft();
   Position neibPos;
@@ -13765,7 +13765,7 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       affMrgCtxTemp.maxNumMergeCand = RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE;
 #endif
 
-      std::vector<RMVFInfo> mvpInfoVec[2][4];
+      std::vector<RMVFInfo> mvpInfoVec[NUM_REF_PIC_LIST_01][MAX_NUM_REF];
       collectNeiMotionInfo(mvpInfoVec, pu);
 
 #if JVET_W0090_ARMC_TM
