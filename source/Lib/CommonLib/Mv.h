@@ -356,14 +356,12 @@ struct MvdSuffixInfo
 
 namespace std
 {
-  template <> struct hash<Mv>
+  template<> struct hash<Mv>
   {
-    size_t operator()(const Mv& value) const
-    {
-      return (((size_t)value.hor << 32) + value.ver);
-    }
+    size_t operator()( const Mv &value ) const { return ( ( (size_t)value.hor << 32 ) + value.ver ); }
   };
 };
+
 extern void(*clipMv) ( Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps );
 void clipMvInPic ( Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps );
 void clipMvInSubpic ( Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps );

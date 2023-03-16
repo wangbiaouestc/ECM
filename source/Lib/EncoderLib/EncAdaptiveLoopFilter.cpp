@@ -1561,7 +1561,7 @@ double EncAdaptiveLoopFilter::deriveCtbAlfEnableFlags( CodingStructure& cs, cons
         // Evaluate cost of signaling filter set index for convergence of filters enabled flag / filter derivation
         assert( cs.slice->getPic()->getAlfCtbFilterIndex()[ctuIdx] == NUM_FIXED_FILTER_SETS );
         assert( cs.slice->getTileGroupNumAps() == 1 );
-        m_CABACEstimator->codeAlfCtuFilterIndex(cs, ctuIdx, true);
+        m_CABACEstimator->codeAlfCtuFilterIndex( cs, ctuIdx, m_alfParamTemp.enabledFlag[COMPONENT_Y] );
       }
       double costOn = distUnfilterCtu + ctuLambda * FRAC_BITS_SCALE * m_CABACEstimator->getEstFracBits();
 
@@ -2101,7 +2101,7 @@ double EncAdaptiveLoopFilter::getFilterCoeffAndCost( CodingStructure& cs, double
       // Evaluate cost of signaling filter set index for convergence of filters enabled flag / filter derivation
       assert( cs.slice->getPic()->getAlfCtbFilterIndex()[ctuIdx] == NUM_FIXED_FILTER_SETS );
       assert( cs.slice->getTileGroupNumAps() == 1 );
-      m_CABACEstimator->codeAlfCtuFilterIndex(cs, ctuIdx, true);
+      m_CABACEstimator->codeAlfCtuFilterIndex( cs, ctuIdx, m_alfParamTemp.enabledFlag[COMPONENT_Y] );
 #if ALF_IMPROVEMENT
       m_CABACEstimator->codeAlfCtuAlternative(cs, ctuIdx, COMPONENT_Y, &m_alfParamTemp, m_alfParamTemp.numAlternativesLuma);
 #endif
@@ -5030,7 +5030,7 @@ void  EncAdaptiveLoopFilter::alfEncoderCtb(CodingStructure& cs, AlfParam& alfPar
                 m_CABACEstimator->resetBits();
                 m_CABACEstimator->codeAlfCtuEnableFlag(cs, ctbIdx, COMPONENT_Y, &m_alfParamTemp);
                 alfCtbFilterSetIndex[ctbIdx] = filterSetIdx;
-                m_CABACEstimator->codeAlfCtuFilterIndex(cs, ctbIdx, true);
+                m_CABACEstimator->codeAlfCtuFilterIndex( cs, ctbIdx, m_alfParamTemp.enabledFlag[COMPONENT_Y] );
 #if ALF_IMPROVEMENT
                 m_ctuAlternative[COMPONENT_Y][ctbIdx] = altIdx;
                 if (filterSetIdx >= NUM_FIXED_FILTER_SETS)
