@@ -9889,7 +9889,7 @@ inline void PU::clusterBvpCand(const int cbWidth, const int cbHeight, AMVPInfo *
       {
         continue;
       }
-      for (int j = i + 1; j < pInfo->numCand; j++)
+      for (int j = i + 1; j < numCand; j++)
       {
         if (validCand[j])
         {
@@ -16766,12 +16766,8 @@ void PU::spanIpmInfoIBC( PredictionUnit &pu, IpmBuf &ib, int bvx, int bvy )
   PosY.y = pu.Y().y + bvy;
   PosY.x = (PosY.x & mask);
   PosY.y = (PosY.y & mask);
-  CodingStructure *cs = pu.cs;
-  while (cs != NULL && !cs->area.Y().contains(PosY))
-  {
-    cs = cs->parent;
-  }
-  const uint8_t ipm = cs->getIpmInfo(PosY);
+  const PredictionUnit* puTarget = pu.cs->getPURestricted(PosY, pu, pu.chType);
+  const uint8_t ipm = puTarget ? puTarget->getIpmInfo(PosY) : 0;
   for (int y = 0; y < ibH; y++)
   {
     for (int x = 0; x < ibW; x++)

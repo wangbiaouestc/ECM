@@ -137,10 +137,10 @@ private:
   // RD cost computation
 #if ENABLE_SPLIT_PARALLELISM
   RdCost                   *m_cRdCost;                            ///< RD cost computation class
-  CtxCache                 *m_CtxCache;                           ///< buffer for temporarily stored context models
+  CtxCache                 *m_ctxCache;                           ///< buffer for temporarily stored context models
 #else
   RdCost                    m_cRdCost;                            ///< RD cost computation class
-  CtxCache                  m_CtxCache;                           ///< buffer for temporarily stored context models
+  CtxCache                  m_ctxCache;                           ///< buffer for temporarily stored context models
 #endif
   // quality control
   RateCtrl                  m_cRateCtrl;                          ///< Rate control class
@@ -240,14 +240,14 @@ public:
   CABACEncoder*           getCABACEncoder       ( int jId = 0 ) { return  &m_CABACEncoder[jId];    }
 
   RdCost*                 getRdCost             ( int jId = 0 ) { return  &m_cRdCost[jId];         }
-  CtxCache*               getCtxCache           ( int jId = 0 ) { return  &m_CtxCache[jId];        }
+  CtxCache*               getCtxCache           ( int jId = 0 ) { return  &m_ctxCache[jId];        }
 #else
   CABACEncoder*           getCABACEncoder       ()              { return  &m_CABACEncoder;         }
 #if JVET_AA0096_MC_BOUNDARY_PADDING
   InterPrediction *         getFrameMcPadPredSearch() { return &m_cFrameMcPadPredSearch; }
 #endif
   RdCost*                 getRdCost             ()              { return  &m_cRdCost;              }
-  CtxCache*               getCtxCache           ()              { return  &m_CtxCache;             }
+  CtxCache*               getCtxCache           ()              { return  &m_ctxCache;             }
 #endif
   RateCtrl*               getRateCtrl           ()              { return  &m_cRateCtrl;            }
 

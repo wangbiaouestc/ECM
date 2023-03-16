@@ -325,7 +325,7 @@ static const int NUM_FIXED_BASED_COEFF       =                      7;
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
 static const int NUM_RESI                    =                      1;
 static const int NUM_RESI_SAMPLE             =                      1;
-static const int NUM_RESI_PAD                =                      0;
+static const int NUM_RESI_PAD                =                      8;
 #endif
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
 static const int NUM_DB                      =                      3;

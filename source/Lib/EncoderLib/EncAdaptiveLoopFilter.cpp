@@ -1047,7 +1047,7 @@ void EncAdaptiveLoopFilter::initCABACEstimator( CABACEncoder* cabacEncoder, CtxC
 {
   m_apsMap = apsMap;
   m_CABACEstimator = cabacEncoder->getCABACEstimator( pcSlice->getSPS() );
-  m_CtxCache = ctxCache;
+  m_ctxCache = ctxCache;
   m_CABACEstimator->initCtxModels( *pcSlice );
   m_CABACEstimator->resetBits();
 }
@@ -1174,9 +1174,9 @@ void EncAdaptiveLoopFilter::ALFProcess( CodingStructure& cs, const double *lambd
 #endif
   AlfParam alfParam;
   alfParam.reset();
-  const TempCtx  ctxStart( m_CtxCache, AlfCtx( m_CABACEstimator->getCtx() ) );
+  const TempCtx  ctxStart( m_ctxCache, AlfCtx( m_CABACEstimator->getCtx() ) );
 
-  const TempCtx ctxStartCcAlf( m_CtxCache, SubCtx( Ctx::CcAlfFilterControlFlag, m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxStartCcAlf( m_ctxCache, SubCtx( Ctx::CcAlfFilterControlFlag, m_CABACEstimator->getCtx() ) );
 
   // set available filter shapes
   alfParam.filterShapes = m_filterShapes;
@@ -1497,10 +1497,10 @@ double EncAdaptiveLoopFilter::deriveCtbAlfEnableFlags( CodingStructure& cs, cons
 #endif
 )
 {
-  TempCtx        ctxTempStart( m_CtxCache );
-  TempCtx        ctxTempBest( m_CtxCache );
-  TempCtx        ctxTempAltStart( m_CtxCache );
-  TempCtx        ctxTempAltBest( m_CtxCache );
+  TempCtx        ctxTempStart( m_ctxCache );
+  TempCtx        ctxTempBest( m_ctxCache );
+  TempCtx        ctxTempAltStart( m_ctxCache );
+  TempCtx        ctxTempAltBest( m_ctxCache );
   const ComponentID compIDFirst = isLuma( channel ) ? COMPONENT_Y : COMPONENT_Cb;
   const ComponentID compIDLast = isLuma( channel ) ? COMPONENT_Y : COMPONENT_Cr;
 #if ALF_IMPROVEMENT
@@ -1679,8 +1679,8 @@ void EncAdaptiveLoopFilter::alfEncoder( CodingStructure& cs, AlfParam& alfParam,
 #endif
                                       )
 {
-  const TempCtx  ctxStart( m_CtxCache, AlfCtx( m_CABACEstimator->getCtx() ) );
-  TempCtx        ctxBest( m_CtxCache );
+  const TempCtx  ctxStart( m_ctxCache, AlfCtx( m_CABACEstimator->getCtx() ) );
+  TempCtx        ctxBest( m_ctxCache );
 
   double costMin = MAX_DOUBLE;
   std::vector<AlfFilterShape>& alfFilterShape = alfParam.filterShapes[channel];
@@ -1907,7 +1907,7 @@ void EncAdaptiveLoopFilter::copyAlfParam( AlfParam& alfParamDst, AlfParam& alfPa
 {
   if( isLuma( channel ) )
   {
-    memcpy( &alfParamDst, &alfParamSrc, sizeof( AlfParam ) );
+    std::copy_n( reinterpret_cast< const char * >( &alfParamSrc ), sizeof( AlfParam ), reinterpret_cast< char * >( &alfParamDst ) );
   }
   else
   {
@@ -3469,7 +3469,7 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
                     isLuma( compID ) ? recBufDb.get( compID ).bufAt( compArea ) : nullptr, isLuma( compID ) ? recBufDb.get( compID ).stride : 0,
 #endif
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
-                    isLuma(compID) ? resiBuf.get(compID).bufAt(compAreaDst) : nullptr,
+                    isLuma(compID) ? resiBuf.get(compID).bufAt(compArea) : nullptr,
                     isLuma(compID) ? resiBuf.get(compID).stride : 0,
 #endif
                     compAreaDst, compArea, chType, fixedFilterSetIdx, classifierIdx );
@@ -3961,7 +3961,7 @@ void EncAdaptiveLoopFilter::calcCovariance( int ELocal[MAX_NUM_ALF_LUMA_COEFF][M
 #if JVET_AA0095_ALF_LONGER_FILTER
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
   if( shape.filterType == ALF_FILTER_13_EXT || shape.filterType == ALF_FILTER_13_EXT_DB 
-#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
       || shape.filterType == ALF_FILTER_13_EXT_DB_RESI
       || shape.filterType == ALF_FILTER_13_EXT_DB_RESI_DIRECT
 #endif
@@ -4792,12 +4792,12 @@ void  EncAdaptiveLoopFilter::alfEncoderCtb(CodingStructure& cs, AlfParam& alfPar
 #endif
 )
 {
-  TempCtx        ctxStart(m_CtxCache, AlfCtx(m_CABACEstimator->getCtx()));
-  TempCtx        ctxBest(m_CtxCache);
-  TempCtx        ctxTempStart(m_CtxCache);
-  TempCtx        ctxTempBest(m_CtxCache);
-  TempCtx        ctxTempAltStart(m_CtxCache);
-  TempCtx        ctxTempAltBest(m_CtxCache);
+  TempCtx        ctxStart(m_ctxCache, AlfCtx(m_CABACEstimator->getCtx()));
+  TempCtx        ctxBest(m_ctxCache);
+  TempCtx        ctxTempStart(m_ctxCache);
+  TempCtx        ctxTempBest(m_ctxCache);
+  TempCtx        ctxTempAltStart(m_ctxCache);
+  TempCtx        ctxTempAltBest(m_ctxCache);
   AlfParam  alfParamNewFiltersBest = alfParamNewFilters;
   bool     hasNewFilters[2] = { alfParamNewFilters.enabledFlag[COMPONENT_Y] , alfParamNewFilters.enabledFlag[COMPONENT_Cb] || alfParamNewFilters.enabledFlag[COMPONENT_Cr] };
   m_alfParamTemp = alfParamNewFilters;
@@ -6049,9 +6049,9 @@ void EncAdaptiveLoopFilter::determineControlIdcValues(CodingStructure &cs, const
   double prevRate = curTotalRate;
 #endif
 
-  TempCtx ctxInitial(m_CtxCache);
-  TempCtx ctxBest(m_CtxCache);
-  TempCtx ctxStart(m_CtxCache);
+  TempCtx ctxInitial(m_ctxCache);
+  TempCtx ctxBest(m_ctxCache);
+  TempCtx ctxStart(m_ctxCache);
   ctxInitial = SubCtx(Ctx::CcAlfFilterControlFlag, m_CABACEstimator->getCtx());
   ctxBest    = SubCtx(Ctx::CcAlfFilterControlFlag, m_CABACEstimator->getCtx());
 
@@ -6287,7 +6287,7 @@ void EncAdaptiveLoopFilter::deriveCcAlfFilter( CodingStructure& cs, ComponentID 
   m_reuseApsId[compID - 1] = -1;
   m_bestFilterCount = 0;
 
-  const TempCtx ctxStartCcAlfFilterControlFlag  ( m_CtxCache, SubCtx( Ctx::CcAlfFilterControlFlag, m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxStartCcAlfFilterControlFlag  ( m_ctxCache, SubCtx( Ctx::CcAlfFilterControlFlag, m_CABACEstimator->getCtx() ) );
 
   // compute cost of not filtering
   uint64_t unfilteredDistortion = 0;

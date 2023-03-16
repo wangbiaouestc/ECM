@@ -1881,8 +1881,6 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 
     int8_t sliceType = m_GOPList[0].m_sliceType;
 
-    memset(m_GOPList, 0, sizeof(m_GOPList));
-    m_GOPList[0].m_sliceType = sliceType;
     for (int i = 1; i < MAX_GOP; i++)
     {
       m_GOPList[i].m_POC = -1;
@@ -3306,7 +3304,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   for( int i = 0; i < (int)m_sMaxMTTHierarchyDepthByTid.size(); i++ )
   {
     CHECK( i >= MAX_TLAYER, "Index exceeds MAX_TLAYER" );
-    m_maxMTTHierarchyDepthByTid[i] = std::stoul( m_sMaxMTTHierarchyDepthByTid.substr( i, 1 ) );
+    m_maxMTTHierarchyDepthByTid[i] = (unsigned int) std::stoul( m_sMaxMTTHierarchyDepthByTid.substr( i, 1 ) );
   }
 
 
@@ -3933,21 +3931,6 @@ bool EncAppCfg::xCheckParameter()
     {
       msg(WARNING, "MVD sign prediction is forcefully disabled since the enable flag of TM tools is set off. \n");
       m_MVSD = false;
-    }
-#endif
-#if JVET_AC0104_IBC_BVD_PREDICTION
-    if (m_bvdPred)
-    {
-      msg(WARNING, "BVD prediction is forcefully disabled since the enable flag of TM tools is set off. \n");
-      m_bvdPred = false;
-    }
-#endif
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-    if (m_bvpCluster)
-    {
-      msg(WARNING, "BVP clustering and BV with one zero component prediction is forcefully disabled since the enable "
-                   "flag of TM tools is set off. \n");
-      m_bvpCluster = false;
     }
 #endif
   }

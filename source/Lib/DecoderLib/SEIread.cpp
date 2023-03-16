@@ -97,10 +97,13 @@ void SEIReader::sei_read_flag(std::ostream *pOS, uint32_t& ruiCode, const char *
 
 static inline void output_sei_message_header(SEI &sei, std::ostream *pDecodedMessageOutputStream, uint32_t payloadSize)
 {
-  if (pDecodedMessageOutputStream)
+  if( pDecodedMessageOutputStream )
   {
-    std::string seiMessageHdr(SEI::getSEIMessageString(sei.payloadType())); seiMessageHdr+=" SEI message";
-    (*pDecodedMessageOutputStream) << std::setfill('-') << std::setw(seiMessageHdr.size()) << "-" << std::setfill(' ') << "\n" << seiMessageHdr << " (" << payloadSize << " bytes)"<< "\n";
+    std::string seiMessageHdr( SEI::getSEIMessageString( sei.payloadType() ) ); seiMessageHdr += " SEI message";
+    (*pDecodedMessageOutputStream) << std::setfill( '-' ) << std::setw( ( int ) seiMessageHdr.size() ) << "-"
+      << std::setfill( ' ' ) << "\n"
+      << seiMessageHdr << " (" << payloadSize << " bytes)"
+      << "\n";
   }
 }
 

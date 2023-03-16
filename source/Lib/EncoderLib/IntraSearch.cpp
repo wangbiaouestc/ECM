@@ -67,7 +67,7 @@ IntraSearch::IntraSearch()
   , m_pcRdCost      (nullptr)
   , m_pcReshape     (nullptr)
   , m_CABACEstimator(nullptr)
-  , m_CtxCache      (nullptr)
+  , m_ctxCache      (nullptr)
   , m_isInitialized (false)
 {
   for( uint32_t ch = 0; ch < MAX_NUM_TBLOCKS; ch++ )
@@ -293,7 +293,7 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
   m_pcTrQuant                    = pcTrQuant;
   m_pcRdCost                     = pcRdCost;
   m_CABACEstimator               = CABACEstimator;
-  m_CtxCache                     = ctxCache;
+  m_ctxCache                     = ctxCache;
   m_pcReshape                    = pcReshape;
 
   const ChromaFormat cform = pcEncCfg->getChromaFormatIdc();
@@ -539,30 +539,30 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
   //===== loop over partitions =====
 
-  const TempCtx ctxStart          ( m_CtxCache, m_CABACEstimator->getCtx() );
-  const TempCtx ctxStartMipFlag    ( m_CtxCache, SubCtx( Ctx::MipFlag,          m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxStart           ( m_ctxCache, m_CABACEstimator->getCtx() );
+  const TempCtx ctxStartMipFlag    ( m_ctxCache, SubCtx( Ctx::MipFlag,          m_CABACEstimator->getCtx() ) );
 #if JVET_V0130_INTRA_TMP
-  const TempCtx ctxStartTpmFlag(m_CtxCache, SubCtx(Ctx::TmpFlag, m_CABACEstimator->getCtx()));
+  const TempCtx ctxStartTpmFlag    ( m_ctxCache, SubCtx(Ctx::TmpFlag, m_CABACEstimator->getCtx()));
 #endif
 #if JVET_W0123_TIMD_FUSION
-  const TempCtx ctxStartTimdFlag   ( m_CtxCache, SubCtx( Ctx::TimdFlag,      m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxStartTimdFlag   ( m_ctxCache, SubCtx( Ctx::TimdFlag,      m_CABACEstimator->getCtx() ) );
 #endif
 #if JVET_AB0155_SGPM
-  const TempCtx ctxStartSgpmFlag(m_CtxCache, SubCtx(Ctx::SgpmFlag, m_CABACEstimator->getCtx()));
+  const TempCtx ctxStartSgpmFlag   ( m_ctxCache, SubCtx(Ctx::SgpmFlag, m_CABACEstimator->getCtx()));
 #endif
 
-  const TempCtx ctxStartIspMode    ( m_CtxCache, SubCtx( Ctx::ISPMode,          m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxStartIspMode    ( m_ctxCache, SubCtx( Ctx::ISPMode,          m_CABACEstimator->getCtx() ) );
 #if SECONDARY_MPM
-  const TempCtx ctxStartMPMIdxFlag(m_CtxCache, SubCtx(Ctx::IntraLumaMPMIdx, m_CABACEstimator->getCtx()));
+  const TempCtx ctxStartMPMIdxFlag ( m_ctxCache, SubCtx(Ctx::IntraLumaMPMIdx, m_CABACEstimator->getCtx()));
 #endif
-  const TempCtx ctxStartPlanarFlag ( m_CtxCache, SubCtx( Ctx::IntraLumaPlanarFlag, m_CABACEstimator->getCtx() ) );
-  const TempCtx ctxStartIntraMode(m_CtxCache, SubCtx(Ctx::IntraLumaMpmFlag, m_CABACEstimator->getCtx()));
+  const TempCtx ctxStartPlanarFlag ( m_ctxCache, SubCtx( Ctx::IntraLumaPlanarFlag, m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxStartIntraMode  ( m_ctxCache, SubCtx(Ctx::IntraLumaMpmFlag, m_CABACEstimator->getCtx()));
 #if SECONDARY_MPM
-  const TempCtx ctxStartIntraMode2(m_CtxCache, SubCtx(Ctx::IntraLumaSecondMpmFlag, m_CABACEstimator->getCtx()));
+  const TempCtx ctxStartIntraMode2 ( m_ctxCache, SubCtx(Ctx::IntraLumaSecondMpmFlag, m_CABACEstimator->getCtx()));
 #endif
-  const TempCtx ctxStartMrlIdx      ( m_CtxCache, SubCtx( Ctx::MultiRefLineIdx,        m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxStartMrlIdx     ( m_ctxCache, SubCtx( Ctx::MultiRefLineIdx,        m_CABACEstimator->getCtx() ) );
 #if JVET_AB0157_TMRL
-  const TempCtx ctxStartTmrlDerive    (m_CtxCache, SubCtx(Ctx::TmrlDerive, m_CABACEstimator->getCtx()));
+  const TempCtx ctxStartTmrlDerive ( m_ctxCache, SubCtx(Ctx::TmrlDerive, m_CABACEstimator->getCtx()));
 #endif
   CHECK( !cu.firstPU, "CU has no PUs" );
   // variables for saving fast intra modes scan results across multiple LFNST passes
@@ -2580,7 +2580,7 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
   const ChromaFormat format   = cu.chromaFormat;
   const uint32_t    numberValidComponents = getNumberValidComponents(format);
   CodingStructure &cs = *cu.cs;
-  const TempCtx ctxStart  ( m_CtxCache, m_CABACEstimator->getCtx() );
+  const TempCtx ctxStart  ( m_ctxCache, m_CABACEstimator->getCtx() );
 
   cs.setDecomp( cs.area.Cb(), false );
 
@@ -7247,8 +7247,8 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
   uint8_t    nNumTransformCands                 = cu.mtsFlag ? 4 : 1;
   uint8_t    numTransformIndexCands             = nNumTransformCands;
 
-  const TempCtx ctxStart  ( m_CtxCache, m_CABACEstimator->getCtx() );
-  TempCtx       ctxBest   ( m_CtxCache );
+  const TempCtx ctxStart  ( m_ctxCache, m_CABACEstimator->getCtx() );
+  TempCtx       ctxBest   ( m_ctxCache );
 
   CodingStructure *csSplit = nullptr;
   CodingStructure *csFull  = nullptr;
@@ -7864,8 +7864,8 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
   bool bCheckFull = !partitioner.canSplit(TU_MAX_TR_SPLIT, cs);
   bool bCheckSplit = !bCheckFull;
 
-  TempCtx ctxStart(m_CtxCache, m_CABACEstimator->getCtx());
-  TempCtx ctxBest(m_CtxCache);
+  TempCtx ctxStart(m_ctxCache, m_CABACEstimator->getCtx());
+  TempCtx ctxBest(m_ctxCache);
 
   CodingStructure *csSplit = nullptr;
   CodingStructure *csFull = nullptr;
@@ -8350,7 +8350,7 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
       }
 #endif
 
-      TempCtx ctxBegin(m_CtxCache);
+      TempCtx ctxBegin(m_ctxCache);
       ctxBegin = m_CABACEstimator->getCtx();
 
       for (int modeId = 0; modeId < numTransformCands; modeId++)
@@ -8764,9 +8764,9 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     int        maxModesTested = 0;
     bool       earlyExitISP   = false;
 
-    TempCtx ctxStartTU( m_CtxCache );
-    TempCtx ctxStart  ( m_CtxCache );
-    TempCtx ctxBest   ( m_CtxCache );
+    TempCtx ctxStartTU( m_ctxCache );
+    TempCtx ctxStart  ( m_ctxCache );
+    TempCtx ctxBest   ( m_ctxCache );
 
     ctxStartTU       = m_CABACEstimator->getCtx();
     currTU.jointCbCr = 0;

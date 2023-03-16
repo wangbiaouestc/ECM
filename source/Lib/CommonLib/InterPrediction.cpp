@@ -5674,15 +5674,11 @@ void  InterPrediction::adjustIbcMergeRribcCand(PredictionUnit &pu, MergeCtx& mrg
   for (uint32_t uiMergeCand = startPos; uiMergeCand < endPos; ++uiMergeCand)
   {
     uiCost = 0;
-    if (mrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0].mv.hor == 0 && mrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0].mv.ver == 0)
-    {
-      break;
-    }
     if (candNumNoRribc >= mrgCtx.numValidMergeCand)
     {
       break;
     }
-    if (mrgCtx.rribcFlipTypes[uiMergeCand] > 0)
+    if (mrgCtx.rribcFlipTypes[uiMergeCand] > 0 || (mrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0].mv.hor == 0 && mrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0].mv.ver == 0))
     {
       uiCost = MAX_UINT - 1;
       if (noNeedSort && uiMergeCand < mrgCtx.numValidMergeCand)

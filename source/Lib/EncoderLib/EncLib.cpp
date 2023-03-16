@@ -117,7 +117,7 @@ void EncLib::create( const int layerId )
   m_cTrQuant        = new TrQuant            [m_numCuEncStacks];
   m_CABACEncoder    = new CABACEncoder       [m_numCuEncStacks];
   m_cRdCost         = new RdCost             [m_numCuEncStacks];
-  m_CtxCache        = new CtxCache           [m_numCuEncStacks];
+  m_ctxCache        = new CtxCache           [m_numCuEncStacks];
 
   for( int jId = 0; jId < m_numCuEncStacks; jId++ )
   {
@@ -278,7 +278,7 @@ void EncLib::destroy ()
   delete[] m_cTrQuant;
   delete[] m_CABACEncoder;
   delete[] m_cRdCost;
-  delete[] m_CtxCache;
+  delete[] m_ctxCache;
 #endif
 
   return;
@@ -657,8 +657,8 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     // precache a few objects
     for( int i = 0; i < 10; i++ )
     {
-      auto x = m_CtxCache[jId].get();
-      m_CtxCache[jId].cache( x );
+      auto x = m_ctxCache[jId].get();
+      m_ctxCache[jId].cache( x );
     }
 
     m_cCuEncoder[jId].init( this, sps0, jId );
