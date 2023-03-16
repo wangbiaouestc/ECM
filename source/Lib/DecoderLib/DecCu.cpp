@@ -2308,11 +2308,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               if (pu.cs->sps->getUseAML())
               {
 #if JVET_Z0075_IBC_HMVP_ENLARGE
-#if JVET_AA0093_ENHANCED_MMVD_EXTENSION
-              uint16_t mrgCandIdx = pu.mergeIdx;
-#else
-              uint8_t mrgCandIdx = pu.mergeIdx;
-#endif
+                auto mrgCandIdx = pu.mergeIdx;
                 PU::getIBCMergeCandidates(pu, mrgCtx);
                 m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
 #if JVET_AC0112_IBC_GPM && JVET_AA0070_RRIBC
@@ -2331,7 +2327,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #endif
 #if JVET_AC0112_IBC_GPM
               {
-                uint16_t mrgCandIdx = pu.mergeIdx;
+                auto mrgCandIdx = pu.mergeIdx;
                 if (pu.ibcGpmFlag)
                 {
                   PU::getIBCMergeCandidates(pu, mrgCtx);
@@ -2358,7 +2354,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if JVET_X0049_ADAPT_DMVR
             if (pu.bmMergeFlag)
             {
-              uint8_t mergeIdx = pu.bmDir == 2 ? pu.mergeIdx - BM_MRG_MAX_NUM_CANDS : pu.mergeIdx;
+              auto mergeIdx = pu.bmDir == 2 ? pu.mergeIdx - BM_MRG_MAX_NUM_CANDS : pu.mergeIdx;
 #if JVET_W0090_ARMC_TM
               if (pu.cs->sps->getUseAML())
               {
