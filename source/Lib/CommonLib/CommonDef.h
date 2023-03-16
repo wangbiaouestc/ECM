@@ -514,10 +514,10 @@ static const int DELTA_QP_ACT[4] =                  { -5, 1, 3, 1 };
 
 struct ClpRng
 {
-  int min;
-  int max;
-  int bd;
-  int n;
+  int min {0};
+  int max {0};
+  int bd  {0};
+  int n   {0};
 };
 
 struct ClpRngs

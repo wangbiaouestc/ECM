@@ -300,8 +300,18 @@ public:
   CtxStore( bool dummy );
   CtxStore( const CtxStore<BinProbModel>& ctxStore );
 public:
-  void copyFrom   ( const CtxStore<BinProbModel>& src )                        { checkInit(); ::memcpy( m_Ctx,               src.m_Ctx,               sizeof( BinProbModel ) * ContextSetCfg::NumberOfContexts ); }
-  void copyFrom   ( const CtxStore<BinProbModel>& src, const CtxSet& ctxSet )  { checkInit(); ::memcpy( m_Ctx+ctxSet.Offset, src.m_Ctx+ctxSet.Offset, sizeof( BinProbModel ) * ctxSet.Size ); }
+  void copyFrom( const CtxStore<BinProbModel> &src )
+  {
+    checkInit();
+    std::copy_n( reinterpret_cast<const char *>( src.m_Ctx ), sizeof( BinProbModel ) * ContextSetCfg::NumberOfContexts,
+      reinterpret_cast<char *>( m_Ctx ) );
+  }
+  void copyFrom( const CtxStore<BinProbModel> &src, const CtxSet &ctxSet )
+  {
+    checkInit();
+    std::copy_n( reinterpret_cast<const char *>( src.m_Ctx + ctxSet.Offset ), sizeof( BinProbModel ) * ctxSet.Size,
+      reinterpret_cast<char *>( m_Ctx + ctxSet.Offset ) );
+  }
   void init       ( int qp, int initId );
   void setWinSizes( const std::vector<uint8_t>&   log2WindowSizes );
   void loadPStates( const std::vector<uint16_t>&  probStates );

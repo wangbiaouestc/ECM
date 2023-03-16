@@ -66,11 +66,8 @@ enum PLTScanMode
 class SortingElement
 {
 public:
-  inline bool operator<(const SortingElement &other) const
+  SortingElement()
   {
-    return cnt > other.cnt;
-  }
-  SortingElement() {
     cnt[0] = cnt[1] = cnt[2] = cnt[3] = 0;
     shift[0] = shift[1] = shift[2] = 0;
     lastCnt[0] = lastCnt[1] = lastCnt[2] = 0;
