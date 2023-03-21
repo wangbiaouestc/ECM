@@ -6950,7 +6950,6 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
 #if JVET_AC0098_LOC_DEP_DIMD
     int sumWeightReal = iRatio[0];
     int countBlendModeNew = countBlendMode;
-    bool adjustWeights = false;
     int lastFilled = 0;
 #endif
     for (int i = 1; i < countBlendMode - 2; i++)
@@ -6971,15 +6970,10 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
       for (int i = lastFilled + 1; i <= countBlendMode - 2; i++)
       {
         iRatio[i] = 0;
+        cu.dimdRelWeight[i + 1] = 0;
         cu.dimdBlendMode[i - 1] = 0;
         countBlendModeNew--;  
       }
-    }
-    if(adjustWeights)
-    {
-      iRatio[countBlendMode - 2] = 0;
-      cu.dimdRelWeight[countBlendMode - 1] = 0;
-      cu.dimdBlendMode[countBlendMode-3] = 0;
     }
     countBlendMode = countBlendModeNew;
     if (sumWeightReal > sumWeight)
@@ -6989,8 +6983,8 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
       {
         for (int i = lastFilled; i >= 1; i--)
         {
-          cu.dimdRelWeight[i+1] -=1;
           iRatio[i] -=1;
+          cu.dimdRelWeight[Clip3(0, DIMD_FUSION_NUM - 1, i+1)] = iRatio[i];
           if (cu.dimdRelWeight[i+1] == 0)
           {
             cu.dimdBlendMode[i-1] = 0;
