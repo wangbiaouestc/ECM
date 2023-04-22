@@ -9820,12 +9820,12 @@ void IntraSearch::xFindAlreadyTestedNearbyIntraModes(int lfnstIdx, int currentIn
   if (lfnstIdx > 0)
   {
     bool sameIntraModeFound = false;
-    if (lfnstIdx == 2 && m_ispTestedModes[1].modeHasBeenTested[currentIntraMode][st])
+    if (lfnstIdx == 2 && m_ispTestedModes[1].modeHasBeenTested[st].count(currentIntraMode) )
     {
       sameIntraModeFound = true;
       *refLfnstIdx = 1;
     }
-    else if (m_ispTestedModes[0].modeHasBeenTested[currentIntraMode][st])
+    else if (m_ispTestedModes[0].modeHasBeenTested[st].count(currentIntraMode) )
     {
       sameIntraModeFound = true;
       *refLfnstIdx = 0;
@@ -9846,8 +9846,8 @@ void IntraSearch::xFindAlreadyTestedNearbyIntraModes(int lfnstIdx, int currentIn
     int leftMode = (off < 0) ? NUM_LUMA_MODE + off : currentIntraMode - k;
     int rightMode = currentIntraMode > DC_IDX ? (((int)currentIntraMode - 2 + k) % 65) + 2 : PLANAR_IDX;
 
-    leftModeFound  = leftMode  != (int)currentIntraMode ? m_ispTestedModes[lfnstIdx].modeHasBeenTested[leftMode][st]  : false;
-    rightModeFound = rightMode != (int)currentIntraMode ? m_ispTestedModes[lfnstIdx].modeHasBeenTested[rightMode][st] : false;
+    leftModeFound  = leftMode  != (int)currentIntraMode ? m_ispTestedModes[lfnstIdx].modeHasBeenTested[st].count( leftMode ) > 0 : false;
+    rightModeFound = rightMode != (int)currentIntraMode ? m_ispTestedModes[lfnstIdx].modeHasBeenTested[st].count( rightMode ) > 0 : false;
     if (leftModeFound || rightModeFound)
     {
       *leftIntraMode = leftModeFound ? leftMode : -1;
