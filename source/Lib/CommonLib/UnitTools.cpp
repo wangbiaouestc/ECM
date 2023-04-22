@@ -9855,7 +9855,16 @@ inline void PU::getRribcBvpCand(PredictionUnit &pu, AMVPInfo *pInfo)
   {
     const int ctbSize     = pu.cs->sps->getCTUSize();
     const int numCurrCtuY = (pu.Y().y >> (floorLog2(ctbSize)));
-    const int rrTop       = (numCurrCtuY < 3) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + 2 * ctbSize);
+    unsigned int lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
+    int rrTop;
+    if (256 == lcuWidth)
+    {
+      rrTop = (numCurrCtuY < 2) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + ctbSize);
+    }
+    else
+    {
+      rrTop = (numCurrCtuY < 3) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + 2 * ctbSize);
+    }
     pInfo->mvCand[0] = Mv(0,std::max(-static_cast<int>(pu.lheight()), rrTop));
     pInfo->mvCand[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
     pInfo->mvCand[1] = Mv(0,rrTop);

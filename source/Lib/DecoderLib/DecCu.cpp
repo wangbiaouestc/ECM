@@ -3240,7 +3240,16 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               {
                 const int ctbSize     = pu.cs->sps->getCTUSize();
                 const int numCurrCtuY = (pu.Y().y >> (floorLog2(ctbSize)));
-                const int rrTop       = (numCurrCtuY < 3) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + 2 * ctbSize);
+                unsigned int lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
+                int rrTop;
+                if (256 == lcuWidth)
+                {
+                  rrTop = (numCurrCtuY < 2) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + ctbSize);
+                }
+                else
+                {
+                  rrTop = (numCurrCtuY < 3) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + 2 * ctbSize);
+                }
                 for (int i = 0; i < 2; i++)
                 {
                   amvpInfo.mvCand[i] = Mv(0, i == 0 ? std::max(-(int) pu.lheight(), rrTop) : rrTop);
