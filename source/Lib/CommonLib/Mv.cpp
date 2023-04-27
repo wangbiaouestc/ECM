@@ -147,7 +147,7 @@ void MvdSuffixInfo::initPrefixes(const Mv& mv, const int imv, const bool isInter
   Mv tmp = mv;
   if (isInternalPrecision)
   {
-    tmp.changeTransPrecInternal2Amvr(imv);
+    tmp.changeIbcPrecInternal2Amvr(imv);
   }
 
   int       horMvd = tmp.getHor();
