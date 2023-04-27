@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -69,7 +69,8 @@ enum PLTScanMode
 class SortingElement
 {
 public:
-  SortingElement() {
+  SortingElement()
+  {
     cnt[0] = cnt[1] = cnt[2] = cnt[3] = 0;
     shift[0] = shift[1] = shift[2] = 0;
     lastCnt[0] = lastCnt[1] = lastCnt[2] = 0;
@@ -343,8 +344,8 @@ private:
   };
   struct ISPTestedModesInfo
   {
-    ISPTestedModeInfo                           intraMode[NUM_LUMA_MODE][2];
-    bool                                        modeHasBeenTested[NUM_LUMA_MODE][2];
+    std::map<int, ISPTestedModeInfo>            intraMode[2];
+    std::map<int, bool>                         modeHasBeenTested[2];
     int                                         numTotalParts[2];
     static_vector<int, FAST_UDI_MAX_RDMODE_NUM> testedModes[2];
     int                                         bestModeSoFar;
@@ -361,11 +362,12 @@ private:
     {
       const unsigned st = splitType - 1;
       CHECKD(st > 1, "The split type is invalid!");
+      CHECK( iModeIdx < 0, "The modeIdx is invalid" );
       const int maxNumParts = numTotalParts[st];
-      intraMode[iModeIdx][st].setMode(numCompletedParts, numCompletedParts == maxNumParts ? rdCost : MAX_DOUBLE);
+      intraMode[st][iModeIdx].setMode(numCompletedParts, numCompletedParts == maxNumParts ? rdCost : MAX_DOUBLE);
       testedModes[st].push_back(iModeIdx);
       numTestedModes[st]++;
-      modeHasBeenTested[iModeIdx][st] = true;
+      modeHasBeenTested[st][iModeIdx] = true;
       if (numCompletedParts == maxNumParts && rdCost < bestCost[st])   // best mode update
       {
         bestMode[st] = iModeIdx;
@@ -382,15 +384,15 @@ private:
     {
       const unsigned st = splitType - 1;
       CHECK(st < 0 || st > 1, "The split type is invalid!");
-      CHECK(iModeIdx < 0 || iModeIdx >(NUM_LUMA_MODE - 1), "The modeIdx is invalid");
-      return modeHasBeenTested[iModeIdx][st] ? intraMode[iModeIdx][st].numCompSubParts : -1;
+      CHECK(iModeIdx < 0, "The modeIdx is invalid");
+      return modeHasBeenTested[st].count( iModeIdx ) > 0 ? intraMode[st][iModeIdx].numCompSubParts : -1;
     }
 
     double getRDCost(ISPType splitType, int iModeIdx)
     {
       const unsigned st = splitType - 1;
       CHECKD(st > 1, "The split type is invalid!");
-      return modeHasBeenTested[iModeIdx][st] ? intraMode[iModeIdx][st].rdCost : MAX_DOUBLE;
+      return modeHasBeenTested[st].count( iModeIdx ) > 0 ? intraMode[st][iModeIdx].rdCost : MAX_DOUBLE;
     }
 
     // get a tested intra mode index
@@ -417,12 +419,13 @@ private:
       bestModeSoFar = -1;
       bestSplitSoFar = NOT_INTRA_SUBPARTITIONS;
       numOrigModesToTest = -1;
-      memset(modeHasBeenTested, 0, sizeof(modeHasBeenTested));
+      modeHasBeenTested[0].clear();
+      modeHasBeenTested[1].clear();
     }
     void clearISPModeInfo(int idx)
     {
-      intraMode[idx][0].clear();
-      intraMode[idx][1].clear();
+      intraMode[0].clear();
+      intraMode[1].clear();
     }
     void init(const int numTotalPartsHor, const int numTotalPartsVer)
     {
@@ -495,6 +498,11 @@ private:
   PelStorage      m_cccmStorage[CCCM_NUM_MODES];
 #endif
 #endif
+
+#if JVET_AC0119_LM_CHROMA_FUSION
+  PelStorage      m_predStorage[2];
+  PelStorage      m_fusionStorage[6];
+#endif
 protected:
   // interface to option
   EncCfg*         m_pcEncCfg;
@@ -509,7 +517,7 @@ protected:
 
   // RD computation
   CABACWriter*    m_CABACEstimator;
-  CtxCache*       m_CtxCache;
+  CtxCache*       m_ctxCache;
 
   bool            m_isInitialized;
   uint32_t        m_symbolSize;
@@ -608,8 +616,8 @@ protected:
   bool testISPforCurrCU(const CodingUnit &cu);
 #endif
   ChromaCbfs xRecurIntraChromaCodingQT( CodingStructure &cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE,                          const PartSplit ispType = TU_NO_ISP 
-#if JVET_AB0143_CCCM_TS
-    , PelUnitBuf cccmStorage = UnitBuf<      Pel>()
+#if JVET_AB0143_CCCM_TS || JVET_AC0119_LM_CHROMA_FUSION
+    , const PelUnitBuf& predStorage = UnitBuf<Pel>()
 #endif
   );
   bool       xRecurIntraCodingLumaQT  ( CodingStructure &cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE, const int subTuIdx = -1, const PartSplit ispType = TU_NO_ISP, const bool ispIsCurrentWinner = false, bool mtsCheckRangeFlag = false, int mtsFirstCheckId = 0, int mtsLastCheckId = 0, bool moreProbMTSIdxFirst = false );

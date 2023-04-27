@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -353,7 +353,7 @@ void CacheBlkInfoCtrl::init( const Slice &slice )
           {
             if( m_codedCUInfo[x][y][wIdx][hIdx] )
             {
-              memset( m_codedCUInfo[x][y][wIdx][hIdx], 0, sizeof( CodedCUInfo ) );
+              std::fill_n( reinterpret_cast< char * >(m_codedCUInfo[x][y][wIdx][hIdx]), sizeof( CodedCUInfo ), 0 );
             }
           }
         }
@@ -607,14 +607,14 @@ void CacheBlkInfoCtrl::setBcwIdx(const UnitArea& area, uint8_t gBiIdx)
   unsigned idx1, idx2, idx3, idx4;
   getAreaIdx(area.Y(), *m_slice_chblk->getPPS()->pcv, idx1, idx2, idx3, idx4);
 
-  m_codedCUInfo[idx1][idx2][idx3][idx4]->BcwIdx = gBiIdx;
+  m_codedCUInfo[idx1][idx2][idx3][idx4]->bcwIdx = gBiIdx;
 }
 uint8_t CacheBlkInfoCtrl::getBcwIdx(const UnitArea& area)
 {
   unsigned idx1, idx2, idx3, idx4;
   getAreaIdx(area.Y(), *m_slice_chblk->getPPS()->pcv, idx1, idx2, idx3, idx4);
 
-  return m_codedCUInfo[idx1][idx2][idx3][idx4]->BcwIdx;
+  return m_codedCUInfo[idx1][idx2][idx3][idx4]->bcwIdx;
 }
 
 #if REUSE_CU_RESULTS
@@ -2235,7 +2235,7 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
           relatedCU.isInter   = true;
           relatedCU.isSkip   |= bestCU->skip;
           relatedCU.isMMVDSkip |= bestCU->mmvdSkip;
-          relatedCU.BcwIdx    = bestCU->BcwIdx;
+          relatedCU.bcwIdx    = bestCU->bcwIdx;
 #if MULTI_HYP_PRED
           relatedCU.numAddHyp = (uint8_t)bestCU->firstPU->addHypData.size();
 #endif

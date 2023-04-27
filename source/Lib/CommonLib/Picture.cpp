@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -297,6 +297,9 @@ void Picture::createTempBuffers( const unsigned _maxCUSize )
   const Area a( Position{ 0, 0 }, lumaSize() );
 #else
   const Area a = m_ctuArea.Y();
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  const Area aOld( Position{ 0, 0 }, lumaSize() );
+#endif
 #endif
 
 #if ENABLE_SPLIT_PARALLELISM
@@ -306,9 +309,8 @@ void Picture::createTempBuffers( const unsigned _maxCUSize )
 #endif
   {
     M_BUFS( jId, PIC_PREDICTION                   ).create( chromaFormat, a,   _maxCUSize );
-#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
-    const Area aOld(Position{ 0, 0 }, lumaSize());
-    M_BUFS(jId, PIC_RESIDUAL).create(chromaFormat, aOld, _maxCUSize);
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT && !KEEP_PRED_AND_RESI_SIGNALS
+    M_BUFS( jId, PIC_RESIDUAL                     ).create(chromaFormat, aOld, _maxCUSize );
 #else
     M_BUFS( jId, PIC_RESIDUAL                     ).create( chromaFormat, a,   _maxCUSize );
 #endif
@@ -446,6 +448,7 @@ void Picture::finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHead
   if( cs )
   {
     cs->initStructData();
+    cs->sps = &sps; 
   }
   else
   {
@@ -1531,15 +1534,9 @@ PelBuf Picture::getBuf( const CompArea &blk, const PictureType &type )
 #if !KEEP_PRED_AND_RESI_SIGNALS
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
   if (type == PIC_PREDICTION)
-  {
-    CompArea localBlk = blk;
-    localBlk.x &= (cs->pcv->maxCUWidthMask >> getComponentScaleX(blk.compID, blk.chromaFormat));
-    localBlk.y &= (cs->pcv->maxCUHeightMask >> getComponentScaleY(blk.compID, blk.chromaFormat));
-
-    return M_BUFS(jId, type).getBuf(localBlk);
-  }
 #else
   if( type == PIC_RESIDUAL || type == PIC_PREDICTION )
+#endif
   {
     CompArea localBlk = blk;
     localBlk.x &= ( cs->pcv->maxCUWidthMask  >> getComponentScaleX( blk.compID, blk.chromaFormat ) );
@@ -1547,7 +1544,6 @@ PelBuf Picture::getBuf( const CompArea &blk, const PictureType &type )
 
     return M_BUFS( jId, type ).getBuf( localBlk );
   }
-#endif
 #endif
 
   return M_BUFS( jId, type ).getBuf( blk );
@@ -1567,15 +1563,9 @@ const CPelBuf Picture::getBuf( const CompArea &blk, const PictureType &type ) co
 #if !KEEP_PRED_AND_RESI_SIGNALS
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
   if (type == PIC_PREDICTION)
-  {
-    CompArea localBlk = blk;
-    localBlk.x &= (cs->pcv->maxCUWidthMask >> getComponentScaleX(blk.compID, blk.chromaFormat));
-    localBlk.y &= (cs->pcv->maxCUHeightMask >> getComponentScaleY(blk.compID, blk.chromaFormat));
-
-    return M_BUFS(jId, type).getBuf(localBlk);
-  }
 #else
   if( type == PIC_RESIDUAL || type == PIC_PREDICTION )
+#endif
   {
     CompArea localBlk = blk;
     localBlk.x &= ( cs->pcv->maxCUWidthMask  >> getComponentScaleX( blk.compID, blk.chromaFormat ) );
@@ -1583,7 +1573,6 @@ const CPelBuf Picture::getBuf( const CompArea &blk, const PictureType &type ) co
 
     return M_BUFS( jId, type ).getBuf( localBlk );
   }
-#endif
 #endif
 
   return M_BUFS( jId, type ).getBuf( blk );

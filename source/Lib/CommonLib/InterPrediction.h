@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -219,13 +219,13 @@ protected:
   Pel*                 m_dIy;
   Pel*                 m_dI;
   Pel*                 m_signGxGy;
-  int*                 m_tmpx_pixel_32bit;
-  int*                 m_tmpy_pixel_32bit;
-  int*                 m_sumAbsGX_pixel_32bit;
-  int*                 m_sumAbsGY_pixel_32bit;
-  int*                 m_sumDIX_pixel_32bit;
-  int*                 m_sumDIY_pixel_32bit;
-  int*                 m_sumSignGY_GX_pixel_32bit;
+  int*                 m_tmpxSample32bit;
+  int*                 m_tmpySample32bit;
+  int*                 m_sumAbsGxSample32bit;
+  int*                 m_sumAbsGySample32bit;
+  int*                 m_sumDIXSample32bit;
+  int*                 m_sumDIYSample32bit;
+  int*                 m_sumSignGyGxSample32bit;
   bool                 m_bdofMvRefined;
   Mv                   m_bdofSubPuMvOffset[BDOF_SUBPU_MAX_NUM];
 #endif
@@ -373,10 +373,10 @@ protected:
   void xSubPuBio(PredictionUnit& pu, PelUnitBuf& predBuf, const RefPicList &eRefPicList = REF_PIC_LIST_X, PelUnitBuf* yuvDstTmp = NULL);
 #endif
 
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
-  MotionInfo      m_SubPuMiBuf[SUB_TMVP_NUM][(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+  MotionInfo      m_subPuMiBuf[SUB_TMVP_NUM][(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
 #else
-  MotionInfo      m_SubPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+  MotionInfo      m_subPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
 #endif
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC || JVET_AA0061_IBC_MBVD
   Pel*   m_acYuvCurAMLTemplate[2][MAX_NUM_COMPONENT];   //0: top, 1: left
@@ -476,7 +476,7 @@ public:
     }
     else
     {
-      int16_t angle = g_GeoParams[splitDir][0];
+      int16_t angle = g_geoParams[splitDir][0];
       if (g_angle2mirror[angle] == 2)
       {
         return m_tplWeightTbl[splitDir] + (top0Left1TrLeft2 == 0 ? GEO_WEIGHT_MASK_SIZE_EXT * GEO_MODE_SEL_TM_SIZE : -GEO_MODE_SEL_TM_SIZE); // Shift to template pos
@@ -527,7 +527,7 @@ public:
 #endif
 #endif
 #endif
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   void    weightedGeoBlk(PredictionUnit &pu, const uint8_t splitDir, const uint8_t bldIdx, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
 #if JVET_Y0065_GPM_INTRA
   void    weightedGeoBlkRounded(PredictionUnit &pu, const uint8_t splitDir, const uint8_t bldIdx, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
@@ -571,6 +571,18 @@ public:
   void getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight);
 #endif
 #endif
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  static constexpr bool checkBitMatch(unsigned int value1, unsigned int value2, int bitpos)
+  {
+    return ((value1 >> bitpos) & 1) == ((value2 >> bitpos) & 1);
+  };
+
+  void deriveBvdSignIBC(const Mv& cMvPred, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, std::vector<Mv>& cMvdDerived, int imv );
+  void initOffsets     (Mv& cMvdInput, std::vector<Mv>& cMvdDerived,       MvdSuffixInfo& si, int imv);
+  void applyOffsets    (Mv& cMvdInput, std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si, int imv);
+#endif
+
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   void deriveMVDcand(const PredictionUnit& pu, RefPicList eRefPicList, std::vector<Mv>& cMvdCandList);
@@ -597,6 +609,10 @@ public:
   int deriveMVSDIdxFromMVDAffine(PredictionUnit& pu, RefPicList eRefList, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3);
   void deriveMVDFromMVSDIdxAffine(PredictionUnit& pu, RefPicList eRefList, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3);
 #endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  int deriveMVSDIdxFromMVDTransIBC(const Mv& cMvd, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si) const;
+  Mv  deriveMVDFromMVSDIdxTransIBC(int mvsdIdx, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si) const;
+#endif
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
   void    cacheAssign( CacheModel *cache );
 #endif
@@ -618,7 +634,7 @@ public:
   void    sortAffineMergeCandidates(PredictionUnit pu, AffineMergeCtx& affMrgCtx, uint32_t * affMmvdLUT, uint32_t afMMVDIdx = -1);
 #endif
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   void    getBlkAMLRefTemplateSubTMVP(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft);
   static bool xCheckIdenticalMotionSubTMVP(const PredictionUnit& pu);
   void    adjustMergeCandidatesInOneCandidateGroupSubTMVP(PredictionUnit &pu, MergeCtx& smvpMergeCandCtx, int numRetrievedMergeCand, int mrgCandIdx = -1);
@@ -644,8 +660,10 @@ public:
   void xSubblockTMOBMC(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst, PelUnitBuf &pcYuvPredSrc,
                        int iDir, int iOBMCmode = 0);
 #endif
+#if JVET_W0090_ARMC_TM || JVET_AA0070_RRIBC
+  void    updateCandList(uint32_t uiCand, Distortion uiCost, uint32_t uiMrgCandNum, uint32_t* rdCandList, Distortion* candCostList);
+#endif
 #if JVET_W0090_ARMC_TM
-  void    updateCandList(uint32_t uiCand, Distortion uiCost, uint32_t uiMrgCandNum, uint32_t* RdCandList, Distortion* CandCostList);
   void    updateCandInfo(MergeCtx& mrgCtx, uint32_t(*RdCandList)[MRG_MAX_NUM_CANDS], int mrgCandIdx = -1);
 #endif
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -712,14 +730,20 @@ public:
 #endif
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   void    adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t startPos,uint32_t endPos);
-  void    updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t* RdCandList, uint32_t startPos,uint32_t endPos);
 #endif
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  Distortion getTempCost(const PredictionUnit &pu, const PelBuf &org, const PelBuf &cur);
 #endif
 #if JVET_AC0112_IBC_GPM
   void    motionCompensationIbcGpm(CodingUnit &cu, MergeCtx &ibcGpmMrgCtx, IntraPrediction* pcIntraPred);
 #if JVET_AA0070_RRIBC
   void    adjustIbcMergeRribcCand(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t startPos, uint32_t endPos);
 #endif
+#endif
+
+#if JVET_Z0075_IBC_HMVP_ENLARGE || JVET_AA0070_RRIBC
+  void    updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t* RdCandList, uint32_t startPos,uint32_t endPos);
 #endif
 
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -999,6 +1023,11 @@ class TplMatchingCtrl
   Distortion m_tmCostArrayCross[5];
 #endif
 
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bool m_useTop;
+  bool m_useLeft;
+#endif
+
 public:
   TplMatchingCtrl(const PredictionUnit&     pu,
                         InterPredResources& interRes, // Bridge required resource from InterPrediction
@@ -1014,7 +1043,11 @@ public:
                   const Mv&                 mvStart,
                   const Mv*                 otherRefListMv,
                   const Distortion          curBestCost
-  );
+#if JVET_AC0104_IBC_BVD_PREDICTION
+                , const int tplSize = TM_TPL_SIZE
+                , const bool isForBmvdFlag = false
+#endif
+                 );
 
   bool       getTemplatePresentFlag() { return m_curTplAbove.buf != nullptr || m_curTplLeft.buf != nullptr; }
   Distortion getMinCost            () { return m_minCost; }
@@ -1027,6 +1060,11 @@ public:
 private:
   template <int tplSize, bool trueAfalseL>         bool       xFillCurTemplate   (Pel* tpl);
   template <int tplSize, bool trueAfalseL, int sr> PelBuf     xGetRefTemplate    (const PredictionUnit& curPu, const Picture& refPic, const Mv& _mv, PelBuf& dstBuf);
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  template <int tplSize, bool trueAfalseL>         bool       xGetCurTemplateAvailable();
+  template <int tplSize, bool trueAfalseL>         PelBuf     xGetCurTemplateBvd(const PredictionUnit& curPu, const Picture& refPic, PelBuf& dstBuf);
+  template <int tplSize, bool trueAfalseL>         PelBuf     xGetRefTemplateBvd (const PredictionUnit& curPu, const Picture& refPic, const Mv& _mv, PelBuf& dstBuf);
+#endif
   template <int tplSize, bool trueAfalseL>         void       xRemoveHighFreq    (const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight);
   template <int tplSize, int searchPattern>         void       xRefineMvSearch    (int maxSearchRounds, int searchStepShift);
 #if MULTI_PASS_DMVR
@@ -1035,11 +1073,20 @@ private:
   template <bool TrueX_FalseY>                      void       xDeriveCostBasedOffset (Distortion costLorA, Distortion costCenter, Distortion costRorB, int log2StepSize);
                                                     int        xBinaryDivision    (int64_t numerator, int64_t denominator, int fracBits);
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
 public:
 #endif
   template <int tplSize>                            Distortion xGetTempMatchError (const Mv& mv);
-  template <int tplSize, bool trueAfalseL>         Distortion xGetTempMatchError (const Mv& mv);
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  template <int tplSize>                            Distortion xGetTempMatchErrorBvd(const Mv& mv);
+  template <int tplSize, bool trueAfalseL, bool useForBvd=false>
+                                                    Distortion xGetTempMatchError (const Mv& mv);
+                                                    bool&      getCurTopRefAvailFlag() { return m_useTop; }
+                                                    bool&      getCurLeftRefAvailFlag() { return m_useLeft; }
+#else
+  template <int tplSize, bool trueAfalseL>          Distortion xGetTempMatchError(const Mv& mv);
+#endif
+
 };
 #endif // TM_AMVP || TM_MRG
 

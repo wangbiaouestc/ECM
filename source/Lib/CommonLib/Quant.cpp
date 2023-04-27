@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1161,7 +1161,7 @@ void Quant::transformSkipQuantOneSample(TransformUnit &tu, const ComponentID &co
   */
   const int iQBits = QUANT_SHIFT + cQP.per(useTransformSkip) + (useTransformSkip ? 0 : iTransformShift);
   // QBits will be OK for any internal bit depth as the reduction in transform shift is balanced by an increase in Qp_per due to QpBDOffset
-  const int iAdd = int64_t(bUseHalfRoundingPoint ? 256 : (tu.cs->slice->isIRAP() ? 171 : 85)) << int64_t(iQBits - 9);
+  const int64_t iAdd = int64_t(bUseHalfRoundingPoint ? 256 : (tu.cs->slice->isIRAP() ? 171 : 85)) << int64_t(iQBits - 9);
   TCoeff transformedCoefficient;
 
   // transform-skip

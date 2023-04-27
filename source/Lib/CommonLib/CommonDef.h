@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -113,7 +113,7 @@
 #define NULL              0
 #endif
 
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 static const int SUB_TMVP_CANDIDATE_NUM = 10;
 static const int SUB_TMVP_INDEX = 3;  // 1: 2 subtmvp; 2: 4 subtmvp
 static const int SUB_TMVP_NUM = 2 * SUB_TMVP_INDEX;
@@ -158,7 +158,7 @@ static const int MAX_NUM_REF =                                     16; ///< max.
 static const int MAX_QP =                                          63;
 static const int NOT_VALID =                                       -1;
 
-#if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP)
+#if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
 static const int REGULAR_AMVP_MAX_NUM_CANDS =                       5; ///< AMVP: advanced motion vector prediction - max number of final candidate for regular inter mode
 #endif
 static const int AMVP_MAX_NUM_CANDS =                               2; ///< AMVP: advanced motion vector prediction - max number of final candidates
@@ -216,8 +216,12 @@ static const int RMVF_PARAM_THRED = (1 << 20);
 #endif
 #endif
 static const int IBC_MRG_MAX_NUM_CANDS =                            6; ///< IBC MERGE
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+static const int IBC_MRG_MAX_NUM_CANDS_MEM =                        28;   ///< IBC AMVP- max number of candidates
+#else
 #if JVET_Z0075_IBC_HMVP_ENLARGE
-static const int IBC_MRG_MAX_NUM_CANDS_MEM =                        20; ///< IBC MERGE- max number of candidates 
+static const int IBC_MRG_MAX_NUM_CANDS_MEM =                        20;   ///< IBC MERGE- max number of candidates
+#endif
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
@@ -321,7 +325,7 @@ static const int NUM_FIXED_BASED_COEFF       =                      7;
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
 static const int NUM_RESI                    =                      1;
 static const int NUM_RESI_SAMPLE             =                      1;
-static const int NUM_RESI_PAD                =                      0;
+static const int NUM_RESI_PAD                =                      8;
 #endif
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
 static const int NUM_DB                      =                      3;
@@ -840,8 +844,10 @@ static const int    PICTURE_DISTANCE_TH =                           1;
 static const int    FAST_SKIP_DEPTH =                               2;
 
 static const double PBINTRA_RATIO     =                             1.1;
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
 static const int    THRES_TRANS =                                  16;
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 static const int    THRES_AFFINE =                                  4;
 #endif
 #if !MERGE_ENC_OPT
@@ -984,7 +990,7 @@ static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM;
 #endif
 #endif
 
-#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION
 static const int CCCM_WINDOW_SIZE         = 6;
 static const int CCCM_NUM_PARAMS          = 7;
 static const int CCCM_MIN_PU_SIZE         = 0; // Set to 0 for no size restriction
@@ -1001,14 +1007,26 @@ static const int CCCM_DECIM_BITS          = 22;
 static const int CCCM_DECIM_ROUND         = ( 1 << (CCCM_DECIM_BITS - 1 ) );
 #if JVET_AB0143_CCCM_TS
 #if MMLM
+#if JVET_AC0054_GLCCCM
+static const int CCCM_NUM_MODES           = 12;
+#else
+static const int CCCM_NUM_MODES           = 6;
+#endif
+#else
+#if JVET_AC0054_GLCCCM
 static const int CCCM_NUM_MODES           = 6;
 #else
 static const int CCCM_NUM_MODES           = 3;
 #endif
 #endif
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
 static const int CCCM_NO_SUB_NUM_PARAMS   = 11;
 static const double CCCM_NO_SUB_WEIGHT    = 1.1; 
+#endif
+#if JVET_AC0054_GLCCCM
+static const int CCCM_LOC_SHIFT           = 3;
+static const int CCCM_LOC_OFFSET          = (1 << CCCM_LOC_SHIFT);
 #endif
 #endif
 
@@ -1038,6 +1056,10 @@ static const int NUM_GLM_PATTERN_BITS =                             4;
 static const int NUM_GLM_IDC =                                     33;
 #endif
 #endif
+#endif
+#if JVET_AC0119_LM_CHROMA_FUSION
+static const int CFLM_NUM_PARAMS = 3;
+static const int CFLM_MAX_REF_SAMPLES = CCCM_MAX_REF_SAMPLES;
 #endif
 #if JVET_AC0071_DBV
 static const int NUM_DBV_POSITION = 5;
@@ -1075,7 +1097,9 @@ static const int NTAPS_CHROMA             =                         4; ///< Numb
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
 static const int MAX_LADF_INTERVALS       =                         5; /// max number of luma adaptive deblocking filter qp offset intervals
 #endif
-
+#if JVET_AC0096
+static const int MAX_RPR_SWITCHING_ORDER_LIST_SIZE           =     32; /// max number of pre-defined RPR switching segments
+#endif
 static const int NTAPS_BILINEAR           =                         2; ///< Number of taps for bilinear filter
 
 #if INTER_RM_SIZE_CONSTRAINTS
@@ -1145,20 +1169,20 @@ static const int GEO_ENC_MMVD_MAX_REFINE_NUM_ADJ = 1 // regular merge(1)
 static const int GEO_MV_MASK_SIZE =         GEO_WEIGHT_MASK_SIZE >> 2;
 #endif
 #if JVET_W0097_GPM_MMVD_TM
-static const int GEO_MAX_TRY_WEIGHTED_SAD = 70;
+static const int GEO_MAX_TRY_WEIGHTED_SAD =                        70;
 #if TM_MRG
 static const int GEO_TM_MAX_NUM_CANDS = GEO_MAX_NUM_UNI_CANDS * (GEO_NUM_TM_MV_CAND - 1);
 #endif
 #else
-static const int GEO_MAX_TRY_WEIGHTED_SAD = 60;
+static const int GEO_MAX_TRY_WEIGHTED_SAD =                        60;
 #endif
-static const int GEO_MAX_TRY_WEIGHTED_SATD = 8;
+static const int GEO_MAX_TRY_WEIGHTED_SATD =                        8;
 
-#if JVET_AA0058_GPM_ADP_BLD
-static const int GEO_NUM_BLD = 5;
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+static const int GEO_BLENDING_NUM =                                 5;
 #endif
 #if JVET_AB0155_SGPM
-static const int TOTAL_GEO_NUM_BLD = 6; // GPM 0~4, SGPM 1~5
+static const int TOTAL_GEO_BLENDING_NUM =                           6; // GPM 0~4, SGPM 1~5
 #define GET_SGPM_BLD_IDX(a, b)                                                                                           \
   (std::min(a, b) <= 4 ? 1 : std::min(a, b) <= 8 ? 2 : std::min(a, b) <= 16 ? 3 : std::min(a, b) <= 32 ? 4 : 5)
 #endif
@@ -1249,6 +1273,10 @@ static const int PLT_FAST_RATIO = 100;
 static const int  EPBIN_WEIGHT_FACTOR =                           4;
 #endif
 static const int ENC_PPS_ID_RPR =                                 3;
+#if JVET_AC0096
+static const int ENC_PPS_ID_RPR2 =                                5;
+static const int ENC_PPS_ID_RPR3 =                                7;
+#endif
 static const int SCALE_RATIO_BITS =                              14;
 static const int MAX_SCALING_RATIO =                              2;  // max downsampling ratio for RPR
 static const std::pair<int, int> SCALE_1X = std::pair<int, int>( 1 << SCALE_RATIO_BITS, 1 << SCALE_RATIO_BITS );  // scale ratio 1x
@@ -1310,6 +1338,10 @@ static const int EXT_PICTURE_SIZE =                             16;
 #endif
 #endif
 
+#if JVET_AC0104_IBC_BVD_PREDICTION
+static const int IBC_BVD_PREDICTION_MAX_BIN_NUM =                4;
+#endif
+
 
 // ====================================================================================================================
 // Macro functions
@@ -1317,10 +1349,10 @@ static const int EXT_PICTURE_SIZE =                             16;
 
 struct ClpRng
 {
-  int min;
-  int max;
-  int bd;
-  int n;
+  int min {0};
+  int max {0};
+  int bd  {0};
+  int n   {0};
 };
 
 struct ClpRngs

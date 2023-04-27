@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -3731,6 +3731,9 @@ SPS::SPS()
 , m_OBMC                      ( false )
 #endif
 , m_ciip                      ( false )
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+, m_ciipTimd                  ( false )
+#endif
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
 , m_ciipTmMrg                 ( false )
 #endif
@@ -3765,6 +3768,10 @@ SPS::SPS()
 , m_SubLayerCbpParametersPresentFlag ( true )
 , m_rprEnabledFlag            ( false )
 , m_resChangeInClvsEnabledFlag ( false )
+#if JVET_AC0096
+, m_rprSwitchingResolutionOrderList{ 0 }
+, m_rprSwitchingQPOffsetOrderList{ 0 }
+#endif
 , m_maxNumMergeCand(MRG_MAX_NUM_CANDS)
 #if JVET_X0049_ADAPT_DMVR
 , m_maxNumBMMergeCand(BM_MRG_MAX_NUM_CANDS)

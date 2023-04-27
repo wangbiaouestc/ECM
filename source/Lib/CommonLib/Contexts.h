@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -345,6 +345,9 @@ public:
 #if JVET_AA0070_RRIBC
   static const CtxSet   rribcFlipType;
 #endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  static const CtxSet bvOneZeroComp;
+#endif
 #if JVET_Y0065_GPM_INTRA
   static const CtxSet   GPMIntraFlag;
 #endif
@@ -366,6 +369,10 @@ public:
   static const CtxSet   DimdChromaMode;
 #endif
   static const CtxSet   ChromaFusionMode;
+#if JVET_AC0119_LM_CHROMA_FUSION
+  static const CtxSet   ChromaFusionType;
+  static const CtxSet   ChromaFusionCclm;
+#endif
 #endif
 #if JVET_AC0071_DBV
   static const CtxSet DbvChromaMode;
@@ -393,7 +400,7 @@ public:
   static const CtxSet   GeoMmvdFlag;
   static const CtxSet   GeoMmvdStepMvpIdx;
 #endif
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   static const CtxSet   GeoBldFlag;
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -442,9 +449,14 @@ public:
 #if JVET_Z0131_IBC_BVD_BINARIZATION
   static const CtxSet   Bvd;
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
   static const CtxSet   MvsdIdx;
 #endif
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  static const CtxSet   MvsdIdxBVDMSB;
+#endif
+
 #if MULTI_HYP_PRED
   static const CtxSet   MultiHypothesisFlag;
   static const CtxSet   MHRefPic;
@@ -571,8 +583,18 @@ public:
   CtxStore( bool dummy );
   CtxStore( const CtxStore<BinProbModel>& ctxStore );
 public:
-  void copyFrom   ( const CtxStore<BinProbModel>& src )                        { checkInit(); ::memcpy( m_Ctx,               src.m_Ctx,               sizeof( BinProbModel ) * ContextSetCfg::NumberOfContexts ); }
-  void copyFrom   ( const CtxStore<BinProbModel>& src, const CtxSet& ctxSet )  { checkInit(); ::memcpy( m_Ctx+ctxSet.Offset, src.m_Ctx+ctxSet.Offset, sizeof( BinProbModel ) * ctxSet.Size ); }
+  void copyFrom( const CtxStore<BinProbModel> &src )
+  {
+    checkInit();
+    std::copy_n( reinterpret_cast< const char * >(src.m_ctx), sizeof( BinProbModel ) * ContextSetCfg::NumberOfContexts,
+                 reinterpret_cast< char * >(m_ctx) );
+  }
+  void copyFrom( const CtxStore<BinProbModel> &src, const CtxSet &ctxSet )
+  {
+    checkInit();
+    std::copy_n( reinterpret_cast< const char * >(src.m_ctx + ctxSet.Offset), sizeof( BinProbModel ) * ctxSet.Size,
+                 reinterpret_cast< char * >(m_ctx + ctxSet.Offset) );
+  }
   void init       ( int qp, int initId );
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   void loadWinSizes( const std::vector<uint8_t>&   windows );
@@ -586,18 +608,18 @@ public:
   void savePStates( std::vector<uint16_t>&        probStates )  const;
 #endif
 
-  const BinProbModel& operator[]      ( unsigned  ctxId  )  const { return m_Ctx[ctxId]; }
-  BinProbModel&       operator[]      ( unsigned  ctxId  )        { return m_Ctx[ctxId]; }
+  const BinProbModel& operator[]      ( unsigned  ctxId  )  const { return m_ctx[ctxId]; }
+  BinProbModel&       operator[]      ( unsigned  ctxId  )        { return m_ctx[ctxId]; }
   uint32_t            estFracBits     ( unsigned  bin,
-                                        unsigned  ctxId  )  const { return m_Ctx[ctxId].estFracBits(bin); }
+                                        unsigned  ctxId  )  const { return m_ctx[ctxId].estFracBits(bin); }
 
-  BinFracBits         getFracBitsArray( unsigned  ctxId  )  const { return m_Ctx[ctxId].getFracBitsArray(); }
+  BinFracBits         getFracBitsArray( unsigned  ctxId  )  const { return m_ctx[ctxId].getFracBitsArray(); }
 
 private:
-  inline void checkInit() { if( m_Ctx ) return; m_CtxBuffer.resize( ContextSetCfg::NumberOfContexts ); m_Ctx = m_CtxBuffer.data(); }
+  inline void checkInit() { if( m_ctx ) return; m_ctxBuffer.resize( ContextSetCfg::NumberOfContexts ); m_ctx = m_ctxBuffer.data(); }
 private:
-  std::vector<BinProbModel> m_CtxBuffer;
-  BinProbModel*             m_Ctx;
+  std::vector<BinProbModel> m_ctxBuffer;
+  BinProbModel*             m_ctx;
 };
 
 
@@ -607,12 +629,12 @@ class SubCtx
 {
   friend class Ctx;
 public:
-  SubCtx( const CtxSet& ctxSet, const Ctx& ctx ) : m_CtxSet( ctxSet          ), m_Ctx( ctx          ) {}
-  SubCtx( const SubCtx& subCtx )                 : m_CtxSet( subCtx.m_CtxSet ), m_Ctx( subCtx.m_Ctx ) {}
+  SubCtx( const CtxSet& ctxSet, const Ctx& ctx ) : m_ctxSet( ctxSet          ), m_ctx( ctx          ) {}
+  SubCtx( const SubCtx& subCtx )                 : m_ctxSet( subCtx.m_ctxSet ), m_ctx( subCtx.m_ctx ) {}
   const SubCtx& operator= ( const SubCtx& ) = delete;
 private:
-  const CtxSet  m_CtxSet;
-  const Ctx&    m_Ctx;
+  const CtxSet  m_ctxSet;
+  const Ctx&    m_ctx;
 };
 
 
@@ -630,7 +652,7 @@ public:
     m_BPMType = ctx.m_BPMType;
     switch( m_BPMType )
     {
-    case BPM_Std:   m_CtxStore_Std  .copyFrom( ctx.m_CtxStore_Std   );  break;
+    case BPM_Std:   m_ctxStore_Std  .copyFrom( ctx.m_ctxStore_Std   );  break;
     default:        break;
     }
     ::memcpy( m_GRAdaptStats, ctx.m_GRAdaptStats, sizeof( unsigned ) * RExt__GOLOMB_RICE_ADAPTATION_STATISTICS_SETS );
@@ -639,10 +661,10 @@ public:
 
   SubCtx operator= ( SubCtx&& subCtx )
   {
-    m_BPMType = subCtx.m_Ctx.m_BPMType;
+    m_BPMType = subCtx.m_ctx.m_BPMType;
     switch( m_BPMType )
     {
-    case BPM_Std:   m_CtxStore_Std  .copyFrom( subCtx.m_Ctx.m_CtxStore_Std,   subCtx.m_CtxSet );  break;
+    case BPM_Std:   m_ctxStore_Std  .copyFrom( subCtx.m_ctx.m_ctxStore_Std,   subCtx.m_ctxSet );  break;
     default:        break;
     }
     return std::move(subCtx);
@@ -652,7 +674,7 @@ public:
   {
     switch( m_BPMType )
     {
-    case BPM_Std:   m_CtxStore_Std  .init( qp, initId );  break;
+    case BPM_Std:   m_ctxStore_Std  .init( qp, initId );  break;
     default:        break;
     }
     for( std::size_t k = 0; k < RExt__GOLOMB_RICE_ADAPTATION_STATISTICS_SETS; k++ )
@@ -666,7 +688,7 @@ public:
   {
     switch( m_BPMType )
     {
-    case BPM_Std:   m_CtxStore_Std.loadWeights( weights );  break;
+    case BPM_Std:   m_ctxStore_Std.loadWeights( weights );  break;
     default:        break;
     }
   }
@@ -675,7 +697,7 @@ public:
   {
     switch( m_BPMType )
     {
-    case BPM_Std:   m_CtxStore_Std.saveWeights( weights );  break;
+    case BPM_Std:   m_ctxStore_Std.saveWeights( weights );  break;
     default:        break;
     }
   }
@@ -684,7 +706,7 @@ public:
   {
     switch( m_BPMType )
     {
-    case BPM_Std:   m_CtxStore_Std.loadWinSizes( windows );  break;
+    case BPM_Std:   m_ctxStore_Std.loadWinSizes( windows );  break;
     default:        break;
     }
   }
@@ -693,7 +715,7 @@ public:
   {
     switch( m_BPMType )
     {
-    case BPM_Std:   m_CtxStore_Std.saveWinSizes( windows );  break;
+    case BPM_Std:   m_ctxStore_Std.saveWinSizes( windows );  break;
     default:        break;
     }
   }
@@ -702,7 +724,7 @@ public:
   {
     switch( m_BPMType )
     {
-    case BPM_Std:   m_CtxStore_Std.loadPStates( probStates );  break;
+    case BPM_Std:   m_ctxStore_Std.loadPStates( probStates );  break;
     default:        break;
     }
   }
@@ -711,7 +733,7 @@ public:
   {
     switch( m_BPMType )
     {
-    case BPM_Std:   m_CtxStore_Std.savePStates( probStates );  break;
+    case BPM_Std:   m_ctxStore_Std.savePStates( probStates );  break;
     default:        break;
     }
   }
@@ -720,7 +742,7 @@ public:
   {
     switch( m_BPMType )
     {
-    case BPM_Std:   m_CtxStore_Std  .loadPStates( probStates );  break;
+    case BPM_Std:   m_ctxStore_Std  .loadPStates( probStates );  break;
     default:        break;
     }
   }
@@ -729,7 +751,7 @@ public:
   {
     switch( m_BPMType )
     {
-    case BPM_Std:   m_CtxStore_Std  .savePStates( probStates );  break;
+    case BPM_Std:   m_ctxStore_Std  .savePStates( probStates );  break;
     default:        break;
     }
   }
@@ -740,8 +762,8 @@ public:
     switch( m_BPMType )
     {
     case BPM_Std:
-      m_CtxStore_Std  [ctxId] = ctx.m_CtxStore_Std  [ctxId];
-      m_CtxStore_Std  [ctxId] . setLog2WindowSize   (winSize);
+      m_ctxStore_Std  [ctxId] = ctx.m_ctxStore_Std  [ctxId];
+      m_ctxStore_Std  [ctxId] . setLog2WindowSize   (winSize);
       break;
     default:
       break;
@@ -756,21 +778,21 @@ public:
   const Ctx&          getCtx          ()                        const { return *this; }
   Ctx&                getCtx          ()                              { return *this; }
 
-  explicit operator   const CtxStore<BinProbModel_Std>  &()     const { return m_CtxStore_Std; }
-  explicit operator         CtxStore<BinProbModel_Std>  &()           { return m_CtxStore_Std; }
+  explicit operator   const CtxStore<BinProbModel_Std>  &()     const { return m_ctxStore_Std; }
+  explicit operator         CtxStore<BinProbModel_Std>  &()           { return m_ctxStore_Std; }
 
   const FracBitsAccess&   getFracBitsAcess()  const
   {
     switch( m_BPMType )
     {
-    case BPM_Std:   return m_CtxStore_Std;
+    case BPM_Std:   return m_ctxStore_Std;
     default:        THROW("BPMType out of range");
     }
   }
 
 private:
   BPMType                       m_BPMType;
-  CtxStore<BinProbModel_Std>    m_CtxStore_Std;
+  CtxStore<BinProbModel_Std>    m_ctxStore_Std;
 protected:
   unsigned                      m_GRAdaptStats[RExt__GOLOMB_RICE_ADAPTATION_STATISTICS_SETS];
 #if ENABLE_SPLIT_PARALLELISM

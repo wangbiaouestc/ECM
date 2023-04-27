@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -473,6 +473,9 @@ protected:
   bool      m_OBMC;
 #endif
   bool      m_ciip;
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  bool      m_ciipTimd;
+#endif
   bool      m_Geo;
   bool      m_HashME;
   bool      m_allowDisFracMMVD;
@@ -484,6 +487,12 @@ protected:
   int       m_MmvdDisNum;
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   bool      m_MVSD;
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bool      m_bvdPred;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bool      m_bvpCluster;
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   bool      m_useARL;
@@ -930,6 +939,19 @@ protected:
   double      m_fractionOfFrames;                             ///< encode a fraction of the frames as specified in FramesToBeEncoded
   int         m_switchPocPeriod;
   int         m_upscaledOutput;                               ////< Output upscaled (2), decoded cropped but in full resolution buffer (1) or decoded cropped (0, default) picture for RPR.
+#if JVET_AC0096
+  int         m_rprSwitchingResolutionOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
+  int         m_rprSwitchingQPOffsetOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
+  int         m_rprSwitchingListSize;
+  bool        m_rprFunctionalityTestingEnabledFlag;
+  bool        m_rprPopulatePPSatIntraFlag;
+  int         m_rprSwitchingSegmentSize;
+  double      m_rprSwitchingTime;
+  double      m_scalingRatioHor2;
+  double      m_scalingRatioVer2;
+  double      m_scalingRatioHor3;
+  double      m_scalingRatioVer3;
+#endif
 #if JVET_AB0082
   int         m_upscaleFilterForDisplay;
 #endif

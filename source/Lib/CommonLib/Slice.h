@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1569,6 +1569,12 @@ private:
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   bool              m_MVSD;
 #endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bool              m_bvdPred;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bool              m_bvpCluster;
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   bool              m_useARL;
 #endif
@@ -1744,12 +1750,15 @@ private:
   unsigned          m_intraTmpMaxSize;                               ///< max CU size for which intra TMP is allowed
 #endif
 #if JVET_AC0071_DBV
-  bool m_intraDBV;
+  bool              m_intraDBV;
 #endif
 #if ENABLE_OBMC
   bool              m_OBMC;
 #endif
   bool              m_ciip;
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  bool              m_ciipTimd;
+#endif
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
   bool              m_ciipTmMrg;
 #endif
@@ -1764,6 +1773,7 @@ private:
   int               m_LadfQpOffset[MAX_LADF_INTERVALS];
   int               m_LadfIntervalLowerBound[MAX_LADF_INTERVALS];
 #endif
+
 #if JVET_AA0133_INTER_MTS_OPT
   int               m_interMTSMaxSize;
 #endif
@@ -1791,7 +1801,11 @@ private:
   bool              m_rprEnabledFlag;
   bool              m_resChangeInClvsEnabledFlag;
   bool              m_interLayerPresentFlag;
-
+#if JVET_AC0096
+  bool              m_rprFunctionalityTestingEnabledFlag;
+  int               m_rprSwitchingResolutionOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
+  int               m_rprSwitchingQPOffsetOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
+#endif
   uint32_t          m_log2ParallelMergeLevelMinus2;
   bool              m_ppsValidFlag[64];
   Size              m_scalingWindowSizeInPPS[64];
@@ -2126,6 +2140,14 @@ void                    setCCALFEnabledFlag( bool b )                           
   void                    setUseMVSD(bool b) { m_MVSD = b; }
   bool                    getUseMVSD()const                                                               { return m_MVSD; }
 #endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  void                    setUseBvdPred(bool b)                                                           { m_bvdPred = b; }
+  bool                    getUseBvdPred() const                                                           { return m_bvdPred; }
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  void                    setUseBvpCluster(bool b)                                                        { m_bvpCluster = b; }
+  bool                    getUseBvpCluster() const                                                        { return m_bvpCluster; }
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   void                    setUseARL(bool b) { m_useARL = b; }
   bool                    getUseARL()const { return m_useARL; }
@@ -2317,6 +2339,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #endif
   void      setUseCiip         ( bool b )                                        { m_ciip = b; }
   bool      getUseCiip         ()                                      const     { return m_ciip; }
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  void      setUseCiipTimd     (bool b)                                          { m_ciipTimd = b; }
+  bool      getUseCiipTimd     ()                                      const     { return m_ciipTimd; }
+#endif
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
   void      setUseCiipTmMrg         ( bool b )                                        { m_ciipTmMrg = b; }
   bool      getUseCiipTmMrg         ()                                      const     { return m_ciipTmMrg; }
@@ -2363,7 +2389,14 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setInterLayerPresentFlag( bool b )                                      { m_interLayerPresentFlag = b; }
   bool      getResChangeInClvsEnabledFlag()                               const     { return m_resChangeInClvsEnabledFlag; }
   void      setResChangeInClvsEnabledFlag(bool flag)                                { m_resChangeInClvsEnabledFlag = flag; }
-
+#if JVET_AC0096
+  bool      getRprFunctionalityTestingEnabledFlag()                       const { return m_rprFunctionalityTestingEnabledFlag; }
+  void      setRprFunctionalityTestingEnabledFlag(bool flag)                        { m_rprFunctionalityTestingEnabledFlag = flag; }
+  void      setRprSwitchingResolutionOrderList(int value, int idx)                  { m_rprSwitchingResolutionOrderList[idx] = value; }
+  int       getRprSwitchingResolutionOrderList(int idx)                  const { return m_rprSwitchingResolutionOrderList[idx]; }
+  void      setRprSwitchingQPOffsetOrderList(int value, int idx)                    { m_rprSwitchingQPOffsetOrderList[idx] = value; }
+  int       getRprSwitchingQPOffsetOrderList(int idx)                    const { return m_rprSwitchingQPOffsetOrderList[idx]; }
+#endif
   uint32_t  getLog2ParallelMergeLevelMinus2() const { return m_log2ParallelMergeLevelMinus2; }
   void      setLog2ParallelMergeLevelMinus2(uint32_t mrgLevel) { m_log2ParallelMergeLevelMinus2 = mrgLevel; }
   void          setPPSValidFlag(int i, bool b) { m_ppsValidFlag[i] = b; }
@@ -3507,9 +3540,9 @@ public:
       std::fill(m_implicitRefIdx[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].begin(), m_implicitRefIdx[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].end(), -1);
     }
   }
-  void                        setImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int col_refIdx, int cur_refIdx, int col) { m_implicitRefIdx[col][colRefPicList][curRefPicList][col_refIdx][sliceIdx] = cur_refIdx; }
-  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int col_refIdx, int col = 0) { return m_implicitRefIdx[col][colRefPicList][curRefPicList][col_refIdx][sliceIdx]; }
-  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int col_refIdx, int col = 0) const { return m_implicitRefIdx[col][colRefPicList][curRefPicList][col_refIdx][sliceIdx]; }
+  void                        setImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int curRefIdx, int col) { m_implicitRefIdx[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx] = curRefIdx; }
+  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) { return m_implicitRefIdx[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) const { return m_implicitRefIdx[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
 #else
   void resizeImBuf(int numSlices)
   {
@@ -3528,9 +3561,9 @@ public:
       std::fill(m_implicitRefIdx[REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].begin(), m_implicitRefIdx[REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].end(), -1);
     }
   }
-  void                        setImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int col_refIdx, int cur_refIdx) { m_implicitRefIdx[colRefPicList][curRefPicList][col_refIdx][sliceIdx] = cur_refIdx; }
-  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int col_refIdx) { return m_implicitRefIdx[colRefPicList][curRefPicList][col_refIdx][sliceIdx]; }
-  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int col_refIdx) const { return m_implicitRefIdx[colRefPicList][curRefPicList][col_refIdx][sliceIdx]; }
+  void                        setImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int curRefIdx) { m_implicitRefIdx[colRefPicList][curRefPicList][colRefIdx][sliceIdx] = curRefIdx; }
+  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx) { return m_implicitRefIdx[colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+  int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx) const { return m_implicitRefIdx[colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
 #endif
 #endif
   bool                        getIsUsedAsLongTerm(int i, int j) const                { return m_bIsUsedAsLongTerm[i][j];                             }

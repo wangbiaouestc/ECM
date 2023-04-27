@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -137,10 +137,10 @@ private:
   // RD cost computation
 #if ENABLE_SPLIT_PARALLELISM
   RdCost                   *m_cRdCost;                            ///< RD cost computation class
-  CtxCache                 *m_CtxCache;                           ///< buffer for temporarily stored context models
+  CtxCache                 *m_ctxCache;                           ///< buffer for temporarily stored context models
 #else
   RdCost                    m_cRdCost;                            ///< RD cost computation class
-  CtxCache                  m_CtxCache;                           ///< buffer for temporarily stored context models
+  CtxCache                  m_ctxCache;                           ///< buffer for temporarily stored context models
 #endif
   // quality control
   RateCtrl                  m_cRateCtrl;                          ///< Rate control class
@@ -175,7 +175,9 @@ public:
   APS**                     getApss() { return m_apss; }
   Ctx                       m_entropyCodingSyncContextState;      ///< leave in addition to vector for compatibility
   PLTBuf                    m_palettePredictorSyncState;
-
+#if JVET_AC0096
+  int                       m_gopRprPpsId;
+#endif
 protected:
   void  xGetNewPicBuffer  ( std::list<PelUnitBuf*>& rcListPicYuvRecOut, Picture*& rpcPic, int ppsId ); ///< get picture buffer which will be processed. If ppsId<0, then the ppsMap will be queried for the first match.
   void  xInitDCI(DCI& dci, const SPS& sps); ///< initialize Decoding Capability Information (DCI) from encoder options
@@ -238,14 +240,14 @@ public:
   CABACEncoder*           getCABACEncoder       ( int jId = 0 ) { return  &m_CABACEncoder[jId];    }
 
   RdCost*                 getRdCost             ( int jId = 0 ) { return  &m_cRdCost[jId];         }
-  CtxCache*               getCtxCache           ( int jId = 0 ) { return  &m_CtxCache[jId];        }
+  CtxCache*               getCtxCache           ( int jId = 0 ) { return  &m_ctxCache[jId];        }
 #else
   CABACEncoder*           getCABACEncoder       ()              { return  &m_CABACEncoder;         }
 #if JVET_AA0096_MC_BOUNDARY_PADDING
   InterPrediction *         getFrameMcPadPredSearch() { return &m_cFrameMcPadPredSearch; }
 #endif
   RdCost*                 getRdCost             ()              { return  &m_cRdCost;              }
-  CtxCache*               getCtxCache           ()              { return  &m_CtxCache;             }
+  CtxCache*               getCtxCache           ()              { return  &m_ctxCache;             }
 #endif
   RateCtrl*               getRateCtrl           ()              { return  &m_cRateCtrl;            }
 

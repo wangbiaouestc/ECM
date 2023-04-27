@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -136,6 +136,13 @@ IntraPrediction::IntraPrediction()
   m_cccmLumaBuf = nullptr;
 #endif
 #endif
+
+#if JVET_AC0119_LM_CHROMA_FUSION
+  for (int i = 0; i < 3; i++)
+  {
+    m_cflmBuf[i] = nullptr;
+  }
+#endif
 }
 
 IntraPrediction::~IntraPrediction()
@@ -231,6 +238,14 @@ void IntraPrediction::destroy()
   delete[] m_cccmLumaBuf;
   m_cccmLumaBuf = nullptr;
 #endif
+#endif
+
+#if JVET_AC0119_LM_CHROMA_FUSION
+  for (int i = 0; i < 3; i++)
+  {
+    delete[] m_cflmBuf[i];
+    m_cflmBuf[i] = nullptr;
+  }
 #endif
 }
 
@@ -346,7 +361,11 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
 
   // the number of total temporal buffers can be adjusted by chaning the number here
 #if JVET_AB0157_INTRA_FUSION
+#if JVET_AC0098_LOC_DEP_DIMD
+  m_tempBuffer.resize( DIMD_FUSION_NUM+2 );
+#else
   m_tempBuffer.resize( DIMD_FUSION_NUM-1 );
+#endif
 #else
   m_tempBuffer.resize( 2 );
 #endif
@@ -407,6 +426,16 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
 #endif
 #endif
 
+#if JVET_AC0119_LM_CHROMA_FUSION
+  for (int i = 0; i < 3; i++)
+  {
+    if (m_cflmBuf[i] == nullptr)
+    {
+      m_cflmBuf[i] = new Pel[(2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE) * (2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE)];
+    }
+  }
+#endif
+
 #if ENABLE_SIMD_TMP
 #ifdef TARGET_SIMD_X86
   initIntraX86();
@@ -414,7 +443,7 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
 #endif
 }
 
-#if JVET_W0123_TIMD_FUSION
+#if JVET_W0123_TIMD_FUSION || JVET_AC0119_LM_CHROMA_FUSION
 void IntraPrediction::xIntraPredTimdAngPdpc(Pel* pDsty,const int dstStride,Pel* refSide,const int width,const int height, int xOffset, int yOffset, int scale,int invAngle)
 {
   int xlim = std::min(3 << scale, width);
@@ -446,8 +475,33 @@ void IntraPrediction::xIntraPredTimdAngPdpc(Pel* pDsty,const int dstStride,Pel* 
 }
 
 #if GRAD_PDPC
-void IntraPrediction::xIntraPredTimdAngGradPdpc(Pel* pDsty, const int dstStride, Pel* refMain, Pel* refSide, const int width, const int height, int xOffset, int yOffset, int scale, int deltaPos, int intraPredAngle, const ClpRng& clpRng)
+void IntraPrediction::xIntraPredTimdAngGradPdpc(Pel* pDsty, const int dstStride, Pel* refMain, Pel* refSide, const int width, const int height, int xOffset, int yOffset, int scale, int deltaPos, int intraPredAngle, const ClpRng& clpRng
+#if JVET_AC0119_LM_CHROMA_FUSION
+  , const bool bExtIntraDir
+#endif
+)
 {
+#if JVET_AC0119_LM_CHROMA_FUSION
+  if (!bExtIntraDir)
+  {
+    for (int y = yOffset; y < height; y++)
+    {
+      const int deltaInt = deltaPos >> 5;
+      const int deltaFract = deltaPos & 31;
+      const Pel left = refSide[1 + y];
+      const Pel topLeft = refMain[deltaInt] + ((deltaFract * (refMain[deltaInt + 1] - refMain[deltaInt]) + 16) >> 5);
+      for (int x = xOffset; x < std::min(3 << scale, width); x++)
+      {
+        int wL = 32 >> (2 * (x - xOffset) >> scale);
+        pDsty[x] = ClipPel(pDsty[x] + ((wL * (left - topLeft) + 32) >> 6), clpRng);
+      }
+      pDsty += dstStride;
+      deltaPos += intraPredAngle;
+    }
+  }
+  else
+  {
+#endif
   for (int y = yOffset; y<height; y++)
   {
     const int deltaInt   = deltaPos >> 6;
@@ -462,6 +516,9 @@ void IntraPrediction::xIntraPredTimdAngGradPdpc(Pel* pDsty, const int dstStride,
     pDsty += dstStride;
     deltaPos += intraPredAngle;
   }
+#if JVET_AC0119_LM_CHROMA_FUSION
+  }
+#endif
 }
 #endif
 
@@ -582,6 +639,23 @@ void IntraPrediction::xIntraPredTimdAngLuma(Pel* pDstBuf, const ptrdiff_t dstStr
   }
 }
 
+#if JVET_AC0119_LM_CHROMA_FUSION
+void IntraPrediction::xIntraPredTimdAngChroma(Pel* pDstBuf, const ptrdiff_t dstStride, Pel* refMain, int width, int height, int deltaPos, int intraPredAngle, const ClpRng& clpRng, int xOffset, int yOffset)
+{
+  for (int y = yOffset; y < height; y++)
+  {
+    const int deltaInt = deltaPos >> 5;
+    const int deltaFract = deltaPos & 31;
+    int refMainIndex = deltaInt + 1 + xOffset;
+    for (int x = xOffset; x < width; x++, refMainIndex++)
+    {
+      pDstBuf[y * dstStride + x] = refMain[refMainIndex] + ((deltaFract * (refMain[refMainIndex + 1] - refMain[refMainIndex]) + 16) >> 5);
+    }
+    deltaPos += intraPredAngle;
+}
+}
+#endif
+
 #if JVET_X0148_TIMD_PDPC
 #if CIIP_PDPC
 void IntraPrediction::xIntraPredPlanarDcPdpc( const CPelBuf &pSrc, Pel* pDst, int iDstStride, int width, int height, bool ciipPDPC )
@@ -664,7 +738,7 @@ bool IntraPrediction::xFillIntraGPMRefTemplateAll(PredictionUnit& pu, TEMPLATE_T
     uint8_t* geoIntraMPMList = m_aiGpmIntraMPMLists[splitDir][partIdx];
     if (!readBufferedMPMList)
     {
-      PU::getGeoIntraMPMs(pu, geoIntraMPMList, splitDir, g_geoTmShape[partIdx][g_GeoParams[splitDir][0]], doInitMPMList, doInitAL, doInitA, doInitL);
+      PU::getGeoIntraMPMs(pu, geoIntraMPMList, splitDir, g_geoTmShape[partIdx][g_geoParams[splitDir][0]], doInitMPMList, doInitAL, doInitA, doInitL);
       doInitMPMList = false; // to prevent duplicating initialization
     }
 
@@ -1166,7 +1240,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     PelBuf predAngExtra[DIMD_FUSION_NUM-2];
     for( int i = 0; i < DIMD_FUSION_NUM-2; ++i)
     {
+#if JVET_AC0098_LOC_DEP_DIMD
+      blendModes[i] = (pu.cu->dimdBlendMode[i] != PLANAR_IDX);
+#else
       blendModes[i] = (i==0 || pu.cu->dimdBlendMode[i] != PLANAR_IDX);
+#endif
       if(blendModes[i])
       {
         predAngExtra[i] = m_tempBuffer[i + 1].getBuf( localUnitArea.Y() );
@@ -1184,6 +1262,176 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     m_ipaParam.applyPDPC = applyPdpc;
 
     // do blending
+#if JVET_AC0098_LOC_DEP_DIMD
+    PelBuf predAngNonLocDep = m_tempBuffer[7].getBuf( localUnitArea.Y() );
+    PelBuf predAngVer       = m_tempBuffer[5].getBuf( localUnitArea.Y() );
+    PelBuf predAngHor       = m_tempBuffer[6].getBuf( localUnitArea.Y() );
+
+    Pel* pelVer = predAngVer.buf;
+    int strideVer = predAngVer.stride;
+    Pel* pelHor = predAngHor.buf;
+    int strideHor = predAngHor.stride;
+    Pel *pelNonLocDep = predAngNonLocDep.buf;
+    int strideNonLocDep = predAngNonLocDep.stride;
+
+    bool useLocDepBlending = false;
+    int weightVer = 0, weightHor = 0, weightNonLocDep = 0;
+    weightNonLocDep += pu.cu->dimdRelWeight[1];
+    for (int i = 0; i < DIMD_FUSION_NUM-1; i++)
+    {
+      if (i == 0  || blendModes[i-1])
+      {
+        if (pu.cu->dimdLocDep[i] == 1)
+        {
+          weightVer += (i == 0 ? pu.cu->dimdRelWeight[0] : pu.cu->dimdRelWeight[i+ 1]);
+        }
+        else if (pu.cu->dimdLocDep[i] == 2)
+        {
+          weightHor += (i == 0 ? pu.cu->dimdRelWeight[0] : pu.cu->dimdRelWeight[i+ 1]);
+        }
+        else
+        {
+          weightNonLocDep += (i == 0 ? pu.cu->dimdRelWeight[0] : pu.cu->dimdRelWeight[i+1]);
+        }
+      }
+    }
+
+    if(weightHor || weightVer)
+    {
+      useLocDepBlending = true;
+    }
+
+    if(!useLocDepBlending)
+    {
+      pelNonLocDep = piPred.buf;
+      strideNonLocDep = piPred.stride;
+    }
+
+    for (int locDep = 0; locDep < 3; locDep++)
+    {
+      int totWeight = (locDep == 0 ? weightNonLocDep : (locDep == 1 ? weightVer : weightHor));
+      if (totWeight == 0)
+      {
+        continue;
+      }
+
+      int weights[6] = {0};
+      weights[0] =  (pu.cu->dimdLocDep[0] == locDep) ? pu.cu->dimdRelWeight[0] : 0;
+      weights[1] =  (blendModes[0] && pu.cu->dimdLocDep[1] == locDep) ? pu.cu->dimdRelWeight[2] : 0;
+      weights[2] =  (blendModes[1] && pu.cu->dimdLocDep[2] == locDep) ? pu.cu->dimdRelWeight[3] : 0;
+      weights[3] =  (blendModes[2] && pu.cu->dimdLocDep[3] == locDep) ? pu.cu->dimdRelWeight[4] : 0;
+      weights[4] =  (blendModes[3] && pu.cu->dimdLocDep[4] == locDep) ? pu.cu->dimdRelWeight[5] : 0;
+      weights[5] =  (locDep == 0) ? pu.cu->dimdRelWeight[1] : 0;
+
+      int num2blend = 0;
+      int blendIndexes[DIMD_FUSION_NUM] = {0};
+      for (int i = 0; i < DIMD_FUSION_NUM; i++)
+      {
+        if (weights[i] != 0)
+        {
+          blendIndexes[num2blend] = i;
+          num2blend++;
+        }
+      }
+#if JVET_W0123_TIMD_FUSION
+      if( (num2blend == 1 ) || (num2blend <=3 && (totWeight == (1 << (floorLog2(totWeight))) ) ))
+      {
+        int index = blendIndexes[0];    
+        if(locDep == 0)
+        {
+          pelNonLocDep = (index == 0 ? piPred.buf : (index == 5 ? planarBuffer.buf : predAngExtra[index-1].buf));
+          strideNonLocDep = (index == 0 ? piPred.stride : (index == 5 ? planarBuffer.stride : predAngExtra[index-1].stride));
+        }
+        else if(locDep == 1)
+        {
+          pelVer = (index == 0 ? piPred.buf : predAngExtra[index-1].buf);
+          strideVer = (index == 0 ? piPred.stride : predAngExtra[index-1].stride);
+        }
+        else
+        {
+          pelHor = (index == 0 ? piPred.buf : predAngExtra[index-1].buf);
+          strideHor = (index == 0 ? piPred.stride : predAngExtra[index-1].stride);
+        }
+        Pel* pCur = (locDep == 0 ? pelNonLocDep : (locDep == 1 ? pelVer : pelHor));
+        int strideCur = (locDep == 0 ? strideNonLocDep : (locDep == 1 ? strideVer : strideHor));
+
+        int factor = 64 / totWeight;
+        if (num2blend == 2)
+        {
+          int index1 = blendIndexes[1];
+          Pel* p1 = (index1 == 0 ? piPred.buf : (index1 == 5 ?  planarBuffer.buf : predAngExtra[index1-1].buf));
+          int stride1 = (index1 == 0 ? piPred.stride : (index1 == 5 ? planarBuffer.stride : predAngExtra[index1-1].stride));
+
+          int w0 = (weights[index]*factor);
+          int w1 = 64 - w0;
+          m_timdBlending(pCur, strideCur, p1, stride1, w0, w1,width, height);
+        }
+        else if(num2blend == 3)
+        {
+          int index1 = blendIndexes[1];
+          Pel* p1 = (index1 == 0 ? piPred.buf : (index1 == 5 ?  planarBuffer.buf : predAngExtra[index1-1].buf));
+          int stride1 = (index1 == 0 ? piPred.stride : (index1 == 5 ? planarBuffer.stride : predAngExtra[index1-1].stride));
+
+          int index2 = blendIndexes[2];
+          Pel* p2 = (index2 == 0 ? piPred.buf : (index2 == 5 ?  planarBuffer.buf : predAngExtra[index2-1].buf));
+          int stride2 = (index2 == 0 ? piPred.stride : (index2 == 5 ? planarBuffer.stride : predAngExtra[index2-1].stride));
+
+          int w0 = (weights[index]*factor);
+          int w1 = (weights[index1]*factor);
+          int w2 = 64  - w0 - w1;
+          m_dimdBlending(pCur, strideCur, p1, stride1, p2, stride2, w0, w1, w2, width, height);
+        }
+      }
+      else
+#endif
+      {
+        Pel* pCur = (locDep == 0 ? pelNonLocDep : (locDep == 1 ? pelVer : pelHor));
+        int strideCur = (locDep == 0 ? strideNonLocDep : (locDep == 1 ? strideVer : strideHor));
+
+        Pel *pelPredAng0 = piPred.buf;
+        Pel *pelPredAng1 = predAngExtra[0].buf;
+        Pel *pelPredAng2 = predAngExtra[1].buf;
+        Pel *pelPredAng3 = predAngExtra[2].buf;
+        Pel *pelPredAng4 = predAngExtra[3].buf;
+        Pel *pelPlanar = planarBuffer.buf;
+        int stride0 = piPred.stride;
+        int stride1 = predAngExtra[0].stride;
+        int stride2 = predAngExtra[1].stride;
+        int stride3 = predAngExtra[2].stride;
+        int stride4 = predAngExtra[3].stride;
+        int stridePlanar = planarBuffer.stride;
+        for( int y = 0; y < height; y++ )
+        {
+          for( int x = 0; x < width; x++ )
+          {
+            int blend = pelPredAng0[x] * weights[0];
+            blend += blendModes[0] ? pelPredAng1[x] * weights[1] : 0;
+            blend += blendModes[1] ? pelPredAng2[x] * weights[2] : 0;
+            blend += blendModes[2] ? pelPredAng3[x] * weights[3] : 0;
+            blend += blendModes[3] ? pelPredAng4[x] * weights[4] : 0;
+            blend += pelPlanar[x] * weights[5];
+            pCur[x] = (Pel)(blend / totWeight);
+          }
+          pCur += strideCur;
+          pelPredAng0 += stride0;
+          pelPredAng1 += stride1;
+          pelPredAng2 += stride2;
+          pelPredAng3 += stride3;
+          pelPredAng4 += stride4;
+          pelPlanar += stridePlanar;
+        }
+      }
+    }
+
+    if (useLocDepBlending)
+    {
+      int mode = ((weightHor > 0 && weightVer > 0) ? 0 : (weightVer > 0 ? 1 : 2));
+
+      Pel *pelDst = piPred.buf;
+      int strideDst = piPred.stride;
+      xDimdLocationdepBlending(pelDst, strideDst, pelVer, strideVer, pelHor, strideHor, pelNonLocDep,strideNonLocDep, width, height,mode, weightVer, weightHor, weightNonLocDep);
+    }
+#else
     const int log2WeightSum = 6;
     Pel *pelPred = piPred.buf;
     Pel *pelPlanar = planarBuffer.buf;
@@ -1203,7 +1451,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       {
         int blend = pelPred[x] * w0;
         blend += pelPlanar[x] * w1;
+#if JVET_AC0098_LOC_DEP_DIMD
+        blend += blendModes[0] ? pelPredAng[x] * w2 : 0;
+#else
         blend += pelPredAng[x] * w2;
+#endif
         blend += blendModes[1] ? pelPredAng2[x] * w3 : 0;
         blend += blendModes[2] ? pelPredAng3[x] * w4 : 0;
         blend += blendModes[3] ? pelPredAng4[x] * w5 : 0;
@@ -1217,6 +1469,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       pelPredAng3 += predAngExtra[2].stride;
       pelPredAng4 += predAngExtra[3].stride;
     }
+#endif
   }
 #else
   if (pu.cu->dimd && pu.cu->dimdBlending && isLuma(compID))
@@ -1227,9 +1480,18 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 
     PelBuf planarBuffer = m_tempBuffer[0].getBuf( localUnitArea.Y() );
     PelBuf predAng = m_tempBuffer[1].getBuf( localUnitArea.Y() );
-    xPredIntraPlanar( srcBuf, planarBuffer );
+
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+    xPredIntraPlanar(srcBuf, planarBuffer, 0);
+#else
+    xPredIntraPlanar(srcBuf, planarBuffer);
+#endif
 
     const bool applyPdpc = m_ipaParam.applyPDPC;
+#if JVET_AC0098_LOC_DEP_DIMD
+    if (pu.cu->dimdBlendMode[0] != 0)
+    {
+#endif
 #if JVET_V0087_DIMD_NO_ISP   // this is pure cleanup to make code easier to read. It generates identical resut to the else part
     PredictionUnit pu2 = pu;
     pu2.intraDir[0] = pu.cu->dimdBlendMode[0];
@@ -1239,6 +1501,13 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     xPredIntraAng(srcBuf, predAng, channelType, clpRng, false);
 #else
     xPredIntraAng(srcBuf, predAng, channelType, clpRng);
+#endif
+#if JVET_AC0098_LOC_DEP_DIMD
+    }
+    else
+    {
+      predAng = piPred;
+    }
 #endif
 #else
     const bool   useISP = NOT_INTRA_SUBPARTITIONS != pu.cu->ispMode && isLuma( CHANNEL_TYPE_LUMA );//ok
@@ -1325,7 +1594,19 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #endif
 #endif
     m_ipaParam.applyPDPC = applyPdpc;
+#if JVET_AC0098_LOC_DEP_DIMD
+    if (pu.cu->dimdLocDep[0] != 0 || pu.cu->dimdLocDep[1] != 0)
+    {
+      Pel *pelPred = piPred.buf;
+      Pel *pelPlanar = planarBuffer.buf;
+      Pel *pelPredAng = predAng.buf;
+      int  wMain = pu.cu->dimdRelWeight[0], wPlanar = pu.cu->dimdRelWeight[1], wSecond = pu.cu->dimdRelWeight[2];
 
+      xDimdLocationdepBlending(pelPred, piPred.stride, pelPred, piPred.stride, pelPredAng, predAng.stride, pelPlanar, planarBuffer.stride, width, height, pu.cu->dimdLocDep[0], pu.cu->dimdLocDep[1], wMain, wSecond, wPlanar);
+    }
+    else
+    {
+#endif
     // do blending
 #if INTRA_TRANS_ENC_OPT
     Pel *pelPred = piPred.buf;
@@ -1353,6 +1634,9 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       pelPred += piPred.stride;
       pelPlanar += planarBuffer.stride;
       pelPredAng += predAng.stride;
+    }
+#endif
+#if JVET_AC0098_LOC_DEP_DIMD
     }
 #endif
   }
@@ -1557,7 +1841,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 }
 
 #if JVET_AC0071_DBV
-void IntraPrediction::PredIntraDbv(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu)
+void IntraPrediction::predIntraDbv(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu)
 {
   const int shiftSampleHor = ::getComponentScaleX(compId, pu.chromaFormat);
   const int shiftSampleVer = ::getComponentScaleY(compId, pu.chromaFormat);
@@ -1794,6 +2078,33 @@ void IntraPrediction::xUpdateCclmModel(int &a, int &b, int &iShift, int midLuma,
 
 void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea& chromaArea, int intraDir, bool createModel, CclmModel *cclmModelStored)
 {
+#if JVET_AC0119_LM_CHROMA_FUSION
+  if (pu.isChromaFusion > 1)
+  {
+    CccmModel<CFLM_NUM_PARAMS> cflmModel(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+#if MMLM
+    if (PU::isMultiModeLM(pu.intraDir[1]))
+    {
+      int modelThr = xCflmCalcRefAver(pu, chromaArea);
+
+      xCflmCalcModels(pu, compID, chromaArea, cflmModel, 1, modelThr);
+      xCflmApplyModel(pu, compID, chromaArea, cflmModel, 1, modelThr, piPred);
+
+      xCflmCalcModels(pu, compID, chromaArea, cflmModel, 2, modelThr);
+      xCflmApplyModel(pu, compID, chromaArea, cflmModel, 2, modelThr, piPred);
+    }
+    else
+    {
+#endif
+      xCflmCalcModels(pu, compID, chromaArea, cflmModel, 0, 0);
+      xCflmApplyModel(pu, compID, chromaArea, cflmModel, 0, 0, piPred);
+#if MMLM
+    }
+#endif
+    return;
+  }
+#endif
+
 #if JVET_AB0092_GLM_WITH_LUMA
   if (pu.glmIdc.getIdc(compID, 0) > NUM_GLM_PATTERN)
   {
@@ -2308,7 +2619,7 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
 #endif
   // initializing for safeguard.
   ::memset(refAbove, 0, sizeof(refAbove));
-  ::memset(refLeft, 0, sizeof(refAbove));
+  ::memset(refLeft, 0, sizeof(refLeft));
 #if JVET_AB0157_INTRA_FUSION
   }
 
@@ -2806,7 +3117,27 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
 
   const CompArea &area = pu2.blocks[compId];
 
+#if JVET_AC0119_LM_CHROMA_FUSION
+  if (!pu.cs->pcv->isEncoder || !pu2.cs->slice->isIntra())
+  {
+#endif
   xGetLumaRecPixels(pu2, area);
+#if JVET_AC0119_LM_CHROMA_FUSION
+  }
+#endif
+
+#if JVET_AC0119_LM_CHROMA_FUSION
+  if (pu.isChromaFusion > 1)
+  {
+    pu2.intraDir[1] = LM_CHROMA_IDX + pu.isChromaFusion - 2;
+    if (!pu.cs->pcv->isEncoder || !pu2.cs->slice->isIntra())
+    {
+      xCflmCreateChromaPred(pu, compId, piPred);
+    }
+    predIntraChromaLM(compId, piPred, pu2, area, pu2.intraDir[1]);
+    return;
+  }
+#endif
   predIntraChromaLM(compId, predLmBuffer, pu2, area, pu2.intraDir[1]);
 #if JVET_AC0071_DBV && JVET_AA0070_RRIBC
   if (pu.intraDir[1] == DBV_CHROMA_IDX && pu.cu->rribcFlipType != 0)
@@ -4000,7 +4331,11 @@ void IntraPrediction::predTimdIntraAng( const ComponentID compId, const Predicti
   {
     case(PLANAR_IDX): xPredTimdIntraPlanar(srcBuf, pPred, uiStride, iWidth, iHeight, eTempType, iTemplateWidth, iTemplateHeight); break;
     case(DC_IDX):     xPredTimdIntraDc(pu, srcBuf, pPred, uiStride, iWidth, iHeight, eTempType, iTemplateWidth, iTemplateHeight); break;
+#if JVET_AC0119_LM_CHROMA_FUSION
+    default:          xPredTimdIntraAng(srcBuf, clpRng, pPred, uiStride, iWidth, iHeight, eTempType, iTemplateWidth, iTemplateHeight, uiDirMode, toChannelType(compID)); break;
+#else
     default:          xPredTimdIntraAng(srcBuf, clpRng, pPred, uiStride, iWidth, iHeight, eTempType, iTemplateWidth, iTemplateHeight, uiDirMode); break;
+#endif
   }
 
   if (m_ipaParam.applyPDPC && (uiDirMode == PLANAR_IDX || uiDirMode == DC_IDX))
@@ -4184,7 +4519,11 @@ void IntraPrediction::xPredTimdIntraPlanar( const CPelBuf &pSrc, Pel* rpDst, int
 
 void IntraPrediction::xPredTimdIntraDc( const PredictionUnit &pu, const CPelBuf &pSrc, Pel* pDst, int iDstStride, int iWidth, int iHeight, TEMPLATE_TYPE eTempType, int iTemplateWidth, int iTemplateHeight )
 {
+#if JVET_AC0119_LM_CHROMA_FUSION
+  const Size& dstSize = Size(iWidth - iTemplateWidth, iHeight - iTemplateHeight);
+#else
   const Size &dstSize = Size(pu.lwidth(), pu.lheight());
+#endif
   const Pel dcval = xGetPredTimdValDc( pSrc, dstSize, eTempType, iTemplateHeight, iTemplateWidth );
   if(eTempType == LEFT_ABOVE_NEIGHBOR)
   {
@@ -4297,7 +4636,11 @@ void IntraPrediction::initPredTimdIntraParams(const PredictionUnit & pu, const C
   }
 }
 
-void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpRng, Pel* pTrueDst, int iDstStride, int iWidth, int iHeight, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight, uint32_t dirMode)
+void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpRng, Pel* pTrueDst, int iDstStride, int iWidth, int iHeight, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight, uint32_t dirMode
+#if JVET_AC0119_LM_CHROMA_FUSION
+  , const ChannelType channelType
+#endif
+)
 {
   int width = iWidth;
   int height = iHeight;
@@ -4309,6 +4652,8 @@ void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpR
 #if JVET_AC0094_REF_SAMPLES_OPT
   Pel refAbove[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
   Pel refLeft[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
+  ::memset(refAbove, 0, sizeof(refAbove));
+  ::memset(refLeft, 0, sizeof(refLeft));
 #else
   static Pel  refAbove[2 * MAX_CU_SIZE + 5 + 33 * MAX_REF_LINE_IDX];
   static Pel  refLeft[2 * MAX_CU_SIZE + 5 + 33 * MAX_REF_LINE_IDX];
@@ -4434,27 +4779,60 @@ void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpR
   else
   {
     Pel *pDsty=pDst;
-    if ( !isIntegerSlopeExt( abs(intraPredAngle) ) )
+#if JVET_AC0119_LM_CHROMA_FUSION
+    bool bExtIntraDir = isLuma(channelType);
+    bool bIntSlope = isLuma(channelType) ? isIntegerSlopeExt(abs(intraPredAngle)) : isIntegerSlope(abs(intraPredAngle));
+    if (!bIntSlope)
+#else
+    if (!isIntegerSlopeExt(abs(intraPredAngle)))
+#endif
     {
       int deltaPos = intraPredAngle;
       if (eTempType == LEFT_ABOVE_NEIGHBOR)
       {
         Pel *pDsty=pDst;
         // Above template
+#if JVET_AC0119_LM_CHROMA_FUSION
+        if (isLuma(channelType))
+        {
+#endif
         xIntraPredTimdAngLuma(pDsty, dstStride, refMain, width, iTemplateHeight, deltaPos, intraPredAngle, clpRng, iTemplateWidth, 0);
         // Left template
         for (int y = 0; y < iTemplateHeight; y++)
+        {
           deltaPos += intraPredAngle;
+        }
         xIntraPredTimdAngLuma(pDsty, dstStride, refMain, iTemplateWidth, height, deltaPos, intraPredAngle, clpRng, 0, iTemplateHeight);
+#if JVET_AC0119_LM_CHROMA_FUSION
+        }
+        else
+        {
+          xIntraPredTimdAngChroma(pDsty, dstStride, refMain, width, iTemplateHeight, deltaPos, intraPredAngle, clpRng, iTemplateWidth, 0);
+          // Left template
+          for (int y = 0; y < iTemplateHeight; y++)
+          {
+            deltaPos += intraPredAngle;
+          }
+          xIntraPredTimdAngChroma(pDsty, dstStride, refMain, iTemplateWidth, height, deltaPos, intraPredAngle, clpRng, 0, iTemplateHeight);
+        }
+#endif
 #if GRAD_PDPC
         if (m_ipaParam.applyPDPC && m_ipaParam.useGradPDPC)
         {
           int deltaPos2 = intraPredAngle;
           const int scale = m_ipaParam.angularScale;
-          xIntraPredTimdAngGradPdpc(pDst, dstStride, refMain, refSide, width, iTemplateHeight, iTemplateWidth, 0, scale, deltaPos2, intraPredAngle, clpRng);
+          xIntraPredTimdAngGradPdpc(pDst, dstStride, refMain, refSide, width, iTemplateHeight, iTemplateWidth, 0, scale, deltaPos2, intraPredAngle, clpRng
+#if JVET_AC0119_LM_CHROMA_FUSION
+            , bExtIntraDir
+#endif
+          );
           for (int y = 0; y < iTemplateHeight; y++)
             deltaPos2 += intraPredAngle;
-          xIntraPredTimdAngGradPdpc(pDst+iTemplateHeight*dstStride, dstStride, refMain, refSide, iTemplateWidth, height, 0, iTemplateHeight, scale, deltaPos2, intraPredAngle, clpRng);
+          xIntraPredTimdAngGradPdpc(pDst+iTemplateHeight*dstStride, dstStride, refMain, refSide, iTemplateWidth, height, 0, iTemplateHeight, scale, deltaPos2, intraPredAngle, clpRng
+#if JVET_AC0119_LM_CHROMA_FUSION
+            , bExtIntraDir
+#endif
+          );
         }
         else
 #endif
@@ -4478,13 +4856,28 @@ void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpR
           iRegionWidth  = width;
           iRegionHeight = iTemplateHeight;
         }
+#if JVET_AC0119_LM_CHROMA_FUSION
+        if (isLuma(channelType))
+        {
+#endif
         xIntraPredTimdAngLuma(pDsty, dstStride, refMain, iRegionWidth, iRegionHeight, deltaPos, intraPredAngle, clpRng, 0, 0);
+#if JVET_AC0119_LM_CHROMA_FUSION
+        }
+        else
+        {
+          xIntraPredTimdAngChroma(pDsty, dstStride, refMain, iRegionWidth, iRegionHeight, deltaPos, intraPredAngle, clpRng, 0, 0);
+        }
+#endif
 #if GRAD_PDPC
         if (m_ipaParam.applyPDPC && m_ipaParam.useGradPDPC)
         {
           int deltaPos2 = intraPredAngle;
           const int scale = m_ipaParam.angularScale;
-          xIntraPredTimdAngGradPdpc(pDst, dstStride, refMain, refSide, iRegionWidth, iRegionHeight, 0, 0, scale, deltaPos2, intraPredAngle, clpRng);
+          xIntraPredTimdAngGradPdpc(pDst, dstStride, refMain, refSide, iRegionWidth, iRegionHeight, 0, 0, scale, deltaPos2, intraPredAngle, clpRng
+#if JVET_AC0119_LM_CHROMA_FUSION
+            , bExtIntraDir
+#endif
+          );
         }
         else
 #endif
@@ -4502,7 +4895,11 @@ void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpR
         Pel *pDsty=pDst;
         for (int y = 0, deltaPos = intraPredAngle; y<height; y++, deltaPos += intraPredAngle, pDsty += dstStride)
         {
-          const int deltaInt   = deltaPos >> 6;
+#if JVET_AC0119_LM_CHROMA_FUSION
+          const int deltaInt = isLuma(channelType) ? deltaPos >> 6 : deltaPos >> 5;
+#else
+          const int deltaInt = deltaPos >> 6;
+#endif
           int iStartIdx, iEndIdx;
           if(y < iTemplateHeight)
           {
@@ -4521,10 +4918,18 @@ void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpR
         {
           int deltaPos2 = intraPredAngle;
           const int scale = m_ipaParam.angularScale;
-          xIntraPredTimdAngGradPdpc(pDst, dstStride, refMain, refSide, width, iTemplateHeight, iTemplateWidth, 0, scale, deltaPos2, intraPredAngle, clpRng);
+          xIntraPredTimdAngGradPdpc(pDst, dstStride, refMain, refSide, width, iTemplateHeight, iTemplateWidth, 0, scale, deltaPos2, intraPredAngle, clpRng
+#if JVET_AC0119_LM_CHROMA_FUSION
+            , bExtIntraDir
+#endif
+          );
           for (int y = 0; y < iTemplateHeight; y++)
             deltaPos2 += intraPredAngle;
-          xIntraPredTimdAngGradPdpc(pDst+iTemplateHeight*dstStride, dstStride, refMain, refSide, iTemplateWidth, height, 0, iTemplateHeight, scale, deltaPos2, intraPredAngle, clpRng);
+          xIntraPredTimdAngGradPdpc(pDst+iTemplateHeight*dstStride, dstStride, refMain, refSide, iTemplateWidth, height, 0, iTemplateHeight, scale, deltaPos2, intraPredAngle, clpRng
+#if JVET_AC0119_LM_CHROMA_FUSION
+            , bExtIntraDir
+#endif
+          );
         }
         else
 #endif
@@ -4552,7 +4957,11 @@ void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpR
         }
         for (int y = 0, deltaPos = intraPredAngle; y<iRegionHeight; y++, deltaPos += intraPredAngle, pDsty += dstStride)
         {
-          const int deltaInt   = deltaPos >> 6;
+#if JVET_AC0119_LM_CHROMA_FUSION
+          const int deltaInt = isLuma(channelType) ? deltaPos >> 6 : deltaPos >> 5;
+#else
+          const int deltaInt = deltaPos >> 6;
+#endif
           memcpy(pDsty, &refMain[deltaInt + 1], iRegionWidth * sizeof(Pel));
         }
 #if GRAD_PDPC
@@ -4560,7 +4969,11 @@ void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpR
         {
           int deltaPos2 = intraPredAngle;
           const int scale = m_ipaParam.angularScale;
-          xIntraPredTimdAngGradPdpc(pDst, dstStride, refMain, refSide, iRegionWidth, iRegionHeight, 0, 0, scale, deltaPos2, intraPredAngle, clpRng);
+          xIntraPredTimdAngGradPdpc(pDst, dstStride, refMain, refSide, iRegionWidth, iRegionHeight, 0, 0, scale, deltaPos2, intraPredAngle, clpRng
+#if JVET_AC0119_LM_CHROMA_FUSION
+            , bExtIntraDir
+#endif
+          );
         }
         else
 #endif
@@ -4938,12 +5351,12 @@ void IntraPrediction::deriveSgpmModeOrdered(const CPelBuf &recoBuf, const CompAr
 
   for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
   {
-    if (!g_sgpm_splitDir[splitDir])
+    if (!g_sgpmSplitDir[splitDir])
     {
       continue;
     }
 
-    int16_t angle = g_GeoParams[splitDir][0];
+    int16_t angle = g_geoParams[splitDir][0];
     for (int partIdx = 0; partIdx < 2; partIdx++)
     {
       PU::getSgpmIntraMPMs(pu, ipmList[splitDir][partIdx], splitDir, g_geoTmShape[partIdx][angle]);
@@ -4987,7 +5400,7 @@ void IntraPrediction::deriveSgpmModeOrdered(const CPelBuf &recoBuf, const CompAr
   uint32_t cntComb = 0;
   for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
   {
-    if (!g_sgpm_splitDir[splitDir])
+    if (!g_sgpmSplitDir[splitDir])
     {
       continue;
     }
@@ -5083,6 +5496,7 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
                              eTempType != LEFT_NEIGHBOR ? iTempHeight : 0, uiRefWidth, uiRefHeight);
 
     uint32_t uiIntraDirNeighbor[5] = { 0 }, modeIdx = 0;
+
     bool     includedMode[EXT_VDIA_IDX + 1];
     memset(includedMode, false, (EXT_VDIA_IDX + 1) * sizeof(bool));
     auto &   pu      = *cu.firstPU;
@@ -5129,6 +5543,7 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
         modeIdx++;
       }
     }
+
     // above
     const PredictionUnit *puAbovex = pu.cs->getPURestricted(posRTx.offset(0, -1), pu, pu.chType);
     if (puAbovex && CU::isIntra(*puAbovex->cu) && CU::isSameCtu(*pu.cu, *puAbovex->cu))
@@ -5144,6 +5559,7 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
         modeIdx++;
       }
     }
+
     // below left
     const PredictionUnit *puLeftBottomx = cs.getPURestricted(posLBx.offset(-1, 1), pu, pu.chType);
     if (puLeftBottomx && CU::isIntra(*puLeftBottomx->cu))
@@ -5159,6 +5575,7 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
         modeIdx++;
       }
     }
+
 #if JVET_AC0094_REF_SAMPLES_OPT
     if (!puLeftx)
     {
@@ -5170,6 +5587,7 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
       decreaseMinFar = false;
     }
 #endif
+
     // above right
     const PredictionUnit *puAboveRightx = cs.getPURestricted(posRTx.offset(1, -1), pu, pu.chType);
     if (puAboveRightx && CU::isIntra(*puAboveRightx->cu))
@@ -5211,6 +5629,7 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
         modeIdx++;
       }
     }
+
     bool bNoAngular = false;
     if (modeIdx >= 2)
     {
@@ -6246,6 +6665,37 @@ void IntraPrediction::ibcCiipBlending(Pel *pDst, int strideDst, const Pel *pSrc0
 #endif
 
 #if ENABLE_DIMD
+
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+int IntraPrediction::deriveDimdIntraTmpModePred(const CodingUnit cu, CPelBuf predBuf)
+{
+  int sigcnt = 0;
+  const Pel* pPred = predBuf.buf;
+  const int iStride = predBuf.stride;
+  int height = predBuf.height;
+  int width = predBuf.width;
+
+  int piHistogramClean[NUM_LUMA_MODE] = { 0 };
+
+  pPred = pPred + iStride + 1;
+  sigcnt += buildHistogram(pPred, iStride, height - 2, width - 2, piHistogramClean, 0, width - 2, height - 2);
+
+  int firstAmp = 0, curAmp = 0;
+  int firstMode = 0, curMode = 0;
+  for (int i = 0; i < NUM_LUMA_MODE; i++)
+  {
+    curAmp = piHistogramClean[i];
+    curMode = i;
+    if (curAmp > firstAmp)
+    {
+      firstAmp = curAmp;
+      firstMode = curMode;
+    }
+  }
+  return firstMode;
+}
+#endif
+
 void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu)
 {
   if( !cu.slice->getSPS()->getUseDimd() )
@@ -6262,8 +6712,13 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
   const uint32_t uiWidth = area.width;
   const uint32_t uiHeight = area.height;
   const int iStride = recoBuf.stride;
+#if JVET_AC0098_LOC_DEP_DIMD
+  const int predSize = uiWidth + 1;
+  const int predHSize = uiHeight + 1;
+#else
   const int predSize = (uiWidth << 1);
   const int predHSize = (uiHeight << 1);
+#endif
 
   const bool noShift = pcv.noChroma2x2 && uiWidth == 4; // don't shift on the lowest level (chroma not-split)
   const int  unitWidth = pcv.minCUWidth >> (noShift ? 0 : getComponentScaleX(area.compID, sps.getChromaFormatIdc()));
@@ -6287,41 +6742,65 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
 
   int numIntraAbove = isAboveAvailable(cu, chType, posLT, numAboveUnits, unitWidth, (neighborFlags + totalLeftUnits + 1));
   int numIntraLeft = isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1));
-#if JVET_AC0094_REF_SAMPLES_OPT
+#if JVET_AC0094_REF_SAMPLES_OPT || JVET_AC0098_LOC_DEP_DIMD
   const int numIntraAboveRight = isAboveRightAvailable(cu, chType, area.topRight(), numAboveRightUnits, unitWidth, neighborFlags + totalLeftUnits + 1 + numAboveUnits);
   const int numIntraBottomLeft = isBelowLeftAvailable(cu, chType, area.bottomLeft(), numLeftBelowUnits, unitHeight, neighborFlags + totalLeftUnits - 1 - numLeftUnits);
 #endif
 
   // ----- Step 2: build histogram of gradients -----
+#if JVET_AC0098_LOC_DEP_DIMD
+  int histogramTop[NUM_LUMA_MODE] = { 0 };
+  int histogramLeft[NUM_LUMA_MODE] = { 0 };
+
+  int histogramTopLeft[NUM_LUMA_MODE] = { 0 };
+#endif
   int histogram[NUM_LUMA_MODE] = { 0 };
 
   if (numIntraLeft)
   {
-#if JVET_AC0094_REF_SAMPLES_OPT
+#if JVET_AC0094_REF_SAMPLES_OPT || JVET_AC0098_LOC_DEP_DIMD
     const uint32_t uiHeightLeft = (numIntraLeft + numIntraBottomLeft) * unitHeight - 1 - (!numIntraAbove ? 1 : 0);
 #else
     uint32_t uiHeightLeft = numIntraLeft * unitHeight - 1 - (!numIntraAbove ? 1 : 0);
 #endif
     const Pel *pRecoLeft = pReco - 2 + iStride * (!numIntraAbove ? 1 : 0);
+#if JVET_AC0098_LOC_DEP_DIMD
+    buildHistogram(pRecoLeft, iStride, uiHeightLeft, 1, histogramLeft, 1, uiWidth, uiHeight);
+#else
     buildHistogram(pRecoLeft, iStride, uiHeightLeft, 1, histogram, 1, uiWidth, uiHeight);
+#endif
   }
 
   if (numIntraAbove)
   {
-#if JVET_AC0094_REF_SAMPLES_OPT
+#if JVET_AC0094_REF_SAMPLES_OPT || JVET_AC0098_LOC_DEP_DIMD
     const uint32_t uiWidthAbove = (numIntraAbove + numIntraAboveRight)*unitWidth - 1 - (!numIntraLeft ? 1 : 0);
 #else
     uint32_t uiWidthAbove = numIntraAbove * unitWidth - 1 - (!numIntraLeft ? 1 : 0);
 #endif
     const Pel *pRecoAbove = pReco - iStride * 2 + (!numIntraLeft ? 1 : 0);
+#if JVET_AC0098_LOC_DEP_DIMD
+    buildHistogram(pRecoAbove, iStride, 1, uiWidthAbove, histogramTop, 2, uiWidth, uiHeight);
+#else
     buildHistogram(pRecoAbove, iStride, 1, uiWidthAbove, histogram, 2, uiWidth, uiHeight);
+#endif
   }
 
   if (numIntraLeft && numIntraAbove)
   {
     const Pel *pRecoAboveLeft = pReco - 2 - iStride * 2;
+#if JVET_AC0098_LOC_DEP_DIMD
+    buildHistogram(pRecoAboveLeft, iStride, 2, 2, histogramTopLeft, 3, uiWidth, uiHeight);
+#else
     buildHistogram(pRecoAboveLeft, iStride, 2, 2, histogram, 3, uiWidth, uiHeight);
+#endif
   }
+#if JVET_AC0098_LOC_DEP_DIMD
+  for (int i = 0; i < NUM_LUMA_MODE; i++)
+  {
+    histogram[i] = histogramTop[i] + histogramLeft[i] + histogramTopLeft[i];
+  }
+#endif
 
 #if JVET_AB0157_INTRA_FUSION
   int amp[DIMD_FUSION_NUM-1] = { 0 };
@@ -6348,12 +6827,51 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
     }
   }
 
+#if JVET_AC0098_LOC_DEP_DIMD
+  for (int i = 0; i < DIMD_FUSION_NUM - 1; i++)
+  {
+    cu.dimdLocDep[i] = 0;
+  }
+  for(int i = 0; i < DIMD_FUSION_NUM - 1; i++)
+  {
+    int secondMode = mode[i];
+    if (secondMode > DC_IDX)
+    {
+      cu.dimdLocDep[i] = 0;
+
+      int ampSecond = histogram[secondMode];
+      int ampSecondLeft = histogramLeft[secondMode];
+      int ampSecondAbove = histogramTop[secondMode];
+        
+      if (ampSecondLeft < (ampSecond / 3))
+      {
+        cu.dimdLocDep[i] = 1;
+      }
+      else if (ampSecondAbove < (ampSecond / 3))
+      {
+        cu.dimdLocDep[i] = 2;
+      }
+    }
+  }
+#endif
+
+
   cu.dimdMode = mode[0];
 
   cu.dimdBlending = true;
   cu.dimdBlending &= amp[1] > 0;
   cu.dimdBlending &= mode[1] > DC_IDX;
   cu.dimdBlending &= mode[0] > DC_IDX;
+
+#if JVET_AC0098_LOC_DEP_DIMD
+  if (cu.dimdLocDep[0] != 0 && amp[1] == 0)
+  {
+    cu.dimdBlending = true;
+    cu.dimdBlending &= mode[0] > DC_IDX;
+    mode[1] = 0;
+    CHECK( mode[2] != 0, "Wrong logic" );
+  } 
+#endif
 
   int countBlendMode = 2;
 
@@ -6381,6 +6899,20 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
   {
 #if JVET_X0149_TIMD_DIMD_LUT
     int g_gradDivTable[16] = { 0, 7, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0 };
+#if JVET_AC0098_LOC_DEP_DIMD
+    if (mode[1] == 0)
+    {    
+      CHECK( cu.dimdLocDep[0] == 0, "Wrong logic" );
+      cu.dimdRelWeight[0] = sumWeight - 21;
+      cu.dimdRelWeight[1] = 21;
+      cu.dimdRelWeight[2] = 0;
+      cu.dimdRelWeight[3] = 0;
+      cu.dimdRelWeight[4] = 0;
+      cu.dimdRelWeight[5] = 0;
+    }
+    else
+    {
+#endif
     sumWeight = sumWeight - dimdPlanarWeight;
     int s1 = 0;
     for (int i = 0; i < DIMD_FUSION_NUM - 1; i++)
@@ -6415,19 +6947,80 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
     int iRatio = static_cast<int>(dRatio * sumWeight);
 #endif
     cu.dimdRelWeight[0] = iRatio[0];
+#if JVET_AC0098_LOC_DEP_DIMD
+    int sumWeightReal = iRatio[0];
+    int countBlendModeNew = countBlendMode;
+    int lastFilled = 0;
+#endif
     for (int i = 1; i < countBlendMode - 2; i++)
     {
       cu.dimdRelWeight[i+1] = iRatio[i];
+#if JVET_AC0098_LOC_DEP_DIMD
+      sumWeightReal += iRatio[i];
+      if(sumWeightReal > sumWeight)
+      {
+        lastFilled = i;
+        break;
+      }
+#endif
     }
+#if JVET_AC0098_LOC_DEP_DIMD
+    if(sumWeightReal > sumWeight)
+    {
+      for (int i = lastFilled + 1; i <= countBlendMode - 2; i++)
+      {
+        iRatio[i] = 0;
+        cu.dimdRelWeight[i + 1] = 0;
+        cu.dimdBlendMode[i - 1] = 0;
+        countBlendModeNew--;  
+      }
+    }
+    countBlendMode = countBlendModeNew;
+    if (sumWeightReal > sumWeight)
+    {
+      int diff = sumWeightReal - sumWeight;
+      for (int j = 0; j < sumWeight; j++)
+      {
+        for (int i = lastFilled; i >= 1; i--)
+        {
+          iRatio[i] -=1;
+          cu.dimdRelWeight[Clip3(0, DIMD_FUSION_NUM - 1, i+1)] = iRatio[i];
+          if (cu.dimdRelWeight[i+1] == 0)
+          {
+            cu.dimdBlendMode[i-1] = 0;
+            countBlendMode--;
+          }
+          diff--;
+          if(diff == 0)
+          {
+            break;
+          }
+        }
+        if(diff == 0)
+        {
+          break;
+        }
+      }
+    }
+#endif
     cu.dimdRelWeight[countBlendMode-1] = sumWeight;
     for (int i = 0; i < countBlendMode - 2; i++)
     {
       cu.dimdRelWeight[countBlendMode-1] = cu.dimdRelWeight[countBlendMode-1] - iRatio[i];
+#if JVET_AC0098_LOC_DEP_DIMD
+      if (cu.dimdRelWeight[countBlendMode-1] == 0)
+      {
+        cu.dimdBlendMode[countBlendMode-3] = 0;
+      }
+#endif
     }
 #if JVET_X0149_TIMD_DIMD_LUT
     cu.dimdRelWeight[1] = dimdPlanarWeight;
 #else
     cu.dimdRelWeight[1] = (1 << blendSumWeight) - sumWeight;
+#endif
+#if JVET_AC0098_LOC_DEP_DIMD
+    }
 #endif
   }
   else
@@ -6463,6 +7056,55 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
     }
   }
 
+#if JVET_AC0098_LOC_DEP_DIMD
+  cu.dimdLocDep[0] = 0;
+  cu.dimdLocDep[1] = 0;
+
+  if (firstMode > DC_IDX)
+  {
+    cu.dimdLocDep[0] = 0;
+
+    int ampFirst = histogram[firstMode];
+    int ampFirstLeft = histogramLeft[firstMode];
+    int ampFirstAbove = histogramTop[firstMode];
+
+    if (ampFirstLeft == 0)
+    {
+      cu.dimdLocDep[0] = 1;
+    }  
+    else if (ampFirstAbove == 0)
+    {
+      cu.dimdLocDep[0] = 2;
+    }
+    else if (ampFirstLeft < (ampFirst / 3))
+    {
+      cu.dimdLocDep[0] = 3;
+    }
+    else if (ampFirstAbove < (ampFirst / 3))
+    {
+      cu.dimdLocDep[0] = 4;
+    }
+  }
+
+  if (secondMode > DC_IDX)
+  {
+    cu.dimdLocDep[1] = 0;
+
+    int ampSecond = histogram[secondMode];
+    int ampSecondLeft = histogramLeft[secondMode];
+    int ampSecondAbove = histogramTop[secondMode];
+
+    if  (ampSecondLeft < (ampSecond / 3))
+    {
+      cu.dimdLocDep[1] = 1;
+    }
+    else if (ampSecondAbove < (ampSecond / 3))
+    {
+      cu.dimdLocDep[1] = 2;
+    }
+  }
+#endif
+
   // ----- Step 3: derive best mode from histogram of gradients -----
   cu.dimdMode = firstMode;
 
@@ -6470,6 +7112,15 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
   cu.dimdBlending &= secondAmp > 0;
   cu.dimdBlending &= secondMode > DC_IDX;
   cu.dimdBlending &= firstMode > DC_IDX;
+
+#if JVET_AC0098_LOC_DEP_DIMD
+  if (cu.dimdLocDep[0] != 0 && secondMode == 0)
+  {
+    cu.dimdBlending = true;
+    cu.dimdBlending &= firstMode > DC_IDX;
+    secondAmp = 0;
+  } 
+#endif
 
   if( cu.dimdBlending )
   {
@@ -6486,6 +7137,16 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
 #endif
   if (cu.dimdBlending)
   {
+#if JVET_AC0098_LOC_DEP_DIMD
+    if (secondMode == 0)
+    {
+      cu.dimdRelWeight[0] = sumWeight - planarWeight;
+      cu.dimdRelWeight[2] = 0;
+      cu.dimdRelWeight[1] = planarWeight;
+    }
+    else
+    {
+#endif
 #if JVET_X0149_TIMD_DIMD_LUT
     sumWeight = sumWeight - planarWeight;
     int s0 = firstAmp;
@@ -6519,6 +7180,9 @@ void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &are
     cu.dimdRelWeight[1] = planarWeight;
 #else
     cu.dimdRelWeight[1] = (1 << blendSumWeight) - sumWeight;
+#endif
+#if JVET_AC0098_LOC_DEP_DIMD
+    }
 #endif
   }
   else
@@ -6820,6 +7484,399 @@ int IntraPrediction::buildHistogram(const Pel *pReco, int iStride, uint32_t uiHe
   }
   return 0;
 }
+
+#if JVET_AC0098_LOC_DEP_DIMD
+#if JVET_AB0157_INTRA_FUSION
+void xDimdLocationdepBlending(Pel *pDst, int strideDst, Pel *pVer, int strideVer, Pel *pHor, int strideHor,Pel *pNonLocDep, int strideNonLocDep, int width, int height, int mode, int wVer, int wHor, int wNonLocDep)
+{
+  int maxWeight = (1 << 6);
+  int weightShift = 6;
+  int weightOffset = 1 << (weightShift - 1);
+  int fixedRange = 10;
+  int sizeThreshold = 64;
+  int heightMinusOne = (height - 1);
+  int widthMinusOne = (width - 1);
+  if (mode == 0) // diagonal blending
+  {
+    int clipRangeVer = 64;
+    int clipRangeHor = 64;
+    {
+      int totRange = wNonLocDep;
+      int totDirWeight = wVer + wHor;
+      clipRangeVer = wVer +  (int)(((double)wVer / (double)totDirWeight)* (double)totRange);
+      clipRangeHor = wHor +  (int)(((double)wHor / (double)totDirWeight)* (double)totRange);
+    }
+    int rangeVer = fixedRange;
+    int rangeHor = fixedRange;  
+
+    if(height > sizeThreshold) 
+    {
+      rangeVer *= 2;
+    }
+    if(width > sizeThreshold)
+    {
+      rangeHor *= 2;
+    }
+
+    bool needClipVer = (((wVer + rangeVer) > clipRangeVer) || ((wVer - rangeVer) < 0));
+    bool needClipHor = (((wHor + rangeHor) > clipRangeHor) || ((wHor - rangeHor) < 0));
+    if(needClipVer && needClipHor)
+    {
+      for (int y = 0; y < height; y++)
+      {
+        int weightVer = Clip3(0, clipRangeVer, (((wVer + rangeVer) * heightMinusOne - ((rangeVer*y) << 1)) / heightMinusOne));
+        for (int x = 0; x < width; x++)
+        {
+          int weightHor =  Clip3(0, clipRangeHor, (((wHor + rangeHor) * widthMinusOne - ((rangeHor*x) << 1)) / widthMinusOne));
+          int weightNonLocDep =  maxWeight - weightVer - weightHor;
+          int blend = (int)pVer[x]  * weightVer + (int)pHor[x]  * weightHor + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pVer += strideVer;
+        pHor += strideHor;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+    else if (needClipVer)
+    {
+      for (int y = 0; y < height; y++)
+      {
+        int weightVer = Clip3(0, clipRangeVer, (((wVer + rangeVer) * heightMinusOne - ((rangeVer*y) << 1)) / heightMinusOne));
+        for (int x = 0; x < width; x++)
+        {
+          int weightHor =  (((wHor + rangeHor) * widthMinusOne - ((rangeHor*x) << 1)) / widthMinusOne);
+          int weightNonLocDep =  maxWeight - weightVer - weightHor;
+          int blend = (int)pVer[x]  * weightVer + (int)pHor[x]  * weightHor + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pVer += strideVer;
+        pHor += strideHor;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+    else if(needClipHor)
+    {
+      for (int y = 0; y < height; y++)
+      {
+        int weightVer =  (((wVer + rangeVer) * heightMinusOne - ((rangeVer*y) << 1)) / heightMinusOne);
+        for (int x = 0; x < width; x++)
+        {
+          int weightHor =  Clip3(0, clipRangeHor, (((wHor + rangeHor) * widthMinusOne - ((rangeHor*x) << 1)) / widthMinusOne));
+          int weightNonLocDep =  maxWeight - weightVer - weightHor;
+          int blend = (int)pVer[x]  * weightVer + (int)pHor[x]  * weightHor + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pVer += strideVer;
+        pHor += strideHor;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+    else
+    {
+      for (int y = 0; y < height; y++)
+      {
+        int weightVer =  (((wVer + rangeVer) * heightMinusOne - ((rangeVer*y) << 1)) / heightMinusOne);
+        for (int x = 0; x < width; x++)
+        {
+          int weightHor =  (((wHor + rangeHor) * widthMinusOne - ((rangeHor*x) << 1)) / widthMinusOne);
+          int weightNonLocDep =  maxWeight - weightVer - weightHor;
+          int blend = (int)pVer[x]  * weightVer + (int)pHor[x]  * weightHor + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pVer += strideVer;
+        pHor += strideHor;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+  }
+  else if(mode == 1) //ver blending
+  {
+    int clipRangeVer = 64; 
+    int rangeVer = fixedRange;
+
+    if(height > sizeThreshold)
+    {
+      rangeVer *= 2;
+    }
+    bool needClipVer = (((wVer + rangeVer) > clipRangeVer) || ((wVer - rangeVer) < 0));
+
+    if (needClipVer)
+    {
+      for (int y = 0; y < height; y++)
+      {
+        int weightVer = Clip3(0, clipRangeVer, (((wVer + rangeVer) * heightMinusOne - ((rangeVer*y) << 1)) / heightMinusOne));
+        for (int x = 0; x < width; x++)
+        {
+          int weightNonLocDep =  maxWeight - weightVer;
+          int blend = (int)pVer[x]  * weightVer + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pVer += strideVer;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+    else
+    {
+      for (int y = 0; y < height; y++)
+      {
+        int weightVer = (((wVer + rangeVer) * heightMinusOne - ((rangeVer*y) << 1)) / heightMinusOne);
+        for (int x = 0; x < width; x++)
+        {
+          int weightNonLocDep =  maxWeight - weightVer;
+          int blend = (int)pVer[x]  * weightVer + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pVer += strideVer;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+  }
+  else// if(mode == 2) //ver blending
+  {
+    int clipRangeHor = 64; 
+    int rangeHor = fixedRange;
+
+    if(width > sizeThreshold)
+    {
+      rangeHor *= 2;
+    }
+    bool needClipHor = (((wHor + rangeHor) > clipRangeHor) || ((wHor - rangeHor) < 0));
+
+    if (needClipHor)
+    {
+      for (int y = 0; y < height; y++)
+      {
+        for (int x = 0; x < width; x++)
+        {
+          int weightHor =  Clip3(0, clipRangeHor, (((wHor + rangeHor) * widthMinusOne - ((rangeHor*x) << 1)) / widthMinusOne));
+          int weightNonLocDep =  maxWeight - weightHor;
+          int blend = (int)pHor[x]  * weightHor + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pHor += strideHor;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+    else
+    {
+      for (int y = 0; y < height; y++)
+      {
+        for (int x = 0; x < width; x++)
+        {
+          int weightHor =  (((wHor + rangeHor) * widthMinusOne - ((rangeHor*x) << 1)) / widthMinusOne);
+          int weightNonLocDep =  maxWeight - weightHor;
+          int blend = (int)pHor[x]  * weightHor + (int)pNonLocDep[x]  * weightNonLocDep + weightOffset;
+          pDst[x] = (Pel)(blend >> weightShift);
+        }
+        pDst += strideDst;
+        pHor += strideHor;
+        pNonLocDep += strideNonLocDep;
+      }
+    }
+  }
+}
+#else
+void xDimdLocationdepBlending(Pel *pDst, int strideDst, Pel *pMainAng, int strideMainAng, Pel *pSecondAng, int strideSecondAng,Pel *pPlanar, int stridePlanar, int width, int height, int sideMain, int sideSecond, int wMain, int wSecond, int wPlanar)
+{
+  int smallerWeightsTh = 2;
+
+  int maxWeight = (1 << 6);
+  int weightShift = 6;
+  int weightOffset = 32;
+
+  if(sideMain != 0 && sideSecond != 0)
+  {
+    wPlanar += 8;
+    wMain -= 4;
+    wSecond = 64 - wMain - wPlanar;
+  }
+
+  int weightMain = wMain;
+  int weightSecond = wSecond; 
+  int weightPlanar = wPlanar; 
+
+  int mainRange = 0, secondRange = 0;
+  
+
+  if(sideMain != 0)
+  {
+    int tempRange = (sideSecond == 0 ? 20 : 15);
+    mainRange = (weightMain < tempRange) ? weightMain : tempRange;
+    if(sideMain > smallerWeightsTh)
+    {
+      int tempRange = (sideSecond == 0 ? 10 : 5);
+      mainRange = (weightMain < tempRange) ? weightMain : tempRange;
+      sideMain -= smallerWeightsTh;
+    }
+    mainRange = Clip3(0, (64 - wMain), mainRange);
+  }
+  if(sideSecond != 0)
+  {
+    int tempRange = (sideMain == 0 ? 10 : 5);
+    secondRange = (weightSecond < tempRange) ? weightSecond : tempRange;
+    if(sideSecond > smallerWeightsTh)
+    {
+      sideSecond -= smallerWeightsTh;
+    }
+    secondRange = Clip3(0, (64 - wSecond), secondRange);
+  }
+  int blend;
+    
+  if(sideMain == 1 && sideSecond == 0)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      weightMain = ((wMain + mainRange) * (height - 1) - ((mainRange*y) << 1)) / (height - 1);
+      weightPlanar = wPlanar + (( wMain - weightMain ) >> 1);
+      weightSecond = maxWeight - weightMain - weightPlanar;
+      for (int x = 0; x < width; x++)
+      {
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+  else if(sideMain == 2 && sideSecond == 0)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        weightMain = ((wMain + mainRange) * (width - 1) - ((mainRange*x) << 1)) / (width - 1);
+        weightPlanar = wPlanar + (( wMain - weightMain ) >> 1);
+        weightSecond = maxWeight - weightMain - weightPlanar;
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+  else if(sideMain == 0 && sideSecond == 1)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      weightSecond = ((wSecond + secondRange) * (height - 1) - ((secondRange*y) << 1)) / (height - 1);
+      weightPlanar = wPlanar + (( wSecond - weightSecond ) >> 1);
+      weightMain = maxWeight - weightSecond - weightPlanar;
+      for (int x = 0; x < width; x++)
+      {
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+  else if(sideMain == 0 && sideSecond == 2)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        weightSecond = ((wSecond + secondRange) * (width - 1) - ((secondRange*x) << 1)) / (width - 1);
+        weightPlanar = wPlanar + (( wSecond - weightSecond ) >> 1);
+        weightMain = maxWeight - weightSecond - weightPlanar;
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+  else if(sideMain == 1 && sideSecond == 1)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      weightMain = ((wMain + mainRange) * (height - 1) - ((mainRange*y) << 1)) / (height - 1);
+      weightSecond = ((wSecond + secondRange) * (height - 1) - ((secondRange*y) << 1)) / (height - 1);
+      weightPlanar =  maxWeight - weightSecond - weightMain;
+      for (int x = 0; x < width; x++)
+      {
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+  else if(sideMain == 1 && sideSecond == 2)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      weightMain = ((wMain + mainRange) * (height - 1) - ((mainRange*y) << 1)) / (height - 1);
+      for (int x = 0; x < width; x++)
+      {
+        weightSecond = ((wSecond + secondRange) * (width - 1) - ((secondRange*x) << 1)) / (width - 1);
+        weightPlanar =  maxWeight - weightSecond - weightMain;
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+  else if(sideMain == 2 && sideSecond == 1)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      weightSecond = ((wSecond + secondRange) * (height - 1) - ((secondRange*y) << 1)) / (height - 1);
+      for (int x = 0; x < width; x++)
+      {
+        weightMain = ((wMain + mainRange) * (width - 1) - ((mainRange*x) << 1)) / (width - 1);
+        weightPlanar =  maxWeight - weightSecond - weightMain;
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+  else if(sideMain == 2 && sideSecond == 2)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        weightMain = ((wMain + mainRange) * (width - 1) - ((mainRange*x) << 1)) / (width - 1);
+        weightSecond = ((wSecond + secondRange) * (width - 1) - ((secondRange*x) << 1)) / (width - 1);
+        weightPlanar =  maxWeight - weightSecond - weightMain;
+        blend = (int)pMainAng[x]  * weightMain + (int)pSecondAng[x]  * weightSecond + (int)pPlanar[x]  * weightPlanar + weightOffset;
+        pDst[x] = (Pel)(blend >> weightShift);
+      }
+      pDst += strideDst;
+      pMainAng += strideMainAng;
+      pSecondAng += strideSecondAng;
+      pPlanar += stridePlanar;
+    }
+  }
+}
+#endif
+#endif
+
 #if INTRA_TRANS_ENC_OPT
 void IntraPrediction::dimdBlending(Pel *pDst, int strideDst, Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int w2, int width, int height)
 {
@@ -7245,6 +8302,14 @@ void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chrom
   if (pu.glmIdc.getIdc(chromaArea.compID, 0) > NUM_GLM_PATTERN)
   {
     xGlmCreateGradRef(pu, chromaArea);
+    return;
+  }
+#endif
+
+#if JVET_AC0119_LM_CHROMA_FUSION
+  if (pu.isChromaFusion > 1)
+  {
+    xCflmCreateLumaRef(pu, chromaArea);
     return;
   }
 #endif
@@ -9406,6 +10471,10 @@ bool IntraPrediction::generateTMPrediction( Pel* piPred, unsigned int uiStride, 
     return false;
   }
 
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  Pel* pPred = piPred;
+#endif
+
 #if TMP_FAST_ENC
   int pX = cu->tmpXdisp;
   int pY = cu->tmpYdisp;
@@ -9444,6 +10513,11 @@ bool IntraPrediction::generateTMPrediction( Pel* piPred, unsigned int uiStride, 
       piPred += uiStride;
     }
   }
+
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  CPelBuf predBuf(pPred, uiStride, uiWidth, uiHeight);
+  cu->intraTmpDimdMode = deriveDimdIntraTmpModePred(*cu, predBuf);
+#endif
   return bSucceedFlag;
 }
 
@@ -9465,6 +10539,10 @@ bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, i
   {
     return false;
   }
+
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  Pel* pPred = piPred;
+#endif
 
 #if TMP_FAST_ENC
   int pX = pu.cu->tmpXdisp;
@@ -9511,13 +10589,25 @@ bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, i
   pu.mv->set(pX << MV_FRACTIONAL_BITS_INTERNAL, pY << MV_FRACTIONAL_BITS_INTERNAL);
   pu.bv.set(pX, pY);
 
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  CPelBuf predBuf(pPred, uiStride, uiWidth, uiHeight);
+  pu.cu->intraTmpDimdMode = deriveDimdIntraTmpModePred(*pu.cu, predBuf);
+#endif
+
   return bSucceedFlag;
 }
 #endif
 
 #if JVET_W0069_TMP_BOUNDARY
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
+bool IntraPrediction::generateTmDcPrediction(Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val, CodingUnit* cu)
+#else
 bool IntraPrediction::generateTmDcPrediction( Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val )
+#endif
 {
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  Pel* pPred = piPred;
+#endif
   bool bSucceedFlag = true;
   {
     for( unsigned int uiY = 0; uiY < uiBlkHeight; uiY++ )
@@ -9529,6 +10619,10 @@ bool IntraPrediction::generateTmDcPrediction( Pel* piPred, unsigned int uiStride
       piPred += uiStride;
     }
   }
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  CPelBuf predBuf(pPred, uiStride, uiBlkWidth, uiBlkHeight);
+  cu->intraTmpDimdMode = deriveDimdIntraTmpModePred(*cu, predBuf);
+#endif
   return bSucceedFlag;
 }
 #endif
@@ -9700,27 +10794,84 @@ int64_t xCccmDivide(int64_t num, int64_t denom) // Note: assumes positive denomi
 }
 #endif
 
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AC0119_LM_CHROMA_FUSION
 #if JVET_AB0174_CCCM_DIV_FREE
-void IntraPrediction::xCccmSetLumaRefValue( const PredictionUnit& pu )
+void IntraPrediction::xCccmSetLumaRefValue(const PredictionUnit& pu)
 {
   int lumaPosX = m_cccmBlkArea.x << getComponentScaleX(COMPONENT_Cb, pu.cu->chromaFormat);
   int lumaPosY = m_cccmBlkArea.y << getComponentScaleY(COMPONENT_Cb, pu.cu->chromaFormat);
-  
-  if ( lumaPosX || lumaPosY )
+
+  if (lumaPosX || lumaPosY)
   {
     lumaPosX = lumaPosX ? lumaPosX - 1 : 0;
     lumaPosY = lumaPosY ? lumaPosY - 1 : 0;
-    
-    m_cccmLumaOffset = pu.cs->picture->getRecoBuf(COMPONENT_Y).at( lumaPosX, lumaPosY );
+
+    m_cccmLumaOffset = pu.cs->picture->getRecoBuf(COMPONENT_Y).at(lumaPosX, lumaPosY);
   }
   else
   {
-    m_cccmLumaOffset = 1 << ( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - 1 );
+    m_cccmLumaOffset = 1 << (pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - 1);
   }
 }
 #endif
 
+// Calculate a single downsampled luma reference value (copied from IntraPrediction::xGetLumaRecPixels)
+Pel IntraPrediction::xCccmGetLumaVal(const PredictionUnit& pu, const CPelBuf pi, const int x, const int y) const
+{
+  const Pel* piSrc = pi.buf;
+  const int iRecStride = pi.stride;
+  Pel ypval = 0;
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  if (pu.cccmNoSubFlag || pu.chromaFormat == CHROMA_444)
+#else
+  if (pu.chromaFormat == CHROMA_444)
+#endif
+  {
+    ypval = piSrc[x + iRecStride * y];
+  }
+  else if (pu.chromaFormat == CHROMA_422)
+  {
+    int s = 2;
+    int offLeft = x > 0 ? -1 : 0;
+    s += piSrc[2 * x + iRecStride * y] * 2;
+    s += piSrc[2 * x + offLeft + iRecStride * y];
+    s += piSrc[2 * x + 1 + iRecStride * y];
+    ypval = s >> 2;
+  }
+  else if (pu.cs->sps->getCclmCollocatedChromaFlag())
+  {
+    int s = 4;
+    int offLeft = x > 0 ? -1 : 0;
+    int offAbove = y > 0 ? -1 : 0;
+    s += piSrc[2 * x + iRecStride * 2 * y] * 4;
+    s += piSrc[2 * x + offLeft + iRecStride * 2 * y];
+    s += piSrc[2 * x + 1 + iRecStride * 2 * y];
+    s += piSrc[2 * x + iRecStride * (2 * y + 1)];
+    s += piSrc[2 * x + iRecStride * (2 * y + offAbove)];
+    ypval = s >> 3;
+  }
+  else
+  {
+    int s = 4;
+    int offLeft = x > 0 ? -1 : 0;
+    s += piSrc[2 * x + iRecStride * y * 2] * 2;
+    s += piSrc[2 * x + offLeft + iRecStride * y * 2];
+    s += piSrc[2 * x + 1 + iRecStride * y * 2];
+    s += piSrc[2 * x + iRecStride * (y * 2 + 1)] * 2;
+    s += piSrc[2 * x + offLeft + iRecStride * (y * 2 + 1)];
+    s += piSrc[2 * x + 1 + iRecStride * (y * 2 + 1)];
+    ypval = s >> 3;
+  }
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  return ypval - m_cccmLumaOffset; // Note: this could have also been included in the rounding offset s to avoid the extra sample based operation
+#else
+  return ypval;
+#endif
+}
+#endif
+
+#if JVET_AA0057_CCCM
 void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr, int intraDir )
 {
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
@@ -9794,7 +10945,10 @@ void IntraPrediction::xCccmApplyModel(const PredictionUnit& pu, const ComponentI
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   CHECK( pu.cccmNoSubFlag, "cccmNoSubFlag shall be disabled" );
 #endif
-
+#if JVET_AC0054_GLCCCM
+  int refSizeX   = m_cccmBlkArea.x - m_cccmRefArea.x; // Reference lines available left and above
+  int refSizeY   = m_cccmBlkArea.y - m_cccmRefArea.y;
+#endif
   CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu);
 
   for (int y = 0; y < refLumaBlk.height; y++)
@@ -9811,6 +10965,30 @@ void IntraPrediction::xCccmApplyModel(const PredictionUnit& pu, const ComponentI
       }
       
       // 7-tap cross
+#if JVET_AC0054_GLCCCM
+      if (!pu.glCccmFlag)
+      {
+        samples[0] = refLumaBlk.at( x  , y   ); // C
+        samples[1] = refLumaBlk.at( x  , y-1 ); // N
+        samples[2] = refLumaBlk.at( x  , y+1 ); // S
+        samples[3] = refLumaBlk.at( x-1, y   ); // W
+        samples[4] = refLumaBlk.at( x+1, y   ); // E
+        samples[5] = cccmModel.nonlinear( refLumaBlk.at( x, y) );
+        samples[6] = cccmModel.bias();
+      }
+      else
+      {
+        samples[0] = refLumaBlk.at( x  , y   ); // C
+        samples[1] = (2 * refLumaBlk.at( x  , y-1 ) + refLumaBlk.at( x-1  , y-1 ) + refLumaBlk.at( x+1  , y-1 ))
+          -(2 * refLumaBlk.at( x  , y+1 ) + refLumaBlk.at( x-1  , y+1 ) + refLumaBlk.at( x+1  , y+1 )); // Vertical gradient
+        samples[2] = (2 * refLumaBlk.at( x-1, y   ) + refLumaBlk.at( x-1  , y-1 ) + refLumaBlk.at( x-1  , y+1 ))
+          -(2 * refLumaBlk.at( x+1, y   ) + refLumaBlk.at( x+1  , y-1 ) + refLumaBlk.at( x+1  , y+1 )); // Horizontal gradient
+        samples[3] = ((y + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+        samples[4] = ((x + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+        samples[5] = cccmModel.nonlinear( refLumaBlk.at( x, y) );
+        samples[6] = cccmModel.bias();
+      }
+#else
       samples[0] = refLumaBlk.at( x  , y   ); // C
       samples[1] = refLumaBlk.at( x  , y-1 ); // N
       samples[2] = refLumaBlk.at( x  , y+1 ); // S
@@ -9818,7 +10996,8 @@ void IntraPrediction::xCccmApplyModel(const PredictionUnit& pu, const ComponentI
       samples[4] = refLumaBlk.at( x+1, y   ); // E
       samples[5] = cccmModel.nonlinear( refLumaBlk.at( x, y) );
       samples[6] = cccmModel.bias();
-
+#endif
+        
       piPred.at(x, y) = ClipPel<Pel>( cccmModel.convolve(samples), clpRng );
     }
   }
@@ -9888,6 +11067,30 @@ void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel<CCCM_N
       }
 
       // 7-tap cross
+#if JVET_AC0054_GLCCCM
+      if (!pu.glCccmFlag)
+      {
+        A[0][sampleNum] = refLuma.at( x  , y   ); // C
+        A[1][sampleNum] = refLuma.at( x  , y-1 ); // N
+        A[2][sampleNum] = refLuma.at( x  , y+1 ); // S
+        A[3][sampleNum] = refLuma.at( x-1, y   ); // W
+        A[4][sampleNum] = refLuma.at( x+1, y   ); // E
+        A[5][sampleNum] = cccmModelCb.nonlinear( refLuma.at( x, y) );
+        A[6][sampleNum] = cccmModelCb.bias();
+      }
+      else
+      {
+        A[0][sampleNum] = refLuma.at( x  , y   ); // C
+        A[1][sampleNum] = (2 * refLuma.at( x  , y-1 ) + refLuma.at( x-1  , y-1 ) + refLuma.at( x+1  , y-1 ))
+                           -(2 * refLuma.at( x  , y+1 ) + refLuma.at( x-1  , y+1 ) + refLuma.at( x+1  , y+1 )); // Vertical gradient
+        A[2][sampleNum] = (2 * refLuma.at( x-1, y   ) + refLuma.at( x-1  , y-1 ) + refLuma.at( x-1  , y+1 ))
+                           -(2 * refLuma.at( x+1, y   ) + refLuma.at( x+1  , y-1 ) + refLuma.at( x+1  , y+1 )); // Horizontal gradient
+        A[3][sampleNum] = ((y + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+        A[4][sampleNum] = ((x + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+        A[5][sampleNum] = cccmModelCb.nonlinear( refLuma.at( x, y) );
+        A[6][sampleNum] = cccmModelCb.bias();
+      }
+#else
       A[0][sampleNum] = refLuma.at( x  , y   ); // C
       A[1][sampleNum] = refLuma.at( x  , y-1 ); // N
       A[2][sampleNum] = refLuma.at( x  , y+1 ); // S
@@ -9895,7 +11098,8 @@ void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel<CCCM_N
       A[4][sampleNum] = refLuma.at( x+1, y   ); // E
       A[5][sampleNum] = cccmModelCb.nonlinear( refLuma.at( x, y) );
       A[6][sampleNum] = cccmModelCb.bias();
-
+#endif
+        
       YCb[sampleNum]   = recoCb.at(refPosPicX + x, refPosPicY + y);
       YCr[sampleNum++] = recoCr.at(refPosPicX + x, refPosPicY + y);
     }
@@ -10275,61 +11479,6 @@ void IntraPrediction::xCccmCreateLumaNoSubRef( const PredictionUnit& pu, CompAre
 }
 #endif
 
-// Calculate a single downsampled luma reference value (copied from IntraPrediction::xGetLumaRecPixels)
-Pel IntraPrediction::xCccmGetLumaVal(const PredictionUnit& pu, const CPelBuf pi, const int x, const int y) const
-{
-  const Pel* piSrc = pi.buf;
-  const int iRecStride = pi.stride;
-  Pel ypval = 0;
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
-  if( pu.cccmNoSubFlag || pu.chromaFormat == CHROMA_444 )
-#else
-  if (pu.chromaFormat == CHROMA_444)
-#endif
-  {
-    ypval = piSrc[x + iRecStride * y];
-  }
-  else if (pu.chromaFormat == CHROMA_422)
-  {
-    int s       = 2;
-    int offLeft = x > 0 ? -1 : 0;
-    s += piSrc[2 * x +           iRecStride * y] * 2;
-    s += piSrc[2 * x + offLeft + iRecStride * y];
-    s += piSrc[2 * x +       1 + iRecStride * y];
-    ypval = s >> 2;
-  }
-  else if (pu.cs->sps->getCclmCollocatedChromaFlag())
-  {
-    int s        = 4;
-    int offLeft  = x > 0 ? -1 : 0;
-    int offAbove = y > 0 ? -1 : 0;
-    s += piSrc[2 * x +           iRecStride *  2 * y            ] * 4;
-    s += piSrc[2 * x + offLeft + iRecStride *  2 * y            ];
-    s += piSrc[2 * x +       1 + iRecStride *  2 * y            ];
-    s += piSrc[2 * x +           iRecStride * (2 * y + 1)       ];
-    s += piSrc[2 * x +           iRecStride * (2 * y + offAbove)];
-    ypval = s >> 3;
-  }
-  else
-  {
-    int s       = 4;
-    int offLeft = x > 0 ? -1 : 0;
-    s += piSrc[2 * x +           iRecStride *  y * 2            ] * 2;
-    s += piSrc[2 * x + offLeft + iRecStride *  y * 2            ];
-    s += piSrc[2 * x +       1 + iRecStride *  y * 2            ];
-    s += piSrc[2 * x +           iRecStride * (y * 2 + 1)       ] * 2;
-    s += piSrc[2 * x + offLeft + iRecStride * (y * 2 + 1)       ];
-    s += piSrc[2 * x +       1 + iRecStride * (y * 2 + 1)       ];
-    ypval = s >> 3;
-  }
-
-#if JVET_AB0174_CCCM_DIV_FREE
-  return ypval - m_cccmLumaOffset; // Note: this could have also been included in the rounding offset s to avoid the extra sample based operation
-#else
-  return ypval;
-#endif
-}
-
 // Using the same availability checking as in IntraPrediction::xFillReferenceSamples
 void IntraPrediction::xCccmCalcRefArea(const PredictionUnit& pu, CompArea chromaArea)
 {
@@ -10690,7 +11839,332 @@ void IntraPrediction::xCccmCreateLumaRef(const PredictionUnit& pu, CompArea chro
 }
 #endif
 
-#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA
+#if JVET_AC0119_LM_CHROMA_FUSION
+void IntraPrediction::xCflmCalcRefArea(const PredictionUnit& pu, const CompArea& chromaArea)
+{
+  const ChannelType     chType = CHANNEL_TYPE_CHROMA;
+  const CodingUnit& cu = *pu.cu;
+  const CodingStructure& cs = *cu.cs;
+  const SPS& sps = *cs.sps;
+  const PreCalcValues& pcv = *cs.pcv;
+
+  const int tuWidth = chromaArea.width;
+  const int tuHeight = chromaArea.height;
+
+  const bool noShift = pcv.noChroma2x2 && chromaArea.width == 4;   // don't shift on the lowest level (chroma not-split)
+  const int  compScaleX = getComponentScaleX(chromaArea.compID, sps.getChromaFormatIdc());
+  const int  compScaleY = getComponentScaleY(chromaArea.compID, sps.getChromaFormatIdc());
+  const int  unitWidth = pcv.minCUWidth >> (noShift ? 0 : compScaleX);
+  const int  unitHeight = pcv.minCUHeight >> (noShift ? 0 : compScaleY);
+
+  const int  totalAboveUnits = (2 * tuWidth + (unitWidth - 1)) / unitWidth;
+  const int  totalLeftUnits = (2 * tuHeight + (unitHeight - 1)) / unitHeight;
+  const int  numAboveUnits = std::max<int>(tuWidth / unitWidth, 1);
+  const int  numLeftUnits = std::max<int>(tuHeight / unitHeight, 1);
+  const int  numAboveRightUnits = totalAboveUnits - numAboveUnits;
+  const int  numLeftBelowUnits = totalLeftUnits - numLeftUnits;
+
+  static bool neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1] = { false }; // Just a dummy array here, content not used
+
+  int avaiAboveRightUnits = isAboveRightAvailable(cu, chType, chromaArea.topRight(), numAboveRightUnits, unitWidth, (neighborFlags + totalLeftUnits + 1 + numAboveUnits));
+  int avaiLeftBelowUnits = isBelowLeftAvailable(cu, chType, chromaArea.bottomLeft(), numLeftBelowUnits, unitHeight, (neighborFlags + totalLeftUnits - 1 - numLeftUnits));
+
+  int refSizeX, refSizeY;
+
+  PU::getCccmRefLineNum(pu, chromaArea, refSizeX, refSizeY); // Reference lines available left and above
+
+  int refWidth = chromaArea.width + refSizeX;              // Reference buffer size excluding paddings
+  int refHeight = chromaArea.height + refSizeY;
+
+  int extWidth = avaiAboveRightUnits * unitWidth;
+  int extHeight = avaiLeftBelowUnits * unitHeight;
+
+  refWidth += refSizeY ? extWidth : 0; // Add above right if above is available
+  refHeight += refSizeX ? extHeight : 0; // Add below left if left is available
+
+  m_cccmBlkArea = chromaArea;
+  m_cflmRefArea = Area(chromaArea.x - refSizeX, chromaArea.y - refSizeY, refWidth, refHeight); // Position with respect to the PU
+}
+
+PelBuf IntraPrediction::xCflmGetRefBuf(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, int& areaWidth, int& areaHeight, int& refSizeX, int& refSizeY, int& refPosPicX, int& refPosPicY) const
+{
+  refSizeX = std::min(chromaArea.x - m_cflmRefArea.x, 2);  // Reference lines available left and above
+  refSizeY = std::min(chromaArea.y - m_cflmRefArea.y, 2);
+  areaWidth = chromaArea.width + refSizeX;
+  areaHeight = chromaArea.height + refSizeY;
+  refPosPicX = chromaArea.x - refSizeX; // Position of the reference area in picture coordinates
+  refPosPicY = chromaArea.y - refSizeY;
+
+  return PelBuf(m_cflmBuf[compId], areaWidth, areaWidth, areaHeight); // Points to the top-left corner of the reference area
+}
+
+PelBuf IntraPrediction::xCflmGetPuBuf(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea) const
+{
+  int refSizeX = std::min(chromaArea.x - m_cflmRefArea.x, 2);  // Reference lines available left and above
+  int refSizeY = std::min(chromaArea.y - m_cflmRefArea.y, 2);
+  int tuWidth = chromaArea.width;
+  int tuHeight = chromaArea.height;
+  int refStride = chromaArea.width + refSizeX;
+  int refOrigin = refStride * refSizeY + refSizeX;
+
+  return PelBuf(m_cflmBuf[compId] + refOrigin, refStride, tuWidth, tuHeight);  // Points to the top-left corner of the block
+}
+
+void IntraPrediction::xCflmCreateLumaRef(const PredictionUnit& pu, const CompArea& chromaArea)
+{
+  const CPelBuf recoLuma = pu.cs->picture->getRecoBuf(COMPONENT_Y);
+  const int  maxPosPicX = pu.cs->picture->chromaSize().width - 1;
+  const int  maxPosPicY = pu.cs->picture->chromaSize().height - 1;
+
+  xCflmCalcRefArea(pu, chromaArea); // Find the reference area
+
+  int areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY;
+
+  PelBuf refLuma = xCflmGetRefBuf(pu, COMPONENT_Y, chromaArea, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY);
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  xCccmSetLumaRefValue(pu);
+#endif
+
+  // Generate down-sampled luma for the area covering both the PU and the top/left reference areas
+  for (int y = 0; y < areaHeight; y++)
+  {
+    for (int x = 0; x < areaWidth; x++)
+    {
+      if (x >= 0 && x < refSizeX && y >= 0 && y < refSizeY)
+      {
+        continue;
+      }
+
+      int chromaPosPicX = refPosPicX + x;
+      int chromaPosPicY = refPosPicY + y;
+
+      chromaPosPicX = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+      chromaPosPicY = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+
+      refLuma.at(x, y) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, chromaPosPicY);
+    }
+  }
+}
+
+bool IntraPrediction::xCflmCreateChromaPred(const PredictionUnit& pu, const ComponentID compId, PelBuf& piPred)
+{
+  uint32_t iMode = PU::getFinalIntraMode(pu, CHANNEL_TYPE_CHROMA);
+
+  const CompArea& area = pu.blocks[compId];
+  int areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY;
+
+  PelBuf refChroma = xCflmGetRefBuf(pu, compId, area, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY);
+
+  // top/left reference areas
+  TEMPLATE_TYPE eTplType = (TEMPLATE_TYPE)((refSizeX > 0 ? LEFT_NEIGHBOR : 0) + (refSizeY > 0 ? ABOVE_NEIGHBOR : 0));
+  if (eTplType == NO_NEIGHBOR)
+  {
+    return false;
+  }
+
+  m_topRefLength = areaWidth << 1;
+  m_leftRefLength = areaHeight << 1;
+  xFillTimdReferenceSamples(pu.cs->picture->getRecoBuf(area), m_refBuffer[compId][PRED_BUF_UNFILTERED], area, *pu.cu, refSizeX, refSizeY);
+
+  Pel* piRefPred = refChroma.bufAt(0, 0);
+  initPredIntraParams(pu, area, *(pu.cs->sps));
+  predTimdIntraAng(compId, pu, iMode, piRefPred, refChroma.stride, areaWidth, areaHeight, eTplType, refSizeX, refSizeY);
+
+  // the PU reference areas
+  PelBuf predChroma = xCflmGetPuBuf(pu, compId, area);
+  Pel* piPredBuf = piPred.buf;
+  for (int y = 0; y < piPred.height; y++)
+  {
+    for (int x = 0; x < piPred.width; x++)
+    {
+      predChroma.at(x, y) = piPredBuf[x];
+    }
+
+    piPredBuf += piPred.stride;
+  }
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  int chromaOffset = 1 << (pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - 1);
+  const CPelBuf reco = pu.cs->picture->getRecoBuf(compId);
+
+  if (refSizeX || refSizeY)
+  {
+    int refPosX = refSizeX > 0 ? refSizeX - 1 : 0;
+    int refPosY = refSizeY > 0 ? refSizeY - 1 : 0;
+
+    chromaOffset = reco.at(refPosPicX + refPosX, refPosPicY + refPosY);
+  }
+
+  for (int y = 0; y < areaHeight; y++)
+  {
+    for (int x = 0; x < areaWidth; x++)
+    {
+      piRefPred[x] -= chromaOffset;
+    }
+
+    piRefPred += refChroma.stride;
+  }
+#endif
+
+  return true;
+}
+
+void IntraPrediction::xCflmCalcModels(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel<CFLM_NUM_PARAMS>& cflmModel, int modelId, int modelThr)
+{
+  int areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY;
+
+  const CPelBuf reco = pu.cs->picture->getRecoBuf(compId);
+  PelBuf        refLuma = xCflmGetRefBuf(pu, COMPONENT_Y, chromaArea, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY);
+  PelBuf        refChroma = xCflmGetRefBuf(pu, compId, chromaArea, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY);
+
+  int sampleNum = 0;
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  int chromaOffset = 1 << (pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - 1);
+
+  if (refSizeX || refSizeY)
+  {
+    int refPosX = refSizeX > 0 ? refSizeX - 1 : 0;
+    int refPosY = refSizeY > 0 ? refSizeY - 1 : 0;
+
+    chromaOffset = reco.at(refPosPicX + refPosX, refPosPicY + refPosY);
+  }
+#endif
+
+  // Collect reference data to input matrix A and target vector Y
+  static Pel A[CFLM_NUM_PARAMS][CFLM_MAX_REF_SAMPLES];
+  static Pel C[CFLM_MAX_REF_SAMPLES];
+
+  for (int y = 0; y < areaHeight; y++)
+  {
+    for (int x = 0; x < areaWidth; x++)
+    {
+      if ((x >= refSizeX && y >= refSizeY)
+        || (x >= 0 && x < refSizeX && y >= 0 && y < refSizeY))
+      {
+        continue;
+      }
+
+      if (modelId == 1 && refLuma.at(x, y) > modelThr) // Model 1: Include only samples below or equal to the threshold
+      {
+        continue;
+      }
+      if (modelId == 2 && refLuma.at(x, y) <= modelThr) // Model 2: Include only samples above the threshold
+      {
+        continue;
+      }
+
+      if (pu.intraDir[1] == MDLM_L_IDX || pu.intraDir[1] == MMLM_L_IDX)
+      {
+        if (y < refSizeY)
+        {
+          continue;
+        }
+      }
+
+      if (pu.intraDir[1] == MDLM_T_IDX || pu.intraDir[1] == MMLM_T_IDX)
+      {
+        if (x < refSizeX)
+        {
+          continue;
+        }
+      }
+
+      A[0][sampleNum] = refLuma.at(x, y); // Luma
+      A[1][sampleNum] = refChroma.at(x, y); // Chroma
+      A[2][sampleNum] = cflmModel.bias();
+
+      C[sampleNum] = reco.at(refPosPicX + x, refPosPicY + y);
+      sampleNum++;
+    }
+  }
+
+  if (!sampleNum) // Number of samples can go to zero in the multimode case
+  {
+    cflmModel.clearModel();
+    return;
+  }
+  else
+  {
+#if JVET_AB0174_CCCM_DIV_FREE
+    m_cflmSolver.solve1(A, C, sampleNum, chromaOffset, cflmModel);
+#else
+    m_cflmSolver.solve1(A, C, sampleNum, cflmModel);
+#endif
+  }
+}
+
+void IntraPrediction::xCflmApplyModel(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel<CFLM_NUM_PARAMS>& cflmModel, int modelId, int modelThr, PelBuf& piPred)
+{
+  const  ClpRng& clpRng(pu.cu->cs->slice->clpRng(compId));
+  static Pel     samples[CFLM_NUM_PARAMS];
+
+  CPelBuf refLumaBlk = xCflmGetPuBuf(pu, COMPONENT_Y, chromaArea);
+  CPelBuf refChromaBlk = xCflmGetPuBuf(pu, compId, chromaArea);
+
+  for (int y = 0; y < refLumaBlk.height; y++)
+  {
+    for (int x = 0; x < refLumaBlk.width; x++)
+    {
+      if (modelId == 1 && refLumaBlk.at(x, y) > modelThr) // Model 1: Include only samples below or equal to the threshold
+      {
+        continue;
+      }
+      if (modelId == 2 && refLumaBlk.at(x, y) <= modelThr) // Model 2: Include only samples above the threshold
+      {
+        continue;
+      }
+
+      samples[0] = refLumaBlk.at(x, y); // Luma
+      samples[1] = refChromaBlk.at(x, y); // Chroma
+      samples[2] = cflmModel.bias();
+
+      piPred.at(x, y) = ClipPel<Pel>(cflmModel.convolve(samples), clpRng);
+    }
+  }
+}
+
+int IntraPrediction::xCflmCalcRefAver(const PredictionUnit& pu, const CompArea& chromaArea)
+{
+  int areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY;
+
+  PelBuf refLuma = xCflmGetRefBuf(pu, COMPONENT_Y, chromaArea, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY);
+
+  int numSamples = 0;
+  int sumSamples = 0;
+
+  // Top samples
+  if (pu.intraDir[1] != MDLM_L_IDX && pu.intraDir[1] != MMLM_L_IDX)
+  {
+    for (int y = 0; y < refSizeY; y++)
+    {
+      for (int x = refSizeX; x < areaWidth; x++)
+      {
+        sumSamples += refLuma.at(x, y);
+        numSamples++;
+      }
+    }
+  }
+
+  // Left samples
+  if (pu.intraDir[1] != MDLM_T_IDX && pu.intraDir[1] != MMLM_T_IDX)
+  {
+    for (int y = refSizeY; y < areaHeight; y++)
+    {
+      for (int x = 0; x < refSizeX; x++)
+      {
+        sumSamples += refLuma.at(x, y);
+        numSamples++;
+      }
+    }
+  }
+
+  return numSamples == 0 ? 512 : (sumSamples + numSamples / 2) / numSamples;
+}
+#endif
+
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION
     
 #if JVET_AC0053_GAUSSIAN_SOLVER
 template<const int M, const int N>
@@ -11516,7 +12990,7 @@ void IntraPrediction::xPredTmrlIntraAng(const CPelBuf& pSrc, const ClpRng& clpRn
 #endif
   // initializing for safeguard.
   ::memset(refAbove, 0, sizeof(refAbove));
-  ::memset(refLeft, 0, sizeof(refAbove));
+  ::memset(refLeft, 0, sizeof(refLeft));
 
   // Initialize the Main and Left reference array.
   if (intraPredAngle < 0)

@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -301,14 +301,14 @@ unsigned BinDecoderBase::decodeAlignedBinsEP( unsigned numBins )
 template <class BinProbModel>
 TBinDecoder<BinProbModel>::TBinDecoder()
   : BinDecoderBase( static_cast<const BinProbModel*>    ( nullptr ) )
-  , m_Ctx         ( static_cast<CtxStore<BinProbModel>&>( *this   ) )
+  , m_ctx         ( static_cast<CtxStore<BinProbModel>&>( *this   ) )
 {}
 
 
 template <class BinProbModel>
 unsigned TBinDecoder<BinProbModel>::decodeBin( unsigned ctxId )
 {
-  BinProbModel& rcProbModel = m_Ctx[ctxId];
+  BinProbModel& rcProbModel = m_ctx[ctxId];
   unsigned      bin         = rcProbModel.mps();
   uint32_t      LPS         = rcProbModel.getLPS( m_Range );
 

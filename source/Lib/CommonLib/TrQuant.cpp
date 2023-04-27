@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -520,13 +520,17 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
 #if JVET_AB0155_SGPM
     if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
     {
-      intraMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
+      intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
     }
 #endif
 #if JVET_V0130_INTRA_TMP
     if( PU::isTmp( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
     {
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+      intraMode = tu.cu->intraTmpDimdMode;
+#else
       intraMode = PLANAR_IDX;
+#endif
     }
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -544,7 +548,7 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
 
 #if JVET_AC0105_DIRECTIONAL_PLANAR
-    if (intraMode == PLANAR_IDX)
+    if (compID == COMPONENT_Y && intraMode == PLANAR_IDX)
     {
       if (tu.cu->plIdx == 2)
       {
@@ -783,13 +787,17 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
 #if JVET_V0130_INTRA_TMP
     if( PU::isTmp( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
     {
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+      intraMode = tu.cu->intraTmpDimdMode;
+#else
       intraMode = PLANAR_IDX;
+#endif
     }
 #endif
 #if JVET_AB0155_SGPM
     if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
     {
-      intraMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
+      intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
     }
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -807,7 +815,7 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
 
 #if JVET_AC0105_DIRECTIONAL_PLANAR
-    if (intraMode == PLANAR_IDX)
+    if (compID == COMPONENT_Y && intraMode == PLANAR_IDX)
     {
       if (tu.cu->plIdx == 2)
       {
@@ -1115,7 +1123,11 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
   }
 
 #if JVET_V0130_INTRA_TMP
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+  if (isImplicitMTS || isISP)
+#else
   if (isImplicitMTS || isISP || tu.cu->tmpFlag)
+#endif
 #else
   if (isImplicitMTS || isISP)
 #endif
@@ -1200,7 +1212,19 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
       uint8_t nSzIdxW = std::min(3, (floorLog2(width) - 2));
       uint8_t nSzIdxH = std::min(3, (floorLog2(height) - 2));
       const CompArea& area = tu.blocks[compID];
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+      int predMode;
+      if (tu.cu->tmpFlag)
+      {
+        predMode = tu.cu->intraTmpDimdMode;
+      }
+      else
+      {
+        predMode = PU::getFinalIntraMode(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID));
+      }
+#else
       int predMode = PU::getFinalIntraMode(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID));
+#endif
 #if JVET_W0123_TIMD_FUSION
       if (tu.cu->timd && compID == COMPONENT_Y)
       {
@@ -1210,7 +1234,7 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
 #if JVET_AB0155_SGPM
       if (tu.cu->sgpm)
       {
-        predMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
+        predMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
       }
 #endif
       int ucMode;
@@ -1229,7 +1253,7 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
         CHECK(predMode < -(NUM_EXT_LUMA_MODE >> 1) || predMode >= NUM_LUMA_MODE + (NUM_EXT_LUMA_MODE >> 1), "luma mode out of range");
         predMode = (predMode < 0) ? 2 : (predMode >= NUM_LUMA_MODE) ? 66 : predMode;
 #if JVET_AC0105_DIRECTIONAL_PLANAR
-        if (predMode == PLANAR_IDX)
+        if (compID == COMPONENT_Y && predMode == PLANAR_IDX)
         {
           if (tu.cu->plIdx == 2)
           {
@@ -2606,13 +2630,17 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
 #if JVET_V0130_INTRA_TMP
   if (PU::isTmp(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
   {
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+    intraMode = tu.cu->intraTmpDimdMode;
+#else
     intraMode = PLANAR_IDX;
+#endif
   }
 #endif
 #if JVET_AB0155_SGPM
   if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
   {
-    intraMode = g_geoAngle2IntraAng[g_GeoParams[tu.cu->sgpmSplitDir][0]];
+    intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
   }
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -2628,7 +2656,7 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
   }
 #endif
 #if JVET_AC0105_DIRECTIONAL_PLANAR
-  if (intraMode == PLANAR_IDX)
+  if (compID == COMPONENT_Y && intraMode == PLANAR_IDX)
   {
     if (tu.cu->plIdx == 2)
     {

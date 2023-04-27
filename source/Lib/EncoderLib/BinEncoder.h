@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -150,7 +150,7 @@ public:
   uint32_t  getEP   ()                  const   { return m_NumBinsEP; }
   uint32_t  getTrm  ()                  const   { return m_NumBinsTrm; }
 private:
-  std::vector<uint32_t> m_CtxBinsCodedBuffer;
+  std::vector<uint32_t> m_ctxBinsCodedBuffer;
   uint32_t*             m_NumBinsCtx;
   uint32_t              m_NumBinsEP;
   uint32_t              m_NumBinsTrm;
@@ -216,7 +216,7 @@ public:
   const BinStore* getBinStore       ()          const   { return &m_BinStore; }
   BinEncIf*       getTestBinEncoder ()          const;
 private:
-  CtxStore<BinProbModel>& m_Ctx;
+  CtxStore<BinProbModel>& m_ctx;
 };
 
 
@@ -267,13 +267,13 @@ class TBitEstimator : public BitEstimatorBase
 public:
   TBitEstimator ();
   ~TBitEstimator() {}
-  void encodeBin    ( unsigned bin, unsigned ctxId )  { m_Ctx[ctxId].estFracBitsUpdate( bin, m_EstFracBits ); }
+  void encodeBin    ( unsigned bin, unsigned ctxId )  { m_ctx[ctxId].estFracBitsUpdate( bin, m_EstFracBits ); }
   void encodeBinTrm ( unsigned bin )                  { m_EstFracBits += BinProbModel::estFracBitsTrm( bin ); }
   void            setBinStorage     ( bool b )        {}
   const BinStore* getBinStore       ()          const { return 0; }
   BinEncIf*       getTestBinEncoder ()          const { return 0; }
 private:
-  CtxStore<BinProbModel>& m_Ctx;
+  CtxStore<BinProbModel>& m_ctx;
 };
 
 

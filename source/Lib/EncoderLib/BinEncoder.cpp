@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -38,8 +38,8 @@
 #include "CommonLib/dtrace_next.h"
 
 BinCounter::BinCounter()
-  : m_CtxBinsCodedBuffer( Ctx::NumberOfContexts )
-  , m_NumBinsCtx        ( m_CtxBinsCodedBuffer.data() )
+  : m_ctxBinsCodedBuffer( Ctx::NumberOfContexts )
+  , m_NumBinsCtx        ( m_ctxBinsCodedBuffer.data() )
   , m_NumBinsEP         ( 0 )
   , m_NumBinsTrm        ( 0 )
 {}
@@ -47,7 +47,7 @@ BinCounter::BinCounter()
 
 void BinCounter::reset()
 {
-  for( std::size_t k = 0; k < m_CtxBinsCodedBuffer.size(); k++ )
+  for( std::size_t k = 0; k < m_ctxBinsCodedBuffer.size(); k++ )
   {
     m_NumBinsCtx[k] = 0;
   }
@@ -59,7 +59,7 @@ void BinCounter::reset()
 uint32_t BinCounter::getAll() const
 {
   uint32_t  count = m_NumBinsEP + m_NumBinsTrm;
-  for( std::size_t k = 0; k < m_CtxBinsCodedBuffer.size(); k++ )
+  for( std::size_t k = 0; k < m_ctxBinsCodedBuffer.size(); k++ )
   {
     count += m_NumBinsCtx[k];
   }
@@ -347,14 +347,14 @@ void BinEncoderBase::writeOut()
 template <class BinProbModel>
 TBinEncoder<BinProbModel>::TBinEncoder()
   : BinEncoderBase( static_cast<const BinProbModel*>    ( nullptr ) )
-  , m_Ctx         ( static_cast<CtxStore<BinProbModel>&>( *this   ) )
+  , m_ctx         ( static_cast<CtxStore<BinProbModel>&>( *this   ) )
 {}
 
 template <class BinProbModel>
 void TBinEncoder<BinProbModel>::encodeBin( unsigned bin, unsigned ctxId )
 {
   BinCounter::addCtx( ctxId );
-  BinProbModel& rcProbModel = m_Ctx[ctxId];
+  BinProbModel& rcProbModel = m_ctx[ctxId];
   uint32_t      LPS         = rcProbModel.getLPS( m_Range );
 
   DTRACE( g_trace_ctx, D_CABAC, "%d" " %d " "%d" "  " "[%d:%d]" "  " "%2d(MPS=%d)"  "  " "  -  " "%d" "\n", DTRACE_GET_COUNTER( g_trace_ctx, D_CABAC ), ctxId, m_Range, m_Range - LPS, LPS, ( unsigned int ) ( rcProbModel.state() ), bin == rcProbModel.mps(), bin );
@@ -458,7 +458,7 @@ void BitEstimatorBase::align()
 template <class BinProbModel>
 TBitEstimator<BinProbModel>::TBitEstimator()
   : BitEstimatorBase  ( static_cast<const BinProbModel*>    ( nullptr) )
-  , m_Ctx             ( static_cast<CtxStore<BinProbModel>&>( *this  ) )
+  , m_ctx             ( static_cast<CtxStore<BinProbModel>&>( *this  ) )
 {}
 
 

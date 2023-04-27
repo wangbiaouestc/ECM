@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -480,6 +480,9 @@ protected:
   bool      m_OBMC;
 #endif
   bool      m_ciip;
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  bool      m_ciipTimd;
+#endif
   bool      m_Geo;
   bool      m_allowDisFracMMVD;
   bool      m_AffineAmvr;
@@ -491,6 +494,12 @@ protected:
   int       m_MmvdDisNum;
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   bool      m_MVSD;
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bool      m_bvdPred;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bool      m_bvpCluster;
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   bool      m_useARL;
@@ -980,6 +989,19 @@ protected:
 #endif
   bool        m_resChangeInClvsEnabled;
   int         m_switchPocPeriod;
+#if JVET_AC0096
+  int         m_rprSwitchingListSize;
+  int         m_rprSwitchingResolutionOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
+  int         m_rprSwitchingQPOffsetOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
+  bool        m_rprFunctionalityTestingEnabledFlag;
+  bool        m_rprPopulatePPSatIntraFlag;
+  int         m_rprSwitchingSegmentSize;
+  double      m_rprSwitchingTime;
+  double      m_scalingRatioHor2;
+  double      m_scalingRatioVer2;
+  double      m_scalingRatioHor3;
+  double      m_scalingRatioVer3;
+#endif
   int         m_upscaledOutput;
 #if JVET_AB0082
   int         m_upscaleFilterForDisplay;
@@ -1532,6 +1554,10 @@ public:
 #endif
   void      setUseCiip                   ( bool b )       { m_ciip = b; }
   bool      getUseCiip                   ()         const { return m_ciip; }
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  void      setUseCiipTimd               (bool b)         { m_ciipTimd = b; }
+  bool      getUseCiipTImd               ()         const { return m_ciipTimd; }
+#endif
   void      setUseGeo                       ( bool b )       { m_Geo = b; }
   bool      getUseGeo                       ()         const { return m_Geo; }
   void      setAllowDisFracMMVD             ( bool b )       { m_allowDisFracMMVD = b;    }
@@ -1553,6 +1579,14 @@ public:
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   void      setUseMVSD(bool b) { m_MVSD = b; }
   bool      getUseMVSD()                               const { return m_MVSD; }
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  void      setUseBvdPred(bool b)                            { m_bvdPred = b; }
+  bool      getUseBvdPred()                            const { return m_bvdPred; }
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  void      setUseBvpCluster(bool b)                         { m_bvpCluster = b; }
+  bool      getUseBvpCluster()                        const  { return m_bvpCluster; }
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   void      setUseARL(bool b) { m_useARL = b; }
@@ -2522,6 +2556,27 @@ public:
   void        setResChangeInClvsEnabled(bool b)                      { m_resChangeInClvsEnabled = b; }
   bool        isResChangeInClvsEnabled()                        const { return m_resChangeInClvsEnabled; }
   void        setSwitchPocPeriod( int p )                            { m_switchPocPeriod = p;}
+#if JVET_AC0096
+  bool        getRprFunctionalityTestingEnabledFlag()             const { return m_rprFunctionalityTestingEnabledFlag; }
+  void        setRprFunctionalityTestingEnabledFlag(bool flag)         { m_rprFunctionalityTestingEnabledFlag = flag; }
+  bool        getRprPopulatePPSatIntraFlag()                      const { return m_rprPopulatePPSatIntraFlag; }
+  void        setRprPopulatePPSatIntraFlag(bool flag)                  { m_rprPopulatePPSatIntraFlag = flag; }
+  int         getRprSwitchingSegmentSize()                        const { return m_rprSwitchingSegmentSize; }
+  void        setRprSwitchingSegmentSize(int size)                     { m_rprSwitchingSegmentSize = size; }
+  int         getRprSwitchingListSize()                           const { return m_rprSwitchingListSize; }
+  void        setRprSwitchingListSize(int size)                        { m_rprSwitchingListSize = size; }
+  double      getRprSwitchingTime()                               const { return m_rprSwitchingTime; }
+  void        setRprSwitchingTime(int size)                            { m_rprSwitchingTime = size; }
+  void        setRprSwitchingResolutionOrderList(int value, int idx)   { m_rprSwitchingResolutionOrderList[idx] = value; }
+  int         getRprSwitchingResolutionOrderList(int idx)         const { return m_rprSwitchingResolutionOrderList[idx]; }
+  void        setRprSwitchingQPOffsetOrderList(int value, int idx)      { m_rprSwitchingQPOffsetOrderList[idx] = value; }
+  int         getRprSwitchingQPOffsetOrderList(int idx)           const { return m_rprSwitchingQPOffsetOrderList[idx]; }
+  int         getRprSwitchingSegment(int currPoc)                 const { return (currPoc / m_rprSwitchingSegmentSize % m_rprSwitchingListSize); }
+  int         getRprSwitchingPPSID(int rprSegment)                const { int res2ppsid[4] = { 0, ENC_PPS_ID_RPR3, ENC_PPS_ID_RPR2, ENC_PPS_ID_RPR };
+                                                                        return res2ppsid[m_rprSwitchingResolutionOrderList[rprSegment]];}
+  void        setScalingRatio2(double hor, double ver)                 { m_scalingRatioHor2 = hor, m_scalingRatioVer2 = ver; }
+  void        setScalingRatio3(double hor, double ver)                 { m_scalingRatioHor3 = hor, m_scalingRatioVer3 = ver; }
+#endif
   void        setUpscaledOutput( int b )                             { m_upscaledOutput = b; }
   int         getUpscaledOutput()                              const { return m_upscaledOutput; }
 #if JVET_AB0082

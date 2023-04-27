@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -643,8 +643,8 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   SMultiValueInput<uint32_t> cfg_kneeSEIOutputKneePointValue     (0, 1000, 0, 999, defaultOutputKneeCodes, sizeof(defaultOutputKneeCodes)/sizeof(uint32_t));
   const int defaultPrimaryCodes[6]     = { 0,50000, 0,0, 50000,0 };
   const int defaultWhitePointCode[2]   = { 16667, 16667 };
-  SMultiValueInput<int>  cfg_DisplayPrimariesCode            (0, 50000, 6, 6, defaultPrimaryCodes,   sizeof(defaultPrimaryCodes  )/sizeof(int));
-  SMultiValueInput<int>  cfg_DisplayWhitePointCode           (0, 50000, 2, 2, defaultWhitePointCode, sizeof(defaultWhitePointCode)/sizeof(int));
+  SMultiValueInput<int>  cfg_displayPrimariesCode            (0, 50000, 6, 6, defaultPrimaryCodes,   sizeof(defaultPrimaryCodes  )/sizeof(int));
+  SMultiValueInput<int>  cfg_displayWhitePointCode           (0, 50000, 2, 2, defaultWhitePointCode, sizeof(defaultWhitePointCode)/sizeof(int));
 
   SMultiValueInput<bool> cfg_timeCodeSeiTimeStampFlag        (0,  1, 0, MAX_TIMECODE_SEI_SETS);
   SMultiValueInput<bool> cfg_timeCodeSeiNumUnitFieldBasedFlag(0,  1, 0, MAX_TIMECODE_SEI_SETS);
@@ -693,6 +693,12 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   const int defaultLadfIntervalLowerBound[2] = { 350, 833 };
   SMultiValueInput<int>  cfg_LadfQpOffset                    ( -MAX_QP, MAX_QP, 2, MAX_LADF_INTERVALS, defaultLadfQpOffset, 3 );
   SMultiValueInput<int>  cfg_LadfIntervalLowerBound          ( 0, std::numeric_limits<int>::max(), 1, MAX_LADF_INTERVALS - 1, defaultLadfIntervalLowerBound, 2 );
+#endif
+#if JVET_AC0096
+  const int defaultRprSwitchingResolutionOrderList[12] = { 1, 0, 2, 0, 3, 0, 1, 0, 2, 0, 3, 0 };
+  const int defaultRprSwitchingQPOffsetOrderList[12] = { -2, 0, -4, 0, -6, 0, -2, 0, -4, 0, -6, 0 };
+  SMultiValueInput<int>  cfg_rprSwitchingResolutionOrderList(0, 3, 0, MAX_RPR_SWITCHING_ORDER_LIST_SIZE, defaultRprSwitchingResolutionOrderList, 12);
+  SMultiValueInput<int>  cfg_rprSwitchingQPOffsetOrderList(-MAX_QP, MAX_QP, 0, MAX_RPR_SWITCHING_ORDER_LIST_SIZE, defaultRprSwitchingQPOffsetOrderList, 12);
 #endif
   SMultiValueInput<unsigned> cfg_virtualBoundariesPosX       (0, std::numeric_limits<uint32_t>::max(), 0, 3);
   SMultiValueInput<unsigned> cfg_virtualBoundariesPosY       (0, std::numeric_limits<uint32_t>::max(), 0, 3);
@@ -1112,6 +1118,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("OBMC",                                            m_OBMC,                                           true, "Overlapping Block Motion Compensation")
 #endif
   ("CIIP",                                            m_ciip,                                           false, "Enable CIIP mode")
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  ("CIIPTIMD",                                        m_ciipTimd,                                       true, "Enable CIIP-TIMD mode")
+#endif
   ("Geo",                                             m_Geo,                                            false, "Enable geometric partitioning mode (0:off, 1:on)")
   ("HashME",                                          m_HashME,                                         false, "Enable hash motion estimation (0:off, 1:on)")
 
@@ -1127,6 +1136,12 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   ("MVSD",                                            m_MVSD,                                            true, "Motion Vector difference Sign Derivation (0:off, 1:on)")
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  ("BvdPred",                                         m_bvdPred,                                         true, "Block vector difference Prediction (0:off, 1:on)")
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  ("BvpCluster",                                      m_bvpCluster,                                      true, "IBC BVP clusteriing and BV with one zero component sign prediction (0:off, 1:on)")
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   ("ARL",                                             m_useARL,                                          true, "Adaptive Reference List (0:off, 1:on)")
@@ -1531,8 +1546,8 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("SEIMasteringDisplayColourVolume",                 m_masteringDisplay.colourVolumeSEIEnabled,         false, "Control generation of mastering display colour volume SEI messages")
   ("SEIMasteringDisplayMaxLuminance",                 m_masteringDisplay.maxLuminance,                  10000u, "Specifies the mastering display maximum luminance value in units of 1/10000 candela per square metre (32-bit code value)")
   ("SEIMasteringDisplayMinLuminance",                 m_masteringDisplay.minLuminance,                      0u, "Specifies the mastering display minimum luminance value in units of 1/10000 candela per square metre (32-bit code value)")
-  ("SEIMasteringDisplayPrimaries",                    cfg_DisplayPrimariesCode,       cfg_DisplayPrimariesCode, "Mastering display primaries for all three colour planes in CIE xy coordinates in increments of 1/50000 (results in the ranges 0 to 50000 inclusive)")
-  ("SEIMasteringDisplayWhitePoint",                   cfg_DisplayWhitePointCode,     cfg_DisplayWhitePointCode, "Mastering display white point CIE xy coordinates in normalised increments of 1/50000 (e.g. 0.333 = 16667)")
+  ("SEIMasteringDisplayPrimaries",                    cfg_displayPrimariesCode,       cfg_displayPrimariesCode, "Mastering display primaries for all three colour planes in CIE xy coordinates in increments of 1/50000 (results in the ranges 0 to 50000 inclusive)")
+  ("SEIMasteringDisplayWhitePoint",                   cfg_displayWhitePointCode,     cfg_displayWhitePointCode, "Mastering display white point CIE xy coordinates in normalised increments of 1/50000 (e.g. 0.333 = 16667)")
 #if U0033_ALTERNATIVE_TRANSFER_CHARACTERISTICS_SEI
   ("SEIPreferredTransferCharacterisics",              m_preferredTransferCharacteristics,                   -1, "Value for the preferred_transfer_characteristics field of the Alternative transfer characteristics SEI which will override the corresponding entry in the VUI. If negative, do not produce the respective SEI message")
 #endif
@@ -1698,6 +1713,18 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ( "FractionNumFrames",                              m_fractionOfFrames,                         1.0, "Encode a fraction of the specified in FramesToBeEncoded frames" )
   ( "SwitchPocPeriod",                                m_switchPocPeriod,                            0, "Switch POC period for RPR" )
   ( "UpscaledOutput",                                 m_upscaledOutput,                             0, "Output upscaled (2), decoded but in full resolution buffer (1) or decoded cropped (0, default) picture for RPR" )
+#if JVET_AC0096
+  ("RPRFunctionalityTesting",                         m_rprFunctionalityTestingEnabledFlag,     false, "Enables RPR functionality testing")
+  ("RPRSwitchingResolutionOrderList",                 cfg_rprSwitchingResolutionOrderList, cfg_rprSwitchingResolutionOrderList, "Order of resolutions for each segment in RPR functionality testing where 0,1,2,3 corresponds to full resolution,4/5,2/3 and 1/2")
+  ("RPRSwitchingQPOffsetOrderList",                   cfg_rprSwitchingQPOffsetOrderList,   cfg_rprSwitchingQPOffsetOrderList, "Order of QP offset for each segment in RPR functionality testing, where the QP is modified according to the given offset")
+  ("RPRSwitchingSegmentSize",                         m_rprSwitchingSegmentSize,                   32, "Number of frames with same resolution")
+  ("RPRSwitchingTime",                                m_rprSwitchingTime,                         0.0, "Segment switching time in seconds, when non-zero it defines the segment size according to frame rate (a multiple of 8)")
+  ("RPRPopulatePPSatIntra",                           m_rprPopulatePPSatIntraFlag,              false, "Populate all PPS which can be used in the sequence at the Intra, e.g. full-res, 4/5, 2/3 and 1/2")
+  ("ScalingRatioHor2",                                m_scalingRatioHor2,                         1.5, "Scaling ratio in hor direction (2/3)")
+  ("ScalingRatioVer2",                                m_scalingRatioVer2,                         1.5, "Scaling ratio in ver direction (2/3)")
+  ("ScalingRatioHor3",                                m_scalingRatioHor3,                        1.25, "Scaling ratio in hor direction (4/5)")
+  ("ScalingRatioVer3",                                m_scalingRatioVer3,                        1.25, "Scaling ratio in ver direction (4/5)")
+#endif
 #if JVET_AB0082
   ("UpscaleFilterForDisplay",                         m_upscaleFilterForDisplay,                    2, "Filters used for upscaling reconstruction to full resolution (2: ECM 12-tap luma and 6-tap chroma MC filters, 1: Alternative 12-tap luma and 6-tap chroma filters, 0: VVC 8-tap luma and 4-tap chroma MC filters)")
 #endif
@@ -1808,7 +1835,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   }
 #endif
 
+#if JVET_AC0096
+  m_resChangeInClvsEnabled = m_scalingRatioHor != 1.0 || m_scalingRatioVer != 1.0 || m_rprFunctionalityTestingEnabledFlag;
+#else
   m_resChangeInClvsEnabled = m_scalingRatioHor != 1.0 || m_scalingRatioVer != 1.0;
+#endif
 #if JVET_Q0114_ASPECT5_GCI_FLAG
   m_resChangeInClvsEnabled = m_resChangeInClvsEnabled && m_rprEnabledFlag;
 #endif
@@ -1850,8 +1881,6 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 
     int8_t sliceType = m_GOPList[0].m_sliceType;
 
-    memset(m_GOPList, 0, sizeof(m_GOPList));
-    m_GOPList[0].m_sliceType = sliceType;
     for (int i = 1; i < MAX_GOP; i++)
     {
       m_GOPList[i].m_POC = -1;
@@ -2855,7 +2884,31 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
       m_chromaQpMappingTableParams.m_deltaQpOutVal[2][i] = cfg_qpInValCbCr.values[i + 1] - cfg_qpInValCbCr.values[i];
     }
   }
-
+#if JVET_AC0096
+  if (m_rprFunctionalityTestingEnabledFlag)
+  {
+    m_upscaledOutput = 2;
+    if (m_scalingRatioHor == 1.0 && m_scalingRatioVer == 1.0)
+    {
+      m_scalingRatioHor = 2.0;
+      m_scalingRatioVer = 2.0;
+    }
+    CHECK(cfg_rprSwitchingResolutionOrderList.values.size() > MAX_RPR_SWITCHING_ORDER_LIST_SIZE, "Length of RPRSwitchingResolutionOrderList exceeds maximum length");
+    CHECK(cfg_rprSwitchingQPOffsetOrderList.values.size() > MAX_RPR_SWITCHING_ORDER_LIST_SIZE, "Length of RPRSwitchingQPOffsetOrderList exceeds maximum length");
+    CHECK(cfg_rprSwitchingResolutionOrderList.values.size() != cfg_rprSwitchingQPOffsetOrderList.values.size(), "RPRSwitchingResolutionOrderList and RPRSwitchingQPOffsetOrderList shall be the same size");
+    m_rprSwitchingListSize = (int)cfg_rprSwitchingResolutionOrderList.values.size();
+    for (int k = 0; k < m_rprSwitchingListSize; k++)
+    {
+      m_rprSwitchingResolutionOrderList[k] = cfg_rprSwitchingResolutionOrderList.values[k];
+      m_rprSwitchingQPOffsetOrderList[k] = cfg_rprSwitchingQPOffsetOrderList.values[k];
+    }
+    if (m_rprSwitchingTime != 0.0)
+    {
+      int segmentSize = 8 * int(((double)m_iFrameRate * m_rprSwitchingTime + 4) / 8);
+      m_rprSwitchingSegmentSize = segmentSize;
+    }
+  }
+#endif
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
   if ( m_LadfEnabed )
   {
@@ -2993,11 +3046,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   {
     for(uint32_t idx=0; idx<6; idx++)
     {
-      m_masteringDisplay.primaries[idx/2][idx%2] = uint16_t((cfg_DisplayPrimariesCode.values.size() > idx) ? cfg_DisplayPrimariesCode.values[idx] : 0);
+      m_masteringDisplay.primaries[idx/2][idx%2] = uint16_t((cfg_displayPrimariesCode.values.size() > idx) ? cfg_displayPrimariesCode.values[idx] : 0);
     }
     for(uint32_t idx=0; idx<2; idx++)
     {
-      m_masteringDisplay.whitePoint[idx] = uint16_t((cfg_DisplayWhitePointCode.values.size() > idx) ? cfg_DisplayWhitePointCode.values[idx] : 0);
+      m_masteringDisplay.whitePoint[idx] = uint16_t((cfg_displayWhitePointCode.values.size() > idx) ? cfg_displayWhitePointCode.values[idx] : 0);
     }
   }
   if ( m_omniViewportSEIEnabled && !m_omniViewportSEICancelFlag )
@@ -3251,7 +3304,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   for( int i = 0; i < (int)m_sMaxMTTHierarchyDepthByTid.size(); i++ )
   {
     CHECK( i >= MAX_TLAYER, "Index exceeds MAX_TLAYER" );
-    m_maxMTTHierarchyDepthByTid[i] = std::stoul( m_sMaxMTTHierarchyDepthByTid.substr( i, 1 ) );
+    m_maxMTTHierarchyDepthByTid[i] = (unsigned int) std::stoul( m_sMaxMTTHierarchyDepthByTid.substr( i, 1 ) );
   }
 
 
@@ -3901,6 +3954,18 @@ bool EncAppCfg::xCheckParameter()
   {
     msg(WARNING, "CIIP-TM mode is forcefully disabled since CIIP is disabled. \n");
     m_tmCIIPMode = 0;
+  }
+#endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  if (!m_ciip && m_ciipTimd)
+  {
+    msg(WARNING, "CIIP-TIMD mode is forcefully disabled since CIIP is disabled. \n");
+    m_ciipTimd = 0;
+  }
+  if (!m_timd && m_ciipTimd)
+  {
+    msg(WARNING, "CIIP-TIMD mode is forcefully disabled since TIMD is disabled. \n");
+    m_ciipTimd = 0;
   }
 #endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
@@ -5142,6 +5207,9 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "LADF:%d ", m_LadfEnabed );
 #endif
     msg(VERBOSE, "CIIP:%d ", m_ciip);
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+    msg(VERBOSE, "CIIPTIMD:%d ", m_ciipTimd);
+#endif
     msg( VERBOSE, "Geo:%d ", m_Geo );
     m_allowDisFracMMVD = m_MMVD ? m_allowDisFracMMVD : false;
     if ( m_MMVD )
@@ -5168,6 +5236,12 @@ void EncAppCfg::xPrintParameter()
     msg(VERBOSE, "IBC:%d ", m_IBCMode);
 #if JVET_AA0061_IBC_MBVD
     msg( VERBOSE, "IBCMBVD:%d ", m_ibcMbvd );
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+    msg(VERBOSE, "IBCBvdPred:%d ", m_bvdPred);
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    msg(VERBOSE, "IBCBvpCluster:%d ", m_bvpCluster);
 #endif
 #if JVET_AC0112_IBC_CIIP
   msg( VERBOSE, "IBCCIIP:%d ", m_ibcCiip);
@@ -5241,7 +5315,16 @@ void EncAppCfg::xPrintParameter()
 
   if (m_resChangeInClvsEnabled)
   {
-    msg( VERBOSE, "RPR:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor, m_scalingRatioVer, m_switchPocPeriod );
+#if JVET_AC0096
+    if (m_rprFunctionalityTestingEnabledFlag)
+    {
+      msg(VERBOSE, "RPR:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor, m_scalingRatioVer, m_rprSwitchingSegmentSize);
+      msg(VERBOSE, "RPR2:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor2, m_scalingRatioVer2, m_rprSwitchingSegmentSize);
+      msg(VERBOSE, "RPR3:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor3, m_scalingRatioVer3, m_rprSwitchingSegmentSize);
+    }
+#else
+    msg(VERBOSE, "RPR:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor, m_scalingRatioVer, m_switchPocPeriod);
+#endif
   }
   else
   {

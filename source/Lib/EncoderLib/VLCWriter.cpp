@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -1585,6 +1585,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_W0123_TIMD_FUSION
   WRITE_FLAG( pcSPS->getUseTimd() ? 1 : 0,                                          "sps_timd_enabled_flag");
 #endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  if (pcSPS->getUseCiip() && pcSPS->getUseTimd())
+  {
+    WRITE_FLAG(pcSPS->getUseCiipTimd() ? 1 : 0, "sps_ciip_timd_enabled_flag");
+  }
+#endif
 #if JVET_AB0155_SGPM
   WRITE_FLAG(pcSPS->getUseSgpm() ? 1 : 0, "sps_sgpm_enabled_flag");
 #endif
@@ -1635,6 +1641,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     WRITE_UVLC(IBC_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumIBCMergeCand(), "six_minus_max_num_ibc_merge_cand");
 #if JVET_AA0061_IBC_MBVD
     WRITE_FLAG( pcSPS->getUseIbcMbvd() ? 1 : 0,                                         "sps_ibc_mbvd_enabled_flag" );
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+    WRITE_FLAG(pcSPS->getUseBvdPred() ? 1 : 0,                                          "sps_ibc_bvd_pred_enabled_flag");
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    WRITE_FLAG(pcSPS->getUseBvpCluster() ? 1 : 0,                                       "sps_ibc_bvp_cluster_enabled_flag");
 #endif
 #if JVET_AC0112_IBC_CIIP
     WRITE_FLAG( pcSPS->getUseIbcCiip() ? 1 : 0,                                         "sps_ibc_ciip_enabled_flag" );

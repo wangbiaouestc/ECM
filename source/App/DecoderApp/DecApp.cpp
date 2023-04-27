@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -630,7 +630,9 @@ void DecApp::xWriteOutput( PicList* pcListPic, uint32_t tId )
   PicList::iterator iterPic   = pcListPic->begin();
   int numPicsNotYetDisplayed = 0;
   int dpbFullness = 0;
-  const SPS* activeSPS = (pcListPic->front()->cs->sps);
+
+  const SPS *activeSPS = m_cDecLib.getActiveSPS();
+
   uint32_t numReorderPicsHighestTid;
   uint32_t maxDecPicBufferingHighestTid;
   uint32_t maxNrSublayers = activeSPS->getMaxTLayers();

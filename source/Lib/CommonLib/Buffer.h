@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -80,18 +80,18 @@ struct PelBufferOps
   void(*bioGradFilter) (Pel* pSrc, int srcStride, int width, int height, int gradStride, Pel* gradX, Pel* gradY, const int bitDepth);
   void(*calcBIOPar)    (const Pel* srcY0Temp, const Pel* srcY1Temp, const Pel* gradX0, const Pel* gradX1, const Pel* gradY0, const Pel* gradY1, int* dotProductTemp1, int* dotProductTemp2, int* dotProductTemp3, int* dotProductTemp5, int* dotProductTemp6, const int src0Stride, const int src1Stride, const int gradStride, const int widthG, const int heightG, const int bitDepth);
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
-  void(*calcBIOParameter)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGY_GX, Pel* dI);
+  void(*calcBIOParameter)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, Pel* dI);
   void(*calAbsSum)          (const Pel* diff, int stride, int width, int height, int* absDiff);
-  void(*calcBIOParamSum5)   (Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGY_GX, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX);
-  void(*calcBIOParamSum4)   (Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGY_GX, int width, int height, const int widthG, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX);
+  void(*calcBIOParamSum5)   (Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx);
+  void(*calcBIOParamSum4)   (Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, int width, int height, const int widthG, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx);
 #if JVET_Z0136_OOB
   void(*addBIOAvgN)         (const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel *gradY1, int gradStride, int width, int height, int* tmpx, int* tmpy, int shift, int offset, const ClpRng& clpRng, bool *mcMask[2], int mcStride, bool *isOOB);
 #else
   void(*addBIOAvgN)         (const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel *gradY1, int gradStride, int width, int height, int* tmpx, int* tmpy, int shift, int offset, const ClpRng& clpRng);
 #endif
-  void(*calcBIOClippedVxVy) (int* sumDIX_pixel_32bit, int* sumAbsGX_pixel_32bit, int* sumDIY_pixel_32bit, int* sumAbsGY_pixel_32bit, int* sumSignGY_GX_pixel_32bit, const int limit, const int bioSubblockSize, int* tmpx_pixel_32bit, int* tmpy_pixel_32bit);
+  void(*calcBIOClippedVxVy) (int* sumDIXSample32bit, int* sumAbsGxSample32bit, int* sumDIYSample32bit, int* sumAbsGySample32bit, int* sumSignGyGxSample32bit, const int limit, const int bioSubblockSize, int* tmpxSample32bit, int* tmpySample32bit);
 #endif
-  void(*calcBIOSums)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int xu, int yu, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGY_GX);
+  void(*calcBIOSums)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int xu, int yu, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx);
   void(*calcBlkGradient)(int sx, int sy, int    *arraysGx2, int     *arraysGxGy, int     *arraysGxdI, int     *arraysGy2, int     *arraysGydI, int     &sGx2, int     &sGy2, int     &sGxGy, int     &sGxdI, int     &sGydI, int width, int height, int unitSize);
   void(*copyBuffer)(Pel *src, int srcStride, Pel *dst, int dstStride, int width, int height);
   void(*padding)(Pel *dst, int stride, int width, int height, int padSize);
@@ -331,55 +331,20 @@ else                                                        \
 template<typename T>
 void AreaBuf<T>::fill(const T &val)
 {
-  if( sizeof( T ) == 1 )
+  if( width == stride )
   {
-    if( width == stride )
-    {
-      ::memset( buf, reinterpret_cast< const signed char& >( val ), width * height * sizeof( T ) );
-    }
-    else
-    {
-      T* dest = buf;
-      size_t line = width * sizeof( T );
-
-      for( unsigned y = 0; y < height; y++ )
-      {
-        ::memset( dest, reinterpret_cast< const signed char& >( val ), line );
-
-        dest += stride;
-      }
-    }
-  }
-  else if( T( 0 ) == val )
-  {
-    if( width == stride )
-    {
-      ::memset( buf, 0, width * height * sizeof( T ) );
-    }
-    else
-    {
-      T* dest = buf;
-      size_t line = width * sizeof( T );
-
-      for( unsigned y = 0; y < height; y++ )
-      {
-        ::memset( dest, 0, line );
-
-        dest += stride;
-      }
-    }
+    std::fill_n( buf, width * height, val );
   }
   else
   {
     T* dest = buf;
 
-#define FILL_INC        dest      += stride
-#define FILL_OP( ADDR ) dest[ADDR] = val
+    for( unsigned y = 0; y < height; y++ )
+    {
+      std::fill_n( dest, width, val );
 
-    SIZE_AWARE_PER_EL_OP( FILL_OP, FILL_INC );
-
-#undef FILL_INC
-#undef FILL_OP
+      dest += stride;
+    }
   }
 }
 
@@ -388,16 +353,15 @@ void AreaBuf<T>::memset( const int val )
 {
   if( width == stride )
   {
-    ::memset( buf, val, width * height * sizeof( T ) );
+    std::fill_n( reinterpret_cast< char * >(buf), width * height * sizeof( T ), val );
   }
   else
   {
-    T* dest = buf;
-    size_t line = width * sizeof( T );
+    T *dest = buf;
 
     for( int y = 0; y < height; y++ )
     {
-      ::memset( dest, val, line );
+      std::fill_n( reinterpret_cast< char * >(dest), width * sizeof( T ), val );
 
       dest += stride;
     }
@@ -547,8 +511,8 @@ void AreaBuf<Pel>::toLast( const ClpRng& clpRng );
 template<typename T>
 void AreaBuf<T>::removeWeightHighFreq(const AreaBuf<T>& other, const bool bClip, const ClpRng& clpRng, const int8_t bcwWeight)
 {
-  const int8_t bcwWeightOther = g_BcwWeightBase - bcwWeight;
-  const int8_t log2WeightBase = g_BcwLog2WeightBase;
+  const int8_t bcwWeightOther = g_bcwWeightBase - bcwWeight;
+  const int8_t log2WeightBase = g_bcwLog2WeightBase;
 
   const Pel* src = other.buf;
   const int  srcStride = other.stride;
@@ -951,7 +915,7 @@ struct UnitBuf
   void padBorderPel         ( unsigned margin, int dir );
   void extendBorderPel      ( unsigned margin );
   void removeHighFreq       ( const UnitBuf<T>& other, const bool bClip, const ClpRngs& clpRngs
-                            , const int8_t bcwWeight = g_BcwWeights[BCW_DEFAULT]
+                            , const int8_t bcwWeight = g_bcwWeights[BCW_DEFAULT]
                             );
 
         UnitBuf<      T> subBuf (const UnitArea& subArea);
@@ -1145,7 +1109,7 @@ void UnitBuf<T>::removeHighFreq( const UnitBuf<T>& other, const bool bClip, cons
                                , const int8_t bcwWeight
                                )
 {
-  if(bcwWeight != g_BcwWeights[BCW_DEFAULT])
+  if(bcwWeight != g_bcwWeights[BCW_DEFAULT])
   {
     bufs[0].removeWeightHighFreq(other.bufs[0], bClip, clpRngs.comp[0], bcwWeight);
     return;

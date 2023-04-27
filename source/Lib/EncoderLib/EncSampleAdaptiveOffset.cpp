@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -293,7 +293,7 @@ void EncSampleAdaptiveOffset::destroyEncData()
 void EncSampleAdaptiveOffset::initCABACEstimator( CABACEncoder* cabacEncoder, CtxCache* ctxCache, Slice* pcSlice )
 {
   m_CABACEstimator = cabacEncoder->getCABACEstimator( pcSlice->getSPS() );
-  m_CtxCache       = ctxCache;
+  m_ctxCache       = ctxCache;
   m_CABACEstimator->initCtxModels( *pcSlice );
   m_CABACEstimator->resetBits();
 }
@@ -938,10 +938,10 @@ void EncSampleAdaptiveOffset::deriveModeNewRDO(const BitDepths &bitDepths, int c
 
   //pre-encode merge flags
   modeParam[COMPONENT_Y].modeIdc = SAO_MODE_OFF;
-  const TempCtx ctxStartBlk   ( m_CtxCache, SAOCtx( m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxStartBlk   ( m_ctxCache, SAOCtx( m_CABACEstimator->getCtx() ) );
   m_CABACEstimator->sao_block_pars( modeParam, bitDepths, sliceEnabled, (mergeList[SAO_MERGE_LEFT]!= NULL), (mergeList[SAO_MERGE_ABOVE]!= NULL), true );
-  const TempCtx ctxStartLuma  ( m_CtxCache, SAOCtx( m_CABACEstimator->getCtx() ) );
-  TempCtx       ctxBestLuma   ( m_CtxCache );
+  const TempCtx ctxStartLuma  ( m_ctxCache, SAOCtx( m_CABACEstimator->getCtx() ) );
+  TempCtx       ctxBestLuma   ( m_ctxCache );
 
     //------ luma --------//
   {
@@ -1070,8 +1070,8 @@ void EncSampleAdaptiveOffset::deriveModeMergeRDO(const BitDepths &bitDepths, int
   SAOBlkParam testBlkParam;
   const int numberOfComponents = m_numberOfComponents;
 
-  const TempCtx ctxStart  ( m_CtxCache, SAOCtx( m_CABACEstimator->getCtx() ) );
-  TempCtx       ctxBest   ( m_CtxCache );
+  const TempCtx ctxStart  ( m_ctxCache, SAOCtx( m_CABACEstimator->getCtx() ) );
+  TempCtx       ctxBest   ( m_ctxCache );
 
   for(int mergeType=0; mergeType< NUM_SAO_MERGE_TYPES; mergeType++)
   {
@@ -1151,7 +1151,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
   bilateralFilter.create();
 #endif
   
-  const TempCtx ctxPicStart ( m_CtxCache, SAOCtx( m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxPicStart ( m_ctxCache, SAOCtx( m_CABACEstimator->getCtx() ) );
 
   SAOBlkParam modeParam;
   double minCost, modeCost;
@@ -1178,8 +1178,8 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
   int     mergeCtuAddr = 1; //Ctu to be merged
   int     groupSize = 1;
   double  Cost[2] = { 0, 0 };
-  TempCtx ctxBeforeMerge(m_CtxCache);
-  TempCtx ctxAfterMerge(m_CtxCache);
+  TempCtx ctxBeforeMerge(m_ctxCache);
+  TempCtx ctxAfterMerge(m_ctxCache);
 
   double totalCost = 0; // Used if bTestSAODisableAtPictureLevel==true
 
@@ -1227,8 +1227,8 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #endif
       }
 
-      const TempCtx  ctxStart ( m_CtxCache, SAOCtx( m_CABACEstimator->getCtx() ) );
-      TempCtx        ctxBest  ( m_CtxCache );
+      const TempCtx  ctxStart ( m_ctxCache, SAOCtx( m_CABACEstimator->getCtx() ) );
+      TempCtx        ctxBest  ( m_ctxCache );
 
       if (ctuRsAddr == (mergeCtuAddr - 1))
       {
@@ -2993,7 +2993,7 @@ void EncSampleAdaptiveOffset::CCSAOProcess(CodingStructure& cs, const double* la
 
   if (cs.slice->getSPS()->getCCSAOEnabledFlag())
   {
-    const TempCtx ctxStartCcSao(m_CtxCache, SubCtx(Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx()));
+    const TempCtx ctxStartCcSao(m_ctxCache, SubCtx(Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx()));
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
     resetblkStatsEdgePre(m_ccSaoStatDataEdgeNew);
     getCcSaoStatisticsEdgeNew(cs, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdgeNew, m_bestCcSaoParam);
@@ -5552,9 +5552,9 @@ void EncSampleAdaptiveOffset::determineCcSaoControlIdc(CodingStructure& cs, cons
 
   double prevRate = curTotalRate;
 
-  TempCtx ctxInitial(m_CtxCache);
-  TempCtx ctxBest(m_CtxCache);
-  TempCtx ctxStart(m_CtxCache);
+  TempCtx ctxInitial(m_ctxCache);
+  TempCtx ctxBest(m_ctxCache);
+  TempCtx ctxStart(m_ctxCache);
   ctxInitial = SubCtx(Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx());
   ctxBest    = SubCtx(Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx());
 
@@ -5756,7 +5756,7 @@ void EncSampleAdaptiveOffset::deriveCcSaoRDO(CodingStructure& cs, const Componen
   const int picHeightC      = cs.pcv->lumaHeight  >> scaleY;
   const int maxTrainingIter = 15;
 
-  const TempCtx ctxStartCcSaoControlFlag  ( m_CtxCache, SubCtx( Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx() ) );
+  const TempCtx ctxStartCcSaoControlFlag  ( m_ctxCache, SubCtx( Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx() ) );
 
   int    trainingIter = 0;
   bool   keepTraining = true;

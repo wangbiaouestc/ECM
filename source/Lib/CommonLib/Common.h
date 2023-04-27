@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -161,25 +161,21 @@ struct UnitScale
 };
 namespace std
 {
-  template <> struct hash<Position>
+  template<> struct hash<Position>
   {
-    size_t operator()(const Position& value) const
-    {
-      return (((size_t)value.x << 32) + value.y);
-    }
+    size_t operator()( const Position &value ) const { return ( ( (size_t)value.x << 32 ) + value.y ); }
   };
 
-  template <> struct hash<Size>
+  template<> struct hash<Size>
   {
-    size_t operator()(const Size& value) const
-    {
-      return (((size_t)value.width << 32) + value.height);
-    }
+    size_t operator()( const Size &value ) const { return ( ( (size_t)value.width << 32 ) + value.height ); }
   };
 }
-inline size_t rsAddr(const Position &pos, const uint32_t stride, const UnitScale &unitScale )
+
+inline ptrdiff_t rsAddr( const Position &pos, const uint32_t stride, const UnitScale &unitScale )
 {
-  return (size_t)(stride >> unitScale.posx) * (size_t)(pos.y >> unitScale.posy) + (size_t)(pos.x >> unitScale.posx);
+  return (ptrdiff_t)( stride >> unitScale.posx ) * (ptrdiff_t)( pos.y >> unitScale.posy )
+    + (ptrdiff_t)( pos.x >> unitScale.posx );
 }
 
 inline size_t rsAddr(const Position &pos, const Position &origin, const uint32_t stride, const UnitScale &unitScale )
@@ -187,9 +183,9 @@ inline size_t rsAddr(const Position &pos, const Position &origin, const uint32_t
   return (stride >> unitScale.posx) * ((pos.y - origin.y) >> unitScale.posy) + ((pos.x - origin.x) >> unitScale.posx);
 }
 
-inline size_t rsAddr(const Position &pos, const uint32_t stride )
+inline ptrdiff_t rsAddr( const Position &pos, const ptrdiff_t stride )
 {
-  return stride * (size_t)pos.y + (size_t)pos.x;
+  return stride * (ptrdiff_t)pos.y + (ptrdiff_t)pos.x;
 }
 
 inline size_t rsAddr(const Position &pos, const Position &origin, const uint32_t stride )

@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2022, ITU/ISO/IEC
+* Copyright (c) 2010-2023, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -282,6 +282,17 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if ENABLE_DIMD
   dimd = other.dimd;
   dimdBlending = other.dimdBlending;
+#if JVET_AC0098_LOC_DEP_DIMD
+#if JVET_AB0157_INTRA_FUSION
+  for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
+  {
+    dimdLocDep[i] = other.dimdLocDep[i];
+  }
+#else
+  dimdLocDep[0] = other.dimdLocDep[0];
+  dimdLocDep[1] = other.dimdLocDep[1];
+#endif
+#endif
   dimdMode = other.dimdMode;
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   dimdChromaMode = other.dimdChromaMode;
@@ -343,7 +354,7 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
   imv               = other.imv;
   imvNumCand        = other.imvNumCand;
-  BcwIdx            = other.BcwIdx;
+  bcwIdx            = other.bcwIdx;
   for (int i = 0; i<2; i++)
     refIdxBi[i] = other.refIdxBi[i];
 
@@ -355,15 +366,22 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if JVET_V0130_INTRA_TMP
   tmpFlag           = other.tmpFlag;
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
+  intraTmpDimdMode = other.intraTmpDimdMode;
+#endif
 #endif
 #if INTER_LIC
-  LICFlag           = other.LICFlag;
+  licFlag           = other.licFlag;
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = other.ibcLicFlag;
 #endif
 #if JVET_AA0070_RRIBC
   rribcFlipType = other.rribcFlipType;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bvOneZeroComp = other.bvOneZeroComp;
+  bvZeroCompDir = other.bvZeroCompDir;
 #endif
 #if JVET_AB0157_TMRL
   tmrlFlag = other.tmrlFlag;
@@ -435,6 +453,17 @@ void CodingUnit::initData()
 #if ENABLE_DIMD
   dimd = false;
   dimdBlending = false;
+#if JVET_AC0098_LOC_DEP_DIMD
+#if JVET_AB0157_INTRA_FUSION
+  for( int i = 0; i < DIMD_FUSION_NUM-1; i++ )
+  {
+    dimdLocDep[i] = 0;
+  }
+#else
+  dimdLocDep[0] = 0;
+  dimdLocDep[1] = 0;
+#endif
+#endif
   dimdMode = -1;
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   dimdChromaMode   = -1;
@@ -499,7 +528,7 @@ void CodingUnit::initData()
 #endif
   imv               = 0;
   imvNumCand        = 0;
-  BcwIdx            = BCW_DEFAULT;
+  bcwIdx            = BCW_DEFAULT;
   for (int i = 0; i < 2; i++)
     refIdxBi[i] = -1;
   smvdMode        = 0;
@@ -510,9 +539,12 @@ void CodingUnit::initData()
 #endif
 #if JVET_V0130_INTRA_TMP
   tmpFlag = false;
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
+  intraTmpDimdMode = -1;
+#endif
 #endif
 #if INTER_LIC
-  LICFlag = false;
+  licFlag = false;
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = false;
@@ -523,6 +555,10 @@ void CodingUnit::initData()
 #if JVET_AB0157_TMRL
   tmrlFlag = false;
   tmrlListIdx = 0;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bvOneZeroComp = 0;
+  bvZeroCompDir = 0;
 #endif
 #if JVET_AC0094_REF_SAMPLES_OPT
   areAboveRightUnavail = false;
@@ -751,7 +787,11 @@ void PredictionUnit::initData()
   intraDir1[1] = PLANAR_IDX;
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
+#if JVET_AC0119_LM_CHROMA_FUSION
+  isChromaFusion = 0;
+#else
   isChromaFusion = false;
+#endif
 #endif
   mipTransposedFlag = false;
   multiRefIdx = 0;
@@ -760,7 +800,7 @@ void PredictionUnit::initData()
   candId = -1;
   parseChromaMode = false;
   mpmFlag = false;
-  ipred_idx = -1;
+  ipredIdx = -1;
 #endif
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = {};
@@ -773,9 +813,12 @@ void PredictionUnit::initData()
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   cccmNoSubFlag = 0;
 #endif
+#if JVET_AC0054_GLCCCM
+  glCccmFlag = 0;
+#endif
 #endif
   // inter data
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = 0;
 #endif
   mergeFlag   = false;
@@ -800,7 +843,7 @@ void PredictionUnit::initData()
   geoTmFlag1 = false;
 #endif
 #endif
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   geoBldIdx = MAX_UCHAR;
 #endif
   mmvdMergeFlag = false;
@@ -860,7 +903,7 @@ void PredictionUnit::initData()
     refIdx[i] = -1;
     mv[i]     .setZero();
     mvd[i]    .setZero();
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
     mvsdIdx[i] = -1;
 #endif
     for( uint32_t j = 0; j < 3; j++ )
@@ -911,7 +954,7 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   candId = predData.candId;
   parseChromaMode = predData.parseChromaMode;
   mpmFlag = predData.mpmFlag;
-  ipred_idx = predData.ipred_idx;
+  ipredIdx = predData.ipredIdx;
 #endif
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = predData.cclmOffsets;
@@ -924,13 +967,16 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   cccmNoSubFlag = predData.cccmNoSubFlag;
 #endif
+#if JVET_AC0054_GLCCCM
+  glCccmFlag = predData.glCccmFlag;
+#endif
 #endif
   return *this;
 }
 
 PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 {
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = predData.colIdx;
 #endif
   mergeFlag   = predData.mergeFlag;
@@ -955,7 +1001,7 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   geoTmFlag1 = predData.geoTmFlag1;
 #endif
 #endif
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   geoBldIdx = predData.geoBldIdx;
 #endif
   mmvdMergeFlag = predData.mmvdMergeFlag;
@@ -1011,7 +1057,7 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
     mv[i]       = predData.mv[i];
     mvd[i]      = predData.mvd[i];
     refIdx[i]   = predData.refIdx[i];
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
     mvsdIdx[i] = predData.mvsdIdx[i];
 #endif
     for( uint32_t j = 0; j < 3; j++ )
@@ -1023,6 +1069,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
       mvAffi[i][j] = predData.mvAffi[i][j];
     }
   }
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bvdSuffixInfo = predData.bvdSuffixInfo;
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   refIdxLC = predData.refIdxLC;
   refPairIdx = predData.refPairIdx;
@@ -1072,11 +1121,14 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   cccmNoSubFlag = other.cccmNoSubFlag;
 #endif
+#if JVET_AC0054_GLCCCM
+  glCccmFlag = other.glCccmFlag;
+#endif
 #endif
 
   mergeFlag   = other.mergeFlag;
   regularMergeFlag = other.regularMergeFlag;
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = other.colIdx;
 #endif
   mergeIdx    = other.mergeIdx;
@@ -1085,7 +1137,7 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   candId = other.candId;
   parseChromaMode = other.parseChromaMode;
   mpmFlag = other.mpmFlag;
-  ipred_idx = other.ipred_idx;
+  ipredIdx = other.ipredIdx;
 #endif
   geoSplitDir  = other.geoSplitDir;
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -1106,7 +1158,7 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   geoTmFlag1 = other.geoTmFlag1;
 #endif
 #endif
-#if JVET_AA0058_GPM_ADP_BLD
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   geoBldIdx = other.geoBldIdx;
 #endif
   mmvdMergeFlag = other.mmvdMergeFlag;
@@ -1162,7 +1214,7 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
     mv[i]       = other.mv[i];
     mvd[i]      = other.mvd[i];
     refIdx[i]   = other.refIdx[i];
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
     mvsdIdx[i] = other.mvsdIdx[i];
 #endif
     for( uint32_t j = 0; j < 3; j++ )
@@ -1174,6 +1226,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
       mvAffi[i][j] = other.mvAffi[i][j];
     }
   }
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bvdSuffixInfo = other.bvdSuffixInfo;
+#endif
+
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   refIdxLC = other.refIdxLC;
   refPairIdx = other.refPairIdx;
@@ -1273,6 +1329,12 @@ CMotionBuf PredictionUnit::getMotionBuf() const
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 bool PredictionUnit::isMvsdApplicable() const
 {
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  if (CU::isIBC(*cu) && cs->sps->getUseBvdPred())
+  {
+    return true;
+  }
+#endif
   if (!cs->sps->getUseMVSD())
   {
     return false;
@@ -1284,6 +1346,31 @@ bool PredictionUnit::isMvsdApplicable() const
   return true;
 }
 #endif
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+bool PredictionUnit::isBvdPredApplicable() const
+{
+  if (!cs->sps->getUseBvdPred())
+  {
+    return false;
+  }
+
+  return true;
+}
+#endif
+
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+bool PredictionUnit::isBvpClusterApplicable() const
+{
+  if (!cs->sps->getUseBvpCluster())
+  {
+    return false;
+  }
+
+  return true;
+}
+#endif
+
 #if JVET_W0123_TIMD_FUSION
 const uint8_t& PredictionUnit::getIpmInfo() const
 {

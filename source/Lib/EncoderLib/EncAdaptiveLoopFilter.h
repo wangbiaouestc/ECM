@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -265,7 +265,7 @@ private:
   AlfCovariance          m_alfCovarianceMerged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES + 2];
   int                    m_alfClipMerged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF];
   CABACWriter*           m_CABACEstimator;
-  CtxCache*              m_CtxCache;
+  CtxCache*              m_ctxCache;
   double                 m_lambda[MAX_NUM_COMPONENT];
 
   int**                  m_filterCoeffSet; // [lumaClassIdx/chromaAltIdx][coeffIdx]

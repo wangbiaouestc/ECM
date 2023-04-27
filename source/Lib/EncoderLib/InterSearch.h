@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2023, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -359,7 +359,7 @@ public:
 public:
   void setBestAmvpRDBeforeLIC(const CodingUnit& cu, double curCuRdCost)
   {
-    m_amvpRdBeforeLIC[cu.imv] = !cu.firstPU->mergeFlag && cu.predMode != MODE_IBC && !cu.LICFlag ? std::min(curCuRdCost, m_amvpRdBeforeLIC[cu.imv]) : m_amvpRdBeforeLIC[cu.imv];
+    m_amvpRdBeforeLIC[cu.imv] = !cu.firstPU->mergeFlag && cu.predMode != MODE_IBC && !cu.licFlag ? std::min(curCuRdCost, m_amvpRdBeforeLIC[cu.imv]) : m_amvpRdBeforeLIC[cu.imv];
   }
 private:
   bool skipLicBasedOnBestAmvpRDBeforeLIC(uint8_t curCuimvIdx, double curBestRdCost)
@@ -454,7 +454,7 @@ protected:
 
   // RD computation
   CABACWriter*    m_CABACEstimator;
-  CtxCache*       m_CtxCache;
+  CtxCache*       m_ctxCache;
   DistParam       m_cDistParam;
 #if JVET_AA0133_INTER_MTS_OPT
   double          m_globalBestLumaCost;
@@ -711,7 +711,11 @@ protected:
   Distortion  xPatternRefinement    ( const CPelBuf* pcPatternKey, Mv baseRefMv, int iFrac, Mv& rcMvFrac, bool bAllowUseOfHadamard );
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  void xEstBvdBitCosts(EstBvdBitsStruct *p, const bool useBvpCluster = true );
+#else
   void xEstBvdBitCosts(EstBvdBitsStruct *p);
+#endif
 #endif
 
    typedef struct
@@ -1133,6 +1137,10 @@ private:
   void xxIBCHashSearch(PredictionUnit &pu, Mv mvPred[3][2], int numMvPred, Mv &mv, int &idxMvPred, IbcHashMap &ibcHashMap, AMVPInfo amvpInfo4Pel[3], int numRribcType);
 #else
   void  xxIBCHashSearch(PredictionUnit& pu, Mv* mvPred, int numMvPred, Mv &mv, int& idxMvPred, IbcHashMap& ibcHashMap);
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  inline void getBestBvpBvOneZeroComp(PredictionUnit &pu, Mv cMv, Distortion initCost, int *bvpIdxBest,
+                                                   AMVPInfo *amvp1Pel = NULL, AMVPInfo *amvp4Pel = NULL);
 #endif
 public:
 #if JVET_AA0133_INTER_MTS_OPT
