@@ -738,7 +738,7 @@ public:
 #if JVET_AC0112_IBC_GPM
   void    motionCompensationIbcGpm(CodingUnit &cu, MergeCtx &ibcGpmMrgCtx, IntraPrediction* pcIntraPred);
 #if JVET_AA0070_RRIBC
-  void    adjustIbcMergeRribcCand(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t startPos, uint32_t endPos);
+  void    adjustIbcMergeRribcCand(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t startPos, uint32_t endPos, bool *isSkipThisCand = NULL);
 #endif
 #endif
 

@@ -5652,7 +5652,7 @@ void InterPrediction::motionCompensationIbcGpm( CodingUnit &cu, MergeCtx &ibcGpm
 }
 
 #if JVET_AA0070_RRIBC
-void  InterPrediction::adjustIbcMergeRribcCand(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t startPos, uint32_t endPos)
+void  InterPrediction::adjustIbcMergeRribcCand(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t startPos, uint32_t endPos, bool* isSkipThisCand)
 {
   if (mrgCtx.numValidMergeCand <= 1)
   {
@@ -5674,11 +5674,15 @@ void  InterPrediction::adjustIbcMergeRribcCand(PredictionUnit &pu, MergeCtx& mrg
   for (uint32_t uiMergeCand = startPos; uiMergeCand < endPos; ++uiMergeCand)
   {
     uiCost = 0;
+    if (mrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0].mv.hor == 0 && mrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0].mv.ver == 0)
+    {
+      break;
+    }
     if (candNumNoRribc >= mrgCtx.numValidMergeCand)
     {
       break;
     }
-    if (mrgCtx.rribcFlipTypes[uiMergeCand] > 0 || (mrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0].mv.hor == 0 && mrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 0].mv.ver == 0))
+    if (mrgCtx.rribcFlipTypes[uiMergeCand] > 0)
     {
       uiCost = MAX_UINT - 1;
       if (noNeedSort && uiMergeCand < mrgCtx.numValidMergeCand)
@@ -5696,6 +5700,13 @@ void  InterPrediction::adjustIbcMergeRribcCand(PredictionUnit &pu, MergeCtx& mrg
   if (!noNeedSort)
   {
     updateIBCCandInfo(pu, mrgCtx, rdCandList, startPos, endPos);
+    if (isSkipThisCand)
+    {
+      for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
+      {
+        isSkipThisCand[i] = isSkipThisCand[rdCandList[i]];
+      }
+    }
   }
 }
 #endif
