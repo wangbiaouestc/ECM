@@ -2526,7 +2526,41 @@ void CABACReader::cccmFlag(PredictionUnit& pu)
 #else
       pu.cccmFlag = (intraDir == MDLM_T_IDX) ? 3 : (intraDir == MDLM_L_IDX) ? 2 : 1;
 #endif
-        
+#if JVET_AD0202_CCCM_MDF
+      bool isCccmWithMdfEnabled = true;
+      if (intraDir == MMLM_CHROMA_IDX)
+      {
+        isCccmWithMdfEnabled = PU::isMultiCccmWithMdf(pu, MMLM_CHROMA_IDX);
+      }
+      else if (intraDir == MMLM_L_IDX)
+      {
+        isCccmWithMdfEnabled = PU::isMultiCccmWithMdf(pu, MMLM_L_IDX);
+      }
+      else if (intraDir == MMLM_T_IDX)
+      {
+        isCccmWithMdfEnabled = PU::isMultiCccmWithMdf(pu, MMLM_T_IDX);
+      }
+
+      if (isCccmWithMdfEnabled)
+      {
+        pu.cccmMultiFilterIdx = m_BinDecoder.decodeBin(Ctx::CccmMpfFlag(0));
+        if (pu.cccmMultiFilterIdx > 0)
+        {
+          pu.cccmMultiFilterIdx += m_BinDecoder.decodeBin(Ctx::CccmMpfFlag(1));
+          if (pu.cccmMultiFilterIdx > 1)
+          {
+            pu.cccmMultiFilterIdx += m_BinDecoder.decodeBin(Ctx::CccmMpfFlag(2));
+          }
+        }
+      }
+      else
+      {
+        pu.cccmMultiFilterIdx = 0;
+      }
+
+      if (!pu.cccmMultiFilterIdx)
+      {
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
       pu.cccmNoSubFlag = 0;
       if ( pu.cs->sps->getUseCccm() == 2 )
@@ -2544,6 +2578,9 @@ void CABACReader::cccmFlag(PredictionUnit& pu)
 #endif
       {
         pu.glCccmFlag = m_BinDecoder.decodeBin( Ctx::CccmFlag( ctxId ) );
+      }
+#endif
+#if JVET_AD0202_CCCM_MDF
       }
 #endif
     }

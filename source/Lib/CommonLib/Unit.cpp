@@ -816,6 +816,9 @@ void PredictionUnit::initData()
 #if JVET_AC0054_GLCCCM
   glCccmFlag = 0;
 #endif
+#if JVET_AD0202_CCCM_MDF
+  cccmMultiFilterIdx = 0;
+#endif
 #endif
   // inter data
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
@@ -970,6 +973,9 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #if JVET_AC0054_GLCCCM
   glCccmFlag = predData.glCccmFlag;
 #endif
+#if JVET_AD0202_CCCM_MDF
+  cccmMultiFilterIdx = predData.cccmMultiFilterIdx;
+#endif
 #endif
   return *this;
 }
@@ -1123,6 +1129,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
 #if JVET_AC0054_GLCCCM
   glCccmFlag = other.glCccmFlag;
+#endif
+#if JVET_AD0202_CCCM_MDF
+  cccmMultiFilterIdx = other.cccmMultiFilterIdx;
 #endif
 #endif
 

@@ -1028,6 +1028,13 @@ static const double CCCM_NO_SUB_WEIGHT    = 1.1;
 static const int CCCM_LOC_SHIFT           = 3;
 static const int CCCM_LOC_OFFSET          = (1 << CCCM_LOC_SHIFT);
 #endif
+#if JVET_AD0202_CCCM_MDF
+static const int CCCM_NUM_PRED_FILTER = 4;
+static const int TOTAL_NUM_CCCM_MODES = CCCM_NUM_MODES * CCCM_NUM_PRED_FILTER;
+static const int VALID_NUM_CCCM_MODES = TOTAL_NUM_CCCM_MODES - 6;
+static const int CCCM_MULTI_PRED_FILTER_NUM_PARAMS = 10;
+static const int CCCM_MULTI_PRED_FILTER_NUM_PARAMS2 = 11;
+#endif
 #endif
 
 #if JVET_AA0126_GLM

@@ -3254,6 +3254,23 @@ const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
   { DWO, },
 #endif
 });
+
+#if JVET_AD0202_CCCM_MDF
+const CtxSet ContextSetCfg::CccmMpfFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+  { DWE, DWE, DWE, },
+  { DWE, DWE, DWE, },
+  { DWE, DWE, DWE, },
+  { DWO, DWO, DWO, },
+  { DWO, DWO, DWO, },
+});
+#endif
 #endif
 
 #if JVET_AC0119_LM_CHROMA_FUSION
