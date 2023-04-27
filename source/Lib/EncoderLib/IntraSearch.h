@@ -493,7 +493,11 @@ private:
   PelStorage      m_colorTransResiBuf;
 #if JVET_AB0143_CCCM_TS
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
+#if JVET_AD0202_CCCM_MDF
+  PelStorage      m_cccmStorage[2][TOTAL_NUM_CCCM_MODES];
+#else
   PelStorage      m_cccmStorage[2][CCCM_NUM_MODES];
+#endif
 #else
   PelStorage      m_cccmStorage[CCCM_NUM_MODES];
 #endif
@@ -540,6 +544,10 @@ public:
   bool            m_skipCCCMSATD;
   int             m_isCccmNoSubModeEnabledInRdo[MMLM_T_IDX + 1];
 #endif 
+#if JVET_AD0202_CCCM_MDF
+  bool            m_skipCCCMwithMdfSATD;
+  int             m_isCccmWithMdfEnabledInRdo[5][MMLM_T_IDX + 1];
+#endif
   IntraSearch();
   ~IntraSearch();
 

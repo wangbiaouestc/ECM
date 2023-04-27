@@ -2467,6 +2467,9 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   m_pcIntraSearch->m_skipCCCMSATD = false;
 #endif
+#if JVET_AD0202_CCCM_MDF
+  m_pcIntraSearch->m_skipCCCMwithMdfSATD = false;
+#endif
   for( int trGrpIdx = 0; trGrpIdx < grpNumMax; trGrpIdx++ )
   {
     const uint8_t startMtsFlag = trGrpIdx > 0;

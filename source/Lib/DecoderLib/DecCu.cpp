@@ -620,10 +620,38 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
     // Create both Cb and Cr predictions when here for Cb
     if( compID == COMPONENT_Cb )
     {
+#if JVET_AD0202_CCCM_MDF
+      PredictionUnit& pu = *tu.cu->firstPU;
+#else
       const PredictionUnit& pu = *tu.cu->firstPU;
+#endif
       PelBuf predCr            = cs.getPredBuf( tu.blocks[COMPONENT_Cr] );
       
+#if JVET_AD0202_CCCM_MDF
+      if (pu.cccmMultiFilterIdx == 1)
+      {
+        m_pcIntraPred->xGetLumaRecPixels(pu, area, 0);
+        m_pcIntraPred->xGetLumaRecPixels(pu, area, 1);
+        m_pcIntraPred->xGetLumaRecPixels(pu, area, 2);
+        m_pcIntraPred->xGetLumaRecPixels(pu, area, 3);
+      }
+      else if (pu.cccmMultiFilterIdx == 2)
+      {
+        m_pcIntraPred->xGetLumaRecPixels(pu, area, 0);
+        m_pcIntraPred->xGetLumaRecPixels(pu, area, 1);
+      }
+      else if (pu.cccmMultiFilterIdx == 3)
+      {
+        m_pcIntraPred->xGetLumaRecPixels(pu, area, 0);
+        m_pcIntraPred->xGetLumaRecPixels(pu, area, 3);
+      }
+      else
+      {
+        m_pcIntraPred->xGetLumaRecPixels(pu, area);
+      }
+#else
       m_pcIntraPred->xGetLumaRecPixels( pu, area );
+#endif
       m_pcIntraPred->predIntraCCCM( pu, piPred, predCr, uiChFinalMode );
     }
   }
