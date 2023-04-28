@@ -519,6 +519,9 @@ struct IntraPredictionData
 #if JVET_AC0054_GLCCCM
   int       glCccmFlag;
 #endif
+#if JVET_AD0202_CCCM_MDF
+  int       cccmMultiFilterIdx;
+#endif
 #endif
 };
 

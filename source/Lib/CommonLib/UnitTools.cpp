@@ -2279,6 +2279,33 @@ bool PU::isTopCccmMode(const PredictionUnit& pu, int intraMode)
 
   return modeIsOk && area.x && area.y;
 }
+
+#if JVET_AD0202_CCCM_MDF
+bool PU::isMultiCccmWithMdf(const PredictionUnit& pu, int intraMode)
+{
+  const Area area = pu.blocks[COMPONENT_Cb];
+  int th, tv;
+  PU::getCccmRefLineNum(pu, area, th, tv);
+  int nsamples;
+  bool nSampleCheck;
+  if (intraMode == MMLM_CHROMA_IDX)
+  {
+    nsamples = ((area.width + th) * (area.height + tv) - (area.area()));
+    nSampleCheck = (nsamples >= 96);
+  }
+  else if (intraMode == MMLM_L_IDX)
+  {
+    nsamples = th * area.height;
+    nSampleCheck = (nsamples >= 256);
+  }
+  else
+  {
+    nsamples = tv * area.width;
+    nSampleCheck = (nsamples >= 256);
+  }
+  return nSampleCheck;
+}
+#endif
 #endif
 #endif
 

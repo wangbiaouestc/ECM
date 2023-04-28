@@ -613,6 +613,9 @@ namespace PU
 #if JVET_AB0143_CCCM_TS
   bool isLeftCccmMode(const PredictionUnit& pu, int intraMode);
   bool isTopCccmMode(const PredictionUnit& pu, int intraMode);
+#if JVET_AD0202_CCCM_MDF
+  bool isMultiCccmWithMdf(const PredictionUnit& pu, int intraMode);
+#endif
 #endif
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
