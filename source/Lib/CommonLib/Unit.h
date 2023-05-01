@@ -707,6 +707,9 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   bool isBvpClusterApplicable() const;
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC)
+  uint32_t          getBvType() const;
+#endif
 };
 
 // ---------------------------------------------------------------------------
@@ -759,6 +762,9 @@ struct TransformUnit : public UnitArea
   TransformUnit& operator=(const TransformUnit& other);
   void copyComponentFrom  (const TransformUnit& other, const ComponentID compID);
   void checkTuNoResidual( unsigned idx );
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  int  countNonZero();
+#endif
   int  getTbAreaAfterCoefZeroOut(ComponentID compID) const;
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   bool checkLFNSTApplied(ComponentID compID);

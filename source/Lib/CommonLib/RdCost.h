@@ -60,8 +60,19 @@ struct EstBvdBitsStruct
 
   uint32_t bitsIdx[2];
   uint32_t bitsImv[2];
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  uint32_t bitsFracImv[4];
+#endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   uint32_t bitsRribc;
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  uint32_t bitsBvType[3];
+#endif
+#if JVET_AA0070_RRIBC && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  uint32_t bitsUseFlip[2];
+#endif
 #endif
 };
 #endif
@@ -169,6 +180,9 @@ private:
 #if JVET_Z0131_IBC_BVD_BINARIZATION
   EstBvdBitsStruct        m_cBvdBitCosts;
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  bool                    m_useFullPelImvForZeroBvd;
+#endif
 
 public:
   RdCost();
@@ -227,7 +241,77 @@ public:
   Distortion     getCost                  ( uint32_t b )                   { return Distortion( m_motionLambda * b ); }
   // for ibc
   void           getMotionCost(int add) { m_dCost = m_dLambdaMotionSAD + add; }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  inline Distortion getBvCostSingle(Mv mv, AMVPInfo& amvpInfo, uint8_t imv, uint8_t imvForZeroBvd, bool zeroMvdCheckX, bool zeroMvdCheckY, uint32_t addExtraBits, uint8_t& mvpIdx)
+  {
+    Mv bv = mv;
+    bv.changeIbcPrecInternal2Amvr(imv);
 
+    auto getMvBinCost = [&](int mvpIdx)
+    {
+      Mv bvp = amvpInfo.mvCand[mvpIdx];
+      bvp.changeIbcPrecInternal2Amvr(imv);
+      Mv bvd = bv - bvp;
+
+      if (imv != imvForZeroBvd && (zeroMvdCheckX || bvd.getHor() == 0) && (zeroMvdCheckY || bvd.getVer() == 0)) // note: zero mvd is allowed only for default IMV mode
+      {
+        return std::numeric_limits<uint32_t>::max();
+      }
+      else
+      {
+        uint32_t binCost = (zeroMvdCheckX ? 0 : xGetExpGolombNumberOfBitsIBCH(bvd.getHor()))
+                         + (zeroMvdCheckY ? 0 : xGetExpGolombNumberOfBitsIBCV(bvd.getVer()))
+                         + m_cBvdBitCosts.bitsIdx[mvpIdx];
+        if (!(imv == imvForZeroBvd && (zeroMvdCheckX || bvd.getHor() == 0) && (zeroMvdCheckY || bvd.getVer() == 0)))
+        {
+          binCost += m_cBvdBitCosts.bitsFracImv[imv];
+        }
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AA0070_RRIBC && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+        if (addExtraBits >= 1 && addExtraBits <= 5)
+        {
+          const static int bvTypeTbl[] = {NOT_VALID,         0, 1, 2, 1, 2}; // 0: 2D, 1: 1-D Hor, 2: 1-D Ver
+          const static int bvFlipTbl[] = {NOT_VALID, NOT_VALID, 0, 0, 1, 1}; // 0: no flip, 1: flip
+
+          binCost += m_cBvdBitCosts.bitsBvType[bvTypeTbl[addExtraBits]];
+          if (addExtraBits > 1)
+          {
+            binCost += m_cBvdBitCosts.bitsUseFlip[bvFlipTbl[addExtraBits]];
+          }
+        }
+#else
+        if (addExtraBits >= 1 && addExtraBits <= 3)
+        {
+          binCost += m_cBvdBitCosts.bitsBvType[addExtraBits - 1];
+        }
+#endif
+#endif
+        return binCost;
+      }
+    };
+
+    uint32_t b0       = getMvBinCost(0);
+    uint32_t b1       = getMvBinCost(1);
+    uint32_t bBest    = (b1 < b0) ? b1 : b0;
+    int      bBestIdx = (b1 < b0) ? 1 : 0;
+
+    mvpIdx = bBestIdx;
+    return Distortion(m_dCost * bBest) >> SCALE_BITS;
+  }
+
+  void setFullPelImvForZeroBvd(bool b) { m_useFullPelImvForZeroBvd = b; }
+#endif
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  inline Mv getBvPred()
+  {
+#if JVET_AA0070_RRIBC
+    return Mv(m_bvPredictors[0][0].getHor(), m_bvPredictors[0][0].getVer());
+#else
+    return Mv(m_bvPredictors[0].getHor(), m_bvPredictors[0].getVer());
+#endif
+  }
+#endif
 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   inline Distortion getBvVerZeroCompCost(int x, bool useIMV, int *tempImv, int *tempIdx, Mv bvp1Pel[2])
@@ -319,6 +403,44 @@ public:
   inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, int rribcFlipType, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL)
 #endif
   {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    const uint32_t fullPelImvCostForZeroBvd = m_useFullPelImvForZeroBvd || rribcFlipType > 0 ? 0 : std::numeric_limits<uint32_t>::max();
+
+    uint32_t b0 = 0;
+    uint32_t b1 = 0;
+    if (useIMV)
+    {
+      if (rribcFlipType == 0)
+      {
+        b0 = (x != m_bvPredictors[rribcFlipType][0].getHor() || y != m_bvPredictors[rribcFlipType][0].getVer()) ? m_cBvdBitCosts.bitsImv[0] : fullPelImvCostForZeroBvd;
+        b1 = (x != m_bvPredictors[rribcFlipType][1].getHor() || y != m_bvPredictors[rribcFlipType][1].getVer()) ? m_cBvdBitCosts.bitsImv[0] : fullPelImvCostForZeroBvd;
+      }
+      else if (rribcFlipType == 1)
+      {
+        b0 = (x != m_bvPredictors[rribcFlipType][0].getHor()) ? m_cBvdBitCosts.bitsImv[0] : fullPelImvCostForZeroBvd;
+        b1 = (x != m_bvPredictors[rribcFlipType][1].getHor()) ? m_cBvdBitCosts.bitsImv[0] : fullPelImvCostForZeroBvd;
+      }
+      else
+      {
+        b0 = (y != m_bvPredictors[rribcFlipType][0].getVer()) ? m_cBvdBitCosts.bitsImv[0] : fullPelImvCostForZeroBvd;
+        b1 = (y != m_bvPredictors[rribcFlipType][1].getVer()) ? m_cBvdBitCosts.bitsImv[0] : fullPelImvCostForZeroBvd;
+      }
+    }
+
+    if (b0 != std::numeric_limits<uint32_t>::max())
+    {
+      b0 += (rribcFlipType == 1) ? 0 : xGetExpGolombNumberOfBitsIBCV(y - m_bvPredictors[rribcFlipType][0].getVer());
+      b0 += (rribcFlipType == 2) ? 0 : xGetExpGolombNumberOfBitsIBCH(x - m_bvPredictors[rribcFlipType][0].getHor());
+      b0 += m_cBvdBitCosts.bitsIdx[0];
+    }
+
+    if (b1 != std::numeric_limits<uint32_t>::max())
+    {
+      b1 += (rribcFlipType == 1) ? 0 : xGetExpGolombNumberOfBitsIBCV(y - m_bvPredictors[rribcFlipType][1].getVer());
+      b1 += (rribcFlipType == 2) ? 0 : xGetExpGolombNumberOfBitsIBCH(x - m_bvPredictors[rribcFlipType][1].getHor());
+      b1 += m_cBvdBitCosts.bitsIdx[1];
+    }
+#else
     uint32_t b0 = (rribcFlipType == 1) ? 0 : xGetExpGolombNumberOfBitsIBCV(y - m_bvPredictors[rribcFlipType][0].getVer());
     b0 += (rribcFlipType == 2) ? 0 : xGetExpGolombNumberOfBitsIBCH(x - m_bvPredictors[rribcFlipType][0].getHor());
     b0 += m_cBvdBitCosts.bitsIdx[0];
@@ -345,6 +467,7 @@ public:
         b1 += (y != m_bvPredictors[rribcFlipType][1].getVer()) ? m_cBvdBitCosts.bitsImv[0] : 0;
       }
     }
+#endif
     uint32_t bBest    = (b1 < b0) ? b1 : b0;
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
     if (useBvpCluster)
@@ -353,7 +476,13 @@ public:
     }
 #endif
     int      bBestIdx = (b1 < b0) ? 1 : 0;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    uint8_t  bestRes  = IMV_FPEL;
+    if(m_useFullPelImvForZeroBvd)
+    {
+#else
     uint8_t  bestRes;
+#endif
     if (rribcFlipType == 0)
     {
       bestRes = (useIMV && (x != m_bvPredictors[rribcFlipType][bBestIdx].getHor() || y != m_bvPredictors[rribcFlipType][bBestIdx].getVer())) ? 1 : 0;
@@ -366,10 +495,17 @@ public:
     {
       bestRes = (useIMV && (y != m_bvPredictors[rribcFlipType][bBestIdx].getVer())) ? 1 : 0;
     }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    }
+#endif
 
     if (bvImvResBest)
     {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      *bvImvResBest = IMV_FPEL;
+#else
       *bvImvResBest = bestRes;
+#endif
       *bvpIdxBest   = bBestIdx;
     }
 

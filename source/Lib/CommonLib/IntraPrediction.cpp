@@ -1874,14 +1874,36 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 }
 
 #if JVET_AC0071_DBV
-void IntraPrediction::predIntraDbv(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu)
+void IntraPrediction::predIntraDbv(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                 , InterPrediction *pcInterPred
+#endif
+)
 {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  Mv mv = refineChromaBv(compId, pu, pcInterPred);
+  bool isFracMv = pu.cs->sps->getIBCFracFlag() && mv.isFracMv<false>(pu.chromaFormat);
+  if (isFracMv)
+  {
+    PelUnitBuf pcBuf(pu.chromaFormat, PelBuf(), piPred, piPred);
+    pcInterPred->getPredIBCBlk(pu, compId, pu.cs->picture, mv, pcBuf);
+  }
+  else
+  {
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  const int bvShftHor = MV_FRACTIONAL_BITS_INTERNAL + ::getComponentScaleX(compId, pu.chromaFormat);
+  const int bvShftVer = MV_FRACTIONAL_BITS_INTERNAL + ::getComponentScaleY(compId, pu.chromaFormat);
+  int refx = pu.blocks[compId].x + (mv.hor >> bvShftHor);
+  int refy = pu.blocks[compId].y + (mv.ver >> bvShftVer);
+#else
   const int shiftSampleHor = ::getComponentScaleX(compId, pu.chromaFormat);
   const int shiftSampleVer = ::getComponentScaleY(compId, pu.chromaFormat);
   Mv chromaBv = Mv(pu.bv.hor >> shiftSampleHor, pu.bv.ver >> shiftSampleVer);
   chromaBv = refineChromaBv(compId, pu);
   int refx = pu.blocks[compId].x + chromaBv.hor;
   int refy = pu.blocks[compId].y + chromaBv.ver;
+#endif
   int refStride = pu.cs->picture->getRecoBuf(compId).stride;
   Pel *ref = pu.cs->picture->getRecoBuf(compId).buf;
   Pel *refTarget = ref + refy * refStride + refx;
@@ -1898,9 +1920,16 @@ void IntraPrediction::predIntraDbv(const ComponentID compId, PelBuf &piPred, con
     refTarget += refStride;
     pred += iStride;
   }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  }
+#endif
 }
 
-Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUnit &pu)
+Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUnit &pu
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                 , InterPrediction *pcInterPred
+#endif
+)
 {
   const CodingStructure &cs = *pu.cs;
   Position posRT = pu.blocks[compId].topRight();
@@ -1909,27 +1938,54 @@ Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUni
   Position posLB = pu.blocks[compId].bottomLeft();
   const PredictionUnit *puLeft = cs.getPURestricted(posLB.offset(-1, 0), pu, pu.chType);
   bool leftCanUse = puLeft && pu.cu != puLeft->cu;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  const int bvShiftHor = MV_FRACTIONAL_BITS_INTERNAL + ::getComponentScaleX(compId, pu.chromaFormat);
+  const int bvShiftVer = MV_FRACTIONAL_BITS_INTERNAL + ::getComponentScaleY(compId, pu.chromaFormat);
+#else
   const int shiftSampleHor = ::getComponentScaleX(compId, pu.chromaFormat);
   const int shiftSampleVer = ::getComponentScaleY(compId, pu.chromaFormat);
+#endif
   if (topCanUse == false && leftCanUse == false)
   {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    return pu.cs->sps->getIBCFracFlag() ? pu.mv[0] : Mv((pu.mv[0].hor >> bvShiftHor) << bvShiftHor, (pu.mv[0].ver >> bvShiftVer) << bvShiftVer);
+#else
     return Mv(pu.bv.hor >> shiftSampleHor, pu.bv.ver >> shiftSampleVer);
+#endif
   }
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  int filterIdx = 1;
+  std::vector<Mv> chromaBvList;
+  chromaBvList.push_back(pu.cs->sps->getIBCFracFlag() ? pu.mv[0] : Mv((pu.mv[0].hor >> bvShiftHor) << bvShiftHor, (pu.mv[0].ver >> bvShiftVer) << bvShiftVer));
+#else
   Mv lumaBv = pu.bv;
   Mv chromaBv(lumaBv.hor >> shiftSampleHor, lumaBv.ver >> shiftSampleVer);
   std::vector<Mv> chromaBvList;
   chromaBvList.push_back(chromaBv);
+#endif
   for (int stephor = 0; stephor < 2; stephor++)
   {
     for (int stepver = 0; stepver < 2; stepver++)
     {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      Mv lumaBv(pu.mv[0].hor + (stephor << MV_FRACTIONAL_BITS_INTERNAL), pu.mv[0].ver + (stepver << MV_FRACTIONAL_BITS_INTERNAL));
+      if (!pu.cs->sps->getIBCFracFlag())
+      {
+        lumaBv.set((lumaBv.hor >> bvShiftHor) << bvShiftHor, (lumaBv.ver >> bvShiftVer) << bvShiftVer);
+      }
+      if (!PU::xCheckSimilarChromaBv(chromaBvList, lumaBv) && PU::checkIsChromaBvCandidateValid(pu, lumaBv, filterIdx))
+      {
+        chromaBvList.push_back(lumaBv);
+      }
+#else
       lumaBv.set(pu.bv.hor + stephor, pu.bv.ver + stepver);
       chromaBv.set(lumaBv.hor >> shiftSampleHor, lumaBv.ver >> shiftSampleVer);
       if (!PU::xCheckSimilarChromaBv(chromaBvList, chromaBv) && PU::checkIsChromaBvCandidateValid(pu, chromaBv))
       {
         chromaBvList.push_back(chromaBv);
       }
+#endif
     }
   }
   if (chromaBvList.size() == 1)
@@ -1967,7 +2023,25 @@ Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUni
         mvTop.setVer(uiHeight);
       }
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      mvTop <<= bvShiftVer;
+#endif
       mvTop += mvCurr;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      if (!PU::checkIsChromaBvCandidateValid(pu, mvTop, filterIdx, true, true))
+      {
+#if JVET_AA0070_RRIBC
+        if (pu.cu->rribcFlipType == 2)
+        {
+          mvTop.setVer(mvCurr.getVer() + ((uiHeight - DBV_TEMPLATE_SIZE) << bvShiftVer));
+        }
+        else
+#endif
+        {
+          mvTop = mvCurr;
+        }
+      }
+#else
 #if JVET_AA0070_RRIBC
       if (pu.cu->rribcFlipType == 2)
       {
@@ -1982,8 +2056,27 @@ Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUni
       {
         mvTop = mvCurr;
       }
+#endif
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      bool isFracMv = pu.cs->sps->getIBCFracFlag() && mvTop.isFracMv<false>(pu.chromaFormat);
+      if (isFracMv)
+      {
+        PelUnitBuf pcBuf(pu.chromaFormat, PelBuf(), PelBuf(refPix + 1, uiWidth, DBV_TEMPLATE_SIZE), PelBuf(refPix + 1, uiWidth, DBV_TEMPLATE_SIZE));
+        pcInterPred->getPredIBCBlk(pu, compId, pu.cs->picture, mvTop, pcBuf, filterIdx == 1);
+#if JVET_AA0070_RRIBC
+        pcBuf.bufs[compId].flip(pu.cu->rribcFlipType);
+#endif
+      }
+      else
+      {
+#endif
       refPixTemp = refPix + 1;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      const Pel *rec = recBuf.bufAt(pu.blocks[compId].pos().offset(mvTop.hor >> bvShiftHor, mvTop.ver >> bvShiftVer));
+#else
       const Pel *rec = recBuf.bufAt(pu.blocks[compId].pos().offset(mvTop.hor, mvTop.ver));
+#endif
       for (int k = 0; k < uiWidth; k++)
       {
         for (int l = 0; l < DBV_TEMPLATE_SIZE; l++)
@@ -2008,6 +2101,9 @@ Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUni
           refPixTemp[k] = recVal;
         }
       }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      }
+#endif
     }
 
     if (leftCanUse)
@@ -2019,7 +2115,25 @@ Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUni
         mvLeft.setHor(uiWidth);
       }
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      mvLeft <<= bvShiftHor;
+#endif
       mvLeft += mvCurr;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      if (!PU::checkIsChromaBvCandidateValid(pu, mvLeft, filterIdx, true, false))
+      {
+#if JVET_AA0070_RRIBC
+        if (pu.cu->rribcFlipType == 1)
+        {
+          mvLeft.setHor(mvCurr.getHor() + ((uiWidth - DBV_TEMPLATE_SIZE) << bvShiftHor));
+        }
+        else
+#endif
+        {
+          mvLeft = mvCurr;
+        }
+      }
+#else
 #if JVET_AA0070_RRIBC
       if (pu.cu->rribcFlipType == 1)
       {
@@ -2034,8 +2148,26 @@ Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUni
       {
         mvLeft = mvCurr;
       }
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      bool isFracMv = pu.cs->sps->getIBCFracFlag() && mvLeft.isFracMv<false>(pu.chromaFormat);
+      if (isFracMv)
+      {
+        PelUnitBuf pcBuf(pu.chromaFormat, PelBuf(), PelBuf(refPix + 1 + stride, DBV_TEMPLATE_SIZE, uiHeight), PelBuf(refPix + 1 + stride, DBV_TEMPLATE_SIZE, uiHeight));
+        pcInterPred->getPredIBCBlk(pu, compId, pu.cs->picture, mvLeft, pcBuf, filterIdx == 1);
+#if JVET_AA0070_RRIBC
+        pcBuf.bufs[compId].flip(pu.cu->rribcFlipType);
+#endif
+      }
+      else
+      {
+#endif
       refPixTemp = refPix + 1 + stride;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      const Pel *rec = recBuf.bufAt(pu.blocks[compId].pos().offset(mvLeft.hor >> bvShiftHor, mvLeft.ver >> bvShiftVer));
+#else
       const Pel *rec = recBuf.bufAt(pu.blocks[compId].pos().offset(mvLeft.hor, mvLeft.ver));
+#endif
       for (int k = 0; k < uiHeight; k++)
       {
         for (int l = 0; l < DBV_TEMPLATE_SIZE; l++)
@@ -2060,6 +2192,9 @@ Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUni
           refPixTemp[k] = recVal;
         }
       }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      }
+#endif
     }
 
     uiCost = 0;

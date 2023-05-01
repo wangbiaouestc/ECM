@@ -921,6 +921,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setPLTMode                                           ( m_PLTMode );
   m_cEncLib.setJointCbCr                                         ( m_JointCbCrMode );
   m_cEncLib.setIBCMode                                           ( m_IBCMode );
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  m_cEncLib.setIBCFracMode                                       ( m_IBCFracMode );
+#endif
   m_cEncLib.setIBCLocalSearchRangeX                              ( m_IBCLocalSearchRangeX );
   m_cEncLib.setIBCLocalSearchRangeY                              ( m_IBCLocalSearchRangeY );
   m_cEncLib.setIBCHashSearch                                     ( m_IBCHashSearch );
@@ -938,6 +941,12 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AC0112_IBC_LIC
   m_cEncLib.setIbcLic                                            ( m_ibcLic );
+#endif
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  m_cEncLib.setRRIbc(m_rribc);
+  m_cEncLib.setTMIbc(m_tmibc);
+  m_cEncLib.setIbcMerge                                          ( m_ibcMerge );
 #endif
 
   m_cEncLib.setUseWrapAround                                     ( m_wrapAround );

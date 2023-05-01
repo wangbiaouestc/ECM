@@ -295,7 +295,11 @@ private:
 #else
   PelStorage            m_acRealMergeBuffer[MRG_MAX_NUM_CANDS];
 #endif
-  PelStorage            m_acMergeTmpBuffer[MRG_MAX_NUM_CANDS];
+  PelStorage            m_acMergeTmpBuffer[MRG_MAX_NUM_CANDS
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0112_IBC_LIC
+                                           + 1
+#endif
+                                          ];
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
   PelStorage            m_acTmMergeTmpBuffer[MRG_MAX_NUM_CANDS];
 #endif

@@ -509,6 +509,9 @@ public:
   static const CtxSet   ChromaQpAdjFlag;
   static const CtxSet   ChromaQpAdjIdc;
   static const CtxSet   ImvFlag;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  static const CtxSet   ImvFlagIBC;
+#endif
 #if ENABLE_DIMD
   static const CtxSet   DimdFlag;
 #endif

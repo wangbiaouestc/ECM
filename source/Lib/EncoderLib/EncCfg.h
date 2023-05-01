@@ -509,6 +509,9 @@ protected:
   unsigned  m_PLTMode;
   bool      m_JointCbCrMode;
   unsigned  m_IBCMode;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  unsigned  m_IBCFracMode;
+#endif
   unsigned  m_IBCLocalSearchRangeX;
   unsigned  m_IBCLocalSearchRangeY;
   unsigned  m_IBCHashSearch;
@@ -517,6 +520,11 @@ protected:
   unsigned  m_IBCFastMethod;
 #if JVET_AA0061_IBC_MBVD
   bool      m_ibcMbvd;
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  bool      m_rribc;
+  bool      m_tmibc;
+  bool      m_ibcMerge;
 #endif
 #if JVET_AC0112_IBC_CIIP
   bool      m_ibcCiip;
@@ -1419,6 +1427,16 @@ public:
   void      setIbcMbvd                      ( bool b )       { m_ibcMbvd = b; }
   bool      getIbcMbvd                      ()         const { return m_ibcMbvd; }
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  void      setRRIbc                        ( bool b )       { m_rribc = b; }
+  bool      getRRIbc                        ()         const { return m_rribc; }
+
+  void      setTMIbc                        ( bool b )       { m_tmibc = b; }
+  bool      getTMIbc                        ()         const { return m_tmibc; }
+
+  void      setIbcMerge                     ( bool b )       { m_ibcMerge = b; }
+  bool      getIbcMerge                     ()         const { return m_ibcMerge; }
+#endif
 #if JVET_AC0112_IBC_CIIP
   void      setIbcCiip                      ( bool b )       { m_ibcCiip = b; }
   bool      getIbcCiip                      ()         const { return m_ibcCiip; }
@@ -1602,6 +1620,10 @@ public:
   bool      getJointCbCr                    ()         const { return m_JointCbCrMode; }
   void      setIBCMode                      (unsigned n)     { m_IBCMode = n; }
   unsigned  getIBCMode                      ()         const { return m_IBCMode; }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  void      setIBCFracMode                  (unsigned n)     { m_IBCFracMode = n; }
+  unsigned  getIBCFracMode                  ()         const { return m_IBCFracMode; }
+#endif
   void      setIBCLocalSearchRangeX         (unsigned n)     { m_IBCLocalSearchRangeX = n; }
   unsigned  getIBCLocalSearchRangeX         ()         const { return m_IBCLocalSearchRangeX; }
   void      setIBCLocalSearchRangeY         (unsigned n)     { m_IBCLocalSearchRangeY = n; }

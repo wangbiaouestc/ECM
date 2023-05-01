@@ -49,8 +49,11 @@
 
 #include "RdCost.h"
 #include "ContextModelling.h"
-#if JVET_Y0065_GPM_INTRA
+#if JVET_Y0065_GPM_INTRA || JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 #include "IntraPrediction.h"
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+class IntraPrediction;
+#endif
 #endif
 // forward declaration
 class Mv;
@@ -77,7 +80,7 @@ struct BMSubBlkInfo : Area
 #endif
 class InterPrediction : public WeightPrediction
 {
-#if INTER_LIC
+#if INTER_LIC || (JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0112_IBC_LIC)
 public:
   PelUnitBuf        m_predictionBeforeLIC;
   bool              m_storeBeforeLIC;
@@ -311,6 +314,11 @@ protected:
                                  , bool fastOBMC = false
 #endif
                                  );
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  void xPredIBCBlkPadding       (const PredictionUnit& pu, ComponentID compID, const Picture* refPic, const ClpRng& clpRng
+                               , CPelBuf& refBufBeforePadding, const Position& refOffsetByIntBv, int xFrac, int yFrac
+                               , int width, int height, int filterIdx, bool& useAltHpelIf);
+#endif
 
   void xAddBIOAvg4              (const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel*gradY1, int gradStride, int width, int height, int tmpx, int tmpy, int shift, int offset, const ClpRng& clpRng);
   void xBioGradFilter           (Pel* pSrc, int srcStride, int width, int height, int gradStride, Pel* gradX, Pel* gradY, int bitDepth);
@@ -378,7 +386,7 @@ protected:
 #else
   MotionInfo      m_subPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
 #endif
-#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC || JVET_AA0061_IBC_MBVD
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC || JVET_AA0061_IBC_MBVD || (JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV)
   Pel*   m_acYuvCurAMLTemplate[2][MAX_NUM_COMPONENT];   //0: top, 1: left
   bool   m_bAMLTemplateAvailabe[2];
   Pel*   m_acYuvRefAboveTemplate[2][MAX_NUM_COMPONENT];   //0: list0, 1: list1
@@ -425,6 +433,10 @@ public:
 #endif
 
   void destroy();
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  template <bool trueAfalseL, int compId> Pel* getCurAMLTemplate() { return m_acYuvCurAMLTemplate[trueAfalseL ? 0 : 1][compId]; }
+  template <bool trueAfalseL, int compId> Pel* getRefAMLTemplate() { return m_acYuvRefAMLTemplate[trueAfalseL ? 0 : 1][compId]; }
+#endif
 
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   void     setUniRefIdxLC(PredictionUnit &pu);
@@ -457,6 +469,32 @@ public:
   void    motionCompensation  (CodingUnit &cu,     const RefPicList &eRefPicList = REF_PIC_LIST_X
     , const bool luma = true, const bool chroma = true
   );
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  inline void getPredIBCBlk(const PredictionUnit& pu, ComponentID comp, const Picture* refPic, const Mv& _mv, PelUnitBuf& dstPic, bool bilinearMC = false
+#if JVET_AC0112_IBC_LIC
+                          , bool bypassIBCLic = false
+#endif
+  )
+  {
+#if JVET_AC0112_IBC_LIC
+    bool ibcLicFlag     = pu.cu->ibcLicFlag;
+    bool storeBeforeLIC = m_storeBeforeLIC;
+    if (bypassIBCLic)
+    {
+      pu.cu->ibcLicFlag = false;
+      m_storeBeforeLIC  = false;
+    }
+#endif
+    xPredInterBlk(comp, pu, refPic, _mv, dstPic, false, pu.cu->slice->clpRng(comp), false, true, SCALE_1X, 0, 0, bilinearMC);
+#if JVET_AC0112_IBC_LIC
+    if (bypassIBCLic)
+    {
+      pu.cu->ibcLicFlag = ibcLicFlag;
+      m_storeBeforeLIC  = storeBeforeLIC;
+    }
+#endif
+  }
+#endif
 #if ENABLE_OBMC
   void    subBlockOBMC(PredictionUnit  &pu, PelUnitBuf *pDst = nullptr);
 #endif

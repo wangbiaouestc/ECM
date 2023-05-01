@@ -738,7 +738,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #if JVET_AC0071_DBV
       if (compID != COMPONENT_Y && uiChFinalMode == DBV_CHROMA_IDX)
       {
-        m_pcIntraPred->predIntraDbv(compID, piPred, pu);
+        m_pcIntraPred->predIntraDbv(compID, piPred, pu
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                  , m_pcInterPred
+#endif
+        );
       }
       else
 #endif
@@ -777,7 +781,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #if JVET_AC0071_DBV
         if (uiChFinalMode == DBV_CHROMA_IDX)
         {
-          m_pcIntraPred->predIntraDbv(COMPONENT_Cr, piPredCr, pu);
+          m_pcIntraPred->predIntraDbv(COMPONENT_Cr, piPredCr, pu
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                    , m_pcInterPred
+#endif
+          );
         }
         else
 #endif
@@ -859,6 +867,9 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 
   if( !tu.cu->ispMode || !isLuma( compID ) )
   {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0071_DBV
+    if (!(uiChFinalMode == DBV_CHROMA_IDX && compID == COMPONENT_Cb))
+#endif
     cs.setDecomp( area );
   }
   else if( tu.cu->ispMode && isLuma( compID ) && CU::isISPFirst( *tu.cu, tu.blocks[compID], compID ) )
@@ -1867,7 +1878,6 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
       CodingStatistics::IncrementStatisticTool( CodingStatisticsClassType{ STATS__TOOL_AFF, pu.Y().width, pu.Y().height } );
     }
 #endif
-
 
     if( pu.mergeFlag )
     {
@@ -3305,6 +3315,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if JVET_AC0104_IBC_BVD_PREDICTION
           if (pu.isBvdPredApplicable() && mvd.isMvsdApplicable())
           {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC)
+            Mv cMvPred = amvpInfo.mvCand[pu.mvpIdx[REF_PIC_LIST_0]];
+            cMvPred.regulateMv(pu.getBvType());
+#else
 #if JVET_AA0070_RRIBC
             auto cMvPred = amvpInfo.mvCand[pu.mvpIdx[REF_PIC_LIST_0]];
             if (pu.cu->rribcFlipType == 1)
@@ -3318,8 +3332,17 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #else
             const auto cMvPred = amvpInfo.mvCand[pu.mvpIdx[REF_PIC_LIST_0]];
 #endif
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+            pu.bvdSuffixInfo.isFracBvEnabled = pu.cs->sps->getIBCFracFlag();
+#endif
             pu.bvdSuffixInfo.initPrefixes(mvd, pu.cu->imv, true);
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+            static std::vector<Mv> cMvdDerivedVec;
+            cMvdDerivedVec.resize(0);
+#else
             std::vector<Mv> cMvdDerivedVec;
+#endif
             m_pcInterPred->deriveBvdSignIBC(cMvPred, mvd, pu, cMvdDerivedVec, pu.cu->imv);
             CHECK(pu.mvsdIdx[REF_PIC_LIST_0] >= cMvdDerivedVec.size(), "pu.mvsdIdx[REF_PIC_LIST_0] out of range");
             int mvsdIdx = pu.mvsdIdx[REF_PIC_LIST_0];
@@ -3334,6 +3357,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           }
           pu.mv[REF_PIC_LIST_0] = amvpInfo.mvCand[pu.mvpIdx[REF_PIC_LIST_0]] + mvd;
           pu.mv[REF_PIC_LIST_0].mvCliptoStorageBitDepth();
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC)
+          pu.mv[REF_PIC_LIST_0].regulateMv(pu.getBvType());
+#else
 #if JVET_AA0070_RRIBC
           if (pu.cu->rribcFlipType == 1)
           {
@@ -3343,6 +3369,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           {
             pu.mv[REF_PIC_LIST_0].setHor(0);
           }
+#endif
 #endif
 #if JVET_Z0160_IBC_ZERO_PADDING
           pu.bv = pu.mv[0];
