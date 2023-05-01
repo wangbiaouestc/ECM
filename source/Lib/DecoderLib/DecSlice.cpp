@@ -316,7 +316,11 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
       resetBcwCodingOrder(true, cs);
     }
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if ((cs.slice->getSliceType() != I_SLICE || cs.slice->getUseIBC()) && ctuXPosInCtus == tileXPosInCtus)
+#else
     if ((cs.slice->getSliceType() != I_SLICE || cs.sps->getIBCFlag()) && ctuXPosInCtus == tileXPosInCtus)
+#endif
     {
 #if JVET_Z0118_GDR
       cs.motionLut.lut0.resize(0);      

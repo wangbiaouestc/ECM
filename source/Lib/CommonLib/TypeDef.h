@@ -193,6 +193,7 @@
 #define JVET_AC0104_IBC_BVD_PREDICTION                    1 // JVET-AC0104: IBC block vector difference prediction (part of JVET-AC0113 Test 3.5a) 
 #define JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV  1 // JVET-AC0060: IBC BVP candidates clustering and BVD sign derivation for BV with one zero component (part of JVET-AC0113 Test 3.5a) 
 #define JVET_AC0071_DBV                                   1 // JVET-AC0071: Direct block vector mode for chroma prediction
+#define JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS   1 // JVET-AD0208: IBC adaptation for camera-captured contents and IBC extension to fractional-pel BV
 
 
 // Inter
@@ -733,6 +734,15 @@ enum PadDirection
   PAD_RIGHT         = 2,
   PAD_LEFT          = 3,
   MAX_PAD_DIRECTION = 4
+};
+#endif
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+enum IbcBvStatus
+{
+  IBC_BV_INVALID,
+  IBC_BV_VALID,
+  IBC_INT_BV_VALID
 };
 #endif
 

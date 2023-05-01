@@ -2811,6 +2811,23 @@ const CtxSet ContextSetCfg::ImvFlag = ContextSetCfg::addCtxSet
   { 117, 147, 117, 116, 119, },
   });
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+const CtxSet ContextSetCfg::ImvFlagIBC = ContextSetCfg::addCtxSet
+({
+  {  59,  33,  50,  59,  53, },
+  {  59,  33,  50,  59,  60, },
+  {  59,  33,  50,  59,  53, },
+  {   1,   5,   1,   0,   4, },
+  {   1,   5,   1,   0,   5, },
+  {   1,   5,   1,   0,   4, },
+  {  11,  18,  11,  32,   4, },
+  {  11,  11,  11,  32,  11, },
+  {  11,  18,  11,  32,   4, },
+  { 126,  92, 126, 116, 118, },
+  { 117, 147, 117, 116, 119, },
+});
+#endif
+
 const CtxSet ContextSetCfg::ctbAlfFlag = ContextSetCfg::addCtxSet
 ({
   {  11,  23,  46,  18,  46,  54,  18,  46,  54, },
@@ -4710,6 +4727,18 @@ const CtxSet ContextSetCfg::ImvFlag = ContextSetCfg::addCtxSet
 	{ 0, 10,  0,  0,  4 }
 });
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+const CtxSet ContextSetCfg::ImvFlagIBC = ContextSetCfg::addCtxSet
+({
+  { 59, 26, 50, 60, 38 },
+  { 59, 48, 58, 60, 60 },
+  { 59, 26, 50, 60, 38 },
+  { 1,  4,  1,  0,  4 },
+  { 0,  5,  1,  0,  4 },
+  { 1,  4,  1,  0,  4 },
+});
+#endif
+
 const CtxSet ContextSetCfg::ctbAlfFlag = ContextSetCfg::addCtxSet
 ({
 	{ 18, 37, 46, 25, 53, 54, 25, 46, 54 },
@@ -5964,6 +5993,16 @@ const CtxSet ContextSetCfg::ImvFlag = ContextSetCfg::addCtxSet
   { CNU,  34, CNU, CNU, CNU, },
   {   0,   5,   0,   0,   4, },
 });
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+const CtxSet ContextSetCfg::ImvFlagIBC = ContextSetCfg::addCtxSet
+({
+  {  59,  26,  50,  60,  38, },
+  {  59,  48,  58,  60,  60, },
+  {  59,  26,  50,  60,  38, },
+  {   0,   5,   0,   0,   4, },
+});
+#endif
 
 const CtxSet ContextSetCfg::ctbAlfFlag = ContextSetCfg::addCtxSet
 ({

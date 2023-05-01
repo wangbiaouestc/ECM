@@ -221,7 +221,14 @@ namespace PU
   Mv adjustChromaBv(const PredictionUnit &lumaPU, const CompArea &lumaArea);
 #endif
   bool xCheckSimilarChromaBv(std::vector<Mv> &chromaBvList, const Mv chromaBv);
-  bool checkIsChromaBvCandidateValid(const PredictionUnit &pu, const Mv chromaBv, bool isRefTemplate = false, bool isRefAbove = false);
+  bool checkIsChromaBvCandidateValid(const PredictionUnit &pu
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                   , const Mv mv
+                                   , int filterIdx = 0
+#else
+                                   , const Mv chromaBv
+#endif
+                                   , bool isRefTemplate = false, bool isRefAbove = false);
 #endif
   int      getWideAngle                   ( const TransformUnit &tu, const uint32_t dirMode, const ComponentID compID );
 #if MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM
@@ -257,11 +264,30 @@ namespace PU
 #if JVET_AA0070_RRIBC
   void rribcAdjustMotion(const PredictionUnit &pu, const Position *cPos, MotionInfo &miNeighbor);
 #endif
-#if  JVET_Y0058_IBC_LIST_MODIFY
-  bool checkIsIBCCandidateValid(const PredictionUnit &pu, const MotionInfo miNeighbor, bool isRefTemplate = false, bool isRefAbove = false);
+#if  JVET_Y0058_IBC_LIST_MODIFY || JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  bool checkIsIBCCandidateValid(const PredictionUnit &pu
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                              ,       MotionInfo miNeighbor
+                              , int  filterIdx = 0
+#else
+                              , const MotionInfo miNeighbor
 #endif
-#if JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0084_IBC_TM || JVET_AA0061_IBC_MBVD
-  bool searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int height, int picWidth, int picHeight, int xBv, int yBv, int ctuSize);
+                              , bool isRefTemplate = false, bool isRefAbove = false
+  );
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  uint32_t checkValidBvPU (const PredictionUnit& pu, ComponentID compID,                                Mv mv, bool ignoreFracMv = false, int filterIdx = 0, bool useAltHPelIF = false);
+  uint32_t checkValidBv   (const PredictionUnit& pu, ComponentID compID, int compWidth, int compHeight, Mv mv, bool ignoreFracMv = false, int filterIdx = 0, bool useAltHPelIF = false
+                         , bool isFinalMC = false // this flag is for non-normative SW speedup
+                         , bool checkAllRefValid = false
+  );
+#endif
+#if JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0084_IBC_TM || JVET_AA0061_IBC_MBVD || JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  bool searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int height, int picWidth, int picHeight, int xBv, int yBv, int ctuSize
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+              , int xFilterTap = 0, int yFilterTap = 0, ComponentID compID = COMPONENT_Y
+#endif
+  );
 #endif
 #if JVET_AA0061_IBC_MBVD
   void getIbcMbvdMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, int numValidBv);
@@ -284,9 +310,17 @@ namespace PU
   inline void       getTemplateLeft(const bool availableLeft, const PredictionUnit &pu, CPelBuf pRecY, PelBuf pTemplateDest,
                                     Position offset, int Height, int templateSize);
   inline void       getTemplateRefTop(const PredictionUnit &pu, CPelBuf pRecY, PelBuf pTempDest, Mv CandMv, int tempWidth,
-                                      int tempHeight);
+                                      int tempHeight
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                    , InterPrediction *pcInter
+#endif
+  );
   inline void       getTemplateRefLeft(const PredictionUnit &pu, CPelBuf pRecY, PelBuf pTempDest, Mv CandMv, int tempWidth,
-                                       int tempHeight);
+                                       int tempHeight
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                     , InterPrediction *pcInter
+#endif
+  );
   inline Distortion getTMCost(const PredictionUnit &pu, CPelBuf pRecY, Mv CandMv, bool availableTmTop,
                               bool availableTmLeft, InterPrediction *pcInter);
   inline void       getRribcBvpCand(PredictionUnit &pu, AMVPInfo *amvpInfo);

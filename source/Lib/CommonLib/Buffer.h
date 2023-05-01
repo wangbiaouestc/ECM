@@ -214,6 +214,9 @@ struct AreaBuf : public Size
 
 #if JVET_AA0070_RRIBC
   void flipSignal(bool isFlipHor);
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  void flip                 ( const int flipType = 0 );
+#endif
 #endif
 
   void rspSignal            ( std::vector<Pel>& pLUT );
@@ -402,6 +405,43 @@ void AreaBuf<T>::copyFrom( const AreaBuf<const T> &other )
     }
   }
 }
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+template<typename T>
+void AreaBuf<T>::flip(int flipType) // flipType = [0] no flip, [1] hor, [2] ver
+{
+  if (buf == nullptr)
+  {
+    return;
+  }
+
+  if (flipType == 2)
+  {
+    T* dstA = buf;
+    T* dstB = buf + (height - 1) * stride;
+    for (int h = (int)(height >> 1); h > 0; --h)
+    {
+      std::swap_ranges(dstA, dstA + width, dstB);
+      dstA += stride;
+      dstB -= stride;
+    }
+  }
+  else if (flipType == 1)
+  {
+    int length = (int)(width >> 1);
+    T* dstL = buf;
+    T* dstR = buf + length;
+    for (int h = (int)height; h > 0; --h)
+    {
+      std::swap_ranges(dstL, dstL + length, dstR);
+      std::reverse(dstL, dstL + length);
+      std::reverse(dstR, dstR + length);
+      dstL += stride;
+      dstR += stride;
+    }
+  }
+}
+#endif
 
 #if MULTI_HYP_PRED
 template<>

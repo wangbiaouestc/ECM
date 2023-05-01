@@ -2580,12 +2580,42 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   READ_FLAG(uiCode, "sps_ibc_enabled_flag");                                    pcSPS->setIBCFlag(uiCode);
   if (pcSPS->getIBCFlag())
   {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    pcSPS->setIBCFracFlag(0);
+    if (pcSPS->getAMVREnabledFlag())
+    {
+      READ_FLAG(uiCode, "sps_ibc_frac_enabled_flag");                            pcSPS->setIBCFracFlag(uiCode);
+    }
+    READ_FLAG(uiCode, "sps_ibc_enabled_flag_inter_slice");                                    pcSPS->setIBCFlagInterSlice(uiCode);
+    READ_FLAG( uiCode, "sps_ibc_merge_enabled_flag" );                                        pcSPS->setUseIbcMerge( uiCode );
+    if( pcSPS->getUseIbcMerge() )
+    {
+#endif
     READ_UVLC(uiCode, "six_minus_max_num_ibc_merge_cand");
     CHECK(IBC_MRG_MAX_NUM_CANDS <= uiCode, "Incorrrect max number of IBC merge candidates!");
     pcSPS->setMaxNumIBCMergeCand(IBC_MRG_MAX_NUM_CANDS - uiCode);
 #if JVET_AA0061_IBC_MBVD
     READ_FLAG( uiCode, "sps_ibc_mbvd_enabled_flag" );                   pcSPS->setUseIbcMbvd             ( uiCode != 0 );
 #endif
+#if JVET_AC0112_IBC_GPM
+    READ_FLAG( uiCode, "sps_ibc_gpm_enabled_flag" );                    pcSPS->setUseIbcGpm              ( uiCode != 0 );
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    }
+    else
+    {
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+      pcSPS->setMaxNumIBCMergeCand( IBC_MRG_MAX_NUM_CANDS );
+#else
+      pcSPS->setMaxNumIBCMergeCand( 0 );
+#endif
+      pcSPS->setUseIbcGpm( 0 );
+      pcSPS->setUseIbcMbvd( 0 );
+    }
+    READ_FLAG(uiCode, "sps_rribc_enabled_flag");                   pcSPS->setUseRRIbc(uiCode != 0);
+    READ_FLAG(uiCode, "sps_tmibc_enabled_flag");                   pcSPS->setUseTMIbc(uiCode != 0);
+#endif
+
 #if JVET_AC0104_IBC_BVD_PREDICTION
     READ_FLAG( uiCode, "sps_bvd_pred_enabled_flag" );                   pcSPS->setUseBvdPred             ( uiCode != 0 );
 #endif
@@ -2593,10 +2623,7 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     READ_FLAG( uiCode, "sps_bvp_cluster_enabled_flag" );                pcSPS->setUseBvpCluster          ( uiCode != 0 );
 #endif
 #if JVET_AC0112_IBC_CIIP
-    READ_FLAG( uiCode, "sps_ibc_ciip_enabled_flag" );                   pcSPS->setUseIbcCiip             ( uiCode != 0 );
-#endif
-#if JVET_AC0112_IBC_GPM
-    READ_FLAG( uiCode, "sps_ibc_gpm_enabled_flag" );                    pcSPS->setUseIbcGpm              ( uiCode != 0 );
+    READ_FLAG(uiCode, "sps_ibc_ciip_enabled_flag");                     pcSPS->setUseIbcCiip(uiCode != 0);
 #endif
 #if JVET_AC0112_IBC_LIC
     READ_FLAG( uiCode, "sps_ibc_lic_enabled_flag" );                    pcSPS->setUseIbcLic              ( uiCode != 0 );
@@ -3752,6 +3779,17 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
     }
   }
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (sps->getIBCFracFlag())
+  {
+    READ_FLAG(uiCode, "ph_fpel_mbvd_enabled_flag");
+    picHeader->setDisFracMBVD(uiCode);
+  }
+  else
+  {
+    picHeader->setDisFracMBVD(true);
+  }
+#endif
 
   if (picHeader->getPicInterSliceAllowedFlag())
   {
@@ -4952,6 +4990,16 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
       pcSlice->setUseLIC(uiCode != 0);
     }
 #endif  
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if ( pcSlice->isIntra())
+    {
+      pcSlice->setUseIBC(sps->getIBCFlag());
+    }
+    else
+    {
+      pcSlice->setUseIBC(sps->getIBCFlagInterSlice());
+    }
+#endif
 
     int qpDelta = 0;
     if (pps->getQpDeltaInfoInPhFlag())

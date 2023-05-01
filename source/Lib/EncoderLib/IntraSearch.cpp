@@ -619,8 +619,12 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
     m_modesForMTS.clear();
     m_modesCoeffAbsSumDCT2.clear();
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    m_bestIntraSADCost = MAX_DOUBLE;
+#endif
   }
 #endif
+
   const bool colorTransformIsEnabled = sps.getUseColorTrans() && !CS::isDualITree(cs);
   const bool isFirstColorSpace       = colorTransformIsEnabled && ((m_pcEncCfg->getRGBFormatFlag() && cu.colorTransform) || (!m_pcEncCfg->getRGBFormatFlag() && !cu.colorTransform));
   const bool isSecondColorSpace      = colorTransformIsEnabled && ((m_pcEncCfg->getRGBFormatFlag() && !cu.colorTransform) || (!m_pcEncCfg->getRGBFormatFlag() && cu.colorTransform));
@@ -706,7 +710,12 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
     int numModesForFullRD = 3;
     numModesForFullRD = g_aucIntraModeNumFast_UseMPM_2D[uiWidthBit - MIN_CU_LOG2][uiHeightBit - MIN_CU_LOG2];
-
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if (m_pcEncCfg->getIBCFastMethod() & IBC_FAST_METHOD_NONSCC)
+    {
+      numModesForFullRD = (numModesForFullRD > 1) ? (numModesForFullRD - 1) : numModesForFullRD;
+    }
+#endif
 #if INTRA_FULL_SEARCH
     numModesForFullRD = numModesAvailable;
 #endif
@@ -932,7 +941,12 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
               // Use the min between SAD and HAD as the cost criterion
               // SAD is scaled by 2 to align with the scaling of HAD
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+              Distortion sadCost = distParamSad.distFunc(distParamSad);
+              minSadHad += std::min(sadCost * 2, distParamHad.distFunc(distParamHad));
+#else
               minSadHad += std::min(distParamSad.distFunc(distParamSad) * 2, distParamHad.distFunc(distParamHad));
+#endif
 
               // NB xFracModeBitsIntra will not affect the mode for chroma that may have already been pre-estimated.
 #if JVET_V0130_INTRA_TMP
@@ -963,7 +977,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               uint64_t fracModeBits = xFracModeBitsIntra(pu, uiMode, CHANNEL_TYPE_LUMA);
 
               double cost = (double) minSadHad + (double) fracModeBits * sqrtLambdaForFirstPass;
-
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+              m_bestIntraSADCost = std::min(m_bestIntraSADCost, cost - (double)minSadHad + (double)sadCost);
+#endif
               DTRACE(g_trace_ctx, D_INTRA_COST, "IntraHAD: %u, %llu, %f (%d)\n", minSadHad, fracModeBits, cost, uiMode);
 
               updateCandList(ModeInfo(false, false, 0, NOT_INTRA_SUBPARTITIONS, uiMode), cost, uiRdModeList,
@@ -995,9 +1011,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
                 // Use the min between SAD and SATD as the cost criterion
                 // SAD is scaled by 2 to align with the scaling of HAD
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                Distortion sadCost = distParamSad.distFunc(distParamSad);
+                Distortion minSadHad = std::min(sadCost * 2, distParamHad.distFunc(distParamHad));
+#else
                 Distortion minSadHad =
                   std::min(distParamSad.distFunc(distParamSad) * 2, distParamHad.distFunc(distParamHad));
-
+#endif
                 // NB xFracModeBitsIntra will not affect the mode for chroma that may have already been
                 // pre-estimated.
 #if JVET_V0130_INTRA_TMP
@@ -1026,7 +1046,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
                 uint64_t fracModeBits = xFracModeBitsIntra(pu, PLANAR_IDX, CHANNEL_TYPE_LUMA);
                 double cost = (double) minSadHad + (double) fracModeBits * sqrtLambdaForFirstPass;
-
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                m_bestIntraSADCost = std::min(m_bestIntraSADCost, cost - (double)minSadHad + (double)sadCost);
+#endif
                 updateCandList(
                   ModeInfo(false, false, 0, NOT_INTRA_SUBPARTITIONS, dirPlanarModeIdx ? PL_VER_IDX : PL_HOR_IDX), cost,
                   uiRdModeList, CandCostList, numModesForFullRD);
@@ -1096,9 +1118,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
                     // Use the min between SAD and SATD as the cost criterion
                     // SAD is scaled by 2 to align with the scaling of HAD
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                    Distortion sadCost = distParamSad.distFunc(distParamSad);
+                    Distortion minSadHad = std::min(sadCost * 2, distParamHad.distFunc(distParamHad));
+#else
                     Distortion minSadHad =
                       std::min(distParamSad.distFunc(distParamSad) * 2, distParamHad.distFunc(distParamHad));
-
+#endif
                     // NB xFracModeBitsIntra will not affect the mode for chroma that may have already been
                     // pre-estimated.
 #if JVET_V0130_INTRA_TMP
@@ -1128,7 +1154,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                     uint64_t fracModeBits = xFracModeBitsIntra(pu, mode, CHANNEL_TYPE_LUMA);
 
                     double cost = (double) minSadHad + (double) fracModeBits * sqrtLambdaForFirstPass;
-
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                    m_bestIntraSADCost = std::min(m_bestIntraSADCost, cost - (double)minSadHad + (double)sadCost);
+#endif
                     updateCandList(ModeInfo(false, false, 0, NOT_INTRA_SUBPARTITIONS, mode), cost, uiRdModeList,
                                    CandCostList, numModesForFullRD);
                     updateCandList(ModeInfo(false, false, 0, NOT_INTRA_SUBPARTITIONS, mode), double(minSadHad),
@@ -1183,9 +1211,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
                   // Use the min between SAD and SATD as the cost criterion
                     // SAD is scaled by 2 to align with the scaling of HAD
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                  Distortion sadCost = distParamSad.distFunc(distParamSad);
+                  Distortion minSadHad = std::min(sadCost * 2, distParamHad.distFunc(distParamHad));
+#else
                   Distortion minSadHad =
                     std::min(distParamSad.distFunc(distParamSad) * 2, distParamHad.distFunc(distParamHad));
-
+#endif
                   // NB xFracModeBitsIntra will not affect the mode for chroma that may have already been pre-estimated.
 #if JVET_V0130_INTRA_TMP
                   m_CABACEstimator->getCtx() = SubCtx(Ctx::TmpFlag, ctxStartTpmFlag);
@@ -1214,6 +1246,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                   uint64_t fracModeBits = xFracModeBitsIntra(pu, pu.intraDir[0], CHANNEL_TYPE_LUMA);
 
                   double cost = (double)minSadHad + (double)fracModeBits * sqrtLambdaForFirstPass;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                  m_bestIntraSADCost = std::min(m_bestIntraSADCost, cost - (double)minSadHad + (double)sadCost);
+#endif
                   updateCandList(ModeInfo(false, false, uiMode, NOT_INTRA_SUBPARTITIONS, 0), cost, uiRdModeList,
                     CandCostList, numModesForFullRD);
                   updateCandList(ModeInfo(false, false, uiMode, NOT_INTRA_SUBPARTITIONS, 0), double(minSadHad),
@@ -1342,15 +1377,21 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #endif
               if (bsuccessfull && foundCandiNum >= 1)
               {
-
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                Distortion sadCost = distParamSad.distFunc(distParamSad);
+                Distortion minSadHad = std::min(sadCost * 2, distParamHad.distFunc(distParamHad));
+#else
                 Distortion minSadHad =
                   std::min(distParamSad.distFunc(distParamSad) * 2, distParamHad.distFunc(distParamHad));
-
+#endif
                 m_CABACEstimator->getCtx() = SubCtx(Ctx::TmpFlag, ctxStartTpmFlag);
 
                 uint64_t fracModeBits = xFracModeBitsIntra(pu, 0, CHANNEL_TYPE_LUMA);
 
                 double cost = double(minSadHad) + double(fracModeBits) * sqrtLambdaForFirstPass;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                m_bestIntraSADCost = std::min(m_bestIntraSADCost, cost - double(minSadHad) + (double)sadCost);
+#endif
                 DTRACE(g_trace_ctx, D_INTRA_COST, "IntraTPM: %u, %llu, %f (%d)\n", minSadHad, fracModeBits, cost, 0);
 
                 updateCandList(ModeInfo(0, 0, 0, NOT_INTRA_SUBPARTITIONS, 0, 1), cost, uiRdModeList, CandCostList, numModesForFullRD);
@@ -1484,14 +1525,21 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
                 // Use the min between SAD and HAD as the cost criterion
                 // SAD is scaled by 2 to align with the scaling of HAD
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                Distortion sadCost = distParamSad.distFunc(distParamSad);
+                Distortion minSadHad = std::min(sadCost * 2, distParamHad.distFunc(distParamHad));
+#else
                 Distortion minSadHad =
                   std::min(distParamSad.distFunc(distParamSad) * 2, distParamHad.distFunc(distParamHad));
-
+#endif
                 m_CABACEstimator->getCtx() = SubCtx(Ctx::MipFlag, ctxStartMipFlag);
 
                 uint64_t fracModeBits = xFracModeBitsIntra(pu, uiMode, CHANNEL_TYPE_LUMA);
 
                 double cost            = double(minSadHad) + double(fracModeBits) * sqrtLambdaForFirstPass;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                m_bestIntraSADCost = std::min(m_bestIntraSADCost, cost - double(minSadHad) + (double)sadCost);
+#endif
                 mipHadCost[uiModeFull] = cost;
                 DTRACE(g_trace_ctx, D_INTRA_COST, "IntraMIP: %u, %llu, %f (%d)\n", minSadHad, fracModeBits, cost,
                        uiModeFull);
@@ -1635,9 +1683,16 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                 predBuf.copyFrom(piPred);
 
                 Distortion minSadHad = 0;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                Distortion sadCost = distParamSad.distFunc(distParamSad);
+                minSadHad += std::min(sadCost * 2, distParamHad.distFunc(distParamHad));
+#else
                 minSadHad += std::min(distParamSad.distFunc(distParamSad) * 2, distParamHad.distFunc(distParamHad));
+#endif
                 double cost = (double) minSadHad + (double) fracModeBits * sqrtLambdaForFirstPass;
-
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                m_bestIntraSADCost = std::min(m_bestIntraSADCost, cost - (double)minSadHad + (double)sadCost);
+#endif
                 updateCandList(ModeInfo(false, false, 0, NOT_INTRA_SUBPARTITIONS, SGPM_IDX,
 #if JVET_V0130_INTRA_TMP
                                         false, //tmpFlag
@@ -1784,6 +1839,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
           CandCostList.resize(numModesForFullRD);
         }
       }
+
 #if ENABLE_DIMD
       bool isDimdValid = cu.slice->getSPS()->getUseDimd();
       if (isDimdValid)
@@ -2583,7 +2639,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
   return validReturn;
 }
 
-void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner, const double maxCostAllowed )
+void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner, const double maxCostAllowed 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                      , InterPrediction* pcInterPred
+#endif
+)
 {
   const ChromaFormat format   = cu.chromaFormat;
   const uint32_t    numberValidComponents = getNumberValidComponents(format);
@@ -3839,7 +3899,14 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         //----- chroma coding -----
         pu.intraDir[1] = chromaIntraMode;
 
-        xRecurIntraChromaCodingQT( cs, partitioner, bestCostSoFar, ispType );
+        xRecurIntraChromaCodingQT( cs, partitioner, bestCostSoFar, ispType 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AB0143_CCCM_TS || JVET_AC0119_LM_CHROMA_FUSION)
+                                  , UnitBuf<Pel>()
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                  , pcInterPred
+#endif
+        );
         if( lumaUsesISP && cs.dist == MAX_UINT )
         {
           continue;
@@ -3938,7 +4005,14 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
             //----- restore context models -----
             m_CABACEstimator->getCtx() = ctxStart;
 
-            xRecurIntraChromaCodingQT( cs, partitioner, bestCostSoFar, ispType );
+            xRecurIntraChromaCodingQT( cs, partitioner, bestCostSoFar, ispType 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AB0143_CCCM_TS || JVET_AC0119_LM_CHROMA_FUSION)
+                                     , UnitBuf<Pel>()
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                     , pcInterPred
+#endif
+            );
             if( lumaUsesISP && cs.dist == MAX_UINT )
             {
               continue;
@@ -4143,6 +4217,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType
 #if JVET_AC0119_LM_CHROMA_FUSION
             , fusionStorage[iModedx]
+#elif JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AB0143_CCCM_TS && !JVET_AC0119_LM_CHROMA_FUSION)
+            , UnitBuf<Pel>()
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+            , pcInterPred
 #endif
           );
           if (lumaUsesISP && cs.dist == MAX_UINT)
@@ -4227,7 +4306,14 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
             //----- restore context models -----
             m_CABACEstimator->getCtx() = ctxStart;
 
-            xRecurIntraChromaCodingQT( cs, partitioner, bestCostSoFar, ispType );
+            xRecurIntraChromaCodingQT( cs, partitioner, bestCostSoFar, ispType 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AB0143_CCCM_TS || JVET_AC0119_LM_CHROMA_FUSION)
+                                     , UnitBuf<Pel>()
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                     , pcInterPred
+#endif
+            );
             if( lumaUsesISP && cs.dist == MAX_UINT )
             {
               continue;
@@ -4460,17 +4546,36 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
 #if JVET_AD0202_CCCM_MDF
           const int cccmBufferIdx = filterIdx * CCCM_NUM_MODES + uiMode;
-          xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType, cccmStorage[sub][cccmBufferIdx]);
+          xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType, cccmStorage[sub][cccmBufferIdx]
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                  , pcInterPred
+#endif
+		  );
 #else
-          xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType, cccmStorage[sub][uiMode]);
+          xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType, cccmStorage[sub][uiMode]
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                  , pcInterPred
+#endif
+	      );
 #endif
 #else
-          xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType, cccmStorage[uiMode]);
+          xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType, cccmStorage[uiMode]
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                  , pcInterPred
+#endif
+          );
 #endif
 #else
           pu.intraDir[1] = chromaIntraMode;
 
-          xRecurIntraChromaCodingQT( cs, partitioner, bestCostSoFar, ispType );
+          xRecurIntraChromaCodingQT( cs, partitioner, bestCostSoFar, ispType 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0119_LM_CHROMA_FUSION
+                                   , UnitBuf<Pel>()
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                   , pcInterPred
+#endif
+          );
 #endif
           if( lumaUsesISP && cs.dist == MAX_UINT )
           {
@@ -5986,7 +6091,11 @@ void IntraSearch::xEncIntraHeader( CodingStructure &cs, Partitioner &partitioner
     // CU header
     if( isFirst )
     {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      if ((!cs.slice->isIntra() || cs.slice->getUseIBC() || cs.slice->getSPS()->getPLTMode())
+#else
       if ((!cs.slice->isIntra() || cs.slice->getSPS()->getIBCFlag() || cs.slice->getSPS()->getPLTMode())
+#endif
           && cu.Y().valid())
       {
         m_CABACEstimator->cu_skip_flag( cu );
@@ -8979,6 +9088,9 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
 #if JVET_AB0143_CCCM_TS || JVET_AC0119_LM_CHROMA_FUSION
   , const PelUnitBuf& predStorage
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  , InterPrediction* pcInterPred
+#endif
 )
 {
   UnitArea currArea                   = partitioner.currArea();
@@ -9024,7 +9136,9 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
 
     TransformUnit &tmpTU = saveCS.addTU(currArea, partitioner.chType);
 
+#if !(JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0071_DBV)
     cs.setDecomp(currArea.Cb(), true); // set in advance (required for Cb2/Cr2 in 4:2:2 video)
+#endif
 
     const unsigned      numTBlocks  = ::getNumberValidTBlocks( *cs.pcv );
 
@@ -9046,6 +9160,12 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
 
     // Do predictions here to avoid repeating the "default0Save1Load2" stuff
     int  predMode   = pu.cu->bdpcmModeChroma ? BDPCM_IDX : PU::getFinalIntraMode(pu, CHANNEL_TYPE_CHROMA);
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0071_DBV
+    if (predMode != DBV_CHROMA_IDX)
+    {
+      cs.setDecomp(currArea.Cb(), true); // set in advance (required for Cb2/Cr2 in 4:2:2 video)
+    }
+#endif
 
     PelBuf piPredCb = cs.getPredBuf(cbArea);
     PelBuf piPredCr = cs.getPredBuf(crArea);
@@ -9104,8 +9224,19 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
 #if JVET_AC0071_DBV
       if (predMode == DBV_CHROMA_IDX)
       {
-        predIntraDbv(COMPONENT_Cb, piPredCb, pu);
-        predIntraDbv(COMPONENT_Cr, piPredCr, pu);
+        predIntraDbv(COMPONENT_Cb, piPredCb, pu
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                  , pcInterPred
+#endif
+        );
+        predIntraDbv(COMPONENT_Cr, piPredCr, pu
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                  , pcInterPred
+#endif
+        );
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0071_DBV
+        cs.setDecomp(currArea.Cb(), true); // set in advance (required for Cb2/Cr2 in 4:2:2 video)
+#endif
       }
       else
       {
@@ -9544,7 +9675,14 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
 
     do
     {
-      ChromaCbfs subCbfs = xRecurIntraChromaCodingQT( cs, partitioner, bestCostSoFar, ispType );
+      ChromaCbfs subCbfs = xRecurIntraChromaCodingQT( cs, partitioner, bestCostSoFar, ispType 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AB0143_CCCM_TS || JVET_AC0119_LM_CHROMA_FUSION)
+                                                    , UnitBuf<Pel>()
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                                    , pcInterPred
+#endif
+      );
 
       for( uint32_t ch = COMPONENT_Cb; ch < numValidTBlocks; ch++ )
       {

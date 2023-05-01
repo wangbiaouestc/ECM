@@ -1108,6 +1108,10 @@ static const int MAX_LADF_INTERVALS       =                         5; /// max n
 static const int MAX_RPR_SWITCHING_ORDER_LIST_SIZE           =     32; /// max number of pre-defined RPR switching segments
 #endif
 static const int NTAPS_BILINEAR           =                         2; ///< Number of taps for bilinear filter
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+static const int NTAPS_LUMA_IBC           =                         8; ///< Number of taps for IBC luma filter
+static const int NTAPS_ALT_LUMA_IBC       =                         4; ///< Number of taps for alternative IBC luma filter
+#endif
 
 #if INTER_RM_SIZE_CONSTRAINTS
 static const int ATMVP_SUB_BLOCK_SIZE =                             2; ///< sub-block size for ATMVP
@@ -1221,6 +1225,12 @@ static const int CHROMA_REFINEMENT_CANDIDATES = 8; /// 8 candidates BV to choose
 static const int IBC_FAST_METHOD_NOINTRA_IBCCBF0 = 0x01;
 static const int IBC_FAST_METHOD_BUFFERBV = 0X02;
 static const int IBC_FAST_METHOD_ADAPTIVE_SEARCHRANGE = 0X04;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+static const int IBC_FAST_METHOD_NONSCC =                         0X08;
+static const int IBC_NONSCC_ENC_RD_NZ_COUNT =                        3;
+static const int IBC_SEARCH_RANGE =                                 32;
+static const int IBC_SUBPEL_AMVR_MODE_FOR_ZERO_MVD =           IMV_OFF;
+#endif
 #if JVET_AA0061_IBC_MBVD
 static const int IBC_MBVD_BASE_NUM =                                 5;
 static const int IBC_MBVD_STEP_NUM =                                 20; // number of distance offset

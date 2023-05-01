@@ -154,7 +154,7 @@ public:
 #endif
 
   void rebindPicBufs();
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   void createTMBuf(const int cbWidth, const int cbHeight);
   void destroyTMBuf();
 #endif
@@ -304,10 +304,12 @@ private:
 public:
   PictureType m_pt; 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   Pel   *m_pCurrTmTop;
   Pel   *m_pCurrTmLeft;
   Pel   *m_pRefTmTop;
   Pel   *m_pRefTmLeft;
+#endif
   PelBuf m_pcBufPredCurTop;
   PelBuf m_pcBufPredCurLeft;
   PelBuf m_pcBufPredRefTop;

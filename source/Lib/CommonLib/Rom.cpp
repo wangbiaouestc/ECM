@@ -5469,5 +5469,7 @@ const int8_t g_ibcGpmSecondSetSplitDir[GEO_NUM_PARTITION_MODE] = {
 0,1,0,0,1,0,1,1,
 0,1,1,0,1,1,0,1
 };
+
 #endif
+
 //! \}

@@ -1380,6 +1380,23 @@ bool PredictionUnit::isBvpClusterApplicable() const
 }
 #endif
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC)
+uint32_t PredictionUnit::getBvType() const
+{
+#if JVET_AA0070_RRIBC
+  int bvType = cu->rribcFlipType;
+#else
+  int bvType = 0;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bvType = isBvpClusterApplicable() ? cu->bvZeroCompDir : bvType;
+#endif
+
+  // 0: 2-D; 1: Hor 1-D; 2: Ver 1-D
+  return bvType;
+}
+#endif
+
 #if JVET_W0123_TIMD_FUSION
 const uint8_t& PredictionUnit::getIpmInfo() const
 {
@@ -1641,6 +1658,27 @@ const CPLTescapeBuf TransformUnit::getescapeValue(const ComponentID id) const { 
 #endif
       bool*         TransformUnit::getRunTypes   (const ComponentID id)       { return  m_runType[id];   }
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+int TransformUnit::countNonZero()
+{
+  if (!cbf[0])
+  {
+    return 0;
+  }
+  int count = 0;
+  auto areaY = Y();
+  auto coeffY = m_coeffs[0];
+  int blksize = areaY.width * areaY.height;
+  for (auto i = 0; i < blksize; ++i)
+  {
+    if (coeffY[i])
+    {
+      count++;
+    }
+  }
+  return count;
+}
+#endif
 void TransformUnit::checkTuNoResidual( unsigned idx )
 {
   if( CU::getSbtIdx( cu->sbtInfo ) == SBT_OFF_DCT )
