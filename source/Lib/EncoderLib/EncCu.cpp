@@ -2713,6 +2713,12 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               PU::spanMotionInfo(*cu.firstPU);
             }
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+            if (!cu.tmpFlag)
+            {
+               PU::spanSCCInfo(*cu.firstPU);
+            }
+#endif
 #if JVET_W0123_TIMD_FUSION
             if (m_pcEncCfg->getUseFastISP() && validCandRet && !mtsFlag && !lfnstIdx && !cu.colorTransform && !cu.timd)
 #else
@@ -3099,6 +3105,13 @@ void EncCu::xCheckPLT(CodingStructure *&tempCS, CodingStructure *&bestCS, Partit
     m_CABACEstimator->cu_skip_flag(cu);
   }
   m_CABACEstimator->pred_mode(cu);
+
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  if (isLuma(partitioner.chType))
+  {
+    PU::spanSCCInfo(*cu.firstPU);
+  }
+#endif
 
   // signaling
   CUCtx cuCtx;
@@ -4174,6 +4187,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             pu.mmvdEncOptMode = 0;
 #if INTER_LIC
             cu.licFlag = affineMergeCtx.licFlags[uiAffMergeCand];
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+            cu.obmcFlag = affineMergeCtx.obmcFlags[uiAffMergeCand];
 #endif
             pu.refIdx[0] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][0].refIdx;
             pu.refIdx[1] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][0].refIdx;
@@ -5313,6 +5329,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if INTER_LIC
         pu.cu->licFlag = affineMergeCtxTmp.licFlags[pu.mergeIdx];
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+        pu.cu->obmcFlag = affineMergeCtxTmp.obmcFlags[pu.mergeIdx];
+#endif
         pu.interDir = affineMergeCtxTmp.interDirNeighbours[pu.mergeIdx];
         pu.cu->affineType = affineMergeCtxTmp.affineType[pu.mergeIdx];
         pu.cu->bcwIdx = affineMergeCtxTmp.bcwIdx[pu.mergeIdx];
@@ -5369,6 +5388,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
         cu.licFlag = affineMergeCtx.licFlags[uiMergeCand];
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+        cu.obmcFlag = affineMergeCtx.obmcFlags[uiMergeCand];
 #endif
         pu.mv[0].setZero();
         pu.mv[1].setZero();
@@ -5786,7 +5808,14 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 
 #if ENABLE_OBMC
       cu.isobmcMC = true;
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+      if (cu.affine == false)
+      {
+#endif
       cu.obmcFlag = true;
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+      }
+#endif
 #if JVET_X0090_CIIP_FIX
       if (!pu.ciipFlag)
       {
@@ -9522,6 +9551,9 @@ void EncCu::xCheckSATDCostAffineMerge(CodingStructure *&tempCS, CodingUnit &cu, 
       pu.refIdx[0] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][0].refIdx;
       pu.refIdx[1] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][0].refIdx;
       // the SbTmvp use xSubPuMC which will need to access the motion buffer for subblock MV
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+      cu.obmcFlag = true;
+#endif
       PU::spanMotionInfo(pu, mrgCtx
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
         , pu.colIdx
@@ -9530,6 +9562,9 @@ void EncCu::xCheckSATDCostAffineMerge(CodingStructure *&tempCS, CodingUnit &cu, 
     }
     else
     {
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+      cu.obmcFlag = affineMergeCtx.obmcFlags[uiAffMergeCand];
+#endif
       PU::setAllAffineMvField(pu, affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0], REF_PIC_LIST_0);
       PU::setAllAffineMvField(pu, affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1], REF_PIC_LIST_1);
     }
@@ -9806,6 +9841,9 @@ void EncCu::xCheckSATDCostAffineMmvdMerge(       CodingStructure*& tempCS,
       pu.cu->affineType = affineMergeCtx.affineType        [pu.mergeIdx];
 #if INTER_LIC
       pu.cu->licFlag    = affineMergeCtx.licFlags          [pu.mergeIdx];
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+      pu.cu->obmcFlag   = affineMergeCtx.obmcFlags         [pu.mergeIdx];
 #endif
       pu.cu->bcwIdx     = affineMergeCtx.bcwIdx            [pu.mergeIdx];
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -15257,12 +15295,19 @@ void EncCu::predInterSearchAdditionalHypothesisMulti(const MEResultVec& in, MERe
     *pu.cu = x.cu;
     pu = x.pu;
 #if JVET_AC0158_PIXEL_AFFINE_MC
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    pu.cu->obmcFlag = (pu.lwidth() * pu.lheight() < 32) || (pu.cu->licFlag == true || pu.cu->cs->sps->getUseOBMC() == false) ? false : !pu.cu->affine;
+#else
     pu.cu->obmcFlag = (pu.lwidth() * pu.lheight() < 32) || (pu.cu->licFlag == true || pu.cu->cs->sps->getUseOBMC() == false) ? false : true;
+#endif
 #endif
 
     if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
     {
       // the SbTmvp use xSubPuMC which will need to access the motion buffer for subblock MV
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+      pu.cu->obmcFlag = (pu.lwidth() * pu.lheight() < 32) || (pu.cu->licFlag == true || pu.cu->cs->sps->getUseOBMC() == false) ? false : true;
+#endif
       PU::spanMotionInfo(pu, mrgCtx
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
         , pu.colIdx
@@ -15464,6 +15509,10 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
 #if ENABLE_OBMC //multi hyp inter IMV
     CodingStructure *prevCS = tempCS;
     PelUnitBuf tempWoOBMCBuf = m_tempWoOBMCBuffer.subBuf(UnitAreaRelative(cu, cu));
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    if (cu.affine == false || pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
+    {
+#endif
     tempWoOBMCBuf.copyFrom(tempCS->getPredBuf(cu));
     cu.isobmcMC = true;
 #if JVET_AC0158_PIXEL_AFFINE_MC
@@ -15473,6 +15522,9 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
 #endif
     m_pcInterSearch->subBlockOBMC(*cu.firstPU);
     cu.isobmcMC = false;
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    }
+#endif
 #endif
     xEncodeInterResidual(tempCS, bestCS, partitioner, encTestMode);
 #if ENABLE_OBMC
@@ -15544,7 +15596,11 @@ void EncCu::xCheckRDCostInterWoOBMC(CodingStructure *&tempCS, CodingStructure *&
   const Distortion uiSADOBMCOn = m_pcRdCost->getDistPart(tempCS->getOrgBuf(cu->Y()), CSWoOBMC->getPredBuf(cu->Y()),
     sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, DF_SAD_FULL_NBIT);
 
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  const double    dOBMCThOff = 0.65;
+#else
   const double    dOBMCThOff = 1.0;
+#endif
   const bool   bCheckOBMCOff = uiSADOBMCOff * dOBMCThOff < uiSADOBMCOn;
 
   if (!bCheckOBMCOff)

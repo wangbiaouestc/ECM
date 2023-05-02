@@ -395,6 +395,9 @@ void InterPrediction::destroy()
 #if MULTI_HYP_PRED
   m_additionalHypothesisStorage.destroy();
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  m_obmcPelStorage.destroy();
+#endif
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC || JVET_AA0061_IBC_MBVD || (JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV)
   for (uint32_t ch = 0; ch < MAX_NUM_COMPONENT; ch++)
   {
@@ -519,6 +522,9 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
     m_colorTransResiBuf[2].create(UnitArea(chromaFormatIDC, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
 #if MULTI_HYP_PRED
     m_additionalHypothesisStorage.create(UnitArea(chromaFormatIDC, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    m_obmcPelStorage.create(UnitArea(chromaFormatIDC, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
 #endif
 
     m_iRefListIdx = -1;
@@ -2963,6 +2969,17 @@ void InterPrediction::xPredAffineBlk(const ComponentID &compID, const Prediction
 #if AFFINE_MMVD
   enable1x1 &= ((pu.mmvdEncOptMode & 3) != 3);
 #endif
+
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  if (pu.mergeFlag && pu.cu->cs->sps->getUseOBMC() && pu.cu->obmcFlag)
+  {
+    if (pu.cu->obmcFlag && isSCC(pu))
+    {
+      pu.cu->obmcFlag = false;
+    }
+  }
+#endif
+
   if (compID == COMPONENT_Y && pu.cu->licFlag == false && pu.cu->cs->sps->getUseOBMC() == true && pu.cu->obmcFlag == true)
   {
     enable1x1 = false;
@@ -5290,6 +5307,16 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
     return;
   }
 
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  if (pu.cu->predMode == MODE_INTER && pu.mergeFlag)
+  {
+    if (isSCC(pu))
+    {
+      return;
+    }
+  }
+#endif
+
   const UnitArea   orgPuArea = pu;
   PredictionUnit subPu = pu;
 
@@ -5539,6 +5566,13 @@ void InterPrediction::xSubblockOBMC(const ComponentID eComp, PredictionUnit &pu,
   const int strideDst = pcYuvPredDst.bufs[eComp].stride;
   const int strideSrc = pcYuvPredSrc.bufs[eComp].stride;
 
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  if (skipObmcConditionByPixel(pu, eComp, iWidth, iHeight, pOrgSrc, strideSrc, pOrgDst, strideDst, pu.cs->sps->getBitDepth(toChannelType(eComp))))
+  {
+    return;
+  }
+#endif
+
   if (iDir == 0) //above
   {
     for (int i = 0; i < iWidth; i++)
@@ -5739,6 +5773,142 @@ void InterPrediction::xSubblockOBMCBlending(const ComponentID eComp, PredictionU
     pDst[1] = ((sumWeight - belowWeight[0] - rightWeight[0]) * pDst[1] + belowWeight[0] * pSrc3[1] + rightWeight[0] * pSrc4[1] + add) >> shift;
   }
 }
+
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+bool InterPrediction::isSCC(const PredictionUnit  &pu)
+{
+  if (pu.cs->sps->getIBCFlag() || pu.cs->sps->getPLTMode() || pu.cs->sps->getBDPCMEnabledFlag())
+  {
+    const uint32_t uiMinCUW = pu.cs->pcv->minCUWidth;
+    for (int iBlkBoundary = 0; iBlkBoundary < 2; iBlkBoundary++)   // 0 - top; 1 - left
+    {
+      unsigned int uiLengthInBlock = ((iBlkBoundary == 0) ? pu.lwidth() / uiMinCUW : pu.lheight() / uiMinCUW);
+      for (unsigned int iSub = 0; iSub < uiLengthInBlock; iSub++)
+      {
+        Position        curOffset = (iBlkBoundary == 0) ? Position(iSub * uiMinCUW, 0) : Position(0, iSub * uiMinCUW);
+        const Position  posCur(pu.lumaPos().offset(curOffset));
+        PredictionUnit *puNeigh  = nullptr;
+        Position        posNeigh = Position(0, 0);
+        if (iBlkBoundary == 0)   // top
+        {
+          posNeigh = posCur.offset(0, -1);
+        }
+        else   // left
+        {
+          posNeigh = posCur.offset(-1, 0);
+        }
+        puNeigh = pu.cs->getPU(posNeigh, pu.chType);
+        if (!puNeigh)
+        {
+          break;
+        }
+
+        MotionInfo miNeigh = puNeigh->getMotionInfo(posNeigh);
+
+        if (miNeigh.isSCC || miNeigh.isRefSCC || miNeigh.isRefRefSCC)
+        {
+          return true;
+        }
+      }
+    }
+    // Non-adjacent candidates
+    const unsigned pLevel              = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
+    int            offsetX             = 0;
+    int            offsetY             = 0;
+    const int      candidateNum[4]     = { 3, 5, 5, 5 };
+    const int      idxMap[4][5]        = { { 0, 1, 4 }, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 } };
+
+    for (int idxDistance = 0; idxDistance < NADISTANCE_LEVEL; idxDistance++)
+    {
+      const int iNonAdjDistanceHor = pu.Y().width * (idxDistance + 1);
+      const int iNonAdjDistanceVer = pu.Y().height * (idxDistance + 1);
+
+      for (int naspIdx = 0; naspIdx < candidateNum[idxDistance]; naspIdx++)
+      {
+        switch (idxMap[idxDistance][naspIdx])
+        {
+        case 0:
+          offsetX = -iNonAdjDistanceHor - 1;
+          offsetY = pu.Y().height + iNonAdjDistanceVer - 1;
+          break;
+        case 1:
+          offsetX = pu.Y().width + iNonAdjDistanceHor - 1;
+          offsetY = -iNonAdjDistanceVer - 1;
+          break;
+        case 2:
+          offsetX = pu.Y().width >> 1;
+          offsetY = -iNonAdjDistanceVer - 1;
+          break;
+        case 3:
+          offsetX = -iNonAdjDistanceHor - 1;
+          offsetY = pu.Y().height >> 1;
+          break;
+        case 4:
+          offsetX = -iNonAdjDistanceHor - 1;
+          offsetY = -iNonAdjDistanceVer - 1;
+          break;
+        default:
+          CHECK(true, "Unknown index for non-adjacent AMVP candidate");
+          break;
+        }
+
+        Position              posNonAdjacent = pu.Y().topLeft().offset(offsetX, offsetY);
+        const PredictionUnit *puNonAdjacent  = pu.cs->getPURestricted(posNonAdjacent, pu, pu.chType);
+        bool isAvailableNonAdjacent          = puNonAdjacent && PU::isDiffMER(pu.lumaPos(), posNonAdjacent, pLevel);
+        if (isAvailableNonAdjacent)
+        {
+          MotionInfo miNonAdjacent = puNonAdjacent->getMotionInfo(posNonAdjacent);
+          if (miNonAdjacent.isSCC || miNonAdjacent.isRefSCC)
+          {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
+// dst is the prediction of the current block
+bool InterPrediction::skipObmcConditionByPixel(PredictionUnit& pu, ComponentID comp, int width, int height, const Pel* src, int strideSrc, const Pel* dst, int strideDst, int bitDepth)
+{
+  const SPS &sps = *pu.cs->sps;
+  const int baseThreshold = 96;
+  const int threshold = baseThreshold << (bitDepth - 8);
+
+  const UnitArea unitArea(pu.chromaFormat, Area(Position(0, 0), pu.Y()));
+  PelUnitBuf refFromNeighbor = m_obmcPelStorage.getBuf(unitArea);
+
+  // reference based checking
+  for (int refList = 0; refList < 2; refList++)
+  {
+    if (pu.interDir & (refList + 1))
+    {
+      Mv mv = pu.mv[refList];
+      clipMv(mv, pu.lumaPos(), pu.lumaSize(), sps, *pu.cs->pps);
+      mv.roundToPrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+      const Picture *refPic = pu.cs->slice->getRefPic(RefPicList(refList), pu.refIdx[refList])->unscaledPic;
+      xPredInterBlk(comp, pu, refPic, mv, refFromNeighbor, false, pu.cs->slice->clpRng(comp), false, false, pu.cs->slice->getScalingRatio(RefPicList(refList), pu.refIdx[refList]));
+      const Pel* ref = refFromNeighbor.bufs[comp].buf;
+      const int strideRef = refFromNeighbor.bufs[comp].stride;
+      const Pel* pred = dst;
+      for (int h = 0; h < height; h++)
+      {
+        for (int w = 0; w < width; w++)
+        {
+          if (std::abs(pred[w] - ref[w]) >= threshold)
+          {
+            return true;
+          }
+        }
+        pred += strideDst;
+        ref += strideRef;
+      }
+    }
+  }
+  return false;
+}
+#endif
 #endif
 
 void InterPrediction::xSubBlockMotionCompensation(PredictionUnit &pu, PelUnitBuf &pcYuvPred)
@@ -10659,6 +10829,9 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
 #if INTER_LIC
     pu.cu->licFlag = affMrgCtx.licFlags[uiMergeCand];
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    pu.cu->obmcFlag = affMrgCtx.obmcFlags[uiMergeCand];
+#endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     pu.colIdx = affMrgCtx.colIdx[uiMergeCand];
 #endif
@@ -10857,6 +11030,9 @@ void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& 
 #if INTER_LIC
     affMrgCtxTmp.licFlags[i] = false;
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    affMrgCtxTmp.obmcFlags[i] = true;
+#endif
   }
   for (uint32_t uiMergeCand = ((mrgCandIdx < 0) ? 0 : (mrgCandIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE)*ADAPTIVE_AFFINE_SUB_GROUP_SIZE); uiMergeCand < (((mrgCandIdx < 0) || ((mrgCandIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE + 1)*ADAPTIVE_AFFINE_SUB_GROUP_SIZE > affMrgCtx.maxNumMergeCand)) ? affMrgCtx.maxNumMergeCand : ((mrgCandIdx / ADAPTIVE_AFFINE_SUB_GROUP_SIZE + 1)*ADAPTIVE_AFFINE_SUB_GROUP_SIZE)); ++uiMergeCand)
   {
@@ -10880,6 +11056,9 @@ void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& 
 #endif
 #if INTER_LIC                                                   
     affMrgCtxTmp.licFlags[uiMergeCand] = affMrgCtx.licFlags[uiMergeCand];
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    affMrgCtxTmp.obmcFlags[uiMergeCand] = affMrgCtx.obmcFlags[uiMergeCand];
 #endif
   }
   //update
@@ -10911,6 +11090,9 @@ void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& 
 #endif
 #if INTER_LIC 
     affMrgCtx.licFlags[uiMergeCand] = affMrgCtxTmp.licFlags[RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_AFFINE_SUB_GROUP_SIZE]];
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    affMrgCtx.obmcFlags[uiMergeCand] = affMrgCtxTmp.obmcFlags[RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE][uiMergeCand % ADAPTIVE_AFFINE_SUB_GROUP_SIZE]];
 #endif
   }
 }
@@ -11479,6 +11661,9 @@ void  InterPrediction::adjustAffineMergeCandidatesOneGroup(PredictionUnit &pu, A
 #if INTER_LIC
     pu.cu->licFlag = affMrgCtx.licFlags[uiMergeCand];
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    pu.cu->obmcFlag = affMrgCtx.obmcFlags[uiMergeCand];
+#endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     pu.colIdx = affMrgCtx.colIdx[uiMergeCand];
 #endif
@@ -11574,6 +11759,9 @@ void  InterPrediction::updateAffineCandInfo2(PredictionUnit &pu, AffineMergeCtx&
 #if INTER_LIC                                                   
     affMrgCtxTmp.licFlags[uiMergeCand] = affMrgCtx.licFlags[uiMergeCand];
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    affMrgCtxTmp.obmcFlags[uiMergeCand] = affMrgCtx.obmcFlags[uiMergeCand];
+#endif
   }
   //update
   for (uint32_t uiMergeCand = 0; uiMergeCand < listsize; ++uiMergeCand)
@@ -11589,6 +11777,9 @@ void  InterPrediction::updateAffineCandInfo2(PredictionUnit &pu, AffineMergeCtx&
     affMrgCtx.bcwIdx[uiMergeCand] = affMrgCtxTmp.bcwIdx[rdCandList[uiMergeCand / listsize][uiMergeCand%listsize]];
 #if INTER_LIC 
     affMrgCtx.licFlags[uiMergeCand] = affMrgCtxTmp.licFlags[rdCandList[uiMergeCand / listsize][uiMergeCand%listsize]];
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    affMrgCtx.obmcFlags[uiMergeCand] = affMrgCtxTmp.obmcFlags[rdCandList[uiMergeCand / listsize][uiMergeCand % listsize]];
 #endif
   }
 }
@@ -12252,6 +12443,13 @@ void InterPrediction::xSubblockTMOBMC(const ComponentID eComp, PredictionUnit &p
   Pel *     pOrgSrc   = pcYuvPredSrc.bufs[eComp].buf;
   const int strideDst = pcYuvPredDst.bufs[eComp].stride;
   const int strideSrc = pcYuvPredSrc.bufs[eComp].stride;
+
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  if (skipObmcConditionByPixel(pu, eComp, iWidth, iHeight, pOrgSrc, strideSrc, pOrgDst, strideDst, pu.cs->sps->getBitDepth(toChannelType(eComp))))
+  {
+    return;
+  }
+#endif
 
   if (iDir == 0)   // above
   {

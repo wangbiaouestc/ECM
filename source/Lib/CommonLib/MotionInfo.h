@@ -168,6 +168,11 @@ struct MvField
 
 struct MotionInfo
 {
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  bool isSCC;
+  bool isRefSCC;
+  bool isRefRefSCC;
+#endif
   bool     isInter;
   bool     isIBCmot;
   char     interDir;
@@ -190,6 +195,17 @@ struct MotionInfo
   MultiHypVec addHypData;
 #endif
   Mv      bv;
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+#if INTER_LIC
+  MotionInfo() : isSCC(false), isRefSCC(false), isRefRefSCC(false), isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, bcwIdx(0), usesLIC(false) { }
+  // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this constructor for anything else
+  MotionInfo(int i) : isSCC(false), isRefSCC(false), isRefRefSCC(false), isInter(i != 0),isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, bcwIdx(0), usesLIC(false) { CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
+#else
+  MotionInfo() : isSCC(false), isRefSCC(false), isRefRefSCC(false), isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, bcwIdx(0) { }
+  // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this constructor for anything else
+  MotionInfo(int i) : isSCC(false), isRefSCC(false), isRefRefSCC(false), isInter(i != 0), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, bcwIdx(0) { CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
+#endif
+#else
 #if INTER_LIC
   MotionInfo() : isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, bcwIdx(0), usesLIC(false) { }
   // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this constructor for anything else
@@ -198,6 +214,7 @@ struct MotionInfo
   MotionInfo() : isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, bcwIdx(0) { }
   // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this constructor for anything else
   MotionInfo(int i) : isInter(i != 0), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, bcwIdx(0) { CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
+#endif
 #endif
 
   bool operator==( const MotionInfo& mi ) const

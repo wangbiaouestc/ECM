@@ -2767,6 +2767,19 @@ const CtxSet ContextSetCfg::SgpmFlag = ContextSetCfg::addCtxSet
 #if ENABLE_OBMC 
 const CtxSet ContextSetCfg::ObmcFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  {  39,  53, },
+  {  39,  53, },
+  { CNU, CNU, },
+  {   1,   7, },
+  {   1,   4, },
+  { DWS, DWS, },
+  {  32,  25, },
+  {  32,   4, },
+  { DWE, DWE, },
+  { 115, 102, },
+  {  98,  68, },
+#else
   {  39, },
   {  39, },
   { CNU, },
@@ -2778,6 +2791,7 @@ const CtxSet ContextSetCfg::ObmcFlag = ContextSetCfg::addCtxSet
   { DWE, },
   { 115, },
   {  98, },
+#endif
   });
 #endif
 

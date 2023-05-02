@@ -1872,7 +1872,11 @@ void CABACReader::obmc_flag(CodingUnit& cu)
   }
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__OBMC, cu.lumaSize());
 
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  cu.obmcFlag = (bool)m_BinDecoder.decodeBin((cu.affine == false || cu.firstPU->addHypData.size() > 0) ? Ctx::ObmcFlag(0) : Ctx::ObmcFlag(1));
+#else
   cu.obmcFlag = (bool)m_BinDecoder.decodeBin(Ctx::ObmcFlag());
+#endif
 }
 #endif
 

@@ -159,6 +159,10 @@ protected:
   int                  m_multiHypActive = 0;
 #endif
 
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  PelStorage           m_obmcPelStorage;
+#endif
+
   ChromaFormat         m_currChromaFormat;
 
   ComponentID          m_maxCompIDToPred;      ///< tells the predictor to only process the components up to (inklusive) this one - useful to skip chroma components during RD-search
@@ -512,6 +516,10 @@ public:
 #endif
 #if ENABLE_OBMC
   void    subBlockOBMC(PredictionUnit  &pu, PelUnitBuf *pDst = nullptr);
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  bool    isSCC(const PredictionUnit  &pu);
+  bool    skipObmcConditionByPixel(PredictionUnit& pu, ComponentID comp, int width, int height, const Pel* src, int strideSrc, const Pel* dst, int strideDst, int bitDepth);
+#endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void    initTplWeightTable();
