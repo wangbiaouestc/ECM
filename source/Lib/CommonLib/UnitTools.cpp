@@ -7407,6 +7407,9 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
   #if INTER_LIC
       affMrgCtx.licFlags[i] = abovePU.cu->licFlag;
   #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+      affMrgCtx.obmcFlags[i] = abovePU.cu->affine ? abovePU.cu->obmcFlag : !abovePU.cu->licFlag;
+#endif
       if (affMrgCtx.numValidMergeCand == mrgCandIdx)
       {
         affMrgCtx.numValidMergeCand++;
@@ -7437,6 +7440,9 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
       affMrgCtx.bcwIdx[i] = BCW_DEFAULT;
 #if INTER_LIC
       affMrgCtx.licFlags[i] = false;
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+      affMrgCtx.obmcFlags[i] = abovePU.cu->affine ? abovePU.cu->obmcFlag : true;
 #endif
       if (affMrgCtx.numValidMergeCand == mrgCandIdx)
       {
@@ -11635,6 +11641,9 @@ bool PU::checkLastAffineMergeCandRedundancy(const PredictionUnit& pu, AffineMerg
 #if INTER_LIC
     affMrgCtx.licFlags[lastIdx] = false;
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    affMrgCtx.obmcFlags[lastIdx] = true;
+#endif
     return false;
   }
   return true;
@@ -11997,6 +12006,9 @@ bool PU::addOneAffineMergeHMVPCand(const PredictionUnit & pu, AffineMergeCtx & a
   affMrgCtx.licFlags[affMrgCtx.numValidMergeCand] = bICflag;
   CHECK( bICflag && mvInfo.interDir == 3, "LIC cannot be used for Bi");
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  affMrgCtx.obmcFlags[affMrgCtx.numValidMergeCand] = !bICflag;
+#endif
 
 
   if (checkLastAffineMergeCandRedundancy(pu, affMrgCtx))
@@ -12062,6 +12074,9 @@ bool PU::addOneInheritedHMVPAffineMergeCand(const PredictionUnit& pu, AffineMerg
 
 #if INTER_LIC
   affMrgCtx.licFlags[affMrgCtx.numValidMergeCand] = false;
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  affMrgCtx.obmcFlags[affMrgCtx.numValidMergeCand] = true;
 #endif
 
   if (checkLastAffineMergeCandRedundancy(pu, affMrgCtx))
@@ -12937,6 +12952,9 @@ void PU::getAffineControlPointCand(const PredictionUnit &pu, MotionInfo mi[4], b
 #if INTER_LIC
   affMrgType.licFlags[affMrgType.numValidMergeCand] = LICFlag;
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  affMrgType.obmcFlags[affMrgType.numValidMergeCand] = !LICFlag;
+#endif
 #if JVET_Z0139_HIST_AFF
   if (!checkLastAffineMergeCandRedundancy(pu, affMrgType))
   {
@@ -13632,6 +13650,9 @@ bool PU::addNonAdjAffineConstructedCPMV(const PredictionUnit &pu, MotionInfo miN
 #if INTER_LIC
     affMrgCtx.licFlags[affMrgCtx.numValidMergeCand] = (dir != 3) ? bLICFlag : false;
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    affMrgCtx.obmcFlags[affMrgCtx.numValidMergeCand] = (dir != 3) ? !bLICFlag : true;
+#endif
 
     affMrgCtx.numValidMergeCand++;
 
@@ -13682,6 +13703,9 @@ void PU::getNonAdjCstMergeCand(const PredictionUnit &pu, AffineMergeCtx &affMrgC
       affMrgCtx.bcwIdx[i]             = BCW_DEFAULT;
 #if INTER_LIC
       affMrgCtx.licFlags[i] = false;
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+      affMrgCtx.obmcFlags[i] = true;
 #endif
     }
 
@@ -13903,6 +13927,9 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
     affMrgCtx.bcwIdx[i] = BCW_DEFAULT;
 #if INTER_LIC
     affMrgCtx.licFlags[i] = false;
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    affMrgCtx.obmcFlags[i] = true;
 #endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
     affMrgCtx.numAffCandToTestEnc = maxNumAffineMergeCand;
@@ -14146,6 +14173,9 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       CHECK( puNeigh->interDir == 3 && puNeigh->cu->licFlag, "LIC should not be enabled for affine bi-pred" );
       affMrgCtx.licFlags[affMrgCtx.numValidMergeCand] = puNeigh->cu->licFlag;
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+      affMrgCtx.obmcFlags[affMrgCtx.numValidMergeCand] = puNeigh->cu->affine ? puNeigh->cu->obmcFlag : !puNeigh->cu->licFlag;
+#endif
 #if JVET_Z0139_HIST_AFF
       if (!checkLastAffineMergeCandRedundancy(pu, affMrgCtx))
       {
@@ -14183,6 +14213,9 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
         affMrgCtxTemp.bcwIdx[i] = BCW_DEFAULT;
 #if INTER_LIC
         affMrgCtxTemp.licFlags[i] = false;
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+        affMrgCtxTemp.obmcFlags[i] = true;
 #endif
         affMrgCtxTemp.candCost[i] = MAX_UINT64;
       }
@@ -14246,6 +14279,9 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
           affMrgCtx.bcwIdx[affMrgCtx.numValidMergeCand] = affMrgCtxTemp.bcwIdx[i];
 #if INTER_LIC
           affMrgCtx.licFlags[affMrgCtx.numValidMergeCand] = affMrgCtxTemp.licFlags[i];
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+          affMrgCtx.obmcFlags[affMrgCtx.numValidMergeCand] = affMrgCtxTemp.obmcFlags[i];
 #endif
           affMrgCtx.candCost[affMrgCtx.numValidMergeCand] = affMrgCtxTemp.candCost[i];
 
@@ -14716,6 +14752,9 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
 
 #if INTER_LIC
       affMrgCtx.licFlags[affMrgCtx.numValidMergeCand] = false;
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+      affMrgCtx.obmcFlags[affMrgCtx.numValidMergeCand] = true;
 #endif
 
       affMrgCtx.affineType[affMrgCtx.numValidMergeCand] = AFFINEMODEL_6PARAM;
@@ -15568,6 +15607,9 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
       MotionBuf mb = pu.getMotionBuf();
       spanIpmInfoInter(pu, mb, ib);
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+      spanSCCInfo(pu);
+#endif
       return;
     }
     MotionBuf mb = pu.getMotionBuf();
@@ -15637,6 +15679,9 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
     spanIpmInfoInter(pu, mb, ib);
 #endif
   }
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    spanSCCInfo(pu);
+#endif
 }
 
 #if JVET_W0123_TIMD_FUSION
@@ -16004,6 +16049,107 @@ void PU::spanIpmInfoInter( PredictionUnit &pu, MotionBuf &mb, IpmBuf &ib)
       ii[x] = ipm;
     }
     ii += ib.stride;
+  }
+}
+#endif
+
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+void PU::spanSCCInfo(PredictionUnit &pu)
+{
+  if (!pu.cs->sps->getIBCFlag() && !pu.cs->sps->getPLTMode() && !pu.cs->sps->getBDPCMEnabledFlag())
+  {
+    return;
+  }
+
+  MotionBuf   mb         = pu.getMotionBuf();
+  MotionInfo *motionInfo = mb.buf;
+
+  const unsigned scale = 4 * std::max<int>(1, 4 * AMVP_DECIMATION_FACTOR / 4);
+  const unsigned mask  = ~(scale - 1);
+  Mv             cMv, cMv0, cMv1;
+  RefPicList     refList;
+  int            refIdx;
+  Position       posY, posY0, posY1;
+#if RPR_ENABLE
+  const Picture *pRefPic0;
+  const Picture *pRefPic1;
+#else
+  Picture *pRefPic0;
+  Picture *pRefPic1;
+#endif
+
+  for (int y = 0; y < mb.height; y++)
+  {
+    for (int x = 0; x < mb.width; x++)
+    {
+      motionInfo[x].isRefSCC    = false;
+      motionInfo[x].isRefRefSCC = false;
+      motionInfo[x].isSCC       = CU::isIBC(*pu.cu) || CU::isPLT(*pu.cu) || (pu.cu->bdpcmMode > 0);
+
+      if (CU::isInter(*pu.cu) && motionInfo[x].isInter && (motionInfo[x].interDir == 1 || motionInfo[x].interDir == 2))
+      {
+        cMv     = motionInfo[x].mv[motionInfo[x].interDir - 1];
+        refList = motionInfo[x].interDir == 1 ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+        refIdx  = motionInfo[x].refIdx[motionInfo[x].interDir - 1];
+        CHECK(refIdx < 0, "unidirectional inter prediction should have a valid refIdx");
+        cMv.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+        posY.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv.getHor();
+        posY.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv.getVer();
+        clipColPos(posY.x, posY.y, pu);
+#if RPR_ENABLE
+        scalePositionInRef(pu, *pu.cs->pps, refList, refIdx, posY);
+        posY.x                  = (posY.x & mask);
+        posY.y                  = (posY.y & mask);
+        const MotionInfo &miRef = pu.cu->slice->getRefPic(refList, refIdx)->unscaledPic->cs->getMotionInfo(posY);
+#else
+        posY.x = (posY.x & mask);
+        posY.y = (posY.y & mask);
+        const MotionInfo &miRef = pu.cu->slice->getRefPic(refList, refIdx)->cs->getMotionInfo(posY);
+#endif
+        motionInfo[x].isRefSCC    = miRef.isSCC;
+        motionInfo[x].isRefRefSCC = miRef.isRefSCC;
+      }
+      else if (CU::isInter(*pu.cu) && motionInfo[x].isInter && motionInfo[x].interDir == 3)
+      {
+#if RPR_ENABLE
+        pRefPic0 = pu.cu->slice->getRefPic(REF_PIC_LIST_0, motionInfo[x].refIdx[0])->unscaledPic;
+#else
+        pRefPic0 = pu.cu->slice->getRefPic(REF_PIC_LIST_0, motionInfo[x].refIdx[0]);
+#endif
+        cMv0 = motionInfo[x].mv[0];
+        cMv0.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+        posY0.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv0.getHor();
+        posY0.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv0.getVer();
+        clipColPos(posY0.x, posY0.y, pu);
+#if RPR_ENABLE
+        scalePositionInRef(pu, *pu.cs->pps, REF_PIC_LIST_0, motionInfo[x].refIdx[0], posY0);
+#endif
+        posY0.x = (posY0.x & mask);
+        posY0.y = (posY0.y & mask);
+        const MotionInfo &mi0Ref     = pRefPic0->cs->getMotionInfo(posY0);
+
+#if RPR_ENABLE
+        pRefPic1 = pu.cu->slice->getRefPic(REF_PIC_LIST_1, motionInfo[x].refIdx[1])->unscaledPic;
+#else
+        pRefPic1 = pu.cu->slice->getRefPic(REF_PIC_LIST_1, motionInfo[x].refIdx[1]);
+#endif
+        cMv1 = motionInfo[x].mv[1];
+        cMv1.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+        posY1.x = pu.Y().x + (x << MIN_CU_LOG2) + cMv1.getHor();
+        posY1.y = pu.Y().y + (y << MIN_CU_LOG2) + cMv1.getVer();
+        clipColPos(posY1.x, posY1.y, pu);
+#if RPR_ENABLE
+        scalePositionInRef(pu, *pu.cs->pps, REF_PIC_LIST_1, motionInfo[x].refIdx[1], posY1);
+#endif
+        posY1.x = (posY1.x & mask);
+        posY1.y = (posY1.y & mask);
+        const MotionInfo &mi1Ref     = pRefPic1->cs->getMotionInfo(posY1);
+
+        motionInfo[x].isRefSCC    = mi0Ref.isSCC || mi1Ref.isSCC;
+        motionInfo[x].isRefRefSCC = mi0Ref.isRefSCC || mi1Ref.isRefSCC;
+      }
+    }
+    motionInfo += mb.stride;
   }
 }
 #endif
@@ -16773,6 +16919,9 @@ void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8
 #endif
   spanIpmInfoInter(pu, mb, ib);
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  spanSCCInfo(pu);
+#endif
 }
 
 #if JVET_W0097_GPM_MMVD_TM
@@ -17185,6 +17334,9 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
   else
 #endif
   spanIpmInfoInter( pu, mb, ib );
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  spanSCCInfo(pu);
 #endif
 }
 

@@ -1110,6 +1110,13 @@ void DecCu::xReconIntraQT( CodingUnit &cu )
         xReconPLT(cu, COMPONENT_Y, 1);
       }
     }
+
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    if (cu.blocks[CHANNEL_TYPE_LUMA].valid())
+    {
+      PU::spanSCCInfo(*cu.firstPU);
+    }
+#endif
     return;
   }
 
@@ -1139,6 +1146,13 @@ void DecCu::xReconIntraQT( CodingUnit &cu )
   if (cu.blocks[CHANNEL_TYPE_LUMA].valid() && cu.tmpFlag)
   {
     PU::spanMotionInfo(*cu.firstPU);
+  }
+#endif
+
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  if (cu.blocks[CHANNEL_TYPE_LUMA].valid() && !cu.tmpFlag)
+  {
+     PU::spanSCCInfo(*cu.firstPU);
   }
 #endif
 }
@@ -2199,6 +2213,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           pu.colIdx = affineMergeCtx.colIdx[pu.mergeIdx];
 #endif
           pu.mergeType = affineMergeCtx.mergeType[pu.mergeIdx];
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+          pu.cu->obmcFlag = (addHypData.size() > 0 && pu.mergeType != MRG_TYPE_SUBPU_ATMVP) ? false : affineMergeCtx.obmcFlags[pu.mergeIdx];
+#endif
           if ( pu.mergeType == MRG_TYPE_SUBPU_ATMVP )
           {
             pu.refIdx[0] = affineMergeCtx.mvFieldNeighbours[(pu.mergeIdx << 1) + 0][0].refIdx;

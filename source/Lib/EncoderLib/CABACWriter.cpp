@@ -1273,7 +1273,11 @@ void CABACWriter::obmc_flag(const CodingUnit& cu)
   {
     return;
   }
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  m_BinEncoder.encodeBin(cu.obmcFlag ? 1 : 0, (cu.affine == false || cu.firstPU->addHypData.size() > 0) ? Ctx::ObmcFlag(0) : Ctx::ObmcFlag(1));
+#else
   m_BinEncoder.encodeBin(cu.obmcFlag ? 1 : 0, Ctx::ObmcFlag());
+#endif
 }
 #endif
 

@@ -477,6 +477,9 @@ namespace PU
   void spanIpmInfoIBC                 (      PredictionUnit &pu, IpmBuf &ib, int bvx, int bvy );
 #endif
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  void spanSCCInfo                    (      PredictionUnit &pu);
+#endif
 #if JVET_AB0155_SGPM
   void spanIpmInfoSgpm                (      PredictionUnit &pu);
 #endif

@@ -671,6 +671,9 @@ public:
 #if INTER_LIC
   bool          licFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  bool          obmcFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#endif
   uint8_t       bcwIdx[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
   int           numValidMergeCand;
   int           numAffCandToTestEnc;
