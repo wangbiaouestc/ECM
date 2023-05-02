@@ -115,6 +115,13 @@ InterPrediction::InterPrediction()
 , m_sumDIYSample32bit(nullptr)
 , m_sumSignGyGxSample32bit(nullptr)
 #endif
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+, m_piDotProduct1(nullptr)
+, m_piDotProduct2(nullptr)
+, m_piDotProduct3(nullptr)
+, m_piDotProduct5(nullptr)
+, m_piDotProduct6(nullptr)
+#endif
 , m_subPuMC(false)
 {
   for( uint32_t ch = 0; ch < MAX_NUM_COMPONENT; ch++ )
@@ -342,6 +349,13 @@ void InterPrediction::destroy()
   xFree(m_sumDIYSample32bit);       m_sumDIYSample32bit = nullptr;
   xFree(m_sumSignGyGxSample32bit);  m_sumSignGyGxSample32bit = nullptr;
 #endif
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+  xFree(m_piDotProduct1);    m_piDotProduct1 = nullptr;
+  xFree(m_piDotProduct2);    m_piDotProduct2 = nullptr;
+  xFree(m_piDotProduct3);    m_piDotProduct3 = nullptr;
+  xFree(m_piDotProduct5);    m_piDotProduct5 = nullptr;
+  xFree(m_piDotProduct6);    m_piDotProduct6 = nullptr;
+#endif
 #if ENABLE_OBMC
   m_tmpObmcBufL0.destroy();
   m_tmpObmcBufT0.destroy();
@@ -520,6 +534,15 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
     m_dIy = (Pel*)xMalloc(Pel, BIO_TEMP_BUFFER_SIZE);
     m_dI = (Pel*)xMalloc(Pel, BIO_TEMP_BUFFER_SIZE);
     m_signGxGy = (Pel*)xMalloc(Pel, BIO_TEMP_BUFFER_SIZE);
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+    m_tmpxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 2);
+    m_tmpySample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 2);
+    m_sumAbsGxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 2);
+    m_sumAbsGySample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 2);
+    m_sumDIXSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 2);
+    m_sumDIYSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 2);
+    m_sumSignGyGxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 2);
+#else
     m_tmpxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
     m_tmpySample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
     m_sumAbsGxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
@@ -527,6 +550,14 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
     m_sumDIXSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
     m_sumDIYSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
     m_sumSignGyGxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
+#endif
+#endif
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+    m_piDotProduct1 = (int32_t*)xMalloc(int32_t, BIO_TEMP_BUFFER_SIZE);
+    m_piDotProduct2 = (int32_t*)xMalloc(int32_t, BIO_TEMP_BUFFER_SIZE);
+    m_piDotProduct3 = (int32_t*)xMalloc(int32_t, BIO_TEMP_BUFFER_SIZE);
+    m_piDotProduct5 = (int32_t*)xMalloc(int32_t, BIO_TEMP_BUFFER_SIZE);
+    m_piDotProduct6 = (int32_t*)xMalloc(int32_t, BIO_TEMP_BUFFER_SIZE);
 #endif
 #if ENABLE_OBMC
     m_tmpObmcBufL0.create(UnitArea(chromaFormatIDC, Area(0, 0, 4, MAX_CU_SIZE)));
@@ -1041,8 +1072,18 @@ void InterPrediction::xPredInterBiSubPuBDOF(PredictionUnit &pu, PelUnitBuf &pcYu
   bool bioApplied = true;
   // common variable for all subPu
   const bool lumaOnly = (luma && !chroma), chromaOnly = (!luma && chroma);
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+  int scaleBDOF = 2;
+  if (pu.lumaSize().width * pu.lumaSize().height < BDOF_SUBPU_AREA_THRESHOLD)
+  {
+    scaleBDOF = 1;
+  }
+  const int bioDy = std::min<int>(pu.lumaSize().height, BDOF_SUBPU_DIM * scaleBDOF);
+  const int bioDx = std::min<int>(pu.lumaSize().width,  BDOF_SUBPU_DIM * scaleBDOF);
+#else
   const int bioDy = std::min<int>(pu.lumaSize().height, BDOF_SUBPU_DIM);
   const int bioDx = std::min<int>(pu.lumaSize().width,  BDOF_SUBPU_DIM);
+#endif
   const int scaleX = getComponentScaleX(COMPONENT_Cb, pu.chromaFormat);
   const int scaleY = getComponentScaleY(COMPONENT_Cb, pu.chromaFormat);
   CPelUnitBuf srcPred0 = ( pu.chromaFormat == CHROMA_400 ?
@@ -1057,13 +1098,45 @@ void InterPrediction::xPredInterBiSubPuBDOF(PredictionUnit &pu, PelUnitBuf &pcYu
   CHECK(subPu.refIdx[1] < 0, "this is not possible for BDOF");
   int bioSubPuIdx = 0;
   const int bioSubPuStrideIncr = BDOF_SUBPU_STRIDE - std::max(1, (int)(pu.lumaSize().width >> BDOF_SUBPU_DIM_LOG2));
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+  int bioDx2 = bioDx;
+  int bioDy2 = bioDy;
+#endif
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+  for (int y = puPos.y, yStart = 0; y < (puPos.y + pu.lumaSize().height); y = y + bioDy2, yStart = yStart + bioDy2)
+#else
   for (int y = puPos.y, yStart = 0; y < (puPos.y + pu.lumaSize().height); y = y + bioDy, yStart = yStart + bioDy)
+#endif
   {
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+    for (int x = puPos.x, xStart = 0; x < (puPos.x + pu.lumaSize().width); x = x + bioDx2, xStart = xStart + bioDx2)
+#else
     for (int x = puPos.x, xStart = 0; x < (puPos.x + pu.lumaSize().width); x = x + bioDx, xStart = xStart + bioDx)
+#endif
     {
       Mv bioMv = m_bdofSubPuMvOffset[bioSubPuIdx];
-
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+      if (pu.bdmvrRefine)
+      {
+        bioDx2 = bioDx;
+        bioDy2 = bioDy;
+        int bdmvrSubPuIdxtemp = (yStart >> DMVR_SUBCU_HEIGHT_LOG2) * DMVR_SUBPU_STRIDE;
+        while (((x + bioDx2) <  (puPos.x + pu.lumaSize().width)) && (m_bdofSubPuMvOffset[bioSubPuIdx] == m_bdofSubPuMvOffset[bioSubPuIdx + (bioDx2 >> BDOF_SUBPU_DIM_LOG2)])
+               && (!pu.bdmvrRefine || ((xStart >> DMVR_SUBCU_WIDTH_LOG2) == ((xStart + bioDx2) >> DMVR_SUBCU_WIDTH_LOG2)) || ((m_bdmvrSubPuMvBuf[0][bdmvrSubPuIdxtemp + (xStart >> DMVR_SUBCU_WIDTH_LOG2)] == m_bdmvrSubPuMvBuf[0][bdmvrSubPuIdxtemp + ((xStart + bioDx2) >> DMVR_SUBCU_WIDTH_LOG2)]) && (m_bdmvrSubPuMvBuf[1][bdmvrSubPuIdxtemp + (xStart >> DMVR_SUBCU_WIDTH_LOG2)] == m_bdmvrSubPuMvBuf[1][bdmvrSubPuIdxtemp + ((xStart + bioDx2) >> DMVR_SUBCU_WIDTH_LOG2)])))
+               )
+        {
+          bioDx2 += bioDx;
+        }
+      }
+      else
+      {
+        bioDx2 = pu.lumaSize().width;
+        bioDy2 = pu.lumaSize().height;
+      }
+      subPu.UnitArea::operator=(UnitArea(pu.chromaFormat, Area(x, y, bioDx2, bioDy2)));
+#else
       subPu.UnitArea::operator=(UnitArea(pu.chromaFormat, Area(x, y, bioDx, bioDy)));
+#endif
       if (pu.bdmvrRefine)
       {
         const int bdmvrSubPuIdx = (yStart >> DMVR_SUBCU_HEIGHT_LOG2) * DMVR_SUBPU_STRIDE + (xStart >> DMVR_SUBCU_WIDTH_LOG2);
@@ -1210,9 +1283,19 @@ void InterPrediction::xPredInterBiSubPuBDOF(PredictionUnit &pu, PelUnitBuf &pcYu
 #endif
         }
       }
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+      bioSubPuIdx += (bioDx2 >> BDOF_SUBPU_DIM_LOG2);
+#else
       bioSubPuIdx += 1;
+#endif
     }
     bioSubPuIdx += bioSubPuStrideIncr;
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+    if (bioDy == 8)
+    {
+      bioSubPuIdx += (scaleBDOF - 1) * BDOF_SUBPU_STRIDE;
+    }
+#endif
   }
 }
 #endif
@@ -1448,11 +1531,19 @@ void InterPrediction::xPredInterBiBDMVR(PredictionUnit &pu, PelUnitBuf &pcYuvPre
             else
 #endif
             isOOB[1] = isMvOOB(subPu.mv[1], subPu.Y().topLeft(), subPu.lumaSize(), subPu.cu->slice->getSPS(), subPu.cu->slice->getPPS(), pu.cs->mcMask[1], pu.cs->mcMaskChroma[1]);
-            xWeightedAverage(true/*isBdofMvRefine*/, bioSubPuOffset/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf, slice.getSPS()->getBitDepths(), slice.clpRngs(), bioApplied, lumaOnly, chromaOnly, yuvPredTmp, pu.cs->mcMask, subYuvPredBuf.Y().width, pu.cs->mcMaskChroma, pu.chromaFormat == CHROMA_400 ? 0 : subYuvPredBuf.Cb().width, isOOB);
+            xWeightedAverage(true/*isBdofMvRefine*/, bioSubPuOffset/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf, slice.getSPS()->getBitDepths(), slice.clpRngs(), bioApplied, lumaOnly, chromaOnly, yuvPredTmp, pu.cs->mcMask, subYuvPredBuf.Y().width, pu.cs->mcMaskChroma, pu.chromaFormat == CHROMA_400 ? 0 : subYuvPredBuf.Cb().width, isOOB
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+                             , width, height
+#endif
+                             );
           }
           else
           {
-            xWeightedAverage(true/*isBdofMvRefine*/, bioSubPuOffset/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf, slice.getSPS()->getBitDepths(), slice.clpRngs(), bioApplied, lumaOnly, chromaOnly, yuvPredTmp, pu.cs->mcMask, subYuvPredBuf.Y().width, pu.cs->mcMaskChroma, pu.chromaFormat == CHROMA_400 ? 0 : subYuvPredBuf.Cb().width, isOOB);
+            xWeightedAverage(true/*isBdofMvRefine*/, bioSubPuOffset/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf, slice.getSPS()->getBitDepths(), slice.clpRngs(), bioApplied, lumaOnly, chromaOnly, yuvPredTmp, pu.cs->mcMask, subYuvPredBuf.Y().width, pu.cs->mcMaskChroma, pu.chromaFormat == CHROMA_400 ? 0 : subYuvPredBuf.Cb().width, isOOB
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+                             , width, height
+#endif
+                             );
           }
 #else
           xWeightedAverage(true/*isBdofMvRefine*/, bioSubPuOffset/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf,
@@ -1591,11 +1682,19 @@ void InterPrediction::xPredInterBiBDMVR(PredictionUnit &pu, PelUnitBuf &pcYuvPre
           else
 #endif
           isOOB[1] = isMvOOB(subPu.mv[1], subPu.Y().topLeft(), subPu.lumaSize(), subPu.cu->slice->getSPS(), subPu.cu->slice->getPPS(), pu.cs->mcMask[1], pu.cs->mcMaskChroma[1]);
-          xWeightedAverage(true/*isBdofMvRefine*/, bioSubPuOffset/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf, slice.getSPS()->getBitDepths(), slice.clpRngs(), bioApplied, lumaOnly, chromaOnly, yuvPredTmp, pu.cs->mcMask, subYuvPredBuf.Y().width, pu.cs->mcMaskChroma, pu.chromaFormat == CHROMA_400 ? 0 : subYuvPredBuf.Cb().width, isOOB);
+          xWeightedAverage(true/*isBdofMvRefine*/, bioSubPuOffset/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf, slice.getSPS()->getBitDepths(), slice.clpRngs(), bioApplied, lumaOnly, chromaOnly, yuvPredTmp, pu.cs->mcMask, subYuvPredBuf.Y().width, pu.cs->mcMaskChroma, pu.chromaFormat == CHROMA_400 ? 0 : subYuvPredBuf.Cb().width, isOOB
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+                           , width, height
+#endif
+                           );
         }
         else
         {
-          xWeightedAverage(true/*isBdofMvRefine*/, bioSubPuOffset/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf, slice.getSPS()->getBitDepths(), slice.clpRngs(), bioApplied, lumaOnly, chromaOnly, yuvPredTmp, pu.cs->mcMask, subYuvPredBuf.Y().width, pu.cs->mcMaskChroma, pu.chromaFormat == CHROMA_400 ? 0 : subYuvPredBuf.Cb().width, isOOB);
+          xWeightedAverage(true/*isBdofMvRefine*/, bioSubPuOffset/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf, slice.getSPS()->getBitDepths(), slice.clpRngs(), bioApplied, lumaOnly, chromaOnly, yuvPredTmp, pu.cs->mcMask, subYuvPredBuf.Y().width, pu.cs->mcMaskChroma, pu.chromaFormat == CHROMA_400 ? 0 : subYuvPredBuf.Cb().width, isOOB
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+                           , width, height
+#endif
+                           );
         }
 #else
         xWeightedAverage( true/*isBdofMvRefine*/, bioSubPuOffset/*bdofBlockOffset*/, subPu, srcSubPred0, srcSubPred1, subYuvPredBuf,
@@ -3773,7 +3872,11 @@ void InterPrediction::xPredAffineBlk(const ComponentID &compID, const Prediction
 
 #if MULTI_PASS_DMVR
 #if JVET_Z0136_OOB
-void InterPrediction::applyBiOptFlow(const bool isBdofMvRefine, const int bdofBlockOffset, const PredictionUnit &pu, const CPelUnitBuf &yuvSrc0, const CPelUnitBuf &yuvSrc1, const int &refIdx0, const int &refIdx1, PelUnitBuf &yuvDst, const BitDepths &clipBitDepths, bool *mcMask[2], bool *mcMaskChroma[2], bool *isOOB)
+void InterPrediction::applyBiOptFlow(const bool isBdofMvRefine, const int bdofBlockOffset, const PredictionUnit &pu, const CPelUnitBuf &yuvSrc0, const CPelUnitBuf &yuvSrc1, const int &refIdx0, const int &refIdx1, PelUnitBuf &yuvDst, const BitDepths &clipBitDepths, bool *mcMask[2], bool *mcMaskChroma[2], bool *isOOB
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+                                     , int ww, int hh
+#endif
+)
 #else
 void InterPrediction::applyBiOptFlow(const bool isBdofMvRefine, const int bdofBlockOffset, const PredictionUnit &pu, const CPelUnitBuf &yuvSrc0, const CPelUnitBuf &yuvSrc1, const int &refIdx0, const int &refIdx1, PelUnitBuf &yuvDst, const BitDepths &clipBitDepths)
 #endif
@@ -3843,17 +3946,47 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
   int srcBlockOffset = (stridePredMC + 1) * BIO_EXTEND_SIZE;
   int bioBlockParamOffset = (widthG + 1);
   int dstBlockOffset = 0;
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+  int scaleBDOF = 2;
+  int scaleBDOFLog2 = 1;
+  if ((isBdofMvRefine && pu.bdmvrRefine && (ww*hh < BDOF_SUBPU_AREA_THRESHOLD)) || (!isBdofMvRefine && ((width % 8 == 4) && (width != 4) )))
+  {
+    scaleBDOF = 1;
+    scaleBDOFLog2 = 0;
+  }
+  const int bioDx = (width < BDOF_SUBPU_DIM*scaleBDOF) ? width : BDOF_SUBPU_DIM*scaleBDOF;
+  const int bioDy = (height < BDOF_SUBPU_DIM*scaleBDOF) ? height : BDOF_SUBPU_DIM*scaleBDOF;
+  const int srcBlockOffsetIncrementY = (stridePredMC << (BDOF_SUBPU_DIM_LOG2 + scaleBDOFLog2)) - width;
+  const int dstBlockOffsetIncrementY = (dstStride << (BDOF_SUBPU_DIM_LOG2 + scaleBDOFLog2)) - width;
+  const int bioBlockParamOffsetIncrementY = (widthG << (BDOF_SUBPU_DIM_LOG2 + scaleBDOFLog2)) - width;
+#else
   const int bioDx = (width < BDOF_SUBPU_DIM) ? width : BDOF_SUBPU_DIM;
   const int bioDy = (height < BDOF_SUBPU_DIM) ? height : BDOF_SUBPU_DIM;
   const int srcBlockOffsetIncrementY = (stridePredMC << BDOF_SUBPU_DIM_LOG2) - width;
   const int dstBlockOffsetIncrementY = (dstStride << BDOF_SUBPU_DIM_LOG2) - width;
   const int bioBlockParamOffsetIncrementY = (widthG << BDOF_SUBPU_DIM_LOG2) - width;
 #endif
+#endif
 #if MULTI_PASS_DMVR
   if (isBdofMvRefine)
   {
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+    bool simBIOParameter = false;
+    if (pu.bdmvrRefine)
+    {
+      g_pelBufOP.calcBIOParameterHighPrecision(srcY0, srcY1, gradX0, gradX1, gradY0, gradY1, widthG, heightG, src0Stride, src1Stride, widthG,
+                                               bitDepth, m_piDotProduct1, m_piDotProduct2, m_piDotProduct3, m_piDotProduct5, m_piDotProduct6, m_dI);
+    }
+    else
+    {
+      g_pelBufOP.calcBIOParameter(srcY0, srcY1, gradX0, gradX1, gradY0, gradY1, widthG, heightG, src0Stride, src1Stride, widthG,
+                                  bitDepth, m_absGx, m_absGy, m_dIx, m_dIy, m_signGxGy, m_dI);
+      simBIOParameter = true;
+    }
+#else
     g_pelBufOP.calcBIOParameter(srcY0, srcY1, gradX0, gradX1, gradY0, gradY1, widthG, heightG, src0Stride, src1Stride, widthG,
                                 bitDepth, m_absGx, m_absGy, m_dIx, m_dIy, m_signGxGy, m_dI);
+#endif
     m_bdofMvRefined = true;
     int bioSubPuMvIndex = 0;
     const int bioSubPuMvIndexIncrementY = BDOF_SUBPU_STRIDE - std::max(1, (width >> BDOF_SUBPU_DIM_LOG2));
@@ -3893,6 +4026,20 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
             }
           }
           m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex].setZero();
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+          if (bioDx == 8)
+          {
+            m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex + 1].setZero();
+          }
+          if (bioDy == 8)
+          {
+            m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex + BDOF_SUBPU_STRIDE].setZero();
+          }
+          if (bioDx == 8 && bioDy == 8)
+          {
+            m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex + BDOF_SUBPU_STRIDE + 1].setZero();
+          }
+#endif
           if (bioDx == 4)
           {
             g_pelBufOP.addAvg4(srcY0Temp, src0Stride, srcY1Temp, src1Stride, dstY + dstBlockOffset,
@@ -3920,11 +4067,32 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
           dstBlockOffset += bioDx;
           bioBlockParamOffset += bioDx;
           bioSubPuMvIndex += 1;
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+          if (bioDx == 8)
+          {
+            bioSubPuMvIndex += scaleBDOF - 1;
+          }
+#endif
           continue;
         }
         if (!pu.bdmvrRefine)
         {
           m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex].setZero();
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+          if (bioDx == 8)
+          {
+            m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex + 1].setZero();
+          }
+          if (bioDy == 8)
+          {
+            m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex + BDOF_SUBPU_STRIDE].setZero();
+          }
+          if (bioDx == 8 && bioDy == 8)
+          {
+            m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex + BDOF_SUBPU_STRIDE + 1].setZero();
+          }
+#endif
+          
 #if JVET_Z0136_OOB
           int maskOffset = yBlock * width + xBlock;
           bool *pSubMcMask[2] = { pu.cs->mcMask[0] + maskOffset, pu.cs->mcMask[1] + maskOffset };
@@ -3954,21 +4122,71 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
           dstBlockOffset += bioDx;
           bioBlockParamOffset += bioDx;
           bioSubPuMvIndex += 1;
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+          if (bioDx == 8)
+          {
+            bioSubPuMvIndex += scaleBDOF - 1;
+          }
+#endif
           continue;
         }
-
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+        int32_t sumS1 = 0, sumS2 = 0,  sumS3 = 0, sumS5 = 0, sumS6 = 0;
+        g_pelBufOP.calcBIOParamSum4HighPrecision(m_piDotProduct1 + bioBlockParamOffset, m_piDotProduct2 + bioBlockParamOffset, m_piDotProduct3 + bioBlockParamOffset, m_piDotProduct5 + bioBlockParamOffset, m_piDotProduct6 + bioBlockParamOffset, bioDx + 4, bioDy + 4, widthG, &sumS1, &sumS2, &sumS3, &sumS5, &sumS6);
+        int64_t dD = (int64_t)sumS1 * sumS5 - (int64_t)sumS2 * sumS2;
+        int64_t xD = (int64_t)sumS3 * sumS5 - (int64_t)sumS6 * sumS2;
+        int64_t yD = (int64_t)sumS1 * sumS6 - (int64_t)sumS3 * sumS2;
+        xD <<= 4;
+        yD <<= 4;
+        // int tmpXblock = (int)(abs(D) < 10 ? 0 : Dx/D);
+        // int tmpYblock = (int)(abs(D) < 10 ? 0 : Dy/D);
+        int tmpXblock = 0;
+        int tmpYblock = 0;
+        int divTable[16] = { 0, 7, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0 };
+        int signD = dD > 0 ? 1 : -1;
+        dD = abs(dD);
+        if (dD > 9)
+        {
+          int log2D  = floorLog2Uint64(dD);
+          int msbD = int((dD << 4) >> log2D) & 15;
+          int invD = divTable[msbD] | 8;
+          log2D += (msbD != 0);
+          int shiftD  = log2D + 3;
+          int offsetD = (1 << (shiftD - 1));
+          tmpXblock = int((signD * xD * invD + offsetD) >> shiftD);
+          tmpYblock = int((signD * yD * invD + offsetD) >> shiftD);
+        }
+#else
         int sumAbsGxBlock = 0, sumAbsGyBlock = 0, sumDIXblock = 0, sumDIYblock = 0, sumSignGyGxBlock = 0;
         g_pelBufOP.calcBIOParamSum4(m_absGx + bioBlockParamOffset, m_absGy + bioBlockParamOffset, m_dIx + bioBlockParamOffset,
                                     m_dIy + bioBlockParamOffset, m_signGxGy + bioBlockParamOffset, bioDx + 4, bioDy + 4, widthG,
                                     &sumAbsGxBlock, &sumAbsGyBlock, &sumDIXblock, &sumDIYblock, &sumSignGyGxBlock);
-
+        
         int tmpXblock = (sumAbsGxBlock == 0 ? 0 : rightShiftMSB(sumDIXblock << 3, sumAbsGxBlock));
         int tmpDataBlock = ((tmpXblock * sumSignGyGxBlock) >> 1);
         int tmpYblock = (sumAbsGyBlock == 0 ? 0 : rightShiftMSB(((sumDIYblock << 3) - tmpDataBlock), sumAbsGyBlock));
+#endif
         tmpXblock = Clip3(-256, 256, tmpXblock);
         tmpYblock = Clip3(-256, 256, tmpYblock);
-
         Mv bioMv;
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+        if (tmpXblock >= 0)
+        {
+          bioMv.hor = ((tmpXblock + 2) >> 2);
+        }
+        else
+        {
+          bioMv.hor = (-1) * ((((-1) * tmpXblock) + 2) >> 2);
+        }
+        if (tmpYblock >= 0)
+        {
+          bioMv.ver = ((tmpYblock + 2) >> 2);
+        }
+        else
+        {
+          bioMv.ver = (-1) * ((((-1) * tmpYblock) + 2) >> 2);
+        }
+#else
         if( tmpXblock >= 0 )
         {
           bioMv.hor = ((tmpXblock + 4) >> 3);
@@ -3986,8 +4204,23 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
         {
           bioMv.ver = (-1) * ((((-1) * tmpYblock) + 4) >> 3);
         }
+#endif
 
         m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex] = bioMv;
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+        if (bioDx == 8)
+        {
+          m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex + 1] = bioMv;
+        }
+        if (bioDy == 8)
+        {
+          m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex + BDOF_SUBPU_STRIDE] = bioMv;
+        }
+        if (bioDx == 8 && bioDy == 8)
+        {
+          m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex + BDOF_SUBPU_STRIDE + 1] = bioMv;
+        }
+#endif
         if (bioMv.hor == 0 && bioMv.ver == 0)
         {
           // by doing this, we do not need to do second LUMA MC
@@ -4010,6 +4243,15 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
               }
             }
           }
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+          if (!simBIOParameter)
+          {
+            g_pelBufOP.calcBIOParameter(srcY0, srcY1, gradX0, gradX1, gradY0, gradY1, widthG, heightG, src0Stride, src1Stride, widthG,
+                                        bitDepth, m_absGx, m_absGy, m_dIx, m_dIy, m_signGxGy, nullptr);
+            simBIOParameter = true;
+          }
+          
+#endif
           subBlockBiOptFlow(dstY + dstBlockOffset, dstStride, srcY0Temp, src0Stride, srcY1Temp, src1Stride,
                             bioBlockParamOffset, widthG, bioDx, bioDy, clpRng, shiftNum, offset, limit, pSubMcMask, width, isOOBTmp);
 #else
@@ -4021,11 +4263,23 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
         dstBlockOffset += bioDx;
         bioBlockParamOffset += bioDx;
         bioSubPuMvIndex += 1;
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+        if (bioDx == 8)
+        {
+          bioSubPuMvIndex += scaleBDOF - 1;
+        }
+#endif
       }
       srcBlockOffset += srcBlockOffsetIncrementY;
       dstBlockOffset += dstBlockOffsetIncrementY;
       bioBlockParamOffset += bioBlockParamOffsetIncrementY;
       bioSubPuMvIndex += bioSubPuMvIndexIncrementY;
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+      if (bioDy == 8)
+      {
+        bioSubPuMvIndex += (scaleBDOF - 1) * BDOF_SUBPU_STRIDE;
+      }
+#endif
     }
     return;
   }
@@ -4135,6 +4389,7 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
     dstLineOfst += ( dstStride << 2 );
   }  // yu
 }
+
 
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
 #if JVET_Z0136_OOB
@@ -4252,7 +4507,11 @@ void InterPrediction::xWeightedAverage(
 #endif
     const PredictionUnit& pu, const CPelUnitBuf& pcYuvSrc0, const CPelUnitBuf& pcYuvSrc1, PelUnitBuf& pcYuvDst, const BitDepths& clipBitDepths,
 #if JVET_Z0136_OOB
-    const ClpRngs& clpRngs, const bool& bioApplied, bool lumaOnly, bool chromaOnly, PelUnitBuf* yuvDstTmp /*= NULL*/, bool *mcMask[2], int mcStride, bool *mcMaskChroma[2], int mcCStride, bool *isOOB)
+    const ClpRngs& clpRngs, const bool& bioApplied, bool lumaOnly, bool chromaOnly, PelUnitBuf* yuvDstTmp /*= NULL*/, bool *mcMask[2], int mcStride, bool *mcMaskChroma[2], int mcCStride, bool *isOOB
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+                                       , int ww, int hh
+#endif
+                                       )
 #else
     const ClpRngs& clpRngs, const bool& bioApplied, bool lumaOnly, bool chromaOnly, PelUnitBuf* yuvDstTmp /*= NULL*/)
 #endif
@@ -4302,7 +4561,11 @@ void InterPrediction::xWeightedAverage(
       {
 #if MULTI_PASS_DMVR
 #if JVET_Z0136_OOB
-        applyBiOptFlow(isBdofMvRefine, bdofBlockOffset, pu, pcYuvSrc0, pcYuvSrc1, iRefIdx0, iRefIdx1, pcYuvDst, clipBitDepths, mcMask, mcMaskChroma, isOOB);
+        applyBiOptFlow(isBdofMvRefine, bdofBlockOffset, pu, pcYuvSrc0, pcYuvSrc1, iRefIdx0, iRefIdx1, pcYuvDst, clipBitDepths, mcMask, mcMaskChroma, isOOB
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+                       , ww, hh
+#endif
+                       );
 #else
         applyBiOptFlow(isBdofMvRefine, bdofBlockOffset, pu, pcYuvSrc0, pcYuvSrc1, iRefIdx0, iRefIdx1, pcYuvDst, clipBitDepths);
 #endif

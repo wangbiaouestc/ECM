@@ -51,6 +51,8 @@
 #include <cassert>
 
 
+
+
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -252,6 +254,7 @@
 #define JVET_AB0112_AFFINE_DMVR                           1 // JVET-AB0112: DMVR (baseMV refinement) for affine
 #define JVET_AC0144_AFFINE_DMVR_REGRESSION                1 // JVET-AC0144: DMVR for affine with regression refinement
 #define JVET_AC0158_PIXEL_AFFINE_MC                       1 // JVET-AC0158: Pixel based affine motion compensation
+#define JVET_AD0195_HIGH_PRECISION_BDOF_CORE              1 // JVET_AD0195: High-Precision MV Refinement for BDOF
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
