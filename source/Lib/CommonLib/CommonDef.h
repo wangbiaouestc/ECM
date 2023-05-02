@@ -769,7 +769,12 @@ static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_LUMA =      28;
 static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA =    28;
 
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+static const int BDOF_SUBPU_DIM_LOG2          =                     2;
+static const int BDOF_SUBPU_AREA_THRESHOLD    =                   256;
+#else
 static const int BDOF_SUBPU_DIM_LOG2          =                     3;
+#endif
 static const int BDOF_SUBPU_DIM               =                     (1 << BDOF_SUBPU_DIM_LOG2);
 static const int BDOF_SUBPU_MAX_NUM           =                     ((MAX_CU_SIZE * MAX_CU_SIZE) >> (BDOF_SUBPU_DIM_LOG2 << 1));
 static const int BDOF_SUBPU_STRIDE            =                     (MAX_CU_SIZE >> BDOF_SUBPU_DIM_LOG2);
@@ -1551,7 +1556,7 @@ static inline int floorLog2(uint32_t x)
 #endif
 }
 
-#if JVET_X0149_TIMD_DIMD_LUT
+#if JVET_X0149_TIMD_DIMD_LUT || JVET_AD0195_HIGH_PRECISION_BDOF_CORE
 static inline int floorLog2Uint64(uint64_t x)
 {
   if (x == 0)
