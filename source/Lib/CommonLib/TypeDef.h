@@ -327,6 +327,9 @@
 #define JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS     1 // JVET-AB0184: Extended Fixed-Filter-Output based Taps for ALF
 #define JVET_AB0171_ASYMMETRIC_DB_FOR_GDR                 1 // JVET-AB0171: Asymmetric Deblocking for GDR
 #define JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT            1 // JVET-AC0162: ALF using residaul samples as additional inputs
+#define JVET_AD0222_ALF_LONG_FIXFILTER                    1 // JVET-AD0222: More taps for fixed filter outputs
+#define JVET_AD0222_ALF_RESI_CLASS                        1 // JVET-AD0222: Residual-based classifier
+#define JVET_AD0222_ADDITONAL_ALF_FIXFILTER               1 // JVET-AD0222: Additional ALF fixed filter
 
 // SIMD optimizations
 #if IF_12TAP

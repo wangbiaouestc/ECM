@@ -1119,8 +1119,21 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
     for (int altIdx = 0; altIdx < param.numAlternativesLuma; ++altIdx)
     {
 #if JVET_X0071_ALF_BAND_CLASSIFIER
+#if JVET_AD0222_ALF_RESI_CLASS
+      READ_FLAG(code, "alf_luma_classifier_band");
+      param.lumaClassifierIdx[altIdx] = code;
+      if (code == 0)
+      {
+        READ_FLAG(code, "alf_luma_classifier_resi");
+        if (code)
+        {
+          param.lumaClassifierIdx[altIdx] = 2;
+        }
+      }
+#else
       READ_FLAG(code, "alf_luma_classifier");
       param.lumaClassifierIdx[altIdx] = code;
+#endif
 #endif
       READ_FLAG(code, "alf_luma_clip");
       param.nonLinearFlag[CHANNEL_TYPE_LUMA][altIdx] = code ? true : false;

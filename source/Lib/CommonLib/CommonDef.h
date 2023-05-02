@@ -319,7 +319,12 @@ static const int MAX_NUM_ALF_CLASSES         =                     25;
 static const int MAX_NUM_ALF_ALTERNATIVES_LUMA = 4;
 static const int EXT_LENGTH = 2;
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+static const int ALF_PADDING_SIZE_FIXED_RESULTS  =                  6;
+static const int NUM_FIXED_BASED_COEFF_NEW       =                 19;
+#else
 static const int ALF_PADDING_SIZE_FIXED_RESULTS  =                  2;
+#endif
 static const int NUM_FIXED_BASED_COEFF       =                      7;
 #endif
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
@@ -327,21 +332,42 @@ static const int NUM_RESI                    =                      1;
 static const int NUM_RESI_SAMPLE             =                      1;
 static const int NUM_RESI_PAD                =                      8;
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+static const int NUM_GAUSS_FILTERED_COEFF        =                  5;
+static const int NUM_GAUSS_FILTERED_SOURCE       =                  1;
+static const int ALF_PADDING_SIZE_GAUSS_RESULTS  =                  2;
+#endif
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
 static const int NUM_DB                      =                      3;
 static const int NUM_DB_SAMPLE               =                      5;
 
-#if JVET_Z0118_GDR
+#if JVET_Z0118_GDR || JVET_AD0222_ADDITONAL_ALF_FIXFILTER
 static const int NUM_DB_PAD                  =                      8;
 #else
 static const int NUM_DB_PAD                  =                      1;
 #endif
 
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_RESI + 1 + NUM_GAUSS_FILTERED_COEFF;
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_RESI + 1
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF + NUM_RESI + 1 + NUM_GAUSS_FILTERED_COEFF;
+#else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF + NUM_RESI + 1;
+#endif
 #else
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_GAUSS_FILTERED_COEFF;
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW;
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF + NUM_GAUSS_FILTERED_COEFF;
+#else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF;
+#endif
 #else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB;
 #endif
@@ -387,9 +413,19 @@ static const int ALF_CTB_MAX_NUM_APS         =                      8;
 static const int ALF_ORDER                   =                      4;
 static const int NUM_FIXED_FILTER_SETS       =                      2;
 #if JVET_X0071_ALF_BAND_CLASSIFIER
+#if JVET_AD0222_ALF_RESI_CLASS
+static const int ALF_RESI_SHIFT_OFFSET       =                      4;
+static const int NUM_RESI_ABS_PAD            =                      8;
+static const int ALF_PADDING_SIZE_PRED       =                      3;
+static const int ALF_NUM_CLASSIFIER          =                      3;
+static const int ALF_CLASSES_RESI            =                     25;
+static const int ALF_CLASSES_NEW             =                     25;
+static const int ALF_NUM_CLASSES_CLASSIFIER[ALF_NUM_CLASSIFIER] = { MAX_NUM_ALF_CLASSES, ALF_CLASSES_NEW, ALF_CLASSES_RESI };
+#else
 static const int ALF_NUM_CLASSIFIER          =                      2;
 static const int ALF_CLASSES_NEW             =                     25;
 static const int ALF_NUM_CLASSES_CLASSIFIER[ALF_NUM_CLASSIFIER] = { MAX_NUM_ALF_CLASSES,  ALF_CLASSES_NEW };
+#endif
 #endif
 #else 
 static const int NUM_FIXED_FILTER_SETS       =                     16;

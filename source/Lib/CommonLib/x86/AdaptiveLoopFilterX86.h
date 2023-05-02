@@ -354,6 +354,9 @@ static void simdFilter5x5Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   , Pel ***fixedFilterResultsPerCtu, bool isFixedFilterPaddedPerCtu
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  , Pel ***gaussPic, Pel ***gaussCtu
+#endif
 #else
   , const int vbCTUHeight, int vbPos
 #endif
@@ -630,6 +633,9 @@ static void simdFilter7x7Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
   int fixedFilterSetIdx
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   , Pel ***fixedFilterResultsPerCtu, bool isFixedFilterPaddedPerCtu
+#endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  , Pel ***gaussPic, Pel ***gaussCtu
 #endif
 #else
   , const int vbCTUHeight, int vbPos
@@ -1099,6 +1105,9 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   , Pel ***fixedFilterResultsPerCtu, bool isFixedFilterPaddedPerCtu
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  , Pel ***gaussPic, Pel ***gaussCtu
+#endif
   )
 {
   const CPelBuf srcBuffer = recSrc.get(compId);
@@ -1309,6 +1318,9 @@ static void simdFilter9x9BlkExt(AlfClassifier **classifier, const PelUnitBuf &re
   int fixedFilterSetIdx
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   , Pel ***fixedFilterResultsPerCtu, bool isFixedFilterPaddedPerCtu
+#endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  , Pel ***gaussPic, Pel ***gaussCtu
 #endif
   )
 {
@@ -1684,6 +1696,26 @@ static const uint16_t shuffleOp13FixedBasedLongLength[4][4][2] =
     { 0, 1 },
     { 0, 1 },
   }, //0
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+  {
+    { 0, 1 },
+    { 1, 2 },
+    { 1, 3 },
+    { 2, 3 },
+  }, //1
+  {
+    { 0, 1 },
+    { 1, 2 },
+    { 1, 3 },
+    { 2, 3 },
+  }, //2
+  {
+    { 0, 1 },
+    { 1, 2 },
+    { 1, 3 },
+    { 2, 3 },
+  }, //3
+#else
   {
     { 0, 1 },
     { 0, 2 },
@@ -1702,6 +1734,7 @@ static const uint16_t shuffleOp13FixedBasedLongLength[4][4][2] =
     { 1, 2 },
     { 2, 3 },
   }, //3
+#endif
 };
 static const uint16_t shuffleTab13FixedBasedLongLength[4][4][2][8] =
 {
@@ -1723,6 +1756,62 @@ static const uint16_t shuffleTab13FixedBasedLongLength[4][4][2][8] =
       { sh(8) , sh(9) , sh(10), sh(11), sh(12), sh(13), sh(14), sh(15) },
     },
   }, //IDX = 0
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+  {
+    {
+      { sh(6), sh(7), sh(8) , sh(3) , sh(9) , sh(5) , sh(0) , sh(1) },
+      { sh(2), sh(4), sh(10), sh(11), sh(12), sh(13), sh(14), sh(15) },
+    },
+    {
+      { sh(0) , sh(1), sh(14), sh(15), sh(4) , sh(5), sh(9), sh(7) },
+      { sh(13), sh(6), sh(10), sh(11), sh(12), sh(8), sh(2), sh(3) },
+    },
+    {
+      { sh(0), sh(1), sh(2), sh(3) , sh(8) , sh(9) , sh(6) , sh(10) },
+      { sh(4), sh(5), sh(7), sh(11), sh(12), sh(13), sh(14), sh(15) },
+    },
+    {
+      { sh(0), sh(1), sh(2) , sh(11), sh(4) , sh(5) , sh(6) , sh(7) },
+      { sh(8), sh(9), sh(10), sh(3) , sh(12), sh(13), sh(14), sh(15) },
+    },
+  }, //IDX = 1
+  {
+    {
+      { sh(0), sh(1), sh(2) , sh(5) , sh(4) , sh(3) , sh(6) , sh(7) },
+      { sh(8), sh(9), sh(10), sh(11), sh(12), sh(13), sh(14), sh(15) },
+    },
+    {
+      { sh(0), sh(1) , sh(2) , sh(3) , sh(4) , sh(5), sh(8) , sh(7) },
+      { sh(6), sh(13), sh(12), sh(11), sh(10), sh(9), sh(14), sh(15) },
+    },
+    {
+      { sh(0), sh(1), sh(2) , sh(3) , sh(4) , sh(5) , sh(6) , sh(7) },
+      { sh(8), sh(9), sh(10), sh(11), sh(12), sh(13), sh(14), sh(15) },
+    },
+    {
+      { sh(0), sh(1), sh(2) , sh(3) , sh(4) , sh(5) , sh(6) , sh(7) },
+      { sh(8), sh(9), sh(10), sh(11), sh(12), sh(13), sh(14), sh(15) },
+    },
+  }, //IDX = 2
+  {
+    {
+      { sh(6), sh(7), sh(8) , sh(5) , sh(9) , sh(3) , sh(0) , sh(1) },
+      { sh(2), sh(4), sh(10), sh(11), sh(12), sh(13), sh(14), sh(15) },
+    },
+    {
+      { sh(0), sh(1), sh(14), sh(15), sh(4) , sh(5), sh(13), sh(7) },
+      { sh(9), sh(8), sh(12), sh(11), sh(10), sh(6), sh(2) , sh(3) },
+    },
+    {
+      { sh(0), sh(1), sh(2), sh(3) , sh(8) , sh(9) , sh(6) , sh(10) },
+      { sh(4), sh(5), sh(7), sh(11), sh(12), sh(13), sh(14), sh(15) },
+    },
+    {
+      { sh(0), sh(1), sh(2) , sh(11), sh(4) , sh(5) , sh(6) , sh(7) },
+      { sh(8), sh(9), sh(10), sh(3) , sh(12), sh(13), sh(14), sh(15) },
+    },
+  }, //IDX = 3
+#else
   {
     {
       { sh(14), sh(15), sh(2) , sh(3) , sh(4) , sh(9) , sh(6) , sh(13) },
@@ -1777,6 +1866,7 @@ static const uint16_t shuffleTab13FixedBasedLongLength[4][4][2][8] =
       { sh(4) , sh(6) , sh(10), sh(11), sh(12), sh(13), sh(14), sh(15) },
     },
   }, //IDX = 3
+#endif
 };
 #endif
 #endif
@@ -1799,6 +1889,9 @@ static void simdFilter9x9BlkExtDb(AlfClassifier **classifier, const PelUnitBuf &
   int fixedFilterSetIdx
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   , Pel ***fixedFilterResultsPerCtu, bool isFixedFilterPaddedPerCtu
+#endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  , Pel ***gaussPic, Pel ***gaussCtu
 #endif
   )
 {
@@ -2138,6 +2231,9 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   , Pel ***fixedFilterResultsPerCtu, bool isFixedFilterPaddedPerCtu
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  , Pel ***gaussPic, Pel ***gaussCtu
+#endif
   )
 {
   const CPelBuf srcBuffer = recSrc.get(compId);
@@ -2167,6 +2263,9 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   const int padSize = ALF_PADDING_SIZE_FIXED_RESULTS;
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  const int padSizeGauss = ALF_PADDING_SIZE_GAUSS_RESULTS;
+#endif
 
   for (size_t i = 0; i < height; i += stepY)
   {
@@ -2174,14 +2273,26 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
     for (size_t j = 0; j < width; j += stepX)
     {
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i params[2][2][18];
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      __m128i params[2][2][15];
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i params[2][2][17];
+#else
       __m128i params[2][2][14];
+#endif
 #else
       __m128i params[2][2][11];
 #endif
       for (int k = 0; k < 2; k++)
       {
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+        __m128i rawCoef[4][5], rawClip[4][5], s0, s1, s2, s3, rawTmp0, rawTmp1;
+#else
         __m128i rawCoef[4][4], rawClip[4][4], s0, s1, s2, s3, rawTmp0, rawTmp1;
+#endif
 #else
         __m128i rawCoef[4][3], rawClip[4][3], s0, s1, s2, s3, rawTmp0, rawTmp1;
 #endif
@@ -2195,12 +2306,18 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
           rawCoef[l][2] = _mm_loadu_si128((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 16));
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
           rawCoef[l][3] = _mm_loadu_si128((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 24));
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+          rawCoef[l][4] = _mm_loadu_si128((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 32));
+#endif
 #endif
           rawClip[l][0] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF));
           rawClip[l][1] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 8));
           rawClip[l][2] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 16));
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
           rawClip[l][3] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 24));
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+          rawClip[l][4] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 32));
+#endif
 #endif
 
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
@@ -2241,22 +2358,40 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
             rawClip[l][op1] = rawTmp1;
           }
         }//for l
-
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
-        for (unsigned char l = 0; l < 4; l++)
+        int limR, lim0, lim1, lim2, lim3;
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+        limR = 5, lim0 = 5, lim1 = 5, lim2 = 4, lim3 = 4;
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+        limR = 4, lim0 = 4, lim1 = 4, lim2 = 4, lim3 = 3;
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+        limR = 5, lim0 = 5, lim1 = 4, lim2 = 4, lim3 = 4;
 #else
-        for (unsigned char l = 0; l < 3; l++)
+        limR = 4, lim0 = 4, lim1 = 4, lim2 = 3, lim3 = 3;
+#endif
+#endif
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+        for( unsigned char l = 0; l < limR; l++ )
+#else
+        for( unsigned char l = 0; l < 3; l++ )
 #endif
         {
           int m = l << 2;
-
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          if( l < lim0 )
+          {
+#endif
           s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0x00), _mm_shuffle_epi32(rawCoef[1][l], 0x00));
           s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0x00), _mm_shuffle_epi32(rawCoef[3][l], 0x00));
           params[k][0][0 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
           s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0x00), _mm_shuffle_epi32(rawClip[1][l], 0x00));
           s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0x00), _mm_shuffle_epi32(rawClip[3][l], 0x00));
           params[k][1][0 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          }
+          if( l < lim1 )
+          {
+#endif
           s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0x55), _mm_shuffle_epi32(rawCoef[1][l], 0x55));
           s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0x55), _mm_shuffle_epi32(rawCoef[3][l], 0x55));
           params[k][0][1 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
@@ -2264,7 +2399,8 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
           s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0x55), _mm_shuffle_epi32(rawClip[3][l], 0x55));
           params[k][1][1 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
-          if( l < 3 )
+          }
+          if( l < lim2 )
           {
 #endif
           s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0xaa), _mm_shuffle_epi32(rawCoef[1][l], 0xaa));
@@ -2273,8 +2409,9 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
           s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0xaa), _mm_shuffle_epi32(rawClip[1][l], 0xaa));
           s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0xaa), _mm_shuffle_epi32(rawClip[3][l], 0xaa));
           params[k][1][2 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-#if !JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
-          if (l < 2)
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          }
+          if( l < lim3 )
           {
 #endif
             s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0xff), _mm_shuffle_epi32(rawCoef[1][l], 0xff));
@@ -2283,12 +2420,16 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
             s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0xff), _mm_shuffle_epi32(rawClip[1][l], 0xff));
             s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0xff), _mm_shuffle_epi32(rawClip[3][l], 0xff));
             params[k][1][3 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
           }
+#endif
         }//for l
       }//for k
 
       const Pel *pImg0, *pImg1, *pImg2, *pImg3, *pImg4, *pImg5, *pImg6, *pImg7, *pImg8;
+#if !JVET_AD0222_ALF_LONG_FIXFILTER
       const Pel *pImg9, *pImg10, *pImg11, *pImg12;
+#endif
 
       pImg0 = src + j;
       pImg1 = pImg0 + srcStride;
@@ -2299,15 +2440,18 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
       pImg6 = pImg4 - srcStride;
       pImg7 = pImg5 + srcStride;
       pImg8 = pImg6 - srcStride;
+#if !JVET_AD0222_ALF_LONG_FIXFILTER
       pImg9 = pImg7 + srcStride;
       pImg10 = pImg8 - srcStride;
       pImg11 = pImg9 + srcStride;
       pImg12 = pImg10 - srcStride;
-
+#endif
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
       int filterSetIdx = 0 + fixedFilterSetIdx;
       const Pel *pImg0FixedBased, *pImg1FixedBased, *pImg2FixedBased, *pImg3FixedBased, *pImg4FixedBased;
-
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+      const Pel *pImg5FixedBased, *pImg6FixedBased, *pImg7FixedBased, *pImg8FixedBased, *pImg9FixedBased, *pImg10FixedBased, *pImg11FixedBased, *pImg12FixedBased;
+#endif
       if(isFixedFilterPaddedPerCtu )
       {
         pImg0FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 0] + j + padSize;
@@ -2315,6 +2459,16 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
         pImg2FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 1] + j + padSize;
         pImg3FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 2] + j + padSize;
         pImg4FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 2] + j + padSize;
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+        pImg5FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 3] + j + padSize;
+        pImg6FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 3] + j + padSize;
+        pImg7FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 4] + j + padSize;
+        pImg8FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 4] + j + padSize;
+        pImg9FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 5] + j + padSize;
+        pImg10FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 5] + j + padSize;
+        pImg11FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 6] + j + padSize;
+        pImg12FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 6] + j + padSize;
+#endif
       }
       else
       {
@@ -2323,9 +2477,44 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
         pImg2FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 1] + blkDst.x + j + padSize;
         pImg3FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 2] + blkDst.x + j + padSize;
         pImg4FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 2] + blkDst.x + j + padSize;
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+        pImg5FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 3] + blkDst.x + j + padSize;
+        pImg6FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 3] + blkDst.x + j + padSize;
+        pImg7FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 4] + blkDst.x + j + padSize;
+        pImg8FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 4] + blkDst.x + j + padSize;
+        pImg9FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 5] + blkDst.x + j + padSize;
+        pImg10FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 5] + blkDst.x + j + padSize;
+        pImg11FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 6] + blkDst.x + j + padSize;
+        pImg12FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 6] + blkDst.x + j + padSize;
+#endif
       }
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      const Pel *pImg0Gauss[NUM_GAUSS_FILTERED_SOURCE];
+      const Pel *pImg1Gauss[NUM_GAUSS_FILTERED_SOURCE], *pImg2Gauss[NUM_GAUSS_FILTERED_SOURCE];
+      const Pel *pImg3Gauss[NUM_GAUSS_FILTERED_SOURCE], *pImg4Gauss[NUM_GAUSS_FILTERED_SOURCE];
 
+      for( int gaussIdx = 0; gaussIdx < NUM_GAUSS_FILTERED_SOURCE; gaussIdx++ )
+      {
+        if( isFixedFilterPaddedPerCtu )
+        {
+          pImg0Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss + 0] + j + padSizeGauss;
+          pImg1Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss + 1] + j + padSizeGauss;
+          pImg2Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss - 1] + j + padSizeGauss;
+          pImg3Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss + 2] + j + padSizeGauss;
+          pImg4Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss - 2] + j + padSizeGauss;
+
+        }
+        else
+        {
+          pImg0Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss + 0] + blkDst.x + j + padSizeGauss;
+          pImg1Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss + 1] + blkDst.x + j + padSizeGauss;
+          pImg2Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss - 1] + blkDst.x + j + padSizeGauss;
+          pImg3Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss + 2] + blkDst.x + j + padSizeGauss;
+          pImg4Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss - 2] + blkDst.x + j + padSizeGauss;
+        }
+      }
+#endif
       __m128i cur = _mm_loadu_si128((const __m128i *) pImg0);
       __m128i accumA = mmOffset;
       __m128i accumB = mmOffset;
@@ -2366,7 +2555,63 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
         accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
         accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
       };
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      process2coeffs(0, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
+      process2coeffs(1, pImg3 + 0, pImg4 - 0, pImg1 + 1, pImg2 - 1);
+      process2coeffs(2, pImg1 + 0, pImg2 - 0, pImg1 - 1, pImg2 + 1);
+      process2coeffs(3, pImg0 + 4, pImg0 - 4, pImg0 + 3, pImg0 - 3);
+      process2coeffs(4, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
+      process2coeffs(5, pImg12FixedBased - 0, pImg11FixedBased + 0, pImg10FixedBased - 0, pImg9FixedBased + 0);
+      process2coeffs(6, pImg8FixedBased - 0, pImg7FixedBased + 0, pImg6FixedBased - 0, pImg5FixedBased + 0);
+      process2coeffs(7, pImg4FixedBased - 1, pImg3FixedBased + 1, pImg4FixedBased - 0, pImg3FixedBased + 0);
+      process2coeffs(8, pImg4FixedBased + 1, pImg3FixedBased - 1, pImg2FixedBased - 2, pImg1FixedBased + 2);
+      process2coeffs(9, pImg2FixedBased - 1, pImg1FixedBased + 1, pImg2FixedBased - 0, pImg1FixedBased + 0);
+      process2coeffs(10, pImg2FixedBased + 1, pImg1FixedBased - 1, pImg2FixedBased + 2, pImg1FixedBased - 2);
+      process2coeffs(11, pImg0FixedBased - 6, pImg0FixedBased + 6, pImg0FixedBased - 5, pImg0FixedBased + 5);
+      process2coeffs(12, pImg0FixedBased - 4, pImg0FixedBased + 4, pImg0FixedBased - 3, pImg0FixedBased + 3);
+      process2coeffs(13, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
+      process2coeffs(14, pImg3Gauss[0] - 0, pImg4Gauss[0] + 0, pImg1Gauss[0] - 0, pImg2Gauss[0] + 0);
+      process2coeffs(15, pImg0Gauss[0] - 2, pImg0Gauss[0] + 2, pImg0Gauss[0] - 1, pImg0Gauss[0] + 1);
 
+      __m128i val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *)(fixedFilterResults[0 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x + j + padSize)), cur);
+      __m128i val10 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *)(fixedFilterResults[2 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x + j + padSize)), cur);
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      process2coeffs(0, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
+      process2coeffs(1, pImg3 + 0, pImg4 - 0, pImg1 + 1, pImg2 - 1);
+      process2coeffs(2, pImg1 + 0, pImg2 - 0, pImg1 - 1, pImg2 + 1);
+      process2coeffs(3, pImg0 + 4, pImg0 - 4, pImg0 + 3, pImg0 - 3);
+      process2coeffs(4, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
+      process2coeffs(5, pImg12FixedBased - 0, pImg11FixedBased + 0, pImg10FixedBased - 0, pImg9FixedBased + 0);
+      process2coeffs(6, pImg8FixedBased - 0, pImg7FixedBased + 0, pImg6FixedBased - 0, pImg5FixedBased + 0);
+      process2coeffs(7, pImg4FixedBased - 1, pImg3FixedBased + 1, pImg4FixedBased - 0, pImg3FixedBased + 0);
+      process2coeffs(8, pImg4FixedBased + 1, pImg3FixedBased - 1, pImg2FixedBased - 2, pImg1FixedBased + 2);
+      process2coeffs(9, pImg2FixedBased - 1, pImg1FixedBased + 1, pImg2FixedBased - 0, pImg1FixedBased + 0);
+      process2coeffs(10, pImg2FixedBased + 1, pImg1FixedBased - 1, pImg2FixedBased + 2, pImg1FixedBased - 2);
+      process2coeffs(11, pImg0FixedBased - 6, pImg0FixedBased + 6, pImg0FixedBased - 5, pImg0FixedBased + 5);
+      process2coeffs(12, pImg0FixedBased - 4, pImg0FixedBased + 4, pImg0FixedBased - 3, pImg0FixedBased + 3);
+      process2coeffs(13, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
+      __m128i val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *)(fixedFilterResults[0 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x + j + padSize)), cur);
+      __m128i val10 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *)(fixedFilterResults[2 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x + j + padSize)), cur);
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      process2coeffs(0, pImg11 + 0, pImg12 - 0, pImg9 + 0, pImg10 - 0);
+      process2coeffs(1, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
+      process2coeffs(2, pImg3 + 2, pImg4 - 2, pImg3 + 1, pImg4 - 1);
+      process2coeffs(3, pImg3 + 0, pImg4 - 0, pImg3 - 1, pImg4 + 1);
+      process2coeffs(4, pImg3 - 2, pImg4 + 2, pImg1 + 2, pImg2 - 2);
+      process2coeffs(5, pImg1 + 1, pImg2 - 1, pImg1 + 0, pImg2 - 0);
+      process2coeffs(6, pImg1 - 1, pImg2 + 1, pImg1 - 2, pImg2 + 2);
+      process2coeffs(7, pImg0 + 6, pImg0 - 6, pImg0 + 5, pImg0 - 5);
+      process2coeffs(8, pImg0 + 4, pImg0 - 4, pImg0 + 3, pImg0 - 3);
+      process2coeffs(9, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
+      process2coeffs(10, pImg4FixedBased - 0, pImg3FixedBased + 0, pImg2FixedBased - 1, pImg1FixedBased + 1);
+      process2coeffs(11, pImg2FixedBased - 0, pImg1FixedBased + 0, pImg2FixedBased + 1, pImg1FixedBased - 1);
+      process2coeffs(12, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
+      process2coeffs(13, pImg3Gauss[0] - 0, pImg4Gauss[0] + 0, pImg1Gauss[0] - 0, pImg2Gauss[0] + 0);
+      process2coeffs(14, pImg0Gauss[0] - 2, pImg0Gauss[0] + 2, pImg0Gauss[0] - 1, pImg0Gauss[0] + 1);
+
+      __m128i val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *)(fixedFilterResults[0 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x + j + padSize)), cur);
+      __m128i val10 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *)(fixedFilterResults[2 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x + j + padSize)), cur);
+#else
       process2coeffs(0, pImg11 + 0, pImg12 - 0, pImg9 + 0, pImg10 - 0);
       process2coeffs(1, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
       process2coeffs(2, pImg3 + 2, pImg4 - 2, pImg3 + 1, pImg4 - 1);
@@ -2388,11 +2633,23 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
       const __m128i val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) (fixedFilterResults[fixedFilterSetIdx][blkDst.y + i] + blkDst.x + j)), cur);
       const __m128i val10 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) (fixedFilterResults[EXT_LENGTH + fixedFilterSetIdx][blkDst.y + i] + blkDst.x + j)), cur);
 #endif
+#endif
       __m128i val01A = _mm_unpacklo_epi16(val00, val10);
       __m128i val01B = _mm_unpackhi_epi16(val00, val10);
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i limit01A = params[0][1][16];
+      __m128i limit01B = params[1][1][16];
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      __m128i limit01A = params[0][1][14];
+      __m128i limit01B = params[1][1][14];
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i limit01A = params[0][1][15];
+      __m128i limit01B = params[1][1][15];
+#else
       __m128i limit01A = params[0][1][13];
       __m128i limit01B = params[1][1][13];
+#endif
 #else
       __m128i limit01A = params[0][1][10];
       __m128i limit01B = params[1][1][10];
@@ -2404,15 +2661,53 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
       val01A = _mm_max_epi16(val01A, limit01A);
       val01B = _mm_max_epi16(val01B, limit01B);
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i coeff01A = params[0][0][16];
+      __m128i coeff01B = params[1][0][16];
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      __m128i coeff01A = params[0][0][14];
+      __m128i coeff01B = params[1][0][14];
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i coeff01A = params[0][0][15];
+      __m128i coeff01B = params[1][0][15];
+#else
       const __m128i coeff01A = params[0][0][13];
       const __m128i coeff01B = params[1][0][13];
+#endif
 #else
       const __m128i coeff01A = params[0][0][10];
       const __m128i coeff01B = params[1][0][10];
 #endif
       accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
       accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
-
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      val00    = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) (pImg0Gauss[0])), cur);
+      val10    = _mm_setzero_si128();
+      val01A   = _mm_unpacklo_epi16(val00, val10);
+      val01B   = _mm_unpackhi_epi16(val00, val10);
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+      limit01A = params[0][1][17];
+      limit01B = params[1][1][17];
+#else
+      limit01A = params[0][1][16];
+      limit01B = params[1][1][16];
+#endif
+      val01A   = _mm_min_epi16(val01A, limit01A);
+      val01B   = _mm_min_epi16(val01B, limit01B);
+      limit01A = _mm_sub_epi16(_mm_setzero_si128(), limit01A);
+      limit01B = _mm_sub_epi16(_mm_setzero_si128(), limit01B);
+      val01A   = _mm_max_epi16(val01A, limit01A);
+      val01B   = _mm_max_epi16(val01B, limit01B);
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+      coeff01A = params[0][0][17];
+      coeff01B = params[1][0][17];
+#else
+      coeff01A = params[0][0][16];
+      coeff01B = params[1][0][16];
+#endif
+      accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
+      accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
+#endif
       accumA = _mm_srai_epi32(accumA, shift);
       accumB = _mm_srai_epi32(accumB, shift);
 
@@ -2447,6 +2742,9 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   , Pel ***fixedFilterResultsPerCtu, bool isFixedFilterPaddedPerCtu
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  , Pel ***gaussPic, Pel ***gaussCtu
+#endif
   )
 {
   const CPelBuf srcBuffer = recSrc.get(compId);
@@ -2479,6 +2777,9 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   const int padSize = ALF_PADDING_SIZE_FIXED_RESULTS;
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  const int padSizeGauss = ALF_PADDING_SIZE_GAUSS_RESULTS;
+#endif
 
   for (size_t i = 0; i < height; i += stepY)
   {
@@ -2486,13 +2787,25 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
     for (size_t j = 0; j < width; j += stepX)
     {
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i params[2][2][19];
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      __m128i params[2][2][17];
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i params[2][2][18];
+#else
       __m128i params[2][2][16];
+#endif
 #else
       __m128i params[2][2][13];
 #endif
       for (int k = 0; k < 2; k++)
       {
+#if JVET_AD0222_ALF_LONG_FIXFILTER || JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+        __m128i rawCoef[4][5], rawClip[4][5], s0, s1, s2, s3, rawTmp0, rawTmp1;
+#else
         __m128i rawCoef[4][4], rawClip[4][4], s0, s1, s2, s3, rawTmp0, rawTmp1;
+#endif
         for (int l = 0; l < 4; l++)
         {
           const int transposeIdx = pClass[j + 4 * k + l] & 0x3;
@@ -2502,10 +2815,16 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
           rawCoef[l][1] = _mm_loadu_si128((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 8));
           rawCoef[l][2] = _mm_loadu_si128((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 16));
           rawCoef[l][3] = _mm_loadu_si128((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 24));
+#if JVET_AD0222_ALF_LONG_FIXFILTER || JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+          rawCoef[l][4] = _mm_loadu_si128((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 32));
+#endif
           rawClip[l][0] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF));
           rawClip[l][1] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 8));
           rawClip[l][2] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 16));
           rawClip[l][3] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 24));
+#if JVET_AD0222_ALF_LONG_FIXFILTER || JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+          rawClip[l][4] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 32));
+#endif
 
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
           for (int m = 0; m < shuffleTime13FixedBasedLongLength[transposeIdx]; m++)
@@ -2543,19 +2862,36 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
             rawClip[l][op1] = rawTmp1;
           }
         }//for l
-
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+        int limR, lim0, lim1, lim2, lim3;
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+        limR = 5, lim0 = 5, lim1 = 5, lim2 = 5, lim3 = 4;
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+        limR = 5, lim0 = 5, lim1 = 4, lim2 = 4, lim3 = 4;
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+        limR = 5, lim0 = 5, lim1 = 5, lim2 = 4, lim3 = 4;
+#else
+        limR = 4, lim0 = 4, lim1 = 4, lim2 = 4, lim3 = 4;
+#endif
+        for (unsigned char l = 0; l < limR; l++)
+#else
         for (unsigned char l = 0; l < 4; l++)
+#endif
         {
           int m = l << 2;
-
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          if( l < lim0 )
+          {
+#endif
           s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0x00), _mm_shuffle_epi32(rawCoef[1][l], 0x00));
           s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0x00), _mm_shuffle_epi32(rawCoef[3][l], 0x00));
           params[k][0][0 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
           s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0x00), _mm_shuffle_epi32(rawClip[1][l], 0x00));
           s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0x00), _mm_shuffle_epi32(rawClip[3][l], 0x00));
           params[k][1][0 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-#if !JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
-          if (l < 3)
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          }
+          if( l < lim1 )
           {
 #endif
             s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0x55), _mm_shuffle_epi32(rawCoef[1][l], 0x55));
@@ -2564,28 +2900,38 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
             s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0x55), _mm_shuffle_epi32(rawClip[1][l], 0x55));
             s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0x55), _mm_shuffle_epi32(rawClip[3][l], 0x55));
             params[k][1][1 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          }
+          if( l < lim2 )
+          {
+#endif
             s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0xaa), _mm_shuffle_epi32(rawCoef[1][l], 0xaa));
             s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0xaa), _mm_shuffle_epi32(rawCoef[3][l], 0xaa));
             params[k][0][2 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
             s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0xaa), _mm_shuffle_epi32(rawClip[1][l], 0xaa));
             s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0xaa), _mm_shuffle_epi32(rawClip[3][l], 0xaa));
             params[k][1][2 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          }
+          if( l < lim3 )
+          {
+#endif
             s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0xff), _mm_shuffle_epi32(rawCoef[1][l], 0xff));
             s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0xff), _mm_shuffle_epi32(rawCoef[3][l], 0xff));
             params[k][0][3 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
             s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0xff), _mm_shuffle_epi32(rawClip[1][l], 0xff));
             s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0xff), _mm_shuffle_epi32(rawClip[3][l], 0xff));
             params[k][1][3 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-#if !JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
           }
 #endif
         }//for l
       }//for k
 
       const Pel *pImg0, *pImg1, *pImg2, *pImg3, *pImg4, *pImg5, *pImg6, *pImg7, *pImg8;
+#if !JVET_AD0222_ALF_LONG_FIXFILTER
       const Pel *pImg9, *pImg10, *pImg11, *pImg12;
+#endif
       pImg0 = src + j;
       pImg1 = pImg0 + srcStride;
       pImg2 = pImg0 - srcStride;
@@ -2595,14 +2941,18 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
       pImg6 = pImg4 - srcStride;
       pImg7 = pImg5 + srcStride;
       pImg8 = pImg6 - srcStride;
+#if !JVET_AD0222_ALF_LONG_FIXFILTER
       pImg9  = pImg7 + srcStride;
       pImg10 = pImg8 - srcStride;
       pImg11 = pImg9 + srcStride;
       pImg12 = pImg10 - srcStride;
+#endif
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
       int filterSetIdx = 0 + fixedFilterSetIdx;
       const Pel *pImg0FixedBased, *pImg1FixedBased, *pImg2FixedBased, *pImg3FixedBased, *pImg4FixedBased;
-
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+      const Pel *pImg5FixedBased, *pImg6FixedBased, *pImg7FixedBased, *pImg8FixedBased, *pImg9FixedBased, *pImg10FixedBased, *pImg11FixedBased, *pImg12FixedBased;
+#endif
       if(isFixedFilterPaddedPerCtu )
       {
         pImg0FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 0] + j + padSize;
@@ -2610,6 +2960,16 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
         pImg2FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 1] + j + padSize;
         pImg3FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 2] + j + padSize;
         pImg4FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 2] + j + padSize;
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+        pImg5FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 3] + j + padSize;
+        pImg6FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 3] + j + padSize;
+        pImg7FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 4] + j + padSize;
+        pImg8FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 4] + j + padSize;
+        pImg9FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 5] + j + padSize;
+        pImg10FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 5] + j + padSize;
+        pImg11FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 6] + j + padSize;
+        pImg12FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 6] + j + padSize;
+#endif
       }
       else
       {
@@ -2618,9 +2978,43 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
         pImg2FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 1] + blkDst.x + j + padSize;
         pImg3FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 2] + blkDst.x + j + padSize;
         pImg4FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 2] + blkDst.x + j + padSize;
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+        pImg5FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 3] + blkDst.x + j + padSize;
+        pImg6FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 3] + blkDst.x + j + padSize;
+        pImg7FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 4] + blkDst.x + j + padSize;
+        pImg8FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 4] + blkDst.x + j + padSize;
+        pImg9FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 5] + blkDst.x + j + padSize;
+        pImg10FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 5] + blkDst.x + j + padSize;
+        pImg11FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 6] + blkDst.x + j + padSize;
+        pImg12FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 6] + blkDst.x + j + padSize;
+#endif
       }
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      const Pel *pImg0Gauss[NUM_GAUSS_FILTERED_SOURCE];
+      const Pel *pImg1Gauss[NUM_GAUSS_FILTERED_SOURCE], *pImg2Gauss[NUM_GAUSS_FILTERED_SOURCE];
+      const Pel *pImg3Gauss[NUM_GAUSS_FILTERED_SOURCE], *pImg4Gauss[NUM_GAUSS_FILTERED_SOURCE];
 
+      for( int gaussIdx = 0; gaussIdx < NUM_GAUSS_FILTERED_SOURCE; gaussIdx++ )
+      {
+        if( isFixedFilterPaddedPerCtu )
+        {
+          pImg0Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss + 0] + j + padSizeGauss;
+          pImg1Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss + 1] + j + padSizeGauss;
+          pImg2Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss - 1] + j + padSizeGauss;
+          pImg3Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss + 2] + j + padSizeGauss;
+          pImg4Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss - 2] + j + padSizeGauss;
+        }
+        else
+        {
+          pImg0Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss + 0] + blkDst.x + j + padSizeGauss;
+          pImg1Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss + 1] + blkDst.x + j + padSizeGauss;
+          pImg2Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss - 1] + blkDst.x + j + padSizeGauss;
+          pImg3Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss + 2] + blkDst.x + j + padSizeGauss;
+          pImg4Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss - 2] + blkDst.x + j + padSizeGauss;
+        }
+      }
+#endif
       __m128i cur = _mm_loadu_si128((const __m128i *) pImg0);
       __m128i accumA = mmOffset;
       __m128i accumB = mmOffset;
@@ -2661,7 +3055,55 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
         accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
         accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
       };
-
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      process2coeffs(0, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
+      process2coeffs(1, pImg3 + 0, pImg4 - 0, pImg1 + 1, pImg2 - 1);
+      process2coeffs(2, pImg1 + 0, pImg2 - 0, pImg1 - 1, pImg2 + 1);
+      process2coeffs(3, pImg0 + 4, pImg0 - 4, pImg0 + 3, pImg0 - 3);
+      process2coeffs(4, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
+      process2coeffs(5, pImg12FixedBased - 0, pImg11FixedBased + 0, pImg10FixedBased - 0, pImg9FixedBased + 0);
+      process2coeffs(6, pImg8FixedBased - 0, pImg7FixedBased + 0, pImg6FixedBased - 0, pImg5FixedBased + 0);
+      process2coeffs(7, pImg4FixedBased - 1, pImg3FixedBased + 1, pImg4FixedBased - 0, pImg3FixedBased + 0);
+      process2coeffs(8, pImg4FixedBased + 1, pImg3FixedBased - 1, pImg2FixedBased - 2, pImg1FixedBased + 2);
+      process2coeffs(9, pImg2FixedBased - 1, pImg1FixedBased + 1, pImg2FixedBased - 0, pImg1FixedBased + 0);
+      process2coeffs(10, pImg2FixedBased + 1, pImg1FixedBased - 1, pImg2FixedBased + 2, pImg1FixedBased - 2);
+      process2coeffs(11, pImg0FixedBased - 6, pImg0FixedBased + 6, pImg0FixedBased - 5, pImg0FixedBased + 5);
+      process2coeffs(12, pImg0FixedBased - 4, pImg0FixedBased + 4, pImg0FixedBased - 3, pImg0FixedBased + 3);
+      process2coeffs(13, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
+      process2coeffs(14, pImg3Gauss[0] - 0, pImg4Gauss[0] + 0, pImg1Gauss[0] - 0, pImg2Gauss[0] + 0);
+      process2coeffs(15, pImg0Gauss[0] - 2, pImg0Gauss[0] + 2, pImg0Gauss[0] - 1, pImg0Gauss[0] + 1);
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      process2coeffs(0, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
+      process2coeffs(1, pImg3 + 0, pImg4 - 0, pImg1 + 1, pImg2 - 1);
+      process2coeffs(2, pImg1 + 0, pImg2 - 0, pImg1 - 1, pImg2 + 1);
+      process2coeffs(3, pImg0 + 4, pImg0 - 4, pImg0 + 3, pImg0 - 3);
+      process2coeffs(4, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
+      process2coeffs(5, pImg12FixedBased - 0, pImg11FixedBased + 0, pImg10FixedBased - 0, pImg9FixedBased + 0);
+      process2coeffs(6, pImg8FixedBased - 0, pImg7FixedBased + 0, pImg6FixedBased - 0, pImg5FixedBased + 0);
+      process2coeffs(7, pImg4FixedBased - 1, pImg3FixedBased + 1, pImg4FixedBased - 0, pImg3FixedBased + 0);
+      process2coeffs(8, pImg4FixedBased + 1, pImg3FixedBased - 1, pImg2FixedBased - 2, pImg1FixedBased + 2);
+      process2coeffs(9, pImg2FixedBased - 1, pImg1FixedBased + 1, pImg2FixedBased - 0, pImg1FixedBased + 0);
+      process2coeffs(10, pImg2FixedBased + 1, pImg1FixedBased - 1, pImg2FixedBased + 2, pImg1FixedBased - 2);
+      process2coeffs(11, pImg0FixedBased - 6, pImg0FixedBased + 6, pImg0FixedBased - 5, pImg0FixedBased + 5);
+      process2coeffs(12, pImg0FixedBased - 4, pImg0FixedBased + 4, pImg0FixedBased - 3, pImg0FixedBased + 3);
+      process2coeffs(13, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      process2coeffs(0, pImg11 + 0, pImg12 - 0, pImg9 + 0, pImg10 - 0);
+      process2coeffs(1, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
+      process2coeffs(2, pImg3 + 2, pImg4 - 2, pImg3 + 1, pImg4 - 1);
+      process2coeffs(3, pImg3 + 0, pImg4 - 0, pImg3 - 1, pImg4 + 1);
+      process2coeffs(4, pImg3 - 2, pImg4 + 2, pImg1 + 2, pImg2 - 2);
+      process2coeffs(5, pImg1 + 1, pImg2 - 1, pImg1 + 0, pImg2 - 0);
+      process2coeffs(6, pImg1 - 1, pImg2 + 1, pImg1 - 2, pImg2 + 2);
+      process2coeffs(7, pImg0 + 6, pImg0 - 6, pImg0 + 5, pImg0 - 5);
+      process2coeffs(8, pImg0 + 4, pImg0 - 4, pImg0 + 3, pImg0 - 3);
+      process2coeffs(9, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
+      process2coeffs(10, pImg4FixedBased - 0, pImg3FixedBased + 0, pImg2FixedBased - 1, pImg1FixedBased + 1);
+      process2coeffs(11, pImg2FixedBased - 0, pImg1FixedBased + 0, pImg2FixedBased + 1, pImg1FixedBased - 1);
+      process2coeffs(12, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
+      process2coeffs(13, pImg3Gauss[0] - 0, pImg4Gauss[0] + 0, pImg1Gauss[0] - 0, pImg2Gauss[0] + 0);
+      process2coeffs(14, pImg0Gauss[0] - 2, pImg0Gauss[0] + 2, pImg0Gauss[0] - 1, pImg0Gauss[0] + 1);
+#else
       process2coeffs(0, pImg11 + 0, pImg12 - 0, pImg9 + 0, pImg10 - 0);
       process2coeffs(1, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
       process2coeffs(2, pImg3 + 2, pImg4 - 2, pImg3 + 1, pImg4 - 1);
@@ -2677,19 +3119,27 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
       process2coeffs(11, pImg2FixedBased - 0, pImg1FixedBased + 0, pImg2FixedBased + 1, pImg1FixedBased - 1);
       process2coeffs(12, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
 #endif
-
+#endif
       pImg0 = srcBeforeDb + j;
       pImg1 = pImg0 + srcBeforeDbStride;
       pImg2 = pImg0 - srcBeforeDbStride;
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      process2coeffs(16, pImg1 + 0, pImg2 + 0, pImg0 + 1, pImg0 - 1);
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      process2coeffs(14, pImg1 + 0, pImg2 + 0, pImg0 + 1, pImg0 - 1);
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      process2coeffs(15, pImg1 + 0, pImg2 + 0, pImg0 + 1, pImg0 - 1);
+#else
       process2coeffs(13, pImg1 + 0, pImg2 + 0, pImg0 + 1, pImg0 - 1);
+#endif
 #else
       process2coeffs(10, pImg1 + 0, pImg2 + 0, pImg0 + 1, pImg0 - 1);
 #endif
 
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
-      __m128i val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) (fixedFilterResults[0 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x + j + padSize)), cur);
-      __m128i val10 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) (fixedFilterResults[2 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x + j + padSize)), cur);
+      __m128i val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *)(fixedFilterResults[0 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x + j + padSize)), cur);
+      __m128i val10 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *)(fixedFilterResults[2 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x + j + padSize)), cur);
 #else
       __m128i val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) pImg0), cur);
       __m128i val10 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) (fixedFilterResults[fixedFilterSetIdx][blkDst.y + i] + blkDst.x + j)), cur);
@@ -2697,8 +3147,19 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
       __m128i val01A = _mm_unpacklo_epi16(val00, val10);
       __m128i val01B = _mm_unpackhi_epi16(val00, val10);
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i limit01A = params[0][1][17];
+      __m128i limit01B = params[1][1][17];
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      __m128i limit01A = params[0][1][15];
+      __m128i limit01B = params[1][1][15];
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i limit01A = params[0][1][16];
+      __m128i limit01B = params[1][1][16];
+#else
       __m128i limit01A = params[0][1][14];
       __m128i limit01B = params[1][1][14];
+#endif
 #else
       __m128i limit01A = params[0][1][11];
       __m128i limit01B = params[1][1][11];
@@ -2710,8 +3171,19 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
       val01A = _mm_max_epi16(val01A, limit01A);
       val01B = _mm_max_epi16(val01B, limit01B);
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i coeff01A = params[0][0][17];
+      __m128i coeff01B = params[1][0][17];
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      __m128i coeff01A = params[0][0][15];
+      __m128i coeff01B = params[1][0][15];
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i coeff01A = params[0][0][16];
+      __m128i coeff01B = params[1][0][16];
+#else
       __m128i coeff01A = params[0][0][14];
       __m128i coeff01B = params[1][0][14];
+#endif
 #else
       __m128i coeff01A = params[0][0][11];
       __m128i coeff01B = params[1][0][11];
@@ -2721,7 +3193,11 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
 
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
       val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) (pImg0)), cur);
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      val10 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) (pImg0Gauss[0])), cur);
+#else
       val10 = _mm_sub_epi16(cur, cur);
+#endif
       val01A = _mm_unpacklo_epi16(val00, val10);
       val01B = _mm_unpackhi_epi16(val00, val10);
 #else
@@ -2730,8 +3206,19 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
       val01B = _mm_shuffle_epi8(val, _mm_setr_epi8(8, 9, 8, 9, 10, 11, 10, 11, 12, 13, 12, 13, 14, 15, 14, 15));
 #endif
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      limit01A = params[0][1][18];
+      limit01B = params[1][1][18];
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      limit01A = params[0][1][16];
+      limit01B = params[1][1][16];
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      limit01A = params[0][1][17];
+      limit01B = params[1][1][17];
+#else
       limit01A = params[0][1][15];
       limit01B = params[1][1][15];
+#endif
 #else
       limit01A = params[0][1][12];
       limit01B = params[1][1][12];
@@ -2743,8 +3230,19 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
       val01A = _mm_max_epi16(val01A, limit01A);
       val01B = _mm_max_epi16(val01B, limit01B);
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      coeff01A = params[0][0][18];
+      coeff01B = params[1][0][18];
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      coeff01A = params[0][0][16];
+      coeff01B = params[1][0][16];
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      coeff01A = params[0][0][17];
+      coeff01B = params[1][0][17];
+#else
       coeff01A = params[0][0][15];
       coeff01B = params[1][0][15];
+#endif
 #else
       coeff01A = params[0][0][12];
       coeff01B = params[1][0][12];
@@ -2782,6 +3280,9 @@ static void simdFilter13x13BlkExtDbResiDirect(
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   ,Pel ***fixedFilterResultsPerCtu, bool isFixedFilterPaddedPerCtu
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  , Pel ***gaussPic, Pel ***gaussCtu
+#endif
 )
 {
   const CPelBuf srcBuffer         = recSrc.get(compId);
@@ -2817,6 +3318,9 @@ static void simdFilter13x13BlkExtDbResiDirect(
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   const int padSize = ALF_PADDING_SIZE_FIXED_RESULTS;
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  const int padSizeGauss = ALF_PADDING_SIZE_GAUSS_RESULTS;
+#endif
 
   for (size_t i = 0; i < height; i += stepY)
   {
@@ -2824,13 +3328,25 @@ static void simdFilter13x13BlkExtDbResiDirect(
     for (size_t j = 0; j < width; j += stepX)
     {
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i params[2][2][20];
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      __m128i params[2][2][17];
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i params[2][2][19];
+#else
       __m128i params[2][2][16];
+#endif
 #else
       __m128i params[2][2][13];
 #endif
       for (int k = 0; k < 2; k++)
       {
+#if JVET_AD0222_ALF_LONG_FIXFILTER || JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+        __m128i rawCoef[4][5], rawClip[4][5], s0, s1, s2, s3, rawTmp0, rawTmp1;
+#else
         __m128i rawCoef[4][4], rawClip[4][4], s0, s1, s2, s3, rawTmp0, rawTmp1;
+#endif
         for (int l = 0; l < 4; l++)
         {
           const int transposeIdx = pClass[j + 4 * k + l] & 0x3;
@@ -2840,12 +3356,16 @@ static void simdFilter13x13BlkExtDbResiDirect(
           rawCoef[l][1] = _mm_loadu_si128((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 8));
           rawCoef[l][2] = _mm_loadu_si128((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 16));
           rawCoef[l][3] = _mm_loadu_si128((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 24));
-
+#if JVET_AD0222_ALF_LONG_FIXFILTER || JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+          rawCoef[l][4] = _mm_loadu_si128((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 32));
+#endif
           rawClip[l][0] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF));
           rawClip[l][1] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 8));
           rawClip[l][2] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 16));
           rawClip[l][3] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 24));
-
+#if JVET_AD0222_ALF_LONG_FIXFILTER || JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+          rawClip[l][4] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 32));
+#endif
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
           for (int m = 0; m < shuffleTime13FixedBasedLongLength[transposeIdx]; m++)
 #else
@@ -2882,19 +3402,36 @@ static void simdFilter13x13BlkExtDbResiDirect(
             rawClip[l][op1] = rawTmp1;
           }
         }   // for l
-
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+        int limR, lim0, lim1, lim2, lim3;
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+        limR = 5, lim0 = 5, lim1 = 5, lim2 = 5, lim3 = 5;
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+        limR = 5, lim0 = 5, lim1 = 4, lim2 = 4, lim3 = 4;
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+        limR = 5, lim0 = 5, lim1 = 5, lim2 = 5, lim3 = 4;
+#else
+        limR = 4, lim0 = 4, lim1 = 4, lim2 = 4, lim3 = 4;
+#endif
+        for (unsigned char l = 0; l < limR; l++)
+#else
         for (unsigned char l = 0; l < 4; l++)
+#endif
         {
           int m = l << 2;
-
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          if (l < lim0)
+          {
+#endif
           s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0x00), _mm_shuffle_epi32(rawCoef[1][l], 0x00));
           s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0x00), _mm_shuffle_epi32(rawCoef[3][l], 0x00));
           params[k][0][0 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
           s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0x00), _mm_shuffle_epi32(rawClip[1][l], 0x00));
           s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0x00), _mm_shuffle_epi32(rawClip[3][l], 0x00));
           params[k][1][0 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-#if !JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
-          if (l < 3)
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          }
+          if (l < lim1)
           {
 #endif
             s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0x55), _mm_shuffle_epi32(rawCoef[1][l], 0x55));
@@ -2903,29 +3440,38 @@ static void simdFilter13x13BlkExtDbResiDirect(
             s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0x55), _mm_shuffle_epi32(rawClip[1][l], 0x55));
             s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0x55), _mm_shuffle_epi32(rawClip[3][l], 0x55));
             params[k][1][1 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          }
+          if (l < lim2)
+          {
+#endif
             s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0xaa), _mm_shuffle_epi32(rawCoef[1][l], 0xaa));
             s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0xaa), _mm_shuffle_epi32(rawCoef[3][l], 0xaa));
             params[k][0][2 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
             s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0xaa), _mm_shuffle_epi32(rawClip[1][l], 0xaa));
             s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0xaa), _mm_shuffle_epi32(rawClip[3][l], 0xaa));
             params[k][1][2 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          }
+          if (l < lim3)
+          {
+#endif
             s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0xff), _mm_shuffle_epi32(rawCoef[1][l], 0xff));
             s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0xff), _mm_shuffle_epi32(rawCoef[3][l], 0xff));
             params[k][0][3 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
             s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0xff), _mm_shuffle_epi32(rawClip[1][l], 0xff));
             s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0xff), _mm_shuffle_epi32(rawClip[3][l], 0xff));
             params[k][1][3 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-#if !JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
           }
 #endif
         }   // for l
       }     // for k
 
       const Pel *pImg0, *pImg1, *pImg2, *pImg3, *pImg4, *pImg5, *pImg6, *pImg7, *pImg8;
+#if !JVET_AD0222_ALF_LONG_FIXFILTER
       const Pel *pImg9, *pImg10, *pImg11, *pImg12;
-
+#endif
       const Pel *pImgP0;
 
       pImg0  = src + j;
@@ -2937,14 +3483,18 @@ static void simdFilter13x13BlkExtDbResiDirect(
       pImg6  = pImg4 - srcStride;
       pImg7  = pImg5 + srcStride;
       pImg8  = pImg6 - srcStride;
+#if !JVET_AD0222_ALF_LONG_FIXFILTER
       pImg9  = pImg7 + srcStride;
       pImg10 = pImg8 - srcStride;
       pImg11 = pImg9 + srcStride;
       pImg12 = pImg10 - srcStride;
+#endif
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
       int        filterSetIdx = 0 + fixedFilterSetIdx;
       const Pel *pImg0FixedBased, *pImg1FixedBased, *pImg2FixedBased, *pImg3FixedBased, *pImg4FixedBased;
-
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+      const Pel *pImg5FixedBased, *pImg6FixedBased, *pImg7FixedBased, *pImg8FixedBased, *pImg9FixedBased, *pImg10FixedBased, *pImg11FixedBased, *pImg12FixedBased;
+#endif
       if (isFixedFilterPaddedPerCtu)
       {
         pImg0FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 0] + j + padSize;
@@ -2952,6 +3502,16 @@ static void simdFilter13x13BlkExtDbResiDirect(
         pImg2FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 1] + j + padSize;
         pImg3FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 2] + j + padSize;
         pImg4FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 2] + j + padSize;
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+        pImg5FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 3] + j + padSize;
+        pImg6FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 3] + j + padSize;
+        pImg7FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 4] + j + padSize;
+        pImg8FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 4] + j + padSize;
+        pImg9FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 5] + j + padSize;
+        pImg10FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 5] + j + padSize;
+        pImg11FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 6] + j + padSize;
+        pImg12FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 6] + j + padSize;
+#endif
       }
       else
       {
@@ -2960,9 +3520,43 @@ static void simdFilter13x13BlkExtDbResiDirect(
         pImg2FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 1] + blkDst.x + j + padSize;
         pImg3FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 2] + blkDst.x + j + padSize;
         pImg4FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 2] + blkDst.x + j + padSize;
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+        pImg5FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 3] + blkDst.x + j + padSize;
+        pImg6FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 3] + blkDst.x + j + padSize;
+        pImg7FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 4] + blkDst.x + j + padSize;
+        pImg8FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 4] + blkDst.x + j + padSize;
+        pImg9FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 5] + blkDst.x + j + padSize;
+        pImg10FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 5] + blkDst.x + j + padSize;
+        pImg11FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 6] + blkDst.x + j + padSize;
+        pImg12FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 6] + blkDst.x + j + padSize;
+#endif
       }
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      const Pel *pImg0Gauss[NUM_GAUSS_FILTERED_SOURCE];
+      const Pel *pImg1Gauss[NUM_GAUSS_FILTERED_SOURCE], *pImg2Gauss[NUM_GAUSS_FILTERED_SOURCE];
+      const Pel *pImg3Gauss[NUM_GAUSS_FILTERED_SOURCE], *pImg4Gauss[NUM_GAUSS_FILTERED_SOURCE];
 
+      for( int gaussIdx = 0; gaussIdx < NUM_GAUSS_FILTERED_SOURCE; gaussIdx++ )
+      {
+        if( isFixedFilterPaddedPerCtu )
+        {
+          pImg0Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss + 0] + j + padSizeGauss;
+          pImg1Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss + 1] + j + padSizeGauss;
+          pImg2Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss - 1] + j + padSizeGauss;
+          pImg3Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss + 2] + j + padSizeGauss;
+          pImg4Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss - 2] + j + padSizeGauss;
+        }
+        else
+        {
+          pImg0Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss + 0] + blkDst.x + j + padSizeGauss;
+          pImg1Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss + 1] + blkDst.x + j + padSizeGauss;
+          pImg2Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss - 1] + blkDst.x + j + padSizeGauss;
+          pImg3Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss + 2] + blkDst.x + j + padSizeGauss;
+          pImg4Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss - 2] + blkDst.x + j + padSizeGauss;
+        }
+      }
+#endif
       __m128i cur    = _mm_loadu_si128((const __m128i *) pImg0);
       __m128i accumA = mmOffset;
       __m128i accumB = mmOffset;
@@ -3004,7 +3598,55 @@ static void simdFilter13x13BlkExtDbResiDirect(
         accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
         accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
       };
-
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      process2coeffs(0, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
+      process2coeffs(1, pImg3 + 0, pImg4 - 0, pImg1 + 1, pImg2 - 1);
+      process2coeffs(2, pImg1 + 0, pImg2 - 0, pImg1 - 1, pImg2 + 1);
+      process2coeffs(3, pImg0 + 4, pImg0 - 4, pImg0 + 3, pImg0 - 3);
+      process2coeffs(4, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
+      process2coeffs(5, pImg12FixedBased - 0, pImg11FixedBased + 0, pImg10FixedBased - 0, pImg9FixedBased + 0);
+      process2coeffs(6, pImg8FixedBased - 0, pImg7FixedBased + 0, pImg6FixedBased - 0, pImg5FixedBased + 0);
+      process2coeffs(7, pImg4FixedBased - 1, pImg3FixedBased + 1, pImg4FixedBased - 0, pImg3FixedBased + 0);
+      process2coeffs(8, pImg4FixedBased + 1, pImg3FixedBased - 1, pImg2FixedBased - 2, pImg1FixedBased + 2);
+      process2coeffs(9, pImg2FixedBased - 1, pImg1FixedBased + 1, pImg2FixedBased - 0, pImg1FixedBased + 0);
+      process2coeffs(10, pImg2FixedBased + 1, pImg1FixedBased - 1, pImg2FixedBased + 2, pImg1FixedBased - 2);
+      process2coeffs(11, pImg0FixedBased - 6, pImg0FixedBased + 6, pImg0FixedBased - 5, pImg0FixedBased + 5);
+      process2coeffs(12, pImg0FixedBased - 4, pImg0FixedBased + 4, pImg0FixedBased - 3, pImg0FixedBased + 3);
+      process2coeffs(13, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
+      process2coeffs(14, pImg3Gauss[0] - 0, pImg4Gauss[0] + 0, pImg1Gauss[0] - 0, pImg2Gauss[0] + 0);
+      process2coeffs(15, pImg0Gauss[0] - 2, pImg0Gauss[0] + 2, pImg0Gauss[0] - 1, pImg0Gauss[0] + 1);
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      process2coeffs(0, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
+      process2coeffs(1, pImg3 + 0, pImg4 - 0, pImg1 + 1, pImg2 - 1);
+      process2coeffs(2, pImg1 + 0, pImg2 - 0, pImg1 - 1, pImg2 + 1);
+      process2coeffs(3, pImg0 + 4, pImg0 - 4, pImg0 + 3, pImg0 - 3);
+      process2coeffs(4, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
+      process2coeffs(5, pImg12FixedBased - 0, pImg11FixedBased + 0, pImg10FixedBased - 0, pImg9FixedBased + 0);
+      process2coeffs(6, pImg8FixedBased - 0, pImg7FixedBased + 0, pImg6FixedBased - 0, pImg5FixedBased + 0);
+      process2coeffs(7, pImg4FixedBased - 1, pImg3FixedBased + 1, pImg4FixedBased - 0, pImg3FixedBased + 0);
+      process2coeffs(8, pImg4FixedBased + 1, pImg3FixedBased - 1, pImg2FixedBased - 2, pImg1FixedBased + 2);
+      process2coeffs(9, pImg2FixedBased - 1, pImg1FixedBased + 1, pImg2FixedBased - 0, pImg1FixedBased + 0);
+      process2coeffs(10, pImg2FixedBased + 1, pImg1FixedBased - 1, pImg2FixedBased + 2, pImg1FixedBased - 2);
+      process2coeffs(11, pImg0FixedBased - 6, pImg0FixedBased + 6, pImg0FixedBased - 5, pImg0FixedBased + 5);
+      process2coeffs(12, pImg0FixedBased - 4, pImg0FixedBased + 4, pImg0FixedBased - 3, pImg0FixedBased + 3);
+      process2coeffs(13, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      process2coeffs(0, pImg11 + 0, pImg12 - 0, pImg9 + 0, pImg10 - 0);
+      process2coeffs(1, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
+      process2coeffs(2, pImg3 + 2, pImg4 - 2, pImg3 + 1, pImg4 - 1);
+      process2coeffs(3, pImg3 + 0, pImg4 - 0, pImg3 - 1, pImg4 + 1);
+      process2coeffs(4, pImg3 - 2, pImg4 + 2, pImg1 + 2, pImg2 - 2);
+      process2coeffs(5, pImg1 + 1, pImg2 - 1, pImg1 + 0, pImg2 - 0);
+      process2coeffs(6, pImg1 - 1, pImg2 + 1, pImg1 - 2, pImg2 + 2);
+      process2coeffs(7, pImg0 + 6, pImg0 - 6, pImg0 + 5, pImg0 - 5);
+      process2coeffs(8, pImg0 + 4, pImg0 - 4, pImg0 + 3, pImg0 - 3);
+      process2coeffs(9, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
+      process2coeffs(10, pImg4FixedBased - 0, pImg3FixedBased + 0, pImg2FixedBased - 1, pImg1FixedBased + 1);
+      process2coeffs(11, pImg2FixedBased - 0, pImg1FixedBased + 0, pImg2FixedBased + 1, pImg1FixedBased - 1);
+      process2coeffs(12, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
+      process2coeffs(13, pImg3Gauss[0] - 0, pImg4Gauss[0] + 0, pImg1Gauss[0] - 0, pImg2Gauss[0] + 0);
+      process2coeffs(14, pImg0Gauss[0] - 2, pImg0Gauss[0] + 2, pImg0Gauss[0] - 1, pImg0Gauss[0] + 1);
+#else
       process2coeffs(0, pImg11 + 0, pImg12 - 0, pImg9 + 0, pImg10 - 0);
       process2coeffs(1, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
       process2coeffs(2, pImg3 + 2, pImg4 - 2, pImg3 + 1, pImg4 - 1);
@@ -3020,7 +3662,7 @@ static void simdFilter13x13BlkExtDbResiDirect(
       process2coeffs(11, pImg2FixedBased - 0, pImg1FixedBased + 0, pImg2FixedBased + 1, pImg1FixedBased - 1);
       process2coeffs(12, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
 #endif
-
+#endif
       pImg0 = srcBeforeDb + j;
       pImg1 = pImg0 + srcBeforeDbStride;
       pImg2 = pImg0 - srcBeforeDbStride;
@@ -3028,19 +3670,23 @@ static void simdFilter13x13BlkExtDbResiDirect(
       pImgP0 = srcResi + j;
 
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      process2coeffs(16, pImg1 + 0, pImg2 + 0, pImg0 + 1, pImg0 - 1);
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      process2coeffs(14, pImg1 + 0, pImg2 + 0, pImg0 + 1, pImg0 - 1);
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      process2coeffs(15, pImg1 + 0, pImg2 + 0, pImg0 + 1, pImg0 - 1);
+#else
       process2coeffs(13, pImg1 + 0, pImg2 + 0, pImg0 + 1, pImg0 - 1);
+#endif
 #else
       process2coeffs(10, pImg1 + 0, pImg2 + 0, pImg0 + 1, pImg0 - 1);
 #endif
 
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
-      __m128i val00 = _mm_sub_epi16(
-        _mm_loadu_si128((const __m128i *) (fixedFilterResults[0 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x
-                                           + j + padSize)),
+      __m128i val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *)(fixedFilterResults[0 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x + j + padSize)),
         cur);
-      __m128i val10 = _mm_sub_epi16(
-        _mm_loadu_si128((const __m128i *) (fixedFilterResults[2 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x
-                                           + j + padSize)),
+      __m128i val10 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *)(fixedFilterResults[2 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x + j + padSize)),
         cur);
 #else
       __m128i val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) pImg0), cur);
@@ -3050,8 +3696,19 @@ static void simdFilter13x13BlkExtDbResiDirect(
       __m128i val01A = _mm_unpacklo_epi16(val00, val10);
       __m128i val01B = _mm_unpackhi_epi16(val00, val10);
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i limit01A = params[0][1][17];
+      __m128i limit01B = params[1][1][17];
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      __m128i limit01A = params[0][1][15];
+      __m128i limit01B = params[1][1][15];
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i limit01A = params[0][1][16];
+      __m128i limit01B = params[1][1][16];
+#else
       __m128i limit01A = params[0][1][14];
       __m128i limit01B = params[1][1][14];
+#endif
 #else
       __m128i limit01A = params[0][1][11];
       __m128i limit01B = params[1][1][11];
@@ -3063,8 +3720,19 @@ static void simdFilter13x13BlkExtDbResiDirect(
       val01A   = _mm_max_epi16(val01A, limit01A);
       val01B   = _mm_max_epi16(val01B, limit01B);
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i coeff01A = params[0][0][17];
+      __m128i coeff01B = params[1][0][17];
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      __m128i coeff01A = params[0][0][15];
+      __m128i coeff01B = params[1][0][15];
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      __m128i coeff01A = params[0][0][16];
+      __m128i coeff01B = params[1][0][16];
+#else
       __m128i coeff01A = params[0][0][14];
       __m128i coeff01B = params[1][0][14];
+#endif
 #else
       __m128i coeff01A = params[0][0][11];
       __m128i coeff01B = params[1][0][11];
@@ -3078,9 +3746,19 @@ static void simdFilter13x13BlkExtDbResiDirect(
       val10        = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) pImgP0), zero);
       val01A       = _mm_unpacklo_epi16(val00, val10);
       val01B       = _mm_unpackhi_epi16(val00, val10);
-
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      limit01A = params[0][1][18];
+      limit01B = params[1][1][18];
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      limit01A = params[0][1][16];
+      limit01B = params[1][1][16];
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      limit01A = params[0][1][17];
+      limit01B = params[1][1][17];
+#else
       limit01A = params[0][1][15];
       limit01B = params[1][1][15];
+#endif
 
       val01A   = _mm_min_epi16(val01A, limit01A);
       val01B   = _mm_min_epi16(val01B, limit01B);
@@ -3088,14 +3766,52 @@ static void simdFilter13x13BlkExtDbResiDirect(
       limit01B = _mm_sub_epi16(_mm_setzero_si128(), limit01B);
       val01A   = _mm_max_epi16(val01A, limit01A);
       val01B   = _mm_max_epi16(val01B, limit01B);
-
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      coeff01A = params[0][0][18];
+      coeff01B = params[1][0][18];
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      coeff01A = params[0][0][16];
+      coeff01B = params[1][0][16];
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      coeff01A = params[0][0][17];
+      coeff01B = params[1][0][17];
+#else
       coeff01A = params[0][0][15];
       coeff01B = params[1][0][15];
+#endif
 
       accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
       accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
       // end prediction fixed filter
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      val00    = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) (pImg0Gauss[0])), cur);
+      val10    = _mm_setzero_si128();
+      val01A   = _mm_unpacklo_epi16(val00, val10);
+      val01B   = _mm_unpackhi_epi16(val00, val10);
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+      limit01A = params[0][1][19];
+      limit01B = params[1][1][19];
+#else
+      limit01A = params[0][1][18];
+      limit01B = params[1][1][18];
+#endif
 
+      val01A   = _mm_min_epi16(val01A, limit01A);
+      val01B   = _mm_min_epi16(val01B, limit01B);
+      limit01A = _mm_sub_epi16(_mm_setzero_si128(), limit01A);
+      limit01B = _mm_sub_epi16(_mm_setzero_si128(), limit01B);
+      val01A   = _mm_max_epi16(val01A, limit01A);
+      val01B   = _mm_max_epi16(val01B, limit01B);
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+      coeff01A = params[0][0][19];
+      coeff01B = params[1][0][19];
+#else
+      coeff01A = params[0][0][18];
+      coeff01B = params[1][0][18];
+#endif
+      accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
+      accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
+#endif
       accumA = _mm_srai_epi32(accumA, shift);
       accumB = _mm_srai_epi32(accumB, shift);
 
@@ -3124,6 +3840,9 @@ static void simdFilter13x13BlkExtDbResi(
   ,const ClpRng &clpRng, CodingStructure &cs, Pel ***fixedFilterResults, Pel ***fixedFilterResiResults, int fixedFilterSetIdx
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   ,Pel ***fixedFilterResultsPerCtu, bool isFixedFilterPaddedPerCtu
+#endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  , Pel ***gaussPic, Pel ***gaussCtu
 #endif
 )
 {
@@ -3160,14 +3879,20 @@ static void simdFilter13x13BlkExtDbResi(
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   const int padSize = ALF_PADDING_SIZE_FIXED_RESULTS;
 #endif
-
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  const int padSizeGauss = ALF_PADDING_SIZE_GAUSS_RESULTS;
+#endif
   for (size_t i = 0; i < height; i += stepY)
   {
     const AlfClassifier *pClass = classifier[blkDst.y + i] + blkDst.x;
     for (size_t j = 0; j < width; j += stepX)
     {
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER 
+      __m128i params[2][2][18];
+#else
       __m128i params[2][2][17];
+#endif
 #else
       __m128i params[2][2][13];
 #endif
@@ -3227,52 +3952,76 @@ static void simdFilter13x13BlkExtDbResi(
             rawClip[l][op1] = rawTmp1;
           }
         }   // for l
-
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+        int limR, lim0, lim1, lim2, lim3;
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+        limR = 5, lim0 = 5, lim1 = 5, lim2 = 4, lim3 = 4;
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+        limR = 5, lim0 = 5, lim1 = 5, lim2 = 4, lim3 = 4;
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+        limR = 5, lim0 = 5, lim1 = 4, lim2 = 4, lim3 = 4;
+#else
+        limR = 5, lim0 = 5, lim1 = 4, lim2 = 4, lim3 = 4;
+#endif
+        for (unsigned char l = 0; l < limR; l++)
+#else
         for (unsigned char l = 0; l < 5; l++)
+#endif
         {
           int m = l << 2;
-
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          if( l < lim0 )
+          {
+#endif
           s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0x00), _mm_shuffle_epi32(rawCoef[1][l], 0x00));
           s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0x00), _mm_shuffle_epi32(rawCoef[3][l], 0x00));
           params[k][0][0 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
           s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0x00), _mm_shuffle_epi32(rawClip[1][l], 0x00));
           s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0x00), _mm_shuffle_epi32(rawClip[3][l], 0x00));
           params[k][1][0 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-#if !JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
-          if (l < 3)
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          }
+          if( l < lim1 )
           {
 #endif
-            if (l < 4)
-            {
-              s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0x55), _mm_shuffle_epi32(rawCoef[1][l], 0x55));
-              s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0x55), _mm_shuffle_epi32(rawCoef[3][l], 0x55));
-              params[k][0][1 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-              s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0x55), _mm_shuffle_epi32(rawClip[1][l], 0x55));
-              s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0x55), _mm_shuffle_epi32(rawClip[3][l], 0x55));
-              params[k][1][1 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-
-              s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0xaa), _mm_shuffle_epi32(rawCoef[1][l], 0xaa));
-              s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0xaa), _mm_shuffle_epi32(rawCoef[3][l], 0xaa));
-              params[k][0][2 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-              s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0xaa), _mm_shuffle_epi32(rawClip[1][l], 0xaa));
-              s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0xaa), _mm_shuffle_epi32(rawClip[3][l], 0xaa));
-              params[k][1][2 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-
-              s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0xff), _mm_shuffle_epi32(rawCoef[1][l], 0xff));
-              s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0xff), _mm_shuffle_epi32(rawCoef[3][l], 0xff));
-              params[k][0][3 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-              s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0xff), _mm_shuffle_epi32(rawClip[1][l], 0xff));
-              s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0xff), _mm_shuffle_epi32(rawClip[3][l], 0xff));
-              params[k][1][3 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
-            }
-#if !JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+            s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0x55), _mm_shuffle_epi32(rawCoef[1][l], 0x55));
+            s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0x55), _mm_shuffle_epi32(rawCoef[3][l], 0x55));
+            params[k][0][1 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+            s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0x55), _mm_shuffle_epi32(rawClip[1][l], 0x55));
+            s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0x55), _mm_shuffle_epi32(rawClip[3][l], 0x55));
+            params[k][1][1 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          }
+          if( l < lim2 )
+          {
+#endif
+            s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0xaa), _mm_shuffle_epi32(rawCoef[1][l], 0xaa));
+            s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0xaa), _mm_shuffle_epi32(rawCoef[3][l], 0xaa));
+            params[k][0][2 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+            s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0xaa), _mm_shuffle_epi32(rawClip[1][l], 0xaa));
+            s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0xaa), _mm_shuffle_epi32(rawClip[3][l], 0xaa));
+            params[k][1][2 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+          }
+          if( l < lim3 )
+          {
+#endif
+            s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0xff), _mm_shuffle_epi32(rawCoef[1][l], 0xff));
+            s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0xff), _mm_shuffle_epi32(rawCoef[3][l], 0xff));
+            params[k][0][3 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+            s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0xff), _mm_shuffle_epi32(rawClip[1][l], 0xff));
+            s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0xff), _mm_shuffle_epi32(rawClip[3][l], 0xff));
+            params[k][1][3 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+#if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
           }
 #endif
         }   // for l
       }     // for k
 
       const Pel *pImg0, *pImg1, *pImg2, *pImg3, *pImg4, *pImg5, *pImg6, *pImg7, *pImg8;
+#if !JVET_AD0222_ALF_LONG_FIXFILTER
       const Pel *pImg9, *pImg10, *pImg11, *pImg12;
+#endif
       const Pel *pImgP0;
 
       pImg0  = src + j;
@@ -3284,14 +4033,18 @@ static void simdFilter13x13BlkExtDbResi(
       pImg6  = pImg4 - srcStride;
       pImg7  = pImg5 + srcStride;
       pImg8  = pImg6 - srcStride;
+#if !JVET_AD0222_ALF_LONG_FIXFILTER
       pImg9  = pImg7 + srcStride;
       pImg10 = pImg8 - srcStride;
       pImg11 = pImg9 + srcStride;
       pImg12 = pImg10 - srcStride;
+#endif
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
       int        filterSetIdx = 0 + fixedFilterSetIdx;
       const Pel *pImg0FixedBased, *pImg1FixedBased, *pImg2FixedBased, *pImg3FixedBased, *pImg4FixedBased;
-
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+      const Pel *pImg5FixedBased, *pImg6FixedBased, *pImg7FixedBased, *pImg8FixedBased, *pImg9FixedBased, *pImg10FixedBased, *pImg11FixedBased, *pImg12FixedBased;
+#endif
       if (isFixedFilterPaddedPerCtu)
       {
         pImg0FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 0] + j + padSize;
@@ -3299,6 +4052,16 @@ static void simdFilter13x13BlkExtDbResi(
         pImg2FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 1] + j + padSize;
         pImg3FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 2] + j + padSize;
         pImg4FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 2] + j + padSize;
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+        pImg5FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 3] + j + padSize;
+        pImg6FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 3] + j + padSize;
+        pImg7FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 4] + j + padSize;
+        pImg8FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 4] + j + padSize;
+        pImg9FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 5] + j + padSize;
+        pImg10FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 5] + j + padSize;
+        pImg11FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize + 6] + j + padSize;
+        pImg12FixedBased = fixedFilterResultsPerCtu[filterSetIdx][i + padSize - 6] + j + padSize;
+#endif
       }
       else
       {
@@ -3307,9 +4070,33 @@ static void simdFilter13x13BlkExtDbResi(
         pImg2FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 1] + blkDst.x + j + padSize;
         pImg3FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 2] + blkDst.x + j + padSize;
         pImg4FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 2] + blkDst.x + j + padSize;
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+        pImg5FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 3] + blkDst.x + j + padSize;
+        pImg6FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 3] + blkDst.x + j + padSize;
+        pImg7FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 4] + blkDst.x + j + padSize;
+        pImg8FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 4] + blkDst.x + j + padSize;
+        pImg9FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 5] + blkDst.x + j + padSize;
+        pImg10FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 5] + blkDst.x + j + padSize;
+        pImg11FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize + 6] + blkDst.x + j + padSize;
+        pImg12FixedBased = fixedFilterResults[filterSetIdx][blkDst.y + i + padSize - 6] + blkDst.x + j + padSize;
+#endif
       }
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      const Pel *pImg0Gauss[NUM_GAUSS_FILTERED_SOURCE];
 
+      for( int gaussIdx = 0; gaussIdx < NUM_GAUSS_FILTERED_SOURCE; gaussIdx++ )
+      {
+        if( isFixedFilterPaddedPerCtu )
+        {
+          pImg0Gauss[gaussIdx] = gaussCtu[gaussIdx][i + padSizeGauss + 0] + j + padSizeGauss;
+        }
+        else
+        {
+          pImg0Gauss[gaussIdx] = gaussPic[gaussIdx][blkDst.y + i + padSizeGauss + 0] + blkDst.x + j + padSizeGauss;
+        }
+      }
+#endif
       __m128i cur    = _mm_loadu_si128((const __m128i *) pImg0);
       __m128i accumA = mmOffset;
       __m128i accumB = mmOffset;
@@ -3351,7 +4138,51 @@ static void simdFilter13x13BlkExtDbResi(
         accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
         accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
       };
-
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      process2coeffs(0, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
+      process2coeffs(1, pImg3 + 0, pImg4 - 0, pImg1 + 1, pImg2 - 1);
+      process2coeffs(2, pImg1 + 0, pImg2 - 0, pImg1 - 1, pImg2 + 1);
+      process2coeffs(3, pImg0 + 4, pImg0 - 4, pImg0 + 3, pImg0 - 3);
+      process2coeffs(4, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
+      process2coeffs(5, pImg12FixedBased - 0, pImg11FixedBased + 0, pImg10FixedBased - 0, pImg9FixedBased + 0);
+      process2coeffs(6, pImg8FixedBased - 0, pImg7FixedBased + 0, pImg6FixedBased - 0, pImg5FixedBased + 0);
+      process2coeffs(7, pImg4FixedBased - 1, pImg3FixedBased + 1, pImg4FixedBased - 0, pImg3FixedBased + 0);
+      process2coeffs(8, pImg4FixedBased + 1, pImg3FixedBased - 1, pImg2FixedBased - 2, pImg1FixedBased + 2);
+      process2coeffs(9, pImg2FixedBased - 1, pImg1FixedBased + 1, pImg2FixedBased - 0, pImg1FixedBased + 0);
+      process2coeffs(10, pImg2FixedBased + 1, pImg1FixedBased - 1, pImg2FixedBased + 2, pImg1FixedBased - 2);
+      process2coeffs(11, pImg0FixedBased - 6, pImg0FixedBased + 6, pImg0FixedBased - 5, pImg0FixedBased + 5);
+      process2coeffs(12, pImg0FixedBased - 4, pImg0FixedBased + 4, pImg0FixedBased - 3, pImg0FixedBased + 3);
+      process2coeffs(13, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      process2coeffs(0, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
+      process2coeffs(1, pImg3 + 0, pImg4 - 0, pImg1 + 1, pImg2 - 1);
+      process2coeffs(2, pImg1 + 0, pImg2 - 0, pImg1 - 1, pImg2 + 1);
+      process2coeffs(3, pImg0 + 4, pImg0 - 4, pImg0 + 3, pImg0 - 3);
+      process2coeffs(4, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
+      process2coeffs(5, pImg12FixedBased - 0, pImg11FixedBased + 0, pImg10FixedBased - 0, pImg9FixedBased + 0);
+      process2coeffs(6, pImg8FixedBased - 0, pImg7FixedBased + 0, pImg6FixedBased - 0, pImg5FixedBased + 0);
+      process2coeffs(7, pImg4FixedBased - 1, pImg3FixedBased + 1, pImg4FixedBased - 0, pImg3FixedBased + 0);
+      process2coeffs(8, pImg4FixedBased + 1, pImg3FixedBased - 1, pImg2FixedBased - 2, pImg1FixedBased + 2);
+      process2coeffs(9, pImg2FixedBased - 1, pImg1FixedBased + 1, pImg2FixedBased - 0, pImg1FixedBased + 0);
+      process2coeffs(10, pImg2FixedBased + 1, pImg1FixedBased - 1, pImg2FixedBased + 2, pImg1FixedBased - 2);
+      process2coeffs(11, pImg0FixedBased - 6, pImg0FixedBased + 6, pImg0FixedBased - 5, pImg0FixedBased + 5);
+      process2coeffs(12, pImg0FixedBased - 4, pImg0FixedBased + 4, pImg0FixedBased - 3, pImg0FixedBased + 3);
+      process2coeffs(13, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      process2coeffs(0, pImg11 + 0, pImg12 - 0, pImg9 + 0, pImg10 - 0);
+      process2coeffs(1, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
+      process2coeffs(2, pImg3 + 2, pImg4 - 2, pImg3 + 1, pImg4 - 1);
+      process2coeffs(3, pImg3 + 0, pImg4 - 0, pImg3 - 1, pImg4 + 1);
+      process2coeffs(4, pImg3 - 2, pImg4 + 2, pImg1 + 2, pImg2 - 2);
+      process2coeffs(5, pImg1 + 1, pImg2 - 1, pImg1 + 0, pImg2 - 0);
+      process2coeffs(6, pImg1 - 1, pImg2 + 1, pImg1 - 2, pImg2 + 2);
+      process2coeffs(7, pImg0 + 6, pImg0 - 6, pImg0 + 5, pImg0 - 5);
+      process2coeffs(8, pImg0 + 4, pImg0 - 4, pImg0 + 3, pImg0 - 3);
+      process2coeffs(9, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
+      process2coeffs(10, pImg4FixedBased - 0, pImg3FixedBased + 0, pImg2FixedBased - 1, pImg1FixedBased + 1);
+      process2coeffs(11, pImg2FixedBased - 0, pImg1FixedBased + 0, pImg2FixedBased + 1, pImg1FixedBased - 1);
+      process2coeffs(12, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
+#else
       process2coeffs(0, pImg11 + 0, pImg12 - 0, pImg9 + 0, pImg10 - 0);
       process2coeffs(1, pImg7 + 0, pImg8 - 0, pImg5 + 0, pImg6 - 0);
       process2coeffs(2, pImg3 + 2, pImg4 - 2, pImg3 + 1, pImg4 - 1);
@@ -3367,27 +4198,25 @@ static void simdFilter13x13BlkExtDbResi(
       process2coeffs(11, pImg2FixedBased - 0, pImg1FixedBased + 0, pImg2FixedBased + 1, pImg1FixedBased - 1);
       process2coeffs(12, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
 #endif
-
+#endif
       pImg0  = srcBeforeDb + j;
       pImg1  = pImg0 + srcBeforeDbStride;
       pImg2  = pImg0 - srcBeforeDbStride;
       pImgP0 = srcResi + j;
 
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER 
+      process2coeffs(14, pImg1 + 0, pImg2 + 0, pImg0 + 1, pImg0 - 1);
+#else
       process2coeffs(13, pImg1 + 0, pImg2 + 0, pImg0 + 1, pImg0 - 1);
+#endif
 #else
       process2coeffs(10, pImg1 + 0, pImg2 + 0, pImg0 + 1, pImg0 - 1);
 #endif
 
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
-      __m128i val00 = _mm_sub_epi16(
-        _mm_loadu_si128((const __m128i *) (fixedFilterResults[0 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x
-                                           + j + padSize)),
-        cur);
-      __m128i val10 = _mm_sub_epi16(
-        _mm_loadu_si128((const __m128i *) (fixedFilterResults[2 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x
-                                           + j + padSize)),
-        cur);
+      __m128i val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *)(fixedFilterResults[0 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x + j + padSize)), cur);
+      __m128i val10 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *)(fixedFilterResults[2 + fixedFilterSetIdx][blkDst.y + i + padSize] + blkDst.x + j + padSize)), cur);
 #else
       __m128i val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) pImg0), cur);
       __m128i val10 = _mm_sub_epi16(
@@ -3396,8 +4225,13 @@ static void simdFilter13x13BlkExtDbResi(
       __m128i val01A = _mm_unpacklo_epi16(val00, val10);
       __m128i val01B = _mm_unpackhi_epi16(val00, val10);
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER 
+      __m128i limit01A = params[0][1][15];
+      __m128i limit01B = params[1][1][15];
+#else
       __m128i limit01A = params[0][1][14];
       __m128i limit01B = params[1][1][14];
+#endif
 #else
       __m128i limit01A = params[0][1][11];
       __m128i limit01B = params[1][1][11];
@@ -3409,8 +4243,13 @@ static void simdFilter13x13BlkExtDbResi(
       val01A   = _mm_max_epi16(val01A, limit01A);
       val01B   = _mm_max_epi16(val01B, limit01B);
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER 
+      __m128i coeff01A = params[0][0][15];
+      __m128i coeff01B = params[1][0][15];
+#else
       __m128i coeff01A = params[0][0][14];
       __m128i coeff01B = params[1][0][14];
+#endif
 #else
       __m128i coeff01A = params[0][0][11];
       __m128i coeff01B = params[1][0][11];
@@ -3427,9 +4266,13 @@ static void simdFilter13x13BlkExtDbResi(
       val10  = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) (pImg0)), cur);
       val01A = _mm_unpacklo_epi16(val00, val10);
       val01B = _mm_unpackhi_epi16(val00, val10);
-
+#if JVET_AD0222_ALF_LONG_FIXFILTER 
+      limit01A = params[0][1][16];
+      limit01B = params[1][1][16];
+#else
       limit01A = params[0][1][15];
       limit01B = params[1][1][15];
+#endif
 
       val01A   = _mm_min_epi16(val01A, limit01A);
       val01B   = _mm_min_epi16(val01B, limit01B);
@@ -3437,9 +4280,13 @@ static void simdFilter13x13BlkExtDbResi(
       limit01B = _mm_sub_epi16(_mm_setzero_si128(), limit01B);
       val01A   = _mm_max_epi16(val01A, limit01A);
       val01B   = _mm_max_epi16(val01B, limit01B);
-
+#if JVET_AD0222_ALF_LONG_FIXFILTER 
+      coeff01A = params[0][0][16];
+      coeff01B = params[1][0][16];
+#else
       coeff01A = params[0][0][15];
       coeff01B = params[1][0][15];
+#endif
 
       accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
       accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
@@ -3447,21 +4294,27 @@ static void simdFilter13x13BlkExtDbResi(
 
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
       val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) pImgP0), zero);
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      val10 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) (pImg0Gauss[0])), cur);
+#else
       val10 = _mm_sub_epi16(cur, cur);
+#endif
 
       val01A = _mm_unpacklo_epi16(val00, val10);
       val01B = _mm_unpackhi_epi16(val00, val10);
 #else
-      __m128i val = _mm_sub_epi16(
-        _mm_loadu_si128(
-          (const __m128i *) (fixedFilterResults[EXT_LENGTH + fixedFilterSetIdx][blkDst.y + i] + blkDst.x + j)),
-        cur);
+      __m128i val = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) (fixedFilterResults[EXT_LENGTH + fixedFilterSetIdx][blkDst.y + i] + blkDst.x + j)), cur);
       val01A = _mm_shuffle_epi8(val, _mm_setr_epi8(0, 1, 0, 1, 2, 3, 2, 3, 4, 5, 4, 5, 6, 7, 6, 7));
       val01B = _mm_shuffle_epi8(val, _mm_setr_epi8(8, 9, 8, 9, 10, 11, 10, 11, 12, 13, 12, 13, 14, 15, 14, 15));
 #endif
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER 
+      limit01A = params[0][1][17];
+      limit01B = params[1][1][17];
+#else
       limit01A = params[0][1][16];
       limit01B = params[1][1][16];
+#endif
 #else
       limit01A = params[0][1][12];
       limit01B = params[1][1][12];
@@ -3473,8 +4326,13 @@ static void simdFilter13x13BlkExtDbResi(
       val01A   = _mm_max_epi16(val01A, limit01A);
       val01B   = _mm_max_epi16(val01B, limit01B);
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER 
+      coeff01A = params[0][0][17];
+      coeff01B = params[1][0][17];
+#else
       coeff01A = params[0][0][16];
       coeff01B = params[1][0][16];
+#endif
 #else
       coeff01A = params[0][0][12];
       coeff01B = params[1][0][12];
@@ -3496,6 +4354,194 @@ static void simdFilter13x13BlkExtDbResi(
     srcBeforeDb += srcBeforeDbStride * stepY;
     srcResi += srcResiStride * stepY;
   }   // for i
+}
+#endif
+
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+//Gauss Filter
+template<X86_VEXT vext>
+static void simdGaussFiltering(CodingStructure &cs, Pel ***gaussPic, const CPelBuf &srcLuma, const Area &blkDst, const Area &blk, const ClpRng &clpRng, const Pel clippingValues[4], int filterSetIdx, int storeIdx )
+{
+  int16_t gaussCoefTable[NUM_GAUSS_FILTERED_SOURCE][25] =
+  {
+    {
+      8, 22, 30, 22, 22, 60, 85, 60, 22, 8, 30, 85, 119, 85, 30, 8, 22, 60, 85, 60, 22, 22, 30, 22, 8,
+    },
+  };
+
+  int16_t gaussClipIdxTable[NUM_GAUSS_FILTERED_SOURCE][25] =
+  {
+    {
+        3, 2, 1, 2, 2, 1, 0, 1, 2, 3, 1, 0, 0, 0, 1, 3, 2, 1, 0, 1, 2, 2, 1, 2, 3,
+    },
+  };
+
+  int16_t numCoeff = 12;
+  int16_t gaussClipTable[25] = {0};
+  for(int i = 0; i < numCoeff; i++)
+  {
+    int clipIdx = gaussClipIdxTable[filterSetIdx][i];
+    gaussClipTable[i] = clippingValues[clipIdx];
+  }
+  int16_t diffTH = 32;
+
+  const __m128i offsetMax = _mm_set1_epi16(diffTH);
+  const __m128i offsetMin = _mm_sub_epi16(_mm_setzero_si128(), offsetMax);
+
+  const CPelBuf srcBuffer = srcLuma;
+  const int srcStride = srcBuffer.stride;
+
+  constexpr int shift = 10;
+  constexpr int round = 1 << (shift - 1);
+
+  const int width = blk.width;
+  const int height = blk.height;
+
+  constexpr int stepX = 8;
+  int stepY = 1;
+
+  const __m128i mmOffset = _mm_set1_epi32(round);
+  const __m128i mmMin = _mm_set1_epi16(clpRng.min);
+  const __m128i mmMax = _mm_set1_epi16(clpRng.max);
+
+  static_assert(sizeof(*gaussCoefTable[0]) == 2, "ALF coeffs must be 16-bit wide");
+  static_assert(sizeof(*gaussClipTable   ) == 2, "ALF clip values must be 16-bit wide");
+
+  const Pel *src = srcBuffer.buf + blk.y * srcStride + blk.x;
+  const int padSizeGauss = ALF_PADDING_SIZE_GAUSS_RESULTS;
+
+  for (int i = 0; i < height; i += stepY)
+  {
+    for (int j = 0; j < width; j += stepX)
+    {
+      __m128i params[2][2][6];
+
+      for (int k = 0; k < 2; k++)
+      {
+        __m128i rawCoef[4][2], rawClip[4][2], s0, s1;
+
+        for (int l = 0; l < 4; l++)
+        {
+          rawCoef[l][0] = _mm_loadu_si128((const __m128i *) (gaussCoefTable[filterSetIdx] + 0));
+          rawCoef[l][1] = _mm_loadu_si128((const __m128i *) (gaussCoefTable[filterSetIdx] + 8));
+
+          rawClip[l][0] = _mm_loadu_si128((const __m128i *) (gaussClipTable + 0));
+          rawClip[l][1] = _mm_loadu_si128((const __m128i *) (gaussClipTable + 8));
+        }//for l
+
+        for (unsigned char l = 0; l < 2; l++)
+        {
+          int m = l << 2;
+
+          s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0x00), _mm_shuffle_epi32(rawCoef[1][l], 0x00));
+          s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0x00), _mm_shuffle_epi32(rawCoef[3][l], 0x00));
+          params[k][0][0 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+          s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0x00), _mm_shuffle_epi32(rawClip[1][l], 0x00));
+          s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0x00), _mm_shuffle_epi32(rawClip[3][l], 0x00));
+          params[k][1][0 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+
+          s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0x55), _mm_shuffle_epi32(rawCoef[1][l], 0x55));
+          s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0x55), _mm_shuffle_epi32(rawCoef[3][l], 0x55));
+          params[k][0][1 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+          s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0x55), _mm_shuffle_epi32(rawClip[1][l], 0x55));
+          s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0x55), _mm_shuffle_epi32(rawClip[3][l], 0x55));
+          params[k][1][1 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+
+          if (l < 1)
+          {
+            s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0xaa), _mm_shuffle_epi32(rawCoef[1][l], 0xaa));
+            s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0xaa), _mm_shuffle_epi32(rawCoef[3][l], 0xaa));
+            params[k][0][2 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+            s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0xaa), _mm_shuffle_epi32(rawClip[1][l], 0xaa));
+            s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0xaa), _mm_shuffle_epi32(rawClip[3][l], 0xaa));
+            params[k][1][2 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+
+            s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[0][l], 0xff), _mm_shuffle_epi32(rawCoef[1][l], 0xff));
+            s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoef[2][l], 0xff), _mm_shuffle_epi32(rawCoef[3][l], 0xff));
+            params[k][0][3 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+            s0 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][l], 0xff), _mm_shuffle_epi32(rawClip[1][l], 0xff));
+            s1 = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[2][l], 0xff), _mm_shuffle_epi32(rawClip[3][l], 0xff));
+            params[k][1][3 + m] = _mm_blend_epi16(_mm_shuffle_epi32(s0, 0x88), _mm_shuffle_epi32(s1, 0x88), 0xf0);
+          }
+        }//for l
+      }//for k
+
+      const Pel *pImg0, *pImg1, *pImg2, *pImg3, *pImg4, *pImg5, *pImg6;
+      pImg0 = src + j;
+      pImg1 = pImg0 + srcStride;
+      pImg2 = pImg0 - srcStride;
+      pImg3 = pImg1 + srcStride;
+      pImg4 = pImg2 - srcStride;
+      pImg5 = pImg3 + srcStride;
+      pImg6 = pImg4 - srcStride;
+
+      __m128i cur = _mm_loadu_si128((const __m128i *) pImg0);
+      __m128i accumA = mmOffset;
+      __m128i accumB = mmOffset;
+
+      auto process2coeffs = [&](const int i, const Pel *ptr0, const Pel *ptr1, const Pel *ptr2, const Pel *ptr3) {
+        const __m128i val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) ptr0), cur);
+        const __m128i val10 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) ptr2), cur);
+        const __m128i val01 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) ptr1), cur);
+        const __m128i val11 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *) ptr3), cur);
+
+        __m128i val01A = _mm_unpacklo_epi16(val00, val10);
+        __m128i val01B = _mm_unpackhi_epi16(val00, val10);
+        __m128i val01C = _mm_unpacklo_epi16(val01, val11);
+        __m128i val01D = _mm_unpackhi_epi16(val01, val11);
+
+        __m128i limit01A = params[0][1][i];
+        __m128i limit01B = params[1][1][i];
+
+        val01A = _mm_min_epi16(val01A, limit01A);
+        val01B = _mm_min_epi16(val01B, limit01B);
+        val01C = _mm_min_epi16(val01C, limit01A);
+        val01D = _mm_min_epi16(val01D, limit01B);
+
+        limit01A = _mm_sub_epi16(_mm_setzero_si128(), limit01A);
+        limit01B = _mm_sub_epi16(_mm_setzero_si128(), limit01B);
+
+        val01A = _mm_max_epi16(val01A, limit01A);
+        val01B = _mm_max_epi16(val01B, limit01B);
+        val01C = _mm_max_epi16(val01C, limit01A);
+        val01D = _mm_max_epi16(val01D, limit01B);
+
+        val01A = _mm_add_epi16(val01A, val01C);
+        val01B = _mm_add_epi16(val01B, val01D);
+
+        const __m128i coeff01A = params[0][0][i];
+        const __m128i coeff01B = params[1][0][i];
+
+        accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
+        accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
+      };
+
+      process2coeffs(0, pImg6 - 0, pImg5 + 0, pImg4 - 1, pImg3 + 1);
+      process2coeffs(1, pImg4 - 0, pImg3 + 0, pImg4 + 1, pImg3 - 1);
+      process2coeffs(2, pImg2 - 2, pImg1 + 2, pImg2 - 1, pImg1 + 1);
+      process2coeffs(3, pImg2 - 0, pImg1 + 0, pImg2 + 1, pImg1 - 1);
+      process2coeffs(4, pImg2 + 2, pImg1 - 2, pImg0 - 3, pImg0 + 3);
+      process2coeffs(5, pImg0 - 2, pImg0 + 2, pImg0 - 1, pImg0 + 1);
+
+      accumA = _mm_srai_epi32(accumA, shift);
+      accumB = _mm_srai_epi32(accumB, shift);
+
+      accumA = _mm_packs_epi32(accumA, accumB);
+
+      //Clip Offset
+      accumA = _mm_min_epi16(accumA, offsetMax);
+      accumA = _mm_max_epi16(accumA, offsetMin);
+
+      accumA = _mm_add_epi16(accumA, cur);
+      accumA = _mm_min_epi16(mmMax, _mm_max_epi16(accumA, mmMin));
+
+      int curY = blkDst.y + i + padSizeGauss;
+      int curX = blkDst.x + j + padSizeGauss;
+      _mm_storeu_si128((__m128i *) (gaussPic[storeIdx][curY] + curX), accumA);
+
+    }//for j
+    src += srcStride * stepY;
+  }//for i
 }
 #endif
 
@@ -4468,6 +5514,9 @@ void AdaptiveLoopFilter::_initAdaptiveLoopFilterX86()
   m_filter13x13Blk = simdFilter13x13Blk<vext>;
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
   m_filterResi13x13Blk = simdFilterResi13x13Blk<vext>;
+#endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  m_gaussFiltering = simdGaussFiltering<vext>;
 #endif
   m_deriveClassificationLaplacian = simdDeriveClassificationLaplacian;
   m_deriveClassificationLaplacianBig = simdDeriveClassificationLaplacianBig;
