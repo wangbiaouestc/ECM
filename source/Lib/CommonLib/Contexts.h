@@ -983,7 +983,11 @@ public:
 
   void updateBufferState( const Slice* slice )
   {
+#if JVET_AD0206_CABAC_INIT_AT_GDR
+    if( slice->getPendingRasInit() || slice->isInterGDR() )
+#else
     if( slice->getPendingRasInit() )
+#endif
     {
       m_ctxStateStore.clearValid();
     }

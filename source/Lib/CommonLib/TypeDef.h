@@ -307,10 +307,12 @@
 #define JVET_AB0067_MIP_DIMD_LFNST                        1 // JVET-AB0067: Modification of LFNST for MIP coded block
 #define JVET_AC0130_NSPT                                  1 // JVET-AC0130: NSPT replacing DCT-II + LFNST for certain block shapes
 #define JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST              1 // JVET-AC0115: Modifications of MTS/LFNST for Intra TMP coded block
+
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision
 #define SLICE_TYPE_WIN_SIZE                               1 // Context window initialization based on slice type
 #define JVET_Z0135_TEMP_CABAC_WIN_WEIGHT                  1 // JVET-Z0135 Test 4.3b: Temporal CABAC, weighted states, windows adjustment
+#define JVET_AD0206_CABAC_INIT_AT_GDR                     1 // JVET-AD0206: Cabac initialization at GDR picture
 
 // Loop filters
 #define ALF_IMPROVEMENT                                   1 // ALF improvement
