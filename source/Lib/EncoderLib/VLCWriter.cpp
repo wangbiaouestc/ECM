@@ -646,7 +646,15 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
     for (int altIdx = 0; altIdx < param.numAlternativesLuma; ++altIdx)
     {
 #if JVET_X0071_ALF_BAND_CLASSIFIER
+#if JVET_AD0222_ALF_RESI_CLASS
+      WRITE_FLAG( param.lumaClassifierIdx[altIdx] == 1 ? 1 : 0, "alf_luma_classifier_band" );
+      if( param.lumaClassifierIdx[altIdx] != 1 )
+      {
+        WRITE_FLAG( param.lumaClassifierIdx[altIdx] == 2 ? 1 : 0, "alf_luma_classifier_resi" );
+      }
+#else
       WRITE_FLAG( param.lumaClassifierIdx[altIdx], "alf_luma_classifier" );
+#endif
 #endif
       WRITE_FLAG( param.nonLinearFlag[CHANNEL_TYPE_LUMA][altIdx], "alf_luma_clip" );
       WRITE_UVLC( param.numLumaFilters[altIdx] - 1, "alf_luma_num_filters_signalled_minus1" );
