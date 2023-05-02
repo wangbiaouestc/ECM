@@ -21339,6 +21339,12 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
     for (int i = 0; i < numPt; i++)
     {
       PictureType pt = (i == 0) ? PIC_RECONSTRUCTION_0 : PIC_RECONSTRUCTION_1;
+#if JVET_AD0123_REF_PICTURE_PADDING_FOR_GDR
+      if (pt == PIC_RECONSTRUCTION_1)
+      {
+        padDirtyArea(pcCurPic, slice, pt);
+      }
+#endif
       mcFramePadOneSide(pcCurPic, slice, PAD_TOP, pPadBuffYUV, &blkDataTmp, pPadYUVContainerDyn, blkUnitAreaBuff,
         pCurBuffYUV, pt);
       mcFramePadOneSide(pcCurPic, slice, PAD_BOTTOM, pPadBuffYUV, &blkDataTmp, pPadYUVContainerDyn, blkUnitAreaBuff,
@@ -22015,6 +22021,34 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
       {
         piTxtRec += iStrideRec;
         memcpy(piTxtRec, piTxtRecSrc, sizeof(Pel) * (((ctuSize + extPadSizeX) << 1) + iWidthFrm));
+      }
+    }
+  }
+#endif
+
+#if JVET_AD0123_REF_PICTURE_PADDING_FOR_GDR
+  void InterPrediction::padDirtyArea(Picture* pcCurPic, Slice& slice, PictureType pt)
+  {
+    if (slice.getPicHeader()->getNumVerVirtualBoundaries() == 1)
+    {
+      const int maxCh = pcCurPic->chromaFormat == CHROMA_400 ? 0 : 2;
+      for (int chan = 0; chan <= maxCh; chan++)
+      {
+        const ComponentID ch = ComponentID(chan);
+        Pel* piTxtRec = pcCurPic->getBuf(ch, pt).bufAt(0, 0);
+        const int iStrideRec = pcCurPic->getBuf(ch, pt).stride;
+        const int iWidthFrm = slice.getPPS()->getPicWidthInLumaSamples() >> getComponentScaleX(ch, CHROMA_420);
+        const int iHeightFrm = slice.getPPS()->getPicHeightInLumaSamples() >> getComponentScaleY(ch, CHROMA_420);
+        const int posVBX = slice.getPicHeader()->getVirtualBoundariesPosX(0) >> getComponentScaleX(ch, CHROMA_420);
+
+        for (int idy = 0; idy < iHeightFrm; idy++)
+        {
+          for (int idx = posVBX; idx < iWidthFrm; idx++)
+          {
+            piTxtRec[idx] = piTxtRec[posVBX - 1];
+          }
+          piTxtRec += iStrideRec;
+        }
       }
     }
   }

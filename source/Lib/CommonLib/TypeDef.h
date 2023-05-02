@@ -255,6 +255,7 @@
 #define JVET_AC0144_AFFINE_DMVR_REGRESSION                1 // JVET-AC0144: DMVR for affine with regression refinement
 #define JVET_AC0158_PIXEL_AFFINE_MC                       1 // JVET-AC0158: Pixel based affine motion compensation
 #define JVET_AD0195_HIGH_PRECISION_BDOF_CORE              1 // JVET_AD0195: High-Precision MV Refinement for BDOF
+#define JVET_AD0123_REF_PICTURE_PADDING_FOR_GDR           1 // JVET-AD0123: Reference picture padding for GDR
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
