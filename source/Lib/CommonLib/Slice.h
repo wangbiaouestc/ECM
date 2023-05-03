@@ -1530,6 +1530,11 @@ private:
 #if JVET_AA0061_IBC_MBVD
   bool              m_ibcMbvd;
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  bool              m_rribc;
+  bool              m_tmibc;
+  bool              m_ibcMerge;
+#endif
 #if JVET_AC0112_IBC_CIIP
   bool              m_ibcCiip;
 #endif
@@ -1716,6 +1721,10 @@ private:
   bool              m_ccalfEnabledFlag;
   bool              m_wrapAroundEnabledFlag;
   unsigned          m_IBCFlag;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  unsigned          m_IBCFracFlag;
+  unsigned          m_IBCFlagInterSlice;
+#endif
   bool              m_useColorTrans;
   unsigned          m_PLTMode;
 
@@ -2088,6 +2097,18 @@ void                    setCCALFEnabledFlag( bool b )                           
   void                    setUseIbcMbvd(bool b)                                                           { m_ibcMbvd = b; }
   bool                    getUseIbcMbvd() const                                                           { return m_ibcMbvd; }
 #endif
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  void                    setUseRRIbc(bool b)                                                             { m_rribc = b; }
+  bool                    getUseRRIbc() const                                                             { return m_rribc; }
+
+  void                    setUseTMIbc(bool b)                                                             { m_tmibc = b; }
+  bool                    getUseTMIbc() const                                                             { return m_tmibc; }
+
+  void                    setUseIbcMerge( bool b )                                                        { m_ibcMerge = b; }
+  bool                    getUseIbcMerge() const                                                          { return m_ibcMerge; }
+#endif
+
 #if JVET_AC0112_IBC_CIIP
   void                    setUseIbcCiip(bool b)                                                           { m_ibcCiip = b; }
   bool                    getUseIbcCiip() const                                                           { return m_ibcCiip; }
@@ -2246,6 +2267,12 @@ void                    setCCALFEnabledFlag( bool b )                           
   bool                    getUseLmcs() const                                                              { return m_lmcsEnabled;                                                }
   void                    setIBCFlag(unsigned IBCFlag)                                                    { m_IBCFlag = IBCFlag; }
   unsigned                getIBCFlag() const                                                              { return m_IBCFlag; }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  void                    setIBCFracFlag(unsigned b)                                                      { m_IBCFracFlag = b;                                                   }
+  unsigned                getIBCFracFlag() const                                                          { return m_IBCFracFlag;                                                }
+  void                    setIBCFlagInterSlice(unsigned IBCFlag)                                          { m_IBCFlagInterSlice = IBCFlag; }
+  unsigned                getIBCFlagInterSlice() const                                                    { return m_IBCFlagInterSlice; }
+#endif
   void                    setUseColorTrans(bool value) { m_useColorTrans = value; }
   bool                    getUseColorTrans() const { return m_useColorTrans; }
   void                    setPLTMode(unsigned PLTMode)                                                    { m_PLTMode = PLTMode; }
@@ -2967,6 +2994,9 @@ private:
 #if JVET_W0097_GPM_MMVD_TM
   bool                        m_gpmMMVDTableFlag;
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  bool                        m_disFracMBVD;
+#endif
   int                         m_qpDelta;                                                //!< value of Qp delta
   bool                        m_saoEnabledFlag[MAX_NUM_CHANNEL_TYPE];                   //!< sao enabled flags for each channel
 #if JVET_W0066_CCSAO
@@ -3121,6 +3151,10 @@ public:
 #if JVET_W0097_GPM_MMVD_TM
   void                        setGPMMMVDTableFlag(bool b)                               { m_gpmMMVDTableFlag = b;                                                                      }
   bool                        getGPMMMVDTableFlag() const                               { return m_gpmMMVDTableFlag;                                                                   }
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  void                        setDisFracMBVD(bool b)                                    { m_disFracMBVD = b;                                                                           }
+  bool                        getDisFracMBVD() const                                    { return m_disFracMBVD;                                                                        }
 #endif
   void                        setQpDelta(int b)                                         { m_qpDelta = b;                                                                               }
   int                         getQpDelta() const                                        { return m_qpDelta;                                                                            }
@@ -3362,6 +3396,9 @@ private:
 #if INTER_LIC
   bool                       m_UseLIC;
 #endif 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  bool                       m_useIBC;
+#endif
 
   bool                       m_abEqualRef  [NUM_REF_PIC_LIST_01][MAX_NUM_REF][MAX_NUM_REF];
   uint32_t                   m_uiTLayer;
@@ -3792,7 +3829,11 @@ public:
   const ClpRngs&              clpRngs()                                         const { return m_clpRngs;}
   const ClpRng&               clpRng( ComponentID id)                           const { return m_clpRngs.comp[id];}
   ClpRngs&                    getClpRngs()                                            { return m_clpRngs;}
-  unsigned                    getMinPictureDistance()                           const ;
+  unsigned                    getMinPictureDistance(
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                                     unsigned ibcFastMethod
+#endif
+                              )                           const ;
   void startProcessingTimer();
   void stopProcessingTimer();
   void resetProcessingTime()       { m_dProcessingTime = m_iProcessingStartTime = 0; }
@@ -3861,6 +3902,10 @@ public:
   bool                        getUseLIC()                                   const { return m_UseLIC; }
   void                        setUseLIC(bool b) { m_UseLIC = b; }
   void                        setUseLICOnPicLevel(bool fastPicDecision);
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  bool                        getUseIBC()                                   const { return m_useIBC; }
+  void                        setUseIBC(bool b) { m_useIBC = b; }
 #endif
 
 protected:

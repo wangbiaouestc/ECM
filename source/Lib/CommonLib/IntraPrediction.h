@@ -51,6 +51,10 @@
 #if JVET_AB0155_SGPM
 #include "CommonLib/InterpolationFilter.h"
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#include "CommonLib/InterPrediction.h"
+class InterPrediction;
+#endif
 //! \ingroup CommonLib
 //! \{
 
@@ -610,8 +614,16 @@ public:
 
 #if JVET_AC0071_DBV
   // Direct Block Vector
-  void predIntraDbv(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
-  Mv refineChromaBv(const ComponentID compId, const PredictionUnit &pu);
+  void predIntraDbv(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                  , InterPrediction *pcInterPred
+#endif
+  );
+  Mv refineChromaBv(const ComponentID compId, const PredictionUnit &pu
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                  , InterPrediction *pcInterPred
+#endif
+  );
 #endif
 
   // Cross-component Chroma

@@ -739,6 +739,267 @@ void calcBIOParameter_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0,
   }
 #endif
 }
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+template< X86_VEXT vext >
+void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx)
+{
+  __m128i vzero = _mm_setzero_si128();
+  __m128i vmask[4] = {_mm_setr_epi16(1, 2, 3, 2, 1, 0, 0, 0), _mm_setr_epi16(0, 1, 2, 3, 2, 1, 0, 0), _mm_setr_epi16(0, 0, 1, 2, 3, 2, 1, 0), _mm_setr_epi16(0, 0, 0, 1, 2, 3, 2, 1)};
+  
+  
+  __m128i sumAbsGXTmp16 = vzero;
+  __m128i sumDIXTmp16 = vzero;
+  __m128i sumAbsGYTmp16 = vzero;
+  __m128i sumDIYTmp16 = vzero;
+  __m128i sumSignGyGxTmp16 = vzero;
+  __m128i sumAbsGXTmp32 = vzero;
+  __m128i sumDIXTmp32 = vzero;
+  __m128i sumAbsGYTmp32 = vzero;
+  __m128i sumDIYTmp32 = vzero;
+  __m128i sumSignGyGxTmp32 = vzero;
+  __m128i a12 = vzero;
+  __m128i a3 = vzero;
+  __m128i b12 = vzero;
+  __m128i b3 = vzero;
+  __m128i c1 = vzero;
+  
+  const int width_height = (width * height);
+  const int width_N = (4 - width_height);
+  const int widthG_height = (widthG * height);
+  const int widthG_2 = (widthG << 1);
+  const int widthG_3 = widthG_2 + widthG;
+  const int widthG_4 = widthG_3 + widthG;
+  const int widthG_N = (4 - widthG_height);
+  
+  for (int x = 0; x < width; x += 4)
+  {
+    sumAbsGXTmp16  = _mm_add_epi16(_mm_loadu_si128((const __m128i*)absGX), _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(absGX + widthG)), 1));
+    sumAbsGXTmp16  = _mm_add_epi16(sumAbsGXTmp16, _mm_loadu_si128((const __m128i*)(absGX + widthG_2)));
+    sumAbsGXTmp16  = _mm_add_epi16(sumAbsGXTmp16, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(absGX + widthG_2)), 1)); //
+    sumAbsGXTmp16  = _mm_add_epi16(sumAbsGXTmp16, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(absGX + widthG_3)), 1));
+    
+    sumDIXTmp16  = _mm_add_epi16(_mm_loadu_si128((const __m128i*)dIX), _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(dIX + widthG)), 1));
+    sumDIXTmp16  = _mm_add_epi16(sumDIXTmp16, _mm_loadu_si128((const __m128i*)(dIX + widthG_2)));
+    sumDIXTmp16  = _mm_add_epi16(sumDIXTmp16, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(dIX + widthG_2)), 1)); //
+    sumDIXTmp16  = _mm_add_epi16(sumDIXTmp16, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(dIX + widthG_3)), 1));
+    
+    sumAbsGYTmp16  = _mm_add_epi16(_mm_loadu_si128((const __m128i*)absGY), _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(absGY + widthG)), 1));
+    sumAbsGYTmp16  = _mm_add_epi16(sumAbsGYTmp16, _mm_loadu_si128((const __m128i*)(absGY + widthG_2)));
+    sumAbsGYTmp16  = _mm_add_epi16(sumAbsGYTmp16, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(absGY + widthG_2)), 1)); //
+    sumAbsGYTmp16  = _mm_add_epi16(sumAbsGYTmp16, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(absGY + widthG_3)), 1));
+    
+    
+    
+    sumDIYTmp16  = _mm_add_epi16(_mm_loadu_si128((const __m128i*)dIY), _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(dIY + widthG)), 1));
+    sumDIYTmp16  = _mm_add_epi16(sumDIYTmp16, _mm_loadu_si128((const __m128i*)(dIY + widthG_2)));
+    sumDIYTmp16  = _mm_add_epi16(sumDIYTmp16, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(dIY + widthG_2)), 1)); //
+    sumDIYTmp16  = _mm_add_epi16(sumDIYTmp16, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(dIY + widthG_3)), 1));
+    
+    
+    sumSignGyGxTmp16  = _mm_add_epi16(_mm_loadu_si128((const __m128i*)signGyGx), _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(signGyGx + widthG)), 1));
+    sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_loadu_si128((const __m128i*)(signGyGx + widthG_2)));
+    sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(signGyGx + widthG_2)), 1)); //
+    sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(signGyGx + widthG_3)), 1));
+    
+    __m128i absGXOneRow = vzero;
+    __m128i dIXOneRow = vzero;
+    __m128i absGYOneRow = vzero;
+    __m128i dIYOneRow = vzero;
+    __m128i signGyGxOneRow = vzero;
+    for (int y = 0; y < height; y++)
+    {
+      sumAbsGXTmp16 = _mm_sub_epi16(sumAbsGXTmp16, absGXOneRow);
+      
+      absGXOneRow  = _mm_add_epi16(_mm_loadu_si128((const __m128i*)absGX), _mm_loadu_si128((const __m128i*)(absGX + widthG))); //
+      absGXOneRow  = _mm_add_epi16(absGXOneRow, _mm_loadu_si128((const __m128i*)(absGX + widthG_2))); //
+      absGXOneRow  = _mm_sub_epi16(absGXOneRow, _mm_loadu_si128((const __m128i*)(absGX + widthG_3))); //
+      absGXOneRow  = _mm_sub_epi16(absGXOneRow, _mm_loadu_si128((const __m128i*)(absGX + widthG_4))); //
+      
+      sumAbsGXTmp16 = _mm_add_epi16(sumAbsGXTmp16, _mm_loadu_si128((const __m128i*)(absGX + widthG_4)));
+      
+      sumDIXTmp16  = _mm_sub_epi16(sumDIXTmp16, dIXOneRow);
+      
+      dIXOneRow  = _mm_add_epi16(_mm_loadu_si128((const __m128i*)dIX), _mm_loadu_si128((const __m128i*)(dIX + widthG))); //
+      dIXOneRow  = _mm_add_epi16(dIXOneRow, _mm_loadu_si128((const __m128i*)(dIX + widthG_2))); //
+      dIXOneRow  = _mm_sub_epi16(dIXOneRow, _mm_loadu_si128((const __m128i*)(dIX + widthG_3))); //
+      dIXOneRow  = _mm_sub_epi16(dIXOneRow, _mm_loadu_si128((const __m128i*)(dIX + widthG_4))); //
+      
+      sumDIXTmp16  = _mm_add_epi16(sumDIXTmp16, _mm_loadu_si128((const __m128i*)(dIX + widthG_4)));
+      
+      sumAbsGYTmp16  = _mm_sub_epi16(sumAbsGYTmp16, absGYOneRow);
+      
+      absGYOneRow  = _mm_add_epi16(_mm_loadu_si128((const __m128i*)absGY), _mm_loadu_si128((const __m128i*)(absGY + widthG))); //
+      absGYOneRow  = _mm_add_epi16(absGYOneRow, _mm_loadu_si128((const __m128i*)(absGY + widthG_2))); //
+      absGYOneRow  = _mm_sub_epi16(absGYOneRow, _mm_loadu_si128((const __m128i*)(absGY + widthG_3))); //
+      absGYOneRow  = _mm_sub_epi16(absGYOneRow, _mm_loadu_si128((const __m128i*)(absGY + widthG_4))); //
+      
+      sumAbsGYTmp16  = _mm_add_epi16(sumAbsGYTmp16, _mm_loadu_si128((const __m128i*)(absGY + widthG_4)));
+      
+      sumDIYTmp16  = _mm_sub_epi16(sumDIYTmp16, dIYOneRow);
+      
+      dIYOneRow  = _mm_add_epi16(_mm_loadu_si128((const __m128i*)dIY), _mm_loadu_si128((const __m128i*)(dIY + widthG))); //
+      dIYOneRow  = _mm_add_epi16(dIYOneRow, _mm_loadu_si128((const __m128i*)(dIY + widthG_2))); //
+      dIYOneRow  = _mm_sub_epi16(dIYOneRow, _mm_loadu_si128((const __m128i*)(dIY + widthG_3))); //
+      dIYOneRow  = _mm_sub_epi16(dIYOneRow, _mm_loadu_si128((const __m128i*)(dIY + widthG_4))); //
+      
+      sumDIYTmp16  = _mm_add_epi16(sumDIYTmp16, _mm_loadu_si128((const __m128i*)(dIY + widthG_4)));
+      
+      sumSignGyGxTmp16  = _mm_sub_epi16(sumSignGyGxTmp16, signGyGxOneRow);
+      
+      signGyGxOneRow  = _mm_add_epi16(_mm_loadu_si128((const __m128i*)signGyGx), _mm_loadu_si128((const __m128i*)(signGyGx + widthG))); //
+      signGyGxOneRow  = _mm_add_epi16(signGyGxOneRow, _mm_loadu_si128((const __m128i*)(signGyGx + widthG_2))); //
+      signGyGxOneRow  = _mm_sub_epi16(signGyGxOneRow, _mm_loadu_si128((const __m128i*)(signGyGx + widthG_3))); //
+      signGyGxOneRow  = _mm_sub_epi16(signGyGxOneRow, _mm_loadu_si128((const __m128i*)(signGyGx + widthG_4))); //
+      
+      sumSignGyGxTmp16  = _mm_add_epi16(sumSignGyGxTmp16, _mm_loadu_si128((const __m128i*)(signGyGx+ widthG_4)));
+      
+      sumAbsGXTmp32 = _mm_madd_epi16(sumAbsGXTmp16, vmask[0]);
+      sumAbsGYTmp32 = _mm_madd_epi16(sumAbsGYTmp16, vmask[0]);
+      sumDIXTmp32 = _mm_madd_epi16(sumDIXTmp16, vmask[0]);
+      sumDIYTmp32 = _mm_madd_epi16(sumDIYTmp16, vmask[0]);
+      a12 = _mm_unpacklo_epi32(sumAbsGXTmp32, sumAbsGYTmp32);
+      a3  = _mm_unpackhi_epi32(sumAbsGXTmp32, sumAbsGYTmp32);
+      b12 = _mm_unpacklo_epi32(sumDIXTmp32, sumDIYTmp32);
+      b3  = _mm_unpackhi_epi32(sumDIXTmp32, sumDIYTmp32);
+      
+      c1  = _mm_unpacklo_epi64(a12, b12);
+      c1 = _mm_add_epi32(c1, _mm_unpackhi_epi64(a12, b12));
+      c1 = _mm_add_epi32(c1, _mm_unpacklo_epi64(a3, b3));
+      
+      *(sumAbsGX+0) = _mm_cvtsi128_si32(c1);
+      *(sumAbsGY+0) = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0x55));
+      *(sumDIX+0)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xaa));
+      *(sumDIY+0)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xff));
+      
+      sumSignGyGxTmp32 = _mm_madd_epi16(sumSignGyGxTmp16, vmask[0]);
+      sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0x4e));   // 01001110
+      sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0xb1));   // 10110001
+      *(sumSignGyGx+0) = _mm_cvtsi128_si32(sumSignGyGxTmp32);
+      
+      sumAbsGXTmp32 = _mm_madd_epi16(sumAbsGXTmp16, vmask[1]);
+      sumAbsGYTmp32 = _mm_madd_epi16(sumAbsGYTmp16, vmask[1]);
+      sumDIXTmp32 = _mm_madd_epi16(sumDIXTmp16, vmask[1]);
+      sumDIYTmp32 = _mm_madd_epi16(sumDIYTmp16, vmask[1]);
+      a12 = _mm_unpacklo_epi32(sumAbsGXTmp32, sumAbsGYTmp32);
+      a3  = _mm_unpackhi_epi32(sumAbsGXTmp32, sumAbsGYTmp32);
+      b12 = _mm_unpacklo_epi32(sumDIXTmp32, sumDIYTmp32);
+      b3  = _mm_unpackhi_epi32(sumDIXTmp32, sumDIYTmp32);
+      
+      c1  = _mm_unpacklo_epi64(a12, b12);
+      c1 = _mm_add_epi32(c1, _mm_unpackhi_epi64(a12, b12));
+      c1 = _mm_add_epi32(c1, _mm_unpacklo_epi64(a3, b3));
+      
+      *(sumAbsGX+1) = _mm_cvtsi128_si32(c1);
+      *(sumAbsGY+1) = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0x55));
+      *(sumDIX+1)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xaa));
+      *(sumDIY+1)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xff));
+      
+      sumSignGyGxTmp32 = _mm_madd_epi16(sumSignGyGxTmp16, vmask[1]);
+      sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0x4e));   // 01001110
+      sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0xb1));   // 10110001
+      *(sumSignGyGx+1) = _mm_cvtsi128_si32(sumSignGyGxTmp32);
+      
+      sumAbsGXTmp32 = _mm_madd_epi16(sumAbsGXTmp16, vmask[2]);
+      sumAbsGYTmp32 = _mm_madd_epi16(sumAbsGYTmp16, vmask[2]);
+      sumDIXTmp32 = _mm_madd_epi16(sumDIXTmp16, vmask[2]);
+      sumDIYTmp32 = _mm_madd_epi16(sumDIYTmp16, vmask[2]);
+      a12 = _mm_unpacklo_epi32(sumAbsGXTmp32, sumAbsGYTmp32);
+      a3  = _mm_unpackhi_epi32(sumAbsGXTmp32, sumAbsGYTmp32);
+      b12 = _mm_unpacklo_epi32(sumDIXTmp32, sumDIYTmp32);
+      b3  = _mm_unpackhi_epi32(sumDIXTmp32, sumDIYTmp32);
+      
+      
+      c1  = _mm_unpackhi_epi64(a12, b12);
+      c1 = _mm_add_epi32(c1, _mm_unpacklo_epi64(a3, b3));
+      c1 = _mm_add_epi32(c1, _mm_unpackhi_epi64(a3, b3));
+      
+      *(sumAbsGX+2) = _mm_cvtsi128_si32(c1);
+      *(sumAbsGY+2) = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0x55));
+      *(sumDIX+2)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xaa));
+      *(sumDIY+2)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xff));
+      
+      sumSignGyGxTmp32 = _mm_madd_epi16(sumSignGyGxTmp16, vmask[2]);
+      sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0x4e));   // 01001110
+      sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0xb1));   // 10110001
+      *(sumSignGyGx+2) = _mm_cvtsi128_si32(sumSignGyGxTmp32);
+      
+      sumAbsGXTmp32 = _mm_madd_epi16(sumAbsGXTmp16, vmask[3]);
+      sumAbsGYTmp32 = _mm_madd_epi16(sumAbsGYTmp16, vmask[3]);
+      sumDIXTmp32 = _mm_madd_epi16(sumDIXTmp16, vmask[3]);
+      sumDIYTmp32 = _mm_madd_epi16(sumDIYTmp16, vmask[3]);
+      a12 = _mm_unpacklo_epi32(sumAbsGXTmp32, sumAbsGYTmp32);
+      a3  = _mm_unpackhi_epi32(sumAbsGXTmp32, sumAbsGYTmp32);
+      b12 = _mm_unpacklo_epi32(sumDIXTmp32, sumDIYTmp32);
+      b3  = _mm_unpackhi_epi32(sumDIXTmp32, sumDIYTmp32);
+      
+      
+      c1  = _mm_unpackhi_epi64(a12, b12);
+      c1 = _mm_add_epi32(c1, _mm_unpacklo_epi64(a3, b3));
+      c1 = _mm_add_epi32(c1, _mm_unpackhi_epi64(a3, b3));
+      
+      *(sumAbsGX+3) = _mm_cvtsi128_si32(c1);
+      *(sumAbsGY+3) = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0x55));
+      *(sumDIX+3)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xaa));
+      *(sumDIY+3)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xff));
+      
+      sumSignGyGxTmp32 = _mm_madd_epi16(sumSignGyGxTmp16, vmask[3]);
+      sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0x4e));   // 01001110
+      sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0xb1));   // 10110001
+      *(sumSignGyGx+3) = _mm_cvtsi128_si32(sumSignGyGxTmp32);
+      
+      
+      
+      // bio parameter increment
+      absGX += widthG;
+      absGY += widthG;
+      dIX += widthG;
+      dIY += widthG;
+      signGyGx += widthG;
+      // sum parameter increment
+      sumAbsGX += width;
+      sumAbsGY += width;
+      sumDIX += width;
+      sumDIY += width;
+      sumSignGyGx += width;
+    }
+    // bio parameter back to first row
+    absGX += widthG_N;
+    absGY += widthG_N;
+    dIX += widthG_N;
+    dIY += widthG_N;
+    signGyGx += widthG_N;
+    // sum parameter back to first row
+    sumAbsGX += width_N;
+    sumAbsGY += width_N;
+    sumDIX += width_N;
+    sumDIY += width_N;
+    sumSignGyGx += width_N;
+  }
+  sumDIX -= width;
+  sumDIY -= width;
+#ifdef USE_AVX2
+  for (int idx = 0; idx < width_height; idx += 8)
+  {
+    __m256i sumDIXTmp256 = _mm256_loadu_si256((const __m256i*)sumDIX);
+    __m256i sumDIYTmp256 = _mm256_loadu_si256((const __m256i*)sumDIY);
+    _mm256_storeu_si256( ( __m256i * )sumDIX, _mm256_slli_epi32(sumDIXTmp256, 2) );
+    _mm256_storeu_si256( ( __m256i * )sumDIY, _mm256_slli_epi32(sumDIYTmp256, 2) );
+    sumDIX += 8;
+    sumDIY += 8;
+  }
+#else
+  for (int idx = 0; idx < width_height; idx += 4)
+  {
+    sumDIXTmp32 = _mm_loadu_si128((const __m128i*)sumDIX);
+    sumDIYTmp32 = _mm_loadu_si128((const __m128i*)sumDIY);
+    _mm_storeu_si128( ( __m128i * )sumDIX, _mm_slli_epi32(sumDIXTmp32, 2) );
+    _mm_storeu_si128( ( __m128i * )sumDIY, _mm_slli_epi32(sumDIYTmp32, 2) );
+    sumDIX += 4;
+    sumDIY += 4;
+  }
+#endif
+}
+#else
 template< X86_VEXT vext >
 void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx)
 {
@@ -882,6 +1143,285 @@ void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
   }
 #endif
 }
+#endif
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+template< X86_VEXT vext >
+void calcBIOParameterHighPrecision_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, Pel* dI)
+{
+  width -= 2;
+  height -= 2;
+  const int bioParamOffset = widthG + 1;
+  srcY0Tmp += src0Stride + 1;
+  srcY1Tmp += src1Stride + 1;
+  gradX0 += bioParamOffset;  gradX1 += bioParamOffset;
+  gradY0 += bioParamOffset;  gradY1 += bioParamOffset;
+  s1  += bioParamOffset;  s2  += bioParamOffset;
+  s3    += bioParamOffset;  s5    += bioParamOffset;
+  s6 += bioParamOffset;
+  int shift4 = 4;
+  dI += bioParamOffset;
+#ifdef USE_AVX2
+  if (width == 8)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      
+      __m128i tempGX = _mm_add_epi16(_mm_loadu_si128((const __m128i*)(gradX0 )), _mm_loadu_si128((const __m128i*)(gradX1 )));
+      __m128i tempGY = _mm_add_epi16(_mm_loadu_si128((const __m128i*)(gradY0 )), _mm_loadu_si128((const __m128i*)(gradY1 )));
+      __m128i temp = _mm_sub_epi16(_mm_srai_epi16(_mm_loadu_si128((const __m128i*)(srcY1Tmp )), shift4), _mm_srai_epi16(_mm_loadu_si128((const __m128i*)(srcY0Tmp )), shift4));
+      _mm_storeu_si128((__m128i *) (dI ),  temp);
+      //s1[x] =  tempGX * tempGX;
+      __m128i lowS1  = _mm_mullo_epi16 (tempGX,tempGX);
+      __m128i highS1 = _mm_mulhi_epi16 (tempGX,tempGX);
+      _mm_storeu_si128((__m128i *) (s1 ),     _mm_unpacklo_epi16 (lowS1, highS1));
+      _mm_storeu_si128((__m128i *) (s1 +  4), _mm_unpackhi_epi16 (lowS1, highS1));
+      //s2[x] =  tempGX * tempGY;
+      __m128i lowS2  = _mm_mullo_epi16 (tempGX,tempGY);
+      __m128i highS2 = _mm_mulhi_epi16 (tempGX,tempGY);
+      _mm_storeu_si128((__m128i *) (s2 ),     _mm_unpacklo_epi16 (lowS2, highS2));
+      _mm_storeu_si128((__m128i *) (s2 +  4), _mm_unpackhi_epi16 (lowS2, highS2));
+      //s5[x] =  tempGY * tempGY;
+      __m128i lowS5  = _mm_mullo_epi16 (tempGY,tempGY);
+      __m128i highS5 = _mm_mulhi_epi16 (tempGY,tempGY);
+      _mm_storeu_si128((__m128i *) (s5 ),    _mm_unpacklo_epi16 (lowS5, highS5));
+      _mm_storeu_si128((__m128i *) (s5 + 4), _mm_unpackhi_epi16 (lowS5, highS5));
+      //s3[x] = -tempGX * temp;
+      __m128i lowS3  = _mm_mullo_epi16 (tempGX,temp);
+      __m128i highS3 = _mm_mulhi_epi16 (tempGX,temp);
+      _mm_storeu_si128((__m128i *) (s3 ),     _mm_unpacklo_epi16 (lowS3, highS3));
+      _mm_storeu_si128((__m128i *) (s3 + 4), _mm_unpackhi_epi16 (lowS3, highS3));
+      //s6[x] = -tempGY * temp;
+      __m128i lowS6  = _mm_mullo_epi16 (tempGY,temp);
+      __m128i highS6 = _mm_mulhi_epi16 (tempGY,temp);
+      _mm_storeu_si128((__m128i *) (s6 ),     _mm_unpacklo_epi16 (lowS6, highS6));
+      _mm_storeu_si128((__m128i *) (s6 + 4), _mm_unpackhi_epi16 (lowS6, highS6));
+      srcY0Tmp += src0Stride;
+      srcY1Tmp += src1Stride;
+      gradX0 += widthG;
+      gradX1 += widthG;
+      gradY0 += widthG;
+      gradY1 += widthG;
+      s1 += widthG;
+      s2 += widthG;
+      s3 += widthG;
+      s5 += widthG;
+      s6 += widthG;
+      dI += widthG;
+    }
+  }
+  else
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x += 16)
+      {
+        __m256i tempGX = _mm256_add_epi16(_mm256_loadu_si256((const __m256i*)(gradX0 + x)), _mm256_loadu_si256((const __m256i*)(gradX1 + x)));
+        __m256i tempGY = _mm256_add_epi16(_mm256_loadu_si256((const __m256i*)(gradY0 + x)), _mm256_loadu_si256((const __m256i*)(gradY1 + x)));
+        __m256i temp = _mm256_sub_epi16(_mm256_srai_epi16(_mm256_loadu_si256((const __m256i*)(srcY1Tmp + x )), shift4), _mm256_srai_epi16(_mm256_loadu_si256((const __m256i*)(srcY0Tmp + x )), shift4));
+        _mm256_storeu_si256((__m256i *) (dI + x ),  temp);
+        //s1[x] =  tempGX * tempGX;
+        __m256i lowS1  = _mm256_mullo_epi16 (tempGX,tempGX);
+        __m256i highS1 = _mm256_mulhi_epi16 (tempGX,tempGX);
+        __m256i tem0S1 = _mm256_unpacklo_epi16 (lowS1, highS1);
+        __m256i tem1S1 = _mm256_unpackhi_epi16 (lowS1, highS1);
+        _mm256_storeu_si256((__m256i *) (s1 + x),     _mm256_permute2x128_si256 (tem0S1, tem1S1, 0x20));
+        _mm256_storeu_si256((__m256i *) (s1 + x + 8), _mm256_permute2x128_si256 (tem0S1, tem1S1, 0x31));
+        //s2[x] =  tempGX * tempGY;
+        __m256i lowS2  = _mm256_mullo_epi16 (tempGX,tempGY);
+        __m256i highS2 = _mm256_mulhi_epi16 (tempGX,tempGY);
+        __m256i tem0S2 = _mm256_unpacklo_epi16 (lowS2, highS2);
+        __m256i tem1S2 = _mm256_unpackhi_epi16 (lowS2, highS2);
+        _mm256_storeu_si256((__m256i *) (s2 + x),     _mm256_permute2x128_si256 (tem0S2, tem1S2, 0x20));
+        _mm256_storeu_si256((__m256i *) (s2 + x + 8), _mm256_permute2x128_si256 (tem0S2, tem1S2, 0x31));
+        //s5[x] =  tempGY * tempGY;
+        __m256i lowS5  = _mm256_mullo_epi16 (tempGY,tempGY);
+        __m256i highS5 = _mm256_mulhi_epi16 (tempGY,tempGY);
+        __m256i tem0S5 = _mm256_unpacklo_epi16 (lowS5, highS5);
+        __m256i tem1S5 = _mm256_unpackhi_epi16 (lowS5, highS5);
+        _mm256_storeu_si256((__m256i *) (s5 + x),     _mm256_permute2x128_si256 (tem0S5, tem1S5, 0x20));
+        _mm256_storeu_si256((__m256i *) (s5 + x + 8), _mm256_permute2x128_si256 (tem0S5, tem1S5, 0x31));
+        //s3[x] = -tempGX * temp;
+        __m256i lowS3  = _mm256_mullo_epi16 (tempGX,temp);
+        __m256i highS3 = _mm256_mulhi_epi16 (tempGX,temp);
+        __m256i tem0S3 = _mm256_unpacklo_epi16 (lowS3, highS3);
+        __m256i tem1S3 = _mm256_unpackhi_epi16 (lowS3, highS3);
+        _mm256_storeu_si256((__m256i *) (s3 + x),     _mm256_permute2x128_si256 (tem0S3, tem1S3, 0x20));
+        _mm256_storeu_si256((__m256i *) (s3 + x + 8), _mm256_permute2x128_si256 (tem0S3, tem1S3, 0x31));
+        //s6[x] = -tempGY * temp;
+        __m256i lowS6  = _mm256_mullo_epi16 (tempGY,temp);
+        __m256i highS6 = _mm256_mulhi_epi16 (tempGY,temp);
+        __m256i tem0S6 = _mm256_unpacklo_epi16 (lowS6, highS6);
+        __m256i tem1S6 = _mm256_unpackhi_epi16 (lowS6, highS6);
+        _mm256_storeu_si256((__m256i *) (s6 + x),     _mm256_permute2x128_si256 (tem0S6, tem1S6, 0x20));
+        _mm256_storeu_si256((__m256i *) (s6 + x + 8), _mm256_permute2x128_si256 (tem0S6, tem1S6, 0x31));
+        
+      }
+      srcY0Tmp += src0Stride;
+      srcY1Tmp += src1Stride;
+      gradX0 += widthG;
+      gradX1 += widthG;
+      gradY0 += widthG;
+      gradY1 += widthG;
+      s1 += widthG;
+      s2 += widthG;
+      s3 += widthG;
+      s5 += widthG;
+      s6 += widthG;
+      dI += widthG;
+    }
+  }
+#else
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x += 8)
+    {
+      __m128i tempGX = _mm_add_epi16(_mm_loadu_si128((const __m128i*)(gradX0 + x)), _mm_loadu_si128((const __m128i*)(gradX1 + x)));
+      __m128i tempGY = _mm_add_epi16(_mm_loadu_si128((const __m128i*)(gradY0 + x)), _mm_loadu_si128((const __m128i*)(gradY1 + x)));
+      __m128i temp = _mm_sub_epi16(_mm_srai_epi16(_mm_loadu_si128((const __m128i*)(srcY1Tmp + x )), shift4), _mm_srai_epi16(_mm_loadu_si128((const __m128i*)(srcY0Tmp + x)), shift4));
+      _mm_storeu_si128((__m128i *) (dI + x ), temp);
+      
+      //s1[x] =  tempGX * tempGX;
+      __m128i lowS1  = _mm_mullo_epi16 (tempGX,tempGX);
+      __m128i highS1 = _mm_mulhi_epi16 (tempGX,tempGX);
+      _mm_storeu_si128((__m128i *) (s1 + x),     _mm_unpacklo_epi16 (lowS1, highS1));
+      _mm_storeu_si128((__m128i *) (s1 + x + 4), _mm_unpackhi_epi16 (lowS1, highS1));
+      //s2[x] =  tempGX * tempGY;
+      __m128i lowS2  = _mm_mullo_epi16 (tempGX,tempGY);
+      __m128i highS2 = _mm_mulhi_epi16 (tempGX,tempGY);
+      _mm_storeu_si128((__m128i *) (s2 + x),     _mm_unpacklo_epi16 (lowS2, highS2));
+      _mm_storeu_si128((__m128i *) (s2 + x + 4), _mm_unpackhi_epi16 (lowS2, highS2));
+      //s5[x] =  tempGY * tempGY;
+      __m128i lowS5  = _mm_mullo_epi16 (tempGY,tempGY);
+      __m128i highS5 = _mm_mulhi_epi16 (tempGY,tempGY);
+      _mm_storeu_si128((__m128i *) (s5 + x),     _mm_unpacklo_epi16 (lowS5, highS5));
+      _mm_storeu_si128((__m128i *) (s5 + x + 4), _mm_unpackhi_epi16 (lowS5, highS5));
+      //s3[x] = -tempGX * temp;
+      __m128i lowS3  = _mm_mullo_epi16 (tempGX,temp);
+      __m128i highS3 = _mm_mulhi_epi16 (tempGX,temp);
+      _mm_storeu_si128((__m128i *) (s3 + x),     _mm_unpacklo_epi16 (lowS3, highS3));
+      _mm_storeu_si128((__m128i *) (s3 + x + 4), _mm_unpackhi_epi16 (lowS3, highS3));
+      //s6[x] = -tempGY * temp;
+      __m128i lowS6  = _mm_mullo_epi16 (tempGY,temp);
+      __m128i highS6 = _mm_mulhi_epi16 (tempGY,temp);
+      _mm_storeu_si128((__m128i *) (s6 + x),     _mm_unpacklo_epi16 (lowS6, highS6));
+      _mm_storeu_si128((__m128i *) (s6 + x + 4), _mm_unpackhi_epi16 (lowS6, highS6));
+      
+    }
+    srcY0Tmp += src0Stride;
+    srcY1Tmp += src1Stride;
+    gradX0 += widthG;
+    gradX1 += widthG;
+    gradY0 += widthG;
+    gradY1 += widthG;
+    s1 += widthG;
+    s2 += widthG;
+    s3 += widthG;
+    s5 += widthG;
+    s6 += widthG;
+    dI += widthG;
+  }
+#endif
+}
+
+template< X86_VEXT vext >
+void calcBIOParamSumHighPrecision_SSE(int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6)
+{
+  __m128i vzero = _mm_setzero_si128();
+  
+  __m128i sumS1Temp = vzero;
+  __m128i sumS2Temp = vzero;
+  __m128i sumS5Temp = vzero;
+  __m128i sumS3Temp = vzero;
+  __m128i sumS6Temp = vzero;
+  
+  __m128i vmask1[12] = {_mm_setr_epi32(1, 2, 3, 4), _mm_setr_epi32(2, 4, 6, 8), _mm_setr_epi32(3, 6, 9, 12), _mm_setr_epi32(4, 8, 12, 16), _mm_setr_epi32(5, 10, 15, 20), _mm_setr_epi32(6, 12, 18, 24)
+  ,_mm_setr_epi32(6, 12, 18, 24) , _mm_setr_epi32(5, 10, 15, 20), _mm_setr_epi32(4, 8, 12, 16), _mm_setr_epi32(3, 6, 9, 12), _mm_setr_epi32(2, 4, 6, 8), _mm_setr_epi32(1, 2, 3, 4)};
+  __m128i vmask2[12] = {_mm_setr_epi32(5, 6, 6, 5), _mm_setr_epi32(10, 12, 12, 10), _mm_setr_epi32(15, 18, 18, 15), _mm_setr_epi32(20, 24, 24, 20), _mm_setr_epi32(25, 30, 30, 25), _mm_setr_epi32(30, 36, 36, 30),_mm_setr_epi32(30, 36, 36, 30) , _mm_setr_epi32(25, 30, 30, 25), _mm_setr_epi32(20, 24, 24, 20), _mm_setr_epi32(15, 18, 18, 15), _mm_setr_epi32(10, 12, 12, 10), _mm_setr_epi32(5, 6, 6, 5)};
+  __m128i vmask3[12] = {_mm_set_epi32(1, 2, 3, 4), _mm_set_epi32(2, 4, 6, 8), _mm_set_epi32(3, 6, 9, 12), _mm_set_epi32(4, 8, 12, 16), _mm_set_epi32(5, 10, 15, 20), _mm_set_epi32(6, 12, 18, 24)
+  ,_mm_set_epi32(6, 12, 18, 24) , _mm_set_epi32(5, 10, 15, 20), _mm_set_epi32(4, 8, 12, 16), _mm_set_epi32(3, 6, 9, 12), _mm_set_epi32(2, 4, 6, 8), _mm_set_epi32(1, 2, 3, 4)};
+  
+  int offset = 0;
+  if (width == 8)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      if (height == 8 && y > 3) offset = 4;
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s1), vmask1[y+offset]));
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s1+4)), vmask3[y+offset]));
+      
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s2), vmask1[y+offset]));
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s2+4)), vmask3[y+offset]));
+      
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s5), vmask1[y+offset]));
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s5+4)), vmask3[y+offset]));
+      
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s3), vmask1[y+offset]));
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s3+4)), vmask3[y+offset]));
+      
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s6), vmask1[y+offset]));
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s6+4)), vmask3[y+offset]));
+      // bio parameter increment
+      s1 += widthG;
+      s2 += widthG;
+      s5 += widthG;
+      s3 += widthG;
+      s6 += widthG;
+    }
+  }
+  else // width = 12
+  {
+    for (int y = 0; y < height; y++)
+    {
+      if (height == 8 && y > 3) offset = 4;
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s1), vmask1[y+offset]));
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s1+4)), vmask2[y+offset]));
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s1+8)), vmask3[y+offset]));
+      
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s2), vmask1[y+offset]));
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s2+4)), vmask2[y+offset]));
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s2+8)), vmask3[y+offset]));
+      
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s5), vmask1[y+offset]));
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s5+4)), vmask2[y+offset]));
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s5+8)), vmask3[y+offset]));
+      
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s3), vmask1[y+offset]));
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s3+4)), vmask2[y+offset]));
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s3+8)), vmask3[y+offset]));
+      
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s6), vmask1[y+offset]));
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s6+4)), vmask2[y+offset]));
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s6+8)), vmask3[y+offset]));
+      // bio parameter increment
+      s1 += widthG;
+      s2 += widthG;
+      s5 += widthG;
+      s3 += widthG;
+      s6 += widthG;
+    }
+  }
+  
+  sumS1Temp = _mm_add_epi32(sumS1Temp, _mm_shuffle_epi32(sumS1Temp, 0x4e));   // 01001110
+  sumS1Temp = _mm_add_epi32(sumS1Temp, _mm_shuffle_epi32(sumS1Temp, 0xb1));   // 10110001
+  *sumS1 = _mm_cvtsi128_si32(sumS1Temp);
+
+  sumS2Temp = _mm_add_epi32(sumS2Temp, _mm_shuffle_epi32(sumS2Temp, 0x4e));   // 01001110
+  sumS2Temp = _mm_add_epi32(sumS2Temp, _mm_shuffle_epi32(sumS2Temp, 0xb1));   // 10110001
+  *sumS2 = _mm_cvtsi128_si32(sumS2Temp);
+
+  sumS5Temp = _mm_add_epi32(sumS5Temp, _mm_shuffle_epi32(sumS5Temp, 0x4e));   // 01001110
+  sumS5Temp = _mm_add_epi32(sumS5Temp, _mm_shuffle_epi32(sumS5Temp, 0xb1));   // 10110001
+  *sumS5 = _mm_cvtsi128_si32(sumS5Temp);
+  
+  sumS3Temp = _mm_add_epi32(sumS3Temp, _mm_shuffle_epi32(sumS3Temp, 0x4e));   // 01001110
+  sumS3Temp = _mm_add_epi32(sumS3Temp, _mm_shuffle_epi32(sumS3Temp, 0xb1));   // 10110001
+  *sumS3 = _mm_cvtsi128_si32(sumS3Temp);
+  
+  sumS6Temp = _mm_add_epi32(sumS6Temp, _mm_shuffle_epi32(sumS6Temp, 0x4e));   // 01001110
+  sumS6Temp = _mm_add_epi32(sumS6Temp, _mm_shuffle_epi32(sumS6Temp, 0xb1));   // 10110001
+  *sumS6 = _mm_cvtsi128_si32(sumS6Temp);
+}
+#endif
 template< X86_VEXT vext >
 void calcBIOParamSum4_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, int width, int height, const int widthG, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx)
 {
@@ -3172,6 +3712,10 @@ void PelBufferOps::_initPelBufOpsX86()
   addBIOAvg4      = addBIOAvg4_SSE<vext>;
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
   calcBIOParameter   = calcBIOParameter_SSE<vext>;
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+  calcBIOParameterHighPrecision = calcBIOParameterHighPrecision_SSE<vext>;
+  calcBIOParamSum4HighPrecision = calcBIOParamSumHighPrecision_SSE<vext>;
+#endif
   calcBIOParamSum5   = calcBIOParamSum5_SSE<vext>;
   calcBIOParamSum4   = calcBIOParamSum4_SSE<vext>;
   calcBIOClippedVxVy = calcBIOClippedVxVy_SSE<vext>;

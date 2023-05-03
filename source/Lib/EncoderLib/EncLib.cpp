@@ -1895,7 +1895,16 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseDMVR                            ( m_DMVR );
   sps.setUseColorTrans(m_useColorTrans);
   sps.setPLTMode                            ( m_PLTMode);
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   sps.setIBCFlag                            ( m_IBCMode);
+#else
+  sps.setIBCFlag                            ( m_IBCMode & 0x01);
+  sps.setIBCFlagInterSlice                  ( m_IBCMode & 0x02);
+  sps.setUseRRIbc                           ( m_rribc );
+  sps.setUseTMIbc                           ( m_tmibc );
+  sps.setUseIbcMerge                        ( m_ibcMerge );
+  sps.setIBCFracFlag                        ( m_IBCFracMode);
+#endif
 #if JVET_AA0061_IBC_MBVD
   sps.setUseIbcMbvd                         ( m_ibcMbvd );
 #endif
@@ -2684,6 +2693,17 @@ void EncLib::xInitPicHeader(PicHeader &picHeader, const SPS &sps, const PPS &pps
 #else
   picHeader.setGPMMMVDTableFlag(false);
 #endif
+  }
+#endif
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  picHeader.setDisFracMBVD(true);
+  if (sps.getIBCFracFlag())
+  {
+    if ((getSourceWidth() * getSourceHeight()) <= (1920 * 1080))
+    {
+      picHeader.setDisFracMBVD(false);
+    }
   }
 #endif
 }

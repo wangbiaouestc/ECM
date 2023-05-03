@@ -2767,6 +2767,19 @@ const CtxSet ContextSetCfg::SgpmFlag = ContextSetCfg::addCtxSet
 #if ENABLE_OBMC 
 const CtxSet ContextSetCfg::ObmcFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  {  39,  53, },
+  {  39,  53, },
+  { CNU, CNU, },
+  {   1,   7, },
+  {   1,   4, },
+  { DWS, DWS, },
+  {  32,  25, },
+  {  32,   4, },
+  { DWE, DWE, },
+  { 115, 102, },
+  {  98,  68, },
+#else
   {  39, },
   {  39, },
   { CNU, },
@@ -2778,6 +2791,7 @@ const CtxSet ContextSetCfg::ObmcFlag = ContextSetCfg::addCtxSet
   { DWE, },
   { 115, },
   {  98, },
+#endif
   });
 #endif
 
@@ -2810,6 +2824,23 @@ const CtxSet ContextSetCfg::ImvFlag = ContextSetCfg::addCtxSet
   { 126,  92, 126, 116, 118, },
   { 117, 147, 117, 116, 119, },
   });
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+const CtxSet ContextSetCfg::ImvFlagIBC = ContextSetCfg::addCtxSet
+({
+  {  59,  33,  50,  59,  53, },
+  {  59,  33,  50,  59,  60, },
+  {  59,  33,  50,  59,  53, },
+  {   1,   5,   1,   0,   4, },
+  {   1,   5,   1,   0,   5, },
+  {   1,   5,   1,   0,   4, },
+  {  11,  18,  11,  32,   4, },
+  {  11,  11,  11,  32,  11, },
+  {  11,  18,  11,  32,   4, },
+  { 126,  92, 126, 116, 118, },
+  { 117, 147, 117, 116, 119, },
+});
+#endif
 
 const CtxSet ContextSetCfg::ctbAlfFlag = ContextSetCfg::addCtxSet
 ({
@@ -4710,6 +4741,18 @@ const CtxSet ContextSetCfg::ImvFlag = ContextSetCfg::addCtxSet
 	{ 0, 10,  0,  0,  4 }
 });
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+const CtxSet ContextSetCfg::ImvFlagIBC = ContextSetCfg::addCtxSet
+({
+  { 59, 26, 50, 60, 38 },
+  { 59, 48, 58, 60, 60 },
+  { 59, 26, 50, 60, 38 },
+  { 1,  4,  1,  0,  4 },
+  { 0,  5,  1,  0,  4 },
+  { 1,  4,  1,  0,  4 },
+});
+#endif
+
 const CtxSet ContextSetCfg::ctbAlfFlag = ContextSetCfg::addCtxSet
 ({
 	{ 18, 37, 46, 25, 53, 54, 25, 46, 54 },
@@ -5964,6 +6007,16 @@ const CtxSet ContextSetCfg::ImvFlag = ContextSetCfg::addCtxSet
   { CNU,  34, CNU, CNU, CNU, },
   {   0,   5,   0,   0,   4, },
 });
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+const CtxSet ContextSetCfg::ImvFlagIBC = ContextSetCfg::addCtxSet
+({
+  {  59,  26,  50,  60,  38, },
+  {  59,  48,  58,  60,  60, },
+  {  59,  26,  50,  60,  38, },
+  {   0,   5,   0,   0,   4, },
+});
+#endif
 
 const CtxSet ContextSetCfg::ctbAlfFlag = ContextSetCfg::addCtxSet
 ({

@@ -1141,7 +1141,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("BvdPred",                                         m_bvdPred,                                         true, "Block vector difference Prediction (0:off, 1:on)")
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  ("BvpCluster",                                      m_bvpCluster,                                     false, "IBC BVP clusteriing and BV with one zero component sign prediction (0:off, 1:on)")
+#else
   ("BvpCluster",                                      m_bvpCluster,                                      true, "IBC BVP clusteriing and BV with one zero component sign prediction (0:off, 1:on)")
+#endif
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   ("ARL",                                             m_useARL,                                          true, "Adaptive Reference List (0:off, 1:on)")
@@ -1150,17 +1154,37 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("PLT",                                             m_PLTMode,                                           0u, "PLTMode (0x1:enabled, 0x0:disabled)  [default: disabled]")
   ("JointCbCr",                                       m_JointCbCrMode,                                  false, "Enable joint coding of chroma residuals (JointCbCr, 0:off, 1:on)")
   ( "IBC",                                            m_IBCMode,                                           0u, "IBCMode (0x1:enabled, 0x0:disabled)  [default: disabled]")
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  ( "IBCFrac",                                        m_IBCFracMode,                                       1u, "IBCMode with fractional BV (0x1:enabled, 0x0:disabled)  [default: disabled]")
+#endif
   ( "IBCLocalSearchRangeX",                           m_IBCLocalSearchRangeX,                            128u, "Search range of IBC local search in x direction")
   ( "IBCLocalSearchRangeY",                           m_IBCLocalSearchRangeY,                            128u, "Search range of IBC local search in y direction")
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  ( "IBCHashSearch",                                  m_IBCHashSearch,                                     0u, "Hash based IBC search")
+#else
   ( "IBCHashSearch",                                  m_IBCHashSearch,                                     1u, "Hash based IBC search")
+#endif
   ( "IBCHashSearchMaxCand",                           m_IBCHashSearchMaxCand,                            256u, "Max candidates for hash based IBC search")
   ( "IBCHashSearchRange4SmallBlk",                    m_IBCHashSearchRange4SmallBlk,                     256u, "Small block search range in based IBC search")
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  ( "IBCFastMethod",                                  m_IBCFastMethod,                                     14u, "Fast methods for IBC")
+#else
   ( "IBCFastMethod",                                  m_IBCFastMethod,                                     6u, "Fast methods for IBC")
+#endif
 #if JVET_AA0061_IBC_MBVD
   ("IBCMBVD",                                         m_ibcMbvd,                                         true, "IBC MMVD mode (0:off, 1:on)  [default: on]" )
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  ("RRIBC",                                           m_rribc,                                          false, "RRIBC mode (0:off, 1:on)  [default: off]")
+  ("TMIBC",                                           m_tmibc,                                          false, "TMIBC mode (0:off, 1:on)  [default: off]")
+  ("IBCMerge",                                        m_ibcMerge,                                       false, "Enable IBC merge")
+#endif
 #if JVET_AC0112_IBC_CIIP
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  ("IBCCIIP",                                         m_ibcCiip,                                        false, "IBC CIIP mode (0:off, 1:on)  [default: off]" )
+#else
   ("IBCCIIP",                                         m_ibcCiip,                                         true, "IBC CIIP mode (0:off, 1:on)  [default: on]" )
+#endif
 #endif
 #if JVET_AC0112_IBC_GPM
   ("IBCGPM",                                          m_ibcGpm,                                          true, "IBC GPM mode (0:off, 1:on)  [default: on]" )
@@ -1186,7 +1210,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #endif
 #if JVET_AC0071_DBV
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+ ("IntraDBV",                                         m_intraDBV,                                       true, "Direct Block Vector (0: off, 1:on)  [default: on]")
+#else
  ("IntraDBV", m_intraDBV, false, "Direct Block Vector (0: off, 1:on)  [default: off]")
+#endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   ("BIF",                                             m_BIF,                                            true, "bilateral filter   (0: off, 1:on)  [default: on]")
@@ -2206,6 +2234,12 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   else
   {
     m_log2SignPredArea = 4;
+  }
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (m_IBCFracMode && (!m_ImvMode || !m_IBCMode))
+  {
+    m_IBCFracMode = 0;
   }
 #endif
 
@@ -3996,6 +4030,27 @@ bool EncAppCfg::xCheckParameter()
     m_useTMMMVD = 0;
   }
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if( !m_ibcMerge )
+  {
+    if( m_ibcGpm )
+    {
+      msg( WARNING, "IBC-GPM is disabled since IBC merge is not used\n" );
+      m_ibcGpm = 0;
+    }
+
+    if( m_ibcMbvd )
+    {
+      msg( WARNING, "IBC MBVD is disabled since IBC merge is not used\n" );
+      m_ibcMbvd = 0;
+    }
+
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+    m_maxNumIBCMergeCand = IBC_MRG_MAX_NUM_CANDS;
+    msg( WARNING, "Max num of IBC merge candidates is set equal to IBC_MRG_MAX_NUM_CANDS since IBC merge is not used\n" );
+#endif
+  }
+#endif
 
   xConfirmPara( m_MTS < 0 || m_MTS > 3, "MTS must be greater than 0 smaller than 4" );
   xConfirmPara( m_MTSIntraMaxCand < 0 || m_MTSIntraMaxCand > 5, "m_MTSIntraMaxCand must be greater than 0 and smaller than 6" );
@@ -5236,6 +5291,12 @@ void EncAppCfg::xPrintParameter()
     msg(VERBOSE, "IBC:%d ", m_IBCMode);
 #if JVET_AA0061_IBC_MBVD
     msg( VERBOSE, "IBCMBVD:%d ", m_ibcMbvd );
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    msg(VERBOSE, "IBCFrac:%d ",  m_IBCFracMode);
+    msg(VERBOSE, "RRIBC:%d ",    m_rribc);
+    msg(VERBOSE, "TMIBC:%d ",    m_tmibc);
+    msg(VERBOSE, "IBCMerge:%d ", m_ibcMerge );
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
     msg(VERBOSE, "IBCBvdPred:%d ", m_bvdPred);

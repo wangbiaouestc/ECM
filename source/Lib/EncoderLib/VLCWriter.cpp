@@ -646,7 +646,15 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
     for (int altIdx = 0; altIdx < param.numAlternativesLuma; ++altIdx)
     {
 #if JVET_X0071_ALF_BAND_CLASSIFIER
+#if JVET_AD0222_ALF_RESI_CLASS
+      WRITE_FLAG( param.lumaClassifierIdx[altIdx] == 1 ? 1 : 0, "alf_luma_classifier_band" );
+      if( param.lumaClassifierIdx[altIdx] != 1 )
+      {
+        WRITE_FLAG( param.lumaClassifierIdx[altIdx] == 2 ? 1 : 0, "alf_luma_classifier_resi" );
+      }
+#else
       WRITE_FLAG( param.lumaClassifierIdx[altIdx], "alf_luma_classifier" );
+#endif
 #endif
       WRITE_FLAG( param.nonLinearFlag[CHANNEL_TYPE_LUMA][altIdx], "alf_luma_clip" );
       WRITE_UVLC( param.numLumaFilters[altIdx] - 1, "alf_luma_num_filters_signalled_minus1" );
@@ -1637,11 +1645,30 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   WRITE_FLAG(pcSPS->getIBCFlag() ? 1 : 0,                                                      "sps_ibc_enabled_flag");
   if (pcSPS->getIBCFlag())
   {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if (pcSPS->getAMVREnabledFlag())
+    {
+      WRITE_FLAG(pcSPS->getIBCFracFlag() ? 1 : 0,                                                      "sps_ibc_frac_enabled_flag");
+    }
+    WRITE_FLAG(pcSPS->getIBCFlagInterSlice() ? 1 : 0,                                                      "sps_ibc_enabled_flag_inter_slice");
+    WRITE_FLAG( pcSPS->getUseIbcMerge() ? 1 : 0, "sps_ibc_merge_enabled_flag" );
+    if( pcSPS->getUseIbcMerge() )
+    {
+#endif
     CHECK(pcSPS->getMaxNumIBCMergeCand() > IBC_MRG_MAX_NUM_CANDS, "More IBC merge candidates signalled than supported");
     WRITE_UVLC(IBC_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumIBCMergeCand(), "six_minus_max_num_ibc_merge_cand");
 #if JVET_AA0061_IBC_MBVD
     WRITE_FLAG( pcSPS->getUseIbcMbvd() ? 1 : 0,                                         "sps_ibc_mbvd_enabled_flag" );
 #endif
+#if JVET_AC0112_IBC_GPM
+    WRITE_FLAG( pcSPS->getUseIbcGpm() ? 1 : 0,                                          "sps_ibc_gpm_enabled_flag" );
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    }
+    WRITE_FLAG(pcSPS->getUseRRIbc() ? 1 : 0, "sps_rribc_enabled_flag");
+    WRITE_FLAG(pcSPS->getUseTMIbc() ? 1 : 0, "sps_tmibc_enabled_flag");
+#endif
+
 #if JVET_AC0104_IBC_BVD_PREDICTION
     WRITE_FLAG(pcSPS->getUseBvdPred() ? 1 : 0,                                          "sps_ibc_bvd_pred_enabled_flag");
 #endif
@@ -1649,10 +1676,7 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     WRITE_FLAG(pcSPS->getUseBvpCluster() ? 1 : 0,                                       "sps_ibc_bvp_cluster_enabled_flag");
 #endif
 #if JVET_AC0112_IBC_CIIP
-    WRITE_FLAG( pcSPS->getUseIbcCiip() ? 1 : 0,                                         "sps_ibc_ciip_enabled_flag" );
-#endif
-#if JVET_AC0112_IBC_GPM
-    WRITE_FLAG( pcSPS->getUseIbcGpm() ? 1 : 0,                                          "sps_ibc_gpm_enabled_flag" );
+    WRITE_FLAG(pcSPS->getUseIbcCiip() ? 1 : 0, "sps_ibc_ciip_enabled_flag");
 #endif
 #if JVET_AC0112_IBC_LIC
     WRITE_FLAG( pcSPS->getUseIbcLic() ? 1 : 0,                                          "sps_ibc_lic_enabled_flag" );
@@ -2420,6 +2444,16 @@ void HLSWriter::codePictureHeader( PicHeader* picHeader, bool writeRbspTrailingB
     }
   }
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (sps->getIBCFracFlag())
+  {
+    WRITE_FLAG(picHeader->getDisFracMBVD(), "ph_fpel_mbvd_enabled_flag");
+  }
+  else
+  {
+    picHeader->setDisFracMBVD(true);
+  }
+#endif
 
   if (picHeader->getPicInterSliceAllowedFlag())
   {
@@ -3065,7 +3099,6 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
       WRITE_FLAG( pcSlice->getUseLIC() ? 1 : 0, "slice_lic_enable_flag" );
     }
 #endif
-
 
     if (!pcSlice->getPPS()->getQpDeltaInfoInPhFlag())
     {

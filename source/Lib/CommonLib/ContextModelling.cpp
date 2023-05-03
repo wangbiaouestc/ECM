@@ -600,6 +600,9 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
   {
     pu.bv = pu.mv[REF_PIC_LIST_0];
     pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT); // used for only integer resolution
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if(!pu.cs->sps->getIBCFracFlag())
+#endif
     pu.cu->imv = pu.cu->imv == IMV_HPEL ? 0 : pu.cu->imv;
 #if MULTI_HYP_PRED
     pu.addHypData.clear();
@@ -1478,6 +1481,12 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
   fPosStep = tempIdx / IBC_MBVD_OFFSET_DIR;
   fPosPosition = tempIdx - fPosStep * (IBC_MBVD_OFFSET_DIR);
   int offset = refMvdCands[fPosStep];
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (!pu.cu->slice->getPicHeader()->getDisFracMBVD() || !pu.cs->slice->getSPS()->getPLTMode())
+  {
+    offset >>= 2;
+  }
+#endif
 
   const int refList0 = ibcMbvdBaseBv[fPosBaseIdx][0].refIdx;
   const int xDir[] = {1, -1,  0,  0,  1, -1,  1, -1, 2, -2,  2, -2, 1,  1, -1, -1};
@@ -1527,6 +1536,13 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
   }
   pu.bv = pu.mv[REF_PIC_LIST_0];
   pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT); // used for only integer resolution
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (pu.cs->sps->getIBCFracFlag())
+  {
+    pu.cu->imv = (!pu.cu->geoFlag && useAltHpelIf[fPosBaseIdx]) ? IMV_HPEL : 0;
+  }
+  else
+#endif
   pu.cu->imv = pu.cu->imv == IMV_HPEL ? 0 : pu.cu->imv;
 #if JVET_AC0112_IBC_LIC
   pu.cu->ibcLicFlag = ibcLicFlags[fPosBaseIdx];

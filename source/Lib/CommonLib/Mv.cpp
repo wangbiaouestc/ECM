@@ -42,7 +42,11 @@
 
 const MvPrecision Mv::m_amvrPrecision[4] = { MV_PRECISION_QUARTER, MV_PRECISION_INT, MV_PRECISION_4PEL, MV_PRECISION_HALF }; // for cu.imv=0, 1, 2 and 3
 const MvPrecision Mv::m_amvrPrecAffine[3] = { MV_PRECISION_QUARTER, MV_PRECISION_SIXTEENTH, MV_PRECISION_INT }; // for cu.imv=0, 1 and 2
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+const MvPrecision Mv::m_amvrPrecIbc[4] = { MV_PRECISION_QUARTER, MV_PRECISION_INT, MV_PRECISION_4PEL, MV_PRECISION_HALF }; // for cu.imv=0, 1, 2 and 3
+#else
 const MvPrecision Mv::m_amvrPrecIbc[3] = { MV_PRECISION_INT, MV_PRECISION_INT, MV_PRECISION_4PEL }; // for cu.imv=0, 1 and 2
+#endif
 
 void roundAffineMv( int& mvx, int& mvy, int nShift )
 {
@@ -181,11 +185,25 @@ void MvdSuffixInfo::initSuffixesAndSigns(const Mv& mv, const int imv)
     horPrefixGroupStartValue = xGetGolombGroupMinValue(horPrefix);
     iBinsInHorSuffix = horPrefix+1;
   }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  else
+  {
+    horPrefixGroupStartValue = -1;
+    iBinsInHorSuffix = -1;
+  }
+#endif
   if (verPrefix >= 0)
   {
     verPrefixGroupStartValue = xGetGolombGroupMinValue(verPrefix);
     iBinsInVerSuffix = verPrefix + 1;
   }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  else
+  {
+    verPrefixGroupStartValue = -1;
+    iBinsInVerSuffix = -1;
+  }
+#endif
 
   defineNumberOfPredictedBinsInSuffix(horPrefix, verPrefix, imv);
 }
@@ -202,12 +220,18 @@ void MvdSuffixInfo::defineNumberOfPredictedBinsInSuffix(const int iHorPrefix, co
   const int iBinsInHorSuffix = iHorPrefix < 0 ? 0 : iHorPrefix + uiExpGolombParam;
   const int iBinsInVerSuffix = iVerPrefix < 0 ? 0 : iVerPrefix + uiExpGolombParam;
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  const int skipFracbins          = isFracBvEnabled ? (imv == IMV_OFF ? 2 : (imv == IMV_HPEL ? 1 : 0)) : 0;  
+  const int iAvailBinsInHorSuffix = std::max(0, iBinsInHorSuffix - skipFracbins);
+  const int iAvailBinsInVerSuffix = std::max(0, iBinsInVerSuffix - skipFracbins);
+#else
   const int iPrecShift = Mv::getImvPrecShift(imv);
   constexpr int iMaxNumberOfInsignLSBins = 0;
 
   const int iNumberOfInsignLSBins = std::max(0, iMaxNumberOfInsignLSBins - iPrecShift);
   const int iAvailBinsInHorSuffix = std::max(0, iBinsInHorSuffix - iNumberOfInsignLSBins);
   const int iAvailBinsInVerSuffix = std::max(0, iBinsInVerSuffix - iNumberOfInsignLSBins);
+#endif
   const int iTotalNumberOfPredBins = std::min(iNumberOfMSBins, iAvailBinsInHorSuffix + iAvailBinsInVerSuffix);
 
   horEncodeSignInEP = false;
