@@ -366,6 +366,7 @@
 #define JVET_Z0067_RPR_ENABLE                             1 // JVET-Z0067: Fixes for RPR
 #define JVET_Z0150_MEMORY_USAGE_PRINT                     1 // JVET-Z0150: Print memory usage
 #define JVET_Z0118_GDR                                    1 // JVET-Z0118: GDR
+#define JVET_AD0169_SMALL_SCALE_DOWNSAMPLING              1 // JVET-AD0169: Downsampling filters in range 1.1 to 1.35 based on Kaiser(7) windowed sinc
 
 #if JVET_Z0118_GDR
 #define GDR_LEAK_TEST                                     0
