@@ -372,6 +372,16 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if INTER_LIC
   licFlag           = other.licFlag;
+#if JVET_AD0213_LIC_IMP
+  for (int i = 0; i < 2; i++)
+  {
+    for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+    {
+      licScale[i][comp] = other.licScale[i][comp];
+      licOffset[i][comp] = other.licOffset[i][comp];
+    }
+  }
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = other.ibcLicFlag;
@@ -545,6 +555,16 @@ void CodingUnit::initData()
 #endif
 #if INTER_LIC
   licFlag = false;
+#if JVET_AD0213_LIC_IMP
+  for (int i = 0; i < 2; i++)
+  {
+    for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+    {
+      licScale[i][comp] = MAX_INT;
+      licOffset[i][comp] = MAX_INT;
+    }
+  }
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = false;

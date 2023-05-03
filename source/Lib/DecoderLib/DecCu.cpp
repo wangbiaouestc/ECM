@@ -158,6 +158,9 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
       m_pcInterPred->setFillCurTplAboveARMC(false);
       m_pcInterPred->setFillCurTplLeftARMC(false);
 #endif
+#if JVET_AD0213_LIC_IMP
+      m_pcInterPred->resetFillLicTpl();
+#endif
 
 #if JVET_Z0118_GDR
       if (cs.isGdrEnabled())
@@ -1471,7 +1474,31 @@ void DecCu::xReconInter(CodingUnit &cu)
     {
       m_pcInterPred->motionCompensation(cu, REF_PIC_LIST_0, luma, chroma);
     }
-
+#if JVET_AD0213_LIC_IMP
+    if (cu.licFlag)
+    {
+      Slice* slice = cu.slice;
+      bool disCond = cu.firstPU->ciipFlag && !(((slice->getPOC() - slice->getRefPOC(REF_PIC_LIST_0, 0)) == 1) && slice->getCheckLDC());
+      for (int list = 0; list < 2; list++)
+      {
+        if (cu.firstPU->refIdx[list] >= 0)
+        {
+          for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+          {
+            if (disCond)
+            {
+              cu.licScale[list][comp] = 32;
+              cu.licOffset[list][comp] = 0;
+            }
+            else
+            {
+              m_pcInterPred->setLicParam(list, comp, cu.licScale[list][comp], cu.licOffset[list][comp]);
+            }
+          }
+        }
+      }
+    }
+#endif
 #if MULTI_PASS_DMVR
     if (cu.firstPU->bdmvrRefine)
     {
@@ -2534,6 +2561,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                     {
                       pu.cu->imv = mrgCtx.useAltHpelIf[candIdx] ? IMV_HPEL : 0;
                       pu.cu->bcwIdx = mrgCtx.bcwIdx[candIdx];
+#if JVET_AD0213_LIC_IMP
+                      pu.cu->licFlag = mrgCtx.licFlags[candIdx];
+#endif
                       pu.mv[0] = mrgCtx.mvFieldNeighbours[candIdx << 1].mv;
                       pu.mv[1] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].mv;
                       pu.refIdx[0] = mrgCtx.mvFieldNeighbours[candIdx << 1].refIdx;
@@ -2614,6 +2644,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                     {
                       pu.cu->imv = mrgCtx.useAltHpelIf[candIdx] ? IMV_HPEL : 0;
                       pu.cu->bcwIdx = mrgCtx.bcwIdx[candIdx];
+#if JVET_AD0213_LIC_IMP
+                      pu.cu->licFlag = mrgCtx.licFlags[candIdx];
+#endif
                       pu.mv[0] = mrgCtx.mvFieldNeighbours[candIdx << 1].mv;
                       pu.mv[1] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].mv;
                       pu.refIdx[0] = mrgCtx.mvFieldNeighbours[candIdx << 1].refIdx;
@@ -3187,7 +3220,15 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           Mv orgMvd0 = pu.mvd[0];
           Mv orgMvd1 = pu.mvd[1];
           // this part is to derive the merge info
+#if JVET_AD0213_LIC_IMP
+          m_pcInterPred->getAmvpMergeModeMergeList(pu, m_mvFieldAmListDec, m_licAmListDec, orgRefIdxAMVP);
+          const int mvFieldMergeIdx = orgRefIdxAMVP * AMVP_MAX_NUM_CANDS_MEM + (pu.amvpMergeModeFlag[REF_PIC_LIST_0] ? orgMvpIdxL1 : orgMvpIdxL0);
+          const int mvFieldAmvpIdx = MAX_NUM_AMVP_CANDS_MAX_REF + mvFieldMergeIdx;
+          CHECK(m_licAmListDec[mvFieldMergeIdx] != m_licAmListDec[mvFieldAmvpIdx], "inconsistent LIC value");
+          pu.cu->licFlag = m_licAmListDec[mvFieldMergeIdx];
+#else
           m_pcInterPred->getAmvpMergeModeMergeList(pu, m_mvFieldAmListDec, orgRefIdxAMVP);
+#endif
           // if there was set PU merge info, restore the AMVP information
           pu.mvpIdx[REF_PIC_LIST_0] = orgMvpIdxL0;
           pu.mvpIdx[REF_PIC_LIST_1] = orgMvpIdxL1;

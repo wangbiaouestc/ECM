@@ -225,7 +225,11 @@ public:
   void        imv_mode                  ( const CodingUnit&             cu );
   void        affine_amvr_mode          ( const CodingUnit&             cu );
   void        inter_pred_idc            ( const PredictionUnit&         pu );
+#if JVET_Z0054_BLK_REF_PIC_REORDER && JVET_AD0213_LIC_IMP
+  void        ref_idx                   ( const PredictionUnit&         pu,       RefPicList eRefList, bool forceRefIdx = false);
+#else
   void        ref_idx                   ( const PredictionUnit&         pu,       RefPicList eRefList );
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   void        refIdxLC                  ( const PredictionUnit&         pu );
   void        refPairIdx                ( const PredictionUnit&         pu );

@@ -78,11 +78,19 @@ struct BMSubBlkInfo : Area
   PosType  m_cYInPU; // y coordinate of center relative to PU's top left sample
 };
 #endif
+#if JVET_AD0213_LIC_IMP
+class TplMatchingCtrl;
+#endif
 class InterPrediction : public WeightPrediction
 {
 #if INTER_LIC || (JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0112_IBC_LIC)
 public:
   PelUnitBuf        m_predictionBeforeLIC;
+#if JVET_AD0213_LIC_IMP
+  PelStorage        m_acPredBeforeLICBuffer[2];
+  bool              m_encMotionEstimation;
+  bool              m_isAddHypMC;
+#endif
   bool              m_storeBeforeLIC;
 #endif
 #if JVET_Z0136_OOB
@@ -103,10 +111,30 @@ private:
 
 #if INTER_LIC || JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   // buffer size for left/above current templates and left/above reference templates
+#if JVET_AD0213_LIC_IMP
+  Pel* m_pcLICRefLeftTemplate[2][MAX_NUM_COMPONENT];
+  Pel* m_pcLICRefAboveTemplate[2][MAX_NUM_COMPONENT];
+  Pel* m_pcLICRecLeftTemplate[MAX_NUM_COMPONENT];
+  Pel* m_pcLICRecAboveTemplate[MAX_NUM_COMPONENT];
+#if JVET_AC0112_IBC_LIC
+  Pel* m_pcIBCLICRecLeftTemplate[MAX_NUM_COMPONENT];
+  Pel* m_pcIBCLICRecAboveTemplate[MAX_NUM_COMPONENT];
+#endif
+
+  Pel* m_curLICRefLeftTemplate[2][MAX_NUM_COMPONENT];
+  Pel* m_curLICRefAboveTemplate[2][MAX_NUM_COMPONENT];
+  Pel* m_curLICRecLeftTemplate[MAX_NUM_COMPONENT];
+  Pel* m_curLICRecAboveTemplate[MAX_NUM_COMPONENT];
+
+  int  m_numTemplate[MAX_NUM_COMPONENT][2];
+  int  m_shift[2][3], m_scale[2][3], m_offset[2][3];
+  bool m_fillLicTpl[MAX_NUM_COMPONENT];
+#else
   Pel* m_pcLICRefLeftTemplate;
   Pel* m_pcLICRefAboveTemplate;
   Pel* m_pcLICRecLeftTemplate;
   Pel* m_pcLICRecAboveTemplate;
+#endif
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
   // buffer size for left/above current templates
@@ -116,6 +144,9 @@ private:
   Pel* m_pcRefTplAbove;
 #endif
 #if TM_AMVP
+#if JVET_AD0213_LIC_IMP
+public:
+#endif
   AMVPInfo m_tplAmvpInfo[NUM_IMV_MODES][NUM_REF_PIC_LIST_01][MAX_NUM_REF];
 #if INTER_LIC
   AMVPInfo m_tplAmvpInfoLIC[NUM_IMV_MODES][NUM_REF_PIC_LIST_01][MAX_NUM_REF];
@@ -661,11 +692,21 @@ public:
 #endif
                            PredictionUnit& pu, RefPicList eRefList, int refIdx, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3);
 #if JVET_AA0146_WRAP_AROUND_FIX
-  Distortion xGetSublkTemplateCost(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight,
+#if JVET_AD0213_LIC_IMP
+  void xGetSublkTemplateCost(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight,
     const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, bool wrapRef = false);
 #else
   Distortion xGetSublkTemplateCost(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight,
+    const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, bool wrapRef = false);
+#endif
+#else
+#if JVET_AD0213_LIC_IMP
+  void xGetSublkTemplateCost(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight,
     const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate);
+#else
+  Distortion xGetSublkTemplateCost(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight,
+    const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate);
+#endif
 #endif
   int deriveMVSDIdxFromMVDAffine(PredictionUnit& pu, RefPicList eRefList, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3);
   void deriveMVDFromMVSDIdxAffine(PredictionUnit& pu, RefPicList eRefList, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3);
@@ -733,6 +774,9 @@ public:
 #else
   void    getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft);
 #endif
+#if JVET_AD0213_LIC_IMP
+  void    getBlkAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft, int8_t posList0 = -1, int8_t posList1 = -1, bool load0 = false, bool load1 = false);
+#endif
 #endif
 #if JVET_W0090_ARMC_TM
   void    adjustAffineMergeCandidates(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, int mrgCandIdx = -1
@@ -763,6 +807,13 @@ public:
     int8_t posList0 = -1, int8_t posList1 = -1, bool loadSave0 = false, bool loadSave1 = false);
 #else
   void    getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft);
+#endif
+#if JVET_AD0213_LIC_IMP
+  void    getAffAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft,
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+    bool isBilinear, AffineMergeCtx affMrgCtx,
+#endif
+    int8_t posList0 = -1, int8_t posList1 = -1, bool loadSave0 = false, bool loadSave1 = false);
 #endif
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
   void adjustMergeCandidates(PredictionUnit& pu, MergeCtx& smvpMergeCandCtx, int numRetrievedMergeCand);
@@ -855,7 +906,13 @@ public:
   void xGetSublkTemplate   (const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate);
   void xLocalIlluComp      (const PredictionUnit& pu, const ComponentID compID, const Picture& refPic, const Mv& mv, const bool biPred, PelBuf& dstBuf);
 #endif
-
+#if JVET_AD0213_LIC_IMP
+  void xGetSublkTemplateAndRef(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, bool recSample, bool refSample);
+  void xLicRemHighFreq(const CodingUnit& cu, int compID, int licIdx);
+  void setLicParam(int refList, int compID, int& licScale, int& licOffset) { licScale = m_scale[refList][compID]; licOffset = m_offset[refList][compID]; }
+  void resetFillLicTpl() { m_fillLicTpl[COMPONENT_Y] = m_fillLicTpl[COMPONENT_Cb] = m_fillLicTpl[COMPONENT_Cr] = false; }
+  void xLicCompAdj(const PredictionUnit& pu, PelUnitBuf& pcYuvPred, const bool lumaOnly, const bool chromaOnly);
+#endif
   template <bool trueAfalseL>
   void xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -880,6 +937,14 @@ public:
 #endif
 #endif
   Distortion deriveTMMv         (const PredictionUnit& pu, bool fillCurTpl, Distortion curBestCost, RefPicList eRefList, int refIdx, int maxSearchRounds, Mv& mv, const MvField* otherMvf = nullptr);
+#if JVET_AD0213_LIC_IMP
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  template <int tplSize>
+  void       deriveTemplateLIC(TplMatchingCtrl& tplCtrl, RefPicList eRefList);
+#else
+  void       deriveTemplateLIC(TplMatchingCtrl& tplCtrl, RefPicList eRefList);
+#endif
+#endif
 #endif // TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 #if TM_AMVP
   void       clearTplAmvpBuffer ();
@@ -955,8 +1020,13 @@ private:
   Mv*       m_bdmvrSubPuMvBuf[2];
 #if JVET_X0083_BM_AMVP_MERGE_MODE
 public:
+#if JVET_AD0213_LIC_IMP
+  void      getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvFieldAmListCommon, bool* licAmListCommon, const int decAmvpRefIdx = -1);
+  void      amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvFieldAmListCommon, bool* licAmListCommon, const int mvFieldMergeIdx, const int mvFieldAmvpIdx);
+#else
   void      getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvFieldAmListCommon, const int decAmvpRefIdx = -1);
   void      amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvFieldAmListCommon, const int mvFieldMergeIdx, const int mvFieldAmvpIdx);
+#endif
 #endif
 #if JVET_AC0144_AFFINE_DMVR_REGRESSION
   void bmAffineInit(const PredictionUnit &pu);
@@ -1058,7 +1128,9 @@ class TplMatchingCtrl
     TMSEARCH_CROSS,
     TMSEARCH_NUMBER_OF_METHODS
   };
-
+#if JVET_AD0213_LIC_IMP
+public:
+#endif
   const CodingUnit&         m_cu;
   const PredictionUnit&     m_pu;
         InterPredResources& m_interRes;
@@ -1120,7 +1192,9 @@ public:
 
   template <int tplSize> void deriveMvUni    ();
   template <int tplSize> void removeHighFreq (const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight);
-
+#if JVET_AD0213_LIC_IMP
+  template <int tplSize> void removeHighFreqLIC(const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight, int shift, int scale, int offset);
+#endif
 private:
   template <int tplSize, bool trueAfalseL>         bool       xFillCurTemplate   (Pel* tpl);
   template <int tplSize, bool trueAfalseL, int sr> PelBuf     xGetRefTemplate    (const PredictionUnit& curPu, const Picture& refPic, const Mv& _mv, PelBuf& dstBuf);
@@ -1130,6 +1204,9 @@ private:
   template <int tplSize, bool trueAfalseL>         PelBuf     xGetRefTemplateBvd (const PredictionUnit& curPu, const Picture& refPic, const Mv& _mv, PelBuf& dstBuf);
 #endif
   template <int tplSize, bool trueAfalseL>         void       xRemoveHighFreq    (const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight);
+#if JVET_AD0213_LIC_IMP
+  template <int tplSize, bool trueAfalseL>         void       xRemoveHighFreqLIC(const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight, int shift, int scale, int offet);
+#endif
   template <int tplSize, int searchPattern>         void       xRefineMvSearch    (int maxSearchRounds, int searchStepShift);
 #if MULTI_PASS_DMVR
   template <int searchPattern>                      void       xNextTmCostAarray  (int bestDirect);
@@ -1150,7 +1227,11 @@ public:
 #else
   template <int tplSize, bool trueAfalseL>          Distortion xGetTempMatchError(const Mv& mv);
 #endif
-
+#if JVET_AD0213_LIC_IMP
+public:
+  template <int tplSize>                           Distortion xGetTempMatchLICError(const Mv& mv, int shift, int scale, int offset);
+  template <int tplSize, bool trueAfalseL>         Distortion xGetTempMatchLICError(const Mv& mv, int shift, int scale, int offset);
+#endif
 };
 #endif // TM_AMVP || TM_MRG
 
