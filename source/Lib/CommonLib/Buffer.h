@@ -72,6 +72,12 @@ struct PelBufferOps
   void ( *addAvg4 )       ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,            int shift, int offset, const ClpRng& clpRng );
   void ( *addAvg8 )       ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,            int shift, int offset, const ClpRng& clpRng );
 #endif
+#if JVET_AD0213_LIC_IMP
+  void(*toLast2)       (Pel* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng);
+  void(*toLast4)       (Pel* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng);
+  void(*licRemoveWeightHighFreq2) (Pel* src0, Pel* src1, Pel* dst, int length, int w0, int w1, int offset, const ClpRng& clpRng);
+  void(*licRemoveWeightHighFreq4) (Pel* src0, Pel* src1, Pel* dst, int length, int w0, int w1, int offset, const ClpRng& clpRng);
+#endif
   void ( *reco4 )         ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,                                   const ClpRng& clpRng );
   void ( *reco8 )         ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,                                   const ClpRng& clpRng );
   void ( *linTf4 )        ( const Pel* src0, int src0Stride,                                  Pel *dst, int dstStride, int width, int height, int scale, int shift, int offset, const ClpRng& clpRng, bool bClip );

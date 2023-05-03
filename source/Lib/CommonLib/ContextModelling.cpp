@@ -654,10 +654,12 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 
 #if INTER_LIC
   pu.cu->licFlag = pu.cs->slice->getUseLIC() ? licFlags[candIdx] : false;
+#if !JVET_AD0213_LIC_IMP
   if (pu.interDir == 3)
   {
     CHECK(pu.cu->licFlag, "LIC is not used with bi-prediction in merge");
   }
+#endif
 #endif
 }
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
@@ -792,6 +794,31 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
   }
 
   return false;
+}
+#endif
+#if JVET_AD0213_LIC_IMP
+void MergeCtx::initMrgCand(int cnt)
+{
+  bcwIdx[cnt] = BCW_DEFAULT;
+#if INTER_LIC
+  licFlags[cnt] = false;
+#endif
+#if JVET_AC0112_IBC_LIC
+  ibcLicFlags[cnt] = false;
+#endif
+#if JVET_AA0070_RRIBC
+  rribcFlipTypes[cnt] = 0;
+#endif
+  interDirNeighbours[cnt] = 0;
+  mvFieldNeighbours[(cnt << 1)].refIdx = NOT_VALID;
+  mvFieldNeighbours[(cnt << 1) + 1].refIdx = NOT_VALID;
+  useAltHpelIf[cnt] = false;
+#if MULTI_HYP_PRED
+  addHypNeighbours[cnt].clear();
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  candCost[cnt] = MAX_UINT64;
+#endif
 }
 #endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC

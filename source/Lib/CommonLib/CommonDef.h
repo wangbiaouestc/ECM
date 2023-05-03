@@ -938,6 +938,9 @@ static const int    NUM_AF_MMVD_SATD_CAND = std::min((int)1, MRG_MAX_NUM_CANDS);
 #if INTER_LIC
 static const int    LIC_MIN_CU_PIXELS =                            32; ///< smallest CU size (in terms of number of luma samples) of LIC
 static const double LIC_AMVP_SKIP_TH  =                           1.2; ///< Given a IMV mode, LIC is not tested if RD cost of non-LIC IMV AMVP mode is 1.2x worse than the current best RD cost
+#if JVET_AD0213_LIC_IMP
+static const int    NUM_LIC_ITERATION =                             3;
+#endif
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 static const int    TM_TPL_SIZE =                                   4; ///< template size for template matching

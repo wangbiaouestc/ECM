@@ -1259,7 +1259,7 @@ void CABACWriter::obmc_flag(const CodingUnit& cu)
 {
   //obmc is false
   if (!cu.cs->sps->getUseOBMC() || CU::isIBC(cu) || cu.predMode == MODE_INTRA
-#if INTER_LIC
+#if INTER_LIC && !JVET_AD0213_LIC_IMP
     || cu.licFlag
 #endif
     || cu.lwidth() * cu.lheight() < 32
@@ -5066,7 +5066,11 @@ void CABACWriter::refPairIdx(const PredictionUnit& pu)
 }
 #endif
 
+#if JVET_Z0054_BLK_REF_PIC_REORDER && JVET_AD0213_LIC_IMP
+void CABACWriter::ref_idx(const PredictionUnit& pu, RefPicList eRefList, bool forceRefIdx)
+#else
 void CABACWriter::ref_idx( const PredictionUnit& pu, RefPicList eRefList )
+#endif
 {
   if ( pu.cu->smvdMode )
   {
@@ -5074,6 +5078,9 @@ void CABACWriter::ref_idx( const PredictionUnit& pu, RefPicList eRefList )
     return;
   }
 #if JVET_Z0054_BLK_REF_PIC_REORDER
+#if JVET_AD0213_LIC_IMP
+  if (!forceRefIdx)
+#endif
   if (PU::useRefCombList(pu) || PU::useRefPairList(pu))
   {
     return;

@@ -974,6 +974,11 @@ protected:
 #if INTER_LIC
   unsigned    m_lic;
   bool        m_fastPicLevelLIC;
+#if JVET_AD0213_LIC_IMP
+  int         m_fastLIC;
+  bool        m_fastLICAffine;
+  bool        m_fastLICBcw;
+#endif
 #endif
 
 #if JVET_O0756_CALCULATE_HDRMETRICS
@@ -2542,6 +2547,14 @@ public:
   bool         getUseLIC()                                      const { return m_lic; }
   void         setFastPicLevelLIC( bool b )                           { m_fastPicLevelLIC = b; }
   bool         getFastPicLevelLIC()                             const { return m_fastPicLevelLIC; }
+#if JVET_AD0213_LIC_IMP
+  void        setFastLic( int b )                               { m_fastLIC = b; }
+  int         getFastLic()                                      const { return m_fastLIC; }
+  void        setFastLicAffine( bool b )                        { m_fastLICAffine = b; }
+  bool        getFastLicAffine()                                const { return m_fastLICAffine; }  
+  void        setFastLicBcw( bool b )                           { m_fastLICBcw = b; }
+  bool        getFastLicBcw()                                   const { return m_fastLICBcw; }
+#endif
 #endif
 
 #if JVET_O0756_CALCULATE_HDRMETRICS

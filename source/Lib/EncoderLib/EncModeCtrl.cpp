@@ -1292,6 +1292,9 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
 #if JVET_W0097_GPM_MMVD_TM
   cuECtx.set( BEST_GPM_COST,        MAX_DOUBLE * .5);
 #endif
+#if JVET_AD0213_LIC_IMP
+  cuECtx.set(BEST_LIC_COST,         MAX_DOUBLE * .5);
+#endif
   cuECtx.set( QT_BEFORE_BT,         qtBeforeBt );
   cuECtx.set( DID_QUAD_SPLIT,       false );
   cuECtx.set( IS_BEST_NOSPLIT_SKIP, false );
@@ -2001,6 +2004,12 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
       return false;
     }
 #endif
+#if JVET_AD0213_LIC_IMP
+    if (encTestmode.type == ETM_INTER_ME && (encTestmode.opts & ETO_LIC) && relatedCU.skipLIC)
+    {
+      return false;
+    }
+#endif
     return true;
   }
   else if( isModeSplit( encTestmode ) )
@@ -2286,6 +2295,27 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
             else if (gpmCost > bestCS->cost && (!cuECtx.bestTU->cbf[0] && !cuECtx.bestTU->cbf[1] && !cuECtx.bestTU->cbf[2]))
             {
               relatedCU.skipGPM = true;
+            }
+          }
+        }
+#endif
+#if JVET_AD0213_LIC_IMP
+        int fastLic = m_pcEncCfg->getFastLic();
+        if (fastLic)
+        {
+          double licCost = cuECtx.get<double>(BEST_LIC_COST);
+          int c1 = (fastLic & 0x03);
+          int c2 = (fastLic & 0x04);
+          double r = ((c1 == 0x01) ? 1.0 : ((c1 == 0x02) ? 1.1 : 1.2));
+          if (licCost != (MAX_DOUBLE * .5))
+          {
+            if (licCost > (bestCS->cost * r) && bestCU->skip)
+            {
+              relatedCU.skipLIC = true;
+            }
+            else if (c2 && licCost > (bestCS->cost * 1.1))
+            {
+              relatedCU.skipLIC = true;
             }
           }
         }
@@ -2606,6 +2636,15 @@ bool EncModeCtrlMTnoRQT::useModeResult( const EncTestMode& encTestmode, CodingSt
     if (tempCS->cost < cuECtx.get<double>(BEST_GPM_COST))
     {
       cuECtx.set(BEST_GPM_COST, tempCS->cost);
+    }
+  }
+#endif
+#if JVET_AD0213_LIC_IMP
+  if (encTestmode.type == ETM_INTER_ME && (encTestmode.opts & ETO_LIC))
+  {
+    if (tempCS->cost < cuECtx.get<double>(BEST_LIC_COST))
+    {
+      cuECtx.set(BEST_LIC_COST, tempCS->cost);
     }
   }
 #endif

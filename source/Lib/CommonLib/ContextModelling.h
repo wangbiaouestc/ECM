@@ -637,6 +637,9 @@ public:
   bool xCheckSimilarMotion2Lists(int mergeCandIndex, MergeCtx *mrgCtx, uint32_t mvdSimilarityThresh = 1) const;
 #endif
 #endif
+#if JVET_AD0213_LIC_IMP
+  void initMrgCand(int cnt);
+#endif
 #if JVET_Z0084_IBC_TM
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   bool xCheckSimilarIBCMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1, int compareNum = -1) const;

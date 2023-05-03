@@ -623,8 +623,14 @@ private:
 
 #if MULTI_HYP_PRED
   MergeCtx        m_geoMrgCtx;
+#if JVET_AD0213_LIC_IMP
+  int             m_mhpMrgTempBufSet;
+  PelUnitBuf      m_mhpMrgTempBuf[GEO_MAX_NUM_UNI_CANDS];
+  PelUnitBuf      m_mhpMrgTempBufLic[GEO_MAX_NUM_UNI_CANDS];
+#else
   bool            m_mhpMrgTempBufSet;
   PelUnitBuf      m_mhpMrgTempBuf[GEO_MAX_NUM_UNI_CANDS];
+#endif
   PelUnitBuf      m_mhpTempBuf[GEO_MAX_TRY_WEIGHTED_SAD];
   int             m_mhpTempBufCounter;
 #endif
@@ -638,6 +644,21 @@ private:
   uint32_t        m_estWeightIdxBits[BCW_NUM];
   BcwMotionParam  m_uniMotions;
   bool            m_affineModeSelected;
+#if JVET_AD0213_LIC_IMP
+  bool            m_doAffineLic;
+#if TM_AMVP
+  bool            updateMvNeeded;
+  bool            updateL1ZeroFlagMvNeeded;
+  bool            updateSMVDMvNeeded;
+  bool            isBDOFNotNeeded;
+  AMVPInfo        *amvpCand0;
+  AMVPInfo        *amvpCand1;
+  AMVPInfo        *amvpCand0Lic;
+  AMVPInfo        *amvpCand1Lic;
+  int             mvpIdx0;
+  int             mvpIdx1;
+#endif
+#endif
   std::unordered_map< Position, std::unordered_map< Size, BlkRecord> > m_ctuRecord;
 #if JVET_AA0070_RRIBC
   Distortion      minCostProj;
@@ -724,14 +745,25 @@ public:
 
 public:
 #if MULTI_HYP_PRED
+#if JVET_AD0213_LIC_IMP
+  void             initMHPTmpBuffer(PelStorage* mergeTmpBuffer, PelStorage* mergeTmpBuffer2, int maxNumMergeCandidates,
+#else
   void             initMHPTmpBuffer(PelStorage* mergeTmpBuffer, int maxNumMergeCandidates,
+#endif
     PelStorage* mhpTmpBuffer, int maxNumStoredMhpCandidates,
     const UnitArea localUnitArea)
   {
+#if JVET_AD0213_LIC_IMP
+    m_mhpMrgTempBufSet = 0;
+#else
     m_mhpMrgTempBufSet = false;
+#endif
     for (uint8_t mergeCand = 0; mergeCand < maxNumMergeCandidates; mergeCand++)
     {
       m_mhpMrgTempBuf[mergeCand] = mergeTmpBuffer[mergeCand].getBuf(localUnitArea);
+#if JVET_AD0213_LIC_IMP
+      m_mhpMrgTempBufLic[mergeCand] = mergeTmpBuffer2[mergeCand].getBuf(localUnitArea);
+#endif
     }
     for (uint8_t i = 0; i < maxNumStoredMhpCandidates; i++)
     {
@@ -739,6 +771,17 @@ public:
     }
     m_mhpTempBufCounter = 0;
   }
+#if JVET_AD0213_LIC_IMP
+  void             setGeoTmpBuffer(int setId)
+  {
+    m_mhpMrgTempBufSet = setId;
+  }
+  void             setGeoTmpBuffer(MergeCtx geoMrgCtx, int setId)
+  {
+    m_mhpMrgTempBufSet = setId;
+    m_geoMrgCtx = geoMrgCtx;
+  }
+#else
   void             setGeoTmpBuffer()
   {
     m_mhpMrgTempBufSet = true;
@@ -748,6 +791,7 @@ public:
     m_mhpMrgTempBufSet = true;
     m_geoMrgCtx = geoMrgCtx;
   }
+#endif
 #endif
 
   InterSearch();
@@ -795,6 +839,16 @@ public:
   void setBestCost(double cost) { m_globalBestLumaCost = cost; }
 #endif
   void setAffineModeSelected        ( bool flag) { m_affineModeSelected = flag; }
+#if JVET_AD0213_LIC_IMP
+  void setDoAffineLic               ( bool flag) { m_doAffineLic = flag; }
+#if TM_AMVP
+  void resetLicEncCtrlPara          ();
+  void setEncCtrlParaLicOff         ( CodingUnit& cu );
+  void setEncCtrlParaLicOn          ( CodingUnit& cu );
+  void checkEncLicOff               ( CodingUnit& cu, MergeCtx& mergeCtx );
+  void checkEncLicOn                ( CodingUnit& cu, MergeCtx& mergeCtx );
+#endif
+#endif
   void resetAffineMVList() { m_affMVListIdx = 0; m_affMVListSize = 0; }
   void savePrevAffMVInfo(int idx, AffineMVInfo &tmpMVInfo, bool& isSaved)
   {
@@ -1000,7 +1054,11 @@ public:
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   void predInterSearch(CodingUnit& cu, Partitioner& partitioner, bool& amvpMergeModeNotValid,
+#if JVET_AD0213_LIC_IMP
+      MvField* mvFieldAmListCommon = nullptr, bool* licAmListCommon = nullptr, Mv* mvBufEncAmBDMVR_L0 = nullptr, Mv* mvBufEncAmBDMVR_L1 = nullptr);
+#else
       MvField* mvFieldAmListCommon = nullptr, Mv* mvBufEncAmBDMVR_L0 = nullptr, Mv* mvBufEncAmBDMVR_L1 = nullptr);
+#endif
 #else
   void predInterSearch(CodingUnit& cu, Partitioner& partitioner );
 #endif
@@ -1457,7 +1515,9 @@ public:
 #endif
   uint64_t xGetSymbolFracBitsInter  (CodingStructure &cs, Partitioner &partitioner);
   uint64_t xCalcPuMeBits            (PredictionUnit& pu);
-
+#if JVET_AD0213_LIC_IMP
+  uint64_t xCalcExpPuBits           (PredictionUnit& pu);
+#endif
 };// END CLASS DEFINITION EncSearch
 
 //! \}

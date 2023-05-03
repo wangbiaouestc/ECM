@@ -402,6 +402,10 @@ struct CodingUnit : public UnitArea
 #endif
 #if INTER_LIC
   bool           licFlag;
+#if JVET_AD0213_LIC_IMP
+  int            licScale[2][3];
+  int            licOffset[2][3];
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   bool           ibcLicFlag;

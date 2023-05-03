@@ -1334,6 +1334,65 @@ void EncApp::xInitLibCfg()
 #if INTER_LIC
   m_cEncLib.setUseLIC                                            ( m_lic );
   m_cEncLib.setFastPicLevelLIC                                   ( m_lic ? m_fastPicLevelLIC : false );
+#if JVET_AD0213_LIC_IMP
+  m_cEncLib.setFastLic(0x00);
+  m_cEncLib.setFastLicAffine(false);
+  m_cEncLib.setFastLicBcw(false);
+  int picSize = m_cEncLib.getSourceWidth() * m_cEncLib.getSourceHeight();
+  if (m_cEncLib.getIntraPeriod() > 1)
+  {
+    if (picSize >= (1280 * 720))
+    {
+      m_cEncLib.setFastLic(0x01);
+    }
+    else if (picSize >= (832 * 480))
+    {
+      m_cEncLib.setFastLic(0x02);
+      if (m_cEncLib.getTMToolsEnableFlag())
+      {
+        m_cEncLib.setFastLicBcw(true);
+      }
+    }
+    else if (picSize >= (416 * 240))
+    {
+      m_cEncLib.setFastLic(0x03);
+    }
+    if (picSize < (3840 * 2160))
+    {
+      m_cEncLib.setFastLicAffine(true);
+    }
+    else
+    {
+      if (m_cEncLib.getTMToolsEnableFlag())
+      {
+        m_cEncLib.setFastLicBcw(true);
+      }
+    }
+  }
+  else if (m_cEncLib.getIntraPeriod() < 0)
+  {
+    if (picSize >= (1920 * 1080))
+    {
+      m_cEncLib.setFastLic(0x01);
+    }
+    else if (picSize >= (1280 * 720))
+    {
+      m_cEncLib.setFastLic(0x02);
+    }
+    else if (picSize >= (416 * 240))
+    {
+      m_cEncLib.setFastLic(0x03);
+    }
+    if (!m_cEncLib.getIBCMode())
+    {
+      m_cEncLib.setFastLic(m_cEncLib.getFastLic() + 0x04);
+    }
+    if (picSize >= (832 * 480) && picSize <= (1280 * 720))
+    {
+      m_cEncLib.setFastLicAffine(true);
+    }
+  }
+#endif
 #endif
 #if DUMP_BEFORE_INLOOP
   m_cEncLib.setDumpBeforeInloop                                  ( m_dumpBeforeInloop );

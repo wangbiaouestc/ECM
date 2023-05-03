@@ -1856,7 +1856,7 @@ void CABACReader::cu_bcw_flag(CodingUnit& cu)
 void CABACReader::obmc_flag(CodingUnit& cu)
 {
   if (!cu.cs->sps->getUseOBMC() || CU::isIBC(cu) || cu.predMode == MODE_INTRA
-#if INTER_LIC
+#if INTER_LIC && !JVET_AD0213_LIC_IMP
     || cu.licFlag
 #endif
     || cu.lwidth() * cu.lheight() < 32
