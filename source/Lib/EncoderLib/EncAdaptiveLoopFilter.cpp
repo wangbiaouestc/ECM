@@ -479,6 +479,32 @@ void EncAdaptiveLoopFilter::create( const EncCfg* encCfg, const int picWidth, co
   CHECK( encCfg == nullptr, "encCfg must not be null" );
   m_encCfg = encCfg;
 
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  if( encCfg->getIntraPeriod() == 1 )   // all intra
+  {
+    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI_DIRECT] = true;
+    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI] = false;
+#if JVET_AD0222_ALF_RESI_CLASS
+    m_enableLessClip = false;
+#endif
+  }
+  else if( encCfg->getIntraPeriod() > 1 )   // random access
+  {
+    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI_DIRECT] = false;
+    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI] = true;
+#if JVET_AD0222_ALF_RESI_CLASS
+    m_enableLessClip = true;
+#endif
+  }
+  else if( encCfg->getIntraPeriod() == -1 )   // low delay
+  {
+    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI_DIRECT] = false;
+    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI] = true;
+#if JVET_AD0222_ALF_RESI_CLASS
+    m_enableLessClip = true;
+#endif
+  }
+#endif
 
   for( int channelIdx = 0; channelIdx < MAX_NUM_CHANNEL_TYPE; channelIdx++ )
   {
@@ -1141,32 +1167,6 @@ void EncAdaptiveLoopFilter::ALFProcess( CodingStructure& cs, const double *lambd
 #endif
 )
 {
-#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
-  if (intraPeriod == 1)   // all intra
-  {
-    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI_DIRECT] = true;
-    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI]        = false;
-#if JVET_AD0222_ALF_RESI_CLASS
-    m_enableLessClip = false;
-#endif
-  }
-  else if (intraPeriod > 1)   // random access
-  {
-    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI_DIRECT] = false;
-    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI]        = true;
-#if JVET_AD0222_ALF_RESI_CLASS
-    m_enableLessClip = true;
-#endif
-  }
-  else if (intraPeriod == -1)   // low delay
-  {
-    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI_DIRECT] = false;
-    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI]        = true;
-#if JVET_AD0222_ALF_RESI_CLASS
-    m_enableLessClip = true;
-#endif
-  }
-#endif
   int layerIdx = cs.vps == nullptr ? 0 : cs.vps->getGeneralLayerIdx( cs.slice->getPic()->layerId );
 
   // IRAP AU is assumed
