@@ -614,6 +614,24 @@ const TFilterCoeff DownsamplingFilterSRC[8][16][12] =
       {   0,   0,   0,   0,  -2,   7, 127,  -6,   2,   0,   0,   0 }
     },
     { // D = 1.5
+#if AD0169_SMALL_SCALE_DOWNSAMPLING
+      {   0,   0,   4, -14,  27,  94,  27, -14,   4,   0,   0,   0 },
+      {   0,   0,   4, -13,  21,  94,  32, -14,   3,   1,   0,   0 },
+      {   0,   0,   4, -12,  16,  93,  39, -15,   3,   1,  -1,   0 },
+      {   0,   0,   4, -11,  11,  92,  45, -15,   2,   1,  -1,   0 },
+      {   0,  -1,   4, -10,   7,  89,  51, -14,   1,   2,  -1,   0 },
+      {   0,  -1,   4,  -8,   2,  86,  57, -13,   0,   2,  -1,   0 },
+      {   0,  -1,   4,  -7,  -1,  82,  63, -12,  -1,   2,  -1,   0 },
+      {   0,  -1,   4,  -5,  -5,  78,  68, -10,  -3,   3,  -1,   0 },
+      {   0,  -1,   3,  -4,  -8,  74,  74,  -8,  -4,   3,  -1,   0 },
+      {   0,  -1,   3,  -3, -10,  68,  78,  -5,  -5,   4,  -1,   0 },
+      {   0,  -1,   2,  -1, -12,  63,  82,  -1,  -7,   4,  -1,   0 },
+      {   0,  -1,   2,   0, -13,  57,  86,   2,  -8,   4,  -1,   0 },
+      {   0,  -1,   2,   1, -14,  51,  89,   7, -10,   4,  -1,   0 },
+      {   0,  -1,   1,   2, -15,  45,  92,  11, -11,   4,   0,   0 },
+      {   0,  -1,   1,   3, -15,  39,  93,  16, -12,   4,   0,   0 },
+      {   0,   0,   1,   3, -14,  32,  94,  21, -13,   4,   0,   0 }
+#else
       {   0,   2,   0, -14,  33,  86,  33, -14,   0,   2,   0,   0 },
       {   0,   1,   1, -14,  29,  85,  38, -13,  -1,   2,   0,   0 },
       {   0,   1,   2, -14,  24,  84,  43, -12,  -2,   2,   0,   0 },
@@ -630,6 +648,7 @@ const TFilterCoeff DownsamplingFilterSRC[8][16][12] =
       {   0,   0,   2,  -3, -11,  48,  83,  19, -13,   2,   1,   0 },
       {   0,   0,   2,  -2, -12,  43,  84,  24, -14,   2,   1,   0 },
       {   0,   0,   2,  -1, -13,  38,  85,  29, -14,   1,   1,   0 }
+#endif
     },
     { // D = 2
       {   0,   5,   -6,  -10,  37,  76,   37,  -10,  -6,    5,  0,   0}, //0
@@ -878,11 +897,19 @@ void Picture::sampleRateConv( const std::pair<int, int> scalingRatio, const std:
     {
       horFilter = 3;
     }
+#if AD0169_SMALL_SCALE_DOWNSAMPLING
+    else if (scalingRatio.first > (27 << SCALE_RATIO_BITS) / 20)
+#else
     else if (scalingRatio.first > (5 << SCALE_RATIO_BITS) / 4)
+#endif
     {
       horFilter = 2;
     }
+#if AD0169_SMALL_SCALE_DOWNSAMPLING
+    else if (scalingRatio.first > (11 << SCALE_RATIO_BITS) / 10)
+#else
     else if (scalingRatio.first > (20 << SCALE_RATIO_BITS) / 19)
+#endif
     {
       horFilter = 1;
     }
@@ -907,11 +934,19 @@ void Picture::sampleRateConv( const std::pair<int, int> scalingRatio, const std:
     {
       verFilter = 3;
     }
+#if AD0169_SMALL_SCALE_DOWNSAMPLING
+    else if (scalingRatio.second > (27 << SCALE_RATIO_BITS) / 20)
+#else
     else if (scalingRatio.second > (5 << SCALE_RATIO_BITS) / 4)
+#endif
     {
       verFilter = 2;
     }
+#if AD0169_SMALL_SCALE_DOWNSAMPLING
+    else if (scalingRatio.second > (11 << SCALE_RATIO_BITS) / 10)
+#else
     else if (scalingRatio.second > (20 << SCALE_RATIO_BITS) / 19)
+#endif
     {
       verFilter = 1;
     }
