@@ -767,7 +767,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #endif
         // this should always be true
         CHECK(!pu.Y().valid(), "PU is not valid");
-#if !JVET_AB0157_TMRL
+#if !JVET_AB0157_TMRL || JVET_AD0082_TMRL_CONFIG
         bool isFirstLineOfCtu     = (((pu.block(COMPONENT_Y).y) & ((pu.cs->sps)->getMaxCUWidth() - 1)) == 0);
 #if JVET_Y0116_EXTENDED_MRL_LIST
         int  numOfPassesExtendRef = MRL_NUM_REF_LINES;
@@ -1173,7 +1173,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               m_ispCandListHor = uiRdModeList;
             }
 
-#if !JVET_AB0157_TMRL
+#if !JVET_AB0157_TMRL || JVET_AD0082_TMRL_CONFIG
             pu.multiRefIdx    = 1;
 #if SECONDARY_MPM
             const int numMPMs = NUM_PRIMARY_MOST_PROBABLE_MODES;
@@ -1187,9 +1187,14 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #endif
 #endif
 #if JVET_AB0157_TMRL
+#if !JVET_AD0082_TMRL_CONFIG
             cu.tmrlFlag = true;
+#endif
             if (CU::allowTmrl(cu))
             {
+#if JVET_AD0082_TMRL_CONFIG
+              cu.tmrlFlag = true;
+#endif
               for (auto multiRefIdx : EXT_REF_LINE_IDX)
               {
                 pu.multiRefIdx = multiRefIdx;
@@ -1258,8 +1263,16 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #endif
                 }
               }
+#if JVET_AD0082_TMRL_CONFIG
+              cu.tmrlFlag = false;
+#endif
             }
-#else
+#endif
+#if !JVET_AB0157_TMRL || JVET_AD0082_TMRL_CONFIG
+#if JVET_AD0082_TMRL_CONFIG
+            else
+            {
+#endif
             for (int mRefNum = 1; mRefNum < numOfPassesExtendRef; mRefNum++)
             {
               int multiRefIdx = MULTI_REF_LINE_IDX[mRefNum];
@@ -1324,6 +1337,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                 }
               }
             }
+#if JVET_AD0082_TMRL_CONFIG
+            }
+#endif
 #endif
             CHECKD(uiRdModeList.size() != numModesForFullRD, "Error: RD mode list size");
 

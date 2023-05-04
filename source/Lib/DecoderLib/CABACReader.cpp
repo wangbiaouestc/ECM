@@ -2048,7 +2048,20 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
     return;
   }
 #endif
-
+#if JVET_AD0082_TMRL_CONFIG
+  if (CU::allowTmrl(cu))
+  {
+    cuTmrlFlag(cu);
+    if (cu.tmrlFlag)
+    {
+      return;
+    }
+  }
+  else
+  {
+    extend_ref_line(cu);
+  }
+#else
 #if JVET_AB0157_TMRL
   cuTmrlFlag(cu);
   if (cu.tmrlFlag)
@@ -2057,6 +2070,7 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
   }
 #else
   extend_ref_line( cu );
+#endif
 #endif
   isp_mode( cu );
 #if ENABLE_DIMD
@@ -7998,6 +8012,7 @@ void CABACReader::amvpMerge_mode( PredictionUnit& pu )
 #if JVET_AB0157_TMRL
 void CABACReader::cuTmrlFlag(CodingUnit& cu)
 {
+#if !JVET_AD0082_TMRL_CONFIG
   if (!CU::allowTmrl(cu))
   {
     cu.firstPU->multiRefIdx = 0;
@@ -8021,6 +8036,7 @@ void CABACReader::cuTmrlFlag(CodingUnit& cu)
   }
   else
   {
+#endif
 #endif
     int ctxId = 0;
     cu.tmrlFlag = bool(m_BinDecoder.decodeBin(Ctx::TmrlDerive(ctxId++)));
@@ -8048,8 +8064,10 @@ void CABACReader::cuTmrlFlag(CodingUnit& cu)
     {
       cu.tmrlListIdx = 0;
     }
+#if !JVET_AD0082_TMRL_CONFIG
 #if JVET_W0123_TIMD_FUSION
   }
+#endif
 #endif
 }
 #endif

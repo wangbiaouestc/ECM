@@ -434,6 +434,10 @@ void EncApp::xInitLibCfg()
     m_cEncLib.setNoSgpmConstraintFlag(m_noSgpmConstraintFlag);
     CHECK(m_noSgpmConstraintFlag && m_sgpm, "SGPM shall be deactivated when m_noSgpmConstraintFlag is equal to 1");
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+    m_cEncLib.setNoTmrlConstraintFlag(m_noTmrlConstraintFlag);
+    CHECK(m_noTmrlConstraintFlag && m_tmrl, "TMRL shall be deactivated when m_noTmrlConstraintFlag is equal to 1");
+#endif
 #if ENABLE_OBMC
     m_cEncLib.setNoObmcConstraintFlag(m_noObmcConstraintFlag);
     CHECK(m_noObmcConstraintFlag && m_OBMC, "OBMC shall be deactivated when m_noObmcConstraintFlag is equal to 1");
@@ -573,6 +577,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AB0155_SGPM
     m_cEncLib.setNoSgpmConstraintFlag(false);
+#endif
+#if JVET_AD0082_TMRL_CONFIG
+    m_cEncLib.setNoTmrlConstraintFlag(false);
 #endif
 #if ENABLE_OBMC
     m_cEncLib.setNoObmcConstraintFlag(false);
@@ -883,6 +890,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AC0189_SGPM_NO_BLENDING
   m_cEncLib.setUseSgpmNoBlend                                    ( m_sgpmNoBlend );
 #endif
+#endif
+#if JVET_AD0082_TMRL_CONFIG
+  m_cEncLib.setUseTmrl                                           ( m_tmrl );
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   m_cEncLib.setUseCccm                                           ( m_cccm );

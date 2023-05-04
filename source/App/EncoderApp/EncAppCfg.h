@@ -211,6 +211,9 @@ protected:
 #if JVET_AB0155_SGPM
   bool      m_noSgpmConstraintFlag;
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  bool      m_noTmrlConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool      m_noObmcConstraintFlag;
 #endif
@@ -465,6 +468,9 @@ protected:
 #if JVET_AC0189_SGPM_NO_BLENDING
   bool      m_sgpmNoBlend;
 #endif
+#endif
+#if JVET_AD0082_TMRL_CONFIG
+  bool      m_tmrl;
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int       m_cccm;
