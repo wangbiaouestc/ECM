@@ -4926,7 +4926,7 @@ void AdaptiveLoopFilter::deriveFixedFilterResultsCtuBoundary(AlfClassifier **cla
 #if JVET_AD0222_ALF_LONG_FIXFILTER
       for( int y = 0; y < padSize; y++ )
       {
-        yPosTmp = yPos + padSize + height + 0;
+        yPosTmp = yPos + padSize + height + y;
         for( int x = 0; x < padSize; x++ )
         {
           fixedFilterResults[filterSetIdx][yPosTmp][xPos + padSize + width + x] = fixedFilterResults[filterSetIdx][yPosTmp][xPos + padSize + width - 1 - x];
