@@ -1523,6 +1523,20 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
     return;
   }
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  if (CU::allowTmrl(cu))
+  {
+    cuTmrlFlag(cu);
+    if (cu.tmrlFlag)
+    {
+      return;
+    }
+  }
+  else
+  {
+    extend_ref_line(cu);
+  }
+#else
 #if JVET_AB0157_TMRL
   cuTmrlFlag(cu);
   if (cu.tmrlFlag)
@@ -1531,6 +1545,7 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
   }
 #else
   extend_ref_line( cu );
+#endif
 #endif
   isp_mode( cu );
 #if ENABLE_DIMD
@@ -1768,6 +1783,20 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
     return;
   }
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  if (CU::allowTmrl(*pu.cu))
+  {
+    cuTmrlFlag(*pu.cu);
+    if (pu.cu->tmrlFlag)
+    {
+      return;
+    }
+  }
+  else
+  {
+    extend_ref_line(pu);
+  }
+#else
 #if JVET_AB0157_TMRL
   cuTmrlFlag(*pu.cu);
   if (pu.cu->tmrlFlag)
@@ -1776,6 +1805,7 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
   }
 #else
   extend_ref_line( pu );
+#endif
 #endif
   isp_mode( *pu.cu );
 #if ENABLE_DIMD
@@ -8023,11 +8053,14 @@ void CABACWriter::amvpMerge_mode( const PredictionUnit& pu )
 #if JVET_AB0157_TMRL
 void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
 {
+#if !JVET_AD0082_TMRL_CONFIG
   if (!CU::allowTmrl(cu))
   {
     return;
   }
+#endif
   const PredictionUnit* pu = cu.firstPU;
+#if !JVET_AD0082_TMRL_CONFIG
 #if JVET_W0123_TIMD_FUSION
   if (cu.timd)
   {
@@ -8043,6 +8076,7 @@ void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
   }
   else
   {
+#endif
 #endif
     int ctxId = 0;
     m_BinEncoder.encodeBin(cu.tmrlFlag, Ctx::TmrlDerive(ctxId++));
@@ -8070,8 +8104,10 @@ void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
       CHECK(pu->multiRefIdx, "?");
     }
     DTRACE(g_trace_ctx, D_SYNTAX, "cu_tmrl_flag() ctx=%d pos=(%d,%d) tmrl=%d\n", 0, cu.lumaPos().x, cu.lumaPos().y, cu.tmrlFlag);
+#if !JVET_AD0082_TMRL_CONFIG
 #if JVET_W0123_TIMD_FUSION
   }
+#endif
 #endif
 }
 #endif

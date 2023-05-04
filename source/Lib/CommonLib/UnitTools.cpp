@@ -18934,7 +18934,12 @@ bool storeContexts( const Slice* slice, const int ctuXPosInCtus, const int ctuYP
 bool CU::allowTmrl(const CodingUnit& cu)
 {
   bool bReorder = true;
-  if (!cu.Y().valid() || cu.predMode != MODE_INTRA || !isLuma(cu.chType) || cu.bdpcmMode || !cu.cs->sps->getUseMRL()
+  if (!cu.Y().valid() || cu.predMode != MODE_INTRA || !isLuma(cu.chType) || cu.bdpcmMode
+#if JVET_AD0082_TMRL_CONFIG
+    || !cu.cs->sps->getUseTmrl() || MRL_NUM_REF_LINES <= 2 || cu.timd
+#else
+    || !cu.cs->sps->getUseMRL()
+#endif
 #if ENABLE_DIMD
     || cu.dimd
 #endif
@@ -18942,6 +18947,7 @@ bool CU::allowTmrl(const CodingUnit& cu)
   {
     bReorder = false;
   }
+
   bool isFirstLineOfCtu = (((cu.block(COMPONENT_Y).y) & ((cu.cs->sps)->getMaxCUWidth() - 1)) == 0);
   if (isFirstLineOfCtu)
   {

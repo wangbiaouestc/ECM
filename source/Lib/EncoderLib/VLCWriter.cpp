@@ -1602,6 +1602,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AB0155_SGPM
   WRITE_FLAG(pcSPS->getUseSgpm() ? 1 : 0, "sps_sgpm_enabled_flag");
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  WRITE_FLAG(pcSPS->getUseTmrl() ? 1 : 0, "sps_tmrl_enabled_flag");
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   WRITE_UVLC(pcSPS->getUseCccm() , "sps_cccm_cand");
 #endif
@@ -3336,7 +3339,9 @@ void  HLSWriter::codeConstraintInfo  ( const ConstraintInfo* cinfo )
 #if JVET_AB0155_SGPM
     WRITE_FLAG(cinfo->getNoSgpmConstraintFlag() ? 1 : 0, "gci_no_sgpm_constraint_flag");
 #endif
-
+#if JVET_AD0082_TMRL_CONFIG
+    WRITE_FLAG(cinfo->getNoTmrlConstraintFlag() ? 1 : 0, "gci_no_tmrl_constraint_flag");
+#endif
     /* inter */
     WRITE_FLAG(cinfo->getNoRprConstraintFlag() ? 1 : 0, "gci_no_ref_pic_resampling_constraint_flag");
     WRITE_FLAG(cinfo->getNoResChangeInClvsConstraintFlag() ? 1 : 0, "gci_no_res_change_in_clvs_constraint_flag");

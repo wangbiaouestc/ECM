@@ -328,6 +328,9 @@ class ConstraintInfo
 #if JVET_AB0155_SGPM
   bool              m_noSgpmConstraintFlag;
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  bool              m_noTmrlConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool              m_noObmcConstraintFlag;
 #endif
@@ -641,6 +644,10 @@ public:
 #if JVET_AB0155_SGPM
   bool          getNoSgpmConstraintFlag() const { return m_noSgpmConstraintFlag; }
   void          setNoSgpmConstraintFlag(bool bVal) { m_noSgpmConstraintFlag = bVal; }
+#endif
+#if JVET_AD0082_TMRL_CONFIG
+  bool          getNoTmrlConstraintFlag() const { return m_noTmrlConstraintFlag; }
+  void          setNoTmrlConstraintFlag(bool bVal) { m_noTmrlConstraintFlag = bVal; }
 #endif
 #if ENABLE_OBMC
   bool          getNoObmcConstraintFlag() const { return m_noObmcConstraintFlag; }
@@ -1751,6 +1758,9 @@ private:
 #if JVET_AB0155_SGPM
   bool              m_sgpm;
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  bool              m_tmrl;
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int               m_cccm;
 #endif
@@ -2354,6 +2364,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AB0155_SGPM
   void      setUseSgpm         (bool b)                                          { m_sgpm = b; }
   bool      getUseSgpm         ()                                      const     { return m_sgpm; }
+#endif
+#if JVET_AD0082_TMRL_CONFIG
+  void      setUseTmrl         (bool b)                                          { m_tmrl = b; }
+  bool      getUseTmrl         ()                                      const     { return m_tmrl; }
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   void      setUseCccm( int i )                                                  { m_cccm = i; }

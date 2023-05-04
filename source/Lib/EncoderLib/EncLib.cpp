@@ -1636,6 +1636,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AB0155_SGPM
   cinfo->setNoSgpmConstraintFlag(m_noSgpmConstraintFlag);
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  cinfo->setNoTmrlConstraintFlag(m_noTmrlConstraintFlag);
+#endif
 #if ENABLE_OBMC
   cinfo->setNoObmcConstraintFlag(m_noObmcConstraintFlag);
 #endif
@@ -1841,6 +1844,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AB0155_SGPM
   sps.setUseSgpm            ( m_sgpm );
+#endif
+#if JVET_AD0082_TMRL_CONFIG
+  sps.setUseTmrl            ( m_tmrl );
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   sps.setUseCccm            ( m_cccm );
