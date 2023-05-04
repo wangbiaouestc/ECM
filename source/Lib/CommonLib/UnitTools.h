@@ -154,6 +154,9 @@ namespace CU
 // PU tools
 namespace PU
 {
+#if JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS
+  int getMeanValue(int sum, int div);
+#endif
   int  getLMSymbolList(const PredictionUnit &pu, int *modeList);
 #if SECONDARY_MPM
   int getIntraMPMs(const PredictionUnit &pu, uint8_t *mpm, uint8_t* non_mpm

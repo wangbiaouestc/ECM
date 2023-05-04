@@ -9773,7 +9773,11 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
   }
   
 #if JVET_Z0050_CCLM_SLOPE
+#if JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS
+  cclmModel.midLuma = numPels ? PU::getMeanValue( sumLuma + (numPels >> 1), numPels ) : 1 << (uiInternalBitDepth - 1);
+#else
   cclmModel.midLuma = numPels ? ( sumLuma + numPels/2 ) / numPels : 1 << (uiInternalBitDepth - 1);
+#endif
 #endif
 
   if ((curChromaMode == MDLM_L_IDX) || (curChromaMode == MDLM_T_IDX))
@@ -9886,8 +9890,13 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
       }
     }
 
+#if JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS
+    cclmModel.midLuma  = numPels0 ? PU::getMeanValue( sumLuma0 + (numPels0 >> 1), numPels0 ) : mean;
+    cclmModel.midLuma2 = numPels1 ? PU::getMeanValue( sumLuma1 + (numPels1 >> 1), numPels1 ) : mean;
+#else
     cclmModel.midLuma  = numPels0 ? ( sumLuma0 + numPels0/2 ) / numPels0 : mean;
     cclmModel.midLuma2 = numPels1 ? ( sumLuma1 + numPels1/2 ) / numPels1 : mean;
+#endif
 #endif
 
     return;
@@ -12739,7 +12748,11 @@ int IntraPrediction::xCflmCalcRefAver(const PredictionUnit& pu, const CompArea& 
     }
   }
 
+#if JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS
+  return numSamples == 0 ? 512 : PU::getMeanValue( sumSamples + (numSamples >> 1), numSamples);
+#else
   return numSamples == 0 ? 512 : (sumSamples + numSamples / 2) / numSamples;
+#endif
 }
 #endif
 
