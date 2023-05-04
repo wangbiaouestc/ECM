@@ -433,6 +433,106 @@ void addAvg_SSE( const int16_t* src0, int src0Stride, const int16_t* src1, int s
 #endif
 }
 
+#if JVET_AD0213_LIC_IMP
+template< X86_VEXT vext, int w >
+void toLast_SSE(Pel* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng)
+{
+  __m128i vzero = _mm_setzero_si128();
+  __m128i voffset = _mm_set1_epi32(offset);
+  __m128i vibdimin = _mm_set1_epi16(clpRng.min);
+  __m128i vibdimax = _mm_set1_epi16(clpRng.max);
+
+  if (w == 4)
+  {
+    for (int row = 0; row < height; row++)
+    {
+      for (int col = 0; col < width; col += 4)
+      {
+        __m128i vsrc = _mm_loadl_epi64((const __m128i *) &src[col]);
+        vsrc = _mm_cvtepi16_epi32(vsrc);
+        vsrc = _mm_add_epi32(vsrc, voffset);
+        vsrc = _mm_srai_epi32(vsrc, shiftNum);
+        vsrc = _mm_packs_epi32(vsrc, vzero);
+        vsrc = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
+        _mm_storel_epi64((__m128i *)&src[col], vsrc);
+      }
+      src += srcStride;
+    }
+  }
+  else if (w == 2)
+  {
+    for (int row = 0; row < height; row++)
+    {
+      for (int col = 0; col < width; col += 2)
+      {
+        __m128i vsrc = _mm_cvtsi32_si128(*(int*)(&src[col]));
+        vsrc = _mm_cvtepi16_epi32(vsrc);
+        vsrc = _mm_add_epi32(vsrc, voffset);
+        vsrc = _mm_srai_epi32(vsrc, shiftNum);
+        vsrc = _mm_packs_epi32(vsrc, vzero);
+        vsrc = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
+        *(int*)(&src[col]) = _mm_cvtsi128_si32(vsrc);
+      }
+      src += srcStride;
+    }
+  }
+  else
+  {
+    THROW("Size unsupported!");
+  }
+}
+
+template< X86_VEXT vext, int w >
+void licRemoveWeightHighFreq_SSE(Pel* src0, Pel* src1, Pel* dst, int length, int w0, int w1, int offset, const ClpRng& clpRng)
+{
+  __m128i vzero = _mm_setzero_si128();
+  __m128i voffset = _mm_set1_epi32(offset);
+  __m128i vw0 = _mm_set1_epi32(w0);
+  __m128i vw1 = _mm_set1_epi32(w1);
+  __m128i vibdimin = _mm_set1_epi16(clpRng.min);
+  __m128i vibdimax = _mm_set1_epi16(clpRng.max);
+
+  if (w == 4)
+  {
+    for (int col = 0; col < length; col += 4)
+    {
+      __m128i vsrc0 = _mm_loadl_epi64((const __m128i *) &src0[col]);
+      __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &src1[col]);
+      vsrc0 = _mm_cvtepi16_epi32(vsrc0);
+      vsrc1 = _mm_cvtepi16_epi32(vsrc1);
+      vsrc0 = _mm_mullo_epi32(vsrc0, vw0);
+      vsrc1 = _mm_mullo_epi32(vsrc1, vw1);
+      vsrc0 = _mm_add_epi32(_mm_sub_epi32(vsrc0, vsrc1), voffset);
+      vsrc0 = _mm_srai_epi32(vsrc0, 16);
+      vsrc0 = _mm_packs_epi32(vsrc0, vzero);
+      vsrc0 = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc0));
+      _mm_storel_epi64((__m128i *)&dst[col], vsrc0);
+    }
+  }
+  else if (w == 2)
+  {
+    for (int col = 0; col < length; col += 2)
+    {
+      __m128i vsrc0 = _mm_cvtsi32_si128(*(int*)(&src0[col]));
+      __m128i vsrc1 = _mm_cvtsi32_si128(*(int*)(&src1[col]));
+      vsrc0 = _mm_cvtepi16_epi32(vsrc0);
+      vsrc1 = _mm_cvtepi16_epi32(vsrc1);
+      vsrc0 = _mm_mullo_epi32(vsrc0, vw0);
+      vsrc1 = _mm_mullo_epi32(vsrc1, vw1);
+      vsrc0 = _mm_add_epi32(_mm_sub_epi32(vsrc0, vsrc1), voffset);
+      vsrc0 = _mm_srai_epi32(vsrc0, 16);
+      vsrc0 = _mm_packs_epi32(vsrc0, vzero);
+      vsrc0 = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc0));
+      *(int*)(&dst[col]) = _mm_cvtsi128_si32(vsrc0);
+    }
+  }
+  else
+  {
+    THROW("Unsupported size!");
+  }
+}
+#endif
+
 template<X86_VEXT vext>
 void copyBufferSimd(Pel *src, int srcStride, Pel *dst, int dstStride, int width, int height)
 {
@@ -3708,6 +3808,12 @@ void PelBufferOps::_initPelBufOpsX86()
 #endif
   addAvg8 = addAvg_SSE<vext, 8>;
   addAvg4 = addAvg_SSE<vext, 4>;
+#if JVET_AD0213_LIC_IMP
+  toLast4 = toLast_SSE<vext, 4>;
+  toLast2 = toLast_SSE<vext, 2>;
+  licRemoveWeightHighFreq2 = licRemoveWeightHighFreq_SSE<vext, 2>;
+  licRemoveWeightHighFreq4 = licRemoveWeightHighFreq_SSE<vext, 4>;
+#endif
 
   addBIOAvg4      = addBIOAvg4_SSE<vext>;
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF

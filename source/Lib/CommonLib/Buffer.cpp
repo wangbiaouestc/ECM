@@ -240,6 +240,31 @@ void addAvgCore( const T* src1, int src1Stride, const T* src2, int src2Stride, T
 #undef ADD_AVG_CORE_INC
 }
 
+#if JVET_AD0213_LIC_IMP
+template< typename T >
+void toLastCore(T* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng)
+{
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      src[x] = ClipPel(rightShift((src[x] + offset), shiftNum), clpRng);
+    }
+    src += srcStride;
+  }
+}
+
+template< typename T >
+void licRemoveWeightHighFreqCore(T* src0, T* src1, T* dst, int length, int w0, int w1, int offset, const ClpRng& clpRng)
+{
+  for (int w = 0; w < length; w++)
+  {
+    T iTemp = ClipPel(T((int(src0[w])*w0 - int(src1[w])*w1 + offset) >> 16), clpRng);
+    dst[w] = iTemp;
+  }
+}
+#endif
+
 void addBIOAvgCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel*gradY1, int gradStride, int width, int height, int tmpx, int tmpy, int shift, int offset, const ClpRng& clpRng)
 {
   int b = 0;
@@ -1028,7 +1053,12 @@ PelBufferOps::PelBufferOps()
 #endif
   addAvg4 = addAvgCore<Pel>;
   addAvg8 = addAvgCore<Pel>;
-
+#if JVET_AD0213_LIC_IMP
+  toLast2 = toLastCore<Pel>;
+  toLast4 = toLastCore<Pel>;
+  licRemoveWeightHighFreq2 = licRemoveWeightHighFreqCore<Pel>;
+  licRemoveWeightHighFreq4 = licRemoveWeightHighFreqCore<Pel>;
+#endif
   reco4 = reconstructCore<Pel>;
   reco8 = reconstructCore<Pel>;
 
@@ -1582,8 +1612,33 @@ void AreaBuf<Pel>::toLast( const ClpRng& clpRng )
 
   if (width == 1)
   {
+#if JVET_AD0213_LIC_IMP
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        src[x] = ClipPel(rightShift((src[x] + offset), shiftNum), clpRng);
+      }
+      src += srcStride;
+    }
+#else
     THROW( "Blocks of width = 1 not supported" );
+#endif
   }
+#if JVET_AD0213_LIC_IMP
+  else if ((width & 3) == 0)
+  {
+    g_pelBufOP.toLast4(src, srcStride, width, height, shiftNum, offset, clpRng);
+  }
+  else if ((width & 1) == 0)
+  {
+    g_pelBufOP.toLast2(src, srcStride, width, height, shiftNum, offset, clpRng);
+  }
+  else
+  {
+    THROW("Unsupported size!");
+  }
+#else
   else if (width&2)
   {
     for ( int y = 0; y < height; y++ )
@@ -1611,6 +1666,7 @@ void AreaBuf<Pel>::toLast( const ClpRng& clpRng )
       src += srcStride;
     }
   }
+#endif
 }
 
 

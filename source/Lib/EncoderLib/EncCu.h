@@ -291,7 +291,11 @@ private:
   PelStorage            m_acMergeBuffer[MMVD_MRG_MAX_RD_BUF_NUM];
 #endif
 #if INTER_LIC || MULTI_HYP_PRED
+#if JVET_AD0213_LIC_IMP
+  PelStorage            m_acRealMergeBuffer[MRG_MAX_NUM_CANDS * 3];
+#else
   PelStorage            m_acRealMergeBuffer[MRG_MAX_NUM_CANDS * 2];
+#endif
 #else
   PelStorage            m_acRealMergeBuffer[MRG_MAX_NUM_CANDS];
 #endif
@@ -363,6 +367,9 @@ private:
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   Mv                    m_mvBufEncAmBDMVR[2][MAX_NUM_SUBCU_DMVR];
   MvField               m_mvFieldAmListEnc[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
+#if JVET_AD0213_LIC_IMP
+  bool                  m_licAmListEnc[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
+#endif
 #endif
 
   int                   m_ctuIbcSearchRangeX;
