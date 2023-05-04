@@ -16623,6 +16623,36 @@ void PU::applyImv( PredictionUnit& pu, MergeCtx &mrgCtx, InterPrediction *interP
 }
 #endif
 
+#if JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS
+int PU::getMeanValue(int sum, int div)
+{
+  int sign = 1;
+  if (sum < 0 )
+  {
+    sum  = -sum;
+    sign = -1;
+  }
+  int divTable[16] = { 0, 7, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0 };
+  int x            = floorLog2(div);
+  int normNum1     = (div << 4 >> x) & 15;
+  int v            = divTable[normNum1] | 8;
+  x += (normNum1 != 0);
+  int shift  = 13 - x;
+  int retVal = 0;
+  if (shift < 0)
+  {
+    shift   = -shift;
+    int add = (1 << (shift - 1));
+    retVal  = (sum * v + add) >> shift;
+  }
+  else
+  {
+    retVal = (sum * v) << shift;
+  }
+  return sign * (retVal >> 16);
+}
+#endif
+
 bool PU::isBiPredFromDifferentDirEqDistPoc(const PredictionUnit& pu)
 {
   if (pu.refIdx[0] >= 0 && pu.refIdx[1] >= 0)
