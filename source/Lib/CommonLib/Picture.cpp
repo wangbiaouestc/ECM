@@ -614,7 +614,7 @@ const TFilterCoeff DownsamplingFilterSRC[8][16][12] =
       {   0,   0,   0,   0,  -2,   7, 127,  -6,   2,   0,   0,   0 }
     },
     { // D = 1.5
-#if AD0169_SMALL_SCALE_DOWNSAMPLING
+#if JVET_AD0169_SMALL_SCALE_DOWNSAMPLING
       {   0,   0,   4, -14,  27,  94,  27, -14,   4,   0,   0,   0 },
       {   0,   0,   4, -13,  21,  94,  32, -14,   3,   1,   0,   0 },
       {   0,   0,   4, -12,  16,  93,  39, -15,   3,   1,  -1,   0 },
@@ -897,7 +897,7 @@ void Picture::sampleRateConv( const std::pair<int, int> scalingRatio, const std:
     {
       horFilter = 3;
     }
-#if AD0169_SMALL_SCALE_DOWNSAMPLING
+#if JVET_AD0169_SMALL_SCALE_DOWNSAMPLING
     else if (scalingRatio.first > (27 << SCALE_RATIO_BITS) / 20)
 #else
     else if (scalingRatio.first > (5 << SCALE_RATIO_BITS) / 4)
@@ -905,7 +905,7 @@ void Picture::sampleRateConv( const std::pair<int, int> scalingRatio, const std:
     {
       horFilter = 2;
     }
-#if AD0169_SMALL_SCALE_DOWNSAMPLING
+#if JVET_AD0169_SMALL_SCALE_DOWNSAMPLING
     else if (scalingRatio.first > (11 << SCALE_RATIO_BITS) / 10)
 #else
     else if (scalingRatio.first > (20 << SCALE_RATIO_BITS) / 19)
@@ -934,7 +934,7 @@ void Picture::sampleRateConv( const std::pair<int, int> scalingRatio, const std:
     {
       verFilter = 3;
     }
-#if AD0169_SMALL_SCALE_DOWNSAMPLING
+#if JVET_AD0169_SMALL_SCALE_DOWNSAMPLING
     else if (scalingRatio.second > (27 << SCALE_RATIO_BITS) / 20)
 #else
     else if (scalingRatio.second > (5 << SCALE_RATIO_BITS) / 4)
@@ -942,7 +942,7 @@ void Picture::sampleRateConv( const std::pair<int, int> scalingRatio, const std:
     {
       verFilter = 2;
     }
-#if AD0169_SMALL_SCALE_DOWNSAMPLING
+#if JVET_AD0169_SMALL_SCALE_DOWNSAMPLING
     else if (scalingRatio.second > (11 << SCALE_RATIO_BITS) / 10)
 #else
     else if (scalingRatio.second > (20 << SCALE_RATIO_BITS) / 19)
