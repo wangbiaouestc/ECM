@@ -358,8 +358,20 @@ struct CodingUnit : public UnitArea
 #endif
 #endif
 #if TMP_FAST_ENC
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  int                tmpXdisp[MTMP_NUM];
+  int                tmpYdisp[MTMP_NUM];
+  IntraTMPFusionInfo tmpFusionInfo[TMP_GROUP_IDX << 1];
+  bool               tmpFlmFlag;
+  int64_t            tmpFlmParams[TMP_FLM_PARAMS][MTMP_NUM];
+  uint8_t            tmpIdx;
+  bool               tmpFusionFlag;
+  int                tmpIsSubPel;
+  int                tmpSubPelIdx;
+#else
   int            tmpXdisp;
   int            tmpYdisp;
+#endif
   int            tmpNumCand;
 #endif
 #if JVET_W0123_TIMD_FUSION

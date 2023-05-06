@@ -680,12 +680,30 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
         m_pcIntraPred->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight(), tempType);
 
         m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight(), tempType);
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+        if (tu.cu->tmpFlmFlag)
+        {
+          m_pcIntraPred->xCalTmpFlmParam(tu.cu, pu.lwidth(), pu.lheight(), tempType);
+        }
+        if (tu.cu->tmpFusionFlag)
+        {
+          m_pcIntraPred->xTMPBuildFusionCandidate(*tu.cu, tempType);
+        }
+        if (pu.cu->tmpIsSubPel)
+        {
+          m_pcIntraPred->xPadForInterpolation(pu.cu);
+        }
+#endif
 #if JVET_AB0061_ITMP_BV_FOR_IBC
         m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, foundCandiNum, pu);
 #elif TMP_FAST_ENC
         m_pcIntraPred->generateTMPrediction( piPred.buf, piPred.stride, pu.Y(), foundCandiNum, pu.cu );
 #else
         m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+#endif
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+        m_pcIntraPred->xGenerateTmpFlmPred(piPred, pu.lwidth(), pu.lheight(), tempType, tu.cu);
+        m_pcIntraPred->xTMPFusionApplyModel(piPred, pu.lwidth(), pu.lheight(), tempType, tu.cu);
 #endif
 		  }
 		  else
