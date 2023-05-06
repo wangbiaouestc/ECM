@@ -1764,10 +1764,40 @@ static const int TMP_MAXSIZE_DEPTH =            6; // should be log2(TMP_TEMPLAT
 static const int USE_MORE_BLOCKSIZE_DEPTH_MAX = TMP_MAXSIZE_DEPTH - 1;
 static const int INIT_THRESHOULD_SHIFTBITS =    2;  ///< (default 2) Early skip threshold for checking distance.
 static const int TMP_SEARCH_RANGE_MULT_FACTOR = 5;
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+static const int TMP_FUSION_NUM      = 5;
+static const int TMP_GROUP_IDX       = 3;
+static const int FUSION_IDX_NUM      = TMP_FUSION_NUM * TMP_GROUP_IDX;
+static const int MTMP_NUM            = 19;
+static const int MTMP_NUM_SPARSE     = 30;
+static const int TL_NUM              = 3;
+static const int TL_NUM_SPARSE       = TL_NUM << 1;
+static const int TMP_MINSR           = 64;
+static const int TMP_FILTER_PADDING  = 1;
+static const int TMP_BEST_CANDIDATES = TMP_FUSION_NUM;
+static const int TMP_FUSION_PARAMS   = TMP_BEST_CANDIDATES + 1;
+static const int TMP_FLM_PARAMS      = 6;
+static const int TMP_FUSHION_CCCM_MAX_REF_SAMPLES =
+  (2 * (TMP_TEMPLATE_SIZE * MAX_CU_SIZE) + TMP_TEMPLATE_SIZE * TMP_TEMPLATE_SIZE);
+static const int TMP_SAMPLING       = 3;
+static const int TMP_SUBPEL_PAD_NUM = 2;
+static const int TMP_MAX_SUBPEL_DIR = 8;
+struct IntraTMPFusionInfo
+{
+  bool    bValid;
+  bool    bFilter;
+  int     tmpFusionIdx;
+  int     tmpMaxNum;
+  int     tmpFusionNumber;
+  int     tmpFusionWeight[TMP_FUSION_NUM];
+  int64_t tmpFushionParams[TMP_FUSION_PARAMS];
+};
+#else 
 #if JVET_AB0130_ITMP_SAMPLING
 static const int LOG2_TMP_SAMPLING = 1;
 static const int TMP_SAMPLING = 1 << LOG2_TMP_SAMPLING;
 #endif
+#endif 
 #endif
 
 #endif // end of #ifndef  __COMMONDEF__

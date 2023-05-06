@@ -81,9 +81,21 @@ public:
   int   m_pDiff;        //mse
   short m_pId;          //frame id
   int   m_diffMax;
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  int   m_rId;
+  int   m_pRegionId;
+#endif
 
   TempLibFast();
   ~TempLibFast();
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  TempLibFast(const int pX, const int pY, const int pDiff, const int pId, const int rId)
+  {
+    m_pX = pX, m_pY = pY, m_pDiff = pDiff, m_pId = pId;
+    m_rId = rId;
+  };
+  int   getRegionId() { return m_pRegionId; }
+#endif
 
   void  initTemplateDiff              ( unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int bitDepth );
 
@@ -216,6 +228,10 @@ private:
   int  m_cccmLumaOffset;
 #endif
 #endif
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  Area m_tmpRefArea[MTMP_NUM];
+  Pel* m_tmpRefBuf[MTMP_NUM];
+#endif
 
 #if JVET_AA0057_CCCM
   Area m_cccmRefArea;
@@ -321,6 +337,10 @@ protected:
 #if JVET_V0130_INTRA_TMP
   int          m_uiPartLibSize;
   TempLibFast  m_tempLibFast;
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  static_vector<TempLibFast, MTMP_NUM> m_mtmpCandList;
+  static_vector<uint64_t, MTMP_NUM>    m_mtmpCostList;
+#endif
   Pel*         m_refPicUsed;
   Picture*     m_refPicBuf;
   unsigned int m_uiPicStride;
@@ -337,6 +357,10 @@ protected:
 #endif
 #if JVET_AB0092_GLM_WITH_LUMA
   CccmCovariance<GLM_NUM_PARAMS, GLM_MAX_REF_SAMPLES> m_glmSolver;
+#endif
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  CccmCovariance<TMP_FLM_PARAMS, CCCM_MAX_REF_SAMPLES>                m_tmpFlmSolver;
+  CccmCovariance<TMP_FUSION_PARAMS, TMP_FUSHION_CCCM_MAX_REF_SAMPLES> m_tmpFusionSolver;
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   CccmCovariance<CCCM_NO_SUB_NUM_PARAMS, GLM_MAX_REF_SAMPLES> m_cccmNoSubSolver;
@@ -700,8 +724,15 @@ public:
 #endif
 #if JVET_V0130_INTRA_TMP
 #if JVET_W0069_TMP_BOUNDARY
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  void(*m_calcTemplateDiff)      (Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int *diff, int *iMax, RefTemplateType TempType, int requiredTemplate);
+  static void calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsigned int uiPatchWidth,
+                               unsigned int uiPatchHeight, int *diff, int *iMax, RefTemplateType TempType,
+                               int requiredTemplate);
+#else
   int( *m_calcTemplateDiff )      ( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType TempType );
   static int calcTemplateDiff     ( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType TempType );
+#endif
 #else
   int( *m_calcTemplateDiff )      (Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax);
   static int calcTemplateDiff     ( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax );
@@ -720,7 +751,28 @@ public:
   void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId );
   void candidateSearchIntra          ( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
 #endif
-#if TMP_FAST_ENC
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  void convertDiff2Weight(int *pDiff, int *weights, const int start, const int foundCandiNum);
+  int  xCalTMPFusionNumber(const int maxNum, const int numIdx);
+  void xTMPBuildFusionCandidate(CodingUnit &cu, RefTemplateType tempType);
+
+  void xCalcTmpFlmRefArea(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType, bool& leftPadding, bool& rightPadding, bool& abovePadding, bool& belowPadding);
+  void xGetTmpFlmRefBuf(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType);
+  void xCalTmpFlmParam(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType);
+  void xGenerateTmpFlmPred(PelBuf& piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType, CodingUnit* pcCU, bool bDeriveDimdMode = true);
+
+  void xTMPFusionCalcParams(CodingUnit* cu, CompArea area, CccmModel<TMP_FUSION_PARAMS>& tmpFusionModel, int foundCandiNum, RefTemplateType tempType, Pel* curPointTemplate, Pel* refPointTemplate[]);
+  void xTMPFusionCalcModels(CodingUnit* cu, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType);
+  void xTMPFusionApplyModel(PelBuf& piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType, CodingUnit* pcCU, bool bDeriveDimdMode = true);
+
+  void xPadForInterpolation(CodingUnit* pcCU);
+#endif
+
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  bool generateTMPrediction          (Pel* piPred, unsigned int uiStride, int& foundCandiNum, PredictionUnit& pu, bool bDeriveDimdMode = true);
+#endif
+#elif TMP_FAST_ENC
   bool generateTMPrediction          (Pel* piPred, unsigned int uiStride, CompArea area, int& foundCandiNum, CodingUnit* cu);
 #if JVET_AB0061_ITMP_BV_FOR_IBC
   bool generateTMPrediction          (Pel* piPred, unsigned int uiStride, int& foundCandiNum, PredictionUnit& pu);

@@ -7605,10 +7605,10 @@ void CABACWriter::code_unary_fixed( unsigned symbol, unsigned ctxId, unsigned un
 #if JVET_V0130_INTRA_TMP
 void CABACWriter::tmp_flag(const CodingUnit& cu)
 {
-	if (!cu.Y().valid())
-	{
-		return;
-	}
+  if (!cu.Y().valid())
+  {
+    return;
+  }
 
 #if JVET_X0124_TMP_SIGNAL
   if (cu.dimd)
@@ -7617,14 +7617,81 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
   }
 #endif
 
-  if( !cu.cs->sps->getUseIntraTMP() )
+  if (!cu.cs->sps->getUseIntraTMP())
   {
     return;
   }
 
-	unsigned ctxId = DeriveCtx::CtxTmpFlag(cu);
-	m_BinEncoder.encodeBin(cu.tmpFlag, Ctx::TmpFlag(ctxId));
-	DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpFlag ? 1 : 0);
+  unsigned ctxId = DeriveCtx::CtxTmpFlag(cu);
+  m_BinEncoder.encodeBin(cu.tmpFlag, Ctx::TmpFlag(ctxId));
+  DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpFlag ? 1 : 0);
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  if (cu.tmpFlag)
+  {
+    unsigned ctxId_fusion = DeriveCtx::CtxTmpFusionFlag(cu);
+    DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
+           cu.tmpFusionFlag ? 1 : 0);
+    if (cu.tmpFusionFlag)
+    {
+      m_BinEncoder.encodeBin(1, Ctx::TmpFusion(ctxId_fusion));
+      m_BinEncoder.encodeBin(cu.tmpIdx >= TMP_GROUP_IDX ? 1: 0, Ctx::TmpFusion(4));
+
+      int tmpFusionIdx = cu.tmpIdx;
+      tmpFusionIdx = tmpFusionIdx >=  TMP_GROUP_IDX ? tmpFusionIdx - TMP_GROUP_IDX: tmpFusionIdx;
+      m_BinEncoder.encodeBin(tmpFusionIdx ? 1: 0, Ctx::TmpFusion(5));
+      if (tmpFusionIdx)
+      {
+        m_BinEncoder.encodeBinEP(tmpFusionIdx > 1 ? 1 : 0);
+      }
+      DTRACE(g_trace_ctx, D_SYNTAX, "tmp_fusion_idx() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIdx);
+    }
+    else
+    {
+      m_BinEncoder.encodeBin(0, Ctx::TmpFusion(ctxId_fusion));
+      if (cu.tmpIdx < 3)
+      {
+        m_BinEncoder.encodeBin(1, Ctx::TmpIdx(0));
+        if (cu.tmpIdx == 0)
+        {
+          m_BinEncoder.encodeBin(1, Ctx::TmpIdx(1));
+        }
+        else
+        {
+          m_BinEncoder.encodeBin(0, Ctx::TmpIdx(1));
+          if (cu.tmpIdx == 1)
+          {
+            m_BinEncoder.encodeBin(1, Ctx::TmpIdx(2));
+          }
+          else
+          {
+            m_BinEncoder.encodeBin(0, Ctx::TmpIdx(2));
+          }
+        }
+      }
+      else
+      {
+        m_BinEncoder.encodeBin(0, Ctx::TmpIdx(0));
+        xWriteTruncBinCode(cu.tmpIdx - 3, MTMP_NUM - 3);
+      }
+      m_BinEncoder.encodeBin(cu.tmpFlmFlag, Ctx::TmpFusion(3));
+      DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flm_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
+             cu.tmpFlmFlag);
+      if (!cu.tmpFlmFlag)
+      {
+        m_BinEncoder.encodeBin(cu.tmpIsSubPel != 0 ? 1 : 0, Ctx::TmpFlag(4));
+        if (cu.tmpIsSubPel)
+        {
+          m_BinEncoder.encodeBin(cu.tmpIsSubPel >= 2 ? 1 : 0, Ctx::TmpFlag(5));
+          if (cu.tmpIsSubPel >= 2)
+          {
+            m_BinEncoder.encodeBin(cu.tmpIsSubPel == 3 ? 1 : 0, Ctx::TmpFlag(6));
+          }
+          m_BinEncoder.encodeBinsEP(cu.tmpSubPelIdx, 3);
+        }
+      }
+    }
+  }
+#endif
 }
 #endif
 

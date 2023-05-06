@@ -2273,7 +2273,11 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   int timdHorMode = 0;
   int timdVerMode = 0;
 #endif
-#if TMP_FAST_ENC
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  int tmpXdisp[MTMP_NUM] = { 0 }, tmpYdisp[MTMP_NUM] = { 0 }, tmpNumCand = 0;
+  IntraTMPFusionInfo tmpFusionInfo[TMP_GROUP_IDX << 1] = {};
+  int64_t tmpFlmParams[TMP_FLM_PARAMS][MTMP_NUM] = {0};
+#elif TMP_FAST_ENC
   int tmpXdisp = 0, tmpYdisp = 0, tmpNumCand = 0;
 #endif
 
@@ -2691,20 +2695,70 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               {
                 m_pcIntraSearch->getTargetTemplate(&cu, cu.lwidth(), cu.lheight(), templateType);
                 m_pcIntraSearch->candidateSearchIntra(&cu, cu.lwidth(), cu.lheight(), templateType);
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+                for (int idx = 0; idx < cu.tmpNumCand && idx < MTMP_NUM; idx++)
+                {
+                  cu.tmpIdx = idx;
+                  m_pcIntraSearch->xCalTmpFlmParam(&cu, cu.lwidth(), cu.lheight(), templateType);
+                }
+                cu.tmpIdx = 0;
+                m_pcIntraSearch->xTMPBuildFusionCandidate(cu, templateType);
+                cu.tmpIdx = 0;
+                cu.tmpFusionFlag = 0;
+#endif
               }
 #else
               m_pcIntraSearch->getTargetTemplate(&cu, cu.lwidth(), cu.lheight());
               m_pcIntraSearch->candidateSearchIntra(&cu, cu.lwidth(), cu.lheight());
 #endif
               tmpDerived = 1;
+
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+              for (int tmpIdx = 0; tmpIdx < MTMP_NUM; tmpIdx++)
+              {
+                tmpXdisp[tmpIdx] = cu.tmpXdisp[tmpIdx];
+                tmpYdisp[tmpIdx] = cu.tmpYdisp[tmpIdx];
+              }
+              for (int j = 0; j < TMP_GROUP_IDX << 1; j++)
+              {
+                tmpFusionInfo[j] = cu.tmpFusionInfo[j];
+              }
+              for (int j = 0; j < MTMP_NUM; j++)
+              {
+                for (int i = 0; i < TMP_FLM_PARAMS; i++)
+                {
+                  tmpFlmParams[i][j] = cu.tmpFlmParams[i][j];
+                }
+              }
+#else
               tmpXdisp = cu.tmpXdisp;
               tmpYdisp = cu.tmpYdisp;
+#endif
               tmpNumCand = cu.tmpNumCand;
             }
             else
             {
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+              for (int tmpIdx = 0; tmpIdx < MTMP_NUM; tmpIdx++)
+              {
+                cu.tmpXdisp[tmpIdx] = tmpXdisp[tmpIdx];
+                cu.tmpYdisp[tmpIdx] = tmpYdisp[tmpIdx];
+              }
+              for(int j = 0; j < TMP_GROUP_IDX << 1; j++)
+              {
+                cu.tmpFusionInfo[j] = tmpFusionInfo[j];
+              }
+              for (int j = 0; j < MTMP_NUM; j++)
+              {
+                for (int i = 0; i < TMP_FLM_PARAMS; i++)
+                {
+                  cu.tmpFlmParams[i][j] = tmpFlmParams[i][j];
+                }
+              }
+#else
               cu.tmpXdisp = tmpXdisp;
               cu.tmpYdisp = tmpYdisp;
+#endif
               cu.tmpNumCand = tmpNumCand;
             }
           }

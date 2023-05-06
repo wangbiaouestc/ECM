@@ -1562,6 +1562,19 @@ const CtxSet ContextSetCfg::MipFlag = ContextSetCfg::addCtxSet
 #if JVET_V0130_INTRA_TMP
 const CtxSet ContextSetCfg::TmpFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  {  33,  42,   7,  33, CNU, CNU, CNU,},
+  {   0,  25,  57,   0, CNU, CNU, CNU,},
+  {  40,  19,  21,  33, CNU, CNU, CNU,},
+  {   1,   4,   6,   1, DWS, DWS, DWS,},
+  {   8,   8,   0,  12, DWS, DWS, DWS,},
+  {   6,   5,   0,   2, DWS, DWS, DWS,},
+  {  11,  32,  25,  18, DWE, DWE, DWE,},
+  {   4,  25,  32,  11, DWE, DWE, DWE,},
+  {  25,  32,   4,  25, DWE, DWE, DWE,},
+  {  99, 101, 133, 115, DWO, DWO, DWO,},
+  { 147, 161, 114, 131, DWO, DWO, DWO,},
+#else
   {  33,  42,   7,  33, },
   {   0,  25,  57,   0, },
   {  40,  19,  21,  33, },
@@ -1573,6 +1586,39 @@ const CtxSet ContextSetCfg::TmpFlag = ContextSetCfg::addCtxSet
   {  25,  32,   4,  25, },
   {  99, 101, 133, 115, },
   { 147, 161, 114, 131, },
+#endif
+  });
+#endif
+
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+const CtxSet ContextSetCfg::TmpIdx = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU,},
+  { CNU, CNU, CNU,},
+  { CNU, CNU, CNU,},
+  { DWS, DWS, DWS,},
+  { DWS, DWS, DWS,},
+  { DWS, DWS, DWS,},
+  { DWE, DWE, DWE,},
+  { DWE, DWE, DWE,},
+  { DWE, DWE, DWE,},
+  { DWO, DWO, DWO,},
+  { DWO, DWO, DWO,},
+  });
+
+const CtxSet ContextSetCfg::TmpFusion = ContextSetCfg::addCtxSet
+({
+  { CNU,CNU,CNU,CNU,CNU,CNU },
+  { CNU,CNU,CNU,CNU,CNU,CNU },
+  { CNU,CNU,CNU,CNU,CNU,CNU },
+  { DWS,DWS,DWS,DWS,DWS,DWS },
+  { DWS,DWS,DWS,DWS,DWS,DWS },
+  { DWS,DWS,DWS,DWS,DWS,DWS },
+  { DWE,DWE,DWE,DWE,DWE,DWE },
+  { DWE,DWE,DWE,DWE,DWE,DWE },
+  { DWE,DWE,DWE,DWE,DWE,DWE },
+  { DWO,DWO,DWO,DWO,DWO,DWO },
+  { DWO,DWO,DWO,DWO,DWO,DWO },
   });
 #endif
 

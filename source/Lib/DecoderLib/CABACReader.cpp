@@ -7736,10 +7736,10 @@ void CABACReader::tmp_flag(CodingUnit& cu)
 {
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2(STATS__CABAC_BITS__INTRA_TMP_FLAG, cu.lumaSize(), COMPONENT_Y);
 
-	if (!cu.Y().valid())
-	{
-		return;
-	}
+  if (!cu.Y().valid())
+  {
+    return;
+  }
 
 #if JVET_X0124_TMP_SIGNAL
   if (cu.dimd)
@@ -7749,15 +7749,84 @@ void CABACReader::tmp_flag(CodingUnit& cu)
   }
 #endif
 
-  if( !cu.cs->sps->getUseIntraTMP() )
+  if (!cu.cs->sps->getUseIntraTMP())
   {
     cu.tmpFlag = false;
     return;
   }
 
-	unsigned ctxId = DeriveCtx::CtxTmpFlag(cu);
-	cu.tmpFlag = m_BinDecoder.decodeBin(Ctx::TmpFlag(ctxId));
-	DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpFlag ? 1 : 0);
+  unsigned ctxId = DeriveCtx::CtxTmpFlag(cu);
+  cu.tmpFlag     = m_BinDecoder.decodeBin(Ctx::TmpFlag(ctxId));
+  DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpFlag ? 1 : 0);
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  if (cu.tmpFlag)
+  {
+    unsigned ctxId_fusion = DeriveCtx::CtxTmpFusionFlag(cu);
+    cu.tmpFusionFlag      = m_BinDecoder.decodeBin(Ctx::TmpFusion(ctxId_fusion));
+    DTRACE(g_trace_ctx, D_SYNTAX, "tmp_fusion_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
+           cu.tmpFusionFlag ? 1 : 0);
+    if (cu.tmpFusionFlag)
+    {
+      cu.tmpIdx = 0;
+      int tmpFusionIdx = m_BinDecoder.decodeBin(Ctx::TmpFusion(4))? TMP_GROUP_IDX : 0;
+
+      cu.tmpIdx =  m_BinDecoder.decodeBin(Ctx::TmpFusion(5));
+      if(cu.tmpIdx)
+      {
+        cu.tmpIdx += m_BinDecoder.decodeBinEP();
+      }
+      cu.tmpIdx += tmpFusionIdx;
+    }
+    else
+    {
+      if (m_BinDecoder.decodeBin(Ctx::TmpIdx(0)))
+      {
+        if (m_BinDecoder.decodeBin(Ctx::TmpIdx(1)))
+        {
+          cu.tmpIdx = 0;
+        }
+        else
+        {
+          if (m_BinDecoder.decodeBin(Ctx::TmpIdx(2)))
+          {
+            cu.tmpIdx = 1;
+          }
+          else
+          {
+            cu.tmpIdx = 2;
+          }
+        }
+      }
+      else
+      {
+        uint32_t tmpIdx = 0;
+        xReadTruncBinCode(tmpIdx, MTMP_NUM - 3);
+        cu.tmpIdx = tmpIdx + 3;
+      }
+      cu.tmpFlmFlag = m_BinDecoder.decodeBin(Ctx::TmpFusion(3));
+      DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flm_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
+             cu.tmpFlmFlag);
+      if (!cu.tmpFlmFlag)
+      {
+        cu.tmpIsSubPel = m_BinDecoder.decodeBin(Ctx::TmpFlag(4));
+        if (cu.tmpIsSubPel)
+        {
+          cu.tmpIsSubPel += m_BinDecoder.decodeBin(Ctx::TmpFlag(5));
+          if (cu.tmpIsSubPel == 2)
+          {
+            cu.tmpIsSubPel += m_BinDecoder.decodeBin(Ctx::TmpFlag(6));
+          }
+          cu.tmpSubPelIdx = m_BinDecoder.decodeBinsEP(3);
+        }
+      }
+      else
+      {
+        cu.tmpIsSubPel  = 0;
+        cu.tmpSubPelIdx = -1;
+      }
+    }
+  }
+#endif
 }
 #endif
 void CABACReader::mip_flag( CodingUnit& cu )

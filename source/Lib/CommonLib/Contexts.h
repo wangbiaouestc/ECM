@@ -383,6 +383,10 @@ public:
   static const CtxSet   MipFlag;
 #if JVET_V0130_INTRA_TMP
   static const CtxSet   TmpFlag;
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  static const CtxSet   TmpIdx;
+  static const CtxSet   TmpFusion;
+#endif  
 #endif
 #if MMLM
   static const CtxSet   MMLMFlag;

@@ -132,6 +132,7 @@
 #endif
 #define JVET_W0069_TMP_BOUNDARY                           1 // JVET-W0069: Boundary handling for TMP
 #define JVET_AB0061_ITMP_BV_FOR_IBC                       1 // JVET-AB0061: Storing IntraTMP BV for IBC BV prediction
+#define JVET_AD0086_ENHANCED_INTRA_TMP                    1 // JVET-AD0086: Enhanced intra TMP
 #endif
 
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
@@ -909,6 +910,19 @@ enum RefTemplateType
   LEFT_TEMPLATE    = 2,
   ABOVE_TEMPLATE   = 3,
   NO_TEMPLATE      = 4
+};
+#endif
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+enum TmpSubPelDirType
+{
+  LEFT_POS         = 0,
+  RIGHT_POS        = 1,
+  ABOVE_POS        = 2,
+  BOTTOM_POS       = 3,
+  ABOVE_LEFT_POS   = 4,
+  ABOVE_RIGHT_POS  = 5,
+  LEFT_BOTTOM_POS  = 6,
+  RIGHT_BOTTOM_POS = 7,
 };
 #endif
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS

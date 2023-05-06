@@ -741,6 +741,9 @@ unsigned CtxbvOneZeroComp(const CodingUnit &cu);
 unsigned CtxPredModeFlag( const CodingUnit& cu );
 unsigned CtxIBCFlag(const CodingUnit& cu);
 unsigned CtxMipFlag   ( const CodingUnit& cu );
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+unsigned CtxTmpFusionFlag( const CodingUnit& cu );
+#endif
 #if JVET_V0130_INTRA_TMP
 unsigned CtxTmpFlag(const CodingUnit& cu);
 #endif
