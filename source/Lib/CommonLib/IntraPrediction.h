@@ -562,6 +562,9 @@ public:
                              static_vector<SgpmInfo, SGPM_NUM> &candModeList,
                              static_vector<double, SGPM_NUM> &  candCostList);
 #endif
+#if JVET_AD0085_MPM_SORTING
+  void deriveMPMSorted(const PredictionUnit& pu, uint8_t* mpm, int& sortedSize, int iStartIdx);
+#endif
 #if JVET_AB0157_TMRL
   struct TmrlInfo
   {

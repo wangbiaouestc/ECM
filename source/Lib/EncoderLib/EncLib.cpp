@@ -1848,6 +1848,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AD0082_TMRL_CONFIG
   sps.setUseTmrl            ( m_tmrl );
 #endif
+#if JVET_AD0085_MPM_SORTING
+  sps.setUseMpmSorting      ( m_mpmSorting );
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   sps.setUseCccm            ( m_cccm );
 #endif

@@ -161,9 +161,12 @@ namespace PU
 #if SECONDARY_MPM
   int getIntraMPMs(const PredictionUnit &pu, uint8_t *mpm, uint8_t* non_mpm
 #if JVET_AC0094_REF_SAMPLES_OPT
-                   , const bool &isForcedValid
+                 , const bool &isForcedValid
 #endif
-      , const ChannelType &channelType = CHANNEL_TYPE_LUMA
+#if JVET_AD0085_MPM_SORTING
+                 , IntraPrediction* pIntraPred = nullptr
+#endif
+                 , const ChannelType &channelType = CHANNEL_TYPE_LUMA
   );
 #else
   int  getIntraMPMs(const PredictionUnit &pu, unsigned *mpm, const ChannelType &channelType = CHANNEL_TYPE_LUMA);
@@ -667,6 +670,9 @@ namespace PU
 #if JVET_AC0144_AFFINE_DMVR_REGRESSION
   void deriveAffineCandFromMvField(Position posLT, const int width, const int height, std::vector<RMVFInfo> mvInfoVec, Mv mvAffi[3]);
 #endif
+#if JVET_AD0085_MPM_SORTING
+  bool allowMPMSorted(const PredictionUnit& pu);
+#endif
 }
 
 // TU tools
@@ -1064,5 +1070,18 @@ bool storeContexts( const Slice* slice, const int ctuXPosInCtus, const int ctuYP
 
 #if JVET_AC0144_AFFINE_DMVR_REGRESSION
 int deriveAffineSubBlkSize(const int sz, const int minSbSz, const int deltaMvX, const int deltaMvY, const int shift);
+#endif
+#if JVET_AD0085_TMRL_EXTENSION
+int getSpatialIpm(const PredictionUnit& pu, uint8_t* spatialIpm, const int maxCands
+#if JVET_AC0094_REF_SAMPLES_OPT
+                , const bool& isForcedValid
+#endif
+                , bool extPrecision = false
+#if JVET_AD0085_MPM_SORTING
+                , IntraPrediction* pIntraPred = nullptr
+#endif
+);
+void fillMPMList(const PredictionUnit& pu, uint8_t* mpm, const int numToFill, const int numCand, bool extPrecision = false);
+void fillNonMPMList(uint8_t* mpm, uint8_t* non_mpm);
 #endif
 #endif

@@ -356,6 +356,9 @@ public:
   static const CtxSet   IntraLumaMpmFlag;
 #if SECONDARY_MPM
   static const CtxSet   IntraLumaSecondMpmFlag;
+#if JVET_AD0085_MPM_SORTING
+  static const CtxSet   IntraLumaSecondMpmIdx;
+#endif
 #endif
   static const CtxSet   IntraLumaPlanarFlag;
 #if SECONDARY_MPM

@@ -2544,6 +2544,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AD0082_TMRL_CONFIG
   READ_FLAG(uiCode, "sps_tmrl_enabled_flag");                       pcSPS->setUseTmrl(uiCode != 0);
 #endif
+#if JVET_AD0085_MPM_SORTING
+  READ_FLAG(uiCode, "sps_mpm_sorting_enabled_flag");                pcSPS->setUseMpmSorting(uiCode != 0);
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   READ_UVLC(uiCode, "sps_cccm_cand");                               pcSPS->setUseCccm(uiCode);
 #endif

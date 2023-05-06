@@ -2436,11 +2436,27 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
     }
 
 #if SECONDARY_MPM
+#if JVET_AD0085_MPM_SORTING
+    if (PU::allowMPMSorted(pu))
+    {
+      m_pcIntraSearch->getMpmListSize() = PU::getIntraMPMs(pu, m_pcIntraSearch->getMPMList(), m_pcIntraSearch->getNonMPMList()
+#if JVET_AC0094_REF_SAMPLES_OPT
+                                                         , true
+#endif
+                                                         , m_pcIntraSearch
+      );
+    }
+    else
+    {
+#endif
     m_pcIntraSearch->getMpmListSize() = PU::getIntraMPMs(pu, m_pcIntraSearch->getMPMList(), m_pcIntraSearch->getNonMPMList()
 #if JVET_AC0094_REF_SAMPLES_OPT
                                                          , false
 #endif
-);
+      );
+#if JVET_AD0085_MPM_SORTING
+    }
+#endif
 #endif
   }
 #if JVET_Z0050_DIMD_CHROMA_FUSION && (JVET_AC0094_REF_SAMPLES_OPT)

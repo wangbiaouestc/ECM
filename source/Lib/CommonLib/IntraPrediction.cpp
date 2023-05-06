@@ -1174,8 +1174,18 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 
   CHECK(PU::isMIP(pu, toChannelType(compId)), "We should not get here for MIP.");
   const uint32_t       uiDirMode    = isLuma( compId ) && pu.cu->bdpcmMode ? BDPCM_IDX : !isLuma(compId) && pu.cu->bdpcmModeChroma ? BDPCM_IDX : PU::getFinalIntraMode(pu, channelType);
+#if JVET_AD0085_TMRL_EXTENSION
+  bool bExtIntraDir = false;
+#if JVET_W0123_TIMD_FUSION
+  bExtIntraDir |= (pu.cu->timd && isLuma(compId));
+#endif
+#if JVET_AD0085_TMRL_EXTENSION
+  bExtIntraDir |= (pu.cu->tmrlFlag && isLuma(compId));
+#endif
+#else
 #if JVET_W0123_TIMD_FUSION
   bool bExtIntraDir = pu.cu->timd && isLuma( compId );
+#endif
 #endif
 
   CHECK( floorLog2(iWidth) < 2 && pu.cs->pcv->noChroma2x2, "Size not allowed" );
@@ -2546,8 +2556,18 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
 {
   const ComponentID compId = area.compID;
   const ChannelType chType = toChannelType(compId);
+#if JVET_AD0085_TMRL_EXTENSION
+  bool bExtIntraDir = false;
+#if JVET_W0123_TIMD_FUSION
+  bExtIntraDir |= (pu.cu->timd && isLuma(chType));
+#endif
+#if JVET_AD0085_TMRL_EXTENSION
+  bExtIntraDir |= (pu.cu->tmrlFlag && isLuma(chType));
+#endif
+#else
 #if JVET_W0123_TIMD_FUSION
   bool bExtIntraDir = pu.cu->timd && isLuma( chType );
+#endif
 #endif
 
   const bool        useISP = NOT_INTRA_SUBPARTITIONS != pu.cu->ispMode && isLuma( chType );
@@ -2562,6 +2582,16 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
 #endif
 #if JVET_W0123_TIMD_FUSION
 #if JVET_AC0094_REF_SAMPLES_OPT
+#if JVET_AD0085_TMRL_EXTENSION
+  bool checkWideAngle = !bExtIntraDir ? true : (pu.cu->timdMode != INVALID_TIMD_IDX ? pu.cu->timdModeCheckWA : pu.cu->timdModeSecondaryCheckWA);
+
+  int predMode = checkWideAngle ? (bExtIntraDir ? getWideAngleExt(blockSize.width, blockSize.height, dirMode) : getModifiedWideAngle(blockSize.width, blockSize.height, dirMode))
+    : (bExtIntraDir ? getTimdWideAngleExt(blockSize.width, blockSize.height, dirMode) : getTimdWideAngle(blockSize.width, blockSize.height, dirMode));
+  if (pu.cu->tmrlFlag && isLuma(chType))
+  {
+    predMode = getWideAngleExt(blockSize.width, blockSize.height, dirMode);
+  }
+#else
   if (bExtIntraDir)
   {
     CHECK(pu.cu->timdMode != dirMode && pu.cu->timdModeSecondary != dirMode, "Unexpected dirMode");
@@ -2570,6 +2600,7 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
   const int predMode = checkWideAngle ? (bExtIntraDir ? getWideAngleExt(blockSize.width, blockSize.height, dirMode) : getModifiedWideAngle(blockSize.width, blockSize.height, dirMode))
                          : (bExtIntraDir ? getTimdWideAngleExt(blockSize.width, blockSize.height, dirMode) : getTimdWideAngle(blockSize.width, blockSize.height, dirMode));
   CHECK(!checkWideAngle && dirMode <= DC_IDX, "Unexpected mode");
+#endif
 #else
   const int     predMode = bExtIntraDir ? getWideAngleExt( blockSize.width, blockSize.height, dirMode ) : getModifiedWideAngle( blockSize.width, blockSize.height, dirMode );
 #endif
@@ -5599,6 +5630,119 @@ void IntraPrediction::deriveSgpmModeOrdered(const CPelBuf &recoBuf, const CompAr
 }
 #endif
 
+#if JVET_AD0085_MPM_SORTING
+void IntraPrediction::deriveMPMSorted(const PredictionUnit& pu, uint8_t* mpm, int& sortedSize, int iStartIdx)
+{
+  SizeType uiWidth = pu.lwidth();
+  SizeType uiHeight = pu.lheight();
+  const CompArea area = pu.Y();
+  int channelBitDepth = pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
+
+  static Pel predLuma[(MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE)];
+  memset(predLuma, 0, (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * sizeof(Pel));
+  Pel* piPred = predLuma;
+  uint32_t uiPredStride = MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE;
+
+  int      iCurX = pu.lx();
+  int      iCurY = pu.ly();
+  int      iRefX = -1, iRefY = -1;
+  uint32_t uiRefWidth = 0, uiRefHeight = 0;
+  int      iTempWidth = 1, iTempHeight = 1;
+
+  static_vector<uint8_t, NUM_MOST_PROBABLE_MODES> uiModeList;
+  static_vector<uint64_t, NUM_MOST_PROBABLE_MODES> uiCostList;
+  int iBestN = std::min(NUM_PRIMARY_MOST_PROBABLE_MODES - 1, sortedSize);
+  if (!pu.cs->pcv->isEncoder && pu.mpmFlag && pu.ipredIdx < iBestN)
+  {
+    iBestN = pu.ipredIdx;
+  }
+
+  TEMPLATE_TYPE eTempType = CU::deriveTimdRefType(iCurX, iCurY, uiWidth, uiHeight, iTempWidth, iTempHeight, iRefX,
+    iRefY, uiRefWidth, uiRefHeight);
+
+  if (eTempType == NO_NEIGHBOR)
+  {
+    return;
+  }
+
+  const CodingStructure& cs = *pu.cs;
+  m_ipaParam.multiRefIndex = iTempWidth;
+  Pel* piOrg = cs.picture->getRecoBuf(area).buf;
+  int  iOrgStride = cs.picture->getRecoBuf(area).stride;
+  piOrg += (iRefY - iCurY) * iOrgStride + (iRefX - iCurX);
+  DistParam distParamSad[2];   // above, left
+  distParamSad[0].applyWeight = false;
+  distParamSad[0].useMR = false;
+  distParamSad[1].applyWeight = false;
+  distParamSad[1].useMR = false;
+  if (eTempType == LEFT_ABOVE_NEIGHBOR)
+  {
+    m_timdSatdCost->setTimdDistParam(distParamSad[0], piOrg + iTempWidth, piPred + iTempWidth, iOrgStride,
+      uiPredStride, channelBitDepth, COMPONENT_Y, uiWidth, iTempHeight, 0, 1, false);   // Use HAD (SATD) cost
+    m_timdSatdCost->setTimdDistParam(distParamSad[1], piOrg + iTempHeight * iOrgStride,
+      piPred + iTempHeight * uiPredStride, iOrgStride, uiPredStride, channelBitDepth,
+      COMPONENT_Y, iTempWidth, uiHeight, 0, 1, false);
+  }
+  else if (eTempType == LEFT_NEIGHBOR)
+  {
+    m_timdSatdCost->setTimdDistParam(distParamSad[1], piOrg, piPred, iOrgStride, uiPredStride, channelBitDepth,
+      COMPONENT_Y, iTempWidth, uiHeight, 0, 1, false);
+  }
+  else if (eTempType == ABOVE_NEIGHBOR)
+  {
+    m_timdSatdCost->setTimdDistParam(distParamSad[0], piOrg, piPred, iOrgStride, uiPredStride, channelBitDepth,
+      COMPONENT_Y, uiWidth, iTempHeight, 0, 1, false);
+  }
+  initTimdIntraPatternLuma(*pu.cu, area, eTempType != ABOVE_NEIGHBOR ? iTempWidth : 0,
+    eTempType != LEFT_NEIGHBOR ? iTempHeight : 0, uiRefWidth, uiRefHeight);
+
+  uint32_t uiRealW = uiRefWidth + (eTempType == LEFT_NEIGHBOR ? iTempWidth : 0);
+  uint32_t uiRealH = uiRefHeight + (eTempType == ABOVE_NEIGHBOR ? iTempHeight : 0);
+
+  for (int i = iStartIdx; i < sortedSize; i++)
+  {
+    uint64_t uiCost = 0;
+    int      iMode = mpm[i];
+    if (iMode > DC_IDX)
+    {
+      iMode = MAP67TO131(iMode);
+    }
+    initPredTimdIntraParams(pu, area, iMode);
+    predTimdIntraAng(COMPONENT_Y, pu, iMode, piPred, uiPredStride, uiRealW, uiRealH, eTempType,
+      (eTempType == ABOVE_NEIGHBOR) ? 0 : iTempWidth,
+      (eTempType == LEFT_NEIGHBOR) ? 0 : iTempHeight);
+    if (eTempType == LEFT_ABOVE_NEIGHBOR)
+    {
+      uiCost += distParamSad[0].distFunc(distParamSad[0]);
+      uiCost += distParamSad[1].distFunc(distParamSad[1]);
+    }
+    else if (eTempType == LEFT_NEIGHBOR)
+    {
+      uiCost = distParamSad[1].distFunc(distParamSad[1]);
+    }
+    else if (eTempType == ABOVE_NEIGHBOR)
+    {
+      uiCost += distParamSad[0].distFunc(distParamSad[0]);
+    }
+    else
+    {
+      assert(0);
+    }
+
+    if (uiCostList.size() < iBestN || (uiCostList.size() >= iBestN && uiCost < uiCostList.back()))
+    {
+      updateCandList(mpm[i], uiCost, uiModeList, uiCostList, iBestN);
+    }
+  }
+
+  sortedSize = int(uiModeList.size()) + iStartIdx;
+  for (int i = 0; i < uiModeList.size(); i++)
+  {
+    mpm[i + iStartIdx] = uiModeList[i];
+  }
+}
+#endif
+
 #if JVET_AB0155_SGPM
 int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu, bool bFull, bool bHorVer)
 {
@@ -5701,7 +5845,11 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
     if (puLeftx && CU::isIntra(*puLeftx->cu))
     {
       uiIntraDirNeighbor[modeIdx] = PU::getIntraDirLuma(*puLeftx);
-      if (!puLeftx->cu->timd)
+      if (!puLeftx->cu->timd
+#if JVET_AD0085_TMRL_EXTENSION
+        && !puLeftx->cu->tmrlFlag
+#endif
+        )
       {
         uiIntraDirNeighbor[modeIdx] = MAP67TO131(uiIntraDirNeighbor[modeIdx]);
       }
@@ -5717,7 +5865,11 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
     if (puAbovex && CU::isIntra(*puAbovex->cu) && CU::isSameCtu(*pu.cu, *puAbovex->cu))
     {
       uiIntraDirNeighbor[modeIdx] = PU::getIntraDirLuma(*puAbovex);
-      if (!puAbovex->cu->timd)
+      if (!puAbovex->cu->timd
+#if JVET_AD0085_TMRL_EXTENSION
+        && !puAbovex->cu->tmrlFlag
+#endif
+        )
       {
         uiIntraDirNeighbor[modeIdx] = MAP67TO131(uiIntraDirNeighbor[modeIdx]);
       }
@@ -5733,7 +5885,11 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
     if (puLeftBottomx && CU::isIntra(*puLeftBottomx->cu))
     {
       uiIntraDirNeighbor[modeIdx] = PU::getIntraDirLuma(*puLeftBottomx);
-      if (!puLeftBottomx->cu->timd)
+      if (!puLeftBottomx->cu->timd
+#if JVET_AD0085_TMRL_EXTENSION
+        && !puLeftBottomx->cu->tmrlFlag
+#endif
+        )
       {
         uiIntraDirNeighbor[modeIdx] = MAP67TO131(uiIntraDirNeighbor[modeIdx]);
       }
@@ -5761,7 +5917,11 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
     if (puAboveRightx && CU::isIntra(*puAboveRightx->cu))
     {
       uiIntraDirNeighbor[modeIdx] = PU::getIntraDirLuma(*puAboveRightx);
-      if (!puAboveRightx->cu->timd)
+      if (!puAboveRightx->cu->timd
+#if JVET_AD0085_TMRL_EXTENSION
+        && !puAboveRightx->cu->tmrlFlag
+#endif
+        )
       {
         uiIntraDirNeighbor[modeIdx] = MAP67TO131(uiIntraDirNeighbor[modeIdx]);
       }
@@ -5787,7 +5947,11 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
     if (puAboveLeftx && CU::isIntra(*puAboveLeftx->cu))
     {
       uiIntraDirNeighbor[modeIdx] = PU::getIntraDirLuma(*puAboveLeftx);
-      if (!puAboveLeftx->cu->timd)
+      if (!puAboveLeftx->cu->timd
+#if JVET_AD0085_TMRL_EXTENSION
+        && !puAboveLeftx->cu->tmrlFlag
+#endif
+        )
       {
         uiIntraDirNeighbor[modeIdx] = MAP67TO131(uiIntraDirNeighbor[modeIdx]);
       }
@@ -13645,6 +13809,15 @@ void IntraPrediction::xPredTmrlIntraDc(const CPelBuf& pSrc, Pel* pDst, int iDstS
 
 Pel tmrlFiltering(Pel* pSrc, const int deltaFrac)
 {
+#if JVET_AD0085_TMRL_EXTENSION
+  const TFilterCoeff* const f = InterpolationFilter::getExtIntraCubicFilter(deltaFrac);
+  int val = 0;
+  for (int i = 0; i < 4; i++)
+  {
+    val += pSrc[i] * f[i];
+  }
+  val = (val + 128) >> 8;
+#else
   const TFilterCoeff IntraCubicFilter[32][4] =
   {
     {  0, 64,  0,  0 },
@@ -13687,6 +13860,7 @@ Pel tmrlFiltering(Pel* pSrc, const int deltaFrac)
     val += pSrc[i] * IntraCubicFilter[deltaFrac][i];
   }
   val = (val + 32) >> 6;
+#endif
   return Pel(val);
 }
 
@@ -13808,10 +13982,15 @@ void IntraPrediction::xPredTmrlIntraAng(const CPelBuf& pSrc, const ClpRng& clpRn
         iStartIdx = 0;
         iEndIdx = uiTemplateLeft;
       }
-
+#if JVET_AD0085_TMRL_EXTENSION
+      const int deltaInt = deltaPos >> 6;
+      const int deltaFract = deltaPos & 63;
+      if (!isIntegerSlopeExt(abs(intraPredAngle)))
+#else
       const int deltaInt = deltaPos >> 5;
       const int deltaFract = deltaPos & 31;
       if (!isIntegerSlope(abs(intraPredAngle)))
+#endif
       {
         CHECK(deltaInt + iStartIdx + lineOffset < -int(uiRefHeight), "over the prepared reference buffer.");
         for (int x = iStartIdx; x < iEndIdx; x++)
@@ -13872,6 +14051,27 @@ void IntraPrediction::initTmrlIntraParams(const PredictionUnit& pu, const CompAr
   const ChannelType chType = toChannelType(compId);
   const Size& blockSize = Size(pu.cu->blocks[compId].width, pu.cu->blocks[compId].height);
   const int      dirMode = PU::getFinalIntraMode(pu, chType);
+#if JVET_AD0085_TMRL_EXTENSION
+  const int     predMode = getWideAngleExt(blockSize.width, blockSize.height, dirMode);
+  m_ipaParam.isModeVer = predMode >= EXT_DIA_IDX;
+  m_ipaParam.multiRefIndex = pu.multiRefIdx;
+  m_ipaParam.refFilterFlag = false;
+  m_ipaParam.applyPDPC = false;
+  const int    intraPredAngleMode = (m_ipaParam.isModeVer) ? predMode - EXT_VER_IDX : -(predMode - EXT_HOR_IDX);
+  if (dirMode > DC_IDX)
+  {
+    int absAng = 0;
+    static const int extAngTable[64] = { 0, 1, 2, 3, 4, 5, 6,7, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 43, 46, 49, 52, 55, 58, 61, 64, 67, 70, 74, 78, 84, 90, 96, 102, 108, 114, 121, 128, 137, 146, 159, 172, 188, 204, 230, 256, 299, 342, 427, 512, 597, 682, 853, 1024, 1536, 2048, 3072 };
+    static const int extInvAngTable[64] = { 0, 32768, 16384, 10923, 8192, 6554, 5461, 4681, 4096, 3277, 2731, 2341, 2048, 1820, 1638, 1489, 1365, 1260, 1170, 1092, 1024, 964, 910, 862, 819, 762, 712, 669, 630, 596, 565, 537, 512, 489, 468, 443, 420, 390, 364, 341, 321, 303, 287, 271, 256, 239, 224, 206, 191, 174, 161, 142, 128, 110, 96, 77, 64, 55, 48, 38, 32, 21, 16, 11 }; // (512 * 64) / Angle
+
+    const int     absAngMode = abs(intraPredAngleMode);
+    const int     signAng = intraPredAngleMode < 0 ? -1 : 1;
+    absAng = extAngTable[absAngMode];
+
+    m_ipaParam.absInvAngle = extInvAngTable[absAngMode];
+    m_ipaParam.intraPredAngle = signAng * absAng;
+  }
+#else
   const int     predMode = getModifiedWideAngle(blockSize.width, blockSize.height, dirMode);
   m_ipaParam.isModeVer = predMode >= DIA_IDX;
   m_ipaParam.multiRefIndex = pu.multiRefIdx;
@@ -13895,6 +14095,7 @@ void IntraPrediction::initTmrlIntraParams(const PredictionUnit& pu, const CompAr
     m_ipaParam.absInvAngle = invAngTable[absAngMode];
     m_ipaParam.intraPredAngle = signAng * absAng;
   }
+#endif
 }
 
 void IntraPrediction::getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlRefList, uint8_t* tmrlIntraList, uint8_t& sizeRef, uint8_t& sizeMode)
@@ -13912,6 +14113,16 @@ void IntraPrediction::getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlR
     }
   }
 
+#if JVET_AD0085_TMRL_EXTENSION
+  sizeMode = TMRL_MPM_SIZE;
+  int numCand = getSpatialIpm(pu, tmrlIntraList, sizeMode
+#if JVET_AC0094_REF_SAMPLES_OPT
+                            , true
+#endif
+                            , true
+  );
+  fillMPMList(pu, tmrlIntraList, sizeMode, numCand, true);
+#else
   // intra mode candidates
   sizeMode = 0;
   const CodingStructure& cs = *pu.cs;
@@ -14141,6 +14352,7 @@ void IntraPrediction::getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlR
       includedMode[tmrlIntraList[sizeMode++]] = true;
     }
   }
+#endif
 }
 
 void IntraPrediction::getTmrlList(CodingUnit& cu)

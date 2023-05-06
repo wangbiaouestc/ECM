@@ -380,11 +380,27 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #if SECONDARY_MPM
           uint8_t* mpmPred = currCU.firstPU->intraMPM;  // mpm_idx / rem_intra_luma_pred_mode
           uint8_t* nonMpmPred = currCU.firstPU->intraNonMPM;
+#if JVET_AD0085_MPM_SORTING
+          if (PU::allowMPMSorted(*currCU.firstPU) && !(currCU.firstPU->mpmFlag && currCU.firstPU->ipredIdx == 0))
+          {
+            PU::getIntraMPMs(*currCU.firstPU, mpmPred, nonMpmPred
+#if JVET_AC0094_REF_SAMPLES_OPT
+                           , true
+#endif
+                           , m_pcIntraPred
+            );
+          }
+          else
+          {
+#endif
           PU::getIntraMPMs( *currCU.firstPU, mpmPred, nonMpmPred
 #if JVET_AC0094_REF_SAMPLES_OPT
                            , false
 #endif
           );
+#if JVET_AD0085_MPM_SORTING
+          }
+#endif
 #else
           unsigned int mpmPred[NUM_MOST_PROBABLE_MODES];  // mpm_idx / rem_intra_luma_pred_mode
           PU::getIntraMPMs(*currCU.firstPU, mpmPred);

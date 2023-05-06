@@ -1605,6 +1605,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AD0082_TMRL_CONFIG
   WRITE_FLAG(pcSPS->getUseTmrl() ? 1 : 0, "sps_tmrl_enabled_flag");
 #endif
+#if JVET_AD0085_MPM_SORTING
+  WRITE_FLAG(pcSPS->getUseMpmSorting() ? 1 : 0, "sps_mpm_sorting_enabled_flag");
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   WRITE_UVLC(pcSPS->getUseCccm() , "sps_cccm_cand");
 #endif

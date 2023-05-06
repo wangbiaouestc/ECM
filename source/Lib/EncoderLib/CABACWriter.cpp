@@ -1686,7 +1686,31 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
         if( secondaryMPMIdx < NUM_SECONDARY_MOST_PROBABLE_MODES )
         {
           m_BinEncoder.encodeBin(1, Ctx::IntraLumaSecondMpmFlag());
+#if JVET_AD0085_MPM_SORTING
+          if (cu.cs->sps->getUseMpmSorting())
+          {
+            int ctxId = 0;
+            const int maxNumCtxBins = (NUM_SECONDARY_MOST_PROBABLE_MODES / 4) - 1;
+            int prefixIdx = secondaryMPMIdx / 4;
+            for (int val = 0; val < maxNumCtxBins; val++)
+            {
+              unsigned int bin = (val == prefixIdx ? 0 : 1);
+              m_BinEncoder.encodeBin(bin, Ctx::IntraLumaSecondMpmIdx(ctxId++));
+              if (!bin)
+              {
+                break;
+              }
+            }
+
+            m_BinEncoder.encodeBinsEP(secondaryMPMIdx - prefixIdx * 4, 2);
+          }
+          else
+          {
+#endif
           m_BinEncoder.encodeBinsEP( secondaryMPMIdx, 4);
+#if JVET_AD0085_MPM_SORTING
+          }
+#endif
 #if ENABLE_TRACING && (ENABLE_DIMD || JVET_W0123_TIMD_FUSION)
           pred_idx = secondaryMPMIdx + NUM_PRIMARY_MOST_PROBABLE_MODES;
           secondMpmFlag = true;
@@ -1893,21 +1917,45 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
     { 
 #if SECONDARY_MPM
       auto secondMpmPred = mpmPred + NUM_PRIMARY_MOST_PROBABLE_MODES;
-      unsigned   second_mpm_idx = NUM_SECONDARY_MOST_PROBABLE_MODES;
+      unsigned   secondMpmIdx = NUM_SECONDARY_MOST_PROBABLE_MODES;
 
       for (unsigned idx = 0; idx < NUM_SECONDARY_MOST_PROBABLE_MODES; idx++)
       {
         if (ipredMode == secondMpmPred[idx])
         {
-          second_mpm_idx = idx;
+          secondMpmIdx = idx;
           break;
         }
       }
 
-      if (second_mpm_idx < NUM_SECONDARY_MOST_PROBABLE_MODES)
+      if (secondMpmIdx < NUM_SECONDARY_MOST_PROBABLE_MODES)
       {
         m_BinEncoder.encodeBin(1, Ctx::IntraLumaSecondMpmFlag());
-        m_BinEncoder.encodeBinsEP(second_mpm_idx, 4);
+#if JVET_AD0085_MPM_SORTING
+        if (pu.cs->sps->getUseMpmSorting())
+        {
+          int ctxId = 0;
+          const int maxNumCtxBins = (NUM_SECONDARY_MOST_PROBABLE_MODES / 4) - 1;
+          int prefixIdx = secondMpmIdx / 4;
+          for (int val = 0; val < maxNumCtxBins; val++)
+          {
+            unsigned int bin = (val == prefixIdx ? 0 : 1);
+            m_BinEncoder.encodeBin(bin, Ctx::IntraLumaSecondMpmIdx(ctxId++));
+            if (!bin)
+            {
+              break;
+            }
+          }
+
+          m_BinEncoder.encodeBinsEP(secondMpmIdx - prefixIdx * 4, 2);
+        }
+        else
+        {
+#endif
+        m_BinEncoder.encodeBinsEP(secondMpmIdx, 4);
+#if JVET_AD0085_MPM_SORTING
+        }
+#endif
       }
       else
       {

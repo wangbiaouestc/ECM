@@ -479,6 +479,9 @@ protected:
 #if JVET_AD0082_TMRL_CONFIG
   bool      m_tmrl;
 #endif
+#if JVET_AD0085_MPM_SORTING
+  bool      m_mpmSorting;
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int       m_cccm;
 #endif
@@ -1580,6 +1583,10 @@ public:
 #if JVET_AD0082_TMRL_CONFIG
   void      setUseTmrl                   (bool b)         { m_tmrl = b; }
   bool      getUseTmrl                   ()         const { return m_tmrl; }
+#endif
+#if JVET_AD0085_MPM_SORTING
+  void      setUseMpmSorting             (bool b)         { m_mpmSorting = b; }
+  bool      getUseMpmSorting             () const         { return m_mpmSorting; }
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   void      setUseCccm                   (int i)          { m_cccm = i; }
