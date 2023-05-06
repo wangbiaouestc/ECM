@@ -1117,6 +1117,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AD0082_TMRL_CONFIG
   ("TMRL",                                            m_tmrl,                                            true,  "Enable template based multiple reference line intra prediction\n")
 #endif
+#if JVET_AD0085_MPM_SORTING
+  ( "MPMSorting",                                     m_mpmSorting,                                      true,  "Enable template-based intra MPM list construction\n" )
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   ( "CCCM",                                           m_cccm,                                               2,  "CCCM mode (0:off, 1:on, 2:on subsampling and no subsampling)  [default: 2]")
 #endif
@@ -5417,6 +5420,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AD0082_TMRL_CONFIG
   msg(VERBOSE, "TMRL:%d ", m_tmrl);
+#endif
+#if JVET_AD0085_MPM_SORTING
+  msg(VERBOSE, "MPMSorting:%d ", m_mpmSorting);
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   msg(VERBOSE, "CCCM:%d ", m_cccm);

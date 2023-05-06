@@ -894,6 +894,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AD0082_TMRL_CONFIG
   m_cEncLib.setUseTmrl                                           ( m_tmrl );
 #endif
+#if JVET_AD0085_MPM_SORTING
+  m_cEncLib.setUseMpmSorting                                     ( m_mpmSorting );
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   m_cEncLib.setUseCccm                                           ( m_cccm );
 #endif

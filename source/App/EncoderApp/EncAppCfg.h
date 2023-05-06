@@ -472,6 +472,9 @@ protected:
 #if JVET_AD0082_TMRL_CONFIG
   bool      m_tmrl;
 #endif
+#if JVET_AD0085_MPM_SORTING
+  bool      m_mpmSorting;
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int       m_cccm;
 #endif

@@ -1400,6 +1400,23 @@ const CtxSet ContextSetCfg::IntraLumaMPMIdx = ContextSetCfg::addCtxSet
   { 121, 126, 119, },
   { 119, 109, 121, },
   });
+
+#if JVET_AD0085_MPM_SORTING
+const CtxSet ContextSetCfg::IntraLumaSecondMpmIdx = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU, CNU },
+  { DWS, DWS, DWS, DWS, DWS },
+  { DWS, DWS, DWS, DWS, DWS },
+  { DWS, DWS, DWS, DWS, DWS },
+  { DWE, DWE, DWE, DWE, DWE },
+  { DWE, DWE, DWE, DWE, DWE },
+  { DWE, DWE, DWE, DWE, DWE },
+  { 119, 119, 119, 119, 119 },
+  { 119, 119, 119, 119, 119 },
+  });
+#endif
 #endif
 
 const CtxSet ContextSetCfg::IntraLumaPlanarFlag = ContextSetCfg::addCtxSet
@@ -3803,6 +3820,17 @@ const CtxSet ContextSetCfg::IntraLumaMPMIdx = ContextSetCfg::addCtxSet
 	{ 4,  1,  6 },
 	{ 2,  2,  6 }
 });
+#if JVET_AD0085_MPM_SORTING
+const CtxSet ContextSetCfg::IntraLumaSecondMpmIdx = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU, CNU },
+  { DWS, DWS, DWS, DWS, DWS },
+  { DWS, DWS, DWS, DWS, DWS },
+  { DWS, DWS, DWS, DWS, DWS },
+  });
+#endif
 #endif
 
 const CtxSet ContextSetCfg::CclmModeFlag = ContextSetCfg::addCtxSet
@@ -5350,6 +5378,15 @@ const CtxSet ContextSetCfg::IntraLumaMPMIdx = ContextSetCfg::addCtxSet
 	{ 20, 44, 35 },
 	{ 2,  2,  6 }
   });
+#if JVET_AD0085_MPM_SORTING
+const CtxSet ContextSetCfg::IntraLumaSecondMpmIdx = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU, CNU },
+  { DWS, DWS, DWS, DWS, DWS },
+  });
+#endif
 #endif
 
 const CtxSet ContextSetCfg::CclmModeFlag = ContextSetCfg::addCtxSet

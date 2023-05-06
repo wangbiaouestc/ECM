@@ -2114,6 +2114,7 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
 
   for( int k = 0; k < numBlocks; k++ )
   {
+#if !JVET_AD0085_TMRL_EXTENSION
 #if SECONDARY_MPM
     PU::getIntraMPMs( *pu, mpmPred, nonMpmPred
 #if JVET_AC0094_REF_SAMPLES_OPT
@@ -2122,6 +2123,7 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
     );
 #else
     PU::getIntraMPMs(*pu, mpmPred);
+#endif
 #endif
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
     pu->parseLumaMode = true;
@@ -2179,7 +2181,33 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
       if( m_BinDecoder.decodeBin( Ctx::IntraLumaSecondMpmFlag() ) )
       {
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
+#if JVET_AD0085_MPM_SORTING
+        int idx = 0;
+        if (cu.cs->sps->getUseMpmSorting())
+        {
+          const int maxNumCtxBins = (NUM_SECONDARY_MOST_PROBABLE_MODES / 4) - 1;
+          int prefixIdx = 0;
+          int ctxId = 0;
+          for (int val = 0; val < maxNumCtxBins; val++)
+          {
+            unsigned int bin = m_BinDecoder.decodeBin(Ctx::IntraLumaSecondMpmIdx(ctxId++));
+            prefixIdx += bin;
+            if (!bin)
+            {
+              break;
+            }
+          }
+
+          idx = m_BinDecoder.decodeBinsEP(2) + prefixIdx * 4;
+          idx += NUM_PRIMARY_MOST_PROBABLE_MODES;
+        }
+        else
+        {
+          idx = m_BinDecoder.decodeBinsEP(4) + NUM_PRIMARY_MOST_PROBABLE_MODES;
+        }
+#else
         int idx = m_BinDecoder.decodeBinsEP( 4 ) + NUM_PRIMARY_MOST_PROBABLE_MODES;
+#endif
         ipredMode = mpmPred[idx];
         pu->secondMpmFlag = true;
         pu->ipredIdx = idx;

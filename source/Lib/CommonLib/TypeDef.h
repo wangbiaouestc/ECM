@@ -173,11 +173,13 @@
 #define JVET_AB0157_TMRL                                  1 // JVET-AB0157: Template-based multiple reference line intra prediction
 #if JVET_AB0157_TMRL
 #define JVET_AD0082_TMRL_CONFIG                           1 // JVET-AD0082: a configuration option for TMRL
+#define JVET_AD0085_TMRL_EXTENSION                        1 // JVET-AD0085: TMRL angular extension and intra candidate list modifications
 #endif
 #define JVET_AB0157_INTRA_FUSION                          1 // JVET-AB0157: Intra prediction fusion
 #define JVET_AC0094_REF_SAMPLES_OPT                       1 // JVET-AC0094: Optimizing the use of reference samples
 #define JVET_AC0105_DIRECTIONAL_PLANAR                    1 // JVET-AC0105: Directional planar
 #define JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS        1 // JVET-AD0184: Removal of division operations
+#define JVET_AD0085_MPM_SORTING                           1 // JVET-AD0085: Template-based intra MPM list construction
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
