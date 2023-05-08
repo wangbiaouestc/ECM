@@ -263,6 +263,12 @@ public:
 
   LutMotionCand motionLut;
 
+#if JVET_AD0188_CCP_MERGE
+  LutCCP                 ccpLut;
+  template<class T> void addCCPToLut(static_vector<T, MAX_NUM_HCCP_CANDS> &lut, const T &model, int reusePos);
+  template<class T> void getOneModelFromCCPLut(const static_vector<T, MAX_NUM_HCCP_CANDS> &lut, T &model, int pos);
+#endif
+
   void addMiToLut(static_vector<MotionInfo, MAX_NUM_HMVP_CANDS>& lut, const MotionInfo &mi);
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   void addMiToLutIBC(static_vector<MotionInfo, MAX_NUM_HMVP_IBC_CANDS>& lut, const MotionInfo &mi);
@@ -520,5 +526,44 @@ private:
 
 static inline uint32_t getNumberValidTBlocks(const PreCalcValues& pcv) { return (pcv.chrFormat==CHROMA_400) ? 1 : ( pcv.multiBlock422 ? MAX_NUM_TBLOCKS : MAX_NUM_COMPONENT ); }
 
+#if JVET_AD0188_CCP_MERGE
+template<class T>
+void CodingStructure::addCCPToLut(static_vector<T, MAX_NUM_HCCP_CANDS> &lut, const T &model, int reusePos)
+{
+  int currCnt = (int) lut.size();
+
+  int erasePos = 0;
+
+  if (reusePos == -1)
+  {
+    for (int j = 0; j < currCnt; j++)
+    {
+      if (lut[currCnt - j - 1] == model)
+      {
+        reusePos = j;
+        break;
+      }
+    }
+  }
+  if (reusePos != -1)
+  {
+    erasePos = currCnt - 1 - reusePos;   // reverse the order
+  }
+  if (reusePos != -1 || currCnt == lut.capacity())
+  {
+    lut.erase(lut.begin() + erasePos);
+  }
+  lut.push_back(model);
+}
+
+template<class T>
+void CodingStructure::getOneModelFromCCPLut(const static_vector<T, MAX_NUM_HCCP_CANDS> &lut, T &model, int pos)
+{
+  size_t currCnt = lut.size();
+  CHECK(pos >= currCnt, "Invalid entry in CCP LUT");
+  model = lut[currCnt - pos - 1];
+}
+
+#endif
 #endif
 

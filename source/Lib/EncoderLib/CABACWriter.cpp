@@ -2279,6 +2279,13 @@ void CABACWriter::glmIdc(const PredictionUnit& pu)
 #endif
 void CABACWriter::intra_chroma_lmc_mode(const PredictionUnit& pu)
 {
+#if JVET_AD0188_CCP_MERGE
+  nonLocalCCPIndex(pu);
+  if (pu.idxNonLocalCCP)
+  {
+    return;
+  }
+#endif
   const unsigned intraDir = pu.intraDir[1];
 #if MMLM
   int lmModeList[NUM_CHROMA_MODE];
@@ -2336,6 +2343,23 @@ void CABACWriter::intra_chroma_lmc_mode(const PredictionUnit& pu)
   cclmDeltaSlope( pu );
 #endif
 }
+
+#if JVET_AD0188_CCP_MERGE
+void CABACWriter::nonLocalCCPIndex(const PredictionUnit &pu)
+{
+  if (PU::hasNonLocalCCP(pu))
+  {
+    CHECK(pu.idxNonLocalCCP < 0 || pu.idxNonLocalCCP > MAX_CCP_CAND_LIST_SIZE, "Invalid idxNonLocalCCP");
+    {
+      m_BinEncoder.encodeBin(pu.idxNonLocalCCP ? 1 : 0, Ctx::nonLocalCCP(0));
+      if (pu.idxNonLocalCCP)
+      {
+        unary_max_eqprob(pu.idxNonLocalCCP - 1, MAX_CCP_CAND_LIST_SIZE - 1);
+      }
+    }
+  }
+}
+#endif
 
 #if JVET_AA0057_CCCM
 void CABACWriter::cccmFlag(const PredictionUnit& pu)

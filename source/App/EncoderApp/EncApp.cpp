@@ -900,6 +900,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   m_cEncLib.setUseCccm                                           ( m_cccm );
 #endif
+#if JVET_AD0188_CCP_MERGE
+  m_cEncLib.setUseCcpMerge                                       ( m_ccpMerge );
+#endif
 #if ENABLE_OBMC
   m_cEncLib.setUseObmc                                           ( m_OBMC );
 #endif

@@ -3415,6 +3415,23 @@ const CtxSet ContextSetCfg::TmrlDerive = ContextSetCfg::addCtxSet
   });
 #endif
 
+#if JVET_AD0188_CCP_MERGE
+const CtxSet ContextSetCfg::nonLocalCCP = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+});
+#endif
+
 #elif SLICE_TYPE_WIN_SIZE
 const CtxSet ContextSetCfg::SplitFlag = ContextSetCfg::addCtxSet
 ({

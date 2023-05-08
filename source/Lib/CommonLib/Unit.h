@@ -539,6 +539,10 @@ struct IntraPredictionData
   int       cccmMultiFilterIdx;
 #endif
 #endif
+#if JVET_AD0188_CCP_MERGE
+  int       idxNonLocalCCP;
+  CCPModelCandidate curCand;
+#endif
 };
 
 struct InterPredictionData

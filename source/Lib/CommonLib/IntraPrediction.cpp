@@ -2312,6 +2312,16 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
     CccmModel<GLM_NUM_PARAMS> glmModel(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
     xGlmCalcModel(pu, compID, chromaArea, glmModel);
     xGlmApplyModel(pu, compID, chromaArea, glmModel, piPred);
+
+ #if JVET_AD0188_CCP_MERGE
+    const_cast<PredictionUnit &>(pu).curCand.type   = CCP_TYPE_GLM4567;
+    const_cast<PredictionUnit &>(pu).curCand.glmIdc = pu.glmIdc.getIdc(compID, 0);
+    PU::glmModelToCcpParams(compID, const_cast<PredictionUnit&>(pu).curCand, glmModel 
+#if JVET_AB0174_CCCM_DIV_FREE
+                            , m_glmLumaOffset
+#endif
+                            );
+#endif
     return;
   }
 #endif
@@ -2374,6 +2384,17 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
 #if MMLM
   xUpdateCclmModel(cclmModel.a2, cclmModel.b2, cclmModel.shift2, cclmModel.midLuma2, compID == COMPONENT_Cb ? pu.cclmOffsets.cb1 : pu.cclmOffsets.cr1);
 #endif
+#endif
+
+#if JVET_AD0188_CCP_MERGE
+  int glmIdc = pu.glmIdc.getIdc(compID, 0);
+  const_cast<PredictionUnit&>(pu).curCand.type = (glmIdc > 0) ? CCP_TYPE_GLM0123 : CCP_TYPE_CCLM;
+  if (PU::isMultiModeLM(pu.intraDir[1]))
+  {
+    const_cast<PredictionUnit&>(pu).curCand.type |= CCP_TYPE_MMLM;
+  }
+  const_cast<PredictionUnit&>(pu).curCand.glmIdc = glmIdc;
+  PU::cclmModelToCcpParams(compID, const_cast<PredictionUnit&>(pu).curCand, cclmModel);
 #endif
 
   ////// final prediction
@@ -3361,6 +3382,16 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
   }
 #endif
   predIntraChromaLM(compId, predLmBuffer, pu2, area, pu2.intraDir[1]);
+
+#if JVET_AD0188_CCP_MERGE
+  const_cast<PredictionUnit&>(pu).curCand = pu2.curCand;
+  const_cast<PredictionUnit &>(pu).curCand.type = CCP_TYPE_CCLM;
+  if (PU::isMultiModeLM(pu2.intraDir[1]))
+  {
+    const_cast<PredictionUnit&>(pu).curCand.type |= CCP_TYPE_MMLM;
+  }
+#endif
+
 #if JVET_AC0071_DBV && JVET_AA0070_RRIBC
   if (pu.intraDir[1] == DBV_CHROMA_IDX && pu.cu->rribcFlipType != 0)
   {
@@ -12533,6 +12564,2826 @@ int IntraPrediction::calcTemplateDiff( Pel* ref, unsigned int uiStride, Pel** ta
 #endif
 #endif
 
+
+#if JVET_AD0188_CCP_MERGE
+void IntraPrediction::xGlmApplyModelOffset(const PredictionUnit &pu, const ComponentID compId,
+                                           const CompArea &chromaArea, CccmModel<GLM_NUM_PARAMS> &glmModel, int glmIdc,
+                                           PelBuf &piPred, int lumaOffset, int chromaOffset) const
+{
+  const ClpRng &clpRng(pu.cu->cs->slice->clpRng(compId));
+  static Pel    samples[GLM_NUM_PARAMS];
+
+  CPelBuf refLumaBlk = xGlmGetGradPuBuf(pu, chromaArea, 0);
+  CPelBuf refGradBlk = xGlmGetGradPuBuf(pu, chromaArea, glmIdc);
+
+  for (int y = 0; y < refLumaBlk.height; y++)
+  {
+    for (int x = 0; x < refLumaBlk.width; x++)
+    {
+      samples[0] = refGradBlk.at(x, y);                // luma gradient
+      samples[1] = refLumaBlk.at(x, y) + lumaOffset;   // luma value
+      samples[2] = glmModel.bias();
+
+      piPred.at(x, y) = ClipPel<Pel>(glmModel.convolve(samples) + chromaOffset, clpRng);
+    }
+  }
+}
+void IntraPrediction::xCccmApplyModelOffset(const PredictionUnit &pu, const ComponentID compId,
+                                            const CccmModel<CCCM_NUM_PARAMS> &cccmModel, int modelId, int modelThr,
+                                            PelBuf &piPred, int lumaOffset, int chromaOffset[], int type,int refSizeX, int refSizeY) const
+{
+  const ClpRng &clpRng(pu.cu->cs->slice->clpRng(compId));
+  static Pel    samples[CCCM_NUM_PARAMS];
+
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu);
+
+  int offset = modelId == 2 ? chromaOffset[1] : chromaOffset[0];
+
+  if (type & CCP_TYPE_CCCM)
+  {
+    for (int y = 0; y < refLumaBlk.height; y++)
+    {
+      for (int x = 0; x < refLumaBlk.width; x++)
+      {
+        if (modelId == 1 && (refLumaBlk.at(x, y) + lumaOffset) > modelThr)   // Model 1: Include only samples below or equal to the threshold
+        {
+          continue;
+        }
+        if (modelId == 2 && (refLumaBlk.at(x, y) + lumaOffset) <= modelThr)   // Model 2: Include only samples above the threshold
+        {
+          continue;
+        }
+
+        // 7-tap cross
+        samples[0] = refLumaBlk.at(x, y) + lumaOffset;       // C
+        samples[1] = refLumaBlk.at(x, y - 1) + lumaOffset;   // N
+        samples[2] = refLumaBlk.at(x, y + 1) + lumaOffset;   // S
+        samples[3] = refLumaBlk.at(x - 1, y) + lumaOffset;   // W
+        samples[4] = refLumaBlk.at(x + 1, y) + lumaOffset;   // E
+        samples[5] = const_cast<CccmModel<CCCM_NUM_PARAMS> &>(cccmModel).nonlinear(refLumaBlk.at(x, y) + lumaOffset);
+        samples[6] = const_cast<CccmModel<CCCM_NUM_PARAMS> &>(cccmModel).bias();
+
+        piPred.at(x, y) = ClipPel<Pel>(const_cast<CccmModel<CCCM_NUM_PARAMS> &>(cccmModel).convolve(samples) + offset, clpRng);
+      }
+    }
+  }
+#if JVET_AC0054_GLCCCM
+  else if (type & CCP_TYPE_GLCCCM)
+  {
+    for (int y = 0; y < refLumaBlk.height; y++)
+    {
+      for (int x = 0; x < refLumaBlk.width; x++)
+      {
+        if (modelId == 1 && (refLumaBlk.at(x, y) + lumaOffset) > modelThr)   // Model 1: Include only samples below or equal to the threshold
+        {
+          continue;
+        }
+        if (modelId == 2 && (refLumaBlk.at(x, y) + lumaOffset) <= modelThr)   // Model 2: Include only samples above the threshold
+        {
+          continue;
+        }
+
+        samples[0] = refLumaBlk.at(x, y) + lumaOffset;   // C
+        samples[1] = (2 * refLumaBlk.at(x, y - 1) + refLumaBlk.at(x - 1, y - 1) + refLumaBlk.at(x + 1, y - 1))
+                   - (2 * refLumaBlk.at(x, y + 1) + refLumaBlk.at(x - 1, y + 1) + refLumaBlk.at(x + 1, y + 1));   // Vertical gradient
+        samples[2] = (2 * refLumaBlk.at(x - 1, y) + refLumaBlk.at(x - 1, y - 1) + refLumaBlk.at(x - 1, y + 1))
+                   - (2 * refLumaBlk.at(x + 1, y) + refLumaBlk.at(x + 1, y - 1) + refLumaBlk.at(x + 1, y + 1));   // Horizontal gradient
+        samples[3] = ((y + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);   // Y coordinate
+        samples[4] = ((x + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);   // X coordinate
+        samples[5] = const_cast<CccmModel<CCCM_NUM_PARAMS> &>(cccmModel).nonlinear(refLumaBlk.at(x, y) + lumaOffset);
+        samples[6] = const_cast<CccmModel<CCCM_NUM_PARAMS> &>(cccmModel).bias();
+
+        piPred.at(x, y) = ClipPel<Pel>(const_cast<CccmModel<CCCM_NUM_PARAMS> &>(cccmModel).convolve(samples) + offset, clpRng);
+      }
+    }
+  }
+#endif
+  else
+  {
+    THROW("Invalid type");
+  }
+}
+
+#if JVET_AD0202_CCCM_MDF
+void IntraPrediction::xMFCccmApplyModelOffset1(const PredictionUnit &pu, const ComponentID compId,
+                                               const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> &cccmModel, int modelId,
+                                               int modelThr, PelBuf &piPred, int lumaOffset, int chromaOffset[2]) const
+{
+  const  ClpRng& clpRng(pu.cu->cs->slice->clpRng(compId));
+  static Pel     samples[CCCM_MULTI_PRED_FILTER_NUM_PARAMS];
+
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  CHECK(pu.cccmNoSubFlag, "cccmNoSubFlag shall be disabled");
+#endif
+#if JVET_AC0054_GLCCCM
+  int refSizeX = m_cccmBlkArea.x - m_cccmRefArea.x; // Reference lines available left and above
+  int refSizeY = m_cccmBlkArea.y - m_cccmRefArea.y;
+#endif
+  CPelBuf refLumaBlk1, refLumaBlk2, refLumaBlk3;
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu, 0, 3, &refLumaBlk1, &refLumaBlk3, &refLumaBlk2);
+
+  int offset = modelId == 2 ? chromaOffset[1] : chromaOffset[0];
+
+  for (int y = 0; y < refLumaBlk.height; y++)
+  {
+    for (int x = 0; x < refLumaBlk.width; x++)
+    {
+      if (modelId == 1 && (refLumaBlk.at(x, y) + lumaOffset) > modelThr) // Model 1: Include only samples below or equal to the threshold
+      {
+        continue;
+      }
+      if (modelId == 2 && (refLumaBlk.at(x, y) + lumaOffset) <= modelThr) // Model 2: Include only samples above the threshold
+      {
+        continue;
+      }
+
+      // 7-tap cross
+      samples[0] = refLumaBlk.at(x, y) + lumaOffset; // C
+      samples[1] = refLumaBlk1.at(x, y) + lumaOffset; // W
+      samples[2] = refLumaBlk2.at(x, y) + lumaOffset; // E
+      samples[3] = refLumaBlk3.at(x, y) + lumaOffset;
+      samples[4] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>&>(cccmModel).nonlinear(refLumaBlk.at(x, y) + lumaOffset);
+      samples[5] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>&>(cccmModel).nonlinear(refLumaBlk1.at(x, y) + lumaOffset);
+      samples[6] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>&>(cccmModel).nonlinear(refLumaBlk2.at(x, y) + lumaOffset);
+      samples[7] = ((y + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+      samples[8] = ((x + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+      samples[9] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>&>(cccmModel).bias();
+
+      piPred.at(x, y) = ClipPel<Pel>(const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>&>(cccmModel).convolve(samples) + offset, clpRng);
+    }
+  }
+}
+
+void IntraPrediction::xMFCccmApplyModelOffset23(const PredictionUnit &pu, const ComponentID compId,
+                                                const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> &cccmModel, int modelId,
+                                                int modelThr, PelBuf &piPred, int lumaOffset, int chromaOffset[2]) const
+{
+  const  ClpRng& clpRng(pu.cu->cs->slice->clpRng(compId));
+  static Pel     samples[CCCM_MULTI_PRED_FILTER_NUM_PARAMS2];
+
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  CHECK(pu.cccmNoSubFlag, "cccmNoSubFlag shall be disabled");
+#endif
+#if JVET_AC0054_GLCCCM
+  int refSizeX = m_cccmBlkArea.x - m_cccmRefArea.x; // Reference lines available left and above
+  int refSizeY = m_cccmBlkArea.y - m_cccmRefArea.y;
+#endif
+  CPelBuf refLumaBlk1, refLumaBlk3;
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu, 0, 2, &refLumaBlk1, &refLumaBlk3);
+  int offset = modelId == 2 ? chromaOffset[1] : chromaOffset[0];
+
+  for (int y = 0; y < refLumaBlk.height; y++)
+  {
+    for (int x = 0; x < refLumaBlk.width; x++)
+    {
+      if (modelId == 1 && (refLumaBlk.at(x, y) + lumaOffset) > modelThr) // Model 1: Include only samples below or equal to the threshold
+      {
+        continue;
+      }
+      if (modelId == 2 && (refLumaBlk.at(x, y) + lumaOffset) <= modelThr) // Model 2: Include only samples above the threshold
+      {
+        continue;
+      }
+
+      // 7-tap cross
+      if (pu.cccmMultiFilterIdx == 2)
+      {
+        samples[0] = refLumaBlk.at(x, y) + lumaOffset; // C
+        samples[1] = refLumaBlk.at(x - 1, y) + lumaOffset; // W
+        samples[2] = refLumaBlk.at(x + 1, y) + lumaOffset; // E
+        samples[3] = refLumaBlk1.at(x, y) + lumaOffset; // C
+        samples[4] = refLumaBlk1.at(x - 1, y) + lumaOffset; // W
+        samples[5] = refLumaBlk1.at(x + 1, y) + lumaOffset; // E
+        samples[6] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x, y)) + lumaOffset;
+        samples[7] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x - 1, y)) + lumaOffset;
+        samples[8] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x + 1, y)) + lumaOffset;
+        samples[9] = ((x + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+        samples[10] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).bias();
+      }
+      else if (pu.cccmMultiFilterIdx == 3)
+      {
+        samples[0] = refLumaBlk.at(x, y) + lumaOffset; // C
+        samples[1] = refLumaBlk.at(x + 1, y - 1) + lumaOffset; // EN
+        samples[2] = refLumaBlk.at(x - 1, y + 1) + lumaOffset; // WS
+        samples[3] = refLumaBlk3.at(x, y) + lumaOffset; // C
+        samples[4] = refLumaBlk3.at(x + 1, y - 1) + lumaOffset; // EN
+        samples[5] = refLumaBlk3.at(x - 1, y + 1) + lumaOffset; // WS
+        samples[6] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x, y)) + lumaOffset;
+        samples[7] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x + 1, y - 1)) + lumaOffset;
+        samples[8] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x - 1, y + 1)) + lumaOffset;
+        samples[9] = ((y + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+        samples[10] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).bias();
+      }
+      else
+      {
+        THROW("Invalid cccmMultiFilterIdx");
+      }
+
+      piPred.at(x, y) = ClipPel<Pel>(const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).convolve(samples) + offset, clpRng);
+    }
+  }
+}
+
+void IntraPrediction::xGetUpdatedOffsetMFCCCM1(const PredictionUnit& pu, const ComponentID compID, int modelNum,
+                                               const CompArea& chromaArea, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModel[2],
+                                               int modelThr, int lumaOffset, int chromaOffset[], int type, int refSizeX, int refSizeY)
+{
+  CHECK(compID != chromaArea.compID, "Invalid component ID");
+
+  static Pel samples[CCCM_MULTI_PRED_FILTER_NUM_PARAMS];
+
+  CPelBuf refLumaBlk1, refLumaBlk2, refLumaBlk3;
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu, 0, 3, &refLumaBlk1, &refLumaBlk3, &refLumaBlk2);
+
+  const SizeType cWidth = chromaArea.width;
+  const SizeType cHeight = chromaArea.height;
+
+  CodingStructure& cs = *(pu.cs);
+  const CodingUnit& cu = *(pu.cu);
+
+  const bool aboveAvailable = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID)) ? true : false;
+  const bool leftAvailable  = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID)) ? true : false;
+
+  const Pel* curChroma0;
+
+  PelBuf chromaReco = cs.picture->getRecoBuf(chromaArea);
+  Pel* curChromaBuf = chromaReco.buf;
+  const int curStride = chromaReco.stride;
+
+  int totalOffset[2] = { 0, 0 };
+  int count[2] = { 0, 0 };
+
+  Pel predChroma;
+
+  if (aboveAvailable)
+  {
+    curChroma0 = curChromaBuf - curStride;
+#if MMLM
+    if (type & CCP_TYPE_MMLM)
+    {
+      for (int pos = 0; pos < cWidth; pos++)
+      {
+        samples[0] = refLumaBlk.at(pos, -1) + lumaOffset; // C
+        samples[1] = refLumaBlk1.at(pos, -1) + lumaOffset; // W
+        samples[2] = refLumaBlk2.at(pos, -1) + lumaOffset; // E
+        samples[3] = refLumaBlk3.at(pos, -1) + lumaOffset;
+        samples[4] = cccmModel[0].nonlinear(refLumaBlk.at(pos, -1) + lumaOffset);
+        samples[5] = cccmModel[0].nonlinear(refLumaBlk1.at(pos, -1) + lumaOffset);
+        samples[6] = cccmModel[0].nonlinear(refLumaBlk2.at(pos, -1) + lumaOffset);
+        samples[7] = (( -1 + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+        samples[8] = ((pos + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+        samples[9] = cccmModel[0].bias();
+        if ((refLumaBlk.at(pos, -1) + lumaOffset) <= modelThr)
+        {
+          predChroma = cccmModel[0].convolve(samples);
+          totalOffset[0] += curChroma0[pos] - predChroma;
+          count[0]++;
+        }
+        else
+        {
+          predChroma = cccmModel[1].convolve(samples);
+          totalOffset[1] += curChroma0[pos] - predChroma;
+          count[1]++;
+        }
+      }
+    }
+    else
+#endif
+    {
+      for (int pos = 0; pos < cWidth; pos++)
+      {
+        samples[0] = refLumaBlk.at(pos, -1) + lumaOffset; // C
+        samples[1] = refLumaBlk1.at(pos, -1) + lumaOffset; // W
+        samples[2] = refLumaBlk2.at(pos, -1) + lumaOffset; // E
+        samples[3] = refLumaBlk3.at(pos, -1) + lumaOffset;
+        samples[4] = cccmModel[0].nonlinear(refLumaBlk.at(pos, -1) + lumaOffset);
+        samples[5] = cccmModel[0].nonlinear(refLumaBlk1.at(pos, -1) + lumaOffset);
+        samples[6] = cccmModel[0].nonlinear(refLumaBlk2.at(pos, -1) + lumaOffset);
+        samples[7] = (( -1 + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+        samples[8] = ((pos + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+        samples[9] = cccmModel[0].bias();
+        predChroma = cccmModel[0].convolve(samples);
+        totalOffset[0] += curChroma0[pos] - predChroma;
+        count[0]++;
+      }
+    }
+  }
+
+  if (leftAvailable)
+  {
+    curChroma0 = curChromaBuf - 1;
+#if MMLM
+    if (type & CCP_TYPE_MMLM)
+    {
+      for (int pos = 0; pos < cHeight; pos++)
+      {
+        samples[0] = refLumaBlk.at(-1, pos) + lumaOffset; // C
+        samples[1] = refLumaBlk1.at(-1, pos) + lumaOffset; // W
+        samples[2] = refLumaBlk2.at(-1, pos) + lumaOffset; // E
+        samples[3] = refLumaBlk3.at(-1, pos) + lumaOffset;
+        samples[4] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos) + lumaOffset);
+        samples[5] = cccmModel[0].nonlinear(refLumaBlk1.at(-1, pos) + lumaOffset);
+        samples[6] = cccmModel[0].nonlinear(refLumaBlk2.at(-1, pos) + lumaOffset);
+        samples[7] = ((pos + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+        samples[8] = (( -1 + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+        samples[9] = cccmModel[0].bias();
+        if ((refLumaBlk.at(-1, pos) + lumaOffset) <= modelThr)
+        {
+          predChroma = cccmModel[0].convolve(samples);
+          totalOffset[0] += curChroma0[pos * curStride] - predChroma;
+          count[0]++;
+        }
+        else
+        {
+          predChroma = cccmModel[1].convolve(samples);
+          totalOffset[1] += curChroma0[pos * curStride] - predChroma;
+          count[1]++;
+        }
+      }
+    }
+    else
+#endif
+    {
+      for (int pos = 0; pos < cHeight; pos++)
+      {
+        samples[0] = refLumaBlk.at(-1, pos) + lumaOffset; // C
+        samples[1] = refLumaBlk1.at(-1, pos) + lumaOffset; // W
+        samples[2] = refLumaBlk2.at(-1, pos) + lumaOffset; // E
+        samples[3] = refLumaBlk3.at(-1, pos) + lumaOffset;
+        samples[4] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos) + lumaOffset);
+        samples[5] = cccmModel[0].nonlinear(refLumaBlk1.at(-1, pos) + lumaOffset);
+        samples[6] = cccmModel[0].nonlinear(refLumaBlk2.at(-1, pos) + lumaOffset);
+        samples[7] = ((pos + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+        samples[8] = (( -1 + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+        samples[9] = cccmModel[0].bias();
+        predChroma = cccmModel[0].convolve(samples);
+        totalOffset[0] += curChroma0[pos * curStride] - predChroma;
+        count[0]++;
+      }
+    }
+  }
+
+  chromaOffset[0] = chromaOffset[1] = 0;
+
+  if (modelNum == 2)
+  {
+    if (count[0])
+    {
+      chromaOffset[0] = PU::getMeanValue(totalOffset[0], count[0]);   // totalOffset[0] / count[0];
+    }
+    if (count[1])
+    {
+      chromaOffset[1] = PU::getMeanValue(totalOffset[1], count[1]);   // totalOffset[1] / count[1];
+    }
+  }
+  else
+  {
+    if (count[0])
+    {
+      chromaOffset[0] = PU::getMeanValue(totalOffset[0], count[0]);   // totalOffset[0] / count[0];
+    }
+  }
+}
+
+void IntraPrediction::xGetUpdatedOffsetMFCCCM23(const PredictionUnit& pu, const ComponentID compID, int modelNum,
+                                                const CompArea& chromaArea, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> cccmModel[2],
+                                                int modelThr, int lumaOffset, int chromaOffset[], int type, int refSizeX, int refSizeY)
+{
+  CHECK(compID != chromaArea.compID, "Invalid component ID");
+
+  static Pel samples[CCCM_MULTI_PRED_FILTER_NUM_PARAMS2];
+
+  CPelBuf refLumaBlk1, refLumaBlk3;
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu, 0, 2, &refLumaBlk1, &refLumaBlk3);
+
+  const SizeType cWidth = chromaArea.width;
+  const SizeType cHeight = chromaArea.height;
+
+  CodingStructure& cs = *(pu.cs);
+  const CodingUnit& cu = *(pu.cu);
+
+  const bool aboveAvailable = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID)) ? true : false;
+  const bool leftAvailable  = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID)) ? true : false;
+
+  const Pel* curChroma0;
+
+  PelBuf chromaReco = cs.picture->getRecoBuf(chromaArea);
+  Pel* curChromaBuf = chromaReco.buf;
+  const int curStride = chromaReco.stride;
+
+  int totalOffset[2] = { 0, 0 };
+  int count[2] = { 0, 0 };
+
+  Pel predChroma;
+
+  if (aboveAvailable)
+  {
+    curChroma0 = curChromaBuf - curStride;
+#if MMLM
+    if (type & CCP_TYPE_MMLM)
+    {
+      if (pu.cccmMultiFilterIdx == 2)
+      {
+        for (int pos = 0; pos < cWidth; pos++)
+        {
+          samples[0] = refLumaBlk.at(pos, -1) + lumaOffset; // C
+          samples[1] = refLumaBlk.at(pos - 1, -1) + lumaOffset; // W
+          samples[2] = refLumaBlk.at(pos + 1, -1) + lumaOffset; // E
+          samples[3] = refLumaBlk1.at(pos, -1) + lumaOffset; // C
+          samples[4] = refLumaBlk1.at(pos - 1, -1) + lumaOffset; // W
+          samples[5] = refLumaBlk1.at(pos + 1, -1) + lumaOffset; // E
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(pos, -1) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(pos - 1, -1) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(pos + 1, -1) + lumaOffset);
+          samples[9] = ((pos + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+          samples[10] = cccmModel[0].bias();
+          if ((refLumaBlk.at(pos, -1) + lumaOffset) <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples);
+            totalOffset[0] += curChroma0[pos] - predChroma;
+            count[0]++;
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples);
+            totalOffset[1] += curChroma0[pos] - predChroma;
+            count[1]++;
+          }
+        }
+      }
+      else if (pu.cccmMultiFilterIdx == 3)
+      {
+        for (int pos = 0; pos < cWidth; pos++)
+        {
+          samples[0] = refLumaBlk.at(pos, -1) + lumaOffset; // C
+          samples[1] = refLumaBlk.at(pos + 1, -2) + lumaOffset; // EN
+          samples[2] = refLumaBlk.at(pos - 1, 0) + lumaOffset; // WS
+          samples[3] = refLumaBlk3.at(pos, -1) + lumaOffset; // C
+          samples[4] = refLumaBlk3.at(pos + 1, -2) + lumaOffset; // EN
+          samples[5] = refLumaBlk3.at(pos - 1, 0) + lumaOffset; // WS
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(pos, -1) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(pos + 1, -2) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(pos - 1, 0) + lumaOffset);
+          samples[9] = ((-1 + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+          samples[10] = cccmModel[0].bias();
+          if ((refLumaBlk.at(pos, -1) + lumaOffset) <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples);
+            totalOffset[0] += curChroma0[pos] - predChroma;
+            count[0]++;
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples);
+            totalOffset[1] += curChroma0[pos] - predChroma;
+            count[1]++;
+          }
+        }
+      }
+      else
+      {
+        THROW("Invalid cccmMultiFilterIdx");
+      }
+    }
+    else
+#endif
+    {
+      if (pu.cccmMultiFilterIdx == 2)
+      {
+        for (int pos = 0; pos < cWidth; pos++)
+        {
+          samples[0] = refLumaBlk.at(pos, -1) + lumaOffset; // C
+          samples[1] = refLumaBlk.at(pos - 1, -1) + lumaOffset; // W
+          samples[2] = refLumaBlk.at(pos + 1, -1) + lumaOffset; // E
+          samples[3] = refLumaBlk1.at(pos, -1) + lumaOffset; // C
+          samples[4] = refLumaBlk1.at(pos - 1, -1) + lumaOffset; // W
+          samples[5] = refLumaBlk1.at(pos + 1, -1) + lumaOffset; // E
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(pos, -1) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(pos - 1, -1) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(pos + 1, -1) + lumaOffset);
+          samples[9] = ((pos + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+          samples[10] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples);
+          totalOffset[0] += curChroma0[pos] - predChroma;
+          count[0]++;
+        }
+      }
+      else if (pu.cccmMultiFilterIdx == 3)
+      {
+        for (int pos = 0; pos < cWidth; pos++)
+        {
+          samples[0] = refLumaBlk.at(pos, -1) + lumaOffset; // C
+          samples[1] = refLumaBlk.at(pos + 1, -2) + lumaOffset; // EN
+          samples[2] = refLumaBlk.at(pos - 1, 0) + lumaOffset; // WS
+          samples[3] = refLumaBlk3.at(pos, -1) + lumaOffset; // C
+          samples[4] = refLumaBlk3.at(pos + 1, -2) + lumaOffset; // EN
+          samples[5] = refLumaBlk3.at(pos - 1, 0) + lumaOffset; // WS
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(pos, -1) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(pos + 1, -2) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(pos - 1, 0) + lumaOffset);
+          samples[9] = ((-1 + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+          samples[10] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples);
+          totalOffset[0] += curChroma0[pos] - predChroma;
+          count[0]++;
+        }
+      }
+      else
+      {
+        THROW("Invalid cccmMultiFilterIdx");
+      }
+    }
+  }
+
+  if (leftAvailable)
+  {
+    curChroma0 = curChromaBuf - 1;
+#if MMLM
+    if (type & CCP_TYPE_MMLM)
+    {
+      if (pu.cccmMultiFilterIdx == 2)
+      {
+        for (int pos = 0; pos < cHeight; pos++)
+        {
+          samples[0] = refLumaBlk.at(-1, pos) + lumaOffset; // C
+          samples[1] = refLumaBlk.at(-2, pos) + lumaOffset; // W
+          samples[2] = refLumaBlk.at(0, pos) + lumaOffset; // E
+          samples[3] = refLumaBlk1.at(-1, pos) + lumaOffset; // C
+          samples[4] = refLumaBlk1.at(-2, pos) + lumaOffset; // W
+          samples[5] = refLumaBlk1.at(0, pos) + lumaOffset; // E
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(-2, pos) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(0, pos) + lumaOffset);
+          samples[9] = ((-1 + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+          samples[10] = cccmModel[0].bias();
+          if ((refLumaBlk.at(-1, pos) + lumaOffset) <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples);
+            totalOffset[0] += curChroma0[pos * curStride] - predChroma;
+            count[0]++;
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples);
+            totalOffset[1] += curChroma0[pos * curStride] - predChroma;
+            count[1]++;
+          }
+        }
+      }
+      else if (pu.cccmMultiFilterIdx == 3)
+      {
+        for (int pos = 0; pos < cHeight; pos++)
+        {
+          samples[0] = refLumaBlk.at(-1, pos) + lumaOffset;      // C
+          samples[1] = refLumaBlk.at(0, pos - 1) + lumaOffset;  // EN
+          samples[2] = refLumaBlk.at(-2, pos + 1) + lumaOffset;  // WS
+          samples[3] = refLumaBlk3.at(-1, pos) + lumaOffset;     // C
+          samples[4] = refLumaBlk3.at(0, pos - 1) + lumaOffset; // EN
+          samples[5] = refLumaBlk3.at(-2, pos + 1) + lumaOffset; // WS
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(0, pos - 1) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(-2, pos + 1) + lumaOffset);
+          samples[9] = ((pos + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+          samples[10] = cccmModel[0].bias();
+          if ((refLumaBlk.at(-1, pos) + lumaOffset) <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples);
+            totalOffset[0] += curChroma0[pos * curStride] - predChroma;
+            count[0]++;
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples);
+            totalOffset[1] += curChroma0[pos * curStride] - predChroma;
+            count[1]++;
+          }
+        }
+      }
+      else
+      {
+        THROW("Invalid cccmMultiFilterIdx");
+      }
+    }
+    else
+#endif
+    {
+      if (pu.cccmMultiFilterIdx == 2)
+      {
+        for (int pos = 0; pos < cHeight; pos++)
+        {
+          samples[0] = refLumaBlk.at(-1, pos) + lumaOffset;  // C
+          samples[1] = refLumaBlk.at(-2, pos) + lumaOffset;  // W
+          samples[2] = refLumaBlk.at(0, pos) + lumaOffset;  // E
+          samples[3] = refLumaBlk1.at(-1, pos) + lumaOffset; // C
+          samples[4] = refLumaBlk1.at(-2, pos) + lumaOffset; // W
+          samples[5] = refLumaBlk1.at(0, pos) + lumaOffset; // E
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos)) + lumaOffset;
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(-2, pos)) + lumaOffset;
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(0, pos)) + lumaOffset;
+          samples[9] = ((-1 + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+          samples[10] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples);
+          totalOffset[0] += curChroma0[pos * curStride] - predChroma;
+          count[0]++;
+        }
+      }
+      else if (pu.cccmMultiFilterIdx == 3)
+      {
+        for (int pos = 0; pos < cHeight; pos++)
+        {
+          samples[0] = refLumaBlk.at(-1, pos) + lumaOffset;      // C
+          samples[1] = refLumaBlk.at(0, pos - 1) + lumaOffset;  // EN
+          samples[2] = refLumaBlk.at(-2, pos + 1) + lumaOffset;  // WS
+          samples[3] = refLumaBlk3.at(-1, pos) + lumaOffset;     // C
+          samples[4] = refLumaBlk3.at(0, pos - 1) + lumaOffset; // EN
+          samples[5] = refLumaBlk3.at(-2, pos + 1) + lumaOffset; // WS
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(0, pos - 1) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(-2, pos + 1) + lumaOffset);
+          samples[9] = ((pos + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+          samples[10] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples);
+          totalOffset[0] += curChroma0[pos * curStride] - predChroma;
+          count[0]++;
+        }
+      }
+      else
+      {
+        THROW("Invalid cccmMultiFilterIdx");
+      }
+    }
+  }
+
+  chromaOffset[0] = chromaOffset[1] = 0;
+
+  if (modelNum == 2)
+  {
+    if (count[0])
+    {
+      chromaOffset[0] = PU::getMeanValue(totalOffset[0], count[0]);   // totalOffset[0] / count[0];
+    }
+    if (count[1])
+    {
+      chromaOffset[1] = PU::getMeanValue(totalOffset[1], count[1]);   // totalOffset[1] / count[1];
+    }
+  }
+  else
+  {
+    if (count[0])
+    {
+      chromaOffset[0] = PU::getMeanValue(totalOffset[0], count[0]);   // totalOffset[0] / count[0];
+    }
+  }
+}
+#endif
+
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+void IntraPrediction::xNSCccmApplyModelOffset(const PredictionUnit &pu, const ComponentID compId,
+                                              const CccmModel<CCCM_NO_SUB_NUM_PARAMS> &cccmModel, int modelId,
+                                              int modelThr, PelBuf &piPred, int lumaOffset, int chromaOffset[2]) const
+{
+  const ClpRng &clpRng(pu.cu->cs->slice->clpRng(compId));
+  static Pel    samples[CCCM_NO_SUB_NUM_PARAMS];
+
+  CPelBuf   refLumaBlk   = xCccmGetLumaPuBuf(pu);
+  const int chromaScaleX = getChannelTypeScaleX(CHANNEL_TYPE_CHROMA, pu.cu->slice->getSPS()->getChromaFormatIdc());
+  const int chromaScaleY = getChannelTypeScaleY(CHANNEL_TYPE_CHROMA, pu.cu->slice->getSPS()->getChromaFormatIdc());
+  const int stepX        = 1 << chromaScaleX;
+  const int stepY        = 1 << chromaScaleY;
+  int offset = modelId == 2 ? chromaOffset[1] : chromaOffset[0];
+
+  for (int y = 0; y < refLumaBlk.height; y += stepY)
+  {
+    for (int x = 0; x < refLumaBlk.width; x += stepX)
+    {
+      const Pel *src0 = refLumaBlk.bufAt(x, y);
+      const Pel *src1 = refLumaBlk.bufAt(x, y + 1);
+
+      if (modelId == 1 && (src0[0] + lumaOffset) > modelThr)   // Model 1: Include only samples below or equal to the threshold
+      {
+        continue;
+      }
+      if (modelId == 2 && (src0[0] + lumaOffset) <= modelThr)   // Model 2: Include only samples above the threshold
+      {
+        continue;
+      }
+
+      samples[0]  = src0[0] + lumaOffset;
+      samples[1]  = src0[-1] + lumaOffset;
+      samples[2]  = src0[1] + lumaOffset;
+      samples[3]  = src1[0] + lumaOffset;
+      samples[4]  = src1[-1] + lumaOffset;
+      samples[5]  = src1[1] + lumaOffset;
+      samples[6]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel).nonlinear(src0[0] + lumaOffset);
+      samples[7]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel).nonlinear(src1[0] + lumaOffset);
+      samples[8]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel).nonlinear(src0[1] + lumaOffset);
+      samples[9]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel).nonlinear(src0[-1] + lumaOffset);
+      samples[10] = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel).bias();
+      piPred.at(x >> chromaScaleX, y >> chromaScaleY) =
+        ClipPel<Pel>(const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel).convolve(samples) + offset, clpRng);
+    }
+  }
+}
+void IntraPrediction::xGetUpdatedOffsetNSCCCM(const PredictionUnit &pu, const ComponentID compID, int modelNum,
+                                              const CompArea                   &chromaArea,
+                                              CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModel[2],
+                                            int modelThr, int lumaOffset, int chromaOffset[])
+{
+  static Pel    samples[CCCM_NO_SUB_NUM_PARAMS];
+
+  CPelBuf   refLumaBlk   = xCccmGetLumaPuBuf(pu);
+  const int chromaScaleX = getChannelTypeScaleX(CHANNEL_TYPE_CHROMA, pu.cu->slice->getSPS()->getChromaFormatIdc());
+  const int chromaScaleY = getChannelTypeScaleY(CHANNEL_TYPE_CHROMA, pu.cu->slice->getSPS()->getChromaFormatIdc());
+  const int stepX        = 1 << chromaScaleX;
+  const int stepY        = 1 << chromaScaleY;
+
+  const SizeType cWidth  = chromaArea.width;
+  const SizeType cHeight = chromaArea.height;
+
+  CodingStructure  &cs = *(pu.cs);
+  const CodingUnit &cu = *(pu.cu);
+
+  const bool aboveAvailable = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID)) ? true : false;
+  const bool leftAvailable  = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID)) ? true : false;
+
+  const Pel *curChroma0;
+
+
+  PelBuf chromaReco = cs.picture->getRecoBuf(chromaArea);
+
+  Pel      *curChromaBuf = chromaReco.buf;
+  const int curStride    = chromaReco.stride;
+
+  int totalOffset[2] = { 0, 0 };
+  int count[2]       = { 0, 0 };
+
+  Pel predChroma;
+
+  if (aboveAvailable)
+  {
+    curChroma0 = curChromaBuf - curStride;
+#if MMLM
+    if (modelNum == 2)
+    {
+      for (int pos = 0, x = 0; pos < cWidth; pos++, x += stepX)
+      {
+        const Pel *src0 = refLumaBlk.bufAt(x, -stepY);
+        const Pel *src1 = refLumaBlk.bufAt(x, -stepY + 1);
+        samples[0]  = src0[0] + lumaOffset;
+        samples[1]  = src0[-1] + lumaOffset;
+        samples[2]  = src0[1] + lumaOffset;
+        samples[3]  = src1[0] + lumaOffset;
+        samples[4]  = src1[-1] + lumaOffset;
+        samples[5]  = src1[1] + lumaOffset;
+        samples[6]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[0] + lumaOffset);
+        samples[7]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src1[0] + lumaOffset);
+        samples[8]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[1] + lumaOffset);
+        samples[9]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[-1] + lumaOffset);
+        samples[10] = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).bias();
+
+        if (src0[0] + lumaOffset <= modelThr)
+        {
+          predChroma = cccmModel[0].convolve(samples);
+          totalOffset[0] += curChroma0[pos] - predChroma;
+          count[0]++;
+        }
+        else
+        {
+          predChroma = cccmModel[1].convolve(samples);
+          totalOffset[1] += curChroma0[pos] - predChroma;
+          count[1]++;
+        }
+      }
+    }
+    else
+#endif
+    {
+      for (int pos = 0, x = 0; pos < cWidth; pos++, x += stepX)
+      {
+        const Pel *src0 = refLumaBlk.bufAt(x, -stepY);
+        const Pel *src1 = refLumaBlk.bufAt(x, -stepY + 1);
+        samples[0]  = src0[0] + lumaOffset;
+        samples[1]  = src0[-1] + lumaOffset;
+        samples[2]  = src0[1] + lumaOffset;
+        samples[3]  = src1[0] + lumaOffset;
+        samples[4]  = src1[-1] + lumaOffset;
+        samples[5]  = src1[1] + lumaOffset;
+        samples[6]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[0] + lumaOffset);
+        samples[7]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src1[0] + lumaOffset);
+        samples[8]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[1] + lumaOffset);
+        samples[9]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[-1] + lumaOffset);
+        samples[10] = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).bias();
+        predChroma = cccmModel[0].convolve(samples);
+        totalOffset[0] += curChroma0[pos] - predChroma;
+        count[0]++;
+      }
+    }
+  }
+
+  if (leftAvailable)
+  {
+    curChroma0 = curChromaBuf - 1;
+#if MMLM
+    if (modelNum == 2)
+    {
+      for (int pos = 0, y = 0; pos < cHeight; pos++, y += stepY)
+      {
+        const Pel *src0 = refLumaBlk.bufAt(-stepX, y);
+        const Pel *src1 = refLumaBlk.bufAt(-stepX, y + 1);
+        samples[0]  = src0[0] + lumaOffset;
+        samples[1]  = src0[-1] + lumaOffset;
+        samples[2]  = src0[1] + lumaOffset;
+        samples[3]  = src1[0] + lumaOffset;
+        samples[4]  = src1[-1] + lumaOffset;
+        samples[5]  = src1[1] + lumaOffset;
+        samples[6]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[0] + lumaOffset);
+        samples[7]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src1[0] + lumaOffset);
+        samples[8]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[1] + lumaOffset);
+        samples[9]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[-1] + lumaOffset);
+        samples[10] = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).bias();
+
+        if (src0[0] + lumaOffset <= modelThr)
+        {
+          predChroma = cccmModel[0].convolve(samples);
+          totalOffset[0] += curChroma0[pos * curStride] - predChroma;
+          count[0]++;
+        }
+        else
+        {
+          predChroma = cccmModel[1].convolve(samples);
+          totalOffset[1] += curChroma0[pos * curStride] - predChroma;
+          count[1]++;
+        }
+      }
+    }
+    else
+#endif
+    {
+      for (int pos = 0, y = 0; pos < cHeight; pos++, y += stepY)
+      {
+        const Pel *src0 = refLumaBlk.bufAt(-stepX, y);
+        const Pel *src1 = refLumaBlk.bufAt(-stepX, y + 1);
+        samples[0]  = src0[0] + lumaOffset;
+        samples[1]  = src0[-1] + lumaOffset;
+        samples[2]  = src0[1] + lumaOffset;
+        samples[3]  = src1[0] + lumaOffset;
+        samples[4]  = src1[-1] + lumaOffset;
+        samples[5]  = src1[1] + lumaOffset;
+        samples[6]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[0] + lumaOffset);
+        samples[7]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src1[0] + lumaOffset);
+        samples[8]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[1] + lumaOffset);
+        samples[9]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[-1] + lumaOffset);
+        samples[10] = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).bias();
+
+        predChroma = cccmModel[0].convolve(samples);
+        totalOffset[0] += curChroma0[pos * curStride] - predChroma;
+        count[0]++;
+      }
+    }
+  }
+
+  chromaOffset[0] = chromaOffset[1] = 0;
+
+  if (modelNum == 2)
+  {
+    if (count[0])
+    {
+      chromaOffset[0] = PU::getMeanValue(totalOffset[0], count[0]);   // totalOffset[0] / count[0];
+    }
+    if (count[1])
+    {
+      chromaOffset[1] = PU::getMeanValue(totalOffset[1], count[1]);   // totalOffset[1] / count[1];
+    }
+  }
+  else
+  {
+    if (count[0])
+    {
+      chromaOffset[0] = PU::getMeanValue(totalOffset[0], count[0]);   // totalOffset[0] / count[0];
+    }
+  }
+}
+
+int IntraPrediction::xGetCostNSCCCM(const PredictionUnit &pu, const ComponentID compID, int modelNum,
+                                    const CompArea &chromaArea, CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModel[2],
+                                    int modelThr, int lumaOffset, int chromaOffset[])
+{
+  const ClpRng &clpRng(pu.cu->cs->slice->clpRng(compID));
+  static Pel samples[CCCM_NO_SUB_NUM_PARAMS];
+
+  CPelBuf   refLumaBlk   = xCccmGetLumaPuBuf(pu);
+  const int chromaScaleX = getChannelTypeScaleX(CHANNEL_TYPE_CHROMA, pu.cu->slice->getSPS()->getChromaFormatIdc());
+  const int chromaScaleY = getChannelTypeScaleY(CHANNEL_TYPE_CHROMA, pu.cu->slice->getSPS()->getChromaFormatIdc());
+  const int stepX        = 1 << chromaScaleX;
+  const int stepY        = 1 << chromaScaleY;
+
+  const SizeType cWidth  = chromaArea.width;
+  const SizeType cHeight = chromaArea.height;
+
+  CodingStructure  &cs = *(pu.cs);
+  const CodingUnit &cu = *(pu.cu);
+
+  const bool aboveAvailable = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID)) ? true : false;
+  const bool leftAvailable  = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID)) ? true : false;
+
+  const Pel *curChroma0;
+
+  PelBuf chromaReco = cs.picture->getRecoBuf(chromaArea);
+
+  Pel      *curChromaBuf = chromaReco.buf;
+  const int curStride    = chromaReco.stride;
+
+  int sad = 0;
+
+  Pel predChroma;
+
+  if (aboveAvailable)
+  {
+    curChroma0 = curChromaBuf - curStride;
+#if MMLM
+    if (modelNum == 2)
+    {
+      for (int pos = 0, x = 0; pos < cWidth; pos++, x += stepX)
+      {
+        const Pel *src0 = refLumaBlk.bufAt(x, -stepY);
+        const Pel *src1 = refLumaBlk.bufAt(x, -stepY + 1);
+        samples[0]  = src0[0] + lumaOffset;
+        samples[1]  = src0[-1] + lumaOffset;
+        samples[2]  = src0[1] + lumaOffset;
+        samples[3]  = src1[0] + lumaOffset;
+        samples[4]  = src1[-1] + lumaOffset;
+        samples[5]  = src1[1] + lumaOffset;
+        samples[6]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[0] + lumaOffset);
+        samples[7]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src1[0] + lumaOffset);
+        samples[8]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[1] + lumaOffset);
+        samples[9]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[-1] + lumaOffset);
+        samples[10] = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).bias();
+
+        if (src0[0] + lumaOffset <= modelThr)
+        {
+          predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+        }
+        else
+        {
+          predChroma = cccmModel[1].convolve(samples) + chromaOffset[1];
+        }
+        predChroma = ClipPel<Pel>(predChroma, clpRng);
+        sad += abs(curChroma0[pos] - predChroma);
+      }
+    }
+    else
+#endif
+    {
+      for (int pos = 0, x = 0; pos < cWidth; pos++, x += stepX)
+      {
+        const Pel *src0 = refLumaBlk.bufAt(x, -stepY);
+        const Pel *src1 = refLumaBlk.bufAt(x, -stepY + 1);
+        samples[0]  = src0[0] + lumaOffset;
+        samples[1]  = src0[-1] + lumaOffset;
+        samples[2]  = src0[1] + lumaOffset;
+        samples[3]  = src1[0] + lumaOffset;
+        samples[4]  = src1[-1] + lumaOffset;
+        samples[5]  = src1[1] + lumaOffset;
+        samples[6]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[0] + lumaOffset);
+        samples[7]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src1[0] + lumaOffset);
+        samples[8]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[1] + lumaOffset);
+        samples[9]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[-1] + lumaOffset);
+        samples[10] = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).bias();
+        predChroma  = cccmModel[0].convolve(samples) + chromaOffset[0];
+        predChroma  = ClipPel<Pel>(predChroma, clpRng);
+        sad += abs(curChroma0[pos] - predChroma);
+      }
+    }
+  }
+
+  if (leftAvailable)
+  {
+    curChroma0 = curChromaBuf - 1;
+#if MMLM
+    if (modelNum == 2)
+    {
+      for (int pos = 0, y = 0; pos < cHeight; pos++, y += stepY)
+      {
+        const Pel *src0 = refLumaBlk.bufAt(-stepX, y);
+        const Pel *src1 = refLumaBlk.bufAt(-stepX, y + 1);
+        samples[0]      = src0[0] + lumaOffset;
+        samples[1]      = src0[-1] + lumaOffset;
+        samples[2]      = src0[1] + lumaOffset;
+        samples[3]      = src1[0] + lumaOffset;
+        samples[4]      = src1[-1] + lumaOffset;
+        samples[5]      = src1[1] + lumaOffset;
+        samples[6]      = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[0] + lumaOffset);
+        samples[7]      = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src1[0] + lumaOffset);
+        samples[8]      = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[1] + lumaOffset);
+        samples[9]      = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[-1] + lumaOffset);
+        samples[10]     = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).bias();
+
+        if (src0[0] + lumaOffset <= modelThr)
+        {
+          predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+        }
+        else
+        {
+          predChroma = cccmModel[1].convolve(samples) + chromaOffset[1];
+        } 
+        predChroma = ClipPel<Pel>(predChroma, clpRng);
+        sad += abs(curChroma0[pos * curStride] - predChroma);
+      }
+    }
+    else
+#endif
+    {
+      for (int pos = 0, y = 0; pos < cHeight; pos++, y += stepY)
+      {
+        const Pel *src0 = refLumaBlk.bufAt(-stepX, y);
+        const Pel *src1 = refLumaBlk.bufAt(-stepX, y + 1);
+        samples[0]  = src0[0] + lumaOffset;
+        samples[1]  = src0[-1] + lumaOffset;
+        samples[2]  = src0[1] + lumaOffset;
+        samples[3]  = src1[0] + lumaOffset;
+        samples[4]  = src1[-1] + lumaOffset;
+        samples[5]  = src1[1] + lumaOffset;
+        samples[6]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[0] + lumaOffset);
+        samples[7]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src1[0] + lumaOffset);
+        samples[8]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[1] + lumaOffset);
+        samples[9]  = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).nonlinear(src0[-1] + lumaOffset);
+        samples[10] = const_cast<CccmModel<CCCM_NO_SUB_NUM_PARAMS> &>(cccmModel[0]).bias();
+
+        predChroma = cccmModel[0].convolve(samples);
+        predChroma = ClipPel<Pel>(predChroma, clpRng);
+        sad += abs(curChroma0[pos * curStride] - predChroma);
+      }
+    }
+  }
+  return sad;
+}
+#endif
+
+void IntraPrediction::xGetUpdatedOffsetCCLM(const PredictionUnit &pu, const ComponentID compID,
+                                            const CompArea &chromaArea, CclmModel &cclmModel, int modelNum, int glmIdc)
+{
+  int    srcStride = 0;
+  PelBuf temp;
+
+  if (glmIdc > 0)
+  {
+    Pel *glmTemp = m_glmTempCb[glmIdc];
+    srcStride    = 2 * MAX_CU_SIZE + 1;
+    temp         = PelBuf(glmTemp + srcStride + 1, srcStride, Size(chromaArea));
+  }
+  else
+  {
+    srcStride = MAX_CU_SIZE + 1;
+    temp      = PelBuf(m_piTemp + srcStride + 1, srcStride, Size(chromaArea));
+  }
+
+  const SizeType cWidth  = chromaArea.width;
+  const SizeType cHeight = chromaArea.height;
+
+  CodingStructure  &cs = *(pu.cs);
+  const CodingUnit &cu = *(pu.cu);
+
+  const bool aboveAvailable = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID)) ? true : false;
+  const bool leftAvailable  = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID)) ? true : false;
+
+  Pel *srcColor0, *curChroma0;
+
+  srcColor0 = temp.bufAt(0, 0);
+
+  PelBuf chromaReco = cs.picture->getRecoBuf(chromaArea);
+
+  Pel      *curChromaBuf = chromaReco.buf;
+  const int curStride    = chromaReco.stride;
+
+  int totalOffset[2] = { 0, 0 };
+  int count[2]       = { 0, 0 };
+  if (aboveAvailable)
+  {
+    curChroma0 = curChromaBuf - curStride;
+    Pel *src   = srcColor0 - srcStride;
+    if (modelNum == 2)
+    {
+      Pel predChroma;
+      for (int pos = 0; pos < cWidth; pos++)
+      {
+        if (src[pos] <= cclmModel.yThres)
+        {
+          predChroma = rightShift(cclmModel.a * src[pos], cclmModel.shift) + cclmModel.b;
+          totalOffset[0] += curChroma0[pos] - predChroma;
+          count[0]++;
+        }
+        else
+        {
+          predChroma = rightShift(cclmModel.a2 * src[pos], cclmModel.shift2) + cclmModel.b2;
+          totalOffset[1] += curChroma0[pos] - predChroma;
+          count[1]++;
+        }
+      }
+    }
+    else
+    {
+      for (int pos = 0; pos < cWidth; pos++)
+      {
+        Pel predChroma = rightShift(cclmModel.a * src[pos], cclmModel.shift) + cclmModel.b;
+        totalOffset[0] += curChroma0[pos] - predChroma;
+        count[0]++;
+      }
+    }
+  }
+
+  if (leftAvailable)
+  {
+    curChroma0 = curChromaBuf - 1;
+    Pel *src = srcColor0 - 1;
+    if (modelNum == 2)
+    {
+      Pel predChroma;
+      for (int pos = 0; pos < cHeight; pos++)
+      {
+        if (src[pos * srcStride] <= cclmModel.yThres)
+        {
+          predChroma = rightShift(cclmModel.a * src[pos * srcStride], cclmModel.shift) + cclmModel.b;
+          totalOffset[0] += curChroma0[pos * curStride] - predChroma;
+          count[0]++;
+        }
+        else
+        {
+          predChroma = rightShift(cclmModel.a2 * src[pos * srcStride], cclmModel.shift2) + cclmModel.b2;
+          totalOffset[1] += curChroma0[pos * curStride] - predChroma;
+          count[1]++;
+        }
+      }
+    }
+    else
+    {
+      for (int pos = 0; pos < cHeight; pos++)
+      {
+        Pel predChroma = rightShift(cclmModel.a * src[pos * srcStride], cclmModel.shift) + cclmModel.b;
+        totalOffset[0] += curChroma0[pos * curStride] - predChroma;
+        count[0]++;
+      }
+    }
+  }
+
+  if (modelNum == 2)
+  {
+    if (count[0])
+    {
+      cclmModel.b += PU::getMeanValue(totalOffset[0], count[0]);   // totalOffset[0] / count[0];
+    }
+    if (count[1])
+    {
+      cclmModel.b2 += PU::getMeanValue(totalOffset[1], count[1]);   //totalOffset[1] / count[1];
+    }
+  }
+  else
+  {
+    if (count[0])
+    {
+      cclmModel.b += PU::getMeanValue(totalOffset[0], count[0]);   //totalOffset[0] / count[0];
+    }
+  }
+}
+
+int  IntraPrediction::xGetCostCCLM(const PredictionUnit &pu, const ComponentID compID, const CompArea &chromaArea,CclmModel &cclmModel, int modelNum, int glmIdc)
+{
+  int    srcStride = 0;
+  PelBuf temp;
+
+  if (glmIdc > 0)
+  {
+    Pel *glmTemp = m_glmTempCb[glmIdc];
+    srcStride    = 2 * MAX_CU_SIZE + 1;
+    temp         = PelBuf(glmTemp + srcStride + 1, srcStride, Size(chromaArea));
+  }
+  else
+  {
+    srcStride = MAX_CU_SIZE + 1;
+    temp      = PelBuf(m_piTemp + srcStride + 1, srcStride, Size(chromaArea));
+  }
+
+  const SizeType cWidth  = chromaArea.width;
+  const SizeType cHeight = chromaArea.height;
+
+  CodingStructure  &cs = *(pu.cs);
+  const CodingUnit &cu = *(pu.cu);
+
+  const bool aboveAvailable = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID)) ? true : false;
+  const bool leftAvailable  = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID)) ? true : false;
+
+  Pel *srcColor0, *curChroma0;
+
+  srcColor0 = temp.bufAt(0, 0);
+
+  PelBuf chromaReco = cs.picture->getRecoBuf(chromaArea);
+
+  Pel      *curChromaBuf = chromaReco.buf;
+  const int curStride    = chromaReco.stride;
+
+  int sad = 0;
+  if (aboveAvailable)
+  {
+    curChroma0 = curChromaBuf - curStride;
+    Pel *src   = srcColor0 - srcStride;
+    if (modelNum == 2)
+    {
+      Pel predChroma;
+      for (int pos = 0; pos < cWidth; pos++)
+      {
+        if (src[pos] <= cclmModel.yThres)
+        {
+          predChroma = rightShift(cclmModel.a * src[pos], cclmModel.shift) + cclmModel.b;
+        }
+        else
+        {
+          predChroma = rightShift(cclmModel.a2 * src[pos], cclmModel.shift2) + cclmModel.b2;
+        }
+        sad += abs( curChroma0[pos] - predChroma);
+      }
+    }
+    else
+    {
+      for (int pos = 0; pos < cWidth; pos++)
+      {
+        Pel predChroma = rightShift(cclmModel.a * src[pos], cclmModel.shift) + cclmModel.b;
+        sad += abs(curChroma0[pos] - predChroma);
+      }
+    }
+  }
+
+  if (leftAvailable)
+  {
+    curChroma0 = curChromaBuf - 1;
+    Pel *src = srcColor0 - 1;
+    if (modelNum == 2)
+    {
+      Pel predChroma;
+      for (int pos = 0; pos < cHeight; pos++)
+      {
+        if (src[pos * srcStride] <= cclmModel.yThres)
+        {
+          predChroma = rightShift(cclmModel.a * src[pos * srcStride], cclmModel.shift) + cclmModel.b;
+
+        }
+        else
+        {
+          predChroma = rightShift(cclmModel.a2 * src[pos * srcStride], cclmModel.shift2) + cclmModel.b2;
+        }
+        sad += abs(curChroma0[pos * curStride] - predChroma);
+      }
+    }
+    else
+    {
+      for (int pos = 0; pos < cHeight; pos++)
+      {
+        Pel predChroma = rightShift(cclmModel.a * src[pos * srcStride], cclmModel.shift) + cclmModel.b;
+        sad += abs(curChroma0[pos * curStride] - predChroma);
+      }
+    }
+  }
+  return sad;
+}
+
+void IntraPrediction::xGetUpdatedOffsetCCCM(const PredictionUnit &pu, const ComponentID compID, int modelNum,
+                                            const CompArea &chromaArea, CccmModel<CCCM_NUM_PARAMS> cccmModel[2],
+                                            int modelThr, int lumaOffset, int chromaOffset[], int type,
+                                            int refSizeX, int refSizeY)
+{
+  int srcStride = 0;
+
+  CHECK(compID != chromaArea.compID, "Invalid component ID");
+
+  static Pel samples[CCCM_NUM_PARAMS];
+
+  CPelBuf temp = xCccmGetLumaPuBuf(pu);
+
+  const SizeType cWidth  = chromaArea.width;
+  const SizeType cHeight = chromaArea.height;
+
+  CodingStructure  &cs = *(pu.cs);
+  const CodingUnit &cu = *(pu.cu);
+
+  const bool aboveAvailable = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID)) ? true : false;
+  const bool leftAvailable  = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID)) ? true : false;
+
+  const Pel *srcColor0, *curChroma0;
+
+  srcColor0 = temp.bufAt(0, 0);
+  srcStride = temp.stride;
+
+  PelBuf chromaReco = cs.picture->getRecoBuf(chromaArea);
+
+  Pel      *curChromaBuf = chromaReco.buf;
+  const int curStride    = chromaReco.stride;
+
+  int totalOffset[2] = { 0, 0 };
+  int count[2]       = { 0, 0 };
+
+  Pel predChroma;
+
+  if (aboveAvailable)
+  {
+    curChroma0     = curChromaBuf - curStride;
+    const Pel *src = srcColor0 - srcStride;
+#if MMLM
+    if (modelNum == 2)
+    {
+      if (type & CCP_TYPE_CCCM)
+      {
+        for (int pos = 0; pos < cWidth; pos++, src++)
+        {
+          samples[0] = *src + lumaOffset;                 // C
+          samples[1] = *(src - srcStride) + lumaOffset;   // N
+          samples[2] = *(src + srcStride) + lumaOffset;   // S
+          samples[3] = *(src - 1) + lumaOffset;           // W
+          samples[4] = *(src + 1) + lumaOffset;           // E
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          if (*src + lumaOffset <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples);
+            totalOffset[0] += curChroma0[pos] - predChroma;
+            count[0]++;
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples);
+            totalOffset[1] += curChroma0[pos] - predChroma;
+            count[1]++;
+          }
+        }
+      }
+#if JVET_AC0054_GLCCCM
+      else if (type & CCP_TYPE_GLCCCM)
+      {
+        for (int pos = 0; pos < cWidth; pos++, src++)
+        {
+          samples[0] = *src + lumaOffset;                 // C
+          samples[1] = (2 * (*(src - srcStride)) + (*(src - 1 - srcStride)) + (*(src - srcStride + 1)))
+                     - (2 * (*(src + srcStride)) + (*(src - 1 + srcStride)) + (*(src + srcStride + 1)));   // Vertical gradient
+          samples[2] = (2 * (*(src - 1)) + (*(src - 1 - srcStride)) + (*(src - 1 + srcStride)))
+                     - (2 * (*(src + 1)) + (*(src + 1 - srcStride)) + (*(src + 1 + srcStride)));   // Horizontal gradient
+          samples[3] = (( -1 + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);   // Y coordinate
+          samples[4] = ((pos + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);   // X coordinate
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          if (*src + lumaOffset <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples);
+            totalOffset[0] += curChroma0[pos] - predChroma;
+            count[0]++;
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples);
+            totalOffset[1] += curChroma0[pos] - predChroma;
+            count[1]++;
+          }
+        }
+      }
+      else
+      {
+        THROW("Invalid type");
+      }
+#endif
+    }
+    else
+#endif
+    {
+      if (type & CCP_TYPE_CCCM)
+      {
+        for (int pos = 0; pos < cWidth; pos++, src++)
+        {
+          samples[0] = *src + lumaOffset;                 // C
+          samples[1] = *(src - srcStride) + lumaOffset;   // N
+          samples[2] = *(src + srcStride) + lumaOffset;   // S
+          samples[3] = *(src - 1) + lumaOffset;           // W
+          samples[4] = *(src + 1) + lumaOffset;           // E
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples);
+          totalOffset[0] += curChroma0[pos] - predChroma;
+          count[0]++;
+        }
+      }
+#if JVET_AC0054_GLCCCM
+      else if (type & CCP_TYPE_GLCCCM)
+      {
+        for (int pos = 0; pos < cWidth; pos++, src++)
+        {
+          samples[0] = *src + lumaOffset;   // C
+          samples[1] = (2 * (*(src - srcStride)) + (*(src - 1 - srcStride)) + (*(src - srcStride + 1)))
+                     - (2 * (*(src + srcStride)) + (*(src - 1 + srcStride)) + (*(src + srcStride + 1)));   // Vertical gradient
+          samples[2] = (2 * (*(src - 1)) + (*(src - 1 - srcStride)) + (*(src - 1 + srcStride)))
+                     - (2 * (*(src + 1)) + (*(src + 1 - srcStride)) + (*(src + 1 + srcStride)));   // Horizontal gradient
+          samples[3] = (( -1 + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);            // Y coordinate
+          samples[4] = ((pos + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);            // X coordinate
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples);
+          totalOffset[0] += curChroma0[pos] - predChroma;
+          count[0]++;
+        }
+      }
+      else
+      {
+        THROW("Invalid type");
+      }
+#endif
+    }
+  }
+
+  if (leftAvailable)
+  {
+    curChroma0 = curChromaBuf - 1;
+    const Pel *src = srcColor0 - 1;
+#if MMLM
+    if (modelNum == 2)
+    {
+      if (type & CCP_TYPE_CCCM)
+      {
+        for (int pos = 0; pos < cHeight; pos++, src += srcStride)
+        {
+          samples[0] = *src + lumaOffset;                 // C
+          samples[1] = *(src - srcStride) + lumaOffset;   // N
+          samples[2] = *(src + srcStride) + lumaOffset;   // S
+          samples[3] = *(src - 1) + lumaOffset;           // W
+          samples[4] = *(src + 1) + lumaOffset;           // E
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          if (*src + lumaOffset <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples);
+            totalOffset[0] += curChroma0[pos * curStride] - predChroma;
+            count[0]++;
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples);
+            totalOffset[1] += curChroma0[pos * curStride] - predChroma;
+            count[1]++;
+          }
+        }
+      }
+#if JVET_AC0054_GLCCCM
+      else if (type & CCP_TYPE_GLCCCM)
+      {
+        for (int pos = 0; pos < cHeight; pos++, src += srcStride)
+        {
+          samples[0] = *src + lumaOffset;   // C
+          samples[1] = (2 * (*(src - srcStride)) + (*(src - 1 - srcStride)) + (*(src - srcStride + 1)))
+                     - (2 * (*(src + srcStride)) + (*(src - 1 + srcStride)) + (*(src + srcStride + 1)));   // Vertical gradient
+          samples[2] = (2 * (*(src - 1)) + (*(src - 1 - srcStride)) + (*(src - 1 + srcStride)))
+                     - (2 * (*(src + 1)) + (*(src + 1 - srcStride)) + (*(src + 1 + srcStride)));   // Horizontal gradient
+          samples[3] = ((pos + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);            // Y coordinate
+          samples[4] = (( -1 + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);            // X coordinate
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          if (*src + lumaOffset <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples);
+            totalOffset[0] += curChroma0[pos * curStride] - predChroma;
+            count[0]++;
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples);
+            totalOffset[1] += curChroma0[pos * curStride] - predChroma;
+            count[1]++;
+          }
+        }
+      }
+      else
+      {
+        THROW("Invalid type");
+      }
+#endif
+    }
+    else
+#endif
+    {
+      if (type & CCP_TYPE_CCCM)
+      {
+        for (int pos = 0; pos < cHeight; pos++, src += srcStride)
+        {
+          samples[0] = *src + lumaOffset;                 // C
+          samples[1] = *(src - srcStride) + lumaOffset;   // N
+          samples[2] = *(src + srcStride) + lumaOffset;   // S
+          samples[3] = *(src - 1) + lumaOffset;           // W
+          samples[4] = *(src + 1) + lumaOffset;           // E
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples);
+          totalOffset[0] += curChroma0[pos * curStride] - predChroma;
+          count[0]++;
+        }
+      }
+#if JVET_AC0054_GLCCCM
+      else if (type & CCP_TYPE_GLCCCM)
+      {
+        for (int pos = 0; pos < cHeight; pos++, src += srcStride)
+        {
+          samples[0] = *src + lumaOffset;   // C
+          samples[1] = (2 * (*(src - srcStride)) + (*(src - 1 - srcStride)) + (*(src - srcStride + 1)))
+                     - (2 * (*(src + srcStride)) + (*(src - 1 + srcStride)) + (*(src + srcStride + 1)));   // Vertical gradient
+          samples[2] = (2 * (*(src - 1)) + (*(src - 1 - srcStride)) + (*(src - 1 + srcStride)))
+                     - (2 * (*(src + 1)) + (*(src + 1 - srcStride)) + (*(src + 1 + srcStride)));   // Horizontal gradient
+          samples[3] = ((pos + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);             // Y coordinate
+          samples[4] = (( -1 + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);            // X coordinate
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples);
+          totalOffset[0] += curChroma0[pos * curStride] - predChroma;
+          count[0]++;
+        }
+      }
+      else
+      {
+        THROW("Invalid type");
+      }
+#endif
+    }
+  }
+
+  chromaOffset[0] = chromaOffset[1] = 0;
+
+  if (modelNum == 2)
+  {
+    if (count[0])
+    {
+      chromaOffset[0] = PU::getMeanValue(totalOffset[0], count[0]);   // totalOffset[0] / count[0];
+    }
+    if (count[1])
+    {
+      chromaOffset[1] = PU::getMeanValue(totalOffset[1], count[1]);   // totalOffset[1] / count[1];
+    }
+  }
+  else
+  {
+    if (count[0])
+    {
+      chromaOffset[0] = PU::getMeanValue(totalOffset[0], count[0]);   // totalOffset[0] / count[0];
+    }
+  }
+}
+int IntraPrediction::xGetCostCCCM(const PredictionUnit &pu, const ComponentID compID, int modelNum,
+                                  const CompArea &chromaArea, CccmModel<CCCM_NUM_PARAMS> cccmModel[2],
+                                  int modelThr, int lumaOffset, int chromaOffset[], int type, int refSizeX, int refSizeY)
+{
+  int srcStride = 0;
+  const ClpRng &clpRng(pu.cu->cs->slice->clpRng(compID));
+
+  CHECK(compID != chromaArea.compID, "Invalid component ID");
+
+  static Pel samples[CCCM_NUM_PARAMS];
+
+  CPelBuf temp = xCccmGetLumaPuBuf(pu);
+
+  const SizeType cWidth  = chromaArea.width;
+  const SizeType cHeight = chromaArea.height;
+
+  CodingStructure  &cs = *(pu.cs);
+  const CodingUnit &cu = *(pu.cu);
+
+  const bool aboveAvailable = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID)) ? true : false;
+  const bool leftAvailable  = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID)) ? true : false;
+
+  const Pel *srcColor0, *curChroma0;
+
+  srcColor0 = temp.bufAt(0, 0);
+  srcStride = temp.stride;
+
+  PelBuf chromaReco = cs.picture->getRecoBuf(chromaArea);
+
+  Pel      *curChromaBuf = chromaReco.buf;
+  const int curStride    = chromaReco.stride;
+
+  int sad = 0;
+
+  Pel predChroma;
+
+  if (aboveAvailable)
+  {
+    curChroma0     = curChromaBuf - curStride;
+    const Pel *src = srcColor0 - srcStride;
+#if MMLM
+    if (type & CCP_TYPE_MMLM)
+    {
+      if (type & CCP_TYPE_CCCM)
+      {
+        for (int pos = 0; pos < cWidth; pos++, src++)
+        {
+          samples[0] = *src + lumaOffset;                 // C
+          samples[1] = *(src - srcStride) + lumaOffset;   // N
+          samples[2] = *(src + srcStride) + lumaOffset;   // S
+          samples[3] = *(src - 1) + lumaOffset;           // W
+          samples[4] = *(src + 1) + lumaOffset;           // E
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          if (*src + lumaOffset <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples) + chromaOffset[1];
+          }
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos] - predChroma);
+        }
+      }
+#if JVET_AC0054_GLCCCM
+      else if (type & CCP_TYPE_GLCCCM)
+      {
+
+        for (int pos = 0; pos < cWidth; pos++, src++)
+        {
+          samples[0] = *src + lumaOffset;                 // C
+          samples[1] = (2 * (*(src - srcStride)) + (*(src - 1 - srcStride)) + (*(src - srcStride + 1)))
+                     - (2 * (*(src + srcStride)) + (*(src - 1 + srcStride)) + (*(src + srcStride + 1)));   // Vertical gradient
+          samples[2] = (2 * (*(src - 1)) + (*(src - 1 - srcStride)) + (*(src - 1 + srcStride)))
+                     - (2 * (*(src + 1)) + (*(src + 1 - srcStride)) + (*(src + 1 + srcStride)));   // Horizontal gradient
+          samples[3] = (( -1 + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);   // Y coordinate
+          samples[4] = ((pos + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);   // X coordinate
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          if (*src + lumaOffset <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples) + chromaOffset[1];
+          }
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos] - predChroma);
+        }
+
+      }
+      else
+      {
+        THROW("Invalid type");
+      }
+#endif
+    }
+    else
+#endif
+    {
+      if (type & CCP_TYPE_CCCM)
+      {
+        for (int pos = 0; pos < cWidth; pos++, src++)
+        {
+          samples[0] = *src + lumaOffset;                 // C
+          samples[1] = *(src - srcStride) + lumaOffset;   // N
+          samples[2] = *(src + srcStride) + lumaOffset;   // S
+          samples[3] = *(src - 1) + lumaOffset;           // W
+          samples[4] = *(src + 1) + lumaOffset;           // E
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos] - predChroma);
+        }
+      }
+#if JVET_AC0054_GLCCCM
+      else if (type & CCP_TYPE_GLCCCM)
+      {
+        for (int pos = 0; pos < cWidth; pos++, src++)
+        {
+          samples[0] = *src + lumaOffset;   // C
+          samples[1] = (2 * (*(src - srcStride)) + (*(src - 1 - srcStride)) + (*(src - srcStride + 1)))
+                     - (2 * (*(src + srcStride)) + (*(src - 1 + srcStride)) + (*(src + srcStride + 1)));   // Vertical gradient
+          samples[2] = (2 * (*(src - 1)) + (*(src - 1 - srcStride)) + (*(src - 1 + srcStride)))
+                     - (2 * (*(src + 1)) + (*(src + 1 - srcStride)) + (*(src + 1 + srcStride)));   // Horizontal gradient
+          samples[3] = (( -1 + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);            // Y coordinate
+          samples[4] = ((pos + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);            // X coordinate
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos] - predChroma);
+        }
+      }
+      else
+      {
+        THROW("Invalid type");
+      }
+#endif
+    }
+  }
+
+  if (leftAvailable)
+  {
+    curChroma0 = curChromaBuf - 1;
+    const Pel *src = srcColor0 - 1;
+#if MMLM
+    if (type & CCP_TYPE_MMLM)
+    {
+      if (type & CCP_TYPE_CCCM)
+      {
+        for (int pos = 0; pos < cHeight; pos++, src += srcStride)
+        {
+          samples[0] = *src + lumaOffset;                 // C
+          samples[1] = *(src - srcStride) + lumaOffset;   // N
+          samples[2] = *(src + srcStride) + lumaOffset;   // S
+          samples[3] = *(src - 1) + lumaOffset;           // W
+          samples[4] = *(src + 1) + lumaOffset;           // E
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          if (*src + lumaOffset <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples) + chromaOffset[1];
+          }
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos * curStride] - predChroma);
+        }
+      }
+#if JVET_AC0054_GLCCCM
+      else if (type & CCP_TYPE_GLCCCM)
+      {
+        for (int pos = 0; pos < cHeight; pos++, src += srcStride)
+        {
+          samples[0] = *src + lumaOffset;   // C
+          samples[1] = (2 * (*(src - srcStride)) + (*(src - 1 - srcStride)) + (*(src - srcStride + 1)))
+                     - (2 * (*(src + srcStride)) + (*(src - 1 + srcStride)) + (*(src + srcStride + 1)));   // Vertical gradient
+          samples[2] = (2 * (*(src - 1)) + (*(src - 1 - srcStride)) + (*(src - 1 + srcStride)))
+                     - (2 * (*(src + 1)) + (*(src + 1 - srcStride)) + (*(src + 1 + srcStride)));   // Horizontal gradient
+          samples[3] = ((pos + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);            // Y coordinate
+          samples[4] = (( -1 + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);            // X coordinate
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          if (*src + lumaOffset <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples) + chromaOffset[1];
+          }
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos * curStride] - predChroma);
+        }
+      }
+      else
+      {
+        THROW("Invalid type");
+      }
+#endif
+    }
+    else
+#endif
+    {
+      if (type & CCP_TYPE_CCCM)
+      {
+        for (int pos = 0; pos < cHeight; pos++, src += srcStride)
+        {
+          samples[0] = *src + lumaOffset;                 // C
+          samples[1] = *(src - srcStride) + lumaOffset;   // N
+          samples[2] = *(src + srcStride) + lumaOffset;   // S
+          samples[3] = *(src - 1) + lumaOffset;           // W
+          samples[4] = *(src + 1) + lumaOffset;           // E
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos * curStride] - predChroma);
+        }
+      }
+#if JVET_AC0054_GLCCCM
+      else if (type & CCP_TYPE_GLCCCM)
+      {
+        for (int pos = 0; pos < cHeight; pos++, src += srcStride)
+        {
+          samples[0] = *src + lumaOffset;   // C
+          samples[1] = (2 * (*(src - srcStride)) + (*(src - 1 - srcStride)) + (*(src - srcStride + 1)))
+                     - (2 * (*(src + srcStride)) + (*(src - 1 + srcStride)) + (*(src + srcStride + 1)));   // Vertical gradient
+          samples[2] = (2 * (*(src - 1)) + (*(src - 1 - srcStride)) + (*(src - 1 + srcStride)))
+                     - (2 * (*(src + 1)) + (*(src + 1 - srcStride)) + (*(src + 1 + srcStride)));   // Horizontal gradient
+          samples[3] = ((pos + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);            // Y coordinate
+          samples[4] = (( -1 + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT);            // X coordinate
+          samples[5] = cccmModel[0].nonlinear(*src + lumaOffset);
+          samples[6] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos * curStride] - predChroma);
+        }
+      }
+      else
+      {
+        THROW("Invalid type");
+      }
+#endif
+    }
+  }
+  return sad;
+}
+
+#if JVET_AD0202_CCCM_MDF
+int IntraPrediction::xGetCostMFCCCM1(const PredictionUnit& pu, const ComponentID compID, int modelNum,
+                                     const CompArea& chromaArea, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModel[2],
+                                     int modelThr, int lumaOffset, int chromaOffset[], int type, int refSizeX, int refSizeY)
+{
+  CHECK(compID != chromaArea.compID, "Invalid component ID");
+
+  const ClpRng& clpRng(pu.cu->cs->slice->clpRng(compID));
+  static Pel samples[CCCM_MULTI_PRED_FILTER_NUM_PARAMS];
+
+  CPelBuf refLumaBlk1, refLumaBlk2, refLumaBlk3;
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu, 0, 3, &refLumaBlk1, &refLumaBlk3, &refLumaBlk2);
+
+  const SizeType cWidth = chromaArea.width;
+  const SizeType cHeight = chromaArea.height;
+
+  CodingStructure& cs = *(pu.cs);
+  const CodingUnit& cu = *(pu.cu);
+
+  const bool aboveAvailable = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID)) ? true : false;
+  const bool leftAvailable = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID)) ? true : false;
+
+  const Pel* curChroma0;
+
+  PelBuf chromaReco = cs.picture->getRecoBuf(chromaArea);
+
+  Pel* curChromaBuf = chromaReco.buf;
+  const int curStride = chromaReco.stride;
+
+  int sad = 0;
+
+  Pel predChroma;
+
+  if (aboveAvailable)
+  {
+    curChroma0 = curChromaBuf - curStride;
+#if MMLM
+    if (type & CCP_TYPE_MMLM)
+    {
+      for (int pos = 0; pos < cWidth; pos++)
+      {
+        samples[0] = refLumaBlk.at(pos, -1) + lumaOffset; // C
+        samples[1] = refLumaBlk1.at(pos, -1) + lumaOffset; // W
+        samples[2] = refLumaBlk2.at(pos, -1) + lumaOffset; // E
+        samples[3] = refLumaBlk3.at(pos, -1) + lumaOffset;
+        samples[4] = cccmModel[0].nonlinear(refLumaBlk.at(pos, -1) + lumaOffset);
+        samples[5] = cccmModel[0].nonlinear(refLumaBlk1.at(pos, -1) + lumaOffset);
+        samples[6] = cccmModel[0].nonlinear(refLumaBlk2.at(pos, -1) + lumaOffset);
+        samples[7] = ((-1 + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+        samples[8] = ((pos + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+        samples[9] = cccmModel[0].bias();
+        if ((refLumaBlk.at(pos, -1) + lumaOffset) <= modelThr)
+        {
+          predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+        }
+        else
+        {
+          predChroma = cccmModel[1].convolve(samples) + chromaOffset[1];
+        }
+        predChroma = ClipPel<Pel>(predChroma, clpRng);
+        sad += abs(curChroma0[pos] - predChroma);
+      }
+    }
+    else
+#endif
+    {
+      for (int pos = 0; pos < cWidth; pos++)
+      {
+        samples[0] = refLumaBlk.at(pos, -1) + lumaOffset; // C
+        samples[1] = refLumaBlk1.at(pos, -1) + lumaOffset; // W
+        samples[2] = refLumaBlk2.at(pos, -1) + lumaOffset; // E
+        samples[3] = refLumaBlk3.at(pos, -1) + lumaOffset;
+        samples[4] = cccmModel[0].nonlinear(refLumaBlk.at(pos, -1) + lumaOffset);
+        samples[5] = cccmModel[0].nonlinear(refLumaBlk1.at(pos, -1) + lumaOffset);
+        samples[6] = cccmModel[0].nonlinear(refLumaBlk2.at(pos, -1) + lumaOffset);
+        samples[7] = ((-1 + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+        samples[8] = ((pos + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+        samples[9] = cccmModel[0].bias();
+        predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+        predChroma = ClipPel<Pel>(predChroma, clpRng);
+        sad += abs(curChroma0[pos] - predChroma);
+      }
+    }
+  }
+
+  if (leftAvailable)
+  {
+    curChroma0 = curChromaBuf - 1;
+#if MMLM
+    if (type & CCP_TYPE_MMLM)
+    {
+      for (int pos = 0; pos < cHeight; pos++)
+      {
+        samples[0] = refLumaBlk.at(-1, pos) + lumaOffset; // C
+        samples[1] = refLumaBlk1.at(-1, pos) + lumaOffset; // W
+        samples[2] = refLumaBlk2.at(-1, pos) + lumaOffset; // E
+        samples[3] = refLumaBlk3.at(-1, pos) + lumaOffset;
+        samples[4] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos) + lumaOffset);
+        samples[5] = cccmModel[0].nonlinear(refLumaBlk1.at(-1, pos) + lumaOffset);
+        samples[6] = cccmModel[0].nonlinear(refLumaBlk2.at(-1, pos) + lumaOffset);
+        samples[7] = ((pos + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+        samples[8] = ((-1 + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+        samples[9] = cccmModel[0].bias();
+        if ((refLumaBlk.at(-1, pos) + lumaOffset) <= modelThr)
+        {
+          predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+        }
+        else
+        {
+          predChroma = cccmModel[1].convolve(samples) + chromaOffset[1];
+        }
+        predChroma = ClipPel<Pel>(predChroma, clpRng);
+        sad += abs(curChroma0[pos * curStride] - predChroma);
+      }
+    }
+    else
+#endif
+    {
+      for (int pos = 0; pos < cHeight; pos++)
+      {
+        samples[0] = refLumaBlk.at(-1, pos) + lumaOffset; // C
+        samples[1] = refLumaBlk1.at(-1, pos) + lumaOffset; // W
+        samples[2] = refLumaBlk2.at(-1, pos) + lumaOffset; // E
+        samples[3] = refLumaBlk3.at(-1, pos) + lumaOffset;
+        samples[4] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos) + lumaOffset);
+        samples[5] = cccmModel[0].nonlinear(refLumaBlk1.at(-1, pos) + lumaOffset);
+        samples[6] = cccmModel[0].nonlinear(refLumaBlk2.at(-1, pos) + lumaOffset);
+        samples[7] = ((pos + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+        samples[8] = ((-1 + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+        samples[9] = cccmModel[0].bias();
+        predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+        predChroma = ClipPel<Pel>(predChroma, clpRng);
+        sad += abs(curChroma0[pos * curStride] - predChroma);
+      }
+    }
+  }
+  return sad;
+}
+
+int IntraPrediction::xGetCostMFCCCM23(const PredictionUnit& pu, const ComponentID compID, int modelNum,
+                                      const CompArea& chromaArea, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> cccmModel[2],
+                                      int modelThr, int lumaOffset, int chromaOffset[], int type, int refSizeX, int refSizeY)
+{
+  CHECK(compID != chromaArea.compID, "Invalid component ID");
+
+  const ClpRng& clpRng(pu.cu->cs->slice->clpRng(compID));
+  static Pel samples[CCCM_MULTI_PRED_FILTER_NUM_PARAMS2];
+
+  CPelBuf refLumaBlk1, refLumaBlk3;
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu, 0, 2, &refLumaBlk1, &refLumaBlk3);
+
+  const SizeType cWidth = chromaArea.width;
+  const SizeType cHeight = chromaArea.height;
+
+  CodingStructure& cs = *(pu.cs);
+  const CodingUnit& cu = *(pu.cu);
+
+  const bool aboveAvailable = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID)) ? true : false;
+  const bool leftAvailable = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID)) ? true : false;
+
+  const Pel* curChroma0;
+
+  PelBuf chromaReco = cs.picture->getRecoBuf(chromaArea);
+  Pel* curChromaBuf = chromaReco.buf;
+  const int curStride = chromaReco.stride;
+
+  int sad = 0;
+
+  Pel predChroma;
+
+  if (aboveAvailable)
+  {
+    curChroma0 = curChromaBuf - curStride;
+#if MMLM
+    if (type & CCP_TYPE_MMLM)
+    {
+      if (pu.cccmMultiFilterIdx == 2)
+      {
+        for (int pos = 0; pos < cWidth; pos++)
+        {
+          samples[0] = refLumaBlk.at(pos,     -1) + lumaOffset; // C
+          samples[1] = refLumaBlk.at(pos - 1, -1) + lumaOffset; // W
+          samples[2] = refLumaBlk.at(pos + 1, -1) + lumaOffset; // E
+          samples[3] = refLumaBlk1.at(pos,     -1) + lumaOffset; // C
+          samples[4] = refLumaBlk1.at(pos - 1, -1) + lumaOffset; // W
+          samples[5] = refLumaBlk1.at(pos + 1, -1) + lumaOffset; // E
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(pos,     -1) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(pos - 1, -1) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(pos + 1, -1) + lumaOffset);
+          samples[9] = ((pos + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+          samples[10] = cccmModel[0].bias();
+          if ((refLumaBlk.at(pos, -1) + lumaOffset) <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples) + chromaOffset[1];
+          }
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos] - predChroma);
+        }
+      }
+      else if(pu.cccmMultiFilterIdx == 3)
+      {
+        for (int pos = 0; pos < cWidth; pos++)
+        {
+          samples[0] = refLumaBlk.at(pos,     -1) + lumaOffset; // C
+          samples[1] = refLumaBlk.at(pos + 1, -2) + lumaOffset; // EN
+          samples[2] = refLumaBlk.at(pos - 1,  0) + lumaOffset; // WS
+          samples[3] = refLumaBlk3.at(pos,     -1) + lumaOffset; // C
+          samples[4] = refLumaBlk3.at(pos + 1, -2) + lumaOffset; // EN
+          samples[5] = refLumaBlk3.at(pos - 1,  0) + lumaOffset; // WS
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(pos,     -1) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(pos + 1, -2) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(pos - 1,  0) + lumaOffset);
+          samples[9] = ((-1 + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+          samples[10] = cccmModel[0].bias();
+          if ((refLumaBlk.at(pos, -1) + lumaOffset) <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples) + chromaOffset[1];
+          }
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos] - predChroma);
+        }
+      }
+    }
+    else
+#endif
+    {
+      if (pu.cccmMultiFilterIdx == 2)
+      {
+        for (int pos = 0; pos < cWidth; pos++)
+        {
+          samples[0] = refLumaBlk.at(pos,     -1) + lumaOffset; // C
+          samples[1] = refLumaBlk.at(pos - 1, -1) + lumaOffset; // W
+          samples[2] = refLumaBlk.at(pos + 1, -1) + lumaOffset; // E
+          samples[3] = refLumaBlk1.at(pos,     -1) + lumaOffset; // C
+          samples[4] = refLumaBlk1.at(pos - 1, -1) + lumaOffset; // W
+          samples[5] = refLumaBlk1.at(pos + 1, -1) + lumaOffset; // E
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(pos,     -1) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(pos - 1, -1) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(pos + 1, -1) + lumaOffset);
+          samples[9] = ((pos + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+          samples[10] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos] - predChroma);
+        }
+      }
+      else // if (pu.cccmMultiFilterIdx == 3)
+      {
+        for (int pos = 0; pos < cWidth; pos++)
+        {
+          samples[0] = refLumaBlk.at(pos,     -1) + lumaOffset; // C
+          samples[1] = refLumaBlk.at(pos + 1, -2) + lumaOffset; // EN
+          samples[2] = refLumaBlk.at(pos - 1,  0) + lumaOffset; // WS
+          samples[3] = refLumaBlk3.at(pos,     -1) + lumaOffset; // C
+          samples[4] = refLumaBlk3.at(pos + 1, -2) + lumaOffset; // EN
+          samples[5] = refLumaBlk3.at(pos - 1,  0) + lumaOffset; // WS
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(pos,     -1) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(pos + 1, -2) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(pos - 1,  0) + lumaOffset);
+          samples[9] = ((-1 + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+          samples[10] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos] - predChroma);
+        }
+      }
+    }
+  }
+
+  if (leftAvailable)
+  {
+    curChroma0 = curChromaBuf - 1;
+#if MMLM
+    if (type & CCP_TYPE_MMLM)
+    {
+      if (pu.cccmMultiFilterIdx == 2)
+      {
+        for (int pos = 0; pos < cHeight; pos++)
+        {
+          samples[0] = refLumaBlk.at(-1, pos) + lumaOffset; // C
+          samples[1] = refLumaBlk.at(-2, pos) + lumaOffset; // W
+          samples[2] = refLumaBlk.at( 0, pos) + lumaOffset; // E
+          samples[3] = refLumaBlk1.at(-1, pos) + lumaOffset; // C
+          samples[4] = refLumaBlk1.at(-2, pos) + lumaOffset; // W
+          samples[5] = refLumaBlk1.at( 0, pos) + lumaOffset; // E
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(-2, pos) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at( 0, pos) + lumaOffset);
+          samples[9] = ((-1 + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+          samples[10] = cccmModel[0].bias();
+          if ((refLumaBlk.at(-1, pos) + lumaOffset) <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples) + chromaOffset[1];
+          }
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos * curStride] - predChroma);
+        }
+      }
+      else // if (pu.cccmMultiFilterIdx == 3)
+      {
+        for (int pos = 0; pos < cHeight; pos++)
+        {
+          samples[0] = refLumaBlk.at(-1, pos) + lumaOffset;      // C
+          samples[1] = refLumaBlk.at( 0, pos - 1) + lumaOffset;  // EN
+          samples[2] = refLumaBlk.at(-2, pos + 1) + lumaOffset;  // WS
+          samples[3] = refLumaBlk3.at(-1, pos) + lumaOffset;     // C
+          samples[4] = refLumaBlk3.at( 0, pos - 1) + lumaOffset; // EN
+          samples[5] = refLumaBlk3.at(-2, pos + 1) + lumaOffset; // WS
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at( 0, pos - 1) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(-2, pos + 1) + lumaOffset);
+          samples[9] = ((pos + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+          samples[10] = cccmModel[0].bias();
+          if ((refLumaBlk.at(-1, pos) + lumaOffset) <= modelThr)
+          {
+            predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          }
+          else
+          {
+            predChroma = cccmModel[1].convolve(samples) + chromaOffset[1];
+          }
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos * curStride] - predChroma);
+        }
+      }
+    }
+    else
+#endif
+    {
+      if (pu.cccmMultiFilterIdx == 2)
+      {
+        for (int pos = 0; pos < cHeight; pos++)
+        {
+          samples[0] = refLumaBlk.at(-1, pos) + lumaOffset;  // C
+          samples[1] = refLumaBlk.at(-2, pos) + lumaOffset;  // W
+          samples[2] = refLumaBlk.at( 0, pos) + lumaOffset;  // E
+          samples[3] = refLumaBlk1.at(-1, pos) + lumaOffset; // C
+          samples[4] = refLumaBlk1.at(-2, pos) + lumaOffset; // W
+          samples[5] = refLumaBlk1.at( 0, pos) + lumaOffset; // E
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos)) + lumaOffset;
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(-2, pos)) + lumaOffset;
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at( 0, pos)) + lumaOffset;
+          samples[9] = ((-1 + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
+          samples[10] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos * curStride] - predChroma);
+        }
+      }
+      else // if (pu.cccmMultiFilterIdx == 3)
+      {
+        for (int pos = 0; pos < cHeight; pos++)
+        {
+          samples[0] = refLumaBlk.at(-1, pos) + lumaOffset;      // C
+          samples[1] = refLumaBlk.at( 0, pos - 1) + lumaOffset;  // EN
+          samples[2] = refLumaBlk.at(-2, pos + 1) + lumaOffset;  // WS
+          samples[3] = refLumaBlk3.at(-1, pos) + lumaOffset;     // C
+          samples[4] = refLumaBlk3.at( 0, pos - 1) + lumaOffset; // EN
+          samples[5] = refLumaBlk3.at(-2, pos + 1) + lumaOffset; // WS
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at( 0, pos - 1) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(-2, pos + 1) + lumaOffset);
+          samples[9] = ((pos + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
+          samples[10] = cccmModel[0].bias();
+          predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
+          predChroma = ClipPel<Pel>(predChroma, clpRng);
+          sad += abs(curChroma0[pos * curStride] - predChroma);
+        }
+      }
+    }
+  }
+  return sad;
+}
+#endif
+
+void IntraPrediction::xGetUpdatedOffsetGLM(const PredictionUnit &pu, const ComponentID compID,
+                                           const CompArea &chromaArea, CccmModel<GLM_NUM_PARAMS> &glmModel, int glmIdc,
+                                           int lumaOffset, int &chromaOffset)
+{
+  CHECK(compID != chromaArea.compID, "Invalid component ID");
+
+  static Pel samples[GLM_NUM_PARAMS];
+
+  CPelBuf refLumaBlk = xGlmGetGradPuBuf(pu, chromaArea, 0);
+  CPelBuf refGradBlk = xGlmGetGradPuBuf(pu, chromaArea, glmIdc);
+
+  const SizeType cWidth  = chromaArea.width;
+  const SizeType cHeight = chromaArea.height;
+
+  CodingStructure  &cs = *(pu.cs);
+  const CodingUnit &cu = *(pu.cu);
+
+  const bool aboveAvailable = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID)) ? true : false;
+  const bool leftAvailable  = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID)) ? true : false;
+
+  const Pel *srcColor0, *srcColor1, *curChroma0;
+
+  srcColor0      = refGradBlk.bufAt(0, 0);
+  int srcStride0 = refGradBlk.stride;
+  srcColor1      = refLumaBlk.bufAt(0, 0);
+  int srcStride1 = refLumaBlk.stride;
+
+  PelBuf chromaReco = cs.picture->getRecoBuf(chromaArea);
+
+  Pel      *curChromaBuf = chromaReco.buf;
+  const int curStride    = chromaReco.stride;
+
+  int totalOffset = 0;
+  int count       = 0;
+
+  if (aboveAvailable)
+  {
+    curChroma0      = curChromaBuf - curStride;
+    const Pel *src0 = srcColor0 - srcStride0;
+    const Pel *src1 = srcColor1 - srcStride1;
+
+    {
+      for (int pos = 0; pos < cWidth; pos++, src0++, src1++)
+      {
+        samples[0] = *src0;                // luma gradient
+        samples[1] = *src1 + lumaOffset;   // luma value
+        samples[2] = glmModel.bias();
+
+        Pel predChroma = glmModel.convolve(samples);
+        totalOffset += curChroma0[pos] - predChroma;
+        count++;
+      }
+    }
+  }
+
+  if (leftAvailable)
+  {
+    curChroma0 = curChromaBuf - 1;
+
+    const Pel *src0 = srcColor0 - 1;
+    const Pel *src1 = srcColor1 - 1;
+
+    for (int pos = 0; pos < cHeight; pos++, src0 += srcStride0, src1 += srcStride1)
+    {
+      samples[0] = *src0;                // luma gradient
+      samples[1] = *src1 + lumaOffset;   // luma value
+      samples[2] = glmModel.bias();
+
+      Pel predChroma = glmModel.convolve(samples);
+      totalOffset += curChroma0[pos * curStride] - predChroma;
+      count++;
+    }
+  }
+
+  chromaOffset = 0;
+
+  if (count)
+  {
+    chromaOffset = PU::getMeanValue(totalOffset, count);   // totalOffset / count;
+  }
+}
+int IntraPrediction::xGetCostGLM(const PredictionUnit &pu, const ComponentID compID, const CompArea &chromaArea,
+                                 CccmModel<GLM_NUM_PARAMS> &glmModel, int glmIdc, int lumaOffset, int &chromaOffset)
+{
+  const ClpRng &clpRng(pu.cu->cs->slice->clpRng(compID));
+  CHECK(compID != chromaArea.compID, "Invalid component ID");
+
+  static Pel samples[GLM_NUM_PARAMS];
+
+  CPelBuf refLumaBlk = xGlmGetGradPuBuf(pu, chromaArea, 0);
+  CPelBuf refGradBlk = xGlmGetGradPuBuf(pu, chromaArea, glmIdc);
+
+  const SizeType cWidth  = chromaArea.width;
+  const SizeType cHeight = chromaArea.height;
+
+  CodingStructure  &cs = *(pu.cs);
+  const CodingUnit &cu = *(pu.cu);
+
+  const bool aboveAvailable = cu.cs->getCU(cu.blocks[compID].pos().offset(0, -1), toChannelType(compID)) ? true : false;
+  const bool leftAvailable  = cu.cs->getCU(cu.blocks[compID].pos().offset(-1, 0), toChannelType(compID)) ? true : false;
+
+  const Pel *srcColor0, *srcColor1, *curChroma0;
+
+  srcColor0      = refGradBlk.bufAt(0, 0);
+  int srcStride0 = refGradBlk.stride;
+  srcColor1      = refLumaBlk.bufAt(0, 0);
+  int srcStride1 = refLumaBlk.stride;
+
+  PelBuf chromaReco = cs.picture->getRecoBuf(chromaArea);
+
+  Pel      *curChromaBuf = chromaReco.buf;
+  const int curStride    = chromaReco.stride;
+
+  int sad = 0;
+
+  if (aboveAvailable)
+  {
+    curChroma0      = curChromaBuf - curStride;
+    const Pel *src0 = srcColor0 - srcStride0;
+    const Pel *src1 = srcColor1 - srcStride1;
+
+    {
+      for (int pos = 0; pos < cWidth; pos++, src0++, src1++)
+      {
+        samples[0] = *src0;                // luma gradient
+        samples[1] = *src1 + lumaOffset;   // luma value
+        samples[2] = glmModel.bias();
+
+        Pel predChroma = glmModel.convolve(samples) + chromaOffset;
+        predChroma     = ClipPel<Pel>(predChroma, clpRng);
+        sad += abs(curChroma0[pos] - predChroma);
+      }
+    }
+  }
+
+  if (leftAvailable)
+  {
+    curChroma0 = curChromaBuf - 1;
+
+    const Pel *src0 = srcColor0 - 1;
+    const Pel *src1 = srcColor1 - 1;
+
+    for (int pos = 0; pos < cHeight; pos++, src0 += srcStride0, src1 += srcStride1)
+    {
+      samples[0] = *src0;                // luma gradient
+      samples[1] = *src1 + lumaOffset;   // luma value
+      samples[2] = glmModel.bias();
+
+      Pel predChroma = glmModel.convolve(samples) + chromaOffset;
+      predChroma     = ClipPel<Pel>(predChroma, clpRng);
+      sad += abs(curChroma0[pos * curStride] - predChroma);
+    }
+  }
+
+  return sad;
+}
+void IntraPrediction::xCclmApplyModel(const PredictionUnit &pu, const ComponentID compId,
+                                      CccmModel<CCCM_NUM_PARAMS> &cccmModel, int modelId, int modelThr,
+                                      PelBuf &piPred) const
+{
+  const ClpRng &clpRng(pu.cu->cs->slice->clpRng(compId));
+  static Pel    samples[CCCM_NUM_PARAMS];
+
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu);
+
+  for (int y = 0; y < refLumaBlk.height; y++)
+  {
+    for (int x = 0; x < refLumaBlk.width; x++)
+    {
+      if (modelId == 1 && refLumaBlk.at(x, y) > modelThr)   // Model 1: Include only samples below or equal to the threshold
+      {
+        continue;
+      }
+      if (modelId == 2 && refLumaBlk.at(x, y) <= modelThr)   // Model 2: Include only samples above the threshold
+      {
+        continue;
+      }
+      samples[0] = refLumaBlk.at(x, y);   // C
+      samples[1] = cccmModel.bias();
+
+      piPred.at(x, y) = ClipPel<Pel>(Pel((cccmModel.params[0] * samples[0] + cccmModel.params[1] * samples[1] + CCCM_DECIM_ROUND) >> CCCM_DECIM_BITS), clpRng);
+    }
+  }
+}
+
+void IntraPrediction::reorderCCPCandidates(const PredictionUnit &pu, CCPModelCandidate candList[], int reorderlistSize)
+{
+  int candCost[MAX_CCP_CAND_LIST_SIZE];
+  for (int i = 0; i < reorderlistSize; i++)
+  {
+    candCost[i] = xGetOneCCPCandCost(pu, candList[i]);
+  }
+
+  //Inserting sorting
+  for (int i = 1; i < reorderlistSize; i++)
+  {
+    for (int j = 0; j < i; j++)
+    {
+      if (candCost[i] < candCost[j])
+      {
+        CCPModelCandidate tmpCand = candList[i];
+        int tmpCost = candCost[i];
+        for (int k = i; k > j; k--)
+        {
+          candList[k] = candList[k - 1];
+          candCost[k] = candCost[k - 1];
+        }
+        candList[j] = tmpCand;
+        candCost[j] = tmpCost;
+        break;
+      }
+    }
+  }
+}
+
+int  IntraPrediction::xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandidate &ccpCand)
+{
+  CompArea chromaArea = pu.Cb();
+  int cost = 0;
+  const int modelNum = (ccpCand.type & CCP_TYPE_MMLM) ? 2 : 1;
+  const int bitDepth = pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
+  int offsetCb[2] = { 0, 0 };
+  int offsetCr[2] = { 0, 0 };
+
+  CHECK(ccpCand.type == CCP_TYPE_NONE, "CCP model with no type")
+  {
+    if (ccpCand.type & (CCP_TYPE_CCCM | CCP_TYPE_GLCCCM))
+    {
+#if JVET_AB0174_CCCM_DIV_FREE
+      int lumaOffset = m_cccmLumaOffset - ccpCand.lumaOffset;
+#else
+      int lumaOffset = 0;
+#endif
+      int refSizeX = ccpCand.corOffX;
+      int refSizeY = ccpCand.corOffY;
+
+      CccmModel<CCCM_NUM_PARAMS> cccmModelCb[2] = { CccmModel<CCCM_NUM_PARAMS>(bitDepth), CccmModel<CCCM_NUM_PARAMS>(bitDepth) };
+      CccmModel<CCCM_NUM_PARAMS> cccmModelCr[2] = { CccmModel<CCCM_NUM_PARAMS>(bitDepth), CccmModel<CCCM_NUM_PARAMS>(bitDepth) };
+
+      PU::ccpParamsToCccmModel(ccpCand, cccmModelCb, cccmModelCr);
+
+      cost += xGetCostCCCM(pu, COMPONENT_Cb, modelNum, pu.Cb(), cccmModelCb, ccpCand.yThres, lumaOffset, offsetCb, ccpCand.type, refSizeX, refSizeY);
+      cost += xGetCostCCCM(pu, COMPONENT_Cr, modelNum, pu.Cr(), cccmModelCr, ccpCand.yThres, lumaOffset, offsetCr, ccpCand.type, refSizeX, refSizeY);
+    }
+#if JVET_AD0202_CCCM_MDF
+    else if (ccpCand.type & (CCP_TYPE_MDFCCCM))
+    {
+      const_cast<PredictionUnit&>(pu).cccmMultiFilterIdx = ccpCand.cccmMultiFilterIdx;
+#if JVET_AB0174_CCCM_DIV_FREE
+      int lumaOffset = m_cccmLumaOffset - ccpCand.lumaOffset;
+#else
+      int lumaOffset = 0;
+#endif
+      int refSizeX = ccpCand.corOffX;
+      int refSizeY = ccpCand.corOffY;
+
+      if (ccpCand.cccmMultiFilterIdx == 1)
+      {
+        CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCb[2] = { CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(bitDepth), CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(bitDepth) };
+        CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCr[2] = { CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(bitDepth), CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(bitDepth) };
+
+        PU::ccpParamsToCccmModel(ccpCand, cccmModelCb, cccmModelCr);
+
+        cost += xGetCostMFCCCM1(pu, COMPONENT_Cb, modelNum, pu.Cb(), cccmModelCb, ccpCand.yThres, lumaOffset, offsetCb, ccpCand.type, refSizeX, refSizeY);
+        cost += xGetCostMFCCCM1(pu, COMPONENT_Cr, modelNum, pu.Cr(), cccmModelCr, ccpCand.yThres, lumaOffset, offsetCr, ccpCand.type, refSizeX, refSizeY);
+      }
+      else
+      {
+        CHECK(ccpCand.cccmMultiFilterIdx != 2 && ccpCand.cccmMultiFilterIdx != 3, "Unexpected cccmMultiFilterIdx");
+
+        CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> cccmModelCb[2] = { CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(bitDepth), CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(bitDepth) };
+        CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> cccmModelCr[2] = { CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(bitDepth), CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(bitDepth) };
+
+        PU::ccpParamsToCccmModel(ccpCand, cccmModelCb, cccmModelCr);
+
+        cost += xGetCostMFCCCM23(pu, COMPONENT_Cb, modelNum, pu.Cb(), cccmModelCb, ccpCand.yThres, lumaOffset, offsetCb, ccpCand.type, refSizeX, refSizeY);
+        cost += xGetCostMFCCCM23(pu, COMPONENT_Cr, modelNum, pu.Cr(), cccmModelCr, ccpCand.yThres, lumaOffset, offsetCr, ccpCand.type, refSizeX, refSizeY);
+      }
+      const_cast<PredictionUnit&>(pu).cccmMultiFilterIdx = 0;
+    }
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+    else if (ccpCand.type & CCP_TYPE_NSCCCM)
+    {
+#if JVET_AB0174_CCCM_DIV_FREE
+      int lumaOffset = m_cccmLumaOffset - ccpCand.lumaOffset;
+#else
+      int lumaOffset = 0;
+#endif
+      const_cast<PredictionUnit &>(pu).cccmNoSubFlag = 1;
+
+      CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCb[2] = { CccmModel<CCCM_NO_SUB_NUM_PARAMS>(bitDepth), CccmModel<CCCM_NO_SUB_NUM_PARAMS>(bitDepth) };
+      CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCr[2] = { CccmModel<CCCM_NO_SUB_NUM_PARAMS>(bitDepth), CccmModel<CCCM_NO_SUB_NUM_PARAMS>(bitDepth) };
+        
+      PU::ccpParamsToCccmModel(ccpCand, cccmModelCb, cccmModelCr);
+        
+      cost += xGetCostNSCCCM(pu, COMPONENT_Cb, modelNum, pu.Cb(), cccmModelCb, ccpCand.yThres, lumaOffset, offsetCb);
+      cost += xGetCostNSCCCM(pu, COMPONENT_Cr, modelNum, pu.Cr(), cccmModelCr, ccpCand.yThres, lumaOffset, offsetCr);
+
+      const_cast<PredictionUnit &>(pu).cccmNoSubFlag = 0;
+    }
+#endif
+    else if (ccpCand.type & (CCP_TYPE_CCLM | CCP_TYPE_GLM0123))
+    {
+      CPelBuf temp;
+      int     lumaStride;
+
+      if (ccpCand.type & CCP_TYPE_GLM0123)
+      {
+        Pel *glmTemp = m_glmTempCb[ccpCand.glmIdc];
+        lumaStride   = 2 * MAX_CU_SIZE + 1;
+        temp         = PelBuf(glmTemp + lumaStride + 1, lumaStride, Size(chromaArea));
+      }
+      else
+      {
+        lumaStride = MAX_CU_SIZE + 1;
+        temp       = PelBuf(m_piTemp + lumaStride + 1, lumaStride, Size(chromaArea));
+      }
+
+      CclmModel cclmModels;
+      PU::ccpParamsToCclmModel(COMPONENT_Cb, ccpCand, cclmModels);
+      cost += xGetCostCCLM(pu, COMPONENT_Cb, pu.Cb(), cclmModels, 1, ccpCand.glmIdc);
+      PU::ccpParamsToCclmModel(COMPONENT_Cr, ccpCand, cclmModels);
+      cost += xGetCostCCLM(pu, COMPONENT_Cr, pu.Cr(), cclmModels, 1, ccpCand.glmIdc);
+    }
+    else if (ccpCand.type & CCP_TYPE_GLM4567)
+    {
+      int glmIdc       = ccpCand.glmIdc;
+      int chromaOffset = 0;
+#if JVET_AB0174_CCCM_DIV_FREE
+      int lumaOffset = m_glmLumaOffset - ccpCand.lumaOffset;
+#else
+      int lumaOffset = 0;
+#endif
+      CccmModel<GLM_NUM_PARAMS> glmModel(bitDepth);
+      PU::ccpParamsToGlmModel(COMPONENT_Cb, ccpCand, glmModel);
+      cost += xGetCostGLM(pu, COMPONENT_Cb, pu.Cb(), glmModel, glmIdc, lumaOffset, chromaOffset);
+      PU::ccpParamsToGlmModel(COMPONENT_Cr, ccpCand, glmModel);
+      cost += xGetCostGLM(pu, COMPONENT_Cr, pu.Cr(), glmModel, glmIdc, lumaOffset, chromaOffset);
+    }
+    else
+    {
+      THROW("Invalid type!");
+    }
+  }
+  return cost;
+}
+
+void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr)
+{
+  const int bitDepth = pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
+
+  if (pu.idxNonLocalCCP)
+  {
+    CompArea                   chromaArea = pu.Cb();
+    int                        cWidth     = chromaArea.width;
+    int                        cHeight    = chromaArea.height;
+    CccmModel<CCCM_NUM_PARAMS> cccmModelCb[2] = { CccmModel<CCCM_NUM_PARAMS>(bitDepth), CccmModel<CCCM_NUM_PARAMS>(bitDepth) };
+    CccmModel<CCCM_NUM_PARAMS> cccmModelCr[2] = { CccmModel<CCCM_NUM_PARAMS>(bitDepth), CccmModel<CCCM_NUM_PARAMS>(bitDepth) };
+
+    CHECK(pu.curCand.type == CCP_TYPE_NONE, "CCP model with no type")
+    {
+      int modelNum = (pu.curCand.type & CCP_TYPE_MMLM) ? 2 : 1;
+
+      if (pu.curCand.type & (CCP_TYPE_CCCM | CCP_TYPE_GLCCCM))
+      {
+#if JVET_AB0174_CCCM_DIV_FREE
+        int lumaOffset = m_cccmLumaOffset - pu.curCand.lumaOffset;
+#else
+        int lumaOffset = 0;
+#endif
+        int refSizeX = pu.curCand.corOffX;
+        int refSizeY = pu.curCand.corOffY;
+        int offsetCb[2] = { 0, 0 };
+        int offsetCr[2] = { 0, 0 };
+
+        PU::ccpParamsToCccmModel(pu.curCand, cccmModelCb, cccmModelCr);
+
+        if (!(pu.curCand.type & CCP_TYPE_MMLM))
+        {
+          xGetUpdatedOffsetCCCM(pu, COMPONENT_Cb, modelNum, pu.Cb(), cccmModelCb, 0, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
+          xGetUpdatedOffsetCCCM(pu, COMPONENT_Cr, modelNum, pu.Cr(), cccmModelCr, 0, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
+
+          xCccmApplyModelOffset(pu, COMPONENT_Cb, cccmModelCb[0], 0, 0, predCb, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
+          xCccmApplyModelOffset(pu, COMPONENT_Cr, cccmModelCr[0], 0, 0, predCr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
+        }
+        else
+        {
+          // Multimode case
+          int modelThr = pu.curCand.yThres;
+
+          xGetUpdatedOffsetCCCM(pu, COMPONENT_Cb, modelNum, pu.Cb(), cccmModelCb, modelThr, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
+          xGetUpdatedOffsetCCCM(pu, COMPONENT_Cr, modelNum, pu.Cr(), cccmModelCr, modelThr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
+
+          xCccmApplyModelOffset(pu, COMPONENT_Cb, cccmModelCb[0], 1, modelThr, predCb, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
+          xCccmApplyModelOffset(pu, COMPONENT_Cr, cccmModelCr[0], 1, modelThr, predCr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
+
+          xCccmApplyModelOffset(pu, COMPONENT_Cb, cccmModelCb[1], 2, modelThr, predCb, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
+          xCccmApplyModelOffset(pu, COMPONENT_Cr, cccmModelCr[1], 2, modelThr, predCr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
+        }
+      }
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+      else if (pu.curCand.type & CCP_TYPE_NSCCCM)
+      {
+        CccmModel<CCCM_NO_SUB_NUM_PARAMS> nscccmModelCb[2] = { CccmModel<CCCM_NO_SUB_NUM_PARAMS>(bitDepth), CccmModel<CCCM_NO_SUB_NUM_PARAMS>(bitDepth) };
+        CccmModel<CCCM_NO_SUB_NUM_PARAMS> nscccmModelCr[2] = { CccmModel<CCCM_NO_SUB_NUM_PARAMS>(bitDepth), CccmModel<CCCM_NO_SUB_NUM_PARAMS>(bitDepth) };
+#if JVET_AB0174_CCCM_DIV_FREE
+        int lumaOffset = m_cccmLumaOffset - pu.curCand.lumaOffset;
+#else
+        int lumaOffset = 0;
+#endif
+        const_cast<PredictionUnit &>(pu).cccmNoSubFlag = 1;
+        int offsetCb[2] = { 0, 0 };
+        int offsetCr[2] = { 0, 0 };
+
+        PU::ccpParamsToCccmModel(pu.curCand, nscccmModelCb, nscccmModelCr);
+
+        if (!(pu.curCand.type & CCP_TYPE_MMLM))
+        {
+          xGetUpdatedOffsetNSCCCM(pu, COMPONENT_Cb, modelNum, pu.Cb(), nscccmModelCb, 0, lumaOffset, offsetCb);
+          xGetUpdatedOffsetNSCCCM(pu, COMPONENT_Cr, modelNum, pu.Cr(), nscccmModelCr, 0, lumaOffset, offsetCr);
+
+          xNSCccmApplyModelOffset(pu, COMPONENT_Cb, nscccmModelCb[0], 0, 0, predCb, lumaOffset, offsetCb);
+          xNSCccmApplyModelOffset(pu, COMPONENT_Cr, nscccmModelCr[0], 0, 0, predCr, lumaOffset, offsetCr);
+        }
+        else
+        {
+          // Multimode case
+          int modelThr = pu.curCand.yThres;
+
+          xGetUpdatedOffsetNSCCCM(pu, COMPONENT_Cb, modelNum, pu.Cb(), nscccmModelCb, modelThr, lumaOffset, offsetCb);
+          xGetUpdatedOffsetNSCCCM(pu, COMPONENT_Cr, modelNum, pu.Cr(), nscccmModelCr, modelThr, lumaOffset, offsetCr);
+
+          xNSCccmApplyModelOffset(pu, COMPONENT_Cb, nscccmModelCb[0], 1, modelThr, predCb, lumaOffset, offsetCb);
+          xNSCccmApplyModelOffset(pu, COMPONENT_Cr, nscccmModelCr[0], 1, modelThr, predCr, lumaOffset, offsetCr);
+
+          xNSCccmApplyModelOffset(pu, COMPONENT_Cb, nscccmModelCb[1], 2, modelThr, predCb, lumaOffset, offsetCb);
+          xNSCccmApplyModelOffset(pu, COMPONENT_Cr, nscccmModelCr[1], 2, modelThr, predCr, lumaOffset, offsetCr);
+        }
+
+        const_cast<PredictionUnit &>(pu).cccmNoSubFlag = 0;
+      }
+#endif
+#if JVET_AD0202_CCCM_MDF
+      else if (pu.curCand.type & CCP_TYPE_MDFCCCM)
+      {
+        const_cast<PredictionUnit&>(pu).cccmMultiFilterIdx = pu.curCand.cccmMultiFilterIdx;
+#if JVET_AB0174_CCCM_DIV_FREE
+        int lumaOffset = m_cccmLumaOffset - pu.curCand.lumaOffset;
+#else
+        int lumaOffset = 0;
+#endif
+        int refSizeX = pu.curCand.corOffX;
+        int refSizeY = pu.curCand.corOffY;
+        int offsetCb[2] = { 0, 0 };
+        int offsetCr[2] = { 0, 0 };
+
+        if (pu.curCand.cccmMultiFilterIdx == 1)
+        {
+          CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> mfcccmModelCb[2] = { CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(bitDepth), CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(bitDepth) };
+          CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> mfcccmModelCr[2] = { CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(bitDepth), CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(bitDepth) };
+
+          PU::ccpParamsToCccmModel(pu.curCand, mfcccmModelCb, mfcccmModelCr);
+
+          if (!(pu.curCand.type & CCP_TYPE_MMLM))
+          {
+            xGetUpdatedOffsetMFCCCM1(pu, COMPONENT_Cb, modelNum, pu.Cb(), mfcccmModelCb, 0, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
+            xGetUpdatedOffsetMFCCCM1(pu, COMPONENT_Cr, modelNum, pu.Cr(), mfcccmModelCr, 0, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
+
+            xMFCccmApplyModelOffset1(pu, COMPONENT_Cb, mfcccmModelCb[0], 0, 0, predCb, lumaOffset, offsetCb);
+            xMFCccmApplyModelOffset1(pu, COMPONENT_Cr, mfcccmModelCr[0], 0, 0, predCr, lumaOffset, offsetCr);
+          }
+          else
+          {
+            // Multimode case
+            int modelThr = pu.curCand.yThres;
+
+            xGetUpdatedOffsetMFCCCM1(pu, COMPONENT_Cb, modelNum, pu.Cb(), mfcccmModelCb, modelThr, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
+            xGetUpdatedOffsetMFCCCM1(pu, COMPONENT_Cr, modelNum, pu.Cr(), mfcccmModelCr, modelThr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
+
+            xMFCccmApplyModelOffset1(pu, COMPONENT_Cb, mfcccmModelCb[0], 1, modelThr, predCb, lumaOffset, offsetCb);
+            xMFCccmApplyModelOffset1(pu, COMPONENT_Cr, mfcccmModelCr[0], 1, modelThr, predCr, lumaOffset, offsetCr);
+
+            xMFCccmApplyModelOffset1(pu, COMPONENT_Cb, mfcccmModelCb[1], 2, modelThr, predCb, lumaOffset, offsetCb);
+            xMFCccmApplyModelOffset1(pu, COMPONENT_Cr, mfcccmModelCr[1], 2, modelThr, predCr, lumaOffset, offsetCr);
+          }
+        }
+        else // if (pu.curCand.cccmMultiFilterIdx == 2 || pu.curCand.cccmMultiFilterIdx == 3)
+        {
+          CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> mfcccmModelCb[2] = { CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(bitDepth), CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(bitDepth) };
+          CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> mfcccmModelCr[2] = { CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(bitDepth), CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(bitDepth) };
+
+          PU::ccpParamsToCccmModel(pu.curCand, mfcccmModelCb, mfcccmModelCr);
+
+          if (!(pu.curCand.type & CCP_TYPE_MMLM))
+          {
+            xGetUpdatedOffsetMFCCCM23(pu, COMPONENT_Cb, modelNum, pu.Cb(), mfcccmModelCb, 0, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
+            xGetUpdatedOffsetMFCCCM23(pu, COMPONENT_Cr, modelNum, pu.Cr(), mfcccmModelCr, 0, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
+
+            xMFCccmApplyModelOffset23(pu, COMPONENT_Cb, mfcccmModelCb[0], 0, 0, predCb, lumaOffset, offsetCb);
+            xMFCccmApplyModelOffset23(pu, COMPONENT_Cr, mfcccmModelCr[0], 0, 0, predCr, lumaOffset, offsetCr);
+          }
+          else
+          {
+            // Multimode case
+            int modelThr = pu.curCand.yThres;
+
+            xGetUpdatedOffsetMFCCCM23(pu, COMPONENT_Cb, modelNum, pu.Cb(), mfcccmModelCb, modelThr, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
+            xGetUpdatedOffsetMFCCCM23(pu, COMPONENT_Cr, modelNum, pu.Cr(), mfcccmModelCr, modelThr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
+
+            xMFCccmApplyModelOffset23(pu, COMPONENT_Cb, mfcccmModelCb[0], 1, modelThr, predCb, lumaOffset, offsetCb);
+            xMFCccmApplyModelOffset23(pu, COMPONENT_Cr, mfcccmModelCr[0], 1, modelThr, predCr, lumaOffset, offsetCr);
+
+            xMFCccmApplyModelOffset23(pu, COMPONENT_Cb, mfcccmModelCb[1], 2, modelThr, predCb, lumaOffset, offsetCb);
+            xMFCccmApplyModelOffset23(pu, COMPONENT_Cr, mfcccmModelCr[1], 2, modelThr, predCr, lumaOffset, offsetCr);
+          }
+        }
+
+        const_cast<PredictionUnit&>(pu).cccmMultiFilterIdx = 0;
+      }
+#endif
+      else if (pu.curCand.type & (CCP_TYPE_CCLM | CCP_TYPE_GLM0123))
+      {
+        CPelBuf temp;
+        int     lumaStride;
+
+        if (pu.curCand.type & CCP_TYPE_GLM0123)
+        {
+          Pel *glmTemp = m_glmTempCb[pu.curCand.glmIdc];
+          lumaStride   = 2 * MAX_CU_SIZE + 1;
+          temp         = PelBuf(glmTemp + lumaStride + 1, lumaStride, Size(chromaArea));
+        }
+        else
+        {
+          lumaStride = MAX_CU_SIZE + 1;
+          temp       = PelBuf(m_piTemp + lumaStride + 1, lumaStride, Size(chromaArea));
+        }
+
+        CclmModel modelsCb, modelsCr;
+        PU::ccpParamsToCclmModel(COMPONENT_Cb, pu.curCand, modelsCb);
+        PU::ccpParamsToCclmModel(COMPONENT_Cr, pu.curCand, modelsCr);
+
+        if (!(pu.curCand.type & CCP_TYPE_MMLM))
+        {
+          xGetUpdatedOffsetCCLM(pu, COMPONENT_Cb, pu.Cb(), modelsCb, 1, pu.curCand.glmIdc);
+          xGetUpdatedOffsetCCLM(pu, COMPONENT_Cr, pu.Cr(), modelsCr, 1, pu.curCand.glmIdc);
+
+          predCb.copyFrom(temp);
+          predCr.copyFrom(temp);
+
+          predCb.linearTransform(modelsCb.a, modelsCb.shift, modelsCb.b, true, pu.cs->slice->clpRng(COMPONENT_Cb));
+          predCr.linearTransform(modelsCr.a, modelsCr.shift, modelsCr.b, true, pu.cs->slice->clpRng(COMPONENT_Cb));
+        }
+        else
+        {
+          xGetUpdatedOffsetCCLM(pu, COMPONENT_Cb, pu.Cb(), modelsCb, 2, pu.curCand.glmIdc);
+          xGetUpdatedOffsetCCLM(pu, COMPONENT_Cr, pu.Cr(), modelsCr, 2, pu.curCand.glmIdc);
+
+          auto applyMMCM = [&](PelBuf &predBuf, const CclmModel &cclmModel)
+          {
+            Pel       *chromaPred   = predBuf.bufAt(0, 0);
+            const Pel *lumaReco     = temp.bufAt(0, 0);
+            int        chromaStride = predBuf.stride;
+
+            for (int i = 0; i < cHeight; i++)
+            {
+              for (int j = 0; j < cWidth; j++)
+              {
+                if (lumaReco[j] <= cclmModel.yThres)
+                {
+                  chromaPred[j] = (Pel) ClipPel(((cclmModel.a * lumaReco[j]) >> cclmModel.shift) + cclmModel.b, pu.cs->slice->clpRng(COMPONENT_Cb));
+                }
+                else
+                {
+                  chromaPred[j] = (Pel) ClipPel(((cclmModel.a2 * lumaReco[j]) >> cclmModel.shift2) + cclmModel.b2, pu.cs->slice->clpRng(COMPONENT_Cb));
+                }
+              }
+              chromaPred += chromaStride;
+              lumaReco += lumaStride;
+            }
+          };
+          applyMMCM(predCb, modelsCb);
+          applyMMCM(predCr, modelsCr);
+        }
+        PU::cclmModelToCcpParams(COMPONENT_Cb, const_cast<PredictionUnit&>(pu).curCand, modelsCb);
+        PU::cclmModelToCcpParams(COMPONENT_Cr, const_cast<PredictionUnit&>(pu).curCand, modelsCr);
+      }
+      else if (pu.curCand.type & CCP_TYPE_GLM4567)
+      {
+#if JVET_AB0174_CCCM_DIV_FREE
+        int lumaOffset = m_glmLumaOffset - pu.curCand.lumaOffset;
+#else
+        int lumaOffset = 0;
+#endif
+        int glmIdc       = pu.curCand.glmIdc;
+        int chromaOffset = 0;
+        CccmModel<GLM_NUM_PARAMS> glmModel(bitDepth);
+
+        PU::ccpParamsToGlmModel(COMPONENT_Cb, pu.curCand, glmModel);
+        xGetUpdatedOffsetGLM(pu, COMPONENT_Cb, pu.Cb(), glmModel, glmIdc, lumaOffset, chromaOffset);
+        xGlmApplyModelOffset(pu, COMPONENT_Cb, pu.Cb(), glmModel, glmIdc, predCb, lumaOffset, chromaOffset);
+
+        PU::ccpParamsToGlmModel(COMPONENT_Cr, pu.curCand, glmModel);
+        xGetUpdatedOffsetGLM(pu, COMPONENT_Cr, pu.Cr(), glmModel, glmIdc, lumaOffset, chromaOffset);
+        xGlmApplyModelOffset(pu, COMPONENT_Cr, pu.Cr(), glmModel, glmIdc, predCr, lumaOffset, chromaOffset);
+      }
+      else
+      {
+        THROW("Invalid Type");
+      }
+    }
+  }
+}
+#endif
+
 #if JVET_AB0174_CCCM_DIV_FREE
 #define DIV_PREC_BITS       14
 #define DIV_PREC_BITS_POW2  8
@@ -12746,8 +15597,15 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   if( pu.cccmNoSubFlag )
   {
+#if JVET_AD0188_CCP_MERGE
+    CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCb[2] = { CccmModel<CCCM_NO_SUB_NUM_PARAMS>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), 
+                                                         CccmModel<CCCM_NO_SUB_NUM_PARAMS>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCr[2] = { CccmModel<CCCM_NO_SUB_NUM_PARAMS>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)),
+                                                         CccmModel<CCCM_NO_SUB_NUM_PARAMS>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+#else
     CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCb( pu.cu->slice->getSPS()->getBitDepth( CHANNEL_TYPE_LUMA ) );
     CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCr( pu.cu->slice->getSPS()->getBitDepth( CHANNEL_TYPE_LUMA ) );
+#endif
 
 #if JVET_AB0143_CCCM_TS
     if( intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX )
@@ -12755,15 +15613,44 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
     if( PU::cccmSingleModeAvail( pu, intraDir ) )
 #endif
     {
+#if JVET_AD0188_CCP_MERGE
+      xCccmCalcModels(pu, cccmModelCb[0], cccmModelCr[0], 0, 0);
+      xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
+
+      const_cast<PredictionUnit &>(pu).curCand.type = CCP_TYPE_NSCCCM;
+      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, 0
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
       xCccmCalcModels( pu, cccmModelCb, cccmModelCr, 0, 0 );
       xCccmApplyModel( pu, COMPONENT_Cb, cccmModelCb, 0, 0, predCb );
       xCccmApplyModel( pu, COMPONENT_Cr, cccmModelCr, 0, 0, predCr );
+#endif
     }
     else
     {
       // Multimode case
       int modelThr = xCccmCalcRefAver( pu );
 
+#if JVET_AD0188_CCP_MERGE
+      xCccmCalcModels( pu, cccmModelCb[0], cccmModelCr[0], 1, modelThr );
+      xCccmApplyModel( pu, COMPONENT_Cb,   cccmModelCb[0], 1, modelThr, predCb );
+      xCccmApplyModel( pu, COMPONENT_Cr,   cccmModelCr[0], 1, modelThr, predCr );
+
+      xCccmCalcModels( pu, cccmModelCb[1], cccmModelCr[1], 2, modelThr );
+      xCccmApplyModel( pu, COMPONENT_Cb,   cccmModelCb[1], 2, modelThr, predCb );
+      xCccmApplyModel( pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr );
+
+      const_cast<PredictionUnit &>(pu).curCand.type = (CCP_TYPE_NSCCCM | CCP_TYPE_MMLM);
+      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, modelThr
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
       xCccmCalcModels( pu, cccmModelCb, cccmModelCr, 1, modelThr );
       xCccmApplyModel( pu, COMPONENT_Cb, cccmModelCb, 1, modelThr, predCb );
       xCccmApplyModel( pu, COMPONENT_Cr, cccmModelCr, 1, modelThr, predCr );
@@ -12771,6 +15658,7 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmCalcModels( pu, cccmModelCb, cccmModelCr, 2, modelThr );
       xCccmApplyModel( pu, COMPONENT_Cb, cccmModelCb, 2, modelThr, predCb );
       xCccmApplyModel( pu, COMPONENT_Cr, cccmModelCr, 2, modelThr, predCr );
+#endif
     }
   }
   else
@@ -12778,8 +15666,15 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
 #if JVET_AD0202_CCCM_MDF
   if (pu.cccmMultiFilterIdx == 1)
   {
+#if JVET_AD0188_CCP_MERGE
+    CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCb[2] = { CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)),
+                                                                    CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCr[2] = { CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)),
+                                                                    CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+#else
     CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCb(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
     CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCr(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+#endif
 
 #if JVET_AB0143_CCCM_TS
     if (intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX)
@@ -12787,15 +15682,52 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
     if (PU::cccmSingleModeAvail(pu, intraDir))
 #endif
     {
+#if JVET_AD0188_CCP_MERGE
+      xCccmCalcModels2(pu, cccmModelCb[0], cccmModelCr[0], 0, 0);
+      xCccmApplyModel2(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
+      xCccmApplyModel2(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
+
+      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_MDFCCCM;
+      const_cast<PredictionUnit&>(pu).curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+
+      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, 0
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
       xCccmCalcModels2(pu, cccmModelCb, cccmModelCr, 0, 0);
       xCccmApplyModel2(pu, COMPONENT_Cb, cccmModelCb, 0, 0, predCb);
       xCccmApplyModel2(pu, COMPONENT_Cr, cccmModelCr, 0, 0, predCr);
+#endif
     }
     else
     {
       // Multimode case
       int modelThr = xCccmCalcRefAver(pu);
 
+#if JVET_AD0188_CCP_MERGE
+      xCccmCalcModels2(pu, cccmModelCb[0], cccmModelCr[0], 1, modelThr);
+      xCccmApplyModel2(pu, COMPONENT_Cb,   cccmModelCb[0], 1, modelThr, predCb);
+      xCccmApplyModel2(pu, COMPONENT_Cr,   cccmModelCr[0], 1, modelThr, predCr);
+
+      xCccmCalcModels2(pu, cccmModelCb[1], cccmModelCr[1], 2, modelThr);
+      xCccmApplyModel2(pu, COMPONENT_Cb,   cccmModelCb[1], 2, modelThr, predCb);
+      xCccmApplyModel2(pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr);
+
+      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_MDFCCCM | CCP_TYPE_MMLM;
+      const_cast<PredictionUnit&>(pu).curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+
+      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, modelThr
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
       xCccmCalcModels2(pu, cccmModelCb, cccmModelCr, 1, modelThr);
       xCccmApplyModel2(pu, COMPONENT_Cb, cccmModelCb, 1, modelThr, predCb);
       xCccmApplyModel2(pu, COMPONENT_Cr, cccmModelCr, 1, modelThr, predCr);
@@ -12803,12 +15735,20 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmCalcModels2(pu, cccmModelCb, cccmModelCr, 2, modelThr);
       xCccmApplyModel2(pu, COMPONENT_Cb, cccmModelCb, 2, modelThr, predCb);
       xCccmApplyModel2(pu, COMPONENT_Cr, cccmModelCr, 2, modelThr, predCr);
+#endif
     }
   }
   else if (pu.cccmMultiFilterIdx > 1)
   {
+#if JVET_AD0188_CCP_MERGE
+    CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> cccmModelCb[2] = { CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)),
+                                                                     CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> cccmModelCr[2] = { CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)),
+                                                                     CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+#else
     CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> cccmModelCb(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
     CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> cccmModelCr(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+#endif
 
 #if JVET_AB0143_CCCM_TS
     if (intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX)
@@ -12816,15 +15756,52 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
     if (PU::cccmSingleModeAvail(pu, intraDir))
 #endif
     {
+#if JVET_AD0188_CCP_MERGE
+      xCccmCalcModels3(pu, cccmModelCb[0], cccmModelCr[0], 0, 0);
+      xCccmApplyModel3(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
+      xCccmApplyModel3(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
+
+      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_MDFCCCM;
+      const_cast<PredictionUnit&>(pu).curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+
+      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, 0
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
       xCccmCalcModels3(pu, cccmModelCb, cccmModelCr, 0, 0);
       xCccmApplyModel3(pu, COMPONENT_Cb, cccmModelCb, 0, 0, predCb);
       xCccmApplyModel3(pu, COMPONENT_Cr, cccmModelCr, 0, 0, predCr);
+#endif
     }
     else
     {
       // Multimode case
       int modelThr = xCccmCalcRefAver(pu);
 
+#if JVET_AD0188_CCP_MERGE
+      xCccmCalcModels3(pu, cccmModelCb[0], cccmModelCr[0], 1, modelThr);
+      xCccmApplyModel3(pu, COMPONENT_Cb,   cccmModelCb[0], 1, modelThr, predCb);
+      xCccmApplyModel3(pu, COMPONENT_Cr,   cccmModelCr[0], 1, modelThr, predCr);
+
+      xCccmCalcModels3(pu, cccmModelCb[1], cccmModelCr[1], 2, modelThr);
+      xCccmApplyModel3(pu, COMPONENT_Cb,   cccmModelCb[1], 2, modelThr, predCb);
+      xCccmApplyModel3(pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr);
+
+      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_MDFCCCM | CCP_TYPE_MMLM;
+      const_cast<PredictionUnit&>(pu).curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+
+      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, modelThr
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
       xCccmCalcModels3(pu, cccmModelCb, cccmModelCr, 1, modelThr);
       xCccmApplyModel3(pu, COMPONENT_Cb, cccmModelCb, 1, modelThr, predCb);
       xCccmApplyModel3(pu, COMPONENT_Cr, cccmModelCr, 1, modelThr, predCr);
@@ -12832,14 +15809,22 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmCalcModels3(pu, cccmModelCb, cccmModelCr, 2, modelThr);
       xCccmApplyModel3(pu, COMPONENT_Cb, cccmModelCb, 2, modelThr, predCb);
       xCccmApplyModel3(pu, COMPONENT_Cr, cccmModelCr, 2, modelThr, predCr);
+#endif
     }
   }
   else
 #endif
   if ( pu.cccmFlag )
   {
+#if JVET_AD0188_CCP_MERGE
+    CccmModel<CCCM_NUM_PARAMS> cccmModelCb[2] = { CccmModel<CCCM_NUM_PARAMS>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), 
+                                                  CccmModel<CCCM_NUM_PARAMS>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel<CCCM_NUM_PARAMS> cccmModelCr[2] = { CccmModel<CCCM_NUM_PARAMS>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)),
+                                                  CccmModel<CCCM_NUM_PARAMS>(pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+#else
     CccmModel<CCCM_NUM_PARAMS> cccmModelCb( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) );
     CccmModel<CCCM_NUM_PARAMS> cccmModelCr( pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) );
+#endif
 
 #if JVET_AB0143_CCCM_TS
     if ( intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX )
@@ -12847,15 +15832,55 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
     if ( PU::cccmSingleModeAvail(pu, intraDir) )
 #endif
     {
+#if JVET_AD0188_CCP_MERGE
+      xCccmCalcModels(pu, cccmModelCb[0], cccmModelCr[0], 0, 0);
+      xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
+
+#if JVET_AC0054_GLCCCM
+      const_cast<PredictionUnit&>(pu).curCand.type = (pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM);
+      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+#else
+      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_CCCM;
+#endif
+      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, 0
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
       xCccmCalcModels(pu, cccmModelCb,  cccmModelCr, 0, 0);
       xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 0, 0, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 0, 0, predCr);
+#endif
     }
     else
     {
       // Multimode case
       int modelThr = xCccmCalcRefAver(pu);
-      
+#if JVET_AD0188_CCP_MERGE
+      xCccmCalcModels(pu, cccmModelCb[0], cccmModelCr[0], 1, modelThr);
+      xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 1, modelThr, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 1, modelThr, predCr);
+
+      xCccmCalcModels(pu, cccmModelCb[1], cccmModelCr[1], 2, modelThr);
+      xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[1], 2, modelThr, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr);
+
+#if JVET_AC0054_GLCCCM
+      const_cast<PredictionUnit&>(pu).curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
+      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+#else
+      const_cast<PredictionUnit&>(pu).curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
+#endif
+      PU::cccmModelToCcpParams(const_cast<PredictionUnit &>(pu).curCand, cccmModelCb, cccmModelCr, modelThr
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
       xCccmCalcModels(pu, cccmModelCb,  cccmModelCr, 1, modelThr);
       xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 1, modelThr, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 1, modelThr, predCr);
@@ -12863,6 +15888,7 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmCalcModels(pu, cccmModelCb,  cccmModelCr, 2, modelThr);
       xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 2, modelThr, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 2, modelThr, predCr);
+#endif
     }
   }
 }

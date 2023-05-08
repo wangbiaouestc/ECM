@@ -367,6 +367,9 @@ public:
   static const CtxSet   CclmModeFlag;
   static const CtxSet   CclmModeIdx;
   static const CtxSet   IntraChromaPredMode;
+#if JVET_AD0188_CCP_MERGE
+  static const CtxSet   nonLocalCCP;
+#endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
 #if ENABLE_DIMD
   static const CtxSet   DimdChromaMode;

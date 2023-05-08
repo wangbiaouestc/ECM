@@ -1842,6 +1842,12 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     }
   }
 #endif
+#if JVET_AD0188_CCP_MERGE
+  if ((pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU()))
+  {
+    cs.ccpLut.lutCCP.resize(0);
+  }
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   if (pcSlice->getUseIBC() && m_pcCuEncoder->getEncCfg()->getIBCHashSearch() && m_pcCuEncoder->getEncCfg()->getIBCFracMode())
   {
@@ -1911,6 +1917,13 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 #endif
 #endif
     }
+
+#if JVET_AD0188_CCP_MERGE
+    if ((pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU()) && cs.pps->ctuIsTileColBd(ctuXPosInCtus))
+    {
+      cs.ccpLut.lutCCP.resize(0);
+    }
+#endif
 
     const SubPic &curSubPic = pcSlice->getPPS()->getSubPicFromPos(pos);
     // padding/restore at slice level

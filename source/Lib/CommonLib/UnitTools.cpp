@@ -2554,6 +2554,468 @@ bool PU::allowMPMSorted(const PredictionUnit& pu)
 }
 #endif
 
+#if JVET_AD0188_CCP_MERGE
+bool PU::hasNonLocalCCP(const PredictionUnit &pu)
+{
+  if (!pu.cs->sps->getUseLMChroma() || !pu.cu->slice->getSPS()->getUseCcpMerge())
+  {
+    return false;
+  }
+  if (pu.cu->ispMode && !CS::isDualITree(*pu.cs))
+  {
+    return false;
+  }
+  if (pu.chromaSize().width * pu.chromaSize().height <= 16)
+  {
+    return false;
+  }
+  return true;
+}
+
+const PredictionUnit *PU::getPUFromPos(const PredictionUnit &pu, const ChannelType &chType, const Position &refPos)
+{
+  const CodingStructure &cs = *pu.cs;
+
+  if (!cs.isDecomp(refPos, chType))
+  {
+    return nullptr;
+  }
+
+  return cs.getPURestricted(refPos, pu, chType);
+}
+
+int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate candList[], int selIdx)
+{
+  int maxCandIdx = 0;
+  bool    found1stCCLM = false;
+  int64_t scaleCclm[2] = { 0 };
+  int     shiftCclm[2] = { 3 };
+
+  int iW = pu.blocks[1].width;
+  int iH = pu.blocks[1].height;
+
+  auto tryToAddOnePU = [&](const PredictionUnit *puRef)
+  {
+    candList[maxCandIdx] = puRef->curCand;
+    
+    for (int j = 0; j < maxCandIdx; j++)
+    {
+      if (candList[maxCandIdx] == candList[j])
+      {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const Position posCand[5] = {
+    pu.chromaPos().offset(-1, iH - 1),
+    pu.chromaPos().offset(iW - 1, -1),
+    pu.chromaPos().offset(-1, iH),
+    pu.chromaPos().offset(iW, -1),
+    pu.chromaPos().offset(-1, -1)
+  };
+
+  for (const Position &posLT : posCand)
+  {
+    const PredictionUnit* puRef = getPUFromPos(pu, CHANNEL_TYPE_CHROMA, posLT);
+    if (puRef != nullptr && puRef->curCand.type > 0)
+    {
+      if (!tryToAddOnePU(puRef))
+      {
+        continue;
+      }
+      if (!found1stCCLM && candList[maxCandIdx].type == CCP_TYPE_CCLM)
+      {
+        scaleCclm[0] = candList[maxCandIdx].params[0][0];
+        shiftCclm[0] = candList[maxCandIdx].shift[0];
+        scaleCclm[1] = candList[maxCandIdx].params[1][0];
+        shiftCclm[1] = candList[maxCandIdx].shift[1];
+        found1stCCLM = true;
+      }
+      maxCandIdx++;
+      if (maxCandIdx == MAX_CCP_CAND_LIST_SIZE)
+      {
+        return maxCandIdx;
+      }
+    }
+  }
+
+  int offsetX = 0;  int offsetY = 0;
+  int offsetX0 = 0; int offsetX1 = 0; int offsetX2 = pu.chType == CHANNEL_TYPE_LUMA ? pu.Y().width >> 1 : pu.Cb().width >> 1;
+  int offsetY0 = 0; int offsetY1 = 0; int offsetY2 = pu.chType == CHANNEL_TYPE_LUMA ? pu.Y().height >> 1 : pu.Cb().height >> 1;
+
+  const int horNAInterval = std::max((int)(pu.chType == CHANNEL_TYPE_LUMA ? pu.Y().width * 2 : pu.Cb().width * 2) >> 1, 4);
+  const int verNAInterval = std::max((int)(pu.chType == CHANNEL_TYPE_LUMA ? pu.Y().height * 2 : pu.Cb().height * 2) >> 1, 4);
+  const int numNACandidate[7] = { 5, 9, 9, 9, 9, 9, 9 };
+  const int idxMap[7][9] = {
+    { 0, 1, 2, 3, 4 },
+    { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+    { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+    { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+    { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+    { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+    { 0, 1, 2, 3, 4, 5, 6, 7, 8 }
+  };
+
+  for (int iDistanceIndex = 0; iDistanceIndex < 7 && maxCandIdx < MAX_CCP_CAND_LIST_SIZE; iDistanceIndex++)
+  {
+    const int iNADistanceHor = horNAInterval * (iDistanceIndex + 1);
+    const int iNADistanceVer = verNAInterval * (iDistanceIndex + 1);
+
+    for (int naspIdx = 0; naspIdx < numNACandidate[iDistanceIndex] && maxCandIdx < MAX_CCP_CAND_LIST_SIZE; naspIdx++)
+    {
+      switch (idxMap[iDistanceIndex][naspIdx])
+      {
+      case 0: offsetX = offsetX0 = -iNADistanceHor - 1;                  offsetY = offsetY0 = verNAInterval + iNADistanceVer - 1;  break;
+      case 1: offsetX = offsetX1 = horNAInterval + iNADistanceHor - 1;  offsetY = offsetY1 = -iNADistanceVer - 1;                  break;
+      case 2: offsetX = offsetX2;       offsetY = offsetY1;       break;
+      case 3: offsetX = offsetX0;       offsetY = offsetY2;       break;
+      case 4: offsetX = offsetX0;       offsetY = offsetY1;       break;
+      case 5: offsetX = -1;             offsetY = offsetY0;       break;
+      case 6: offsetX = offsetX1;       offsetY = -1;             break;
+      case 7: offsetX = offsetX0 >> 1;  offsetY = offsetY0;       break;
+      case 8: offsetX = offsetX1;       offsetY = offsetY1 >> 1;  break;
+      default: printf("error!"); exit(0); break;
+      }
+
+      Position posLT(pu.chromaPos().x + offsetX, pu.chromaPos().y + offsetY);
+
+      const PredictionUnit *puRef = getPUFromPos(pu, CHANNEL_TYPE_CHROMA, posLT);
+
+      if (puRef != nullptr && puRef->curCand.type > 0)
+      {
+        if (!tryToAddOnePU(puRef))
+        {
+          continue;
+        }
+        if (!found1stCCLM && candList[maxCandIdx].type == CCP_TYPE_CCLM)
+        {
+          scaleCclm[0] = candList[maxCandIdx].params[0][0];
+          shiftCclm[0] = candList[maxCandIdx].shift[0];
+          scaleCclm[1] = candList[maxCandIdx].params[1][0];
+          shiftCclm[1] = candList[maxCandIdx].shift[1];
+          found1stCCLM = true;
+        }
+        maxCandIdx++;
+        if (maxCandIdx == MAX_CCP_CAND_LIST_SIZE)
+        {
+          return maxCandIdx;
+        }
+      }
+    }
+  }
+
+  // Non-adjacent candidates round 2
+  const int numNACandidate2[7] = { 4, 4, 4, 4, 4, 4, 4 };
+  const int idxMap2[7][5]        = { { 0, 1, 2, 3 }, { 0, 1, 2, 3 }, { 0, 1, 2, 3 }, { 0, 1, 2, 3 },
+                                     { 0, 1, 2, 3 }, { 0, 1, 2, 3 }, { 0, 1, 2, 3 } };
+
+  for (int iDistanceIndex = 0; iDistanceIndex < 7 && maxCandIdx < MAX_CCP_CAND_LIST_SIZE; iDistanceIndex++)
+  {
+    const int horNADistance = horNAInterval * (iDistanceIndex + 1);
+    const int verNADistance = verNAInterval * (iDistanceIndex + 1);
+
+    for (int naspIdx = 0; naspIdx < numNACandidate2[iDistanceIndex] && maxCandIdx < MAX_CCP_CAND_LIST_SIZE; naspIdx++)
+    {
+      switch (idxMap2[iDistanceIndex][naspIdx])
+      {
+      case 0: offsetX = offsetX0 = -horNADistance - 1;          offsetY = offsetY2 + ((verNAInterval + verNADistance - 1 - offsetY2) >> 1); break;
+      case 1: offsetX = offsetX2 + ((horNAInterval + horNADistance - 1 - offsetX2) >> 1); offsetY = offsetY0 = -verNADistance - 1; break;
+      case 2: offsetX = offsetX0;                                offsetY = offsetY0 + ((offsetY2 - offsetY0) >> 1); break;
+      case 3: offsetX = offsetX0 + ((offsetX2 - offsetX0) >> 1); offsetY = offsetY0; break;
+      default: printf("error!"); exit(0); break;
+      }
+
+      Position posLT(pu.chromaPos().x + offsetX, pu.chromaPos().y + offsetY);
+
+      const PredictionUnit *puRef = getPUFromPos(pu, CHANNEL_TYPE_CHROMA, posLT);
+
+      if (puRef != nullptr && puRef->curCand.type > 0)
+      {
+        if (!tryToAddOnePU(puRef))
+        {
+          continue;
+        }
+        if (!found1stCCLM && candList[maxCandIdx].type == CCP_TYPE_CCLM)
+        {
+          scaleCclm[0] = candList[maxCandIdx].params[0][0];
+          shiftCclm[0] = candList[maxCandIdx].shift[0];
+          scaleCclm[1] = candList[maxCandIdx].params[1][0];
+          shiftCclm[1] = candList[maxCandIdx].shift[1];
+          found1stCCLM = true;
+        }
+        maxCandIdx++;
+        if (maxCandIdx == MAX_CCP_CAND_LIST_SIZE)
+        {
+          return maxCandIdx;
+        }
+      }
+    }
+  }
+
+  auto tryHistCCP = [&](const LutCCP &ccpLut)
+  {
+    for (int idx = 0; idx < ccpLut.lutCCP.size(); idx++)
+    {
+      CCPModelCandidate curModel;
+      pu.cs->getOneModelFromCCPLut(ccpLut.lutCCP, curModel, idx);
+      candList[maxCandIdx] = curModel;
+      bool duplication = false;
+      for (int j = 0; j < maxCandIdx; j++)
+      {
+        if (candList[maxCandIdx] == candList[j])
+        {
+          duplication = true;
+          // THROW("Should not duplicaten");
+          break;
+        }
+      }
+      if (duplication)
+      {
+        continue;
+      }
+      if (!found1stCCLM && candList[maxCandIdx].type == CCP_TYPE_CCLM)
+      {
+        scaleCclm[0] = candList[maxCandIdx].params[0][0];
+        shiftCclm[0] = candList[maxCandIdx].shift[0];
+        scaleCclm[1] = candList[maxCandIdx].params[1][0];
+        shiftCclm[1] = candList[maxCandIdx].shift[1];
+        found1stCCLM = true;
+      }
+      maxCandIdx++;
+      if (maxCandIdx == MAX_CCP_CAND_LIST_SIZE)
+      {
+        return maxCandIdx;
+      }
+    }
+    return -1;
+  };
+
+  int ret = tryHistCCP(pu.cs->ccpLut);
+  if (ret != -1)
+  {
+    return ret;
+  }
+
+  if (maxCandIdx < MAX_CCP_CAND_LIST_SIZE)
+  {
+    unsigned uiInternalBitDepth = pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA);
+    const int defaultA[MAX_CCP_CAND_LIST_SIZE] = { 0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6 };
+    const int defaultB = 1 << (uiInternalBitDepth - 1);
+    const int defaultShift = 3;
+
+    for (int posIdx = 0; posIdx < MAX_CCP_CAND_LIST_SIZE; posIdx++)
+    {
+      CCPModelCandidate curModel;
+      curModel.type         = CCP_TYPE_CCLM;
+      curModel.params[0][0] = scaleCclm[0];
+      curModel.params[0][1] = defaultB;
+      curModel.shift[0]     = shiftCclm[0];
+      curModel.params[1][0] = scaleCclm[1];
+      curModel.params[1][1] = defaultB;
+      curModel.shift[1]     = shiftCclm[1];
+
+      if (found1stCCLM && defaultA[posIdx])
+      {
+        int dCb = curModel.params[0][0] > 0 ? -defaultA[posIdx] : defaultA[posIdx];
+        if (curModel.shift[0] < defaultShift)
+        {
+          curModel.params[0][0] <<= (defaultShift - curModel.shift[0]);
+          curModel.shift[0] = defaultShift;
+        }
+        else if (curModel.shift[0] > defaultShift)
+        {
+          dCb <<= (curModel.shift[0] - defaultShift);
+        }
+        curModel.params[0][0] += dCb;
+
+        int dCr = curModel.params[1][0] > 0 ? -defaultA[posIdx] : defaultA[posIdx];
+        if (curModel.shift[1] < defaultShift)
+        {
+          curModel.params[1][0] <<= (defaultShift - curModel.shift[1]);
+          curModel.shift[1] = defaultShift;
+        }
+        else if (curModel.shift[1] > defaultShift)
+        {
+          dCr <<= (curModel.shift[1] - defaultShift);
+        }
+        curModel.params[1][0] += dCr;
+      }
+      else
+      {
+        curModel.params[0][0] = curModel.params[1][0] = defaultA[posIdx];
+        curModel.shift[0] = curModel.shift[1] = defaultShift;
+      }
+
+      bool duplication = false;
+      for (int j = 0; j < maxCandIdx; j++)
+      {
+        if (candList[j] == curModel)
+        {
+          duplication = true;
+          // THROW("Should not duplicaten");
+          break;
+        }
+      }
+      if (duplication)
+      {
+        continue;
+      }
+      candList[maxCandIdx] = curModel;
+      if (selIdx == maxCandIdx)
+      {
+        return maxCandIdx + 1;
+      }
+      maxCandIdx++;
+      if (maxCandIdx == MAX_CCP_CAND_LIST_SIZE)
+      {
+        return maxCandIdx;
+      }
+    }
+  }
+
+  CHECK(maxCandIdx > MAX_CCP_CAND_LIST_SIZE, "Invlid number of non-adj CCCM candidates");
+  return maxCandIdx;
+}
+
+void CU::saveModelsInHCCP(const CodingUnit &cu)
+{
+  bool lumaUsesISP = !CS::isDualITree(*cu.cs) && cu.ispMode;
+  if (cu.chromaFormat == CHROMA_400 || (CS::isDualITree(*cu.cs) && cu.chType == CHANNEL_TYPE_LUMA) || !CU::isIntra(cu))
+  {
+    return;
+  }
+  if (lumaUsesISP)
+  {
+    return;
+  }
+  const PredictionUnit &pu = *cu.firstPU;
+  CodingStructure      &cs = *cu.cs;
+
+  if (PU::isLMCMode(pu.intraDir[1]) && pu.curCand.type != CCP_TYPE_NONE)
+  {
+    cs.addCCPToLut(cs.ccpLut.lutCCP, pu.curCand, -1);
+  }
+}
+
+void PU::ccpParamsToCclmModel(const ComponentID compId, const CCPModelCandidate& params, CclmModel& cclmModel)
+{
+  cclmModel.a = int(params.params[compId - 1][0]);
+  cclmModel.b = int(params.params[compId - 1][1]);
+  cclmModel.shift = params.shift[compId - 1];
+#if MMLM
+  if (params.type & CCP_TYPE_MMLM)
+  {
+    cclmModel.a2 = int(params.params2[compId - 1][0]);
+    cclmModel.b2 = int(params.params2[compId - 1][1]);
+    cclmModel.shift2 = params.shift2[compId - 1];
+    cclmModel.yThres = params.yThres;
+  }
+#endif
+}
+
+void PU::cclmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CclmModel& cclmModel)
+{
+  params.params[compId - 1][0] = cclmModel.a;
+  params.params[compId - 1][1] = cclmModel.b;
+  params.shift[compId - 1] = cclmModel.shift;
+#if MMLM
+  params.params2[compId - 1][0] = cclmModel.a2;
+  params.params2[compId - 1][1] = cclmModel.b2;
+  params.shift2[compId - 1] = cclmModel.shift2;
+  params.yThres = cclmModel.yThres;
+#endif
+}
+
+template <int NUM>
+#if JVET_AB0174_CCCM_DIV_FREE
+void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<NUM> cccmModelCb[2], const CccmModel<NUM> cccmModelCr[2], const int yThres, const int cccmLumaOffset)
+#else
+void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<NUM> cccmModelCb[2], const CccmModel<NUM> cccmModelCr[2], const int yThres)
+#endif
+{
+  std::memcpy(params.params[0], cccmModelCb[0].params, sizeof(TCccmCoeff) * NUM);
+  std::memcpy(params.params[1], cccmModelCr[0].params, sizeof(TCccmCoeff) * NUM);
+  params.midVal = cccmModelCb[0].midVal;
+  params.bd = cccmModelCb[0].bd;
+#if JVET_AB0174_CCCM_DIV_FREE
+  params.lumaOffset = cccmLumaOffset;
+#endif
+#if MMLM
+  std::memcpy(params.params2[0], cccmModelCb[1].params, sizeof(TCccmCoeff) * NUM);
+  std::memcpy(params.params2[1], cccmModelCr[1].params, sizeof(TCccmCoeff) * NUM);
+  params.yThres = yThres;
+#endif
+}
+
+template<int NUM>
+void PU::ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<NUM> cccmModelCb[2], CccmModel<NUM> cccmModelCr[2])
+{
+  std::memcpy(cccmModelCb[0].params, params.params[0], sizeof(TCccmCoeff) * NUM);
+  std::memcpy(cccmModelCr[0].params, params.params[1], sizeof(TCccmCoeff) * NUM);
+  cccmModelCb[0].midVal = cccmModelCr[0].midVal = params.midVal;
+  cccmModelCb[0].bd = cccmModelCr[0].bd = params.bd;
+#if MMLM
+  if (params.type & CCP_TYPE_MMLM)
+  {
+    std::memcpy(cccmModelCb[1].params, params.params2[0], sizeof(TCccmCoeff) * NUM);
+    std::memcpy(cccmModelCr[1].params, params.params2[1], sizeof(TCccmCoeff) * NUM);
+    cccmModelCb[1].midVal = cccmModelCr[1].midVal = params.midVal;
+    cccmModelCb[1].bd = cccmModelCr[1].bd = params.bd;
+  }
+#endif
+}
+
+#if JVET_AB0174_CCCM_DIV_FREE
+template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_NUM_PARAMS> cccmModelCr[2], const int yThres, const int cccmLumaOffset);
+#else
+template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_NUM_PARAMS> cccmModelCr[2], const int yThres);
+#endif
+template void PU::ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<CCCM_NUM_PARAMS> cccmModelCb[2], CccmModel<CCCM_NUM_PARAMS> cccmModelCr[2]);
+
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+#if JVET_AB0174_CCCM_DIV_FREE
+template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCr[2], const int yThres, const int cccmLumaOffset);
+#else
+template void PU::cccmModelToCcpParams(CCPModelCandidate &params, const CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCr[2], const int yThres);
+#endif
+template void PU::ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCb[2], CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCr[2]);
+#endif
+
+#if JVET_AD0202_CCCM_MDF
+#if JVET_AB0174_CCCM_DIV_FREE
+template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCr[2], const int yThres, const int cccmLumaOffset);
+#else
+template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCr[2], const int yThres);
+#endif
+template void PU::ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCb[2], CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCr[2]);
+#endif
+
+#if JVET_AB0092_GLM_WITH_LUMA
+#if JVET_AB0174_CCCM_DIV_FREE
+void PU::glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel<GLM_NUM_PARAMS> &glmModel, const int lumaOffset)
+#else
+void PU::glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel<GLM_NUM_PARAMS> &glmModel)
+#endif
+{
+  std::memcpy(params.params[compId - 1], glmModel.params, sizeof(TCccmCoeff) * GLM_NUM_PARAMS);
+  params.midVal = glmModel.midVal;
+  params.bd = glmModel.bd;
+#if JVET_AB0174_CCCM_DIV_FREE
+  params.lumaOffset = lumaOffset;
+#endif
+}
+
+void PU::ccpParamsToGlmModel(const ComponentID compId, const CCPModelCandidate& params, CccmModel<GLM_NUM_PARAMS> &glmModel)
+{
+  std::memcpy(glmModel.params, params.params[compId - 1], sizeof(TCccmCoeff) * GLM_NUM_PARAMS);
+  glmModel.midVal = params.midVal;
+  glmModel.bd = params.bd;
+}
+#endif
+#endif
+
 #if JVET_AB0155_SGPM
 bool PU::isSgpm(const PredictionUnit &pu, const ChannelType &chType)
 {

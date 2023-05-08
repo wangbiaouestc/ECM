@@ -1123,6 +1123,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   ( "CCCM",                                           m_cccm,                                               2,  "CCCM mode (0:off, 1:on, 2:on subsampling and no subsampling)  [default: 2]")
 #endif
+#if JVET_AD0188_CCP_MERGE
+  ( "CCPMerge",                                       m_ccpMerge,                                       true, "Enable cross-componet prediction merge mode for chroma intra coding" )
+#endif
 #if ENABLE_OBMC
   ("OBMC",                                            m_OBMC,                                           true, "Overlapping Block Motion Compensation")
 #endif
