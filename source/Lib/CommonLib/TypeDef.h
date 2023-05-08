@@ -55,6 +55,7 @@
 //########### place macros to be removed in next cycle below this line ###############
 #define JVET_AC0096                                        1 // RPR functionality testing
 #define JVET_AB0081                                        1 // Upscaling filter for display 12-tap luma and 6-tap chroma
+#define JVET_AD0169_SMALL_SCALE_DOWNSAMPLING               1 // JVET-AD0169: Downsampling filters in range 1.1 to 1.35 based on Kaiser(7) windowed sinc
 
 #define JVET_AA0098_MAX_MTT_DEPTH_TID                      1 // JVET-X0144: max MTT hierarchy depth set by temporal ID
 #if JVET_AA0098_MAX_MTT_DEPTH_TID
