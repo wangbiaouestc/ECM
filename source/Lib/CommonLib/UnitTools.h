@@ -79,6 +79,9 @@ namespace CU
   void addPUs                         (      CodingUnit& cu);
 
   void saveMotionInHMVP               (const CodingUnit& cu, const bool isToBeDone );
+#if JVET_AD0188_CCP_MERGE
+  void saveModelsInHCCP               (const CodingUnit &cu);
+#endif
 
   PartSplit getSplitAtDepth           (const CodingUnit& cu, const unsigned depth);
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -672,6 +675,32 @@ namespace PU
 #endif
 #if JVET_AD0085_MPM_SORTING
   bool allowMPMSorted(const PredictionUnit& pu);
+#endif
+#if JVET_AD0188_CCP_MERGE
+  void ccpParamsToCclmModel(const ComponentID compID, const CCPModelCandidate& params, CclmModel& cclmModel);
+  void cclmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CclmModel& cclmModel);
+
+  template <int NUM>
+#if JVET_AB0174_CCCM_DIV_FREE
+  void cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<NUM> cccmModelCb[2], const CccmModel<NUM> cccmModelCr[2], const int yThres = 0, const int cccmLumaOffset = 0);
+#else
+  void cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<NUM> cccmModelCb[2], const CccmModel<NUM> cccmModelCr[2], const int yThres = 0);
+#endif
+  template<int NUM>
+  void ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<NUM> cccmModelCb[2], CccmModel<NUM> cccmModelCr[2]);
+
+#if JVET_AB0092_GLM_WITH_LUMA
+#if JVET_AB0174_CCCM_DIV_FREE
+  void glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel<GLM_NUM_PARAMS> &glmModel, const int lumaOffset);
+#else
+  void glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel<GLM_NUM_PARAMS> &glmModel);
+#endif
+  void ccpParamsToGlmModel(const ComponentID compId, const CCPModelCandidate& params, CccmModel<GLM_NUM_PARAMS> &glmModel);
+#endif
+
+  const PredictionUnit *getPUFromPos(const PredictionUnit &pu, const ChannelType &chType, const Position &refPos);
+  bool  hasNonLocalCCP(const PredictionUnit &pu);
+  int   getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate candList[], int selIdx = -1);
 #endif
 }
 

@@ -1854,6 +1854,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   sps.setUseCccm            ( m_cccm );
 #endif
+#if JVET_AD0188_CCP_MERGE
+  sps.setUseCcpMerge        ( m_ccpMerge );
+#endif
 #if ENABLE_OBMC
   sps.setUseOBMC            ( m_OBMC );
 #endif

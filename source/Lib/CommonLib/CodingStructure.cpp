@@ -2244,7 +2244,9 @@ void CodingStructure::initSubStructure( CodingStructure& subStruct, const Channe
   subStruct.m_isTuEnc = isTuEnc;
 
   subStruct.motionLut = motionLut;
-
+#if JVET_AD0188_CCP_MERGE
+  subStruct.ccpLut    = ccpLut;
+#endif
   subStruct.prevPLT = prevPLT;
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   subStruct.treeType  = treeType;
@@ -2381,6 +2383,10 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
 
     motionLut = subStruct.motionLut;
   }
+#if JVET_AD0188_CCP_MERGE
+  ccpLut = subStruct.ccpLut;
+#endif
+
 #if JVET_W0123_TIMD_FUSION
   if (!subStruct.m_isTuEnc && chType != CHANNEL_TYPE_CHROMA)
   {
@@ -2529,6 +2535,11 @@ void CodingStructure::copyStructure( const CodingStructure& other, const Channel
 
     motionLut = other.motionLut;
   }
+
+#if JVET_AD0188_CCP_MERGE
+  ccpLut = other.ccpLut;
+#endif
+
 #if JVET_W0123_TIMD_FUSION
   IpmBuf  ownIB = getIpmBuf();
   CIpmBuf subIB = other.getIpmBuf();

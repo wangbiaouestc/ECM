@@ -553,6 +553,18 @@ private:
 #endif
 #endif
 
+#if JVET_AD0188_CCP_MERGE
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+#if JVET_AD0202_CCCM_MDF
+  CCPModelCandidate m_ccmParamsStorage[2][TOTAL_NUM_CCCM_MODES];
+#else
+  CCPModelCandidate m_ccmParamsStorage[2][CCCM_NUM_MODES];
+#endif
+#else
+  CCPModelCandidate m_ccmParamsStorage[CCCM_NUM_MODES];
+#endif
+#endif
+
 #if JVET_AC0119_LM_CHROMA_FUSION
   PelStorage      m_predStorage[2];
   PelStorage      m_fusionStorage[6];

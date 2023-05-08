@@ -1403,6 +1403,15 @@ static const int EXT_PICTURE_SIZE =                             16;
 static const int IBC_BVD_PREDICTION_MAX_BIN_NUM =                4;
 #endif
 
+#if JVET_AD0188_CCP_MERGE
+static const int MAX_CCP_CAND_LIST_SIZE = 12;
+static const int MAX_NUM_HCCP_CANDS     = 6;
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+static const int NUM_CCP_PARAMS = CCCM_NO_SUB_NUM_PARAMS;
+#else
+static const int NUM_CCP_PARAMS = CCCM_NUM_PARAMS;
+#endif
+#endif
 
 // ====================================================================================================================
 // Macro functions

@@ -1611,6 +1611,10 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   WRITE_UVLC(pcSPS->getUseCccm() , "sps_cccm_cand");
 #endif
+#if JVET_AD0188_CCP_MERGE
+  WRITE_UVLC(pcSPS->getUseCcpMerge(), "sps_ccp_merge");
+#endif
+
   if( pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
     WRITE_FLAG( pcSPS->getUseLMChroma() ? 1 : 0,                                      "sps_cclm_enabled_flag");

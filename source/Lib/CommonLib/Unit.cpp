@@ -888,6 +888,11 @@ void PredictionUnit::initData()
   cccmMultiFilterIdx = 0;
 #endif
 #endif
+#if JVET_AD0188_CCP_MERGE
+  idxNonLocalCCP = 0;
+  curCand = {};
+  curCand.type = CCP_TYPE_NONE;
+#endif
   // inter data
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = 0;
@@ -1045,6 +1050,10 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   cccmMultiFilterIdx = predData.cccmMultiFilterIdx;
 #endif
 #endif
+#if JVET_AD0188_CCP_MERGE
+  idxNonLocalCCP  = predData.idxNonLocalCCP;
+  curCand = predData.curCand;
+#endif
   return *this;
 }
 
@@ -1201,6 +1210,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #if JVET_AD0202_CCCM_MDF
   cccmMultiFilterIdx = other.cccmMultiFilterIdx;
 #endif
+#endif
+#if JVET_AD0188_CCP_MERGE
+  idxNonLocalCCP  = other.idxNonLocalCCP;
+  curCand = other.curCand;
 #endif
 
   mergeFlag   = other.mergeFlag;

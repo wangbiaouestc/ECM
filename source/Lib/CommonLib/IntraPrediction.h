@@ -470,7 +470,7 @@ public:
   void   xCccmApplyModel          (const PredictionUnit& pu, const ComponentID compId, CccmModel<CCCM_NUM_PARAMS> &cccmModel, int modelId, int modelThr, PelBuf &piPred) const;
   void   xCccmCreateLumaRef       (const PredictionUnit& pu, CompArea chromaArea
 #if JVET_AD0202_CCCM_MDF
-    , int downsFilterIdx
+    , int downsFilterIdx = 0
 #endif
   );
   PelBuf xCccmGetLumaRefBuf       (const PredictionUnit& pu, int &areaWidth, int &areaHeight, int &refSizeX, int &refSizeY, int &refPosPicX, int &refPosPicY
@@ -518,6 +518,45 @@ public:
   PelBuf xCflmGetPuBuf            (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea) const;
   int    xCflmCalcRefAver         (const PredictionUnit& pu, const CompArea& chromaArea);
   void   xCflmCalcRefArea         (const PredictionUnit& pu, const CompArea& chromaArea);
+#endif
+
+#if JVET_AD0188_CCP_MERGE
+  void reorderCCPCandidates(const PredictionUnit &pu, CCPModelCandidate candList[], int reorderlistSize);
+  int  xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandidate &ccpCand);
+  void predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr);
+
+  void xCclmApplyModel(const PredictionUnit &pu, const ComponentID compId, CccmModel<CCCM_NUM_PARAMS> &cccmModel, int modelId, int modelThr, PelBuf &piPred) const;
+  void xCccmApplyModelOffset(const PredictionUnit& pu, const ComponentID compId, const CccmModel<CCCM_NUM_PARAMS>& cccmModel, int modelId, int modelThr, PelBuf& piPred, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY) const;
+  void xGlmApplyModelOffset(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel<GLM_NUM_PARAMS>& glmModel, int glmIdc, PelBuf& piPred, int lumaOffset, int chromaOffset) const;
+#if JVET_AD0202_CCCM_MDF
+  void xMFCccmApplyModelOffset1(const PredictionUnit& pu, const ComponentID compId, const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>& cccmModel, int modelId, int modelThr, PelBuf& piPred, int lumaOffset, int chromaOffset[2]) const;
+  void xMFCccmApplyModelOffset23(const PredictionUnit& pu, const ComponentID compId, const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>& cccmModel, int modelId, int modelThr, PelBuf& piPred, int lumaOffset, int chromaOffset[2]) const;
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  void xNSCccmApplyModelOffset(const PredictionUnit& pu, const ComponentID compId, const CccmModel<CCCM_NO_SUB_NUM_PARAMS>& cccmModel, int modelId, int modelThr, PelBuf& piPred, int lumaOffset, int chromaOffset[2]) const;
+#endif
+
+  void xGetUpdatedOffsetCCLM(const PredictionUnit &pu, const ComponentID compID, const CompArea &chromaArea, CclmModel &cclmModel, int modelNum, int glmIdc);
+  void xGetUpdatedOffsetCCCM(const PredictionUnit& pu, const ComponentID compID, int modelNum, const CompArea& chromaArea, CccmModel<CCCM_NUM_PARAMS> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY);
+  void xGetUpdatedOffsetGLM(const PredictionUnit& pu, const ComponentID compID, const CompArea& chromaArea, CccmModel<GLM_NUM_PARAMS>& glmModel, int glmIdc, int lumaOffset, int& chromaOffset);
+#if JVET_AD0202_CCCM_MDF
+  void xGetUpdatedOffsetMFCCCM1(const PredictionUnit& pu, const ComponentID compID, int modelNum, const CompArea& chromaArea, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY);
+  void xGetUpdatedOffsetMFCCCM23(const PredictionUnit& pu, const ComponentID compID, int modelNum, const CompArea& chromaArea, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY);
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  void xGetUpdatedOffsetNSCCCM(const PredictionUnit& pu, const ComponentID compID, int modelNum, const CompArea& chromaArea, CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[]);
+#endif
+
+  int xGetCostCCLM(const PredictionUnit &pu, const ComponentID compID, const CompArea &chromaArea, CclmModel &cclmModel, int modelNum, int glmIdc);
+  int xGetCostCCCM(const PredictionUnit &pu, const ComponentID compID, int modelNum, const CompArea &chromaArea, CccmModel<CCCM_NUM_PARAMS> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY);
+  int xGetCostGLM(const PredictionUnit& pu, const ComponentID compID, const CompArea& chromaArea, CccmModel<GLM_NUM_PARAMS>& glmModel, int glmIdc, int lumaOffset, int& chromaOffset);
+#if JVET_AD0202_CCCM_MDF
+  int xGetCostMFCCCM1(const PredictionUnit& pu, const ComponentID compID, int modelNum, const CompArea& chromaArea, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY);
+  int xGetCostMFCCCM23(const PredictionUnit& pu, const ComponentID compID, int modelNum, const CompArea& chromaArea, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY);
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  int xGetCostNSCCCM(const PredictionUnit& pu, const ComponentID compID, int modelNum, const CompArea& chromaArea, CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[]);
+#endif
 #endif
 
 #if ENABLE_DIMD

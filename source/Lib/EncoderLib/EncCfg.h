@@ -485,6 +485,9 @@ protected:
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int       m_cccm;
 #endif
+#if JVET_AD0188_CCP_MERGE
+  bool      m_ccpMerge;
+#endif
 #if ENABLE_OBMC
   bool      m_OBMC;
 #endif
@@ -1591,6 +1594,10 @@ public:
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   void      setUseCccm                   (int i)          { m_cccm = i; }
   int       getUseCccm                   () const         { return m_cccm; }
+#endif
+#if JVET_AD0188_CCP_MERGE
+  void      setUseCcpMerge               (bool i)         { m_ccpMerge = i; }
+  bool      getUseCcpMerge               ()         const { return m_ccpMerge; }
 #endif
 #if ENABLE_OBMC
   void      setUseObmc                   ( bool b )       { m_OBMC = b; }

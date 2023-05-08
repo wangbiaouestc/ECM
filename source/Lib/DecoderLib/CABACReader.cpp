@@ -2556,8 +2556,34 @@ void CABACReader::glmIdc(PredictionUnit& pu)
   }
 }
 #endif
+
+#if JVET_AD0188_CCP_MERGE
+void CABACReader::nonLocalCCPIndex(PredictionUnit &pu)
+{
+  pu.idxNonLocalCCP = 0;
+
+  if (PU::hasNonLocalCCP(pu))
+  {
+    pu.idxNonLocalCCP = m_BinDecoder.decodeBin(Ctx::nonLocalCCP(0));
+    if (pu.idxNonLocalCCP)
+    {
+      pu.idxNonLocalCCP += unary_max_eqprob(MAX_CCP_CAND_LIST_SIZE - 1);
+      pu.cccmFlag    = 0;
+      pu.intraDir[1] = LM_CHROMA_IDX;
+    }
+  }
+}
+#endif
+
 bool CABACReader::intra_chroma_lmc_mode(PredictionUnit& pu)
 {
+#if JVET_AD0188_CCP_MERGE
+  nonLocalCCPIndex(pu);
+  if (pu.idxNonLocalCCP)
+  {
+    return true;
+  }
+#endif
 #if MMLM
   int lmModeList[NUM_CHROMA_MODE];
 #else 

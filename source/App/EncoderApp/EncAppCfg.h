@@ -478,6 +478,9 @@ protected:
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int       m_cccm;
 #endif
+#if JVET_AD0188_CCP_MERGE
+  bool      m_ccpMerge;
+#endif
 #if ENABLE_OBMC
   bool      m_OBMC;
 #endif

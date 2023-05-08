@@ -1558,6 +1558,20 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     bool isIbcSmallBlk = CU::isIBC(cu) && (cu.lwidth() * cu.lheight() <= 16);
     CU::saveMotionInHMVP( cu, isIbcSmallBlk );
   }
+
+#if JVET_AD0188_CCP_MERGE
+  {
+    const CodingUnit &cu          = *bestCS->cus.front();
+    bool              lumaUsesISP = !CS::isDualITree(*bestCS) && cu.ispMode;
+    if (!(cu.chromaFormat == CHROMA_400 || (CS::isDualITree(*bestCS) && cu.chType == CHANNEL_TYPE_LUMA))
+        && CU::isIntra(cu) && !lumaUsesISP && bestCS->cus.size() == 1
+        && bestCS->area.Cb() == (*bestCS->cus.back()).Cb())
+    {
+      CU::saveModelsInHCCP(cu);
+    }
+  }
+#endif
+
   bestCS->picture->getPredBuf(currCsArea).copyFrom(bestCS->getPredBuf(currCsArea));
 #if JVET_Z0118_GDR
   bestCS->updateReconMotIPM(currCsArea); // xcomrpessCU - need 
@@ -1842,6 +1856,9 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
   const Slice &slice          = *tempCS->slice;
   const int oldPrevQp         = tempCS->prevQP[partitioner.chType];
   const auto oldMotionLut     = tempCS->motionLut;
+#if JVET_AD0188_CCP_MERGE
+  const auto oldCCPLut        = tempCS->ccpLut;
+#endif
 #if ENABLE_QPA_SUB_CTU
   const PPS &pps              = *tempCS->pps;
   const uint32_t currDepth    = partitioner.currDepth;
@@ -1981,6 +1998,9 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
 
 #if JVET_Z0118_GDR
         tempCS->motionLut = oldMotionLut;
+#if JVET_AD0188_CCP_MERGE
+        tempCS->ccpLut  = oldCCPLut;
+#endif
         tempCS->prevPLT = oldPLT;
         tempCS->releaseIntermediateData();
         tempCS->prevQP[partitioner.chType] = oldPrevQp;
@@ -2240,6 +2260,9 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
   tempCS->motionLut = oldMotionLut;
 
   tempCS->prevPLT   = oldPLT;
+#if JVET_AD0188_CCP_MERGE
+  tempCS->ccpLut    = oldCCPLut;
+#endif
 
   tempCS->releaseIntermediateData();
 
