@@ -4102,7 +4102,7 @@ bool IntraPrediction::isRefTemplateAvailable(CodingUnit& cu, CompArea& area)
   {
     return L_SHAPE_TEMPLATE;
   }
-  else if (isAboveLeftAvailable(cu, chType, posLT))
+  else if (isLeftAvailable(cu, chType, posLT, numLeftUnits, unitHeight, (neighborFlags + totalLeftUnits - 1)))
   {
     return LEFT_TEMPLATE;
   }
@@ -10378,7 +10378,7 @@ void insertNode( int diff, int& iXOffset, int& iYOffset, int& pDiff, int& pX, in
   pId = setId;
 }
 
-void clipMvIntraConstraint( CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX )
+void clipMvIntraConstraint( CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX, RefTemplateType tempType )
 {
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   int searchRangeWidth  = std::max(TMP_SEARCH_RANGE_MULT_FACTOR * (int) uiBlkWidth, TMP_MINSR);
@@ -10394,10 +10394,10 @@ void clipMvIntraConstraint( CodingUnit* pcCU, int regionId, int& iHorMin, int& i
   if( regionId == 0 ) //above outside LCU
   {
     iHorMax = std::min( (iCurrX + searchRangeWidth) << iMvShift, ( int ) ((pcCU->cs->pps->getPicWidthInLumaSamples() - iBlkWidth) << iMvShift) );
-    iHorMin = std::max( (iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift );
+    iHorMin = std::max( (tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift );
 
     iVerMax = (iCurrY - iBlkHeight - offsetLCUY) << iMvShift;
-    iVerMin = std::max( ((iTemplateSize) << iMvShift), ((iCurrY - searchRangeHeight) << iMvShift) );
+    iVerMin = std::max( (tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, ((iCurrY - searchRangeHeight) << iMvShift) );
 
     iHorMin = iHorMin - iCurrX;
     iHorMax = iHorMax - iCurrX;
@@ -10408,15 +10408,15 @@ void clipMvIntraConstraint( CodingUnit* pcCU, int regionId, int& iHorMin, int& i
   {
 #if JVET_AD0086_ENHANCED_INTRA_TMP
     iHorMax = (iCurrX - iBlkWidth) << iMvShift;
-    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift);
+    iHorMin = std::max( (tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift );
 
-    iVerMin = std::max((iTemplateSize) << iMvShift, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift);
+    iVerMin = std::max( (tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift );
     iVerMax = (iCurrY) << iMvShift;
 #else
     iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
-    iHorMin = std::max( (iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift );
+    iHorMin = std::max( (tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift );
 
-    iVerMin = std::max( (iTemplateSize) << iMvShift, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift );
+    iVerMin = std::max( (tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift );
     iVerMax = (iCurrY) << iMvShift;
 #endif
 
@@ -10427,7 +10427,7 @@ void clipMvIntraConstraint( CodingUnit* pcCU, int regionId, int& iHorMin, int& i
   }
   else if( regionId == 2 ) //left outside LCU (can reach the bottom row of LCU)
   {
-    iHorMin = std::max( (iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift );
+    iHorMin = std::max( (tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift );
     iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
     iVerMin = (iCurrY + 1) << iMvShift;
     iVerMax = std::min( pcCU->cs->pps->getPicHeightInLumaSamples() - iBlkHeight, (iCurrY - offsetLCUY + pcCU->cs->sps->getCTUSize() - iBlkHeight) << iMvShift );
@@ -10440,9 +10440,9 @@ void clipMvIntraConstraint( CodingUnit* pcCU, int regionId, int& iHorMin, int& i
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   else if (regionId == 3)   // within CTU
   {
-    iVerMin = std::max(((iTemplateSize) << iMvShift), (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift);
+    iVerMin = std::max( (tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift );
     iVerMax = (iCurrY - iBlkHeight) << iMvShift;
-    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - iBlkWidth + 1) << iMvShift);
+    iHorMin = std::max( (tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - iBlkWidth + 1) << iMvShift );
     iHorMax = (iCurrX);
 
     iHorMin = iHorMin - iCurrX;
@@ -10454,7 +10454,7 @@ void clipMvIntraConstraint( CodingUnit* pcCU, int regionId, int& iHorMin, int& i
 }
 
 #if JVET_AB0130_ITMP_SAMPLING
-void clipMvIntraConstraint_Refine(CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX, int pX, int pY, int refinementRange)
+void clipMvIntraConstraint_Refine(CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX, int pX, int pY, int refinementRange, RefTemplateType tempType)
 {
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   int searchRangeWidth  = std::max(TMP_SEARCH_RANGE_MULT_FACTOR * (int) uiBlkWidth, TMP_MINSR);
@@ -10470,9 +10470,9 @@ void clipMvIntraConstraint_Refine(CodingUnit* pcCU, int regionId, int& iHorMin, 
   if (regionId == 0) //above outside LCU
   {
     iHorMax = std::min((iCurrX + searchRangeWidth) << iMvShift, (int)((pcCU->cs->pps->getPicWidthInLumaSamples() - iBlkWidth) << iMvShift));
-    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift);
+    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift);
     iVerMax = (iCurrY - iBlkHeight - offsetLCUY) << iMvShift;
-    iVerMin = std::max(((iTemplateSize) << iMvShift), ((iCurrY - searchRangeHeight) << iMvShift));
+    iVerMin = std::max((tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - searchRangeHeight) << iMvShift);
 #if !JVET_AD0086_ENHANCED_INTRA_TMP
     int bestPosX = iCurrX + pX;
     int bestPosY = iCurrY + pY;
@@ -10490,13 +10490,13 @@ void clipMvIntraConstraint_Refine(CodingUnit* pcCU, int regionId, int& iHorMin, 
   {
 #if JVET_AD0086_ENHANCED_INTRA_TMP
     iHorMax = (iCurrX - iBlkWidth) << iMvShift;
-    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift);
-    iVerMin = std::max((iTemplateSize) << iMvShift, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift);
+    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift);
+    iVerMin = std::max((tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift);
     iVerMax = (iCurrY) << iMvShift;
 #else
     iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
-    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift);
-    iVerMin = std::max((iTemplateSize) << iMvShift, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift);
+    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift);
+    iVerMin = std::max((tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift);
     iVerMax = (iCurrY) << iMvShift;
     int bestPosX = iCurrX + pX;
     int bestPosY = iCurrY + pY;
@@ -10512,7 +10512,7 @@ void clipMvIntraConstraint_Refine(CodingUnit* pcCU, int regionId, int& iHorMin, 
   }
   else if (regionId == 2) //left outside LCU (can reach the bottom row of LCU)
   {
-    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift);
+    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift);
     iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
     iVerMin = (iCurrY + 1) << iMvShift;
     iVerMax = std::min(pcCU->cs->pps->getPicHeightInLumaSamples() - iBlkHeight, (iCurrY - offsetLCUY + pcCU->cs->sps->getCTUSize() - iBlkHeight) << iMvShift);
@@ -10531,14 +10531,14 @@ void clipMvIntraConstraint_Refine(CodingUnit* pcCU, int regionId, int& iHorMin, 
   }
   else if (regionId == 3) // within CTU
   {
-    iVerMin = std::max(((iTemplateSize) << iMvShift), (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift);
+    iVerMin = std::max((tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift);
     iVerMax = (iCurrY - iBlkHeight) << iMvShift;
 #if JVET_AD0086_ENHANCED_INTRA_TMP
-    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - iBlkWidth + 1) << iMvShift);
-    iHorMax = (iCurrX);
+    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - iBlkWidth + 1) << iMvShift);
+    iHorMax = (iCurrX) << iMvShift;
 #else
-    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - offsetLCUX - iBlkWidth + 1) << iMvShift);
-    iHorMax = (iCurrX - iBlkWidth);
+    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - offsetLCUX - iBlkWidth + 1) << iMvShift);
+    iHorMax = (iCurrX - iBlkWidth) << iMvShift;
     int bestPosX = iCurrX + pX;
     int bestPosY = iCurrY + pY;
     iHorMin = std::max(iHorMin, bestPosX - refinementRange);
@@ -10789,7 +10789,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   for (regionId = 0; regionId < regionNum; regionId++)
   {
     clipMvIntraConstraint(pcCU, regionId, mvXMins[regionId], mvXMaxs[regionId], mvYMins[regionId], mvYMaxs[regionId],
-                          TMP_TEMPLATE_SIZE, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX);
+                          TMP_TEMPLATE_SIZE, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX, tempType);
   }
   for (int checkIdx = 0; checkIdx < regionNum; checkIdx++)
   {
@@ -10842,10 +10842,10 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   regionId = 0;
   int iMvShift = 0;
 
-  int iVerMin = std::max( ((iTemplateSize) << iMvShift), (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift );
+  int iVerMin = std::max( (tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift );
   int iVerMax = (iCurrY - iBlkHeight) << iMvShift;
-  int iHorMin = std::max( (iTemplateSize) << iMvShift, (iCurrX - offsetLCUX - iBlkWidth + 1) << iMvShift );
-  int iHorMax = (iCurrX - iBlkWidth);
+  int iHorMin = std::max( (tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - offsetLCUX - iBlkWidth + 1) << iMvShift );
+  int iHorMax = (iCurrX - iBlkWidth) << iMvShift;
 
   mvXMins[regionId] = iHorMin - iCurrX;
   mvXMaxs[regionId] = iHorMax - iCurrX;
@@ -10899,7 +10899,8 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   for( regionId = 0; regionId < regionNum; regionId++ )
   {
     // this function fills in the range the template matching for pixels outside the current CTU
-    clipMvIntraConstraint( pcCU, regionId, mvXMins[regionId], mvXMaxs[regionId], mvYMins[regionId], mvYMaxs[regionId], TMP_TEMPLATE_SIZE, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX );
+    clipMvIntraConstraint(pcCU, regionId, mvXMins[regionId], mvXMaxs[regionId], mvYMins[regionId], mvYMaxs[regionId],
+                          TMP_TEMPLATE_SIZE, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX, tempType);
   }
 
   for( regionId = 0; regionId < regionNum; regionId++ )
@@ -10989,7 +10990,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
       clipMvIntraConstraint_Refine(pcCU, bestRegionId, mvXMin, mvXMax, mvYMin, mvYMax, TMP_TEMPLATE_SIZE, uiBlkWidth,
                                    uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX,
                                    sparseMtmpCandList[temIdx][candIdx].m_pX, sparseMtmpCandList[temIdx][candIdx].m_pY,
-                                   iRefineRange);
+                                   iRefineRange, tempType);
 
       if (!(mvYMax < mvYMin || mvXMax < mvXMin))
       {
@@ -11071,7 +11072,8 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
     {
       int iRefine = 1 << iRefineLog2;
       int tmpRefineRange = std::min(uiBlkHeight, uiBlkHeight) / 2;
-      clipMvIntraConstraint_Refine(pcCU, bestRegionId, mvXMins[bestRegionId], mvXMaxs[bestRegionId], mvYMins[bestRegionId], mvYMaxs[bestRegionId], TMP_TEMPLATE_SIZE, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX, pX, pY, iRefine * tmpRefineRange);
+      clipMvIntraConstraint_Refine(pcCU, bestRegionId, mvXMins[bestRegionId], mvXMaxs[bestRegionId], mvYMins[bestRegionId], mvYMaxs[bestRegionId], 
+                                   TMP_TEMPLATE_SIZE, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX, pX, pY, iRefine* tmpRefineRange, tempType);
       int mvYMin = mvYMins[bestRegionId];
       int mvYMax = mvYMaxs[bestRegionId];
       int mvXMin = mvXMins[bestRegionId];
@@ -11522,23 +11524,22 @@ void IntraPrediction::xCalcTmpFlmRefArea(CodingUnit *cu, unsigned int uiBlkWidth
   CHECK(regionId < 0 || regionId > 5, "region Id error\n");
   if (regionId == 0)   // above outside LCU
   {
-    iHorMax = std::min((iCurrX + searchRangeWidth) << iMvShift,
-                       (int) ((cu->cs->pps->getPicWidthInLumaSamples() - iBlkWidth) << iMvShift));
-    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift);
+    iHorMax = std::min((iCurrX + searchRangeWidth) << iMvShift,(int)((cu->cs->pps->getPicWidthInLumaSamples() - iBlkWidth) << iMvShift));
+    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift);
 
     iVerMax = (iCurrY - iBlkHeight - offsetLCUY) << iMvShift;
-    iVerMin = std::max(((iTemplateSize) << iMvShift), ((iCurrY - searchRangeHeight) << iMvShift));
+    iVerMin = std::max((tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, ((iCurrY - searchRangeHeight) << iMvShift));
   }
   else if (regionId == 1)   // left outside LCU
   {
     iHorMax = (iCurrX - iBlkWidth) << iMvShift;
-    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift);
-    iVerMin = std::max((iTemplateSize) << iMvShift, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift);
+    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift);
+    iVerMin = std::max((tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift);
     iVerMax = (iCurrY) << iMvShift;
   }
   else if (regionId == 2)   // left outside LCU (can reach the bottom row of LCU)
   {
-    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - searchRangeWidth) << iMvShift);
+    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift);
     iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
 
     iVerMin = (iCurrY + 1) << iMvShift;
@@ -11547,9 +11548,9 @@ void IntraPrediction::xCalcTmpFlmRefArea(CodingUnit *cu, unsigned int uiBlkWidth
   }
   else if (regionId == 3)   // within CTU
   {
-    iVerMin = std::max(((iTemplateSize) << iMvShift), (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift);
+    iVerMin = std::max((tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift);
     iVerMax = (iCurrY - iBlkHeight) << iMvShift;
-    iHorMin = std::max((iTemplateSize) << iMvShift, (iCurrX - iBlkWidth + 1) << iMvShift);
+    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - iBlkWidth + 1) << iMvShift);
     iHorMax = (iCurrX);
   }
 
