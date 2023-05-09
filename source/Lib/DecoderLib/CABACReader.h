@@ -131,6 +131,9 @@ public:
 #if JVET_AA0057_CCCM
   void        cccmFlag                  ( PredictionUnit&               pu );
 #endif
+#if JVET_AD0188_CCP_MERGE
+  void        nonLocalCCPIndex          ( PredictionUnit&               pu );
+#endif
 #if ENABLE_DIMD
   void        cu_dimd_flag              (CodingUnit&                   cu);
  #endif

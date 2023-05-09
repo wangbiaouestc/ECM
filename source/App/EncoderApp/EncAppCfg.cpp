@@ -929,6 +929,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AB0155_SGPM
   ("NoSgpmConstraintFlag",                             m_noSgpmConstraintFlag,                          false, "Indicate that SGPM is deactivated")
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  ("NoTmrlConstraintFlag",                             m_noTmrlConstraintFlag,                          false, "Indicate that TMRL is deactivated")
+#endif
 #if ENABLE_OBMC
   ("NoObmcConstraintFlag",                             m_noObmcConstraintFlag,                            false, "Indicate that OBMC is deactivated")
 #endif
@@ -1111,8 +1114,17 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ( "SGPMnoBlend",                                    m_sgpmNoBlend,                                     false,  "Enable spatial geometric partitioning mode without blending\n" )
 #endif
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  ("TMRL",                                            m_tmrl,                                            true,  "Enable template based multiple reference line intra prediction\n")
+#endif
+#if JVET_AD0085_MPM_SORTING
+  ( "MPMSorting",                                     m_mpmSorting,                                      true,  "Enable template-based intra MPM list construction\n" )
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   ( "CCCM",                                           m_cccm,                                               2,  "CCCM mode (0:off, 1:on, 2:on subsampling and no subsampling)  [default: 2]")
+#endif
+#if JVET_AD0188_CCP_MERGE
+  ( "CCPMerge",                                       m_ccpMerge,                                       true, "Enable cross-componet prediction merge mode for chroma intra coding" )
 #endif
 #if ENABLE_OBMC
   ("OBMC",                                            m_OBMC,                                           true, "Overlapping Block Motion Compensation")
@@ -5408,6 +5420,12 @@ void EncAppCfg::xPrintParameter()
 #if JVET_AC0189_SGPM_NO_BLENDING
   msg(VERBOSE, "SGPMnoBlend:%d ", m_sgpmNoBlend);
 #endif
+#endif
+#if JVET_AD0082_TMRL_CONFIG
+  msg(VERBOSE, "TMRL:%d ", m_tmrl);
+#endif
+#if JVET_AD0085_MPM_SORTING
+  msg(VERBOSE, "MPMSorting:%d ", m_mpmSorting);
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   msg(VERBOSE, "CCCM:%d ", m_cccm);

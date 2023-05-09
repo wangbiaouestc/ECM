@@ -227,7 +227,14 @@ private:
     uint8_t  ispMod; // CU::ispMode
     uint32_t modeId; // PU::intraDir[CHANNEL_TYPE_LUMA]
 #if JVET_V0130_INTRA_TMP
-	  bool     tmpFlag; // CU::tmpFlag
+    bool     tmpFlag; // CU::tmpFlag
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+    int      tmpIdx;
+    bool     tmpFusionFlag;
+    bool     tmpFlmFlag;
+    int      tmpIsSubPel;
+    int      tmpSubPelIdx;
+#endif
 #endif
 #if JVET_AB0155_SGPM
     bool     sgpmFlag;   // CU::sgpmFlag
@@ -238,9 +245,17 @@ private:
 #endif
 #if JVET_AB0155_SGPM
 #if JVET_V0130_INTRA_TMP
-    ModeInfo() : mipFlg( false ), mipTrFlg( false ), mRefId( 0 ), ispMod( NOT_INTRA_SUBPARTITIONS ), modeId( 0 ), tmpFlag( 0 ), sgpmFlag( 0 ), sgpmSplitDir( 0 ), sgpmMode0( 0 ), sgpmMode1( 0 ), sgpmIdx( 0 ) {}
-    ModeInfo( const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode,
-      const bool tmpf = 0, const bool sf = 0, const int sd = 0, const int sm0 = 0, const int sm1 = 0, const int si = 0 )
+    ModeInfo() : mipFlg( false ), mipTrFlg( false ), mRefId( 0 ), ispMod( NOT_INTRA_SUBPARTITIONS ), modeId( 0 ), tmpFlag( 0 )
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+      , tmpIdx(0) , tmpFusionFlag(false) , tmpFlmFlag(false) , tmpIsSubPel(0), tmpSubPelIdx(0)
+#endif
+	, sgpmFlag( 0 ), sgpmSplitDir( 0 ), sgpmMode0( 0 ), sgpmMode1( 0 ), sgpmIdx( 0 ) {}
+    ModeInfo(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode,
+             const bool tmpf = 0
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+      , const int tmpi = 0 , const bool tmpff = 0  , const int tmpflmf = 0 , const int tmpsp = 0, const int tmpspi = 0
+#endif
+	  , const bool sf = 0, const int sd = 0, const int sm0 = 0, const int sm1 = 0, const int si = 0 )
 #else
     ModeInfo() : mipFlg(false), mipTrFlg(false), mRefId(0), ispMod(NOT_INTRA_SUBPARTITIONS), modeId(0), sgpmFlag(0), sgpmSplitDir(0), sgpmMode0(0), sgpmMode1(0), sgpmIdx(0){}
     ModeInfo(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode,
@@ -253,6 +268,9 @@ private:
       , modeId(mode)
 #if JVET_V0130_INTRA_TMP
       , tmpFlag(tmpf)
+#endif
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+      , tmpIdx(tmpi) , tmpFusionFlag(tmpff) , tmpFlmFlag(tmpflmf) , tmpIsSubPel(tmpsp) , tmpSubPelIdx(tmpspi)
 #endif
       , sgpmFlag(sf)
       , sgpmSplitDir(sd)
@@ -271,6 +289,13 @@ private:
 #if JVET_V0130_INTRA_TMP
       tmpFlag      = other.tmpFlag;    // CU::tmpFlag
 #endif
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+      tmpIdx        = other.tmpIdx;
+      tmpFusionFlag = other.tmpFusionFlag;
+      tmpFlmFlag    = other.tmpFlmFlag;
+      tmpIsSubPel   = other.tmpIsSubPel;    // CU::tmpIsSubPel
+      tmpSubPelIdx  = other.tmpSubPelIdx;   // CU::tmpSubPelIdx
+#endif
       sgpmFlag     = other.sgpmFlag;   // CU::sgpmFlag
       sgpmSplitDir = other.sgpmSplitDir;
       sgpmMode0    = other.sgpmMode0;
@@ -284,6 +309,13 @@ private:
                 && modeId == cmp.modeId 
 #if JVET_V0130_INTRA_TMP
                 && tmpFlag == cmp.tmpFlag
+#endif
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+                && tmpIdx == cmp.tmpIdx
+                && tmpFusionFlag == cmp.tmpFusionFlag
+                && tmpFlmFlag == cmp.tmpFlmFlag
+                && tmpIsSubPel == cmp.tmpIsSubPel
+                && tmpSubPelIdx == cmp.tmpSubPelIdx
 #endif
                 && sgpmFlag == cmp.sgpmFlag
                 && sgpmSplitDir == cmp.sgpmSplitDir); // sgpmMode0 and sgpmMode1 seems no need
@@ -303,15 +335,30 @@ private:
     double rdCost;
     ModeInfoWithCost() : ModeInfo(), rdCost(MAX_DOUBLE) {}
 #if JVET_AB0155_SGPM && JVET_V0130_INTRA_TMP
-    ModeInfoWithCost(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode,
-                     const bool tpmf, double cost, const bool sf = 0, const int sd = 0, const int sm0 = 0, const int sm1 = 0)
-      : ModeInfo(mipf, miptf, mrid, ispm, mode, tpmf, sf, sd, sm0, sm1), rdCost(cost)
+    ModeInfoWithCost(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode, const bool tpmf, 
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+                     const int tmpi, const bool tmpff, const int tmpflmf,  const int tmpsp, const int tmpspi,
+#endif
+					 double cost, const bool sf = 0, const int sd = 0, const int sm0 = 0, const int sm1 = 0)
+      : ModeInfo(mipf, miptf, mrid, ispm, mode, tpmf
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+        ,tmpi ,tmpff ,tmpflmf , tmpsp, tmpspi
+#endif
+	  , sf, sd, sm0, sm1), rdCost(cost)
     {
     }
     bool operator==(const ModeInfoWithCost cmp) const
     {
       return (mipFlg == cmp.mipFlg && mipTrFlg == cmp.mipTrFlg && mRefId == cmp.mRefId && ispMod == cmp.ispMod
-              && modeId == cmp.modeId && tmpFlag == cmp.tmpFlag && rdCost == cmp.rdCost && sgpmFlag == cmp.sgpmFlag
+              && modeId == cmp.modeId && tmpFlag == cmp.tmpFlag
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+      && tmpIdx == cmp.tmpIdx
+      && tmpFusionFlag == cmp.tmpFusionFlag
+      && tmpFlmFlag == cmp.tmpFlmFlag
+      && tmpIsSubPel == cmp.tmpIsSubPel
+      && tmpSubPelIdx == cmp.tmpSubPelIdx
+#endif
+			   && rdCost == cmp.rdCost && sgpmFlag == cmp.sgpmFlag
               && sgpmSplitDir == cmp.sgpmSplitDir);   // sgpmMode0 and sgpmMode1 seems no need
     }
 #elif JVET_V0130_INTRA_TMP
@@ -503,6 +550,18 @@ private:
 #endif
 #else
   PelStorage      m_cccmStorage[CCCM_NUM_MODES];
+#endif
+#endif
+
+#if JVET_AD0188_CCP_MERGE
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+#if JVET_AD0202_CCCM_MDF
+  CCPModelCandidate m_ccmParamsStorage[2][TOTAL_NUM_CCCM_MODES];
+#else
+  CCPModelCandidate m_ccmParamsStorage[2][CCCM_NUM_MODES];
+#endif
+#else
+  CCPModelCandidate m_ccmParamsStorage[CCCM_NUM_MODES];
 #endif
 #endif
 

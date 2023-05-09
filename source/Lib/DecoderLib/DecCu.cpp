@@ -380,11 +380,27 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #if SECONDARY_MPM
           uint8_t* mpmPred = currCU.firstPU->intraMPM;  // mpm_idx / rem_intra_luma_pred_mode
           uint8_t* nonMpmPred = currCU.firstPU->intraNonMPM;
+#if JVET_AD0085_MPM_SORTING
+          if (PU::allowMPMSorted(*currCU.firstPU) && !(currCU.firstPU->mpmFlag && currCU.firstPU->ipredIdx == 0))
+          {
+            PU::getIntraMPMs(*currCU.firstPU, mpmPred, nonMpmPred
+#if JVET_AC0094_REF_SAMPLES_OPT
+                           , true
+#endif
+                           , m_pcIntraPred
+            );
+          }
+          else
+          {
+#endif
           PU::getIntraMPMs( *currCU.firstPU, mpmPred, nonMpmPred
 #if JVET_AC0094_REF_SAMPLES_OPT
                            , false
 #endif
           );
+#if JVET_AD0085_MPM_SORTING
+          }
+#endif
 #else
           unsigned int mpmPred[NUM_MOST_PROBABLE_MODES];  // mpm_idx / rem_intra_luma_pred_mode
           PU::getIntraMPMs(*currCU.firstPU, mpmPred);
@@ -494,6 +510,9 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #endif
 #endif
         xReconIntraQT( currCU );
+#if JVET_AD0188_CCP_MERGE
+        CU::saveModelsInHCCP(currCU);
+#endif
         break;
       default:
         THROW( "Invalid prediction mode" );
@@ -617,6 +636,99 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   }
 
   //===== get prediction signal =====
+#if JVET_AD0188_CCP_MERGE
+  if (compID != COMPONENT_Y && pu.idxNonLocalCCP)
+  {
+    if (compID == COMPONENT_Cb)
+    {
+      PelBuf            predCr = cs.getPredBuf(tu.blocks[COMPONENT_Cr]);
+      CCPModelCandidate candList[MAX_CCP_CAND_LIST_SIZE];
+
+      int candIdx = pu.idxNonLocalCCP - 1;
+
+      int candNum         = PU::getCCPModelCandidateList(pu, candList);
+      bool hasFilteredCCCM   = false;
+      bool hasFilteredCCLM   = false;
+      bool hasFilteredNSCCCM = false;
+      bool hasFilteredGLM[8] = { false, false, false, false, false, false, false, false};
+#if JVET_AD0202_CCCM_MDF
+      bool hasFilteredMFCCCM = false;
+#endif
+
+      for (int i = 0; i < candNum; i++)
+      {
+        if (candList[i].type & (CCP_TYPE_CCCM | CCP_TYPE_GLCCCM))
+        {
+          if (!hasFilteredCCCM)
+          {
+            m_pcIntraPred->xCccmCreateLumaRef(pu, area);
+            hasFilteredCCCM = true;
+          }
+        }
+#if JVET_AD0202_CCCM_MDF
+        else if (candList[i].type & CCP_TYPE_MDFCCCM)
+        {
+          if (!hasFilteredMFCCCM)
+          {
+            pu.cccmMultiFilterIdx = candList[i].cccmMultiFilterIdx;
+            if (!hasFilteredCCCM)
+            {
+              m_pcIntraPred->xCccmCreateLumaRef(pu, area, 0);
+              hasFilteredCCCM = true;
+            }
+            m_pcIntraPred->xCccmCreateLumaRef(pu, area, 1);
+            m_pcIntraPred->xCccmCreateLumaRef(pu, area, 2);
+            m_pcIntraPred->xCccmCreateLumaRef(pu, area, 3);
+            pu.cccmMultiFilterIdx = 0;
+            hasFilteredMFCCCM = true;
+          }
+        }
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+        else if (candList[i].type & CCP_TYPE_NSCCCM)
+        {
+          if (!hasFilteredNSCCCM)
+          {
+            pu.cccmNoSubFlag = 1;
+            m_pcIntraPred->xCccmCreateLumaNoSubRef(pu, area);
+            pu.cccmNoSubFlag = 0;
+            hasFilteredNSCCCM  = true;
+          }
+        }
+#endif
+        else if (candList[i].type & CCP_TYPE_CCLM)
+        {
+          if (!hasFilteredCCLM)
+          {
+            m_pcIntraPred->xGetLumaRecPixels(pu, area);
+            hasFilteredCCLM = true;
+          }
+        }
+        else if (candList[i].type & (CCP_TYPE_GLM0123 | CCP_TYPE_GLM4567))
+        {
+          int filtertype = candList[i].glmIdc - 1;
+          if (!hasFilteredGLM[filtertype])
+          {
+            pu.glmIdc.cr0 = pu.glmIdc.cb0 = filtertype + 1;
+            m_pcIntraPred->xGetLumaRecPixels(pu, area);
+            pu.glmIdc.cr0 = pu.glmIdc.cb0 = 0;
+            hasFilteredGLM[filtertype] = true;
+          }
+        }
+        else
+        {
+          THROW("Invalid type");
+        }
+      }
+      CHECK(pu.idxNonLocalCCP < 1 || pu.idxNonLocalCCP > MAX_CCP_CAND_LIST_SIZE, " Invalid idxNonLocalCCP index");
+
+      m_pcIntraPred->reorderCCPCandidates(pu, candList, candNum);
+      pu.curCand = candList[candIdx];
+      m_pcIntraPred->predCCPCandidate(pu, piPred, predCr);
+    }
+  }
+  else
+#endif
 #if JVET_AA0057_CCCM
   if( compID != COMPONENT_Y && pu.cccmFlag )
   {
@@ -680,12 +792,30 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
         m_pcIntraPred->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight(), tempType);
 
         m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight(), tempType);
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+        if (tu.cu->tmpFlmFlag)
+        {
+          m_pcIntraPred->xCalTmpFlmParam(tu.cu, pu.lwidth(), pu.lheight(), tempType);
+        }
+        if (tu.cu->tmpFusionFlag)
+        {
+          m_pcIntraPred->xTMPBuildFusionCandidate(*tu.cu, tempType);
+        }
+        if (pu.cu->tmpIsSubPel)
+        {
+          m_pcIntraPred->xPadForInterpolation(pu.cu);
+        }
+#endif
 #if JVET_AB0061_ITMP_BV_FOR_IBC
         m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, foundCandiNum, pu);
 #elif TMP_FAST_ENC
         m_pcIntraPred->generateTMPrediction( piPred.buf, piPred.stride, pu.Y(), foundCandiNum, pu.cu );
 #else
         m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
+#endif
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+        m_pcIntraPred->xGenerateTmpFlmPred(piPred, pu.lwidth(), pu.lheight(), tempType, tu.cu);
+        m_pcIntraPred->xTMPFusionApplyModel(piPred, pu.lwidth(), pu.lheight(), tempType, tu.cu);
 #endif
 		  }
 		  else
@@ -760,7 +890,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   }
 #if SIGN_PREDICTION
 #if JVET_AA0057_CCCM
+#if JVET_AD0188_CCP_MERGE
+  if (isJCCR && compID == COMPONENT_Cb && !pu.cccmFlag && !pu.idxNonLocalCCP)   // Cr prediction was done already for CCCM
+#else
   if(isJCCR && compID == COMPONENT_Cb && !pu.cccmFlag) // Cr prediction was done already for CCCM
+#endif
 #else
   if(isJCCR && compID == COMPONENT_Cb)
 #endif

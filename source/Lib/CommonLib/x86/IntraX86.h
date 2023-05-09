@@ -44,6 +44,461 @@
 #include <nmmintrin.h>
 
 #if ENABLE_SIMD_TMP
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+template<X86_VEXT vext>
+void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsigned int uiPatchWidth,
+                          unsigned int uiPatchHeight, int *diff, int *iMax, RefTemplateType tempType,
+                          int requiredTemplate)
+{
+  int diffSum  = 0;
+  int topDiff  = MAX_INT;
+  int leftDiff = MAX_INT;
+  int iY;
+#if JVET_W0069_TMP_BOUNDARY
+  Pel *refPatchRow;
+  if (tempType == L_SHAPE_TEMPLATE)
+  {
+    refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride - TMP_TEMPLATE_SIZE;
+  }
+  else if (tempType == LEFT_TEMPLATE)
+  {
+    refPatchRow = ref - TMP_TEMPLATE_SIZE;
+  }
+  else if (tempType == ABOVE_TEMPLATE)
+  {
+    refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride;
+  }
+#else
+  Pel *refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride - TMP_TEMPLATE_SIZE;
+#endif
+  Pel *    tarPatchRow;
+  uint32_t uiSum;
+
+  // horizontal difference
+#if JVET_W0069_TMP_BOUNDARY
+  if (tempType == L_SHAPE_TEMPLATE)
+  {
+#endif
+    topDiff  = 0;
+    leftDiff = 0;
+    if (requiredTemplate == 3)
+    {
+      for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
+      {
+        tarPatchRow        = tarPatch[iY];
+        const short *pSrc1 = (const short *) tarPatchRow;
+        const short *pSrc2 = (const short *) refPatchRow;
+
+        // SIMD difference
+        int iCols = uiPatchWidth;
+
+        // TopLeft
+        // Do with step of 4
+        __m128i vzero  = _mm_setzero_si128();
+        __m128i vsum32 = vzero;
+        __m128i vsum16 = vzero;
+        for (int iX = 0; iX < 4; iX += 4)
+        {
+          __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
+          __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
+          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+        }
+        __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+        uiSum            = _mm_cvtsi128_si32(vsum32);
+        diffSum += uiSum;
+
+        if (((iCols - TMP_TEMPLATE_SIZE) & 7) == 0)
+        {
+          // Do with step of 8
+          __m128i vzero  = _mm_setzero_si128();
+          __m128i vsum32 = vzero;
+          __m128i vsum16 = vzero;
+          for (int iX = TMP_TEMPLATE_SIZE; iX < iCols; iX += 8)
+          {
+            __m128i vsrc1 = _mm_loadu_si128((const __m128i *) &pSrc1[iX]);
+            __m128i vsrc2 = _mm_lddqu_si128((const __m128i *) &pSrc2[iX]);
+            vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+          }
+          __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+          vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+          uiSum            = _mm_cvtsi128_si32(vsum32);
+        }
+        else
+        {
+          // Do with step of 4
+          __m128i vzero  = _mm_setzero_si128();
+          __m128i vsum32 = vzero;
+          __m128i vsum16 = vzero;
+          for (int iX = TMP_TEMPLATE_SIZE; iX < iCols; iX += 4)
+          {
+            __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
+            __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
+            vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+          }
+          __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+          vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+          uiSum            = _mm_cvtsi128_si32(vsum32);
+        }
+        diffSum += uiSum;
+        topDiff += uiSum;
+
+        if (diffSum > iMax[0] && topDiff > iMax[1])
+        {
+          break;
+        }
+
+        // update location
+        refPatchRow += uiStride;
+      }
+      // TopDiff = top_diff;
+      refPatchRow = ref - TMP_TEMPLATE_SIZE;
+
+      // vertical difference
+      int iCols = TMP_TEMPLATE_SIZE;
+
+      for (iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)
+      {
+        tarPatchRow        = tarPatch[iY];
+        const short *pSrc1 = (const short *) tarPatchRow;
+        const short *pSrc2 = (const short *) refPatchRow;
+
+        // SIMD difference
+
+        // Do with step of 4
+        __m128i vzero  = _mm_setzero_si128();
+        __m128i vsum32 = vzero;
+        __m128i vsum16 = vzero;
+        for (int iX = 0; iX < iCols; iX += 4)
+        {
+          __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
+          __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
+          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+        }
+        __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+        uiSum            = _mm_cvtsi128_si32(vsum32);
+
+        diffSum += uiSum;
+        leftDiff += uiSum;
+
+        if (diffSum > iMax[0] && leftDiff > iMax[2])
+        {
+          break;
+        }
+        // update location
+        refPatchRow += uiStride;
+      }
+    }
+    else if (requiredTemplate == 0)
+    {
+      for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
+      {
+        tarPatchRow        = tarPatch[iY];
+        const short *pSrc1 = (const short *) tarPatchRow;
+        const short *pSrc2 = (const short *) refPatchRow;
+
+        // SIMD difference
+        // int  iRows = uiPatchHeight;
+        int iCols = uiPatchWidth;
+        if ((iCols & 7) == 0)
+        {
+          // Do with step of 8
+          __m128i vzero  = _mm_setzero_si128();
+          __m128i vsum32 = vzero;
+          __m128i vsum16 = vzero;
+          for (int iX = 0; iX < iCols; iX += 8)
+          {
+            __m128i vsrc1 = _mm_loadu_si128((const __m128i *) &pSrc1[iX]);
+            __m128i vsrc2 = _mm_lddqu_si128((const __m128i *) &pSrc2[iX]);
+            vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+          }
+          __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+          vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+          uiSum            = _mm_cvtsi128_si32(vsum32);
+        }
+        else
+        {
+          // Do with step of 4
+          __m128i vzero  = _mm_setzero_si128();
+          __m128i vsum32 = vzero;
+          __m128i vsum16 = vzero;
+          for (int iX = 0; iX < iCols; iX += 4)
+          {
+            __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
+            __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
+            vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+          }
+          __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+          vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+          uiSum            = _mm_cvtsi128_si32(vsum32);
+        }
+        diffSum += uiSum;
+
+        if (diffSum > iMax[0])
+        {
+          break;
+        }
+        // update location
+        refPatchRow += uiStride;
+      }
+
+      // vertical difference
+      int iCols = TMP_TEMPLATE_SIZE;
+
+      for (iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)
+      {
+        tarPatchRow        = tarPatch[iY];
+        const short *pSrc1 = (const short *) tarPatchRow;
+        const short *pSrc2 = (const short *) refPatchRow;
+
+        // SIMD difference
+
+        // Do with step of 4
+        __m128i vzero  = _mm_setzero_si128();
+        __m128i vsum32 = vzero;
+        __m128i vsum16 = vzero;
+        for (int iX = 0; iX < iCols; iX += 4)
+        {
+          __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
+          __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
+          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+        }
+        __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+        uiSum            = _mm_cvtsi128_si32(vsum32);
+
+        diffSum += uiSum;
+
+        if (diffSum > iMax[0])
+        {
+          break;
+        }
+        // update location
+        refPatchRow += uiStride;
+      }
+    }
+    else if (requiredTemplate == 1)
+    {
+      for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
+      {
+        tarPatchRow        = tarPatch[iY];
+        const short *pSrc1 = (const short *) tarPatchRow;
+        const short *pSrc2 = (const short *) refPatchRow;
+
+        // SIMD difference
+        int iCols = uiPatchWidth;
+
+        if (((iCols - TMP_TEMPLATE_SIZE) & 7) == 0)
+        {
+          // Do with step of 8
+          __m128i vzero  = _mm_setzero_si128();
+          __m128i vsum32 = vzero;
+          __m128i vsum16 = vzero;
+
+          for (int iX = TMP_TEMPLATE_SIZE; iX < iCols; iX += 8)
+          {
+            __m128i vsrc1 = _mm_loadu_si128((const __m128i *) &pSrc1[iX]);
+            __m128i vsrc2 = _mm_lddqu_si128((const __m128i *) &pSrc2[iX]);
+            vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+          }
+          __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+          vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+          uiSum            = _mm_cvtsi128_si32(vsum32);
+        }
+        else
+        {
+          // Do with step of 4
+          __m128i vzero  = _mm_setzero_si128();
+          __m128i vsum32 = vzero;
+          __m128i vsum16 = vzero;
+          for (int iX = TMP_TEMPLATE_SIZE; iX < iCols; iX += 4)
+          {
+            __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
+            __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
+            vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+          }
+          __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+          vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+          uiSum            = _mm_cvtsi128_si32(vsum32);
+        }
+        topDiff += uiSum;
+
+        if (topDiff > iMax[1])
+        {
+          break;
+        }
+        // update location
+        refPatchRow += uiStride;
+      }
+    }
+    else   // L
+    {
+      refPatchRow = ref - TMP_TEMPLATE_SIZE;
+
+      // vertical difference
+      int iCols = TMP_TEMPLATE_SIZE;
+
+      for (iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)
+      {
+        tarPatchRow        = tarPatch[iY];
+        const short *pSrc1 = (const short *) tarPatchRow;
+        const short *pSrc2 = (const short *) refPatchRow;
+
+        // SIMD difference
+
+        // Do with step of 4
+        __m128i vzero  = _mm_setzero_si128();
+        __m128i vsum32 = vzero;
+        __m128i vsum16 = vzero;
+        for (int iX = 0; iX < iCols; iX += 4)
+        {
+          __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
+          __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
+          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+        }
+        __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+        uiSum            = _mm_cvtsi128_si32(vsum32);
+
+        leftDiff += uiSum;
+
+        if (leftDiff > iMax[2])
+        {
+          break;
+        }
+        // update location
+        refPatchRow += uiStride;
+      }
+    }
+
+#if JVET_W0069_TMP_BOUNDARY
+  }
+  else if (tempType == ABOVE_TEMPLATE)
+  {
+    // horizontal difference
+    for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
+    {
+      tarPatchRow        = tarPatch[iY];
+      const short *pSrc1 = (const short *) tarPatchRow;
+      const short *pSrc2 = (const short *) refPatchRow;
+
+      // SIMD difference
+      // int  iRows = uiPatchHeight;
+      int iCols = uiPatchWidth - TMP_TEMPLATE_SIZE;
+      if ((iCols & 7) == 0)
+      {
+        // Do with step of 8
+        __m128i vzero  = _mm_setzero_si128();
+        __m128i vsum32 = vzero;
+        __m128i vsum16 = vzero;
+        for (int iX = 0; iX < iCols; iX += 8)
+        {
+          __m128i vsrc1 = _mm_loadu_si128((const __m128i *) (&pSrc1[iX]));
+          __m128i vsrc2 = _mm_lddqu_si128((const __m128i *) (&pSrc2[iX]));
+          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+        }
+        __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+        uiSum            = _mm_cvtsi128_si32(vsum32);
+      }
+      else
+      {
+        // Do with step of 4
+        __m128i vzero  = _mm_setzero_si128();
+        __m128i vsum32 = vzero;
+        __m128i vsum16 = vzero;
+        for (int iX = 0; iX < iCols; iX += 4)
+        {
+          __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
+          __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
+          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+        }
+        __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+        uiSum            = _mm_cvtsi128_si32(vsum32);
+      }
+      diffSum += uiSum;
+
+      if (diffSum > iMax[0])   // for speeding up
+      {
+        break;
+      }
+
+      // update location
+      refPatchRow += uiStride;
+    }
+  }
+  else if (tempType == LEFT_TEMPLATE)
+  {
+    // vertical difference
+    int iCols = TMP_TEMPLATE_SIZE;
+
+    for (iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)
+    {
+      tarPatchRow        = tarPatch[iY];
+      const short *pSrc1 = (const short *) tarPatchRow;
+      const short *pSrc2 = (const short *) refPatchRow;
+
+      // SIMD difference
+
+      // Do with step of 4
+      __m128i vzero  = _mm_setzero_si128();
+      __m128i vsum32 = vzero;
+      __m128i vsum16 = vzero;
+      for (int iX = 0; iX < iCols; iX += 4)
+      {
+        __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
+        __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
+        vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+      }
+      __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+      vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+      vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+      vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+      uiSum            = _mm_cvtsi128_si32(vsum32);
+
+      diffSum += uiSum;
+
+      if (diffSum > iMax[0])   // for speeding up
+      {
+        break;
+      }
+
+      refPatchRow += uiStride;
+    }
+  }
+#endif
+
+  diff[0] = diffSum;
+  diff[1] = topDiff;
+  diff[2] = leftDiff;
+}
+#else
 template< X86_VEXT vext >
 #if JVET_W0069_TMP_BOUNDARY
 int calcTemplateDiffSIMD(Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType tempType)
@@ -75,236 +530,204 @@ int calcTemplateDiffSIMD( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsig
 
   // horizontal difference
 #if JVET_W0069_TMP_BOUNDARY
-  if( tempType == L_SHAPE_TEMPLATE )
+  if (tempType == L_SHAPE_TEMPLATE)
   {
 #endif
-  for( iY = 0; iY < TMP_TEMPLATE_SIZE; iY++ )
-  {
-    tarPatchRow = tarPatch[iY];
-    const short* pSrc1 = ( const short* ) tarPatchRow;
-    const short* pSrc2 = ( const short* ) refPatchRow;
+    for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
+    {
+      tarPatchRow        = tarPatch[iY];
+      const short *pSrc1 = (const short *) tarPatchRow;
+      const short *pSrc2 = (const short *) refPatchRow;
 
-    // SIMD difference
-    //int  iRows = uiPatchHeight;
-    int  iCols = uiPatchWidth;
-    if( (iCols & 7) == 0 )
-    {
-      // Do with step of 8
-      __m128i vzero = _mm_setzero_si128();
-      __m128i vsum32 = vzero;
-      //for (int iY = 0; iY < iRows; iY += iSubStep)
+      // SIMD difference
+      // int  iRows = uiPatchHeight;
+      int iCols = uiPatchWidth;
+      if ((iCols & 7) == 0)
       {
+        // Do with step of 8
+        __m128i vzero  = _mm_setzero_si128();
+        __m128i vsum32 = vzero;
         __m128i vsum16 = vzero;
-        for( int iX = 0; iX < iCols; iX += 8 )
+        for (int iX = 0; iX < iCols; iX += 8)
         {
-          __m128i vsrc1 = _mm_loadu_si128( (const __m128i*)(&pSrc1[iX]) );
-          __m128i vsrc2 = _mm_lddqu_si128( (const __m128i*)(&pSrc2[iX]) );
-          vsum16 = _mm_add_epi16( vsum16, _mm_abs_epi16( _mm_sub_epi16( vsrc1, vsrc2 ) ) );
+          __m128i vsrc1 = _mm_loadu_si128((const __m128i *) &pSrc1[iX]);
+          __m128i vsrc2 = _mm_lddqu_si128((const __m128i *) &pSrc2[iX]);
+          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
         }
-        __m128i vsumtemp = _mm_add_epi32( _mm_unpacklo_epi16( vsum16, vzero ), _mm_unpackhi_epi16( vsum16, vzero ) );
-        vsum32 = _mm_add_epi32( vsum32, vsumtemp );
-        //pSrc1 += iStrideSrc1;
-        //pSrc2 += iStrideSrc2;
+        __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+        uiSum            = _mm_cvtsi128_si32(vsum32);
       }
-      vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
-      vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
-      uiSum = _mm_cvtsi128_si32( vsum32 );
+      else
+      {
+        // Do with step of 4
+        __m128i vzero  = _mm_setzero_si128();
+        __m128i vsum32 = vzero;
+        __m128i vsum16 = vzero;
+        for (int iX = 0; iX < iCols; iX += 4)
+        {
+          __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
+          __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
+          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+        }
+        __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+        uiSum            = _mm_cvtsi128_si32(vsum32);
+      }
+      diffSum += uiSum;
+
+      if (diffSum > iMax)   // for speeding up
+      {
+        return diffSum;
+      }
+      // update location
+      refPatchRow += uiStride;
     }
-    else
+
+    // vertical difference
+    int iCols = TMP_TEMPLATE_SIZE;
+
+    for (iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)
     {
+      tarPatchRow        = tarPatch[iY];
+      const short *pSrc1 = (const short *) tarPatchRow;
+      const short *pSrc2 = (const short *) refPatchRow;
+
+      // SIMD difference
+
       // Do with step of 4
-      __m128i vzero = _mm_setzero_si128();
+      __m128i vzero  = _mm_setzero_si128();
       __m128i vsum32 = vzero;
-      //for (int iY = 0; iY < iRows; iY += iSubStep)
-      {
-        __m128i vsum16 = vzero;
-        for( int iX = 0; iX < iCols; iX += 4 )
-        {
-          __m128i vsrc1 = _mm_loadl_epi64( (const __m128i*) & pSrc1[iX] );
-          __m128i vsrc2 = _mm_loadl_epi64( (const __m128i*) & pSrc2[iX] );
-          vsum16 = _mm_add_epi16( vsum16, _mm_abs_epi16( _mm_sub_epi16( vsrc1, vsrc2 ) ) );
-        }
-        __m128i vsumtemp = _mm_add_epi32( _mm_unpacklo_epi16( vsum16, vzero ), _mm_unpackhi_epi16( vsum16, vzero ) );
-        vsum32 = _mm_add_epi32( vsum32, vsumtemp );
-        //pSrc1 += iStrideSrc1;
-        //pSrc2 += iStrideSrc2;
-      }
-      vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
-      vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
-      uiSum = _mm_cvtsi128_si32( vsum32 );
-    }
-    diffSum += uiSum;
-
-    if( diffSum > iMax ) //for speeding up
-    {
-      return diffSum;
-    }
-    // update location
-    refPatchRow += uiStride;
-  }
-
-  // vertical difference
-  int  iCols = TMP_TEMPLATE_SIZE;
-
-  for( iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++ )
-  {
-    tarPatchRow = tarPatch[iY];
-    const short* pSrc1 = ( const short* ) tarPatchRow;
-    const short* pSrc2 = ( const short* ) refPatchRow;
-
-    // SIMD difference
-
-    // Do with step of 4
-    __m128i vzero = _mm_setzero_si128();
-    __m128i vsum32 = vzero;
-    //for (int iY = 0; iY < iRows; iY += iSubStep)
-    {
       __m128i vsum16 = vzero;
-      for( int iX = 0; iX < iCols; iX += 4 )
+      for (int iX = 0; iX < iCols; iX += 4)
       {
-        __m128i vsrc1 = _mm_loadl_epi64( (const __m128i*) & pSrc1[iX] );
-        __m128i vsrc2 = _mm_loadl_epi64( (const __m128i*) & pSrc2[iX] );
-        vsum16 = _mm_add_epi16( vsum16, _mm_abs_epi16( _mm_sub_epi16( vsrc1, vsrc2 ) ) );
+        __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
+        __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
+        vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
       }
-      __m128i vsumtemp = _mm_add_epi32( _mm_unpacklo_epi16( vsum16, vzero ), _mm_unpackhi_epi16( vsum16, vzero ) );
-      vsum32 = _mm_add_epi32( vsum32, vsumtemp );
-      //pSrc1 += iStrideSrc1;
-      //pSrc2 += iStrideSrc2;
-    }
-    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
-    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
-    uiSum = _mm_cvtsi128_si32( vsum32 );
+      __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+      vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+      vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+      vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+      uiSum            = _mm_cvtsi128_si32(vsum32);
 
-    diffSum += uiSum;
+      diffSum += uiSum;
 
-    if( diffSum > iMax ) //for speeding up
-    {
-      return diffSum;
+      if (diffSum > iMax)   // for speeding up
+      {
+        return diffSum;
+      }
+      // update location
+      refPatchRow += uiStride;
     }
-    // update location
-    refPatchRow += uiStride;
-  }
 #if JVET_W0069_TMP_BOUNDARY
   }
   else if (tempType == ABOVE_TEMPLATE)
   {
-  // horizontal difference
-  for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
-  {
-    tarPatchRow = tarPatch[iY];
-    const short* pSrc1 = (const short*)tarPatchRow;
-    const short* pSrc2 = (const short*)refPatchRow;
-
-    // SIMD difference
-    //int  iRows = uiPatchHeight;
-    int  iCols = uiPatchWidth - TMP_TEMPLATE_SIZE;
-    if ((iCols & 7) == 0)
+    // horizontal difference
+    for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
     {
-      // Do with step of 8
-      __m128i vzero = _mm_setzero_si128();
-      __m128i vsum32 = vzero;
-      //for (int iY = 0; iY < iRows; iY += iSubStep)
+      tarPatchRow        = tarPatch[iY];
+      const short *pSrc1 = (const short *) tarPatchRow;
+      const short *pSrc2 = (const short *) refPatchRow;
+
+      // SIMD difference
+      // int  iRows = uiPatchHeight;
+      int iCols = uiPatchWidth - TMP_TEMPLATE_SIZE;
+      if ((iCols & 7) == 0)
       {
+        // Do with step of 8
+        __m128i vzero  = _mm_setzero_si128();
+        __m128i vsum32 = vzero;
         __m128i vsum16 = vzero;
         for (int iX = 0; iX < iCols; iX += 8)
         {
-          __m128i vsrc1 = _mm_loadu_si128((const __m128i*)(&pSrc1[iX]));
-          __m128i vsrc2 = _mm_lddqu_si128((const __m128i*)(&pSrc2[iX]));
-          vsum16 = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+          __m128i vsrc1 = _mm_loadu_si128((const __m128i *) &pSrc1[iX]);
+          __m128i vsrc2 = _mm_lddqu_si128((const __m128i *) &pSrc2[iX]);
+          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
         }
         __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-        vsum32 = _mm_add_epi32(vsum32, vsumtemp);
-        //pSrc1 += iStrideSrc1;
-        //pSrc2 += iStrideSrc2;
+        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+        uiSum            = _mm_cvtsi128_si32(vsum32);
       }
-      vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-      vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-      uiSum = _mm_cvtsi128_si32(vsum32);
-    }
-    else
-    {
-      // Do with step of 4
-      __m128i vzero = _mm_setzero_si128();
-      __m128i vsum32 = vzero;
-      //for (int iY = 0; iY < iRows; iY += iSubStep)
+      else
       {
+        // Do with step of 4
+        __m128i vzero  = _mm_setzero_si128();
+        __m128i vsum32 = vzero;
         __m128i vsum16 = vzero;
         for (int iX = 0; iX < iCols; iX += 4)
         {
-          __m128i vsrc1 = _mm_loadl_epi64((const __m128i*) & pSrc1[iX]);
-          __m128i vsrc2 = _mm_loadl_epi64((const __m128i*) & pSrc2[iX]);
-          vsum16 = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+          __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
+          __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
+          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
         }
         __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-        vsum32 = _mm_add_epi32(vsum32, vsumtemp);
-        //pSrc1 += iStrideSrc1;
-        //pSrc2 += iStrideSrc2;
+        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+        uiSum            = _mm_cvtsi128_si32(vsum32);
       }
-      vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-      vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-      uiSum = _mm_cvtsi128_si32(vsum32);
-    }
-    diffSum += uiSum;
+      diffSum += uiSum;
 
-    if (diffSum > iMax) //for speeding up
-    {
-      return diffSum;
+      if (diffSum > iMax)   // for speeding up
+      {
+        return diffSum;
+      }
+      // update location
+      refPatchRow += uiStride;
     }
-    // update location
-    refPatchRow += uiStride;
-  }
-
-  
   }
   else if (tempType == LEFT_TEMPLATE)
   {
+    // vertical difference
+    int iCols = TMP_TEMPLATE_SIZE;
 
-  // vertical difference
-  int  iCols = TMP_TEMPLATE_SIZE;
-
-  for (iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)
-  {
-    tarPatchRow = tarPatch[iY];
-    const short* pSrc1 = (const short*)tarPatchRow;
-    const short* pSrc2 = (const short*)refPatchRow;
-
-    // SIMD difference
-
-    // Do with step of 4
-    __m128i vzero = _mm_setzero_si128();
-    __m128i vsum32 = vzero;
-    //for (int iY = 0; iY < iRows; iY += iSubStep)
+    for (iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)
     {
+      tarPatchRow        = tarPatch[iY];
+      const short *pSrc1 = (const short *) tarPatchRow;
+      const short *pSrc2 = (const short *) refPatchRow;
+
+      // SIMD difference
+
+      // Do with step of 4
+      __m128i vzero  = _mm_setzero_si128();
+      __m128i vsum32 = vzero;
       __m128i vsum16 = vzero;
       for (int iX = 0; iX < iCols; iX += 4)
       {
-        __m128i vsrc1 = _mm_loadl_epi64((const __m128i*) & pSrc1[iX]);
-        __m128i vsrc2 = _mm_loadl_epi64((const __m128i*) & pSrc2[iX]);
-        vsum16 = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+        __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
+        __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
+        vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
       }
       __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-      vsum32 = _mm_add_epi32(vsum32, vsumtemp);
-      //pSrc1 += iStrideSrc1;
-      //pSrc2 += iStrideSrc2;
-    }
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-    uiSum = _mm_cvtsi128_si32(vsum32);
+      vsum32           = _mm_add_epi32(vsum32, vsumtemp);
+      vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+      vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+      uiSum            = _mm_cvtsi128_si32(vsum32);
 
-    diffSum += uiSum;
+      diffSum += uiSum;
 
-    if (diffSum > iMax) //for speeding up
-    {
-      return diffSum;
+      if (diffSum > iMax)   // for speeding up
+      {
+        return diffSum;
+      }
+      // update location
+      refPatchRow += uiStride;
     }
-    // update location
-    refPatchRow += uiStride;
-  }
   }
 #endif
 
   return diffSum;
 }
+#endif 
 #endif
 
 #if ENABLE_DIMD && INTRA_TRANS_ENC_OPT

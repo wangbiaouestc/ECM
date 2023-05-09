@@ -323,8 +323,32 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #endif
 #if TMP_FAST_ENC
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  for (int i = 0; i < MTMP_NUM; i++)
+  {
+    tmpXdisp[i] = other.tmpXdisp[i];
+    tmpYdisp[i] = other.tmpYdisp[i];
+  }
+  for (int i = 0; i < TMP_GROUP_IDX << 1; i++)
+  {
+    tmpFusionInfo[i] = other.tmpFusionInfo[i];
+  }
+  tmpIdx        = other.tmpIdx;
+  tmpFusionFlag = other.tmpFusionFlag;
+  tmpFlmFlag    = other.tmpFlmFlag;
+  for (int j = 0; j < MTMP_NUM; j++)
+  {
+    for (int i = 0; i < TMP_FLM_PARAMS; i++)
+    {
+      tmpFlmParams[i][j] = other.tmpFlmParams[i][j];
+    }
+  }
+  tmpIsSubPel  = other.tmpIsSubPel;
+  tmpSubPelIdx = other.tmpSubPelIdx;
+#else
   tmpXdisp = other.tmpXdisp;
   tmpYdisp = other.tmpYdisp;
+#endif
   tmpNumCand = other.tmpNumCand;
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -504,8 +528,32 @@ void CodingUnit::initData()
 #endif
 #endif
 #if TMP_FAST_ENC
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  for (int i = 0; i < MTMP_NUM; i++)
+  {
+    tmpXdisp[i] = 0;
+    tmpYdisp[i] = 0;
+  }
+  for (int i = 0; i < TMP_GROUP_IDX << 1; i++)
+  {
+    tmpFusionInfo[i] = IntraTMPFusionInfo{ false, false, 0, 1 };
+  }
+  tmpIdx        = 0;
+  tmpFusionFlag = false;
+  tmpFlmFlag    = false;
+  for (int j = 0; j < MTMP_NUM; j++)
+  {
+    for (int i = 0; i < TMP_FLM_PARAMS; i++)
+    {
+      tmpFlmParams[i][j] = -1;
+    }
+  }
+  tmpIsSubPel  = -1;
+  tmpSubPelIdx = -1;
+#else  
   tmpXdisp = 0;
   tmpYdisp = 0;
+#endif 
   tmpNumCand = 0;
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -840,6 +888,11 @@ void PredictionUnit::initData()
   cccmMultiFilterIdx = 0;
 #endif
 #endif
+#if JVET_AD0188_CCP_MERGE
+  idxNonLocalCCP = 0;
+  curCand = {};
+  curCand.type = CCP_TYPE_NONE;
+#endif
   // inter data
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = 0;
@@ -997,6 +1050,10 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   cccmMultiFilterIdx = predData.cccmMultiFilterIdx;
 #endif
 #endif
+#if JVET_AD0188_CCP_MERGE
+  idxNonLocalCCP  = predData.idxNonLocalCCP;
+  curCand = predData.curCand;
+#endif
   return *this;
 }
 
@@ -1153,6 +1210,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #if JVET_AD0202_CCCM_MDF
   cccmMultiFilterIdx = other.cccmMultiFilterIdx;
 #endif
+#endif
+#if JVET_AD0188_CCP_MERGE
+  idxNonLocalCCP  = other.idxNonLocalCCP;
+  curCand = other.curCand;
 #endif
 
   mergeFlag   = other.mergeFlag;

@@ -1523,6 +1523,20 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
     return;
   }
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  if (CU::allowTmrl(cu))
+  {
+    cuTmrlFlag(cu);
+    if (cu.tmrlFlag)
+    {
+      return;
+    }
+  }
+  else
+  {
+    extend_ref_line(cu);
+  }
+#else
 #if JVET_AB0157_TMRL
   cuTmrlFlag(cu);
   if (cu.tmrlFlag)
@@ -1531,6 +1545,7 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
   }
 #else
   extend_ref_line( cu );
+#endif
 #endif
   isp_mode( cu );
 #if ENABLE_DIMD
@@ -1671,7 +1686,31 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
         if( secondaryMPMIdx < NUM_SECONDARY_MOST_PROBABLE_MODES )
         {
           m_BinEncoder.encodeBin(1, Ctx::IntraLumaSecondMpmFlag());
+#if JVET_AD0085_MPM_SORTING
+          if (cu.cs->sps->getUseMpmSorting())
+          {
+            int ctxId = 0;
+            const int maxNumCtxBins = (NUM_SECONDARY_MOST_PROBABLE_MODES / 4) - 1;
+            int prefixIdx = secondaryMPMIdx / 4;
+            for (int val = 0; val < maxNumCtxBins; val++)
+            {
+              unsigned int bin = (val == prefixIdx ? 0 : 1);
+              m_BinEncoder.encodeBin(bin, Ctx::IntraLumaSecondMpmIdx(ctxId++));
+              if (!bin)
+              {
+                break;
+              }
+            }
+
+            m_BinEncoder.encodeBinsEP(secondaryMPMIdx - prefixIdx * 4, 2);
+          }
+          else
+          {
+#endif
           m_BinEncoder.encodeBinsEP( secondaryMPMIdx, 4);
+#if JVET_AD0085_MPM_SORTING
+          }
+#endif
 #if ENABLE_TRACING && (ENABLE_DIMD || JVET_W0123_TIMD_FUSION)
           pred_idx = secondaryMPMIdx + NUM_PRIMARY_MOST_PROBABLE_MODES;
           secondMpmFlag = true;
@@ -1768,6 +1807,20 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
     return;
   }
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  if (CU::allowTmrl(*pu.cu))
+  {
+    cuTmrlFlag(*pu.cu);
+    if (pu.cu->tmrlFlag)
+    {
+      return;
+    }
+  }
+  else
+  {
+    extend_ref_line(pu);
+  }
+#else
 #if JVET_AB0157_TMRL
   cuTmrlFlag(*pu.cu);
   if (pu.cu->tmrlFlag)
@@ -1776,6 +1829,7 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
   }
 #else
   extend_ref_line( pu );
+#endif
 #endif
   isp_mode( *pu.cu );
 #if ENABLE_DIMD
@@ -1863,21 +1917,45 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
     { 
 #if SECONDARY_MPM
       auto secondMpmPred = mpmPred + NUM_PRIMARY_MOST_PROBABLE_MODES;
-      unsigned   second_mpm_idx = NUM_SECONDARY_MOST_PROBABLE_MODES;
+      unsigned   secondMpmIdx = NUM_SECONDARY_MOST_PROBABLE_MODES;
 
       for (unsigned idx = 0; idx < NUM_SECONDARY_MOST_PROBABLE_MODES; idx++)
       {
         if (ipredMode == secondMpmPred[idx])
         {
-          second_mpm_idx = idx;
+          secondMpmIdx = idx;
           break;
         }
       }
 
-      if (second_mpm_idx < NUM_SECONDARY_MOST_PROBABLE_MODES)
+      if (secondMpmIdx < NUM_SECONDARY_MOST_PROBABLE_MODES)
       {
         m_BinEncoder.encodeBin(1, Ctx::IntraLumaSecondMpmFlag());
-        m_BinEncoder.encodeBinsEP(second_mpm_idx, 4);
+#if JVET_AD0085_MPM_SORTING
+        if (pu.cs->sps->getUseMpmSorting())
+        {
+          int ctxId = 0;
+          const int maxNumCtxBins = (NUM_SECONDARY_MOST_PROBABLE_MODES / 4) - 1;
+          int prefixIdx = secondMpmIdx / 4;
+          for (int val = 0; val < maxNumCtxBins; val++)
+          {
+            unsigned int bin = (val == prefixIdx ? 0 : 1);
+            m_BinEncoder.encodeBin(bin, Ctx::IntraLumaSecondMpmIdx(ctxId++));
+            if (!bin)
+            {
+              break;
+            }
+          }
+
+          m_BinEncoder.encodeBinsEP(secondMpmIdx - prefixIdx * 4, 2);
+        }
+        else
+        {
+#endif
+        m_BinEncoder.encodeBinsEP(secondMpmIdx, 4);
+#if JVET_AD0085_MPM_SORTING
+        }
+#endif
       }
       else
       {
@@ -2201,6 +2279,13 @@ void CABACWriter::glmIdc(const PredictionUnit& pu)
 #endif
 void CABACWriter::intra_chroma_lmc_mode(const PredictionUnit& pu)
 {
+#if JVET_AD0188_CCP_MERGE
+  nonLocalCCPIndex(pu);
+  if (pu.idxNonLocalCCP)
+  {
+    return;
+  }
+#endif
   const unsigned intraDir = pu.intraDir[1];
 #if MMLM
   int lmModeList[NUM_CHROMA_MODE];
@@ -2258,6 +2343,23 @@ void CABACWriter::intra_chroma_lmc_mode(const PredictionUnit& pu)
   cclmDeltaSlope( pu );
 #endif
 }
+
+#if JVET_AD0188_CCP_MERGE
+void CABACWriter::nonLocalCCPIndex(const PredictionUnit &pu)
+{
+  if (PU::hasNonLocalCCP(pu))
+  {
+    CHECK(pu.idxNonLocalCCP < 0 || pu.idxNonLocalCCP > MAX_CCP_CAND_LIST_SIZE, "Invalid idxNonLocalCCP");
+    {
+      m_BinEncoder.encodeBin(pu.idxNonLocalCCP ? 1 : 0, Ctx::nonLocalCCP(0));
+      if (pu.idxNonLocalCCP)
+      {
+        unary_max_eqprob(pu.idxNonLocalCCP - 1, MAX_CCP_CAND_LIST_SIZE - 1);
+      }
+    }
+  }
+}
+#endif
 
 #if JVET_AA0057_CCCM
 void CABACWriter::cccmFlag(const PredictionUnit& pu)
@@ -7527,10 +7629,10 @@ void CABACWriter::code_unary_fixed( unsigned symbol, unsigned ctxId, unsigned un
 #if JVET_V0130_INTRA_TMP
 void CABACWriter::tmp_flag(const CodingUnit& cu)
 {
-	if (!cu.Y().valid())
-	{
-		return;
-	}
+  if (!cu.Y().valid())
+  {
+    return;
+  }
 
 #if JVET_X0124_TMP_SIGNAL
   if (cu.dimd)
@@ -7539,14 +7641,81 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
   }
 #endif
 
-  if( !cu.cs->sps->getUseIntraTMP() )
+  if (!cu.cs->sps->getUseIntraTMP())
   {
     return;
   }
 
-	unsigned ctxId = DeriveCtx::CtxTmpFlag(cu);
-	m_BinEncoder.encodeBin(cu.tmpFlag, Ctx::TmpFlag(ctxId));
-	DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpFlag ? 1 : 0);
+  unsigned ctxId = DeriveCtx::CtxTmpFlag(cu);
+  m_BinEncoder.encodeBin(cu.tmpFlag, Ctx::TmpFlag(ctxId));
+  DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpFlag ? 1 : 0);
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  if (cu.tmpFlag)
+  {
+    unsigned ctxId_fusion = DeriveCtx::CtxTmpFusionFlag(cu);
+    DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
+           cu.tmpFusionFlag ? 1 : 0);
+    if (cu.tmpFusionFlag)
+    {
+      m_BinEncoder.encodeBin(1, Ctx::TmpFusion(ctxId_fusion));
+      m_BinEncoder.encodeBin(cu.tmpIdx >= TMP_GROUP_IDX ? 1: 0, Ctx::TmpFusion(4));
+
+      int tmpFusionIdx = cu.tmpIdx;
+      tmpFusionIdx = tmpFusionIdx >=  TMP_GROUP_IDX ? tmpFusionIdx - TMP_GROUP_IDX: tmpFusionIdx;
+      m_BinEncoder.encodeBin(tmpFusionIdx ? 1: 0, Ctx::TmpFusion(5));
+      if (tmpFusionIdx)
+      {
+        m_BinEncoder.encodeBinEP(tmpFusionIdx > 1 ? 1 : 0);
+      }
+      DTRACE(g_trace_ctx, D_SYNTAX, "tmp_fusion_idx() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIdx);
+    }
+    else
+    {
+      m_BinEncoder.encodeBin(0, Ctx::TmpFusion(ctxId_fusion));
+      if (cu.tmpIdx < 3)
+      {
+        m_BinEncoder.encodeBin(1, Ctx::TmpIdx(0));
+        if (cu.tmpIdx == 0)
+        {
+          m_BinEncoder.encodeBin(1, Ctx::TmpIdx(1));
+        }
+        else
+        {
+          m_BinEncoder.encodeBin(0, Ctx::TmpIdx(1));
+          if (cu.tmpIdx == 1)
+          {
+            m_BinEncoder.encodeBin(1, Ctx::TmpIdx(2));
+          }
+          else
+          {
+            m_BinEncoder.encodeBin(0, Ctx::TmpIdx(2));
+          }
+        }
+      }
+      else
+      {
+        m_BinEncoder.encodeBin(0, Ctx::TmpIdx(0));
+        xWriteTruncBinCode(cu.tmpIdx - 3, MTMP_NUM - 3);
+      }
+      m_BinEncoder.encodeBin(cu.tmpFlmFlag, Ctx::TmpFusion(3));
+      DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flm_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
+             cu.tmpFlmFlag);
+      if (!cu.tmpFlmFlag)
+      {
+        m_BinEncoder.encodeBin(cu.tmpIsSubPel != 0 ? 1 : 0, Ctx::TmpFlag(4));
+        if (cu.tmpIsSubPel)
+        {
+          m_BinEncoder.encodeBin(cu.tmpIsSubPel >= 2 ? 1 : 0, Ctx::TmpFlag(5));
+          if (cu.tmpIsSubPel >= 2)
+          {
+            m_BinEncoder.encodeBin(cu.tmpIsSubPel == 3 ? 1 : 0, Ctx::TmpFlag(6));
+          }
+          m_BinEncoder.encodeBinsEP(cu.tmpSubPelIdx, 3);
+        }
+      }
+    }
+  }
+#endif
 }
 #endif
 
@@ -8023,11 +8192,14 @@ void CABACWriter::amvpMerge_mode( const PredictionUnit& pu )
 #if JVET_AB0157_TMRL
 void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
 {
+#if !JVET_AD0082_TMRL_CONFIG
   if (!CU::allowTmrl(cu))
   {
     return;
   }
+#endif
   const PredictionUnit* pu = cu.firstPU;
+#if !JVET_AD0082_TMRL_CONFIG
 #if JVET_W0123_TIMD_FUSION
   if (cu.timd)
   {
@@ -8043,6 +8215,7 @@ void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
   }
   else
   {
+#endif
 #endif
     int ctxId = 0;
     m_BinEncoder.encodeBin(cu.tmrlFlag, Ctx::TmrlDerive(ctxId++));
@@ -8070,8 +8243,10 @@ void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
       CHECK(pu->multiRefIdx, "?");
     }
     DTRACE(g_trace_ctx, D_SYNTAX, "cu_tmrl_flag() ctx=%d pos=(%d,%d) tmrl=%d\n", 0, cu.lumaPos().x, cu.lumaPos().y, cu.tmrlFlag);
+#if !JVET_AD0082_TMRL_CONFIG
 #if JVET_W0123_TIMD_FUSION
   }
+#endif
 #endif
 }
 #endif

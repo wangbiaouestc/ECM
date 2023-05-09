@@ -2541,8 +2541,17 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AB0155_SGPM
   READ_FLAG(uiCode, "sps_sgpm_enabled_flag");                       pcSPS->setUseSgpm(uiCode != 0);
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  READ_FLAG(uiCode, "sps_tmrl_enabled_flag");                       pcSPS->setUseTmrl(uiCode != 0);
+#endif
+#if JVET_AD0085_MPM_SORTING
+  READ_FLAG(uiCode, "sps_mpm_sorting_enabled_flag");                pcSPS->setUseMpmSorting(uiCode != 0);
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   READ_UVLC(uiCode, "sps_cccm_cand");                               pcSPS->setUseCccm(uiCode);
+#endif
+#if JVET_AD0188_CCP_MERGE
+  READ_UVLC(uiCode, "sps_ccp_merge");                               pcSPS->setUseCcpMerge(uiCode);
 #endif
   if( pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
@@ -5518,6 +5527,9 @@ void HLSyntaxReader::parseConstraintInfo(ConstraintInfo *cinfo)
 #endif
 #if JVET_AB0155_SGPM
     READ_FLAG(symbol, "gci_no_sgpm_constraint_flag");                    cinfo->setNoSgpmConstraintFlag(symbol > 0 ? true : false);
+#endif
+#if JVET_AD0082_TMRL_CONFIG
+    READ_FLAG(symbol, "gci_no_tmrl_constraint_flag");                    cinfo->setNoTmrlConstraintFlag(symbol > 0 ? true : false);
 #endif
     /* inter */
     READ_FLAG(symbol, "gci_no_ref_pic_resampling_constraint_flag");      cinfo->setNoRprConstraintFlag(symbol > 0 ? true : false);

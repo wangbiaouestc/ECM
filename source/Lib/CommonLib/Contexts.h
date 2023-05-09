@@ -356,6 +356,9 @@ public:
   static const CtxSet   IntraLumaMpmFlag;
 #if SECONDARY_MPM
   static const CtxSet   IntraLumaSecondMpmFlag;
+#if JVET_AD0085_MPM_SORTING
+  static const CtxSet   IntraLumaSecondMpmIdx;
+#endif
 #endif
   static const CtxSet   IntraLumaPlanarFlag;
 #if SECONDARY_MPM
@@ -364,6 +367,9 @@ public:
   static const CtxSet   CclmModeFlag;
   static const CtxSet   CclmModeIdx;
   static const CtxSet   IntraChromaPredMode;
+#if JVET_AD0188_CCP_MERGE
+  static const CtxSet   nonLocalCCP;
+#endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
 #if ENABLE_DIMD
   static const CtxSet   DimdChromaMode;
@@ -380,6 +386,10 @@ public:
   static const CtxSet   MipFlag;
 #if JVET_V0130_INTRA_TMP
   static const CtxSet   TmpFlag;
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  static const CtxSet   TmpIdx;
+  static const CtxSet   TmpFusion;
+#endif  
 #endif
 #if MMLM
   static const CtxSet   MMLMFlag;

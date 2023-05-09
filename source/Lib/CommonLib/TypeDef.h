@@ -132,6 +132,7 @@
 #endif
 #define JVET_W0069_TMP_BOUNDARY                           1 // JVET-W0069: Boundary handling for TMP
 #define JVET_AB0061_ITMP_BV_FOR_IBC                       1 // JVET-AB0061: Storing IntraTMP BV for IBC BV prediction
+#define JVET_AD0086_ENHANCED_INTRA_TMP                    1 // JVET-AD0086: Enhanced intra TMP
 #endif
 
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
@@ -171,9 +172,16 @@
 #define JVET_AB0155_SGPM                                  1 // JVET-AB0155: Spatial geometric partitioning mode
 #define JVET_AC0189_SGPM_NO_BLENDING                      1 // JVET-AC0189: Allow no blending for SGPM
 #define JVET_AB0157_TMRL                                  1 // JVET-AB0157: Template-based multiple reference line intra prediction
+#if JVET_AB0157_TMRL
+#define JVET_AD0082_TMRL_CONFIG                           1 // JVET-AD0082: a configuration option for TMRL
+#define JVET_AD0085_TMRL_EXTENSION                        1 // JVET-AD0085: TMRL angular extension and intra candidate list modifications
+#endif
 #define JVET_AB0157_INTRA_FUSION                          1 // JVET-AB0157: Intra prediction fusion
 #define JVET_AC0094_REF_SAMPLES_OPT                       1 // JVET-AC0094: Optimizing the use of reference samples
 #define JVET_AC0105_DIRECTIONAL_PLANAR                    1 // JVET-AC0105: Directional planar
+#define JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS        1 // JVET-AD0184: Removal of division operations
+#define JVET_AD0085_MPM_SORTING                           1 // JVET-AD0085: Template-based intra MPM list construction
+#define JVET_AD0188_CCP_MERGE                             1 // JVET_AD0188: Non-local cross-component prediction and cross-component merge mode
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -366,6 +374,7 @@
 #define JVET_Z0067_RPR_ENABLE                             1 // JVET-Z0067: Fixes for RPR
 #define JVET_Z0150_MEMORY_USAGE_PRINT                     1 // JVET-Z0150: Print memory usage
 #define JVET_Z0118_GDR                                    1 // JVET-Z0118: GDR
+#define JVET_AD0169_SMALL_SCALE_DOWNSAMPLING              1 // JVET-AD0169: Downsampling filters in range 1.1 to 1.35 based on Kaiser(7) windowed sinc
 
 #if JVET_Z0118_GDR
 #define GDR_LEAK_TEST                                     0
@@ -902,6 +911,19 @@ enum RefTemplateType
   LEFT_TEMPLATE    = 2,
   ABOVE_TEMPLATE   = 3,
   NO_TEMPLATE      = 4
+};
+#endif
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+enum TmpSubPelDirType
+{
+  LEFT_POS         = 0,
+  RIGHT_POS        = 1,
+  ABOVE_POS        = 2,
+  BOTTOM_POS       = 3,
+  ABOVE_LEFT_POS   = 4,
+  ABOVE_RIGHT_POS  = 5,
+  LEFT_BOTTOM_POS  = 6,
+  RIGHT_BOTTOM_POS = 7,
 };
 #endif
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS

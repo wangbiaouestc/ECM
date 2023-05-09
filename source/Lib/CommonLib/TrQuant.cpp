@@ -545,6 +545,12 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
       intraMode = PLANAR_IDX;
     }
 #endif
+#if JVET_AD0085_TMRL_EXTENSION
+    if (tu.cu->tmrlFlag && compID == COMPONENT_Y)
+    {
+      intraMode = MAP131TO67(intraMode);
+    }
+#endif
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
 
 #if JVET_AC0105_DIRECTIONAL_PLANAR
@@ -810,6 +816,12 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
     if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
     {
       intraMode = PLANAR_IDX;
+    }
+#endif
+#if JVET_AD0085_TMRL_EXTENSION
+    if (tu.cu->tmrlFlag && compID == COMPONENT_Y)
+    {
+      intraMode = MAP131TO67(intraMode);
     }
 #endif
     CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
@@ -1235,6 +1247,12 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
       if (tu.cu->sgpm)
       {
         predMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
+      }
+#endif
+#if JVET_AD0085_TMRL_EXTENSION
+      if (tu.cu->tmrlFlag && compID == COMPONENT_Y)
+      {
+        predMode = MAP131TO67(predMode);
       }
 #endif
       int ucMode;
@@ -2653,6 +2671,12 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
   if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
   {
     intraMode = PLANAR_IDX;
+  }
+#endif
+#if JVET_AD0085_TMRL_EXTENSION
+  if (tu.cu->tmrlFlag && compID == COMPONENT_Y)
+  {
+    intraMode = MAP131TO67(intraMode);
   }
 #endif
 #if JVET_AC0105_DIRECTIONAL_PLANAR

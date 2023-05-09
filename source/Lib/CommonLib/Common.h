@@ -295,6 +295,264 @@ public:
   }
 };
 
+#if JVET_AD0188_CCP_MERGE
+enum CCPType
+{
+  CCP_TYPE_NONE    = 0,
+  CCP_TYPE_CCLM    = 1,
+  CCP_TYPE_MMLM    = (1 << 1),
+  CCP_TYPE_GLM0123 = (1 << 2),
+  CCP_TYPE_GLM4567 = (1 << 3),
+  CCP_TYPE_CCCM    = (1 << 4),
+  CCP_TYPE_GLCCCM  = (1 << 5),
+  CCP_TYPE_NSCCCM  = (1 << 6),
+  CCP_TYPE_MDFCCCM = (1 << 7),
+  NUM_CCP_TYPE
+};
 
+struct CCPModelCandidate
+{
+  int64_t params[2][NUM_CCP_PARAMS] = { 0 };
+#if MMLM
+  int64_t params2[2][NUM_CCP_PARAMS] = { 0 };
+  int     shift2[2] = { 0 };
+  int     yThres = 0;
+#endif
+  int     shift[2] = { 0 };
+  int     bd = 0;
+  int     midVal = 0;
+  int     type = 0;
+#if JVET_AB0174_CCCM_DIV_FREE
+  int     lumaOffset = 0;
+#endif
+#if JVET_AC0054_GLCCCM || JVET_AD0202_CCCM_MDF
+  int     corOffX = 0;
+  int     corOffY = 0;
+#endif
+#if JVET_AD0202_CCCM_MDF
+  int     cccmMultiFilterIdx = 0;
+#endif
+#if JVET_AA0126_GLM
+  int8_t  glmIdc = 0;
+#endif
+
+  template<int NUM>
+  inline bool isTheSameParams(const CCPModelCandidate& p) const
+  {
+    for (int i = 0; i < NUM; ++i)
+    {
+      if (params[0][i] != p.params[0][i] || params[1][i] != p.params[1][i])
+      {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  template<int NUM>
+  inline bool isTheSameParams2(const CCPModelCandidate& p) const
+  {
+    for (int i = 0; i < NUM; ++i)
+    {
+      if (params2[0][i] != p.params2[0][i] || params2[1][i] != p.params2[1][i])
+      {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool operator==(const CCPModelCandidate& cand) const
+  {
+    if (type != cand.type)
+    {
+      return false;
+    }
+
+    if ((type & CCP_TYPE_MMLM) != (cand.type & CCP_TYPE_MMLM))
+    {
+      return false;
+    }
+
+    if (type & (CCP_TYPE_CCCM | CCP_TYPE_GLCCCM))
+    {
+#if JVET_AB0174_CCCM_DIV_FREE
+      if (lumaOffset != cand.lumaOffset)
+      {
+        return false;
+      }
+#endif
+      if (type & CCP_TYPE_MMLM)
+      {
+        if (yThres != cand.yThres)
+        {
+          return false;
+        }
+        if (isTheSameParams<CCCM_NUM_PARAMS>(cand) && isTheSameParams2<CCCM_NUM_PARAMS>(cand))
+        {
+          return true;
+        }
+      }
+      else
+      {
+        if (isTheSameParams<CCCM_NUM_PARAMS>(cand))
+        {
+          return true;
+        }
+      }
+      return false;
+    }
+    else if (type & (CCP_TYPE_CCLM | CCP_TYPE_GLM0123))
+    {
+      if (type & CCP_TYPE_MMLM)
+      {
+        if (yThres != cand.yThres)
+        {
+          return false;
+        }
+        if (params[0][0] == cand.params[0][0] && shift[0] == cand.shift[0]
+          && params[1][0] == cand.params[1][0] && shift[1] == cand.shift[1]
+          && params2[0][0] == cand.params2[0][0] && shift2[0] == cand.shift2[0]
+          && params2[1][0] == cand.params2[1][0] && shift2[1] == cand.shift2[1])
+        {
+          return true;
+        }
+      }
+      else
+      {
+        if (params[0][0] == cand.params[0][0] && shift[0] == cand.shift[0]
+          && params[1][0] == cand.params[1][0] && shift[1] == cand.shift[1])
+        {
+          return true;
+        }
+      }
+      return false;
+    }
+    else if (type & CCP_TYPE_GLM4567)
+    {
+#if JVET_AB0174_CCCM_DIV_FREE
+      if (lumaOffset != cand.lumaOffset)
+      {
+        return false;
+      }
+#endif
+      if (type & CCP_TYPE_MMLM)
+      {
+        if (yThres != cand.yThres)
+        {
+          return false;
+        }
+        if (isTheSameParams<GLM_NUM_PARAMS>(cand) && isTheSameParams2<GLM_NUM_PARAMS>(cand))
+        {
+          return true;
+        }
+      }
+      else
+      {
+        if (isTheSameParams<GLM_NUM_PARAMS>(cand))
+        {
+          return true;
+        }
+      }
+      return false;
+    }
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+    else if (type & CCP_TYPE_NSCCCM)
+    {
+#if JVET_AB0174_CCCM_DIV_FREE
+      if (lumaOffset != cand.lumaOffset)
+      {
+        return false;
+      }
+#endif
+      if (type & CCP_TYPE_MMLM)
+      {
+        if (yThres != cand.yThres)
+        {
+          return false;
+        }
+        if (isTheSameParams<CCCM_NO_SUB_NUM_PARAMS>(cand) && isTheSameParams2<CCCM_NO_SUB_NUM_PARAMS>(cand))
+        {
+          return true;
+        }
+      }
+      else
+      {
+        if (isTheSameParams<CCCM_NO_SUB_NUM_PARAMS>(cand))
+        {
+          return true;
+        }
+      }
+      return false;
+    }
+#endif
+#if JVET_AD0202_CCCM_MDF
+    else if (type & CCP_TYPE_MDFCCCM)
+    {
+      if (cccmMultiFilterIdx != cand.cccmMultiFilterIdx)
+      {
+        return false;
+      }
+#if JVET_AB0174_CCCM_DIV_FREE
+      if (lumaOffset != cand.lumaOffset)
+      {
+        return false;
+      }
+#endif
+      if (type & CCP_TYPE_MMLM)
+      {
+        if (yThres != cand.yThres)
+        {
+          return false;
+        }
+        if (cccmMultiFilterIdx == 1)
+        {
+          if (isTheSameParams<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(cand) && isTheSameParams2<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(cand))
+          {
+            return true;
+          }
+        }
+        else
+        {
+          if (isTheSameParams<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(cand) && isTheSameParams2<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(cand))
+          {
+            return true;
+          }
+        }
+      }
+      else
+      {
+        if (cccmMultiFilterIdx == 1)
+        {
+          if (isTheSameParams<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>(cand))
+          {
+            return true;
+          }
+        }
+        else
+        {
+          if (isTheSameParams<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>(cand))
+          {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+#endif
+    else
+    {
+      THROW("Wrong Type");
+      // return pos == cand.pos;
+    }
+  }
+};
+
+struct LutCCP
+{
+  static_vector<CCPModelCandidate, MAX_NUM_HCCP_CANDS> lutCCP;
+  // Postions for future extensions
+};
+#endif
 
 #endif

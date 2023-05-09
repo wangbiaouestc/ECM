@@ -79,6 +79,9 @@ namespace CU
   void addPUs                         (      CodingUnit& cu);
 
   void saveMotionInHMVP               (const CodingUnit& cu, const bool isToBeDone );
+#if JVET_AD0188_CCP_MERGE
+  void saveModelsInHCCP               (const CodingUnit &cu);
+#endif
 
   PartSplit getSplitAtDepth           (const CodingUnit& cu, const unsigned depth);
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -154,13 +157,19 @@ namespace CU
 // PU tools
 namespace PU
 {
+#if JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS
+  int getMeanValue(int sum, int div);
+#endif
   int  getLMSymbolList(const PredictionUnit &pu, int *modeList);
 #if SECONDARY_MPM
   int getIntraMPMs(const PredictionUnit &pu, uint8_t *mpm, uint8_t* non_mpm
 #if JVET_AC0094_REF_SAMPLES_OPT
-                   , const bool &isForcedValid
+                 , const bool &isForcedValid
 #endif
-      , const ChannelType &channelType = CHANNEL_TYPE_LUMA
+#if JVET_AD0085_MPM_SORTING
+                 , IntraPrediction* pIntraPred = nullptr
+#endif
+                 , const ChannelType &channelType = CHANNEL_TYPE_LUMA
   );
 #else
   int  getIntraMPMs(const PredictionUnit &pu, unsigned *mpm, const ChannelType &channelType = CHANNEL_TYPE_LUMA);
@@ -664,6 +673,35 @@ namespace PU
 #if JVET_AC0144_AFFINE_DMVR_REGRESSION
   void deriveAffineCandFromMvField(Position posLT, const int width, const int height, std::vector<RMVFInfo> mvInfoVec, Mv mvAffi[3]);
 #endif
+#if JVET_AD0085_MPM_SORTING
+  bool allowMPMSorted(const PredictionUnit& pu);
+#endif
+#if JVET_AD0188_CCP_MERGE
+  void ccpParamsToCclmModel(const ComponentID compID, const CCPModelCandidate& params, CclmModel& cclmModel);
+  void cclmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CclmModel& cclmModel);
+
+  template <int NUM>
+#if JVET_AB0174_CCCM_DIV_FREE
+  void cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<NUM> cccmModelCb[2], const CccmModel<NUM> cccmModelCr[2], const int yThres = 0, const int cccmLumaOffset = 0);
+#else
+  void cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<NUM> cccmModelCb[2], const CccmModel<NUM> cccmModelCr[2], const int yThres = 0);
+#endif
+  template<int NUM>
+  void ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<NUM> cccmModelCb[2], CccmModel<NUM> cccmModelCr[2]);
+
+#if JVET_AB0092_GLM_WITH_LUMA
+#if JVET_AB0174_CCCM_DIV_FREE
+  void glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel<GLM_NUM_PARAMS> &glmModel, const int lumaOffset);
+#else
+  void glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel<GLM_NUM_PARAMS> &glmModel);
+#endif
+  void ccpParamsToGlmModel(const ComponentID compId, const CCPModelCandidate& params, CccmModel<GLM_NUM_PARAMS> &glmModel);
+#endif
+
+  const PredictionUnit *getPUFromPos(const PredictionUnit &pu, const ChannelType &chType, const Position &refPos);
+  bool  hasNonLocalCCP(const PredictionUnit &pu);
+  int   getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate candList[], int selIdx = -1);
+#endif
 }
 
 // TU tools
@@ -1061,5 +1099,18 @@ bool storeContexts( const Slice* slice, const int ctuXPosInCtus, const int ctuYP
 
 #if JVET_AC0144_AFFINE_DMVR_REGRESSION
 int deriveAffineSubBlkSize(const int sz, const int minSbSz, const int deltaMvX, const int deltaMvY, const int shift);
+#endif
+#if JVET_AD0085_TMRL_EXTENSION
+int getSpatialIpm(const PredictionUnit& pu, uint8_t* spatialIpm, const int maxCands
+#if JVET_AC0094_REF_SAMPLES_OPT
+                , const bool& isForcedValid
+#endif
+                , bool extPrecision = false
+#if JVET_AD0085_MPM_SORTING
+                , IntraPrediction* pIntraPred = nullptr
+#endif
+);
+void fillMPMList(const PredictionUnit& pu, uint8_t* mpm, const int numToFill, const int numCand, bool extPrecision = false);
+void fillNonMPMList(uint8_t* mpm, uint8_t* non_mpm);
 #endif
 #endif

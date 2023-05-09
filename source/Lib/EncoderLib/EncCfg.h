@@ -255,6 +255,9 @@ protected:
 #if JVET_AB0155_SGPM
   bool      m_noSgpmConstraintFlag;
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  bool      m_noTmrlConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool      m_noObmcConstraintFlag;
 #endif
@@ -473,8 +476,17 @@ protected:
   bool      m_sgpmNoBlend;
 #endif
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  bool      m_tmrl;
+#endif
+#if JVET_AD0085_MPM_SORTING
+  bool      m_mpmSorting;
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int       m_cccm;
+#endif
+#if JVET_AD0188_CCP_MERGE
+  bool      m_ccpMerge;
 #endif
 #if ENABLE_OBMC
   bool      m_OBMC;
@@ -1171,6 +1183,10 @@ public:
   bool      getNoSgpmConstraintFlag() const { return m_noSgpmConstraintFlag; }
   void      setNoSgpmConstraintFlag(bool val) { m_noSgpmConstraintFlag = val; }
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  bool      getNoTmrlConstraintFlag() const { return m_noTmrlConstraintFlag; }
+  void      setNoTmrlConstraintFlag(bool val) { m_noTmrlConstraintFlag = val; }
+#endif
 #if ENABLE_OBMC
   bool      getNoObmcConstraintFlag() const { return m_noObmcConstraintFlag; }
   void      setNoObmcConstraintFlag(bool bVal) { m_noObmcConstraintFlag = bVal; }
@@ -1567,9 +1583,21 @@ public:
   bool      getUseSgpmNoBlend            ()         const { return m_sgpmNoBlend; }
 #endif
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  void      setUseTmrl                   (bool b)         { m_tmrl = b; }
+  bool      getUseTmrl                   ()         const { return m_tmrl; }
+#endif
+#if JVET_AD0085_MPM_SORTING
+  void      setUseMpmSorting             (bool b)         { m_mpmSorting = b; }
+  bool      getUseMpmSorting             () const         { return m_mpmSorting; }
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   void      setUseCccm                   (int i)          { m_cccm = i; }
   int       getUseCccm                   () const         { return m_cccm; }
+#endif
+#if JVET_AD0188_CCP_MERGE
+  void      setUseCcpMerge               (bool i)         { m_ccpMerge = i; }
+  bool      getUseCcpMerge               ()         const { return m_ccpMerge; }
 #endif
 #if ENABLE_OBMC
   void      setUseObmc                   ( bool b )       { m_OBMC = b; }

@@ -1585,6 +1585,22 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
 }
 #endif
 
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+unsigned DeriveCtx::CtxTmpFusionFlag(const CodingUnit& cu)
+{
+  const CodingStructure* cs = cu.cs;
+  unsigned ctxId = 0;
+
+  const CodingUnit* cuLeft = cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+  ctxId = cuLeft && cuLeft->tmpFusionFlag ? 1 : 0;
+
+  const CodingUnit* cuAbove = cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+  ctxId += cuAbove && cuAbove->tmpFusionFlag ? 1 : 0;
+
+  return ctxId;
+}
+#endif
+
 #if JVET_V0130_INTRA_TMP
 unsigned DeriveCtx::CtxTmpFlag(const CodingUnit& cu)
 {
