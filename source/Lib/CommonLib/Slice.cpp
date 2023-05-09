@@ -3614,6 +3614,9 @@ SPS::SPS()
 , m_affineAmvrEnabledFlag     ( false )
 , m_DMVR                      ( false )
 , m_MMVD                      ( false )
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+, m_affineParaRefinement      ( false )
+#endif
 #if AFFINE_MMVD
  , m_AffineMmvdMode           ( false )
 #endif

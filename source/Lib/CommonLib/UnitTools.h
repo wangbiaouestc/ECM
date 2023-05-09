@@ -516,6 +516,11 @@ namespace PU
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION && JVET_W0090_ARMC_TM
     InterPrediction* m_pcInterSearch,
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    AffineMergeCtx affineRMVFCtx,
+    AffineMergeCtx affineRMVFOriCtx,
+    uint16_t numCandtoAdd,
+#endif
 #if AFFINE_MMVD
                            int mrgCandIdx = -1, bool isAfMmvd = false
 #else
@@ -525,6 +530,12 @@ namespace PU
                          , bool isZeroCandIdx = false 
 #endif
   );
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  bool isAffBMMergeFlagCoded(const PredictionUnit& pu);
+  void getRMVFAffineCand(const PredictionUnit &pu, AffineMergeCtx& affineMergeRMVFCtx, AffineMergeCtx& affineMergeRMVFOriCtx, InterPrediction* m_pcInterSearch, uint16_t &numCand);
+  void getBMAffineMergeCand(const PredictionUnit &pu, AffineMergeCtx& affineBMMergeCtx, AffineMergeCtx affineMergeRMVFCtx, int mrgCandIdx = -1);
+  bool getBMNonAdjCstMergeCand(const PredictionUnit &pu, AffineMergeCtx &affMrgCtx, const int mrgCandIdx = -1);
+#endif
 #if AFFINE_MMVD
   void    getAfMmvdMvf                (const PredictionUnit &pu, const AffineMergeCtx& affineMergeCtx, MvField mvfMmvd[2][3], const uint16_t afMmvdBaseIdx, const uint16_t offsetStep, const uint16_t offsetDir);
   int32_t getAfMmvdEstBits            (const PredictionUnit &pu);
@@ -618,6 +629,10 @@ namespace PU
   void getIbcMVPsEncOnly(PredictionUnit &pu, Mv* mvPred, int& nbPred);
   bool getDerivedBV(PredictionUnit &pu, const Mv& currentMv, Mv& derivedMv);
   bool checkDMVRCondition(const PredictionUnit& pu);
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  bool checkBDMVR4Affine(const PredictionUnit& pu);
+  bool checkBDMVRCpmvRefinementPuUsage(const PredictionUnit& pu);
+#endif
 #if MULTI_PASS_DMVR
   bool checkBDMVRCondition(const PredictionUnit& pu);
 #endif

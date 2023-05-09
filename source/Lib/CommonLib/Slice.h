@@ -1531,6 +1531,9 @@ private:
   bool              m_affineAmvrEnabledFlag;
   bool              m_DMVR;
   bool              m_MMVD;
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  bool              m_affineParaRefinement;
+#endif
 #if AFFINE_MMVD
   bool              m_AffineMmvdMode;
 #endif
@@ -2103,6 +2106,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   void                    setFpelMmvdEnabledFlag( bool b )                                                { m_fpelMmvdEnabledFlag = b;    }
   bool                    getUseDMVR()const                                                               { return m_DMVR; }
   void                    setUseDMVR(bool b)                                                              { m_DMVR = b;    }
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  bool                    getUseAffineParaRefinement()const                                               { return m_affineParaRefinement; }
+  void                    setUseAffineParaRefinement(bool b)                                              { m_affineParaRefinement = b; }
+#endif
   bool                    getUseMMVD()const                                                               { return m_MMVD; }
   void                    setUseMMVD(bool b)                                                              { m_MMVD = b;    }
 #if AFFINE_MMVD

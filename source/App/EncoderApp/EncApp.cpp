@@ -919,6 +919,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setUseAffineAmvp                                     ( m_AffineAmvp );
   m_cEncLib.setDMVR                                              ( m_DMVR );
   m_cEncLib.setMMVD                                              ( m_MMVD );
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  m_cEncLib.setAffineParaRefinement                              (m_affineParaRefinement);
+#endif
   m_cEncLib.setMmvdDisNum                                        (m_MmvdDisNum);
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   m_cEncLib.setUseMVSD                                           (m_MVSD);

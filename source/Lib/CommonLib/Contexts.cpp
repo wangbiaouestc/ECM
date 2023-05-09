@@ -1746,7 +1746,22 @@ const CtxSet ContextSetCfg::BMMergeFlag = ContextSetCfg::addCtxSet
   { 117, 117, 110, 116, },
   });
 #endif
-
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+const CtxSet ContextSetCfg::affBMFlag = ContextSetCfg::addCtxSet
+({
+  {  48,  50, },
+  {  56,  50, },
+  { CNU, CNU, },
+  {   5,   5, },
+  {   5,   5, },
+  { DWS, DWS, },
+  {  18,  18, },
+  {  18,  18, },
+  { DWE, DWE, },
+  { 126, 126, },
+  { 117, 117, },
+  });
+#endif
 #if JVET_AA0070_RRIBC
 const CtxSet ContextSetCfg::rribcFlipType = ContextSetCfg::addCtxSet
 ({
