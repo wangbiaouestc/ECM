@@ -308,6 +308,7 @@
 #define SIGN_PREDICTION                                   1 // Transform coefficients sign prediction
 #if SIGN_PREDICTION
 #define JVET_Y0141_SIGN_PRED_IMPROVE                      1 // JVET-Y0141 test3: Sign prediction improvement                          
+#define JVET_AD0105_ASPECT1_NUM_SIGN_PRED_BY_QP           1 // JVET-AD0105 Aspect1: NumSignPred based on QP
 #endif
 #define JVET_W0103_INTRA_MTS                              1 // JVET-W0103: Extended Intra MTS
 #if JVET_W0103_INTRA_MTS

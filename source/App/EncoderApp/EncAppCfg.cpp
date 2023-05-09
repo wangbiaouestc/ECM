@@ -727,6 +727,10 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   std::string sMaxMTTHierarchyDepthByTidOverrideByQP;
 #endif
 
+#if JVET_AD0105_ASPECT1_NUM_SIGN_PRED_BY_QP
+  std::string sNumSignPredOverrideByQP;
+#endif
+
   int warnUnknowParameter = 0;
 
 #if ENABLE_TRACING
@@ -764,6 +768,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if SIGN_PREDICTION
   ("NumSignPred",                                     m_numPredSign,                                        8, "Number of predicted transform coefficient signs")
+#if JVET_AD0105_ASPECT1_NUM_SIGN_PRED_BY_QP
+  ("NumSignPredOverrideByQP",                         sNumSignPredOverrideByQP,                 string("0 8"), "Override NumSignPred based on QP")
+#endif
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   ("Log2SignPredArea",                                m_log2SignPredArea,                                   2, "log2 of width/height of area for sign prediction")
 #endif
@@ -2248,6 +2255,21 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
     m_log2SignPredArea = 4;
   }
 #endif
+
+#if JVET_AD0105_ASPECT1_NUM_SIGN_PRED_BY_QP
+  std::istringstream issNumSignPred(sNumSignPredOverrideByQP);
+  std::string        sNumSignPredOverrideQp;
+  std::string        sNumSignPredOverride;
+  getline(issNumSignPred, sNumSignPredOverrideQp, ' ');
+  getline(issNumSignPred, sNumSignPredOverride, ' ');
+  int overriddenNumSignPredQP = std::stoi(sNumSignPredOverrideQp);
+  int overriddenNumSignPred = std::stoi(sNumSignPredOverride);
+  if (m_iQP == overriddenNumSignPredQP)
+  {
+    m_numPredSign = overriddenNumSignPred;
+  }
+#endif
+
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   if (m_IBCFracMode && (!m_ImvMode || !m_IBCMode))
   {
