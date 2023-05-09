@@ -628,6 +628,9 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 #if JVET_X0049_ADAPT_DMVR
     || pu.bmMergeFlag
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    || pu.affBMMergeFlag
+#endif
     )
   {
     pu.addHypData.clear();

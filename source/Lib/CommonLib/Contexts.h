@@ -342,6 +342,9 @@ public:
 #if JVET_X0049_ADAPT_DMVR
   static const CtxSet   BMMergeFlag;
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  static const CtxSet   affBMFlag;
+#endif
 #if JVET_AA0070_RRIBC
   static const CtxSet   rribcFlipType;
 #endif

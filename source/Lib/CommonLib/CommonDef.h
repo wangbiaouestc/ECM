@@ -989,6 +989,16 @@ static const int    AFFINE_DMVR_SEARCH_RANGE                      = 3;
 static const int    AFFINE_DMVR_INT_SRCH_RANGE                    = 2;
 static const int    AFFINE_DMVR_MIN_SUBBLK_SIZE                   = 4;
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+static const int DMVR_PARA_BASE_NUM                               = 3;
+static const int DMVR_PARA_ROUND_NUM_BASE0                        = 7;
+static const int DMVR_PARA_ROUND_NUM_BASE1                        = 2;
+static const int DMVR_PARA_ROUND_NUM_BASE2                        = 1; 
+static const double TH_COST                                       = 0.90;
+static const int PARA_PRECISION_BIT                               = 2;
+static const int AFFINE_ADAPTIVE_DMVR_MAX_CAND                    = 1;
+static const int AFFINE_ADAPTIVE_DMVR_INIT_SIZE                   = 15;
+#endif
 #endif
 static const int    AML_MERGE_TEMPLATE_SIZE                       = 1;
 #endif

@@ -1905,6 +1905,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setProfControlPresentFlag(m_PROF);
   sps.setAffineAmvrEnabledFlag              ( m_AffineAmvr );
   sps.setUseDMVR                            ( m_DMVR );
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  sps.setUseAffineParaRefinement            (m_affineParaRefinement);
+#endif
   sps.setUseColorTrans(m_useColorTrans);
   sps.setPLTMode                            ( m_PLTMode);
 #if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS

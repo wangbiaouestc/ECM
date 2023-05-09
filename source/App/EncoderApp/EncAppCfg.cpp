@@ -1141,6 +1141,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("AffineAmvrEncOpt",                                m_AffineAmvrEncOpt,                               false, "Enable encoder optimization of affine AMVR")
   ("AffineAmvp",                                      m_AffineAmvp,                                      true, "Enable AMVP for affine inter mode")
   ("DMVR",                                            m_DMVR,                                           false, "Decoder-side Motion Vector Refinement")
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  ("AffineParameterRefinement",                       m_affineParaRefinement,                           true, "Affine non-translation parameter refinement")
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   ("MmvdDisNum",                                      m_MmvdDisNum,                          MMVD_REFINE_STEP, "Number of MMVD Distance Entries")
 #else
@@ -1966,6 +1969,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
     m_BIO  = false;
     m_DMVR = false;
     m_SMVD = false;
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    m_affineParaRefinement = false;
+#endif
 
     if (m_gdrPeriod < 0)
     {
@@ -5286,6 +5292,9 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "AffineAmvrEncOpt:%d ", m_AffineAmvrEncOpt );
     msg(VERBOSE, "AffineAmvp:%d ", m_AffineAmvp);
     msg(VERBOSE, "DMVR:%d ", m_DMVR);
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    msg(VERBOSE, "AffineParameterRefinement:%d ", m_affineParaRefinement);
+#endif
     msg(VERBOSE, "MmvdDisNum:%d ", m_MmvdDisNum);
 #if !JVET_AA0132_CONFIGURABLE_TM_TOOLS
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
