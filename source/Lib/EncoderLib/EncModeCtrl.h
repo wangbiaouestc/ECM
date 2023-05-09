@@ -967,6 +967,9 @@ struct CodedCUInfo
   int      geoMrgIdx0List[GEO_MAX_TRY_WEIGHTED_SATD];
   int      geoMrgIdx1List[GEO_MAX_TRY_WEIGHTED_SATD];
 #endif
+#if JVET_AD0213_LIC_IMP
+  bool    skipLIC;
+#endif
 #if JVET_AA0070_RRIBC
   bool     isRribcCoded;
   bool     isRribcTested;
@@ -1144,11 +1147,17 @@ enum ExtraFeatures
   BEST_NO_IMV_COST,
   BEST_IMV_COST,
   BEST_GPM_COST,
+#if JVET_AD0213_LIC_IMP
+  BEST_LIC_COST,
+#endif
   QT_BEFORE_BT,
   IS_BEST_NOSPLIT_SKIP,
   MAX_QT_SUB_DEPTH,
 #if REUSE_CU_RESULTS
   IS_REUSING_CU,
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  BEST_INTRA_NZ_CNT,
 #endif
   NUM_EXTRA_FEATURES
 };
@@ -1174,6 +1183,9 @@ class EncModeCtrlMTnoRQT : public EncModeCtrl, public CacheBlkInfoCtrl
     BEST_NON_SPLIT_COST,
     BEST_NO_IMV_COST,
     BEST_IMV_COST,
+#if JVET_AD0213_LIC_IMP
+    BEST_LIC_COST,
+#endif
     QT_BEFORE_BT,
     IS_BEST_NOSPLIT_SKIP,
     MAX_QT_SUB_DEPTH,

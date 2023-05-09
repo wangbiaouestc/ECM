@@ -116,6 +116,9 @@ private:
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   MvField           m_mvFieldAmListDec[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
+#if JVET_AD0213_LIC_IMP
+  bool              m_licAmListDec[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
+#endif
 #endif
 
   MergeCtx          m_geoMrgCtx;

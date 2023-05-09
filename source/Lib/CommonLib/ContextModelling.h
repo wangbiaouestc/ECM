@@ -637,6 +637,9 @@ public:
   bool xCheckSimilarMotion2Lists(int mergeCandIndex, MergeCtx *mrgCtx, uint32_t mvdSimilarityThresh = 1) const;
 #endif
 #endif
+#if JVET_AD0213_LIC_IMP
+  void initMrgCand(int cnt);
+#endif
 #if JVET_Z0084_IBC_TM
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   bool xCheckSimilarIBCMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1, int compareNum = -1) const;
@@ -670,6 +673,9 @@ public:
   EAffineModel  affineType[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
 #if INTER_LIC
   bool          licFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  bool          obmcFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
 #endif
   uint8_t       bcwIdx[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
   int           numValidMergeCand;
@@ -735,6 +741,9 @@ unsigned CtxbvOneZeroComp(const CodingUnit &cu);
 unsigned CtxPredModeFlag( const CodingUnit& cu );
 unsigned CtxIBCFlag(const CodingUnit& cu);
 unsigned CtxMipFlag   ( const CodingUnit& cu );
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+unsigned CtxTmpFusionFlag( const CodingUnit& cu );
+#endif
 #if JVET_V0130_INTRA_TMP
 unsigned CtxTmpFlag(const CodingUnit& cu);
 #endif

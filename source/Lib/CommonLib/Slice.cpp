@@ -105,6 +105,9 @@ Slice::Slice()
 #if INTER_LIC
 , m_UseLIC                        ( false )
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+, m_useIBC                        ( false )
+#endif
 , m_uiTLayer                      ( 0 )
 , m_bTLayerSwitchingFlag          ( false )
 , m_independentSliceIdx           ( 0 )
@@ -1669,6 +1672,9 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
 #if INTER_LIC
   m_UseLIC                        = pSrc->m_UseLIC;
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  m_useIBC                        = pSrc->m_useIBC;
+#endif
 
   for ( uint32_t e=0 ; e<NUM_REF_PIC_LIST_01 ; e++ )
   {
@@ -3006,16 +3012,34 @@ void Slice::stopProcessingTimer()
   m_iProcessingStartTime = 0;
 }
 
-unsigned Slice::getMinPictureDistance() const
+unsigned Slice::getMinPictureDistance(
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                      unsigned ibcFastMethod
+#endif
+) const
 {
   int minPicDist = MAX_INT;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (getUseIBC())
+#else
   if (getSPS()->getIBCFlag())
+#endif
   {
     minPicDist = 0;
   }
+
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   else
-  if( ! isIntra() )
+#endif
+  if( ! isIntra()
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    && (ibcFastMethod & IBC_FAST_METHOD_NONSCC)
+#endif
+    )
   {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    minPicDist = MAX_INT;
+#endif
     const int currPOC  = getPOC();
     for (int refIdx = 0; refIdx < getNumRefIdx(REF_PIC_LIST_0); refIdx++)
     {
@@ -3365,6 +3389,9 @@ PicHeader::PicHeader()
 #if JVET_W0097_GPM_MMVD_TM
 , m_gpmMMVDTableFlag                              (false)
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+, m_disFracMBVD                                   ( true )
+#endif
 , m_qpDelta                                       ( 0 )
 , m_numAlfAps                                     ( 0 )
 , m_alfApsId                                      ( 0 )
@@ -3459,6 +3486,9 @@ void PicHeader::initPicHeader()
   m_jointCbCrSignFlag                             = 0;
 #if JVET_W0097_GPM_MMVD_TM
   m_gpmMMVDTableFlag                              = 0;
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  m_disFracMBVD                                   = true;
 #endif
   m_qpDelta                                       = 0;
   m_numAlfAps                                     = 0;
@@ -3584,11 +3614,19 @@ SPS::SPS()
 , m_affineAmvrEnabledFlag     ( false )
 , m_DMVR                      ( false )
 , m_MMVD                      ( false )
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+, m_affineParaRefinement      ( false )
+#endif
 #if AFFINE_MMVD
  , m_AffineMmvdMode           ( false )
 #endif
 #if JVET_AA0061_IBC_MBVD
   , m_ibcMbvd                 ( false )
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  , m_rribc                   ( false )
+  , m_tmibc                   ( false )
+  , m_ibcMerge                ( false )
 #endif
 #if JVET_AC0112_IBC_CIIP
   , m_ibcCiip                 ( false )
@@ -3702,6 +3740,10 @@ SPS::SPS()
 , m_vuiParameters             ()
 , m_wrapAroundEnabledFlag     (false)
 , m_IBCFlag                   (  0)
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+, m_IBCFracFlag               (  0)
+, m_IBCFlagInterSlice         (  0)
+#endif
 , m_PLTMode                   (  0)
 , m_lmcsEnabled               (false)
 , m_AMVREnabledFlag                       ( false )

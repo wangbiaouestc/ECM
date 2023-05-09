@@ -358,8 +358,20 @@ struct CodingUnit : public UnitArea
 #endif
 #endif
 #if TMP_FAST_ENC
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  int                tmpXdisp[MTMP_NUM];
+  int                tmpYdisp[MTMP_NUM];
+  IntraTMPFusionInfo tmpFusionInfo[TMP_GROUP_IDX << 1];
+  bool               tmpFlmFlag;
+  int64_t            tmpFlmParams[TMP_FLM_PARAMS][MTMP_NUM];
+  uint8_t            tmpIdx;
+  bool               tmpFusionFlag;
+  int                tmpIsSubPel;
+  int                tmpSubPelIdx;
+#else
   int            tmpXdisp;
   int            tmpYdisp;
+#endif
   int            tmpNumCand;
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -402,6 +414,10 @@ struct CodingUnit : public UnitArea
 #endif
 #if INTER_LIC
   bool           licFlag;
+#if JVET_AD0213_LIC_IMP
+  int            licScale[2][3];
+  int            licOffset[2][3];
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   bool           ibcLicFlag;
@@ -519,6 +535,13 @@ struct IntraPredictionData
 #if JVET_AC0054_GLCCCM
   int       glCccmFlag;
 #endif
+#if JVET_AD0202_CCCM_MDF
+  int       cccmMultiFilterIdx;
+#endif
+#endif
+#if JVET_AD0188_CCP_MERGE
+  int       idxNonLocalCCP;
+  CCPModelCandidate curCand;
 #endif
 };
 
@@ -597,6 +620,10 @@ struct InterPredictionData
 #if JVET_X0049_ADAPT_DMVR
   uint8_t     bmMergeFlag;
   uint8_t     bmDir;
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  uint8_t     affBMMergeFlag;
+  uint8_t     affBMDir;
 #endif
   uint8_t     interDir;
   uint8_t     mvpIdx  [NUM_REF_PIC_LIST_01];
@@ -704,6 +731,9 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   bool isBvpClusterApplicable() const;
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC)
+  uint32_t          getBvType() const;
+#endif
 };
 
 // ---------------------------------------------------------------------------
@@ -756,6 +786,9 @@ struct TransformUnit : public UnitArea
   TransformUnit& operator=(const TransformUnit& other);
   void copyComponentFrom  (const TransformUnit& other, const ComponentID compID);
   void checkTuNoResidual( unsigned idx );
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  int  countNonZero();
+#endif
   int  getTbAreaAfterCoefZeroOut(ComponentID compID) const;
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   bool checkLFNSTApplied(ComponentID compID);

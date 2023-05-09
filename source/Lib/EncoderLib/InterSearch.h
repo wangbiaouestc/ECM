@@ -122,6 +122,10 @@ struct ModeInfo
   bool     isBMMrg;
   uint8_t  bmDir;
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  bool isAffBMMrg;
+  uint8_t affBMDir;
+#endif
 #if JVET_AA0070_RRIBC
   int rribcFlipType;
 #endif
@@ -150,6 +154,10 @@ struct ModeInfo
 #if JVET_X0049_ADAPT_DMVR
     , isBMMrg(false)
     , bmDir(0)
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    , isAffBMMrg(false)
+    , affBMDir(0)
 #endif
 #if JVET_AA0070_RRIBC
     , rribcFlipType(0)
@@ -195,6 +203,10 @@ struct ModeInfo
     , isBMMrg( false )
     , bmDir( 0 )
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    , isAffBMMrg(false)
+    , affBMDir(0)
+#endif
     , isGeo(false), geoSplitDir(0), geoMergeIdx0(0), geoMergeIdx1(0)
 #if ENABLE_OBMC
     , isOBMC(false)
@@ -233,6 +245,10 @@ struct ModeInfo
 #if JVET_X0049_ADAPT_DMVR
     isBMMrg = pu.bmMergeFlag;
     bmDir = pu.bmDir;
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    isAffBMMrg = pu.affBMMergeFlag;
+    affBMDir = pu.affBMDir;
 #endif
 #if JVET_AA0070_RRIBC
     rribcFlipType = cu.rribcFlipType;
@@ -370,6 +386,214 @@ private:
 };
 #endif
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+template <int N>
+struct SrchCostBv
+{
+  static const int maxSize  = N;
+  static const int capacity = (N) + 1;
+
+  uint32_t   cnt;
+  bool       enableFracIBC;         // Just to make sure cfg-off results and macro-off results will match
+  bool       enableMultiCandSrch;   // True: search best fracBv among best N integer BVs; False: search best fracBv among best integer BVs and best fracBv of previous round
+  Distortion costList  [capacity];
+  Mv         mvList    [capacity];
+  uint8_t    imvList   [capacity];
+  uint8_t    mvpIdxList[capacity];
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  int        bvTypeList[capacity];
+#endif
+#if JVET_AA0070_RRIBC && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bool       bvFlipList[capacity];
+#endif
+
+  SrchCostBv()
+  : cnt                 (0)
+  , enableFracIBC       (false)
+  , enableMultiCandSrch (false)
+  {
+    mvList[maxSize].setZero();
+  }
+
+  void init(bool resetHistoryMv = false, bool _enableFracIBC = false)
+  {
+    cnt = 0;
+    enableFracIBC       = _enableFracIBC;
+    enableMultiCandSrch = _enableFracIBC;
+    if (resetHistoryMv)
+    {
+      mvList[maxSize].setZero();
+    }
+  }
+
+  void cutoff(double ratio)
+  {
+    if (N >= 2)
+    {
+      if (cnt >= 2)
+      {
+        double th = ratio * (double)costList[0];
+
+        for (int i = 1; i < cnt; ++i)
+        {
+          if ((double)costList[i] > th)
+          {
+            cnt = i;
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  int find(int mvx, int mvy
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+         , int bvType
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+         , bool bvFlip
+#endif
+  )
+  {
+    for (int i = 0; i < (int)cnt; ++i)
+    {
+      if (mvList[i].getHor() == mvx && mvList[i].getVer() == mvy
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+        && bvTypeList[i] == bvType
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+        && bvFlipList[i] == bvFlip
+#endif
+        )
+      {
+        return i;
+      }
+    }
+    return NOT_VALID;
+  }
+
+  void  replaceAt(uint32_t idxSrc, uint32_t idxDst)
+  {
+    if (idxSrc != idxDst)
+    {
+      costList  [idxDst] = costList  [idxSrc];
+      mvList    [idxDst] = mvList    [idxSrc];
+      imvList   [idxDst] = imvList   [idxSrc];
+      mvpIdxList[idxDst] = mvpIdxList[idxSrc];
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+      bvTypeList[idxDst] = bvTypeList[idxSrc];
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+      bvFlipList[idxDst] = bvFlipList[idxSrc];
+#endif
+    }
+  }
+
+  int  insert(Distortion cost, int mvx, int mvy
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+            , int bvType = 0
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+            , bool bvFlip = true
+#endif
+  )
+  {
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    // Ignore 1-D BV's
+    if (bvType != 0)
+    {
+      return NOT_VALID;
+    }
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+    bvFlip = bvType == 0 ? false : bvFlip;
+#endif
+
+    // Find insertion index
+    int insertIdx = NOT_VALID;
+    for (int i = 0; i < (int)cnt; ++i)
+    {
+      if (cost <= costList[i])
+      {
+        if (cost == costList[i])
+        {
+          if (mvList[i].getHor() == mvx && mvList[i].getVer() == mvy
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+            && bvTypeList[i] == bvType
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+            && bvFlipList[i] == bvFlip
+#endif
+            )
+          {
+            return NOT_VALID;
+          }
+        }
+        else
+        {
+          insertIdx = i;
+          break;
+        }
+      }
+    }
+
+    // Do insertion
+    auto setAt = [&](uint32_t idx)
+    {
+      costList[idx] = cost;
+      mvList[idx].set(mvx, mvy);
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+      bvTypeList[idx] = bvType;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+      bvFlipList[idx] = bvFlip;
+#endif
+    };
+
+    auto replaceNext = [&](uint32_t idx)
+    {
+      costList[idx + 1] = costList[idx];
+      mvList[idx + 1].set(mvList[idx].getHor(), mvList[idx].getVer());
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+      bvTypeList[idx + 1] = bvTypeList[idx];
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+      bvFlipList[idx + 1] = bvFlipList[idx];
+#endif
+    };
+
+    if (insertIdx != NOT_VALID)
+    {
+      for (int i = (cnt < N ? cnt - 1 : N - 2); i >= insertIdx; --i)
+      {
+        replaceNext(i);
+      }
+      setAt(insertIdx);
+
+      if (cnt < N)
+      {
+        ++cnt;
+      }
+      return insertIdx;
+    }
+    else if (cnt < N)
+    {
+      insertIdx = cnt;
+      setAt(insertIdx);
+
+      ++cnt;
+      return insertIdx;
+    }
+    else
+    {
+      return NOT_VALID;
+    }
+  }
+};
+
+typedef SrchCostBv<4> SrchCostIntBv;
+#endif
+
 /// encoder search class
 class InterSearch : public InterPrediction, AffineGradientSearch
 {
@@ -378,6 +602,13 @@ private:
 
   PelStorage      m_tmpPredStorage              [NUM_REF_PIC_LIST_01];
   PelStorage      m_tmpStorageLCU;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  PelStorage      m_tmpStorageCUflipH;
+  PelStorage      m_tmpStorageCUflipV;
+public:
+  SrchCostIntBv   m_bestSrchCostIntBv;
+private:
+#endif
   PelStorage      m_tmpAffiStorage;
   Pel*            m_tmpAffiError;
 #if AFFINE_ENC_OPT
@@ -392,16 +623,30 @@ private:
 #if JVET_AA0070_RRIBC
   AMVPInfo        m_amvpInfo[3];
   AMVPInfo        m_amvpInfo4Pel[3];
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  AMVPInfo        m_amvpInfoHPel[3];
+  AMVPInfo        m_amvpInfoQPel[3];
+#endif
 #else
   AMVPInfo        m_amvpInfo;
   AMVPInfo        m_amvpInfo4Pel;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  AMVPInfo        m_amvpInfoHPel;
+  AMVPInfo        m_amvpInfoQPel;
+#endif
 #endif
 #endif
 
 #if MULTI_HYP_PRED
   MergeCtx        m_geoMrgCtx;
+#if JVET_AD0213_LIC_IMP
+  int             m_mhpMrgTempBufSet;
+  PelUnitBuf      m_mhpMrgTempBuf[GEO_MAX_NUM_UNI_CANDS];
+  PelUnitBuf      m_mhpMrgTempBufLic[GEO_MAX_NUM_UNI_CANDS];
+#else
   bool            m_mhpMrgTempBufSet;
   PelUnitBuf      m_mhpMrgTempBuf[GEO_MAX_NUM_UNI_CANDS];
+#endif
   PelUnitBuf      m_mhpTempBuf[GEO_MAX_TRY_WEIGHTED_SAD];
   int             m_mhpTempBufCounter;
 #endif
@@ -415,6 +660,21 @@ private:
   uint32_t        m_estWeightIdxBits[BCW_NUM];
   BcwMotionParam  m_uniMotions;
   bool            m_affineModeSelected;
+#if JVET_AD0213_LIC_IMP
+  bool            m_doAffineLic;
+#if TM_AMVP
+  bool            updateMvNeeded;
+  bool            updateL1ZeroFlagMvNeeded;
+  bool            updateSMVDMvNeeded;
+  bool            isBDOFNotNeeded;
+  AMVPInfo        *amvpCand0;
+  AMVPInfo        *amvpCand1;
+  AMVPInfo        *amvpCand0Lic;
+  AMVPInfo        *amvpCand1Lic;
+  int             mvpIdx0;
+  int             mvpIdx1;
+#endif
+#endif
   std::unordered_map< Position, std::unordered_map< Size, BlkRecord> > m_ctuRecord;
 #if JVET_AA0070_RRIBC
   Distortion      minCostProj;
@@ -501,14 +761,25 @@ public:
 
 public:
 #if MULTI_HYP_PRED
+#if JVET_AD0213_LIC_IMP
+  void             initMHPTmpBuffer(PelStorage* mergeTmpBuffer, PelStorage* mergeTmpBuffer2, int maxNumMergeCandidates,
+#else
   void             initMHPTmpBuffer(PelStorage* mergeTmpBuffer, int maxNumMergeCandidates,
+#endif
     PelStorage* mhpTmpBuffer, int maxNumStoredMhpCandidates,
     const UnitArea localUnitArea)
   {
+#if JVET_AD0213_LIC_IMP
+    m_mhpMrgTempBufSet = 0;
+#else
     m_mhpMrgTempBufSet = false;
+#endif
     for (uint8_t mergeCand = 0; mergeCand < maxNumMergeCandidates; mergeCand++)
     {
       m_mhpMrgTempBuf[mergeCand] = mergeTmpBuffer[mergeCand].getBuf(localUnitArea);
+#if JVET_AD0213_LIC_IMP
+      m_mhpMrgTempBufLic[mergeCand] = mergeTmpBuffer2[mergeCand].getBuf(localUnitArea);
+#endif
     }
     for (uint8_t i = 0; i < maxNumStoredMhpCandidates; i++)
     {
@@ -516,6 +787,17 @@ public:
     }
     m_mhpTempBufCounter = 0;
   }
+#if JVET_AD0213_LIC_IMP
+  void             setGeoTmpBuffer(int setId)
+  {
+    m_mhpMrgTempBufSet = setId;
+  }
+  void             setGeoTmpBuffer(MergeCtx geoMrgCtx, int setId)
+  {
+    m_mhpMrgTempBufSet = setId;
+    m_geoMrgCtx = geoMrgCtx;
+  }
+#else
   void             setGeoTmpBuffer()
   {
     m_mhpMrgTempBufSet = true;
@@ -525,6 +807,7 @@ public:
     m_mhpMrgTempBufSet = true;
     m_geoMrgCtx = geoMrgCtx;
   }
+#endif
 #endif
 
   InterSearch();
@@ -572,6 +855,16 @@ public:
   void setBestCost(double cost) { m_globalBestLumaCost = cost; }
 #endif
   void setAffineModeSelected        ( bool flag) { m_affineModeSelected = flag; }
+#if JVET_AD0213_LIC_IMP
+  void setDoAffineLic               ( bool flag) { m_doAffineLic = flag; }
+#if TM_AMVP
+  void resetLicEncCtrlPara          ();
+  void setEncCtrlParaLicOff         ( CodingUnit& cu );
+  void setEncCtrlParaLicOn          ( CodingUnit& cu );
+  void checkEncLicOff               ( CodingUnit& cu, MergeCtx& mergeCtx );
+  void checkEncLicOn                ( CodingUnit& cu, MergeCtx& mergeCtx );
+#endif
+#endif
   void resetAffineMVList() { m_affMVListIdx = 0; m_affMVListSize = 0; }
   void savePrevAffMVInfo(int idx, AffineMVInfo &tmpMVInfo, bool& isSaved)
   {
@@ -711,10 +1004,27 @@ protected:
   Distortion  xPatternRefinement    ( const CPelBuf* pcPatternKey, Mv baseRefMv, int iFrac, Mv& rcMvFrac, bool bAllowUseOfHadamard );
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS || 1
+  void xEstBvdBitCosts(EstBvdBitsStruct *p
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                     , unsigned useIBCFrac = 0
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AA0070_RRIBC
+                     , int ctxIdRrIBC = NOT_VALID
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                     , int ctxIdOneComp = NOT_VALID
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                     , const bool useBvpCluster = true
+#endif
+  );
+#else // Note: The below "else part" can be removed due to code duplication
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   void xEstBvdBitCosts(EstBvdBitsStruct *p, const bool useBvpCluster = true );
 #else
   void xEstBvdBitCosts(EstBvdBitsStruct *p);
+#endif
 #endif
 #endif
 
@@ -760,13 +1070,44 @@ public:
 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   void predInterSearch(CodingUnit& cu, Partitioner& partitioner, bool& amvpMergeModeNotValid,
+#if JVET_AD0213_LIC_IMP
+      MvField* mvFieldAmListCommon = nullptr, bool* licAmListCommon = nullptr, Mv* mvBufEncAmBDMVR_L0 = nullptr, Mv* mvBufEncAmBDMVR_L1 = nullptr);
+#else
       MvField* mvFieldAmListCommon = nullptr, Mv* mvBufEncAmBDMVR_L0 = nullptr, Mv* mvBufEncAmBDMVR_L1 = nullptr);
+#endif
 #else
   void predInterSearch(CodingUnit& cu, Partitioner& partitioner );
 #endif
 
   /// set ME search range
   void setAdaptiveSearchRange       ( int iDir, int iRefIdx, int iSearchRange) { CHECK(iDir >= MAX_NUM_REF_LIST_ADAPT_SR || iRefIdx>=int(MAX_IDX_ADAPT_SR), "Invalid index"); m_aaiAdaptSR[iDir][iRefIdx] = iSearchRange; }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  bool  predIBCSearch               ( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap
+#if JVET_AC0112_IBC_LIC || JVET_AC0112_IBC_CIIP
+                                    , Distortion* bvSearchCost = nullptr
+#endif
+#if JVET_AC0112_IBC_CIIP
+                                    , PelBuf* ciipIbcBuff = nullptr
+#endif
+#if JVET_AA0070_RRIBC
+                                    , bool isSecondPass = false
+#endif
+#if JVET_AC0112_IBC_LIC || JVET_AC0112_IBC_CIIP
+                                    , bool* searchedByHash = nullptr
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0112_IBC_CIIP
+                                    , bool isCiipFirstPass = false
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC)
+                                    , double costTh = std::numeric_limits<double>::max()
+#endif
+  );
+  void  xIntraPatternSearch         ( PredictionUnit& pu, IntTZSearchStruct&  cStruct, Mv& rcMv, Distortion&  ruiCost, Mv* cMvSrchRngLT, Mv* cMvSrchRngRB, Mv* pcMvPred
+#if JVET_AA0070_RRIBC
+                                    , int rribcFlipType
+#endif
+  );
+#else
 #if JVET_AA0070_RRIBC
 #if JVET_AC0112_IBC_CIIP
   bool  predIBCSearch           ( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, Distortion* bvSearchCost = NULL, PelBuf* ciipIbcBuff = NULL, bool isSecondPass = false, bool* searchedByHash = NULL );
@@ -789,6 +1130,30 @@ public:
 #endif
 #endif
   void  xIntraPatternSearch         ( PredictionUnit& pu, IntTZSearchStruct&  cStruct, Mv& rcMv, Distortion&  ruiCost, Mv* cMvSrchRngLT, Mv* cMvSrchRngRB, Mv* pcMvPred );
+#endif
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  void  xIntraPatternSearchOpt(PredictionUnit& pu, IntTZSearchStruct&  cStruct, Mv& rcMv, Distortion&  ruiCost, Mv* cMvSrchRngLT, Mv* cMvSrchRngRB, Mv* pcMvPred
+#if JVET_AA0070_RRIBC
+                             , int rribcFlipType
+#endif
+  );
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  template <int N>
+  Distortion xPredIBCFracPelSearch  ( PredictionUnit&              pu 
+                                    , SrchCostBv<N>&               intBvList
+                                    , AMVPInfo*                    amvpInfoQPel
+                                    , AMVPInfo*                    amvpInfoHPel
+                                    , AMVPInfo*                    amvpInfoFPel
+                                    , AMVPInfo*                    amvpInfo4Pel
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                                    , int                          numBvTypes = 1
+#endif
+#if JVET_AA0070_RRIBC && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                                    , bool                         testRrIBC = true
+#endif
+  );
 #endif
   void  xSetIntraSearchRange        ( PredictionUnit& pu, int iRoiWidth, int iRoiHeight, const int localSearchRangeX, const int localSearchRangeY, Mv& rcMvSrchRngLT, Mv& rcMvSrchRngRB);
   void  resetIbcSearch()
@@ -1166,7 +1531,9 @@ public:
 #endif
   uint64_t xGetSymbolFracBitsInter  (CodingStructure &cs, Partitioner &partitioner);
   uint64_t xCalcPuMeBits            (PredictionUnit& pu);
-
+#if JVET_AD0213_LIC_IMP
+  uint64_t xCalcExpPuBits           (PredictionUnit& pu);
+#endif
 };// END CLASS DEFINITION EncSearch
 
 //! \}

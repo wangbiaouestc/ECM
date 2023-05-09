@@ -65,7 +65,11 @@ class Mv
 private:
   static const MvPrecision m_amvrPrecision[4];
   static const MvPrecision m_amvrPrecAffine[3];
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  static const MvPrecision m_amvrPrecIbc[4];
+#else
   static const MvPrecision m_amvrPrecIbc[3];
+#endif
 
   static const int mvClipPeriod = (1 << MV_BITS);
   static const int halMvClipPeriod = (1 << (MV_BITS - 1));
@@ -98,6 +102,19 @@ public:
   int   getVer    () const { return ver;          }
   int   getAbsHor () const { return abs( hor );   }
   int   getAbsVer () const { return abs( ver );   }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  template <           int fracBits = MV_FRACTIONAL_BITS_INTERNAL> inline int   getTrHor ()                 const { return (hor >> (fracBits)) << (fracBits); }
+  template <           int fracBits = MV_FRACTIONAL_BITS_INTERNAL> inline int   getTrVer ()                 const { return (ver >> (fracBits)) << (fracBits); }
+  template <bool luma, int fracBits = MV_FRACTIONAL_BITS_INTERNAL> inline int   getTrHor (int chromaFormat) const { return luma || chromaFormat == CHROMA_444 ? getTrHor<fracBits>() : getTrHor<fracBits + 1>(); }
+  template <bool luma, int fracBits = MV_FRACTIONAL_BITS_INTERNAL> inline int   getTrVer (int chromaFormat) const { return luma || chromaFormat != CHROMA_420 ? getTrVer<fracBits>() : getTrVer<fracBits + 1>(); }
+
+private:
+                       inline bool  isFracChromaMv420 ()                 const { return hor != getTrHor<MV_FRACTIONAL_BITS_INTERNAL + 1>() || ver != getTrVer<MV_FRACTIONAL_BITS_INTERNAL + 1>(); }
+                       inline bool  isFracChromaMv422 ()                 const { return hor != getTrHor<MV_FRACTIONAL_BITS_INTERNAL + 1>() || ver != getTrVer<MV_FRACTIONAL_BITS_INTERNAL    >(); }
+public:
+                       inline bool  isFracMv          ()                 const { return hor != getTrHor<MV_FRACTIONAL_BITS_INTERNAL    >() || ver != getTrVer<MV_FRACTIONAL_BITS_INTERNAL    >(); }
+  template <bool luma> inline int   isFracMv          (int chromaFormat) const { return !luma && chromaFormat == CHROMA_420 ? isFracChromaMv420() : (!luma && chromaFormat == CHROMA_422 ? isFracChromaMv422() : isFracMv()); }
+#endif
 
   // ------------------------------------------------------------------------------------------------------------------
   // operations
@@ -247,9 +264,31 @@ public:
   }
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
-  static int getImvPrecShift(const uint8_t imv)
+  static int getImvPrecShift(const uint8_t imv
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                           , bool supportFracBv
+#endif
+  )
   {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    return supportFracBv ? (imv == IMV_OFF || imv == IMV_HPEL ? 0 : 2) : MV_PRECISION_4PEL == m_amvrPrecIbc[imv] ? 2 : 0;
+#else
     return MV_PRECISION_4PEL == m_amvrPrecIbc[imv] ? 2 : 0;
+#endif
+  }
+#endif
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC)
+  void regulateMv(int mvDirType)
+  {
+    if (mvDirType == 1)
+    {
+      ver = 0;
+    }
+    else if (mvDirType == 2)
+    {
+      hor = 0;
+    }
   }
 #endif
 
@@ -305,6 +344,9 @@ struct MvdSuffixInfo
 
   int      horSignHypMatch = -1;
   int      verSignHypMatch = -1;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  bool     isFracBvEnabled = false;
+#endif
 
   void initPrefixes                       (const Mv& mv, const int imv, const bool isInternalPrecision);
   void initSuffixesAndSigns               (const Mv& mv, const int imv);
@@ -356,14 +398,12 @@ struct MvdSuffixInfo
 
 namespace std
 {
-  template <> struct hash<Mv>
+  template<> struct hash<Mv>
   {
-    size_t operator()(const Mv& value) const
-    {
-      return (((size_t)value.hor << 32) + value.ver);
-    }
+    size_t operator()( const Mv &value ) const { return ( ( (size_t)value.hor << 32 ) + value.ver ); }
   };
 };
+
 extern void(*clipMv) ( Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps );
 void clipMvInPic ( Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps );
 void clipMvInSubpic ( Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps );

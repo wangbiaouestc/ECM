@@ -342,6 +342,9 @@ public:
 #if JVET_X0049_ADAPT_DMVR
   static const CtxSet   BMMergeFlag;
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  static const CtxSet   affBMFlag;
+#endif
 #if JVET_AA0070_RRIBC
   static const CtxSet   rribcFlipType;
 #endif
@@ -356,6 +359,9 @@ public:
   static const CtxSet   IntraLumaMpmFlag;
 #if SECONDARY_MPM
   static const CtxSet   IntraLumaSecondMpmFlag;
+#if JVET_AD0085_MPM_SORTING
+  static const CtxSet   IntraLumaSecondMpmIdx;
+#endif
 #endif
   static const CtxSet   IntraLumaPlanarFlag;
 #if SECONDARY_MPM
@@ -364,6 +370,9 @@ public:
   static const CtxSet   CclmModeFlag;
   static const CtxSet   CclmModeIdx;
   static const CtxSet   IntraChromaPredMode;
+#if JVET_AD0188_CCP_MERGE
+  static const CtxSet   nonLocalCCP;
+#endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
 #if ENABLE_DIMD
   static const CtxSet   DimdChromaMode;
@@ -380,6 +389,10 @@ public:
   static const CtxSet   MipFlag;
 #if JVET_V0130_INTRA_TMP
   static const CtxSet   TmpFlag;
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  static const CtxSet   TmpIdx;
+  static const CtxSet   TmpFusion;
+#endif  
 #endif
 #if MMLM
   static const CtxSet   MMLMFlag;
@@ -509,6 +522,9 @@ public:
   static const CtxSet   ChromaQpAdjFlag;
   static const CtxSet   ChromaQpAdjIdc;
   static const CtxSet   ImvFlag;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  static const CtxSet   ImvFlagIBC;
+#endif
 #if ENABLE_DIMD
   static const CtxSet   DimdFlag;
 #endif
@@ -545,6 +561,9 @@ public:
 #endif
 #if JVET_AA0057_CCCM
   static const CtxSet   CccmFlag;
+#endif
+#if JVET_AD0202_CCCM_MDF
+  static const CtxSet   CccmMpfFlag;
 #endif
 #if JVET_AB0157_TMRL
   static const CtxSet   TmrlDerive;
@@ -977,7 +996,11 @@ public:
 
   void updateBufferState( const Slice* slice )
   {
+#if JVET_AD0206_CABAC_INIT_AT_GDR
+    if( slice->getPendingRasInit() || slice->isInterGDR() )
+#else
     if( slice->getPendingRasInit() )
+#endif
     {
       m_ctxStateStore.clearValid();
     }

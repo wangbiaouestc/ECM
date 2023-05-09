@@ -1636,6 +1636,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AB0155_SGPM
   cinfo->setNoSgpmConstraintFlag(m_noSgpmConstraintFlag);
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  cinfo->setNoTmrlConstraintFlag(m_noTmrlConstraintFlag);
+#endif
 #if ENABLE_OBMC
   cinfo->setNoObmcConstraintFlag(m_noObmcConstraintFlag);
 #endif
@@ -1842,8 +1845,17 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AB0155_SGPM
   sps.setUseSgpm            ( m_sgpm );
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  sps.setUseTmrl            ( m_tmrl );
+#endif
+#if JVET_AD0085_MPM_SORTING
+  sps.setUseMpmSorting      ( m_mpmSorting );
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   sps.setUseCccm            ( m_cccm );
+#endif
+#if JVET_AD0188_CCP_MERGE
+  sps.setUseCcpMerge        ( m_ccpMerge );
 #endif
 #if ENABLE_OBMC
   sps.setUseOBMC            ( m_OBMC );
@@ -1893,9 +1905,21 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setProfControlPresentFlag(m_PROF);
   sps.setAffineAmvrEnabledFlag              ( m_AffineAmvr );
   sps.setUseDMVR                            ( m_DMVR );
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  sps.setUseAffineParaRefinement            (m_affineParaRefinement);
+#endif
   sps.setUseColorTrans(m_useColorTrans);
   sps.setPLTMode                            ( m_PLTMode);
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   sps.setIBCFlag                            ( m_IBCMode);
+#else
+  sps.setIBCFlag                            ( m_IBCMode & 0x01);
+  sps.setIBCFlagInterSlice                  ( m_IBCMode & 0x02);
+  sps.setUseRRIbc                           ( m_rribc );
+  sps.setUseTMIbc                           ( m_tmibc );
+  sps.setUseIbcMerge                        ( m_ibcMerge );
+  sps.setIBCFracFlag                        ( m_IBCFracMode);
+#endif
 #if JVET_AA0061_IBC_MBVD
   sps.setUseIbcMbvd                         ( m_ibcMbvd );
 #endif
@@ -2684,6 +2708,17 @@ void EncLib::xInitPicHeader(PicHeader &picHeader, const SPS &sps, const PPS &pps
 #else
   picHeader.setGPMMMVDTableFlag(false);
 #endif
+  }
+#endif
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  picHeader.setDisFracMBVD(true);
+  if (sps.getIBCFracFlag())
+  {
+    if ((getSourceWidth() * getSourceHeight()) <= (1920 * 1080))
+    {
+      picHeader.setDisFracMBVD(false);
+    }
   }
 #endif
 }

@@ -87,10 +87,27 @@ static const Mv s_acMvRefineQ[9] =
 };
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS || 1
+void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                , unsigned useIBCFrac
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AA0070_RRIBC
+                                , int ctxIdRrIBC
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                                , int ctxIdOneComp
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                                , const bool useBvpCluster
+#endif
+)
+#else // Note: The below "else part" can be removed due to code duplication
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
 void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p, const bool useBvpCluster)
 #else
 void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p)
+#endif
 #endif
 {
   const FracBitsAccess& fracBits = m_CABACEstimator->getCtx().getFracBitsAcess();
@@ -145,11 +162,27 @@ void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p)
     p->bitsV[i] = bitsY + singleBitV[0] + (i+BVD_CODING_GOLOMB_ORDER) * epBitCost;
     bitsY += singleBitV[1];
   }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  const CtxSet& imvCtx = useIBCFrac ? Ctx::ImvFlagIBC : Ctx::ImvFlag;
+#endif
 
   p->bitsIdx[0] = fracBits.getFracBitsArray(Ctx::MVPIdx()).intBits[0];
   p->bitsIdx[1] = fracBits.getFracBitsArray(Ctx::MVPIdx()).intBits[1];
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  p->bitsImv[0] = fracBits.getFracBitsArray(imvCtx(1)).intBits[0];
+  p->bitsImv[1] = fracBits.getFracBitsArray(imvCtx(1)).intBits[1];
+#else
   p->bitsImv[0] = fracBits.getFracBitsArray(Ctx::ImvFlag(1)).intBits[0];
   p->bitsImv[1] = fracBits.getFracBitsArray(Ctx::ImvFlag(1)).intBits[1];
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  p->bitsFracImv[IMV_OFF ] = fracBits.getFracBitsArray(imvCtx(0)).intBits[0];
+  p->bitsFracImv[IMV_FPEL] = fracBits.getFracBitsArray(imvCtx(0)).intBits[1]
+                           + p->bitsImv[0];
+  p->bitsFracImv[IMV_4PEL] = fracBits.getFracBitsArray(imvCtx(0)).intBits[1]
+                           + p->bitsImv[1];
+  p->bitsFracImv[IMV_HPEL] = std::numeric_limits<uint32_t>::max();
+#endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
   if (useBvpCluster)
   {
@@ -159,6 +192,53 @@ void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p)
   {
     p->bitsRribc = 0;
   }
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  p->bitsBvType[0] = 0;
+  p->bitsBvType[1] = 0;
+  p->bitsBvType[2] = 0;
+#endif
+#if JVET_AA0070_RRIBC && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  p->bitsBvType[0] = 0;
+  p->bitsBvType[1] = 0;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  if (useBvpCluster)
+  {
+    if (ctxIdOneComp != NOT_VALID)
+    {
+      p->bitsBvType[0] = fracBits.getFracBitsArray(Ctx::bvOneZeroComp(ctxIdOneComp)).intBits[0];
+      p->bitsBvType[1] = fracBits.getFracBitsArray(Ctx::bvOneZeroComp(ctxIdOneComp)).intBits[1]
+                       + fracBits.getFracBitsArray(Ctx::bvOneZeroComp(3           )).intBits[0];
+      p->bitsBvType[2] = fracBits.getFracBitsArray(Ctx::bvOneZeroComp(ctxIdOneComp)).intBits[1]
+                       + fracBits.getFracBitsArray(Ctx::bvOneZeroComp(3           )).intBits[1];
+    }
+
+#if JVET_AA0070_RRIBC
+    if (ctxIdRrIBC != NOT_VALID)
+    {
+      p->bitsUseFlip[0] = fracBits.getFracBitsArray(Ctx::rribcFlipType(ctxIdRrIBC)).intBits[0];
+      p->bitsUseFlip[1] = fracBits.getFracBitsArray(Ctx::rribcFlipType(ctxIdRrIBC)).intBits[1];
+    }
+#endif
+  }
+#if JVET_AA0070_RRIBC
+  else
+#endif
+#endif
+#if JVET_AA0070_RRIBC
+  {
+    if (ctxIdRrIBC != NOT_VALID)
+    {
+      p->bitsBvType[0] = fracBits.getFracBitsArray(Ctx::rribcFlipType(ctxIdRrIBC)).intBits[0];
+      p->bitsBvType[1] = fracBits.getFracBitsArray(Ctx::rribcFlipType(ctxIdRrIBC)).intBits[1]
+                       + fracBits.getFracBitsArray(Ctx::rribcFlipType(3         )).intBits[0];
+      p->bitsBvType[2] = fracBits.getFracBitsArray(Ctx::rribcFlipType(ctxIdRrIBC)).intBits[1]
+                       + fracBits.getFracBitsArray(Ctx::rribcFlipType(3         )).intBits[1];
+    }
+  }
+#endif
 #endif
 }
 #endif
@@ -234,6 +314,10 @@ void InterSearch::destroy()
     m_tmpPredStorage[i].destroy();
   }
   m_tmpStorageLCU.destroy();
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  m_tmpStorageCUflipH.destroy();
+  m_tmpStorageCUflipV.destroy();
+#endif
   m_tmpAffiStorage.destroy();
 #if JVET_AC0112_IBC_CIIP
   m_ibcCiipBuffer.destroy();
@@ -384,6 +468,10 @@ void InterSearch::init( EncCfg*        pcEncCfg,
     m_tmpPredStorage[i].create( UnitArea( cform, Area( 0, 0, MAX_CU_SIZE, MAX_CU_SIZE ) ) );
   }
   m_tmpStorageLCU.create( UnitArea( cform, Area( 0, 0, MAX_CU_SIZE, MAX_CU_SIZE ) ) );
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  m_tmpStorageCUflipH.create( UnitArea( cform, Area( 0, 0, MAX_CU_SIZE, MAX_CU_SIZE ) ) );
+  m_tmpStorageCUflipV.create( UnitArea( cform, Area( 0, 0, MAX_CU_SIZE, MAX_CU_SIZE ) ) );
+#endif
   m_tmpAffiStorage.create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
   m_tmpAffiError = new Pel[MAX_CU_SIZE * MAX_CU_SIZE];
 #if AFFINE_ENC_OPT
@@ -928,6 +1016,13 @@ void InterSearch::xIBCSearchMVCandUpdate(Distortion  sad, int x, int y, Distorti
   {
     for (int t = CHROMA_REFINEMENT_CANDIDATES - 1; t >= 0; t--)
     {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      if (m_bestSrchCostIntBv.enableFracIBC && (cMVCand[t].hor == x && cMVCand[t].ver == y))
+      {
+        CHECK(sad != sadBestCand[t], "This should not happen");
+        return;
+      }
+#endif
       if (sad < sadBestCand[t])
         j = t;
     }
@@ -1093,7 +1188,424 @@ static unsigned int xMergeCandLists(Mv *dst, unsigned int dn, unsigned int dstTo
 
   return dn;
 }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+void InterSearch::xIntraPatternSearchOpt(PredictionUnit &pu, IntTZSearchStruct &cStruct, Mv &rcMv, Distortion &ruiCost, Mv *pcMvSrchRngLT, Mv *pcMvSrchRngRB, Mv *pcMvPred
+#if JVET_AA0070_RRIBC
+                                       , int rribcFlipType
+#endif
+)
+{
+  const int   srchRngHorLeft = pcMvSrchRngLT->getHor();
+  const int   srchRngHorRight = pcMvSrchRngRB->getHor();
+  const int   srchRngVerTop = pcMvSrchRngLT->getVer();
+  const int   srchRngVerBottom = pcMvSrchRngRB->getVer();
 
+  const unsigned int  lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
+  const int   puPelOffsetX = 0;
+  const int   puPelOffsetY = 0;
+  const int   cuPelX = pu.Y().x;
+  const int   cuPelY = pu.Y().y;
+
+  int          roiWidth = pu.lwidth();
+  int          roiHeight = pu.lheight();
+
+  Distortion  sad;
+  Distortion  sadBest = std::numeric_limits<Distortion>::max();
+  int         bestX = 0;
+  int         bestY = 0;
+
+  const Pel*        piRefSrch = cStruct.piRefY;
+
+  int         bestCandIdx = 0;
+
+  Distortion  sadBestCand[CHROMA_REFINEMENT_CANDIDATES];
+  Mv      cMVCand[CHROMA_REFINEMENT_CANDIDATES];
+
+
+  for (int cand = 0; cand < CHROMA_REFINEMENT_CANDIDATES; cand++)
+  {
+    sadBestCand[cand] = std::numeric_limits<Distortion>::max();
+    cMVCand[cand].set(0, 0);
+  }
+  m_cDistParam.useMR = false;
+  m_pcRdCost->setDistParam(m_cDistParam, *cStruct.pcPatternKey, cStruct.piRefY, cStruct.iRefStride, m_lumaClpRng.bd, COMPONENT_Y, cStruct.subShiftMode);
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  m_pcRdCost->setFullPelImvForZeroBvd(!pu.cs->sps->getIBCFracFlag());
+#endif
+
+  const int picWidth = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
+  const int picHeight = pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
+
+  {
+    m_cDistParam.subShift = 0;
+    
+    int srLeft = srchRngHorLeft, srRight = srchRngHorRight, srTop = srchRngVerTop, srBottom = srchRngVerBottom;
+    m_numBVs = 0;
+    m_numBVs = xMergeCandLists(m_acBVs, m_numBVs, (2 * IBC_NUM_CANDIDATES), m_defaultCachedBvs.m_bvCands, m_defaultCachedBvs.currCnt);
+
+    Mv cMvPredEncOnly[IBC_NUM_CANDIDATES];
+    int nbPreds = 0;
+    PU::getIbcMVPsEncOnly(pu, cMvPredEncOnly, nbPreds);
+    m_numBVs = xMergeCandLists(m_acBVs, m_numBVs, (2 * IBC_NUM_CANDIDATES), cMvPredEncOnly, nbPreds);
+
+    for (unsigned int cand = 0; cand < m_numBVs; cand++)
+    {
+      int xPred = m_acBVs[cand].getHor();
+      int yPred = m_acBVs[cand].getVer();
+
+#if JVET_AA0070_RRIBC
+      if ((rribcFlipType == 1 && yPred != 0) || (rribcFlipType == 2 && xPred != 0))
+      {
+        continue;
+      }
+#endif
+
+      if (!(xPred == 0 && yPred == 0)
+        && !((yPred < srTop) || (yPred > srBottom))
+        && !((xPred < srLeft) || (xPred > srRight)))
+      {
+#if JVET_Z0084_IBC_TM
+        bool validCand = PU::searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, xPred, yPred, lcuWidth);
+#else
+        bool validCand = searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, xPred, yPred, lcuWidth);
+#endif
+
+        if (validCand)
+        {
+#if JVET_AA0070_RRIBC
+          sad = m_pcRdCost->getBvCostMultiplePreds(xPred, yPred, pu.cs->sps->getAMVREnabledFlag(), rribcFlipType);
+#else
+          sad = m_pcRdCost->getBvCostMultiplePreds(xPred, yPred, pu.cs->sps->getAMVREnabledFlag());
+#endif
+          m_cDistParam.cur.buf = piRefSrch + cStruct.iRefStride * yPred + xPred;
+          sad += m_cDistParam.distFunc(m_cDistParam);
+
+          xIBCSearchMVCandUpdate(sad, xPred, yPred, sadBestCand, cMVCand);
+        }
+      }
+    }
+
+    bestX = cMVCand[0].getHor();
+    bestY = cMVCand[0].getVer();
+    rcMv.set(bestX, bestY);
+    sadBest = sadBestCand[0];
+
+    const int boundY = (0 - roiHeight - puPelOffsetY);
+    for (int y = std::max(srchRngVerTop, 0 - cuPelY); y <= boundY; ++y)
+    {
+#if JVET_AA0070_RRIBC
+      if (rribcFlipType == 1 && y != 0)
+      {
+        continue;
+      }
+#endif
+#if JVET_Z0084_IBC_TM
+      if (!PU::searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, 0, y, lcuWidth))
+#else
+      if (!searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, 0, y, lcuWidth))
+#endif
+      {
+        continue;
+      }
+
+#if JVET_AA0070_RRIBC
+      sad = m_pcRdCost->getBvCostMultiplePreds(0, y, pu.cs->sps->getAMVREnabledFlag(), rribcFlipType);
+#else
+      sad = m_pcRdCost->getBvCostMultiplePreds(0, y, pu.cs->sps->getAMVREnabledFlag());
+#endif
+      m_cDistParam.cur.buf = piRefSrch + cStruct.iRefStride * y;
+      sad += m_cDistParam.distFunc(m_cDistParam);
+
+      xIBCSearchMVCandUpdate(sad, 0, y, sadBestCand, cMVCand);
+      
+      if (sadBestCand[0] <= 3)
+      {
+        bestX = cMVCand[0].getHor();
+        bestY = cMVCand[0].getVer();
+        sadBest = sadBestCand[0];
+        rcMv.set(bestX, bestY);
+        ruiCost = sadBest;
+        goto end;
+      }
+    }
+
+    const int boundX = std::max(srchRngHorLeft, -cuPelX);
+    for (int x = 0 - roiWidth - puPelOffsetX; x >= boundX; --x)
+    {
+#if JVET_AA0070_RRIBC
+      if (rribcFlipType == 2 && x != 0)
+      {
+        continue;
+      }
+#endif
+#if JVET_Z0084_IBC_TM
+      if (!PU::searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, x, 0, lcuWidth))
+#else
+      if (!searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, x, 0, lcuWidth))
+#endif
+      {
+        continue;
+      }
+
+#if JVET_AA0070_RRIBC
+      sad = m_pcRdCost->getBvCostMultiplePreds(x, 0, pu.cs->sps->getAMVREnabledFlag(), rribcFlipType);
+#else
+      sad = m_pcRdCost->getBvCostMultiplePreds(x, 0, pu.cs->sps->getAMVREnabledFlag());
+#endif
+      m_cDistParam.cur.buf = piRefSrch + x;
+      sad += m_cDistParam.distFunc(m_cDistParam);
+
+
+      xIBCSearchMVCandUpdate(sad, x, 0, sadBestCand, cMVCand);
+
+      if (sadBestCand[0] <= 3)
+      {
+        bestX = cMVCand[0].getHor();
+        bestY = cMVCand[0].getVer();
+        sadBest = sadBestCand[0];
+        rcMv.set(bestX, bestY);
+        ruiCost = sadBest;
+        goto end;
+      }
+    }
+
+    bestX = cMVCand[0].getHor();
+    bestY = cMVCand[0].getVer();
+    sadBest = sadBestCand[0];
+#if JVET_AA0070_RRIBC
+    if ((!bestX && !bestY) || (sadBest - m_pcRdCost->getBvCostMultiplePreds(bestX, bestY, pu.cs->sps->getAMVREnabledFlag(), rribcFlipType) <= 32))
+    {
+      //chroma refine
+      bestCandIdx = xIBCSearchMVChromaRefine(pu, roiWidth, roiHeight, cuPelX, cuPelY, sadBestCand, cMVCand, rribcFlipType);
+#else
+    if ((!bestX && !bestY) || (sadBest - m_pcRdCost->getBvCostMultiplePreds(bestX, bestY, pu.cs->sps->getAMVREnabledFlag()) <= 32))
+    {
+      //chroma refine
+      bestCandIdx = xIBCSearchMVChromaRefine(pu, roiWidth, roiHeight, cuPelX, cuPelY, sadBestCand, cMVCand);
+#endif
+      bestX = cMVCand[bestCandIdx].getHor();
+      bestY = cMVCand[bestCandIdx].getVer();
+      sadBest = sadBestCand[bestCandIdx];
+      rcMv.set(bestX, bestY);
+      ruiCost = sadBest;
+      goto end;
+    }
+
+    if (pu.lwidth() < 128 && pu.lheight() < 128)
+    {
+#if JVET_Z0153_IBC_EXT_REF
+      int verTop    = bestY - IBC_SEARCH_RANGE;
+      int verBottom = bestY + IBC_SEARCH_RANGE;
+      int horLeft   = bestX - IBC_SEARCH_RANGE;
+      int horRight  = bestX + IBC_SEARCH_RANGE;
+
+      for (int y = std::max(verTop, -cuPelY); y <= verBottom; y += 2)
+      {
+#if JVET_AA0070_RRIBC
+        if (rribcFlipType == 1 && y != 0)
+        {
+          continue;
+        }
+#endif
+        if ((y == 0) || ((int)(cuPelY + y + roiHeight) >= picHeight))
+        {
+          continue;
+        }
+        for (int x = std::max(horLeft, -cuPelX); x <= horRight; x += 2)
+        {
+#if JVET_AA0070_RRIBC
+          if (rribcFlipType == 2 && x != 0)
+          {
+            continue;
+          }
+#endif
+#else
+      for (int y = std::max(srchRngVerTop, -cuPelY); y <= srchRngVerBottom; y += 2)
+      {
+#if JVET_AA0070_RRIBC
+        if (rribcFlipType == 1 && y != 0)
+        {
+          continue;
+        }
+#endif
+        if ((y == 0) || ((int)(cuPelY + y + roiHeight) >= picHeight))
+        {
+          continue;
+        }
+
+        for (int x = std::max(srchRngHorLeft, -cuPelX); x <= srchRngHorRight; x++)
+        {
+#if JVET_AA0070_RRIBC
+          if (rribcFlipType == 2 && x != 0)
+          {
+            continue;
+          }
+#endif
+#endif
+          if ((x == 0) || ((int)(cuPelX + x + roiWidth) >= picWidth))
+          {
+            continue;
+          }
+
+#if JVET_Z0084_IBC_TM
+          if (!PU::searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, x, y, lcuWidth))
+#else
+          if (!searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, x, y, lcuWidth))
+#endif
+          {
+            continue;
+          }
+#if JVET_AA0070_RRIBC
+          sad = m_pcRdCost->getBvCostMultiplePreds(x, y, pu.cs->sps->getAMVREnabledFlag(), rribcFlipType);
+#else
+          sad = m_pcRdCost->getBvCostMultiplePreds(x, y, pu.cs->sps->getAMVREnabledFlag());
+#endif
+          m_cDistParam.cur.buf = piRefSrch + cStruct.iRefStride * y + x;
+          sad += m_cDistParam.distFunc(m_cDistParam);
+
+          xIBCSearchMVCandUpdate(sad, x, y, sadBestCand, cMVCand);
+        }
+      }
+
+      bestX = cMVCand[0].getHor();
+      bestY = cMVCand[0].getVer();
+      sadBest = sadBestCand[0];
+#if JVET_AA0070_RRIBC
+      if (sadBest - m_pcRdCost->getBvCostMultiplePreds(bestX, bestY, pu.cs->sps->getAMVREnabledFlag(), rribcFlipType) <= 16)
+      {
+        bestCandIdx = xIBCSearchMVChromaRefine(pu, roiWidth, roiHeight, cuPelX, cuPelY, sadBestCand, cMVCand, rribcFlipType);
+#else
+      if (sadBest - m_pcRdCost->getBvCostMultiplePreds(bestX, bestY, pu.cs->sps->getAMVREnabledFlag()) <= 16)
+      {
+        // chroma refine
+        bestCandIdx = xIBCSearchMVChromaRefine(pu, roiWidth, roiHeight, cuPelX, cuPelY, sadBestCand, cMVCand);
+#endif
+        bestX = cMVCand[bestCandIdx].getHor();
+        bestY = cMVCand[bestCandIdx].getVer();
+        sadBest = sadBestCand[bestCandIdx];
+        rcMv.set(bestX, bestY);
+        ruiCost = sadBest;
+        goto end;
+      }
+      }
+
+    //refinement (+/-1) around best 8 candidates so far
+    //copy the MVCandList, as the main list is updating
+    Mv cMvCandTemp[CHROMA_REFINEMENT_CANDIDATES];
+    for (int cand = 0; cand < CHROMA_REFINEMENT_CANDIDATES; cand++)
+    {
+      cMvCandTemp[cand] = cMVCand[cand];
+    }
+    for (int cand = 0; cand < CHROMA_REFINEMENT_CANDIDATES; cand++)
+    {
+      int centerX = cMvCandTemp[cand].getHor();
+      int centerY = cMvCandTemp[cand].getVer();
+      for (int y = centerY - 1; y < centerY + 2; y++)
+      {
+        for (int x = centerX - 1; x < centerX + 2; x++)
+        {
+          if (x == centerX && y == centerY)
+          {
+            continue;
+          }
+          if ((x == 0) || ((int)(cuPelX + x + roiWidth) >= picWidth))
+          {
+            continue;
+          }
+#if JVET_Z0084_IBC_TM
+          if (!PU::searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, x, y, lcuWidth))
+#else
+          if (!searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, x, y, lcuWidth))
+#endif
+          {
+            continue;
+          }
+#if JVET_AA0070_RRIBC
+          sad = m_pcRdCost->getBvCostMultiplePreds(x, y, pu.cs->sps->getAMVREnabledFlag(), rribcFlipType);
+#else
+          sad = m_pcRdCost->getBvCostMultiplePreds(x, y, pu.cs->sps->getAMVREnabledFlag());
+#endif
+          m_cDistParam.cur.buf = piRefSrch + cStruct.iRefStride * y + x;
+          sad += m_cDistParam.distFunc(m_cDistParam);
+
+          xIBCSearchMVCandUpdate(sad, x, y, sadBestCand, cMVCand);
+        }
+      }
+    }
+
+  }
+#if JVET_AA0070_RRIBC
+  bestCandIdx = xIBCSearchMVChromaRefine(pu, roiWidth, roiHeight, cuPelX, cuPelY, sadBestCand, cMVCand, rribcFlipType);
+#else
+  bestCandIdx = xIBCSearchMVChromaRefine(pu, roiWidth, roiHeight, cuPelX, cuPelY, sadBestCand, cMVCand);
+#endif
+
+  bestX = cMVCand[bestCandIdx].getHor();
+  bestY = cMVCand[bestCandIdx].getVer();
+  sadBest = sadBestCand[bestCandIdx];
+  rcMv.set(bestX, bestY);
+  ruiCost = sadBest;
+
+end:
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (pu.cs->sps->getIBCFracFlag()
+#if JVET_AA0070_RRIBC
+    && rribcFlipType == 0
+#endif
+    )
+  {
+    for (int cand = 0; cand < CHROMA_REFINEMENT_CANDIDATES; cand++)
+    {
+      if (sadBestCand[cand] == std::numeric_limits<Distortion>::max())
+      {
+        break;
+      }
+      m_bestSrchCostIntBv.insert(sadBestCand[cand], cMVCand[cand].getHor(), cMVCand[cand].getVer()
+#if JVET_AA0070_RRIBC
+                               , rribcFlipType
+#endif
+      );
+    }
+  }
+#endif
+
+  m_numBVs = 0;
+  m_numBVs = xMergeCandLists(m_acBVs, m_numBVs, (2 * IBC_NUM_CANDIDATES), m_defaultCachedBvs.m_bvCands, m_defaultCachedBvs.currCnt);
+
+  m_defaultCachedBvs.currCnt = 0;
+  m_defaultCachedBvs.currCnt = xMergeCandLists(m_defaultCachedBvs.m_bvCands, m_defaultCachedBvs.currCnt, IBC_NUM_CANDIDATES, cMVCand, CHROMA_REFINEMENT_CANDIDATES);
+  m_defaultCachedBvs.currCnt = xMergeCandLists(m_defaultCachedBvs.m_bvCands, m_defaultCachedBvs.currCnt, IBC_NUM_CANDIDATES, m_acBVs, m_numBVs);
+
+  for (unsigned int cand = 0; cand < CHROMA_REFINEMENT_CANDIDATES; cand++)
+  {
+#if JVET_AA0070_RRIBC
+    if ((rribcFlipType == 1 && cMVCand[cand].getVer() != 0) || (rribcFlipType == 2 && cMVCand[cand].getHor() != 0))
+    {
+      continue;
+    }
+    if (m_pcEncCfg->getIntraPeriod() < 1 && m_pcEncCfg->getIBCFastMethod())
+    {
+      if (sadBestCand[cand] >= minCostProj)
+      {
+        break;
+      }
+      else if (!cand && rribcFlipType)
+      {
+        minCostProj = 3 * sadBestCand[0];
+      }
+    }
+#endif
+    if (cMVCand[cand].getHor() == 0 && cMVCand[cand].getVer() == 0)
+    {
+      continue;
+    }
+
+    m_ctuRecord[pu.lumaPos()][pu.lumaSize()].bvRecord[cMVCand[cand]] = sadBestCand[cand];
+  }
+
+  return;
+ }
+#endif
 #if JVET_AA0070_RRIBC
 void InterSearch::xIntraPatternSearch( PredictionUnit &pu, IntTZSearchStruct &cStruct, Mv &rcMv, Distortion &ruiCost, Mv *pcMvSrchRngLT, Mv *pcMvSrchRngRB, Mv *pcMvPred, int rribcFlipType )
 #else
@@ -1135,6 +1647,9 @@ void InterSearch::xIntraPatternSearch(PredictionUnit &pu, IntTZSearchStruct &cSt
 
   m_cDistParam.useMR = false;
   m_pcRdCost->setDistParam(m_cDistParam, *cStruct.pcPatternKey, cStruct.piRefY, cStruct.iRefStride, m_lumaClpRng.bd, COMPONENT_Y, cStruct.subShiftMode);
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  m_pcRdCost->setFullPelImvForZeroBvd(!pu.cs->sps->getIBCFracFlag());
+#endif
 
   const int picWidth = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
   const int picHeight = pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
@@ -1296,16 +1811,31 @@ void InterSearch::xIntraPatternSearch(PredictionUnit &pu, IntTZSearchStruct &cSt
       ruiCost = sadBest;
       goto end;
     }
-
-
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    int blkSize = (m_pcEncCfg->getIBCFastMethod() & IBC_FAST_METHOD_NONSCC) ? 128 : 16;
+    if (pu.lwidth() < blkSize && pu.lheight() < blkSize)
+#else
     if (pu.lwidth() < 16 && pu.lheight() < 16)
+#endif
     {
 #if JVET_Z0153_IBC_EXT_REF
       int verTop = - (int)lcuWidth;
       int verBottom = std::min((int)(lcuWidth>>2), (int)(lcuWidth - (cuPelY % lcuWidth) - roiHeight));
       int horLeft = - (int)lcuWidth*2;
       int horRight = lcuWidth>>2;
-
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AA0070_RRIBC
+      if ((m_pcEncCfg->getIBCFastMethod() & IBC_FAST_METHOD_NONSCC) && pu.cu->predMode == MODE_IBC && rribcFlipType == 0)
+#else
+      if ((m_pcEncCfg->getIBCFastMethod() & IBC_FAST_METHOD_NONSCC) && pu.cu->predMode == MODE_IBC)
+#endif
+      {
+        verTop    = bestY - IBC_SEARCH_RANGE;
+        verBottom = bestY + IBC_SEARCH_RANGE;
+        horLeft   = bestX - IBC_SEARCH_RANGE;
+        horRight  = bestX + IBC_SEARCH_RANGE;
+      }
+#endif
       for (int y = std::max(verTop, -cuPelY); y <= verBottom; y += 2)
       {
 #if JVET_AA0070_RRIBC
@@ -1585,6 +2115,28 @@ void InterSearch::xIntraPatternSearch(PredictionUnit &pu, IntTZSearchStruct &cSt
   ruiCost = sadBest;
 
 end:
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (pu.cs->sps->getIBCFracFlag()
+#if JVET_AA0070_RRIBC
+    && rribcFlipType == 0
+#endif
+    )
+  {
+    for (int cand = 0; cand < CHROMA_REFINEMENT_CANDIDATES; cand++)
+    {
+      if (sadBestCand[cand] == std::numeric_limits<Distortion>::max())
+      {
+        break;
+      }
+      m_bestSrchCostIntBv.insert(sadBestCand[cand], cMVCand[cand].getHor(), cMVCand[cand].getVer()
+#if JVET_AA0070_RRIBC
+                               , rribcFlipType
+#endif
+      );
+    }
+  }
+#endif
+
   m_numBVs = 0;
   m_numBVs = xMergeCandLists(m_acBVs, m_numBVs, (2 * IBC_NUM_CANDIDATES), m_defaultCachedBvs.m_bvCands, m_defaultCachedBvs.currCnt);
 
@@ -1621,7 +2173,6 @@ end:
 
   return;
 }
-
 
 
 // based on xMotionEstimation
@@ -1665,16 +2216,22 @@ void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pc
 
   CPelBuf   *pcPatternKeyFlipH;
   CPelBuf   *pcPatternKeyFlipV;
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   PelStorage m_tmpStorageCUflipH;
   PelStorage m_tmpStorageCUflipV;
+#endif
   PelBuf tmpOrgLumaFlipH, tmpOrgLumaFlipV;
 
   if (numRribcType > 1)
   {
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     m_tmpStorageCUflipH.create(UnitArea(pu.chromaFormat, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
+#endif
     tmpOrgLumaFlipH = m_tmpStorageCUflipH.getBuf(tmpArea);
 
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     m_tmpStorageCUflipV.create(UnitArea(pu.chromaFormat, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
+#endif
     tmpOrgLumaFlipV = m_tmpStorageCUflipV.getBuf(tmpArea);
 
     if ((pu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag()))
@@ -1744,6 +2301,9 @@ void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pc
   m_pcRdCost->getMotionCost(0);
   m_pcRdCost->setPredictors(pcMvPred);
   m_pcRdCost->setCostScale(0);
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  m_pcRdCost->setFullPelImvForZeroBvd(!pu.cs->sps->getIBCFracFlag());
+#endif
 
   m_cDistParam.useMR = false;
 #if JVET_AC0112_IBC_LIC
@@ -1840,6 +2400,12 @@ void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pc
                 pu.cu->rribcFlipType = rribcFlipType;
               }
             }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+            if (pu.cs->sps->getIBCFracFlag())
+            {
+              m_bestSrchCostIntBv.insert(sad, xBv, yBv, rribcFlipType);
+            }
+#endif
           }
         }
       }
@@ -1896,6 +2462,12 @@ void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pc
                   pu.cu->rribcFlipType = rribcFlipType;
                 }
               }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+              if (pu.cs->sps->getIBCFracFlag())
+              {
+                m_bestSrchCostIntBv.insert(sad, xPred, yPred, rribcFlipType);
+              }
+#endif
 
               m_ctuRecord[pu.lumaPos()][pu.lumaSize()].bvRecord[Mv(xPred, yPred)] = sad;
             }
@@ -1975,6 +2547,12 @@ void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pc
             pu.cu->rribcFlipType = rribcFlipType;
           }
         }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+        if (pu.cs->sps->getIBCFracFlag())
+        {
+          m_bestSrchCostIntBv.insert(sad, xBv, yBv, rribcFlipType);
+        }
+#endif
         }
       }
 #else
@@ -1983,6 +2561,12 @@ void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pc
             // update the vector.
             rcMv = bv;
           }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+          if (pu.cs->sps->getIBCFracFlag())
+          {
+            m_bestSrchCostIntBv.insert(sad, xBv, yBv);
+          }
+#endif
         }
       }
 #endif
@@ -2040,6 +2624,16 @@ void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pc
 #endif
             }
           }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+          if (pu.cs->sps->getIBCFracFlag())
+          {
+            m_bestSrchCostIntBv.insert(sad, xPred, yPred
+#if JVET_AA0070_RRIBC
+                                     , rribcFlipType
+#endif
+            );
+          }
+#endif
 
           m_ctuRecord[pu.lumaPos()][pu.lumaSize()].bvRecord[Mv(xPred, yPred)] = sad;
 #if JVET_AA0070_RRIBC
@@ -2067,6 +2661,13 @@ void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pc
     {
       cStruct.pcPatternKey = (rribcFlipType == 0) ? pcPatternKey : ((rribcFlipType == 1) ? pcPatternKeyFlipH : pcPatternKeyFlipV);
       m_pcRdCost->setDistParam(m_cDistParam, *cStruct.pcPatternKey, cStruct.piRefY, cStruct.iRefStride, m_lumaClpRng.bd, COMPONENT_Y, cStruct.subShiftMode);
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      if (m_pcEncCfg->getIBCFastMethod() & IBC_FAST_METHOD_NONSCC && !rribcFlipType)
+      {
+        xIntraPatternSearchOpt(pu, cStruct, tempMv, ruiCost, &cMvSrchRngLT, &cMvSrchRngRB, pcMvPred[rribcFlipType], rribcFlipType);
+      }
+      else
+#endif
       xIntraPatternSearch(pu, cStruct, tempMv, ruiCost, &cMvSrchRngLT, &cMvSrchRngRB, pcMvPred[rribcFlipType], rribcFlipType);
       if (ruiCost < minCost)
       {
@@ -2076,11 +2677,13 @@ void InterSearch::xIBCEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Mv *pc
       }
     }
   }
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   if (numRribcType > 1)
   {
     m_tmpStorageCUflipH.destroy();
     m_tmpStorageCUflipV.destroy();
   }
+#endif
 #else
     xIntraPatternSearch(pu, cStruct, rcMv, ruiCost, &cMvSrchRngLT, &cMvSrchRngRB, pcMvPred);
   }
@@ -2103,6 +2706,12 @@ void InterSearch::xSetIntraSearchRange(PredictionUnit& pu, int iRoiWidth, int iR
 
   srLeft = -cuPelX;
   srTop = - 2 * lcuWidth - (cuPelY % lcuWidth);
+#if JVET_AA0106_IBCBUF_CTU256
+  if (256 == lcuWidth)
+  {
+    srTop = -lcuWidth - (cuPelY % lcuWidth);
+  }
+#endif
   srRight = picWidth - cuPelX - iRoiWidth;
   srBottom = lcuWidth - (cuPelY % lcuWidth) - iRoiHeight;  
 #else
@@ -2140,6 +2749,28 @@ void InterSearch::xSetIntraSearchRange(PredictionUnit& pu, int iRoiWidth, int iR
   rcMvSrchRngRB >>= 2;
 }
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+bool InterSearch::predIBCSearch( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap
+#if JVET_AC0112_IBC_LIC || JVET_AC0112_IBC_CIIP
+                               , Distortion* bvSearchCost
+#endif
+#if JVET_AC0112_IBC_CIIP
+                               , PelBuf* ibcCiipIntraBuf
+#endif
+#if JVET_AA0070_RRIBC
+                               , bool isSecondPass
+#endif
+#if JVET_AC0112_IBC_LIC || JVET_AC0112_IBC_CIIP
+                               , bool* searchedByHash
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0112_IBC_CIIP
+                               , bool isCiipFirstPass
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC)
+                               , double costTh
+#endif
+)
+#else
 #if JVET_AA0070_RRIBC
 #if JVET_AC0112_IBC_CIIP
 bool InterSearch::predIBCSearch( CodingUnit& cu, Partitioner& partitioner, const int localSearchRangeX, const int localSearchRangeY, IbcHashMap& ibcHashMap, Distortion* bvSearchCost, PelBuf* ibcCiipIntraBuf, bool isSecondPass, bool* searchedByHash)
@@ -2161,6 +2792,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 #endif
 #endif
 #endif
+#endif
 {
   Mv           cMvSrchRngLT;
   Mv           cMvSrchRngRB;
@@ -2169,6 +2801,22 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
   Mv           cMvPred;
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS || 1
+  xEstBvdBitCosts(m_pcRdCost->getBvdBitCosts()
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                , cu.cs->sps->getIBCFracFlag()
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AA0070_RRIBC
+                , cu.cs->sps->getIBCFracFlag() ? (int)DeriveCtx::CtxRribcFlipType(cu) : NOT_VALID
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                , cu.cs->sps->getIBCFracFlag() ? (int)DeriveCtx::CtxbvOneZeroComp(cu) : NOT_VALID
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                , cu.firstPU->isBvpClusterApplicable()
+#endif
+  );
+#else // Note: The below "else part" can be removed due to code duplication
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   const PredictionUnit &pu = *cu.firstPU;
   if (pu.isBvpClusterApplicable())
@@ -2177,6 +2825,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
   }
 #else
   xEstBvdBitCosts(m_pcRdCost->getBvdBitCosts());
+#endif
 #endif
 #endif
 #if JVET_AA0070_RRIBC
@@ -2188,14 +2837,37 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
   }
 #endif
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  uint8_t imvForZeroMvd = (cu.cs->sps->getIBCFracFlag() ? IBC_SUBPEL_AMVR_MODE_FOR_ZERO_MVD : IMV_FPEL);
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  cu.bvOneZeroComp = 0;
+  cu.bvZeroCompDir = 0;
+#endif
+#endif
 
   for (auto &pu : CU::traversePUs(cu))
   {
     m_maxCompIDToPred = MAX_NUM_COMPONENT;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    m_bestSrchCostIntBv.init(false, cu.cs->sps->getIBCFracFlag());
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+    bool bAmvpListDerived = false;
+#if JVET_AC0112_IBC_LIC
+    bAmvpListDerived |= pu.cu->ibcLicFlag;
+#endif
+#if JVET_AC0112_IBC_CIIP
+    bAmvpListDerived |= pu.ibcCiipFlag;
+#endif
+#endif
+#endif
 
     CHECK(pu.cu != &cu, "PU is contained in another CU");
 #if JVET_AA0070_RRIBC
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    int numRribcType = (cu.cs->sps->getUseRRIbc()) ? 3 : 1;
+#else
     int numRribcType = 3;
+#endif
     if (isSecondPass)
     {
       if (!relatedCU.isRribcCoded)
@@ -2203,6 +2875,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
         numRribcType = 1;
       }
     }
+
 #if JVET_AC0112_IBC_CIIP
     if (pu.ibcCiipFlag)
     {
@@ -2215,6 +2888,13 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
       numRribcType = 1;
     }
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    int numBvTypes = numRribcType;
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    numBvTypes = std::max(numBvTypes, (int)(cu.cs->sps->getIBCFracFlag() && pu.isBvpClusterApplicable() ? 3 : 1));
+#endif
+#endif
+
     Mv       cMv;
     cMv.setZero();
     int iBvpNum    = 2;
@@ -2223,13 +2903,40 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 
     AMVPInfo amvpInfo4Pel[3];
     AMVPInfo amvpInfo[3];
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    AMVPInfo  amvpInfoQPel[3];
+    AMVPInfo  amvpInfoHPel[3];
+    AMVPInfo* amvpInfoList[NUM_IMV_MODES] = { amvpInfoQPel, amvpInfo, amvpInfo4Pel, amvpInfoHPel };
+#endif
     Mv       cMvPred[3][2];
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    for (int i = 0; i < numBvTypes; i++)
+#else
     for (int i = 0; i < numRribcType; i++)
+#endif
     {
       pu.cu->rribcFlipType = i;
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC)
+      if (!bAmvpListDerived)
+      {
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      if (cu.cs->sps->getIBCFracFlag() && i == 0)
+      {
+        // prepare imv = 0 accuracy predictor info
+        pu.cu->imv = IMV_OFF;
+        PU::fillIBCMvpCand(pu, amvpInfoQPel[i]
+#if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                         , this
+#endif
+        );
+      }
+#endif
+
       // prepare imv = 2 accuracy predictor info
       pu.cu->imv      = 2;
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 #if JVET_AC0112_IBC_CIIP
 #if JVET_AC0112_IBC_LIC
       if (!pu.ibcCiipFlag && !pu.cu->ibcLicFlag)
@@ -2244,11 +2951,13 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
       {
 #endif
 #endif
+#endif
 #if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
       PU::fillIBCMvpCand(pu, amvpInfo4Pel[i], this);
 #else
       PU::fillIBCMvpCand(pu, amvpInfo4Pel[i]);
 #endif
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 #if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
       m_amvpInfo4Pel[i] = amvpInfo4Pel[i];
       }
@@ -2257,9 +2966,16 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
         amvpInfo4Pel[i] = m_amvpInfo4Pel[i];
       }
 #endif
+#endif
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      // prepare imv = 1 accuracy predictor info
+      pu.cu->imv = 1;
+#else
       // prepare imv = 0 accuracy predictor info
       pu.cu->imv = 0;
+#endif
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 #if JVET_AC0112_IBC_CIIP
 #if JVET_AC0112_IBC_LIC
       if (!pu.ibcCiipFlag && !pu.cu->ibcLicFlag)
@@ -2274,17 +2990,45 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
       {
 #endif
 #endif
+#endif
 #if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
       PU::fillIBCMvpCand(pu, amvpInfo[i], this);
 #else
       PU::fillIBCMvpCand(pu, amvpInfo[i]);
 #endif
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 #if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
       m_amvpInfo[i] = amvpInfo[i];
       }
       else
       {
         amvpInfo[i] = m_amvpInfo[i];
+      }
+#endif
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC)
+      }
+
+      if (bAmvpListDerived)
+      {
+        if (cu.cs->sps->getIBCFracFlag())
+        {
+          amvpInfoQPel[i] = m_amvpInfoQPel[i];
+          amvpInfoHPel[i] = m_amvpInfoHPel[i];
+        }
+        amvpInfo4Pel[i] = m_amvpInfo4Pel[i];
+        amvpInfo    [i] = m_amvpInfo    [i];
+        pu.cu->imv = 1;
+      }
+      else
+      {
+        if (cu.cs->sps->getIBCFracFlag())
+        {
+          m_amvpInfoQPel[i] = amvpInfoQPel[i];
+          m_amvpInfoHPel[i] = amvpInfoHPel[i];
+        }
+        m_amvpInfo4Pel[i] = amvpInfo4Pel[i];
+        m_amvpInfo    [i] = amvpInfo    [i];
       }
 #endif
 
@@ -2303,7 +3047,27 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 #else
     //////////////////////////////////////////////////////////
     /// ibc search
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    AMVPInfo  amvpInfo, amvpInfo4Pel, amvpInfoQPel, amvpInfoHPel;
+    Mv cMv, cMvPred[2];
+
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+    if (!bAmvpListDerived)
+    {
+#endif
+    if (cu.cs->sps->getIBCFracFlag())
+    {
+      pu.cu->imv = IMV_OFF;
+      PU::fillIBCMvpCand(pu, amvpInfoQPel
+#if JVET_Z0084_IBC_TM && IBC_TM_AMVP
+                       , this
+#endif
+      );
+    }
+#endif
+
     pu.cu->imv = 2;
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     AMVPInfo amvpInfo4Pel;
 #if JVET_AC0112_IBC_CIIP
 #if JVET_AC0112_IBC_LIC
@@ -2319,11 +3083,13 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     {
 #endif
 #endif
+#endif
 #if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
     PU::fillIBCMvpCand(pu, amvpInfo4Pel, this);
 #else
     PU::fillIBCMvpCand(pu, amvpInfo4Pel);
 #endif
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 #if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
       m_amvpInfo4Pel = amvpInfo4Pel;
     }
@@ -2332,8 +3098,14 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
       amvpInfo4Pel = m_amvpInfo4Pel;
     }
 #endif
+#endif
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    pu.cu->imv = 1;
+#else
     pu.cu->imv = 0;// (Int)cu.cs->sps->getUseIMV(); // set as IMV=0 initially
+#endif
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     Mv    cMv, cMvPred[2];
     AMVPInfo amvpInfo;
 #if JVET_AC0112_IBC_CIIP
@@ -2350,17 +3122,45 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     {
 #endif
 #endif
+#endif
 #if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
     PU::fillIBCMvpCand(pu, amvpInfo, this);
 #else
     PU::fillIBCMvpCand(pu, amvpInfo);
 #endif
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 #if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
       m_amvpInfo = amvpInfo;
     }
     else
     {
       amvpInfo = m_amvpInfo;
+    }
+#endif
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC)
+    }
+
+    if (bAmvpListDerived)
+    {
+      if (cu.cs->sps->getIBCFracFlag())
+      {
+        amvpInfoQPel = m_amvpInfoQPel;
+        amvpInfoHPel = m_amvpInfoHPel;
+      }
+      amvpInfo4Pel = m_amvpInfo4Pel;
+      amvpInfo     = m_amvpInfo;
+      pu.cu->imv = 1;
+    }
+    else
+    {
+      if (cu.cs->sps->getIBCFracFlag())
+      {
+        m_amvpInfoQPel = amvpInfoQPel;
+        m_amvpInfoHPel = amvpInfoHPel;
+      }
+      m_amvpInfo4Pel = amvpInfo4Pel;
+      m_amvpInfo     = amvpInfo;
     }
 #endif
 
@@ -2379,6 +3179,19 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
       iBvpNum = 1;
       cMvPred[1] = cMvPred[0];
     }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    AMVPInfo* amvpInfoList[NUM_IMV_MODES] = { &amvpInfoQPel, &amvpInfo, &amvpInfo4Pel, &amvpInfoHPel };
+#endif
+#endif
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    m_pcRdCost->setFullPelImvForZeroBvd(!cu.cs->sps->getIBCFracFlag());
+#if JVET_AC0112_IBC_CIIP
+    m_bestSrchCostIntBv.enableMultiCandSrch = cu.cs->sps->getIBCFracFlag() && pu.ibcCiipFlag ? false : m_bestSrchCostIntBv.enableMultiCandSrch;
+#endif
+#if JVET_AC0112_IBC_LIC
+    m_bestSrchCostIntBv.enableMultiCandSrch = cu.cs->sps->getIBCFracFlag() && cu.ibcLicFlag && (m_pcEncCfg->getIBCFastMethod() & IBC_FAST_METHOD_NONSCC) > 0 ? false : m_bestSrchCostIntBv.enableMultiCandSrch;
+#endif
 #endif
 
 #if JVET_AC0112_IBC_CIIP
@@ -2441,10 +3254,25 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     }
     /// ibc search
     /////////////////////////////////////////////////////////
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    m_pcRdCost->setFullPelImvForZeroBvd(!cu.cs->sps->getIBCFracFlag());
+#endif
 #if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
     if (bvSearchCost)
     {
       *bvSearchCost = cost;
+    }
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0112_IBC_CIIP
+    if (isCiipFirstPass)
+    {
+      return false;
+    }
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC)
+    if ((m_pcEncCfg->getIBCFastMethod() & IBC_FAST_METHOD_NONSCC) && (((double)cost) > costTh))
+    {
+      return false;
     }
 #endif
 #if JVET_Z0131_IBC_BVD_BINARIZATION
@@ -2517,6 +3345,9 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
         bitsBVPBest = bitsBVPTemp;
         bvpIdxBest = bvpIdxTemp;
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+        pu.cu->imv = IMV_FPEL;
+#else
 #if JVET_AA0070_RRIBC
         bool diffMV = false;
         if ((pu.cu->rribcFlipType == 1 && cMv.getHor() != ccMvPred.getHor()) || (pu.cu->rribcFlipType == 2 && cMv.getVer() != ccMvPred.getVer()) || (pu.cu->rribcFlipType == 0 && cMv != ccMvPred))
@@ -2530,6 +3361,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
           pu.cu->imv = 1; // set as full-pel
         else
           pu.cu->imv = 0; // set as fractional-pel
+#endif
 
       }
 
@@ -2579,12 +3411,27 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     }
 #endif
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    Mv curBestBv = cMv;
+#endif
     pu.bv = cMv; // bv is always at integer accuracy
     cMv.changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
     pu.mv[REF_PIC_LIST_0] = cMv; // store in fractional pel accuracy
 
     pu.mvpIdx[REF_PIC_LIST_0] = bvpIdxBest;
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC)
+    int intBvType = pu.getBvType();
+    if (pu.cu->imv == IMV_4PEL && cMv != amvpInfoList[IMV_4PEL][intBvType].mvCand[bvpIdxBest])
+    {
+      pu.mvd[REF_PIC_LIST_0] = cMv - amvpInfoList[IMV_4PEL][intBvType].mvCand[bvpIdxBest];
+    }
+    else
+    {
+      pu.mvd[REF_PIC_LIST_0] = cMv - amvpInfoList[IMV_FPEL][intBvType].mvCand[bvpIdxBest];
+    }
+    pu.mvd[REF_PIC_LIST_0].regulateMv(intBvType);
+#else
 #if JVET_AA0070_RRIBC
     if (pu.cu->imv == 2 && cMv != amvpInfo4Pel[pu.cu->rribcFlipType].mvCand[bvpIdxBest])
     {
@@ -2608,10 +3455,25 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
     else
       pu.mvd[REF_PIC_LIST_0] = cMv - amvpInfo.mvCand[bvpIdxBest];
 #endif
+#endif
 
     if( pu.mvd[REF_PIC_LIST_0] == Mv( 0, 0 ) )
     {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC
+      pu.cu->imv = intBvType == 0 ? imvForZeroMvd : IMV_FPEL;
+      pu.mv[0] = amvpInfoList[pu.cu->imv][intBvType].mvCand[bvpIdxBest];
+      pu.mv[0].regulateMv(intBvType);
+#else
+      pu.cu->imv = imvForZeroMvd;
+      pu.mv[0] = amvpInfoList[pu.cu->imv][0].mvCand[bvpIdxBest];
+#endif
+
+      pu.bv = pu.mv[0];
+      pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT); // bv is always set at integer precision
+#else
       pu.cu->imv = 0;
+#endif
     }
 
     if( pu.cu->imv == 2 )
@@ -2619,20 +3481,103 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
       assert( ( cMv.getHor() % 16 == 0 ) && ( cMv.getVer() % 16 == 0 ) );
     }
 
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     if( cu.cs->sps->getAMVREnabledFlag() )
     {
       assert( pu.cu->imv > 0 || pu.mvd[REF_PIC_LIST_0] == Mv() );
     }
+#endif
 
     pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if (pu.cs->sps->getIBCFracFlag()
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC
+      && intBvType == 0
+#endif
+      )
+    {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+      if (pu.isBvpClusterApplicable() && pu.cu->rribcFlipType)
+      {
+        pu.cu->bvOneZeroComp = 1;
+        pu.cu->bvZeroCompDir = pu.cu->rribcFlipType;
+      }
+#endif
+
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC
+      int bvType = pu.getBvType();
+#endif
+
+      if (NOT_VALID == m_bestSrchCostIntBv.find(curBestBv.getHor(), curBestBv.getVer()
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC
+                                              , bvType
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+                                              , (pu.cu->rribcFlipType > 0)
+#endif
+      ))
+      {
+        m_bestSrchCostIntBv.insert(0, curBestBv.getHor(), curBestBv.getVer()
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC
+                                 , bvType
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+                                 , (pu.cu->rribcFlipType > 0)
+#endif
+        );
+      }
+
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+      Distortion fracCost =
+#endif
+      xPredIBCFracPelSearch(pu, m_bestSrchCostIntBv, amvpInfoList[IMV_OFF], amvpInfoList[IMV_HPEL], amvpInfoList[IMV_FPEL], amvpInfoList[IMV_4PEL]
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC
+                          , numBvTypes
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+                          , numRribcType > 1
+#endif
+      );
+#if JVET_AC0104_IBC_BVD_PREDICTION
+      bvpIdxBest = pu.mvpIdx[REF_PIC_LIST_0];
+#endif
+
+#if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_LIC
+      if (bvSearchCost)
+      {
+        *bvSearchCost = fracCost;
+      }
+#endif
+    }
+#endif
 
 #if JVET_AC0104_IBC_BVD_PREDICTION 
     pu.mvsdIdx[REF_PIC_LIST_0] = 0;
     if (pu.isBvdPredApplicable() && pu.mvd[REF_PIC_LIST_0].isMvsdApplicable())
     {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      pu.bvdSuffixInfo.isFracBvEnabled = pu.cs->sps->getIBCFracFlag();
+#endif
       pu.bvdSuffixInfo.initPrefixes(pu.mvd[REF_PIC_LIST_0], pu.cu->imv, true);
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      static std::vector<Mv> cMvdDerivedVec;
+      cMvdDerivedVec.resize(0);
+#else
       std::vector<Mv> cMvdDerivedVec;
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+      int bvType = pu.getBvType();
+#else
+      int bvType = 0;
+#endif
+      Mv cMvPred2 = amvpInfoList[pu.cu->imv][bvType].mvCand[bvpIdxBest];
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+      cMvPred2.regulateMv(bvType);
+#endif
+#else
 #if JVET_AA0070_RRIBC
       Mv cMvPred2 = ((pu.cu->imv == 2 && cMv != amvpInfo4Pel[pu.cu->rribcFlipType].mvCand[bvpIdxBest]) ? amvpInfo4Pel[pu.cu->rribcFlipType] : amvpInfo[pu.cu->rribcFlipType]).mvCand[bvpIdxBest];
       if (pu.cu->rribcFlipType == 1)
@@ -2645,6 +3590,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
       }
 #else
       const Mv cMvPred2 = ((pu.cu->imv == 2 && cMv != amvpInfo4Pel.mvCand[bvpIdxBest]) ? amvpInfo4Pel : amvpInfo).mvCand[bvpIdxBest];
+#endif
 #endif
 
       const Mv cMvdKnownAtDecoder = pu.mvd[REF_PIC_LIST_0];// .getAbsMv();
@@ -2665,6 +3611,383 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
   return true;
 }
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+template <int N>
+Distortion InterSearch::xPredIBCFracPelSearch(PredictionUnit&              pu
+                                            , SrchCostBv<N>&               intBvList
+                                            , AMVPInfo*                    amvpInfoQPel
+                                            , AMVPInfo*                    amvpInfoHPel
+                                            , AMVPInfo*                    amvpInfoFPel
+                                            , AMVPInfo*                    amvpInfo4Pel
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                                            , int                          numBvTypes
+#endif
+#if JVET_AA0070_RRIBC && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                                            , bool                         testRrIBC
+#endif
+)
+{
+  if (intBvList.cnt == 0)
+  {
+    return std::numeric_limits<Distortion>::max();
+  }
+  intBvList.cnt = intBvList.enableMultiCandSrch ? intBvList.cnt : 1;
+
+  AMVPInfo* amvpInfoList[NUM_IMV_MODES] = { amvpInfoQPel, amvpInfoFPel, amvpInfo4Pel, amvpInfoHPel };
+#if JVET_AA0070_RRIBC && !JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bool testRrIBC = numBvTypes > 1;
+#endif
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  {
+    // Frac BV only for 2-D modes
+    numBvTypes = 1;
+#if JVET_AA0070_RRIBC && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    testRrIBC = false;
+#endif
+  }
+#endif
+
+  // Get original samples
+  PelUnitBuf origBuf = pu.cs->getOrgBuf(pu);
+  const CompArea& area = pu.blocks[COMPONENT_Y];
+  CompArea  tmpArea(COMPONENT_Y, area.chromaFormat, Position(0, 0), area.size());
+
+#if JVET_AA0070_RRIBC
+  PelBuf tmpOrgLuma[3];
+#else
+  PelBuf tmpOrgLuma[1];
+#endif
+#if JVET_AC0112_IBC_CIIP
+  if (pu.ibcCiipFlag)
+  {
+    tmpOrgLuma[0] = m_ibcCiipBuffer.getBuf(tmpArea);
+  }
+  else
+#endif
+  {
+    if ((pu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag()))
+    {
+      tmpOrgLuma[0] = m_tmpStorageLCU.getBuf(tmpArea);
+      tmpOrgLuma[0].rspSignal(origBuf.Y(), m_pcReshape->getFwdLUT());
+    }
+    else
+    {
+      tmpOrgLuma[0] = origBuf.Y();
+    }
+  }
+
+#if JVET_AA0070_RRIBC
+  if (testRrIBC)
+  {
+    tmpOrgLuma[1] = m_tmpStorageCUflipH.getBuf(tmpArea);
+    tmpOrgLuma[2] = m_tmpStorageCUflipV.getBuf(tmpArea);
+    tmpOrgLuma[1].copyFrom(tmpOrgLuma[0]);
+    tmpOrgLuma[2].copyFrom(tmpOrgLuma[0]);
+    tmpOrgLuma[1].flip(1);
+    tmpOrgLuma[2].flip(2);
+  }
+#endif
+
+  // Compute cost for integer BV
+  uint8_t imvForZeroMvd = IBC_SUBPEL_AMVR_MODE_FOR_ZERO_MVD;
+  bool    useBilinearMC = false;
+  PelUnitBuf predBuf = pu.cs->getPredBuf(pu);
+  DistParam distParam;
+#if JVET_AC0112_IBC_LIC
+  distParam.useMR = pu.cu->ibcLicFlag;
+#endif
+  m_pcRdCost->setDistParam(distParam, tmpOrgLuma[0], predBuf.Y().buf, predBuf.Y().stride, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, 0, 1, false);
+  m_pcRdCost->getMotionCost(0);
+  m_pcRdCost->setCostScale(0);
+
+  for (int i = 0; i < intBvList.cnt; ++i)
+  {
+    pu.cu->imv = IMV_FPEL;
+    pu.bv      = intBvList.mvList[i];
+    pu.mv[0]   = intBvList.mvList[i];
+    pu.mv[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+
+#if JVET_AC0112_IBC_LIC
+    if (pu.cu->ibcLicFlag)
+    {
+      getPredIBCBlk(pu, COMPONENT_Y, pu.cu->slice->getPic(), pu.mv[0], predBuf, useBilinearMC);
+      distParam.cur.buf = predBuf.Y().buf;
+      distParam.cur.stride = predBuf.Y().stride;
+    }
+    else
+#endif
+    {
+      Position offset = pu.Y().pos().offset(pu.bv.getHor(), pu.bv.getVer());
+      CPelBuf  refBuf = pu.cu->slice->getPic()->getRecoBuf(CompArea(COMPONENT_Y, pu.chromaFormat, offset, Size(pu.lwidth(), pu.lheight())), false);
+      distParam.cur.buf = refBuf.buf;
+      distParam.cur.stride = refBuf.stride;
+    }
+    
+    {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC
+      int bvType = intBvList.bvTypeList[i];
+#else
+      int bvType = 0;
+#endif
+#if JVET_AA0070_RRIBC 
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+      distParam.org = tmpOrgLuma[intBvList.bvFlipList[i] ? bvType : 0];
+#else
+      distParam.org = tmpOrgLuma[bvType];
+#endif
+#endif
+
+      uint32_t   addExtraBits  = 1 + bvType
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+                               + (bvType == 0 ? 0 : (intBvList.bvFlipList[i] ? 2 : 0))
+#endif
+        ;
+      bool       has4PelIMV    = (pu.bv.getHor() & 3) == 0 && (pu.bv.getVer() & 3) == 0;
+      uint8_t    tempMvpIdx[2] = { 0, 0 };
+      Distortion tempBvCost[2] =
+      {
+                     m_pcRdCost->getBvCostSingle(pu.mv[0], amvpInfoList[IMV_FPEL][bvType], IMV_FPEL, imvForZeroMvd, bvType == 2, bvType == 1, addExtraBits, tempMvpIdx[0]),
+        has4PelIMV ? m_pcRdCost->getBvCostSingle(pu.mv[0], amvpInfoList[IMV_4PEL][bvType], IMV_4PEL, imvForZeroMvd, bvType == 2, bvType == 1, addExtraBits, tempMvpIdx[1]) : std::numeric_limits<Distortion>::max()
+      };
+
+      uint8_t bestIdx = tempBvCost[1] < tempBvCost[0] ? 1 : 0;
+      intBvList.imvList   [i] = bestIdx == 0 ? IMV_FPEL : IMV_4PEL;
+      intBvList.mvpIdxList[i] = tempMvpIdx[bestIdx];
+      intBvList.costList  [i] = tempBvCost[bestIdx] + distParam.distFunc(distParam);
+      intBvList.mvList    [i] = pu.mv[0];
+    }
+  }
+  distParam.cur.buf    = predBuf.Y().buf;
+  distParam.cur.stride = predBuf.Y().stride;
+
+  // Frac-pel search
+  const static Mv mvOffsetH[] = { Mv(-8, 0), Mv(8, 0), Mv(0, -8), Mv(0, 8), Mv(-8, -8), Mv(8, -8), Mv(-8, 8), Mv(8, 8), };
+  const static Mv mvOffsetQ[] = { Mv(-4, 0), Mv(4, 0), Mv(0, -4), Mv(0, 4), Mv(-4, -4), Mv(4, -4), Mv(-4, 4), Mv(4, 4), };
+
+  auto ibcFracPelSquareSearch = [&](uint8_t imv, int candIdx, const Mv* mvOffset, int numOffset)
+  {
+    CHECK(imv != IMV_HPEL && imv != IMV_OFF, "Error on IMV value in IBC fractional-pel search");
+    Distortion& bestCost     = intBvList.costList  [candIdx];
+    uint8_t&    bestImv      = intBvList.imvList   [candIdx];
+    uint8_t&    bestMvpIdx   = intBvList.mvpIdxList[candIdx];
+    Mv&         bestMv       = intBvList.mvList    [candIdx];
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    int&        bestBvType   = intBvList.bvTypeList[candIdx];
+#endif
+#if JVET_AA0070_RRIBC && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    bool&       bestFlipMode = intBvList.bvFlipList[candIdx];
+#endif
+
+    pu.cu->imv = imv;
+    const Mv  centerMv = bestMv;
+    for (int j = 0; j < numOffset; ++j)
+    {
+      pu.mv[0] = centerMv + mvOffset[j];
+      uint32_t validType = PU::checkValidBvPU(pu, COMPONENT_Y, pu.mv[0], true, 0, imv == IMV_HPEL);
+      if (validType == IBC_BV_INVALID)
+      {
+        continue;
+      }
+      getPredIBCBlk(pu, COMPONENT_Y, pu.cu->slice->getPic(), pu.mv[0], predBuf, useBilinearMC);
+
+      // Check cost
+      uint32_t addExtraBits  = 1;
+      distParam.org = tmpOrgLuma[0];
+      uint8_t tempMvpIdx = 0;
+      Distortion tempCost = m_pcRdCost->getBvCostSingle(pu.mv[0], amvpInfoList[imv][0], imv, imvForZeroMvd, false, false, addExtraBits, tempMvpIdx);
+      int        tempBvType = 0;
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+      if (pu.isBvpClusterApplicable())
+      {
+        // Check cost for hor bv and ver bv
+        for (int bvType = 1; bvType < numBvTypes; ++bvType)
+        {
+          if ((bvType == 1 && pu.mv[0].ver != 0) || (bvType == 2 && pu.mv[0].hor != 0))
+          {
+            continue;
+          }
+
+          addExtraBits = 1 + bvType;
+          Distortion tempCost1D = m_pcRdCost->getBvCostSingle(pu.mv[0], amvpInfoList[imv][bvType], imv, imvForZeroMvd, bvType == 2, bvType == 1, addExtraBits, tempMvpIdx);
+          if (tempCost1D < tempCost)
+          {
+            tempCost   = tempCost1D;
+            tempBvType = bvType;
+          }
+        }
+      }
+#endif
+      tempCost += (tempCost < bestCost ? distParam.distFunc(distParam) : 0);
+
+      if (tempCost < bestCost)
+      {
+        bestCost     = tempCost;
+        bestImv      = imv;
+        bestMvpIdx   = tempMvpIdx;
+        bestMv       = pu.mv[0];
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+        bestBvType   = tempBvType;
+#endif
+#if JVET_AA0070_RRIBC && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+        bestFlipMode = false;
+#endif
+      }
+
+#if JVET_AA0070_RRIBC
+      // Check cost for hor flip and ver flip
+      if(testRrIBC
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+        && pu.cs->sps->getUseRRIbc()
+#endif
+        )
+      {
+        for (int rrType = 1; rrType < numBvTypes; ++rrType)
+        {
+          if ((rrType == 1 && pu.mv[0].ver != 0) || (rrType == 2 && pu.mv[0].hor != 0))
+          {
+            continue;
+          }
+          
+          addExtraBits = 1 + rrType
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                       + 2
+#endif
+            ;
+          distParam.org = tmpOrgLuma[rrType];
+          tempMvpIdx = 0;
+          tempCost = m_pcRdCost->getBvCostSingle(pu.mv[0], amvpInfoList[imv][rrType], imv, imvForZeroMvd, rrType == 2, rrType == 1, addExtraBits, tempMvpIdx);
+          tempCost += (tempCost < bestCost ? distParam.distFunc(distParam) : 0);
+          
+          if (tempCost < bestCost)
+          {
+            bestCost     = tempCost;
+            bestImv      = imv;
+            bestMvpIdx   = tempMvpIdx;
+            bestMv       = pu.mv[0];
+            bestBvType   = rrType;
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+            bestFlipMode = true;
+#endif
+          }
+        }
+      }
+#endif
+    }
+  };
+
+  if (!intBvList.enableMultiCandSrch && intBvList.mvList[intBvList.maxSize] != Mv())
+  {
+    if( NOT_VALID == intBvList.find(intBvList.mvList[intBvList.maxSize].hor
+                                  , intBvList.mvList[intBvList.maxSize].ver
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                                  , intBvList.bvTypeList[intBvList.maxSize]
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
+                                  , intBvList.bvFlipList[intBvList.maxSize]
+#endif
+      ))
+    {
+      intBvList.replaceAt(intBvList.maxSize, 1); // Add history best frac BV
+      intBvList.cnt = 2;
+    }
+  }
+
+  for (int i = 0; i < intBvList.cnt; ++i)
+  {
+    ibcFracPelSquareSearch(IMV_OFF, i, mvOffsetH, 8);
+    ibcFracPelSquareSearch(IMV_OFF, i, mvOffsetQ, 8);
+  }
+
+  // Find best
+  int bestCandIdx = 0;
+  if (intBvList.cnt > 1)
+  {
+    for (int i = 1; i < intBvList.cnt; ++i)
+    {
+      if (intBvList.costList[i] < intBvList.costList[bestCandIdx])
+      {
+        bestCandIdx = i;
+      }
+    }
+  }
+
+  if (intBvList.enableMultiCandSrch)
+  {  
+    // stored for next round
+    intBvList.replaceAt(bestCandIdx, intBvList.maxSize);
+
+    // Further refinement when best bv is fractional
+    if ((intBvList.imvList[bestCandIdx] == IMV_OFF || intBvList.imvList[bestCandIdx] == IMV_HPEL))
+    {
+      intBvList.replaceAt(bestCandIdx, 0);
+      intBvList.cnt = 1;
+      bestCandIdx   = 0;
+
+      ibcFracPelSquareSearch(IMV_OFF, 0, mvOffsetH, 8);
+      ibcFracPelSquareSearch(IMV_OFF, 0, mvOffsetQ, 8);
+    }
+  }
+
+  // Set best mode
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  int bestBvType = intBvList.bvTypeList[bestCandIdx];
+#else
+  int bestBvType = 0;
+#endif
+
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  pu.cu->bvZeroCompDir = bestBvType;
+  pu.cu->bvOneZeroComp = bestBvType > 0;
+#endif
+#if JVET_AA0070_RRIBC
+  pu.cu->rribcFlipType = bestBvType;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  pu.cu->rribcFlipType = pu.cs->sps->getUseRRIbc() ? pu.cu->rribcFlipType : 0;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  pu.cu->rribcFlipType = intBvList.bvFlipList[bestCandIdx] ? pu.cu->rribcFlipType : 0;
+#endif
+#endif
+
+  pu.cu->imv   = intBvList.imvList   [bestCandIdx];
+  pu.mvpIdx[0] = intBvList.mvpIdxList[bestCandIdx];
+  pu.mv    [0] = intBvList.mvList    [bestCandIdx];
+  pu.mvd   [0] = pu.mv[0] - amvpInfoList[pu.cu->imv][bestBvType].mvCand[pu.mvpIdx[0]];
+
+  pu.bv = pu.mv[0];
+  pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT); // bv is always stored at integer precision
+
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  if (bestBvType == 1)
+  {
+    pu.mvd[REF_PIC_LIST_0].setVer(0);
+    CHECK(pu.mv[0].ver != 0, "Invalid bv for horizontal IBC mode");
+  }
+  else if (bestBvType == 2)
+  {
+    pu.mvd[REF_PIC_LIST_0].setHor(0);
+    CHECK(pu.mv[0].hor != 0, "Invalid bv for vertical IBC mode");
+  }
+#endif
+
+  if (pu.mvd[REF_PIC_LIST_0] == Mv(0, 0))
+  {
+    pu.cu->imv = imvForZeroMvd;
+
+    pu.mv[0] = amvpInfoList[pu.cu->imv][bestBvType].mvCand[pu.mvpIdx[0]];
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    pu.mv[0].regulateMv(bestBvType);
+#endif
+
+    pu.bv = pu.mv[0];
+    pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT); // pu.bv is always stored at integer precision
+  }
+
+  pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
+  return intBvList.costList[bestCandIdx];
+}
+#endif
+
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
 inline void InterSearch::getBestBvpBvOneZeroComp(PredictionUnit &pu, Mv cMv, Distortion initCost,
                                                  int *bvpIdxBest, AMVPInfo *amvp1Pel, AMVPInfo *amvp4Pel)
@@ -2682,8 +4005,16 @@ inline void InterSearch::getBestBvpBvOneZeroComp(PredictionUnit &pu, Mv cMv, Dis
   {
     const int ctbSize     = pu.cs->sps->getCTUSize();
     const int numCurrCtuY = (pu.Y().y >> (floorLog2(ctbSize)));
-    const int rrTop       = (numCurrCtuY < 3) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + 2 * ctbSize);
-
+    unsigned int lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
+    int rrTop;
+    if (256 == lcuWidth)
+    {
+      rrTop = (numCurrCtuY < 2) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + ctbSize);
+    }
+    else
+    {
+      rrTop = (numCurrCtuY < 3) ? -pu.Y().y : -((pu.Y().y & (ctbSize - 1)) + 2 * ctbSize);
+    }
     bvpCand[0] = Mv(0, std::max(-(int) pu.lheight(), rrTop));
     bvpCand[1] = Mv(0, rrTop);
     bvOneZeroCompCost = m_pcRdCost->getBvHorZeroCompCost(cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &tempImv, &tempIdx, bvpCand);
@@ -2801,7 +4132,9 @@ void InterSearch::xxIBCHashSearch(PredictionUnit &pu, Mv *mvPred, int numMvPred,
           continue;
         }
 
-
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+        m_pcRdCost->setFullPelImvForZeroBvd(!pu.cs->sps->getIBCFracFlag());
+#endif
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AA0070_RRIBC
 #if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
@@ -3576,7 +4909,11 @@ bool InterSearch::predInterHashSearch(CodingUnit& cu, Partitioner& partitioner, 
 //! search of the best candidate for inter prediction
 #if JVET_X0083_BM_AMVP_MERGE_MODE
 void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner, bool& bdmvrAmMergeNotValid,
+#if JVET_AD0213_LIC_IMP
+    MvField* mvFieldAmListCommon, bool* licAmListCommon, Mv* mvBufEncAmBDMVR_L0, Mv* mvBufEncAmBDMVR_L1)
+#else
     MvField* mvFieldAmListCommon, Mv* mvBufEncAmBDMVR_L0, Mv* mvBufEncAmBDMVR_L1)
+#endif
 #else
 void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #endif
@@ -3661,7 +4998,11 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     checkAffine = false;
     refListMerge = pu.amvpMergeModeFlag[0] ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
     refListAmvp = RefPicList(1 - refListMerge);
+#if JVET_AD0213_LIC_IMP
+    getAmvpMergeModeMergeList(pu, mvFieldAmListCommon, licAmListCommon);
+#else
     getAmvpMergeModeMergeList(pu, mvFieldAmListCommon);
+#endif
     for (int iRefIdxTemp = 0; iRefIdxTemp < cs.slice->getNumRefIdx(refListAmvp); iRefIdxTemp++)
     {
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
@@ -3696,6 +5037,10 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #endif
   }
 
+#if JVET_AD0213_LIC_IMP && TM_AMVP
+  resetLicEncCtrlPara();
+#endif
+
 #if MULTI_HYP_PRED
   const bool saveMeResultsForMHP = cs.sps->getUseInterMultiHyp()
     && bcwIdx != BCW_DEFAULT
@@ -3703,6 +5048,9 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
       ;
 #endif
   {
+#if JVET_AD0213_LIC_IMP
+    m_encMotionEstimation = true;
+#endif
     if (pu.cu->cs->bestParent != nullptr && pu.cu->cs->bestParent->getCU(CHANNEL_TYPE_LUMA) != nullptr && pu.cu->cs->bestParent->getCU(CHANNEL_TYPE_LUMA)->affine == false)
     {
       m_skipPROF = true;
@@ -3890,9 +5238,16 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
       }
 #endif
       //  Bi-predictive Motion estimation
+#if JVET_AD0213_LIC_IMP
+      bool condOn = cu.slice->getCheckLDC() || bcwIdx == BCW_DEFAULT || !m_affineModeSelected || !m_pcEncCfg->getUseBcwFast() || (cu.licFlag && bcwIdx != BCW_DEFAULT);
+#endif
       if( ( cs.slice->isInterB() ) && ( PU::isBipredRestriction( pu ) == false )
+#if JVET_AD0213_LIC_IMP
+        && condOn
+#else
         && (cu.slice->getCheckLDC() || bcwIdx == BCW_DEFAULT || !m_affineModeSelected || !m_pcEncCfg->getUseBcwFast())
-#if INTER_LIC
+#endif
+#if INTER_LIC && !JVET_AD0213_LIC_IMP
         && !cu.licFlag
 #endif
         )
@@ -4092,6 +5447,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
               pu.refIdx[1 - iRefList] = mvFieldAmListCommon[mvFieldMergeIdx].refIdx;
             }
 #endif
+#if !JVET_AD0213_LIC_IMP
             if( m_pcEncCfg->getUseBcwFast() && (bcwIdx != BCW_DEFAULT)
               && (pu.cu->slice->getRefPic(eRefPicList, iRefIdxTemp)->getPOC() == pu.cu->slice->getRefPic(RefPicList(1 - iRefList), pu.refIdx[1 - iRefList])->getPOC())
               && (!pu.cu->imv && pu.cu->slice->getTLayer()>1)
@@ -4102,6 +5458,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
             {
               continue;
             }
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
             if (amvpMergeModeFlag)
             {
@@ -4165,7 +5522,16 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
                 MvField amvpMvField, mergeMvField;
                 amvpMvField.setMvField(cMvPredBi[iRefList][iRefIdxTemp], iRefIdxTemp);
                 mergeMvField.setMvField(cMvPredBi[iRefList][iRefIdxTemp].getSymmvdMv(cMvPredBi[iRefList][iRefIdxTemp], pu.mv[1 - iRefList]), pu.refIdx[1 - iRefList]);
+#if JVET_AD0213_LIC_IMP
+                int mvFieldMergeIdx = iRefIdxTemp * AMVP_MAX_NUM_CANDS_MEM + bestMvpIdxLoop;
+                CHECK(licAmListCommon[mvFieldMergeIdx] != licAmListCommon[MAX_NUM_AMVP_CANDS_MAX_REF + mvFieldMergeIdx], "inconsistent LIC value");
+                int orgLicFlag = pu.cu->licFlag;
+                pu.cu->licFlag = licAmListCommon[mvFieldMergeIdx];
+#endif
                 uiCostTemp = xGetSymmetricCost( pu, origBuf, eRefPicList, amvpMvField, mergeMvField, bcwIdx );
+#if JVET_AD0213_LIC_IMP
+                pu.cu->licFlag = orgLicFlag;
+#endif
                 uiCostTemp += m_pcRdCost->getCost( uiBitsTemp );
                 cMvTemp[iRefList][iRefIdxTemp] = amvpMvField.mv;
               }
@@ -4177,7 +5543,15 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #if MULTI_HYP_PRED
               CHECK(pu.addHypData.empty() == false, "this is not possible");
 #endif
+#if JVET_AD0213_LIC_IMP
+              int mvFieldMergeIdx = iRefIdxTemp * AMVP_MAX_NUM_CANDS_MEM + bestMvpIdxLoop;
+              int orgLicFlag = pu.cu->licFlag;
+              pu.cu->licFlag = licAmListCommon[mvFieldMergeIdx];
+#endif
               xMotionEstimation ( pu, origBuf, eRefPicList, cMvPredBi[iRefList][iRefIdxTemp], iRefIdxTemp, cMvTemp[iRefList][iRefIdxTemp], aaiMvpIdxBi[iRefList][iRefIdxTemp], uiBitsTemp, uiCostTemp, amvp[eRefPicList], true );
+#if JVET_AD0213_LIC_IMP
+              pu.cu->licFlag = orgLicFlag;
+#endif
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
               }
 #endif
@@ -4553,6 +5927,9 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           m_encOnly = false;
 #endif
           bdmvrAmMergeNotValid = true;
+#if JVET_AD0213_LIC_IMP
+          m_encMotionEstimation = false;
+#endif
           return;
         }
         m_amvpOnlyCost = (uiCostBi < m_amvpOnlyCost) ? uiCostBi : m_amvpOnlyCost;
@@ -4573,6 +5950,9 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
           pu.mvd[REF_PIC_LIST_1].setZero();
 #endif
+#if JVET_AD0213_LIC_IMP
+          pu.cu->licFlag = licAmListCommon[mvFieldMergeIdx];
+#endif
         }
         if (pu.amvpMergeModeFlag[0])
         {
@@ -4586,6 +5966,9 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           pu.mvpIdx[REF_PIC_LIST_0] = 2;
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
           pu.mvd[REF_PIC_LIST_0].setZero();
+#endif
+#if JVET_AD0213_LIC_IMP
+          pu.cu->licFlag = licAmListCommon[mvFieldMergeIdx];
 #endif
         }
         pu.interDir = 3;
@@ -4660,6 +6043,13 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     }
 #endif
     }
+#if JVET_AD0213_LIC_IMP
+    bool condOn = (bcwIdx == BCW_DEFAULT || m_affineModeSelected || !m_pcEncCfg->getUseBcwFast() || (cu.licFlag && bcwIdx != BCW_DEFAULT));
+    if (cu.licFlag && !m_doAffineLic)
+    {
+      condOn = false;
+    }
+#endif
 #if INTER_RM_SIZE_CONSTRAINTS
     if (cu.Y().width >= 8 && cu.Y().height >= 8 && cu.slice->getSPS()->getUseAffine()
 #else
@@ -4667,7 +6057,11 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #endif
       && checkAffine
       && m_pcEncCfg->getUseAffineAmvp()
+#if JVET_AD0213_LIC_IMP
+      && condOn
+#else
       && (bcwIdx == BCW_DEFAULT || m_affineModeSelected || !m_pcEncCfg->getUseBcwFast())
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
       && !amvpMergeModeFlag
 #endif
@@ -4858,20 +6252,67 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     {
       m_affineMotion.hevcCost[pu.cu->imv] = uiHevcCost;
     }
-#if INTER_LIC
-    if (cu.licFlag)
+#if JVET_AC0158_PIXEL_AFFINE_MC && JVET_AD0213_LIC_IMP
+    cu.obmcFlag = true;
+    if ((cu.lwidth() * cu.lheight() < 32) || cu.slice->getSPS()->getUseOBMC() == false)
     {
+      cu.obmcFlag = false;
+    }
+#endif
+#if INTER_LIC
+#if JVET_X0083_BM_AMVP_MERGE_MODE && JVET_AD0213_LIC_IMP
+    if (cu.licFlag && !amvpMergeModeFlag)
+#else
+    if (cu.licFlag)
+#endif
+    {
+#if JVET_AD0213_LIC_IMP && TM_AMVP
+      setEncCtrlParaLicOff(cu);
+#else
 #if !TM_AMVP
+#if JVET_AD0213_LIC_IMP
+      m_storeBeforeLIC = (pu.interDir == 1 || pu.interDir == 2 || pu.cu->affine || pu.cu->smvdMode) ? true : false;
+#else
       m_storeBeforeLIC = true;
+#endif
 #else
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP
       m_storeBeforeLIC = pu.cs->sps->getUseTMAmvpMode() ? false : true;
 #endif
 #endif
+#endif
       m_predictionBeforeLIC = m_tmpStorageLCU.getBuf(UnitAreaRelative(*pu.cu, pu));
     }
+#if JVET_AD0213_LIC_IMP
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+    if ((cu.slice->getUseLIC() && (cu.Y().area() >= LIC_MIN_CU_PIXELS)) && !pu.cu->licFlag && !amvpMergeModeFlag && pu.interDir != 10)
+#else
+    if ((cu.slice->getUseLIC() && (cu.Y().area() >= LIC_MIN_CU_PIXELS)) && !pu.cu->licFlag && pu.interDir != 10)
+#endif
+    {
+      setEncCtrlParaLicOn(cu);
+    }
+#endif
+#endif
+#if JVET_AD0213_LIC_IMP
+    m_encMotionEstimation = false;
 #endif
     motionCompensation( pu, predBuf, REF_PIC_LIST_X );
+#if JVET_AD0213_LIC_IMP
+    if (pu.cu->licFlag)
+    {
+      for (int list = 0; list < 2; list++)
+      {
+        if (pu.refIdx[list] >= 0)
+        {
+          for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+          {
+            setLicParam(list, comp, pu.cu->licScale[list][comp], pu.cu->licOffset[list][comp]);
+          }
+        }
+      }
+    }
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
     if (pu.bdmvrRefine)
     {
@@ -4882,13 +6323,31 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
         mvBufEncAmBDMVR_L0, mvBufEncAmBDMVR_L1, getBdofSubPuMvOffset());
     }
 #endif
-#if INTER_LIC && (!TM_AMVP || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP))
+#if INTER_LIC && (!TM_AMVP || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP) || JVET_AD0213_LIC_IMP)
     m_storeBeforeLIC = false;
 #endif
     puIdx++;
   }
 
 #if INTER_LIC
+#if JVET_AD0213_LIC_IMP && TM_AMVP
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  if (cu.licFlag && !amvpMergeModeFlag && pu.interDir != 10)
+#else
+  if (cu.licFlag && pu.interDir != 10)
+#endif
+  {
+    checkEncLicOff(cu, mergeCtx);
+  }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  if ((cu.slice->getUseLIC() && (cu.Y().area() >= LIC_MIN_CU_PIXELS)) && !pu.cu->licFlag && !amvpMergeModeFlag && pu.interDir != 10)
+#else
+  if ((cu.slice->getUseLIC() && (cu.Y().area() >= LIC_MIN_CU_PIXELS)) && !pu.cu->licFlag && pu.interDir != 10)
+#endif
+  {
+    checkEncLicOn(cu, mergeCtx);
+  }
+#else
 #if !TM_AMVP || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP) // This LIC optimization must be off; otherwise, enc/dec mismatching will result. Because the cost metrics (MRSAD or SAD) of TM mode is adaptive to LIC flag, refined MVs would change when LIC flag is 1 or 0.
   if (cu.licFlag && pu.interDir != 10
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP
@@ -4896,13 +6355,25 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #endif
     ) // xCheckRDCostInterIMV initializes pu.interDir by using 10. When checkAffine and checkNonAffine are both false, pu.interDir remains 10 which should be avoided
   {
+#if JVET_AD0213_LIC_IMP
+    CHECK(pu.interDir != 1 && pu.interDir != 2 && pu.interDir != 3, "Invalid InterDir for LIC");
+#else
     CHECK(pu.interDir != 1 && pu.interDir != 2, "Invalid InterDir for LIC");
+#endif
 
     PelUnitBuf predBuf = pu.cs->getPredBuf(pu);
     DistParam distParam;
     m_pcRdCost->setDistParam(distParam, cs.getOrgBuf().Y(), predBuf.Y(), cs.sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
     Distortion distLicOn = distParam.distFunc(distParam);
 
+#if JVET_AD0213_LIC_IMP
+    if (!(pu.interDir == 1 || pu.interDir == 2 || pu.cu->affine || pu.cu->smvdMode))
+    {
+      pu.cu->licFlag = false;
+      motionCompensation(pu, m_predictionBeforeLIC, REF_PIC_LIST_X);
+      pu.cu->licFlag = true;
+    }
+#endif
     m_pcRdCost->setDistParam(distParam, cs.getOrgBuf().Y(), m_predictionBeforeLIC.Y(), cs.sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
     Distortion distLicOff = distParam.distFunc(distParam);
     if (distLicOn >= distLicOff)
@@ -4912,6 +6383,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
       predBuf.copyFrom(m_predictionBeforeLIC);
     }
   }
+#endif
 #endif
 #endif
 
@@ -4930,7 +6402,9 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #endif
   if (pu.isMvsdApplicable())
   {
+#if !JVET_AD0213_LIC_IMP
     bool bi = pu.interDir == 3;
+#endif
     if (cu.affine)
     {
       for (uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
@@ -4974,12 +6448,18 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           && cMvd.isMvsdApplicable()
           )
         {
+#if JVET_AD0213_LIC_IMP
+          int      iRefIdx = pu.refIdx[uiRefListIdx];
+          AMVPInfo* amvpCand = cu.licFlag ? &(m_tplAmvpInfoLIC[cu.imv][uiRefListIdx][iRefIdx]) : &(m_tplAmvpInfo[cu.imv][uiRefListIdx][iRefIdx]);
+          Mv cMvPred2 = amvpCand->mvCand[pu.mvpIdx[uiRefListIdx]];
+#else
           auto aMvPred = bi ? cMvPredBi : cMvPred;
           auto aRefIdx = bi ? iRefIdxBi : iRefIdx;
           auto aMv = bi ? cMvBi : cMv;
           Mv cMvPred2 = aMvPred[uiRefListIdx][aRefIdx[uiRefListIdx]];
           CHECK(cMvd != aMv[uiRefListIdx] - cMvPred2, "");
           int iRefIdx = pu.refIdx[uiRefListIdx];
+#endif
           Mv cMvdKnownAtDecoder = Mv(cMvd.getAbsHor(), cMvd.getAbsVer());
           std::vector<Mv> cMvdDerivedVec;
           if (cu.smvdMode)
@@ -4991,7 +6471,13 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
               CHECK(cs.slice->getSymRefIdx(REF_PIC_LIST_0) != pu.refIdx[REF_PIC_LIST_0], "ref Idx for List 0 does not match for SMVD at Enc");
               CHECK(cs.slice->getSymRefIdx(REF_PIC_LIST_1) != pu.refIdx[REF_PIC_LIST_1], "ref Idx for List 1 does not match for SMVD at Enc");
 
+#if JVET_AD0213_LIC_IMP
+              AMVPInfo* amvpCand0 = cu.licFlag ? &(m_tplAmvpInfoLIC[cu.imv][0][iRefIdx]) : &(m_tplAmvpInfo[cu.imv][0][iRefIdx]);
+              CHECK(amvpCand0->numCand == 0, "amvp candiate is not available");
+              deriveMvdSignSMVD(amvpCand0->mvCand[pu.mvpIdx[0]], amvpCand->mvCand[pu.mvpIdx[uiRefListIdx]], cMvdKnownAtDecoder, pu, cMvdDerivedVec);
+#else
               deriveMvdSignSMVD(aMvPred[0][aRefIdx[0]], aMvPred[1][aRefIdx[1]], cMvdKnownAtDecoder, pu, cMvdDerivedVec);
+#endif
               int idx = deriveMVSDIdxFromMVDTrans(cMvd, cMvdDerivedVec);
               CHECK(idx == -1, "");
               pu.mvsdIdx[REF_PIC_LIST_0] = idx;
@@ -5097,6 +6583,69 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
     const bool bUseHadamard = !pu.cs->slice->getDisableSATDForRD();
     m_pcRdCost->setDistParam(distParam, origBuf.Y(), tempOrigBuf.Y(), sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
 
+#if JVET_AD0213_LIC_IMP
+    bool mhpMrgListGenerate = ((!savedLICFlag && ((m_mhpMrgTempBufSet & 0x1) == 0)) || (savedLICFlag && ((m_mhpMrgTempBufSet & 0x2) == 0)));
+    if (mhpMrgListGenerate)
+    {
+      PredictionUnit fakePredData = pu;
+      fakePredData.mergeFlag = false;
+      fakePredData.mergeType = MRG_TYPE_DEFAULT_N;
+      fakePredData.mmvdMergeFlag = false;
+      fakePredData.ciipFlag = false;
+      fakePredData.addHypData.clear();
+      fakePredData.regularMergeFlag = false;
+#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
+      fakePredData.tmMergeFlag = false;
+#endif
+#if JVET_X0049_ADAPT_DMVR
+      fakePredData.bmMergeFlag = false;
+#endif
+#if MULTI_PASS_DMVR
+      fakePredData.bdmvrRefine = false;
+#endif
+      if (!m_mhpMrgTempBufSet)
+      {
+        PU::getGeoMergeCandidates(fakePredData, m_geoMrgCtx);
+      }
+#if JVET_W0097_GPM_MMVD_TM
+      maxNumMergeCandidates = min((int)maxNumMergeCandidates, m_geoMrgCtx.numValidMergeCand);
+#endif
+      const auto savedAffine = pu.cu->affine;
+      const auto savedIMV = pu.cu->imv;
+      for (int i = 0; i < maxNumMergeCandidates; i++)
+      {
+        // get prediction for the additional hypothesis
+        int refList = m_geoMrgCtx.interDirNeighbours[i] - 1; CHECK(refList != 0 && refList != 1, "");
+        fakePredData.interDir = refList + 1;
+        fakePredData.mv[refList] = m_geoMrgCtx.mvFieldNeighbours[(i << 1) + refList].mv;
+        fakePredData.refIdx[refList] = m_geoMrgCtx.mvFieldNeighbours[(i << 1) + refList].refIdx;
+        fakePredData.refIdx[1 - refList] = -1;
+        fakePredData.cu->affine = false;
+        fakePredData.cu->imv = m_geoMrgCtx.useAltHpelIf[i] ? IMV_HPEL : 0;
+        fakePredData.mvRefine = true;
+        if (savedLICFlag)
+        {
+          motionCompensation(fakePredData, m_mhpMrgTempBufLic[i], REF_PIC_LIST_X, true, false);
+        }
+        else
+        {
+          motionCompensation(fakePredData, m_mhpMrgTempBuf[i], REF_PIC_LIST_X, true, false);
+        }
+        fakePredData.mvRefine = false;
+        // the restore of affine flag and imv flag has to be here
+        fakePredData.cu->imv = savedIMV;
+        fakePredData.cu->affine = savedAffine;
+      }
+      if (savedLICFlag)
+      {
+        setGeoTmpBuffer(m_mhpMrgTempBufSet + 0x2);
+      }
+      else
+      {
+        setGeoTmpBuffer(m_mhpMrgTempBufSet + 0x1);
+      }
+    }
+#else
     if (!(pu.addHypData.size() > pu.numMergedAddHyps && m_mhpMrgTempBufSet)) // non 1st addHyp check should already have the MC results stored
     {
       PredictionUnit fakePredData = pu;
@@ -5151,6 +6700,7 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
       }
       setGeoTmpBuffer();
     }
+#endif
 #if JVET_W0097_GPM_MMVD_TM
     else
     {
@@ -5173,6 +6723,13 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
       {
         tempOrigBuf.copyFrom(tempPredBuf, true);
 
+#if JVET_AD0213_LIC_IMP
+        if (savedLICFlag)
+        {
+          tempOrigBuf.addHypothesisAndClip(m_mhpMrgTempBufLic[i], g_addHypWeight[tempMHPredData.weightIdx], pu.cs->slice->clpRngs(), true);
+        }
+        else
+#endif
         tempOrigBuf.addHypothesisAndClip(m_mhpMrgTempBuf[i], g_addHypWeight[tempMHPredData.weightIdx], pu.cs->slice->clpRngs(), true);
         Distortion uiSad = distParam.distFunc(distParam);
         uint32_t uiBits = x.bits + (i + 1);
@@ -6468,7 +8025,11 @@ void InterSearch::xMotionEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Ref
 #if INTER_LIC
   if (pu.cu->licFlag)
   {
+#if JVET_AD0213_LIC_IMP
+    PelUnitBuf predTempBuf = m_tmpAffiStorage.getBuf(UnitAreaRelative(*pu.cu, pu));
+#else
     PelUnitBuf predTempBuf = m_tmpStorageLCU.getBuf(UnitAreaRelative(*pu.cu, pu));
+#endif
     const Picture* picRef = pu.cu->slice->getRefPic(eRefPicList, iRefIdxPred);
 #if JVET_AA0096_MC_BOUNDARY_PADDING
     Mv rcMvClipped(rcMv);
@@ -6480,11 +8041,16 @@ void InterSearch::xMotionEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, Ref
 #endif
 
     DistParam distParam;
+#if JVET_AD0213_LIC_IMP
+    m_pcRdCost->setDistParam(distParam, pBuf->Y(), predTempBuf.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, !pu.cs->slice->getDisableSATDForRD());
+    ruiCost = (Distortion)floor(fWeight * (double)distParam.distFunc(distParam)) + m_pcRdCost->getCost(ruiBits);
+#else
     m_pcRdCost->setDistParam(distParam, origBuf.Y(), predTempBuf.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, !pu.cs->slice->getDisableSATDForRD());
 #if MULTI_HYP_PRED
     ruiCost = (Distortion)floor(fWeight * (double)distParam.distFunc(distParam)) + m_pcRdCost->getCost(ruiBits);
 #else
     ruiCost = distParam.distFunc(distParam) + m_pcRdCost->getCost(ruiBits);
+#endif
 #endif
   }
 #endif
@@ -7400,7 +8966,11 @@ Distortion InterSearch::xGetSymmetricCost( PredictionUnit& pu, PelUnitBuf& origB
   const Picture* picRefA = pu.cu->slice->getRefPic( eCurRefPicList, cCurMvField.refIdx );
   Mv mvA = cCurMvField.mv;
   clipMv( mvA, pu.cu->lumaPos(), pu.cu->lumaSize(), *pu.cs->sps, *pu.cs->pps );
+#if JVET_AD0213_LIC_IMP
+  if ((mvA.hor & 15) == 0 && (mvA.ver & 15) == 0 && !pu.cu->licFlag)
+#else
   if ( (mvA.hor & 15) == 0 && (mvA.ver & 15) == 0 )
+#endif
   {
     Position offset = pu.blocks[COMPONENT_Y].pos().offset( mvA.getHor() >> 4, mvA.getVer() >> 4 );
     CPelBuf pelBufA = picRefA->getRecoBuf( CompArea( COMPONENT_Y, pu.chromaFormat, offset, pu.blocks[COMPONENT_Y].size() ), false );
@@ -7419,7 +8989,11 @@ Distortion InterSearch::xGetSymmetricCost( PredictionUnit& pu, PelUnitBuf& origB
   const Picture* picRefB = pu.cu->slice->getRefPic( eTarRefPicList, cTarMvField.refIdx );
   Mv mvB = cTarMvField.mv;
   clipMv( mvB, pu.cu->lumaPos(), pu.cu->lumaSize(), *pu.cs->sps, *pu.cs->pps );
+#if JVET_AD0213_LIC_IMP
+  if ((mvB.hor & 15) == 0 && (mvB.ver & 15) == 0 && !pu.cu->licFlag)
+#else
   if ( (mvB.hor & 15) == 0 && (mvB.ver & 15) == 0 )
+#endif
   {
     Position offset = pu.blocks[COMPONENT_Y].pos().offset( mvB.getHor() >> 4, mvB.getVer() >> 4 );
     CPelBuf pelBufB = picRefB->getRecoBuf( CompArea( COMPONENT_Y, pu.chromaFormat, offset, pu.blocks[COMPONENT_Y].size() ), false );
@@ -7961,7 +9535,7 @@ void InterSearch::xPredAffineInterSearch( PredictionUnit&       pu,
     // Therefore, the undefined bits would be stored in MHP candidates.
     && !(pu.cu->affineType == AFFINEMODEL_6PARAM && (refIdx4Para[0] == NOT_VALID || refIdx4Para[1] == NOT_VALID))
 #endif
-#if INTER_LIC
+#if INTER_LIC && !JVET_AD0213_LIC_IMP
     && !pu.cu->licFlag
 #endif
     )
@@ -8115,12 +9689,14 @@ void InterSearch::xPredAffineInterSearch( PredictionUnit&       pu,
         {
           continue;
         }
+#if !JVET_AD0213_LIC_IMP
         if(m_pcEncCfg->getUseBcwFast() && (bcwIdx != BCW_DEFAULT)
           && (pu.cu->slice->getRefPic(eRefPicList, iRefIdxTemp)->getPOC() == pu.cu->slice->getRefPic(RefPicList(1 - iRefList), pu.refIdx[1 - iRefList])->getPOC())
           && (pu.cu->affineType == AFFINEMODEL_4PARAM && pu.cu->slice->getTLayer()>1))
         {
           continue;
         }
+#endif
         // update bits
         uiBitsTemp = uiMbBits[2] + uiMotBits[1-iRefList];
         uiBitsTemp += ((pu.cu->slice->getSPS()->getUseBcw() == true) ? bcwIdxBits : 0);
@@ -11827,7 +13403,11 @@ void InterSearch::symmvdCheckBestMvp(
   const Picture* picRefA = pu.cu->slice->getRefPic(curRefList, cCurMvField.refIdx);
   Mv mvA = cCurMvField.mv;
   clipMv( mvA, pu.cu->lumaPos(), pu.cu->lumaSize(), *pu.cs->sps, *pu.cs->pps );
+#if JVET_AD0213_LIC_IMP
+  if ((mvA.hor & 15) == 0 && (mvA.ver & 15) == 0 && !pu.cu->licFlag)
+#else
   if ( (mvA.hor & 15) == 0 && (mvA.ver & 15) == 0 )
+#endif
   {
     Position offset = pu.blocks[COMPONENT_Y].pos().offset( mvA.getHor() >> 4, mvA.getVer() >> 4 );
     CPelBuf pelBufA = picRefA->getRecoBuf( CompArea( COMPONENT_Y, pu.chromaFormat, offset, pu.blocks[COMPONENT_Y].size() ), false );
@@ -11862,7 +13442,11 @@ void InterSearch::symmvdCheckBestMvp(
       const Picture* picRefB = pu.cu->slice->getRefPic(tarRefList, cTarMvField.refIdx);
       Mv mvB = cTarMvField.mv;
       clipMv( mvB, pu.cu->lumaPos(), pu.cu->lumaSize(), *pu.cs->sps, *pu.cs->pps );
+#if JVET_AD0213_LIC_IMP
+      if ((mvB.hor & 15) == 0 && (mvB.ver & 15) == 0 && !pu.cu->licFlag)
+#else
       if ( (mvB.hor & 15) == 0 && (mvB.ver & 15) == 0 )
+#endif
       {
         Position offset = pu.blocks[COMPONENT_Y].pos().offset( mvB.getHor() >> 4, mvB.getVer() >> 4 );
         CPelBuf pelBufB = picRefB->getRecoBuf( CompArea( COMPONENT_Y, pu.chromaFormat, offset, pu.blocks[COMPONENT_Y].size() ), false );
@@ -11924,6 +13508,549 @@ uint64_t InterSearch::xCalcPuMeBits(PredictionUnit& pu)
 #endif
   return m_CABACEstimator->getEstFracBits();
 }
+
+#if JVET_AD0213_LIC_IMP
+void InterSearch::resetLicEncCtrlPara()
+{
+  updateMvNeeded = updateL1ZeroFlagMvNeeded = updateSMVDMvNeeded = isBDOFNotNeeded = false;
+  amvpCand0 = amvpCand1 = amvpCand0Lic = amvpCand1Lic = nullptr;
+  mvpIdx0 = mvpIdx1 = -1;
+}
+
+void InterSearch::setEncCtrlParaLicOff(CodingUnit& cu)
+{
+  CodingStructure& cs = *cu.cs;
+  PredictionUnit&  pu = *cu.firstPU;
+
+  isBDOFNotNeeded = (pu.interDir == 1 || pu.interDir == 2 || pu.cu->bcwIdx != BCW_DEFAULT || pu.cu->affine || pu.cu->smvdMode);
+  amvpCand0 = &(m_tplAmvpInfo[cu.imv][REF_PIC_LIST_0][pu.refIdx[REF_PIC_LIST_0]]);
+  amvpCand1 = &(m_tplAmvpInfo[cu.imv][REF_PIC_LIST_1][pu.refIdx[REF_PIC_LIST_1]]);
+  amvpCand0Lic = &(m_tplAmvpInfoLIC[cu.imv][REF_PIC_LIST_0][pu.refIdx[REF_PIC_LIST_0]]);
+  amvpCand1Lic = &(m_tplAmvpInfoLIC[cu.imv][REF_PIC_LIST_1][pu.refIdx[REF_PIC_LIST_1]]);
+  mvpIdx0 = pu.mvpIdx[REF_PIC_LIST_0];
+  mvpIdx1 = pu.mvpIdx[REF_PIC_LIST_1];
+  if (!cu.affine)
+  {
+    for (int refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
+    {
+      if ((pu.interDir & (1 << refList)) == 0)
+      {
+        continue;
+      }
+      RefPicList eRefList = (RefPicList)refList;
+
+      AMVPInfo* curAmvpLicCand = ((eRefList == REF_PIC_LIST_0) ? amvpCand0Lic : amvpCand1Lic);
+      if (curAmvpLicCand->numCand == 0)
+      {
+        PU::fillMvpCand(pu, eRefList, pu.refIdx[refList], *curAmvpLicCand, this);
+      }
+
+      AMVPInfo* curAmvpCand = (eRefList == REF_PIC_LIST_0) ? amvpCand0 : amvpCand1;
+      if (curAmvpCand->numCand == 0)
+      {
+        pu.cu->licFlag = false;
+        PU::fillMvpCand(pu, eRefList, pu.refIdx[refList], *curAmvpCand, this);
+        pu.cu->licFlag = true;
+      }
+    }
+
+    if (cs.picHeader->getMvdL1ZeroFlag() && pu.interDir == 3)
+    {
+      if (amvpCand1Lic->mvCand[mvpIdx1] != amvpCand1->mvCand[mvpIdx1])
+      {
+        updateL1ZeroFlagMvNeeded = true;
+      }
+    }
+    if (pu.cu->smvdMode)
+    {
+      Mv mvd0 = pu.mv[REF_PIC_LIST_0] - amvpCand0->mvCand[mvpIdx0];
+      Mv mvd1 = amvpCand1->mvCand[mvpIdx1] - pu.mv[REF_PIC_LIST_1];
+      if (mvd0 != mvd1)
+      {
+        updateSMVDMvNeeded = true;
+      }
+    }
+  }
+  updateMvNeeded = updateL1ZeroFlagMvNeeded || updateSMVDMvNeeded;
+#if JVET_AC0158_PIXEL_AFFINE_MC && !JVET_AD0213_LIC_IMP
+  m_storeBeforeLIC = !updateMvNeeded && isBDOFNotNeeded && !pu.cu->affine;
+#else
+  m_storeBeforeLIC = !updateMvNeeded && isBDOFNotNeeded;
+#endif
+}
+
+void InterSearch::setEncCtrlParaLicOn(CodingUnit& cu)
+{
+  PredictionUnit& pu = *cu.firstPU;
+
+  amvpCand0 = &(m_tplAmvpInfo[cu.imv][REF_PIC_LIST_0][pu.refIdx[REF_PIC_LIST_0]]);
+  amvpCand1 = &(m_tplAmvpInfo[cu.imv][REF_PIC_LIST_1][pu.refIdx[REF_PIC_LIST_1]]);
+  amvpCand0Lic = &(m_tplAmvpInfoLIC[cu.imv][REF_PIC_LIST_0][pu.refIdx[REF_PIC_LIST_0]]);
+  amvpCand1Lic = &(m_tplAmvpInfoLIC[cu.imv][REF_PIC_LIST_1][pu.refIdx[REF_PIC_LIST_1]]);
+  mvpIdx0 = pu.mvpIdx[REF_PIC_LIST_0];
+  mvpIdx1 = pu.mvpIdx[REF_PIC_LIST_1];
+
+  if (!cu.affine)
+  {
+    for (int refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
+    {
+      if ((pu.interDir & (1 << refList)) == 0)
+      {
+        continue;
+      }
+      RefPicList eRefList = (RefPicList)refList;
+
+      AMVPInfo* curAmvpCand = (eRefList == REF_PIC_LIST_0) ? amvpCand0 : amvpCand1;
+      if (curAmvpCand->numCand == 0)
+      {
+        PU::fillMvpCand(pu, eRefList, pu.refIdx[refList], *curAmvpCand, this);
+      }
+
+      AMVPInfo* curAmvpLicCand = ((eRefList == REF_PIC_LIST_0) ? amvpCand0Lic : amvpCand1Lic);
+      if (curAmvpLicCand->numCand == 0)
+      {
+        pu.cu->licFlag = true;
+        PU::fillMvpCand(pu, eRefList, pu.refIdx[refList], *curAmvpLicCand, this);
+        pu.cu->licFlag = false;
+      }
+    }
+  }
+  m_predictionBeforeLIC = m_tmpStorageLCU.getBuf(UnitAreaRelative(*pu.cu, pu));
+}
+
+void InterSearch::checkEncLicOff(CodingUnit& cu, MergeCtx& mergeCtx)
+{
+  CodingStructure& cs = *cu.cs;
+  PredictionUnit&  pu = *cu.firstPU;
+
+  PelUnitBuf predBuf = pu.cs->getPredBuf(pu);
+  DistParam distParam;
+  m_pcRdCost->setDistParam(distParam, cs.getOrgBuf().Y(), predBuf.Y(), cs.sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+  Distortion distLicOn = distParam.distFunc(distParam);
+
+  const double  sqrtLambdaForFirstPassIntra = m_pcRdCost->getMotionLambda() * FRAC_BITS_SCALE;
+  const TempCtx ctxStart(m_ctxCache, m_CABACEstimator->getCtx());
+  uint64_t licOnFracBits = xCalcExpPuBits(pu);
+  double   licOnCost = (double)distLicOn + (double)licOnFracBits * sqrtLambdaForFirstPassIntra;
+  pu.cu->licFlag = false;
+#if JVET_AC0158_PIXEL_AFFINE_MC
+  if ((cu.lwidth() * cu.lheight() < 32) || cu.slice->getSPS()->getUseOBMC() == false)
+  {
+    pu.cu->obmcFlag = false;
+  }
+  else
+  {
+    pu.cu->obmcFlag = true;
+  }
+#endif
+
+  Mv orgMv1 = pu.mv[REF_PIC_LIST_1];
+  Mv orgMvd0 = pu.mvd[REF_PIC_LIST_0];
+  Mv orgMvd1 = pu.mvd[REF_PIC_LIST_1];
+
+  if (!pu.cu->affine) // because affine has the same AMVPs when LIC is on and off, it is not needed to update mv and mvd
+  {
+    if (cs.picHeader->getMvdL1ZeroFlag() && pu.interDir == 3)
+    {
+      CHECK(pu.mvd[REF_PIC_LIST_1] != Mv(), "L1 mvd should be zero MV for MvdL1ZeroFlag");
+      pu.mvd[REF_PIC_LIST_0] = pu.mv[REF_PIC_LIST_0] - amvpCand0->mvCand[mvpIdx0];
+      pu.mv[REF_PIC_LIST_1] = amvpCand1->mvCand[mvpIdx1];
+    }
+    else if (pu.cu->smvdMode)
+    {
+      Mv mvd = pu.mv[REF_PIC_LIST_0] - amvpCand0->mvCand[mvpIdx0];
+      pu.mv[REF_PIC_LIST_1] = amvpCand1->mvCand[mvpIdx1] - mvd;
+      pu.mvd[REF_PIC_LIST_0] = mvd;
+      pu.mvd[REF_PIC_LIST_1] = Mv() - mvd;
+    }
+    else
+    {
+      if (pu.interDir == 1)
+      {
+        pu.mvd[REF_PIC_LIST_0] = pu.mv[REF_PIC_LIST_0] - amvpCand0->mvCand[mvpIdx0];
+      }
+      else if (pu.interDir == 2)
+      {
+        pu.mvd[REF_PIC_LIST_1] = pu.mv[REF_PIC_LIST_1] - amvpCand1->mvCand[mvpIdx1];
+      }
+      else if (pu.interDir == 3)
+      {
+        pu.mvd[REF_PIC_LIST_0] = pu.mv[REF_PIC_LIST_0] - amvpCand0->mvCand[mvpIdx0];
+        pu.mvd[REF_PIC_LIST_1] = pu.mv[REF_PIC_LIST_1] - amvpCand1->mvCand[mvpIdx1];
+      }
+    }
+  }
+
+#if JVET_AC0158_PIXEL_AFFINE_MC && !JVET_AD0213_LIC_IMP
+  if (updateMvNeeded || !isBDOFNotNeeded || pu.cu->affine)
+#else
+  if (updateMvNeeded || !isBDOFNotNeeded)
+#endif
+  {
+    motionCompensation(pu, m_predictionBeforeLIC, REF_PIC_LIST_X);
+  }
+  m_pcRdCost->setDistParam(distParam, cs.getOrgBuf().Y(), m_predictionBeforeLIC.Y(), cs.sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+  Distortion distLicOff = distParam.distFunc(distParam);
+  m_CABACEstimator->getCtx() = ctxStart;
+  uint64_t licOffFracBits = xCalcExpPuBits(pu);
+  double licOffCost = (double)distLicOff + (double)licOffFracBits * sqrtLambdaForFirstPassIntra;
+  if (licOnCost >= licOffCost)
+  {
+    pu.cu->licFlag = false;
+#if JVET_AC0158_PIXEL_AFFINE_MC
+    if ((cu.lwidth() * cu.lheight() < 32) || cu.slice->getSPS()->getUseOBMC() == false)
+    {
+      pu.cu->obmcFlag = false;
+    }
+    else
+    {
+      pu.cu->obmcFlag = true;
+    }
+#endif
+#if JVET_AD0213_LIC_IMP
+    for (int list = 0; list < 2; list++)
+    {
+      for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+      {
+        pu.cu->licScale[list][comp] = MAX_INT;
+        pu.cu->licOffset[list][comp] = MAX_INT;
+      }
+    }
+#endif
+    PU::spanMotionInfo(pu, mergeCtx);
+    predBuf.copyFrom(m_predictionBeforeLIC);
+  }
+  else
+  {
+    pu.cu->licFlag = true;
+#if JVET_AC0158_PIXEL_AFFINE_MC
+#if JVET_AD0213_LIC_IMP
+    if ((cu.lwidth() * cu.lheight() < 32) || cu.slice->getSPS()->getUseOBMC() == false)
+    {
+      pu.cu->obmcFlag = false;
+    }
+    else
+    {
+      pu.cu->obmcFlag = true;
+    }
+#else
+    pu.cu->obmcFlag = false;
+#endif
+#endif
+    pu.mv[REF_PIC_LIST_1] = orgMv1;
+    pu.mvd[REF_PIC_LIST_0] = orgMvd0;
+    pu.mvd[REF_PIC_LIST_1] = orgMvd1;
+  }
+  m_CABACEstimator->getCtx() = ctxStart;
+}
+
+void InterSearch::checkEncLicOn(CodingUnit& cu, MergeCtx& mergeCtx)
+{
+  CodingStructure& cs = *cu.cs;
+  PredictionUnit&  pu = *cu.firstPU;
+
+  PelUnitBuf predBuf = pu.cs->getPredBuf(pu);
+  DistParam distParam;
+  m_pcRdCost->setDistParam(distParam, cs.getOrgBuf().Y(), predBuf.Y(), cs.sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+  Distortion distLicOff = distParam.distFunc(distParam);
+
+  const double  sqrtLambdaForFirstPassIntra = m_pcRdCost->getMotionLambda() * FRAC_BITS_SCALE;
+  const TempCtx ctxStart(m_ctxCache, m_CABACEstimator->getCtx());
+  uint64_t licOffFracBits = xCalcExpPuBits(pu);
+  double   licOffCost = (double)distLicOff + (double)licOffFracBits * sqrtLambdaForFirstPassIntra;
+  pu.cu->licFlag = true;
+#if JVET_AC0158_PIXEL_AFFINE_MC
+#if JVET_AD0213_LIC_IMP
+  if ((cu.lwidth() * cu.lheight() < 32) || cu.slice->getSPS()->getUseOBMC() == false)
+  {
+    pu.cu->obmcFlag = false;
+  }
+  else
+  {
+    pu.cu->obmcFlag = true;
+  }
+#else
+  pu.cu->obmcFlag = false;
+#endif
+#endif
+
+  Mv orgMv1 = pu.mv[REF_PIC_LIST_1];
+  Mv orgMvd0 = pu.mvd[REF_PIC_LIST_0];
+  Mv orgMvd1 = pu.mvd[REF_PIC_LIST_1];
+
+  if (!pu.cu->affine) // because affine has the same AMVPs when LIC is on and off, it is not needed to update mv and mvd
+  {
+    if (cs.picHeader->getMvdL1ZeroFlag() && pu.interDir == 3)
+    {
+      CHECK(pu.mvd[REF_PIC_LIST_1] != Mv(), "L1 mvd should be zero MV for MvdL1ZeroFlag");
+      pu.mvd[REF_PIC_LIST_0] = pu.mv[REF_PIC_LIST_0] - amvpCand0Lic->mvCand[mvpIdx0];
+      pu.mv[REF_PIC_LIST_1] = amvpCand1Lic->mvCand[mvpIdx1];
+    }
+    else if (pu.cu->smvdMode)
+    {
+      Mv mvd = pu.mv[REF_PIC_LIST_0] - amvpCand0Lic->mvCand[mvpIdx0];
+      pu.mv[REF_PIC_LIST_1] = amvpCand1Lic->mvCand[mvpIdx1] - mvd;
+      pu.mvd[REF_PIC_LIST_0] = mvd;
+      pu.mvd[REF_PIC_LIST_1] = Mv() - mvd;
+    }
+    else
+    {
+      if (pu.interDir == 1)
+      {
+        pu.mvd[REF_PIC_LIST_0] = pu.mv[REF_PIC_LIST_0] - amvpCand0Lic->mvCand[mvpIdx0];
+      }
+      else if (pu.interDir == 2)
+      {
+        pu.mvd[REF_PIC_LIST_1] = pu.mv[REF_PIC_LIST_1] - amvpCand1Lic->mvCand[mvpIdx1];
+      }
+      else if (pu.interDir == 3)
+      {
+        pu.mvd[REF_PIC_LIST_0] = pu.mv[REF_PIC_LIST_0] - amvpCand0Lic->mvCand[mvpIdx0];
+        pu.mvd[REF_PIC_LIST_1] = pu.mv[REF_PIC_LIST_1] - amvpCand1Lic->mvCand[mvpIdx1];
+      }
+    }
+  }
+  motionCompensation(pu, m_predictionBeforeLIC, REF_PIC_LIST_X);
+#if JVET_AD0213_LIC_IMP
+  for (int list = 0; list < 2; list++)
+  {
+    if (pu.refIdx[list] >= 0)
+    {
+      for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+      {
+        setLicParam(list, comp, pu.cu->licScale[list][comp], pu.cu->licOffset[list][comp]);
+      }
+    }
+  }
+#endif
+  m_pcRdCost->setDistParam(distParam, cs.getOrgBuf().Y(), m_predictionBeforeLIC.Y(), cs.sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+  Distortion distLicOn = distParam.distFunc(distParam);
+  m_CABACEstimator->getCtx() = ctxStart;
+  uint64_t licOnFracBits = xCalcExpPuBits(pu);
+  double licOnCost = (double)distLicOn + (double)licOnFracBits * sqrtLambdaForFirstPassIntra;
+
+  if (licOnCost < licOffCost)
+  {
+    pu.cu->licFlag = true;
+#if JVET_AC0158_PIXEL_AFFINE_MC
+#if JVET_AD0213_LIC_IMP
+    if ((cu.lwidth() * cu.lheight() < 32) || cu.slice->getSPS()->getUseOBMC() == false)
+    {
+      pu.cu->obmcFlag = false;
+    }
+    else
+    {
+      pu.cu->obmcFlag = true;
+    }
+#else
+    pu.cu->obmcFlag = false;
+#endif
+#endif
+    PU::spanMotionInfo(pu, mergeCtx);
+    predBuf.copyFrom(m_predictionBeforeLIC);
+  }
+  else
+  {
+    pu.cu->licFlag = false;
+#if JVET_AC0158_PIXEL_AFFINE_MC
+    if ((cu.lwidth() * cu.lheight() < 32) || cu.slice->getSPS()->getUseOBMC() == false)
+    {
+      pu.cu->obmcFlag = false;
+    }
+    else
+    {
+      pu.cu->obmcFlag = true;
+    }
+#endif
+#if JVET_AD0213_LIC_IMP
+    for (int list = 0; list < 2; list++)
+    {
+      for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+      {
+        pu.cu->licScale[list][comp] = MAX_INT;
+        pu.cu->licOffset[list][comp] = MAX_INT;
+      }
+    }
+#endif
+    pu.mv[REF_PIC_LIST_1] = orgMv1;
+    pu.mvd[REF_PIC_LIST_0] = orgMvd0;
+    pu.mvd[REF_PIC_LIST_1] = orgMvd1;
+  }
+  m_CABACEstimator->getCtx() = ctxStart;
+}
+
+uint64_t InterSearch::xCalcExpPuBits(PredictionUnit& pu)
+{
+  assert(!pu.mergeFlag);
+  assert(!CU::isIBC(*pu.cu));
+  m_CABACEstimator->resetBits();
+
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  m_CABACEstimator->amvpMerge_mode(pu);
+  if (!(pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1]))
+  {
+#endif
+    m_CABACEstimator->inter_pred_idc(pu);
+    m_CABACEstimator->affine_flag(*pu.cu);
+    m_CABACEstimator->smvd_mode(pu);
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    if (pu.cs->sps->getUseMVSD())
+    {
+#endif
+      m_CABACEstimator->cu_bcw_flag(*pu.cu);
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    }
+#endif
+#endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+  }
+#endif
+  if (pu.interDir != 2 /* PRED_L1 */)
+  {
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+    if (!pu.amvpMergeModeFlag[REF_PIC_LIST_0])
+    {
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+      m_CABACEstimator->ref_idx(pu, REF_PIC_LIST_0, true);
+#else
+      m_CABACEstimator->ref_idx(pu, REF_PIC_LIST_0);
+#endif
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+      m_CABACEstimator->mvp_flag(pu, REF_PIC_LIST_0);
+#endif
+      if (pu.cu->affine)
+      {
+        Mv mvd = pu.mvdAffi[REF_PIC_LIST_0][0];
+        mvd.changeAffinePrecInternal2Amvr(pu.cu->imv);
+        m_CABACEstimator->mvd_coding(mvd, 0); // already changed to signaling precision
+        mvd = pu.mvdAffi[REF_PIC_LIST_0][1];
+        mvd.changeAffinePrecInternal2Amvr(pu.cu->imv);
+        m_CABACEstimator->mvd_coding(mvd, 0); // already changed to signaling precision
+
+        if (pu.cu->affineType == AFFINEMODEL_6PARAM)
+        {
+          mvd = pu.mvdAffi[REF_PIC_LIST_0][2];
+          mvd.changeAffinePrecInternal2Amvr(pu.cu->imv);
+          m_CABACEstimator->mvd_coding(mvd, 0); // already changed to signaling precision
+        }
+      }
+      else
+      {
+        Mv mvd = pu.mvd[REF_PIC_LIST_0];
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+        if (pu.amvpMergeModeFlag[REF_PIC_LIST_1] == true && pu.mvpIdx[REF_PIC_LIST_0] < 2)
+        {
+          CHECK(mvd.hor != 0, "this is not possible");
+          CHECK(mvd.ver != 0, "this is not possible");
+        }
+        else
+        {
+#endif
+          mvd.changeTransPrecInternal2Amvr(pu.cu->imv);
+          m_CABACEstimator->mvd_coding(mvd, 0); // already changed to signaling precision
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+        }
+#endif
+      }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+    }
+#endif
+#if !JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+    m_CABACEstimator->mvp_flag(pu, REF_PIC_LIST_0);
+#endif
+  }
+  if (pu.interDir != 1 /* PRED_L0 */)
+  {
+    if (pu.cu->smvdMode != 1)
+    {
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+      if (!pu.amvpMergeModeFlag[REF_PIC_LIST_1])
+      {
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+        m_CABACEstimator->ref_idx(pu, REF_PIC_LIST_1, true);
+#else
+        m_CABACEstimator->ref_idx(pu, REF_PIC_LIST_1);
+#endif
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+        m_CABACEstimator->mvp_flag(pu, REF_PIC_LIST_1);
+#endif
+        if (!pu.cs->picHeader->getMvdL1ZeroFlag() || pu.interDir != 3 /* PRED_BI */)
+        {
+          if (pu.cu->affine)
+          {
+            Mv mvd = pu.mvdAffi[REF_PIC_LIST_1][0];
+            mvd.changeAffinePrecInternal2Amvr(pu.cu->imv);
+            m_CABACEstimator->mvd_coding(mvd, 0); // already changed to signaling precision
+            mvd = pu.mvdAffi[REF_PIC_LIST_1][1];
+            mvd.changeAffinePrecInternal2Amvr(pu.cu->imv);
+            m_CABACEstimator->mvd_coding(mvd, 0); // already changed to signaling precision
+            if (pu.cu->affineType == AFFINEMODEL_6PARAM)
+            {
+              mvd = pu.mvdAffi[REF_PIC_LIST_1][2];
+              mvd.changeAffinePrecInternal2Amvr(pu.cu->imv);
+              m_CABACEstimator->mvd_coding(mvd, 0); // already changed to signaling precision
+            }
+          }
+          else
+          {
+            Mv mvd = pu.mvd[REF_PIC_LIST_1];
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+            if (pu.amvpMergeModeFlag[REF_PIC_LIST_0] == true && pu.mvpIdx[REF_PIC_LIST_1] < 2)
+            {
+              CHECK(mvd.hor != 0, "this is not possible");
+              CHECK(mvd.ver != 0, "this is not possible");
+            }
+            else
+            {
+#endif
+              mvd.changeTransPrecInternal2Amvr(pu.cu->imv);
+              m_CABACEstimator->mvd_coding(mvd, 0); // already changed to signaling precision
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+            }
+#endif
+          }
+        }
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+      }
+#endif
+    }
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+    else
+    {
+      CHECK(pu.refIdx[REF_PIC_LIST_1] != pu.cs->slice->getSymRefIdx(REF_PIC_LIST_1), "Wrong L1 reference index");
+      m_CABACEstimator->mvp_flag(pu, REF_PIC_LIST_1);
+    }
+#endif
+#if !JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+    m_CABACEstimator->mvp_flag(pu, REF_PIC_LIST_1);
+#endif
+  }
+
+  m_CABACEstimator->imv_mode(*pu.cu);
+  m_CABACEstimator->affine_amvr_mode(*pu.cu);
+#if INTER_LIC
+  m_CABACEstimator->cu_lic_flag(*pu.cu);
+#endif
+#if !JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED)
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  if (!pu.cu->cs->sps->getUseMVSD())
+  {
+#endif
+    m_CABACEstimator->cu_bcw_flag(*pu.cu);
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  }
+#endif
+#endif
+#if ENABLE_OBMC 
+  m_CABACEstimator->obmc_flag(*pu.cu);
+#endif
+
+  return m_CABACEstimator->getEstFracBits();
+}
+#endif
 
 #if !JVET_Z0084_IBC_TM
 bool InterSearch::searchBv(PredictionUnit& pu, int xPos, int yPos, int width, int height, int picWidth, int picHeight, int xBv, int yBv, int ctuSize)
@@ -11993,10 +14120,42 @@ bool InterSearch::searchBv(PredictionUnit& pu, int xPos, int yPos, int width, in
   }
 
 #if JVET_Z0153_IBC_EXT_REF
+#if JVET_AA0106_IBCBUF_CTU256
+  if (256 == ctuSize)
+  {
+    if ((refTopY >> ctuSizeLog2) + 1 < (yPos >> ctuSizeLog2))
+    {
+      return false;
+    }
+    if (((refTopY >> ctuSizeLog2) == (yPos >> ctuSizeLog2)) && ((refRightX >> ctuSizeLog2) > (xPos >> ctuSizeLog2)))
+    {
+      return false;
+    }
+    if (((refTopY >> ctuSizeLog2) + 1 == (yPos >> ctuSizeLog2)) && ((refLeftX >> ctuSizeLog2) + 1 < (xPos >> ctuSizeLog2)))
+    {
+      return false;
+    }
+  }
+  else
+  {
+    if ((refTopY >> ctuSizeLog2) + 2 < (yPos >> ctuSizeLog2))
+    {
+      return false;
+    }
+    if (((refTopY >> ctuSizeLog2) == (yPos >> ctuSizeLog2)) && ((refRightX >> ctuSizeLog2) > (xPos >> ctuSizeLog2)))
+    {
+      return false;
+    }
+    if (((refTopY >> ctuSizeLog2) + 2 == (yPos >> ctuSizeLog2)) && ((refLeftX >> ctuSizeLog2) + 2 < (xPos >> ctuSizeLog2)))
+    {
+      return false;
+    }
+  }
+#else
   if ((refTopY >> ctuSizeLog2) + 2 < (yPos >> ctuSizeLog2))
   {
     return false;
-  };
+  }
   if (((refTopY >> ctuSizeLog2) == (yPos >> ctuSizeLog2)) && ((refRightX >> ctuSizeLog2) > (xPos >> ctuSizeLog2)))
   {
     return false;
@@ -12005,6 +14164,7 @@ bool InterSearch::searchBv(PredictionUnit& pu, int xPos, int yPos, int width, in
   {
     return false;
   }
+#endif
 #else
   // in the same CTU line
 #if CTU_256

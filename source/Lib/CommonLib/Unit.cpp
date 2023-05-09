@@ -323,8 +323,32 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #endif
 #if TMP_FAST_ENC
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  for (int i = 0; i < MTMP_NUM; i++)
+  {
+    tmpXdisp[i] = other.tmpXdisp[i];
+    tmpYdisp[i] = other.tmpYdisp[i];
+  }
+  for (int i = 0; i < TMP_GROUP_IDX << 1; i++)
+  {
+    tmpFusionInfo[i] = other.tmpFusionInfo[i];
+  }
+  tmpIdx        = other.tmpIdx;
+  tmpFusionFlag = other.tmpFusionFlag;
+  tmpFlmFlag    = other.tmpFlmFlag;
+  for (int j = 0; j < MTMP_NUM; j++)
+  {
+    for (int i = 0; i < TMP_FLM_PARAMS; i++)
+    {
+      tmpFlmParams[i][j] = other.tmpFlmParams[i][j];
+    }
+  }
+  tmpIsSubPel  = other.tmpIsSubPel;
+  tmpSubPelIdx = other.tmpSubPelIdx;
+#else
   tmpXdisp = other.tmpXdisp;
   tmpYdisp = other.tmpYdisp;
+#endif
   tmpNumCand = other.tmpNumCand;
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -372,6 +396,16 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if INTER_LIC
   licFlag           = other.licFlag;
+#if JVET_AD0213_LIC_IMP
+  for (int i = 0; i < 2; i++)
+  {
+    for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+    {
+      licScale[i][comp] = other.licScale[i][comp];
+      licOffset[i][comp] = other.licOffset[i][comp];
+    }
+  }
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = other.ibcLicFlag;
@@ -494,8 +528,32 @@ void CodingUnit::initData()
 #endif
 #endif
 #if TMP_FAST_ENC
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  for (int i = 0; i < MTMP_NUM; i++)
+  {
+    tmpXdisp[i] = 0;
+    tmpYdisp[i] = 0;
+  }
+  for (int i = 0; i < TMP_GROUP_IDX << 1; i++)
+  {
+    tmpFusionInfo[i] = IntraTMPFusionInfo{ false, false, 0, 1 };
+  }
+  tmpIdx        = 0;
+  tmpFusionFlag = false;
+  tmpFlmFlag    = false;
+  for (int j = 0; j < MTMP_NUM; j++)
+  {
+    for (int i = 0; i < TMP_FLM_PARAMS; i++)
+    {
+      tmpFlmParams[i][j] = -1;
+    }
+  }
+  tmpIsSubPel  = -1;
+  tmpSubPelIdx = -1;
+#else  
   tmpXdisp = 0;
   tmpYdisp = 0;
+#endif 
   tmpNumCand = 0;
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -545,6 +603,16 @@ void CodingUnit::initData()
 #endif
 #if INTER_LIC
   licFlag = false;
+#if JVET_AD0213_LIC_IMP
+  for (int i = 0; i < 2; i++)
+  {
+    for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+    {
+      licScale[i][comp] = MAX_INT;
+      licOffset[i][comp] = MAX_INT;
+    }
+  }
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = false;
@@ -816,6 +884,14 @@ void PredictionUnit::initData()
 #if JVET_AC0054_GLCCCM
   glCccmFlag = 0;
 #endif
+#if JVET_AD0202_CCCM_MDF
+  cccmMultiFilterIdx = 0;
+#endif
+#endif
+#if JVET_AD0188_CCP_MERGE
+  idxNonLocalCCP = 0;
+  curCand = {};
+  curCand.type = CCP_TYPE_NONE;
 #endif
   // inter data
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
@@ -867,6 +943,10 @@ void PredictionUnit::initData()
 #if JVET_X0049_ADAPT_DMVR
   bmMergeFlag = false;
   bmDir = 0;
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  affBMMergeFlag = false;
+  affBMDir = 0;
 #endif
   interDir    = MAX_UCHAR;
   mergeType   = MRG_TYPE_DEFAULT_N;
@@ -970,6 +1050,13 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #if JVET_AC0054_GLCCCM
   glCccmFlag = predData.glCccmFlag;
 #endif
+#if JVET_AD0202_CCCM_MDF
+  cccmMultiFilterIdx = predData.cccmMultiFilterIdx;
+#endif
+#endif
+#if JVET_AD0188_CCP_MERGE
+  idxNonLocalCCP  = predData.idxNonLocalCCP;
+  curCand = predData.curCand;
 #endif
   return *this;
 }
@@ -1025,6 +1112,10 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 #if JVET_X0049_ADAPT_DMVR
   bmMergeFlag = predData.bmMergeFlag;
   bmDir = predData.bmDir;
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  affBMMergeFlag = predData.affBMMergeFlag;
+  affBMDir = predData.affBMDir;
 #endif
   interDir    = predData.interDir;
   mergeType   = predData.mergeType;
@@ -1124,6 +1215,13 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #if JVET_AC0054_GLCCCM
   glCccmFlag = other.glCccmFlag;
 #endif
+#if JVET_AD0202_CCCM_MDF
+  cccmMultiFilterIdx = other.cccmMultiFilterIdx;
+#endif
+#endif
+#if JVET_AD0188_CCP_MERGE
+  idxNonLocalCCP  = other.idxNonLocalCCP;
+  curCand = other.curCand;
 #endif
 
   mergeFlag   = other.mergeFlag;
@@ -1182,6 +1280,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #if JVET_X0049_ADAPT_DMVR
   bmMergeFlag = other.bmMergeFlag;
   bmDir = other.bmDir;
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  affBMMergeFlag = other.affBMMergeFlag;
+  affBMDir = other.affBMDir;
 #endif
   interDir    = other.interDir;
   mergeType   = other.mergeType;
@@ -1368,6 +1470,23 @@ bool PredictionUnit::isBvpClusterApplicable() const
   }
 
   return true;
+}
+#endif
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC)
+uint32_t PredictionUnit::getBvType() const
+{
+#if JVET_AA0070_RRIBC
+  int bvType = cu->rribcFlipType;
+#else
+  int bvType = 0;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bvType = isBvpClusterApplicable() ? cu->bvZeroCompDir : bvType;
+#endif
+
+  // 0: 2-D; 1: Hor 1-D; 2: Ver 1-D
+  return bvType;
 }
 #endif
 
@@ -1632,6 +1751,27 @@ const CPLTescapeBuf TransformUnit::getescapeValue(const ComponentID id) const { 
 #endif
       bool*         TransformUnit::getRunTypes   (const ComponentID id)       { return  m_runType[id];   }
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+int TransformUnit::countNonZero()
+{
+  if (!cbf[0])
+  {
+    return 0;
+  }
+  int count = 0;
+  auto areaY = Y();
+  auto coeffY = m_coeffs[0];
+  int blksize = areaY.width * areaY.height;
+  for (auto i = 0; i < blksize; ++i)
+  {
+    if (coeffY[i])
+    {
+      count++;
+    }
+  }
+  return count;
+}
+#endif
 void TransformUnit::checkTuNoResidual( unsigned idx )
 {
   if( CU::getSbtIdx( cu->sbtInfo ) == SBT_OFF_DCT )

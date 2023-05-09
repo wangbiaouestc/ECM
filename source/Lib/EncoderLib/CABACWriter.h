@@ -144,6 +144,9 @@ public:
 #if JVET_AA0057_CCCM
   void        cccmFlag                  ( const PredictionUnit&         pu );
 #endif
+#if JVET_AD0188_CCP_MERGE
+  void        nonLocalCCPIndex          ( const PredictionUnit&         pu );
+#endif
   void        cu_residual               ( const CodingUnit&             cu,       Partitioner&      pm,         CUCtx& cuCtx );
   void        rqt_root_cbf              ( const CodingUnit&             cu );
   void        adaptive_color_transform(const CodingUnit&             cu);
@@ -154,6 +157,9 @@ public:
 #endif
 #if JVET_X0049_ADAPT_DMVR
   void        bm_merge_flag             ( const PredictionUnit&         pu);
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  void        affBmFlag                 (const PredictionUnit&         pu);
 #endif
   void        mip_flag                  ( const CodingUnit&             cu );
   void        mip_pred_modes            ( const CodingUnit&             cu );
@@ -225,7 +231,11 @@ public:
   void        imv_mode                  ( const CodingUnit&             cu );
   void        affine_amvr_mode          ( const CodingUnit&             cu );
   void        inter_pred_idc            ( const PredictionUnit&         pu );
+#if JVET_Z0054_BLK_REF_PIC_REORDER && JVET_AD0213_LIC_IMP
+  void        ref_idx                   ( const PredictionUnit&         pu,       RefPicList eRefList, bool forceRefIdx = false);
+#else
   void        ref_idx                   ( const PredictionUnit&         pu,       RefPicList eRefList );
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   void        refIdxLC                  ( const PredictionUnit&         pu );
   void        refPairIdx                ( const PredictionUnit&         pu );

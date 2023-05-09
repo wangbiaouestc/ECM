@@ -233,7 +233,11 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   static Ctx storedCtx;
 #endif
-
+#if JVET_AD0188_CCP_MERGE
+  {
+    cs.ccpLut.lutCCP.resize(0);
+  }
+#endif
   unsigned subStrmId = 0;
   for( unsigned ctuIdx = 0; ctuIdx < slice->getNumCtuInSlice(); ctuIdx++ )
   {
@@ -316,7 +320,11 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
       resetBcwCodingOrder(true, cs);
     }
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if ((cs.slice->getSliceType() != I_SLICE || cs.slice->getUseIBC()) && ctuXPosInCtus == tileXPosInCtus)
+#else
     if ((cs.slice->getSliceType() != I_SLICE || cs.sps->getIBCFlag()) && ctuXPosInCtus == tileXPosInCtus)
+#endif
     {
 #if JVET_Z0118_GDR
       cs.motionLut.lut0.resize(0);      
@@ -359,7 +367,12 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
       cs.resetIBCBuffer = true;
 #endif
     }
-
+#if JVET_AD0188_CCP_MERGE
+    if (ctuXPosInCtus == tileXPosInCtus)
+    {
+      cs.ccpLut.lutCCP.resize(0);
+    }
+#endif
     if( !cs.slice->isIntra() )
     {
       pic->mctsInfo.init( &cs, getCtuAddr( ctuArea.lumaPos(), *( cs.pcv ) ) );

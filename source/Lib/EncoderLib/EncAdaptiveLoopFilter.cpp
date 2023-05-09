@@ -101,7 +101,11 @@ void AlfCovariance::reduceClipCost(const AlfFilterShape& alfShape, int *clip) co
   }
 }
 
+#if JVET_AD0222_ALF_RESI_CLASS
+double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, double *f, bool optimize_clip, bool enableLessClip) const
+#else
 double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, double *f, bool optimize_clip) const
+#endif
 {
   const int size = alfShape.numCoeff;
   int clip_max[MAX_NUM_ALF_LUMA_COEFF];
@@ -130,8 +134,15 @@ double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, 
   memcpy( fBest, f, copySize );
   int step = optimize_clip ? (numBins+1)/2 : 0;
 
+#if JVET_AD0222_ALF_RESI_CLASS
+  int iter = 0;
+  while( enableLessClip ? step > 0 && iter < 32 : step > 0 )
+  {
+    iter++;
+#else
   while( step > 0 )
   {
+#endif
     double err_min = err_best;
     int idx_min = -1;
     int inc_min = 0;
@@ -468,6 +479,32 @@ void EncAdaptiveLoopFilter::create( const EncCfg* encCfg, const int picWidth, co
   CHECK( encCfg == nullptr, "encCfg must not be null" );
   m_encCfg = encCfg;
 
+#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+  if( encCfg->getIntraPeriod() == 1 )   // all intra
+  {
+    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI_DIRECT] = true;
+    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI] = false;
+#if JVET_AD0222_ALF_RESI_CLASS
+    m_enableLessClip = false;
+#endif
+  }
+  else if( encCfg->getIntraPeriod() > 1 )   // random access
+  {
+    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI_DIRECT] = false;
+    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI] = true;
+#if JVET_AD0222_ALF_RESI_CLASS
+    m_enableLessClip = true;
+#endif
+  }
+  else if( encCfg->getIntraPeriod() == -1 )   // low delay
+  {
+    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI_DIRECT] = false;
+    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI] = true;
+#if JVET_AD0222_ALF_RESI_CLASS
+    m_enableLessClip = true;
+#endif
+  }
+#endif
 
   for( int channelIdx = 0; channelIdx < MAX_NUM_CHANNEL_TYPE; channelIdx++ )
   {
@@ -1130,23 +1167,6 @@ void EncAdaptiveLoopFilter::ALFProcess( CodingStructure& cs, const double *lambd
 #endif
 )
 {
-#if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
-  if (intraPeriod == 1)   // all intra
-  {
-    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI_DIRECT] = true;
-    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI]        = false;
-  }
-  else if (intraPeriod > 1)   // random access
-  {
-    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI_DIRECT] = false;
-    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI]        = true;
-  }
-  else if (intraPeriod == -1)   // low delay
-  {
-    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI_DIRECT] = false;
-    m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI]        = true;
-  }
-#endif
   int layerIdx = cs.vps == nullptr ? 0 : cs.vps->getGeneralLayerIdx( cs.slice->getPic()->layerId );
 
   // IRAP AU is assumed
@@ -1226,7 +1246,13 @@ void EncAdaptiveLoopFilter::ALFProcess( CodingStructure& cs, const double *lambd
 #endif
 
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  PelUnitBuf recYuvBeforeDb = m_tempBufBeforeDb.getBuf( UnitArea( CHROMA_400, cs.area.blocks[COMPONENT_Y] ) );
+  mirroredPaddingForAlf(cs, recYuvBeforeDb, NUM_DB_PAD, true, false);
+  const CPelBuf& recLumaBeforeDb = recYuvBeforeDb.get( COMPONENT_Y );
+#else
   m_tempBufBeforeDb.getBuf( UnitArea( CHROMA_400, cs.area.blocks[COMPONENT_Y] ) ).extendBorderPel( NUM_DB_PAD );
+#endif
 #endif
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
   PelUnitBuf resiYuv = m_tempBufResi.getBuf(cs.area);
@@ -1307,17 +1333,31 @@ void EncAdaptiveLoopFilter::ALFProcess( CodingStructure& cs, const double *lambd
 #else
             bufResi.extendBorderPel(MAX_ALF_PADDING_SIZE);
 #endif
-            bufResi = bufResi.subBuf(UnitArea(
-              cs.area.chromaFormat, Area(clipL ? 0 : MAX_ALF_PADDING_SIZE, clipT ? 0 : MAX_ALF_PADDING_SIZE, w, h)));
+            bufResi = bufResi.subBuf(UnitArea(cs.area.chromaFormat, Area(clipL ? 0 : MAX_ALF_PADDING_SIZE, clipT ? 0 : MAX_ALF_PADDING_SIZE, w, h)));
 #endif
-
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+            //RecBeforeDb
+            PelUnitBuf bufDb = m_tempBufBeforeDb2.subBuf(UnitArea(CHROMA_400, Area(0, 0, wBuf, hBuf)));
+            bufDb.copyFrom(m_tempBufBeforeDb.subBuf(UnitArea(CHROMA_400, Area(xStart - (clipL ? 0 : NUM_DB_PAD), yStart - (clipT ? 0 : NUM_DB_PAD), wBuf, hBuf))));
+            // pad top-left unavailable samples for raster slice
+            if (xStart == xPos && yStart == yPos && (rasterSliceAlfPad & 1))
+            {
+              bufDb.padBorderPel(NUM_DB_PAD, 1);
+            }
+            // pad bottom-right unavailable samples for raster slice
+            if (xEnd == xPos + width && yEnd == yPos + height && (rasterSliceAlfPad & 2))
+            {
+              bufDb.padBorderPel(NUM_DB_PAD, 2);
+            }
+            mirroredPaddingForAlf(cs, bufDb, NUM_DB_PAD, true, false);
+            bufDb = bufDb.subBuf(UnitArea(CHROMA_400, Area(clipL ? 0 : NUM_DB_PAD, clipT ? 0 : NUM_DB_PAD, w, h)));
+#endif
             const Area blkSrc( 0, 0, w, h );
             const Area blkDst( xStart, yStart, w, h );
 #if JVET_X0071_ALF_BAND_CLASSIFIER
             deriveClassification( m_classifier, buf.get( COMPONENT_Y ), 
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
-                                 m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI] == true,
-                                 bufResi.get(COMPONENT_Y),
+                                 m_filterTypeTest[CHANNEL_TYPE_LUMA][ALF_FILTER_13_EXT_DB_RESI] == true, bufResi.get(COMPONENT_Y),
 #endif
               blkDst, blkSrc, cs, -1, ALF_NUM_CLASSIFIER );
 #else
@@ -1327,7 +1367,9 @@ void EncAdaptiveLoopFilter::ALFProcess( CodingStructure& cs, const double *lambd
 #endif
             );
 #endif
-
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+            deriveGaussResults( bufDb.get( COMPONENT_Y ), blkDst, blkSrc, cs, 0, 0 );
+#endif
             xStart = xEnd;
           }
 
@@ -1350,6 +1392,9 @@ void EncAdaptiveLoopFilter::ALFProcess( CodingStructure& cs, const double *lambd
 #endif
         );
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+        deriveGaussResults( recLumaBeforeDb, blk, blk, cs, 0, 0 );
+#endif
       }
     }
   }
@@ -1359,7 +1404,12 @@ void EncAdaptiveLoopFilter::ALFProcess( CodingStructure& cs, const double *lambd
     paddingFixedFilterResultsPic(m_fixFilterResult, fixedFilterSetIdx);
   }
 #endif
-
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  for(int gaussIdx = 0; gaussIdx < NUM_GAUSS_FILTERED_SOURCE; gaussIdx++ )
+  {
+    paddingGaussResultsPic(m_gaussPic, gaussIdx);
+  }
+#endif
   // get CTB stats for filtering
   if( m_alfWSSD )
   {
@@ -1561,7 +1611,7 @@ double EncAdaptiveLoopFilter::deriveCtbAlfEnableFlags( CodingStructure& cs, cons
         // Evaluate cost of signaling filter set index for convergence of filters enabled flag / filter derivation
         assert( cs.slice->getPic()->getAlfCtbFilterIndex()[ctuIdx] == NUM_FIXED_FILTER_SETS );
         assert( cs.slice->getTileGroupNumAps() == 1 );
-        m_CABACEstimator->codeAlfCtuFilterIndex(cs, ctuIdx, true);
+        m_CABACEstimator->codeAlfCtuFilterIndex( cs, ctuIdx, m_alfParamTemp.enabledFlag[COMPONENT_Y] );
       }
       double costOn = distUnfilterCtu + ctuLambda * FRAC_BITS_SCALE * m_CABACEstimator->getEstFracBits();
 
@@ -1948,6 +1998,12 @@ double EncAdaptiveLoopFilter::getFilterCoeffAndCost( CodingStructure& cs, double
       for( int classifierIdx = 0; classifierIdx < ALF_NUM_CLASSIFIER; classifierIdx++ )
       {
 #endif
+#if JVET_AD0222_ALF_RESI_CLASS
+        if( classifierIdx == ALF_NUM_CLASSIFIER - 1 && cs.slice->isIntra() )
+        {
+          continue;
+        }
+#endif
       //collect stat based on CTU decision
       if ( bReCollectStat )
       {
@@ -2101,7 +2157,7 @@ double EncAdaptiveLoopFilter::getFilterCoeffAndCost( CodingStructure& cs, double
       // Evaluate cost of signaling filter set index for convergence of filters enabled flag / filter derivation
       assert( cs.slice->getPic()->getAlfCtbFilterIndex()[ctuIdx] == NUM_FIXED_FILTER_SETS );
       assert( cs.slice->getTileGroupNumAps() == 1 );
-      m_CABACEstimator->codeAlfCtuFilterIndex(cs, ctuIdx, true);
+      m_CABACEstimator->codeAlfCtuFilterIndex( cs, ctuIdx, m_alfParamTemp.enabledFlag[COMPONENT_Y] );
 #if ALF_IMPROVEMENT
       m_CABACEstimator->codeAlfCtuAlternative(cs, ctuIdx, COMPONENT_Y, &m_alfParamTemp, m_alfParamTemp.numAlternativesLuma);
 #endif
@@ -2465,7 +2521,18 @@ int EncAdaptiveLoopFilter::getNonFilterCoeffRate( AlfParam& alfParam
     }
   }
 #if JVET_X0071_ALF_BAND_CLASSIFIER
+#if JVET_AD0222_ALF_RESI_CLASS
+  if( classifierIdx == 1 )
+  {
+    len++;
+  }
+  else
+  {
+    len += 2;
+  }
+#else
   len++;
+#endif
 #endif
   return len;
 }
@@ -2861,7 +2928,11 @@ double EncAdaptiveLoopFilter::deriveCoeffQuant( int *filterClipp, int *filterCoe
   const int numCoeff = shape.numCoeff;
   double    filterCoeff[MAX_NUM_ALF_LUMA_COEFF];
 
+#if JVET_AD0222_ALF_RESI_CLASS
+  cov.optimizeFilter( shape, filterClipp, filterCoeff, optimizeClip, m_enableLessClip );
+#else
   cov.optimizeFilter( shape, filterClipp, filterCoeff, optimizeClip );
+#endif
   roundFiltCoeff( filterCoeffQuant, filterCoeff, numCoeff, factor );
 
   for ( int i = 0; i < numCoeff - 1; i++ )
@@ -3007,7 +3078,11 @@ void EncAdaptiveLoopFilter::mergeClasses( const AlfFilterShape& alfShape, AlfCov
     if ( m_alfParamTemp.nonLinearFlag[CHANNEL_TYPE_LUMA] )
 #endif
     {
+#if JVET_AD0222_ALF_RESI_CLASS
+      err[i] = covMerged[i].optimizeFilterClip( alfShape, clipMerged[numRemaining - 1][i], m_enableLessClip );
+#else
       err[i] = covMerged[i].optimizeFilterClip( alfShape, clipMerged[numRemaining-1][i] );
+#endif
     }
     else
     {
@@ -3244,6 +3319,12 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
 #if JVET_X0071_ALF_BAND_CLASSIFIER
     for( int classifierIdx = 0; classifierIdx < (isLuma(compID) ? ALF_NUM_CLASSIFIER : 1); classifierIdx++ )
     {
+#if JVET_AD0222_ALF_RESI_CLASS
+      if( isLuma( compID ) && classifierIdx == ALF_NUM_CLASSIFIER - 1 && cs.slice->isIntra() )
+      {
+        continue;
+      }
+#endif
       const int numClasses = isLuma(compID) ? ALF_NUM_CLASSES_CLASSIFIER[classifierIdx] : 1;
 #else
     const int numClasses = isLuma( compID ) ? MAX_NUM_ALF_CLASSES : 1;
@@ -3392,6 +3473,15 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
               }
             }
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+            if( m_isFixedFilterPaddedPerCtu )
+            {
+              for(int gaussIdx = 0; gaussIdx < NUM_GAUSS_FILTERED_SOURCE; gaussIdx++)
+              {
+                paddingGaussResultsCtu(m_gaussPic, m_gaussCtu, gaussIdx, Area(xStart, yStart, w, h));
+              }
+            }
+#endif
             for( int compIdx = 0; compIdx < numberOfComponents; compIdx++ )
             {
               const ComponentID compID = ComponentID( compIdx );
@@ -3462,6 +3552,23 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
 #endif
               {
 #if JVET_X0071_ALF_BAND_CLASSIFIER
+#if JVET_AD0222_ALF_RESI_CLASS
+                int classifierIdx = 0;
+                getBlkStats<alfWSSD, false>(m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][classifierIdx], m_filterShapes[chType][shape], compIdx ? nullptr : m_classifier[classifierIdx], org, orgStride, rec, recStride, nullptr, nullptr, isLuma(compID) ? recBufDb.get(compID).bufAt(compArea) : nullptr, isLuma(compID) ? recBufDb.get(compID).stride : 0, isLuma(compID) ? resiBuf.get(compID).bufAt(compAreaDst) : nullptr, isLuma(compID) ? resiBuf.get(compID).stride : 0, compAreaDst, compArea, chType, fixedFilterSetIdx, classifierIdx);
+                if (isLuma(compID))
+                {
+                  classifierIdx = 1;
+                  if (cs.slice->isIntra())
+                  {
+                    getBlkStats<alfWSSD, false>(m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][classifierIdx], m_filterShapes[chType][shape], compIdx ? nullptr : m_classifier[classifierIdx], org, orgStride, rec, recStride, nullptr, nullptr, isLuma(compID) ? recBufDb.get(compID).bufAt(compArea) : nullptr, isLuma(compID) ? recBufDb.get(compID).stride : 0, isLuma(compID) ? resiBuf.get(compID).bufAt(compAreaDst) : nullptr, isLuma(compID) ? resiBuf.get(compID).stride : 0, compAreaDst, compArea, chType, fixedFilterSetIdx, classifierIdx);
+                  }
+                  else
+                  {
+                    getBlkStats<alfWSSD, true>(m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][classifierIdx], m_filterShapes[chType][shape], compIdx ? nullptr : m_classifier[classifierIdx], org, orgStride, rec, recStride, m_classifier[2], m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][2], isLuma(compID) ? recBufDb.get(compID).bufAt(compArea) : nullptr, isLuma(compID) ? recBufDb.get(compID).stride : 0, isLuma(compID) ? resiBuf.get(compID).bufAt(compAreaDst) : nullptr,
+                      isLuma(compID) ? resiBuf.get(compID).stride : 0, compAreaDst, compArea, chType, fixedFilterSetIdx, classifierIdx);
+                  }
+                }
+#else
                 for (int classifierIdx = 0; classifierIdx < (compIdx ? 1 : ALF_NUM_CLASSIFIER); classifierIdx++)
                 {
                   getBlkStats<alfWSSD>( m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][classifierIdx], m_filterShapes[chType][shape], compIdx ? nullptr : m_classifier[classifierIdx], org, orgStride, rec, recStride,
@@ -3474,6 +3581,7 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
 #endif
                     compAreaDst, compArea, chType, fixedFilterSetIdx, classifierIdx );
                 }
+#endif
 #else
                 getBlkStats<alfWSSD>( m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx], m_filterShapes[chType][shape], compIdx ? nullptr : m_classifier, org, orgStride, rec, recStride,
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
@@ -3567,7 +3675,15 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
           }
         }
 #endif
-
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+        if( m_isFixedFilterPaddedPerCtu )
+        {
+          for(int gaussIdx = 0; gaussIdx < NUM_GAUSS_FILTERED_SOURCE; gaussIdx++)
+          {
+            paddingGaussResultsCtu(m_gaussPic, m_gaussCtu, gaussIdx, Area( xPos, yPos, width, height ));
+          }
+        }
+#endif
         for( int compIdx = 0; compIdx < numberOfComponents; compIdx++ )
         {
           const ComponentID compID = ComponentID( compIdx );
@@ -3605,6 +3721,22 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
 
             {
 #if JVET_X0071_ALF_BAND_CLASSIFIER
+#if JVET_AD0222_ALF_RESI_CLASS
+              int classifierIdx = 0;
+              getBlkStats<alfWSSD, false>(m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][classifierIdx], m_filterShapes[chType][shape], compIdx ? nullptr : m_classifier[classifierIdx], org, orgStride, rec, recStride, nullptr, nullptr, recDb, recDbStride, resi, resiStride, compArea, compArea, chType, fixedFilterSetIdx, classifierIdx);
+              if (isLuma(compID))
+              {
+                classifierIdx = 1;
+                if (cs.slice->isIntra())
+                {
+                  getBlkStats<alfWSSD, false>(m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][classifierIdx], m_filterShapes[chType][shape], compIdx ? nullptr : m_classifier[classifierIdx], org, orgStride, rec, recStride, nullptr, nullptr, recDb, recDbStride, resi, resiStride, compArea, compArea, chType, fixedFilterSetIdx, classifierIdx);
+                }
+                else
+                {
+                  getBlkStats<alfWSSD, true>(m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][classifierIdx], m_filterShapes[chType][shape], compIdx ? nullptr : m_classifier[classifierIdx], org, orgStride, rec, recStride, m_classifier[2], m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][2], recDb, recDbStride, resi, resiStride, compArea, compArea, chType, fixedFilterSetIdx, classifierIdx);
+                }
+              }
+#else
               for( int classifierIdx = 0; classifierIdx < (compIdx ? 1 : ALF_NUM_CLASSIFIER); classifierIdx++ )
               {
                 getBlkStats<alfWSSD>( m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][classifierIdx], m_filterShapes[chType][shape], compIdx ? nullptr : m_classifier[classifierIdx], org, orgStride, rec, recStride,
@@ -3616,6 +3748,7 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
 #endif
                   compArea, compArea, chType, fixedFilterSetIdx, classifierIdx );
               }
+#endif
 #else
               getBlkStats<alfWSSD>( m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx], m_filterShapes[chType][shape], compIdx ? nullptr : m_classifier, org, orgStride, rec, recStride,
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
@@ -3672,9 +3805,16 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
 }
 
 #if ALF_IMPROVEMENT
+#if JVET_AD0222_ALF_RESI_CLASS
+template<bool m_alfWSSD, bool reuse>
+#else
 template<bool m_alfWSSD>
+#endif
 #if JVET_X0071_ALF_BAND_CLASSIFIER
 void EncAdaptiveLoopFilter::getBlkStats( AlfCovariance* alfCovariance, const AlfFilterShape& shape, AlfClassifier** classifier, const Pel* org, const int orgStride, const Pel* rec, const int recStride,
+#if JVET_AD0222_ALF_RESI_CLASS
+  AlfClassifier** classifierNext, AlfCovariance* alfCovarianceNext,
+#endif
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
   const Pel* recBeforeDb, const int recBeforeDbStride,
 #endif
@@ -3709,6 +3849,10 @@ void EncAdaptiveLoopFilter::getBlkStats( AlfCovariance* alfCovariance, const Alf
   const int numBins = AlfNumClippingValues[channel];
   int transposeIdx = 0;
   int classIdx = 0;
+#if JVET_AD0222_ALF_RESI_CLASS
+  int classIdxNext = 0;
+  double curE, curY, curP;
+#endif
 
   for( int i = 0; i < area.height; i++ )
   {
@@ -3737,7 +3881,12 @@ void EncAdaptiveLoopFilter::getBlkStats( AlfCovariance* alfCovariance, const Alf
         classIdx = cl.classIdx;
 #endif
       }
-
+#if JVET_AD0222_ALF_RESI_CLASS
+      if( classifierNext )
+      {
+        classIdxNext = classifierNext[areaDst.y + i][areaDst.x + j] >> 2;
+      }
+#endif
       double weight = 1.0;
       if( m_alfWSSD )
       {
@@ -3802,7 +3951,20 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
               if (m_alfWSSD)
               {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AD0222_ALF_RESI_CLASS
+                if (reuse)
+                {
+                  curE = weight * (ELocal[k][b0] * (double)ELocal[l][b1]);
+                  alfCovariance[classIdx].E[b0][b1][k][l] += curE;
+                  alfCovarianceNext[classIdxNext].E[b0][b1][k][l] += curE;
+                }
+                else
+                {
+                  alfCovariance[classIdx].E[b0][b1][k][l] += weight * (ELocal[k][b0] * (double)ELocal[l][b1]);
+                }
+#else
                 alfCovariance[classIdx].E[b0][b1][k][l] += weight * (ELocal[k][b0] * (double)ELocal[l][b1]);
+#endif
 #else
                 alfCovariance[classIdx].E[b0][b1][k][l] += weight * (double)(ELocal[k][b0] * ELocal[l][b1]);
 #endif
@@ -3810,7 +3972,20 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
               else
               {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AD0222_ALF_RESI_CLASS
+                if (reuse)
+                {
+                  curE = ELocal[k][b0] * (double)ELocal[l][b1];
+                  alfCovariance[classIdx].E[b0][b1][k][l] += curE;
+                  alfCovarianceNext[classIdxNext].E[b0][b1][k][l] += curE;
+                }
+                else
+                {
+                  alfCovariance[classIdx].E[b0][b1][k][l] += ELocal[k][b0] * (double)ELocal[l][b1];
+                }
+#else
                 alfCovariance[classIdx].E[b0][b1][k][l] += ELocal[k][b0] * (double)ELocal[l][b1];
+#endif
 #else
                 alfCovariance[classIdx].E[b0][b1][k][l] += ELocal[k][b0] * ELocal[l][b1];
 #endif
@@ -3823,7 +3998,20 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
           if (m_alfWSSD)
           {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AD0222_ALF_RESI_CLASS
+            if (reuse)
+            {
+              curY = weight * (ELocal[k][b] * (double)yLocal);
+              alfCovariance[classIdx].y[b][k] += curY;
+              alfCovarianceNext[classIdxNext].y[b][k] += curY;
+            }
+            else
+            {
+              alfCovariance[classIdx].y[b][k] += weight * (ELocal[k][b] * (double)yLocal);
+            }
+#else
             alfCovariance[classIdx].y[b][k] += weight * (ELocal[k][b] * (double)yLocal);
+#endif
 #else
             alfCovariance[classIdx].y[b][k] += weight * (double)(ELocal[k][b] * yLocal);
 #endif
@@ -3831,7 +4019,20 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
           else
           {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AD0222_ALF_RESI_CLASS
+            if( reuse )
+            {
+              curY = ELocal[k][b] * (double)yLocal;
+              alfCovariance[classIdx].y[b][k] += curY;
+              alfCovarianceNext[classIdxNext].y[b][k] += curY;
+            }
+            else
+            {
+              alfCovariance[classIdx].y[b][k] += ELocal[k][b] * (double)yLocal;
+            }           
+#else
             alfCovariance[classIdx].y[b][k] += ELocal[k][b] * (double)yLocal;
+#endif
 #else
             alfCovariance[classIdx].y[b][k] += ELocal[k][b] * yLocal;
 #endif
@@ -3841,7 +4042,20 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
       if (m_alfWSSD)
       {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AD0222_ALF_RESI_CLASS
+        if( reuse )
+        {
+         curP = weight * (yLocal * (double)yLocal);
+         alfCovariance[classIdx].pixAcc += curP;
+         alfCovarianceNext[classIdxNext].pixAcc += curP;
+        }
+        else
+        {
+          alfCovariance[classIdx].pixAcc += weight * (yLocal * (double)yLocal);
+        }
+#else
         alfCovariance[classIdx].pixAcc += weight * (yLocal * (double)yLocal);
+#endif
 #else
         alfCovariance[classIdx].pixAcc += weight * (double)(yLocal * yLocal);
 #endif
@@ -3849,7 +4063,20 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
       else
       {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AD0222_ALF_RESI_CLASS
+        if( reuse )
+        {
+          curP = yLocal * (double)yLocal;
+          alfCovariance[classIdx].pixAcc += curP;
+          alfCovarianceNext[classIdxNext].pixAcc += curP;
+        }
+        else
+        {
+          alfCovariance[classIdx].pixAcc += yLocal * (double)yLocal;
+        }
+#else
         alfCovariance[classIdx].pixAcc += yLocal * (double)yLocal;
+#endif
 #else
         alfCovariance[classIdx].pixAcc += yLocal * yLocal;
 #endif
@@ -3884,6 +4111,12 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
         {
           for( int b1 = 0; b1 < numBins; b1++ )
           {
+#if JVET_AD0222_ALF_RESI_CLASS
+            if( reuse )
+            {
+              alfCovarianceNext[classIdx].E[b0][b1][k][l] = alfCovarianceNext[classIdx].E[b1][b0][l][k];
+            }
+#endif
             alfCovariance[classIdx].E[b0][b1][k][l] = alfCovariance[classIdx].E[b1][b0][l][k];
           }
         }
@@ -3958,6 +4191,9 @@ void EncAdaptiveLoopFilter::calcCovariance( int ELocal[MAX_NUM_ALF_LUMA_COEFF][M
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   int padSize = ALF_PADDING_SIZE_FIXED_RESULTS;
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  int padSizeGauss = ALF_PADDING_SIZE_GAUSS_RESULTS;
+#endif
 #if JVET_AA0095_ALF_LONGER_FILTER
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
   if( shape.filterType == ALF_FILTER_13_EXT || shape.filterType == ALF_FILTER_13_EXT_DB 
@@ -3970,6 +4206,85 @@ void EncAdaptiveLoopFilter::calcCovariance( int ELocal[MAX_NUM_ALF_LUMA_COEFF][M
   if( shape.filterType == ALF_FILTER_13_EXT )
 #endif
   {
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+    const Pel *pImg0, *pImg1, *pImg2, *pImg3, *pImg4, *pImg5, *pImg6, *pImg7, *pImg8;
+
+    pImg0 = rec;
+    pImg1 = pImg0 + stride;
+    pImg2 = pImg0 - stride;
+    pImg3 = pImg1 + stride;
+    pImg4 = pImg2 - stride;
+    pImg5 = pImg3 + stride;
+    pImg6 = pImg4 - stride;
+    pImg7 = pImg5 + stride;
+    pImg8 = pImg6 - stride;
+
+    if (transposeIdx == 1)
+    {
+      for (int b = 0; b < numBins; b++)
+      {
+        ELocal[6][b] += clipALF(clip[b], curr, pImg7[+0], pImg8[-0]);
+        ELocal[7][b] += clipALF(clip[b], curr, pImg5[+0], pImg6[-0]);
+        ELocal[8][b] += clipALF(clip[b], curr, pImg3[+0], pImg4[-0]);
+        ELocal[3][b] += clipALF(clip[b], curr, pImg1[+1], pImg2[-1]);
+        ELocal[9][b] += clipALF(clip[b], curr, pImg1[+0], pImg2[-0]);
+        ELocal[5][b] += clipALF(clip[b], curr, pImg1[-1], pImg2[+1]);
+        ELocal[0][b] += clipALF(clip[b], curr, pImg0[+4], pImg0[-4]);
+        ELocal[1][b] += clipALF(clip[b], curr, pImg0[+3], pImg0[-3]);
+        ELocal[2][b] += clipALF(clip[b], curr, pImg0[+2], pImg0[-2]);
+        ELocal[4][b] += clipALF(clip[b], curr, pImg0[+1], pImg0[-1]);
+      }
+    }
+    else if (transposeIdx == 2)
+    {
+      for (int b = 0; b < numBins; b++)
+      {
+        ELocal[0][b] += clipALF(clip[b], curr, pImg7[+0], pImg8[-0]);
+        ELocal[1][b] += clipALF(clip[b], curr, pImg5[+0], pImg6[-0]);
+        ELocal[2][b] += clipALF(clip[b], curr, pImg3[+0], pImg4[-0]);
+        ELocal[5][b] += clipALF(clip[b], curr, pImg1[+1], pImg2[-1]);
+        ELocal[4][b] += clipALF(clip[b], curr, pImg1[+0], pImg2[-0]);
+        ELocal[3][b] += clipALF(clip[b], curr, pImg1[-1], pImg2[+1]);
+        ELocal[6][b] += clipALF(clip[b], curr, pImg0[+4], pImg0[-4]);
+        ELocal[7][b] += clipALF(clip[b], curr, pImg0[+3], pImg0[-3]);
+        ELocal[8][b] += clipALF(clip[b], curr, pImg0[+2], pImg0[-2]);
+        ELocal[9][b] += clipALF(clip[b], curr, pImg0[+1], pImg0[-1]);
+      }
+    }
+    else if (transposeIdx == 3)
+    {
+      for (int b = 0; b < numBins; b++)
+      {
+        ELocal[6][b] += clipALF(clip[b], curr, pImg7[+0], pImg8[-0]);
+        ELocal[7][b] += clipALF(clip[b], curr, pImg5[+0], pImg6[-0]);
+        ELocal[8][b] += clipALF(clip[b], curr, pImg3[+0], pImg4[-0]);
+        ELocal[5][b] += clipALF(clip[b], curr, pImg1[+1], pImg2[-1]);
+        ELocal[9][b] += clipALF(clip[b], curr, pImg1[+0], pImg2[-0]);
+        ELocal[3][b] += clipALF(clip[b], curr, pImg1[-1], pImg2[+1]);
+        ELocal[0][b] += clipALF(clip[b], curr, pImg0[+4], pImg0[-4]);
+        ELocal[1][b] += clipALF(clip[b], curr, pImg0[+3], pImg0[-3]);
+        ELocal[2][b] += clipALF(clip[b], curr, pImg0[+2], pImg0[-2]);
+        ELocal[4][b] += clipALF(clip[b], curr, pImg0[+1], pImg0[-1]);
+      }
+    }
+    else
+    {
+      for (int b = 0; b < numBins; b++)
+      {
+        ELocal[0][b] += clipALF(clip[b], curr, pImg7[+0], pImg8[-0]);
+        ELocal[1][b] += clipALF(clip[b], curr, pImg5[+0], pImg6[-0]);
+        ELocal[2][b] += clipALF(clip[b], curr, pImg3[+0], pImg4[-0]);
+        ELocal[3][b] += clipALF(clip[b], curr, pImg1[+1], pImg2[-1]);
+        ELocal[4][b] += clipALF(clip[b], curr, pImg1[+0], pImg2[-0]);
+        ELocal[5][b] += clipALF(clip[b], curr, pImg1[-1], pImg2[+1]);
+        ELocal[6][b] += clipALF(clip[b], curr, pImg0[+4], pImg0[-4]);
+        ELocal[7][b] += clipALF(clip[b], curr, pImg0[+3], pImg0[-3]);
+        ELocal[8][b] += clipALF(clip[b], curr, pImg0[+2], pImg0[-2]);
+        ELocal[9][b] += clipALF(clip[b], curr, pImg0[+1], pImg0[-1]);
+      }
+    }
+    k = 10;
+#else
     const Pel *pImg0, *pImg1, *pImg2, *pImg3, *pImg4, *pImg5, *pImg6, *pImg7, *pImg8, *pImg9, *pImg10;
     const Pel *pImg11, *pImg12;
 
@@ -4104,6 +4419,7 @@ void EncAdaptiveLoopFilter::calcCovariance( int ELocal[MAX_NUM_ALF_LUMA_COEFF][M
       }
     }
     k = 20;
+#endif
   }
   else
   {
@@ -4227,7 +4543,171 @@ void EncAdaptiveLoopFilter::calcCovariance( int ELocal[MAX_NUM_ALF_LUMA_COEFF][M
   } //data collection for new shape
 #endif
 #if ALF_IMPROVEMENT
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  Pel *pImg0Gauss[NUM_GAUSS_FILTERED_SOURCE];
+  Pel *pImg1Gauss[NUM_GAUSS_FILTERED_SOURCE], *pImg2Gauss[NUM_GAUSS_FILTERED_SOURCE];
+  Pel *pImg3Gauss[NUM_GAUSS_FILTERED_SOURCE], *pImg4Gauss[NUM_GAUSS_FILTERED_SOURCE];
+
+  for(int gaussIdx = 0; gaussIdx < NUM_GAUSS_FILTERED_SOURCE; gaussIdx++ )
+  {
+    if( m_isFixedFilterPaddedPerCtu )
+    {
+      pImg0Gauss[gaussIdx] = &m_gaussCtu[gaussIdx][posInCtu.y + padSizeGauss + 0][posInCtu.x + padSizeGauss];
+      pImg1Gauss[gaussIdx] = &m_gaussCtu[gaussIdx][posInCtu.y + padSizeGauss + 1][posInCtu.x + padSizeGauss];
+      pImg2Gauss[gaussIdx] = &m_gaussCtu[gaussIdx][posInCtu.y + padSizeGauss - 1][posInCtu.x + padSizeGauss];
+      pImg3Gauss[gaussIdx] = &m_gaussCtu[gaussIdx][posInCtu.y + padSizeGauss + 2][posInCtu.x + padSizeGauss];
+      pImg4Gauss[gaussIdx] = &m_gaussCtu[gaussIdx][posInCtu.y + padSizeGauss - 2][posInCtu.x + padSizeGauss];
+
+    }
+    else
+    {
+      pImg0Gauss[gaussIdx] = &m_gaussPic[gaussIdx][posDst.y + padSizeGauss + 0][posDst.x + padSizeGauss];
+      pImg1Gauss[gaussIdx] = &m_gaussPic[gaussIdx][posDst.y + padSizeGauss + 1][posDst.x + padSizeGauss];
+      pImg2Gauss[gaussIdx] = &m_gaussPic[gaussIdx][posDst.y + padSizeGauss - 1][posDst.x + padSizeGauss];
+      pImg3Gauss[gaussIdx] = &m_gaussPic[gaussIdx][posDst.y + padSizeGauss + 2][posDst.x + padSizeGauss];
+      pImg4Gauss[gaussIdx] = &m_gaussPic[gaussIdx][posDst.y + padSizeGauss - 2][posDst.x + padSizeGauss];
+
+    }
+  }
+#endif
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+  if (shape.filterType >= ALF_FILTER_13_EXT && shape.filterType != ALF_FILTER_9_EXT_DB)
+  {
+    int filterSetIdx = 0 + fixedFilterSetIdx;
+    Pel *pImg0FixedBased, *pImg1FixedBased, *pImg2FixedBased, *pImg3FixedBased, *pImg4FixedBased, *pImg5FixedBased, *pImg6FixedBased, *pImg7FixedBased, *pImg8FixedBased, *pImg9FixedBased, *pImg10FixedBased, *pImg11FixedBased, *pImg12FixedBased;
+
+    if (m_isFixedFilterPaddedPerCtu)
+    {
+      pImg0FixedBased = &m_fixedFilterResultPerCtu[filterSetIdx][posInCtu.y + padSize + 0][posInCtu.x + padSize];
+      pImg1FixedBased = &m_fixedFilterResultPerCtu[filterSetIdx][posInCtu.y + padSize + 1][posInCtu.x + padSize];
+      pImg2FixedBased = &m_fixedFilterResultPerCtu[filterSetIdx][posInCtu.y + padSize - 1][posInCtu.x + padSize];
+      pImg3FixedBased = &m_fixedFilterResultPerCtu[filterSetIdx][posInCtu.y + padSize + 2][posInCtu.x + padSize];
+      pImg4FixedBased = &m_fixedFilterResultPerCtu[filterSetIdx][posInCtu.y + padSize - 2][posInCtu.x + padSize];
+      pImg5FixedBased = &m_fixedFilterResultPerCtu[filterSetIdx][posInCtu.y + padSize + 3][posInCtu.x + padSize];
+      pImg6FixedBased = &m_fixedFilterResultPerCtu[filterSetIdx][posInCtu.y + padSize - 3][posInCtu.x + padSize];
+      pImg7FixedBased = &m_fixedFilterResultPerCtu[filterSetIdx][posInCtu.y + padSize + 4][posInCtu.x + padSize];
+      pImg8FixedBased = &m_fixedFilterResultPerCtu[filterSetIdx][posInCtu.y + padSize - 4][posInCtu.x + padSize];
+      pImg9FixedBased = &m_fixedFilterResultPerCtu[filterSetIdx][posInCtu.y + padSize + 5][posInCtu.x + padSize];
+      pImg10FixedBased = &m_fixedFilterResultPerCtu[filterSetIdx][posInCtu.y + padSize - 5][posInCtu.x + padSize];
+      pImg11FixedBased = &m_fixedFilterResultPerCtu[filterSetIdx][posInCtu.y + padSize + 6][posInCtu.x + padSize];
+      pImg12FixedBased = &m_fixedFilterResultPerCtu[filterSetIdx][posInCtu.y + padSize - 6][posInCtu.x + padSize];
+    }
+    else
+    {
+      pImg0FixedBased = &fixedFitlerResults[filterSetIdx][pos.y + padSize + 0][pos.x + padSize];
+      pImg1FixedBased = &fixedFitlerResults[filterSetIdx][pos.y + padSize + 1][pos.x + padSize];
+      pImg2FixedBased = &fixedFitlerResults[filterSetIdx][pos.y + padSize - 1][pos.x + padSize];
+      pImg3FixedBased = &fixedFitlerResults[filterSetIdx][pos.y + padSize + 2][pos.x + padSize];
+      pImg4FixedBased = &fixedFitlerResults[filterSetIdx][pos.y + padSize - 2][pos.x + padSize];
+      pImg5FixedBased = &fixedFitlerResults[filterSetIdx][pos.y + padSize + 3][pos.x + padSize];
+      pImg6FixedBased = &fixedFitlerResults[filterSetIdx][pos.y + padSize - 3][pos.x + padSize];
+      pImg7FixedBased = &fixedFitlerResults[filterSetIdx][pos.y + padSize + 4][pos.x + padSize];
+      pImg8FixedBased = &fixedFitlerResults[filterSetIdx][pos.y + padSize - 4][pos.x + padSize];
+      pImg9FixedBased = &fixedFitlerResults[filterSetIdx][pos.y + padSize + 5][pos.x + padSize];
+      pImg10FixedBased = &fixedFitlerResults[filterSetIdx][pos.y + padSize - 5][pos.x + padSize];
+      pImg11FixedBased = &fixedFitlerResults[filterSetIdx][pos.y + padSize + 6][pos.x + padSize];
+      pImg12FixedBased = &fixedFitlerResults[filterSetIdx][pos.y + padSize - 6][pos.x + padSize];
+    }
+    if (transposeIdx == 1)
+    {
+      for (int b = 0; b < numBins; b++)
+      {
+        ELocal[22][b] += clipALF(clip[b], curr, pImg12FixedBased[+0], pImg11FixedBased[-0]);
+        ELocal[23][b] += clipALF(clip[b], curr, pImg10FixedBased[+0], pImg9FixedBased[-0]);
+        ELocal[24][b] += clipALF(clip[b], curr, pImg8FixedBased[+0], pImg7FixedBased[-0]);
+        ELocal[25][b] += clipALF(clip[b], curr, pImg6FixedBased[+0], pImg5FixedBased[-0]);
+        ELocal[17][b] += clipALF(clip[b], curr, pImg4FixedBased[-1], pImg3FixedBased[+1]);
+        ELocal[26][b] += clipALF(clip[b], curr, pImg4FixedBased[-0], pImg3FixedBased[+0]);
+        ELocal[21][b] += clipALF(clip[b], curr, pImg4FixedBased[+1], pImg3FixedBased[-1]);
+        ELocal[14][b] += clipALF(clip[b], curr, pImg2FixedBased[-2], pImg1FixedBased[+2]);
+        ELocal[18][b] += clipALF(clip[b], curr, pImg2FixedBased[-1], pImg1FixedBased[+1]);
+        ELocal[27][b] += clipALF(clip[b], curr, pImg2FixedBased[-0], pImg1FixedBased[+0]);
+        ELocal[20][b] += clipALF(clip[b], curr, pImg2FixedBased[+1], pImg1FixedBased[-1]);
+        ELocal[16][b] += clipALF(clip[b], curr, pImg2FixedBased[+2], pImg1FixedBased[-2]);
+        ELocal[10][b] += clipALF(clip[b], curr, pImg0FixedBased[+6], pImg0FixedBased[-6]);
+        ELocal[11][b] += clipALF(clip[b], curr, pImg0FixedBased[+5], pImg0FixedBased[-5]);
+        ELocal[12][b] += clipALF(clip[b], curr, pImg0FixedBased[+4], pImg0FixedBased[-4]);
+        ELocal[13][b] += clipALF(clip[b], curr, pImg0FixedBased[+3], pImg0FixedBased[-3]);
+        ELocal[15][b] += clipALF(clip[b], curr, pImg0FixedBased[+2], pImg0FixedBased[-2]);
+        ELocal[19][b] += clipALF(clip[b], curr, pImg0FixedBased[+1], pImg0FixedBased[-1]);
+      }
+    }
+    else if (transposeIdx == 2)
+    {
+      for (int b = 0; b < numBins; b++)
+      {
+        ELocal[10][b] += clipALF(clip[b], curr, pImg12FixedBased[+0], pImg11FixedBased[-0]);
+        ELocal[11][b] += clipALF(clip[b], curr, pImg10FixedBased[+0], pImg9FixedBased[-0]);
+        ELocal[12][b] += clipALF(clip[b], curr, pImg8FixedBased[+0], pImg7FixedBased[-0]);
+        ELocal[13][b] += clipALF(clip[b], curr, pImg6FixedBased[+0], pImg5FixedBased[-0]);
+        ELocal[16][b] += clipALF(clip[b], curr, pImg4FixedBased[-1], pImg3FixedBased[+1]);
+        ELocal[15][b] += clipALF(clip[b], curr, pImg4FixedBased[-0], pImg3FixedBased[+0]);
+        ELocal[14][b] += clipALF(clip[b], curr, pImg4FixedBased[+1], pImg3FixedBased[-1]);
+        ELocal[21][b] += clipALF(clip[b], curr, pImg2FixedBased[-2], pImg1FixedBased[+2]);
+        ELocal[20][b] += clipALF(clip[b], curr, pImg2FixedBased[-1], pImg1FixedBased[+1]);
+        ELocal[19][b] += clipALF(clip[b], curr, pImg2FixedBased[-0], pImg1FixedBased[+0]);
+        ELocal[18][b] += clipALF(clip[b], curr, pImg2FixedBased[+1], pImg1FixedBased[-1]);
+        ELocal[17][b] += clipALF(clip[b], curr, pImg2FixedBased[+2], pImg1FixedBased[-2]);
+        ELocal[22][b] += clipALF(clip[b], curr, pImg0FixedBased[+6], pImg0FixedBased[-6]);
+        ELocal[23][b] += clipALF(clip[b], curr, pImg0FixedBased[+5], pImg0FixedBased[-5]);
+        ELocal[24][b] += clipALF(clip[b], curr, pImg0FixedBased[+4], pImg0FixedBased[-4]);
+        ELocal[25][b] += clipALF(clip[b], curr, pImg0FixedBased[+3], pImg0FixedBased[-3]);
+        ELocal[26][b] += clipALF(clip[b], curr, pImg0FixedBased[+2], pImg0FixedBased[-2]);
+        ELocal[27][b] += clipALF(clip[b], curr, pImg0FixedBased[+1], pImg0FixedBased[-1]);
+      }
+    }
+    else if (transposeIdx == 3)
+    {
+      for (int b = 0; b < numBins; b++)
+      {
+        ELocal[22][b] += clipALF(clip[b], curr, pImg12FixedBased[+0], pImg11FixedBased[-0]);
+        ELocal[23][b] += clipALF(clip[b], curr, pImg10FixedBased[+0], pImg9FixedBased[-0]);
+        ELocal[24][b] += clipALF(clip[b], curr, pImg8FixedBased[+0], pImg7FixedBased[-0]);
+        ELocal[25][b] += clipALF(clip[b], curr, pImg6FixedBased[+0], pImg5FixedBased[-0]);
+        ELocal[21][b] += clipALF(clip[b], curr, pImg4FixedBased[-1], pImg3FixedBased[+1]);
+        ELocal[26][b] += clipALF(clip[b], curr, pImg4FixedBased[-0], pImg3FixedBased[+0]);
+        ELocal[17][b] += clipALF(clip[b], curr, pImg4FixedBased[+1], pImg3FixedBased[-1]);
+        ELocal[16][b] += clipALF(clip[b], curr, pImg2FixedBased[-2], pImg1FixedBased[+2]);
+        ELocal[20][b] += clipALF(clip[b], curr, pImg2FixedBased[-1], pImg1FixedBased[+1]);
+        ELocal[27][b] += clipALF(clip[b], curr, pImg2FixedBased[-0], pImg1FixedBased[+0]);
+        ELocal[18][b] += clipALF(clip[b], curr, pImg2FixedBased[+1], pImg1FixedBased[-1]);
+        ELocal[14][b] += clipALF(clip[b], curr, pImg2FixedBased[+2], pImg1FixedBased[-2]);
+        ELocal[10][b] += clipALF(clip[b], curr, pImg0FixedBased[+6], pImg0FixedBased[-6]);
+        ELocal[11][b] += clipALF(clip[b], curr, pImg0FixedBased[+5], pImg0FixedBased[-5]);
+        ELocal[12][b] += clipALF(clip[b], curr, pImg0FixedBased[+4], pImg0FixedBased[-4]);
+        ELocal[13][b] += clipALF(clip[b], curr, pImg0FixedBased[+3], pImg0FixedBased[-3]);
+        ELocal[15][b] += clipALF(clip[b], curr, pImg0FixedBased[+2], pImg0FixedBased[-2]);
+        ELocal[19][b] += clipALF(clip[b], curr, pImg0FixedBased[+1], pImg0FixedBased[-1]);
+      }
+    }
+    else
+    {
+      for (int b = 0; b < numBins; b++)
+      {
+        ELocal[10][b] += clipALF(clip[b], curr, pImg12FixedBased[+0], pImg11FixedBased[-0]);
+        ELocal[11][b] += clipALF(clip[b], curr, pImg10FixedBased[+0], pImg9FixedBased[-0]);
+        ELocal[12][b] += clipALF(clip[b], curr, pImg8FixedBased[+0], pImg7FixedBased[-0]);
+        ELocal[13][b] += clipALF(clip[b], curr, pImg6FixedBased[+0], pImg5FixedBased[-0]);
+        ELocal[14][b] += clipALF(clip[b], curr, pImg4FixedBased[-1], pImg3FixedBased[+1]);
+        ELocal[15][b] += clipALF(clip[b], curr, pImg4FixedBased[-0], pImg3FixedBased[+0]);
+        ELocal[16][b] += clipALF(clip[b], curr, pImg4FixedBased[+1], pImg3FixedBased[-1]);
+        ELocal[17][b] += clipALF(clip[b], curr, pImg2FixedBased[-2], pImg1FixedBased[+2]);
+        ELocal[18][b] += clipALF(clip[b], curr, pImg2FixedBased[-1], pImg1FixedBased[+1]);
+        ELocal[19][b] += clipALF(clip[b], curr, pImg2FixedBased[-0], pImg1FixedBased[+0]);
+        ELocal[20][b] += clipALF(clip[b], curr, pImg2FixedBased[+1], pImg1FixedBased[-1]);
+        ELocal[21][b] += clipALF(clip[b], curr, pImg2FixedBased[+2], pImg1FixedBased[-2]);
+        ELocal[22][b] += clipALF(clip[b], curr, pImg0FixedBased[+6], pImg0FixedBased[-6]);
+        ELocal[23][b] += clipALF(clip[b], curr, pImg0FixedBased[+5], pImg0FixedBased[-5]);
+        ELocal[24][b] += clipALF(clip[b], curr, pImg0FixedBased[+4], pImg0FixedBased[-4]);
+        ELocal[25][b] += clipALF(clip[b], curr, pImg0FixedBased[+3], pImg0FixedBased[-3]);
+        ELocal[26][b] += clipALF(clip[b], curr, pImg0FixedBased[+2], pImg0FixedBased[-2]);
+        ELocal[27][b] += clipALF(clip[b], curr, pImg0FixedBased[+1], pImg0FixedBased[-1]);
+      }
+    }
+  }
+  else
+#endif
   if( shape.filterType >= ALF_FILTER_9_EXT && shape.filterType != ALF_FILTER_EXT )
   {
     int filterSetIdx = 0 + fixedFilterSetIdx;
@@ -4300,7 +4780,40 @@ void EncAdaptiveLoopFilter::calcCovariance( int ELocal[MAX_NUM_ALF_LUMA_COEFF][M
     }
   }
 #endif
-#if JVET_AA0095_ALF_LONGER_FILTER
+#if JVET_AD0222_ALF_LONG_FIXFILTER || JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  if( shape.filterType == ALF_FILTER_13_EXT )
+  {
+    for ( int b = 0; b < numBins; b++ )
+    {
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      ELocal[28][b] += clipALF(clip[b], curr, pImg3Gauss[0][+0], pImg4Gauss[0][-0]);
+      ELocal[29][b] += clipALF(clip[b], curr, pImg1Gauss[0][+0], pImg2Gauss[0][-0]);
+      ELocal[30][b] += clipALF(clip[b], curr, pImg0Gauss[0][+2], pImg0Gauss[0][-2]);
+      ELocal[31][b] += clipALF(clip[b], curr, pImg0Gauss[0][+1], pImg0Gauss[0][-1]);
+      ELocal[32][b] += clipALF(clip[b], curr, fixedFitlerResults[0 + fixedFilterSetIdx][pos.y + padSize][pos.x + padSize]);
+      ELocal[33][b] += clipALF(clip[b], curr, fixedFitlerResults[2 + fixedFilterSetIdx][pos.y + padSize][pos.x + padSize]);
+      ELocal[34][b] += clipALF(clip[b], curr, pImg0Gauss[0][+0] );
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      ELocal[28][b] += clipALF(clip[b], curr, fixedFitlerResults[0 + fixedFilterSetIdx][pos.y + padSize][pos.x + padSize]);
+      ELocal[29][b] += clipALF(clip[b], curr, fixedFitlerResults[2 + fixedFilterSetIdx][pos.y + padSize][pos.x + padSize]);
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      ELocal[26][b] += clipALF(clip[b], curr, pImg3Gauss[0][+0], pImg4Gauss[0][-0]);
+      ELocal[27][b] += clipALF(clip[b], curr, pImg1Gauss[0][+0], pImg2Gauss[0][-0]);
+      ELocal[28][b] += clipALF(clip[b], curr, pImg0Gauss[0][+2], pImg0Gauss[0][-2]);
+      ELocal[29][b] += clipALF(clip[b], curr, pImg0Gauss[0][+1], pImg0Gauss[0][-1]);
+      ELocal[30][b] += clipALF(clip[b], curr, fixedFitlerResults[0 + fixedFilterSetIdx][pos.y + padSize][pos.x + padSize]);
+      ELocal[31][b] += clipALF(clip[b], curr, fixedFitlerResults[2 + fixedFilterSetIdx][pos.y + padSize][pos.x + padSize]);
+      ELocal[32][b] += clipALF(clip[b], curr, pImg0Gauss[0][+0] );
+#endif
+    }
+    for( int b = 0; b < numBins; b++ )
+    {
+      ELocal[shape.numCoeff - 1][b] += curr;
+    }
+  }
+  else
+#endif
+#if JVET_AA0095_ALF_LONGER_FILTER && !JVET_AD0222_ALF_LONG_FIXFILTER && !JVET_AD0222_ADDITONAL_ALF_FIXFILTER
   if( shape.filterType == ALF_FILTER_9_EXT || shape.filterType == ALF_FILTER_13_EXT )
 #else
   if( shape.filterType == ALF_FILTER_9_EXT )
@@ -4327,7 +4840,56 @@ void EncAdaptiveLoopFilter::calcCovariance( int ELocal[MAX_NUM_ALF_LUMA_COEFF][M
     }
   }
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
-#if JVET_AA0095_ALF_LONGER_FILTER
+#if JVET_AD0222_ALF_LONG_FIXFILTER || JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+  else if (shape.filterType == ALF_FILTER_13_EXT_DB)
+  {
+    const Pel* pRecDbTmp0 = recBeforeDb;
+    const Pel* pRecDbTmp1 = recBeforeDb + recBeforeDbStride;
+    const Pel* pRecDbTmp2 = recBeforeDb - recBeforeDbStride;
+    for (int b = 0; b < numBins; b++)
+    {
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      ELocal[28][b] += clipALF(clip[b], curr, pImg3Gauss[0][+0], pImg4Gauss[0][-0]);
+      ELocal[29][b] += clipALF(clip[b], curr, pImg1Gauss[0][+0], pImg2Gauss[0][-0]);
+      ELocal[30][b] += clipALF(clip[b], curr, pImg0Gauss[0][+2], pImg0Gauss[0][-2]);
+      ELocal[31][b] += clipALF(clip[b], curr, pImg0Gauss[0][+1], pImg0Gauss[0][-1]);
+
+      ELocal[32][b] += clipALF(clip[b], curr, pRecDbTmp2[+0], pRecDbTmp1[+0]);
+      ELocal[33][b] += clipALF(clip[b], curr, pRecDbTmp0[-1], pRecDbTmp0[+1]);
+
+      ELocal[34][b] += clipALF(clip[b], curr, fixedFitlerResults[0 + fixedFilterSetIdx][pos.y + padSize][pos.x + padSize]);
+      ELocal[35][b] += clipALF(clip[b], curr, fixedFitlerResults[2 + fixedFilterSetIdx][pos.y + padSize][pos.x + padSize]);
+      ELocal[36][b] += clipALF(clip[b], curr, pRecDbTmp0[+0]);
+      ELocal[37][b] += clipALF(clip[b], curr, pImg0Gauss[0][+0] );
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      ELocal[28][b] += clipALF(clip[b], curr, pRecDbTmp2[+0], pRecDbTmp1[+0]);
+      ELocal[29][b] += clipALF(clip[b], curr, pRecDbTmp0[-1], pRecDbTmp0[+1]);
+
+      ELocal[30][b] += clipALF(clip[b], curr, fixedFitlerResults[0 + fixedFilterSetIdx][pos.y + padSize][pos.x + padSize]);
+      ELocal[31][b] += clipALF(clip[b], curr, fixedFitlerResults[2 + fixedFilterSetIdx][pos.y + padSize][pos.x + padSize]);
+      ELocal[32][b] += clipALF(clip[b], curr, pRecDbTmp0[+0]);
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      ELocal[26][b] += clipALF(clip[b], curr, pImg3Gauss[0][+0], pImg4Gauss[0][-0]);
+      ELocal[27][b] += clipALF(clip[b], curr, pImg1Gauss[0][+0], pImg2Gauss[0][-0]);
+      ELocal[28][b] += clipALF(clip[b], curr, pImg0Gauss[0][+2], pImg0Gauss[0][-2]);
+      ELocal[29][b] += clipALF(clip[b], curr, pImg0Gauss[0][+1], pImg0Gauss[0][-1]);
+
+      ELocal[30][b] += clipALF(clip[b], curr, pRecDbTmp2[+0], pRecDbTmp1[+0]);
+      ELocal[31][b] += clipALF(clip[b], curr, pRecDbTmp0[-1], pRecDbTmp0[+1]);
+
+      ELocal[32][b] += clipALF(clip[b], curr, fixedFitlerResults[0 + fixedFilterSetIdx][pos.y + padSize][pos.x + padSize]);
+      ELocal[33][b] += clipALF(clip[b], curr, fixedFitlerResults[2 + fixedFilterSetIdx][pos.y + padSize][pos.x + padSize]);
+      ELocal[34][b] += clipALF(clip[b], curr, pRecDbTmp0[+0]);
+      ELocal[35][b] += clipALF(clip[b], curr, pImg0Gauss[0][+0] );
+#endif
+    }
+    for( int b = 0; b < numBins; b++ )
+    {
+      ELocal[shape.numCoeff - 1][b] += curr;
+    }
+  }
+#endif
+#if JVET_AA0095_ALF_LONGER_FILTER && !JVET_AD0222_ALF_LONG_FIXFILTER && !JVET_AD0222_ADDITONAL_ALF_FIXFILTER
   else if( shape.filterType == ALF_FILTER_9_EXT_DB || shape.filterType == ALF_FILTER_13_EXT_DB )
 #else
   else if( shape.filterType == ALF_FILTER_9_EXT_DB )
@@ -4378,6 +4940,42 @@ void EncAdaptiveLoopFilter::calcCovariance( int ELocal[MAX_NUM_ALF_LUMA_COEFF][M
 
     for (int b = 0; b < numBins; b++)
     {
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      ELocal[28][b] += clipALF(clip[b], curr, pImg3Gauss[0][+0], pImg4Gauss[0][-0]);
+      ELocal[29][b] += clipALF(clip[b], curr, pImg1Gauss[0][+0], pImg2Gauss[0][-0]);
+      ELocal[30][b] += clipALF(clip[b], curr, pImg0Gauss[0][+2], pImg0Gauss[0][-2]);
+      ELocal[31][b] += clipALF(clip[b], curr, pImg0Gauss[0][+1], pImg0Gauss[0][-1]);
+
+      ELocal[32][b] += clipALF(clip[b], curr, pRecDbTmp2[+0], pRecDbTmp1[+0]);
+      ELocal[33][b] += clipALF(clip[b], curr, pRecDbTmp0[-1], pRecDbTmp0[+1]);
+
+      ELocal[34][b] += clipALF(clip[b], curr, fixedFitlerResults[0 + fixedFilterSetIdx][posDst.y + padSize][posDst.x + padSize]);
+      ELocal[35][b] += clipALF(clip[b], curr, fixedFitlerResults[2 + fixedFilterSetIdx][posDst.y + padSize][posDst.x + padSize]);
+      ELocal[36][b] += clipALF(clip[b], curr, pRecDbTmp0[+0]);
+      ELocal[37][b] += clipALF(clip[b],    0, pResiTmp0[+0]);
+      ELocal[38][b] += clipALF(clip[b], curr, pImg0Gauss[0][+0] );
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      ELocal[28][b] += clipALF(clip[b], curr, pRecDbTmp2[+0], pRecDbTmp1[+0]);
+      ELocal[29][b] += clipALF(clip[b], curr, pRecDbTmp0[-1], pRecDbTmp0[+1]);
+      ELocal[30][b] += clipALF(clip[b], curr, fixedFitlerResults[0 + fixedFilterSetIdx][posDst.y + padSize][posDst.x + padSize]);
+      ELocal[31][b] += clipALF(clip[b], curr, fixedFitlerResults[2 + fixedFilterSetIdx][posDst.y + padSize][posDst.x + padSize]);
+      ELocal[32][b] += clipALF(clip[b], curr, pRecDbTmp0[+0]);
+      ELocal[33][b] += clipALF(clip[b], 0, pResiTmp0[+0]);
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      ELocal[26][b] += clipALF(clip[b], curr, pImg3Gauss[0][+0], pImg4Gauss[0][-0]);
+      ELocal[27][b] += clipALF(clip[b], curr, pImg1Gauss[0][+0], pImg2Gauss[0][-0]);
+      ELocal[28][b] += clipALF(clip[b], curr, pImg0Gauss[0][+2], pImg0Gauss[0][-2]);
+      ELocal[29][b] += clipALF(clip[b], curr, pImg0Gauss[0][+1], pImg0Gauss[0][-1]);
+
+      ELocal[30][b] += clipALF(clip[b], curr, pRecDbTmp2[+0], pRecDbTmp1[+0]);
+      ELocal[31][b] += clipALF(clip[b], curr, pRecDbTmp0[-1], pRecDbTmp0[+1]);
+
+      ELocal[32][b] += clipALF(clip[b], curr, fixedFitlerResults[0 + fixedFilterSetIdx][posDst.y + padSize][posDst.x + padSize]);
+      ELocal[33][b] += clipALF(clip[b], curr, fixedFitlerResults[2 + fixedFilterSetIdx][posDst.y + padSize][posDst.x + padSize]);
+      ELocal[34][b] += clipALF(clip[b], curr, pRecDbTmp0[+0]);
+      ELocal[35][b] += clipALF(clip[b],    0, pResiTmp0[+0]);
+      ELocal[36][b] += clipALF(clip[b], curr, pImg0Gauss[0][+0] );
+#else
       ELocal[26][b] += clipALF(clip[b], curr, pRecDbTmp2[+0], pRecDbTmp1[+0]);
       ELocal[27][b] += clipALF(clip[b], curr, pRecDbTmp0[-1], pRecDbTmp0[+1]);
 
@@ -4387,6 +4985,7 @@ void EncAdaptiveLoopFilter::calcCovariance( int ELocal[MAX_NUM_ALF_LUMA_COEFF][M
         clipALF(clip[b], curr, fixedFitlerResults[2 + fixedFilterSetIdx][posDst.y + padSize][posDst.x + padSize]);
       ELocal[30][b] += clipALF(clip[b], curr, pRecDbTmp0[+0]);
       ELocal[31][b] += clipALF(clip[b], 0, pResiTmp0[+0]);
+#endif
     }
     for (int b = 0; b < numBins; b++)
     {
@@ -4403,6 +5002,36 @@ void EncAdaptiveLoopFilter::calcCovariance( int ELocal[MAX_NUM_ALF_LUMA_COEFF][M
 
     for (int b = 0; b < numBins; b++)
     {
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      ELocal[28][b] += clipALF(clip[b], curr, pRecDbTmp2[+0], pRecDbTmp1[+0]);
+      ELocal[29][b] += clipALF(clip[b], curr, pRecDbTmp0[-1], pRecDbTmp0[+1]);
+
+      ELocal[30][b] += clipALF(clip[b], curr, fixedFitlerResults[0 + fixedFilterSetIdx][posDst.y + padSize][posDst.x + padSize]);
+      ELocal[31][b] += clipALF(clip[b], curr, fixedFitlerResults[2 + fixedFilterSetIdx][posDst.y + padSize][posDst.x + padSize]);
+      ELocal[32][b] += clipALF(clip[b],    0, fixedFitlerResiResults[0 + 1 - fixedFilterSetIdx][pos.y][pos.x]);
+      ELocal[33][b] += clipALF(clip[b], curr, pRecDbTmp0[+0]);
+      ELocal[34][b] += clipALF(clip[b],    0, pResiTmp0[+0]);
+      ELocal[35][b] += clipALF(clip[b], curr, pImg0Gauss[0][+0] );
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+      ELocal[28][b] += clipALF(clip[b], curr, pRecDbTmp2[+0], pRecDbTmp1[+0]);
+      ELocal[29][b] += clipALF(clip[b], curr, pRecDbTmp0[-1], pRecDbTmp0[+1]);
+
+      ELocal[30][b] += clipALF(clip[b], curr, fixedFitlerResults[0 + fixedFilterSetIdx][posDst.y + padSize][posDst.x + padSize]);
+      ELocal[31][b] += clipALF(clip[b], curr, fixedFitlerResults[2 + fixedFilterSetIdx][posDst.y + padSize][posDst.x + padSize]);
+      ELocal[32][b] += clipALF(clip[b], 0, fixedFitlerResiResults[0 + 1 - fixedFilterSetIdx][pos.y][pos.x]);
+      ELocal[33][b] += clipALF(clip[b], curr, pRecDbTmp0[+0]);
+      ELocal[34][b] += clipALF(clip[b], 0, pResiTmp0[+0]);
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+      ELocal[26][b] += clipALF(clip[b], curr, pRecDbTmp2[+0], pRecDbTmp1[+0]);
+      ELocal[27][b] += clipALF(clip[b], curr, pRecDbTmp0[-1], pRecDbTmp0[+1]);
+
+      ELocal[28][b] += clipALF(clip[b], curr, fixedFitlerResults[0 + fixedFilterSetIdx][posDst.y + padSize][posDst.x + padSize]);
+      ELocal[29][b] += clipALF(clip[b], curr, fixedFitlerResults[2 + fixedFilterSetIdx][posDst.y + padSize][posDst.x + padSize]);
+      ELocal[30][b] += clipALF(clip[b],    0, fixedFitlerResiResults[0 + 1 - fixedFilterSetIdx][pos.y][pos.x]);
+      ELocal[31][b] += clipALF(clip[b], curr, pRecDbTmp0[+0]);
+      ELocal[32][b] += clipALF(clip[b],    0, pResiTmp0[+0]);
+      ELocal[33][b] += clipALF(clip[b], curr, pImg0Gauss[0][+0] );
+#else
       ELocal[26][b] += clipALF(clip[b], curr, pRecDbTmp2[+0], pRecDbTmp1[+0]);
       ELocal[27][b] += clipALF(clip[b], curr, pRecDbTmp0[-1], pRecDbTmp0[+1]);
 
@@ -4413,6 +5042,7 @@ void EncAdaptiveLoopFilter::calcCovariance( int ELocal[MAX_NUM_ALF_LUMA_COEFF][M
       ELocal[30][b] += clipALF(clip[b], 0, fixedFitlerResiResults[0 + 1 - fixedFilterSetIdx][pos.y][pos.x]);
       ELocal[31][b] += clipALF(clip[b], curr, pRecDbTmp0[+0]);
       ELocal[32][b] += clipALF(clip[b], 0, pResiTmp0[+0]);
+#endif
     }
     for (int b = 0; b < numBins; b++)
     {
@@ -5030,7 +5660,7 @@ void  EncAdaptiveLoopFilter::alfEncoderCtb(CodingStructure& cs, AlfParam& alfPar
                 m_CABACEstimator->resetBits();
                 m_CABACEstimator->codeAlfCtuEnableFlag(cs, ctbIdx, COMPONENT_Y, &m_alfParamTemp);
                 alfCtbFilterSetIndex[ctbIdx] = filterSetIdx;
-                m_CABACEstimator->codeAlfCtuFilterIndex(cs, ctbIdx, true);
+                m_CABACEstimator->codeAlfCtuFilterIndex( cs, ctbIdx, m_alfParamTemp.enabledFlag[COMPONENT_Y] );
 #if ALF_IMPROVEMENT
                 m_ctuAlternative[COMPONENT_Y][ctbIdx] = altIdx;
                 if (filterSetIdx >= NUM_FIXED_FILTER_SETS)
@@ -5539,6 +6169,15 @@ void EncAdaptiveLoopFilter::alfReconstructor(CodingStructure& cs, const PelUnitB
                   paddingFixedFilterResultsCtu(m_fixFilterResult, m_fixedFilterResultPerCtu, fixedFilterSetIdx, blkDst);
                 }
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+                if( m_isFixedFilterPaddedPerCtu )
+                {
+                  for(int gaussIdx = 0; gaussIdx < NUM_GAUSS_FILTERED_SOURCE; gaussIdx++)
+                  {
+                    paddingGaussResultsCtu(m_gaussPic, m_gaussCtu, gaussIdx, blkDst);
+                  }
+                }
+#endif
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
                 PelUnitBuf bufDb = m_tempBufBeforeDb2.subBuf( UnitArea ( CHROMA_400, Area( 0, 0, wBuf, hBuf ) ) );
 #if JVET_AA0095_ALF_LONGER_FILTER
@@ -5593,10 +6232,11 @@ void EncAdaptiveLoopFilter::alfReconstructor(CodingStructure& cs, const PelUnitB
                 int classifierIdx = m_classifierIdxApsLuma[filterSetIndex - NUM_FIXED_FILTER_SETS][alt_num];
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
-                alfFiltering(m_classifier[classifierIdx], recBuf, bufDb, bufResi, buf, blkDst, blkSrc, COMPONENT_Y,
-                             coeff, clip, m_clpRngs.comp[COMPONENT_Y], cs, filterTypeCtb, m_fixFilterResult,
-                             m_fixFilterResiResult, fixedFilterSetIdx, m_fixedFilterResultPerCtu,
-                             m_isFixedFilterPaddedPerCtu);
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+                alfFiltering(m_classifier[classifierIdx], recBuf, bufDb, bufResi, buf, blkDst, blkSrc, COMPONENT_Y, coeff, clip, m_clpRngs.comp[COMPONENT_Y], cs, filterTypeCtb, m_fixFilterResult, m_fixFilterResiResult, fixedFilterSetIdx, m_fixedFilterResultPerCtu, m_isFixedFilterPaddedPerCtu, m_gaussPic, m_gaussCtu);
+#else
+                alfFiltering(m_classifier[classifierIdx], recBuf, bufDb, bufResi, buf, blkDst, blkSrc, COMPONENT_Y, coeff, clip, m_clpRngs.comp[COMPONENT_Y], cs, filterTypeCtb, m_fixFilterResult, m_fixFilterResiResult, fixedFilterSetIdx, m_fixedFilterResultPerCtu, m_isFixedFilterPaddedPerCtu);
+#endif
 #else
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
                 alfFiltering( m_classifier[classifierIdx], recBuf, bufDb, buf, blkDst, blkSrc, COMPONENT_Y, coeff, clip, m_clpRngs.comp[COMPONENT_Y], cs, filterTypeCtb, m_fixFilterResult, fixedFilterSetIdx, m_fixedFilterResultPerCtu, m_isFixedFilterPaddedPerCtu );
@@ -5656,6 +6296,9 @@ void EncAdaptiveLoopFilter::alfReconstructor(CodingStructure& cs, const PelUnitB
 #if JVET_X0071_ALF_BAND_CLASSIFIER
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+                alfFiltering(m_classifier[0], recBuf, tmpYuvBeforeDb, tmpYuvResi, buf, blkDst, blkSrc, compID, m_chromaCoeffFinal[alt_num], m_chromaClippFinal[alt_num], m_clpRngs.comp[compIdx], cs, m_filterTypeApsChroma, nullptr, nullptr, -1, nullptr, false, m_gaussPic, m_gaussCtu);
+#else
                 alfFiltering( m_classifier[0], recBuf, tmpYuvBeforeDb, 
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
                              tmpYuvResi,
@@ -5665,6 +6308,7 @@ void EncAdaptiveLoopFilter::alfReconstructor(CodingStructure& cs, const PelUnitB
                              nullptr,
 #endif
                   -1, nullptr, false );
+#endif
 #else
                 alfFiltering( m_classifier[0], recBuf, tmpYuvBeforeDb, buf, blkDst, blkSrc, compID, m_chromaCoeffFinal[alt_num], m_chromaClippFinal[alt_num], m_clpRngs.comp[compIdx], cs, m_filterTypeApsChroma, nullptr, -1 );
 #endif
@@ -5733,10 +6377,22 @@ void EncAdaptiveLoopFilter::alfReconstructor(CodingStructure& cs, const PelUnitB
             paddingFixedFilterResultsCtu(m_fixFilterResult, m_fixedFilterResultPerCtu, fixedFilterSetIdx, blk);
           }
 #endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+          if( m_isFixedFilterPaddedPerCtu )
+          {
+            for(int gaussIdx = 0; gaussIdx < NUM_GAUSS_FILTERED_SOURCE; gaussIdx++)
+            {
+              paddingGaussResultsCtu(m_gaussPic, m_gaussCtu, gaussIdx, blk);
+            }
+          }
+#endif
 #if JVET_X0071_ALF_BAND_CLASSIFIER
           int classifierIdx = m_classifierIdxApsLuma[filterSetIndex - NUM_FIXED_FILTER_SETS][alt_num];
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+          alfFiltering(m_classifier[classifierIdx], recBuf, tmpYuvBeforeDb, tmpYuvResi, recExtBuf, blk, blk, COMPONENT_Y, coeff, clip, m_clpRngs.comp[COMPONENT_Y], cs, filterTypeCtb, m_fixFilterResult, m_fixFilterResiResult, fixedFilterSetIdx, m_fixedFilterResultPerCtu, m_isFixedFilterPaddedPerCtu, m_gaussPic, m_gaussCtu);
+#else
           alfFiltering(m_classifier[classifierIdx], recBuf, tmpYuvBeforeDb, 
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
                        tmpYuvResi,
@@ -5746,6 +6402,7 @@ void EncAdaptiveLoopFilter::alfReconstructor(CodingStructure& cs, const PelUnitB
                        m_fixFilterResiResult,
 #endif
             fixedFilterSetIdx, m_fixedFilterResultPerCtu, m_isFixedFilterPaddedPerCtu);
+#endif
 #else
           alfFiltering(m_classifier[classifierIdx], recBuf, tmpYuvBeforeDb, recExtBuf, blk, blk, COMPONENT_Y, coeff, clip, m_clpRngs.comp[COMPONENT_Y], cs, filterTypeCtb, m_fixFilterResult, fixedFilterSetIdx);
 #endif
@@ -5801,6 +6458,9 @@ void EncAdaptiveLoopFilter::alfReconstructor(CodingStructure& cs, const PelUnitB
 #if JVET_X0071_ALF_BAND_CLASSIFIER
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+          alfFiltering(m_classifier[0], recBuf, tmpYuvBeforeDb, tmpYuvResi, recExtBuf, blk, blk, compID, m_chromaCoeffFinal[altNum], m_chromaClippFinal[altNum], m_clpRngs.comp[compIdx], cs, m_filterTypeApsChroma, nullptr, nullptr, -1, nullptr, false, m_gaussPic, m_gaussCtu);
+#else
           alfFiltering( m_classifier[0], recBuf, tmpYuvBeforeDb, 
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
                        tmpYuvResi,
@@ -5810,6 +6470,7 @@ void EncAdaptiveLoopFilter::alfReconstructor(CodingStructure& cs, const PelUnitB
                        nullptr,
 #endif
             -1, nullptr, false );
+#endif
 #else
           alfFiltering( m_classifier[0], recBuf, tmpYuvBeforeDb, recExtBuf, blk, blk, compID, m_chromaCoeffFinal[altNum], m_chromaClippFinal[altNum], m_clpRngs.comp[compIdx], cs, m_filterTypeApsChroma, nullptr, -1 );
 #endif
