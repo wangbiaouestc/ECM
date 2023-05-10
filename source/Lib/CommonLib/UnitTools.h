@@ -682,6 +682,10 @@ namespace PU
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   bool hasChromaFusionFlag(const PredictionUnit &pu, int intraMode);
 #endif
+#if JVET_AD0120_LBCCP
+  bool hasCcInsideFilterFlag(const PredictionUnit &pu, int intraMode);
+  bool isModetobeFiltered(int intraMode);
+#endif
 #if JVET_AC0071_DBV
   bool hasChromaBvFlag(const PredictionUnit &pu);
 #endif

@@ -2312,6 +2312,7 @@ void CABACWriter::intra_chroma_lmc_mode(const PredictionUnit& pu)
     CHECK(symbol > 5, "invalid symbol for MMLM");
     m_BinEncoder.encodeBin(symbol == 1 ? 0 : 1, Ctx::MMLMFlag(0));
 
+
     if (symbol > 1)
     {
       m_BinEncoder.encodeBinEP(symbol > 2);
@@ -2325,7 +2326,6 @@ void CABACWriter::intra_chroma_lmc_mode(const PredictionUnit& pu)
     {
       m_BinEncoder.encodeBinEP(symbol > 4);
     }
-
 #else
     CHECK(symbol > 2, "invalid symbol for MMLM");
     unsigned int symbol_minus_1 = symbol - 1;
@@ -2341,6 +2341,9 @@ void CABACWriter::intra_chroma_lmc_mode(const PredictionUnit& pu)
 #endif
 #if JVET_Z0050_CCLM_SLOPE
   cclmDeltaSlope( pu );
+#endif
+#if JVET_AD0120_LBCCP
+  ccInsideFilterFlag(pu);
 #endif
 }
 
@@ -2482,6 +2485,18 @@ void CABACWriter::intraChromaFusionMode(const PredictionUnit& pu)
       m_BinEncoder.encodeBin(symbol > 2 ? 1 : 0, Ctx::ChromaFusionCclm());  // LM=2
     }
 #endif
+  }
+}
+#endif
+
+#if JVET_AD0120_LBCCP
+void CABACWriter::ccInsideFilterFlag(const PredictionUnit &pu)
+{
+  const unsigned intraDir = pu.intraDir[1];
+
+  if (PU::hasCcInsideFilterFlag(pu, intraDir))
+  {
+    m_BinEncoder.encodeBin(pu.ccInsideFilter, Ctx::CcInsideFilterFlag(0));
   }
 }
 #endif

@@ -2617,7 +2617,6 @@ bool CABACReader::intra_chroma_lmc_mode(PredictionUnit& pu)
     {
       modeIdx += m_BinDecoder.decodeBinEP();
     } // == 5 mean MMLM_T
-
     pu.intraDir[1] = lmModeList[modeIdx];
 #else
     symbol += m_BinDecoder.decodeBinEP();
@@ -2633,6 +2632,9 @@ bool CABACReader::intra_chroma_lmc_mode(PredictionUnit& pu)
 #endif
 #if JVET_Z0050_CCLM_SLOPE
   cclmDeltaSlope( pu );
+#endif
+#if JVET_AD0120_LBCCP
+  ccInsideFilterFlag(pu);
 #endif
 
   return true; //it will only enter this function for LMC modes, so always return true ;
@@ -2751,6 +2753,19 @@ void CABACReader::cccmFlag(PredictionUnit& pu)
 #endif
     }
 #endif
+  }
+}
+#endif
+
+#if JVET_AD0120_LBCCP
+void CABACReader::ccInsideFilterFlag(PredictionUnit &pu)
+{
+  const unsigned intraDir = pu.intraDir[1];
+  pu.ccInsideFilter       = 0;
+
+  if (PU::hasCcInsideFilterFlag(pu, intraDir))
+  {
+    pu.ccInsideFilter = m_BinDecoder.decodeBin(Ctx::CcInsideFilterFlag(0));
   }
 }
 #endif

@@ -1089,6 +1089,9 @@ static const int VALID_NUM_CCCM_MODES = TOTAL_NUM_CCCM_MODES - 6;
 static const int CCCM_MULTI_PRED_FILTER_NUM_PARAMS = 10;
 static const int CCCM_MULTI_PRED_FILTER_NUM_PARAMS2 = 11;
 #endif
+#if JVET_AD0120_LBCCP
+static const int LBCCP_FILTER_MMLMNUM = 4 + 3;// multi-model TL mode of CCLM, CCCM w/ subsample, CCCM w/o subsample if applicable, GL-CCCM, and three more from CCCM_MDF
+#endif
 #endif
 
 #if JVET_AA0126_GLM
