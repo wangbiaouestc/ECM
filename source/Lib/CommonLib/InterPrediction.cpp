@@ -2391,7 +2391,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
       if(pu.cs->sps->getIBCFracFlag() && (xFrac != 0 || yFrac != 0))
       {
-        bvValidType = PU::checkValidBv(pu, compID, dstPic.bufs[compID].width, dstPic.bufs[compID].height, mv, false, filterIdx, useAltHpelIf, true);
+        bvValidType = PU::checkValidBv(pu, compID, dstPic.bufs[compID].width, dstPic.bufs[compID].height, mv, false, filterIdx, true);
       }
       else
 #endif
@@ -2437,7 +2437,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
       {
         xPredIBCBlkPadding(pu, compID, refPic, clpRng
                          , refBuf, offset, xFrac, yFrac
-                         , (int)width, (int)height, filterIdx, useAltHpelIf);
+                         , (int)width, (int)height, filterIdx);
       }
 #endif
     }
@@ -2509,7 +2509,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
           && !( (xFrac == 8 || yFrac == 8) && useAltHpelIf ) //to avoid (8,12 or 12,8 passes)
           && dmvrWidth == 0                                  //seems to conflict with DMVR, not sure //kolya
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-          && !(isIBC && pu.cs->sps->getIBCFracFlag() && (filterIdx == 1 || filterIdx == -1 || filterIdx == -2)) // IBC could use non-12-tap filter
+          && !(isIBC && pu.cs->sps->getIBCFracFlag() && (filterIdx == 1 || filterIdx == -1)) // IBC could use non-12-tap filter
 #endif
         )
         m_if.filter4x4(clpRng,  (Pel*)refBuf.buf, refBuf.stride,  dstBuf.buf, dstBuf.stride, xFrac, yFrac, rndRes);
@@ -2544,11 +2544,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
         if (isLuma(compID) && filterIdx == -1)
         {
-          vFilterSize = useAltHpelIf && yFrac == 8 ? 6 : NTAPS_LUMA_IBC;
-        }
-        if (isLuma(compID) && filterIdx == -2)
-        {
-          vFilterSize = useAltHpelIf && yFrac == 8 ? 6 : NTAPS_ALT_LUMA_IBC;
+          vFilterSize = NTAPS_LUMA_IBC;
         }
         if (isChroma(compID) && filterIdx == 1 && isIBC && pu.cs->sps->getIBCFracFlag())
         {
@@ -2805,7 +2801,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 void InterPrediction::xPredIBCBlkPadding(const PredictionUnit& pu, ComponentID compID, const Picture* refPic, const ClpRng& clpRng
                                        , CPelBuf& refBufBeforePadding, const Position& refOffsetByIntBv, int xFrac, int yFrac
-                                       , int width, int height, int filterIdx, bool& useAltHpelIf)
+                                       , int width, int height, int filterIdx)
 {
         Position         offset = refOffsetByIntBv;
         CPelBuf&         refBuf = refBufBeforePadding;
@@ -2821,9 +2817,8 @@ void InterPrediction::xPredIBCBlkPadding(const PredictionUnit& pu, ComponentID c
   if (isLuma(compID))
   {
     int filterTap = filterIdx == 1 ? 2 : NTAPS_LUMA_IBC;
-    useAltHpelIf &= (filterIdx == 0);
-    xFilterTap    = useAltHpelIf && xFrac == 8 ? 6 : filterTap;
-    yFilterTap    = useAltHpelIf && yFrac == 8 ? 6 : filterTap;
+    xFilterTap    = filterTap;
+    yFilterTap    = filterTap;
   }
   else
   {
@@ -7854,7 +7849,7 @@ void  InterPrediction::sortIbcMergeMbvdCandidates(PredictionUnit &pu, MergeCtx& 
 #endif
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-    uint32_t bvValidType = PU::checkValidBvPU(pu, COMPONENT_Y, pu.mv[0], true, 0, pu.cu->imv == IMV_HPEL);
+    uint32_t bvValidType = PU::checkValidBvPU(pu, COMPONENT_Y, pu.mv[0], true, 0);
     if (bvValidType == IBC_BV_INVALID)
 #else
     if (!PU::searchBv(pu, cuPelX, cuPelY, roiWidth, roiHeight, picWidth, picHeight, xPred, yPred, lcuWidth)) // not valid bv derived
@@ -15706,7 +15701,7 @@ PelBuf TplMatchingCtrl::xGetRefTemplate(const PredictionUnit& curPu, const Pictu
     tempBv += _mv;
 
     int filterIdx = 1;
-    if (PU::checkValidBv(m_pu, COMPONENT_Y, roiWidth, roiHeight, tempBv, false, filterIdx, m_cu.imv == IMV_HPEL, false, true) != IBC_BV_VALID)
+    if (PU::checkValidBv(m_pu, COMPONENT_Y, roiWidth, roiHeight, tempBv, false, filterIdx, false, true) != IBC_BV_VALID)
     {
       return PelBuf();
     }
@@ -15939,7 +15934,6 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   const int  roiWidth  = m_pu.lwidth();
   const int  roiHeight = m_pu.lheight();
-  const bool altIfHPel = m_cu.imv == IMV_HPEL;
   const int  filterIdx = 1;
 #else
   const int cuPelX       = m_pu.lx();
@@ -15972,9 +15966,9 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
       if( CU::isIBC(m_cu) )
       {
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-        if (PU::checkValidBv(m_pu, COMPONENT_Y, roiWidth, roiHeight, mvCand, false, 0, altIfHPel, false, true) != IBC_BV_VALID
-          || (m_curTplAbove.buf != nullptr && PU::checkValidBv(m_pu, COMPONENT_Y, roiWidth,  tplSize, mvCand - Mv(0, (tplSize << MV_FRACTIONAL_BITS_INTERNAL)), false, filterIdx, altIfHPel, false, true) != IBC_BV_VALID)
-          || (m_curTplLeft.buf  != nullptr && PU::checkValidBv(m_pu, COMPONENT_Y, tplSize, roiHeight, mvCand - Mv((tplSize << MV_FRACTIONAL_BITS_INTERNAL), 0), false, filterIdx, altIfHPel, false, true) != IBC_BV_VALID))
+        if (PU::checkValidBv(m_pu, COMPONENT_Y, roiWidth, roiHeight, mvCand, false, 0, false, true) != IBC_BV_VALID
+          || (m_curTplAbove.buf != nullptr && PU::checkValidBv(m_pu, COMPONENT_Y, roiWidth,  tplSize, mvCand - Mv(0, (tplSize << MV_FRACTIONAL_BITS_INTERNAL)), false, filterIdx, false, true) != IBC_BV_VALID)
+          || (m_curTplLeft.buf  != nullptr && PU::checkValidBv(m_pu, COMPONENT_Y, tplSize, roiHeight, mvCand - Mv((tplSize << MV_FRACTIONAL_BITS_INTERNAL), 0), false, filterIdx, false, true) != IBC_BV_VALID))
 #else
         Mv tempBv = mvCand;
         tempBv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
@@ -23482,13 +23476,12 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
       bool res = true;
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
       int  filterIdx = 1; // Aligned with TMP's setting
-      bool useAltHPleIF = pu.cu->imv == IMV_HPEL;
 #endif
 
       if (doBoundaryCheck)
       {
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-        res = PU::checkValidBv(pu, COMPONENT_Y, (int)pu.lwidth(), (int)pu.lheight(), cMvTest, false, 0, useAltHPleIF, false, true) == IBC_BV_VALID;
+        res = PU::checkValidBv(pu, COMPONENT_Y, (int)pu.lwidth(), (int)pu.lheight(), cMvTest, false, 0, false, true) == IBC_BV_VALID;
 #else
         res = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), pu.lheight(), picWidth, picHeight, xPred, yPred, lcuWidth);
 #endif
@@ -23503,9 +23496,9 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
         {
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
           Mv cMvTemp(cMvTest.hor, cMvTest.ver - (1 << MV_FRACTIONAL_BITS_INTERNAL));
-          useTop  = PU::checkValidBv(pu, COMPONENT_Y, (int)pu.lwidth(),  1, cMvTemp, false, filterIdx, useAltHPleIF, false, true) == IBC_BV_VALID;
+          useTop  = PU::checkValidBv(pu, COMPONENT_Y, (int)pu.lwidth(),  1, cMvTemp, false, filterIdx, false, true) == IBC_BV_VALID;
           cMvTemp.set(cMvTest.hor + (pu.lwidth() << MV_FRACTIONAL_BITS_INTERNAL), cMvTest.ver);
-          useLeft = PU::checkValidBv(pu, COMPONENT_Y, 1, (int)pu.lheight(), cMvTemp, false, filterIdx, useAltHPleIF, false, true) == IBC_BV_VALID;
+          useLeft = PU::checkValidBv(pu, COMPONENT_Y, 1, (int)pu.lheight(), cMvTemp, false, filterIdx, false, true) == IBC_BV_VALID;
 #else
           useTop = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred, lcuWidth);
           xPred += pu.lwidth(); //at least, template size of 1 should be available
@@ -23518,9 +23511,9 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
           {
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
             Mv cMvTemp(cMvTest.hor - (1 << MV_FRACTIONAL_BITS_INTERNAL), cMvTest.ver);
-            useLeft = PU::checkValidBv(pu, COMPONENT_Y, 1, (int)pu.lheight(), cMvTemp, false, filterIdx, useAltHPleIF, false, true) == IBC_BV_VALID;
+            useLeft = PU::checkValidBv(pu, COMPONENT_Y, 1, (int)pu.lheight(), cMvTemp, false, filterIdx, false, true) == IBC_BV_VALID;
             cMvTemp.set(cMvTest.hor, cMvTest.ver + (pu.lheight() << MV_FRACTIONAL_BITS_INTERNAL));
-            useTop  = PU::checkValidBv(pu, COMPONENT_Y, (int)pu.lwidth(),  1, cMvTemp, false, filterIdx, useAltHPleIF, false, true) == IBC_BV_VALID;
+            useTop  = PU::checkValidBv(pu, COMPONENT_Y, (int)pu.lwidth(),  1, cMvTemp, false, filterIdx, false, true) == IBC_BV_VALID;
 #else
             useLeft = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred, yPred, lcuWidth);
             yPred += pu.lheight(); //at least, template size of 1 should be available
@@ -23531,9 +23524,9 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
           {
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
             Mv cMvTemp(cMvTest.hor - (1 << MV_FRACTIONAL_BITS_INTERNAL), cMvTest.ver);
-            useLeft = PU::checkValidBv(pu, COMPONENT_Y, 1, (int)pu.lheight(), cMvTemp, false, filterIdx, useAltHPleIF, false, true) == IBC_BV_VALID;
+            useLeft = PU::checkValidBv(pu, COMPONENT_Y, 1, (int)pu.lheight(), cMvTemp, false, filterIdx, false, true) == IBC_BV_VALID;
             cMvTemp.set(cMvTest.hor, cMvTest.ver - (1 << MV_FRACTIONAL_BITS_INTERNAL));
-            useTop  = PU::checkValidBv(pu, COMPONENT_Y, (int)pu.lwidth(),  1, cMvTemp, false, filterIdx, useAltHPleIF, false, true) == IBC_BV_VALID;
+            useTop  = PU::checkValidBv(pu, COMPONENT_Y, (int)pu.lwidth(),  1, cMvTemp, false, filterIdx, false, true) == IBC_BV_VALID;
 #else
             useLeft = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred - 1, yPred, lcuWidth);
             useTop = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred - 1, lcuWidth);
@@ -23543,9 +23536,9 @@ void InterPrediction::deriveMVDcandAffine(const PredictionUnit& pu, RefPicList e
 #else
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
         Mv cMvTemp(cMvTest.hor - (1 << MV_FRACTIONAL_BITS_INTERNAL), cMvTest.ver);
-        useLeft = PU::checkValidBv(pu, COMPONENT_Y, 1, (int)pu.lheight(), cMvTemp, false, filterIdx, useAltHPleIF, false, true) == IBC_BV_VALID;
+        useLeft = PU::checkValidBv(pu, COMPONENT_Y, 1, (int)pu.lheight(), cMvTemp, false, filterIdx, false, true) == IBC_BV_VALID;
         cMvTemp.set(cMvTest.hor, cMvTest.ver - (1 << MV_FRACTIONAL_BITS_INTERNAL));
-        useTop  = PU::checkValidBv(pu, COMPONENT_Y, (int)pu.lwidth(),  1, cMvTemp, false, filterIdx, useAltHPleIF, false, true) == IBC_BV_VALID;
+        useTop  = PU::checkValidBv(pu, COMPONENT_Y, (int)pu.lwidth(),  1, cMvTemp, false, filterIdx, false, true) == IBC_BV_VALID;
 #else
         useLeft = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, 1, pu.lheight(), picWidth, picHeight, xPred - 1, yPred, lcuWidth);
         useTop = PU::searchBv(pu, pu.lumaPos().x, pu.lumaPos().y, pu.lwidth(), 1, picWidth, picHeight, xPred, yPred - 1, lcuWidth);

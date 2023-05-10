@@ -367,7 +367,7 @@ protected:
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   void xPredIBCBlkPadding       (const PredictionUnit& pu, ComponentID compID, const Picture* refPic, const ClpRng& clpRng
                                , CPelBuf& refBufBeforePadding, const Position& refOffsetByIntBv, int xFrac, int yFrac
-                               , int width, int height, int filterIdx, bool& useAltHpelIf);
+                               , int width, int height, int filterIdx);
 #endif
 
   void xAddBIOAvg4              (const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel*gradY1, int gradStride, int width, int height, int tmpx, int tmpy, int shift, int offset, const ClpRng& clpRng);

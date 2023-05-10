@@ -2001,7 +2001,7 @@ Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUni
   }
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-  int filterIdx = 1;
+  int filterIdx = 0;
   std::vector<Mv> chromaBvList;
   chromaBvList.push_back(pu.cs->sps->getIBCFracFlag() ? pu.mv[0] : Mv((pu.mv[0].hor >> bvShiftHor) << bvShiftHor, (pu.mv[0].ver >> bvShiftVer) << bvShiftVer));
 #else

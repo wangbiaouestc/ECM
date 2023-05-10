@@ -285,8 +285,8 @@ namespace PU
   );
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-  uint32_t checkValidBvPU (const PredictionUnit& pu, ComponentID compID,                                Mv mv, bool ignoreFracMv = false, int filterIdx = 0, bool useAltHPelIF = false);
-  uint32_t checkValidBv   (const PredictionUnit& pu, ComponentID compID, int compWidth, int compHeight, Mv mv, bool ignoreFracMv = false, int filterIdx = 0, bool useAltHPelIF = false
+  uint32_t checkValidBvPU (const PredictionUnit& pu, ComponentID compID,                                Mv mv, bool ignoreFracMv = false, int filterIdx = 0);
+  uint32_t checkValidBv   (const PredictionUnit& pu, ComponentID compID, int compWidth, int compHeight, Mv mv, bool ignoreFracMv = false, int filterIdx = 0
                          , bool isFinalMC = false // this flag is for non-normative SW speedup
                          , bool checkAllRefValid = false
   );
