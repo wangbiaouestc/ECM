@@ -893,6 +893,9 @@ void PredictionUnit::initData()
   curCand = {};
   curCand.type = CCP_TYPE_NONE;
 #endif
+#if JVET_AD0120_LBCCP
+  ccInsideFilter = 0;
+#endif
   // inter data
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = 0;
@@ -1057,6 +1060,9 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #if JVET_AD0188_CCP_MERGE
   idxNonLocalCCP  = predData.idxNonLocalCCP;
   curCand = predData.curCand;
+#endif
+#if JVET_AD0120_LBCCP
+  ccInsideFilter = predData.ccInsideFilter;
 #endif
   return *this;
 }
@@ -1224,6 +1230,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   curCand = other.curCand;
 #endif
 
+#if JVET_AD0120_LBCCP
+  ccInsideFilter = other.ccInsideFilter;
+#endif
   mergeFlag   = other.mergeFlag;
   regularMergeFlag = other.regularMergeFlag;
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION

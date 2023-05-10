@@ -569,6 +569,20 @@ private:
   PelStorage      m_predStorage[2];
   PelStorage      m_fusionStorage[6];
 #endif
+
+#if JVET_AD0120_LBCCP
+  PelStorage      m_lmPredFiltStorage[LBCCP_FILTER_MMLMNUM];
+  struct lmPredFiltModeInfo
+  {
+    int    bufIdx;
+    int    isCccm;
+    int    isCccmNoSub;
+    int    isGlcccm;
+    int    cccmMdfIdx;
+    double cost;
+  };
+#endif
+
 protected:
   // interface to option
   EncCfg*         m_pcEncCfg;
@@ -657,6 +671,9 @@ public:
   void sortRdModeListFirstColorSpace(ModeInfo mode, double cost, char bdpcmMode, ModeInfo* rdModeList, double* rdCostList, char* bdpcmModeList, int& candNum);
   void invalidateBestRdModeFirstColorSpace();
   void setSavedRdModeIdx(int idx) { m_savedRdModeIdx = idx; }
+#if JVET_AD0120_LBCCP
+  void fillLmPredFiltList(PredictionUnit pu, const PelUnitBuf& lmPredFilt, int &lmPredFiltIdx, std::vector<lmPredFiltModeInfo> &miLmPredFiltList);
+#endif
 
 #if SECONDARY_MPM
   uint8_t* getMPMList()           { return m_mpmList; }

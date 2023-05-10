@@ -543,6 +543,9 @@ struct IntraPredictionData
   int       idxNonLocalCCP;
   CCPModelCandidate curCand;
 #endif
+#if JVET_AD0120_LBCCP
+  int       ccInsideFilter;
+#endif
 };
 
 struct InterPredictionData

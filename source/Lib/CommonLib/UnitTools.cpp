@@ -2520,6 +2520,35 @@ bool PU::hasChromaFusionFlag(const PredictionUnit &pu, int intraMode)
   return hasChromaFusionFlag;
 }
 #endif
+#if JVET_AD0120_LBCCP
+bool PU::isModetobeFiltered(int intraMode)
+{
+#if MMLM
+  if (intraMode == MMLM_CHROMA_IDX )
+  {
+    return true;
+  }
+#endif
+  return false;
+}
+
+bool PU::hasCcInsideFilterFlag(const PredictionUnit &pu, int intraMode)
+{
+#if JVET_AA0126_GLM
+  if (pu.glmIdc.isActive())
+  {
+    return false;
+  }
+#endif
+#if JVET_Z0050_CCLM_SLOPE
+  if (pu.cclmOffsets.isActive())
+  {
+    return false;
+  }
+#endif
+  return isModetobeFiltered(intraMode);
+}
+#endif
 
 #if JVET_AC0071_DBV
 bool PU::hasChromaBvFlag(const PredictionUnit &pu)

@@ -3382,6 +3382,23 @@ const CtxSet ContextSetCfg::CccmMpfFlag = ContextSetCfg::addCtxSet
 #endif
 #endif
 
+#if JVET_AD0120_LBCCP
+const CtxSet ContextSetCfg::CcInsideFilterFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+});
+#endif
+
 #if JVET_AC0119_LM_CHROMA_FUSION
 const CtxSet ContextSetCfg::ChromaFusionType = ContextSetCfg::addCtxSet
 ({

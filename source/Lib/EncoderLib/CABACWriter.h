@@ -147,6 +147,10 @@ public:
 #if JVET_AD0188_CCP_MERGE
   void        nonLocalCCPIndex          ( const PredictionUnit&         pu );
 #endif
+#if JVET_AD0120_LBCCP
+  void        ccInsideFilterFlag(const PredictionUnit &pu);
+#endif
+
   void        cu_residual               ( const CodingUnit&             cu,       Partitioner&      pm,         CUCtx& cuCtx );
   void        rqt_root_cbf              ( const CodingUnit&             cu );
   void        adaptive_color_transform(const CodingUnit&             cu);

@@ -565,6 +565,9 @@ public:
 #if JVET_AD0202_CCCM_MDF
   static const CtxSet   CccmMpfFlag;
 #endif
+#if JVET_AD0120_LBCCP
+  static const CtxSet   CcInsideFilterFlag;
+#endif
 #if JVET_AB0157_TMRL
   static const CtxSet   TmrlDerive;
 #endif

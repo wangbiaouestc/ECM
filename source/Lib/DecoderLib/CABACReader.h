@@ -134,6 +134,9 @@ public:
 #if JVET_AD0188_CCP_MERGE
   void        nonLocalCCPIndex          ( PredictionUnit&               pu );
 #endif
+#if JVET_AD0120_LBCCP
+  void        ccInsideFilterFlag(PredictionUnit &pu);
+#endif
 #if ENABLE_DIMD
   void        cu_dimd_flag              (CodingUnit&                   cu);
  #endif
