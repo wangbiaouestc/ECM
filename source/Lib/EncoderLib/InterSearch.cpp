@@ -3783,7 +3783,7 @@ Distortion InterSearch::xPredIBCFracPelSearch(PredictionUnit&              pu
     for (int j = 0; j < numOffset; ++j)
     {
       pu.mv[0] = centerMv + mvOffset[j];
-      uint32_t validType = PU::checkValidBvPU(pu, COMPONENT_Y, pu.mv[0], true, 0, imv == IMV_HPEL);
+      uint32_t validType = PU::checkValidBvPU(pu, COMPONENT_Y, pu.mv[0], true, 0);
       if (validType == IBC_BV_INVALID)
       {
         continue;

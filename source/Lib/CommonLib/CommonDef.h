@@ -1164,7 +1164,6 @@ static const int MAX_RPR_SWITCHING_ORDER_LIST_SIZE           =     32; /// max n
 static const int NTAPS_BILINEAR           =                         2; ///< Number of taps for bilinear filter
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 static const int NTAPS_LUMA_IBC           =                         8; ///< Number of taps for IBC luma filter
-static const int NTAPS_ALT_LUMA_IBC       =                         4; ///< Number of taps for alternative IBC luma filter
 #endif
 
 #if INTER_RM_SIZE_CONSTRAINTS
