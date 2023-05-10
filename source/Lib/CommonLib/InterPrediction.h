@@ -74,6 +74,10 @@ struct BMSubBlkInfo : Area
   Distortion m_bmCost;
   Mv       m_mv[2];
   Mv       m_mvRefine[2];
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  Mv       m_mvRefineL0[2];
+  Mv       m_mvRefineL1[2];
+#endif
   PosType  m_cXInPU; // x coordinate of center relative to PU's top left sample
   PosType  m_cYInPU; // y coordinate of center relative to PU's top left sample
 };
@@ -833,7 +837,11 @@ public:
   void    updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t* rdCandList, bool* applyBDMVR, Mv** mvBufBDMVR, Mv** mvBufBDMVRTmp, bool subRefineList[][2] = NULL, bool subRefineListTmp[][2] = NULL, int numCandInCategory = -1);
 #endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
-  void    adjustAffineMergeCandidatesOneGroup(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, int listsize, int mrgCandIdx = -1);
+  void    adjustAffineMergeCandidatesOneGroup(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, int listsize
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    , AffineMergeCtx& affOriMrgCtx
+#endif
+    , int mrgCandIdx = -1);
   void    updateAffineCandInfo2(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, uint32_t(*rdCandList)[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE], int listsize, int mrgCandIdx = -1);
 #endif
 #if JVET_Y0058_IBC_LIST_MODIFY
@@ -1032,12 +1040,25 @@ public:
   void bmAffineInit(const PredictionUnit &pu);
   void bmInitAffineSubBlocks(const Position puPos, const int width, const int height, const int dx, const int dy,
     int mvScaleHor[2], int mvScaleVer[2], int deltaMvHorX[2], int deltaMvHorY[2], int deltaMvVerX[2], int deltaMvVerY[2]);
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  bool processBDMVR4AdaptiveAffine(PredictionUnit& pu, Mv(&mvAffiL0)[2][3], Mv(&mvAffiL1)[2][3], EAffineModel& affTypeL0, EAffineModel& affTypeL1);
+  void xDeriveCPMV(PredictionUnit &pu, const Mv(&curShiftMv)[2][3], int deltaMvHorX, int deltaMvHorY, int deltaMvVerX, int deltaMvVerY, int baseCP, Mv(&cpMV)[2][3]);
+  Distortion xBDMVRMv6ParameterSearchAffine(Distortion curBestCost, PredictionUnit& pu);
+  void bmAdaptiveAffineIntSearch(const PredictionUnit &pu, Mv(&mvOffsetL0)[2], Distortion &minCostL0, Mv(&mvOffsetL1)[2], Distortion &minCostL1);
+  void bmAdaptiveAffineHPelSearch(const PredictionUnit &pu, Mv(&mvOffset)[2], Distortion &minCost, Distortion localCostArray[9], RefPicList refList);
+  Distortion xGetBilateralMatchingErrorAdaptiveAffine(const PredictionUnit& pu, Mv(&mvOffset)[2], RefPicList refList, bool skipOtherRef);
+  bool bmAdaptiveAffineRegression(PredictionUnit &pu, Distortion &minCost, RefPicList refList);
+  Distortion xGetBilateralMatchingErrorAffine(const PredictionUnit& pu, Mv(&mvAffi)[2][3], bool skipInterpolation = false);
+  template <bool checkMv>
+  Distortion xGetBilateralMatchingErrorAffineCheckMv(const PredictionUnit& pu, Mv(&mvAffi)[2][3]);
+#else
+  Distortion xGetBilateralMatchingErrorAffine(const PredictionUnit& pu, Mv(&mvAffi)[2][3]);
+#endif
   void bmAffineIntSearch(const PredictionUnit &pu, Mv(&mvOffset)[2], Distortion &minCost, Distortion totalCost[(AFFINE_DMVR_INT_SRCH_RANGE << 1) + 1][(AFFINE_DMVR_INT_SRCH_RANGE << 1) + 1]);
   void bmAffineHPelSearch(const PredictionUnit &pu, Mv(&mvOffset)[2], Distortion &minCost, Distortion localCostArray[9]);
 
   void xInitBilateralMatching(const int width, const int height, const int bitDepth, const bool useMR, const bool useHadmard);
   Distortion xGetBilateralMatchingErrorAffine(const PredictionUnit& pu, Mv(&mvOffset)[2]);
-  Distortion xGetBilateralMatchingErrorAffine(const PredictionUnit& pu, Mv(&mvAffi)[2][3]);
   bool bmAffineRegression(PredictionUnit &pu, Distortion &minCost);
 #endif
 public:

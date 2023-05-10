@@ -727,6 +727,10 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   std::string sMaxMTTHierarchyDepthByTidOverrideByQP;
 #endif
 
+#if JVET_AD0105_ASPECT1_NUM_SIGN_PRED_BY_QP
+  std::string sNumSignPredOverrideByQP;
+#endif
+
   int warnUnknowParameter = 0;
 
 #if ENABLE_TRACING
@@ -764,6 +768,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if SIGN_PREDICTION
   ("NumSignPred",                                     m_numPredSign,                                        8, "Number of predicted transform coefficient signs")
+#if JVET_AD0105_ASPECT1_NUM_SIGN_PRED_BY_QP
+  ("NumSignPredOverrideByQP",                         sNumSignPredOverrideByQP,                 string("0 8"), "Override NumSignPred based on QP")
+#endif
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   ("Log2SignPredArea",                                m_log2SignPredArea,                                   2, "log2 of width/height of area for sign prediction")
 #endif
@@ -1141,6 +1148,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("AffineAmvrEncOpt",                                m_AffineAmvrEncOpt,                               false, "Enable encoder optimization of affine AMVR")
   ("AffineAmvp",                                      m_AffineAmvp,                                      true, "Enable AMVP for affine inter mode")
   ("DMVR",                                            m_DMVR,                                           false, "Decoder-side Motion Vector Refinement")
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  ("AffineParameterRefinement",                       m_affineParaRefinement,                           true, "Affine non-translation parameter refinement")
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   ("MmvdDisNum",                                      m_MmvdDisNum,                          MMVD_REFINE_STEP, "Number of MMVD Distance Entries")
 #else
@@ -1966,6 +1976,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
     m_BIO  = false;
     m_DMVR = false;
     m_SMVD = false;
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    m_affineParaRefinement = false;
+#endif
 
     if (m_gdrPeriod < 0)
     {
@@ -2248,6 +2261,21 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
     m_log2SignPredArea = 4;
   }
 #endif
+
+#if JVET_AD0105_ASPECT1_NUM_SIGN_PRED_BY_QP
+  std::istringstream issNumSignPred(sNumSignPredOverrideByQP);
+  std::string        sNumSignPredOverrideQp;
+  std::string        sNumSignPredOverride;
+  getline(issNumSignPred, sNumSignPredOverrideQp, ' ');
+  getline(issNumSignPred, sNumSignPredOverride, ' ');
+  int overriddenNumSignPredQP = std::stoi(sNumSignPredOverrideQp);
+  int overriddenNumSignPred = std::stoi(sNumSignPredOverride);
+  if (m_iQP == overriddenNumSignPredQP)
+  {
+    m_numPredSign = overriddenNumSignPred;
+  }
+#endif
+
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   if (m_IBCFracMode && (!m_ImvMode || !m_IBCMode))
   {
@@ -5286,6 +5314,9 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "AffineAmvrEncOpt:%d ", m_AffineAmvrEncOpt );
     msg(VERBOSE, "AffineAmvp:%d ", m_AffineAmvp);
     msg(VERBOSE, "DMVR:%d ", m_DMVR);
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    msg(VERBOSE, "AffineParameterRefinement:%d ", m_affineParaRefinement);
+#endif
     msg(VERBOSE, "MmvdDisNum:%d ", m_MmvdDisNum);
 #if !JVET_AA0132_CONFIGURABLE_TM_TOOLS
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED

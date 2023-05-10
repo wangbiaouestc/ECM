@@ -148,6 +148,9 @@ public:
 #if JVET_X0049_ADAPT_DMVR
   void        bm_merge_flag             ( PredictionUnit&               pu );
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  void        affBmFlag                 (PredictionUnit&               pu);
+#endif
   void        mip_flag                  ( CodingUnit&                   cu );
   void        mip_pred_modes            ( CodingUnit&                   cu );
   void        mip_pred_mode             ( PredictionUnit&               pu );

@@ -621,6 +621,10 @@ struct InterPredictionData
   uint8_t     bmMergeFlag;
   uint8_t     bmDir;
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  uint8_t     affBMMergeFlag;
+  uint8_t     affBMDir;
+#endif
   uint8_t     interDir;
   uint8_t     mvpIdx  [NUM_REF_PIC_LIST_01];
   uint8_t     mvpNum  [NUM_REF_PIC_LIST_01];

@@ -122,6 +122,10 @@ struct ModeInfo
   bool     isBMMrg;
   uint8_t  bmDir;
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  bool isAffBMMrg;
+  uint8_t affBMDir;
+#endif
 #if JVET_AA0070_RRIBC
   int rribcFlipType;
 #endif
@@ -150,6 +154,10 @@ struct ModeInfo
 #if JVET_X0049_ADAPT_DMVR
     , isBMMrg(false)
     , bmDir(0)
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    , isAffBMMrg(false)
+    , affBMDir(0)
 #endif
 #if JVET_AA0070_RRIBC
     , rribcFlipType(0)
@@ -195,6 +203,10 @@ struct ModeInfo
     , isBMMrg( false )
     , bmDir( 0 )
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    , isAffBMMrg(false)
+    , affBMDir(0)
+#endif
     , isGeo(false), geoSplitDir(0), geoMergeIdx0(0), geoMergeIdx1(0)
 #if ENABLE_OBMC
     , isOBMC(false)
@@ -233,6 +245,10 @@ struct ModeInfo
 #if JVET_X0049_ADAPT_DMVR
     isBMMrg = pu.bmMergeFlag;
     bmDir = pu.bmDir;
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    isAffBMMrg = pu.affBMMergeFlag;
+    affBMDir = pu.affBMDir;
 #endif
 #if JVET_AA0070_RRIBC
     rribcFlipType = cu.rribcFlipType;

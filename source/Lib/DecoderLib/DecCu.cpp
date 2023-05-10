@@ -2256,6 +2256,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           }
 #endif
           AffineMergeCtx affineMergeCtx;
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+          AffineMergeCtx affineRMVFCtx;
+          AffineMergeCtx affineRMVFOriCtx;
+#endif
           if (pu.cs->sps->getSbTMVPEnabledFlag())
           {
             Size bufSize = g_miScaling.scale(pu.lumaSize());
@@ -2283,24 +2287,46 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               AF_MMVD_BASE_NUM;
 #else
             affMrgIdx = pu.afMmvdBaseIdx;
-#endif			  
+#endif
           }
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
           pu.cu->imv = IMV_OFF;
 #endif
-          PU::getAffineMergeCand(pu, affineMergeCtx
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+          uint16_t addNumRMVF = 0;
+          PU::getRMVFAffineCand(pu, affineRMVFCtx, affineRMVFOriCtx, m_pcInterPred, addNumRMVF);
+          if (pu.affBMMergeFlag)
+          {
+            PU::getBMAffineMergeCand(pu, affineMergeCtx, affineRMVFOriCtx, -1);
+          }
+          else
+          {
+#endif
+            PU::getAffineMergeCand(pu, affineMergeCtx
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
                                , mrgCtxAll
 #endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
                                , m_pcInterPred
 #endif
-                               , affMrgIdx
-							   , pu.afMmvdFlag
-#if JVET_Z0139_NA_AFF
-							   , pu.mergeIdx == 0
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+              , affineRMVFCtx
+              , affineRMVFOriCtx
+              , addNumRMVF
 #endif
-		  );
+              , affMrgIdx
+              , pu.afMmvdFlag
+#if JVET_Z0139_NA_AFF
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+              , (pu.mergeIdx == 0 && !pu.affBMMergeFlag)
+#else
+              , pu.mergeIdx == 0
+#endif
+#endif
+            );
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+          }
+#endif
 #else
           PU::getAffineMergeCand(pu, affineMergeCtx, (pu.afMmvdFlag ? pu.afMmvdBaseIdx : pu.mergeIdx), pu.afMmvdFlag);
 #endif
@@ -2309,6 +2335,51 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           {
             pu.mergeIdx = PU::getMergeIdxFromAfMmvdBaseIdx(affineMergeCtx, pu.afMmvdBaseIdx);
             CHECK(pu.mergeIdx >= pu.cu->slice->getPicHeader()->getMaxNumAffineMergeCand(), "Affine MMVD mode doesn't have a valid base candidate!");
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+            pu.interDir = affineMergeCtx.interDirNeighbours[pu.mergeIdx];
+            pu.cu->affineType = affineMergeCtx.affineType[pu.mergeIdx];
+            pu.cu->bcwIdx = affineMergeCtx.bcwIdx[pu.mergeIdx];
+#if INTER_LIC
+            pu.cu->licFlag = affineMergeCtx.licFlags[pu.mergeIdx];
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+            pu.cu->obmcFlag = affineMergeCtx.obmcFlags[pu.mergeIdx];
+#endif
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            pu.colIdx = affineMergeCtx.colIdx[pu.mergeIdx];
+#endif
+            pu.mergeType = affineMergeCtx.mergeType[pu.mergeIdx];
+            {
+              for (int i = 0; i < 2; ++i)
+              {
+                if (pu.cs->slice->getNumRefIdx(RefPicList(i)) > 0)
+                {
+                  MvField* mvField = affineMergeCtx.mvFieldNeighbours[(pu.mergeIdx << 1) + i];
+                  pu.mvpIdx[i] = 0;
+                  pu.mvpNum[i] = 0;
+                  pu.mvd[i] = Mv();
+                  pu.refIdx[i] = mvField[0].refIdx;
+                  pu.mvAffi[i][0] = mvField[0].mv;
+                  pu.mvAffi[i][1] = mvField[1].mv;
+                  pu.mvAffi[i][2] = mvField[2].mv;
+                }
+              }
+            }
+            if (PU::checkBDMVRCondition(pu))
+            {
+              if (PU::checkBDMVR4Affine(pu))
+              {
+                m_pcInterPred->processBDMVR4Affine(pu);
+              }
+              for (int i = 0; i < 2; ++i)
+              {
+                affineMergeCtx.affineType[pu.mergeIdx] = (EAffineModel)pu.cu->affineType;
+                affineMergeCtx.mvFieldNeighbours[(pu.mergeIdx << 1) + i][0].mv = pu.mvAffi[i][0];
+                affineMergeCtx.mvFieldNeighbours[(pu.mergeIdx << 1) + i][1].mv = pu.mvAffi[i][1];
+                affineMergeCtx.mvFieldNeighbours[(pu.mergeIdx << 1) + i][2].mv = pu.mvAffi[i][2];
+              }
+            }
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
             if(pu.cs->sps->getUseTMMMVD())
@@ -2341,6 +2412,13 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             {
               m_pcInterPred->adjustAffineMergeCandidates(pu, affineMergeCtx, pu.mergeIdx);
             }
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+            if (pu.affBMMergeFlag)
+            {
+              affineMergeCtx.numValidMergeCand = AFFINE_ADAPTIVE_DMVR_MAX_CAND;
+              affineMergeCtx.maxNumMergeCand = AFFINE_ADAPTIVE_DMVR_MAX_CAND;
+            }
+#endif
           }
 #endif
 #else
@@ -2406,9 +2484,31 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
 #endif
             pu.bdmvrRefine = false;
-            if (!affineMergeCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu)))
+            if (!affineMergeCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu))
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+              || pu.affBMMergeFlag
+#endif
+              )
             {
-              m_pcInterPred->processBDMVR4Affine(pu);
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+              Mv refinedMvL0[2][3];
+              Mv refinedMvL1[2][3];
+              EAffineModel affTypeL0;
+              EAffineModel affTypeL1;
+              if (pu.affBMMergeFlag && PU::checkBDMVR4Affine(pu))
+              {
+                m_pcInterPred->processBDMVR4AdaptiveAffine(pu, refinedMvL0, refinedMvL1, affTypeL0, affTypeL1);
+              }
+              else
+              {
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+                if (PU::checkBDMVR4Affine(pu))
+#endif
+                m_pcInterPred->processBDMVR4Affine(pu);
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+              }
+#endif
 #if !JVET_AC0144_AFFINE_DMVR_REGRESSION
               pu.mvAffi[0][0] += m_mvBufBDMVR[0][0];
               pu.mvAffi[0][1] += m_mvBufBDMVR[0][0];

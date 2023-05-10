@@ -503,6 +503,9 @@ protected:
   bool      m_AffineAmvp;
   bool      m_DMVR;
   bool      m_MMVD;
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  bool      m_affineParaRefinement;
+#endif
   int       m_MmvdDisNum;
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   bool      m_MVSD;
@@ -1624,6 +1627,10 @@ public:
   void      setDMVR                      ( bool b )       { m_DMVR = b; }
   bool      getDMVR                      ()         const { return m_DMVR; }
   void      setMMVD                         (bool b)         { m_MMVD = b;    }
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  bool      getAffineParaRefinement     ()                   { return m_affineParaRefinement; }
+  void      setAffineParaRefinement     (bool b)             { m_affineParaRefinement = b; }
+#endif
   bool      getMMVD                         ()         const { return m_MMVD; }
   void      setMmvdDisNum                   ( int b )        { m_MmvdDisNum = b; }
   int       getMmvdDisNum                   ()         const { return m_MmvdDisNum; }

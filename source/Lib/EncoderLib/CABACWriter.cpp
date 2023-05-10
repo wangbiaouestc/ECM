@@ -3968,7 +3968,23 @@ void CABACWriter::bm_merge_flag(const PredictionUnit& pu)
   DTRACE(g_trace_ctx, D_SYNTAX, "bm_merge_flag() bmMergeFlag=%d, bmDir = %d\n", pu.bmMergeFlag ? 1 : 0, pu.bmDir);
 }
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+void CABACWriter::affBmFlag(const PredictionUnit& pu)
+{
 
+  if (!PU::isAffBMMergeFlagCoded(pu))
+  {
+    CHECK(pu.affBMMergeFlag != false, "");
+    return;
+  }
+  m_BinEncoder.encodeBin(pu.affBMMergeFlag, Ctx::affBMFlag(0));
+  if (pu.affBMMergeFlag)
+  {
+    CHECK(pu.affBMDir != 1 && pu.affBMDir != 2, "pu.affBMDir != 1 && pu.affBMDir != 2");
+    m_BinEncoder.encodeBin(pu.affBMDir >> 1, Ctx::affBMFlag(1));
+  }
+}
+#endif
 void CABACWriter::merge_flag( const PredictionUnit& pu )
 {
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -4037,6 +4053,12 @@ void CABACWriter::merge_data(const PredictionUnit& pu)
   {
 #if AFFINE_MMVD
     affine_mmvd_data(pu);
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    if (!pu.afMmvdFlag)
+    {
+      affBmFlag(pu);
+    }
 #endif
     merge_idx(pu);
     return;
@@ -4291,6 +4313,12 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
   {
 #if AFFINE_MMVD
     if (pu.afMmvdFlag)
+    {
+      return;
+    }
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    if (pu.affBMMergeFlag)
     {
       return;
     }

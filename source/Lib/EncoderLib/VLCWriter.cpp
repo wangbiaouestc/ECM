@@ -1501,6 +1501,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     {
       WRITE_FLAG(pcSPS->getProfControlPresentFlag() ? 1 : 0,                                   "sps_prof_pic_present_flag" );
     }
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    WRITE_FLAG(pcSPS->getUseAffineParaRefinement() ? 1 : 0,                                    "sps_affine_nontranslation_parameter_refinement");
+#endif
   }
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   if (pcSPS->getUseMMVD() || pcSPS->getUseAffineMmvdMode())

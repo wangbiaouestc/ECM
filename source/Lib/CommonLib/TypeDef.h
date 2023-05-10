@@ -265,6 +265,7 @@
 #define JVET_AA0096_MC_BOUNDARY_PADDING                   1 // JVET-AA0096: motion compensated picture boundary padding
 #define JVET_AB0112_AFFINE_DMVR                           1 // JVET-AB0112: DMVR (baseMV refinement) for affine
 #define JVET_AC0144_AFFINE_DMVR_REGRESSION                1 // JVET-AC0144: DMVR for affine with regression refinement
+#define JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS           1 // JVET-AD0182: Affine parameter refinement and adaptive affine DMVR mode extension
 #define JVET_AC0158_PIXEL_AFFINE_MC                       1 // JVET-AC0158: Pixel based affine motion compensation
 #define JVET_AD0195_HIGH_PRECISION_BDOF_CORE              1 // JVET_AD0195: High-Precision MV Refinement for BDOF
 #define JVET_AD0123_REF_PICTURE_PADDING_FOR_GDR           1 // JVET-AD0123: Reference picture padding for GDR
@@ -308,6 +309,7 @@
 #define SIGN_PREDICTION                                   1 // Transform coefficients sign prediction
 #if SIGN_PREDICTION
 #define JVET_Y0141_SIGN_PRED_IMPROVE                      1 // JVET-Y0141 test3: Sign prediction improvement                          
+#define JVET_AD0105_ASPECT1_NUM_SIGN_PRED_BY_QP           1 // JVET-AD0105 Aspect1: NumSignPred based on QP
 #endif
 #define JVET_W0103_INTRA_MTS                              1 // JVET-W0103: Extended Intra MTS
 #if JVET_W0103_INTRA_MTS

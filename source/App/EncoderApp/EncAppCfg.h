@@ -495,6 +495,9 @@ protected:
   bool      m_AffineAmvrEncOpt;
   bool      m_AffineAmvp;
   bool      m_DMVR;
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  bool      m_affineParaRefinement;
+#endif
   bool      m_MMVD;
   int       m_MmvdDisNum;
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
