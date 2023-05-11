@@ -3539,7 +3539,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
                           , numRribcType > 1
 #endif
       );
-#if JVET_AC0104_IBC_BVD_PREDICTION
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
       bvpIdxBest = pu.mvpIdx[REF_PIC_LIST_0];
 #endif
 
@@ -3554,7 +3554,7 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 
 #if JVET_AC0104_IBC_BVD_PREDICTION 
     pu.mvsdIdx[REF_PIC_LIST_0] = 0;
-    if (pu.isBvdPredApplicable() && pu.mvd[REF_PIC_LIST_0].isMvsdApplicable())
+    if (pu.isBvdPredApplicable() && pu.mvd[REF_PIC_LIST_0].isMvdPredApplicable())
     {
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
       pu.bvdSuffixInfo.isFracBvEnabled = pu.cs->sps->getIBCFracFlag();
@@ -4858,15 +4858,29 @@ bool InterSearch::predInterHashSearch(CodingUnit& cu, Partitioner& partitioner, 
 #if JVET_Z0054_BLK_REF_PIC_REORDER
     if (!PU::useRefPairList(pu) && !PU::useRefCombList(pu))
 #endif
-    if (pu.isMvsdApplicable())
+    if (pu.isMvdPredApplicable())
     {
       std::vector<Mv> cMvdDerivedVec;
       Mv cMvPred = pu.mv[bestRefPicList] - pu.mvd[bestRefPicList];
       Mv cMvdKnownAtDecoder = Mv(pu.mvd[bestRefPicList].getAbsHor(), pu.mvd[bestRefPicList].getAbsVer());
+#if JVET_AD0140_MVD_PREDICTION
+      const auto& motionModel = ( 0 != pu.cu->smvdMode ) ? MotionModel::BiTranslationalSmvd : 
+                                                          (3 == pu.interDir) ? MotionModel::BiTranslational : MotionModel::UniTranslational;
+      CHECK(pu.cu->affine != 0, "Affine motion model is specified in the encoder Hash Search ");
+      pu.mvdSuffixInfo.initPrefixesMvd( 0, bestRefPicList, pu.mvd[bestRefPicList], pu.cu->imv, true, motionModel );
+      pu.mvdSuffixInfo.getBinBudgetForMv(MvdSuffixInfoMv::getBinBudgetForPrediction(pu.Y().width, pu.Y().height, pu.cu->imv), bestRefPicList);
+      deriveMvdSign(cMvPred, cMvdKnownAtDecoder, pu, bestRefPicList, bestRefIndex, cMvdDerivedVec);
+      int idx = deriveMVSDIdxFromMVDTransSI(pu.mvd[bestRefPicList], cMvdDerivedVec, pu.mvdSuffixInfo.mvBins[bestRefPicList][0]);
+      initOffsetsMvd(pu.mvd[bestRefPicList], cMvdDerivedVec, pu.mvdSuffixInfo.mvBins[bestRefPicList][0], pu.cu->imv);
+#else
       deriveMvdSign(cMvPred, cMvdKnownAtDecoder, pu, bestRefPicList, bestRefIndex, cMvdDerivedVec);
       int idx = deriveMVSDIdxFromMVDTrans(pu.mvd[bestRefPicList], cMvdDerivedVec);
+#endif
       CHECK(idx == -1, "");
       pu.mvsdIdx[bestRefPicList] = idx;
+#if JVET_AD0140_MVD_PREDICTION
+      defineSignHypMatch(pu.mvd[bestRefPicList], pu.mvdSuffixInfo.mvBins[bestRefPicList][0], pu.mvsdIdx[bestRefPicList]);
+#endif
     }
 #endif
     pu.refIdx[bestRefPicList] = bestRefIndex;
@@ -6400,13 +6414,20 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
   if(!PU::useRefPairList(pu) && !PU::useRefCombList(pu))
 #endif
 #endif
-  if (pu.isMvsdApplicable())
+  if (pu.isMvdPredApplicable())
   {
+
+#if JVET_AD0140_MVD_PREDICTION
+    pu.mvdSuffixInfo.clear();
+#endif
+
 #if !JVET_AD0213_LIC_IMP
     bool bi = pu.interDir == 3;
 #endif
     if (cu.affine)
     {
+#if JVET_AD0140_MVD_PREDICTION
+      const auto& motionModel = (3 == pu.interDir) ? MotionModel::BiAffine : MotionModel::UniAffine;
       for (uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
       {
         RefPicList eRefPicList = RefPicList(uiRefListIdx);
@@ -6415,12 +6436,36 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
         absMvd[1] = Mv(pu.mvdAffi[uiRefListIdx][1].getAbsMv());
         absMvd[2] = (cu.affineType == AFFINEMODEL_6PARAM) ? Mv(pu.mvdAffi[uiRefListIdx][2].getAbsMv()) : Mv(0, 0);
         if (pu.cs->slice->getNumRefIdx(eRefPicList) > 0
-          && (pu.interDir & (1 << uiRefListIdx)) && (absMvd[0] != Mv(0, 0) || absMvd[1] != Mv(0, 0) || absMvd[2] != Mv(0, 0)) && pu.isMvsdApplicable())
+          && (pu.interDir & (1 << uiRefListIdx)) && (absMvd[0] != Mv(0, 0) || absMvd[1] != Mv(0, 0) || absMvd[2] != Mv(0, 0)) && pu.isMvdPredApplicable())
+        {
+          for (int i = 0; i < 2 + (pu.cu->affine); ++i)
+          {
+            pu.mvdSuffixInfo.initPrefixesMvd(i, eRefPicList, pu.mvdAffi[uiRefListIdx][i].getAbsMv(), pu.cu->imv, true, motionModel);
+          }
+
+        }
+        pu.mvdSuffixInfo.getBinBudgetForMv(MvdSuffixInfoMv::getBinBudgetForPrediction(pu.Y().width, pu.Y().height, pu.cu->imv), eRefPicList);
+      }
+#endif
+      for (uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
+      {
+        RefPicList eRefPicList = RefPicList(uiRefListIdx);
+        Mv absMvd[3];
+        absMvd[0] = Mv(pu.mvdAffi[uiRefListIdx][0].getAbsMv());
+        absMvd[1] = Mv(pu.mvdAffi[uiRefListIdx][1].getAbsMv());
+        absMvd[2] = (cu.affineType == AFFINEMODEL_6PARAM) ? Mv(pu.mvdAffi[uiRefListIdx][2].getAbsMv()) : Mv(0, 0);
+        if (pu.cs->slice->getNumRefIdx(eRefPicList) > 0
+          && (pu.interDir & (1 << uiRefListIdx)) && (absMvd[0] != Mv(0, 0) || absMvd[1] != Mv(0, 0) || absMvd[2] != Mv(0, 0)) && pu.isMvdPredApplicable())
         {
           AffineAMVPInfo affineAMVPInfo;
           PU::fillAffineMvpCand(pu, eRefPicList, pu.refIdx[uiRefListIdx], affineAMVPInfo);
           const unsigned mvpIdx = pu.mvpIdx[eRefPicList];
 
+#if JVET_AD0140_MVD_PREDICTION
+          std::vector<Mv> cMvdDerived[3];
+          deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvpIdx], affineAMVPInfo.mvCandRT[mvpIdx], affineAMVPInfo.mvCandLB[mvpIdx], 
+            absMvd, pu, eRefPicList, pu.refIdx[eRefPicList], cMvdDerived[0], cMvdDerived[1], cMvdDerived[2]);
+#else
           std::vector<Mv> cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3;
 #if JVET_Z0054_BLK_REF_PIC_REORDER
           deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvpIdx], affineAMVPInfo.mvCandRT[mvpIdx], affineAMVPInfo.mvCandLB[mvpIdx],
@@ -6429,23 +6474,63 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvpIdx], affineAMVPInfo.mvCandRT[mvpIdx], affineAMVPInfo.mvCandLB[mvpIdx],
             absMvd[0], absMvd[1], absMvd[2], pu, eRefPicList, pu.refIdx[eRefPicList], cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
 #endif
+#endif
           int idx = -1;
+#if JVET_AD0140_MVD_PREDICTION
+          idx = deriveMVSDIdxFromMVDAffineSI(pu, eRefPicList, cMvdDerived[0], cMvdDerived[1], cMvdDerived[2]);
+          initOffsetsAffineMvd(pu, eRefPicList, cMvdDerived);
+#else
           idx = deriveMVSDIdxFromMVDAffine(pu, eRefPicList, cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
+#endif
           CHECK(idx == -1, "no match for mvsdIdx at Encoder");
           pu.mvsdIdx[eRefPicList] = idx;
+#if JVET_AD0140_MVD_PREDICTION
+          defineSignHypMatchAffine(pu, eRefPicList);
+#endif
         }
       }
     }
     else
     {
+#if JVET_AD0140_MVD_PREDICTION
+      pu.mvdSuffixInfo.clear();
+      const auto& motionModel = (0 != cu.smvdMode) ? MotionModel::BiTranslationalSmvd :
+        (3 == pu.interDir) ? MotionModel::BiTranslational : MotionModel::UniTranslational;
+      for (uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
+      {
+        RefPicList eRefPicList = RefPicList(uiRefListIdx);
+        Mv cMvd = pu.mvd[eRefPicList];
+
+        if (pu.cs->slice->getNumRefIdx(eRefPicList) > 0
+          && (pu.interDir & (1 << uiRefListIdx))
+          && pu.isMvdPredApplicable()
+          && cMvd.isMvdPredApplicable()
+          )
+        {
+          const RefPicList curRefList = cu.smvdMode ? REF_PIC_LIST_0 : (RefPicList)uiRefListIdx;
+          if ((!cu.smvdMode) || REF_PIC_LIST_0 == eRefPicList)
+          {
+            pu.mvdSuffixInfo.initPrefixesMvd(0, curRefList, pu.mvd[curRefList].getAbsMv(), pu.cu->imv, true, motionModel);
+          }
+
+          pu.mvdSuffixInfo.getBinBudgetForMv(MvdSuffixInfoMv::getBinBudgetForPrediction(pu.Y().width, pu.Y().height, pu.cu->imv), eRefPicList);
+          if (cu.smvdMode)
+          {
+            pu.mvdSuffixInfo.selectRplForMvdCoding(MvdSuffixInfoMv::getBinBudgetForPrediction(pu.Y().width, pu.Y().height, pu.cu->imv));
+            break;
+          }
+        }
+      }
+#endif
+
       for (uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
       {
         RefPicList eRefPicList = RefPicList(uiRefListIdx);
         Mv cMvd = pu.mvd[eRefPicList];
         if (pu.cs->slice->getNumRefIdx(eRefPicList) > 0
           && (pu.interDir & (1 << uiRefListIdx))
-          && pu.isMvsdApplicable()
-          && cMvd.isMvsdApplicable()
+          && pu.isMvdPredApplicable()
+          && cMvd.isMvdPredApplicable()
           )
         {
 #if JVET_AD0213_LIC_IMP
@@ -6462,6 +6547,10 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #endif
           Mv cMvdKnownAtDecoder = Mv(cMvd.getAbsHor(), cMvd.getAbsVer());
           std::vector<Mv> cMvdDerivedVec;
+
+#if JVET_AD0140_MVD_PREDICTION
+          const RefPicList curRefList = cu.smvdMode ? REF_PIC_LIST_0 : (RefPicList)uiRefListIdx;
+#endif
           if (cu.smvdMode)
           {
             if (uiRefListIdx == 1)
@@ -6478,17 +6567,33 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #else
               deriveMvdSignSMVD(aMvPred[0][aRefIdx[0]], aMvPred[1][aRefIdx[1]], cMvdKnownAtDecoder, pu, cMvdDerivedVec);
 #endif
+#if JVET_AD0140_MVD_PREDICTION
+              int idx = deriveMVSDIdxFromMVDTransSI(cMvd, cMvdDerivedVec, pu.mvdSuffixInfo.mvBins[curRefList][0]);
+              initOffsetsMvd(pu.mvd[curRefList], cMvdDerivedVec, pu.mvdSuffixInfo.mvBins[curRefList][0], pu.cu->imv);
+#else
               int idx = deriveMVSDIdxFromMVDTrans(cMvd, cMvdDerivedVec);
+#endif
               CHECK(idx == -1, "");
               pu.mvsdIdx[REF_PIC_LIST_0] = idx;
+#if JVET_AD0140_MVD_PREDICTION
+              defineSignHypMatch(pu.mvd[curRefList], pu.mvdSuffixInfo.mvBins[curRefList][0], pu.mvsdIdx[curRefList]);
+#endif
             }
           }
           else
           {
             deriveMvdSign(cMvPred2, cMvdKnownAtDecoder, pu, eRefPicList, iRefIdx, cMvdDerivedVec);
+#if JVET_AD0140_MVD_PREDICTION
+            int idx = deriveMVSDIdxFromMVDTransSI(cMvd, cMvdDerivedVec, pu.mvdSuffixInfo.mvBins[uiRefListIdx][0]);
+            initOffsetsMvd(pu.mvd[uiRefListIdx], cMvdDerivedVec, pu.mvdSuffixInfo.mvBins[uiRefListIdx][0], pu.cu->imv);
+#else
             int idx = deriveMVSDIdxFromMVDTrans(cMvd, cMvdDerivedVec);
+#endif
             CHECK(idx == -1, "");
             pu.mvsdIdx[eRefPicList] = idx;
+#if JVET_AD0140_MVD_PREDICTION
+            defineSignHypMatch(pu.mvd[uiRefListIdx], pu.mvdSuffixInfo.mvBins[uiRefListIdx][0], pu.mvsdIdx[uiRefListIdx]);
+#endif
           }
         }
       } //loop end for non-affine
@@ -13895,7 +14000,7 @@ uint64_t InterSearch::xCalcExpPuBits(PredictionUnit& pu)
     m_CABACEstimator->smvd_mode(pu);
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
-    if (pu.cs->sps->getUseMVSD())
+    if (pu.cs->sps->getUseMvdPred())
     {
 #endif
       m_CABACEstimator->cu_bcw_flag(*pu.cu);
@@ -14036,7 +14141,7 @@ uint64_t InterSearch::xCalcExpPuBits(PredictionUnit& pu)
 #endif
 #if !JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED)
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  if (!pu.cu->cs->sps->getUseMVSD())
+  if (!pu.cu->cs->sps->getUseMvdPred())
   {
 #endif
     m_CABACEstimator->cu_bcw_flag(*pu.cu);

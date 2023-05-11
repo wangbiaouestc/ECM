@@ -14391,6 +14391,29 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   PredictionUnit& pu = *cu.firstPU;
+
+#if JVET_AD0140_MVD_PREDICTION
+  if (pu.cu->smvdMode)
+  {
+
+    const Mv& cMvd = pu.mvd[REF_PIC_LIST_0];
+
+    if (pu.isMvdPredApplicable() && cMvd.isMvdPredApplicable())
+    {
+      if (MotionModel::Undefined == pu.mvdSuffixInfo.m_motionModel)
+      {
+        THROW("Undefined Motion Model for SMVD");
+      }
+    }
+    else
+    {
+      pu.mvdSuffixInfo.m_motionModel = MotionModel::BiTranslationalSmvd;
+      pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_0][0].m_motionModel = MotionModel::BiTranslationalSmvd;
+    }
+  }
+#endif
+
+
   if (PU::useRefCombList(pu))
   {
     m_pcInterSearch->setUniRefIdxLC(pu);
@@ -14728,6 +14751,11 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
 
   cu.firstPU->interDir = 10;
 
+
+#if JVET_AD0140_MVD_PREDICTION
+  cu.firstPU->mvdSuffixInfo.clear();
+#endif
+
 #if INTER_LIC
   if (cu.slice->getUseLIC() && lic) { m_pcInterSearch->swapUniMvBuffer(); }
 #if JVET_AD0213_LIC_IMP
@@ -14809,12 +14837,39 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
   PredictionUnit& pu = *cu.firstPU;
   if (PU::useRefCombList(pu))
   {
+#if JVET_AD0140_MVD_PREDICTION
+    pu.mvdSuffixInfo.clear();
+#endif
     m_pcInterSearch->setUniRefIdxLC(pu);
   }
   else if (PU::useRefPairList(pu))
   {
+#if JVET_AD0140_MVD_PREDICTION
+    pu.mvdSuffixInfo.clear();
+#endif
     m_pcInterSearch->setBiRefPairIdx(pu);
   }
+
+#if JVET_AD0140_MVD_PREDICTION
+  if (pu.cu->smvdMode)
+  {
+
+    const Mv& cMvd = pu.mvd[REF_PIC_LIST_0];
+
+    if (pu.isMvdPredApplicable() && cMvd.isMvdPredApplicable())
+    {
+      if (MotionModel::Undefined == pu.mvdSuffixInfo.m_motionModel)
+      {
+        THROW("Undefined Motion Model for SMVD");
+      }
+    }
+    else
+    {
+      pu.mvdSuffixInfo.m_motionModel = MotionModel::BiTranslationalSmvd;
+      pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_0][0].m_motionModel = MotionModel::BiTranslationalSmvd;
+    }
+  }
+#endif
 #endif
 #if JVET_AC0158_PIXEL_AFFINE_MC
   if (cu.affine == true)

@@ -288,6 +288,7 @@
 #define JVET_Y0134_TMVP_NAMVP_CAND_REORDERING             1 // JVET-Y0134: MV candidate reordering for TMVP and NAMVP types (controlled by JVET_W0090_ARMC_TM), and reference picture selection for TMVP 
 #if JVET_W0090_ARMC_TM
 #define JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED            1 // JVET-Y0067: TM based reordering for MMVD and affine MMVD and MVD sign prediction
+#define JVET_AD0140_MVD_PREDICTION                        1 // JVET-AD0140: MVD (sign and suffix) prediction
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 #define JVET_AA0093_ENHANCED_MMVD_EXTENSION               1 // JVET-AA0093: Test 2.3 part: Extension on TM based reordering for MMVD and affine MMVD
 #endif

@@ -18665,11 +18665,11 @@ void PU::applyImv( PredictionUnit& pu, MergeCtx &mrgCtx, InterPrediction *interP
       }
       pu.mvpNum[0] = amvpInfo.numCand;
       pu.mvpIdx[0] = mvpIdx;
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
       if (!CU::isIBC(*pu.cu))
       {
         RefPicList eRefList(REF_PIC_LIST_0);
-        if (pu.isMvsdApplicable() && pu.mvd[eRefList].isMvsdApplicable())
+        if (pu.isMvdPredApplicable() && pu.mvd[eRefList].isMvdPredApplicable())
         {
           if (pu.cu->smvdMode)
           {
@@ -18721,9 +18721,9 @@ void PU::applyImv( PredictionUnit& pu, MergeCtx &mrgCtx, InterPrediction *interP
       );
       pu.mvpNum[1] = amvpInfo.numCand;
       pu.mvpIdx[1] = mvpIdx;
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
       RefPicList eRefList(REF_PIC_LIST_1);
-      if (pu.isMvsdApplicable() && pu.mvd[eRefList].isMvsdApplicable())
+      if (pu.isMvdPredApplicable() && pu.mvd[eRefList].isMvdPredApplicable())
       {
         if (pu.cu->smvdMode)
         {
