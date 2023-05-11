@@ -1888,8 +1888,8 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseGeo                ( m_Geo );
   sps.setUseMMVD               ( m_MMVD );
   sps.setFpelMmvdEnabledFlag   (( m_MMVD ) ? m_allowDisFracMMVD : false);
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  sps.setUseMVSD               (m_MVSD);
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  sps.setUseMvdPred            (m_mvdPred);
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   sps.setUseBvdPred            (m_bvdPred);

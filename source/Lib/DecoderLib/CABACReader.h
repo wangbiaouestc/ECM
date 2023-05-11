@@ -238,12 +238,32 @@ public:
   bool        cbf_comp                 ( CodingStructure&              cs,     const CompArea& area,     unsigned depth, const bool prevCbf = false, const bool useISP = false );
 
   // mvd coding (clause 7.3.8.9)
-#if JVET_AA0070_RRIBC
+#if JVET_AD0140_MVD_PREDICTION
+  void        mvd_coding(Mv& rMvd, MvdSuffixInfo* const pSi = nullptr
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+                       , bool codeSign = true
+#endif
+                        );
+#elif JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0070_RRIBC
    void        mvd_coding              ( Mv &rMvd, bool codeSign = true, const int &rribcFlipType = 0 );
 #else
-   void        mvd_coding              ( Mv &rMvd, const int &rribcFlipType = 0 );
+   void        mvd_coding              ( Mv &rMvd, bool codeSign = true);
 #endif
+#else
+#if JVET_AA0070_RRIBC
+   void        mvd_coding              ( Mv &rMvd, const int &rribcFlipType = 0 );
+#else
+   void        mvd_coding              ( Mv &rMvd);
+#endif
+#endif
+
+#if JVET_AD0140_MVD_PREDICTION
+   unsigned    xReadMvdPrefix            ( int param );
+   unsigned    xReadMvdContextSuffix     ( int symbol, int param );
+   void        mvdCodingRemainder        ( Mv& rMvd, MvdSuffixInfo& si, const int imv);
+#endif
+#if JVET_AA0070_RRIBC
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
@@ -266,10 +286,19 @@ public:
 #endif
 #else
   void        mvd_coding               ( Mv &rMvd 
+#if JVET_AD0140_MVD_PREDICTION
+                                        , MvdSuffixInfo& si
+                                        , bool ctxCoding = false
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
     , bool codeSign = true
 #endif
   );
+#if JVET_AD0140_MVD_PREDICTION
+  unsigned    xReadMvdPrefix            ( int param );
+  unsigned    xReadMvdContextSuffix     ( int symbol, int param );
+  void        mvdCodingRemainder        ( Mv& rMvd, MvdSuffixInfo& si, const int imv, const bool isAffine );
+#endif
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV

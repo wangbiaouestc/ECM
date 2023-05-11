@@ -258,6 +258,10 @@ struct MotionInfoPred
   Mv         mvAffi[2][3];
   Mv         mvdAffi[2][3];
   Distortion cost;
+#if JVET_AD0140_MVD_PREDICTION
+  bool       aboveCostCalculated;
+  bool       leftCostCalculated;
+#endif
 };
 #endif
 

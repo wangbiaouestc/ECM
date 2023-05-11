@@ -97,6 +97,14 @@ public:
 #endif
   bool              m_storeBeforeLIC;
 #endif
+#if JVET_AD0140_MVD_PREDICTION
+  struct MvdDerivedInfo
+  {
+    std::vector<std::array<Mv, 3>> mvdAffineVec;
+    std::vector<bool>              isCandValid;
+    int                            firstValidIdx;
+  };
+#endif
 #if JVET_Z0136_OOB
   bool isMvOOB(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, bool *mcMaskChroma, bool lumaOnly = false);
   bool isMvOOBSubBlk(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, int mcStride, bool *mcMaskChroma, int mcCStride, bool lumaOnly = false);
@@ -293,6 +301,12 @@ protected:
 #if JVET_AC0158_PIXEL_AFFINE_MC
   Mv                   m_pixelAffineMotionBuf[MAX_CU_SIZE][MAX_CU_SIZE];
 #endif
+
+#if JVET_AD0140_MVD_PREDICTION
+  Pel m_acYuvRefAMLBiPredTemplateCache[MAX_NUM_REFIDX][NUM_REF_PIC_LIST_01][MAX_NUM_CANDS][2][MAX_CU_SIZE];
+  Pel m_acYuvRefAMLBiPredTemplateIdMotionCache[MAX_NUM_REFIDX][NUM_REF_PIC_LIST_01][MAX_NUM_CANDS][2][MAX_CU_SIZE];
+#endif
+
   void xIntraBlockCopy          (PredictionUnit &pu, PelUnitBuf &predBuf, const ComponentID compID);
   int             rightShiftMSB(int numer, int    denom);
 #if MULTI_PASS_DMVR
@@ -403,7 +417,12 @@ protected:
   void xWeightedAverageY(const PredictionUnit& pu, const CPelUnitBuf& pcYuvSrc0, const CPelUnitBuf& pcYuvSrc1, PelUnitBuf& pcYuvDst, const BitDepths& clipBitDepths, const ClpRngs& clpRngs);
 #endif
 #if JVET_W0090_ARMC_TM
+#if JVET_AD0140_MVD_PREDICTION
+  template <bool exitIfOob, int iAbove1Left2All3>
+  bool xPredAffineTpl(const PredictionUnit& pu, const RefPicList& eRefPicList, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate
+#else
   void xPredAffineTpl(const PredictionUnit &pu, const RefPicList &eRefPicList, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate
+#endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     , AffineMergeCtx affMrgCtx, bool isBilinear
 #endif
@@ -498,17 +517,34 @@ public:
   void     reorderRefCombList(PredictionUnit &pu, std::vector<RefListAndRefIdx> &refListComb
     , RefPicList currRefList
     , std::vector<MotionInfoPred> &miPredList
+#if JVET_AD0140_MVD_PREDICTION
+    , std::vector<Mv> (&cMvdDerivedVec)[3]
+    , bool &isMvdDerivedVecOrigSpecified
+#endif
   );
+
+
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AD0140_MVD_PREDICTION
+  void      deriveMVDCandVecFromMotionInforPred(const PredictionUnit &pu, std::vector<MotionInfoPred> &miPredList, RefPicList eRefPicList, std::vector<Mv> &cMvdDerivedVec, bool &isMvdDerivedVecOrigSpecified);
+  void      deriveAffineMVDCandVecFromMotionInforPred(const PredictionUnit &pu, std::vector<MotionInfoPred> &miPredList, RefPicList eRefPicList, std::vector<Mv> cMvdDerivedVec[3], bool &isMvdDerivedVecOrigSpecified);
+  void      deriveMVDCandVecFromMotionInforPredGeneral(const PredictionUnit &pu, std::vector<MotionInfoPred> &miPredList, RefPicList eRefPicList, std::vector<Mv> &cMvdDerivedVec, bool &isMvdDerivedVecOrigSpecified);
+  void      deriveAffineMVDCandVecFromMotionInforPredGeneral(const PredictionUnit &pu, std::vector<MotionInfoPred> &miPredList, RefPicList eRefPicList, std::vector<Mv> cMvdDerivedVec[3], bool &isMvdDerivedVecOrigSpecified);
+#else
   void      deriveMVDCandVecFromMotionInforPred(const PredictionUnit &pu, std::vector<MotionInfoPred> &miPredList, RefPicList eRefPicList, std::vector<Mv> &cMvdDerivedVec);
   void      deriveAffineMVDCandVecFromMotionInforPred(const PredictionUnit &pu, std::vector<MotionInfoPred> &miPredList, RefPicList eRefPicList, std::vector<Mv> cMvdDerivedVec[3]);
   void      deriveMVDCandVecFromMotionInforPredGeneral(const PredictionUnit &pu, std::vector<MotionInfoPred> &miPredList, RefPicList eRefPicList, std::vector<Mv> &cMvdDerivedVec);
   void      deriveAffineMVDCandVecFromMotionInforPredGeneral(const PredictionUnit &pu, std::vector<MotionInfoPred> &miPredList, RefPicList eRefPicList, std::vector<Mv> cMvdDerivedVec[3]);
 #endif
+#endif
   void     setBiRefPairIdx(PredictionUnit &pu);
   void     setBiRefIdx(PredictionUnit &pu);
   void     reorderRefPairList(PredictionUnit &pu, std::vector<RefPicPair> &refPairList
     , std::vector<MotionInfoPred> &miPredList
+#if JVET_AD0140_MVD_PREDICTION
+    , std::vector<Mv> (&cMvdDerivedVec)[2][3]
+    , bool &isMvdDerivedVecOrigSpecified
+#endif
   );
 #endif
 
@@ -666,9 +702,10 @@ public:
 #else
   void getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight);
 #endif
+
 #endif
 
-#if JVET_AC0104_IBC_BVD_PREDICTION
+#if JVET_AC0104_IBC_BVD_PREDICTION || JVET_AD0140_MVD_PREDICTION
   static constexpr bool checkBitMatch(unsigned int value1, unsigned int value2, int bitpos)
   {
     return ((value1 >> bitpos) & 1) == ((value2 >> bitpos) & 1);
@@ -684,7 +721,28 @@ public:
   void deriveMVDcand(const PredictionUnit& pu, RefPicList eRefPicList, std::vector<Mv>& cMvdCandList);
   void deriveMVDcandAffine(const PredictionUnit& pu, RefPicList eRefPicList, std::vector<Mv> cMvdCandList[3]);
 #endif
+#if JVET_AD0140_MVD_PREDICTION
+  void deriveMVDcandAffineWithSuffixBins( const PredictionUnit& pu, RefPicList eRefPicList
+                                        , std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3);
+  void deriveMVDcandAffineWithSuffixBins( const PredictionUnit& pu, RefPicList eRefPicList
+                                        , std::vector<Mv> cMvdDerived[3]) 
+  {
+    deriveMVDcandAffineWithSuffixBins(pu, eRefPicList, cMvdDerived[0], cMvdDerived[1], cMvdDerived[2]);
+  }
+
+  void deriveMVDcandAffineSingleMv(const PredictionUnit& pu, RefPicList eRefPicList, int affineIdx, std::vector<Mv>& cMvdCandList);
+  uint16_t deriveMVDcandTrans(const PredictionUnit& pu, RefPicList eRefList, std::vector<Mv>& cMvdCandList);
+#endif
   void deriveMvdSign(const Mv& cMvPred, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, RefPicList eRefPicList, int iRefIdx, std::vector<Mv>& cMvdDerived);
+#if JVET_AD0140_MVD_PREDICTION
+  void initOffsetsMvd(Mv& cMvdInput, std::vector<Mv>& cMvdDerived, MvdSuffixInfo& si, int imv);
+  void defineSignHypMatch(const Mv &cMvdInput, MvdSuffixInfo &si, const int mvsdIdx);
+  void defineSignHypMatchAffine(PredictionUnit &pu, const RefPicList eRefPicList);
+  void applyOffsetsMvd(Mv& cMvdInput, std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si, int imv);
+
+  int deriveMVSDIdxFromMVDTransSI(const Mv& cMvd, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo &si);
+  Mv  deriveMVDFromMVSDIdxTransSI(int mvsdIdx, const std::vector<Mv> &cMvdDerived, const MvdSuffixInfo &si);
+#endif
   int deriveMVSDIdxFromMVDTrans(Mv cMvd, std::vector<Mv>& cMvdDerived);
   Mv deriveMVDFromMVSDIdxTrans(int mvsdIdx, std::vector<Mv>& cMvdDerived);
   void deriveMvdSignSMVD(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, std::vector<Mv>& cMvdDerived);
@@ -712,12 +770,22 @@ public:
     const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate);
 #endif
 #endif
+#if JVET_AD0140_MVD_PREDICTION
+  void initOffsetsAffineMvd(PredictionUnit &pu, RefPicList eRefList, const std::vector<Mv> (&cMvdDerived)[3]);
+  void applyOffsetsAffineMvd(const PredictionUnit& pu, RefPicList eRefList, std::vector<Mv>& cMvdInput, const  std::vector<Mv>(&cMvdDerived)[3]);
+
+  int deriveMVSDIdxFromMVDAffineSI(PredictionUnit& pu, RefPicList eRefList, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3);
+  std::vector<Mv> deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu, RefPicList eRefList, const std::vector<Mv>& cMvdDerived, const std::vector<Mv>& cMvdDerived2, const std::vector<Mv>& cMvdDerived3, std::vector<Mv>& cMvd);
+#endif
   int deriveMVSDIdxFromMVDAffine(PredictionUnit& pu, RefPicList eRefList, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3);
   void deriveMVDFromMVSDIdxAffine(PredictionUnit& pu, RefPicList eRefList, std::vector<Mv>& cMvdDerived, std::vector<Mv>& cMvdDerived2, std::vector<Mv>& cMvdDerived3);
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   int deriveMVSDIdxFromMVDTransIBC(const Mv& cMvd, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si) const;
   Mv  deriveMVDFromMVSDIdxTransIBC(int mvsdIdx, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo& si) const;
+#endif
+#if JVET_AD0140_MVD_PREDICTION
+  static int selectMvdCodingList(const PredictionUnit& pu, const int numCandL0 = -1);
 #endif
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
   void    cacheAssign( CacheModel *cache );
@@ -782,6 +850,11 @@ public:
   void    getBlkAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft, int8_t posList0 = -1, int8_t posList1 = -1, bool load0 = false, bool load1 = false);
 #endif
 #endif
+
+#if JVET_AD0140_MVD_PREDICTION
+  bool    getBlkAMLRefTemplateMvdPredUni(PredictionUnit& pu, PelUnitBuf& pcBufPredRefTop, PelUnitBuf& pcBufPredRefLeft);
+  bool    getBlkAMLRefTemplateMvdPred   (PredictionUnit& pu, PelUnitBuf& pcBufPredRefTop, PelUnitBuf& pcBufPredRefLeft);
+#endif
 #if JVET_W0090_ARMC_TM
   void    adjustAffineMergeCandidates(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, int mrgCandIdx = -1
 #if JVET_Z0139_NA_AFF
@@ -795,6 +868,9 @@ public:
     uint32_t(*RdCandList)[AFFINE_MRG_MAX_NUM_CANDS],
 #endif
     int mrgCandIdx = -1);
+#if JVET_AD0140_MVD_PREDICTION
+  template <int iAbove1Left2All3 = 3>
+#endif
   void    xGetSublkAMLTemplate(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
      , bool afMMVD = false
@@ -803,14 +879,39 @@ public:
     , bool wrapRef = false
 #endif
                                );
+
+#if JVET_AD0140_MVD_PREDICTION
+  bool fillAffAMLRefTemplateCache( PredictionUnit& pu, int refList, const int candIdx, const Size& topSize, const Size& leftSize
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                                  , bool isBilinear, AffineMergeCtx affMrgCtx
+#endif
+                                  );
+  bool fillAMLRefTemplateCache(PredictionUnit& pu, int refList, const int candIdx, const Size& topSize, const Size& leftSize );
+#endif
+
+
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
+#if JVET_AD0140_MVD_PREDICTION
+  template <bool exitIfOob = false>
+  bool    getAffAMLRefTemplate(PredictionUnit& pu, PelUnitBuf& pcBufPredRefTop, PelUnitBuf& pcBufPredRefLeft,
+#else
   void    getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft,
+#endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     bool isBilinear, AffineMergeCtx affMrgCtx,
 #endif
     int8_t posList0 = -1, int8_t posList1 = -1, bool loadSave0 = false, bool loadSave1 = false);
 #else
   void    getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft);
+#endif
+
+#if JVET_AD0140_MVD_PREDICTION
+  template <int iAbove1Left2All3 = 3>
+  bool    getAffAMLRefTemplateMvdPredUni(PredictionUnit& pu, PelUnitBuf& pcBufPredRefTop, PelUnitBuf& pcBufPredRefLeft,
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                                         bool isBilinear, AffineMergeCtx affMrgCtx
+#endif                               
+                                        );
 #endif
 #if JVET_AD0213_LIC_IMP
   void    getAffAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft,

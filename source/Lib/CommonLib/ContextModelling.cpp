@@ -460,6 +460,15 @@ int DeriveCtx::CtxSmBvdBin(const int iPreviousBinIsCorrect2, const int iPrevious
 }
 #endif
 
+#if JVET_AD0140_MVD_PREDICTION 
+int DeriveCtx::ctxSmMvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrect, const int isHor, const int significance, const MotionModel& motionModel)
+{
+  const bool isAffine = MotionModel::BiAffine == motionModel || MotionModel::UniAffine == motionModel;
+  int ctxOffset = Clip3(0, 5, significance); 
+  return (isAffine ? 5 : 0) + ctxOffset;
+}
+#endif
+
 unsigned DeriveCtx::CtxPredModeFlag( const CodingUnit& cu )
 {
   const CodingUnit *cuLeft  = cu.cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);

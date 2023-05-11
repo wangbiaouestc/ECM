@@ -923,8 +923,8 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setAffineParaRefinement                              (m_affineParaRefinement);
 #endif
   m_cEncLib.setMmvdDisNum                                        (m_MmvdDisNum);
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  m_cEncLib.setUseMVSD                                           (m_MVSD);
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  m_cEncLib.setUseMvdPred                                        (m_mvdPred);
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   m_cEncLib.setUseBvdPred                                        (m_bvdPred);

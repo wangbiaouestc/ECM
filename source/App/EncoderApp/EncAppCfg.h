@@ -500,8 +500,8 @@ protected:
 #endif
   bool      m_MMVD;
   int       m_MmvdDisNum;
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  bool      m_MVSD;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  bool      m_mvdPred;
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   bool      m_bvdPred;

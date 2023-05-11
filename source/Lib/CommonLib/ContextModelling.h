@@ -757,7 +757,9 @@ unsigned CtxTimdFlag( const CodingUnit& cu );
 #if JVET_AB0155_SGPM
 unsigned CtxSgpmFlag(const CodingUnit &cu);
 #endif
-
+#if JVET_AD0140_MVD_PREDICTION
+int ctxSmMvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrect, const int isHor, const int significance, const MotionModel& motionModel);
+#endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
 int CtxSmBvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrect, const int isHor, const int significance);
 #endif

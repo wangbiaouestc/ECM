@@ -606,6 +606,10 @@ static const int BVD_IBC_MAX_PREFIX      = 16;
 static const int VER_BVD_CTX_OFFSET      = 6;
 #endif
 
+#if JVET_AD0140_MVD_PREDICTION
+static const int MVD_CODING_GOLOMB_ORDER = 1;
+#endif
+
 #if JVET_W0119_LFNST_EXTENSION
 static const int NUM_LFNST_INTRA_MODES   = NUM_LUMA_MODE + NUM_EXT_LUMA_MODE;
 static const uint32_t  L16W_ZO           = 96;
@@ -1423,6 +1427,12 @@ static const int NUM_CCP_PARAMS = CCCM_NO_SUB_NUM_PARAMS;
 #else
 static const int NUM_CCP_PARAMS = CCCM_NUM_PARAMS;
 #endif
+#endif
+#if JVET_AD0140_MVD_PREDICTION
+static const int MVD_PREDICTION_SIGN_SUFFIX_BIN_THR =            2;
+static const int MVD_PREDICTION_EGC_OFFSET =                     1;
+static const int MAX_NUM_REFIDX =                                5;
+static const int MAX_NUM_CANDS =                                64;
 #endif
 
 // ====================================================================================================================
