@@ -87,28 +87,20 @@ static const Mv s_acMvRefineQ[9] =
 };
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
-#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS || 1
 void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
                                 , unsigned useIBCFrac
-#endif
-#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AA0070_RRIBC
+#if JVET_AA0070_RRIBC
                                 , int ctxIdRrIBC
 #endif
-#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
                                 , int ctxIdOneComp
+#endif
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
                                 , const bool useBvpCluster
 #endif
 )
-#else // Note: The below "else part" can be removed due to code duplication
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p, const bool useBvpCluster)
-#else
-void InterSearch::xEstBvdBitCosts(EstBvdBitsStruct *p)
-#endif
-#endif
 {
   const FracBitsAccess& fracBits = m_CABACEstimator->getCtx().getFracBitsAcess();
 
@@ -2801,32 +2793,20 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
   Mv           cMvPred;
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
-#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS || 1
   xEstBvdBitCosts(m_pcRdCost->getBvdBitCosts()
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
                 , cu.cs->sps->getIBCFracFlag()
-#endif
-#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AA0070_RRIBC
+#if JVET_AA0070_RRIBC
                 , cu.cs->sps->getIBCFracFlag() ? (int)DeriveCtx::CtxRribcFlipType(cu) : NOT_VALID
 #endif
-#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
                 , cu.cs->sps->getIBCFracFlag() ? (int)DeriveCtx::CtxbvOneZeroComp(cu) : NOT_VALID
+#endif
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
                 , cu.firstPU->isBvpClusterApplicable()
 #endif
   );
-#else // Note: The below "else part" can be removed due to code duplication
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  const PredictionUnit &pu = *cu.firstPU;
-  if (pu.isBvpClusterApplicable())
-  {
-    xEstBvdBitCosts(m_pcRdCost->getBvdBitCosts(), pu.isBvpClusterApplicable());
-  }
-#else
-  xEstBvdBitCosts(m_pcRdCost->getBvdBitCosts());
-#endif
-#endif
 #endif
 #if JVET_AA0070_RRIBC
   CodedCUInfo& relatedCU = ((EncModeCtrlMTnoRQT *)m_modeCtrl)->getBlkInfo(partitioner.currArea());
@@ -4924,9 +4904,9 @@ bool InterSearch::predInterHashSearch(CodingUnit& cu, Partitioner& partitioner, 
 #if JVET_X0083_BM_AMVP_MERGE_MODE
 void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner, bool& bdmvrAmMergeNotValid,
 #if JVET_AD0213_LIC_IMP
-    MvField* mvFieldAmListCommon, bool* licAmListCommon, Mv* mvBufEncAmBDMVR_L0, Mv* mvBufEncAmBDMVR_L1)
+    MvField* mvFieldAmListCommon, bool* licAmListCommon, Mv* mvBufEncAmBDmvrL0, Mv* mvBufEncAmBDmvrL1)
 #else
-    MvField* mvFieldAmListCommon, Mv* mvBufEncAmBDMVR_L0, Mv* mvBufEncAmBDMVR_L1)
+    MvField* mvFieldAmListCommon, Mv* mvBufEncAmBDmvrL0, Mv* mvBufEncAmBDmvrL1)
 #endif
 #else
 void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
@@ -6235,13 +6215,13 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #if JVET_X0083_BM_AMVP_MERGE_MODE
     if (amvpMergeModeFlag && PU::checkBDMVRCondition(pu))
     {
-      setBdmvrSubPuMvBuf(mvBufEncAmBDMVR_L0, mvBufEncAmBDMVR_L1);
+      setBdmvrSubPuMvBuf(mvBufEncAmBDmvrL0, mvBufEncAmBDmvrL1);
       pu.bdmvrRefine = true;
       // span motion to subPU
       for (int subPuIdx = 0; subPuIdx < MAX_NUM_SUBCU_DMVR; subPuIdx++)
       {
-        mvBufEncAmBDMVR_L0[subPuIdx] = pu.mv[0];
-        mvBufEncAmBDMVR_L1[subPuIdx] = pu.mv[1];
+        mvBufEncAmBDmvrL0[subPuIdx] = pu.mv[0];
+        mvBufEncAmBDmvrL1[subPuIdx] = pu.mv[1];
       }
     }
     if (!pu.bdmvrRefine)
@@ -6334,7 +6314,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
         pu.colIdx,
 #endif
-        mvBufEncAmBDMVR_L0, mvBufEncAmBDMVR_L1, getBdofSubPuMvOffset());
+        mvBufEncAmBDmvrL0, mvBufEncAmBDmvrL1, getBdofSubPuMvOffset());
     }
 #endif
 #if INTER_LIC && (!TM_AMVP || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP) || JVET_AD0213_LIC_IMP)

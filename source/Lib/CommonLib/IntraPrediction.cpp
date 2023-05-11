@@ -10600,7 +10600,7 @@ void clipMvIntraConstraint( CodingUnit* pcCU, int regionId, int& iHorMin, int& i
 }
 
 #if JVET_AB0130_ITMP_SAMPLING
-void clipMvIntraConstraint_Refine(CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX, int pX, int pY, int refinementRange, RefTemplateType tempType)
+void clipMvIntraConstraintRefine(CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX, int pX, int pY, int refinementRange, RefTemplateType tempType)
 {
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   int searchRangeWidth  = std::max(TMP_SEARCH_RANGE_MULT_FACTOR * (int) uiBlkWidth, TMP_MINSR);
@@ -11133,7 +11133,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
       int mvYMax       = 0;
       int mvXMin       = 0;
       int mvXMax       = 0;
-      clipMvIntraConstraint_Refine(pcCU, bestRegionId, mvXMin, mvXMax, mvYMin, mvYMax, TMP_TEMPLATE_SIZE, uiBlkWidth,
+      clipMvIntraConstraintRefine(pcCU, bestRegionId, mvXMin, mvXMax, mvYMin, mvYMax, TMP_TEMPLATE_SIZE, uiBlkWidth,
                                    uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX,
                                    sparseMtmpCandList[temIdx][candIdx].m_pX, sparseMtmpCandList[temIdx][candIdx].m_pY,
                                    iRefineRange, tempType);
@@ -11218,7 +11218,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
     {
       int iRefine = 1 << iRefineLog2;
       int tmpRefineRange = std::min(uiBlkHeight, uiBlkHeight) / 2;
-      clipMvIntraConstraint_Refine(pcCU, bestRegionId, mvXMins[bestRegionId], mvXMaxs[bestRegionId], mvYMins[bestRegionId], mvYMaxs[bestRegionId], 
+      clipMvIntraConstraintRefine(pcCU, bestRegionId, mvXMins[bestRegionId], mvXMaxs[bestRegionId], mvYMins[bestRegionId], mvYMaxs[bestRegionId], 
                                    TMP_TEMPLATE_SIZE, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX, pX, pY, iRefine* tmpRefineRange, tempType);
       int mvYMin = mvYMins[bestRegionId];
       int mvYMax = mvYMaxs[bestRegionId];
