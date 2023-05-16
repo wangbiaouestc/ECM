@@ -2520,6 +2520,35 @@ bool PU::hasChromaFusionFlag(const PredictionUnit &pu, int intraMode)
   return hasChromaFusionFlag;
 }
 #endif
+#if JVET_AD0120_LBCCP
+bool PU::isModetobeFiltered(int intraMode)
+{
+#if MMLM
+  if (intraMode == MMLM_CHROMA_IDX )
+  {
+    return true;
+  }
+#endif
+  return false;
+}
+
+bool PU::hasCcInsideFilterFlag(const PredictionUnit &pu, int intraMode)
+{
+#if JVET_AA0126_GLM
+  if (pu.glmIdc.isActive())
+  {
+    return false;
+  }
+#endif
+#if JVET_Z0050_CCLM_SLOPE
+  if (pu.cclmOffsets.isActive())
+  {
+    return false;
+  }
+#endif
+  return isModetobeFiltered(intraMode);
+}
+#endif
 
 #if JVET_AC0071_DBV
 bool PU::hasChromaBvFlag(const PredictionUnit &pu)
@@ -3466,7 +3495,7 @@ bool PU::checkIsChromaBvCandidateValid(const PredictionUnit &pu
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   int roiWidth  = (isRefTemplate && !isRefAbove) ? DBV_TEMPLATE_SIZE : pu.Cb().width;
   int roiHeight = (isRefTemplate && isRefAbove ) ? DBV_TEMPLATE_SIZE : pu.Cb().height;
-  uint32_t validType = checkValidBv(pu, COMPONENT_Cb, roiWidth, roiHeight, mv, true, filterIdx, false);
+  uint32_t validType = checkValidBv(pu, COMPONENT_Cb, roiWidth, roiHeight, mv, true, filterIdx);
   return validType != IBC_BV_INVALID;
 #else
   const int cuPelX = pu.Cb().x;
@@ -4956,7 +4985,7 @@ bool PU::checkIsIBCCandidateValid(const PredictionUnit& pu
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   int roiWidth  = (isRefTemplate && !isRefAbove) ? AML_MERGE_TEMPLATE_SIZE : pu.lwidth();
   int roiHeight = (isRefTemplate &&  isRefAbove) ? AML_MERGE_TEMPLATE_SIZE : pu.lheight();
-  uint32_t validType = checkValidBv(pu, COMPONENT_Y, roiWidth, roiHeight, miNeighbor.mv[REF_PIC_LIST_0], true, filterIdx, miNeighbor.useAltHpelIf);
+  uint32_t validType = checkValidBv(pu, COMPONENT_Y, roiWidth, roiHeight, miNeighbor.mv[REF_PIC_LIST_0], true, filterIdx);
   return validType != IBC_BV_INVALID;
 #else
   Mv bv = miNeighbor.mv[REF_PIC_LIST_0];
@@ -4985,12 +5014,12 @@ bool PU::checkIsIBCCandidateValid(const PredictionUnit& pu
 
 #if JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0084_IBC_TM
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-uint32_t PU::checkValidBvPU(const PredictionUnit& pu, ComponentID compID, Mv mv, bool ignoreFracMv, int filterIdx, bool useAltHPelIF)
+uint32_t PU::checkValidBvPU(const PredictionUnit& pu, ComponentID compID, Mv mv, bool ignoreFracMv, int filterIdx)
 {
-  return PU::checkValidBv(pu, compID, (int)pu.blocks[compID].width, (int)pu.blocks[compID].height, mv, ignoreFracMv, filterIdx, useAltHPelIF);
+  return PU::checkValidBv(pu, compID, (int)pu.blocks[compID].width, (int)pu.blocks[compID].height, mv, ignoreFracMv, filterIdx);
 }
 
-uint32_t PU::checkValidBv(const PredictionUnit& pu, ComponentID compID, int compWidth, int compHeight, Mv mv, bool ignoreFracMv, int filterIdx, bool useAltHPelIF
+uint32_t PU::checkValidBv(const PredictionUnit& pu, ComponentID compID, int compWidth, int compHeight, Mv mv, bool ignoreFracMv, int filterIdx
                         , bool isFinalMC
                         , bool checkAllRefValid
 )
@@ -5028,11 +5057,9 @@ uint32_t PU::checkValidBv(const PredictionUnit& pu, ComponentID compID, int comp
 
   if (compID == COMPONENT_Y)
   {
-    CHECK(useAltHPelIF, "IBC does not support IMV_HPEL");
-
     int filterTap = filterIdx == 1 ? 2 : NTAPS_LUMA_IBC;
-    xFilterTap    = xFrac == 0 ? 0 : (useAltHPelIF && xFrac == 8 ? 6 : filterTap);
-    yFilterTap    = yFrac == 0 ? 0 : (useAltHPelIF && yFrac == 8 ? 6 : filterTap);
+    xFilterTap    = xFrac == 0 ? 0 : filterTap;
+    yFilterTap    = yFrac == 0 ? 0 : filterTap;
   }
   else
   {
@@ -18638,11 +18665,11 @@ void PU::applyImv( PredictionUnit& pu, MergeCtx &mrgCtx, InterPrediction *interP
       }
       pu.mvpNum[0] = amvpInfo.numCand;
       pu.mvpIdx[0] = mvpIdx;
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
       if (!CU::isIBC(*pu.cu))
       {
         RefPicList eRefList(REF_PIC_LIST_0);
-        if (pu.isMvsdApplicable() && pu.mvd[eRefList].isMvsdApplicable())
+        if (pu.isMvdPredApplicable() && pu.mvd[eRefList].isMvdPredApplicable())
         {
           if (pu.cu->smvdMode)
           {
@@ -18694,9 +18721,9 @@ void PU::applyImv( PredictionUnit& pu, MergeCtx &mrgCtx, InterPrediction *interP
       );
       pu.mvpNum[1] = amvpInfo.numCand;
       pu.mvpIdx[1] = mvpIdx;
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
       RefPicList eRefList(REF_PIC_LIST_1);
-      if (pu.isMvsdApplicable() && pu.mvd[eRefList].isMvsdApplicable())
+      if (pu.isMvdPredApplicable() && pu.mvd[eRefList].isMvdPredApplicable())
       {
         if (pu.cu->smvdMode)
         {

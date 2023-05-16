@@ -1004,28 +1004,20 @@ protected:
   Distortion  xPatternRefinement    ( const CPelBuf* pcPatternKey, Mv baseRefMv, int iFrac, Mv& rcMvFrac, bool bAllowUseOfHadamard );
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
-#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS || 1
   void xEstBvdBitCosts(EstBvdBitsStruct *p
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
                      , unsigned useIBCFrac = 0
-#endif
-#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AA0070_RRIBC
+#if JVET_AA0070_RRIBC
                      , int ctxIdRrIBC = NOT_VALID
 #endif
-#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
                      , int ctxIdOneComp = NOT_VALID
+#endif
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
                      , const bool useBvpCluster = true
 #endif
   );
-#else // Note: The below "else part" can be removed due to code duplication
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  void xEstBvdBitCosts(EstBvdBitsStruct *p, const bool useBvpCluster = true );
-#else
-  void xEstBvdBitCosts(EstBvdBitsStruct *p);
-#endif
-#endif
 #endif
 
    typedef struct
@@ -1071,9 +1063,9 @@ public:
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   void predInterSearch(CodingUnit& cu, Partitioner& partitioner, bool& amvpMergeModeNotValid,
 #if JVET_AD0213_LIC_IMP
-      MvField* mvFieldAmListCommon = nullptr, bool* licAmListCommon = nullptr, Mv* mvBufEncAmBDMVR_L0 = nullptr, Mv* mvBufEncAmBDMVR_L1 = nullptr);
+      MvField* mvFieldAmListCommon = nullptr, bool* licAmListCommon = nullptr, Mv* mvBufEncAmBDmvrL0 = nullptr, Mv* mvBufEncAmBDmvrL1 = nullptr);
 #else
-      MvField* mvFieldAmListCommon = nullptr, Mv* mvBufEncAmBDMVR_L0 = nullptr, Mv* mvBufEncAmBDMVR_L1 = nullptr);
+      MvField* mvFieldAmListCommon = nullptr, Mv* mvBufEncAmBDmvrL0 = nullptr, Mv* mvBufEncAmBDmvrL1 = nullptr);
 #endif
 #else
   void predInterSearch(CodingUnit& cu, Partitioner& partitioner );

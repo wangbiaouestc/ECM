@@ -182,6 +182,7 @@
 #define JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS        1 // JVET-AD0184: Removal of division operations
 #define JVET_AD0085_MPM_SORTING                           1 // JVET-AD0085: Template-based intra MPM list construction
 #define JVET_AD0188_CCP_MERGE                             1 // JVET_AD0188: Non-local cross-component prediction and cross-component merge mode
+#define JVET_AD0120_LBCCP                                 1 // JVET_AD0120: Local-Boosting Cross-Component Prediction, wherein the template part is controlled by CCCM SPS
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -287,6 +288,7 @@
 #define JVET_Y0134_TMVP_NAMVP_CAND_REORDERING             1 // JVET-Y0134: MV candidate reordering for TMVP and NAMVP types (controlled by JVET_W0090_ARMC_TM), and reference picture selection for TMVP 
 #if JVET_W0090_ARMC_TM
 #define JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED            1 // JVET-Y0067: TM based reordering for MMVD and affine MMVD and MVD sign prediction
+#define JVET_AD0140_MVD_PREDICTION                        1 // JVET-AD0140: MVD (sign and suffix) prediction
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 #define JVET_AA0093_ENHANCED_MMVD_EXTENSION               1 // JVET-AA0093: Test 2.3 part: Extension on TM based reordering for MMVD and affine MMVD
 #endif

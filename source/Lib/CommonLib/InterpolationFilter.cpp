@@ -1144,14 +1144,6 @@ const TFilterCoeff InterpolationFilter::m_bilinearFilterChroma[CHROMA_INTERPOLAT
   { _ADJIF_( 2), _ADJIF_(62), },
 };
 
-const TFilterCoeff InterpolationFilter::m_lumaIBCFilter[4][NTAPS_ALT_LUMA_IBC] =
-{
-  { _ADJIF_( 0), _ADJIF_(64), _ADJIF_( 0), _ADJIF_( 0), },
-  { _ADJIF_(-4), _ADJIF_(54), _ADJIF_(16), _ADJIF_(-2), },
-  { _ADJIF_(-4), _ADJIF_(36), _ADJIF_(36), _ADJIF_(-4), },
-  { _ADJIF_(-2), _ADJIF_(16), _ADJIF_(54), _ADJIF_(-4), },
-};
-
 #undef _ADJIF_
 #endif
 
@@ -2016,11 +2008,6 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
     {
       filterHor<NTAPS_LUMA_IBC>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilter[frac], biMCForDMVR);
     }
-    else if (nFilterIdx == -2)
-    {
-      frac >>= MV_FRACTIONAL_BITS_DIFF;
-      filterHor<NTAPS_ALT_LUMA_IBC>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaIBCFilter[frac], biMCForDMVR);
-    }
 #endif
 #if !AFFINE_RM_CONSTRAINTS_AND_OPT
     else if ((width == 4 && height == 4) || (width == 4 && height == (4 + NTAPS_LUMA(0) - 1)))
@@ -2070,11 +2057,6 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
     else if (nFilterIdx == -1)
     {
       filterHor<NTAPS_LUMA_IBC>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilter[frac], biMCForDMVR);
-    }
-    else if (nFilterIdx == -2)
-    {
-      frac >>= MV_FRACTIONAL_BITS_DIFF;
-      filterHor<NTAPS_ALT_LUMA_IBC>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaIBCFilter[frac], biMCForDMVR);
     }
 #endif
 #if !AFFINE_RM_CONSTRAINTS_AND_OPT
@@ -2210,11 +2192,6 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
     {
       filterVer<NTAPS_LUMA_IBC>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilter[frac], biMCForDMVR);
     }
-    else if (nFilterIdx == -2)
-    {
-      frac >>= MV_FRACTIONAL_BITS_DIFF;
-      filterVer<NTAPS_ALT_LUMA_IBC>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaIBCFilter[frac], biMCForDMVR);
-    }
 #endif
 #if !AFFINE_RM_CONSTRAINTS_AND_OPT
     else if (width == 4 && height == 4)
@@ -2264,11 +2241,6 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
     else if (nFilterIdx == -1)
     {
       filterVer<NTAPS_LUMA_IBC>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilter[frac], biMCForDMVR);
-    }
-    else if (nFilterIdx == -2)
-    {
-      frac >>= MV_FRACTIONAL_BITS_DIFF;
-      filterVer<NTAPS_ALT_LUMA_IBC>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaIBCFilter[frac], biMCForDMVR);
     }
 #endif
 #if !AFFINE_RM_CONSTRAINTS_AND_OPT

@@ -1773,6 +1773,9 @@ void CABACReader::cu_pred_data( CodingUnit &cu )
 
   for( auto &pu : CU::traversePUs( cu ) )
   {
+#if JVET_AD0140_MVD_PREDICTION
+    pu.mvdSuffixInfo.clear();
+#endif
     prediction_unit( pu, mrgCtx );
   }
 
@@ -1787,13 +1790,13 @@ void CABACReader::cu_pred_data( CodingUnit &cu )
 #if INTER_LIC
   cu_lic_flag( cu ); // local illumination compensation
 #endif
-#if !JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED)
-#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  if (!cu.cs->sps->getUseMVSD())
+#if !(JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION) || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && (JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION))
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && (JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION)
+  if (!cu.cs->sps->getUseMvdPred())
   {
 #endif
   cu_bcw_flag(cu);
-#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && (JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION)
   }
 #endif
 #endif
@@ -2617,7 +2620,6 @@ bool CABACReader::intra_chroma_lmc_mode(PredictionUnit& pu)
     {
       modeIdx += m_BinDecoder.decodeBinEP();
     } // == 5 mean MMLM_T
-
     pu.intraDir[1] = lmModeList[modeIdx];
 #else
     symbol += m_BinDecoder.decodeBinEP();
@@ -2633,6 +2635,9 @@ bool CABACReader::intra_chroma_lmc_mode(PredictionUnit& pu)
 #endif
 #if JVET_Z0050_CCLM_SLOPE
   cclmDeltaSlope( pu );
+#endif
+#if JVET_AD0120_LBCCP
+  ccInsideFilterFlag(pu);
 #endif
 
   return true; //it will only enter this function for LMC modes, so always return true ;
@@ -2751,6 +2756,19 @@ void CABACReader::cccmFlag(PredictionUnit& pu)
 #endif
     }
 #endif
+  }
+}
+#endif
+
+#if JVET_AD0120_LBCCP
+void CABACReader::ccInsideFilterFlag(PredictionUnit &pu)
+{
+  const unsigned intraDir = pu.intraDir[1];
+  pu.ccInsideFilter       = 0;
+
+  if (PU::hasCcInsideFilterFlag(pu, intraDir))
+  {
+    pu.ccInsideFilter = m_BinDecoder.decodeBin(Ctx::CcInsideFilterFlag(0));
   }
 }
 #endif
@@ -3634,9 +3652,9 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
     inter_pred_idc( pu );
     affine_flag   ( *pu.cu );
     smvd_mode( pu );
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
-    if(pu.cs->sps->getUseMVSD())
+    if(pu.cs->sps->getUseMvdPred())
     {
 #endif
     cu_bcw_flag(*pu.cu);
@@ -3668,21 +3686,55 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
       {
         RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MVD, pu.lumaSize());
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-        mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][0],  !pu.isMvsdApplicable());
+#if JVET_AD0140_MVD_PREDICTION
+        const auto& motionModel = (pu.interDir == 3) ? MotionModel::BiAffine : MotionModel::UniAffine;
+        pu.mvdSuffixInfo.setMotionModel(motionModel);
+        {
+          auto& si = pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_0][0];
+          si.setMotionModel(motionModel);
+          mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][0], &si, !pu.isMvdPredApplicable());
+        }
+#else
+        mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][0], !pu.isMvdPredApplicable());
+#endif
+#else
+#if JVET_AD0140_MVD_PREDICTION
+        mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][0], pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_0][0]);
 #else
         mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][0]);
 #endif
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-        mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][1],  !pu.isMvsdApplicable());
+#if JVET_AD0140_MVD_PREDICTION
+        auto& si1 = pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_0][1];
+        si1.setMotionModel(motionModel);
+        mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][1], &si1, !pu.isMvdPredApplicable());
+#else
+        mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][1],  !pu.isMvdPredApplicable());
+#endif
+#else
+#if JVET_AD0140_MVD_PREDICTION
+        mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][1], pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_0][1]);
 #else
         mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][1]);
+#endif
 #endif
         if ( pu.cu->affineType == AFFINEMODEL_6PARAM )
         {
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-          mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][2],  !pu.isMvsdApplicable());
+#if JVET_AD0140_MVD_PREDICTION
+          auto& si2 = pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_0][2];
+          si2.setMotionModel(motionModel);
+          mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][2], &si2, !pu.isMvdPredApplicable());
+#else
+        mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][2],  !pu.isMvdPredApplicable());
+#endif
+#else
+#if JVET_AD0140_MVD_PREDICTION
+          mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][2], pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_0][2]);
 #else
           mvd_coding(pu.mvdAffi[REF_PIC_LIST_0][2]);
+#endif
 #endif
         }
       }
@@ -3698,9 +3750,22 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
         {
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-        mvd_coding(pu.mvd[REF_PIC_LIST_0] ,  !pu.isMvsdApplicable());
+#if JVET_AD0140_MVD_PREDICTION
+          const auto motionModel = pu.cu->smvdMode ? MotionModel::BiTranslationalSmvd :
+                                                     ( 3 == pu.interDir ) ? MotionModel::BiTranslational : MotionModel::UniTranslational;
+          pu.mvdSuffixInfo.setMotionModel(motionModel);
+          auto& si = pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_0][0];
+          si.setMotionModel(motionModel);
+          mvd_coding(pu.mvd[REF_PIC_LIST_0], &si, !pu.isMvdPredApplicable());
+#else
+          mvd_coding(pu.mvd[REF_PIC_LIST_0] ,  !pu.isMvdPredApplicable());
+#endif
+#else
+#if JVET_AD0140_MVD_PREDICTION
+        mvd_coding(pu.mvd[REF_PIC_LIST_0], pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_0][0]);
 #else
         mvd_coding(pu.mvd[REF_PIC_LIST_0] );
+#endif
 #endif
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
         }
@@ -3737,21 +3802,53 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
         {
           RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MVD, pu.lumaSize());
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-          mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][0],  !pu.isMvsdApplicable());
+#if JVET_AD0140_MVD_PREDICTION
+          const auto& motionModel = (pu.interDir == 3) ? MotionModel::BiAffine : MotionModel::UniAffine;
+          pu.mvdSuffixInfo.setMotionModel(motionModel);
+          auto& si = pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_1][0];
+          si.setMotionModel(motionModel);
+          mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][0], &si, !pu.isMvdPredApplicable());
+#else
+          mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][0],  !pu.isMvdPredApplicable());
+#endif
+#else
+#if JVET_AD0140_MVD_PREDICTION
+          mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][0], pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_1][0]);
 #else
           mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][0]);
 #endif
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-          mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][1],  !pu.isMvsdApplicable());
+#if JVET_AD0140_MVD_PREDICTION
+          auto& si1 = pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_1][1];
+          si1.setMotionModel(motionModel);
+          mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][1], &si1, !pu.isMvdPredApplicable());
+#else
+          mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][1],  !pu.isMvdPredApplicable());
+#endif
+#else
+#if JVET_AD0140_MVD_PREDICTION
+          mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][1], pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_1][1]);
 #else
           mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][1]);
+#endif
 #endif
           if (pu.cu->affineType == AFFINEMODEL_6PARAM)
           {
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-            mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][2],  !pu.isMvsdApplicable());
+#if JVET_AD0140_MVD_PREDICTION
+            auto& si2 = pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_1][2];
+            si2.setMotionModel(motionModel);
+            mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][2], &si2, !pu.isMvdPredApplicable());
+#else
+            mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][2],  !pu.isMvdPredApplicable());
+#endif
+#else
+#if JVET_AD0140_MVD_PREDICTION
+            mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][2], pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_1][2]);
 #else
             mvd_coding(pu.mvdAffi[REF_PIC_LIST_1][2]);
+#endif
 #endif
           }
         }
@@ -3767,9 +3864,22 @@ void CABACReader::prediction_unit( PredictionUnit& pu, MergeCtx& mrgCtx )
           {
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-            mvd_coding(pu.mvd[REF_PIC_LIST_1],  !pu.isMvsdApplicable());
+#if JVET_AD0140_MVD_PREDICTION
+            const auto motionModel = pu.cu->smvdMode ? MotionModel::BiTranslationalSmvd :
+                                                       ( 3 == pu.interDir ) ? MotionModel::BiTranslational : MotionModel::UniTranslational;
+            pu.mvdSuffixInfo.setMotionModel(motionModel);
+            auto& si = pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_1][0];
+            si.setMotionModel(motionModel);
+            mvd_coding(pu.mvd[REF_PIC_LIST_1], &si, !pu.isMvdPredApplicable());
+#else
+            mvd_coding(pu.mvd[REF_PIC_LIST_1],  !pu.isMvdPredApplicable());
+#endif
+#else
+#if JVET_AD0140_MVD_PREDICTION
+          mvd_coding(pu.mvd[REF_PIC_LIST_1], pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_1][0]);
 #else
           mvd_coding(pu.mvd[REF_PIC_LIST_1]);
+#endif
 #endif
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
           }
@@ -3825,13 +3935,40 @@ void CABACReader::mvsd_data(PredictionUnit&  pu)
 #if !JVET_AC0104_IBC_BVD_PREDICTION
     || CU::isIBC(*pu.cu)
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-    || !pu.isMvsdApplicable()
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+    || !pu.isMvdPredApplicable()
 #endif
      )
   {
     return;
   }
+#if JVET_AD0140_MVD_PREDICTION
+  const int numAffinesInRpl = 2 + (pu.cu->affineType == AFFINEMODEL_6PARAM);
+  for (int i = REF_PIC_LIST_0; i < NUM_REF_PIC_LIST_01; ++i)
+  {
+    const RefPicList& eRefList = static_cast<RefPicList>(i);
+    if (pu.cu->affine)
+    {
+      const auto& motionModel = (3 == pu.interDir) ? MotionModel::BiAffine : MotionModel::UniAffine ;
+      for (int j = 0; j < numAffinesInRpl; ++j)
+      {
+        pu.mvdSuffixInfo.initSuffixesAndSignsMvd( j, eRefList, pu.mvdAffi[i][j], pu.cu->imv, motionModel );
+      }
+    }
+    else
+    {
+      const auto& motionModel = ( 0 != pu.cu->smvdMode ) ? MotionModel::BiTranslationalSmvd : 
+                                                          (3 == pu.interDir) ? MotionModel::BiTranslational : MotionModel::UniTranslational;
+      pu.mvdSuffixInfo.initSuffixesAndSignsMvd(0, static_cast<RefPicList>(i), pu.mvd[i], pu.cu->imv, motionModel);
+
+      if ( pu.cu->smvdMode )
+      {
+        break;
+      }
+    }
+  }
+  pu.mvdSuffixInfo.getMergedBinBudgetForMv( MvdSuffixInfoMv::getBinBudgetForPrediction(pu.Y().width, pu.Y().height, pu.cu->imv));
+#endif
   if (pu.interDir != 2 /* PRED_L1 */)
   {
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -5773,7 +5910,11 @@ void CABACReader::mh_pred_data(PredictionUnit& pu)
     CHECK(mhData.refIdx < 0, "Multi Hyp: mhData.refIdx < 0");
     CHECK(mhData.refIdx >= numMHRef, "Multi Hyp: mhData.refIdx >= numMHRef");
     RExt__DECODER_DEBUG_BIT_STATISTICS_SET(ctype_mvd);
+#if JVET_AD0140_MVD_PREDICTION 
+    mvd_coding(mhData.mvd, nullptr, true);
+#else
     mvd_coding(mhData.mvd);
+#endif
     RExt__DECODER_DEBUG_BIT_STATISTICS_SET(ctype_mvpIdx);
     mhData.mvpIdx = m_BinDecoder.decodeBin(Ctx::MVPIdx());
     mhData.weightIdx = unary_max_symbol(Ctx::MHWeight(), Ctx::MHWeight(1), pu.cs->sps->getNumAddHypWeights() - 1);
@@ -5907,6 +6048,241 @@ bool CABACReader::cbf_comp( CodingStructure& cs, const CompArea& area, unsigned 
 //--------------------------------------------------------------------------------
 //    void  mvd_coding( pu, refList )
 //================================================================================
+
+#if JVET_AD0140_MVD_PREDICTION
+void CABACReader::mvd_coding( Mv &rMvd, MvdSuffixInfo* const pSi
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+                            , bool codeSign
+#endif
+)
+{
+  const bool ctxCoding = nullptr != pSi && !codeSign;
+
+  // abs_mvd_greater0_flag[ 0 | 1 ]
+  int horAbs = 0, verAbs = 0;
+  
+  horAbs = (int)m_BinDecoder.decodeBin(Ctx::Mvd());
+  verAbs = (int)m_BinDecoder.decodeBin(Ctx::Mvd());
+
+  const int iEgcOffset = (!codeSign && ctxCoding) ? pSi->getEGCOffset() : 1;
+  if ( iEgcOffset != 0 )
+  {
+    // abs_mvd_greater1_flag[ 0 | 1 ]
+    if (horAbs)
+    {
+      horAbs += (int)m_BinDecoder.decodeBin(Ctx::Mvd(1));
+    }
+    if (verAbs)
+    {
+      verAbs += (int)m_BinDecoder.decodeBin(Ctx::Mvd(1));
+    }
+  }
+
+  // abs_mvd_minus2[ 0 | 1 ] and mvd_sign_flag[ 0 | 1 ]
+  int horParam = -1;
+  int verParam = -1;
+  if (!codeSign && ctxCoding)
+  {    
+    horParam = horAbs > iEgcOffset ? xReadMvdPrefix(MVD_CODING_GOLOMB_ORDER) : -1;
+    verParam = verAbs > iEgcOffset ? xReadMvdPrefix(MVD_CODING_GOLOMB_ORDER) : -1;
+    DTRACE(g_trace_ctx, D_SYNTAX, "horParam=%d \n", horParam);
+    DTRACE(g_trace_ctx, D_SYNTAX, "verParam=%d \n", verParam);
+  }
+  else
+  {
+    DTRACE(g_trace_ctx, D_SYNTAX, "codeSign=%d \n", codeSign);
+    if (horAbs)
+    {
+      if (horAbs > 1)
+      {
+        horAbs += m_BinDecoder.decodeRemAbsEP(1, 0, MV_BITS - 1);
+      }
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+      if (codeSign)
+#endif
+      if (m_BinDecoder.decodeBinEP())
+      {
+        horAbs = -horAbs;
+      }
+    }
+    if (verAbs)
+    {
+      if (verAbs > 1)
+      {
+        verAbs += m_BinDecoder.decodeRemAbsEP(1, 0, MV_BITS - 1);
+      }
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+      if (codeSign)
+#endif
+      if (m_BinDecoder.decodeBinEP())
+      {
+        verAbs = -verAbs;
+      }
+    }
+    DTRACE(g_trace_ctx, D_SYNTAX, "horAbs=%d \n", horAbs);
+    DTRACE(g_trace_ctx, D_SYNTAX, "verAbs=%d \n", verAbs);
+  }
+  rMvd = Mv(horAbs, verAbs);
+  if (ctxCoding)
+  {
+    pSi->horPrefix = horParam;
+    pSi->verPrefix = verParam;
+  }
+}
+
+unsigned CABACReader::xReadMvdPrefix( int param )
+{
+  unsigned symbol = 0;
+  unsigned bit    = 1;
+  unsigned uiIdx  = 0;
+
+  while (bit)
+  {
+    DTRACE(g_trace_ctx, D_SYNTAX, "prefix: encodeBinEP \n");
+    bit = m_BinDecoder.decodeBinEP();
+    uiIdx++;
+    symbol += bit << param++;
+  }
+
+  --uiIdx;
+
+  return uiIdx;
+}
+
+unsigned CABACReader::xReadMvdContextSuffix(int symbol, int param)
+{
+  unsigned bit = 0;
+  ++param;
+  CHECK(param < 0, "param < 0");
+  if (0 != param)
+  {
+    CHECK(param == 0, "param == 0");
+
+    bit = m_BinDecoder.decodeBinsEP(param);
+
+    DTRACE(g_trace_ctx, D_SYNTAX, "ContextSuffix()=%d, numBit=%d \n", bit, param);
+    symbol += bit;
+  }
+  return symbol;
+}
+
+void CABACReader::mvdCodingRemainder(Mv& rMvd, MvdSuffixInfo& si, const int imv)
+{
+  int horAbs = rMvd.getAbsHor();
+  int verAbs = rMvd.getAbsVer();
+
+  const int horParam = si.horPrefix;
+  const int verParam = si.verPrefix;
+
+  unsigned int& horOffsetPrediction = si.horOffsetPrediction;
+  unsigned int& verOffsetPrediction = si.verOffsetPrediction;
+  horOffsetPrediction = 0;
+  verOffsetPrediction = 0;
+
+  const int numMSBhor = std::max(0, si.horOffsetPredictionNumBins);
+  const int numMSBver = std::max(0, si.verOffsetPredictionNumBins);
+
+  unsigned horSuffix = 0;
+  unsigned verSuffix = 0;
+
+  if (horParam >= 0 || verParam >= 0) 
+  {    
+    DTRACE(g_trace_ctx, D_SYNTAX, "horParam: %d, verParam = %d \n", horParam, verParam);
+    DTRACE(g_trace_ctx, D_SYNTAX, "imv: %d \n", imv);
+
+    const int iEgcOffset = si.getEGCOffset() + 1;
+
+    if (horParam >= 0)
+    {  
+      for (int i = numMSBhor - 1; i >= 0; --i)
+      {
+        const int prev2Bin = (i + 1 > numMSBhor - 1) ? -1
+                           : (i + 1 == numMSBhor - 1) ? si.horSignHypMatch
+                                       : /*otherwise*/ (horOffsetPrediction >> 1) & 1;
+        const int prevBin  = (i == numMSBhor - 1) ? si.horSignHypMatch : (horOffsetPrediction & 1);
+        const int imvShift = MotionModelCheck::isAffine(si.m_motionModel) ? Mv::getImvPrecShiftAffineMvd(imv) : Mv::getImvPrecShiftMvd(imv);
+        const int iCtxIdx  = DeriveCtx::ctxSmMvdBin(prev2Bin, prevBin, true, i + imvShift, si.m_motionModel);
+
+        horOffsetPrediction <<= 1;
+
+        int bin = (int)m_BinDecoder.decodeBin(Ctx::MvsdIdxMVDMSB(iCtxIdx));
+        bin = (0 == bin) ? 1 : 0;
+        horOffsetPrediction |= bin;
+      }
+
+      DTRACE(g_trace_ctx, D_SYNTAX, "horOffsetPrediction: %d, iHorMSBins = %d \n", horOffsetPrediction, numMSBhor);
+
+      CHECK(horParam < 0, "horParam < 0");
+      CHECK(horParam + 1 < numMSBhor, "horParam + 1 < numMSBhor");
+
+      DTRACE(g_trace_ctx, D_SYNTAX, "horSuffix bits: %d \n", horParam - numMSBhor);
+      horSuffix = xReadMvdContextSuffix(si.horPrefixGroupStartValue, horParam - numMSBhor );
+      horAbs = horSuffix + iEgcOffset;
+      DTRACE(g_trace_ctx, D_SYNTAX, "horSuffix=%d \n", horSuffix);
+    }
+    if (verParam >= 0)
+    {
+      for (int i = numMSBver - 1; i >= 0; --i)
+      {
+        const int prev2Bin = (i + 1 > numMSBver - 1) ? -1
+                           : (i + 1 == numMSBver - 1) ? si.verSignHypMatch
+                                       : /*otherwise*/ (verOffsetPrediction >> 1) & 1;
+        const int prevBin  = (i == numMSBver - 1) ? si.verSignHypMatch : (verOffsetPrediction & 1);
+        const int imvShift = MotionModelCheck::isAffine(si.m_motionModel) ? Mv::getImvPrecShiftAffineMvd(imv) : Mv::getImvPrecShiftMvd(imv);
+        const int iCtxIdx  = DeriveCtx::ctxSmMvdBin(prev2Bin, prevBin, false, i + imvShift, si.m_motionModel);
+
+        verOffsetPrediction <<= 1;
+
+        int bin = (int)m_BinDecoder.decodeBin(Ctx::MvsdIdxMVDMSB(iCtxIdx));
+        bin = (0 == bin) ? 1 : 0;
+        verOffsetPrediction |= bin;
+      }
+
+      DTRACE(g_trace_ctx, D_SYNTAX, "verOffsetPrediction: %d, iVerMSBins = %d \n", verOffsetPrediction, numMSBver);
+
+      CHECK(verParam < 0, "verParam < 0");
+      CHECK(verParam + 1 < numMSBver, "verParam + 1 < numMSBver");
+
+      DTRACE(g_trace_ctx, D_SYNTAX, "verSuffix bits: %d \n", verParam - numMSBver);
+      verSuffix = xReadMvdContextSuffix(si.verPrefixGroupStartValue, verParam - numMSBver );
+      verAbs = verSuffix + iEgcOffset;
+      DTRACE(g_trace_ctx, D_SYNTAX, "verSuffix=%d \n", verSuffix);
+    }
+    DTRACE(g_trace_ctx, D_SYNTAX, "abs(mvd)=(%d,%d) \n", horAbs, verAbs);
+
+    rMvd = Mv(horAbs, verAbs);
+
+    CHECK(!((horAbs >= MVD_MIN) && (horAbs <= MVD_MAX)) || !((verAbs >= MVD_MIN) && (verAbs <= MVD_MAX)), "Illegal MVD value");
+  }
+  else
+  {
+    unsigned horSuffix = 0;
+    unsigned verSuffix = 0;
+    if (horAbs != 0)
+    {
+      int horGolombMin = si.horPrefixGroupStartValue;
+
+      horSuffix = xReadMvdContextSuffix(horGolombMin, horParam );
+      horAbs = horSuffix + 2;
+      DTRACE(g_trace_ctx, D_SYNTAX, "horSuffix=%d \n", horSuffix);
+    }
+
+    if (verAbs != 0)
+    {
+      int verGolombMin = si.verPrefixGroupStartValue;
+
+      verSuffix = xReadMvdContextSuffix(verGolombMin, verParam );
+      verAbs = verSuffix + 2;
+      DTRACE(g_trace_ctx, D_SYNTAX, "verSuffix=%d \n", verSuffix);
+    }
+
+    DTRACE(g_trace_ctx, D_SYNTAX, "abs(mvd)=(%d,%d) \n", horAbs, verAbs);
+    rMvd = Mv(horAbs, verAbs);
+  }
+}
+
+#else
+
 #if JVET_AA0070_RRIBC
 void CABACReader::mvd_coding( Mv &rMvd
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -5980,6 +6356,8 @@ void CABACReader::mvd_coding( Mv &rMvd
   CHECK(!((horAbs >= MVD_MIN) && (horAbs <= MVD_MAX)) || !((verAbs >= MVD_MIN) && (verAbs <= MVD_MAX)), "Illegal MVD value");
 }
 
+#endif
+
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AC0104_IBC_BVD_PREDICTION
 unsigned CABACReader::xReadBvdContextPrefix(unsigned ctxT, int offset, int param )
@@ -5987,7 +6365,8 @@ unsigned CABACReader::xReadBvdContextPrefix(unsigned ctxT, int offset, int param
   unsigned symbol = 0;
   unsigned bit    = 1;
   unsigned uiIdx = 0;
-  while( bit )
+
+  while (bit)
   {
     if (uiIdx >= ctxT)
     {
@@ -6029,8 +6408,7 @@ unsigned CABACReader::xReadBvdContext(unsigned ctxT, int offset, int param )
   unsigned symbol = 0;
   unsigned bit    = 1;
   unsigned uiIdx = 0;
-
-  while (bit)
+  while( bit )
   {
     if (uiIdx >= ctxT)
     {
@@ -6331,8 +6709,8 @@ void CABACReader::bvdCoding(Mv & rMvd)
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
 void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
 {
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  if (!pu.isMvsdApplicable())
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  if (!pu.isMvdPredApplicable())
   {
     return;
   }
@@ -6351,7 +6729,7 @@ void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
   {
     return;
   }
-#if JVET_Z0054_BLK_REF_PIC_REORDER
+#if JVET_Z0054_BLK_REF_PIC_REORDER && !JVET_AD0140_MVD_PREDICTION
   if (PU::useRefPairList(pu))
   {
     if (pu.interDir == 3 && eRefList == REF_PIC_LIST_1 && (pu.mvd[0].getHor() || pu.mvd[0].getVer()))
@@ -6430,8 +6808,12 @@ void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
       else
       {
         uint8_t ctxId = (trMv.getHor() <= Thres) ? 0 : 1;
+#if JVET_AD0140_MVD_PREDICTION
+        uint8_t bin   = m_BinDecoder.decodeBin(Ctx::MvsdIdxIBC(ctxId));
+#else
         uint8_t bin   = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
 
+#endif
         pu.bvdSuffixInfo.horSignHypMatch = 0==bin;
 
         mvsdIdx += (bin << shift);
@@ -6447,8 +6829,11 @@ void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
       else
       {
         uint8_t ctxId = (trMv.getVer() <= Thres) ? 0 : 1;
-        uint8_t bin   = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
-
+#if JVET_AD0140_MVD_PREDICTION
+        uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdxIBC(ctxId));
+#else
+        uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
+#endif
         pu.bvdSuffixInfo.verSignHypMatch = 0 == bin;
 
         mvsdIdx += (bin << shift);
@@ -6470,7 +6855,111 @@ void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
     return;
   }
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+
+#if JVET_AD0140_MVD_PREDICTION
+  auto& si = pu.mvdSuffixInfo.mvBins[eRefList][0];
+  bool setHorSignToNegative = false;
+  bool setVerSignToNegative = false;
+
+  si.horSignHypMatch = -1;
+  si.verSignHypMatch = -1;
+
+  const int horPrefix = si.horPrefix;
+  const int verPrefix = si.verPrefix;
+
+  trMv = Mv(horPrefix < 0 ? 0 : MvdSuffixInfo::xGetGolombGroupMinValue(horPrefix),
+            verPrefix < 0 ? 0 : MvdSuffixInfo::xGetGolombGroupMinValue(verPrefix));
+  trMv.changeTransPrecAmvr2Internal(pu.cu->imv);
+
+  if (pu.mvd[eRefList].getHor())
+  {
+      if (si.horEncodeSignInEP)
+      {
+        setHorSignToNegative = m_BinDecoder.decodeBinEP();
+      }
+      else
+      {
+        uint8_t ctxId = (trMv.getHor() <= Thres) ? 0 : 1;
+        uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
+        si.horSignHypMatch = 0 == bin;
+        DTRACE(g_trace_ctx, D_SYNTAX, "mvsd hor: bin=%d, ctx=%d \n", bin, ctxId);
+        mvsdIdx += (bin << shift);
+        shift++;
+      }
+  }
+  if (pu.mvd[eRefList].getVer())
+  {
+      if (si.verEncodeSignInEP)
+      {
+        setVerSignToNegative = m_BinDecoder.decodeBinEP();
+      }
+      else
+      {
+        uint8_t ctxId = (trMv.getVer() <= Thres) ? 0 : 1;
+        uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
+        si.verSignHypMatch = 0 == bin;
+        DTRACE(g_trace_ctx, D_SYNTAX, "mvsd ver: bin=%d, ctx=%d \n", bin, ctxId);
+        mvsdIdx += (bin << shift);
+        shift++;
+      }
+  }
+
+  pu.mvsdIdx[eRefList] = mvsdIdx;
+
+  if (setHorSignToNegative)
+  {
+    pu.mvd[eRefList].setHor(-pu.mvd[eRefList].getHor());
+  }
+  if (setVerSignToNegative)
+  {
+    pu.mvd[eRefList].setVer(-pu.mvd[eRefList].getVer());
+  }
+
+  if (eRefList == REF_PIC_LIST_1 || pu.interDir == 1
+      || (pu.cu->cs->picHeader->getMvdL1ZeroFlag() && eRefList == REF_PIC_LIST_0 && pu.interDir == 3)
+      || pu.cu->smvdMode
+     )
+  {
+    bool readL0Suffixes = pu.interDir != 2;
+    bool readL1Suffixes = pu.interDir != 1 && !(pu.cu->cs->picHeader->getMvdL1ZeroFlag() && pu.interDir == 3);
+
+    if (pu.cu->smvdMode) 
+    {
+      CHECK(pu.interDir != 3, "SMVD mode should be B-prediction");
+      readL0Suffixes &= (eRefList == 0);
+      readL1Suffixes = false;
+    }
+
+    for (int i = REF_PIC_LIST_0; i < NUM_REF_PIC_LIST_01; ++i)
+    {
+      if ((i == 0 && !readL0Suffixes) || (i == 1 && !readL1Suffixes) || (!pu.mvd[i].getHor() && !pu.mvd[i].getVer()))
+      {
+          continue;
+      }
+
+      auto& si = pu.mvdSuffixInfo.mvBins[i][0];
+      const int horPrefix = si.horPrefix;
+      const int verPrefix = si.verPrefix;
+
+      if (horPrefix >= 0 || verPrefix >= 0)
+      {
+        setHorSignToNegative = pu.mvd[i].getHor() < 0;
+        setVerSignToNegative = pu.mvd[i].getVer() < 0;
+
+        mvdCodingRemainder(pu.mvd[i], si, pu.cu->imv );
+
+        if (setHorSignToNegative)
+        {
+            pu.mvd[i].setHor(-pu.mvd[i].getHor());
+        }
+        if (setVerSignToNegative)
+        {
+            pu.mvd[i].setVer(-pu.mvd[i].getVer());
+        }
+      }
+    }
+  }
+#elif JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   if (pu.mvd[eRefList].getHor())
   {
     uint8_t ctxId = (trMv.getHor() <= Thres) ? 0 : 1;
@@ -6496,7 +6985,7 @@ void CABACReader::mvsdAffineIdxFunc(PredictionUnit &pu, RefPicList eRefList)
   {
     return;
   }
-  if (!pu.isMvsdApplicable())
+  if (!pu.isMvdPredApplicable())
   {
     return;
   }
@@ -6506,7 +6995,7 @@ void CABACReader::mvsdAffineIdxFunc(PredictionUnit &pu, RefPicList eRefList)
     return;
   }
 
-#if JVET_Z0054_BLK_REF_PIC_REORDER
+#if JVET_Z0054_BLK_REF_PIC_REORDER && !JVET_AD0140_MVD_PREDICTION
   if (PU::useRefPairList(pu))
   {
     if (pu.interDir == 3 && eRefList == REF_PIC_LIST_1 &&
@@ -6580,6 +7069,108 @@ void CABACReader::mvsdAffineIdxFunc(PredictionUnit &pu, RefPicList eRefList)
   int shift = 0;
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MVS, pu.lumaSize());
   
+#if JVET_AD0140_MVD_PREDICTION
+  const int numAffinesInRpl = 2 + (pu.cu->affineType == AFFINEMODEL_6PARAM);
+
+  for (int i = 0; i < numAffinesInRpl; ++i)
+  {
+    auto& si = pu.mvdSuffixInfo.mvBins[eRefList][i];
+    bool setHorSignToNegative = false;
+    bool setVerSignToNegative = false;
+
+    si.horSignHypMatch = -1;
+    si.verSignHypMatch = -1;
+
+    const int horPrefix = si.horPrefix;
+    const int verPrefix = si.verPrefix;
+
+    Mv TrMv = Mv(horPrefix < 0 ? 0 : MvdSuffixInfo::xGetGolombGroupMinValue(horPrefix),
+                  verPrefix < 0 ? 0 : MvdSuffixInfo::xGetGolombGroupMinValue(verPrefix));
+    TrMv.changeAffinePrecAmvr2Internal(pu.cu->imv);
+
+    if (pu.mvdAffi[eRefList][i].getHor())
+    {
+      if (si.horEncodeSignInEP)
+      {
+        setHorSignToNegative = m_BinDecoder.decodeBinEP();
+      }
+      else
+      {
+        uint8_t ctxId = (TrMv.getHor() <= Thres) ? 2 : 3;
+        uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
+        si.horSignHypMatch = 0 == bin;
+        mvsdIdx += (bin << shift);
+        shift++;
+      }
+    }
+    if (pu.mvdAffi[eRefList][i].getVer())
+    {
+      if (si.verEncodeSignInEP)
+      {
+        setVerSignToNegative = m_BinDecoder.decodeBinEP();
+      }
+      else
+      {
+        uint8_t ctxId = (TrMv.getVer() <= Thres) ? 2 : 3;
+        uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
+        si.verSignHypMatch = 0 == bin;
+        mvsdIdx += (bin << shift);
+        shift++;
+      }
+    }
+
+    if (setHorSignToNegative)
+    {
+      pu.mvdAffi[eRefList][i].setHor(-pu.mvdAffi[eRefList][i].getHor());
+    }
+    if (setVerSignToNegative)
+    {
+      pu.mvdAffi[eRefList][i].setVer(-pu.mvdAffi[eRefList][i].getVer());
+    }
+  }
+
+  if (eRefList == REF_PIC_LIST_1 || pu.interDir == 1
+    || (pu.cu->cs->picHeader->getMvdL1ZeroFlag() && eRefList == REF_PIC_LIST_0 && pu.interDir == 3)) // current RPL = L1 or there is only L0: now we can predict suffix bins
+  {
+    bool readL0Suffixes = pu.interDir != 2;
+    bool readL1Suffixes = pu.interDir != 1 && !(pu.cu->cs->picHeader->getMvdL1ZeroFlag() && pu.interDir == 3);
+
+    // read suffixes
+    for (int i = REF_PIC_LIST_0; i < NUM_REF_PIC_LIST_01; ++i)   // read MVD suffixes
+    {
+      const RefPicList& eRefList = static_cast<RefPicList>(i);
+
+      for (int j = 0; j < numAffinesInRpl; ++j)
+      {
+        auto& si = pu.mvdSuffixInfo.mvBins[eRefList][j];
+
+        if ((i == 0 && !readL0Suffixes) || (i == 1 && !readL1Suffixes) || (!pu.mvdAffi[i][j].getHor() && !pu.mvdAffi[i][j].getVer()))
+        {
+          continue;
+        }
+
+        const int horPrefix = si.horPrefix;
+        const int verPrefix = si.verPrefix;
+        if (horPrefix >= 0 || verPrefix >= 0)
+        {
+          const bool horSignIsNegative = pu.mvdAffi[i][j].getHor() < 0;
+          const bool verSignIsNegative = pu.mvdAffi[i][j].getVer() < 0;
+          mvdCodingRemainder( pu.mvdAffi[i][j], si, pu.cu->imv );
+
+          if (horSignIsNegative)
+          {
+            pu.mvdAffi[i][j].setHor(-pu.mvdAffi[i][j].getHor());
+          }
+          if (verSignIsNegative)
+          {
+            pu.mvdAffi[i][j].setVer(-pu.mvdAffi[i][j].getVer());
+          }
+        }
+      }
+    }
+  }
+
+#else
   if (pu.mvdAffi[eRefList][0].getHor())
   {
     uint8_t ctxId = (AffMv[0].getHor() <= Thres) ? 2 : 3;
@@ -6625,6 +7216,7 @@ void CABACReader::mvsdAffineIdxFunc(PredictionUnit &pu, RefPicList eRefList)
       shift++;
     }
   }
+#endif
   pu.mvsdIdx[eRefList] = mvsdIdx;
 }
 #endif

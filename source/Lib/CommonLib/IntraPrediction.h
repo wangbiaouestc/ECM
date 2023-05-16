@@ -299,6 +299,9 @@ private:
 
   IntraPredParam m_ipaParam;
 
+#if JVET_AD0120_LBCCP
+  Pel* m_pCCFilterTemp;
+#endif
 #if JVET_AB0067_MIP_DIMD_LFNST
   Pel* m_pMipTemp;
 #endif
@@ -466,7 +469,11 @@ public:
 #endif
 #if JVET_AA0057_CCCM
   void   predIntraCCCM            (const PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, int intraDir);
-  void   xCccmCalcModels          (const PredictionUnit& pu, CccmModel<CCCM_NUM_PARAMS> &cccmModelCb, CccmModel<CCCM_NUM_PARAMS> &cccmModelCr, int modelId, int modelThr);
+  void   xCccmCalcModels          (const PredictionUnit& pu, CccmModel<CCCM_NUM_PARAMS> &cccmModelCb, CccmModel<CCCM_NUM_PARAMS> &cccmModelCr, int modelId, int modelThr
+#if JVET_AD0120_LBCCP
+    , int trainingRange = -1
+#endif
+  );
   void   xCccmApplyModel          (const PredictionUnit& pu, const ComponentID compId, CccmModel<CCCM_NUM_PARAMS> &cccmModel, int modelId, int modelThr, PelBuf &piPred) const;
   void   xCccmCreateLumaRef       (const PredictionUnit& pu, CompArea chromaArea
 #if JVET_AD0202_CCCM_MDF
@@ -483,7 +490,11 @@ public:
     , int cccmDownsamplesFilterIdx = 0, int numBuffer = 0, CPelBuf* refLuma1 = NULL, CPelBuf* refLuma3 = NULL, CPelBuf* refLuma2 = NULL
 #endif
   ) const;
-  int    xCccmCalcRefAver         (const PredictionUnit& pu) const;
+  int    xCccmCalcRefAver         (const PredictionUnit& pu
+#if JVET_AD0120_LBCCP
+                                    , int trainingRange = -1
+#endif
+  ) const;
   void   xCccmCalcRefArea         (const PredictionUnit& pu, CompArea chromaArea);
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   void   xCccmCreateLumaNoSubRef  ( const PredictionUnit& pu, CompArea chromaArea );
@@ -736,6 +747,14 @@ public:
   void predIntraMip               (const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
 #endif
 
+#if JVET_AD0120_LBCCP
+#if JVET_AA0057_CCCM
+  uint32_t xCalculateCCCMcost(const PredictionUnit &pu, const ComponentID compID, int intraDir, const CompArea &chromaArea, CccmModel<CCCM_NUM_PARAMS> cccmModel[2], int modelThr);
+  uint32_t xCalculateCCLMcost(const PredictionUnit &pu, const ComponentID compID, int intraDir, const CompArea  &chromaArea, const CclmModel &cclmModel);
+  void     applyChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea &chromaArea, int intraDir, const CclmModel &cclmModel);
+#endif
+  void     filterPredInside(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu);
+#endif
   template<bool lmcs>
   void geneWeightedPred           ( const ComponentID compId, PelBuf& pred, const PredictionUnit &pu, const PelBuf& interPred, const PelBuf& intraPred, const Pel* pLUT = nullptr );
   void geneIntrainterPred         (const CodingUnit &cu, PelStorage& pred);

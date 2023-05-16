@@ -1454,11 +1454,11 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   {
     WRITE_FLAG(pcSPS->getFpelMmvdEnabledFlag() ? 1 : 0,                               "sps_mmvd_fullpel_only_flag");
   }
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   if (pcSPS->getTMToolsEnableFlag())
 #endif
-  WRITE_FLAG(pcSPS->getUseMVSD() ? 1 : 0,                                                      "sps_mvsd_enabled_flag");
+  WRITE_FLAG(pcSPS->getUseMvdPred() ? 1 : 0,                                          "sps_mvd_pred_enabled_flag");
 #endif
   WRITE_UVLC(MRG_MAX_NUM_CANDS - pcSPS->getMaxNumMergeCand(), "six_minus_max_num_merge_cand");
   WRITE_FLAG( pcSPS->getUseSBT() ? 1 : 0,                                                      "sps_sbt_enabled_flag");

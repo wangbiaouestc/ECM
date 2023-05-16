@@ -465,6 +465,13 @@ public:
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
   static const CtxSet   MvsdIdx;
 #endif
+#if JVET_AD0140_MVD_PREDICTION && JVET_AC0104_IBC_BVD_PREDICTION
+  static const CtxSet   MvsdIdxIBC;
+#endif
+
+#if JVET_AD0140_MVD_PREDICTION
+  static const CtxSet   MvsdIdxMVDMSB;
+#endif
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
   static const CtxSet   MvsdIdxBVDMSB;
@@ -564,6 +571,9 @@ public:
 #endif
 #if JVET_AD0202_CCCM_MDF
   static const CtxSet   CccmMpfFlag;
+#endif
+#if JVET_AD0120_LBCCP
+  static const CtxSet   CcInsideFilterFlag;
 #endif
 #if JVET_AB0157_TMRL
   static const CtxSet   TmrlDerive;

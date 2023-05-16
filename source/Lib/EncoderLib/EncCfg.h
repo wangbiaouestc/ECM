@@ -507,8 +507,8 @@ protected:
   bool      m_affineParaRefinement;
 #endif
   int       m_MmvdDisNum;
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  bool      m_MVSD;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  bool      m_mvdPred;
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   bool      m_bvdPred;
@@ -1634,9 +1634,9 @@ public:
   bool      getMMVD                         ()         const { return m_MMVD; }
   void      setMmvdDisNum                   ( int b )        { m_MmvdDisNum = b; }
   int       getMmvdDisNum                   ()         const { return m_MmvdDisNum; }
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  void      setUseMVSD(bool b) { m_MVSD = b; }
-  bool      getUseMVSD()                               const { return m_MVSD; }
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  void      setUseMvdPred(bool b)                            { m_mvdPred = b; }
+  bool      getUseMvdPred()                            const { return m_mvdPred; }
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   void      setUseBvdPred(bool b)                            { m_bvdPred = b; }

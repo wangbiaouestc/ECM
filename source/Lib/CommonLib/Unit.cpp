@@ -893,6 +893,9 @@ void PredictionUnit::initData()
   curCand = {};
   curCand.type = CCP_TYPE_NONE;
 #endif
+#if JVET_AD0120_LBCCP
+  ccInsideFilter = 0;
+#endif
   // inter data
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = 0;
@@ -1058,6 +1061,9 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   idxNonLocalCCP  = predData.idxNonLocalCCP;
   curCand = predData.curCand;
 #endif
+#if JVET_AD0120_LBCCP
+  ccInsideFilter = predData.ccInsideFilter;
+#endif
   return *this;
 }
 
@@ -1160,6 +1166,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
       mvAffi[i][j] = predData.mvAffi[i][j];
     }
   }
+#if JVET_AD0140_MVD_PREDICTION
+  mvdSuffixInfo = predData.mvdSuffixInfo;
+#endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   bvdSuffixInfo = predData.bvdSuffixInfo;
 #endif
@@ -1224,6 +1233,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   curCand = other.curCand;
 #endif
 
+#if JVET_AD0120_LBCCP
+  ccInsideFilter = other.ccInsideFilter;
+#endif
   mergeFlag   = other.mergeFlag;
   regularMergeFlag = other.regularMergeFlag;
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
@@ -1328,6 +1340,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
       mvAffi[i][j] = other.mvAffi[i][j];
     }
   }
+#if JVET_AD0140_MVD_PREDICTION
+  mvdSuffixInfo = other.mvdSuffixInfo;
+#endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   bvdSuffixInfo = other.bvdSuffixInfo;
 #endif
@@ -1428,8 +1443,8 @@ CMotionBuf PredictionUnit::getMotionBuf() const
 {
   return cs->getMotionBuf( *this );
 }
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-bool PredictionUnit::isMvsdApplicable() const
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+bool PredictionUnit::isMvdPredApplicable() const
 {
 #if JVET_AC0104_IBC_BVD_PREDICTION
   if (CU::isIBC(*cu) && cs->sps->getUseBvdPred())
@@ -1437,7 +1452,8 @@ bool PredictionUnit::isMvsdApplicable() const
     return true;
   }
 #endif
-  if (!cs->sps->getUseMVSD())
+
+  if (!cs->sps->getUseMvdPred())
   {
     return false;
   }

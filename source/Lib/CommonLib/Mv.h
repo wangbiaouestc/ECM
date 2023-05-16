@@ -292,6 +292,21 @@ public:
   }
 #endif
 
+#if JVET_AD0140_MVD_PREDICTION
+  static int getImvPrecShiftMvd(const uint8_t imv)
+  {
+    return MV_PRECISION_4PEL == m_amvrPrecision[imv] ? 4 
+            : (MV_PRECISION_INT == m_amvrPrecision[imv] ? 2
+                : (MV_PRECISION_HALF == m_amvrPrecision[imv] ? 1 : 0));
+  }
+
+  static int getImvPrecShiftAffineMvd(const uint8_t imv)
+  {
+    return MV_PRECISION_INT == m_amvrPrecAffine[imv] ? 4 
+             : (MV_PRECISION_QUARTER == m_amvrPrecAffine[imv] ? 2 : 0);
+  }
+#endif
+
   Mv getSymmvdMv(const Mv& curMvPred, const Mv& tarMvPred)
   {
     return Mv(tarMvPred.hor - hor + curMvPred.hor, tarMvPred.ver - ver + curMvPred.ver);
@@ -310,7 +325,7 @@ public:
     ver = (ver >= halMvClipPeriod) ? (ver - mvClipPeriod) : ver;
   }
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
-  bool isMvsdApplicable() const
+  bool isMvdPredApplicable() const
   {
     return (getAbsHor() + getAbsVer()) >= 1;
   }
@@ -319,11 +334,30 @@ public:
 #endif
 };// END CLASS DEFINITION MV
 
-#if JVET_AC0104_IBC_BVD_PREDICTION
+#if JVET_AC0104_IBC_BVD_PREDICTION || JVET_AD0140_MVD_PREDICTION
+#if JVET_AD0140_MVD_PREDICTION
+enum class MotionModel 
+{ 
+  Undefined = -1, 
+  UniTranslational = 0, 
+  BiTranslational, 
+  BiTranslationalSmvd, 
+  UniAffine, 
+  BiAffine, 
+  NumberOfMotionModels 
+};
+namespace MotionModelCheck
+{
+  bool isAffine(const MotionModel& mm);
+}
+#endif
+
 struct MvdSuffixInfo
 {
   static const int paramOfGolombCode = 1;
-
+#if JVET_AD0140_MVD_PREDICTION
+  MotionModel m_motionModel = MotionModel::Undefined;
+#endif
   unsigned horOffsetPrediction = 0;
   unsigned verOffsetPrediction = 0;
 
@@ -339,8 +373,13 @@ struct MvdSuffixInfo
   int      horPrefixGroupStartValue = -1;
   int      verPrefixGroupStartValue = -1;
 
+#if JVET_AD0140_MVD_PREDICTION
+  bool     horEncodeSignInEP = true;
+  bool     verEncodeSignInEP = true;
+#else
   bool     horEncodeSignInEP = false;
   bool     verEncodeSignInEP = false;
+#endif
 
   int      horSignHypMatch = -1;
   int      verSignHypMatch = -1;
@@ -348,9 +387,37 @@ struct MvdSuffixInfo
   bool     isFracBvEnabled = false;
 #endif
 
-  void initPrefixes                       (const Mv& mv, const int imv, const bool isInternalPrecision);
-  void initSuffixesAndSigns               (const Mv& mv, const int imv);
+#if JVET_AD0140_MVD_PREDICTION
+  bool     isHorMagnZero = true;
+  bool     isVerMagnZero = true;
+#endif
+
+#if JVET_AC0104_IBC_BVD_PREDICTION 
+  void initPrefixes(const Mv &mv, const int imv, const bool isInternalPrecision);
+
+  void initSuffixesAndSigns(const Mv &mv, const int imv);
+
   void defineNumberOfPredictedBinsInSuffix(const int iHorPrefix, const int iVerPrefix, const uint8_t imv);
+#endif
+
+#if JVET_AD0140_MVD_PREDICTION
+  void       setMotionModel(const MotionModel& motionModel) { m_motionModel = motionModel; }
+  static int getEGCOffset(const MotionModel& motionModel);
+  int        getEGCOffset() const { return getEGCOffset(m_motionModel); }
+
+  int getNumBinsOfSignsAndSuffixes() const
+  {
+    return ((!isHorMagnZero && !horEncodeSignInEP) ? 1 : 0) + // hor sign bin
+           ((!isVerMagnZero && !verEncodeSignInEP) ? 1 : 0) + // ver sign bin
+           std::max(0,horOffsetPredictionNumBins) + std::max(0, verOffsetPredictionNumBins);
+  }
+
+  void initPrefixesMvd(const Mv& mv, const int imv, const bool isInternalPrecision);
+  void initSuffixesAndSignsMvd(const Mv &mv, const int imv);
+  void initPrefixesAffineMvd(const Mv& affineMv, const int imv, const bool isInternalPrecision, int& binBudget);
+  void initSuffixesAndSignsAffineMvd(const Mv& affineMv, const int imv, int& binBudget);
+  void defineNumberOfPredictedBinsInSuffixAffineMvd(const int iHorPrefix, const int iVerPrefix, const uint8_t imv, int& binBudget);
+#endif
 
   static int getMaxSuffix(const int prefix, const int maxAbs, const int maxGroupStartValue)
   {
@@ -391,8 +458,46 @@ struct MvdSuffixInfo
     const int golomb_param = BVD_CODING_GOLOMB_ORDER;
     return (1 << (prefix + golomb_param)) - 1 - ((1 << golomb_param) - 1);// (final_param > golomb_param + 1 ? ((1 << golomb_param) - 1) : 0);
   }
+};
+#endif
 
+#if JVET_AD0140_MVD_PREDICTION
+struct MvdSuffixInfoMv
+{
+  static constexpr int suffixPosThreshold = 0; // least significant postition of predicted bin in a suffix 
+  static constexpr int maxNumMv           = 3;
+  static constexpr int maxNumMvComp       = 2 * maxNumMv; //MV has 2 components: horizontal and vertical ones
 
+  MotionModel   m_motionModel = MotionModel::Undefined;
+
+  MvdSuffixInfo mvBins[NUM_REF_PIC_LIST_01][maxNumMv];
+  struct AuxMvdBins
+  {
+    int  mvIdx      = -1;
+    bool isHor      = true;
+    int  numHypBins = -1; // Number of hypotheses bins (siffix + sign bin)
+    int  rplIdx     = static_cast<int>(REF_PIC_LIST_X);
+    AuxMvdBins() {};
+    AuxMvdBins(int _mvIdxIn, bool _isHorIn, int _numHypBins, int _rplIdx) : mvIdx(_mvIdxIn), isHor(_isHorIn), numHypBins(_numHypBins), rplIdx(_rplIdx) {};
+  };
+
+  AuxMvdBins auxMvdBins[NUM_REF_PIC_LIST_01][maxNumMvComp]; //one entry for one MV (MVD) component
+  int actualMvCompNum[NUM_REF_PIC_LIST_01] = { -1, -1 };
+  RefPicList actualRpl                     = REF_PIC_LIST_X;
+
+  static unsigned getBinBudgetForPrediction(const unsigned int width, const unsigned int height, const uint8_t imv)
+  {
+    return (width > 4 && height > 4) ? 6 : 2;
+  }
+
+  void clear();
+
+  void       setMotionModel         ( const MotionModel& motionModel ) { m_motionModel = motionModel;}
+  bool       getMergedBinBudgetForMv( const unsigned int curBinBudget );
+  bool       getBinBudgetForMv      ( const unsigned int curBinBudget, const RefPicList rplIdx );
+  RefPicList selectRplForMvdCoding  ( const unsigned int curBinBudget ) const;
+  void       initPrefixesMvd        ( const int mvIdx, const RefPicList curRpl, const Mv& mvd, const int imv, const bool isInternalPrecision, const MotionModel& motionModel );
+  void       initSuffixesAndSignsMvd( const int mvIdx, const RefPicList rpl,    const Mv& mvd, const int imv, const MotionModel& motionModel );
 };
 #endif
 

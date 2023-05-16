@@ -543,6 +543,9 @@ struct IntraPredictionData
   int       idxNonLocalCCP;
   CCPModelCandidate curCand;
 #endif
+#if JVET_AD0120_LBCCP
+  int       ccInsideFilter;
+#endif
 };
 
 struct InterPredictionData
@@ -657,6 +660,9 @@ struct InterPredictionData
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
   int       mvsdIdx[NUM_REF_PIC_LIST_01];
 #endif
+#if JVET_AD0140_MVD_PREDICTION
+  MvdSuffixInfoMv mvdSuffixInfo;
+#endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   MvdSuffixInfo bvdSuffixInfo;
 #endif
@@ -722,8 +728,8 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
   int64_t cacheId;
   bool    cacheUsed;
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  bool              isMvsdApplicable() const;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  bool              isMvdPredApplicable() const;
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   bool              isBvdPredApplicable() const;

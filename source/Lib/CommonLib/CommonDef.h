@@ -606,6 +606,10 @@ static const int BVD_IBC_MAX_PREFIX      = 16;
 static const int VER_BVD_CTX_OFFSET      = 6;
 #endif
 
+#if JVET_AD0140_MVD_PREDICTION
+static const int MVD_CODING_GOLOMB_ORDER = 1;
+#endif
+
 #if JVET_W0119_LFNST_EXTENSION
 static const int NUM_LFNST_INTRA_MODES   = NUM_LUMA_MODE + NUM_EXT_LUMA_MODE;
 static const uint32_t  L16W_ZO           = 96;
@@ -1089,6 +1093,9 @@ static const int VALID_NUM_CCCM_MODES = TOTAL_NUM_CCCM_MODES - 6;
 static const int CCCM_MULTI_PRED_FILTER_NUM_PARAMS = 10;
 static const int CCCM_MULTI_PRED_FILTER_NUM_PARAMS2 = 11;
 #endif
+#if JVET_AD0120_LBCCP
+static const int LBCCP_FILTER_MMLMNUM = 4 + 3;// multi-model TL mode of CCLM, CCCM w/ subsample, CCCM w/o subsample if applicable, GL-CCCM, and three more from CCCM_MDF
+#endif
 #endif
 
 #if JVET_AA0126_GLM
@@ -1164,7 +1171,6 @@ static const int MAX_RPR_SWITCHING_ORDER_LIST_SIZE           =     32; /// max n
 static const int NTAPS_BILINEAR           =                         2; ///< Number of taps for bilinear filter
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 static const int NTAPS_LUMA_IBC           =                         8; ///< Number of taps for IBC luma filter
-static const int NTAPS_ALT_LUMA_IBC       =                         4; ///< Number of taps for alternative IBC luma filter
 #endif
 
 #if INTER_RM_SIZE_CONSTRAINTS
@@ -1421,6 +1427,12 @@ static const int NUM_CCP_PARAMS = CCCM_NO_SUB_NUM_PARAMS;
 #else
 static const int NUM_CCP_PARAMS = CCCM_NUM_PARAMS;
 #endif
+#endif
+#if JVET_AD0140_MVD_PREDICTION
+static const int MVD_PREDICTION_SIGN_SUFFIX_BIN_THR =            2;
+static const int MVD_PREDICTION_EGC_OFFSET =                     1;
+static const int MAX_NUM_REFIDX =                                5;
+static const int MAX_NUM_CANDS =                                64;
 #endif
 
 // ====================================================================================================================
