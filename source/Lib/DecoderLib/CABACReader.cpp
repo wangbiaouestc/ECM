@@ -6085,8 +6085,24 @@ void CABACReader::mvd_coding( Mv &rMvd, MvdSuffixInfo* const pSi
   {    
     horParam = horAbs > iEgcOffset ? xReadMvdPrefix(MVD_CODING_GOLOMB_ORDER) : -1;
     verParam = verAbs > iEgcOffset ? xReadMvdPrefix(MVD_CODING_GOLOMB_ORDER) : -1;
-    DTRACE(g_trace_ctx, D_SYNTAX, "horParam=%d \n", horParam);
-    DTRACE(g_trace_ctx, D_SYNTAX, "verParam=%d \n", verParam);
+#if ENABLE_TRACING
+    if (horParam == -1)
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "abs(MVD_hor) = %d \n", horAbs);
+    }
+    else
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "MVD_hor prefix=%d \n", horParam);
+    }
+    if (verParam == -1)
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "abs(MVD_ver) = %d \n", verAbs);
+    }
+    else
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "MVD_ver prefix=%d \n", verParam);
+    }
+#endif
   }
   else
   {
@@ -6138,7 +6154,6 @@ unsigned CABACReader::xReadMvdPrefix( int param )
 
   while (bit)
   {
-    DTRACE(g_trace_ctx, D_SYNTAX, "prefix: encodeBinEP \n");
     bit = m_BinDecoder.decodeBinEP();
     uiIdx++;
     symbol += bit << param++;
@@ -6156,11 +6171,7 @@ unsigned CABACReader::xReadMvdContextSuffix(int symbol, int param)
   CHECK(param < 0, "param < 0");
   if (0 != param)
   {
-    CHECK(param == 0, "param == 0");
-
     bit = m_BinDecoder.decodeBinsEP(param);
-
-    DTRACE(g_trace_ctx, D_SYNTAX, "ContextSuffix()=%d, numBit=%d \n", bit, param);
     symbol += bit;
   }
   return symbol;
@@ -6187,9 +6198,6 @@ void CABACReader::mvdCodingRemainder(Mv& rMvd, MvdSuffixInfo& si, const int imv)
 
   if (horParam >= 0 || verParam >= 0) 
   {    
-    DTRACE(g_trace_ctx, D_SYNTAX, "horParam: %d, verParam = %d \n", horParam, verParam);
-    DTRACE(g_trace_ctx, D_SYNTAX, "imv: %d \n", imv);
-
     const int iEgcOffset = si.getEGCOffset() + 1;
 
     if (horParam >= 0)
@@ -6210,15 +6218,15 @@ void CABACReader::mvdCodingRemainder(Mv& rMvd, MvdSuffixInfo& si, const int imv)
         horOffsetPrediction |= bin;
       }
 
-      DTRACE(g_trace_ctx, D_SYNTAX, "horOffsetPrediction: %d, iHorMSBins = %d \n", horOffsetPrediction, numMSBhor);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Codeword for MVD suffix prediction bins for horizontal component: %d \n", horOffsetPrediction);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of MVD suffix prediction bins for horizontal component: %d \n", numMSBhor);
 
       CHECK(horParam < 0, "horParam < 0");
       CHECK(horParam + 1 < numMSBhor, "horParam + 1 < numMSBhor");
 
-      DTRACE(g_trace_ctx, D_SYNTAX, "horSuffix bits: %d \n", horParam - numMSBhor);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of explicitly coded MVD horizontal suffix bins: %d \n", horParam - numMSBhor + 1);
       horSuffix = xReadMvdContextSuffix(si.horPrefixGroupStartValue, horParam - numMSBhor );
       horAbs = horSuffix + iEgcOffset;
-      DTRACE(g_trace_ctx, D_SYNTAX, "horSuffix=%d \n", horSuffix);
     }
     if (verParam >= 0)
     {
@@ -6238,18 +6246,16 @@ void CABACReader::mvdCodingRemainder(Mv& rMvd, MvdSuffixInfo& si, const int imv)
         verOffsetPrediction |= bin;
       }
 
-      DTRACE(g_trace_ctx, D_SYNTAX, "verOffsetPrediction: %d, iVerMSBins = %d \n", verOffsetPrediction, numMSBver);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Codeword for MVD suffix prediction bins for vertical component: %d \n", verOffsetPrediction);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of MVD suffix prediction bins for vertical component: %d \n", numMSBver);
 
       CHECK(verParam < 0, "verParam < 0");
       CHECK(verParam + 1 < numMSBver, "verParam + 1 < numMSBver");
 
-      DTRACE(g_trace_ctx, D_SYNTAX, "verSuffix bits: %d \n", verParam - numMSBver);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of explicitly coded MVD vertical suffix bins: %d \n", verParam - numMSBver + 1);
       verSuffix = xReadMvdContextSuffix(si.verPrefixGroupStartValue, verParam - numMSBver );
       verAbs = verSuffix + iEgcOffset;
-      DTRACE(g_trace_ctx, D_SYNTAX, "verSuffix=%d \n", verSuffix);
     }
-    DTRACE(g_trace_ctx, D_SYNTAX, "abs(mvd)=(%d,%d) \n", horAbs, verAbs);
-
     rMvd = Mv(horAbs, verAbs);
 
     CHECK(!((horAbs >= MVD_MIN) && (horAbs <= MVD_MAX)) || !((verAbs >= MVD_MIN) && (verAbs <= MVD_MAX)), "Illegal MVD value");

@@ -5794,25 +5794,39 @@ void CABACWriter::mvd_coding( const Mv &rMvd, int8_t imv, const MvdSuffixInfo* c
 #if ENABLE_TRACING
     int horParam = -1;
     int verParam = -1;
-#endif //ENABLE_TRACING
+#endif
     if (horAbs > iEgcOffset)
     {
 #if ENABLE_TRACING
       horParam =
-#endif // ENABLE_TRACING
+#endif
         xWriteMvdPrefix(horAbs - 1 - iEgcOffset, MVD_CODING_GOLOMB_ORDER);
     }
     if (verAbs > iEgcOffset)
     {
 #if ENABLE_TRACING
       verParam =
-#endif // ENABLE_TRACING
+#endif
         xWriteMvdPrefix(verAbs - 1 - iEgcOffset, MVD_CODING_GOLOMB_ORDER);
     }
 #if ENABLE_TRACING
-    DTRACE(g_trace_ctx, D_SYNTAX, "horParam=%d \n", horParam);
-    DTRACE(g_trace_ctx, D_SYNTAX, "verParam=%d \n", verParam);
-#endif //ENABLE_TRACING
+    if (horParam == -1)
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "abs(MVD_hor) = %d \n", horAbs);
+    }
+    else
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "MVD_hor prefix=%d \n", horParam);
+    }
+    if (verParam == -1)
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "abs(MVD_ver) = %d \n", verAbs);
+    }
+    else
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "MVD_ver prefix=%d \n", verParam);
+    }
+#endif
   }
   else
   {
@@ -5865,7 +5879,6 @@ unsigned CABACWriter::xWriteMvdPrefix( unsigned uiSymbol, int param )
   for (int i = numBins - 1; i >= 0; i--)
   {
     temp = bins >> i;
-    DTRACE(g_trace_ctx, D_SYNTAX, "prefix: encodeBinEP \n");
     m_BinEncoder.encodeBinEP(temp);
     bins -= (temp << i);
     bitCount++;
@@ -5897,15 +5910,11 @@ void CABACWriter::xWriteMvdContextSuffix(unsigned uiSymbol, int param, int param
     paramUpdated-= numSkipMSB;
     unsigned skipMask = ( 1 << (paramUpdated + numSkipMSB)) -1 - ((1 << (paramUpdated)) - 1);
     uiSymbol &= ~skipMask;
-    DTRACE(g_trace_ctx, D_SYNTAX, "uiSymbol without MSB: %d \n", uiSymbol);
-    DTRACE(g_trace_ctx, D_SYNTAX, "encodeBinsEP bits: %d \n", paramUpdated );
     CHECK(uiSymbol >= (1 << paramUpdated), "uiSymbol >= (1<<paramUpdated)");
   }
-  DTRACE(g_trace_ctx, D_SYNTAX, "ContextSuffix()=%d, numBit=%d \n", uiSymbol, paramUpdated);
 
   if (paramUpdated > 0)
   {
-    CHECK(uiSymbol >= (1 << (paramUpdated+1)), "uiSymbol >= (1<<paramUpdated)");
     m_BinEncoder.encodeBinsEP(uiSymbol, paramUpdated);
   }
 }
@@ -5931,10 +5940,6 @@ void CABACWriter::mvdCodingRemainder(const Mv& rMvd, const MvdSuffixInfo& si, in
     const int iHorMSBins = std::max(0, si.horOffsetPredictionNumBins);
     const int iVerMSBins = std::max(0, si.verOffsetPredictionNumBins);
 
-    DTRACE(g_trace_ctx, D_SYNTAX, "horParam: %d, verParam = %d \n", horParam, verParam);
-    DTRACE(g_trace_ctx, D_SYNTAX, "imv: %d \n", imv);
-
-
     if (horParam >= 0)
     {
       for (int i = iHorMSBins - 1; i >= 0; --i)
@@ -5951,13 +5956,14 @@ void CABACWriter::mvdCodingRemainder(const Mv& rMvd, const MvdSuffixInfo& si, in
         const unsigned int ctx = Ctx::MvsdIdxMVDMSB(iCtxIdx);
         m_BinEncoder.encodeBin((0 == bin) ? 1 : 0, ctx);
       }
-      DTRACE(g_trace_ctx, D_SYNTAX, "horOffsetPrediction: %d, iHorMSBins = %d \n", horOffsetPrediction, iHorMSBins);
+
+      DTRACE(g_trace_ctx, D_SYNTAX, "Codeword for MVD suffix prediction bins for horizontal component: %d \n", horOffsetPrediction);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of MVD suffix prediction bins for horizontal component: %d \n", iHorMSBins);
 
       CHECK(horParam < 0, "horParam < 0");
 
-      DTRACE(g_trace_ctx, D_SYNTAX, "horSuffix bits: %d \n", horParam - iHorMSBins);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of explicitly coded MVD horizontal suffix bins: %d \n", horParam - iHorMSBins + 1);
       xWriteMvdContextSuffix(horAbs - 1 - iEgcOffset, MVD_CODING_GOLOMB_ORDER, horParam, iHorMSBins);
-      DTRACE(g_trace_ctx, D_SYNTAX, "horSuffix=%d \n", horAbs - 1);
     }
     if (verParam >= 0)
     {
@@ -5975,15 +5981,14 @@ void CABACWriter::mvdCodingRemainder(const Mv& rMvd, const MvdSuffixInfo& si, in
         const unsigned int ctx = Ctx::MvsdIdxMVDMSB(iCtxIdx);
         m_BinEncoder.encodeBin((0 == bin) ? 1 : 0, ctx);
       }
-      DTRACE(g_trace_ctx, D_SYNTAX, "verOffsetPrediction: %d, iVerMSBins = %d \n", verOffsetPrediction, iVerMSBins);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Codeword for MVD suffix prediction bins for vertical component: %d \n", verOffsetPrediction);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of MVD suffix prediction bins for vertical component: %d \n", iVerMSBins);
 
       CHECK(verParam < 0, "verParam < 0");
 
-      DTRACE(g_trace_ctx, D_SYNTAX, "verSuffix bits: %d \n", verParam - iVerMSBins);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of explicitly coded MVD vertical suffix bins: %d \n", verParam - iVerMSBins + 1);
       xWriteMvdContextSuffix(verAbs - 1 - iEgcOffset, MVD_CODING_GOLOMB_ORDER, verParam, iVerMSBins);
-      DTRACE(g_trace_ctx, D_SYNTAX, "verSuffix=%d \n", verAbs - 1 - iEgcOffset);
     }
-    DTRACE(g_trace_ctx, D_SYNTAX, "abs(mvd)=(%d,%d) \n", horAbs, verAbs);
   }
   else
   {
