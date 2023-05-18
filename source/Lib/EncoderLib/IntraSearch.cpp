@@ -4379,7 +4379,8 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       int satdChromaFusionModeList[6];
       for (int i = 0; i < 6; i++)
       {
-        satdChromaFusionCost[i] = MAX_UINT64; // for the mode not pre-select by SATD, do RDO by default, so set the initial value 0.
+        fusionModeMap[i][0] = fusionModeMap[i][1] = 0;
+        satdChromaFusionCost[i] = MAX_UINT64;
         satdChromaFusionModeList[i] = i;
       }
 
