@@ -3709,7 +3709,7 @@ void CABACWriter::ibcMbvdData(const PredictionUnit& pu)
     return;
   }
   m_BinEncoder.encodeBin(pu.ibcMbvdMergeFlag, Ctx::IbcMbvdFlag());
-  DTRACE(g_trace_ctx, D_SYNTAX, "IBC_mbvd_flag() IBC_mbvd_merge=%d pos=(%d,%d) size=%dx%d\n", pu.ibcMbvdMergeFlag ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
+  DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_flag() ibc_mbvd_merge=%d pos=(%d,%d) size=%dx%d\n", pu.ibcMbvdMergeFlag ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
 
   if (!pu.ibcMbvdMergeFlag)
   {
@@ -3740,7 +3740,7 @@ void CABACWriter::ibcMbvdData(const PredictionUnit& pu)
       }
     }
   }
-  DTRACE(g_trace_ctx, D_SYNTAX, "ibcMbvdBaseIdx() ibcMbvdBaseIdx=%d\n", var0);
+  DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_merge_idx() base_idx=%d\n", var0);
 
   unsigned int ricePar = 1;
   int numCandStepMinus1 = (IBC_MBVD_SIZE_ENC >> ricePar) - 1;
@@ -3759,7 +3759,7 @@ void CABACWriter::ibcMbvdData(const PredictionUnit& pu)
     }
   }
 
-  DTRACE(g_trace_ctx, D_SYNTAX, "mmvd_merge_idx() mmvd_merge_idx=%d\n", pu.ibcMbvdMergeIdx);
+  DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_merge_idx() merge_idx=%d\n", pu.ibcMbvdMergeIdx);
 }
 #endif
 
@@ -5604,7 +5604,9 @@ void CABACWriter::mvp_flag( const PredictionUnit& pu, RefPicList eRefList )
 #endif
   m_BinEncoder.encodeBin( pu.mvpIdx[eRefList], Ctx::MVPIdx() );
   DTRACE( g_trace_ctx, D_SYNTAX, "mvp_flag() value=%d pos=(%d,%d)\n", pu.mvpIdx[eRefList], pu.lumaPos().x, pu.lumaPos().y );
+#if !JVET_Z0054_BLK_REF_PIC_REORDER
   DTRACE( g_trace_ctx, D_SYNTAX, "mvpIdx(refList:%d)=%d\n", eRefList, pu.mvpIdx[eRefList] );
+#endif
 }
 
 void CABACWriter::Ciip_flag(const PredictionUnit& pu)
@@ -6617,8 +6619,8 @@ void CABACWriter::mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
       {
         uint8_t ctxId = (trMv.getHor() <= Thres) ? 0 : 1;
         int     bin = mvsdIdx & 1;
-        DTRACE(g_trace_ctx, D_SYNTAX, "mvsd hor: bin=%d, ctx=%d \n", bin, ctxId);
         m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
+        DTRACE(g_trace_ctx, D_SYNTAX, "mvsd hor: bin=%d, ctx=%d \n", bin, ctxId);
         mvsdIdx >>= 1;
       }
   }
@@ -6633,8 +6635,8 @@ void CABACWriter::mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
       {
         uint8_t ctxId = (trMv.getVer() <= Thres) ? 0 : 1;
         int     bin = mvsdIdx & 1;
-        DTRACE(g_trace_ctx, D_SYNTAX, "mvsd ver: bin=%d, ctx=%d \n", bin, ctxId);
         m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
+        DTRACE(g_trace_ctx, D_SYNTAX, "mvsd ver: bin=%d, ctx=%d \n", bin, ctxId);
         mvsdIdx >>= 1;
       }
   }
@@ -7403,8 +7405,8 @@ void CABACWriter::mts_idx( const CodingUnit& cu, CUCtx* cuCtx )
       }
 #endif
     }
+    DTRACE(g_trace_ctx, D_SYNTAX, "mts_idx() etype=%d pos=(%d,%d) mtsIdx=%d\n", COMPONENT_Y, tu.cu->lx(), tu.cu->ly(), mtsIdx);
   }
-  DTRACE( g_trace_ctx, D_SYNTAX, "mts_idx() etype=%d pos=(%d,%d) mtsIdx=%d\n", COMPONENT_Y, tu.cu->lx(), tu.cu->ly(), mtsIdx);
 }
 
 void CABACWriter::isp_mode( const CodingUnit& cu )
@@ -8178,11 +8180,11 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
   if (cu.tmpFlag)
   {
     unsigned ctxId_fusion = DeriveCtx::CtxTmpFusionFlag(cu);
-    DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
+    m_BinEncoder.encodeBin(cu.tmpFusionFlag, Ctx::TmpFusion(ctxId_fusion));
+    DTRACE(g_trace_ctx, D_SYNTAX, "tmp_fusion_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
            cu.tmpFusionFlag ? 1 : 0);
     if (cu.tmpFusionFlag)
     {
-      m_BinEncoder.encodeBin(1, Ctx::TmpFusion(ctxId_fusion));
       m_BinEncoder.encodeBin(cu.tmpIdx >= TMP_GROUP_IDX ? 1: 0, Ctx::TmpFusion(4));
 
       int tmpFusionIdx = cu.tmpIdx;
@@ -8196,7 +8198,6 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
     }
     else
     {
-      m_BinEncoder.encodeBin(0, Ctx::TmpFusion(ctxId_fusion));
       if (cu.tmpIdx < 3)
       {
         m_BinEncoder.encodeBin(1, Ctx::TmpIdx(0));
@@ -8222,6 +8223,8 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
         m_BinEncoder.encodeBin(0, Ctx::TmpIdx(0));
         xWriteTruncBinCode(cu.tmpIdx - 3, MTMP_NUM - 3);
       }
+      DTRACE(g_trace_ctx, D_SYNTAX, "tmp_idx() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIdx);
+
       m_BinEncoder.encodeBin(cu.tmpFlmFlag, Ctx::TmpFusion(3));
       DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flm_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
              cu.tmpFlmFlag);
@@ -8237,6 +8240,7 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
           }
           m_BinEncoder.encodeBinsEP(cu.tmpSubPelIdx, 3);
         }
+        DTRACE(g_trace_ctx, D_SYNTAX, "tmp_is_subpel() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIsSubPel);
       }
     }
   }
@@ -8477,6 +8481,7 @@ void CABACWriter::bvOneZeroComp(const CodingUnit &cu)
 #endif
 #endif
   }
+  DTRACE(g_trace_ctx, D_SYNTAX, "rribcData() rribcFlipType = %d\n", cu.rribcFlipType);
 }
 #endif
 
@@ -8744,6 +8749,7 @@ void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
 #endif
     int ctxId = 0;
     m_BinEncoder.encodeBin(cu.tmrlFlag, Ctx::TmrlDerive(ctxId++));
+    DTRACE(g_trace_ctx, D_SYNTAX, "cu_tmrl_flag() ctx=%d pos=(%d,%d) tmrl=%d\n", 0, cu.lumaPos().x, cu.lumaPos().y, cu.tmrlFlag);
     if (cu.tmrlFlag)
     {
       const int maxNumCtxBins = (MRL_LIST_SIZE / MRL_IDX_RICE_CODE_DIVISOR) - 1;
@@ -8762,12 +8768,12 @@ void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
       m_BinEncoder.encodeBin((mrlIdxSuffix & 1), Ctx::TmrlDerive(maxNumCtxBins + 1));
       m_BinEncoder.encodeBin(((mrlIdxSuffix >> 1) & 1), Ctx::TmrlDerive(maxNumCtxBins + 2));
       CHECK(cu.tmrlList[cu.tmrlListIdx].intraDir != pu->intraDir[0] || cu.tmrlList[cu.tmrlListIdx].multiRefIdx != pu->multiRefIdx, "? ");
+      DTRACE(g_trace_ctx, D_SYNTAX, "cu_tmrl_idx() ctx=%d pos=(%d,%d) tmrlidx=%d\n", 0, cu.lumaPos().x, cu.lumaPos().y, cu.tmrlListIdx);
     }
     else
     {
       CHECK(pu->multiRefIdx, "?");
     }
-    DTRACE(g_trace_ctx, D_SYNTAX, "cu_tmrl_flag() ctx=%d pos=(%d,%d) tmrl=%d\n", 0, cu.lumaPos().x, cu.lumaPos().y, cu.tmrlFlag);
 #if !JVET_AD0082_TMRL_CONFIG
 #if JVET_W0123_TIMD_FUSION
   }
