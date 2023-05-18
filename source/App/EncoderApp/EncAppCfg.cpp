@@ -1175,7 +1175,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("ColorTransform",                                  m_useColorTrans,                                  false, "Enable the color transform")
   ("PLT",                                             m_PLTMode,                                           0u, "PLTMode (0x1:enabled, 0x0:disabled)  [default: disabled]")
   ("JointCbCr",                                       m_JointCbCrMode,                                  false, "Enable joint coding of chroma residuals (JointCbCr, 0:off, 1:on)")
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  ( "IBC",                                            m_IBCMode,                                           0u, "IBCMode (0: disabled, 1: enabled for I slices, 2: enabled for P/B slices, 3: enabled for all slices)  [default: disabled]")
+#else
   ( "IBC",                                            m_IBCMode,                                           0u, "IBCMode (0x1:enabled, 0x0:disabled)  [default: disabled]")
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   ( "IBCFrac",                                        m_IBCFracMode,                                       1u, "IBCMode with fractional BV (0x1:enabled, 0x0:disabled)  [default: disabled]")
 #endif
@@ -1235,7 +1239,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
  ("IntraDBV",                                         m_intraDBV,                                       true, "Direct Block Vector (0: off, 1:on)  [default: on]")
 #else
- ("IntraDBV", m_intraDBV, false, "Direct Block Vector (0: off, 1:on)  [default: off]")
+ ("IntraDBV",                                         m_intraDBV,                                      false, "Direct Block Vector (0: off, 1:on)  [default: off]")
 #endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER

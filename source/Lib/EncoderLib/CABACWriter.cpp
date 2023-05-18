@@ -6610,35 +6610,35 @@ void CABACWriter::mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
 
   if (pu.mvd[eRefList].getHor())
   {
-      if (si.horEncodeSignInEP)
-      {
-        unsigned bin = pu.mvd[eRefList].getHor() < 0 ? 1 : 0;
-        m_BinEncoder.encodeBinEP(bin);
-      }
-      else
-      {
-        uint8_t ctxId = (trMv.getHor() <= Thres) ? 0 : 1;
-        int     bin = mvsdIdx & 1;
-        m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
-        DTRACE(g_trace_ctx, D_SYNTAX, "mvsd hor: bin=%d, ctx=%d \n", bin, ctxId);
-        mvsdIdx >>= 1;
-      }
+    if( si.horEncodeSignInEP )
+    {
+      unsigned bin = pu.mvd[eRefList].getHor() < 0 ? 1 : 0;
+      m_BinEncoder.encodeBinEP( bin );
+    }
+    else
+    {
+      uint8_t ctxId = ( trMv.getHor() <= Thres ) ? 0 : 1;
+      int     bin = mvsdIdx & 1;
+      m_BinEncoder.encodeBin( bin, Ctx::MvsdIdx( ctxId ) );
+      DTRACE( g_trace_ctx, D_SYNTAX, "mvsd hor: bin=%d, ctx=%d \n", bin, ctxId );
+      mvsdIdx >>= 1;
+    }
   }
   if (pu.mvd[eRefList].getVer())
   {
-      if (si.verEncodeSignInEP)
-      {
-        unsigned bin = pu.mvd[eRefList].getVer() < 0 ? 1 : 0;
-        m_BinEncoder.encodeBinEP(bin);
-      }
-      else
-      {
-        uint8_t ctxId = (trMv.getVer() <= Thres) ? 0 : 1;
-        int     bin = mvsdIdx & 1;
-        m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
-        DTRACE(g_trace_ctx, D_SYNTAX, "mvsd ver: bin=%d, ctx=%d \n", bin, ctxId);
-        mvsdIdx >>= 1;
-      }
+    if( si.verEncodeSignInEP )
+    {
+      unsigned bin = pu.mvd[eRefList].getVer() < 0 ? 1 : 0;
+      m_BinEncoder.encodeBinEP( bin );
+    }
+    else
+    {
+      uint8_t ctxId = ( trMv.getVer() <= Thres ) ? 0 : 1;
+      int     bin = mvsdIdx & 1;
+      m_BinEncoder.encodeBin( bin, Ctx::MvsdIdx( ctxId ) );
+      DTRACE( g_trace_ctx, D_SYNTAX, "mvsd ver: bin=%d, ctx=%d \n", bin, ctxId );
+      mvsdIdx >>= 1;
+    }
   }
 
   if (eRefList == REF_PIC_LIST_1 || pu.interDir == 1
@@ -6646,45 +6646,46 @@ void CABACWriter::mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
       || pu.cu->smvdMode
       )
   {
-      bool writeL0Suffixes = pu.interDir != 2;
-      bool writeL1Suffixes = pu.interDir != 1 && !(pu.cu->cs->picHeader->getMvdL1ZeroFlag() && pu.interDir == 3);
+    bool writeL0Suffixes = pu.interDir != 2;
+    bool writeL1Suffixes = pu.interDir != 1 && !( pu.cu->cs->picHeader->getMvdL1ZeroFlag() && pu.interDir == 3 );
 
-      if (pu.cu->smvdMode) {
-          CHECK(pu.interDir != 3, "SMVD mode should be B-prediction");
-          writeL0Suffixes &= (eRefList == 0);
-          writeL1Suffixes = false; // &= (eRefList == 1);
-          const int maxNumBins = MvdSuffixInfoMv::getBinBudgetForPrediction(pu.Y().width, pu.Y().height, pu.cu->imv);
-          const auto& si = pu.mvdSuffixInfo.mvBins[0][0];
-          CHECK(si.getNumBinsOfSignsAndSuffixes() > maxNumBins,"Bin budget exceeded");
-      }
+    if( pu.cu->smvdMode )
+    {
+      CHECK( pu.interDir != 3, "SMVD mode should be B-prediction" );
+      writeL0Suffixes &= ( eRefList == 0 );
+      writeL1Suffixes = false; // &= (eRefList == 1);
+      const int maxNumBins = MvdSuffixInfoMv::getBinBudgetForPrediction( pu.Y().width, pu.Y().height, pu.cu->imv );
+      const auto& si = pu.mvdSuffixInfo.mvBins[0][0];
+      CHECK( si.getNumBinsOfSignsAndSuffixes() > maxNumBins, "Bin budget exceeded" );
+    }
 
-      for (int i = REF_PIC_LIST_0; i < NUM_REF_PIC_LIST_01; ++i)   // read MVD suffixes
+    for( int i = REF_PIC_LIST_0; i < NUM_REF_PIC_LIST_01; ++i )   // read MVD suffixes
+    {
+      Mv mvd = pu.mvd[i];
+      mvd.changeTransPrecInternal2Amvr( pu.cu->imv );
+
+      if( ( i == 0 && !writeL0Suffixes ) || ( i == 1 && !writeL1Suffixes ) || ( !mvd.getHor() && !mvd.getVer() ) )
       {
-          Mv mvd = pu.mvd[i];
-          mvd.changeTransPrecInternal2Amvr(pu.cu->imv);
-
-          if ((i == 0 && !writeL0Suffixes) || (i == 1 && !writeL1Suffixes) || (!mvd.getHor() && !mvd.getVer()))
-          {
-              continue;
-          }
-
-          MvdSuffixInfoMv currSI = pu.mvdSuffixInfo;
-
-          int verPrefix = currSI.mvBins[i][0].verPrefix;
-          int horPrefix = currSI.mvBins[i][0].horPrefix;
-
-          CHECK(0 > currSI.actualMvCompNum[i], "Uninitialized suffix info");
-
-          if (horPrefix >= 0 || verPrefix >= 0)
-          {
-              mvdCodingRemainder( mvd, currSI.mvBins[i][0], pu.cu->imv );
-          }
+        continue;
       }
+
+      MvdSuffixInfoMv currSI = pu.mvdSuffixInfo;
+
+      int verPrefix = currSI.mvBins[i][0].verPrefix;
+      int horPrefix = currSI.mvBins[i][0].horPrefix;
+
+      CHECK( 0 > currSI.actualMvCompNum[i], "Uninitialized suffix info" );
+
+      if( horPrefix >= 0 || verPrefix >= 0 )
+      {
+        mvdCodingRemainder( mvd, currSI.mvBins[i][0], pu.cu->imv );
+      }
+    }
   }
   else
   {
-      Mv mvd = pu.mvd[eRefList];
-      mvd.changeTransPrecInternal2Amvr(pu.cu->imv);
+    Mv mvd = pu.mvd[eRefList];
+    mvd.changeTransPrecInternal2Amvr( pu.cu->imv );
   }
 #elif JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   if (pu.mvd[eRefList].getHor())
@@ -6696,7 +6697,6 @@ void CABACWriter::mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
   }
   if (pu.mvd[eRefList].getVer())
   {
-
     uint8_t ctxId = (trMv.getVer() <= Thres) ? 0 : 1;
 
     int bin = mvsdIdx & 1;
