@@ -5512,7 +5512,10 @@ void IntraPrediction::xFillTimdReferenceSamples(const CPelBuf &recoBuf, Pel* ref
   if( numIntraNeighbor == 0 )
   {
     // Fill border with DC value
-    for (int j = 0; j <= predSize; j++) { ptrDst[j] = valueDC; }
+    for (int j = 0; j <= predSize; j++)
+    {
+      ptrDst[j] = valueDC;
+    }
     for (int i = 0; i <= predHSize; i++)
     {
       ptrDst[i + predStride] = valueDC;
@@ -5538,10 +5541,14 @@ void IntraPrediction::xFillTimdReferenceSamples(const CPelBuf &recoBuf, Pel* ref
     ptrDst = refBufUnfiltered;
     if (neighborFlags[totalLeftUnits])
     {
-      for (int i = 0; i <= iTemplateWidth; i++)
+      for( int i = 0; i <= iTemplateWidth; i++ )
+      {
         ptrDst[i] = ptrSrc[i];
-      for (int i = 0; i <= iTemplateHeight; i++)
+      }
+      for( int i = 0; i <= iTemplateHeight; i++ )
+      {
         ptrDst[i + predStride] = ptrSrc[i * srcStride];
+      }
     }
 
     // Fill left & below-left samples if available (downwards)

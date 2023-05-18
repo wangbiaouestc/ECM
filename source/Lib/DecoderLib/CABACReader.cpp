@@ -6881,35 +6881,35 @@ void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
 
   if (pu.mvd[eRefList].getHor())
   {
-      if (si.horEncodeSignInEP)
-      {
-        setHorSignToNegative = m_BinDecoder.decodeBinEP();
-      }
-      else
-      {
-        uint8_t ctxId = (trMv.getHor() <= Thres) ? 0 : 1;
-        uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
-        si.horSignHypMatch = 0 == bin;
-        DTRACE(g_trace_ctx, D_SYNTAX, "mvsd hor: bin=%d, ctx=%d \n", bin, ctxId);
-        mvsdIdx += (bin << shift);
-        shift++;
-      }
+    if( si.horEncodeSignInEP )
+    {
+      setHorSignToNegative = m_BinDecoder.decodeBinEP();
+    }
+    else
+    {
+      uint8_t ctxId = ( trMv.getHor() <= Thres ) ? 0 : 1;
+      uint8_t bin = m_BinDecoder.decodeBin( Ctx::MvsdIdx( ctxId ) );
+      si.horSignHypMatch = 0 == bin;
+      DTRACE( g_trace_ctx, D_SYNTAX, "mvsd hor: bin=%d, ctx=%d \n", bin, ctxId );
+      mvsdIdx += ( bin << shift );
+      shift++;
+    }
   }
   if (pu.mvd[eRefList].getVer())
   {
-      if (si.verEncodeSignInEP)
-      {
-        setVerSignToNegative = m_BinDecoder.decodeBinEP();
-      }
-      else
-      {
-        uint8_t ctxId = (trMv.getVer() <= Thres) ? 0 : 1;
-        uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
-        si.verSignHypMatch = 0 == bin;
-        DTRACE(g_trace_ctx, D_SYNTAX, "mvsd ver: bin=%d, ctx=%d \n", bin, ctxId);
-        mvsdIdx += (bin << shift);
-        shift++;
-      }
+    if( si.verEncodeSignInEP )
+    {
+      setVerSignToNegative = m_BinDecoder.decodeBinEP();
+    }
+    else
+    {
+      uint8_t ctxId = ( trMv.getVer() <= Thres ) ? 0 : 1;
+      uint8_t bin = m_BinDecoder.decodeBin( Ctx::MvsdIdx( ctxId ) );
+      si.verSignHypMatch = 0 == bin;
+      DTRACE( g_trace_ctx, D_SYNTAX, "mvsd ver: bin=%d, ctx=%d \n", bin, ctxId );
+      mvsdIdx += ( bin << shift );
+      shift++;
+    }
   }
 
   pu.mvsdIdx[eRefList] = mvsdIdx;
