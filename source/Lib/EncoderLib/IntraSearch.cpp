@@ -4484,8 +4484,10 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       for (int32_t lstIdx = 0; lstIdx < 6; lstIdx++)
       {
         int iModedx = satdChromaFusionModeList[lstIdx];
-        if (!fusionModeIsEnable[iModedx])
+        if( !fusionModeIsEnable[iModedx] )
+        {
           break;
+        }
 
         int chromaIntraMode = fusionModeMap[iModedx][0];
         pu.isChromaFusion = fusionModeMap[iModedx][1];

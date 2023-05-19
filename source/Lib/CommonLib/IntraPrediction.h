@@ -585,9 +585,9 @@ public:
 #endif
 #if JVET_W0123_TIMD_FUSION || JVET_AC0119_LM_CHROMA_FUSION
   void xIntraPredTimdHorVerPdpc   (Pel* pDsty,const int dstStride, Pel* refSide, const int width, const int height, int xOffset, int yOffset, int scale, const Pel* refMain, const ClpRng& clpRng);
-  void xPredTimdIntraPlanar       (const CPelBuf &pSrc, Pel* pDst, int iDstStride, int width, int height, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight);
-  void xPredTimdIntraDc           ( const PredictionUnit &pu, const CPelBuf &pSrc, Pel* pDst, int iDstStride, int iWidth, int iHeight, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight);
-  void xPredTimdIntraAng          ( const CPelBuf &pSrc, const ClpRng& clpRng, Pel* pTrueDst, int iDstStride, int iWidth, int iHeight, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight, uint32_t dirMode
+  void xPredTimdIntraPlanar       (const CPelBuf &pSrc, Pel* pDst, int iDstStride, int width, int height, TemplateType eTempType, int iTemplateWidth , int iTemplateHeight);
+  void xPredTimdIntraDc           ( const PredictionUnit &pu, const CPelBuf &pSrc, Pel* pDst, int iDstStride, int iWidth, int iHeight, TemplateType eTempType, int iTemplateWidth , int iTemplateHeight);
+  void xPredTimdIntraAng          ( const CPelBuf &pSrc, const ClpRng& clpRng, Pel* pTrueDst, int iDstStride, int iWidth, int iHeight, TemplateType eTempType, int iTemplateWidth , int iTemplateHeight, uint32_t dirMode
 #if JVET_AC0119_LM_CHROMA_FUSION
     , const ChannelType channelType
 #endif
@@ -596,10 +596,10 @@ public:
 #if JVET_AC0119_LM_CHROMA_FUSION
   void xIntraPredTimdAngChroma(Pel* pDstBuf, const ptrdiff_t dstStride, Pel* refMain, int width, int height, int deltaPos, int intraPredAngle, const ClpRng& clpRng, int xOffset, int yOffset);
 #endif
-  void xIntraPredTimdPlanarDcPdpc (const CPelBuf &pSrc, Pel* pDst, int iDstStride, int width, int height, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight);
+  void xIntraPredTimdPlanarDcPdpc (const CPelBuf &pSrc, Pel* pDst, int iDstStride, int width, int height, TemplateType eTempType, int iTemplateWidth , int iTemplateHeight);
   void xIntraPredTimdAngPdpc(Pel* pDsty,const int dstStride,Pel* refSide,const int width,const int height, int xOffset, int yOffset, int scale, int invAngle);
   void xFillTimdReferenceSamples  ( const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu, int iTemplateWidth, int iTemplateHeight );
-  Pel  xGetPredTimdValDc          ( const CPelBuf &pSrc, const Size &dstSize, TEMPLATE_TYPE eTempType, int iTempHeight, int iTempWidth );
+  Pel  xGetPredTimdValDc          ( const CPelBuf &pSrc, const Size &dstSize, TemplateType eTempType, int iTempHeight, int iTempWidth );
 #if JVET_AB0155_SGPM
   void initPredTimdIntraParams(const PredictionUnit &pu, const CompArea area, int dirMode, bool bSgpm = false
 #if JVET_AC0094_REF_SAMPLES_OPT
@@ -609,7 +609,7 @@ public:
 #else
   void initPredTimdIntraParams    (const PredictionUnit & pu, const CompArea area, int dirMode);
 #endif
-  void predTimdIntraAng           ( const ComponentID compId, const PredictionUnit &pu, uint32_t uiDirMode, Pel* pPred, uint32_t uiStride, uint32_t iWidth, uint32_t iHeight, TEMPLATE_TYPE eTempType, int32_t iTemplateWidth, int32_t iTemplateHeight);
+  void predTimdIntraAng           ( const ComponentID compId, const PredictionUnit &pu, uint32_t uiDirMode, Pel* pPred, uint32_t uiStride, uint32_t iWidth, uint32_t iHeight, TemplateType eTempType, int32_t iTemplateWidth, int32_t iTemplateHeight);
 #if JVET_AB0155_SGPM
   int deriveTimdMode              ( const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu, bool bFull = true, bool bHorVer = false );
 #else
@@ -666,8 +666,8 @@ protected:
   Pel     m_acYuvRefGPMIntraTemplate[NUM_INTRA_MODE][2][GEO_MAX_CU_SIZE * GEO_MODE_SEL_TM_SIZE];   //[][0][]: top, [][1][]: left
 
   template <uint8_t partIdx>
-  bool xFillIntraGPMRefTemplateAll(PredictionUnit& pu, TEMPLATE_TYPE eTempType, bool readBufferedMPMList, bool doInitMPMList, bool loadIntraRef, std::vector<Pel>* lut = nullptr, uint8_t candIdx = std::numeric_limits<uint8_t>::max());
-  bool xFillIntraGPMRefTemplate   (PredictionUnit& pu, TEMPLATE_TYPE eTempType, uint8_t intraMode, bool loadIntraRef, Pel* bufTop, Pel* bufLeft, std::vector<Pel>* lut = nullptr);
+  bool xFillIntraGPMRefTemplateAll(PredictionUnit& pu, TemplateType eTempType, bool readBufferedMPMList, bool doInitMPMList, bool loadIntraRef, std::vector<Pel>* lut = nullptr, uint8_t candIdx = std::numeric_limits<uint8_t>::max());
+  bool xFillIntraGPMRefTemplate   (PredictionUnit& pu, TemplateType eTempType, uint8_t intraMode, bool loadIntraRef, Pel* bufTop, Pel* bufLeft, std::vector<Pel>* lut = nullptr);
 
 public:
   uint8_t    prefillIntraGPMReferenceSamples   (PredictionUnit& pu, int iTempWidth, int iTempHeight);
