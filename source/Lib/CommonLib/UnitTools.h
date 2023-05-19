@@ -120,7 +120,7 @@ namespace CU
   uint32_t  getISPSplitDim            ( const int width, const int height, const PartSplit ispType );
   bool      allLumaCBFsAreZero        ( const CodingUnit& cu );
 #if JVET_W0123_TIMD_FUSION
-  TEMPLATE_TYPE deriveTimdRefType     ( int iCurX, int iCurY, uint32_t uiCurWidth, uint32_t uiCurHeight, int iTemplateWidth, int iTemplateHeight, int& iRefX, int& iRefY, uint32_t& uiRefWidth, uint32_t& uiRefHeight );
+  TemplateType deriveTimdRefType      ( int iCurX, int iCurY, uint32_t uiCurWidth, uint32_t uiCurHeight, int iTemplateWidth, int iTemplateHeight, int& iRefX, int& iRefY, uint32_t& uiRefWidth, uint32_t& uiRefHeight );
 #endif
 
   PUTraverser traversePUs             (      CodingUnit& cu);

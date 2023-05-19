@@ -194,7 +194,7 @@ void IntraPrediction::destroy()
 #endif
 
 #if JVET_AD0120_LBCCP
-  delete m_pCCFilterTemp;
+  delete[] m_pCCFilterTemp;
   m_pCCFilterTemp = nullptr;
 #endif
 #if JVET_AB0067_MIP_DIMD_LFNST
@@ -609,7 +609,7 @@ void IntraPrediction::xIntraPredTimdHorVerPdpc(Pel* pDsty,const int dstStride,Pe
   }
 }
 
-void IntraPrediction::xIntraPredTimdPlanarDcPdpc(const CPelBuf &pSrc, Pel* pDst, int iDstStride, int width, int height, TEMPLATE_TYPE eTempType, int iTemplateWidth, int iTemplateHeight)
+void IntraPrediction::xIntraPredTimdPlanarDcPdpc(const CPelBuf &pSrc, Pel* pDst, int iDstStride, int width, int height, TemplateType eTempType, int iTemplateWidth, int iTemplateHeight)
 {
   if (eTempType == LEFT_ABOVE_NEIGHBOR)
   {
@@ -788,7 +788,7 @@ void IntraPrediction::xIntraPredPlanarDcPdpc(const CPelBuf &pSrc, Pel* pDst, int
 
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING && JVET_Y0065_GPM_INTRA
 template <uint8_t partIdx>
-bool IntraPrediction::xFillIntraGPMRefTemplateAll(PredictionUnit& pu, TEMPLATE_TYPE eTempType, bool readBufferedMPMList, bool doInitMPMList, bool loadIntraRef, std::vector<Pel>* lut, uint8_t candIdx)
+bool IntraPrediction::xFillIntraGPMRefTemplateAll(PredictionUnit& pu, TemplateType eTempType, bool readBufferedMPMList, bool doInitMPMList, bool loadIntraRef, std::vector<Pel>* lut, uint8_t candIdx)
 {
   if (eTempType == NO_NEIGHBOR || candIdx < GEO_MAX_NUM_UNI_CANDS)
   {
@@ -825,7 +825,7 @@ bool IntraPrediction::xFillIntraGPMRefTemplateAll(PredictionUnit& pu, TEMPLATE_T
   return true;
 }
 
-bool IntraPrediction::xFillIntraGPMRefTemplate(PredictionUnit& pu, TEMPLATE_TYPE eTempType, uint8_t intraMode, bool loadIntraRef, Pel* bufTop, Pel* bufLeft, std::vector<Pel>* lut)
+bool IntraPrediction::xFillIntraGPMRefTemplate(PredictionUnit& pu, TemplateType eTempType, uint8_t intraMode, bool loadIntraRef, Pel* bufTop, Pel* bufLeft, std::vector<Pel>* lut)
 {
   if (eTempType == NO_NEIGHBOR)
   {
@@ -835,7 +835,7 @@ bool IntraPrediction::xFillIntraGPMRefTemplate(PredictionUnit& pu, TEMPLATE_TYPE
   m_abFilledIntraGPMRefTpl[intraMode] = true;
 
   const uint32_t uiPredStride = MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE;
-  static Pel PredLuma[uiPredStride * uiPredStride];
+  static Pel predLuma[uiPredStride * uiPredStride];
   
   int iTempWidth  = GEO_MODE_SEL_TM_SIZE;
   int iTempHeight = GEO_MODE_SEL_TM_SIZE;
@@ -843,7 +843,7 @@ bool IntraPrediction::xFillIntraGPMRefTemplate(PredictionUnit& pu, TEMPLATE_TYPE
   // Load reference samples
   if (loadIntraRef)
   {
-    TEMPLATE_TYPE tplType = (TEMPLATE_TYPE)prefillIntraGPMReferenceSamples(pu, iTempWidth, iTempHeight);
+    TemplateType tplType = (TemplateType)prefillIntraGPMReferenceSamples(pu, iTempWidth, iTempHeight);
     CHECK(eTempType != tplType, "Inconsistent template block availability");
   }
   else // Just need setting intra ref parameters, when ref samples have not been swapped out
@@ -858,23 +858,23 @@ bool IntraPrediction::xFillIntraGPMRefTemplate(PredictionUnit& pu, TEMPLATE_TYPE
   uint32_t uiRealW = pu.lwidth()  + (eTempType != ABOVE_NEIGHBOR ? iTempWidth  : 0);
   uint32_t uiRealH = pu.lheight() + (eTempType != LEFT_NEIGHBOR  ? iTempHeight : 0);
   initPredTimdIntraParams(pu, pu.Y(), dirMode);
-  predTimdIntraAng(COMPONENT_Y, pu, dirMode, PredLuma, uiPredStride, uiRealW, uiRealH, eTempType, (eTempType == ABOVE_NEIGHBOR) ? 0 : iTempWidth, (eTempType == LEFT_NEIGHBOR) ? 0 : iTempHeight);
+  predTimdIntraAng(COMPONENT_Y, pu, dirMode, predLuma, uiPredStride, uiRealW, uiRealH, eTempType, (eTempType == ABOVE_NEIGHBOR) ? 0 : iTempWidth, (eTempType == LEFT_NEIGHBOR) ? 0 : iTempHeight);
 
   // Store intra pred
   Pel* predSrcAbove = nullptr;
   Pel* predSrcLeft  = nullptr;
   if (eTempType == ABOVE_NEIGHBOR)
   {
-    predSrcAbove = PredLuma;
+    predSrcAbove = predLuma;
   }
   else if (eTempType == LEFT_NEIGHBOR)
   {
-    predSrcLeft = PredLuma;
+    predSrcLeft = predLuma;
   }
   else // Above-left
   {
-    predSrcAbove = PredLuma + iTempWidth;
-    predSrcLeft  = PredLuma + iTempHeight * uiPredStride;
+    predSrcAbove = predLuma + iTempWidth;
+    predSrcLeft  = predLuma + iTempHeight * uiPredStride;
   }
 
   if (predSrcAbove != nullptr)
@@ -942,7 +942,7 @@ uint8_t IntraPrediction::prefillIntraGPMReferenceSamples(PredictionUnit& pu, int
 {
   int  iRefX = -1, iRefY = -1;
   uint32_t uiRefWidth = 0, uiRefHeight = 0;
-  TEMPLATE_TYPE eTempType = CU::deriveTimdRefType(pu.lx(), pu.ly(), pu.lwidth(), pu.lheight(), iTempWidth, iTempHeight, iRefX, iRefY, uiRefWidth, uiRefHeight);
+  TemplateType eTempType = CU::deriveTimdRefType(pu.lx(), pu.ly(), pu.lwidth(), pu.lheight(), iTempWidth, iTempHeight, iRefX, iRefY, uiRefWidth, uiRefHeight);
     
   m_ipaParam.multiRefIndex = iTempWidth;
   initTimdIntraPatternLuma(*pu.cu, pu.Y(), (eTempType != ABOVE_NEIGHBOR ? iTempWidth : 0), (eTempType != LEFT_NEIGHBOR ? iTempHeight : 0), uiRefWidth, uiRefHeight);
@@ -957,7 +957,7 @@ bool IntraPrediction::fillIntraGPMRefTemplateAll(PredictionUnit& pu, bool hasAbo
     return false;
   }
 
-  TEMPLATE_TYPE templateType = (TEMPLATE_TYPE)((hasAboveTemplate ? ABOVE_NEIGHBOR : 0) + (hasLeftTemplate ? LEFT_NEIGHBOR : 0));
+  TemplateType templateType = (TemplateType)((hasAboveTemplate ? ABOVE_NEIGHBOR : 0) + (hasLeftTemplate ? LEFT_NEIGHBOR : 0));
   if (templateType == NO_NEIGHBOR)
   {
     return false;
@@ -4654,7 +4654,7 @@ void IntraPrediction::xFilterReferenceSamples(const Pel *refBufUnfiltered, Pel *
 }
 
 #if JVET_W0123_TIMD_FUSION
-Pel IntraPrediction::xGetPredTimdValDc( const CPelBuf &pSrc, const Size &dstSize, TEMPLATE_TYPE eTempType, int iTempHeight, int iTempWidth )
+Pel IntraPrediction::xGetPredTimdValDc( const CPelBuf &pSrc, const Size &dstSize, TemplateType eTempType, int iTempHeight, int iTempWidth )
 {
   int idx, sum = 0;
   Pel dcVal;
@@ -4703,7 +4703,7 @@ Pel IntraPrediction::xGetPredTimdValDc( const CPelBuf &pSrc, const Size &dstSize
   return dcVal;
 }
 
-void IntraPrediction::predTimdIntraAng( const ComponentID compId, const PredictionUnit &pu, uint32_t uiDirMode, Pel* pPred, uint32_t uiStride, uint32_t iWidth, uint32_t iHeight, TEMPLATE_TYPE eTempType, int32_t iTemplateWidth, int32_t iTemplateHeight)
+void IntraPrediction::predTimdIntraAng( const ComponentID compId, const PredictionUnit &pu, uint32_t uiDirMode, Pel* pPred, uint32_t uiStride, uint32_t iWidth, uint32_t iHeight, TemplateType eTempType, int32_t iTemplateWidth, int32_t iTemplateHeight)
 {
   const ComponentID compID       = MAP_CHROMA( compId );
 
@@ -4730,7 +4730,7 @@ void IntraPrediction::predTimdIntraAng( const ComponentID compId, const Predicti
   }
 }
 
-void IntraPrediction::xPredTimdIntraPlanar( const CPelBuf &pSrc, Pel* rpDst, int iDstStride, int width, int height, TEMPLATE_TYPE eTempType, int iTemplateWidth, int iTemplateHeight )
+void IntraPrediction::xPredTimdIntraPlanar( const CPelBuf &pSrc, Pel* rpDst, int iDstStride, int width, int height, TemplateType eTempType, int iTemplateWidth, int iTemplateHeight )
 {
   static int leftColumn[MAX_CU_SIZE+DIMD_MAX_TEMP_SIZE+1] = {0}, topRow[MAX_CU_SIZE+DIMD_MAX_TEMP_SIZE+1] ={0}, bottomRow[MAX_CU_SIZE+DIMD_MAX_TEMP_SIZE] = {0}, rightColumn[MAX_CU_SIZE+DIMD_MAX_TEMP_SIZE]={0};
   if(eTempType == LEFT_ABOVE_NEIGHBOR)
@@ -4903,7 +4903,7 @@ void IntraPrediction::xPredTimdIntraPlanar( const CPelBuf &pSrc, Pel* rpDst, int
   }
 }
 
-void IntraPrediction::xPredTimdIntraDc( const PredictionUnit &pu, const CPelBuf &pSrc, Pel* pDst, int iDstStride, int iWidth, int iHeight, TEMPLATE_TYPE eTempType, int iTemplateWidth, int iTemplateHeight )
+void IntraPrediction::xPredTimdIntraDc( const PredictionUnit &pu, const CPelBuf &pSrc, Pel* pDst, int iDstStride, int iWidth, int iHeight, TemplateType eTempType, int iTemplateWidth, int iTemplateHeight )
 {
 #if JVET_AC0119_LM_CHROMA_FUSION
   const Size& dstSize = Size(iWidth - iTemplateWidth, iHeight - iTemplateHeight);
@@ -5022,7 +5022,7 @@ void IntraPrediction::initPredTimdIntraParams(const PredictionUnit & pu, const C
   }
 }
 
-void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpRng, Pel* pTrueDst, int iDstStride, int iWidth, int iHeight, TEMPLATE_TYPE eTempType, int iTemplateWidth , int iTemplateHeight, uint32_t dirMode
+void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpRng, Pel* pTrueDst, int iDstStride, int iWidth, int iHeight, TemplateType eTempType, int iTemplateWidth , int iTemplateHeight, uint32_t dirMode
 #if JVET_AC0119_LM_CHROMA_FUSION
   , const ChannelType channelType
 #endif
@@ -5720,7 +5720,7 @@ void IntraPrediction::deriveSgpmModeOrdered(const CPelBuf &recoBuf, const CompAr
 
   const int iTempWidth = SGPM_TEMPLATE_SIZE, iTempHeight = SGPM_TEMPLATE_SIZE;
 
-  TEMPLATE_TYPE eTempType = CU::deriveTimdRefType(iCurX, iCurY, uiWidth, uiHeight, iTempWidth, iTempHeight, iRefX,
+  TemplateType eTempType = CU::deriveTimdRefType(iCurX, iCurY, uiWidth, uiHeight, iTempWidth, iTempHeight, iRefX,
                                                   iRefY, uiRefWidth, uiRefHeight);
   auto &        pu        = *cu.firstPU;
   uint32_t      uiRealW   = uiRefWidth + (eTempType == LEFT_NEIGHBOR ? iTempWidth : 0);
@@ -5851,7 +5851,7 @@ void IntraPrediction::deriveMPMSorted(const PredictionUnit& pu, uint8_t* mpm, in
     iBestN = pu.ipredIdx;
   }
 
-  TEMPLATE_TYPE eTempType = CU::deriveTimdRefType(iCurX, iCurY, uiWidth, uiHeight, iTempWidth, iTempHeight, iRefX,
+  TemplateType eTempType = CU::deriveTimdRefType(iCurX, iCurY, uiWidth, uiHeight, iTempWidth, iTempHeight, iRefX,
     iRefY, uiRefWidth, uiRefHeight);
 
   if (eTempType == NO_NEIGHBOR)
@@ -5944,9 +5944,9 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
   SizeType uiWidth         = cu.lwidth();
   SizeType uiHeight        = cu.lheight();
 
-  static Pel PredLuma[(MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE)];
-  memset(PredLuma, 0, (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * sizeof(Pel));
-  Pel *    piPred       = PredLuma;
+  static Pel predLuma[(MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE)];
+  memset(predLuma, 0, (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * sizeof(Pel));
+  Pel *    piPred       = predLuma;
   uint32_t uiPredStride = MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE;
 
   int      iCurX = cu.lx();
@@ -5964,7 +5964,7 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
     iTempHeight = 2;
   }
 
-  TEMPLATE_TYPE eTempType = CU::deriveTimdRefType(iCurX, iCurY, uiWidth, uiHeight, iTempWidth, iTempHeight, iRefX,
+  TemplateType eTempType = CU::deriveTimdRefType(iCurX, iCurY, uiWidth, uiHeight, iTempWidth, iTempHeight, iRefX,
                                                   iRefY, uiRefWidth, uiRefHeight);
 
   if (eTempType != NO_NEIGHBOR)
@@ -6728,9 +6728,9 @@ int IntraPrediction::deriveTimdMode( const CPelBuf &recoBuf, const CompArea &are
   SizeType uiWidth = cu.lwidth();
   SizeType uiHeight = cu.lheight();
 
-  static Pel PredLuma[(MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE)];
-  memset(PredLuma, 0, (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * sizeof(Pel));
-  Pel* piPred = PredLuma;
+  static Pel predLuma[(MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE)];
+  memset(predLuma, 0, (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * sizeof(Pel));
+  Pel* piPred = predLuma;
   uint32_t uiPredStride = MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE;
 
   int  iCurX  = cu.lx();
@@ -6748,7 +6748,7 @@ int IntraPrediction::deriveTimdMode( const CPelBuf &recoBuf, const CompArea &are
     iTempHeight = 2;
   }
 
-  TEMPLATE_TYPE eTempType = CU::deriveTimdRefType(iCurX, iCurY, uiWidth, uiHeight, iTempWidth, iTempHeight, iRefX, iRefY, uiRefWidth, uiRefHeight);
+  TemplateType eTempType = CU::deriveTimdRefType(iCurX, iCurY, uiWidth, uiHeight, iTempWidth, iTempHeight, iRefX, iRefY, uiRefWidth, uiRefHeight);
 
   if (eTempType != NO_NEIGHBOR)
   {
@@ -10342,8 +10342,8 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
   {
     // Classify and training
     MMLM_parameter parameters[2];
-    int LumaSamples[512];
-    int ChrmSamples[512];
+    int lumaSamples[512];
+    int chromaSamples[512];
     int meanC = 0; int mean = 0;
     int avgCnt = cntT + cntL;
 
@@ -10351,8 +10351,8 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
     {
       mean += pTempBufferSrc[i];
       meanC += pTempBufferCur[i];
-      LumaSamples[i] = pTempBufferSrc[i];
-      ChrmSamples[i] = pTempBufferCur[i];
+      lumaSamples[i] = pTempBufferSrc[i];
+      chromaSamples[i] = pTempBufferCur[i];
     }
 
     if (avgCnt)
@@ -10370,7 +10370,7 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
        meanC = (meanC * v) >> (x + 3);
     }
 
-    xLMSampleClassifiedTraining(avgCnt, mean, meanC, LumaSamples, ChrmSamples, uiInternalBitDepth, parameters);
+    xLMSampleClassifiedTraining(avgCnt, mean, meanC, lumaSamples, chromaSamples, uiInternalBitDepth, parameters);
 
     cclmModel.setFirstModel ( parameters[0].a, parameters[0].b, parameters[0].shift );
     cclmModel.setSecondModel( parameters[1].a, parameters[1].b, parameters[1].shift, mean );
@@ -10384,14 +10384,14 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
 
     for (int i = 0; i < avgCnt; i++)
     {
-      if ( LumaSamples[i] <= mean )
+      if ( lumaSamples[i] <= mean )
       {
-        sumLuma0 += LumaSamples[i];
+        sumLuma0 += lumaSamples[i];
         numPels0 += 1;
       }
       else
       {
-        sumLuma1 += LumaSamples[i];
+        sumLuma1 += lumaSamples[i];
         numPels1 += 1;
       }
     }
@@ -18013,7 +18013,7 @@ bool IntraPrediction::xCflmCreateChromaPred(const PredictionUnit& pu, const Comp
   PelBuf refChroma = xCflmGetRefBuf(pu, compId, area, areaWidth, areaHeight, refSizeX, refSizeY, refPosPicX, refPosPicY);
 
   // top/left reference areas
-  TEMPLATE_TYPE eTplType = (TEMPLATE_TYPE)((refSizeX > 0 ? LEFT_NEIGHBOR : 0) + (refSizeY > 0 ? ABOVE_NEIGHBOR : 0));
+  TemplateType eTplType = (TemplateType)((refSizeX > 0 ? LEFT_NEIGHBOR : 0) + (refSizeY > 0 ? ABOVE_NEIGHBOR : 0));
   if (eTplType == NO_NEIGHBOR)
   {
     return false;
@@ -19532,9 +19532,9 @@ void IntraPrediction::getTmrlList(CodingUnit& cu)
   int channelBitDepth = cu.slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
   SizeType uiWidth = cu.lwidth();
   SizeType uiHeight = cu.lheight();
-  static Pel PredLuma[(MAX_CU_SIZE + TMRL_TPL_SIZE) * (MAX_CU_SIZE + TMRL_TPL_SIZE)];
-  memset(PredLuma, 0, (MAX_CU_SIZE + TMRL_TPL_SIZE) * (MAX_CU_SIZE + TMRL_TPL_SIZE) * sizeof(Pel));
-  Pel* piPred = PredLuma;
+  static Pel predLuma[(MAX_CU_SIZE + TMRL_TPL_SIZE) * (MAX_CU_SIZE + TMRL_TPL_SIZE)];
+  memset(predLuma, 0, (MAX_CU_SIZE + TMRL_TPL_SIZE) * (MAX_CU_SIZE + TMRL_TPL_SIZE) * sizeof(Pel));
+  Pel* piPred = predLuma;
   uint32_t uiPredStride = MAX_CU_SIZE + TMRL_TPL_SIZE;
   tmrlInfo.uiWidth = uiWidth;
   tmrlInfo.uiHeight = uiHeight;
