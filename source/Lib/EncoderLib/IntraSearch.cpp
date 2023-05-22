@@ -4250,10 +4250,13 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         if (findBestNonLm && dCost < dBestNonLmCost)
         {
 #if JVET_AC0119_LM_CHROMA_FUSION
-          predStorage[1].Cb().copyFrom(predStorage[0].Cb());
-          predStorage[1].Cr().copyFrom(predStorage[0].Cr());
-          secondNonLmMode = bestNonLmMode;
-          dSecondNonLmCost = dBestNonLmCost;
+          if (bestNonLmMode != -1)
+          {
+            predStorage[1].Cb().copyFrom(predStorage[0].Cb());
+            predStorage[1].Cr().copyFrom(predStorage[0].Cr());
+            secondNonLmMode = bestNonLmMode;
+            dSecondNonLmCost = dBestNonLmCost;
+          }
 
           predStorage[0].Cb().copyFrom(cs.getPredBuf(pu.Cb()));
           predStorage[0].Cr().copyFrom(cs.getPredBuf(pu.Cr()));
@@ -4373,12 +4376,13 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #if MMLM
       uiFusionModeNum += 1;
 #endif
-      bool fusionModeIsEnable[6] = { false };
+      bool fusionModeIsEnable[6];
       int32_t fusionModeMap[6][2];
       Distortion satdChromaFusionCost[6];
       int satdChromaFusionModeList[6];
       for (int i = 0; i < 6; i++)
       {
+        fusionModeIsEnable[i] = false;
         fusionModeMap[i][0] = fusionModeMap[i][1] = 0;
         satdChromaFusionCost[i] = MAX_UINT64;
         satdChromaFusionModeList[i] = i;
