@@ -710,14 +710,14 @@ bool CU::allLumaCBFsAreZero(const CodingUnit& cu)
 }
 
 #if JVET_W0123_TIMD_FUSION
-TEMPLATE_TYPE CU::deriveTimdRefType( int iCurX, int iCurY, uint32_t uiCurWidth, uint32_t uiCurHeight, int iTemplateWidth, int iTemplateHeight, int& iRefX, int& iRefY, uint32_t& uiRefWidth, uint32_t& uiRefHeight )
+TemplateType CU::deriveTimdRefType( int iCurX, int iCurY, uint32_t uiCurWidth, uint32_t uiCurHeight, int iTemplateWidth, int iTemplateHeight, int& iRefX, int& iRefY, uint32_t& uiRefWidth, uint32_t& uiRefHeight )
 {
   if(iCurX == 0 && iCurY == 0)
   {
     return NO_NEIGHBOR;
   }
 
-  TEMPLATE_TYPE eTempType = NO_NEIGHBOR;
+  TemplateType eTempType = NO_NEIGHBOR;
   iRefX = iRefY = -1;
   if(iCurX > 0 && iCurY > 0)
   {

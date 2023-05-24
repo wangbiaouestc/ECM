@@ -3709,7 +3709,7 @@ void CABACWriter::ibcMbvdData(const PredictionUnit& pu)
     return;
   }
   m_BinEncoder.encodeBin(pu.ibcMbvdMergeFlag, Ctx::IbcMbvdFlag());
-  DTRACE(g_trace_ctx, D_SYNTAX, "IBC_mbvd_flag() IBC_mbvd_merge=%d pos=(%d,%d) size=%dx%d\n", pu.ibcMbvdMergeFlag ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
+  DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_flag() ibc_mbvd_merge=%d pos=(%d,%d) size=%dx%d\n", pu.ibcMbvdMergeFlag ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
 
   if (!pu.ibcMbvdMergeFlag)
   {
@@ -3740,7 +3740,7 @@ void CABACWriter::ibcMbvdData(const PredictionUnit& pu)
       }
     }
   }
-  DTRACE(g_trace_ctx, D_SYNTAX, "ibcMbvdBaseIdx() ibcMbvdBaseIdx=%d\n", var0);
+  DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_merge_idx() base_idx=%d\n", var0);
 
   unsigned int ricePar = 1;
   int numCandStepMinus1 = (IBC_MBVD_SIZE_ENC >> ricePar) - 1;
@@ -3759,7 +3759,7 @@ void CABACWriter::ibcMbvdData(const PredictionUnit& pu)
     }
   }
 
-  DTRACE(g_trace_ctx, D_SYNTAX, "mmvd_merge_idx() mmvd_merge_idx=%d\n", pu.ibcMbvdMergeIdx);
+  DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_merge_idx() merge_idx=%d\n", pu.ibcMbvdMergeIdx);
 }
 #endif
 
@@ -5604,7 +5604,9 @@ void CABACWriter::mvp_flag( const PredictionUnit& pu, RefPicList eRefList )
 #endif
   m_BinEncoder.encodeBin( pu.mvpIdx[eRefList], Ctx::MVPIdx() );
   DTRACE( g_trace_ctx, D_SYNTAX, "mvp_flag() value=%d pos=(%d,%d)\n", pu.mvpIdx[eRefList], pu.lumaPos().x, pu.lumaPos().y );
+#if !JVET_Z0054_BLK_REF_PIC_REORDER
   DTRACE( g_trace_ctx, D_SYNTAX, "mvpIdx(refList:%d)=%d\n", eRefList, pu.mvpIdx[eRefList] );
+#endif
 }
 
 void CABACWriter::Ciip_flag(const PredictionUnit& pu)
@@ -5794,25 +5796,39 @@ void CABACWriter::mvd_coding( const Mv &rMvd, int8_t imv, const MvdSuffixInfo* c
 #if ENABLE_TRACING
     int horParam = -1;
     int verParam = -1;
-#endif //ENABLE_TRACING
+#endif
     if (horAbs > iEgcOffset)
     {
 #if ENABLE_TRACING
       horParam =
-#endif // ENABLE_TRACING
+#endif
         xWriteMvdPrefix(horAbs - 1 - iEgcOffset, MVD_CODING_GOLOMB_ORDER);
     }
     if (verAbs > iEgcOffset)
     {
 #if ENABLE_TRACING
       verParam =
-#endif // ENABLE_TRACING
+#endif
         xWriteMvdPrefix(verAbs - 1 - iEgcOffset, MVD_CODING_GOLOMB_ORDER);
     }
 #if ENABLE_TRACING
-    DTRACE(g_trace_ctx, D_SYNTAX, "horParam=%d \n", horParam);
-    DTRACE(g_trace_ctx, D_SYNTAX, "verParam=%d \n", verParam);
-#endif //ENABLE_TRACING
+    if (horParam == -1)
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "abs(MVD_hor) = %d \n", horAbs);
+    }
+    else
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "MVD_hor prefix=%d \n", horParam);
+    }
+    if (verParam == -1)
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "abs(MVD_ver) = %d \n", verAbs);
+    }
+    else
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "MVD_ver prefix=%d \n", verParam);
+    }
+#endif
   }
   else
   {
@@ -5865,7 +5881,6 @@ unsigned CABACWriter::xWriteMvdPrefix( unsigned uiSymbol, int param )
   for (int i = numBins - 1; i >= 0; i--)
   {
     temp = bins >> i;
-    DTRACE(g_trace_ctx, D_SYNTAX, "prefix: encodeBinEP \n");
     m_BinEncoder.encodeBinEP(temp);
     bins -= (temp << i);
     bitCount++;
@@ -5897,15 +5912,11 @@ void CABACWriter::xWriteMvdContextSuffix(unsigned uiSymbol, int param, int param
     paramUpdated-= numSkipMSB;
     unsigned skipMask = ( 1 << (paramUpdated + numSkipMSB)) -1 - ((1 << (paramUpdated)) - 1);
     uiSymbol &= ~skipMask;
-    DTRACE(g_trace_ctx, D_SYNTAX, "uiSymbol without MSB: %d \n", uiSymbol);
-    DTRACE(g_trace_ctx, D_SYNTAX, "encodeBinsEP bits: %d \n", paramUpdated );
     CHECK(uiSymbol >= (1 << paramUpdated), "uiSymbol >= (1<<paramUpdated)");
   }
-  DTRACE(g_trace_ctx, D_SYNTAX, "ContextSuffix()=%d, numBit=%d \n", uiSymbol, paramUpdated);
 
   if (paramUpdated > 0)
   {
-    CHECK(uiSymbol >= (1 << (paramUpdated+1)), "uiSymbol >= (1<<paramUpdated)");
     m_BinEncoder.encodeBinsEP(uiSymbol, paramUpdated);
   }
 }
@@ -5931,10 +5942,6 @@ void CABACWriter::mvdCodingRemainder(const Mv& rMvd, const MvdSuffixInfo& si, in
     const int iHorMSBins = std::max(0, si.horOffsetPredictionNumBins);
     const int iVerMSBins = std::max(0, si.verOffsetPredictionNumBins);
 
-    DTRACE(g_trace_ctx, D_SYNTAX, "horParam: %d, verParam = %d \n", horParam, verParam);
-    DTRACE(g_trace_ctx, D_SYNTAX, "imv: %d \n", imv);
-
-
     if (horParam >= 0)
     {
       for (int i = iHorMSBins - 1; i >= 0; --i)
@@ -5951,13 +5958,14 @@ void CABACWriter::mvdCodingRemainder(const Mv& rMvd, const MvdSuffixInfo& si, in
         const unsigned int ctx = Ctx::MvsdIdxMVDMSB(iCtxIdx);
         m_BinEncoder.encodeBin((0 == bin) ? 1 : 0, ctx);
       }
-      DTRACE(g_trace_ctx, D_SYNTAX, "horOffsetPrediction: %d, iHorMSBins = %d \n", horOffsetPrediction, iHorMSBins);
+
+      DTRACE(g_trace_ctx, D_SYNTAX, "Codeword for MVD suffix prediction bins for horizontal component: %d \n", horOffsetPrediction);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of MVD suffix prediction bins for horizontal component: %d \n", iHorMSBins);
 
       CHECK(horParam < 0, "horParam < 0");
 
-      DTRACE(g_trace_ctx, D_SYNTAX, "horSuffix bits: %d \n", horParam - iHorMSBins);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of explicitly coded MVD horizontal suffix bins: %d \n", horParam - iHorMSBins + 1);
       xWriteMvdContextSuffix(horAbs - 1 - iEgcOffset, MVD_CODING_GOLOMB_ORDER, horParam, iHorMSBins);
-      DTRACE(g_trace_ctx, D_SYNTAX, "horSuffix=%d \n", horAbs - 1);
     }
     if (verParam >= 0)
     {
@@ -5975,15 +5983,14 @@ void CABACWriter::mvdCodingRemainder(const Mv& rMvd, const MvdSuffixInfo& si, in
         const unsigned int ctx = Ctx::MvsdIdxMVDMSB(iCtxIdx);
         m_BinEncoder.encodeBin((0 == bin) ? 1 : 0, ctx);
       }
-      DTRACE(g_trace_ctx, D_SYNTAX, "verOffsetPrediction: %d, iVerMSBins = %d \n", verOffsetPrediction, iVerMSBins);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Codeword for MVD suffix prediction bins for vertical component: %d \n", verOffsetPrediction);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of MVD suffix prediction bins for vertical component: %d \n", iVerMSBins);
 
       CHECK(verParam < 0, "verParam < 0");
 
-      DTRACE(g_trace_ctx, D_SYNTAX, "verSuffix bits: %d \n", verParam - iVerMSBins);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of explicitly coded MVD vertical suffix bins: %d \n", verParam - iVerMSBins + 1);
       xWriteMvdContextSuffix(verAbs - 1 - iEgcOffset, MVD_CODING_GOLOMB_ORDER, verParam, iVerMSBins);
-      DTRACE(g_trace_ctx, D_SYNTAX, "verSuffix=%d \n", verAbs - 1 - iEgcOffset);
     }
-    DTRACE(g_trace_ctx, D_SYNTAX, "abs(mvd)=(%d,%d) \n", horAbs, verAbs);
   }
   else
   {
@@ -6603,35 +6610,35 @@ void CABACWriter::mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
 
   if (pu.mvd[eRefList].getHor())
   {
-      if (si.horEncodeSignInEP)
-      {
-        unsigned bin = pu.mvd[eRefList].getHor() < 0 ? 1 : 0;
-        m_BinEncoder.encodeBinEP(bin);
-      }
-      else
-      {
-        uint8_t ctxId = (trMv.getHor() <= Thres) ? 0 : 1;
-        int     bin = mvsdIdx & 1;
-        DTRACE(g_trace_ctx, D_SYNTAX, "mvsd hor: bin=%d, ctx=%d \n", bin, ctxId);
-        m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
-        mvsdIdx >>= 1;
-      }
+    if( si.horEncodeSignInEP )
+    {
+      unsigned bin = pu.mvd[eRefList].getHor() < 0 ? 1 : 0;
+      m_BinEncoder.encodeBinEP( bin );
+    }
+    else
+    {
+      uint8_t ctxId = ( trMv.getHor() <= Thres ) ? 0 : 1;
+      int     bin = mvsdIdx & 1;
+      m_BinEncoder.encodeBin( bin, Ctx::MvsdIdx( ctxId ) );
+      DTRACE( g_trace_ctx, D_SYNTAX, "mvsd hor: bin=%d, ctx=%d \n", bin, ctxId );
+      mvsdIdx >>= 1;
+    }
   }
   if (pu.mvd[eRefList].getVer())
   {
-      if (si.verEncodeSignInEP)
-      {
-        unsigned bin = pu.mvd[eRefList].getVer() < 0 ? 1 : 0;
-        m_BinEncoder.encodeBinEP(bin);
-      }
-      else
-      {
-        uint8_t ctxId = (trMv.getVer() <= Thres) ? 0 : 1;
-        int     bin = mvsdIdx & 1;
-        DTRACE(g_trace_ctx, D_SYNTAX, "mvsd ver: bin=%d, ctx=%d \n", bin, ctxId);
-        m_BinEncoder.encodeBin(bin, Ctx::MvsdIdx(ctxId));
-        mvsdIdx >>= 1;
-      }
+    if( si.verEncodeSignInEP )
+    {
+      unsigned bin = pu.mvd[eRefList].getVer() < 0 ? 1 : 0;
+      m_BinEncoder.encodeBinEP( bin );
+    }
+    else
+    {
+      uint8_t ctxId = ( trMv.getVer() <= Thres ) ? 0 : 1;
+      int     bin = mvsdIdx & 1;
+      m_BinEncoder.encodeBin( bin, Ctx::MvsdIdx( ctxId ) );
+      DTRACE( g_trace_ctx, D_SYNTAX, "mvsd ver: bin=%d, ctx=%d \n", bin, ctxId );
+      mvsdIdx >>= 1;
+    }
   }
 
   if (eRefList == REF_PIC_LIST_1 || pu.interDir == 1
@@ -6639,45 +6646,46 @@ void CABACWriter::mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
       || pu.cu->smvdMode
       )
   {
-      bool writeL0Suffixes = pu.interDir != 2;
-      bool writeL1Suffixes = pu.interDir != 1 && !(pu.cu->cs->picHeader->getMvdL1ZeroFlag() && pu.interDir == 3);
+    bool writeL0Suffixes = pu.interDir != 2;
+    bool writeL1Suffixes = pu.interDir != 1 && !( pu.cu->cs->picHeader->getMvdL1ZeroFlag() && pu.interDir == 3 );
 
-      if (pu.cu->smvdMode) {
-          CHECK(pu.interDir != 3, "SMVD mode should be B-prediction");
-          writeL0Suffixes &= (eRefList == 0);
-          writeL1Suffixes = false; // &= (eRefList == 1);
-          const int maxNumBins = MvdSuffixInfoMv::getBinBudgetForPrediction(pu.Y().width, pu.Y().height, pu.cu->imv);
-          const auto& si = pu.mvdSuffixInfo.mvBins[0][0];
-          CHECK(si.getNumBinsOfSignsAndSuffixes() > maxNumBins,"Bin budget exceeded");
-      }
+    if( pu.cu->smvdMode )
+    {
+      CHECK( pu.interDir != 3, "SMVD mode should be B-prediction" );
+      writeL0Suffixes &= ( eRefList == 0 );
+      writeL1Suffixes = false; // &= (eRefList == 1);
+      const int maxNumBins = MvdSuffixInfoMv::getBinBudgetForPrediction( pu.Y().width, pu.Y().height, pu.cu->imv );
+      const auto& si = pu.mvdSuffixInfo.mvBins[0][0];
+      CHECK( si.getNumBinsOfSignsAndSuffixes() > maxNumBins, "Bin budget exceeded" );
+    }
 
-      for (int i = REF_PIC_LIST_0; i < NUM_REF_PIC_LIST_01; ++i)   // read MVD suffixes
+    for( int i = REF_PIC_LIST_0; i < NUM_REF_PIC_LIST_01; ++i )   // read MVD suffixes
+    {
+      Mv mvd = pu.mvd[i];
+      mvd.changeTransPrecInternal2Amvr( pu.cu->imv );
+
+      if( ( i == 0 && !writeL0Suffixes ) || ( i == 1 && !writeL1Suffixes ) || ( !mvd.getHor() && !mvd.getVer() ) )
       {
-          Mv mvd = pu.mvd[i];
-          mvd.changeTransPrecInternal2Amvr(pu.cu->imv);
-
-          if ((i == 0 && !writeL0Suffixes) || (i == 1 && !writeL1Suffixes) || (!mvd.getHor() && !mvd.getVer()))
-          {
-              continue;
-          }
-
-          MvdSuffixInfoMv currSI = pu.mvdSuffixInfo;
-
-          int verPrefix = currSI.mvBins[i][0].verPrefix;
-          int horPrefix = currSI.mvBins[i][0].horPrefix;
-
-          CHECK(0 > currSI.actualMvCompNum[i], "Uninitialized suffix info");
-
-          if (horPrefix >= 0 || verPrefix >= 0)
-          {
-              mvdCodingRemainder( mvd, currSI.mvBins[i][0], pu.cu->imv );
-          }
+        continue;
       }
+
+      MvdSuffixInfoMv currSI = pu.mvdSuffixInfo;
+
+      int verPrefix = currSI.mvBins[i][0].verPrefix;
+      int horPrefix = currSI.mvBins[i][0].horPrefix;
+
+      CHECK( 0 > currSI.actualMvCompNum[i], "Uninitialized suffix info" );
+
+      if( horPrefix >= 0 || verPrefix >= 0 )
+      {
+        mvdCodingRemainder( mvd, currSI.mvBins[i][0], pu.cu->imv );
+      }
+    }
   }
   else
   {
-      Mv mvd = pu.mvd[eRefList];
-      mvd.changeTransPrecInternal2Amvr(pu.cu->imv);
+    Mv mvd = pu.mvd[eRefList];
+    mvd.changeTransPrecInternal2Amvr( pu.cu->imv );
   }
 #elif JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   if (pu.mvd[eRefList].getHor())
@@ -6689,7 +6697,6 @@ void CABACWriter::mvsdIdxFunc(const PredictionUnit &pu, RefPicList eRefList)
   }
   if (pu.mvd[eRefList].getVer())
   {
-
     uint8_t ctxId = (trMv.getVer() <= Thres) ? 0 : 1;
 
     int bin = mvsdIdx & 1;
@@ -7398,8 +7405,8 @@ void CABACWriter::mts_idx( const CodingUnit& cu, CUCtx* cuCtx )
       }
 #endif
     }
+    DTRACE(g_trace_ctx, D_SYNTAX, "mts_idx() etype=%d pos=(%d,%d) mtsIdx=%d\n", COMPONENT_Y, tu.cu->lx(), tu.cu->ly(), mtsIdx);
   }
-  DTRACE( g_trace_ctx, D_SYNTAX, "mts_idx() etype=%d pos=(%d,%d) mtsIdx=%d\n", COMPONENT_Y, tu.cu->lx(), tu.cu->ly(), mtsIdx);
 }
 
 void CABACWriter::isp_mode( const CodingUnit& cu )
@@ -8173,11 +8180,11 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
   if (cu.tmpFlag)
   {
     unsigned ctxId_fusion = DeriveCtx::CtxTmpFusionFlag(cu);
-    DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
+    m_BinEncoder.encodeBin(cu.tmpFusionFlag, Ctx::TmpFusion(ctxId_fusion));
+    DTRACE(g_trace_ctx, D_SYNTAX, "tmp_fusion_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
            cu.tmpFusionFlag ? 1 : 0);
     if (cu.tmpFusionFlag)
     {
-      m_BinEncoder.encodeBin(1, Ctx::TmpFusion(ctxId_fusion));
       m_BinEncoder.encodeBin(cu.tmpIdx >= TMP_GROUP_IDX ? 1: 0, Ctx::TmpFusion(4));
 
       int tmpFusionIdx = cu.tmpIdx;
@@ -8191,7 +8198,6 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
     }
     else
     {
-      m_BinEncoder.encodeBin(0, Ctx::TmpFusion(ctxId_fusion));
       if (cu.tmpIdx < 3)
       {
         m_BinEncoder.encodeBin(1, Ctx::TmpIdx(0));
@@ -8217,6 +8223,8 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
         m_BinEncoder.encodeBin(0, Ctx::TmpIdx(0));
         xWriteTruncBinCode(cu.tmpIdx - 3, MTMP_NUM - 3);
       }
+      DTRACE(g_trace_ctx, D_SYNTAX, "tmp_idx() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIdx);
+
       m_BinEncoder.encodeBin(cu.tmpFlmFlag, Ctx::TmpFusion(3));
       DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flm_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
              cu.tmpFlmFlag);
@@ -8232,6 +8240,7 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
           }
           m_BinEncoder.encodeBinsEP(cu.tmpSubPelIdx, 3);
         }
+        DTRACE(g_trace_ctx, D_SYNTAX, "tmp_is_subpel() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIsSubPel);
       }
     }
   }
@@ -8472,6 +8481,7 @@ void CABACWriter::bvOneZeroComp(const CodingUnit &cu)
 #endif
 #endif
   }
+  DTRACE(g_trace_ctx, D_SYNTAX, "rribcData() rribcFlipType = %d\n", cu.rribcFlipType);
 }
 #endif
 
@@ -8739,6 +8749,7 @@ void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
 #endif
     int ctxId = 0;
     m_BinEncoder.encodeBin(cu.tmrlFlag, Ctx::TmrlDerive(ctxId++));
+    DTRACE(g_trace_ctx, D_SYNTAX, "cu_tmrl_flag() ctx=%d pos=(%d,%d) tmrl=%d\n", 0, cu.lumaPos().x, cu.lumaPos().y, cu.tmrlFlag);
     if (cu.tmrlFlag)
     {
       const int maxNumCtxBins = (MRL_LIST_SIZE / MRL_IDX_RICE_CODE_DIVISOR) - 1;
@@ -8757,12 +8768,12 @@ void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
       m_BinEncoder.encodeBin((mrlIdxSuffix & 1), Ctx::TmrlDerive(maxNumCtxBins + 1));
       m_BinEncoder.encodeBin(((mrlIdxSuffix >> 1) & 1), Ctx::TmrlDerive(maxNumCtxBins + 2));
       CHECK(cu.tmrlList[cu.tmrlListIdx].intraDir != pu->intraDir[0] || cu.tmrlList[cu.tmrlListIdx].multiRefIdx != pu->multiRefIdx, "? ");
+      DTRACE(g_trace_ctx, D_SYNTAX, "cu_tmrl_idx() ctx=%d pos=(%d,%d) tmrlidx=%d\n", 0, cu.lumaPos().x, cu.lumaPos().y, cu.tmrlListIdx);
     }
     else
     {
       CHECK(pu->multiRefIdx, "?");
     }
-    DTRACE(g_trace_ctx, D_SYNTAX, "cu_tmrl_flag() ctx=%d pos=(%d,%d) tmrl=%d\n", 0, cu.lumaPos().x, cu.lumaPos().y, cu.tmrlFlag);
 #if !JVET_AD0082_TMRL_CONFIG
 #if JVET_W0123_TIMD_FUSION
   }

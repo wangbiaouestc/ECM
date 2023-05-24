@@ -4220,7 +4220,7 @@ void CABACReader::ibcMbvdData(PredictionUnit& pu)
   }
 
   pu.ibcMbvdMergeFlag = (m_BinDecoder.decodeBin(Ctx::IbcMbvdFlag()));
-  DTRACE(g_trace_ctx, D_SYNTAX, "IBC_mbvd_flag() IBC_mbvd_merge=%d pos=(%d,%d) size=%dx%d\n", pu.ibcMbvdMergeFlag ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
+  DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_flag() ibc_mbvd_merge=%d pos=(%d,%d) size=%dx%d\n", pu.ibcMbvdMergeFlag ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
 
   if (!pu.ibcMbvdMergeFlag)
   {
@@ -4245,7 +4245,7 @@ void CABACReader::ibcMbvdData(PredictionUnit& pu)
       }
     }
   }
-  DTRACE(g_trace_ctx, D_SYNTAX, "ibcMbvdBaseIdx() ibcMbvdBaseIdx=%d\n", var0);
+  DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_merge_idx() base_idx=%d\n", var0);
 
   unsigned int uiUnaryIdx = 0;
   unsigned int ricePar = 1;
@@ -4263,7 +4263,7 @@ void CABACReader::ibcMbvdData(PredictionUnit& pu)
   uiUnaryIdx <<= ricePar;
   uiUnaryIdx += temp;
   pu.ibcMbvdMergeIdx = var0 * IBC_MBVD_MAX_REFINE_NUM  +uiUnaryIdx;
-  DTRACE(g_trace_ctx, D_SYNTAX, "IBC_mbvd_merge_idx() IBC_mbvd_merge_idx=%d\n", pu.ibcMbvdMergeIdx);
+  DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_merge_idx() merge_idx=%d\n", pu.ibcMbvdMergeIdx);
 }
 #endif
 
@@ -5754,7 +5754,9 @@ void CABACReader::mvp_flag( PredictionUnit& pu, RefPicList eRefList )
 #endif
   DTRACE( g_trace_ctx, D_SYNTAX, "mvp_flag() value=%d pos=(%d,%d)\n", mvpIdx, pu.lumaPos().x, pu.lumaPos().y );
   pu.mvpIdx [eRefList] = mvpIdx;
+#if !JVET_Z0054_BLK_REF_PIC_REORDER
   DTRACE( g_trace_ctx, D_SYNTAX, "mvpIdx(refList:%d)=%d\n", eRefList, mvpIdx );
+#endif
 }
 
 void CABACReader::Ciip_flag(PredictionUnit& pu)
@@ -6085,8 +6087,24 @@ void CABACReader::mvd_coding( Mv &rMvd, MvdSuffixInfo* const pSi
   {    
     horParam = horAbs > iEgcOffset ? xReadMvdPrefix(MVD_CODING_GOLOMB_ORDER) : -1;
     verParam = verAbs > iEgcOffset ? xReadMvdPrefix(MVD_CODING_GOLOMB_ORDER) : -1;
-    DTRACE(g_trace_ctx, D_SYNTAX, "horParam=%d \n", horParam);
-    DTRACE(g_trace_ctx, D_SYNTAX, "verParam=%d \n", verParam);
+#if ENABLE_TRACING
+    if (horParam == -1)
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "abs(MVD_hor) = %d \n", horAbs);
+    }
+    else
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "MVD_hor prefix=%d \n", horParam);
+    }
+    if (verParam == -1)
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "abs(MVD_ver) = %d \n", verAbs);
+    }
+    else
+    {
+      DTRACE(g_trace_ctx, D_SYNTAX, "MVD_ver prefix=%d \n", verParam);
+    }
+#endif
   }
   else
   {
@@ -6138,7 +6156,6 @@ unsigned CABACReader::xReadMvdPrefix( int param )
 
   while (bit)
   {
-    DTRACE(g_trace_ctx, D_SYNTAX, "prefix: encodeBinEP \n");
     bit = m_BinDecoder.decodeBinEP();
     uiIdx++;
     symbol += bit << param++;
@@ -6156,11 +6173,7 @@ unsigned CABACReader::xReadMvdContextSuffix(int symbol, int param)
   CHECK(param < 0, "param < 0");
   if (0 != param)
   {
-    CHECK(param == 0, "param == 0");
-
     bit = m_BinDecoder.decodeBinsEP(param);
-
-    DTRACE(g_trace_ctx, D_SYNTAX, "ContextSuffix()=%d, numBit=%d \n", bit, param);
     symbol += bit;
   }
   return symbol;
@@ -6187,9 +6200,6 @@ void CABACReader::mvdCodingRemainder(Mv& rMvd, MvdSuffixInfo& si, const int imv)
 
   if (horParam >= 0 || verParam >= 0) 
   {    
-    DTRACE(g_trace_ctx, D_SYNTAX, "horParam: %d, verParam = %d \n", horParam, verParam);
-    DTRACE(g_trace_ctx, D_SYNTAX, "imv: %d \n", imv);
-
     const int iEgcOffset = si.getEGCOffset() + 1;
 
     if (horParam >= 0)
@@ -6210,15 +6220,15 @@ void CABACReader::mvdCodingRemainder(Mv& rMvd, MvdSuffixInfo& si, const int imv)
         horOffsetPrediction |= bin;
       }
 
-      DTRACE(g_trace_ctx, D_SYNTAX, "horOffsetPrediction: %d, iHorMSBins = %d \n", horOffsetPrediction, numMSBhor);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Codeword for MVD suffix prediction bins for horizontal component: %d \n", horOffsetPrediction);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of MVD suffix prediction bins for horizontal component: %d \n", numMSBhor);
 
       CHECK(horParam < 0, "horParam < 0");
       CHECK(horParam + 1 < numMSBhor, "horParam + 1 < numMSBhor");
 
-      DTRACE(g_trace_ctx, D_SYNTAX, "horSuffix bits: %d \n", horParam - numMSBhor);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of explicitly coded MVD horizontal suffix bins: %d \n", horParam - numMSBhor + 1);
       horSuffix = xReadMvdContextSuffix(si.horPrefixGroupStartValue, horParam - numMSBhor );
       horAbs = horSuffix + iEgcOffset;
-      DTRACE(g_trace_ctx, D_SYNTAX, "horSuffix=%d \n", horSuffix);
     }
     if (verParam >= 0)
     {
@@ -6238,18 +6248,16 @@ void CABACReader::mvdCodingRemainder(Mv& rMvd, MvdSuffixInfo& si, const int imv)
         verOffsetPrediction |= bin;
       }
 
-      DTRACE(g_trace_ctx, D_SYNTAX, "verOffsetPrediction: %d, iVerMSBins = %d \n", verOffsetPrediction, numMSBver);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Codeword for MVD suffix prediction bins for vertical component: %d \n", verOffsetPrediction);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of MVD suffix prediction bins for vertical component: %d \n", numMSBver);
 
       CHECK(verParam < 0, "verParam < 0");
       CHECK(verParam + 1 < numMSBver, "verParam + 1 < numMSBver");
 
-      DTRACE(g_trace_ctx, D_SYNTAX, "verSuffix bits: %d \n", verParam - numMSBver);
+      DTRACE(g_trace_ctx, D_SYNTAX, "Number of explicitly coded MVD vertical suffix bins: %d \n", verParam - numMSBver + 1);
       verSuffix = xReadMvdContextSuffix(si.verPrefixGroupStartValue, verParam - numMSBver );
       verAbs = verSuffix + iEgcOffset;
-      DTRACE(g_trace_ctx, D_SYNTAX, "verSuffix=%d \n", verSuffix);
     }
-    DTRACE(g_trace_ctx, D_SYNTAX, "abs(mvd)=(%d,%d) \n", horAbs, verAbs);
-
     rMvd = Mv(horAbs, verAbs);
 
     CHECK(!((horAbs >= MVD_MIN) && (horAbs <= MVD_MAX)) || !((verAbs >= MVD_MIN) && (verAbs <= MVD_MAX)), "Illegal MVD value");
@@ -6873,35 +6881,35 @@ void CABACReader::mvsdIdxFunc(PredictionUnit &pu, RefPicList eRefList)
 
   if (pu.mvd[eRefList].getHor())
   {
-      if (si.horEncodeSignInEP)
-      {
-        setHorSignToNegative = m_BinDecoder.decodeBinEP();
-      }
-      else
-      {
-        uint8_t ctxId = (trMv.getHor() <= Thres) ? 0 : 1;
-        uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
-        si.horSignHypMatch = 0 == bin;
-        DTRACE(g_trace_ctx, D_SYNTAX, "mvsd hor: bin=%d, ctx=%d \n", bin, ctxId);
-        mvsdIdx += (bin << shift);
-        shift++;
-      }
+    if( si.horEncodeSignInEP )
+    {
+      setHorSignToNegative = m_BinDecoder.decodeBinEP();
+    }
+    else
+    {
+      uint8_t ctxId = ( trMv.getHor() <= Thres ) ? 0 : 1;
+      uint8_t bin = m_BinDecoder.decodeBin( Ctx::MvsdIdx( ctxId ) );
+      si.horSignHypMatch = 0 == bin;
+      DTRACE( g_trace_ctx, D_SYNTAX, "mvsd hor: bin=%d, ctx=%d \n", bin, ctxId );
+      mvsdIdx += ( bin << shift );
+      shift++;
+    }
   }
   if (pu.mvd[eRefList].getVer())
   {
-      if (si.verEncodeSignInEP)
-      {
-        setVerSignToNegative = m_BinDecoder.decodeBinEP();
-      }
-      else
-      {
-        uint8_t ctxId = (trMv.getVer() <= Thres) ? 0 : 1;
-        uint8_t bin = m_BinDecoder.decodeBin(Ctx::MvsdIdx(ctxId));
-        si.verSignHypMatch = 0 == bin;
-        DTRACE(g_trace_ctx, D_SYNTAX, "mvsd ver: bin=%d, ctx=%d \n", bin, ctxId);
-        mvsdIdx += (bin << shift);
-        shift++;
-      }
+    if( si.verEncodeSignInEP )
+    {
+      setVerSignToNegative = m_BinDecoder.decodeBinEP();
+    }
+    else
+    {
+      uint8_t ctxId = ( trMv.getVer() <= Thres ) ? 0 : 1;
+      uint8_t bin = m_BinDecoder.decodeBin( Ctx::MvsdIdx( ctxId ) );
+      si.verSignHypMatch = 0 == bin;
+      DTRACE( g_trace_ctx, D_SYNTAX, "mvsd ver: bin=%d, ctx=%d \n", bin, ctxId );
+      mvsdIdx += ( bin << shift );
+      shift++;
+    }
   }
 
   pu.mvsdIdx[eRefList] = mvsdIdx;
@@ -7668,6 +7676,7 @@ void CABACReader::mts_idx( CodingUnit& cu, CUCtx& cuCtx )
       }
 #endif
     }
+    DTRACE(g_trace_ctx, D_SYNTAX, "mts_idx() etype=%d pos=(%d,%d) mtsIdx=%d\n", COMPONENT_Y, tu.cu->lx(), tu.cu->ly(), mtsIdx);
   }
 
 #if TU_256
@@ -7679,7 +7688,6 @@ void CABACReader::mts_idx( CodingUnit& cu, CUCtx& cuCtx )
   tu.mtsIdx[COMPONENT_Y] = mtsIdx;
 #endif
 
-  DTRACE(g_trace_ctx, D_SYNTAX, "mts_idx() etype=%d pos=(%d,%d) mtsIdx=%d\n", COMPONENT_Y, tu.cu->lx(), tu.cu->ly(), mtsIdx);
 }
 
 void CABACReader::isp_mode( CodingUnit& cu )
@@ -8423,6 +8431,7 @@ void CABACReader::tmp_flag(CodingUnit& cu)
         cu.tmpIdx += m_BinDecoder.decodeBinEP();
       }
       cu.tmpIdx += tmpFusionIdx;
+      DTRACE(g_trace_ctx, D_SYNTAX, "tmp_fusion_idx() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIdx);
     }
     else
     {
@@ -8450,6 +8459,8 @@ void CABACReader::tmp_flag(CodingUnit& cu)
         xReadTruncBinCode(tmpIdx, MTMP_NUM - 3);
         cu.tmpIdx = tmpIdx + 3;
       }
+      DTRACE(g_trace_ctx, D_SYNTAX, "tmp_idx() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIdx);
+
       cu.tmpFlmFlag = m_BinDecoder.decodeBin(Ctx::TmpFusion(3));
       DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flm_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
              cu.tmpFlmFlag);
@@ -8465,6 +8476,7 @@ void CABACReader::tmp_flag(CodingUnit& cu)
           }
           cu.tmpSubPelIdx = m_BinDecoder.decodeBinsEP(3);
         }
+        DTRACE(g_trace_ctx, D_SYNTAX, "tmp_is_subpel() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIsSubPel);
       }
       else
       {
