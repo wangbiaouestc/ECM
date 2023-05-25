@@ -339,7 +339,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
           static_vector<double, SGPM_NUM>   sgpmCostList;
           int                         sgpmIdx = currCU.sgpmIdx;
 
-          if (currCU.lwidth() * currCU.lheight() <= 1024)
+          if (currCU.lwidth() * currCU.lheight() <= 1024 && currCU.cs->sps->getUseTimd() )
           {
             m_pcIntraPred->deriveTimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU, false, true);
           }
