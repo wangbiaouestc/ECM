@@ -120,7 +120,7 @@ namespace CU
   uint32_t  getISPSplitDim            ( const int width, const int height, const PartSplit ispType );
   bool      allLumaCBFsAreZero        ( const CodingUnit& cu );
 #if JVET_W0123_TIMD_FUSION
-  TEMPLATE_TYPE deriveTimdRefType     ( int iCurX, int iCurY, uint32_t uiCurWidth, uint32_t uiCurHeight, int iTemplateWidth, int iTemplateHeight, int& iRefX, int& iRefY, uint32_t& uiRefWidth, uint32_t& uiRefHeight );
+  TemplateType deriveTimdRefType      ( int iCurX, int iCurY, uint32_t uiCurWidth, uint32_t uiCurHeight, int iTemplateWidth, int iTemplateHeight, int& iRefX, int& iRefY, uint32_t& uiRefWidth, uint32_t& uiRefHeight );
 #endif
 
   PUTraverser traversePUs             (      CodingUnit& cu);
@@ -285,8 +285,8 @@ namespace PU
   );
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-  uint32_t checkValidBvPU (const PredictionUnit& pu, ComponentID compID,                                Mv mv, bool ignoreFracMv = false, int filterIdx = 0, bool useAltHPelIF = false);
-  uint32_t checkValidBv   (const PredictionUnit& pu, ComponentID compID, int compWidth, int compHeight, Mv mv, bool ignoreFracMv = false, int filterIdx = 0, bool useAltHPelIF = false
+  uint32_t checkValidBvPU (const PredictionUnit& pu, ComponentID compID,                                Mv mv, bool ignoreFracMv = false, int filterIdx = 0);
+  uint32_t checkValidBv   (const PredictionUnit& pu, ComponentID compID, int compWidth, int compHeight, Mv mv, bool ignoreFracMv = false, int filterIdx = 0
                          , bool isFinalMC = false // this flag is for non-normative SW speedup
                          , bool checkAllRefValid = false
   );
@@ -681,6 +681,10 @@ namespace PU
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
   bool hasChromaFusionFlag(const PredictionUnit &pu, int intraMode);
+#endif
+#if JVET_AD0120_LBCCP
+  bool hasCcInsideFilterFlag(const PredictionUnit &pu, int intraMode);
+  bool isModetobeFiltered(int intraMode);
 #endif
 #if JVET_AC0071_DBV
   bool hasChromaBvFlag(const PredictionUnit &pu);

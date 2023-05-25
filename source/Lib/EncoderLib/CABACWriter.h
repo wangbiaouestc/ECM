@@ -147,6 +147,10 @@ public:
 #if JVET_AD0188_CCP_MERGE
   void        nonLocalCCPIndex          ( const PredictionUnit&         pu );
 #endif
+#if JVET_AD0120_LBCCP
+  void        ccInsideFilterFlag(const PredictionUnit &pu);
+#endif
+
   void        cu_residual               ( const CodingUnit&             cu,       Partitioner&      pm,         CUCtx& cuCtx );
   void        rqt_root_cbf              ( const CodingUnit&             cu );
   void        adaptive_color_transform(const CodingUnit&             cu);
@@ -265,12 +269,30 @@ public:
   void        cbf_comp                  ( const CodingStructure&        cs,       bool              cbf,    const CompArea& area, unsigned depth, const bool prevCbf = false, const bool useISP = false );
 
   // mvd coding (clause 7.3.8.9)
-#if JVET_AA0070_RRIBC
+#if JVET_AD0140_MVD_PREDICTION
+  void        mvd_coding            ( const Mv& rMvd, int8_t imv, const MvdSuffixInfo* const pSi = nullptr
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  void        mvd_coding                ( const Mv &rMvd, int8_t imv, bool codeSign = true, const int &rribcFlipType = 0 );
-#else
-  void        mvd_coding                ( const Mv &rMvd, int8_t imv, const int &rribcFlipType = 0 );
+                        , bool codeSign = true
 #endif
+                                    );
+  void        mvdCodingRemainder    ( const Mv& rMvd, const MvdSuffixInfo& si, int8_t imv );
+  unsigned    xWriteMvdPrefix       ( unsigned uiSymbol, int param);
+  void        xWriteMvdContextSuffix( unsigned uiSymbol, int param, int param_updated, int numSkipMSB );
+#elif JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+  void        mvd_coding                ( const Mv &rMvd, int8_t imv, bool ctxCoding = true 
+#if JVET_AA0070_RRIBC
+                                        , const int& rribcFlipType = 0
+#endif
+                                        );
+#else
+  void        mvd_coding                ( const Mv &rMvd, int8_t imv, const int &rribcFlipType = 0
+#if JVET_AA0070_RRIBC
+                                        , const int& rribcFlipType = 0
+#endif
+                                        );
+#endif
+
+#if JVET_AA0070_RRIBC
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
@@ -302,6 +324,12 @@ public:
 #endif
   );
 
+#if JVET_AD0140_MVD_PREDICTION
+  void        mvdCodingRemainder        ( const Mv& rMvd, const MvdSuffixInfo& si, int8_t imv, const bool isAffine
+  );
+  unsigned    xWriteMvdPrefix           ( unsigned uiSymbol, int param );
+  void        xWriteMvdContextSuffix    ( unsigned uiSymbol, int param, int param_updated, int numSkipMSB = 0 );
+#endif
 #if JVET_Z0131_IBC_BVD_BINARIZATION
 #if JVET_AC0104_IBC_BVD_PREDICTION
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV

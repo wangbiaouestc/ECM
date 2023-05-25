@@ -339,7 +339,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
           static_vector<double, SGPM_NUM>   sgpmCostList;
           int                         sgpmIdx = currCU.sgpmIdx;
 
-          if (currCU.lwidth() * currCU.lheight() <= 1024)
+          if (currCU.lwidth() * currCU.lheight() <= 1024 && currCU.cs->sps->getUseTimd() )
           {
             m_pcIntraPred->deriveTimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU, false, true);
           }
@@ -3504,15 +3504,28 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                 }
               }
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED 
-              if (pu.isMvsdApplicable())
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+              if (pu.isMvdPredApplicable())
               {
                 Mv absMvd[3];
                 absMvd[0] = Mv(pu.mvdAffi[eRefList][0].getAbsMv());
                 absMvd[1] = Mv(pu.mvdAffi[eRefList][1].getAbsMv());
                 absMvd[2] = (cu.affineType == AFFINEMODEL_6PARAM) ? Mv(pu.mvdAffi[eRefList][2].getAbsMv()) : Mv(0, 0);
-                if ((absMvd[0] != Mv(0, 0) || absMvd[1] != Mv(0, 0) || absMvd[2] != Mv(0, 0)) && pu.isMvsdApplicable())
+                if ((absMvd[0] != Mv(0, 0) || absMvd[1] != Mv(0, 0) || absMvd[2] != Mv(0, 0)) && pu.isMvdPredApplicable())
                 {
+#if JVET_AD0140_MVD_PREDICTION 
+                  std::vector<Mv> cMvdDerived[3];
+                  m_pcInterPred->deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvpIdx], affineAMVPInfo.mvCandRT[mvpIdx], affineAMVPInfo.mvCandLB[mvpIdx],
+                    absMvd, pu, eRefList, pu.refIdx[eRefList], cMvdDerived[0], cMvdDerived[1], cMvdDerived[2]);
+                  CHECK(pu.mvsdIdx[eRefList] >= cMvdDerived[0].size(), "");
+                  std::vector<Mv> cMvd = { Mv(0, 0), Mv(0, 0), Mv(0, 0) };
+                  m_pcInterPred->deriveMVDFromMVSDIdxAffineSI(pu, eRefList, cMvdDerived[0], cMvdDerived[1], cMvdDerived[2], cMvd);
+                  m_pcInterPred->applyOffsetsAffineMvd(pu, eRefList, cMvd, cMvdDerived);
+                  for (int i = 0; i < 3; ++i)
+                  {
+                    pu.mvdAffi[eRefList][i] = cMvd[i];
+                  }
+#else
                   std::vector<Mv> cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3;
 #if JVET_Z0054_BLK_REF_PIC_REORDER
                   m_pcInterPred->deriveMvdSignAffine(affineAMVPInfo.mvCandLT[mvpIdx], affineAMVPInfo.mvCandRT[mvpIdx], affineAMVPInfo.mvCandLB[mvpIdx],
@@ -3523,6 +3536,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #endif
                   CHECK(pu.mvsdIdx[eRefList] >= cMvdDerivedVec.size(), "");
                   m_pcInterPred->deriveMVDFromMVSDIdxAffine(pu, eRefList, cMvdDerivedVec, cMvdDerivedVec2, cMvdDerivedVec3);
+#endif
                 }
               }
 #endif
@@ -3605,7 +3619,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #endif
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
-          if (pu.isBvdPredApplicable() && mvd.isMvsdApplicable())
+          if (pu.isBvdPredApplicable() && mvd.isMvdPredApplicable())
           {
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC)
             Mv cMvPred = amvpInfo.mvCand[pu.mvpIdx[REF_PIC_LIST_0]];
@@ -3751,8 +3765,8 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                 pu.mvd[eRefList].changeTransPrecAmvr2Internal(pu.cu->imv);
               }
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-              if (pu.isMvsdApplicable() && pu.mvd[eRefList].isMvsdApplicable())
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+              if (pu.isMvdPredApplicable() && pu.mvd[eRefList].isMvdPredApplicable())
               {
                 if (pu.cu->smvdMode)
                 {
@@ -3763,11 +3777,32 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                   else
                   {
                     std::vector<Mv> cMvdDerivedVec;
-                    Mv cMvdKnownAtDecoder = Mv(pu.mvd[REF_PIC_LIST_0].getAbsHor(), pu.mvd[REF_PIC_LIST_0].getAbsVer());
+#if JVET_AD0140_MVD_PREDICTION
+                    Mv cMvdKnownAtDecoder = Mv(pu.mvd[REF_PIC_LIST_0].getHor(), pu.mvd[REF_PIC_LIST_0].getVer());
+#else
+                    Mv cMvdKnownAtDecoder = Mv(pu.mvd[eRefList].getAbsHor(), pu.mvd[eRefList].getAbsVer());
+#endif
                     m_pcInterPred->deriveMvdSignSMVD(cMvpL0, amvpInfo.mvCand[pu.mvpIdx[1]], cMvdKnownAtDecoder, pu, cMvdDerivedVec); //pass the absolute Mvd value as MVd may be negative while CU reuse at encoder.
+#if JVET_AD0140_MVD_PREDICTION
+                    if (!cMvdDerivedVec.empty())
+                    {
+#endif
                     CHECK(pu.mvsdIdx[REF_PIC_LIST_0] >= cMvdDerivedVec.size(), "");
+#if JVET_AD0140_MVD_PREDICTION
+                    }
+#endif
                     int mvsdIdx = pu.mvsdIdx[REF_PIC_LIST_0];
+
+#if JVET_AD0140_MVD_PREDICTION
+                    Mv cMvd = cMvdKnownAtDecoder;
+                    if (!cMvdDerivedVec.empty())
+                    {
+                      cMvd = m_pcInterPred->deriveMVDFromMVSDIdxTransSI(mvsdIdx, cMvdDerivedVec, pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_0][0]);
+                      m_pcInterPred->applyOffsetsMvd(cMvd, cMvdDerivedVec, pu.mvdSuffixInfo.mvBins[REF_PIC_LIST_0][0], pu.cu->imv);
+                    }
+#else
                     Mv cMvd = m_pcInterPred->deriveMVDFromMVSDIdxTrans(mvsdIdx, cMvdDerivedVec);
+#endif
                     CHECK(cMvd == Mv(0, 0), " zero MVD for SMVD!");
                     pu.mvd[REF_PIC_LIST_0] = cMvd;
                     pu.mv[REF_PIC_LIST_0] = cMvpL0 + pu.mvd[REF_PIC_LIST_0];
@@ -3778,11 +3813,24 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                 else
                 {
                   std::vector<Mv> cMvdDerivedVec;
+#if JVET_AD0140_MVD_PREDICTION
+                  Mv cMvdKnownAtDecoder = Mv(pu.mvd[eRefList].getHor(), pu.mvd[eRefList].getVer());
+#else
                   Mv cMvdKnownAtDecoder = Mv(pu.mvd[eRefList].getAbsHor(), pu.mvd[eRefList].getAbsVer());
+#endif
                   m_pcInterPred->deriveMvdSign(amvpInfo.mvCand[pu.mvpIdx[eRefList]], cMvdKnownAtDecoder, pu, eRefList, pu.refIdx[eRefList], cMvdDerivedVec); //pass the absolute Mvd value as MVd may be negative while CU reuse at encoder.
                   CHECK(pu.mvsdIdx[eRefList] >= cMvdDerivedVec.size(), "");
                   int mvsdIdx = pu.mvsdIdx[eRefList];
+#if JVET_AD0140_MVD_PREDICTION
+                  Mv cMvd = cMvdKnownAtDecoder;
+                  if (!cMvdDerivedVec.empty())
+                  {
+                    cMvd = m_pcInterPred->deriveMVDFromMVSDIdxTransSI(mvsdIdx, cMvdDerivedVec, pu.mvdSuffixInfo.mvBins[eRefList][0]);
+                    m_pcInterPred->applyOffsetsMvd(cMvd, cMvdDerivedVec, pu.mvdSuffixInfo.mvBins[eRefList][0], pu.cu->imv);
+                  }
+#else
                   Mv cMvd = m_pcInterPred->deriveMVDFromMVSDIdxTrans(mvsdIdx, cMvdDerivedVec);
+#endif
                   CHECK(cMvd == Mv(0, 0), " zero MVD!");
                   pu.mvd[eRefList] = cMvd;
                 }

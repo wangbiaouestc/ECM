@@ -1156,8 +1156,8 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #else
   ("MmvdDisNum",                                      m_MmvdDisNum,                                         8, "Number of MMVD Distance Entries")
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  ("MVSD",                                            m_MVSD,                                            true, "Motion Vector difference Sign Derivation (0:off, 1:on)")
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  ("MvdPred",                                         m_mvdPred,                                         true, "Motion vector difference Prediction (0:off, 1:on)")
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   ("BvdPred",                                         m_bvdPred,                                         true, "Block vector difference Prediction (0:off, 1:on)")
@@ -1175,7 +1175,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("ColorTransform",                                  m_useColorTrans,                                  false, "Enable the color transform")
   ("PLT",                                             m_PLTMode,                                           0u, "PLTMode (0x1:enabled, 0x0:disabled)  [default: disabled]")
   ("JointCbCr",                                       m_JointCbCrMode,                                  false, "Enable joint coding of chroma residuals (JointCbCr, 0:off, 1:on)")
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  ( "IBC",                                            m_IBCMode,                                           0u, "IBCMode (0: disabled, 1: enabled for I slices, 2: enabled for P/B slices, 3: enabled for all slices)  [default: disabled]")
+#else
   ( "IBC",                                            m_IBCMode,                                           0u, "IBCMode (0x1:enabled, 0x0:disabled)  [default: disabled]")
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   ( "IBCFrac",                                        m_IBCFracMode,                                       1u, "IBCMode with fractional BV (0x1:enabled, 0x0:disabled)  [default: disabled]")
 #endif
@@ -1235,7 +1239,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
  ("IntraDBV",                                         m_intraDBV,                                       true, "Direct Block Vector (0: off, 1:on)  [default: on]")
 #else
- ("IntraDBV", m_intraDBV, false, "Direct Block Vector (0: off, 1:on)  [default: off]")
+ ("IntraDBV",                                         m_intraDBV,                                      false, "Direct Block Vector (0: off, 1:on)  [default: off]")
 #endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
@@ -4000,11 +4004,11 @@ bool EncAppCfg::xCheckParameter()
       m_useARL = false;
     }
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-    if (m_MVSD)
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+    if (m_mvdPred)
     {
-      msg(WARNING, "MVD sign prediction is forcefully disabled since the enable flag of TM tools is set off. \n");
-      m_MVSD = false;
+      msg(WARNING, "MVD prediction is forcefully disabled since the enable flag of TM tools is set off. \n");
+      m_mvdPred = false;
     }
 #endif
   }
@@ -5319,8 +5323,8 @@ void EncAppCfg::xPrintParameter()
 #endif
     msg(VERBOSE, "MmvdDisNum:%d ", m_MmvdDisNum);
 #if !JVET_AA0132_CONFIGURABLE_TM_TOOLS
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-    msg(VERBOSE, "MVSD:%d ", m_MVSD);
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+    msg(VERBOSE, "MvdPred:%d ", m_mvdPred);
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
     msg(VERBOSE, "ARL:%d ", m_useARL);
@@ -5539,8 +5543,8 @@ void EncAppCfg::xPrintParameter()
   msg( VERBOSE, "ARL:%d ", m_useARL );
 #endif
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  msg( VERBOSE, "MVSD:%d ", m_MVSD );
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  msg( VERBOSE, "MvdPred:%d ", m_mvdPred );
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   msg( VERBOSE, "AltGPMSplitModeCode:%d ", m_altGPMSplitModeCode );

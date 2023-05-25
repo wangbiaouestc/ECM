@@ -1922,6 +1922,23 @@ const CtxSet ContextSetCfg::Bvd = ContextSetCfg::addCtxSet
 });
 #endif
 
+#if JVET_AD0140_MVD_PREDICTION
+const CtxSet ContextSetCfg::MvsdIdxMVDMSB = ContextSetCfg::addCtxSet
+({
+  {  34,  41,  49,  41,  34,  41,  49,  41,  34,  41,  49,  41,  34,  41,  49,  41,  34,  41,  49,  41,  34,  41,  49,  41,  34,  41,  49,  41,  34,  41,  49,  41},
+  {  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41},
+  { CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU},
+  {  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12},
+  {  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12},
+  { DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS},
+  {   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4},
+  {   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4},
+  { DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE},
+  { 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94},
+  { 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101},
+});
+#endif
+
 #if JVET_AC0104_IBC_BVD_PREDICTION
 const CtxSet ContextSetCfg::MvsdIdxBVDMSB = ContextSetCfg::addCtxSet
 ({
@@ -1954,6 +1971,24 @@ const CtxSet ContextSetCfg::MvsdIdx = ContextSetCfg::addCtxSet
   { DWE, DWE, DWE, DWE, },
   { 222,  83, 181,  94, },
   { 100, 116, 100, 101, },
+  });
+#endif
+
+
+#if JVET_AD0140_MVD_PREDICTION && JVET_AC0104_IBC_BVD_PREDICTION
+const CtxSet ContextSetCfg::MvsdIdxIBC = ContextSetCfg::addCtxSet
+({
+  {  34,  41 },
+  {  34,  41 },
+  { CNU, CNU },
+  {  13,  13 },
+  {  13,  13 },
+  { DWS, DWS },
+  {   4,   4 },
+  {   4,   4 },
+  { DWE, DWE },
+  { 222,  83 },
+  { 100, 116 },
   });
 #endif
 
@@ -3380,6 +3415,23 @@ const CtxSet ContextSetCfg::CccmMpfFlag = ContextSetCfg::addCtxSet
   { DWO, DWO, DWO, },
 });
 #endif
+#endif
+
+#if JVET_AD0120_LBCCP
+const CtxSet ContextSetCfg::CcInsideFilterFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+});
 #endif
 
 #if JVET_AC0119_LM_CHROMA_FUSION

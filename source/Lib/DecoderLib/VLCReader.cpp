@@ -450,7 +450,7 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
   READ_UVLC( uiCode, "pic_height_in_luma_samples" );         pcPPS->setPicHeightInLumaSamples( uiCode );
 
 #if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
-  READ_FLAG(uiCode, "aysmmetric_ILF_flag");                  pcPPS->setAsymmetricILF(uiCode == 1);
+  READ_FLAG(uiCode, "pps_aysmmetric_ILF_flag");              pcPPS->setAsymmetricILF(uiCode == 1);
 #endif
 
   READ_FLAG(uiCode, "pps_conformance_window_flag");
@@ -2352,13 +2352,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   {
     pcSPS->setFpelMmvdEnabledFlag( false );
   }
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   uiCode = 0;
   if (pcSPS->getTMToolsEnableFlag())
 #endif
-  READ_FLAG(uiCode, "sps_mvsd_enabled_flag");
-  pcSPS->setUseMVSD(uiCode != 0);
+  READ_FLAG(uiCode, "sps_mvd_pred_enabled_flag");
+  pcSPS->setUseMvdPred(uiCode != 0);
 #endif
   READ_UVLC(uiCode, "six_minus_max_num_merge_cand");
   CHECK(MRG_MAX_NUM_CANDS <= uiCode, "Incorrrect max number of merge candidates!");
@@ -2642,10 +2642,10 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #endif
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
-    READ_FLAG( uiCode, "sps_bvd_pred_enabled_flag" );                   pcSPS->setUseBvdPred             ( uiCode != 0 );
+    READ_FLAG( uiCode, "sps_ibc_bvd_pred_enabled_flag" );               pcSPS->setUseBvdPred             ( uiCode != 0 );
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-    READ_FLAG( uiCode, "sps_bvp_cluster_enabled_flag" );                pcSPS->setUseBvpCluster          ( uiCode != 0 );
+    READ_FLAG( uiCode, "sps_ibc_bvp_cluster_enabled_flag" );            pcSPS->setUseBvpCluster          ( uiCode != 0 );
 #endif
 #if JVET_AC0112_IBC_CIIP
     READ_FLAG(uiCode, "sps_ibc_ciip_enabled_flag");                     pcSPS->setUseIbcCiip(uiCode != 0);
