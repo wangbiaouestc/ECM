@@ -12908,9 +12908,9 @@ void IntraPrediction::xMFCccmApplyModelOffset23(const PredictionUnit &pu, const 
         samples[3] = refLumaBlk1.at(x, y) + lumaOffset; // C
         samples[4] = refLumaBlk1.at(x - 1, y) + lumaOffset; // W
         samples[5] = refLumaBlk1.at(x + 1, y) + lumaOffset; // E
-        samples[6] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x, y)) + lumaOffset;
-        samples[7] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x - 1, y)) + lumaOffset;
-        samples[8] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x + 1, y)) + lumaOffset;
+        samples[6] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x, y) + lumaOffset);
+        samples[7] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x - 1, y) + lumaOffset);
+        samples[8] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x + 1, y) + lumaOffset);
         samples[9] = ((x + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
         samples[10] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).bias();
       }
@@ -12922,9 +12922,9 @@ void IntraPrediction::xMFCccmApplyModelOffset23(const PredictionUnit &pu, const 
         samples[3] = refLumaBlk3.at(x, y) + lumaOffset; // C
         samples[4] = refLumaBlk3.at(x + 1, y - 1) + lumaOffset; // EN
         samples[5] = refLumaBlk3.at(x - 1, y + 1) + lumaOffset; // WS
-        samples[6] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x, y)) + lumaOffset;
-        samples[7] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x + 1, y - 1)) + lumaOffset;
-        samples[8] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x - 1, y + 1)) + lumaOffset;
+        samples[6] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x, y) + lumaOffset);
+        samples[7] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x + 1, y - 1) + lumaOffset);
+        samples[8] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).nonlinear(refLumaBlk.at(x - 1, y + 1) + lumaOffset);
         samples[9] = ((y + refSizeY + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // Y coordinate
         samples[10] = const_cast<CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>&>(cccmModel).bias();
       }
@@ -13331,9 +13331,9 @@ void IntraPrediction::xGetUpdatedOffsetMFCCCM23(const PredictionUnit& pu, const 
           samples[3] = refLumaBlk1.at(-1, pos) + lumaOffset; // C
           samples[4] = refLumaBlk1.at(-2, pos) + lumaOffset; // W
           samples[5] = refLumaBlk1.at(0, pos) + lumaOffset; // E
-          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos)) + lumaOffset;
-          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(-2, pos)) + lumaOffset;
-          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(0, pos)) + lumaOffset;
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(-2, pos) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at(0, pos) + lumaOffset);
           samples[9] = ((-1 + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
           samples[10] = cccmModel[0].bias();
           predChroma = cccmModel[0].convolve(samples);
@@ -14887,9 +14887,9 @@ int IntraPrediction::xGetCostMFCCCM23(const PredictionUnit& pu, const ComponentI
           samples[3] = refLumaBlk1.at(-1, pos) + lumaOffset; // C
           samples[4] = refLumaBlk1.at(-2, pos) + lumaOffset; // W
           samples[5] = refLumaBlk1.at( 0, pos) + lumaOffset; // E
-          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos)) + lumaOffset;
-          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(-2, pos)) + lumaOffset;
-          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at( 0, pos)) + lumaOffset;
+          samples[6] = cccmModel[0].nonlinear(refLumaBlk.at(-1, pos) + lumaOffset);
+          samples[7] = cccmModel[0].nonlinear(refLumaBlk.at(-2, pos) + lumaOffset);
+          samples[8] = cccmModel[0].nonlinear(refLumaBlk.at( 0, pos) + lumaOffset);
           samples[9] = ((-1 + refSizeX + CCCM_LOC_OFFSET) << CCCM_LOC_SHIFT); // X coordinate
           samples[10] = cccmModel[0].bias();
           predChroma = cccmModel[0].convolve(samples) + chromaOffset[0];
