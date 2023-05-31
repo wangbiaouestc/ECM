@@ -21255,6 +21255,16 @@ void InterPrediction::deriveAffineMVDCandVecFromMotionInforPred(const Prediction
 
         if (el.interDir == pu.interDir && el.refIdx[eRefPicList] == pu.refIdx[eRefPicList])
         {
+#if RPR_ENABLE
+          const bool bRefIsRescaled = pu.cu->slice->getRefPic(eRefPicList, el.refIdx[eRefPicList])->isRefScaled(pu.cs->pps);
+          if (bRefIsRescaled)
+          {
+            el.cost = std::numeric_limits<Distortion>::max();
+            el.aboveCostCalculated = true;
+            el.leftCostCalculated = true;
+            continue;
+          }
+#endif
           if (!pu.cu->licFlag && pu.cu->affine)
           {
             if (m_bAMLTemplateAvailabe[0] && !el.aboveCostCalculated)
@@ -22255,12 +22265,23 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
     
           AffineMergeCtx tmp;
 
-          candAvailable[refIdx][refList][i] = 
-            fillAffAMLRefTemplateCache(tmpPU, refList, static_cast<int>(i), pcBufPredRefTop.bufs[0], pcBufPredRefLeft.bufs[0]
+#if RPR_ENABLE
+          const bool bRefIsRescaled = tmpPU.cu->slice->getRefPic(eRefList, refIdx)->isRefScaled(tmpPU.cs->pps);
+          candAvailable[refIdx][refList][i] = !bRefIsRescaled &&
+            fillAffAMLRefTemplateCache( tmpPU, refList, static_cast<int>(i), pcBufPredRefTop.bufs[0], pcBufPredRefLeft.bufs[0]
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
-            , pu.cs->sps->getUseFastSubTmvp(), tmp
+                                      , pu.cs->sps->getUseFastSubTmvp(), tmp
+#endif
+            );
+#else
+          candAvailable[refIdx][refList][i] = 
+            fillAffAMLRefTemplateCache( tmpPU, refList, static_cast<int>(i), pcBufPredRefTop.bufs[0], pcBufPredRefLeft.bufs[0]
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                                      , pu.cs->sps->getUseFastSubTmvp(), tmp
 #endif
           );
+#endif
+
         }
       }
     }
@@ -22406,7 +22427,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
 
             if (res && !identicalMotion)
             {
-
+#if JVET_AD0213_LIC_IMP
               if (pu.cu->licFlag)
               {
                 const ClpRng& clpRng = pu.cu->slice->clpRng(COMPONENT_Y);
@@ -22474,10 +22495,11 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
                   }
                 }
               }
-
+#endif
               PelUnitBuf srcPred[2];
               if (m_bAMLTemplateAvailabe[0])
               {
+#if JVET_AD0213_LIC_IMP
                 if (pu.cu->licFlag)
                 {
                   PelBuf dstRefAboveTemplate0(m_pcLICRefAboveTemplate[0][0], pcBufPredRefTop.Y());
@@ -22501,6 +22523,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
 
                 }
                 else
+#endif
                 {
                   srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[0]][0][i][0], pcBufPredRefTop.Y()));
                   srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[1]][1][j][0], pcBufPredRefTop.Y()));
@@ -22511,6 +22534,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
               }
               if (m_bAMLTemplateAvailabe[1])
               {
+#if JVET_AD0213_LIC_IMP
                 if (pu.cu->licFlag)
                 {
                   PelBuf dstRefLeftTemplate0(m_pcLICRefLeftTemplate[0][0], pcBufPredRefLeft.Y());
@@ -22533,6 +22557,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
 
                 }
                 else
+#endif
                 {
                   srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[0]][0][i][1], pcBufPredRefLeft.Y()));
                   srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[1]][1][j][1], pcBufPredRefLeft.Y()));
@@ -22649,36 +22674,36 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
       rplIdxs[1].insert(refPairList[idx].refIdx[1]);
     }
 
+    
+    for (int refList = 0; refList < 2; refList++)
     {
-      for (int refList = 0; refList < 2; refList++)
+      for (const auto& refIdx : rplIdxs[refList])
       {
-        for (const auto& refIdx : rplIdxs[refList])
-        {
-          tmpPU.refIdx[refList] = refIdx;
-          tmpPU.refIdx[1 - refList] = -1;
+        tmpPU.refIdx[refList] = refIdx;
+        tmpPU.refIdx[1 - refList] = -1;
+        tmpPU.interDir = 1 << refList;
 
-
-          RefPicList eRefList = (RefPicList)refList;
-          PU::fillMvpCand(tmpPU, eRefList, tmpPU.refIdx[eRefList], amvpInfo[eRefList][tmpPU.refIdx[refList]]
+        RefPicList eRefList = (RefPicList)refList;
+        PU::fillMvpCand(tmpPU, eRefList, tmpPU.refIdx[eRefList], amvpInfo[eRefList][tmpPU.refIdx[refList]]
 #if TM_AMVP
-            , this
+          , this
 #endif
-          );
+        );
 
-          for (size_t i = 0; i < cMvdCandList[refList][0].size(); i++)
-          {
-            const unsigned mvp_idx = tmpPU.mvpIdx[refList];
-            tmpPU.mv[refList] = amvpInfo[refList][refIdx].mvCand[mvp_idx] + cMvdCandList[refList][0][i];
-            tmpPU.mv[refList].mvCliptoStorageBitDepth();
+        for (size_t i = 0; i < cMvdCandList[refList][0].size(); i++)
+        {
+          const unsigned mvp_idx = tmpPU.mvpIdx[refList];
+          tmpPU.mv[refList] = amvpInfo[refList][refIdx].mvCand[mvp_idx] + cMvdCandList[refList][0][i];
+          tmpPU.mv[refList].mvCliptoStorageBitDepth();
 
-            AffineMergeCtx tmp;
+          AffineMergeCtx tmp;
 
-            candAvailable[refIdx][refList][i] =
-              fillAMLRefTemplateCache(tmpPU, refList, static_cast<int>(i), pcBufPredRefTop.bufs[0], pcBufPredRefLeft.bufs[0]);
-          }
+          candAvailable[refIdx][refList][i] =
+            fillAMLRefTemplateCache(tmpPU, refList, static_cast<int>(i), pcBufPredRefTop.bufs[0], pcBufPredRefLeft.bufs[0]);
         }
       }
     }
+    tmpPU.interDir = 3;
 #endif
     for (int idx = 0; idx < refPairList.size(); idx++)
     {
@@ -22780,6 +22805,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
         Pel uniLeftBuf[MAX_CU_SIZE];
 
         const bool uniLIC = xCheckIdenticalMotion(tmpPU);
+#if JVET_AD0213_LIC_IMP
         if (pu.cu->licFlag )
         {
           const ClpRng& clpRng = pu.cu->slice->clpRng(COMPONENT_Y);
@@ -22866,6 +22892,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           }          
         }
 #endif
+#endif
 
         if (m_bAMLTemplateAvailabe[0])
         {
@@ -22877,7 +22904,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           if (!pu.cu->licFlag || !uniLIC)
           {
             PelUnitBuf srcPred[2];
-
+#if JVET_AD0213_LIC_IMP
             if (pu.cu->licFlag)
             {
               const int biShift = IF_INTERNAL_PREC - pu.cu->slice->clpRng(COMPONENT_Y).bd;
@@ -22906,6 +22933,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
               }
             }
             else
+#endif
             {
               srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[0]][0][i][0], pcBufPredRefTop.Y()));
               srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[1]][1][j][0], pcBufPredRefTop.Y()));
@@ -22928,7 +22956,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           if (!pu.cu->licFlag || !uniLIC)
           {
             PelUnitBuf srcPred[2];
-
+#if JVET_AD0213_LIC_IMP
             if (pu.cu->licFlag)
             {
               const int biShift = IF_INTERNAL_PREC - pu.cu->slice->clpRng(COMPONENT_Y).bd;
@@ -22958,6 +22986,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
 
             }
             else
+#endif
             {
               srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[0]][0][i][1], pcBufPredRefLeft.Y()));
               srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[1]][1][j][1], pcBufPredRefLeft.Y()));
