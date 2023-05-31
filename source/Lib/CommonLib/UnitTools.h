@@ -699,22 +699,20 @@ namespace PU
   void ccpParamsToCclmModel(const ComponentID compID, const CCPModelCandidate& params, CclmModel& cclmModel);
   void cclmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CclmModel& cclmModel);
 
-  template <int NUM>
 #if JVET_AB0174_CCCM_DIV_FREE
-  void cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<NUM> cccmModelCb[2], const CccmModel<NUM> cccmModelCr[2], const int yThres = 0, const int cccmLumaOffset = 0);
+  void cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel cccmModelCb[2], const CccmModel cccmModelCr[2], const int yThres = 0, const int cccmLumaOffset = 0);
 #else
-  void cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<NUM> cccmModelCb[2], const CccmModel<NUM> cccmModelCr[2], const int yThres = 0);
+  void cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel cccmModelCb[2], const CccmModel cccmModelCr[2], const int yThres = 0);
 #endif
-  template<int NUM>
-  void ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<NUM> cccmModelCb[2], CccmModel<NUM> cccmModelCr[2]);
+  void ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel cccmModelCb[2], CccmModel cccmModelCr[2]);
 
 #if JVET_AB0092_GLM_WITH_LUMA
 #if JVET_AB0174_CCCM_DIV_FREE
-  void glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel<GLM_NUM_PARAMS> &glmModel, const int lumaOffset);
+  void glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel& glmModel, const int lumaOffset);
 #else
-  void glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel<GLM_NUM_PARAMS> &glmModel);
+  void glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel& glmModel);
 #endif
-  void ccpParamsToGlmModel(const ComponentID compId, const CCPModelCandidate& params, CccmModel<GLM_NUM_PARAMS> &glmModel);
+  void ccpParamsToGlmModel(const ComponentID compId, const CCPModelCandidate& params, CccmModel& glmModel);
 #endif
 
   const PredictionUnit *getPUFromPos(const PredictionUnit &pu, const ChannelType &chType, const Position &refPos);

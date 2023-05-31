@@ -2957,78 +2957,51 @@ void PU::cclmModelToCcpParams(const ComponentID compId, CCPModelCandidate& param
 #endif
 }
 
-template <int NUM>
 #if JVET_AB0174_CCCM_DIV_FREE
-void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<NUM> cccmModelCb[2], const CccmModel<NUM> cccmModelCr[2], const int yThres, const int cccmLumaOffset)
+void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel cccmModelCb[2], const CccmModel cccmModelCr[2], const int yThres, const int cccmLumaOffset)
 #else
-void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<NUM> cccmModelCb[2], const CccmModel<NUM> cccmModelCr[2], const int yThres)
+void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel cccmModelCb[2], const CccmModel cccmModelCr[2], const int yThres)
 #endif
 {
-  std::memcpy(params.params[0], cccmModelCb[0].params, sizeof(TCccmCoeff) * NUM);
-  std::memcpy(params.params[1], cccmModelCr[0].params, sizeof(TCccmCoeff) * NUM);
+  std::memcpy(params.params[0], cccmModelCb[0].params.data(), sizeof(TCccmCoeff) * cccmModelCb[0].getNumParams() );
+  std::memcpy(params.params[1], cccmModelCr[0].params.data(), sizeof(TCccmCoeff) * cccmModelCr[0].getNumParams() );
   params.midVal = cccmModelCb[0].midVal;
   params.bd = cccmModelCb[0].bd;
 #if JVET_AB0174_CCCM_DIV_FREE
   params.lumaOffset = cccmLumaOffset;
 #endif
 #if MMLM
-  std::memcpy(params.params2[0], cccmModelCb[1].params, sizeof(TCccmCoeff) * NUM);
-  std::memcpy(params.params2[1], cccmModelCr[1].params, sizeof(TCccmCoeff) * NUM);
+  std::memcpy(params.params2[0], cccmModelCb[1].params.data(), sizeof(TCccmCoeff) * cccmModelCb[1].getNumParams() );
+  std::memcpy(params.params2[1], cccmModelCr[1].params.data(), sizeof(TCccmCoeff) * cccmModelCr[1].getNumParams() );
   params.yThres = yThres;
 #endif
 }
 
-template<int NUM>
-void PU::ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<NUM> cccmModelCb[2], CccmModel<NUM> cccmModelCr[2])
+void PU::ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel cccmModelCb[2], CccmModel cccmModelCr[2])
 {
-  std::memcpy(cccmModelCb[0].params, params.params[0], sizeof(TCccmCoeff) * NUM);
-  std::memcpy(cccmModelCr[0].params, params.params[1], sizeof(TCccmCoeff) * NUM);
+  std::memcpy(&cccmModelCb[0].params[0], params.params[0], sizeof(TCccmCoeff) * cccmModelCb[0].getNumParams() );
+  std::memcpy(&cccmModelCr[0].params[0], params.params[1], sizeof(TCccmCoeff) * cccmModelCr[0].getNumParams() );
   cccmModelCb[0].midVal = cccmModelCr[0].midVal = params.midVal;
   cccmModelCb[0].bd = cccmModelCr[0].bd = params.bd;
 #if MMLM
   if (params.type & CCP_TYPE_MMLM)
   {
-    std::memcpy(cccmModelCb[1].params, params.params2[0], sizeof(TCccmCoeff) * NUM);
-    std::memcpy(cccmModelCr[1].params, params.params2[1], sizeof(TCccmCoeff) * NUM);
+    std::memcpy(&cccmModelCb[1].params[0], params.params2[0], sizeof(TCccmCoeff) * cccmModelCb[1].getNumParams() );
+    std::memcpy(&cccmModelCr[1].params[0], params.params2[1], sizeof(TCccmCoeff) * cccmModelCr[1].getNumParams() );
     cccmModelCb[1].midVal = cccmModelCr[1].midVal = params.midVal;
     cccmModelCb[1].bd = cccmModelCr[1].bd = params.bd;
   }
 #endif
 }
 
-#if JVET_AB0174_CCCM_DIV_FREE
-template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_NUM_PARAMS> cccmModelCr[2], const int yThres, const int cccmLumaOffset);
-#else
-template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_NUM_PARAMS> cccmModelCr[2], const int yThres);
-#endif
-template void PU::ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<CCCM_NUM_PARAMS> cccmModelCb[2], CccmModel<CCCM_NUM_PARAMS> cccmModelCr[2]);
-
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
-#if JVET_AB0174_CCCM_DIV_FREE
-template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCr[2], const int yThres, const int cccmLumaOffset);
-#else
-template void PU::cccmModelToCcpParams(CCPModelCandidate &params, const CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCr[2], const int yThres);
-#endif
-template void PU::ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCb[2], CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCr[2]);
-#endif
-
-#if JVET_AD0202_CCCM_MDF
-#if JVET_AB0174_CCCM_DIV_FREE
-template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCr[2], const int yThres, const int cccmLumaOffset);
-#else
-template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCr[2], const int yThres);
-#endif
-template void PU::ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCb[2], CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCr[2]);
-#endif
-
 #if JVET_AB0092_GLM_WITH_LUMA
 #if JVET_AB0174_CCCM_DIV_FREE
-void PU::glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel<GLM_NUM_PARAMS> &glmModel, const int lumaOffset)
+void PU::glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel& glmModel, const int lumaOffset)
 #else
-void PU::glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel<GLM_NUM_PARAMS> &glmModel)
+void PU::glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel& glmModel)
 #endif
 {
-  std::memcpy(params.params[compId - 1], glmModel.params, sizeof(TCccmCoeff) * GLM_NUM_PARAMS);
+  std::memcpy(params.params[compId - 1], glmModel.params.data(), sizeof(TCccmCoeff) * GLM_NUM_PARAMS);
   params.midVal = glmModel.midVal;
   params.bd = glmModel.bd;
 #if JVET_AB0174_CCCM_DIV_FREE
@@ -3036,9 +3009,9 @@ void PU::glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params
 #endif
 }
 
-void PU::ccpParamsToGlmModel(const ComponentID compId, const CCPModelCandidate& params, CccmModel<GLM_NUM_PARAMS> &glmModel)
+void PU::ccpParamsToGlmModel(const ComponentID compId, const CCPModelCandidate& params, CccmModel& glmModel)
 {
-  std::memcpy(glmModel.params, params.params[compId - 1], sizeof(TCccmCoeff) * GLM_NUM_PARAMS);
+  std::memcpy(&glmModel.params[0], params.params[compId - 1], sizeof(TCccmCoeff) * GLM_NUM_PARAMS);
   glmModel.midVal = params.midVal;
   glmModel.bd = params.bd;
 }
