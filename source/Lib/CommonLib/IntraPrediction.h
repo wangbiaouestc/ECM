@@ -117,34 +117,40 @@ typedef int64_t TCccmCoeff;
 #define FIXED_DIV(x, y)  TCccmCoeff((int64_t(x)    << CCCM_DECIM_BITS ) / (y) )
 #endif
 
-template<const int M>
 struct CccmModel
 {
-  TCccmCoeff params[M];
+  CccmModel( int num, int bitdepth )
+  {
+    bd = bitdepth;
+    midVal = ( 1 << ( bitdepth - 1 ) );
+    params.resize( num );
+  }
+
+  ~CccmModel() {}
+
+  std::vector<TCccmCoeff> params;
   int        bd;
   int        midVal;
   
-  CccmModel(int bitdepth)
+  const int getNumParams() const
   {
-    bd     = bitdepth;
-    midVal = (1 << ( bitdepth - 1));
+    return (int)params.size();
   }
-  
+
   void clearModel()
   {
-    for( int i = 0; i < M - 1; i++)
-    {
-      params[i] = 0;
-    }
+    const int numParams = (int)params.size();
 
-    params[M - 1] = 1 << CCCM_DECIM_BITS; // Default bias to 1
+    std::fill( params.begin(), params.end(), 0 );
+
+    params[numParams - 1] = 1 << CCCM_DECIM_BITS; // Default bias to 1
   }
 
   Pel convolve(Pel* vector)
   {
     TCccmCoeff sum = 0;
     
-    for( int i = 0; i < M; i++)
+    for( int i = 0; i < params.size(); i++)
     {
       sum += params[i] * vector[i];
     }
@@ -156,41 +162,34 @@ struct CccmModel
   Pel bias     ()              { return midVal; }
 };
 
-template<const int M, const int N>
 struct CccmCovariance
 {
-  using TE = TCccmCoeff[M][M];
-  using Ty = TCccmCoeff[M];
-  using MN = Pel[M][N];
-#if JVET_AC0053_GAUSSIAN_SOLVER
-  using TE2 = TCccmCoeff[M][M+2];
-#endif
-
   CccmCovariance() {}
   ~CccmCovariance() {}
 
-  bool ldlDecompose                (TE A, TE U,          Ty diag,                      int numEq) const;
-  void ldlSolve                    (TE U, Ty diag,       TCccmCoeff* y, TCccmCoeff* x, int numEq, bool decompOk) const;
 #if JVET_AB0174_CCCM_DIV_FREE
-  void solve1                      ( const MN A, const Pel* C, const int sampleNum, const int chromaOffset, CccmModel<M>& model );
-  void solve2                      ( const MN A, const Pel* Cb, const Pel* Cr, const int sampleNum, const int chromaOffsetCb, const int chromaOffsetCr, CccmModel<M>& modelCb, CccmModel<M>& modelCr );
+  void solve1                      ( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX], const Pel* C, const int sampleNum, const int chromaOffset, CccmModel& model );
+  void solve2                      ( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX], const Pel* Cb, const Pel* Cr, const int sampleNum, const int chromaOffsetCb, const int chromaOffsetCr, CccmModel& modelCb, CccmModel& modelCr );
 #else
-  void solve1                      ( const MN A, const Pel* C, const int sampleNum, CccmModel<M>& model );
-  void solve2                      ( const MN A, const Pel* Cb, const Pel* Cr, const int sampleNum, CccmModel<M>& modelCb, CccmModel<M>& modelCr );
+  void solve1                      ( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX], const Pel* C, const int sampleNum, CccmModel& model );
+  void solve2                      ( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX], const Pel* Cb, const Pel* Cr, const int sampleNum, CccmModel& modelCb, CccmModel& modelCr );
 #endif
 
 private:
-  TE ATA;
-  Ty ATCb;
-  Ty ATCr;
+  TCccmCoeff ATA[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX];
+  TCccmCoeff ATCb[CCCM_NUM_PARAMS_MAX];
+  TCccmCoeff ATCr[CCCM_NUM_PARAMS_MAX];
+  TCccmCoeff C[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX + 2];
 
 #if JVET_AC0053_GAUSSIAN_SOLVER
-  void gaussBacksubstitution       (TE2 C, Ty x, int numEq, int col);
-  void gaussElimination            (TE A, Ty y0, Ty x0, Ty y1, Ty x1, int numEq, int numFilters, int bd);
+  void gaussBacksubstitution       ( TCccmCoeff* x, int numEq, int col );
+  void gaussElimination            ( TCccmCoeff A[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff* y0, TCccmCoeff* x0, TCccmCoeff* y1, TCccmCoeff* x1, int numEq, int numFilters, int bd);
 #else
-  void ldlBacksubstitution         (TE U, TCccmCoeff* z, TCccmCoeff* x, int numEq) const;
-  void ldlTransposeBacksubstitution(TE U, TCccmCoeff* y, TCccmCoeff* z, int numEq) const;
-  bool ldlDecomp                   (TE A, TE U,          Ty outDiag,    int numEq) const;
+  bool ldlDecompose                ( TCccmCoeff A[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff U[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff* diag, int numEq) const;
+  void ldlSolve                    ( TCccmCoeff U[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff* diag, TCccmCoeff* y, TCccmCoeff* x, int numEq, bool decompOk) const;
+  void ldlBacksubstitution         ( TCccmCoeff U[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff* z, TCccmCoeff* x, int numEq) const;
+  void ldlTransposeBacksubstitution( TCccmCoeff U[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff* y, TCccmCoeff* z, int numEq) const;
+  bool ldlDecomp                   ( TCccmCoeff A[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff U[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff* outDiag, int numEq) const;
 #endif
 };
 #endif
@@ -352,24 +351,12 @@ protected:
 #endif
 
 #if JVET_AA0057_CCCM
-  CccmCovariance<CCCM_NUM_PARAMS, CCCM_MAX_REF_SAMPLES> m_cccmSolver;
-#if JVET_AD0202_CCCM_MDF
-  CccmCovariance<CCCM_MULTI_PRED_FILTER_NUM_PARAMS, CCCM_MAX_REF_SAMPLES> m_cccmMultiDownSolver;
-  CccmCovariance<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, CCCM_MAX_REF_SAMPLES> m_cccmMultiDownSolver2;
-#endif
-#endif
-#if JVET_AB0092_GLM_WITH_LUMA
-  CccmCovariance<GLM_NUM_PARAMS, GLM_MAX_REF_SAMPLES> m_glmSolver;
-#endif
-#if JVET_AD0086_ENHANCED_INTRA_TMP
-  CccmCovariance<TMP_FLM_PARAMS, CCCM_MAX_REF_SAMPLES>                m_tmpFlmSolver;
-  CccmCovariance<TMP_FUSION_PARAMS, TMP_FUSHION_CCCM_MAX_REF_SAMPLES> m_tmpFusionSolver;
-#endif
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
-  CccmCovariance<CCCM_NO_SUB_NUM_PARAMS, GLM_MAX_REF_SAMPLES> m_cccmNoSubSolver;
-#endif
-#if JVET_AC0119_LM_CHROMA_FUSION
-  CccmCovariance<CFLM_NUM_PARAMS, CFLM_MAX_REF_SAMPLES> m_cflmSolver;
+  CccmCovariance m_cccmSolver;
+
+  Pel m_samples[CCCM_NUM_PARAMS_MAX];
+  Pel m_a[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX];
+  Pel m_cb[CCCM_REF_SAMPLES_MAX];
+  Pel m_cr[CCCM_REF_SAMPLES_MAX];
 #endif
 
   // prediction
@@ -469,12 +456,15 @@ public:
 #endif
 #if JVET_AA0057_CCCM
   void   predIntraCCCM            (const PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, int intraDir);
-  void   xCccmCalcModels          (const PredictionUnit& pu, CccmModel<CCCM_NUM_PARAMS> &cccmModelCb, CccmModel<CCCM_NUM_PARAMS> &cccmModelCr, int modelId, int modelThr
+
+  void   xCccmCalcModels          (const PredictionUnit& pu, CccmModel& cccmModelCb, CccmModel& cccmModelCr, int modelId, int modelThr
 #if JVET_AD0120_LBCCP
     , int trainingRange = -1
 #endif
   );
-  void   xCccmApplyModel          (const PredictionUnit& pu, const ComponentID compId, CccmModel<CCCM_NUM_PARAMS> &cccmModel, int modelId, int modelThr, PelBuf &piPred) const;
+
+  void   xCccmApplyModel          (const PredictionUnit& pu, const ComponentID compId, CccmModel& cccmModel, int modelId, int modelThr, PelBuf &piPred);
+
   void   xCccmCreateLumaRef       (const PredictionUnit& pu, CompArea chromaArea
 #if JVET_AD0202_CCCM_MDF
     , int downsFilterIdx = 0
@@ -498,19 +488,11 @@ public:
   void   xCccmCalcRefArea         (const PredictionUnit& pu, CompArea chromaArea);
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   void   xCccmCreateLumaNoSubRef  ( const PredictionUnit& pu, CompArea chromaArea );
-  void   xCccmApplyModel          ( const PredictionUnit& pu, const ComponentID compId, CccmModel<CCCM_NO_SUB_NUM_PARAMS> &cccmModel, int modelId, int modelThr, PelBuf &piPred ) const;
-  void   xCccmCalcModels          ( const PredictionUnit& pu, CccmModel<CCCM_NO_SUB_NUM_PARAMS> &cccmModelCb, CccmModel<CCCM_NO_SUB_NUM_PARAMS> &cccmModelCr, int modelId, int modelThr );
-#endif
-#if JVET_AD0202_CCCM_MDF
-  void   xCccmCalcModels2(const PredictionUnit& pu, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> &cccmModelCb, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> &cccmModelCr, int modelId, int modelThr);
-  void   xCccmApplyModel2(const PredictionUnit& pu, const ComponentID compId, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> &cccmModel, int modelId, int modelThr, PelBuf &piPred) const;
-  void   xCccmCalcModels3(const PredictionUnit& pu, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> &cccmModelCb, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> &cccmModelCr, int modelId, int modelThr);
-  void   xCccmApplyModel3(const PredictionUnit& pu, const ComponentID compId, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> &cccmModel, int modelId, int modelThr, PelBuf &piPred) const;
 #endif
 #endif
 #if JVET_AB0092_GLM_WITH_LUMA
-  void   xGlmCalcModel            (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel<GLM_NUM_PARAMS> &glmModel);
-  void   xGlmApplyModel           (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel<GLM_NUM_PARAMS> &glmModel, PelBuf &piPred) const;
+  void   xGlmCalcModel            (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel& glmModel);
+  void   xGlmApplyModel           (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel& glmModel, PelBuf &piPred);
   void   xGlmCreateGradRef        (const PredictionUnit& pu, CompArea chromaArea);
   PelBuf xGlmGetGradRefBuf        (const PredictionUnit& pu, CompArea chromaArea, int &areaWidth, int &areaHeight, int &refSizeX, int &refSizeY, int &refPosPicX, int &refPosPicY, int glmIdx) const;
   PelBuf xGlmGetGradPuBuf         (const PredictionUnit& pu, CompArea chromaArea, int glmIdx) const;
@@ -521,8 +503,8 @@ public:
 #endif
 #endif
 #if JVET_AC0119_LM_CHROMA_FUSION
-  void   xCflmCalcModels(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel<CFLM_NUM_PARAMS>& cflmModel, int modelId, int modelThr);
-  void   xCflmApplyModel(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel<CFLM_NUM_PARAMS>& cflmModel, int modelId, int modelThr, PelBuf& piPred);
+  void   xCflmCalcModels(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel& cflmModel, int modelId, int modelThr);
+  void   xCflmApplyModel(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel& cflmModel, int modelId, int modelThr, PelBuf& piPred);
   void   xCflmCreateLumaRef       (const PredictionUnit& pu, const CompArea& chromaArea);
   bool   xCflmCreateChromaPred    (const PredictionUnit& pu, const ComponentID compId, PelBuf& piPred);
   PelBuf xCflmGetRefBuf           (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, int& areaWidth, int& areaHeight, int& refSizeX, int& refSizeY, int& refPosPicX, int& refPosPicY) const;
@@ -536,38 +518,18 @@ public:
   int  xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandidate &ccpCand);
   void predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr);
 
-  void xCclmApplyModel(const PredictionUnit &pu, const ComponentID compId, CccmModel<CCCM_NUM_PARAMS> &cccmModel, int modelId, int modelThr, PelBuf &piPred) const;
-  void xCccmApplyModelOffset(const PredictionUnit& pu, const ComponentID compId, const CccmModel<CCCM_NUM_PARAMS>& cccmModel, int modelId, int modelThr, PelBuf& piPred, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY) const;
-  void xGlmApplyModelOffset(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel<GLM_NUM_PARAMS>& glmModel, int glmIdc, PelBuf& piPred, int lumaOffset, int chromaOffset) const;
-#if JVET_AD0202_CCCM_MDF
-  void xMFCccmApplyModelOffset1(const PredictionUnit& pu, const ComponentID compId, const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS>& cccmModel, int modelId, int modelThr, PelBuf& piPred, int lumaOffset, int chromaOffset[2]) const;
-  void xMFCccmApplyModelOffset23(const PredictionUnit& pu, const ComponentID compId, const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2>& cccmModel, int modelId, int modelThr, PelBuf& piPred, int lumaOffset, int chromaOffset[2]) const;
-#endif
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
-  void xNSCccmApplyModelOffset(const PredictionUnit& pu, const ComponentID compId, const CccmModel<CCCM_NO_SUB_NUM_PARAMS>& cccmModel, int modelId, int modelThr, PelBuf& piPred, int lumaOffset, int chromaOffset[2]) const;
-#endif
+  void xCclmApplyModel(const PredictionUnit &pu, const ComponentID compId, CccmModel& cccmModel, int modelId, int modelThr, PelBuf &piPred);
+  void xCccmApplyModelOffset(const PredictionUnit& pu, const ComponentID compId, CccmModel& cccmModel, int modelId, int modelThr, PelBuf& piPred, int lumaOffset, int chromaOffset[2], int type, int refSizeX = 0, int refSizeY = 0 );
+  void xGlmApplyModelOffset(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel& glmModel, int glmIdc, PelBuf& piPred, int lumaOffset, int chromaOffset);  
 
-  void xGetUpdatedOffsetCCLM(const PredictionUnit &pu, const ComponentID compID, const CompArea &chromaArea, CclmModel &cclmModel, int modelNum, int glmIdc);
-  void xGetUpdatedOffsetCCCM(const PredictionUnit& pu, const ComponentID compID, int modelNum, const CompArea& chromaArea, CccmModel<CCCM_NUM_PARAMS> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY);
-  void xGetUpdatedOffsetGLM(const PredictionUnit& pu, const ComponentID compID, const CompArea& chromaArea, CccmModel<GLM_NUM_PARAMS>& glmModel, int glmIdc, int lumaOffset, int& chromaOffset);
-#if JVET_AD0202_CCCM_MDF
-  void xGetUpdatedOffsetMFCCCM1(const PredictionUnit& pu, const ComponentID compID, int modelNum, const CompArea& chromaArea, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY);
-  void xGetUpdatedOffsetMFCCCM23(const PredictionUnit& pu, const ComponentID compID, int modelNum, const CompArea& chromaArea, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY);
-#endif
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
-  void xGetUpdatedOffsetNSCCCM(const PredictionUnit& pu, const ComponentID compID, int modelNum, const CompArea& chromaArea, CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[]);
-#endif
+  template <const bool updateOffsets>
+  int xUpdateOffsetsAndGetCostCCLM(const PredictionUnit &pu, const ComponentID compID, const CompArea &chromaArea, CclmModel &cclmModel, int modelNum, int glmIdc);
 
-  int xGetCostCCLM(const PredictionUnit &pu, const ComponentID compID, const CompArea &chromaArea, CclmModel &cclmModel, int modelNum, int glmIdc);
-  int xGetCostCCCM(const PredictionUnit &pu, const ComponentID compID, int modelNum, const CompArea &chromaArea, CccmModel<CCCM_NUM_PARAMS> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY);
-  int xGetCostGLM(const PredictionUnit& pu, const ComponentID compID, const CompArea& chromaArea, CccmModel<GLM_NUM_PARAMS>& glmModel, int glmIdc, int lumaOffset, int& chromaOffset);
-#if JVET_AD0202_CCCM_MDF
-  int xGetCostMFCCCM1(const PredictionUnit& pu, const ComponentID compID, int modelNum, const CompArea& chromaArea, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY);
-  int xGetCostMFCCCM23(const PredictionUnit& pu, const ComponentID compID, int modelNum, const CompArea& chromaArea, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS2> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY);
-#endif
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
-  int xGetCostNSCCCM(const PredictionUnit& pu, const ComponentID compID, int modelNum, const CompArea& chromaArea, CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[]);
-#endif
+  template <const bool updateOffsets>
+  int xUpdateOffsetsAndGetCostCCCM(const PredictionUnit &pu, const ComponentID compID, const CompArea &chromaArea, CccmModel cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[2], int type, int refSizeX = 0, int refSizeY = 0, const int cccmMultiFilterIdx = -1 );
+
+  template <const bool updateOffsets>
+  int xUpdateOffsetsAndGetCostGLM(const PredictionUnit& pu, const ComponentID compID, const CompArea& chromaArea, CccmModel& glmModel, int glmIdc, int lumaOffset, int& chromaOffset);
 #endif
 
 #if ENABLE_DIMD
@@ -749,11 +711,11 @@ public:
 
 #if JVET_AD0120_LBCCP
 #if JVET_AA0057_CCCM
-  uint32_t xCalculateCCCMcost(const PredictionUnit &pu, const ComponentID compID, int intraDir, const CompArea &chromaArea, CccmModel<CCCM_NUM_PARAMS> cccmModel[2], int modelThr);
-  uint32_t xCalculateCCLMcost(const PredictionUnit &pu, const ComponentID compID, int intraDir, const CompArea  &chromaArea, const CclmModel &cclmModel);
-  void     applyChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea &chromaArea, int intraDir, const CclmModel &cclmModel);
+  uint32_t xCalculateCCCMcost     (const PredictionUnit &pu, const ComponentID compID, int intraDir, const CompArea &chromaArea, CccmModel cccmModel[2], int modelThr);
+  uint32_t xCalculateCCLMcost     (const PredictionUnit &pu, const ComponentID compID, int intraDir, const CompArea  &chromaArea, const CclmModel &cclmModel);
+  void     applyChromaLM          (const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea &chromaArea, int intraDir, const CclmModel &cclmModel);
 #endif
-  void     filterPredInside(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu);
+  void     filterPredInside       (const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu);
 #endif
   template<bool lmcs>
   void geneWeightedPred           ( const ComponentID compId, PelBuf& pred, const PredictionUnit &pu, const PelBuf& interPred, const PelBuf& intraPred, const Pel* pLUT = nullptr );
@@ -763,8 +725,8 @@ public:
 #endif
 #if JVET_AC0112_IBC_CIIP
   void geneWeightedPred           ( const ComponentID compId, PelBuf& pred, const PredictionUnit &pu, const PelBuf& interPred, const PelBuf& intraPred);
-  void(*m_ibcCiipBlending)           ( Pel *pDst, int strideDst, const Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int shift, int width, int height );
-  static void ibcCiipBlending        ( Pel *pDst, int strideDst, const Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int shift, int width, int height );
+  void(*m_ibcCiipBlending)        ( Pel *pDst, int strideDst, const Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int shift, int width, int height );
+  static void ibcCiipBlending     ( Pel *pDst, int strideDst, const Pel *pSrc0, int strideSrc0, Pel *pSrc1, int strideSrc1, int w0, int w1, int shift, int width, int height );
 #endif
   void reorderPLT                 (CodingStructure& cs, Partitioner& partitioner, ComponentID compBegin, uint32_t numComp);
 #if !MERGE_ENC_OPT
@@ -810,20 +772,20 @@ public:
   void candidateSearchIntra          ( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
-  void convertDiff2Weight(int *pDiff, int *weights, const int start, const int foundCandiNum);
-  int  xCalTMPFusionNumber(const int maxNum, const int numIdx);
-  void xTMPBuildFusionCandidate(CodingUnit &cu, RefTemplateType tempType);
+  void convertDiff2Weight            (int *pDiff, int *weights, const int start, const int foundCandiNum);
+  int  xCalTMPFusionNumber           (const int maxNum, const int numIdx);
+  void xTMPBuildFusionCandidate      (CodingUnit &cu, RefTemplateType tempType);
 
-  void xCalcTmpFlmRefArea(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType, bool& leftPadding, bool& rightPadding, bool& abovePadding, bool& belowPadding);
-  void xGetTmpFlmRefBuf(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType);
-  void xCalTmpFlmParam(CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType);
-  void xGenerateTmpFlmPred(PelBuf& piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType, CodingUnit* pcCU, bool bDeriveDimdMode = true);
+  void xCalcTmpFlmRefArea            (CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType, bool& leftPadding, bool& rightPadding, bool& abovePadding, bool& belowPadding);
+  void xGetTmpFlmRefBuf              (CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType);
+  void xCalTmpFlmParam               (CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType);
+  void xGenerateTmpFlmPred           (PelBuf& piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType, CodingUnit* pcCU, bool bDeriveDimdMode = true);
 
-  void xTMPFusionCalcParams(CodingUnit* cu, CompArea area, CccmModel<TMP_FUSION_PARAMS>& tmpFusionModel, int foundCandiNum, RefTemplateType tempType, Pel* curPointTemplate, Pel* refPointTemplate[]);
-  void xTMPFusionCalcModels(CodingUnit* cu, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType);
-  void xTMPFusionApplyModel(PelBuf& piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType, CodingUnit* pcCU, bool bDeriveDimdMode = true);
+  void xTMPFusionCalcParams          (CodingUnit* cu, CompArea area, CccmModel& tmpFusionModel, int foundCandiNum, RefTemplateType tempType, Pel* curPointTemplate, Pel* refPointTemplate[]);
+  void xTMPFusionCalcModels          (CodingUnit* cu, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType);
+  void xTMPFusionApplyModel          (PelBuf& piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType, CodingUnit* pcCU, bool bDeriveDimdMode = true);
 
-  void xPadForInterpolation(CodingUnit* pcCU);
+  void xPadForInterpolation          (CodingUnit* pcCU);
 #endif
 
 #if JVET_AD0086_ENHANCED_INTRA_TMP
@@ -843,7 +805,7 @@ public:
 #endif
 #if JVET_W0069_TMP_BOUNDARY
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
-  bool generateTmDcPrediction(Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val, CodingUnit* cu);
+  bool generateTmDcPrediction        (Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val, CodingUnit* cu);
 #else
   bool generateTmDcPrediction        ( Pel* piPred, unsigned int uiStride, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int DC_Val );
 #endif
