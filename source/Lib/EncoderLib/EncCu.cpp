@@ -4362,11 +4362,16 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         if (checkaffBmMrg)
         {
           m_pcInterSearch->adjustAffineMergeCandidates(pu, affineBMMergeCtx);
-          affineBMMergeCtx.numValidMergeCand = AFFINE_ADAPTIVE_DMVR_MAX_CAND;
-          affineBMMergeCtx.maxNumMergeCand = AFFINE_ADAPTIVE_DMVR_MAX_CAND;
-          affineBMMergeCtx.numAffCandToTestEnc = affineBMMergeCtx.numAffCandToTestEnc >= AFFINE_ADAPTIVE_DMVR_MAX_CAND - 1 ? AFFINE_ADAPTIVE_DMVR_MAX_CAND : affineBMMergeCtx.numAffCandToTestEnc + 1;
         }
 #endif
+      }
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+      if (checkaffBmMrg)
+      {
+        affineBMMergeCtx.numValidMergeCand = AFFINE_ADAPTIVE_DMVR_MAX_CAND;
+        affineBMMergeCtx.maxNumMergeCand = AFFINE_ADAPTIVE_DMVR_MAX_CAND;
+        affineBMMergeCtx.numAffCandToTestEnc = affineBMMergeCtx.numAffCandToTestEnc >= AFFINE_ADAPTIVE_DMVR_MAX_CAND - 1 ? AFFINE_ADAPTIVE_DMVR_MAX_CAND : affineBMMergeCtx.numAffCandToTestEnc + 1;
       }
 #endif
       cu.affine = false;
