@@ -17028,6 +17028,10 @@ void PU::getRMVFAffineCand(const PredictionUnit &pu, AffineMergeCtx& affineMerge
       for (int i = 0; i < numAffNeighExtend2; i++)
       {
         getRMVFAffineGuideCand(pu, *npu[i], affMrgCtxTemp, mvpInfoVec, -1);
+        if (affMrgCtxTemp.numValidMergeCand == affMrgCtxTemp.maxNumMergeCand)
+        {
+          break;
+        }
       }
 #if JVET_W0090_ARMC_TM
     }
