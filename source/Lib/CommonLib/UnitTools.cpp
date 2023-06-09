@@ -2783,12 +2783,23 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
     }
   }
 
-  auto tryHistCCP = [&](const LutCCP &ccpLut)
+#if JVET_Z0118_GDR  
+  auto tryHistCCP = [&](const static_vector<CCPModelCandidate, MAX_NUM_HCCP_CANDS>& lut)
+#else
+  auto tryHistCCP = [&](const LutCCP& ccpLut)
+#endif
   {
+#if JVET_Z0118_GDR  
+    for (int idx = 0; idx < lut.size(); idx++)
+    {
+      CCPModelCandidate curModel;
+      pu.cs->getOneModelFromCCPLut(lut, curModel, idx);
+#else
     for (int idx = 0; idx < ccpLut.lutCCP.size(); idx++)
     {
       CCPModelCandidate curModel;
       pu.cs->getOneModelFromCCPLut(ccpLut.lutCCP, curModel, idx);
+#endif
       candList[maxCandIdx] = curModel;
       bool duplication = false;
       for (int j = 0; j < maxCandIdx; j++)
@@ -2821,7 +2832,21 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
     return -1;
   };
 
+#if JVET_Z0118_GDR
+  int ret;
+
+  if (pu.cs->isGdrEnabled() && pu.cs->isClean(pu))
+  {
+    ret = tryHistCCP(pu.cs->ccpLut.lutCCP1);  
+  }
+  else
+  {
+    ret = tryHistCCP(pu.cs->ccpLut.lutCCP0);
+  }
+#else
   int ret = tryHistCCP(pu.cs->ccpLut);
+#endif
+
   if (ret != -1)
   {
     return ret;
@@ -2924,7 +2949,16 @@ void CU::saveModelsInHCCP(const CodingUnit &cu)
 
   if (PU::isLMCMode(pu.intraDir[1]) && pu.curCand.type != CCP_TYPE_NONE)
   {
+#if JVET_Z0118_GDR   
+    if (pu.cs->isGdrEnabled() && pu.cs->isClean(pu))
+    {      
+      cs.addCCPToLut(cs.ccpLut.lutCCP1, pu.curCand, -1);     
+    }
+
+    cs.addCCPToLut(cs.ccpLut.lutCCP0, pu.curCand, -1);
+#else
     cs.addCCPToLut(cs.ccpLut.lutCCP, pu.curCand, -1);
+#endif
   }
 }
 

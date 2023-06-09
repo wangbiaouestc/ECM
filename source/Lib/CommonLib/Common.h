@@ -550,7 +550,12 @@ struct CCPModelCandidate
 
 struct LutCCP
 {
+#if JVET_Z0118_GDR  
+  static_vector<CCPModelCandidate, MAX_NUM_HCCP_CANDS> lutCCP0;
+  static_vector<CCPModelCandidate, MAX_NUM_HCCP_CANDS> lutCCP1;
+#else
   static_vector<CCPModelCandidate, MAX_NUM_HCCP_CANDS> lutCCP;
+#endif
   // Postions for future extensions
 };
 #endif
