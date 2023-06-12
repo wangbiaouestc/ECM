@@ -20390,7 +20390,7 @@ unsigned int PU::getSameNeigMotion(PredictionUnit &pu, MotionInfo& mi, Position 
 
     bool bIsSimilarMV = PU::identicalMvOBMC(currMi, mi, pu.cs->slice->getCheckLDC());
 #if JVET_AD0213_LIC_IMP
-    if (bIsSimilarMV)
+    if (bIsSimilarMV && !tmpPu->cs->sps->getRprEnabledFlag())
     {
       if (tmpPu->interDir == 3 && tmpPu->cu->bcwIdx != pu.cu->bcwIdx)
       {
@@ -20468,7 +20468,7 @@ unsigned int PU::getSameNeigMotion(PredictionUnit &pu, MotionInfo& mi, Position 
           {
             bSameMv = false;
           }
-          if (bSameMv)
+          if (bSameMv && !tmpPu->cs->sps->getRprEnabledFlag())
           {
             if (tmpPu1->cu->licFlag != tmpPu->cu->licFlag)
             {
@@ -20825,6 +20825,13 @@ bool CU::isLICFlagPresent(const CodingUnit& cu)
       CHECK(cu.firstPU->refIdxLC < 0, "cu.firstPU->refIdxLC < 0");
       return (cu.firstPU->refIdxLC >= cu.cs->slice->getNumNonScaledRefPic() ? false : true);
     }
+#if JVET_AD0213_LIC_IMP
+    if (PU::useRefPairList(*cu.firstPU))
+    {
+      CHECK(cu.firstPU->refPairIdx < 0, "cu.firstPU->refPairIdx < 0");
+      return (cu.firstPU->refPairIdx >= cu.cs->slice->getNumNonScaledRefPicPair() ? false : true);
+    }
+#endif
   }
 #endif
 #if JVET_Y0128_NON_CTC

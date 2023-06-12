@@ -14391,6 +14391,10 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
     {
       cu.licFlag = false;
       PU::spanLicFlags(*cu.firstPU, false);
+#if JVET_AD0213_LIC_IMP
+      tempCS->initStructData(encTestMode.qp);
+      continue;
+#endif
     }
   }
 #endif
@@ -14816,6 +14820,10 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
     {
       cu.licFlag = false;
       PU::spanLicFlags(*cu.firstPU, false);
+#if JVET_AD0213_LIC_IMP
+      tempCS->initStructData(encTestMode.qp);
+      continue;
+#endif
     }
   }
 #endif
@@ -16360,6 +16368,13 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
 
     pu = mhResults[i].pu;
     cu = mhResults[i].cu;
+#if JVET_AD0213_LIC_IMP
+    if (cu.licFlag && !PU::checkRprLicCondition(pu))
+    {
+      tempCS->initStructData(encTestMode.qp);
+      continue;
+    }
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
     if (!pu.mergeFlag && PU::useRefCombList(pu))
     {
