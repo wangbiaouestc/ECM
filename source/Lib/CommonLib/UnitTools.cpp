@@ -17982,6 +17982,7 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
           mi.mv[1] = Mv();
           mi.refIdx[1] = NOT_VALID;
         }
+        mi.bcwIdx = BCW_DEFAULT;
 
         mb.subBuf(g_miScaling.scale(Position{ x, y } - pu.lumaPos()), g_miScaling.scale(Size(puWidth, puHeight)))
           .fill(mi);
@@ -18031,6 +18032,7 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
 #if JVET_AA0070_RRIBC
     mi.rribcFlipType = mi.isIBCmot ? pu.cu->rribcFlipType : 0;
 #endif
+    mi.bcwIdx = pu.cu->bcwIdx;
 
     if( mi.isInter )
     {
@@ -18186,6 +18188,7 @@ void PU::spanMotionInfo2( PredictionUnit &pu, const MergeCtx &mrgCtx )
 #if INTER_LIC
     mi.usesLIC = pu.cu->licFlag;
 #endif
+    mi.bcwIdx  = pu.cu->bcwIdx;
 
     if( mi.isInter )
     {
@@ -19229,6 +19232,7 @@ void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8
     for (int x = 0; x < mb.width; x++)
     {
       motionIdx = (((4 * x + offsetX) << 1) + 5) * g_dis[distanceX] + lookUpY;
+      motionInfo[x].bcwIdx = pu.cu->bcwIdx;
 #if JVET_Y0065_GPM_INTRA
       tpmMask = motionIdx <= 0 ? (1 - isFlip) : isFlip;
       if (tpmMask == 0 && isIntra0)
@@ -19644,6 +19648,7 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
     for (int x = 0; x < mb.width; x++)
     {
       motionIdx = (((4 * x + offsetX) << 1) + 5) * g_dis[distanceX] + lookUpY;
+      mb.at(x, y).bcwIdx = pu.cu->bcwIdx;
 #if JVET_Y0065_GPM_INTRA
       tpmMask = motionIdx <= 0 ? (1 - isFlip) : isFlip;
       if (tpmMask == 0 && isIntra0)
@@ -20426,7 +20431,7 @@ unsigned int PU::getSameNeigMotion(PredictionUnit &pu, MotionInfo& mi, Position 
 #if JVET_AD0213_LIC_IMP
     if (bIsSimilarMV && !tmpPu->cs->sps->getRprEnabledFlag())
     {
-      if (tmpPu->interDir == 3 && tmpPu->cu->bcwIdx != pu.cu->bcwIdx)
+      if (mi.interDir == 3 && mi.bcwIdx != currMi.bcwIdx)
       {
         bIsSimilarMV = false;
       }
@@ -20498,7 +20503,7 @@ unsigned int PU::getSameNeigMotion(PredictionUnit &pu, MotionInfo& mi, Position 
 #if JVET_AD0213_LIC_IMP
         if (bSameMv)
         {
-          if (tmpPu1->interDir == 3 && tmpPu1->cu->bcwIdx != tmpPu->cu->bcwIdx)
+          if (mi.interDir == 3 && miNeigh.bcwIdx != mi.bcwIdx)
           {
             bSameMv = false;
           }
