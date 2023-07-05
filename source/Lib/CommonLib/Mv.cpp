@@ -167,7 +167,11 @@ bool MvdSuffixInfoMv::getMergedBinBudgetForMv(const unsigned int curBinBudget)
     }
   };
 
-  if (!useMergedBinBudget)
+  if (rplIdx == REF_PIC_LIST_X)
+  {
+    return false;
+  }
+  else if (!useMergedBinBudget)
   {
     actualRpl = rplIdx;
     return MvdSuffixInfoMv::getBinBudgetForMv(curBinBudget, rplIdx);
