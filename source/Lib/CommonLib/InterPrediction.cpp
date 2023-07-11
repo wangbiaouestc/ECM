@@ -21526,31 +21526,31 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
       AffineAMVPInfo affineAMVPInfo;
       PU::fillAffineMvpCand(tmpPU, eRefList, tmpPU.refIdx[eRefList], affineAMVPInfo);
 
-      const unsigned mvp_idx = tmpPU.mvpIdx[eRefList];
+      const unsigned mvpIdx = tmpPU.mvpIdx[eRefList];
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
       refListComb[idx].cost = std::numeric_limits<Distortion>::max();
       for (size_t i = 0; i < cMvdCandList[0].size(); i++)
       {
-        Mv mvLT = affineAMVPInfo.mvCandLT[mvp_idx] + cMvdCandList[0][i];
-        Mv mvRT = affineAMVPInfo.mvCandRT[mvp_idx] + cMvdCandList[1][i];
+        Mv mvLT = affineAMVPInfo.mvCandLT[mvpIdx] + cMvdCandList[0][i];
+        Mv mvRT = affineAMVPInfo.mvCandRT[mvpIdx] + cMvdCandList[1][i];
         mvRT += cMvdCandList[0][i];
 
         Mv mvLB;
         if (tmpPU.cu->affineType == AFFINEMODEL_6PARAM)
         {
-          mvLB = affineAMVPInfo.mvCandLB[mvp_idx] + cMvdCandList[2][i];
+          mvLB = affineAMVPInfo.mvCandLB[mvpIdx] + cMvdCandList[2][i];
           mvLB += cMvdCandList[0][i];
         }
 #else
-      Mv mvLT = affineAMVPInfo.mvCandLT[mvp_idx] + tmpPU.mvdAffi[eRefList][0];
-      Mv mvRT = affineAMVPInfo.mvCandRT[mvp_idx] + tmpPU.mvdAffi[eRefList][1];
+      Mv mvLT = affineAMVPInfo.mvCandLT[mvpIdx] + tmpPU.mvdAffi[eRefList][0];
+      Mv mvRT = affineAMVPInfo.mvCandRT[mvpIdx] + tmpPU.mvdAffi[eRefList][1];
       mvRT += tmpPU.mvdAffi[eRefList][0];
 
       Mv mvLB;
       if (tmpPU.cu->affineType == AFFINEMODEL_6PARAM)
       {
-        mvLB = affineAMVPInfo.mvCandLB[mvp_idx] + tmpPU.mvdAffi[eRefList][2];
+        mvLB = affineAMVPInfo.mvCandLB[mvpIdx] + tmpPU.mvdAffi[eRefList][2];
         mvLB += tmpPU.mvdAffi[eRefList][0];
       }
 #endif
@@ -22262,16 +22262,16 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
         }
         for (size_t i = 0; i < cMvdCandList[refList][0].size(); i++)
         {
-          unsigned mvp_idx = tmpPU.mvpIdx[refList];
+          unsigned mvpIdx = tmpPU.mvpIdx[refList];
 
-          Mv mvLT = affineAMVPInfo[refList][refIdx].mvCandLT[mvp_idx] + cMvdCandList[refList][0][i];
-          Mv mvRT = affineAMVPInfo[refList][refIdx].mvCandRT[mvp_idx] + cMvdCandList[refList][1][i];
+          Mv mvLT = affineAMVPInfo[refList][refIdx].mvCandLT[mvpIdx] + cMvdCandList[refList][0][i];
+          Mv mvRT = affineAMVPInfo[refList][refIdx].mvCandRT[mvpIdx] + cMvdCandList[refList][1][i];
           mvRT += cMvdCandList[refList][0][i];
 
           Mv mvLB;
           if (tmpPU.cu->affineType == AFFINEMODEL_6PARAM)
           {
-            mvLB = affineAMVPInfo[refList][refIdx].mvCandLB[mvp_idx] + cMvdCandList[refList][2][i];
+            mvLB = affineAMVPInfo[refList][refIdx].mvCandLB[mvpIdx] + cMvdCandList[refList][2][i];
             mvLB += cMvdCandList[refList][0][i];
           }
 
@@ -22317,16 +22317,16 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
         PU::fillAffineMvpCand(tmpPU, eRefList, tmpPU.refIdx[eRefList], affineAMVPInfo[eRefList]);
 
 #if !JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-        const unsigned mvp_idx = tmpPU.mvpIdx[eRefList];
+        const unsigned mvpIdx = tmpPU.mvpIdx[eRefList];
 
-        Mv mvLT = affineAMVPInfo[eRefList].mvCandLT[mvp_idx] + tmpPU.mvdAffi[eRefList][0];
-        Mv mvRT = affineAMVPInfo[eRefList].mvCandRT[mvp_idx] + tmpPU.mvdAffi[eRefList][1];
+        Mv mvLT = affineAMVPInfo[eRefList].mvCandLT[mvpIdx] + tmpPU.mvdAffi[eRefList][0];
+        Mv mvRT = affineAMVPInfo[eRefList].mvCandRT[mvpIdx] + tmpPU.mvdAffi[eRefList][1];
         mvRT += tmpPU.mvdAffi[eRefList][0];
 
         Mv mvLB;
         if (tmpPU.cu->affineType == AFFINEMODEL_6PARAM)
         {
-          mvLB = affineAMVPInfo[eRefList].mvCandLB[mvp_idx] + tmpPU.mvdAffi[eRefList][2];
+          mvLB = affineAMVPInfo[eRefList].mvCandLB[mvpIdx] + tmpPU.mvdAffi[eRefList][2];
           mvLB += tmpPU.mvdAffi[eRefList][0];
         }
  
@@ -22346,13 +22346,13 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           MotionInfoPred miPred;
           miPred.interDir = 3;
           int refList = 0;
-          unsigned mvp_idx = tmpPU.mvpIdx[refList];
+          unsigned mvpIdx = tmpPU.mvpIdx[refList];
 #if JVET_AD0140_MVD_PREDICTION
-          Mv mvLT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLT[mvp_idx] + cMvdCandList[refList][0][i];
-          Mv mvRT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandRT[mvp_idx] + cMvdCandList[refList][1][i];
+          Mv mvLT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLT[mvpIdx] + cMvdCandList[refList][0][i];
+          Mv mvRT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandRT[mvpIdx] + cMvdCandList[refList][1][i];
 #else
-          Mv mvLT = affineAMVPInfo[refList].mvCandLT[mvp_idx] + cMvdCandList[refList][0][i];
-          Mv mvRT = affineAMVPInfo[refList].mvCandRT[mvp_idx] + cMvdCandList[refList][1][i];
+          Mv mvLT = affineAMVPInfo[refList].mvCandLT[mvpIdx] + cMvdCandList[refList][0][i];
+          Mv mvRT = affineAMVPInfo[refList].mvCandRT[mvpIdx] + cMvdCandList[refList][1][i];
 #endif
           mvRT += cMvdCandList[refList][0][i];
 
@@ -22360,9 +22360,9 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           if (tmpPU.cu->affineType == AFFINEMODEL_6PARAM)
           {
 #if JVET_AD0140_MVD_PREDICTION
-            mvLB = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLB[mvp_idx] + cMvdCandList[refList][2][i];
+            mvLB = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLB[mvpIdx] + cMvdCandList[refList][2][i];
 #else
-            mvLB = affineAMVPInfo[refList].mvCandLB[mvp_idx] + cMvdCandList[refList][2][i];
+            mvLB = affineAMVPInfo[refList].mvCandLB[mvpIdx] + cMvdCandList[refList][2][i];
 #endif
             mvLB += cMvdCandList[refList][0][i];
           }
@@ -22379,22 +22379,22 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           miPred.mvAffi[refList][1] = tmpPU.mvAffi[refList][1];
           miPred.mvAffi[refList][2] = tmpPU.mvAffi[refList][2];
           refList = 1;
-          mvp_idx = tmpPU.mvpIdx[refList];
+          mvpIdx = tmpPU.mvpIdx[refList];
 #if JVET_AD0140_MVD_PREDICTION
-          mvLT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLT[mvp_idx] + cMvdCandList[refList][0][j];
-          mvRT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandRT[mvp_idx] + cMvdCandList[refList][1][j];
+          mvLT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLT[mvpIdx] + cMvdCandList[refList][0][j];
+          mvRT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandRT[mvpIdx] + cMvdCandList[refList][1][j];
 #else
-          mvLT = affineAMVPInfo[refList].mvCandLT[mvp_idx] + cMvdCandList[refList][0][j];
-          mvRT = affineAMVPInfo[refList].mvCandRT[mvp_idx] + cMvdCandList[refList][1][j];
+          mvLT = affineAMVPInfo[refList].mvCandLT[mvpIdx] + cMvdCandList[refList][0][j];
+          mvRT = affineAMVPInfo[refList].mvCandRT[mvpIdx] + cMvdCandList[refList][1][j];
 #endif
           mvRT += cMvdCandList[refList][0][j];
 
           if (tmpPU.cu->affineType == AFFINEMODEL_6PARAM)
           {
 #if JVET_AD0140_MVD_PREDICTION
-            mvLB = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLB[mvp_idx] + cMvdCandList[refList][2][j];
+            mvLB = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLB[mvpIdx] + cMvdCandList[refList][2][j];
 #else
-            mvLB = affineAMVPInfo[refList].mvCandLB[mvp_idx] + cMvdCandList[refList][2][j];
+            mvLB = affineAMVPInfo[refList].mvCandLB[mvpIdx] + cMvdCandList[refList][2][j];
 #endif
             mvLB += cMvdCandList[refList][0][j];
           }
@@ -22717,8 +22717,8 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
 
         for (size_t i = 0; i < cMvdCandList[refList][0].size(); i++)
         {
-          const unsigned mvp_idx = tmpPU.mvpIdx[refList];
-          tmpPU.mv[refList] = amvpInfo[refList][refIdx].mvCand[mvp_idx] + cMvdCandList[refList][0][i];
+          const unsigned mvpIdx = tmpPU.mvpIdx[refList];
+          tmpPU.mv[refList] = amvpInfo[refList][refIdx].mvCand[mvpIdx] + cMvdCandList[refList][0][i];
           tmpPU.mv[refList].mvCliptoStorageBitDepth();
 
           AffineMergeCtx tmp;
