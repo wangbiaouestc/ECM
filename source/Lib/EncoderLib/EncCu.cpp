@@ -14758,7 +14758,7 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
   }
 #endif
 
-  cu.firstPU->interDir = 10;
+  cu.firstPU->interDir = MAX_UCHAR;
 
 
 #if JVET_AD0140_MVD_PREDICTION
