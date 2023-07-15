@@ -15372,6 +15372,14 @@ void InterPrediction::deriveTMMv(PredictionUnit& pu)
       RefPicList eTargetPicList = (minCostUni[0] <= minCostUni[1]) ? REF_PIC_LIST_1 : REF_PIC_LIST_0;
       MvField    mvfBetterUni(pu.mv[1 - eTargetPicList], pu.refIdx[1 - eTargetPicList]);
       Distortion biCost = deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), eTargetPicList, pu.refIdx[eTargetPicList], 0, pu.mv[eTargetPicList], &mvfBetterUni);
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+      if ((biCost > (minCostUni[1 - eTargetPicList] + (minCostUni[1 - eTargetPicList] >> 3))) || !pu.cs->slice->getCheckLDC())
+      {
+        eTargetPicList = (minCostUni[0] <= minCostUni[1]) ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+        MvField mvfBetterUni2nd(pu.mv[1 - eTargetPicList], pu.refIdx[1 - eTargetPicList]);
+        biCost = deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), eTargetPicList, pu.refIdx[eTargetPicList], TM_MAX_NUM_OF_ITERATIONS, pu.mv[eTargetPicList], &mvfBetterUni2nd);
+      }
+#endif
       *tmCost = biCost;
     }
     else
@@ -15382,7 +15390,9 @@ void InterPrediction::deriveTMMv(PredictionUnit& pu)
 
   if (pu.cu->slice->isInterB() && pu.interDir == 3
 #if MULTI_PASS_DMVR
+#if !JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
     && !PU::checkBDMVRCondition(pu)
+#endif
 #endif
     )
   {
@@ -15394,6 +15404,14 @@ void InterPrediction::deriveTMMv(PredictionUnit& pu)
     RefPicList eTargetPicList = (minCostUni[0] <= minCostUni[1]) ? REF_PIC_LIST_1 : REF_PIC_LIST_0;
     MvField    mvfBetterUni(pu.mv[1 - eTargetPicList], pu.refIdx[1 - eTargetPicList]);
     Distortion minCostBi = deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), eTargetPicList, pu.refIdx[eTargetPicList], TM_MAX_NUM_OF_ITERATIONS, pu.mv[eTargetPicList], &mvfBetterUni);
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+    if ((minCostBi > (minCostUni[1 - eTargetPicList] + (minCostUni[1 - eTargetPicList] >> 3))) || !pu.cs->slice->getCheckLDC())
+    {
+      eTargetPicList = (minCostUni[0] <= minCostUni[1]) ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+      MvField mvfBetterUni2nd(pu.mv[1 - eTargetPicList], pu.refIdx[1 - eTargetPicList]);
+      minCostBi = deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), eTargetPicList, pu.refIdx[eTargetPicList], TM_MAX_NUM_OF_ITERATIONS, pu.mv[eTargetPicList], &mvfBetterUni2nd);
+    }
+#endif
 
     if (minCostBi > (minCostUni[1 - eTargetPicList] + (minCostUni[1 - eTargetPicList] >> 3)))
     {
@@ -16143,6 +16161,9 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
   // Search pattern configuration
   static const Mv patternCross  [4] = { Mv(0, 1), Mv(1, 0), Mv(0, -1), Mv(-1, 0) };
   static const Mv patternDiamond[8] = { Mv(0, 2), Mv(1, 1), Mv(2, 0), Mv(1, -1), Mv(0, -2), Mv(-1, -1), Mv(-2, 0), Mv(-1, 1) };
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+  static const Mv patternDiamond16[16] = { Mv(0, 2), Mv(1, 1), Mv(2, 0), Mv(1, -1), Mv(0, -2), Mv(-1, -1), Mv(-2, 0), Mv(-1, 1), Mv(0, 4), Mv(3, 3), Mv(4, 0), Mv(3, -3), Mv(0, -4), Mv(-3, -3), Mv(-4, 0), Mv(-3, 3) };
+#endif
 
   int       directStart = 0, directEnd = 0, directRounding = 0, directMask = 0;
   const Mv *pSearchOffset = nullptr;
@@ -16167,10 +16188,27 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
     directRounding = 8;
     directMask     = 0x07;
     pSearchOffset  = patternDiamond;
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+    if (!CU::isIBC(m_cu))
+    {
+      directEnd      = 15;
+      directRounding = 16;
+      directMask     = 0x0F;
+      pSearchOffset  = patternDiamond16;
+    }
+#endif
 #if MULTI_PASS_DMVR
     memset(m_tmCostArrayDiamond, -1, sizeof(m_tmCostArrayDiamond));
     costArray      = m_tmCostArrayDiamond;
     costArray[8]   = m_minCost;
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+    if (!CU::isIBC(m_cu))
+    {
+      memset(m_tmCostArrayDiamond16, -1, sizeof(m_tmCostArrayDiamond16));
+      costArray      = m_tmCostArrayDiamond16;
+      costArray[17]   = m_minCost;
+    }
+#endif
 #endif
   }
   else
@@ -16193,6 +16231,9 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
   const uint32_t ctuSize = m_pu.cs->slice->getSPS()->getMaxCUWidth();
 #endif
 #endif
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+  bool earlyStop = false;
+#endif
 
   // Iterative search
   for (int uiRound = 0; uiRound < maxSearchRounds; uiRound++)
@@ -16202,7 +16243,19 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
 #if JVET_X0056_DMVD_EARLY_TERMINATION
     Distortion prevMinCost = m_minCost;
 #endif
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+    if (earlyStop)
+    {
+      break;
+    }
+    int diamondLoopNum = !CU::isIBC(m_cu) && (!m_cu.slice->getCheckLDC() || (m_cu.slice->getCheckLDC() && m_pu.lwidth()*m_pu.lheight() >= 256)) && searchPattern == TMSEARCH_DIAMOND && uiRound > 0 ? 2 : 1;
+    for (int diamondIdx = 0; diamondIdx < diamondLoopNum; diamondIdx++)
+    {
+      int idxShift = ((uiRound == 0 || CU::isIBC(m_cu)) ? 0 : (diamondIdx - (directStart < 8 ? 0 : 1))) << 3;
+      for (int nIdx = directStart + idxShift; nIdx <= directEnd + idxShift; nIdx++)
+#else
     for (int nIdx = directStart; nIdx <= directEnd; nIdx++)
+#endif
     {
       int nDirect = (nIdx + directRounding) & directMask;
 
@@ -16251,11 +16304,17 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
 
     if (directBest == -1)
     {
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+      earlyStop = true;
+#endif
       break;
     }
 #if JVET_X0056_DMVD_EARLY_TERMINATION
     if (uiRound > 0 && prevMinCost < m_minCost + m_earlyTerminateTh)
     {
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+      earlyStop = true;
+#endif
       break;
     }
 #endif
@@ -16268,6 +16327,9 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
     if ((uiRound + 1) < maxSearchRounds)
     {
       xNextTmCostAarray<searchPattern>(directBest);
+    }
+#endif
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
     }
 #endif
   }
