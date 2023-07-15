@@ -1279,6 +1279,9 @@ public:
 #if MULTI_PASS_DMVR
   Distortion m_tmCostArrayDiamond[9];
   Distortion m_tmCostArrayCross[5];
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+  Distortion m_tmCostArrayDiamond16[17];
+#endif
 #endif
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
