@@ -2783,12 +2783,23 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
     }
   }
 
-  auto tryHistCCP = [&](const LutCCP &ccpLut)
+#if JVET_Z0118_GDR  
+  auto tryHistCCP = [&](const static_vector<CCPModelCandidate, MAX_NUM_HCCP_CANDS>& lut)
+#else
+  auto tryHistCCP = [&](const LutCCP& ccpLut)
+#endif
   {
+#if JVET_Z0118_GDR  
+    for (int idx = 0; idx < lut.size(); idx++)
+    {
+      CCPModelCandidate curModel;
+      pu.cs->getOneModelFromCCPLut(lut, curModel, idx);
+#else
     for (int idx = 0; idx < ccpLut.lutCCP.size(); idx++)
     {
       CCPModelCandidate curModel;
       pu.cs->getOneModelFromCCPLut(ccpLut.lutCCP, curModel, idx);
+#endif
       candList[maxCandIdx] = curModel;
       bool duplication = false;
       for (int j = 0; j < maxCandIdx; j++)
@@ -2821,7 +2832,21 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
     return -1;
   };
 
+#if JVET_Z0118_GDR
+  int ret;
+
+  if (pu.cs->isGdrEnabled() && pu.cs->isClean(pu))
+  {
+    ret = tryHistCCP(pu.cs->ccpLut.lutCCP1);  
+  }
+  else
+  {
+    ret = tryHistCCP(pu.cs->ccpLut.lutCCP0);
+  }
+#else
   int ret = tryHistCCP(pu.cs->ccpLut);
+#endif
+
   if (ret != -1)
   {
     return ret;
@@ -2924,7 +2949,16 @@ void CU::saveModelsInHCCP(const CodingUnit &cu)
 
   if (PU::isLMCMode(pu.intraDir[1]) && pu.curCand.type != CCP_TYPE_NONE)
   {
+#if JVET_Z0118_GDR   
+    if (pu.cs->isGdrEnabled() && pu.cs->isClean(pu))
+    {      
+      cs.addCCPToLut(cs.ccpLut.lutCCP1, pu.curCand, -1);     
+    }
+
+    cs.addCCPToLut(cs.ccpLut.lutCCP0, pu.curCand, -1);
+#else
     cs.addCCPToLut(cs.ccpLut.lutCCP, pu.curCand, -1);
+#endif
   }
 }
 
@@ -2957,78 +2991,51 @@ void PU::cclmModelToCcpParams(const ComponentID compId, CCPModelCandidate& param
 #endif
 }
 
-template <int NUM>
 #if JVET_AB0174_CCCM_DIV_FREE
-void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<NUM> cccmModelCb[2], const CccmModel<NUM> cccmModelCr[2], const int yThres, const int cccmLumaOffset)
+void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel cccmModelCb[2], const CccmModel cccmModelCr[2], const int yThres, const int cccmLumaOffset)
 #else
-void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<NUM> cccmModelCb[2], const CccmModel<NUM> cccmModelCr[2], const int yThres)
+void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel cccmModelCb[2], const CccmModel cccmModelCr[2], const int yThres)
 #endif
 {
-  std::memcpy(params.params[0], cccmModelCb[0].params, sizeof(TCccmCoeff) * NUM);
-  std::memcpy(params.params[1], cccmModelCr[0].params, sizeof(TCccmCoeff) * NUM);
+  std::memcpy(params.params[0], cccmModelCb[0].params.data(), sizeof(TCccmCoeff) * cccmModelCb[0].getNumParams() );
+  std::memcpy(params.params[1], cccmModelCr[0].params.data(), sizeof(TCccmCoeff) * cccmModelCr[0].getNumParams() );
   params.midVal = cccmModelCb[0].midVal;
   params.bd = cccmModelCb[0].bd;
 #if JVET_AB0174_CCCM_DIV_FREE
   params.lumaOffset = cccmLumaOffset;
 #endif
 #if MMLM
-  std::memcpy(params.params2[0], cccmModelCb[1].params, sizeof(TCccmCoeff) * NUM);
-  std::memcpy(params.params2[1], cccmModelCr[1].params, sizeof(TCccmCoeff) * NUM);
+  std::memcpy(params.params2[0], cccmModelCb[1].params.data(), sizeof(TCccmCoeff) * cccmModelCb[1].getNumParams() );
+  std::memcpy(params.params2[1], cccmModelCr[1].params.data(), sizeof(TCccmCoeff) * cccmModelCr[1].getNumParams() );
   params.yThres = yThres;
 #endif
 }
 
-template<int NUM>
-void PU::ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<NUM> cccmModelCb[2], CccmModel<NUM> cccmModelCr[2])
+void PU::ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel cccmModelCb[2], CccmModel cccmModelCr[2])
 {
-  std::memcpy(cccmModelCb[0].params, params.params[0], sizeof(TCccmCoeff) * NUM);
-  std::memcpy(cccmModelCr[0].params, params.params[1], sizeof(TCccmCoeff) * NUM);
+  std::memcpy(&cccmModelCb[0].params[0], params.params[0], sizeof(TCccmCoeff) * cccmModelCb[0].getNumParams() );
+  std::memcpy(&cccmModelCr[0].params[0], params.params[1], sizeof(TCccmCoeff) * cccmModelCr[0].getNumParams() );
   cccmModelCb[0].midVal = cccmModelCr[0].midVal = params.midVal;
   cccmModelCb[0].bd = cccmModelCr[0].bd = params.bd;
 #if MMLM
   if (params.type & CCP_TYPE_MMLM)
   {
-    std::memcpy(cccmModelCb[1].params, params.params2[0], sizeof(TCccmCoeff) * NUM);
-    std::memcpy(cccmModelCr[1].params, params.params2[1], sizeof(TCccmCoeff) * NUM);
+    std::memcpy(&cccmModelCb[1].params[0], params.params2[0], sizeof(TCccmCoeff) * cccmModelCb[1].getNumParams() );
+    std::memcpy(&cccmModelCr[1].params[0], params.params2[1], sizeof(TCccmCoeff) * cccmModelCr[1].getNumParams() );
     cccmModelCb[1].midVal = cccmModelCr[1].midVal = params.midVal;
     cccmModelCb[1].bd = cccmModelCr[1].bd = params.bd;
   }
 #endif
 }
 
-#if JVET_AB0174_CCCM_DIV_FREE
-template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_NUM_PARAMS> cccmModelCr[2], const int yThres, const int cccmLumaOffset);
-#else
-template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_NUM_PARAMS> cccmModelCr[2], const int yThres);
-#endif
-template void PU::ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<CCCM_NUM_PARAMS> cccmModelCb[2], CccmModel<CCCM_NUM_PARAMS> cccmModelCr[2]);
-
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
-#if JVET_AB0174_CCCM_DIV_FREE
-template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCr[2], const int yThres, const int cccmLumaOffset);
-#else
-template void PU::cccmModelToCcpParams(CCPModelCandidate &params, const CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCr[2], const int yThres);
-#endif
-template void PU::ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCb[2], CccmModel<CCCM_NO_SUB_NUM_PARAMS> cccmModelCr[2]);
-#endif
-
-#if JVET_AD0202_CCCM_MDF
-#if JVET_AB0174_CCCM_DIV_FREE
-template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCr[2], const int yThres, const int cccmLumaOffset);
-#else
-template void PU::cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCb[2], const CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCr[2], const int yThres);
-#endif
-template void PU::ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCb[2], CccmModel<CCCM_MULTI_PRED_FILTER_NUM_PARAMS> cccmModelCr[2]);
-#endif
-
 #if JVET_AB0092_GLM_WITH_LUMA
 #if JVET_AB0174_CCCM_DIV_FREE
-void PU::glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel<GLM_NUM_PARAMS> &glmModel, const int lumaOffset)
+void PU::glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel& glmModel, const int lumaOffset)
 #else
-void PU::glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel<GLM_NUM_PARAMS> &glmModel)
+void PU::glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel& glmModel)
 #endif
 {
-  std::memcpy(params.params[compId - 1], glmModel.params, sizeof(TCccmCoeff) * GLM_NUM_PARAMS);
+  std::memcpy(params.params[compId - 1], glmModel.params.data(), sizeof(TCccmCoeff) * GLM_NUM_PARAMS);
   params.midVal = glmModel.midVal;
   params.bd = glmModel.bd;
 #if JVET_AB0174_CCCM_DIV_FREE
@@ -3036,9 +3043,9 @@ void PU::glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params
 #endif
 }
 
-void PU::ccpParamsToGlmModel(const ComponentID compId, const CCPModelCandidate& params, CccmModel<GLM_NUM_PARAMS> &glmModel)
+void PU::ccpParamsToGlmModel(const ComponentID compId, const CCPModelCandidate& params, CccmModel& glmModel)
 {
-  std::memcpy(glmModel.params, params.params[compId - 1], sizeof(TCccmCoeff) * GLM_NUM_PARAMS);
+  std::memcpy(&glmModel.params[0], params.params[compId - 1], sizeof(TCccmCoeff) * GLM_NUM_PARAMS);
   glmModel.midVal = params.midVal;
   glmModel.bd = params.bd;
 }
@@ -17055,6 +17062,10 @@ void PU::getRMVFAffineCand(const PredictionUnit &pu, AffineMergeCtx& affineMerge
       for (int i = 0; i < numAffNeighExtend2; i++)
       {
         getRMVFAffineGuideCand(pu, *npu[i], affMrgCtxTemp, mvpInfoVec, -1);
+        if (affMrgCtxTemp.numValidMergeCand == affMrgCtxTemp.maxNumMergeCand)
+        {
+          break;
+        }
       }
 #if JVET_W0090_ARMC_TM
     }
@@ -17971,6 +17982,7 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
           mi.mv[1] = Mv();
           mi.refIdx[1] = NOT_VALID;
         }
+        mi.bcwIdx = BCW_DEFAULT;
 
         mb.subBuf(g_miScaling.scale(Position{ x, y } - pu.lumaPos()), g_miScaling.scale(Size(puWidth, puHeight)))
           .fill(mi);
@@ -18020,6 +18032,7 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
 #if JVET_AA0070_RRIBC
     mi.rribcFlipType = mi.isIBCmot ? pu.cu->rribcFlipType : 0;
 #endif
+    mi.bcwIdx = pu.cu->bcwIdx;
 
     if( mi.isInter )
     {
@@ -18175,6 +18188,7 @@ void PU::spanMotionInfo2( PredictionUnit &pu, const MergeCtx &mrgCtx )
 #if INTER_LIC
     mi.usesLIC = pu.cu->licFlag;
 #endif
+    mi.bcwIdx  = pu.cu->bcwIdx;
 
     if( mi.isInter )
     {
@@ -19218,6 +19232,7 @@ void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8
     for (int x = 0; x < mb.width; x++)
     {
       motionIdx = (((4 * x + offsetX) << 1) + 5) * g_dis[distanceX] + lookUpY;
+      motionInfo[x].bcwIdx = pu.cu->bcwIdx;
 #if JVET_Y0065_GPM_INTRA
       tpmMask = motionIdx <= 0 ? (1 - isFlip) : isFlip;
       if (tpmMask == 0 && isIntra0)
@@ -19633,6 +19648,7 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
     for (int x = 0; x < mb.width; x++)
     {
       motionIdx = (((4 * x + offsetX) << 1) + 5) * g_dis[distanceX] + lookUpY;
+      mb.at(x, y).bcwIdx = pu.cu->bcwIdx;
 #if JVET_Y0065_GPM_INTRA
       tpmMask = motionIdx <= 0 ? (1 - isFlip) : isFlip;
       if (tpmMask == 0 && isIntra0)
@@ -20413,9 +20429,9 @@ unsigned int PU::getSameNeigMotion(PredictionUnit &pu, MotionInfo& mi, Position 
 
     bool bIsSimilarMV = PU::identicalMvOBMC(currMi, mi, pu.cs->slice->getCheckLDC());
 #if JVET_AD0213_LIC_IMP
-    if (bIsSimilarMV)
+    if (bIsSimilarMV && !tmpPu->cs->sps->getRprEnabledFlag())
     {
-      if (tmpPu->interDir == 3 && tmpPu->cu->bcwIdx != pu.cu->bcwIdx)
+      if (mi.interDir == 3 && mi.bcwIdx != currMi.bcwIdx)
       {
         bIsSimilarMV = false;
       }
@@ -20487,11 +20503,11 @@ unsigned int PU::getSameNeigMotion(PredictionUnit &pu, MotionInfo& mi, Position 
 #if JVET_AD0213_LIC_IMP
         if (bSameMv)
         {
-          if (tmpPu1->interDir == 3 && tmpPu1->cu->bcwIdx != tmpPu->cu->bcwIdx)
+          if (mi.interDir == 3 && miNeigh.bcwIdx != mi.bcwIdx)
           {
             bSameMv = false;
           }
-          if (bSameMv)
+          if (bSameMv && !tmpPu->cs->sps->getRprEnabledFlag())
           {
             if (tmpPu1->cu->licFlag != tmpPu->cu->licFlag)
             {
@@ -20848,6 +20864,13 @@ bool CU::isLICFlagPresent(const CodingUnit& cu)
       CHECK(cu.firstPU->refIdxLC < 0, "cu.firstPU->refIdxLC < 0");
       return (cu.firstPU->refIdxLC >= cu.cs->slice->getNumNonScaledRefPic() ? false : true);
     }
+#if JVET_AD0213_LIC_IMP
+    if (PU::useRefPairList(*cu.firstPU))
+    {
+      CHECK(cu.firstPU->refPairIdx < 0, "cu.firstPU->refPairIdx < 0");
+      return (cu.firstPU->refPairIdx >= cu.cs->slice->getNumNonScaledRefPicPair() ? false : true);
+    }
+#endif
   }
 #endif
 #if JVET_Y0128_NON_CTC

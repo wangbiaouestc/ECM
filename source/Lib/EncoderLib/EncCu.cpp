@@ -4362,11 +4362,16 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         if (checkaffBmMrg)
         {
           m_pcInterSearch->adjustAffineMergeCandidates(pu, affineBMMergeCtx);
-          affineBMMergeCtx.numValidMergeCand = AFFINE_ADAPTIVE_DMVR_MAX_CAND;
-          affineBMMergeCtx.maxNumMergeCand = AFFINE_ADAPTIVE_DMVR_MAX_CAND;
-          affineBMMergeCtx.numAffCandToTestEnc = affineBMMergeCtx.numAffCandToTestEnc >= AFFINE_ADAPTIVE_DMVR_MAX_CAND - 1 ? AFFINE_ADAPTIVE_DMVR_MAX_CAND : affineBMMergeCtx.numAffCandToTestEnc + 1;
         }
 #endif
+      }
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+      if (checkaffBmMrg)
+      {
+        affineBMMergeCtx.numValidMergeCand = AFFINE_ADAPTIVE_DMVR_MAX_CAND;
+        affineBMMergeCtx.maxNumMergeCand = AFFINE_ADAPTIVE_DMVR_MAX_CAND;
+        affineBMMergeCtx.numAffCandToTestEnc = affineBMMergeCtx.numAffCandToTestEnc >= AFFINE_ADAPTIVE_DMVR_MAX_CAND - 1 ? AFFINE_ADAPTIVE_DMVR_MAX_CAND : affineBMMergeCtx.numAffCandToTestEnc + 1;
       }
 #endif
       cu.affine = false;
@@ -14386,6 +14391,10 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
     {
       cu.licFlag = false;
       PU::spanLicFlags(*cu.firstPU, false);
+#if JVET_AD0213_LIC_IMP
+      tempCS->initStructData(encTestMode.qp);
+      continue;
+#endif
     }
   }
 #endif
@@ -14749,7 +14758,7 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
   }
 #endif
 
-  cu.firstPU->interDir = 10;
+  cu.firstPU->interDir = MAX_UCHAR;
 
 
 #if JVET_AD0140_MVD_PREDICTION
@@ -14811,6 +14820,10 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
     {
       cu.licFlag = false;
       PU::spanLicFlags(*cu.firstPU, false);
+#if JVET_AD0213_LIC_IMP
+      tempCS->initStructData(encTestMode.qp);
+      continue;
+#endif
     }
   }
 #endif
@@ -16355,6 +16368,13 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
 
     pu = mhResults[i].pu;
     cu = mhResults[i].cu;
+#if JVET_AD0213_LIC_IMP
+    if (cu.licFlag && !PU::checkRprLicCondition(pu))
+    {
+      tempCS->initStructData(encTestMode.qp);
+      continue;
+    }
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
     if (!pu.mergeFlag && PU::useRefCombList(pu))
     {

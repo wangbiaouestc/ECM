@@ -1845,7 +1845,12 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 #if JVET_AD0188_CCP_MERGE
   if ((pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU()))
   {
+#if JVET_Z0118_GDR
+    cs.ccpLut.lutCCP0.resize(0);
+    cs.ccpLut.lutCCP1.resize(0);
+#else
     cs.ccpLut.lutCCP.resize(0);
+#endif
   }
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -1921,7 +1926,12 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 #if JVET_AD0188_CCP_MERGE
     if ((pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU()) && cs.pps->ctuIsTileColBd(ctuXPosInCtus))
     {
+#if JVET_Z0118_GDR
+      cs.ccpLut.lutCCP0.resize(0);
+      cs.ccpLut.lutCCP1.resize(0);
+#else
       cs.ccpLut.lutCCP.resize(0);
+#endif
     }
 #endif
 

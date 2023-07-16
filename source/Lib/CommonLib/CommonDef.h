@@ -1434,6 +1434,11 @@ static const int MVD_PREDICTION_EGC_OFFSET =                     1;
 static const int MAX_NUM_REFIDX =                                5;
 static const int MAX_NUM_CANDS =                                64;
 #endif
+#if JVET_AA0057_CCCM
+// max number of parameters used in CCCM related methods
+static const int CCCM_NUM_PARAMS_MAX =      CCCM_NO_SUB_NUM_PARAMS;
+static const int CCCM_REF_SAMPLES_MAX =       CCCM_MAX_REF_SAMPLES;
+#endif
 
 // ====================================================================================================================
 // Macro functions

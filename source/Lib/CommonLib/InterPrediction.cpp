@@ -2661,7 +2661,10 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
     CHECK(m_storeBeforeLIC || pu.ciipFlag, "m_storeBeforeLIC || pu.ciip");
     if (pu.cu->licFlag && !bi)
     {
-      dstBuf.linearTransform(pu.cu->licScale[m_iRefListIdx][compID], m_LICShift, pu.cu->licOffset[m_iRefListIdx][compID], true, clpRng);
+      if (!pu.cs->sps->getRprEnabledFlag())
+      {
+        dstBuf.linearTransform(pu.cu->licScale[m_iRefListIdx][compID], m_LICShift, pu.cu->licOffset[m_iRefListIdx][compID], true, clpRng);
+      }
     }
     return;
   }
@@ -2720,7 +2723,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
 #endif
 #if RPR_ENABLE
 #if JVET_AD0213_LIC_IMP
-      if (m_encMotionEstimation || PU::checkRprLicCondition(pu))
+      if ((m_encMotionEstimation && !refPic->isRefScaled(pu.cs->pps)) || (!m_encMotionEstimation && PU::checkRprLicCondition(pu)))
 #else
       if (PU::checkRprLicCondition(pu))
 #endif
@@ -4121,7 +4124,7 @@ void InterPrediction::xPredAffineBlk(const ComponentID &compID, const Prediction
 #endif
 #if INTER_LIC
 #if JVET_AD0213_LIC_IMP
-  if (pu.cu->licFlag)
+  if (pu.cu->licFlag && (!refPic->isRefScaled(pu.cs->pps) || enable1x1))
   {
     if (bi)
     {
@@ -4149,7 +4152,7 @@ void InterPrediction::xPredAffineBlk(const ComponentID &compID, const Prediction
 
 #if RPR_ENABLE
 #if JVET_AD0213_LIC_IMP
-  if (pu.cu->licFlag && (m_encMotionEstimation || PU::checkRprLicCondition(pu)))
+  if (pu.cu->licFlag && ((m_encMotionEstimation && !refPic->isRefScaled(pu.cs->pps)) || (!m_encMotionEstimation && PU::checkRprLicCondition(pu))))
 #else
   if( pu.cu->licFlag && PU::checkRprLicCondition( pu ) )
 #endif
@@ -11265,53 +11268,56 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
         int cWidth = pu.Y().width;
         int cHeight = pu.Y().height;
 
-        if (m_bAMLTemplateAvailabe[0])
-        {
-          CHECK(m_numTemplate[COMPONENT_Y][0] != cWidth, "invalid template width");
-        }
-        if (m_bAMLTemplateAvailabe[1])
-        {
-          CHECK(m_numTemplate[COMPONENT_Y][1] != cHeight, "invalid template height");
-        }
-        for (uint32_t licIdx = 0; licIdx < NUM_LIC_ITERATION; licIdx++)
-        {
-          int licRefList = (licIdx % 2);
-          xLicRemHighFreq(*pu.cu, COMPONENT_Y, licIdx);
-          xGetLICParamGeneral(*pu.cu, COMPONENT_Y, m_numTemplate[COMPONENT_Y], m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], m_curLICRecLeftTemplate[COMPONENT_Y], m_curLICRecAboveTemplate[COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_scale[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y]);
-          if (licIdx < (NUM_LIC_ITERATION - 1))
-          {
-            if (m_numTemplate[COMPONENT_Y][0])
-            {
-              PelBuf aboveTemplate(m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
-              PelBuf curAboveTemplate(m_curLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
-              curAboveTemplate.copyFrom(aboveTemplate);
-              curAboveTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
-            }
-            if (m_numTemplate[COMPONENT_Y][1])
-            {
-              PelBuf leftTemplate(m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
-              PelBuf curLeftTemplate(m_curLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
-              curLeftTemplate.copyFrom(leftTemplate);
-              curLeftTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
-            }
-          }
-        }
-
-        for (int refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
+        if (!pu.cs->sps->getRprEnabledFlag())
         {
           if (m_bAMLTemplateAvailabe[0])
           {
-            PelUnitBuf curSrcPred = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAboveTemplate[refList][0], Size(cWidth, 1)));
-            curSrcPred.bufs[COMPONENT_Y].toLast(clpRng);
-            curSrcPred.bufs[COMPONENT_Y].linearTransform(m_scale[refList][COMPONENT_Y], m_shift[refList][COMPONENT_Y], m_offset[refList][COMPONENT_Y], true, clpRng);
-            curSrcPred.bufs[COMPONENT_Y].linearTransform(1, -biShift, biOffset, false, clpRng);
+            CHECK(m_numTemplate[COMPONENT_Y][0] != cWidth, "invalid template width");
           }
           if (m_bAMLTemplateAvailabe[1])
           {
-            PelUnitBuf curSrcPred = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[refList][0], Size(cHeight, 1)));
-            curSrcPred.bufs[COMPONENT_Y].toLast(clpRng);
-            curSrcPred.bufs[COMPONENT_Y].linearTransform(m_scale[refList][COMPONENT_Y], m_shift[refList][COMPONENT_Y], m_offset[refList][COMPONENT_Y], true, clpRng);
-            curSrcPred.bufs[COMPONENT_Y].linearTransform(1, -biShift, biOffset, false, clpRng);
+            CHECK(m_numTemplate[COMPONENT_Y][1] != cHeight, "invalid template height");
+          }
+          for (uint32_t licIdx = 0; licIdx < NUM_LIC_ITERATION; licIdx++)
+          {
+            int licRefList = (licIdx % 2);
+            xLicRemHighFreq(*pu.cu, COMPONENT_Y, licIdx);
+            xGetLICParamGeneral(*pu.cu, COMPONENT_Y, m_numTemplate[COMPONENT_Y], m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], m_curLICRecLeftTemplate[COMPONENT_Y], m_curLICRecAboveTemplate[COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_scale[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y]);
+            if (licIdx < (NUM_LIC_ITERATION - 1))
+            {
+              if (m_numTemplate[COMPONENT_Y][0])
+              {
+                PelBuf aboveTemplate(m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
+                PelBuf curAboveTemplate(m_curLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
+                curAboveTemplate.copyFrom(aboveTemplate);
+                curAboveTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
+              }
+              if (m_numTemplate[COMPONENT_Y][1])
+              {
+                PelBuf leftTemplate(m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
+                PelBuf curLeftTemplate(m_curLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
+                curLeftTemplate.copyFrom(leftTemplate);
+                curLeftTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
+              }
+            }
+          }
+
+          for (int refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
+          {
+            if (m_bAMLTemplateAvailabe[0])
+            {
+              PelUnitBuf curSrcPred = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAboveTemplate[refList][0], Size(cWidth, 1)));
+              curSrcPred.bufs[COMPONENT_Y].toLast(clpRng);
+              curSrcPred.bufs[COMPONENT_Y].linearTransform(m_scale[refList][COMPONENT_Y], m_shift[refList][COMPONENT_Y], m_offset[refList][COMPONENT_Y], true, clpRng);
+              curSrcPred.bufs[COMPONENT_Y].linearTransform(1, -biShift, biOffset, false, clpRng);
+            }
+            if (m_bAMLTemplateAvailabe[1])
+            {
+              PelUnitBuf curSrcPred = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[refList][0], Size(cHeight, 1)));
+              curSrcPred.bufs[COMPONENT_Y].toLast(clpRng);
+              curSrcPred.bufs[COMPONENT_Y].linearTransform(m_scale[refList][COMPONENT_Y], m_shift[refList][COMPONENT_Y], m_offset[refList][COMPONENT_Y], true, clpRng);
+              curSrcPred.bufs[COMPONENT_Y].linearTransform(1, -biShift, biOffset, false, clpRng);
+            }
           }
         }
       }
@@ -12197,28 +12203,36 @@ void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
         m_numTemplate[COMPONENT_Y][0] = (m_bAMLTemplateAvailabe[0] ? cWidth : 0);
         m_numTemplate[COMPONENT_Y][1] = (m_bAMLTemplateAvailabe[1] ? cHeight : 0);
 
-        for (uint32_t licIdx = 0; licIdx < NUM_LIC_ITERATION; licIdx++)
+        if (!pu.cs->sps->getRprEnabledFlag())
         {
-          int licRefList = (licIdx % 2);
-          xLicRemHighFreq(*pu.cu, COMPONENT_Y, licIdx);
-          xGetLICParamGeneral(*pu.cu, COMPONENT_Y, m_numTemplate[COMPONENT_Y], m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], m_curLICRecLeftTemplate[COMPONENT_Y], m_curLICRecAboveTemplate[COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_scale[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y]);
-          if (licIdx < (NUM_LIC_ITERATION - 1))
+          for (uint32_t licIdx = 0; licIdx < NUM_LIC_ITERATION; licIdx++)
           {
-            if (m_numTemplate[COMPONENT_Y][0])
+            int licRefList = (licIdx % 2);
+            xLicRemHighFreq(*pu.cu, COMPONENT_Y, licIdx);
+            xGetLICParamGeneral(*pu.cu, COMPONENT_Y, m_numTemplate[COMPONENT_Y], m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], m_curLICRecLeftTemplate[COMPONENT_Y], m_curLICRecAboveTemplate[COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_scale[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y]);
+            if (licIdx < (NUM_LIC_ITERATION - 1))
             {
-              PelBuf aboveTemplate(m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
-              PelBuf curAboveTemplate(m_curLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
-              curAboveTemplate.copyFrom(aboveTemplate);
-              curAboveTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
-            }
-            if (m_numTemplate[COMPONENT_Y][1])
-            {
-              PelBuf leftTemplate(m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
-              PelBuf curLeftTemplate(m_curLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
-              curLeftTemplate.copyFrom(leftTemplate);
-              curLeftTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
+              if (m_numTemplate[COMPONENT_Y][0])
+              {
+                PelBuf aboveTemplate(m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
+                PelBuf curAboveTemplate(m_curLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
+                curAboveTemplate.copyFrom(aboveTemplate);
+                curAboveTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
+              }
+              if (m_numTemplate[COMPONENT_Y][1])
+              {
+                PelBuf leftTemplate(m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
+                PelBuf curLeftTemplate(m_curLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
+                curLeftTemplate.copyFrom(leftTemplate);
+                curLeftTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
+              }
             }
           }
+        }
+        else
+        {
+          m_scale[0][COMPONENT_Y] = 32; m_offset[0][COMPONENT_Y] = 0; m_shift[0][COMPONENT_Y] = 5;
+          m_scale[1][COMPONENT_Y] = 32; m_offset[1][COMPONENT_Y] = 0; m_shift[1][COMPONENT_Y] = 5;
         }
 
         for (int refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
@@ -13358,7 +13372,7 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
                         , true);
 #endif
 #if JVET_AD0213_LIC_IMP
-          if (subblockPu.cu->licFlag)
+          if (subblockPu.cu->licFlag && !subblockPu.cs->sps->getRprEnabledFlag())
           {
             const ClpRng& clpRng = subblockPu.cu->slice->clpRng(COMPONENT_Y);
             const Pel biOffset = -IF_INTERNAL_OFFS;
@@ -13450,7 +13464,7 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
                         , true);
 #endif
 #if JVET_AD0213_LIC_IMP
-          if (subblockPu.cu->licFlag)
+          if (subblockPu.cu->licFlag && !subblockPu.cs->sps->getRprEnabledFlag())
           {
             const ClpRng& clpRng = subblockPu.cu->slice->clpRng(COMPONENT_Y);
             const Pel biOffset = -IF_INTERNAL_OFFS;
@@ -14622,7 +14636,7 @@ void InterPrediction::xLicCompAdj(const PredictionUnit& pu, PelUnitBuf& pcYuvPre
 {
   const Slice &slice = *pu.cs->slice;
 
-  if (pu.cu->isobmcMC)
+  if (pu.cu->isobmcMC && !pu.cs->sps->getRprEnabledFlag())
   {
     if (pu.cu->licFlag && pu.refIdx[0] >= 0 && pu.refIdx[1] >= 0)
     {
@@ -14653,70 +14667,73 @@ void InterPrediction::xLicCompAdj(const PredictionUnit& pu, PelUnitBuf& pcYuvPre
   }
   else if (pu.cu->licFlag && !(pu.ciipFlag && !(((slice.getPOC() - slice.getRefPOC(REF_PIC_LIST_0, 0)) == 1) && slice.getCheckLDC())) && pu.refIdx[0] >= 0 && pu.refIdx[1] >= 0)
   {
-    for (uint32_t licIdx = 0; licIdx < NUM_LIC_ITERATION; licIdx++)
+    if (!pu.cs->sps->getRprEnabledFlag())
     {
-      int licRefList = (licIdx % 2);
-
-      for (int compID = 0; compID < MAX_NUM_COMPONENT; compID++)
+      for (uint32_t licIdx = 0; licIdx < NUM_LIC_ITERATION; licIdx++)
       {
-        if (isLuma(ComponentID(compID)) && chromaOnly)
-        {
-          CHECK(m_numTemplate[compID][0] != 0 || m_numTemplate[compID][1] != 0, " there should be no luma template samples");
-          continue;
-        }
-        if (isChroma(ComponentID(compID)) && lumaOnly)
-        {
-          CHECK(m_numTemplate[compID][0] != 0 || m_numTemplate[compID][1] != 0, " there should be no chroma template samples");
-          continue;
-        }
+        int licRefList = (licIdx % 2);
 
-        xLicRemHighFreq(*pu.cu, compID, licIdx);
-        xGetLICParamGeneral(*pu.cu, ComponentID(compID), m_numTemplate[compID], m_pcLICRefLeftTemplate[licRefList][compID], m_pcLICRefAboveTemplate[licRefList][compID], m_curLICRecLeftTemplate[compID], m_curLICRecAboveTemplate[compID], m_shift[licRefList][compID], m_scale[licRefList][compID], m_offset[licRefList][compID]);
-
-        const ClpRng& clpRng = pu.cu->slice->clpRng(ComponentID(compID));
-        if (licIdx < (NUM_LIC_ITERATION - 1))
+        for (int compID = 0; compID < MAX_NUM_COMPONENT; compID++)
         {
-          if (m_numTemplate[compID][0])
+          if (isLuma(ComponentID(compID)) && chromaOnly)
           {
-            int cWidth = pu.blocks[compID].width;
-            PelBuf aboveTemplate(m_pcLICRefAboveTemplate[licRefList][compID], Size(cWidth, 1));
-            PelBuf curAboveTemplate(m_curLICRefAboveTemplate[licRefList][compID], Size(cWidth, 1));
-            curAboveTemplate.copyFrom(aboveTemplate);
-            curAboveTemplate.linearTransform(m_scale[licRefList][compID], m_shift[licRefList][compID], m_offset[licRefList][compID], true, clpRng);
+            CHECK(m_numTemplate[compID][0] != 0 || m_numTemplate[compID][1] != 0, " there should be no luma template samples");
+            continue;
           }
-          if (m_numTemplate[compID][1])
+          if (isChroma(ComponentID(compID)) && lumaOnly)
           {
-            int cHeight = pu.blocks[compID].height;
-            PelBuf leftTemplate(m_pcLICRefLeftTemplate[licRefList][compID], Size(cHeight, 1));
-            PelBuf curLeftTemplate(m_curLICRefLeftTemplate[licRefList][compID], Size(cHeight, 1));
-            curLeftTemplate.copyFrom(leftTemplate);
-            curLeftTemplate.linearTransform(m_scale[licRefList][compID], m_shift[licRefList][compID], m_offset[licRefList][compID], true, clpRng);
+            CHECK(m_numTemplate[compID][0] != 0 || m_numTemplate[compID][1] != 0, " there should be no chroma template samples");
+            continue;
+          }
+
+          xLicRemHighFreq(*pu.cu, compID, licIdx);
+          xGetLICParamGeneral(*pu.cu, ComponentID(compID), m_numTemplate[compID], m_pcLICRefLeftTemplate[licRefList][compID], m_pcLICRefAboveTemplate[licRefList][compID], m_curLICRecLeftTemplate[compID], m_curLICRecAboveTemplate[compID], m_shift[licRefList][compID], m_scale[licRefList][compID], m_offset[licRefList][compID]);
+
+          const ClpRng& clpRng = pu.cu->slice->clpRng(ComponentID(compID));
+          if (licIdx < (NUM_LIC_ITERATION - 1))
+          {
+            if (m_numTemplate[compID][0])
+            {
+              int cWidth = pu.blocks[compID].width;
+              PelBuf aboveTemplate(m_pcLICRefAboveTemplate[licRefList][compID], Size(cWidth, 1));
+              PelBuf curAboveTemplate(m_curLICRefAboveTemplate[licRefList][compID], Size(cWidth, 1));
+              curAboveTemplate.copyFrom(aboveTemplate);
+              curAboveTemplate.linearTransform(m_scale[licRefList][compID], m_shift[licRefList][compID], m_offset[licRefList][compID], true, clpRng);
+            }
+            if (m_numTemplate[compID][1])
+            {
+              int cHeight = pu.blocks[compID].height;
+              PelBuf leftTemplate(m_pcLICRefLeftTemplate[licRefList][compID], Size(cHeight, 1));
+              PelBuf curLeftTemplate(m_curLICRefLeftTemplate[licRefList][compID], Size(cHeight, 1));
+              curLeftTemplate.copyFrom(leftTemplate);
+              curLeftTemplate.linearTransform(m_scale[licRefList][compID], m_shift[licRefList][compID], m_offset[licRefList][compID], true, clpRng);
+            }
           }
         }
       }
-    }
 
-    const Pel biOffset = -IF_INTERNAL_OFFS;
-    for (int refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
-    {
-      PelUnitBuf curSrcPred = (refList == 0) ? PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvPred[0][0], pcYuvPred.Y()), PelBuf(m_acYuvPred[0][1], pcYuvPred.Cb()), PelBuf(m_acYuvPred[0][2], pcYuvPred.Cr())) :
-        PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvPred[1][0], pcYuvPred.Y()), PelBuf(m_acYuvPred[1][1], pcYuvPred.Cb()), PelBuf(m_acYuvPred[1][2], pcYuvPred.Cr()));
-      for (int compID = 0; compID < MAX_NUM_COMPONENT; compID++)
+      const Pel biOffset = -IF_INTERNAL_OFFS;
+      for (int refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
       {
-        if (isLuma(ComponentID(compID)) && chromaOnly)
+        PelUnitBuf curSrcPred = (refList == 0) ? PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvPred[0][0], pcYuvPred.Y()), PelBuf(m_acYuvPred[0][1], pcYuvPred.Cb()), PelBuf(m_acYuvPred[0][2], pcYuvPred.Cr())) :
+                                                 PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvPred[1][0], pcYuvPred.Y()), PelBuf(m_acYuvPred[1][1], pcYuvPred.Cb()), PelBuf(m_acYuvPred[1][2], pcYuvPred.Cr()));
+        for (int compID = 0; compID < MAX_NUM_COMPONENT; compID++)
         {
-          continue;
-        }
-        if (isChroma(ComponentID(compID)) && lumaOnly)
-        {
-          continue;
-        }
+          if (isLuma(ComponentID(compID)) && chromaOnly)
+          {
+            continue;
+          }
+          if (isChroma(ComponentID(compID)) && lumaOnly)
+          {
+            continue;
+          }
 
-        const ClpRng& clpRng = pu.cu->slice->clpRng(ComponentID(compID));
-        const int biShift = IF_INTERNAL_PREC - clpRng.bd;
-        curSrcPred.bufs[compID].toLast(clpRng);
-        curSrcPred.bufs[compID].linearTransform(m_scale[refList][compID], m_shift[refList][compID], m_offset[refList][compID], true, clpRng);
-        curSrcPred.bufs[compID].linearTransform(1, -biShift, biOffset, false, clpRng);
+          const ClpRng& clpRng = pu.cu->slice->clpRng(ComponentID(compID));
+          const int biShift = IF_INTERNAL_PREC - clpRng.bd;
+          curSrcPred.bufs[compID].toLast(clpRng);
+          curSrcPred.bufs[compID].linearTransform(m_scale[refList][compID], m_shift[refList][compID], m_offset[refList][compID], true, clpRng);
+          curSrcPred.bufs[compID].linearTransform(1, -biShift, biOffset, false, clpRng);
+        }
       }
     }
   }
@@ -15355,6 +15372,14 @@ void InterPrediction::deriveTMMv(PredictionUnit& pu)
       RefPicList eTargetPicList = (minCostUni[0] <= minCostUni[1]) ? REF_PIC_LIST_1 : REF_PIC_LIST_0;
       MvField    mvfBetterUni(pu.mv[1 - eTargetPicList], pu.refIdx[1 - eTargetPicList]);
       Distortion biCost = deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), eTargetPicList, pu.refIdx[eTargetPicList], 0, pu.mv[eTargetPicList], &mvfBetterUni);
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+      if ((biCost > (minCostUni[1 - eTargetPicList] + (minCostUni[1 - eTargetPicList] >> 3))) || !pu.cs->slice->getCheckLDC())
+      {
+        eTargetPicList = (minCostUni[0] <= minCostUni[1]) ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+        MvField mvfBetterUni2nd(pu.mv[1 - eTargetPicList], pu.refIdx[1 - eTargetPicList]);
+        biCost = deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), eTargetPicList, pu.refIdx[eTargetPicList], TM_MAX_NUM_OF_ITERATIONS, pu.mv[eTargetPicList], &mvfBetterUni2nd);
+      }
+#endif
       *tmCost = biCost;
     }
     else
@@ -15365,7 +15390,9 @@ void InterPrediction::deriveTMMv(PredictionUnit& pu)
 
   if (pu.cu->slice->isInterB() && pu.interDir == 3
 #if MULTI_PASS_DMVR
+#if !JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
     && !PU::checkBDMVRCondition(pu)
+#endif
 #endif
     )
   {
@@ -15377,6 +15404,14 @@ void InterPrediction::deriveTMMv(PredictionUnit& pu)
     RefPicList eTargetPicList = (minCostUni[0] <= minCostUni[1]) ? REF_PIC_LIST_1 : REF_PIC_LIST_0;
     MvField    mvfBetterUni(pu.mv[1 - eTargetPicList], pu.refIdx[1 - eTargetPicList]);
     Distortion minCostBi = deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), eTargetPicList, pu.refIdx[eTargetPicList], TM_MAX_NUM_OF_ITERATIONS, pu.mv[eTargetPicList], &mvfBetterUni);
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+    if ((minCostBi > (minCostUni[1 - eTargetPicList] + (minCostUni[1 - eTargetPicList] >> 3))) || !pu.cs->slice->getCheckLDC())
+    {
+      eTargetPicList = (minCostUni[0] <= minCostUni[1]) ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+      MvField mvfBetterUni2nd(pu.mv[1 - eTargetPicList], pu.refIdx[1 - eTargetPicList]);
+      minCostBi = deriveTMMv(pu, true, std::numeric_limits<Distortion>::max(), eTargetPicList, pu.refIdx[eTargetPicList], TM_MAX_NUM_OF_ITERATIONS, pu.mv[eTargetPicList], &mvfBetterUni2nd);
+    }
+#endif
 
     if (minCostBi > (minCostUni[1 - eTargetPicList] + (minCostUni[1 - eTargetPicList] >> 3)))
     {
@@ -16126,6 +16161,9 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
   // Search pattern configuration
   static const Mv patternCross  [4] = { Mv(0, 1), Mv(1, 0), Mv(0, -1), Mv(-1, 0) };
   static const Mv patternDiamond[8] = { Mv(0, 2), Mv(1, 1), Mv(2, 0), Mv(1, -1), Mv(0, -2), Mv(-1, -1), Mv(-2, 0), Mv(-1, 1) };
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+  static const Mv patternDiamond16[16] = { Mv(0, 2), Mv(1, 1), Mv(2, 0), Mv(1, -1), Mv(0, -2), Mv(-1, -1), Mv(-2, 0), Mv(-1, 1), Mv(0, 4), Mv(3, 3), Mv(4, 0), Mv(3, -3), Mv(0, -4), Mv(-3, -3), Mv(-4, 0), Mv(-3, 3) };
+#endif
 
   int       directStart = 0, directEnd = 0, directRounding = 0, directMask = 0;
   const Mv *pSearchOffset = nullptr;
@@ -16150,10 +16188,27 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
     directRounding = 8;
     directMask     = 0x07;
     pSearchOffset  = patternDiamond;
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+    if (!CU::isIBC(m_cu))
+    {
+      directEnd      = 15;
+      directRounding = 16;
+      directMask     = 0x0F;
+      pSearchOffset  = patternDiamond16;
+    }
+#endif
 #if MULTI_PASS_DMVR
     memset(m_tmCostArrayDiamond, -1, sizeof(m_tmCostArrayDiamond));
     costArray      = m_tmCostArrayDiamond;
     costArray[8]   = m_minCost;
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+    if (!CU::isIBC(m_cu))
+    {
+      memset(m_tmCostArrayDiamond16, -1, sizeof(m_tmCostArrayDiamond16));
+      costArray      = m_tmCostArrayDiamond16;
+      costArray[17]   = m_minCost;
+    }
+#endif
 #endif
   }
   else
@@ -16176,6 +16231,9 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
   const uint32_t ctuSize = m_pu.cs->slice->getSPS()->getMaxCUWidth();
 #endif
 #endif
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+  bool earlyStop = false;
+#endif
 
   // Iterative search
   for (int uiRound = 0; uiRound < maxSearchRounds; uiRound++)
@@ -16185,7 +16243,19 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
 #if JVET_X0056_DMVD_EARLY_TERMINATION
     Distortion prevMinCost = m_minCost;
 #endif
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+    if (earlyStop)
+    {
+      break;
+    }
+    int diamondLoopNum = !CU::isIBC(m_cu) && (!m_cu.slice->getCheckLDC() || (m_cu.slice->getCheckLDC() && m_pu.lwidth()*m_pu.lheight() >= 256)) && searchPattern == TMSEARCH_DIAMOND && uiRound > 0 ? 2 : 1;
+    for (int diamondIdx = 0; diamondIdx < diamondLoopNum; diamondIdx++)
+    {
+      int idxShift = ((uiRound == 0 || CU::isIBC(m_cu)) ? 0 : (diamondIdx - (directStart < 8 ? 0 : 1))) << 3;
+      for (int nIdx = directStart + idxShift; nIdx <= directEnd + idxShift; nIdx++)
+#else
     for (int nIdx = directStart; nIdx <= directEnd; nIdx++)
+#endif
     {
       int nDirect = (nIdx + directRounding) & directMask;
 
@@ -16234,11 +16304,17 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
 
     if (directBest == -1)
     {
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+      earlyStop = true;
+#endif
       break;
     }
 #if JVET_X0056_DMVD_EARLY_TERMINATION
     if (uiRound > 0 && prevMinCost < m_minCost + m_earlyTerminateTh)
     {
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+      earlyStop = true;
+#endif
       break;
     }
 #endif
@@ -16251,6 +16327,9 @@ void TplMatchingCtrl::xRefineMvSearch(int maxSearchRounds, int searchStepShift)
     if ((uiRound + 1) < maxSearchRounds)
     {
       xNextTmCostAarray<searchPattern>(directBest);
+    }
+#endif
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
     }
 #endif
   }
@@ -21255,6 +21334,16 @@ void InterPrediction::deriveAffineMVDCandVecFromMotionInforPred(const Prediction
 
         if (el.interDir == pu.interDir && el.refIdx[eRefPicList] == pu.refIdx[eRefPicList])
         {
+#if RPR_ENABLE
+          const bool bRefIsRescaled = pu.cu->slice->getRefPic(eRefPicList, el.refIdx[eRefPicList])->isRefScaled(pu.cs->pps);
+          if (bRefIsRescaled)
+          {
+            el.cost = std::numeric_limits<Distortion>::max();
+            el.aboveCostCalculated = true;
+            el.leftCostCalculated = true;
+            continue;
+          }
+#endif
           if (!pu.cu->licFlag && pu.cu->affine)
           {
             if (m_bAMLTemplateAvailabe[0] && !el.aboveCostCalculated)
@@ -21499,31 +21588,31 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
       AffineAMVPInfo affineAMVPInfo;
       PU::fillAffineMvpCand(tmpPU, eRefList, tmpPU.refIdx[eRefList], affineAMVPInfo);
 
-      const unsigned mvp_idx = tmpPU.mvpIdx[eRefList];
+      const unsigned mvpIdx = tmpPU.mvpIdx[eRefList];
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
       refListComb[idx].cost = std::numeric_limits<Distortion>::max();
       for (size_t i = 0; i < cMvdCandList[0].size(); i++)
       {
-        Mv mvLT = affineAMVPInfo.mvCandLT[mvp_idx] + cMvdCandList[0][i];
-        Mv mvRT = affineAMVPInfo.mvCandRT[mvp_idx] + cMvdCandList[1][i];
+        Mv mvLT = affineAMVPInfo.mvCandLT[mvpIdx] + cMvdCandList[0][i];
+        Mv mvRT = affineAMVPInfo.mvCandRT[mvpIdx] + cMvdCandList[1][i];
         mvRT += cMvdCandList[0][i];
 
         Mv mvLB;
         if (tmpPU.cu->affineType == AFFINEMODEL_6PARAM)
         {
-          mvLB = affineAMVPInfo.mvCandLB[mvp_idx] + cMvdCandList[2][i];
+          mvLB = affineAMVPInfo.mvCandLB[mvpIdx] + cMvdCandList[2][i];
           mvLB += cMvdCandList[0][i];
         }
 #else
-      Mv mvLT = affineAMVPInfo.mvCandLT[mvp_idx] + tmpPU.mvdAffi[eRefList][0];
-      Mv mvRT = affineAMVPInfo.mvCandRT[mvp_idx] + tmpPU.mvdAffi[eRefList][1];
+      Mv mvLT = affineAMVPInfo.mvCandLT[mvpIdx] + tmpPU.mvdAffi[eRefList][0];
+      Mv mvRT = affineAMVPInfo.mvCandRT[mvpIdx] + tmpPU.mvdAffi[eRefList][1];
       mvRT += tmpPU.mvdAffi[eRefList][0];
 
       Mv mvLB;
       if (tmpPU.cu->affineType == AFFINEMODEL_6PARAM)
       {
-        mvLB = affineAMVPInfo.mvCandLB[mvp_idx] + tmpPU.mvdAffi[eRefList][2];
+        mvLB = affineAMVPInfo.mvCandLB[mvpIdx] + tmpPU.mvdAffi[eRefList][2];
         mvLB += tmpPU.mvdAffi[eRefList][0];
       }
 #endif
@@ -22235,16 +22324,16 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
         }
         for (size_t i = 0; i < cMvdCandList[refList][0].size(); i++)
         {
-          unsigned mvp_idx = tmpPU.mvpIdx[refList];
+          unsigned mvpIdx = tmpPU.mvpIdx[refList];
 
-          Mv mvLT = affineAMVPInfo[refList][refIdx].mvCandLT[mvp_idx] + cMvdCandList[refList][0][i];
-          Mv mvRT = affineAMVPInfo[refList][refIdx].mvCandRT[mvp_idx] + cMvdCandList[refList][1][i];
+          Mv mvLT = affineAMVPInfo[refList][refIdx].mvCandLT[mvpIdx] + cMvdCandList[refList][0][i];
+          Mv mvRT = affineAMVPInfo[refList][refIdx].mvCandRT[mvpIdx] + cMvdCandList[refList][1][i];
           mvRT += cMvdCandList[refList][0][i];
 
           Mv mvLB;
           if (tmpPU.cu->affineType == AFFINEMODEL_6PARAM)
           {
-            mvLB = affineAMVPInfo[refList][refIdx].mvCandLB[mvp_idx] + cMvdCandList[refList][2][i];
+            mvLB = affineAMVPInfo[refList][refIdx].mvCandLB[mvpIdx] + cMvdCandList[refList][2][i];
             mvLB += cMvdCandList[refList][0][i];
           }
 
@@ -22255,12 +22344,23 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
     
           AffineMergeCtx tmp;
 
-          candAvailable[refIdx][refList][i] = 
-            fillAffAMLRefTemplateCache(tmpPU, refList, static_cast<int>(i), pcBufPredRefTop.bufs[0], pcBufPredRefLeft.bufs[0]
+#if RPR_ENABLE
+          const bool bRefIsRescaled = tmpPU.cu->slice->getRefPic(eRefList, refIdx)->isRefScaled(tmpPU.cs->pps);
+          candAvailable[refIdx][refList][i] = !bRefIsRescaled &&
+            fillAffAMLRefTemplateCache( tmpPU, refList, static_cast<int>(i), pcBufPredRefTop.bufs[0], pcBufPredRefLeft.bufs[0]
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
-            , pu.cs->sps->getUseFastSubTmvp(), tmp
+                                      , pu.cs->sps->getUseFastSubTmvp(), tmp
+#endif
+            );
+#else
+          candAvailable[refIdx][refList][i] = 
+            fillAffAMLRefTemplateCache( tmpPU, refList, static_cast<int>(i), pcBufPredRefTop.bufs[0], pcBufPredRefLeft.bufs[0]
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                                      , pu.cs->sps->getUseFastSubTmvp(), tmp
 #endif
           );
+#endif
+
         }
       }
     }
@@ -22279,16 +22379,16 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
         PU::fillAffineMvpCand(tmpPU, eRefList, tmpPU.refIdx[eRefList], affineAMVPInfo[eRefList]);
 
 #if !JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-        const unsigned mvp_idx = tmpPU.mvpIdx[eRefList];
+        const unsigned mvpIdx = tmpPU.mvpIdx[eRefList];
 
-        Mv mvLT = affineAMVPInfo[eRefList].mvCandLT[mvp_idx] + tmpPU.mvdAffi[eRefList][0];
-        Mv mvRT = affineAMVPInfo[eRefList].mvCandRT[mvp_idx] + tmpPU.mvdAffi[eRefList][1];
+        Mv mvLT = affineAMVPInfo[eRefList].mvCandLT[mvpIdx] + tmpPU.mvdAffi[eRefList][0];
+        Mv mvRT = affineAMVPInfo[eRefList].mvCandRT[mvpIdx] + tmpPU.mvdAffi[eRefList][1];
         mvRT += tmpPU.mvdAffi[eRefList][0];
 
         Mv mvLB;
         if (tmpPU.cu->affineType == AFFINEMODEL_6PARAM)
         {
-          mvLB = affineAMVPInfo[eRefList].mvCandLB[mvp_idx] + tmpPU.mvdAffi[eRefList][2];
+          mvLB = affineAMVPInfo[eRefList].mvCandLB[mvpIdx] + tmpPU.mvdAffi[eRefList][2];
           mvLB += tmpPU.mvdAffi[eRefList][0];
         }
  
@@ -22308,13 +22408,13 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           MotionInfoPred miPred;
           miPred.interDir = 3;
           int refList = 0;
-          unsigned mvp_idx = tmpPU.mvpIdx[refList];
+          unsigned mvpIdx = tmpPU.mvpIdx[refList];
 #if JVET_AD0140_MVD_PREDICTION
-          Mv mvLT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLT[mvp_idx] + cMvdCandList[refList][0][i];
-          Mv mvRT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandRT[mvp_idx] + cMvdCandList[refList][1][i];
+          Mv mvLT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLT[mvpIdx] + cMvdCandList[refList][0][i];
+          Mv mvRT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandRT[mvpIdx] + cMvdCandList[refList][1][i];
 #else
-          Mv mvLT = affineAMVPInfo[refList].mvCandLT[mvp_idx] + cMvdCandList[refList][0][i];
-          Mv mvRT = affineAMVPInfo[refList].mvCandRT[mvp_idx] + cMvdCandList[refList][1][i];
+          Mv mvLT = affineAMVPInfo[refList].mvCandLT[mvpIdx] + cMvdCandList[refList][0][i];
+          Mv mvRT = affineAMVPInfo[refList].mvCandRT[mvpIdx] + cMvdCandList[refList][1][i];
 #endif
           mvRT += cMvdCandList[refList][0][i];
 
@@ -22322,9 +22422,9 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           if (tmpPU.cu->affineType == AFFINEMODEL_6PARAM)
           {
 #if JVET_AD0140_MVD_PREDICTION
-            mvLB = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLB[mvp_idx] + cMvdCandList[refList][2][i];
+            mvLB = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLB[mvpIdx] + cMvdCandList[refList][2][i];
 #else
-            mvLB = affineAMVPInfo[refList].mvCandLB[mvp_idx] + cMvdCandList[refList][2][i];
+            mvLB = affineAMVPInfo[refList].mvCandLB[mvpIdx] + cMvdCandList[refList][2][i];
 #endif
             mvLB += cMvdCandList[refList][0][i];
           }
@@ -22341,22 +22441,22 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           miPred.mvAffi[refList][1] = tmpPU.mvAffi[refList][1];
           miPred.mvAffi[refList][2] = tmpPU.mvAffi[refList][2];
           refList = 1;
-          mvp_idx = tmpPU.mvpIdx[refList];
+          mvpIdx = tmpPU.mvpIdx[refList];
 #if JVET_AD0140_MVD_PREDICTION
-          mvLT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLT[mvp_idx] + cMvdCandList[refList][0][j];
-          mvRT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandRT[mvp_idx] + cMvdCandList[refList][1][j];
+          mvLT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLT[mvpIdx] + cMvdCandList[refList][0][j];
+          mvRT = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandRT[mvpIdx] + cMvdCandList[refList][1][j];
 #else
-          mvLT = affineAMVPInfo[refList].mvCandLT[mvp_idx] + cMvdCandList[refList][0][j];
-          mvRT = affineAMVPInfo[refList].mvCandRT[mvp_idx] + cMvdCandList[refList][1][j];
+          mvLT = affineAMVPInfo[refList].mvCandLT[mvpIdx] + cMvdCandList[refList][0][j];
+          mvRT = affineAMVPInfo[refList].mvCandRT[mvpIdx] + cMvdCandList[refList][1][j];
 #endif
           mvRT += cMvdCandList[refList][0][j];
 
           if (tmpPU.cu->affineType == AFFINEMODEL_6PARAM)
           {
 #if JVET_AD0140_MVD_PREDICTION
-            mvLB = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLB[mvp_idx] + cMvdCandList[refList][2][j];
+            mvLB = affineAMVPInfo[refList][tmpPU.refIdx[refList]].mvCandLB[mvpIdx] + cMvdCandList[refList][2][j];
 #else
-            mvLB = affineAMVPInfo[refList].mvCandLB[mvp_idx] + cMvdCandList[refList][2][j];
+            mvLB = affineAMVPInfo[refList].mvCandLB[mvpIdx] + cMvdCandList[refList][2][j];
 #endif
             mvLB += cMvdCandList[refList][0][j];
           }
@@ -22406,7 +22506,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
 
             if (res && !identicalMotion)
             {
-
+#if JVET_AD0213_LIC_IMP
               if (pu.cu->licFlag)
               {
                 const ClpRng& clpRng = pu.cu->slice->clpRng(COMPONENT_Y);
@@ -22450,34 +22550,43 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
                 m_numTemplate[COMPONENT_Y][0] = (m_bAMLTemplateAvailabe[0] ? cWidth : 0);
                 m_numTemplate[COMPONENT_Y][1] = (m_bAMLTemplateAvailabe[1] ? cHeight : 0);
 
-                for (uint32_t licIdx = 0; licIdx < NUM_LIC_ITERATION; licIdx++)
+                if (!pu.cs->sps->getRprEnabledFlag())
                 {
-                  int licRefList = (licIdx % 2);
-                  xLicRemHighFreq(*pu.cu, COMPONENT_Y, licIdx);
-                  xGetLICParamGeneral(*pu.cu, COMPONENT_Y, m_numTemplate[COMPONENT_Y], m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], m_curLICRecLeftTemplate[COMPONENT_Y], m_curLICRecAboveTemplate[COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_scale[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y]);
-                  if (licIdx < (NUM_LIC_ITERATION - 1))
+                  for (uint32_t licIdx = 0; licIdx < NUM_LIC_ITERATION; licIdx++)
                   {
-                    if (m_numTemplate[COMPONENT_Y][0])
+                    int licRefList = (licIdx % 2);
+                    xLicRemHighFreq(*pu.cu, COMPONENT_Y, licIdx);
+                    xGetLICParamGeneral(*pu.cu, COMPONENT_Y, m_numTemplate[COMPONENT_Y], m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], m_curLICRecLeftTemplate[COMPONENT_Y], m_curLICRecAboveTemplate[COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_scale[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y]);
+                    if (licIdx < (NUM_LIC_ITERATION - 1))
                     {
-                      PelBuf aboveTemplate(m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
-                      PelBuf curAboveTemplate(m_curLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
-                      curAboveTemplate.copyFrom(aboveTemplate);
-                      curAboveTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
-                    }
-                    if (m_numTemplate[COMPONENT_Y][1])
-                    {
-                      PelBuf leftTemplate(m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
-                      PelBuf curLeftTemplate(m_curLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
-                      curLeftTemplate.copyFrom(leftTemplate);
-                      curLeftTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
+                      if (m_numTemplate[COMPONENT_Y][0])
+                      {
+                        PelBuf aboveTemplate(m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
+                        PelBuf curAboveTemplate(m_curLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
+                        curAboveTemplate.copyFrom(aboveTemplate);
+                        curAboveTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
+                      }
+                      if (m_numTemplate[COMPONENT_Y][1])
+                      {
+                        PelBuf leftTemplate(m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
+                        PelBuf curLeftTemplate(m_curLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
+                        curLeftTemplate.copyFrom(leftTemplate);
+                        curLeftTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
+                      }
                     }
                   }
                 }
+                else
+                {
+                  m_scale[0][COMPONENT_Y] = 32; m_offset[0][COMPONENT_Y] = 0; m_shift[0][COMPONENT_Y] = 5;
+                  m_scale[1][COMPONENT_Y] = 32; m_offset[1][COMPONENT_Y] = 0; m_shift[1][COMPONENT_Y] = 5;
+                }
               }
-
+#endif
               PelUnitBuf srcPred[2];
               if (m_bAMLTemplateAvailabe[0])
               {
+#if JVET_AD0213_LIC_IMP
                 if (pu.cu->licFlag)
                 {
                   PelBuf dstRefAboveTemplate0(m_pcLICRefAboveTemplate[0][0], pcBufPredRefTop.Y());
@@ -22501,6 +22610,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
 
                 }
                 else
+#endif
                 {
                   srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[0]][0][i][0], pcBufPredRefTop.Y()));
                   srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[1]][1][j][0], pcBufPredRefTop.Y()));
@@ -22511,6 +22621,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
               }
               if (m_bAMLTemplateAvailabe[1])
               {
+#if JVET_AD0213_LIC_IMP
                 if (pu.cu->licFlag)
                 {
                   PelBuf dstRefLeftTemplate0(m_pcLICRefLeftTemplate[0][0], pcBufPredRefLeft.Y());
@@ -22533,6 +22644,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
 
                 }
                 else
+#endif
                 {
                   srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[0]][0][i][1], pcBufPredRefLeft.Y()));
                   srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[1]][1][j][1], pcBufPredRefLeft.Y()));
@@ -22649,36 +22761,36 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
       rplIdxs[1].insert(refPairList[idx].refIdx[1]);
     }
 
+    
+    for (int refList = 0; refList < 2; refList++)
     {
-      for (int refList = 0; refList < 2; refList++)
+      for (const auto& refIdx : rplIdxs[refList])
       {
-        for (const auto& refIdx : rplIdxs[refList])
-        {
-          tmpPU.refIdx[refList] = refIdx;
-          tmpPU.refIdx[1 - refList] = -1;
+        tmpPU.refIdx[refList] = refIdx;
+        tmpPU.refIdx[1 - refList] = -1;
+        tmpPU.interDir = 1 << refList;
 
-
-          RefPicList eRefList = (RefPicList)refList;
-          PU::fillMvpCand(tmpPU, eRefList, tmpPU.refIdx[eRefList], amvpInfo[eRefList][tmpPU.refIdx[refList]]
+        RefPicList eRefList = (RefPicList)refList;
+        PU::fillMvpCand(tmpPU, eRefList, tmpPU.refIdx[eRefList], amvpInfo[eRefList][tmpPU.refIdx[refList]]
 #if TM_AMVP
-            , this
+          , this
 #endif
-          );
+        );
 
-          for (size_t i = 0; i < cMvdCandList[refList][0].size(); i++)
-          {
-            const unsigned mvp_idx = tmpPU.mvpIdx[refList];
-            tmpPU.mv[refList] = amvpInfo[refList][refIdx].mvCand[mvp_idx] + cMvdCandList[refList][0][i];
-            tmpPU.mv[refList].mvCliptoStorageBitDepth();
+        for (size_t i = 0; i < cMvdCandList[refList][0].size(); i++)
+        {
+          const unsigned mvpIdx = tmpPU.mvpIdx[refList];
+          tmpPU.mv[refList] = amvpInfo[refList][refIdx].mvCand[mvpIdx] + cMvdCandList[refList][0][i];
+          tmpPU.mv[refList].mvCliptoStorageBitDepth();
 
-            AffineMergeCtx tmp;
+          AffineMergeCtx tmp;
 
-            candAvailable[refIdx][refList][i] =
-              fillAMLRefTemplateCache(tmpPU, refList, static_cast<int>(i), pcBufPredRefTop.bufs[0], pcBufPredRefLeft.bufs[0]);
-          }
+          candAvailable[refIdx][refList][i] =
+            fillAMLRefTemplateCache(tmpPU, refList, static_cast<int>(i), pcBufPredRefTop.bufs[0], pcBufPredRefLeft.bufs[0]);
         }
       }
     }
+    tmpPU.interDir = 3;
 #endif
     for (int idx = 0; idx < refPairList.size(); idx++)
     {
@@ -22780,6 +22892,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
         Pel uniLeftBuf[MAX_CU_SIZE];
 
         const bool uniLIC = xCheckIdenticalMotion(tmpPU);
+#if JVET_AD0213_LIC_IMP
         if (pu.cu->licFlag )
         {
           const ClpRng& clpRng = pu.cu->slice->clpRng(COMPONENT_Y);
@@ -22832,39 +22945,48 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
               }
             }
 
-            if (m_bAMLTemplateAvailabe[0])
+            if (!pu.cs->sps->getRprEnabledFlag())
             {
-              CHECK(m_numTemplate[COMPONENT_Y][0] != cWidth, "invalid template width");
-            }
-            if (m_bAMLTemplateAvailabe[1])
-            {
-              CHECK(m_numTemplate[COMPONENT_Y][1] != cHeight, "invalid template height");
-            }
-            for (uint32_t licIdx = 0; licIdx < NUM_LIC_ITERATION; licIdx++)
-            {
-              int licRefList = (licIdx % 2);
-              xLicRemHighFreq(*pu.cu, COMPONENT_Y, licIdx);
-              xGetLICParamGeneral(*pu.cu, COMPONENT_Y, m_numTemplate[COMPONENT_Y], m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], m_curLICRecLeftTemplate[COMPONENT_Y], m_curLICRecAboveTemplate[COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_scale[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y]);
-              if (licIdx < (NUM_LIC_ITERATION - 1))
+              if (m_bAMLTemplateAvailabe[0])
               {
-                if (m_numTemplate[COMPONENT_Y][0])
+                CHECK(m_numTemplate[COMPONENT_Y][0] != cWidth, "invalid template width");
+              }
+              if (m_bAMLTemplateAvailabe[1])
+              {
+                CHECK(m_numTemplate[COMPONENT_Y][1] != cHeight, "invalid template height");
+              }
+              for (uint32_t licIdx = 0; licIdx < NUM_LIC_ITERATION; licIdx++)
+              {
+                int licRefList = (licIdx % 2);
+                xLicRemHighFreq(*pu.cu, COMPONENT_Y, licIdx);
+                xGetLICParamGeneral(*pu.cu, COMPONENT_Y, m_numTemplate[COMPONENT_Y], m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], m_curLICRecLeftTemplate[COMPONENT_Y], m_curLICRecAboveTemplate[COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_scale[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y]);
+                if (licIdx < (NUM_LIC_ITERATION - 1))
                 {
-                  PelBuf aboveTemplate(m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
-                  PelBuf curAboveTemplate(m_curLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
-                  curAboveTemplate.copyFrom(aboveTemplate);
-                  curAboveTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
-                }
-                if (m_numTemplate[COMPONENT_Y][1])
-                {
-                  PelBuf leftTemplate(m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
-                  PelBuf curLeftTemplate(m_curLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
-                  curLeftTemplate.copyFrom(leftTemplate);
-                  curLeftTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
+                  if (m_numTemplate[COMPONENT_Y][0])
+                  {
+                    PelBuf aboveTemplate(m_pcLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
+                    PelBuf curAboveTemplate(m_curLICRefAboveTemplate[licRefList][COMPONENT_Y], Size(cWidth, 1));
+                    curAboveTemplate.copyFrom(aboveTemplate);
+                    curAboveTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
+                  }
+                  if (m_numTemplate[COMPONENT_Y][1])
+                  {
+                    PelBuf leftTemplate(m_pcLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
+                    PelBuf curLeftTemplate(m_curLICRefLeftTemplate[licRefList][COMPONENT_Y], Size(cHeight, 1));
+                    curLeftTemplate.copyFrom(leftTemplate);
+                    curLeftTemplate.linearTransform(m_scale[licRefList][COMPONENT_Y], m_shift[licRefList][COMPONENT_Y], m_offset[licRefList][COMPONENT_Y], true, clpRng);
+                  }
                 }
               }
             }
+            else
+            {
+              m_scale[0][COMPONENT_Y] = 32; m_offset[0][COMPONENT_Y] = 0; m_shift[0][COMPONENT_Y] = 5;
+              m_scale[1][COMPONENT_Y] = 32; m_offset[1][COMPONENT_Y] = 0; m_shift[1][COMPONENT_Y] = 5;
+            }
           }          
         }
+#endif
 #endif
 
         if (m_bAMLTemplateAvailabe[0])
@@ -22877,7 +22999,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           if (!pu.cu->licFlag || !uniLIC)
           {
             PelUnitBuf srcPred[2];
-
+#if JVET_AD0213_LIC_IMP
             if (pu.cu->licFlag)
             {
               const int biShift = IF_INTERNAL_PREC - pu.cu->slice->clpRng(COMPONENT_Y).bd;
@@ -22906,6 +23028,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
               }
             }
             else
+#endif
             {
               srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[0]][0][i][0], pcBufPredRefTop.Y()));
               srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[1]][1][j][0], pcBufPredRefTop.Y()));
@@ -22928,7 +23051,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           if (!pu.cu->licFlag || !uniLIC)
           {
             PelUnitBuf srcPred[2];
-
+#if JVET_AD0213_LIC_IMP
             if (pu.cu->licFlag)
             {
               const int biShift = IF_INTERNAL_PREC - pu.cu->slice->clpRng(COMPONENT_Y).bd;
@@ -22958,6 +23081,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
 
             }
             else
+#endif
             {
               srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[0]][0][i][1], pcBufPredRefLeft.Y()));
               srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[1]][1][j][1], pcBufPredRefLeft.Y()));

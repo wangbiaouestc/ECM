@@ -6261,7 +6261,10 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #endif
     {
 #if JVET_AD0213_LIC_IMP && TM_AMVP
-      setEncCtrlParaLicOff(cu);
+      if (pu.interDir != MAX_UCHAR)
+      {
+        setEncCtrlParaLicOff(cu);
+      }
 #else
 #if !TM_AMVP
 #if JVET_AD0213_LIC_IMP
@@ -6279,9 +6282,9 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     }
 #if JVET_AD0213_LIC_IMP
 #if JVET_X0083_BM_AMVP_MERGE_MODE
-    if ((cu.slice->getUseLIC() && (cu.Y().area() >= LIC_MIN_CU_PIXELS)) && !pu.cu->licFlag && !amvpMergeModeFlag && pu.interDir != 10)
+    if ((cu.slice->getUseLIC() && (cu.Y().area() >= LIC_MIN_CU_PIXELS)) && !pu.cu->licFlag && !amvpMergeModeFlag && pu.interDir != MAX_UCHAR)
 #else
-    if ((cu.slice->getUseLIC() && (cu.Y().area() >= LIC_MIN_CU_PIXELS)) && !pu.cu->licFlag && pu.interDir != 10)
+    if ((cu.slice->getUseLIC() && (cu.Y().area() >= LIC_MIN_CU_PIXELS)) && !pu.cu->licFlag && pu.interDir != MAX_UCHAR)
 #endif
     {
       setEncCtrlParaLicOn(cu);
@@ -6326,24 +6329,24 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #if INTER_LIC
 #if JVET_AD0213_LIC_IMP && TM_AMVP
 #if JVET_X0083_BM_AMVP_MERGE_MODE
-  if (cu.licFlag && !amvpMergeModeFlag && pu.interDir != 10)
+  if (cu.licFlag && !amvpMergeModeFlag && pu.interDir != MAX_UCHAR)
 #else
-  if (cu.licFlag && pu.interDir != 10)
+  if (cu.licFlag && pu.interDir != MAX_UCHAR)
 #endif
   {
     checkEncLicOff(cu, mergeCtx);
   }
 #if JVET_X0083_BM_AMVP_MERGE_MODE
-  if ((cu.slice->getUseLIC() && (cu.Y().area() >= LIC_MIN_CU_PIXELS)) && !pu.cu->licFlag && !amvpMergeModeFlag && pu.interDir != 10)
+  if ((cu.slice->getUseLIC() && (cu.Y().area() >= LIC_MIN_CU_PIXELS)) && !pu.cu->licFlag && !amvpMergeModeFlag && pu.interDir != MAX_UCHAR)
 #else
-  if ((cu.slice->getUseLIC() && (cu.Y().area() >= LIC_MIN_CU_PIXELS)) && !pu.cu->licFlag && pu.interDir != 10)
+  if ((cu.slice->getUseLIC() && (cu.Y().area() >= LIC_MIN_CU_PIXELS)) && !pu.cu->licFlag && pu.interDir != MAX_UCHAR)
 #endif
   {
     checkEncLicOn(cu, mergeCtx);
   }
 #else
 #if !TM_AMVP || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP) // This LIC optimization must be off; otherwise, enc/dec mismatching will result. Because the cost metrics (MRSAD or SAD) of TM mode is adaptive to LIC flag, refined MVs would change when LIC flag is 1 or 0.
-  if (cu.licFlag && pu.interDir != 10
+  if (cu.licFlag && pu.interDir != MAX_UCHAR
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP
     && !pu.cs->sps->getUseTMAmvpMode()
 #endif
@@ -6516,6 +6519,10 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #if JVET_AD0213_LIC_IMP
           int      iRefIdx = pu.refIdx[uiRefListIdx];
           AMVPInfo* amvpCand = cu.licFlag ? &(m_tplAmvpInfoLIC[cu.imv][uiRefListIdx][iRefIdx]) : &(m_tplAmvpInfo[cu.imv][uiRefListIdx][iRefIdx]);
+          if (amvpCand->numCand == 0)
+          {
+            PU::fillMvpCand(pu, RefPicList(uiRefListIdx), iRefIdx, *amvpCand, this);
+          }
           Mv cMvPred2 = amvpCand->mvCand[pu.mvpIdx[uiRefListIdx]];
 #else
           auto aMvPred = bi ? cMvPredBi : cMvPred;

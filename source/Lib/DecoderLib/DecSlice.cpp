@@ -235,7 +235,12 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #endif
 #if JVET_AD0188_CCP_MERGE
   {
+#if JVET_Z0118_GDR
+    cs.ccpLut.lutCCP0.resize(0);
+    cs.ccpLut.lutCCP1.resize(0);
+#else
     cs.ccpLut.lutCCP.resize(0);
+#endif
   }
 #endif
   unsigned subStrmId = 0;
@@ -370,7 +375,12 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #if JVET_AD0188_CCP_MERGE
     if (ctuXPosInCtus == tileXPosInCtus)
     {
+#if JVET_Z0118_GDR
+      cs.ccpLut.lutCCP0.resize(0);
+      cs.ccpLut.lutCCP1.resize(0);
+#else
       cs.ccpLut.lutCCP.resize(0);
+#endif
     }
 #endif
     if( !cs.slice->isIntra() )
