@@ -42,6 +42,7 @@
 #error Include CommonDef.h not TypeDef.h
 #endif
 
+
 #include <vector>
 #include <utility>
 #include <sstream>
@@ -352,6 +353,7 @@
 #define JVET_AD0222_ALF_LONG_FIXFILTER                    1 // JVET-AD0222: More taps for fixed filter outputs
 #define JVET_AD0222_ALF_RESI_CLASS                        1 // JVET-AD0222: Residual-based classifier
 #define JVET_AD0222_ADDITONAL_ALF_FIXFILTER               1 // JVET-AD0222: Additional ALF fixed filter
+#define JVET_AE0139_ALF_IMPROVED_FIXFILTER                1 // JVET-AE0139: Improved ALF fixed filter
 
 // SIMD optimizations
 #if IF_12TAP
