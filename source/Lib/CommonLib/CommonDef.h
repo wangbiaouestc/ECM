@@ -1789,9 +1789,21 @@ static const int NUM_CLASSIFIER          = 2;
 static const int NUM_SETS_FIXED_FILTERS  = 8;
 static const int NUM_DIR_FIX             = 7;
 static const int NUM_ACT_FIX             = 16;
+#if JVET_AE0139_ALF_IMPROVED_FIXFILTER
+static const int DIST_CLASS              = 4;
+static const int NUM_DIST_FIX            = 8;
+static const int NUM_CLASSES_FIX         = ((NUM_DIR_FIX*(NUM_DIR_FIX + 1))*NUM_ACT_FIX * NUM_DIST_FIX);
+#else
 static const int NUM_CLASSES_FIX         = ((NUM_DIR_FIX*(NUM_DIR_FIX + 1))*NUM_ACT_FIX);
+#endif
 static const int MAX_FILTER_LENGTH_FIXED = 13;
+#if JVET_AE0139_ALF_IMPROVED_FIXFILTER
+static const int FIX_FILTER_NUM_COEFF_9_DB_9            = 41;
+static const int FIX_FILTER_NUM_COEFF_DB_COMBINE_9_DB_9 = 21;
+static const int FIX_FILTER_NUM_COEFF_13_DB_9           = 64;
+#else
 static const int FIX_FILTER_NUM_COEFF    = 42;
+#endif
 #endif
 
 #if JVET_V0130_INTRA_TMP

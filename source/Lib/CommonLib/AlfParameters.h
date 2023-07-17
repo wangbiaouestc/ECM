@@ -44,6 +44,14 @@
 //! \ingroup AlfParameters
 //! \{
 
+#if JVET_AE0139_ALF_IMPROVED_FIXFILTER
+enum AlfFixedFilterType
+{
+  ALF_FIXED_FILTER_13_DB_9,
+  ALF_FIXED_FILTER_9_DB_9
+};
+#endif
+
 enum AlfFilterType
 {
   ALF_FILTER_5,

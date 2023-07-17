@@ -64,6 +64,9 @@ enum Direction
   VER,
   DIAG0,
   DIAG1,
+#if JVET_AE0139_ALF_IMPROVED_FIXFILTER
+  VARIANCE,
+#endif
   NUM_DIRECTIONS
 };
 
@@ -129,7 +132,7 @@ public:
 
 #if ALF_IMPROVEMENT
   void  copyFixedFilterResults(const PelUnitBuf &recDst, const Area &blkDst, ComponentID COMPONENT_Y, Pel*** fixedFilterResults, const int fixedFilterSetIdx, const int classifierIdx);
-
+#if !JVET_AE0139_ALF_IMPROVED_FIXFILTER
   static void fixedFiltering(AlfClassifier **classifier, const CPelBuf &srcLuma, const Area &cu,
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                              const Area &blkDst,
@@ -137,6 +140,7 @@ public:
                              Pel ***fixedFilterResults, int picWidth, const int fixedFiltInd,
                              const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize,
                              const ClpRng &clpRng, const Pel clippingValues[4]);
+#endif
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
   static void fixedFilteringResi(AlfClassifier **classifier, const CPelBuf &srcResiLuma, const Area &cu,
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -148,9 +152,26 @@ public:
 #endif
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   void paddingFixedFilterResultsPic(Pel*** fixedFilterResultsPic, const int fixedFilterSetIdx);
+#if JVET_AE0139_ALF_IMPROVED_FIXFILTER
+  void paddingFixedFilterResultsCtu( Pel*** fixedFilterResultsPic, Pel*** fixedFilterResultsCtu, const int fixedFilterSetIdx, const Area &blk, int classifierIdx );
+  void deriveFixedFilterResultsBlk( AlfClassifier*** classifier, const CPelBuf& srcLuma, const CPelBuf& srcLumaBeforeDb, const Area& blkDst, const Area& blk, const int bits, CodingStructure &cs, const ClpRng &clpRng, const Pel clippingValues[4], int qp, int winIdx, int fixedFilterSetIdx );
+  void deriveFixedFilterResults( AlfClassifier*** classifier, const CPelBuf& srcLuma, const CPelBuf& srcLumaBeforeDb, const Area& blkDst, const Area& blk, CodingStructure &cs, int winIdx, int fixedFilterSetIdx );
+  static void calcClass0Var( AlfClassifier **classifier, const Area &blkDst, const Area &cu, int dirWindSize, int classDir, int noDir, int noAct, int bitDepth, int subBlkSize, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS] );
+  static void deriveVariance( const CPelBuf &srcLuma, const Area &blkDst, const Area &blk, uint32_t ***laplacian );
+  void deriveFixedFilterResultsCtuBoundary( AlfClassifier ***classifier, Pel ***fixedFilterResults, const CPelBuf &srcLuma, const CPelBuf &srcLumaBeforeDb, const Area &blkDst, const int bits, CodingStructure& cs, const ClpRng &clpRng, const Pel clippingValues[4], int qp, int fixedFilterSetIdx, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS], uint8_t* ctuEnableFlagLuma, uint8_t* ctuEnableOnlineLuma, int ctuIdx, int classifierIdx );
+  void deriveFixedFilterResultsPerBlk( AlfClassifier ***classifier, Pel ***fixedFilterResults, const CPelBuf &srcLuma, const CPelBuf &srcLumaBeforeDb, const Area &blkCur, const int bits, CodingStructure& cs, const ClpRng &clpRng, const Pel clippingValues[4], int qp, int fixedFilterSetIdx, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS], const int classifierIdx );
+  void(*m_deriveVariance)(const CPelBuf &srcLuma, const Area &blkDst, const Area &blk, uint32_t ***variance);
+  void alfFixedFilterBlkNonSimd(AlfClassifier **classifier, const CPelBuf &srcLuma, const Area &curBlk, const Area &blkDst, const CPelBuf &srcLumaBeforeDb, Pel ***fixedFilterResults, int picWidth, const int fixedFiltInd, int fixedFiltQpInd, int dirWindSize, const ClpRng &clpRng, const Pel clippingValues[4]);
+  void alfFixedFilterBlk(AlfClassifier **classifier, const CPelBuf &srcLuma, const Area &curBlk, const Area &blkDst, const CPelBuf &srcLumaBeforeDb, Pel ***fixedFilterResults, int picWidth, const int fixedFiltInd, int fixedFiltQpInd, int dirWindSize, const ClpRng &clpRng, const Pel clippingValues[4]);
+  template<AlfFixedFilterType filtType>
+  static void fixedFilterBlk(AlfClassifier **classifier, const CPelBuf &srcLuma, const Area &curBlk, const Area &blkDst, const CPelBuf &srcLumaBeforeDb, Pel ***fixedFilterResults, int picWidth, const int fixedFiltInd, const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize, const ClpRng &clpRng, const Pel clippingValues[4]);
+  void(*m_fixFilter13x13Db9Blk)(AlfClassifier **classifier, const CPelBuf &srcLuma, const Area &curBlk, const Area &blkDst, const CPelBuf &srcLumaBeforeDb, Pel ***fixedFilterResults, int picWidth, const int fixedFiltInd, const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize, const ClpRng &clpRng, const Pel clippingValues[4]);
+  void(*m_fixFilter9x9Db9Blk)(AlfClassifier **classifier, const CPelBuf &srcLuma, const Area &curBlk, const Area &blkDst, const CPelBuf &srcLumaBeforeDb, Pel ***fixedFilterResults, int picWidth, const int fixedFiltInd, const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize, const ClpRng &clpRng, const Pel clippingValues[4]);
+#else
   void paddingFixedFilterResultsCtu(Pel*** fixedFilterResultsPic, Pel*** fixedFilterResultsCtu, const int fixedFilterSetIdx, const Area &blk);
   void deriveFixedFilterResultsCtuBoundary(AlfClassifier **classifier, Pel ***fixedFilterResults, const CPelBuf &srcLuma, const Area &blkDst, const int bits, CodingStructure& cs, const ClpRng &clpRng, const Pel clippingValues[4], int qp, int fixedFilterSetIdx, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS], uint8_t* ctuEnableFlagLuma, uint8_t* ctuEnableOnlineLuma, int ctuIdx);
   void deriveFixedFilterResultsPerBlk(AlfClassifier **classifier, Pel ***fixedFilterResults, const CPelBuf &srcLuma, const Area &blkCur, const int bits, CodingStructure& cs, const ClpRng &clpRng, const Pel clippingValues[4], int qp, int fixedFilterSetIdx, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS], const int classifierIdx );
+#endif
 #endif
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
   void paddingGaussResultsPic(Pel*** gaussPic, const int storeIdx);
@@ -171,6 +192,9 @@ public:
   void deriveClassificationAndFixFilterResultsBlk( AlfClassifier ***classifier, Pel ***fixedFilterResults, const CPelBuf &srcLuma, 
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
     const bool bResiFixed, Pel ***fixedFilterResiResults, const CPelBuf &srcResiLuma,
+#endif
+#if JVET_AE0139_ALF_IMPROVED_FIXFILTER
+    const CPelBuf &srcLumaBeforeDb, const uint8_t ctuPadFlag,
 #endif
     const Area &blkDst, const Area &blk, const int bits, CodingStructure& cs, const ClpRng &clpRng, const Pel clippingValues[4], int qp, int qpIdx, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS], const int classifierIdx, const int multipleClassifierIdx );
   static void calcClassNew( AlfClassifier **classifier, const Area &blkDst, const Area &cu, const CPelBuf& srcLuma, int subBlkSize, AlfClassifier **classifier0, int classifierIdx, int bitDepth
@@ -193,6 +217,9 @@ public:
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
                             const bool bResiFixed, const CPelBuf &srcResiLuma,
 #endif
+#if JVET_AE0139_ALF_IMPROVED_FIXFILTER
+                            const CPelBuf& srcLumaBeforeDb, const uint8_t ctuPadFlag,
+#endif
     const Area& blkDst, const Area& blk, CodingStructure &cs, const int classifierIdx, const int multipleClassifierIdx );
 #else
   void deriveClassification( AlfClassifier** classifier, const CPelBuf& srcLuma, const Area& blkDst, const Area& blk
@@ -214,6 +241,7 @@ public:
 #endif
   void(*m_deriveClassificationLaplacianBig)(const Area &curBlk, uint32_t **laplacian[NUM_DIRECTIONS]);
   void(*m_deriveClassificationLaplacian)(const CPelBuf &srcLuma, const Area &blkDst, const Area &blk, uint32_t **laplacian[NUM_DIRECTIONS]);
+#if !JVET_AE0139_ALF_IMPROVED_FIXFILTER
   void (*m_filter13x13Blk)(AlfClassifier **classifier, const CPelBuf &srcLuma, const Area &curBlk,
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                            const Area &blkDst,
@@ -221,14 +249,21 @@ public:
                            Pel ***fixedFilterResults, int picWidth, const int fixedFiltInd,
                            const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize,
                            const ClpRng &clpRng, const Pel clippingValues[4]);
+#endif
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+#if JVET_AE0139_ALF_IMPROVED_FIXFILTER
+  void(*m_filterResi9x9Blk)(AlfClassifier **classifier, const CPelBuf &srcResiLuma, const Area &curBlk,
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+    const Area &blkDst,
+#endif
+    Pel ***fixedFilterResiResults, int picWidth, const int fixedFiltInd, const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize, const ClpRng &clpRng, const Pel clippingValues[4]);
+#else
   void (*m_filterResi13x13Blk)(AlfClassifier **classifier, const CPelBuf &srcResiLuma, const Area &curBlk,
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                                const Area &blkDst,
 #endif
-                               Pel ***fixedFilterResiResults, int picWidth, const int fixedFiltInd,
-                               const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize,
-                               const ClpRng &clpRng, const Pel clippingValues[4]);
+                               Pel ***fixedFilterResiResults, int picWidth, const int fixedFiltInd, const short classIndFixed[NUM_CLASSES_FIX], int fixedFiltQpInd, int dirWindSize, const ClpRng &clpRng, const Pel clippingValues[4]);
+#endif
 #endif
   void(*m_filterCcAlf)(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs);
   template<AlfFilterType filtType>
@@ -585,7 +620,11 @@ protected:
   int                          m_filterTypeToStatIndex[MAX_NUM_CHANNEL_TYPE][ALF_NUM_OF_FILTER_TYPES];
 #endif
 #if JVET_X0071_ALF_BAND_CLASSIFIER
+#if JVET_AE0139_ALF_IMPROVED_FIXFILTER
+  AlfClassifier**              m_classifier[ALF_NUM_CLASSIFIER + 1];
+#else
   AlfClassifier**              m_classifier[ALF_NUM_CLASSIFIER];
+#endif
   char                         m_classifierIdxApsLuma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA];
   char                         m_classifierFinal[MAX_NUM_ALF_ALTERNATIVES_LUMA];
 #else
@@ -629,6 +668,9 @@ protected:
   Pel***                       m_fixedFilterResultPerCtu;
   bool                         m_isFixedFilterPaddedPerCtu;
   uint8_t*                     m_ctuEnableOnlineLumaFlag;
+#endif
+#if JVET_AE0139_ALF_IMPROVED_FIXFILTER
+  uint8_t*                     m_ctuPadFlag;
 #endif
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
   Pel***                       m_gaussPic;
