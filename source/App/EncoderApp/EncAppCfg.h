@@ -472,6 +472,9 @@ protected:
 #if JVET_AD0082_TMRL_CONFIG
   bool      m_tmrl;
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  bool      m_tmNoninterToolsEnableFlag;
+#endif
 #if JVET_AD0085_MPM_SORTING
   bool      m_mpmSorting;
 #endif

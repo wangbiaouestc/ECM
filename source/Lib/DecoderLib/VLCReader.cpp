@@ -2218,6 +2218,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   READ_FLAG( uiCode, "sps_tm_tools_enabled_flag" );                 pcSPS->setTMToolsEnableFlag( uiCode );
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  READ_FLAG( uiCode, "sps_tmNoninterToolsEnableFlag_enabled_flag" ); pcSPS->setTMnoninterToolsEnableFlag( uiCode );
+#endif
 #if INTER_LIC
   READ_FLAG( uiCode, "sps_lic_enabled_flag" );                      pcSPS->setLicEnabledFlag( uiCode );
 #endif
@@ -2248,8 +2251,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 
 #if JVET_W0090_ARMC_TM
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if(pcSPS->getTMToolsEnableFlag() || pcSPS->getTMnoninterToolsEnableFlag())
+#else
   pcSPS->setUseAML(false);
   if(pcSPS->getTMToolsEnableFlag())
+#endif
   {
 #endif
   READ_FLAG( uiCode, "sps_aml_enabled_flag");                        pcSPS->setUseAML ( uiCode != 0 );
@@ -2262,7 +2269,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
   pcSPS->setUseTmvpNmvpReordering(false);
-  if (pcSPS->getUseAML())
+  if (pcSPS->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && pcSPS->getTMToolsEnableFlag()
+#endif
+    )
   {
     READ_FLAG( uiCode, "sps_aml_tmvp_nmvp_enabled_flag");            pcSPS->setUseTmvpNmvpReordering ( uiCode != 0 );
   }
@@ -2271,7 +2282,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   pcSPS->setUseArmcRefinedMotion (false);
 #endif
-  if (pcSPS->getUseAML())
+  if (pcSPS->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && pcSPS->getTMToolsEnableFlag()
+#endif
+    )
   {
     READ_FLAG( uiCode, "sps_ArmcRefinedMotion_enabled_flag");        pcSPS->setUseArmcRefinedMotion ( uiCode != 0 );
   }
@@ -2280,7 +2295,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   pcSPS->setNumLambda(0);
 #endif
-  if (pcSPS->getUseAML())
+  if (pcSPS->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && pcSPS->getTMToolsEnableFlag()
+#endif
+    )
   {
     READ_UVLC(uiCode, "num_Lambda");
     pcSPS->setNumLambda(uiCode);
@@ -2518,6 +2537,10 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if ENABLE_DIMD
   READ_FLAG(uiCode, "sps_dimd_enabled_flag");                           pcSPS->setUseDimd(uiCode != 0);
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (pcSPS->getTMnoninterToolsEnableFlag())
+  {
+#endif
 #if JVET_V0130_INTRA_TMP
   READ_FLAG(uiCode, "sps_intraTMP_enabled_flag");                   pcSPS->setUseIntraTMP( uiCode != 0 );
   if(pcSPS->getUseIntraTMP())
@@ -2555,6 +2578,15 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #endif
 #if JVET_AD0188_CCP_MERGE
   READ_UVLC(uiCode, "sps_ccp_merge");                               pcSPS->setUseCcpMerge(uiCode);
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  }
+  else
+  {
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+    READ_UVLC(uiCode, "sps_cccm_cand");                             pcSPS->setUseCccm(uiCode);
+#endif
+  }
 #endif
   if( pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
@@ -2638,15 +2670,29 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
       pcSPS->setUseIbcMbvd( 0 );
     }
     READ_FLAG(uiCode, "sps_rribc_enabled_flag");                   pcSPS->setUseRRIbc(uiCode != 0);
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+    if (pcSPS->getTMnoninterToolsEnableFlag())
+    {
+      READ_FLAG(uiCode, "sps_tmibc_enabled_flag");                 pcSPS->setUseTMIbc(uiCode != 0);
+    }
+#else
     READ_FLAG(uiCode, "sps_tmibc_enabled_flag");                   pcSPS->setUseTMIbc(uiCode != 0);
 #endif
-
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (pcSPS->getTMnoninterToolsEnableFlag())
+  {
+#endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
     READ_FLAG( uiCode, "sps_ibc_bvd_pred_enabled_flag" );               pcSPS->setUseBvdPred             ( uiCode != 0 );
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
     READ_FLAG( uiCode, "sps_ibc_bvp_cluster_enabled_flag" );            pcSPS->setUseBvpCluster          ( uiCode != 0 );
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  }
+#endif
+
 #if JVET_AC0112_IBC_CIIP
     READ_FLAG(uiCode, "sps_ibc_ciip_enabled_flag");                     pcSPS->setUseIbcCiip(uiCode != 0);
 #endif
@@ -5231,7 +5277,11 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
 
   }
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
-  if (!pcSlice->isIntra() && sps->getUseAML())
+  if (!pcSlice->isIntra() && sps->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && sps->getTMToolsEnableFlag()
+#endif
+    )
   {
     int index = sps->getQPOffsetsIdx(pcSlice->getSliceQp() - (pps->getPicInitQPMinus26() + 26));
     bool lambdaCanBePredicted = false;

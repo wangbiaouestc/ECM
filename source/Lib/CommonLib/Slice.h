@@ -1764,6 +1764,9 @@ private:
 #if JVET_AD0082_TMRL_CONFIG
   bool              m_tmrl;
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  bool              m_tmNoninterToolsEnableFlag;
+#endif
 #if JVET_AD0085_MPM_SORTING
   bool              m_mpmSorting;
 #endif
@@ -2381,6 +2384,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AD0082_TMRL_CONFIG
   void      setUseTmrl         (bool b)                                          { m_tmrl = b; }
   bool      getUseTmrl         ()                                      const     { return m_tmrl; }
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  void      setTMnoninterToolsEnableFlag         (bool b)                                          { m_tmNoninterToolsEnableFlag = b; }
+  bool      getTMnoninterToolsEnableFlag          ()                                      const     { return m_tmNoninterToolsEnableFlag; }
 #endif
 #if JVET_AD0085_MPM_SORTING
   void      setUseMpmSorting   (bool b)                                          { m_mpmSorting = b; }

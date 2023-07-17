@@ -3664,6 +3664,20 @@ SPS::SPS()
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 , m_altGPMSplitModeCode       ( false )
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  , m_mvdPred(false)
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  , m_bvdPred(false)
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  , m_bvpCluster(false)
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  , m_useARL(false)
+#endif
+#endif
 , m_SBT                       ( false )
 , m_ISP                       ( false )
 , m_chromaFormatIdc           (CHROMA_420)
@@ -3761,6 +3775,24 @@ SPS::SPS()
 #endif
 #if JVET_W0123_TIMD_FUSION
 , m_timd                      ( false )
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+#if JVET_AB0155_SGPM
+  , m_sgpm(false)
+#endif
+#if JVET_AD0082_TMRL_CONFIG
+  , m_tmrl(false)
+#endif
+, m_tmNoninterToolsEnableFlag ( false )
+#if JVET_AD0085_MPM_SORTING
+, m_mpmSorting                      ( false )
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+, m_cccm                      ( false )
+#endif
+#if JVET_AD0188_CCP_MERGE
+, m_ccpMerge                      ( false )
+#endif
 #endif
 #if JVET_V0130_INTRA_TMP
 , m_intraTMP                  ( false )

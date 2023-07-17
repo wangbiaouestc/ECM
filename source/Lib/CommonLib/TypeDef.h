@@ -52,7 +52,6 @@
 
 
 
-
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -170,7 +169,9 @@
 #define JVET_AC0053_GAUSSIAN_SOLVER                       1 // JVET-AC0053: Filter parameters using Gaussian elimination steps
 #endif
 #define JVET_AB0155_SGPM                                  1 // JVET-AB0155: Spatial geometric partitioning mode
+#if JVET_AB0155_SGPM
 #define JVET_AC0189_SGPM_NO_BLENDING                      1 // JVET-AC0189: Allow no blending for SGPM
+#endif
 #define JVET_AB0157_TMRL                                  1 // JVET-AB0157: Template-based multiple reference line intra prediction
 #if JVET_AB0157_TMRL
 #define JVET_AD0082_TMRL_CONFIG                           1 // JVET-AD0082: a configuration option for TMRL
@@ -206,6 +207,7 @@
 #define JVET_AC0071_DBV                                   1 // JVET-AC0071: Direct block vector mode for chroma prediction
 #define JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS   1 // JVET-AD0208: IBC adaptation for camera-captured contents and IBC extension to fractional-pel BV
 
+#define JVET_AE0174_NONINTER_TM_TOOLS_CONTROL             1 // JVET-AE0174: Add non-inter TM sps flag to control whether template matching is used for non-inter (Intra and IBC) tools
 
 // Inter
 #define CIIP_PDPC                                         1 // Apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
