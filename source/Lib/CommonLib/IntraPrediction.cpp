@@ -3404,10 +3404,14 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
 #if JVET_AD0120_LBCCP
   static int cclmSAD  = MAX_INT;
   static int cccmSAD  = MAX_INT;
-  bool isMultiCccmFullEnabled = false;
 #if JVET_AA0057_CCCM
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (pu.cs->slice->isIntra() && PU::cccmMultiModeAvail(pu, MMLM_CHROMA_IDX) && pu.cs->sps->getTMnoninterToolsEnableFlag())
+#else
+  bool isMultiCccmFullEnabled = false;
   isMultiCccmFullEnabled = PU::cccmMultiModeAvail(pu, MMLM_CHROMA_IDX);
   if (pu.cs->slice->isIntra() && isMultiCccmFullEnabled)
+#endif
   {
     const int  bitDepth = pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
     const CompArea                   &areaCb = pu2.blocks[COMPONENT_Cb];
@@ -3512,7 +3516,11 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
   int  shift = 2;
 
 #if JVET_AD0120_LBCCP
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (pu.cs->slice->isIntra() && PU::cccmMultiModeAvail(pu, MMLM_CHROMA_IDX) && pu.cs->sps->getTMnoninterToolsEnableFlag())
+#else
   if (pu.cs->slice->isIntra() && isMultiCccmFullEnabled)
+#endif
   {
     const bool aboveAvailable = pu.cu->cs->getCU(pu.blocks[compId].pos().offset(0, -1), toChannelType(compId)) ? true : false;
     const bool leftAvailable = pu.cu->cs->getCU(pu.blocks[compId].pos().offset(-1, 0), toChannelType(compId)) ? true : false;
@@ -14893,6 +14901,9 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
         && !pu.cccmNoSubFlag
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && pu.cs->sps->getTMnoninterToolsEnableFlag()
 #endif
     )
   {

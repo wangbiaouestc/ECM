@@ -4625,10 +4625,12 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
   }
 
   // above left
-#if JVET_Z0084_IBC_TM && JVET_Z0075_IBC_HMVP_ENLARGE && JVET_W0090_ARMC_TM
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL && JVET_Z0084_IBC_TM && JVET_Z0075_IBC_HMVP_ENLARGE && JVET_W0090_ARMC_TM
+  if ((cnt < 4 && pu.cs->sps->getUseAML() && pu.cs->sps->getTMnoninterToolsEnableFlag() && mrgCandIdx >= 0) || !(pu.cs->sps->getUseAML() && pu.cs->sps->getTMnoninterToolsEnableFlag())) //Only for AMVP case
+#elif JVET_Z0084_IBC_TM && JVET_Z0075_IBC_HMVP_ENLARGE && JVET_W0090_ARMC_TM
   if ((cnt < 4 && pu.cs->sps->getUseAML() && mrgCandIdx >= 0)
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0090_ARMC_TM
-	  || !pu.cs->sps->getUseAML()
+         || !pu.cs->sps->getUseAML()
 #endif
   ) //Only for AMVP case
 #elif !JVET_Z0075_IBC_HMVP_ENLARGE
@@ -5901,7 +5903,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 )
 {
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (!(pu.cs->sps->getUseAML() && pu.cs->sps->getTMToolsEnableFlag())|| !pu.cs->sps->getUseTmvpNmvpReordering())
+#else
   if (!pu.cs->sps->getUseAML() || !pu.cs->sps->getUseTmvpNmvpReordering())
+#endif
   {
     tmvpMrgCtx  = nullptr;
     namvpMrgCtx = nullptr;
@@ -5924,14 +5930,21 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   }
   const uint32_t maxNumMergeCand =
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+                                   !(pu.cs->sps->getUseAML() && pu.cs->sps->getTMToolsEnableFlag())|| !pu.cs->sps->getUseTmvpNmvpReordering() ?
+#else
                                    !pu.cs->sps->getUseAML() || !pu.cs->sps->getUseTmvpNmvpReordering() ?
+#endif
                                    (pu.tmMergeFlag ? pu.cs->sps->getMaxNumTMMergeCand() : pu.cs->sps->getMaxNumMergeCand()) :
 #endif
                                    (pu.tmMergeFlag ? std::min((int)(TM_MRG_MAX_NUM_INIT_CANDS        + additionalMRGCand), ((int)NUM_MERGE_CANDS - (3)))
                                                    : std::min((int)(pu.cs->sps->getMaxNumMergeCand() + additionalMRGCand), ((int)NUM_MERGE_CANDS - (3))));
 #else
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
-  const uint32_t maxNumMergeCand = pu.tmMergeFlag ? ((pu.cs->sps->getUseAML()
+  const uint32_t maxNumMergeCand = pu.tmMergeFlag ? (( pu.cs->sps->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+                                                  && pu.cs->sps->getTMToolsEnableFlag()
+#endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
                                                   && pu.cs->sps->getUseTmvpNmvpReordering()
 #endif
@@ -6785,7 +6798,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #endif
   {
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (!(pu.cs->sps->getUseAML() && pu.cs->sps->getTMToolsEnableFlag()) && cnt >= maxNumMergeCand - 1)
+#else
     if (!pu.cs->sps->getUseAML() && cnt >= maxNumMergeCand - 1)
+#endif
     {
       continue;
     }
@@ -6800,7 +6817,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #endif
     {
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (!(pu.cs->sps->getUseAML() && pu.cs->sps->getTMToolsEnableFlag()) && cnt >= maxNumMergeCand - 1)
+#else
       if (!pu.cs->sps->getUseAML() && cnt >= maxNumMergeCand - 1)
+#endif
       {
         continue;
       }
@@ -6946,7 +6967,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   int maxNumMergeCandMin1 = maxNumMergeCand;
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  maxNumMergeCandMin1 -= !(pu.cs->sps->getUseAML() && pu.cs->sps->getTMToolsEnableFlag()) ? 1 : 0;
+#else
   maxNumMergeCandMin1 -= !pu.cs->sps->getUseAML() ? 1 : 0;
+#endif
 #endif
 #else
   int maxNumMergeCandMin1 = maxNumMergeCand - 1;
@@ -6987,7 +7012,11 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   {
     if (cnt > 1 && cnt < maxNumMergeCand
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && !(pu.cs->sps->getUseAML() && pu.cs->sps->getTMToolsEnableFlag())
+#else
       && !pu.cs->sps->getUseAML()
+#endif
 #endif
       )
     {
@@ -8461,7 +8490,11 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
 )
 {
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (!(pu.cs->sps->getUseAML() && pu.cs->sps->getTMToolsEnableFlag()) || !pu.cs->sps->getUseTmvpNmvpReordering())
+#else
   if (!pu.cs->sps->getUseAML() || !pu.cs->sps->getUseTmvpNmvpReordering())
+#endif
   {
     mvpMrgCtx1 = nullptr;
     mvpMrgCtx2 = nullptr;
@@ -8476,6 +8509,9 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
                              + (mvpMrgCtx2 != NULL ? mvpMrgCtx2->numValidMergeCand : 0);
 #endif
   const uint32_t maxNumMergeCand = pu.cs->sps->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+                                && pu.cs->sps->getTMToolsEnableFlag()
+#endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
                                 && pu.cs->sps->getUseTmvpNmvpReordering()
 #endif
@@ -8973,7 +9009,11 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   int maxNumMergeCandMin1 = maxNumMergeCand;
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  maxNumMergeCandMin1 -= !(pu.cs->sps->getUseAML() && pu.cs->sps->getTMToolsEnableFlag()) ? 1 : 0;
+#else
   maxNumMergeCandMin1 -= !pu.cs->sps->getUseAML() ? 1 : 0;
+#endif
 #endif
 #else
   int maxNumMergeCandMin1 = maxNumMergeCand - 1;
@@ -9113,7 +9153,11 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
 
 #if !JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC)
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (!(pu.cs->sps->getUseAML() && pu.cs->sps->getTMToolsEnableFlag()))
+#else
   if (!pu.cs->sps->getUseAML())
+#endif
 #endif
   {
     if (cnt > 1 && cnt < maxNumMergeCand)
@@ -11761,7 +11805,11 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
     namvpMergeCandCtx[1].numValidMergeCand = 0;
 
     bool isSaved = true;
-    if (pu.cs->sps->getUseAML() && interPred != NULL)
+    if (pu.cs->sps->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+      && interPred != NULL)
     {
       int nWidth = pu.lumaSize().width;
       int nHeight = pu.lumaSize().height;
@@ -13185,7 +13233,11 @@ bool PU::addSpatialAffineMergeHMVPCand(const PredictionUnit& pu, AffineMergeCtx&
   const Slice& slice = *pu.cs->slice;
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
 #if JVET_W0090_ARMC_TM
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand() + ((pu.cs->sps->getUseAML()&& pu.cs->sps->getTMToolsEnableFlag()) ? ADDITIONAL_AFFINE_CAND_NUM : 0);
+#else
   const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand() + (pu.cs->sps->getUseAML() ? ADDITIONAL_AFFINE_CAND_NUM : 0);
+#endif
 #else
   const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand();
 #endif
@@ -14786,7 +14838,11 @@ void PU::getNonAdjCstMergeCand(const PredictionUnit &pu, AffineMergeCtx &affMrgC
   const Slice &          slice = *pu.cs->slice;
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
 #if JVET_W0090_ARMC_TM
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand() + ((pu.cs->sps->getUseAML()&& pu.cs->sps->getTMToolsEnableFlag()) ? ADDITIONAL_AFFINE_CAND_NUM : 0);
+#else
   const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand() + (pu.cs->sps->getUseAML() ? ADDITIONAL_AFFINE_CAND_NUM : 0);
+#endif
 #else
   const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand();
 #endif
@@ -15013,7 +15069,11 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
   const Slice &slice = *pu.cs->slice;
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
 #if JVET_W0090_ARMC_TM
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand() + ((pu.cs->sps->getUseAML()&& pu.cs->sps->getTMToolsEnableFlag()) ? ADDITIONAL_AFFINE_CAND_NUM : 0);
+#else
   const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand() + (pu.cs->sps->getUseAML() ? ADDITIONAL_AFFINE_CAND_NUM : 0);
+#endif
 #else
   const uint32_t maxNumAffineMergeCand = slice.getPicHeader()->getMaxNumAffineMergeCand();
 #endif
@@ -15340,7 +15400,11 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
     }
     affMrgCtxTemp.numValidMergeCand = 0;
     affMrgCtxTemp.maxNumMergeCand = RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE;
-    if (pu.cs->sps->getUseAML())
+    if (pu.cs->sps->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+        && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+      )
     {
       int counter = 0;
       affMrgCtxTemp = affineRMVFCtx;
@@ -15495,7 +15559,11 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       collectNeiMotionInfo(mvpInfoVec, pu);
 
 #if JVET_W0090_ARMC_TM
-      if (pu.cs->sps->getUseAML())
+      if (pu.cs->sps->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+          && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+        )
       {
         for (int i = 0; i < numAffNeighExtend2; i++)
         {
@@ -15897,7 +15965,11 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
       }
     }
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION && JVET_W0090_ARMC_TM
-    if (pu.cs->sps->getUseAML())
+    if (pu.cs->sps->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+        && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+      )
     {
       affMrgCtx.numAffCandToTestEnc = affMrgCtx.numValidMergeCand;
     }
@@ -17041,7 +17113,11 @@ void PU::getRMVFAffineCand(const PredictionUnit &pu, AffineMergeCtx& affineMerge
     std::vector<RMVFInfo> mvpInfoVec[NUM_REF_PIC_LIST_01][MAX_NUM_REF];
     collectNeiMotionInfo(mvpInfoVec, pu);
 #if JVET_W0090_ARMC_TM
-    if (pu.cs->sps->getUseAML())
+    if (pu.cs->sps->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+        && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+      )
     {
       for (int i = 0; i < numAffNeighExtend2; i++)
       {
@@ -21090,7 +21166,11 @@ bool PU::checkIsValidMergeMvCand(const CodingStructure &cs, const PredictionUnit
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
 bool PU::isArmcRefinedMotionEnabled(const PredictionUnit &pu, unsigned mode)
 {
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (!(pu.cs->sps->getUseAML() && pu.cs->sps->getTMToolsEnableFlag()) || !pu.cs->sps->getUseArmcRefinedMotion())
+#else
   if (!pu.cs->sps->getUseAML() || !pu.cs->sps->getUseArmcRefinedMotion())
+#endif
   {
     return false;
   }
