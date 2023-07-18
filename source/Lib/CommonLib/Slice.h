@@ -1554,6 +1554,9 @@ private:
 #if JVET_AC0112_IBC_LIC
   bool              m_ibcLic;
 #endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  bool              m_ibcNonAdjCand;
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool              m_DMVDMode;
 #endif
@@ -2153,6 +2156,11 @@ void                    setCCALFEnabledFlag( bool b )                           
   void                    setUseIbcLic(bool b)                                                            { m_ibcLic = b; }
   bool                    getUseIbcLic() const                                                            { return m_ibcLic; }
 #endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  void                    setUseIbcNonAdjCand(bool b)                                                     { m_ibcNonAdjCand = b; }
+  bool                    getUseIbcNonAdjCand() const                                                     { return m_ibcNonAdjCand; }
+#endif
+
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void                    setUseDMVDMode(bool b)                                                          { m_DMVDMode = b; }
   bool                    getUseDMVDMode() const                                                          { return m_DMVDMode; }

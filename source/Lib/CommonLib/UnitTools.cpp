@@ -4621,6 +4621,12 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
   //left
   const PredictionUnit* puLeft = cs.getPURestricted(posLB.offset(-1, 0), pu, pu.chType);
   bool isGt4x4 = pu.lwidth() * pu.lheight() > 16;
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  if(pu.cs->sps->getUseIbcNonAdjCand())
+  {
+    isGt4x4 = true;
+  }
+#endif
 #if JVET_AB0061_ITMP_BV_FOR_IBC
   const bool isAvailableA1 = puLeft && pu.cu != puLeft->cu && (CU::isIBC(*puLeft->cu) || puLeft->cu->tmpFlag);
 #else
@@ -5361,7 +5367,427 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
     }
   }
 #endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  if (pu.cs->sps->getUseIbcNonAdjCand() && pu.mergeFlag && cnt != maxNumMergeCand)
+  {
+    MotionInfo miNonAdjacent;
+    int        offsetX             = 0;
+    int        offsetY             = 0;
+    int        offsetX0            = 0;
+    int        offsetX1            = 0;
+    int        offsetX2            = pu.Y().width >> 1;
+    int        offsetY0            = 0;
+    int        offsetY1            = 0;
+    int        offsetY2            = pu.Y().height >> 1;
+    const int  iNonAdjCandNum[7] = { 5, 5, 5, 5, 5, 5, 5 };
+    const int  idxMap[7][9]        = { { 0, 1, 2, 3, 4 },
+                               { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+                               { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+                               { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+                               { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+                               { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+                               { 0, 1, 2, 3, 4, 5, 6, 7, 8 } };
+#if JVET_AA0070_RRIBC
+    int cPosCurX = pu.lx() + (pu.lwidth() >> 1);
+    int cPosCurY = pu.ly() + (pu.lheight() >> 1);
+    int thW      = (pu.lwidth() >> 1) * 3;
+    int thH      = (pu.lheight() >> 1) * 3;
+#endif
+    for (int iDistanceIndex = 0; iDistanceIndex < 7 && cnt < maxNumMergeCand; iDistanceIndex++)
+    {
+      const int iNADistanceHor = pu.Y().width * (iDistanceIndex + 1);
+      const int iNADistanceVer = pu.Y().height * (iDistanceIndex + 1);
+      for (int iNonAdjIdx = 0; iNonAdjIdx < iNonAdjCandNum[iDistanceIndex] && cnt < maxNumMergeCand; iNonAdjIdx++)
+      {
+        switch (idxMap[iDistanceIndex][iNonAdjIdx])
+        {
+        case 0:
+          offsetX = offsetX0 = -iNADistanceHor - 1;
+          offsetY = offsetY0 = pu.Y().height + iNADistanceVer - 1;
+          break;
+        case 1:
+          offsetX = offsetX1 = pu.Y().width + iNADistanceHor - 1;
+          offsetY = offsetY1 = -iNADistanceVer - 1;
+          break;
+        case 2:
+          offsetX = offsetX2;
+          offsetY = offsetY1;
+          break;
+        case 3:
+          offsetX = offsetX0;
+          offsetY = offsetY2;
+          break;
+        case 4:
+          offsetX = offsetX0;
+          offsetY = offsetY1;
+          break;
+        case 5:
+          offsetX = -1;
+          offsetY = offsetY0;
+          break;
+        case 6:
+          offsetX = offsetX1;
+          offsetY = -1;
+          break;
+        case 7:
+          offsetX = offsetX0 >> 1;
+          offsetY = offsetY0;
+          break;
+        case 8:
+          offsetX = offsetX1;
+          offsetY = offsetY1 >> 1;
+          break;
+        default:
+          printf("error!");
+          exit(0);
+          break;
+        }
+        const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
+        bool                  isAvailableNonAdjacent =
+          puNonAdjacent && pu.cu != puNonAdjacent->cu && (CU::isIBC(*puNonAdjacent->cu) || puNonAdjacent->cu->tmpFlag);
+        if (isGt4x4 && isAvailableNonAdjacent)
+        {
+          miNonAdjacent = puNonAdjacent->getMotionInfo(posLT.offset(offsetX, offsetY));
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+          miNonAdjacent.useAltHpelIf = pu.mergeFlag ? miNonAdjacent.useAltHpelIf : (pu.cu->imv == IMV_HPEL);
+#endif
+#if JVET_AA0070_RRIBC
+          Position cPos(puNonAdjacent->lx() + (puNonAdjacent->lwidth() >> 1),
+                        puNonAdjacent->ly() + (puNonAdjacent->lheight() >> 1));
+          if (pu.mergeFlag || ((abs(cPosCurX - (int) cPos.x) <= thW) && (abs(cPosCurY - (int) cPos.y) <= thH)))
+          {
+            rribcAdjustMotion(pu, &cPos, miNonAdjacent);
+          }
+#endif
+          if (checkIsIBCCandidateValid(pu, miNonAdjacent))
+          {
+            // get Inter Dir
+#if JVET_AE0169_BIPREDICTIVE_IBC
+            mrgCtx.interDirNeighbours[cnt] = 1;
+#else
+            mrgCtx.interDirNeighbours[cnt] = miNonAdjacent.interDir;
+#endif
+            mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNonAdjacent.mv[0], miNonAdjacent.refIdx[0]);
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+            mrgCtx.useAltHpelIf[cnt] = miNonAdjacent.useAltHpelIf;
+#endif
+#if JVET_AA0070_RRIBC
+#if IBC_TM_MRG
+#if JVET_AA0061_IBC_MBVD
+            mrgCtx.rribcFlipTypes[cnt] =
+              (miNonAdjacent.isIBCmot && !pu.tmMergeFlag && !pu.ibcMbvdMergeFlag) ? miNonAdjacent.rribcFlipType : 0;
+#else
+            mrgCtx.rribcFlipTypes[cnt] = (miAboveLeft.isIBCmot && !pu.tmMergeFlag) ? miAboveLeft.rribcFlipType : 0;
+#endif
+#else
+#if JVET_AA0061_IBC_MBVD
+            mrgCtx.rribcFlipTypes[cnt] = (miAboveLeft.isIBCmot && !pu.ibcMbvdMergeFlag) ? miAboveLeft.rribcFlipType : 0;
+#else
+            mrgCtx.rribcFlipTypes[cnt] = (miAboveLeft.isIBCmot) ? miAboveLeft.rribcFlipType : 0;
+#endif
+#endif
+#endif
+#if JVET_AC0112_IBC_LIC
+#if JVET_AA0070_RRIBC
+            mrgCtx.ibcLicFlags[cnt] =
+              miNonAdjacent.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miNonAdjacent.useIbcLic : false;
+#else
+            mrgCtx.ibcLicFlags[cnt]    = miNonAdjacent.isIBCmot ? miNonAdjacent.useIbcLic : false;
+#endif
+#endif
+#if JVET_Z0084_IBC_TM
+            if (!mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh))
+#endif
+            {
+              if (mrgCandIdx == cnt)
+              {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                mrgCtx.numAMVPMergeCand = cnt;
+#endif
+                return;
+              }
+              cnt++;
+              // early termination
+              if (cnt == maxNumMergeCand)
+              {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                mrgCtx.numAMVPMergeCand = cnt;
+#endif
+                return;
+              }
+            }
+          }
+#if JVET_AE0169_BIPREDICTIVE_IBC
+          if (miNonAdjacent.isIBCmot && miNonAdjacent.interDir == 3)
+          {
+            MotionInfo miNonAdjacentL1 = miNonAdjacent;
+            miNonAdjacentL1.mv[0]      = miNonAdjacentL1.mv[1];
+            miNonAdjacentL1.refIdx[1]  = -1;
+#if JVET_AA0070_RRIBC
+            if (pu.mergeFlag || ((abs(cPosCurX - (int) cPos.x) <= thW) && (abs(cPosCurY - (int) cPos.y) <= thH)))
+            {
+              rribcAdjustMotion(pu, &cPos, miNonAdjacentL1);
+            }
+#endif
 
+            if (checkIsIBCCandidateValid(pu, miNonAdjacentL1))
+            {
+              // get Inter Dir
+              mrgCtx.interDirNeighbours[cnt] = 1;
+              mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNonAdjacentL1.mv[0], miNonAdjacentL1.refIdx[0]);
+#if JVET_AA0070_RRIBC
+#if IBC_TM_MRG
+#if JVET_AA0061_IBC_MBVD
+              mrgCtx.rribcFlipTypes[cnt] =
+                (miNonAdjacentL1.isIBCmot && !pu.tmMergeFlag && !pu.ibcMbvdMergeFlag) ? miNonAdjacentL1.rribcFlipType : 0;
+#else
+              mrgCtx.rribcFlipTypes[cnt] =
+                (miNonAdjacentL1.isIBCmot && !pu.tmMergeFlag) ? miNonAdjacentL1.rribcFlipType : 0;
+#endif
+#else
+#if JVET_AA0061_IBC_MBVD
+              mrgCtx.rribcFlipTypes[cnt] =
+                (miNonAdjacentL1.isIBCmot && !pu.ibcMbvdMergeFlag) ? miNonAdjacentL1.rribcFlipType : 0;
+#else
+              mrgCtx.rribcFlipTypes[cnt] = (miNonAdjacentL1.isIBCmot) ? miNonAdjacentL1.rribcFlipType : 0;
+#endif
+#endif
+#endif
+#if JVET_AC0112_IBC_LIC
+#if JVET_AA0070_RRIBC
+              mrgCtx.ibcLicFlags[cnt] =
+                miNonAdjacentL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miNonAdjacentL1.useIbcLic : false;
+#else
+              mrgCtx.ibcLicFlags[cnt] = miNonAdjacentL1.isIBCmot ? miNonAdjacentL1.useIbcLic : false;
+#endif
+#endif
+
+#if JVET_Z0084_IBC_TM
+              if (!mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh))
+#endif
+              {
+                if (mrgCandIdx == cnt)
+                {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                  mrgCtx.numAMVPMergeCand = cnt;
+#endif
+                  return;
+                }
+                cnt++;
+
+                // early termination
+                if (cnt == maxNumMergeCand)
+                {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                  mrgCtx.numAMVPMergeCand = cnt;
+#endif
+                  return;
+                }
+              }
+            }
+          }
+#endif
+        }
+      }
+    }
+  }
+  if (pu.cs->sps->getUseIbcNonAdjCand() && !pu.mergeFlag && cnt != maxNumMergeCand)
+  {
+    MotionInfo miNonAdjacent;
+    int        offsetX             = 0;
+    int        offsetY             = 0;
+    const int  iNonAdjCandNum[4] = { 5, 5, 5, 5 };
+    const int  idxMap[4][5]        = { { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 } };
+#if JVET_AA0070_RRIBC
+    int cPosCurX = pu.lx() + (pu.lwidth() >> 1);
+    int cPosCurY = pu.ly() + (pu.lheight() >> 1);
+    int thW      = (pu.lwidth() >> 1) * 3;
+    int thH      = (pu.lheight() >> 1) * 3;
+#endif
+    for (int iDistanceIndex = 0; iDistanceIndex < NADISTANCE_LEVEL && cnt < maxNumMergeCand; iDistanceIndex++)
+    {
+      const int iNADistanceHor = pu.Y().width * (iDistanceIndex + 1);
+      const int iNADistanceVer = pu.Y().height * (iDistanceIndex + 1);
+      for (int iNonAdjIdx = 0; iNonAdjIdx < iNonAdjCandNum[iDistanceIndex] && cnt < maxNumMergeCand; iNonAdjIdx++)
+      {
+        switch (idxMap[iDistanceIndex][iNonAdjIdx])
+        {
+        case 0:
+          offsetX = -iNADistanceHor - 1;
+          offsetY = pu.Y().height + iNADistanceVer - 1;
+          break;
+        case 1:
+          offsetX = pu.Y().width + iNADistanceHor - 1;
+          offsetY = -iNADistanceVer - 1;
+          break;
+        case 2:
+          offsetX = pu.Y().width >> 1;
+          offsetY = -iNADistanceVer - 1;
+          break;
+        case 3:
+          offsetX = -iNADistanceHor - 1;
+          offsetY = pu.Y().height >> 1;
+          break;
+        case 4:
+          offsetX = -iNADistanceHor - 1;
+          offsetY = -iNADistanceVer - 1;
+          break;
+        default:
+          printf("error!");
+          exit(0);
+          break;
+        }
+        const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
+        bool                  isAvailableNonAdjacent =
+          puNonAdjacent && pu.cu != puNonAdjacent->cu && (CU::isIBC(*puNonAdjacent->cu) || puNonAdjacent->cu->tmpFlag);
+        if (isGt4x4 && isAvailableNonAdjacent)
+        {
+          miNonAdjacent = puNonAdjacent->getMotionInfo(posLT.offset(offsetX, offsetY));
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+          miNonAdjacent.useAltHpelIf = pu.mergeFlag ? miNonAdjacent.useAltHpelIf : (pu.cu->imv == IMV_HPEL);
+#endif
+#if JVET_AA0070_RRIBC
+          Position cPos(puNonAdjacent->lx() + (puNonAdjacent->lwidth() >> 1),
+                        puNonAdjacent->ly() + (puNonAdjacent->lheight() >> 1));
+          if (pu.mergeFlag || ((abs(cPosCurX - (int) cPos.x) <= thW) && (abs(cPosCurY - (int) cPos.y) <= thH)))
+          {
+            rribcAdjustMotion(pu, &cPos, miNonAdjacent);
+          }
+#endif
+          if (checkIsIBCCandidateValid(pu, miNonAdjacent))
+          {
+            // get Inter Dir
+#if JVET_AE0169_BIPREDICTIVE_IBC
+            mrgCtx.interDirNeighbours[cnt] = 1;
+#else
+            mrgCtx.interDirNeighbours[cnt] = miNonAdjacent.interDir;
+#endif
+            mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNonAdjacent.mv[0], miNonAdjacent.refIdx[0]);
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+            mrgCtx.useAltHpelIf[cnt] = miNonAdjacent.useAltHpelIf;
+#endif
+#if JVET_AA0070_RRIBC
+#if IBC_TM_MRG
+#if JVET_AA0061_IBC_MBVD
+            mrgCtx.rribcFlipTypes[cnt] =
+              (miNonAdjacent.isIBCmot && !pu.tmMergeFlag && !pu.ibcMbvdMergeFlag) ? miNonAdjacent.rribcFlipType : 0;
+#else
+            mrgCtx.rribcFlipTypes[cnt] = (miAboveLeft.isIBCmot && !pu.tmMergeFlag) ? miAboveLeft.rribcFlipType : 0;
+#endif
+#else
+#if JVET_AA0061_IBC_MBVD
+            mrgCtx.rribcFlipTypes[cnt] = (miAboveLeft.isIBCmot && !pu.ibcMbvdMergeFlag) ? miAboveLeft.rribcFlipType : 0;
+#else
+            mrgCtx.rribcFlipTypes[cnt] = (miAboveLeft.isIBCmot) ? miAboveLeft.rribcFlipType : 0;
+#endif
+#endif
+#endif
+#if JVET_AC0112_IBC_LIC
+#if JVET_AA0070_RRIBC
+            mrgCtx.ibcLicFlags[cnt] =
+              miNonAdjacent.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miNonAdjacent.useIbcLic : false;
+#else
+            mrgCtx.ibcLicFlags[cnt]    = miNonAdjacent.isIBCmot ? miNonAdjacent.useIbcLic : false;
+#endif
+#endif
+#if JVET_Z0084_IBC_TM
+            if (!mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh))
+#endif
+            {
+              if (mrgCandIdx == cnt)
+              {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                mrgCtx.numAMVPMergeCand = cnt;
+#endif
+                return;
+              }
+              cnt++;
+              // early termination
+              if (cnt == maxNumMergeCand)
+              {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                mrgCtx.numAMVPMergeCand = cnt;
+#endif
+                return;
+              }
+            }
+          }
+#if JVET_AE0169_BIPREDICTIVE_IBC
+          if (miNonAdjacent.isIBCmot && miNonAdjacent.interDir == 3)
+          {
+            MotionInfo miNonAdjacentL1 = miNonAdjacent;
+            miNonAdjacentL1.mv[0]      = miNonAdjacentL1.mv[1];
+            miNonAdjacentL1.refIdx[1]  = -1;
+#if JVET_AA0070_RRIBC
+            if (pu.mergeFlag || ((abs(cPosCurX - (int) cPos.x) <= thW) && (abs(cPosCurY - (int) cPos.y) <= thH)))
+            {
+              rribcAdjustMotion(pu, &cPos, miNonAdjacentL1);
+            }
+#endif
+
+            if (checkIsIBCCandidateValid(pu, miNonAdjacentL1))
+            {
+              // get Inter Dir
+              mrgCtx.interDirNeighbours[cnt] = 1;
+              mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNonAdjacentL1.mv[0], miNonAdjacentL1.refIdx[0]);
+#if JVET_AA0070_RRIBC
+#if IBC_TM_MRG
+#if JVET_AA0061_IBC_MBVD
+              mrgCtx.rribcFlipTypes[cnt] = (miNonAdjacentL1.isIBCmot && !pu.tmMergeFlag && !pu.ibcMbvdMergeFlag)
+                                             ? miNonAdjacentL1.rribcFlipType
+                                             : 0;
+#else
+              mrgCtx.rribcFlipTypes[cnt] =
+                (miNonAdjacentL1.isIBCmot && !pu.tmMergeFlag) ? miNonAdjacentL1.rribcFlipType : 0;
+#endif
+#else
+#if JVET_AA0061_IBC_MBVD
+              mrgCtx.rribcFlipTypes[cnt] =
+                (miNonAdjacentL1.isIBCmot && !pu.ibcMbvdMergeFlag) ? miNonAdjacentL1.rribcFlipType : 0;
+#else
+              mrgCtx.rribcFlipTypes[cnt] = (miNonAdjacentL1.isIBCmot) ? miNonAdjacentL1.rribcFlipType : 0;
+#endif
+#endif
+#endif
+#if JVET_AC0112_IBC_LIC
+#if JVET_AA0070_RRIBC
+              mrgCtx.ibcLicFlags[cnt] =
+                miNonAdjacentL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miNonAdjacentL1.useIbcLic : false;
+#else
+              mrgCtx.ibcLicFlags[cnt] = miNonAdjacentL1.isIBCmot ? miNonAdjacentL1.useIbcLic : false;
+#endif
+#endif
+
+#if JVET_Z0084_IBC_TM
+              if (!mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh))
+#endif
+              {
+                if (mrgCandIdx == cnt)
+                {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                  mrgCtx.numAMVPMergeCand = cnt;
+#endif
+                  return;
+                }
+                cnt++;
+
+                // early termination
+                if (cnt == maxNumMergeCand)
+                {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                  mrgCtx.numAMVPMergeCand = cnt;
+#endif
+                  return;
+                }
+              }
+            }
+          }
+#endif
+        }
+      }
+    }
+  }
+#endif
   if (cnt != maxNumMergeCand)
   {
 #if JVET_Z0075_IBC_HMVP_ENLARGE

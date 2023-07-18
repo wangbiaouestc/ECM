@@ -1703,6 +1703,12 @@ void DecCu::xReconInter(CodingUnit &cu)
     }
 #endif
     bool isIbcSmallBlk = CU::isIBC(cu) && (cu.lwidth() * cu.lheight() <= 16);
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+    if (cu.cs->sps->getUseIbcNonAdjCand())
+    {
+      isIbcSmallBlk = false;
+    }
+#endif
     CU::saveMotionInHMVP( cu, isIbcSmallBlk );
   }
 

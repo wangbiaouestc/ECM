@@ -1938,6 +1938,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AC0112_IBC_LIC
   sps.setUseIbcLic                          ( m_ibcLic );
 #endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  sps.setUseIbcNonAdjCand                   ( m_ibcNonAdjCand );
+#endif
   sps.setWrapAroundEnabledFlag                      ( m_wrapAround );
 #if MULTI_HYP_PRED
   sps.setMaxNumAddHyps(m_maxNumAddHyps);

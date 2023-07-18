@@ -967,6 +967,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AE0169_BIPREDICTIVE_IBC
   m_cEncLib.setIbcBiPred                                         ( m_ibcBiPred );
 #endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  m_cEncLib.setIbcNonAdjCand                                     ( m_ibcNonAdjCand);
+#endif
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   m_cEncLib.setRRIbc(m_rribc);

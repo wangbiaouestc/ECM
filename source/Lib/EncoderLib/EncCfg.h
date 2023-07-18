@@ -556,6 +556,9 @@ protected:
 #if JVET_AE0169_BIPREDICTIVE_IBC
   bool      m_ibcBiPred;
 #endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  bool      m_ibcNonAdjCand;
+#endif
 
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;
@@ -1489,6 +1492,11 @@ public:
   void      setIbcBiPred                    ( bool b )       { m_ibcBiPred = b; }
   bool      getIbcBiPred                    ()         const { return m_ibcBiPred; }
 #endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  void      setIbcNonAdjCand                 ( bool b )       { m_ibcNonAdjCand = b; }
+  bool      getIbcNonAdjCand                 ()         const { return m_ibcNonAdjCand; }
+#endif
+
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void      setUseDMVDMode                  (bool b)         { m_DMVDMode = b; }
   bool      getUseDMVDMode                  ()         const { return m_DMVDMode; }
