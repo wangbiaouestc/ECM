@@ -55,6 +55,9 @@
 class IntraPrediction;
 #endif
 #endif
+#if JVET_AE0059_INTER_CCCM
+class InterCccm;
+#endif
 // forward declaration
 class Mv;
 #if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
@@ -113,6 +116,9 @@ public:
   Reshape*          m_pcReshape;
 #endif
 
+#if JVET_AE0059_INTER_CCCM
+  InterCccm*        m_interCccm;
+#endif
 private:
 #if INTER_LIC
   static const int  m_LICShift     = 5;
@@ -1359,7 +1365,64 @@ public:
 #endif
 };
 #endif // TM_AMVP || TM_MRG
+#if JVET_AE0059_INTER_CCCM
+struct CccmModel;
+class InterCccm
+{
+private:
 
+  const int m_subSampleX[7][7];
+  const int m_subSampleY[7][7];
+
+  PelBuf m_lumaRecoNonDownSampled;
+  PelBuf m_lumaPredNonDownSampled;
+  PelBuf m_chroma[2];
+
+  Pel** m_chromaStorage;
+  Pel m_s[6];
+
+  Pel *m_cb;
+  Pel *m_cr;
+  Pel *m_samples;
+  Pel (*m_a)[CCCM_REF_SAMPLES_MAX];
+
+  CccmModel* m_interCccmModels[2];
+
+  PredictionUnit* m_pu;
+  Size    m_chromaSize;
+  ClpRng  m_clprng;
+
+  int     m_offset[MAX_NUM_COMPONENT];
+  int     m_sampleNum;
+  int     m_flipType;
+  int     m_dsX;
+  int     m_dsY;
+
+  bool m_valid;
+
+  void getData();
+  void solveModels();
+  void applyModels();
+
+  inline void getNonDownSampledLumaValsOffset(const PredictionUnit* pu, const PelBuf& luma_, const int x, const int y, Pel* s, const int offset, const int flipType = 0);
+  inline void getNonDownSampledLumaVals(const PredictionUnit* pu, const PelBuf& luma_, const int x, const int y, Pel* s, const int flipType = 0);
+  inline int computeOffset(const PelBuf& buf);
+
+public:
+  InterCccm();
+  ~InterCccm();
+
+  void setup(const TransformUnit* tu, const PelBuf& lumaPrediction, const PelBuf& lumaReconstruction, const PelBuf& cb, const PelBuf& cr);
+  void destroy();
+  void init();
+  void setCccmBuffers(Pel (*m_a_intra)[CCCM_REF_SAMPLES_MAX], Pel *m_cb_intra, Pel *m_cr_intra, Pel *m_samples_intra);
+
+  const PelBuf& getCb() const { return m_chroma[0]; };
+  const PelBuf& getCr() const { return m_chroma[1]; };
+
+  bool isValid() const { return m_valid; };
+};
+#endif
 //! \}
 
 #endif // __INTERPREDICTION__

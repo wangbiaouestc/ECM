@@ -3499,6 +3499,23 @@ const CtxSet ContextSetCfg::nonLocalCCP = ContextSetCfg::addCtxSet
 });
 #endif
 
+#if JVET_AE0059_INTER_CCCM
+const CtxSet ContextSetCfg::InterCccmFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+#endif
+
 #elif SLICE_TYPE_WIN_SIZE
 const CtxSet ContextSetCfg::SplitFlag = ContextSetCfg::addCtxSet
 ({

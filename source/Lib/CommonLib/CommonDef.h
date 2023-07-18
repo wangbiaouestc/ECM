@@ -1129,6 +1129,10 @@ static const int NUM_GLM_IDC =                                     33;
 static const int CFLM_NUM_PARAMS = 3;
 static const int CFLM_MAX_REF_SAMPLES = CCCM_MAX_REF_SAMPLES;
 #endif
+#if JVET_AE0059_INTER_CCCM
+static const int INTER_CCCM_NUM_PARAMS = 8;
+static const int INTER_CCCM_MAX_REF_SAMPLES = 256;
+#endif
 #if JVET_AC0071_DBV
 static const int NUM_DBV_POSITION = 5;
 static const int DBV_TEMPLATE_SIZE = 1;

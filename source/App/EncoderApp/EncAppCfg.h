@@ -568,6 +568,9 @@ protected:
 #if JVET_AC0071_DBV
   bool m_intraDBV; ///< Direct Block Vector
 #endif
+#if JVET_AE0059_INTER_CCCM
+  bool m_interCccm; ///< CCCM for inter prediction
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   bool      m_BIF;                                            ///< bilateral filter
   unsigned  m_BIFStrength;                                    /// Bilateral filter strength

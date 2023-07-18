@@ -16492,11 +16492,19 @@ void CccmCovariance::gaussBacksubstitution( TCccmCoeff* x, int numEq, int col )
   }
 }
 
-void CccmCovariance::gaussElimination( TCccmCoeff A[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff* y0, TCccmCoeff* x0, TCccmCoeff* y1, TCccmCoeff* x1, int numEq, int numFilters, int bd )
+void CccmCovariance::gaussElimination( TCccmCoeff A[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff* y0, TCccmCoeff* x0, TCccmCoeff* y1, TCccmCoeff* x1, int numEq, int numFilters, int bd
+#if JVET_AE0059_INTER_CCCM
+  ,const bool interCccmMode
+#endif
+)
 { 
   int colChr0 = numEq;
   int colChr1 = numEq + 1;
-  int reg     = 2 << (bd - 8);
+#if JVET_AE0059_INTER_CCCM
+  int reg = interCccmMode ? 1 : 2 << (bd - 8);
+#else
+  int reg = 2 << (bd - 8);
+#endif
   
   // Create an [M][M+2] matrix system (could have been done already when calculating auto/cross-correlations)
   for( int i = 0; i < numEq; i++ )
@@ -16781,9 +16789,17 @@ void CccmCovariance::solve1( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_M
 }
 
 #if JVET_AB0174_CCCM_DIV_FREE
-void CccmCovariance::solve2( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX], const Pel* Cb, const Pel* Cr, const int sampleNum, const int chromaOffsetCb, const int chromaOffsetCr, CccmModel& modelCb, CccmModel& modelCr )
+void CccmCovariance::solve2( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX], const Pel* Cb, const Pel* Cr, const int sampleNum, const int chromaOffsetCb, const int chromaOffsetCr, CccmModel& modelCb, CccmModel& modelCr
+#if JVET_AE0059_INTER_CCCM
+    , const bool interCccmMode
+#endif
+)
 #else
-void CccmCovariance::solve2( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX], const Pel* Cb, const Pel* Cr, const int sampleNum, CccmModel& modelCb, CccmModel<M>& modelCr )
+void CccmCovariance::solve2( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX], const Pel* Cb, const Pel* Cr, const int sampleNum, CccmModel& modelCb, CccmModel& modelCr
+#if JVET_AE0059_INTER_CCCM
+    , const bool interCccmMode
+#endif
+)
 #endif
 {
 
@@ -16837,7 +16853,11 @@ void CccmCovariance::solve2( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_M
 
   // Scale the matrix and vector to selected dynamic range
   CHECK( modelCb.bd != modelCr.bd, "Bitdepth of Cb and Cr is different" );
+#if JVET_AE0059_INTER_CCCM
+  int matrixShift = (interCccmMode ? 28 : CCCM_MATRIX_BITS) - 2 * modelCb.bd - ceilLog2( sampleNum );
+#else
   int matrixShift = CCCM_MATRIX_BITS - 2 * modelCb.bd - ceilLog2( sampleNum );
+#endif
 
   if( matrixShift > 0 )
   {
@@ -16884,7 +16904,11 @@ void CccmCovariance::solve2( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_M
 
 #if JVET_AC0053_GAUSSIAN_SOLVER
   // Solve the filter coefficients
-  gaussElimination(ATA, ATCb, modelCb.params.data(), ATCr, modelCr.params.data(), numParams, 2, modelCb.bd);
+  gaussElimination(ATA, ATCb, modelCb.params.data(), ATCr, modelCr.params.data(), numParams, 2, modelCb.bd
+#if JVET_AE0059_INTER_CCCM
+    , interCccmMode
+#endif
+  );
 #else
   // Solve the filter coefficients using LDL decomposition
   TE U;       // Upper triangular L' of ATA's LDL decomposition

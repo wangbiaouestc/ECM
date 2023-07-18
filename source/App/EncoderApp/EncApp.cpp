@@ -994,6 +994,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setChromaBIFQPOffset                                 ( m_chromaBIFQPOffset );
 #endif
 
+#if JVET_AE0059_INTER_CCCM
+  m_cEncLib.setUseInterCccm                                      ( m_interCccm );
+#endif
   // ADD_NEW_TOOL : (encoder app) add setting of tool enabling flags and associated parameters here
   m_cEncLib.setVirtualBoundariesEnabledFlag                      ( m_virtualBoundariesEnabledFlag );
   if( m_cEncLib.getVirtualBoundariesEnabledFlag() )

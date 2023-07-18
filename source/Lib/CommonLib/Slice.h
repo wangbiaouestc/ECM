@@ -1798,6 +1798,9 @@ private:
   bool              m_licEnabledFlag;
 #endif
 
+#if JVET_AE0059_INTER_CCCM
+  bool              m_interCccm;
+#endif
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
   bool              m_LadfEnabled;
   int               m_LadfNumIntervals;
@@ -2420,6 +2423,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if INTER_LIC
   void      setLicEnabledFlag     ( bool b )                                        { m_licEnabledFlag = b; }
   bool      getLicEnabledFlag     ()                                     const      { return m_licEnabledFlag; }
+#endif
+#if JVET_AE0059_INTER_CCCM
+  void      setUseInterCccm       ( bool b )                                         { m_interCccm = b; }
+  bool      getUseInterCccm       ()                                      const      { return m_interCccm; }
 #endif
   void      setUseMRL             ( bool b )                                        { m_MRL = b; }
   bool      getUseMRL             ()                                      const     { return m_MRL; }

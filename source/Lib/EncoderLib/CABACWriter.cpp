@@ -7073,6 +7073,12 @@ void CABACWriter::transform_unit( const TransformUnit& tu, CUCtx& cuCtx, Partiti
     }
   }
 
+#if JVET_AE0059_INTER_CCCM
+  if ( !lumaOnly )
+  {
+    interCccm( tu );
+  }
+#endif
   if( !lumaOnly )
   {
     joint_cb_cr( tu, ( cbf[COMPONENT_Cb] ? 2 : 0 ) + ( cbf[COMPONENT_Cr] ? 1 : 0 ) );
@@ -8779,6 +8785,15 @@ void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
   }
 #endif
 #endif
+}
+#endif
+#if JVET_AE0059_INTER_CCCM
+void CABACWriter::interCccm(const TransformUnit& tu)
+{
+  if (TU::interCccmAllowed(tu))
+  {
+    m_BinEncoder.encodeBin(tu.interCccm > 0 ? 1 : 0, Ctx::InterCccmFlag(0));
+  }
 }
 #endif
 //! \}

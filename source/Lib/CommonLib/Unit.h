@@ -758,6 +758,9 @@ struct TransformUnit : public UnitArea
   uint8_t        jointCbCr;
   uint8_t        cbf        [ MAX_NUM_TBLOCKS ];
 
+#if JVET_AE0059_INTER_CCCM
+  int8_t         interCccm;
+#endif
   TransformUnit() : chType( CH_L ) { }
   TransformUnit(const UnitArea& unit);
   TransformUnit(const ChromaFormat _chromaFormat, const Area &area);

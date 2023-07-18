@@ -975,6 +975,9 @@ protected:
 #if JVET_AC0071_DBV
   bool m_intraDBV;
 #endif
+#if JVET_AE0059_INTER_CCCM
+  bool m_interCccm;
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   bool        m_BIF;
   int         m_BIFStrength;
@@ -1701,6 +1704,10 @@ public:
 #if JVET_AC0071_DBV
   void setUseIntraDBV(bool b) { m_intraDBV = b; }
   bool getUseIntraDBV() const { return m_intraDBV; }
+#endif
+#if JVET_AE0059_INTER_CCCM
+  void setUseInterCccm(bool b) { m_interCccm = b; }
+  bool getUseInterCccm() const { return m_interCccm; }
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   void      setUseBIF                       ( bool b )       { m_BIF = b; }

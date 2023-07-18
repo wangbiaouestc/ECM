@@ -383,6 +383,9 @@ public:
 #if JVET_AA0070_RRIBC
   void        rribcData                 ( CodingUnit &cu );
 #endif
+#if JVET_AE0059_INTER_CCCM
+  void        interCccm                 ( TransformUnit& tu );
+#endif
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   CABACDataStore*         m_CABACDataStore;
 #endif

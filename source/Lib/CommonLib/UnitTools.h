@@ -153,6 +153,9 @@ namespace CU
 #if JVET_AC0105_DIRECTIONAL_PLANAR
   bool isDirectionalPlanarAvailable(const CodingUnit &cu);
 #endif
+#if JVET_AE0059_INTER_CCCM
+  bool interCccmSearchAllowed(const CodingUnit& cu);
+#endif
 }
 // PU tools
 namespace PU
@@ -742,6 +745,9 @@ namespace TU
   void predBorderResi(const Position blkPos, const CPelBuf &recoBuf, const CPelBuf &predBuf, const ComponentID compID,
                       const uint32_t uiWidth,    const uint32_t uiHeight,   Pel *predResiBorder,   const Pel defaultPel);
   Position posSignHidingFirstCG(const TransformUnit &tu, ComponentID compID);
+#endif
+#if JVET_AE0059_INTER_CCCM
+  bool interCccmAllowed(const TransformUnit& tu);
 #endif
 }
 
