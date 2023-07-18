@@ -119,6 +119,9 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
   }
 #endif
 
+#if JVET_AE0059_INTER_CCCM
+  m_pcInterPred->m_interCccm->setCccmBuffers(m_pcIntraPred->getCccmBufferA(),m_pcIntraPred->getCccmBufferCb(),m_pcIntraPred->getCccmBufferCr(),m_pcIntraPred->getCccmBufferSamples());
+#endif
 #if JVET_Z0118_GDR
   // reset current IBC Buffer only when VB pass through
   if (cs.isGdrEnabled() && cs.isInGdrIntervalOrRecoveryPoc())
@@ -2009,6 +2012,26 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
 #endif
       CodingStructure  &cs = *cu.cs;
       const Slice &slice = *cs.slice;
+#if JVET_AE0059_INTER_CCCM
+      if (currTU.interCccm && compID == COMPONENT_Cb && currTU.blocks[COMPONENT_Cb].valid())
+      {
+        PelStorage tmpInterCccmStorage;
+        tmpInterCccmStorage.create(CHROMA_400,currTU.blocks[COMPONENT_Y]);
+        tmpInterCccmStorage.getBuf(COMPONENT_Y).copyFrom(cs.getPredBuf(currTU.blocks[COMPONENT_Y]));
+        if (cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
+        {
+          tmpInterCccmStorage.getBuf(COMPONENT_Y).rspSignal(m_pcReshape->getFwdLUT());
+        }
+        m_pcInterPred->m_interCccm->setup(&currTU, tmpInterCccmStorage.getBuf(COMPONENT_Y), cs.getRecoBuf(currTU.blocks[COMPONENT_Y]), cs.getPredBuf(currTU.blocks[COMPONENT_Cb]), cs.getPredBuf(currTU.blocks[COMPONENT_Cr]));
+        CHECK(!m_pcInterPred->m_interCccm->isValid(), "invalid cccm inter");
+        cs.getPredBuf(currTU.blocks[COMPONENT_Cb]).copyFrom(m_pcInterPred->m_interCccm->getCb());
+        cs.getPredBuf(currTU.blocks[COMPONENT_Cr]).copyFrom(m_pcInterPred->m_interCccm->getCr());
+#if SIGN_PREDICTION
+        cs.getRecoBuf(currTU.blocks[COMPONENT_Cb]).copyClip(cs.getPredBuf(currTU.blocks[COMPONENT_Cb]), cs.slice->clpRng(COMPONENT_Cb));
+        cs.getRecoBuf(currTU.blocks[COMPONENT_Cr]).copyClip(cs.getPredBuf(currTU.blocks[COMPONENT_Cr]), cs.slice->clpRng(COMPONENT_Cr));
+#endif
+      }
+#endif
       if (slice.getLmcsEnabledFlag() && slice.getPicHeader()->getLmcsChromaResidualScaleFlag() && (compID == COMPONENT_Y) && (currTU.cbf[COMPONENT_Cb] || currTU.cbf[COMPONENT_Cr]))
       {
 #if LMCS_CHROMA_CALC_CU

@@ -1245,6 +1245,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
  ("IntraDBV",                                         m_intraDBV,                                      false, "Direct Block Vector (0: off, 1:on)  [default: off]")
 #endif
 #endif
+#if JVET_AE0059_INTER_CCCM
+  ("InterCCCM",                                       m_interCccm,                                      true, "CCCM for inter prediction (0: off, 1:on)  [default: on]")
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   ("BIF",                                             m_BIF,                                            true, "bilateral filter   (0: off, 1:on)  [default: on]")
   ("BIFStrength",                                     m_BIFStrength,                                       1u, "bilateral filter strength  (0: half, 1: full, 2: double)  [default: full]")
@@ -5629,6 +5632,9 @@ void EncAppCfg::xPrintParameter()
   {
     msg( VERBOSE, "FastPicLevelLIC:%d ", m_fastPicLevelLIC );
   }
+#endif
+#if JVET_AE0059_INTER_CCCM
+  msg( VERBOSE, "InterCCCM:%d ", m_interCccm );
 #endif
 #if !JVET_AA0132_CONFIGURABLE_TM_TOOLS
 #if JVET_W0090_ARMC_TM

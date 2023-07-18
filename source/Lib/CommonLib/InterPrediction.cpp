@@ -84,6 +84,9 @@ InterPrediction::InterPrediction()
 #if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) // note: already refactor
   m_pcReshape            ( nullptr ),
 #endif
+#if JVET_AE0059_INTER_CCCM
+  m_interCccm( nullptr ),
+#endif
 #if INTER_LIC || JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 #if !JVET_AD0213_LIC_IMP
   m_pcLICRefLeftTemplate ( nullptr ),
@@ -498,6 +501,13 @@ void InterPrediction::destroy()
     }
   }
 #endif
+#if JVET_AE0059_INTER_CCCM
+  if (m_interCccm)
+  {
+    delete m_interCccm;
+    m_interCccm = nullptr;
+  }
+#endif
 }
 
 #if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
@@ -803,6 +813,12 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
     m_ibcBufferWidth = g_IBCBufferSize / ctuSize;
     m_ibcBuffer.create(UnitArea(chromaFormatIDC, Area(0, 0, m_ibcBufferWidth, ctuSize)));
 #endif
+  }
+#endif
+#if JVET_AE0059_INTER_CCCM
+  if (m_interCccm == nullptr)
+  {
+    m_interCccm = new InterCccm();
   }
 #endif
 }
@@ -29117,4 +29133,283 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
     }
     return true;
   }
+#endif
+
+#if JVET_AE0059_INTER_CCCM
+InterCccm::InterCccm() :
+  m_subSampleX{
+{1,1,1,1,1,1,1},
+{1,1,1,1,1,1,2},
+{1,1,1,1,1,2,4},
+{1,1,1,1,2,4,8},
+{1,1,1,1,2,4,8},
+{1,1,1,1,2,4,8},
+{1,1,1,1,2,4,8} },
+  m_subSampleY{
+{1,1,1,1,1,1,1},
+{1,1,1,1,1,1,1},
+{1,1,1,1,1,1,1},
+{1,1,1,1,1,1,1},
+{1,1,1,2,2,2,2},
+{1,1,2,4,4,4,4},
+{1,2,4,8,8,8,8} }
+{
+  init();
+}
+InterCccm::~InterCccm()
+{
+  destroy();
+}
+void InterCccm::setCccmBuffers(Pel (*m_a_intra)[CCCM_REF_SAMPLES_MAX], Pel* m_cb_intra, Pel* m_cr_intra, Pel* m_samples_intra)
+{
+  m_a = m_a_intra;
+  m_cb = m_cb_intra;
+  m_cr = m_cr_intra;
+  m_samples = m_samples_intra;
+}
+void InterCccm::init()
+{
+  m_chromaStorage = nullptr;
+  m_interCccmModels[0] = nullptr;
+  m_interCccmModels[1] = nullptr;
+  if (m_chromaStorage == nullptr)
+  {
+    m_chromaStorage = new Pel * [2];
+    for (int i = 0; i < 2; i++)
+    {
+      m_chromaStorage[i] = new Pel[MAX_CU_SIZE * MAX_CU_SIZE];
+    }
+  }
+  if (m_interCccmModels[0] == nullptr)
+  {
+    m_interCccmModels[0] = new CccmModel(INTER_CCCM_NUM_PARAMS,0);
+  }
+  if (m_interCccmModels[1] == nullptr)
+  {
+    m_interCccmModels[1] = new CccmModel(INTER_CCCM_NUM_PARAMS,0);
+  }
+  m_a = nullptr;
+  m_cb = nullptr;
+  m_cr = nullptr;
+  m_samples = nullptr;
+}
+void InterCccm::destroy()
+{
+  if (m_chromaStorage)
+  {
+    for (int i = 0; i < 2; i++)
+    {
+      delete[] m_chromaStorage[i];
+    }
+    delete[] m_chromaStorage;
+    m_chromaStorage = nullptr;
+  }
+  if (m_interCccmModels[0])
+  {
+    delete m_interCccmModels[0];
+    m_interCccmModels[0] = nullptr;
+  }
+  if (m_interCccmModels[1])
+  {
+    delete m_interCccmModels[1];
+    m_interCccmModels[1] = nullptr;
+  }
+  m_a = nullptr;
+  m_cb = nullptr;
+  m_cr = nullptr;
+  m_samples = nullptr;
+}
+void InterCccm::setup(const TransformUnit* tu, const PelBuf& lumaPrediction, const PelBuf& lumaReconstruction, const PelBuf& cb, const PelBuf& cr)
+{
+  CHECK(!m_a || !m_cb || !m_cr || !m_samples,"InterCCCM ERROR: CCCM buffers are not linked from IntraPrediction.");
+  m_valid = false;
+  m_clprng.bd = tu->cs->sps->getBitDepth(CH_C);
+  m_clprng.min = 0;
+  m_clprng.max = (1 << m_clprng.bd) - 1;
+  m_pu = tu->cu->firstPU;
+  m_chromaSize = Size(cb);
+  m_sampleNum = 0;
+  m_interCccmModels[0]->setBd(m_clprng.bd);
+  m_interCccmModels[1]->setBd(m_clprng.bd);
+  m_dsX = m_subSampleX[floorLog2(m_chromaSize.width) - 1][floorLog2(m_chromaSize.height) - 1];
+  m_dsY = m_subSampleY[floorLog2(m_chromaSize.width) - 1][floorLog2(m_chromaSize.height) - 1];
+#if JVET_AA0070_RRIBC
+  m_flipType = CU::isIBC(*m_pu->cu) ? m_pu->cu->rribcFlipType : 0;
+#else
+  m_flipType = 0;
+#endif
+  m_lumaRecoNonDownSampled = lumaReconstruction;
+  m_lumaPredNonDownSampled = lumaPrediction;
+#if JVET_AB0174_CCCM_DIV_FREE
+  m_offset[COMPONENT_Y] = computeOffset(m_lumaPredNonDownSampled);
+  m_offset[COMPONENT_Cb] = computeOffset(cb);
+  m_offset[COMPONENT_Cr] = computeOffset(cr);
+#else
+  m_offset[COMPONENT_Y] = 0;
+  m_offset[COMPONENT_Cb] = 0;
+  m_offset[COMPONENT_Cr] = 0;
+#endif
+  m_chroma[COMPONENT_Cb - 1] = PelBuf(m_chromaStorage[COMPONENT_Cb - 1], Size(m_chromaSize));
+  m_chroma[COMPONENT_Cb - 1].copyFrom(cb);
+  m_chroma[COMPONENT_Cr - 1] = PelBuf(m_chromaStorage[COMPONENT_Cr - 1], Size(m_chromaSize));
+  m_chroma[COMPONENT_Cr - 1].copyFrom(cr);
+  getData();
+  if (!m_sampleNum)
+  {
+    m_valid = false;
+    return;
+  }
+  solveModels();
+  applyModels();
+  m_valid = true;
+}
+void InterCccm::getData()
+{
+  for (int y = 0; y < m_chromaSize.height; y += m_dsY)
+  {
+    for (int x = 0; x < m_chromaSize.width; x += m_dsX)
+    {
+      getNonDownSampledLumaValsOffset(m_pu, m_lumaPredNonDownSampled, x, y, m_s, m_offset[COMPONENT_Y]);
+      m_a[0][m_sampleNum] = m_s[0];
+      m_a[1][m_sampleNum] = m_s[3];
+      m_a[2][m_sampleNum] = m_s[1];
+      m_a[3][m_sampleNum] = m_s[2];
+      m_a[4][m_sampleNum] = m_s[4];
+      m_a[5][m_sampleNum] = m_s[5];
+      m_a[6][m_sampleNum] = m_interCccmModels[0]->nonlinear((m_s[0] + m_s[3] + 1) >> 1);
+      m_a[7][m_sampleNum] = m_interCccmModels[0]->bias();
+      m_cb[m_sampleNum] = m_chroma[COMPONENT_Cb - 1].at(x, y);
+      m_cr[m_sampleNum] = m_chroma[COMPONENT_Cr - 1].at(x, y);
+      m_sampleNum++;
+    }
+  }
+}
+void InterCccm::solveModels()
+{
+  static CccmCovariance interCccmSolver;
+#if JVET_AB0174_CCCM_DIV_FREE
+  interCccmSolver.solve2(m_a, m_cb, m_cr, m_sampleNum, m_offset[COMPONENT_Cb], m_offset[COMPONENT_Cr], * m_interCccmModels[0], * m_interCccmModels[1], true);
+#else
+  interCccmSolver.solve2(m_a, m_cb, m_cr, m_sampleNum, *m_interCccmModels[0], *m_interCccmModels[1], true);
+#endif
+}
+void InterCccm::applyModels()
+{
+  for (int y = 0; y < m_chromaSize.height; y++)
+  {
+    for (int x = 0; x < m_chromaSize.width; x++)
+    {
+      getNonDownSampledLumaValsOffset(m_pu, m_lumaRecoNonDownSampled, x, y, m_s, m_offset[COMPONENT_Y], m_flipType);
+      m_samples[0] = m_s[0];
+      m_samples[1] = m_s[3];
+      m_samples[2] = m_s[1];
+      m_samples[3] = m_s[2];
+      m_samples[4] = m_s[4];
+      m_samples[5] = m_s[5];
+      m_samples[6] = m_interCccmModels[COMPONENT_Cb - 1]->nonlinear((m_s[0] + m_s[3] + 1) >> 1);
+      m_samples[7] = m_interCccmModels[COMPONENT_Cr - 1]->bias();
+      const int interCccmCb = m_interCccmModels[COMPONENT_Cb - 1]->convolve(m_samples);
+      const int interCccmCr = m_interCccmModels[COMPONENT_Cr - 1]->convolve(m_samples);
+      m_chroma[COMPONENT_Cb - 1].at(x, y) = (3 * interCccmCb + m_chroma[COMPONENT_Cb - 1].at(x, y) + 2) >> 2;
+      m_chroma[COMPONENT_Cr - 1].at(x, y) = (3 * interCccmCr + m_chroma[COMPONENT_Cr - 1].at(x, y) + 2) >> 2;
+      m_chroma[COMPONENT_Cb - 1].at(x, y) = ClipPel(m_chroma[COMPONENT_Cb - 1].at(x, y), m_clprng);
+      m_chroma[COMPONENT_Cr - 1].at(x, y) = ClipPel(m_chroma[COMPONENT_Cr - 1].at(x, y), m_clprng);
+    }
+  }
+}
+inline void InterCccm::getNonDownSampledLumaVals(const PredictionUnit* pu, const PelBuf &luma_, const int x, const int y, Pel* s, const int m_flipType)
+{
+  const Pel* piSrc = luma_.buf;
+  const int iRecStride = luma_.stride;
+  if (pu->chromaFormat == CHROMA_444)
+  {
+    s[0] = piSrc[x + iRecStride * y];
+  }
+  else if (pu->chromaFormat == CHROMA_422)
+  {
+    const int offLeft = x > 0 ? -1 : 0;
+    s[0] = piSrc[2 * x + iRecStride * y];
+    s[1] = piSrc[2 * x + offLeft + iRecStride * y];
+    s[2] = piSrc[2 * x + 1 + iRecStride * y];
+  }
+  else if (pu->cs->sps->getCclmCollocatedChromaFlag())
+  {
+    const int offLeft = x > 0 ? -1 : 0;
+    const int offAbove = y > 0 ? -1 : 0;
+    s[0] = piSrc[2 * x + iRecStride * 2 * y];
+    s[1] = piSrc[2 * x + offLeft + iRecStride * 2 * y];
+    s[2] = piSrc[2 * x + 1 + iRecStride * 2 * y];
+    s[3] = piSrc[2 * x + iRecStride * (2 * y + 1)];
+    s[4] = piSrc[2 * x + iRecStride * (2 * y + offAbove)];
+    if (m_flipType == 1) // horizontal
+    {
+      std::swap(s[1], s[2]);
+    }
+    else if (m_flipType == 2) // vertical
+    {
+      std::swap(s[3], s[4]);
+    }
+  }
+  else
+  {
+    const int offLeft = x > 0 ? -1 : 0;
+    s[0] = piSrc[2 * x + iRecStride * y * 2];
+    s[1] = piSrc[2 * x + offLeft + iRecStride * y * 2];
+    s[2] = piSrc[2 * x + 1 + iRecStride * y * 2];
+    s[3] = piSrc[2 * x + iRecStride * (y * 2 + 1)];
+    s[4] = piSrc[2 * x + offLeft + iRecStride * (y * 2 + 1)];
+    s[5] = piSrc[2 * x + 1 + iRecStride * (y * 2 + 1)];
+    if (m_flipType == 1) // horizontal
+    {
+      std::swap(s[1], s[2]);
+      std::swap(s[4], s[5]);
+    }
+    else if (m_flipType == 2) // vertical
+    {
+      std::swap(s[1], s[4]);
+      std::swap(s[0], s[3]);
+      std::swap(s[2], s[5]);
+    }
+  }
+}
+inline void InterCccm::getNonDownSampledLumaValsOffset(const PredictionUnit* pu, const PelBuf &luma_, const int x, const int y, Pel* s, const int m_offset, const int m_flipType)
+{
+  getNonDownSampledLumaVals(pu, luma_, x, y, s, m_flipType);
+  if (pu->chromaFormat == CHROMA_444)
+  {
+    s[0] -= m_offset;
+  }
+  else if (pu->chromaFormat == CHROMA_422)
+  {
+    s[0] -= m_offset;
+    s[1] -= m_offset;
+    s[2] -= m_offset;
+  }
+  else if (pu->cs->sps->getCclmCollocatedChromaFlag())
+  {
+    s[0] -= m_offset;
+    s[1] -= m_offset;
+    s[2] -= m_offset;
+    s[3] -= m_offset;
+    s[4] -= m_offset;
+  }
+  else
+  {
+    s[0] -= m_offset;
+    s[1] -= m_offset;
+    s[2] -= m_offset;
+    s[3] -= m_offset;
+    s[4] -= m_offset;
+    s[5] -= m_offset;
+  }
+}
+inline int InterCccm::computeOffset(const PelBuf &buf)
+{
+  int sum = 0;
+  sum += buf.at(0,0);
+  sum += buf.at(buf.width-1,0);
+  sum += buf.at(buf.width-1,buf.height-1);
+  sum += buf.at(0,buf.height-1);
+  return ((sum + 2) >> 2);
+}
 #endif

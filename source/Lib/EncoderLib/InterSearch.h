@@ -695,6 +695,9 @@ private:
   Distortion      m_hevcCost;
   EncAffineMotion m_affineMotion;
   PatentBvCand    m_defaultCachedBvs;
+#if JVET_AE0059_INTER_CCCM
+  Pel             **m_interCccmStorage;
+#endif
 protected:
   // interface to option
   EncCfg*         m_pcEncCfg;

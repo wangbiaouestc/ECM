@@ -772,6 +772,33 @@ cTUTraverser CU::traverseTUs( const CodingUnit& cu )
   return cTUTraverser( cu.firstTU, cu.lastTU->next );
 }
 
+#if JVET_AE0059_INTER_CCCM
+bool CU::interCccmSearchAllowed(const CodingUnit& cu)
+{
+  if (!cu.cs->slice->getSPS()->getUseInterCccm())
+  {
+    return false;
+  }
+  if (cu.predMode != MODE_INTER && cu.predMode != MODE_IBC)
+  {
+    return false;
+  }
+  if (cu.blocks[COMPONENT_Cb].area() < 16)
+  {
+    return false;
+  }
+  if (!cu.firstTU->blocks[COMPONENT_Cb].valid())
+  {
+    return false;
+  }
+  if (!cu.firstTU->blocks[COMPONENT_Cr].valid())
+  {
+    return false;
+  }
+  return true;
+}
+#endif
+
 #if JVET_AC0094_REF_SAMPLES_OPT
 void CU::getNbModesRemovedFirstLast(const bool &areAboveRightUnavail, const bool &areBelowLeftUnavail, const SizeType &height, const SizeType &width, int &nbRemovedFirst, int &nbRemovedLast)
 {
@@ -20855,6 +20882,24 @@ bool TU::getPrevTuCbfAtDepth( const TransformUnit &currentTu, const ComponentID 
   return ( prevTU != nullptr ) ? TU::getCbfAtDepth( *prevTU, compID, trDepth ) : false;
 }
 
+#if JVET_AE0059_INTER_CCCM
+bool TU::interCccmAllowed(const TransformUnit& tu)
+{
+  if (tu.cu->colorTransform)
+  {
+    return false;
+  }
+  if (!CU::interCccmSearchAllowed(*tu.cu))
+  {
+    return false;
+  }
+  if (!TU::getCbf(tu, COMPONENT_Y))
+  {
+    return false;
+  }
+  return true;
+}
+#endif
 
 // other tools
 

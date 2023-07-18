@@ -160,6 +160,13 @@ struct CccmModel
   
   Pel nonlinear(const Pel val) { return (val * val + midVal) >> bd; }
   Pel bias     ()              { return midVal; }
+#if JVET_AE0059_INTER_CCCM
+  void setBd(const int bitdepth)
+  {
+    bd = bitdepth;
+    midVal = (1 << (bitdepth - 1));
+  }
+#endif
 };
 
 struct CccmCovariance
@@ -169,10 +176,18 @@ struct CccmCovariance
 
 #if JVET_AB0174_CCCM_DIV_FREE
   void solve1                      ( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX], const Pel* C, const int sampleNum, const int chromaOffset, CccmModel& model );
-  void solve2                      ( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX], const Pel* Cb, const Pel* Cr, const int sampleNum, const int chromaOffsetCb, const int chromaOffsetCr, CccmModel& modelCb, CccmModel& modelCr );
+  void solve2                      ( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX], const Pel* Cb, const Pel* Cr, const int sampleNum, const int chromaOffsetCb, const int chromaOffsetCr, CccmModel& modelCb, CccmModel& modelCr
+#if JVET_AE0059_INTER_CCCM
+    , const bool interCccmMode = false
+#endif
+  );
 #else
   void solve1                      ( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX], const Pel* C, const int sampleNum, CccmModel& model );
-  void solve2                      ( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX], const Pel* Cb, const Pel* Cr, const int sampleNum, CccmModel& modelCb, CccmModel& modelCr );
+  void solve2                      ( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX], const Pel* Cb, const Pel* Cr, const int sampleNum, CccmModel& modelCb, CccmModel& modelCr
+#if JVET_AE0059_INTER_CCCM
+    , const bool interCccmMode = false
+#endif
+  );
 #endif
 
 private:
@@ -183,7 +198,11 @@ private:
 
 #if JVET_AC0053_GAUSSIAN_SOLVER
   void gaussBacksubstitution       ( TCccmCoeff* x, int numEq, int col );
+#if JVET_AE0059_INTER_CCCM
+  void gaussElimination            ( TCccmCoeff A[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff* y0, TCccmCoeff* x0, TCccmCoeff* y1, TCccmCoeff* x1, int numEq, int numFilters, int bd, const bool interCccmMode = false);
+#else
   void gaussElimination            ( TCccmCoeff A[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff* y0, TCccmCoeff* x0, TCccmCoeff* y1, TCccmCoeff* x1, int numEq, int numFilters, int bd);
+#endif
 #else
   bool ldlDecompose                ( TCccmCoeff A[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff U[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff* diag, int numEq) const;
   void ldlSolve                    ( TCccmCoeff U[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff* diag, TCccmCoeff* y, TCccmCoeff* x, int numEq, bool decompOk) const;
@@ -357,6 +376,14 @@ protected:
   Pel m_a[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX];
   Pel m_cb[CCCM_REF_SAMPLES_MAX];
   Pel m_cr[CCCM_REF_SAMPLES_MAX];
+#if JVET_AE0059_INTER_CCCM
+  public:
+    Pel (*getCccmBufferA())[CCCM_REF_SAMPLES_MAX]  { return m_a; };
+    Pel* getCccmBufferCb() { return m_cb; };
+    Pel* getCccmBufferCr() { return m_cr; };
+    Pel* getCccmBufferSamples() { return m_samples; };
+  protected:
+#endif
 #endif
 
   // prediction

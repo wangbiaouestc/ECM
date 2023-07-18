@@ -751,6 +751,9 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
   m_cInterSearch.setTempBuffers( m_cIntraSearch.getSplitCSBuf(), m_cIntraSearch.getFullCSBuf(), m_cIntraSearch.getSaveCSBuf() );
 #endif // ENABLE_SPLIT_PARALLELISM || ENABLE_WPP_PARALLELISM
 
+#if JVET_AE0059_INTER_CCCM
+  m_cInterSearch.m_interCccm->setCccmBuffers(m_cIntraSearch.getCccmBufferA(),m_cIntraSearch.getCccmBufferCb(),m_cIntraSearch.getCccmBufferCr(),m_cIntraSearch.getCccmBufferSamples());
+#endif
   m_iMaxRefPicNum = 0;
 
 #if ER_CHROMA_QP_WCG_PPS
@@ -1947,6 +1950,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AC0071_DBV
   sps.setUseIntraDBV(m_intraDBV);
+#endif
+#if JVET_AE0059_INTER_CCCM
+  sps.setUseInterCccm(m_interCccm);
 #endif
   // ADD_NEW_TOOL : (encoder lib) set tool enabling flags and associated parameters here
   sps.setUseISP                             ( m_ISP );

@@ -404,6 +404,9 @@ public:
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   void        bvOneZeroComp            ( const CodingUnit &cu );
 #endif
+#if JVET_AE0059_INTER_CCCM
+  void        interCccm                ( const TransformUnit& tu );
+#endif
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   CABACDataStore*         m_CABACDataStore;
 #endif

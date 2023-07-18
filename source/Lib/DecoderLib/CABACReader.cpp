@@ -7371,6 +7371,12 @@ void CABACReader::transform_unit( TransformUnit& tu, CUCtx& cuCtx, Partitioner& 
     }
   }
 
+#if JVET_AE0059_INTER_CCCM
+  if ( !lumaOnly )
+  {
+    interCccm( tu );
+  }
+#endif
   if( !lumaOnly )
   {
     joint_cb_cr( tu, ( tu.cbf[COMPONENT_Cb] ? 2 : 0 ) + ( tu.cbf[COMPONENT_Cr] ? 1 : 0 ) );
@@ -8825,5 +8831,15 @@ void CABACReader::cuTmrlFlag(CodingUnit& cu)
   }
 #endif
 #endif
+}
+#endif
+
+#if JVET_AE0059_INTER_CCCM
+void CABACReader::interCccm(TransformUnit& tu)
+{
+  if (TU::interCccmAllowed(tu))
+  {
+    tu.interCccm = m_BinDecoder.decodeBin(Ctx::InterCccmFlag(0));
+  }
 }
 #endif

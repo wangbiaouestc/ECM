@@ -1612,6 +1612,9 @@ void TransformUnit::initData()
   noResidual         = false;
   jointCbCr          = 0;
   m_chromaResScaleInv = 0;
+#if JVET_AE0059_INTER_CCCM
+  interCccm          = 0;
+#endif
 }
 #if REMOVE_PCM
 #if SIGN_PREDICTION
@@ -1695,6 +1698,9 @@ TransformUnit& TransformUnit::operator=(const TransformUnit& other)
   depth              = other.depth;
   noResidual         = other.noResidual;
   jointCbCr          = other.jointCbCr;
+#if JVET_AE0059_INTER_CCCM
+  interCccm          = other.interCccm;
+#endif
   return *this;
 }
 
@@ -1729,6 +1735,9 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
   mtsIdx[i]        = other.mtsIdx[i];
   noResidual       = other.noResidual;
   jointCbCr        = isChroma( i ) ? other.jointCbCr : jointCbCr;
+#if JVET_AE0059_INTER_CCCM
+  interCccm        = other.interCccm;
+#endif
 }
 
        CoeffBuf TransformUnit::getCoeffs(const ComponentID id)       { return  CoeffBuf(m_coeffs[id], blocks[id]); }
