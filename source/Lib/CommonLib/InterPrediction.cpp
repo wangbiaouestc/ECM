@@ -9239,7 +9239,7 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
         else
         {
           const int poc0 = pu.cu->slice->getRefPOC(REF_PIC_LIST_0, mvfMmvd[0][0].refIdx);
-          const int poc1 = pu.cu->slice->getRefPOC(REF_PIC_LIST_1, mvfMmvd[0][0].refIdx);
+          const int poc1 = pu.cu->slice->getRefPOC(REF_PIC_LIST_1, mvfMmvd[1][0].refIdx);
           const int currPoc = pu.cu->slice->getPOC();
           if ((poc1 - currPoc)*(poc0 - currPoc) > 0)
           {
