@@ -323,8 +323,32 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #endif
 #if TMP_FAST_ENC
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  for (int i = 0; i < MTMP_NUM; i++)
+  {
+    tmpXdisp[i] = other.tmpXdisp[i];
+    tmpYdisp[i] = other.tmpYdisp[i];
+  }
+  for (int i = 0; i < TMP_GROUP_IDX << 1; i++)
+  {
+    tmpFusionInfo[i] = other.tmpFusionInfo[i];
+  }
+  tmpIdx        = other.tmpIdx;
+  tmpFusionFlag = other.tmpFusionFlag;
+  tmpFlmFlag    = other.tmpFlmFlag;
+  for (int j = 0; j < MTMP_NUM; j++)
+  {
+    for (int i = 0; i < TMP_FLM_PARAMS; i++)
+    {
+      tmpFlmParams[i][j] = other.tmpFlmParams[i][j];
+    }
+  }
+  tmpIsSubPel  = other.tmpIsSubPel;
+  tmpSubPelIdx = other.tmpSubPelIdx;
+#else
   tmpXdisp = other.tmpXdisp;
   tmpYdisp = other.tmpYdisp;
+#endif
   tmpNumCand = other.tmpNumCand;
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -372,6 +396,16 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if INTER_LIC
   licFlag           = other.licFlag;
+#if JVET_AD0213_LIC_IMP
+  for (int i = 0; i < 2; i++)
+  {
+    for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+    {
+      licScale[i][comp] = other.licScale[i][comp];
+      licOffset[i][comp] = other.licOffset[i][comp];
+    }
+  }
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = other.ibcLicFlag;
@@ -380,8 +414,8 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   rribcFlipType = other.rribcFlipType;
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  bvOneNullComp = other.bvOneNullComp;
-  bvNullCompDir = other.bvNullCompDir;
+  bvOneZeroComp = other.bvOneZeroComp;
+  bvZeroCompDir = other.bvZeroCompDir;
 #endif
 #if JVET_AB0157_TMRL
   tmrlFlag = other.tmrlFlag;
@@ -494,8 +528,32 @@ void CodingUnit::initData()
 #endif
 #endif
 #if TMP_FAST_ENC
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  for (int i = 0; i < MTMP_NUM; i++)
+  {
+    tmpXdisp[i] = 0;
+    tmpYdisp[i] = 0;
+  }
+  for (int i = 0; i < TMP_GROUP_IDX << 1; i++)
+  {
+    tmpFusionInfo[i] = IntraTMPFusionInfo{ false, false, 0, 1 };
+  }
+  tmpIdx        = 0;
+  tmpFusionFlag = false;
+  tmpFlmFlag    = false;
+  for (int j = 0; j < MTMP_NUM; j++)
+  {
+    for (int i = 0; i < TMP_FLM_PARAMS; i++)
+    {
+      tmpFlmParams[i][j] = -1;
+    }
+  }
+  tmpIsSubPel  = -1;
+  tmpSubPelIdx = -1;
+#else  
   tmpXdisp = 0;
   tmpYdisp = 0;
+#endif 
   tmpNumCand = 0;
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -545,6 +603,16 @@ void CodingUnit::initData()
 #endif
 #if INTER_LIC
   licFlag = false;
+#if JVET_AD0213_LIC_IMP
+  for (int i = 0; i < 2; i++)
+  {
+    for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+    {
+      licScale[i][comp] = MAX_INT;
+      licOffset[i][comp] = MAX_INT;
+    }
+  }
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = false;
@@ -557,8 +625,8 @@ void CodingUnit::initData()
   tmrlListIdx = 0;
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  bvOneNullComp = 0;
-  bvNullCompDir = 0;
+  bvOneZeroComp = 0;
+  bvZeroCompDir = 0;
 #endif
 #if JVET_AC0094_REF_SAMPLES_OPT
   areAboveRightUnavail = false;
@@ -816,9 +884,20 @@ void PredictionUnit::initData()
 #if JVET_AC0054_GLCCCM
   glCccmFlag = 0;
 #endif
+#if JVET_AD0202_CCCM_MDF
+  cccmMultiFilterIdx = 0;
+#endif
+#endif
+#if JVET_AD0188_CCP_MERGE
+  idxNonLocalCCP = 0;
+  curCand = {};
+  curCand.type = CCP_TYPE_NONE;
+#endif
+#if JVET_AD0120_LBCCP
+  ccInsideFilter = 0;
 #endif
   // inter data
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = 0;
 #endif
   mergeFlag   = false;
@@ -868,6 +947,10 @@ void PredictionUnit::initData()
   bmMergeFlag = false;
   bmDir = 0;
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  affBMMergeFlag = false;
+  affBMDir = 0;
+#endif
   interDir    = MAX_UCHAR;
   mergeType   = MRG_TYPE_DEFAULT_N;
   bv.setZero();
@@ -903,7 +986,7 @@ void PredictionUnit::initData()
     refIdx[i] = -1;
     mv[i]     .setZero();
     mvd[i]    .setZero();
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
     mvsdIdx[i] = -1;
 #endif
     for( uint32_t j = 0; j < 3; j++ )
@@ -970,13 +1053,23 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #if JVET_AC0054_GLCCCM
   glCccmFlag = predData.glCccmFlag;
 #endif
+#if JVET_AD0202_CCCM_MDF
+  cccmMultiFilterIdx = predData.cccmMultiFilterIdx;
+#endif
+#endif
+#if JVET_AD0188_CCP_MERGE
+  idxNonLocalCCP  = predData.idxNonLocalCCP;
+  curCand = predData.curCand;
+#endif
+#if JVET_AD0120_LBCCP
+  ccInsideFilter = predData.ccInsideFilter;
 #endif
   return *this;
 }
 
 PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 {
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = predData.colIdx;
 #endif
   mergeFlag   = predData.mergeFlag;
@@ -1026,6 +1119,10 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   bmMergeFlag = predData.bmMergeFlag;
   bmDir = predData.bmDir;
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  affBMMergeFlag = predData.affBMMergeFlag;
+  affBMDir = predData.affBMDir;
+#endif
   interDir    = predData.interDir;
   mergeType   = predData.mergeType;
   bv          = predData.bv;
@@ -1057,7 +1154,7 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
     mv[i]       = predData.mv[i];
     mvd[i]      = predData.mvd[i];
     refIdx[i]   = predData.refIdx[i];
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
     mvsdIdx[i] = predData.mvsdIdx[i];
 #endif
     for( uint32_t j = 0; j < 3; j++ )
@@ -1069,9 +1166,12 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
       mvAffi[i][j] = predData.mvAffi[i][j];
     }
   }
+#if JVET_AD0140_MVD_PREDICTION
+  mvdSuffixInfo = predData.mvdSuffixInfo;
+#endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   bvdSuffixInfo = predData.bvdSuffixInfo;
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   refIdxLC = predData.refIdxLC;
   refPairIdx = predData.refPairIdx;
@@ -1124,11 +1224,21 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #if JVET_AC0054_GLCCCM
   glCccmFlag = other.glCccmFlag;
 #endif
+#if JVET_AD0202_CCCM_MDF
+  cccmMultiFilterIdx = other.cccmMultiFilterIdx;
+#endif
+#endif
+#if JVET_AD0188_CCP_MERGE
+  idxNonLocalCCP  = other.idxNonLocalCCP;
+  curCand = other.curCand;
 #endif
 
+#if JVET_AD0120_LBCCP
+  ccInsideFilter = other.ccInsideFilter;
+#endif
   mergeFlag   = other.mergeFlag;
   regularMergeFlag = other.regularMergeFlag;
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = other.colIdx;
 #endif
   mergeIdx    = other.mergeIdx;
@@ -1183,6 +1293,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   bmMergeFlag = other.bmMergeFlag;
   bmDir = other.bmDir;
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  affBMMergeFlag = other.affBMMergeFlag;
+  affBMDir = other.affBMDir;
+#endif
   interDir    = other.interDir;
   mergeType   = other.mergeType;
   bv          = other.bv;
@@ -1214,7 +1328,7 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
     mv[i]       = other.mv[i];
     mvd[i]      = other.mvd[i];
     refIdx[i]   = other.refIdx[i];
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
     mvsdIdx[i] = other.mvsdIdx[i];
 #endif
     for( uint32_t j = 0; j < 3; j++ )
@@ -1226,9 +1340,12 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
       mvAffi[i][j] = other.mvAffi[i][j];
     }
   }
+#if JVET_AD0140_MVD_PREDICTION
+  mvdSuffixInfo = other.mvdSuffixInfo;
+#endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   bvdSuffixInfo = other.bvdSuffixInfo;
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   refIdxLC = other.refIdxLC;
@@ -1326,10 +1443,17 @@ CMotionBuf PredictionUnit::getMotionBuf() const
 {
   return cs->getMotionBuf( *this );
 }
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-bool PredictionUnit::isMvsdApplicable() const
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+bool PredictionUnit::isMvdPredApplicable() const
 {
-  if (!cs->sps->getUseMVSD())
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  if (CU::isIBC(*cu) && cs->sps->getUseBvdPred())
+  {
+    return true;
+  }
+#endif
+
+  if (!cs->sps->getUseMvdPred())
   {
     return false;
   }
@@ -1340,6 +1464,48 @@ bool PredictionUnit::isMvsdApplicable() const
   return true;
 }
 #endif
+
+#if JVET_AC0104_IBC_BVD_PREDICTION
+bool PredictionUnit::isBvdPredApplicable() const
+{
+  if (!cs->sps->getUseBvdPred())
+  {
+    return false;
+  }
+
+  return true;
+}
+#endif
+
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+bool PredictionUnit::isBvpClusterApplicable() const
+{
+  if (!cs->sps->getUseBvpCluster())
+  {
+    return false;
+  }
+
+  return true;
+}
+#endif
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC)
+uint32_t PredictionUnit::getBvType() const
+{
+#if JVET_AA0070_RRIBC
+  int bvType = cu->rribcFlipType;
+#else
+  int bvType = 0;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bvType = isBvpClusterApplicable() ? cu->bvZeroCompDir : bvType;
+#endif
+
+  // 0: 2-D; 1: Hor 1-D; 2: Ver 1-D
+  return bvType;
+}
+#endif
+
 #if JVET_W0123_TIMD_FUSION
 const uint8_t& PredictionUnit::getIpmInfo() const
 {
@@ -1446,6 +1612,9 @@ void TransformUnit::initData()
   noResidual         = false;
   jointCbCr          = 0;
   m_chromaResScaleInv = 0;
+#if JVET_AE0059_INTER_CCCM
+  interCccm          = 0;
+#endif
 }
 #if REMOVE_PCM
 #if SIGN_PREDICTION
@@ -1529,6 +1698,9 @@ TransformUnit& TransformUnit::operator=(const TransformUnit& other)
   depth              = other.depth;
   noResidual         = other.noResidual;
   jointCbCr          = other.jointCbCr;
+#if JVET_AE0059_INTER_CCCM
+  interCccm          = other.interCccm;
+#endif
   return *this;
 }
 
@@ -1563,6 +1735,9 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
   mtsIdx[i]        = other.mtsIdx[i];
   noResidual       = other.noResidual;
   jointCbCr        = isChroma( i ) ? other.jointCbCr : jointCbCr;
+#if JVET_AE0059_INTER_CCCM
+  interCccm        = other.interCccm;
+#endif
 }
 
        CoeffBuf TransformUnit::getCoeffs(const ComponentID id)       { return  CoeffBuf(m_coeffs[id], blocks[id]); }
@@ -1601,6 +1776,27 @@ const CPLTescapeBuf TransformUnit::getescapeValue(const ComponentID id) const { 
 #endif
       bool*         TransformUnit::getRunTypes   (const ComponentID id)       { return  m_runType[id];   }
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+int TransformUnit::countNonZero()
+{
+  if (!cbf[0])
+  {
+    return 0;
+  }
+  int count = 0;
+  auto areaY = Y();
+  auto coeffY = m_coeffs[0];
+  int blksize = areaY.width * areaY.height;
+  for (auto i = 0; i < blksize; ++i)
+  {
+    if (coeffY[i])
+    {
+      count++;
+    }
+  }
+  return count;
+}
+#endif
 void TransformUnit::checkTuNoResidual( unsigned idx )
 {
   if( CU::getSbtIdx( cu->sbtInfo ) == SBT_OFF_DCT )

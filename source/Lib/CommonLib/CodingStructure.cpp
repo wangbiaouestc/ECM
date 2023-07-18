@@ -2076,7 +2076,7 @@ void CodingStructure::rebindPicBufs()
   }
 }
 
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 void CodingStructure::createTMBuf(const int cbWidth, const int cbHeight)
 {
   m_pCurrTmTop  = (Pel *) xMalloc(Pel, AML_MERGE_TEMPLATE_SIZE * cbWidth);
@@ -2244,7 +2244,9 @@ void CodingStructure::initSubStructure( CodingStructure& subStruct, const Channe
   subStruct.m_isTuEnc = isTuEnc;
 
   subStruct.motionLut = motionLut;
-
+#if JVET_AD0188_CCP_MERGE
+  subStruct.ccpLut    = ccpLut;
+#endif
   subStruct.prevPLT = prevPLT;
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   subStruct.treeType  = treeType;
@@ -2359,10 +2361,18 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
   }
 #endif  
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  if (!subStruct.m_isTuEnc && ((!slice->isIntra() || slice->getUseIBC() || slice->getSPS()->getUseIntraTMP()) && chType != CHANNEL_TYPE_CHROMA))
+#else
+  if (!subStruct.m_isTuEnc && ((!slice->isIntra() || slice->getUseIBC()) && chType != CHANNEL_TYPE_CHROMA))
+#endif
+#else
 #if JVET_AB0061_ITMP_BV_FOR_IBC
   if (!subStruct.m_isTuEnc && ((!slice->isIntra() || slice->getSPS()->getIBCFlag() || slice->getSPS()->getUseIntraTMP()) && chType != CHANNEL_TYPE_CHROMA))
 #else
   if (!subStruct.m_isTuEnc && ((!slice->isIntra() || slice->getSPS()->getIBCFlag()) && chType != CHANNEL_TYPE_CHROMA))
+#endif
 #endif
   {
     // copy motion buffer
@@ -2373,6 +2383,10 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
 
     motionLut = subStruct.motionLut;
   }
+#if JVET_AD0188_CCP_MERGE
+  ccpLut = subStruct.ccpLut;
+#endif
+
 #if JVET_W0123_TIMD_FUSION
   if (!subStruct.m_isTuEnc && chType != CHANNEL_TYPE_CHROMA)
   {
@@ -2499,10 +2513,18 @@ void CodingStructure::copyStructure( const CodingStructure& other, const Channel
     pu = *ppu;
   }
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  if (!other.slice->isIntra() || other.slice->getUseIBC() || other.slice->getSPS()->getUseIntraTMP() )
+#else
+  if (!other.slice->isIntra() || other.slice->getUseIBC())
+#endif
+#else
 #if JVET_AB0061_ITMP_BV_FOR_IBC
   if (!other.slice->isIntra() || other.slice->getSPS()->getIBCFlag() || other.slice->getSPS()->getUseIntraTMP() )
 #else
   if (!other.slice->isIntra() || other.slice->getSPS()->getIBCFlag())
+#endif
 #endif
   {
     // copy motion buffer
@@ -2513,6 +2535,11 @@ void CodingStructure::copyStructure( const CodingStructure& other, const Channel
 
     motionLut = other.motionLut;
   }
+
+#if JVET_AD0188_CCP_MERGE
+  ccpLut = other.ccpLut;
+#endif
+
 #if JVET_W0123_TIMD_FUSION
   IpmBuf  ownIB = getIpmBuf();
   CIpmBuf subIB = other.getIpmBuf();
@@ -2593,10 +2620,18 @@ void CodingStructure::initStructData( const int &QP, const bool &skipMotBuf )
     currQP[0] = currQP[1] = QP;
   }
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AB0061_ITMP_BV_FOR_IBC
+  if (!skipMotBuf && (!parent || ((!slice->isIntra() || slice->getUseIBC() || slice->getSPS()->getUseIntraTMP()) && !m_isTuEnc)))
+#else
+  if (!skipMotBuf && (!parent || ((!slice->isIntra() || slice->getUseIBC()) && !m_isTuEnc)))
+#endif
+#else
 #if JVET_AB0061_ITMP_BV_FOR_IBC
   if (!skipMotBuf && (!parent || ((!slice->isIntra() || slice->getSPS()->getIBCFlag() || slice->getSPS()->getUseIntraTMP()) && !m_isTuEnc)))
 #else
   if (!skipMotBuf && (!parent || ((!slice->isIntra() || slice->getSPS()->getIBCFlag()) && !m_isTuEnc)))
+#endif
 #endif
   {
 #if JVET_Z0118_GDR

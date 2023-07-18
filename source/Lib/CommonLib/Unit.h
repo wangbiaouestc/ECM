@@ -358,8 +358,20 @@ struct CodingUnit : public UnitArea
 #endif
 #endif
 #if TMP_FAST_ENC
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  int                tmpXdisp[MTMP_NUM];
+  int                tmpYdisp[MTMP_NUM];
+  IntraTMPFusionInfo tmpFusionInfo[TMP_GROUP_IDX << 1];
+  bool               tmpFlmFlag;
+  int64_t            tmpFlmParams[TMP_FLM_PARAMS][MTMP_NUM];
+  uint8_t            tmpIdx;
+  bool               tmpFusionFlag;
+  int                tmpIsSubPel;
+  int                tmpSubPelIdx;
+#else
   int            tmpXdisp;
   int            tmpYdisp;
+#endif
   int            tmpNumCand;
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -402,6 +414,10 @@ struct CodingUnit : public UnitArea
 #endif
 #if INTER_LIC
   bool           licFlag;
+#if JVET_AD0213_LIC_IMP
+  int            licScale[2][3];
+  int            licOffset[2][3];
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   bool           ibcLicFlag;
@@ -410,8 +426,8 @@ struct CodingUnit : public UnitArea
   int            rribcFlipType;
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  int            bvOneNullComp;   // IBC BV has one null component
-  int            bvNullCompDir;   // 1: vertical null comp.  2: horizontal null comp.
+  int            bvOneZeroComp;   // IBC BV has one null component
+  int            bvZeroCompDir;   // 1: vertical null comp.  2: horizontal null comp.
 #endif
 #if JVET_AB0157_TMRL
   bool           tmrlFlag;
@@ -519,12 +535,22 @@ struct IntraPredictionData
 #if JVET_AC0054_GLCCCM
   int       glCccmFlag;
 #endif
+#if JVET_AD0202_CCCM_MDF
+  int       cccmMultiFilterIdx;
+#endif
+#endif
+#if JVET_AD0188_CCP_MERGE
+  int       idxNonLocalCCP;
+  CCPModelCandidate curCand;
+#endif
+#if JVET_AD0120_LBCCP
+  int       ccInsideFilter;
 #endif
 };
 
 struct InterPredictionData
 {
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   uint8_t     colIdx;
 #endif
   bool      mergeFlag;
@@ -598,6 +624,10 @@ struct InterPredictionData
   uint8_t     bmMergeFlag;
   uint8_t     bmDir;
 #endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  uint8_t     affBMMergeFlag;
+  uint8_t     affBMDir;
+#endif
   uint8_t     interDir;
   uint8_t     mvpIdx  [NUM_REF_PIC_LIST_01];
   uint8_t     mvpNum  [NUM_REF_PIC_LIST_01];
@@ -627,12 +657,15 @@ struct InterPredictionData
 #if CIIP_PDPC
   bool      ciipPDPC;
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
   int       mvsdIdx[NUM_REF_PIC_LIST_01];
+#endif
+#if JVET_AD0140_MVD_PREDICTION
+  MvdSuffixInfoMv mvdSuffixInfo;
 #endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
   MvdSuffixInfo bvdSuffixInfo;
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
   Mv        bv;                             // block vector for IBC
   Mv        bvd;                            // block vector difference for IBC
@@ -695,8 +728,17 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
   int64_t cacheId;
   bool    cacheUsed;
 #endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  bool              isMvsdApplicable() const;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  bool              isMvdPredApplicable() const;
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bool              isBvdPredApplicable() const;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bool isBvpClusterApplicable() const;
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC)
+  uint32_t          getBvType() const;
 #endif
 };
 
@@ -716,6 +758,9 @@ struct TransformUnit : public UnitArea
   uint8_t        jointCbCr;
   uint8_t        cbf        [ MAX_NUM_TBLOCKS ];
 
+#if JVET_AE0059_INTER_CCCM
+  int8_t         interCccm;
+#endif
   TransformUnit() : chType( CH_L ) { }
   TransformUnit(const UnitArea& unit);
   TransformUnit(const ChromaFormat _chromaFormat, const Area &area);
@@ -750,6 +795,9 @@ struct TransformUnit : public UnitArea
   TransformUnit& operator=(const TransformUnit& other);
   void copyComponentFrom  (const TransformUnit& other, const ComponentID compID);
   void checkTuNoResidual( unsigned idx );
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  int  countNonZero();
+#endif
   int  getTbAreaAfterCoefZeroOut(ComponentID compID) const;
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   bool checkLFNSTApplied(ComponentID compID);
@@ -811,7 +859,7 @@ private:
 #include <iterator>
 
 template<typename T>
-class UnitIterator : public std::iterator<std::forward_iterator_tag, T>
+class UnitIterator
 {
 private:
   T* m_punit;

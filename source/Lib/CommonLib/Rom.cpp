@@ -4739,7 +4739,11 @@ void destroyROM()
   }
   delete[] g_geoParams;
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
-  for (int bldIdx = 0; bldIdx < GEO_BLENDING_NUM; bldIdx++)
+#if JVET_AB0155_SGPM
+  for( int bldIdx = 0; bldIdx < TOTAL_GEO_BLENDING_NUM; bldIdx++ )
+#else
+  for( int bldIdx = 0; bldIdx < GEO_BLENDING_NUM; bldIdx++ )
+#endif
   {
     for (int i = 0; i < GEO_NUM_PRESTORED_MASK; i++)
     {
@@ -5469,5 +5473,7 @@ const int8_t g_ibcGpmSecondSetSplitDir[GEO_NUM_PARTITION_MODE] = {
 0,1,0,0,1,0,1,1,
 0,1,1,0,1,1,0,1
 };
+
 #endif
+
 //! \}

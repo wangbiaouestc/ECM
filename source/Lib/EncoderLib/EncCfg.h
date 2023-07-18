@@ -255,6 +255,9 @@ protected:
 #if JVET_AB0155_SGPM
   bool      m_noSgpmConstraintFlag;
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  bool      m_noTmrlConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool      m_noObmcConstraintFlag;
 #endif
@@ -473,13 +476,28 @@ protected:
   bool      m_sgpmNoBlend;
 #endif
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  bool      m_tmrl;
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  bool      m_tmNoninterToolsEnableFlag;
+#endif
+#if JVET_AD0085_MPM_SORTING
+  bool      m_mpmSorting;
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int       m_cccm;
+#endif
+#if JVET_AD0188_CCP_MERGE
+  bool      m_ccpMerge;
 #endif
 #if ENABLE_OBMC
   bool      m_OBMC;
 #endif
   bool      m_ciip;
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  bool      m_ciipTimd;
+#endif
   bool      m_Geo;
   bool      m_allowDisFracMMVD;
   bool      m_AffineAmvr;
@@ -488,9 +506,18 @@ protected:
   bool      m_AffineAmvp;
   bool      m_DMVR;
   bool      m_MMVD;
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  bool      m_affineParaRefinement;
+#endif
   int       m_MmvdDisNum;
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  bool      m_MVSD;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  bool      m_mvdPred;
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bool      m_bvdPred;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bool      m_bvpCluster;
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   bool      m_useARL;
@@ -500,6 +527,9 @@ protected:
   unsigned  m_PLTMode;
   bool      m_JointCbCrMode;
   unsigned  m_IBCMode;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  unsigned  m_IBCFracMode;
+#endif
   unsigned  m_IBCLocalSearchRangeX;
   unsigned  m_IBCLocalSearchRangeY;
   unsigned  m_IBCHashSearch;
@@ -508,6 +538,11 @@ protected:
   unsigned  m_IBCFastMethod;
 #if JVET_AA0061_IBC_MBVD
   bool      m_ibcMbvd;
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  bool      m_rribc;
+  bool      m_tmibc;
+  bool      m_ibcMerge;
 #endif
 #if JVET_AC0112_IBC_CIIP
   bool      m_ibcCiip;
@@ -940,6 +975,9 @@ protected:
 #if JVET_AC0071_DBV
   bool m_intraDBV;
 #endif
+#if JVET_AE0059_INTER_CCCM
+  bool m_interCccm;
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   bool        m_BIF;
   int         m_BIFStrength;
@@ -957,6 +995,11 @@ protected:
 #if INTER_LIC
   unsigned    m_lic;
   bool        m_fastPicLevelLIC;
+#if JVET_AD0213_LIC_IMP
+  int         m_fastLIC;
+  bool        m_fastLICAffine;
+  bool        m_fastLICBcw;
+#endif
 #endif
 
 #if JVET_O0756_CALCULATE_HDRMETRICS
@@ -1148,6 +1191,10 @@ public:
 #if JVET_AB0155_SGPM
   bool      getNoSgpmConstraintFlag() const { return m_noSgpmConstraintFlag; }
   void      setNoSgpmConstraintFlag(bool val) { m_noSgpmConstraintFlag = val; }
+#endif
+#if JVET_AD0082_TMRL_CONFIG
+  bool      getNoTmrlConstraintFlag() const { return m_noTmrlConstraintFlag; }
+  void      setNoTmrlConstraintFlag(bool val) { m_noTmrlConstraintFlag = val; }
 #endif
 #if ENABLE_OBMC
   bool      getNoObmcConstraintFlag() const { return m_noObmcConstraintFlag; }
@@ -1410,6 +1457,16 @@ public:
   void      setIbcMbvd                      ( bool b )       { m_ibcMbvd = b; }
   bool      getIbcMbvd                      ()         const { return m_ibcMbvd; }
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  void      setRRIbc                        ( bool b )       { m_rribc = b; }
+  bool      getRRIbc                        ()         const { return m_rribc; }
+
+  void      setTMIbc                        ( bool b )       { m_tmibc = b; }
+  bool      getTMIbc                        ()         const { return m_tmibc; }
+
+  void      setIbcMerge                     ( bool b )       { m_ibcMerge = b; }
+  bool      getIbcMerge                     ()         const { return m_ibcMerge; }
+#endif
 #if JVET_AC0112_IBC_CIIP
   void      setIbcCiip                      ( bool b )       { m_ibcCiip = b; }
   bool      getIbcCiip                      ()         const { return m_ibcCiip; }
@@ -1535,9 +1592,25 @@ public:
   bool      getUseSgpmNoBlend            ()         const { return m_sgpmNoBlend; }
 #endif
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  void      setUseTmrl                   (bool b)         { m_tmrl = b; }
+  bool      getUseTmrl                   ()         const { return m_tmrl; }
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  void      setTMnoninterToolsEnableFlag                   (bool b)         { m_tmNoninterToolsEnableFlag = b; }
+  bool      getTMnoninterToolsEnableFlag                   ()         const { return m_tmNoninterToolsEnableFlag; }
+#endif
+#if JVET_AD0085_MPM_SORTING
+  void      setUseMpmSorting             (bool b)         { m_mpmSorting = b; }
+  bool      getUseMpmSorting             () const         { return m_mpmSorting; }
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   void      setUseCccm                   (int i)          { m_cccm = i; }
   int       getUseCccm                   () const         { return m_cccm; }
+#endif
+#if JVET_AD0188_CCP_MERGE
+  void      setUseCcpMerge               (bool i)         { m_ccpMerge = i; }
+  bool      getUseCcpMerge               ()         const { return m_ccpMerge; }
 #endif
 #if ENABLE_OBMC
   void      setUseObmc                   ( bool b )       { m_OBMC = b; }
@@ -1545,6 +1618,10 @@ public:
 #endif
   void      setUseCiip                   ( bool b )       { m_ciip = b; }
   bool      getUseCiip                   ()         const { return m_ciip; }
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  void      setUseCiipTimd               (bool b)         { m_ciipTimd = b; }
+  bool      getUseCiipTImd               ()         const { return m_ciipTimd; }
+#endif
   void      setUseGeo                       ( bool b )       { m_Geo = b; }
   bool      getUseGeo                       ()         const { return m_Geo; }
   void      setAllowDisFracMMVD             ( bool b )       { m_allowDisFracMMVD = b;    }
@@ -1560,12 +1637,24 @@ public:
   void      setDMVR                      ( bool b )       { m_DMVR = b; }
   bool      getDMVR                      ()         const { return m_DMVR; }
   void      setMMVD                         (bool b)         { m_MMVD = b;    }
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  bool      getAffineParaRefinement     ()                   { return m_affineParaRefinement; }
+  void      setAffineParaRefinement     (bool b)             { m_affineParaRefinement = b; }
+#endif
   bool      getMMVD                         ()         const { return m_MMVD; }
   void      setMmvdDisNum                   ( int b )        { m_MmvdDisNum = b; }
   int       getMmvdDisNum                   ()         const { return m_MmvdDisNum; }
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  void      setUseMVSD(bool b) { m_MVSD = b; }
-  bool      getUseMVSD()                               const { return m_MVSD; }
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  void      setUseMvdPred(bool b)                            { m_mvdPred = b; }
+  bool      getUseMvdPred()                            const { return m_mvdPred; }
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  void      setUseBvdPred(bool b)                            { m_bvdPred = b; }
+  bool      getUseBvdPred()                            const { return m_bvdPred; }
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  void      setUseBvpCluster(bool b)                         { m_bvpCluster = b; }
+  bool      getUseBvpCluster()                        const  { return m_bvpCluster; }
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   void      setUseARL(bool b) { m_useARL = b; }
@@ -1581,6 +1670,10 @@ public:
   bool      getJointCbCr                    ()         const { return m_JointCbCrMode; }
   void      setIBCMode                      (unsigned n)     { m_IBCMode = n; }
   unsigned  getIBCMode                      ()         const { return m_IBCMode; }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  void      setIBCFracMode                  (unsigned n)     { m_IBCFracMode = n; }
+  unsigned  getIBCFracMode                  ()         const { return m_IBCFracMode; }
+#endif
   void      setIBCLocalSearchRangeX         (unsigned n)     { m_IBCLocalSearchRangeX = n; }
   unsigned  getIBCLocalSearchRangeX         ()         const { return m_IBCLocalSearchRangeX; }
   void      setIBCLocalSearchRangeY         (unsigned n)     { m_IBCLocalSearchRangeY = n; }
@@ -1611,6 +1704,10 @@ public:
 #if JVET_AC0071_DBV
   void setUseIntraDBV(bool b) { m_intraDBV = b; }
   bool getUseIntraDBV() const { return m_intraDBV; }
+#endif
+#if JVET_AE0059_INTER_CCCM
+  void setUseInterCccm(bool b) { m_interCccm = b; }
+  bool getUseInterCccm() const { return m_interCccm; }
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   void      setUseBIF                       ( bool b )       { m_BIF = b; }
@@ -2499,6 +2596,14 @@ public:
   bool         getUseLIC()                                      const { return m_lic; }
   void         setFastPicLevelLIC( bool b )                           { m_fastPicLevelLIC = b; }
   bool         getFastPicLevelLIC()                             const { return m_fastPicLevelLIC; }
+#if JVET_AD0213_LIC_IMP
+  void        setFastLic( int b )                               { m_fastLIC = b; }
+  int         getFastLic()                                      const { return m_fastLIC; }
+  void        setFastLicAffine( bool b )                        { m_fastLICAffine = b; }
+  bool        getFastLicAffine()                                const { return m_fastLICAffine; }  
+  void        setFastLicBcw( bool b )                           { m_fastLICBcw = b; }
+  bool        getFastLicBcw()                                   const { return m_fastLICBcw; }
+#endif
 #endif
 
 #if JVET_O0756_CALCULATE_HDRMETRICS

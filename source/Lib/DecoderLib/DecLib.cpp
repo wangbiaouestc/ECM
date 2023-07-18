@@ -545,6 +545,11 @@ DecLib::~DecLib()
     m_prefixSEINALUs.pop_front();
   }
 
+  while( !m_pictureSeiNalus.empty() )
+  {
+    delete m_pictureSeiNalus.front();
+    m_pictureSeiNalus.pop_front();
+  }
 }
 
 void DecLib::create()

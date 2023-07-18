@@ -71,7 +71,7 @@ typedef static_vector<MultiHypPredictionData, MULTI_HYP_PRED_MAX_CANDS> MultiHyp
 /// parameters for AMVP
 struct AMVPInfo
 {
-#if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP)
+#if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   Mv       mvCand[REGULAR_AMVP_MAX_NUM_CANDS + 1];  ///< array of motion vector predictor candidates
 #else
   Mv       mvCand[AMVP_MAX_NUM_CANDS_MEM];  ///< array of motion vector predictor candidates
@@ -80,7 +80,7 @@ struct AMVPInfo
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   Distortion mvCost[REGULAR_AMVP_MAX_NUM_CANDS + 1];
 #endif
-#if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP)
+#if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   unsigned maxStorageSize;
   unsigned maxSimilarityThreshold;
 
@@ -168,6 +168,11 @@ struct MvField
 
 struct MotionInfo
 {
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  bool isSCC;
+  bool isRefSCC;
+  bool isRefRefSCC;
+#endif
   bool     isInter;
   bool     isIBCmot;
   char     interDir;
@@ -190,6 +195,17 @@ struct MotionInfo
   MultiHypVec addHypData;
 #endif
   Mv      bv;
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+#if INTER_LIC
+  MotionInfo() : isSCC(false), isRefSCC(false), isRefRefSCC(false), isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, bcwIdx(0), usesLIC(false) { }
+  // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this constructor for anything else
+  MotionInfo(int i) : isSCC(false), isRefSCC(false), isRefRefSCC(false), isInter(i != 0),isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, bcwIdx(0), usesLIC(false) { CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
+#else
+  MotionInfo() : isSCC(false), isRefSCC(false), isRefRefSCC(false), isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, bcwIdx(0) { }
+  // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this constructor for anything else
+  MotionInfo(int i) : isSCC(false), isRefSCC(false), isRefRefSCC(false), isInter(i != 0), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, bcwIdx(0) { CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
+#endif
+#else
 #if INTER_LIC
   MotionInfo() : isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, bcwIdx(0), usesLIC(false) { }
   // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this constructor for anything else
@@ -198,6 +214,7 @@ struct MotionInfo
   MotionInfo() : isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, bcwIdx(0) { }
   // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this constructor for anything else
   MotionInfo(int i) : isInter(i != 0), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, bcwIdx(0) { CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
+#endif
 #endif
 
   bool operator==( const MotionInfo& mi ) const
@@ -241,6 +258,10 @@ struct MotionInfoPred
   Mv         mvAffi[2][3];
   Mv         mvdAffi[2][3];
   Distortion cost;
+#if JVET_AD0140_MVD_PREDICTION
+  bool       aboveCostCalculated;
+  bool       leftCostCalculated;
+#endif
 };
 #endif
 

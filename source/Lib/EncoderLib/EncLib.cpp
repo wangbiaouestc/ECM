@@ -117,7 +117,7 @@ void EncLib::create( const int layerId )
   m_cTrQuant        = new TrQuant            [m_numCuEncStacks];
   m_CABACEncoder    = new CABACEncoder       [m_numCuEncStacks];
   m_cRdCost         = new RdCost             [m_numCuEncStacks];
-  m_CtxCache        = new CtxCache           [m_numCuEncStacks];
+  m_ctxCache        = new CtxCache           [m_numCuEncStacks];
 
   for( int jId = 0; jId < m_numCuEncStacks; jId++ )
   {
@@ -278,7 +278,7 @@ void EncLib::destroy ()
   delete[] m_cTrQuant;
   delete[] m_CABACEncoder;
   delete[] m_cRdCost;
-  delete[] m_CtxCache;
+  delete[] m_ctxCache;
 #endif
 
   return;
@@ -657,8 +657,8 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     // precache a few objects
     for( int i = 0; i < 10; i++ )
     {
-      auto x = m_CtxCache[jId].get();
-      m_CtxCache[jId].cache( x );
+      auto x = m_ctxCache[jId].get();
+      m_ctxCache[jId].cache( x );
     }
 
     m_cCuEncoder[jId].init( this, sps0, jId );
@@ -751,6 +751,9 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
   m_cInterSearch.setTempBuffers( m_cIntraSearch.getSplitCSBuf(), m_cIntraSearch.getFullCSBuf(), m_cIntraSearch.getSaveCSBuf() );
 #endif // ENABLE_SPLIT_PARALLELISM || ENABLE_WPP_PARALLELISM
 
+#if JVET_AE0059_INTER_CCCM
+  m_cInterSearch.m_interCccm->setCccmBuffers(m_cIntraSearch.getCccmBufferA(),m_cIntraSearch.getCccmBufferCb(),m_cIntraSearch.getCccmBufferCr(),m_cIntraSearch.getCccmBufferSamples());
+#endif
   m_iMaxRefPicNum = 0;
 
 #if ER_CHROMA_QP_WCG_PPS
@@ -1636,6 +1639,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AB0155_SGPM
   cinfo->setNoSgpmConstraintFlag(m_noSgpmConstraintFlag);
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  cinfo->setNoTmrlConstraintFlag(m_noTmrlConstraintFlag);
+#endif
 #if ENABLE_OBMC
   cinfo->setNoObmcConstraintFlag(m_noObmcConstraintFlag);
 #endif
@@ -1836,11 +1842,26 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_W0123_TIMD_FUSION
   sps.setUseTimd            ( m_timd );
 #endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  sps.setUseCiipTimd        ( m_ciipTimd );
+#endif
 #if JVET_AB0155_SGPM
   sps.setUseSgpm            ( m_sgpm );
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  sps.setUseTmrl            ( m_tmrl );
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  sps.setTMnoninterToolsEnableFlag            ( m_tmNoninterToolsEnableFlag );
+#endif
+#if JVET_AD0085_MPM_SORTING
+  sps.setUseMpmSorting      ( m_mpmSorting );
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   sps.setUseCccm            ( m_cccm );
+#endif
+#if JVET_AD0188_CCP_MERGE
+  sps.setUseCcpMerge        ( m_ccpMerge );
 #endif
 #if ENABLE_OBMC
   sps.setUseOBMC            ( m_OBMC );
@@ -1873,8 +1894,14 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseGeo                ( m_Geo );
   sps.setUseMMVD               ( m_MMVD );
   sps.setFpelMmvdEnabledFlag   (( m_MMVD ) ? m_allowDisFracMMVD : false);
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  sps.setUseMVSD               (m_MVSD);
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  sps.setUseMvdPred            (m_mvdPred);
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  sps.setUseBvdPred            (m_bvdPred);
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  sps.setUseBvpCluster         (m_bvpCluster);
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   sps.setUseARL                (m_useARL);
@@ -1884,9 +1911,21 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setProfControlPresentFlag(m_PROF);
   sps.setAffineAmvrEnabledFlag              ( m_AffineAmvr );
   sps.setUseDMVR                            ( m_DMVR );
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  sps.setUseAffineParaRefinement            (m_affineParaRefinement);
+#endif
   sps.setUseColorTrans(m_useColorTrans);
   sps.setPLTMode                            ( m_PLTMode);
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   sps.setIBCFlag                            ( m_IBCMode);
+#else
+  sps.setIBCFlag                            ( m_IBCMode & 0x01);
+  sps.setIBCFlagInterSlice                  ( m_IBCMode & 0x02);
+  sps.setUseRRIbc                           ( m_rribc );
+  sps.setUseTMIbc                           ( m_tmibc );
+  sps.setUseIbcMerge                        ( m_ibcMerge );
+  sps.setIBCFracFlag                        ( m_IBCFracMode);
+#endif
 #if JVET_AA0061_IBC_MBVD
   sps.setUseIbcMbvd                         ( m_ibcMbvd );
 #endif
@@ -1911,6 +1950,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AC0071_DBV
   sps.setUseIntraDBV(m_intraDBV);
+#endif
+#if JVET_AE0059_INTER_CCCM
+  sps.setUseInterCccm(m_interCccm);
 #endif
   // ADD_NEW_TOOL : (encoder lib) set tool enabling flags and associated parameters here
   sps.setUseISP                             ( m_ISP );
@@ -2675,6 +2717,17 @@ void EncLib::xInitPicHeader(PicHeader &picHeader, const SPS &sps, const PPS &pps
 #else
   picHeader.setGPMMMVDTableFlag(false);
 #endif
+  }
+#endif
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  picHeader.setDisFracMBVD(true);
+  if (sps.getIBCFracFlag())
+  {
+    if ((getSourceWidth() * getSourceHeight()) <= (1920 * 1080))
+    {
+      picHeader.setDisFracMBVD(false);
+    }
   }
 #endif
 }

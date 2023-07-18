@@ -105,6 +105,9 @@ Slice::Slice()
 #if INTER_LIC
 , m_UseLIC                        ( false )
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+, m_useIBC                        ( false )
+#endif
 , m_uiTLayer                      ( 0 )
 , m_bTLayerSwitchingFlag          ( false )
 , m_independentSliceIdx           ( 0 )
@@ -1669,6 +1672,9 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
 #if INTER_LIC
   m_UseLIC                        = pSrc->m_UseLIC;
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  m_useIBC                        = pSrc->m_useIBC;
+#endif
 
   for ( uint32_t e=0 ; e<NUM_REF_PIC_LIST_01 ; e++ )
   {
@@ -3006,16 +3012,34 @@ void Slice::stopProcessingTimer()
   m_iProcessingStartTime = 0;
 }
 
-unsigned Slice::getMinPictureDistance() const
+unsigned Slice::getMinPictureDistance(
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                                      unsigned ibcFastMethod
+#endif
+) const
 {
   int minPicDist = MAX_INT;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (getUseIBC())
+#else
   if (getSPS()->getIBCFlag())
+#endif
   {
     minPicDist = 0;
   }
+
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   else
-  if( ! isIntra() )
+#endif
+  if( ! isIntra()
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    && (ibcFastMethod & IBC_FAST_METHOD_NONSCC)
+#endif
+    )
   {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    minPicDist = MAX_INT;
+#endif
     const int currPOC  = getPOC();
     for (int refIdx = 0; refIdx < getNumRefIdx(REF_PIC_LIST_0); refIdx++)
     {
@@ -3365,6 +3389,9 @@ PicHeader::PicHeader()
 #if JVET_W0097_GPM_MMVD_TM
 , m_gpmMMVDTableFlag                              (false)
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+, m_disFracMBVD                                   ( true )
+#endif
 , m_qpDelta                                       ( 0 )
 , m_numAlfAps                                     ( 0 )
 , m_alfApsId                                      ( 0 )
@@ -3459,6 +3486,9 @@ void PicHeader::initPicHeader()
   m_jointCbCrSignFlag                             = 0;
 #if JVET_W0097_GPM_MMVD_TM
   m_gpmMMVDTableFlag                              = 0;
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  m_disFracMBVD                                   = true;
 #endif
   m_qpDelta                                       = 0;
   m_numAlfAps                                     = 0;
@@ -3584,11 +3614,19 @@ SPS::SPS()
 , m_affineAmvrEnabledFlag     ( false )
 , m_DMVR                      ( false )
 , m_MMVD                      ( false )
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+, m_affineParaRefinement      ( false )
+#endif
 #if AFFINE_MMVD
  , m_AffineMmvdMode           ( false )
 #endif
 #if JVET_AA0061_IBC_MBVD
   , m_ibcMbvd                 ( false )
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  , m_rribc                   ( false )
+  , m_tmibc                   ( false )
+  , m_ibcMerge                ( false )
 #endif
 #if JVET_AC0112_IBC_CIIP
   , m_ibcCiip                 ( false )
@@ -3625,6 +3663,20 @@ SPS::SPS()
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 , m_altGPMSplitModeCode       ( false )
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  , m_mvdPred(false)
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  , m_bvdPred(false)
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  , m_bvpCluster(false)
+#endif
+#if JVET_Z0054_BLK_REF_PIC_REORDER
+  , m_useARL(false)
+#endif
 #endif
 , m_SBT                       ( false )
 , m_ISP                       ( false )
@@ -3702,6 +3754,10 @@ SPS::SPS()
 , m_vuiParameters             ()
 , m_wrapAroundEnabledFlag     (false)
 , m_IBCFlag                   (  0)
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+, m_IBCFracFlag               (  0)
+, m_IBCFlagInterSlice         (  0)
+#endif
 , m_PLTMode                   (  0)
 , m_lmcsEnabled               (false)
 , m_AMVREnabledFlag                       ( false )
@@ -3720,6 +3776,24 @@ SPS::SPS()
 #if JVET_W0123_TIMD_FUSION
 , m_timd                      ( false )
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+#if JVET_AB0155_SGPM
+  , m_sgpm(false)
+#endif
+#if JVET_AD0082_TMRL_CONFIG
+  , m_tmrl(false)
+#endif
+, m_tmNoninterToolsEnableFlag ( false )
+#if JVET_AD0085_MPM_SORTING
+, m_mpmSorting                      ( false )
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+, m_cccm                      ( false )
+#endif
+#if JVET_AD0188_CCP_MERGE
+, m_ccpMerge                      ( false )
+#endif
+#endif
 #if JVET_V0130_INTRA_TMP
 , m_intraTMP                  ( false )
 , m_intraTmpMaxSize           ( 64 )
@@ -3731,6 +3805,9 @@ SPS::SPS()
 , m_OBMC                      ( false )
 #endif
 , m_ciip                      ( false )
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+, m_ciipTimd                  ( false )
+#endif
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
 , m_ciipTmMrg                 ( false )
 #endif

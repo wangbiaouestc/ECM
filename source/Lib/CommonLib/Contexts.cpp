@@ -1400,6 +1400,23 @@ const CtxSet ContextSetCfg::IntraLumaMPMIdx = ContextSetCfg::addCtxSet
   { 121, 126, 119, },
   { 119, 109, 121, },
   });
+
+#if JVET_AD0085_MPM_SORTING
+const CtxSet ContextSetCfg::IntraLumaSecondMpmIdx = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU, CNU },
+  { DWS, DWS, DWS, DWS, DWS },
+  { DWS, DWS, DWS, DWS, DWS },
+  { DWS, DWS, DWS, DWS, DWS },
+  { DWE, DWE, DWE, DWE, DWE },
+  { DWE, DWE, DWE, DWE, DWE },
+  { DWE, DWE, DWE, DWE, DWE },
+  { 119, 119, 119, 119, 119 },
+  { 119, 119, 119, 119, 119 },
+  });
+#endif
 #endif
 
 const CtxSet ContextSetCfg::IntraLumaPlanarFlag = ContextSetCfg::addCtxSet
@@ -1545,6 +1562,19 @@ const CtxSet ContextSetCfg::MipFlag = ContextSetCfg::addCtxSet
 #if JVET_V0130_INTRA_TMP
 const CtxSet ContextSetCfg::TmpFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  {  33,  42,   7,  33, CNU, CNU, CNU,},
+  {   0,  25,  57,   0, CNU, CNU, CNU,},
+  {  40,  19,  21,  33, CNU, CNU, CNU,},
+  {   1,   4,   6,   1, DWS, DWS, DWS,},
+  {   8,   8,   0,  12, DWS, DWS, DWS,},
+  {   6,   5,   0,   2, DWS, DWS, DWS,},
+  {  11,  32,  25,  18, DWE, DWE, DWE,},
+  {   4,  25,  32,  11, DWE, DWE, DWE,},
+  {  25,  32,   4,  25, DWE, DWE, DWE,},
+  {  99, 101, 133, 115, DWO, DWO, DWO,},
+  { 147, 161, 114, 131, DWO, DWO, DWO,},
+#else
   {  33,  42,   7,  33, },
   {   0,  25,  57,   0, },
   {  40,  19,  21,  33, },
@@ -1556,6 +1586,39 @@ const CtxSet ContextSetCfg::TmpFlag = ContextSetCfg::addCtxSet
   {  25,  32,   4,  25, },
   {  99, 101, 133, 115, },
   { 147, 161, 114, 131, },
+#endif
+  });
+#endif
+
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+const CtxSet ContextSetCfg::TmpIdx = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU,},
+  { CNU, CNU, CNU,},
+  { CNU, CNU, CNU,},
+  { DWS, DWS, DWS,},
+  { DWS, DWS, DWS,},
+  { DWS, DWS, DWS,},
+  { DWE, DWE, DWE,},
+  { DWE, DWE, DWE,},
+  { DWE, DWE, DWE,},
+  { DWO, DWO, DWO,},
+  { DWO, DWO, DWO,},
+  });
+
+const CtxSet ContextSetCfg::TmpFusion = ContextSetCfg::addCtxSet
+({
+  { CNU,CNU,CNU,CNU,CNU,CNU },
+  { CNU,CNU,CNU,CNU,CNU,CNU },
+  { CNU,CNU,CNU,CNU,CNU,CNU },
+  { DWS,DWS,DWS,DWS,DWS,DWS },
+  { DWS,DWS,DWS,DWS,DWS,DWS },
+  { DWS,DWS,DWS,DWS,DWS,DWS },
+  { DWE,DWE,DWE,DWE,DWE,DWE },
+  { DWE,DWE,DWE,DWE,DWE,DWE },
+  { DWE,DWE,DWE,DWE,DWE,DWE },
+  { DWO,DWO,DWO,DWO,DWO,DWO },
+  { DWO,DWO,DWO,DWO,DWO,DWO },
   });
 #endif
 
@@ -1683,7 +1746,22 @@ const CtxSet ContextSetCfg::BMMergeFlag = ContextSetCfg::addCtxSet
   { 117, 117, 110, 116, },
   });
 #endif
-
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+const CtxSet ContextSetCfg::affBMFlag = ContextSetCfg::addCtxSet
+({
+  {  48,  50, },
+  {  56,  50, },
+  { CNU, CNU, },
+  {   5,   5, },
+  {   5,   5, },
+  { DWS, DWS, },
+  {  18,  18, },
+  {  18,  18, },
+  { DWE, DWE, },
+  { 126, 126, },
+  { 117, 117, },
+  });
+#endif
 #if JVET_AA0070_RRIBC
 const CtxSet ContextSetCfg::rribcFlipType = ContextSetCfg::addCtxSet
 ({
@@ -1702,7 +1780,7 @@ const CtxSet ContextSetCfg::rribcFlipType = ContextSetCfg::addCtxSet
 #endif
 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-const CtxSet ContextSetCfg::bvOneNullComp = ContextSetCfg::addCtxSet
+const CtxSet ContextSetCfg::bvOneZeroComp = ContextSetCfg::addCtxSet
 ({
   {  48,  50,  50,  50, },
   {  56,  50,  43,  28, },
@@ -1844,6 +1922,23 @@ const CtxSet ContextSetCfg::Bvd = ContextSetCfg::addCtxSet
 });
 #endif
 
+#if JVET_AD0140_MVD_PREDICTION
+const CtxSet ContextSetCfg::MvsdIdxMVDMSB = ContextSetCfg::addCtxSet
+({
+  {  34,  41,  49,  41,  34,  41,  49,  41,  34,  41,  49,  41,  34,  41,  49,  41,  34,  41,  49,  41,  34,  41,  49,  41,  34,  41,  49,  41,  34,  41,  49,  41},
+  {  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41,  34,  41},
+  { CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU, CNU},
+  {  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12},
+  {  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12,  13,  13,  12,  12},
+  { DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS, DWS},
+  {   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4},
+  {   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4,   4,   4,  18,   4},
+  { DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE, DWE},
+  { 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94},
+  { 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101},
+});
+#endif
+
 #if JVET_AC0104_IBC_BVD_PREDICTION
 const CtxSet ContextSetCfg::MvsdIdxBVDMSB = ContextSetCfg::addCtxSet
 ({
@@ -1859,10 +1954,10 @@ const CtxSet ContextSetCfg::MvsdIdxBVDMSB = ContextSetCfg::addCtxSet
   { 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, 222,  83, 181,  94, },
   { 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, 100, 116, 100, 101, },
   });
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
 const CtxSet ContextSetCfg::MvsdIdx = ContextSetCfg::addCtxSet
 ({
   {  34,  41,  49,  41, },
@@ -1876,6 +1971,24 @@ const CtxSet ContextSetCfg::MvsdIdx = ContextSetCfg::addCtxSet
   { DWE, DWE, DWE, DWE, },
   { 222,  83, 181,  94, },
   { 100, 116, 100, 101, },
+  });
+#endif
+
+
+#if JVET_AD0140_MVD_PREDICTION && JVET_AC0104_IBC_BVD_PREDICTION
+const CtxSet ContextSetCfg::MvsdIdxIBC = ContextSetCfg::addCtxSet
+({
+  {  34,  41 },
+  {  34,  41 },
+  { CNU, CNU },
+  {  13,  13 },
+  {  13,  13 },
+  { DWS, DWS },
+  {   4,   4 },
+  {   4,   4 },
+  { DWE, DWE },
+  { 222,  83 },
+  { 100, 116 },
   });
 #endif
 
@@ -2767,6 +2880,19 @@ const CtxSet ContextSetCfg::SgpmFlag = ContextSetCfg::addCtxSet
 #if ENABLE_OBMC 
 const CtxSet ContextSetCfg::ObmcFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  {  39,  53, },
+  {  39,  53, },
+  { CNU, CNU, },
+  {   1,   7, },
+  {   1,   4, },
+  { DWS, DWS, },
+  {  32,  25, },
+  {  32,   4, },
+  { DWE, DWE, },
+  { 115, 102, },
+  {  98,  68, },
+#else
   {  39, },
   {  39, },
   { CNU, },
@@ -2778,6 +2904,7 @@ const CtxSet ContextSetCfg::ObmcFlag = ContextSetCfg::addCtxSet
   { DWE, },
   { 115, },
   {  98, },
+#endif
   });
 #endif
 
@@ -2810,6 +2937,23 @@ const CtxSet ContextSetCfg::ImvFlag = ContextSetCfg::addCtxSet
   { 126,  92, 126, 116, 118, },
   { 117, 147, 117, 116, 119, },
   });
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+const CtxSet ContextSetCfg::ImvFlagIBC = ContextSetCfg::addCtxSet
+({
+  {  59,  33,  50,  59,  53, },
+  {  59,  33,  50,  59,  60, },
+  {  59,  33,  50,  59,  53, },
+  {   1,   5,   1,   0,   4, },
+  {   1,   5,   1,   0,   5, },
+  {   1,   5,   1,   0,   4, },
+  {  11,  18,  11,  32,   4, },
+  {  11,  11,  11,  32,  11, },
+  {  11,  18,  11,  32,   4, },
+  { 126,  92, 126, 116, 118, },
+  { 117, 147, 117, 116, 119, },
+});
+#endif
 
 const CtxSet ContextSetCfg::ctbAlfFlag = ContextSetCfg::addCtxSet
 ({
@@ -3254,6 +3398,40 @@ const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
   { DWO, },
 #endif
 });
+
+#if JVET_AD0202_CCCM_MDF
+const CtxSet ContextSetCfg::CccmMpfFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+  { DWE, DWE, DWE, },
+  { DWE, DWE, DWE, },
+  { DWE, DWE, DWE, },
+  { DWO, DWO, DWO, },
+  { DWO, DWO, DWO, },
+});
+#endif
+#endif
+
+#if JVET_AD0120_LBCCP
+const CtxSet ContextSetCfg::CcInsideFilterFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+});
 #endif
 
 #if JVET_AC0119_LM_CHROMA_FUSION
@@ -3301,6 +3479,40 @@ const CtxSet ContextSetCfg::TmrlDerive = ContextSetCfg::addCtxSet
   {  18, DWE, DWE, DWE, DWE, DWE, DWE, DWE, },
   { 119, DWO, DWO, DWO, DWO, DWO, DWO, DWO, },
   { 119, DWO, DWO, DWO, DWO, DWO, DWO, DWO, },
+  });
+#endif
+
+#if JVET_AD0188_CCP_MERGE
+const CtxSet ContextSetCfg::nonLocalCCP = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+});
+#endif
+
+#if JVET_AE0059_INTER_CCCM
+const CtxSet ContextSetCfg::InterCccmFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
   });
 #endif
 
@@ -3755,6 +3967,17 @@ const CtxSet ContextSetCfg::IntraLumaMPMIdx = ContextSetCfg::addCtxSet
 	{ 4,  1,  6 },
 	{ 2,  2,  6 }
 });
+#if JVET_AD0085_MPM_SORTING
+const CtxSet ContextSetCfg::IntraLumaSecondMpmIdx = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU, CNU },
+  { DWS, DWS, DWS, DWS, DWS },
+  { DWS, DWS, DWS, DWS, DWS },
+  { DWS, DWS, DWS, DWS, DWS },
+  });
+#endif
 #endif
 
 const CtxSet ContextSetCfg::CclmModeFlag = ContextSetCfg::addCtxSet
@@ -4015,7 +4238,7 @@ const CtxSet ContextSetCfg::Bvd = ContextSetCfg::addCtxSet
 });
 #endif
 
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
 const CtxSet ContextSetCfg::MvsdIdx = ContextSetCfg::addCtxSet
 ({
   { 34, 34, 34, 34,},
@@ -4693,6 +4916,18 @@ const CtxSet ContextSetCfg::ImvFlag = ContextSetCfg::addCtxSet
 	{ 0, 10,  0,  0,  4 }
 });
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+const CtxSet ContextSetCfg::ImvFlagIBC = ContextSetCfg::addCtxSet
+({
+  { 59, 26, 50, 60, 38 },
+  { 59, 48, 58, 60, 60 },
+  { 59, 26, 50, 60, 38 },
+  { 1,  4,  1,  0,  4 },
+  { 0,  5,  1,  0,  4 },
+  { 1,  4,  1,  0,  4 },
+});
+#endif
+
 const CtxSet ContextSetCfg::ctbAlfFlag = ContextSetCfg::addCtxSet
 ({
 	{ 18, 37, 46, 25, 53, 54, 25, 46, 54 },
@@ -5290,6 +5525,15 @@ const CtxSet ContextSetCfg::IntraLumaMPMIdx = ContextSetCfg::addCtxSet
 	{ 20, 44, 35 },
 	{ 2,  2,  6 }
   });
+#if JVET_AD0085_MPM_SORTING
+const CtxSet ContextSetCfg::IntraLumaSecondMpmIdx = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU, CNU },
+  { CNU, CNU, CNU, CNU, CNU },
+  { DWS, DWS, DWS, DWS, DWS },
+  });
+#endif
 #endif
 
 const CtxSet ContextSetCfg::CclmModeFlag = ContextSetCfg::addCtxSet
@@ -5948,6 +6192,16 @@ const CtxSet ContextSetCfg::ImvFlag = ContextSetCfg::addCtxSet
   {   0,   5,   0,   0,   4, },
 });
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+const CtxSet ContextSetCfg::ImvFlagIBC = ContextSetCfg::addCtxSet
+({
+  {  59,  26,  50,  60,  38, },
+  {  59,  48,  58,  60,  60, },
+  {  59,  26,  50,  60,  38, },
+  {   0,   5,   0,   0,   4, },
+});
+#endif
+
 const CtxSet ContextSetCfg::ctbAlfFlag = ContextSetCfg::addCtxSet
 ({
   {  33,  52,  46,  25,  61,  54,  25,  61,  54, },
@@ -6160,63 +6414,63 @@ const CtxSet ContextSetCfg::Alf = { ContextSetCfg::ctbAlfFlag, ContextSetCfg::ct
 
 template <class BinProbModel>
 CtxStore<BinProbModel>::CtxStore()
-  : m_CtxBuffer ()
-  , m_Ctx       ( nullptr )
+  : m_ctxBuffer ()
+  , m_ctx       ( nullptr )
 {}
 
 template <class BinProbModel>
 CtxStore<BinProbModel>::CtxStore( bool dummy )
-  : m_CtxBuffer ( ContextSetCfg::NumberOfContexts )
-  , m_Ctx       ( m_CtxBuffer.data() )
+  : m_ctxBuffer ( ContextSetCfg::NumberOfContexts )
+  , m_ctx       ( m_ctxBuffer.data() )
 {}
 
 template <class BinProbModel>
 CtxStore<BinProbModel>::CtxStore( const CtxStore<BinProbModel>& ctxStore )
-  : m_CtxBuffer ( ctxStore.m_CtxBuffer )
-  , m_Ctx       ( m_CtxBuffer.data() )
+  : m_ctxBuffer ( ctxStore.m_ctxBuffer )
+  , m_ctx       ( m_ctxBuffer.data() )
 {}
 
 template <class BinProbModel>
 void CtxStore<BinProbModel>::init( int qp, int initId )
 {
   const std::vector<uint8_t>& initTable = ContextSetCfg::getInitTable( initId );
-  CHECK( m_CtxBuffer.size() != initTable.size(),
-        "Size of init table (" << initTable.size() << ") does not match size of context buffer (" << m_CtxBuffer.size() << ")." );
+  CHECK( m_ctxBuffer.size() != initTable.size(),
+        "Size of init table (" << initTable.size() << ") does not match size of context buffer (" << m_ctxBuffer.size() << ")." );
 #if SLICE_TYPE_WIN_SIZE
 	const std::vector<uint8_t> &rateInitTable = ContextSetCfg::getInitTable(NUMBER_OF_SLICE_TYPES + initId);
 #else
 	const std::vector<uint8_t> &rateInitTable = ContextSetCfg::getInitTable(NUMBER_OF_SLICE_TYPES);
 #endif
-  CHECK(m_CtxBuffer.size() != rateInitTable.size(),
+  CHECK(m_ctxBuffer.size() != rateInitTable.size(),
         "Size of rate init table (" << rateInitTable.size() << ") does not match size of context buffer ("
-                                    << m_CtxBuffer.size() << ").");
+                                    << m_ctxBuffer.size() << ").");
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   const std::vector<uint8_t> &weightInitTable = ContextSetCfg::getInitTable( (NUMBER_OF_SLICE_TYPES << 1) + initId );
-  CHECK( m_CtxBuffer.size() != weightInitTable.size(),
-         "Size of weight init table (" << weightInitTable.size() << ") does not match size of context buffer (" << m_CtxBuffer.size() << ")." );
+  CHECK( m_ctxBuffer.size() != weightInitTable.size(),
+         "Size of weight init table (" << weightInitTable.size() << ") does not match size of context buffer (" << m_ctxBuffer.size() << ")." );
 
   const std::vector<uint8_t> &rateOffsetInitTable0 = ContextSetCfg::getInitTable((NUMBER_OF_SLICE_TYPES * 3));
   const std::vector<uint8_t> &rateOffsetInitTable1 = ContextSetCfg::getInitTable((NUMBER_OF_SLICE_TYPES * 3) + 1);
 
-  CHECK(m_CtxBuffer.size() != rateOffsetInitTable0.size(),
+  CHECK(m_ctxBuffer.size() != rateOffsetInitTable0.size(),
         "Size of weight init table (" << rateOffsetInitTable0.size() << ") does not match size of context buffer ("
-                                      << m_CtxBuffer.size() << ").");
-  CHECK(m_CtxBuffer.size() != rateOffsetInitTable1.size(),
+                                      << m_ctxBuffer.size() << ").");
+  CHECK(m_ctxBuffer.size() != rateOffsetInitTable1.size(),
         "Size of weight init table (" << rateOffsetInitTable1.size() << ") does not match size of context buffer ("
-                                      << m_CtxBuffer.size() << ").");
+                                      << m_ctxBuffer.size() << ").");
 #endif
 
 
   int clippedQP = Clip3( 0, MAX_QP, qp );
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    m_CtxBuffer[k].init( clippedQP, initTable[k] );
-    m_CtxBuffer[k].setLog2WindowSize(rateInitTable[k]);
+    m_ctxBuffer[k].init( clippedQP, initTable[k] );
+    m_ctxBuffer[k].setLog2WindowSize(rateInitTable[k]);
 
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
-    m_CtxBuffer[k].setAdaptRateOffset(rateOffsetInitTable0[k], 0);
-    m_CtxBuffer[k].setAdaptRateOffset(rateOffsetInitTable1[k], 1);
-    m_CtxBuffer[k].setAdaptRateWeight( weightInitTable[k] );
+    m_ctxBuffer[k].setAdaptRateOffset(rateOffsetInitTable0[k], 0);
+    m_ctxBuffer[k].setAdaptRateOffset(rateOffsetInitTable1[k], 1);
+    m_ctxBuffer[k].setAdaptRateWeight( weightInitTable[k] );
 #endif
   }
 }
@@ -6225,87 +6479,87 @@ void CtxStore<BinProbModel>::init( int qp, int initId )
 template <class BinProbModel>
 void CtxStore<BinProbModel>::saveWinSizes( std::vector<uint8_t>& windows ) const
 {
-  windows.resize( m_CtxBuffer.size(), uint8_t( 0 ) );
+  windows.resize( m_ctxBuffer.size(), uint8_t( 0 ) );
 
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    windows[k] = m_CtxBuffer[k].getWinSizes();
+    windows[k] = m_ctxBuffer[k].getWinSizes();
   }
 }
 
 template <class BinProbModel>
 void CtxStore<BinProbModel>::loadWinSizes( const std::vector<uint8_t>& windows )
 {
-  CHECK( m_CtxBuffer.size() != windows.size(),
-         "Size of prob states table (" << windows.size() << ") does not match size of context buffer (" << m_CtxBuffer.size() << ")." );
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  CHECK( m_ctxBuffer.size() != windows.size(),
+         "Size of prob states table (" << windows.size() << ") does not match size of context buffer (" << m_ctxBuffer.size() << ")." );
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    m_CtxBuffer[k].setWinSizes( windows[k] );
+    m_ctxBuffer[k].setWinSizes( windows[k] );
   }
 }
 
 template <class BinProbModel>
 void CtxStore<BinProbModel>::loadWeights( const std::vector<uint8_t>& weights )
 {
-  CHECK( m_CtxBuffer.size() != weights.size(),
-         "Size of prob states table (" << weights.size() << ") does not match size of context buffer (" << m_CtxBuffer.size() << ")." );
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  CHECK( m_ctxBuffer.size() != weights.size(),
+         "Size of prob states table (" << weights.size() << ") does not match size of context buffer (" << m_ctxBuffer.size() << ")." );
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    m_CtxBuffer[k].setAdaptRateWeight( weights[k] );
+    m_ctxBuffer[k].setAdaptRateWeight( weights[k] );
   }
 }
 
 template <class BinProbModel>
 void CtxStore<BinProbModel>::saveWeights( std::vector<uint8_t>& weights ) const
 {
-  weights.resize( m_CtxBuffer.size(), uint8_t( 0 ) );
+  weights.resize( m_ctxBuffer.size(), uint8_t( 0 ) );
 
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    weights[k] = m_CtxBuffer[k].getAdaptRateWeight();
+    weights[k] = m_ctxBuffer[k].getAdaptRateWeight();
   }
 }
 
 template <class BinProbModel>
 void CtxStore<BinProbModel>::loadPStates( const std::vector<std::pair<uint16_t, uint16_t>>& probStates )
 {
-  CHECK( m_CtxBuffer.size() != probStates.size(),
-         "Size of prob states table (" << probStates.size() << ") does not match size of context buffer (" << m_CtxBuffer.size() << ")." );
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  CHECK( m_ctxBuffer.size() != probStates.size(),
+         "Size of prob states table (" << probStates.size() << ") does not match size of context buffer (" << m_ctxBuffer.size() << ")." );
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    m_CtxBuffer[k].setState( probStates[k] );
+    m_ctxBuffer[k].setState( probStates[k] );
   }
 }
 
 template <class BinProbModel>
 void CtxStore<BinProbModel>::savePStates( std::vector<std::pair<uint16_t, uint16_t>>& probStates ) const
 {
-  probStates.resize( m_CtxBuffer.size(), std::pair<uint16_t, uint16_t>( 0, 0 ) );
+  probStates.resize( m_ctxBuffer.size(), std::pair<uint16_t, uint16_t>( 0, 0 ) );
 
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    probStates[k] = m_CtxBuffer[k].getState();
+    probStates[k] = m_ctxBuffer[k].getState();
   }
 }
 #else
 template <class BinProbModel>
 void CtxStore<BinProbModel>::loadPStates( const std::vector<uint16_t>& probStates )
 {
-  CHECK( m_CtxBuffer.size() != probStates.size(),
-        "Size of prob states table (" << probStates.size() << ") does not match size of context buffer (" << m_CtxBuffer.size() << ")." );
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  CHECK( m_ctxBuffer.size() != probStates.size(),
+        "Size of prob states table (" << probStates.size() << ") does not match size of context buffer (" << m_ctxBuffer.size() << ")." );
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    m_CtxBuffer[k].setState( probStates[k] );
+    m_ctxBuffer[k].setState( probStates[k] );
   }
 }
 
 template <class BinProbModel>
 void CtxStore<BinProbModel>::savePStates( std::vector<uint16_t>& probStates ) const
 {
-  probStates.resize( m_CtxBuffer.size(), uint16_t(0) );
-  for( std::size_t k = 0; k < m_CtxBuffer.size(); k++ )
+  probStates.resize( m_ctxBuffer.size(), uint16_t(0) );
+  for( std::size_t k = 0; k < m_ctxBuffer.size(); k++ )
   {
-    probStates[k] = m_CtxBuffer[k].getState();
+    probStates[k] = m_ctxBuffer[k].getState();
   }
 }
 #endif
@@ -6319,11 +6573,11 @@ template class CtxStore<BinProbModel_Std>;
 
 
 Ctx::Ctx()                                  : m_BPMType( BPM_Undefined )                        {}
-Ctx::Ctx( const BinProbModel_Std*   dummy ) : m_BPMType( BPM_Std   ), m_CtxStore_Std  ( true )  {}
+Ctx::Ctx( const BinProbModel_Std*   dummy ) : m_BPMType( BPM_Std   ), m_ctxStore_Std  ( true )  {}
 
 Ctx::Ctx( const Ctx& ctx )
   : m_BPMType         ( ctx.m_BPMType )
-  , m_CtxStore_Std    ( ctx.m_CtxStore_Std    )
+  , m_ctxStore_Std    ( ctx.m_ctxStore_Std    )
 {
   ::memcpy( m_GRAdaptStats, ctx.m_GRAdaptStats, sizeof( unsigned ) * RExt__GOLOMB_RICE_ADAPTATION_STATISTICS_SETS );
 }

@@ -95,8 +95,8 @@ public:
   unsigned        posY(int scanPos) const { return m_scan[scanPos].y; }
   unsigned        maxLastPosX     ()                        const { return m_maxLastPosX; }
   unsigned        maxLastPosY     ()                        const { return m_maxLastPosY; }
-  unsigned        lastXCtxId      ( unsigned  posLastX  )   const { return m_CtxSetLastX( m_lastOffsetX + ( posLastX >> m_lastShiftX ) ); }
-  unsigned        lastYCtxId      ( unsigned  posLastY  )   const { return m_CtxSetLastY( m_lastOffsetY + ( posLastY >> m_lastShiftY ) ); }
+  unsigned        lastXCtxId      ( unsigned  posLastX  )   const { return m_ctxSetLastX( m_lastOffsetX + ( posLastX >> m_lastShiftX ) ); }
+  unsigned        lastYCtxId      ( unsigned  posLastY  )   const { return m_ctxSetLastY( m_lastOffsetY + ( posLastY >> m_lastShiftY ) ); }
   int             numCtxBins      ()                        const { return   m_remainingContextBins;      }
   void            setNumCtxBins   ( int n )                       {          m_remainingContextBins  = n; }
   unsigned        sigGroupCtxId   ( bool ts = false     )   const { return ts ? m_sigGroupCtxIdTS : m_sigGroupCtxId; }
@@ -459,8 +459,8 @@ private:
   CoeffScanType             m_scanType;
   const ScanElement *       m_scan;
   const ScanElement *       m_scanCG;
-  const CtxSet              m_CtxSetLastX;
-  const CtxSet              m_CtxSetLastY;
+  const CtxSet              m_ctxSetLastX;
+  const CtxSet              m_ctxSetLastY;
   const unsigned            m_maxLastPosX;
   const unsigned            m_maxLastPosY;
   const int                 m_lastOffsetX;
@@ -601,7 +601,7 @@ public:
   int numAMVPMergeCand;
 #endif
 
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   MotionBuf     subPuMvpMiBuf[SUB_TMVP_NUM];
 #else
   MotionBuf     subPuMvpMiBuf;
@@ -623,7 +623,7 @@ public:
 #else
   bool          useAltHpelIf      [ MRG_MAX_NUM_CANDS ];
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   void saveMergeInfo(PredictionUnit& puTmp, PredictionUnit pu);
 #endif
   void setMergeInfo( PredictionUnit& pu, int candIdx );
@@ -637,6 +637,9 @@ public:
   bool xCheckSimilarMotion2Lists(int mergeCandIndex, MergeCtx *mrgCtx, uint32_t mvdSimilarityThresh = 1) const;
 #endif
 #endif
+#if JVET_AD0213_LIC_IMP
+  void initMrgCand(int cnt);
+#endif
 #if JVET_Z0084_IBC_TM
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   bool xCheckSimilarIBCMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1, int compareNum = -1) const;
@@ -644,7 +647,7 @@ public:
   bool xCheckSimilarIBCMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
   bool xCheckSimilarMotionSubTMVP(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
 #if TM_MRG
@@ -671,6 +674,9 @@ public:
 #if INTER_LIC
   bool          licFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
 #endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  bool          obmcFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#endif
   uint8_t       bcwIdx[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
   int           numValidMergeCand;
   int           numAffCandToTestEnc;
@@ -678,7 +684,7 @@ public:
 
   MergeCtx     *mrgCtx;
   MergeType     mergeType[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   int           colIdx[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
 #endif
 #if JVET_AB0112_AFFINE_DMVR
@@ -704,7 +710,7 @@ public:
 
   MergeCtx     *mrgCtx;
   MergeType     mergeType[AFFINE_MRG_MAX_NUM_CANDS];
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   int           colIdx[AFFINE_MRG_MAX_NUM_CANDS];
 #endif
 #if JVET_AB0112_AFFINE_DMVR
@@ -730,11 +736,14 @@ unsigned CtxBMMrgFlag(const CodingUnit& cu);
 unsigned CtxRribcFlipType(const CodingUnit& cu);
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-unsigned CtxBvOneNullComp(const CodingUnit &cu);
+unsigned CtxbvOneZeroComp(const CodingUnit &cu);
 #endif
 unsigned CtxPredModeFlag( const CodingUnit& cu );
 unsigned CtxIBCFlag(const CodingUnit& cu);
 unsigned CtxMipFlag   ( const CodingUnit& cu );
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+unsigned CtxTmpFusionFlag( const CodingUnit& cu );
+#endif
 #if JVET_V0130_INTRA_TMP
 unsigned CtxTmpFlag(const CodingUnit& cu);
 #endif
@@ -748,10 +757,12 @@ unsigned CtxTimdFlag( const CodingUnit& cu );
 #if JVET_AB0155_SGPM
 unsigned CtxSgpmFlag(const CodingUnit &cu);
 #endif
-
+#if JVET_AD0140_MVD_PREDICTION
+int ctxSmMvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrect, const int isHor, const int significance, const MotionModel& motionModel);
+#endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
 int CtxSmBvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrect, const int isHor, const int significance);
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 }
 

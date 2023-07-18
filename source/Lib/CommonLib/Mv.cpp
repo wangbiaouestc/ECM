@@ -42,7 +42,11 @@
 
 const MvPrecision Mv::m_amvrPrecision[4] = { MV_PRECISION_QUARTER, MV_PRECISION_INT, MV_PRECISION_4PEL, MV_PRECISION_HALF }; // for cu.imv=0, 1, 2 and 3
 const MvPrecision Mv::m_amvrPrecAffine[3] = { MV_PRECISION_QUARTER, MV_PRECISION_SIXTEENTH, MV_PRECISION_INT }; // for cu.imv=0, 1 and 2
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+const MvPrecision Mv::m_amvrPrecIbc[4] = { MV_PRECISION_QUARTER, MV_PRECISION_INT, MV_PRECISION_4PEL, MV_PRECISION_HALF }; // for cu.imv=0, 1, 2 and 3
+#else
 const MvPrecision Mv::m_amvrPrecIbc[3] = { MV_PRECISION_INT, MV_PRECISION_INT, MV_PRECISION_4PEL }; // for cu.imv=0, 1 and 2
+#endif
 
 void roundAffineMv( int& mvx, int& mvy, int nShift )
 {
@@ -141,13 +145,309 @@ bool wrapClipMv( Mv& rcMv, const Position& pos, const struct Size& size, const S
   return wrapRef;
 }
 
+
+#if JVET_AD0140_MVD_PREDICTION
+bool MvdSuffixInfoMv::getMergedBinBudgetForMv(const unsigned int curBinBudget)
+{
+  bool       useMergedBinBudget = true;
+  RefPicList rplIdx = REF_PIC_LIST_X;
+  constexpr int rplNumber = static_cast<int>(NUM_REF_PIC_LIST_01); //to be updated for MHP ???
+  for (int rplCnt = 0; rplCnt < rplNumber; ++rplCnt)
+  {
+    const int& curActualMvCompNum = actualMvCompNum[rplCnt];
+    CHECK(curActualMvCompNum > maxNumMvComp, "actualMvCompNum > maxNumMvComp");
+
+    if (0 >= curActualMvCompNum)
+    {
+      useMergedBinBudget = false;
+    }
+    else
+    {
+      rplIdx = static_cast<RefPicList>(rplCnt);
+    }
+  };
+
+  if (rplIdx == REF_PIC_LIST_X)
+  {
+    return false;
+  }
+  else if (!useMergedBinBudget)
+  {
+    actualRpl = rplIdx;
+    return MvdSuffixInfoMv::getBinBudgetForMv(curBinBudget, rplIdx);
+  }
+
+
+  AuxMvdBins curAuxMvdBins[rplNumber * maxNumMvComp];
+  int totalActualMvCompNum = 0;
+  for (int rplCnt = 0; rplCnt < rplNumber; ++rplCnt)
+  {
+    const int& curActualMvCompNum = actualMvCompNum[rplCnt];
+    std::memcpy(curAuxMvdBins + totalActualMvCompNum, auxMvdBins[rplCnt], curActualMvCompNum * sizeof(AuxMvdBins));
+    totalActualMvCompNum += curActualMvCompNum;
+  }
+
+  auto compAuxMvdBins = [this](const AuxMvdBins& entry0, const AuxMvdBins& entry1)
+  {
+    const int hypBinDiff = entry0.numHypBins - entry1.numHypBins;
+    const auto& mvd0Info = mvBins[entry0.rplIdx][entry0.mvIdx];
+    const int sign0 = static_cast<int>(entry0.isHor ? mvd0Info.horEncodeSignInEP : mvd0Info.verEncodeSignInEP);
+    const auto& mvd1Info = mvBins[entry1.rplIdx][entry1.mvIdx];
+    const int sign1 = static_cast<int>(entry1.isHor ? mvd1Info.horEncodeSignInEP : mvd1Info.verEncodeSignInEP);
+
+    if (0 == hypBinDiff)
+    {
+      return sign0 > sign1;
+    }
+    else if (std::abs(hypBinDiff) <= MVD_PREDICTION_SIGN_SUFFIX_BIN_THR && entry0.numHypBins > entry1.numHypBins)
+    {
+      return sign0 < sign1 ? false : true;
+    }
+    else if (std::abs(hypBinDiff) <= MVD_PREDICTION_SIGN_SUFFIX_BIN_THR && entry0.numHypBins < entry1.numHypBins)
+    {
+      return sign0 > sign1 ? true : false;
+    }
+
+    return entry0.numHypBins > entry1.numHypBins;
+  };
+
+  for (int binCnt = 0; binCnt < curBinBudget; ++binCnt)
+  {
+
+    int bestIdx = 0;
+    for (int entryCnt = 1; entryCnt < totalActualMvCompNum; ++entryCnt)
+    {
+      if (compAuxMvdBins(curAuxMvdBins[entryCnt], curAuxMvdBins[bestIdx]))
+      {
+        bestIdx = entryCnt;
+      }
+    }
+
+    if (0 != bestIdx)
+    {
+      std::swap(*curAuxMvdBins, curAuxMvdBins[bestIdx]);
+    }
+
+    int& mvCompWithMaxBinNum = curAuxMvdBins[0].numHypBins;
+    if (mvCompWithMaxBinNum > 0)
+    {
+      const int& mvIdx = curAuxMvdBins[0].mvIdx;
+      const int& rplSelected = curAuxMvdBins[0].rplIdx;
+
+      if (curAuxMvdBins[0].isHor)
+      {
+        if (mvBins[rplSelected][mvIdx].horOffsetPredictionNumBins < 0) //get a hor sign counted and initialize the number of used suffix bins for a hor component
+        {
+          mvBins[rplSelected][mvIdx].horEncodeSignInEP = false;
+          mvBins[rplSelected][mvIdx].horOffsetPredictionNumBins = 0;
+        }
+        else
+        {
+          ++mvBins[rplSelected][mvIdx].horOffsetPredictionNumBins;
+        }
+      }
+      else
+      {
+        if (mvBins[rplSelected][mvIdx].verOffsetPredictionNumBins < 0) //get a ver sign counted and initialize the number of used suffix bins for a ver component
+        {
+          mvBins[rplSelected][mvIdx].verEncodeSignInEP = false;
+          mvBins[rplSelected][mvIdx].verOffsetPredictionNumBins = 0;
+        }
+        else
+        {
+          ++mvBins[rplSelected][mvIdx].verOffsetPredictionNumBins;
+        }
+      };
+
+      --mvCompWithMaxBinNum;
+    }
+    else
+    {
+      break;
+    }
+    }
+
+  return true;
+  }
+
+bool MvdSuffixInfoMv::getBinBudgetForMv(const unsigned int curBinBudget, const RefPicList rplIdx)
+{
+  const size_t rplSelected        = static_cast<size_t>(rplIdx);
+  const int&   curActualMvCompNum = actualMvCompNum[rplSelected];
+  if (0 >= curActualMvCompNum)
+  {
+    return false;
+  };
+  AuxMvdBins curAuxMvdBins[maxNumMvComp];
+  CHECK(rplSelected > 1, "rplSelected > 1");
+  CHECK(curActualMvCompNum > maxNumMvComp, "actualMvCompNum > maxNumMvComp");
+  std::memcpy(curAuxMvdBins, auxMvdBins[rplSelected], curActualMvCompNum * sizeof(AuxMvdBins));
+
+  auto compAuxMvdBins = [this, rplSelected](const AuxMvdBins& entry0, const AuxMvdBins& entry1)
+  {
+    const int hypBinDiff = entry0.numHypBins - entry1.numHypBins;
+    const auto& mvd0Info = mvBins[rplSelected][entry0.mvIdx];
+    const int sign0      = static_cast<int>(entry0.isHor ? mvd0Info.horEncodeSignInEP : mvd0Info.verEncodeSignInEP);
+    const auto& mvd1Info = mvBins[rplSelected][entry1.mvIdx];
+    const int sign1      = static_cast<int>(entry1.isHor ? mvd1Info.horEncodeSignInEP : mvd1Info.verEncodeSignInEP);
+
+    if (0 == hypBinDiff)
+    {
+      return sign0 > sign1;
+    }
+    else if (std::abs(hypBinDiff) <= MVD_PREDICTION_SIGN_SUFFIX_BIN_THR && entry0.numHypBins > entry1.numHypBins)
+    {
+      return sign0 < sign1 ? false : true;
+    }
+    else if (std::abs(hypBinDiff) <= MVD_PREDICTION_SIGN_SUFFIX_BIN_THR && entry0.numHypBins < entry1.numHypBins)
+    {
+      return sign0 > sign1 ? true : false;
+    }
+    
+    return entry0.numHypBins > entry1.numHypBins;
+  };
+
+  for (int binCnt = 0; binCnt < curBinBudget; ++binCnt)
+  {
+
+    int bestIdx = 0;
+    for (int entryCnt = 1; entryCnt < curActualMvCompNum; ++entryCnt)
+    {
+      if (compAuxMvdBins(curAuxMvdBins[entryCnt], curAuxMvdBins[bestIdx]))
+      {
+        bestIdx = entryCnt;
+      }
+    }
+
+    if (0 != bestIdx)
+    {
+      std::swap(*curAuxMvdBins, curAuxMvdBins[bestIdx]);
+    }
+
+    int& mvCompWithMaxBinNum = curAuxMvdBins[0].numHypBins;
+    if (mvCompWithMaxBinNum > 0)
+    {
+      const int& mvIdx = curAuxMvdBins[0].mvIdx;
+
+      if (curAuxMvdBins[0].isHor)
+      {
+        if (mvBins[rplSelected][mvIdx].horOffsetPredictionNumBins < 0) //get a hor sign counted and initialize the number of used suffix bins for a hor component
+        {
+          mvBins[rplSelected][mvIdx].horEncodeSignInEP          = false;
+          mvBins[rplSelected][mvIdx].horOffsetPredictionNumBins = 0;
+        }
+        else
+        {
+          ++mvBins[rplSelected][mvIdx].horOffsetPredictionNumBins;
+        }
+      }
+      else
+      {
+        if (mvBins[rplSelected][mvIdx].verOffsetPredictionNumBins < 0) //get a ver sign counted and initialize the number of used suffix bins for a ver component
+        {
+          mvBins[rplSelected][mvIdx].verEncodeSignInEP          = false;
+          mvBins[rplSelected][mvIdx].verOffsetPredictionNumBins = 0;
+        }
+        else
+        {
+          ++mvBins[rplSelected][mvIdx].verOffsetPredictionNumBins;
+        }
+      };
+
+      --mvCompWithMaxBinNum;
+    }
+    else
+    {
+      break;
+    }
+  }
+
+  return true;
+}
+
+RefPicList MvdSuffixInfoMv::selectRplForMvdCoding(const unsigned int curBinBudget) const
+{
+  constexpr size_t rpl0Idx   = static_cast<size_t>(REF_PIC_LIST_0);
+  constexpr size_t rpl1Idx   = static_cast<size_t>(REF_PIC_LIST_1);
+  constexpr size_t rplLength = static_cast<size_t>(NUM_REF_PIC_LIST_01);
+
+  int binSum[rplLength] = {0, 0};
+  for (int rplCnt = 0; rplCnt < rplLength; ++rplCnt)
+  {
+    for (int mvCompCnt = 0; mvCompCnt < actualMvCompNum[rplCnt]; ++mvCompCnt)
+    {
+      binSum[rplCnt] += auxMvdBins[rplCnt][mvCompCnt].numHypBins;
+      CHECK(binSum[rplCnt] < 0, "A negative value of a suffix bin sum");
+    }
+  }
+  
+  if (0 == binSum[rpl0Idx] && 0 == binSum[rpl1Idx])
+  {
+    return REF_PIC_LIST_0;
+  }
+
+  const bool rplCoversBinBudget[rplLength] = { curBinBudget <= binSum[rpl0Idx], curBinBudget <= binSum[rpl1Idx] };
+  if (rplCoversBinBudget[rpl0Idx] != rplCoversBinBudget[rpl1Idx])
+  {
+    return rplCoversBinBudget[rpl0Idx] ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+  }
+
+  if (!rplCoversBinBudget[rpl0Idx] && !rplCoversBinBudget[rpl1Idx])
+  {
+    if (binSum[rpl0Idx] > binSum[rpl1Idx])
+    {
+      return REF_PIC_LIST_0;
+    }
+
+    if (binSum[rpl0Idx] < binSum[rpl1Idx])
+    {
+      return REF_PIC_LIST_1;
+    }
+  }
+
+
+  auto compAuxMvdBins = [](const AuxMvdBins& entry0, const AuxMvdBins& entry1) { return entry0.numHypBins > entry1.numHypBins; };
+  auto getBinWeight   = [](const int binPos)
+  { 
+    constexpr int binExistOffset = 10;
+    const     int result         = binExistOffset + binPos - 1;
+    return result;
+  };
+
+  int binWeightedSum[rplLength] = { 0, 0 };
+  AuxMvdBins auxMvdBinsCopy[NUM_REF_PIC_LIST_01][maxNumMvComp];
+  std::memcpy(auxMvdBinsCopy, auxMvdBins, rplLength * maxNumMvComp * sizeof(AuxMvdBins));
+  
+  for (int binCnt = 0; binCnt < curBinBudget; ++binCnt)
+  {
+    std::nth_element(auxMvdBinsCopy[rpl0Idx], auxMvdBinsCopy[rpl0Idx], &auxMvdBinsCopy[rpl0Idx][actualMvCompNum[rpl0Idx]], compAuxMvdBins);
+    int& maxBinRpl0 = auxMvdBinsCopy[rpl0Idx][0].numHypBins;
+    if (maxBinRpl0 > 0)
+    {
+      binWeightedSum[rpl0Idx] += getBinWeight(maxBinRpl0);
+      --maxBinRpl0;
+    }
+
+    std::nth_element(auxMvdBinsCopy[rpl1Idx], auxMvdBinsCopy[rpl1Idx], &auxMvdBinsCopy[rpl1Idx][actualMvCompNum[rpl1Idx]], compAuxMvdBins);
+    int& maxBinRpl1 = auxMvdBinsCopy[rpl1Idx][0].numHypBins;
+    if (maxBinRpl1 > 0)
+    {
+      binWeightedSum[rpl1Idx] += getBinWeight(maxBinRpl1);
+      --maxBinRpl1;
+    }
+  }
+
+  return binWeightedSum[rpl0Idx] >= binWeightedSum[rpl1Idx] ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
+}
+#endif
+
 #if JVET_AC0104_IBC_BVD_PREDICTION
 void MvdSuffixInfo::initPrefixes(const Mv& mv, const int imv, const bool isInternalPrecision)
 {
   Mv tmp = mv;
   if (isInternalPrecision)
   {
-    tmp.changeTransPrecInternal2Amvr(imv);
+    tmp.changeIbcPrecInternal2Amvr(imv);
   }
 
   int       horMvd = tmp.getHor();
@@ -181,11 +481,25 @@ void MvdSuffixInfo::initSuffixesAndSigns(const Mv& mv, const int imv)
     horPrefixGroupStartValue = xGetGolombGroupMinValue(horPrefix);
     iBinsInHorSuffix = horPrefix+1;
   }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  else
+  {
+    horPrefixGroupStartValue = -1;
+    iBinsInHorSuffix = -1;
+  }
+#endif
   if (verPrefix >= 0)
   {
     verPrefixGroupStartValue = xGetGolombGroupMinValue(verPrefix);
     iBinsInVerSuffix = verPrefix + 1;
   }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  else
+  {
+    verPrefixGroupStartValue = -1;
+    iBinsInVerSuffix = -1;
+  }
+#endif
 
   defineNumberOfPredictedBinsInSuffix(horPrefix, verPrefix, imv);
 }
@@ -202,12 +516,18 @@ void MvdSuffixInfo::defineNumberOfPredictedBinsInSuffix(const int iHorPrefix, co
   const int iBinsInHorSuffix = iHorPrefix < 0 ? 0 : iHorPrefix + uiExpGolombParam;
   const int iBinsInVerSuffix = iVerPrefix < 0 ? 0 : iVerPrefix + uiExpGolombParam;
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  const int skipFracbins          = isFracBvEnabled ? (imv == IMV_OFF ? 2 : (imv == IMV_HPEL ? 1 : 0)) : 0;  
+  const int iAvailBinsInHorSuffix = std::max(0, iBinsInHorSuffix - skipFracbins);
+  const int iAvailBinsInVerSuffix = std::max(0, iBinsInVerSuffix - skipFracbins);
+#else
   const int iPrecShift = Mv::getImvPrecShift(imv);
   constexpr int iMaxNumberOfInsignLSBins = 0;
 
   const int iNumberOfInsignLSBins = std::max(0, iMaxNumberOfInsignLSBins - iPrecShift);
   const int iAvailBinsInHorSuffix = std::max(0, iBinsInHorSuffix - iNumberOfInsignLSBins);
   const int iAvailBinsInVerSuffix = std::max(0, iBinsInVerSuffix - iNumberOfInsignLSBins);
+#endif
   const int iTotalNumberOfPredBins = std::min(iNumberOfMSBins, iAvailBinsInHorSuffix + iAvailBinsInVerSuffix);
 
   horEncodeSignInEP = false;
@@ -297,6 +617,146 @@ void MvdSuffixInfo::defineNumberOfPredictedBinsInSuffix(const int iHorPrefix, co
   horOffsetPredictionNumBins = std::min(iAvailBinsInHorSuffix, iNumberOfHorMSBins);
   verOffsetPredictionNumBins = std::min(iAvailBinsInVerSuffix, iNumberOfVerMSBins);
 }
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
+#if JVET_AD0140_MVD_PREDICTION
+void MvdSuffixInfoMv::initPrefixesMvd(const int mvIdx, const RefPicList curRpl, const Mv& mv, const int imv, const bool isInternalPrecision, const MotionModel& motionModel)
+{
+  CHECK(mvIdx < 0, "mvIdx < 0");
+  CHECK(mvIdx > 5, "mvIdx > 5");
+
+  auto& horPrefix = mvBins[curRpl][mvIdx].horPrefix;
+  auto& verPrefix = mvBins[curRpl][mvIdx].verPrefix;
+
+  Mv tmp = mv;
+  if (isInternalPrecision)
+  {
+    const auto transPrecFxn = MotionModelCheck::isAffine(motionModel) ? &Mv::changeAffinePrecInternal2Amvr : &Mv::changeTransPrecInternal2Amvr;
+    (tmp.*transPrecFxn)(imv);
+  }
+
+  int       horMvd = tmp.getHor();
+  int       verMvd = tmp.getVer();
+
+  unsigned  absHor = unsigned(horMvd < 0 ? -horMvd : horMvd);
+  unsigned  absVer = unsigned(verMvd < 0 ? -verMvd : verMvd);
+
+  const int iEgcOffset = MvdSuffixInfo::getEGCOffset(motionModel) + 1;
+  const auto horRemainderNonZero = (absHor >= iEgcOffset);
+  const auto verRemainderNonZero = (absVer >= iEgcOffset);
+
+  horPrefix = -1;
+  if (horRemainderNonZero)
+  {
+    horPrefix = MvdSuffixInfo::getPrefixLength(absHor - iEgcOffset);
+  }
+
+  verPrefix = -1;
+  if (verRemainderNonZero)
+  {
+    verPrefix = MvdSuffixInfo::getPrefixLength(absVer - iEgcOffset);
+  }
+  if (-1 == actualMvCompNum[curRpl]) // init
+  {
+    actualMvCompNum[curRpl] = 0;
+  } 
+
+  initSuffixesAndSignsMvd(mvIdx, curRpl, mv, imv, motionModel);
+}
+
+void MvdSuffixInfoMv::clear()
+{
+  m_motionModel = MotionModel::Undefined;
+  for (int rplIdx = static_cast<int>(REF_PIC_LIST_0); rplIdx < static_cast<int>(NUM_REF_PIC_LIST_01); ++rplIdx)
+  { 
+    actualMvCompNum[rplIdx] = -1;
+    for (int i = 0; i < maxNumMv; ++i)
+    {
+      mvBins[rplIdx][i] = MvdSuffixInfo();
+    }
+    for (int i = 0; i < maxNumMvComp; ++i)
+    {
+      auxMvdBins[rplIdx][i] = AuxMvdBins();
+    }
+  }
+}
+
+void MvdSuffixInfoMv::initSuffixesAndSignsMvd(const int mvIdx, const RefPicList rpl, const Mv& mvd, const int imv, const MotionModel& motionModel)
+{
+  const size_t rplIdx = static_cast<size_t>(rpl);
+  CHECK(rplIdx >= static_cast<int>(NUM_REF_PIC_LIST_01), "Uninitialized value of actualRpl is used");
+
+  if (actualMvCompNum[rplIdx] < 0)
+  {
+    actualMvCompNum[rplIdx] = 0;
+  }
+
+  mvBins[rplIdx][mvIdx].m_motionModel = motionModel;
+
+  auto& isHorMagnZero = mvBins[rplIdx][mvIdx].isHorMagnZero;
+  auto& isVerMagnZero = mvBins[rplIdx][mvIdx].isVerMagnZero;
+
+  isHorMagnZero = mvd.getHor() == 0;
+  isVerMagnZero = mvd.getVer() == 0;
+
+  auto& horPrefix = mvBins[rplIdx][mvIdx].horPrefix;
+  auto& verPrefix = mvBins[rplIdx][mvIdx].verPrefix;
+  auto& si = mvBins[rplIdx][mvIdx];
+
+  int iPrecShift = MotionModelCheck::isAffine(motionModel) ? Mv::getImvPrecShiftAffineMvd(imv) : Mv::getImvPrecShiftMvd(imv);
+  constexpr int iMaxNumberOfInsignLSBins = 0;
+  const int iNumberOfInsignLSBins = std::max(0, iMaxNumberOfInsignLSBins - iPrecShift);
+
+  if (!isHorMagnZero)
+  {
+    if (horPrefix >= 0)
+    {
+      si.horPrefixGroupStartValue = MvdSuffixInfo::xGetGolombGroupMinValue(horPrefix);
+      si.iBinsInHorSuffix = horPrefix + 1;
+    }
+    // set bin prediction budget for horizontal component of MVD (including the sign bin)
+    int suffixBins = std::max(0, (horPrefix >= 0) ? mvBins[rplIdx][mvIdx].iBinsInHorSuffix - iNumberOfInsignLSBins : 0);
+    auxMvdBins[rplIdx][actualMvCompNum[rplIdx]++] = AuxMvdBins( mvIdx, true, suffixBins + (isHorMagnZero ? 0 : 1) /*sign*/, static_cast<int>(rplIdx));
+  }
+
+  if (!isVerMagnZero)
+  {
+    if (verPrefix >= 0)
+    {
+      si.verPrefixGroupStartValue = MvdSuffixInfo::xGetGolombGroupMinValue(verPrefix);
+      si.iBinsInVerSuffix = verPrefix + 1;
+    }
+    // set bin prediction budget for vertical component of MVD (including the sign bin)
+    int suffixBins = std::max(0, (verPrefix >= 0) ? mvBins[rplIdx][mvIdx].iBinsInVerSuffix - iNumberOfInsignLSBins : 0);
+    auxMvdBins[rplIdx][actualMvCompNum[rplIdx]++] = AuxMvdBins( mvIdx, false, suffixBins + (isVerMagnZero ? 0 : 1) /*sign*/, static_cast<int>(rplIdx));
+  }
+
+  if (MotionModel::UniAffine != m_motionModel && MotionModel::BiAffine != m_motionModel)
+  {
+    CHECK(actualMvCompNum[rplIdx] != (0 != mvd.getAbsHor() ? 1 : 0) + (0 != mvd.getAbsVer() ? 1 : 0), "actualMvCompNum invalid");
+  }
+
+  if (MotionModel::Undefined == m_motionModel)
+  {
+    m_motionModel = motionModel;
+  }
+  else
+  {
+    CHECK(m_motionModel != motionModel, "Inconsistent assignment of motion model");
+  }
+}
+
+
+int MvdSuffixInfo::getEGCOffset(const MotionModel& motionModel)
+{
+  CHECK(MotionModel::Undefined == motionModel, "Undefined motion model");
+
+  return 1;
+}
+
+bool MotionModelCheck::isAffine(const MotionModel& mm)
+{
+  return (mm == MotionModel::UniAffine) || (mm == MotionModel::BiAffine);
+}
+#endif
 //! \}

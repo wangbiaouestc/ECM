@@ -353,7 +353,7 @@ void CacheBlkInfoCtrl::init( const Slice &slice )
           {
             if( m_codedCUInfo[x][y][wIdx][hIdx] )
             {
-              memset( m_codedCUInfo[x][y][wIdx][hIdx], 0, sizeof( CodedCUInfo ) );
+              std::fill_n( reinterpret_cast< char * >(m_codedCUInfo[x][y][wIdx][hIdx]), sizeof( CodedCUInfo ), 0 );
             }
           }
         }
@@ -1223,10 +1223,15 @@ void EncModeCtrlMTnoRQT::initCTUEncoding( const Slice &slice )
 
   if( m_pcEncCfg->getUseE0023FastEnc() )
   {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    const int thres = m_pcEncCfg->getUseCompositeRef() ? 2 * PICTURE_DISTANCE_TH : PICTURE_DISTANCE_TH;
+    m_skipThreshold = ((slice.getMinPictureDistance(m_pcEncCfg->getIBCFastMethod()) <= thres) ? FAST_SKIP_DEPTH : SKIP_DEPTH);
+#else
     if (m_pcEncCfg->getUseCompositeRef())
       m_skipThreshold = ( ( slice.getMinPictureDistance() <= PICTURE_DISTANCE_TH * 2 ) ? FAST_SKIP_DEPTH : SKIP_DEPTH );
     else
       m_skipThreshold = ((slice.getMinPictureDistance() <= PICTURE_DISTANCE_TH) ? FAST_SKIP_DEPTH : SKIP_DEPTH);
+#endif
 
   }
   else
@@ -1287,6 +1292,9 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
 #if JVET_W0097_GPM_MMVD_TM
   cuECtx.set( BEST_GPM_COST,        MAX_DOUBLE * .5);
 #endif
+#if JVET_AD0213_LIC_IMP
+  cuECtx.set(BEST_LIC_COST,         MAX_DOUBLE * .5);
+#endif
   cuECtx.set( QT_BEFORE_BT,         qtBeforeBt );
   cuECtx.set( DID_QUAD_SPLIT,       false );
   cuECtx.set( IS_BEST_NOSPLIT_SKIP, false );
@@ -1339,6 +1347,7 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
   {
     checkIbc = false;
   }
+
   // Add coding modes here
   // NOTE: Working back to front, as a stack, which is more efficient with the container
   // NOTE: First added modes will be processed at the end.
@@ -1444,6 +1453,16 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
       m_ComprCUCtxList.back().testModes.push_back( {ETM_RECO_CACHED, ETO_STANDARD, qp} );
     }
 #endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if (cs.slice->getSliceType() == I_SLICE && cs.slice->getUseIBC() && checkIbc && (m_pcEncCfg->getIBCFastMethod() & IBC_FAST_METHOD_NONSCC ))
+    {
+      m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC,         ETO_STANDARD,  qp });
+      if (m_pcEncCfg->getIbcMerge() && partitioner.chType == CHANNEL_TYPE_LUMA)
+      {
+        m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC_MERGE,   ETO_STANDARD,  qp });
+      }
+    }
+#endif
     // add intra modes
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     if (cs.slice->getSPS()->getPLTMode() && ( cs.slice->isIntra() || (cs.area.lwidth() == 4 && cs.area.lheight() == 4)) && getPltEnc())
@@ -1468,9 +1487,16 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
     }
 #endif
     // add ibc mode to intra path
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if (cs.slice->getUseIBC() && checkIbc && (cs.slice->getSliceType() != I_SLICE || !(m_pcEncCfg->getIBCFastMethod() & IBC_FAST_METHOD_NONSCC )))
+#else
     if (cs.sps->getIBCFlag() && checkIbc)
+#endif
     {
       m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC,         ETO_STANDARD,  qp });
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      if( m_pcEncCfg->getIbcMerge() )
+#endif
       if (partitioner.chType == CHANNEL_TYPE_LUMA)
       {
         m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC_MERGE,   ETO_STANDARD,  qp });
@@ -1705,7 +1731,9 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
 
 #endif
   const Slice&           slice       = *m_slice;
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   const SPS&             sps         = *slice.getSPS();
+#endif
   const uint32_t             numComp     = getNumberValidComponents( slice.getSPS()->getChromaFormatIdc() );
   const uint32_t             width       = partitioner.currArea().lumaSize().width;
   const CodingStructure *bestCS      = cuECtx.bestCS;
@@ -1730,7 +1758,17 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
     // update the best non-split cost
     cuECtx.set( BEST_NON_SPLIT_COST, bestCS->cost );
   }
-
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS  
+  if (partitioner.currArea().Y().valid() && lastTestMode().type == ETM_INTRA && bestCS && bestCS->cus.size() == 1)
+  {
+    int cnt = 0;
+    for (auto tu : bestCS->tus)
+    {
+      cnt += tu->countNonZero();
+    }
+    cuECtx.set(BEST_INTRA_NZ_CNT, cnt);
+  }
+#endif
   if( encTestmode.type == ETM_INTRA )
   {
     if( getFastDeltaQp() )
@@ -1766,13 +1804,21 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
     }
 #endif
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if (m_pcEncCfg->getUsePbIntraFast() && (!cs.slice->isIntra() || cs.slice->getUseIBC()) && !interHadActive(cuECtx) && cuECtx.bestCU && !CU::isIntra(*cuECtx.bestCU))
+#else
     if (m_pcEncCfg->getUsePbIntraFast() && (!cs.slice->isIntra() || cs.slice->getSPS()->getIBCFlag()) && !interHadActive(cuECtx) && cuECtx.bestCU && !CU::isIntra(*cuECtx.bestCU))
+#endif
     {
       return false;
     }
 
     // INTRA MODES
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if (cs.slice->getUseIBC() && !cuECtx.bestTU)
+#else
     if (cs.sps->getIBCFlag() && !cuECtx.bestTU)
+#endif
       return true;
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     if( partitioner.isConsIntra() && !cuECtx.bestTU )
@@ -1863,7 +1909,15 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
   else if (encTestmode.type == ETM_IBC || encTestmode.type == ETM_IBC_MERGE)
   {
     // IBC MODES
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if ((m_pcEncCfg->getIBCFastMethod() & IBC_FAST_METHOD_NONSCC) && cuECtx.get<int>(BEST_INTRA_NZ_CNT) < IBC_NONSCC_ENC_RD_NZ_COUNT)
+    {
+      return false;
+    }
+    return slice.getUseIBC() && (partitioner.currArea().lumaSize().width < 128 && partitioner.currArea().lumaSize().height < 128);
+#else
     return sps.getIBCFlag() && (partitioner.currArea().lumaSize().width < 128 && partitioner.currArea().lumaSize().height < 128);
+#endif
   }
   else if( isModeInter( encTestmode ) )
   {
@@ -1950,6 +2004,12 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
       return false;
     }
 #endif
+#if JVET_AD0213_LIC_IMP
+    if (encTestmode.type == ETM_INTER_ME && (encTestmode.opts & ETO_LIC) && relatedCU.skipLIC)
+    {
+      return false;
+    }
+#endif
     return true;
   }
   else if( isModeSplit( encTestmode ) )
@@ -1960,7 +2020,11 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
     //////////////////////////////////////////////////////////////////////////
     int skipScore = 0;
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if ((!slice.isIntra() || slice.getUseIBC()) && cuECtx.get<bool>(IS_BEST_NOSPLIT_SKIP))
+#else
     if ((!slice.isIntra() || slice.getSPS()->getIBCFlag()) && cuECtx.get<bool>(IS_BEST_NOSPLIT_SKIP))
+#endif
     {
       for( int i = 2; i < m_ComprCUCtxList.size(); i++ )
       {
@@ -2055,8 +2119,13 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
             const CodingUnit *cuBR = bestCS->cus.back();
             unsigned height        = partitioner.currArea().lumaSize().height;
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+            if (bestCU && ((bestCU->btDepth == 0 && maxBTD >= ((slice.isIntra() && !slice.getUseIBC()) ? 3 : 2))
+              || (bestCU->btDepth == 1 && cuBR && cuBR->btDepth == 1 && maxBTD >= ((slice.isIntra() && !slice.getUseIBC()) ? 4 : 3)))
+#else
             if (bestCU && ((bestCU->btDepth == 0 && maxBTD >= ((slice.isIntra() && !slice.getSPS()->getIBCFlag()) ? 3 : 2))
               || (bestCU->btDepth == 1 && cuBR && cuBR->btDepth == 1 && maxBTD >= ((slice.isIntra() && !slice.getSPS()->getIBCFlag()) ? 4 : 3)))
+#endif
               && (width <= MAX_TB_SIZEY && height <= MAX_TB_SIZEY)
               && cuECtx.get<bool>(DID_HORZ_SPLIT) && cuECtx.get<bool>(DID_VERT_SPLIT))
             {
@@ -2226,6 +2295,27 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
             else if (gpmCost > bestCS->cost && (!cuECtx.bestTU->cbf[0] && !cuECtx.bestTU->cbf[1] && !cuECtx.bestTU->cbf[2]))
             {
               relatedCU.skipGPM = true;
+            }
+          }
+        }
+#endif
+#if JVET_AD0213_LIC_IMP
+        int fastLic = m_pcEncCfg->getFastLic();
+        if (fastLic)
+        {
+          double licCost = cuECtx.get<double>(BEST_LIC_COST);
+          int c1 = (fastLic & 0x03);
+          int c2 = (fastLic & 0x04);
+          double r = ((c1 == 0x01) ? 1.0 : ((c1 == 0x02) ? 1.1 : 1.2));
+          if (licCost != (MAX_DOUBLE * .5))
+          {
+            if (licCost > (bestCS->cost * r) && bestCU->skip)
+            {
+              relatedCU.skipLIC = true;
+            }
+            else if (c2 && licCost > (bestCS->cost * 1.1))
+            {
+              relatedCU.skipLIC = true;
             }
           }
         }
@@ -2493,7 +2583,7 @@ bool EncModeCtrlMTnoRQT::useModeResult( const EncTestMode& encTestmode, CodingSt
   }
   else if( encTestmode.type == ETM_INTRA )
   {
-    const CodingUnit cu = *tempCS->getCU( partitioner.chType );
+    const CodingUnit& cu = *tempCS->getCU( partitioner.chType );
 
     if( !cu.mtsFlag )
     {
@@ -2546,6 +2636,15 @@ bool EncModeCtrlMTnoRQT::useModeResult( const EncTestMode& encTestmode, CodingSt
     if (tempCS->cost < cuECtx.get<double>(BEST_GPM_COST))
     {
       cuECtx.set(BEST_GPM_COST, tempCS->cost);
+    }
+  }
+#endif
+#if JVET_AD0213_LIC_IMP
+  if (encTestmode.type == ETM_INTER_ME && (encTestmode.opts & ETO_LIC))
+  {
+    if (tempCS->cost < cuECtx.get<double>(BEST_LIC_COST))
+    {
+      cuECtx.set(BEST_LIC_COST, tempCS->cost);
     }
   }
 #endif

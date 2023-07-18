@@ -39,7 +39,7 @@
 #define __MV__
 
 #include "CommonDef.h"
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0147_CCCM_NO_SUBSAMPLING
 #include <limits.h>
 #endif
 //! \ingroup CommonLib
@@ -65,7 +65,11 @@ class Mv
 private:
   static const MvPrecision m_amvrPrecision[4];
   static const MvPrecision m_amvrPrecAffine[3];
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  static const MvPrecision m_amvrPrecIbc[4];
+#else
   static const MvPrecision m_amvrPrecIbc[3];
+#endif
 
   static const int mvClipPeriod = (1 << MV_BITS);
   static const int halMvClipPeriod = (1 << (MV_BITS - 1));
@@ -98,6 +102,19 @@ public:
   int   getVer    () const { return ver;          }
   int   getAbsHor () const { return abs( hor );   }
   int   getAbsVer () const { return abs( ver );   }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  template <           int fracBits = MV_FRACTIONAL_BITS_INTERNAL> inline int   getTrHor ()                 const { return (hor >> (fracBits)) << (fracBits); }
+  template <           int fracBits = MV_FRACTIONAL_BITS_INTERNAL> inline int   getTrVer ()                 const { return (ver >> (fracBits)) << (fracBits); }
+  template <bool luma, int fracBits = MV_FRACTIONAL_BITS_INTERNAL> inline int   getTrHor (int chromaFormat) const { return luma || chromaFormat == CHROMA_444 ? getTrHor<fracBits>() : getTrHor<fracBits + 1>(); }
+  template <bool luma, int fracBits = MV_FRACTIONAL_BITS_INTERNAL> inline int   getTrVer (int chromaFormat) const { return luma || chromaFormat != CHROMA_420 ? getTrVer<fracBits>() : getTrVer<fracBits + 1>(); }
+
+private:
+                       inline bool  isFracChromaMv420 ()                 const { return hor != getTrHor<MV_FRACTIONAL_BITS_INTERNAL + 1>() || ver != getTrVer<MV_FRACTIONAL_BITS_INTERNAL + 1>(); }
+                       inline bool  isFracChromaMv422 ()                 const { return hor != getTrHor<MV_FRACTIONAL_BITS_INTERNAL + 1>() || ver != getTrVer<MV_FRACTIONAL_BITS_INTERNAL    >(); }
+public:
+                       inline bool  isFracMv          ()                 const { return hor != getTrHor<MV_FRACTIONAL_BITS_INTERNAL    >() || ver != getTrVer<MV_FRACTIONAL_BITS_INTERNAL    >(); }
+  template <bool luma> inline int   isFracMv          (int chromaFormat) const { return !luma && chromaFormat == CHROMA_420 ? isFracChromaMv420() : (!luma && chromaFormat == CHROMA_422 ? isFracChromaMv422() : isFracMv()); }
+#endif
 
   // ------------------------------------------------------------------------------------------------------------------
   // operations
@@ -247,11 +264,48 @@ public:
   }
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
-  static int getImvPrecShift(const uint8_t imv)
+  static int getImvPrecShift(const uint8_t imv
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+                           , bool supportFracBv
+#endif
+  )
   {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    return supportFracBv ? (imv == IMV_OFF || imv == IMV_HPEL ? 0 : 2) : MV_PRECISION_4PEL == m_amvrPrecIbc[imv] ? 2 : 0;
+#else
     return MV_PRECISION_4PEL == m_amvrPrecIbc[imv] ? 2 : 0;
+#endif
   }
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && (JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV || JVET_AA0070_RRIBC)
+  void regulateMv(int mvDirType)
+  {
+    if (mvDirType == 1)
+    {
+      ver = 0;
+    }
+    else if (mvDirType == 2)
+    {
+      hor = 0;
+    }
+  }
+#endif
+
+#if JVET_AD0140_MVD_PREDICTION
+  static int getImvPrecShiftMvd(const uint8_t imv)
+  {
+    return MV_PRECISION_4PEL == m_amvrPrecision[imv] ? 4 
+            : (MV_PRECISION_INT == m_amvrPrecision[imv] ? 2
+                : (MV_PRECISION_HALF == m_amvrPrecision[imv] ? 1 : 0));
+  }
+
+  static int getImvPrecShiftAffineMvd(const uint8_t imv)
+  {
+    return MV_PRECISION_INT == m_amvrPrecAffine[imv] ? 4 
+             : (MV_PRECISION_QUARTER == m_amvrPrecAffine[imv] ? 2 : 0);
+  }
+#endif
 
   Mv getSymmvdMv(const Mv& curMvPred, const Mv& tarMvPred)
   {
@@ -270,8 +324,8 @@ public:
     ver = (ver + mvClipPeriod) & (mvClipPeriod - 1);
     ver = (ver >= halMvClipPeriod) ? (ver - mvClipPeriod) : ver;
   }
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  bool isMvsdApplicable() const
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
+  bool isMvdPredApplicable() const
   {
     return (getAbsHor() + getAbsVer()) >= 1;
   }
@@ -280,11 +334,30 @@ public:
 #endif
 };// END CLASS DEFINITION MV
 
-#if JVET_AC0104_IBC_BVD_PREDICTION
+#if JVET_AC0104_IBC_BVD_PREDICTION || JVET_AD0140_MVD_PREDICTION
+#if JVET_AD0140_MVD_PREDICTION
+enum class MotionModel 
+{ 
+  Undefined = -1, 
+  UniTranslational = 0, 
+  BiTranslational, 
+  BiTranslationalSmvd, 
+  UniAffine, 
+  BiAffine, 
+  NumberOfMotionModels 
+};
+namespace MotionModelCheck
+{
+  bool isAffine(const MotionModel& mm);
+}
+#endif
+
 struct MvdSuffixInfo
 {
   static const int paramOfGolombCode = 1;
-
+#if JVET_AD0140_MVD_PREDICTION
+  MotionModel m_motionModel = MotionModel::Undefined;
+#endif
   unsigned horOffsetPrediction = 0;
   unsigned verOffsetPrediction = 0;
 
@@ -300,17 +373,51 @@ struct MvdSuffixInfo
   int      horPrefixGroupStartValue = -1;
   int      verPrefixGroupStartValue = -1;
 
+#if JVET_AD0140_MVD_PREDICTION
+  bool     horEncodeSignInEP = true;
+  bool     verEncodeSignInEP = true;
+#else
   bool     horEncodeSignInEP = false;
   bool     verEncodeSignInEP = false;
+#endif
 
   int      horSignHypMatch = -1;
   int      verSignHypMatch = -1;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  bool     isFracBvEnabled = false;
+#endif
 
-  void initPrefixes(const Mv& mv, const int imv, const bool isInternalPrecision);
+#if JVET_AD0140_MVD_PREDICTION
+  bool     isHorMagnZero = true;
+  bool     isVerMagnZero = true;
+#endif
 
-  void initSuffixesAndSigns(const Mv& mv, const int imv);
+#if JVET_AC0104_IBC_BVD_PREDICTION 
+  void initPrefixes(const Mv &mv, const int imv, const bool isInternalPrecision);
 
-  void defineNumberOfPredictedBinsInSuffix(const int iHorPrefix, const int iVerPrefix, const uint8_t imv  );
+  void initSuffixesAndSigns(const Mv &mv, const int imv);
+
+  void defineNumberOfPredictedBinsInSuffix(const int iHorPrefix, const int iVerPrefix, const uint8_t imv);
+#endif
+
+#if JVET_AD0140_MVD_PREDICTION
+  void       setMotionModel(const MotionModel& motionModel) { m_motionModel = motionModel; }
+  static int getEGCOffset(const MotionModel& motionModel);
+  int        getEGCOffset() const { return getEGCOffset(m_motionModel); }
+
+  int getNumBinsOfSignsAndSuffixes() const
+  {
+    return ((!isHorMagnZero && !horEncodeSignInEP) ? 1 : 0) + // hor sign bin
+           ((!isVerMagnZero && !verEncodeSignInEP) ? 1 : 0) + // ver sign bin
+           std::max(0,horOffsetPredictionNumBins) + std::max(0, verOffsetPredictionNumBins);
+  }
+
+  void initPrefixesMvd(const Mv& mv, const int imv, const bool isInternalPrecision);
+  void initSuffixesAndSignsMvd(const Mv &mv, const int imv);
+  void initPrefixesAffineMvd(const Mv& affineMv, const int imv, const bool isInternalPrecision, int& binBudget);
+  void initSuffixesAndSignsAffineMvd(const Mv& affineMv, const int imv, int& binBudget);
+  void defineNumberOfPredictedBinsInSuffixAffineMvd(const int iHorPrefix, const int iVerPrefix, const uint8_t imv, int& binBudget);
+#endif
 
   static int getMaxSuffix(const int prefix, const int maxAbs, const int maxGroupStartValue)
   {
@@ -351,21 +458,57 @@ struct MvdSuffixInfo
     const int golomb_param = BVD_CODING_GOLOMB_ORDER;
     return (1 << (prefix + golomb_param)) - 1 - ((1 << golomb_param) - 1);// (final_param > golomb_param + 1 ? ((1 << golomb_param) - 1) : 0);
   }
-
-
 };
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
+
+#if JVET_AD0140_MVD_PREDICTION
+struct MvdSuffixInfoMv
+{
+  static constexpr int suffixPosThreshold = 0; // least significant postition of predicted bin in a suffix 
+  static constexpr int maxNumMv           = 3;
+  static constexpr int maxNumMvComp       = 2 * maxNumMv; //MV has 2 components: horizontal and vertical ones
+
+  MotionModel   m_motionModel = MotionModel::Undefined;
+
+  MvdSuffixInfo mvBins[NUM_REF_PIC_LIST_01][maxNumMv];
+  struct AuxMvdBins
+  {
+    int  mvIdx      = -1;
+    bool isHor      = true;
+    int  numHypBins = -1; // Number of hypotheses bins (siffix + sign bin)
+    int  rplIdx     = static_cast<int>(REF_PIC_LIST_X);
+    AuxMvdBins() {};
+    AuxMvdBins(int _mvIdxIn, bool _isHorIn, int _numHypBins, int _rplIdx) : mvIdx(_mvIdxIn), isHor(_isHorIn), numHypBins(_numHypBins), rplIdx(_rplIdx) {};
+  };
+
+  AuxMvdBins auxMvdBins[NUM_REF_PIC_LIST_01][maxNumMvComp]; //one entry for one MV (MVD) component
+  int actualMvCompNum[NUM_REF_PIC_LIST_01] = { -1, -1 };
+  RefPicList actualRpl                     = REF_PIC_LIST_X;
+
+  static unsigned getBinBudgetForPrediction(const unsigned int width, const unsigned int height, const uint8_t imv)
+  {
+    return (width > 4 && height > 4) ? 6 : 2;
+  }
+
+  void clear();
+
+  void       setMotionModel         ( const MotionModel& motionModel ) { m_motionModel = motionModel;}
+  bool       getMergedBinBudgetForMv( const unsigned int curBinBudget );
+  bool       getBinBudgetForMv      ( const unsigned int curBinBudget, const RefPicList rplIdx );
+  RefPicList selectRplForMvdCoding  ( const unsigned int curBinBudget ) const;
+  void       initPrefixesMvd        ( const int mvIdx, const RefPicList curRpl, const Mv& mvd, const int imv, const bool isInternalPrecision, const MotionModel& motionModel );
+  void       initSuffixesAndSignsMvd( const int mvIdx, const RefPicList rpl,    const Mv& mvd, const int imv, const MotionModel& motionModel );
+};
+#endif
 
 namespace std
 {
-  template <> struct hash<Mv>
+  template<> struct hash<Mv>
   {
-    size_t operator()(const Mv& value) const
-    {
-      return (((size_t)value.hor << 32) + value.ver);
-    }
+    size_t operator()( const Mv &value ) const { return ( ( (size_t)value.hor << 32 ) + value.ver ); }
   };
 };
+
 extern void(*clipMv) ( Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps );
 void clipMvInPic ( Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps );
 void clipMvInSubpic ( Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps );

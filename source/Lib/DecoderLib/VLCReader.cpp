@@ -450,7 +450,7 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
   READ_UVLC( uiCode, "pic_height_in_luma_samples" );         pcPPS->setPicHeightInLumaSamples( uiCode );
 
 #if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
-  READ_FLAG(uiCode, "aysmmetric_ILF_flag");                  pcPPS->setAsymmetricILF(uiCode == 1);
+  READ_FLAG(uiCode, "pps_aysmmetric_ILF_flag");              pcPPS->setAsymmetricILF(uiCode == 1);
 #endif
 
   READ_FLAG(uiCode, "pps_conformance_window_flag");
@@ -1119,8 +1119,21 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
     for (int altIdx = 0; altIdx < param.numAlternativesLuma; ++altIdx)
     {
 #if JVET_X0071_ALF_BAND_CLASSIFIER
+#if JVET_AD0222_ALF_RESI_CLASS
+      READ_FLAG(code, "alf_luma_classifier_band");
+      param.lumaClassifierIdx[altIdx] = code;
+      if (code == 0)
+      {
+        READ_FLAG(code, "alf_luma_classifier_resi");
+        if (code)
+        {
+          param.lumaClassifierIdx[altIdx] = 2;
+        }
+      }
+#else
       READ_FLAG(code, "alf_luma_classifier");
       param.lumaClassifierIdx[altIdx] = code;
+#endif
 #endif
       READ_FLAG(code, "alf_luma_clip");
       param.nonLinearFlag[CHANNEL_TYPE_LUMA][altIdx] = code ? true : false;
@@ -2205,6 +2218,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   READ_FLAG( uiCode, "sps_tm_tools_enabled_flag" );                 pcSPS->setTMToolsEnableFlag( uiCode );
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  READ_FLAG( uiCode, "sps_tmNoninterToolsEnableFlag_enabled_flag" ); pcSPS->setTMnoninterToolsEnableFlag( uiCode );
+#endif
 #if INTER_LIC
   READ_FLAG( uiCode, "sps_lic_enabled_flag" );                      pcSPS->setLicEnabledFlag( uiCode );
 #endif
@@ -2235,8 +2251,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 
 #if JVET_W0090_ARMC_TM
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if(pcSPS->getTMToolsEnableFlag() || pcSPS->getTMnoninterToolsEnableFlag())
+#else
   pcSPS->setUseAML(false);
   if(pcSPS->getTMToolsEnableFlag())
+#endif
   {
 #endif
   READ_FLAG( uiCode, "sps_aml_enabled_flag");                        pcSPS->setUseAML ( uiCode != 0 );
@@ -2249,7 +2269,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
   pcSPS->setUseTmvpNmvpReordering(false);
-  if (pcSPS->getUseAML())
+  if (pcSPS->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && pcSPS->getTMToolsEnableFlag()
+#endif
+    )
   {
     READ_FLAG( uiCode, "sps_aml_tmvp_nmvp_enabled_flag");            pcSPS->setUseTmvpNmvpReordering ( uiCode != 0 );
   }
@@ -2258,7 +2282,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   pcSPS->setUseArmcRefinedMotion (false);
 #endif
-  if (pcSPS->getUseAML())
+  if (pcSPS->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && pcSPS->getTMToolsEnableFlag()
+#endif
+    )
   {
     READ_FLAG( uiCode, "sps_ArmcRefinedMotion_enabled_flag");        pcSPS->setUseArmcRefinedMotion ( uiCode != 0 );
   }
@@ -2267,7 +2295,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   pcSPS->setNumLambda(0);
 #endif
-  if (pcSPS->getUseAML())
+  if (pcSPS->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && pcSPS->getTMToolsEnableFlag()
+#endif
+    )
   {
     READ_UVLC(uiCode, "num_Lambda");
     pcSPS->setNumLambda(uiCode);
@@ -2339,13 +2371,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   {
     pcSPS->setFpelMmvdEnabledFlag( false );
   }
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   uiCode = 0;
   if (pcSPS->getTMToolsEnableFlag())
 #endif
-  READ_FLAG(uiCode, "sps_mvsd_enabled_flag");
-  pcSPS->setUseMVSD(uiCode != 0);
+  READ_FLAG(uiCode, "sps_mvd_pred_enabled_flag");
+  pcSPS->setUseMvdPred(uiCode != 0);
 #endif
   READ_UVLC(uiCode, "six_minus_max_num_merge_cand");
   CHECK(MRG_MAX_NUM_CANDS <= uiCode, "Incorrrect max number of merge candidates!");
@@ -2415,6 +2447,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     else {
       pcSPS->setProfControlPresentFlag( false );
     }
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    READ_FLAG(uiCode, "sps_affine_nontranslation_parameter_refinement");       pcSPS->setUseAffineParaRefinement(uiCode != 0);
+#endif
   }
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   pcSPS->setUseTMMMVD(false);
@@ -2502,6 +2537,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if ENABLE_DIMD
   READ_FLAG(uiCode, "sps_dimd_enabled_flag");                           pcSPS->setUseDimd(uiCode != 0);
 #endif
+#if JVET_AE0059_INTER_CCCM
+  READ_FLAG(uiCode, "sps_inter_cccm");                              pcSPS->setUseInterCccm( uiCode != 0 );
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (pcSPS->getTMnoninterToolsEnableFlag())
+  {
+#endif
 #if JVET_V0130_INTRA_TMP
   READ_FLAG(uiCode, "sps_intraTMP_enabled_flag");                   pcSPS->setUseIntraTMP( uiCode != 0 );
   if(pcSPS->getUseIntraTMP())
@@ -2515,11 +2557,39 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_W0123_TIMD_FUSION
   READ_FLAG(uiCode, "sps_timd_enabled_flag");                        pcSPS->setUseTimd( uiCode != 0 );
 #endif
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  if (pcSPS->getUseCiip() && pcSPS->getUseTimd())
+  {
+    READ_FLAG(uiCode, "sps_ciip_timd_enabled_flag");                pcSPS->setUseCiipTimd(uiCode != 0);
+  }
+  else
+  {
+    pcSPS->setUseCiipTimd(false);
+  }
+#endif
 #if JVET_AB0155_SGPM
   READ_FLAG(uiCode, "sps_sgpm_enabled_flag");                       pcSPS->setUseSgpm(uiCode != 0);
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  READ_FLAG(uiCode, "sps_tmrl_enabled_flag");                       pcSPS->setUseTmrl(uiCode != 0);
+#endif
+#if JVET_AD0085_MPM_SORTING
+  READ_FLAG(uiCode, "sps_mpm_sorting_enabled_flag");                pcSPS->setUseMpmSorting(uiCode != 0);
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   READ_UVLC(uiCode, "sps_cccm_cand");                               pcSPS->setUseCccm(uiCode);
+#endif
+#if JVET_AD0188_CCP_MERGE
+  READ_UVLC(uiCode, "sps_ccp_merge");                               pcSPS->setUseCcpMerge(uiCode);
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  }
+  else
+  {
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+    READ_UVLC(uiCode, "sps_cccm_cand");                             pcSPS->setUseCccm(uiCode);
+#endif
+  }
 #endif
   if( pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
@@ -2570,17 +2640,64 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   READ_FLAG(uiCode, "sps_ibc_enabled_flag");                                    pcSPS->setIBCFlag(uiCode);
   if (pcSPS->getIBCFlag())
   {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    pcSPS->setIBCFracFlag(0);
+    if (pcSPS->getAMVREnabledFlag())
+    {
+      READ_FLAG(uiCode, "sps_ibc_frac_enabled_flag");                            pcSPS->setIBCFracFlag(uiCode);
+    }
+    READ_FLAG(uiCode, "sps_ibc_enabled_flag_inter_slice");                                    pcSPS->setIBCFlagInterSlice(uiCode);
+    READ_FLAG( uiCode, "sps_ibc_merge_enabled_flag" );                                        pcSPS->setUseIbcMerge( uiCode );
+    if( pcSPS->getUseIbcMerge() )
+    {
+#endif
     READ_UVLC(uiCode, "six_minus_max_num_ibc_merge_cand");
     CHECK(IBC_MRG_MAX_NUM_CANDS <= uiCode, "Incorrrect max number of IBC merge candidates!");
     pcSPS->setMaxNumIBCMergeCand(IBC_MRG_MAX_NUM_CANDS - uiCode);
 #if JVET_AA0061_IBC_MBVD
     READ_FLAG( uiCode, "sps_ibc_mbvd_enabled_flag" );                   pcSPS->setUseIbcMbvd             ( uiCode != 0 );
 #endif
-#if JVET_AC0112_IBC_CIIP
-    READ_FLAG( uiCode, "sps_ibc_ciip_enabled_flag" );                   pcSPS->setUseIbcCiip             ( uiCode != 0 );
-#endif
 #if JVET_AC0112_IBC_GPM
     READ_FLAG( uiCode, "sps_ibc_gpm_enabled_flag" );                    pcSPS->setUseIbcGpm              ( uiCode != 0 );
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    }
+    else
+    {
+#if JVET_Z0075_IBC_HMVP_ENLARGE
+      pcSPS->setMaxNumIBCMergeCand( IBC_MRG_MAX_NUM_CANDS );
+#else
+      pcSPS->setMaxNumIBCMergeCand( 0 );
+#endif
+      pcSPS->setUseIbcGpm( 0 );
+      pcSPS->setUseIbcMbvd( 0 );
+    }
+    READ_FLAG(uiCode, "sps_rribc_enabled_flag");                   pcSPS->setUseRRIbc(uiCode != 0);
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+    if (pcSPS->getTMnoninterToolsEnableFlag())
+    {
+      READ_FLAG(uiCode, "sps_tmibc_enabled_flag");                 pcSPS->setUseTMIbc(uiCode != 0);
+    }
+#else
+    READ_FLAG(uiCode, "sps_tmibc_enabled_flag");                   pcSPS->setUseTMIbc(uiCode != 0);
+#endif
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (pcSPS->getTMnoninterToolsEnableFlag())
+  {
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+    READ_FLAG( uiCode, "sps_ibc_bvd_pred_enabled_flag" );               pcSPS->setUseBvdPred             ( uiCode != 0 );
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    READ_FLAG( uiCode, "sps_ibc_bvp_cluster_enabled_flag" );            pcSPS->setUseBvpCluster          ( uiCode != 0 );
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  }
+#endif
+
+#if JVET_AC0112_IBC_CIIP
+    READ_FLAG(uiCode, "sps_ibc_ciip_enabled_flag");                     pcSPS->setUseIbcCiip(uiCode != 0);
 #endif
 #if JVET_AC0112_IBC_LIC
     READ_FLAG( uiCode, "sps_ibc_lic_enabled_flag" );                    pcSPS->setUseIbcLic              ( uiCode != 0 );
@@ -3736,6 +3853,17 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
     }
   }
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (sps->getIBCFracFlag())
+  {
+    READ_FLAG(uiCode, "ph_fpel_mbvd_enabled_flag");
+    picHeader->setDisFracMBVD(uiCode);
+  }
+  else
+  {
+    picHeader->setDisFracMBVD(true);
+  }
+#endif
 
   if (picHeader->getPicInterSliceAllowedFlag())
   {
@@ -4936,6 +5064,16 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
       pcSlice->setUseLIC(uiCode != 0);
     }
 #endif  
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if ( pcSlice->isIntra())
+    {
+      pcSlice->setUseIBC(sps->getIBCFlag());
+    }
+    else
+    {
+      pcSlice->setUseIBC(sps->getIBCFlagInterSlice());
+    }
+#endif
 
     int qpDelta = 0;
     if (pps->getQpDeltaInfoInPhFlag())
@@ -5142,7 +5280,11 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
 
   }
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
-  if (!pcSlice->isIntra() && sps->getUseAML())
+  if (!pcSlice->isIntra() && sps->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && sps->getTMToolsEnableFlag()
+#endif
+    )
   {
     int index = sps->getQPOffsetsIdx(pcSlice->getSliceQp() - (pps->getPicInitQPMinus26() + 26));
     bool lambdaCanBePredicted = false;
@@ -5441,6 +5583,9 @@ void HLSyntaxReader::parseConstraintInfo(ConstraintInfo *cinfo)
 #endif
 #if JVET_AB0155_SGPM
     READ_FLAG(symbol, "gci_no_sgpm_constraint_flag");                    cinfo->setNoSgpmConstraintFlag(symbol > 0 ? true : false);
+#endif
+#if JVET_AD0082_TMRL_CONFIG
+    READ_FLAG(symbol, "gci_no_tmrl_constraint_flag");                    cinfo->setNoTmrlConstraintFlag(symbol > 0 ? true : false);
 #endif
     /* inter */
     READ_FLAG(symbol, "gci_no_ref_pic_resampling_constraint_flag");      cinfo->setNoRprConstraintFlag(symbol > 0 ? true : false);

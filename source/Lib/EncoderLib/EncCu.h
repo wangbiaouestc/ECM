@@ -244,9 +244,9 @@ private:
     Ctx best;
   };
 
-  std::vector<CtxPair>  m_CtxBuffer;
+  std::vector<CtxPair>  m_ctxBuffer;
   CtxPair*              m_CurrCtx;
-  CtxCache*             m_CtxCache;
+  CtxCache*             m_ctxCache;
 
 #if ENABLE_SPLIT_PARALLELISM
   int                   m_dataId;
@@ -291,11 +291,19 @@ private:
   PelStorage            m_acMergeBuffer[MMVD_MRG_MAX_RD_BUF_NUM];
 #endif
 #if INTER_LIC || MULTI_HYP_PRED
+#if JVET_AD0213_LIC_IMP
+  PelStorage            m_acRealMergeBuffer[MRG_MAX_NUM_CANDS * 3];
+#else
   PelStorage            m_acRealMergeBuffer[MRG_MAX_NUM_CANDS * 2];
+#endif
 #else
   PelStorage            m_acRealMergeBuffer[MRG_MAX_NUM_CANDS];
 #endif
-  PelStorage            m_acMergeTmpBuffer[MRG_MAX_NUM_CANDS];
+  PelStorage            m_acMergeTmpBuffer[MRG_MAX_NUM_CANDS
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0112_IBC_LIC
+                                           + 1
+#endif
+                                          ];
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
   PelStorage            m_acTmMergeTmpBuffer[MRG_MAX_NUM_CANDS];
 #endif
@@ -327,7 +335,7 @@ private:
 #endif
   double                m_AFFBestSATDCost;
   double                m_mergeBestSATDCost;
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   MotionInfo            m_subPuMiBuf[SUB_TMVP_NUM][(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
 #else
   MotionInfo            m_subPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
@@ -359,6 +367,9 @@ private:
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   Mv                    m_mvBufEncAmBDMVR[2][MAX_NUM_SUBCU_DMVR];
   MvField               m_mvFieldAmListEnc[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
+#if JVET_AD0213_LIC_IMP
+  bool                  m_licAmListEnc[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
+#endif
 #endif
 
   int                   m_ctuIbcSearchRangeX;
@@ -503,6 +514,12 @@ protected:
   void xCheckSATDCostAffineMerge 
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, AffineMergeCtx affineMergeCtx, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
                                 , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &rdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  void xCheckSATDCostBMAffineMerge
+  (CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, AffineMergeCtx affineMergeCtxL0, RefPicList reflist, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
+    , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &rdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart
+  );
+#endif
 #if AFFINE_MMVD
   void xCheckSATDCostAffineMmvdMerge
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, AffineMergeCtx affineMergeCtx, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer

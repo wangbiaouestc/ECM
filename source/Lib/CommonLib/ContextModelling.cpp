@@ -60,8 +60,8 @@ CoeffCodingContext::CoeffCodingContext( const TransformUnit& tu, ComponentID com
   , m_scanType                  (SCAN_DIAG)
   , m_scan                      (g_scanOrder     [SCAN_GROUPED_4x4][m_scanType][gp_sizeIdxInfo->idxFrom(m_width        )][gp_sizeIdxInfo->idxFrom(m_height        )])
   , m_scanCG                    (g_scanOrder     [SCAN_UNGROUPED  ][m_scanType][gp_sizeIdxInfo->idxFrom(m_widthInGroups)][gp_sizeIdxInfo->idxFrom(m_heightInGroups)])
-  , m_CtxSetLastX               (Ctx::LastX[m_chType])
-  , m_CtxSetLastY               (Ctx::LastY[m_chType])
+  , m_ctxSetLastX               (Ctx::LastX[m_chType])
+  , m_ctxSetLastY               (Ctx::LastY[m_chType])
   , m_maxLastPosX(g_uiGroupIdx[std::min<unsigned>(JVET_C0024_ZERO_OUT_TH, m_width) - 1])
   , m_maxLastPosY(g_uiGroupIdx[std::min<unsigned>(JVET_C0024_ZERO_OUT_TH, m_height) - 1])
   , m_lastOffsetX               (0)
@@ -342,16 +342,16 @@ unsigned DeriveCtx::CtxRribcFlipType(const CodingUnit& cu)
 #endif
 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-unsigned DeriveCtx::CtxBvOneNullComp(const CodingUnit &cu)
+unsigned DeriveCtx::CtxbvOneZeroComp(const CodingUnit &cu)
 {
   const CodingStructure *cs    = cu.cs;
   unsigned               ctxId = 0;
 
   const CodingUnit *cuLeft = cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
-  ctxId = (cuLeft && cuLeft->predMode == MODE_IBC && !cuLeft->firstPU->mergeFlag && cuLeft->bvOneNullComp) ? 1 : 0;
+  ctxId = (cuLeft && cuLeft->predMode == MODE_IBC && !cuLeft->firstPU->mergeFlag && cuLeft->bvOneZeroComp) ? 1 : 0;
 
   const CodingUnit *cuAbove = cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
-  ctxId += (cuAbove && cuAbove->predMode == MODE_IBC && !cuAbove->firstPU->mergeFlag && cuAbove->bvOneNullComp) ? 1 : 0;
+  ctxId += (cuAbove && cuAbove->predMode == MODE_IBC && !cuAbove->firstPU->mergeFlag && cuAbove->bvOneZeroComp) ? 1 : 0;
 
   return ctxId;
 }
@@ -458,7 +458,16 @@ int DeriveCtx::CtxSmBvdBin(const int iPreviousBinIsCorrect2, const int iPrevious
   }
   return ctxNumInGroup + (0 == isHor ? 0 : ctxNumInGroup) + iCtxIdx;
 }
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
+
+#if JVET_AD0140_MVD_PREDICTION 
+int DeriveCtx::ctxSmMvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrect, const int isHor, const int significance, const MotionModel& motionModel)
+{
+  const bool isAffine = MotionModel::BiAffine == motionModel || MotionModel::UniAffine == motionModel;
+  int ctxOffset = Clip3(0, 5, significance); 
+  return (isAffine ? 5 : 0) + ctxOffset;
+}
+#endif
 
 unsigned DeriveCtx::CtxPredModeFlag( const CodingUnit& cu )
 {
@@ -534,7 +543,7 @@ void MergeCtx::convertRegularMergeCandToBi(int candIdx)
   } 
 }
 #endif
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 void MergeCtx::saveMergeInfo(PredictionUnit& puTmp, PredictionUnit pu)
 {
   puTmp.mergeIdx = pu.mergeIdx;
@@ -600,6 +609,9 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
   {
     pu.bv = pu.mv[REF_PIC_LIST_0];
     pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT); // used for only integer resolution
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if(!pu.cs->sps->getIBCFracFlag())
+#endif
     pu.cu->imv = pu.cu->imv == IMV_HPEL ? 0 : pu.cu->imv;
 #if MULTI_HYP_PRED
     pu.addHypData.clear();
@@ -624,6 +636,9 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 #endif
 #if JVET_X0049_ADAPT_DMVR
     || pu.bmMergeFlag
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+    || pu.affBMMergeFlag
 #endif
     )
   {
@@ -651,13 +666,15 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 
 #if INTER_LIC
   pu.cu->licFlag = pu.cs->slice->getUseLIC() ? licFlags[candIdx] : false;
+#if !JVET_AD0213_LIC_IMP
   if (pu.interDir == 3)
   {
     CHECK(pu.cu->licFlag, "LIC is not used with bi-prediction in merge");
   }
 #endif
+#endif
 }
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
 bool MergeCtx::xCheckSimilarMotionSubTMVP(int mergeCandIndex, uint32_t mvdSimilarityThresh) const
 {
   if (interDirNeighbours[mergeCandIndex] == 0)
@@ -789,6 +806,31 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
   }
 
   return false;
+}
+#endif
+#if JVET_AD0213_LIC_IMP
+void MergeCtx::initMrgCand(int cnt)
+{
+  bcwIdx[cnt] = BCW_DEFAULT;
+#if INTER_LIC
+  licFlags[cnt] = false;
+#endif
+#if JVET_AC0112_IBC_LIC
+  ibcLicFlags[cnt] = false;
+#endif
+#if JVET_AA0070_RRIBC
+  rribcFlipTypes[cnt] = 0;
+#endif
+  interDirNeighbours[cnt] = 0;
+  mvFieldNeighbours[(cnt << 1)].refIdx = NOT_VALID;
+  mvFieldNeighbours[(cnt << 1) + 1].refIdx = NOT_VALID;
+  useAltHpelIf[cnt] = false;
+#if MULTI_HYP_PRED
+  addHypNeighbours[cnt].clear();
+#endif
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+  candCost[cnt] = MAX_UINT64;
+#endif
 }
 #endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
@@ -1478,6 +1520,12 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
   fPosStep = tempIdx / IBC_MBVD_OFFSET_DIR;
   fPosPosition = tempIdx - fPosStep * (IBC_MBVD_OFFSET_DIR);
   int offset = refMvdCands[fPosStep];
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (!pu.cu->slice->getPicHeader()->getDisFracMBVD() || !pu.cs->slice->getSPS()->getPLTMode())
+  {
+    offset >>= 2;
+  }
+#endif
 
   const int refList0 = ibcMbvdBaseBv[fPosBaseIdx][0].refIdx;
   const int xDir[] = {1, -1,  0,  0,  1, -1,  1, -1, 2, -2,  2, -2, 1,  1, -1, -1};
@@ -1527,6 +1575,13 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
   }
   pu.bv = pu.mv[REF_PIC_LIST_0];
   pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT); // used for only integer resolution
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (pu.cs->sps->getIBCFracFlag())
+  {
+    pu.cu->imv = (!pu.cu->geoFlag && useAltHpelIf[fPosBaseIdx]) ? IMV_HPEL : 0;
+  }
+  else
+#endif
   pu.cu->imv = pu.cu->imv == IMV_HPEL ? 0 : pu.cu->imv;
 #if JVET_AC0112_IBC_LIC
   pu.cu->ibcLicFlag = ibcLicFlags[fPosBaseIdx];
@@ -1539,6 +1594,22 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
   pu.numMergedAddHyps = 0;
 #endif
   return false;
+}
+#endif
+
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+unsigned DeriveCtx::CtxTmpFusionFlag(const CodingUnit& cu)
+{
+  const CodingStructure* cs = cu.cs;
+  unsigned ctxId = 0;
+
+  const CodingUnit* cuLeft = cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+  ctxId = cuLeft && cuLeft->tmpFusionFlag ? 1 : 0;
+
+  const CodingUnit* cuAbove = cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+  ctxId += cuAbove && cuAbove->tmpFusionFlag ? 1 : 0;
+
+  return ctxId;
 }
 #endif
 

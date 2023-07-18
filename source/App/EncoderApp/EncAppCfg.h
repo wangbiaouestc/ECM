@@ -211,6 +211,9 @@ protected:
 #if JVET_AB0155_SGPM
   bool      m_noSgpmConstraintFlag;
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  bool      m_noTmrlConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool      m_noObmcConstraintFlag;
 #endif
@@ -466,13 +469,28 @@ protected:
   bool      m_sgpmNoBlend;
 #endif
 #endif
+#if JVET_AD0082_TMRL_CONFIG
+  bool      m_tmrl;
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  bool      m_tmNoninterToolsEnableFlag;
+#endif
+#if JVET_AD0085_MPM_SORTING
+  bool      m_mpmSorting;
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int       m_cccm;
+#endif
+#if JVET_AD0188_CCP_MERGE
+  bool      m_ccpMerge;
 #endif
 #if ENABLE_OBMC
   bool      m_OBMC;
 #endif
   bool      m_ciip;
+#if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
+  bool      m_ciipTimd;
+#endif
   bool      m_Geo;
   bool      m_HashME;
   bool      m_allowDisFracMMVD;
@@ -480,10 +498,19 @@ protected:
   bool      m_AffineAmvrEncOpt;
   bool      m_AffineAmvp;
   bool      m_DMVR;
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+  bool      m_affineParaRefinement;
+#endif
   bool      m_MMVD;
   int       m_MmvdDisNum;
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  bool      m_MVSD;
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+  bool      m_mvdPred;
+#endif
+#if JVET_AC0104_IBC_BVD_PREDICTION
+  bool      m_bvdPred;
+#endif
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+  bool      m_bvpCluster;
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   bool      m_useARL;
@@ -494,6 +521,9 @@ protected:
   bool      m_JointCbCrMode;
   bool      m_useChromaTS;
   unsigned  m_IBCMode;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  unsigned  m_IBCFracMode;
+#endif
   unsigned  m_IBCLocalSearchRangeX;
   unsigned  m_IBCLocalSearchRangeY;
   unsigned  m_IBCHashSearch;
@@ -511,6 +541,12 @@ protected:
 #endif
 #if JVET_AC0112_IBC_LIC
   bool      m_ibcLic;
+#endif
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  bool      m_rribc;
+  bool      m_tmibc;
+  bool      m_ibcMerge;
 #endif
 
   bool      m_wrapAround;
@@ -531,6 +567,9 @@ protected:
 #endif
 #if JVET_AC0071_DBV
   bool m_intraDBV; ///< Direct Block Vector
+#endif
+#if JVET_AE0059_INTER_CCCM
+  bool m_interCccm; ///< CCCM for inter prediction
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   bool      m_BIF;                                            ///< bilateral filter

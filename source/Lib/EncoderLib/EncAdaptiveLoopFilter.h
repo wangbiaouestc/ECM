@@ -200,12 +200,21 @@ struct AlfCovariance
     return calculateError( clip, f );
   }
 
+#if JVET_AD0222_ALF_RESI_CLASS
+  double optimizeFilter(const AlfFilterShape& alfShape, int* clip, double *f, bool optimize_clip, bool enableLessClip) const;
+  double optimizeFilterClip(const AlfFilterShape& alfShape, int* clip, bool enableLessClip) const
+  {
+    Ty f;
+    return optimizeFilter(alfShape, clip, f, true, enableLessClip);
+  }
+#else 
   double optimizeFilter(const AlfFilterShape& alfShape, int* clip, double *f, bool optimize_clip) const;
   double optimizeFilterClip(const AlfFilterShape& alfShape, int* clip) const
   {
     Ty f;
     return optimizeFilter(alfShape, clip, f, true);
   }
+#endif
 
   double calculateError( const int *clip ) const;
   double calculateError( const int *clip, const double *coeff ) const { return calculateError(clip, coeff, numCoeff); }
@@ -265,7 +274,7 @@ private:
   AlfCovariance          m_alfCovarianceMerged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES + 2];
   int                    m_alfClipMerged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF];
   CABACWriter*           m_CABACEstimator;
-  CtxCache*              m_CtxCache;
+  CtxCache*              m_ctxCache;
   double                 m_lambda[MAX_NUM_COMPONENT];
 
   int**                  m_filterCoeffSet; // [lumaClassIdx/chromaAltIdx][coeffIdx]
@@ -286,7 +295,9 @@ private:
   double                 *m_ctbDistortionFixedFilter[NUM_FIXED_FILTER_SETS];
   int                    m_clipDefaultEnc[MAX_NUM_ALF_LUMA_COEFF];
 #endif
-
+#if JVET_AD0222_ALF_RESI_CLASS
+  bool                   m_enableLessClip;
+#endif
   std::vector<short>     m_alfCtbFilterSetIndexTmp;
   AlfParam               m_alfParamTempNL;
   int                    m_filterTmp[MAX_NUM_ALF_LUMA_COEFF];
@@ -382,9 +393,16 @@ private:
   void   deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnitBuf& recYuv, CodingStructure& cs );
 
 #if ALF_IMPROVEMENT
+#if JVET_AD0222_ALF_RESI_CLASS
+  template<bool m_alfWSSD, bool reuse>
+#else
   template<bool m_alfWSSD>
+#endif
 #if JVET_X0071_ALF_BAND_CLASSIFIER
   void   getBlkStats(AlfCovariance* alfCovariace, const AlfFilterShape& shape, AlfClassifier** classifier, const Pel* org, const int orgStride, const Pel* rec, const int recStride,
+#if JVET_AD0222_ALF_RESI_CLASS
+    AlfClassifier** classifierNext, AlfCovariance* alfCovarianceNext,
+#endif
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
     const Pel* recBeforeDb, const int recBeforeDbStride,
 #endif

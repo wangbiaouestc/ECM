@@ -154,7 +154,7 @@ public:
 #endif
 
   void rebindPicBufs();
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   void createTMBuf(const int cbWidth, const int cbHeight);
   void destroyTMBuf();
 #endif
@@ -263,6 +263,12 @@ public:
 
   LutMotionCand motionLut;
 
+#if JVET_AD0188_CCP_MERGE
+  LutCCP                 ccpLut;
+  template<class T> void addCCPToLut(static_vector<T, MAX_NUM_HCCP_CANDS> &lut, const T &model, int reusePos);
+  template<class T> void getOneModelFromCCPLut(const static_vector<T, MAX_NUM_HCCP_CANDS> &lut, T &model, int pos);
+#endif
+
   void addMiToLut(static_vector<MotionInfo, MAX_NUM_HMVP_CANDS>& lut, const MotionInfo &mi);
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   void addMiToLutIBC(static_vector<MotionInfo, MAX_NUM_HMVP_IBC_CANDS>& lut, const MotionInfo &mi);
@@ -304,10 +310,12 @@ private:
 public:
   PictureType m_pt; 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   Pel   *m_pCurrTmTop;
   Pel   *m_pCurrTmLeft;
   Pel   *m_pRefTmTop;
   Pel   *m_pRefTmLeft;
+#endif
   PelBuf m_pcBufPredCurTop;
   PelBuf m_pcBufPredCurLeft;
   PelBuf m_pcBufPredRefTop;
@@ -518,5 +526,44 @@ private:
 
 static inline uint32_t getNumberValidTBlocks(const PreCalcValues& pcv) { return (pcv.chrFormat==CHROMA_400) ? 1 : ( pcv.multiBlock422 ? MAX_NUM_TBLOCKS : MAX_NUM_COMPONENT ); }
 
+#if JVET_AD0188_CCP_MERGE
+template<class T>
+void CodingStructure::addCCPToLut(static_vector<T, MAX_NUM_HCCP_CANDS> &lut, const T &model, int reusePos)
+{
+  int currCnt = (int) lut.size();
+
+  int erasePos = 0;
+
+  if (reusePos == -1)
+  {
+    for (int j = 0; j < currCnt; j++)
+    {
+      if (lut[currCnt - j - 1] == model)
+      {
+        reusePos = j;
+        break;
+      }
+    }
+  }
+  if (reusePos != -1)
+  {
+    erasePos = currCnt - 1 - reusePos;   // reverse the order
+  }
+  if (reusePos != -1 || currCnt == lut.capacity())
+  {
+    lut.erase(lut.begin() + erasePos);
+  }
+  lut.push_back(model);
+}
+
+template<class T>
+void CodingStructure::getOneModelFromCCPLut(const static_vector<T, MAX_NUM_HCCP_CANDS> &lut, T &model, int pos)
+{
+  size_t currCnt = lut.size();
+  CHECK(pos >= currCnt, "Invalid entry in CCP LUT");
+  model = lut[currCnt - pos - 1];
+}
+
+#endif
 #endif
 

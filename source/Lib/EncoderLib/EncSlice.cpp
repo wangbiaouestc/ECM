@@ -564,7 +564,11 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
  #endif
   if(rpcSlice->getPPS()->getSliceChromaQpFlag())
   {
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    const bool bUseIntraOrPeriodicOffset = (rpcSlice->isIntra() && !rpcSlice->getUseIBC()) || (m_pcCfg->getSliceChromaOffsetQpPeriodicity() > 0 && (rpcSlice->getPOC() % m_pcCfg->getSliceChromaOffsetQpPeriodicity()) == 0);
+#else
     const bool bUseIntraOrPeriodicOffset = (rpcSlice->isIntra() && !rpcSlice->getSPS()->getIBCFlag()) || (m_pcCfg->getSliceChromaOffsetQpPeriodicity() > 0 && (rpcSlice->getPOC() % m_pcCfg->getSliceChromaOffsetQpPeriodicity()) == 0);
+#endif
     int cbQP = bUseIntraOrPeriodicOffset ? m_pcCfg->getSliceChromaOffsetQpIntraOrPeriodic(false) : m_pcCfg->getGOPEntry(iGOPid).m_CbQPoffset;
     int crQP = bUseIntraOrPeriodicOffset ? m_pcCfg->getSliceChromaOffsetQpIntraOrPeriodic(true)  : m_pcCfg->getGOPEntry(iGOPid).m_CrQPoffset;
 
@@ -1580,6 +1584,21 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
   }
 
   const bool bWp_explicit = (pcSlice->getSliceType()==P_SLICE && pcSlice->getPPS()->getUseWP()) || (pcSlice->getSliceType()==B_SLICE && pcSlice->getPPS()->getWPBiPred());
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if(pcSlice->getSPS()->getIBCFlag())
+  {
+    auto sliceType = pcSlice->getSliceType();
+
+    if(sliceType == I_SLICE)
+    {
+      pcSlice->setUseIBC(pcSlice->getSPS()->getIBCFlag());
+    }
+    else
+    {
+      pcSlice->setUseIBC(pcSlice->getSPS()->getIBCFlagInterSlice());
+    }
+  }
+#endif
 
   if ( bWp_explicit )
   {
@@ -1779,11 +1798,15 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 
     prevQP[0] = prevQP[1] = pcSlice->getSliceQp();
 
-#if JVET_AC0335_CONTENT_ADAPTIVE_OBMC_ENABLING && ENABLE_OBMC
+#if (JVET_AC0335_CONTENT_ADAPTIVE_OBMC_ENABLING && ENABLE_OBMC) || JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     int hashBlkHitPerc = -1;
 #endif
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if( ( !pcSlice->isIntra() && pcSlice->getSPS()->getFpelMmvdEnabledFlag() ) || ( pcSlice->getUseIBC() && m_pcCuEncoder->getEncCfg()->getIBCHashSearch() ) )
+#else
   if( ( !pcSlice->isIntra() && pcSlice->getSPS()->getFpelMmvdEnabledFlag() ) || ( pcSlice->getSPS()->getIBCFlag() && m_pcCuEncoder->getEncCfg()->getIBCHashSearch() ) )
+#endif
   {
 #if JVET_AA0070_RRIBC
     m_pcCuEncoder->getIbcHashMap().rebuildPicHashMap(cs.picture->getTrueOrigBuf(), CS::isDualITree(cs));
@@ -1792,7 +1815,7 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 #endif
     if (m_pcCfg->getIntraPeriod() != -1)
     {
-#if JVET_AC0335_CONTENT_ADAPTIVE_OBMC_ENABLING && ENABLE_OBMC
+#if (JVET_AC0335_CONTENT_ADAPTIVE_OBMC_ENABLING && ENABLE_OBMC) || JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
       hashBlkHitPerc = m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y());
 #else
       int hashBlkHitPerc = m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y());
@@ -1807,12 +1830,37 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     if (cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE) // ensure sequential and parallel simulation generate same output
     {
       SPS* spsTmp = const_cast<SPS*>(cs.sps);
-      hashBlkHitPerc == -1 ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
+      hashBlkHitPerc = (hashBlkHitPerc == -1) ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
       bool hashScc = hashBlkHitPerc < 57;
       spsTmp->setUseOBMC(hashScc);
 #if JVET_Z0061_TM_OBMC
-      spsTmp->setUseOBMCTMMode(hashScc);
+      if( m_pcLib->getUseOBMCTMMode() )
+      {
+        spsTmp->setUseOBMCTMMode( hashScc );
+      }
 #endif
+    }
+  }
+#endif
+#if JVET_AD0188_CCP_MERGE
+  if ((pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU()))
+  {
+#if JVET_Z0118_GDR
+    cs.ccpLut.lutCCP0.resize(0);
+    cs.ccpLut.lutCCP1.resize(0);
+#else
+    cs.ccpLut.lutCCP.resize(0);
+#endif
+  }
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (pcSlice->getUseIBC() && m_pcCuEncoder->getEncCfg()->getIBCHashSearch() && m_pcCuEncoder->getEncCfg()->getIBCFracMode())
+  {
+    if (cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE) // ensure sequential and parallel simulation generate same output
+    {
+      hashBlkHitPerc = hashBlkHitPerc == -1 ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
+      bool isSCC = hashBlkHitPerc >= 60;
+      cs.picHeader->setDisFracMBVD(isSCC);
     }
   }
 #endif
@@ -1831,7 +1879,11 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     DTRACE_UPDATE( g_trace_ctx, std::make_pair( "ctu", ctuRsAddr ) );
 
     if( pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU() )
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if ((cs.slice->getSliceType() != I_SLICE || cs.slice->getUseIBC()) && cs.pps->ctuIsTileColBd( ctuXPosInCtus ))
+#else
     if ((cs.slice->getSliceType() != I_SLICE || cs.sps->getIBCFlag()) && cs.pps->ctuIsTileColBd( ctuXPosInCtus ))
+#endif
     {
 #if JVET_Z0118_GDR
       cs.motionLut.lut0.resize(0);      
@@ -1870,6 +1922,18 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 #endif
 #endif
     }
+
+#if JVET_AD0188_CCP_MERGE
+    if ((pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU()) && cs.pps->ctuIsTileColBd(ctuXPosInCtus))
+    {
+#if JVET_Z0118_GDR
+      cs.ccpLut.lutCCP0.resize(0);
+      cs.ccpLut.lutCCP1.resize(0);
+#else
+      cs.ccpLut.lutCCP.resize(0);
+#endif
+    }
+#endif
 
     const SubPic &curSubPic = pcSlice->getPPS()->getSubPicFromPos(pos);
     // padding/restore at slice level

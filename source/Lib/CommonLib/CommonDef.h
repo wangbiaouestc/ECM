@@ -113,7 +113,7 @@
 #define NULL              0
 #endif
 
-#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 static const int SUB_TMVP_CANDIDATE_NUM = 10;
 static const int SUB_TMVP_INDEX = 3;  // 1: 2 subtmvp; 2: 4 subtmvp
 static const int SUB_TMVP_NUM = 2 * SUB_TMVP_INDEX;
@@ -158,7 +158,7 @@ static const int MAX_NUM_REF =                                     16; ///< max.
 static const int MAX_QP =                                          63;
 static const int NOT_VALID =                                       -1;
 
-#if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP)
+#if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
 static const int REGULAR_AMVP_MAX_NUM_CANDS =                       5; ///< AMVP: advanced motion vector prediction - max number of final candidate for regular inter mode
 #endif
 static const int AMVP_MAX_NUM_CANDS =                               2; ///< AMVP: advanced motion vector prediction - max number of final candidates
@@ -319,29 +319,55 @@ static const int MAX_NUM_ALF_CLASSES         =                     25;
 static const int MAX_NUM_ALF_ALTERNATIVES_LUMA = 4;
 static const int EXT_LENGTH = 2;
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER
+static const int ALF_PADDING_SIZE_FIXED_RESULTS  =                  6;
+static const int NUM_FIXED_BASED_COEFF_NEW       =                 19;
+#else
 static const int ALF_PADDING_SIZE_FIXED_RESULTS  =                  2;
+#endif
 static const int NUM_FIXED_BASED_COEFF       =                      7;
 #endif
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
 static const int NUM_RESI                    =                      1;
 static const int NUM_RESI_SAMPLE             =                      1;
-static const int NUM_RESI_PAD                =                      0;
+static const int NUM_RESI_PAD                =                      8;
+#endif
+#if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+static const int NUM_GAUSS_FILTERED_COEFF        =                  5;
+static const int NUM_GAUSS_FILTERED_SOURCE       =                  1;
+static const int ALF_PADDING_SIZE_GAUSS_RESULTS  =                  2;
 #endif
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
 static const int NUM_DB                      =                      3;
 static const int NUM_DB_SAMPLE               =                      5;
 
-#if JVET_Z0118_GDR
+#if JVET_Z0118_GDR || JVET_AD0222_ADDITONAL_ALF_FIXFILTER
 static const int NUM_DB_PAD                  =                      8;
 #else
 static const int NUM_DB_PAD                  =                      1;
 #endif
 
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_RESI + 1 + NUM_GAUSS_FILTERED_COEFF;
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_RESI + 1
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF + NUM_RESI + 1 + NUM_GAUSS_FILTERED_COEFF;
+#else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF + NUM_RESI + 1;
+#endif
 #else
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_GAUSS_FILTERED_COEFF;
+#elif JVET_AD0222_ALF_LONG_FIXFILTER
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW;
+#elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF + NUM_GAUSS_FILTERED_COEFF;
+#else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF;
+#endif
 #else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB;
 #endif
@@ -387,9 +413,19 @@ static const int ALF_CTB_MAX_NUM_APS         =                      8;
 static const int ALF_ORDER                   =                      4;
 static const int NUM_FIXED_FILTER_SETS       =                      2;
 #if JVET_X0071_ALF_BAND_CLASSIFIER
+#if JVET_AD0222_ALF_RESI_CLASS
+static const int ALF_RESI_SHIFT_OFFSET       =                      4;
+static const int NUM_RESI_ABS_PAD            =                      8;
+static const int ALF_PADDING_SIZE_PRED       =                      3;
+static const int ALF_NUM_CLASSIFIER          =                      3;
+static const int ALF_CLASSES_RESI            =                     25;
+static const int ALF_CLASSES_NEW             =                     25;
+static const int ALF_NUM_CLASSES_CLASSIFIER[ALF_NUM_CLASSIFIER] = { MAX_NUM_ALF_CLASSES, ALF_CLASSES_NEW, ALF_CLASSES_RESI };
+#else
 static const int ALF_NUM_CLASSIFIER          =                      2;
 static const int ALF_CLASSES_NEW             =                     25;
 static const int ALF_NUM_CLASSES_CLASSIFIER[ALF_NUM_CLASSIFIER] = { MAX_NUM_ALF_CLASSES,  ALF_CLASSES_NEW };
+#endif
 #endif
 #else 
 static const int NUM_FIXED_FILTER_SETS       =                     16;
@@ -568,6 +604,10 @@ static const int NUM_VER_BVD_CTX         = 5;
 static const int HOR_BVD_CTX_OFFSET      = 0;
 static const int BVD_IBC_MAX_PREFIX      = 16;
 static const int VER_BVD_CTX_OFFSET      = 6;
+#endif
+
+#if JVET_AD0140_MVD_PREDICTION
+static const int MVD_CODING_GOLOMB_ORDER = 1;
 #endif
 
 #if JVET_W0119_LFNST_EXTENSION
@@ -769,7 +809,12 @@ static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_LUMA =      28;
 static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA =    28;
 
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+static const int BDOF_SUBPU_DIM_LOG2          =                     2;
+static const int BDOF_SUBPU_AREA_THRESHOLD    =                   256;
+#else
 static const int BDOF_SUBPU_DIM_LOG2          =                     3;
+#endif
 static const int BDOF_SUBPU_DIM               =                     (1 << BDOF_SUBPU_DIM_LOG2);
 static const int BDOF_SUBPU_MAX_NUM           =                     ((MAX_CU_SIZE * MAX_CU_SIZE) >> (BDOF_SUBPU_DIM_LOG2 << 1));
 static const int BDOF_SUBPU_STRIDE            =                     (MAX_CU_SIZE >> BDOF_SUBPU_DIM_LOG2);
@@ -844,8 +889,10 @@ static const int    PICTURE_DISTANCE_TH =                           1;
 static const int    FAST_SKIP_DEPTH =                               2;
 
 static const double PBINTRA_RATIO     =                             1.1;
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
 static const int    THRES_TRANS =                                  16;
+#endif
+#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
 static const int    THRES_AFFINE =                                  4;
 #endif
 #if !MERGE_ENC_OPT
@@ -895,6 +942,9 @@ static const int    NUM_AF_MMVD_SATD_CAND = std::min((int)1, MRG_MAX_NUM_CANDS);
 #if INTER_LIC
 static const int    LIC_MIN_CU_PIXELS =                            32; ///< smallest CU size (in terms of number of luma samples) of LIC
 static const double LIC_AMVP_SKIP_TH  =                           1.2; ///< Given a IMV mode, LIC is not tested if RD cost of non-LIC IMV AMVP mode is 1.2x worse than the current best RD cost
+#if JVET_AD0213_LIC_IMP
+static const int    NUM_LIC_ITERATION =                             3;
+#endif
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 static const int    TM_TPL_SIZE =                                   4; ///< template size for template matching
@@ -942,6 +992,16 @@ static const int    AFFINE_DMVR_SEARCH_RANGE                      = 3;
 #if JVET_AC0144_AFFINE_DMVR_REGRESSION
 static const int    AFFINE_DMVR_INT_SRCH_RANGE                    = 2;
 static const int    AFFINE_DMVR_MIN_SUBBLK_SIZE                   = 4;
+#endif
+#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+static const int DMVR_PARA_BASE_NUM                               = 3;
+static const int DMVR_PARA_ROUND_NUM_BASE0                        = 7;
+static const int DMVR_PARA_ROUND_NUM_BASE1                        = 2;
+static const int DMVR_PARA_ROUND_NUM_BASE2                        = 1; 
+static const double TH_COST                                       = 0.90;
+static const int PARA_PRECISION_BIT                               = 2;
+static const int AFFINE_ADAPTIVE_DMVR_MAX_CAND                    = 1;
+static const int AFFINE_ADAPTIVE_DMVR_INIT_SIZE                   = 15;
 #endif
 #endif
 static const int    AML_MERGE_TEMPLATE_SIZE                       = 1;
@@ -1026,6 +1086,16 @@ static const double CCCM_NO_SUB_WEIGHT    = 1.1;
 static const int CCCM_LOC_SHIFT           = 3;
 static const int CCCM_LOC_OFFSET          = (1 << CCCM_LOC_SHIFT);
 #endif
+#if JVET_AD0202_CCCM_MDF
+static const int CCCM_NUM_PRED_FILTER = 4;
+static const int TOTAL_NUM_CCCM_MODES = CCCM_NUM_MODES * CCCM_NUM_PRED_FILTER;
+static const int VALID_NUM_CCCM_MODES = TOTAL_NUM_CCCM_MODES - 6;
+static const int CCCM_MULTI_PRED_FILTER_NUM_PARAMS = 10;
+static const int CCCM_MULTI_PRED_FILTER_NUM_PARAMS2 = 11;
+#endif
+#if JVET_AD0120_LBCCP
+static const int LBCCP_FILTER_MMLMNUM = 4 + 3;// multi-model TL mode of CCLM, CCCM w/ subsample, CCCM w/o subsample if applicable, GL-CCCM, and three more from CCCM_MDF
+#endif
 #endif
 
 #if JVET_AA0126_GLM
@@ -1058,6 +1128,10 @@ static const int NUM_GLM_IDC =                                     33;
 #if JVET_AC0119_LM_CHROMA_FUSION
 static const int CFLM_NUM_PARAMS = 3;
 static const int CFLM_MAX_REF_SAMPLES = CCCM_MAX_REF_SAMPLES;
+#endif
+#if JVET_AE0059_INTER_CCCM
+static const int INTER_CCCM_NUM_PARAMS = 8;
+static const int INTER_CCCM_MAX_REF_SAMPLES = 256;
 #endif
 #if JVET_AC0071_DBV
 static const int NUM_DBV_POSITION = 5;
@@ -1099,6 +1173,9 @@ static const int MAX_LADF_INTERVALS       =                         5; /// max n
 static const int MAX_RPR_SWITCHING_ORDER_LIST_SIZE           =     32; /// max number of pre-defined RPR switching segments
 #endif
 static const int NTAPS_BILINEAR           =                         2; ///< Number of taps for bilinear filter
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+static const int NTAPS_LUMA_IBC           =                         8; ///< Number of taps for IBC luma filter
+#endif
 
 #if INTER_RM_SIZE_CONSTRAINTS
 static const int ATMVP_SUB_BLOCK_SIZE =                             2; ///< sub-block size for ATMVP
@@ -1212,6 +1289,12 @@ static const int CHROMA_REFINEMENT_CANDIDATES = 8; /// 8 candidates BV to choose
 static const int IBC_FAST_METHOD_NOINTRA_IBCCBF0 = 0x01;
 static const int IBC_FAST_METHOD_BUFFERBV = 0X02;
 static const int IBC_FAST_METHOD_ADAPTIVE_SEARCHRANGE = 0X04;
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+static const int IBC_FAST_METHOD_NONSCC =                         0X08;
+static const int IBC_NONSCC_ENC_RD_NZ_COUNT =                        3;
+static const int IBC_SEARCH_RANGE =                                 32;
+static const int IBC_SUBPEL_AMVR_MODE_FOR_ZERO_MVD =           IMV_OFF;
+#endif
 #if JVET_AA0061_IBC_MBVD
 static const int IBC_MBVD_BASE_NUM =                                 5;
 static const int IBC_MBVD_STEP_NUM =                                 20; // number of distance offset
@@ -1338,8 +1421,28 @@ static const int EXT_PICTURE_SIZE =                             16;
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
 static const int IBC_BVD_PREDICTION_MAX_BIN_NUM =                4;
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
+#if JVET_AD0188_CCP_MERGE
+static const int MAX_CCP_CAND_LIST_SIZE = 12;
+static const int MAX_NUM_HCCP_CANDS     = 6;
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+static const int NUM_CCP_PARAMS = CCCM_NO_SUB_NUM_PARAMS;
+#else
+static const int NUM_CCP_PARAMS = CCCM_NUM_PARAMS;
+#endif
+#endif
+#if JVET_AD0140_MVD_PREDICTION
+static const int MVD_PREDICTION_SIGN_SUFFIX_BIN_THR =            2;
+static const int MVD_PREDICTION_EGC_OFFSET =                     1;
+static const int MAX_NUM_REFIDX =                                5;
+static const int MAX_NUM_CANDS =                                64;
+#endif
+#if JVET_AA0057_CCCM
+// max number of parameters used in CCCM related methods
+static const int CCCM_NUM_PARAMS_MAX =      CCCM_NO_SUB_NUM_PARAMS;
+static const int CCCM_REF_SAMPLES_MAX =       CCCM_MAX_REF_SAMPLES;
+#endif
 
 // ====================================================================================================================
 // Macro functions
@@ -1347,10 +1450,10 @@ static const int IBC_BVD_PREDICTION_MAX_BIN_NUM =                4;
 
 struct ClpRng
 {
-  int min;
-  int max;
-  int bd;
-  int n;
+  int min {0};
+  int max {0};
+  int bd  {0};
+  int n   {0};
 };
 
 struct ClpRngs
@@ -1532,7 +1635,7 @@ static inline int floorLog2(uint32_t x)
 #endif
 }
 
-#if JVET_X0149_TIMD_DIMD_LUT
+#if JVET_X0149_TIMD_DIMD_LUT || JVET_AD0195_HIGH_PRECISION_BDOF_CORE
 static inline int floorLog2Uint64(uint64_t x)
 {
   if (x == 0)
@@ -1690,9 +1793,21 @@ static const int NUM_CLASSIFIER          = 2;
 static const int NUM_SETS_FIXED_FILTERS  = 8;
 static const int NUM_DIR_FIX             = 7;
 static const int NUM_ACT_FIX             = 16;
+#if JVET_AE0139_ALF_IMPROVED_FIXFILTER
+static const int DIST_CLASS              = 4;
+static const int NUM_DIST_FIX            = 8;
+static const int NUM_CLASSES_FIX         = ((NUM_DIR_FIX*(NUM_DIR_FIX + 1))*NUM_ACT_FIX * NUM_DIST_FIX);
+#else
 static const int NUM_CLASSES_FIX         = ((NUM_DIR_FIX*(NUM_DIR_FIX + 1))*NUM_ACT_FIX);
+#endif
 static const int MAX_FILTER_LENGTH_FIXED = 13;
+#if JVET_AE0139_ALF_IMPROVED_FIXFILTER
+static const int FIX_FILTER_NUM_COEFF_9_DB_9            = 41;
+static const int FIX_FILTER_NUM_COEFF_DB_COMBINE_9_DB_9 = 21;
+static const int FIX_FILTER_NUM_COEFF_13_DB_9           = 64;
+#else
 static const int FIX_FILTER_NUM_COEFF    = 42;
+#endif
 #endif
 
 #if JVET_V0130_INTRA_TMP
@@ -1701,10 +1816,40 @@ static const int TMP_MAXSIZE_DEPTH =            6; // should be log2(TMP_TEMPLAT
 static const int USE_MORE_BLOCKSIZE_DEPTH_MAX = TMP_MAXSIZE_DEPTH - 1;
 static const int INIT_THRESHOULD_SHIFTBITS =    2;  ///< (default 2) Early skip threshold for checking distance.
 static const int TMP_SEARCH_RANGE_MULT_FACTOR = 5;
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+static const int TMP_FUSION_NUM      = 5;
+static const int TMP_GROUP_IDX       = 3;
+static const int FUSION_IDX_NUM      = TMP_FUSION_NUM * TMP_GROUP_IDX;
+static const int MTMP_NUM            = 19;
+static const int MTMP_NUM_SPARSE     = 30;
+static const int TL_NUM              = 3;
+static const int TL_NUM_SPARSE       = TL_NUM << 1;
+static const int TMP_MINSR           = 64;
+static const int TMP_FILTER_PADDING  = 1;
+static const int TMP_BEST_CANDIDATES = TMP_FUSION_NUM;
+static const int TMP_FUSION_PARAMS   = TMP_BEST_CANDIDATES + 1;
+static const int TMP_FLM_PARAMS      = 6;
+static const int TMP_FUSHION_CCCM_MAX_REF_SAMPLES =
+  (2 * (TMP_TEMPLATE_SIZE * MAX_CU_SIZE) + TMP_TEMPLATE_SIZE * TMP_TEMPLATE_SIZE);
+static const int TMP_SAMPLING       = 3;
+static const int TMP_SUBPEL_PAD_NUM = 2;
+static const int TMP_MAX_SUBPEL_DIR = 8;
+struct IntraTMPFusionInfo
+{
+  bool    bValid;
+  bool    bFilter;
+  int     tmpFusionIdx;
+  int     tmpMaxNum;
+  int     tmpFusionNumber;
+  int     tmpFusionWeight[TMP_FUSION_NUM];
+  int64_t tmpFushionParams[TMP_FUSION_PARAMS];
+};
+#else 
 #if JVET_AB0130_ITMP_SAMPLING
 static const int LOG2_TMP_SAMPLING = 1;
 static const int TMP_SAMPLING = 1 << LOG2_TMP_SAMPLING;
 #endif
+#endif 
 #endif
 
 #endif // end of #ifndef  __COMMONDEF__

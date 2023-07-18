@@ -240,6 +240,31 @@ void addAvgCore( const T* src1, int src1Stride, const T* src2, int src2Stride, T
 #undef ADD_AVG_CORE_INC
 }
 
+#if JVET_AD0213_LIC_IMP
+template< typename T >
+void toLastCore(T* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng)
+{
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      src[x] = ClipPel(rightShift((src[x] + offset), shiftNum), clpRng);
+    }
+    src += srcStride;
+  }
+}
+
+template< typename T >
+void licRemoveWeightHighFreqCore(T* src0, T* src1, T* dst, int length, int w0, int w1, int offset, const ClpRng& clpRng)
+{
+  for (int w = 0; w < length; w++)
+  {
+    T iTemp = ClipPel(T((int(src0[w])*w0 - int(src1[w])*w1 + offset) >> 16), clpRng);
+    dst[w] = iTemp;
+  }
+}
+#endif
+
 void addBIOAvgCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel*gradY1, int gradStride, int width, int height, int tmpx, int tmpy, int shift, int offset, const ClpRng& clpRng)
 {
   int b = 0;
@@ -280,6 +305,77 @@ void addBIOAvgCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Str
     gradX0 += gradStride; gradX1 += gradStride; gradY0 += gradStride; gradY1 += gradStride;
   }
 }
+
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+void calcBIOParameterCoreHighPrecision(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, Pel* dI)
+{
+  width -= 2;
+  height -= 2;
+  const int bioParamOffset = widthG + 1;
+  srcY0Tmp += src0Stride + 1;
+  srcY1Tmp += src1Stride + 1;
+  gradX0 += bioParamOffset;  gradX1 += bioParamOffset;
+  gradY0 += bioParamOffset;  gradY1 += bioParamOffset;
+  s1  += bioParamOffset;  s2  += bioParamOffset;
+  s3    += bioParamOffset;  s5    += bioParamOffset;
+  s6 += bioParamOffset;
+  int shift4 = 4;
+  dI += bioParamOffset;
+  int32_t  temp=0, tempGX=0, tempGY=0;
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      temp = (int32_t) ((srcY1Tmp[x] >> shift4) - (srcY0Tmp[x] >> shift4)) ;
+      tempGX = (int32_t) (gradX0[x] + gradX1[x]);
+      tempGY = (int32_t) (gradY0[x] + gradY1[x]);
+      dI[x] = (Pel) temp;
+      s1[x] =  tempGX * tempGX;
+      s2[x] =  tempGX * tempGY;
+      s5[x] =  tempGY * tempGY;
+      s3[x] = tempGX * temp;
+      s6[x] = tempGY * temp;
+      
+    }
+    srcY0Tmp += src0Stride;
+    srcY1Tmp += src1Stride;
+    gradX0 += widthG;
+    gradX1 += widthG;
+    gradY0 += widthG;
+    gradY1 += widthG;
+    s1 += widthG;
+    s2 += widthG;
+    s3 += widthG;
+    s5 += widthG;
+    s6 += widthG;
+    dI += widthG;
+  }
+  
+  return;
+}
+
+void calcBIOParamSum4CoreHighPrecision(int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6)
+{
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      int w = 1;
+      w = (x >= (width/2) ? width - x : x + 1) * (y >= (height/2) ? height - y : y + 1);
+      *sumS1 += w * s1[x];
+      *sumS2 += w * s2[x];
+      *sumS3 += w * s3[x];
+      *sumS5 += w * s5[x];
+      *sumS6 += w * s6[x];
+    }
+    s1 += widthG;
+    s2 += widthG;
+    s3 += widthG;
+    s5 += widthG;
+    s6 += widthG;
+  }
+}
+#endif
 
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
 void calcBIOParameterCore(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, Pel* dI)
@@ -373,11 +469,21 @@ void calcBIOParamSum5Core(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
       {
         for (int xx = 0; xx < 5; xx++)
         {
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+          int w = 1;
+          w = (xx >= 2 ? 5 - xx : xx + 1) * (yy >= 2 ? 5 - yy : yy + 1);
+          sumAbsGX[sampleIdx] += w * absGX[xx];
+          sumAbsGY[sampleIdx] += w * absGY[xx];
+          sumDIX[sampleIdx] += w * dIX[xx];
+          sumDIY[sampleIdx] += w * dIY[xx];
+          sumSignGyGx[sampleIdx] += w * signGyGx[xx];
+#else
           sumAbsGX[sampleIdx] += absGX[xx];
           sumAbsGY[sampleIdx] += absGY[xx];
           sumDIX[sampleIdx] += dIX[xx];
           sumDIY[sampleIdx] += dIY[xx];
           sumSignGyGx[sampleIdx] += signGyGx[xx];
+#endif
         }
         absGX += widthG;
         absGY += widthG;
@@ -947,7 +1053,12 @@ PelBufferOps::PelBufferOps()
 #endif
   addAvg4 = addAvgCore<Pel>;
   addAvg8 = addAvgCore<Pel>;
-
+#if JVET_AD0213_LIC_IMP
+  toLast2 = toLastCore<Pel>;
+  toLast4 = toLastCore<Pel>;
+  licRemoveWeightHighFreq2 = licRemoveWeightHighFreqCore<Pel>;
+  licRemoveWeightHighFreq4 = licRemoveWeightHighFreqCore<Pel>;
+#endif
   reco4 = reconstructCore<Pel>;
   reco8 = reconstructCore<Pel>;
 
@@ -955,6 +1066,10 @@ PelBufferOps::PelBufferOps()
   linTf8 = linTfCore<Pel>;
 
   addBIOAvg4      = addBIOAvgCore;
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+  calcBIOParameterHighPrecision   = calcBIOParameterCoreHighPrecision;
+  calcBIOParamSum4HighPrecision   = calcBIOParamSum4CoreHighPrecision;
+#endif
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
   calcBIOParameter   = calcBIOParameterCore;
   calcBIOParamSum5   = calcBIOParamSum5Core;
@@ -1497,8 +1612,33 @@ void AreaBuf<Pel>::toLast( const ClpRng& clpRng )
 
   if (width == 1)
   {
+#if JVET_AD0213_LIC_IMP
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        src[x] = ClipPel(rightShift((src[x] + offset), shiftNum), clpRng);
+      }
+      src += srcStride;
+    }
+#else
     THROW( "Blocks of width = 1 not supported" );
+#endif
   }
+#if JVET_AD0213_LIC_IMP
+  else if ((width & 3) == 0)
+  {
+    g_pelBufOP.toLast4(src, srcStride, width, height, shiftNum, offset, clpRng);
+  }
+  else if ((width & 1) == 0)
+  {
+    g_pelBufOP.toLast2(src, srcStride, width, height, shiftNum, offset, clpRng);
+  }
+  else
+  {
+    THROW("Unsupported size!");
+  }
+#else
   else if (width&2)
   {
     for ( int y = 0; y < height; y++ )
@@ -1526,6 +1666,7 @@ void AreaBuf<Pel>::toLast( const ClpRng& clpRng )
       src += srcStride;
     }
   }
+#endif
 }
 
 
@@ -1683,12 +1824,6 @@ template<>
 void AreaBuf<Pel>::subtract( const Pel val )
 {
   ClpRng clpRngDummy;
-
-  clpRngDummy.min = 0;
-  clpRngDummy.max = 0;
-  clpRngDummy.bd = 0;
-  clpRngDummy.n = 0;
-
   linearTransform( 1, 0, -val, false, clpRngDummy );
 }
 #endif

@@ -72,6 +72,12 @@ struct PelBufferOps
   void ( *addAvg4 )       ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,            int shift, int offset, const ClpRng& clpRng );
   void ( *addAvg8 )       ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,            int shift, int offset, const ClpRng& clpRng );
 #endif
+#if JVET_AD0213_LIC_IMP
+  void(*toLast2)       (Pel* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng);
+  void(*toLast4)       (Pel* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng);
+  void(*licRemoveWeightHighFreq2) (Pel* src0, Pel* src1, Pel* dst, int length, int w0, int w1, int offset, const ClpRng& clpRng);
+  void(*licRemoveWeightHighFreq4) (Pel* src0, Pel* src1, Pel* dst, int length, int w0, int w1, int offset, const ClpRng& clpRng);
+#endif
   void ( *reco4 )         ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,                                   const ClpRng& clpRng );
   void ( *reco8 )         ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,                                   const ClpRng& clpRng );
   void ( *linTf4 )        ( const Pel* src0, int src0Stride,                                  Pel *dst, int dstStride, int width, int height, int scale, int shift, int offset, const ClpRng& clpRng, bool bClip );
@@ -79,6 +85,10 @@ struct PelBufferOps
   void(*addBIOAvg4)    (const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel*gradY1, int gradStride, int width, int height, int tmpx, int tmpy, int shift, int offset, const ClpRng& clpRng);
   void(*bioGradFilter) (Pel* pSrc, int srcStride, int width, int height, int gradStride, Pel* gradX, Pel* gradY, const int bitDepth);
   void(*calcBIOPar)    (const Pel* srcY0Temp, const Pel* srcY1Temp, const Pel* gradX0, const Pel* gradX1, const Pel* gradY0, const Pel* gradY1, int* dotProductTemp1, int* dotProductTemp2, int* dotProductTemp3, int* dotProductTemp5, int* dotProductTemp6, const int src0Stride, const int src1Stride, const int gradStride, const int widthG, const int heightG, const int bitDepth);
+#if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+  void(*calcBIOParameterHighPrecision)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, Pel* dI);
+  void(*calcBIOParamSum4HighPrecision)   (int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6);
+#endif
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
   void(*calcBIOParameter)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, Pel* dI);
   void(*calAbsSum)          (const Pel* diff, int stride, int width, int height, int* absDiff);
@@ -214,6 +224,9 @@ struct AreaBuf : public Size
 
 #if JVET_AA0070_RRIBC
   void flipSignal(bool isFlipHor);
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  void flip                 ( const int flipType = 0 );
+#endif
 #endif
 
   void rspSignal            ( std::vector<Pel>& pLUT );
@@ -331,55 +344,20 @@ else                                                        \
 template<typename T>
 void AreaBuf<T>::fill(const T &val)
 {
-  if( sizeof( T ) == 1 )
+  if( width == stride )
   {
-    if( width == stride )
-    {
-      ::memset( buf, reinterpret_cast< const signed char& >( val ), width * height * sizeof( T ) );
-    }
-    else
-    {
-      T* dest = buf;
-      size_t line = width * sizeof( T );
-
-      for( unsigned y = 0; y < height; y++ )
-      {
-        ::memset( dest, reinterpret_cast< const signed char& >( val ), line );
-
-        dest += stride;
-      }
-    }
-  }
-  else if( T( 0 ) == val )
-  {
-    if( width == stride )
-    {
-      ::memset( buf, 0, width * height * sizeof( T ) );
-    }
-    else
-    {
-      T* dest = buf;
-      size_t line = width * sizeof( T );
-
-      for( unsigned y = 0; y < height; y++ )
-      {
-        ::memset( dest, 0, line );
-
-        dest += stride;
-      }
-    }
+    std::fill_n( buf, width * height, val );
   }
   else
   {
     T* dest = buf;
 
-#define FILL_INC        dest      += stride
-#define FILL_OP( ADDR ) dest[ADDR] = val
+    for( unsigned y = 0; y < height; y++ )
+    {
+      std::fill_n( dest, width, val );
 
-    SIZE_AWARE_PER_EL_OP( FILL_OP, FILL_INC );
-
-#undef FILL_INC
-#undef FILL_OP
+      dest += stride;
+    }
   }
 }
 
@@ -388,16 +366,15 @@ void AreaBuf<T>::memset( const int val )
 {
   if( width == stride )
   {
-    ::memset( buf, val, width * height * sizeof( T ) );
+    std::fill_n( reinterpret_cast< char * >(buf), width * height * sizeof( T ), val );
   }
   else
   {
-    T* dest = buf;
-    size_t line = width * sizeof( T );
+    T *dest = buf;
 
     for( int y = 0; y < height; y++ )
     {
-      ::memset( dest, val, line );
+      std::fill_n( reinterpret_cast< char * >(dest), width * sizeof( T ), val );
 
       dest += stride;
     }
@@ -438,6 +415,43 @@ void AreaBuf<T>::copyFrom( const AreaBuf<const T> &other )
     }
   }
 }
+
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+template<typename T>
+void AreaBuf<T>::flip(int flipType) // flipType = [0] no flip, [1] hor, [2] ver
+{
+  if (buf == nullptr)
+  {
+    return;
+  }
+
+  if (flipType == 2)
+  {
+    T* dstA = buf;
+    T* dstB = buf + (height - 1) * stride;
+    for (int h = (int)(height >> 1); h > 0; --h)
+    {
+      std::swap_ranges(dstA, dstA + width, dstB);
+      dstA += stride;
+      dstB -= stride;
+    }
+  }
+  else if (flipType == 1)
+  {
+    int length = (int)(width >> 1);
+    T* dstL = buf;
+    T* dstR = buf + length;
+    for (int h = (int)height; h > 0; --h)
+    {
+      std::swap_ranges(dstL, dstL + length, dstR);
+      std::reverse(dstL, dstL + length);
+      std::reverse(dstR, dstR + length);
+      dstL += stride;
+      dstR += stride;
+    }
+  }
+}
+#endif
 
 #if MULTI_HYP_PRED
 template<>

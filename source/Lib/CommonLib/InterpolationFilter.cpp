@@ -1101,6 +1101,52 @@ const TFilterCoeff InterpolationFilter::m_chromaFilterRPR2[CHROMA_INTERPOLATION_
 #endif
 };
 
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if IF_12TAP
+#define _ADJIF_(x)  ((x) * 4)
+#else
+#define _ADJIF_(x)  (x)
+#endif
+
+const TFilterCoeff InterpolationFilter::m_bilinearFilterChroma[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_BILINEAR] =
+{
+  { _ADJIF_(64), _ADJIF_( 0), },
+  { _ADJIF_(62), _ADJIF_( 2), },
+  { _ADJIF_(60), _ADJIF_( 4), },
+  { _ADJIF_(58), _ADJIF_( 6), },
+  { _ADJIF_(56), _ADJIF_( 8), },
+  { _ADJIF_(54), _ADJIF_(10), },
+  { _ADJIF_(52), _ADJIF_(12), },
+  { _ADJIF_(50), _ADJIF_(14), },
+  { _ADJIF_(48), _ADJIF_(16), },
+  { _ADJIF_(46), _ADJIF_(18), },
+  { _ADJIF_(44), _ADJIF_(20), },
+  { _ADJIF_(42), _ADJIF_(22), },
+  { _ADJIF_(40), _ADJIF_(24), },
+  { _ADJIF_(38), _ADJIF_(26), },
+  { _ADJIF_(36), _ADJIF_(28), },
+  { _ADJIF_(34), _ADJIF_(30), },
+  { _ADJIF_(32), _ADJIF_(32), },
+  { _ADJIF_(30), _ADJIF_(34), },
+  { _ADJIF_(28), _ADJIF_(36), },
+  { _ADJIF_(26), _ADJIF_(38), },
+  { _ADJIF_(24), _ADJIF_(40), },
+  { _ADJIF_(22), _ADJIF_(42), },
+  { _ADJIF_(20), _ADJIF_(44), },
+  { _ADJIF_(18), _ADJIF_(46), },
+  { _ADJIF_(16), _ADJIF_(48), },
+  { _ADJIF_(14), _ADJIF_(50), },
+  { _ADJIF_(12), _ADJIF_(52), },
+  { _ADJIF_(10), _ADJIF_(54), },
+  { _ADJIF_( 8), _ADJIF_(56), },
+  { _ADJIF_( 6), _ADJIF_(58), },
+  { _ADJIF_( 4), _ADJIF_(60), },
+  { _ADJIF_( 2), _ADJIF_(62), },
+};
+
+#undef _ADJIF_
+#endif
+
 const TFilterCoeff InterpolationFilter::m_bilinearFilter[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_BILINEAR] =
 {
 #if IF_12TAP
@@ -1166,7 +1212,6 @@ const TFilterCoeff InterpolationFilter::m_bilinearFilterPrec4[LUMA_INTERPOLATION
 InterpolationFilter::InterpolationFilter()
 {
 #if IF_12TAP
-#if !QC_SIF_SIMD
   m_filterHor[0][0][0] = filter<12, false, false, false>;
   m_filterHor[0][0][1] = filter<12, false, false, true>;
   m_filterHor[0][1][0] = filter<12, false, true, false>;
@@ -1240,9 +1285,7 @@ InterpolationFilter::InterpolationFilter()
   m_filterVer[3][1][0] = filter<2, true, true, false>;
   m_filterVer[3][1][1] = filter<2, true, true, true>;
 #endif
-#endif
 #else
-#if !QC_SIF_SIMD
   m_filterHor[0][0][0] = filter<8, false, false, false>;
   m_filterHor[0][0][1] = filter<8, false, false, true>;
   m_filterHor[0][1][0] = filter<8, false, true, false>;
@@ -1273,7 +1316,6 @@ InterpolationFilter::InterpolationFilter()
   m_filterVer[2][1][0] = filter<2, true, true, false>;
   m_filterVer[2][1][1] = filter<2, true, true, true>;
 #endif
-#endif
   m_filterCopy[0][0]   = filterCopy<false, false>;
   m_filterCopy[0][1]   = filterCopy<false, true>;
   m_filterCopy[1][0]   = filterCopy<true, false>;
@@ -1282,8 +1324,7 @@ InterpolationFilter::InterpolationFilter()
   m_filterCopyWithNoClipping = filterCopyWithNoClipping;
   m_filterReverseCopy[0]     = filterReverseCopy <true>;
   m_filterReverseCopy[1]     = filterReverseCopy <false>;
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
-#if !QC_SIF_SIMD
+#endif
   m_weightedGeoBlk = xWeightedGeoBlk;
 #if JVET_Y0065_GPM_INTRA
   m_weightedGeoBlkRounded = xWeightedGeoBlkRounded;
@@ -1292,7 +1333,6 @@ InterpolationFilter::InterpolationFilter()
   m_weightedSgpm = xWeightedSgpm;
   m_sadTM     = xSadTM;
   m_sgpmSadTM = xSgpmSadTM;
-#endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   m_weightedGeoTplA = xWeightedGeoTpl<true>;
@@ -1493,7 +1533,7 @@ void InterpolationFilter::filterReverseCopy(const ClpRng& clpRng, const Pel* src
     }
   }
 }
-#endif // JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
 #if SIMD_4x4_12 && defined(TARGET_SIMD_X86)
 void InterpolationFilter::filter4x4( const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int xFrac, int yFrac, bool isLast)
@@ -1888,7 +1928,7 @@ void InterpolationFilter::filterVer(const ClpRng& clpRng, Pel const *src, int sr
 void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx, bool biMCForDMVR, bool useAltHpelIf
 #if JVET_AC0104_IBC_BVD_PREDICTION
                                   , const bool useCopyWithNoClipping
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 )
 {
 #if JVET_AC0104_IBC_BVD_PREDICTION
@@ -1897,7 +1937,7 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
     m_filterCopyWithNoClipping(clpRng, src, srcStride, dst, dstStride, width, height);
   }
   else
-#endif //JVET_AC0104_IBC_BVD_PREDICTION
+#endif
 
   if( frac == 0 && nFilterIdx < 2 )
   {
@@ -1963,6 +2003,12 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
     {
       filterHor<8>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaAltHpelIFilter, biMCForDMVR);
     }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    else if (nFilterIdx == -1)
+    {
+      filterHor<NTAPS_LUMA_IBC>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilter[frac], biMCForDMVR);
+    }
+#endif
 #if !AFFINE_RM_CONSTRAINTS_AND_OPT
     else if ((width == 4 && height == 4) || (width == 4 && height == (4 + NTAPS_LUMA(0) - 1)))
     {
@@ -2007,6 +2053,12 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
     {
       filterHor<NTAPS_LUMA>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaAltHpelIFilter, biMCForDMVR );
     }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    else if (nFilterIdx == -1)
+    {
+      filterHor<NTAPS_LUMA_IBC>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilter[frac], biMCForDMVR);
+    }
+#endif
 #if !AFFINE_RM_CONSTRAINTS_AND_OPT
     else if( ( width == 4 && height == 4 ) || ( width == 4 && height == ( 4 + NTAPS_LUMA - 1 ) ) )
     {
@@ -2023,6 +2075,13 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
   {
     const uint32_t csx = getComponentScaleX( compID, fmt );
     CHECK( frac < 0 || csx >= 2 || ( frac << ( 1 - csx ) ) >= CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction" );
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if (nFilterIdx == 1)
+    {
+      filterHor<NTAPS_BILINEAR>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_bilinearFilterChroma[frac << ( 1 - csx )], false );
+    }
+    else
+#endif
     if( nFilterIdx == 3 )
     {
 #if JVET_Z0117_CHROMA_IF
@@ -2128,6 +2187,12 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
     {
       filterVer<8>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaAltHpelIFilter, biMCForDMVR);
     }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    else if (nFilterIdx == -1)
+    {
+      filterVer<NTAPS_LUMA_IBC>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilter[frac], biMCForDMVR);
+    }
+#endif
 #if !AFFINE_RM_CONSTRAINTS_AND_OPT
     else if (width == 4 && height == 4)
     {
@@ -2172,6 +2237,12 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
     {
       filterVer<NTAPS_LUMA>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaAltHpelIFilter, biMCForDMVR );
     }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    else if (nFilterIdx == -1)
+    {
+      filterVer<NTAPS_LUMA_IBC>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilter[frac], biMCForDMVR);
+    }
+#endif
 #if !AFFINE_RM_CONSTRAINTS_AND_OPT
     else if( width == 4 && height == 4 )
     {
@@ -2188,6 +2259,13 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
   {
     const uint32_t csy = getComponentScaleY( compID, fmt );
     CHECK( frac < 0 || csy >= 2 || ( frac << ( 1 - csy ) ) >= CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction" );
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if (nFilterIdx == 1)
+    {
+      filterVer<NTAPS_BILINEAR>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_bilinearFilterChroma[frac], false);
+    }
+    else
+#endif
     if( nFilterIdx == 3 )
     {
 #if JVET_Z0117_CHROMA_IF
