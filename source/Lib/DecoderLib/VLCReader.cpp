@@ -2648,12 +2648,18 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     }
     READ_FLAG(uiCode, "sps_ibc_enabled_flag_inter_slice");                                    pcSPS->setIBCFlagInterSlice(uiCode);
     READ_FLAG( uiCode, "sps_ibc_merge_enabled_flag" );                                        pcSPS->setUseIbcMerge( uiCode );
+#if !JVET_AE0169_BIPREDICTIVE_IBC
     if( pcSPS->getUseIbcMerge() )
     {
+#endif
 #endif
     READ_UVLC(uiCode, "six_minus_max_num_ibc_merge_cand");
     CHECK(IBC_MRG_MAX_NUM_CANDS <= uiCode, "Incorrrect max number of IBC merge candidates!");
     pcSPS->setMaxNumIBCMergeCand(IBC_MRG_MAX_NUM_CANDS - uiCode);
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS&&JVET_AE0169_BIPREDICTIVE_IBC
+    if( pcSPS->getUseIbcMerge() )
+    {
+#endif
 #if JVET_AA0061_IBC_MBVD
     READ_FLAG( uiCode, "sps_ibc_mbvd_enabled_flag" );                   pcSPS->setUseIbcMbvd             ( uiCode != 0 );
 #endif
@@ -2664,10 +2670,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     }
     else
     {
+#if !JVET_AE0169_BIPREDICTIVE_IBC
 #if JVET_Z0075_IBC_HMVP_ENLARGE
       pcSPS->setMaxNumIBCMergeCand( IBC_MRG_MAX_NUM_CANDS );
 #else
       pcSPS->setMaxNumIBCMergeCand( 0 );
+#endif
 #endif
       pcSPS->setUseIbcGpm( 0 );
       pcSPS->setUseIbcMbvd( 0 );
@@ -5073,6 +5081,20 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
     {
       pcSlice->setUseIBC(sps->getIBCFlagInterSlice());
     }
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (pcSlice->getUseIBC())
+#else
+  if (pcSlice->getSPS()->getIBCFlag())
+#endif
+  {
+    READ_FLAG(uiCode, "bi_prediction_ibc_flag"); pcSlice->setBiPredictionIBCFlag(uiCode != 0);
+  }
+  else
+  {
+    pcSlice->setBiPredictionIBCFlag(false);
+  }
 #endif
 
     int qpDelta = 0;

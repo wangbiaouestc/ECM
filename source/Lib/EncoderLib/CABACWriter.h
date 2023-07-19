@@ -185,6 +185,10 @@ public:
 #if AFFINE_MMVD
   void        affine_mmvd_data          ( const PredictionUnit&         pu );
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void        ibcBiPredictionFlag     ( const PredictionUnit&         pu );
+  void        ibcMergeIdx1            ( const PredictionUnit&         pu );
+#endif
 #if JVET_AA0061_IBC_MBVD
   void        ibcMbvdData             ( const PredictionUnit&         pu );
 #endif

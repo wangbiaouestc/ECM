@@ -909,12 +909,24 @@ unsigned LoopFilter::xGetBoundaryStrengthSingle ( const CodingUnit& cu, const De
 #endif
   const Slice&       sliceP = *cuP.slice;
 
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  if (sliceQ.isInterB() || sliceP.isInterB() || (CU::isIBC(cuQ) && cuQ.slice->getBiPredictionIBCFlag()) || (CU::isIBC(cuP) && cuP.slice->getBiPredictionIBCFlag()))
+#else
   if (sliceQ.isInterB() || sliceP.isInterB())
+#endif
   {
     const Picture *piRefP0 = (CU::isIBC(cuP) ? sliceP.getPic() : ((0 > miP.refIdx[0]) ? NULL : sliceP.getRefPic(REF_PIC_LIST_0, miP.refIdx[0])));
+#if JVET_AE0169_BIPREDICTIVE_IBC
+    const Picture *piRefP1 = (CU::isIBC(cuP) ? (miP.interDir == 3 ? sliceP.getPic() : NULL) : ((0 > miP.refIdx[1]) ? NULL : sliceP.getRefPic(REF_PIC_LIST_1, miP.refIdx[1])));
+#else
     const Picture *piRefP1 = (CU::isIBC(cuP) ? NULL            : ((0 > miP.refIdx[1]) ? NULL : sliceP.getRefPic(REF_PIC_LIST_1, miP.refIdx[1])));
+#endif
     const Picture *piRefQ0 = (CU::isIBC(cuQ) ? sliceQ.getPic() : ((0 > miQ.refIdx[0]) ? NULL : sliceQ.getRefPic(REF_PIC_LIST_0, miQ.refIdx[0])));
+#if JVET_AE0169_BIPREDICTIVE_IBC
+    const Picture *piRefQ1 = (CU::isIBC(cuQ) ? (miQ.interDir == 3 ? sliceQ.getPic() : NULL) : ((0 > miQ.refIdx[1]) ? NULL : sliceQ.getRefPic(REF_PIC_LIST_1, miQ.refIdx[1])));
+#else
     const Picture *piRefQ1 = (CU::isIBC(cuQ) ? NULL            : ((0 > miQ.refIdx[1]) ? NULL : sliceQ.getRefPic(REF_PIC_LIST_1, miQ.refIdx[1])));
+#endif
     Mv mvP0, mvP1, mvQ0, mvQ1;
 
     if (0 <= miP.refIdx[0])

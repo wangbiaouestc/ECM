@@ -507,6 +507,9 @@ private:
   int64_t m_coeffAbsSumDCT2;
 #endif
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  double     m_bestIntraSADHADCost;
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   double     m_bestIntraSADCost;
 #endif
@@ -679,6 +682,9 @@ public:
   uint8_t* getMPMList()           { return m_mpmList; }
   uint8_t* getNonMPMList()        { return m_nonMPMList; }
   int& getMpmListSize()           { return m_mpmListSize; }
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  double getBestIntraSADHADCost() { return m_bestIntraSADHADCost; }
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   double getBestIntraSADCost()    { return m_bestIntraSADCost; }

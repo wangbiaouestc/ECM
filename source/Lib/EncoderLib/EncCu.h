@@ -395,6 +395,9 @@ private:
   MergeCtx              m_mergeCand;
   bool                  m_mergeCandAvail;
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  bool                  m_skipIbcMerge;
+#endif
 public:
   /// copy parameters from encoder class
   void  init                ( EncLib* pcEncLib, const SPS& sps PARL_PARAM( const int jId = 0 ) );

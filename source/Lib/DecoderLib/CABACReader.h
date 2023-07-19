@@ -169,6 +169,10 @@ public:
   void        affine_flag               ( CodingUnit&                   cu );
   void        subblock_merge_flag       ( CodingUnit&                   cu );
   void        merge_idx                 ( PredictionUnit&               pu );
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void        ibcBiPredictionFlag     ( PredictionUnit&               pu );
+  void        ibcMergeIdx1            ( PredictionUnit&               pu );
+#endif
   void        mmvd_merge_idx(PredictionUnit&               pu);
 #if AFFINE_MMVD
   void        affine_mmvd_data          ( PredictionUnit&               pu );

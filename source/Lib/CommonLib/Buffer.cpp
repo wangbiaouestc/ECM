@@ -1596,6 +1596,40 @@ void AreaBuf<Pel>::addAvg( const AreaBuf<const Pel> &other1, const AreaBuf<const
 #endif
 }
 
+#if JVET_AE0169_BIPREDICTIVE_IBC
+template<>
+void AreaBuf<Pel>::avg(const AreaBuf<const Pel> &other1, const AreaBuf<const Pel> &other2)
+{
+  const Pel* src1 = other1.buf;
+  const Pel* src2 = other2.buf;
+        Pel* dest =        buf;
+
+  const unsigned src1Stride = other1.stride;
+  const unsigned src2Stride = other2.stride;
+  const unsigned destStride =        stride;
+
+#if ENABLE_SIMD_OPT_BUFFER && defined(TARGET_SIMD_X86)
+  if ((width & 3) == 0)
+  {
+    g_pelBufOP.avg(src1, src1Stride, src2, src2Stride, dest, destStride, width, height);
+  }
+  else
+#endif
+  {
+#define ADD_AVG_OP( ADDR ) dest[ADDR] = rightShift( ( src1[ADDR] + src2[ADDR] + 1 ), 1 )
+#define ADD_AVG_INC     \
+    src1 += src1Stride; \
+    src2 += src2Stride; \
+    dest += destStride; \
+
+    SIZE_AWARE_PER_EL_OP( ADD_AVG_OP, ADD_AVG_INC );
+
+#undef ADD_AVG_OP
+#undef ADD_AVG_INC
+  }
+}
+#endif
+
 template<>
 void AreaBuf<Pel>::toLast( const ClpRng& clpRng )
 {

@@ -964,6 +964,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AC0112_IBC_LIC
   m_cEncLib.setIbcLic                                            ( m_ibcLic );
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  m_cEncLib.setIbcBiPred                                         ( m_ibcBiPred );
+#endif
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   m_cEncLib.setRRIbc(m_rribc);

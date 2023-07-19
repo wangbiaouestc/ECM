@@ -542,6 +542,9 @@ protected:
 #if JVET_AC0112_IBC_LIC
   bool      m_ibcLic;
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  bool      m_ibcBiPred;
+#endif
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   bool      m_rribc;

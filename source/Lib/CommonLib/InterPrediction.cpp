@@ -854,14 +854,23 @@ bool InterPrediction::xCheckIdenticalMotion( const PredictionUnit &pu )
 {
   const Slice &slice = *pu.cs->slice;
 
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  if ((slice.isInterB() && !pu.cs->pps->getWPBiPred()) || slice.getBiPredictionIBCFlag())
+#else
   if( slice.isInterB() && !pu.cs->pps->getWPBiPred() )
+#endif
   {
     if( pu.refIdx[0] >= 0 && pu.refIdx[1] >= 0 )
     {
-      int RefPOCL0 = slice.getRefPic( REF_PIC_LIST_0, pu.refIdx[0] )->getPOC();
-      int RefPOCL1 = slice.getRefPic( REF_PIC_LIST_1, pu.refIdx[1] )->getPOC();
+#if JVET_AE0169_BIPREDICTIVE_IBC
+      int refPOCL0 = CU::isIBC(*pu.cu) ? slice.getPOC() : slice.getRefPic( REF_PIC_LIST_0, pu.refIdx[0] )->getPOC();
+      int refPOCL1 = CU::isIBC(*pu.cu) ? slice.getPOC() : slice.getRefPic( REF_PIC_LIST_1, pu.refIdx[1] )->getPOC();
+#else
+      int refPOCL0 = slice.getRefPic( REF_PIC_LIST_0, pu.refIdx[0] )->getPOC();
+      int refPOCL1 = slice.getRefPic( REF_PIC_LIST_1, pu.refIdx[1] )->getPOC();
+#endif
 
-      if( RefPOCL0 == RefPOCL1 )
+      if( refPOCL0 == refPOCL1 )
       {
         if( !pu.cu->affine )
         {
@@ -2066,7 +2075,9 @@ void InterPrediction::xPredInterBi(PredictionUnit &pu, PelUnitBuf &pcYuvPred, co
 
     RefPicList eRefPicList = (refList ? REF_PIC_LIST_1 : REF_PIC_LIST_0);
 
+#if !JVET_AE0169_BIPREDICTIVE_IBC
     CHECK(CU::isIBC(*pu.cu) && eRefPicList != REF_PIC_LIST_0, "Invalid interdir for ibc mode");
+#endif
     CHECK(CU::isIBC(*pu.cu) && pu.refIdx[refList] != MAX_NUM_REF, "Invalid reference index for ibc mode");
     CHECK((CU::isInter(*pu.cu) && pu.refIdx[refList] >= slice.getNumRefIdx(eRefPicList)), "Invalid reference index");
     m_iRefListIdx = refList;
@@ -2150,7 +2161,11 @@ void InterPrediction::xPredInterBi(PredictionUnit &pu, PelUnitBuf &pcYuvPred, co
 #if MULTI_PASS_DMVR
 #if JVET_Z0136_OOB
       bool isOOB[2] = { false,false };
+#if JVET_AE0169_BIPREDICTIVE_IBC
+      if (pu.interDir == 3 && !CU::isIBC(*pu.cu))
+#else
       if (pu.interDir == 3)
+#endif
       {
         if (pu.cu->affine && pu.mergeType != MRG_TYPE_SUBPU_ATMVP)  // affine
         {
@@ -5420,7 +5435,11 @@ void InterPrediction::motionCompensation( PredictionUnit &pu, PelUnitBuf &predBu
 
   if (!pu.cs->pcv->isEncoder)
   {
+#if JVET_AE0169_BIPREDICTIVE_IBC
+    if (CU::isIBC(*pu.cu) && pu.interDir == 1)
+#else
     if (CU::isIBC(*pu.cu))
+#endif
     {
       CHECK(!luma, "IBC only for Chroma is not allowed.");
       xIntraBlockCopy(pu, predBuf, COMPONENT_Y);
@@ -6788,6 +6807,9 @@ void InterPrediction::motionCompensationIbcGpm( CodingUnit &cu, MergeCtx &ibcGpm
 
   for( auto &pu : CU::traversePUs( cu ) )
   {
+#if JVET_AE0169_GPM_IBC_IBC
+    Mv tmMergeIdx0Mv, tmMergeIdx1Mv;
+#endif
     const UnitArea localUnitArea( cu.cs->area.chromaFormat, Area( 0, 0, pu.lwidth(), pu.lheight() ) );
     PelUnitBuf tmpGeoBuf0 = m_geoPartBuf[0].getBuf( localUnitArea );
     PelUnitBuf tmpGeoBuf1 = m_geoPartBuf[1].getBuf( localUnitArea );
@@ -6804,8 +6826,10 @@ void InterPrediction::motionCompensationIbcGpm( CodingUnit &cu, MergeCtx &ibcGpm
       pu.intraDir[0] = pu.intraMPM[candIdx0 - IBC_GPM_MAX_NUM_UNI_CANDS];
       pcIntraPred->initIntraPatternChType(cu, pu.Y());
       pcIntraPred->predIntraAng(COMPONENT_Y, tmpGeoBuf0.Y(), pu);
+#if !JVET_AE0169_GPM_IBC_IBC
       pu.intraDir[0] = DC_IDX;
       pu.intraDir[1] = PLANAR_IDX;
+#endif
       if (chroma)
       {
         pu.intraDir[1] = pu.intraMPM[candIdx0 - IBC_GPM_MAX_NUM_UNI_CANDS];
@@ -6825,6 +6849,9 @@ void InterPrediction::motionCompensationIbcGpm( CodingUnit &cu, MergeCtx &ibcGpm
         pu.bv = pu.mv[0];
         pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
       }
+#if JVET_AE0169_GPM_IBC_IBC
+        tmMergeIdx0Mv = pu.mv[0];
+#endif
       if (luma && (chroma || !isChromaEnabled(cu.chromaFormat)))
       {
         motionCompensation(pu, tmpGeoBuf0, REF_PIC_LIST_X, true, true);
@@ -6841,8 +6868,10 @@ void InterPrediction::motionCompensationIbcGpm( CodingUnit &cu, MergeCtx &ibcGpm
       pu.intraDir[0] = pu.intraMPM[candIdx1 - IBC_GPM_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS];
       pcIntraPred->initIntraPatternChType(cu, pu.Y());
       pcIntraPred->predIntraAng(COMPONENT_Y, tmpGeoBuf1.Y(), pu);
+#if !JVET_AE0169_GPM_IBC_IBC
       pu.intraDir[0] = DC_IDX;
       pu.intraDir[1] = PLANAR_IDX;
+#endif
       if (chroma)
       {
         pu.intraDir[1] = pu.intraMPM[candIdx1 - IBC_GPM_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS];
@@ -6862,6 +6891,9 @@ void InterPrediction::motionCompensationIbcGpm( CodingUnit &cu, MergeCtx &ibcGpm
         pu.bv = pu.mv[0];
         pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
       }
+#if JVET_AE0169_GPM_IBC_IBC
+        tmMergeIdx1Mv = pu.mv[0];
+#endif
       if (luma && (chroma || !isChromaEnabled(cu.chromaFormat)))
       {
         motionCompensation(pu, tmpGeoBuf1, REF_PIC_LIST_X, true, true);
@@ -6889,6 +6921,23 @@ void InterPrediction::motionCompensationIbcGpm( CodingUnit &cu, MergeCtx &ibcGpm
       pu.bv = pu.mv[0];
       pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
     }
+#if JVET_AE0169_GPM_IBC_IBC
+    if(!isIntra0)
+    {
+      if (pu.tmMergeFlag)
+      {
+        ibcGpmMrgCtx.mvFieldNeighbours[candIdx0 << 1].mv = tmMergeIdx0Mv;
+      }
+    }
+    if(!isIntra1)
+    {
+      if (pu.tmMergeFlag)
+      {
+        ibcGpmMrgCtx.mvFieldNeighbours[candIdx1 << 1].mv = tmMergeIdx1Mv;
+      }
+    }
+    PU::spanGeoIBCMotionInfo(pu, ibcGpmMrgCtx);
+#endif
     pu.intraDir[0] = DC_IDX;
     pu.intraDir[1] = PLANAR_IDX;
   }
@@ -7855,8 +7904,12 @@ void InterPrediction::xProcessDMVR(PredictionUnit& pu, PelUnitBuf &pcYuvDst, con
 #if JVET_AA0061_IBC_MBVD
 void  InterPrediction::sortIbcMergeMbvdCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t * ibcMbvdLUT,uint32_t * ibcMbvdValidNum, int ibcMbvdIdx)
 {
-
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  const int numBaseIdx = std::min<int>(IBC_MBVD_BASE_NUM, mrgCtx.numValidMergeCand);
+  const int tempNum = (const int) (numBaseIdx * IBC_MBVD_MAX_REFINE_NUM);
+#else
   const int tempNum = (const int) (std::min<int>(IBC_MBVD_BASE_NUM, mrgCtx.numValidMergeCand) * IBC_MBVD_MAX_REFINE_NUM);
+#endif
   const int groupSize = std::min<int>(tempNum, ADAPTIVE_SUB_GROUP_SIZE_IBC_MBVD);
 
   Distortion candCostList[IBC_MBVD_BASE_NUM* IBC_MBVD_MAX_REFINE_NUM];
@@ -7876,6 +7929,7 @@ void  InterPrediction::sortIbcMergeMbvdCandidates(PredictionUnit &pu, MergeCtx& 
     return;
   }
 
+#if !JVET_AE0169_BIPREDICTIVE_IBC
   int startMMVDIdx = 0;
   int endMMVDIdx = tempNum;
   if(ibcMbvdIdx!= -1)
@@ -7884,9 +7938,12 @@ void  InterPrediction::sortIbcMergeMbvdCandidates(PredictionUnit &pu, MergeCtx& 
     startMMVDIdx = gpId * groupSize;
     endMMVDIdx = (gpId+1) * groupSize;
   }
+#endif
 
   int encGrpSize = IBC_MBVD_SIZE_ENC;
+#if !JVET_AE0169_BIPREDICTIVE_IBC
   int baseIdx = 0;
+#endif
 #if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   const int cuPelX = pu.Y().x;
   const int cuPelY = pu.Y().y;
@@ -7896,7 +7953,17 @@ void  InterPrediction::sortIbcMergeMbvdCandidates(PredictionUnit &pu, MergeCtx& 
   const int picHeight = pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
   const unsigned int  lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  for (int baseIdx = 0; baseIdx < numBaseIdx; baseIdx++)
+  {
+    if (!((1<<baseIdx)&ibcMbvdIdx))
+    {
+      continue;
+    }
+    for (int mmvdMergeCand = baseIdx*groupSize; mmvdMergeCand < (baseIdx+1)*groupSize; mmvdMergeCand++)
+#else
   for (int mmvdMergeCand = startMMVDIdx; mmvdMergeCand < endMMVDIdx; mmvdMergeCand++)
+#endif
   {
     bool mbvdCandMisAlign = mrgCtx.setIbcMbvdMergeCandiInfo(pu, mmvdMergeCand, mmvdMergeCand);
     if (mbvdCandMisAlign)
@@ -7963,6 +8030,9 @@ void  InterPrediction::sortIbcMergeMbvdCandidates(PredictionUnit &pu, MergeCtx& 
       candCostList[endIdx - shift] = uiCost;
     }
   }
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  }
+#endif
 }
 #endif
 
@@ -13222,10 +13292,10 @@ bool InterPrediction::xCheckIdenticalMotionOBMC(PredictionUnit &pu, MotionInfo t
   {
     if (tryMi.refIdx[0] >= 0 && tryMi.refIdx[1] >= 0)
     {
-      int RefPOCL0 = slice.getRefPic(REF_PIC_LIST_0, tryMi.refIdx[0])->getPOC();
-      int RefPOCL1 = slice.getRefPic(REF_PIC_LIST_1, tryMi.refIdx[1])->getPOC();
+      int refPOCL0 = slice.getRefPic(REF_PIC_LIST_0, tryMi.refIdx[0])->getPOC();
+      int refPOCL1 = slice.getRefPic(REF_PIC_LIST_1, tryMi.refIdx[1])->getPOC();
 
-      if (RefPOCL0 == RefPOCL1)
+      if (refPOCL0 == refPOCL1)
       {
         if (!pu.cu->affine)
         {
@@ -15226,7 +15296,9 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
     return std::numeric_limits<Distortion>::max();
   }
 #endif
+#if !JVET_AE0169_BIPREDICTIVE_IBC
   CHECK(CU::isIBC(cu) && otherMvf != nullptr, "IBC TM for bidir is not allowed.");
+#endif
   const Picture& refPic  = CU::isIBC(cu) ? *cu.slice->getPic() : *cu.slice->getRefPic(eRefList, refIdx)->unscaledPic;
 #else
 #if JVET_Y0128_NON_CTC
@@ -15372,7 +15444,11 @@ void InterPrediction::deriveTMMv(PredictionUnit& pu)
 
   Distortion minCostUni[NUM_REF_PIC_LIST_01] = { std::numeric_limits<Distortion>::max(), std::numeric_limits<Distortion>::max() };
 
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  for (int iRefList = 0; iRefList < ( (pu.cu->slice->isInterB() && !CU::isIBC(*pu.cu)) ? NUM_REF_PIC_LIST_01 : 1 ) ; ++iRefList)
+#else
   for (int iRefList = 0; iRefList < ( pu.cu->slice->isInterB() ? NUM_REF_PIC_LIST_01 : 1 ) ; ++iRefList)
+#endif
   {
     if (pu.interDir & (iRefList + 1))
     {
@@ -15405,6 +15481,9 @@ void InterPrediction::deriveTMMv(PredictionUnit& pu)
 #endif
 
   if (pu.cu->slice->isInterB() && pu.interDir == 3
+#if JVET_AE0169_BIPREDICTIVE_IBC
+    && !CU::isIBC(*pu.cu)
+#endif
 #if MULTI_PASS_DMVR
 #if !JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
     && !PU::checkBDMVRCondition(pu)

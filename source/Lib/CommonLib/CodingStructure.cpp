@@ -1903,6 +1903,47 @@ void CodingStructure::addAffInheritToLut(static_vector<AffineInheritInfo, MAX_NU
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 void CodingStructure::addMiToLutIBC(static_vector<MotionInfo, MAX_NUM_HMVP_IBC_CANDS> &lut, const MotionInfo &mi)
 {
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  if (mi.interDir == 3)
+  {
+    for (int l = 1; l >= 0; l--)
+    {
+      MotionInfo saveMi = mi;
+      if (l == 1)
+      {
+        saveMi.mv[0] = saveMi.mv[1];
+      }
+      saveMi.interDir = 1;
+      saveMi.mv[1] = Mv();
+      saveMi.refIdx[1] = -1;
+      saveMi.bv = saveMi.mv[0];
+      saveMi.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+
+      size_t currCnt = lut.size();
+
+      bool pruned      = false;
+      int  sameCandIdx = 0;
+
+      for (int idx = 0; idx < currCnt; idx++)
+      {
+        if (lut[idx] == saveMi)
+        {
+          sameCandIdx = idx;
+          pruned      = true;
+          break;
+        }
+      }
+
+      if (pruned || currCnt == lut.capacity())
+      {
+        lut.erase(lut.begin() + sameCandIdx);
+      }
+
+      lut.push_back(saveMi);
+    }
+    return;
+  }
+#endif
   size_t currCnt = lut.size();
 
   bool pruned      = false;

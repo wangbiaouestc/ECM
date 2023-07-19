@@ -69,6 +69,9 @@ Slice::Slice()
 #if JVET_S0193_NO_OUTPUT_PRIOR_PIC
 , m_noOutputOfPriorPicsFlag       ( 0 )
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+, m_biPredictionIBCFlag           ( false )
+#endif
 , m_iSliceQp                      ( 0 )
 , m_ChromaQpAdjEnabled            ( false )
 , m_lmcsEnabledFlag               ( 0 )
@@ -199,6 +202,9 @@ void Slice::initSlice()
 
 #if JVET_S0193_NO_OUTPUT_PRIOR_PIC
   m_noOutputOfPriorPicsFlag = 0;
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  m_biPredictionIBCFlag = false;
 #endif
 
   m_bCheckLDC = false;

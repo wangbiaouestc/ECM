@@ -1456,11 +1456,19 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     if (cs.slice->getSliceType() == I_SLICE && cs.slice->getUseIBC() && checkIbc && (m_pcEncCfg->getIBCFastMethod() & IBC_FAST_METHOD_NONSCC ))
     {
+#if JVET_AE0169_BIPREDICTIVE_IBC
+      if (m_pcEncCfg->getIbcMerge() && partitioner.chType == CHANNEL_TYPE_LUMA)
+      {
+        m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC_MERGE,   ETO_STANDARD,  qp });
+      }
+      m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC,         ETO_STANDARD,  qp });
+#else
       m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC,         ETO_STANDARD,  qp });
       if (m_pcEncCfg->getIbcMerge() && partitioner.chType == CHANNEL_TYPE_LUMA)
       {
         m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC_MERGE,   ETO_STANDARD,  qp });
       }
+#endif
     }
 #endif
     // add intra modes

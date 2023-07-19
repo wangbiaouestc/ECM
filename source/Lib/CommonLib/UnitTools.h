@@ -230,7 +230,11 @@ namespace PU
   bool dbvModeAvail(const PredictionUnit &pu);
   void deriveChromaBv(PredictionUnit &pu);
 #if JVET_AA0070_RRIBC
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  Mv adjustChromaBv(const PredictionUnit &lumaPU, const CompArea &lumaArea, RefPicList list = REF_PIC_LIST_0);
+#else
   Mv adjustChromaBv(const PredictionUnit &lumaPU, const CompArea &lumaArea);
+#endif
 #endif
   bool xCheckSimilarChromaBv(std::vector<Mv> &chromaBvList, const Mv chromaBv);
   bool checkIsChromaBvCandidateValid(const PredictionUnit &pu
@@ -288,6 +292,9 @@ namespace PU
   );
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  bool checkIsIBCCandidateValidBi(const PredictionUnit &pu, MotionInfo miNeighbor);
+#endif
   uint32_t checkValidBvPU (const PredictionUnit& pu, ComponentID compID,                                Mv mv, bool ignoreFracMv = false, int filterIdx = 0);
   uint32_t checkValidBv   (const PredictionUnit& pu, ComponentID compID, int compWidth, int compHeight, Mv mv, bool ignoreFracMv = false, int filterIdx = 0
                          , bool isFinalMC = false // this flag is for non-normative SW speedup
@@ -303,7 +310,11 @@ namespace PU
 #endif
 #if JVET_AA0061_IBC_MBVD
   void getIbcMbvdMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, int numValidBv);
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  int32_t getIbcMbvdEstBits      (const PredictionUnit &pu, int mmvdMergeCand, int mmvdMergeCand1 = -1);
+#else
   int32_t getIbcMbvdEstBits      (const PredictionUnit &pu, unsigned int mmvdMergeCand);
+#endif
 #endif
   void getInterMMVDMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx = -1);
   int getDistScaleFactor(const int &currPOC, const int &currRefPOC, const int &colPOC, const int &colRefPOC);
@@ -344,7 +355,11 @@ namespace PU
 #endif
   );
 #if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void fillIBCMvpCand                 (      PredictionUnit &pu, AMVPInfo &amvpInfo, MergeCtx& mergeCtx, InterPrediction* pcInter);
+#else
   void fillIBCMvpCand                 (      PredictionUnit &pu, AMVPInfo &amvpInfo, InterPrediction* pcInter);
+#endif
 #else
   void fillIBCMvpCand                 (PredictionUnit &pu, AMVPInfo &amvpInfo);
 #endif
@@ -628,9 +643,16 @@ namespace PU
 #endif
 #endif
 #endif
+#if JVET_AE0169_GPM_IBC_IBC
+  void spanGeoIBCMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx);
+#endif
   bool isAddNeighborMv  (const Mv& currMv, Mv* neighborMvs, int numNeighborMv);
   void getIbcMVPsEncOnly(PredictionUnit &pu, Mv* mvPred, int& nbPred);
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  bool getDerivedBV(PredictionUnit &pu, const Mv& currentMv, Mv& derivedMv, Mv& derivedMvL1);
+#else
   bool getDerivedBV(PredictionUnit &pu, const Mv& currentMv, Mv& derivedMv);
+#endif
   bool checkDMVRCondition(const PredictionUnit& pu);
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
   bool checkBDMVR4Affine(const PredictionUnit& pu);

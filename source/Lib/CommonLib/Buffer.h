@@ -72,6 +72,9 @@ struct PelBufferOps
   void ( *addAvg4 )       ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,            int shift, int offset, const ClpRng& clpRng );
   void ( *addAvg8 )       ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,            int shift, int offset, const ClpRng& clpRng );
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void ( *avg )        (const Pel* src1, int src1Stride, const Pel* src2, int src2Stride, Pel *dst, int dstStride, int width, int height);
+#endif
 #if JVET_AD0213_LIC_IMP
   void(*toLast2)       (Pel* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng);
   void(*toLast4)       (Pel* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng);
@@ -206,6 +209,9 @@ struct AreaBuf : public Size
   void addAvg               ( const AreaBuf<const T> &other1, const AreaBuf<const T> &other2, const ClpRng& clpRng, bool *mcMask[2], int mcStride, bool* isOOB);
 #else
   void addAvg               ( const AreaBuf<const T> &other1, const AreaBuf<const T> &other2, const ClpRng& clpRng );
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void avg                  (const AreaBuf<const T> &other1, const AreaBuf<const T> &other2);
 #endif
   void removeHighFreq       ( const AreaBuf<T>& other, const bool bClip, const ClpRng& clpRng);
   void updateHistogram      ( std::vector<int32_t>& hist ) const;

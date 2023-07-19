@@ -1303,6 +1303,9 @@ static const int IBC_MBVD_MAX_REFINE_NUM = IBC_MBVD_STEP_NUM * IBC_MBVD_OFFSET_D
 static const int IBC_MBVD_NUM = IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM;        ///< total number of IBC mmvd candidate
 static const int IBC_MBVD_SIZE_ENC =                                 8;
 static const int ADAPTIVE_SUB_GROUP_SIZE_IBC_MBVD = IBC_MBVD_MAX_REFINE_NUM;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+static const int IBC_MBVD_NUM_BI_CANDIDATES =                       10;
+#endif
 #endif
 #if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
 static const int IBC_GPM_MAX_NUM_UNI_CANDS =                        15;
@@ -1316,7 +1319,11 @@ static const int IBC_GPM_MAX_TRY_WEIGHTED_SAD =                     36;
 static const int IBC_GPM_MAX_TRY_WEIGHTED_SATD =                    20;
 static const int IBC_GPM_MAX_SPLIT_DIR_FIRST_SET_NUM =               8;
 static const int IBC_GPM_MAX_SPLIT_DIR_SECOND_SET_NUM =             40;
+#if JVET_AE0169_GPM_IBC_IBC
+static const int IBC_GPM_NUM_BLENDING =                              5;   // 1 or 5
+#else
 static const int IBC_GPM_NUM_BLENDING =                              1; // 1 or 5
+#endif
 #endif
 static constexpr int MV_EXPONENT_BITCOUNT    = 4;
 static constexpr int MV_MANTISSA_BITCOUNT    = 6;
