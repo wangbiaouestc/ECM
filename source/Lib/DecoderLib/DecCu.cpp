@@ -594,6 +594,14 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #endif
   }
 #endif
+#if JVET_AE0100_BVGCCCM
+  if (pu.bvgCccmFlag && compID == COMPONENT_Cb)
+  {
+    bool validBv = false;
+    PU::getBvgCccmCands(pu, validBv);
+    CHECK(!validBv, "No valid BV found!");
+  }
+#endif
 #if JVET_AC0071_DBV
   if (pu.intraDir[1] == DBV_CHROMA_IDX && compID == COMPONENT_Cb)
   {

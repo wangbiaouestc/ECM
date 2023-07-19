@@ -574,6 +574,9 @@ protected:
 #if JVET_AE0059_INTER_CCCM
   bool m_interCccm; ///< CCCM for inter prediction
 #endif
+#if JVET_AE0100_BVGCCCM
+  bool m_bvgCccm; ///< Block vector guided CCCM
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   bool      m_BIF;                                            ///< bilateral filter
   unsigned  m_BIFStrength;                                    /// Bilateral filter strength

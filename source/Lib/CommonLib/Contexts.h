@@ -572,6 +572,9 @@ public:
 #if JVET_AA0057_CCCM
   static const CtxSet   CccmFlag;
 #endif
+#if JVET_AE0100_BVGCCCM
+  static const CtxSet   BvgCccmFlag;
+#endif
 #if JVET_AD0202_CCCM_MDF
   static const CtxSet   CccmMpfFlag;
 #endif

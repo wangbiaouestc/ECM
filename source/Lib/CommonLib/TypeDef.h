@@ -158,8 +158,9 @@
 #if JVET_AA0057_CCCM
 #define JVET_AB0143_CCCM_TS                               1 // JVET-AB0143: CCCM template selection
 #define JVET_AC0147_CCCM_NO_SUBSAMPLING                   1 // JVET-AC0147: Subsampling is not applied to CCCM
-#define JVET_AC0054_GLCCCM                                1 // JVET_AC0054: Gradient and location based CCCM
-#define JVET_AD0202_CCCM_MDF                              1 // JVET_AD0202: CCCM with multiple downsampling filters
+#define JVET_AC0054_GLCCCM                                1 // JVET-AC0054: Gradient and location based CCCM
+#define JVET_AD0202_CCCM_MDF                              1 // JVET-AD0202: CCCM with multiple downsampling filters
+#define JVET_AE0100_BVGCCCM                               1 // JVET-AE0100: Block vector guided CCCM
 #endif
 #define JVET_AA0126_GLM                                   1 // JVET-AA0126: Gradient linear model
 #if JVET_AA0126_GLM
@@ -183,8 +184,8 @@
 #define JVET_AC0105_DIRECTIONAL_PLANAR                    1 // JVET-AC0105: Directional planar
 #define JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS        1 // JVET-AD0184: Removal of division operations
 #define JVET_AD0085_MPM_SORTING                           1 // JVET-AD0085: Template-based intra MPM list construction
-#define JVET_AD0188_CCP_MERGE                             1 // JVET_AD0188: Non-local cross-component prediction and cross-component merge mode
-#define JVET_AD0120_LBCCP                                 1 // JVET_AD0120: Local-Boosting Cross-Component Prediction, wherein the template part is controlled by CCCM SPS
+#define JVET_AD0188_CCP_MERGE                             1 // JVET-AD0188: Non-local cross-component prediction and cross-component merge mode
+#define JVET_AD0120_LBCCP                                 1 // JVET-AD0120: Local-Boosting Cross-Component Prediction, wherein the template part is controlled by CCCM SPS
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM

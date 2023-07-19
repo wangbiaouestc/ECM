@@ -986,6 +986,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AC0071_DBV
   m_cEncLib.setUseIntraDBV(m_intraDBV);
 #endif
+#if JVET_AE0100_BVGCCCM
+  m_cEncLib.setUseBvgCccm(m_bvgCccm);
+#endif
 #if JVET_V0094_BILATERAL_FILTER
   m_cEncLib.setUseBIF                                            ( m_BIF );
   m_cEncLib.setBIFStrength                                       ( m_BIFStrength );

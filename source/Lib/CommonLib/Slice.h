@@ -1773,6 +1773,9 @@ private:
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int               m_cccm;
 #endif
+#if JVET_AE0100_BVGCCCM
+  bool              m_bvgCccm;
+#endif
 #if JVET_AD0188_CCP_MERGE
   bool              m_ccpMerge;
 #endif
@@ -2399,6 +2402,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   void      setUseCccm( int i )                                                  { m_cccm = i; }
   int       getUseCccm()                                               const     { return m_cccm; }
+#endif
+#if JVET_AE0100_BVGCCCM
+  void      setUseBvgCccm(bool b)                                                { m_bvgCccm = b; }
+  bool      getUseBvgCccm()                                            const     { return m_bvgCccm; }
 #endif
 #if JVET_AD0188_CCP_MERGE
   void      setUseCcpMerge     ( bool i )                                        { m_ccpMerge = i; }

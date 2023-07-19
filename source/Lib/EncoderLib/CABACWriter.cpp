@@ -2375,6 +2375,16 @@ void CABACWriter::cccmFlag(const PredictionUnit& pu)
 #endif
   const unsigned intraDir = pu.intraDir[1];
   
+#if JVET_AE0100_BVGCCCM
+  if ((intraDir == LM_CHROMA_IDX || intraDir == MMLM_CHROMA_IDX) && PU::hasBvgCccmFlag(pu) && PU::cccmSingleModeAvail(pu, LM_CHROMA_IDX) && PU::bvgCccmMultiModeAvail(pu, intraDir))
+  {
+    m_BinEncoder.encodeBin( pu.bvgCccmFlag ? 1 : 0, Ctx::BvgCccmFlag( 0 ) );
+    if (pu.bvgCccmFlag)
+    {
+      return;
+    }
+  }
+#endif
 #if JVET_AB0143_CCCM_TS
   bool isCCCMEnabled = false;
   if (intraDir == LM_CHROMA_IDX)
@@ -2492,6 +2502,12 @@ void CABACWriter::intraChromaFusionMode(const PredictionUnit& pu)
 #if JVET_AD0120_LBCCP
 void CABACWriter::ccInsideFilterFlag(const PredictionUnit &pu)
 {
+#if JVET_AE0100_BVGCCCM
+  if (pu.bvgCccmFlag)
+  {
+    return;
+  }
+#endif
   const unsigned intraDir = pu.intraDir[1];
 
   if (PU::hasCcInsideFilterFlag(pu, intraDir))

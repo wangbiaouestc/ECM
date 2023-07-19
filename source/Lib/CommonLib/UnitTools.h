@@ -744,6 +744,14 @@ namespace PU
   bool  hasNonLocalCCP(const PredictionUnit &pu);
   int   getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate candList[], int selIdx = -1);
 #endif
+#if JVET_AE0100_BVGCCCM
+  bool hasBvgCccmFlag(const PredictionUnit &pu);
+  bool bvgCccmModeAvail(const PredictionUnit &pu);
+  bool bvgCccmMultiModeAvail(const PredictionUnit& pu, int intraMode);
+  void getBvgCccmCands(PredictionUnit &pu, bool &validBv);
+  bool isBvgCccmCand(const PredictionUnit &pu, Mv &chromaBv, int& rrIbcType, int candIdx = 0);
+  bool checkIsChromaBvCandidateValid(const PredictionUnit &pu, const Mv chromaBv, int &iWidth, int &iHeight, bool isRefTemplate = false, bool isRefAbove = false);
+#endif
 }
 
 // TU tools

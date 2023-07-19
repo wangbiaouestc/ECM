@@ -145,6 +145,14 @@ IntraPrediction::IntraPrediction()
 #else
   m_cccmLumaBuf = nullptr;
 #endif
+#if JVET_AE0100_BVGCCCM
+  for (int i = 0; i < NUM_BVG_CCCM_CANDS; i++)
+  {
+    m_bvgCccmLumaBuf[i] = nullptr;
+    m_bvgCccmChromaBuf[i][0] = nullptr;
+    m_bvgCccmChromaBuf[i][1] = nullptr;
+  }
+#endif
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   for (int j = 0; j < MTMP_NUM; j++)
@@ -265,6 +273,17 @@ void IntraPrediction::destroy()
 #else
   delete[] m_cccmLumaBuf;
   m_cccmLumaBuf = nullptr;
+#endif
+#if JVET_AE0100_BVGCCCM
+  for (int i = 0; i < NUM_BVG_CCCM_CANDS; i++)
+  {
+    delete[] m_bvgCccmLumaBuf[i];
+    m_bvgCccmLumaBuf[i] = nullptr;
+    delete[] m_bvgCccmChromaBuf[i][0];
+    m_bvgCccmChromaBuf[i][0] = nullptr;
+    delete[] m_bvgCccmChromaBuf[i][1];
+    m_bvgCccmChromaBuf[i][1] = nullptr;
+  }
 #endif
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
@@ -481,6 +500,23 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
   if (m_cccmLumaBuf == nullptr)
   {
     m_cccmLumaBuf = new Pel[(2*MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2*CCCM_FILTER_PADDING) * (2*MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2*CCCM_FILTER_PADDING)];
+  }
+#endif
+#if JVET_AE0100_BVGCCCM
+  for (int i = 0; i < NUM_BVG_CCCM_CANDS; i++)
+  {
+    if( m_bvgCccmLumaBuf[i] == nullptr )
+    {
+      m_bvgCccmLumaBuf[i] = new Pel[(2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2 * CCCM_FILTER_PADDING) * (2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2 * CCCM_FILTER_PADDING)];
+    }
+    if (m_bvgCccmChromaBuf[i][0] == nullptr)
+    {
+      m_bvgCccmChromaBuf[i][0] = new Pel[(2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2 * CCCM_FILTER_PADDING) * (2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2 * CCCM_FILTER_PADDING)];
+    }
+    if (m_bvgCccmChromaBuf[i][1] == nullptr)
+    {
+      m_bvgCccmChromaBuf[i][1] = new Pel[(2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2 * CCCM_FILTER_PADDING) * (2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2 * CCCM_FILTER_PADDING)];
+    }
   }
 #endif
 #endif
@@ -8849,6 +8885,17 @@ void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chrom
       , downsFilterIdx
 #endif
     );
+#if JVET_AE0100_BVGCCCM
+    if (pu.bvgCccmFlag)
+    {
+      CHECK(downsFilterIdx > 0, "downsFilterIdx in bvgCccm must be zero!");
+      xBvgCccmCreateLumaRef(pu, chromaArea
+#if JVET_AD0202_CCCM_MDF
+      , downsFilterIdx
+#endif
+                            );
+    }
+#endif
     return;
   }
 #endif
@@ -14680,6 +14727,38 @@ Pel IntraPrediction::xCccmGetLumaVal(const PredictionUnit& pu, const CPelBuf pi,
 #if JVET_AA0057_CCCM
 void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr, int intraDir )
 {
+#if JVET_AE0100_BVGCCCM
+  if (pu.bvgCccmFlag)
+  {
+    CccmModel cccmModelCb[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel cccmModelCr[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    
+    if (intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX)
+    {
+      int minVal = 0, maxVal = 0;
+      xBvgCccmCalcBlkRange(pu, minVal, maxVal);
+      
+      xBvgCccmCalcModels(pu, cccmModelCb[0],  cccmModelCr[0], 0, 0, minVal, maxVal);
+      xBvgCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[0], 0, 0, predCb);
+      xBvgCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[0], 0, 0, predCr);
+    }
+    else
+    {
+      int modelThr = xBvgCccmCalcBlkAver(pu);
+      int minVal = 0, maxVal = 0;
+      xBvgCccmCalcBlkRange(pu, minVal, maxVal);
+      
+      xBvgCccmCalcModels(pu, cccmModelCb[0],  cccmModelCr[0], 1, modelThr, minVal, maxVal);
+      xBvgCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[0], 1, modelThr, predCb);
+      xBvgCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[0], 1, modelThr, predCr);
+      
+      xBvgCccmCalcModels(pu, cccmModelCb[1],  cccmModelCr[1], 2, modelThr, minVal, maxVal);
+      xBvgCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[1], 2, modelThr, predCb);
+      xBvgCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[1], 2, modelThr, predCr);
+    }
+    return;
+  }
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   if( pu.cccmNoSubFlag )
   {
@@ -15672,6 +15751,430 @@ void IntraPrediction::xCccmCreateLumaNoSubRef( const PredictionUnit& pu, CompAre
           refLuma.at( x, refSizeY + y ) = xCccmGetLumaVal( pu, recoLuma, chromaPosPicX, padPosPicY );
         }
       }
+    }
+  }
+}
+#endif
+#if JVET_AE0100_BVGCCCM
+void IntraPrediction::xBvgCccmCalcModels( const PredictionUnit& pu, CccmModel& cccmModelCb, CccmModel &cccmModelCr, int modelId, int modelThr, int minVal, int maxVal )
+{
+  const CPelBuf recoCb = pu.cs->picture->getRecoBuf( COMPONENT_Cb );
+  const CPelBuf recoCr = pu.cs->picture->getRecoBuf( COMPONENT_Cr );
+  int chromaOffsetCb = 1 << ( pu.cu->slice->getSPS()->getBitDepth( CHANNEL_TYPE_CHROMA ) - 1 );
+  int chromaOffsetCr = 1 << ( pu.cu->slice->getSPS()->getBitDepth( CHANNEL_TYPE_CHROMA ) - 1 );
+  
+  int refSizeX   = m_cccmBlkArea.x - m_cccmRefArea.x; // Reference lines available left and above
+  int refSizeY   = m_cccmBlkArea.y - m_cccmRefArea.y;
+  int refPosPicX = m_cccmRefArea.x;                   // Position of the reference area in picture coordinates
+  int refPosPicY = m_cccmRefArea.y;
+#if JVET_AB0174_CCCM_DIV_FREE
+  if ( refSizeX || refSizeY )
+  {
+    int refPosX = refSizeX > 0 ? refSizeX - 1 : 0;
+    int refPosY = refSizeY > 0 ? refSizeY - 1 : 0;
+    
+    chromaOffsetCb = recoCb.at(refPosPicX + refPosX, refPosPicY + refPosY);
+    chromaOffsetCr = recoCr.at(refPosPicX + refPosX, refPosPicY + refPosY);
+  }
+#endif
+  int sampleNum = 0;
+  int strX[NUM_BVG_CCCM_CANDS], endX[NUM_BVG_CCCM_CANDS], strY[NUM_BVG_CCCM_CANDS], endY[NUM_BVG_CCCM_CANDS];
+  for (int candIdx = 0; candIdx < pu.numBvgCands; candIdx++)
+  {
+    Mv chromaBv = pu.bvList[candIdx];
+    PelBuf refLuma = xBvgCccmGetLumaPuBuf(pu, candIdx);
+    int refPosPicX = pu.blocks[COMPONENT_Cb].x + chromaBv.hor;
+    int refPosPicY = pu.blocks[COMPONENT_Cb].y + chromaBv.ver;
+    strX[candIdx] = refPosPicX;
+    strY[candIdx] = refPosPicY;
+    endX[candIdx] = refPosPicX + refLuma.width;
+    endY[candIdx] = refPosPicY + refLuma.height;
+  }
+  
+  for (int candIdx = 0; candIdx < pu.numBvgCands; candIdx++)
+  {
+    PelBuf refLuma = xBvgCccmGetLumaPuBuf(pu, candIdx);
+    PelBuf refCb = xBvgCccmGetChromaPuBuf(pu, COMPONENT_Cb, candIdx);
+    PelBuf refCr = xBvgCccmGetChromaPuBuf(pu, COMPONENT_Cr, candIdx);
+      //-- collect data
+    for( int y = 0; y < refLuma.height; y++ )
+    {
+      for( int x = 0; x < refLuma.width; x++ )
+      {
+        if ( modelId == 1 && refLuma.at(x, y) > modelThr ) // Model 1: Include only samples below or equal to the threshold
+        {
+          continue;
+        }
+        if ( modelId == 2 && refLuma.at(x, y) <= modelThr) // Model 2: Include only samples above the threshold
+        {
+          continue;
+        }
+        if (refLuma.at(x, y) < minVal || refLuma.at(x, y) > maxVal)
+        {
+          continue;
+        }
+        bool exist = false;
+        if (candIdx > 0)
+        {
+          for (int i = 0; i < candIdx; i++)
+          {
+            int xx = strX[candIdx] + x;
+            int yy = strY[candIdx] + y;
+            if (xx >= strX[i] && xx < endX[i] && yy >= strY[i] && yy < endY[i])
+            {
+              exist = true;
+              break;
+            }
+          }
+        }
+        if (exist)
+        {
+          continue;
+        }
+        // 11-tap filter
+        m_a[0][sampleNum] = refLuma.at(x, y    ); // C
+        m_a[1][sampleNum] = refLuma.at(x, y - 1); // N
+        m_a[2][sampleNum] = refLuma.at(x, y + 1); // S
+        m_a[3][sampleNum] = refLuma.at(x - 1, y); // W
+        m_a[4][sampleNum] = refLuma.at(x + 1, y); // E
+        m_a[5][sampleNum] = cccmModelCb.nonlinear( refLuma.at(x, y) );     // nonlinear(C)
+        m_a[6][sampleNum] = cccmModelCb.nonlinear( refLuma.at(x, y - 1) ); // nonlinear(N)
+        m_a[7][sampleNum] = cccmModelCb.nonlinear( refLuma.at(x, y + 1) ); // nonlinear(S)
+        m_a[8][sampleNum] = cccmModelCb.nonlinear( refLuma.at(x - 1, y) ); // nonlinear(W)
+        m_a[9][sampleNum] = cccmModelCb.nonlinear( refLuma.at(x + 1, y) ); // nonlinear(E)
+        m_a[10][sampleNum] = cccmModelCb.bias();
+        
+        m_cb[sampleNum] = refCb.at( x, y );
+        m_cr[sampleNum++] = refCr.at( x, y );
+      }
+    }
+  }
+  
+  if( !sampleNum ) // Number of samples can go to zero in the multimode case
+  {
+    cccmModelCb.clearModel();
+    cccmModelCr.clearModel();
+  }
+  else
+  {
+#if JVET_AB0174_CCCM_DIV_FREE
+    m_cccmSolver.solve2( m_a, m_cb, m_cr, sampleNum, chromaOffsetCb, chromaOffsetCr, cccmModelCb, cccmModelCr );
+#else
+    m_cccmSolver.solve2( m_a, m_cb, m_cr, sampleNum, cccmModelCb, cccmModelCr );
+#endif
+  }
+  return;
+}
+void IntraPrediction::xBvgCccmApplyModel( const PredictionUnit& pu, const ComponentID compId, CccmModel &cccmModel, int modelId, int modelThr, PelBuf &piPred )
+{
+  const  ClpRng& clpRng(pu.cu->cs->slice->clpRng(compId));
+  Pel* samples = m_samples;
+  
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  CHECK( pu.cccmNoSubFlag, "cccmNoSubFlag shall be disabled" );
+#endif
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu);
+  for (int y = 0; y < refLumaBlk.height; y++)
+  {
+    for (int x = 0; x < refLumaBlk.width; x++)
+    {
+      if ( modelId == 1 && refLumaBlk.at( x, y ) > modelThr ) // Model 1: Include only samples below or equal to the threshold
+      {
+        continue;
+      }
+      if ( modelId == 2 && refLumaBlk.at( x, y ) <= modelThr) // Model 2: Include only samples above the threshold
+      {
+        continue;
+      }
+      // 11-tap filter
+      samples[0] = refLumaBlk.at(x, y    ); // C
+      samples[1] = refLumaBlk.at(x, y - 1); // N
+      samples[2] = refLumaBlk.at(x, y + 1); // S
+      samples[3] = refLumaBlk.at(x - 1, y); // W
+      samples[4] = refLumaBlk.at(x + 1, y); // E
+      samples[5] = cccmModel.nonlinear( refLumaBlk.at(x, y) );     // nonlinear(C)
+      samples[6] = cccmModel.nonlinear( refLumaBlk.at(x, y - 1) ); // nonlinear(N)
+      samples[7] = cccmModel.nonlinear( refLumaBlk.at(x, y + 1) ); // nonlinear(S)
+      samples[8] = cccmModel.nonlinear( refLumaBlk.at(x - 1, y) ); // nonlinear(W)
+      samples[9] = cccmModel.nonlinear( refLumaBlk.at(x + 1, y) ); // nonlinear(E)
+      samples[10] = cccmModel.bias();
+      
+      piPred.at(x, y) = ClipPel<Pel>( cccmModel.convolve(samples), clpRng );
+    }
+  }
+}
+int IntraPrediction::xBvgCccmCalcBlkAver(const PredictionUnit& pu) const
+{
+  int numSamples = 0;
+  int sumSamples = 0;
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf( pu );
+  
+  for (int y = 0; y < refLumaBlk.height; y++)
+  {
+    for (int x = 0; x < refLumaBlk.width; x++)
+    {
+      sumSamples += refLumaBlk.at(x, y);
+      numSamples += 1;
+    }
+  }
+#if JVET_AB0174_CCCM_DIV_FREE
+  return numSamples == 0 ? 512 : xCccmDivideLowPrec(sumSamples, numSamples);
+#else
+  return numSamples == 0 ? 512 : ( sumSamples + numSamples/2) / numSamples;
+#endif
+}
+void IntraPrediction::xBvgCccmCalcBlkRange(const PredictionUnit& pu, int& minVal, int&maxVal) const
+{
+  minVal = MAX_INT, maxVal = -MAX_INT;
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu);
+  for (int y = 0; y < refLumaBlk.height; y++)
+  {
+    for (int x = 0; x < refLumaBlk.width; x++)
+    {
+      if (refLumaBlk.at(x, y) < minVal)
+      {
+        minVal = refLumaBlk.at(x, y);
+      }
+      if (refLumaBlk.at(x, y) > maxVal)
+      {
+        maxVal = refLumaBlk.at(x, y);
+      }
+    }
+  }
+  int range = abs(maxVal - minVal) >> 4;
+  minVal -= range;
+  maxVal += range;
+}
+void IntraPrediction::xBvgCccmCalcRefArea(const PredictionUnit& pu, CompArea chromaArea)
+{
+  m_bvgCccmBlkArea = chromaArea;
+  m_bvgCccmRefArea = chromaArea;
+  int refWidth = chromaArea.width + 2 * CCCM_FILTER_PADDING;
+  int refHeight = chromaArea.height + 2 * CCCM_FILTER_PADDING;
+  m_bvgCccmRefArea = Area(chromaArea.x - CCCM_FILTER_PADDING, chromaArea.y - CCCM_FILTER_PADDING, refWidth, refHeight);
+}
+PelBuf IntraPrediction::xBvgCccmGetLumaPuBufFul(const PredictionUnit& pu, int candIdx) const
+{
+  int refStride = m_bvgCccmRefArea.width;
+  int tuWidth = m_bvgCccmRefArea.width;
+  int tuHeight = m_bvgCccmRefArea.height;
+  return PelBuf( m_bvgCccmLumaBuf[candIdx], refStride, tuWidth, tuHeight );  // Points to the top-left corner
+                                                                             //  return PelBuf( m_bvgCccmLumaBuf[0], refStride, tuWidth, tuHeight );  // Points to the top-left corner
+}
+PelBuf IntraPrediction::xBvgCccmGetLumaPuBuf(const PredictionUnit& pu, int candIdx) const
+{
+  int refSizeX  = 0;//m_bvgCccmBlkArea.x; // Reference lines available left and above
+  int refSizeY  = 0;//m_bvgCccmBlkArea.y;
+  int tuWidth   = m_bvgCccmBlkArea.width;
+  int tuHeight  = m_bvgCccmBlkArea.height;
+  int refStride = m_bvgCccmBlkArea.width + 2 * CCCM_FILTER_PADDING; // Including paddings required for the 2D filter
+  int refOrigin = refStride * (refSizeY + CCCM_FILTER_PADDING) + refSizeX + CCCM_FILTER_PADDING;
+  
+  return PelBuf( m_bvgCccmLumaBuf[candIdx] + refOrigin, refStride, tuWidth, tuHeight );  // Points to the top-left corner of the block
+                                                                                         //  return PelBuf( m_bvgCccmLumaBuf[0] + refOrigin, refStride, tuWidth, tuHeight );  // Points to the top-left corner of the block
+}
+PelBuf IntraPrediction::xBvgCccmGetChromaPuBuf(const PredictionUnit& pu, const ComponentID compID, int candIdx) const
+{
+  int refSizeX  = 0;//m_bvgCccmBlkArea.x; // Reference lines available left and above
+  int refSizeY  = 0;//m_bvgCccmBlkArea.y;
+  int tuWidth   = m_bvgCccmBlkArea.width;
+  int tuHeight  = m_bvgCccmBlkArea.height;
+  int refStride = m_bvgCccmBlkArea.width + 2 * CCCM_FILTER_PADDING; // Including paddings required for the 2D filter
+  int refOrigin = refStride * (refSizeY + CCCM_FILTER_PADDING) + refSizeX + CCCM_FILTER_PADDING;
+  if (compID == COMPONENT_Cb)
+  {
+    return PelBuf( m_bvgCccmChromaBuf[candIdx][0] + refOrigin, refStride, tuWidth, tuHeight );  // Points to the top-left corner of the block
+  }
+  else
+  {
+    return PelBuf( m_bvgCccmChromaBuf[candIdx][1] + refOrigin, refStride, tuWidth, tuHeight );  // Points to the top-left corner of the block
+  }
+}
+void IntraPrediction::xBvgCccmCreateLumaRef(const PredictionUnit& pu, CompArea chromaArea
+#if JVET_AD0202_CCCM_MDF
+                                            , int downsFilterIdx
+#endif
+                                            )
+{
+  const CPelBuf recoLuma = pu.cs->picture->getRecoBuf(COMPONENT_Y);
+  const CPelBuf recoCb = pu.cs->picture->getRecoBuf( COMPONENT_Cb );
+  const CPelBuf recoCr = pu.cs->picture->getRecoBuf( COMPONENT_Cr );
+  
+  const int  maxPosPicX  = pu.cs->picture->chromaSize().width  - 1;
+  const int  maxPosPicY  = pu.cs->picture->chromaSize().height - 1;
+  int ctuWidth  = pu.cs->sps->getMaxCUWidth()  >> getComponentScaleX(COMPONENT_Cb, pu.chromaFormat);
+  int ctuHeight = pu.cs->sps->getMaxCUHeight() >> getComponentScaleY(COMPONENT_Cb, pu.chromaFormat);
+  
+  for (int candIdx = 0; candIdx < pu.numBvgCands; candIdx++)
+  {
+    Mv chromaBv = pu.bvList[candIdx];
+    xBvgCccmCalcRefArea(pu, chromaArea); // Find the reference area
+    PelBuf refLuma = xBvgCccmGetLumaPuBuf(pu, candIdx);
+    PelBuf refCb = xBvgCccmGetChromaPuBuf(pu, COMPONENT_Cb, candIdx);
+    PelBuf refCr = xBvgCccmGetChromaPuBuf(pu, COMPONENT_Cr, candIdx);
+    
+#if JVET_AB0174_CCCM_DIV_FREE
+    xCccmSetLumaRefValue( pu );
+#endif
+    
+    int refPosPicX = pu.blocks[COMPONENT_Cb].x + chromaBv.hor;
+    int refPosPicY = pu.blocks[COMPONENT_Cb].y + chromaBv.ver;
+    int maxWidth = refLuma.width;
+    int maxHeight =  refLuma.height;
+    PU::checkIsChromaBvCandidateValid(pu, chromaBv, maxWidth, maxHeight);
+    // Generate down-sampled luma for the area covering both the PU and the top/left reference areas (+ top and left paddings)
+    for (int y = 0; y < refLuma.height; y++)
+    {
+      for (int x = 0; x < refLuma.width; x++)
+      {
+        int chromaPosPicX = refPosPicX + x;
+        int chromaPosPicY = refPosPicY + y;
+        
+        chromaPosPicX = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+        chromaPosPicY = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+        
+        refLuma.at( x, y ) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, chromaPosPicY
+#if JVET_AD0202_CCCM_MDF
+                                             , downsFilterIdx
+#endif
+                                             );
+        refCb.at( x, y ) = recoCb.at( chromaPosPicX, chromaPosPicY );
+        refCr.at( x, y ) = recoCr.at( chromaPosPicX, chromaPosPicY );
+        // pad if not available
+        if ( x >= maxWidth )
+        {
+          refLuma.at( x, y ) = refLuma.at( x - 1, y );
+          refCb.at( x, y ) = refCb.at( x - 1, y );
+          refCr.at( x, y ) = refCr.at( x - 1, y );
+        }
+        else if (y >= maxHeight)
+        {
+          refLuma.at( x, y ) = refLuma.at( x, y - 1);
+          refCb.at( x, y ) = refCb.at( x, y - 1);
+          refCr.at( x, y ) = refCr.at( x, y - 1);
+        }
+      }
+    }
+    //-- Now fill the out of block samples (North)
+    for (int x = 0; x < refLuma.width; x++)
+    {
+      int y = -1;
+      int chromaPosPicX = refPosPicX + x;
+      int chromaPosPicY = refPosPicY + y;
+      
+      chromaPosPicX = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+      chromaPosPicY = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+      
+      refLuma.at( x, y ) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, chromaPosPicY
+#if JVET_AD0202_CCCM_MDF
+                                           , downsFilterIdx
+#endif
+                                           );
+      if (chromaPosPicY < 0)
+      {
+        refLuma.at( x, y ) = refLuma.at( x, y + 1 );
+      }
+      if ( x >= maxWidth )
+      {
+        refLuma.at( x, y ) = refLuma.at( x - 1, y );
+      }
+    }
+    //-- Now fill the out of block samples (South)
+    for (int x = 0; x < refLuma.width; x++)
+    {
+      int y = refLuma.height;
+      int chromaPosPicX = refPosPicX + x;
+      int chromaPosPicY = refPosPicY + y;
+      
+      chromaPosPicX = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+      chromaPosPicY = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+      
+      refLuma.at( x, y ) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, chromaPosPicY
+#if JVET_AD0202_CCCM_MDF
+                                           , downsFilterIdx
+#endif
+                                           );
+      if (chromaPosPicY >= maxPosPicY)
+      {
+        refLuma.at( x, y ) = refLuma.at( x, y - 1 );
+      }
+      if (!( chromaPosPicY <= maxPosPicY && (chromaPosPicY % ctuHeight) ))
+      {
+        refLuma.at( x, y ) = refLuma.at( x, y - 1 );
+      }
+      if (maxHeight < refLuma.height)
+      {
+        refLuma.at( x, y ) = refLuma.at( x, y - 1);
+      }
+      if ( x >= maxWidth )
+      {
+        refLuma.at( x, y ) = refLuma.at( x - 1, y );
+      }
+    }
+    //-- Now fill the out of block samples (West)
+    for (int y = 0; y < refLuma.height; y++)
+    {
+      int x = -1;
+      int chromaPosPicX = refPosPicX + x;
+      int chromaPosPicY = refPosPicY + y;
+      
+      chromaPosPicX = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+      chromaPosPicY = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+      
+      refLuma.at( x, y ) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, chromaPosPicY
+#if JVET_AD0202_CCCM_MDF
+                                           , downsFilterIdx
+#endif
+                                           );
+      if (chromaPosPicX < 0)
+      {
+        refLuma.at( x, y ) = refLuma.at( x + 1, y );
+      }
+      if ( y >= maxHeight )
+      {
+        refLuma.at( x, y ) = refLuma.at( x, y - 1 );
+      }
+    }
+    //-- Now fill the out of block samples (East)
+    for (int y = 0; y < refLuma.height; y++)
+    {
+      int x = refLuma.width;
+      int chromaPosPicX = refPosPicX + x;
+      int chromaPosPicY = refPosPicY + y;
+      
+      chromaPosPicX = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+      chromaPosPicY = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+      
+      refLuma.at( x, y ) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, chromaPosPicY
+#if JVET_AD0202_CCCM_MDF
+                                           , downsFilterIdx
+#endif
+                                           );
+      if (chromaPosPicX >= maxPosPicX)
+      {
+        refLuma.at( x, y ) = refLuma.at( x - 1, y );
+      }
+      if (!( chromaPosPicX <= maxPosPicX && (chromaPosPicX % ctuWidth) ))
+      {
+        refLuma.at( x, y ) = refLuma.at( x - 1, y );
+      }
+      if (maxWidth < refLuma.width)
+      {
+        refLuma.at( x, y ) = refLuma.at( x - 1, y );
+      }
+      if ( y >= maxHeight )
+      {
+        refLuma.at( x, y ) = refLuma.at( x, y - 1 );
+      }
+    }
+    
+    int rribcFlipType = pu.rrIbcList[candIdx];
+    if (rribcFlipType > 0)
+    {
+      PelBuf refLumaExt = xBvgCccmGetLumaPuBufFul(pu, candIdx);
+      refLumaExt.flipSignal(rribcFlipType == 1);
+      refCb.flipSignal(rribcFlipType == 1);
+      refCr.flipSignal(rribcFlipType == 1);
     }
   }
 }

@@ -3463,6 +3463,22 @@ const CtxSet ContextSetCfg::CccmMpfFlag = ContextSetCfg::addCtxSet
   { DWO, DWO, DWO, },
 });
 #endif
+#if JVET_AE0100_BVGCCCM
+const CtxSet ContextSetCfg::BvgCccmFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+});
+#endif
 #endif
 
 #if JVET_AD0120_LBCCP
@@ -5220,6 +5236,17 @@ const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
   { DWS, },
 #endif
 });
+#if JVET_AE0100_BVGCCCM
+const CtxSet ContextSetCfg::BvgCccmFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+});
+#endif
 #endif
 
 #if JVET_AC0119_LM_CHROMA_FUSION
@@ -6429,6 +6456,15 @@ const CtxSet ContextSetCfg::CccmFlag = ContextSetCfg::addCtxSet
   { DWS, },
 #endif
 });
+#if JVET_AE0100_BVGCCCM
+const CtxSet ContextSetCfg::BvgCccmFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+});
+#endif
 #endif
 
 #if JVET_AC0119_LM_CHROMA_FUSION
