@@ -647,6 +647,11 @@ namespace DQIntern
     inline TCoeff getSSbbThreshold() const { return m_thresSSbb; }
 
     inline int64_t getQScale()       const { return m_QScale; }
+
+#if JVET_AE0125_SHIFT_QUANTIZATION_CENTER
+    const int m_coeffShift[64]={0,63, 31, 21, 15, 12, 10, 9, 7, 7, 6, 5, 5, 4, 4, 4, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+#endif
+
   private:
     // quantization
     int               m_QShift;
@@ -788,6 +793,22 @@ namespace DQIntern
         Intermediate_Int  qIdx      = ( level << 1 ) + ( level > 0 ? -(state>>1) : (state>>1) );
 #endif
 				int64_t  nomTCoeff          = ((int64_t)qIdx * (int64_t)invQScale + add) >> ((shift < 0) ? 0 : shift);
+
+#if JVET_AE0125_SHIFT_QUANTIZATION_CENTER
+        // Latent Shift
+        int qIdx2=qIdx;
+        qIdx2+=(qIdx>0? 1: -1);
+        int64_t  nomTCoeff2         = ((int64_t)qIdx2 *(int64_t)invQScale + add) >> ((shift < 0) ? 0 : shift) ;
+        int aqIdx  = abs(qIdx);
+        int coef=0;
+        if (aqIdx<64)
+        {
+          coef=m_coeffShift[aqIdx];
+        }
+        nomTCoeff=(int64_t)((1024-coef)*nomTCoeff+coef*nomTCoeff2)>>10;
+        // Latent Shift
+#endif
+
         tCoeff[rasterPos]           = (TCoeff)Clip3<int64_t>(minTCoeff, maxTCoeff, nomTCoeff);
       }
 #if TCQ_8STATES
