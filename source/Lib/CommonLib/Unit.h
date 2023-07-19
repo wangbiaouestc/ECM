@@ -538,6 +538,12 @@ struct IntraPredictionData
 #if JVET_AD0202_CCCM_MDF
   int       cccmMultiFilterIdx;
 #endif
+#if JVET_AE0100_BVGCCCM
+  int       bvgCccmFlag;
+  int       numBvgCands;
+  Mv        bvList[NUM_BVG_CCCM_CANDS];
+  int       rrIbcList[NUM_BVG_CCCM_CANDS];
+#endif
 #endif
 #if JVET_AD0188_CCP_MERGE
   int       idxNonLocalCCP;

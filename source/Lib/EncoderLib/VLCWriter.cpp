@@ -1640,6 +1640,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   WRITE_UVLC(pcSPS->getUseCccm() , "sps_cccm_cand");
 #endif
+#if JVET_AE0100_BVGCCCM
+  WRITE_FLAG(pcSPS->getUseBvgCccm() ? 1 : 0, "sps_bvg_cccm");
+#endif
 #if JVET_AD0188_CCP_MERGE
   WRITE_UVLC(pcSPS->getUseCcpMerge(), "sps_ccp_merge");
 #endif

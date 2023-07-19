@@ -2658,6 +2658,17 @@ void CABACReader::cccmFlag(PredictionUnit& pu)
 #endif
   const unsigned intraDir = pu.intraDir[1];
   
+#if JVET_AE0100_BVGCCCM
+  if ((intraDir == LM_CHROMA_IDX || intraDir == MMLM_CHROMA_IDX) && PU::hasBvgCccmFlag(pu) && PU::cccmSingleModeAvail(pu, LM_CHROMA_IDX) && PU::bvgCccmMultiModeAvail(pu, intraDir))
+  {
+    pu.bvgCccmFlag = m_BinDecoder.decodeBin( Ctx::BvgCccmFlag( 0 ) );
+    if (pu.bvgCccmFlag)
+    {
+      pu.cccmFlag = 1;
+      return;
+    }
+  }
+#endif
 #if JVET_AB0143_CCCM_TS
   bool isCCCMEnabled = false;
   if (intraDir == LM_CHROMA_IDX)
@@ -2767,6 +2778,12 @@ void CABACReader::cccmFlag(PredictionUnit& pu)
 #if JVET_AD0120_LBCCP
 void CABACReader::ccInsideFilterFlag(PredictionUnit &pu)
 {
+#if JVET_AE0100_BVGCCCM
+  if (pu.bvgCccmFlag)
+  {
+    return;
+  }
+#endif
   const unsigned intraDir = pu.intraDir[1];
   pu.ccInsideFilter       = 0;
 

@@ -2579,6 +2579,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   READ_UVLC(uiCode, "sps_cccm_cand");                               pcSPS->setUseCccm(uiCode);
 #endif
+#if JVET_AE0100_BVGCCCM
+  READ_FLAG(uiCode, "sps_bvg_cccm");                                pcSPS->setUseBvgCccm(uiCode != 0);
+#endif
 #if JVET_AD0188_CCP_MERGE
   READ_UVLC(uiCode, "sps_ccp_merge");                               pcSPS->setUseCcpMerge(uiCode);
 #endif

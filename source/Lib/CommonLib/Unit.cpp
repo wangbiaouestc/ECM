@@ -887,6 +887,15 @@ void PredictionUnit::initData()
 #if JVET_AD0202_CCCM_MDF
   cccmMultiFilterIdx = 0;
 #endif
+#if JVET_AE0100_BVGCCCM
+  bvgCccmFlag = 0;
+  numBvgCands = 0;
+  for (int candIdx = 0; candIdx < NUM_BVG_CCCM_CANDS; candIdx++)
+  {
+    bvList[candIdx] = Mv(0, 0);
+    rrIbcList[candIdx] = 0;
+  }
+#endif
 #endif
 #if JVET_AD0188_CCP_MERGE
   idxNonLocalCCP = 0;
@@ -1058,6 +1067,15 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #endif
 #if JVET_AD0202_CCCM_MDF
   cccmMultiFilterIdx = predData.cccmMultiFilterIdx;
+#endif
+#if JVET_AE0100_BVGCCCM
+  bvgCccmFlag = predData.bvgCccmFlag;
+  numBvgCands = predData.numBvgCands;
+  for (int candIdx = 0; candIdx < NUM_BVG_CCCM_CANDS; candIdx++)
+  {
+    bvList[candIdx] = predData.bvList[candIdx];
+    rrIbcList[candIdx] = predData.rrIbcList[candIdx];
+  }
 #endif
 #endif
 #if JVET_AD0188_CCP_MERGE
@@ -1232,6 +1250,15 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
 #if JVET_AD0202_CCCM_MDF
   cccmMultiFilterIdx = other.cccmMultiFilterIdx;
+#endif
+#if JVET_AE0100_BVGCCCM
+  bvgCccmFlag = other.bvgCccmFlag;
+  numBvgCands = other.numBvgCands;
+  for (int candIdx = 0; candIdx < NUM_BVG_CCCM_CANDS; candIdx++)
+  {
+    bvList[candIdx] = other.bvList[candIdx];
+    rrIbcList[candIdx] = other.rrIbcList[candIdx];
+  }
 #endif
 #endif
 #if JVET_AD0188_CCP_MERGE

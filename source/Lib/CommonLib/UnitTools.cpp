@@ -2547,6 +2547,245 @@ bool PU::hasChromaFusionFlag(const PredictionUnit &pu, int intraMode)
   return hasChromaFusionFlag;
 }
 #endif
+#if JVET_AE0100_BVGCCCM
+bool PU::hasBvgCccmFlag(const PredictionUnit &pu)
+{
+  if (CS::isDualITree(*pu.cs) && pu.cu->slice->getSPS()->getUseBvgCccm())
+  {
+    return bvgCccmModeAvail(pu);
+  }
+  return false;
+}
+bool PU::bvgCccmMultiModeAvail(const PredictionUnit& pu, int intraMode)
+{
+  if (intraMode == MMLM_CHROMA_IDX && pu.chromaSize().height * pu.chromaSize().width <= 16)
+  {
+    return false;
+  }
+  return true;
+}
+void PU::getBvgCccmCands(PredictionUnit &pu, bool &validBv)
+{
+  validBv = false;
+  for (int posIdx = 0; posIdx < NUM_BVG_CCCM_CANDS; posIdx++)
+  {
+    Mv chromaBv = Mv(0, 0);
+    int rrIbcType = 0;
+    pu.bvList[posIdx] = Mv(0, 0);
+    if (PU::isBvgCccmCand(pu, chromaBv, rrIbcType, posIdx))
+    {
+      if (chromaBv == Mv(0, 0))
+      {
+        continue;
+      }
+      bool bvExist = false;
+      for (int i = 0; i < pu.numBvgCands; i++)
+      {
+        if (chromaBv == pu.bvList[i])
+        {
+          bvExist = true;
+          break;
+        }
+      }
+      if (!bvExist)
+      {
+        pu.bvList[pu.numBvgCands] = chromaBv;
+        pu.rrIbcList[pu.numBvgCands] = rrIbcType;
+        pu.numBvgCands++;
+        validBv = true;
+      }
+    }
+  }
+}
+bool PU::bvgCccmModeAvail(const PredictionUnit &pu)
+{
+  CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, pu.Cb().lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, pu.Cb().size()));
+  lumaArea = clipArea(lumaArea, pu.cs->picture->block(COMPONENT_Y));
+  Position posList[NUM_BVG_CCCM_CANDS] = { lumaArea.center(), lumaArea.topLeft(), lumaArea.topRight(), lumaArea.bottomLeft(), lumaArea.bottomRight() };
+  int checkOffset = BVG_CCCM_POS_OFFSET >> 1;
+  
+  for (int n = 0; n < NUM_BVG_CCCM_CANDS; n++)
+  {
+    const PredictionUnit *lumaPU = pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+    if (lumaPU && (CU::isIBC(*lumaPU->cu) || isTmp(*lumaPU)))
+    {
+      return true;
+    }
+    else
+    {
+      for (int a = 0; a < 3; a++)
+      {
+        int offsetX = (a == 0) ? 1 : (a >> 1);
+        int offsetY = (a == 0) ? 1 : (a % 2);
+        Position temp(posList[n].getX() - offsetX * checkOffset, posList[n].getY() - offsetY * checkOffset);
+        const PredictionUnit* lumaPU = pu.cs->picture->cs->getPU(temp, CHANNEL_TYPE_LUMA);
+        if (lumaPU && (CU::isIBC(*lumaPU->cu) || isTmp(*lumaPU)))
+        {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+bool PU::isBvgCccmCand(const PredictionUnit &pu, Mv &chromaBv, int& rrIbcType, int candIdx)
+{
+  rrIbcType = 0;
+  chromaBv = Mv(0, 0);
+  const int shiftHor = ::getComponentScaleX(COMPONENT_Cb, pu.chromaFormat);
+  const int shiftVer = ::getComponentScaleY(COMPONENT_Cb, pu.chromaFormat);
+  int checkOffset = BVG_CCCM_POS_OFFSET >> 1;
+  bool isBvgFound = true;
+  CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, pu.Cb().lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, pu.Cb().size()));
+  lumaArea = clipArea(lumaArea, pu.cs->picture->block(COMPONENT_Y));
+  Position posList[NUM_BVG_CCCM_CANDS] = { lumaArea.center(), lumaArea.topLeft(), lumaArea.topRight(), lumaArea.bottomLeft(), lumaArea.bottomRight() };
+  const PredictionUnit *lumaPU = pu.cs->picture->cs->getPU(posList[candIdx], CHANNEL_TYPE_LUMA);
+  
+  if (lumaPU && (CU::isIBC(*lumaPU->cu) || isTmp(*lumaPU)))
+  {
+    if (candIdx > 0)
+    {
+      for (int n = 0; n < candIdx; n++)
+      {
+        const PredictionUnit *prevLumaPU = pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+        if (prevLumaPU == lumaPU)
+        {
+          isBvgFound= false;
+        }
+      }
+    }
+    if (isBvgFound)
+    {
+      Mv lumaBv = lumaPU->bv;
+#if JVET_AA0070_RRIBC
+      lumaBv = adjustChromaBv(*lumaPU, lumaArea);
+#endif
+      const int bvShiftHor = MV_FRACTIONAL_BITS_INTERNAL + shiftHor;
+      const int bvShiftVer = MV_FRACTIONAL_BITS_INTERNAL + shiftVer;
+      lumaBv.hor = (lumaBv.hor >> bvShiftHor) << shiftHor;
+      lumaBv.ver = (lumaBv.ver >> bvShiftVer) << shiftVer;
+      chromaBv = Mv(lumaBv.hor >> shiftHor, lumaBv.ver >> shiftVer);
+      int maxWidth = pu.chromaSize().width;
+      int maxHeight = pu.chromaSize().height;
+      if (PU::checkIsChromaBvCandidateValid(pu, chromaBv, maxWidth, maxHeight))
+      {
+        rrIbcType = (int)lumaPU->cu->rribcFlipType;
+        return true;
+      }
+    }
+  }
+  {
+    for (int a = 0; a < 3; a++)
+    {
+      int offsetX = (a == 0) ? 1 : (a >> 1);
+      int offsetY = (a == 0) ? 1 : (a % 2);
+      Position temp(posList[candIdx].getX() - offsetX * checkOffset, posList[candIdx].getY() - offsetY * checkOffset);
+      const PredictionUnit* lumaPU = pu.cs->picture->cs->getPU(temp, CHANNEL_TYPE_LUMA);
+      if (lumaPU && (CU::isIBC(*lumaPU->cu) || isTmp(*lumaPU)))
+      {
+        if (candIdx > 0)
+        {
+          for (int n = 0; n < candIdx; n++)
+          {
+            const PredictionUnit* prevLumaPU = pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+            if (prevLumaPU == lumaPU)
+            {
+              isBvgFound = false;
+            }
+          }
+        }
+        if (isBvgFound)
+        {
+          Mv lumaBv = lumaPU->bv;
+#if JVET_AA0070_RRIBC
+          lumaBv = adjustChromaBv(*lumaPU, lumaArea);
+#endif
+          const int bvShiftHor = MV_FRACTIONAL_BITS_INTERNAL + shiftHor;
+          const int bvShiftVer = MV_FRACTIONAL_BITS_INTERNAL + shiftVer;
+          lumaBv.hor = (lumaBv.hor >> bvShiftHor) << shiftHor;
+          lumaBv.ver = (lumaBv.ver >> bvShiftVer) << shiftVer;
+          chromaBv = Mv(lumaBv.hor >> shiftHor, lumaBv.ver >> shiftVer);
+          int maxWidth = pu.chromaSize().width;
+          int maxHeight = pu.chromaSize().height;
+          if (PU::checkIsChromaBvCandidateValid(pu, chromaBv, maxWidth, maxHeight))
+          {
+            rrIbcType = (int)lumaPU->cu->rribcFlipType;
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+bool PU::checkIsChromaBvCandidateValid(const PredictionUnit &pu, const Mv chromaBv, int &maxWidth, int &maxHeight, bool isRefTemplate, bool isRefAbove)
+{
+  const int cuPelX = pu.Cb().x;
+  const int cuPelY = pu.Cb().y;
+  int roiWidth = (isRefTemplate && !isRefAbove) ? DBV_TEMPLATE_SIZE : pu.Cb().width;
+  int roiHeight = (isRefTemplate && isRefAbove) ? DBV_TEMPLATE_SIZE : pu.Cb().height;
+  int xPred = chromaBv.getHor();
+  int yPred = chromaBv.getVer();
+  if ((xPred + roiWidth) > 0 && (yPred + roiHeight) > 0)
+  {
+    maxWidth = 0;
+    maxHeight = 0;
+    return false;
+  }
+  int refRightX = cuPelX + xPred + roiWidth - 1;
+  int refLeftX = cuPelX + xPred;
+  int refBottomY = cuPelY + yPred + roiHeight - 1;
+  int refTopY = cuPelY + yPred;
+  const Position refPosLT(refLeftX, refTopY);
+  Position refPosBR(refRightX, refBottomY);
+  if (!pu.cs->isDecomp(refPosLT, pu.chType))
+  {
+    return false;
+  }
+  if (!pu.cs->isDecomp(refPosBR, pu.chType))
+  {
+    Position tmpPosBR(refRightX, refTopY);
+    int validX = refRightX;
+    int validY = refBottomY;
+    for (int x = tmpPosBR.x; x >= 0; x -= 1)
+    {
+      if (!pu.cs->isDecomp(tmpPosBR, pu.chType))
+      {
+        tmpPosBR.x -= 1;
+      }
+      else
+      {
+        validX = tmpPosBR.x;
+        break;
+      }
+    }
+    tmpPosBR.x = refLeftX;
+    tmpPosBR.y = refBottomY;
+    for (int y = tmpPosBR.y; y >= 0; y -= 1)
+    {
+      if (!pu.cs->isDecomp(tmpPosBR, pu.chType))
+      {
+        tmpPosBR.y -= 1;
+      }
+      else
+      {
+        validY = tmpPosBR.y;
+        break;
+      }
+    }
+    tmpPosBR.x = validX;
+    tmpPosBR.y = validY;
+    if (pu.cs->isDecomp(tmpPosBR, pu.chType))
+    {
+      maxHeight = maxHeight - (refBottomY - validY);
+      maxWidth = maxWidth - (refRightX - validX);
+      return true;
+    }
+    return false;
+  }
+  return true;
+}
+#endif
 #if JVET_AD0120_LBCCP
 bool PU::isModetobeFiltered(int intraMode)
 {

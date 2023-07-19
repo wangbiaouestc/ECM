@@ -1948,6 +1948,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseIntraTMP(m_intraTMP);
   sps.setIntraTMPMaxSize(m_intraTmpMaxSize);
 #endif
+#if JVET_AE0100_BVGCCCM
+  sps.setUseBvgCccm(m_bvgCccm);
+#endif
 #if JVET_AC0071_DBV
   sps.setUseIntraDBV(m_intraDBV);
 #endif

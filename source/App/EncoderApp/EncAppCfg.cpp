@@ -1249,6 +1249,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("FastIntraTMP",                                    m_fastIntraTMP,                                   true,  "fast intra Template Matching (0: off, 1:on)  [default: off]")
 #endif
 #endif
+#if JVET_AE0100_BVGCCCM
+  ("BvgCccm",                                         m_bvgCccm,                                        true, "Block Vector Guided CCCM (0: off, 1:on)  [default: on]")
+#endif
 #if JVET_AC0071_DBV
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
  ("IntraDBV",                                         m_intraDBV,                                       true, "Direct Block Vector (0: off, 1:on)  [default: on]")
@@ -5565,6 +5568,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   msg(VERBOSE, "CCCM:%d ", m_cccm);
+#endif
+#if JVET_AE0100_BVGCCCM
+  msg(VERBOSE, "BvgCCCM:%d ", m_bvgCccm);
 #endif
 #if JVET_V0130_INTRA_TMP && !JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   msg( VERBOSE, "IntraTMP:%d ", m_intraTMP );

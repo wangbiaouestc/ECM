@@ -1054,7 +1054,11 @@ static const int CCCM_NUM_PARAMS          = 7;
 static const int CCCM_MIN_PU_SIZE         = 0; // Set to 0 for no size restriction
 static const int CCCM_REF_LINES_ABOVE_CTU = 0; // Number of chroma lines allowed to be included in the reference area above the CTU (0: no restrictions)
 static const int CCCM_FILTER_PADDING      = 1; // E.g. 3x3 filter needs one padded sample
+#if JVET_AE0100_BVGCCCM
+static const int CCCM_MAX_REF_SAMPLES     = 4 * ( 2 * CCCM_WINDOW_SIZE * ( 2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE ) );
+#else
 static const int CCCM_MAX_REF_SAMPLES     = ( 2 * CCCM_WINDOW_SIZE * ( 2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE ) );
+#endif
 #if JVET_AB0174_CCCM_DIV_FREE
 static const int CCCM_MATRIX_BITS         = 22;
 static const int CCCM_DECIM_BITS          = 16;
@@ -1095,6 +1099,11 @@ static const int CCCM_MULTI_PRED_FILTER_NUM_PARAMS2 = 11;
 #endif
 #if JVET_AD0120_LBCCP
 static const int LBCCP_FILTER_MMLMNUM = 4 + 3;// multi-model TL mode of CCLM, CCCM w/ subsample, CCCM w/o subsample if applicable, GL-CCCM, and three more from CCCM_MDF
+#endif
+#if JVET_AE0100_BVGCCCM
+static const int NUM_BVG_CCCM_CANDS       = 5;
+static const int BVG_CCCM_POS_OFFSET      = 4;
+static const int BVG_CCCM_NUM_PARAMS      = 11;
 #endif
 #endif
 

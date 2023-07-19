@@ -262,6 +262,12 @@ private:
 #else
   Pel* m_cccmLumaBuf;
 #endif
+#if JVET_AE0100_BVGCCCM
+  Pel* m_bvgCccmLumaBuf[NUM_BVG_CCCM_CANDS];
+  Pel* m_bvgCccmChromaBuf[NUM_BVG_CCCM_CANDS][2];
+  Area m_bvgCccmBlkArea;
+  Area m_bvgCccmRefArea;
+#endif
 #endif
   
   static const uint8_t m_aucIntraFilter[MAX_INTRA_FILTER_DEPTHS];
@@ -515,6 +521,21 @@ public:
   void   xCccmCalcRefArea         (const PredictionUnit& pu, CompArea chromaArea);
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   void   xCccmCreateLumaNoSubRef  ( const PredictionUnit& pu, CompArea chromaArea );
+#endif
+#if JVET_AE0100_BVGCCCM
+  void   xBvgCccmCalcRefArea      (const PredictionUnit& pu, CompArea chromaArea);
+  PelBuf xBvgCccmGetLumaPuBuf     (const PredictionUnit& pu, int candIdx = 0) const;
+  PelBuf xBvgCccmGetLumaPuBufFul  (const PredictionUnit& pu, int candIdx = 0) const;
+  PelBuf xBvgCccmGetChromaPuBuf   (const PredictionUnit& pu, const ComponentID compId, int candIdx = 0) const;
+  void   xBvgCccmCreateLumaRef    (const PredictionUnit& pu, CompArea chromaArea
+#if JVET_AD0202_CCCM_MDF
+    , int downsFilterIdx = 0
+#endif
+                                   );
+  int    xBvgCccmCalcBlkAver   (const PredictionUnit& pu) const;
+  void   xBvgCccmCalcBlkRange  (const PredictionUnit& pu, int& minVal, int&maxVal) const;
+  void   xBvgCccmCalcModels  ( const PredictionUnit& pu, CccmModel& cccmModelCb, CccmModel& cccmModelCr, int modelId, int modelThr, int minVal, int maxVal );
+  void   xBvgCccmApplyModel  ( const PredictionUnit& pu, const ComponentID compId, CccmModel& cccmModel, int modelId, int modelThr, PelBuf &piPred );
 #endif
 #endif
 #if JVET_AB0092_GLM_WITH_LUMA
