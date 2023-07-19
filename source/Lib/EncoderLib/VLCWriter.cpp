@@ -1699,11 +1699,17 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     }
     WRITE_FLAG(pcSPS->getIBCFlagInterSlice() ? 1 : 0,                                                      "sps_ibc_enabled_flag_inter_slice");
     WRITE_FLAG( pcSPS->getUseIbcMerge() ? 1 : 0, "sps_ibc_merge_enabled_flag" );
+#if !JVET_AE0169_BIPREDICTIVE_IBC
     if( pcSPS->getUseIbcMerge() )
     {
 #endif
+#endif
     CHECK(pcSPS->getMaxNumIBCMergeCand() > IBC_MRG_MAX_NUM_CANDS, "More IBC merge candidates signalled than supported");
     WRITE_UVLC(IBC_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumIBCMergeCand(), "six_minus_max_num_ibc_merge_cand");
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS&&JVET_AE0169_BIPREDICTIVE_IBC
+    if( pcSPS->getUseIbcMerge() )
+    {
+#endif
 #if JVET_AA0061_IBC_MBVD
     WRITE_FLAG( pcSPS->getUseIbcMbvd() ? 1 : 0,                                         "sps_ibc_mbvd_enabled_flag" );
 #endif
@@ -3159,6 +3165,16 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
     if( pcSlice->getSPS()->getLicEnabledFlag() && !pcSlice->isIntra() )
     {
       WRITE_FLAG( pcSlice->getUseLIC() ? 1 : 0, "slice_lic_enable_flag" );
+    }
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+    if (pcSlice->getUseIBC())
+#else
+    if (pcSlice->getSPS()->getIBCFlag())
+#endif
+    {
+      WRITE_FLAG(pcSlice->getBiPredictionIBCFlag(), "bi_prediction_ibc_flag");
     }
 #endif
 

@@ -615,7 +615,11 @@ public:
 #endif
 #if JVET_AA0061_IBC_MBVD
   MvField ibcMbvdBaseBv[IBC_MBVD_BASE_NUM][2];
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  bool setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int candIdxMaped = -1, int candIdx1 = -1, int candIdxMaped1 = -1);
+#else
   bool setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int candIdxMaped = -1);
+#endif
 #endif
   bool          mmvdUseAltHpelIf  [ MMVD_BASE_MV_NUM ];
 #if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Z0075_IBC_HMVP_ENLARGE
@@ -627,6 +631,9 @@ public:
   void saveMergeInfo(PredictionUnit& puTmp, PredictionUnit pu);
 #endif
   void setMergeInfo( PredictionUnit& pu, int candIdx );
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void setIbcL1Info( PredictionUnit& pu, int candIdx );
+#endif
 #if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Y0058_IBC_LIST_MODIFY
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   bool xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1, int compareNum = -1) const;

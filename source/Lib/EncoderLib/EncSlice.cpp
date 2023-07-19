@@ -1599,6 +1599,21 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
     }
   }
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (pcSlice->getUseIBC())
+#else
+  if (pcSlice->getSPS()->getIBCFlag())
+#endif
+  {
+    bool mode = m_pcCfg->getIbcBiPred();
+    pcSlice->setBiPredictionIBCFlag(mode);
+  }
+  else
+  {
+    pcSlice->setBiPredictionIBCFlag(false);
+  }
+#endif
 
   if ( bWp_explicit )
   {

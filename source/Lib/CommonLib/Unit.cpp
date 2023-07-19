@@ -927,6 +927,9 @@ void PredictionUnit::initData()
 #endif
   mmvdMergeFlag = false;
   mmvdMergeIdx = MAX_UCHAR;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  ibcMergeIdx1 = MAX_INT;
+#endif
 #if JVET_AA0061_IBC_MBVD
   ibcMbvdMergeFlag = false;
   ibcMbvdMergeIdx = MAX_INT;
@@ -1099,6 +1102,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 #endif
   mmvdMergeFlag = predData.mmvdMergeFlag;
   mmvdMergeIdx = predData.mmvdMergeIdx;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  ibcMergeIdx1 = predData.ibcMergeIdx1;
+#endif
 #if JVET_AA0061_IBC_MBVD
   ibcMbvdMergeFlag = predData.ibcMbvdMergeFlag;
   ibcMbvdMergeIdx = predData.ibcMbvdMergeIdx;
@@ -1273,6 +1279,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
   mmvdMergeFlag = other.mmvdMergeFlag;
   mmvdMergeIdx = other.mmvdMergeIdx;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  ibcMergeIdx1 = other.ibcMergeIdx1;
+#endif
 #if JVET_AA0061_IBC_MBVD
   ibcMbvdMergeFlag = other.ibcMbvdMergeFlag;
   ibcMbvdMergeIdx = other.ibcMbvdMergeIdx;

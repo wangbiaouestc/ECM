@@ -1206,7 +1206,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   ("RRIBC",                                           m_rribc,                                          false, "RRIBC mode (0:off, 1:on)  [default: off]")
   ("TMIBC",                                           m_tmibc,                                          false, "TMIBC mode (0:off, 1:on)  [default: off]")
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  ("IBCMerge",                                        m_ibcMerge,                                        true, "Enable IBC merge")
+#else
   ("IBCMerge",                                        m_ibcMerge,                                       false, "Enable IBC merge")
+#endif
 #endif
 #if JVET_AC0112_IBC_CIIP
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -1216,10 +1220,17 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #endif
 #if JVET_AC0112_IBC_GPM
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  ("IBCGPM",                                          m_ibcGpm,                                         false, "IBC GPM mode (0:off, 1:on)  [default: off]" )
+#else
   ("IBCGPM",                                          m_ibcGpm,                                          true, "IBC GPM mode (0:off, 1:on)  [default: on]" )
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   ("IBCLIC",                                          m_ibcLic,                                          true, "IBC LIC mode (0:off, 1:on)  [default: on]" )
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  ("IBCBiPred",                                       m_ibcBiPred,                                       true, "IBC BiPred mode in I-Slice (0:off, 1:on)  [default: on]" )
 #endif
 
   ("WrapAround",                                      m_wrapAround,                                     false, "Enable horizontal wrap-around motion compensation for inter prediction (0:off, 1:on)  [default: off]")
@@ -5446,6 +5457,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AC0112_IBC_LIC
   msg( VERBOSE, "IBCLIC:%d ", m_ibcLic );
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  msg( VERBOSE, "IBCBiPred:%d ", m_ibcBiPred );
 #endif
   msg( VERBOSE, "HashME:%d ", m_HashME );
   msg( VERBOSE, "WrapAround:%d ", m_wrapAround);

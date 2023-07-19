@@ -589,6 +589,9 @@ struct InterPredictionData
 #else
   uint8_t       mmvdMergeIdx;
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  int         ibcMergeIdx1;
+#endif
 #if JVET_AA0061_IBC_MBVD
   bool          ibcMbvdMergeFlag;
   int           ibcMbvdMergeIdx;

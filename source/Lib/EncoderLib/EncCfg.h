@@ -553,6 +553,9 @@ protected:
 #if JVET_AC0112_IBC_LIC
   bool      m_ibcLic;
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  bool      m_ibcBiPred;
+#endif
 
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;
@@ -1478,6 +1481,10 @@ public:
 #if JVET_AC0112_IBC_LIC
   void      setIbcLic                       ( bool b )       { m_ibcLic = b; }
   bool      getIbcLic                       ()         const { return m_ibcLic; }
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void      setIbcBiPred                    ( bool b )       { m_ibcBiPred = b; }
+  bool      getIbcBiPred                    ()         const { return m_ibcBiPred; }
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void      setUseDMVDMode                  (bool b)         { m_DMVDMode = b; }

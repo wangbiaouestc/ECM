@@ -66,6 +66,9 @@ struct EstBvdBitsStruct
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   uint32_t bitsRribc;
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  uint32_t bitsMerge[IBC_MRG_MAX_NUM_CANDS];
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 #if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   uint32_t bitsBvType[3];
@@ -226,9 +229,9 @@ public:
 #if JVET_W0123_TIMD_FUSION
   void           setTimdDistParam( DistParam &rcDP, const Pel* pOrg, const Pel* piRefY, int iOrgStride, int iRefStride, int bitDepth, ComponentID compID, int width, int height, int subShiftMode = 0, int step = 1, bool useHadamard = false );
 #endif
-  void           setDistParam( DistParam &rcDP, const CPelBuf &org, const Pel* piRefY, int iRefStride, const Pel* mask01, int iMaskStride, int stepX, int iMaskStride2, int bitDepth,  ComponentID compID);
+  void           setDistParam( DistParam &rcDP, const CPelBuf &org, const Pel* piRefY, int iRefStride, const Pel* mask01, int iMaskStride, int stepX, int iMaskStride2, int bitDepth, ComponentID compID);
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
-  void           setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &cur, int bitDepth, bool trueAfalseL, int wIdx, int subShift, ComponentID compID );
+  void           setDistParam( DistParam &rcDP, const CPelBuf &org, const CPelBuf &cur, int bitDepth, bool trueAfalseL, int wIdx, int subShift, ComponentID compID);
 #endif
 
   double         getMotionLambda          ( )  { return m_dLambdaMotionSAD; }
@@ -270,8 +273,8 @@ public:
 #if JVET_AA0070_RRIBC && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
         if (addExtraBits >= 1 && addExtraBits <= 5)
         {
-          const static int bvTypeTbl[] = {NOT_VALID,         0, 1, 2, 1, 2}; // 0: 2D, 1: 1-D Hor, 2: 1-D Ver
-          const static int bvFlipTbl[] = {NOT_VALID, NOT_VALID, 0, 0, 1, 1}; // 0: no flip, 1: flip
+          const static int bvTypeTbl[] = { NOT_VALID,         0, 1, 2, 1, 2 }; // 0: 2D, 1: 1-D Hor, 2: 1-D Ver
+          const static int bvFlipTbl[] = { NOT_VALID, NOT_VALID, 0, 0, 1, 1 }; // 0: no flip, 1: flip
 
           binCost += m_cBvdBitCosts.bitsBvType[bvTypeTbl[addExtraBits]];
           if (addExtraBits > 1)
@@ -298,6 +301,43 @@ public:
     mvpIdx = bBestIdx;
     return Distortion(m_dCost * bBest) >> SCALE_BITS;
   }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AE0169_BIPREDICTIVE_IBC
+  inline Distortion getBvCost(Mv mvd, uint8_t imv, uint8_t imvForZeroBvd, bool zeroMvdCheckX, bool zeroMvdCheckY,
+                              uint32_t addExtraBits, uint8_t mvpIdx)
+  {
+    Mv bvd = mvd;
+    bvd.changeIbcPrecInternal2Amvr(imv);
+
+    uint32_t binCost = (zeroMvdCheckX ? 0 : xGetExpGolombNumberOfBitsIBCH(bvd.getHor()))
+                       + (zeroMvdCheckY ? 0 : xGetExpGolombNumberOfBitsIBCV(bvd.getVer()))
+                       + m_cBvdBitCosts.bitsIdx[mvpIdx];
+    if (!(imv == imvForZeroBvd && (zeroMvdCheckX || bvd.getHor() == 0) && (zeroMvdCheckY || bvd.getVer() == 0)))
+    {
+      binCost += m_cBvdBitCosts.bitsFracImv[imv];
+    }
+#if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AA0070_RRIBC && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+    if (addExtraBits >= 1 && addExtraBits <= 5)
+    {
+      const int bvTypeTbl[] = { NOT_VALID, 0, 1, 2, 1, 2 };           // 0: 2D, 1: 1-D Hor, 2: 1-D Ver
+      const int bvFlipTbl[] = { NOT_VALID, NOT_VALID, 0, 0, 1, 1 };   // 0: no flip, 1: flip
+
+      binCost += m_cBvdBitCosts.bitsBvType[bvTypeTbl[addExtraBits]];
+      if (addExtraBits > 1)
+      {
+        binCost += m_cBvdBitCosts.bitsUseFlip[bvFlipTbl[addExtraBits]];
+      }
+    }
+#else
+    if (addExtraBits >= 1 && addExtraBits <= 3)
+    {
+      binCost += m_cBvdBitCosts.bitsBvType[addExtraBits - 1];
+    }
+#endif
+#endif
+    return Distortion(m_dCost * binCost) >> SCALE_BITS;
+  }
+#endif
 
   void setFullPelImvForZeroBvd(bool b) { m_useFullPelImvForZeroBvd = b; }
 #endif
@@ -390,6 +430,13 @@ public:
   }
 #endif
 
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  inline Distortion getBvpMergeCost(int idx)
+  {
+    return Distortion(m_dCost * m_cBvdBitCosts.bitsMerge[idx]) >> SCALE_BITS;
+  }
+#endif
+
 #if JVET_AA0070_RRIBC
   void setPredictors(Mv pcMv[3][2]);
 #if JVET_Z0131_IBC_BVD_BINARIZATION || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
@@ -403,7 +450,7 @@ public:
   inline Distortion getBvCostMultiplePreds(int x, int y, bool useIMV, int rribcFlipType, uint8_t *bvImvResBest = NULL, int *bvpIdxBest = NULL)
 #endif
   {
-#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && !JVET_AE0169_BIPREDICTIVE_IBC
     const uint32_t fullPelImvCostForZeroBvd = m_useFullPelImvForZeroBvd || rribcFlipType > 0 ? 0 : std::numeric_limits<uint32_t>::max();
 
     uint32_t b0 = 0;
@@ -509,7 +556,11 @@ public:
       *bvpIdxBest   = bBestIdx;
     }
 
+#if JVET_AE0169_BIPREDICTIVE_IBC
+    if (useIMV && bestRes && x % 4 == 0 && y % 4 == 0)
+#else
     if (bestRes && x % 4 == 0 && y % 4 == 0)
+#endif
     {
       Mv cMv(x >> 2, y >> 2);
 

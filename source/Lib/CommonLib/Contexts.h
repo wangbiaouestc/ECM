@@ -552,6 +552,9 @@ public:
   static const CtxSet   CiipFlag;
   static const CtxSet   SmvdFlag;
   static const CtxSet   IBCFlag;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  static const CtxSet   BiPredIbcFlag;
+#endif
   static const CtxSet   ISPMode;
   static const CtxSet   JointCbCrFlag;
 #if INTER_LIC

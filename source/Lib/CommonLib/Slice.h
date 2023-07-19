@@ -3355,6 +3355,9 @@ private:
 #if JVET_S0193_NO_OUTPUT_PRIOR_PIC
   bool                       m_noOutputOfPriorPicsFlag;           //!< no output of prior pictures flag
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  bool                       m_biPredictionIBCFlag;
+#endif
   int                        m_iSliceQp;
   int                        m_iSliceQpBase;
   bool                       m_ChromaQpAdjEnabled;
@@ -3562,6 +3565,10 @@ public:
 #if JVET_S0193_NO_OUTPUT_PRIOR_PIC
   void                        setNoOutputOfPriorPicsFlag(bool b)                     { m_noOutputOfPriorPicsFlag = b;                                }
   bool                        getNoOutputOfPriorPicsFlag() const                     { return m_noOutputOfPriorPicsFlag;                             }
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void                        setBiPredictionIBCFlag(bool b)                         { m_biPredictionIBCFlag = b;                                }
+  bool                        getBiPredictionIBCFlag() const                         { return m_biPredictionIBCFlag;                             }
 #endif
   int                         getPOC() const                                         { return m_iPOC;                                                }
   int                         getSliceQp() const                                     { return m_iSliceQp;                                            }
