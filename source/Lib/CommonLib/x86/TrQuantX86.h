@@ -652,6 +652,24 @@ void computeFwdNspt_SIMD( int* src, int* dst, const uint32_t mode, const uint32_
   {
     trMat = g_nspt16x8[ mode ][ nsptIdx ][ 0 ];
   }
+#if JVET_AE0086_LARGE_NSPT
+  else if( width == 4 && height == 32 )
+  {
+    trMat = g_nspt4x32[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 32 && height == 4 )
+  {
+    trMat = g_nspt32x4[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 8 && height == 32 )
+  {
+    trMat = g_nspt8x32[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 32 && height == 8 )
+  {
+    trMat = g_nspt32x8[ mode ][ nsptIdx ][ 0 ];
+  }
+#endif
 
   int shift = shift_1st + shift_2nd - 7;
   int rnd = 1 << ( shift - 1 );
@@ -737,6 +755,24 @@ void TrQuant::computeInvNspt( int* src, int* dst, const uint32_t mode, const uin
   {
     trMat = g_nspt16x8[ mode ][ nsptIdx ][ 0 ];
   }
+#if JVET_AE0086_LARGE_NSPT
+  else if( width == 4 && height == 32 )
+  {
+    trMat = g_nspt4x32[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 32 && height == 4 )
+  {
+    trMat = g_nspt32x4[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 8 && height == 32 )
+  {
+    trMat = g_nspt8x32[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 32 && height == 8 )
+  {
+    trMat = g_nspt32x8[ mode ][ nsptIdx ][ 0 ];
+  }
+#endif
 
   int shift = shift_1st + shift_2nd - 7;
   int rnd = 1 << ( shift - 1 );

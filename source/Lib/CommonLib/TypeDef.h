@@ -336,6 +336,9 @@
 #define JVET_AA0133_INTER_MTS_OPT                         1 // JVET-AA0133: Inter MTS optimization
 #define JVET_AB0067_MIP_DIMD_LFNST                        1 // JVET-AB0067: Modification of LFNST for MIP coded block
 #define JVET_AC0130_NSPT                                  1 // JVET-AC0130: NSPT replacing DCT-II + LFNST for certain block shapes
+#if JVET_AC0130_NSPT
+#define JVET_AE0086_LARGE_NSPT                            1 // JVET-AE0086: Large NSPT kernels (4x32, 8x32)
+#endif
 #define JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST              1 // JVET-AC0115: Modifications of MTS/LFNST for Intra TMP coded block
 #define JVET_AE0125_SHIFT_QUANTIZATION_CENTER             1 // JVET-AE0125: Shifting quantization center
 

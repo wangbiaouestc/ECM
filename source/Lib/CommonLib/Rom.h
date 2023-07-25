@@ -234,6 +234,12 @@ extern const     int8_t   g_nspt4x16[ 35 ][ 3 ][ 24 ][ 64 ];
 extern const     int8_t   g_nspt16x4[ 35 ][ 3 ][ 24 ][ 64 ];
 extern const     int8_t   g_nspt8x16[ 35 ][ 3 ][ 40 ][ 128 ];
 extern const     int8_t   g_nspt16x8[ 35 ][ 3 ][ 40 ][ 128 ];
+#if JVET_AE0086_LARGE_NSPT
+extern const     int8_t   g_nspt4x32[ 35 ][ 3 ][ 20 ][ 128 ];
+extern const     int8_t   g_nspt32x4[ 35 ][ 3 ][ 20 ][ 128 ];
+extern const     int8_t   g_nspt8x32[ 35 ][ 3 ][ 24 ][ 256 ];
+extern const     int8_t   g_nspt32x8[ 35 ][ 3 ][ 24 ][ 256 ];
+#endif
 #endif
 
 // ====================================================================================================================
