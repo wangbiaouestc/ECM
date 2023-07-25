@@ -14167,11 +14167,25 @@ bool InterPrediction::xPredInterBlkRPR( const std::pair<int, int>& scalingRatio,
 
     int xFilter = filterIndex;
     int yFilter = filterIndex;
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+    const int rprThreshold1 = ( 1 << SCALE_RATIO_BITS ) * 11 / 10;
+    const int rprThreshold2 = ( 1 << SCALE_RATIO_BITS ) * 27 / 20;
+    const int rprThreshold3 = ( 1 << SCALE_RATIO_BITS ) * 7 / 4;
+#else
     const int rprThreshold1 = ( 1 << SCALE_RATIO_BITS ) * 5 / 4;
     const int rprThreshold2 = ( 1 << SCALE_RATIO_BITS ) * 7 / 4;
+#endif
     if( filterIndex == 0 )
     {
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+      if( scalingRatio.first > rprThreshold3 )
+      {
+        xFilter = 5;
+      }
+      else if (scalingRatio.first > rprThreshold2)
+#else
       if( scalingRatio.first > rprThreshold2 )
+#endif
       {
         xFilter = 4;
       }
@@ -14180,7 +14194,15 @@ bool InterPrediction::xPredInterBlkRPR( const std::pair<int, int>& scalingRatio,
         xFilter = 3;
       }
 
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+      if( scalingRatio.second > rprThreshold3 )
+      {
+        yFilter = 5;
+      }
+      else if (scalingRatio.second > rprThreshold2)
+#else
       if( scalingRatio.second > rprThreshold2 )
+#endif
       {
         yFilter = 4;
       }
@@ -14193,6 +14215,20 @@ bool InterPrediction::xPredInterBlkRPR( const std::pair<int, int>& scalingRatio,
     {
       if (isLuma(compID))
       {
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+        if (scalingRatio.first > rprThreshold3)
+        {
+          xFilter = 8;
+        }
+        else if (scalingRatio.first > rprThreshold2)
+        {
+          xFilter = 7;
+        }
+        else if (scalingRatio.first > rprThreshold1)
+        {
+          xFilter = 6;
+        }
+#else
         if (scalingRatio.first > rprThreshold2)
         {
           xFilter = 6;
@@ -14201,7 +14237,22 @@ bool InterPrediction::xPredInterBlkRPR( const std::pair<int, int>& scalingRatio,
         {
           xFilter = 5;
         }
+#endif
 
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+        if (scalingRatio.second > rprThreshold3)
+        {
+          yFilter = 8;
+        }
+        else if (scalingRatio.second > rprThreshold2)
+        {
+          yFilter = 7;
+        }
+        else if (scalingRatio.second > rprThreshold1)
+        {
+          yFilter = 6;
+        }
+#else
         if (scalingRatio.second > rprThreshold2)
         {
           yFilter = 6;
@@ -14210,10 +14261,19 @@ bool InterPrediction::xPredInterBlkRPR( const std::pair<int, int>& scalingRatio,
         {
           yFilter = 5;
         }
+#endif
       }
       else
       {
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+        if (scalingRatio.first > rprThreshold3)
+        {
+          xFilter = 5;
+        }
+        else if (scalingRatio.first > rprThreshold2)
+#else
         if (scalingRatio.first > rprThreshold2)
+#endif
         {
           xFilter = 4;
         }
@@ -14222,7 +14282,15 @@ bool InterPrediction::xPredInterBlkRPR( const std::pair<int, int>& scalingRatio,
           xFilter = 3;
         }
 
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+        if (scalingRatio.second > rprThreshold3)
+        {
+          yFilter = 5;
+        }
+        else if (scalingRatio.second > rprThreshold2)
+#else
         if (scalingRatio.second > rprThreshold2)
+#endif
         {
           yFilter = 4;
         }
