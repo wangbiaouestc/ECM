@@ -284,6 +284,9 @@ protected:
   int*                 m_sumSignGyGxSample32bit;
   bool                 m_bdofMvRefined;
   Mv                   m_bdofSubPuMvOffset[BDOF_SUBPU_MAX_NUM];
+#if JVET_AE0091_ITERATIVE_BDOF
+  Mv                   m_bdofSubPuMvOffse2[BDOF_SUBPU_MAX_NUM];
+#endif
 #endif
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
   int32_t*             m_piDotProduct1;
@@ -327,6 +330,9 @@ protected:
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
                                             , int ww = 4, int hh = 4
 #endif
+#if JVET_AE0091_ITERATIVE_BDOF
+                                            ,int iter = 0
+#endif
   );
 #else
   void            applyBiOptFlow           ( const bool isBdofMvRefine, const int bdofBlockOffset, const PredictionUnit &pu,
@@ -362,6 +368,9 @@ protected:
 #endif
 #if MULTI_PASS_DMVR
   void xPredInterBiBDMVR        ( PredictionUnit &pu, PelUnitBuf &pcYuvPred, const bool luma, const bool chroma, PelUnitBuf *yuvPredTmp = NULL );
+#endif
+#if JVET_AE0091_ITERATIVE_BDOF
+  void xPredInterBiBDMVR2       ( PredictionUnit &pu, PelUnitBuf &pcYuvPred, const bool luma, const bool chroma, PelUnitBuf *yuvPredTmp = NULL, int iter = 1 );
 #endif
   void xPredInterBi             ( PredictionUnit& pu, PelUnitBuf &pcYuvPred, const bool luma = true, const bool chroma = true, PelUnitBuf* yuvPredTmp = NULL );
   void xPredInterBlk            ( const ComponentID& compID, const PredictionUnit& pu, const Picture* refPic, const Mv& _mv, PelUnitBuf& dstPic, const bool& bi, const ClpRng& clpRng
@@ -399,6 +408,9 @@ protected:
   void xWeightedAverage         ( const bool isBdofMvRefine, const int bdofBlockOffset, const PredictionUnit& pu, const CPelUnitBuf& pcYuvSrc0, const CPelUnitBuf& pcYuvSrc1, PelUnitBuf& pcYuvDst, const BitDepths& clipBitDepths, const ClpRngs& clpRngs, const bool& bioApplied, const bool lumaOnly = false, const bool chromaOnly = false, PelUnitBuf* yuvDstTmp = NULL, bool *mcMask[2] = NULL, int mcStride = -1, bool *mcMaskChroma[2] = NULL, int mcCStride = -1, bool *isOOB = NULL
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
                                  , int ww = 4, int  hh = 4
+#endif
+#if JVET_AE0091_ITERATIVE_BDOF
+                                 ,int iter = 0
 #endif
   );
 #else

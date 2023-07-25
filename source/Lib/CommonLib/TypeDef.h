@@ -276,7 +276,8 @@
 #define JVET_AC0144_AFFINE_DMVR_REGRESSION                1 // JVET-AC0144: DMVR for affine with regression refinement
 #define JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS           1 // JVET-AD0182: Affine parameter refinement and adaptive affine DMVR mode extension
 #define JVET_AC0158_PIXEL_AFFINE_MC                       1 // JVET-AC0158: Pixel based affine motion compensation
-#define JVET_AD0195_HIGH_PRECISION_BDOF_CORE              1 // JVET_AD0195: High-Precision MV Refinement for BDOF
+#define JVET_AD0195_HIGH_PRECISION_BDOF_CORE              1 // JVET-AD0195: High-Precision MV Refinement for BDOF
+#define JVET_AE0091_ITERATIVE_BDOF                        1 // JVET-AE0091: Iterative BDOF part of JVET-AE0091
 #define JVET_AD0123_REF_PICTURE_PADDING_FOR_GDR           1 // JVET-AD0123: Reference picture padding for GDR
 #define JVET_AE0059_INTER_CCCM                            1 // JVET-AE0059: Convolutional cross-component model for inter prediction
 #if IF_12TAP && JVET_AA0042_RPR_FILTERS && JVET_Z0117_CHROMA_IF

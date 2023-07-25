@@ -493,6 +493,11 @@ void calcBIOParamSum5Core(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
       }
       sumDIX[sampleIdx] <<= 2;
       sumDIY[sampleIdx] <<= 2;
+#if JVET_AE0091_ITERATIVE_BDOF
+      int regVxVy = (1 << 8);
+      sumAbsGX[sampleIdx] += regVxVy;
+      sumAbsGY[sampleIdx] += regVxVy;
+#endif
       absGX += (1 - 5 * widthG);
       absGY += (1 - 5 * widthG);
       dIX += (1 - 5 * widthG);
