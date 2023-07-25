@@ -14058,9 +14058,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
 
         if (!(pu.curCand.type & CCP_TYPE_MMLM))
         {
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), cccmModelCb, 0, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), cccmModelCr, 0, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
-
+#endif
           xCccmApplyModelOffset(pu, COMPONENT_Cb, cccmModelCb[0], 0, 0, predCb, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
           xCccmApplyModelOffset(pu, COMPONENT_Cr, cccmModelCr[0], 0, 0, predCr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
         }
@@ -14068,10 +14069,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
         {
           // Multimode case
           int modelThr = pu.curCand.yThres;
-
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), cccmModelCb, modelThr, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), cccmModelCr, modelThr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
-
+#endif
           xCccmApplyModelOffset(pu, COMPONENT_Cb, cccmModelCb[0], 1, modelThr, predCb, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
           xCccmApplyModelOffset(pu, COMPONENT_Cr, cccmModelCr[0], 1, modelThr, predCr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
 
@@ -14097,9 +14098,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
 
         if (!(pu.curCand.type & CCP_TYPE_MMLM))
         {
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), nscccmModelCb, 0, lumaOffset, offsetCb, pu.curCand.type );
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), nscccmModelCr, 0, lumaOffset, offsetCr, pu.curCand.type );
-
+#endif
           xCccmApplyModelOffset(pu, COMPONENT_Cb, nscccmModelCb[0], 0, 0, predCb, lumaOffset, offsetCb, pu.curCand.type );
           xCccmApplyModelOffset(pu, COMPONENT_Cr, nscccmModelCr[0], 0, 0, predCr, lumaOffset, offsetCr, pu.curCand.type );
         }
@@ -14107,10 +14109,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
         {
           // Multimode case
           int modelThr = pu.curCand.yThres;
-
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), nscccmModelCb, modelThr, lumaOffset, offsetCb, pu.curCand.type );
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), nscccmModelCr, modelThr, lumaOffset, offsetCr, pu.curCand.type );
-
+#endif
           xCccmApplyModelOffset(pu, COMPONENT_Cb, nscccmModelCb[0], 1, modelThr, predCb, lumaOffset, offsetCb, pu.curCand.type );
           xCccmApplyModelOffset(pu, COMPONENT_Cr, nscccmModelCr[0], 1, modelThr, predCr, lumaOffset, offsetCr, pu.curCand.type );
 
@@ -14130,8 +14132,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
 #else
         int lumaOffset = 0;
 #endif
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
         int refSizeX = pu.curCand.corOffX;
         int refSizeY = pu.curCand.corOffY;
+#endif
         int offsetCb[2] = { 0, 0 };
         int offsetCr[2] = { 0, 0 };
 
@@ -14144,9 +14148,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
 
           if (!(pu.curCand.type & CCP_TYPE_MMLM))
           {
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), mfcccmModelCb, 0, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), mfcccmModelCr, 0, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
-
+#endif
             xCccmApplyModelOffset(pu, COMPONENT_Cb, mfcccmModelCb[0], 0, 0, predCb, lumaOffset, offsetCb, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
             xCccmApplyModelOffset(pu, COMPONENT_Cr, mfcccmModelCr[0], 0, 0, predCr, lumaOffset, offsetCr, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
           }
@@ -14154,10 +14159,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
           {
             // Multimode case
             int modelThr = pu.curCand.yThres;
-
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), mfcccmModelCb, modelThr, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), mfcccmModelCr, modelThr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
-
+#endif
             xCccmApplyModelOffset(pu, COMPONENT_Cb, mfcccmModelCb[0], 1, modelThr, predCb, lumaOffset, offsetCb, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
             xCccmApplyModelOffset(pu, COMPONENT_Cr, mfcccmModelCr[0], 1, modelThr, predCr, lumaOffset, offsetCr, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
 
@@ -14174,9 +14179,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
 
           if (!(pu.curCand.type & CCP_TYPE_MMLM))
           {
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), mfcccmModelCb, 0, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), mfcccmModelCr, 0, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
-
+#endif
             xCccmApplyModelOffset(pu, COMPONENT_Cb, mfcccmModelCb[0], 0, 0, predCb, lumaOffset, offsetCb, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
             xCccmApplyModelOffset(pu, COMPONENT_Cr, mfcccmModelCr[0], 0, 0, predCr, lumaOffset, offsetCr, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
           }
@@ -14184,10 +14190,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
           {
             // Multimode case
             int modelThr = pu.curCand.yThres;
-
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), mfcccmModelCb, modelThr, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), mfcccmModelCr, modelThr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
-
+#endif
             xCccmApplyModelOffset(pu, COMPONENT_Cb, mfcccmModelCb[0], 1, modelThr, predCb, lumaOffset, offsetCb, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
             xCccmApplyModelOffset(pu, COMPONENT_Cr, mfcccmModelCr[0], 1, modelThr, predCr, lumaOffset, offsetCr, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
 
@@ -14222,9 +14228,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
 
         if (!(pu.curCand.type & CCP_TYPE_MMLM))
         {
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
           xUpdateOffsetsAndGetCostCCLM<true>(pu, COMPONENT_Cb, pu.Cb(), modelsCb, 1, pu.curCand.glmIdc);
           xUpdateOffsetsAndGetCostCCLM<true>(pu, COMPONENT_Cr, pu.Cr(), modelsCr, 1, pu.curCand.glmIdc);
-
+#endif
           predCb.copyFrom(temp);
           predCr.copyFrom(temp);
 
@@ -14233,9 +14240,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
         }
         else
         {
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
           xUpdateOffsetsAndGetCostCCLM<true>(pu, COMPONENT_Cb, pu.Cb(), modelsCb, 2, pu.curCand.glmIdc);
           xUpdateOffsetsAndGetCostCCLM<true>(pu, COMPONENT_Cr, pu.Cr(), modelsCr, 2, pu.curCand.glmIdc);
-
+#endif
           auto applyMMCM = [&](PelBuf &predBuf, const CclmModel &cclmModel)
           {
             Pel       *chromaPred   = predBuf.bufAt(0, 0);
@@ -14277,11 +14285,15 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
         CccmModel glmModel( GLM_NUM_PARAMS, bitDepth);
 
         PU::ccpParamsToGlmModel(COMPONENT_Cb, pu.curCand, glmModel);
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
         xUpdateOffsetsAndGetCostGLM<true>(pu, COMPONENT_Cb, pu.Cb(), glmModel, glmIdc, lumaOffset, chromaOffset);
+#endif
         xGlmApplyModelOffset(pu, COMPONENT_Cb, pu.Cb(), glmModel, glmIdc, predCb, lumaOffset, chromaOffset);
 
         PU::ccpParamsToGlmModel(COMPONENT_Cr, pu.curCand, glmModel);
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
         xUpdateOffsetsAndGetCostGLM<true>(pu, COMPONENT_Cr, pu.Cr(), glmModel, glmIdc, lumaOffset, chromaOffset);
+#endif
         xGlmApplyModelOffset(pu, COMPONENT_Cr, pu.Cr(), glmModel, glmIdc, predCr, lumaOffset, chromaOffset);
       }
       else

@@ -186,6 +186,9 @@
 #define JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS        1 // JVET-AD0184: Removal of division operations
 #define JVET_AD0085_MPM_SORTING                           1 // JVET-AD0085: Template-based intra MPM list construction
 #define JVET_AD0188_CCP_MERGE                             1 // JVET-AD0188: Non-local cross-component prediction and cross-component merge mode
+#if JVET_AD0188_CCP_MERGE
+#define JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE         1 // JVET-AE0097: Remove offset update process in CCP merge
+#endif
 #define JVET_AD0120_LBCCP                                 1 // JVET-AD0120: Local-Boosting Cross-Component Prediction, wherein the template part is controlled by CCCM SPS
 
 //IBC
