@@ -213,6 +213,7 @@
 #define JVET_AE0169_BIPREDICTIVE_IBC                      1 // JVET-AE0169: IBC BVP-merge and bi-predictive IBC merge
 
 #define JVET_AE0174_NONINTER_TM_TOOLS_CONTROL             1 // JVET-AE0174: Add non-inter TM sps flag to control whether template matching is used for non-inter (Intra and IBC) tools
+#define JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES    1 // JVET-AE0094: IBC with non-adjacent spatial candidates
 
 // Inter
 #define CIIP_PDPC                                         1 // Apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode

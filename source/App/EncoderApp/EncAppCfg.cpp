@@ -1232,6 +1232,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AE0169_BIPREDICTIVE_IBC
   ("IBCBiPred",                                       m_ibcBiPred,                                       true, "IBC BiPred mode in I-Slice (0:off, 1:on)  [default: on]" )
 #endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  ("IBCNonAdjCand",                                   m_ibcNonAdjCand,                                    false, "IBC with non-adjacent spatial candidates (0:off, 1:on)  [default: off]" )
+#endif
 
   ("WrapAround",                                      m_wrapAround,                                     false, "Enable horizontal wrap-around motion compensation for inter prediction (0:off, 1:on)  [default: off]")
   ("WrapAroundOffset",                                m_wrapAroundOffset,                                  0u, "Offset in luma samples used for computing the horizontal wrap-around position")
@@ -5463,6 +5466,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   msg( VERBOSE, "IBCBiPred:%d ", m_ibcBiPred );
+#endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  msg(VERBOSE, "IBCNonAdjCand:%d ", m_ibcNonAdjCand);
 #endif
   msg( VERBOSE, "HashME:%d ", m_HashME );
   msg( VERBOSE, "WrapAround:%d ", m_wrapAround);

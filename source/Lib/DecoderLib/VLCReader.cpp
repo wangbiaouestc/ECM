@@ -2713,6 +2713,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AC0112_IBC_LIC
     READ_FLAG( uiCode, "sps_ibc_lic_enabled_flag" );                    pcSPS->setUseIbcLic              ( uiCode != 0 );
 #endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+    READ_FLAG( uiCode, "sps_ibc_non_adjacent_spatial_candidates_enabled_flag");    pcSPS->setUseIbcNonAdjCand(uiCode != 0);
+#endif
   }
   else
     pcSPS->setMaxNumIBCMergeCand(0);
