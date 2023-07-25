@@ -277,6 +277,9 @@
 #define JVET_AD0195_HIGH_PRECISION_BDOF_CORE              1 // JVET_AD0195: High-Precision MV Refinement for BDOF
 #define JVET_AD0123_REF_PICTURE_PADDING_FOR_GDR           1 // JVET-AD0123: Reference picture padding for GDR
 #define JVET_AE0059_INTER_CCCM                            1 // JVET-AE0059: Convolutional cross-component model for inter prediction
+#if IF_12TAP && JVET_AA0042_RPR_FILTERS && JVET_Z0117_CHROMA_IF
+#define JVET_AE0150_SMALL_SCALE_RPR_FILTERS               1 // RPR filters and thresholds for scale factors 1.1x to 1.35x
+#endif
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
