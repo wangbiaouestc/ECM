@@ -811,7 +811,12 @@ static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA =    28;
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
 static const int BDOF_SUBPU_DIM_LOG2          =                     2;
+#if JVET_AE0091_ITERATIVE_BDOF
+static const int BDOF_SUBPU_AREA_THRESHOL0    =                     0;
+static const int BDOF_SUBPU_AREA_THRESHOL1    =                  1024;
+#else
 static const int BDOF_SUBPU_AREA_THRESHOLD    =                   256;
+#endif
 #else
 static const int BDOF_SUBPU_DIM_LOG2          =                     3;
 #endif
@@ -825,6 +830,9 @@ static const int BIO_EXTEND_SIZE              =                     1;
 #endif
 static const int BIO_TEMP_BUFFER_SIZE         =                     (MAX_CU_SIZE + 2 * BIO_EXTEND_SIZE) * (MAX_CU_SIZE + 2 * BIO_EXTEND_SIZE);
 
+#if JVET_AE0091_ITERATIVE_BDOF
+static const int BDOF_DMVR_MAX_ITER           =                     2;
+#endif
 static const int PROF_BORDER_EXT_W            =                     1;
 static const int PROF_BORDER_EXT_H            =                     1;
 static const int BCW_NUM =                                          5; ///< the number of weight options

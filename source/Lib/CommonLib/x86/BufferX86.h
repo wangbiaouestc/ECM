@@ -1018,6 +1018,9 @@ void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
       c1 = _mm_add_epi32(c1, _mm_unpackhi_epi64(a12, b12));
       c1 = _mm_add_epi32(c1, _mm_unpacklo_epi64(a3, b3));
       
+#if JVET_AE0091_ITERATIVE_BDOF
+      int regVxVy = (1 << 8);
+#endif
       *(sumAbsGX+0) = _mm_cvtsi128_si32(c1);
       *(sumAbsGY+0) = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0x55));
       *(sumDIX+0)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xaa));
@@ -1093,6 +1096,16 @@ void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
       *(sumAbsGY+3) = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0x55));
       *(sumDIX+3)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xaa));
       *(sumDIY+3)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xff));
+#if JVET_AE0091_ITERATIVE_BDOF 
+      *(sumAbsGX+0) += regVxVy;
+      *(sumAbsGY+0) += regVxVy;
+      *(sumAbsGX+1) += regVxVy;
+      *(sumAbsGY+1) += regVxVy;
+      *(sumAbsGX+2) += regVxVy;
+      *(sumAbsGY+2) += regVxVy;
+      *(sumAbsGX+3) += regVxVy;
+      *(sumAbsGY+3) += regVxVy;
+#endif
       
       sumSignGyGxTmp32 = _mm_madd_epi16(sumSignGyGxTmp16, vmask[3]);
       sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0x4e));   // 01001110
