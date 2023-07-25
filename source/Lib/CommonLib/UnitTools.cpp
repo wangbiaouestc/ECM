@@ -22882,6 +22882,10 @@ int PU::getNSPTMatrixDim( int width, int height )
 
   dimension = ( ( width == 4 && height == 16 ) || ( width == 16 && height == 4 ) ) ? 24 : ( ( ( width == 8 && height == 16 ) || ( width == 16 && height == 8 ) ) ? 40 : dimension );
 
+#if JVET_AE0086_LARGE_NSPT
+  dimension = ( ( width == 4 && height == 32 ) || ( width == 32 && height == 4 ) ) ? 20 : ( ( ( width == 8 && height == 32 ) || ( width == 32 && height == 8 ) ) ? 24 : dimension );
+#endif
+
   return dimension;
 }
 
@@ -22984,7 +22988,11 @@ bool CU::isNSPTAllowed( const TransformUnit &tu, const ComponentID compID, int w
   if( allowNSPT )
   {
     allowNSPT = ( ( width == 4 && height ==  4 ) || ( width ==  8 && height == 8 ) || ( width == 4 && height ==  8 ) || ( width ==  8 && height == 4 ) ||
-                  ( width == 4 && height == 16 ) || ( width == 16 && height == 4 ) || ( width == 8 && height == 16 ) || ( width == 16 && height == 8 ) );
+                  ( width == 4 && height == 16 ) || ( width == 16 && height == 4 ) || ( width == 8 && height == 16 ) || ( width == 16 && height == 8 )
+#if JVET_AE0086_LARGE_NSPT
+               || ( width == 4 && height == 32 ) || ( width == 32 && height == 4 ) || ( width == 8 && height == 32 ) || ( width == 32 && height == 8 )
+#endif
+                );
   }
 
   return allowNSPT;
