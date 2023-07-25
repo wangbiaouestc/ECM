@@ -5369,11 +5369,14 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
 
             scaledRefPic[j]->poc = NOT_VALID;
 
+
+            scaledRefPic[j]->create(
 #if JVET_Z0118_GDR
-            scaledRefPic[j]->create(sps->getGDREnabledFlag(), sps->getChromaFormatIdc(), Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()), sps->getMaxCUWidth(), sps->getMaxCUWidth() + EXT_PICTURE_SIZE, isDecoder, layerId);
-#else
-            scaledRefPic[j]->create( sps->getChromaFormatIdc(), Size( pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples() ), sps->getMaxCUWidth(), sps->getMaxCUWidth() + EXT_PICTURE_SIZE, isDecoder, layerId );
+              sps->getGDREnabledFlag(),
 #endif
+              sps->getWrapAroundEnabledFlag(), sps->getChromaFormatIdc(),
+              Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()), sps->getMaxCUWidth(),
+              sps->getMaxCUWidth() + EXT_PICTURE_SIZE, isDecoder, layerId);
           }
 
           scaledRefPic[j]->poc = poc;

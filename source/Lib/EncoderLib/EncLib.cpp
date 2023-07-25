@@ -776,13 +776,15 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
   if (getUseCompositeRef())
   {
     Picture *picBg = new Picture;
+
+    picBg->create(
 #if JVET_Z0118_GDR
-    picBg->create(sps0.getGDREnabledFlag(), sps0.getChromaFormatIdc(), Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples()),
-                   sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
-#else
-    picBg->create( sps0.getChromaFormatIdc(), Size( pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples() ),
-                   sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled() );
+      sps0.getGDREnabledFlag(),
 #endif
+      sps0.getWrapAroundEnabledFlag(), sps0.getChromaFormatIdc(),
+      Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples()), sps0.getMaxCUWidth(),
+      sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
+
     picBg->getRecoBuf().fill(0);
 
     picBg->finalInit( m_vps, sps0, pps0, &m_picHeader, m_apss, m_lmcsAPS, m_scalinglistAPS );
@@ -792,13 +794,15 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     picBg->createSpliceIdx(pps0.pcv->sizeInCtus);
     m_cGOPEncoder.setPicBg(picBg);
     Picture *picOrig = new Picture;
+
+    picOrig->create(
 #if JVET_Z0118_GDR
-    picOrig->create(sps0.getGDREnabledFlag(), sps0.getChromaFormatIdc(), Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples()),
-      sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
-#else
-    picOrig->create( sps0.getChromaFormatIdc(), Size( pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples() ),
-                     sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled() );
+      sps0.getGDREnabledFlag(),
 #endif
+      sps0.getWrapAroundEnabledFlag(), sps0.getChromaFormatIdc(),
+      Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples()), sps0.getMaxCUWidth(),
+      sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
+
     picOrig->getOrigBuf().fill(0);
     m_cGOPEncoder.setPicOrig(picOrig);
   }
@@ -1384,13 +1388,14 @@ void EncLib::xGetNewPicBuffer ( std::list<PelUnitBuf*>& rcListPicYuvRecOut, Pict
   if (rpcPic==0)
   {
     rpcPic = new Picture;
+
+    rpcPic->create(
 #if JVET_Z0118_GDR
-    rpcPic->create( getGdrEnabled(), sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ),
-                    sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
-#else
-    rpcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()),
-      sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
+      getGdrEnabled(),
 #endif
+      sps.getWrapAroundEnabledFlag(), sps.getChromaFormatIdc(),
+      Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(),
+      sps.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
 
 
     if (m_resChangeInClvsEnabled)
