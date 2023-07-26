@@ -263,6 +263,9 @@ protected:
   bool                 m_skipPROF;
   bool                 m_encOnly;
   bool                 m_isBi;
+#if JVET_AE0046_BI_GPM
+  bool                 m_lumaBdofReady;
+#endif
 
   Pel*                 m_gradX0;
   Pel*                 m_gradY0;
@@ -567,6 +570,10 @@ public:
 #endif
 
   // inter
+#if JVET_AE0046_BI_GPM
+  void    setLumaBdofReady(bool isReady) { m_lumaBdofReady = isReady; }
+  void    convert2HighPrec(PredictionUnit& pu, PelUnitBuf& predBuf, bool lumaOnly, bool chromaOnly, PelUnitBuf* yuvPredTmp = nullptr);
+#endif
   void    motionCompensation  (PredictionUnit &pu, PelUnitBuf& predBuf, const RefPicList &eRefPicList = REF_PIC_LIST_X
     , const bool luma = true, const bool chroma = true
     , PelUnitBuf* predBufWOBIO = NULL
@@ -653,10 +660,15 @@ public:
 #endif
   );
 #endif
+
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void    motionCompensationGeo(CodingUnit &cu, MergeCtx &geoMrgCtx
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
                               , MergeCtx (&geoTmMrgCtx)[GEO_NUM_TM_MV_CAND]
+#endif
+#if JVET_AE0046_BI_GPM
+                              , Mv(&subMvBuf)[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR]
+                              , Mv(&subBdofBuf)[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM]
 #endif
 #if JVET_Y0065_GPM_INTRA
                               , IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT
@@ -671,7 +683,14 @@ public:
 #endif
 #else
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AE0046_BI_GPM
+  void    motionCompensationGeo(CodingUnit& cu, MergeCtx& geoMrgCtx
+                               ,Mv(&subMvBuf)[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR]
+                               ,Mv(&subBdofBuf)[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM]
+                               ,IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT);
+#else
   void    motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx, IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT );
+#endif
 #else
   void    motionCompensationGeo(CodingUnit &cu, MergeCtx &GeoMrgCtx);
 #endif

@@ -683,6 +683,12 @@ struct InterPredictionData
   MultiHypVec addHypData;
   int8_t      numMergedAddHyps;
 #endif
+
+#if JVET_AE0046_BI_GPM
+  int8_t   gpmDirMode; // 0: use uni list gen, 1 : use bi list gen
+  bool     gpmDmvrRefinePart0;
+  bool     gpmDmvrRefinePart1;
+#endif
 };
 
 struct PredictionUnit : public UnitArea, public IntraPredictionData, public InterPredictionData

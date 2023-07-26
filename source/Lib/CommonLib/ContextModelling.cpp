@@ -714,7 +714,7 @@ bool MergeCtx::xCheckSimilarMotionSubTMVP(int mergeCandIndex, uint32_t mvdSimila
   return false;
 }
 #endif
-#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Y0058_IBC_LIST_MODIFY
+#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Y0058_IBC_LIST_MODIFY || JVET_AE0046_BI_GPM
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh, int compareNum) const
 #else
@@ -993,7 +993,20 @@ void MergeCtx::setGeoMmvdMergeInfo(PredictionUnit& pu, int mergeIdx, int mmvdIdx
     pu.regularMergeFlag = !(pu.ciipFlag || pu.cu->geoFlag);
   pu.mergeFlag = true;
   pu.mmvdMergeFlag = false;
+#if JVET_AE0046_BI_GPM
+  int desiredDir = interDirNeighbours[mergeIdx];
+
+  if (interDirNeighbours[mergeIdx] == 3)
+  {
+    if (!pu.cs->slice->getCheckLDC())
+    {
+      desiredDir = (mergeIdx % 2) + 1;
+    }
+  }
+  pu.interDir = desiredDir;
+#else
   pu.interDir = interDirNeighbours[mergeIdx];
+#endif
   pu.cu->imv = 0;
   pu.mergeIdx = mergeIdx;
   pu.mergeType = MRG_TYPE_DEFAULT_N;
@@ -1042,25 +1055,116 @@ void MergeCtx::setGeoMmvdMergeInfo(PredictionUnit& pu, int mergeIdx, int mmvdIdx
     mvOffset = Mv(-offset, -offset);
   }
 
-  pu.refIdx[REF_PIC_LIST_0] = mvFieldNeighbours[(mergeIdx << 1) + 0].refIdx;
-  pu.refIdx[REF_PIC_LIST_1] = mvFieldNeighbours[(mergeIdx << 1) + 1].refIdx;
-  if (pu.refIdx[REF_PIC_LIST_0] >= 0)
+#if JVET_AE0046_BI_GPM
+  if (desiredDir == 3)
   {
-    pu.mv[REF_PIC_LIST_0] = mvFieldNeighbours[(mergeIdx << 1) + 0].mv + mvOffset;
+    pu.refIdx[REF_PIC_LIST_0] = mvFieldNeighbours[(mergeIdx << 1) + 0].refIdx;
+    pu.refIdx[REF_PIC_LIST_1] = mvFieldNeighbours[(mergeIdx << 1) + 1].refIdx;
   }
   else
   {
-    pu.mv[REF_PIC_LIST_0] = Mv();
+    int listTarget = desiredDir - 1;
+    int listEmpty = 1 - listTarget;
+
+    pu.refIdx[ RefPicList(listTarget) ] = mvFieldNeighbours[(mergeIdx << 1) + listTarget].refIdx;
+    pu.refIdx[ RefPicList(listEmpty) ]  = -1;
   }
 
-  if (pu.refIdx[REF_PIC_LIST_1] >= 0)
+#else
+  pu.refIdx[REF_PIC_LIST_0] = mvFieldNeighbours[(mergeIdx << 1) + 0].refIdx;
+  pu.refIdx[REF_PIC_LIST_1] = mvFieldNeighbours[(mergeIdx << 1) + 1].refIdx;
+#endif
+
+#if JVET_AE0046_BI_GPM
+  if (pu.refIdx[REF_PIC_LIST_0] >= 0 && pu.refIdx[REF_PIC_LIST_1] >= 0)
   {
-    pu.mv[REF_PIC_LIST_1] = mvFieldNeighbours[(mergeIdx << 1) + 1].mv + mvOffset;
+    Mv tempMv[2];
+
+    const int refListIdx0 = pu.refIdx[REF_PIC_LIST_0];
+    const int refListIdx1 = pu.refIdx[REF_PIC_LIST_1];
+
+    const int poc0 = pu.cs->slice->getRefPOC(REF_PIC_LIST_0, refListIdx0);
+    const int poc1 = pu.cs->slice->getRefPOC(REF_PIC_LIST_1, refListIdx1);
+    const int currPoc = pu.cs->slice->getPOC();
+
+    tempMv[0] = mvOffset;
+
+    if ((poc0 - currPoc) == (poc1 - currPoc))
+    {
+      tempMv[1] = tempMv[0];
+    }
+    else if (abs(poc1 - currPoc) > abs(poc0 - currPoc))
+    {
+      const int scale = PU::getDistScaleFactor(currPoc, poc0, currPoc, poc1);
+      tempMv[1] = tempMv[0];
+
+      const bool isL0RefLongTerm = pu.cs->slice->getRefPic(REF_PIC_LIST_0, refListIdx0)->longTerm;
+      const bool isL1RefLongTerm = pu.cs->slice->getRefPic(REF_PIC_LIST_1, refListIdx1)->longTerm;
+
+      if (isL0RefLongTerm || isL1RefLongTerm)
+      {
+        if ((poc1 - currPoc) * (poc0 - currPoc) > 0)
+        {
+          tempMv[0] = tempMv[1];
+        }
+        else
+        {
+          tempMv[0].set(-1 * tempMv[1].getHor(), -1 * tempMv[1].getVer());
+        }
+      }
+      else
+      {
+        tempMv[0] = tempMv[1].scaleMv(scale);
+      }
+    }
+    else
+    {
+      const int scale = PU::getDistScaleFactor(currPoc, poc1, currPoc, poc0);
+      const bool isL0RefLongTerm = pu.cs->slice->getRefPic(REF_PIC_LIST_0, refListIdx0)->longTerm;
+      const bool isL1RefLongTerm = pu.cs->slice->getRefPic(REF_PIC_LIST_1, refListIdx1)->longTerm;
+      if (isL0RefLongTerm || isL1RefLongTerm)
+      {
+        if ((poc1 - currPoc) * (poc0 - currPoc) > 0)
+        {
+          tempMv[1] = tempMv[0];
+        }
+        else
+        {
+          tempMv[1].set(-1 * tempMv[0].getHor(), -1 * tempMv[0].getVer());
+        }
+      }
+      else
+      {
+        tempMv[1] = tempMv[0].scaleMv(scale);
+      }
+    }
+
+    pu.mv[REF_PIC_LIST_0] = mvFieldNeighbours[(mergeIdx << 1) + 0].mv + tempMv[0];
+    pu.mv[REF_PIC_LIST_1] = mvFieldNeighbours[(mergeIdx << 1) + 1].mv + tempMv[1];
   }
   else
   {
-    pu.mv[REF_PIC_LIST_1] = Mv();
+#endif
+    if (pu.refIdx[REF_PIC_LIST_0] >= 0)
+    {
+      pu.mv[REF_PIC_LIST_0] = mvFieldNeighbours[(mergeIdx << 1) + 0].mv + mvOffset;
+    }
+    else
+    {
+      pu.mv[REF_PIC_LIST_0] = Mv();
+    }
+
+    if (pu.refIdx[REF_PIC_LIST_1] >= 0)
+    {
+      pu.mv[REF_PIC_LIST_1] = mvFieldNeighbours[(mergeIdx << 1) + 1].mv + mvOffset;
+    }
+    else
+    {
+      pu.mv[REF_PIC_LIST_1] = Mv();
+    }
+#if JVET_AE0046_BI_GPM
   }
+#endif
   pu.mvd[REF_PIC_LIST_0] = Mv();
   pu.mvd[REF_PIC_LIST_1] = Mv();
   pu.mvpIdx[REF_PIC_LIST_0] = NOT_VALID;

@@ -108,7 +108,7 @@ private:
   bool applyBDMVR4BM[BM_MRG_MAX_NUM_INIT_CANDS];
 #endif
 #if MULTI_PASS_DMVR
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC || JVET_AE0046_BI_GPM
   Mv                m_mvBufBDMVR[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR];
 #else
   Mv                m_mvBufBDMVR[2][MAX_NUM_SUBCU_DMVR];
@@ -131,6 +131,10 @@ private:
 #endif
 #if JVET_AC0112_IBC_GPM
   MergeCtx          m_ibcMrgCtx;
+#endif
+#if JVET_AE0046_BI_GPM
+protected:
+  Mv                m_mvBufBDOF4GPM[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
 #endif
 };
 

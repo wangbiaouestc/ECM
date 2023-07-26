@@ -1474,6 +1474,10 @@ void DecCu::xReconInter(CodingUnit &cu)
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
                                         , m_geoTmMrgCtx
 #endif
+#if JVET_AE0046_BI_GPM
+                                        , m_mvBufBDMVR
+                                        , m_mvBufBDOF4GPM
+#endif
 #if JVET_Y0065_GPM_INTRA
                                         , m_pcIntraPred, (cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag()) ? &m_pcReshape->getFwdLUT() : nullptr
 #endif
@@ -1505,6 +1509,12 @@ void DecCu::xReconInter(CodingUnit &cu)
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
                               , cu.firstPU->geoBldIdx
 #endif
+#if JVET_AE0046_BI_GPM
+                               , cu.firstPU->gpmDmvrRefinePart0
+                               , cu.firstPU->gpmDmvrRefinePart1
+                               , cu.firstPU->gpmDmvrRefinePart0 ? m_mvBufBDOF4GPM[cu.firstPU->geoMergeIdx0] : nullptr
+                               , cu.firstPU->gpmDmvrRefinePart1 ? m_mvBufBDOF4GPM[cu.firstPU->geoMergeIdx1] : nullptr
+#endif
     );
 #else
 #if JVET_W0097_GPM_MMVD_TM
@@ -1521,7 +1531,11 @@ void DecCu::xReconInter(CodingUnit &cu)
 #endif
 #else
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AE0046_BI_GPM
+    m_pcInterPred->motionCompensationGeo(cu, m_geoMrgCtx, m_mvBufBDMVR, m_mvBufBDOF4GPM, m_pcIntraPred, (cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag()) ? &m_pcReshape->getFwdLUT() : nullptr);
+#else
     m_pcInterPred->motionCompensationGeo( cu, m_geoMrgCtx, m_pcIntraPred, (cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag()) ? &m_pcReshape->getFwdLUT() : nullptr );
+#endif
 #else
     m_pcInterPred->motionCompensationGeo(cu, m_geoMrgCtx);
 #endif
@@ -2189,7 +2203,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
       {
         if( pu.cu->geoFlag )
         {
+#if JVET_AE0046_BI_GPM
+          PU::getGeoMergeCandidates(pu, m_geoMrgCtx, nullptr, true);
+#else
           PU::getGeoMergeCandidates( pu, m_geoMrgCtx );
+#endif
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
           if (pu.geoTmFlag0)
           {
@@ -2224,6 +2242,12 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               m_geoTmMrgCtx[tmType].setMergeInfo(pu, pu.geoMergeIdx0);
               pu.geoTmType = tmType;
               m_pcInterPred->deriveTMMv(pu);
+#if JVET_AE0046_BI_GPM
+              m_geoTmMrgCtx[tmType].interDirNeighbours[pu.geoMergeIdx0] = pu.interDir;
+              m_geoTmMrgCtx[tmType].bcwIdx[pu.geoMergeIdx0] = (pu.interDir != 3) ? BCW_DEFAULT : m_geoMrgCtx.bcwIdx[pu.geoMergeIdx0];
+              m_geoTmMrgCtx[tmType].mvFieldNeighbours[(pu.geoMergeIdx0 << 1)].refIdx = pu.refIdx[0];
+              m_geoTmMrgCtx[tmType].mvFieldNeighbours[(pu.geoMergeIdx0 << 1) + 1].refIdx = pu.refIdx[1];
+#endif
               m_geoTmMrgCtx[tmType].mvFieldNeighbours[(pu.geoMergeIdx0 << 1)    ].mv.set(pu.mv[0].getHor(), pu.mv[0].getVer());
               m_geoTmMrgCtx[tmType].mvFieldNeighbours[(pu.geoMergeIdx0 << 1) + 1].mv.set(pu.mv[1].getHor(), pu.mv[1].getVer());
             }
@@ -2268,6 +2292,12 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               m_geoTmMrgCtx[tmType].setMergeInfo(pu, pu.geoMergeIdx1);
               pu.geoTmType = tmType;
               m_pcInterPred->deriveTMMv(pu);
+#if JVET_AE0046_BI_GPM
+              m_geoTmMrgCtx[tmType].interDirNeighbours[pu.geoMergeIdx1] = pu.interDir;
+              m_geoTmMrgCtx[tmType].bcwIdx[pu.geoMergeIdx1] = (pu.interDir != 3) ? BCW_DEFAULT : m_geoMrgCtx.bcwIdx[pu.geoMergeIdx1];
+              m_geoTmMrgCtx[tmType].mvFieldNeighbours[(pu.geoMergeIdx1 << 1)].refIdx = pu.refIdx[0];
+              m_geoTmMrgCtx[tmType].mvFieldNeighbours[(pu.geoMergeIdx1 << 1) + 1].refIdx = pu.refIdx[1];
+#endif
               m_geoTmMrgCtx[tmType].mvFieldNeighbours[(pu.geoMergeIdx1 << 1)    ].mv.set(pu.mv[0].getHor(), pu.mv[0].getVer());
               m_geoTmMrgCtx[tmType].mvFieldNeighbours[(pu.geoMergeIdx1 << 1) + 1].mv.set(pu.mv[1].getHor(), pu.mv[1].getVer());
             }

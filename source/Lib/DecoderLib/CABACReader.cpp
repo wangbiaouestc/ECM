@@ -5007,6 +5007,9 @@ void CABACReader::merge_data( PredictionUnit& pu )
       else
       {
         pu.cu->geoFlag = true;
+#if JVET_AE0046_BI_GPM
+        PU::setGpmDirMode(pu);
+#endif
       }
     }
   }
