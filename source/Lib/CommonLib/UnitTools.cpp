@@ -4432,6 +4432,15 @@ bool PU::addIBCMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const 
 #endif
 
       mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNeighbor.mv[0], miNeighbor.refIdx[0]);
+#if JVET_AE0084_IBC_LIC_INHERITANCE
+#if JVET_AC0112_IBC_LIC
+#if JVET_AA0070_RRIBC
+      mrgCtx.ibcLicFlags[cnt] = mrgCtx.rribcFlipTypes[cnt] == 0 ? miNeighbor.useIbcLic : false;
+#else
+      mrgCtx.ibcLicFlags[cnt] = miNeighbor.useIbcLic;
+#endif
+#endif
+#endif
 #if !JVET_Z0084_IBC_TM
       if (slice.isInterB())
       {
