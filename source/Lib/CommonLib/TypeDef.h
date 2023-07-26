@@ -212,6 +212,7 @@
 #define JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV  1 // JVET-AC0060: IBC BVP candidates clustering and BVD sign derivation for BV with one zero component (part of JVET-AC0113 Test 3.5a) 
 #define JVET_AC0071_DBV                                   1 // JVET-AC0071: Direct block vector mode for chroma prediction
 #define JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS   1 // JVET-AD0208: IBC adaptation for camera-captured contents and IBC extension to fractional-pel BV
+#define JVET_AE0084_IBC_LIC_INHERITANCE                   1 // JVET-AE0084: Harmonization of IBC HMVP and IBC-LIC
 #define JVET_AE0169_GPM_IBC_IBC                           1 // JVET-AE0169: Bi-predictive IBC GPM
 #define JVET_AE0169_BIPREDICTIVE_IBC                      1 // JVET-AE0169: IBC BVP-merge and bi-predictive IBC merge
 
