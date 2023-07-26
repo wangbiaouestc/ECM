@@ -108,6 +108,9 @@ InterPrediction::InterPrediction()
 , m_skipPROF (false)
 , m_encOnly  (false)
 , m_isBi     (false)
+#if JVET_AE0046_BI_GPM
+, m_lumaBdofReady (false)
+#endif
 , m_gradX0(nullptr)
 , m_gradY0(nullptr)
 , m_gradX1(nullptr)
@@ -2116,6 +2119,34 @@ void InterPrediction::xPredInterBiBDMVR2(PredictionUnit &pu, PelUnitBuf &pcYuvPr
   }
 }
 #endif
+
+#if JVET_AE0046_BI_GPM
+void InterPrediction::convert2HighPrec(PredictionUnit& pu, PelUnitBuf& predBuf, bool lumaOnly, bool chromaOnly, PelUnitBuf* yuvPredTmp)
+{
+  const size_t istart = chromaOnly ? 1 : 0;
+  const size_t iend = lumaOnly ? 1 : predBuf.bufs.size();
+
+  CHECK(lumaOnly && chromaOnly, "should not happen");
+
+  if (yuvPredTmp)
+  {
+    CHECK(yuvPredTmp->bufs.size() != predBuf.bufs.size(), "src buffer size differs from dst buffer size, better doublecheck");
+  }
+
+  PelUnitBuf& dstBuf = yuvPredTmp ? *yuvPredTmp : predBuf;
+
+  for (size_t i = istart; i < iend; i++)
+  {
+    const ComponentID compId = ComponentID(i);
+    const ClpRng& clpRng = pu.cu->slice->clpRng(compId);
+
+    const int biShift = IF_INTERNAL_PREC - pu.cu->slice->clpRng(compId).bd;
+    const Pel biOffset = -IF_INTERNAL_OFFS;
+    dstBuf.bufs[compId].linearTransform(1, -biShift, biOffset, false, clpRng);
+  }
+}
+#endif
+
 void InterPrediction::xPredInterBi(PredictionUnit &pu, PelUnitBuf &pcYuvPred, const bool luma, const bool chroma, PelUnitBuf *yuvPredTmp /*= NULL*/)
 {
   const PPS   &pps = *pu.cs->pps;
@@ -4524,6 +4555,17 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
 #endif
 #endif
 {
+#if JVET_AE0046_BI_GPM
+  if (m_lumaBdofReady)
+  {
+    if (isBdofMvRefine)
+    {
+      m_bdofMvRefined = true;
+    }
+    return;
+  }
+#endif
+
   const int     height = yuvDst.Y().height;
   const int     width = yuvDst.Y().width;
   int           heightG = height + 2 * BIO_EXTEND_SIZE;
@@ -6094,6 +6136,16 @@ void InterPrediction::motionCompensation( PredictionUnit &pu, PelUnitBuf &predBu
 #endif
       }
   }
+
+#if JVET_AE0046_BI_GPM
+  if (pu.cu->geoFlag && pu.interDir == 3)
+  {
+    const bool lumaOnly = luma && !chroma;
+    const bool chromaOnly = !luma && chroma;
+    convert2HighPrec(pu, predBuf, lumaOnly, chromaOnly);
+  }
+#endif
+
   return;
 }
 
@@ -7021,6 +7073,10 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
                                            , MergeCtx(&geoTmMrgCtx)[GEO_NUM_TM_MV_CAND]
 #endif
+#if JVET_AE0046_BI_GPM
+                                          , Mv(&subMvBuf)[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR]
+                                          , Mv(&subBdofBuf)[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM]
+#endif
 #if JVET_Y0065_GPM_INTRA
                                            , IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT
 #endif
@@ -7034,7 +7090,14 @@ void InterPrediction::motionCompensationGeo(CodingUnit &cu, MergeCtx &geoMrgCtx,
 #endif
 #else
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AE0046_BI_GPM
+void InterPrediction::motionCompensationGeo(CodingUnit& cu, MergeCtx& geoMrgCtx
+                                          , Mv(&subMvBuf)[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR]
+                                          , Mv(&subBdofBuf)[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM]
+                                          , IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT)
+#else
 void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx, IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT )
+#endif
 #else
 void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx )
 #endif
@@ -7075,6 +7138,11 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
 
   for( auto &pu : CU::traversePUs( cu ) )
   {
+#if JVET_AE0046_BI_GPM
+    pu.gpmDmvrRefinePart0 = false;
+    pu.gpmDmvrRefinePart1 = false;
+#endif
+
     const UnitArea localUnitArea( cu.cs->area.chromaFormat, Area( 0, 0, pu.lwidth(), pu.lheight() ) );
     PelUnitBuf tmpGeoBuf0 = m_geoPartBuf[0].getBuf( localUnitArea );
     PelUnitBuf tmpGeoBuf1 = m_geoPartBuf[1].getBuf( localUnitArea );
@@ -7116,7 +7184,24 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
 #endif
     geoMrgCtx.setMergeInfo( pu, candIdx0 );
 
+#if JVET_AE0046_BI_GPM
+    pu.bdmvrRefine = false;
+    if (PU::checkBDMVRCondition(pu, true))
+    {
+      pu.bdmvrRefine = true;
+      PU::spanPuMv2DmvrBuffer(pu, subMvBuf[0], subMvBuf[1]);
+      setBdmvrSubPuMvBuf(subMvBuf[0], subMvBuf[1]);
+      pu.gpmDmvrRefinePart0 = pu.bdmvrRefine;
+    }
+#endif
+
     motionCompensation(pu, tmpGeoBuf0, REF_PIC_LIST_X, true, isChromaEnabled(pu.chromaFormat)); // TODO: check 4:0:0 interaction with weighted prediction.
+
+#if JVET_AE0046_BI_GPM
+    pu.bdmvrRefine = false;
+    ::memcpy(subBdofBuf[candIdx0], getBdofSubPuMvOffset(), sizeof(Mv) * BDOF_SUBPU_MAX_NUM);
+#endif
+
     if( g_mctsDecCheckEnabled && !MCTSHelper::checkMvBufferForMCTSConstraint( pu, true ) )
     {
       printf( "DECODER_GEO_PU: pu motion vector across tile boundaries (%d,%d,%d,%d)\n", pu.lx(), pu.ly(), pu.lwidth(), pu.lheight() );
@@ -7127,7 +7212,19 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
         tmpGeoBuf0.roundToOutputBitdepth(tmpGeoBuf0, cu.slice->clpRngs());
 #if ENABLE_OBMC
 #if JVET_W0123_TIMD_FUSION
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AE0046_BI_GPM
+        PU::spanMotionInfo2(pu, MergeCtx(), 0, nullptr, nullptr, subBdofBuf[candIdx0]);
+#else
+        PU::spanMotionInfo2(pu, MergeCtx(), 0);
+#endif
+#else
+#if JVET_AE0046_BI_GPM
+        PU::spanMotionInfo2(pu, MergeCtx(), nullptr, nullptr, subBdofBuf[candIdx0]);
+#else
         PU::spanMotionInfo2(pu);
+#endif
+#endif
 #else
         PU::spanMotionInfo(pu);
 #endif
@@ -7172,7 +7269,24 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
 #endif
     geoMrgCtx.setMergeInfo( pu, candIdx1 );
 
+#if JVET_AE0046_BI_GPM
+    pu.bdmvrRefine = false;
+    if (PU::checkBDMVRCondition(pu, true))
+    {
+      pu.bdmvrRefine = true;
+      PU::spanPuMv2DmvrBuffer(pu, subMvBuf[0], subMvBuf[1]);
+      setBdmvrSubPuMvBuf(subMvBuf[0], subMvBuf[1]);
+      pu.gpmDmvrRefinePart1 = pu.bdmvrRefine;
+    }
+#endif
+
     motionCompensation(pu, tmpGeoBuf1, REF_PIC_LIST_X, true, isChromaEnabled(pu.chromaFormat)); // TODO: check 4:0:0 interaction with weighted prediction.
+
+#if JVET_AE0046_BI_GPM
+    pu.bdmvrRefine = false;
+    ::memcpy(subBdofBuf[candIdx1], getBdofSubPuMvOffset(), sizeof(Mv) * BDOF_SUBPU_MAX_NUM);
+#endif
+
     if( g_mctsDecCheckEnabled && !MCTSHelper::checkMvBufferForMCTSConstraint( pu, true ) )
     {
       printf( "DECODER_GEO_PU: pu motion vector across tile boundaries (%d,%d,%d,%d)\n", pu.lx(), pu.ly(), pu.lwidth(), pu.lheight() );
@@ -7183,7 +7297,19 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
         tmpGeoBuf1.roundToOutputBitdepth(tmpGeoBuf1, cu.slice->clpRngs());
 #if ENABLE_OBMC
 #if JVET_W0123_TIMD_FUSION
+#if ENABLE_INTER_TEMPLATE_MATCHING && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AE0046_BI_GPM
+        PU::spanMotionInfo2(pu, MergeCtx(), 0, nullptr, nullptr, subBdofBuf[candIdx1]);
+#else
+        PU::spanMotionInfo2(pu, MergeCtx(), 0);
+#endif
+#else
+#if JVET_AE0046_BI_GPM
+        PU::spanMotionInfo2(pu, MergeCtx(), nullptr, nullptr, subBdofBuf[candIdx1]);
+#else
         PU::spanMotionInfo2(pu);
+#endif
+#endif
 #else
         PU::spanMotionInfo(pu);
 #endif
@@ -16007,7 +16133,13 @@ void InterPrediction::deriveTMMv(PredictionUnit& pu)
     }
 #endif
 
+#if JVET_AE0046_BI_GPM
+    bool allowSwitch = (!pu.cu->geoFlag) || ( pu.cu->geoFlag && !pu.cs->slice->getCheckLDC() );
+    bool biCostTooMuch = (pu.cu->geoFlag && !pu.cs->slice->getCheckLDC()) ? (minCostBi > ((3 * minCostUni[1 - eTargetPicList]) >> 2)) : (minCostBi > (minCostUni[1 - eTargetPicList] + (minCostUni[1 - eTargetPicList] >> 3)));
+    if (biCostTooMuch && allowSwitch)
+#else
     if (minCostBi > (minCostUni[1 - eTargetPicList] + (minCostUni[1 - eTargetPicList] >> 3)))
+#endif
     {
       pu.interDir = 1 + (1 - eTargetPicList);
       pu.mv    [eTargetPicList] = Mv();

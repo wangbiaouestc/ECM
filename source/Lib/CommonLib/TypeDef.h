@@ -284,6 +284,7 @@
 #define JVET_AE0091_ITERATIVE_BDOF                        1 // JVET-AE0091: Iterative BDOF part of JVET-AE0091
 #define JVET_AD0123_REF_PICTURE_PADDING_FOR_GDR           1 // JVET-AD0123: Reference picture padding for GDR
 #define JVET_AE0059_INTER_CCCM                            1 // JVET-AE0059: Convolutional cross-component model for inter prediction
+#define JVET_AE0046_BI_GPM                                1 // JVET-AE0046: Allow bi-MVs for inter partitions in GPM
 #if IF_12TAP && JVET_AA0042_RPR_FILTERS && JVET_Z0117_CHROMA_IF
 #define JVET_AE0150_SMALL_SCALE_RPR_FILTERS               1 // RPR filters and thresholds for scale factors 1.1x to 1.35x
 #endif

@@ -1023,6 +1023,12 @@ void PredictionUnit::initData()
   addHypData.clear();
   numMergedAddHyps = 0;
 #endif
+
+#if JVET_AE0046_BI_GPM
+  gpmDirMode = 0;
+  gpmDmvrRefinePart0 = false;
+  gpmDmvrRefinePart1 = false;
+#endif
 }
 
 PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
@@ -1212,6 +1218,11 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   addHypData = predData.addHypData;
   numMergedAddHyps = predData.numMergedAddHyps;
 #endif
+#if JVET_AE0046_BI_GPM
+  gpmDirMode = predData.gpmDirMode;
+  gpmDmvrRefinePart0 = predData.gpmDmvrRefinePart0;
+  gpmDmvrRefinePart1 = predData.gpmDmvrRefinePart1;
+#endif
   return *this;
 }
 
@@ -1398,6 +1409,11 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #if MULTI_HYP_PRED
   addHypData = other.addHypData;
   numMergedAddHyps = other.numMergedAddHyps;
+#endif
+#if JVET_AE0046_BI_GPM
+  gpmDirMode = other.gpmDirMode;
+  gpmDmvrRefinePart0 = other.gpmDmvrRefinePart0;
+  gpmDmvrRefinePart1 = other.gpmDmvrRefinePart1;
 #endif
   return *this;
 }
