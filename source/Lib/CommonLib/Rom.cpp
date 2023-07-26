@@ -5421,9 +5421,20 @@ const int8_t g_ccSaoCandPosX[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y] = { {-1,  
 const int8_t g_ccSaoCandPosY[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y] = { {-1, -1, -1,  0,  0,  0,  1,  1,  1} };
 #endif
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+const int8_t g_ccSaoEdgePosX[MAX_CCSAO_EDGE_DIR][2] = { { -1,  1 }, {  0,  0 }, { -1,  1 }, {  1, -1 } };
+const int8_t g_ccSaoEdgePosY[MAX_CCSAO_EDGE_DIR][2] = { {  0,  0 }, { -1,  1 }, { -1,  1 }, { -1,  1 } };
+const short  g_ccSaoEdgeThr [MAX_CCSAO_EDGE_IDC][MAX_CCSAO_EDGE_THR]
+                                                    = { {   2,   4,   6,   8,  10,  14,  18,  22,  30,  38,  54,  70,  86, 118, 150, 182},
+                                                        {  -4,   4,  -8,   8, -14,  14, -22,  22, -38,  38, -70,  70,-118, 118,-182, 182}};
+const int8_t g_ccSaoEdgeNum [MAX_CCSAO_EDGE_IDC][2] = { {16, 4}, { 4, 2} };
+const int8_t g_ccSaoBandTab [MAX_CCSAO_BAND_IDC][2] = { {COMPONENT_Y, 1}, {COMPONENT_Y, 2}, {COMPONENT_Y, 3}, {COMPONENT_Y, 4}, {COMPONENT_Y, 5}, {COMPONENT_Y, 6}, {COMPONENT_Y,  7}, {COMPONENT_Y,  8},
+                                                        {COMPONENT_Y, 9}, {COMPONENT_Y,10}, {COMPONENT_Y,11}, {COMPONENT_Y,12}, {COMPONENT_Y,13}, {COMPONENT_Y,14}, {COMPONENT_Cb, 2}, {COMPONENT_Cr, 2} };
+#else
 const int8_t g_ccSaoEdgeTypeX[CCSAO_EDGE_TYPE][2] = { { -1, 1 }, { 0, 0 }, { -1, 1 }, { 1, -1 } };
 const int8_t g_ccSaoEdgeTypeY[CCSAO_EDGE_TYPE][2] = { { 0, 0 }, { -1, 1 }, { -1, 1 }, { -1, 1 } };
 const short  g_ccSaoQuanValue[CCSAO_QUAN_NUM]      = { 2, 4, 6, 8, 10, 14, 18, 22, 30, 38, 54, 70, 86, 118, 150, 182 };
+#endif
 #endif
 #if JVET_AC0130_NSPT
 const uint8_t g_nsptLut[ 97 ] =

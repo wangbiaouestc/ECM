@@ -300,6 +300,21 @@ static const int MAX_CCSAO_FILTER_LENGTH     =                      3;
 #endif
 
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+static const int MAX_CCSAO_EDGE_CMP_BITS     =                      2;
+static const int MAX_CCSAO_EDGE_IDC          =                      2;
+static const int MAX_CCSAO_EDGE_IDC_BITS     =                      1;
+static const int MAX_CCSAO_EDGE_DIR          =                      4;
+static const int MAX_CCSAO_EDGE_DIR_BITS     =                      2;
+static const int MAX_CCSAO_EDGE_THR          =                     16;
+static const int MAX_CCSAO_EDGE_THR_BITS     =                      4;
+static const int MAX_CCSAO_EDGE_NUM          =                     16;
+static const int MAX_CCSAO_EDGE_NUM_BITS     =                      4;
+static const int MAX_CCSAO_BAND_IDC          =                     16;
+static const int MAX_CCSAO_BAND_IDC_BITS     =                      4;
+static const int MAX_CCSAO_PRV_NUM           =                     16;
+static const int MAX_CCSAO_PRV_NUM_BITS      =                      4;
+#else
 static const int N_C                            = 3; /* Num components*/
 static const int Y_C                            = 0; /* Y luma */
 static const int U_C                            = 1; /* Cb Chroma */
@@ -311,6 +326,7 @@ static const int CCSAO_QUAN_NUM                 = 16;
 static const int CCSAO_EDGE_BAND_NUM_Y          = 4;
 static const int CCSAO_EDGE_BAND_NUM_C          = 4;
 static const int MAX_CCSAO_BAND_NUM_U_BAND_BITS = 4;
+#endif
 #endif
 
 static const int MAX_NUM_ALF_ALTERNATIVES_CHROMA =                  8;

@@ -372,6 +372,7 @@
 #define JVET_AD0222_ALF_RESI_CLASS                        1 // JVET-AD0222: Residual-based classifier
 #define JVET_AD0222_ADDITONAL_ALF_FIXFILTER               1 // JVET-AD0222: Additional ALF fixed filter
 #define JVET_AE0139_ALF_IMPROVED_FIXFILTER                1 // JVET-AE0139: Improved ALF fixed filter
+#define JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO      1 // JVET-AE0151: CCSAO with history offsets and extended edge classifiers
 
 // SIMD optimizations
 #if IF_12TAP
@@ -1266,6 +1267,15 @@ enum SAOEOClasses
 
 #define NUM_SAO_BO_CLASSES_LOG2  5
 #define NUM_SAO_BO_CLASSES       (1<<NUM_SAO_BO_CLASSES_LOG2)
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+enum CCSAOSetTypes
+{
+  CCSAO_SET_TYPE_BAND = 0,
+  CCSAO_SET_TYPE_EDGE = 1,
+  NUM_CCSAO_SET_TYPES = 2
+};
+#endif
 
 namespace Profile
 {

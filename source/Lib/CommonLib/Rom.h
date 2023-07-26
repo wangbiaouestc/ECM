@@ -401,9 +401,17 @@ extern const int8_t g_ccSaoCandPosX[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y];
 extern const int8_t g_ccSaoCandPosY[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y];
 #endif
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+extern const int8_t g_ccSaoEdgePosX[MAX_CCSAO_EDGE_DIR][2];
+extern const int8_t g_ccSaoEdgePosY[MAX_CCSAO_EDGE_DIR][2];
+extern const short  g_ccSaoEdgeThr [MAX_CCSAO_EDGE_IDC][MAX_CCSAO_EDGE_THR];
+extern const int8_t g_ccSaoEdgeNum [MAX_CCSAO_EDGE_IDC][2];
+extern const int8_t g_ccSaoBandTab [MAX_CCSAO_BAND_IDC][2];
+#else
 extern const int8_t g_ccSaoEdgeTypeX[CCSAO_EDGE_TYPE][2];
 extern const int8_t g_ccSaoEdgeTypeY[CCSAO_EDGE_TYPE][2];
 extern const short  g_ccSaoQuanValue[CCSAO_QUAN_NUM];
+#endif
 #endif
 #if JVET_V0130_INTRA_TMP
 extern unsigned int g_uiDepth2Width[5];
