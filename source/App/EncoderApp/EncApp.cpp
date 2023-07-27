@@ -1072,7 +1072,9 @@ void EncApp::xInitLibCfg()
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   m_cEncLib.setTempCabacInitMode                                 ( m_tempCabacInitMode );
 #endif
-
+  #if JVET_AE0057_MTT_ET 
+  m_cEncLib.setUseMttSkip                                        (m_useMttSkip);
+#endif
   // set internal bit-depth and constants
   for (uint32_t channelType = 0; channelType < MAX_NUM_CHANNEL_TYPE; channelType++)
   {
