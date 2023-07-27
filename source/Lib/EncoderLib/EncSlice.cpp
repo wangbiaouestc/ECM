@@ -1857,6 +1857,15 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     }
   }
 #endif
+#if JVET_AE0159_FIBC
+  if (m_pcCuEncoder->getEncCfg()->getIbcFilter())
+  {
+    SPS* spsTmp = const_cast<SPS*>(cs.sps);
+    hashBlkHitPerc = (hashBlkHitPerc == -1) ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
+    bool isSCC = hashBlkHitPerc >= 20;
+    spsTmp->setUseIbcFilter(isSCC);   
+  }
+#endif
 #if JVET_AD0188_CCP_MERGE
   if ((pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU()))
   {

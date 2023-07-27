@@ -12426,6 +12426,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if JVET_AC0112_IBC_LIC
     cu.ibcLicFlag = false;
 #endif
+#if JVET_AE0159_FIBC
+    cu.ibcFilterFlag = false;
+#endif
 #if JVET_AA0070_RRIBC
     cu.rribcFlipType = 0;
     pu.mergeFlag = true;
@@ -12656,6 +12659,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 #if JVET_AC0112_IBC_LIC
       cu.ibcLicFlag = false;
+#endif
+#if JVET_AE0159_FIBC
+      cu.ibcFilterFlag = false;
 #endif
       cu.geoFlag = false;
 
@@ -14530,6 +14536,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if JVET_AC0112_IBC_LIC
             cu.ibcLicFlag = false;
 #endif
+#if JVET_AE0159_FIBC
+            cu.ibcFilterFlag = false;
+#endif
 
 #if JVET_AA0070_RRIBC
             cu.rribcFlipType = 0;
@@ -14989,7 +14998,11 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
   double curBestCost = bestCS->cost;
   bool searchedByHash[1] = {false};
   Distortion tempCost[1] = {0};
+#if JVET_AE0159_FIBC
+  Distortion searchCost[3] = {0, 0, 0};
+#else
   Distortion searchCost[2] = {0, 0};
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   m_pcInterSearch->m_bestSrchCostIntBv.init(true);
 #if JVET_AC0112_IBC_LIC
@@ -15014,8 +15027,14 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
 
 #if JVET_AC0112_IBC_LIC
   bool skipSecondLicPass = false;
+#if JVET_AE0159_FIBC
+  double bestNonLicCost = MAX_DOUBLE;
+  int licIdxMax = (m_pcEncCfg->getIntraPeriod() == 1) && tempCS->slice->getSPS()->getUseIbcLic() && (tempCS->area.lx() > 0 || tempCS->area.ly() > 0) ? 2 : tempCS->slice->getSPS()->getUseIbcLic() && (tempCS->area.lx() > FIBC_TEMPLATE_SIZE || tempCS->area.ly() > FIBC_TEMPLATE_SIZE) ? 3 : (tempCS->slice->getSPS()->getUseIbcLic() && (tempCS->area.lx() > 0 || tempCS->area.ly() > 0) ? 2 : 1);
+  if ( tempCS->area.lwidth() * tempCS->area.lheight() < 32 )
+#else
   int licIdxMax = tempCS->slice->getSPS()->getUseIbcLic() && (tempCS->area.lx() > 0 || tempCS->area.ly() > 0) ? 2 : 1;
   if (tempCS->area.lwidth() * tempCS->area.lheight() < 32 || tempCS->area.lwidth() * tempCS->area.lheight() > 256)
+#endif
   {
     licIdxMax = 1;
   }
@@ -15062,6 +15081,12 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
       }
       for (int licIdx = 0; licIdx < licIdxMax; licIdx++)
       {
+#if JVET_AE0159_FIBC
+        if (licIdx == 1 && tempCS->area.lwidth() * tempCS->area.lheight() > 256)
+        {
+          continue;
+        }
+#endif
         if (licIdx == 1 && skipSecondLicPass)
         {
           continue;
@@ -15095,7 +15120,27 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
     cu.imv = 0;
     cu.sbtInfo = 0;
 #if JVET_AC0112_IBC_LIC
+#if JVET_AE0159_FIBC
+    cu.ibcLicFlag = licIdx > 0 ? true: false;
+    if (m_pcEncCfg->getIntraPeriod() == 1)
+    {
+      cu.ibcFilterFlag = false;
+    }
+    else
+    {
+      cu.ibcFilterFlag = licIdx > 1 ? true : false;
+      if ( cu.ibcLicFlag && !cu.ibcFilterFlag && tempCS->area.lwidth() * tempCS->area.lheight() > 256)
+      {
+        continue;
+      }
+    }
+    if ((licIdx == 2) && ( !tempCS->slice->getSPS()->getUseIbcFilter() || cu.cs->slice->getSliceType() != I_SLICE))
+    {
+      continue;
+    }
+#else
     cu.ibcLicFlag = licIdx;
+#endif
 #endif
 
     CU::addPUs(cu);
@@ -15268,6 +15313,19 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
       }
 #endif
 #endif
+#if JVET_AE0159_FIBC
+      if (tempCS->slice->getSPS()->getUseIbcFilter())
+      {
+        if (!cu.ibcLicFlag)
+        {
+          bestNonLicCost = min(dCost, bestNonLicCost);
+        }
+        else if (dCost > 1.4 * bestNonLicCost)
+        {
+          continue;
+        }
+      }
+#endif
 #if JVET_AC0112_IBC_LIC
       if (licIdx == 0 && searchedByHash[0])
       {
@@ -15302,7 +15360,11 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
 #else
         searchCost[licIdx] = tempCost[0];
 #endif
+#if JVET_AE0159_FIBC
+        if (licIdx > 0 && searchCost[0] > 0 && searchCost[licIdx] > 1.05 * searchCost[0])
+#else
         if (licIdx > 0 && searchCost[0] > 0 && searchCost[1] > 1.05 * searchCost[0])
+#endif
         {
           continue;
         }
@@ -15419,7 +15481,11 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
           }
 #endif
 #if JVET_AC0112_IBC_LIC
+#if JVET_AE0159_FIBC
+          if ( !tempCS->slice->getSPS()->getUseIbcFilter() && licIdx == 0 && tempCS->cost > curBestCost * 1.4)
+#else
           if (licIdx == 0 && tempCS->cost > curBestCost * 1.4)
+#endif
           {
             skipSecondLicPass = true;
           }

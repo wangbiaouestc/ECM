@@ -3218,6 +3218,19 @@ const CtxSet ContextSetCfg::IbcGpmBldIdx = ContextSetCfg::addCtxSet
 #if JVET_AC0112_IBC_LIC
 const CtxSet ContextSetCfg::IbcLicFlag = ContextSetCfg::addCtxSet
 ({
+#if JVET_AE0159_FIBC
+  { CNU, CNU, CNU, CNU, },
+  { CNU, CNU, CNU, CNU, },
+  {  27,  25,  26,  12, },
+  { DWS, DWS, DWS, DWS, },
+  { DWS, DWS, DWS, DWS, },
+  {   1,   6,   2,   0, },
+  { DWE, DWE, DWE, DWE, },
+  { DWE, DWE, DWE, DWE, },
+  {  32,  32,  32,  32, },
+  { DWO, DWO, DWO, DWO, },
+  { DWO, DWO, DWO, DWO, },
+#else
   { CNU, },
   { CNU, },
   { CNU, },
@@ -3229,6 +3242,7 @@ const CtxSet ContextSetCfg::IbcLicFlag = ContextSetCfg::addCtxSet
   { DWE, },
   { DWO, },
   { DWO, },
+#endif
   });
 #endif
 

@@ -122,6 +122,9 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #if JVET_AE0059_INTER_CCCM
   m_pcInterPred->m_interCccm->setCccmBuffers(m_pcIntraPred->getCccmBufferA(),m_pcIntraPred->getCccmBufferCb(),m_pcIntraPred->getCccmBufferCr(),m_pcIntraPred->getCccmBufferSamples());
 #endif
+#if JVET_AE0159_FIBC
+  m_pcInterPred->setIbcFilterBuffers(m_pcIntraPred->getCccmBufferA(),m_pcIntraPred->getCccmBufferCb(),m_pcIntraPred->getCccmBufferSamples(), m_pcIntraPred);
+#endif
 #if JVET_Z0118_GDR
   // reset current IBC Buffer only when VB pass through
   if (cs.isGdrEnabled() && cs.isInGdrIntervalOrRecoveryPoc())
@@ -3844,6 +3847,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               m_pcInterPred->adjustIbcMergeRribcCand(pu, mrgCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
               pu.cu->rribcFlipType = 0;
               pu.cu->ibcLicFlag = 0;
+#if JVET_AE0159_FIBC
+              pu.cu->ibcFilterFlag = false;
+#endif
             }
 #endif
             pu.cu->imv = imv;

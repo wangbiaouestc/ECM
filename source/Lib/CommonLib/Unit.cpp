@@ -410,6 +410,13 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = other.ibcLicFlag;
 #endif
+#if JVET_AE0159_FIBC
+  ibcFilterFlag  = other.ibcFilterFlag;
+  if (slice->getSPS()->getUseIbcFilter())
+  {
+    memcpy(ibcFilterParams, other.ibcFilterParams, FIBC_PARAMS * sizeof(int64_t));
+  }
+#endif
 #if JVET_AA0070_RRIBC
   rribcFlipType = other.rribcFlipType;
 #endif
@@ -616,6 +623,13 @@ void CodingUnit::initData()
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = false;
+#endif
+#if JVET_AE0159_FIBC
+  for (int i = 0; i < FIBC_PARAMS; i++)
+  {
+    ibcFilterParams[i] = -1;
+  }
+  ibcFilterFlag = false;
 #endif
 #if JVET_AA0070_RRIBC
   rribcFlipType = 0;

@@ -542,6 +542,9 @@ protected:
 #if JVET_AC0112_IBC_LIC
   bool      m_ibcLic;
 #endif
+#if JVET_AE0159_FIBC
+  bool      m_ibcFilter;
+#endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   bool      m_ibcBiPred;
 #endif

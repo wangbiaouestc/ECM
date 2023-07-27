@@ -1752,6 +1752,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AC0112_IBC_LIC
     WRITE_FLAG( pcSPS->getUseIbcLic() ? 1 : 0,                                          "sps_ibc_lic_enabled_flag" );
 #endif
+#if JVET_AE0159_FIBC
+    WRITE_FLAG( pcSPS->getUseIbcFilter() ? 1 : 0,                                       "sps_ibc_filter_enabled_flag" );
+#endif
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
     WRITE_FLAG(pcSPS->getUseIbcNonAdjCand() ? 1 : 0, "sps_ibc_non_adjacent_spatial_candidates_enabled_flag");
 #endif

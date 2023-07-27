@@ -754,6 +754,9 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
 #if JVET_AE0059_INTER_CCCM
   m_cInterSearch.m_interCccm->setCccmBuffers(m_cIntraSearch.getCccmBufferA(),m_cIntraSearch.getCccmBufferCb(),m_cIntraSearch.getCccmBufferCr(),m_cIntraSearch.getCccmBufferSamples());
 #endif
+#if JVET_AE0159_FIBC
+  m_cInterSearch.setIbcFilterBuffers(m_cIntraSearch.getCccmBufferA(),m_cIntraSearch.getCccmBufferCb(),m_cIntraSearch.getCccmBufferSamples(), &m_cIntraSearch);
+#endif
   m_iMaxRefPicNum = 0;
 
 #if ER_CHROMA_QP_WCG_PPS
@@ -1942,6 +1945,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AC0112_IBC_LIC
   sps.setUseIbcLic                          ( m_ibcLic );
+#endif
+#if JVET_AE0159_FIBC
+  sps.setUseIbcFilter                       ( m_ibcFilter );
 #endif
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   sps.setUseIbcNonAdjCand                   ( m_ibcNonAdjCand );
