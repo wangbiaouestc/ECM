@@ -3628,6 +3628,9 @@ SPS::SPS()
 #endif
 #if JVET_AA0061_IBC_MBVD
   , m_ibcMbvd                 ( false )
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  , m_ibcMbvdAdSearch         ( false )
+#endif
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   , m_rribc                   ( false )

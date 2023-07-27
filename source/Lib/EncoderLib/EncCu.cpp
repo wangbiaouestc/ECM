@@ -13631,6 +13631,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 
 #if JVET_AA0061_IBC_MBVD
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+    const bool mbvdAdaptiveSearch = sps.getUseIbcMbvdAdSearch();
+#endif
 #if JVET_AA0070_RRIBC
     int numValidBvIBC = mergeCtxTmp.numValidMergeCand;
 #endif
@@ -13639,6 +13642,10 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
       if (pu.cs->sps->getUseIbcMbvd())
       {
 #if JVET_AA0070_RRIBC
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+        if (!mbvdAdaptiveSearch)
+        {
+#endif
         for (unsigned int mergeCand = 0; mergeCand < mergeCtxTmp.numValidMergeCand; mergeCand++)
         {
           mergeCtxTmp.setMergeInfo(pu, mergeCand); // set bv info in merge mode
@@ -13657,6 +13664,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
             continue;
           }
         }
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+        }
+#endif
 #endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
         const int baseNum = std::min(std::min(numValidBvIBC, IBC_MBVD_BASE_NUM), (int)tempCS->sps->getMaxNumIBCMergeCand());
@@ -13665,9 +13675,15 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
         const int baseNum = std::min(numValidBvIBC, IBC_MBVD_BASE_NUM);
 #endif
 #if !JVET_AA0070_RRIBC
-        mergeCtxTmp = mergeCtx;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+        if (!mbvdAdaptiveSearch)
+        {
 #endif
-
+        mergeCtxTmp = mergeCtx;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+        }
+#endif
+#endif
         PU::getIbcMbvdMergeCandidates(pu, mergeCtxTmp, baseNum);
 
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
@@ -13703,10 +13719,27 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 #endif
 
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+        const int tempNum = mbvdAdaptiveSearch ? IBC_MBVD_ENC_NUM : baseNum * IBC_MBVD_MAX_REFINE_NUM;
+#else
         const int tempNum = baseNum * IBC_MBVD_MAX_REFINE_NUM;
-        int baseIdx = 0;
+#endif
         for (unsigned int mmvdMergeCandtemp = 0; mmvdMergeCandtemp < tempNum; mmvdMergeCandtemp++)
         {
+          int baseIdx = 0;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+          if (mbvdAdaptiveSearch)
+          {
+            baseIdx = mmvdMergeCandtemp / IBC_MBVD_SIZE_ENC;
+            if (mmvdMergeCandtemp - baseIdx * IBC_MBVD_SIZE_ENC >= ibcMbvdValidNum[baseIdx])
+            {
+              continue;
+            }
+            numValidBv++;
+          }
+          else
+          {
+#endif
           baseIdx = mmvdMergeCandtemp / IBC_MBVD_MAX_REFINE_NUM;
           if (mmvdMergeCandtemp - (mmvdMergeCandtemp / IBC_MBVD_MAX_REFINE_NUM) * IBC_MBVD_MAX_REFINE_NUM >= IBC_MBVD_SIZE_ENC)
           {
@@ -13716,6 +13749,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
           {
             continue;
           }
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+          }
+#endif
           unsigned int mmvdMergeCand = ibcMbvdLUT[mmvdMergeCandtemp];
           bool mbvdCandMisAlign = mergeCtxTmp.setIbcMbvdMergeCandiInfo(pu, mmvdMergeCandtemp, mmvdMergeCand);
           CHECK(mbvdCandMisAlign, "MBVD candidate is invalid");
@@ -13742,7 +13778,11 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 #if JVET_AE0169_BIPREDICTIVE_IBC
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+          int bufNum = mbvdAdaptiveSearch ? mmvdMergeCandtemp : mmvdMergeCandtemp - (baseIdx * IBC_MBVD_MAX_REFINE_NUM) + (baseIdx * IBC_MBVD_SIZE_ENC);
+#else
           int bufNum = mmvdMergeCandtemp - (baseIdx*IBC_MBVD_MAX_REFINE_NUM) + (baseIdx*IBC_MBVD_SIZE_ENC);
+#endif
 #endif
           bool foundFracBV = isFracBv(pu.mv[0]);
           if (foundFracBV)
@@ -13979,12 +14019,21 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 
           for (int candIdx = 0; candIdx < numMbvdSadList; candIdx++)
           {
-            baseIdx = mbvdSadList[candIdx].mmvdMergeCandtemp / IBC_MBVD_MAX_REFINE_NUM;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+            int baseIdx = mbvdSadList[candIdx].mmvdMergeCandtemp / (mbvdAdaptiveSearch ? IBC_MBVD_SIZE_ENC : IBC_MBVD_MAX_REFINE_NUM);
+#else
+            int baseIdx = mbvdSadList[candIdx].mmvdMergeCandtemp / IBC_MBVD_MAX_REFINE_NUM;
+#endif
             if (!mergeCtxTmp.rribcFlipTypes[baseIdx])
             {
               checkBiMbvd[baseIdx] = true;
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-              bool foundFracBV = isFracBv(mergeCtxTmp.mvFieldNeighbours[baseIdx<<1].mv);
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+              const Mv& baseBv = mbvdAdaptiveSearch ? mergeCtxTmp.ibcMbvdBaseBvFrac[baseIdx][0].mv : mergeCtxTmp.ibcMbvdBaseBv[baseIdx][0].mv;
+#else
+              const Mv& baseBv = mergeCtxTmp.ibcMbvdBaseBv[baseIdx][0].mv;
+#endif
+              bool foundFracBV = isFracBv(baseBv);
               if (foundFracBV)
               {
                 mbvdCenterBuf[baseIdx] = m_acMergeTmpBuffer[baseIdx].getBuf(localUnitArea).Y();
@@ -13992,7 +14041,7 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
                 m_pcInterSearch->m_storeBeforeLIC = false;
 #endif
                 PelUnitBuf dstPic = PelUnitBuf(pu.chromaFormat, mbvdCenterBuf[baseIdx]);
-                m_pcInterSearch->getPredIBCBlk(pu, COMPONENT_Y, pu.cu->slice->getPic(), mergeCtxTmp.mvFieldNeighbours[baseIdx<<1].mv, dstPic, encOptMC);
+                m_pcInterSearch->getPredIBCBlk(pu, COMPONENT_Y, pu.cu->slice->getPic(), baseBv, dstPic, encOptMC);
               }
 #endif
             }
@@ -14028,8 +14077,21 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
               CHECK(mbvdCandMisAlign, "MBVD candidate is invalid");
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+              int bufNum0;
+              if (mbvdAdaptiveSearch)
+              {
+                bufNum0 = mmvdMergeCandtemp0;
+              }
+              else
+              {
+                int baseIdx0 = mmvdMergeCandtemp0 / IBC_MBVD_MAX_REFINE_NUM;
+                bufNum0 = mmvdMergeCandtemp0 - (baseIdx0 * IBC_MBVD_MAX_REFINE_NUM) + (baseIdx0 * IBC_MBVD_SIZE_ENC);
+              }
+#else
               int baseIdx0 = mmvdMergeCandtemp0 / IBC_MBVD_MAX_REFINE_NUM;
               int bufNum0 = mmvdMergeCandtemp0 - (baseIdx0*IBC_MBVD_MAX_REFINE_NUM) + (baseIdx0*IBC_MBVD_SIZE_ENC);
+#endif
               CPelBuf refBufL1;
               if (mmvdMergeCandidx1 >= numMbvdSadList)
               {
@@ -14048,8 +14110,21 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
               }
               else
               {
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+                int bufNum1;
+                if (mbvdAdaptiveSearch)
+                {
+                  bufNum1 = (mmvdMergeCandtemp1 - IBC_MRG_MAX_NUM_CANDS);
+                }
+                else
+                {
+                  int baseIdx1 = (mmvdMergeCandtemp1 - IBC_MRG_MAX_NUM_CANDS) / IBC_MBVD_MAX_REFINE_NUM;
+                  bufNum1 = (mmvdMergeCandtemp1 - IBC_MRG_MAX_NUM_CANDS) - (baseIdx1 * IBC_MBVD_MAX_REFINE_NUM) + (baseIdx1 * IBC_MBVD_SIZE_ENC);
+                }
+#else
                 int baseIdx1 = (mmvdMergeCandtemp1-IBC_MRG_MAX_NUM_CANDS) / IBC_MBVD_MAX_REFINE_NUM;
                 int bufNum1 = (mmvdMergeCandtemp1-IBC_MRG_MAX_NUM_CANDS) - (baseIdx1*IBC_MBVD_MAX_REFINE_NUM) + (baseIdx1*IBC_MBVD_SIZE_ENC);
+#endif
                 refBufL1 = predBufMbvd[bufNum1];
               }
               PelBuf refBufBi = predBuf;

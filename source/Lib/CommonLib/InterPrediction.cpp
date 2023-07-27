@@ -326,6 +326,11 @@ InterPrediction::InterPrediction()
   m_samples = nullptr;
   m_pcIntraPred     = nullptr;
 #endif
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  m_mbvdCandCostList = nullptr;
+  m_mbvdSearchCandsList = nullptr;
+  m_mbvdTestedCandsList = nullptr;
+#endif
 }
 
 InterPrediction::~InterPrediction()
@@ -517,6 +522,14 @@ void InterPrediction::destroy()
   m_samples = nullptr;
   m_pcIntraPred     = nullptr;
   m_ibcRefBuf   = nullptr;
+#endif
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  xFree(m_mbvdCandCostList);
+  xFree(m_mbvdSearchCandsList);
+  xFree(m_mbvdTestedCandsList);
+  m_mbvdCandCostList = nullptr;
+  m_mbvdSearchCandsList = nullptr;
+  m_mbvdTestedCandsList = nullptr;
 #endif
 #if JVET_AE0059_INTER_CCCM
   if (m_interCccm)
@@ -832,6 +845,12 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
 #endif
   }
 #endif
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  m_mbvdCandCostList = (Distortion*)xMalloc(Distortion, IBC_MBVD_ENC_NUM);
+  m_mbvdSearchCandsList = (int*)xMalloc(int, IBC_MBVD_AD_NUM);
+  m_mbvdTestedCandsList = (bool*)xMalloc(bool, IBC_MBVD_AD_NUM);
+#endif
+
 #if JVET_AE0059_INTER_CCCM
   if (m_interCccm == nullptr)
   {
@@ -8473,8 +8492,229 @@ void InterPrediction::xProcessDMVR(PredictionUnit& pu, PelUnitBuf &pcYuvDst, con
 }
 
 #if JVET_AA0061_IBC_MBVD
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+void  InterPrediction::sortIbcAdaptiveMergeMbvdCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t * ibcMbvdLUT,uint32_t * ibcMbvdValidNum, int ibcMbvdIdx)
+{
+
+  memset(ibcMbvdValidNum, 0, sizeof(uint32_t)     * IBC_MBVD_BASE_NUM);
+  int nWidth = pu.lumaSize().width;
+  int nHeight = pu.lumaSize().height;
+  if (!xAMLIBCGetCurBlkTemplate(pu, nWidth, nHeight))
+  {
+    return;
+  }
+  const int ibcMbvdSearchStartPelNCandsNumber = IBC_MBVD_AD_MAX_REFINE_NUM >> IBC_MBVD_LOG2_START_STEP;
+  const int numBaseIdx = std::min<int>(IBC_MBVD_BASE_NUM, mrgCtx.numValidMergeCand);
+  const int groupSize = IBC_MBVD_AD_MAX_REFINE_NUM;
+
+  memset(m_mbvdCandCostList,    -1,         sizeof(uint64_t) * IBC_MBVD_ENC_NUM);
+  memset(m_mbvdTestedCandsList, false,      sizeof(bool)     * IBC_MBVD_AD_NUM);
+#if !JVET_AE0169_BIPREDICTIVE_IBC
+  int startBvpIdx = 0;
+  int endBvpIdx = numBaseIdx;
+  if(ibcMbvdIdx != -1)
+  {
+    startBvpIdx = ibcMbvdIdx / IBC_MBVD_SIZE_ENC;
+    endBvpIdx = startBvpIdx + 1;
+  }
+#endif
+  memset(ibcMbvdLUT,     -1, sizeof(uint32_t)     * IBC_MBVD_ENC_NUM); // the rest is unused
+  Distortion uiCost;
+  DistParam cDistParam;
+  cDistParam.applyWeight = false;
+
+  const int roiWidth = pu.lwidth() + (m_bAMLTemplateAvailabe[1] ? AML_MERGE_TEMPLATE_SIZE : 0);
+  const int roiHeight = pu.lheight() + (m_bAMLTemplateAvailabe[0] ? AML_MERGE_TEMPLATE_SIZE : 0);
+#if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  const int cuPelX = pu.Y().x;
+  const int cuPelY = pu.Y().y;
+  const int roiWidth = pu.lwidth()   + (m_bAMLTemplateAvailabe[1] ? AML_MERGE_TEMPLATE_SIZE : 0);
+  const int roiHeight = pu.lheight() + (m_bAMLTemplateAvailabe[0] ? AML_MERGE_TEMPLATE_SIZE : 0);
+  const int picWidth = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
+  const int picHeight = pu.cs->slice->getPPS()->getPicHeightInLumaSamples();
+  const unsigned int  lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
+#endif
+
+  // Calculate offsets for templates
+  int bvHorOffset[IBC_MBVD_BASE_NUM], bvVerOffset[IBC_MBVD_BASE_NUM];
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  for (int bvpIdx = 0; bvpIdx < numBaseIdx; bvpIdx++)
+  {
+    if (!((1 << bvpIdx) & ibcMbvdIdx))
+    {
+      continue;
+    }
+#else
+  for (int bvpIdx = startBvpIdx; bvpIdx < endBvpIdx; bvpIdx++)
+  {
+#endif
+#if JVET_AA0070_RRIBC
+    bvHorOffset[bvpIdx] = 0;
+    bvVerOffset[bvpIdx] = 0;
+    int startBvdIdx = bvpIdx * groupSize;
+    if (mrgCtx.setIbcMbvdMergeCandiInfo(pu, startBvdIdx, startBvdIdx))
+    {
+      bool mbvdCandMisAlign = mrgCtx.setIbcMbvdMergeCandiInfo(pu, startBvdIdx + 2, startBvdIdx + 2);
+      CHECK(mbvdCandMisAlign, "this is not possible");
+    }
+    if (m_bAMLTemplateAvailabe[0] && pu.cu->rribcFlipType != 2)
+    {
+      bvVerOffset[bvpIdx] -= (AML_MERGE_TEMPLATE_SIZE << MV_FRACTIONAL_BITS_INTERNAL);
+    }
+    if (m_bAMLTemplateAvailabe[1] && pu.cu->rribcFlipType != 1)
+    {
+      bvHorOffset[bvpIdx] -= (AML_MERGE_TEMPLATE_SIZE << MV_FRACTIONAL_BITS_INTERNAL);
+    }
+#else
+    bvHorOffset[bvpIdx] -= (AML_MERGE_TEMPLATE_SIZE << MV_FRACTIONAL_BITS_INTERNAL);
+    bvVerOffset[bvpIdx] -= (AML_MERGE_TEMPLATE_SIZE << MV_FRACTIONAL_BITS_INTERNAL);
+#endif
+  }
+
+  // 2 step: N unit -> 1 unit (unit = qpel)
+  for (int bvdSearchLoopIdx = IBC_MBVD_LOG2_START_STEP; bvdSearchLoopIdx >= 0; bvdSearchLoopIdx = (bvdSearchLoopIdx > 0 ? 0 : -1))
+  {
+    // buildup search candidate list
+    int totalNumberBvdCandToSearch = 0;
+
+#if JVET_AE0169_BIPREDICTIVE_IBC
+    for (int bvpIdx = 0; bvpIdx < numBaseIdx; bvpIdx++)
+    {
+      if (!((1 << bvpIdx) & ibcMbvdIdx))
+      {
+        continue;
+      }
+#else
+    for (int bvpIdx = startBvpIdx; bvpIdx < endBvpIdx; bvpIdx++)
+    {
+#endif
+      int startBvdIdx = bvpIdx * groupSize;
+      int startBvdEncIdx = bvpIdx * IBC_MBVD_SIZE_ENC;
+      // this is early terminate
+      if (m_mbvdCandCostList[startBvdEncIdx + IBC_MBVD_SIZE_ENC - 1] == 0)
+      {
+        continue;
+      }
+      int endBvdIdx = startBvdIdx + groupSize;
+      // first step
+      if (bvdSearchLoopIdx == IBC_MBVD_LOG2_START_STEP)
+      {
+        std::memcpy(m_mbvdSearchCandsList + totalNumberBvdCandToSearch,
+            g_ibcMbvdStepCandIdxList + bvpIdx * ibcMbvdSearchStartPelNCandsNumber,
+            sizeof(int) * ibcMbvdSearchStartPelNCandsNumber);
+        totalNumberBvdCandToSearch += ibcMbvdSearchStartPelNCandsNumber;
+      }
+      else  // second step
+      {
+        for (int bestBvdIdx = 0; bestBvdIdx < ibcMbvdValidNum[bvpIdx]; bestBvdIdx++)
+        {
+          const int tmpBestBvd = ibcMbvdLUT[startBvdEncIdx + bestBvdIdx];
+          for (int neiIdx = 0; neiIdx < IBC_MBVD_NEI_NUM<<1; neiIdx++)
+          {
+            const int bvd = tmpBestBvd + g_ibcMbvdNeiOffsets[neiIdx];
+            if (bvd >= startBvdIdx && bvd < endBvdIdx && !m_mbvdTestedCandsList[bvd])
+            {
+              m_mbvdSearchCandsList[totalNumberBvdCandToSearch++] = bvd;
+              m_mbvdTestedCandsList[bvd] = true;
+            }
+          }
+        }
+      }
+    }
+    // search cycle
+    for (int bvdSearchCandIdx = 0; bvdSearchCandIdx < totalNumberBvdCandToSearch; bvdSearchCandIdx++)
+    {
+      int mmvdMergeCand = m_mbvdSearchCandsList[bvdSearchCandIdx];
+      uint32_t gpIdx = mmvdMergeCand/groupSize;
+      uint32_t endEncIdx = (gpIdx + 1) * IBC_MBVD_SIZE_ENC;
+      if (m_mbvdCandCostList[endEncIdx - 1] == 0)
+      {
+        continue;
+      }
+      bool mbvdCandMisAlign = mrgCtx.setIbcMbvdMergeCandiInfo(pu, mmvdMergeCand, mmvdMergeCand);
+      if (mbvdCandMisAlign)
+      {
+        continue;
+      }
+      int xPred = pu.mv[0].getHor() + bvHorOffset[gpIdx];
+      int yPred = pu.mv[0].getVer() + bvVerOffset[gpIdx];
+
+      if (PU::checkValidBv(pu, COMPONENT_Y, roiWidth, roiHeight, Mv(xPred, yPred), true, 1, false, true) == IBC_BV_INVALID)
+      {
+        continue;
+      }
+
+      uiCost = 0;
+
+      PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+      PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+      PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+
+      getIBCAMLRefTemplate(pu, nWidth, nHeight, false/*doIbcLic*/, false/*checkTmlBvValidaion*/);
+
+      if (m_bAMLTemplateAvailabe[0])
+      {
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+        uiCost += cDistParam.distFunc(cDistParam);
+      }
+
+      if (uiCost < m_mbvdCandCostList[endEncIdx - 1] && m_bAMLTemplateAvailabe[1])
+      {
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+        uiCost += cDistParam.distFunc(cDistParam);
+      }
+
+      // update part
+      uint32_t i;
+      uint32_t shift = 0;
+      while (shift < IBC_MBVD_SIZE_ENC && uiCost < m_mbvdCandCostList[endEncIdx - 1 - shift])
+      {
+        shift++;
+      }
+      if (shift != 0)
+      {
+        for (i = 1; i < shift; i++)
+        {
+          ibcMbvdLUT[endEncIdx - i] = ibcMbvdLUT[endEncIdx - 1 - i];
+          m_mbvdCandCostList[endEncIdx - i] = m_mbvdCandCostList[endEncIdx - 1 - i];
+        }
+        ibcMbvdLUT[endEncIdx - shift] = mmvdMergeCand;
+        m_mbvdCandCostList[endEncIdx - shift] = uiCost;
+      }
+    }
+#if JVET_AE0169_BIPREDICTIVE_IBC
+    for (int bvpIdx = 0; bvpIdx < numBaseIdx; bvpIdx++)
+    {
+      if (!((1 << bvpIdx) & ibcMbvdIdx))
+      {
+        continue;
+      }
+#else
+    for (int bvpIdx = startBvpIdx; bvpIdx < endBvpIdx; bvpIdx++)
+    {
+#endif
+      int startBackLoopBvdIdx = bvpIdx * IBC_MBVD_SIZE_ENC;
+      int bvdValidNum = IBC_MBVD_SIZE_ENC;
+      while (bvdValidNum > 0 && m_mbvdCandCostList[startBackLoopBvdIdx + bvdValidNum - 1] == MAX_UINT64)
+      {
+        bvdValidNum--;
+      }
+      ibcMbvdValidNum[bvpIdx] = bvdValidNum;
+    }
+  }
+}
+#endif
+
 void  InterPrediction::sortIbcMergeMbvdCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t * ibcMbvdLUT,uint32_t * ibcMbvdValidNum, int ibcMbvdIdx)
 {
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  if (pu.cu->slice->getSPS()->getUseIbcMbvdAdSearch())
+  {
+    sortIbcAdaptiveMergeMbvdCandidates(pu, mrgCtx, ibcMbvdLUT, ibcMbvdValidNum, ibcMbvdIdx);
+    return;
+  }
+#endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   const int numBaseIdx = std::min<int>(IBC_MBVD_BASE_NUM, mrgCtx.numValidMergeCand);
   const int tempNum = (const int) (numBaseIdx * IBC_MBVD_MAX_REFINE_NUM);
@@ -8656,7 +8896,11 @@ bool InterPrediction::xAMLIBCGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWi
 }
 
 #if JVET_AC0112_IBC_LIC
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight, bool doIbcLic, bool checkTmlBvValidaion)
+#else
 void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight, bool doIbcLic)
+#endif
 #else
 void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight)
 #endif
@@ -8729,6 +8973,10 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
 #endif
     miTop2.refIdx[0] = MAX_NUM_REF;
 
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+    if (checkTmlBvValidaion)
+    {
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     if (!PU::checkIsIBCCandidateValid(pu, miTop, filterIdx, true, true))
     {
@@ -8781,6 +9029,9 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
         numTemplate[0]++;
       }
     }
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+    }
+#endif
   }
   if (m_bAMLTemplateAvailabe[1])
   {
@@ -8817,6 +9068,10 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
     miLeft2.mv[0] = Mv(mvLeft2.hor <<horShift , mvLeft2.ver<< verShift);
 #endif
     miLeft2.refIdx[0] = MAX_NUM_REF;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+    if (checkTmlBvValidaion)
+    {
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     if (!PU::checkIsIBCCandidateValid(pu, miLeft, filterIdx, true, false))
     {
@@ -8869,6 +9124,9 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
         numTemplate[1]++;
       }
     }
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+    }
+#endif
   }
   if (numTemplate[0] + numTemplate[1] > 0)
   {

@@ -622,6 +622,9 @@ public:
 #if JVET_AA0061_IBC_MBVD
   MvField ibcMbvdBaseBv[IBC_MBVD_BASE_NUM][2];
 #if JVET_AE0169_BIPREDICTIVE_IBC
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  MvField ibcMbvdBaseBvFrac[IBC_MBVD_BASE_NUM][2];
+#endif
   bool setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int candIdxMaped = -1, int candIdx1 = -1, int candIdxMaped1 = -1);
 #else
   bool setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int candIdxMaped = -1);

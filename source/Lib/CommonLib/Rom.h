@@ -422,5 +422,10 @@ extern const int8_t g_ibcGpmFirstSetSplitDirToIdx[GEO_NUM_PARTITION_MODE];
 extern const int8_t g_ibcGpmFirstSetSplitDir[IBC_GPM_MAX_SPLIT_DIR_FIRST_SET_NUM];
 extern const int8_t g_ibcGpmSecondSetSplitDir[GEO_NUM_PARTITION_MODE];
 #endif
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+extern int g_ibcMbvdCandOffsets[IBC_MBVD_AD_STEP_NUM];
+extern int g_ibcMbvdStepCandIdxList[IBC_MBVD_AD_NUM >> IBC_MBVD_LOG2_START_STEP];
+extern int g_ibcMbvdNeiOffsets[IBC_MBVD_NEI_NUM * 2];
+#endif
 #endif  //__TCOMROM__
 

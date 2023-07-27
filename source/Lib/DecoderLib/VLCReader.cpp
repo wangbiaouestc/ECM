@@ -2683,6 +2683,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
       pcSPS->setUseIbcGpm( 0 );
       pcSPS->setUseIbcMbvd( 0 );
     }
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+    if (pcSPS->getUseIbcMbvd())
+    {
+      READ_FLAG(uiCode, "sps_ibc_mbvd_adaptive_search_flag");           pcSPS->setUseIbcMbvdAdSearch(uiCode);
+    }
+#endif
     READ_FLAG(uiCode, "sps_rribc_enabled_flag");                   pcSPS->setUseRRIbc(uiCode != 0);
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
     if (pcSPS->getTMnoninterToolsEnableFlag())

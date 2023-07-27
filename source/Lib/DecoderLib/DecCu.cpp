@@ -2701,11 +2701,16 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if JVET_AA0061_IBC_MBVD
             if (pu.ibcMbvdMergeFlag)
             {
-              int fPosIBCBaseIdx = pu.ibcMbvdMergeIdx / IBC_MBVD_MAX_REFINE_NUM;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+              const int mbvdsPerBase = pu.cu->slice->getSPS()->getUseIbcMbvdAdSearch() ? IBC_MBVD_SIZE_ENC : IBC_MBVD_MAX_REFINE_NUM;
+#else
+              const int mbvdsPerBase = IBC_MBVD_MAX_REFINE_NUM;
+#endif
+              int fPosIBCBaseIdx = pu.ibcMbvdMergeIdx / mbvdsPerBase;
 #if JVET_AE0169_BIPREDICTIVE_IBC
               if (pu.interDir == 3)
               {
-                fPosIBCBaseIdx = std::max(fPosIBCBaseIdx, (pu.ibcMergeIdx1 >= IBC_MRG_MAX_NUM_CANDS) ? (pu.ibcMergeIdx1-IBC_MRG_MAX_NUM_CANDS) / IBC_MBVD_MAX_REFINE_NUM : pu.ibcMergeIdx1);
+                fPosIBCBaseIdx = std::max(fPosIBCBaseIdx, (pu.ibcMergeIdx1 >= IBC_MRG_MAX_NUM_CANDS) ? (pu.ibcMergeIdx1-IBC_MRG_MAX_NUM_CANDS) / mbvdsPerBase : pu.ibcMergeIdx1);
               }
 #endif
 #if JVET_Y0058_IBC_LIST_MODIFY && JVET_W0090_ARMC_TM
@@ -2754,10 +2759,10 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
                 int      ibcMbvdIdx= pu.ibcMbvdMergeIdx;
 #if JVET_AE0169_BIPREDICTIVE_IBC
                 int ibcMbvdIdx1 = pu.interDir == 1 ? -1 : pu.ibcMergeIdx1;
-                int mask = 1<<(ibcMbvdIdx/IBC_MBVD_MAX_REFINE_NUM);
+                int mask = 1<<(ibcMbvdIdx/mbvdsPerBase);
                 if (ibcMbvdIdx1 >= IBC_MRG_MAX_NUM_CANDS)
                 {
-                  mask |= 1<<((ibcMbvdIdx1 - IBC_MRG_MAX_NUM_CANDS)/IBC_MBVD_MAX_REFINE_NUM);
+                  mask |= 1<<((ibcMbvdIdx1 - IBC_MRG_MAX_NUM_CANDS)/mbvdsPerBase);
                 }
                 m_pcInterPred->sortIbcMergeMbvdCandidates(pu, mrgCtx, ibcMbvdLUT, ibcMbvdValidNum, mask);
                 int ibcMbvdIdx1LUT = (ibcMbvdIdx1 < IBC_MRG_MAX_NUM_CANDS) ? -1 : ibcMbvdLUT[ibcMbvdIdx1-IBC_MRG_MAX_NUM_CANDS];

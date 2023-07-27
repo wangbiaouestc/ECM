@@ -6603,6 +6603,13 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
 #if JVET_AA0061_IBC_MBVD
 void PU::getIbcMbvdMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, int numValidBv)
 {
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  if (pu.cu->slice->getSPS()->getUseIbcMbvdAdSearch())
+  {
+    getIbcAdaptiveMbvdMergeCandidates(pu, mrgCtx, numValidBv);
+    return;
+  }
+#endif
   int refIdxList0;
   int k;
   int currBaseNum = 0;
@@ -6625,31 +6632,77 @@ void PU::getIbcMbvdMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, i
     }
   }
 }
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+void PU::getIbcAdaptiveMbvdMergeCandidates(const PredictionUnit& pu, MergeCtx& mrgCtx, int numValidBv)
+{
+  int currBaseNum = 0;
+
+  for (int k = 0; k < mrgCtx.numValidMergeCand; k++)
+  {
+    int refIdxList0 = mrgCtx.mvFieldNeighbours[(k << 1)].refIdx;
+    if (refIdxList0 >= 0)
+    {
+      mrgCtx.ibcMbvdBaseBv[currBaseNum][0] = mrgCtx.mvFieldNeighbours[(k << 1)];
+      mrgCtx.ibcMbvdBaseBv[currBaseNum][0].mv.roundToPrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+#if JVET_AE0169_BIPREDICTIVE_IBC // store original unrounded base for use as merge candidates
+      mrgCtx.ibcMbvdBaseBvFrac[currBaseNum][0] = mrgCtx.mvFieldNeighbours[(k << 1)];
+      mrgCtx.ibcMbvdBaseBvFrac[currBaseNum][1] = MvField(Mv(0, 0), -1);
+#endif
+      mrgCtx.ibcMbvdBaseBv[currBaseNum][1] = MvField(Mv(0, 0), -1);
+      bool findSimilarBaseBv = false;
+      for (int baseIdx = 0; baseIdx < currBaseNum; baseIdx++)
+      {
+        if (((mrgCtx.ibcMbvdBaseBv[baseIdx][0].mv.hor == mrgCtx.ibcMbvdBaseBv[currBaseNum][0].mv.hor)
+          && (std::abs(mrgCtx.ibcMbvdBaseBv[baseIdx][0].mv.ver - mrgCtx.ibcMbvdBaseBv[currBaseNum][0].mv.ver) < IBC_MBVD_BASE_DIFF_TH))
+          || ((mrgCtx.ibcMbvdBaseBv[baseIdx][0].mv.ver == mrgCtx.ibcMbvdBaseBv[currBaseNum][0].mv.ver)
+            && (std::abs(mrgCtx.ibcMbvdBaseBv[baseIdx][0].mv.hor - mrgCtx.ibcMbvdBaseBv[currBaseNum][0].mv.hor) < IBC_MBVD_BASE_DIFF_TH)))
+        {
+          findSimilarBaseBv = true;
+          break;
+        }
+      }
+      currBaseNum += (findSimilarBaseBv == false);
+    }
+    if (currBaseNum == numValidBv)
+    {
+      mrgCtx.numValidMergeCand = currBaseNum;
+      return;
+    }
+  }
+  mrgCtx.numValidMergeCand = currBaseNum;
+}
+#endif
+
 #if JVET_AE0169_BIPREDICTIVE_IBC
 int32_t PU::getIbcMbvdEstBits(const PredictionUnit &pu, int mmvdMergeCand, int mmvdMergeCand1)
 #else
 int32_t PU::getIbcMbvdEstBits(const PredictionUnit &pu,unsigned int mmvdMergeCand)
 #endif
 {
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  const int mbvdsPerBase = pu.cu->slice->getSPS()->getUseIbcMbvdAdSearch() ? IBC_MBVD_SIZE_ENC : IBC_MBVD_MAX_REFINE_NUM;
+#else
+  const int mbvdsPerBase = IBC_MBVD_MAX_REFINE_NUM;
+#endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   int numCandminus1 = std::min(int(pu.cs->sps->getMaxNumIBCMergeCand()), IBC_MBVD_BASE_NUM) - 1;
   bool bimbvd = mmvdMergeCand1 >= IBC_MRG_MAX_NUM_CANDS;
   if (bimbvd)
   {
     mmvdMergeCand1 -= IBC_MRG_MAX_NUM_CANDS;
-    int baseIdx0 = mmvdMergeCand / IBC_MBVD_MAX_REFINE_NUM;
-    int baseIdx1 = mmvdMergeCand1 / IBC_MBVD_MAX_REFINE_NUM;
+    int baseIdx0 = mmvdMergeCand / mbvdsPerBase;
+    int baseIdx1 = mmvdMergeCand1 / mbvdsPerBase;
     int baseBits = (numCandminus1 == 0 ? 0 : baseIdx1 + (baseIdx1 == numCandminus1 ? 1: 2));
     baseBits -= (baseIdx0 == numCandminus1) ? 1 : 0;
     int ricePar = 1;
-    unsigned int mvpIdx0 = mmvdMergeCand - baseIdx0 * IBC_MBVD_MAX_REFINE_NUM;
+    unsigned int mvpIdx0 = mmvdMergeCand - baseIdx0 * mbvdsPerBase;
     unsigned int mmvdUnaryBits0 = mvpIdx0 >> ricePar;
     const int ibcMbvdSizeEnc0 = IBC_MBVD_SIZE_ENC-((baseIdx0 == baseIdx1) ? 1 : 0);
     int numCandStepMinus1_0 = ((ibcMbvdSizeEnc0+((1<<ricePar)-1)) >> ricePar) - 1;
     unsigned int riceBits0 = ((mmvdUnaryBits0 == numCandStepMinus1_0) && (ibcMbvdSizeEnc0&1)) ? 0 : 1;
     mmvdUnaryBits0 += (mmvdUnaryBits0 == numCandStepMinus1_0) ? 0 : 1;
 
-    unsigned int mvpIdx1 = mmvdMergeCand1- baseIdx1 * IBC_MBVD_MAX_REFINE_NUM;
+    unsigned int mvpIdx1 = mmvdMergeCand1- baseIdx1 * mbvdsPerBase;
     if (baseIdx0 == baseIdx1)
     {
       mvpIdx1 -= (mvpIdx0+1);
@@ -6665,7 +6718,7 @@ int32_t PU::getIbcMbvdEstBits(const PredictionUnit &pu,unsigned int mmvdMergeCan
   else
   {
 #endif
-  int baseIdx = mmvdMergeCand / IBC_MBVD_MAX_REFINE_NUM;
+  int baseIdx = mmvdMergeCand / mbvdsPerBase;
 #if JVET_AE0169_BIPREDICTIVE_IBC
   int baseBits = (numCandminus1 == 0 ? 0 : baseIdx + (baseIdx == numCandminus1 ? 0: 1));
 #else
@@ -6673,7 +6726,7 @@ int32_t PU::getIbcMbvdEstBits(const PredictionUnit &pu,unsigned int mmvdMergeCan
 #endif
   int ricePar = 1;
   unsigned int mvpIdx = mmvdMergeCand;
-  mvpIdx -= baseIdx * IBC_MBVD_MAX_REFINE_NUM;
+  mvpIdx -= baseIdx * mbvdsPerBase;
   mvpIdx >>= ricePar;
   int numCandStepMinus1 = (IBC_MBVD_SIZE_ENC >> ricePar) - 1;
   int mmvdUnaryBits = mvpIdx + (mvpIdx == numCandStepMinus1 ? 0 : 1);

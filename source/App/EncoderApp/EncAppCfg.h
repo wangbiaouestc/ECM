@@ -532,6 +532,9 @@ protected:
   unsigned  m_IBCFastMethod;
 #if JVET_AA0061_IBC_MBVD
   bool      m_ibcMbvd;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  bool      m_ibcMbvdAdSearch;
+#endif
 #endif
 #if JVET_AC0112_IBC_CIIP
   bool     m_ibcCiip;
