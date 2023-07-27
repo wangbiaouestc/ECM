@@ -1154,7 +1154,11 @@ static const int INTER_CCCM_MAX_REF_SAMPLES = 256;
 static const int NUM_DBV_POSITION = 5;
 static const int DBV_TEMPLATE_SIZE = 1;
 #endif
-
+#if JVET_AE0159_FIBC
+static const int FIBC_TEMPLATE_SIZE = 4; 
+static const int FIBC_PADDING       = 1;
+static const int FIBC_PARAMS        = 7;
+#endif
 #if JVET_Y0152_TT_ENC_SPEEDUP
 static constexpr int FAST_METHOD_TT_ENC_SPEEDUP =              0x0001;  ///< Embedding flag, which, if false, de-activates all the following ABT_ENC_SPEEDUP_* modes
 static constexpr int FAST_METHOD_HOR_XOR_VER =                 0x0002;

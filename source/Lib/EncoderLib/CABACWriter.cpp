@@ -4206,7 +4206,11 @@ void CABACWriter::ibcGpmAdaptBlendIdx(const int flag)
 #if JVET_AC0112_IBC_LIC
 void CABACWriter::cuIbcLicFlag(const CodingUnit& cu)
 {
+#if JVET_AE0159_FIBC
+  if (!(cu.cs->sps->getUseIbcLic() || cu.cs->sps->getUseIbcFilter() ) || !CU::isIBC(cu) || cu.firstPU->mergeFlag)
+#else
   if (!cu.cs->sps->getUseIbcLic() || !CU::isIBC(cu) || cu.firstPU->mergeFlag)
+#endif
   {
     return;
   }
@@ -4216,11 +4220,35 @@ void CABACWriter::cuIbcLicFlag(const CodingUnit& cu)
     return;
   }
 #endif
+#if JVET_AE0159_FIBC
+  if (cu.lwidth() * cu.lheight() < 32 )
+#else
   if (cu.lwidth() * cu.lheight() < 32 || cu.lwidth() * cu.lheight() > 256)
+#endif
   {
     return;
   }
+#if JVET_AE0159_FIBC
+  if (cu.ibcFilterFlag)
+  {
+    CHECK(!cu.ibcLicFlag, "LIC flag has to be 1 when FIBC is 1");
+  }
+  if (cu.lx() < FIBC_TEMPLATE_SIZE && cu.ly() < FIBC_TEMPLATE_SIZE)
+  {
+    CHECK(cu.ibcFilterFlag, "FIBC has to be 0 when not enough template");
+  }
+  if ((cu.lx() >= FIBC_TEMPLATE_SIZE || cu.ly() >= FIBC_TEMPLATE_SIZE) && (cu.cs->slice->getSliceType() == I_SLICE) && cu.cs->sps->getUseIbcFilter() )
+  {
+    unsigned ctxIdx = 1 + DeriveCtx::ctxIbcFilterFlag(cu);
+    m_BinEncoder.encodeBin(cu.ibcFilterFlag ? 1 : 0, Ctx::IbcLicFlag(ctxIdx));
+  }
+  if (!cu.ibcFilterFlag && (cu.lwidth() * cu.lheight() <= 256))
+  {
+    m_BinEncoder.encodeBin(cu.ibcLicFlag ? 1 : 0, Ctx::IbcLicFlag(0));
+  }
+#else
   m_BinEncoder.encodeBin(cu.ibcLicFlag ? 1 : 0, Ctx::IbcLicFlag());
+#endif
 }
 #endif
 

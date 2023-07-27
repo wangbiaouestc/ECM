@@ -1229,6 +1229,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AC0112_IBC_LIC
   ("IBCLIC",                                          m_ibcLic,                                          true, "IBC LIC mode (0:off, 1:on)  [default: on]" )
 #endif
+#if JVET_AE0159_FIBC
+  ("IBCFilter",                                       m_ibcFilter,                                      false, "Filtered IBC mode (0:off, 1:on)  [default: off]" )
+#endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   ("IBCBiPred",                                       m_ibcBiPred,                                       true, "IBC BiPred mode in I-Slice (0:off, 1:on)  [default: on]" )
 #endif
@@ -5463,6 +5466,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AC0112_IBC_LIC
   msg( VERBOSE, "IBCLIC:%d ", m_ibcLic );
+#endif
+#if JVET_AE0159_FIBC
+  msg( VERBOSE, "IBCFilter:%d ", m_ibcFilter );
 #endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   msg( VERBOSE, "IBCBiPred:%d ", m_ibcBiPred );

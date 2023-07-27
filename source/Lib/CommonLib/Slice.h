@@ -1554,6 +1554,9 @@ private:
 #if JVET_AC0112_IBC_LIC
   bool              m_ibcLic;
 #endif
+#if JVET_AE0159_FIBC
+  bool              m_ibcFilter;
+#endif
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   bool              m_ibcNonAdjCand;
 #endif
@@ -2155,6 +2158,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AC0112_IBC_LIC
   void                    setUseIbcLic(bool b)                                                            { m_ibcLic = b; }
   bool                    getUseIbcLic() const                                                            { return m_ibcLic; }
+#endif
+#if JVET_AE0159_FIBC
+  void                    setUseIbcFilter(bool b)                                                         { m_ibcFilter = b; }
+  bool                    getUseIbcFilter() const                                                         { return m_ibcFilter; }
 #endif
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   void                    setUseIbcNonAdjCand(bool b)                                                     { m_ibcNonAdjCand = b; }

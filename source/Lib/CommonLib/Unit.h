@@ -422,6 +422,10 @@ struct CodingUnit : public UnitArea
 #if JVET_AC0112_IBC_LIC
   bool           ibcLicFlag;
 #endif
+#if JVET_AE0159_FIBC
+  int64_t ibcFilterParams[FIBC_PARAMS];
+  bool           ibcFilterFlag;
+#endif
 #if JVET_AA0070_RRIBC
   int            rribcFlipType;
 #endif

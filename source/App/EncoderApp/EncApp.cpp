@@ -964,6 +964,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AC0112_IBC_LIC
   m_cEncLib.setIbcLic                                            ( m_ibcLic );
 #endif
+#if JVET_AE0159_FIBC
+  m_cEncLib.setIbcFilter                                         ( m_ibcFilter );
+#endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   m_cEncLib.setIbcBiPred                                         ( m_ibcBiPred );
 #endif

@@ -382,12 +382,16 @@ protected:
   Pel m_a[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX];
   Pel m_cb[CCCM_REF_SAMPLES_MAX];
   Pel m_cr[CCCM_REF_SAMPLES_MAX];
-#if JVET_AE0059_INTER_CCCM
+#if JVET_AE0059_INTER_CCCM || JVET_AE0159_FIBC
   public:
     Pel (*getCccmBufferA())[CCCM_REF_SAMPLES_MAX]  { return m_a; };
     Pel* getCccmBufferCb() { return m_cb; };
     Pel* getCccmBufferCr() { return m_cr; };
     Pel* getCccmBufferSamples() { return m_samples; };
+#if JVET_AE0159_FIBC
+    CccmCovariance* getCccmBufferSolver() { return &m_cccmSolver; };
+    Pel* getCccmBufferLuma() { return *m_cccmLumaBuf; };   
+#endif
   protected:
 #endif
 #endif

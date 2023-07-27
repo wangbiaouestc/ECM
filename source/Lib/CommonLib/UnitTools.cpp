@@ -4129,6 +4129,13 @@ bool PU::addMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const int
       mrgCtx.ibcLicFlags       [cnt] = miNeighbor.useIbcLic;
 #endif
 #endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+      mrgCtx.ibcFilterFlags    [cnt] = mrgCtx.rribcFlipTypes[cnt] ? false : miNeighbor.useIbcFilter;
+#else
+      mrgCtx.ibcFilterFlags    [cnt] = miNeighbor.useIbcFilter;
+#endif
+#endif
 
       mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miNeighbor.mv[0], miNeighbor.refIdx[0]);
       if (slice.isInterB())
@@ -4441,6 +4448,13 @@ bool PU::addIBCMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const 
 #endif
 #endif
 #endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+      mrgCtx.ibcFilterFlags[cnt] = mrgCtx.rribcFlipTypes[cnt] == 0 ? miNeighbor.useIbcFilter : false;
+#else
+      mrgCtx.ibcFilterFlags[cnt] = miNeighbor.useIbcFilter;
+#endif
+#endif
 #if !JVET_Z0084_IBC_TM
       if (slice.isInterB())
       {
@@ -4601,6 +4615,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #if JVET_AC0112_IBC_LIC
     mrgCtx.ibcLicFlags[ui] =false;
 #endif
+#if JVET_AE0159_FIBC
+    mrgCtx.ibcFilterFlags[ui] = false;
+#endif
 #if JVET_AA0070_RRIBC
     mrgCtx.rribcFlipTypes[ui] = 0;
 #endif
@@ -4689,6 +4706,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
     mrgCtx.ibcLicFlags[cnt] = miLeft.isIBCmot? miLeft.useIbcLic : false;
 #endif
 #endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+    mrgCtx.ibcFilterFlags[cnt] = miLeft.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miLeft.useIbcFilter : false;
+#else
+    mrgCtx.ibcFilterFlags[cnt] = miLeft.isIBCmot? miLeft.useIbcFilter : false;
+#endif
+#endif
     if (mrgCandIdx == cnt)
     {
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
@@ -4747,6 +4771,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
       mrgCtx.ibcLicFlags[cnt] = miLeftL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miLeftL1.useIbcLic : false;
 #else
       mrgCtx.ibcLicFlags[cnt] = miLeftL1.isIBCmot? miLeftL1.useIbcLic : false;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+      mrgCtx.ibcFilterFlags[cnt] = miLeftL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miLeftL1.useIbcFilter : false;
+#else
+      mrgCtx.ibcFilterFlags[cnt] = miLeftL1.isIBCmot? miLeftL1.useIbcFilter : false;
 #endif
 #endif
       if (mrgCandIdx == cnt)
@@ -4830,6 +4861,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
       mrgCtx.ibcLicFlags[cnt] = miAbove.isIBCmot ? miAbove.useIbcLic : false;
 #endif
 #endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+      mrgCtx.ibcFilterFlags[cnt] = miAbove.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miAbove.useIbcFilter : false;
+#else
+      mrgCtx.ibcFilterFlags[cnt] = miAbove.isIBCmot ? miAbove.useIbcFilter : false;
+#endif
+#endif
 
 #if JVET_Z0084_IBC_TM
       if( !mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh) )
@@ -4895,6 +4933,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
         mrgCtx.ibcLicFlags[cnt] = miAboveL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miAboveL1.useIbcLic : false;
 #else
         mrgCtx.ibcLicFlags[cnt] = miAboveL1.isIBCmot ? miAboveL1.useIbcLic : false;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+        mrgCtx.ibcFilterFlags[cnt] = miAboveL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miAboveL1.useIbcFilter : false;
+#else
+        mrgCtx.ibcFilterFlags[cnt] = miAboveL1.isIBCmot ? miAboveL1.useIbcFilter : false;
 #endif
 #endif
 
@@ -4983,6 +5028,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
         mrgCtx.ibcLicFlags[cnt] = miAboveRight.isIBCmot? miAboveRight.useIbcLic : false;
 #endif
 #endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+        mrgCtx.ibcFilterFlags[cnt] = miAboveRight.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miAboveRight.useIbcFilter : false;
+#else
+        mrgCtx.ibcFilterFlags[cnt] = miAboveRight.isIBCmot? miAboveRight.useIbcFilter : false;
+#endif
+#endif
 
 #if JVET_Z0084_IBC_TM
         if( !mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh) )
@@ -5044,6 +5096,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
         mrgCtx.ibcLicFlags[cnt] = miAboveRightL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miAboveRightL1.useIbcLic : false;
 #else
         mrgCtx.ibcLicFlags[cnt] = miAboveRightL1.isIBCmot? miAboveRightL1.useIbcLic : false;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+        mrgCtx.ibcFilterFlags[cnt] = miAboveRightL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miAboveRightL1.useIbcFilter : false;
+#else
+        mrgCtx.ibcFilterFlags[cnt] = miAboveRightL1.isIBCmot? miAboveRightL1.useIbcFilter : false;
 #endif
 #endif
 
@@ -5128,6 +5187,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
         mrgCtx.ibcLicFlags[cnt] = miBelowLeft.isIBCmot ? miBelowLeft.useIbcLic : false;
 #endif
 #endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+        mrgCtx.ibcFilterFlags[cnt] = miBelowLeft.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miBelowLeft.useIbcFilter : false;
+#else
+        mrgCtx.ibcFilterFlags[cnt] = miBelowLeft.isIBCmot ? miBelowLeft.useIbcFilter : false;
+#endif
+#endif
 
 #if JVET_Z0084_IBC_TM
         if( !mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh) )
@@ -5188,6 +5254,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
         mrgCtx.ibcLicFlags[cnt] = miBelowLeftL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miBelowLeftL1.useIbcLic : false;
 #else
         mrgCtx.ibcLicFlags[cnt] = miBelowLeftL1.isIBCmot ? miBelowLeftL1.useIbcLic : false;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+        mrgCtx.ibcFilterFlags[cnt] = miBelowLeftL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miBelowLeftL1.useIbcFilter : false;
+#else
+        mrgCtx.ibcFilterFlags[cnt] = miBelowLeftL1.isIBCmot ? miBelowLeftL1.useIbcFilter : false;
 #endif
 #endif
 
@@ -5284,6 +5357,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
           mrgCtx.ibcLicFlags[cnt] = miAboveLeft.isIBCmot ? miAboveLeft.useIbcLic : false;
 #endif
 #endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+          mrgCtx.ibcFilterFlags[cnt] = miAboveLeft.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miAboveLeft.useIbcFilter : false;
+#else
+          mrgCtx.ibcFilterFlags[cnt] = miAboveLeft.isIBCmot ? miAboveLeft.useIbcFilter : false;
+#endif
+#endif
 
 #if JVET_Z0084_IBC_TM
           if( !mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh) )
@@ -5345,6 +5425,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
           mrgCtx.ibcLicFlags[cnt] = miAboveLeftL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miAboveLeftL1.useIbcLic : false;
 #else
           mrgCtx.ibcLicFlags[cnt] = miAboveLeftL1.isIBCmot ? miAboveLeftL1.useIbcLic : false;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+          mrgCtx.ibcFilterFlags[cnt] = miAboveLeftL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miAboveLeftL1.useIbcFilter : false;
+#else
+          mrgCtx.ibcFilterFlags[cnt] = miAboveLeftL1.isIBCmot ? miAboveLeftL1.useIbcFilter : false;
 #endif
 #endif
 
@@ -5504,6 +5591,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
             mrgCtx.ibcLicFlags[cnt]    = miNonAdjacent.isIBCmot ? miNonAdjacent.useIbcLic : false;
 #endif
 #endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+            mrgCtx.ibcFilterFlags[cnt] = miNonAdjacent.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miNonAdjacent.useIbcFilter : false;
+#else
+            mrgCtx.ibcFilterFlags[cnt] = miNonAdjacent.isIBCmot ? miNonAdjacent.useIbcFilter : false;
+#endif
+#endif
 #if JVET_Z0084_IBC_TM
             if (!mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh))
 #endif
@@ -5568,6 +5662,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
                 miNonAdjacentL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miNonAdjacentL1.useIbcLic : false;
 #else
               mrgCtx.ibcLicFlags[cnt] = miNonAdjacentL1.isIBCmot ? miNonAdjacentL1.useIbcLic : false;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+              mrgCtx.ibcFilterFlags[cnt] = miNonAdjacentL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miNonAdjacentL1.useIbcFilter : false;
+#else
+              mrgCtx.ibcFilterFlags[cnt] = miNonAdjacentL1.isIBCmot ? miNonAdjacentL1.useIbcFilter : false;
 #endif
 #endif
 
@@ -5699,6 +5800,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
             mrgCtx.ibcLicFlags[cnt]    = miNonAdjacent.isIBCmot ? miNonAdjacent.useIbcLic : false;
 #endif
 #endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+            mrgCtx.ibcFilterFlags[cnt] = miNonAdjacent.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miNonAdjacent.useIbcFilter : false;
+#else
+            mrgCtx.ibcFilterFlags[cnt] = miNonAdjacent.isIBCmot ? miNonAdjacent.useIbcFilter : false;
+#endif
+#endif
 #if JVET_Z0084_IBC_TM
             if (!mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh))
 #endif
@@ -5766,7 +5874,13 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
               mrgCtx.ibcLicFlags[cnt] = miNonAdjacentL1.isIBCmot ? miNonAdjacentL1.useIbcLic : false;
 #endif
 #endif
-
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+              mrgCtx.ibcFilterFlags[cnt] = miNonAdjacentL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miNonAdjacentL1.useIbcFilter : false;
+#else
+              mrgCtx.ibcFilterFlags[cnt] = miNonAdjacentL1.isIBCmot ? miNonAdjacentL1.useIbcFilter : false;
+#endif
+#endif
 #if JVET_Z0084_IBC_TM
               if (!mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh))
 #endif
@@ -5999,6 +6113,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #if JVET_AC0112_IBC_LIC
     mrgCtx.ibcLicFlags[cnt] = false;
 #endif
+#if JVET_AE0159_FIBC
+    mrgCtx.ibcFilterFlags[cnt] = false;
+#endif
 #if JVET_AA0070_RRIBC
     mrgCtx.rribcFlipTypes[cnt] = 0;
 #endif
@@ -6028,6 +6145,9 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
     mrgCtx.mvFieldNeighbours[cnt * 2].setMvField(Mv(0, 0), MAX_NUM_REF);
 #if JVET_AC0112_IBC_LIC
     mrgCtx.ibcLicFlags[cnt] = false;
+#endif
+#if JVET_AE0159_FIBC
+    mrgCtx.ibcFilterFlags[cnt] = false;
 #endif
 #if JVET_AA0070_RRIBC
     mrgCtx.rribcFlipTypes[cnt] = 0;
@@ -6191,6 +6311,16 @@ uint32_t PU::checkValidBv(const PredictionUnit& pu, ComponentID compID, int comp
     }
     return PU::checkValidBv(pu, compID, compWidth, compHeight, mv, true);
   }
+}
+#endif
+
+#if JVET_AE0159_FIBC
+bool PU::checkIsIBCFilterCandidateValid(const PredictionUnit& pu, const MotionInfo miNeighbor, int filterIdx, bool isRefTemplate, bool isRefAbove)
+{
+  int roiWidth  = (isRefTemplate && !isRefAbove) ? FIBC_TEMPLATE_SIZE : pu.lwidth();
+  int roiHeight = (isRefTemplate &&  isRefAbove) ? FIBC_TEMPLATE_SIZE : pu.lheight();
+  uint32_t validType = checkValidBv(pu, COMPONENT_Y, roiWidth, roiHeight, miNeighbor.mv[REF_PIC_LIST_0], true, filterIdx);
+  return validType != IBC_BV_INVALID;
 }
 #endif
 
@@ -7148,6 +7278,9 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
 #endif
 #if JVET_AC0112_IBC_LIC
     mrgCtx.ibcLicFlags[ui] = false;
+#endif
+#if JVET_AE0159_FIBC
+    mrgCtx.ibcFilterFlags[ui] = false;
 #endif
 #if JVET_AA0070_RRIBC
     mrgCtx.rribcFlipTypes[ui] = 0;
@@ -19379,6 +19512,9 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
 #endif
 #if JVET_AC0112_IBC_LIC
     mi.useIbcLic = mi.isIBCmot ? pu.cu->ibcLicFlag : 0;
+#endif
+#if JVET_AE0159_FIBC
+    mi.useIbcFilter = mi.isIBCmot ? pu.cu->ibcFilterFlag : false;
 #endif
 #if JVET_AA0070_RRIBC
     mi.rribcFlipType = mi.isIBCmot ? pu.cu->rribcFlipType : 0;

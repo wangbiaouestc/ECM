@@ -3643,6 +3643,9 @@ SPS::SPS()
 #if JVET_AC0112_IBC_LIC
   , m_ibcLic                  ( false )
 #endif
+#if JVET_AE0159_FIBC
+  , m_ibcFilter               ( false )
+#endif
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   , m_ibcNonAdjCand           ( false )
 #endif

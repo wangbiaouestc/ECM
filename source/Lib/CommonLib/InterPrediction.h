@@ -319,6 +319,15 @@ protected:
   Pel m_acYuvRefAMLBiPredTemplateIdMotionCache[MAX_NUM_REFIDX][NUM_REF_PIC_LIST_01][MAX_NUM_CANDS][2][MAX_CU_SIZE];
 #endif
 
+#if JVET_AE0159_FIBC
+  IntraPrediction*  m_pcIntraPred;
+  Area m_ibcRefArea;
+  Pel *m_ibcRefBuf;
+  Pel *m_y;
+  Pel *m_samples;
+  Pel (*m_a)[CCCM_REF_SAMPLES_MAX];
+#endif
+
   void xIntraBlockCopy          (PredictionUnit &pu, PelUnitBuf &predBuf, const ComponentID compID);
   int             rightShiftMSB(int numer, int    denom);
 #if MULTI_PASS_DMVR
@@ -1043,6 +1052,12 @@ public:
 #endif
 #if INTER_LIC || JVET_AC0112_IBC_LIC
   void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset);
+#endif
+#if JVET_AE0159_FIBC
+  void xGetIbcFilterRefBuf(PelBuf& piPred, CodingUnit* pcCU, const ComponentID compID, const Mv& mv, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
+  void xCalIbcFilterParam(PelBuf& piPred, CodingUnit* pcCU, const ComponentID compID, const Mv& mv, unsigned int uiBlkWidth, unsigned int uiBlkHeight ); 
+  void xGenerateIbcFilterPred(PelBuf& piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight, const ComponentID compID, CodingUnit* pcCU);
+  void setIbcFilterBuffers(Pel (*m_a_intra)[CCCM_REF_SAMPLES_MAX], Pel *m_cb_intra,Pel *m_samples_intra, IntraPrediction* pcIntra);
 #endif
 #if INTER_LIC
 #if JVET_AA0146_WRAP_AROUND_FIX

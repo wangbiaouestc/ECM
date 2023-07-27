@@ -564,6 +564,9 @@ public:
 #if JVET_AC0112_IBC_LIC
   bool          ibcLicFlags[NUM_MERGE_CANDS];
 #endif
+#if JVET_AE0159_FIBC
+  bool          ibcFilterFlags[NUM_MERGE_CANDS];
+#endif
 #if JVET_AA0070_RRIBC
   int           rribcFlipTypes[NUM_MERGE_CANDS];
 #endif
@@ -583,6 +586,9 @@ public:
 #endif
 #if JVET_AC0112_IBC_LIC
   bool          ibcLicFlags       [ MRG_MAX_NUM_CANDS      ];
+#endif
+#if JVET_AE0159_FIBC
+  bool          ibcFilterFlags    [ MRG_MAX_NUM_CANDS      ];
 #endif
 #if JVET_AA0070_RRIBC
   int rribcFlipTypes[MRG_MAX_NUM_CANDS];
@@ -770,7 +776,9 @@ int ctxSmMvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrec
 #if JVET_AC0104_IBC_BVD_PREDICTION
 int CtxSmBvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrect, const int isHor, const int significance);
 #endif
-
+#if JVET_AE0159_FIBC
+unsigned ctxIbcFilterFlag(const CodingUnit& cu);
+#endif
 }
 
 #endif // __CONTEXTMODELLING__

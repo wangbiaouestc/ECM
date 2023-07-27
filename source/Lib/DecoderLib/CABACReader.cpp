@@ -4707,6 +4707,46 @@ void CABACReader::ibcGpmAdaptBlendIdx(PredictionUnit& pu)
 #if JVET_AC0112_IBC_LIC
 void CABACReader::cuIbcLicFlag( CodingUnit& cu )
 {
+#if JVET_AE0159_FIBC
+  if (!(cu.cs->sps->getUseIbcLic() || cu.cs->sps->getUseIbcFilter()) || !CU::isIBC(cu) || cu.firstPU->mergeFlag)
+  {
+    cu.ibcLicFlag = false;
+    return;
+  }
+#if JVET_AA0070_RRIBC
+  if (cu.rribcFlipType > 0)
+  {
+    cu.ibcLicFlag = false;
+    return;
+  }
+#endif
+  if (cu.lwidth() * cu.lheight() < 32)
+  {
+    cu.ibcLicFlag = false;
+    return;
+  }
+  if ((cu.lx() >= FIBC_TEMPLATE_SIZE || cu.ly() >= FIBC_TEMPLATE_SIZE) && (cu.cs->slice->getSliceType() == I_SLICE) && cu.cs->sps->getUseIbcFilter() )
+  {
+    unsigned ctxIdx = 1 + DeriveCtx::ctxIbcFilterFlag(cu);
+    cu.ibcFilterFlag = m_BinDecoder.decodeBin(Ctx::IbcLicFlag(ctxIdx));
+  }
+  else
+  {
+    cu.ibcFilterFlag = false;
+  }
+  if (!cu.ibcFilterFlag && (cu.lwidth() * cu.lheight() <= 256))
+  {
+    cu.ibcLicFlag = m_BinDecoder.decodeBin(Ctx::IbcLicFlag(0));
+  }
+  else if (!cu.ibcFilterFlag) // (cu.lwidth() * cu.lheight() > 256)
+  {
+    cu.ibcLicFlag = false;
+  }
+  else 
+  {
+    cu.ibcLicFlag = true;
+  }
+#else
   if (!cu.cs->sps->getUseIbcLic() || !CU::isIBC(cu) || cu.firstPU->mergeFlag)
   {
     cu.ibcLicFlag = false;
@@ -4725,6 +4765,7 @@ void CABACReader::cuIbcLicFlag( CodingUnit& cu )
     return;
   }
   cu.ibcLicFlag = m_BinDecoder.decodeBin( Ctx::IbcLicFlag() );
+#endif
 }
 #endif
 

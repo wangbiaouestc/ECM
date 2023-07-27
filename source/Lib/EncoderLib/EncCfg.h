@@ -553,6 +553,9 @@ protected:
 #if JVET_AC0112_IBC_LIC
   bool      m_ibcLic;
 #endif
+#if JVET_AE0159_FIBC
+  bool      m_ibcFilter;
+#endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   bool      m_ibcBiPred;
 #endif
@@ -1487,6 +1490,10 @@ public:
 #if JVET_AC0112_IBC_LIC
   void      setIbcLic                       ( bool b )       { m_ibcLic = b; }
   bool      getIbcLic                       ()         const { return m_ibcLic; }
+#endif
+#if JVET_AE0159_FIBC
+  void      setIbcFilter                       ( bool b )       { m_ibcFilter = b; }
+  bool      getIbcFilter                       ()         const { return m_ibcFilter; }
 #endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   void      setIbcBiPred                    ( bool b )       { m_ibcBiPred = b; }

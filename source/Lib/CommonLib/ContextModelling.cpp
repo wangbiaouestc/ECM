@@ -620,6 +620,9 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 #if JVET_AC0112_IBC_LIC
     pu.cu->ibcLicFlag = ibcLicFlags[candIdx];
 #endif
+#if JVET_AE0159_FIBC
+    pu.cu->ibcFilterFlag = ibcFilterFlags[candIdx];
+#endif
 #if JVET_AA0070_RRIBC
     pu.cu->rribcFlipType = rribcFlipTypes[candIdx];
   }
@@ -684,6 +687,9 @@ void MergeCtx::setIbcL1Info( PredictionUnit& pu, int candIdx )
   pu.refIdx[REF_PIC_LIST_1] = MAX_NUM_REF;
   pu.cu->ibcLicFlag = 0;
   pu.cu->rribcFlipType = 0;
+#if JVET_AE0159_FIBC
+  pu.cu->ibcFilterFlag = false;
+#endif
 }
 #endif
 
@@ -830,6 +836,9 @@ void MergeCtx::initMrgCand(int cnt)
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlags[cnt] = false;
+#endif
+#if JVET_AE0159_FIBC
+  ibcFilterFlags[cnt] = false;
 #endif
 #if JVET_AA0070_RRIBC
   rribcFlipTypes[cnt] = 0;
@@ -1774,12 +1783,18 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
 #if JVET_AC0112_IBC_LIC
   pu.cu->ibcLicFlag = (pu.interDir == 3) ? false : ibcLicFlags[fPosBaseIdx];
 #endif
+#if JVET_AE0159_FIBC
+  pu.cu->ibcFilterFlag = (pu.interDir == 3) ? false : ibcFilterFlags[fPosBaseIdx];
+#endif
 #if JVET_AA0070_RRIBC
   pu.cu->rribcFlipType = (pu.interDir == 3) ? 0 : rribcFlipTypes[fPosBaseIdx];
 #endif
 #else
 #if JVET_AC0112_IBC_LIC
   pu.cu->ibcLicFlag = ibcLicFlags[fPosBaseIdx];
+#endif
+#if JVET_AE0159_FIBC
+  pu.cu->ibcFilterFlag = ibcFilterFlags[fPosBaseIdx];
 #endif
 #if JVET_AA0070_RRIBC
   pu.cu->rribcFlipType = rribcFlipTypes[fPosBaseIdx];
@@ -1855,3 +1870,18 @@ unsigned DeriveCtx::CtxPltCopyFlag( const unsigned prevRunType, const unsigned d
     return ucCtxLut[RUN_IDX_THRE];
   }
 }
+
+#if JVET_AE0159_FIBC 
+unsigned DeriveCtx::ctxIbcFilterFlag(const CodingUnit& cu)
+{
+  const CodingStructure *cs = cu.cs;
+  unsigned ctxId = 0;
+  const Position pos = cu.chType == CHANNEL_TYPE_CHROMA ? cu.chromaPos() : cu.lumaPos();
+  const CodingUnit *cuLeft = cs->getCURestricted(pos.offset(-1, 0), cu, cu.chType);
+  ctxId += (cuLeft && !cuLeft->firstPU->mergeFlag && (cuLeft->ibcLicFlag || cuLeft->ibcFilterFlag)) ? 1 : 0;
+
+  const CodingUnit *cuAbove = cs->getCURestricted(pos.offset(0, -1), cu, cu.chType);
+  ctxId += (cuAbove && !cuAbove->firstPU->mergeFlag && (cuAbove->ibcLicFlag || cuAbove->ibcFilterFlag)) ? 1 : 0;
+  return ctxId;
+}
+#endif
