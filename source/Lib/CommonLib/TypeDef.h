@@ -65,6 +65,8 @@
 #define ALF_SAO_TRUE_ORG                                  1 // using true original samples for SAO and ALF optimization
 #define REMOVE_PCM                                        1 // Remove PCM related code for memory reduction and speedup
 #define JVET_Y0152_TT_ENC_SPEEDUP                         1 // TT encoding speedup
+#define JVET_AE0057_MTT_ET                                1 // JVET-AE0057: MTT early termination of 64x64 luma CU based on no-split RD cost 
+
 
 // Software optimization
 #define JVET_X0144_MAX_MTT_DEPTH_TID                      1 // JVET-X0144: max MTT hierarchy depth set by temporal ID

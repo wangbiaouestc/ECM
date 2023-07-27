@@ -605,6 +605,9 @@ protected:
   int       m_fastLocalDualTreeMode;
 #endif
   uint32_t  m_log2MaxTbSize;
+#if JVET_AE0057_MTT_ET
+  bool      m_useMttSkip;
+#endif
 
   //====== Loop/Deblock Filter ========
   bool      m_bLoopFilterDisable;
@@ -1835,6 +1838,10 @@ public:
   int      getFastLocalDualTreeMode         () const         { return m_fastLocalDualTreeMode; }
 #endif
   void      setLog2MaxTbSize                ( uint32_t  u )   { m_log2MaxTbSize = u; }
+#if JVET_AE0057_MTT_ET
+  void      setUseMttSkip                   (bool i)         { m_useMttSkip = i; }
+  bool      getUseMttSkip                   () const         { return m_useMttSkip; }
+#endif
 
   //====== Loop/Deblock Filter ========
 #if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR
