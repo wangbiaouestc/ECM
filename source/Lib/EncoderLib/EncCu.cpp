@@ -8315,7 +8315,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
             PU::spanPuMv2DmvrBuffer(pu, m_mvBufBDMVR4GPM[0], m_mvBufBDMVR4GPM[1]);
           }
 #endif
-          m_pcInterSearch->motionCompensation(pu, geoTmBuffer[mergeCand]);
+          m_pcInterSearch->motionCompensation(pu, geoTmBuffer[mergeCand], REF_PIC_LIST_X, true, false);
 
 #if JVET_AE0046_BI_GPM
           if (pu.bdmvrRefine)
