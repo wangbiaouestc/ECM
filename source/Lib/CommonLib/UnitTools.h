@@ -319,6 +319,9 @@ namespace PU
 #endif
 #if JVET_AA0061_IBC_MBVD
   void getIbcMbvdMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, int numValidBv);
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  void getIbcAdaptiveMbvdMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, int numValidBv);
+#endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   int32_t getIbcMbvdEstBits      (const PredictionUnit &pu, int mmvdMergeCand, int mmvdMergeCand1 = -1);
 #else

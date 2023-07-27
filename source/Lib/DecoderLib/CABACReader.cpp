@@ -4268,6 +4268,7 @@ void CABACReader::ibcMbvdData(PredictionUnit& pu)
   if (pu.interDir == 3)
   {
     biMbvdMode = m_BinDecoder.decodeBin(Ctx::IbcMbvdFlag(1)) + 1;
+    DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_flag() bi_mbvd_mode=%d\n", biMbvdMode);
   }
 #endif
 
@@ -4294,6 +4295,12 @@ void CABACReader::ibcMbvdData(PredictionUnit& pu)
     }
   }
   DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_merge_idx() base_idx=%d\n", var0);
+
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  const int mbvdsPerBase = pu.cu->slice->getSPS()->getUseIbcMbvdAdSearch() ? IBC_MBVD_SIZE_ENC : IBC_MBVD_MAX_REFINE_NUM;
+#else
+  const int mbvdsPerBase = IBC_MBVD_MAX_REFINE_NUM;
+#endif
 
 #if JVET_AE0169_BIPREDICTIVE_IBC
   int ibcMbvdSizeEnc = IBC_MBVD_SIZE_ENC;
@@ -4347,7 +4354,7 @@ void CABACReader::ibcMbvdData(PredictionUnit& pu)
     temp = m_BinDecoder.decodeBinsEP(length);
   }
   uiUnaryIdx += temp;
-  pu.ibcMbvdMergeIdx = var0 * IBC_MBVD_MAX_REFINE_NUM + uiUnaryIdx;
+  pu.ibcMbvdMergeIdx = var0 * mbvdsPerBase + uiUnaryIdx;
   DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_merge_idx() merge_idx=%d\n", pu.ibcMbvdMergeIdx);
 
   if (biMbvdMode == 1)
@@ -4387,7 +4394,7 @@ void CABACReader::ibcMbvdData(PredictionUnit& pu)
     {
       uiUnaryIdx1 += (uiUnaryIdx+1);
     }
-    pu.ibcMergeIdx1 = var1 * IBC_MBVD_MAX_REFINE_NUM + uiUnaryIdx1 + IBC_MRG_MAX_NUM_CANDS;
+    pu.ibcMergeIdx1 = var1 * mbvdsPerBase + uiUnaryIdx1 + IBC_MRG_MAX_NUM_CANDS;
     DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_merge_idx() merge_idx1=%d\n", pu.ibcMergeIdx1 - IBC_MRG_MAX_NUM_CANDS);
   }
 #else
@@ -4406,7 +4413,7 @@ void CABACReader::ibcMbvdData(PredictionUnit& pu)
   }
   uiUnaryIdx <<= ricePar;
   uiUnaryIdx += temp;
-  pu.ibcMbvdMergeIdx = var0 * IBC_MBVD_MAX_REFINE_NUM  +uiUnaryIdx;
+  pu.ibcMbvdMergeIdx = var0 * mbvdsPerBase + uiUnaryIdx;
   DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_merge_idx() merge_idx=%d\n", pu.ibcMbvdMergeIdx);
 #endif
 }

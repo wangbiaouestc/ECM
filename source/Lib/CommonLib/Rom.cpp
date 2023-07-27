@@ -4707,6 +4707,36 @@ void initROM()
     g_rmvfMultApproxTbl[k] = ((1 << 15) + (k >> 1)) / k;
   }
 #endif
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  const int bvpStep = IBC_MBVD_AD_MAX_REFINE_NUM;
+  const int curInterval = 1 << IBC_MBVD_LOG2_START_STEP;
+  const int incInterval = curInterval * IBC_MBVD_OFFSET_DIR;
+  const int startStepOffset = (curInterval - 1) * IBC_MBVD_OFFSET_DIR;
+  int searchCandIdx = 0;
+  for (int bvpIdx = 0; bvpIdx < IBC_MBVD_BASE_NUM; bvpIdx++)
+  {
+    int startBvdIdx = bvpIdx * bvpStep;
+    int endBvdIdx = startBvdIdx + bvpStep;
+    for (int bvdIdx = startBvdIdx + startStepOffset; bvdIdx < endBvdIdx; bvdIdx += incInterval)
+    {
+      for (int dir = 0; dir < IBC_MBVD_OFFSET_DIR; dir++)
+      {
+        g_ibcMbvdStepCandIdxList[searchCandIdx++] = bvdIdx + dir;
+      }
+    }
+  }
+  for (int bvdIdx = 0; bvdIdx < IBC_MBVD_AD_STEP_NUM; bvdIdx++)
+  {
+    g_ibcMbvdCandOffsets[bvdIdx] = ((bvdIdx + 1) << MV_FRACTIONAL_BITS_INTERNAL);
+  }
+  int neiShift = 0;
+  for (int neiIdx = 0; neiIdx < IBC_MBVD_NEI_NUM * 2; neiIdx += 2)
+  {
+    neiShift += IBC_MBVD_OFFSET_DIR;
+    g_ibcMbvdNeiOffsets[neiIdx    ] = -neiShift;
+    g_ibcMbvdNeiOffsets[neiIdx + 1] = +neiShift;
+  }
+#endif
 }
 
 void destroyROM()
@@ -4875,6 +4905,11 @@ const uint8_t g_chroma422IntraAngleMappingTable[NUM_INTRA_MODE] =
 { 0, 1, 61, 62, 63, 64, 65, 66, 2, 3,  5,  6,  8, 10, 12, 13, 14, 16, 18, 20, 22, 23, 24, 26, 28, 30, 31, 33, 34, 35, 36, 37, 38, 39, 40, 41, 41, 42, 43, 43, 44, 44, 45, 45, 46, 47, 48, 48, 49, 49, 50, 51, 51, 52, 52, 53, 54, 55, 55, 56, 56, 57, 57, 58, 59, 59, 60, DM_CHROMA_IDX };
 
 
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+int g_ibcMbvdCandOffsets[IBC_MBVD_AD_STEP_NUM];
+int g_ibcMbvdStepCandIdxList[IBC_MBVD_AD_NUM >> IBC_MBVD_LOG2_START_STEP];
+int g_ibcMbvdNeiOffsets[IBC_MBVD_NEI_NUM * 2];
+#endif
 
 // ====================================================================================================================
 // Misc.

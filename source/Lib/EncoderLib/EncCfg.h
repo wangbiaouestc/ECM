@@ -538,6 +538,9 @@ protected:
   unsigned  m_IBCFastMethod;
 #if JVET_AA0061_IBC_MBVD
   bool      m_ibcMbvd;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  bool      m_ibcMbvdAdSearch;
+#endif
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   bool      m_rribc;
@@ -1471,6 +1474,10 @@ public:
 #if JVET_AA0061_IBC_MBVD
   void      setIbcMbvd                      ( bool b )       { m_ibcMbvd = b; }
   bool      getIbcMbvd                      ()         const { return m_ibcMbvd; }
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  void      setIbcMbvdAdSearch              ( bool b )       { m_ibcMbvdAdSearch = b; }
+  bool      getIbcMbvdAdSearch              ()         const { return m_ibcMbvdAdSearch; }
+#endif
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   void      setRRIbc                        ( bool b )       { m_rribc = b; }

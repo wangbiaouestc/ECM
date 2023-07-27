@@ -1202,6 +1202,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_AA0061_IBC_MBVD
   ("IBCMBVD",                                         m_ibcMbvd,                                         true, "IBC MMVD mode (0:off, 1:on)  [default: on]" )
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  ("IBCMBVDAdaptive",                                 m_ibcMbvdAdSearch,                                false, "IBC MBVD adaptive search (0:fixed, 1:adaptive)  [default: 0]" )
+#endif
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   ("RRIBC",                                           m_rribc,                                          false, "RRIBC mode (0:off, 1:on)  [default: off]")
@@ -4202,6 +4205,13 @@ bool EncAppCfg::xCheckParameter()
     msg( WARNING, "Max num of IBC merge candidates is set equal to IBC_MRG_MAX_NUM_CANDS since IBC merge is not used\n" );
 #endif
   }
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  if ( !m_ibcMbvd && m_ibcMbvdAdSearch )
+  {
+    msg(WARNING, "IBC MBVD Adaptive search is disabled since IBC MBVD is not used\n");
+    m_ibcMbvdAdSearch = false;
+  }
+#endif
 #endif
 
   xConfirmPara( m_MTS < 0 || m_MTS > 3, "MTS must be greater than 0 smaller than 4" );
@@ -5446,6 +5456,12 @@ void EncAppCfg::xPrintParameter()
     msg(VERBOSE, "IBC:%d ", m_IBCMode);
 #if JVET_AA0061_IBC_MBVD
     msg( VERBOSE, "IBCMBVD:%d ", m_ibcMbvd );
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+    if ( m_ibcMbvd )
+    {
+      msg(VERBOSE, "IBCMBVDAdaptive:%d ", m_ibcMbvdAdSearch);
+    }
+#endif
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     msg(VERBOSE, "IBCFrac:%d ",  m_IBCFracMode);

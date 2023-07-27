@@ -954,6 +954,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AA0061_IBC_MBVD
   m_cEncLib.setIbcMbvd                                           ( m_ibcMbvd );
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  m_cEncLib.setIbcMbvdAdSearch                                   ( m_ibcMbvdAdSearch );
+#endif
 #endif
 #if JVET_AC0112_IBC_CIIP
   m_cEncLib.setIbcCiip                                           ( m_ibcCiip );

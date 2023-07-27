@@ -1936,6 +1936,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AA0061_IBC_MBVD
   sps.setUseIbcMbvd                         ( m_ibcMbvd );
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  sps.setUseIbcMbvdAdSearch                 ( m_ibcMbvdAdSearch );
+#endif
 #endif
 #if JVET_AC0112_IBC_CIIP
   sps.setUseIbcCiip                         ( m_ibcCiip );

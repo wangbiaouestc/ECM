@@ -1323,6 +1323,15 @@ static const int IBC_MBVD_OFFSET_DIR =                               4; // (+, 0
 static const int IBC_MBVD_MAX_REFINE_NUM = IBC_MBVD_STEP_NUM * IBC_MBVD_OFFSET_DIR; ///< max number of candidate from a base candidate
 static const int IBC_MBVD_NUM = IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM;        ///< total number of IBC mmvd candidate
 static const int IBC_MBVD_SIZE_ENC =                                 8;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+static const int IBC_MBVD_AD_STEP_NUM =                            256; ///< number of distance offsets in an adaptive algorithm
+static const int IBC_MBVD_AD_MAX_REFINE_NUM = IBC_MBVD_AD_STEP_NUM * IBC_MBVD_OFFSET_DIR;  ///< max number of candidate from a base candidate
+static const int IBC_MBVD_AD_NUM = IBC_MBVD_BASE_NUM * IBC_MBVD_AD_MAX_REFINE_NUM;            ///< total number of IBC mmvd candidate
+static const int IBC_MBVD_ENC_NUM = IBC_MBVD_BASE_NUM * IBC_MBVD_SIZE_ENC;                    ///< total number of IBC mmvd candidate for encoder
+static const int IBC_MBVD_BASE_DIFF_TH = 32 << MV_FRACTIONAL_BITS_INTERNAL;                   ///< linear distance threshold for bases in MBVD
+static const int IBC_MBVD_LOG2_START_STEP =                          2; ///< search step at the first step in pels = 1 << N
+static const int IBC_MBVD_NEI_NUM =    (1<<IBC_MBVD_LOG2_START_STEP)-1; ///< number of neighbors for the second step
+#endif
 static const int ADAPTIVE_SUB_GROUP_SIZE_IBC_MBVD = IBC_MBVD_MAX_REFINE_NUM;
 #if JVET_AE0169_BIPREDICTIVE_IBC
 static const int IBC_MBVD_NUM_BI_CANDIDATES =                       10;

@@ -1721,6 +1721,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     }
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+    if (pcSPS->getUseIbcMbvd())
+    {
+      WRITE_FLAG(pcSPS->getUseIbcMbvdAdSearch() ? 1 : 0,                                "sps_ibc_mbvd_adaptive_search_flag");
+    }
+#endif
     WRITE_FLAG(pcSPS->getUseRRIbc() ? 1 : 0, "sps_rribc_enabled_flag");
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   if (pcSPS->getTMnoninterToolsEnableFlag())

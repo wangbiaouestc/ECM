@@ -1643,13 +1643,31 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
   }
   tempIdx = candIdxMaped;
 
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  int offset = 0;
+  if (pu.cu->slice->getSPS()->getUseIbcMbvdAdSearch())
+  {
+    fPosBaseIdx = tempIdx / IBC_MBVD_AD_MAX_REFINE_NUM;
+    tempIdx = tempIdx - fPosBaseIdx * (IBC_MBVD_AD_MAX_REFINE_NUM);
+    fPosStep = tempIdx / IBC_MBVD_OFFSET_DIR;
+    fPosPosition = tempIdx - fPosStep * (IBC_MBVD_OFFSET_DIR);
+    offset = g_ibcMbvdCandOffsets[fPosStep];
+  }
+  else
+  {
+#endif
   fPosGroup = tempIdx / (IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM);
   tempIdx = tempIdx - fPosGroup * (IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM);
   fPosBaseIdx = tempIdx / IBC_MBVD_MAX_REFINE_NUM;
   tempIdx = tempIdx - fPosBaseIdx * (IBC_MBVD_MAX_REFINE_NUM);
   fPosStep = tempIdx / IBC_MBVD_OFFSET_DIR;
   fPosPosition = tempIdx - fPosStep * (IBC_MBVD_OFFSET_DIR);
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  offset = refMvdCands[fPosStep];
+  }
+#else
   int offset = refMvdCands[fPosStep];
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   if (!pu.cu->slice->getPicHeader()->getDisFracMBVD() || !pu.cs->slice->getSPS()->getPLTMode())
   {
@@ -1710,18 +1728,39 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
         return true;
       }
 #endif
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+      pu.mv[REF_PIC_LIST_1] = pu.cu->slice->getSPS()->getUseIbcMbvdAdSearch() ? ibcMbvdBaseBvFrac[fPosBaseIdx][0].mv : ibcMbvdBaseBv[fPosBaseIdx][0].mv;
+#endif
     }
     else
     {
       tempIdx = candIdxMaped1;
 
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+      int offset = 0;
+      if (pu.cu->slice->getSPS()->getUseIbcMbvdAdSearch())
+      {
+        fPosBaseIdx = tempIdx / IBC_MBVD_AD_MAX_REFINE_NUM;
+        tempIdx = tempIdx - fPosBaseIdx * (IBC_MBVD_AD_MAX_REFINE_NUM);
+        fPosStep = tempIdx / IBC_MBVD_OFFSET_DIR;
+        fPosPosition = tempIdx - fPosStep * (IBC_MBVD_OFFSET_DIR);
+        offset = g_ibcMbvdCandOffsets[fPosStep];
+      }
+      else
+      {
+#endif
       fPosGroup = tempIdx / (IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM);
       tempIdx = tempIdx - fPosGroup * (IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM);
       fPosBaseIdx = tempIdx / IBC_MBVD_MAX_REFINE_NUM;
       tempIdx = tempIdx - fPosBaseIdx * (IBC_MBVD_MAX_REFINE_NUM);
       fPosStep = tempIdx / IBC_MBVD_OFFSET_DIR;
       fPosPosition = tempIdx - fPosStep * (IBC_MBVD_OFFSET_DIR);
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
       offset = refMvdCands[fPosStep];
+      }
+#else
+      int offset = refMvdCands[fPosStep];
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
       if (!pu.cu->slice->getPicHeader()->getDisFracMBVD() || !pu.cs->slice->getSPS()->getPLTMode())
       {
@@ -1741,9 +1780,14 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
         return true;
       }
 #endif
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+      pu.mv[REF_PIC_LIST_1] = ibcMbvdBaseBv[fPosBaseIdx][0].mv + tempMv;
+#endif
     }
     pu.interDir = 3;
+#if !JVET_AE0169_IBC_MBVD_LIST_DERIVATION
     pu.mv[REF_PIC_LIST_1] = ibcMbvdBaseBv[fPosBaseIdx][0].mv + tempMv;
+#endif
     pu.refIdx[REF_PIC_LIST_1] = MAX_NUM_REF;
     pu.ibcMergeIdx1 = candIdx1;
   }

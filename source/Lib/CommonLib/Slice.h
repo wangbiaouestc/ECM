@@ -1539,6 +1539,9 @@ private:
 #endif
 #if JVET_AA0061_IBC_MBVD
   bool              m_ibcMbvd;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  bool              m_ibcMbvdAdSearch;
+#endif
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   bool              m_rribc;
@@ -2134,6 +2137,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AA0061_IBC_MBVD
   void                    setUseIbcMbvd(bool b)                                                           { m_ibcMbvd = b; }
   bool                    getUseIbcMbvd() const                                                           { return m_ibcMbvd; }
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  void                    setUseIbcMbvdAdSearch(bool b)                                                   { m_ibcMbvdAdSearch = b; }
+  bool                    getUseIbcMbvdAdSearch() const                                                   { return m_ibcMbvdAdSearch; }
+#endif
 #endif
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS

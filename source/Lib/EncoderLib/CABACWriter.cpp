@@ -3791,16 +3791,23 @@ void CABACWriter::ibcMbvdData(const PredictionUnit& pu)
   {
     return;
   }
+
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  const int mbvdsPerBase = pu.cu->slice->getSPS()->getUseIbcMbvdAdSearch() ? IBC_MBVD_SIZE_ENC : IBC_MBVD_MAX_REFINE_NUM;
+#else
+  const int mbvdsPerBase = IBC_MBVD_MAX_REFINE_NUM;
+#endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   if (pu.interDir == 3)
   {
     m_BinEncoder.encodeBin(pu.ibcMergeIdx1 < IBC_MRG_MAX_NUM_CANDS ? 0 : 1, Ctx::IbcMbvdFlag(1));
+    DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_flag() bi_mbvd_mode=%d\n", pu.ibcMergeIdx1 < IBC_MRG_MAX_NUM_CANDS ? 1 : 2);
   }
 #endif
   int mvpIdx = pu.ibcMbvdMergeIdx;
   uint8_t var0;
-  var0 = mvpIdx / IBC_MBVD_MAX_REFINE_NUM;
-  mvpIdx -= var0 * IBC_MBVD_MAX_REFINE_NUM;
+  var0 = mvpIdx / mbvdsPerBase;
+  mvpIdx -= var0 * mbvdsPerBase;
 
   // Base affine merge candidate idx
 
@@ -3835,8 +3842,8 @@ void CABACWriter::ibcMbvdData(const PredictionUnit& pu)
   if (pu.interDir == 3 && pu.ibcMergeIdx1 >= IBC_MRG_MAX_NUM_CANDS)
   {
     mvpIdx1 = pu.ibcMergeIdx1 - IBC_MRG_MAX_NUM_CANDS;
-    var1 = mvpIdx1 / IBC_MBVD_MAX_REFINE_NUM;
-    mvpIdx1 -= var1 * IBC_MBVD_MAX_REFINE_NUM;
+    var1 = mvpIdx1 / mbvdsPerBase;
+    mvpIdx1 -= var1 * mbvdsPerBase;
     CHECK(var1 < var0, "var1 < var0");
     if (numBaseCandMinus1 > 0 && var0 < numBaseCandMinus1)
     {

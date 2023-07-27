@@ -206,6 +206,9 @@
 #define JVET_Z0160_IBC_ZERO_PADDING                       1 // JVET-Z0160: Replacement of zero-padding candidates
 #define JVET_AA0106_IBCBUF_CTU256                         1 // JVET-AA0106: Adjust IBC reference area to 2*128 rows above the current CTU
 #define JVET_AA0061_IBC_MBVD                              1 // JVET-AA0061: IBC merge mode with block vector differences
+#if JVET_AA0061_IBC_MBVD
+#define JVET_AE0169_IBC_MBVD_LIST_DERIVATION              1 // JVET-AE0169: IBC MBVD list derivation
+#endif
 #define JVET_AA0070_RRIBC                                 1 // JVET-AA0070: Reconstruction-Reordered IBC
 #define JVET_AC0112_IBC_CIIP                              1 // JVET-AC0112: Combined IBC and intra prediction (IBC-CIIP)
 #define JVET_AC0112_IBC_GPM                               1 // JVET-AC0112: IBC with geometry partitioning mode (IBC-GPM)
