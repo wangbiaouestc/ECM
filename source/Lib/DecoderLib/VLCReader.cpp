@@ -6496,16 +6496,57 @@ void HLSyntaxReader::parseCcSao( Slice* pcSlice, PicHeader* picHeader, const SPS
     ccSaoParam.enabled[COMPONENT_Cr] = false;
   }
 
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  if (ccSaoParam.enabled[COMPONENT_Y] || ccSaoParam.enabled[COMPONENT_Cb] || ccSaoParam.enabled[COMPONENT_Cr])
+  {
+    READ_FLAG(uiCode, "ccsao_ext_chroma"); 
+    ccSaoParam.extChroma[COMPONENT_Y] = ccSaoParam.extChroma[COMPONENT_Cb] = ccSaoParam.extChroma[COMPONENT_Cr] = uiCode;
+  }
+#endif
+
   for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
   {
     if (ccSaoParam.enabled[compIdx])
     {
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+      if (!pcSlice->isIntra())
+      {
+        READ_FLAG(uiCode, "ccsao_reuse_prv_flag"); ccSaoParam.reusePrv[compIdx] = uiCode;
+      }
+      else
+      {
+        ccSaoParam.reusePrv[compIdx] = false;
+      }
+
+      if (ccSaoParam.reusePrv[compIdx])
+      {
+        READ_CODE(MAX_CCSAO_PRV_NUM_BITS, uiCode, "ccsao_reuse_prv_id"); ccSaoParam.reusePrvId[compIdx] = uiCode;
+        continue;
+      }
+#endif
+
       READ_UVLC(uiCode, "ccsao_set_num"); ccSaoParam.setNum[compIdx] = uiCode + 1;
       
       for (int setIdx = 0; setIdx < ccSaoParam.setNum[compIdx]; setIdx++)
       {
         ccSaoParam.setEnabled[compIdx][setIdx] = true;
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        READ_FLAG(uiCode, "ccsao_set_type"); ccSaoParam.setType[compIdx][setIdx] = uiCode;
+        if (ccSaoParam.setType[compIdx][setIdx] == CCSAO_SET_TYPE_EDGE)
+        {
+          if (ccSaoParam.extChroma[compIdx])
+          {
+            READ_CODE(MAX_CCSAO_EDGE_CMP_BITS, uiCode, "ccsao_edge_cmp"); ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Cb] = uiCode;
+          }
+          READ_CODE(MAX_CCSAO_EDGE_IDC_BITS, uiCode, "ccsao_edge_idc"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] = uiCode;
+          READ_CODE(MAX_CCSAO_EDGE_DIR_BITS, uiCode, "ccsao_edge_dir"); ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y ] = uiCode;
+          READ_CODE(MAX_CCSAO_EDGE_THR_BITS, uiCode, "ccsao_edge_thr"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] = uiCode;
+          READ_CODE(MAX_CCSAO_BAND_IDC_BITS, uiCode, "ccsao_band_idc"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ] = uiCode;
+        }
+        else
+        {
+#else
         READ_FLAG(uiCode, "ccsao_setType");
         ccSaoParam.setType[compIdx][setIdx] = uiCode;
         if (ccSaoParam.setType[compIdx][setIdx])
@@ -6522,23 +6563,24 @@ void HLSyntaxReader::parseCcSao( Slice* pcSlice, PicHeader* picHeader, const SPS
         {
           /* Band offset */
 #endif
-          READ_CODE(MAX_CCSAO_CAND_POS_Y_BITS, uiCode, "ccsao_cand_pos_y");
-          ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y] = uiCode;
-          READ_CODE(MAX_CCSAO_BAND_NUM_Y_BITS, uiCode, "ccsao_band_num_y");
-          ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] = uiCode + 1;
-          READ_CODE(MAX_CCSAO_BAND_NUM_U_BITS, uiCode, "ccsao_band_num_u");
-          ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] = uiCode + 1;
-          READ_CODE(MAX_CCSAO_BAND_NUM_V_BITS, uiCode, "ccsao_band_num_v");
-          ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] = uiCode + 1;
+#endif
+          READ_CODE(MAX_CCSAO_CAND_POS_Y_BITS, uiCode, "ccsao_cand_pos_y"); ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y ] = uiCode;
+          READ_CODE(MAX_CCSAO_BAND_NUM_Y_BITS, uiCode, "ccsao_band_num_y"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ] = uiCode + 1;
+          READ_CODE(MAX_CCSAO_BAND_NUM_U_BITS, uiCode, "ccsao_band_num_u"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] = uiCode + 1;
+          READ_CODE(MAX_CCSAO_BAND_NUM_V_BITS, uiCode, "ccsao_band_num_v"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] = uiCode + 1;
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
         }
 #endif
         short *offset   = ccSaoParam.offset [compIdx][setIdx];
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        int    classNum = SampleAdaptiveOffset::getCcSaoClassNum(compIdx, setIdx, ccSaoParam);
+#else
         int    classNum = ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ]
                         * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb]
                         * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr];
+#endif
 
-#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER && !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
         if (ccSaoParam.setType[compIdx][setIdx])
         {
           if (ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] <= CCSAO_EDGE_COMPARE_VALUE + CCSAO_EDGE_COMPARE_VALUE)
@@ -6576,6 +6618,56 @@ void HLSyntaxReader::parseCcSao( Slice* pcSlice, PicHeader* picHeader, const SPS
       }
     }
   }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  // Should be before CcSaoControlIdc to assign setNum
+  if (pcSlice->isIDRorBLA())
+  {
+    g_ccSaoPrvParam[COMPONENT_Y ].clear();
+    g_ccSaoPrvParam[COMPONENT_Cb].clear();
+    g_ccSaoPrvParam[COMPONENT_Cr].clear();
+  }
+
+  // loadCcSaoPrvParam
+  for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
+  {
+    if (ccSaoParam.enabled[compIdx] && ccSaoParam.reusePrv[compIdx])
+    {
+      int prvId = ccSaoParam.reusePrvId[compIdx];
+
+      CcSaoPrvParam prvParam = g_ccSaoPrvParam[compIdx][prvId];
+      ccSaoParam.setNum[compIdx] = prvParam.setNum;
+      std::memcpy( ccSaoParam.setEnabled[compIdx], prvParam.setEnabled, sizeof( ccSaoParam.setEnabled[compIdx] ) );
+      std::memcpy( ccSaoParam.setType   [compIdx], prvParam.setType,    sizeof( ccSaoParam.setType   [compIdx] ) );
+      std::memcpy( ccSaoParam.candPos   [compIdx], prvParam.candPos,    sizeof( ccSaoParam.candPos   [compIdx] ) );
+      std::memcpy( ccSaoParam.bandNum   [compIdx], prvParam.bandNum,    sizeof( ccSaoParam.bandNum   [compIdx] ) );
+      std::memcpy( ccSaoParam.offset    [compIdx], prvParam.offset,     sizeof( ccSaoParam.offset    [compIdx] ) );
+    }
+  }
+
+  // setup/saveCcSaoPrvParam
+  for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
+  {
+    if (ccSaoParam.enabled[compIdx] && !ccSaoParam.reusePrv[compIdx])
+    {
+      if (g_ccSaoPrvParam[compIdx].size() == MAX_CCSAO_PRV_NUM)
+      {
+        g_ccSaoPrvParam[compIdx].pop_back();
+      }
+
+      CcSaoPrvParam prvParam;
+      prvParam.temporalId = pcSlice->getTLayer();
+      prvParam.setNum     = ccSaoParam.setNum[compIdx];
+      std::memcpy( prvParam.setEnabled, ccSaoParam.setEnabled[compIdx], sizeof( prvParam.setEnabled ) );
+      std::memcpy( prvParam.setType,    ccSaoParam.setType   [compIdx], sizeof( prvParam.setType    ) );
+      std::memcpy( prvParam.candPos,    ccSaoParam.candPos   [compIdx], sizeof( prvParam.candPos    ) );
+      std::memcpy( prvParam.bandNum,    ccSaoParam.bandNum   [compIdx], sizeof( prvParam.bandNum    ) );
+      std::memcpy( prvParam.offset,     ccSaoParam.offset    [compIdx], sizeof( prvParam.offset     ) );
+      
+      g_ccSaoPrvParam[compIdx].insert(g_ccSaoPrvParam[compIdx].begin(), prvParam);
+    }
+  }
+#endif
 }
 #endif
 
