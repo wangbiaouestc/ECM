@@ -71,6 +71,7 @@ private:
   double    m_MSEyuvframe[MAX_NUM_COMPONENT]; // sum of MSEs
   double    m_upscaledPSNR[MAX_NUM_COMPONENT];
   double    m_msssim[MAX_NUM_COMPONENT];
+  double    m_upscaledMsssim[MAX_NUM_COMPONENT];
 #if EXTENSION_360_VIDEO
   TExt360EncAnalyze m_ext360;
 #endif
@@ -84,7 +85,8 @@ public:
   Analyze() { clear(); }
 
   void  addResult( double psnr[MAX_NUM_COMPONENT], double bits, const double MSEyuvframe[MAX_NUM_COMPONENT],
-    const double upscaledPSNR[MAX_NUM_COMPONENT], const double msssim[MAX_NUM_COMPONENT], bool isEncodeLtRef )
+                 const double upscaledPSNR[MAX_NUM_COMPONENT], const double msssim[MAX_NUM_COMPONENT],
+                 const double upscaledMsssim[MAX_NUM_COMPONENT], bool isEncodeLtRef)
   {
     m_dAddBits  += bits;
     if (isEncodeLtRef)
@@ -95,6 +97,7 @@ public:
       m_MSEyuvframe[i] += MSEyuvframe[i];
       m_upscaledPSNR[i] += upscaledPSNR[i];
       m_msssim[i] += msssim[i];
+      m_upscaledMsssim[i] += upscaledMsssim[i];
     }
 
     m_uiNumPic++;
@@ -135,6 +138,7 @@ public:
       m_MSEyuvframe[i] = 0;
       m_upscaledPSNR[i] = 0;
       m_msssim[i] = 0;
+      m_upscaledMsssim[i] = 0;
     }
     m_uiNumPic = 0;
 #if EXTENSION_360_VIDEO
@@ -625,6 +629,12 @@ public:
                 m_upscaledPSNR[COMPONENT_Y] / (double)getNumPic(),
                 m_upscaledPSNR[COMPONENT_Cb] / (double)getNumPic(),
                 m_upscaledPSNR[COMPONENT_Cr] / (double)getNumPic());
+
+              msg( e_msg_level, "MS-SSIM2 Y-MS-SSIM     "  "U-MS-SSIM     "  "V-MS-SSIM\n" );
+              msg( e_msg_level, "       %8.4lf    "     "  %8.4lf  "     "     %8.4lf\n",
+                     m_upscaledMsssim[COMPONENT_Y ] / (double)getNumPic(),
+                     m_upscaledMsssim[COMPONENT_Cb] / (double)getNumPic(),
+                     m_upscaledMsssim[COMPONENT_Cr] / (double)getNumPic());
             }
           }
         }

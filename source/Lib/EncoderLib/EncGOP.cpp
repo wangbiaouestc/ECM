@@ -4232,6 +4232,7 @@ void EncGOP::xCalculateAddPSNR(Picture* pcPic, PelUnitBuf cPicD, const AccessUni
   double  MSEyuvframeWeighted[MAX_NUM_COMPONENT];
 #endif
   double  upscaledPSNR[MAX_NUM_COMPONENT];
+  double  upscaledMsssim[MAX_NUM_COMPONENT];
   for(int i=0; i<MAX_NUM_COMPONENT; i++)
   {
     dPSNR[i]=0.0;
@@ -4360,6 +4361,7 @@ void EncGOP::xCalculateAddPSNR(Picture* pcPic, PelUnitBuf cPicD, const AccessUni
 #endif
 
       upscaledPSNR[comp] = upscaledSSD ? 10.0 * log10( (double)maxval * maxval * upscaledWidth * upscaledHeight / (double)upscaledSSD ) : 999.99;
+      upscaledMsssim[comp] = xCalculateMSSSIM (upscaledOrgPB.bufAt(0, 0), upscaledOrgPB.stride, upscaledRecPB.bufAt(0, 0), upscaledRecPB.stride, upscaledWidth, upscaledHeight, bitDepth);
     }
   }
 
@@ -4412,7 +4414,7 @@ void EncGOP::xCalculateAddPSNR(Picture* pcPic, PelUnitBuf cPicD, const AccessUni
   m_vRVM_RP.push_back( uibits );
 
   //===== add PSNR =====
-  m_gcAnalyzeAll.addResult(dPSNR, (double)uibits, MSEyuvframe, upscaledPSNR, msssim, isEncodeLtRef);
+  m_gcAnalyzeAll.addResult(dPSNR, (double) uibits, MSEyuvframe, upscaledPSNR, msssim, upscaledMsssim, isEncodeLtRef);
 #if EXTENSION_360_VIDEO
   m_ext360.addResult(m_gcAnalyzeAll);
 #endif
@@ -4424,7 +4426,7 @@ void EncGOP::xCalculateAddPSNR(Picture* pcPic, PelUnitBuf cPicD, const AccessUni
 #endif
   if (pcSlice->isIntra())
   {
-    m_gcAnalyzeI.addResult(dPSNR, (double)uibits, MSEyuvframe, upscaledPSNR, msssim, isEncodeLtRef);
+    m_gcAnalyzeI.addResult(dPSNR, (double) uibits, MSEyuvframe, upscaledPSNR, msssim, upscaledMsssim, isEncodeLtRef);
     *PSNR_Y = dPSNR[COMPONENT_Y];
 #if EXTENSION_360_VIDEO
     m_ext360.addResult(m_gcAnalyzeI);
@@ -4438,7 +4440,7 @@ void EncGOP::xCalculateAddPSNR(Picture* pcPic, PelUnitBuf cPicD, const AccessUni
   }
   if (pcSlice->isInterP())
   {
-    m_gcAnalyzeP.addResult(dPSNR, (double)uibits, MSEyuvframe, upscaledPSNR, msssim, isEncodeLtRef);
+    m_gcAnalyzeP.addResult(dPSNR, (double) uibits, MSEyuvframe, upscaledPSNR, msssim, upscaledMsssim, isEncodeLtRef);
     *PSNR_Y = dPSNR[COMPONENT_Y];
 #if EXTENSION_360_VIDEO
     m_ext360.addResult(m_gcAnalyzeP);
@@ -4452,7 +4454,7 @@ void EncGOP::xCalculateAddPSNR(Picture* pcPic, PelUnitBuf cPicD, const AccessUni
   }
   if (pcSlice->isInterB())
   {
-    m_gcAnalyzeB.addResult(dPSNR, (double)uibits, MSEyuvframe, upscaledPSNR, msssim, isEncodeLtRef);
+    m_gcAnalyzeB.addResult(dPSNR, (double) uibits, MSEyuvframe, upscaledPSNR, msssim, upscaledMsssim, isEncodeLtRef);
     *PSNR_Y = dPSNR[COMPONENT_Y];
 #if EXTENSION_360_VIDEO
     m_ext360.addResult(m_gcAnalyzeB);
@@ -4467,7 +4469,7 @@ void EncGOP::xCalculateAddPSNR(Picture* pcPic, PelUnitBuf cPicD, const AccessUni
 #if WCG_WPSNR
   if (useLumaWPSNR)
   {
-    m_gcAnalyzeWPSNR.addResult( dPSNRWeighted, (double)uibits, MSEyuvframeWeighted, upscaledPSNR, msssim, isEncodeLtRef );
+    m_gcAnalyzeWPSNR.addResult( dPSNRWeighted, (double)uibits, MSEyuvframeWeighted, upscaledPSNR, msssim, upscaledMsssim, isEncodeLtRef );
   }
 #endif
 
@@ -4618,6 +4620,7 @@ void EncGOP::xCalculateAddPSNR(Picture* pcPic, PelUnitBuf cPicD, const AccessUni
     if (m_pcEncLib->isResChangeInClvsEnabled())
     {
       msg( NOTICE, "\nPSNR2: [Y %6.4lf dB    U %6.4lf dB    V %6.4lf dB]", upscaledPSNR[COMPONENT_Y], upscaledPSNR[COMPONENT_Cb], upscaledPSNR[COMPONENT_Cr] );
+      msg( NOTICE, "\nMS-SSIM2: [Y %6.4lf    U %6.4lf    V %6.4lf ]", upscaledMsssim[COMPONENT_Y], upscaledMsssim[COMPONENT_Cb], upscaledMsssim[COMPONENT_Cr] );
     }
   }
   else if( g_verbosity >= INFO )
@@ -4970,7 +4973,7 @@ void EncGOP::xCalculateInterlacedAddPSNR( Picture* pcPicOrgFirstField, Picture* 
   uint32_t uibits = 0; // the number of bits for the pair is not calculated here - instead the overall total is used elsewhere.
 
   //===== add PSNR =====
-  m_gcAnalyzeAll_in.addResult (dPSNR, (double)uibits, MSEyuvframe, MSEyuvframe, msssim, isEncodeLtRef);
+  m_gcAnalyzeAll_in.addResult(dPSNR, (double) uibits, MSEyuvframe, MSEyuvframe, msssim, msssim, isEncodeLtRef);
 
   *PSNR_Y = dPSNR[COMPONENT_Y];
 
