@@ -5144,6 +5144,7 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
   double  MSEyuvframeWeighted[MAX_NUM_COMPONENT];
 #endif
   double  upscaledPSNR[MAX_NUM_COMPONENT];
+  double  upscaledMsssim[MAX_NUM_COMPONENT];
   for(int i=0; i<MAX_NUM_COMPONENT; i++)
   {
     dPSNR[i]=0.0;
@@ -5283,6 +5284,7 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
 #endif
 
       upscaledPSNR[comp] = upscaledSSD ? 10.0 * log10( (double)maxval * maxval * upscaledWidth * upscaledHeight / (double)upscaledSSD ) : 999.99;
+      upscaledMsssim[comp] = xCalculateMSSSIM (upscaledOrgPB.bufAt(0, 0), upscaledOrgPB.stride, upscaledRecPB.bufAt(0, 0), upscaledRecPB.stride, upscaledWidth, upscaledHeight, bitDepth);
     }
   }
 
@@ -5334,6 +5336,7 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
   m_gcAnalyzeAll.addResult(dPSNR, (double) uibits, MSEyuvframe, upscaledPSNR,
 #if MSSIM_UNIFORM_METRICS_LOG
                            msssim,
+                           upscaledMsssim, 
 #endif
                            isEncodeLtRef);
 #if EXTENSION_360_VIDEO
@@ -5350,6 +5353,7 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
     m_gcAnalyzeI.addResult(dPSNR, (double) uibits, MSEyuvframe, upscaledPSNR,
 #if MSSIM_UNIFORM_METRICS_LOG
                            msssim,
+                           upscaledMsssim, 
 #endif
                            isEncodeLtRef);
     *PSNR_Y = dPSNR[COMPONENT_Y];
@@ -5368,6 +5372,7 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
     m_gcAnalyzeP.addResult(dPSNR, (double) uibits, MSEyuvframe, upscaledPSNR,
 #if MSSIM_UNIFORM_METRICS_LOG
                            msssim,
+                           upscaledMsssim, 
 #endif
                            isEncodeLtRef);
     *PSNR_Y = dPSNR[COMPONENT_Y];
@@ -5386,6 +5391,7 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
     m_gcAnalyzeB.addResult(dPSNR, (double) uibits, MSEyuvframe, upscaledPSNR,
 #if MSSIM_UNIFORM_METRICS_LOG
                            msssim,
+                           upscaledMsssim, 
 #endif
                            isEncodeLtRef);
     *PSNR_Y = dPSNR[COMPONENT_Y];
@@ -5405,6 +5411,7 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
     m_gcAnalyzeWPSNR.addResult(dPSNRWeighted, (double) uibits, MSEyuvframeWeighted, upscaledPSNR,
 #if MSSIM_UNIFORM_METRICS_LOG
                                msssim,
+                               upscaledMsssim, 
 #endif
                                isEncodeLtRef);
   }
@@ -5559,8 +5566,10 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
     {
 #if JVET_W0134_UNIFORM_METRICS_LOG
       msg( NOTICE, " [Y2 %6.4lf dB  U2 %6.4lf dB  V2 %6.4lf dB]", upscaledPSNR[COMPONENT_Y], upscaledPSNR[COMPONENT_Cb], upscaledPSNR[COMPONENT_Cr] );
+      msg( NOTICE, " MS-SSIM2: [Y %6.4lf  U %6.4lf  V %6.4lf ]", upscaledMsssim[COMPONENT_Y], upscaledMsssim[COMPONENT_Cb], upscaledMsssim[COMPONENT_Cr] );
 #else
       msg( NOTICE, "\nPSNR2: [Y %6.4lf dB    U %6.4lf dB    V %6.4lf dB]", upscaledPSNR[COMPONENT_Y], upscaledPSNR[COMPONENT_Cb], upscaledPSNR[COMPONENT_Cr] );
+      msg( NOTICE, "\nMS-SSIM2: [Y %6.4lf  U %6.4lf  V %6.4lf ]", upscaledMsssim[COMPONENT_Y], upscaledMsssim[COMPONENT_Cb], upscaledMsssim[COMPONENT_Cr] );
 #endif
     }
   }
@@ -5944,6 +5953,7 @@ void EncGOP::xCalculateInterlacedAddPSNR( Picture* pcPicOrgFirstField, Picture* 
   //===== add PSNR =====
   m_gcAnalyzeAll_in.addResult(dPSNR, (double) uibits, MSEyuvframe, MSEyuvframe,
 #if MSSIM_UNIFORM_METRICS_LOG
+                              msssim,
                               msssim,
 #endif
                               isEncodeLtRef);
