@@ -211,8 +211,7 @@ void EncSampleAdaptiveOffset::createEncData(bool isPreDBFSamplesUsed, uint32_t n
   }
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
 #if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
-  int numStatsEdge = m_numCTUsInPic * MAX_CCSAO_EDGE_DIR * MAX_CCSAO_EDGE_THR * MAX_CCSAO_BAND_IDC
-                   * MAX_NUM_COMPONENT * MAX_CCSAO_EDGE_IDC;
+  int numStatsEdge = m_numCTUsInPic * MAX_CCSAO_EDGE_DIR * MAX_CCSAO_EDGE_THR * MAX_CCSAO_BAND_IDC * MAX_NUM_COMPONENT * MAX_CCSAO_EDGE_IDC;
   m_ccSaoStatDataEdgePre = new CcSaoStatData[numStatsEdge];
 #else
   for (int comp = Y_C; comp < N_C; comp++)
@@ -352,10 +351,14 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   bifParams.frmOn = 1;
   bifParams.allCtuOn = 1;
 
-  if (bifParams.frmOn == 0)
-    std::fill(bifParams.ctuOn.begin(), bifParams.ctuOn.end(), 0);
-  else if (bifParams.allCtuOn)
-      std::fill(bifParams.ctuOn.begin(), bifParams.ctuOn.end(), 1);
+  if( bifParams.frmOn == 0 )
+  {
+    std::fill( bifParams.ctuOn.begin(), bifParams.ctuOn.end(), 0 );
+  }
+  else if( bifParams.allCtuOn )
+  {
+    std::fill( bifParams.ctuOn.begin(), bifParams.ctuOn.end(), 1 );
+  }
 
   //double MseNoFltFrame = 0;
   //double MseFltDefFrame = 0;
@@ -388,20 +391,20 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
 
     if (chromaBifParams.frmOnCb == 0)
     {
-        std::fill(chromaBifParams.ctuOnCb.begin(), chromaBifParams.ctuOnCb.end(), 0);
+      std::fill( chromaBifParams.ctuOnCb.begin(), chromaBifParams.ctuOnCb.end(), 0 );
     }
     else if (chromaBifParams.allCtuOnCb)
     {
-        std::fill(chromaBifParams.ctuOnCb.begin(), chromaBifParams.ctuOnCb.end(), 1);
+      std::fill( chromaBifParams.ctuOnCb.begin(), chromaBifParams.ctuOnCb.end(), 1 );
     }
 
     if (chromaBifParams.frmOnCr == 0)
     {
-        std::fill(chromaBifParams.ctuOnCr.begin(), chromaBifParams.ctuOnCr.end(), 0);
+      std::fill( chromaBifParams.ctuOnCr.begin(), chromaBifParams.ctuOnCr.end(), 0 );
     }
     else if (chromaBifParams.allCtuOnCr)
     {
-        std::fill(chromaBifParams.ctuOnCr.begin(), chromaBifParams.ctuOnCr.end(), 1);
+      std::fill( chromaBifParams.ctuOnCr.begin(), chromaBifParams.ctuOnCr.end(), 1 );
     }
   }
 #endif
@@ -411,20 +414,20 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
     BilateralFilter bilateralFilter;
     if(!cs.sps->getSAOEnabledFlag() && (cs.pps->getUseBIF() || cs.pps->getUseChromaBIF()))
     {
-        bilateralFilter.create();
-        if(cs.pps->getUseBIF())
-        {
-            bilateralFilter.bilateralFilterPicRDOperCTU(cs, src, BifCABACEstimator); // Filters from src to res
-        }
-        if(cs.pps->getUseChromaBIF())
-        {
-          //Cb
-          bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, true);
-          //Cr
-          bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, false);
-        }
-        bilateralFilter.destroy();
-        return;
+      bilateralFilter.create();
+      if( cs.pps->getUseBIF() )
+      {
+        bilateralFilter.bilateralFilterPicRDOperCTU( cs, src, BifCABACEstimator ); // Filters from src to res
+      }
+      if( cs.pps->getUseChromaBIF() )
+      {
+        //Cb
+        bilateralFilter.bilateralFilterPicRDOperCTUChroma( cs, src, ChromaBifCABACEstimator, true );
+        //Cr
+        bilateralFilter.bilateralFilterPicRDOperCTUChroma( cs, src, ChromaBifCABACEstimator, false );
+      }
+      bilateralFilter.destroy();
+      return;
     }
     memcpy(m_lambda, lambdas, sizeof(m_lambda));
 #else
@@ -464,21 +467,21 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   //collect statistics
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  if(cs.pps->getUseBIF() || cs.pps->getUseChromaBIF())
+  if( cs.pps->getUseBIF() || cs.pps->getUseChromaBIF() )
   {
     bilateralFilter.create();
-    if(cs.pps->getUseBIF())
+    if( cs.pps->getUseBIF() )
     {
-        bilateralFilter.bilateralFilterPicRDOperCTU(cs, src, BifCABACEstimator); // Filters from src to res'
+      bilateralFilter.bilateralFilterPicRDOperCTU( cs, src, BifCABACEstimator ); // Filters from src to res'
     }
-    if(cs.pps->getUseChromaBIF())
+    if( cs.pps->getUseChromaBIF() )
     {
       //Cb
-      bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, true);
+      bilateralFilter.bilateralFilterPicRDOperCTUChroma( cs, src, ChromaBifCABACEstimator, true );
       //Cr
-      bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, false);
+      bilateralFilter.bilateralFilterPicRDOperCTUChroma( cs, src, ChromaBifCABACEstimator, false );
     }
-    getStatistics(m_statData, org, src, res, cs);
+    getStatistics( m_statData, org, src, res, cs );
     bilateralFilter.destroy();
   }
   else
@@ -949,52 +952,50 @@ void EncSampleAdaptiveOffset::deriveModeNewRDO(const BitDepths &bitDepths, int c
   const TempCtx ctxStartLuma  ( m_ctxCache, SAOCtx( m_CABACEstimator->getCtx() ) );
   TempCtx       ctxBestLuma   ( m_ctxCache );
 
-    //------ luma --------//
+  //------ luma --------//
+  const ComponentID compIdx = COMPONENT_Y;
+  //"off" case as initial cost
+  modeParam[compIdx].modeIdc = SAO_MODE_OFF;
+  m_CABACEstimator->resetBits();
+  m_CABACEstimator->sao_offset_pars( modeParam[compIdx], compIdx, sliceEnabled[compIdx], bitDepths.recon[CHANNEL_TYPE_LUMA] );
+  modeDist[compIdx] = 0;
+  minCost = m_lambda[compIdx] * (FRAC_BITS_SCALE * m_CABACEstimator->getEstFracBits());
+  ctxBestLuma = SAOCtx( m_CABACEstimator->getCtx() );
+  if( sliceEnabled[compIdx] )
   {
-    const ComponentID compIdx = COMPONENT_Y;
-    //"off" case as initial cost
-    modeParam[compIdx].modeIdc = SAO_MODE_OFF;
-    m_CABACEstimator->resetBits();
-    m_CABACEstimator->sao_offset_pars( modeParam[compIdx], compIdx, sliceEnabled[compIdx], bitDepths.recon[CHANNEL_TYPE_LUMA] );
-    modeDist[compIdx] = 0;
-    minCost           = m_lambda[compIdx] * (FRAC_BITS_SCALE * m_CABACEstimator->getEstFracBits());
-    ctxBestLuma = SAOCtx( m_CABACEstimator->getCtx() );
-    if(sliceEnabled[compIdx])
+    for( int typeIdc = 0; typeIdc < NUM_SAO_NEW_TYPES; typeIdc++ )
     {
-      for(int typeIdc=0; typeIdc< NUM_SAO_NEW_TYPES; typeIdc++)
+      testOffset[compIdx].modeIdc = SAO_MODE_NEW;
+      testOffset[compIdx].typeIdc = typeIdc;
+
+      //derive coded offset
+      deriveOffsets( compIdx, bitDepths.recon[CHANNEL_TYPE_LUMA], typeIdc, blkStats[ctuRsAddr][compIdx][typeIdc], testOffset[compIdx].offset, testOffset[compIdx].typeAuxInfo );
+
+      //inversed quantized offsets
+      invertQuantOffsets( compIdx, typeIdc, testOffset[compIdx].typeAuxInfo, invQuantOffset, testOffset[compIdx].offset );
+
+      //get distortion
+      dist[compIdx] = getDistortion( bitDepths.recon[CHANNEL_TYPE_LUMA], testOffset[compIdx].typeIdc, testOffset[compIdx].typeAuxInfo, invQuantOffset, blkStats[ctuRsAddr][compIdx][typeIdc] );
+
+      //get rate
+      m_CABACEstimator->getCtx() = SAOCtx( ctxStartLuma );
+      m_CABACEstimator->resetBits();
+      m_CABACEstimator->sao_offset_pars( testOffset[compIdx], compIdx, sliceEnabled[compIdx], bitDepths.recon[CHANNEL_TYPE_LUMA] );
+      double rate = FRAC_BITS_SCALE * m_CABACEstimator->getEstFracBits();
+      cost = ( double ) dist[compIdx] + m_lambda[compIdx] * rate;
+      if( cost < minCost )
       {
-        testOffset[compIdx].modeIdc = SAO_MODE_NEW;
-        testOffset[compIdx].typeIdc = typeIdc;
-
-        //derive coded offset
-        deriveOffsets(compIdx, bitDepths.recon[CHANNEL_TYPE_LUMA], typeIdc, blkStats[ctuRsAddr][compIdx][typeIdc], testOffset[compIdx].offset, testOffset[compIdx].typeAuxInfo);
-
-        //inversed quantized offsets
-        invertQuantOffsets(compIdx, typeIdc, testOffset[compIdx].typeAuxInfo, invQuantOffset, testOffset[compIdx].offset);
-
-        //get distortion
-        dist[compIdx] = getDistortion(bitDepths.recon[CHANNEL_TYPE_LUMA], testOffset[compIdx].typeIdc, testOffset[compIdx].typeAuxInfo, invQuantOffset, blkStats[ctuRsAddr][compIdx][typeIdc]);
-
-        //get rate
-        m_CABACEstimator->getCtx() = SAOCtx( ctxStartLuma );
-        m_CABACEstimator->resetBits();
-        m_CABACEstimator->sao_offset_pars( testOffset[compIdx], compIdx, sliceEnabled[compIdx], bitDepths.recon[CHANNEL_TYPE_LUMA] );
-        double rate = FRAC_BITS_SCALE * m_CABACEstimator->getEstFracBits();
-        cost = (double)dist[compIdx] + m_lambda[compIdx]*rate;
-        if(cost < minCost)
-        {
-          minCost = cost;
-          modeDist[compIdx] = dist[compIdx];
-          modeParam[compIdx]= testOffset[compIdx];
-          ctxBestLuma = SAOCtx( m_CABACEstimator->getCtx() );
-        }
+        minCost = cost;
+        modeDist[compIdx] = dist[compIdx];
+        modeParam[compIdx] = testOffset[compIdx];
+        ctxBestLuma = SAOCtx( m_CABACEstimator->getCtx() );
       }
     }
-    m_CABACEstimator->getCtx() = SAOCtx( ctxBestLuma );
   }
+  m_CABACEstimator->getCtx() = SAOCtx( ctxBestLuma );
 
   //------ chroma --------//
-//"off" case as initial cost
+  //"off" case as initial cost
   cost = 0;
   previousFracBits = 0;
   m_CABACEstimator->resetBits();
@@ -1467,7 +1468,8 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
         for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, chType), chType))
         {
           bool chromaValid = currCU.Cb().valid() && currCU.Cr().valid();
-          if(!chromaValid){
+          if(!chromaValid)
+          {
             continue;
           }
           for (auto &currTU : CU::traverseTUs(currCU))
@@ -1885,9 +1887,13 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           int mySrcStride = srcYuv.get(COMPONENT_Y).stride;
           Pel* mySrcBlk = srcYuv.get(COMPONENT_Y).bufAt(myCompArea);
           
-          for(int yy = 0; yy<area.lheight(); yy++)
-            for(int xx = 0; xx<area.lwidth(); xx++)
-              myResBlk[yy*myResStride+xx] = mySrcBlk[yy*mySrcStride+xx];
+          for( int yy = 0; yy < area.lheight(); yy++ )
+          {
+            for( int xx = 0; xx < area.lwidth(); xx++ )
+            {
+              myResBlk[yy*myResStride + xx] = mySrcBlk[yy*mySrcStride + xx];
+            }
+          }
         }
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
@@ -3113,8 +3119,8 @@ void EncSampleAdaptiveOffset::setupCcSaoSH(CodingStructure& cs, const CPelUnitBu
 }
 #endif
 
-void EncSampleAdaptiveOffset::deriveCcSao(CodingStructure& cs, const ComponentID compID
-                                        , const CPelUnitBuf& orgYuv, const CPelUnitBuf& srcYuv, const CPelUnitBuf& dstYuv)
+void EncSampleAdaptiveOffset::deriveCcSao( CodingStructure& cs, const ComponentID compID
+                                           , const CPelUnitBuf& orgYuv, const CPelUnitBuf& srcYuv, const CPelUnitBuf& dstYuv )
 {
   double bestCost = 0;
   double tempCost = 0;
@@ -3123,8 +3129,10 @@ void EncSampleAdaptiveOffset::deriveCcSao(CodingStructure& cs, const ComponentID
   double bestCostG[17] = { 0 };
   int    classNumG[17] = { 0 };
   int    stageNum = m_intraPeriod == 1 ? MAX_CCSAO_CLASS_NUM / 4 : MAX_CCSAO_CLASS_NUM / 16;
-  for (int stage = 1; stage <= stageNum; stage++)
+  for( int stage = 1; stage <= stageNum; stage++ )
+  {
     classNumG[stage] = stage * (MAX_CCSAO_CLASS_NUM / stageNum);
+  }
 
 #if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
   const int edgeCmpNum = m_extChroma ? MAX_NUM_COMPONENT : MAX_NUM_LUMA_COMP;
@@ -3132,67 +3140,81 @@ void EncSampleAdaptiveOffset::deriveCcSao(CodingStructure& cs, const ComponentID
 #endif
 
   m_bestCcSaoParam.reset();
-  memset(m_bestCcSaoControl, 0, sizeof(uint8_t) * m_numCTUsInPic);
+  memset( m_bestCcSaoControl, 0, sizeof( uint8_t ) * m_numCTUsInPic );
 
-  for (int setNum = 1; setNum <= MAX_CCSAO_SET_NUM; setNum++)
+  for( int setNum = 1; setNum <= MAX_CCSAO_SET_NUM; setNum++ )
   {
-    if (setNum > 1)
+    if( setNum > 1 )
     {
-      getCcSaoStatistics    (cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatData,                             m_bestCcSaoParam);
+      getCcSaoStatistics( cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatData, m_bestCcSaoParam );
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
 #if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
-      getCcSaoStatisticsEdge(cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdge, m_ccSaoStatDataEdgePre, m_bestCcSaoParam);
+      getCcSaoStatisticsEdge( cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdge, m_ccSaoStatDataEdgePre, m_bestCcSaoParam );
 #else
-      getCcSaoStatisticsEdge(cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdge, m_ccSaoStatDataEdgeNew, m_bestCcSaoParam);
+      getCcSaoStatisticsEdge( cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdge, m_ccSaoStatDataEdgeNew, m_bestCcSaoParam );
 #endif
 #endif
     }
-    setupInitCcSaoParam(cs, compID, setNum, m_trainingDistortion, m_ccSaoStatData, m_ccSaoStatFrame
+    setupInitCcSaoParam( cs, compID, setNum, m_trainingDistortion, m_ccSaoStatData, m_ccSaoStatFrame
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-                      , m_ccSaoStatDataEdge, m_ccSaoStatFrameEdge
+                         , m_ccSaoStatDataEdge, m_ccSaoStatFrameEdge
 #endif
-                      , m_initCcSaoParam, m_bestCcSaoParam, m_initCcSaoControl, m_bestCcSaoControl);
+                         , m_initCcSaoParam, m_bestCcSaoParam, m_initCcSaoControl, m_bestCcSaoControl );
 
 
-    for (int stage = 1; stage <= stageNum; stage++)
+    for( int stage = 1; stage <= stageNum; stage++ )
     {
-      for (int bandNumY = 1; bandNumY <= MAX_CCSAO_BAND_NUM_Y; bandNumY++)
-      for (int bandNumU = 1; bandNumU <= MAX_CCSAO_BAND_NUM_U; bandNumU++)
-      for (int bandNumV = 1; bandNumV <= MAX_CCSAO_BAND_NUM_V; bandNumV++)
-      for (int candPosY = 0; candPosY <  MAX_CCSAO_CAND_POS_Y && bandNumY > 1; candPosY++)
+      for( int bandNumY = 1; bandNumY <= MAX_CCSAO_BAND_NUM_Y; bandNumY++ )
       {
-        if (bandNumY < bandNumU || bandNumY < bandNumV)
-          continue;
+        for( int bandNumU = 1; bandNumU <= MAX_CCSAO_BAND_NUM_U; bandNumU++ )
+        {
+          for( int bandNumV = 1; bandNumV <= MAX_CCSAO_BAND_NUM_V; bandNumV++ )
+          {
+            for( int candPosY = 0; candPosY < MAX_CCSAO_CAND_POS_Y && bandNumY > 1; candPosY++ )
+            {
+              if( bandNumY < bandNumU || bandNumY < bandNumV )
+              {
+                continue;
+              }
 
-        int classNum = bandNumY * bandNumU * bandNumV;
-        if (classNum > MAX_CCSAO_CLASS_NUM)
-          continue;
+              int classNum = bandNumY * bandNumU * bandNumV;
+              if( classNum > MAX_CCSAO_CLASS_NUM )
+              {
+                continue;
+              }
 
-        if (classNum <= classNumG[stage - 1] || classNum > classNumG[stage])
-          continue;
+              if( classNum <= classNumG[stage - 1] || classNum > classNumG[stage] )
+              {
+                continue;
+              }
 
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-        setupTempCcSaoParam(cs, compID, setNum
+              setupTempCcSaoParam( cs, compID, setNum
 #if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
-                          , 0 /*dummy*/
+                                   , 0 /*dummy*/
 #endif
-                          , candPosY, bandNumY, bandNumU, bandNumV
-                          , m_tempCcSaoParam, m_initCcSaoParam, m_tempCcSaoControl, m_initCcSaoControl /*, 0 (default Band type*/);
+                                   , candPosY, bandNumY, bandNumU, bandNumV
+                                   , m_tempCcSaoParam, m_initCcSaoParam, m_tempCcSaoControl, m_initCcSaoControl /*, 0 (default Band type*/ );
 #else
-        setupTempCcSaoParam(cs, compID, setNum, candPosY, bandNumY, bandNumU, bandNumV, m_tempCcSaoParam,
-                            m_initCcSaoParam, m_tempCcSaoControl, m_initCcSaoControl);
+              setupTempCcSaoParam( cs, compID, setNum, candPosY, bandNumY, bandNumU, bandNumV, m_tempCcSaoParam,
+                                   m_initCcSaoParam, m_tempCcSaoControl, m_initCcSaoControl );
 #endif
-        getCcSaoStatistics(cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatData, m_tempCcSaoParam);
-        deriveCcSaoRDO(cs, compID, m_trainingDistortion, m_ccSaoStatData, m_ccSaoStatFrame
+              getCcSaoStatistics( cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatData, m_tempCcSaoParam );
+              deriveCcSaoRDO( cs, compID, m_trainingDistortion, m_ccSaoStatData, m_ccSaoStatFrame
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-                     , m_ccSaoStatDataEdge,  m_ccSaoStatFrameEdge
+                              , m_ccSaoStatDataEdge, m_ccSaoStatFrameEdge
 #endif
-                     , m_bestCcSaoParam, m_tempCcSaoParam, m_bestCcSaoControl, m_tempCcSaoControl, bestCost, tempCost);
+                              , m_bestCcSaoParam, m_tempCcSaoParam, m_bestCcSaoControl, m_tempCcSaoControl, bestCost, tempCost );
+            }
+          }
+        }
       }
 
       bestCostG[stage] = bestCost;
-      if (bestCostG[stage] >= bestCostG[stage - 1])
+      if( bestCostG[stage] >= bestCostG[stage - 1] )
+      {
         break;
+      }
     }
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
 #if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
@@ -3251,7 +3273,9 @@ void EncSampleAdaptiveOffset::deriveCcSao(CodingStructure& cs, const ComponentID
 #endif
     bestCostS[setNum] = bestCost;
     if (bestCostS[setNum] >= bestCostS[setNum - 1])
+    {
       break;
+    }
   }
 
 #if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
@@ -3495,6 +3519,8 @@ void EncSampleAdaptiveOffset::setupTempCcSaoParam(CodingStructure& cs, const Com
   tempCcSaoParam.bandNum   [setNum - 1][COMPONENT_Cb] = bandNumU;
   tempCcSaoParam.bandNum   [setNum - 1][COMPONENT_Cr] = bandNumV;
 
+  CHECK( setNum > MAX_CCSAO_SET_NUM, "setNum exceeds the buffer size" );
+
   for (int setIdx = 0; setIdx <= setNum; setIdx++)
   {
     tempCcSaoParam.mapIdxToIdc[setIdx] = setIdx < setNum ? setIdx + 1 : 0;
@@ -3518,6 +3544,8 @@ void EncSampleAdaptiveOffset::setupTempCcSaoParamFromPrv(CodingStructure& cs, co
   memcpy( tempCcSaoParam.candPos   , prvCcSaoParam.candPos   , sizeof( tempCcSaoParam.candPos    ) );
   memcpy( tempCcSaoParam.bandNum   , prvCcSaoParam.bandNum   , sizeof( tempCcSaoParam.bandNum    ) );
   memcpy( tempCcSaoParam.offset    , prvCcSaoParam.offset    , sizeof( tempCcSaoParam.offset     ) );
+
+  CHECK( tempCcSaoParam.setNum > MAX_CCSAO_SET_NUM, "setNum exceeds the buffer size" );
 
   for (int setIdx = 0; setIdx <= tempCcSaoParam.setNum; setIdx++)
   {

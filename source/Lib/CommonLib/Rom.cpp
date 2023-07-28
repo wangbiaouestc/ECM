@@ -5468,7 +5468,7 @@ const int8_t g_ccSaoBandTab [MAX_CCSAO_BAND_IDC][2] = { {COMPONENT_Y, 1}, {COMPO
 #else
 const int8_t g_ccSaoEdgeTypeX[CCSAO_EDGE_TYPE][2] = { { -1, 1 }, { 0, 0 }, { -1, 1 }, { 1, -1 } };
 const int8_t g_ccSaoEdgeTypeY[CCSAO_EDGE_TYPE][2] = { { 0, 0 }, { -1, 1 }, { -1, 1 }, { -1, 1 } };
-const short  g_ccSaoQuanValue[CCSAO_QUAN_NUM]      = { 2, 4, 6, 8, 10, 14, 18, 22, 30, 38, 54, 70, 86, 118, 150, 182 };
+const short  g_ccSaoQuanValue[CCSAO_QUAN_NUM]     = { 2, 4, 6, 8, 10, 14, 18, 22, 30, 38, 54, 70, 86, 118, 150, 182 };
 #endif
 #endif
 #if JVET_AC0130_NSPT
