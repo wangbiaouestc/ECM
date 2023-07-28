@@ -46,8 +46,6 @@
 
 struct AlfCovariance
 {
-  static constexpr int MaxAlfNumClippingValues = AdaptiveLoopFilter::MaxAlfNumClippingValues;
-
 #if JVET_X0071_LONGER_CCALF && !JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF && !JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   using TE = double[MAX_NUM_CC_ALF_CHROMA_COEFF][MAX_NUM_CC_ALF_CHROMA_COEFF];
   using Ty = double[MAX_NUM_CC_ALF_CHROMA_COEFF];
@@ -55,49 +53,119 @@ struct AlfCovariance
   using TE = double[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];
   using Ty = double[MAX_NUM_ALF_LUMA_COEFF];
 #endif
-
-
-  using TKE = TE[AdaptiveLoopFilter::MaxAlfNumClippingValues][AdaptiveLoopFilter::MaxAlfNumClippingValues];
-  using TKy = Ty[AdaptiveLoopFilter::MaxAlfNumClippingValues];
-
   int numCoeff;
   int numBins;
-  TKy y;
-  TKE E;
+  double**** E;
+  double** y;
   double pixAcc;
-
-  AlfCovariance() {}
+  AlfCovariance() 
+  {
+    numCoeff = numBins = 0;
+    E = nullptr;
+    y = nullptr;
+    pixAcc = 0;
+  }
   ~AlfCovariance() {}
 
-  void create( int size, int num_bins = MaxAlfNumClippingValues )
+  void create( int size, int num_bins )
   {
     numCoeff = size;
     numBins = num_bins;
-    std::memset( y, 0, sizeof( y ) );
-    std::memset( E, 0, sizeof( E ) );
+    E = new double***[numBins];
+    y = new double*[numBins];
+    for( int b0 = 0; b0 < numBins; b0++ )
+    {
+      E[b0] = new double**[numBins];
+      y[b0] = new double [numCoeff];
+      for( int b1 = 0; b1 < numBins; b1++ )
+      {
+        E[b0][b1] = new double*[numCoeff];
+        for( int i = 0; i < numCoeff; i++ )
+        {
+          E[b0][b1][i] = new double[numCoeff];
+        }
+      }
+    }
   }
 
   void destroy()
   {
+    if( E )
+    {
+      for( int b0 = 0; b0 < numBins; b0++ )
+      {
+        if( E[b0] )
+        {
+          for( int b1 = 0; b1 < numBins; b1++ )
+          {
+            if( E[b0][b1] )
+            {
+              for( int i = 0; i < numCoeff; i++ )
+              {
+                if( E[b0][b1][i] )
+                {
+                  delete[] E[b0][b1][i];
+                  E[b0][b1][i] = nullptr;
+                }
+              }
+              delete[] E[b0][b1];
+              E[b0][b1] = nullptr;
+            }
+          }
+          delete[] E[b0];
+          E[b0] = nullptr;
+        }
+      }
+      delete[] E;
+      E = nullptr;
+    }
+    if( y )
+    {
+      for( int b0 = 0; b0 < numBins; b0++ )
+      {
+        if( y[b0] )
+        {
+          delete[] y[b0];
+          y[b0] = nullptr;
+        }
+      }
+      delete[] y;
+      y = nullptr;
+    }
   }
 
-  void reset( int num_bins = -1 )
+  void reset()
   {
-    if ( num_bins > 0 )
-      numBins = num_bins;
     pixAcc = 0;
-    std::memset( y, 0, sizeof( y ) );
-    std::memset( E, 0, sizeof( E ) );
+    for( int b0 = 0; b0 < numBins; b0++ )
+    {     
+      for( int b1 = 0; b1 < numBins; b1++ )
+      {          
+        for( int i = 0; i < numCoeff; i++ )
+        {
+          std::memset( E[b0][b1][i], 0, sizeof( double ) * numCoeff );
+        }
+      }
+      std::memset(y[b0], 0, sizeof( double ) * numCoeff);
+    }
   }
 
   const AlfCovariance& operator=( const AlfCovariance& src )
   {
     numCoeff = src.numCoeff;
     numBins = src.numBins;
-    std::memcpy( E, src.E, sizeof( E ) );
-    std::memcpy( y, src.y, sizeof( y ) );
+    for( int b0 = 0; b0 < numBins; b0++ )
+    {
+      for( int b1 = 0; b1 < numBins; b1++ )
+      {
+        for( int i = 0; i < numCoeff; i++ )
+        {
+          std::memcpy( E[b0][b1][i], src.E[b0][b1][i], sizeof( double ) * numCoeff );
+        }
+      }
+      std::memcpy( y[b0], src.y[b0], sizeof( double ) * numCoeff );
+    }   
     pixAcc = src.pixAcc;
-
     return *this;
   }
 
@@ -259,8 +327,8 @@ private:
   uint8_t*               m_ctuEnableFlagTmp[MAX_NUM_COMPONENT];
   uint8_t*               m_ctuEnableFlagTmp2[MAX_NUM_COMPONENT];
   uint8_t*               m_ctuAlternativeTmp[MAX_NUM_COMPONENT];
-  AlfCovariance***       m_alfCovarianceCcAlf[2];           // [compIdx-1][shapeIdx][filterIdx][ctbAddr]
-  AlfCovariance**        m_alfCovarianceFrameCcAlf[2];      // [compIdx-1][shapeIdx][filterIdx]
+  AlfCovariance**        m_alfCovarianceCcAlf;           // [shapeIdx][ctbAddr]
+  AlfCovariance*         m_alfCovarianceFrameCcAlf;      // [shapeIdx]
 
 #if ALF_IMPROVEMENT
   bool classChanged[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES];
@@ -454,8 +522,7 @@ private:
 #endif
 #endif
   template<bool alfWSSD>
-  void   deriveStatsForCcAlfFiltering(const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const int compIdx,
-                                      const int maskStride, const uint8_t filterIdc, CodingStructure &cs);
+   void   deriveStatsForCcAlfFiltering( const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const int compIdx, CodingStructure &cs );
   template<bool m_alfWSSD>
   void   getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape, const PelUnitBuf &orgYuv,
                           const PelUnitBuf &recYuv, const UnitArea &areaDst, const UnitArea &area,
@@ -566,7 +633,7 @@ private:
   void countLumaSwingGreaterThanThreshold(const Pel* luma, int lumaStride, int height, int width, int log2BlockWidth, int log2BlockHeight, uint64_t* lumaSwingGreaterThanThresholdCount, int lumaCountStride);
   void countChromaSampleValueNearMidPoint(const Pel* chroma, int chromaStride, int height, int width, int log2BlockWidth, int log2BlockHeight, uint64_t* chromaSampleCountNearMidPoint, int chromaSampleCountNearMidPointStride);
   void getFrameStatsCcalf(ComponentID compIdx, int filterIdc);
-  void initDistortionCcalf();
+  void initDistortionCcalf( int comp );
 };
 
 #endif

@@ -1314,8 +1314,7 @@ void AdaptiveLoopFilter::create(const int picWidth, const int picHeight, const C
   m_numCTUsInWidth = (m_picWidth / m_maxCUWidth) + ((m_picWidth % m_maxCUWidth) ? 1 : 0);
   m_numCTUsInHeight = (m_picHeight / m_maxCUHeight) + ((m_picHeight % m_maxCUHeight) ? 1 : 0);
   m_numCTUsInPic = m_numCTUsInHeight * m_numCTUsInWidth;
-  m_filterShapesCcAlf[0].push_back(AlfFilterShape(size_CC_ALF));
-  m_filterShapesCcAlf[1].push_back(AlfFilterShape(size_CC_ALF));
+  m_filterShapesCcAlf.push_back(AlfFilterShape(size_CC_ALF));
 
 #if ALF_IMPROVEMENT
   m_filterShapes[CHANNEL_TYPE_LUMA].push_back(AlfFilterShape(5));
@@ -1881,9 +1880,8 @@ void AdaptiveLoopFilter::destroy()
   m_filterShapes[CHANNEL_TYPE_LUMA].clear();
   m_filterShapes[CHANNEL_TYPE_CHROMA].clear();
   m_created = false;
+  m_filterShapesCcAlf.clear();
 
-  m_filterShapesCcAlf[0].clear();
-  m_filterShapesCcAlf[1].clear();
   if ( m_ccAlfFilterControl[0] )
   {
     delete [] m_ccAlfFilterControl[0];
@@ -4868,7 +4866,7 @@ void AdaptiveLoopFilter::filterBlk(AlfClassifier **classifier, const PelUnitBuf 
             }
           }
 #endif
-          #if JVET_AD0222_ALF_LONG_FIXFILTER || JVET_AD0222_ADDITONAL_ALF_FIXFILTER
+#if JVET_AD0222_ALF_LONG_FIXFILTER || JVET_AD0222_ADDITONAL_ALF_FIXFILTER
           if (filtType == ALF_FILTER_13_EXT)
           {
 #if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
