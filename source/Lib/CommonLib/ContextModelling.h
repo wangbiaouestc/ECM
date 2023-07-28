@@ -110,7 +110,11 @@ public:
   TCoeff          maxCoeff()                                const { return m_maxCoeff; }
 #endif
 
-  unsigned sigCtxIdAbs( int scanPos, const TCoeff* coeff, const int state )
+#if JVET_AE0102_LFNST_CTX 
+  unsigned sigCtxIdAbs(int scanPos, const TCoeff* coeff, const int state, int lfnstIdx = -1)
+#else
+  unsigned sigCtxIdAbs(int scanPos, const TCoeff* coeff, const int state)
+#endif
   {
     const uint32_t posY      = m_scan[scanPos].y;
     const uint32_t posX      = m_scan[scanPos].x;
@@ -123,6 +127,10 @@ public:
 #else
     int           sumAbs    = 0;
 #define UPDATE(x) {int a=abs(x);sumAbs+=std::min(4+(a&1),a);numPos+=!!a;}
+#endif
+#if JVET_AE0102_LFNST_CTX
+    if (lfnstIdx == 0)
+    {
 #endif
     if( posX < m_width-1 )
     {
@@ -144,6 +152,16 @@ public:
         UPDATE( pData[m_width<<1] );
       }
     }
+#if JVET_AE0102_LFNST_CTX
+    }
+    else if (lfnstIdx > 0)
+    {
+      for (int k = 1; k <= std::min(5, scanPosLast() - scanPos); k++)
+      {
+        UPDATE( coeff[blockPos(scanPos + k)] );
+      }
+    }
+#endif
 #undef UPDATE
 
 
@@ -166,7 +184,6 @@ public:
     return m_sigFlagCtxSet[std::max( 0, state-1 )]( ctxOfs );
 #endif
   }
-
   uint8_t ctxOffsetAbs()
   {
     int offset = 0;
@@ -181,11 +198,25 @@ public:
     }
     return uint8_t(offset);
   }
-
-  unsigned parityCtxIdAbs   ( uint8_t offset )  const { return m_parFlagCtxSet   ( offset ); }
+  unsigned parityCtxIdAbs   ( uint8_t offset)  const { return m_parFlagCtxSet   ( offset ); }
   unsigned greater1CtxIdAbs ( uint8_t offset )  const { return m_gtxFlagCtxSet[1]( offset ); }
   unsigned greater2CtxIdAbs ( uint8_t offset )  const { return m_gtxFlagCtxSet[0]( offset ); }
-  unsigned templateAbsSum( int scanPos, const TCoeff* coeff, int baseLevel )
+#if JVET_AE0102_LFNST_CTX
+  void updateCtxSets()
+  {
+    m_sigFlagCtxSet[0] = Ctx::SigFlag[m_chType];
+    m_sigFlagCtxSet[1] = Ctx::SigFlag[m_chType + 2];
+    m_sigFlagCtxSet[2] = Ctx::SigFlag[m_chType];
+    m_sigFlagCtxSet[3] = Ctx::SigFlag[m_chType + 4];
+
+    m_parFlagCtxSet    = Ctx::ParFlag[m_chType];
+    m_gtxFlagCtxSet[0] = Ctx::GtxFlag[m_chType];
+    m_gtxFlagCtxSet[1] = Ctx::GtxFlag[m_chType + 2];
+  }
+  unsigned templateAbsSum(int scanPos, const TCoeff* coeff, int baseLevel, int lfnstIdx = 0)
+#else
+  unsigned templateAbsSum(int scanPos, const TCoeff* coeff, int baseLevel)
+#endif
   {
     const uint32_t  posY  = m_scan[scanPos].y;
     const uint32_t  posX  = m_scan[scanPos].x;
@@ -194,6 +225,10 @@ public:
     TCoeff          sum   = 0;
 #else
     int             sum   = 0;
+#endif
+#if JVET_AE0102_LFNST_CTX
+    if (lfnstIdx == 0 )
+    {
 #endif
     if (posX < m_width - 1)
     {
@@ -215,6 +250,16 @@ public:
         sum += abs(pData[m_width << 1]);
       }
     }
+#if JVET_AE0102_LFNST_CTX
+    }
+    else if (lfnstIdx > 0)
+    {
+      for (int k = 1; k <= std::min(5, scanPosLast() - scanPos); k++)
+      {
+        sum += abs(coeff[blockPos(scanPos + k)]);
+      }
+    }
+#endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
     return unsigned(std::max<TCoeff>(std::min<TCoeff>(sum - 5 * baseLevel, 31), 0));
 #else
@@ -488,7 +533,7 @@ private:
 #endif
   int                       m_tmplCpDiag;
 #if TCQ_8STATES
-	CtxSet                    m_sigFlagCtxSet[4];
+  CtxSet                    m_sigFlagCtxSet[4];
 #else
   CtxSet                    m_sigFlagCtxSet[3];
 #endif

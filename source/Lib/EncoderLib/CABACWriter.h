@@ -269,7 +269,12 @@ public:
 #endif
 
   // transform tree (clause 7.3.8.8)
-  void        transform_tree            ( const CodingStructure&        cs,       Partitioner&      pm,     CUCtx& cuCtx,                         const PartSplit ispType = TU_NO_ISP, const int subTuIdx = -1 );
+  void        transform_tree(const CodingStructure&        cs, Partitioner&      pm, CUCtx& cuCtx, const PartSplit ispType = TU_NO_ISP, const int subTuIdx = -1
+#if JVET_AE0102_LFNST_CTX
+    , const bool codeTuCoeff = false
+#endif  
+  );
+
   void        cbf_comp                  ( const CodingStructure&        cs,       bool              cbf,    const CompArea& area, unsigned depth, const bool prevCbf = false, const bool useISP = false );
 
   // mvd coding (clause 7.3.8.9)
@@ -359,19 +364,33 @@ public:
   void mvsdAffineIdxFunc(const PredictionUnit &pu, RefPicList eRefList);
 #endif
   // transform unit (clause 7.3.8.10)
-  void        transform_unit            ( const TransformUnit&          tu,       CUCtx&            cuCtx,  Partitioner& pm,       const int subTuCounter = -1 );
+  void        transform_unit( const TransformUnit&          tu, CUCtx&            cuCtx, Partitioner& pm, const int subTuCounter = -1
+#if JVET_AE0102_LFNST_CTX
+    , const bool codeTuCoeff = false
+#endif
+  );
+
+
   void        cu_qp_delta               ( const CodingUnit&             cu,       int               predQP, const int8_t qp );
   void        cu_chroma_qp_offset       ( const CodingUnit&             cu );
 
   // residual coding (clause 7.3.8.11)
-  void        residual_coding           ( const TransformUnit&          tu,       ComponentID       compID, CUCtx* cuCtx = nullptr );
+  void        residual_coding           ( const TransformUnit&          tu,       ComponentID       compID, CUCtx* cuCtx = nullptr
+#if JVET_AE0102_LFNST_CTX  
+    , const bool codeTuCoeff = false
+#endif      
+  );
   void        ts_flag                   ( const TransformUnit&          tu,       ComponentID       compID );
   void        mts_idx                   ( const CodingUnit&             cu,       CUCtx*            cuCtx  );
   void        residual_lfnst_mode       ( const CodingUnit&             cu,       CUCtx&            cuCtx );
   void        isp_mode                  ( const CodingUnit&             cu );
   void        last_sig_coeff            ( CoeffCodingContext&           cctx,     const TransformUnit& tu, ComponentID       compID );
 #if TCQ_8STATES
-  void        residual_coding_subblock  ( CoeffCodingContext&           cctx,     const TCoeff*     coeff, const uint64_t stateTransTable, int& state );
+#if JVET_AE0102_LFNST_CTX 
+  void        residual_coding_subblock(CoeffCodingContext& cctx, const TCoeff* coeff, const uint64_t stateTransTable, int& state, int lfnstIdx = -1);
+#else
+  void        residual_coding_subblock(CoeffCodingContext& cctx, const TCoeff* coeff, const uint64_t stateTransTable, int& state);
+#endif
 #else
 	void        residual_coding_subblock  ( CoeffCodingContext&           cctx,     const TCoeff*     coeff, const int stateTransTable, int& state );
 #endif

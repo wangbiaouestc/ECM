@@ -776,6 +776,9 @@ struct TransformUnit : public UnitArea
   bool           noResidual;
   uint8_t        jointCbCr;
   uint8_t        cbf        [ MAX_NUM_TBLOCKS ];
+#if JVET_AE0102_LFNST_CTX
+  int            lastPosition[ MAX_NUM_TBLOCKS ];
+#endif
 
 #if JVET_AE0059_INTER_CCCM
   int8_t         interCccm;
