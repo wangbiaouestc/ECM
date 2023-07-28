@@ -280,6 +280,11 @@ typedef AreaBuf<      uint8_t> IpmBuf;
 typedef AreaBuf<const uint8_t> CIpmBuf;
 #endif
 
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+typedef AreaBuf<      int>   CCPModelIdxBuf;
+typedef AreaBuf<const int>  CCCPModelIdxBuf;
+#endif
+
 typedef AreaBuf<      TCoeff>  PLTescapeBuf;
 typedef AreaBuf<const TCoeff> CPLTescapeBuf;
 
