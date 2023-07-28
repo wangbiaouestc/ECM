@@ -790,6 +790,13 @@ void DecLib::executeLoopFilters()
   CS::setRefinedMotionField(cs);
 #endif
 
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  if ((cs.picture->temporalId == 0) || (cs.picture->temporalId < cs.slice->getSPS()->getMaxTLayers() - 1))
+  {
+    CS::saveTemporalCcpModel(cs);
+  }
+#endif
+
 #if JVET_W0066_CCSAO
   if (cs.sps->getCCSAOEnabledFlag())
   {

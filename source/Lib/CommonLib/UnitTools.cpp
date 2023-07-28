@@ -106,6 +106,36 @@ void CS::setRefinedMotionField(CodingStructure &cs)
   }
 }
 #endif
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+void CS::saveTemporalCcpModel(CodingStructure &cs)
+{
+  unsigned lumaAreaScaled = g_miScaling.scale( cs.area.lumaSize() ).area();
+  cs.m_ccpmIdxBuf = new int[lumaAreaScaled];
+  cs.m_ccpModelLUT.clear();
+  
+  if (cs.area.Cb().area() > 0)
+  {
+    CCPModelIdxBuf ccpIdxBuf = cs.getCcpmIdxBuf(cs.area.Cb());
+    ccpIdxBuf.fill(0);
+  }
+
+  int idx = 0;
+  for (CodingUnit *cu : cs.cus)
+  {
+    for (auto &pu : CU::traversePUs(*cu))
+    {
+      if (pu.curCand.type > 0)
+      {
+        CCPModelCandidate ccpModel = pu.curCand;
+        cs.m_ccpModelLUT.push_back(ccpModel);
+        idx++;
+        CCPModelIdxBuf ccpIdxBuf = pu.cs->getCcpmIdxBuf(pu.Cb());
+        ccpIdxBuf.fill(idx);
+      }
+    }
+  }
+}
+#endif
 // CU tools
 
 bool CU::getRprScaling( const SPS* sps, const PPS* curPPS, Picture* refPic, int& xScale, int& yScale )
@@ -2860,7 +2890,11 @@ bool PU::hasNonLocalCCP(const PredictionUnit &pu)
   {
     return false;
   }
-  if (pu.chromaSize().width * pu.chromaSize().height <= 16)
+  if (pu.chromaSize().width * pu.chromaSize().height <= 16
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+      && pu.cs->slice->getSliceType() == I_SLICE
+#endif
+  )
   {
     return false;
   }
@@ -2903,6 +2937,22 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
     return true;
   };
 
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  auto tryToAddOneModel = [&](const CCPModelCandidate& curCand)
+  {
+    candList[maxCandIdx] = curCand;
+    
+    for (int j = 0; j < maxCandIdx; j++)
+    {
+      if (candList[maxCandIdx] == candList[j])
+      {
+        return false;
+      }
+    }
+    return true;
+  };
+#endif
+
   const Position posCand[5] = {
     pu.chromaPos().offset(-1, iH - 1),
     pu.chromaPos().offset(iW - 1, -1),
@@ -2935,6 +2985,132 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
       }
     }
   }
+
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  // Temporal candidates
+  const CodingStructure& cs = *pu.cs;
+  const Slice &slice = *pu.cs->slice;
+  if (!slice.isIntra())
+  {
+    const Picture* const pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx()); 
+
+    if(pColPic)
+    {
+      const PreCalcValues& pcv = *cs.pcv;
+      bool c0Avail;
+      bool c1Avail;
+      bool boundaryCond;
+      const SubPic& curSubPic = pu.cs->slice->getPPS()->getSubPicFromPos(pu.lumaPos());
+      int lumaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, pu.chromaFormat );
+      int lumaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, pu.chromaFormat );
+      Position posRB = pu.Cb().bottomRight().offset(-1, -1);
+      Position posCenter = pu.Cb().center();
+      Position posC0;
+      Position posC1;
+
+      int offsetX0 = 0, offsetX1 = 0, offsetX2 = 0, offsetX3 = pu.Cb().width >> 1;
+      int offsetY0 = 0, offsetY1 = 0, offsetY2 = 0, offsetY3 = pu.Cb().height >> 1;
+
+      const int numNACandidate[5] = { 2, 2, 2, 2, 2 };
+      const int idxMap[5][2] = { { 0, 1 },{ 0, 2 },{ 0, 2 },{ 0, 2 },{ 0, 2 } };
+
+      for (int iDistanceIndex = 0; iDistanceIndex < 5 && maxCandIdx < MAX_CCP_CAND_LIST_SIZE; iDistanceIndex++)
+      {
+        const int iNADistanceHor = pu.Cb().width  * iDistanceIndex;
+        const int iNADistanceVer = pu.Cb().height * iDistanceIndex;
+
+        for (int naspIdx = 0; naspIdx < numNACandidate[iDistanceIndex] && maxCandIdx < MAX_CCP_CAND_LIST_SIZE; naspIdx++)
+        {
+          switch (idxMap[iDistanceIndex][naspIdx])
+          {
+          case 0: offsetX0 = offsetX2 = 2 + iNADistanceHor; offsetY0 = offsetY2 = 2 + iNADistanceVer; offsetX1 = iNADistanceHor; offsetY1 = iNADistanceVer; break;
+          case 1: offsetX0 = 2; offsetY0 = 0; offsetX1 = 0; offsetY1 = 2; break;
+          case 2: offsetX0 = offsetX2; offsetY0 = 2 - offsetY3; offsetX1 = 2 - offsetX3; offsetY1 = offsetY2; break;
+          default: printf("error!"); exit(0); break;
+          }
+        
+          c0Avail = false;
+          if (curSubPic.getTreatedAsPicFlag())
+          {
+            boundaryCond = ((posRB.x + offsetX0) <= (curSubPic.getSubPicRight() >> lumaScaleX)) && ((posRB.y + offsetY0) <= (curSubPic.getSubPicBottom() >> lumaScaleY));
+          }
+          else
+          {
+            boundaryCond = ((posRB.x + offsetX0) < (pcv.lumaWidth >> lumaScaleX)) && ((posRB.y + offsetY0) < (pcv.lumaHeight >> lumaScaleY));
+          }
+          if (boundaryCond)
+          {
+            posC0 = posRB.offset(offsetX0, offsetY0);
+            c0Avail = true;
+          }
+
+          if (idxMap[iDistanceIndex][naspIdx] == 0)
+          {
+            c1Avail = false;
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+              boundaryCond = ((posCenter.x + offsetX1) <= (curSubPic.getSubPicRight() >> lumaScaleX) && (posCenter.y + offsetY1) <= (curSubPic.getSubPicBottom() >> lumaScaleY));
+            }
+            else
+            {
+              boundaryCond = ((posCenter.x + offsetX1) < (pcv.lumaWidth >> lumaScaleX)) && ((posCenter.y + offsetY1) < (pcv.lumaHeight >> lumaScaleY));
+            }
+            if (boundaryCond)
+            {
+              posC1 = posCenter.offset(offsetX1, offsetY1);
+              c1Avail = true;
+            }
+          }
+          else
+          {
+            c1Avail = false;
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+              boundaryCond = ((posRB.x + offsetX1) <= (curSubPic.getSubPicRight() >> lumaScaleX) && (posRB.y + offsetY1) <= (curSubPic.getSubPicBottom() >> lumaScaleY));
+            }
+            else
+            {
+              boundaryCond = ((posRB.x + offsetX1) < (pcv.lumaWidth >> lumaScaleX)) && ((posRB.y + offsetY1) < (pcv.lumaHeight >> lumaScaleY));
+            }
+            if (boundaryCond)
+            {
+              posC1 = posRB.offset(offsetX1, offsetY1);
+              c1Avail = true;
+            }
+          }
+
+          if (c0Avail || c1Avail)
+          {
+            int modelIdx = c0Avail? pColPic->cs->getCcpmIdxInfo(posC0) 
+                            : pColPic->cs->getCcpmIdxInfo(posC1);
+            if (modelIdx > 0)
+            {
+              const CCPModelCandidate currCCPModel = pColPic->cs->m_ccpModelLUT[modelIdx-1];
+              CHECK(currCCPModel.type <= 0, "Invalid type");
+              if (!tryToAddOneModel(currCCPModel))
+              {
+                continue;
+              }
+              if (!found1stCCLM && candList[maxCandIdx].type == CCP_TYPE_CCLM)
+              {
+                scaleCclm[0] = candList[maxCandIdx].params[0][0];
+                shiftCclm[0] = candList[maxCandIdx].shift[0];
+                scaleCclm[1] = candList[maxCandIdx].params[1][0];
+                shiftCclm[1] = candList[maxCandIdx].shift[1];
+                found1stCCLM = true;
+              }
+              maxCandIdx++;
+              if (maxCandIdx == MAX_CCP_CAND_LIST_SIZE)
+              {
+                return maxCandIdx;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+#endif
 
   int offsetX = 0;  int offsetY = 0;
   int offsetX0 = 0; int offsetX1 = 0; int offsetX2 = pu.chType == CHANNEL_TYPE_LUMA ? pu.Y().width >> 1 : pu.Cb().width >> 1;
@@ -3117,6 +3293,178 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
   {
     return ret;
   }
+
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  // Temporal motion vector shifted candidates
+  if (!slice.isIntra())
+  {
+    const Picture* const pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx()); 
+
+    if(pColPic)
+    {
+      const PreCalcValues& pcv = *cs.pcv;
+
+      bool c0Avail;
+      bool c1Avail;
+      bool boundaryCond;
+      const SubPic& curSubPic = pu.cs->slice->getPPS()->getSubPicFromPos(pu.lumaPos());
+      int lumaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, pu.chromaFormat );
+      int lumaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, pu.chromaFormat );
+      Position posRB = pu.Cb().bottomRight().offset(-1, -1);
+      Position posCenter = pu.Cb().center();
+      
+      Position posC0;
+      Position posC1;
+
+      int offsetX0 = 0, offsetX1 = 0, offsetX2 = 0, offsetX3 = pu.Cb().width >> 1;
+      int offsetY0 = 0, offsetY1 = 0, offsetY2 = 0, offsetY3 = pu.Cb().height >> 1;
+
+      const int numNACandidate[5] = { 2, 2, 2, 2, 2 };
+      const int idxMap[5][2] = { { 0, 1 },{ 0, 2 },{ 0, 2 },{ 0, 2 },{ 0, 2 } };
+
+      const unsigned plevel = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
+
+      MotionInfo miNeigh;
+      bool foundNeighMV = false;
+      bool useL0;
+      const int colPOC     = pColPic->getPOC();
+
+      for (int posIdx = 0; posIdx < 5 && foundNeighMV == false; posIdx++)
+      {
+        const PredictionUnit *puRef = cs.getPURestricted(posCand[posIdx], pu, pu.chType);
+        bool isAvailableNeigh = puRef && 
+                                isDiffMER(pu.lumaPos(), posCand[posIdx], plevel) && 
+                                pu.cu != puRef->cu && 
+                                CU::isInter(*puRef->cu);
+
+        if (isAvailableNeigh)
+        {
+          miNeigh = puRef->getMotionInfo(posCand[posIdx]);
+          for (int i = 0; i < 2 && foundNeighMV == false; i++)
+          {
+            int refIdx = miNeigh.refIdx[i];
+            if (refIdx != -1)
+            {
+              const int currRefPOC = slice.getRefPic(RefPicList(i), refIdx)->getPOC();
+              if (currRefPOC == colPOC)
+              {
+                foundNeighMV = true;
+                useL0 = i == 0 ? 1 : 0;
+              }
+            }
+          }
+        }
+      }
+      
+      Mv   shiftChromaMv;
+      if (foundNeighMV)
+      {
+        shiftChromaMv = useL0 ? miNeigh.mv[0] : miNeigh.mv[1];
+        shiftChromaMv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+        shiftChromaMv.hor = shiftChromaMv.hor >> lumaScaleX;
+        shiftChromaMv.ver = shiftChromaMv.ver >> lumaScaleY;
+      }
+      else
+      {
+        shiftChromaMv.set(0,0);
+      }
+
+      for (int iDistanceIndex = 0; iDistanceIndex < 5 && maxCandIdx < MAX_CCP_CAND_LIST_SIZE; iDistanceIndex++)
+      {
+        const int iNADistanceHor = pu.Cb().width  * iDistanceIndex;
+        const int iNADistanceVer = pu.Cb().height * iDistanceIndex;
+
+        for (int naspIdx = 0; naspIdx < numNACandidate[iDistanceIndex] && maxCandIdx < MAX_CCP_CAND_LIST_SIZE; naspIdx++)
+        {
+          switch (idxMap[iDistanceIndex][naspIdx])
+          {
+          case 0: offsetX0 = offsetX2 = 2 + iNADistanceHor; offsetY0 = offsetY2 = 2 + iNADistanceVer; offsetX1 = iNADistanceHor; offsetY1 = iNADistanceVer; break;
+          case 1: offsetX0 = 2; offsetY0 = 0; offsetX1 = 0; offsetY1 = 2; break;
+          case 2: offsetX0 = offsetX2; offsetY0 = 2 - offsetY3; offsetX1 = 2 - offsetX3; offsetY1 = offsetY2; break;
+          default: printf("error!"); exit(0); break;
+          }
+        
+          c0Avail = false;
+          if (curSubPic.getTreatedAsPicFlag())
+          {
+            boundaryCond = ((posRB.x + shiftChromaMv.hor + offsetX0) <= (curSubPic.getSubPicRight() >> lumaScaleX)) && ((posRB.y + shiftChromaMv.ver + offsetY0) <= (curSubPic.getSubPicBottom() >> lumaScaleY));
+          }
+          else
+          {
+            boundaryCond = ((posRB.x + shiftChromaMv.hor + offsetX0) < (pcv.lumaWidth >> lumaScaleX)) && ((posRB.y + shiftChromaMv.ver + offsetY0) < (pcv.lumaHeight >> lumaScaleY));
+          }
+          if (boundaryCond)
+          {
+            posC0 = posRB.offset(shiftChromaMv.hor + offsetX0, shiftChromaMv.ver + offsetY0);
+            c0Avail = true;
+          }
+
+          if (idxMap[iDistanceIndex][naspIdx] == 0)
+          {
+            c1Avail = false;
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+              boundaryCond = ((posCenter.x + shiftChromaMv.hor + offsetX1) <= (curSubPic.getSubPicRight() >> lumaScaleX) && (posCenter.y + shiftChromaMv.ver + offsetY1) <= (curSubPic.getSubPicBottom() >> lumaScaleY));
+            }
+            else
+            {
+              boundaryCond = ((posCenter.x + shiftChromaMv.hor + offsetX1) < (pcv.lumaWidth >> lumaScaleX)) && ((posCenter.y + shiftChromaMv.ver + offsetY1) < (pcv.lumaHeight >> lumaScaleY));
+            }
+            if (boundaryCond)
+            {
+              posC1 = posCenter.offset(shiftChromaMv.hor + offsetX1, shiftChromaMv.ver + offsetY1);
+              c1Avail = true;
+            }
+          }
+          else
+          {
+            c1Avail = false;
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+              boundaryCond = ((posRB.x + shiftChromaMv.hor + offsetX1) <= (curSubPic.getSubPicRight() >> lumaScaleX) && (posRB.y + shiftChromaMv.ver + offsetY1) <= (curSubPic.getSubPicBottom() >> lumaScaleY));
+            }
+            else
+            {
+              boundaryCond = ((posRB.x + shiftChromaMv.hor + offsetX1) < (pcv.lumaWidth >> lumaScaleX)) && ((posRB.y + shiftChromaMv.ver + offsetY1) < (pcv.lumaHeight >> lumaScaleY));
+            }
+            if (boundaryCond)
+            {
+              posC1 = posRB.offset(shiftChromaMv.hor + offsetX1, shiftChromaMv.ver + offsetY1);          
+              c1Avail = true;
+            }
+          }
+          if (c0Avail || c1Avail)
+          {
+            int modelIdx = c0Avail? pColPic->cs->getCcpmIdxInfo(posC0) 
+                            : pColPic->cs->getCcpmIdxInfo(posC1);
+            if (modelIdx > 0)
+            {
+              const CCPModelCandidate currCCPModel = pColPic->cs->m_ccpModelLUT[modelIdx-1];
+              CHECK(currCCPModel.type <= 0, "Invalid type");
+              if (!tryToAddOneModel(currCCPModel))
+              {
+                continue;
+              }
+              if (!found1stCCLM && candList[maxCandIdx].type == CCP_TYPE_CCLM)
+              {
+                scaleCclm[0] = candList[maxCandIdx].params[0][0];
+                shiftCclm[0] = candList[maxCandIdx].shift[0];
+                scaleCclm[1] = candList[maxCandIdx].params[1][0];
+                shiftCclm[1] = candList[maxCandIdx].shift[1];
+                found1stCCLM = true;
+              }
+              maxCandIdx++;
+              if (maxCandIdx == MAX_CCP_CAND_LIST_SIZE)
+              {
+                return maxCandIdx;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+#endif
 
   if (maxCandIdx < MAX_CCP_CAND_LIST_SIZE)
   {

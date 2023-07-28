@@ -52,6 +52,9 @@ namespace CS
 #if !MULTI_PASS_DMVR
   void   setRefinedMotionField(CodingStructure &cs);
 #endif
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  void   saveTemporalCcpModel(CodingStructure &cs); 
+#endif
 }
 
 

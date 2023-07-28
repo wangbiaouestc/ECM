@@ -3577,6 +3577,13 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       CS::setRefinedMotionField(cs);
 #endif
 
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+      if ((pcPic->temporalId == 0) || (pcPic->temporalId < pcSlice->getSPS()->getMaxTLayers() - 1))
+      {
+        CS::saveTemporalCcpModel(cs);
+      }
+#endif
+
 #if JVET_W0066_CCSAO
       if ( cs.sps->getCCSAOEnabledFlag() )
       {
