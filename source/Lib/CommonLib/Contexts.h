@@ -489,6 +489,11 @@ public:
   static const CtxSet   SigCoeffGroup   [2];    // [ ChannelType ]
   static const CtxSet   LastX           [2];    // [ ChannelType ]
   static const CtxSet   LastY           [2];    // [ ChannelType ]
+#if JVET_AE0102_LFNST_CTX
+  static const CtxSet   SigFlagL[6];    // [ ChannelType + State ]
+  static const CtxSet   ParFlagL[2];    // [ ChannelType ]
+  static const CtxSet   GtxFlagL[4];    // [ ChannelType + x ]
+#endif
   static const CtxSet   SigFlag         [6];    // [ ChannelType + State ]
   static const CtxSet   ParFlag         [2];    // [ ChannelType ]
   static const CtxSet   GtxFlag         [4];    // [ ChannelType + x ]
@@ -621,19 +626,19 @@ public:
   CtxStore( bool dummy );
   CtxStore( const CtxStore<BinProbModel>& ctxStore );
 public:
-  void copyFrom( const CtxStore<BinProbModel> &src )
+  void copyFrom(const CtxStore<BinProbModel>& src)
   {
     checkInit();
-    std::copy_n( reinterpret_cast< const char * >(src.m_ctx), sizeof( BinProbModel ) * ContextSetCfg::NumberOfContexts,
-                 reinterpret_cast< char * >(m_ctx) );
+    std::copy_n(reinterpret_cast<const char*>(src.m_ctx), sizeof(BinProbModel) * ContextSetCfg::NumberOfContexts,
+      reinterpret_cast<char*>(m_ctx));
   }
-  void copyFrom( const CtxStore<BinProbModel> &src, const CtxSet &ctxSet )
+  void copyFrom(const CtxStore<BinProbModel>& src, const CtxSet& ctxSet)
   {
     checkInit();
-    std::copy_n( reinterpret_cast< const char * >(src.m_ctx + ctxSet.Offset), sizeof( BinProbModel ) * ctxSet.Size,
-                 reinterpret_cast< char * >(m_ctx + ctxSet.Offset) );
+    std::copy_n(reinterpret_cast<const char*>(src.m_ctx + ctxSet.Offset), sizeof(BinProbModel) * ctxSet.Size,
+      reinterpret_cast<char*>(m_ctx + ctxSet.Offset));
   }
-  void init       ( int qp, int initId );
+  void init(int qp, int initId);
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   void loadWinSizes( const std::vector<uint8_t>&   windows );
   void saveWinSizes( std::vector<uint8_t>&         windows ) const;
@@ -708,14 +713,14 @@ public:
     return std::move(subCtx);
   }
 
-  void  init ( int qp, int initId )
+  void  init(int qp, int initId)
   {
-    switch( m_BPMType )
+    switch (m_BPMType)
     {
     case BPM_Std:   m_ctxStore_Std  .init( qp, initId );  break;
     default:        break;
     }
-    for( std::size_t k = 0; k < RExt__GOLOMB_RICE_ADAPTATION_STATISTICS_SETS; k++ )
+    for (std::size_t k = 0; k < RExt__GOLOMB_RICE_ADAPTATION_STATISTICS_SETS; k++)
     {
       m_GRAdaptStats[k] = 0;
     }

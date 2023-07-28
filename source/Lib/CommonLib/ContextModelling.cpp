@@ -84,12 +84,24 @@ CoeffCodingContext::CoeffCodingContext( const TransformUnit& tu, ComponentID com
   , m_tmplCpSum1                (-1)
   , m_tmplCpDiag                (-1)
 #if TCQ_8STATES
+#if JVET_AE0102_LFNST_CTX
+  , m_sigFlagCtxSet             { (tu.cu->lfnstIdx == 0) ? Ctx::SigFlag[m_chType]     : Ctx::SigFlagL[m_chType],
+                                  (tu.cu->lfnstIdx == 0) ? Ctx::SigFlag[m_chType + 2] : Ctx::SigFlagL[m_chType + 2],
+                                  (tu.cu->lfnstIdx == 0) ? Ctx::SigFlag[m_chType]     : Ctx::SigFlagL[m_chType],
+                                  (tu.cu->lfnstIdx == 0) ? Ctx::SigFlag[m_chType + 4] : Ctx::SigFlagL[m_chType + 4] }
+#else
   , m_sigFlagCtxSet             { Ctx::SigFlag[m_chType], Ctx::SigFlag[m_chType+2], Ctx::SigFlag[m_chType], Ctx::SigFlag[m_chType+4] }
+#endif
 #else
   , m_sigFlagCtxSet             { Ctx::SigFlag[m_chType], Ctx::SigFlag[m_chType+2], Ctx::SigFlag[m_chType+4] }
 #endif
+#if JVET_AE0102_LFNST_CTX
+  , m_parFlagCtxSet             { (tu.cu->lfnstIdx == 0) ? Ctx::ParFlag[m_chType] : Ctx::ParFlagL[m_chType] }
+  , m_gtxFlagCtxSet             { (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlag[m_chType] : Ctx::GtxFlagL[m_chType] , (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlag[m_chType + 2] : Ctx::GtxFlagL[m_chType + 2] }
+#else
   , m_parFlagCtxSet             ( Ctx::ParFlag[m_chType] )
   , m_gtxFlagCtxSet             { Ctx::GtxFlag[m_chType], Ctx::GtxFlag[m_chType+2] }
+#endif
   , m_sigGroupCtxIdTS           (-1)
   , m_tsSigFlagCtxSet           ( Ctx::TsSigFlag )
   , m_tsParFlagCtxSet           ( Ctx::TsParFlag )

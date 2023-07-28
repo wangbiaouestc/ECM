@@ -354,7 +354,7 @@
 #endif
 #define JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST              1 // JVET-AC0115: Modifications of MTS/LFNST for Intra TMP coded block
 #define JVET_AE0125_SHIFT_QUANTIZATION_CENTER             1 // JVET-AE0125: Shifting quantization center
-
+#define JVET_AE0102_LFNST_CTX                             1 // JVET-AE0102: Context modelling for transform coefficients for LFNST/NSPT
 
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision
