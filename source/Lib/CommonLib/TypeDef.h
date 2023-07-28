@@ -81,6 +81,7 @@
 #define JVET_S0175_ASPECT6                                1 // The general_nal_hrd_params_present_flag and general_vcl_hrd_params_present_flag are allowed to both be equal to 0
 #define JVET_R0046_IRAP_ASPECT2                           1 // Add a constraint on an ILRP being either an IRAP picture or having TemporalId less than or equal to Max (0, vps_max_tid_il_ref_pics_plus1[ refPicVpsLayerId ] - 1 )
 #define JVET_T0064                                        1 // JVET-T0064: control of filter strength for ALF
+#define JVET_AE0057_MTT_ET                                1 // JVET-AE0057: MTT split modes early termination
 
 //########### place macros to be be kept below this line ###############
 #define JVET_S0257_DUMP_360SEI_MESSAGE                    1 // Software support of 360 SEI messages
@@ -94,6 +95,7 @@
 #define JVET_R0107_BITSTREAM_EXTACTION                    1 // JVET-R0107 Proposal 3:Bitsteam extraction modifications
 
 #define APPLY_SBT_SL_ON_MTS                               1 // apply save & load fast algorithm on inter MTS when SBT is on
+
 
 typedef std::pair<int, bool> TrMode;
 typedef std::pair<int, int>  TrCost;
