@@ -461,6 +461,9 @@ protected:
 #else
   void xGetLMParameters           (const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, CclmModel &cclmModel);
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+public:
+#endif
 #if LMS_LINEAR_MODEL && MMLM
   struct MMLM_parameter
   {
@@ -470,6 +473,9 @@ protected:
   };
   int xCalcLMParametersGeneralized(int x, int y, int xx, int xy, int count, int bitDepth, int &a, int &b, int &iShift);
   int xLMSampleClassifiedTraining (int count, int mean, int meanC, int LumaSamples[], int ChrmSamples[], int bitDepth, MMLM_parameter parameters[]);
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+protected:
 #endif
 #if JVET_Z0050_CCLM_SLOPE
   void xUpdateCclmModel           (int &a, int &b, int &iShift, int midLuma, int delta);

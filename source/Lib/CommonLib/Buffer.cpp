@@ -1817,6 +1817,32 @@ void AreaBuf<Pel>::reconstruct( const AreaBuf<const Pel> &pred, const AreaBuf<co
   }
 }
 
+#if JVET_AE0078_IBC_LIC_EXTENSION
+template<>
+void AreaBuf<Pel>::linearTransforms(const int scale, const int shift, const int offset, const int scale2, const int shift2, const int offset2, const int yThres, bool bClip, const ClpRng& clpRng)
+{
+  const Pel* src = buf;
+  Pel* dst = buf;
+
+  for (int i = 0; i < height; i++)
+  {
+    for (int j = 0; j < width; j++)
+    {
+      if (src[j] <= yThres)
+      {
+        dst[j] = (Pel)ClipPel(((scale * src[j]) >> shift) + offset, clpRng);
+      }
+      else
+      {
+        dst[j] = (Pel)ClipPel(((scale2 * src[j]) >> shift2) + offset2, clpRng);
+      }
+    }
+    src += stride;
+    dst += stride;
+  }
+}
+#endif
+
 template<>
 void AreaBuf<Pel>::linearTransform( const int scale, const int shift, const int offset, bool bClip, const ClpRng& clpRng )
 {

@@ -3425,6 +3425,22 @@ const CtxSet ContextSetCfg::IbcLicFlag = ContextSetCfg::addCtxSet
   { DWO, },
 #endif
   });
+#if JVET_AE0078_IBC_LIC_EXTENSION
+const CtxSet ContextSetCfg::IbcLicIndex = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, },
+  { CNU, CNU, },
+  { CNU, CNU, },
+  { DWS, DWS, },
+  { DWS, DWS, },
+  { DWS, DWS, },
+  { DWE, DWE, },
+  { DWE, DWE, },
+  { DWE, DWE, },
+  { DWO, DWO, },
+  { DWO, DWO, },
+  });
+#endif
 #endif
 
 const CtxSet ContextSetCfg::JointCbCrFlag = ContextSetCfg::addCtxSet

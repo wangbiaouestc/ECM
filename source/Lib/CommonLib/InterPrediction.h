@@ -319,7 +319,7 @@ protected:
   Pel m_acYuvRefAMLBiPredTemplateIdMotionCache[MAX_NUM_REFIDX][NUM_REF_PIC_LIST_01][MAX_NUM_CANDS][2][MAX_CU_SIZE];
 #endif
 
-#if JVET_AE0159_FIBC
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION
   IntraPrediction*  m_pcIntraPred;
   Area m_ibcRefArea;
   Pel *m_ibcRefBuf;
@@ -1063,12 +1063,18 @@ public:
   }
 #endif
 #if INTER_LIC || JVET_AC0112_IBC_LIC
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset, int* shift2 = nullptr, int* scale2 = nullptr, int* offset2 = nullptr, int* mean = nullptr);
+#else
   void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset);
+#endif
 #endif
 #if JVET_AE0159_FIBC
   void xGetIbcFilterRefBuf(PelBuf& piPred, CodingUnit* pcCU, const ComponentID compID, const Mv& mv, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
   void xCalIbcFilterParam(PelBuf& piPred, CodingUnit* pcCU, const ComponentID compID, const Mv& mv, unsigned int uiBlkWidth, unsigned int uiBlkHeight ); 
   void xGenerateIbcFilterPred(PelBuf& piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight, const ComponentID compID, CodingUnit* pcCU);
+#endif
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION
   void setIbcFilterBuffers(Pel (*m_a_intra)[CCCM_REF_SAMPLES_MAX], Pel *m_cb_intra,Pel *m_samples_intra, IntraPrediction* pcIntra);
 #endif
 #if INTER_LIC

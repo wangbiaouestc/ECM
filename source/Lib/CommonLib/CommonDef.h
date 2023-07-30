@@ -1371,6 +1371,12 @@ static const int IBC_GPM_NUM_BLENDING =                              5;   // 1 o
 static const int IBC_GPM_NUM_BLENDING =                              1; // 1 or 5
 #endif
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+static const int IBC_LIC_IDX =                                       0;
+static const int IBC_LIC_IDX_T =                                     1;
+static const int IBC_LIC_IDX_L =                                     2;
+static const int IBC_LIC_IDX_M =                                     3;
+#endif
 static constexpr int MV_EXPONENT_BITCOUNT    = 4;
 static constexpr int MV_MANTISSA_BITCOUNT    = 6;
 static constexpr int MV_MANTISSA_UPPER_LIMIT = ((1 << (MV_MANTISSA_BITCOUNT - 1)) - 1);

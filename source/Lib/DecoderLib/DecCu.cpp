@@ -122,7 +122,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #if JVET_AE0059_INTER_CCCM
   m_pcInterPred->m_interCccm->setCccmBuffers(m_pcIntraPred->getCccmBufferA(),m_pcIntraPred->getCccmBufferCb(),m_pcIntraPred->getCccmBufferCr(),m_pcIntraPred->getCccmBufferSamples());
 #endif
-#if JVET_AE0159_FIBC
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION
   m_pcInterPred->setIbcFilterBuffers(m_pcIntraPred->getCccmBufferA(),m_pcIntraPred->getCccmBufferCb(),m_pcIntraPred->getCccmBufferSamples(), m_pcIntraPred);
 #endif
 #if JVET_Z0118_GDR

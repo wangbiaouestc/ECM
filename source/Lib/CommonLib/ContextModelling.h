@@ -608,6 +608,9 @@ public:
 #endif
 #if JVET_AC0112_IBC_LIC
   bool          ibcLicFlags[NUM_MERGE_CANDS];
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  int           ibcLicIndex[NUM_MERGE_CANDS];
+#endif
 #endif
 #if JVET_AE0159_FIBC
   bool          ibcFilterFlags[NUM_MERGE_CANDS];
@@ -631,6 +634,9 @@ public:
 #endif
 #if JVET_AC0112_IBC_LIC
   bool          ibcLicFlags       [ MRG_MAX_NUM_CANDS      ];
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  int           ibcLicIndex       [ MRG_MAX_NUM_CANDS      ];
+#endif
 #endif
 #if JVET_AE0159_FIBC
   bool          ibcFilterFlags    [ MRG_MAX_NUM_CANDS      ];

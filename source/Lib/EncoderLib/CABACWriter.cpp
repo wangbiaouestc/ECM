@@ -4237,7 +4237,7 @@ void CABACWriter::cuIbcLicFlag(const CodingUnit& cu)
     return;
   }
 #endif
-#if JVET_AE0159_FIBC
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION
   if (cu.lwidth() * cu.lheight() < 32 )
 #else
   if (cu.lwidth() * cu.lheight() < 32 || cu.lwidth() * cu.lheight() > 256)
@@ -4259,12 +4259,34 @@ void CABACWriter::cuIbcLicFlag(const CodingUnit& cu)
     unsigned ctxIdx = 1 + DeriveCtx::ctxIbcFilterFlag(cu);
     m_BinEncoder.encodeBin(cu.ibcFilterFlag ? 1 : 0, Ctx::IbcLicFlag(ctxIdx));
   }
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  if (!cu.ibcFilterFlag)
+#else
   if (!cu.ibcFilterFlag && (cu.lwidth() * cu.lheight() <= 256))
+#endif
   {
     m_BinEncoder.encodeBin(cu.ibcLicFlag ? 1 : 0, Ctx::IbcLicFlag(0));
+#if JVET_AE0078_IBC_LIC_EXTENSION
+    if (cu.ibcLicFlag)
+    {
+      const int bin1 = (cu.ibcLicIdx == IBC_LIC_IDX) || (cu.ibcLicIdx == IBC_LIC_IDX_M) ? 0 : 1;
+      const int bin2 = (cu.ibcLicIdx == IBC_LIC_IDX) || (cu.ibcLicIdx == IBC_LIC_IDX_T) ? 0 : 1;
+      m_BinEncoder.encodeBin(bin1, Ctx::IbcLicIndex(0));
+      m_BinEncoder.encodeBin(bin2, Ctx::IbcLicIndex(1));
+    }
+#endif
   }
 #else
   m_BinEncoder.encodeBin(cu.ibcLicFlag ? 1 : 0, Ctx::IbcLicFlag());
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  if (cu.ibcLicFlag)
+  {
+    const int bin1 = (cu.ibcLicIdx == IBC_LIC_IDX) || (cu.ibcLicIdx == IBC_LIC_IDX_M) ? 0 : 1;
+    const int bin2 = (cu.ibcLicIdx == IBC_LIC_IDX) || (cu.ibcLicIdx == IBC_LIC_IDX_T) ? 0 : 1;
+    m_BinEncoder.encodeBin(bin1, Ctx::IbcLicIndex(0));
+    m_BinEncoder.encodeBin(bin2, Ctx::IbcLicIndex(1));
+  }
+#endif
 #endif
 }
 #endif

@@ -448,6 +448,9 @@ public:
 #endif
 #if JVET_AC0112_IBC_LIC
   static const CtxSet   IbcLicFlag;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  static const CtxSet   IbcLicIndex;
+#endif
 #endif
 
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)

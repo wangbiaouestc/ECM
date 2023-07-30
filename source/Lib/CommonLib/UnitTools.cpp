@@ -23221,6 +23221,29 @@ bool allowLfnstWithTmp()
 	return true;
 }
 #endif
+
+#if JVET_AE0078_IBC_LIC_EXTENSION
+int getLicDimBit(const CodingUnit& cu, const ComponentID compID)
+{
+  const int cuWidth = cu.blocks[compID].width;
+  const int cuHeight = cu.blocks[compID].height;
+
+  if (cu.ibcLicFlag)
+  {
+    if (cu.ibcLicIdx == IBC_LIC_IDX_T)
+    {
+      return floorLog2(cuWidth);
+    }
+    else if (cu.ibcLicIdx == IBC_LIC_IDX_L)
+    {
+      return floorLog2(cuHeight);
+    }
+  }
+
+  return floorLog2(std::min(cuHeight, cuWidth));
+}
+#endif
+
 #if INTER_LIC
 bool CU::isLICFlagPresent(const CodingUnit& cu)
 {
