@@ -12451,6 +12451,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
     cu.geoFlag = false;
 #if JVET_AC0112_IBC_LIC
     cu.ibcLicFlag = false;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+    cu.ibcLicIdx = 0;
+#endif
 #endif
 #if JVET_AE0159_FIBC
     cu.ibcFilterFlag = false;
@@ -12685,6 +12688,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 #if JVET_AC0112_IBC_LIC
       cu.ibcLicFlag = false;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+      cu.ibcLicIdx = 0;
+#endif
 #endif
 #if JVET_AE0159_FIBC
       cu.ibcFilterFlag = false;
@@ -14636,6 +14642,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 #if JVET_AC0112_IBC_LIC
             cu.ibcLicFlag = false;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+            cu.ibcLicIdx = 0;
+#endif
 #endif
 #if JVET_AE0159_FIBC
             cu.ibcFilterFlag = false;
@@ -15134,7 +15143,11 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
   if ( tempCS->area.lwidth() * tempCS->area.lheight() < 32 )
 #else
   int licIdxMax = tempCS->slice->getSPS()->getUseIbcLic() && (tempCS->area.lx() > 0 || tempCS->area.ly() > 0) ? 2 : 1;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  if (tempCS->area.lwidth() * tempCS->area.lheight() < 32)
+#else
   if (tempCS->area.lwidth() * tempCS->area.lheight() < 32 || tempCS->area.lwidth() * tempCS->area.lheight() > 256)
+#endif
 #endif
   {
     licIdxMax = 1;
@@ -15182,7 +15195,7 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
       }
       for (int licIdx = 0; licIdx < licIdxMax; licIdx++)
       {
-#if JVET_AE0159_FIBC
+#if JVET_AE0159_FIBC && !JVET_AE0078_IBC_LIC_EXTENSION
         if (licIdx == 1 && tempCS->area.lwidth() * tempCS->area.lheight() > 256)
         {
           continue;
@@ -15223,6 +15236,9 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
 #if JVET_AC0112_IBC_LIC
 #if JVET_AE0159_FIBC
     cu.ibcLicFlag = licIdx > 0 ? true: false;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+    cu.ibcLicIdx = 0;
+#endif
     if (m_pcEncCfg->getIntraPeriod() == 1)
     {
       cu.ibcFilterFlag = false;
@@ -15230,10 +15246,12 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
     else
     {
       cu.ibcFilterFlag = licIdx > 1 ? true : false;
+#if !JVET_AE0078_IBC_LIC_EXTENSION
       if ( cu.ibcLicFlag && !cu.ibcFilterFlag && tempCS->area.lwidth() * tempCS->area.lheight() > 256)
       {
         continue;
       }
+#endif
     }
     if ((licIdx == 2) && ( !tempCS->slice->getSPS()->getUseIbcFilter() || cu.cs->slice->getSliceType() != I_SLICE))
     {
@@ -15241,6 +15259,9 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
     }
 #else
     cu.ibcLicFlag = licIdx;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+    cu.ibcLicIdx = 0;
+#endif
 #endif
 #endif
 
@@ -15563,7 +15584,7 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
               skipSecondIbcCiipPass = true;
             }
 #endif
-#if JVET_AC0112_IBC_LIC
+#if JVET_AC0112_IBC_LIC && !JVET_AE0078_IBC_LIC_EXTENSION
             if (tempCS->cost > curBestCost * 1.4)
             {
               skipSecondLicPass = true;

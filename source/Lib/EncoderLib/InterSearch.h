@@ -416,6 +416,10 @@ struct SrchCostBv
 #if JVET_AE0159_FIBC
   bool       bvFilter[capacity];
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  bool       skipLicSrch[capacity];
+  int        bvLicIdx[capacity];
+#endif
 
   SrchCostBv()
   : cnt                 (0)
@@ -435,6 +439,10 @@ struct SrchCostBv
       mvList[maxSize].setZero();
 #if JVET_AE0159_FIBC
       bvFilter[maxSize] = false;
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+      bvLicIdx[maxSize] = 0;
+      skipLicSrch[maxSize] = false;
 #endif
     }
   }
@@ -641,7 +649,7 @@ private:
   PelStorage      m_tmpStorageCUflipV;
 public:
   SrchCostIntBv   m_bestSrchCostIntBv;
-#if JVET_AE0159_FIBC
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION
   SrchCostIntBv   m_bestSrchCostIbcFilter;
 #endif
 private:

@@ -832,6 +832,9 @@ bool allowLfnstWithMip(const Size& block);
 #if JVET_V0130_INTRA_TMP
 bool allowLfnstWithTmp();
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+int getLicDimBit      (const CodingUnit& cu, const ComponentID compID);
+#endif
 
 template<typename T, size_t N>
 uint32_t updateCandList(T uiMode, double uiCost, static_vector<T, N>& candModeList, static_vector<double, N>& candCostList

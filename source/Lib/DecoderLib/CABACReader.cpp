@@ -4748,17 +4748,45 @@ void CABACReader::cuIbcLicFlag( CodingUnit& cu )
   {
     cu.ibcFilterFlag = false;
   }
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  if (!cu.ibcFilterFlag)
+#else
   if (!cu.ibcFilterFlag && (cu.lwidth() * cu.lheight() <= 256))
+#endif
   {
     cu.ibcLicFlag = m_BinDecoder.decodeBin(Ctx::IbcLicFlag(0));
+#if JVET_AE0078_IBC_LIC_EXTENSION
+    if (cu.ibcLicFlag)
+    {
+      const int bin1 = m_BinDecoder.decodeBin(Ctx::IbcLicIndex(0));
+      const int bin2 = m_BinDecoder.decodeBin(Ctx::IbcLicIndex(1));
+      if (bin1)
+      {
+        cu.ibcLicIdx = bin2 ? IBC_LIC_IDX_L : IBC_LIC_IDX_T;
+      }
+      else
+      {
+        cu.ibcLicIdx = bin2 ? IBC_LIC_IDX_M : IBC_LIC_IDX;
+      }
+    }
+    else
+    {
+      cu.ibcLicIdx = 0;
+    }
+#endif
   }
+#if !JVET_AE0078_IBC_LIC_EXTENSION
   else if (!cu.ibcFilterFlag) // (cu.lwidth() * cu.lheight() > 256)
   {
     cu.ibcLicFlag = false;
   }
+#endif
   else 
   {
     cu.ibcLicFlag = true;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+    cu.ibcLicIdx = 0;
+#endif
   }
 #else
   if (!cu.cs->sps->getUseIbcLic() || !CU::isIBC(cu) || cu.firstPU->mergeFlag)
@@ -4773,12 +4801,35 @@ void CABACReader::cuIbcLicFlag( CodingUnit& cu )
     return;
   }
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  if (cu.lwidth() * cu.lheight() < 32)
+#else
   if (cu.lwidth() * cu.lheight() < 32 || cu.lwidth() * cu.lheight() > 256)
+#endif
   {
     cu.ibcLicFlag = false;
     return;
   }
   cu.ibcLicFlag = m_BinDecoder.decodeBin( Ctx::IbcLicFlag() );
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  if (cu.ibcLicFlag)
+  {
+    const int bin1 = m_BinDecoder.decodeBin(Ctx::IbcLicIndex(0));
+    const int bin2 = m_BinDecoder.decodeBin(Ctx::IbcLicIndex(1));
+    if (bin1)
+    {
+      cu.ibcLicIdx = bin2 ? IBC_LIC_IDX_L : IBC_LIC_IDX_T;
+    }
+    else
+    {
+      cu.ibcLicIdx = bin2 ? IBC_LIC_IDX_M : IBC_LIC_IDX;
+    }
+  }
+  else
+  {
+    cu.ibcLicIdx = 0;
+  }
+#endif
 #endif
 }
 #endif

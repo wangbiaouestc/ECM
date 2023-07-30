@@ -222,6 +222,9 @@ struct AreaBuf : public Size
   T    meanDiff             ( const AreaBuf<const T> &other ) const;
   void subtract             ( const T val );
   void subtract             ( const AreaBuf<const T> &buffer1, const AreaBuf<const T> &buffer2 );
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  void linearTransforms     ( const int scale, const int shift, const int offset, const int scale2, const int shift2, const int offset2, const int yThres, bool bClip, const ClpRng& clpRng );
+#endif
   void linearTransform      ( const int scale, const int shift, const int offset, bool bClip, const ClpRng& clpRng );
 
   void transposedFrom       ( const AreaBuf<const T> &other );

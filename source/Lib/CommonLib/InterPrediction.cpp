@@ -319,7 +319,7 @@ InterPrediction::InterPrediction()
     }
   }
 #endif
-#if JVET_AE0159_FIBC
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION
   m_ibcRefBuf = nullptr;
   m_a = nullptr;
   m_y = nullptr;
@@ -516,7 +516,7 @@ void InterPrediction::destroy()
     }
   }
 #endif
-#if JVET_AE0159_FIBC
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION
   m_a = nullptr;
   m_y = nullptr;
   m_samples = nullptr;
@@ -15752,6 +15752,12 @@ void InterPrediction::xGetLICParamGeneral(const CodingUnit& cu,
                                           int&              shift,
                                           int&              scale,
                                           int&              offset
+#if JVET_AE0078_IBC_LIC_EXTENSION
+                                        , int*              shift2,
+                                          int*              scale2,
+                                          int*              offset2,
+                                          int*              mean
+#endif
 )
 {
   const int       cuWidth = cu.blocks[compID].width;
@@ -15760,7 +15766,11 @@ void InterPrediction::xGetLICParamGeneral(const CodingUnit& cu,
   const int       bitDepth = cu.cs->sps->getBitDepth(toChannelType(compID));
   const int       precShift = std::max(0, bitDepth - 12);
   const int       maxNumMinus1 = 30 - 2 * std::min(bitDepth, 12) - 1;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  const int       minDimBit = getLicDimBit(cu, compID);
+#else
   const int       minDimBit = floorLog2(std::min(cuHeight, cuWidth));
+#endif
   const int       minDim = 1 << minDimBit;
   int       minStepBit = minDim > 8 ? 1 : 0;
   while (minDimBit > minStepBit + maxNumMinus1) { minStepBit++; } //make sure log2(2*minDim/tmpStep) + 2*min(bitDepth,12) <= 30
@@ -15769,6 +15779,11 @@ void InterPrediction::xGetLICParamGeneral(const CodingUnit& cu,
 
   //----- get correlation data -----
   int x = 0, y = 0, xx = 0, xy = 0, cntShift = 0;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  int refSamples[MAX_CU_SIZE] = { 0 };
+  int recSamples[MAX_CU_SIZE] = { 0 };
+  int startPos = (numTemplate[0] != 0) ? numSteps : 0;
+#endif
 
   // above
   if (numTemplate[0] != 0)
@@ -15779,7 +15794,10 @@ void InterPrediction::xGetLICParamGeneral(const CodingUnit& cu,
 
       int refVal = refAboveTemplate[((k * cuWidth) >> dimShift)];
       int recVal = recAboveTemplate[((k * cuWidth) >> dimShift)];
-
+#if JVET_AE0078_IBC_LIC_EXTENSION
+      refSamples[k] = refVal;
+      recSamples[k] = recVal;
+#endif
       x += refVal;
       y += recVal;
       xx += refVal * refVal;
@@ -15798,7 +15816,10 @@ void InterPrediction::xGetLICParamGeneral(const CodingUnit& cu,
 
       int refVal = refLeftTemplate[((k * cuHeight) >> dimShift)];
       int recVal = recLeftTemplate[((k * cuHeight) >> dimShift)];
-
+#if JVET_AE0078_IBC_LIC_EXTENSION
+      refSamples[k + startPos] = refVal;
+      recSamples[k + startPos] = recVal;
+#endif
       x += refVal;
       y += recVal;
       xx += refVal * refVal;
@@ -15809,6 +15830,38 @@ void InterPrediction::xGetLICParamGeneral(const CodingUnit& cu,
   }
 
   //----- determine scale and offset -----
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  if (cu.ibcLicFlag && cu.ibcLicIdx == IBC_LIC_IDX_M)
+  {
+    int meanRef = 0;
+    int meanRec = 0;
+    int avgCnt = 1 << cntShift;
+    IntraPrediction::MMLM_parameter parameters[2];
+    for (int i = 0; i < avgCnt; i++)
+    {
+      meanRef += refSamples[i];
+      meanRec += recSamples[i];
+    }
+
+    if (avgCnt)
+    {
+      int x = floorLog2(avgCnt);
+      static const uint8_t DivSigTable[1 << 4] = {
+       0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0
+      };
+      int normDiff = (avgCnt << 4 >> x) & 15;
+      int v = DivSigTable[normDiff] | 8;
+      x += normDiff != 0;
+
+      meanRef = (meanRef * v) >> (x + 3);
+      meanRec = (meanRec * v) >> (x + 3);
+    }
+    m_pcIntraPred->xLMSampleClassifiedTraining(avgCnt, meanRef, meanRec, refSamples, recSamples, bitDepth, parameters);
+    scale = parameters[0].a; offset = parameters[0].b; shift = parameters[0].shift;
+    *scale2 = parameters[1].a; *offset2 = parameters[1].b; *shift2 = parameters[1].shift; *mean = meanRef;
+    return;
+  }
+#endif
   shift = m_LICShift;
   if (cntShift == 0)
   {
@@ -15843,15 +15896,19 @@ void InterPrediction::xGetLICParamGeneral(const CodingUnit& cu,
 }
 #endif
 
-#if JVET_AE0159_FIBC
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION
 void InterPrediction::setIbcFilterBuffers(Pel (*a)[CCCM_REF_SAMPLES_MAX], Pel* y, Pel* samples, IntraPrediction* pcIntra)
 {
   m_pcIntraPred     = pcIntra;
+#if JVET_AE0159_FIBC
   m_ibcRefBuf       = pcIntra->getCccmBufferLuma();
   m_a = a;
   m_y = y;
   m_samples = samples;
+#endif
 }
+#endif
+#if JVET_AE0159_FIBC
 void InterPrediction::xCalIbcFilterParam(PelBuf& piPred, CodingUnit* cu, const ComponentID compID, const Mv& mv, unsigned int uiBlkWidth, unsigned int uiBlkHeight) 
 {
   CompArea area = cu->blocks[compID];
@@ -16336,9 +16393,21 @@ void InterPrediction::xLocalIlluComp(const PredictionUnit& pu,
     xGetSublkTemplate(*pu.cu, compID, bv, pu.blocks[compID].width, pu.blocks[compID].height, 0, 0, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate);
 
     int shift = 0, scale = 0, offset = 0;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+    int shift2 = 0, scale2 = 0, offset2 = 0, mean = 0;
+    xGetLICParamGeneral(*pu.cu, compID, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate, shift, scale, offset, &shift2, &scale2, &offset2, &mean);
+#else
     xGetLICParamGeneral(*pu.cu, compID, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate, shift, scale, offset);
+#endif
 
     const ClpRng& clpRng = pu.cu->cs->slice->clpRng(compID);
+#if JVET_AE0078_IBC_LIC_EXTENSION
+    if (pu.cu->ibcLicFlag && pu.cu->ibcLicIdx == IBC_LIC_IDX_M)
+    {
+      dstBuf.linearTransforms(scale, shift, offset, scale2, shift2, offset2, mean, true, clpRng);
+      return;
+    }
+#endif
     dstBuf.linearTransform(scale, shift, offset, true, clpRng);
   }
   else if ((pu.cu->ibcLicFlag) && (pu.cu->ibcFilterFlag ))
@@ -16362,9 +16431,21 @@ void InterPrediction::xLocalIlluComp(const PredictionUnit& pu,
   xGetSublkTemplate(*pu.cu, compID, bv, pu.blocks[compID].width, pu.blocks[compID].height, 0, 0, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate);
 
   int shift = 0, scale = 0, offset = 0;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  int shift2 = 0, scale2 = 0, offset2 = 0, mean = 0;
+  xGetLICParamGeneral(*pu.cu, compID, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate, shift, scale, offset, &shift2, &scale2, &offset2, &mean);
+#else
   xGetLICParamGeneral(*pu.cu, compID, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate, shift, scale, offset);
+#endif
 
   const ClpRng& clpRng = pu.cu->cs->slice->clpRng(compID);
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  if (pu.cu->ibcLicFlag && pu.cu->ibcLicIdx == IBC_LIC_IDX_M)
+  {
+    dstBuf.linearTransforms(scale, shift, offset, scale2, shift2, offset2, mean, true, clpRng);
+    return;
+  }
+#endif
   dstBuf.linearTransform(scale, shift, offset, true, clpRng);
 #endif
 }
@@ -16409,7 +16490,11 @@ void InterPrediction::xGetSublkTemplate(const CodingUnit& cu,
 #if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   const int lumaShift = 2 + MV_FRACTIONAL_BITS_DIFF;
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  if (cuAbove && posH == 0 && cu.ibcLicIdx != IBC_LIC_IDX_L)
+#else
   if (cuAbove && posH == 0)
+#endif
   {
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     Mv mvTop(0, -((1 + shiftSampleVer) << MV_FRACTIONAL_BITS_INTERNAL));
@@ -16454,7 +16539,11 @@ void InterPrediction::xGetSublkTemplate(const CodingUnit& cu,
   }
 
   // left
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  if (cuLeft && posW == 0 && cu.ibcLicIdx != IBC_LIC_IDX_T)
+#else
   if (cuLeft && posW == 0)
+#endif
   {
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     Mv mvLeft(-((1 + shiftSampleHor) << MV_FRACTIONAL_BITS_INTERNAL), 0);

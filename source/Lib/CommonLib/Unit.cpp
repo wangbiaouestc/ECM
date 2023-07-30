@@ -409,6 +409,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = other.ibcLicFlag;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  ibcLicIdx = other.ibcLicIdx;
+#endif
 #endif
 #if JVET_AE0159_FIBC
   ibcFilterFlag  = other.ibcFilterFlag;
@@ -623,6 +626,9 @@ void CodingUnit::initData()
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = false;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  ibcLicIdx = 0;
+#endif
 #endif
 #if JVET_AE0159_FIBC
   for (int i = 0; i < FIBC_PARAMS; i++)

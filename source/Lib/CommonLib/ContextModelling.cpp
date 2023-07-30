@@ -631,6 +631,9 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 #endif
 #if JVET_AC0112_IBC_LIC
     pu.cu->ibcLicFlag = ibcLicFlags[candIdx];
+#if JVET_AE0078_IBC_LIC_EXTENSION
+    pu.cu->ibcLicIdx = 0;
+#endif
 #endif
 #if JVET_AE0159_FIBC
     pu.cu->ibcFilterFlag = ibcFilterFlags[candIdx];
@@ -848,6 +851,9 @@ void MergeCtx::initMrgCand(int cnt)
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlags[cnt] = false;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  ibcLicIndex[cnt] = 0;
+#endif
 #endif
 #if JVET_AE0159_FIBC
   ibcFilterFlags[cnt] = false;
@@ -1838,6 +1844,9 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
 #if JVET_AE0169_BIPREDICTIVE_IBC
 #if JVET_AC0112_IBC_LIC
   pu.cu->ibcLicFlag = (pu.interDir == 3) ? false : ibcLicFlags[fPosBaseIdx];
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  pu.cu->ibcLicIdx = 0;
+#endif
 #endif
 #if JVET_AE0159_FIBC
   pu.cu->ibcFilterFlag = (pu.interDir == 3) ? false : ibcFilterFlags[fPosBaseIdx];
@@ -1848,6 +1857,9 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
 #else
 #if JVET_AC0112_IBC_LIC
   pu.cu->ibcLicFlag = ibcLicFlags[fPosBaseIdx];
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  pu.cu->ibcLicIdx = 0;
+#endif
 #endif
 #if JVET_AE0159_FIBC
   pu.cu->ibcFilterFlag = ibcFilterFlags[fPosBaseIdx];
