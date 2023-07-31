@@ -119,11 +119,8 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
   }
 #endif
 
-#if JVET_AE0059_INTER_CCCM
-  m_pcInterPred->m_interCccm->setCccmBuffers(m_pcIntraPred->getCccmBufferA(),m_pcIntraPred->getCccmBufferCb(),m_pcIntraPred->getCccmBufferCr(),m_pcIntraPred->getCccmBufferSamples());
-#endif
-#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION
-  m_pcInterPred->setIbcFilterBuffers(m_pcIntraPred->getCccmBufferA(),m_pcIntraPred->getCccmBufferCb(),m_pcIntraPred->getCccmBufferSamples(), m_pcIntraPred);
+#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION
+  m_pcInterPred->setIntraPrediction( m_pcIntraPred );
 #endif
 #if JVET_Z0118_GDR
   // reset current IBC Buffer only when VB pass through
@@ -2082,10 +2079,14 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
         {
           tmpInterCccmStorage.getBuf(COMPONENT_Y).rspSignal(m_pcReshape->getFwdLUT());
         }
-        m_pcInterPred->m_interCccm->setup(&currTU, tmpInterCccmStorage.getBuf(COMPONENT_Y), cs.getRecoBuf(currTU.blocks[COMPONENT_Y]), cs.getPredBuf(currTU.blocks[COMPONENT_Cb]), cs.getPredBuf(currTU.blocks[COMPONENT_Cr]));
-        CHECK(!m_pcInterPred->m_interCccm->isValid(), "invalid cccm inter");
-        cs.getPredBuf(currTU.blocks[COMPONENT_Cb]).copyFrom(m_pcInterPred->m_interCccm->getCb());
-        cs.getPredBuf(currTU.blocks[COMPONENT_Cr]).copyFrom(m_pcInterPred->m_interCccm->getCr());
+
+        PelBuf bufCb = cs.getPredBuf( currTU.blocks[COMPONENT_Cb] );
+        PelBuf bufCr = cs.getPredBuf( currTU.blocks[COMPONENT_Cr] );
+
+        const bool valid = m_pcInterPred->deriveInterCccmPrediction(&currTU, tmpInterCccmStorage.getBuf(COMPONENT_Y), cs.getRecoBuf(currTU.blocks[COMPONENT_Y]), bufCb, bufCr, bufCb, bufCr );
+
+        CHECK( !valid, "invalid inter cccm" );
+
 #if SIGN_PREDICTION
         cs.getRecoBuf(currTU.blocks[COMPONENT_Cb]).copyClip(cs.getPredBuf(currTU.blocks[COMPONENT_Cb]), cs.slice->clpRng(COMPONENT_Cb));
         cs.getRecoBuf(currTU.blocks[COMPONENT_Cr]).copyClip(cs.getPredBuf(currTU.blocks[COMPONENT_Cr]), cs.slice->clpRng(COMPONENT_Cr));

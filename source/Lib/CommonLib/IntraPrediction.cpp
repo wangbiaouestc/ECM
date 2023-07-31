@@ -9504,16 +9504,12 @@ void IntraPrediction::xGetLMParameters(const PredictionUnit &pu, const Component
   if (avgCnt)
   {
     int x = floorLog2(avgCnt);
-    static const uint8_t DivSigTable[1 << 4] = {
-      // 4bit significands - 8 ( MSB is omitted )
-      0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0
-    };
+    // 4bit significands - 8 ( MSB is omitted )
+    const uint8_t divSigTable[1 << 4] = { 0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0 };
     int normDiff = (avgCnt << 4 >> x) & 15;
-    int v = DivSigTable[normDiff] | 8;
+    int v = divSigTable[normDiff] | 8;
     x += normDiff != 0;
-
     yAvg = (yAvg * v) >> (x + 3);
-
   }
   int cntMMLM[2] = { 0,0 };
 
@@ -9594,19 +9590,18 @@ void IntraPrediction::xGetLMParameters(const PredictionUnit &pu, const Component
         {
           int diffC = maxLuma2[i][1] - minLuma2[i][1];
           int x = floorLog2(diff);
-          static const uint8_t DivSigTable[1 << 4] = {
-            // 4bit significands - 8 ( MSB is omitted )
-            0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0
-          };
+          // 4bit significands - 8 ( MSB is omitted )
+          const uint8_t divSigTable[1 << 4] = { 0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0 };
           int normDiff = (diff << 4 >> x) & 15;
-          int v = DivSigTable[normDiff] | 8;
+          int v = divSigTable[normDiff] | 8;
           x += normDiff != 0;
 
           int y = floorLog2(abs(diffC)) + 1;
           int add = 1 << y >> 1;
           ax = (diffC * v + add) >> y;
           iShiftx = 3 + x - y;
-          if (iShiftx < 1) {
+          if (iShiftx < 1)
+          {
             iShiftx = 1;
             ax = ((ax == 0) ? 0 : (ax < 0) ? -15 : 15);   // a=Sign(a)*15
           }
@@ -9652,12 +9647,10 @@ void IntraPrediction::xGetLMParameters(const PredictionUnit &pu, const Component
     {
       int diffC = maxLuma[1] - minLuma[1];
       int x = floorLog2( diff );
-      static const uint8_t DivSigTable[1 << 4] = {
-        // 4bit significands - 8 ( MSB is omitted )
-        0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0
-      };
+      // 4bit significands - 8 ( MSB is omitted )
+      const uint8_t divSigTable[1 << 4] = { 0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0 };
       int normDiff = (diff << 4 >> x) & 15;
-      int v = DivSigTable[normDiff] | 8;
+      int v = divSigTable[normDiff] | 8;
       x += normDiff != 0;
 
       int y = floorLog2( abs( diffC ) ) + 1;
@@ -10018,7 +10011,7 @@ int IntraPrediction::xCalcLMParametersGeneralized(int x, int y, int xx, int xy, 
   return 0;
 }
 
-int IntraPrediction::xLMSampleClassifiedTraining(int count, int mean, int meanC, int LumaSamples[], int ChrmSamples[], int bitDepth, MMLM_parameter parameters[])
+int IntraPrediction::xLMSampleClassifiedTraining(int count, int mean, int meanC, int lumaSamples[], int chrmSamples[], int bitDepth, MMLMParameters parameters[])
 {
 
   //Initialize
@@ -10034,36 +10027,36 @@ int IntraPrediction::xLMSampleClassifiedTraining(int count, int mean, int meanC,
   {
     return -1;
   }
-  int GroupCount[2] = { 0, 0 };
+  int groupCount[2] = { 0, 0 };
 
   CHECK(count > 512, "");
 
   int meanDiff = meanC - mean;
   mean = std::max(1, mean);
 
-  int LumaPower2[2][128];
-  int ChromaPower2[2][128];
+  int lumaPower2[2][128];
+  int chromaPower2[2][128];
   //int GroupCount[2] = { 0, 0 };
   for (int i = 0; i < count; i++)
   {
-    if (LumaSamples[i] <= mean)
+    if (lumaSamples[i] <= mean)
     {
-      LumaPower2[0][GroupCount[0]] = LumaSamples[i];
-      ChromaPower2[0][GroupCount[0]] = ChrmSamples[i];
-      GroupCount[0]++;
+      lumaPower2[0][groupCount[0]] = lumaSamples[i];
+      chromaPower2[0][groupCount[0]] = chrmSamples[i];
+      groupCount[0]++;
     }
     else
     {
-      LumaPower2[1][GroupCount[1]] = LumaSamples[i];
-      ChromaPower2[1][GroupCount[1]] = ChrmSamples[i];
-      GroupCount[1]++;
+      lumaPower2[1][groupCount[1]] = lumaSamples[i];
+      chromaPower2[1][groupCount[1]] = chrmSamples[i];
+      groupCount[1]++;
     }
   }
 
   // Take power of two
   for (int group = 0; group < 2; group++)
   {
-    int existSampNum = GroupCount[group];
+    int existSampNum = groupCount[group];
     if (existSampNum < 2)
     {
       continue;
@@ -10075,12 +10068,12 @@ int IntraPrediction::xLMSampleClassifiedTraining(int count, int mean, int meanC,
     if (upperPower2 != lowerPower2)
     {
       int numPaddedSamples = std::min(existSampNum, upperPower2 - existSampNum);
-      GroupCount[group] = upperPower2;
+      groupCount[group] = upperPower2;
       int step = (int)(existSampNum / numPaddedSamples);
       for (int i = 0; i < numPaddedSamples; i++)
       {
-        LumaPower2[group][existSampNum + i] = LumaPower2[group][i * step];
-        ChromaPower2[group][existSampNum + i] = ChromaPower2[group][i * step];
+        lumaPower2[group][existSampNum + i] = lumaPower2[group][i * step];
+        chromaPower2[group][existSampNum + i] = chromaPower2[group][i * step];
 
       }
     }
@@ -10095,20 +10088,20 @@ int IntraPrediction::xLMSampleClassifiedTraining(int count, int mean, int meanC,
   for (int group = 0; group < 2; group++)
   {
 
-    for (int i = 0; i < GroupCount[group]; i++)
+    for (int i = 0; i < groupCount[group]; i++)
     {
-      x[group] += LumaPower2[group][i];
-      y[group] += ChromaPower2[group][i];
-      xx[group] += LumaPower2[group][i] * LumaPower2[group][i];
-      xy[group] += LumaPower2[group][i] * ChromaPower2[group][i];
+      x[group] += lumaPower2[group][i];
+      y[group] += chromaPower2[group][i];
+      xx[group] += lumaPower2[group][i] * lumaPower2[group][i];
+      xy[group] += lumaPower2[group][i] * chromaPower2[group][i];
     }
   }
   for (int group = 0; group < 2; group++)
   {
     int a, b, iShift;
-    if (GroupCount[group] > 1)
+    if (groupCount[group] > 1)
     {
-      xCalcLMParametersGeneralized(x[group], y[group], xx[group], xy[group], GroupCount[group], bitDepth, a, b, iShift);
+      xCalcLMParametersGeneralized(x[group], y[group], xx[group], xy[group], groupCount[group], bitDepth, a, b, iShift);
 
       parameters[group].a = a;
       parameters[group].b = b;
@@ -10396,7 +10389,7 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
   if (PU::isMultiModeLM(pu.intraDir[1]))
   {
     // Classify and training
-    MMLM_parameter parameters[2];
+    MMLMParameters parameters[2];
     int lumaSamples[512];
     int chromaSamples[512];
     int meanC = 0; int mean = 0;
@@ -10413,12 +10406,10 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
     if (avgCnt)
     {
        int x = floorLog2(avgCnt);
-       static const uint8_t DivSigTable[1 << 4] = {
-         // 4bit significands - 8 ( MSB is omitted )
-        0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0
-       };
+       // 4bit significands - 8 ( MSB is omitted )
+       const uint8_t divSigTable[1 << 4] = { 0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0 };
        int normDiff = (avgCnt << 4 >> x) & 15;
-       int v = DivSigTable[normDiff] | 8;
+       int v = divSigTable[normDiff] | 8;
        x += normDiff != 0;
 
        mean = (mean * v) >> (x + 3);

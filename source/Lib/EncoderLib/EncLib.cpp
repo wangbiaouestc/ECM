@@ -751,11 +751,8 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
   m_cInterSearch.setTempBuffers( m_cIntraSearch.getSplitCSBuf(), m_cIntraSearch.getFullCSBuf(), m_cIntraSearch.getSaveCSBuf() );
 #endif // ENABLE_SPLIT_PARALLELISM || ENABLE_WPP_PARALLELISM
 
-#if JVET_AE0059_INTER_CCCM
-  m_cInterSearch.m_interCccm->setCccmBuffers(m_cIntraSearch.getCccmBufferA(),m_cIntraSearch.getCccmBufferCb(),m_cIntraSearch.getCccmBufferCr(),m_cIntraSearch.getCccmBufferSamples());
-#endif
-#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION
-  m_cInterSearch.setIbcFilterBuffers(m_cIntraSearch.getCccmBufferA(),m_cIntraSearch.getCccmBufferCb(),m_cIntraSearch.getCccmBufferSamples(), &m_cIntraSearch);
+#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION
+  m_cInterSearch.setIntraPrediction(&m_cIntraSearch);
 #endif
   m_iMaxRefPicNum = 0;
 

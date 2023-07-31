@@ -12586,17 +12586,21 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         {
           lumaRecoBuf.flipSignal(cu.rribcFlipType == 1);
         }
-        m_interCccm->setup(&tu, lumaPredBuf, lumaRecoBuf, csFull->getPredBuf(tu.blocks[COMPONENT_Cb]), csFull->getPredBuf(tu.blocks[COMPONENT_Cr]));
-        if (m_interCccm->isValid())
+
+        PelBuf bufCb = csFull->getPredBuf( tu.blocks[COMPONENT_Cb] );
+        PelBuf bufCr = csFull->getPredBuf( tu.blocks[COMPONENT_Cr] );
+
+        const bool valid = deriveInterCccmPrediction( &tu, lumaPredBuf, lumaRecoBuf, bufCb, bufCr, interCccmPredBuf[COMPONENT_Cb], interCccmPredBuf[COMPONENT_Cr] );
+
+        if( valid )
         {
-          interCccmPredBuf[COMPONENT_Cb].copyFrom(m_interCccm->getCb());
-          interCccmPredBuf[COMPONENT_Cr].copyFrom(m_interCccm->getCr());
           interCccmOk = true;
         }
         else
         {
           break;
         }
+
         for (int y = 0; y < compArea.height; y++)
         {
           for (int x = 0; x < compArea.width; x++)
@@ -14206,22 +14210,36 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
 #if JVET_AE0059_INTER_CCCM
     for (const auto& tuTmp : cs.tus)
     {
-      if (tuTmp->interCccm && tuTmp->blocks[COMPONENT_Cb].valid())
+      if( tuTmp->interCccm && tuTmp->blocks[COMPONENT_Cb].valid() )
       {
-        PelBuf lumaPredBuf(m_interCccmStorage[0], tuTmp->blocks[COMPONENT_Y]);
-        lumaPredBuf.copyFrom(cs.getPredBuf(tuTmp->blocks[COMPONENT_Y]));
-        if (cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
+        PelBuf lumaPredBuf( m_interCccmStorage[0], tuTmp->blocks[COMPONENT_Y] );
+        lumaPredBuf.copyFrom( cs.getPredBuf( tuTmp->blocks[COMPONENT_Y] ) );
+
+        if( cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC( cu ) )
         {
-          lumaPredBuf.rspSignal(m_pcReshape->getFwdLUT()); // so that matches with resibuf domain
+          lumaPredBuf.rspSignal( m_pcReshape->getFwdLUT() ); // so that matches with resibuf domain
         }
-        m_interCccm->setup(tuTmp, lumaPredBuf, cs.getRecoBuf(tuTmp->blocks[COMPONENT_Y]), cs.getPredBuf(tuTmp->blocks[COMPONENT_Cb]), cs.getPredBuf(tuTmp->blocks[COMPONENT_Cr]));
-        cs.getRecoBuf(tuTmp->blocks[COMPONENT_Cb]).reconstruct(m_interCccm->getCb(), cs.getResiBuf(tuTmp->blocks[COMPONENT_Cb]), cs.slice->clpRngs().comp[COMPONENT_Cb]);
-        cs.getRecoBuf(tuTmp->blocks[COMPONENT_Cr]).reconstruct(m_interCccm->getCr(), cs.getResiBuf(tuTmp->blocks[COMPONENT_Cr]), cs.slice->clpRngs().comp[COMPONENT_Cr]);
+
+        PelBuf bufCb = cs.getPredBuf( tuTmp->blocks[COMPONENT_Cb] );
+        PelBuf bufCr = cs.getPredBuf( tuTmp->blocks[COMPONENT_Cr] );
+        PelBuf interCccmPredBuf[3];
+
+        for( int i = 0; i < MAX_NUM_COMPONENT; i++ )
+        {
+          interCccmPredBuf[i] = PelBuf( m_interCccmStorage[i + 3], tuTmp->blocks[ComponentID( i )] );
+        }
+
+        const bool valid = deriveInterCccmPrediction( tuTmp, lumaPredBuf, cs.getRecoBuf( tuTmp->blocks[COMPONENT_Y] ), bufCb, bufCr, interCccmPredBuf[COMPONENT_Cb], interCccmPredBuf[COMPONENT_Cr] );
+
+        CHECK( !valid, "invalid inter cccm" );
+
+        cs.getRecoBuf( tuTmp->blocks[COMPONENT_Cb] ).reconstruct( interCccmPredBuf[COMPONENT_Cb], cs.getResiBuf( tuTmp->blocks[COMPONENT_Cb] ), cs.slice->clpRngs().comp[COMPONENT_Cb] );
+        cs.getRecoBuf( tuTmp->blocks[COMPONENT_Cr] ).reconstruct( interCccmPredBuf[COMPONENT_Cr], cs.getResiBuf( tuTmp->blocks[COMPONENT_Cr] ), cs.slice->clpRngs().comp[COMPONENT_Cr] );
       }
       else
       {
-        cs.getRecoBuf(tuTmp->blocks[COMPONENT_Cb]).reconstruct(cs.getPredBuf(tuTmp->blocks[COMPONENT_Cb]), cs.getResiBuf(tuTmp->blocks[COMPONENT_Cb]), cs.slice->clpRngs().comp[1]);
-        cs.getRecoBuf(tuTmp->blocks[COMPONENT_Cr]).reconstruct(cs.getPredBuf(tuTmp->blocks[COMPONENT_Cr]), cs.getResiBuf(tuTmp->blocks[COMPONENT_Cr]), cs.slice->clpRngs().comp[2]);
+        cs.getRecoBuf( tuTmp->blocks[COMPONENT_Cb] ).reconstruct( cs.getPredBuf( tuTmp->blocks[COMPONENT_Cb] ), cs.getResiBuf( tuTmp->blocks[COMPONENT_Cb] ), cs.slice->clpRngs().comp[COMPONENT_Cb] );
+        cs.getRecoBuf( tuTmp->blocks[COMPONENT_Cr] ).reconstruct( cs.getPredBuf( tuTmp->blocks[COMPONENT_Cr] ), cs.getResiBuf( tuTmp->blocks[COMPONENT_Cr] ), cs.slice->clpRngs().comp[COMPONENT_Cr] );
       }
     }
 #else

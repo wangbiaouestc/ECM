@@ -55,9 +55,6 @@
 class IntraPrediction;
 #endif
 #endif
-#if JVET_AE0059_INTER_CCCM
-class InterCccm;
-#endif
 // forward declaration
 class Mv;
 #if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
@@ -116,9 +113,6 @@ public:
   Reshape*          m_pcReshape;
 #endif
 
-#if JVET_AE0059_INTER_CCCM
-  InterCccm*        m_interCccm;
-#endif
 private:
 #if INTER_LIC
   static const int  m_LICShift     = 5;
@@ -319,13 +313,9 @@ protected:
   Pel m_acYuvRefAMLBiPredTemplateIdMotionCache[MAX_NUM_REFIDX][NUM_REF_PIC_LIST_01][MAX_NUM_CANDS][2][MAX_CU_SIZE];
 #endif
 
-#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AE0059_INTER_CCCM
   IntraPrediction*  m_pcIntraPred;
   Area m_ibcRefArea;
-  Pel *m_ibcRefBuf;
-  Pel *m_y;
-  Pel *m_samples;
-  Pel (*m_a)[CCCM_REF_SAMPLES_MAX];
 #endif
 
   void xIntraBlockCopy          (PredictionUnit &pu, PelUnitBuf &predBuf, const ComponentID compID);
@@ -1074,8 +1064,8 @@ public:
   void xCalIbcFilterParam(PelBuf& piPred, CodingUnit* pcCU, const ComponentID compID, const Mv& mv, unsigned int uiBlkWidth, unsigned int uiBlkHeight ); 
   void xGenerateIbcFilterPred(PelBuf& piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight, const ComponentID compID, CodingUnit* pcCU);
 #endif
-#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION
-  void setIbcFilterBuffers(Pel (*m_a_intra)[CCCM_REF_SAMPLES_MAX], Pel *m_cb_intra,Pel *m_samples_intra, IntraPrediction* pcIntra);
+#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION
+  void setIntraPrediction( IntraPrediction* intra );
 #endif
 #if INTER_LIC
 #if JVET_AA0146_WRAP_AROUND_FIX
@@ -1288,6 +1278,13 @@ public:
   void mcFramePadRepExt(Picture *pcCurPic, Slice &slice);
 #endif
 #endif
+
+#if JVET_AE0059_INTER_CCCM
+  inline void getNonDownSampledLumaValsOffset( const PredictionUnit* pu, const PelBuf& luma, const int x, const int y, Pel* s, const int offset, const int flipType = 0 );
+  inline void getNonDownSampledLumaVals( const PredictionUnit* pu, const PelBuf& luma, const int x, const int y, Pel* s, const int flipType = 0 );
+  inline int computeOffset( const PelBuf& buf );
+  bool deriveInterCccmPrediction( const TransformUnit* tu, const PelBuf& lumaPrediction, const PelBuf& lumaReconstruction, const PelBuf& inBufCb, const PelBuf& inBufCr, PelBuf& outBufCb, PelBuf& outBufCr );
+#endif
 };
 
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
@@ -1429,64 +1426,6 @@ public:
 #endif
 };
 #endif // TM_AMVP || TM_MRG
-#if JVET_AE0059_INTER_CCCM
-struct CccmModel;
-class InterCccm
-{
-private:
-
-  const int m_subSampleX[7][7];
-  const int m_subSampleY[7][7];
-
-  PelBuf m_lumaRecoNonDownSampled;
-  PelBuf m_lumaPredNonDownSampled;
-  PelBuf m_chroma[2];
-
-  Pel** m_chromaStorage;
-  Pel m_s[6];
-
-  Pel *m_cb;
-  Pel *m_cr;
-  Pel *m_samples;
-  Pel (*m_a)[CCCM_REF_SAMPLES_MAX];
-
-  CccmModel* m_interCccmModels[2];
-
-  PredictionUnit* m_pu;
-  Size    m_chromaSize;
-  ClpRng  m_clprng;
-
-  int     m_offset[MAX_NUM_COMPONENT];
-  int     m_sampleNum;
-  int     m_flipType;
-  int     m_dsX;
-  int     m_dsY;
-
-  bool m_valid;
-
-  void getData();
-  void solveModels();
-  void applyModels();
-
-  inline void getNonDownSampledLumaValsOffset(const PredictionUnit* pu, const PelBuf& luma_, const int x, const int y, Pel* s, const int offset, const int flipType = 0);
-  inline void getNonDownSampledLumaVals(const PredictionUnit* pu, const PelBuf& luma_, const int x, const int y, Pel* s, const int flipType = 0);
-  inline int computeOffset(const PelBuf& buf);
-
-public:
-  InterCccm();
-  ~InterCccm();
-
-  void setup(const TransformUnit* tu, const PelBuf& lumaPrediction, const PelBuf& lumaReconstruction, const PelBuf& cb, const PelBuf& cr);
-  void destroy();
-  void init();
-  void setCccmBuffers(Pel (*m_a_intra)[CCCM_REF_SAMPLES_MAX], Pel *m_cb_intra, Pel *m_cr_intra, Pel *m_samples_intra);
-
-  const PelBuf& getCb() const { return m_chroma[0]; };
-  const PelBuf& getCr() const { return m_chroma[1]; };
-
-  bool isValid() const { return m_valid; };
-};
-#endif
 //! \}
 
 #endif // __INTERPREDICTION__
