@@ -215,10 +215,29 @@ private:
 
 class IntraPrediction
 {
-#if MMLM
 public:
+#if MMLM
   bool m_encPreRDRun;
 #endif
+
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+#if JVET_AD0202_CCCM_MDF
+  Pel* m_cccmLumaBuf[CCCM_NUM_PRED_FILTER + 1];
+#else
+  Pel* m_cccmLumaBuf[2];
+#endif
+#else
+  Pel* m_cccmLumaBuf;
+#endif
+#if JVET_AA0057_CCCM
+  CccmCovariance m_cccmSolver;
+
+  Pel m_samples[CCCM_NUM_PARAMS_MAX];
+  Pel m_a[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX];
+  Pel m_cb[CCCM_REF_SAMPLES_MAX];
+  Pel m_cr[CCCM_REF_SAMPLES_MAX];
+#endif
+
 protected:
 #if JVET_AC0094_REF_SAMPLES_OPT
   Pel m_refBuffer[MAX_NUM_COMPONENT][NUM_PRED_BUF][((MAX_CU_SIZE << 3) + 1 + MAX_REF_LINE_IDX) * 2];
@@ -234,7 +253,6 @@ protected:
 #endif
 
 private:
-
 #if !MERGE_ENC_OPT
   Pel* m_yuvExt2[MAX_NUM_COMPONENT][4];
   int  m_yuvExtSize2;
@@ -253,15 +271,6 @@ private:
 
 #if JVET_AA0057_CCCM
   Area m_cccmRefArea;
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
-#if JVET_AD0202_CCCM_MDF
-  Pel* m_cccmLumaBuf[CCCM_NUM_PRED_FILTER + 1];
-#else
-  Pel* m_cccmLumaBuf[2];
-#endif
-#else
-  Pel* m_cccmLumaBuf;
-#endif
 #if JVET_AE0100_BVGCCCM
   Pel* m_bvgCccmLumaBuf[NUM_BVG_CCCM_CANDS];
   Pel* m_bvgCccmChromaBuf[NUM_BVG_CCCM_CANDS][2];
@@ -375,27 +384,6 @@ protected:
   Pel***       m_pppTarPatch;
 #endif
 
-#if JVET_AA0057_CCCM
-  CccmCovariance m_cccmSolver;
-
-  Pel m_samples[CCCM_NUM_PARAMS_MAX];
-  Pel m_a[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX];
-  Pel m_cb[CCCM_REF_SAMPLES_MAX];
-  Pel m_cr[CCCM_REF_SAMPLES_MAX];
-#if JVET_AE0059_INTER_CCCM || JVET_AE0159_FIBC
-  public:
-    Pel (*getCccmBufferA())[CCCM_REF_SAMPLES_MAX]  { return m_a; };
-    Pel* getCccmBufferCb() { return m_cb; };
-    Pel* getCccmBufferCr() { return m_cr; };
-    Pel* getCccmBufferSamples() { return m_samples; };
-#if JVET_AE0159_FIBC
-    CccmCovariance* getCccmBufferSolver() { return &m_cccmSolver; };
-    Pel* getCccmBufferLuma() { return *m_cccmLumaBuf; };   
-#endif
-  protected:
-#endif
-#endif
-
   // prediction
   void xPredIntraPlanar           ( const CPelBuf &pSrc, PelBuf &pDst
 #if JVET_AC0105_DIRECTIONAL_PLANAR
@@ -465,14 +453,14 @@ protected:
 public:
 #endif
 #if LMS_LINEAR_MODEL && MMLM
-  struct MMLM_parameter
+  struct MMLMParameters
   {
     int a;
     int b;
     int shift;
   };
   int xCalcLMParametersGeneralized(int x, int y, int xx, int xy, int count, int bitDepth, int &a, int &b, int &iShift);
-  int xLMSampleClassifiedTraining (int count, int mean, int meanC, int LumaSamples[], int ChrmSamples[], int bitDepth, MMLM_parameter parameters[]);
+  int xLMSampleClassifiedTraining (int count, int mean, int meanC, int lumaSamples[], int chrmSamples[], int bitDepth, MMLMParameters parameters[]);
 #endif
 #if JVET_AE0078_IBC_LIC_EXTENSION
 protected:
