@@ -2326,7 +2326,11 @@ void IntraPrediction::xUpdateCclmModel(int &a, int &b, int &iShift, int midLuma,
 }
 #endif
 
+#if JVET_AD0188_CCP_MERGE
+void IntraPrediction::predIntraChromaLM( const ComponentID compID, PelBuf &piPred, PredictionUnit &pu, const CompArea& chromaArea, int intraDir, bool createModel, CclmModel *cclmModelStored )
+#else
 void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea& chromaArea, int intraDir, bool createModel, CclmModel *cclmModelStored)
+#endif
 {
 #if JVET_AC0119_LM_CHROMA_FUSION
   if (pu.isChromaFusion > 1)
@@ -2363,9 +2367,9 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
     xGlmApplyModel(pu, compID, chromaArea, glmModel, piPred);
 
  #if JVET_AD0188_CCP_MERGE
-    const_cast<PredictionUnit &>(pu).curCand.type   = CCP_TYPE_GLM4567;
-    const_cast<PredictionUnit &>(pu).curCand.glmIdc = pu.glmIdc.getIdc(compID, 0);
-    PU::glmModelToCcpParams(compID, const_cast<PredictionUnit&>(pu).curCand, glmModel 
+    pu.curCand.type   = CCP_TYPE_GLM4567;
+    pu.curCand.glmIdc = pu.glmIdc.getIdc(compID, 0);
+    PU::glmModelToCcpParams(compID, pu.curCand, glmModel 
 #if JVET_AB0174_CCCM_DIV_FREE
                             , m_glmLumaOffset
 #endif
@@ -2437,13 +2441,15 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
 
 #if JVET_AD0188_CCP_MERGE
   int glmIdc = pu.glmIdc.getIdc(compID, 0);
-  const_cast<PredictionUnit&>(pu).curCand.type = (glmIdc > 0) ? CCP_TYPE_GLM0123 : CCP_TYPE_CCLM;
+  pu.curCand.type = (glmIdc > 0) ? CCP_TYPE_GLM0123 : CCP_TYPE_CCLM;
+
   if (PU::isMultiModeLM(pu.intraDir[1]))
   {
-    const_cast<PredictionUnit&>(pu).curCand.type |= CCP_TYPE_MMLM;
+    pu.curCand.type |= CCP_TYPE_MMLM;
   }
-  const_cast<PredictionUnit&>(pu).curCand.glmIdc = glmIdc;
-  PU::cclmModelToCcpParams(compID, const_cast<PredictionUnit&>(pu).curCand, cclmModel);
+
+  pu.curCand.glmIdc = glmIdc;
+  PU::cclmModelToCcpParams(compID, pu.curCand, cclmModel);
 #endif
 
   ////// final prediction
@@ -3398,7 +3404,11 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
 }
 
 #if JVET_Z0050_DIMD_CHROMA_FUSION
+#if JVET_AD0188_CCP_MERGE
+void IntraPrediction::geneChromaFusionPred( const ComponentID compId, PelBuf &piPred, PredictionUnit &pu )
+#else
 void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu)
+#endif
 {
   int width = piPred.width;
   int height = piPred.height;
@@ -3499,13 +3509,13 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
       if (cccmSAD < cclmSAD)
       {
 #if JVET_AC0054_GLCCCM
-        const_cast<PredictionUnit &>(pu).curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
-        const_cast<PredictionUnit &>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-        const_cast<PredictionUnit &>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+        pu.curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
+        pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+        pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 #else
-        const_cast<PredictionUnit &>(pu).curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
+        pu.curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
 #endif
-        PU::cccmModelToCcpParams(const_cast<PredictionUnit &>(pu).curCand, cccmModelCb, cccmModelCr, modelThr
+        PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, modelThr
 #if JVET_AB0174_CCCM_DIV_FREE
                                  , m_cccmLumaOffset
 #endif
@@ -3513,9 +3523,9 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
       }
       else
       {
-        const_cast<PredictionUnit &>(pu).curCand.type = (CCP_TYPE_CCLM | CCP_TYPE_MMLM);
-        PU::cclmModelToCcpParams(COMPONENT_Cb, const_cast<PredictionUnit &>(pu).curCand, cclmModelCb);
-        PU::cclmModelToCcpParams(COMPONENT_Cr, const_cast<PredictionUnit &>(pu).curCand, cclmModelCr);
+        pu.curCand.type = (CCP_TYPE_CCLM | CCP_TYPE_MMLM);
+        PU::cclmModelToCcpParams(COMPONENT_Cb, pu.curCand, cclmModelCb);
+        PU::cclmModelToCcpParams(COMPONENT_Cr, pu.curCand, cclmModelCr);
       }
     }
 #endif
@@ -3527,11 +3537,12 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
     predIntraChromaLM(compId, predLmBuffer, pu2, area, pu2.intraDir[1]);
 
 #if JVET_AD0188_CCP_MERGE
-    const_cast<PredictionUnit &>(pu).curCand      = pu2.curCand;
-    const_cast<PredictionUnit &>(pu).curCand.type = CCP_TYPE_CCLM;
+    pu.curCand      = pu2.curCand;
+    pu.curCand.type = CCP_TYPE_CCLM;
+
     if (PU::isMultiModeLM(pu2.intraDir[1]))
     {
-      const_cast<PredictionUnit &>(pu).curCand.type |= CCP_TYPE_MMLM;
+      pu.curCand.type |= CCP_TYPE_MMLM;
     }
 #endif
 #if JVET_AD0120_LBCCP
@@ -13857,7 +13868,7 @@ void IntraPrediction::xCclmApplyModel(const PredictionUnit &pu, const ComponentI
   }
 }
 
-void IntraPrediction::reorderCCPCandidates(const PredictionUnit &pu, CCPModelCandidate candList[], int reorderlistSize)
+void IntraPrediction::reorderCCPCandidates(PredictionUnit &pu, CCPModelCandidate candList[], int reorderlistSize)
 {
   int candCost[MAX_CCP_CAND_LIST_SIZE];
   for (int i = 0; i < reorderlistSize; i++)
@@ -13887,7 +13898,7 @@ void IntraPrediction::reorderCCPCandidates(const PredictionUnit &pu, CCPModelCan
   }
 }
 
-int  IntraPrediction::xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandidate &ccpCand)
+int IntraPrediction::xGetOneCCPCandCost( PredictionUnit &pu, CCPModelCandidate &ccpCand )
 {
   CompArea chromaArea = pu.Cb();
   int cost = 0;
@@ -13918,7 +13929,7 @@ int  IntraPrediction::xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandi
 #if JVET_AD0202_CCCM_MDF
     else if (ccpCand.type & (CCP_TYPE_MDFCCCM))
     {
-      const_cast<PredictionUnit&>(pu).cccmMultiFilterIdx = ccpCand.cccmMultiFilterIdx;
+      pu.cccmMultiFilterIdx = ccpCand.cccmMultiFilterIdx;
 #if JVET_AB0174_CCCM_DIV_FREE
       int lumaOffset = m_cccmLumaOffset - ccpCand.lumaOffset;
 #else
@@ -13949,7 +13960,8 @@ int  IntraPrediction::xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandi
         cost += xUpdateOffsetsAndGetCostCCCM<false>(pu, COMPONENT_Cb, pu.Cb(), cccmModelCb, ccpCand.yThres, lumaOffset, offsetCb, ccpCand.type, refSizeX, refSizeY, ccpCand.cccmMultiFilterIdx );
         cost += xUpdateOffsetsAndGetCostCCCM<false>(pu, COMPONENT_Cr, pu.Cr(), cccmModelCr, ccpCand.yThres, lumaOffset, offsetCr, ccpCand.type, refSizeX, refSizeY, ccpCand.cccmMultiFilterIdx );
       }
-      const_cast<PredictionUnit&>(pu).cccmMultiFilterIdx = 0;
+
+      pu.cccmMultiFilterIdx = 0;
     }
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
@@ -13960,7 +13972,7 @@ int  IntraPrediction::xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandi
 #else
       int lumaOffset = 0;
 #endif
-      const_cast<PredictionUnit &>(pu).cccmNoSubFlag = 1;
+      pu.cccmNoSubFlag = 1;
 
       CccmModel cccmModelCb[2] = { CccmModel( CCCM_NO_SUB_NUM_PARAMS, bitDepth ), CccmModel( CCCM_NO_SUB_NUM_PARAMS, bitDepth ) };
       CccmModel cccmModelCr[2] = { CccmModel( CCCM_NO_SUB_NUM_PARAMS, bitDepth ), CccmModel( CCCM_NO_SUB_NUM_PARAMS, bitDepth ) };
@@ -13970,7 +13982,7 @@ int  IntraPrediction::xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandi
       cost += xUpdateOffsetsAndGetCostCCCM<false>(pu, COMPONENT_Cb, pu.Cb(), cccmModelCb, ccpCand.yThres, lumaOffset, offsetCb, ccpCand.type );
       cost += xUpdateOffsetsAndGetCostCCCM<false>(pu, COMPONENT_Cr, pu.Cr(), cccmModelCr, ccpCand.yThres, lumaOffset, offsetCr, ccpCand.type );
 
-      const_cast<PredictionUnit &>(pu).cccmNoSubFlag = 0;
+      pu.cccmNoSubFlag = 0;
     }
 #endif
     else if (ccpCand.type & (CCP_TYPE_CCLM | CCP_TYPE_GLM0123))
@@ -14019,7 +14031,7 @@ int  IntraPrediction::xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandi
   return cost;
 }
 
-void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr)
+void IntraPrediction::predCCPCandidate(PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr)
 {
   const int bitDepth = pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
 
@@ -14081,7 +14093,7 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
 #else
         int lumaOffset = 0;
 #endif
-        const_cast<PredictionUnit &>(pu).cccmNoSubFlag = 1;
+        pu.cccmNoSubFlag = 1;
         int offsetCb[2] = { 0, 0 };
         int offsetCr[2] = { 0, 0 };
 
@@ -14111,13 +14123,13 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
           xCccmApplyModelOffset(pu, COMPONENT_Cr, nscccmModelCr[1], 2, modelThr, predCr, lumaOffset, offsetCr, pu.curCand.type );
         }
 
-        const_cast<PredictionUnit &>(pu).cccmNoSubFlag = 0;
+        pu.cccmNoSubFlag = 0;
       }
 #endif
 #if JVET_AD0202_CCCM_MDF
       else if (pu.curCand.type & CCP_TYPE_MDFCCCM)
       {
-        const_cast<PredictionUnit&>(pu).cccmMultiFilterIdx = pu.curCand.cccmMultiFilterIdx;
+        pu.cccmMultiFilterIdx = pu.curCand.cccmMultiFilterIdx;
 #if JVET_AB0174_CCCM_DIV_FREE
         int lumaOffset = m_cccmLumaOffset - pu.curCand.lumaOffset;
 #else
@@ -14193,7 +14205,7 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
           }
         }
 
-        const_cast<PredictionUnit&>(pu).cccmMultiFilterIdx = 0;
+        pu.cccmMultiFilterIdx = 0;
       }
 #endif
       else if (pu.curCand.type & (CCP_TYPE_CCLM | CCP_TYPE_GLM0123))
@@ -14261,8 +14273,8 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
           applyMMCM(predCb, modelsCb);
           applyMMCM(predCr, modelsCr);
         }
-        PU::cclmModelToCcpParams(COMPONENT_Cb, const_cast<PredictionUnit&>(pu).curCand, modelsCb);
-        PU::cclmModelToCcpParams(COMPONENT_Cr, const_cast<PredictionUnit&>(pu).curCand, modelsCr);
+        PU::cclmModelToCcpParams(COMPONENT_Cb, pu.curCand, modelsCb);
+        PU::cclmModelToCcpParams(COMPONENT_Cr, pu.curCand, modelsCr);
       }
       else if (pu.curCand.type & CCP_TYPE_GLM4567)
       {
@@ -14873,7 +14885,11 @@ Pel IntraPrediction::xCccmGetLumaVal(const PredictionUnit& pu, const CPelBuf pi,
 #endif
 
 #if JVET_AA0057_CCCM
+#if JVET_AD0188_CCP_MERGE
+void IntraPrediction::predIntraCCCM( PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr, int intraDir )
+#else
 void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr, int intraDir )
+#endif
 {
 #if JVET_AE0100_BVGCCCM
   if (pu.bvgCccmFlag)
@@ -14929,8 +14945,8 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
 
-      const_cast<PredictionUnit &>(pu).curCand.type = CCP_TYPE_NSCCCM;
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, 0
+      pu.curCand.type = CCP_TYPE_NSCCCM;
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, 0
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -14955,8 +14971,8 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel( pu, COMPONENT_Cb,   cccmModelCb[1], 2, modelThr, predCb );
       xCccmApplyModel( pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr );
 
-      const_cast<PredictionUnit &>(pu).curCand.type = (CCP_TYPE_NSCCCM | CCP_TYPE_MMLM);
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, modelThr
+      pu.curCand.type = (CCP_TYPE_NSCCCM | CCP_TYPE_MMLM);
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, modelThr
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -14996,12 +15012,12 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
 
-      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_MDFCCCM;
-      const_cast<PredictionUnit&>(pu).curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
-      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = CCP_TYPE_MDFCCCM;
+      pu.curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, 0
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, 0
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -15026,12 +15042,12 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[1], 2, modelThr, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr);
 
-      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_MDFCCCM | CCP_TYPE_MMLM;
-      const_cast<PredictionUnit&>(pu).curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
-      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = CCP_TYPE_MDFCCCM | CCP_TYPE_MMLM;
+      pu.curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, modelThr
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, modelThr
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -15068,12 +15084,12 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
 
-      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_MDFCCCM;
-      const_cast<PredictionUnit&>(pu).curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
-      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = CCP_TYPE_MDFCCCM;
+      pu.curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, 0
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, 0
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -15098,12 +15114,12 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[1], 2, modelThr, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr);
 
-      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_MDFCCCM | CCP_TYPE_MMLM;
-      const_cast<PredictionUnit&>(pu).curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
-      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = CCP_TYPE_MDFCCCM | CCP_TYPE_MMLM;
+      pu.curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, modelThr
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, modelThr
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -15153,11 +15169,11 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       cccmSADtmp += xCalculateCCCMcost(pu, COMPONENT_Cr, intraDir, pu.blocks[COMPONENT_Cr], &cccmModelCr[2], 0);
 #if JVET_AD0188_CCP_MERGE
 #if JVET_AC0054_GLCCCM
-      const_cast<PredictionUnit&>(pu).curCand.type = (pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM);
-      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = (pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM);
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 #else
-      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_CCCM;
+      pu.curCand.type = CCP_TYPE_CCCM;
 #endif
 #endif
       if (cccmSADtmp < cccmSAD)
@@ -15165,7 +15181,7 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
         xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[2], 0, 0, predCb);
         xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[2], 0, 0, predCr);
 #if JVET_AD0188_CCP_MERGE
-        PU::cccmModelToCcpParams(const_cast<PredictionUnit &>(pu).curCand, &cccmModelCb[2], &cccmModelCr[2], 0
+        PU::cccmModelToCcpParams(pu.curCand, &cccmModelCb[2], &cccmModelCr[2], 0
 #if JVET_AB0174_CCCM_DIV_FREE
                                  , m_cccmLumaOffset
 #endif
@@ -15177,7 +15193,7 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
         xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[0], 0, 0, predCb);
         xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[0], 0, 0, predCr);
 #if JVET_AD0188_CCP_MERGE
-        PU::cccmModelToCcpParams(const_cast<PredictionUnit &>(pu).curCand, &cccmModelCb[0], &cccmModelCr[0], 0
+        PU::cccmModelToCcpParams(pu.curCand, &cccmModelCb[0], &cccmModelCr[0], 0
 #if JVET_AB0174_CCCM_DIV_FREE
                                  , m_cccmLumaOffset
 #endif
@@ -15204,11 +15220,11 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       cccmSADtmp += xCalculateCCCMcost(pu, COMPONENT_Cr, pu.intraDir[1], pu.blocks[COMPONENT_Cr], &cccmModelCr[2], modelThrTmp);
 #if JVET_AD0188_CCP_MERGE
 #if JVET_AC0054_GLCCCM
-        const_cast<PredictionUnit &>(pu).curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
-        const_cast<PredictionUnit &>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-        const_cast<PredictionUnit &>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 #else
-        const_cast<PredictionUnit &>(pu).curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
+      pu.curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
 #endif
 #endif
       if (cccmSADtmp < cccmSAD)
@@ -15219,7 +15235,7 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
         xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[2], 1, modelThrTmp, predCr);
         xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[3], 2, modelThrTmp, predCr);
 #if JVET_AD0188_CCP_MERGE
-        PU::cccmModelToCcpParams(const_cast<PredictionUnit &>(pu).curCand, &cccmModelCb[2], &cccmModelCr[2], modelThrTmp
+        PU::cccmModelToCcpParams(pu.curCand, &cccmModelCb[2], &cccmModelCr[2], modelThrTmp
 #if JVET_AB0174_CCCM_DIV_FREE
                                  , m_cccmLumaOffset
 #endif
@@ -15234,7 +15250,7 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
         xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[0], 1, modelThr, predCr);
         xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[1], 2, modelThr, predCr);
 #if JVET_AD0188_CCP_MERGE
-        PU::cccmModelToCcpParams(const_cast<PredictionUnit &>(pu).curCand, &cccmModelCb[0], &cccmModelCr[0], modelThr
+        PU::cccmModelToCcpParams(pu.curCand, &cccmModelCb[0], &cccmModelCr[0], modelThr
 #if JVET_AB0174_CCCM_DIV_FREE
                                  , m_cccmLumaOffset
 #endif
@@ -15267,13 +15283,13 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
 
 #if JVET_AC0054_GLCCCM
-      const_cast<PredictionUnit&>(pu).curCand.type = (pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM);
-      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = (pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM);
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 #else
-      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_CCCM;
+      pu.curCand.type = CCP_TYPE_CCCM;
 #endif
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, 0
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, 0
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -15298,13 +15314,13 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr);
 
 #if JVET_AC0054_GLCCCM
-      const_cast<PredictionUnit&>(pu).curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
-      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 #else
-      const_cast<PredictionUnit&>(pu).curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
+      pu.curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
 #endif
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit &>(pu).curCand, cccmModelCb, cccmModelCr, modelThr
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, modelThr
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif

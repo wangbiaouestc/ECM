@@ -10009,7 +10009,11 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
   const Slice           &slice = *cs.slice;
 
   TransformUnit &currTU               = *cs.getTU( currArea.chromaPos(), CHANNEL_TYPE_CHROMA );
+#if JVET_AD0188_CCP_MERGE
+  PredictionUnit &pu                  = *cs.getPU( currArea.chromaPos(), CHANNEL_TYPE_CHROMA );
+#else
   const PredictionUnit &pu            = *cs.getPU( currArea.chromaPos(), CHANNEL_TYPE_CHROMA );
+#endif
 
   bool lumaUsesISP                    = false;
   uint32_t     currDepth                  = partitioner.currTrDepth;

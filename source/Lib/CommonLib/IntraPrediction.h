@@ -486,7 +486,11 @@ public:
 #endif
 #endif
 #if JVET_AA0057_CCCM
+#if JVET_AD0188_CCP_MERGE
+  void   predIntraCCCM            ( PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, int intraDir );
+#else
   void   predIntraCCCM            (const PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, int intraDir);
+#endif
 
   void   xCccmCalcModels          (const PredictionUnit& pu, CccmModel& cccmModelCb, CccmModel& cccmModelCr, int modelId, int modelThr
 #if JVET_AD0120_LBCCP
@@ -560,13 +564,13 @@ public:
 #endif
 
 #if JVET_AD0188_CCP_MERGE
-  void reorderCCPCandidates(const PredictionUnit &pu, CCPModelCandidate candList[], int reorderlistSize);
-  int  xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandidate &ccpCand);
-  void predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr);
+  void reorderCCPCandidates       ( PredictionUnit &pu, CCPModelCandidate candList[], int reorderlistSize );
+  int  xGetOneCCPCandCost         ( PredictionUnit &pu, CCPModelCandidate &ccpCand );
+  void predCCPCandidate           ( PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr);
 
-  void xCclmApplyModel(const PredictionUnit &pu, const ComponentID compId, CccmModel& cccmModel, int modelId, int modelThr, PelBuf &piPred);
-  void xCccmApplyModelOffset(const PredictionUnit& pu, const ComponentID compId, CccmModel& cccmModel, int modelId, int modelThr, PelBuf& piPred, int lumaOffset, int chromaOffset[2], int type, int refSizeX = 0, int refSizeY = 0 );
-  void xGlmApplyModelOffset(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel& glmModel, int glmIdc, PelBuf& piPred, int lumaOffset, int chromaOffset);  
+  void xCclmApplyModel            (const PredictionUnit &pu, const ComponentID compId, CccmModel& cccmModel, int modelId, int modelThr, PelBuf &piPred);
+  void xCccmApplyModelOffset      (const PredictionUnit& pu, const ComponentID compId, CccmModel& cccmModel, int modelId, int modelThr, PelBuf& piPred, int lumaOffset, int chromaOffset[2], int type, int refSizeX = 0, int refSizeY = 0 );
+  void xGlmApplyModelOffset       (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel& glmModel, int glmIdc, PelBuf& piPred, int lumaOffset, int chromaOffset);  
 
   template <const bool updateOffsets>
   int xUpdateOffsetsAndGetCostCCLM(const PredictionUnit &pu, const ComponentID compID, const CompArea &chromaArea, CclmModel &cclmModel, int modelNum, int glmIdc);
@@ -711,8 +715,12 @@ public:
   );
 #endif
 
-  // Cross-component Chroma
+  // Cross-component chroma
+#if JVET_AD0188_CCP_MERGE
+  void predIntraChromaLM( const ComponentID compID, PelBuf &piPred, PredictionUnit &pu, const CompArea& chromaArea, int intraDir, bool createModel = true, CclmModel *cclmModelStored = nullptr );
+#else
   void predIntraChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea& chromaArea, int intraDir, bool createModel = true, CclmModel *cclmModelStored = nullptr);
+#endif
   void xGetLumaRecPixels(const PredictionUnit &pu, CompArea chromaArea
 #if JVET_AD0202_CCCM_MDF
     , int downsFilterIdx = 0
@@ -767,7 +775,11 @@ public:
   void geneWeightedPred           ( const ComponentID compId, PelBuf& pred, const PredictionUnit &pu, const PelBuf& interPred, const PelBuf& intraPred, const Pel* pLUT = nullptr );
   void geneIntrainterPred         (const CodingUnit &cu, PelStorage& pred);
 #if JVET_Z0050_DIMD_CHROMA_FUSION
+#if JVET_AD0188_CCP_MERGE
+  void geneChromaFusionPred       (const ComponentID compId, PelBuf &piPred, PredictionUnit &pu);
+#else
   void geneChromaFusionPred       (const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
+#endif
 #endif
 #if JVET_AC0112_IBC_CIIP
   void geneWeightedPred           ( const ComponentID compId, PelBuf& pred, const PredictionUnit &pu, const PelBuf& interPred, const PelBuf& intraPred);
