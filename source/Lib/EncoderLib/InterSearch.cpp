@@ -12453,10 +12453,14 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #endif
     {
       const ComponentID compID    = ComponentID(c);
-      if (compID == COMPONENT_Y && !luma)
+      if( compID == COMPONENT_Y && !luma )
+      {
         continue;
-      if (compID != COMPONENT_Y && !chroma)
+      }
+      if( compID != COMPONENT_Y && !chroma )
+      {
         continue;
+      }
       const CompArea&   compArea  = tu.blocks[compID];
       const int channelBitDepth   = sps.getBitDepth(toChannelType(compID));
 
