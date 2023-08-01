@@ -828,9 +828,20 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
   }
 #endif
 #if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
-  m_mbvdCandCostList = (Distortion*)xMalloc(Distortion, IBC_MBVD_ENC_NUM);
-  m_mbvdSearchCandsList = (int*)xMalloc(int, IBC_MBVD_AD_NUM);
-  m_mbvdTestedCandsList = (bool*)xMalloc(bool, IBC_MBVD_AD_NUM);
+  if( m_mbvdCandCostList == nullptr )
+  {
+    m_mbvdCandCostList = ( Distortion* ) xMalloc( Distortion, IBC_MBVD_ENC_NUM );
+  }
+
+  if( m_mbvdSearchCandsList == nullptr )
+  {
+    m_mbvdSearchCandsList = ( int* ) xMalloc( int, IBC_MBVD_AD_NUM );
+  }
+
+  if( m_mbvdTestedCandsList == nullptr )
+  {
+    m_mbvdTestedCandsList = ( bool* ) xMalloc( bool, IBC_MBVD_AD_NUM );
+  }
 #endif
 }
 

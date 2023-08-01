@@ -785,7 +785,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #endif
   if( compID != COMPONENT_Y && PU::isLMCMode( uiChFinalMode ) )
   {
+#if JVET_AD0188_CCP_MERGE
+    PredictionUnit& pu = *tu.cu->firstPU;
+#else
     const PredictionUnit& pu = *tu.cu->firstPU;
+#endif
     m_pcIntraPred->xGetLumaRecPixels( pu, area );
     m_pcIntraPred->predIntraChromaLM( compID, piPred, pu, area, uiChFinalMode );
   }
@@ -913,7 +917,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
     m_pcIntraPred->initIntraPatternChType(*tu.cu, areaCr);
     if( PU::isLMCMode( uiChFinalMode ) )
     {
+#if JVET_AD0188_CCP_MERGE
+      PredictionUnit& pu = *tu.cu->firstPU;
+#else
       const PredictionUnit& pu = *tu.cu->firstPU;
+#endif
       m_pcIntraPred->xGetLumaRecPixels( pu, areaCr );
       m_pcIntraPred->predIntraChromaLM( COMPONENT_Cr, piPredCr, pu, areaCr, uiChFinalMode );
     }
