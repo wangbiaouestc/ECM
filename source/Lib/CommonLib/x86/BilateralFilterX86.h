@@ -46,27 +46,27 @@
 #if ENABLE_SIMD_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER_ENABLE_SIMD
 #if JVET_W0066_CCSAO
 template<X86_VEXT vext>
-void BilateralFilter::simdFilterDiamond5x5NoClip(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr)
+void BilateralFilter::simdFilterDiamond5x5NoClip(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr)
 {
   //if( uiWidth < 4 || ( uiWidth < 8 && isRDO ) )
   if (uiWidth < 4)
   {
-    return blockBilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, block, blkFilt, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, isRDO, LUTrowPtr);
+    return blockBilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, block, blkFilt, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, isRDO, lutRowPtr);
   }
 
   int pad = 2;
   int padwidth = iWidthExtSIMD;
 
-  __m128i center, left, right, up, down, lu, ld, ru, rd, diffabs, four, fifteen, lut, acc, temp, round_add, clipmin, clipmax, inputVals;
+  __m128i center, left, right, up, down, lu, ld, ru, rd, diffabs, four, fifteen, lut, acc, temp, roundAdd, clipmin, clipmax, inputVals;
   __m128i ll, rr, uu, dd;
 
   four = _mm_set1_epi16(4);
   fifteen = _mm_set1_epi16(15);
-  round_add = _mm_set1_epi16(bif_round_add);
+  roundAdd = _mm_set1_epi16(bifRoundAdd);
   clipmin = _mm_set1_epi16(clpRng.min);
   clipmax = _mm_set1_epi16(clpRng.max);
 
-  lut = _mm_loadu_si128((__m128i*)(LUTrowPtr));
+  lut = _mm_loadu_si128((__m128i*)(lutRowPtr));
   acc = _mm_set1_epi32(0);
 
   // Copy back parameters
@@ -269,8 +269,8 @@ void BilateralFilter::simdFilterDiamond5x5NoClip(uint32_t uiWidth, uint32_t uiHe
       }
 
       // Add 16 and shift 5
-      acc = _mm_add_epi16(acc, round_add);
-      acc = _mm_srai_epi16(acc, bif_round_shift);
+      acc = _mm_add_epi16(acc, roundAdd);
+      acc = _mm_srai_epi16(acc, bifRoundShift);
 
       // Instead we add our input values to the delta
       if (isRDO)
@@ -306,27 +306,27 @@ void BilateralFilter::simdFilterDiamond5x5NoClip(uint32_t uiWidth, uint32_t uiHe
 }
 #endif
 template<X86_VEXT vext>
-void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr )
+void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr )
 {
   //if( uiWidth < 4 || ( uiWidth < 8 && isRDO ) )
   if( uiWidth < 4 )
   {
-    return blockBilateralFilterDiamond5x5(uiWidth, uiHeight, block, blkFilt, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, isRDO, LUTrowPtr );
+    return blockBilateralFilterDiamond5x5(uiWidth, uiHeight, block, blkFilt, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, isRDO, lutRowPtr );
   }
 
   int pad = 2;
   int padwidth = iWidthExtSIMD;
 
-  __m128i center, left, right, up, down, lu, ld, ru, rd, diffabs, four, fifteen, lut, acc, temp, round_add, clipmin, clipmax, inputVals;
+  __m128i center, left, right, up, down, lu, ld, ru, rd, diffabs, four, fifteen, lut, acc, temp, roundAdd, clipmin, clipmax, inputVals;
   __m128i ll, rr, uu, dd;
 
   four = _mm_set1_epi16(4);
   fifteen = _mm_set1_epi16(15);
-  round_add = _mm_set1_epi16(bif_round_add);
+  roundAdd = _mm_set1_epi16(bifRoundAdd);
   clipmin = _mm_set1_epi16(clpRng.min);
   clipmax = _mm_set1_epi16(clpRng.max);
 
-  lut = _mm_loadu_si128((__m128i*)(LUTrowPtr));
+  lut = _mm_loadu_si128((__m128i*)(lutRowPtr));
   acc = _mm_set1_epi32(0);
   
   // Copy back parameters
@@ -529,8 +529,8 @@ void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, 
       }
       
       // Add 16 and shift 5
-      acc = _mm_add_epi16(acc, round_add);
-      acc = _mm_srai_epi16(acc, bif_round_shift);
+      acc = _mm_add_epi16(acc, roundAdd);
+      acc = _mm_srai_epi16(acc, bifRoundShift);
       
       // Instead we add our input values to the delta
       if(isRDO)

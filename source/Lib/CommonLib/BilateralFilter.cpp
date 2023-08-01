@@ -123,7 +123,7 @@ const char* BilateralFilter::getFilterLutParameters( const int size, const PredM
 }
 #endif
 #if JVET_W0066_CCSAO
-void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr)
+void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr)
 {
   int pad = 2;
 
@@ -144,7 +144,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
     idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
-    w0 = LUTrowPtr[idx];
+    w0 = lutRowPtr[idx];
     int mod = (w0 + sg0) ^ sg0;
     downbuffer[x] = mod;
 
@@ -154,7 +154,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
     idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
-    w0 = LUTrowPtr[idx] >> 1;
+    w0 = lutRowPtr[idx] >> 1;
     mod = (w0 + sg0) ^ sg0;
     downrightbuffer[1][x + 1] = mod;
 
@@ -164,7 +164,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
     idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
-    w0 = LUTrowPtr[idx] >> 1;
+    w0 = lutRowPtr[idx] >> 1;
     mod = (w0 + sg0) ^ sg0;
     downleftbuffer[x] = mod;
   }
@@ -183,7 +183,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
     idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
-    w0 = LUTrowPtr[idx];
+    w0 = lutRowPtr[idx];
     int mod = (w0 + sg0) ^ sg0;
     int rightmod = mod;
 
@@ -194,7 +194,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
     idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
-    w0 = LUTrowPtr[idx] >> 1;
+    w0 = lutRowPtr[idx] >> 1;
     mod = (w0 + sg0) ^ sg0;
     downrightbuffer[(y + 1) % 2][0] = mod;
 
@@ -205,7 +205,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
     idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
-    w0 = LUTrowPtr[idx] >> 1;
+    w0 = lutRowPtr[idx] >> 1;
     mod = (w0 + sg0) ^ sg0;
     downleftbuffer[width] = mod;
 
@@ -226,7 +226,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx];
+      w0 = lutRowPtr[idx];
       mod = (w0 + sg0) ^ sg0;
 
       modsum += mod;
@@ -238,7 +238,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx];
+      w0 = lutRowPtr[idx];
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;
       downbuffer[x] = mod;
@@ -257,7 +257,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx] >> 1;
+      w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       // modsum += ((int16_t)((uint16_t)((mod) >> 1)));
       modsum += mod;
@@ -269,7 +269,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx] >> 1;
+      w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       //modsum += ((int16_t)((uint16_t)((mod) >> 1)));
       modsum += mod;
@@ -285,7 +285,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx] >> 1;
+      w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;
 
@@ -295,7 +295,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx] >> 1;
+      w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;
 
@@ -305,7 +305,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx] >> 1;
+      w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;
 
@@ -315,11 +315,11 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15) & ((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx] >> 1;
+      w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;
 
-      blkFilt[(y + pad) * (padwidth + 4) + x + pad] = ((int16_t)((uint16_t)((modsum * bfac + bif_round_add) >> bif_round_shift)));
+      blkFilt[(y + pad) * (padwidth + 4) + x + pad] = ((int16_t)((uint16_t)((modsum * bfac + bifRoundAdd) >> bifRoundShift)));
     }
   }
 
@@ -357,7 +357,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uin
   }
 }
 #endif
-void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr )
+void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr )
 {
   int pad = 2;
 
@@ -378,7 +378,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
     idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
-    w0 = LUTrowPtr[idx];
+    w0 = lutRowPtr[idx];
     int mod = (w0 + sg0) ^ sg0;
     downbuffer[x] = mod;
 
@@ -388,7 +388,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
     idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
-    w0 = LUTrowPtr[idx] >> 1;
+    w0 = lutRowPtr[idx] >> 1;
     mod = (w0 + sg0) ^ sg0;
     downrightbuffer[1][x + 1] = mod;
 
@@ -398,7 +398,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
     idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
-    w0 = LUTrowPtr[idx] >> 1;
+    w0 = lutRowPtr[idx] >> 1;
     mod = (w0 + sg0) ^ sg0;
     downleftbuffer[x] = mod;
   }
@@ -417,7 +417,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
     idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
-    w0 = LUTrowPtr[idx];
+    w0 = lutRowPtr[idx];
     int mod = (w0 + sg0) ^ sg0;
     int rightmod = mod;
 
@@ -428,7 +428,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
     idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
-    w0 = LUTrowPtr[idx] >> 1;
+    w0 = lutRowPtr[idx] >> 1;
     mod = (w0 + sg0) ^ sg0;
     downrightbuffer[(y + 1) % 2][0] = mod;
 
@@ -439,7 +439,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
     idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
-    w0 = LUTrowPtr[idx] >> 1;
+    w0 = lutRowPtr[idx] >> 1;
     mod = (w0 + sg0) ^ sg0;
     downleftbuffer[width] = mod;
 
@@ -460,7 +460,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx];
+      w0 = lutRowPtr[idx];
       mod = (w0 + sg0) ^ sg0;
 
       modsum += mod;
@@ -472,7 +472,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx];
+      w0 = lutRowPtr[idx];
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;
       downbuffer[x] = mod;
@@ -491,7 +491,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx] >> 1;
+      w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       // modsum += ((int16_t)((uint16_t)((mod) >> 1)));
       modsum += mod;
@@ -503,7 +503,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx] >> 1;
+      w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       //modsum += ((int16_t)((uint16_t)((mod) >> 1)));
       modsum += mod;
@@ -519,7 +519,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx] >> 1;
+      w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;
 
@@ -529,7 +529,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx] >> 1;
+      w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;
 
@@ -539,7 +539,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx] >> 1;
+      w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;
 
@@ -549,11 +549,11 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
       idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
-      w0 = LUTrowPtr[idx] >> 1;
+      w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;
 
-      blkFilt[(y + pad)*(padwidth + 4) + x + pad] = (( int16_t ) (( uint16_t ) ((modsum*bfac + bif_round_add) >> bif_round_shift)));
+      blkFilt[(y + pad)*(padwidth + 4) + x + pad] = (( int16_t ) (( uint16_t ) ((modsum*bfac + bifRoundAdd) >> bifRoundShift)));
     }
   }
 
@@ -596,8 +596,8 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
   const unsigned uiHeight = predBuf.height;
   
   int bfac = 1;
-  int bif_round_add = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
-  int bif_round_shift = ( BIF_ROUND_SHIFT ) -(currTU.cs->pps->getBIFStrength());
+  int bifRoundAdd = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
+  int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
 
   const char* lutRowPtr = getFilterLutParameters( std::min( uiWidth, uiHeight ), currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac );
 
@@ -780,7 +780,7 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBu
   std::copy(tempblock + iWidthExtSIMD, tempblock + iWidthExtSIMD + uiWidthExt, tempblock);
   std::copy(tempblock  + iWidthExtSIMD*(uiHeightExt-2), tempblock  + iWidthExtSIMD*(uiHeightExt-2) + uiWidthExt, tempblock + iWidthExtSIMD*(uiHeightExt-1));
 
-  m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, piReco, uiRecStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, true, lutRowPtr );
+  m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, piReco, uiRecStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, true, lutRowPtr );
 
   if (!useReco)
   {
@@ -848,11 +848,11 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
         Pel *recPtr    = rec.get(COMPONENT_Y).bufAt(blkDst);
 
         int         bfac      = 1;
-        const char *LUTrowPtr = getFilterLutParameters(std::min(width, height), currTU.cu->predMode,
+        const char *lutRowPtr = getFilterLutParameters(std::min(width, height), currTU.cu->predMode,
                                                        qp + currTU.cs->pps->getBIFQPOffset(), bfac);
 
-        int bif_round_add   = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
-        int bif_round_shift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getBIFStrength());
+        int bifRoundAdd   = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
+        int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
 
         bool topAltAvailable  = !clipT;
         bool leftAltAvailable = !clipL;
@@ -929,11 +929,11 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
             std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
           }
           m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride,
-                                            iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+                                            iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr);
         }
         else
         {
-          tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+          tempBlockPtr = tempblock + NUMBER_PADDED_SAMPLES *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
 
           //// Move block to temporary block
           for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
@@ -1087,7 +1087,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
               tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
           }
           m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride,
-                                            iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+                                            iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr);
         }
 
         xStart = xEnd;
@@ -1114,10 +1114,10 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
     Pel *recPtr    = rec.get(COMPONENT_Y).bufAt(compArea);
 
     int         bfac      = 1;
-    const char *LUTrowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac);
+    const char *lutRowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac);
 
-    int bif_round_add   = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
-    int bif_round_shift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getBIFStrength());
+    int bifRoundAdd   = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
+    int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
 
     const CompArea &myArea = currTU.blocks[COMPONENT_Y];
     topAltAvailable        = myArea.y - 2 >= 0;
@@ -1165,18 +1165,18 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
         // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
         // Therefore, copy samples from one line up instead of from two lines up by updating srcPtr *before* copy.
         srcPtr += srcStride;
-        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
       }
       else
       {
-        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
         srcPtr += srcStride;
       }
       tempBlockPtr += iWidthExtSIMD;
       // Copy samples that are not out of bounds.
       for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
       {
-        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
         srcPtr += srcStride;
         tempBlockPtr += iWidthExtSIMD;
       }
@@ -1196,12 +1196,12 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
         std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
       }
       return m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr,
-                                               recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false,
-                                               LUTrowPtr);
+                                               recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false,
+                                                lutRowPtr);
     }
     else
     {
-      tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+      tempBlockPtr = tempblock + NUMBER_PADDED_SAMPLES *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
 
       //// Move block to temporary block
       for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
@@ -1354,7 +1354,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
     }
 
     m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride,
-                                      iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+                                      iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr);
   }
 #else
   CompArea &compArea = currTU.block(COMPONENT_Y);
@@ -1373,11 +1373,11 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
   Pel *recPtr    = rec.get(COMPONENT_Y).bufAt(compArea);
 
   int         bfac      = 1;
-  const char *LUTrowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode,
+  const char *lutRowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode,
                                                  qp + currTU.cs->pps->getBIFQPOffset(), bfac);
 
-  int bif_round_add   = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
-  int bif_round_shift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getBIFStrength());
+  int bifRoundAdd   = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
+  int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
 
   const CompArea &myArea  = currTU.blocks[COMPONENT_Y];
   topAltAvailable         = myArea.y - 2 >= 0;
@@ -1458,7 +1458,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
   }
   else
   {
-    tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+    tempBlockPtr = tempblock + NUMBER_PADDED_SAMPLES *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
 
     //// Move block to temporary block
     for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
@@ -1586,7 +1586,7 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, Pe
     }
   }
 
-  m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+  m_bilateralFilterDiamond5x5NoClip(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr);
 #endif
 }
 #endif
@@ -1639,11 +1639,11 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
         Pel *recPtr    = rec.get(COMPONENT_Y).bufAt(blkDst);
 
         int         bfac      = 1;
-        const char *LUTrowPtr = getFilterLutParameters(std::min(width, height), currTU.cu->predMode,
+        const char *lutRowPtr = getFilterLutParameters(std::min(width, height), currTU.cu->predMode,
                                                        qp + currTU.cs->pps->getBIFQPOffset(), bfac);
 
-        int bif_round_add   = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
-        int bif_round_shift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getBIFStrength());
+        int bifRoundAdd   = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
+        int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
 
         bool topAltAvailable  = !clipT;
         bool leftAltAvailable = !clipL;
@@ -1689,18 +1689,18 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
             // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
             // Therefore, copy samples from one line up instead of from two lines up by updating srcPtr *before* copy.
             srcPtr += srcStride;
-            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+            std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
           }
           else
           {
-            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+            std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
             srcPtr += srcStride;
           }
           tempBlockPtr += iWidthExtSIMD;
           // Copy samples that are not out of bounds.
           for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
           {
-            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+            std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
             srcPtr += srcStride;
             tempBlockPtr += iWidthExtSIMD;
           }
@@ -1713,18 +1713,18 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
             // Therefore, copy samples from the second to last line instead of the last line by subtracting srcPtr
             // before copy.
             srcPtr -= srcStride;
-            std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+            std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
           }
           else
           {
             std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
           }
           m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride,
-                                            iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+                                            iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr);
         }
         else
         {
-          tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+          tempBlockPtr = tempblock + NUMBER_PADDED_SAMPLES *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
 
           //// Move block to temporary block
           for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
@@ -1853,7 +1853,7 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
             tempblock[iWidthExtSIMD * (uiHeightExt - 1) + uiWidthExt - 1] = tempblock[iWidthExtSIMD * (uiHeightExt - 3) + uiWidthExt - 3];
           }
           m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride,
-                                            iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+                                            iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr);
         }
 
         xStart = xEnd;
@@ -1880,10 +1880,10 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
     Pel *recPtr    = rec.get(COMPONENT_Y).bufAt(compArea);
 
     int         bfac      = 1;
-    const char *LUTrowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac);
+    const char *lutRowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac);
 
-    int bif_round_add   = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
-    int bif_round_shift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getBIFStrength());
+    int bifRoundAdd   = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
+    int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
 
     const CompArea &myArea = currTU.blocks[COMPONENT_Y];
     topAltAvailable        = myArea.y - 2 >= 0;
@@ -1931,18 +1931,18 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
         // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
         // Therefore, copy samples from one line up instead of from two lines up by updating srcPtr *before* copy.
         srcPtr += srcStride;
-        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
       }
       else
       {
-        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
         srcPtr += srcStride;
       }
       tempBlockPtr += iWidthExtSIMD;
       // Copy samples that are not out of bounds.
       for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
       {
-        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
         srcPtr += srcStride;
         tempBlockPtr += iWidthExtSIMD;
       }
@@ -1955,18 +1955,17 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
         // Therefore, copy samples from the second to last line instead of the last line by subtracting srcPtr before
         // copy.
         srcPtr -= srcStride;
-        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
       }
       else
       {
-        std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+        std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
       }
-      return m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false,
-                                               LUTrowPtr);
+      return m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr);
     }
     else
     {
-      tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+      tempBlockPtr = tempblock + NUMBER_PADDED_SAMPLES *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
 
       //// Move block to temporary block
       for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
@@ -2098,7 +2097,7 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
       }
     }
 
-    m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+    m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr);
   }
 #else
   CompArea &compArea = currTU.block(COMPONENT_Y);
@@ -2117,11 +2116,11 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
   Pel *recPtr    = rec.get(COMPONENT_Y).bufAt(compArea);
 
   int         bfac      = 1;
-  const char *LUTrowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode,
+  const char *lutRowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode,
                                                  qp + currTU.cs->pps->getBIFQPOffset(), bfac);
 
-  int bif_round_add   = (BIF_ROUND_ADD) >> (currTU.cs->pps->getBIFStrength());
-  int bif_round_shift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getBIFStrength());
+  int bifRoundAdd   = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
+  int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
 
   const CompArea &myArea  = currTU.blocks[COMPONENT_Y];
   topAltAvailable         = myArea.y - 2 >= 0;
@@ -2169,18 +2168,18 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
       // Hence the top line of tempblock is unavailable if the block is the top block of a CTU.
       // Therefore, copy samples from one line up instead of from two lines up by updating srcPtr *before* copy.
       srcPtr += srcStride;
-      std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
     }
     else
     {
-      std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
       srcPtr += srcStride;
     }
     tempBlockPtr += iWidthExtSIMD;
     // Copy samples that are not out of bounds.
     for (uint32_t uiY = 1; uiY < uiHeightExt - 1; ++uiY)
     {
-      std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
       srcPtr += srcStride;
       tempBlockPtr += iWidthExtSIMD;
     }
@@ -2192,17 +2191,17 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
       // Hence the bottom line of tempblock is unavailable if the block at the bottom of a CTU.
       // Therefore, copy samples from the second to last line instead of the last line by subtracting srcPtr before copy.
       srcPtr -= srcStride;
-      std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
     }
     else
     {
-      std::memcpy(tempBlockPtr, srcPtr, (uiWidthExt) * sizeof(Pel));
+      std::memcpy(tempBlockPtr, srcPtr, uiWidthExt * sizeof(Pel));
     }
-    return m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+    return m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr);
   }
   else
   {
-    tempBlockPtr = tempblock + (NUMBER_PADDED_SAMPLES) *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
+    tempBlockPtr = tempblock + NUMBER_PADDED_SAMPLES *iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
 
     //// Move block to temporary block
     for (uint32_t uiY = 0; uiY < uiHeight; ++uiY)
@@ -2330,7 +2329,7 @@ void BilateralFilter::bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitB
     }
   }
 
-  m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bif_round_add, bif_round_shift, false, LUTrowPtr);
+  m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr);
 #endif
 }
 #endif
@@ -2704,8 +2703,8 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5Chroma(PelBuf& resiBuf, const 
   const unsigned uiHeight = predBuf.height;
 
   int bfac = 1;
-  int bifRoundAdd = (BIF_ROUND_ADD) >> (currTU.cs->pps->getChromaBIFStrength());
-  int bifRoundShift = ( BIF_ROUND_SHIFT ) -(currTU.cs->pps->getChromaBIFStrength());
+  int bifRoundAdd = BIF_ROUND_ADD >> currTU.cs->pps->getChromaBIFStrength();
+  int bifRoundShift = BIF_ROUND_SHIFT -currTU.cs->pps->getChromaBIFStrength();
 
   ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
   int widthForStrength = currTU.blocks[compID].width;
@@ -3196,8 +3195,8 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
         Pel *recPtr    = rec.get(compID).bufAt(blkDst);
 
         int bfac            = 1;
-        int bifRoundAdd     = (BIF_ROUND_ADD) >> (currTU.cs->pps->getChromaBIFStrength());
-        int bifRoundShift   = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getChromaBIFStrength());
+        int bifRoundAdd     = BIF_ROUND_ADD >> currTU.cs->pps->getChromaBIFStrength();
+        int bifRoundShift   = BIF_ROUND_SHIFT - currTU.cs->pps->getChromaBIFStrength();
 
         bool topAltAvailable  = !clipT;
         bool leftAltAvailable = !clipL;
@@ -3454,8 +3453,8 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
     Pel *recPtr    = rec.get(compID).bufAt(compArea);
 
     int bfac            = 1;
-    int bifRoundAdd     = (BIF_ROUND_ADD) >> (currTU.cs->pps->getChromaBIFStrength());
-    int bifRoundShift   = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getChromaBIFStrength());
+    int bifRoundAdd     = BIF_ROUND_ADD >> currTU.cs->pps->getChromaBIFStrength();
+    int bifRoundShift   = BIF_ROUND_SHIFT - currTU.cs->pps->getChromaBIFStrength();
 
     int widthForStrength    = currTU.blocks[compID].width;
     int heightForStrength   = currTU.blocks[compID].height;
@@ -3702,8 +3701,8 @@ void BilateralFilter::bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& s
   Pel *recPtr = rec.get(compID).bufAt(compArea);
 
   int bfac = 1;
-  int bifRoundAdd = (BIF_ROUND_ADD) >> (currTU.cs->pps->getChromaBIFStrength());
-  int bifRoundShift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getChromaBIFStrength());
+  int bifRoundAdd = BIF_ROUND_ADD >> currTU.cs->pps->getChromaBIFStrength();
+  int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getChromaBIFStrength();
 
   int widthForStrength = currTU.blocks[compID].width;
   int heightForStrength = currTU.blocks[compID].height;
@@ -4000,8 +3999,8 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
         Pel *recPtr    = rec.get(compID).bufAt(blkDst);
 
         int bfac            = 1;
-        int bifRoundAdd      = (BIF_ROUND_ADD) >> (currTU.cs->pps->getChromaBIFStrength());
-        int bifRoundShift    = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getChromaBIFStrength());
+        int bifRoundAdd      = BIF_ROUND_ADD >> currTU.cs->pps->getChromaBIFStrength();
+        int bifRoundShift    = BIF_ROUND_SHIFT - currTU.cs->pps->getChromaBIFStrength();
 
         bool topAltAvailable  = !clipT;
         bool leftAltAvailable = !clipL;
@@ -4259,8 +4258,8 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
     Pel *recPtr    = rec.get(compID).bufAt(compArea);
 
     int bfac            = 1;
-    int bifRoundAdd     = (BIF_ROUND_ADD) >> (currTU.cs->pps->getChromaBIFStrength());
-    int bifRoundShift   = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getChromaBIFStrength());
+    int bifRoundAdd     = BIF_ROUND_ADD >> currTU.cs->pps->getChromaBIFStrength();
+    int bifRoundShift   = BIF_ROUND_SHIFT - currTU.cs->pps->getChromaBIFStrength();
 
     int widthForStrength    = currTU.blocks[compID].width;
     int heightForStrength   = currTU.blocks[compID].height;
@@ -4506,8 +4505,8 @@ void BilateralFilter::bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, Pe
   Pel *recPtr    = rec.get(compID).bufAt(compArea);
 
   int bfac          = 1;
-  int bifRoundAdd   = (BIF_ROUND_ADD) >> (currTU.cs->pps->getChromaBIFStrength());
-  int bifRoundShift = (BIF_ROUND_SHIFT) - (currTU.cs->pps->getChromaBIFStrength());
+  int bifRoundAdd   = BIF_ROUND_ADD >> currTU.cs->pps->getChromaBIFStrength();
+  int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getChromaBIFStrength();
 
   int widthForStrength  = currTU.blocks[compID].width;
   int heightForStrength = currTU.blocks[compID].height;
