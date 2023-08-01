@@ -4445,15 +4445,14 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           initIntraPatternChType(cu, pu.Cb());
           initIntraPatternChType(cu, pu.Cr());
 
-          fusionStorage[uiMode * uiFusionModeNum].Cb().copyFrom(predStorage[uiMode].Cb());
-          fusionStorage[uiMode * uiFusionModeNum].Cr().copyFrom(predStorage[uiMode].Cr());
-
           for (int32_t fusionMode = 0; fusionMode < uiFusionModeNum; fusionMode++)
           {
             pu.intraDir[1] = chromaIntraMode;
             pu.isChromaFusion = fusionMode + 1;
             int idx = uiMode * uiFusionModeNum + fusionMode;
 
+            fusionStorage[idx].Cb().copyFrom( predStorage[uiMode].Cb() );
+            fusionStorage[idx].Cr().copyFrom( predStorage[uiMode].Cr() );
             geneChromaFusionPred(COMPONENT_Cb, fusionStorage[idx].Cb(), pu);
             geneChromaFusionPred(COMPONENT_Cr, fusionStorage[idx].Cr(), pu);
 
@@ -4483,13 +4482,8 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         {
           if (satdChromaFusionCost[j] < satdChromaFusionCost[i])
           {
-            tempIdx = satdChromaFusionModeList[i];
-            satdChromaFusionModeList[i] = satdChromaFusionModeList[j];
-            satdChromaFusionModeList[j] = tempIdx;
-
-            tempCost = satdChromaFusionCost[i];
-            satdChromaFusionCost[i] = satdChromaFusionCost[j];
-            satdChromaFusionCost[j] = tempCost;
+            std::swap( satdChromaFusionModeList[i], satdChromaFusionModeList[j] );
+            std::swap( satdChromaFusionCost[i], satdChromaFusionCost[j] );
           }
         }
       }
