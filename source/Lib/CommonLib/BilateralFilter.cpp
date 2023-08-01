@@ -365,8 +365,8 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
   int downbuffer[64];
   int downleftbuffer[65];
   int downrightbuffer[2][65];
-  int Shift, sg0, v0, idx, w0;
-  Shift = sizeof( int ) * 8 - 1;
+  int shift, sg0, v0, idx, w0;
+  shift = sizeof( int ) * 8 - 1;
   downbuffer[0] = 0;
 
   for( int x = 0; x < uiWidth; x++ )
@@ -374,30 +374,30 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
     int pixel = block[(-1 + pad)*padwidth + x + pad];
     int below = block[(-1 + pad + 1)*padwidth + x + pad];
     int diff = below - pixel;
-    sg0 = diff >> Shift;
+    sg0 = diff >> shift;
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
-    idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
+    idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
     w0 = lutRowPtr[idx];
     int mod = (w0 + sg0) ^ sg0;
     downbuffer[x] = mod;
 
     int belowright = block[(-1 + pad + 1)*padwidth + x + pad + 1];
     diff = belowright - pixel;
-    sg0 = diff >> Shift;
+    sg0 = diff >> shift;
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
-    idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
+    idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
     w0 = lutRowPtr[idx] >> 1;
     mod = (w0 + sg0) ^ sg0;
     downrightbuffer[1][x + 1] = mod;
 
     int belowleft = block[(-1 + pad + 1)*padwidth + x + pad - 1];
     diff = belowleft - pixel;
-    sg0 = diff >> Shift;
+    sg0 = diff >> shift;
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
-    idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
+    idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
     w0 = lutRowPtr[idx] >> 1;
     mod = (w0 + sg0) ^ sg0;
     downleftbuffer[x] = mod;
@@ -413,10 +413,10 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
 
     int right = rowStart[0];
     diff = right - pixel;
-    sg0 = diff >> Shift;
+    sg0 = diff >> shift;
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
-    idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
+    idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
     w0 = lutRowPtr[idx];
     int mod = (w0 + sg0) ^ sg0;
     int rightmod = mod;
@@ -424,10 +424,10 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
     pixel = rowStart[-padwidth - 1];
     int belowright = right;
     diff = belowright - pixel;
-    sg0 = diff >> Shift;
+    sg0 = diff >> shift;
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
-    idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
+    idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
     w0 = lutRowPtr[idx] >> 1;
     mod = (w0 + sg0) ^ sg0;
     downrightbuffer[(y + 1) % 2][0] = mod;
@@ -435,10 +435,10 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
     pixel = rowStart[-padwidth + width];
     int belowleft = rowStart[width - 1];
     diff = belowleft - pixel;
-    sg0 = diff >> Shift;
+    sg0 = diff >> shift;
     v0 = (diff + sg0) ^ sg0;
     v0 = (v0 + 4) >> 3;
-    idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
+    idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
     w0 = lutRowPtr[idx] >> 1;
     mod = (w0 + sg0) ^ sg0;
     downleftbuffer[width] = mod;
@@ -456,10 +456,10 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
 
       right = rowStart[x + 1];
       diff = right - pixel;
-      sg0 = diff >> Shift;
+      sg0 = diff >> shift;
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
+      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
       w0 = lutRowPtr[idx];
       mod = (w0 + sg0) ^ sg0;
 
@@ -468,10 +468,10 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
 
       int below = rowStart[x + padwidth];
       diff = below - pixel;
-      sg0 = diff >> Shift;
+      sg0 = diff >> shift;
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
+      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
       w0 = lutRowPtr[idx];
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;
@@ -487,10 +487,10 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
 
       int belowleft = rowStart[x + padwidth - 1];
       diff = belowleft - pixel;
-      sg0 = diff >> Shift;
+      sg0 = diff >> shift;
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
+      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
       w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       // modsum += ((int16_t)((uint16_t)((mod) >> 1)));
@@ -499,10 +499,10 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
 
       int belowright = rowStart[x + padwidth + 1];
       diff = belowright - pixel;
-      sg0 = diff >> Shift;
+      sg0 = diff >> shift;
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
+      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
       w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       //modsum += ((int16_t)((uint16_t)((mod) >> 1)));
@@ -515,40 +515,40 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
 
       int above = rowStart[x - 2 * padwidth];
       diff = above - pixel;
-      sg0 = diff >> Shift;
+      sg0 = diff >> shift;
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
+      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
       w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;
 
       below = rowStart[x + 2 * padwidth];
       diff = below - pixel;
-      sg0 = diff >> Shift;
+      sg0 = diff >> shift;
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
+      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
       w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;
 
       int left = rowStart[x - 2];
       diff = left - pixel;
-      sg0 = diff >> Shift;
+      sg0 = diff >> shift;
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
+      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
       w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;
 
       right = rowStart[x + 2];
       diff = right - pixel;
-      sg0 = diff >> Shift;
+      sg0 = diff >> shift;
       v0 = (diff + sg0) ^ sg0;
       v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> Shift));
+      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
       w0 = lutRowPtr[idx] >> 1;
       mod = (w0 + sg0) ^ sg0;
       modsum += mod;

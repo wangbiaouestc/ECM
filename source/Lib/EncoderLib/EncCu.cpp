@@ -16941,7 +16941,9 @@ void EncCu::xEncodeInterResidual(   CodingStructure *&tempCS
           mvShift = affineShiftTab[cu->imv];
           Mv signaledmvd(pu.mvdAffi[refList][ctrlP].getHor() >> mvShift, pu.mvdAffi[refList][ctrlP].getVer() >> mvShift);
           if (!((signaledmvd.getHor() >= MVD_MIN) && (signaledmvd.getHor() <= MVD_MAX)) || !((signaledmvd.getVer() >= MVD_MIN) && (signaledmvd.getVer() <= MVD_MAX)))
+          {
             return;
+          }
         }
       }
     }
