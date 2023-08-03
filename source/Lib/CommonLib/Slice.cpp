@@ -1681,6 +1681,9 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   m_useIBC                        = pSrc->m_useIBC;
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  m_biPredictionIBCFlag           = pSrc->m_biPredictionIBCFlag;
+#endif
 
   for ( uint32_t e=0 ; e<NUM_REF_PIC_LIST_01 ; e++ )
   {
