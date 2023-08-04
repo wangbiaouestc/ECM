@@ -1805,6 +1805,11 @@ void CodingStructure::createInternals(const UnitArea& _unit, const bool isTopLay
   m_motionBuf       = new MotionInfo[_lumaAreaScaled];
 #endif
 
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  m_ccpmIdxBuf = new int[_lumaAreaScaled];
+  m_ccpModelLUT.resize(0);
+#endif
+
 #if JVET_W0123_TIMD_FUSION
 #if JVET_Z0118_GDR
   m_ipmBuf0 = new uint8_t[_lumaAreaScaled];
@@ -2593,6 +2598,12 @@ void CodingStructure::copyStructure( const CodingStructure& other, const Channel
 
 #if JVET_AD0188_CCP_MERGE
   ccpLut = other.ccpLut;
+#endif
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  CCPModelIdxBuf  ownIdxB = getCcpmIdxBuf();
+  CCCPModelIdxBuf subIdxB = other.getCcpmIdxBuf();
+  ownIdxB.copyFrom( subIdxB );
+  m_ccpModelLUT = other.m_ccpModelLUT;
 #endif
 
 #if JVET_W0123_TIMD_FUSION
