@@ -109,10 +109,6 @@ void CS::setRefinedMotionField(CodingStructure &cs)
 #if JVET_AE0043_CCP_MERGE_TEMPORAL
 void CS::saveTemporalCcpModel(CodingStructure &cs)
 {
-  unsigned lumaAreaScaled = g_miScaling.scale( cs.area.lumaSize() ).area();
-  cs.m_ccpmIdxBuf = new int[lumaAreaScaled];
-  cs.m_ccpModelLUT.clear();
-  
   if (cs.area.Cb().area() > 0)
   {
     CCPModelIdxBuf ccpIdxBuf = cs.getCcpmIdxBuf(cs.area.Cb());
