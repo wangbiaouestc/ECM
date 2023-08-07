@@ -12823,7 +12823,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #if JVET_Y0065_GPM_INTRA
                 if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !tu.cu->firstPU->gpmIntraFlag && !CU::isIBC(*tu.cu))
 #else
-			    if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !CU::isIBC(*tu.cu))
+                if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !CU::isIBC(*tu.cu))
 #endif
                 {
 #if JVET_Z0118_GDR
@@ -12851,7 +12851,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #if JVET_Y0065_GPM_INTRA
                 if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !tu.cu->firstPU->gpmIntraFlag && !CU::isIBC(*tu.cu))
 #else
-			    if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !CU::isIBC(*tu.cu))
+                if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !CU::isIBC(*tu.cu))
 #endif
                 {
                   cs.getPredBuf(tu.blocks[COMPONENT_Y]).copyFrom(cs.picture->getRecoBuf(tu.blocks[COMPONENT_Y]));
@@ -12901,20 +12901,21 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #if JVET_V0094_BILATERAL_FILTER
             // getCbf() is going to be 1 since currAbsSum > 0 here, according to the if-statement a couple of lines up.
             bool isInter = (cu.predMode == MODE_INTER) ? true : false;
-            if (cs.pps->getUseBIF() && isLuma(compID) && (tu.cu->qp > 17) && (128 > std::max(tu.lumaSize().width, tu.lumaSize().height)) && ((isInter == false) || (32 > std::min(tu.lumaSize().width, tu.lumaSize().height))))
+            if( cs.pps->getUseBIF() && isLuma( compID ) && tu.cu->qp > 17 && 128 > std::max( tu.lumaSize().width, tu.lumaSize().height ) && ( !isInter || 32 > std::min( tu.lumaSize().width, tu.lumaSize().height ) ) )
             {
-              CompArea tmpArea1(COMPONENT_Y, tu.chromaFormat, Position(0, 0), Size(resiBuf.width, resiBuf.height));
+              CompArea tmpArea1( compID, tu.chromaFormat, Position(0, 0), Size(resiBuf.width, resiBuf.height));
               PelBuf tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
               tmpRecLuma.copyFrom(resiBuf);
               
               const CPelBuf predBuf = csFull->getPredBuf(compArea);
               PelBuf recIPredBuf = csFull->slice->getPic()->getRecoBuf(compArea);
               std::vector<Pel> invLUT;
-              m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, predBuf, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, false, false, invLUT);
+              m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpRecLuma, predBuf, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, false, false, &invLUT );
 
               currCompDist = m_pcRdCost->getDistPart(orgResiBuf, tmpRecLuma, channelBitDepth, compID, DF_SSE);
             }
             else
+#endif
             {
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
               if(isChroma(compID))
@@ -12932,8 +12933,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
                   const CPelBuf predBuf = csFull->getPredBuf(compArea);
 #endif
                   PelBuf recIPredBuf = csFull->slice->getPic()->getRecoBuf(compArea);
-                  bool isCb = compID == COMPONENT_Cb ? true : false;
-                  m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpRecChroma, predBuf, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, false, isCb);
+                  m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpRecChroma, predBuf, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, false );
                   currCompDist = m_pcRdCost->getDistPart(orgResiBuf, tmpRecChroma, channelBitDepth, compID, DF_SSE);
                 }
                 else
@@ -12949,37 +12949,6 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
               currCompDist = m_pcRdCost->getDistPart(orgResiBuf, resiBuf, channelBitDepth, compID, DF_SSE);
 #endif
             }
-#else
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-            if(isChroma(compID))
-            {
-              if(cs.pps->getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17))
-              {
-                //chroma and bilateral
-                CompArea tmpArea1(compID, tu.chromaFormat, Position(0, 0), Size(resiBuf.width, resiBuf.height));
-                PelBuf tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea1);
-                tmpRecChroma.copyFrom(resiBuf);
-                const CPelBuf predBuf = csFull->getPredBuf(compArea);
-                PelBuf recIPredBuf = csFull->slice->getPic()->getRecoBuf(compArea);
-                bool isCb = compID == COMPONENT_Cb ? true : false;
-                m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpRecChroma, predBuf, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, false, isCb);
-                currCompDist = m_pcRdCost->getDistPart(orgResiBuf, tmpRecChroma, channelBitDepth, compID, DF_SSE);
-              }
-              else
-              {
-                //chroma but not bilateral
-                currCompDist = m_pcRdCost->getDistPart(orgResiBuf, resiBuf, channelBitDepth, compID, DF_SSE);
-              }
-            }
-            else
-            {
-              //luma but not bilateral
-              currCompDist = m_pcRdCost->getDistPart(orgResiBuf, resiBuf, channelBitDepth, compID, DF_SSE);
-            }
-#else
-            currCompDist = m_pcRdCost->getDistPart(orgResiBuf, resiBuf, channelBitDepth, compID, DF_SSE);
-#endif
-#endif
 
 #if WCG_EXT
             currCompCost = m_pcRdCost->calcRdCost(currCompFracBits, currCompDist, false);
@@ -14289,24 +14258,23 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
         for (auto &currTU : CU::traverseTUs(cu))
         {
           Position tuPosInCu = currTU.lumaPos() - cu.lumaPos();
-          PelBuf tmpSubBuf = tmpRecLuma.subBuf(tuPosInCu, currTU.lumaSize());
-          
+          PelBuf tmpSubBuf = tmpRecLuma.subBuf(tuPosInCu, currTU.lumaSize());          
           
           bool isInter = (cu.predMode == MODE_INTER) ? true : false;
-          if ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+          if( ( TU::getCbf( currTU, compID ) || !isInter ) && currTU.cu->qp > 17 && 128 > std::max( currTU.lumaSize().width, currTU.lumaSize().height ) && ( !isInter || 32 > std::min( currTU.lumaSize().width, currTU.lumaSize().height ) ) )
           {
             CompArea compArea = currTU.blocks[compID];
             PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
             
             // Only reshape surrounding samples if reshaping is on
-            if(m_pcEncCfg->getLmcs() && (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() ) && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
+            if( m_pcEncCfg->getLmcs() && cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() )
             {
-              m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, true, m_pcReshape->getInvLUT());
+              m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng( compID ), currTU, true, true, &m_pcReshape->getInvLUT() );
             }
             else
             {
               std::vector<Pel> invLUT;
-              m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, false, invLUT);
+              m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng( compID ), currTU, true, false, &invLUT );
             }
           }
         }
@@ -14316,9 +14284,8 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
     PelBuf tmpRecChroma;
     if(isChroma(compID))
     {
-      bool isCb = compID == COMPONENT_Cb ? true : false;
-      const CompArea &areaUV = isCb ? cu.Cb() : cu.Cr();
-      CompArea      tmpArea2(isCb ? COMPONENT_Cb : COMPONENT_Cr, areaUV.chromaFormat, Position(0, 0), areaUV.size());
+      const CompArea &area = cu.blocks[compID];
+      CompArea      tmpArea2( compID, area.chromaFormat, Position(0, 0), area.size() );
       tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea2);
       tmpRecChroma.copyFrom(reco);
 
@@ -14329,11 +14296,11 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
           Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
           PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
           bool isInter = (cu.predMode == MODE_INTER) ? true : false;
-          if ((TU::getCbf(currTU, isCb ? COMPONENT_Cb : COMPONENT_Cr) || isInter == false))
+          if ((TU::getCbf(currTU, compID) || isInter == false))
           {
             CompArea compArea = currTU.blocks[compID];
             PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
-            m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, isCb);
+            m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true );
           }
         }
       }
@@ -14382,9 +14349,8 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
     PelBuf tmpRecChroma;
     if(isChroma(compID))
     {
-      bool isCb = compID == COMPONENT_Cb ? true : false;
-      const CompArea &areaUV = isCb ? cu.Cb() : cu.Cr();
-      CompArea      tmpArea2(isCb ? COMPONENT_Cb : COMPONENT_Cr, areaUV.chromaFormat, Position(0, 0), areaUV.size());
+      const CompArea &area = cu.blocks[compID];
+      CompArea      tmpArea2( compID, area.chromaFormat, Position(0, 0), area.size());
       tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea2);
       tmpRecChroma.copyFrom(reco);
       if(cs.pps->getUseChromaBIF() && isChroma(compID) && (cu.qp > 17))
@@ -14394,11 +14360,11 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
           Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
           PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
           bool isInter = (cu.predMode == MODE_INTER) ? true : false;
-          if ((TU::getCbf(currTU, isCb ? COMPONENT_Cb : COMPONENT_Cr) || isInter == false))
+          if ((TU::getCbf( currTU, compID ) || isInter == false))
           {
             CompArea compArea = currTU.blocks[compID];
             PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
-            m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, isCb);
+            m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true );
           }
         }
       }

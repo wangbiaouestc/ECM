@@ -395,14 +395,11 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #if JVET_V0094_BILATERAL_FILTER
     if (ctuRsAddr == 0)
     {
-      cabacReader.bif(cs);
-    }
-#endif
+      cabacReader.bif(COMPONENT_Y, cs);
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-    if (ctuRsAddr == 0)
-    {
-      cabacReader.chromaBifCb(cs);
-      cabacReader.chromaBifCr(cs);
+      cabacReader.bif( COMPONENT_Cb, cs );
+      cabacReader.bif( COMPONENT_Cr, cs );
+#endif
     }
 #endif
     cabacReader.coding_tree_unit( cs, ctuArea, pic->m_prevQP, ctuRsAddr );

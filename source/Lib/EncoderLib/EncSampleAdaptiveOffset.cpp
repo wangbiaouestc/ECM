@@ -310,10 +310,7 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
 #endif
                                           const bool bTestSAODisableAtPictureLevel, const double saoEncodingRate, const double saoEncodingRateChroma, const bool isPreDBFSamplesUsed, bool isGreedyMergeEncoding
 #if JVET_V0094_BILATERAL_FILTER
-                                          ,BIFCabacEst* BifCABACEstimator
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-                                          ,ChromaBIFCabacEst* ChromaBifCABACEstimator
+                                          ,BIFCabacEst* bifCABACEstimator
 #endif
                                          )
 {
@@ -333,7 +330,7 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
 
 #if JVET_V0094_BILATERAL_FILTER
   const PreCalcValues& pcv = *cs.pcv;
-  BifParams& bifParams = cs.picture->getBifParam();
+  BifParams& bifParams = cs.picture->getBifParam(COMPONENT_Y);
   int width = cs.picture->lwidth();
   int height = cs.picture->lheight();
   int block_width = pcv.maxCUWidth;
@@ -369,7 +366,8 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   if(cs.pps->getUseChromaBIF())
   {
     const PreCalcValues& pcv = *cs.pcv;
-    ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
+    BifParams& bifParamsCb = cs.picture->getBifParam( COMPONENT_Cb );
+    BifParams& bifParamsCr = cs.picture->getBifParam( COMPONENT_Cr );
     int width = cs.picture->lwidth();
     int height = cs.picture->lheight();
     int blockWidth = pcv.maxCUWidth;
@@ -378,33 +376,34 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
     int widthInBlocks = width / blockWidth + (width % blockWidth != 0);
     int heightInBlocks = height / blockHeight + (height % blockHeight != 0);
 
-    chromaBifParams.numBlocks = widthInBlocks * heightInBlocks;
+    bifParamsCb.numBlocks = widthInBlocks * heightInBlocks;
+    bifParamsCr.numBlocks = widthInBlocks * heightInBlocks;
 
-    chromaBifParams.ctuOnCb.resize(chromaBifParams.numBlocks);
-    chromaBifParams.ctuOnCr.resize(chromaBifParams.numBlocks);
-    std::fill(chromaBifParams.ctuOnCb.begin(), chromaBifParams.ctuOnCb.end(), 0);
-    std::fill(chromaBifParams.ctuOnCr.begin(), chromaBifParams.ctuOnCr.end(), 0);
-    chromaBifParams.frmOnCb = 0;
-    chromaBifParams.frmOnCr = 0;
-    chromaBifParams.allCtuOnCb = 0;
-    chromaBifParams.allCtuOnCr = 0;
+    bifParamsCb.ctuOn.resize( bifParamsCb.numBlocks);
+    bifParamsCr.ctuOn.resize( bifParamsCr.numBlocks);
+    std::fill( bifParamsCb.ctuOn.begin(), bifParamsCb.ctuOn.end(), 0);
+    std::fill( bifParamsCr.ctuOn.begin(), bifParamsCr.ctuOn.end(), 0);
+    bifParamsCb.frmOn = 0;
+    bifParamsCr.frmOn = 0;
+    bifParamsCb.allCtuOn = 0;
+    bifParamsCr.allCtuOn = 0;
 
-    if (chromaBifParams.frmOnCb == 0)
+    if ( bifParamsCb.frmOn == 0)
     {
-      std::fill( chromaBifParams.ctuOnCb.begin(), chromaBifParams.ctuOnCb.end(), 0 );
+      std::fill( bifParamsCb.ctuOn.begin(), bifParamsCb.ctuOn.end(), 0 );
     }
-    else if (chromaBifParams.allCtuOnCb)
+    else if ( bifParamsCb.allCtuOn)
     {
-      std::fill( chromaBifParams.ctuOnCb.begin(), chromaBifParams.ctuOnCb.end(), 1 );
+      std::fill( bifParamsCb.ctuOn.begin(), bifParamsCb.ctuOn.end(), 1 );
     }
 
-    if (chromaBifParams.frmOnCr == 0)
+    if ( bifParamsCr.frmOn == 0)
     {
-      std::fill( chromaBifParams.ctuOnCr.begin(), chromaBifParams.ctuOnCr.end(), 0 );
+      std::fill( bifParamsCr.ctuOn.begin(), bifParamsCr.ctuOn.end(), 0 );
     }
-    else if (chromaBifParams.allCtuOnCr)
+    else if ( bifParamsCr.allCtuOn)
     {
-      std::fill( chromaBifParams.ctuOnCr.begin(), chromaBifParams.ctuOnCr.end(), 1 );
+      std::fill( bifParamsCr.ctuOn.begin(), bifParamsCr.ctuOn.end(), 1 );
     }
   }
 #endif
@@ -417,14 +416,14 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
       bilateralFilter.create();
       if( cs.pps->getUseBIF() )
       {
-        bilateralFilter.bilateralFilterPicRDOperCTU( cs, src, BifCABACEstimator ); // Filters from src to res
+        bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Y, cs, src, bifCABACEstimator ); // Filters from src to res
       }
       if( cs.pps->getUseChromaBIF() )
       {
         //Cb
-        bilateralFilter.bilateralFilterPicRDOperCTUChroma( cs, src, ChromaBifCABACEstimator, true );
+        bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cb, cs, src, bifCABACEstimator );
         //Cr
-        bilateralFilter.bilateralFilterPicRDOperCTUChroma( cs, src, ChromaBifCABACEstimator, false );
+        bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cr, cs, src, bifCABACEstimator );
       }
       bilateralFilter.destroy();
       return;
@@ -439,7 +438,7 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   if(!cs.sps->getSAOEnabledFlag() && cs.pps->getUseBIF())
   {
     bilateralFilter.create();
-    bilateralFilter.bilateralFilterPicRDOperCTU(cs, src, BifCABACEstimator); // Filters from src to res
+    bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Y, cs, src, bifCABACEstimator); // Filters from src to res
     bilateralFilter.destroy();
     return;
   }
@@ -452,9 +451,9 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   {
     bilateralFilter.create();
     //Cb
-    bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, true);
+    bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cb, cs, src, bifCABACEstimator );
     //Cr
-    bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, false);
+    bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cr, cs, src, bifCABACEstimator );
     bilateralFilter.destroy();
     return;
   }
@@ -472,14 +471,14 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
     bilateralFilter.create();
     if( cs.pps->getUseBIF() )
     {
-      bilateralFilter.bilateralFilterPicRDOperCTU( cs, src, BifCABACEstimator ); // Filters from src to res'
+      bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Y, cs, src, bifCABACEstimator ); // Filters from src to res'
     }
     if( cs.pps->getUseChromaBIF() )
     {
       //Cb
-      bilateralFilter.bilateralFilterPicRDOperCTUChroma( cs, src, ChromaBifCABACEstimator, true );
+      bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cb, cs, src, bifCABACEstimator );
       //Cr
-      bilateralFilter.bilateralFilterPicRDOperCTUChroma( cs, src, ChromaBifCABACEstimator, false );
+      bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cr, cs, src, bifCABACEstimator );
     }
     getStatistics( m_statData, org, src, res, cs );
     bilateralFilter.destroy();
@@ -493,7 +492,7 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   if(cs.pps->getUseBIF())
   {
     bilateralFilter.create();
-    bilateralFilter.bilateralFilterPicRDOperCTU(cs, src, BifCABACEstimator); // Filters from src to res
+    bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Y, cs, src, bifCABACEstimator); // Filters from src to res
     getStatistics(m_statData, org, src, res, cs);
     bilateralFilter.destroy();
   }
@@ -508,9 +507,9 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   {
     bilateralFilter.create();
     //Cb
-    bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, true);
+    bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cb, cs, src, bifCABACEstimator );
     //Cr
-    bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, false);
+    bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cr, cs, src, bifCABACEstimator );
     getStatistics(m_statData, org, src, res, cs);
     bilateralFilter.destroy();
   }
@@ -1420,7 +1419,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_V0094_BILATERAL_FILTER
       if (cs.pps->getUseBIF())
       {
-        BifParams& bifParams = cs.picture->getBifParam();
+        BifParams& bifParams = cs.picture->getBifParam( COMPONENT_Y );
         for (auto& currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
         {
           for (auto& currTU : CU::traverseTUs(currCU))
@@ -1438,10 +1437,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                 cs, currTU.Y().x, currTU.Y().y, currTU.lumaSize().width, currTU.lumaSize().height, clipTop, clipBottom,
                 clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
-              bilateralFilter.bilateralFilterDiamond5x5NoClip(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+              bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU, true
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                , clipTop, clipBottom, clipLeft, clipRight
+                , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
               );
             }
@@ -1452,8 +1450,6 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
       if(cs.pps->getUseChromaBIF())
       {
-        ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
-
         bool tuValid = false;
         bool tuCBF = false;
         bool isDualTree = CS::isDualITree(cs);
@@ -1477,9 +1473,10 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
             bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
             for(int compIdx = COMPONENT_Cb ; compIdx < MAX_NUM_COMPONENT; compIdx++)
             {
-              bool isCb = compIdx == COMPONENT_Cb ? true : false;
-              ComponentID compID = isCb ? COMPONENT_Cb :COMPONENT_Cr;
-              bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] :  chromaBifParams.ctuOnCr[ctuRsAddr];
+              ComponentID compID = ComponentID( compIdx );
+              BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+              bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
+
               applyChromaBIF = false;
               if(!isDualTree)
               {
@@ -1511,10 +1508,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                bilateralFilter.bilateralFilterDiamond5x5NoClipChroma(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, true
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                  , clipTop, clipBottom, clipLeft, clipRight
+                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                 );
               }
@@ -1547,18 +1543,16 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
           SAOOffset& myCtbOffsetCb     = mySAOblkParam[1];
           SAOOffset& myCtbOffsetCr     = mySAOblkParam[2];
-          ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
 
-          bool clipChromaIfNoBilatCb = false;
-          bool clipChromaIfNoBilatCr = false;
+          bool clipChromaIfNoBilat[MAX_NUM_COMPONENT] = { false };
 
           if(myCtbOffsetCb.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCb = true;
+            clipChromaIfNoBilat[COMPONENT_Cb] = true;
           }
           if(myCtbOffsetCr.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCr = true;
+            clipChromaIfNoBilat[COMPONENT_Cr] = true;
           }
           if(cs.pps->getUseBIF())
           {
@@ -1581,7 +1575,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   cs, currTU.Y().x, currTU.Y().y, currTU.lumaSize().width, currTU.lumaSize().height, clipTop,
                   clipBottom, clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
-                bilateralFilter.bilateralFilterDiamond5x5(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+                bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                   , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
                   , clipTop, clipBottom, clipLeft, clipRight
@@ -1591,8 +1585,10 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               else
               {
                 // We don't need to clip if SAO was not performed on luma.
-                if(clipLumaIfNoBilat)
-                  bilateralFilter.clipNotBilaterallyFilteredBlocks(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
+                if( clipLumaIfNoBilat )
+                {
+                  bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, srcYuv, resYuv, cs.slice->clpRng( COMPONENT_Y ), currTU );
+                }
               }
             }
           }
@@ -1606,7 +1602,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               {
                 if(clipLumaIfNoBilat)
                 {
-                  m_bilateralFilter.clipNotBilaterallyFilteredBlocks(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
+                  m_bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU );
                 }
               }
             }
@@ -1631,9 +1627,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                 bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
                 for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
                 {
-                  bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                  ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                  bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+                  ComponentID compID = ComponentID( compIdx );
+                  BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+                  bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
                   applyChromaBIF = false;
                   if(!isDualTree)
                   {
@@ -1667,19 +1663,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                       clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                    m_bilateralFilter.bilateralFilterDiamond5x5Chroma(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                    m_bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, false,
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                    , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                    , clipTop, clipBottom, clipLeft, clipRight
+                    , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                     );
                   }
                   else
                   {
-                    bool useClip = isCb ? clipChromaIfNoBilatCb : clipChromaIfNoBilatCr;
+                    bool useClip = clipChromaIfNoBilat[compID];
                     if(useClip && currTU.blocks[compID].valid())
                     {
-                      m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(compID), currTU, isCb);
+                      m_bilateralFilter.clipNotBilaterallyFilteredBlocks( compID, srcYuv, resYuv, cs.slice->clpRng(compID), currTU );
                     }
                   }
                 }
@@ -1700,13 +1695,13 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               }
               for (auto &currTU : CU::traverseTUs(currCU))
               {
-                if(clipChromaIfNoBilatCb && currTU.blocks[COMPONENT_Cb].valid())
+                if( clipChromaIfNoBilat[COMPONENT_Cb] && currTU.blocks[COMPONENT_Cb].valid())
                 {
-                  m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cb), currTU, true);
+                  m_bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Cb, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cb), currTU );
                 }
-                if(clipChromaIfNoBilatCr && currTU.blocks[COMPONENT_Cr].valid())
+                if( clipChromaIfNoBilat[COMPONENT_Cr] && currTU.blocks[COMPONENT_Cr].valid())
                 {
-                  m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cr), currTU, false);
+                  m_bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Cr, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cr), currTU );
                 }
               }
             }
@@ -1738,24 +1733,22 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
             {
               if(clipLumaIfNoBilat)
               {
-                bilateralFilter.clipNotBilaterallyFilteredBlocks(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
+                bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU );
               }
             }
           }
 
           SAOOffset& myCtbOffsetCb     = mySAOblkParam[1];
           SAOOffset& myCtbOffsetCr     = mySAOblkParam[2];
-          bool clipChromaIfNoBilatCb = false;
-          bool clipChromaIfNoBilatCr = false;
-          ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
+          bool clipChromaIfNoBilat[MAX_NUM_COMPONENT] = { false };
 
           if(myCtbOffsetCb.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCb = true;
+            clipChromaIfNoBilat[COMPONENT_Cb] = true;
           }
           if(myCtbOffsetCr.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCr = true;
+            clipChromaIfNoBilat[COMPONENT_Cr] = true;
           }
 
           bool tuValid = false;
@@ -1776,9 +1769,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
               for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
               {
-                bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+                ComponentID compID = ComponentID( compIdx );
+                BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+                bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
                 applyChromaBIF = false;
                 if(!isDualTree)
                 {
@@ -1812,19 +1805,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                  m_bilateralFilter.bilateralFilterDiamond5x5Chroma(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                  m_bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, false,
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                    , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                    , clipTop, clipBottom, clipLeft, clipRight
+                    , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                   );
                 }
                 else
                 {
-                  bool useClip = isCb ? clipChromaIfNoBilatCb : clipChromaIfNoBilatCr;
+                  bool useClip = clipChromaIfNoBilat[compID];
                   if(useClip && currTU.blocks[compID].valid())
                   {
-                    m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(compID), currTU, isCb);
+                    m_bilateralFilter.clipNotBilaterallyFilteredBlocks( compID, srcYuv, resYuv, cs.slice->clpRng(compID), currTU );
                   }
                 }
               }
@@ -1880,44 +1872,14 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_V0094_BILATERAL_FILTER
         if(cs.pps->getUseBIF())
         {
-          // Sorry for not using nice copy method and using ugly code instead:
-          int  myResStride = resYuv.get(COMPONENT_Y).stride;
-          const CompArea& myCompArea = area.block(COMPONENT_Y);
-          Pel* myResBlk = resYuv.get(COMPONENT_Y).bufAt(myCompArea);
-          int mySrcStride = srcYuv.get(COMPONENT_Y).stride;
-          Pel* mySrcBlk = srcYuv.get(COMPONENT_Y).bufAt(myCompArea);
-          
-          for( int yy = 0; yy < area.lheight(); yy++ )
-          {
-            for( int xx = 0; xx < area.lwidth(); xx++ )
-            {
-              myResBlk[yy*myResStride + xx] = mySrcBlk[yy*mySrcStride + xx];
-            }
-          }
+          resYuv.subBuf( area ).bufs[COMPONENT_Y].copyFrom( srcYuv.subBuf( area ).bufs[COMPONENT_Y] );
         }
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
         if(cs.pps->getUseChromaBIF())
         {
-          for(int chromaIdx = COMPONENT_Cb; chromaIdx < MAX_NUM_COMPONENT; chromaIdx++)
-          {
-            bool isCb = chromaIdx == COMPONENT_Cb ? true : false;
-            ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-
-            int  myResStrideChroma = resYuv.get(compID).stride;
-            const CompArea& myCompAreaChroma = area.block(compID);
-            Pel* myResBlkChroma = resYuv.get(compID).bufAt(myCompAreaChroma);
-            int mySrcStrideChroma = srcYuv.get(compID).stride;
-            Pel* mySrcBlkChroma = srcYuv.get(compID).bufAt(myCompAreaChroma);
-
-            for(int yy = 0; yy<area.chromaSize().height; yy++)
-            {
-              for(int xx = 0; xx<area.chromaSize().width; xx++)
-              {
-                myResBlkChroma[yy*myResStrideChroma+xx] = mySrcBlkChroma[yy*mySrcStrideChroma+xx];
-              }
-            }
-          }
+          resYuv.subBuf( area ).bufs[COMPONENT_Cb].copyFrom( srcYuv.subBuf( area ).bufs[COMPONENT_Cb] );
+          resYuv.subBuf( area ).bufs[COMPONENT_Cr].copyFrom( srcYuv.subBuf( area ).bufs[COMPONENT_Cr] );
         }
 #endif
 
@@ -1926,7 +1888,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_V0094_BILATERAL_FILTER
         if (cs.pps->getUseBIF())
         {
-          BifParams& bifParams = cs.picture->getBifParam();
+          BifParams& bifParams = cs.picture->getBifParam( COMPONENT_Y );
           for (auto& currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
           {
             for (auto& currTU : CU::traverseTUs(currCU))
@@ -1945,10 +1907,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   clipBottom, clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
 
-                bilateralFilter.bilateralFilterDiamond5x5NoClip(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+                bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU, true
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                  , clipTop, clipBottom, clipLeft, clipRight
+                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                 );
               }
@@ -1959,7 +1920,6 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
         if(cs.pps->getUseChromaBIF())
         {
-          ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
           bool tuValid = false;
           bool tuCBF = false;
           bool isDualTree = CS::isDualITree(cs);
@@ -1983,9 +1943,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
               for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
               {
-                bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+                ComponentID compID = ComponentID( compIdx );
+                BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+                bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
 
                 applyChromaBIF = false;
                 if(!isDualTree)
@@ -2018,10 +1978,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                  bilateralFilter.bilateralFilterDiamond5x5NoClipChroma(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                  bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, true
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                    , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                    , clipTop, clipBottom, clipLeft, clipRight
+                    , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                   );
                 }
@@ -2038,7 +1997,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           offsetCTUnoClip(area, srcYuv, resYuv, reconParams[ctuRsAddr], cs);
           SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
           SAOOffset& myCtbOffset     = mySAOblkParam[0];
-          BifParams& bifParams = cs.picture->getBifParam();
+          BifParams& bifParams = cs.picture->getBifParam(COMPONENT_Y);
 
           bool clipLumaIfNoBilat = false;
           if(myCtbOffset.modeIdc != SAO_MODE_OFF)
@@ -2046,19 +2005,17 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
             clipLumaIfNoBilat = true;
           }
 
-          ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
           SAOOffset& myCtbOffsetCb     = mySAOblkParam[1];
           SAOOffset& myCtbOffsetCr     = mySAOblkParam[2];
-          bool clipChromaIfNoBilatCb = false;
-          bool clipChromaIfNoBilatCr = false;
+          bool clipChromaIfNoBilat[MAX_NUM_COMPONENT] = { false };
 
           if(myCtbOffsetCb.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCb = true;
+            clipChromaIfNoBilat[COMPONENT_Cb] = true;
           }
           if(myCtbOffsetCr.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCr = true;
+            clipChromaIfNoBilat[COMPONENT_Cr] = true;
           }
           if(cs.pps->getUseBIF())
           {
@@ -2078,7 +2035,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     cs, currTU.Y().x, currTU.Y().y, currTU.lumaSize().width, currTU.lumaSize().height, clipTop,
                     clipBottom, clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
-                  bilateralFilter.bilateralFilterDiamond5x5(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+                  bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                   , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
                   , clipTop, clipBottom, clipLeft, clipRight
@@ -2090,7 +2047,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   // We don't need to clip if SAO was not performed on luma.
                   if(clipLumaIfNoBilat)
                   {
-                    bilateralFilter.clipNotBilaterallyFilteredBlocks(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
+                    bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU );
                   }
                 }
               }
@@ -2104,7 +2061,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               {
                 if(clipLumaIfNoBilat)
                 {
-                  bilateralFilter.clipNotBilaterallyFilteredBlocks(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
+                  bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU );
                 }
               }
             }
@@ -2130,9 +2087,10 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                 bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
                 for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
                 {
-                  bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                  ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                  bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+                  ComponentID compID = ComponentID( compIdx );
+                  BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+                  bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
+
                   applyChromaBIF = false;
                   if(!isDualTree)
                   {
@@ -2166,19 +2124,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                       clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                    bilateralFilter.bilateralFilterDiamond5x5Chroma(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                    bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, false,
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                      ,isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry,
-                      clipTop, clipBottom, clipLeft, clipRight
+                      ,isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                     );
                   }
                   else
                   {
-                    bool useClip = isCb ? clipChromaIfNoBilatCb : clipChromaIfNoBilatCr;
+                    bool useClip = clipChromaIfNoBilat[compID];
                     if(useClip && currTU.blocks[compIdx].valid())
                     {
-                      bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(compID), currTU, isCb);
+                      bilateralFilter.clipNotBilaterallyFilteredBlocks( compID, srcYuv, resYuv, cs.slice->clpRng(compID), currTU );
                     }
                   }
                 }
@@ -2199,13 +2156,13 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               }
               for (auto &currTU : CU::traverseTUs(currCU))
               {
-                if(clipChromaIfNoBilatCb && currTU.blocks[COMPONENT_Cb].valid())
+                if( clipChromaIfNoBilat[COMPONENT_Cb] && currTU.blocks[COMPONENT_Cb].valid())
                 {
-                  bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cb), currTU, true);
+                  bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Cb, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cb), currTU );
                 }
-                if(clipChromaIfNoBilatCr && currTU.blocks[COMPONENT_Cr].valid())
+                if( clipChromaIfNoBilat[COMPONENT_Cr] && currTU.blocks[COMPONENT_Cr].valid())
                 {
-                  bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cr), currTU, false);
+                  bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Cr, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cr), currTU );
                 }
               }
             }
@@ -2227,11 +2184,13 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           // We don't need to clip if SAO was not performed on luma.
           SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
           SAOOffset& myCtbOffset     = mySAOblkParam[0];
-          BifParams& bifParams = cs.picture->getBifParam();
+          BifParams& bifParams = cs.picture->getBifParam(COMPONENT_Y);
           
           bool clipLumaIfNoBilat = false;
-          if(myCtbOffset.modeIdc != SAO_MODE_OFF)
+          if( myCtbOffset.modeIdc != SAO_MODE_OFF )
+          {
             clipLumaIfNoBilat = true;
+          }
           
           for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
           {
@@ -2251,7 +2210,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   clipBottom, clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
 
-                bilateralFilter.bilateralFilterDiamond5x5(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+                bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                   , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
                   , clipTop, clipBottom, clipLeft, clipRight
@@ -2261,8 +2220,10 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               else
               {
                 // We don't need to clip if SAO was not performed on luma.
-                if(clipLumaIfNoBilat)
-                  bilateralFilter.clipNotBilaterallyFilteredBlocks(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
+                if( clipLumaIfNoBilat )
+                {
+                  bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, srcYuv, resYuv, cs.slice->clpRng( COMPONENT_Y ), currTU );
+                }
               }
             }
           }
@@ -2280,7 +2241,6 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           offsetCTUnoClip(area, srcYuv, resYuv, reconParams[ctuRsAddr], cs);
 
           SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
-          ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
 
           SAOOffset& myCtbOffset     = mySAOblkParam[0];
           bool clipLumaIfNoBilat = false;
@@ -2291,16 +2251,15 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 
           SAOOffset& myCtbOffsetCb     = mySAOblkParam[1];
           SAOOffset& myCtbOffsetCr     = mySAOblkParam[2];
-          bool clipChromaIfNoBilatCb = false;
-          bool clipChromaIfNoBilatCr = false;
+          bool clipChromaIfNoBilat[MAX_NUM_COMPONENT] = { false };
 
           if(myCtbOffsetCb.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCb = true;
+            clipChromaIfNoBilat[COMPONENT_Cb] = true;
           }
           if(myCtbOffsetCr.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCr = true;
+            clipChromaIfNoBilat[COMPONENT_Cr] = true;
           }
 
           for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
@@ -2309,7 +2268,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
             {
               if(clipLumaIfNoBilat)
               {
-                bilateralFilter.clipNotBilaterallyFilteredBlocks(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
+                bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU );
               }
             }
           }
@@ -2331,9 +2290,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
               for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
               {
-                bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+                ComponentID compID = ComponentID( compIdx );
+                BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+                bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
                 applyChromaBIF = false;
                 if(!isDualTree)
                 {
@@ -2367,19 +2326,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                  bilateralFilter.bilateralFilterDiamond5x5Chroma(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                  bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, false,
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                  , clipTop, clipBottom, clipLeft, clipRight
+                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                   );
                 }
                 else
                 {
-                  bool useClip = isCb ? clipChromaIfNoBilatCb : clipChromaIfNoBilatCr;
+                  bool useClip = clipChromaIfNoBilat[compID];
                   if(useClip && currTU.blocks[compIdx].valid())
                   {
-                    bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(compID), currTU, isCb);
+                    bilateralFilter.clipNotBilaterallyFilteredBlocksChroma( compID, srcYuv, resYuv, cs.slice->clpRng(compID), currTU );
                   }
                 }
               }

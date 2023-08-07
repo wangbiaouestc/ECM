@@ -2295,16 +2295,11 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
 #if JVET_V0094_BILATERAL_FILTER
     if (ctuRsAddr == 0)
     {
-      BifParams& bifParam = cs.picture->getBifParam();
-      m_CABACWriter->bif(*pcSlice, bifParam);
-    }
-#endif
+      m_CABACWriter->bif( COMPONENT_Y, *pcSlice, cs.picture->getBifParam( COMPONENT_Y ) );
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-    if(ctuRsAddr == 0)
-    {
-        ChromaBifParams& chromaBifParam = cs.picture->getChromaBifParam();
-        m_CABACWriter->chromaBifCb(*pcSlice, chromaBifParam);
-        m_CABACWriter->chromaBifCr(*pcSlice, chromaBifParam);
+      m_CABACWriter->bif( COMPONENT_Cb, *pcSlice, cs.picture->getBifParam( COMPONENT_Cb ) );
+      m_CABACWriter->bif( COMPONENT_Cr, *pcSlice, cs.picture->getBifParam( COMPONENT_Cr ) );
+#endif
     }
 #endif
     m_CABACWriter->coding_tree_unit( cs, ctuArea, pcPic->m_prevQP, ctuRsAddr );

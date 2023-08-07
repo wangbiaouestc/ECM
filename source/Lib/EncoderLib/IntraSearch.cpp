@@ -7993,25 +7993,25 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     {
     
       const CPelBuf orgLuma = cs.getOrgBuf( cs.area.blocks[COMPONENT_Y] );
-      if (compID == COMPONENT_Y)
+      if( isLuma( compID) )
       {
         if(!(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
         {
           tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
         }
 
-        if (pps.getUseBIF() /*&& (uiAbsSum > 0)*/ && isLuma(compID) && (tu.cu->qp > 17) && (128 > std::max(tu.lumaSize().width, tu.lumaSize().height)))
+        if( pps.getUseBIF() /*&& (uiAbsSum > 0)*/ && tu.cu->qp > 17 && 128 > std::max( tu.lumaSize().width, tu.lumaSize().height ) )
         {
           CompArea compArea = tu.blocks[compID];
           PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
           if(!(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
           {
-            m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, true, m_pcReshape->getInvLUT());
+            m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng( compID ), tu, true, true, &m_pcReshape->getInvLUT() );
           }
           else
           {
             std::vector<Pel> invLUT;
-            m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, false, invLUT);
+            m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng( compID ), tu, true, false, &invLUT );
           }
         }
       
@@ -8020,12 +8020,11 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       else
       {
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-        if(pps.getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17))
+        if(pps.getUseChromaBIF() && isChroma(compID) && tu.cu->qp > 17)
         {
           CompArea compArea = tu.blocks[compID];
           PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
-          bool isCb = compID == COMPONENT_Cb ? true : false;
-          m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true );
         }
         ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecChroma, bitDepth, compID, DF_SSE_WTD, &orgLuma);
 #else
@@ -8053,12 +8052,12 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     {
       if(isLuma(compID))
       {
-        if (pps.getUseBIF() /*&& (uiAbsSum > 0)*/ && isLuma(compID) && (tu.cu->qp > 17) && (128 > std::max(tu.lumaSize().width, tu.lumaSize().height)))
+        if( pps.getUseBIF() /*&& (uiAbsSum > 0)*/ && tu.cu->qp > 17 && 128 > std::max( tu.lumaSize().width, tu.lumaSize().height ) )
         {
           CompArea compArea = tu.blocks[compID];
           PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
           std::vector<Pel> invLUT;
-          m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, false, invLUT);
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpRecLuma, tmpRecLuma, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng( compID ), tu, true, false, &invLUT );
         }
       
         ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecLuma, bitDepth, compID, DF_SSE );
@@ -8070,8 +8069,7 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
         {
           CompArea compArea = tu.blocks[compID];
           PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
-          bool isCb = compID == COMPONENT_Cb ? true : false;
-          m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true );
         }
         ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecChroma, bitDepth, compID, DF_SSE );
 #else
@@ -8133,8 +8131,7 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
         {
           CompArea compArea = tu.blocks[compID];
           PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
-          bool isCb = compID == COMPONENT_Cb ? true : false;
-          m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true );
         }
         ruiDist += m_pcRdCost->getDistPart(piOrg, tmpRecChroma, bitDepth, compID, DF_SSE_WTD, &orgLuma);
         if( jointCbCr )
@@ -8163,8 +8160,7 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
         {
           CompArea compArea = tu.blocks[compID];
           PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
-          bool isCb = compID == COMPONENT_Cb ? true : false;
-          m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true, isCb);
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpRecChroma, tmpRecChroma, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, true );
         }
         ruiDist += m_pcRdCost->getDistPart( piOrg, tmpRecChroma, bitDepth, compID, DF_SSE );
       }

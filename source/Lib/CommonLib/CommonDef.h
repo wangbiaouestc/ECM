@@ -828,8 +828,8 @@ static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA =    28;
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
 static const int BDOF_SUBPU_DIM_LOG2          =                     2;
 #if JVET_AE0091_ITERATIVE_BDOF
-static const int BDOF_SUBPU_AREA_THRESHOL0    =                     0;
-static const int BDOF_SUBPU_AREA_THRESHOL1    =                  1024;
+static const int BDOF_SUBPU_AREA_THRESHOLD0   =                     0;
+static const int BDOF_SUBPU_AREA_THRESHOLD1   =                  1024;
 #else
 static const int BDOF_SUBPU_AREA_THRESHOLD    =                   256;
 #endif

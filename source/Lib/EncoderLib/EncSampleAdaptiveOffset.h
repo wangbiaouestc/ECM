@@ -183,10 +183,7 @@ public:
 #endif
                    const bool bTestSAODisableAtPictureLevel, const double saoEncodingRate, const double saoEncodingRateChroma, const bool isPreDBFSamplesUsed, bool isGreedyMergeEncoding
 #if JVET_V0094_BILATERAL_FILTER
-                                          ,BIFCabacEst* BifCABACEstimator
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-                                          ,ChromaBIFCabacEst* ChromaBifCABACEstimator
+                                          , BIFCabacEst* bifCABACEstimator
 #endif
                   );
 #if JVET_W0066_CCSAO

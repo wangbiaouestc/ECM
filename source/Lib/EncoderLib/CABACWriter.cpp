@@ -154,21 +154,29 @@ void CABACWriter::end_of_slice()
 }
 
 #if JVET_V0094_BILATERAL_FILTER
-void CABACWriter::bif(const Slice& slice, const BifParams& bifParams)
+void CABACWriter::bif( const ComponentID compID, const Slice& slice, const BifParams& bifParams )
 {
   for (int i = 0; i < bifParams.numBlocks; ++i)
   {
-    bif(slice, bifParams, i);
+    bif(compID, slice, bifParams, i);
   }
 }
 
-void CABACWriter::bif(const Slice& slice, const BifParams& bifParams, unsigned ctuRsAddr)
+void CABACWriter::bif( const ComponentID compID, const Slice& slice, const BifParams& bifParams, unsigned ctuRsAddr)
 {
   const PPS& pps = *slice.getPPS();
-  if (!pps.getUseBIF())
+
+  if( isLuma( compID ) && !pps.getUseBIF() )
   {
     return;
   }
+
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if( isChroma( compID ) && !pps.getUseChromaBIF() )
+  {
+    return;
+  }
+#endif
 
   if (ctuRsAddr == 0)
   {
@@ -178,71 +186,10 @@ void CABACWriter::bif(const Slice& slice, const BifParams& bifParams, unsigned c
       m_BinEncoder.encodeBinEP(bifParams.frmOn);
     }
   }
-  if (bifParams.allCtuOn == 0 && bifParams.frmOn)
+  if(bifParams.allCtuOn == 0 && bifParams.frmOn )
   {
     int i = ctuRsAddr;
-    m_BinEncoder.encodeBin(bifParams.ctuOn[i], Ctx::BifCtrlFlags());
-  }
-}
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-void CABACWriter::chromaBifCb(const Slice& slice, const ChromaBifParams& chromaBifParams)
-{
-  for (int i = 0; i < chromaBifParams.numBlocks; ++i)
-  {
-    chromaBifCb(slice, chromaBifParams, i);
-  }
-}
-
-void CABACWriter::chromaBifCb(const Slice& slice, const ChromaBifParams& chromaBifParams, unsigned ctuRsAddr)
-{
-  const PPS& pps = *slice.getPPS();
-  if (!pps.getUseChromaBIF())
-  {
-    return;
-  }
-  if (ctuRsAddr == 0)
-  {
-    m_BinEncoder.encodeBinEP(chromaBifParams.allCtuOnCb);
-    if (chromaBifParams.allCtuOnCb == 0)
-    {
-      m_BinEncoder.encodeBinEP(chromaBifParams.frmOnCb);
-    }
-  }
-  if (chromaBifParams.allCtuOnCb == 0 && chromaBifParams.frmOnCb)
-  {
-    int i = ctuRsAddr;
-    m_BinEncoder.encodeBin(chromaBifParams.ctuOnCb[i], Ctx::ChromaBifCtrlFlagsCb());
-  }
-}
-
-void CABACWriter::chromaBifCr(const Slice& slice, const ChromaBifParams& chromaBifParams)
-{
-  for (int i = 0; i < chromaBifParams.numBlocks; ++i)
-  {
-    chromaBifCr(slice, chromaBifParams, i);
-  }
-}
-
-void CABACWriter::chromaBifCr(const Slice& slice, const ChromaBifParams& chromaBifParams, unsigned ctuRsAddr)
-{
-  const PPS& pps = *slice.getPPS();
-  if (!pps.getUseChromaBIF())
-  {
-    return;
-  }
-  if (ctuRsAddr == 0)
-  {
-    m_BinEncoder.encodeBinEP(chromaBifParams.allCtuOnCr);
-    if (chromaBifParams.allCtuOnCr == 0)
-    {
-      m_BinEncoder.encodeBinEP(chromaBifParams.frmOnCr);
-    }
-  }
-  if (chromaBifParams.allCtuOnCr == 0 && chromaBifParams.frmOnCr)
-  {
-    int i = ctuRsAddr;
-    m_BinEncoder.encodeBin(chromaBifParams.ctuOnCr[i], Ctx::ChromaBifCtrlFlagsCr());
+    m_BinEncoder.encodeBin( bifParams.ctuOn[i], Ctx::BifCtrlFlags[compID]() );
   }
 }
 #endif

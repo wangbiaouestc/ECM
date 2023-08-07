@@ -1226,7 +1226,7 @@ void InterPrediction::xPredInterBiSubPuBDOF(PredictionUnit &pu, PelUnitBuf &pcYu
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
   int scaleBDOF = 2;
 #if JVET_AE0091_ITERATIVE_BDOF
-  if (pu.lumaSize().width * pu.lumaSize().height < BDOF_SUBPU_AREA_THRESHOL1)
+  if (pu.lumaSize().width * pu.lumaSize().height < BDOF_SUBPU_AREA_THRESHOLD1)
 #else
   if (pu.lumaSize().width * pu.lumaSize().height < BDOF_SUBPU_AREA_THRESHOLD)
 #endif
@@ -1956,7 +1956,7 @@ void InterPrediction::xPredInterBiBDMVR2(PredictionUnit &pu, PelUnitBuf &pcYuvPr
   // common variable for all subPu
   const bool lumaOnly = (luma && !chroma), chromaOnly = (!luma && chroma);
   int scaleBDOF = 2;
-  if (pu.lumaSize().width * pu.lumaSize().height < BDOF_SUBPU_AREA_THRESHOL0)
+  if (pu.lumaSize().width * pu.lumaSize().height < BDOF_SUBPU_AREA_THRESHOLD0)
   {
     scaleBDOF = 1;
   }
@@ -4647,7 +4647,7 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
   int scaleBDOF = 2;
   int scaleBDOFLog2 = 1;
 #if JVET_AE0091_ITERATIVE_BDOF
-  int BDOF_SUBPU_AREA_THRE = (iter == 0) ? BDOF_SUBPU_AREA_THRESHOL0 : BDOF_SUBPU_AREA_THRESHOL1;
+  int BDOF_SUBPU_AREA_THRE = (iter == 0) ? BDOF_SUBPU_AREA_THRESHOLD0 : BDOF_SUBPU_AREA_THRESHOLD1;
   if ((isBdofMvRefine && pu.bdmvrRefine && (ww*hh < BDOF_SUBPU_AREA_THRE)) || (!isBdofMvRefine && ((width % 8 == 4) && (width != 4) )))
 #else
     if ((isBdofMvRefine && pu.bdmvrRefine && (ww*hh < BDOF_SUBPU_AREA_THRESHOLD)) || (!isBdofMvRefine && ((width % 8 == 4) && (width != 4) )))

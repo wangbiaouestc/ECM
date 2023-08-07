@@ -513,11 +513,7 @@ public:
   static const CtxSet   SaoMergeFlag;
   static const CtxSet   SaoTypeIdx;
 #if JVET_V0094_BILATERAL_FILTER
-  static const CtxSet   BifCtrlFlags;
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-  static const CtxSet   ChromaBifCtrlFlagsCb;
-  static const CtxSet   ChromaBifCtrlFlagsCr;
+  static const CtxSet   BifCtrlFlags[];
 #endif
 #if JVET_W0066_CCSAO
   static const CtxSet   CcSaoControlIdc;

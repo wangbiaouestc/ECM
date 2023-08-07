@@ -76,14 +76,8 @@ public:
   void        sao                       ( CodingStructure&              cs,     unsigned        ctuRsAddr );
 
 #if JVET_V0094_BILATERAL_FILTER
-  void        bif                      (CodingStructure&              cs);
-  void        bif                      (CodingStructure&              cs, unsigned ctuRsAddr);
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-  void        chromaBifCb              (CodingStructure&              cs);
-  void        chromaBifCb              (CodingStructure&              cs, unsigned ctuRsAddr);
-  void        chromaBifCr              (CodingStructure&              cs);
-  void        chromaBifCr              (CodingStructure&              cs, unsigned ctuRsAddr);
+  void        bif                      ( const ComponentID compID, CodingStructure&              cs);
+  void        bif                      ( const ComponentID compID, CodingStructure&              cs, unsigned ctuRsAddr);
 #endif
   
 #if JVET_W0066_CCSAO
