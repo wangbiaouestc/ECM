@@ -3573,9 +3573,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if MULTI_HYP_PRED
       // put saved additional hypotheseis to the end
 #if JVET_Z0118_GDR
-      int n = (int) addHypData.capacity();
-      int s = (int) pu.addHypData.size();
-      int e = (int) (addHypData.end() - addHypData.begin());
+      size_t n = addHypData.capacity();
+      size_t s = pu.addHypData.size();
+      size_t e = addHypData.end() - addHypData.begin();
 
       if ((s + e) < n)
       {
