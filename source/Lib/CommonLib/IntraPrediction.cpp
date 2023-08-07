@@ -1878,7 +1878,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #endif
     {
       xIntraPredPlanarDcPdpc(srcBuf2, m_tempBuffer[1].getBuf(localUnitArea.Y()).buf,
-                             m_tempBuffer[1].getBuf(localUnitArea.Y()).stride, iWidth, iHeight, pu.ciipPDPC);
+                             m_tempBuffer[1].getBuf(localUnitArea.Y()).stride, iWidth, iHeight
+#if CIIP_PDPC       
+           ,pu.ciipPDPC
+#endif   
+      );
     }
 #endif
     
