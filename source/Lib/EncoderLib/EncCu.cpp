@@ -16710,7 +16710,7 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
             PelBuf    recBuf = picDbBuf.getBuf(compArea);
             PelBuf recIPredBuf = recBuf;
             std::vector<Pel> invLUT;
-            m_bilateralFilter->bilateralFilterRDOdiamond5x5(recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(COMPONENT_Y), currTU, true, false, invLUT);
+            m_bilateralFilter->bilateralFilterRDOdiamond5x5( COMPONENT_Y, recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(COMPONENT_Y), currTU, true, false, &invLUT );
           }
         }
       }
@@ -16741,8 +16741,7 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
         bool isInter = (cu->predMode == MODE_INTER) ? true : false;
         for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
         {
-          bool isCb = compIdx == COMPONENT_Cb ? true : false;
-          ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
+          ComponentID compID = ComponentID( compIdx );
           applyChromaBIF = false;
           if(!isDualTree && chromaValid)
           {
@@ -16765,7 +16764,7 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
             CompArea &compArea = currTU.block(compID);
             PelBuf    recBuf = picDbBuf.getBuf(compArea);
             PelBuf recIPredBuf = recBuf;
-            m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true, isCb);
+            m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true );
           }
         }
       }
@@ -17508,7 +17507,7 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
             tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
           }
         }
-        if(tempCS->pps->getUseBIF() && isLuma(compID) && (cu.qp > 17))
+        if(tempCS->pps->getUseBIF() && isLuma(compID) && cu.qp > 17)
         {
           for (auto &currTU : CU::traverseTUs(cu))
           {
@@ -17517,22 +17516,22 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
 
             bool isInter = (cu.predMode == MODE_INTRA) ? false : true;
             
-            if ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+            if ((TU::getCbf(currTU, compID ) || isInter == false) && (currTU.cu->qp > 17) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
             {
               CompArea compArea = currTU.blocks[compID];
               PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
               // Do we need to use clipArea?
               
               // Only reshape surrounding samples if reshaping is on
-               if(m_pcEncCfg->getLmcs() && (tempCS->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() ) && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
-               {
-                 m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, true, m_pcReshape->getInvLUT());
-               }
-               else
-               {
-                 std::vector<Pel> invLUT;
-                 m_bilateralFilter->bilateralFilterRDOdiamond5x5(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, false, invLUT);
-               }
+              if( m_pcEncCfg->getLmcs() && (tempCS->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag()) && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()) )
+              {
+                m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng( compID ), currTU, true, true, &m_pcReshape->getInvLUT() );
+              }
+              else
+              {
+                std::vector<Pel> invLUT;
+                m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng( compID ), currTU, true, false, &invLUT );
+              }
             }
           }
         }
@@ -17558,7 +17557,6 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
             Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
             PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
             bool isInter = (cu.predMode == MODE_INTER) ? true : false;
-            bool isCb = compID == COMPONENT_Cb ? true : false;
             applyChromaBIF = false;
             if(!isDualTree && chromaValid)
             {
@@ -17580,7 +17578,7 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
             {
               CompArea compArea = currTU.blocks[compID];
               PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
-              m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, isCb);
+              m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true );
             }
           }
         }
@@ -17641,7 +17639,6 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
             PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
 
             bool isInter = (cu.predMode == MODE_INTER) ? true : false;
-            bool isCb = compID == COMPONENT_Cb ? true : false;
             applyChromaBIF = false;
             if(!isDualTree && chromaValid)
             {
@@ -17661,7 +17658,7 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
             {
               CompArea compArea = currTU.blocks[compID];
               PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
-              m_bilateralFilter->bilateralFilterRDOdiamond5x5Chroma(tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true, isCb);
+              m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true );
             }
           }
         }

@@ -1519,19 +1519,6 @@ public:
   std::vector<int> ctuOn;   // bif_ctb_flag[][]
 };
 #endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-class ChromaBifParams
-{
-public:
-  int frmOnCb;                // slice_bif_enabled_flag for chroma
-  int frmOnCr;                // slice_bif_enabled_flag for chroma
-  int allCtuOnCb;             // slice_bif_all_ctb_enabled_flag for chroma
-  int allCtuOnCr;             // slice_bif_all_ctb_enabled_flag for chroma
-  int numBlocks;
-  std::vector<int> ctuOnCb;   // bif_ctb_flag[][] for chroma
-  std::vector<int> ctuOnCr;   // bif_ctb_flag[][] for chroma
-};
-#endif
 
 struct CclmModel
 {

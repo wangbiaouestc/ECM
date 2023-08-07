@@ -39,12 +39,6 @@
 #include "SEI.h"
 #include "ChromaFormat.h"
 #include "CommonLib/InterpolationFilter.h"
-#if JVET_V0094_BILATERAL_FILTER
-BifParams Picture::m_BifParams;
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-ChromaBifParams Picture::m_ChromaBifParams;
-#endif
 
 #if ENABLE_SPLIT_PARALLELISM
 

@@ -2013,35 +2013,11 @@ public:
   BIFCabacEstImp(CABACWriter* _CABACEstimator) : CABACEstimator(_CABACEstimator) {};
   virtual ~BIFCabacEstImp() {};
 
-  virtual uint64_t getBits(const Slice& slice, const BifParams& htdfParams)
+  virtual uint64_t getBits(const ComponentID compID, const Slice& slice, const BifParams& htdfParams)
   {
     CABACEstimator->initCtxModels(slice);
     CABACEstimator->resetBits();
-    CABACEstimator->bif(slice, htdfParams);
-    return CABACEstimator->getEstFracBits();
-  }
-};
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-class ChromaBIFCabacEstImp : public ChromaBIFCabacEst
-{
-  CABACWriter* CABACEstimator;
-public:
-  ChromaBIFCabacEstImp(CABACWriter* _CABACEstimator) : CABACEstimator(_CABACEstimator) {};
-  virtual ~ChromaBIFCabacEstImp() {};
-
-  virtual uint64_t getBitsCb(const Slice& slice, const ChromaBifParams& chromaBifParams)
-  {
-    CABACEstimator->initCtxModels(slice);
-    CABACEstimator->resetBits();
-    CABACEstimator->chromaBifCb(slice, chromaBifParams);
-    return CABACEstimator->getEstFracBits();
-  }
-  virtual uint64_t getBitsCr(const Slice& slice, const ChromaBifParams& chromaBifParams)
-  {
-    CABACEstimator->initCtxModels(slice);
-    CABACEstimator->resetBits();
-    CABACEstimator->chromaBifCr(slice, chromaBifParams);
+    CABACEstimator->bif( compID, slice, htdfParams);
     return CABACEstimator->getEstFracBits();
   }
 };
@@ -3610,11 +3586,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         m_pcSAO->initCABACEstimator( m_pcEncLib->getCABACEncoder(), m_pcEncLib->getCtxCache(), pcSlice );
 #if JVET_V0094_BILATERAL_FILTER
         BIFCabacEstImp est(m_pcEncLib->getCABACEncoder()->getCABACEstimator(cs.slice->getSPS()));
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-        ChromaBIFCabacEstImp chromaBifEst(m_pcEncLib->getCABACEncoder()->getCABACEstimator(cs.slice->getSPS()));
-#endif
-        
+#endif      
         m_pcSAO->SAOProcess( cs, sliceEnabled, pcSlice->getLambdas(),
 #if ENABLE_QPA
                              (m_pcCfg->getUsePerceptQPA() && !m_pcCfg->getUseRateCtrl() && pcSlice->getPPS()->getUseDQP() ? m_pcEncLib->getRdCost (PARL_PARAM0 (0))->getChromaWeight() : 0.0),
@@ -3622,9 +3594,6 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
                              m_pcCfg->getTestSAODisableAtPictureLevel(), m_pcCfg->getSaoEncodingRate(), m_pcCfg->getSaoEncodingRateChroma(), m_pcCfg->getSaoCtuBoundary(), m_pcCfg->getSaoGreedyMergeEnc()
 #if JVET_V0094_BILATERAL_FILTER
                               , &est
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-                              , &chromaBifEst
 #endif
                             );
         //assign SAO slice header

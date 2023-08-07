@@ -2707,8 +2707,10 @@ const CtxSet ContextSetCfg::SaoTypeIdx = ContextSetCfg::addCtxSet
   });
 
 #if JVET_V0094_BILATERAL_FILTER
-const CtxSet ContextSetCfg::BifCtrlFlags = ContextSetCfg::addCtxSet
-({
+const CtxSet ContextSetCfg::BifCtrlFlags[] =
+{
+ContextSetCfg::addCtxSet
+( {
   {  38, },
   {  38, },
   {  23, },
@@ -2720,12 +2722,10 @@ const CtxSet ContextSetCfg::BifCtrlFlags = ContextSetCfg::addCtxSet
   {  18, },
   { 115, },
   { 102, },
-  });
-#endif
-
+  } ),
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-const CtxSet ContextSetCfg::ChromaBifCtrlFlagsCb = ContextSetCfg::addCtxSet
-({
+  ContextSetCfg::addCtxSet
+( {
   {  53, },
   {  37, },
   {  22, },
@@ -2737,10 +2737,9 @@ const CtxSet ContextSetCfg::ChromaBifCtrlFlagsCb = ContextSetCfg::addCtxSet
   {  11, },
   { 116, },
   { 116, },
-  });
-
-const CtxSet ContextSetCfg::ChromaBifCtrlFlagsCr = ContextSetCfg::addCtxSet
-({
+  } ),
+  ContextSetCfg::addCtxSet
+( {
   {  37, },
   {  30, },
   {  22, },
@@ -2752,7 +2751,9 @@ const CtxSet ContextSetCfg::ChromaBifCtrlFlagsCr = ContextSetCfg::addCtxSet
   {  18, },
   { 116, },
   { 117, },
-  });
+  } )
+#endif
+};
 #endif
 
 #if JVET_W0066_CCSAO
@@ -4874,35 +4875,38 @@ const CtxSet ContextSetCfg::SaoTypeIdx = ContextSetCfg::addCtxSet
 });
 
 #if JVET_V0094_BILATERAL_FILTER
-const CtxSet ContextSetCfg::BifCtrlFlags = ContextSetCfg::addCtxSet
-({
+const CtxSet ContextSetCfg::BifCtrlFlags[] =
+{
+ContextSetCfg::addCtxSet
+( {
   { 39 },
   { 39 },
   { 39 },
   { DWS },
   { DWS },
   { DWS }
-});
-#endif
+} ),
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-const CtxSet ContextSetCfg::ChromaBifCtrlFlagsCb = ContextSetCfg::addCtxSet
-({
+ContextSetCfg::addCtxSet
+( {
   { 39 },
   { 39 },
   { 39 },
   { DWS },
   { DWS },
   { DWS }
-});
-const CtxSet ContextSetCfg::ChromaBifCtrlFlagsCr = ContextSetCfg::addCtxSet
-({
+} ),
+ContextSetCfg::addCtxSet
+( {
   { 39 },
   { 39 },
   { 39 },
   { DWS },
   { DWS },
   { DWS }
-});
+} )
+#endif
+}
 #endif
 
 #if JVET_W0066_CCSAO
@@ -6265,29 +6269,32 @@ const CtxSet ContextSetCfg::SaoTypeIdx = ContextSetCfg::addCtxSet
 });
 
 #if JVET_V0094_BILATERAL_FILTER
-const CtxSet ContextSetCfg::BifCtrlFlags = ContextSetCfg::addCtxSet
-({
+const CtxSet ContextSetCfg::BifCtrlFlags[] =
+{
+ContextSetCfg::addCtxSet
+( {
   { 39, },
   { 39, },
   { 39, },
   { DWS, },
-});
-#endif
+} ),
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-const CtxSet ContextSetCfg::ChromaBifCtrlFlagsCb = ContextSetCfg::addCtxSet
-({
+ContextSetCfg::addCtxSet
+( {
     { 39, },
     { 39, },
     { 39, },
     { DWS, },
-});
-const CtxSet ContextSetCfg::ChromaBifCtrlFlagsCr = ContextSetCfg::addCtxSet
-({
+} ),
+ContextSetCfg::addCtxSet
+( {
     { 39, },
     { 39, },
     { 39, },
     { DWS, },
-});
+} )
+#endif
+}
 #endif
 
 #if JVET_W0066_CCSAO

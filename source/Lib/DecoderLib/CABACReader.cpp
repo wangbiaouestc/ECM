@@ -549,54 +549,63 @@ void CABACReader::sao( CodingStructure& cs, unsigned ctuRsAddr )
 }
 
 #if JVET_V0094_BILATERAL_FILTER
-void CABACReader::bif(CodingStructure& cs)
+void CABACReader::bif( const ComponentID compID, CodingStructure& cs)
 {
   int width = cs.picture->lwidth();
   int height = cs.picture->lheight();
 
-  int block_width = cs.pcv->maxCUWidth;
-  int block_height = cs.pcv->maxCUHeight;
+  int blockWidth = cs.pcv->maxCUWidth;
+  int blockHeight = cs.pcv->maxCUHeight;
 
-  int width_in_blocks = width / block_width + (width % block_width != 0);
-  int height_in_blocks = height / block_height + (height % block_height != 0);
+  int widthInBlocks = width / blockWidth + (width % blockWidth != 0);
+  int heightInBlocks = height / blockHeight + (height % blockHeight != 0);
 
-  for (int i = 0; i < width_in_blocks * height_in_blocks; i++)
+  for (int i = 0; i < widthInBlocks * heightInBlocks; i++)
   {
-    bif(cs, i);
+    bif(compID, cs, i);
   }
 }
 
-void CABACReader::bif(CodingStructure& cs, unsigned ctuRsAddr)
+void CABACReader::bif( const ComponentID compID, CodingStructure& cs, unsigned ctuRsAddr )
 {
 //  const SPS&   sps = *cs.sps;
   const PPS&   pps = *cs.pps;
 
-  if (!pps.getUseBIF())
+  if( isLuma(compID) && !pps.getUseBIF())
   {
     return;
   }
 
-  BifParams& bifParams = cs.picture->getBifParam();
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  if( isChroma( compID ) && !pps.getUseChromaBIF() )
+  {
+    return;
+  }
+#endif
+
+  BifParams& bifParams = cs.picture->getBifParam( compID );
 
   if (ctuRsAddr == 0)
   {
     int width = cs.picture->lwidth();
     int height = cs.picture->lheight();
-    int block_width = cs.pcv->maxCUWidth;
-    int block_height = cs.pcv->maxCUHeight;
+    int blockWidth = cs.pcv->maxCUWidth;
+    int blockHeight = cs.pcv->maxCUHeight;
 
-    int width_in_blocks = width / block_width + (width % block_width != 0);
-    int height_in_blocks = height / block_height + (height % block_height != 0);
-    bifParams.numBlocks = width_in_blocks * height_in_blocks;
-    bifParams.ctuOn.resize(bifParams.numBlocks);
+    int widthInBlocks = width / blockWidth + (width % blockWidth != 0);
+    int heightInBlocks = height / blockHeight + (height % blockHeight != 0);
+    bifParams.numBlocks = widthInBlocks * heightInBlocks;
+    bifParams.ctuOn.resize( bifParams.numBlocks );
     std::fill(bifParams.ctuOn.begin(), bifParams.ctuOn.end(), 0);
   }
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET2(STATS__CABAC_BITS__BIF, COMPONENT_Y);
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET2(STATS__CABAC_BITS__BIF, compID);
   if (ctuRsAddr == 0)
   {
     bifParams.allCtuOn = m_BinDecoder.decodeBinEP();
-    if (bifParams.allCtuOn == 0)
+    if( bifParams.allCtuOn == 0 )
+    {
       bifParams.frmOn = m_BinDecoder.decodeBinEP();
+    }
   }
   int i = ctuRsAddr;
   if (bifParams.allCtuOn)
@@ -605,150 +614,13 @@ void CABACReader::bif(CodingStructure& cs, unsigned ctuRsAddr)
   }
   else
   {
-    if (bifParams.frmOn)
+    if (bifParams.frmOn )
     {
-      bifParams.ctuOn[i] = m_BinDecoder.decodeBin(Ctx::BifCtrlFlags());
+      bifParams.ctuOn[i] = m_BinDecoder.decodeBin(Ctx::BifCtrlFlags[compID]());
     }
     else
     {
       bifParams.ctuOn[i] = 0;
-    }
-  }
-}
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-void CABACReader::chromaBifCb(CodingStructure& cs)
-{
-  int width = cs.picture->lwidth();
-  int height = cs.picture->lheight();
-
-  int blockWidth = cs.pcv->maxCUWidth;
-  int blockHeight = cs.pcv->maxCUHeight;
-
-  int widthInBlocks = width / blockWidth + (width % blockWidth != 0);
-  int heightInBlocks = height / blockHeight + (height % blockHeight != 0);
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET2(STATS__CABAC_BITS__BIF, COMPONENT_Cb);
-
-  for (int i = 0; i < widthInBlocks * heightInBlocks; i++)
-  {
-    chromaBifCb(cs, i);
-  }
-}
-
-void CABACReader::chromaBifCb(CodingStructure& cs, unsigned ctuRsAddr)
-{
-  const PPS&   pps = *cs.pps;
-
-  if (!pps.getUseChromaBIF())
-  {
-    return;
-  }
-  ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
-  if (ctuRsAddr == 0)
-  {
-    int width = cs.picture->lwidth();
-    int height = cs.picture->lheight();
-    int blockWidth = cs.pcv->maxCUWidth;
-    int blockHeight = cs.pcv->maxCUHeight;
-
-    int widthInBlocks = width / blockWidth + (width % blockWidth != 0);
-    int heightInBlocks = height / blockHeight + (height % blockHeight != 0);
-    int numBlocks = widthInBlocks * heightInBlocks;
-    chromaBifParams.numBlocks = numBlocks;
-    chromaBifParams.ctuOnCb.resize(numBlocks);
-    std::fill(chromaBifParams.ctuOnCb.begin(), chromaBifParams.ctuOnCb.end(), 0);
-  }
-  if (ctuRsAddr == 0)
-  {
-    chromaBifParams.allCtuOnCb = m_BinDecoder.decodeBinEP();
-    if (chromaBifParams.allCtuOnCb == 0)
-    {
-      chromaBifParams.frmOnCb = m_BinDecoder.decodeBinEP();
-    }
-  }
-  int i = ctuRsAddr;
-  if (chromaBifParams.allCtuOnCb)
-  {
-    chromaBifParams.ctuOnCb[i] = 1;
-  }
-  else
-  {
-    if (chromaBifParams.frmOnCb)
-    {
-      chromaBifParams.ctuOnCb[i] = m_BinDecoder.decodeBin(Ctx::ChromaBifCtrlFlagsCb());
-    }
-    else
-    {
-      chromaBifParams.ctuOnCb[i] = 0;
-    }
-  }
-}
-
-void CABACReader::chromaBifCr(CodingStructure& cs)
-{
-  int width = cs.picture->lwidth();
-  int height = cs.picture->lheight();
-
-  int blockWidth = cs.pcv->maxCUWidth;
-  int blockHeight = cs.pcv->maxCUHeight;
-
-  int widthInBlocks = width / blockWidth + (width % blockWidth != 0);
-  int heightInBlocks = height / blockHeight + (height % blockHeight != 0);
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET2(STATS__CABAC_BITS__BIF, COMPONENT_Cr);
-
-  for (int i = 0; i < widthInBlocks * heightInBlocks; i++)
-  {
-    chromaBifCr(cs, i);
-  }
-}
-
-void CABACReader::chromaBifCr(CodingStructure& cs, unsigned ctuRsAddr)
-{
-  const PPS&   pps = *cs.pps;
-
-  if (!pps.getUseChromaBIF())
-  {
-    return;
-  }
-
-  ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
-
-  if (ctuRsAddr == 0)
-  {
-    int width = cs.picture->lwidth();
-    int height = cs.picture->lheight();
-    int blockWidth = cs.pcv->maxCUWidth;
-    int blockHeight = cs.pcv->maxCUHeight;
-
-    int widthInBlocks = width / blockWidth + (width % blockWidth != 0);
-    int heightInBlocks = height / blockHeight + (height % blockHeight != 0);
-    int numBlocks = widthInBlocks * heightInBlocks;
-    chromaBifParams.numBlocks = numBlocks;
-    chromaBifParams.ctuOnCr.resize(numBlocks);
-    std::fill(chromaBifParams.ctuOnCr.begin(), chromaBifParams.ctuOnCr.end(), 0);
-  }
-  if (ctuRsAddr == 0)
-  {
-    chromaBifParams.allCtuOnCr = m_BinDecoder.decodeBinEP();
-    if (chromaBifParams.allCtuOnCr == 0)
-    {
-      chromaBifParams.frmOnCr = m_BinDecoder.decodeBinEP();
-    }
-  }
-  int i = ctuRsAddr;
-  if (chromaBifParams.allCtuOnCr)
-  {
-    chromaBifParams.ctuOnCr[i] = 1;
-  }
-  else
-  {
-    if (chromaBifParams.frmOnCr)
-    {
-      chromaBifParams.ctuOnCr[i] = m_BinDecoder.decodeBin(Ctx::ChromaBifCtrlFlagsCr());
-    }
-    else
-    {
-      chromaBifParams.ctuOnCr[i] = 0;
     }
   }
 }

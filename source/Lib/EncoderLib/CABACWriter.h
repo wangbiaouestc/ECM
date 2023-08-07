@@ -89,14 +89,8 @@ public:
   void        sao_block_pars            ( const SAOBlkParam&            saoPars,  const BitDepths&  bitDepths,  bool* sliceEnabled, bool leftMergeAvail, bool aboveMergeAvail, bool onlyEstMergeInfo );
   void        sao_offset_pars           ( const SAOOffset&              ctbPars,  ComponentID       compID,     bool sliceEnabled,  int bitDepth );
 #if JVET_V0094_BILATERAL_FILTER
-  void        bif                      (const Slice&                   slice, const BifParams& BifParams);
-  void        bif                      (const Slice& slice, const BifParams& BifParams, unsigned ctuRsAddr);
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-  void        chromaBifCb              (const Slice&                   slice, const ChromaBifParams& chromaBifParams);
-  void        chromaBifCb              (const Slice& slice, const ChromaBifParams& chromaBifParams, unsigned ctuRsAddr);
-  void        chromaBifCr              (const Slice&                   slice, const ChromaBifParams& chromaBifParams);
-  void        chromaBifCr              (const Slice& slice, const ChromaBifParams& chromaBifParams, unsigned ctuRsAddr);
+  void        bif                      ( const ComponentID compID, const Slice&                   slice, const BifParams& bifParams);
+  void        bif                      ( const ComponentID compID, const Slice& slice, const BifParams& bifParams, unsigned ctuRsAddr);
 #endif
 #if JVET_W0066_CCSAO
   void        codeCcSaoControlIdc       ( uint8_t idcVal, CodingStructure &cs, const ComponentID compID, const int curIdx,
