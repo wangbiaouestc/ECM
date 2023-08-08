@@ -4243,9 +4243,9 @@ void CABACWriter::cuIbcLicFlag(const CodingUnit& cu)
     DTRACE(g_trace_ctx, D_SYNTAX, "cu_ibc_lic_flag() filter_flag=%d\n", cu.ibcFilterFlag);
   }
 #if JVET_AE0078_IBC_LIC_EXTENSION
-  if (!cu.ibcFilterFlag)
+  if (!cu.ibcFilterFlag && cu.cs->sps->getUseIbcLic())
 #else
-  if (!cu.ibcFilterFlag && (cu.lwidth() * cu.lheight() <= 256))
+  if (!cu.ibcFilterFlag && cu.cs->sps->getUseIbcLic() && (cu.lwidth() * cu.lheight() <= 256))
 #endif
   {
     m_BinEncoder.encodeBin(cu.ibcLicFlag ? 1 : 0, Ctx::IbcLicFlag(0));
