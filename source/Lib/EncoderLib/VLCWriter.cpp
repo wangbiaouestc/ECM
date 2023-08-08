@@ -4018,14 +4018,14 @@ void HLSWriter::codeCcSao(Slice* pcSlice, PicHeader* picHeader, const SPS* sps, 
 {
   if (pcSlice->getSPS()->getCCSAOEnabledFlag())
   {
-    WRITE_FLAG(ccSaoParam.enabled[COMPONENT_Y ] ? 1 : 0, "slice_ccsao_y_enabled_flag");
-    WRITE_FLAG(ccSaoParam.enabled[COMPONENT_Cb] ? 1 : 0, "slice_ccsao_cb_enabled_flag");
-    WRITE_FLAG(ccSaoParam.enabled[COMPONENT_Cr] ? 1 : 0, "slice_ccsao_cr_enabled_flag");
+    WRITE_FLAG(ccSaoParam.enabled[COMPONENT_Y ] ? 1 : 0, "ccsao_y_enabled_flag");
+    WRITE_FLAG(ccSaoParam.enabled[COMPONENT_Cb] ? 1 : 0, "ccsao_cb_enabled_flag");
+    WRITE_FLAG(ccSaoParam.enabled[COMPONENT_Cr] ? 1 : 0, "ccsao_cr_enabled_flag");
 
 #if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
     if (ccSaoParam.enabled[COMPONENT_Y] || ccSaoParam.enabled[COMPONENT_Cb] || ccSaoParam.enabled[COMPONENT_Cr])
     {
-      WRITE_FLAG(ccSaoParam.extChroma[COMPONENT_Y] ? 1 : 0, "slice_ccsao_ext_chroma_flag");
+      WRITE_FLAG(ccSaoParam.extChroma[COMPONENT_Y] ? 1 : 0, "ccsao_ext_chroma_flag");
     }
 #endif
 

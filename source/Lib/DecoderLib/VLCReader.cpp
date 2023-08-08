@@ -6485,9 +6485,9 @@ void HLSyntaxReader::parseCcSao( Slice* pcSlice, PicHeader* picHeader, const SPS
   uint32_t  uiCode;
   if (sps->getCCSAOEnabledFlag())
   {
-    READ_FLAG(uiCode, "slice_ccsao_y_enabled_flag" ); pcSlice->setCcSaoEnabledFlag(COMPONENT_Y,  uiCode); ccSaoParam.enabled[COMPONENT_Y ] = uiCode;
-    READ_FLAG(uiCode, "slice_ccsao_cb_enabled_flag"); pcSlice->setCcSaoEnabledFlag(COMPONENT_Cb, uiCode); ccSaoParam.enabled[COMPONENT_Cb] = uiCode;
-    READ_FLAG(uiCode, "slice_ccsao_cr_enabled_flag"); pcSlice->setCcSaoEnabledFlag(COMPONENT_Cr, uiCode); ccSaoParam.enabled[COMPONENT_Cr] = uiCode;
+    READ_FLAG(uiCode, "ccsao_y_enabled_flag" ); pcSlice->setCcSaoEnabledFlag(COMPONENT_Y,  uiCode); ccSaoParam.enabled[COMPONENT_Y ] = uiCode;
+    READ_FLAG(uiCode, "ccsao_cb_enabled_flag"); pcSlice->setCcSaoEnabledFlag(COMPONENT_Cb, uiCode); ccSaoParam.enabled[COMPONENT_Cb] = uiCode;
+    READ_FLAG(uiCode, "ccsao_cr_enabled_flag"); pcSlice->setCcSaoEnabledFlag(COMPONENT_Cr, uiCode); ccSaoParam.enabled[COMPONENT_Cr] = uiCode;
   }
   else
   {
@@ -6499,7 +6499,7 @@ void HLSyntaxReader::parseCcSao( Slice* pcSlice, PicHeader* picHeader, const SPS
 #if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
   if (ccSaoParam.enabled[COMPONENT_Y] || ccSaoParam.enabled[COMPONENT_Cb] || ccSaoParam.enabled[COMPONENT_Cr])
   {
-    READ_FLAG(uiCode, "ccsao_ext_chroma"); 
+    READ_FLAG(uiCode, "ccsao_ext_chroma_flag"); 
     ccSaoParam.extChroma[COMPONENT_Y] = ccSaoParam.extChroma[COMPONENT_Cb] = ccSaoParam.extChroma[COMPONENT_Cr] = uiCode;
   }
 #endif
