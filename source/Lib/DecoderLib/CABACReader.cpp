@@ -4654,9 +4654,9 @@ void CABACReader::cuIbcLicFlag( CodingUnit& cu )
     cu.ibcFilterFlag = false;
   }
 #if JVET_AE0078_IBC_LIC_EXTENSION
-  if (!cu.ibcFilterFlag)
+  if (!cu.ibcFilterFlag && cu.cs->sps->getUseIbcLic())
 #else
-  if (!cu.ibcFilterFlag && (cu.lwidth() * cu.lheight() <= 256))
+  if (!cu.ibcFilterFlag && cu.cs->sps->getUseIbcLic() && (cu.lwidth() * cu.lheight() <= 256))
 #endif
   {
     cu.ibcLicFlag = m_BinDecoder.decodeBin(Ctx::IbcLicFlag(0));
@@ -4683,14 +4683,14 @@ void CABACReader::cuIbcLicFlag( CodingUnit& cu )
 #endif
   }
 #if !JVET_AE0078_IBC_LIC_EXTENSION
-  else if (!cu.ibcFilterFlag) // (cu.lwidth() * cu.lheight() > 256)
+  else if (!cu.ibcFilterFlag && cu.cs->sps->getUseIbcLic()) // (cu.lwidth() * cu.lheight() > 256)
   {
     cu.ibcLicFlag = false;
   }
 #endif
   else 
   {
-    cu.ibcLicFlag = true;
+    cu.ibcLicFlag = cu.cs->sps->getUseIbcLic()? true : false;
 #if JVET_AE0078_IBC_LIC_EXTENSION
     cu.ibcLicIdx = 0;
 #endif
