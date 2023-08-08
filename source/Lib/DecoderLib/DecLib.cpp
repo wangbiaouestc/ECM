@@ -2571,6 +2571,21 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
     }
   }
 
+  if (m_apsMapEnc) // saving ALF APS for debug bitstream mode
+  {
+    const auto& apsMap = m_parameterSetManager.getApsMap();
+    for (int psId = ALF_APS; psId < (ALF_CTB_MAX_NUM_APS<<NUM_APS_TYPE_LEN) + ALF_APS; psId += (1<<NUM_APS_TYPE_LEN))
+    {
+      APS* aps = apsMap->getPS(psId);
+      if (aps && apsMap->getChangedFlag(psId))
+      {
+        APS* apsEnc = new APS();
+        *apsEnc = *aps;
+        m_apsMapEnc->storePS(psId, apsEnc);
+      }
+    }
+  }
+
   //Reset POC MSB when CRA or GDR has NoOutputBeforeRecoveryFlag equal to 1
   if (!pps->getMixedNaluTypesInPicFlag() && (m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_CRA || m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_GDR) && m_lastNoOutputBeforeRecoveryFlag[nalu.m_nuhLayerId])
   {
