@@ -3908,7 +3908,14 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       mrgCtxCiip.candCost[uiMergeCand] = mergeCtx.candCost[uiMergeCand];
     }
     
-    m_pcInterSearch->adjustMergeCandidatesBcwIdx(pu, mergeCtx);
+    if (sps.getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && sps.getTMToolsEnableFlag()
+#endif
+      )
+    {
+      m_pcInterSearch->adjustMergeCandidatesBcwIdx(pu, mergeCtx);
+    }
 #endif
     PU::getInterMergeCandidates(pu, mergeCtxtmp, 0);
 #endif
@@ -4047,7 +4054,14 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     bool flag = pu.mmvdMergeFlag;
     pu.mmvdMergeFlag = true;
 #if JVET_AB0079_TM_BCW_MRG
-    m_pcInterSearch->adjustMergeCandidatesBcwIdx(pu, mergeCtxtmp);
+    if (sps.getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && sps.getTMToolsEnableFlag()
+#endif
+      )
+    {
+      m_pcInterSearch->adjustMergeCandidatesBcwIdx(pu, mergeCtxtmp);
+    }
 #endif
     m_pcInterSearch->sortInterMergeMMVDCandidates(pu, mergeCtxtmp, mmvdLUT);
     pu.mmvdMergeFlag = flag;
