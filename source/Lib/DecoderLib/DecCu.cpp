@@ -2189,7 +2189,14 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           pu.mmvdMergeIdx
         );
 #if JVET_AB0079_TM_BCW_MRG
-        m_pcInterPred->adjustMergeCandidatesBcwIdx(pu, mrgCtx, fPosBaseIdx);
+        if (pu.cs->sps->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+          && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+          )
+        {
+          m_pcInterPred->adjustMergeCandidatesBcwIdx(pu, mrgCtx, fPosBaseIdx);
+        }
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
         uint32_t mmvdLUT[MMVD_ADD_NUM];
