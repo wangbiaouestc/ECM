@@ -1880,8 +1880,8 @@ void AdaptiveLoopFilter::destroy()
   m_filterShapes[CHANNEL_TYPE_LUMA].clear();
   m_filterShapes[CHANNEL_TYPE_CHROMA].clear();
   m_created = false;
-  m_filterShapesCcAlf.clear();
 
+  m_filterShapesCcAlf.clear();
   if ( m_ccAlfFilterControl[0] )
   {
     delete [] m_ccAlfFilterControl[0];
