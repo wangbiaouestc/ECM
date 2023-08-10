@@ -46,6 +46,8 @@
 
 struct AlfCovariance
 {
+  static constexpr int MaxAlfNumClippingValues = AdaptiveLoopFilter::MaxAlfNumClippingValues;
+
 #if JVET_X0071_LONGER_CCALF && !JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF && !JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
   using TE = double[MAX_NUM_CC_ALF_CHROMA_COEFF][MAX_NUM_CC_ALF_CHROMA_COEFF];
   using Ty = double[MAX_NUM_CC_ALF_CHROMA_COEFF];
@@ -53,171 +55,134 @@ struct AlfCovariance
   using TE = double[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];
   using Ty = double[MAX_NUM_ALF_LUMA_COEFF];
 #endif
+
+
+  std::vector<double> data;
+
+  ptrdiff_t                offsetE;
+  ptrdiff_t                stridey;
+
+  size_t sizeY() const { return offsetE; }
+  size_t sizeE() const { return data.size() - offsetE; }
+
+  ptrdiff_t getOffsetY(ptrdiff_t i, ptrdiff_t j) const { return stridey * i + j; }
+
+  ptrdiff_t getOffsetEfast(ptrdiff_t i, ptrdiff_t j, ptrdiff_t k, ptrdiff_t l) const
+  {
+    const ptrdiff_t v0 = getOffsetY(i, k);
+    const ptrdiff_t v1 = getOffsetY(j, l);
+
+    assert(v1 <= v0);
+
+    return offsetE + (v0 * (v0 + 1) >> 1) + v1;
+  }
+
+  ptrdiff_t getOffsetE(ptrdiff_t i, ptrdiff_t j, ptrdiff_t k, ptrdiff_t l) const
+  {
+    const ptrdiff_t v0 = getOffsetY(i, k);
+    const ptrdiff_t v1 = getOffsetY(j, l);
+
+    return offsetE + (v1 <= v0 ? (v0 * (v0 + 1) >> 1) + v1 : (v1 * (v1 + 1) >> 1) + v0);
+  }
+
+  double       &y(ptrdiff_t i, ptrdiff_t j) { return data[getOffsetY(i, j)]; }
+  const double &y(ptrdiff_t i, ptrdiff_t j) const { return data[getOffsetY(i, j)]; }
+
+  double       &E(ptrdiff_t i, ptrdiff_t j, ptrdiff_t k, ptrdiff_t l) { return data[getOffsetE(i, j, k, l)]; }
+  const double &E(ptrdiff_t i, ptrdiff_t j, ptrdiff_t k, ptrdiff_t l) const { return data[getOffsetE(i, j, k, l)]; }
+
   int numCoeff;
   int numBins;
-  double**** E;
-  double** y;
   double pixAcc;
-  AlfCovariance() 
-  {
-    numCoeff = numBins = 0;
-    E = nullptr;
-    y = nullptr;
-    pixAcc = 0;
-  }
+
+  AlfCovariance() {}
   ~AlfCovariance() {}
 
-  void create( int size, int num_bins )
+  void create(int size, int _numBins)
   {
     numCoeff = size;
-    numBins = num_bins;
-    E = new double***[numBins];
-    y = new double*[numBins];
-    for( int b0 = 0; b0 < numBins; b0++ )
-    {
-      E[b0] = new double**[numBins];
-      y[b0] = new double [numCoeff];
-      for( int b1 = 0; b1 < numBins; b1++ )
-      {
-        E[b0][b1] = new double*[numCoeff];
-        for( int i = 0; i < numCoeff; i++ )
-        {
-          E[b0][b1][i] = new double[numCoeff];
-        }
-      }
-    }
+    numBins  = _numBins;
+    const int numCols = numCoeff * numBins;
+    stridey    = numCoeff;
+    offsetE    = stridey * numBins;
+    data.resize(offsetE + (numCols * (numCols + 1) >> 1));
+    std::fill(data.begin(), data.end(), 0.0);
   }
 
   void destroy()
   {
-    if( E )
-    {
-      for( int b0 = 0; b0 < numBins; b0++ )
-      {
-        if( E[b0] )
-        {
-          for( int b1 = 0; b1 < numBins; b1++ )
-          {
-            if( E[b0][b1] )
-            {
-              for( int i = 0; i < numCoeff; i++ )
-              {
-                if( E[b0][b1][i] )
-                {
-                  delete[] E[b0][b1][i];
-                  E[b0][b1][i] = nullptr;
-                }
-              }
-              delete[] E[b0][b1];
-              E[b0][b1] = nullptr;
-            }
-          }
-          delete[] E[b0];
-          E[b0] = nullptr;
-        }
-      }
-      delete[] E;
-      E = nullptr;
-    }
-    if( y )
-    {
-      for( int b0 = 0; b0 < numBins; b0++ )
-      {
-        if( y[b0] )
-        {
-          delete[] y[b0];
-          y[b0] = nullptr;
-        }
-      }
-      delete[] y;
-      y = nullptr;
-    }
   }
 
   void reset()
   {
     pixAcc = 0;
-    for( int b0 = 0; b0 < numBins; b0++ )
-    {     
-      for( int b1 = 0; b1 < numBins; b1++ )
-      {          
-        for( int i = 0; i < numCoeff; i++ )
-        {
-          std::memset( E[b0][b1][i], 0, sizeof( double ) * numCoeff );
-        }
-      }
-      std::memset(y[b0], 0, sizeof( double ) * numCoeff);
-    }
+    std::fill(data.begin(), data.end(), 0.0);
+  }
+
+  void reset(int _numBins)
+  {
+    numBins = _numBins;
+    reset();
   }
 
   const AlfCovariance& operator=( const AlfCovariance& src )
   {
     numCoeff = src.numCoeff;
     numBins = src.numBins;
-    for( int b0 = 0; b0 < numBins; b0++ )
-    {
-      for( int b1 = 0; b1 < numBins; b1++ )
-      {
-        for( int i = 0; i < numCoeff; i++ )
-        {
-          std::memcpy( E[b0][b1][i], src.E[b0][b1][i], sizeof( double ) * numCoeff );
-        }
-      }
-      std::memcpy( y[b0], src.y[b0], sizeof( double ) * numCoeff );
-    }   
+    data     = src.data;
+    stridey  = src.stridey;
+    offsetE  = src.offsetE;
     pixAcc = src.pixAcc;
+
     return *this;
   }
+
+  bool sameSizeAs(const AlfCovariance &x) { return x.numCoeff == numCoeff && x.numBins == numBins; }
 
   void add( const AlfCovariance& lhs, const AlfCovariance& rhs )
   {
     numCoeff = lhs.numCoeff;
     numBins = lhs.numBins;
-    for( int b0 = 0; b0 < numBins; b0++ )
+    CHECK(!sameSizeAs(lhs), "AlfCovariance size mismatch");
+    CHECK(!sameSizeAs(rhs), "AlfCovariance size mismatch");
+
+    for (ptrdiff_t i = 0; i < data.size(); i++)
     {
-      for( int b1 = 0; b1 < numBins; b1++ )
-      {
-        for( int j = 0; j < numCoeff; j++ )
-        {
-          for( int i = 0; i < numCoeff; i++ )
-          {
-            E[b0][b1][j][i] = lhs.E[b0][b1][j][i] + rhs.E[b0][b1][j][i];
-          }
-        }
-      }
-    }
-    for( int b = 0; b < numBins; b++ )
-    {
-      for( int j = 0; j < numCoeff; j++ )
-      {
-        y[b][j] = lhs.y[b][j] + rhs.y[b][j];
-      }
+      data[i] = lhs.data[i] + rhs.data[i];
     }
     pixAcc = lhs.pixAcc + rhs.pixAcc;
   }
 
   const AlfCovariance& operator+= ( const AlfCovariance& src )
   {
-    for( int b0 = 0; b0 < numBins; b0++ )
+    CHECK(src.numCoeff != numCoeff, "AlfCovariance size mismatch");
+    // There may be a case where we accumulate only bin #0
+    CHECK(src.numBins != numBins && numBins != 1, "AlfCovariance size mismatch");
+
+    for (ptrdiff_t i = 0; i < sizeY(); i++)
     {
-      for( int b1 = 0; b1 < numBins; b1++ )
+      data[i] += src.data[i];
+    }
+
+    if (src.numBins != numBins)
+    {
+      // numBins == 1 (see CHECK above)
+      for (ptrdiff_t i = 0; i < numCoeff; i++)
       {
-        for( int j = 0; j < numCoeff; j++ )
+        for (ptrdiff_t j = 0; j <= i; j++)
         {
-          for( int i = 0; i < numCoeff; i++ )
-          {
-            E[b0][b1][j][i] += src.E[b0][b1][j][i];
-          }
+          data[getOffsetEfast(0, 0, i, j)] += src.data[src.getOffsetEfast(0, 0, i, j)];
         }
       }
     }
-    for( int b = 0; b < numBins; b++ )
+    else
     {
-      for( int j = 0; j < numCoeff; j++ )
+      for (ptrdiff_t i = 0; i < sizeE(); i++)
       {
-        y[b][j] += src.y[b][j];
+        data[offsetE + i] += src.data[src.offsetE + i];
       }
     }
+
     pixAcc += src.pixAcc;
 
     return *this;
@@ -225,26 +190,33 @@ struct AlfCovariance
 
   const AlfCovariance& operator-= ( const AlfCovariance& src )
   {
-    for( int b0 = 0; b0 < numBins; b0++ )
+    CHECK(src.numCoeff != numCoeff, "AlfCovariance size mismatch");
+    // There may be a case where we accumulate only bin #0
+    CHECK(src.numBins != numBins && numBins != 1, "AlfCovariance size mismatch");
+
+    for (ptrdiff_t i = 0; i < sizeY(); i++)
     {
-      for( int b1 = 0; b1 < numBins; b1++ )
+      data[i] -= src.data[i];
+    }
+    if (src.numBins != numBins)
+    {
+      // numBins == 1 (see CHECK above)
+      for (ptrdiff_t i = 0; i < numCoeff; i++)
       {
-        for( int j = 0; j < numCoeff; j++ )
+        for (ptrdiff_t j = 0; j <= i; j++)
         {
-          for( int i = 0; i < numCoeff; i++ )
-          {
-            E[b0][b1][j][i] -= src.E[b0][b1][j][i];
-          }
+          data[getOffsetEfast(0, 0, i, j)] -= src.data[src.getOffsetEfast(0, 0, i, j)];
         }
       }
     }
-    for( int b = 0; b < numBins; b++ )
+    else
     {
-      for( int j = 0; j < numCoeff; j++ )
+      for (ptrdiff_t i = 0; i < sizeE(); i++)
       {
-        y[b][j] -= src.y[b][j];
+        data[offsetE + i] -= src.data[src.offsetE + i];
       }
     }
+
     pixAcc -= src.pixAcc;
 
     return *this;
@@ -252,12 +224,14 @@ struct AlfCovariance
 
   void setEyFromClip(const int* clip, TE _E, Ty _y, int size) const
   {
-    for (int k=0; k<size; k++)
+    CHECK(size != numCoeff, "AlfCovariance size mismatch");
+
+    for (ptrdiff_t k = 0; k < size; k++)
     {
-      _y[k] = y[clip[k]][k];
-      for (int l=0; l<size; l++)
+      _y[k] = y(clip[k], k);
+      for (ptrdiff_t l = 0; l < size; l++)
       {
-        _E[k][l] = E[clip[k]][clip[l]][k][l];
+        _E[k][l] = E(clip[k], clip[l], k, l);
       }
     }
   }
@@ -327,8 +301,8 @@ private:
   uint8_t*               m_ctuEnableFlagTmp[MAX_NUM_COMPONENT];
   uint8_t*               m_ctuEnableFlagTmp2[MAX_NUM_COMPONENT];
   uint8_t*               m_ctuAlternativeTmp[MAX_NUM_COMPONENT];
-  AlfCovariance**        m_alfCovarianceCcAlf;           // [shapeIdx][ctbAddr]
-  AlfCovariance*         m_alfCovarianceFrameCcAlf;      // [shapeIdx]
+  AlfCovariance**        m_alfCovarianceCcAlf;           // [shapeIdx][filterIdx][ctbAddr]
+  AlfCovariance*         m_alfCovarianceFrameCcAlf;      // [shapeIdx][filterIdx]
 
 #if ALF_IMPROVEMENT
   bool classChanged[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES];
@@ -522,7 +496,7 @@ private:
 #endif
 #endif
   template<bool alfWSSD>
-   void   deriveStatsForCcAlfFiltering( const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const int compIdx, CodingStructure &cs );
+  void   deriveStatsForCcAlfFiltering(const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const int compIdx, CodingStructure &cs);
   template<bool m_alfWSSD>
   void   getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape, const PelUnitBuf &orgYuv,
                           const PelUnitBuf &recYuv, const UnitArea &areaDst, const UnitArea &area,
@@ -633,7 +607,7 @@ private:
   void countLumaSwingGreaterThanThreshold(const Pel* luma, int lumaStride, int height, int width, int log2BlockWidth, int log2BlockHeight, uint64_t* lumaSwingGreaterThanThresholdCount, int lumaCountStride);
   void countChromaSampleValueNearMidPoint(const Pel* chroma, int chromaStride, int height, int width, int log2BlockWidth, int log2BlockHeight, uint64_t* chromaSampleCountNearMidPoint, int chromaSampleCountNearMidPointStride);
   void getFrameStatsCcalf(ComponentID compIdx, int filterIdc);
-  void initDistortionCcalf( int comp );
+  void initDistortionCcalf(int comp);
 };
 
 #endif
