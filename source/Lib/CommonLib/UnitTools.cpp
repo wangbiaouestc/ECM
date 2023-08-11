@@ -114,6 +114,7 @@ void CS::saveTemporalCcpModel(CodingStructure &cs)
     CCPModelIdxBuf ccpIdxBuf = cs.getCcpmIdxBuf(cs.area.Cb());
     ccpIdxBuf.fill(0);
   }
+  cs.m_ccpModelLUT.resize(0);
 
   int idx = 0;
   for (CodingUnit *cu : cs.cus)
