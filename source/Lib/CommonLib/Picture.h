@@ -341,13 +341,15 @@ public:
   void            copySAO(const Picture& src, int dstid)    { std::copy(src.m_sao[0].begin(), src.m_sao[0].end(), m_sao[dstid].begin()); }
 
 #if JVET_V0094_BILATERAL_FILTER
-  BifParams&       getBifParam( const ComponentID compID ) { return m_bifParams[compID]; }
+  BifParams&       getBifParam( const ComponentID compID )  { return m_bifParams[compID]; }
   void resizeBIF( const ComponentID compID, unsigned numEntries )
   {
     m_bifParams[compID].numBlocks = numEntries;
     m_bifParams[compID].ctuOn.resize(numEntries);
     std::fill(m_bifParams[compID].ctuOn.begin(), m_bifParams[compID].ctuOn.end(), 0);
   };
+
+  void              copyBIF( const Picture& src )            { m_bifParams[COMPONENT_Y] = src.m_bifParams[COMPONENT_Y]; m_bifParams[COMPONENT_Cb] = src.m_bifParams[COMPONENT_Cb]; m_bifParams[COMPONENT_Cr] = src.m_bifParams[COMPONENT_Cr]; }
 #endif
 #if ENABLE_QPA
   std::vector<double>     m_uEnerHpCtu;                         ///< CTU-wise L2 or squared L1 norm of high-passed luma input

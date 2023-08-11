@@ -209,6 +209,10 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
 #endif
                 {
                   pcEncPic->copySAO( *pic, 0 );
+
+#if JVET_V0094_BILATERAL_FILTER
+                  pcEncPic->copyBIF( *pic );
+#endif
                 }
 
 #if JVET_W0066_CCSAO
