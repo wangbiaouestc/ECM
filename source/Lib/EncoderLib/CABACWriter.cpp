@@ -178,18 +178,18 @@ void CABACWriter::bif( const ComponentID compID, const Slice& slice, const BifPa
   }
 #endif
 
-  if (ctuRsAddr == 0)
+  if( ctuRsAddr == 0 )
   {
-    m_BinEncoder.encodeBinEP(bifParams.allCtuOn);
-    if (bifParams.allCtuOn == 0)
+    m_BinEncoder.encodeBinEP( bifParams.allCtuOn );
+    if( bifParams.allCtuOn == 0 )
     {
-      m_BinEncoder.encodeBinEP(bifParams.frmOn);
+      m_BinEncoder.encodeBinEP( bifParams.frmOn );
     }
   }
-  if(bifParams.allCtuOn == 0 && bifParams.frmOn )
+
+  if( bifParams.allCtuOn == 0 && bifParams.frmOn )
   {
-    int i = ctuRsAddr;
-    m_BinEncoder.encodeBin( bifParams.ctuOn[i], Ctx::BifCtrlFlags[compID]() );
+    m_BinEncoder.encodeBin( bifParams.ctuOn[ctuRsAddr], Ctx::BifCtrlFlags[compID]() );
   }
 }
 #endif

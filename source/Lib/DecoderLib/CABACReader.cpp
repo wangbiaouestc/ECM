@@ -584,9 +584,11 @@ void CABACReader::bif( const ComponentID compID, CodingStructure& cs, unsigned c
   }
 #endif
 
+  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET2( STATS__CABAC_BITS__BIF, compID );
+
   BifParams& bifParams = cs.picture->getBifParam( compID );
 
-  if (ctuRsAddr == 0)
+  if( ctuRsAddr == 0 )
   {
     int width = cs.picture->lwidth();
     int height = cs.picture->lheight();
@@ -598,30 +600,32 @@ void CABACReader::bif( const ComponentID compID, CodingStructure& cs, unsigned c
     bifParams.numBlocks = widthInBlocks * heightInBlocks;
     bifParams.ctuOn.resize( bifParams.numBlocks );
     std::fill(bifParams.ctuOn.begin(), bifParams.ctuOn.end(), 0);
-  }
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET2(STATS__CABAC_BITS__BIF, compID);
-  if (ctuRsAddr == 0)
-  {
+
     bifParams.allCtuOn = m_BinDecoder.decodeBinEP();
+
     if( bifParams.allCtuOn == 0 )
     {
       bifParams.frmOn = m_BinDecoder.decodeBinEP();
     }
+    else
+    {
+      bifParams.frmOn = 0;
+    }
   }
-  int i = ctuRsAddr;
-  if (bifParams.allCtuOn)
+
+  if( bifParams.allCtuOn )
   {
-    bifParams.ctuOn[i] = 1;
+    bifParams.ctuOn[ctuRsAddr] = 1;
   }
   else
   {
-    if (bifParams.frmOn )
+    if( bifParams.frmOn )
     {
-      bifParams.ctuOn[i] = m_BinDecoder.decodeBin(Ctx::BifCtrlFlags[compID]());
+      bifParams.ctuOn[ctuRsAddr] = m_BinDecoder.decodeBin( Ctx::BifCtrlFlags[compID]() );
     }
     else
     {
-      bifParams.ctuOn[i] = 0;
+      bifParams.ctuOn[ctuRsAddr] = 0;
     }
   }
 }
