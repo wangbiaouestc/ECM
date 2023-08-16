@@ -240,6 +240,23 @@ void addAvgCore( const T* src1, int src1Stride, const T* src2, int src2Stride, T
 #undef ADD_AVG_CORE_INC
 }
 
+#if JVET_AE0169_BIPREDICTIVE_IBC
+template< typename T >
+void avgCore( const T* src1, int src1Stride, const T* src2, int src2Stride, T* dest, int dstStride, int width, int height )
+{
+#define ADD_AVG_CORE_OP( ADDR ) dest[ADDR] = ( ( src1[ADDR] + src2[ADDR] + 1 ) >> 1 )
+#define ADD_AVG_CORE_INC    \
+  src1 += src1Stride;       \
+  src2 += src2Stride;       \
+  dest +=  dstStride;       \
+
+  SIZE_AWARE_PER_EL_OP( ADD_AVG_CORE_OP, ADD_AVG_CORE_INC );
+
+#undef ADD_AVG_CORE_OP
+#undef ADD_AVG_CORE_INC
+}
+#endif
+
 #if JVET_AD0213_LIC_IMP
 template< typename T >
 void toLastCore(T* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng)
@@ -1058,6 +1075,9 @@ PelBufferOps::PelBufferOps()
 #endif
   addAvg4 = addAvgCore<Pel>;
   addAvg8 = addAvgCore<Pel>;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  avg = avgCore<Pel>;
+#endif
 #if JVET_AD0213_LIC_IMP
   toLast2 = toLastCore<Pel>;
   toLast4 = toLastCore<Pel>;
