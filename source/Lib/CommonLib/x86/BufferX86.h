@@ -538,16 +538,16 @@ template< X86_VEXT vext >
 void avg_SSE( const int16_t* src1, int src1Stride, const int16_t* src2, int src2Stride, int16_t *dst, int dstStride, int width, int height)
 {
 #ifdef USE_AVX2
-  if (width >= 16)
+  if( !( width % 16 ) )
   {
-    for (int y = 0; y < height; y++)
+    for( int y = 0; y < height; y++ )
     {
-      for (int x = 0; x < width; x += 16)
+      for( int x = 0; x < width; x += 16 )
       {
-        __m256i mmSrc1 = _mm256_loadu_si256((const __m256i*)(src1 + x));
-        __m256i mmSrc2 = _mm256_loadu_si256((const __m256i*)(src2 + x));
-        __m256i mmDst = _mm256_avg_epu16(mmSrc1, mmSrc2);
-        _mm256_storeu_si256((__m256i *) (dst + x), mmDst);
+        __m256i mmSrc1 = _mm256_loadu_si256( ( const __m256i* )( src1 + x ) );
+        __m256i mmSrc2 = _mm256_loadu_si256( ( const __m256i* )( src2 + x ) );
+        __m256i mmDst = _mm256_avg_epu16( mmSrc1, mmSrc2 );
+        _mm256_storeu_si256( ( __m256i * ) ( dst + x ), mmDst );
       }
       src1 += src1Stride;
       src2 += src2Stride;
@@ -556,30 +556,51 @@ void avg_SSE( const int16_t* src1, int src1Stride, const int16_t* src2, int src2
   }
   else
 #endif
-  if (width >= 8)
   {
-    for (int y = 0; y < height; y++)
+    if( !( width % 8 ) )
     {
-      __m128i mmSrc1 = _mm_loadu_si128((const __m128i*)(src1));
-      __m128i mmSrc2 = _mm_loadu_si128((const __m128i*)(src2));
-      __m128i mmDst = _mm_avg_epu16(mmSrc1, mmSrc2);
-      _mm_storeu_si128((__m128i *)dst, mmDst);
-      src1 += src1Stride;
-      src2 += src2Stride;
-      dst += dstStride;
+      for( int y = 0; y < height; y++ )
+      {
+        for( int x = 0; x < width; x += 8 )
+        {
+          __m128i mmSrc1 = _mm_loadu_si128( ( const __m128i* )( src1 + x ) );
+          __m128i mmSrc2 = _mm_loadu_si128( ( const __m128i* )( src2 + x ) );
+          __m128i mmDst = _mm_avg_epu16( mmSrc1, mmSrc2 );
+          _mm_storeu_si128( ( __m128i * )( dst + x ), mmDst );
+        }
+        src1 += src1Stride;
+        src2 += src2Stride;
+        dst += dstStride;
+      }
     }
-  }
-  else // width >= 4
-  {
-    for (int y = 0; y < height; y++)
+    else if( !( width % 4 ) )
     {
-      __m128i mmSrc1 = _mm_loadl_epi64((const __m128i*)(src1));
-      __m128i mmSrc2 = _mm_loadl_epi64((const __m128i*)(src2));
-      __m128i mmDst = _mm_avg_epu16(mmSrc1, mmSrc2);
-      _mm_storel_epi64((__m128i *)dst, mmDst);
-      src1 += src1Stride;
-      src2 += src2Stride;
-      dst += dstStride;
+      for( int y = 0; y < height; y++ )
+      {
+        for( int x = 0; x < width; x += 4 )
+        {
+          __m128i mmSrc1 = _mm_loadl_epi64( ( const __m128i* )( src1 + x ) );
+          __m128i mmSrc2 = _mm_loadl_epi64( ( const __m128i* )( src2 + x ) );
+          __m128i mmDst = _mm_avg_epu16( mmSrc1, mmSrc2 );
+          _mm_storel_epi64( ( __m128i * )( dst + x ), mmDst );
+        }
+        src1 += src1Stride;
+        src2 += src2Stride;
+        dst += dstStride;
+      }
+    }
+    else
+    {
+      for( int y = 0; y < height; y++ )
+      {
+        for( int x = 0; x < width; x++ )
+        {
+          dst[x] = ( src1[x] + src2[x] + 1 ) >> 1;
+        }
+        src1 += src1Stride;
+        src2 += src2Stride;
+        dst += dstStride;
+      }
     }
   }
 }
