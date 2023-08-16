@@ -1598,16 +1598,6 @@ void EncApp::createLib( const int layerIdx )
   m_orgPic->create( unitArea );
   m_trueOrgPic->create( unitArea );
 
-#if JVET_Y0240_BIM
-  if ( m_gopBasedTemporalFilterEnabled || m_bimEnabled )
-#else
-  if ( m_gopBasedTemporalFilterEnabled )
-#endif
-  {
-    m_filteredOrgPic = new PelStorage;
-    m_filteredOrgPic->create( unitArea );
-  }
-
   if( !m_bitstream.is_open() )
   {
     m_bitstream.open( m_bitstreamFileName.c_str(), fstream::binary | fstream::out );
@@ -1636,7 +1626,7 @@ void EncApp::createLib( const int layerIdx )
 #endif
   {
 #if JVET_AA0146_WRAP_AROUND_FIX
-    m_temporalFilter.init( m_FrameSkip, m_inputBitDepth, m_MSBExtendedBitDepth, m_internalBitDepth, m_sourceWidth,
+    m_cEncLib.getTemporalFilter().init(m_FrameSkip, m_inputBitDepth, m_MSBExtendedBitDepth, m_internalBitDepth, m_sourceWidth,
                            sourceHeight, m_sourcePadding, m_bClipInputVideoToRec709Range, m_inputFileName,
                            m_chromaFormatIDC, m_inputColourSpaceConvert, m_iQP, m_gopBasedTemporalFilterStrengths,
                            m_gopBasedTemporalFilterPastRefs, m_gopBasedTemporalFilterFutureRefs, m_firstValidFrame,
@@ -1646,7 +1636,7 @@ void EncApp::createLib( const int layerIdx )
 #endif
                            );
 #else
-    m_temporalFilter.init( m_FrameSkip, m_inputBitDepth, m_MSBExtendedBitDepth, m_internalBitDepth, m_iSourceWidth,
+    m_cEncLib.getTemporalFilter().init(m_FrameSkip, m_inputBitDepth, m_MSBExtendedBitDepth, m_internalBitDepth, m_iSourceWidth,
                            sourceHeight, m_aiPad, m_bClipInputVideoToRec709Range, m_inputFileName,
                            m_chromaFormatIDC, m_inputColourSpaceConvert, m_iQP, m_gopBasedTemporalFilterStrengths,
                            m_gopBasedTemporalFilterPastRefs, m_gopBasedTemporalFilterFutureRefs, m_firstValidFrame,
@@ -1686,15 +1676,6 @@ void EncApp::destroyLib()
   delete m_trueOrgPic;
   delete m_orgPic;
 
-#if JVET_Y0240_BIM
-  if ( m_gopBasedTemporalFilterEnabled || m_bimEnabled )
-#else
-  if ( m_gopBasedTemporalFilterEnabled )
-#endif
-  {
-    m_filteredOrgPic->destroy();
-    delete m_filteredOrgPic;
-  }
 #if JVET_Y0240_BIM
   if ( m_bimEnabled )
   {
@@ -1741,16 +1722,6 @@ bool EncApp::encodePrep( bool& eos )
 #endif
 #endif
 
-#if JVET_Y0240_BIM
-  if ( m_gopBasedTemporalFilterEnabled || m_bimEnabled )
-#else
-  if ( m_gopBasedTemporalFilterEnabled )
-#endif
-  {
-    m_temporalFilter.filter( m_orgPic, m_iFrameRcvd );
-    m_filteredOrgPic->copyFrom( *m_orgPic );
-  }
-
   // increase number of received frames
   m_iFrameRcvd++;
 
@@ -1770,11 +1741,11 @@ bool EncApp::encodePrep( bool& eos )
   // call encoding function for one frame
   if( m_isField )
   {
-    keepDoing = m_cEncLib.encodePrep( eos, m_flush ? 0 : m_orgPic, m_flush ? 0 : m_trueOrgPic, m_flush ? 0 : m_filteredOrgPic, snrCSC, m_recBufList, m_numEncoded, m_isTopFieldFirst );
+    keepDoing = m_cEncLib.encodePrep( eos, m_flush ? 0 : m_orgPic, snrCSC, m_recBufList, m_numEncoded, m_isTopFieldFirst );
   }
   else
   {
-    keepDoing = m_cEncLib.encodePrep( eos, m_flush ? 0 : m_orgPic, m_flush ? 0 : m_trueOrgPic, m_flush ? 0 : m_filteredOrgPic, snrCSC, m_recBufList, m_numEncoded );
+    keepDoing = m_cEncLib.encodePrep( eos, m_flush ? 0 : m_orgPic, snrCSC, m_recBufList, m_numEncoded );
   }
 
   return keepDoing;

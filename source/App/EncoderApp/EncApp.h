@@ -48,7 +48,6 @@
 #if EXTENSION_360_VIDEO
 #include "AppEncHelper360/TExt360AppEncTop.h"
 #endif
-#include "EncoderLib/EncTemporalFilter.h"
 
 #if JVET_O0756_CALCULATE_HDRMETRICS
 #include <chrono>
@@ -97,11 +96,9 @@ private:
   int                    m_numEncoded;
   PelStorage*            m_trueOrgPic;
   PelStorage*            m_orgPic;
-  PelStorage*            m_filteredOrgPic;
 #if EXTENSION_360_VIDEO
   TExt360AppEncTop*      m_ext360;
 #endif
-  EncTemporalFilter      m_temporalFilter;
   bool m_flush;
 
 public:

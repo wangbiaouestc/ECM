@@ -36,6 +36,7 @@
 */
 
 #include "EncTemporalFilter.h"
+#include "Utilities/VideoIOYuv.h"
 #include <math.h>
 
 
@@ -142,12 +143,12 @@ void EncTemporalFilter::init( const int frameSkip, const int inputBitDepth[MAX_N
 // Public member functions
 // ====================================================================================================================
 
-bool EncTemporalFilter::filter(PelStorage *orgPic, int receivedPoc)
+bool EncTemporalFilter::filter(PelStorage &orgPic, int receivedPoc)
 {
   bool isFilterThisFrame = false;
   if (m_QP >= 17)  // disable filter for QP < 17
   {
-    for (map<int, double>::iterator it = m_temporalFilterStrengths.begin(); it != m_temporalFilterStrengths.end(); ++it)
+    for (std::map<int, double>::iterator it = m_temporalFilterStrengths.begin(); it != m_temporalFilterStrengths.end(); ++it)
     {
       int filteredFrame = it->first;
       if (receivedPoc % filteredFrame == 0)
@@ -173,7 +174,7 @@ bool EncTemporalFilter::filter(PelStorage *orgPic, int receivedPoc)
     PelStorage origPadded;
 
     origPadded.create(m_chromaFormatIDC, m_area, 0, m_padding);
-    origPadded.copyFrom(*orgPic);
+    origPadded.copyFrom(orgPic);
     origPadded.extendBorderPel(m_padding, m_padding);
 
     PelStorage origSubsampled2;
@@ -212,6 +213,13 @@ bool EncTemporalFilter::filter(PelStorage *orgPic, int receivedPoc)
       srcPic.origOffset = poc - currentFilePoc;
     }
 
+    const int numRefs = int(srcFrameInfo.size());
+    if (numRefs == 0)
+    {
+      yuvFrames.close();
+      return false;
+    }
+
     // filter
     PelStorage newOrgPic;
     newOrgPic.create(m_chromaFormatIDC, m_area, 0, m_padding);
@@ -226,8 +234,7 @@ bool EncTemporalFilter::filter(PelStorage *orgPic, int receivedPoc)
       }
     }
 #if JVET_Y0240_BIM
-    const int numRefs = int(srcFrameInfo.size());
-    if ( m_bimEnabled && ( numRefs > 0 ) )
+    if ( m_bimEnabled )
     {
       const int bimFirstFrame = std::max(currentFilePoc - 2, firstFrame);
       const int bimLastFrame  = std::min(currentFilePoc + 2, lastFrame);
@@ -296,13 +303,13 @@ bool EncTemporalFilter::filter(PelStorage *orgPic, int receivedPoc)
 #endif
 
 #if JVET_Y0240_BIM
-    if ( m_mctfEnabled && ( numRefs > 0 ) )
+    if ( m_mctfEnabled )
 #endif
     {
       bilateralFilter(origPadded, srcFrameInfo, newOrgPic, overallStrength);
 
       // move filtered to orgPic
-      orgPic->copyFrom(newOrgPic);
+      orgPic.copyFrom(newOrgPic);
     }
 
     yuvFrames.close();

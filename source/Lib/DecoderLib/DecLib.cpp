@@ -1816,7 +1816,7 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
     m_apcSlicePilot->setPicHeader(m_pcPic->cs->picHeader);
 #endif
 
-    m_pcPic->createTempBuffers( m_pcPic->cs->pps->pcv->maxCUWidth );
+    m_pcPic->createTempBuffers( m_pcPic->cs->pps->pcv->maxCUWidth, false, false, true);
     m_pcPic->cs->createCoeffs((bool)m_pcPic->cs->sps->getPLTMode());
 
     m_pcPic->allocateNewSlice();

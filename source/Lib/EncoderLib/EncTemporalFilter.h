@@ -37,7 +37,7 @@
 
 #ifndef __TEMPORAL_FILTER__
 #define __TEMPORAL_FILTER__
-#include "EncLib.h"
+#include "CommonLib/Unit.h"
 #include "CommonLib/Buffer.h"
 #include <sstream>
 #include <map>
@@ -124,7 +124,7 @@ public:
 #endif
              );
 
-  bool filter(PelStorage *orgPic, int frame);
+  bool filter(PelStorage &orgPic, int frame);
 
 private:
   // Private static member variables

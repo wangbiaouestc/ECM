@@ -238,13 +238,6 @@ void Picture::create(
   if( !_decoder )
   {
     M_BUFS( 0, PIC_ORIGINAL ).    create( _chromaFormat, a );
-    M_BUFS( 0, PIC_TRUE_ORIGINAL ). create( _chromaFormat, a );
-
-    if( gopBasedTemporalFilterEnabled )
-    {
-      M_BUFS( 0, PIC_FILTERED_ORIGINAL ).create( _chromaFormat, a );
-    }
-
   }
 #if !KEEP_PRED_AND_RESI_SIGNALS
   m_ctuArea = UnitArea( _chromaFormat, Area( Position{ 0, 0 }, Size( _maxCUSize, _maxCUSize ) ) );
@@ -290,7 +283,7 @@ void Picture::destroy()
   }
 }
 
-void Picture::createTempBuffers( const unsigned _maxCUSize )
+void Picture::createTempBuffers( const unsigned _maxCUSize, bool useFilterFrame, bool resChange, bool decoder)
 {
 #if KEEP_PRED_AND_RESI_SIGNALS
   const Area a( Position{ 0, 0 }, lumaSize() );
@@ -313,6 +306,23 @@ void Picture::createTempBuffers( const unsigned _maxCUSize )
 #else
     M_BUFS( jId, PIC_RESIDUAL                     ).create( chromaFormat, a,   _maxCUSize );
 #endif
+    if (!decoder)
+    {
+      M_BUFS(jId, PIC_TRUE_ORIGINAL).create(chromaFormat, aOld, _maxCUSize);
+      if (useFilterFrame)
+      {
+        M_BUFS(jId, PIC_FILTERED_ORIGINAL).create(chromaFormat, aOld, _maxCUSize);
+      }
+      if (resChange)
+      {
+        const Area aInput(Position{ 0, 0 }, Size(M_BUFS(jId, PIC_ORIGINAL_INPUT).Y().width, M_BUFS(jId, PIC_ORIGINAL_INPUT).Y().height));
+        M_BUFS(jId, PIC_TRUE_ORIGINAL_INPUT).create(chromaFormat, aInput, _maxCUSize);
+        if (useFilterFrame)
+        {
+          M_BUFS(jId, PIC_FILTERED_ORIGINAL_INPUT).create(chromaFormat, aInput, _maxCUSize);
+        }
+      }
+    }
 #if ENABLE_SPLIT_PARALLELISM
     if (jId > 0)
     {
@@ -337,7 +347,7 @@ void Picture::destroyTempBuffers()
   {
     for (uint32_t t = 0; t < NUM_PIC_TYPES; t++)
     {
-      if (t == PIC_RESIDUAL || t == PIC_PREDICTION)
+      if (t == PIC_RESIDUAL || t == PIC_PREDICTION || t == PIC_FILTERED_ORIGINAL || t == PIC_TRUE_ORIGINAL)
       {
         M_BUFS(jId, t).destroy();
       }
