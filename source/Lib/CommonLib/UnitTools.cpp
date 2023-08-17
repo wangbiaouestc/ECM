@@ -12569,6 +12569,14 @@ bool PU::checkRprRefExistingInGpm(const PredictionUnit& pu, const MergeCtx& geoM
         return false;
       }
 #endif
+#if JVET_AE0046_BI_GPM
+      if (mrgCtx.interDirNeighbours[candIdx] == 3)
+      {
+        int refIdxL0 = mrgCtx.mvFieldNeighbours[(candIdx << 1)].refIdx;
+        int refIdxL1 = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].refIdx;
+        return pu.cu->slice->getRefPic(REF_PIC_LIST_0, refIdxL0)->isRefScaled(pu.cs->pps) || pu.cu->slice->getRefPic(REF_PIC_LIST_1, refIdxL1)->isRefScaled(pu.cs->pps);
+      }
+#endif
       int refList = mrgCtx.interDirNeighbours[candIdx] - 1;
       int refIdx  = mrgCtx.mvFieldNeighbours[(candIdx << 1) + refList].refIdx;
       return pu.cu->slice->getRefPic((RefPicList)refList, refIdx)->isRefScaled(pu.cs->pps);
