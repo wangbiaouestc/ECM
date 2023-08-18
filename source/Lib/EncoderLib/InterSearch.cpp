@@ -4385,6 +4385,25 @@ Distortion InterSearch::xPredIBCFracPelSearch(PredictionUnit&              pu
         }
       }
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+      if (pu.cu->ibcLicFlag)
+      {
+        uint8_t bestIdx = tempBvCost[1] < tempBvCost[0] ? 1 : 0;
+        m_bestSrchCostIbcFilter.imvList[licIdc] = ImvMode(bestIdx);
+        m_bestSrchCostIbcFilter.mvpIdxList[licIdc] = tempMvpIdx[bestIdx];
+        m_bestSrchCostIbcFilter.costList[licIdc] = tempBvCost[bestIdx] + distParam.distFunc(distParam);
+        m_bestSrchCostIbcFilter.mvList[licIdc] = pu.mv[0];
+        Distortion currCost = licIdc == 0 ? Distortion(m_bestSrchCostIbcFilter.costList[licIdc] * 0.95)
+                                          : m_bestSrchCostIbcFilter.costList[licIdc];
+        if (currCost < bestLicCost)
+        {
+          bestLicIdc = licIdc;
+          bestLicCost = currCost;
+        }
+      }
+      else
+      {
+#endif
       uint8_t bestIdx = tempBvCost[1] < tempBvCost[0] ? 1 : 0;
       intBvList.imvList[i] = bestIdx == 0 ? IMV_FPEL : IMV_4PEL;
 #endif
@@ -4540,7 +4559,25 @@ Distortion InterSearch::xPredIBCFracPelSearch(PredictionUnit&              pu
         }
       }
 #endif
-
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION
+      if (pu.cu->ibcLicFlag)
+      {
+        uint8_t bestIdx = tempBvCost[1] < tempBvCost[0] ? 1 : 0;
+        m_bestSrchCostIbcFilter.imvList[licIdc] = ImvMode(bestIdx);
+        m_bestSrchCostIbcFilter.mvpIdxList[licIdc] = tempMvpIdx[bestIdx];
+        m_bestSrchCostIbcFilter.costList[licIdc] = tempBvCost[bestIdx] + distParam.distFunc(distParam);
+        m_bestSrchCostIbcFilter.mvList[licIdc] = pu.mv[0];
+        Distortion currCost = licIdc == 0 ? Distortion(m_bestSrchCostIbcFilter.costList[licIdc] * 0.95)
+                                          : m_bestSrchCostIbcFilter.costList[licIdc];
+        if (currCost < bestLicCost)
+        {
+          bestLicIdc = licIdc;
+          bestLicCost = currCost;
+        }
+      }
+      else
+      {
+#endif
       uint8_t bestIdx = tempBvCost[1] < tempBvCost[0] ? 1 : 0;
       intBvList.imvList   [i] = bestIdx == 0 ? IMV_FPEL : IMV_4PEL;
 #endif
