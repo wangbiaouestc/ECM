@@ -3626,7 +3626,7 @@ public:
   int                         getNumRefIdx( RefPicList e ) const                     { return m_aiNumRefIdx[e];                                      }
   Picture*                    getPic()                                               { return m_pcPic;                                               }
   const Picture*              getPic() const                                         { return m_pcPic;                                               }
-        Picture*              getRefPic( RefPicList e, int iRefIdx) const            { return m_apcRefPicList[e][iRefIdx];                           }
+        Picture*              getRefPic( RefPicList e, int iRefIdx) const            { CHECK( iRefIdx < 0 || iRefIdx >= MAX_NUM_REF, "refIdx is out of range" ); return m_apcRefPicList[e][iRefIdx]; }
 #if JVET_Z0118_GDR
         Picture*              getReferencePicture(RefPicList e, int iRefIdx)         { return m_apcRefPicList[e][iRefIdx];                           }
 #endif

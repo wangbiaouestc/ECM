@@ -2950,7 +2950,8 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
   };
 #endif
 
-  const Position posCand[5] = {
+  const Position posCand[5] =
+  {
     pu.chromaPos().offset(-1, iH - 1),
     pu.chromaPos().offset(iW - 1, -1),
     pu.chromaPos().offset(-1, iH),
@@ -2991,7 +2992,7 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
   {
     const Picture* const pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx()); 
 
-    if(pColPic)
+    if( pColPic && !pColPic->isRefScaled( slice.getPPS() ) )
     {
       const PreCalcValues& pcv = *cs.pcv;
       bool c0Avail;
@@ -3078,8 +3079,7 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
 
           if (c0Avail || c1Avail)
           {
-            int modelIdx = c0Avail? pColPic->cs->getCcpmIdxInfo(posC0) 
-                            : pColPic->cs->getCcpmIdxInfo(posC1);
+            int modelIdx = c0Avail? pColPic->cs->getCcpmIdxInfo(posC0) : pColPic->cs->getCcpmIdxInfo(posC1);
             if (modelIdx > 0)
             {
               const CCPModelCandidate currCCPModel = pColPic->cs->m_ccpModelLUT[modelIdx-1];
@@ -3116,7 +3116,8 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
   const int horNAInterval = std::max((int)(pu.chType == CHANNEL_TYPE_LUMA ? pu.Y().width * 2 : pu.Cb().width * 2) >> 1, 4);
   const int verNAInterval = std::max((int)(pu.chType == CHANNEL_TYPE_LUMA ? pu.Y().height * 2 : pu.Cb().height * 2) >> 1, 4);
   const int numNACandidate[7] = { 5, 9, 9, 9, 9, 9, 9 };
-  const int idxMap[7][9] = {
+  const int idxMap[7][9] =
+  {
     { 0, 1, 2, 3, 4 },
     { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
     { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
@@ -3297,7 +3298,7 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
   {
     const Picture* const pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx()); 
 
-    if(pColPic)
+    if( pColPic && !pColPic->isRefScaled( slice.getPPS() ) )
     {
       const PreCalcValues& pcv = *cs.pcv;
 
@@ -3331,8 +3332,10 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
         const PredictionUnit *puRef = cs.getPURestricted(posCand[posIdx], pu, pu.chType);
         bool isAvailableNeigh = puRef && 
                                 isDiffMER(pu.lumaPos(), posCand[posIdx], plevel) && 
-                                pu.cu != puRef->cu && 
-                                CU::isInter(*puRef->cu);
+#if JVET_Y0065_GPM_INTRA
+                                puRef->getMotionInfo( posCand[posIdx] ).isInter &&
+#endif
+                                pu.cu != puRef->cu && CU::isInter(*puRef->cu);
 
         if (isAvailableNeigh)
         {
@@ -5883,9 +5886,10 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
           exit(0);
           break;
         }
+
         const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
-        bool                  isAvailableNonAdjacent =
-          puNonAdjacent && pu.cu != puNonAdjacent->cu && (CU::isIBC(*puNonAdjacent->cu) || puNonAdjacent->cu->tmpFlag);
+        bool isAvailableNonAdjacent = puNonAdjacent && pu.cu != puNonAdjacent->cu && (CU::isIBC(*puNonAdjacent->cu) || puNonAdjacent->cu->tmpFlag);
+
         if (isGt4x4 && isAvailableNonAdjacent)
         {
           miNonAdjacent = puNonAdjacent->getMotionInfo(posLT.offset(offsetX, offsetY));
@@ -6092,9 +6096,10 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
           exit(0);
           break;
         }
+
         const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
-        bool                  isAvailableNonAdjacent =
-          puNonAdjacent && pu.cu != puNonAdjacent->cu && (CU::isIBC(*puNonAdjacent->cu) || puNonAdjacent->cu->tmpFlag);
+        bool isAvailableNonAdjacent = puNonAdjacent && pu.cu != puNonAdjacent->cu && (CU::isIBC(*puNonAdjacent->cu) || puNonAdjacent->cu->tmpFlag);
+
         if (isGt4x4 && isAvailableNonAdjacent)
         {
           miNonAdjacent = puNonAdjacent->getMotionInfo(posLT.offset(offsetX, offsetY));
@@ -10773,9 +10778,7 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
       {
         miNeighbor = puNonAdjacent->getMotionInfo(posLT.offset(offsetX, offsetY));
 
-
-        if (isBiPredFromDifferentDirEqDistPoc(pu, miNeighbor.refIdx[0], miNeighbor.refIdx[1])
-          )
+        if( isBiPredFromDifferentDirEqDistPoc(pu, miNeighbor.refIdx[0], miNeighbor.refIdx[1]) )
         {
           // get Inter Dir
           mrgCtx.interDirNeighbours[cnt] = miNeighbor.interDir;
@@ -11952,9 +11955,9 @@ void PU::getNonAdjacentMergeCandSubTMVP(const PredictionUnit &pu, MergeCtx& mrgC
     const int iNADistanceHor = pu.Y().width  * (iDistanceIndex + 1);
     const int iNADistanceVer = pu.Y().height * (iDistanceIndex + 1);
 
-    for (int NASPIdx = 0; NASPIdx < numNACandidate[iDistanceIndex] && cnt < maxNumMergeCand; NASPIdx++)
+    for (int naSpIdx = 0; naSpIdx < numNACandidate[iDistanceIndex] && cnt < maxNumMergeCand; naSpIdx++)
     {
-      switch (idxMap[iDistanceIndex][NASPIdx])
+      switch( idxMap[iDistanceIndex][naSpIdx] )
       {
       case 0:offsetX = offsetX0 = -iNADistanceHor - 1;               offsetY = offsetY0 = pu.Y().height + iNADistanceVer - 1; break;
       case 1:offsetX = offsetX1 = pu.Y().width + iNADistanceHor - 1; offsetY = offsetY1 = -iNADistanceVer - 1;                break;
@@ -11970,7 +11973,11 @@ void PU::getNonAdjacentMergeCandSubTMVP(const PredictionUnit &pu, MergeCtx& mrgC
 
       const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
 
-      bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu);
+#if JVET_Y0065_GPM_INTRA
+      bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER( pu.lumaPos(), posLT.offset( offsetX, offsetY ), plevel ) && CU::isInter( *puNonAdjacent->cu ) && puNonAdjacent->getMotionInfo( posLT.offset( offsetX, offsetY ) ).isInter;
+#else
+      bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER( pu.lumaPos(), posLT.offset( offsetX, offsetY ), plevel ) && CU::isInter( *puNonAdjacent->cu );
+#endif
 
       if (isAvailableNonAdjacent)
       {
@@ -12038,7 +12045,11 @@ void PU::getNonAdjacentMergeCandSubTMVP(const PredictionUnit &pu, MergeCtx& mrgC
 
       const PredictionUnit *puNonAdjacent = cs.getPURestricted(posLT.offset(offsetX, offsetY), pu, pu.chType);
 
+#if JVET_Y0065_GPM_INTRA
+      bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER( pu.lumaPos(), posLT.offset( offsetX, offsetY ), plevel ) && CU::isInter( *puNonAdjacent->cu ) && puNonAdjacent->getMotionInfo( posLT.offset( offsetX, offsetY ) ).isInter;
+#else
       bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), posLT.offset(offsetX, offsetY), plevel) && CU::isInter(*puNonAdjacent->cu);
+#endif
 
       if (isAvailableNonAdjacent)
       {
@@ -20052,7 +20063,7 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
 #endif
   }
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
-    spanSCCInfo(pu);
+  spanSCCInfo(pu);
 #endif
 }
 
