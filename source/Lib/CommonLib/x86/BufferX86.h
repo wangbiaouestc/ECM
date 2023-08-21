@@ -538,7 +538,7 @@ template< X86_VEXT vext >
 void avg_SSE( const int16_t* src1, int src1Stride, const int16_t* src2, int src2Stride, int16_t *dst, int dstStride, int width, int height)
 {
 #ifdef USE_AVX2
-  if( !( width % 16 ) )
+  if( !( width & 15 ) )
   {
     for( int y = 0; y < height; y++ )
     {
@@ -557,7 +557,7 @@ void avg_SSE( const int16_t* src1, int src1Stride, const int16_t* src2, int src2
   else
 #endif
   {
-    if( !( width % 8 ) )
+    if( !( width & 7 ) )
     {
       for( int y = 0; y < height; y++ )
       {
@@ -573,7 +573,7 @@ void avg_SSE( const int16_t* src1, int src1Stride, const int16_t* src2, int src2
         dst += dstStride;
       }
     }
-    else if( !( width % 4 ) )
+    else if( !( width & 3 ) )
     {
       for( int y = 0; y < height; y++ )
       {
@@ -628,8 +628,11 @@ void copyBufferSimd(Pel *src, int srcStride, Pel *dst, int dstStride, int width,
   {
     for (size_t x = 0; x < width; x += 8)
     {
-      if (x > width - 8)
+      if( x > width - 8 )
+      {
         x = width - 8;
+      }
+
       for (size_t y = 0; y < height; y++)
       {
         __m128i val = _mm_loadu_si128((const __m128i *) (src + y * srcStride + x));
@@ -2762,12 +2765,71 @@ int64_t getSumOfDifference_SSE(const Pel* src0, int src0Stride, const Pel* src1,
 
   // internal bit-depth must be 12-bit or lower
 
-  if (width & 7) // multiple of 4
+#ifdef USE_AVX2
+  if( vext >= AVX2 && !( width & 15 ) ) // multiple of 16
+  {
+    __m256i vzero = _mm256_setzero_si256();
+    __m256i vsum32 = vzero;
+
+    for( int m = 0; m < height; m += subStep )
+    {
+      __m256i vsum16 = vzero;
+
+      for( int n = 0; n < width; n += 16 )
+      {
+        __m256i org = _mm256_lddqu_si256( ( __m256i* )( pOrg + n ) );
+        __m256i cur = _mm256_lddqu_si256( ( __m256i* )( pCur + n ) );
+        vsum16 = _mm256_adds_epi16( vsum16, _mm256_sub_epi16( org, cur ) );
+      }
+
+      __m256i vsign = _mm256_cmpgt_epi16( vzero, vsum16 );
+      __m256i vsumtemp = _mm256_add_epi32( _mm256_unpacklo_epi16( vsum16, vsign ), _mm256_unpackhi_epi16( vsum16, vsign ) );
+      vsum32 = _mm256_add_epi32( vsum32, vsumtemp );
+
+      pOrg += strideOrg;
+      pCur += strideCur;
+    }
+
+    vsum32 = _mm256_hadd_epi32( vsum32, vzero );
+    vsum32 = _mm256_hadd_epi32( vsum32, vzero );
+    deltaAvg = _mm_cvtsi128_si32( _mm256_castsi256_si128( vsum32 ) ) + _mm_cvtsi128_si32( _mm256_castsi256_si128( _mm256_permute2x128_si256( vsum32, vsum32, 0x11 ) ) );
+  }
+  else
+#endif
+  if( !( width & 7 ) )// multiple of 8
   {
     __m128i vzero = _mm_setzero_si128();
     __m128i vsum32 = vzero;
 
-    for (; height != 0; height -= subStep)
+    for( int m = 0; m < height; m += subStep )
+    {
+      __m128i vsum16 = vzero;
+
+      for( int n = 0; n < width; n += 8 )
+      {
+        __m128i org = _mm_lddqu_si128( ( __m128i* )( pOrg + n ) );
+        __m128i cur = _mm_lddqu_si128( ( __m128i* )( pCur + n ) );
+        vsum16 = _mm_adds_epi16( vsum16, _mm_sub_epi16( org, cur ) );
+      }
+
+      __m128i vsign = _mm_cmpgt_epi16( vzero, vsum16 );
+      __m128i vsumtemp = _mm_add_epi32( _mm_unpacklo_epi16( vsum16, vsign ), _mm_unpackhi_epi16( vsum16, vsign ) );
+      vsum32 = _mm_add_epi32( vsum32, vsumtemp );
+
+      pOrg += strideOrg;
+      pCur += strideCur;
+    }
+
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
+    deltaAvg = _mm_cvtsi128_si32( vsum32 );
+  }
+  else if( !( width & 3 ) ) // multiple of 4
+  {
+    __m128i vzero = _mm_setzero_si128();
+    __m128i vsum32 = vzero;
+
+    for( int m = 0; m < height; m += subStep )
     {
       __m128i vsum16 = vzero;
 
@@ -2789,63 +2851,9 @@ int64_t getSumOfDifference_SSE(const Pel* src0, int src0Stride, const Pel* src1,
     vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
     deltaAvg = _mm_cvtsi128_si32(vsum32);
   }
-#ifdef USE_AVX2
-  else if (vext >= AVX2 && width >= 16) // multiple of 16
+  else
   {
-    __m256i vzero = _mm256_setzero_si256();
-    __m256i vsum32 = vzero;
-
-    for (; height != 0; height -= subStep)
-    {
-      __m256i vsum16 = vzero;
-
-      for (int n = 0; n < width; n += 16)
-      {
-        __m256i org = _mm256_lddqu_si256((__m256i*)(pOrg + n));
-        __m256i cur = _mm256_lddqu_si256((__m256i*)(pCur + n));
-        vsum16 = _mm256_adds_epi16(vsum16, _mm256_sub_epi16(org, cur));
-      }
-
-      __m256i vsign = _mm256_cmpgt_epi16(vzero, vsum16);
-      __m256i vsumtemp = _mm256_add_epi32(_mm256_unpacklo_epi16(vsum16, vsign), _mm256_unpackhi_epi16(vsum16, vsign));
-      vsum32 = _mm256_add_epi32(vsum32, vsumtemp);
-
-      pOrg += strideOrg;
-      pCur += strideCur;
-    }
-
-    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
-    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
-    deltaAvg = _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum32)) + _mm_cvtsi128_si32(_mm256_castsi256_si128(_mm256_permute2x128_si256(vsum32, vsum32, 0x11)));
-  }
-#endif
-  else // multiple of 8
-  {
-    __m128i vzero = _mm_setzero_si128();
-    __m128i vsum32 = vzero;
-
-    for (; height != 0; height -= subStep)
-    {
-      __m128i vsum16 = vzero;
-
-      for (int n = 0; n < width; n += 8)
-      {
-        __m128i org = _mm_lddqu_si128((__m128i*)(pOrg + n));
-        __m128i cur = _mm_lddqu_si128((__m128i*)(pCur + n));
-        vsum16 = _mm_adds_epi16(vsum16, _mm_sub_epi16(org, cur));
-      }
-
-      __m128i vsign = _mm_cmpgt_epi16(vzero, vsum16);
-      __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vsign), _mm_unpackhi_epi16(vsum16, vsign));
-      vsum32 = _mm_add_epi32(vsum32, vsumtemp);
-
-      pOrg += strideOrg;
-      pCur += strideCur;
-    }
-
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-    deltaAvg = _mm_cvtsi128_si32(vsum32);
+    return getSumOfDifferenceCore( src0, src0Stride, src1, src1Stride, width, height, rowSubShift, bitDepth );
   }
 
   deltaAvg <<= subShift;
