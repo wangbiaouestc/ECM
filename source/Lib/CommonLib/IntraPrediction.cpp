@@ -10584,12 +10584,11 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
 #endif
 
 #if JVET_V0130_INTRA_TMP
-void insertNode( int diff, int& iXOffset, int& iYOffset, int& pDiff, int& pX, int& pY, short& pId, unsigned int& setId )
+void insertNode( int diff, int& iXOffset, int& iYOffset, int& pDiff, int& pX, int& pY )
 {
   pDiff = diff;
   pX = iXOffset;
   pY = iYOffset;
-  pId = setId;
 }
 
 void clipMvIntraConstraint( CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX, RefTemplateType tempType )
@@ -10720,6 +10719,7 @@ TempLibFast::~TempLibFast()
 {
 }
 
+#if !JVET_AD0086_ENHANCED_INTRA_TMP
 void TempLibFast::initTemplateDiff( unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int bitDepth )
 {
   int maxValue = ((1 << bitDepth) >> (INIT_THRESHOULD_SHIFTBITS)) * (uiPatchHeight * uiPatchWidth - uiBlkHeight * uiBlkWidth);
@@ -10728,6 +10728,7 @@ void TempLibFast::initTemplateDiff( unsigned int uiPatchWidth, unsigned int uiPa
     m_pDiff = maxValue;
   }
 }
+#endif
 
 #if JVET_W0069_TMP_BOUNDARY
 void IntraPrediction::getTargetTemplate( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType )
@@ -10809,20 +10810,21 @@ void IntraPrediction::candidateSearchIntra( CodingUnit* pcCU, unsigned int uiBlk
 void IntraPrediction::candidateSearchIntra( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight )
 #endif
 {
-  const ComponentID compID = COMPONENT_Y;
-  const int channelBitDepth = pcCU->cs->sps->getBitDepth( toChannelType( compID ) );
   unsigned int uiPatchWidth = uiBlkWidth + TMP_TEMPLATE_SIZE;
   unsigned int uiPatchHeight = uiBlkHeight + TMP_TEMPLATE_SIZE;
   unsigned int uiTarDepth = floorLog2( std::max( uiBlkWidth, uiBlkHeight ) ) - 2;
 
   Pel** tarPatch = getTargetPatch( uiTarDepth );
   //Initialize the library for saving the best candidates
+#if !JVET_AD0086_ENHANCED_INTRA_TMP
+  const ComponentID compID = COMPONENT_Y;
+  const int channelBitDepth = pcCU->cs->sps->getBitDepth(toChannelType(compID));
   m_tempLibFast.initTemplateDiff( uiPatchWidth, uiPatchHeight, uiBlkWidth, uiBlkHeight, channelBitDepth );
-  short setId = 0; //record the reference picture.
+#endif
 #if JVET_W0069_TMP_BOUNDARY
-  searchCandidateFromOnePicIntra( pcCU, tarPatch, uiPatchWidth, uiPatchHeight, setId, tempType );
+  searchCandidateFromOnePicIntra( pcCU, tarPatch, uiPatchWidth, uiPatchHeight, tempType );
 #else
-  searchCandidateFromOnePicIntra( pcCU, tarPatch, uiPatchWidth, uiPatchHeight, setId );
+  searchCandidateFromOnePicIntra( pcCU, tarPatch, uiPatchWidth, uiPatchHeight, );
 #endif
 #if !JVET_AD0086_ENHANCED_INTRA_TMP
   //count collected candidate number
@@ -10845,9 +10847,9 @@ void IntraPrediction::candidateSearchIntra( CodingUnit* pcCU, unsigned int uiBlk
 }
 
 #if JVET_W0069_TMP_BOUNDARY
-void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId, RefTemplateType tempType )
+void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, RefTemplateType tempType )
 #else
-void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId )
+void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, )
 #endif
 {
 #if JVET_AD0086_ENHANCED_INTRA_TMP
@@ -10866,7 +10868,6 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   int      pX        = m_tempLibFast.getX();
   int      pY        = m_tempLibFast.getY();
   int      pDiff     = m_tempLibFast.getDiff();
-  short    pId       = m_tempLibFast.getId();
 #endif
   CompArea area      = pcCU->blocks[compID];
   int      refStride = pcCU->cs->picture->getRecoBuf(compID).stride;
@@ -10987,7 +10988,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
         {
           if (diff[temIdx] < pDiff[temIdx])
           {
-            updateCandList(TempLibFast(iXOffset, iYOffset, diff[temIdx], setId, regionId), diff[temIdx],
+            updateCandList(TempLibFast(iXOffset, iYOffset, regionId), diff[temIdx],
                            sparseMtmpCandList[temIdx], sparseMtmpCostList[temIdx], mtmpNumSparse[temIdx]);
             if (sparseMtmpCandList[temIdx].size() == mtmpNumSparse[temIdx])
             {
@@ -11038,7 +11039,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 #endif
         if( diff < (pDiff) )
         {
-          insertNode( diff, iXOffset, iYOffset, pDiff, pX, pY, pId, setId );
+          insertNode( diff, iXOffset, iYOffset, pDiff, pX, pY );
 #if JVET_AB0130_ITMP_SAMPLING
           bestRegionId = regionId;
 #endif
@@ -11089,7 +11090,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 
         if( diff < (pDiff) )
         {
-          insertNode( diff, iXOffset, iYOffset, pDiff, pX, pY, pId, setId );
+          insertNode( diff, iXOffset, iYOffset, pDiff, pX, pY );
 #if JVET_AB0130_ITMP_SAMPLING
           bestRegionId = regionId;
 #endif
@@ -11174,7 +11175,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
             }
             if (diff[temIdx] < pDiff[temIdx])
             {
-              updateCandList(TempLibFast(iXOffset, iYOffset, diff[temIdx], setId, bestRegionId), diff[temIdx],
+              updateCandList(TempLibFast(iXOffset, iYOffset, bestRegionId), diff[temIdx],
                              refineMtmpCandList[temIdx], refineMtmpCostList[temIdx], mtmpNumRefine[temIdx]);
               if (refineMtmpCandList[temIdx].size() == mtmpNumRefine[temIdx])
               {
@@ -11254,7 +11255,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 #endif
             if (diff < (pDiff))
             {
-              insertNode(diff, iXOffset, iYOffset, pDiff, pX, pY, pId, setId);
+              insertNode(diff, iXOffset, iYOffset, pDiff, pX, pY);
             }
           }
         }
@@ -11265,7 +11266,6 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   m_tempLibFast.m_pX    = pX;
   m_tempLibFast.m_pY    = pY;
   m_tempLibFast.m_pDiff = pDiff;
-  m_tempLibFast.m_pId   = pId;
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   pcCU->tmpNumCand = (int) m_mtmpCandList.size();
@@ -11285,10 +11285,6 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
     pcCU->tmpXdisp[i] = pcCU->tmpXdisp[i - pcCU->tmpNumCand];
     pcCU->tmpYdisp[i] = pcCU->tmpYdisp[i - pcCU->tmpNumCand];
     m_mtmpCostList.push_back(m_mtmpCostList[i - pcCU->tmpNumCand]);
-  }
-  if (pcCU->tmpNumCand)
-  {
-    m_tempLibFast.m_pRegionId = m_mtmpCandList[0].m_rId;
   }
 #else 
 #if TMP_FAST_ENC

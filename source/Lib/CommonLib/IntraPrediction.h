@@ -78,32 +78,32 @@ class TempLibFast
 public:
   int   m_pX;           //offset X
   int   m_pY;           //offset Y
-  int   m_pDiff;        //mse
-  short m_pId;          //frame id
-  int   m_diffMax;
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   int   m_rId;
-  int   m_pRegionId;
+#else
+  int   m_pDiff;        //mse
+  int   m_diffMax;
 #endif
 
   TempLibFast();
   ~TempLibFast();
 #if JVET_AD0086_ENHANCED_INTRA_TMP
-  TempLibFast(const int pX, const int pY, const int pDiff, const int pId, const int rId)
+  TempLibFast(const int pX, const int pY, const int rId)
   {
-    m_pX = pX, m_pY = pY, m_pDiff = pDiff, m_pId = pId;
+    m_pX = pX;
+    m_pY = pY;
     m_rId = rId;
   };
-  int   getRegionId() { return m_pRegionId; }
 #endif
 
   void  initTemplateDiff              ( unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int bitDepth );
 
   int   getX                          ()       { return m_pX;      }
   int   getY                          ()       { return m_pY;      }
+#if !JVET_AD0086_ENHANCED_INTRA_TMP
   int   getDiff                       ()       { return m_pDiff;   }
-  short getId                         ()       { return m_pId;     }
   int   getDiffMax                    ()       { return m_diffMax; }
+#endif
 };
 
 typedef short TrainDataType;
@@ -372,10 +372,11 @@ protected:
 #endif
 #if JVET_V0130_INTRA_TMP
   int          m_uiPartLibSize;
-  TempLibFast  m_tempLibFast;
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   static_vector<TempLibFast, MTMP_NUM> m_mtmpCandList;
   static_vector<uint64_t, MTMP_NUM>    m_mtmpCostList;
+#else
+  TempLibFast  m_tempLibFast;
 #endif
   Pel*         m_refPicUsed;
   Picture*     m_refPicBuf;
@@ -823,10 +824,10 @@ public:
 
 #if JVET_W0069_TMP_BOUNDARY
   RefTemplateType getRefTemplateType ( CodingUnit& cu, CompArea& area );
-  void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId, RefTemplateType tempType );
+  void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, RefTemplateType tempType );
   void candidateSearchIntra          ( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType );
 #else
-  void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId );
+  void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, );
   void candidateSearchIntra          ( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
