@@ -2949,7 +2949,7 @@ const WPScalingParam *Slice::getWpScaling(const RefPicList refPicList, const int
 WPScalingParam *Slice::getWpScaling(const RefPicList refPicList, const int refIdx)
 {
   CHECK(refPicList >= NUM_REF_PIC_LIST_01, "Invalid picture reference list");
-  if (refIdx < 0)
+  if( refIdx < 0 || refIdx >= MAX_NUM_REF )
   {
     return nullptr;
   }
